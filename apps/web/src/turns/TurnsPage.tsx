@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from '@tanstack/react-router';
+import { formatYearMonth, personalLogDate } from '../game/gameDate';
 import { PolicyBar } from '../policy/PolicyBar';
 import { useTRPC } from '../trpc';
 import { retryUnlessClientError } from './apiError';
-import { slotTimes } from './schedule';
 import { homePollMs, TurnEditor } from './TurnEditor';
 import styles from './TurnsPage.module.css';
 
@@ -44,7 +44,8 @@ function RecentResults({ worldId }: { worldId: string }) {
       ) : (
         <ol className={styles.logs} data-testid="recent-results">
           {logs.map((log) => {
-            const date = summary.data ? slotTimes(1, summary.data, log.tick, null)[0]?.date : null;
+            const logDate = summary.data ? personalLogDate(log.tick, summary.data) : null;
+            const date = logDate ? formatYearMonth(logDate) : null;
             return (
               <li key={log.id} className={log.kind === 'failure' ? styles.failure : undefined}>
                 <span className={styles.logHead}>

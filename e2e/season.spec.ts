@@ -1,4 +1,4 @@
-import { expect, test, type Browser, type Page } from '@playwright/test';
+import { expect, test, type Browser, type Locator, type Page } from '@playwright/test';
 import { createAccount, withE2eDb } from './account';
 import {
   ApiError,
@@ -102,6 +102,7 @@ async function createGeneral(page: Page, worldId: string, world: Awaited<ReturnT
   expect(await world.loop.advanceTo(stored.clockTick)).toEqual([]);
   const mine = await query<{ general: { id: number } | null }>(page, 'general.mine', { worldId });
   expect(mine.general).not.toBeNull();
+  return mine.general!.id;
 }
 
 async function runToEnd(world: Awaited<ReturnType<typeof seasonWorld>>) {
@@ -125,6 +126,24 @@ async function expectResult(page: Page, worldId: string) {
   await expect(page.getByTestId('next-turn')).toHaveText('종료');
   return result;
 }
+
+// 이 장수의 최신 개인 로그 연월. 시험 DB의 로그 tick을 규칙의 toGameDate로 바꾼다. 로그가 없으면 실패한다.
+async function latestLogDate(world: Awaited<ReturnType<typeof seasonWorld>>, generalId: number) {
+  const latest = await world.hold.db.generalLog.findFirst({
+    where: { worldId: world.worldId, generalId },
+    orderBy: { tick: 'desc' },
+    select: { tick: true },
+  });
+  if (!latest) throw new Error('종료 연도 월드에 이 장수의 개인 로그가 없습니다.');
+  const { toGameDate } = await import('../packages/rules/src/index');
+  const date = toGameDate(world.startYear, latest.tick);
+  return `${date.year}년 ${date.month}월`;
+}
+
+// 메인 개인 기록과 예턴 화면 최근 실행 결과의 줄. 첫 줄의 첫 칸이 연월이다.
+const records = (page: Page) => page.locator('[data-main-area="general-records"] [data-record-kind="general"] li');
+const recentResults = (page: Page) => page.getByTestId('recent-results').locator('li');
+const firstDate = (lines: Locator) => lines.first().locator('span').first();
 
 // 종료 뒤 20초 동안 월드 요약·내 장수·기록 요청이 없어야 한다. 다른 tRPC 요청도 없는지 함께 본다.
 async function expectQuiet(screens: Screen[]) {
@@ -161,7 +180,7 @@ test('실시간 월드를 가속하면 두 화면이 따라오고 종료 연도�
   try {
     const a = await openScreen(browser);
     const b = await openScreen(browser);
-    await createGeneral(a.page, world.worldId, world);
+    const generalId = await createGeneral(a.page, world.worldId, world);
     for (const screen of [a, b]) await screen.page.goto(`/w/${world.worldId}`);
     await expect(a.page.getByTestId('next-turn')).toContainText('다음 턴까지');
     await expect(b.page.getByTestId('next-turn')).toHaveText('내 장수 없음');
@@ -193,10 +212,22 @@ test('실시간 월드를 가속하면 두 화면이 따라오고 종료 연도�
     await expectResult(b.page, world.worldId);
     await expectQuiet([a, b]);
 
+    // 개인 기록 연월은 종료 직후, 새로고침 뒤, 예턴 화면 최근 실행 결과에서 모두 같다 (T1-27 후속).
+    // 경로 이동과 새로고침은 위의 초기 탐색 1회 검사가 끝난 뒤에 한다.
+    const logDate = await latestLogDate(world, generalId);
+    await expect(firstDate(records(a.page))).toHaveText(logDate);
+
     await a.page.screenshot({ path: testInfo.outputPath('season-end-year.png'), fullPage: true });
     await testInfo.attach('season-end-year', { path: testInfo.outputPath('season-end-year.png') });
     await a.page.reload();
     await expectResult(a.page, world.worldId);
+    await expect(firstDate(records(a.page))).toHaveText(logDate);
+
+    const recentHead = new RegExp(`^${logDate} (실행|실패)$`);
+    await a.page.goto(`/w/${world.worldId}/turns`);
+    await expect(firstDate(recentResults(a.page))).toHaveText(recentHead);
+    await a.page.reload();
+    await expect(firstDate(recentResults(a.page))).toHaveText(recentHead);
   } finally {
     await releaseHold(world.hold);
   }

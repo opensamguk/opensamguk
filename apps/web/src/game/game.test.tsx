@@ -4,7 +4,7 @@ import { TRPCClientError } from '@trpc/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DUE_RETRY_DELAYS_MS, formatRemaining, remainingSeconds, useTurnCountdown } from './countdown';
 import { errorCode, retryUnlessClientError } from './errors';
-import { formatYearMonth, tickDate } from './gameDate';
+import { formatYearMonth, personalLogDate, tickDate } from './gameDate';
 import { commandName, officerName } from './names';
 
 afterEach(cleanup);
@@ -108,6 +108,47 @@ describe('기록 연월', () => {
     expect(tickDate(120_000, clock)).toEqual({ year: 192, month: 1 });
     expect(formatYearMonth(tickDate(9_999, clock))).toBe('191년 1월');
     expect(formatYearMonth(null)).toBe('—');
+  });
+
+  // 종료 연도 도달 월드: 시작 연도 300, 한 달 10_000 tick (turnTerm 1분, msPerTick 6), 결정 tick 120_000, 결과 300년 12월.
+  // 국가 기록은 tickDate를 그대로 쓴다. 지금 값이며 개인 로그 수리 뒤에도 같아야 한다.
+  it('국가 기록 연월은 종료 직전과 종료 뒤 요약에서 지금 값을 지킨다', () => {
+    const running = { gameDate: { year: 300, month: 12 }, nowTick: 119_999, msPerTick: 6, turnTermMinutes: 1 };
+    const ended = { gameDate: { year: 300, month: 12 }, nowTick: 120_000, msPerTick: 6, turnTermMinutes: 1 };
+    expect(formatYearMonth(tickDate(110_000, running))).toBe('300년 12월');
+    expect(formatYearMonth(tickDate(110_000, ended))).toBe('300년 11월');
+    expect(formatYearMonth(tickDate(120_000, ended))).toBe('300년 12월');
+  });
+});
+
+describe('개인 로그 연월 (T1-27 후속)', () => {
+  // synthetic 시계다. 한 달 10_000 tick (turnTerm 1분, msPerTick 6). 실제 API나 DB 값이 아니다.
+  const endYear = { startYear: 300, msPerTick: 6, turnTermMinutes: 1 };
+  const unified = { startYear: 191, msPerTick: 6, turnTermMinutes: 1 };
+
+  it('종료 연도 월드의 마지막 로그는 300년 12월이다', () => {
+    expect(formatYearMonth(personalLogDate(119_999, endYear))).toBe('300년 12월');
+  });
+
+  it('달 경계 앞은 앞 달, 경계와 그 뒤는 다음 달이다', () => {
+    expect(formatYearMonth(personalLogDate(109_999, endYear))).toBe('300년 11월');
+    expect(formatYearMonth(personalLogDate(110_000, endYear))).toBe('300년 12월');
+    expect(formatYearMonth(personalLogDate(110_001, endYear))).toBe('300년 12월');
+  });
+
+  it('tick 0은 시작 연도 1월이다', () => {
+    expect(formatYearMonth(personalLogDate(0, endYear))).toBe('300년 1월');
+  });
+
+  it('천하통일 월드는 정산 경계 직전 로그와 월중 로그를 각각 그 tick의 달로 쓴다', () => {
+    expect(formatYearMonth(personalLogDate(19_999, unified))).toBe('191년 2월');
+    expect(formatYearMonth(personalLogDate(25_000, unified))).toBe('191년 3월');
+  });
+
+  it('tick 길이를 셀 수 없는 시계는 연월을 쓰지 않는다', () => {
+    expect(personalLogDate(119_999, { ...endYear, msPerTick: 0 })).toBeNull();
+    expect(personalLogDate(119_999, { ...endYear, turnTermMinutes: 0 })).toBeNull();
+    expect(formatYearMonth(personalLogDate(119_999, { ...endYear, msPerTick: 0 }))).toBe('—');
   });
 });
 
