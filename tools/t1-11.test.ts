@@ -7,7 +7,7 @@ import {
   COMMAND_CATEGORIES,
 } from '../packages/rules/src/index';
 import { commandList } from '../apps/server/src/routers/commands';
-import unitSet from '../resources/unitset/basic.json';
+import monthlyInitial from '../apps/engine/test/fixtures/monthly-initial.json';
 
 const payload = { name: '새장수', leadership: 55, strength: 55, intel: 55, portraitId: null };
 const stat = { total: 165, min: 15, max: 80 };
@@ -62,7 +62,7 @@ describe('T1-11 순수 규칙과 공개 명령', () => {
       monthlyTick: 0,
       tick: 50000,
       cityKeys: [9, 2, 4],
-      unitSet,
+      unitSet: monthlyInitial.initial.unitSet,
     };
     const general = buildCreatedGeneral(input);
     expect(general).toEqual(buildCreatedGeneral({ ...input, cityKeys: [2, 4, 9] }));

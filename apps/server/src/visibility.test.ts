@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import { readFixture } from '../test/readFixture';
+import { visibilityFixture } from '../test/visibilityFixture';
 import {
   cityInfo,
   generalInfo,
@@ -10,9 +10,9 @@ import {
   worldRecordInfo,
 } from './visibility';
 
-let state: Awaited<ReturnType<typeof readFixture>>;
+let state: Awaited<ReturnType<typeof visibilityFixture>>;
 beforeAll(async () => {
-  state = await readFixture();
+  state = await visibilityFixture();
 });
 
 describe('T1-12 / AC-M1-19 공개 범위 표', () => {
