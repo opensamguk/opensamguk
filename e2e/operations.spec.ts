@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
+import type { OperationDetail } from '../apps/web/src/operations/contract';
 import { createAccount, withE2eDb } from './account';
 import { createGeneralByApi, e2eWorld, mutate, query, setTurns, stubPortraits, turns } from './game';
 
@@ -182,5 +183,73 @@ test.describe('국가 작전판', () => {
     await chief.page.goto(`/w/${s.world}`);
     await chief.page.getByRole('link', { name: '감찰' }).click();
     await expect(chief.page.getByTestId('inspection-table')).toBeVisible();
+  });
+
+  // U62-4a대로 출병 tick이 목표 연월 첫 tick보다 작아야 제때이고 같으면 늦음이다. 기준을 0/0/0으로 두어 준비 부족이 아닌 시간 경계만 본다.
+  // 목표 첫 tick은 world.summary 한 응답의 연월과 nowTick으로 따로 셈한다. operation.get 응답에서 기대값을 만들지 않는다.
+  // DB는 이 장수 행의 nextTurnTick 하나만 다음 달 첫 tick으로 옮겨 출병 칸이 목표 첫 tick에 닿게 한다. 출병은 실제 turns.set으로 저장한다.
+  test('출병 칸의 tick이 목표 연월 첫 tick과 같으면 서버와 화면 모두 늦음이다', async ({ browser, page }) => {
+    const s = await setup(page);
+    const chief = await member(browser, s.world, s.ours, 5);
+    const summary = await query<{ gameDate: { year: number; month: number }; nowTick: number }>(
+      chief.page,
+      'world.summary',
+      { worldId: s.world },
+    );
+    const monthOf = (date: { year: number; month: number }) => date.year * 12 + date.month - 1;
+    const ahead = monthOf(s.targetDate) - monthOf(summary.gameDate);
+    expect(ahead).toBeGreaterThan(1);
+    expect(ahead).toBeLessThanOrEqual(30);
+    const firstTick = (Math.floor(summary.nowTick / 10_000) + ahead) * 10_000;
+    const sortieSlot = ahead - 1;
+    const nextTurnTick = firstTick - sortieSlot * 10_000;
+
+    await withE2eDb((db) =>
+      db.general.update({ where: { worldId_id: { worldId: s.world, id: chief.generalId } }, data: { nextTurnTick } }),
+    );
+    const { revision } = await turns(chief.page, s.world);
+    const saved = await mutate<{ ok: boolean }>(chief.page, 'turns.set', {
+      worldId: s.world,
+      revision,
+      slots: Array.from({ length: 30 }, (_, i) =>
+        i === sortieSlot ? { commandKey: 'attack', args: { cityKey: s.target.key } } : null,
+      ),
+    });
+    expect(saved.ok).toBe(true);
+    const { id } = await mutate<{ id: string }>(chief.page, 'operation.create', {
+      worldId: s.world,
+      targetCityKey: s.target.key,
+      targetYear: s.targetDate.year,
+      targetMonth: s.targetDate.month,
+      min: { crew: 0, train: 0, atmos: 0 },
+      memberIds: [chief.generalId],
+    });
+
+    const detail = await query<OperationDetail>(chief.page, 'operation.get', { worldId: s.world, id });
+    expect(detail.targetDate).toEqual(s.targetDate);
+    expect(detail.targetTick).toBe(firstTick);
+    expect(detail.targetTick % 10_000).toBe(0);
+    expect(detail.target.cityKey).toBe(s.target.key);
+    expect(detail.min).toEqual({ crew: 0, train: 0, atmos: 0 });
+    expect(detail.timeline.map((m) => m.generalId)).toEqual([chief.generalId]);
+    const mine = detail.timeline.find((m) => m.generalId === chief.generalId);
+    expect(mine?.cells[0]?.tick).toBe(nextTurnTick);
+    expect(mine?.beyondWindow).toBe(false);
+    expect(mine?.sortie?.slot).toBe(sortieSlot);
+    expect(mine?.sortie?.tick).toBe(firstTick);
+    expect(mine?.sortie?.date).toEqual(s.targetDate);
+    expect(mine?.sortie?.turn.commandKey).toBe('attack');
+    expect(mine?.sortie?.turn.args).toEqual({ cityKey: s.target.key });
+    expect(mine?.cells[sortieSlot - 1]?.tick).toBe(firstTick - 10_000);
+    expect(mine?.verdict).toBe('LATE');
+
+    await chief.page.goto(`/w/${s.world}/operations/${id}`);
+    const timeline = chief.page.getByTestId('operation-timeline');
+    const line = timeline.locator(`tbody tr[data-general-id="${chief.generalId}"]`);
+    await expect(line).toHaveCount(1);
+    await expect(line).toHaveAttribute('data-verdict', 'LATE');
+    await expect(line.locator('td').first()).toBeVisible();
+    await expect(line.locator('td').first()).toContainText('늦음');
+    await expect(line.locator(`td[data-slot="${sortieSlot + 1}"]`)).toContainText('출병');
   });
 });
