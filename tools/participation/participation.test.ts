@@ -1,39 +1,55 @@
-import { spawn } from 'node:child_process';
 import { rm, writeFile, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { tmpdir } from 'node:os';
+import { OwnedChildScope } from '../test-support/owned-child-scope';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { parseNative, parseResult, parseCompletion } from './schema';
 import { syntheticBundle } from './testFixture';
 import { digest, validateBundle } from './validate';
 
-const dirs: string[] = [];
-async function fixture(mode: 'm2' | 'm3' = 'm2') {
-  const f = await syntheticBundle(mode);
-  dirs.push(f.dir);
-  return f;
+let currentScope: OwnedChildScope | undefined;
+beforeEach(() => {
+  const scope = new OwnedChildScope({ label: 'participation', traceDir: process.env.OPENSAMGUK_CHILD_TRACE_DIR });
+  currentScope = scope;
+  return () => {
+    if (currentScope === scope) currentScope = undefined;
+    return scope.close();
+  };
+});
+function requireScope() {
+  if (!currentScope) throw new Error('CHILD_SCOPE_MISSING');
+  return currentScope;
 }
-const runCli = (...args: string[]): Promise<{ status: number | null; stdout: string; stderr: string }> =>
+async function fixture(mode: 'm2' | 'm3' = 'm2', scope = requireScope()) {
+  return scope.fixture(async (register) => {
+    const f = await syntheticBundle(mode);
+    await register(f.dir, { parent: tmpdir(), prefix: 'participation-tool-test-' });
+    return { ...f, scope, runCli: (...args: string[]) => runCli(scope, ...args) };
+  });
+}
+const runCli = (
+  scope: OwnedChildScope,
+  ...args: string[]
+): Promise<{ status: number | null; stdout: string; stderr: string }> =>
   new Promise((resolve) => {
-    const child = spawn(process.execPath, ['--import', 'tsx', 'tools/participation/cli.ts', ...args], {
+    const owned = scope.start(process.execPath, ['--import', 'tsx', 'tools/participation/cli.ts', ...args], {
       stdio: ['ignore', 'pipe', 'pipe'],
       timeout: 20_000,
     });
+    const child = owned.child;
     let stdout = '';
     let stderr = '';
-    child.stdout.setEncoding('utf8').on('data', (chunk: string) => {
+    child.stdout!.setEncoding('utf8').on('data', (chunk: string) => {
       stdout += chunk;
     });
-    child.stderr.setEncoding('utf8').on('data', (chunk: string) => {
+    child.stderr!.setEncoding('utf8').on('data', (chunk: string) => {
       stderr += chunk;
     });
     child.once('error', (error) => {
       stderr += error.message;
     });
-    child.once('close', (status) => resolve({ status, stdout, stderr }));
+    void owned.closed.then(({ code: status }) => resolve({ status, stdout, stderr }));
   });
-afterEach(async () => {
-  await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
-});
 
 describe('T2-18/T3-15 evidence tooling, never product acceptance', () => {
   it.each(['m2', 'm3'] as const)('validates the %s synthetic control but refuses a product PASS', async (mode) => {
@@ -51,8 +67,8 @@ describe('T2-18/T3-15 evidence tooling, never product acceptance', () => {
     const f = await fixture(mode);
     const manifest = await f.save();
     const [result, ordinary] = await Promise.all([
-      runCli('validate', '--manifest', manifest, '--source-sha', f.sourceSHA, '--fixture'),
-      runCli('validate', '--manifest', manifest, '--source-sha', f.sourceSHA),
+      f.runCli('validate', '--manifest', manifest, '--source-sha', f.sourceSHA, '--fixture'),
+      f.runCli('validate', '--manifest', manifest, '--source-sha', f.sourceSHA),
     ]);
     expect(result.status, result.stderr).toBe(0);
     expect(ordinary.status, ordinary.stderr).toBe(1);
@@ -280,7 +296,9 @@ describe('T2-18/T3-15 evidence tooling, never product acceptance', () => {
     const report = await validateBundle(manifest, f.sourceSHA);
     expect(report.productStatus).toBe('NOT_READY');
     expect(report.issues).toContain(code);
-    expect((await runCli('validate', '--manifest', manifest, '--source-sha', f.sourceSHA, '--fixture')).status).toBe(1);
+    expect((await f.runCli('validate', '--manifest', manifest, '--source-sha', f.sourceSHA, '--fixture')).status).toBe(
+      1,
+    );
   });
   it('requires current prerequisites even when all evidence shapes are present', async () => {
     const f = await fixture();
@@ -326,7 +344,7 @@ describe('T2-18/T3-15 evidence tooling, never product acceptance', () => {
       const f = await fixture();
       const manifest = await f.save();
       await writeFile(manifest, JSON.stringify({ ...f.m, [key]: 'private-value-never-echo' }));
-      const result = await runCli('validate', '--manifest', manifest, '--source-sha', f.sourceSHA);
+      const result = await f.runCli('validate', '--manifest', manifest, '--source-sha', f.sourceSHA);
       expect(result.status).toBe(1);
       expect(result.stdout + result.stderr).not.toContain('private-value-never-echo');
       expect(JSON.parse(result.stdout).productStatus).toBe('NOT_READY');
@@ -345,7 +363,7 @@ describe('T2-18/T3-15 evidence tooling, never product acceptance', () => {
     expect((await validateBundle(unsafeManifest, f.sourceSHA)).productStatus).toBe('NOT_READY');
     f.m.events.file = 'actions.jsonl';
     const manifest = await f.save();
-    const other = await fixture();
+    const other = await fixture('m2', f.scope);
     await other.save();
     await rm(join(f.dir, 'actions.jsonl'));
     await symlink(join(other.dir, 'actions.jsonl'), join(f.dir, 'actions.jsonl'));
@@ -366,9 +384,9 @@ describe('T2-18/T3-15 evidence tooling, never product acceptance', () => {
     await writeFile(manifest, JSON.stringify(f.m));
     expect((await validateBundle(manifest, f.sourceSHA)).productStatus).toBe('NOT_READY');
     const [missing, invalid, badProbe] = await Promise.all([
-      runCli('validate', '--manifest', join(f.dir, 'missing.json'), '--source-sha', f.sourceSHA),
-      runCli('invalid'),
-      runCli('probe', '--base-url', 'http://not-loopback.invalid', '--source-sha', f.sourceSHA),
+      f.runCli('validate', '--manifest', join(f.dir, 'missing.json'), '--source-sha', f.sourceSHA),
+      f.runCli('invalid'),
+      f.runCli('probe', '--base-url', 'http://not-loopback.invalid', '--source-sha', f.sourceSHA),
     ]);
     expect(missing.status, missing.stderr).toBe(1);
     expect(invalid.status, invalid.stderr).toBe(2);
