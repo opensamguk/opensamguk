@@ -66,6 +66,9 @@
 | `apps/web/src/pages/WorldPages.tsx` | 직접 주소용 보조 화면: 지도·도시·국가·기록 |
 | `e2e/main.spec.ts`, `e2e/world.ts` | 실제 엔진 월드로 메인 작업 화면 E2E (턴 1분 월드 생성·시작, 시험 계정 장수 붙이기) |
 | `packages/db/prisma/schema.prisma` | DB schema. 생성물은 `packages/db/src/generated/` (Git 제외) |
+| `packages/db/sql/resources-init.sql` | T4-77 생성물. 내장 다섯 자원 1판의 원본 JSON과 `resources/NOTICE.md` 출처를 담은 초기화 SQL이며 손으로 고치지 않는다. DB 적용 초기화 도구의 소스는 준비됐지만 실제 DB 초기화는 검증되지 않았고 공유 script에도 연결되지 않았다. 월드 생성은 지금도 `resources/` 파일을 읽는다 |
+| `tools/resources-sql/convert.ts`, `generate.ts`, `convert.test.ts` | 다섯 자원을 검증해 위 SQL을 만드는 순수 변환·생성기와 단위 시험. 구분자·NUL 거부, S0 `contentHash` 고정, 출처 고지를 본다. DB를 쓰지 않는다 |
+| `tools/init-resources.ts`, `resource-init.integration.test.ts` | T4-77 S2b 준비. 위 SQL을 한 트랜잭션에서 실행하고 같은 트랜잭션에서 S0 해시를 후검증하는 초기화 도구(C4)와 P1~P12·P29 실제 PostgreSQL 시험. 실제 PG 실행은 아직 하지 않았다 |
 | `packages/shared/src/gameDate.ts` | 게임 달력 |
 | `eslint.config.js` | 패키지 경계·결정성 규칙 |
 | `tools/next-task.mjs` | `pnpm next`: 다음 작업과 담당 출력 |
