@@ -153,6 +153,7 @@ function pending(kind = 'treaty.propose', id = 1n): Event {
     payload: { toNationId: 2, clauses: [{ kind: 'peace' }] },
     result: null,
     sequence: null,
+    stepTick: null,
     createdAt: new Date(0),
   } as Event;
 }
