@@ -84,10 +84,14 @@ describe('T4-02 등록된 확장 명령 대조', () => {
   const command = (key: string, target = 'general') => `({ key: '${key}', target: '${target}' })`;
   const actualSupport = () =>
     Object.fromEntries(
-      ['support.ts', '../balance.ts', '../model/clone.ts', 'ext/state.ts'].map((file) => [
-        file,
-        readFileSync(join(root, 'packages/rules/src/commands', file), 'utf8'),
-      ]),
+      [
+        'support.ts',
+        '../balance.ts',
+        '../model/clone.ts',
+        'ext/state.ts',
+        '../personnel/permissions.ts',
+        '../personnel/types.ts',
+      ].map((file) => [file, readFileSync(join(root, 'packages/rules/src/commands', file), 'utf8')]),
     );
   const importWithTsx = (dir: string, expression: string) => {
     const file = pathToFileURL(join(dir, 'packages/rules/src/commands/ext/registry.ts')).href;
@@ -218,6 +222,214 @@ describe('T4-02 등록된 확장 명령 대조', () => {
       );
     },
   );
+
+  it('실제 permissions.ts의 동결 표와 빈 Error 클래스를 실제 import 목록과 대조한다', () => {
+    fixture(
+      stratagemFixture(),
+      (dir) => {
+        const path = join(dir, 'packages/rules/src/personnel/permissions.ts');
+        const url = JSON.stringify(pathToFileURL(path).href);
+        const runtime = importWithTsx(
+          dir,
+          '({registry: extensionCommands.map(({key,target})=>({key,target})),' +
+            'frozen: Object.isFrozen((await import(' +
+            url +
+            ')).NATION_COMMAND_PERMISSIONS),' +
+            'appointable: (await import(' +
+            url +
+            ')).APPOINTABLE_OFFICER_LEVELS})',
+        );
+        expect(runtime.registry).toEqual(extensionCommands.map(({ key, target }) => ({ key, target })));
+        expect(readExtensionRegistryKeys(dir)).toEqual(runtime.registry);
+        expect(runtime.frozen).toBe(true);
+        expect(runtime.appointable).toEqual([11, 10, 9, 8, 7, 6, 5]);
+        expect(readFileSync(path, 'utf8').replaceAll('\r\n', '\n')).toBe(
+          readFileSync(join(root, 'packages/rules/src/personnel/permissions.ts'), 'utf8').replaceAll('\r\n', '\n'),
+        );
+      },
+      join(root, 'packages/rules'),
+    );
+  });
+
+  it('닫힌 동결 표의 별칭·Set·읽기 전용 콜백은 실제 계산과 같다', () => {
+    const source = [
+      "const none = Object.freeze([] as const); const base = Object.freeze(['a','b'] as const);",
+      "const wide = Object.freeze([...base, 'c'] as const);",
+      'export const ROLES = Object.freeze([',
+      'Object.freeze({levels:Object.freeze([2] as const),lead:true,keys:wide}),',
+      'Object.freeze({levels:Object.freeze([1,0] as const),lead:false,keys:base}),',
+      'Object.freeze({levels:Object.freeze([9] as const),lead:false,keys:none})] as const);',
+      'const keys = [...new Set(ROLES.flatMap<string>(role => role.keys))];',
+      'export const TABLE = Object.freeze(Object.fromEntries(keys.map(key => [key,',
+      'Object.freeze(ROLES.filter(role => role.keys.some(item => item === key)).flatMap<number>(role => role.levels))])));',
+      'export const PICKED = Object.freeze(ROLES.filter(role => !role.lead && role.keys.length > 0).flatMap<number>(role => role.levels));',
+      'export function lookup(key: string) { return TABLE[key as keyof typeof TABLE]; }',
+    ].join('\n');
+    fixture(
+      {
+        'ext/definitions.ts': 'export const list = [' + command('fire_attack') + '];',
+        '../../package.json': '{"type":"module"}',
+        'ext/table.ts': source,
+        'ext/registry.ts':
+          "import {lookup} from './table.ts'; export {list as extensionCommands} from './definitions.ts';",
+      },
+      (dir) => {
+        const url = JSON.stringify(pathToFileURL(join(dir, 'packages/rules/src/commands/ext/table.ts')).href);
+        const runtime = importWithTsx(
+          dir,
+          '({registry:extensionCommands, table:(await import(' +
+            url +
+            ')).TABLE, picked:(await import(' +
+            url +
+            ')).PICKED})',
+        );
+        expect(runtime.table).toEqual({ a: [2, 1, 0], b: [2, 1, 0], c: [2] });
+        expect(runtime.picked).toEqual([1, 0]);
+        expect(runtime.registry).toEqual([{ key: 'fire_attack', target: 'general' }]);
+        expect(readExtensionRegistryKeys(dir)).toEqual(runtime.registry);
+      },
+    );
+  });
+
+  it.each([
+    ['중첩 push', 'const t = Object.freeze([list.push(hidden)]);'],
+    ['콜백 push', 'const t = Object.freeze(roles.map(role => list.push(hidden)));'],
+    ['캡처 별칭 변경', 'const target = list; const t = Object.freeze(roles.map(role => target.push(hidden)));'],
+    ['helper 호출', 'const add = () => list.push(hidden); const t = Object.freeze(roles.flatMap(role => add()));'],
+    ['블록 콜백', 'const t = Object.freeze(roles.map(role => { list.push(hidden); return role; }));'],
+    ['접근자', 'const t = Object.freeze([{get keys() { list.push(hidden); return []; }}].flatMap(role => role.keys));'],
+    ['계산 속성', 'const t = Object.freeze({[list.push(hidden)]:1});'],
+    ['모르는 Object 함수', 'const t = Object.freeze(Object.assign(list,{1:hidden}));'],
+    ['모르는 내장 콜백', 'const t = Object.freeze(Array.from(roles,() => list.push(hidden)));'],
+    [
+      'Object 가림',
+      'const Object = {freeze:(value:unknown) => (list.push(hidden),value)}; const t = Object.freeze([]);',
+    ],
+    ['Set 가림', 'function Set(value:unknown) { list.push(hidden); return value; } const t = [...new Set(roles)];'],
+    ['키 형 변환', "const t = Object.fromEntries([[{toString() { list.push(hidden); return 'k'; }},1]]);"],
+    ['클래스 static 블록', 'class Err extends Error {static {list.push(hidden);}}'],
+    ['클래스 static 필드', 'class Err extends Error {static changed = list.push(hidden);}'],
+    ['클래스 계산 키', 'class Err extends Error {[list.push(hidden)]() {}}'],
+    ['상속 식 실행', 'class Err extends (list.push(hidden),Error) {}'],
+  ])('동결 자료 %s의 숨은 등록은 실제로 생기고 정적 도구와 CLI는 거부한다', (name, code) => {
+    const roles =
+      name === 'Object 가림'
+        ? ''
+        : "const roles = Object.freeze([Object.freeze({keys:Object.freeze(['a'] as const)})]);";
+    fixture(
+      {
+        'ext/definitions.ts':
+          'export const list = [' +
+          command('fire_attack') +
+          ']; export const hidden = ' +
+          command('hidden_command') +
+          ';',
+        '../../package.json': '{"type":"module"}',
+        'ext/table.ts': "import {list,hidden} from './definitions.ts'; " + roles + ' export const unused = 0; ' + code,
+        'ext/registry.ts':
+          "import {unused} from './table.ts'; export const dependency = unused; export {list as extensionCommands} from './definitions.ts';",
+      },
+      (dir) => {
+        const runtime = importWithTsx(dir, 'extensionCommands');
+        expect(runtime[0]).toEqual({ key: 'fire_attack', target: 'general' });
+        expect(runtime.length).toBeGreaterThan(1);
+        expect(runtime.slice(1)).toEqual(
+          Array.from({ length: runtime.length - 1 }, () => ({ key: 'hidden_command', target: 'general' })),
+        );
+        expect(() => readExtensionRegistryKeys(dir)).toThrow(/ext[\\/]table\.ts/);
+        emptyLegacyRegistry(dir);
+        const result = main(['--root', dir, '--file', tablePath]);
+        expect(result.code).toBe(1);
+        expect(result.output).toContain('registry를 읽지 못했다: 확장 registry');
+      },
+    );
+  });
+
+  it('실제 permissions.ts 콜백의 숨은 등록을 실제 실행과 대조해 거부한다', () => {
+    const files: Record<string, string> = {
+      ...actualSupport(),
+      'ext/definitions.ts':
+        'export const list = [' +
+        command('fire_attack') +
+        ']; export const hidden = ' +
+        command('hidden_command') +
+        ';',
+      'ext/registry.ts':
+        "import {defineCommand} from '../support.ts'; export const dependency = defineCommand; export {list as extensionCommands} from './definitions.ts';",
+    };
+    files['../personnel/permissions.ts'] =
+      "import {list,hidden} from '../commands/ext/definitions.ts';\n" +
+      files['../personnel/permissions.ts'] +
+      '\nconst changed = Object.freeze(OFFICER_ROLES.map(role => list.push(hidden)));\n';
+    fixture(
+      files,
+      (dir) => {
+        const runtime = importWithTsx(dir, 'extensionCommands');
+        expect(runtime[0]).toEqual({ key: 'fire_attack', target: 'general' });
+        expect(runtime.length).toBeGreaterThan(1);
+        expect(runtime.slice(1)).toEqual(
+          Array.from({ length: runtime.length - 1 }, () => ({ key: 'hidden_command', target: 'general' })),
+        );
+        expect(() => readExtensionRegistryKeys(dir)).toThrow(/personnel[\\/]permissions\.ts/);
+        emptyLegacyRegistry(dir);
+        const result = main(['--root', dir, '--file', tablePath]);
+        expect(result.code).toBe(1);
+        expect(result.output).toContain('permissions.ts');
+      },
+      join(root, 'packages/rules'),
+    );
+  });
+
+  it.each([
+    ['구조 분해 콜백', 'const t = roles.map(({keys}) => keys);'],
+    ['콜백 기본값', 'const t = roles.map((role = roles) => role);'],
+    ['콜백 나머지', 'const t = roles.map((...role) => role);'],
+    ['콜백 매개변수 둘', 'const t = roles.map((role,index) => index);'],
+    ['function 콜백', 'const t = roles.map(function(role) {return role;});'],
+    ['async 콜백', 'const t = roles.map(async role => role);'],
+    ['매개변수 Object 가림', 'const t = roles.map(Object => Object.freeze([]));'],
+    ['import Object 가림', 'const t = Object.freeze([]);'],
+    ['상속 속성', 'const t = roles.map(role => role.constructor);'],
+    ['__proto__ 키', 'const t = Object.freeze({__proto__:roles});'],
+    ['배열 원소 접근', 'const t = roles.map(role => role.keys[0]);'],
+    ['배열 메서드 값', 'const t = roles.map(role => role.keys.at);'],
+    ['모르는 배열 메서드', 'const t = roles.find(role => role);'],
+    ['optional 수신자', 'const t = roles?.map(role => role);'],
+    ['optional 호출', 'const t = roles.map?.(role => role);'],
+    ['객체 비교', 'const t = roles.filter(role => role.keys === role.keys);'],
+    ['숫자 아닌 비교', 'const t = roles.filter(role => role.keys > 0);'],
+    ['모르는 연산자', 'const t = roles.filter(role => role.n == 1);'],
+    ['함수 값 자료', 'const t = Object.freeze([() => 1]);'],
+    ['배열 빈칸', "const t = Object.freeze([,'a']);"],
+    ['인자 spread', 'const t = Object.freeze(...[roles]);'],
+    ['globalThis 경유', 'const t = globalThis.Object.freeze([]);'],
+    ['순환', 'const a = Object.freeze([...b]); const b = Object.freeze([...a]);'],
+    ['let 별칭', "let data = ['a']; const t = Object.freeze(data.map(item => item));"],
+    ['실행 안 된 콜백', 'const t = Object.freeze([].map(item => item));'],
+    ['실행 안 된 조건 오른쪽', 'const t = roles.filter(role => false && role.keys.at);'],
+    ['닫힌 자료의 zod', "import {z} from 'zod'; const t = Object.freeze([z.string()]);"],
+    ['Set 객체 동일성', 'const a = {}; const t = Object.freeze([...new Set([a,a])]);'],
+    ['Error 가림', 'function Error() {} class Err extends Error {}'],
+    ['상속 함수 호출', 'const make = () => Error; class Err extends make() {}'],
+    ['decorator', 'const dec = (value:unknown) => value; @dec class Err extends Error {}'],
+    ['default 클래스', 'export default class extends Error {}'],
+  ])('닫힌 자료의 지원 밖 %s은 실패한다', (name, source) => {
+    const imports =
+      name === 'import Object 가림'
+        ? "import {tools as Object} from './hooks.ts';"
+        : "import {tools} from './hooks.ts';";
+    fixture(
+      {
+        'ext/hooks.ts': 'export const tools = {freeze:(value:unknown) => value};',
+        'ext/registry.ts':
+          imports +
+          "const roles = Object.freeze([Object.freeze({keys:Object.freeze(['a'] as const),n:1})]);" +
+          source +
+          ' export const extensionCommands = [];',
+      },
+      (dir) => expect(() => readExtensionRegistryKeys(dir)).toThrow('확장 registry'),
+    );
+  });
 
   it('운영 확장 목록의 key·target이 실제 extensionCommands와 순서까지 같다', () => {
     expect(readExtensionRegistryKeys(root)).toEqual(extensionCommands.map(({ key, target }) => ({ key, target })));
