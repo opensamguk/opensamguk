@@ -146,6 +146,18 @@ export const publicNationDisplaySelect = {
   color: true,
 } as const satisfies Prisma.NationSelect;
 
+export const publicTimelapseCitySelect = {
+  cityKey: true,
+  name: true,
+  x: true,
+  y: true,
+  connections: true,
+} as const satisfies Prisma.CitySelect;
+
+export function publicTimelapseCityInfo(city: Prisma.CityGetPayload<{ select: typeof publicTimelapseCitySelect }>) {
+  return { cityKey: city.cityKey, name: city.name, x: city.x, y: city.y, connections: city.connections };
+}
+
 const publicMapData = z.object({
   cities: z.array(
     z.object({

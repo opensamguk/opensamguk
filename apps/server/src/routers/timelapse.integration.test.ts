@@ -477,3 +477,338 @@ describe('T4-35 / AC-P2-17 실제 TCP HTTP·PostgreSQL 영토 스냅샷', () => 
     }
   });
 });
+
+type PublicFrames = inferRouterOutputs<AppRouter>['timelapse']['publicFrames'];
+
+async function publicQuery(input: unknown, cookie: string | null = null, method = 'GET') {
+  const encoded = JSON.stringify({ 0: input });
+  const response = await fetch(`${base}/trpc/timelapse.publicFrames?batch=1&input=${encodeURIComponent(encoded)}`, {
+    method,
+    headers: {
+      origin: 'http://127.0.0.1:5173',
+      ...(cookie ? { cookie } : {}),
+      ...(method === 'POST' ? { 'content-type': 'application/json' } : {}),
+    },
+    ...(method === 'POST' ? { body: encoded } : {}),
+  });
+  type Envelope = {
+    result?: { data: PublicFrames };
+    error?: { message: string; data: { code: string; reason: null } };
+  };
+  const payload = (await response.json()) as Envelope | Envelope[];
+  const body = Array.isArray(payload) ? payload[0]! : payload;
+  return {
+    status: response.status,
+    data: body.result?.data,
+    error: body.error?.data.code,
+    message: body.error?.message,
+    reason: body.error?.data.reason,
+    hasResult: Object.hasOwn(body, 'result'),
+    raw: JSON.stringify(body),
+  };
+}
+
+async function endedFixture(label: string, count: number) {
+  const id = await fixtureWorld(label, count);
+  await db.world.update({ where: { id }, data: { status: 'ENDED' } });
+  await db.worldResult.create({
+    data: {
+      worldId: id,
+      reason: 'END_YEAR',
+      endedYear: 194,
+      endedMonth: 2,
+      endedTick: 360000,
+      endedSequence: count,
+      remainingNations: 2,
+      finalStateHash: 'private-result-hash',
+      endedAt: new Date(now),
+    },
+  });
+  return id;
+}
+
+function expectPublicKeys(data: PublicFrames) {
+  expect(Object.keys(data).sort()).toEqual(['items', 'map', 'nextCursor', 'world']);
+  expect(Object.keys(data.world).sort()).toEqual(['endedMonth', 'endedYear', 'name']);
+  if (data.map) {
+    expect(Object.keys(data.map)).toEqual(['cities']);
+    for (const city of data.map.cities)
+      expect(Object.keys(city).sort()).toEqual(['cityKey', 'connections', 'name', 'x', 'y']);
+  }
+  for (const frame of data.items) {
+    expect(Object.keys(frame).sort()).toEqual(['cities', 'month', 'nations', 'tick', 'year']);
+    for (const city of frame.cities) expect(Object.keys(city).sort()).toEqual(['cityKey', 'nationId']);
+    for (const nation of frame.nations) expect(Object.keys(nation).sort()).toEqual(['color', 'id', 'name']);
+  }
+  const forbidden = new Set([
+    'gold',
+    'rice',
+    'power',
+    'generals',
+    'population',
+    'currentNations',
+    'level',
+    'supplied',
+    'private',
+    'token',
+    'generalId',
+    'userId',
+    'stateHash',
+    'initialStateHash',
+    'sequence',
+  ]);
+  const visit = (value: unknown) => {
+    if (Array.isArray(value)) {
+      for (const item of value) visit(item);
+      return;
+    }
+    if (value === null || typeof value !== 'object') return;
+    for (const [key, nested] of Object.entries(value)) {
+      expect(forbidden.has(key)).toBe(false);
+      visit(nested);
+    }
+  };
+  visit(data);
+}
+
+describe('T4-91 / AC-P2-17 종료 월드 무인증 실제 TCP HTTP·PostgreSQL', () => {
+  it('P1 종료 월드 첫 페이지는 저장 프레임과 다섯 칸 지도만 반환한다', async () => {
+    const id = await endedFixture('public-primary', 35);
+    const result = await publicQuery({ worldId: id });
+    const member = await query({ worldId: id });
+    expect(result.status).toBe(200);
+    expect(result.data!.world).toEqual({ name: 'public-primary', endedYear: 194, endedMonth: 2 });
+    expect(result.data!.items).toEqual(member.data!.items);
+    expect(result.data!.nextCursor).toBe(member.data!.nextCursor);
+    expect(result.data!.map!.cities).toEqual(
+      state.cities
+        .map(({ cityKey, name, x, y, connections }) => ({
+          cityKey,
+          name,
+          x,
+          y,
+          connections,
+        }))
+        .sort((a, b) => a.cityKey - b.cityKey),
+    );
+    expect(result.data!.map!.cities).toHaveLength(94);
+    expectPublicKeys(result.data!);
+  });
+
+  it('P2 종료 전 월드는 무인증·로그인·제재 세션 모두 자료 없이 거부한다', async () => {
+    await db.user.update({ where: { id: users[2]!.id }, data: { status: 'SANCTIONED' } });
+    try {
+      for (const status of ['PREOPEN', 'RUNNING', 'PAUSED'] as const) {
+        const id = await fixtureWorld(`denied-${status}`, 1);
+        await db.world.update({ where: { id }, data: { status } });
+        for (const cookie of [null, users[0]!.cookie, users[2]!.cookie]) {
+          const result = await publicQuery({ worldId: id }, cookie);
+          expect([result.status, result.error, result.message, result.hasResult, result.reason]).toEqual([
+            403,
+            'FORBIDDEN',
+            '종료된 월드만 로그인 없이 볼 수 있습니다.',
+            false,
+            null,
+          ]);
+          expect(result.data).toBeUndefined();
+          for (const secret of [
+            `denied-${status}`,
+            '191',
+            savedDisplay(`denied-${status}`, 0, 1).name,
+            state.cities[0]!.name,
+          ]) {
+            expect(result.raw).not.toContain(secret);
+          }
+        }
+      }
+    } finally {
+      await db.user.update({ where: { id: users[2]!.id }, data: { status: 'ACTIVE' } });
+    }
+  });
+
+  it('P3 없는 월드는 404이고 다른 월드의 저장 프레임은 섞이지 않는다', async () => {
+    const missing = await publicQuery({ worldId: randomUUID() });
+    expect([missing.status, missing.error, missing.hasResult]).toEqual([404, 'NOT_FOUND', false]);
+    const a = await endedFixture('public-a', 1);
+    const b = await endedFixture('public-b', 1);
+    const first = (await publicQuery({ worldId: a })).data!;
+    const second = (await publicQuery({ worldId: b })).data!;
+    expect(first.world.name).toBe('public-a');
+    expect(second.world.name).toBe('public-b');
+    for (const frame of first.items)
+      expect(frame.nations.every(({ name }) => name.startsWith('public-a-past-'))).toBe(true);
+    for (const frame of second.items)
+      expect(frame.nations.every(({ name }) => name.startsWith('public-b-past-'))).toBe(true);
+    expect(JSON.stringify(first)).not.toContain('public-b');
+  });
+
+  it('P4 모든 깊이의 응답 key와 비밀값을 허용 목록으로 제한한다', async () => {
+    const id = await endedFixture('public-keys', 35);
+    for (const input of [{ worldId: id }, { worldId: id, cursor: '300000' }]) {
+      const result = await publicQuery(input);
+      expect(result.status).toBe(200);
+      expectPublicKeys(result.data!);
+      for (const marker of [
+        'private-city-token',
+        'private-snapshot-token',
+        'private-state-hash',
+        'private-initial-hash',
+        'private-result-hash',
+      ]) {
+        expect(result.raw).not.toContain(marker);
+      }
+    }
+  });
+
+  it('P5 30행 페이지·마지막 페이지·정확히 30행·빈 종료 월드를 처리한다', async () => {
+    const id = await endedFixture('public-pages', 35);
+    const first = (await publicQuery({ worldId: id })).data!;
+    const second = (await publicQuery({ worldId: id, cursor: first.nextCursor })).data!;
+    expect(first.items).toHaveLength(30);
+    expect(first.nextCursor).toBe('300000');
+    expect(second.items).toHaveLength(5);
+    expect(second.map).toBeNull();
+    expect(second.nextCursor).toBeNull();
+    expect([...first.items, ...second.items].map(({ tick }) => tick)).toEqual(
+      Array.from({ length: 35 }, (_, index) => (index + 1) * 10000),
+    );
+    const member = (await query({ worldId: id, cursor: '300000' })).data!;
+    expect(second.items).toEqual(member.items);
+    expect(second.nextCursor).toBe(member.nextCursor);
+    const exact = await endedFixture('public-exact', 30);
+    expect((await publicQuery({ worldId: exact })).data!.nextCursor).toBeNull();
+    const empty = await endedFixture('public-empty', 0);
+    const noFrames = (await publicQuery({ worldId: empty })).data!;
+    expect(noFrames.items).toEqual([]);
+    expect(noFrames.nextCursor).toBeNull();
+    expect(noFrames.map!.cities).toHaveLength(94);
+  });
+
+  it('P6 현재 국가와 삭제 직전 표시값 대신 프레임에 저장된 이름·색만 반환한다', async () => {
+    const label = 'public-history';
+    const id = await endedFixture(label, 35);
+    expect(await db.nation.count({ where: { worldId: id, id: 3 } })).toBe(0);
+    await db.nation.updateMany({ where: { worldId: id }, data: { name: '현재만 있는 이름', color: '#ffffff' } });
+    await db.removedNation.create({
+      data: {
+        worldId: id,
+        nationId: 3,
+        name: '삭제 직전 이름-public',
+        color: '#abcdef',
+        removedSequence: 100,
+        removedTick: 360000,
+      },
+    });
+    const first = (await publicQuery({ worldId: id })).data!;
+    expect(first.items[0]!.nations.find(({ id }) => id === 2)).toEqual(savedDisplay(label, 0, 2));
+    expect(first.items[1]!.nations.find(({ id }) => id === 2)).toEqual(savedDisplay(label, 1, 2));
+    const second = (await publicQuery({ worldId: id, cursor: '300000' })).data!;
+    for (const [index, frame] of second.items.entries())
+      expect(frame.nations.find(({ id }) => id === 3)).toEqual(savedDisplay(label, index + 30, 3));
+    for (const data of [first, second]) {
+      expect(JSON.stringify(data)).not.toContain('현재만 있는 이름');
+      expect(JSON.stringify(data)).not.toContain('삭제 직전 이름-public');
+    }
+  });
+
+  it('P7 저장 국가가 없는 달은 현재 국가나 회색으로 채우지 않는다', async () => {
+    const id = await endedFixture('public-missing', 2);
+    await db.yearbookNation.delete({ where: { worldId_tick_nationId: { worldId: id, tick: 10000, nationId: 2 } } });
+    let data = (await publicQuery({ worldId: id })).data!;
+    expect(data.items[0]!.cities.some(({ nationId }) => nationId === 2)).toBe(true);
+    expect(data.items[0]!.nations).toEqual([savedDisplay('public-missing', 0, 1)]);
+    await db.yearbookNation.deleteMany({ where: { worldId: id } });
+    data = (await publicQuery({ worldId: id })).data!;
+    expect(data.items.every(({ nations }) => nations.length === 0)).toBe(true);
+    expect(await db.nation.count({ where: { worldId: id } })).toBe(2);
+  });
+
+  it('P8 actor 주입·추가 입력·잘못된 월드·cursor·POST를 거부한다', async () => {
+    const id = await endedFixture('public-invalid', 1);
+    const invalid: unknown[] = [null, [], {}, { worldId: 'not-uuid' }, { worldId: 12 }];
+    for (const key of ['userId', 'generalId', 'actorId', 'nationId', 'limit', 'order', 'fromTick'])
+      invalid.push({ worldId: id, [key]: 1 });
+    for (const cursor of ['', '-1', '01', '1.5', '2147483648', '1e3', 1, null, {}, '9'.repeat(1000)])
+      invalid.push({ worldId: id, cursor });
+    const before = await gameSnapshot();
+    for (const input of invalid) {
+      const result = await publicQuery(input);
+      expect([result.status, result.error, result.hasResult]).toEqual([400, 'BAD_REQUEST', false]);
+    }
+    expect((await publicQuery({ worldId: id }, null, 'POST')).status).toBe(405);
+    expect(await gameSnapshot()).toBe(before);
+  });
+
+  it('P9 종료 결과 누락과 깨진 저장 JSON은 가린 500이고 프레임을 내지 않는다', async () => {
+    const noResult = await fixtureWorld('public-no-result', 1);
+    await db.world.update({ where: { id: noResult }, data: { status: 'ENDED' } });
+    const missing = await publicQuery({ worldId: noResult });
+    expect([missing.status, missing.error, missing.message, missing.hasResult, missing.reason]).toEqual([
+      500,
+      'INTERNAL_SERVER_ERROR',
+      '요청을 처리하지 못했습니다.',
+      false,
+      null,
+    ]);
+    const id = await endedFixture('public-malformed', 31);
+    const malformed: Prisma.InputJsonValue = { private: 'private-malformed-value' };
+    await db.yearbookSnapshot.update({
+      where: { worldId_tick: { worldId: id, tick: 310000 } },
+      data: { data: malformed },
+    });
+    const first = await publicQuery({ worldId: id });
+    expect(first.status).toBe(200);
+    expect(first.data!.items).toHaveLength(30);
+    const second = await publicQuery({ worldId: id, cursor: first.data!.nextCursor });
+    expect([second.status, second.error, second.message, second.hasResult]).toEqual([
+      500,
+      'INTERNAL_SERVER_ERROR',
+      '요청을 처리하지 못했습니다.',
+      false,
+    ]);
+    expect(second.raw).not.toContain('private-malformed-value');
+    await db.yearbookSnapshot.update({
+      where: { worldId_tick: { worldId: id, tick: 10000 } },
+      data: { data: malformed },
+    });
+    expect((await publicQuery({ worldId: id })).status).toBe(500);
+  });
+
+  it('P10 성공·거부 조회가 게임 상태와 입력·기록·예턴을 바꾸지 않는다', async () => {
+    const id = await endedFixture('public-read-only', 35);
+    const running = await fixtureWorld('public-read-only-running', 1);
+    const before = await gameSnapshot();
+    for (const cookie of [null, users[0]!.cookie]) {
+      await publicQuery({ worldId: id }, cookie);
+      await publicQuery({ worldId: id, cursor: '300000' }, cookie);
+      await publicQuery({ worldId: running }, cookie);
+      await publicQuery({ worldId: id, userId: users[1]!.id }, cookie);
+      await publicQuery({ worldId: randomUUID() }, cookie);
+    }
+    expect(await gameSnapshot()).toBe(before);
+  });
+
+  it('P11 무인증·위조·만료·제재·탈퇴·로그인 세션의 종료 응답이 같다', async () => {
+    const id = await endedFixture('public-sessions', 1);
+    const expired = newSession(now - 31 * 24 * 60 * 60 * 1000);
+    await db.session.create({ data: { id: expired.id, userId: users[0]!.id, expiresAt: expired.expiresAt } });
+    await db.user.update({ where: { id: users[2]!.id }, data: { status: 'SANCTIONED' } });
+    await db.user.update({ where: { id: users[3]!.id }, data: { status: 'WITHDRAWN' } });
+    try {
+      const expected = await publicQuery({ worldId: id });
+      expect(expected.status).toBe(200);
+      for (const cookie of [
+        null,
+        'sid=forged',
+        `sid=${expired.token}`,
+        users[2]!.cookie,
+        users[3]!.cookie,
+        users[0]!.cookie,
+      ]) {
+        expect(await publicQuery({ worldId: id }, cookie)).toEqual(expected);
+      }
+    } finally {
+      await db.user.updateMany({ where: { id: { in: [users[2]!.id, users[3]!.id] } }, data: { status: 'ACTIVE' } });
+    }
+  });
+});

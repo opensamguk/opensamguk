@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { timelapseFrameInfo } from '../visibility';
+import { publicTimelapseCityInfo, publicTimelapseCitySelect, timelapseFrameInfo } from '../visibility';
 
 describe('T4-35 / AC-P2-17 월간 도시 소유 공개 투영', () => {
   it('U1 국가 자원과 중첩 비밀값을 버리고 도시 소유만 남긴다', () => {
@@ -39,4 +39,21 @@ describe('T4-35 / AC-P2-17 월간 도시 소유 공개 투영', () => {
   ])('U3 잘못 저장된 도시 소유는 거부한다: %j', (data) => {
     expect(() => timelapseFrameInfo(data)).toThrow();
   });
+});
+
+it('U4 종료 월드 공개 지도는 도시 다섯 칸만 남긴다', () => {
+  const city = {
+    cityKey: 1,
+    name: '공개 도시',
+    x: 12,
+    y: 34,
+    connections: [2, 3],
+    nationId: 2,
+    level: 7,
+    supplied: true,
+    population: 9999,
+    private: { token: 'private-city-token' },
+  };
+  expect(publicTimelapseCitySelect).toEqual({ cityKey: true, name: true, x: true, y: true, connections: true });
+  expect(publicTimelapseCityInfo(city)).toEqual({ cityKey: 1, name: '공개 도시', x: 12, y: 34, connections: [2, 3] });
 });
