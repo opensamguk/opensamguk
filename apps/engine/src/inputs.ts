@@ -39,7 +39,9 @@ export async function processPendingInput(
   });
   if (!event) return false;
   if (Object.hasOwn(TREATY_INPUTS, event.kind)) {
-    if (selectWorldCapabilities(world).kind !== 'caps') throw new Error('조약을 끈 월드의 조약 입력입니다.');
+    const capabilities = selectWorldCapabilities(world);
+    if (capabilities.kind !== 'caps' || !('treaty' in capabilities.selection))
+      throw new Error('조약을 끈 월드의 조약 입력입니다.');
     await processTreatyInput(tx, world, event, tick);
     return true;
   }

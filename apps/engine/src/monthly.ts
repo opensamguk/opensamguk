@@ -65,7 +65,8 @@ export async function persistMonthly(
   const capabilities = selectWorldCapabilities(await tx.world.findUniqueOrThrow({ where: { id: worldId } }));
   const date = monthlyDate(before.startYear, tick);
   const result = runMonthly(before, tick, rngFor(seed, 'monthly', date.year, date.month));
-  const next = capabilities.kind === 'caps' ? settleTreaties(result.state, tick) : result.state;
+  const treatyEnabled = capabilities.kind === 'caps' && 'treaty' in capabilities.selection;
+  const next = treatyEnabled ? settleTreaties(result.state, tick) : result.state;
   // 모든 변경은 같은 리스·월드 잠금을 잡은 트랜잭션 안에서 최종값으로 쓴다.
   for (const city of Object.values(next.cities)) {
     const old = before.cities[city.cityKey]!;
@@ -86,7 +87,7 @@ export async function persistMonthly(
   await tx.diplomacy.deleteMany({ where: { worldId } });
   await tx.diplomacy.createMany({ data: next.diplomacies.map((entry) => ({ ...entry, worldId })) });
   await persistExt(tx, worldId, before.ext, next.ext);
-  if (capabilities.kind === 'caps') await persistTreatyClosures(tx, worldId, before, next, { tick, sequence });
+  if (treatyEnabled) await persistTreatyClosures(tx, worldId, before, next, { tick, sequence });
   await tx.world.update({ where: { id: worldId }, data: { monthlyTick: tick } });
   const snapshot = await loadReplayState(tx, worldId);
   await tx.yearbookSnapshot.create({

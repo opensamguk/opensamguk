@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { createCommandResolver, type EnabledCommands } from './commands/resolve';
+import { extSliceKeys } from './commands/ext/state';
 import { TREATY_INPUTS, applyTreatyInput, settleTreaties, validateTreatyRecord } from './diplomacy/treaty';
 import { isPolicyMode } from './policy';
 import {
@@ -18,6 +20,7 @@ import {
   type ReplayState,
 } from './replay';
 import type { WorldInit } from './world/bootstrap';
+import { parsePreset, presetCommands, presetRules, type WorldPreset } from './world/preset';
 import type { UnitSetResource } from './world/resources';
 
 export const ORIGIN_CAPS = 6 as const;
@@ -36,10 +39,16 @@ export interface CapsOrigin {
   resourceHash: string;
   capabilities: CapabilityDescriptor;
 }
-export interface CapabilitySelection {
-  treaty: { version: 1 };
-  policy: PolicyFormat | null;
+export interface ExtDescriptorV1 {
+  version: 1;
+  commands: EnabledCommands;
+  preset: WorldPreset;
+  resources: Record<string, never>;
+  sliceKeys: [];
 }
+export type CapabilitySelection =
+  | { treaty: { version: 1 }; policy: PolicyFormat | null }
+  | { ext: ExtDescriptorV1; policy: PolicyFormat & { fromSequence: 0 } };
 type CapsOwner = 'common' | 'policy' | 'treaty';
 export const CAPS_INPUT_OWNERS: Readonly<Record<string, CapsOwner>> = Object.freeze({
   'turns.set': 'common',
@@ -75,7 +84,46 @@ const originSchema = z.strictObject({
   resourceHash: z.string(),
   capabilities: descriptorSchema,
 });
-const selectionSchema = z.strictObject({ treaty: treatyDescriptor, policy: policyFormatSchema.nullable() });
+function sameCanonical(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  if (Array.isArray(left) && Array.isArray(right))
+    return left.length === right.length && left.every((entry, index) => sameCanonical(entry, right[index]));
+  if (!isPlainObject(left) || !isPlainObject(right)) return false;
+  const keys = Object.keys(left).sort();
+  const otherKeys = Object.keys(right).sort();
+  return (
+    keys.length === otherKeys.length &&
+    keys.every((key, index) => key === otherKeys[index] && sameCanonical(left[key], right[key]))
+  );
+}
+const STATELESS_STRATAGEMS = ['fire_attack', 'incite', 'plunder', 'sabotage'] as const;
+const extDescriptor = z
+  .strictObject({
+    version: z.literal(1),
+    commands: z.strictObject({ general: z.array(z.enum(STATELESS_STRATAGEMS)).min(1), nation: z.array(z.never()) }),
+    preset: plainObject,
+    resources: z.strictObject({}),
+    sliceKeys: z.array(z.never()),
+  })
+  .transform((ext, context): ExtDescriptorV1 => {
+    try {
+      if (ext.commands.general.some((key, index, keys) => index > 0 && keys[index - 1]! >= key))
+        throw new Error('확장 명령 순서를 확인하세요.');
+      createCommandResolver(ext.commands);
+      if (!sameCanonical(extSliceKeys(ext.commands), ext.sliceKeys)) throw new Error('확장 상태 조각이 다릅니다.');
+      const preset = parsePreset(ext.preset);
+      if (!sameCanonical(preset, ext.preset) || !sameCanonical(presetCommands(preset), ext.commands))
+        throw new Error('확장 명령과 프리셋이 다릅니다.');
+      return { ...ext, preset, sliceKeys: [] };
+    } catch {
+      context.addIssue({ code: 'custom', message: '확장 기능의 명령과 프리셋을 확인하세요.' });
+      return z.NEVER;
+    }
+  });
+const selectionSchema = z.union([
+  z.strictObject({ treaty: treatyDescriptor, policy: policyFormatSchema.nullable() }),
+  z.strictObject({ ext: extDescriptor, policy: policyFormatSchema.extend({ fromSequence: z.literal(0) }) }),
+]);
 const sequenceSchema = z.number().int().min(1).max(2_147_483_647);
 
 // 해시를 대조하는 앱 adapter가 전체 initial과 archive 외피를 검사한다.
@@ -88,9 +136,10 @@ export function parseCapsOrigin(value: unknown): CapsOrigin {
   return structuredClone(value) as unknown as CapsOrigin;
 }
 
-const SUPPORTED_COMBINATIONS = [['treaty']] as const;
+const SUPPORTED_COMBINATIONS = [['ext'], ['treaty']] as const;
 
-function supportedCapabilityBase(descriptor: CapabilityDescriptor): Pick<CapabilitySelection, 'treaty'> {
+function supportedCapabilityBase(origin: CapsOrigin): { treaty: { version: 1 } } | { ext: ExtDescriptorV1 } {
+  const descriptor = origin.capabilities;
   const features = (['treaty', 'ext', 'personnel'] as const).filter((key) => Object.hasOwn(descriptor, key)).sort();
   if (
     !SUPPORTED_COMBINATIONS.some(
@@ -99,12 +148,18 @@ function supportedCapabilityBase(descriptor: CapabilityDescriptor): Pick<Capabil
     )
   )
     throw new Error('아직 재생할 수 없는 기능 조합입니다.');
-  return { treaty: treatyDescriptor.parse(descriptor.treaty) };
+  if (Object.hasOwn(descriptor, 'treaty')) return { treaty: treatyDescriptor.parse(descriptor.treaty) };
+  const result = extDescriptor.safeParse(descriptor.ext);
+  if (!result.success) throw new Error('아직 재생할 수 없는 기능 조합입니다.');
+  const ext = result.data;
+  if (!sameCanonical(origin.initial.presetRules, presetRules(ext.preset)))
+    throw new Error('확장 프리셋과 초기 규칙이 다릅니다.');
+  return { ext };
 }
 
 export function selectSupportedCapabilities(origin: CapsOrigin, config: unknown): CapabilitySelection {
   const parsed = parseCapsOrigin(origin);
-  const supported = supportedCapabilityBase(parsed.capabilities);
+  const supported = supportedCapabilityBase(parsed);
   const options = z
     .strictObject({
       endYear: z.number().int().min(parsed.initial.startYear).max(10000).nullable(),
@@ -112,7 +167,7 @@ export function selectSupportedCapabilities(origin: CapsOrigin, config: unknown)
       policy: policyFormatSchema.optional(),
     })
     .parse(config);
-  return { ...supported, policy: options.policy ?? null };
+  return selectionSchema.parse({ ...supported, policy: options.policy ?? null });
 }
 
 export function capsResourceHashInput(origin: CapsOrigin): Readonly<Record<string, unknown>> {
@@ -147,6 +202,7 @@ export function validateCapsRecordedInput(
     throw new Error('방침 전환 표지의 순서를 확인하세요.');
   let input: RecordedInput;
   if (owner === 'treaty') {
+    if (!('treaty' in selection)) throw new Error('조약을 끈 월드의 조약 입력입니다.');
     input = validateTreatyRecord(value, {
       treaty: selection.treaty,
       monthlyTick: ctx.monthlyTick,
@@ -156,16 +212,24 @@ export function validateCapsRecordedInput(
     validatePolicyRecordedInput(value, modern);
     input = structuredClone(value);
   }
+  if ('ext' in selection && input.kind === 'turns.set' && input.status === 'APPLIED') {
+    const resolver = createCommandResolver(selection.ext.commands);
+    const { turns } = input.payload as { turns: { commandKey: string }[] };
+    if (turns.some((turn) => resolver.get(turn.commandKey)?.target !== 'general'))
+      throw new Error('이 월드에서 쓸 수 없는 예턴 명령입니다.');
+  }
   if (ctx.endTick !== undefined && input.status !== 'REJECTED') throw new Error('종료 뒤 적용된 입력 기록입니다.');
   return input;
 }
 
 export function startCapsReplay(origin: CapsOrigin, selection: CapabilitySelection): ReplayState {
   const parsed = parseCapsOrigin(origin);
-  supportedCapabilityBase(parsed.capabilities);
+  const supported = supportedCapabilityBase(parsed);
   const selected = selectionSchema.parse(selection);
+  const { policy, ...base } = selected;
+  if (!sameCanonical(supported, base)) throw new Error('생성 기록과 기능 선택이 다릅니다.');
   const replay = initialReplayState(parsed.initial);
-  return selected.policy?.fromSequence === 0 ? enableReplayPolicy(replay, selected.policy.turnTermMinutes, 0) : replay;
+  return policy?.fromSequence === 0 ? enableReplayPolicy(replay, policy.turnTermMinutes, 0) : replay;
 }
 
 export function enterCapsPolicyAtMarker(
@@ -194,12 +258,14 @@ export function applyCapsRecordedInput(
   value: unknown,
   ctx: { selection: CapabilitySelection; endTick?: number },
 ): ReplayState {
-  const input = validateCapsRecordedInput(value, { ...ctx, monthlyTick: replay.monthlyTick });
+  const selection = selectionSchema.parse(ctx.selection);
+  const input = validateCapsRecordedInput(value, { ...ctx, selection, monthlyTick: replay.monthlyTick });
   if (input.status === 'REJECTED') return replay;
   if (input.kind === 'system.policy.enable') return enterCapsPolicyAtMarker(replay, input, ctx.selection);
   if (CAPS_INPUT_OWNERS[input.kind] !== 'treaty') return applyRecordedInput(replay, input);
+  if (!('treaty' in selection)) throw new Error('조약을 끈 월드의 조약 입력입니다.');
   const record = validateTreatyRecord(input, {
-    treaty: ctx.selection.treaty,
+    treaty: selection.treaty,
     monthlyTick: replay.monthlyTick,
     ...(ctx.endTick === undefined ? {} : { endTick: ctx.endTick }),
   });
@@ -208,7 +274,7 @@ export function applyCapsRecordedInput(
   const recomputed = validateTreatyRecord(
     { ...record, result: result.result },
     {
-      treaty: ctx.selection.treaty,
+      treaty: selection.treaty,
       monthlyTick: replay.monthlyTick,
       ...(ctx.endTick === undefined ? {} : { endTick: ctx.endTick }),
     },
@@ -224,8 +290,11 @@ export function runCapsReplayAction(
   unitSet: UnitSetResource | undefined,
   selection: CapabilitySelection,
 ): ReplayState {
-  selectionSchema.parse(selection);
+  const selected = selectionSchema.parse(selection);
   const action = nextGameAction(replay);
-  const next = runReplayAction(replay, seed, unitSet);
-  return action.kind === 'monthly' ? { ...next, state: settleTreaties(next.state, action.tick) } : next;
+  const resolver = 'ext' in selected ? createCommandResolver(selected.ext.commands) : undefined;
+  const next = runReplayAction(replay, seed, unitSet, resolver);
+  return action.kind === 'monthly' && 'treaty' in selected
+    ? { ...next, state: settleTreaties(next.state, action.tick) }
+    : next;
 }

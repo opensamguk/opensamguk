@@ -1,9 +1,35 @@
 import type { Prisma } from '@opensamguk/db';
 import { hashState } from '@opensamguk/shared/node';
+import { parsePreset, presetRules } from '@opensamguk/rules';
 import { expect, it, vi } from 'vitest';
 import legacy from '../test/fixtures/replay-v1-b8f5074.json';
 import { assertWorldCapabilities } from './capsGate';
 import { loadWorld } from './worldLoader';
+
+const regular = {
+  name: '정규',
+  turnTermMinutes: 60,
+  scenario: '1030',
+  map: 'che',
+  unitSet: 'basic',
+  commands: null,
+  npc: {
+    fillRatio: 1,
+    aggression: 1,
+  },
+  protection: {
+    foundUntilMonths: 0,
+    peaceMonths: 0,
+    maxGeneralsPerNation: null,
+  },
+  boost: {
+    smallWorld: null,
+    lateJoin: null,
+  },
+  features: {
+    advisor: false,
+  },
+};
 
 type World = Prisma.WorldGetPayload<Record<string, never>>;
 const statuses = ['PROPOSED', 'ACTIVE', 'REJECTED', 'EXPIRED', 'ENDED'] as const;
@@ -105,6 +131,34 @@ it('3a gate는 모든 status의 열두 칸을 읽고 선택만 반환한다 (단
   expect(Object.keys(query.select!).sort()).toEqual([...keys].sort());
   expect(input).toEqual(before);
   expect(write).not.toHaveBeenCalled();
+});
+
+it('T4-17 B ext 단독의 조약 잔존 검사는 한 번이고 loadWorld는 열린 조약을 읽지 않는다 (단위)', async () => {
+  const commands = { general: ['fire_attack'], nation: [] };
+  const preset = parsePreset({ ...regular, commands });
+  // 조약 guard만 보는 손 행이다. 실제 생성·적재와 프리셋 대조의 증거가 아니다.
+  const stored = world({
+    treatyFormat: null,
+    policyFromSequence: 0,
+    replayOrigin: {
+      ...legacy.origin,
+      version: 6,
+      initial: { ...legacy.origin.initial, presetRules: presetRules(preset) },
+      capabilities: { version: 1, ext: { version: 1, commands, preset, resources: {}, sliceKeys: [] } },
+    } as unknown as Prisma.JsonObject,
+  });
+  const empty = transaction([], stored);
+  const loaded = await loadWorld(empty.tx, stored.id);
+  expect(loaded).not.toHaveProperty('treaties');
+  expect(empty.findMany).toHaveBeenCalledOnce();
+  expect(empty.findMany.mock.calls[0]![0].where).toEqual({ worldId: stored.id });
+  expect(empty.write).not.toHaveBeenCalled();
+  for (const status of statuses) {
+    const f = transaction([row(status)], stored);
+    await expect(assertWorldCapabilities(f.tx, stored)).rejects.toThrow('조약을 끈 월드');
+    expect(f.findMany).toHaveBeenCalledOnce();
+    expect(f.write).not.toHaveBeenCalled();
+  }
 });
 
 it.each(statuses)('3a off 월드는 %s 잔여 행도 거부한다 (단위 stub)', async (status) => {

@@ -1,7 +1,33 @@
 import type { Prisma } from '@opensamguk/db';
 import { hashState } from '@opensamguk/shared/node';
+import { parsePreset, presetRules } from '@opensamguk/rules';
 import { expect, it, vi } from 'vitest';
 import { readView } from './queries';
+
+const regular = {
+  name: '정규',
+  turnTermMinutes: 60,
+  scenario: '1030',
+  map: 'che',
+  unitSet: 'basic',
+  commands: null,
+  npc: {
+    fillRatio: 1,
+    aggression: 1,
+  },
+  protection: {
+    foundUntilMonths: 0,
+    peaceMonths: 0,
+    maxGeneralsPerNation: null,
+  },
+  boost: {
+    smallWorld: null,
+    lateJoin: null,
+  },
+  features: {
+    advisor: false,
+  },
+};
 
 const statuses = ['PROPOSED', 'ACTIVE', 'REJECTED', 'EXPIRED', 'ENDED'] as const;
 const origin = {
@@ -92,6 +118,33 @@ it('3a readView는 모든 status를 검사하고 toWorldState 뒤 열린 조약�
   expect(findMany.mock.calls[0]![0].where).toEqual({ worldId: 'world' });
   expect(Object.keys(findMany.mock.calls[0]![0].select)).toHaveLength(12);
   expect(write).not.toHaveBeenCalled();
+});
+
+it('T4-17 B ext 단독 readView도 잔존 조약만 한 번 검사한다 (단위)', async () => {
+  const commands = { general: ['fire_attack'], nation: [] };
+  const preset = parsePreset({ ...regular, commands });
+  // 조약 분기용 손 행이다. 확장 프리셋 대조와 실제 ON은 이 시험의 범위가 아니다.
+  const changes = {
+    preset,
+    treatyFormat: null,
+    policyFromSequence: 0,
+    replayOrigin: {
+      ...origin,
+      initial: { startYear: 190, presetRules: presetRules(preset) },
+      capabilities: { version: 1, ext: { version: 1, commands, preset, resources: {}, sliceKeys: [] } },
+    },
+  };
+  const empty = transaction([], changes);
+  expect(await readView(empty.tx, 'world')).not.toHaveProperty('treaties');
+  expect(empty.findMany).toHaveBeenCalledOnce();
+  expect(empty.write).not.toHaveBeenCalled();
+  for (const status of statuses) {
+    const f = transaction([row(status)], changes);
+    await expect(readView(f.tx, 'world')).rejects.toThrow('조약을 끈 월드');
+    expect(f.findMany).toHaveBeenCalledOnce();
+    expect(f.city).not.toHaveBeenCalled();
+    expect(f.write).not.toHaveBeenCalled();
+  }
 });
 
 it.each(['REJECTED', 'EXPIRED', 'ENDED'] as const)(

@@ -1,9 +1,34 @@
 import type { Prisma } from '@opensamguk/db';
-import { capsResourceHashInput, emptyQueue, type CapsOrigin } from '@opensamguk/rules';
+import { capsResourceHashInput, emptyQueue, parsePreset, presetRules, type CapsOrigin } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { expect, it, vi } from 'vitest';
 import legacy from '../test/fixtures/replay-v1-b8f5074.json';
 import { processPendingInput } from './inputs';
+
+const regular = {
+  name: '정규',
+  turnTermMinutes: 60,
+  scenario: '1030',
+  map: 'che',
+  unitSet: 'basic',
+  commands: null,
+  npc: {
+    fillRatio: 1,
+    aggression: 1,
+  },
+  protection: {
+    foundUntilMonths: 0,
+    peaceMonths: 0,
+    maxGeneralsPerNation: null,
+  },
+  boost: {
+    smallWorld: null,
+    lateJoin: null,
+  },
+  features: {
+    advisor: false,
+  },
+};
 
 type World = Prisma.WorldGetPayload<Record<string, never>>;
 type Event = Prisma.InputEventGetPayload<Record<string, never>>;
@@ -126,6 +151,31 @@ it.each(['treaty.propose', 'treaty.respond'])('off 월드의 %s는 sequence 전�
     expect(f.tx.inputEvent.updateMany).not.toHaveBeenCalled();
   }
 });
+
+it.each(['treaty.propose', 'treaty.respond'])(
+  'T4-17 B ext 단독의 %s도 sequence·쓰기 전에 거부한다 (단위)',
+  async (kind) => {
+    const commands = { general: ['fire_attack'], nation: [] };
+    const preset = parsePreset({ ...regular, commands });
+    const f = fixture(
+      [event(kind)],
+      world({
+        treatyFormat: null,
+        policyFromSequence: 0,
+        replayOrigin: {
+          ...legacy.origin,
+          version: 6,
+          initial: { ...legacy.origin.initial, presetRules: presetRules(preset) },
+          capabilities: { version: 1, ext: { version: 1, commands, preset, resources: {}, sliceKeys: [] } },
+        } as unknown as Prisma.JsonObject,
+      }),
+    );
+    await expect(f.run()).rejects.toThrow('조약을 끈 월드');
+    expect(f.sequence).not.toHaveBeenCalled();
+    expect(f.tx.inputEvent.updateMany).not.toHaveBeenCalled();
+    expect(f.tx.inputEvent.update).not.toHaveBeenCalled();
+  },
+);
 
 it.each(['treaty.propose', 'treaty.respond'])('PAUSED %s는 실제 Ops 처리기에서 한 번 배정한다 (단위)', async (kind) => {
   const f = fixture([event(kind), event('general.create', 2n)], world({ status: 'PAUSED' }));

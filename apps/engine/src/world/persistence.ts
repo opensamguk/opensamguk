@@ -9,6 +9,11 @@ import {
   ORIGIN_CAPS,
   capsResourceHashInput,
   parseCapsOrigin,
+  selectSupportedCapabilities,
+  createExtState,
+  toWorldState,
+  presetCommands,
+  extSliceKeys,
   type CapsOrigin,
   type WorldPreset,
 } from '@opensamguk/rules';
@@ -25,6 +30,7 @@ export async function saveInitialWorld(
     endYear: number | null;
     replayFormat?: 'legacy' | 'policy';
     treatyFormat?: 1;
+    extFormat?: 1;
     preset?: { key: string; value: WorldPreset };
   },
 ) {
@@ -37,7 +43,22 @@ export async function saveInitialWorld(
     throw new Error('월드 이름과 턴 간격(1~2147483647분)을 확인하세요.');
   }
   const parsedPreset = options.preset ? parsePreset(options.preset.value) : null;
-  const { preset } = engineResolver({ preset: parsedPreset });
+  if (options.extFormat !== undefined && options.extFormat !== 1) throw new Error('확장 생성 형식을 확인하세요.');
+  if (
+    options.extFormat === 1 &&
+    (!parsedPreset?.commands || options.treatyFormat !== undefined || options.replayFormat === 'legacy')
+  )
+    throw new Error('확장 단독 월드의 생성 옵션을 확인하세요.');
+  const preset =
+    options.extFormat === 1
+      ? parsePreset({
+          ...parsedPreset!,
+          commands: {
+            general: [...parsedPreset!.commands!.general].sort(),
+            nation: [...parsedPreset!.commands!.nation].sort(),
+          },
+        })
+      : engineResolver({ preset: parsedPreset }).preset;
   if (options.preset && !/^[a-zA-Z0-9_-]+$/.test(options.preset.key)) throw new Error('프리셋 ID를 확인하세요.');
   const initial = preset ? { ...state, presetRules: presetRules(preset) } : state;
   const stateHash = hashState(initial);
@@ -60,6 +81,31 @@ export async function saveInitialWorld(
     initialStateHash: stateHash,
   };
   let creationState = state;
+  if (options.extFormat === 1) {
+    const commands = presetCommands(preset)!;
+    if (
+      Object.hasOwn(initial, 'ext') ||
+      extSliceKeys(commands).length !== 0 ||
+      createExtState(commands, toWorldState(initial)) !== undefined
+    )
+      throw new Error('상태 조각이 없는 확장 명령만 생성할 수 있습니다.');
+    const origin: CapsOrigin = {
+      version: ORIGIN_CAPS,
+      initial,
+      initialStateHash: stateHash,
+      resourceHash: '',
+      capabilities: { version: 1, ext: { version: 1, commands, preset: preset!, resources: {}, sliceKeys: [] } },
+    };
+    origin.resourceHash = hashState(capsResourceHashInput(origin));
+    const parsedOrigin = parseCapsOrigin(origin);
+    selectSupportedCapabilities(parsedOrigin, {
+      endYear: options.endYear,
+      outcomeFromSequence: 0,
+      policy: { version: 1, fromSequence: 0, turnTermMinutes: options.turnTermMinutes },
+    });
+    replayOrigin = parsedOrigin;
+    creationState = parsedOrigin.initial;
+  }
   if (options.treatyFormat === 1) {
     const origin: CapsOrigin = {
       version: ORIGIN_CAPS,
