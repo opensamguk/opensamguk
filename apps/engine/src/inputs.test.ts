@@ -20,6 +20,7 @@ function world(changes: Partial<World> = {}): World {
     id: 'world',
     status: 'ENDED',
     treatyFormat: 1,
+    personnelFormat: null,
     replayOrigin: origin,
     policyFromSequence: null,
     actionSequence: 0,

@@ -7,6 +7,7 @@ import { parseCapsOrigin, type CapsOrigin } from './replayCapabilities';
 function row(): WorldCapsRow {
   return {
     treatyFormat: null,
+    personnelFormat: null,
     policyFromSequence: null,
     actionSequence: 0,
     turnTermMinutes: 30,
@@ -132,6 +133,7 @@ describe('T4-03 / AC-P2-02 저장된 월드 기능 선택 U1~U11', () => {
         selectWorldCapabilities({
           ...row(),
           treatyFormat: Object.hasOwn(capabilities, 'treaty') ? 1 : null,
+          personnelFormat: Object.hasOwn(capabilities, 'personnel') ? 1 : null,
           replayOrigin: candidate,
         }),
       ).toThrow('기능 조합');
@@ -142,8 +144,76 @@ describe('T4-03 / AC-P2-02 저장된 월드 기능 선택 U1~U11', () => {
   it('U6 저장 표시의 범위와 형식을 강제 변환하지 않는다', () => {
     for (const treatyFormat of [2, 0, -1, 1.5, '1', undefined, NaN])
       expect(() => selectWorldCapabilities({ ...row(), treatyFormat } as WorldCapsRow)).toThrow();
+    for (const base of [row(), enabled()])
+      for (const personnelFormat of [2, 0, -1, 1.5, '1', undefined, NaN, Infinity]) {
+        const input = { ...base, personnelFormat } as WorldCapsRow;
+        const before = structuredClone(input);
+        expect(() => selectWorldCapabilities(input)).toThrow();
+        expect(input).toEqual(before);
+      }
     for (const actionSequence of [-1, 0.5, 2147483648])
       expect(() => selectWorldCapabilities({ ...row(), actionSequence })).toThrow();
+  });
+
+  it.each([null, 0, 20])('B9 O2 인사 표지 대조는 정책 F=%s에서 켜짐을 허용하지 않는다', (fromSequence) => {
+    const policy = { policyFromSequence: fromSequence, actionSequence: fromSequence ?? 0 };
+    for (const replayOrigin of [null, { version: 1 }]) {
+      const input = { ...row(), ...policy, replayOrigin };
+      expect(selectWorldCapabilities(input)).toEqual({
+        kind: 'legacy',
+        policy: fromSequence === null ? null : { version: 1, fromSequence, turnTermMinutes: 30 },
+      });
+      expect(() => selectWorldCapabilities({ ...input, personnelFormat: 1 })).toThrow('인사 저장 형식');
+    }
+    const treatyOnly = { ...enabled(), ...policy };
+    expect(selectWorldCapabilities(treatyOnly)).toEqual({
+      kind: 'caps',
+      origin: treatyOnly.replayOrigin,
+      selection: {
+        treaty: { version: 1 },
+        policy: fromSequence === null ? null : { version: 1, fromSequence, turnTermMinutes: 30 },
+      },
+    });
+    expect(() => selectWorldCapabilities({ ...treatyOnly, personnelFormat: 1 })).toThrow('인사 저장 형식');
+    for (const capabilities of [
+      { version: 1, personnel: { version: 1 } },
+      { version: 1, treaty: { version: 1 }, personnel: { version: 1 } },
+      { version: 1, treaty: { version: 1 }, personnel: {} },
+      { version: 1, treaty: { version: 1 }, personnel: { version: 2 } },
+    ]) {
+      const input = {
+        ...row(),
+        ...policy,
+        treatyFormat: Object.hasOwn(capabilities, 'treaty') ? 1 : null,
+        replayOrigin: { ...origin(), capabilities },
+      };
+      const before = structuredClone(input);
+      expect(() => selectWorldCapabilities(input)).toThrow('인사 저장 형식');
+      expect(() => selectWorldCapabilities({ ...input, personnelFormat: 1 })).toThrow('기능 조합');
+      expect(input).toEqual(before);
+    }
+  });
+
+  it('B9 O2 인사 표지가 없는 손 행에 기본값을 채우지 않는다', () => {
+    const { personnelFormat: ignored, ...missing } = row();
+    void ignored;
+    const before = structuredClone(missing);
+    expect(() => {
+      // @ts-expect-error 저장 행에는 인사 표지가 반드시 있어야 한다.
+      selectWorldCapabilities(missing);
+    }).toThrow();
+    expect(missing).toEqual(before);
+  });
+
+  it.each([true, null, [], 0])('B9 O2 일반 객체가 아닌 인사 descriptor는 운반부터 거부한다: %j', (personnel) => {
+    const input = {
+      ...enabled(),
+      personnelFormat: 1,
+      replayOrigin: { ...origin(), capabilities: { version: 1, treaty: { version: 1 }, personnel } },
+    };
+    const before = structuredClone(input);
+    expect(() => selectWorldCapabilities(input)).toThrow('형식 6 기능 표시');
+    expect(input).toEqual(before);
   });
 
   it('U7 다른 origin 번호와 파손된 생성 기록을 거부하고 legacy parser를 넓히지 않는다', () => {

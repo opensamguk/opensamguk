@@ -29,6 +29,7 @@ function world(changes: Partial<World> = {}): World {
     commandMeta: null,
     startYear: legacy.origin.initial.startYear,
     treatyFormat: 1,
+    personnelFormat: null,
     policyFromSequence: null,
     actionSequence: 0,
     turnTermMinutes: 30,
@@ -141,10 +142,18 @@ it.each(['PREOPEN', 'RUNNING', 'PAUSED', 'ENDED'] as const)(
 );
 
 it('3a 형식·origin·정책 불일치는 저장 행 읽기 전에 실패한다 (단위 stub)', async () => {
+  const personnelOrigin = {
+    ...legacy.origin,
+    version: 6,
+    capabilities: { version: 1, treaty: { version: 1 }, personnel: { version: 1 } },
+  };
   for (const stored of [
     world({ treatyFormat: null }),
     world({ replayOrigin: null }),
     world({ policyFromSequence: 20, actionSequence: 19 }),
+    world({ personnelFormat: 1 }),
+    world({ replayOrigin: personnelOrigin }),
+    world({ personnelFormat: 1, replayOrigin: personnelOrigin }),
   ]) {
     const { tx, findMany, write } = transaction([], stored);
     await expect(assertWorldCapabilities(tx, stored)).rejects.toThrow();

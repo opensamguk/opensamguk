@@ -44,6 +44,7 @@ model World {
   actionSequence  Int         @default(0)
   policyFromSequence Int?
   treatyFormat    Int?
+  personnelFormat Int?
   replayOrigin    Json?
   inputEvents     InputEvent[]
   nationHistory   NationHistory[]

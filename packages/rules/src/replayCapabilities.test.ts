@@ -164,6 +164,11 @@ describe('T4-03 / AC-P2-02 형식 6 운반과 실행 선택', () => {
     { version: 1 as const, treaty: { version: 1 as const }, ext: { commands: ['future'], nested: { untouched: [1] } } },
     { version: 1 as const, personnel: { version: 1, future: [2] } },
     { version: 1 as const, ext: { commands: ['future'] } },
+    { version: 1 as const, treaty: { version: 1 as const }, personnel: { version: 1 } },
+    { version: 1 as const, treaty: { version: 1 as const }, personnel: {} },
+    { version: 1 as const, personnel: { version: 2 } },
+    { version: 1 as const, ext: {}, personnel: { version: 1 } },
+    { version: 1 as const, treaty: { version: 1 as const }, ext: {}, personnel: { version: 1 } },
   ])('C4 운반과 자원 해시는 원본 descriptor를 보존하고 실행은 먼저 거부한다: %j', (capabilities) => {
     const input = { ...origin(), capabilities };
     const parsed = parseCapsOrigin(input);
@@ -185,8 +190,16 @@ describe('T4-03 / AC-P2-02 형식 6 운반과 실행 선택', () => {
     { ...selection, extra: true },
     { ...selection, treaty: { version: 2 } },
     { ...selection, policy: { version: 1, fromSequence: -1, turnTermMinutes: 30 } },
+    { ...selection, personnel: { version: 1 } },
+    { ...selection, ext: {} },
+    { ...selection, future: 1 },
   ])('C4 손으로 만든 잘못된 선택도 projection 전에 거부한다: %j', (chosen) => {
     expect(() => startCapsReplay(origin(), chosen as CapabilitySelection)).toThrow();
+    expect(() =>
+      validateCapsRecordedInput(rejection(), { selection: chosen as CapabilitySelection, monthlyTick: 0 }),
+    ).toThrow();
+    expect(() => applyCapsRecordedInput(start(), rejection(), { selection: chosen as CapabilitySelection })).toThrow();
+    expect(() => runCapsReplayAction(start(), 'seed', testUnits, chosen as CapabilitySelection)).toThrow();
   });
   it.each([
     { ...config, extra: true },

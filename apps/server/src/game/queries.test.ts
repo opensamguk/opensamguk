@@ -37,6 +37,7 @@ function transaction(rows: unknown[] = [], changes: Record<string, unknown> = {}
     status: 'RUNNING',
     startYear: 190,
     treatyFormat: 1,
+    personnelFormat: null,
     policyFromSequence: null,
     actionSequence: 0,
     turnTermMinutes: 30,

@@ -81,6 +81,7 @@ async function fixture(treaties: Treaty[] = [], caps = true, policyFromSequence:
     startYear: initial.startYear,
     monthlyTick: 50000,
     treatyFormat: caps ? 1 : null,
+    personnelFormat: null,
     replayOrigin: caps
       ? origin
       : {

@@ -21,6 +21,7 @@ function fixture(status: World['status'] = 'PAUSED', caps = false, beforeCommit?
     status,
     preset: null,
     treatyFormat: caps ? 1 : null,
+    personnelFormat: null,
     replayOrigin: caps ? origin : null,
     policyFromSequence: null,
     actionSequence: 0,

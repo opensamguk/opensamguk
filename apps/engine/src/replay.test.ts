@@ -279,6 +279,7 @@ function exportDatabase(archive: ReplayArchiveV2 | ReplayArchiveV5, ended = true
       findUniqueOrThrow: vi.fn(async () => ({
         replayOrigin: archive.origin,
         treatyFormat: null,
+        personnelFormat: null,
         policyFromSequence: archive.version === 5 ? archive.config.policy.fromSequence : null,
         actionSequence: archive.end?.sequence ?? archive.months.at(-1)?.sequence ?? 0,
         turnTermMinutes: 30,
@@ -381,6 +382,7 @@ describe('T1-26 내보내기와 네 키 상태', () => {
           id: worldId,
           preset: null,
           treatyFormat: null,
+          personnelFormat: null,
           replayOrigin: null,
           policyFromSequence: null,
           actionSequence: 0,

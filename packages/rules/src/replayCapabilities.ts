@@ -88,15 +88,23 @@ export function parseCapsOrigin(value: unknown): CapsOrigin {
   return structuredClone(value) as unknown as CapsOrigin;
 }
 
-function assertTreatyOnly(origin: CapsOrigin): void {
-  const descriptor = origin.capabilities;
-  if (Object.hasOwn(descriptor, 'ext') || Object.hasOwn(descriptor, 'personnel') || !descriptor.treaty)
+const SUPPORTED_COMBINATIONS = [['treaty']] as const;
+
+function supportedCapabilityBase(descriptor: CapabilityDescriptor): Pick<CapabilitySelection, 'treaty'> {
+  const features = (['treaty', 'ext', 'personnel'] as const).filter((key) => Object.hasOwn(descriptor, key)).sort();
+  if (
+    !SUPPORTED_COMBINATIONS.some(
+      (combination) =>
+        combination.length === features.length && combination.every((key, index) => key === features[index]),
+    )
+  )
     throw new Error('아직 재생할 수 없는 기능 조합입니다.');
+  return { treaty: treatyDescriptor.parse(descriptor.treaty) };
 }
 
 export function selectSupportedCapabilities(origin: CapsOrigin, config: unknown): CapabilitySelection {
   const parsed = parseCapsOrigin(origin);
-  assertTreatyOnly(parsed);
+  const supported = supportedCapabilityBase(parsed.capabilities);
   const options = z
     .strictObject({
       endYear: z.number().int().min(parsed.initial.startYear).max(10000).nullable(),
@@ -104,7 +112,7 @@ export function selectSupportedCapabilities(origin: CapsOrigin, config: unknown)
       policy: policyFormatSchema.optional(),
     })
     .parse(config);
-  return { treaty: { version: 1 }, policy: options.policy ?? null };
+  return { ...supported, policy: options.policy ?? null };
 }
 
 export function capsResourceHashInput(origin: CapsOrigin): Readonly<Record<string, unknown>> {
@@ -154,7 +162,7 @@ export function validateCapsRecordedInput(
 
 export function startCapsReplay(origin: CapsOrigin, selection: CapabilitySelection): ReplayState {
   const parsed = parseCapsOrigin(origin);
-  assertTreatyOnly(parsed);
+  supportedCapabilityBase(parsed.capabilities);
   const selected = selectionSchema.parse(selection);
   const replay = initialReplayState(parsed.initial);
   return selected.policy?.fromSequence === 0 ? enableReplayPolicy(replay, selected.policy.turnTermMinutes, 0) : replay;
