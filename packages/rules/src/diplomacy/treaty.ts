@@ -414,14 +414,94 @@ function isFirstClause(clause: TreatyClause): clause is FirstTreatyClause {
 
 function relationAllows(state: TreatyView, from: number, to: number, clauses: readonly FirstTreatyClause[]): boolean {
   const relation = state.diplomacies.find((d) => d.nationA === Math.min(from, to) && d.nationB === Math.max(from, to));
+  return relationAllowsClauses(relation?.state ?? 'NONE', clauses);
+}
+
+function relationAllowsClauses(current: TreatyRelation, clauses: readonly FirstTreatyClause[]): boolean {
   const peace = clauses.some((c) => c.kind === 'peace');
   const nonAggression = clauses.some((c) => c.kind === 'nonAggression');
-  const current = relation?.state ?? 'NONE';
   return (
     (!peace || current === 'WAR' || current === 'DECLARED') &&
     !(nonAggression && current === 'NON_AGGRESSION') &&
     meetsTreatyPeaceRequirement(current, { peace, nonAggression })
   );
+}
+
+export type TreatyQuoteCode = 'BAD_INPUT' | 'CLAUSE_NOT_CONNECTED' | 'BAD_TARGET' | 'TREATY_RELATION';
+export type TreatyQuoteResult = {
+  cost: TreatyAmounts | null;
+  problem: { code: TreatyQuoteCode; message: string } | null;
+};
+
+// 정규화한 공개값으로 비용과 조항·관계 문제를 본다. 국고·NPC·집행 tick은 받지 않는다.
+export function quoteTreatyProposal(
+  proposal: Readonly<{
+    fromNationId: number;
+    toNationId: number;
+    clauses: readonly TreatyClause[];
+    fromCityCount: number;
+    target: Readonly<{ relation: TreatyRelation; cityCount: number }> | null;
+  }>,
+): TreatyQuoteResult {
+  const { clauses } = proposeStored.parse({ toNationId: proposal.toNationId, clauses: proposal.clauses });
+  positive.parse(proposal.fromNationId);
+  nonNegativeSafeInteger(proposal.fromCityCount, 'fromCityCount');
+  if (proposal.target !== null) {
+    nonNegativeSafeInteger(proposal.target.cityCount, 'target.cityCount');
+    z.enum(['NONE', 'WAR', 'DECLARED', 'NON_AGGRESSION']).parse(proposal.target.relation);
+  }
+  const problem = (code: TreatyQuoteCode, cost: TreatyAmounts | null = null): TreatyQuoteResult => ({
+    cost,
+    problem: { code, message: rejectionMessages[code] },
+  });
+  const domain = domainClauses(clauses);
+  if (domain === 'BAD_INPUT' || domain === 'CLAUSE_NOT_CONNECTED') return problem(domain);
+  if (domain !== null) throw new Error('조약 견적의 조항 판정을 확인하세요.');
+  if (proposal.toNationId === proposal.fromNationId || proposal.target === null) return problem('BAD_TARGET');
+  const firstClauses = clauses.filter(isFirstClause);
+  const months = firstClauses.find((clause) => clause.kind === 'nonAggression')?.months ?? null;
+  const cost = {
+    from: calculateTreatyFee(proposal.fromCityCount, months),
+    to: calculateTreatyFee(proposal.target.cityCount, months),
+  };
+  if (!relationAllowsClauses(proposal.target.relation, firstClauses)) return problem('TREATY_RELATION', cost);
+  return { cost, problem: null };
+}
+
+export type TreatyResponseGuideCode = 'EXPIRED' | 'TREATY_RELATION' | 'INSUFFICIENT_GOLD';
+export type TreatyResponseGuide = Readonly<{
+  accept: Readonly<{ code: TreatyResponseGuideCode; message: string }> | null;
+  reject: Readonly<{ code: 'EXPIRED'; message: string }> | null;
+}>;
+
+// 받은 제안의 안내다. 제안국 국고를 읽지 않으며 최종 집행은 엔진이 판정한다.
+export function guideTreatyResponse(
+  input: Readonly<{
+    treaty: DeepReadonly<TreatyState>;
+    tick: number;
+    relation: TreatyRelation;
+    responderCityCount: number;
+    responderGold: number;
+  }>,
+): TreatyResponseGuide {
+  const treaty = validateTreatyState(input.treaty);
+  if (treaty.status !== 'PROPOSED') throw new RangeError('응답을 기다리는 조약이 아닙니다.');
+  tickSchema.max(MAX_ENGINE_TICK).parse(input.tick);
+  nonNegativeSafeInteger(input.responderCityCount, 'responderCityCount');
+  nonNegativeSafeInteger(input.responderGold, 'responderGold');
+  z.enum(['NONE', 'WAR', 'DECLARED', 'NON_AGGRESSION']).parse(input.relation);
+  if (input.tick >= treaty.respondByTick) {
+    const expired = { code: 'EXPIRED', message: rejectionMessages.EXPIRED } as const;
+    return { accept: expired, reject: expired };
+  }
+  const deny = (code: TreatyResponseGuideCode): TreatyResponseGuide => ({
+    accept: { code, message: rejectionMessages[code] },
+    reject: null,
+  });
+  if (!relationAllowsClauses(input.relation, treaty.clauses)) return deny('TREATY_RELATION');
+  const months = treaty.clauses.find((clause) => clause.kind === 'nonAggression')?.months ?? null;
+  if (input.responderGold < calculateTreatyFee(input.responderCityCount, months)) return deny('INSUFFICIENT_GOLD');
+  return { accept: null, reject: null };
 }
 
 function putTreaties(state: TreatyWorldState, treaties: TreatyState[]): void {
