@@ -138,6 +138,7 @@ it('T4-17 B ext 단독의 조약 잔존 검사는 한 번이고 loadWorld는 열
   const preset = parsePreset({ ...regular, commands });
   // 조약 guard만 보는 손 행이다. 실제 생성·적재와 프리셋 대조의 증거가 아니다.
   const stored = world({
+    preset: preset as unknown as Prisma.JsonObject,
     treatyFormat: null,
     policyFromSequence: 0,
     replayOrigin: {
