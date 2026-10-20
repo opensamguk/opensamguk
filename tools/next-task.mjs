@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 다음 작업과 담당을 출력한다. 기준: docs/product/phases.md의 작업 대기열.
 // 흐름: 계획(Claude) → 구현(담당) → 리뷰(구현하지 않은 쪽) → 완료
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const STAGES = ['계획', '구현', '리뷰', '완료'];
@@ -45,21 +45,27 @@ function resolveDeps(row, rows) {
   });
 }
 
-// 현재 관문(완료되지 않은 첫 관문)에서 담당별로 지금 할 수 있는 일을 고른다.
-export function nextActions(rows) {
+// 구현 전에 계획이 있어야 한다: 단계가 '계획'이거나, '구현'인데 계획 문서가 없으면 계획이 필요하다.
+function needsPlan(row, hasPlan) {
+  if (row.owner === '사용자') return false;
+  return row.stage === '계획' || (row.stage === '구현' && !hasPlan(row.id));
+}
+
+// 현재 관문(완료되지 않은 첫 관문)에서 담당별로 지금 할 수 있는 일을 고르고,
+// 다음 관문들의 계획 대기 작업을 따로 모은다 (계획은 선행과 상관없이 미리 쓸 수 있다).
+export function nextActions(rows, { hasPlan = () => true } = {}) {
   const current = rows.find((r) => r.stage !== '완료')?.milestone ?? null;
   const ready = {};
   const blocked = [];
-  if (current === null) return { milestone: null, ready, blocked };
+  if (current === null) return { milestone: null, ready, blocked, ahead: [] };
 
   for (const row of rows.filter((r) => r.milestone === current && r.stage !== '완료')) {
     const waitingOn = resolveDeps(row, rows).filter((d) => d.stage !== '완료');
     let who;
     let what;
-    if (row.stage === '계획') {
-      // 계획은 선행과 상관없이 미리 쓸 수 있다.
+    if (needsPlan(row, hasPlan)) {
       who = 'Claude';
-      what = '계획';
+      what = row.stage === '계획' ? '계획' : '계획(문서 없음)';
     } else if (row.stage === '리뷰') {
       who = REVIEWER[row.owner];
       what = '리뷰';
@@ -73,10 +79,11 @@ export function nextActions(rows) {
     }
     (ready[who] ??= []).push({ row, what });
   }
-  return { milestone: current, ready, blocked };
+  const ahead = rows.filter((r) => r.milestone > current && needsPlan(r, hasPlan));
+  return { milestone: current, ready, blocked, ahead };
 }
 
-export function render({ milestone, ready, blocked }) {
+export function render({ milestone, ready, blocked, ahead = [] }) {
   if (milestone === null) return '모든 작업이 완료됐습니다.';
   const lines = [
     `다음 작업 · 현재 관문 M${milestone} · 기준: docs/product/phases.md`,
@@ -91,12 +98,27 @@ export function render({ milestone, ready, blocked }) {
       continue;
     }
     const [first, ...rest] = items;
-    const handoff =
-      first.what === '계획' ? ` · 구현은 ${first.row.owner}` : first.what === '구현' ? ` · 리뷰는 ${REVIEWER[first.row.owner]}` : '';
+    const handoff = first.what.startsWith('계획')
+      ? ` · 구현은 ${first.row.owner}`
+      : first.what === '구현'
+        ? ` · 리뷰는 ${REVIEWER[first.row.owner]}`
+        : '';
     lines.push(`${label} ${first.what} ${first.row.id} ${first.row.title} (AC-${first.row.ac})${handoff}`);
     if (rest.length > 0) {
       const shown = rest.slice(0, 5).map((i) => `${i.row.id} ${i.what}`).join(', ');
       lines.push(`    그 밖에 ${rest.length}건: ${shown}${rest.length > 5 ? ' …' : ''}`);
+    }
+  }
+  const planning = [...(ready.Claude ?? []).filter((i) => i.what.startsWith('계획')).map((i) => i.row), ...ahead];
+  lines.push('', `[계획] 구현 전 계획이 필요한 작업 ${planning.length}건 (Claude)`);
+  if (planning.length === 0) {
+    lines.push('    없음');
+  } else {
+    const byMilestone = new Map();
+    for (const row of planning) byMilestone.set(row.milestone, [...(byMilestone.get(row.milestone) ?? []), row]);
+    for (const [m, list] of byMilestone) {
+      const shown = list.slice(0, 4).map((r) => `${r.id} ${r.title.split(':')[0]}(구현 ${r.owner})`).join(', ');
+      lines.push(`    M${m}${m === milestone ? ' (현재)' : ''} ${list.length}건: ${shown}${list.length > 4 ? ' …' : ''}`);
     }
   }
   if (blocked.length > 0) {
@@ -108,5 +130,6 @@ export function render({ milestone, ready, blocked }) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const markdown = readFileSync(new URL('../docs/product/phases.md', import.meta.url), 'utf8');
-  console.log(render(nextActions(parseQueue(markdown))));
+  const hasPlan = (id) => existsSync(new URL(`../docs/plans/${id}.md`, import.meta.url));
+  console.log(render(nextActions(parseQueue(markdown), { hasPlan })));
 }

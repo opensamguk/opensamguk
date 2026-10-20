@@ -1,0 +1,73 @@
+{
+  "purpose": "T1-13 화면 레퍼런스. 방향 합의용이며 이미지를 저장하거나 화면에 다시 쓰지 않는다.",
+  "checkedAt": "2026-10-20",
+  "decision": "A10 (PRD 가정 원장) 2026-10-20 사용자 확인",
+  "references": [
+    {
+      "id": "R1",
+      "title": "원작 메인 화면 (core2026 MainView)",
+      "kind": "source-code",
+      "official": true,
+      "url": "https://gitea.hided.net/devsam/core2026/src/commit/df6c9269fa1e2862418ba9da481c8dd2d758d6c5/app/game-frontend/src/views/MainView.vue",
+      "license": "MIT (core2026)",
+      "screen": "게임 메인 화면. 지도(MapViewer), 예턴 목록(CommandListPanel, MainTurnControls), 도시·국가·장수 카드(CityBasicCard, NationBasicCard, GeneralInformationPanel), 기록(RecordPanel), 메시지(MessagePanel)를 한 화면에 조립한다.",
+      "borrow": ["한 화면 정보량의 기준", "장수·도시·국가·예턴·기록을 함께 두는 배치"],
+      "usedIn": ["메인 (T1-13 격자, T1-16 연결)"]
+    },
+    {
+      "id": "R2",
+      "title": "원작 국가 도시 화면 (core2026 NationCitiesView)",
+      "kind": "source-code",
+      "official": true,
+      "url": "https://gitea.hided.net/devsam/core2026/src/commit/df6c9269fa1e2862418ba9da481c8dd2d758d6c5/app/game-frontend/src/views/NationCitiesView.vue",
+      "license": "MIT (core2026)",
+      "screen": "국가 소유 도시 목록. 도시마다 인구·농업·상업·치안·수비·성벽·민심·교역, 관직 3칸, 주둔 장수를 보여 주고, 최대치에 못 미친 값을 괄호 부족분과 색 단계로 표시하며, 대부분의 머리글로 정렬한다.",
+      "borrow": ["최대치 대비 부족분 표시", "관리 필요 값의 색 단계", "머리글 정렬"],
+      "usedIn": ["국가 정보, 도시 정보 (T1-16)", "StatTable 최대치 막대"]
+    },
+    {
+      "id": "R3",
+      "title": "Europa Universalis IV 장부(Ledger)",
+      "kind": "community-wiki",
+      "official": false,
+      "url": "https://eu4.paradoxwikis.com/Ledger",
+      "license": "CC BY-SA 3.0 (Paradox Wikis 커뮤니티 문서)",
+      "screen": "국가 비교 통계 화면 모음. 국가·군사·경제·교역·관계 범주로 나뉘며 수입 비교, 점수 비교, 국가별 병종 구성 같은 비교표를 둔다. 문서의 이미지는 장부 범주 그림 한 장이다.",
+      "borrow": ["국가 사이 비교표", "범주별 탭으로 많은 수치를 나누기"],
+      "usedIn": ["국가 정보, 순위 (M2)"]
+    },
+    {
+      "id": "R4",
+      "title": "GitHub Projects 표 보기 사용자 설정",
+      "kind": "official-docs",
+      "official": true,
+      "url": "https://docs.github.com/en/issues/planning-and-tracking-with-projects/customizing-views-in-your-project/customizing-the-table-layout",
+      "license": "GitHub Docs (CC BY 4.0)",
+      "screen": "표 보기 문서. 필드 머리글 메뉴, 머리글을 끌어 열 순서 바꾸기, 행 번호로 행 순서 바꾸기, 2차 정렬 메뉴의 스크린샷 4장이 있다. 필드 보이기·숨기기, 여러 필드 정렬, 묶기, 숫자 필드 합계를 다룬다.",
+      "borrow": ["얇은 구분선과 고정 머리글의 촘촘한 표", "머리글에서 정렬·열 고르기", "숫자 합계 행"],
+      "usedIn": ["StatTable", "장수·도시 표 (T1-16)"]
+    },
+    {
+      "id": "R5",
+      "title": "Linear 보기 옵션(Display options)",
+      "kind": "official-docs",
+      "official": true,
+      "url": "https://linear.app/docs/display-options",
+      "license": "Linear 공식 문서 (저작권은 Linear)",
+      "screen": "보기 옵션 문서. 이미지는 로드맵 보기 오른쪽 위의 보기 옵션 메뉴 한 장이다. 항목마다 보일 속성(상태·담당·우선순위·마감 등)과 정렬 기준을 고르고 기본값으로 저장하는 방식을 설명한다.",
+      "borrow": ["표시할 속성을 사용자가 고르는 방식", "정렬 기준 선택과 기본값 저장"],
+      "usedIn": ["예턴 편집, 기록 (T1-15, T1-16)"],
+      "note": "목록 화면 자체의 이미지는 아니다. 보기 옵션 메뉴만 참고한다."
+    }
+  ],
+  "dropped": [
+    {
+      "title": "Football Manager 선수 목록",
+      "reason": "Sports Interactive의 공식 화면 출처를 찾지 못했다. 찾은 것은 팬 사이트뿐이다."
+    },
+    {
+      "title": "EVE Online 시장 창",
+      "reason": "EVE University 위키 'Market' 문서에 시장 창 이미지가 없고, CCP 공식 지원 문서를 찾지 못했다."
+    }
+  ]
+}

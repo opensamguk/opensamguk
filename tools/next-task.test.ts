@@ -38,6 +38,24 @@ describe('다음 작업 출력', () => {
     expect(result.blocked.map((b) => b.row.id)).toEqual(['T2-02']);
   });
 
+  it('구현 단계여도 계획 문서가 없으면 Claude가 먼저 계획한다', () => {
+    const rows = parseQueue(table('| T1-01 | 월드 | M1-01 | Codex | — | 구현 |\n| T1-02 | 로비 | M1-02 | Codex | — | 구현 |'));
+    const { ready } = nextActions(rows, { hasPlan: (id: string) => id === 'T1-02' });
+    expect(ready.Claude?.[0]).toMatchObject({ what: '계획(문서 없음)', row: { id: 'T1-01' } });
+    expect(ready.Codex?.map((i) => i.row.id)).toEqual(['T1-02']);
+  });
+
+  it('다음 관문의 계획 대기 작업을 미리 보여 준다', () => {
+    const rows = parseQueue(
+      table('| T1-01 | 뼈대 | M1-01 | Codex | — | 구현 |\n| T2-01 | 다중 월드 | M2-01 | Codex | M1 | 계획 |\n| T2-02 | 지인 테스트 | M2-02 | 사용자 | M1 | 구현 |'),
+    );
+    const result = nextActions(rows);
+    expect(result.ahead.map((r) => r.id)).toEqual(['T2-01']);
+    const text = render(result);
+    expect(text).toContain('[계획] 구현 전 계획이 필요한 작업 1건');
+    expect(text).toContain('M2 1건: T2-01 다중 월드(구현 Codex)');
+  });
+
   it('형식이 틀리면 알려 준다', () => {
     expect(() => parseQueue(table('| T1-01 | 뼈대 | M1-01 | Gemini | — | 구현 |'))).toThrow('구현 담당');
     expect(() => parseQueue(table('| T1-01 | 뼈대 | M1-01 | Codex | — | 진행 |'))).toThrow('단계');
