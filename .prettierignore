@@ -1,0 +1,12 @@
+# .gitignore에 있는 것(생성물·테스트 산출물)은 프리티어가 따로 읽어서 건너뛴다. 이유: docs/plans/T1-21.md
+
+# 문서는 코드 포맷터로 다루지 않는다
+*.md
+
+# 데이터. 생성 스크립트 출력과 바이트 단위로 같아야 한다
+resources/
+
+# 기존 migration은 고치지 않는다
+packages/db/prisma/migrations/
+
+pnpm-lock.yaml

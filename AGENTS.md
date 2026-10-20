@@ -83,6 +83,8 @@ Codex와 Claude 모두 이 파일을 읽습니다. `CLAUDE.md`는 이 파일을 
 ```sh
 pnpm install        # 의존성 설치 (Node.js 24 이상)
 pnpm check          # Prisma 생성 + lint + 타입 + 단위 테스트 + 다음 작업 출력
+pnpm format         # 프리티어로 고치기 (설정: .prettierrc.json, 제외: .prettierignore)
+pnpm format:check   # 프리티어 검사만. pnpm check에는 T1-22(전체 포맷) 뒤에 들어간다
 pnpm next           # 다음 작업과 담당 (계획·구현·리뷰)
 pnpm db:up          # 로컬 PostgreSQL (docker compose)
 pnpm dev            # web·server·engine 동시 실행
