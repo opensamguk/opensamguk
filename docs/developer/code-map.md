@@ -24,6 +24,7 @@
 | `apps/server/src/router.ts` | tRPC `AppRouter` (API 계약). 지금은 `health`만 |
 | `apps/engine/src/index.ts` | 엔진 자리 (대기만 함) |
 | `apps/web/src/LoginPage.tsx` | 자리표시 로그인 화면과 서버 상태 표시 |
+| `apps/web/apiTarget.ts` | dev 프록시가 쓸 API 서버 주소 (`SERVER_PORT`) |
 | `apps/web/src/trpc.ts` | tRPC 클라이언트 (`AppRouter` 타입만 import) |
 | `packages/db/prisma/schema.prisma` | DB schema. 생성물은 `packages/db/src/generated/` (Git 제외) |
 | `packages/shared/src/gameDate.ts` | 게임 달력 |

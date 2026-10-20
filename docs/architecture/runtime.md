@@ -36,7 +36,8 @@ pnpm e2e               # 스모크 테스트 (dev 서버가 없으면 자동으�
 pnpm db:down           # DB 끄기 (데이터는 볼륨에 남음)
 ```
 
-- web은 `/trpc` 요청을 server로 프록시합니다.
+- web은 `/trpc` 요청을 server로 프록시합니다. 프록시 대상 포트는 server와 같은 `SERVER_PORT`를 따릅니다
+  (프로세스 환경변수 → 루트 `.env` → 3001, `apps/web/apiTarget.ts`).
 - server·engine은 `tsx watch`로 실행합니다. Node `--watch`는 macOS에서 파일 감시 한도를 넘어 실패했습니다.
 - Claude 실행 환경의 sandbox는 Docker 소켓과 로컬 포트를 막습니다. 그 환경에서는 sandbox 밖에서 실행하거나
   `sandbox.network.allowLocalBinding`을 켭니다.
