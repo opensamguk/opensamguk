@@ -38,3 +38,11 @@ PRD [§6.3](../product/prd.md#63-mvp-명령-세트)의 37개. 코드가 생기�
 
 <!-- TODO(M1): 명령 정의 인터페이스 코드 예시. -->
 <!-- TODO(M1): 실패 이유 코드 목록 (화면 번역용). -->
+
+## T1-05 명령 정의와 결과
+
+`commands/types.ts`의 CommandDef는 key·표시 이름·대상·zod 인자·precheck·check·execute를 가집니다. `runCommand()`가 입력과 실행 조건을 검사한 뒤 Effect와 로그를 반환하며, `applyEffects()`가 원본을 변경하지 않고 복사본에 적용합니다.
+
+실패 코드: NO_ACTOR, NOT_NATION, NOT_OWN_CITY, NO_SUPPLY, NO_GOLD, AT_MAX, BAD_ARGS, UNKNOWN_COMMAND. 실패에는 설명이 있고 Effect가 없습니다.
+
+내정은 능력치×민심×난수 점수에 치명·전선 보정을 적용합니다. 정착 장려는 인구에 round(점수×10), 주민 선정은 민심에 점수÷10(소수 유지)을 더하며 각각 금 200을 씁니다. 나머지 6종은 round(점수)를 더하고 금 100을 씁니다. 경험·공헌은 도시값의 단위 배율을 적용하기 전 점수로 계산합니다. RNG 순서는 점수 → 치명 판정 → 치명일 때만 배율입니다. 원작의 특기·장비·능력치별 치명 보정은 제외했습니다. 휴식은 비용 없이 부상을 1 회복합니다.

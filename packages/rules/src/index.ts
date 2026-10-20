@@ -4,3 +4,8 @@ export * from './world/bootstrap';
 export * from './world/resources';
 export * from './clock/constants';
 export * from './clock/clock';
+export * from './model/world';
+export * from './balance';
+export * from './commands/types';
+export * from './commands/effects';
+export * from './commands/registry';
