@@ -46,9 +46,10 @@ export async function renewLease(db: PrismaClient, lease: Lease): Promise<void> 
   if (count !== 1) throw new LeaseLostError();
 }
 
-export async function releaseLease(db: PrismaClient, lease: Lease): Promise<void> {
+export async function releaseLease(db: Prisma.TransactionClient, lease: Lease): Promise<void> {
   // 토큰을 지우지 않아 해제·재획득 뒤에도 이전 프로세스의 토큰을 재사용하지 않는다.
-  await db.$executeRaw`UPDATE "EngineLease" SET "expiresAt" = clock_timestamp() AT TIME ZONE 'UTC'
+  // TIMESTAMP(3) 반올림으로 해제 시각이 미래가 되지 않게 밀리초 아래를 버린다.
+  await db.$executeRaw`UPDATE "EngineLease" SET "expiresAt" = date_trunc('milliseconds', clock_timestamp() AT TIME ZONE 'UTC')
     WHERE "worldId" = ${lease.worldId} AND "ownerId" = ${lease.ownerId} AND "fencingToken" = ${lease.fencingToken}`;
 }
 
