@@ -1,38 +1,26 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
+import { getRouteApi, Link } from '@tanstack/react-router';
+import { AuthForm } from '../auth/AuthForm';
+import styles from '../auth/AuthPage.module.css';
 import { useTRPC } from '../trpc';
 
-// 로그인 자리. 실제 가입·로그인은 T1-14에서 연결한다 (API는 T1-10).
+const route = getRouteApi('/login');
+
 export function LoginPage() {
+  const { next } = route.useSearch();
   const trpc = useTRPC();
   const health = useQuery(trpc.health.queryOptions());
 
   return (
-    <main style={{ maxWidth: 360, margin: '64px auto' }}>
+    <main className={styles.page}>
       <h1>로그인</h1>
-      <form onSubmit={(e) => e.preventDefault()}>
-        <p>
-          <label>
-            이메일
-            <br />
-            <input type="email" name="email" autoComplete="email" />
-          </label>
-        </p>
-        <p>
-          <label>
-            비밀번호
-            <br />
-            <input type="password" name="password" autoComplete="current-password" />
-          </label>
-        </p>
-        <button type="submit" disabled>
-          로그인 (준비 중)
-        </button>
-      </form>
-      <p>
-        <Link to="/signup">가입하기</Link>
+      <AuthForm mode="login" next={next} />
+      <p className={styles.switch}>
+        계정이 없으면 <Link to="/signup" search={next ? { next } : {}}>가입하기</Link>
       </p>
-      <p role="status">{statusText(health)}</p>
+      <p role="status" className={styles.status}>
+        {statusText(health)}
+      </p>
     </main>
   );
 }

@@ -1,14 +1,22 @@
-import { createRootRoute, createRoute, createRouter, Outlet, redirect } from '@tanstack/react-router';
+import type { QueryClient } from '@tanstack/react-query';
+import { createRootRouteWithContext, createRoute, createRouter, Outlet, redirect, useRouter } from '@tanstack/react-router';
 import { GameLayout } from './layout/GameLayout';
 import { DevUiPage } from './pages/DevUiPage';
+import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { MainPage } from './pages/MainPage';
 import { Placeholder } from './pages/Placeholder';
 import { SignupPage } from './pages/SignupPage';
-import { EmptyState } from './ui/States';
+import { queryClient, trpc, type Trpc } from './trpc';
+import { EmptyState, ErrorState } from './ui/States';
 
-// 주소 체계: docs/plans/T1-13.md. 로그인 가드는 T1-14에서 auth.me로 붙인다.
-const rootRoute = createRootRoute({
+// 주소 체계: docs/plans/T1-13.md. 로그인 가드: docs/frontend-ui-guidelines.md §4.
+interface RouterContext {
+  queryClient: QueryClient;
+  trpc: Trpc;
+}
+
+const rootRoute = createRootRouteWithContext<RouterContext>()({
   component: Outlet,
   notFoundComponent: () => (
     <main style={{ maxWidth: 480, margin: '64px auto' }}>
@@ -17,18 +25,48 @@ const rootRoute = createRootRoute({
   ),
 });
 
+// 화면 이동마다 서버에 세션을 다시 묻는다. 캐시만 보면 다른 탭에서 로그아웃했거나
+// 세션이 만료된 뒤에도 이전 사용자로 통과한다 (T1-14 Codex 리뷰 1).
+async function currentUser({ queryClient, trpc }: RouterContext) {
+  const { user } = await queryClient.fetchQuery({ ...trpc.auth.me.queryOptions(), staleTime: 0 });
+  return user;
+}
+
+function GuardError() {
+  const router = useRouter();
+  return (
+    <main style={{ maxWidth: 480, margin: '64px auto' }}>
+      <ErrorState title="서버에 연결할 수 없습니다" onRetry={() => void router.invalidate()} />
+    </main>
+  );
+}
+
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  beforeLoad: () => {
-    throw redirect({ to: '/login' });
+  beforeLoad: async ({ context }) => {
+    if (!(await currentUser(context))) throw redirect({ to: '/login' });
   },
+  component: HomePage,
+  errorComponent: GuardError,
 });
 
-const loginRoute = createRoute({ getParentRoute: () => rootRoute, path: 'login', component: LoginPage });
-const signupRoute = createRoute({ getParentRoute: () => rootRoute, path: 'signup', component: SignupPage });
+const authSearch = (search: Record<string, unknown>): { next?: string } =>
+  typeof search.next === 'string' ? { next: search.next } : {};
 
-const worldRoute = createRoute({ getParentRoute: () => rootRoute, path: 'w/$worldId', component: GameLayout });
+const loginRoute = createRoute({ getParentRoute: () => rootRoute, path: 'login', validateSearch: authSearch, component: LoginPage });
+const signupRoute = createRoute({ getParentRoute: () => rootRoute, path: 'signup', validateSearch: authSearch, component: SignupPage });
+
+// 게임 화면은 모두 로그인이 필요하다. 로그인 뒤 원래 주소로 돌아오도록 next에 담는다.
+const worldRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'w/$worldId',
+  beforeLoad: async ({ context, location }) => {
+    if (!(await currentUser(context))) throw redirect({ to: '/login', search: { next: location.href } });
+  },
+  component: GameLayout,
+  errorComponent: GuardError,
+});
 
 const worldIndexRoute = createRoute({ getParentRoute: () => worldRoute, path: '/', component: MainPage });
 
@@ -94,7 +132,7 @@ const routeTree = rootRoute.addChildren([
   ...(import.meta.env.DEV ? [devUiRoute] : []),
 ]);
 
-export const router = createRouter({ routeTree });
+export const router = createRouter({ routeTree, context: { queryClient, trpc } });
 
 declare module '@tanstack/react-router' {
   interface Register {

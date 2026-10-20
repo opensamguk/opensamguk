@@ -1,4 +1,5 @@
 import { Link, Outlet, useParams } from '@tanstack/react-router';
+import { LogoutButton } from '../auth/LogoutButton';
 import { EmptyState } from '../ui/States';
 import styles from './GameLayout.module.css';
 
@@ -9,7 +10,7 @@ const NAV = [
   { to: '/w/$worldId/records', label: '기록' },
 ] as const;
 
-// 위쪽 띠(월드·연월·다음 턴·메뉴) + 왼쪽 내 장수 요약 + 본문.
+// 위쪽 띠(월드·연월·다음 턴·메뉴·로그아웃) + 왼쪽 내 장수 요약 + 본문.
 // 월드 요약과 장수 요약은 T1-16에서 world.summary·home.get으로 연결한다.
 export function GameLayout() {
   const { worldId } = useParams({ from: '/w/$worldId' });
@@ -37,6 +38,7 @@ export function GameLayout() {
             </Link>
           ))}
         </nav>
+        <LogoutButton className={styles.logout} />
       </header>
       <aside className={styles.sidebar} aria-label="내 장수">
         <EmptyState title="내 장수">T1-16에서 연결합니다.</EmptyState>

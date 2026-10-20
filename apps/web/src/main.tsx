@@ -6,10 +6,7 @@ import { RouterProvider } from '@tanstack/react-router';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { router } from './router';
-import { makeQueryClient, makeTrpcClient, TRPCProvider } from './trpc';
-
-const queryClient = makeQueryClient();
-const trpcClient = makeTrpcClient();
+import { queryClient, TRPCProvider, trpcClient } from './trpc';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('#root가 없습니다');

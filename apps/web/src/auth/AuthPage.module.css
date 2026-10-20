@@ -1,0 +1,15 @@
+.page {
+  max-width: 360px;
+  margin: 64px auto;
+  padding: 0 var(--space-4);
+}
+.switch {
+  margin: var(--space-6) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+.status {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
