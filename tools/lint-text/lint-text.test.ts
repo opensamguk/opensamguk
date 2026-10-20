@@ -214,6 +214,8 @@ describe('AC-M1-22 T1-25 pnpm lint:text 명령', () => {
     expect(collectTargets(dir, ['docs/sub']).map((t) => t.path)).toEqual(['docs/sub/b.md']);
     expect(collectTargets(dir, ['private'])).toEqual([]);
     expect(() => collectTargets(dir, ['../outside'])).toThrow('저장소 밖');
+    expect(collectTargets(dir, [join(dir, 'docs/sub/b.md')]).map((t) => t.path)).toEqual(['docs/sub/b.md']);
+    expect(() => collectTargets(dir, [tmpdir()])).toThrow('저장소 밖');
   });
 
   it('실제 명령의 종료 코드: 경고 0, --strict 1', { timeout: 60_000 }, () => {

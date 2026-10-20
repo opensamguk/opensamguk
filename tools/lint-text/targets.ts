@@ -1,6 +1,6 @@
 // 문구 검사 대상 파일 고르기 (T1-25). 범위: docs/plans/T1-25.md
 import { existsSync, readdirSync, statSync } from 'node:fs';
-import { join, relative, sep } from 'node:path';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { SourceKind } from './lint-text';
 
 export interface Target {
@@ -68,8 +68,9 @@ export function collectTargets(root: string, paths?: readonly string[]): Target[
   const files: string[] = [];
   const given = paths !== undefined && paths.length > 0;
   for (const path of given ? paths : DEFAULT_PATHS) {
-    const normalized = relative(root, join(root, path)).split(sep).join('/') || '.';
-    if (normalized.startsWith('..')) throw new Error(`저장소 밖 경로는 검사하지 않습니다: ${path}`);
+    const normalized = relative(root, resolve(root, path)).split(sep).join('/') || '.';
+    if (normalized.startsWith('..') || isAbsolute(normalized))
+      throw new Error(`저장소 밖 경로는 검사하지 않습니다: ${path}`);
     if (normalized === 'private' || normalized.startsWith('private/')) continue;
     if (!given && !existsSync(join(root, normalized))) continue;
     walk(root, normalized === '.' ? '' : normalized, files);
