@@ -1,0 +1,21 @@
+node_modules/
+dist/
+coverage/
+.turbo/
+*.log
+.DS_Store
+
+# 환경변수와 비밀값
+.env
+.env.*
+!.env.example
+
+# 테스트 산출물
+playwright-report/
+test-results/
+
+# Prisma 생성물
+packages/db/src/generated/
+
+# 로컬 도구 설정
+.claude/settings.local.json
