@@ -30,7 +30,7 @@ describe('AC-M1-04 실제 DB 시계', () => {
   });
   it('명령줄 create → start → pause → status → resume가 동작한다', async () => {
     const { worldId } = await create();
-    const run = (action: string) => JSON.parse(execFileSync('pnpm', ['-s', `world:${action}`, '--world', worldId], {
+    const run = (action: string) => JSON.parse(execFileSync(process.execPath, ['--import', 'tsx', 'apps/engine/src/cli/controlWorld.ts', action, '--world', worldId], {
       cwd: new URL('../../../../', import.meta.url), env: { ...process.env, DATABASE_URL: url }, encoding: 'utf8', timeout: 30_000,
     }).trim().split('\n').at(-1)!) as { status: string; tick: number };
     expect(run('start').status).toBe('RUNNING');

@@ -22,8 +22,12 @@
 | --------------------- | ------------------------ | -------------------------------------------------------------- | ---- | ---- |
 | `DATABASE_URL`        | PostgreSQL 연결          | `postgresql://opensamguk:opensamguk@127.0.0.1:5433/opensamguk` | 예   | 사용 중 |
 | `SERVER_PORT`         | API 서버 포트            | `3001`                                                         | 아니오 | 사용 중 |
-| `SESSION_SECRET`      | 세션 서명                | —                                                              | 예   | T1-10에서 |
+| `SESSION_SECRET`      | 사용하지 않음. 무작위 토큰의 SHA-256을 DB에서 조회 | — | — | 불필요 (T1-10) |
 | `VITE_IMAGE_BASE_URL` | 초상 이미지 base URL     | —                                                              | 아니오 (공개값) | T1-17에서 |
+
+세션 쿠키 `sid`는 HttpOnly·SameSite=Lax·Path=/이며 `NODE_ENV=production`에서 Secure를 붙입니다.
+DB에는 토큰 원문 대신 SHA-256만 저장하고, 만료는 활동 시 DB와 쿠키 모두 30일로 연장합니다.
+계정 상태가 ACTIVE가 아니거나 세션이 만료되면 인증하지 않습니다. 요청 로그에는 URL·본문·쿠키·원본 오류를 기록하지 않습니다.
 
 ## 3. 로컬 실행
 
@@ -46,7 +50,7 @@ pnpm world:create --scenario 1030 --map che --seed demo --turn-term 10 --name �
 
 생성된 월드 ID와 초기 상태 SHA-256을 출력합니다. 상태는 `PREOPEN`, 초기 tick은 0입니다.
 이름과 턴 간격(1~2147483647분)을 검사하고, 리소스 검사나 DB 저장 실패 시 부분 월드를 남기지 않습니다.
-월드 시작·일시정지·재개는 T1-04에서 추가합니다.
+월드 시작·일시정지·재개는 아래 월드 상태 전환 명령을 사용합니다.
 
 - web은 `/trpc` 요청을 server로 프록시합니다. 프록시 대상 포트는 server와 같은 `SERVER_PORT`를 따릅니다
   (프로세스 환경변수 → 루트 `.env` → 3001, `apps/web/apiTarget.ts`).

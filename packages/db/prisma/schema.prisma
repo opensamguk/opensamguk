@@ -108,6 +108,7 @@ model General {
   worldId        String
   id             Int
   userId         String?
+  user           User? @relation(fields: [userId], references: [id], onDelete: NoAction)
   affinity       Int
   name           String
   portraitId     Int?
@@ -141,6 +142,33 @@ model General {
   @@unique([worldId, userId])
   @@index([worldId, nationId])
   @@index([worldId, cityKey])
+}
+
+enum UserStatus {
+  ACTIVE
+  SANCTIONED
+  WITHDRAWN
+}
+
+model User {
+  id           String @id @default(uuid())
+  email        String @unique
+  passwordHash String
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime @default(now())
+  sessions     Session[]
+  generals     General[]
+}
+
+model Session {
+  id        String @id
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model Diplomacy {

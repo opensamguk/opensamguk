@@ -16,12 +16,16 @@
 | 새 화면                 | `apps/web/src/routes/`                                      |
 | 지도·시나리오·프리셋     | `resources/`                                                |
 
-## 지금 있는 파일 (T1-01~T1-03)
+## 지금 있는 파일
 
 | 경로 | 역할 |
 | ---- | ---- |
-| `apps/server/src/index.ts` | Fastify 시작, tRPC를 `/trpc`에 연결 |
-| `apps/server/src/router.ts` | tRPC `AppRouter` (API 계약). 지금은 `health`만 |
+| `apps/server/src/index.ts` | DB 연결과 HTTP 서버 시작·종료 |
+| `apps/server/src/server.ts` | Fastify 생성, 쿠키·인증 context, 비밀값을 제외한 로그 |
+| `apps/server/src/auth/` | Argon2id, 세션 토큰 해시·만료·연장, 실제 HTTP·DB 테스트 |
+| `apps/server/src/routers/auth.ts` | 가입·로그인·로그아웃·현재 계정 |
+| `apps/server/src/trpc.ts` | 공개·인증 필수 procedure |
+| `apps/server/src/router.ts` | tRPC `AppRouter` (API 계약): `health`, `auth` |
 | `apps/engine/src/index.ts` | 엔진 자리 (대기만 함) |
 | `apps/web/src/LoginPage.tsx` | 자리표시 로그인 화면과 서버 상태 표시 |
 | `apps/web/apiTarget.ts` | dev 프록시가 쓸 API 서버 주소 (`SERVER_PORT`) |

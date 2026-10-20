@@ -1,12 +1,11 @@
 import { RULESET_ID } from '@opensamguk/rules';
-import { initTRPC } from '@trpc/server';
-import type { Context } from './context';
+import { router, publicProcedure } from './trpc';
+import { authRouter } from './routers/auth';
 
-const t = initTRPC.context<Context>().create();
-
-export const appRouter = t.router({
+export const appRouter = router({
+  auth: authRouter,
   // 화면이 서버와 DB 연결을 확인하는 데 쓴다 (AC-M1-02).
-  health: t.procedure.query(async ({ ctx }) => {
+  health: publicProcedure.query(async ({ ctx }) => {
     let db: 'ok' | 'down' = 'ok';
     try {
       await ctx.db.$queryRaw`SELECT 1`;
