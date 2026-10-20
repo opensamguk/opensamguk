@@ -1,6 +1,6 @@
 # UI 지침
 
-> 상태: 뼈대 · 필요 시점: M1 화면 작업 전 · 관련 결정: D-007 · 관련 AC: M1-19, M3-08
+> 상태: 초안 (T1-13) · 레퍼런스: [design/references](./design/references/README.md) · 관련 결정: D-007 · 관련 AC: M1-19, M3-08
 > 참고: core2026 `frontend-css-architecture.md`, `frontend-typography.md`, `frontend-page-navigation.md` (셋을 합침)
 
 ## 1. 방향: 원작 정보량 + 모던 정리
@@ -33,11 +33,40 @@
 
 ## 3. 글자와 색
 
-<!-- TODO(M1): 글꼴(한글 본문, 숫자), 크기 단계, 색 토큰(라이트·다크). 외부 레퍼런스 수집 후 (A10). -->
+기준 파일: `apps/web/src/styles/tokens.css`. 화면 코드에 색·크기 값을 직접 쓰지 않고 토큰을 씁니다.
+
+| 종류 | 토큰 |
+| ---- | ---- |
+| 글꼴 | `--font-sans` = Pretendard Variable (npm `pretendard`, 자체 호스팅). 숫자는 `.num` 클래스(고정폭·오른쪽 정렬) |
+| 글자 크기 | `--text-xs` 12 · `sm` 13 · `md` 14(본문) · `lg` 16 · `xl` 20 · `2xl` 24 |
+| 간격 | `--space-1` 4 · `2` 8 · `3` 12 · `4` 16 · `6` 24 · `8` 32 |
+| 표 | `--row-height` 28px |
+| 바탕·글자 | `--color-bg`, `--color-surface`, `--color-surface-muted`, `--color-text`, `--color-text-muted`, `--color-border`, `--color-border-strong` |
+| 강조 | `--color-accent`, `--color-accent-text` |
+| 상태 | `--color-success`, `--color-danger`, `--color-warning`, `--color-info` |
+
+- 국가색은 토큰이 아니라 데이터에서 옵니다. 그 위 글자색은 `readableTextColor()`가 대비로 고릅니다.
+- 다크 모드는 같은 토큰 이름을 `prefers-color-scheme: dark`에서 바꿉니다. 다듬기는 M3(T3-10).
+- 공통 부품: `StatTable`, `ValueDelta`, `NationBadge`, `EmptyState`/`ErrorState`, `DisabledReason`. 개발 모드에서 `/dev/ui`로 상태별 모습을 봅니다.
 
 ## 4. 화면 이동
 
-<!-- TODO(M1): 주소 체계 (/w/:worldId/...), 새로고침·직접 접근, 뒤로 가기. -->
+라우터: TanStack Router (코드 기반, `apps/web/src/router.tsx`). 모든 주소는 직접 접근·새로고침이 됩니다 (`e2e/routes.spec.ts`).
+
+| 주소 | 화면 |
+| ---- | ---- |
+| `/login`, `/signup` | 로그인, 가입 |
+| `/w/:worldId` | 메인 |
+| `/w/:worldId/map` | 지도 |
+| `/w/:worldId/turns` | 예턴 편집 |
+| `/w/:worldId/city/:cityKey` | 도시 정보 |
+| `/w/:worldId/nation/:nationId` | 국가 정보 |
+| `/w/:worldId/records?tab=general\|nation\|world` | 기록 |
+| `/w/:worldId/create` | 장수 생성 |
+| `/dev/ui` | 부품 모음 (개발 모드만) |
+
+- 로그인 안 됨 → `/login?next=…`, 장수 없음 → `/w/:worldId/create` (T1-14·T1-15에서 연결).
+- 데이터는 TanStack Query + `@trpc/tanstack-react-query`의 `useTRPC()`로 가져옵니다.
 
 ## 5. 반응형 (M3)
 

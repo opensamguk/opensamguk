@@ -1,0 +1,29 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-areas:
+    'general city nation'
+    'turns logs logs';
+  gap: var(--space-4);
+}
+.panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+}
+.general {
+  grid-area: general;
+}
+.city {
+  grid-area: city;
+}
+.nation {
+  grid-area: nation;
+}
+.turns {
+  grid-area: turns;
+}
+.logs {
+  grid-area: logs;
+}

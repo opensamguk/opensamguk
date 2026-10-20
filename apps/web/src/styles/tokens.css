@@ -1,0 +1,60 @@
+/* 디자인 토큰. 원작 정보량 + 모던 정리 (D-007). 국가색은 토큰이 아니라 데이터에서 온다. */
+:root {
+  color-scheme: light dark;
+
+  --color-bg: #f4f2ee;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f9f8f5;
+  --color-text: #1f1d1a;
+  --color-text-muted: #6b665e;
+  --color-border: #ddd8cf;
+  --color-border-strong: #b9b2a5;
+  --color-accent: #8a5a2b;
+  --color-accent-text: #ffffff;
+
+  --color-success: #2e7d4f;
+  --color-danger: #b3261e;
+  --color-warning: #a86a00;
+  --color-info: #2f5f9e;
+
+  --font-sans: 'Pretendard Variable', Pretendard, system-ui, sans-serif;
+
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  --radius: 4px;
+  --row-height: 28px;
+  --topbar-height: 44px;
+  --sidebar-width: 240px;
+}
+
+/* 다크 모드는 자리만 둔다. 다듬기는 M3 (T3-10). */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #171614;
+    --color-surface: #211f1c;
+    --color-surface-muted: #1b1a18;
+    --color-text: #ece8e1;
+    --color-text-muted: #a39d93;
+    --color-border: #3a3631;
+    --color-border-strong: #57524a;
+    --color-accent: #c08a50;
+    --color-accent-text: #171614;
+
+    --color-success: #5cb984;
+    --color-danger: #ef6b62;
+    --color-warning: #e0a43a;
+    --color-info: #7aa7e6;
+  }
+}
