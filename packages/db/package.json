@@ -7,7 +7,8 @@
   },
   "scripts": {
     "generate": "prisma generate",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "migrate": "prisma migrate deploy"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.1",

@@ -9,6 +9,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@opensamguk/shared": "workspace:*"
+    "@opensamguk/shared": "workspace:*",
+    "zod": "^4.6.7"
   }
 }

@@ -30,11 +30,23 @@
 ```sh
 cp .env.example .env   # 처음 한 번
 pnpm install
+pnpm generate          # Prisma client 생성
 pnpm db:up             # PostgreSQL 18, 127.0.0.1:5433
+pnpm db:migrate        # 저장소의 migration 적용
 pnpm dev               # web 127.0.0.1:5173 · server 127.0.0.1:3001 · engine
 pnpm e2e               # 스모크 테스트 (dev 서버가 없으면 자동으로 켬)
 pnpm db:down           # DB 끄기 (데이터는 볼륨에 남음)
 ```
+
+월드 생성 (T1-03):
+
+```sh
+pnpm world:create --scenario 1030 --map che --seed demo --turn-term 10 --name 군웅할거
+```
+
+생성된 월드 ID와 초기 상태 SHA-256을 출력합니다. 상태는 `PREOPEN`, 초기 tick은 0입니다.
+이름과 턴 간격(1~2147483647분)을 검사하고, 리소스 검사나 DB 저장 실패 시 부분 월드를 남기지 않습니다.
+월드 시작·일시정지·재개는 T1-04에서 추가합니다.
 
 - web은 `/trpc` 요청을 server로 프록시합니다. 프록시 대상 포트는 server와 같은 `SERVER_PORT`를 따릅니다
   (프로세스 환경변수 → 루트 `.env` → 3001, `apps/web/apiTarget.ts`).

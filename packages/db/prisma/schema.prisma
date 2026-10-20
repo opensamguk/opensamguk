@@ -1,5 +1,4 @@
 // 데이터 모델 개요: docs/product/data-model.md
-// AC-M1-03에서 월드·국가·도시·장수 테이블을 더한다.
 
 generator client {
   provider = "prisma-client"
@@ -11,7 +10,144 @@ datasource db {
 }
 
 model World {
-  id        String   @id @default(uuid())
-  name      String
-  createdAt DateTime @default(now())
+  id              String      @id @default(uuid())
+  name            String
+  scenarioKey     String
+  mapKey          String
+  unitSetKey      String
+  seed            String
+  startYear       Int
+  turnTermMinutes Int
+  status          WorldStatus @default(PREOPEN)
+  clockTick       Int         @default(0)
+  initialStateHash String
+  statRules       Json
+  unitSet         Json
+  createdAt       DateTime    @default(now())
+  nations         Nation[]
+  cities          City[]
+  generals        General[]
+  diplomacies     Diplomacy[]
+}
+
+enum WorldStatus {
+  PREOPEN
+  RUNNING
+  PAUSED
+  ENDED
+}
+
+enum DiplomacyState {
+  WAR
+  DECLARED
+  NON_AGGRESSION
+}
+
+model Nation {
+  worldId        String
+  id             Int
+  name           String
+  color          String
+  gold           Int
+  rice           Int
+  description    String
+  tech           Float
+  philosophy     String
+  level          Int
+  capitalCityKey Int?
+  isNpc          Boolean @default(true)
+  world          World   @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  capital        City?   @relation("Capital", fields: [worldId, capitalCityKey], references: [worldId, cityKey], onDelete: NoAction)
+  cities         City[]  @relation("OwnedCities")
+  generals       General[]
+  diplomacyAsA   Diplomacy[] @relation("NationA")
+  diplomacyAsB   Diplomacy[] @relation("NationB")
+
+  @@id([worldId, id])
+}
+
+model City {
+  worldId       String
+  cityKey       Int
+  name          String
+  level         Int
+  region        Int
+  x             Float
+  y             Float
+  connections   Int[]
+  nationId      Int?
+  population    Int
+  populationMax Int
+  agriculture   Int
+  agricultureMax Int
+  commerce      Int
+  commerceMax   Int
+  security      Int
+  securityMax   Int
+  defence       Int
+  defenceMax    Int
+  wall          Int
+  wallMax       Int
+  trust         Float
+  supplied      Boolean
+  world         World   @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  nation        Nation? @relation("OwnedCities", fields: [worldId, nationId], references: [worldId, id], onDelete: NoAction)
+  capitalOf     Nation[] @relation("Capital")
+  generals      General[]
+
+  @@id([worldId, cityKey])
+  @@unique([worldId, name])
+  @@index([worldId, nationId])
+}
+
+model General {
+  worldId        String
+  id             Int
+  userId         String?
+  affinity       Int
+  name           String
+  portraitId     Int?
+  nationId       Int?
+  cityKey        Int
+  leadership     Int
+  strength       Int
+  intel          Int
+  officerLevel   Int
+  birthYear      Int
+  deathYear      Int
+  activeFromYear Int
+  personality    String?
+  special        String?
+  gold           Int
+  rice           Int
+  crew           Int
+  crewType       Int
+  train          Int
+  atmos          Int
+  experience     Int
+  dedication     Int
+  age            Int
+  injury         Int
+  nextTurnTick   Int
+  world          World   @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  nation         Nation? @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: NoAction)
+  city           City    @relation(fields: [worldId, cityKey], references: [worldId, cityKey], onDelete: NoAction)
+
+  @@id([worldId, id])
+  @@unique([worldId, userId])
+  @@index([worldId, nationId])
+  @@index([worldId, cityKey])
+}
+
+model Diplomacy {
+  worldId   String
+  nationA   Int
+  nationB   Int
+  state     DiplomacyState
+  untilTick Int
+  world     World  @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  a         Nation @relation("NationA", fields: [worldId, nationA], references: [worldId, id], onDelete: NoAction)
+  b         Nation @relation("NationB", fields: [worldId, nationB], references: [worldId, id], onDelete: NoAction)
+
+  @@id([worldId, nationA, nationB])
 }

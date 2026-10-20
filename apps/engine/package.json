@@ -4,9 +4,12 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=../../.env src/index.ts",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "world:create": "tsx --env-file-if-exists=../../.env src/cli/createWorld.ts"
   },
   "dependencies": {
-    "@opensamguk/rules": "workspace:*"
+    "@opensamguk/rules": "workspace:*",
+    "@opensamguk/shared": "workspace:*",
+    "@opensamguk/db": "workspace:*"
   }
 }

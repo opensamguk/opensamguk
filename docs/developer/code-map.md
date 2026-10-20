@@ -16,7 +16,7 @@
 | 새 화면                 | `apps/web/src/routes/`                                      |
 | 지도·시나리오·프리셋     | `resources/`                                                |
 
-## 지금 있는 파일 (T1-01·T1-02)
+## 지금 있는 파일 (T1-01~T1-03)
 
 | 경로 | 역할 |
 | ---- | ---- |
@@ -30,6 +30,13 @@
 | `packages/shared/src/gameDate.ts` | 게임 달력 |
 | `eslint.config.js` | 패키지 경계·결정성 규칙 |
 | `tools/next-task.mjs` | `pnpm next`: 다음 작업과 담당 출력 |
+| `resources/` | 지정된 core2026 리소스와 `NOTICE.md` 출처 고지 |
+| `packages/rules/src/world/` | 리소스 schema와 순수 초기 상태 변환 |
+| `packages/shared/src/rng.ts` | FNV-1a + Mulberry32 시드 RNG와 용도별 스트림 |
+| `packages/shared/src/node/hashState.ts` | Node 전용 상태 SHA-256 |
+| `apps/engine/src/world/` | 리소스 파일 읽기, 초기 상태 저장·재적재와 통합 테스트 |
+| `apps/engine/src/cli/createWorld.ts` | `pnpm world:create` |
+| `tools/run-integration.ts` | 전용 테스트 DB 준비·migration·통합 테스트 실행 |
 
 ## 새 저장 필드를 추가할 때 빠뜨리기 쉬운 것
 

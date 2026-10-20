@@ -87,9 +87,11 @@ pnpm next           # 다음 작업과 담당 (계획·구현·리뷰)
 pnpm db:up          # 로컬 PostgreSQL (docker compose)
 pnpm dev            # web·server·engine 동시 실행
 pnpm e2e            # Playwright
+pnpm test:int       # 전용 PostgreSQL DB로 통합 테스트
+pnpm db:migrate     # migration 적용
 ```
 
-아직 없는 명령: `pnpm test:int`(통합 테스트, AC-M1-03부터), `pnpm sim`(시뮬레이터, AC-M1-17).
+아직 없는 명령: `pnpm sim`(시뮬레이터, AC-M1-17).
 
 ## 9. Git
 

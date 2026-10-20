@@ -16,7 +16,10 @@
     "e2e": "playwright test",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
-    "next": "node tools/next-task.mjs"
+    "next": "node tools/next-task.mjs",
+    "world:create": "pnpm --filter @opensamguk/engine world:create",
+    "db:migrate": "pnpm --filter @opensamguk/db migrate",
+    "test:int": "pnpm generate && tsx --env-file-if-exists=.env tools/run-integration.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

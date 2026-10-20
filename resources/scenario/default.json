@@ -1,0 +1,13 @@
+{
+  "$comment": "Source: core2026 df6c926 / resources/scenario/default.json; MIT (c) 2025 devsam. See resources/NOTICE.md.",
+  "stat": {
+    "total": 165,
+    "min": 15,
+    "max": 80,
+    "npcTotal": 150,
+    "npcMax": 75,
+    "npcMin": 10,
+    "chiefMin": 65
+  },
+  "iconPath": "."
+}

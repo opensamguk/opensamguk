@@ -19,8 +19,8 @@ const BOUNDARY_MESSAGE = '패키지 의존 방향 위반입니다. docs/architec
 
 // Node 내장 모듈 전체 (접두사 없는 이름, 하위 경로, node: 접두사). 목록을 손으로 관리하지 않는다.
 const NODE_BUILTINS = [
-  'node:*',
-  ...builtinModules.filter((name) => !name.startsWith('_')).flatMap((name) => [name, `${name}/*`]),
+  '/node:*',
+  ...builtinModules.filter((name) => !name.startsWith('_')).flatMap((name) => [`/${name}`, `/${name}/*`]),
 ];
 
 function importRule(allowed, { banBuiltins = false, typeOnly = [] } = {}) {
@@ -36,7 +36,7 @@ function importRule(allowed, { banBuiltins = false, typeOnly = [] } = {}) {
     });
   }
   if (banBuiltins) {
-    patterns.push({ group: NODE_BUILTINS, message: 'rules는 파일·네트워크·프로세스를 쓰지 않습니다.' });
+    patterns.push({ group: [...NODE_BUILTINS, '/@opensamguk/shared/node'], message: 'rules는 파일·네트워크·프로세스를 쓰지 않습니다.' });
   }
   return ['error', { patterns }];
 }

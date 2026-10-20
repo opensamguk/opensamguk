@@ -1,8 +1,11 @@
 import { ESLint } from 'eslint';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 // eslint.config.js의 경계 규칙이 실제로 막는지 확인한다 (AC-M1-01).
 const eslint = new ESLint();
+
+// Cold plugin loading can exceed a single assertion's timeout on a busy machine.
+beforeAll(async () => { await eslint.calculateConfigForFile('packages/rules/src/x.ts'); }, 30_000);
 
 async function ruleIds(code: string, filePath: string): Promise<string[]> {
   const [result] = await eslint.lintText(code, { filePath });
@@ -68,5 +71,7 @@ describe('패키지 경계', () => {
     expect(await ruleIds("export * from '../model/index';\n", 'packages/rules/src/commands/x.ts')).not.toContain(
       'opensamguk/no-cross-package-relative',
     );
+    expect(await ruleIds("export * from '../clock/constants';\n", 'packages/rules/src/world/x.ts')).toEqual([]);
+    expect(await ruleIds("export * from '@opensamguk/shared/node';\n", 'packages/rules/src/x.ts')).toContain('no-restricted-imports');
   });
 });

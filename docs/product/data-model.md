@@ -48,7 +48,7 @@
 
 | 테이블        | 주요 필드                                                                                  | 관문 |
 | ------------- | ------------------------------------------------------------------------------------------ | ---- |
-| `World`       | id, name, scenarioKey, mapKey, presetKey, status(PREOPEN·RUNNING·PAUSED·ENDED), turnTermMinutes, seed, clockTick, clockAnchorAt, startedAt, endedAt | M1 |
+| `World`       | id, name, scenarioKey, mapKey, unitSetKey, startYear, status(PREOPEN·RUNNING·PAUSED·ENDED), turnTermMinutes, seed, clockTick, initialStateHash, statRules, unitSet. clockAnchorAt·startedAt·endedAt는 T1-04 이후 | M1 |
 | `EngineLease` | worldId(PK), ownerId, fencingToken, expiresAt                                              | M1   |
 | `InputEvent`  | id, worldId, actorUserId, generalId, kind, payload, idempotencyKey(월드 안에서 고유), status(PENDING·DONE·FAILED), result, createdAt, processedAt | M1 |
 
@@ -56,9 +56,9 @@
 
 | 테이블      | 주요 필드                                                                                   | 관문 |
 | ----------- | ------------------------------------------------------------------------------------------- | ---- |
-| `Nation`    | id, worldId, name, color, capitalCityId, gold, rice, taxRate, payRate, tech, level, notice, isNpc, foundedTick, destroyedTick | M1 |
+| `Nation`    | (worldId, id) PK, name, color, capitalCityKey, gold, rice, description, philosophy, tech, level, isNpc. taxRate·payRate·notice·foundedTick·destroyedTick는 후속 작업 | M1 |
 | `City`      | (worldId, cityKey) PK, name, nationId, population·Max, agriculture·Max, commerce·Max, security·Max, defence·Max, wall·Max, trust(민심), supplied | M1 |
-| `General`   | id, worldId, userId(NPC면 없음), name, portraitId, nationId, cityId, officerLevel, leadership, strength, intel, gold, rice, crew, crewType, train, atmos, experience, dedication, age, injury, nextTurnTick, defenceMode, npcKind, lastActiveAt, turnRevision | M1 |
+| `General`   | (worldId, id) PK, userId(NPC면 없음), name, portraitId, nationId, cityKey, officerLevel, leadership, strength, intel, affinity, birthYear, deathYear, activeFromYear, personality, special, gold, rice, crew, crewType, train, atmos, experience, dedication, age, injury, nextTurnTick. defenceMode·npcKind·lastActiveAt·turnRevision는 후속 작업 | M1 |
 | `GeneralTurn` | (generalId, slot 0~29) PK, commandKey, args                                               | M1   |
 | `NationTurn`  | (nationId, officerLevel, slot 0~11) PK, commandKey, args                                  | M1   |
 | `Diplomacy`   | (worldId, nationA, nationB) PK (A < B), state(NEUTRAL·DECLARED·WAR·NON_AGGRESSION), untilTick, treatyId | M1 |
@@ -105,4 +105,4 @@ core2026 리소스를 옮길 때는 파일 머리나 `resources/NOTICE`에 출�
 ## 정할 것
 
 - tick 단위: core2026처럼 1턴을 큰 정수(36,000,000 tick)로 둘지, 더 단순하게 갈지. M1 엔진 작업 첫날 정합니다.
-- `officerLevel` 숫자 체계: 원작(0 재야 ~ 12 군주)을 따를지.
+- `officerLevel`은 원작 숫자 0~12를 보존합니다 (T1-03). 0 재야, 1 장수, 5~10 수뇌, 11 참모, 12 군주입니다.

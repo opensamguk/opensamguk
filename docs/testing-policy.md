@@ -44,4 +44,18 @@ core2026 측정값을 참고합니다. 장수 880명·도시 94개를 NPC만으�
 
 ## 5. 통합 테스트 준비
 
-<!-- TODO(M1): 테스트용 DB를 Docker로 띄우는 법. 통합 테스트는 DB를 비우므로 개발 DB와 나눈다. -->
+```sh
+pnpm db:up
+pnpm test:int
+```
+
+`tools/run-integration.ts`가 전용 DB를 만들고 migration을 적용한 뒤 테스트를 실행합니다.
+기본 대상은 같은 PostgreSQL의 `opensamguk_test`입니다. 다른 대상은 `.env`의 `TEST_DATABASE_URL`로 지정합니다.
+DB 생성 권한이 없으면 해당 계정의 전용 테스트 DB를 먼저 준비해야 합니다.
+
+테스트 DB 이름은 소문자·숫자·밑줄로 구성하고 `_test`로 끝나야 합니다.
+개발 `DATABASE_URL`과 호스트·포트·DB 이름이 같으면 시작 전에 거부합니다.
+테스트는 이 전용 DB의 월드 데이터를 시작·종료 시 지웁니다. 개발 DB는 비우지 않습니다.
+
+통합 파일은 `*.integration.test.ts`이며 `pnpm check`의 단위 테스트에서 제외합니다.
+DB가 없거나 migration·테스트가 실패하면 명령이 실패하고, skip으로 통과시키지 않습니다.
