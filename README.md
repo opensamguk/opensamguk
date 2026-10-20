@@ -51,4 +51,5 @@ PostgreSQL · Prisma · Vitest · Playwright · Docker Compose · Caddy
 
 - **core2026** (MIT, © 2025 devsam): 구조와 규칙을 참고합니다. 코드나 리소스를 옮길 때는 출처와 MIT 고지를 남깁니다.
 - **이미지**: [이미지 자산](docs/image-assets.md)을 보세요. 공개 전에 라이선스 관문(AC-M3-06)을 통과해야 합니다.
-- 이 저장소의 라이선스는 아직 정하지 않았습니다.
+- 이 저장소의 코드와 문서는 [MIT](LICENSE)입니다. 옮겨 온 리소스의 출처와 원 라이선스는 [resources/NOTICE.md](resources/NOTICE.md)에 있습니다.
+  이미지 저장소의 그림은 이 라이선스에 포함되지 않습니다 ([이미지 자산](docs/image-assets.md) §3).
