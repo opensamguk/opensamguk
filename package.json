@@ -10,6 +10,7 @@
     "dev": "pnpm --parallel --filter \"./apps/*\" dev",
     "generate": "pnpm --filter @opensamguk/db generate",
     "lint": "eslint .",
+    "lint:text": "tsx tools/lint-text/cli.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "pnpm -r typecheck",
