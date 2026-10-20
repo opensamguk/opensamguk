@@ -25,11 +25,6 @@ export function parseQueue(markdown) {
     }
     rows.push({ id: match[1], milestone: Number(match[2]), title, ac, owner, deps, stage });
   }
-  for (const owner of OWNERS) {
-    if (rows.filter((row) => row.owner === owner && row.stage === '진행중').length > 1) {
-      throw new Error(`${owner}: 진행중 작업은 한 번에 하나만 둡니다`);
-    }
-  }
   return rows;
 }
 
@@ -106,13 +101,17 @@ export function render({ milestone, ready, blocked, ahead = [] }) {
       lines.push(`${label} 할 일 없음`);
       continue;
     }
-    const [first, ...rest] = items;
-    const handoff = first.what.startsWith('계획')
-      ? ` · 구현은 ${first.row.owner}`
-      : ['구현', '진행중'].includes(first.what) && first.row.owner !== '사용자'
-        ? ` · 리뷰는 ${REVIEWER[first.row.owner]}`
-        : '';
-    lines.push(`${label} ${first.what} ${first.row.id} ${first.row.title} (AC-${first.row.ac})${handoff}`);
+    const active = items.filter((item) => item.what === '진행중');
+    const shownItems = active.length > 0 ? active : items.slice(0, 1);
+    const rest = items.filter((item) => !shownItems.includes(item));
+    for (const item of shownItems) {
+      const handoff = item.what.startsWith('계획')
+        ? ` · 구현은 ${item.row.owner}`
+        : ['구현', '진행중'].includes(item.what) && item.row.owner !== '사용자'
+          ? ` · 리뷰는 ${REVIEWER[item.row.owner]}`
+          : '';
+      lines.push(`${label} ${item.what} ${item.row.id} ${item.row.title} (AC-${item.row.ac})${handoff}`);
+    }
     if (rest.length > 0) {
       const shown = rest
         .slice(0, 5)

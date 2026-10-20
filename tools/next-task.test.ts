@@ -14,10 +14,36 @@ describe('다음 작업 출력', () => {
     expect(render(result)).toContain('[Codex] 진행중 T1-02');
   });
 
-  it('담당별 동시 진행중 두 건은 거부한다', () => {
-    expect(() =>
-      parseQueue(table('| T1-01 | 하나 | M1-01 | Codex | — | 진행중 |\n| T1-02 | 둘 | M1-02 | Codex | — | 진행중 |')),
-    ).toThrow('한 번에 하나');
+  it.each(['Codex', 'Claude', '사용자'])('%s 담당의 동시 진행중 여러 건을 허용한다', (owner) => {
+    const rows = parseQueue(
+      table(`| T1-01 | 하나 | M1-01 | ${owner} | — | 진행중 |\n| T1-02 | 둘 | M1-02 | ${owner} | — | 진행중 |`),
+    );
+    expect(nextActions(rows).ready[owner]?.map((item) => item.row.id)).toEqual(['T1-01', 'T1-02']);
+  });
+
+  it('진행중이 많아도 모두 표시하고 구현 대기만 요약한다', () => {
+    const active = Array.from({ length: 8 }, (_, i) => `T1-${String(i + 2).padStart(2, '0')}`);
+    const rows = parseQueue(
+      table(
+        [
+          '| T1-01 | 대기 | M1-01 | Codex | — | 구현 |',
+          ...active.map((id) => `| ${id} | 병렬 작업 | M1-01 | Codex | — | 진행중 |`),
+        ].join('\n'),
+      ),
+    );
+    const output = render(nextActions(rows));
+    expect(output.match(/^\[Codex\] 진행중 /gm)).toHaveLength(8);
+    for (const id of active) expect(output).toContain(`[Codex] 진행중 ${id} 병렬 작업`);
+    expect(output).toContain('그 밖에 1건: T1-01 구현');
+  });
+
+  it('병렬 작업이어도 선행이 완료되지 않은 진행중 작업은 선행 대기로 표시한다', () => {
+    const rows = parseQueue(
+      table('| T1-01 | 선행 | M1-01 | Codex | — | 진행중 |\n| T1-02 | 후속 | M1-02 | Codex | T1-01 | 진행중 |'),
+    );
+    const result = nextActions(rows);
+    expect(result.ready.Codex?.map((item) => item.row.id)).toEqual(['T1-01']);
+    expect(result.blocked.map((item) => item.row.id)).toEqual(['T1-02']);
   });
   it('구현이 끝난 작업의 리뷰는 반대쪽이 맡는다', () => {
     const rows = parseQueue(
