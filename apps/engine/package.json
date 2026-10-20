@@ -5,7 +5,11 @@
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=../../.env src/index.ts",
     "typecheck": "tsc -p tsconfig.json",
-    "world:create": "tsx --env-file-if-exists=../../.env src/cli/createWorld.ts"
+    "world:create": "tsx --env-file-if-exists=../../.env src/cli/createWorld.ts",
+    "world:start": "tsx --env-file-if-exists=../../.env src/cli/controlWorld.ts start",
+    "world:pause": "tsx --env-file-if-exists=../../.env src/cli/controlWorld.ts pause",
+    "world:resume": "tsx --env-file-if-exists=../../.env src/cli/controlWorld.ts resume",
+    "world:status": "tsx --env-file-if-exists=../../.env src/cli/controlWorld.ts status"
   },
   "dependencies": {
     "@opensamguk/rules": "workspace:*",

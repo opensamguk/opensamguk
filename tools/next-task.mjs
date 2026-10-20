@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // 다음 작업과 담당을 출력한다. 기준: docs/product/phases.md의 작업 대기열.
-// 흐름: 계획(Claude) → 구현(담당) → 리뷰(구현하지 않은 쪽) → 완료
+// 흐름: 계획(Claude) → 구현 대기 → 진행중(담당) → 리뷰(구현하지 않은 쪽) → 완료
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const STAGES = ['계획', '구현', '리뷰', '완료'];
+const STAGES = ['계획', '구현', '진행중', '리뷰', '완료'];
 const OWNERS = ['Codex', 'Claude', '사용자'];
 const REVIEWER = { Codex: 'Claude', Claude: 'Codex' };
 
@@ -22,6 +22,11 @@ export function parseQueue(markdown) {
       throw new Error(`${match[1]}: 사용자 작업은 구현·완료 단계만 씁니다`);
     }
     rows.push({ id: match[1], milestone: Number(match[2]), title, ac, owner, deps, stage });
+  }
+  for (const owner of OWNERS) {
+    if (rows.filter((row) => row.owner === owner && row.stage === '진행중').length > 1) {
+      throw new Error(`${owner}: 진행중 작업은 한 번에 하나만 둡니다`);
+    }
   }
   return rows;
 }
@@ -48,7 +53,7 @@ function resolveDeps(row, rows) {
 // 구현 전에 계획이 있어야 한다: 단계가 '계획'이거나, '구현'인데 계획 문서가 없으면 계획이 필요하다.
 function needsPlan(row, hasPlan) {
   if (row.owner === '사용자') return false;
-  return row.stage === '계획' || (row.stage === '구현' && !hasPlan(row.id));
+  return row.stage === '계획' || (['구현', '진행중'].includes(row.stage) && !hasPlan(row.id));
 }
 
 // 현재 관문(완료되지 않은 첫 관문)에서 담당별로 지금 할 수 있는 일을 고르고,
@@ -71,7 +76,7 @@ export function nextActions(rows, { hasPlan = () => true } = {}) {
       what = '리뷰';
     } else {
       who = row.owner;
-      what = row.owner === '사용자' ? '진행' : '구현';
+      what = row.stage === '진행중' ? '진행중' : row.owner === '사용자' ? '진행' : '구현';
       if (waitingOn.length > 0) {
         blocked.push({ row, who, what, waitingOn });
         continue;
@@ -79,6 +84,7 @@ export function nextActions(rows, { hasPlan = () => true } = {}) {
     }
     (ready[who] ??= []).push({ row, what });
   }
+  for (const items of Object.values(ready)) items.sort((a, b) => Number(b.row.stage === '진행중') - Number(a.row.stage === '진행중'));
   const ahead = rows.filter((r) => r.milestone > current && needsPlan(r, hasPlan));
   return { milestone: current, ready, blocked, ahead };
 }
@@ -87,7 +93,7 @@ export function render({ milestone, ready, blocked, ahead = [] }) {
   if (milestone === null) return '모든 작업이 완료됐습니다.';
   const lines = [
     `다음 작업 · 현재 관문 M${milestone} · 기준: docs/product/phases.md`,
-    '흐름: 계획(Claude) → 구현(담당) → 리뷰(구현하지 않은 쪽)',
+    '흐름: 계획(Claude) → 구현 대기 → 진행중(담당) → 리뷰(구현하지 않은 쪽)',
     '',
   ];
   for (const who of ['Codex', 'Claude', '사용자']) {
@@ -100,7 +106,7 @@ export function render({ milestone, ready, blocked, ahead = [] }) {
     const [first, ...rest] = items;
     const handoff = first.what.startsWith('계획')
       ? ` · 구현은 ${first.row.owner}`
-      : first.what === '구현'
+      : ['구현', '진행중'].includes(first.what) && first.row.owner !== '사용자'
         ? ` · 리뷰는 ${REVIEWER[first.row.owner]}`
         : '';
     lines.push(`${label} ${first.what} ${first.row.id} ${first.row.title} (AC-${first.row.ac})${handoff}`);

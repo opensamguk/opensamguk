@@ -60,4 +60,4 @@ pnpm world:create --scenario 1030 --map che --seed demo --turn-term 10 --name �
 
 ## 5. 월드 상태 전환
 
-<!-- TODO(M1): PREOPEN → RUNNING ⇄ PAUSED → ENDED. 누가 어떤 명령으로 바꾸나. -->
+`pnpm world:start --world <ID>`로 시작하고, `world:pause`, `world:resume`, `world:status`도 같은 인자를 받습니다. 정지 중에는 tick이 고정됩니다. 시각은 rules에 인자로 주입하며 엔진이 DB 시각·revision을 저장합니다. 게임 턴 실행은 T1-06에서 연결합니다.

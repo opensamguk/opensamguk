@@ -20,6 +20,10 @@ model World {
   turnTermMinutes Int
   status          WorldStatus @default(PREOPEN)
   clockTick       Int         @default(0)
+  clockAnchorAt   DateTime?
+  clockRevision   Int         @default(0)
+  startedAt       DateTime?
+  endedAt         DateTime?
   initialStateHash String
   statRules       Json
   unitSet         Json

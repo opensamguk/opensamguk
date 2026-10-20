@@ -5,6 +5,16 @@ import { nextActions, parseQueue, render } from './next-task.mjs';
 const table = (rows: string) => `| ID | 작업 | AC | 구현 | 선행 | 단계 |\n| -- | -- | -- | -- | -- | -- |\n${rows}`;
 
 describe('다음 작업 출력', () => {
+  it('진행중 작업은 다른 구현 대기보다 먼저 표시한다', () => {
+    const rows = parseQueue(table('| T1-01 | 대기 | M1-01 | Codex | — | 구현 |\n| T1-02 | 착수 | M1-02 | Codex | — | 진행중 |'));
+    const result = nextActions(rows);
+    expect(result.ready.Codex?.[0]).toMatchObject({ what: '진행중', row: { id: 'T1-02' } });
+    expect(render(result)).toContain('[Codex] 진행중 T1-02');
+  });
+
+  it('담당별 동시 진행중 두 건은 거부한다', () => {
+    expect(() => parseQueue(table('| T1-01 | 하나 | M1-01 | Codex | — | 진행중 |\n| T1-02 | 둘 | M1-02 | Codex | — | 진행중 |'))).toThrow('한 번에 하나');
+  });
   it('구현이 끝난 작업의 리뷰는 반대쪽이 맡는다', () => {
     const rows = parseQueue(
       table('| T1-01 | 백엔드 | M1-01 | Codex | — | 리뷰 |\n| T1-02 | 화면 | M1-02 | Claude | — | 리뷰 |'),

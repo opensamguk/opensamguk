@@ -3,3 +3,4 @@ export const RULESET_ID = 'opensamguk-mvp';
 export * from './world/bootstrap';
 export * from './world/resources';
 export * from './clock/constants';
+export * from './clock/clock';
