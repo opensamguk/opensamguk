@@ -34,7 +34,7 @@
 | -------------------------------------- | ---- | --------- |
 | [작업 계획 틀과 규칙](./plans/README.md) | 초안 | 지금 |
 | [T1-01 저장소 뼈대](./plans/T1-01.md), [T1-02 로컬 실행](./plans/T1-02.md) | 완료 | 지금 |
-| M1 작업 계획 [T1-03](./plans/T1-03.md) ~ [T1-17](./plans/T1-17.md), [T1-19](./plans/T1-19.md), [T1-20](./plans/T1-20.md) ~ [T1-22](./plans/T1-22.md) | 계획 완료 | 지금 |
+| M1 작업 계획 [T1-03](./plans/T1-03.md) ~ [T1-17](./plans/T1-17.md), [T1-19](./plans/T1-19.md), [T1-20](./plans/T1-20.md) ~ [T1-25](./plans/T1-25.md) | 계획 완료 | 지금 |
 | M2 작업 계획 [T2-01](./plans/T2-01.md) ~ [T2-17](./plans/T2-17.md), [T2-20](./plans/T2-20.md) ~ [T2-23](./plans/T2-23.md) | 계획 완료 | M2 |
 | M3 작업 계획                           | 예정 | M3 전 |
 
@@ -96,6 +96,7 @@
 | [테스트 정책](./testing-policy.md)                 | 뼈대 | M1 |
 | [수치 상태 정책](./numeric-state-policy.md)        | 뼈대 | M1 |
 | [UI 지침](./frontend-ui-guidelines.md)             | 초안 | M1 |
+| [글쓰기 규칙](./writing-style.md)                  | 초안 | 지금 |
 | [이미지 자산](./image-assets.md)                   | 초안 | M1 |
 | [릴리스 운영](./release-operations.md)             | 뼈대 | M2 |
 | [관리자 콘솔](./admin-console.md)                  | 뼈대 | M3 |
