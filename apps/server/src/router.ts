@@ -1,9 +1,11 @@
 import { RULESET_ID } from '@opensamguk/rules';
 import { router, publicProcedure } from './trpc';
 import { authRouter } from './routers/auth';
+import { worldRouter } from './routers/world';
 
 export const appRouter = router({
   auth: authRouter,
+  world: worldRouter,
   // 화면이 서버와 DB 연결을 확인하는 데 쓴다 (AC-M1-02).
   health: publicProcedure.query(async ({ ctx }) => {
     let db: 'ok' | 'down' = 'ok';
