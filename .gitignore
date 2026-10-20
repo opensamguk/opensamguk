@@ -22,3 +22,6 @@ packages/db/src/generated/
 
 # pnpm이 sandbox 안에서 만든 로컬 저장소
 .pnpm-store/
+
+# 비공개 자료 (공개 저장소에 올리지 않음): v1 요소 목록·v1 백로그 등
+/private/
