@@ -18,7 +18,7 @@
 
 | 관문                           | 전체 | ✅ | 🟨 | ⬜ |
 | ------------------------------ | ---- | -- | -- | -- |
-| M1 혼자 + NPC로 한 판 완주     | 21   | 0  | 2  | 19 |
+| M1 혼자 + NPC로 한 판 완주     | 21   | 1  | 1  | 19 |
 | M2 지인 테스트                 | 17   | 0  | 0  | 17 |
 | M3 공개 오픈 = MVP 완료        | 16   | 0  | 0  | 16 |
 
@@ -35,8 +35,8 @@
 
 | ID        | 조건 | 검증 방법 | 상태 | 증거 |
 | --------- | ---- | --------- | ---- | ---- |
-| AC-M1-01  | 새로 클론한 저장소에서 `pnpm install` 다음 `pnpm check`(lint·타입·테스트)가 통과한다 | 깨끗한 폴더에서 명령 실행 로그 | 🟨 | 2026-10-20 Codex 재검증: `4122b70`의 Git 추적 파일만 빈 폴더에 풀어 `pnpm install --frozen-lockfile` → `pnpm check` 통과 (Prisma 생성, lint 0건, 타입 6개 패키지, 테스트 16개). 리뷰는 수정 필요: 형제 패키지 상대 import·일부 Node 내장 모듈이 lint를 통과함. [T1-01 리뷰](../plans/T1-01.md#리뷰-codex) |
-| AC-M1-02  | `docker compose up`으로 DB를 띄우고 `pnpm dev`로 web·server·engine을 켜면 브라우저에 로그인 화면이 나온다 | Playwright 스모크 테스트 | 🟨 | 2026-10-20 Codex 재검증: 실제 DB로 `pnpm db:up` → `pnpm e2e` 1개 통과. 리뷰는 수정 필요: `SERVER_PORT=3002 pnpm e2e`는 고정된 웹 프록시 포트 때문에 서버 연결 실패. T1-01 완료 후 수정. [T1-02 리뷰](../plans/T1-02.md#리뷰-codex) |
+| AC-M1-01  | 새로 클론한 저장소에서 `pnpm install` 다음 `pnpm check`(lint·타입·테스트)가 통과한다 | 깨끗한 폴더에서 명령 실행 로그 | ✅ | 2026-10-20 Codex 재리뷰 통과. 수정 커밋 `6336033`을 포함한 `40738ec`의 Git 추적 파일만 빈 폴더에 풀어 `pnpm install --frozen-lockfile` → `pnpm check` 통과 (Prisma 생성, lint 0건, 타입 6개 패키지, 테스트 17개). 이전 지적을 포함한 독립 ESLint 검사도 통과. [T1-01 리뷰](../plans/T1-01.md#리뷰-codex) |
+| AC-M1-02  | `docker compose up`으로 DB를 띄우고 `pnpm dev`로 web·server·engine을 켜면 브라우저에 로그인 화면이 나온다 | Playwright 스모크 테스트 | 🟨 | 2026-10-20 최초 검증에서 실제 DB로 `pnpm db:up` → `pnpm e2e` 1개 통과. `SERVER_PORT=3002 pnpm e2e`는 고정된 웹 프록시 포트 때문에 서버 연결 실패. 재리뷰에서 관련 코드 미수정을 확인했으며 현재 Claude의 수정 차례. [T1-02 리뷰](../plans/T1-02.md#리뷰-codex) |
 
 ### 월드·시나리오
 
