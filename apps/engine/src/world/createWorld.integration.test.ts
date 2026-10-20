@@ -27,6 +27,11 @@ describe('AC-M1-03 실제 DB 월드 생성', () => {
       const read = await readWorldState(db, result.worldId);
       expect([read.cities.length, read.nations.length, read.generals.length, read.diplomacies.length]).toEqual([94, 21, 491, 7]);
       expect(read).toEqual(state);
+      const withPortraits = read.generals.filter((general) => general.portraitId !== null);
+      expect(withPortraits.length).toBe(429);
+      expect(withPortraits.length / read.generals.length).toBeGreaterThanOrEqual(0.8);
+      expect(read.generals.find((general) => general.name === '조조')?.portraitId).toBe(10405);
+      expect(read.generals.find((general) => general.name === '고승')?.portraitId).toBeNull();
       expect(hashState(read)).toBe(result.stateHash);
       expect(result.stateHash).toBe(hashState(state));
       const world = await db.world.findUniqueOrThrow({ where: { id: result.worldId } });

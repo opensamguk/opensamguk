@@ -1,6 +1,6 @@
 import { rngFor } from '@opensamguk/shared';
 import { TICKS_PER_MONTH } from '../clock/constants';
-import { mapSchema, scenarioSchema, statRulesSchema, unitSetSchema } from './resources';
+import { mapSchema, portraitMapSchema, scenarioSchema, statRulesSchema, unitSetSchema } from './resources';
 import type { StatRules, UnitSetResource } from './resources';
 
 export interface InitialCity {
@@ -94,13 +94,14 @@ export interface WorldInit {
 }
 
 export function buildInitialWorld(input: {
-  map: unknown; scenario: unknown; unitSet: unknown; statRules: unknown; seed: string;
+  map: unknown; scenario: unknown; unitSet: unknown; statRules: unknown; seed: string; portraitMap?: unknown;
 }): WorldInit {
   if (typeof input.seed !== 'string' || input.seed.length === 0) throw new Error('시드가 비어 있습니다.');
   const map = mapSchema.parse(input.map);
   const scenario = scenarioSchema.parse(input.scenario);
   const unitSet = unitSetSchema.parse(input.unitSet);
   const statRules = statRulesSchema.parse(input.statRules).stat;
+  const portraits = portraitMapSchema.parse(input.portraitMap ?? { portraits: {} }).portraits;
   const mapCities = [...map.cities].sort((a, b) => a.id - b.id);
   const byId = new Map(mapCities.map((city) => [city.id, city]));
   const byName = new Map(mapCities.map((city) => [city.name, city]));
@@ -165,7 +166,7 @@ export function buildInitialWorld(input: {
     if (cityName !== null && !explicitCity) throw new Error(`${name}: 지도에 없는 도시 ${cityName}`);
     const cityKey = explicitCity?.id ?? rng.pick(nationId === null ? allCities : ownedCities.get(nationId)!);
     return {
-      id: i + 1, userId: null, affinity, name, portraitId: null, nationId, cityKey,
+      id: i + 1, userId: null, affinity, name, portraitId: Object.hasOwn(portraits, name) ? portraits[name]! : null, nationId, cityKey,
       leadership, strength, intel, officerLevel, birthYear, deathYear, activeFromYear: birthYear + 15,
       personality, special,
       // core2026 df6c926 bootstrap의 초기 금·쌀을 참고. resources/NOTICE.md.

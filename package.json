@@ -23,7 +23,8 @@
     "world:start": "pnpm --filter @opensamguk/engine world:start",
     "world:pause": "pnpm --filter @opensamguk/engine world:pause",
     "world:resume": "pnpm --filter @opensamguk/engine world:resume",
-    "world:status": "pnpm --filter @opensamguk/engine world:status"
+    "world:status": "pnpm --filter @opensamguk/engine world:status",
+    "portraits:map": "tsx tools/portrait-map/generate.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

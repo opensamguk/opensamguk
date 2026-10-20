@@ -34,7 +34,8 @@
 | `packages/shared/src/gameDate.ts` | 게임 달력 |
 | `eslint.config.js` | 패키지 경계·결정성 규칙 |
 | `tools/next-task.mjs` | `pnpm next`: 다음 작업과 담당 출력 |
-| `resources/` | 지정된 core2026 리소스와 `NOTICE.md` 출처 고지 |
+| `resources/` | 지정된 core2026 리소스·초상 대응표와 `NOTICE.md` 출처 고지 |
+| `tools/portrait-map/` | 초상 이름 대응 생성기, 원본 스냅샷, 후속 수정용 `manual.json` |
 | `packages/rules/src/world/` | 리소스 schema와 순수 초기 상태 변환 |
 | `packages/shared/src/rng.ts` | FNV-1a + Mulberry32 시드 RNG와 용도별 스트림 |
 | `packages/shared/src/node/hashState.ts` | Node 전용 상태 SHA-256 |

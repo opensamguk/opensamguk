@@ -12,11 +12,12 @@ export async function loadInitialWorld(options: {
   scenario: string; map: string; seed: string; unitSet?: string;
 }) {
   const readJson = async (path: string): Promise<unknown> => JSON.parse(await readFile(new URL(path, resourceRoot), 'utf8'));
-  const [map, scenario, unitSet, statRules] = await Promise.all([
+  const [map, scenario, unitSet, statRules, portraitMap] = await Promise.all([
     readJson(`map/${resourceKey(options.map)}.json`),
     readJson(`scenario/${resourceKey(options.scenario)}.json`),
     readJson(`unitset/${resourceKey(options.unitSet ?? 'basic')}.json`),
     readJson('scenario/default.json'),
+    readJson('portraits/rtk14-map.json'),
   ]);
-  return buildInitialWorld({ map, scenario, unitSet, statRules, seed: options.seed });
+  return buildInitialWorld({ map, scenario, unitSet, statRules, portraitMap, seed: options.seed });
 }

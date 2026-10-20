@@ -3,6 +3,9 @@ import { z } from 'zod';
 const natural = z.number().int().nonnegative();
 const positive = z.number().int().positive();
 const name = z.string().min(1);
+export const portraitMapSchema = z.object({
+  portraits: z.record(name, z.number().int().min(10001).max(11000)),
+});
 const cityValues = z.object({
   population: natural, agriculture: natural, commerce: natural,
   security: natural, defence: natural, wall: natural,
