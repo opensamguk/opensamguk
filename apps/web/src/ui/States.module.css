@@ -1,0 +1,33 @@
+.empty,
+.error {
+  padding: var(--space-6) var(--space-4);
+  border-radius: var(--radius);
+  text-align: center;
+}
+.empty {
+  border: 1px dashed var(--color-border-strong);
+  color: var(--color-text-muted);
+}
+.error {
+  border: 1px solid var(--color-danger);
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 6%, transparent);
+}
+.title {
+  margin: 0;
+  font-weight: 600;
+}
+.body {
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+}
+.retry {
+  margin-top: var(--space-3);
+  font: inherit;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid currentColor;
+  border-radius: var(--radius);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}

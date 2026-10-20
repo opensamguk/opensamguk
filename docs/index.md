@@ -86,6 +86,7 @@
 | 문서                                   | 상태 | 필요 시점 |
 | -------------------------------------- | ---- | --------- |
 | [설계 문서 틀](./design/README.md)     | 초안 | 차별화 기능 착수 전 |
+| [화면 레퍼런스](./design/references/README.md) | 초안 (A10 확인 대기) | 지금 |
 
 ## 운영·품질
 
@@ -93,7 +94,7 @@
 | -------------------------------------------------- | ---- | --------- |
 | [테스트 정책](./testing-policy.md)                 | 뼈대 | M1 |
 | [수치 상태 정책](./numeric-state-policy.md)        | 뼈대 | M1 |
-| [UI 지침](./frontend-ui-guidelines.md)             | 뼈대 | M1 |
+| [UI 지침](./frontend-ui-guidelines.md)             | 초안 | M1 |
 | [이미지 자산](./image-assets.md)                   | 초안 | M1 |
 | [릴리스 운영](./release-operations.md)             | 뼈대 | M2 |
 | [관리자 콘솔](./admin-console.md)                  | 뼈대 | M3 |
