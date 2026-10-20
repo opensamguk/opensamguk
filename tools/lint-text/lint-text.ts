@@ -239,119 +239,162 @@ function maskTablePathCells(line: string): string {
   });
 }
 
-// 블록 구조는 CommonMark를 줄여서 따른다. 인용(>)과 목록 항목 안의 들여쓰기를 기준으로
-// 펜스 코드 블록과 들여쓴 코드 블록(기준보다 4칸 이상, 문단 중간이 아닐 때)을 찾는다.
+// 블록 구조는 CommonMark를 줄여서 따른다. 줄마다 열린 컨테이너(인용, 목록 항목)를 바깥부터 맞춰 보고,
+// 남은 자리에서 새 컨테이너를 여는 대로 모두 연 뒤, 가장 안쪽의 첫 내용이 코드인지 판정한다.
+// 그래서 한 줄에 인용과 목록 표지가 몇 겹이든, 표지 바로 뒤가 펜스나 들여쓴 코드여도 같은 경로를 탄다.
+// 칸은 탭을 4칸 정지로 펼쳐서 센다. 코드로 판정한 줄은 통째로 가린다(남는 것은 컨테이너 표지뿐이다).
 const FENCE_OPEN = /^(`{3,})[^`]*$|^(~{3,})/;
-const LIST_MARKER = /^(?:[-+*]|\d{1,9}[.)])(?=[ \t]|$)/;
+const FENCE_CLOSE = /^(`{3,}|~{3,})[ \t]*$/;
+const LIST_MARKER = /^(?:[-+*]|(\d{1,9})[.)])(?= |$)/;
 const THEMATIC_BREAK = /^(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,})$/;
+const ATX_HEADING = /^#{1,6}(?: |$)/;
 
-function splitQuote(raw: string, maxDepth = Infinity): { depth: number; content: string } {
-  let depth = 0;
-  let content = raw;
-  while (depth < maxDepth) {
-    const marker = content.match(/^ {0,3}> ?/);
-    if (!marker) break;
-    depth += 1;
-    content = content.slice(marker[0].length);
-  }
-  return { depth, content };
+interface ListItem {
+  kind: 'list';
+  /** 바깥 컨테이너의 내용 시작점에서 항목 내용까지의 칸. 인용 표지 앞 공백은 줄마다 달라서 절대 칸으로 두지 않는다. */
+  width: number;
+  /** 내용이나 하위 컨테이너가 생겼는가. 빈 채로 열린 항목은 빈 줄에서 끝난다. */
+  filled: boolean;
+}
+type Container = { kind: 'quote' } | ListItem;
+type Leaf = { kind: 'paragraph' } | { kind: 'indented' } | { kind: 'fence'; marker: string } | null;
+
+function expandTabs(line: string): string {
+  let out = '';
+  for (const char of line) out += char === '\t' ? ' '.repeat(4 - (out.length % 4)) : char;
+  return out;
 }
 
-function columns(whitespace: string, start = 0): number {
-  let column = start;
-  for (const char of whitespace) column = char === '\t' ? column + 4 - (column % 4) : column + 1;
-  return column - start;
+function spacesAt(line: string, pos: number): number {
+  let end = pos;
+  while (line[end] === ' ') end += 1;
+  return end - pos;
 }
 
-interface CodeBlock {
-  /** 인용 깊이 */
-  depth: number;
-  /** 목록 항목이 정한 들여쓰기 기준 */
-  base: number;
-  /** 펜스 코드 블록이면 여는 펜스, 들여쓴 코드 블록이면 null */
-  fence: string | null;
+// 목록 표지로 시작하면 표지 앞에서 항목 내용까지의 칸 수를 돌려준다. 표지 뒤가 1~4칸이면 거기서 내용이
+// 시작한다. 5칸 이상이거나 비었으면 1칸 뒤에서 시작하고, 나머지 칸은 내용의 들여쓰기(들여쓴 코드)다.
+// 문단을 끊을 때는 빈 항목과 1이 아닌 번호 목록이 항목을 열지 못한다.
+function listItemWidth(text: string, interruptsParagraph: boolean): number | null {
+  const marker = text.match(LIST_MARKER);
+  if (!marker) return null;
+  const markerEnd = marker[0].length;
+  const gap = spacesAt(text, markerEnd);
+  const empty = markerEnd + gap === text.length;
+  if (interruptsParagraph && (empty || (marker[1] !== undefined && marker[1] !== '1'))) return null;
+  return markerEnd + (empty || gap > 4 ? 1 : gap);
+}
+
+// 컨테이너 표지가 빠진 줄이 앞 문단에 이어지는가(게으른 이어쓰기). 새 블록을 여는 줄이면 이어지지 않는다.
+// 이때는 바깥 컨테이너에서 새 블록을 여는 것이라 빈 항목이나 1이 아닌 번호 목록도 항목을 연다.
+function continuesParagraph(line: string, pos: number): boolean {
+  const indent = spacesAt(line, pos);
+  const text = line.slice(pos + indent);
+  if (text === '') return false;
+  if (indent >= 4) return true;
+  return !(
+    text[0] === '>' ||
+    FENCE_OPEN.test(text) ||
+    ATX_HEADING.test(text) ||
+    THEMATIC_BREAK.test(text) ||
+    listItemWidth(text, false) !== null
+  );
 }
 
 export function maskMarkdown(source: string, { keepIgnoreComments = false } = {}): string {
-  let code: CodeBlock | null = null;
-  let lists: number[] = [];
-  let quoteDepth = 0;
-  let paragraph = false;
+  let containers: Container[] = [];
+  let leaf: Leaf = null;
 
   const maskLine = (raw: string): string => {
-    if (code) {
-      const { depth, content } = splitQuote(raw, code.depth);
-      const lead = content.match(/^[ \t]*/)![0];
-      const indent = columns(lead);
-      const empty = lead.length === content.length;
-      // 인용이 끝나거나 목록 항목보다 덜 들여쓰면 코드 블록도 끝난다.
-      const inside = depth === code.depth && (empty || indent >= code.base);
-      if (inside && code.fence) {
-        const close = content.slice(lead.length).match(/^(`{3,}|~{3,})[ \t]*$/);
-        if (
-          close &&
-          indent - code.base <= 3 &&
-          close[1]![0] === code.fence[0] &&
-          close[1]!.length >= code.fence.length
-        ) {
-          code = null;
-        }
+    const line = expandTabs(raw);
+    let pos = 0;
+
+    // 1. 열린 컨테이너를 바깥부터 맞춰 본다. 빈 줄은 인용을 끝내고, 내용 없이 열린 목록 항목도 끝낸다.
+    let matched = 0;
+    for (const container of containers) {
+      const indent = spacesAt(line, pos);
+      if (container.kind === 'quote') {
+        // 이미 열린 인용은 표지 앞이 4칸 이상 들여써져도 이어 본다. markdown-it과 같고,
+        // 코드로 보고 가리는 쪽보다 글로 보고 검사하는 쪽을 고른 것이다.
+        if (line[pos + indent] !== '>') break;
+        pos += indent + 1;
+        if (line[pos] === ' ') pos += 1;
+      } else if (pos + indent === line.length) {
+        if (!container.filled) break;
+        pos = line.length;
+      } else {
+        if (indent < container.width) break;
+        pos += container.width;
+      }
+      matched += 1;
+    }
+
+    // 2. 컨테이너가 모두 이어지면 열린 코드 블록도 이어진다. 하나라도 끝나면 그 안의 블록도 끝난다.
+    if (matched === containers.length) {
+      if (leaf?.kind === 'fence') {
+        const indent = spacesAt(line, pos);
+        const close = line.slice(pos + indent).match(FENCE_CLOSE)?.[1];
+        if (indent <= 3 && close && close[0] === leaf.marker[0] && close.length >= leaf.marker.length) leaf = null;
         return blank(raw);
       }
-      if (inside && (empty || indent - code.base >= 4)) return blank(raw);
-      code = null;
+      if (leaf?.kind === 'indented') {
+        const indent = spacesAt(line, pos);
+        if (indent >= 4 || pos + indent === line.length) return blank(raw);
+        leaf = null;
+      }
+    } else if (leaf?.kind === 'paragraph' && continuesParagraph(line, pos)) {
+      return maskInline(raw, keepIgnoreComments);
+    } else {
+      containers = containers.slice(0, matched);
+      leaf = null;
     }
 
-    const { depth, content } = splitQuote(raw);
-    const lead = content.match(/^[ \t]*/)![0];
-    const body = content.slice(lead.length);
-    const indent = columns(lead);
-    if (body.trim() === '') {
-      quoteDepth = depth;
-      paragraph = false;
+    // 3. 남은 자리에서 새 컨테이너를 모두 연다. 한 줄에 인용과 목록 표지가 겹쳐도 차례로 연다.
+    for (;;) {
+      const indent = spacesAt(line, pos);
+      if (indent >= 4) break;
+      const start = pos + indent;
+      const text = line.slice(start);
+      if (text[0] === '>') {
+        containers.push({ kind: 'quote' });
+        pos = start + 1;
+        if (line[pos] === ' ') pos += 1;
+        leaf = null;
+        continue;
+      }
+      // 문단 바로 아래의 - 줄은 제목 밑줄이다.
+      if (THEMATIC_BREAK.test(text) || (leaf?.kind === 'paragraph' && /^-+[ \t]*$/.test(text))) break;
+      const width = listItemWidth(text, leaf?.kind === 'paragraph');
+      if (width === null) break;
+      containers.push({ kind: 'list', width: indent + width, filled: false });
+      pos = Math.min(start + width, line.length);
+      leaf = null;
+    }
+
+    // 4. 가장 안쪽 컨테이너의 첫 내용을 판정한다. 문단 중간이 아니면 4칸 이상 들여쓴 줄은 코드다.
+    const indent = spacesAt(line, pos);
+    const text = line.slice(pos + indent);
+    for (const [i, container] of containers.entries()) {
+      if (container.kind === 'list' && (text !== '' || i < containers.length - 1)) container.filled = true;
+    }
+    if (text === '') {
+      leaf = null;
       return raw;
     }
-    const startsBlock =
-      LIST_MARKER.test(body) || FENCE_OPEN.test(body) || /^#{1,6}(?:[ \t]|$)/.test(body) || THEMATIC_BREAK.test(body);
-    // 인용 밖으로 나온 줄도 문단 중간이면 앞 문단에 이어진다.
-    const lazy = paragraph && !startsBlock;
-    if (depth !== quoteDepth && !(depth < quoteDepth && lazy)) {
-      lists = [];
-      paragraph = false;
-    }
-    quoteDepth = depth;
-    if (!lazy) while (lists.length > 0 && indent < lists.at(-1)!) lists.pop();
-    const base = lists.at(-1) ?? 0;
-
-    if (!paragraph && indent - base >= 4) {
-      code = { depth, base, fence: null };
+    if (indent >= 4) {
+      if (leaf?.kind === 'paragraph') return maskInline(raw, keepIgnoreComments);
+      leaf = { kind: 'indented' };
       return blank(raw);
     }
-    if (indent - base <= 3) {
-      let rest = body;
-      let restBase = base;
-      const marker = body.match(LIST_MARKER);
-      if (marker) {
-        const after = body.slice(marker[0].length);
-        const gap = after.match(/^[ \t]*/)![0];
-        const markerEnd = indent + marker[0].length;
-        const width = columns(gap, markerEnd);
-        restBase = markerEnd + (width >= 1 && width <= 4 && gap.length < after.length ? width : 1);
-        lists.push(restBase);
-        rest = after.slice(gap.length);
-      }
-      const fence = rest.match(FENCE_OPEN);
-      if (fence) {
-        code = { depth, base: restBase, fence: fence[1] ?? fence[2]! };
-        paragraph = false;
-        return marker ? raw.slice(0, raw.length - rest.length) + blank(rest) : blank(raw);
-      }
-      if (/^#{1,6}(?:[ \t]|$)/.test(rest) || THEMATIC_BREAK.test(rest) || (paragraph && /^=+[ \t]*$/.test(rest))) {
-        paragraph = false;
-      } else {
-        paragraph = rest.trim() !== '';
-      }
+    const fence = text.match(FENCE_OPEN);
+    if (fence) {
+      leaf = { kind: 'fence', marker: fence[1] ?? fence[2]! };
+      return blank(raw);
     }
+    const ends =
+      ATX_HEADING.test(text) ||
+      THEMATIC_BREAK.test(text) ||
+      (leaf?.kind === 'paragraph' && /^(?:=+|-+)[ \t]*$/.test(text));
+    leaf = ends ? null : { kind: 'paragraph' };
     return maskInline(raw, keepIgnoreComments);
   };
 

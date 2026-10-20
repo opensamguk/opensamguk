@@ -120,6 +120,36 @@ describe('AC-M1-22 T1-25 문구 검사: 건너뛰는 곳', () => {
     expect(md('- ```ts\n  const a = "가지고 있다";\n  ```')).toEqual([]);
   });
 
+  it('한 줄에 겹친 목록과 인용 표지 뒤의 코드와 표지 바로 뒤의 들여쓴 코드도 보지 않는다', () => {
+    const nested = [
+      '- > ```\n  > 가지고 있다\n  > ```',
+      '- - ```\n    가지고 있다\n    ```',
+      '-     가지고 있다',
+      '> - ```\n>   가지고 있다\n>   ```',
+      '1. > - ~~~\n   >   되어진다\n   >   ~~~',
+      '* >     가지고 있다',
+      '-\t    가지고 있다',
+    ];
+    for (const source of nested) expect(md(source)).toEqual([]);
+    // 같은 코드 뒤에 빈 줄과 코드 밖 문장을 붙이면 그 문장만 걸린다.
+    for (const source of nested) {
+      const lines = source.split('\n').length;
+      expect(md(`${source}\n\n가지고 있다`).map((f) => `${f.line} ${f.id}`)).toEqual([`${lines + 2} A-7`]);
+    }
+  });
+
+  it('겹친 표지 뒤라도 코드가 아닌 내용은 본다', () => {
+    expect(ids(md('- > 가지고 있다'))).toEqual(['A-7']);
+    expect(ids(md('- - 가지고 있다'))).toEqual(['A-7']);
+    expect(ids(md('-    가지고 있다'))).toEqual(['A-7']);
+    expect(ids(md('- > ```\n  > 코드\n  > ```\n  > 가지고 있다'))).toEqual(['A-7']);
+    expect(ids(md('- - ```\n    코드\n  가지고 있다'))).toEqual(['A-7']);
+    expect(ids(md('- 문단\n-     가지고 있다'))).toEqual([]);
+    expect(ids(md('문단\n2.     가지고 있다'))).toEqual(['A-7']);
+    // 이미 열린 인용은 표지 앞이 4칸 이상 들여써져도 이어진다. 코드로 가리지 않는다.
+    expect(ids(md('> >\n    > 가지고 있다'))).toEqual(['A-7']);
+  });
+
   it('인용이나 목록 항목이 끝나면 그 안의 코드 블록도 끝난다', () => {
     expect(md('> ```ts\n> 코드\n> ```\n> 가지고 있다').map((f) => f.line)).toEqual([4]);
     expect(md('> ```\n> 코드\n가지고 있다').map((f) => f.line)).toEqual([3]);
@@ -313,6 +343,20 @@ describe('AC-M1-22 T1-25 pnpm lint:text 명령', () => {
     const cleanRun = run(clean, '--strict');
     expect(cleanRun).toMatchObject({ status: 0, stderr: '' });
     expect(cleanRun.stdout).toContain('걸린 곳 없음');
+  });
+
+  it('겹친 목록·인용 표지 뒤 코드의 종료 코드', () => {
+    const samples = [
+      '- > ```\n  > 가지고 있다\n  > ```\n',
+      '- - ```\n    가지고 있다\n    ```\n',
+      '-     가지고 있다\n',
+    ];
+    for (const sample of samples) {
+      expect(run(fixture({ 'docs/a.md': sample }), '--strict')).toMatchObject({ status: 0, stderr: '' });
+      const caught = run(fixture({ 'docs/a.md': `${sample}\n가지고 있다\n` }), '--strict');
+      expect(caught.status).toBe(1);
+      expect(caught.stdout).toContain('1건 (A-7 1)');
+    }
   });
 
   it('실제 명령의 종료 코드: 경고 0, --strict 1', { timeout: 60_000 }, () => {
