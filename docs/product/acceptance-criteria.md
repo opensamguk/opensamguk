@@ -35,7 +35,7 @@
 
 | ID        | 조건 | 검증 방법 | 상태 | 증거 |
 | --------- | ---- | --------- | ---- | ---- |
-| AC-M1-01  | 새로 클론한 저장소에서 `pnpm install` 다음 `pnpm check`(lint·타입·테스트)가 통과한다 | 깨끗한 폴더에서 명령 실행 로그 | ✅ | 2026-10-20 Codex 재리뷰 통과. 수정 커밋 `6336033`을 포함한 `40738ec`의 Git 추적 파일만 빈 폴더에 풀어 `pnpm install --frozen-lockfile` → `pnpm check` 통과 (Prisma 생성, lint 0건, 타입 6개 패키지, 테스트 17개). 이전 지적을 포함한 독립 ESLint 검사도 통과. [T1-01 리뷰](../plans/T1-01.md#리뷰-codex). T1-21 설정 추가도 Codex 리뷰 통과: prettier 3.9.9 고정·제외 목록·frozen 설치 확인, 현재 작업 트리 `pnpm check` 단위 103개 통과. 전체 포맷은 T1-22. [T1-21 리뷰](../plans/T1-21.md#리뷰-codex) |
+| AC-M1-01  | 새로 클론한 저장소에서 `pnpm install` 다음 `pnpm check`(lint·타입·테스트)가 통과한다 | 깨끗한 폴더에서 명령 실행 로그 | ✅ | 2026-10-20 Codex 재리뷰 통과. 수정 커밋 `6336033`을 포함한 `40738ec`의 Git 추적 파일만 빈 폴더에 풀어 `pnpm install --frozen-lockfile` → `pnpm check` 통과 (Prisma 생성, lint 0건, 타입 6개 패키지, 테스트 17개). 이전 지적을 포함한 독립 ESLint 검사도 통과. [T1-01 리뷰](../plans/T1-01.md#리뷰-codex). T1-21 설정 추가도 Codex 리뷰 통과: prettier 3.9.9 고정·제외 목록·frozen 설치 확인, 현재 작업 트리 `pnpm check` 단위 103개 통과. [T1-21 리뷰](../plans/T1-21.md#리뷰-codex). T1-22 Codex 독립 리뷰 통과: 포맷 전 `03300fd`·후 `4505937`에 같은 CI만 추가한 실행 39414531777·39414535326에서 frozen 설치·check 단위106·DB33·E2E24·웹 빌드 결과가 같다. 최신 원본 `3a526e5`의 실행39413811270은 check 단위110·DB33·E2E24 통과. 들여쓰기 반례 실행39414541369에서 check exit1 확인 후 원본 tree로 복원. [T1-22 리뷰](../plans/T1-22.md#리뷰-codex) |
 | AC-M1-02  | `docker compose up`으로 DB를 띄우고 `pnpm dev`로 web·server·engine을 켜면 브라우저에 로그인 화면이 나온다 | Playwright 스모크 테스트 | ✅ | 2026-10-20 Codex 재리뷰 통과 (`c367e6c`). 기존 dev 리스너 없이 실제 PostgreSQL 18로 `pnpm db:up` → `pnpm e2e` 1개 통과, `SERVER_PORT=3002 pnpm e2e` 1개 통과. 두 실행 모두 로그인 화면과 서버·DB 정상 표시 확인. `pnpm check`도 테스트 21개 통과. [T1-02 리뷰](../plans/T1-02.md#리뷰-codex) |
 
 ### 월드·시나리오
