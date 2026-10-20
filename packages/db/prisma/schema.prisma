@@ -33,6 +33,12 @@ model World {
   generals        General[]
   diplomacies     Diplomacy[]
   engineLease     EngineLease?
+  monthlyTick     Int         @default(0)
+  actionSequence  Int         @default(0)
+  replayOrigin    Json?
+  inputEvents     InputEvent[]
+  nationHistory   NationHistory[]
+  yearbooks       YearbookSnapshot[]
 }
 
 enum WorldStatus {
@@ -220,4 +226,52 @@ model Diplomacy {
   b         Nation @relation("NationB", fields: [worldId, nationB], references: [worldId, id], onDelete: NoAction)
 
   @@id([worldId, nationA, nationB])
+}
+
+enum InputEventStatus {
+  PENDING
+  APPLIED
+  REJECTED
+}
+
+model InputEvent {
+  id             BigInt @id @default(autoincrement())
+  worldId        String
+  userId         String
+  generalId      Int?
+  kind           String
+  idempotencyKey String
+  payload        Json
+  status         InputEventStatus @default(PENDING)
+  sequence       Int?
+  result         Json?
+  createdAt      DateTime @default(now())
+  world          World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@unique([worldId, userId, idempotencyKey])
+  @@unique([worldId, sequence])
+  @@index([worldId, status, id])
+}
+
+model NationHistory {
+  worldId  String
+  tick     Int
+  nationId Int
+  data     Json
+  world    World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@id([worldId, tick, nationId])
+}
+
+model YearbookSnapshot {
+  worldId   String
+  tick      Int
+  year      Int
+  month     Int
+  sequence  Int
+  data      Json
+  stateHash String
+  world     World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@id([worldId, tick])
 }
