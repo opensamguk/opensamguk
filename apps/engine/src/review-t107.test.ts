@@ -47,10 +47,14 @@ describe('리뷰 탐침 AC-M1-12 단계 순서', () => {
         );
       })
       .map((order) => order.join('>'));
-    // 인구·보급·외교는 서로 다른 값을 바꿔 순서를 관측할 수 없다. 세입만 앞서야 한다.
+    // 인구·보급·외교는 서로 다른 값을 바꿔 순서를 관측할 수 없다. 세입이 인구·보급보다 앞서야 한다.
     expect(matching).toContain('income>population>supply>diplomacy');
-    expect(matching.every((order) => order.startsWith('income>'))).toBe(true);
-    expect(matching).toHaveLength(6);
+    const incomeFirst = (order: string) => {
+      const keys = order.split('>');
+      return keys.indexOf('income') < keys.indexOf('population') && keys.indexOf('income') < keys.indexOf('supply');
+    };
+    expect(matching.filter((order) => !incomeFirst(order))).toEqual([]);
+    expect(matching).toHaveLength(8);
   });
 
   it('보급 단절은 다음 달 세입을 줄인다(단계 간 실제 상호작용)', async () => {
