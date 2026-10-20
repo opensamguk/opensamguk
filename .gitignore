@@ -19,3 +19,6 @@ packages/db/src/generated/
 
 # 로컬 도구 설정
 .claude/settings.local.json
+
+# pnpm이 sandbox 안에서 만든 로컬 저장소
+.pnpm-store/

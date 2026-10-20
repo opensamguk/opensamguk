@@ -1,0 +1,17 @@
+// 데이터 모델 개요: docs/product/data-model.md
+// AC-M1-03에서 월드·국가·도시·장수 테이블을 더한다.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model World {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+}

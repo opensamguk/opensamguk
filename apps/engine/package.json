@@ -1,0 +1,12 @@
+{
+  "name": "@opensamguk/engine",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=../../.env src/index.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@opensamguk/rules": "workspace:*"
+  }
+}

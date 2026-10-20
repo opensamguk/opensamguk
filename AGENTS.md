@@ -1,19 +1,43 @@
 # opensamguk 작업 지침
 
-사람과 AI 모두에게 적용합니다. `CLAUDE.md`는 이 파일을 가리킵니다.
+사람과 AI(Codex, Claude) 모두에게 적용합니다.
 지난번 시도가 늘어진 이유는 "무엇을 하는지, 언제 끝나는지 모르는 것"이었습니다. 아래 규칙은 그것을 막기 위해 있습니다.
+
+## 0. 담당과 흐름 (D-012)
+
+Codex와 Claude 모두 이 파일을 읽습니다. `CLAUDE.md`는 이 파일을 가리킵니다.
+
+```text
+계획 (Claude) ──▶ 구현 (담당) ──▶ 리뷰 (구현하지 않은 쪽) ──▶ 완료
+```
+
+| 영역 | 경로 | 구현 | 리뷰 |
+| ---- | ---- | ---- | ---- |
+| 백엔드 | `apps/server`, `apps/engine`, `packages/*`, `resources/`, `docker-compose.yml`, 운영 스크립트 | **Codex** | Claude |
+| 프론트 | `apps/web`, `e2e/`, `docs/user/`, `docs/frontend-ui-guidelines.md` | **Claude** | Codex |
+| 계획 | `docs/plans/`, `docs/product/` | **Claude** | 사용자 |
+| 공통 설정 | 루트 `package.json`, `eslint.config.js`, `tsconfig.base.json`, `vitest.config.ts`, `playwright.config.ts`, `tools/` | 필요한 쪽 | 반대쪽 |
+
+- **다음 할 일은 `pnpm next`로 봅니다.** 기준은 [단계 계획의 작업 대기열](docs/product/phases.md)입니다.
+- **계획**: Claude가 [작업 계획](docs/plans/README.md)을 쓰고 대기열 단계를 `구현`으로 바꿉니다.
+- **구현**: 담당만 그 영역의 파일을 고칩니다. 끝나면 계획 문서의 "구현 기록"을 채우고 단계를 `리뷰`로 바꿉니다.
+  자기 단계를 `완료`로 바꾸지 않습니다.
+- **리뷰**: 구현하지 않은 쪽이 계획 문서의 "리뷰"에 결과를 씁니다. 통과하면 단계를 `완료`, 인수조건을 ✅로 바꿉니다.
+  고칠 것이 있으면 단계를 `구현`으로 되돌립니다.
+- **상대 영역이 필요하면** 직접 고치지 않고 대기열에 상대 담당 작업을 한 줄 추가한 뒤 사용자에게 알립니다.
+- **API 계약**은 `apps/server`의 tRPC `AppRouter` 타입입니다. Codex가 소유하고, 프론트는 타입만 import합니다.
+- **작업이 끝나면 마지막 보고에 `pnpm next` 출력을 그대로 붙입니다.** 사용자는 그것을 보고 다음 작업을 어디에 맡길지 정합니다.
 
 ## 1. 작업 단위는 인수조건(AC)이다
 
 - 모든 작업은 [인수조건](docs/product/acceptance-criteria.md)의 AC ID 하나에서 시작합니다.
 - AC ID가 없는 작업은 하지 않습니다. 필요해 보이면 [백로그](docs/product/backlog.md)에 적고 사용자에게 묻습니다.
-- **🟨(진행 중)는 한 번에 하나만** 둡니다.
-- 커밋 메시지는 AC ID로 시작합니다. 예: `[AC-M1-08] 오래된 revision의 예턴 저장을 거부한다`
+- 담당마다 **`구현` 단계 작업은 한 번에 하나만** 둡니다.
 - AC 하나가 1주를 넘길 것 같으면 시작 전에 더 작은 AC로 나눕니다. 나누는 것도 문서에 먼저 반영합니다.
 
 ## 2. 완료는 증거로만 판정한다
 
-- AC의 "검증 방법"이 실제로 통과하고, 인수조건 문서의 상태를 ✅로 바꾸고, 증거 칸을 채워야 완료입니다.
+- AC의 "검증 방법"이 실제로 통과하고, **반대쪽 리뷰가 끝나고**, 인수조건 문서의 상태를 ✅로 바꾸고, 증거 칸을 채워야 완료입니다.
 - 증거는 테스트 이름, 실행한 명령, 커밋, 녹화 중 하나입니다.
 - skip된 테스트, mock만으로 끝낸 검증, "아마 될 것" 같은 판단은 증거가 아닙니다.
 - 완료가 아닌데 완료라고 보고하지 않습니다. 막혔으면 막힌 이유를 그대로 보고합니다.
@@ -54,16 +78,21 @@
 - 비밀번호, 세션 토큰, 비밀 키를 Git, 명령줄 인자, 로그, 스크린샷에 넣지 않습니다.
 - `VITE_*` 환경변수는 공개값입니다. 비밀값을 넣지 않습니다.
 
-## 8. 검증 명령 (코드가 생기면 채움)
+## 8. 검증 명령
 
 ```sh
-pnpm check          # lint + 타입 + 단위 테스트
-pnpm test:int       # DB가 필요한 통합 테스트
-pnpm sim --seeds 10 # NPC만으로 한 판 시뮬레이션
+pnpm install        # 의존성 설치 (Node.js 24 이상)
+pnpm check          # Prisma 생성 + lint + 타입 + 단위 테스트 + 다음 작업 출력
+pnpm next           # 다음 작업과 담당 (계획·구현·리뷰)
+pnpm db:up          # 로컬 PostgreSQL (docker compose)
+pnpm dev            # web·server·engine 동시 실행
 pnpm e2e            # Playwright
 ```
+
+아직 없는 명령: `pnpm test:int`(통합 테스트, AC-M1-03부터), `pnpm sim`(시뮬레이터, AC-M1-17).
 
 ## 9. Git
 
 - 커밋과 푸시는 사용자가 요청할 때만 합니다.
+- 커밋 메시지는 대기열 작업 ID와 AC ID로 시작합니다. 예: `[T1-03][AC-M1-03] 시나리오 로더를 추가한다`
 - 기존 migration 파일은 고치지 않고 새 migration을 만듭니다.

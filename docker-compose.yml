@@ -1,0 +1,20 @@
+# 로컬 개발용 PostgreSQL. 운영 구성은 docs/release-operations.md (M2).
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: opensamguk
+      POSTGRES_PASSWORD: opensamguk
+      POSTGRES_DB: opensamguk
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U opensamguk -d opensamguk"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pgdata:

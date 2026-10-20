@@ -1,0 +1,18 @@
+{
+  "name": "@opensamguk/server",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./router": "./src/router.ts"
+  },
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=../../.env src/index.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@opensamguk/db": "workspace:*",
+    "@opensamguk/rules": "workspace:*",
+    "@trpc/server": "^11.19.0",
+    "fastify": "^5.12.7"
+  }
+}

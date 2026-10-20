@@ -1,6 +1,6 @@
 # 런타임
 
-> 상태: 뼈대 · 필요 시점: M1 (로컬), M2 (서버 배포) · 참고: core2026 `docs/architecture/runtime.md`
+> 상태: 로컬 실행 초안 (T1-02) · 서버 배포는 M2 · 참고: core2026 `docs/architecture/runtime.md`
 > 이 문서가 답할 질문: 어떤 프로세스가 몇 개 뜨고, 무엇을 설정하고, 어떻게 켜고 끄나?
 
 ## 1. 프로세스
@@ -16,17 +16,30 @@
 
 ## 2. 환경변수
 
-<!-- TODO(M1): 이름, 의미, 기본값, 비밀 여부 표. 비밀값은 파일(/run/secrets)로만. -->
+루트 `.env`에 둡니다 (`.env.example`을 복사). 비밀값은 운영에서 파일(`/run/secrets`)로만 넣습니다.
 
-| 이름                     | 의미                     | 비밀 |
-| ------------------------ | ------------------------ | ---- |
-| `DATABASE_URL`           | PostgreSQL 연결          | 예   |
-| `SESSION_SECRET`         | 세션 서명                | 예   |
-| `VITE_IMAGE_BASE_URL`    | 초상 이미지 base URL     | 아니오 (공개값) |
+| 이름                  | 의미                     | 기본값 (로컬)                                                  | 비밀 | 상태 |
+| --------------------- | ------------------------ | -------------------------------------------------------------- | ---- | ---- |
+| `DATABASE_URL`        | PostgreSQL 연결          | `postgresql://opensamguk:opensamguk@127.0.0.1:5433/opensamguk` | 예   | 사용 중 |
+| `SERVER_PORT`         | API 서버 포트            | `3001`                                                         | 아니오 | 사용 중 |
+| `SESSION_SECRET`      | 세션 서명                | —                                                              | 예   | T1-10에서 |
+| `VITE_IMAGE_BASE_URL` | 초상 이미지 base URL     | —                                                              | 아니오 (공개값) | T1-17에서 |
 
 ## 3. 로컬 실행
 
-<!-- TODO(M1): docker compose와 pnpm dev 절차. AC-M1-02와 같은 내용. -->
+```sh
+cp .env.example .env   # 처음 한 번
+pnpm install
+pnpm db:up             # PostgreSQL 18, 127.0.0.1:5433
+pnpm dev               # web 127.0.0.1:5173 · server 127.0.0.1:3001 · engine
+pnpm e2e               # 스모크 테스트 (dev 서버가 없으면 자동으로 켬)
+pnpm db:down           # DB 끄기 (데이터는 볼륨에 남음)
+```
+
+- web은 `/trpc` 요청을 server로 프록시합니다.
+- server·engine은 `tsx watch`로 실행합니다. Node `--watch`는 macOS에서 파일 감시 한도를 넘어 실패했습니다.
+- Claude 실행 환경의 sandbox는 Docker 소켓과 로컬 포트를 막습니다. 그 환경에서는 sandbox 밖에서 실행하거나
+  `sandbox.network.allowLocalBinding`을 켭니다.
 
 ## 4. 엔진 수명 주기
 

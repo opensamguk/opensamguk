@@ -16,7 +16,19 @@
 | 새 화면                 | `apps/web/src/routes/`                                      |
 | 지도·시나리오·프리셋     | `resources/`                                                |
 
-<!-- TODO(M1): 실제 경로가 생기면 위 표를 고치고, 각 디렉터리의 핵심 파일 3개씩 적는다. -->
+## 지금 있는 파일 (T1-01·T1-02)
+
+| 경로 | 역할 |
+| ---- | ---- |
+| `apps/server/src/index.ts` | Fastify 시작, tRPC를 `/trpc`에 연결 |
+| `apps/server/src/router.ts` | tRPC `AppRouter` (API 계약). 지금은 `health`만 |
+| `apps/engine/src/index.ts` | 엔진 자리 (대기만 함) |
+| `apps/web/src/LoginPage.tsx` | 자리표시 로그인 화면과 서버 상태 표시 |
+| `apps/web/src/trpc.ts` | tRPC 클라이언트 (`AppRouter` 타입만 import) |
+| `packages/db/prisma/schema.prisma` | DB schema. 생성물은 `packages/db/src/generated/` (Git 제외) |
+| `packages/shared/src/gameDate.ts` | 게임 달력 |
+| `eslint.config.js` | 패키지 경계·결정성 규칙 |
+| `tools/next-task.mjs` | `pnpm next`: 다음 작업과 담당 출력 |
 
 ## 새 저장 필드를 추가할 때 빠뜨리기 쉬운 것
 

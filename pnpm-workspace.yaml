@@ -1,0 +1,9 @@
+packages:
+  - apps/*
+  - packages/*
+
+# 설치 스크립트를 실행해도 되는 의존성
+onlyBuiltDependencies:
+  - '@prisma/engines'
+  - esbuild
+  - prisma
