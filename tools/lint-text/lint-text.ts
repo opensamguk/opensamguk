@@ -190,11 +190,16 @@ function ignoredIds(line: string): Set<string> {
   return new Set(match[1]!.split(/[\s,]+/).filter(Boolean));
 }
 
-// ---- 마크다운: 코드·URL·경로를 가린다 ----
-
 function blank(text: string): string {
   return text.replace(/[^\n]/g, ' ');
 }
+
+// URL을 같은 길이의 공백으로 가린다. 마크다운과 코드 문자열이 함께 쓴다.
+function maskUrls(text: string): string {
+  return text.replace(/\b(?:https?|ftp):\/\/[^\s)>\]]+/g, blank).replace(/\bwww\.[^\s)>\]]+/g, blank);
+}
+
+// ---- 마크다운: 코드·URL·경로를 가린다 ----
 
 function maskInlineCode(line: string): string {
   let out = '';
@@ -234,31 +239,134 @@ function maskTablePathCells(line: string): string {
   });
 }
 
+// 블록 구조는 CommonMark를 줄여서 따른다. 인용(>)과 목록 항목 안의 들여쓰기를 기준으로
+// 펜스 코드 블록과 들여쓴 코드 블록(기준보다 4칸 이상, 문단 중간이 아닐 때)을 찾는다.
+const FENCE_OPEN = /^(`{3,})[^`]*$|^(~{3,})/;
+const LIST_MARKER = /^(?:[-+*]|\d{1,9}[.)])(?=[ \t]|$)/;
+const THEMATIC_BREAK = /^(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,})$/;
+
+function splitQuote(raw: string, maxDepth = Infinity): { depth: number; content: string } {
+  let depth = 0;
+  let content = raw;
+  while (depth < maxDepth) {
+    const marker = content.match(/^ {0,3}> ?/);
+    if (!marker) break;
+    depth += 1;
+    content = content.slice(marker[0].length);
+  }
+  return { depth, content };
+}
+
+function columns(whitespace: string, start = 0): number {
+  let column = start;
+  for (const char of whitespace) column = char === '\t' ? column + 4 - (column % 4) : column + 1;
+  return column - start;
+}
+
+interface CodeBlock {
+  /** 인용 깊이 */
+  depth: number;
+  /** 목록 항목이 정한 들여쓰기 기준 */
+  base: number;
+  /** 펜스 코드 블록이면 여는 펜스, 들여쓴 코드 블록이면 null */
+  fence: string | null;
+}
+
 export function maskMarkdown(source: string, { keepIgnoreComments = false } = {}): string {
-  const lines = source.split('\n');
-  let fence: string | null = null;
-  return lines
-    .map((raw) => {
-      const fenceMatch = raw.match(/^\s{0,3}(`{3,}|~{3,})/);
+  let code: CodeBlock | null = null;
+  let lists: number[] = [];
+  let quoteDepth = 0;
+  let paragraph = false;
+
+  const maskLine = (raw: string): string => {
+    if (code) {
+      const { depth, content } = splitQuote(raw, code.depth);
+      const lead = content.match(/^[ \t]*/)![0];
+      const indent = columns(lead);
+      const empty = lead.length === content.length;
+      // 인용이 끝나거나 목록 항목보다 덜 들여쓰면 코드 블록도 끝난다.
+      const inside = depth === code.depth && (empty || indent >= code.base);
+      if (inside && code.fence) {
+        const close = content.slice(lead.length).match(/^(`{3,}|~{3,})[ \t]*$/);
+        if (
+          close &&
+          indent - code.base <= 3 &&
+          close[1]![0] === code.fence[0] &&
+          close[1]!.length >= code.fence.length
+        ) {
+          code = null;
+        }
+        return blank(raw);
+      }
+      if (inside && (empty || indent - code.base >= 4)) return blank(raw);
+      code = null;
+    }
+
+    const { depth, content } = splitQuote(raw);
+    const lead = content.match(/^[ \t]*/)![0];
+    const body = content.slice(lead.length);
+    const indent = columns(lead);
+    if (body.trim() === '') {
+      quoteDepth = depth;
+      paragraph = false;
+      return raw;
+    }
+    const startsBlock =
+      LIST_MARKER.test(body) || FENCE_OPEN.test(body) || /^#{1,6}(?:[ \t]|$)/.test(body) || THEMATIC_BREAK.test(body);
+    // 인용 밖으로 나온 줄도 문단 중간이면 앞 문단에 이어진다.
+    const lazy = paragraph && !startsBlock;
+    if (depth !== quoteDepth && !(depth < quoteDepth && lazy)) {
+      lists = [];
+      paragraph = false;
+    }
+    quoteDepth = depth;
+    if (!lazy) while (lists.length > 0 && indent < lists.at(-1)!) lists.pop();
+    const base = lists.at(-1) ?? 0;
+
+    if (!paragraph && indent - base >= 4) {
+      code = { depth, base, fence: null };
+      return blank(raw);
+    }
+    if (indent - base <= 3) {
+      let rest = body;
+      let restBase = base;
+      const marker = body.match(LIST_MARKER);
+      if (marker) {
+        const after = body.slice(marker[0].length);
+        const gap = after.match(/^[ \t]*/)![0];
+        const markerEnd = indent + marker[0].length;
+        const width = columns(gap, markerEnd);
+        restBase = markerEnd + (width >= 1 && width <= 4 && gap.length < after.length ? width : 1);
+        lists.push(restBase);
+        rest = after.slice(gap.length);
+      }
+      const fence = rest.match(FENCE_OPEN);
       if (fence) {
-        if (fenceMatch && fenceMatch[1]![0] === fence[0] && fenceMatch[1]!.length >= fence.length) fence = null;
-        return blank(raw);
+        code = { depth, base: restBase, fence: fence[1] ?? fence[2]! };
+        paragraph = false;
+        return marker ? raw.slice(0, raw.length - rest.length) + blank(rest) : blank(raw);
       }
-      if (fenceMatch) {
-        fence = fenceMatch[1]!;
-        return blank(raw);
+      if (/^#{1,6}(?:[ \t]|$)/.test(rest) || THEMATIC_BREAK.test(rest) || (paragraph && /^=+[ \t]*$/.test(rest))) {
+        paragraph = false;
+      } else {
+        paragraph = rest.trim() !== '';
       }
-      let line = maskInlineCode(raw);
-      line = line.replace(/<(?:https?|ftp|mailto):[^>\s]*>/g, blank);
-      line = line.replace(/\]\([^)\s]*(?:\s+"[^"]*")?\)/g, (link) => '](' + blank(link.slice(2, -1)) + ')');
-      line = line.replace(/^(\s{0,3}\[[^\]]+\]:\s*)(\S+)/, (_all, label: string, url: string) => label + blank(url));
-      line = line.replace(/\b(?:https?|ftp):\/\/[^\s)>\]]+/g, blank);
-      line = line.replace(/\bwww\.[^\s)>\]]+/g, blank);
-      line = maskTablePathCells(line);
-      if (!keepIgnoreComments) line = line.replace(MARKDOWN_IGNORE_COMMENT, blank);
-      return line;
-    })
-    .join('\n');
+    }
+    return maskInline(raw, keepIgnoreComments);
+  };
+
+  return source.split('\n').map(maskLine).join('\n');
+}
+
+function maskInline(raw: string, keepIgnoreComments: boolean): string {
+  let line = maskInlineCode(raw);
+  line = line.replace(/<(?:https?|ftp|mailto):[^>\s]*>/g, blank);
+  line = line.replace(/\]\([^)\s]*(?:\s+"[^"]*")?\)/g, (link) => '](' + blank(link.slice(2, -1)) + ')');
+  line = line.replace(/^(\s{0,3}\[[^\]]+\]:\s*)(\S+)/, (_all, label: string, url: string) => label + blank(url));
+  line = maskUrls(line);
+  line = maskTablePathCells(line);
+  if (!keepIgnoreComments) line = line.replace(MARKDOWN_IGNORE_COMMENT, blank);
+  return line;
 }
 
 // ---- 코드: 문자열과 JSX 텍스트만 꺼낸다 ----
@@ -277,19 +385,50 @@ function isModuleSpecifier(node: ts.Node): boolean {
   return false;
 }
 
-export function codeSegments(path: string, source: string, { koreanOnly }: { koreanOnly: boolean }): Segment[] {
+function parseCode(path: string, source: string): ts.SourceFile {
   const scriptKind = path.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
-  const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, scriptKind);
+  return ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, scriptKind);
+}
+
+export function codeSegments(path: string, source: string, { koreanOnly }: { koreanOnly: boolean }): Segment[] {
+  const file = parseCode(path, source);
   const segments: Segment[] = [];
-  const add = (start: number, text: string) => {
+  const add = (start: number, raw: string) => {
+    const text = maskUrls(raw);
     if (koreanOnly && !HANGUL.test(text)) return;
     segments.push({ text, offset: start });
   };
+  // 템플릿은 ${...} 자리를 공백 없는 글자로 메운 뒤 URL을 가린다. 주소 가운데에 값이 들어가도 한 URL로 본다.
+  const addTemplate = (node: ts.TemplateExpression | ts.TemplateLiteralTypeNode) => {
+    const parts = [node.head, ...node.templateSpans.map((span) => span.literal)].map((part) => {
+      const start = part.getStart(file) + 1;
+      const tail = ts.isTemplateTail(part) ? 1 : 2;
+      return { start, end: part.getEnd() - tail };
+    });
+    const from = parts[0]!.start;
+    let joined = '';
+    for (const [i, part] of parts.entries()) {
+      if (i > 0) joined += source.slice(parts[i - 1]!.end, part.start).replace(/[^\n]/g, 'x');
+      joined += source.slice(part.start, part.end);
+    }
+    const masked = maskUrls(joined);
+    for (const part of parts) {
+      const text = masked.slice(part.start - from, part.end - from);
+      if (!(koreanOnly && !HANGUL.test(text))) segments.push({ text, offset: part.start });
+    }
+  };
   const visit = (node: ts.Node) => {
-    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateTail(node)) {
+    if (ts.isTemplateExpression(node) || ts.isTemplateLiteralTypeNode(node)) {
+      addTemplate(node);
+      for (const span of node.templateSpans) {
+        ts.forEachChild(span, (child) => {
+          if (child !== span.literal) visit(child);
+        });
+      }
+      return;
+    }
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
       if (!isModuleSpecifier(node)) add(node.getStart(file) + 1, node.getText(file).slice(1, -1));
-    } else if (ts.isTemplateHead(node) || ts.isTemplateMiddle(node)) {
-      add(node.getStart(file) + 1, node.getText(file).slice(1, -2));
     } else if (ts.isJsxText(node)) {
       add(node.getStart(file), node.getText(file));
     }
@@ -297,6 +436,41 @@ export function codeSegments(path: string, source: string, { koreanOnly }: { kor
   };
   visit(file);
   return segments;
+}
+
+// 코드의 예외 표시는 실제 주석에서만 읽는다. 문자열이나 JSX 텍스트에 같은 글자가 있어도 예외가 아니다.
+// 토큰 사이의 공백과 주석(trivia)만 훑는다. JSX 텍스트는 글이라서 건너뛴다.
+function codeIgnores(path: string, source: string, starts: number[]): Map<number, Set<string>> {
+  const file = parseCode(path, source);
+  const byLine = new Map<number, Set<string>>();
+  const seen = new Set<number>();
+  const visit = (node: ts.Node) => {
+    if (ts.isJsxText(node) || (node.kind >= ts.SyntaxKind.FirstJSDocNode && node.kind <= ts.SyntaxKind.LastJSDocNode)) {
+      return;
+    }
+    const children = node.getChildren(file);
+    if (children.length > 0) {
+      children.forEach(visit);
+      return;
+    }
+    const ranges = [
+      ...(ts.getTrailingCommentRanges(source, node.pos) ?? []),
+      ...(ts.getLeadingCommentRanges(source, node.pos) ?? []),
+    ];
+    for (const range of ranges) {
+      if (seen.has(range.pos)) continue;
+      seen.add(range.pos);
+      const comment = source.slice(range.pos, range.end);
+      for (const match of comment.matchAll(new RegExp(IGNORE_DIRECTIVE, 'g'))) {
+        const line = lineOf(starts, range.pos + match.index);
+        const ids = byLine.get(line) ?? new Set<string>();
+        for (const id of ignoredIds(match[0])) ids.add(id);
+        byLine.set(line, ids);
+      }
+    }
+  };
+  visit(file);
+  return byLine;
 }
 
 // ---- 검사 ----
@@ -331,17 +505,16 @@ export function lintSource({ path, source, kind, koreanOnly = false }: LintInput
   const segments =
     kind === 'markdown' ? [{ text: maskMarkdown(text), offset: 0 }] : codeSegments(path, text, { koreanOnly });
   const starts = lineStarts(text);
-  // 마크다운의 예외 표시는 코드 밖의 HTML 주석만 인정한다. 코드는 그 줄의 주석에서 찾는다.
-  const lines = (kind === 'markdown' ? maskMarkdown(text, { keepIgnoreComments: true }) : text).split('\n');
-  const ignoreCache = new Map<number, Set<string>>();
-  const isIgnored = (line: number, id: RuleId) => {
-    if (!ignoreCache.has(line)) {
-      const raw = lines[line - 1] ?? '';
-      const directive = kind === 'markdown' ? (raw.match(MARKDOWN_IGNORE_COMMENT)?.join(' ') ?? '') : raw;
-      ignoreCache.set(line, ignoredIds(directive));
-    }
-    return ignoreCache.get(line)!.has(id);
-  };
+  // 마크다운의 예외 표시는 코드 밖의 HTML 주석만 인정한다. 코드는 실제 주석에 적힌 것만 인정한다.
+  const ignores =
+    kind === 'markdown'
+      ? new Map(
+          maskMarkdown(text, { keepIgnoreComments: true })
+            .split('\n')
+            .map((line, i) => [i + 1, ignoredIds(line.match(MARKDOWN_IGNORE_COMMENT)?.join(' ') ?? '')] as const),
+        )
+      : codeIgnores(path, text, starts);
+  const isIgnored = (line: number, id: RuleId) => ignores.get(line)?.has(id) ?? false;
 
   const findings: Finding[] = [];
   for (const rule of RULES) {

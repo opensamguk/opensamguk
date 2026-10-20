@@ -96,6 +96,39 @@ describe('AC-M1-22 T1-25 문구 검사: 건너뛰는 곳', () => {
     expect(ids(md('```\n코드\n```\n가지고 있다'))).toEqual(['A-7']);
   });
 
+  it('들여쓴 코드 블록은 보지 않고, 같은 문장이 코드 밖에 있으면 본다', () => {
+    expect(md('예시:\n\n    const a = "가지고 있다";\n')).toEqual([]);
+    expect(md('# 제목\n    const a = "가지고 있다";')).toEqual([]);
+    expect(md('예시:\n\n    const a = "가지고 있다";\n\n    되어진다\n\n장수는 가지고 있다.')).toEqual([
+      { path: 'doc.md', line: 7, id: 'A-7', text: '가지고 있' },
+    ]);
+  });
+
+  it('문단 중간의 들여쓴 줄과 목록 항목의 이어지는 문단은 코드가 아니다', () => {
+    expect(ids(md('문단 첫 줄\n    가지고 있다'))).toEqual(['A-7']);
+    expect(ids(md('- 항목\n\n    가지고 있다'))).toEqual(['A-7']);
+    expect(ids(md('1. 항목\n\n   가지고 있다'))).toEqual(['A-7']);
+    expect(ids(md('- 항목\n  - 하위 항목\n\n      가지고 있다'))).toEqual(['A-7']);
+    expect(md('- 항목\n\n      const a = "가지고 있다";')).toEqual([]);
+  });
+
+  it('인용과 목록 안의 펜스 코드 블록도 보지 않는다', () => {
+    expect(md('> ```ts\n> const a = "가지고 있다";\n> ```')).toEqual([]);
+    expect(md('> > ~~~\n> > 되어진다\n> > ~~~')).toEqual([]);
+    expect(md('>     const a = "가지고 있다";')).toEqual([]);
+    expect(md('- 항목\n\n  ```ts\n  const a = "가지고 있다";\n  ```')).toEqual([]);
+    expect(md('- ```ts\n  const a = "가지고 있다";\n  ```')).toEqual([]);
+  });
+
+  it('인용이나 목록 항목이 끝나면 그 안의 코드 블록도 끝난다', () => {
+    expect(md('> ```ts\n> 코드\n> ```\n> 가지고 있다').map((f) => f.line)).toEqual([4]);
+    expect(md('> ```\n> 코드\n가지고 있다').map((f) => f.line)).toEqual([3]);
+    expect(md('- 항목\n\n  ```\n  코드\n가지고 있다').map((f) => f.line)).toEqual([5]);
+    expect(md('```\n코드\n```ts 가 아니다\n가지고 있다\n```').map((f) => f.line)).toEqual([]);
+    expect(md('```가지고``` 는 펜스가 아니다\n가지고 있다').map((f) => f.line)).toEqual([2]);
+    expect(md('가지고 ```있다``` 는 인라인 코드다\n가지고 있다').map((f) => f.line)).toEqual([2]);
+  });
+
   it('표의 경로가 아닌 칸은 본다', () => {
     expect(ids(md('| 이름 | 설명 |\n| --- | --- |\n| 장수 | 무력을 가지고 있다 |'))).toEqual(['A-7']);
   });
@@ -142,6 +175,28 @@ describe('AC-M1-22 T1-25 문구 검사: 코드의 문자열과 JSX 텍스트', (
     expect(code("const a = '🚀';", 'a.ts', true)).toEqual([]);
     expect(ids(code("const a = '🚀 출병';", 'a.ts', true))).toEqual(['C-5']);
   });
+
+  it('문자열, 템플릿, JSX의 URL은 가리고 같은 문자열의 나머지 문구는 본다', () => {
+    expect(code('const url = "https://example.test/되어진다";')).toEqual([]);
+    expect(code('const url = "https://example.test/되어진다";', 'a.ts', true)).toEqual([]);
+    expect(code("const s = '주소 https://example.test/되어진다 는 기록되어진다';")).toEqual([
+      { path: 'a.tsx', line: 1, id: 'A-8', text: '되어진' },
+    ]);
+    expect(ids(code('const u = `https://example.test/${id}/되어진다/${x} 그리고 기록되어진다`;'))).toEqual(['A-8']);
+    expect(
+      ids(
+        code(
+          'const C = () => <a href="https://example.test/가지고있다" title="가지고 있다">www.example.test/되어진</a>;',
+        ),
+      ),
+    ).toEqual(['A-7']);
+    const source = ['const u = `', 'https://example.test/되어진다', '${id} 가지고 있다', '`;'].join('\n');
+    expect(code(source).map((f) => `${f.line} ${f.id} ${f.text}`)).toEqual(['3 A-7 가지고 있']);
+  });
+
+  it('타입 자리의 템플릿 문자열도 본다', () => {
+    expect(ids(code('type T = `가지고 있다 ${string}`;', 'a.ts'))).toEqual(['A-7']);
+  });
 });
 
 describe('AC-M1-22 T1-25 문구 검사: 예외 표시', () => {
@@ -157,6 +212,25 @@ describe('AC-M1-22 T1-25 문구 검사: 예외 표시', () => {
     expect(code("const a = '가지고 있다'; // lint-text-ignore A-7")).toEqual([]);
     expect(code('const C = () => <p>가지고 있다 {/* lint-text-ignore A-7 */}</p>;')).toEqual([]);
     expect(ids(code("const a = '가지고 있다'; // lint-text-ignore A-8"))).toEqual(['A-7']);
+  });
+
+  it('코드의 예외 표시는 실제 주석만 인정하고 문자열과 JSX 텍스트의 글자는 무시한다', () => {
+    expect(ids(code('const a = "가지고 있다 lint-text-ignore A-7";'))).toEqual(['A-7']);
+    expect(ids(code('const a = "가지고 있다"; const b = "lint-text-ignore A-7";'))).toEqual(['A-7']);
+    expect(ids(code('const C = () => <p>가지고 있다 lint-text-ignore A-7</p>;'))).toEqual(['A-7']);
+    expect(ids(code('const C = () => <p>가지고 있다 // lint-text-ignore A-7</p>;'))).toEqual(['A-7']);
+    expect(ids(code('const a = `가지고 있다 /* lint-text-ignore A-7 */`;'))).toEqual(['A-7']);
+    expect(ids(code('const C = () => <p title="lint-text-ignore A-7">가지고 있다</p>;'))).toEqual(['A-7']);
+    expect(code('const a = `가지고 있다 ${b /* lint-text-ignore A-7 */}`;')).toEqual([]);
+    expect(code('/* lint-text-ignore A-7 */ const a = "가지고 있다";')).toEqual([]);
+    expect(ids(code('const a = "가지고 있다";\n// lint-text-ignore A-7'))).toEqual(['A-7']);
+  });
+
+  it('문자열의 예외 표시는 문서당 횟수에서도 빠지지 않는다', () => {
+    const line = "const a = '따라서 1. 따라서 2. 따라서 3. 따라서 4.";
+    expect(ids(code(`${line} lint-text-ignore D-1';`))).toEqual(['D-1', 'D-1', 'D-1', 'D-1']);
+    expect(code(`${line}'; // lint-text-ignore D-1`)).toEqual([]);
+    expect(code(`${line}';`)).toHaveLength(4);
   });
 
   it('예외로 둔 곳은 문서당 횟수에서도 빠진다', () => {
@@ -216,6 +290,29 @@ describe('AC-M1-22 T1-25 pnpm lint:text 명령', () => {
     expect(() => collectTargets(dir, ['../outside'])).toThrow('저장소 밖');
     expect(collectTargets(dir, [join(dir, 'docs/sub/b.md')]).map((t) => t.path)).toEqual(['docs/sub/b.md']);
     expect(() => collectTargets(dir, [tmpdir()])).toThrow('저장소 밖');
+  });
+
+  it('리뷰에서 찾은 예외 표시, 코드 블록, URL의 종료 코드', () => {
+    const caught = fixture({
+      'apps/web/src/A.tsx': 'export const a = "가지고 있다 lint-text-ignore A-7";\n',
+      'apps/web/src/B.tsx': 'export const a = "가지고 있다";\nexport const b = "lint-text-ignore A-7";\n',
+      'apps/web/src/C.tsx': 'export const C = () => <p>가지고 있다 lint-text-ignore A-7</p>;\n',
+      'docs/a.md': '예시:\n\n    코드\n\n장수는 가지고 있다.\n',
+    });
+    const caughtRun = run(caught, '--strict');
+    expect(caughtRun.status).toBe(1);
+    expect(caughtRun.stdout).toContain('4건 (A-7 4)');
+
+    const clean = fixture({
+      'apps/web/src/A.tsx': 'export const a = "가지고 있다"; // lint-text-ignore A-7\n',
+      'apps/web/src/C.tsx': 'export const C = () => <p>가지고 있다 {/* lint-text-ignore A-7 */}</p>;\n',
+      'apps/web/src/U.ts': 'export const url = "https://example.test/되어진다";\n',
+      'docs/a.md': '예시:\n\n    const a = "가지고 있다";\n',
+      'docs/b.md': '> ```ts\n> const a = "가지고 있다";\n> ```\n',
+    });
+    const cleanRun = run(clean, '--strict');
+    expect(cleanRun).toMatchObject({ status: 0, stderr: '' });
+    expect(cleanRun.stdout).toContain('걸린 곳 없음');
   });
 
   it('실제 명령의 종료 코드: 경고 0, --strict 1', { timeout: 60_000 }, () => {
