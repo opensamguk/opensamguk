@@ -9,8 +9,10 @@ export function engineFailureMessage(error: unknown): string {
   return '[engine] 실행 실패. 월드 ID·DB 연결·migration·실행권을 확인하세요.';
 }
 
-export async function runEngine(db: PrismaClient, options: { worldId?: string; signal: AbortSignal;
-  onStatus?: (status: string) => void }) {
+export async function runEngine(
+  db: PrismaClient,
+  options: { worldId?: string; signal: AbortSignal; onStatus?: (status: string) => void },
+) {
   const { signal } = options;
   let lastStatus: string | undefined;
   const report = (status: string) => {
@@ -18,17 +20,29 @@ export async function runEngine(db: PrismaClient, options: { worldId?: string; s
     lastStatus = status;
   };
   const wait = async (ms: number) => {
-    try { await delay(ms, undefined, { signal }); }
-    catch (error) { if (!signal.aborted) throw error; }
+    try {
+      await delay(ms, undefined, { signal });
+    } catch (error) {
+      if (!signal.aborted) throw error;
+    }
   };
   let worldId = options.worldId;
   while (!signal.aborted) {
     if (!worldId) {
-      worldId = (await db.world.findFirst({ where: { status: 'RUNNING' }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] }))?.id;
-      if (!worldId) { await wait(1000); continue; }
+      worldId = (
+        await db.world.findFirst({ where: { status: 'RUNNING' }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] })
+      )?.id;
+      if (!worldId) {
+        await wait(1000);
+        continue;
+      }
     }
     const lease = await acquireLease(db, worldId);
-    if (!lease) { report('리스 대기'); await wait(1000); continue; }
+    if (!lease) {
+      report('리스 대기');
+      await wait(1000);
+      continue;
+    }
     report('실행권 획득');
     const loop = new TurnLoop(db, lease);
     const session = new AbortController();
@@ -39,18 +53,28 @@ export async function runEngine(db: PrismaClient, options: { worldId?: string; s
     // setInterval의 겹친 갱신·미처리 rejection을 피한다.
     const renewal = (async () => {
       while (!session.signal.aborted) {
-        try { await delay(LEASE_TTL_MS / 3, undefined, { signal: session.signal }); }
-        catch { break; }
+        try {
+          await delay(LEASE_TTL_MS / 3, undefined, { signal: session.signal });
+        } catch {
+          break;
+        }
         if (session.signal.aborted) break;
-        try { await renewLease(db, lease); }
-        catch (error) { renewalError = error; session.abort(); }
+        try {
+          await renewLease(db, lease);
+        } catch (error) {
+          renewalError = error;
+          session.abort();
+        }
       }
     })();
     try {
       while (!session.signal.aborted) {
         await loop.poll(session.signal);
-        try { await delay(100, undefined, { signal: session.signal }); }
-        catch { break; }
+        try {
+          await delay(100, undefined, { signal: session.signal });
+        } catch {
+          break;
+        }
       }
       if (renewalError) throw renewalError;
       return;

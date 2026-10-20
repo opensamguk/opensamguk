@@ -1,5 +1,12 @@
 import type { QueryClient } from '@tanstack/react-query';
-import { createRootRouteWithContext, createRoute, createRouter, Outlet, redirect, useRouter } from '@tanstack/react-router';
+import {
+  createRootRouteWithContext,
+  createRoute,
+  createRouter,
+  Outlet,
+  redirect,
+  useRouter,
+} from '@tanstack/react-router';
 import { GameLayout } from './layout/GameLayout';
 import { DevUiPage } from './pages/DevUiPage';
 import { HomePage } from './pages/HomePage';
@@ -54,8 +61,18 @@ const indexRoute = createRoute({
 const authSearch = (search: Record<string, unknown>): { next?: string } =>
   typeof search.next === 'string' ? { next: search.next } : {};
 
-const loginRoute = createRoute({ getParentRoute: () => rootRoute, path: 'login', validateSearch: authSearch, component: LoginPage });
-const signupRoute = createRoute({ getParentRoute: () => rootRoute, path: 'signup', validateSearch: authSearch, component: SignupPage });
+const loginRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'login',
+  validateSearch: authSearch,
+  component: LoginPage,
+});
+const signupRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'signup',
+  validateSearch: authSearch,
+  component: SignupPage,
+});
 
 // 게임 화면은 모두 로그인이 필요하다. 로그인 뒤 원래 주소로 돌아오도록 next에 담는다.
 const worldRoute = createRoute({
@@ -128,7 +145,15 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
   signupRoute,
-  worldRoute.addChildren([worldIndexRoute, mapRoute, turnsRoute, cityRoute, nationRoute, recordsRoute, createGeneralRoute]),
+  worldRoute.addChildren([
+    worldIndexRoute,
+    mapRoute,
+    turnsRoute,
+    cityRoute,
+    nationRoute,
+    recordsRoute,
+    createGeneralRoute,
+  ]),
   ...(import.meta.env.DEV ? [devUiRoute] : []),
 ]);
 

@@ -26,14 +26,18 @@ describe('AC-M1-14 T1-05 명령 9종', () => {
       expect(state).toEqual(before);
       expect(result.logs).toHaveLength(1);
       if (command.key === 'rest') expect(next.generals[general.id]!.injury).toBe(9);
-      else expect(next.generals[general.id]!.gold).toBe(general.gold - (['settle', 'goodwill'].includes(command.key) ? 200 : 100));
+      else
+        expect(next.generals[general.id]!.gold).toBe(
+          general.gold - (['settle', 'goodwill'].includes(command.key) ? 200 : 100),
+        );
     });
     it(`${command.key}: 대표 실패는 효과를 만들지 않는다`, () => {
       const { state, general, actor } = fixture();
       general.gold = 0;
       const invalidActor = command.key === 'rest' ? { generalId: -1 } : actor;
-      expect(runCommand(state, invalidActor, command.key, {}, createRng('failure')))
-        .toMatchObject({ code: command.key === 'rest' ? 'NO_ACTOR' : 'NO_GOLD' });
+      expect(runCommand(state, invalidActor, command.key, {}, createRng('failure'))).toMatchObject({
+        code: command.key === 'rest' ? 'NO_ACTOR' : 'NO_GOLD',
+      });
     });
   }
   it('고정 시드 농지 개간 결과를 고정한다', () => {
@@ -41,9 +45,12 @@ describe('AC-M1-14 T1-05 명령 9종', () => {
     const result = runCommand(state, actor, 'farm', {}, createRng('farm-golden'));
     if (!('effects' in result)) throw new Error(result.message);
     const next = applyEffects(state, result.effects);
-    expect({ agriculture: next.cities[city.cityKey]!.agriculture, gold: next.generals[general.id]!.gold,
-      experience: next.generals[general.id]!.experience, dedication: next.generals[general.id]!.dedication })
-      .toMatchInlineSnapshot(`
+    expect({
+      agriculture: next.cities[city.cityKey]!.agriculture,
+      gold: next.generals[general.id]!.gold,
+      experience: next.generals[general.id]!.experience,
+      dedication: next.generals[general.id]!.dedication,
+    }).toMatchInlineSnapshot(`
         {
           "agriculture": 1014,
           "dedication": 14,
@@ -60,11 +67,18 @@ describe('AC-M1-14 T1-05 명령 9종', () => {
     const result = runCommand(state, actor, expected.key, {}, createRng(`${expected.key}-golden`));
     if (!('effects' in result)) throw new Error(result.message);
     const next = applyEffects(state, result.effects);
-    expect({ population: next.cities[city.cityKey]!.population, trust: next.cities[city.cityKey]!.trust,
-      gold: next.generals[general.id]!.gold, experience: next.generals[general.id]!.experience,
-      dedication: next.generals[general.id]!.dedication }).toEqual({
-      population: expected.population, trust: expected.trust, gold: 800,
-      experience: expected.experience, dedication: expected.dedication,
+    expect({
+      population: next.cities[city.cityKey]!.population,
+      trust: next.cities[city.cityKey]!.trust,
+      gold: next.generals[general.id]!.gold,
+      experience: next.generals[general.id]!.experience,
+      dedication: next.generals[general.id]!.dedication,
+    }).toEqual({
+      population: expected.population,
+      trust: expected.trust,
+      gold: 800,
+      experience: expected.experience,
+      dedication: expected.dedication,
     });
   });
   it('정착·선정은 금 199를 거부하고 200부터 허용하며 실패 시 RNG를 소비하지 않는다', () => {
@@ -74,7 +88,12 @@ describe('AC-M1-14 T1-05 명령 9종', () => {
       general.gold = 199;
       expect(command.precheck(state, actor, {})).toMatchObject({ code: 'NO_GOLD' });
       expect(command.check(state, actor, {})).toMatchObject({ code: 'NO_GOLD' });
-      const rng = { ...createRng('cost'), next: () => { throw new Error('실패 시 난수 소비'); } };
+      const rng = {
+        ...createRng('cost'),
+        next: () => {
+          throw new Error('실패 시 난수 소비');
+        },
+      };
       expect(runCommand(state, actor, key, {}, rng)).toMatchObject({ code: 'NO_GOLD' });
       general.gold = 200;
       expect(command.precheck(state, actor, {})).toBeNull();
@@ -86,7 +105,9 @@ describe('AC-M1-14 T1-05 명령 9종', () => {
   it('정착·선정의 경험·공헌은 도시값 단위 배율의 영향을 받지 않는다', () => {
     for (const key of ['settle', 'goodwill']) {
       const { state, general, actor, city } = fixture();
-      general.leadership = 80; city.trust = 50; state.diplomacies = [];
+      general.leadership = 80;
+      city.trust = 50;
+      state.diplomacies = [];
       const values = [0.55, 0.5];
       const rng = { ...createRng('reward'), next: () => values.shift()! };
       const result = runCommand(state, actor, key, {}, rng);
@@ -101,7 +122,8 @@ describe('AC-M1-14 T1-05 명령 9종', () => {
   it('정착·선정의 배율 적용 뒤에도 인구·민심 최대치를 넘지 않는다', () => {
     for (const key of ['settle', 'goodwill']) {
       const { state, actor, city } = fixture();
-      city.population = city.populationMax - 1; city.trust = 99.9;
+      city.population = city.populationMax - 1;
+      city.trust = 99.9;
       const result = runCommand(state, actor, key, {}, createRng('cap'));
       if (!('effects' in result)) throw new Error(result.message);
       const next = applyEffects(state, result.effects);
@@ -113,17 +135,21 @@ describe('AC-M1-14 T1-05 명령 9종', () => {
     const { state, actor, city } = fixture();
     city.nationId = null;
     expect(runCommand(state, actor, 'farm', {}, createRng('x'))).toMatchObject({ code: 'NOT_OWN_CITY' });
-    city.nationId = 1; city.supplied = false;
+    city.nationId = 1;
+    city.supplied = false;
     expect(runCommand(state, actor, 'farm', {}, createRng('x'))).toMatchObject({ code: 'NO_SUPPLY' });
-    city.supplied = true; city.agriculture = city.agricultureMax;
+    city.supplied = true;
+    city.agriculture = city.agricultureMax;
     expect(runCommand(state, actor, 'farm', {}, createRng('x'))).toMatchObject({ code: 'AT_MAX' });
     expect(runCommand(state, actor, 'farm', { extra: true }, createRng('x'))).toMatchObject({ code: 'BAD_ARGS' });
     expect(runCommand(state, actor, 'missing', {}, createRng('x'))).toMatchObject({ code: 'UNKNOWN_COMMAND' });
   });
   it('전선은 점수를 절반으로 만들고 치명 RNG는 정해진 순서로 소비한다', () => {
     const { state, actor, general, city } = fixture();
-    general.intel = 100; city.trust = 100;
-    const neighbor = state.cities[city.connections[0]!]!; neighbor.nationId = 2;
+    general.intel = 100;
+    city.trust = 100;
+    const neighbor = state.cities[city.connections[0]!]!;
+    neighbor.nationId = 2;
     state.diplomacies = [{ nationA: 1, nationB: 2, state: 'WAR', untilTick: 1000 }];
     const values = [0.5, 0.05, 0.5];
     const rng = { ...createRng('x'), next: () => values.shift()! };

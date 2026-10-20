@@ -25,9 +25,7 @@ const NODE_BUILTINS = [
 
 function importRule(allowed, { banBuiltins = false, typeOnly = [] } = {}) {
   const banned = PACKAGES.filter((p) => !allowed.includes(p) && !typeOnly.includes(p));
-  const patterns = [
-    { group: banned.flatMap((p) => [p, `${p}/*`]), message: BOUNDARY_MESSAGE },
-  ];
+  const patterns = [{ group: banned.flatMap((p) => [p, `${p}/*`]), message: BOUNDARY_MESSAGE }];
   if (typeOnly.length > 0) {
     patterns.push({
       group: typeOnly.flatMap((p) => [p, `${p}/*`]),
@@ -36,7 +34,10 @@ function importRule(allowed, { banBuiltins = false, typeOnly = [] } = {}) {
     });
   }
   if (banBuiltins) {
-    patterns.push({ group: [...NODE_BUILTINS, '/@opensamguk/shared/node'], message: 'rules는 파일·네트워크·프로세스를 쓰지 않습니다.' });
+    patterns.push({
+      group: [...NODE_BUILTINS, '/@opensamguk/shared/node'],
+      message: 'rules는 파일·네트워크·프로세스를 쓰지 않습니다.',
+    });
   }
   return ['error', { patterns }];
 }
@@ -48,13 +49,7 @@ const NO_MATH_RANDOM = {
 };
 
 export default defineConfig([
-  globalIgnores([
-    '**/node_modules/',
-    '**/dist/',
-    'packages/db/src/generated/',
-    'playwright-report/',
-    'test-results/',
-  ]),
+  globalIgnores(['**/node_modules/', '**/dist/', 'packages/db/src/generated/', 'playwright-report/', 'test-results/']),
   js.configs.recommended,
   tseslint.configs.recommended,
   {
@@ -80,7 +75,10 @@ export default defineConfig([
       ],
       'no-restricted-syntax': [
         'error',
-        { selector: "NewExpression[callee.name='Date']", message: 'rules는 현재 시각을 읽지 않습니다. 시각은 인자로 받습니다.' },
+        {
+          selector: "NewExpression[callee.name='Date']",
+          message: 'rules는 현재 시각을 읽지 않습니다. 시각은 인자로 받습니다.',
+        },
       ],
       'no-restricted-globals': ['error', { name: 'fetch', message: 'rules는 네트워크를 쓰지 않습니다.' }],
     },
@@ -92,13 +90,23 @@ export default defineConfig([
   {
     files: ['apps/server/**'],
     rules: {
-      'no-restricted-imports': importRule(['@opensamguk/shared', '@opensamguk/rules', '@opensamguk/db', '@opensamguk/server']),
+      'no-restricted-imports': importRule([
+        '@opensamguk/shared',
+        '@opensamguk/rules',
+        '@opensamguk/db',
+        '@opensamguk/server',
+      ]),
     },
   },
   {
     files: ['apps/engine/**'],
     rules: {
-      'no-restricted-imports': importRule(['@opensamguk/shared', '@opensamguk/rules', '@opensamguk/db', '@opensamguk/engine']),
+      'no-restricted-imports': importRule([
+        '@opensamguk/shared',
+        '@opensamguk/rules',
+        '@opensamguk/db',
+        '@opensamguk/engine',
+      ]),
       'no-restricted-properties': ['error', NO_MATH_RANDOM],
     },
   },
@@ -106,7 +114,9 @@ export default defineConfig([
     files: ['apps/web/**'],
     languageOptions: { globals: globals.browser },
     rules: {
-      'no-restricted-imports': importRule(['@opensamguk/shared', '@opensamguk/web'], { typeOnly: ['@opensamguk/server'] }),
+      'no-restricted-imports': importRule(['@opensamguk/shared', '@opensamguk/web'], {
+        typeOnly: ['@opensamguk/server'],
+      }),
     },
   },
 ]);

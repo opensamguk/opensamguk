@@ -5,7 +5,9 @@ import { beforeAll, describe, expect, it } from 'vitest';
 const eslint = new ESLint();
 
 // Cold plugin loading can exceed a single assertion's timeout on a busy machine.
-beforeAll(async () => { await eslint.calculateConfigForFile('packages/rules/src/x.ts'); }, 30_000);
+beforeAll(async () => {
+  await eslint.calculateConfigForFile('packages/rules/src/x.ts');
+}, 30_000);
 
 async function ruleIds(code: string, filePath: string): Promise<string[]> {
   const [result] = await eslint.lintText(code, { filePath });
@@ -20,7 +22,10 @@ describe('결정성 규칙', () => {
   });
 
   it('rules에서 현재 시각을 막는다', async () => {
-    const ids = await ruleIds('export const a = Date.now();\nexport const b = new Date();\n', 'packages/rules/src/x.ts');
+    const ids = await ruleIds(
+      'export const a = Date.now();\nexport const b = new Date();\n',
+      'packages/rules/src/x.ts',
+    );
     expect(ids).toEqual(expect.arrayContaining(['no-restricted-properties', 'no-restricted-syntax']));
   });
 
@@ -33,14 +38,23 @@ describe('결정성 규칙', () => {
 
 describe('패키지 경계', () => {
   it('rules는 db를 import할 수 없다', async () => {
-    expect(await ruleIds("import { createDb } from '@opensamguk/db';\nexport { createDb };\n", 'packages/rules/src/x.ts')).toContain(
-      'no-restricted-imports',
-    );
+    expect(
+      await ruleIds("import { createDb } from '@opensamguk/db';\nexport { createDb };\n", 'packages/rules/src/x.ts'),
+    ).toContain('no-restricted-imports');
   });
 
   it('rules는 node 내장 모듈을 import할 수 없다', async () => {
     // 리뷰 T1-01: 접두사 없는 이름과 하위 경로도 막아야 한다
-    const specifiers = ['node:fs', 'fs', 'crypto', 'node:crypto', 'dns/promises', 'node:dns/promises', 'fs/promises', 'timers/promises'];
+    const specifiers = [
+      'node:fs',
+      'fs',
+      'crypto',
+      'node:crypto',
+      'dns/promises',
+      'node:dns/promises',
+      'fs/promises',
+      'timers/promises',
+    ];
     for (const spec of specifiers) {
       const code = `import * as m from '${spec}';\nexport { m };\n`;
       expect(await ruleIds(code, 'packages/rules/src/x.ts'), spec).toContain('no-restricted-imports');
@@ -72,6 +86,8 @@ describe('패키지 경계', () => {
       'opensamguk/no-cross-package-relative',
     );
     expect(await ruleIds("export * from '../clock/constants';\n", 'packages/rules/src/world/x.ts')).toEqual([]);
-    expect(await ruleIds("export * from '@opensamguk/shared/node';\n", 'packages/rules/src/x.ts')).toContain('no-restricted-imports');
+    expect(await ruleIds("export * from '@opensamguk/shared/node';\n", 'packages/rules/src/x.ts')).toContain(
+      'no-restricted-imports',
+    );
   });
 });

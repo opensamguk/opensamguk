@@ -7,11 +7,11 @@ services:
       POSTGRES_PASSWORD: opensamguk
       POSTGRES_DB: opensamguk
     ports:
-      - "127.0.0.1:5433:5432"
+      - '127.0.0.1:5433:5432'
     volumes:
       - pgdata:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U opensamguk -d opensamguk"]
+      test: ['CMD-SHELL', 'pg_isready -U opensamguk -d opensamguk']
       interval: 2s
       timeout: 3s
       retries: 20

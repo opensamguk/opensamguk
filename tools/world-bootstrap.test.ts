@@ -11,7 +11,9 @@ const input = { map, scenario, unitSet, statRules, seed: 'test-world' };
 describe('AC-M1-03 시나리오 합성', () => {
   it('도시 94·국가 21·장수 491·중복을 합친 외교 7쌍과 조조 수도를 만든다', () => {
     const world = buildInitialWorld(input);
-    expect([world.cities.length, world.nations.length, world.generals.length, world.diplomacies.length]).toEqual([94, 21, 491, 7]);
+    expect([world.cities.length, world.nations.length, world.generals.length, world.diplomacies.length]).toEqual([
+      94, 21, 491, 7,
+    ]);
     const cao = world.nations.find((nation) => nation.name === '조조')!;
     expect(world.cities.find((city) => city.cityKey === cao.capitalCityKey)?.name).toBe('진류');
     expect(world.generals.every((general) => general.userId === null && general.portraitId === null)).toBe(true);
@@ -43,7 +45,9 @@ describe('AC-M1-03 시나리오 합성', () => {
     expect(new Set(offsets).size).toBeGreaterThan(1);
     const changed = structuredClone(scenario);
     for (const row of changed.general) row[4] = null;
-    expect(buildInitialWorld({ ...input, scenario: changed }).generals.map((general) => general.nextTurnTick)).toEqual(offsets);
+    expect(buildInitialWorld({ ...input, scenario: changed }).generals.map((general) => general.nextTurnTick)).toEqual(
+      offsets,
+    );
   });
 
   it('15세 미만도 만들고 행동 가능 연도와 관직 원본을 보존한다', () => {
@@ -56,15 +60,20 @@ describe('AC-M1-03 시나리오 합성', () => {
   it('도시 초기값·최대치·민심을 보존하고 입력을 변경하지 않는다', () => {
     const original = JSON.stringify(input);
     const world = buildInitialWorld(input);
-    expect(world.cities[0]).toMatchObject({ population: map.cities[0]!.initial.population, populationMax: map.cities[0]!.max.population, trust: 50 });
+    expect(world.cities[0]).toMatchObject({
+      population: map.cities[0]!.initial.population,
+      populationMax: map.cities[0]!.max.population,
+      trust: 50,
+    });
     expect(JSON.stringify(input)).toBe(original);
   });
 
   it('국가 쌍은 순서를 정규화하고 마지막 외교 줄을 쓴다', () => {
     const changed = structuredClone(scenario);
     changed.diplomacy.push([10, 2, 0, 5]);
-    expect(buildInitialWorld({ ...input, scenario: changed }).diplomacies.find((d) => d.nationA === 2 && d.nationB === 10))
-      .toEqual({ nationA: 2, nationB: 10, state: 'WAR', untilTick: 5 * TICKS_PER_MONTH });
+    expect(
+      buildInitialWorld({ ...input, scenario: changed }).diplomacies.find((d) => d.nationA === 2 && d.nationB === 10),
+    ).toEqual({ nationA: 2, nationB: 10, state: 'WAR', untilTick: 5 * TICKS_PER_MONTH });
   });
 
   it('단방향 연결과 중복 도시 ID를 거부한다', () => {
@@ -99,6 +108,8 @@ describe('AC-M1-03 시나리오 합성', () => {
 
   it('잘못된 튜플과 없는 기본 병종을 거부한다', () => {
     expect(() => buildInitialWorld({ ...input, scenario: { ...scenario, nation: [['불완전']] } })).toThrow();
-    expect(() => buildInitialWorld({ ...input, unitSet: { ...unitSet, defaultCrewTypeId: 9999 } })).toThrow('기본 병종');
+    expect(() => buildInitialWorld({ ...input, unitSet: { ...unitSet, defaultCrewTypeId: 9999 } })).toThrow(
+      '기본 병종',
+    );
   });
 });

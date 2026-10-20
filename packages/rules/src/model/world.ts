@@ -10,9 +10,11 @@ export type DeepReadonly<T> = T extends object ? { readonly [K in keyof T]: Deep
 export type WorldView = DeepReadonly<WorldState>;
 export function toWorldState(initial: WorldInit): WorldState {
   const state = structuredClone(initial);
-  return { startYear: state.startYear,
+  return {
+    startYear: state.startYear,
     cities: Object.fromEntries(state.cities.map((city) => [city.cityKey, city])),
     nations: Object.fromEntries(state.nations.map((nation) => [nation.id, nation])),
     generals: Object.fromEntries(state.generals.map((general) => [general.id, general])),
-    diplomacies: state.diplomacies };
+    diplomacies: state.diplomacies,
+  };
 }

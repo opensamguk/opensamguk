@@ -23,7 +23,10 @@ describe('describeFailure', () => {
   const serverError = (code: string) => TRPCClientError.from({ error: { message: '', code: -32000, data: { code } } });
 
   it('서버 오류 코드를 문구로 바꾼다', () => {
-    expect(describeFailure(serverError('UNAUTHORIZED'))).toEqual({ kind: 'message', text: '이메일 또는 비밀번호가 맞지 않습니다' });
+    expect(describeFailure(serverError('UNAUTHORIZED'))).toEqual({
+      kind: 'message',
+      text: '이메일 또는 비밀번호가 맞지 않습니다',
+    });
     expect(describeFailure(serverError('CONFLICT'))).toEqual({ kind: 'message', text: '이미 가입된 이메일입니다' });
   });
 
@@ -38,10 +41,16 @@ describe('safeNext', () => {
     expect(safeNext('/w/1/map?x=1')).toBe('/w/1/map?x=1');
   });
 
-  it.each([undefined, '', 'https://evil.example', '//evil.example', '/\\evil.example', '/\t/evil.example', '/login', '/signup?next=/w/1'])(
-    '%j는 받지 않는다',
-    (value) => {
-      expect(safeNext(value)).toBeNull();
-    },
-  );
+  it.each([
+    undefined,
+    '',
+    'https://evil.example',
+    '//evil.example',
+    '/\\evil.example',
+    '/\t/evil.example',
+    '/login',
+    '/signup?next=/w/1',
+  ])('%j는 받지 않는다', (value) => {
+    expect(safeNext(value)).toBeNull();
+  });
 });

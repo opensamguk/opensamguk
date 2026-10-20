@@ -2,9 +2,17 @@ import { randomUUID } from 'node:crypto';
 import type { Prisma, PrismaClient } from '@opensamguk/db';
 
 export const LEASE_TTL_MS = 15_000;
-export interface Lease { worldId: string; ownerId: string; fencingToken: number; ttlMs: number }
+export interface Lease {
+  worldId: string;
+  ownerId: string;
+  fencingToken: number;
+  ttlMs: number;
+}
 export class LeaseLostError extends Error {
-  constructor() { super('엔진 실행권을 잃었습니다.'); this.name = 'LeaseLostError'; }
+  constructor() {
+    super('엔진 실행권을 잃었습니다.');
+    this.name = 'LeaseLostError';
+  }
 }
 
 export async function databaseNow(tx: Prisma.TransactionClient): Promise<Date> {
@@ -12,7 +20,12 @@ export async function databaseNow(tx: Prisma.TransactionClient): Promise<Date> {
   return row!.now;
 }
 
-export async function acquireLease(db: PrismaClient, worldId: string, ownerId = randomUUID(), ttlMs = LEASE_TTL_MS): Promise<Lease | null> {
+export async function acquireLease(
+  db: PrismaClient,
+  worldId: string,
+  ownerId = randomUUID(),
+  ttlMs = LEASE_TTL_MS,
+): Promise<Lease | null> {
   if (!Number.isSafeInteger(ttlMs) || ttlMs < 3) throw new Error('리스 만료 시간은 3ms 이상의 정수여야 합니다.');
   const rows = await db.$queryRaw<{ fencingToken: number }[]>`
     INSERT INTO "EngineLease" ("worldId", "ownerId", "fencingToken", "expiresAt")

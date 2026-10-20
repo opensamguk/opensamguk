@@ -13,10 +13,22 @@ if (!lease) {
   process.send?.('waiting');
   await db.$disconnect();
 } else {
-  const hold = () => new Promise<void>(() => { /* 부모가 SIGKILL한다. */ });
-  const loop = new TurnLoop(db, lease, phase === 'beforeCommit' ? {
-    beforeCommit: async () => { process.send?.('beforeCommit'); await hold(); },
-  } : {});
+  const hold = () =>
+    new Promise<void>(() => {
+      /* 부모가 SIGKILL한다. */
+    });
+  const loop = new TurnLoop(
+    db,
+    lease,
+    phase === 'beforeCommit'
+      ? {
+          beforeCommit: async () => {
+            process.send?.('beforeCommit');
+            await hold();
+          },
+        }
+      : {},
+  );
   await loop.advanceTo(500);
   process.send?.('committed');
   await hold();

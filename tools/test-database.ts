@@ -8,8 +8,12 @@ export function testDatabaseUrl(env: Record<string, string | undefined>): URL {
   }
   if (env.DATABASE_URL) {
     const development = new URL(env.DATABASE_URL);
-    const host = (value: URL) => value.hostname === 'localhost' ? '127.0.0.1' : value.hostname;
-    if (host(development) === host(url) && (development.port || '5432') === (url.port || '5432') && development.pathname === url.pathname) {
+    const host = (value: URL) => (value.hostname === 'localhost' ? '127.0.0.1' : value.hostname);
+    if (
+      host(development) === host(url) &&
+      (development.port || '5432') === (url.port || '5432') &&
+      development.pathname === url.pathname
+    ) {
       throw new Error('통합 테스트 DB와 개발 DATABASE_URL은 달라야 합니다.');
     }
   }

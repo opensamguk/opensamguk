@@ -12,8 +12,11 @@ async function main() {
   process.on('SIGTERM', shutdown);
   try {
     console.log('[engine] 시작');
-    await runEngine(db, { ...(values.world ? { worldId: values.world } : {}), signal: controller.signal,
-      onStatus: (status) => console.log(`[engine] ${status}`) });
+    await runEngine(db, {
+      ...(values.world ? { worldId: values.world } : {}),
+      signal: controller.signal,
+      onStatus: (status) => console.log(`[engine] ${status}`),
+    });
   } finally {
     process.off('SIGINT', shutdown);
     process.off('SIGTERM', shutdown);

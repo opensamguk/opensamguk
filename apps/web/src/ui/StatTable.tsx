@@ -21,7 +21,9 @@ export function StatTable({ rows, caption }: { rows: StatRow[]; caption?: string
             <td className="num" title={row.value === null ? row.hiddenReason : undefined}>
               {row.value === null ? '—' : row.value.toLocaleString('ko-KR')}
             </td>
-            <td className={`num ${styles.max}`}>{row.max === undefined ? '' : `/ ${row.max.toLocaleString('ko-KR')}`}</td>
+            <td className={`num ${styles.max}`}>
+              {row.max === undefined ? '' : `/ ${row.max.toLocaleString('ko-KR')}`}
+            </td>
             <td className={styles.barCell}>
               {row.max !== undefined && row.value !== null ? (
                 <span
@@ -32,7 +34,10 @@ export function StatTable({ rows, caption }: { rows: StatRow[]; caption?: string
                   aria-valuemin={0}
                   aria-valuemax={row.max}
                 >
-                  <span className={styles.fill} style={{ width: `${Math.min(100, (row.value / Math.max(row.max, 1)) * 100)}%` }} />
+                  <span
+                    className={styles.fill}
+                    style={{ width: `${Math.min(100, (row.value / Math.max(row.max, 1)) * 100)}%` }}
+                  />
                 </span>
               ) : null}
             </td>

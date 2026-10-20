@@ -5,7 +5,13 @@ import { rest } from './rest';
 import type { Actor, CommandDef, CommandResult, Failure } from './types';
 export const commands: readonly CommandDef[] = [...DOMESTIC_SPECS.map(makeInvestment), rest];
 export const commandRegistry = new Map(commands.map((command) => [command.key, command]));
-export function runCommand(view: WorldView, actor: Actor, key: string, args: unknown, rng: Rng): CommandResult | Failure {
+export function runCommand(
+  view: WorldView,
+  actor: Actor,
+  key: string,
+  args: unknown,
+  rng: Rng,
+): CommandResult | Failure {
   const command = commandRegistry.get(key);
   if (!command) return { code: 'UNKNOWN_COMMAND', message: '없는 명령입니다.' };
   const parsed = command.args.safeParse(args);

@@ -3,14 +3,21 @@ import type { WorldState } from '../model/world';
 
 type Change<K extends string, F extends string> = { kind: K; id: number; field: F; op: 'add' | 'set'; value: number };
 export type CityField = 'population' | 'agriculture' | 'commerce' | 'security' | 'defence' | 'wall' | 'trust';
-export type Effect = Change<'city', CityField> | Change<'nation', 'gold' | 'rice' | 'tech'> |
-  Change<'general', 'gold' | 'rice' | 'crew' | 'train' | 'atmos' | 'experience' | 'dedication' | 'injury'>;
+export type Effect =
+  | Change<'city', CityField>
+  | Change<'nation', 'gold' | 'rice' | 'tech'>
+  | Change<'general', 'gold' | 'rice' | 'crew' | 'train' | 'atmos' | 'experience' | 'dedication' | 'injury'>;
 
 export function applyEffects(state: WorldState, effects: readonly Effect[]): WorldState {
   const next = structuredClone(state);
   for (const effect of effects) {
     if (!Number.isFinite(effect.value)) throw new Error('효과 값은 유한한 수여야 합니다.');
-    const entity = effect.kind === 'city' ? next.cities[effect.id] : effect.kind === 'nation' ? next.nations[effect.id] : next.generals[effect.id];
+    const entity =
+      effect.kind === 'city'
+        ? next.cities[effect.id]
+        : effect.kind === 'nation'
+          ? next.nations[effect.id]
+          : next.generals[effect.id];
     if (!entity) throw new Error('효과 대상이 없습니다.');
     const values = entity as unknown as Record<string, number>;
     const old = values[effect.field];

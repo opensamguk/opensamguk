@@ -12,7 +12,10 @@ export function SignupPage() {
       <h1>가입</h1>
       <AuthForm mode="signup" next={next} />
       <p className={styles.switch}>
-        이미 계정이 있으면 <Link to="/login" search={next ? { next } : {}}>로그인</Link>
+        이미 계정이 있으면{' '}
+        <Link to="/login" search={next ? { next } : {}}>
+          로그인
+        </Link>
       </p>
     </main>
   );

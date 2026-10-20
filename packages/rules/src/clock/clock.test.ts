@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { checkpointClock, endClock, nowTick, pauseClock, resumeClock, startClock, toGameDate, type Clock } from './clock';
+import {
+  checkpointClock,
+  endClock,
+  nowTick,
+  pauseClock,
+  resumeClock,
+  startClock,
+  toGameDate,
+  type Clock,
+} from './clock';
 const initial: Clock = { status: 'PREOPEN', clockTick: 0, clockAnchorAt: null, turnTermMinutes: 10 };
 
 describe('AC-M1-04 게임 시계', () => {

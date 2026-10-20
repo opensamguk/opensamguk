@@ -5,10 +5,19 @@ import { hashPassword, verifyPassword } from '../auth/password';
 import { newSession, SESSION_SECONDS } from '../auth/session';
 import { publicProcedure, router } from '../trpc';
 
-const credentials = z.strictObject({ email: z.string().trim().toLowerCase().email().max(254), password: z.string().min(10).max(128) });
+const credentials = z.strictObject({
+  email: z.string().trim().toLowerCase().email().max(254),
+  password: z.string().min(10).max(128),
+});
 const loginFailure = () => new TRPCError({ code: 'UNAUTHORIZED', message: '이메일 또는 비밀번호가 맞지 않습니다' });
 function setCookie(ctx: Context, token: string) {
-  ctx.reply.setCookie('sid', token, { httpOnly: true, sameSite: 'lax', secure: ctx.secureCookies, path: '/', maxAge: SESSION_SECONDS });
+  ctx.reply.setCookie('sid', token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: ctx.secureCookies,
+    path: '/',
+    maxAge: SESSION_SECONDS,
+  });
 }
 
 export const authRouter = router({
@@ -17,7 +26,10 @@ export const authRouter = router({
     const session = newSession(ctx.now);
     try {
       const user = await ctx.db.$transaction(async (tx) => {
-        const user = await tx.user.create({ data: { email: input.email, passwordHash }, select: { id: true, email: true } });
+        const user = await tx.user.create({
+          data: { email: input.email, passwordHash },
+          select: { id: true, email: true },
+        });
         if (ctx.sessionId) await tx.session.deleteMany({ where: { id: ctx.sessionId } });
         await tx.session.create({ data: { id: session.id, userId: user.id, expiresAt: session.expiresAt } });
         return user;

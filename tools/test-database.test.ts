@@ -11,9 +11,11 @@ describe('통합 테스트 DB 보호', () => {
     }
   });
   it('개발 DB와 같은 대상이면 호스트 별칭·인증 정보와 무관하게 거부한다', () => {
-    expect(() => testDatabaseUrl({
-      TEST_DATABASE_URL: 'postgresql://test@localhost/shared_test',
-      DATABASE_URL: 'postgresql://dev@127.0.0.1:5432/shared_test',
-    })).toThrow('달라야');
+    expect(() =>
+      testDatabaseUrl({
+        TEST_DATABASE_URL: 'postgresql://test@localhost/shared_test',
+        DATABASE_URL: 'postgresql://dev@127.0.0.1:5432/shared_test',
+      }),
+    ).toThrow('달라야');
   });
 });

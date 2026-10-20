@@ -21,7 +21,10 @@ beforeAll(async () => {
   await db.world.deleteMany();
   template = await loadInitialWorld({ scenario: '1030', map: 'che', seed: 'engine-test' });
 });
-afterAll(async () => { await db.world.deleteMany(); await db.$disconnect(); });
+afterAll(async () => {
+  await db.world.deleteMany();
+  await db.$disconnect();
+});
 
 async function create(count = 1) {
   const initial = structuredClone(template);
@@ -30,17 +33,26 @@ async function create(count = 1) {
   city.agricultureMax = 10_000;
   city.trust = 100;
   city.supplied = true;
-  initial.generals = initial.generals.slice(0, count).map((general, i) => ({ ...general, id: i + 1,
-    cityKey: city.cityKey, nationId: city.nationId, nextTurnTick: 500, gold: 1000, injury: 3 }));
+  initial.generals = initial.generals.slice(0, count).map((general, i) => ({
+    ...general,
+    id: i + 1,
+    cityKey: city.cityKey,
+    nationId: city.nationId,
+    nextTurnTick: 500,
+    gold: 1000,
+    injury: 3,
+  }));
   const { worldId } = await saveInitialWorld(db, initial, { name: '엔진 통합', turnTermMinutes: 10 });
   await controlClock(db, worldId, 'start');
   return { worldId, cityKey: city.cityKey };
 }
 async function queue(worldId: string, generalId = 1, commandKey = 'farm') {
-  await db.generalTurn.createMany({ data: [
-    { worldId, generalId, slot: 0, commandKey, args: {} },
-    { worldId, generalId, slot: 1, commandKey: 'rest', args: {} },
-  ] });
+  await db.generalTurn.createMany({
+    data: [
+      { worldId, generalId, slot: 0, commandKey, args: {} },
+      { worldId, generalId, slot: 1, commandKey: 'rest', args: {} },
+    ],
+  });
 }
 async function engine(worldId: string) {
   const lease = await acquireLease(db, worldId);
@@ -51,23 +63,36 @@ async function expire(worldId: string) {
   await db.$executeRaw`UPDATE "EngineLease" SET "expiresAt" = (clock_timestamp() AT TIME ZONE 'UTC') - interval '1 second'
     WHERE "worldId" = ${worldId}`;
 }
-async function general(worldId: string) { return db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } }); }
+async function general(worldId: string) {
+  return db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
+}
 function worker(worldId: string, phase: string) {
   return spawn(process.execPath, ['--import', 'tsx', 'apps/engine/test/turnWorker.ts', worldId, phase], {
-    cwd: new URL('../../../', import.meta.url), env: { ...process.env, TEST_DATABASE_URL: url },
+    cwd: new URL('../../../', import.meta.url),
+    env: { ...process.env, TEST_DATABASE_URL: url },
     stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
   });
 }
 async function message(child: ChildProcess, expected?: string) {
   return new Promise<string>((resolve, reject) => {
-    const timer = setTimeout(() => { cleanup(); reject(new Error(`worker가 ${expected}에 도달하지 못했습니다.`)); }, 30_000);
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error(`worker가 ${expected}에 도달하지 못했습니다.`));
+    }, 30_000);
     const onMessage = (value: unknown) => {
       cleanup();
       if (typeof value === 'string' && (expected === undefined || value === expected)) resolve(value);
       else reject(new Error(`worker: ${String(value)}`));
     };
-    const onExit = () => { cleanup(); reject(new Error('worker가 준비 전에 종료됐습니다.')); };
-    function cleanup() { clearTimeout(timer); child.off('message', onMessage); child.off('exit', onExit); }
+    const onExit = () => {
+      cleanup();
+      reject(new Error('worker가 준비 전에 종료됐습니다.'));
+    };
+    function cleanup() {
+      clearTimeout(timer);
+      child.off('message', onMessage);
+      child.off('exit', onExit);
+    }
     child.once('message', onMessage);
     child.once('exit', onExit);
   });
@@ -87,7 +112,9 @@ describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
     expect(await loop.advanceTo(499)).toEqual([]);
     expect(await db.generalLog.count({ where: { worldId } })).toBe(0);
     expect(await loop.advanceTo(500)).toEqual([{ generalId: 1, tick: 500, commandKey: 'farm' }]);
-    expect((await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId, cityKey } } })).agriculture).toBeGreaterThan(100);
+    expect(
+      (await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId, cityKey } } })).agriculture,
+    ).toBeGreaterThan(100);
     expect(await general(worldId)).toMatchObject({ gold: 900, turnRevision: 1, nextTurnTick: 10_500 });
     const logs = await db.generalLog.findMany({ where: { worldId } });
     expect(logs).toHaveLength(1);
@@ -106,7 +133,12 @@ describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
     const loop = await engine(worldId);
     const executions = await loop.advanceTo(10_500);
     expect(executions.map(({ generalId, tick }) => [generalId, tick])).toEqual([
-      [3, 100], [1, 500], [2, 500], [3, 10_100], [1, 10_500], [2, 10_500],
+      [3, 100],
+      [1, 500],
+      [2, 500],
+      [3, 10_100],
+      [1, 10_500],
+      [2, 10_500],
     ]);
     expect(await db.generalLog.count({ where: { worldId } })).toBe(6);
   });
@@ -118,17 +150,29 @@ describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
     const loop = await engine(worldId);
     await loop.advanceTo(500);
     expect(await general(worldId)).toMatchObject({ gold: 0, nextTurnTick: 10_500, turnRevision: 1 });
-    expect((await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId, cityKey } } })).agriculture).toBe(100);
-    expect(await db.generalLog.findFirst({ where: { worldId } })).toMatchObject({ kind: 'failure', text: expect.stringContaining('NO_GOLD') });
+    expect((await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId, cityKey } } })).agriculture).toBe(
+      100,
+    );
+    expect(await db.generalLog.findFirst({ where: { worldId } })).toMatchObject({
+      kind: 'failure',
+      text: expect.stringContaining('NO_GOLD'),
+    });
   });
 
   it.each(['missing-command', 'bad-args'])('잘못 저장된 명령 %s도 상태 변경 없이 실패로 소비한다', async (kind) => {
     const { worldId } = await create();
     await queue(worldId, 1, kind === 'missing-command' ? 'unknown' : 'farm');
-    if (kind === 'bad-args') await db.generalTurn.update({ where: { worldId_generalId_slot: { worldId, generalId: 1, slot: 0 } }, data: { args: { unexpected: 1 } } });
+    if (kind === 'bad-args')
+      await db.generalTurn.update({
+        where: { worldId_generalId_slot: { worldId, generalId: 1, slot: 0 } },
+        data: { args: { unexpected: 1 } },
+      });
     await (await engine(worldId)).advanceTo(500);
     expect(await general(worldId)).toMatchObject({ gold: 1000, nextTurnTick: 10_500 });
-    expect(await db.generalLog.findFirst({ where: { worldId } })).toMatchObject({ kind: 'failure', text: expect.stringContaining(kind === 'missing-command' ? 'UNKNOWN_COMMAND' : 'BAD_ARGS') });
+    expect(await db.generalLog.findFirst({ where: { worldId } })).toMatchObject({
+      kind: 'failure',
+      text: expect.stringContaining(kind === 'missing-command' ? 'UNKNOWN_COMMAND' : 'BAD_ARGS'),
+    });
   });
 
   it('일시정지 동안 예턴·로그·다음 턴을 바꾸지 않고 재개 후 따라잡는다', async () => {
@@ -186,15 +230,21 @@ describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
       expect(await db.world.findUniqueOrThrow({ where: { id: worldId } })).toEqual(paused);
       expect(load).not.toHaveBeenCalled();
       expect(loop.state).toBeNull();
-    } finally { load.mockRestore(); }
+    } finally {
+      load.mockRestore();
+    }
   });
 
   it('운영 명령은 진행 중인 시계 쓰기를 기다린 뒤 최신 revision으로 저장한다', async () => {
     const { worldId } = await create();
     let locked!: (pid: number) => void;
-    const ready = new Promise<number>((resolve) => { locked = resolve; });
+    const ready = new Promise<number>((resolve) => {
+      locked = resolve;
+    });
     let release!: () => void;
-    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     const writer = db.$transaction(async (tx) => {
       const [backend] = await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
       await tx.world.update({ where: { id: worldId }, data: { clockRevision: { increment: 1 } } });
@@ -205,13 +255,19 @@ describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
     const pause = controlClock(db, worldId, 'pause');
     // 잠금 대기를 실제 PostgreSQL에서 확인한 다음 쓰기를 commit한다.
     try {
-      await vi.waitFor(async () => {
-        const [row] = await db.$queryRaw<{ waiting: boolean }[]>`SELECT EXISTS (
+      await vi.waitFor(
+        async () => {
+          const [row] = await db.$queryRaw<{ waiting: boolean }[]>`SELECT EXISTS (
           SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND ${pid} = ANY(pg_blocking_pids(pid))
         ) AS waiting`;
-        expect(row!.waiting).toBe(true);
-      }, { timeout: 3000, interval: 10 });
-    } finally { release(); await writer; }
+          expect(row!.waiting).toBe(true);
+        },
+        { timeout: 3000, interval: 10 },
+      );
+    } finally {
+      release();
+      await writer;
+    }
     expect((await pause).status).toBe('PAUSED');
   });
 
@@ -219,10 +275,19 @@ describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
     const { worldId } = await create();
     const abort = new AbortController();
     let started!: () => void;
-    const ready = new Promise<void>((resolve) => { started = resolve; });
-    const running = runEngine(db, { worldId, signal: abort.signal, onStatus: (status) => {
-      if (status === '실행권 획득') started();
-    } }).then(() => null, (error: unknown) => error);
+    const ready = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const running = runEngine(db, {
+      worldId,
+      signal: abort.signal,
+      onStatus: (status) => {
+        if (status === '실행권 획득') started();
+      },
+    }).then(
+      () => null,
+      (error: unknown) => error,
+    );
     try {
       await ready;
       for (let i = 0; i < 40; i++) {
@@ -239,7 +304,10 @@ describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
         expect((await controlClock(db, worldId, 'resume')).status).toBe('RUNNING');
         await delay(5);
       }
-    } finally { abort.abort(); expect(await running).toBeNull(); }
+    } finally {
+      abort.abort();
+      expect(await running).toBeNull();
+    }
   });
 });
 
@@ -275,7 +343,11 @@ describe('AC-M1-11 리스·재시작·펜싱, 실제 PostgreSQL', () => {
   it('commit 직전 오류는 엔티티·로그·예턴·시계·메모리 사본을 모두 롤백한다', async () => {
     const { worldId } = await create();
     await queue(worldId);
-    const loop = new TurnLoop(db, (await acquireLease(db, worldId))!, { beforeCommit: async () => { throw new Error('중단'); } });
+    const loop = new TurnLoop(db, (await acquireLease(db, worldId))!, {
+      beforeCommit: async () => {
+        throw new Error('중단');
+      },
+    });
     const before = await readWorldState(db, worldId);
     const clock = await db.world.findUniqueOrThrow({ where: { id: worldId } });
     await expect(loop.advanceTo(500)).rejects.toThrow('중단');
@@ -291,9 +363,11 @@ describe('AC-M1-11 리스·재시작·펜싱, 실제 PostgreSQL', () => {
 
   it('commit 직전 토큰이 바뀌면 최종 검사에서 모든 저장을 롤백한다', async () => {
     const { worldId } = await create();
-    const loop = new TurnLoop(db, (await acquireLease(db, worldId))!, { beforeCommit: async (tx) => {
-      await tx.engineLease.update({ where: { worldId }, data: { fencingToken: { increment: 1 } } });
-    } });
+    const loop = new TurnLoop(db, (await acquireLease(db, worldId))!, {
+      beforeCommit: async (tx) => {
+        await tx.engineLease.update({ where: { worldId }, data: { fencingToken: { increment: 1 } } });
+      },
+    });
     await expect(loop.advanceTo(500)).rejects.toBeInstanceOf(LeaseLostError);
     expect(await general(worldId)).toMatchObject({ nextTurnTick: 500, turnRevision: 0 });
     expect(await db.generalLog.count({ where: { worldId } })).toBe(0);
@@ -301,9 +375,11 @@ describe('AC-M1-11 리스·재시작·펜싱, 실제 PostgreSQL', () => {
 
   it('저장 도중 리스가 만료되면 같은 토큰이어도 commit을 롤백한다', async () => {
     const { worldId } = await create();
-    const loop = new TurnLoop(db, (await acquireLease(db, worldId))!, { beforeCommit: async (tx) => {
-      await tx.engineLease.update({ where: { worldId }, data: { expiresAt: new Date(0) } });
-    } });
+    const loop = new TurnLoop(db, (await acquireLease(db, worldId))!, {
+      beforeCommit: async (tx) => {
+        await tx.engineLease.update({ where: { worldId }, data: { expiresAt: new Date(0) } });
+      },
+    });
     await expect(loop.advanceTo(500)).rejects.toBeInstanceOf(LeaseLostError);
     expect(await db.generalLog.count({ where: { worldId } })).toBe(0);
   });
@@ -311,38 +387,57 @@ describe('AC-M1-11 리스·재시작·펜싱, 실제 PostgreSQL', () => {
   it('종료 신호가 처리 중 들어오면 현재 트랜잭션을 취소한다', async () => {
     const { worldId } = await create();
     const abort = new AbortController();
-    const loop = new TurnLoop(db, (await acquireLease(db, worldId))!, { beforeCommit: async () => { abort.abort(); } });
+    const loop = new TurnLoop(db, (await acquireLease(db, worldId))!, {
+      beforeCommit: async () => {
+        abort.abort();
+      },
+    });
     await expect(loop.advanceTo(500, abort.signal)).rejects.toThrow();
     expect(await db.generalLog.count({ where: { worldId } })).toBe(0);
     expect(await general(worldId)).toMatchObject({ nextTurnTick: 500, turnRevision: 0 });
     expect(loop.state).toBeNull();
   });
 
-  it.each(['beforeCommit', 'committed'])('실제 SIGKILL (%s) 후 재시작하면 같은 RNG 결과로 턴이 정확히 한 번 반영된다', async (phase) => {
-    const { worldId } = await create();
-    await queue(worldId);
-    const initial = await readWorldState(db, worldId);
-    const state = { startYear: initial.startYear, cities: Object.fromEntries(initial.cities.map((c) => [c.cityKey, c])),
-      nations: Object.fromEntries(initial.nations.map((n) => [n.id, n])), generals: Object.fromEntries(initial.generals.map((g) => [g.id, g])), diplomacies: initial.diplomacies };
-    const expected = runCommand(state, { generalId: 1 }, 'farm', {}, rngFor(initial.seed, 'turn', 500, 1));
-    if ('code' in expected) throw new Error('검증 명령 실패');
-    const next = applyEffects(state, expected.effects);
-    const child = worker(worldId, phase);
-    try {
-      await message(child, phase);
-      await kill(child);
-      expect(await db.generalLog.count({ where: { worldId } })).toBe(phase === 'committed' ? 1 : 0);
-      await expire(worldId);
-      const restarted = await engine(worldId);
-      await restarted.advanceTo(500);
-      await restarted.advanceTo(TICKS_PER_MONTH);
-      expect(await general(worldId)).toMatchObject({ gold: next.generals[1]!.gold, experience: next.generals[1]!.experience,
-        nextTurnTick: 10_500, turnRevision: 1 });
-      expect(await db.generalLog.count({ where: { worldId } })).toBe(1);
-      expect(await db.generalTurn.count({ where: { worldId } })).toBe(30);
-      expect(await db.generalLog.findFirst({ where: { worldId } })).toMatchObject({ text: expected.logs[0]!.text });
-    } finally { await kill(child); }
-  }, 60_000);
+  it.each(['beforeCommit', 'committed'])(
+    '실제 SIGKILL (%s) 후 재시작하면 같은 RNG 결과로 턴이 정확히 한 번 반영된다',
+    async (phase) => {
+      const { worldId } = await create();
+      await queue(worldId);
+      const initial = await readWorldState(db, worldId);
+      const state = {
+        startYear: initial.startYear,
+        cities: Object.fromEntries(initial.cities.map((c) => [c.cityKey, c])),
+        nations: Object.fromEntries(initial.nations.map((n) => [n.id, n])),
+        generals: Object.fromEntries(initial.generals.map((g) => [g.id, g])),
+        diplomacies: initial.diplomacies,
+      };
+      const expected = runCommand(state, { generalId: 1 }, 'farm', {}, rngFor(initial.seed, 'turn', 500, 1));
+      if ('code' in expected) throw new Error('검증 명령 실패');
+      const next = applyEffects(state, expected.effects);
+      const child = worker(worldId, phase);
+      try {
+        await message(child, phase);
+        await kill(child);
+        expect(await db.generalLog.count({ where: { worldId } })).toBe(phase === 'committed' ? 1 : 0);
+        await expire(worldId);
+        const restarted = await engine(worldId);
+        await restarted.advanceTo(500);
+        await restarted.advanceTo(TICKS_PER_MONTH);
+        expect(await general(worldId)).toMatchObject({
+          gold: next.generals[1]!.gold,
+          experience: next.generals[1]!.experience,
+          nextTurnTick: 10_500,
+          turnRevision: 1,
+        });
+        expect(await db.generalLog.count({ where: { worldId } })).toBe(1);
+        expect(await db.generalTurn.count({ where: { worldId } })).toBe(30);
+        expect(await db.generalLog.findFirst({ where: { worldId } })).toMatchObject({ text: expected.logs[0]!.text });
+      } finally {
+        await kill(child);
+      }
+    },
+    60_000,
+  );
 
   it('실제 프로세스 둘을 띄우면 한 쪽만 턴을 저장한다', async () => {
     const { worldId } = await create();
@@ -354,7 +449,9 @@ describe('AC-M1-11 리스·재시작·펜싱, 실제 PostgreSQL', () => {
       const outcomes = await Promise.all([readyA, readyB]);
       expect(outcomes.sort()).toEqual(['committed', 'waiting']);
       expect(await db.generalLog.count({ where: { worldId } })).toBe(1);
-    } finally { await Promise.all([kill(a), kill(b)]); }
+    } finally {
+      await Promise.all([kill(a), kill(b)]);
+    }
   }, 60_000);
 
   it('런타임이 RUNNING 월드를 자동 선택하고 종료 때 리스를 해제한다', async () => {
@@ -362,9 +459,15 @@ describe('AC-M1-11 리스·재시작·펜싱, 실제 PostgreSQL', () => {
     const { worldId } = await create();
     const abort = new AbortController();
     let acquired = false;
-    const running = runEngine(db, { signal: abort.signal, onStatus: (status) => {
-      if (status === '실행권 획득') { acquired = true; abort.abort(); }
-    } });
+    const running = runEngine(db, {
+      signal: abort.signal,
+      onStatus: (status) => {
+        if (status === '실행권 획득') {
+          acquired = true;
+          abort.abort();
+        }
+      },
+    });
     await running;
     expect(acquired).toBe(true);
     const lease = await acquireLease(db, worldId);
@@ -374,23 +477,40 @@ describe('AC-M1-11 리스·재시작·펜싱, 실제 PostgreSQL', () => {
   it('명시적 월드 CLI가 실행권을 잡고 SIGTERM으로 정상 종료·해제한다', async () => {
     const { worldId } = await create();
     const child = spawn(process.execPath, ['--import', 'tsx', 'apps/engine/src/index.ts', '--world', worldId], {
-      cwd: new URL('../../../', import.meta.url), env: { ...process.env, DATABASE_URL: url }, stdio: ['ignore', 'pipe', 'pipe'],
+      cwd: new URL('../../../', import.meta.url),
+      env: { ...process.env, DATABASE_URL: url },
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
     const exited = once(child, 'exit');
     try {
       await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(() => { cleanup(); reject(new Error('CLI 시작 시간 초과')); }, 30_000);
+        const timer = setTimeout(() => {
+          cleanup();
+          reject(new Error('CLI 시작 시간 초과'));
+        }, 30_000);
         const onData = (data: Buffer) => {
-          if (data.toString().includes('실행권 획득')) { cleanup(); resolve(); }
+          if (data.toString().includes('실행권 획득')) {
+            cleanup();
+            resolve();
+          }
         };
-        const onExit = () => { cleanup(); reject(new Error('CLI가 시작 전에 종료됐습니다.')); };
-        function cleanup() { clearTimeout(timer); child.stdout.off('data', onData); child.off('exit', onExit); }
+        const onExit = () => {
+          cleanup();
+          reject(new Error('CLI가 시작 전에 종료됐습니다.'));
+        };
+        function cleanup() {
+          clearTimeout(timer);
+          child.stdout.off('data', onData);
+          child.off('exit', onExit);
+        }
         child.stdout.on('data', onData);
         child.once('exit', onExit);
       });
       child.kill('SIGTERM');
       expect((await exited)[0]).toBe(0);
       expect(await acquireLease(db, worldId)).not.toBeNull();
-    } finally { await kill(child); }
+    } finally {
+      await kill(child);
+    }
   }, 60_000);
 });

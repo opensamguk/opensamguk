@@ -16,8 +16,10 @@ export function parseQueue(markdown) {
     const cells = match[3].split('|').map((cell) => cell.trim());
     if (cells.length !== 5) throw new Error(`대기열 형식 오류 (칸 ${cells.length}개): ${line}`);
     const [title, ac, owner, deps, stage] = cells;
-    if (!OWNERS.includes(owner)) throw new Error(`${match[1]}: 구현 담당은 ${OWNERS.join('·')} 중 하나여야 합니다 ("${owner}")`);
-    if (!STAGES.includes(stage)) throw new Error(`${match[1]}: 단계는 ${STAGES.join('·')} 중 하나여야 합니다 ("${stage}")`);
+    if (!OWNERS.includes(owner))
+      throw new Error(`${match[1]}: 구현 담당은 ${OWNERS.join('·')} 중 하나여야 합니다 ("${owner}")`);
+    if (!STAGES.includes(stage))
+      throw new Error(`${match[1]}: 단계는 ${STAGES.join('·')} 중 하나여야 합니다 ("${stage}")`);
     if (owner === '사용자' && (stage === '계획' || stage === '리뷰')) {
       throw new Error(`${match[1]}: 사용자 작업은 구현·완료 단계만 씁니다`);
     }
@@ -84,7 +86,8 @@ export function nextActions(rows, { hasPlan = () => true } = {}) {
     }
     (ready[who] ??= []).push({ row, what });
   }
-  for (const items of Object.values(ready)) items.sort((a, b) => Number(b.row.stage === '진행중') - Number(a.row.stage === '진행중'));
+  for (const items of Object.values(ready))
+    items.sort((a, b) => Number(b.row.stage === '진행중') - Number(a.row.stage === '진행중'));
   const ahead = rows.filter((r) => r.milestone > current && needsPlan(r, hasPlan));
   return { milestone: current, ready, blocked, ahead };
 }
@@ -111,7 +114,10 @@ export function render({ milestone, ready, blocked, ahead = [] }) {
         : '';
     lines.push(`${label} ${first.what} ${first.row.id} ${first.row.title} (AC-${first.row.ac})${handoff}`);
     if (rest.length > 0) {
-      const shown = rest.slice(0, 5).map((i) => `${i.row.id} ${i.what}`).join(', ');
+      const shown = rest
+        .slice(0, 5)
+        .map((i) => `${i.row.id} ${i.what}`)
+        .join(', ');
       lines.push(`    그 밖에 ${rest.length}건: ${shown}${rest.length > 5 ? ' …' : ''}`);
     }
   }
@@ -123,12 +129,19 @@ export function render({ milestone, ready, blocked, ahead = [] }) {
     const byMilestone = new Map();
     for (const row of planning) byMilestone.set(row.milestone, [...(byMilestone.get(row.milestone) ?? []), row]);
     for (const [m, list] of byMilestone) {
-      const shown = list.slice(0, 4).map((r) => `${r.id} ${r.title.split(':')[0]}(구현 ${r.owner})`).join(', ');
-      lines.push(`    M${m}${m === milestone ? ' (현재)' : ''} ${list.length}건: ${shown}${list.length > 4 ? ' …' : ''}`);
+      const shown = list
+        .slice(0, 4)
+        .map((r) => `${r.id} ${r.title.split(':')[0]}(구현 ${r.owner})`)
+        .join(', ');
+      lines.push(
+        `    M${m}${m === milestone ? ' (현재)' : ''} ${list.length}건: ${shown}${list.length > 4 ? ' …' : ''}`,
+      );
     }
   }
   if (blocked.length > 0) {
-    const shown = blocked.slice(0, 5).map((b) => `${b.row.id}(${b.who} ${b.what} ← ${b.waitingOn.map((d) => d.id).join('·')})`);
+    const shown = blocked
+      .slice(0, 5)
+      .map((b) => `${b.row.id}(${b.who} ${b.what} ← ${b.waitingOn.map((d) => d.id).join('·')})`);
     lines.push('', `선행 대기 ${blocked.length}건: ${shown.join(', ')}${blocked.length > 5 ? ' …' : ''}`);
   }
   return lines.join('\n');

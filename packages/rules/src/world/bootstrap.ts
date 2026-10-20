@@ -94,7 +94,12 @@ export interface WorldInit {
 }
 
 export function buildInitialWorld(input: {
-  map: unknown; scenario: unknown; unitSet: unknown; statRules: unknown; seed: string; portraitMap?: unknown;
+  map: unknown;
+  scenario: unknown;
+  unitSet: unknown;
+  statRules: unknown;
+  seed: string;
+  portraitMap?: unknown;
 }): WorldInit {
   if (typeof input.seed !== 'string' || input.seed.length === 0) throw new Error('시드가 비어 있습니다.');
   const map = mapSchema.parse(input.map);
@@ -105,7 +110,8 @@ export function buildInitialWorld(input: {
   const mapCities = [...map.cities].sort((a, b) => a.id - b.id);
   const byId = new Map(mapCities.map((city) => [city.id, city]));
   const byName = new Map(mapCities.map((city) => [city.name, city]));
-  if (byId.size !== mapCities.length || byName.size !== mapCities.length) throw new Error('도시 ID 또는 이름이 중복됩니다.');
+  if (byId.size !== mapCities.length || byName.size !== mapCities.length)
+    throw new Error('도시 ID 또는 이름이 중복됩니다.');
 
   for (const city of mapCities) {
     if (new Set(city.connections).size !== city.connections.length) throw new Error(`${city.name}: 연결이 중복됩니다.`);
@@ -137,28 +143,65 @@ export function buildInitialWorld(input: {
       return city.id;
     });
     ownedCities.set(id, cityKeys);
-    return { id, name, color, gold, rice, description, tech, philosophy, level, capitalCityKey: cityKeys[0]!, isNpc: true };
+    return {
+      id,
+      name,
+      color,
+      gold,
+      rice,
+      description,
+      tech,
+      philosophy,
+      level,
+      capitalCityKey: cityKeys[0]!,
+      isNpc: true,
+    };
   });
 
   const cities: InitialCity[] = mapCities.map((city) => ({
-    cityKey: city.id, name: city.name, level: city.level, region: city.region,
-    x: city.position.x, y: city.position.y, connections: [...city.connections].sort((a, b) => a - b),
+    cityKey: city.id,
+    name: city.name,
+    level: city.level,
+    region: city.region,
+    x: city.position.x,
+    y: city.position.y,
+    connections: [...city.connections].sort((a, b) => a - b),
     nationId: ownerByCity.get(city.id) ?? null,
-    population: city.initial.population, populationMax: city.max.population,
-    agriculture: city.initial.agriculture, agricultureMax: city.max.agriculture,
-    commerce: city.initial.commerce, commerceMax: city.max.commerce,
-    security: city.initial.security, securityMax: city.max.security,
-    defence: city.initial.defence, defenceMax: city.max.defence,
-    wall: city.initial.wall, wallMax: city.max.wall,
-    trust: map.defaults.trust, supplied: map.defaults.supplyState === 1,
+    population: city.initial.population,
+    populationMax: city.max.population,
+    agriculture: city.initial.agriculture,
+    agricultureMax: city.max.agriculture,
+    commerce: city.initial.commerce,
+    commerceMax: city.max.commerce,
+    security: city.initial.security,
+    securityMax: city.max.security,
+    defence: city.initial.defence,
+    defenceMax: city.max.defence,
+    wall: city.initial.wall,
+    wallMax: city.max.wall,
+    trust: map.defaults.trust,
+    supplied: map.defaults.supplyState === 1,
   }));
 
   // 배치만 bootstrap 스트림을 소비한다. DB ID·시각은 규칙 상태에 넣지 않는다.
   const rng = rngFor(input.seed, 'bootstrap');
   const allCities = cities.map((city) => city.cityKey);
   const generals: InitialGeneral[] = scenario.general.map((row, i) => {
-    const [affinity, name, , nationNumber, cityName, leadership, strength, intel, officerLevel,
-      birthYear, deathYear, personality, special] = row;
+    const [
+      affinity,
+      name,
+      ,
+      nationNumber,
+      cityName,
+      leadership,
+      strength,
+      intel,
+      officerLevel,
+      birthYear,
+      deathYear,
+      personality,
+      special,
+    ] = row;
     const nationId = nationNumber === 0 ? null : nationNumber;
     if (nationId !== null && !ownedCities.has(nationId)) throw new Error(`${name}: 없는 국가 ${nationId}`);
     if (birthYear > deathYear) throw new Error(`${name}: 생년이 몰년보다 늦습니다.`);
@@ -166,29 +209,61 @@ export function buildInitialWorld(input: {
     if (cityName !== null && !explicitCity) throw new Error(`${name}: 지도에 없는 도시 ${cityName}`);
     const cityKey = explicitCity?.id ?? rng.pick(nationId === null ? allCities : ownedCities.get(nationId)!);
     return {
-      id: i + 1, userId: null, affinity, name, portraitId: Object.hasOwn(portraits, name) ? portraits[name]! : null, nationId, cityKey,
-      leadership, strength, intel, officerLevel, birthYear, deathYear, activeFromYear: birthYear + 15,
-      personality, special,
+      id: i + 1,
+      userId: null,
+      affinity,
+      name,
+      portraitId: Object.hasOwn(portraits, name) ? portraits[name]! : null,
+      nationId,
+      cityKey,
+      leadership,
+      strength,
+      intel,
+      officerLevel,
+      birthYear,
+      deathYear,
+      activeFromYear: birthYear + 15,
+      personality,
+      special,
       // core2026 df6c926 bootstrap의 초기 금·쌀을 참고. resources/NOTICE.md.
-      gold: 1000, rice: 1000, crew: 0, crewType: unitSet.defaultCrewTypeId,
-      train: 0, atmos: 0, experience: 0, dedication: 0, age: Math.max(0, scenario.startYear - birthYear),
-      injury: 0, nextTurnTick: rngFor(input.seed, 'turn-offset', i + 1).int(0, TICKS_PER_MONTH - 1),
+      gold: 1000,
+      rice: 1000,
+      crew: 0,
+      crewType: unitSet.defaultCrewTypeId,
+      train: 0,
+      atmos: 0,
+      experience: 0,
+      dedication: 0,
+      age: Math.max(0, scenario.startYear - birthYear),
+      injury: 0,
+      nextTurnTick: rngFor(input.seed, 'turn-offset', i + 1).int(0, TICKS_PER_MONTH - 1),
     };
   });
 
   const diplomacyByPair = new Map<string, InitialDiplomacy>();
   for (const [a, b, kind, months] of scenario.diplomacy) {
-    if (a === b || !ownedCities.has(a) || !ownedCities.has(b)) throw new Error(`외교 국가 쌍이 올바르지 않습니다: ${a}, ${b}`);
+    if (a === b || !ownedCities.has(a) || !ownedCities.has(b))
+      throw new Error(`외교 국가 쌍이 올바르지 않습니다: ${a}, ${b}`);
     const nationA = Math.min(a, b);
     const nationB = Math.max(a, b);
     diplomacyByPair.set(`${nationA}:${nationB}`, {
-      nationA, nationB, state: kind === 0 ? 'WAR' : kind === 1 ? 'DECLARED' : 'NON_AGGRESSION',
+      nationA,
+      nationB,
+      state: kind === 0 ? 'WAR' : kind === 1 ? 'DECLARED' : 'NON_AGGRESSION',
       untilTick: months * TICKS_PER_MONTH,
     });
   }
   return {
-    seed: input.seed, scenarioKey: scenario.id, mapKey: map.id, unitSetKey: unitSet.id,
-    startYear: scenario.startYear, statRules, unitSet, cities, nations, generals,
+    seed: input.seed,
+    scenarioKey: scenario.id,
+    mapKey: map.id,
+    unitSetKey: unitSet.id,
+    startYear: scenario.startYear,
+    statRules,
+    unitSet,
+    cities,
+    nations,
+    generals,
     diplomacies: [...diplomacyByPair.values()].sort((a, b) => a.nationA - b.nationA || a.nationB - b.nationB),
   };
 }

@@ -26,7 +26,8 @@ export function DevUiPage() {
       </section>
       <section>
         <h2>NationBadge</h2>
-        <NationBadge name="조조" color="#000080" /> <NationBadge name="원소" color="#ffd700" /> <NationBadge name="재야" color={null} />
+        <NationBadge name="조조" color="#000080" /> <NationBadge name="원소" color="#ffd700" />{' '}
+        <NationBadge name="재야" color={null} />
       </section>
       <section>
         <h2>EmptyState / ErrorState</h2>

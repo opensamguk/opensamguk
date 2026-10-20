@@ -5,9 +5,7 @@ export interface GameDate {
 }
 
 export function nextMonth(date: GameDate): GameDate {
-  return date.month === 12
-    ? { year: date.year + 1, month: 1 }
-    : { year: date.year, month: date.month + 1 };
+  return date.month === 12 ? { year: date.year + 1, month: 1 } : { year: date.year, month: date.month + 1 };
 }
 
 export function formatGameDate(date: GameDate): string {
