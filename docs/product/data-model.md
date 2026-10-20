@@ -58,8 +58,8 @@
 | ----------- | ------------------------------------------------------------------------------------------- | ---- |
 | `Nation`    | (worldId, id) PK, name, color, capitalCityKey, gold, rice, description, philosophy, tech, level, isNpc. taxRate·payRate·notice·foundedTick·destroyedTick는 후속 작업 | M1 |
 | `City`      | (worldId, cityKey) PK, name, nationId, population·Max, agriculture·Max, commerce·Max, security·Max, defence·Max, wall·Max, trust(민심), supplied | M1 |
-| `General`   | (worldId, id) PK, userId(NPC면 없음), name, portraitId, nationId, cityKey, officerLevel, leadership, strength, intel, affinity, birthYear, deathYear, activeFromYear, personality, special, gold, rice, crew, crewType, train, atmos, experience, dedication, age, injury, nextTurnTick. defenceMode·npcKind·lastActiveAt·turnRevision는 후속 작업 | M1 |
-| `GeneralTurn` | (generalId, slot 0~29) PK, commandKey, args                                               | M1   |
+| `General`   | (worldId, id) PK, userId(NPC면 없음), name, portraitId, nationId, cityKey, officerLevel, leadership, strength, intel, affinity, birthYear, deathYear, activeFromYear, personality, special, gold, rice, crew, crewType, train, atmos, experience, dedication, age, injury, nextTurnTick, turnRevision. defenceMode·npcKind·lastActiveAt는 후속 작업 | M1 |
+| `GeneralTurn` | (worldId, generalId, slot 0~29) PK, commandKey, args. slot 범위는 DB CHECK로 제한           | M1   |
 | `NationTurn`  | (nationId, officerLevel, slot 0~11) PK, commandKey, args                                  | M1   |
 | `Diplomacy`   | (worldId, nationA, nationB) PK (A < B), state(NEUTRAL·DECLARED·WAR·NON_AGGRESSION), untilTick, treatyId | M1 |
 | `DiplomacyProposal` | id, worldId, fromNationId, toNationId, kind, terms, status, expiresTick             | M2   |
@@ -69,7 +69,7 @@
 
 | 테이블             | 주요 필드                                                         | 관문 |
 | ------------------ | ----------------------------------------------------------------- | ---- |
-| `GeneralLog`       | id, worldId, generalId, tick, kind, text                          | M1   |
+| `GeneralLog`       | id(BigInt), worldId, generalId, tick, commandKey, kind, text, createdAt. (worldId, generalId, tick) 고유 | M1   |
 | `NationHistory`    | id, worldId, nationId(없으면 월드 정세), tick, text               | M1   |
 | `YearbookSnapshot` | (worldId, tick) PK, data(국가별 국력, 도시별 소유 국가, 장수 수)  | M1   |
 | `SeasonResult`     | worldId(PK), endedTick, winnerNationId, rankings                  | M3   |

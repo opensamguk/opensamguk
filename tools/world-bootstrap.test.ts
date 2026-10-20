@@ -36,6 +36,16 @@ describe('AC-M1-03 시나리오 합성', () => {
     }
   });
 
+  it('AC-M1-10 장수 턴은 첫 달 안에 흩어지고 도시 배치 RNG 소비와 독립적이다', () => {
+    const world = buildInitialWorld(input);
+    const offsets = world.generals.map((general) => general.nextTurnTick);
+    expect(offsets.every((tick) => Number.isInteger(tick) && tick >= 0 && tick < TICKS_PER_MONTH)).toBe(true);
+    expect(new Set(offsets).size).toBeGreaterThan(1);
+    const changed = structuredClone(scenario);
+    for (const row of changed.general) row[4] = null;
+    expect(buildInitialWorld({ ...input, scenario: changed }).generals.map((general) => general.nextTurnTick)).toEqual(offsets);
+  });
+
   it('15세 미만도 만들고 행동 가능 연도와 관직 원본을 보존한다', () => {
     const world = buildInitialWorld(input);
     const young = world.generals.find((general) => general.birthYear + 15 > world.startYear)!;

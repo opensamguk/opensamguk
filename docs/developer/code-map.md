@@ -26,7 +26,10 @@
 | `apps/server/src/routers/auth.ts` | 가입·로그인·로그아웃·현재 계정 |
 | `apps/server/src/trpc.ts` | 공개·인증 필수 procedure |
 | `apps/server/src/router.ts` | tRPC `AppRouter` (API 계약): `health`, `auth` |
-| `apps/engine/src/index.ts` | 엔진 자리 (대기만 함) |
+| `apps/engine/src/index.ts`, `main.ts` | `engine:run --world <ID>`·dev 월드 선택, 갱신·종료 |
+| `apps/engine/src/lease.ts` | DB 시각 기준 실행권 획득·갱신·해제·펜싱 |
+| `apps/engine/src/worldLoader.ts`, `turnLoop.ts`, `persist.ts` | 현재 상태 적재, manual/realtime 턴 실행, 원자적 저장 |
+| `apps/engine/src/turnLoop.integration.test.ts` | 실제 DB, SIGKILL·동시 엔진·재시작·토큰 검증 |
 | `apps/web/src/LoginPage.tsx` | 자리표시 로그인 화면과 서버 상태 표시 |
 | `apps/web/apiTarget.ts` | dev 프록시가 쓸 API 서버 주소 (`SERVER_PORT`) |
 | `apps/web/src/trpc.ts` | tRPC 클라이언트 (`AppRouter` 타입만 import) |

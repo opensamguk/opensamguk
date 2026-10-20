@@ -172,7 +172,7 @@ export function buildInitialWorld(input: {
       // core2026 df6c926 bootstrap의 초기 금·쌀을 참고. resources/NOTICE.md.
       gold: 1000, rice: 1000, crew: 0, crewType: unitSet.defaultCrewTypeId,
       train: 0, atmos: 0, experience: 0, dedication: 0, age: Math.max(0, scenario.startYear - birthYear),
-      injury: 0, nextTurnTick: 0,
+      injury: 0, nextTurnTick: rngFor(input.seed, 'turn-offset', i + 1).int(0, TICKS_PER_MONTH - 1),
     };
   });
 

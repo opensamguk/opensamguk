@@ -19,6 +19,15 @@ describe('AC-M1-04 게임 시계', () => {
     expect(nowTick(clock, 50)).toBe(clock.clockTick);
     expect(nowTick(clock, 220)).toBe(2);
   });
+  it('아직 저장하지 않은 관측 tick도 역행하지 않고 원래 시각부터 이어 간다', () => {
+    const running = startClock(initial, 0);
+    const observed = nowTick(running, 600_000);
+    const checkpoint = checkpointClock(running, 300_000, observed);
+    expect(checkpoint).toMatchObject({ clockTick: 10_000, clockAnchorAt: 600_000 });
+    expect(nowTick(checkpoint, 600_000)).toBe(10_000);
+    expect(nowTick(checkpoint, 660_000)).toBe(11_000);
+    expect(checkpointClock({ ...checkpoint, status: 'PAUSED' }, 900_000, 20_000).clockTick).toBe(10_000);
+  });
   it('금지된 전환과 잘못된 값을 거부한다', () => {
     expect(() => pauseClock(initial, 0)).toThrow();
     const ended = endClock(startClock(initial, 0), 1000);

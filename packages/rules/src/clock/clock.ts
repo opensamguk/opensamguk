@@ -24,8 +24,9 @@ export function nowTick(clock: Clock, now: number): number {
 }
 
 // Preserve fractional ticks when saving a running clock checkpoint.
-export function checkpointClock(clock: Clock, now: number): Clock {
-  const tick = nowTick(clock, now);
+export function checkpointClock(clock: Clock, now: number, minimumTick = 0): Clock {
+  if (!Number.isSafeInteger(minimumTick) || minimumTick < 0) throw new Error('잘못된 최소 tick입니다.');
+  const tick = Math.max(minimumTick, nowTick(clock, now));
   if (clock.status !== 'RUNNING') return { ...clock };
   return { ...clock, clockTick: tick, clockAnchorAt: clock.clockAnchorAt! +
     (tick - clock.clockTick) * clock.turnTermMinutes * 60_000 / TICKS_PER_MONTH };

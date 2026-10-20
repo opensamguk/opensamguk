@@ -32,6 +32,7 @@ model World {
   cities          City[]
   generals        General[]
   diplomacies     Diplomacy[]
+  engineLease     EngineLease?
 }
 
 enum WorldStatus {
@@ -134,6 +135,9 @@ model General {
   age            Int
   injury         Int
   nextTurnTick   Int
+  turnRevision   Int @default(0)
+  turns          GeneralTurn[]
+  logs           GeneralLog[]
   world          World   @relation(fields: [worldId], references: [id], onDelete: Cascade)
   nation         Nation? @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: NoAction)
   city           City    @relation(fields: [worldId, cityKey], references: [worldId, cityKey], onDelete: NoAction)
@@ -142,6 +146,40 @@ model General {
   @@unique([worldId, userId])
   @@index([worldId, nationId])
   @@index([worldId, cityKey])
+  @@index([worldId, nextTurnTick, id])
+}
+
+model EngineLease {
+  worldId      String @id
+  ownerId      String
+  fencingToken Int
+  expiresAt    DateTime
+  world        World @relation(fields: [worldId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model GeneralTurn {
+  worldId    String
+  generalId  Int
+  slot       Int
+  commandKey String @default("rest")
+  args       Json @default("{}")
+  general    General @relation(fields: [worldId, generalId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([worldId, generalId, slot])
+}
+
+model GeneralLog {
+  id         BigInt @id @default(autoincrement())
+  worldId    String
+  generalId  Int
+  tick       Int
+  commandKey String
+  kind       String
+  text       String
+  createdAt  DateTime @default(now())
+  general    General @relation(fields: [worldId, generalId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([worldId, generalId, tick])
 }
 
 enum UserStatus {
