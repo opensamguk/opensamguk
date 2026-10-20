@@ -11,7 +11,7 @@
 | 관문                         | 완료 조건                                                    | 상태 |
 | ---------------------------- | ------------------------------------------------------------ | ---- |
 | 기획                         | PRD·요구사항·인수조건·차별화 선택                            | ✅ v0.2 (가정 원장 일부 남음) |
-| M1 혼자 + NPC로 한 판 완주   | [AC-M1 21개](docs/product/acceptance-criteria.md#m1) 통과    | 🟨 0/21 (2개 리뷰 대기) |
+| M1 혼자 + NPC로 한 판 완주   | [AC-M1 21개](docs/product/acceptance-criteria.md#m1) 통과    | 🟨 0/21 (T1-01·T1-02 리뷰 결과 수정 필요) |
 | M2 지인 테스트               | [AC-M2 17개](docs/product/acceptance-criteria.md#m2) 통과    | ⬜ 0/17 |
 | M3 공개 오픈 = MVP 완료      | [AC-M3 16개](docs/product/acceptance-criteria.md#m3) 통과    | ⬜ 0/16 |
 

@@ -100,7 +100,8 @@ export function render({ milestone, ready, blocked }) {
     }
   }
   if (blocked.length > 0) {
-    lines.push('', `선행 대기 ${blocked.length}건: ${blocked.map((b) => `${b.row.id}(${b.who} ${b.what} ← ${b.waitingOn.map((d) => d.id).join('·')})`).join(', ')}`);
+    const shown = blocked.slice(0, 5).map((b) => `${b.row.id}(${b.who} ${b.what} ← ${b.waitingOn.map((d) => d.id).join('·')})`);
+    lines.push('', `선행 대기 ${blocked.length}건: ${shown.join(', ')}${blocked.length > 5 ? ' …' : ''}`);
   }
   return lines.join('\n');
 }

@@ -1,7 +1,9 @@
+import { builtinModules } from 'node:module';
 import js from '@eslint/js';
 import { defineConfig, globalIgnores } from 'eslint/config';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
+import opensamguk from './tools/eslint/no-cross-package-relative.js';
 
 // 패키지 의존 방향: docs/architecture/package-boundaries.md
 const PACKAGES = [
@@ -15,16 +17,16 @@ const PACKAGES = [
 
 const BOUNDARY_MESSAGE = '패키지 의존 방향 위반입니다. docs/architecture/package-boundaries.md를 보세요.';
 
-const NODE_BUILTINS = ['node:*', 'fs', 'fs/*', 'path', 'os', 'http', 'https', 'net', 'child_process', 'worker_threads'];
+// Node 내장 모듈 전체 (접두사 없는 이름, 하위 경로, node: 접두사). 목록을 손으로 관리하지 않는다.
+const NODE_BUILTINS = [
+  'node:*',
+  ...builtinModules.filter((name) => !name.startsWith('_')).flatMap((name) => [name, `${name}/*`]),
+];
 
 function importRule(allowed, { banBuiltins = false, typeOnly = [] } = {}) {
   const banned = PACKAGES.filter((p) => !allowed.includes(p) && !typeOnly.includes(p));
   const patterns = [
     { group: banned.flatMap((p) => [p, `${p}/*`]), message: BOUNDARY_MESSAGE },
-    {
-      group: ['**/apps/**', '**/packages/**'],
-      message: '다른 패키지는 상대 경로가 아니라 패키지 이름으로 import합니다.',
-    },
   ];
   if (typeOnly.length > 0) {
     patterns.push({
@@ -57,6 +59,8 @@ export default defineConfig([
   tseslint.configs.recommended,
   {
     languageOptions: { globals: globals.node },
+    plugins: { opensamguk },
+    rules: { 'opensamguk/no-cross-package-relative': 'error' },
   },
   {
     files: ['packages/shared/**'],

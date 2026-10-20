@@ -36,9 +36,12 @@ describe('패키지 경계', () => {
   });
 
   it('rules는 node 내장 모듈을 import할 수 없다', async () => {
-    expect(await ruleIds("import { readFileSync } from 'node:fs';\nexport { readFileSync };\n", 'packages/rules/src/x.ts')).toContain(
-      'no-restricted-imports',
-    );
+    // 리뷰 T1-01: 접두사 없는 이름과 하위 경로도 막아야 한다
+    const specifiers = ['node:fs', 'fs', 'crypto', 'node:crypto', 'dns/promises', 'node:dns/promises', 'fs/promises', 'timers/promises'];
+    for (const spec of specifiers) {
+      const code = `import * as m from '${spec}';\nexport { m };\n`;
+      expect(await ruleIds(code, 'packages/rules/src/x.ts'), spec).toContain('no-restricted-imports');
+    }
   });
 
   it('web은 server에서 타입만 import할 수 있다', async () => {
@@ -49,8 +52,21 @@ describe('패키지 경계', () => {
   });
 
   it('상대 경로로 다른 패키지를 import할 수 없다', async () => {
-    expect(await ruleIds("export { RULESET_ID } from '../../../packages/rules/src/index';\n", 'apps/engine/src/x.ts')).toContain(
-      'no-restricted-imports',
+    const cases: Array<[string, string]> = [
+      ["export { RULESET_ID } from '../../../packages/rules/src/index';\n", 'apps/engine/src/x.ts'],
+      // 리뷰 T1-01: 형제 패키지 경로는 문자열에 apps·packages가 없다
+      ["import { createDb } from '../../db/src/index';\nexport { createDb };\n", 'packages/rules/src/x.ts'],
+      ["import { appRouter } from '../../server/src/router';\nexport { appRouter };\n", 'apps/web/src/x.ts'],
+      ["export * from '../../../shared/src/index';\n", 'packages/rules/src/deep/x.ts'],
+    ];
+    for (const [code, file] of cases) {
+      expect(await ruleIds(code, file), file).toContain('opensamguk/no-cross-package-relative');
+    }
+  });
+
+  it('같은 패키지 안의 상대 경로는 허용한다', async () => {
+    expect(await ruleIds("export * from '../model/index';\n", 'packages/rules/src/commands/x.ts')).not.toContain(
+      'opensamguk/no-cross-package-relative',
     );
   });
 });

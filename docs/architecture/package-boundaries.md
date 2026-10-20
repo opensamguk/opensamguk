@@ -35,6 +35,7 @@ tools/* ───────────▶ 무엇이든 (배포물에 포함�
 
 `eslint.config.js`가 막고, `tools/lint-boundaries.test.ts`가 규칙이 실제로 동작하는지 확인합니다 (`pnpm check`).
 
-- import 방향: 패키지별 `no-restricted-imports`. 다른 패키지를 상대 경로로 import하는 것도 막습니다.
-- `packages/rules`: `Math.random`, `Date.now`, `new Date()`, node 내장 모듈, `fetch`를 막습니다.
+- import 방향: 패키지별 `no-restricted-imports`.
+- 상대 경로로 다른 패키지 들어가기: 로컬 규칙 `opensamguk/no-cross-package-relative`가 실제로 풀린 경로로 판단해 막습니다.
+- `packages/rules`: `Math.random`, `Date.now`, `new Date()`, `fetch`, node 내장 모듈 전체(`builtinModules`, 하위 경로, `node:` 접두사)를 막습니다.
 - `packages/shared`, `apps/engine`: `Math.random`을 막습니다.
