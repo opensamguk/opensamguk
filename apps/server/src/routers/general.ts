@@ -30,6 +30,7 @@ function rejection(result: unknown) {
 }
 export const generalRouter = router({
   create: protectedProcedure.input(generalCreationSchema.extend(worldInput.shape)).mutation(async ({ ctx, input }) => {
+    const started = performance.now();
     const { worldId, ...payload } = input;
     const id = await ctx.db.$transaction(async (tx) => {
       const world = await requireWorld(tx, worldId, true);
@@ -74,7 +75,7 @@ export const generalRouter = router({
           where: {
             id: ctx.sessionId!,
             userId: ctx.user.id,
-            expiresAt: { gt: new Date(ctx.now) },
+            expiresAt: { gt: new Date(ctx.now + performance.now() - started) },
             user: { status: 'ACTIVE' },
           },
         });

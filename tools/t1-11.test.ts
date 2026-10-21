@@ -68,7 +68,8 @@ describe('T1-11 순수 규칙과 공개 명령', () => {
     expect(general).toEqual(buildCreatedGeneral({ ...input, cityKeys: [2, 4, 9] }));
     expect(general.nextTurnTick).toBeGreaterThan(50000);
     expect(general.nextTurnTick).toBeLessThanOrEqual(60000);
-    expect(general).toMatchObject({ age: 20, gold: 1000, rice: 1000, nationId: null, crew: 0 });
+    expect(general).toMatchObject({ age: 20, birthYear: 170, gold: 1000, rice: 1000, nationId: null, crew: 0 });
+    expect(buildCreatedGeneral({ ...input, monthlyTick: 120000, tick: 120000 }).birthYear).toBe(171);
     expect(general.affinity).toBeGreaterThanOrEqual(1);
     expect(general.affinity).toBeLessThanOrEqual(150);
   });

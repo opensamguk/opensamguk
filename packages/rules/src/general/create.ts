@@ -71,7 +71,8 @@ export function buildCreatedGeneral(input: {
     nextTurnTick += (Math.floor((input.tick - nextTurnTick) / TICKS_PER_MONTH) + 1) * TICKS_PER_MONTH;
   if (nextTurnTick > 2_147_483_647 || !Number.isSafeInteger(input.id) || input.id < 1 || input.id > 2_147_483_647)
     throw new Error('장수 저장 범위를 넘었습니다.');
-  const birthYear = monthlyDate(input.startYear, input.monthlyTick).year - 20;
+  // monthlyDate는 정산할 달의 끝 경계를 받는다. monthlyTick=0도 첫 달이다.
+  const birthYear = monthlyDate(input.startYear, input.monthlyTick + TICKS_PER_MONTH).year - 20;
   return {
     ...input.payload,
     id: input.id,
