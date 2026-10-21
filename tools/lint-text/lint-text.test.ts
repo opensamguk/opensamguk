@@ -163,6 +163,49 @@ describe('AC-M1-22 T1-25 문구 검사: 건너뛰는 곳', () => {
     expect(ids(md('| 이름 | 설명 |\n| --- | --- |\n| 장수 | 무력을 가지고 있다 |'))).toEqual(['A-7']);
   });
 
+  // 인라인 코드의 경계는 GitHub가 쓰는 cmark-gfm으로 렌더링해 맞춰 보았다.
+  it('인라인 코드는 문단 안에서 줄을 넘어 이어지고, 같은 길이의 백틱 묶음끼리만 닫힌다', () => {
+    const spans = [
+      '앞말 `첫줄\n가지고 있다\n끝줄` 뒷말',
+      '> 앞말 `첫줄\n> 가지고 있다\n> 끝줄` 뒷말',
+      '> 앞말 `첫줄\n가지고 있다` 뒷말',
+      '- 앞말 `첫줄\n  가지고 있다` 뒷말',
+      '``가지고 있다 ` 코드``',
+      '`a`` 가지고 있다 ``b`',
+      '\\\\`가지고 있다`',
+    ];
+    for (const source of spans) expect(md(source)).toEqual([]);
+    // 같은 코드 뒤에 빈 줄과 코드 밖 문장을 붙이면 그 문장만 걸린다.
+    for (const source of spans) {
+      const lines = source.split('\n').length;
+      expect(md(`${source}\n\n가지고 있다`).map((f) => `${f.line} ${f.id}`)).toEqual([`${lines + 2} A-7`]);
+    }
+    expect(ids(md('``가지고 있다` 끝'))).toEqual(['A-7']);
+  });
+
+  it('역슬래시 뒤의 백틱은 코드를 열지 않고, 코드 안의 역슬래시는 닫는 백틱을 막지 않는다', () => {
+    expect(md('\\`가지고 있다\\`').map((f) => `${f.line} ${f.id}`)).toEqual(['1 A-7']);
+    expect(md('\\`가지고 있다`').map((f) => `${f.line} ${f.id}`)).toEqual(['1 A-7']);
+    expect(md('`코드\\`가지고 있다`').map((f) => `${f.line} ${f.id}`)).toEqual(['1 A-7']);
+    expect(md('앞말 \\`첫줄\n가지고 있다\n끝줄` 뒷말').map((f) => `${f.line} ${f.id}`)).toEqual(['2 A-7']);
+  });
+
+  it('인라인 코드는 빈 줄, 새 블록, 표의 행을 넘지 않는다', () => {
+    const lineOf = (source: string) => md(source).map((f) => `${f.line} ${f.id}`);
+    expect(lineOf('앞말 `첫줄\n\n가지고 있다 끝줄` 뒷말')).toEqual(['3 A-7']);
+    expect(lineOf('앞말 `첫줄\n# 가지고 있다 끝줄`')).toEqual(['2 A-7']);
+    expect(lineOf('- 앞말 `첫줄\n- 가지고 있다 끝줄`')).toEqual(['2 A-7']);
+    expect(lineOf('> 앞말 `첫줄\n\n> 가지고 있다 끝줄`')).toEqual(['3 A-7']);
+    expect(lineOf('앞말 `첫줄\n```\n코드\n```\n가지고 있다 끝줄`')).toEqual(['5 A-7']);
+    expect(lineOf('| 이름 | 설명 |\n| --- | --- |\n| `열림 | 무력 |\n| 장수 | 가지고 있다` |')).toEqual(['4 A-7']);
+    expect(md('| 이름 | 설명 |\n| --- | --- |\n| `가지고 있다\\|코드` | 무력 |')).toEqual([]);
+  });
+
+  it('닫는 표지를 끝까지 못 찾은 뒤에는 cmark-gfm처럼 앞서 본 묶음 위치로 판정한다', () => {
+    // ``` 가 닫히지 않아 끝까지 훑은 뒤 `a` 가 닫히면, 그 뒤의 ` 는 GitHub에서 글자로 보인다.
+    expect(ids(md('``` `a` `가지고 있다 `'))).toEqual(['A-7']);
+  });
+
   it('비공개 폴더 private/는 대상이 아니다', () => {
     expect(classify('private/v1/backlog.md')).toBeNull();
     expect(classify('docs/index.md')).toMatchObject({ kind: 'markdown' });
@@ -359,6 +402,21 @@ describe('AC-M1-22 T1-25 pnpm lint:text 명령', () => {
     }
   });
 
+  it('여러 줄 인라인 코드와 역슬래시 백틱의 종료 코드', () => {
+    const span = '앞말 `첫줄\n가지고 있다\n끝줄` 뒷말\n';
+    expect(run(fixture({ 'docs/a.md': span }), '--strict')).toMatchObject({ status: 0, stderr: '' });
+    const after = run(fixture({ 'docs/a.md': `${span}\n가지고 있다\n` }), '--strict');
+    expect(after.status).toBe(1);
+    expect(after.stdout).toContain('docs/a.md:5 [A-7]');
+    expect(after.stdout).toContain('1건 (A-7 1)');
+    for (const sample of ['\\`가지고 있다\\`\n', '\\`가지고 있다`\n']) {
+      const escaped = run(fixture({ 'docs/a.md': sample }), '--strict');
+      expect(escaped.status).toBe(1);
+      expect(escaped.stdout).toContain('docs/a.md:1 [A-7]');
+    }
+    expect(run(fixture({ 'docs/a.md': '`가지고 있다`\n' }), '--strict').status).toBe(0);
+  });
+
   it('실제 명령의 종료 코드: 경고 0, --strict 1', { timeout: 60_000 }, () => {
     const dir = fixture({ 'docs/a.md': '무력을 가지고 있다\n' });
     const tsx = fileURLToPath(new URL('../../node_modules/.bin/tsx', import.meta.url));
@@ -367,5 +425,24 @@ describe('AC-M1-22 T1-25 pnpm lint:text 명령', () => {
     expect(warn.status).toBe(0);
     expect(warn.stdout).toContain('docs/a.md:1 [A-7] 가지고 있');
     expect(spawnSync(tsx, [cli, '--strict'], { cwd: dir, encoding: 'utf8' }).status).toBe(1);
+  });
+
+  it('실제 명령: 여러 줄 인라인 코드는 0, 코드 밖 문장과 역슬래시 백틱은 1', { timeout: 60_000 }, () => {
+    const dir = fixture({
+      'docs/span.md': '앞말 `첫줄\n가지고 있다\n끝줄` 뒷말\n',
+      'docs/after.md': '앞말 `첫줄\n가지고 있다\n끝줄` 뒷말\n\n가지고 있다\n',
+      'docs/escaped.md': '\\`가지고 있다\\`\n',
+    });
+    const tsx = fileURLToPath(new URL('../../node_modules/.bin/tsx', import.meta.url));
+    const cli = fileURLToPath(new URL('cli.ts', import.meta.url));
+    const strict = (path: string) => spawnSync(tsx, [cli, '--strict', path], { cwd: dir, encoding: 'utf8' });
+    expect(strict('docs/span.md').status).toBe(0);
+    const after = strict('docs/after.md');
+    expect(after.status).toBe(1);
+    expect(after.stdout).toContain('docs/after.md:5 [A-7] 가지고 있');
+    expect(after.stdout).toContain('1건 (A-7 1)');
+    const escaped = strict('docs/escaped.md');
+    expect(escaped.status).toBe(1);
+    expect(escaped.stdout).toContain('docs/escaped.md:1 [A-7] 가지고 있');
   });
 });

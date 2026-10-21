@@ -201,33 +201,94 @@ function maskUrls(text: string): string {
 
 // ---- 마크다운: 코드·URL·경로를 가린다 ----
 
-function maskInlineCode(line: string): string {
+// 인라인 코드는 CommonMark처럼 읽는다. 백틱 묶음은 길이가 같은 묶음과만 짝을 짓고, 짝이 없으면 글자로 남는다.
+// 코드 밖에서 역슬래시 뒤의 문장 부호는 글자라서, 역슬래시 바로 뒤의 백틱은 여는 표지가 아니다(\\ 뒤의 백틱은 연다).
+// 코드 안에서는 이스케이프가 없으므로 닫는 표지는 역슬래시와 상관없이 찾는다.
+// text는 인라인 묶음 하나(여러 줄 문단이면 줄바꿈으로 이은 것)라서 코드가 줄을 넘어도 된다. 묶음 밖으로는 넘지 않는다.
+// 닫는 표지를 찾을 때는 GitHub(cmark-gfm)과 markdown-it처럼 길이마다 마지막으로 본 묶음 위치를 적어 둔다.
+// 한 번 끝까지 훑은 뒤에는 그 위치가 여는 표지보다 앞이면 닫는 표지가 없다고 본다. 두 구현이 같게 읽는 결과를 따른다.
+const ASCII_PUNCTUATION = /[!-/:-@[-`{-~]/;
+
+function backtickRunEnd(text: string, start: number): number {
+  let end = start;
+  while (text[end] === '`') end += 1;
+  return end;
+}
+
+function maskInlineCode(text: string): string {
+  const lastRun = new Map<number, number>();
+  let scannedToEnd = false;
+  const closingRun = (open: number, from: number, length: number): number => {
+    if (scannedToEnd && (lastRun.get(length) ?? 0) <= open) return -1;
+    let i = text.indexOf('`', from);
+    while (i !== -1) {
+      const end = backtickRunEnd(text, i);
+      lastRun.set(end - i, i);
+      if (end - i === length) return i;
+      i = text.indexOf('`', end);
+    }
+    scannedToEnd = true;
+    return -1;
+  };
+
   let out = '';
   let i = 0;
-  while (i < line.length) {
-    if (line[i] !== '`') {
-      out += line[i];
+  while (i < text.length) {
+    const char = text[i]!;
+    if (char === '\\' && ASCII_PUNCTUATION.test(text[i + 1] ?? '')) {
+      out += text.slice(i, i + 2);
+      i += 2;
+      continue;
+    }
+    if (char !== '`') {
+      out += char;
       i += 1;
       continue;
     }
-    let run = 1;
-    while (line[i + run] === '`') run += 1;
-    const fence = '`'.repeat(run);
-    let close = line.indexOf(fence, i + run);
-    while (close !== -1 && line[close + run] === '`') {
-      let next = close;
-      while (line[next] === '`') next += 1;
-      close = line.indexOf(fence, next);
-    }
+    const runEnd = backtickRunEnd(text, i);
+    const close = closingRun(i, runEnd, runEnd - i);
     if (close === -1) {
-      out += fence;
-      i += run;
+      out += text.slice(i, runEnd);
+      i = runEnd;
       continue;
     }
-    out += blank(line.slice(i, close + run));
-    i = close + run;
+    const end = close + (runEnd - i);
+    out += blank(text.slice(i, end));
+    i = end;
   }
   return out;
+}
+
+// 표의 행은 GFM처럼 | 로 칸을 먼저 나눈 뒤 칸마다 인라인 코드를 찾는다. 역슬래시 바로 뒤의 | 는 칸을 나누지 않는다.
+// cmark-gfm은 역슬래시가 몇 개든 바로 뒤의 | 를 글자로 본다.
+function splitTableRow(row: string): string[] {
+  const cells: string[] = [];
+  let start = 0;
+  for (let i = 0; i < row.length; i += 1) {
+    if (row[i] === '|' && row[i - 1] !== '\\') {
+      cells.push(row.slice(start, i));
+      start = i + 1;
+    }
+  }
+  cells.push(row.slice(start));
+  return cells;
+}
+
+function tableCellCount(text: string): number {
+  const cells = splitTableRow(text.trim());
+  if (cells.length > 1 && cells[0]!.trim() === '') cells.shift();
+  if (cells.length > 1 && cells.at(-1)!.trim() === '') cells.pop();
+  return cells.length;
+}
+
+const TABLE_DELIMITER_CELL = /^[ \t]*:?-+:?[ \t]*$/;
+
+function isTableDelimiter(text: string): boolean {
+  if (!text.includes('|')) return false;
+  const cells = splitTableRow(text.trim());
+  if (cells[0]!.trim() === '') cells.shift();
+  if (cells.length > 0 && cells.at(-1)!.trim() === '') cells.pop();
+  return cells.length > 0 && cells.every((cell) => TABLE_DELIMITER_CELL.test(cell));
 }
 
 function maskTablePathCells(line: string): string {
@@ -257,7 +318,13 @@ interface ListItem {
   filled: boolean;
 }
 type Container = { kind: 'quote' } | ListItem;
-type Leaf = { kind: 'paragraph' } | { kind: 'indented' } | { kind: 'fence'; marker: string } | null;
+type Leaf =
+  /** lines는 이 문단의 인라인 묶음이다. last는 마지막 줄의 내용(표 머리줄인지 볼 때 쓴다). */
+  | { kind: 'paragraph'; lines: number[]; last: string }
+  | { kind: 'table' }
+  | { kind: 'indented' }
+  | { kind: 'fence'; marker: string }
+  | null;
 
 function expandTabs(line: string): string {
   let out = '';
@@ -300,11 +367,23 @@ function continuesParagraph(line: string, pos: number): boolean {
   );
 }
 
+// 인라인 글의 묶음. 문단은 이어지는 줄을 한 묶음으로 모으고, 제목과 표의 행은 한 줄이 한 묶음이다.
+// 인라인 코드는 묶음 안에서만 짝을 짓는다. 빈 줄, 새 블록, 컨테이너가 끝난 뒤의 줄은 다른 묶음이다.
+interface InlineGroup {
+  lines: number[];
+  tableRow: boolean;
+}
+
 export function maskMarkdown(source: string, { keepIgnoreComments = false } = {}): string {
+  const lines = source.split('\n');
+  const out = [...lines];
+  const groups: InlineGroup[] = [];
   let containers: Container[] = [];
   let leaf: Leaf = null;
 
-  const maskLine = (raw: string): string => {
+  const single = (n: number, tableRow = false) => groups.push({ lines: [n], tableRow });
+
+  const blockLine = (raw: string, n: number): void => {
     const line = expandTabs(raw);
     let pos = 0;
 
@@ -334,15 +413,22 @@ export function maskMarkdown(source: string, { keepIgnoreComments = false } = {}
         const indent = spacesAt(line, pos);
         const close = line.slice(pos + indent).match(FENCE_CLOSE)?.[1];
         if (indent <= 3 && close && close[0] === leaf.marker[0] && close.length >= leaf.marker.length) leaf = null;
-        return blank(raw);
+        out[n] = blank(raw);
+        return;
       }
       if (leaf?.kind === 'indented') {
         const indent = spacesAt(line, pos);
-        if (indent >= 4 || pos + indent === line.length) return blank(raw);
+        if (indent >= 4 || pos + indent === line.length) {
+          out[n] = blank(raw);
+          return;
+        }
         leaf = null;
       }
     } else if (leaf?.kind === 'paragraph' && continuesParagraph(line, pos)) {
-      return maskInline(raw, keepIgnoreComments);
+      // 게으른 이어쓰기 줄은 같은 문단이라 앞 줄과 한 묶음이다.
+      leaf.lines.push(n);
+      leaf.last = line.slice(pos).trim();
+      return;
     } else {
       containers = containers.slice(0, matched);
       leaf = null;
@@ -378,31 +464,73 @@ export function maskMarkdown(source: string, { keepIgnoreComments = false } = {}
     }
     if (text === '') {
       leaf = null;
-      return raw;
+      return;
+    }
+    // 표는 빈 줄이나 새 블록이 나올 때까지 줄마다 한 행이다.
+    if (leaf?.kind === 'table') {
+      if (indent >= 4 || !(FENCE_OPEN.test(text) || ATX_HEADING.test(text) || THEMATIC_BREAK.test(text))) {
+        single(n, true);
+        return;
+      }
+      leaf = null;
     }
     if (indent >= 4) {
-      if (leaf?.kind === 'paragraph') return maskInline(raw, keepIgnoreComments);
+      if (leaf?.kind === 'paragraph') {
+        leaf.lines.push(n);
+        leaf.last = text;
+        return;
+      }
       leaf = { kind: 'indented' };
-      return blank(raw);
+      out[n] = blank(raw);
+      return;
     }
     const fence = text.match(FENCE_OPEN);
     if (fence) {
       leaf = { kind: 'fence', marker: fence[1] ?? fence[2]! };
-      return blank(raw);
+      out[n] = blank(raw);
+      return;
+    }
+    // GFM 표: 문단의 마지막 줄과 칸 수가 같은 구분 줄이 오면 그 줄부터 표다. 앞 줄들은 문단으로 남는다.
+    if (leaf?.kind === 'paragraph' && isTableDelimiter(text) && tableCellCount(leaf.last) === tableCellCount(text)) {
+      single(leaf.lines.pop()!, true);
+      single(n, true);
+      leaf = { kind: 'table' };
+      return;
     }
     const ends =
       ATX_HEADING.test(text) ||
       THEMATIC_BREAK.test(text) ||
       (leaf?.kind === 'paragraph' && /^(?:=+|-+)[ \t]*$/.test(text));
-    leaf = ends ? null : { kind: 'paragraph' };
-    return maskInline(raw, keepIgnoreComments);
+    if (ends) {
+      single(n);
+      leaf = null;
+    } else if (leaf?.kind === 'paragraph') {
+      leaf.lines.push(n);
+      leaf.last = text;
+    } else {
+      const paragraph: InlineGroup = { lines: [n], tableRow: false };
+      groups.push(paragraph);
+      leaf = { kind: 'paragraph', lines: paragraph.lines, last: text };
+    }
   };
 
-  return source.split('\n').map(maskLine).join('\n');
+  lines.forEach(blockLine);
+
+  // 인라인 코드를 묶음 단위로 가린 뒤, 나머지(URL, 링크 주소, 표의 경로 칸, 예외 주석)는 줄마다 가린다.
+  const inline = new Set<number>();
+  for (const { lines: group, tableRow } of groups) {
+    if (group.length === 0) continue;
+    const joined = group.map((n) => lines[n]!).join('\n');
+    const masked = tableRow ? splitTableRow(joined).map(maskInlineCode).join('|') : maskInlineCode(joined);
+    masked.split('\n').forEach((line, i) => {
+      out[group[i]!] = line;
+      inline.add(group[i]!);
+    });
+  }
+  return out.map((line, n) => (inline.has(n) ? maskInlineRest(line, keepIgnoreComments) : line)).join('\n');
 }
 
-function maskInline(raw: string, keepIgnoreComments: boolean): string {
-  let line = maskInlineCode(raw);
+function maskInlineRest(line: string, keepIgnoreComments: boolean): string {
   line = line.replace(/<(?:https?|ftp|mailto):[^>\s]*>/g, blank);
   line = line.replace(/\]\([^)\s]*(?:\s+"[^"]*")?\)/g, (link) => '](' + blank(link.slice(2, -1)) + ')');
   line = line.replace(/^(\s{0,3}\[[^\]]+\]:\s*)(\S+)/, (_all, label: string, url: string) => label + blank(url));
