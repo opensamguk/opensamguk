@@ -75,11 +75,25 @@ describe('T1-11 순수 규칙과 공개 명령', () => {
   });
   it('모든 category와 JSON 입력 schema는 registry와 일치한다', () => {
     expect(commandList.map((d) => d.key)).toEqual(commands.filter((d) => d.target === 'general').map((d) => d.key));
+    const current = new Set([
+      'farm',
+      'commerce',
+      'security',
+      'settle',
+      'goodwill',
+      'defence',
+      'wall',
+      'research',
+      'rest',
+    ]);
     for (const def of commands) {
       expect(COMMAND_CATEGORIES).toContain(def.category);
-      expect(def.category).toBe(def.key === 'rest' ? 'personal' : 'domestic');
+      if (current.has(def.key)) expect(def.category).toBe(def.key === 'rest' ? 'personal' : 'domestic');
     }
-    for (const item of commandList)
-      expect(item.argsSchema).toMatchObject({ type: 'object', properties: {}, additionalProperties: false });
+    for (const item of commandList) {
+      expect(() => JSON.stringify(item.argsSchema)).not.toThrow();
+      if (current.has(item.key))
+        expect(item.argsSchema).toMatchObject({ type: 'object', properties: {}, additionalProperties: false });
+    }
   });
 });

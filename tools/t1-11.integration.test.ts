@@ -164,6 +164,36 @@ describe('T1-11 실제 HTTP·PostgreSQL 권한', () => {
 });
 
 describe('T1-11 생성 접수와 엔진', () => {
+  it('중복 PENDING을 동시 처리해도 장수 한 명과 처음 결과를 보존하며 다중 월 지연을 따라잡는다', async () => {
+    const { a, worldId, lease, loop } = await fixture(false);
+    const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+    await enqueue(world, a.id);
+    await enqueue(world, a.id);
+    await Promise.all([loop.advanceTo(50000), new TurnLoop(db, lease).advanceTo(50000)]);
+    const actor = await db.general.findUniqueOrThrow({ where: { worldId_userId: { worldId, userId: a.id } } });
+    expect(actor.nextTurnTick).toBeGreaterThan(50000);
+    expect(await db.general.count({ where: { worldId, userId: a.id } })).toBe(1);
+    const events = await db.inputEvent.findMany({ where: { worldId }, orderBy: { id: 'asc' } });
+    expect(events.map((e) => e.status)).toEqual(['APPLIED', 'REJECTED']);
+    expect(events[1]!.result).toEqual({ code: 'ALREADY_EXISTS', message: CREATION_ERRORS.ALREADY_EXISTS });
+    expect(replayArchive(await exportReplay(db, worldId), 5)).toHaveLength(5);
+  });
+  it.each(['SANCTIONED', 'WITHDRAWN'] as const)(
+    '접수 뒤 %s는 엔진과 대기 API에서 안전하게 거부한다',
+    async (status) => {
+      const { a, worldId, loop } = await fixture(false);
+      const response = request('general.create', { worldId, ...payload }, a.cookie);
+      await pending(worldId);
+      await db.user.update({ where: { id: a.id }, data: { status } });
+      await loop.advanceTo(0);
+      const rejected = await response;
+      expect(rejected.code).toBe('UNAUTHORIZED');
+      expect(rejected.message).toBe(CREATION_ERRORS.ACTOR_INACTIVE);
+      expect(rejected.text).not.toContain(a.id);
+      expect(rejected.text).not.toContain('stack');
+      expect(await db.general.count({ where: { worldId, userId: a.id } })).toBe(0);
+    },
+  );
   it.each(['beforeCommit', 'committed'])(
     '실제 SIGKILL %s 후 생성이 정확히 한 번 적용된다',
     async (phase) => {
