@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { hashState } from '@opensamguk/shared/node';
-import { initialReplayState, nextGameAction, runReplayAction, toWorldState, type WorldInit } from '@opensamguk/rules';
+import {
+  initialReplayState,
+  nextGameAction,
+  runGeneralTurn,
+  runReplayAction,
+  toWorldState,
+  type WorldInit,
+} from '@opensamguk/rules';
 import { loadInitialWorld } from './world/resources';
 import { DEFAULT_SIMULATION_MAX_YEAR, simulateGame, unifiedNation } from './simulation';
 
@@ -19,14 +26,27 @@ describe('AC-M1-17 메모리 실행기', () => {
     const result = simulateGame(initial, { maxYear: initial.startYear });
     let replay = initialReplayState(initial);
     let turns = 0;
+    const nationCommandCounts: Record<string, number> = {};
     while (replay.monthlyTick < 120000) {
-      if (nextGameAction(replay).kind === 'turn') turns++;
+      const action = nextGameAction(replay);
+      if (action.kind === 'turn') {
+        turns++;
+        const turn = runGeneralTurn(
+          replay.state,
+          { generalId: action.generalId, tick: action.tick, unitSet: initial.unitSet },
+          { commandKey: 'rest', args: {} },
+          initial.seed,
+        );
+        if (turn.nation)
+          nationCommandCounts[turn.nation.commandKey] = (nationCommandCounts[turn.nation.commandKey] ?? 0) + 1;
+      }
       replay = runReplayAction(replay, initial.seed, initial.unitSet);
     }
     expect(result.stateHash).toBe(hashState(replay.state));
     expect(result.turns).toBe(turns);
     expect(result).toMatchObject({ outcome: '종료연도', finalYear: initial.startYear, finalMonth: 12, winner: null });
     expect(Object.keys(result.commandCounts)).not.toEqual(['rest']);
+    expect(result.nationCommandCounts).toEqual(nationCommandCounts);
     expect(simulateGame(initial, { maxYear: initial.startYear }).stateHash).toBe(result.stateHash);
     expect(initial).toEqual(before);
   });

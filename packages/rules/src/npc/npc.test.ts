@@ -3,9 +3,17 @@ import { rngFor } from '@opensamguk/shared';
 import { commandWorld, testUnits } from '../../test/commandFixture';
 import { commandRegistry } from '../commands/registry';
 import { runGeneralTurn } from '../commands/turn';
+import { BALANCE } from '../balance';
 import { chooseGeneralTurn, chooseNationTurn } from './index';
 
 const context = { tick: 100, unitSet: testUnits };
+function rearWorld() {
+  const world = commandWorld();
+  world.cities[1]!.connections = [4];
+  world.cities[4]!.connections = [1, 2];
+  world.cities[4]!.supplied = true;
+  return world;
+}
 describe('AC-M1-17 NPC 판단', () => {
   it('잘못된 휴식 인자는 빈 슬롯으로 바꾸지 않고 실패시킨다', () => {
     const world = commandWorld();
@@ -34,6 +42,43 @@ describe('AC-M1-17 NPC 판단', () => {
     expect(chooseGeneralTurn(world, world.generals[1]!, rngFor('npc'), context).chosen).toMatchObject({
       key: 'attack',
       args: { cityKey: 2 },
+    });
+  });
+  it('준비를 마쳤지만 출병 대상이 없는 전선 장수는 이웃 전선으로 이동하지 않는다', () => {
+    const world = commandWorld();
+    world.diplomacies = [];
+    world.cities[1]!.connections.push(4);
+    world.cities[4]!.connections = [1, 2];
+    world.cities[4]!.supplied = true;
+    expect(commandRegistry.get('move')!.check(world, { ...context, generalId: 1 }, { cityKey: 4 })).toBeNull();
+    const decision = chooseGeneralTurn(world, world.generals[1]!, rngFor('npc'), context);
+    expect(decision.candidates.some((c) => c.key === 'attack' || c.key === 'move')).toBe(false);
+    expect(decision.chosen?.key).not.toBe('move');
+  });
+  it('후방 장수는 전선으로 이동할 수 있어도 부족한 내정을 먼저 채운다', () => {
+    const world = rearWorld();
+    const decision = chooseGeneralTurn(world, world.generals[1]!, rngFor('npc'), context);
+    const move = decision.candidates.find((c) => c.key === 'move');
+    expect(move).toMatchObject({ args: { cityKey: 4 }, score: 60 });
+    expect(commandRegistry.get(decision.chosen!.key)!.category).toBe('domestic');
+    expect(decision.chosen!.score).toBeGreaterThan(move!.score);
+    expect(decision.chosen!.reason).toBe('후방에서는 전선 이동보다 부족한 내정을 먼저 채운다.');
+  });
+  it('내정을 모두 채운 후방 장수는 자기 영토를 따라 전선으로 이동한다', () => {
+    const world = rearWorld();
+    const city = world.cities[1]!;
+    city.agriculture = city.agricultureMax;
+    city.commerce = city.commerceMax;
+    city.security = city.securityMax;
+    city.population = city.populationMax;
+    city.defence = city.defenceMax;
+    city.wall = city.wallMax;
+    city.trust = BALANCE.MAX_TRUST;
+    world.nations[1]!.tech = BALANCE.MAX_TECH;
+    expect(chooseGeneralTurn(world, world.generals[1]!, rngFor('npc'), context).chosen).toMatchObject({
+      key: 'move',
+      args: { cityKey: 4 },
+      reason: '후방에서 자기 영토를 따라 가까운 전선으로 한 칸 이동한다.',
     });
   });
   it('후보는 모두 같은 Actor로 check를 통과하고 판단은 입력을 바꾸지 않는다', () => {

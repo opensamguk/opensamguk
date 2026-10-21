@@ -35,6 +35,7 @@ export function simulateGame(
   let date = { year: initial.startYear, month: 1 };
   let winner = unifiedNation(state);
   const commandCounts: Record<string, number> = {};
+  const nationCommandCounts: Record<string, number> = {};
   // 장수는 달마다 한 번 실행한다. 월간 정산의 미등장 장수 offset 갱신도 그대로 적용한다.
   for (let boundary = TICKS_PER_MONTH; winner === null; boundary += TICKS_PER_MONTH) {
     date = monthlyDate(initial.startYear, boundary);
@@ -58,6 +59,8 @@ export function simulateGame(
       state.generals[general.id]!.nextTurnTick = tick + TICKS_PER_MONTH;
       turns++;
       commandCounts[turn.commandKey] = (commandCounts[turn.commandKey] ?? 0) + 1;
+      if (turn.nation)
+        nationCommandCounts[turn.nation.commandKey] = (nationCommandCounts[turn.nation.commandKey] ?? 0) + 1;
       winner = unifiedNation(state);
       if (winner !== null) break;
     }
@@ -84,5 +87,6 @@ export function simulateGame(
     seconds: (performance.now() - started) / 1000,
     stateHash,
     commandCounts,
+    nationCommandCounts,
   };
 }

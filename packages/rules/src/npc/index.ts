@@ -57,6 +57,7 @@ function frontier(view: WorldView, nationId: number, cityKey: number) {
 // 자기 영토의 BFS로 전선까지 한 칸을 고른다. ID 순서로 동률을 고정한다.
 function frontlineSteps(view: WorldView, general: General): number[] {
   const start = view.cities[general.cityKey]!;
+  if (frontier(view, general.nationId!, start.cityKey)) return [];
   const queue = start.connections
     .filter((key) => view.cities[key]?.nationId === general.nationId)
     .sort((a, b) => a - b)
@@ -102,12 +103,12 @@ export function chooseGeneralTurn(view: WorldView, general: General, rng: Rng, c
     choice.add(
       spec.key,
       {},
-      10 + Math.round(20 * (1 - value / Math.max(1, max))),
-      '도시와 국가의 부족한 내정 수치를 채운다.',
+      (front ? 10 : 70) + Math.round(20 * (1 - value / Math.max(1, max))),
+      front ? '도시와 국가의 부족한 내정 수치를 채운다.' : '후방에서는 전선 이동보다 부족한 내정을 먼저 채운다.',
     );
   }
   for (const key of frontlineSteps(view, general))
-    choice.add('move', { cityKey: key }, 60, '자기 영토를 따라 가까운 전선으로 간다.');
+    choice.add('move', { cityKey: key }, 60, '후방에서 자기 영토를 따라 가까운 전선으로 한 칸 이동한다.');
   if (front && city.nationId === general.nationId) {
     const capacity = general.leadership * BALANCE.CREW_PER_LEADERSHIP;
     const minimum = Math.min(capacity, 2000);
