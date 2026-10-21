@@ -112,7 +112,9 @@ describe('명령 경계와 국가 예턴', () => {
       });
     for (const c of commands.filter((c) => c.target === 'nation')) {
       expect(runCommand(state, { generalId: 1 }, c.key, {}, rngFor('bad'))).toMatchObject({ code: 'BAD_ARGS' });
-      expect(runCommand(state, { generalId: 3, target: 'nation' }, c.key, commandCases[c.key]!.args, rngFor('bad'))).toMatchObject({ code: 'NOT_RULER' });
+      expect(
+        runCommand(state, { generalId: 3, target: 'nation' }, c.key, commandCases[c.key]!.args, rngFor('bad')),
+      ).toMatchObject({ code: 'NOT_RULER' });
     }
   });
   it('국가 포상 후 장수 명령을 재검사하고 예턴은 한 칸만 당긴다', () => {
