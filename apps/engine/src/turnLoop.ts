@@ -127,13 +127,13 @@ export class TurnLoop {
           const command = await tx.generalTurn.findUnique({
             where: { worldId_generalId_slot: { worldId, generalId: due.id, slot: 0 } },
           });
-          const commandKey = command?.commandKey ?? 'rest';
           const turn = runGeneralTurn(
             state,
             { generalId: due.id, tick: due.nextTurnTick, unitSet: unitSetSchema.parse(world.unitSet) },
-            { commandKey, args: command?.args ?? {} },
+            { commandKey: command?.commandKey ?? 'rest', args: command?.args ?? {} },
             world.seed,
           );
+          const commandKey = turn.commandKey;
           const result = turn.result;
           const failed = 'code' in result;
           next = turn.state;

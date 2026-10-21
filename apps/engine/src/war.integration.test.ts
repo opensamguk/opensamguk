@@ -149,6 +149,7 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
       args: { generalId: 4, resource: 'gold', amount: 10 },
     };
     const { worldId, loop } = await create(initial);
+    await queue(worldId, 1, 'farm', {});
     await loop.advanceTo(100);
     await loop.advanceTo(100);
     const history = await db.nationHistory.findUniqueOrThrow({

@@ -81,8 +81,8 @@
 
 | ID        | 조건 | 검증 방법 | 상태 | 증거 |
 | --------- | ---- | --------- | ---- | ---- |
-| AC-M1-17  | 사람 없이 NPC만으로 10개 시드를 돌리면 10개 모두 오류 없이 천하통일 또는 종료 연도에 이른다 ⚠️ A18 | `pnpm sim --seeds 10` 결과 | ⬜ | |
-| AC-M1-18  | 위 시뮬레이션 1판이 개발 PC에서 15분 안에 끝난다 ⚠️ A18 | 같은 명령의 시간 기록 | ⬜ | |
+| AC-M1-17  | 사람 없이 NPC만으로 10개 시드를 돌리면 10개 모두 오류 없이 천하통일 또는 종료 연도에 이른다 ⚠️ A18 | `pnpm sim --seeds 10` 결과 | ✅ | 2026-10-21 Claude 재리뷰 통과(PR #45 `afab6be`): [simulation 39548309088](https://github.com/peppone-choi/opensamguk/actions/runs/39548309088)의 `pnpm sim --seeds 10 --output simulation.jsonl`에서 1030·94도시·491명·종료 연도 300으로 10개 모두 300년 12월 도달, 예외 0, 통일 0. seed 1 보조 ON·OFF 각 두 번 반복 해시 `fab04343…07f4` 일치. 같은 코드 `8c273f0`의 [simulation 39547027632](https://github.com/peppone-choi/opensamguk/actions/runs/39547027632)와 10시드 해시·집계 일치. 판단 단위 시험 `packages/rules/src/npc/npc.test.ts` 11개와 `apps/engine/src/simulation.test.ts` 3개, exact head CI 단위 310·PostgreSQL 129 통과. 표는 [테스트 정책 §4](../testing-policy.md#t1-09-측정), [T1-09 재리뷰](../plans/T1-09.md#재리뷰-claude-2026-10-21) |
+| AC-M1-18  | 위 시뮬레이션 1판이 개발 PC에서 15분 안에 끝난다 ⚠️ A18 | 같은 명령의 시간 기록 | 🟨 | hosted 실행기만 측정했다(개발 PC 증거 아님). PR #45 `afab6be`의 [simulation 39548309088](https://github.com/peppone-choi/opensamguk/actions/runs/39548309088) 14판 최장 65.128초(Intel Xeon Platinum 8573C, 4 vCPU), `8c273f0` 최장 38.803초. 개발 PC에서 같은 명령의 최장 시간과 CPU·메모리·Node 버전 기록이 오면 통과로 바꾼다. [T1-09 재리뷰](../plans/T1-09.md#재리뷰-claude-2026-10-21) |
 
 ### 화면·이미지
 

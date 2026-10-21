@@ -15,3 +15,4 @@ export * from './general/create';
 export * from './supply';
 export * from './commands/turn';
 export * from './ranking';
+export * from './npc';
