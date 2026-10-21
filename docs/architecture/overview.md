@@ -33,7 +33,7 @@ packages/rules ── 순수 게임 규칙 (engine과 server가 함께 씀)
 | gateway-api + game-api + game-engine, profile별 배포 | server 하나 + engine (월드별 실행자)      | 1인 운영. 같은 버전이 여러 월드를 돌린다 (D-006) |
 | Gateway orchestrator (commit별 worktree, PM2)    | 없음                                         | 배포는 서버 1대에 한 버전 |
 | profile마다 PostgreSQL schema                    | 한 schema, `worldId` 열                       | 단순함 |
-| Redis (세션, pub/sub, worker)                    | 없음. 세션은 DB, 알림은 LISTEN/NOTIFY ⚠️ A11 | 구성 요소 하나 줄이기 |
+| Redis (세션, pub/sub, worker)                    | 없음. 세션은 DB, 알림은 LISTEN/NOTIFY (가정 A11) | 구성 요소 하나 줄이기 |
 | Vue 3                                            | React                                        | D-003 |
 | 원작 PHP와 차등 검증                             | 결정성·재생 테스트                           | D-001 |
 
@@ -43,7 +43,7 @@ packages/rules ── 순수 게임 규칙 (engine과 server가 함께 씀)
 | ---------------------------- | ---------------------------- | ----------------- |
 | 계정·세션·제재·감사          | PostgreSQL                   | server            |
 | 예턴                         | PostgreSQL (`GeneralTurn`, `NationTurn`) | server (revision 비교) |
-| 월드·국가·도시·장수·외교     | PostgreSQL                   | **engine만**      |
+| 월드·국가·도시·장수·외교     | PostgreSQL                   | engine만          |
 | 요청 기록과 처리 결과        | PostgreSQL `InputEvent`      | server 기록, engine 처리 |
 | 엔진 실행권                  | PostgreSQL `EngineLease`     | engine            |
 | 지도·시나리오·병종·프리셋    | `resources/` 파일            | 빌드 시 포함      |

@@ -2,7 +2,7 @@ import type { Prisma } from '@opensamguk/db';
 import { BALANCE } from '@opensamguk/rules';
 import { z } from 'zod';
 
-type General = Prisma.GeneralGetPayload<true>;
+type General = Omit<Prisma.GeneralGetPayload<true>, 'battleWins' | 'captures'>;
 type City = Prisma.CityGetPayload<true>;
 type Nation = Prisma.NationGetPayload<true>;
 export type Viewer = Pick<General, 'id' | 'nationId' | 'cityKey'> | null;
