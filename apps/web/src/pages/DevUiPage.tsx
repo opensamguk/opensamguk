@@ -1,3 +1,5 @@
+import { Portrait } from '../portrait/Portrait';
+import { imageBaseUrl } from '../portrait/portraitUrl';
 import { DisabledReason } from '../ui/DisabledReason';
 import { NationBadge } from '../ui/NationBadge';
 import { StatTable } from '../ui/StatTable';
@@ -33,6 +35,21 @@ export function DevUiPage() {
         <h2>EmptyState / ErrorState</h2>
         <EmptyState title="기록이 없습니다">첫 턴이 실행되면 여기에 나옵니다.</EmptyState>
         <ErrorState title="불러오지 못했습니다" onRetry={() => undefined} />
+      </section>
+      <section>
+        <h2>Portrait</h2>
+        <p>
+          base URL: <code data-testid="image-base-url">{imageBaseUrl}</code>
+        </p>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <Portrait id={10002} name="정원" variant="portrait" />
+          <Portrait id={10002} name="정원" variant="icon" />
+          <Portrait id={10002} name="정원" variant="thumb" />
+          <Portrait id={11000} name="공도" variant="icon" />
+          <Portrait id={null} name="유비" variant="portrait" />
+          <Portrait id={null} name="관우" variant="icon" />
+          <Portrait id={9999} name="장비" variant="thumb" />
+        </div>
       </section>
       <section>
         <h2>DisabledReason</h2>
