@@ -5,7 +5,7 @@
 ## 읽기 순서
 
 1. [PRD](../product/prd.md)의 한 줄 요약과 §5 핵심 게임 루프
-2. [인수조건](../product/acceptance-criteria.md)에서 지금 🟨인 AC
+2. [인수조건](../product/acceptance-criteria.md)에서 지금 진행 중인 AC
 3. [아키텍처 개요](../architecture/overview.md) → [패키지 경계](../architecture/package-boundaries.md)
 4. [요청·턴·저장 흐름](./request-turn-persistence.md)
 5. 맡은 기능의 문서 (아래 표)
@@ -27,5 +27,5 @@
 ## 작업 시작 체크
 
 - [ ] 이 작업의 AC ID가 있다
-- [ ] 다른 🟨 AC가 없다
+- [ ] 다른 진행 중 AC가 없다
 - [ ] AC의 검증 방법을 어떻게 실행할지 안다
