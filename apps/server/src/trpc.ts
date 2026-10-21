@@ -1,6 +1,16 @@
 import { initTRPC, TRPCError } from '@trpc/server';
 import type { Context } from './context';
-const t = initTRPC.context<Context>().create();
+const t = initTRPC.context<Context>().create({
+  errorFormatter({ shape, error }) {
+    const { stack, ...data } = shape.data;
+    void stack;
+    return {
+      ...shape,
+      data,
+      message: error.code === 'INTERNAL_SERVER_ERROR' ? '요청을 처리하지 못했습니다.' : shape.message,
+    };
+  },
+});
 export const router = t.router;
 export const publicProcedure = t.procedure;
 export const protectedProcedure = publicProcedure.use(({ ctx, next }) => {
