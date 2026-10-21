@@ -23,7 +23,7 @@
 | `DATABASE_URL`        | PostgreSQL 연결          | `postgresql://opensamguk:opensamguk@127.0.0.1:5433/opensamguk` | 예   | 사용 중 |
 | `SERVER_PORT`         | API 서버 포트            | `3001`                                                         | 아니오 | 사용 중 |
 | `SESSION_SECRET`      | 사용하지 않음. 무작위 토큰의 SHA-256을 DB에서 조회 | — | — | 불필요 (T1-10) |
-| `VITE_IMAGE_BASE_URL` | 초상 이미지 base URL     | —                                                              | 아니오 (공개값) | T1-17에서 |
+| `VITE_IMAGE_BASE_URL` | 초상 이미지 base URL     | 비우면 jsDelivr 고정 커밋 주소 ([이미지 자산 §2](../image-assets.md#2-초상-id와-경로)) | 아니오 (공개값) | 사용 중 |
 
 세션 쿠키 `sid`는 HttpOnly·SameSite=Lax·Path=/이며 `NODE_ENV=production`에서 Secure를 붙입니다.
 DB에는 토큰 원문 대신 SHA-256만 저장하고, 만료는 활동 시 DB와 쿠키 모두 30일로 연장합니다.
