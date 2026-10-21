@@ -32,22 +32,22 @@ GAME 규칙을 WALL 시각으로 판정하지 않습니다. 반대도 마찬가�
 
 ## 4. tick과 장수 턴 배치
 
-1개월 = 10,000 tick입니다. 현실 1 tick = `turnTermMinutes × 60,000 / 10,000` ms이며, 게임 연월은 시작 연도 1월에서 완료된 개월 수만큼 더합니다. 원작의 36,000,000 tick보다 단순하게 줄였습니다.
+1개월 = 10,000 tick입니다. 현실 1 tick = `turnTermMinutes × 60,000 / 10,000` ms이며 게임 연월은 시작 연도 1월에서 완료된 개월 수만큼 더합니다. 원작의 36,000,000 tick보다 단순하게 줄였습니다.
 새 월드의 장수는 `rngFor(seed, 'turn-offset', generalId).int(0, 9_999)`로 첫 달 안의 턴 위치를 정합니다. 실행할 때마다 `nextTurnTick`에 10,000을 더합니다. 같은 tick은 장수 ID 오름차순입니다. 이 분산은 도시 배치용 bootstrap RNG와 독립적입니다. 기존 월드에 저장된 `nextTurnTick`과 초기 상태 해시는 migration에서 바꾸지 않습니다.
 
 M1에서는 운영 중 턴 간격을 바꾸는 명령을 제공하지 않습니다. 이후 변경 기능은 이전 비율로 체크포인트를 저장한 뒤 새 간격·기준 시각을 함께 바꿔야 하며 장수의 `nextTurnTick` 순서는 유지해야 합니다.
 
 ## 5. 일시정지와 재개
 
-PREOPEN → RUNNING → PAUSED ⇄ RUNNING → ENDED만 허용합니다. 정지 시 현재 tick을 저장하고 재개 시 기준 시각을 현재로 옮겨, 정지한 시간은 계산에서 제외합니다.
+PREOPEN → RUNNING → PAUSED ⇄ RUNNING → ENDED만 허용합니다. 정지 시 현재 tick을 저장하고 재개 시 기준 시각을 현재로 옮겨 정지한 시간은 계산에서 제외합니다.
 
-운영 명령은 `pnpm world:start/pause/resume/status --world <ID>`입니다. 상태 전환은 DB 트랜잭션과 revision 조건으로 보호하며, status 조회는 완료된 tick을 저장합니다. 자투리 tick은 남기고 벽시계가 역행하면 저장된 tick을 유지합니다.
+운영 명령은 `pnpm world:start/pause/resume/status --world <ID>`입니다. 상태 전환은 DB 트랜잭션과 revision 조건으로 보호하며 status 조회는 완료된 tick을 저장합니다. 자투리 tick은 남기고 벽시계가 역행하면 저장된 tick을 유지합니다.
 
 운영 명령과 realtime 엔진은 모두 DB UTC 시각을 기준으로 삼습니다. 운영 명령은 월드 행을 잠근 뒤 최신 시계와 현재 DB 시각을 읽어 엔진의 턴 저장·체크포인트와 직렬화합니다. RUNNING이 아니면 밀린 턴도 처리하지 않습니다. 재개하면 저장된 `nextTurnTick`부터 따라잡습니다.
 
 엔진은 턴 저장 시와 턴이 없는 동안 5초 간격으로 시계를 체크포인트합니다. 나머지 100ms 폴링은 시계·실행 대상만 확인하며 전체 월드를 적재하거나 쓰지 않습니다. 메모리에서 본 tick 최댓값은 저장 사이에도 유지합니다. `checkpointClock`의 최소 tick 인자로 이를 전달해, 벽시계 역행 시 tick과 그 tick의 기준 시각을 함께 보존합니다. 체크포인트 간격은 monotonic 시각으로 재고 자투리 tick도 남깁니다.
 
-manual 엔진은 `advanceTo(tick)`까지 처리하고 그 tick을 저장합니다. 이미 저장한 tick보다 작은 값은 거부하며, paused 상태에서는 호출해도 진행하지 않습니다. manual에서도 실행권·저장 원자성 검사는 운영과 같습니다.
+manual 엔진은 `advanceTo(tick)`까지 처리하고 그 tick을 저장합니다. 이미 저장한 tick보다 작은 값은 거부하며 paused 상태에서는 호출해도 진행하지 않습니다. manual에서도 실행권·저장 원자성 검사는 운영과 같습니다.
 
 ## 6. 월간 정산 순서
 
