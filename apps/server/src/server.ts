@@ -74,8 +74,10 @@ export async function buildServer(options: {
   await server.register(cookie);
   server.addHook('onSend', async (req, reply, payload) => {
     const now = requestTimes.get(req);
+    // tRPC가 보낸 Web Response의 status는 Fastify가 onSend 뒤에 reply로 옮긴다.
+    const status = payload instanceof Response ? payload.status : reply.statusCode;
     // 거부한 요청은 세션 만료 시각도 바꾸지 않는다. 성공 응답에서만 기존 갱신 계약을 적용한다.
-    if (reply.statusCode === 200 && now !== undefined && req.cookies.sid) {
+    if (status === 200 && now !== undefined && req.cookies.sid) {
       const identity = await authenticate(options.db, req.cookies.sid, now);
       if (identity?.renewed)
         reply.setCookie('sid', req.cookies.sid, {

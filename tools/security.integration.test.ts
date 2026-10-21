@@ -240,7 +240,7 @@ describe('T3-04 실제 TCP HTTP·PostgreSQL 보안', () => {
       const blocked = await send(base, 'turns.edit', data, { headers: { cookie: ownCookie } });
       expect(blocked.code).toBe('TOO_MANY_REQUESTS');
       expect(blocked.headers['retry-after']).toBe(String(Math.ceil((60_000 - (now % 60_000)) / 1000)));
-      expect(blocked.headers['set-cookie']).toBeUndefined();
+      expect(blocked.headers['set-cookie'] === undefined).toBe(true);
       expect(await snapshot()).toEqual(before);
       expect(
         (await send(base, 'turns.edit', { ...data, revision: 0 }, { headers: { cookie: otherCookie } })).data,
