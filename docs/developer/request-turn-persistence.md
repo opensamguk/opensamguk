@@ -16,7 +16,7 @@
 
 `turns.edit`의 put은 from..to 양끝을 포함해 덮어쓴다. shift 양수는 뒤로 밀고 음수는 앞으로 당기며 새 칸은 휴식으로 채운다. repeat는 편집 전 from..to 사본을 to+1부터 times번 복사하고 30칸 밖은 자른다. 편집도 `turns.set` 입력으로 최종 30칸만 기록한다. STALE·권한·형식 오류는 입력 기록과 revision을 바꾸지 않는다. 같은 revision 재전송은 STALE이므로 화면은 최신 목록으로 복구한다.
 
-구현은 `routers/turns.ts`, `game/slots.ts`와 `packages/shared/src/editArray.ts`다. 편집 유틸에는 명령 registry와 게임 규칙을 넣지 않는다. `turns.precheck`는 소유 장수의 DB 스냅샷으로 순수 precheck만 호출하며 상태를 바꾸지 않는다. 저장 때 조건 경고가 나더라도 형식이 맞으면 저장하고 실행 때 엔진이 다시 검사한다.
+구현은 `routers/turns.ts`, `game/slots.ts`와 `packages/shared/src/editArray.ts`다. 편집 유틸에는 명령 registry와 게임 규칙을 넣지 않는다. `commands.list`와 예턴 API는 장수 명령 27개만 다루며 국가 명령 10개는 입력에서도 거부한다. `turns.precheck`는 같은 DB 스냅샷의 소유 장수 nextTurnTick과 검증한 World.unitSet을 actor에 넘기고 등용 제안은 World.commandMeta에서 읽는다. 클라이언트 actor·target·unitSet은 받지 않는다. 순수 precheck만 호출하므로 상태를 바꾸지 않으며 저장 때 조건 경고가 나더라도 형식이 맞으면 저장하고 실행 때 엔진이 다시 검사한다.
 
 ## 2. 즉시 행동 (server → engine)
 
