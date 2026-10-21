@@ -31,6 +31,6 @@ export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): 
       }),
     ),
     diplomacies: diplomacies.map(stripWorldId),
-    ...await loadCommandState(tx, worldId),
+    ...(await loadCommandState(tx, worldId)),
   };
 }

@@ -10,7 +10,8 @@ export const fail = (code: Failure['code'], message: string): Failure => ({ code
 export function ownCity(view: WorldView, actor: Actor): Failure | null {
   const general = view.generals[actor.generalId];
   if (!general) return fail('NO_ACTOR', '장수가 없습니다.');
-  if (general.nationId === null || !view.nations[general.nationId]) return fail('NOT_NATION', '국가에 소속되어야 합니다.');
+  if (general.nationId === null || !view.nations[general.nationId])
+    return fail('NOT_NATION', '국가에 소속되어야 합니다.');
   const city = view.cities[general.cityKey];
   if (city?.nationId !== general.nationId) return fail('NOT_OWN_CITY', '자기 국가 도시에서만 가능합니다.');
   return city.supplied ? null : fail('NO_SUPPLY', '보급이 끊긴 도시입니다.');
@@ -18,7 +19,8 @@ export function ownCity(view: WorldView, actor: Actor): Failure | null {
 export function ruler(view: WorldView, actor: Actor): Failure | null {
   const general = view.generals[actor.generalId];
   if (!general) return fail('NO_ACTOR', '장수가 없습니다.');
-  if (general.nationId === null || !view.nations[general.nationId]) return fail('NOT_NATION', '국가에 소속되어야 합니다.');
+  if (general.nationId === null || !view.nations[general.nationId])
+    return fail('NOT_NATION', '국가에 소속되어야 합니다.');
   return general.officerLevel === BALANCE.RULER_LEVEL ? null : fail('NOT_RULER', '군주만 실행할 수 있습니다.');
 }
 export function defineCommand<A>(spec: {
@@ -37,9 +39,13 @@ export function defineCommand<A>(spec: {
     return (spec.target === 'nation' ? ruler(view, actor) : null) ?? spec.check(view, actor, parsed.data);
   };
   const definition = {
-    key: spec.key, name: spec.name, target: spec.target ?? 'general', args: spec.args,
+    key: spec.key,
+    name: spec.name,
+    target: spec.target ?? 'general',
+    args: spec.args,
     category: spec.category,
-    check, precheck: check,
+    check,
+    precheck: check,
     execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): CommandResult {
       const failure = check(view, actor, raw);
       if (failure) throw new Error(failure.message);
@@ -52,7 +58,10 @@ export function defineCommand<A>(spec: {
 }
 export const success = (text: string): Omit<CommandResult, 'effects'> => ({ logs: [{ kind: 'success', text }] });
 export function commandMeta(state: WorldState) {
-  return state.commandMeta ??= { nextNationId: Math.max(0, ...Object.keys(state.nations).map(Number)) + 1, offers: {} };
+  return (state.commandMeta ??= {
+    nextNationId: Math.max(0, ...Object.keys(state.nations).map(Number)) + 1,
+    offers: {},
+  });
 }
 export function relation(view: WorldView, a: number, b: number) {
   return view.diplomacies.find((d) => d.nationA === Math.min(a, b) && d.nationB === Math.max(a, b));
@@ -66,7 +75,10 @@ export function removeNation(state: WorldState, nationId: number) {
     if (!Object.keys(state.nationTurns).length) delete state.nationTurns;
   }
   for (const general of Object.values(state.generals)) {
-    if (general.nationId === nationId) { general.nationId = null; general.officerLevel = 0; }
+    if (general.nationId === nationId) {
+      general.nationId = null;
+      general.officerLevel = 0;
+    }
   }
   if (state.commandMeta) {
     for (const [id, nation] of Object.entries(state.commandMeta.offers)) {

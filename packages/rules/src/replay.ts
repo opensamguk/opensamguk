@@ -56,12 +56,7 @@ export function runReplayAction(replay: ReplayState, seed: string, unitSet?: Uni
   const next = structuredClone(replay);
   const turns = next.turns[action.generalId] ?? emptyTurns();
   const command = turns[0]!;
-  const result = runGeneralTurn(
-    next.state,
-    { generalId: action.generalId, tick: action.tick, unitSet },
-    command,
-    seed,
-  );
+  const result = runGeneralTurn(next.state, { generalId: action.generalId, tick: action.tick, unitSet }, command, seed);
   next.state = result.state;
   next.state.generals[action.generalId]!.nextTurnTick += TICKS_PER_MONTH;
   next.turns[action.generalId] = [...turns.slice(1), { commandKey: 'rest', args: {} }];

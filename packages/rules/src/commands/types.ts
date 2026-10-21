@@ -12,9 +12,24 @@ export interface Actor {
 }
 export interface Failure {
   code:
-    'NO_ACTOR' | 'NOT_NATION' | 'NOT_OWN_CITY' | 'NO_SUPPLY' | 'NO_GOLD' | 'AT_MAX' | 'BAD_ARGS' | 'UNKNOWN_COMMAND'
-    | 'NO_RICE' | 'NO_CREW' | 'NOT_RULER' | 'BAD_TARGET' | 'NOT_ADJACENT' | 'NOT_WAR' | 'BAD_STATE'
-    | 'NO_POPULATION' | 'NO_OFFER' | 'NO_UNIT_SET';
+    | 'NO_ACTOR'
+    | 'NOT_NATION'
+    | 'NOT_OWN_CITY'
+    | 'NO_SUPPLY'
+    | 'NO_GOLD'
+    | 'AT_MAX'
+    | 'BAD_ARGS'
+    | 'UNKNOWN_COMMAND'
+    | 'NO_RICE'
+    | 'NO_CREW'
+    | 'NOT_RULER'
+    | 'BAD_TARGET'
+    | 'NOT_ADJACENT'
+    | 'NOT_WAR'
+    | 'BAD_STATE'
+    | 'NO_POPULATION'
+    | 'NO_OFFER'
+    | 'NO_UNIT_SET';
   message: string;
 }
 export interface LogEntry {

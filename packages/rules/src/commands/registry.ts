@@ -8,7 +8,15 @@ import { personnelCommands } from './personnel';
 import { personalCommands } from './personal';
 import { nationCommands } from './nation';
 import { attack } from './attack';
-export const commands: readonly CommandDef[] = [...DOMESTIC_SPECS.map(makeInvestment), rest, ...militaryCommands, attack, ...personnelCommands, ...personalCommands, ...nationCommands];
+export const commands: readonly CommandDef[] = [
+  ...DOMESTIC_SPECS.map(makeInvestment),
+  rest,
+  ...militaryCommands,
+  attack,
+  ...personnelCommands,
+  ...personalCommands,
+  ...nationCommands,
+];
 export const commandRegistry = new Map(commands.map((command) => [command.key, command]));
 export function runCommand(
   view: WorldView,

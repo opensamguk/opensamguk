@@ -2,7 +2,10 @@ import type { Prisma } from '@opensamguk/db';
 import type { CommandResult, WorldState } from '@opensamguk/rules';
 import { loadWorld } from './worldLoader';
 
-export async function loadCommandState(tx: Prisma.TransactionClient, worldId: string): Promise<Pick<WorldState, 'commandMeta' | 'nationTurns'>> {
+export async function loadCommandState(
+  tx: Prisma.TransactionClient,
+  worldId: string,
+): Promise<Pick<WorldState, 'commandMeta' | 'nationTurns'>> {
   const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
   const slots = await tx.nationTurn.findMany({ where: { worldId }, orderBy: [{ nationId: 'asc' }, { slot: 'asc' }] });
   const nationTurns: NonNullable<WorldState['nationTurns']> = {};
@@ -45,10 +48,24 @@ export async function persistCommandState(tx: Prisma.TransactionClient, worldId:
   }
   if (JSON.stringify(state.nationTurns) !== JSON.stringify(before.nationTurns)) {
     await tx.nationTurn.deleteMany({ where: { worldId } });
-    await tx.nationTurn.createMany({ data: Object.entries(state.nationTurns ?? {}).flatMap(([nationId, slots]) => slots.map((slot, i) => ({ worldId, nationId: Number(nationId), slot: i, commandKey: slot.commandKey, args: slot.args as Prisma.InputJsonValue }))) });
+    await tx.nationTurn.createMany({
+      data: Object.entries(state.nationTurns ?? {}).flatMap(([nationId, slots]) =>
+        slots.map((slot, i) => ({
+          worldId,
+          nationId: Number(nationId),
+          slot: i,
+          commandKey: slot.commandKey,
+          args: slot.args as Prisma.InputJsonValue,
+        })),
+      ),
+    });
   }
   if (JSON.stringify(state.commandMeta) !== JSON.stringify(before.commandMeta)) {
-    if (state.commandMeta) await tx.world.update({ where: { id: worldId }, data: { commandMeta: state.commandMeta as Prisma.InputJsonValue } });
+    if (state.commandMeta)
+      await tx.world.update({
+        where: { id: worldId },
+        data: { commandMeta: state.commandMeta as Prisma.InputJsonValue },
+      });
     else await tx.$executeRaw`UPDATE "World" SET "commandMeta" = NULL WHERE id = ${worldId}`;
   }
   for (const nation of Object.values(before.nations)) {
@@ -59,14 +76,32 @@ export async function persistCommandState(tx: Prisma.TransactionClient, worldId:
   }
 }
 
-export async function persistCommandReports(tx: Prisma.TransactionClient, worldId: string, tick: number, attackerId: number, result: CommandResult) {
-  await tx.battleLog.createMany({ data: (result.reports ?? []).map((report) => ({ ...report, worldId, tick, attackerId })) });
+export async function persistCommandReports(
+  tx: Prisma.TransactionClient,
+  worldId: string,
+  tick: number,
+  attackerId: number,
+  result: CommandResult,
+) {
+  await tx.battleLog.createMany({
+    data: (result.reports ?? []).map((report) => ({ ...report, worldId, tick, attackerId })),
+  });
   for (const entry of result.history ?? []) await appendNationHistory(tx, worldId, tick, entry.nationId, entry.text);
 }
-export async function appendNationHistory(tx: Prisma.TransactionClient, worldId: string, tick: number, nationId: number, text: string) {
+export async function appendNationHistory(
+  tx: Prisma.TransactionClient,
+  worldId: string,
+  tick: number,
+  nationId: number,
+  text: string,
+) {
   const where = { worldId_tick_nationId: { worldId, tick, nationId } };
   const previous = await tx.nationHistory.findUnique({ where });
   const data = (previous?.data ?? {}) as Record<string, Prisma.InputJsonValue>;
   const events = Array.isArray(data.events) ? data.events : [];
-  await tx.nationHistory.upsert({ where, create: { worldId, tick, nationId, data: { events: [text] } }, update: { data: { ...data, events: [...events, text] } } });
+  await tx.nationHistory.upsert({
+    where,
+    create: { worldId, tick, nationId, data: { events: [text] } },
+    update: { data: { ...data, events: [...events, text] } },
+  });
 }

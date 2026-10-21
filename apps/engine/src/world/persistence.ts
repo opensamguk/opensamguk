@@ -61,7 +61,17 @@ export async function saveInitialWorld(
       }
       await tx.general.createMany({ data: state.generals.map((general) => ({ ...general, worldId })) });
       await tx.diplomacy.createMany({ data: state.diplomacies.map((diplomacy) => ({ ...diplomacy, worldId })) });
-      await tx.nationTurn.createMany({ data: Object.entries(state.nationTurns ?? {}).flatMap(([nationId, slots]) => slots.map((slot, i) => ({ worldId, nationId: Number(nationId), slot: i, commandKey: slot.commandKey, args: slot.args as Prisma.InputJsonValue }))) });
+      await tx.nationTurn.createMany({
+        data: Object.entries(state.nationTurns ?? {}).flatMap(([nationId, slots]) =>
+          slots.map((slot, i) => ({
+            worldId,
+            nationId: Number(nationId),
+            slot: i,
+            commandKey: slot.commandKey,
+            args: slot.args as Prisma.InputJsonValue,
+          })),
+        ),
+      });
       return world;
     },
     { timeout: 30_000 },
@@ -103,7 +113,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
           return stripWorldId(general);
         }),
         diplomacies: diplomacies.map(stripWorldId),
-        ...await loadCommandState(tx, worldId),
+        ...(await loadCommandState(tx, worldId)),
       };
     },
     { isolationLevel: 'RepeatableRead' },

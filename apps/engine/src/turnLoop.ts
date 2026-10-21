@@ -130,8 +130,13 @@ export class TurnLoop {
           if (turn.nation) {
             const national = turn.nation.result;
             if (!('code' in national)) await persistCommandReports(tx, worldId, due.nextTurnTick, due.id, national);
-            await appendNationHistory(tx, worldId, due.nextTurnTick, turn.nation.nationId,
-              `${turn.nation.commandKey}: ${'code' in national ? `${national.code}: ${national.message}` : national.logs.map((log) => log.text).join('\n')}`);
+            await appendNationHistory(
+              tx,
+              worldId,
+              due.nextTurnTick,
+              turn.nation.nationId,
+              `${turn.nation.commandKey}: ${'code' in national ? `${national.code}: ${national.message}` : national.logs.map((log) => log.text).join('\n')}`,
+            );
           }
           await tx.generalLog.create({
             data: {

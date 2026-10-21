@@ -16,7 +16,13 @@ describe('AC-M1-14 명령 자동 대조', () => {
     expect(Object.keys(commandCases).sort()).toEqual(commands.map((c) => c.key).sort());
   });
   it('신규28개 category는 target과 별도로 지정한다', () => {
-    for (const [group, category] of [[militaryCommands, 'military'], [[attack], 'military'], [personnelCommands, 'strategy'], [personalCommands, 'personal'], [nationCommands, 'nation']] as const) {
+    for (const [group, category] of [
+      [militaryCommands, 'military'],
+      [[attack], 'military'],
+      [personnelCommands, 'strategy'],
+      [personalCommands, 'personal'],
+      [nationCommands, 'nation'],
+    ] as const) {
       for (const command of group) expect(command).toHaveProperty('category', category);
     }
   });
