@@ -5,6 +5,8 @@ export interface WorldState {
   nations: Record<number, InitialNation>;
   generals: Record<number, InitialGeneral>;
   diplomacies: InitialDiplomacy[];
+  commandMeta?: { nextNationId: number; offers: Record<number, number> };
+  nationTurns?: Record<number, { commandKey: string; args: unknown }[]>;
 }
 export type DeepReadonly<T> = T extends object ? { readonly [K in keyof T]: DeepReadonly<T[K]> } : T;
 export type WorldView = DeepReadonly<WorldState>;
@@ -16,5 +18,7 @@ export function toWorldState(initial: WorldInit): WorldState {
     nations: Object.fromEntries(state.nations.map((nation) => [nation.id, nation])),
     generals: Object.fromEntries(state.generals.map((general) => [general.id, general])),
     diplomacies: state.diplomacies,
+    ...(state.commandMeta ? { commandMeta: state.commandMeta } : {}),
+    ...(state.nationTurns ? { nationTurns: state.nationTurns } : {}),
   };
 }

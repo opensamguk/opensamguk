@@ -2,12 +2,19 @@ import type { z } from 'zod';
 import type { Rng } from '@opensamguk/shared';
 import type { WorldView } from '../model/world';
 import type { Effect } from './effects';
+import type { UnitSetResource } from '../world/resources';
+import type { DeepReadonly } from '../model/world';
 export interface Actor {
   generalId: number;
+  target?: 'general' | 'nation';
+  tick?: number;
+  unitSet?: DeepReadonly<UnitSetResource> | undefined;
 }
 export interface Failure {
   code:
-    'NO_ACTOR' | 'NOT_NATION' | 'NOT_OWN_CITY' | 'NO_SUPPLY' | 'NO_GOLD' | 'AT_MAX' | 'BAD_ARGS' | 'UNKNOWN_COMMAND';
+    'NO_ACTOR' | 'NOT_NATION' | 'NOT_OWN_CITY' | 'NO_SUPPLY' | 'NO_GOLD' | 'AT_MAX' | 'BAD_ARGS' | 'UNKNOWN_COMMAND'
+    | 'NO_RICE' | 'NO_CREW' | 'NOT_RULER' | 'BAD_TARGET' | 'NOT_ADJACENT' | 'NOT_WAR' | 'BAD_STATE'
+    | 'NO_POPULATION' | 'NO_OFFER' | 'NO_UNIT_SET';
   message: string;
 }
 export interface LogEntry {
@@ -17,8 +24,10 @@ export interface LogEntry {
 export interface CommandResult {
   effects: Effect[];
   logs: LogEntry[];
+  reports?: { generalId: number; text: string }[];
+  history?: { nationId: number; text: string }[];
 }
-export interface CommandDef<Args = Record<string, never>> {
+export interface CommandDef<Args = unknown> {
   key: string;
   name: string;
   target: 'general' | 'nation';

@@ -2,6 +2,7 @@ import type { PrismaClient, Prisma } from '@opensamguk/db';
 import type { WorldInit } from '@opensamguk/rules';
 import { statRulesSchema, unitSetSchema } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
+import { loadCommandState } from '../commandPersistence';
 
 export async function saveInitialWorld(
   db: PrismaClient,
@@ -43,6 +44,7 @@ export async function saveInitialWorld(
           } as unknown as Prisma.InputJsonValue,
           statRules: state.statRules,
           unitSet: state.unitSet as Prisma.InputJsonValue,
+          ...(state.commandMeta ? { commandMeta: state.commandMeta as Prisma.InputJsonValue } : {}),
         },
       });
       const worldId = world.id;
@@ -59,6 +61,7 @@ export async function saveInitialWorld(
       }
       await tx.general.createMany({ data: state.generals.map((general) => ({ ...general, worldId })) });
       await tx.diplomacy.createMany({ data: state.diplomacies.map((diplomacy) => ({ ...diplomacy, worldId })) });
+      await tx.nationTurn.createMany({ data: Object.entries(state.nationTurns ?? {}).flatMap(([nationId, slots]) => slots.map((slot, i) => ({ worldId, nationId: Number(nationId), slot: i, commandKey: slot.commandKey, args: slot.args as Prisma.InputJsonValue }))) });
       return world;
     },
     { timeout: 30_000 },
@@ -100,6 +103,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
           return stripWorldId(general);
         }),
         diplomacies: diplomacies.map(stripWorldId),
+        ...await loadCommandState(tx, worldId),
       };
     },
     { isolationLevel: 'RepeatableRead' },

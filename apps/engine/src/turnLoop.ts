@@ -1,14 +1,14 @@
 import type { Prisma, PrismaClient } from '@opensamguk/db';
 import { nextActionSequence } from '@opensamguk/db';
 import {
-  applyEffects,
   checkpointClock,
   monthlyDate,
-  runCommand,
+  runGeneralTurn,
+  unitSetSchema,
   TICKS_PER_MONTH,
   type WorldState,
 } from '@opensamguk/rules';
-import { rngFor } from '@opensamguk/shared';
+import { appendNationHistory, persistCommandReports } from './commandPersistence';
 import { assertLease, databaseNow, lockLease, type Lease } from './lease';
 import { loadWorld } from './worldLoader';
 import { persistEffects, shiftTurns } from './persist';
@@ -115,18 +115,24 @@ export class TurnLoop {
             where: { worldId_generalId_slot: { worldId, generalId: due.id, slot: 0 } },
           });
           const commandKey = command?.commandKey ?? 'rest';
-          const result = runCommand(
+          const turn = runGeneralTurn(
             state,
-            { generalId: due.id },
-            commandKey,
-            command?.args ?? {},
-            rngFor(world.seed, 'turn', due.nextTurnTick, due.id),
+            { generalId: due.id, tick: due.nextTurnTick, unitSet: unitSetSchema.parse(world.unitSet) },
+            { commandKey, args: command?.args ?? {} },
+            world.seed,
           );
+          const result = turn.result;
           const failed = 'code' in result;
-          const effects = failed ? [] : result.effects;
-          next = applyEffects(state, effects);
+          next = turn.state;
           next.generals[due.id]!.nextTurnTick = due.nextTurnTick + TICKS_PER_MONTH;
-          await persistEffects(tx, worldId, next, effects);
+          await persistEffects(tx, worldId, next, [{ kind: 'world', state: next }]);
+          if (!failed) await persistCommandReports(tx, worldId, due.nextTurnTick, due.id, result);
+          if (turn.nation) {
+            const national = turn.nation.result;
+            if (!('code' in national)) await persistCommandReports(tx, worldId, due.nextTurnTick, due.id, national);
+            await appendNationHistory(tx, worldId, due.nextTurnTick, turn.nation.nationId,
+              `${turn.nation.commandKey}: ${'code' in national ? `${national.code}: ${national.message}` : national.logs.map((log) => log.text).join('\n')}`);
+          }
           await tx.generalLog.create({
             data: {
               worldId,
