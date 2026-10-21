@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { commandWorld } from '../test/commandFixture';
 import {
   generalMerit,
   publicNationPower,
@@ -90,21 +91,82 @@ describe('AC-M2-19 국가 순위', () => {
     expect(rows).toEqual(before);
   });
 
-  it('공개 국력은 도시·장수·기술 1000단위 구간의 합이며 사유 자원을 받지 않는다', () => {
-    expect(publicNationPower(3, 12, 999.99)).toBe(15);
-    expect(publicNationPower(3, 12, 1_000)).toBe(16);
-    expect(publicNationPower(3, 12, 1_999.99)).toBe(16);
-    expect(publicNationPower(3, 12, 2_000)).toBe(17);
-    expect(publicNationPower(3, 12, 11_000)).toBe(26);
-    expect(publicNationPower(3, 12, 12_000)).toBe(26);
+  it('정렬 결과에는 국력 계산에 쓰인 사유 자원을 내보내지 않는다', () => {
     const source = [{ ...rows[0]!, gold: 10000, rice: 20000, population: 30000, crew: 40000 }];
     expect(rankNations(source, 'power')).toEqual([{ ...rows[0]!, rank: 1, value: 100 }]);
     expect(rankNations([], 'power')).toEqual([]);
   });
 
-  it('도시·장수 수를 아는 상대도 같은 기술 구간 안의 원값을 구별할 수 없다', () => {
-    const powers = [1_000, 1_234, 1_999].map((tech) => publicNationPower(3, 12, tech));
-    expect(new Set(powers).size).toBe(1);
-    expect(powers[0]! - 3 - 12).toBe(1);
+  const at = { seed: 'public-power', tick: 10000, year: 191 };
+
+  it('도시·장수 수가 같은 두 나라에서 이를 빼도 기술 등급이 남지 않는다', () => {
+    const state = commandWorld();
+    state.cities[4]!.nationId = null;
+    state.generals[3]!.nationId = null;
+    state.nations[1]!.tech = 5432;
+    state.nations[2]!.tech = 6432;
+    for (const id of [1, 2]) {
+      expect(publicNationPower(state, id, at) - 1 - 1).not.toBe(Math.floor(state.nations[id]!.tech / 1000));
+    }
+  });
+
+  it('기술과 국고가 다른 상태도 같은 공개 국력이 될 수 있다', () => {
+    const first = commandWorld();
+    first.nations[1]!.tech = 5000;
+    const second = structuredClone(first);
+    second.nations[1]!.tech += 1000;
+    second.nations[1]!.gold -= 100000;
+    expect(publicNationPower(first, 1, at)).toBe(publicNationPower(second, 1, at));
+  });
+
+  it('같은 시드·월·국가의 값은 재생과 다른 국가 계산 순서에 영향받지 않는다', () => {
+    const state = commandWorld();
+    const before = structuredClone(state);
+    const first = publicNationPower(state, 1, at);
+    publicNationPower(state, 2, at);
+    expect(publicNationPower(structuredClone(state), 1, at)).toBe(first);
+    expect(state).toEqual(before);
+  });
+
+  it('미등장 장수와 보급이 끊긴 도시의 내정은 합산하지 않는다', () => {
+    const state = commandWorld();
+    const first = publicNationPower(state, 1, at);
+    state.generals[4]!.nationId = 1;
+    state.generals[4]!.activeFromYear = at.year + 1;
+    state.generals[4]!.gold = 100000000;
+    state.cities[4]!.population = 1000000;
+    state.cities[4]!.agriculture = 1000000;
+    expect(publicNationPower(state, 1, at)).toBe(first);
+  });
+
+  it('기본 국력 126에 적용하는 월별 배율은 0.95~1.05 범위를 지킨다', () => {
+    const state = commandWorld();
+    Object.assign(state.nations[1]!, { gold: 10000, rice: 0, tech: 1000 });
+    Object.assign(state.generals[1]!, {
+      gold: 0,
+      rice: 0,
+      leadership: 40,
+      strength: 9,
+      intel: 16,
+      experience: 100,
+      dedication: 100,
+    });
+    Object.assign(state.cities[1]!, {
+      population: 10000,
+      populationMax: 20000,
+      agriculture: 100,
+      agricultureMax: 100,
+      commerce: 100,
+      commerceMax: 100,
+      security: 100,
+      securityMax: 100,
+      wall: 100,
+      wallMax: 100,
+      defence: 100,
+      defenceMax: 100,
+    });
+    const powers = Array.from({ length: 30 }, (_, i) => publicNationPower(state, 1, { ...at, tick: 10000 * (i + 1) }));
+    expect(powers.every((power) => Number.isInteger(power) && power >= 120 && power <= 132)).toBe(true);
+    expect(new Set(powers).size).toBeGreaterThan(1);
   });
 });

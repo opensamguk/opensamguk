@@ -70,6 +70,6 @@ export async function persistMonthly(
       data: nation as unknown as Prisma.InputJsonValue,
     })),
   });
-  await persistRanking(tx, worldId, next, { tick, ...date });
+  await persistRanking(tx, worldId, next, seed, { tick, ...date });
   return next;
 }

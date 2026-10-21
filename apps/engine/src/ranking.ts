@@ -5,6 +5,7 @@ export async function persistRanking(
   tx: Prisma.TransactionClient,
   worldId: string,
   state: WorldState,
+  seed: string,
   at: { tick: number; year: number; month: number },
 ) {
   const counters = await tx.general.findMany({
@@ -39,7 +40,7 @@ export async function persistRanking(
         color: nation.color,
         cities,
         generals: count,
-        power: publicNationPower(cities, count, nation.tech),
+        power: publicNationPower(state, nation.id, { seed, tick: at.tick, year: at.year }),
       };
     });
   const data = { ...at, generals, nations };
