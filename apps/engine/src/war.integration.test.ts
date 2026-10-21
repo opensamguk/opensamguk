@@ -149,6 +149,7 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
       args: { generalId: 4, resource: 'gold', amount: 10 },
     };
     const { worldId, loop } = await create(initial);
+    await queue(worldId, 1, 'farm', {});
     await loop.advanceTo(100);
     await loop.advanceTo(100);
     const history = await db.nationHistory.findUniqueOrThrow({
@@ -271,12 +272,20 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
         child.kill('SIGKILL');
         await exited;
         expect(await db.battleLog.count({ where: { worldId } })).toBe(phase === 'committed' ? 2 : 0);
+        expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } })).toMatchObject({
+          battleWins: phase === 'committed' ? 2 : 0,
+          captures: phase === 'committed' ? 1 : 0,
+        });
         await db.$executeRaw`UPDATE "EngineLease" SET "expiresAt" = (clock_timestamp() AT TIME ZONE 'UTC') - interval '1 second' WHERE "worldId" = ${worldId}`;
         const loop = new TurnLoop(db, (await acquireLease(db, worldId))!);
         await loop.advanceTo(500);
         await loop.advanceTo(500);
         expect(await db.battleLog.count({ where: { worldId } })).toBe(2);
         expect(await db.generalLog.count({ where: { worldId } })).toBe(1);
+        expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } })).toMatchObject({
+          battleWins: 2,
+          captures: 1,
+        });
         expect(await db.nation.count({ where: { worldId } })).toBe(1);
         expect(
           await db.nationTurn.findUniqueOrThrow({

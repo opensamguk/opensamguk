@@ -108,8 +108,10 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
           if (nation.capitalCityKey === null) throw new Error(`국가 ${nation.id}의 수도가 없습니다.`);
           return { ...stripWorldId(nation), capitalCityKey: nation.capitalCityKey };
         }),
-        generals: generals.map(({ turnRevision, ...general }) => {
+        generals: generals.map(({ turnRevision, battleWins, captures, ...general }) => {
           void turnRevision;
+          void battleWins;
+          void captures;
           return stripWorldId(general);
         }),
         diplomacies: diplomacies.map(stripWorldId),

@@ -1,0 +1,59 @@
+.page h1 {
+  margin-bottom: var(--space-3);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.results {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  font-size: var(--text-sm);
+}
+
+.muted {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.logs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.logs li {
+  display: flex;
+  flex-direction: column;
+  padding-left: var(--space-2);
+  border-left: 3px solid var(--color-success);
+}
+
+.logs li.failure {
+  border-left-color: var(--color-warning);
+}
+
+.logHead {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.logText {
+  white-space: pre-line;
+}

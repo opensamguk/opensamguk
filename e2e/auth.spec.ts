@@ -119,7 +119,7 @@ test('다른 탭에서 로그아웃하면 이 탭의 다음 이동도 로그인�
   await other.getByRole('button', { name: '로그아웃' }).click();
   await expect(other).toHaveURL('/login');
 
-  // 지도는 메인 안에 있어 메뉴에서 뺐다 (D-018). 메뉴의 기록으로 이동해 본다.
+  // 지도는 메인 안에 있어 메뉴에서 뺐다 (D-020). 메뉴의 기록으로 이동해 본다.
   await page.getByRole('link', { name: '기록', exact: true }).click();
   await expect(page).toHaveURL(/\/login\?next=/);
   expect(new URL(page.url()).searchParams.get('next')).toMatch(/^\/w\/1\/records(\?tab=general)?$/);
