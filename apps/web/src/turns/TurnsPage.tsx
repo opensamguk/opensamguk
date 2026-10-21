@@ -46,7 +46,7 @@ function RecentResults({ worldId }: { worldId: string }) {
                 <span className={styles.logHead}>
                   {date ?? ''} {log.kind === 'failure' ? '실패' : '실행'}
                 </span>
-                <span className={styles.logText}>{log.text}</span>
+                <span className={styles.logText}>{readableLog(log.text)}</span>
               </li>
             );
           })}
@@ -54,4 +54,9 @@ function RecentResults({ worldId }: { worldId: string }) {
       )}
     </section>
   );
+}
+
+// 실패 기록은 엔진이 `코드: 이유`로 남긴다. 화면에는 이유만 보인다.
+function readableLog(text: string): string {
+  return text.replace(/^[A-Z][A-Z_]*: /, '');
 }
