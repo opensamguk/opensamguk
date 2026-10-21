@@ -4,12 +4,12 @@ import { errorCode } from '../game/errors';
 import { NoGeneral, QueryError } from '../game/QueryState';
 import { useHome, useWorldId, useWorldMap, useWorldSummary } from '../game/queries';
 import { CityInfo } from '../main/CityInfo';
-import { CommandPreview } from '../main/CommandPanel';
 import { GeneralInfo } from '../main/GeneralInfo';
 import { NationInfo } from '../main/NationInfo';
 import { Panel } from '../main/Panel';
 import { RECORD_LABELS, RecordList } from '../main/Records';
 import { MapLegend, WorldMap } from '../main/WorldMap';
+import { TurnEditor } from '../turns/TurnEditor';
 import { EmptyState, LoadingState } from '../ui/States';
 import styles from './MainPage.module.css';
 
@@ -93,10 +93,10 @@ export function MainPage() {
           )}
         </Panel>
 
+        {/* 30칸 예턴 편집기(T1-15). 지도 선택은 대상 도시 기본값으로만 넘긴다. 조회 상태와 무관하게 늘 같은 자리에 두어
+            도시 선택·재조회 때 다시 만들지 않는다. 그래서 저장하지 않은 편집과 고른 칸이 유지된다. */}
         <Panel title="명령 목록" area="commands">
-          {withHome((data) => (
-            <CommandPreview worldId={worldId} home={data} turnTermMinutes={summary.data?.turnTermMinutes ?? 0} />
-          ))}
+          <TurnEditor worldId={worldId} selectedCityKey={cityKey} />
         </Panel>
 
         <Panel title="도시 정보" area="city">

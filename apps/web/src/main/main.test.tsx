@@ -3,7 +3,6 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { MapCity } from '../game/types';
 import { DataTable, sortRows } from '../ui/DataTable';
-import { slotTimes } from './CommandPanel';
 import { careTags } from './NationInfo';
 import { cityLabel, cityRadius, mapLinks, WorldMap } from './WorldMap';
 
@@ -94,16 +93,5 @@ describe('관리 필요 표시', () => {
   it('부상, 병력이 있을 때 훈련·사기 부족만 표시한다', () => {
     expect(careTags({ injury: 3, crew: 100, train: 40, atmos: 80 })).toEqual(['부상 3', '훈련 부족']);
     expect(careTags({ injury: 0, crew: 0, train: 0, atmos: 0 })).toEqual([]);
-  });
-});
-
-describe('예약 명령 시각', () => {
-  it('nextTurnAt부터 턴 간격씩 더하고 정지 중이면 비운다', () => {
-    expect(slotTimes('2026-10-21T00:00:00.000Z', 10, 3)).toEqual([
-      '2026-10-21T00:00:00.000Z',
-      '2026-10-21T00:10:00.000Z',
-      '2026-10-21T00:20:00.000Z',
-    ]);
-    expect(slotTimes(null, 10, 2)).toEqual([null, null]);
   });
 });

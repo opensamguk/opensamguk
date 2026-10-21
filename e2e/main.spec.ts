@@ -1,10 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 import { signUpByApi } from './account';
-import { bindGeneral, createRunningWorld, query } from './world';
+import { e2eWorld, setTurns, turns, waitNextTurn, waitTurnWindow } from './game';
+import { bindGeneral, query } from './world';
 
 // T1-16 · AC-M1-19: 실제 PostgreSQL·서버·엔진·Chromium으로 메인 작업 화면을 검증한다.
 // 소유자 UI 정정(2026-10-21)에 따라 지도·명령 목록·도시·국가·장수·기록이 한 메인 화면에 함께 있고,
-// 지도에서 도시를 골라도 메인을 떠나지 않는다. 턴 간격 1분 월드라 실제 엔진이 1분 안에 턴과 월간 정산을 처리한다.
+// 지도에서 도시를 골라도 메인을 떠나지 않는다. 명령 목록 칸은 T1-15의 30칸 편집기이며 같은 메인에서 입력·저장·충돌 안내를 본다.
+// 월드는 pnpm dev 엔진이 돌리는 첫 RUNNING 월드(e2eWorld, 턴 1분)라 실제 엔진이 시험 중에 턴과 월간 정산을 처리한다.
 
 interface MapData {
   cities: Array<{ key: number; name: string; nationId: number | null; supplied: boolean; links: number[] }>;
@@ -31,11 +33,11 @@ test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async ({ browser }) => {
   test.setTimeout(120_000);
-  ctx.worldId = await createRunningWorld(`E2E 메인 ${Date.now()}`, 1);
   // 이 파일의 test.use(storageState)가 아직 없는 파일을 읽지 않도록 빈 상태로 시작한다.
   const context = await browser.newContext({ baseURL: BASE, storageState: { cookies: [], origins: [] } });
   const page = await context.newPage();
   await signUpByApi(page);
+  ctx.worldId = await e2eWorld(page);
   const { user } = await query<{ user: { id: string } }>(context.request, 'auth.me');
   await bindGeneral(ctx.worldId, user.id);
   ctx.home = await query<HomeData>(context.request, 'home.get', { worldId: ctx.worldId });
@@ -65,6 +67,22 @@ function enemyCity() {
   );
   if (!city) throw new Error('적 도시가 없습니다');
   return city;
+}
+
+// 메인 명령 목록 칸 안의 30칸 편집기
+const editor = (page: Page) => page.getByRole('region', { name: '명령 목록', exact: true }).getByTestId('turn-editor');
+const row = (page: Page, slot: number) => editor(page).locator(`tr[data-slot="${slot}"]`);
+const draftState = (page: Page) => editor(page).getByTestId('draft-state');
+
+async function pick(page: Page, command: string) {
+  await editor(page).getByLabel('명령 찾기').fill(command);
+  await editor(page).getByRole('radio', { name: command }).check();
+}
+
+async function save(page: Page) {
+  await editor(page).getByRole('button', { name: '저장', exact: true }).click();
+  await expect(editor(page).getByText('저장했습니다.')).toBeVisible();
+  await expect(draftState(page)).toHaveText('저장된 목록');
 }
 
 test.describe('장수가 있는 계정', () => {
@@ -120,8 +138,8 @@ test.describe('장수가 있는 계정', () => {
     await expect(map.locator('[data-cut="true"]')).toHaveCount(cut);
     await expect(map.locator('[data-mine="true"]')).toHaveAttribute('data-city-key', String(ctx.home.general.cityKey));
 
-    // 명령 목록 5칸, 장수·국가·도시 정보
-    await expect(page.getByRole('list', { name: '예약한 명령' }).getByRole('listitem')).toHaveCount(5);
+    // 명령 목록은 30칸 편집기, 장수·국가·도시 정보
+    await expect(editor(page).locator('tr[data-slot]')).toHaveCount(30);
     const general = page.getByRole('region', { name: '장수 정보', exact: true });
     await expect(general.getByText(ctx.home.general.name, { exact: true })).toBeVisible();
     await expect(
@@ -165,6 +183,144 @@ test.describe('장수가 있는 계정', () => {
 
     await page.getByRole('button', { name: '내 도시로' }).click();
     await expect(city.locator(`[data-city-key="${ctx.home.general.cityKey}"][data-visibility="detail"]`)).toBeVisible();
+  });
+
+  test('메인 명령 칸에서 넣은 편집은 지도 도시 선택과 재조회 뒤에도 남고, 고른 도시가 대상 기본값이 되며 저장된다', async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    // 다음 턴이 시험 도중에 실행되면 서버 목록이 바뀌어 저장이 충돌 안내로 간다. 여유가 있을 때 시작한다.
+    await waitTurnWindow(page, ctx.worldId, 45_000);
+    await setTurns(page, ctx.worldId, []);
+    await openMain(page);
+    await expect(row(page, 30)).toBeVisible();
+    await expect(row(page, 1)).toContainText('휴식');
+    await page.evaluate(() => Object.assign(window, { __sameDocument: true }));
+
+    await row(page, 1).click();
+    await row(page, 3).click({ modifiers: ['Shift'] });
+    await expect(editor(page).getByTestId('selection')).toHaveText('선택: 1~3번 칸');
+    await pick(page, '농지 개간');
+    await editor(page).getByRole('button', { name: '1~3번 칸에 넣기' }).click();
+    await expect(draftState(page)).toHaveText('저장하지 않은 편집 1건');
+
+    // 지도에서 다른 도시를 고르고 조회가 다시 돌아도 같은 편집기가 남는다. 초안·고른 칸이 그대로다.
+    const enemy = enemyCity();
+    const refetched = Promise.all([
+      page.waitForResponse((r) => r.url().includes('home.get') && r.ok(), { timeout: 30_000 }),
+      page.waitForResponse((r) => r.url().includes('turns.get') && r.ok(), { timeout: 30_000 }),
+    ]);
+    await page.getByTestId('world-map').locator(`[data-city-key="${enemy.key}"]`).click();
+    await expect(page).toHaveURL(new RegExp(`/w/${ctx.worldId}\\?city=${enemy.key}$`));
+    await expect(
+      page.getByRole('region', { name: '도시 정보', exact: true }).locator(`[data-city-key="${enemy.key}"]`),
+    ).toBeVisible();
+    await refetched;
+    expect(await page.evaluate(() => (window as unknown as { __sameDocument?: boolean }).__sameDocument)).toBe(true);
+    await expect(draftState(page)).toHaveText('저장하지 않은 편집 1건');
+    await expect(editor(page).getByTestId('selection')).toHaveText('선택: 1~3번 칸');
+    for (const slot of [1, 2, 3]) await expect(row(page, slot)).toContainText('농지 개간');
+
+    // 지도에서 고른 도시는 대상 도시의 기본값일 뿐이다. 넣기 전에는 칸이 바뀌지 않는다.
+    await editor(page).getByRole('button', { name: '선택 해제' }).click();
+    await row(page, 4).click();
+    await pick(page, '이동');
+    await expect(editor(page).getByRole('combobox', { name: '대상 도시' })).toHaveValue(String(enemy.key));
+    await expect(row(page, 4)).toContainText('휴식');
+    await editor(page).getByRole('button', { name: '4번 칸에 넣기', exact: true }).click();
+    await expect(row(page, 4)).toContainText(enemy.name);
+    await expect(draftState(page)).toHaveText('저장하지 않은 편집 2건');
+    await shot(page, '10-main-turn-draft.png');
+
+    await save(page);
+    const saved = await turns(page, ctx.worldId);
+    expect(saved.slots.slice(0, 5).map((slot) => slot.commandKey)).toEqual(['farm', 'farm', 'farm', 'move', 'rest']);
+    expect(saved.slots[3]!.args).toMatchObject({ cityKey: enemy.key });
+    await page.reload();
+    await expect(row(page, 4)).toContainText(enemy.name);
+    await expect(draftState(page)).toHaveText('저장된 목록');
+  });
+
+  test('같은 메인을 연 두 탭에서 저장하면 늦은 탭이 충돌 안내를 보고 내 편집을 다시 적용해 저장한다', async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    await waitTurnWindow(page, ctx.worldId, 45_000);
+    await setTurns(page, ctx.worldId, []);
+    await openMain(page);
+    await expect(row(page, 1)).toContainText('휴식');
+    const other = await page.context().newPage();
+    await openMain(other);
+    await expect(row(other, 1)).toContainText('휴식');
+
+    // 늦은 탭이 먼저 편집을 시작한다. 이 편집은 지금 revision을 기준으로 한다.
+    await row(other, 2).click();
+    await pick(other, '상업 투자');
+    await editor(other).getByRole('button', { name: '2번 칸에 넣기' }).click();
+
+    await row(page, 1).click();
+    await pick(page, '농지 개간');
+    await editor(page).getByRole('button', { name: '1번 칸에 넣기' }).click();
+    await save(page);
+
+    await editor(other).getByRole('button', { name: '저장', exact: true }).click();
+    const alert = editor(other).getByTestId('stale-alert');
+    await expect(alert).toContainText('다른 곳에서 먼저 바뀌었습니다. 최신 목록을 다시 불러왔습니다.');
+    await expect(alert).toContainText('내 편집 1건');
+    await expect(row(other, 1)).toContainText('농지 개간');
+    await expect(row(other, 2)).toContainText('휴식');
+    // 충돌 안내도 지도와 같은 메인 화면 안에 있다.
+    await expect(other.getByTestId('world-map')).toBeVisible();
+    await shot(other, '11-main-turn-stale.png');
+
+    await alert.getByRole('button', { name: '내 편집 다시 적용' }).click();
+    await expect(row(other, 1)).toContainText('농지 개간');
+    await expect(row(other, 2)).toContainText('상업 투자');
+    await save(other);
+    const saved = await turns(page, ctx.worldId);
+    expect(saved.slots.slice(0, 3).map((slot) => slot.commandKey)).toEqual(['farm', 'commerce', 'rest']);
+    await other.close();
+  });
+
+  test('저장한 예턴을 엔진이 실행하면 같은 메인에서 개인 기록에 결과가 쌓이고 편집기 칸이 당겨진다', async ({
+    page,
+  }) => {
+    test.setTimeout(300_000);
+    await waitTurnWindow(page, ctx.worldId, 30_000);
+    await setTurns(page, ctx.worldId, [{ commandKey: 'farm' }, { commandKey: 'commerce' }]);
+    const before = await turns(page, ctx.worldId);
+    const logsBefore = await query<{ items: Array<{ id: string }> }>(page.request, 'records.general', {
+      worldId: ctx.worldId,
+    });
+    await openMain(page);
+    await expect(row(page, 1)).toContainText('농지 개간');
+    await expect(row(page, 2)).toContainText('상업 투자');
+
+    await waitNextTurn(page, ctx.worldId);
+    // 엔진이 첫 칸을 실행하면 편집기가 새 목록을 받아 한 칸 당긴다 (turns.get 10초 주기).
+    await expect(row(page, 1)).toContainText('상업 투자', { timeout: 150_000 });
+    await expect(row(page, 2)).toContainText('휴식');
+    const after = await turns(page, ctx.worldId);
+    expect(after.revision).toBeGreaterThan(before.revision);
+
+    let latest: { id: string; text: string } | undefined;
+    await expect
+      .poll(
+        async () => {
+          const { items } = await query<{ items: Array<{ id: string; text: string }> }>(
+            page.request,
+            'records.general',
+            { worldId: ctx.worldId },
+          );
+          latest = items[0];
+          return latest?.id ?? null;
+        },
+        { timeout: 60_000 },
+      )
+      .not.toBe(logsBefore.items[0]?.id ?? null);
+    const records = page.getByRole('region', { name: '개인 기록', exact: true });
+    await expect(records).toContainText(latest!.text, { timeout: 60_000 });
+    await shot(page, '12-main-turn-result.png');
   });
 
   test('국가 정보에서 소속 장수·소유 도시 표를 펼치고 정렬한다', async ({ page }) => {
@@ -248,7 +404,8 @@ test.describe('장수가 있는 계정', () => {
 
     await page.goto(`/w/${ctx.worldId}/turns`);
     await expect(page.getByRole('heading', { level: 1, name: '예턴 편집' })).toBeVisible();
-    await shot(page, '09-turns-placeholder.png');
+    await expect(page.getByTestId('turn-editor').locator('tr[data-slot]')).toHaveCount(30);
+    await shot(page, '09-turns.png');
   });
 });
 
@@ -276,7 +433,7 @@ test('장수 생성 API로 만든 재야 장수는 메인에서 바로 재야 �
   await expect(
     page.getByRole('region', { name: '국가 기록', exact: true }).getByText('소속 국가가 없습니다'),
   ).toBeVisible();
-  await expect(page.getByRole('list', { name: '예약한 명령' }).getByRole('listitem')).toHaveCount(5);
+  await expect(editor(page).locator('tr[data-slot]')).toHaveCount(30);
   await expect(page.getByTestId('world-map').locator('[data-mine="true"]')).toHaveCount(1);
 });
 
