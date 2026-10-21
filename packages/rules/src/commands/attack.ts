@@ -129,12 +129,23 @@ export const attack = defineCommand({
       city.security = Math.round(city.security * BALANCE.CAPTURE_SECURITY_FACTOR);
       city.trust = Math.max(0, city.trust - BALANCE.CAPTURE_TRUST_LOSS);
       g.cityKey = city.cityKey;
-      if (defendingNation !== null && !Object.values(state.cities).some((c) => c.nationId === defendingNation)) {
-        const name = state.nations[defendingNation]!.name;
-        removeNation(state, defendingNation);
-        history.push({ nationId: defendingNation, text: `${name} 멸망, 소속 장수 재야` });
+      let relocated: { nationId: number; text: string } | undefined;
+      if (defendingNation !== null) {
+        const nation = state.nations[defendingNation]!;
+        const remaining = Object.values(state.cities)
+          .filter((c) => c.nationId === defendingNation)
+          .sort((a, b) => b.population - a.population || a.cityKey - b.cityKey);
+        if (!remaining.length) {
+          removeNation(state, defendingNation);
+          history.push({ nationId: defendingNation, text: `${nation.name} 멸망, 소속 장수 재야` });
+        } else if (nation.capitalCityKey === city.cityKey) {
+          const capital = remaining[0]!;
+          nation.capitalCityKey = capital.cityKey;
+          relocated = { nationId: defendingNation, text: `${nation.name} 수도 함락, ${capital.name} 천도` };
+        }
       }
       refreshSupply(state);
+      if (relocated) history.push(relocated);
     }
     const summary = `${g.name} ${city.name} ${captured ? '점령' : '점령 실패'}: 병력 ${g.crew}명`;
     for (const report of reports) report.text += `, ${captured ? '점령' : '수비 유지'}`;

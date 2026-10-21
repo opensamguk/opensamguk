@@ -2,6 +2,7 @@ import type { Prisma, PrismaClient } from '@opensamguk/db';
 import { nextActionSequence } from '@opensamguk/db';
 import {
   checkpointClock,
+  commandRegistry,
   monthlyDate,
   runGeneralTurn,
   unitSetSchema,
@@ -129,14 +130,18 @@ export class TurnLoop {
           if (!failed) await persistCommandReports(tx, worldId, due.nextTurnTick, due.id, result);
           if (turn.nation) {
             const national = turn.nation.result;
+            const nationId = turn.nation.nationId;
             if (!('code' in national)) await persistCommandReports(tx, worldId, due.nextTurnTick, due.id, national);
-            await appendNationHistory(
-              tx,
-              worldId,
-              due.nextTurnTick,
-              turn.nation.nationId,
-              `${turn.nation.commandKey}: ${'code' in national ? `${national.code}: ${national.message}` : national.logs.map((log) => log.text).join('\n')}`,
-            );
+            if ('code' in national || !national.history?.some((entry) => entry.nationId === nationId)) {
+              const name = commandRegistry.get(turn.nation.commandKey)?.name ?? '국가 명령';
+              await appendNationHistory(
+                tx,
+                worldId,
+                due.nextTurnTick,
+                nationId,
+                `${name}: ${'code' in national ? `${national.code}: ${national.message}` : national.logs.map((log) => log.text).join('\n')}`,
+              );
+            }
           }
           await tx.generalLog.create({
             data: {

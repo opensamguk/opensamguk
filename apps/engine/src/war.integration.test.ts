@@ -103,6 +103,13 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
       turnRevision: 2,
       nextTurnTick: 10100,
     });
+    const rewardHistory = await db.nationHistory.findUniqueOrThrow({
+      where: { worldId_tick_nationId: { worldId, tick: 100, nationId: 1 } },
+    });
+    expect(rewardHistory.data).toMatchObject({
+      events: expect.arrayContaining([expect.stringMatching(/^포상: .*포상: 금 10$/)]),
+    });
+    expect(JSON.stringify(rewardHistory.data)).not.toContain('nation_reward');
     for (let month = 1; month <= 12; month++) {
       await renewLease(db, lease);
       await loop.advanceTo(month * 10000);
@@ -111,6 +118,115 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
     expect(replayArchive(archive).map((e) => e.stateHash)).toEqual(archive.months.map((m) => m.stateHash));
     expect(archive.months[0]!.data.nations.map((n) => n.nationId)).toEqual([1]);
   });
+  it.each([
+    { key: 'nation_declare', name: '선전포고', relation: 'neutral' },
+    { key: 'nation_peace', name: '종전 제의', relation: 'WAR' },
+    { key: 'nation_pact', name: '불가침 제의', relation: 'neutral' },
+    { key: 'nation_break_pact', name: '불가침 파기 제의', relation: 'NON_AGGRESSION' },
+    { key: 'nation_aid', name: '원조', relation: 'neutral' },
+  ] as const)('$name 국가 역사는 양국에 한 번만 남긴다', async ({ key, name, relation }) => {
+    const initial = await warFixture();
+    initial.diplomacies =
+      relation === 'neutral' ? [] : [{ nationA: 1, nationB: 2, state: relation, untilTick: 10000 }];
+    initial.nationTurns![1]![0] = {
+      commandKey: key,
+      args: key === 'nation_aid' ? { nationId: 2, resource: 'gold', amount: 10 } : { nationId: 2 },
+    };
+    const { worldId, loop } = await create(initial);
+    await loop.advanceTo(100);
+    await loop.advanceTo(100);
+    const histories = await db.nationHistory.findMany({ where: { worldId, tick: 100 }, orderBy: { nationId: 'asc' } });
+    expect(histories.map((entry) => entry.nationId)).toEqual([1, 2]);
+    for (const history of histories) {
+      expect(history.data).toEqual({ events: [expect.stringContaining(name)] });
+      expect(JSON.stringify(history.data)).not.toContain('nation_');
+    }
+    expect(histories[0]!.data).toEqual(histories[1]!.data);
+  });
+  it('국가 명령 실패도 표시 이름과 실패 이유를 한 번 남긴다', async () => {
+    const initial = await warFixture();
+    initial.nationTurns![1]![0] = {
+      commandKey: 'nation_reward',
+      args: { generalId: 4, resource: 'gold', amount: 10 },
+    };
+    const { worldId, loop } = await create(initial);
+    await loop.advanceTo(100);
+    await loop.advanceTo(100);
+    const history = await db.nationHistory.findUniqueOrThrow({
+      where: { worldId_tick_nationId: { worldId, tick: 100, nationId: 1 } },
+    });
+    expect(history.data).toEqual({ events: ['포상: BAD_TARGET: 자기 국가 장수만 가능합니다.'] });
+  });
+  it.each(['success', 'error', 'token', 'expiry'] as const)(
+    '수도 함락 %s 뒤 자동 천도·보급·반격·역사를 저장하고 롤백·재생한다',
+    async (failure) => {
+      const initial = await warFixture();
+      initial.cities[2]!.nationId = 2;
+      initial.cities[3]!.nationId = 2;
+      initial.cities.push({ ...initial.cities[3]!, cityKey: 5, name: '고립 도시', population: 10000, connections: [] });
+      initial.generals[0]!.crew = 1000;
+      initial.generals[1]!.cityKey = 3;
+      initial.generals[1]!.crew = 10000;
+      initial.generals[1]!.nextTurnTick = 200;
+      delete initial.nationTurns;
+      const ready = toWorldState(initial);
+      refreshSupply(ready);
+      initial.cities = Object.values(ready.cities);
+      const { worldId, lease } = await create(initial);
+      await queue(worldId, 1, 'attack', { cityKey: 2 });
+      await queue(worldId, 2, 'attack', { cityKey: 2 });
+      if (failure !== 'success') {
+        const before = await snapshot(worldId);
+        const interrupted = new TurnLoop(db, lease, {
+          beforeCommit: async (tx) => {
+            if (failure === 'error') throw new Error('천도 저장 중단');
+            await tx.engineLease.update({
+              where: { worldId },
+              data: failure === 'token' ? { fencingToken: { increment: 1 } } : { expiresAt: new Date(0) },
+            });
+          },
+        });
+        if (failure === 'error') await expect(interrupted.advanceTo(100)).rejects.toThrow('천도 저장 중단');
+        else await expect(interrupted.advanceTo(100)).rejects.toBeInstanceOf(LeaseLostError);
+        expect(await snapshot(worldId)).toEqual(before);
+        expect(interrupted.state).toBeNull();
+      }
+      const loop = new TurnLoop(db, lease);
+      await loop.advanceTo(100);
+      await loop.advanceTo(100);
+      const captured = await readWorldState(db, worldId);
+      expect(captured.nations.find((n) => n.id === 2)).toMatchObject({ capitalCityKey: 3 });
+      expect(captured.cities.find((c) => c.cityKey === 2)).toMatchObject({ nationId: 1 });
+      for (const cityKey of [3, 4])
+        expect(captured.cities.find((c) => c.cityKey === cityKey)).toMatchObject({ nationId: 2, supplied: true });
+      expect(captured.cities.find((c) => c.cityKey === 5)).toMatchObject({ nationId: 2, supplied: false });
+      expect(await db.nationTurn.count({ where: { worldId } })).toBe(0);
+      const history = await db.nationHistory.findUniqueOrThrow({
+        where: { worldId_tick_nationId: { worldId, tick: 100, nationId: 2 } },
+      });
+      const events = (history.data as { events: string[] }).events;
+      expect(events.filter((event) => event.includes('천도'))).toEqual([
+        `${initial.nations[1]!.name} 수도 함락, 도시3 천도`,
+      ]);
+      await loop.advanceTo(200);
+      expect(
+        await db.generalLog.findUniqueOrThrow({
+          where: { worldId_generalId_tick: { worldId, generalId: 2, tick: 200 } },
+        }),
+      ).toMatchObject({ kind: 'success', text: expect.stringContaining('도시2 점령:') });
+      expect(await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId, cityKey: 2 } } })).toMatchObject({
+        nationId: 2,
+      });
+      for (const tick of [10000, 20000]) {
+        await renewLease(db, lease);
+        await loop.advanceTo(tick);
+      }
+      const archive = await exportReplay(db, worldId);
+      expect(replayArchive(archive, 2).map((entry) => entry.stateHash)).toEqual(
+        archive.months.map((entry) => entry.stateHash),
+      );
+    },
+  );
   it.each(['error', 'token', 'expiry'] as const)(
     '전투 저장 직전 %s이면 소유권·국가·양쪽 로그·예턴·메모리를 모두 롤백한다',
     async (failure) => {

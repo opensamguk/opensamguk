@@ -5,6 +5,7 @@ import { applyEffects } from './effects';
 import { commands, runCommand } from './registry';
 import { runGeneralTurn } from './turn';
 import { runMonthly, settleSupply } from '../monthly/index';
+import { refreshSupply } from '../supply';
 import type { WorldState } from '../model/world';
 import { commandCases } from './contracts';
 
@@ -39,6 +40,7 @@ describe('AC-M1-15 전투 시나리오', () => {
     expect(a.state.nationTurns).toBeUndefined();
     expect(a.state.diplomacies).toEqual([]);
     expect(a.result.history?.some((h) => h.text.includes('멸망'))).toBe(true);
+    expect(a.result.history?.some((h) => h.text.includes('천도'))).toBe(false);
     expect(initial.nations[2]).toBeDefined();
   });
   it('동률 수비는 ID 순, 수비 실패·페이즈 제한은 성벽과 도시 소유권을 보존한다', () => {
@@ -76,6 +78,54 @@ describe('AC-M1-15 전투 시나리오', () => {
   });
 });
 describe('AC-M1-16 점령과 보급', () => {
+  it.each([
+    { populations: [30000, 20000], capital: 3 },
+    { populations: [20000, 30000], capital: 4 },
+    { populations: [20000, 20000], capital: 3 },
+  ])('수도 함락 뒤 인구 $populations 기준 수도 $capital에서 보급하고 반격한다', ({ populations, capital }) => {
+    const state = commandWorld();
+    state.cities[3]!.nationId = 2;
+    state.cities[4]!.nationId = 2;
+    state.cities[3]!.population = populations[0]!;
+    state.cities[4]!.population = populations[1]!;
+    state.cities[5] = { ...state.cities[4]!, cityKey: 5, name: '고립 도시', population: 10000, connections: [] };
+    state.generals[1]!.crew = 1000;
+    state.generals[2]!.cityKey = 3;
+    state.generals[2]!.crew = 10000;
+    refreshSupply(state);
+    const supplied = state;
+    expect(supplied.cities[3]!.supplied).toBe(true);
+    const captured = execute(supplied, 1, 'attack', { cityKey: 2 });
+    expect(captured.state.cities[2]!.nationId).toBe(1);
+    expect(captured.state.nations[2]!.capitalCityKey).toBe(capital);
+    expect(captured.state.cities[3]!.supplied).toBe(true);
+    expect(captured.state.cities[4]!.supplied).toBe(true);
+    expect(captured.state.cities[5]!.supplied).toBe(false);
+    expect(captured.state.nationTurns).toBeUndefined();
+    expect(captured.result.history?.filter((h) => h.text.includes('천도'))).toEqual([
+      { nationId: 2, text: `국가2 수도 함락, 도시${capital} 천도` },
+    ]);
+    expect(captured).toEqual(execute(supplied, 1, 'attack', { cityKey: 2 }));
+    expect(supplied.nations[2]!.capitalCityKey).toBe(2);
+    const alreadyRelocated = structuredClone(supplied);
+    alreadyRelocated.nations[2]!.capitalCityKey = capital;
+    const rng = rngFor('capital-rng'),
+      referenceRng = rngFor('capital-rng');
+    const actor = { generalId: 1, tick: 100, unitSet: testUnits };
+    const automatic = runCommand(supplied, actor, 'attack', { cityKey: 2 }, rng);
+    const reference = runCommand(alreadyRelocated, actor, 'attack', { cityKey: 2 }, referenceRng);
+    expect(automatic).not.toHaveProperty('code');
+    expect(reference).not.toHaveProperty('code');
+    if ('code' in automatic || 'code' in reference) throw new Error('수도 함락 출병 실패');
+    expect(applyEffects(supplied, automatic.effects)).toEqual(applyEffects(alreadyRelocated, reference.effects));
+    expect(rng.next()).toBe(referenceRng.next());
+    const counterattack = execute(captured.state, 2, 'attack', { cityKey: 2 });
+    expect(counterattack.state.cities[2]!.nationId).toBe(2);
+    expect(counterattack.result.logs[0]!.text).toContain('도시2 점령:');
+    const monthly = runMonthly(counterattack.state, 10000, rngFor('capital-month')).state;
+    expect(monthly.cities[3]!.agriculture).toBe(100);
+    expect(monthly.cities[5]!.agriculture).toBe(90);
+  });
   it('회랑 점령 직후 단절 표시, 월간 손해, 재점령 직후 회복과 다음 달 손해 중단', () => {
     const state = commandWorld();
     for (const id of [1, 2, 3]) state.cities[id]!.nationId = 1;
@@ -90,6 +140,7 @@ describe('AC-M1-16 점령과 보급', () => {
     const supplied = settleSupply(state);
     expect(supplied.cities[3]!.supplied).toBe(true);
     const cut = execute(supplied, 2, 'attack', { cityKey: 2 }).state;
+    expect(cut.nations[1]!.capitalCityKey).toBe(1);
     expect(cut.cities[3]!.supplied).toBe(false);
     expect(cut.cities[3]!.agriculture).toBe(100);
     const damaged = runMonthly(cut, 10000, rngFor('month')).state;
