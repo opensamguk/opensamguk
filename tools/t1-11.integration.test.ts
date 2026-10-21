@@ -30,7 +30,11 @@ async function request(path: string, input: unknown, cookie?: string) {
     `${address}/trpc/${path}?batch=1${mutation ? '' : `&input=${encodeURIComponent(JSON.stringify({ 0: input }))}`}`,
     {
       method: mutation ? 'POST' : 'GET',
-      headers: { ...(cookie ? { cookie } : {}), ...(mutation ? { 'content-type': 'application/json' } : {}) },
+      headers: {
+        origin: 'http://127.0.0.1:5173',
+        ...(cookie ? { cookie } : {}),
+        ...(mutation ? { 'content-type': 'application/json' } : {}),
+      },
       ...(mutation ? { body: JSON.stringify({ 0: input }) } : {}),
     },
   );

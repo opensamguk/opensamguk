@@ -136,7 +136,7 @@ describe('T1-20 / AC-M1-05 world.list 실제 HTTP·DB', () => {
     const logout = await app.inject({
       method: 'POST',
       url: '/trpc/auth.logout?batch=1',
-      headers: { cookie: `sid=${session.token}` },
+      headers: { origin: 'http://127.0.0.1:5173', cookie: `sid=${session.token}` },
       payload: {},
     });
     expect(logout.statusCode).toBe(200);

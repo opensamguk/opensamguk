@@ -52,7 +52,11 @@ async function query<R extends keyof Results>(
     `${base}/trpc/${route}?batch=1&input=${encodeURIComponent(JSON.stringify({ 0: input }))}`,
     {
       method,
-      headers: { ...(cookie ? { cookie } : {}), ...(method === 'POST' ? { 'content-type': 'application/json' } : {}) },
+      headers: {
+        origin: 'http://127.0.0.1:5173',
+        ...(cookie ? { cookie } : {}),
+        ...(method === 'POST' ? { 'content-type': 'application/json' } : {}),
+      },
       ...(method === 'POST' ? { body: JSON.stringify({ 0: input }) } : {}),
     },
   );
