@@ -7,10 +7,16 @@
 ## 1. 예턴 저장 (server)
 
 ```text
-요청(장수 ID는 세션에서) ─▶ 입력 검증 ─▶ 현재 turnRevision과 비교
+요청(장수 ID는 세션에서) ─▶ strict 입력·명령 인자 검증 ─▶ World 잠금 ─▶ 멱등 키 재검사 ─▶ General 잠금 ─▶ turnRevision 비교
    ├─ 다르면: 거부 + 최신 목록 반환 (AC-M1-08)
-   └─ 같으면: GeneralTurn 교체 + turnRevision 증가 (한 트랜잭션)
+   └─ 같으면: GeneralTurn 30칸 교체 + turnRevision 증가 + APPLIED InputEvent (한 트랜잭션)
 ```
+
+`turns.get`과 충돌 응답은 같은 revision의 30칸을 반환한다. 조회는 RepeatableRead 스냅샷을 쓴다. API 입력의 칸 번호는 0~29이며 0번이 다음 실행 칸이다. null 칸과 생략한 args는 각각 `rest`와 `{}`로 바꾼다. 저장은 registry의 general 명령과 파싱된 인자만 허용한다. 표시용 name은 받지 않으며 출력 때 registry에서 붙인다. 빠진 DB 칸은 휴식으로 읽는다.
+
+`turns.edit`의 put은 from..to 양끝을 포함해 덮어쓴다. shift 양수는 뒤로 밀고 음수는 앞으로 당기며 새 칸은 휴식으로 채운다. repeat는 편집 전 from..to 사본을 to+1부터 times번 복사하고 30칸 밖은 자른다. 편집도 `turns.set` 입력으로 최종 30칸만 기록한다. STALE·권한·형식 오류는 입력 기록과 revision을 바꾸지 않는다. 같은 revision 재전송은 STALE이므로 화면은 최신 목록으로 복구한다.
+
+구현은 `routers/turns.ts`, `game/slots.ts`와 `packages/shared/src/editArray.ts`다. 편집 유틸에는 명령 registry와 게임 규칙을 넣지 않는다. `commands.list`와 예턴 API는 장수 명령 27개만 다루며 국가 명령 10개는 입력에서도 거부한다. `turns.precheck`는 같은 DB 스냅샷의 소유 장수 nextTurnTick과 검증한 World.unitSet을 actor에 넘기고 등용 제안은 World.commandMeta에서 읽는다. 클라이언트 actor·target·unitSet은 받지 않는다. 순수 precheck만 호출하므로 상태를 바꾸지 않으며 저장 때 조건 경고가 나더라도 형식이 맞으면 저장하고 실행 때 엔진이 다시 검사한다.
 
 ## 2. 즉시 행동 (server → engine)
 
@@ -18,7 +24,15 @@
 요청 ─▶ InputEvent(멱등 키) 기록 ─▶ engine이 가져가 처리 ─▶ 결과·상태를 한 트랜잭션으로 저장
 ```
 
-<!-- TODO(M1): 같은 멱등 키로 다시 요청하면 처음 결과를 그대로 돌려준다 (core2026 api-input-event-replay 참고). -->
+`general.create`는 세션 사용자·월드로 접수한다. 서버가 `general.create:<UUID>` 키를 만들고 PENDING을 기록한다. 같은 actor·world의 PENDING이 있으면 정규화된 payload가 같을 때만 재사용하며 다른 payload는 CONFLICT다. 완료 뒤 재요청은 기존 장수가 있으므로 CONFLICT이며 `general.mine`으로 복구한다. REJECTED 뒤 재시도는 새 입력을 만든다. 첫 입력의 결과는 바꾸지 않는다.
+
+API와 엔진은 NFC·trim 뒤 코드포인트 1~6글자 이름(한글 음절·Han·ASCII 영문·숫자), 실제 World.statRules의 정수·범위·정확한 합계, null 또는 10001~11000 초상을 검사한다. 생성은 RUNNING만 받는다. 엔진은 계정 ACTIVE와 월드 상태도 다시 검사하고 NPC를 포함한 정규화된 이름 중복을 거부한다. 접수 뒤 제재·탈퇴는 ACTOR_INACTIVE로 거부한다. 오류는 정해진 code/message만 공개한다.
+
+엔진 `inputs.ts`가 리스→World 잠금 아래 id 순으로 한 건씩 처리한다. 순수 생성 규칙은 `packages/rules/src/general/create.ts`에 있다. `rngFor(seed, 'create', userId)`에서 cityKey 정렬 후보의 도시→affinity 1~150→턴 offset 0~9999 순서로 소비한다. ID는 잠금 아래 기존 최댓값+1이다. 초기 금·쌀은 1000, 재야·나이 20, 기본 병종이며 나머지 전투 수치는 0이다. nextTurnTick은 monthlyTick+offset에서 시작해 처리 tick보다 뒤가 될 때까지 월 간격을 더한다. 다중 월 지연도 같은 계산을 쓴다.
+
+General·휴식 30칸·완료 sequence·InitialGeneral 전체 결과를 같은 펜싱 트랜잭션으로 저장한다. API는 commit 뒤 최대 5초 조회하고 미완료면 pending을 반환한다. mine.creation으로 pending·rejected를 구분한다. 공개 장수는 명시적 projection이며 userId·affinity·내부 입력 키·sequence는 내보내지 않는다. 세션은 30일 수명을 유지하며 잔여 15일 이하일 때만 연장·Set-Cookie를 한다. 정상 동시 연장은 최신 상태를 다시 읽어 인증 실패와 구분한다.
+
+증거는 `tools/t1-11.integration.test.ts`의 실제 HTTP·PostgreSQL 권한·경합·원자성·SIGKILL·12개월 재생 시험으로 확인한다. 화면 AC는 T1-15에서 별도로 검증한다.
 
 ## 3. 턴 실행 (engine)
 
