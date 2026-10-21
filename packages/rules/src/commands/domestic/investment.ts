@@ -102,7 +102,7 @@ export function makeInvestment(spec: Spec): CommandDef {
           { kind: 'general', id: general.id, field: 'experience', op: 'add', value: Math.round(score * 0.7) },
           { kind: 'general', id: general.id, field: 'dedication', op: 'add', value: points },
         ],
-        logs: [{ kind: 'success', text: `${spec.name}: ${change}` }],
+        logs: [{ kind: 'success', text: `${spec.name}: ${spec.field === 'trust' ? change.toFixed(1) : change}` }],
       };
     },
   };

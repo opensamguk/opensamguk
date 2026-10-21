@@ -12,7 +12,7 @@ import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { exportReplay, replayArchive } from '../apps/engine/src/replay';
-import { CREATION_ERRORS } from '../packages/rules/src/index';
+import { CREATION_ERRORS, commands } from '../packages/rules/src/index';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -23,16 +23,20 @@ const users: string[] = [];
 const payload = { name: '새장수', leadership: 55, strength: 55, intel: 55, portraitId: 10001 };
 const empty = () => Array.from({ length: 30 }, () => null);
 const mutations = new Set(['general.create', 'turns.set', 'turns.edit']);
+let address: string;
 async function request(path: string, input: unknown, cookie?: string) {
   const mutation = mutations.has(path);
-  const res = await app.inject({
-    method: mutation ? 'POST' : 'GET',
-    url: `/trpc/${path}?batch=1${mutation ? '' : `&input=${encodeURIComponent(JSON.stringify({ 0: input }))}`}`,
-    headers: cookie ? { cookie } : {},
-    ...(mutation ? { payload: { 0: input } } : {}),
-  });
-  const body = res.json()[0];
-  return { data: body.result?.data, code: body.error?.data.code, message: body.error?.message, text: res.body };
+  const res = await fetch(
+    `${address}/trpc/${path}?batch=1${mutation ? '' : `&input=${encodeURIComponent(JSON.stringify({ 0: input }))}`}`,
+    {
+      method: mutation ? 'POST' : 'GET',
+      headers: { ...(cookie ? { cookie } : {}), ...(mutation ? { 'content-type': 'application/json' } : {}) },
+      ...(mutation ? { body: JSON.stringify({ 0: input }) } : {}),
+    },
+  );
+  const text = await res.text();
+  const body = JSON.parse(text)[0];
+  return { data: body.result?.data, code: body.error?.data.code, message: body.error?.message, text };
 }
 async function identity() {
   const user = await db.user.create({ data: { email: `${randomUUID()}@test.invalid`, passwordHash: 'test-only' } });
@@ -41,12 +45,13 @@ async function identity() {
   await db.session.create({ data: { id: session.id, userId: user.id, expiresAt: session.expiresAt } });
   return { id: user.id, cookie: `sid=${session.token}`, sessionId: session.id };
 }
-async function fixture(own = true) {
+async function fixture(own = true, configure?: (initial: Awaited<ReturnType<typeof monthlyFixture>>) => void) {
   const a = await identity();
   const b = await identity();
   const initial = await monthlyFixture();
   if (own) initial.generals[0]!.userId = a.id;
   initial.generals[1]!.userId = b.id;
+  configure?.(initial);
   const { worldId } = await saveInitialWorld(db, initial, { name: 'T1-11 시험', turnTermMinutes: 60 });
   worlds.push(worldId);
   await controlClock(db, worldId, 'start');
@@ -82,7 +87,7 @@ async function unchanged(worldId: string) {
   };
 }
 beforeAll(async () => {
-  await app.ready();
+  address = await app.listen({ host: '127.0.0.1', port: 0 });
 });
 afterAll(async () => {
   await app.close();
@@ -135,25 +140,50 @@ describe('T1-11 실제 HTTP·PostgreSQL 권한', () => {
       expect(mine.data.general).not.toHaveProperty(key);
     }
   });
-  it('기존 9개 명령과 사전 검사는 서버 소유 장수만 쓰고 actor·target·unitSet 삽입을 거부한다', async () => {
+  it('장수 27개만 공개하고 JSON 인자와 서버 소유 actor·target·unitSet 경계를 지킨다', async () => {
     const { a, worldId } = await fixture();
     const before = await unchanged(worldId);
     const list = (await request('commands.list', { worldId }, a.cookie)).data;
-    expect(list.map((d: { key: string }) => d.key).sort()).toEqual([
-      'commerce',
-      'defence',
-      'farm',
-      'goodwill',
-      'research',
-      'rest',
-      'security',
-      'settle',
-      'wall',
-    ]);
+    const args: Record<string, object> = {
+      farm: {},
+      commerce: {},
+      security: {},
+      settle: {},
+      goodwill: {},
+      defence: {},
+      wall: {},
+      research: {},
+      rest: {},
+      recruit: { amount: 10, crewType: 1 },
+      conscript: { amount: 10, crewType: 1 },
+      train: {},
+      morale: {},
+      attack: { cityKey: 2 },
+      move: { cityKey: 2 },
+      return: {},
+      dismiss: {},
+      join: { nationId: 2 },
+      join_random: {},
+      found: { name: '새나라', color: '#112233' },
+      uprising: { name: '새나라', color: '#112233' },
+      resign: {},
+      invite: { generalId: 2 },
+      accept_invite: {},
+      heal: {},
+      trade_rice: { amount: 1, buy: true },
+      donate: { resource: 'gold', amount: 1 },
+    };
+    expect(list).toHaveLength(27);
+    expect(list.map((d: { key: string }) => d.key).sort()).toEqual(Object.keys(args).sort());
     for (const command of list) {
-      expect(command.argsSchema).toMatchObject({ type: 'object', properties: {}, additionalProperties: false });
-      expect((await request('turns.precheck', { worldId, commandKey: command.key }, a.cookie)).code).toBeUndefined();
+      expect(command.argsSchema).toMatchObject({ type: 'object', additionalProperties: false });
+      expect(
+        (await request('turns.precheck', { worldId, commandKey: command.key, args: args[command.key] }, a.cookie)).code,
+      ).toBeUndefined();
     }
+    expect(list.find((d: { key: string }) => d.key === 'recruit').argsSchema).toMatchObject({
+      required: ['amount', 'crewType'],
+    });
     for (const extra of [{ actor: { generalId: 2 } }, { target: 'nation' }, { unitSet: {} }]) {
       expect((await request('turns.precheck', { worldId, commandKey: 'rest', ...extra }, a.cookie)).code).toBe(
         'BAD_REQUEST',
@@ -162,6 +192,62 @@ describe('T1-11 실제 HTTP·PostgreSQL 권한', () => {
         'BAD_REQUEST',
       );
       expect((await request('commands.list', { worldId, ...extra }, a.cookie)).code).toBe('BAD_REQUEST');
+    }
+    expect(await unchanged(worldId)).toEqual(before);
+  });
+  it('국가 10개는 올바른 인자라도 set·edit·precheck에서 거부하고 DB를 바꾸지 않는다', async () => {
+    const { a, worldId } = await fixture();
+    const before = await unchanged(worldId);
+    const national = commands.filter((d) => d.target === 'nation');
+    expect(national).toHaveLength(10);
+    const args: Record<string, object> = {
+      nation_rest: {},
+      nation_reward: { generalId: 1, resource: 'gold', amount: 1 },
+      nation_seize: { generalId: 1, resource: 'rice', amount: 1 },
+      nation_assign: { generalId: 1, cityKey: 3 },
+      nation_capital: { cityKey: 3 },
+      nation_declare: { nationId: 2 },
+      nation_peace: { nationId: 2 },
+      nation_pact: { nationId: 2 },
+      nation_break_pact: { nationId: 2 },
+      nation_aid: { nationId: 2, resource: 'gold', amount: 1 },
+    };
+    for (const def of national) {
+      const turn = { commandKey: def.key, args: args[def.key] };
+      expect(def.args.safeParse(turn.args).success).toBe(true);
+      for (const [path, extra] of [
+        ['turns.precheck', turn],
+        ['turns.set', { revision: 0, slots: [turn, ...empty().slice(1)] }],
+        ['turns.edit', { revision: 0, op: { put: { from: 0, to: 0, ...turn } } }],
+      ] as const)
+        expect((await request(path, { worldId, ...extra }, a.cookie)).code, `${path}/${def.key}`).toBe('BAD_REQUEST');
+    }
+    expect(await unchanged(worldId)).toEqual(before);
+  });
+  it('인자가 있는 명령도 set·edit·precheck에서 타입·누락·추가 JSON 필드를 엄격히 검사한다', async () => {
+    const { a, worldId } = await fixture();
+    const before = await unchanged(worldId);
+    for (const args of [
+      undefined,
+      {},
+      { amount: '10', crewType: 1 },
+      { amount: 0, crewType: 1 },
+      { amount: 1.5, crewType: 1 },
+      { amount: 10 },
+      { amount: 10, crewType: 1, extra: true },
+      ...[{ actor: { generalId: 2 } }, { target: 'nation' }, { unitSet: {} }].map((extra) => ({
+        amount: 10,
+        crewType: 1,
+        ...extra,
+      })),
+    ]) {
+      const turn = { commandKey: 'recruit', args };
+      for (const [path, extra] of [
+        ['turns.precheck', turn],
+        ['turns.set', { revision: 0, slots: [turn, ...empty().slice(1)] }],
+        ['turns.edit', { revision: 0, op: { put: { from: 0, to: 0, ...turn } } }],
+      ] as const)
+        expect((await request(path, { worldId, ...extra }, a.cookie)).code, path).toBe('BAD_REQUEST');
     }
     expect(await unchanged(worldId)).toEqual(before);
   });
@@ -455,6 +541,103 @@ describe('T1-11 생성 접수와 엔진', () => {
     const archive = await exportReplay(db, worldId);
     expect(replayArchive(archive, 12).map((m) => m.stateHash)).toEqual(archive.months.map((m) => m.stateHash));
     expect(await db.general.count({ where: { worldId, userId: a.id } })).toBe(1);
+  });
+});
+
+describe('T1-11 군사 명령 API·엔진 결합', () => {
+  it.each([
+    ['recruit', true],
+    ['recruit', false],
+    ['conscript', true],
+    ['conscript', false],
+    ['attack', true],
+    ['attack', false],
+  ] as const)(
+    '%s 사전 검사 성공=%s와 실제 실행·12개월 재생이 일치한다',
+    async (commandKey, accepted) => {
+      const { a, worldId, loop, lease, initial } = await fixture(true, (initial) => {
+        const unit = initial.unitSet.crewTypes.find((u) => u.armType > 0)!;
+        Object.assign(initial.generals[0]!, {
+          crewType: unit.id,
+          crew: commandKey === 'attack' && accepted ? 1000 : 0,
+          leadership: 80,
+          gold: accepted ? 100000 : 0,
+          rice: 10000,
+          train: 100,
+          atmos: 100,
+        });
+        initial.cities[1]!.wall = 0;
+        initial.diplomacies = [{ nationA: 1, nationB: 2, state: 'WAR', untilTick: null }];
+      });
+      const unit = initial.unitSet.crewTypes.find((u) => u.armType > 0)!;
+      const turn = { commandKey, args: commandKey === 'attack' ? { cityKey: 2 } : { amount: 10, crewType: unit.id } };
+      const before = await unchanged(worldId);
+      const preview = await request('turns.precheck', { worldId, ...turn }, a.cookie);
+      expect(preview.code).toBeUndefined();
+      expect(preview.data).toMatchObject(
+        accepted ? { ok: true } : { ok: false, code: commandKey === 'attack' ? 'NO_CREW' : 'NO_GOLD' },
+      );
+      expect(await unchanged(worldId)).toEqual(before);
+      expect(
+        (await request('turns.set', { worldId, revision: 0, slots: [turn, ...empty().slice(1)] }, a.cookie)).data,
+      ).toMatchObject({ ok: true, revision: 1 });
+      expect((await request('turns.get', { worldId }, a.cookie)).data.slots[0]).toMatchObject(turn);
+      await loop.advanceTo(100);
+      const log = await db.generalLog.findUniqueOrThrow({
+        where: { worldId_generalId_tick: { worldId, generalId: 1, tick: 100 } },
+      });
+      expect(log).toMatchObject({ commandKey, kind: accepted ? 'success' : 'failure' });
+      if (!accepted) expect(log.text).toContain(preview.data.code);
+      const general = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
+      const city = await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId, cityKey: 3 } } });
+      if (accepted && commandKey !== 'attack') {
+        expect(general.crew).toBe(10);
+        expect(general.crewType).toBe(unit.id);
+        expect(general.gold).toBe(100000 - Math.ceil(10 * unit.cost * (commandKey === 'conscript' ? 0.5 : 1)));
+        expect(city.population).toBe(990);
+      } else if (accepted) {
+        expect(general.cityKey).toBe(2);
+        expect(await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId, cityKey: 2 } } })).toMatchObject({
+          nationId: 1,
+        });
+      } else {
+        expect(general.crew).toBe(0);
+        expect(general.gold).toBe(0);
+        expect(city.population).toBe(1000);
+      }
+      for (let month = 1; month <= 12; month++) {
+        await renewLease(db, lease);
+        await loop.advanceTo(month * 10000);
+      }
+      const archive = await exportReplay(db, worldId);
+      expect(archive.inputs[0]).toMatchObject({
+        kind: 'turns.set',
+        status: 'APPLIED',
+        payload: { turns: [turn, ...Array.from({ length: 29 }, () => ({ commandKey: 'rest', args: {} }))] },
+      });
+      expect(archive.months).toHaveLength(12);
+      expect(replayArchive(archive, 12).map((m) => m.stateHash)).toEqual(archive.months.map((m) => m.stateHash));
+    },
+    60000,
+  );
+  it('저장된 월드 병종을 검증하고 기본 리소스로 대체하지 않는다', async () => {
+    const { a, worldId, initial } = await fixture(true, (initial) => {
+      initial.generals[0]!.crew = 0;
+      initial.generals[0]!.gold = 1000;
+      initial.unitSet.crewTypes.find((u) => u.armType > 0)!.cost = 200;
+    });
+    const crewType = initial.unitSet.crewTypes.find((u) => u.armType > 0)!.id;
+    expect(
+      (await request('turns.precheck', { worldId, commandKey: 'recruit', args: { crewType, amount: 10 } }, a.cookie))
+        .data,
+    ).toMatchObject({ ok: false, code: 'NO_GOLD' });
+    await db.world.update({ where: { id: worldId }, data: { unitSet: {} } });
+    const before = await unchanged(worldId);
+    expect(
+      (await request('turns.precheck', { worldId, commandKey: 'recruit', args: { crewType, amount: 10 } }, a.cookie))
+        .code,
+    ).toBe('INTERNAL_SERVER_ERROR');
+    expect(await unchanged(worldId)).toEqual(before);
   });
 });
 

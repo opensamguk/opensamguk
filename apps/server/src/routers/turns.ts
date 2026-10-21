@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { TRPCError } from '@trpc/server';
 import { nextActionSequence, type Prisma } from '@opensamguk/db';
-import { commandRegistry, type QueuedTurn } from '@opensamguk/rules';
+import { commandRegistry, unitSetSchema, type QueuedTurn } from '@opensamguk/rules';
 import { editArray, type ArrayEdit } from '@opensamguk/shared';
 import { z } from 'zod';
 import { router, protectedProcedure } from '../trpc';
@@ -106,11 +106,15 @@ export const turnsRouter = router({
     const turn = parseSlot(input);
     return ctx.db.$transaction(
       async (tx) => {
-        await requireWorld(tx, input.worldId);
+        const world = await requireWorld(tx, input.worldId);
         const actor = await requireGeneral(tx, input.worldId, ctx.user.id);
         const view = await readView(tx, input.worldId);
         const def = commandRegistry.get(turn.commandKey)!;
-        const failure = def.precheck(view, { generalId: actor.id }, turn.args as Record<string, never>);
+        const failure = def.precheck(
+          view,
+          { generalId: actor.id, tick: actor.nextTurnTick, unitSet: unitSetSchema.parse(world.unitSet) },
+          turn.args,
+        );
         return failure ? { ok: false as const, ...failure } : { ok: true as const };
       },
       { isolationLevel: 'RepeatableRead' },
