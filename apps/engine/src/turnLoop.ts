@@ -1,9 +1,18 @@
 import type { Prisma, PrismaClient } from '@opensamguk/db';
-import { applyEffects, checkpointClock, runCommand, TICKS_PER_MONTH, type WorldState } from '@opensamguk/rules';
+import { nextActionSequence } from '@opensamguk/db';
+import {
+  applyEffects,
+  checkpointClock,
+  monthlyDate,
+  runCommand,
+  TICKS_PER_MONTH,
+  type WorldState,
+} from '@opensamguk/rules';
 import { rngFor } from '@opensamguk/shared';
 import { assertLease, databaseNow, lockLease, type Lease } from './lease';
 import { loadWorld } from './worldLoader';
 import { persistEffects, shiftTurns } from './persist';
+import { persistMonthly } from './monthly';
 
 export const CLOCK_CHECKPOINT_MS = 5_000;
 type TurnHooks = { beforeCommit?: (tx: Prisma.TransactionClient) => Promise<void>; elapsedNow?: () => number };
@@ -55,8 +64,8 @@ export class TurnLoop {
         if (result.state) this.committedState = result.state;
         this.highWaterTick = Math.max(this.highWaterTick, result.tick);
         if (result.checkpointed) this.nextCheckpointAt = this.elapsedNow() + CLOCK_CHECKPOINT_MS;
-        if (!result.execution) break;
-        executions.push(result.execution);
+        if (result.execution) executions.push(result.execution);
+        if (!result.progressed) break;
       }
       return executions;
     } finally {
@@ -66,79 +75,90 @@ export class TurnLoop {
 
   private async step(target: number | undefined, signal?: AbortSignal) {
     const { worldId } = this.lease;
-    return this.db.$transaction(async (tx) => {
-      await lockLease(tx, this.lease);
-      // 일시정지·재개와 턴 commit이 같은 월드 행에서 직렬화된다.
-      await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${worldId} FOR UPDATE`;
-      const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
-      if (world.status !== 'RUNNING') {
-        return { tick: world.clockTick, state: null, execution: null, checkpointed: false };
-      }
-      const now = (await databaseNow(tx)).getTime();
-      const clock = { ...world, clockAnchorAt: world.clockAnchorAt?.getTime() ?? null };
-      const checkpoint = checkpointClock(clock, now, this.highWaterTick);
-      const tick = target ?? checkpoint.clockTick;
-      if (tick < world.clockTick) throw new Error('이미 저장된 시계보다 뒤로 진행할 수 없습니다.');
-      if (tick > 2_147_483_647 - TICKS_PER_MONTH) throw new Error('게임 tick 저장 범위를 넘었습니다.');
-      const due = await tx.general.findFirst({
-        where: { worldId, nextTurnTick: { lte: tick } },
-        orderBy: [{ nextTurnTick: 'asc' }, { id: 'asc' }],
-      });
-      const checkpointed = due !== null || target !== undefined || this.elapsedNow() >= this.nextCheckpointAt;
-      if (!checkpointed) return { tick, state: null, execution: null, checkpointed: false };
-      let execution: TurnExecution | null = null;
-      let next: WorldState | null = null;
-      if (due) {
-        await tx.$queryRaw`SELECT id FROM "General" WHERE "worldId" = ${worldId} AND id = ${due.id} FOR UPDATE`;
-        // 예턴 편집은 actor 행 잠금 또는 turnRevision 조건을 함께 사용해야 한다.
-        const state = await loadWorld(tx, worldId);
-        const actor = await tx.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: due.id } } });
-        const command = await tx.generalTurn.findUnique({
-          where: { worldId_generalId_slot: { worldId, generalId: due.id, slot: 0 } },
+    return this.db.$transaction(
+      async (tx) => {
+        await lockLease(tx, this.lease);
+        // 일시정지·재개와 턴 commit이 같은 월드 행에서 직렬화된다.
+        await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${worldId} FOR UPDATE`;
+        const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
+        if (world.status !== 'RUNNING') {
+          return { tick: world.clockTick, state: null, execution: null, checkpointed: false, progressed: false };
+        }
+        const now = (await databaseNow(tx)).getTime();
+        const clock = { ...world, clockAnchorAt: world.clockAnchorAt?.getTime() ?? null };
+        const checkpoint = checkpointClock(clock, now, this.highWaterTick);
+        const tick = target ?? checkpoint.clockTick;
+        if (tick < world.clockTick) throw new Error('이미 저장된 시계보다 뒤로 진행할 수 없습니다.');
+        if (tick > 2_147_483_647 - TICKS_PER_MONTH) throw new Error('게임 tick 저장 범위를 넘었습니다.');
+        const boundary = world.monthlyTick + TICKS_PER_MONTH;
+        const year = monthlyDate(world.startYear, boundary).year;
+        const due = await tx.general.findFirst({
+          where: { worldId, nextTurnTick: { lte: tick }, activeFromYear: { lte: year } },
+          orderBy: [{ nextTurnTick: 'asc' }, { id: 'asc' }],
         });
-        const commandKey = command?.commandKey ?? 'rest';
-        const result = runCommand(
-          state,
-          { generalId: due.id },
-          commandKey,
-          command?.args ?? {},
-          rngFor(world.seed, 'turn', due.nextTurnTick, due.id),
-        );
-        const failed = 'code' in result;
-        const effects = failed ? [] : result.effects;
-        next = applyEffects(state, effects);
-        next.generals[due.id]!.nextTurnTick = due.nextTurnTick + TICKS_PER_MONTH;
-        await persistEffects(tx, worldId, next, effects);
-        await tx.generalLog.create({
-          data: {
-            worldId,
-            generalId: due.id,
-            tick: due.nextTurnTick,
+        const monthly = boundary <= tick && (!due || due.nextTurnTick >= boundary);
+        const progressed = monthly || due !== null;
+        const checkpointed = progressed || target !== undefined || this.elapsedNow() >= this.nextCheckpointAt;
+        if (!checkpointed) return { tick, state: null, execution: null, checkpointed: false, progressed: false };
+        let execution: TurnExecution | null = null;
+        let next: WorldState | null = null;
+        if (monthly) {
+          const sequence = await nextActionSequence(tx, worldId);
+          next = await persistMonthly(tx, worldId, world.seed, boundary, sequence);
+        } else if (due) {
+          await nextActionSequence(tx, worldId);
+          await tx.$queryRaw`SELECT id FROM "General" WHERE "worldId" = ${worldId} AND id = ${due.id} FOR UPDATE`;
+          // 예턴 편집은 actor 행 잠금 또는 turnRevision 조건을 함께 사용해야 한다.
+          const state = await loadWorld(tx, worldId);
+          const actor = await tx.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: due.id } } });
+          const command = await tx.generalTurn.findUnique({
+            where: { worldId_generalId_slot: { worldId, generalId: due.id, slot: 0 } },
+          });
+          const commandKey = command?.commandKey ?? 'rest';
+          const result = runCommand(
+            state,
+            { generalId: due.id },
             commandKey,
-            kind: failed ? 'failure' : 'success',
-            text: failed ? `${result.code}: ${result.message}` : result.logs.map((log) => log.text).join('\n'),
+            command?.args ?? {},
+            rngFor(world.seed, 'turn', due.nextTurnTick, due.id),
+          );
+          const failed = 'code' in result;
+          const effects = failed ? [] : result.effects;
+          next = applyEffects(state, effects);
+          next.generals[due.id]!.nextTurnTick = due.nextTurnTick + TICKS_PER_MONTH;
+          await persistEffects(tx, worldId, next, effects);
+          await tx.generalLog.create({
+            data: {
+              worldId,
+              generalId: due.id,
+              tick: due.nextTurnTick,
+              commandKey,
+              kind: failed ? 'failure' : 'success',
+              text: failed ? `${result.code}: ${result.message}` : result.logs.map((log) => log.text).join('\n'),
+            },
+          });
+          await shiftTurns(tx, worldId, due.id);
+          const updated = await tx.general.updateMany({
+            where: { worldId, id: due.id, nextTurnTick: due.nextTurnTick, turnRevision: actor.turnRevision },
+            data: { nextTurnTick: due.nextTurnTick + TICKS_PER_MONTH, turnRevision: { increment: 1 } },
+          });
+          if (updated.count !== 1) throw new Error('예턴이 변경되어 턴 저장을 취소했습니다.');
+          execution = { generalId: due.id, tick: due.nextTurnTick, commandKey };
+        }
+        await tx.world.update({
+          where: { id: worldId },
+          data: {
+            clockTick: tick,
+            clockAnchorAt: new Date(target === undefined ? checkpoint.clockAnchorAt! : now),
+            clockRevision: { increment: 1 },
           },
         });
-        await shiftTurns(tx, worldId, due.id);
-        const updated = await tx.general.updateMany({
-          where: { worldId, id: due.id, nextTurnTick: due.nextTurnTick, turnRevision: actor.turnRevision },
-          data: { nextTurnTick: due.nextTurnTick + TICKS_PER_MONTH, turnRevision: { increment: 1 } },
-        });
-        if (updated.count !== 1) throw new Error('예턴이 변경되어 턴 저장을 취소했습니다.');
-        execution = { generalId: due.id, tick: due.nextTurnTick, commandKey };
-      }
-      await tx.world.update({
-        where: { id: worldId },
-        data: {
-          clockTick: tick,
-          clockAnchorAt: new Date(target === undefined ? checkpoint.clockAnchorAt! : now),
-          clockRevision: { increment: 1 },
-        },
-      });
-      if (execution) await this.hooks.beforeCommit?.(tx);
-      signal?.throwIfAborted();
-      await assertLease(tx, this.lease);
-      return { tick, state: next, execution, checkpointed };
-    });
+        if (progressed) await this.hooks.beforeCommit?.(tx);
+        signal?.throwIfAborted();
+        await assertLease(tx, this.lease);
+        return { tick, state: next, execution, checkpointed, progressed };
+      },
+      { timeout: 30_000 },
+    );
   }
 }
