@@ -9,13 +9,13 @@ export function newSession(now: number) {
   const token = randomBytes(32).toString('base64url');
   return { token, id: hashToken(token), expiresAt: new Date(now + SESSION_SECONDS * 1000) };
 }
-export async function authenticate(db: PrismaClient, token: string | undefined, now: number) {
+export async function authenticate(db: PrismaClient, token: string | undefined, now: number, renew = true) {
   if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
   const id = hashToken(token);
   const session = await db.session.findUnique({ where: { id }, include: { user: true } });
   if (!session || session.expiresAt.getTime() <= now || session.user.status !== 'ACTIVE') return null;
   const identity = { sessionId: id, user: { id: session.user.id, email: session.user.email } };
-  if (session.expiresAt.getTime() - now > SESSION_RENEW_MS) return { ...identity, renewed: false };
+  if (!renew || session.expiresAt.getTime() - now > SESSION_RENEW_MS) return { ...identity, renewed: false };
   const updated = await db.session.updateMany({
     where: { id, expiresAt: { gt: new Date(now), lte: new Date(now + SESSION_RENEW_MS) }, user: { status: 'ACTIVE' } },
     data: { expiresAt: new Date(now + SESSION_SECONDS * 1000) },
