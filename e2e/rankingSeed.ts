@@ -53,6 +53,8 @@ async function settled(emails: string[]) {
   if (!lease) throw new Error('엔진 리스를 얻지 못했습니다.');
   try {
     await controlClock(db, worldId, 'start');
+    // [PROBE] 진단 전용: RUNNING 창을 넓혀 dev 엔진 폴링(1초)이 반드시 이 월드를 보게 한다.
+    await new Promise((resolve) => setTimeout(resolve, 5_000));
     const loop = new TurnLoop(db, lease);
     await loop.advanceTo(TICKS_PER_MONTH);
     // 정산 뒤에 생긴 장수. 장수 생성 API가 넣는 입력과 같은 모양을 넣고 엔진이 처리한다.
