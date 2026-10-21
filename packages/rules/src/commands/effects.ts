@@ -4,13 +4,18 @@ import type { WorldState } from '../model/world';
 type Change<K extends string, F extends string> = { kind: K; id: number; field: F; op: 'add' | 'set'; value: number };
 export type CityField = 'population' | 'agriculture' | 'commerce' | 'security' | 'defence' | 'wall' | 'trust';
 export type Effect =
+  | { kind: 'world'; state: WorldState }
   | Change<'city', CityField>
   | Change<'nation', 'gold' | 'rice' | 'tech'>
   | Change<'general', 'gold' | 'rice' | 'crew' | 'train' | 'atmos' | 'experience' | 'dedication' | 'injury'>;
 
 export function applyEffects(state: WorldState, effects: readonly Effect[]): WorldState {
-  const next = structuredClone(state);
+  let next = structuredClone(state);
   for (const effect of effects) {
+    if (effect.kind === 'world') {
+      next = structuredClone(effect.state);
+      continue;
+    }
     if (!Number.isFinite(effect.value)) throw new Error('효과 값은 유한한 수여야 합니다.');
     const entity =
       effect.kind === 'city'

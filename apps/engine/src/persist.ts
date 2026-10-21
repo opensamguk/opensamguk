@@ -1,5 +1,6 @@
 import type { Prisma } from '@opensamguk/db';
 import type { Effect, WorldState } from '@opensamguk/rules';
+import { persistCommandState } from './commandPersistence';
 
 export async function persistEffects(
   tx: Prisma.TransactionClient,
@@ -8,8 +9,14 @@ export async function persistEffects(
   effects: readonly Effect[],
 ) {
   // 규칙에서 보정한 최종값만 저장한다. 같은 필드의 효과가 여럿이어도 한 번 쓴다.
-  const changes = new Map<string, Effect>();
-  for (const effect of effects) changes.set(`${effect.kind}:${effect.id}:${effect.field}`, effect);
+  if (effects.some((effect) => effect.kind === 'world')) {
+    await persistCommandState(tx, worldId, state);
+    return;
+  }
+  const changes = new Map<string, Exclude<Effect, { kind: 'world' }>>();
+  for (const effect of effects) {
+    if (effect.kind !== 'world') changes.set(`${effect.kind}:${effect.id}:${effect.field}`, effect);
+  }
   for (const effect of changes.values()) {
     if (effect.kind === 'city') {
       await tx.city.update({

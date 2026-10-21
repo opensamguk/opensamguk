@@ -14,7 +14,8 @@ function fixture() {
   return { state, general, actor: { generalId: general.id }, city: state.cities[general.cityKey]! };
 }
 describe('AC-M1-14 T1-05 명령 9종', () => {
-  for (const command of commands) {
+  for (const key of ['farm', 'commerce', 'security', 'settle', 'goodwill', 'defence', 'wall', 'research', 'rest']) {
+    const command = commands.find((command) => command.key === key)!;
     it(`${command.key}: 성공과 효과 적용`, () => {
       const { state, general, actor } = fixture();
       const before = structuredClone(state);
