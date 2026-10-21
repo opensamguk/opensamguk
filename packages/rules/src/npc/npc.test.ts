@@ -72,6 +72,16 @@ describe('AC-M1-17 NPC 판단', () => {
     world.nations[1]!.isNpc = false;
     expect(chooseNationTurn(world, world.generals[1]!, rngFor('npc'), context).chosen).toBeNull();
   });
+  it('더 연결된 도시가 있을 때만 고립된 수도를 옮긴다', () => {
+    const world = commandWorld();
+    expect(
+      chooseNationTurn(world, world.generals[1]!, rngFor('npc'), context).candidates.some(
+        (c) => c.key === 'nation_capital',
+      ),
+    ).toBe(false);
+    world.cities[3]!.nationId = 1;
+    expect(chooseNationTurn(world, world.generals[1]!, rngFor('npc'), context).chosen?.key).toBe('nation_capital');
+  });
   it('국가 포상 뒤 장수 명령을 다시 판단하고 수렴 보조는 출병 점수만 바꾼다', () => {
     const world = commandWorld();
     world.generals[1]!.gold = 0;

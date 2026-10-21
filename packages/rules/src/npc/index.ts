@@ -148,13 +148,16 @@ export function chooseNationTurn(view: WorldView, ruler: General, rng: Rng, cont
     !capital?.supplied ||
     (cities.length > 1 && !capital.connections.some((key) => view.cities[key]?.nationId === nation.id))
   ) {
-    for (const city of cities)
-      choice.add(
-        'nation_capital',
-        { cityKey: city.cityKey },
-        200 + city.connections.filter((key) => view.cities[key]?.nationId === nation.id).length,
-        '고립된 수도를 연결된 자기 도시로 옮긴다.',
-      );
+    for (const city of cities) {
+      const connections = city.connections.filter((key) => view.cities[key]?.nationId === nation.id).length;
+      if (connections > 0 || !capital?.supplied)
+        choice.add(
+          'nation_capital',
+          { cityKey: city.cityKey },
+          200 + connections,
+          '고립된 수도를 연결된 자기 도시로 옮긴다.',
+        );
+    }
   }
   const fighting = view.diplomacies.some(
     (d) => (d.nationA === nation.id || d.nationB === nation.id) && (d.state === 'WAR' || d.state === 'DECLARED'),
