@@ -126,8 +126,7 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
     { key: 'nation_aid', name: '원조', relation: 'neutral' },
   ] as const)('$name 국가 역사는 양국에 한 번만 남긴다', async ({ key, name, relation }) => {
     const initial = await warFixture();
-    initial.diplomacies =
-      relation === 'neutral' ? [] : [{ nationA: 1, nationB: 2, state: relation, untilTick: 10000 }];
+    initial.diplomacies = relation === 'neutral' ? [] : [{ nationA: 1, nationB: 2, state: relation, untilTick: 10000 }];
     initial.nationTurns![1]![0] = {
       commandKey: key,
       args: key === 'nation_aid' ? { nationId: 2, resource: 'gold', amount: 10 } : { nationId: 2 },
@@ -205,9 +204,7 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
         where: { worldId_tick_nationId: { worldId, tick: 100, nationId: 2 } },
       });
       const events = (history.data as { events: string[] }).events;
-      expect(events.filter((event) => event.includes('천도'))).toEqual([
-        `${initial.nations[1]!.name} 수도 함락, 도시3 천도`,
-      ]);
+      expect(events.filter((event) => event.includes('천도'))).toEqual([`${initial.nations[1]!.name} 수도 함락, 도시3 천도`]);
       await loop.advanceTo(200);
       expect(
         await db.generalLog.findUniqueOrThrow({
