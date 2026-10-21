@@ -29,7 +29,7 @@ try {
   await page.goto('http://127.0.0.1:5173/login');
   await expect(page.getByRole('heading', { name: '로그인', exact: true })).toBeVisible();
   await expect(page.getByRole('status')).toHaveText('서버 정상 · DB 정상');
-  await page.evaluate(() => document.fonts.ready);
+  await page.evaluate('document.fonts.ready');
   await page.screenshot({ path: `${out}/01-login-real-server.png`, fullPage: true });
   manifest.screenshots.push({
     file: '01-login-real-server.png',
@@ -49,8 +49,12 @@ try {
   manifest.realWorldList = 'PASS';
   await page.goto(`http://127.0.0.1:5173/w/${world.worldId}`);
   await expect(page.getByRole('heading', { name: '메인', exact: true })).toBeVisible();
-  await expect(page.getByText('T1-16에서 연결합니다')).toHaveCount(5);
-  await page.evaluate(() => document.fonts.ready);
+  for (const panel of ['내 장수', '현재 도시', '소속 국가', '예턴 앞 5칸', '최근 기록']) {
+    await expect(
+      page.getByRole('region', { name: panel, exact: true }).getByText('T1-16에서 연결합니다', { exact: true }),
+    ).toBeVisible();
+  }
+  await page.evaluate('document.fonts.ready');
   await page.screenshot({ path: `${out}/02-main-unconnected-panels.png`, fullPage: true });
   manifest.screenshots.push({
     file: '02-main-unconnected-panels.png',
