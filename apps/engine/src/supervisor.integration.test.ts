@@ -8,7 +8,7 @@ import { hashState } from '@opensamguk/shared/node';
 import { acquireLease, LeaseLostError, releaseLease } from './lease';
 import { HEARTBEAT_MS, writeHeartbeat } from './main';
 import { exportReplay, replayArchive } from './replay';
-import { CRASH_MESSAGE, type SupervisorEvent } from './supervisor';
+import { CRASH_MESSAGE, runSupervisor, type SupervisorEvent } from './supervisor';
 import { controlClock } from './world/clock';
 import { saveInitialWorld } from './world/persistence';
 import { loadInitialWorld } from './world/resources';
@@ -186,9 +186,11 @@ describe('AC-M2-01 실제 PostgreSQL·감독·자식 프로세스', () => {
 
   it('종료·삭제 월드를 10초 발견 주기에서 내리고 SIGTERM으로 자기 자식만 정리한다', async () => {
     const a = await create();
-    const b = await create(true);
     const managed = supervisor();
-    await Promise.all([ready(a), ready(b)]);
+    await ready(a);
+    const b = await create(true);
+    await db.world.update({ where: { id: b }, data: { status: 'PAUSED' } });
+    await ready(b);
     await db.world.update({ where: { id: a }, data: { status: 'ENDED' } });
     await db.world.delete({ where: { id: b } });
     await until(() => managed.events.filter((event) => event.kind === 'removed').length === 2);
@@ -197,7 +199,7 @@ describe('AC-M2-01 실제 PostgreSQL·감독·자식 프로세스', () => {
       expect(alive(event.pid!)).toBe(false);
     await stop(managed.child);
     console.log('T2-01: ENDED/deleted removal, cascading heartbeat, SIGTERM cleanup PASS');
-  });
+  }, 45_000);
 
   it('감독 둘의 중복 자식도 한 리스만 쓰고 소유 감독 종료 뒤 낡은 토큰을 거부한다', async () => {
     const a = await create();
@@ -260,5 +262,41 @@ describe('AC-M2-01 실제 PostgreSQL·감독·자식 프로세스', () => {
       db.engineHeartbeat.create({ data: { worldId: 'nonexistent-test-world', at: new Date(), lastTick: 0, lagMs: 0 } }),
     ).rejects.toThrow();
     await releaseLease(db, lease!);
+  });
+
+  it('SIGTERM을 무시한 자기 자식은 5초 뒤 죽이고 무관한 프로세스는 남긴다', async () => {
+    await create();
+    const controller = new AbortController();
+    const children: ChildProcess[] = [];
+    const unrelated = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
+    let childReady = false;
+    const running = runSupervisor(db, {
+      signal: controller.signal,
+      spawnChild: () => {
+        const child = spawn(
+          process.execPath,
+          ['-e', 'process.on("SIGTERM", () => {}); process.send("ready"); setInterval(() => {}, 1000)'],
+          { stdio: ['ignore', 'ignore', 'ignore', 'ipc'] },
+        );
+        children.push(child);
+        child.on('message', () => {
+          childReady = true;
+        });
+        return child;
+      },
+    });
+    try {
+      await until(() => childReady);
+      const started = performance.now();
+      controller.abort();
+      await running;
+      expect(performance.now() - started).toBeGreaterThanOrEqual(4900);
+      expect(children[0]!.signalCode).toBe('SIGKILL');
+      expect(alive(unrelated.pid!)).toBe(true);
+    } finally {
+      controller.abort();
+      await running;
+      await stop(unrelated, 'SIGKILL');
+    }
   });
 });
