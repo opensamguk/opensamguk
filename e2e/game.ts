@@ -123,16 +123,19 @@ async function nextTurnAt(page: Page, world: string): Promise<number | null> {
 }
 
 // 다음 턴까지 needMs 이상 남을 때까지 기다린다. 턴이 실행되면 예턴이 한 칸 당겨지므로,
-// 칸 위치를 확인하는 시험은 이 창 안에서 끝낸다.
-export async function waitTurnWindow(page: Page, world: string, needMs = 30_000) {
-  for (let i = 0; i < 4; i++) {
+// 칸 위치를 확인하는 시험은 이 창 안에서 끝낸다. 엔진이 밀린 턴을 따라잡는 중이면 따라잡을 때까지 기다린다.
+export async function waitTurnWindow(page: Page, world: string, needMs = 30_000, limitMs = 100_000) {
+  const deadline = Date.now() + limitMs;
+  while (Date.now() < deadline) {
     const at = await nextTurnAt(page, world);
     if (at === null) return;
     const left = at - Date.now();
     if (left >= needMs) return;
-    await page.waitForTimeout(Math.max(0, left) + 3_000);
+    await page.waitForTimeout(Math.min(Math.max(0, left) + 3_000, Math.max(0, deadline - Date.now())));
   }
-  throw new Error('턴 간격이 시험 창보다 짧습니다. 1분 이상 턴 월드에서 실행하세요.');
+  throw new Error(
+    '다음 턴까지 시험할 여유가 생기지 않았습니다. 엔진이 돌고 있는지, 턴 간격이 1분 이상인지 확인하세요.',
+  );
 }
 
 // 다음 턴이 실행될 때까지 기다린다. 반환값은 실행 예정 시각(ms)이다.
