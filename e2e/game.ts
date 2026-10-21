@@ -1,10 +1,14 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { setTimeout as delay } from 'node:timers/promises';
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
+import type { Lease } from '../apps/engine/src/lease';
+import type { PrismaClient } from '../packages/db/src/index';
 
 // 실제 서버·DB·엔진으로 게임 화면을 시험하는 도우미 (T1-15).
-// pnpm dev의 엔진은 RUNNING 월드 중 가장 먼저 만든 것 하나만 돌린다. world.list도 같은 순서라 그 첫 월드를 쓴다.
-// 없으면 1분 턴 월드를 만들고 시작한다. 1분 턴이라 시험 중에도 장수 턴이 실행된다 (waitTurnWindow 참고).
+// pnpm dev의 엔진 감독은 10초마다 RUNNING·PAUSED 월드를 모두 찾아 월드마다 엔진을 하나씩 띄운다 (T2-01).
+// world.list는 RUNNING 월드를 만든 순서로 주므로 그 첫 월드를 쓴다. 없으면 1분 턴 월드를 만들고 시작한다.
+// 1분 턴이라 시험 중에도 장수 턴이 실행된다 (waitTurnWindow 참고).
 
 if (!process.env.DATABASE_URL && existsSync('.env')) process.loadEnvFile('.env');
 
@@ -36,72 +40,171 @@ export async function mutate<T = Json>(page: Page, path: string, input: unknown)
   return (await unwrap(await page.request.post(`/trpc/${path}`, { data: input }), path)) as T;
 }
 
+function databaseUrl(): string {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error('DATABASE_URL이 필요합니다.');
+  return url;
+}
+
+// PREOPEN 월드를 만든다. 감독은 world:start로 RUNNING이 된 뒤에야 이 월드를 찾는다.
+function createWorld(seed: string, name: string): string {
+  const created = run([
+    'world:create',
+    '--scenario',
+    '1030',
+    '--map',
+    'che',
+    '--seed',
+    seed,
+    '--turn-term',
+    '1',
+    '--name',
+    name,
+  ]);
+  return (JSON.parse(created.trim().split('\n').at(-1)!) as { worldId: string }).worldId;
+}
+
 let worldId: string | undefined;
 
 export async function e2eWorld(page: Page): Promise<string> {
   if (worldId) return worldId;
   const { worlds } = await query<{ worlds: Array<{ id: string }> }>(page, 'world.list');
-  if (worlds[0]) return (worldId = worlds[0].id);
-  const created = run([
-    'world:create',
-    '--scenario',
-    '1030',
-    '--map',
-    'che',
-    '--seed',
-    `e2e-${Date.now()}`,
-    '--turn-term',
-    '1',
-    '--name',
-    'E2E 월드',
-  ]);
-  const id = (JSON.parse(created.trim().split('\n').at(-1)!) as { worldId: string }).worldId;
-  run(['world:start', '--world', id]);
+  let id = worlds[0]?.id;
+  if (!id) {
+    id = createWorld(`e2e-${Date.now()}`, 'E2E 월드');
+    run(['world:start', '--world', id]);
+  }
+  await waitEngineReady(id);
   return (worldId = id);
 }
 
-let idleWorldId: string | undefined;
-
-// pnpm dev의 엔진이 돌리지 않는 두 번째 월드. 생성 요청이 엔진 처리 전까지 pending으로 남는 경우를 만든다.
-// 이 월드의 입력은 시험이 startEngine으로 기존 엔진을 직접 켤 때만 처리된다.
-export async function idleWorld(page: Page): Promise<string> {
-  // dev 엔진이 먼저 만든 월드에 묶인 뒤에 만든다. 엔진은 가장 먼저 만든 RUNNING 월드 하나만 고른다.
-  await e2eWorld(page);
-  if (idleWorldId) return idleWorldId;
-  const created = run([
-    'world:create',
-    '--scenario',
-    '1030',
-    '--map',
-    'che',
-    '--seed',
-    `e2e-idle-${Date.now()}`,
-    '--turn-term',
-    '1',
-    '--name',
-    'E2E 대기 월드',
-  ]);
-  const id = (JSON.parse(created.trim().split('\n').at(-1)!) as { worldId: string }).worldId;
-  run(['world:start', '--world', id]);
-  return (idleWorldId = id);
+// 감독이 이 월드의 엔진을 띄워 실행권을 잡으면 엔진이 곧바로 heartbeat를 쓰고 30초마다 고친다.
+// 시간을 정해 두고 기다리지 않고, 이 월드의 heartbeat가 최근 것이고 오류가 없을 때 시험을 시작한다.
+async function waitEngineReady(world: string) {
+  const { createDb } = await import('../packages/db/src/index');
+  const { HEARTBEAT_MS } = await import('../apps/engine/src/main');
+  const db = createDb(databaseUrl());
+  try {
+    await expect
+      .poll(
+        async () => {
+          const rows = await db.$queryRaw<Array<{ ready: boolean }>>`
+            SELECT "lastError" IS NULL AND "at" > clock_timestamp() - ${HEARTBEAT_MS * 2} * interval '1 millisecond' AS ready
+            FROM "EngineHeartbeat" WHERE "worldId" = ${world}`;
+          return rows[0]?.ready ?? false;
+        },
+        {
+          message: '엔진 감독이 시험 월드의 엔진을 띄우지 않았습니다. pnpm dev의 엔진 로그를 확인하세요.',
+          timeout: 90_000,
+          intervals: [500, 1_000],
+        },
+      )
+      .toBe(true);
+  } finally {
+    await db.$disconnect();
+  }
 }
 
-// 기존 엔진(apps/engine의 runEngine)을 이 월드에만 켠다. 돌려받은 함수를 부르면 실행권을 놓고 멈춘다.
-export async function startEngine(world: string): Promise<() => Promise<void>> {
+interface LeaseHold {
+  db: PrismaClient;
+  lease: Lease;
+  done: AbortController;
+  renewal: Promise<void>;
+  lost?: unknown;
+}
+
+let idle: { id: string; hold: LeaseHold } | undefined;
+
+// 감독이 띄운 엔진이 처리하지 못하는 RUNNING 월드. 생성 요청이 엔진 처리 전까지 pending으로 남는 경우를 만든다.
+// 서버와 엔진은 RUNNING 월드에서만 장수를 만들어 PREOPEN 월드로는 이 경우를 만들 수 없다.
+// 그래서 시험이 이 월드의 실제 실행권(EngineLease)을 시작 전에 잡고 계속 갱신한다. 감독이 띄운 엔진은
+// 실행권을 얻지 못해 기다리고, 입력은 시험이 startEngine으로 같은 실행권을 써서 턴 루프를 돌릴 때만 처리된다.
+export async function idleWorld(page: Page): Promise<string> {
+  await e2eWorld(page);
+  if (idle) return idle.id;
+  const id = createWorld(`e2e-idle-${Date.now()}`, 'E2E 대기 월드');
+  const hold = await holdLease(id);
+  try {
+    run(['world:start', '--world', id]);
+  } catch (error) {
+    await releaseHold(hold);
+    throw error;
+  }
+  idle = { id, hold };
+  return id;
+}
+
+async function holdLease(world: string): Promise<LeaseHold> {
   const { createDb } = await import('../packages/db/src/index');
-  const { runEngine } = await import('../apps/engine/src/main');
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error('DATABASE_URL이 필요합니다.');
-  const db = createDb(url);
+  const { acquireLease, renewLease, LEASE_TTL_MS } = await import('../apps/engine/src/lease');
+  const db = createDb(databaseUrl());
+  const lease = await acquireLease(db, world).catch(async (error: unknown) => {
+    await db.$disconnect();
+    throw error;
+  });
+  if (!lease) {
+    await db.$disconnect();
+    throw new Error('대기 월드의 엔진 실행권을 잡지 못했습니다.');
+  }
+  const done = new AbortController();
+  const hold: LeaseHold = { db, lease, done, renewal: Promise.resolve() };
+  hold.renewal = (async () => {
+    while (!done.signal.aborted) {
+      try {
+        await delay(LEASE_TTL_MS / 3, undefined, { signal: done.signal });
+        await renewLease(db, lease);
+      } catch (error) {
+        if (!done.signal.aborted) hold.lost = error;
+        return;
+      }
+    }
+  })();
+  return hold;
+}
+
+async function releaseHold(hold: LeaseHold) {
+  const { releaseLease } = await import('../apps/engine/src/lease');
+  hold.done.abort();
+  await hold.renewal;
+  try {
+    await releaseLease(hold.db, hold.lease);
+  } finally {
+    await hold.db.$disconnect();
+  }
+}
+
+// 대기 월드의 실행권을 놓는다. 그 뒤로는 감독이 띄운 엔진이 이 월드를 돌린다.
+export async function releaseIdleWorld() {
+  if (!idle) return;
+  const { hold } = idle;
+  idle = undefined;
+  await releaseHold(hold);
+}
+
+// 시험이 쥔 대기 월드의 실행권으로 기존 엔진의 턴 루프(runEngine이 돌리는 TurnLoop)를 돌린다.
+// 돌려받은 함수를 부르면 루프만 멈추고 실행권은 계속 쥔다. 그래서 다시 보낸 생성 요청도 pending으로 남는다.
+export async function startEngine(world: string): Promise<() => Promise<void>> {
+  if (idle?.id !== world) throw new Error('startEngine은 idleWorld로 만든 월드에만 씁니다.');
+  const { hold } = idle;
+  const { TurnLoop } = await import('../apps/engine/src/turnLoop');
+  const loop = new TurnLoop(hold.db, hold.lease);
   const controller = new AbortController();
-  const running = runEngine(db, { worldId: world, signal: controller.signal });
+  const running = (async () => {
+    try {
+      while (!controller.signal.aborted) {
+        if (hold.lost) throw hold.lost;
+        await loop.poll(controller.signal);
+        await delay(100, undefined, { signal: controller.signal });
+      }
+    } catch (error) {
+      if (!controller.signal.aborted) throw error;
+    }
+  })();
+  // 실패는 멈출 때 다시 던진다.
+  running.catch(() => undefined);
   return async () => {
     controller.abort();
-    try {
-      await running;
-    } finally {
-      await db.$disconnect();
-    }
+    await running;
   };
 }
 
