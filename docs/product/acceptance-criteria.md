@@ -73,9 +73,9 @@
 
 | ID        | 조건 | 검증 방법 | 상태 | 증거 |
 | --------- | ---- | --------- | ---- | ---- |
-| AC-M1-14  | MVP 명령 37개 각각에 성공 1건과 대표 실패 1건 테스트가 있다. 명령 목록과 테스트 목록이 자동으로 대조된다 ⚠️ A4 | rules 단위 테스트 + 대조 스크립트 | 🟨 | T1-05 내정 8종·휴식 단위 27개 통과, 정착·선정 단위·비용 수정 반영. `pnpm check` 전체 88개 통과. 37종 전체·자동 대조는 T1-08, Claude 재리뷰 대기 |
-| AC-M1-15  | 출병하면 수비 장수와 차례로 싸우고, 성벽을 거쳐 점령한다. 마지막 도시를 잃은 국가는 멸망하고 소속 장수는 재야가 된다 | 시나리오 테스트 | ⬜ | |
-| AC-M1-16  | 수도와 끊긴 도시는 보급 끊김으로 표시되고 월간 손해를 본다. 연결을 되찾으면 풀린다 | 단위 테스트 | ⬜ | |
+| AC-M1-14  | MVP 명령 37개 각각에 성공 1건과 대표 실패 1건 테스트가 있다. 명령 목록과 테스트 목록이 자동으로 대조된다 ⚠️ A4 | rules 단위 테스트 + 대조 스크립트 | ✅ | 2026-10-21 Claude 재리뷰 통과(PR #38 `81ffd1b`): `packages/rules/src/commands/registry.test.ts` `37개 key, 장수27·국가10과 행동 검사 목록이 정확히 일치한다`, `tools/command-coverage.test.ts` `AC-M1-14 모든 registry key에 성공·실패 행동 테스트 파일이 있다`, `war.test.ts` `37종 잘못된 인자를 거부하고 국가 명령은 군주·대상을 따로 검사한다`, 기존 9종 `tools/commands.test.ts` 27개. exact head CI [39537902044](https://github.com/peppone-choi/opensamguk/actions/runs/39537902044) 단위 291개 통과. [T1-08 재리뷰](../plans/T1-08.md#재리뷰-claude-2026-10-21) |
+| AC-M1-15  | 출병하면 수비 장수와 차례로 싸우고, 성벽을 거쳐 점령한다. 마지막 도시를 잃은 국가는 멸망하고 소속 장수는 재야가 된다 | 시나리오 테스트 | ✅ | 2026-10-21 Claude 재리뷰 통과(PR #38 `81ffd1b`): `packages/rules/src/commands/war.test.ts` `수비2명·성벽 순서, 마지막 도시 멸망·재야·국가 예턴 삭제와 같은 시드 결과`, `apps/engine/src/war.integration.test.ts` `국가포상·수비2명·성벽·멸망·재야·국가예턴 삭제와 로그를 한 번 저장하고 12개월 재생한다`, `전투 저장 직전 %s이면 소유권·국가·양쪽 로그·예턴·메모리를 모두 롤백한다`. exact head CI [39537902044](https://github.com/peppone-choi/opensamguk/actions/runs/39537902044) PostgreSQL 91개 통과. [T1-08 재리뷰](../plans/T1-08.md#재리뷰-claude-2026-10-21) |
+| AC-M1-16  | 수도와 끊긴 도시는 보급 끊김으로 표시되고 월간 손해를 본다. 연결을 되찾으면 풀린다 | 단위 테스트 | ✅ | 2026-10-21 Claude 재리뷰 통과(PR #38 `81ffd1b`): `packages/rules/src/commands/war.test.ts` `회랑 점령 직후 단절 표시, 월간 손해, 재점령 직후 회복과 다음 달 손해 중단`, `수도 함락 뒤 인구 $populations 기준 수도 $capital에서 보급하고 반격한다`, `apps/engine/src/war.integration.test.ts` `회랑 점령·단절 월간 손해·재점령 회복을 저장하고 2개월 재생한다`, `수도 함락 %s 뒤 자동 천도·보급·반격·역사를 저장하고 롤백·재생한다`. exact head CI [39537902044](https://github.com/peppone-choi/opensamguk/actions/runs/39537902044) 단위 291개·PostgreSQL 91개 통과. [T1-08 재리뷰](../plans/T1-08.md#재리뷰-claude-2026-10-21) |
 
 ### NPC
 
