@@ -81,3 +81,43 @@ jobs:
       - run: pnpm db:migrate
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm e2e --workers=1 --reporter=line
+      - name: Capture requested actual progress screens
+        if: github.ref == 'refs/heads/qa/owner-progress-20261021-eedd815'
+        env:
+          OWNER_SNAPSHOT_DIR: ${{ runner.temp }}/owner-progress
+          OWNER_WORLD_RESULT: ${{ runner.temp }}/owner-world.jsonl
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm world:create --scenario 1030 --map che --seed owner-progress-20261021 --turn-term 60 --name '진행 확인 전용 월드' > "$OWNER_WORLD_RESULT"
+          WORLD_ID=$(node --input-type=module -e 'import fs from "node:fs";const s=fs.readFileSync(process.env.OWNER_WORLD_RESULT,"utf8").trim().split("\n");console.log(JSON.parse(s.at(-1)).worldId)')
+          pnpm world:start --world "$WORLD_ID"
+          setsid pnpm dev > "$RUNNER_TEMP/owner-dev.log" 2>&1 &
+          OWNED_GROUP=$!
+          cleanup() {
+            kill -TERM -- "-$OWNED_GROUP" 2>/dev/null || true
+            for n in $(seq 1 30); do
+              if ! kill -0 -- "-$OWNED_GROUP" 2>/dev/null; then return 0; fi
+              sleep 0.2
+            done
+            kill -KILL -- "-$OWNED_GROUP" 2>/dev/null || true
+            wait "$OWNED_GROUP" 2>/dev/null || true
+            if kill -0 -- "-$OWNED_GROUP" 2>/dev/null; then echo 'Owned group cleanup failed'; return 1; fi
+          }
+          trap cleanup EXIT
+          for n in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:5173/login >/dev/null; then break; fi
+            sleep 1
+          done
+          node .github/scripts/owner-progress.mjs
+          cleanup
+          trap - EXIT
+          printf '{"ownedProcessGroupExitVerified":true}\n' > "$OWNER_SNAPSHOT_DIR/cleanup.json"
+      - name: Upload requested actual progress screens
+        if: always() && github.ref == 'refs/heads/qa/owner-progress-20261021-eedd815'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: owner-progress-eedd815
+          path: ${{ runner.temp }}/owner-progress
+          retention-days: 7
+          if-no-files-found: error
