@@ -6,7 +6,10 @@ export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): 
   const cities = await tx.city.findMany({ where: { worldId } });
   const nations = await tx.nation.findMany({ where: { worldId } });
   const generals = await tx.general.findMany({ where: { worldId } });
-  const diplomacies = await tx.diplomacy.findMany({ where: { worldId } });
+  const diplomacies = await tx.diplomacy.findMany({
+    where: { worldId },
+    orderBy: [{ nationA: 'asc' }, { nationB: 'asc' }],
+  });
   const stripWorldId = <T extends { worldId: string }>({ worldId: ignored, ...value }: T) => {
     void ignored;
     return value;

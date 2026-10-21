@@ -29,6 +29,18 @@ export async function saveInitialWorld(
           seed: state.seed,
           startYear: state.startYear,
           initialStateHash: stateHash,
+          replayOrigin: {
+            version: 1,
+            initial: state,
+            resourceHash: hashState({
+              scenarioKey: state.scenarioKey,
+              mapKey: state.mapKey,
+              unitSetKey: state.unitSetKey,
+              statRules: state.statRules,
+              unitSet: state.unitSet,
+            }),
+            initialStateHash: stateHash,
+          } as unknown as Prisma.InputJsonValue,
           statRules: state.statRules,
           unitSet: state.unitSet as Prisma.InputJsonValue,
         },
