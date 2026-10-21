@@ -34,20 +34,24 @@ describe('지도 계산', () => {
 
   it('접근 가능한 이름에 소속·보급 끊김·내 위치를 글자로 담는다', () => {
     const nation = { id: 1, name: '위', color: '#000080' };
-    expect(cityLabel(city(1, [], { supplied: false }), nation, true)).toBe('도시1, 위, 보급 끊김, 내 위치');
+    expect(cityLabel(city(1, [], { supplied: false, nationId: 1 }), nation, true)).toBe(
+      '도시1, 위, 보급 끊김, 내 위치',
+    );
+    expect(cityLabel(city(3, [], { supplied: false }), undefined, false)).toBe('도시3, 공백지');
     expect(cityLabel(city(2, []), undefined, false)).toBe('도시2, 공백지');
   });
 
   it('도시를 누르거나 Enter를 치면 onSelect로 알리고 내 도시를 표시한다', () => {
     const onSelect = vi.fn();
     const nations = [{ id: 1, name: '위', color: '#000080' }];
-    const cities = [city(1, [2], { nationId: 1 }), city(2, [1], { supplied: false })];
-    render(<WorldMap cities={cities} nations={nations} myCityKey={1} selectedKey={2} onSelect={onSelect} />);
+    const nations2 = [...nations, { id: 2, name: '오', color: '#ff0000' }];
+    const cities = [city(1, [2], { nationId: 1 }), city(2, [1], { supplied: false, nationId: 2 })];
+    render(<WorldMap cities={cities} nations={nations2} myCityKey={1} selectedKey={2} onSelect={onSelect} />);
     const mine = screen.getByRole('button', { name: '도시1, 위, 내 위치' });
     expect(mine.getAttribute('data-mine')).toBe('true');
-    const other = screen.getByRole('button', { name: '도시2, 공백지, 보급 끊김' });
+    const other = screen.getByRole('button', { name: '도시2, 오, 보급 끊김' });
     expect(other.getAttribute('aria-pressed')).toBe('true');
-    expect(other.getAttribute('data-supplied')).toBe('false');
+    expect(other.getAttribute('data-cut')).toBe('true');
     fireEvent.click(mine);
     fireEvent.keyDown(other, { key: 'Enter' });
     expect(onSelect.mock.calls).toEqual([[1], [2]]);

@@ -117,6 +117,7 @@ describe('이름표', () => {
     expect(commandName('없는_키')).toBe('없는_키');
     expect(officerName(12)).toBe('군주');
     expect(officerName(0)).toBe('재야');
+    expect(officerName(0, true)).toBe('일반');
     expect(officerName(5)).toBe('관직 5단계');
   });
 });

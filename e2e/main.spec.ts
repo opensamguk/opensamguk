@@ -115,8 +115,9 @@ test.describe('장수가 있는 계정', () => {
     const rgb = `rgb(${parseInt(hex.slice(0, 2), 16)}, ${parseInt(hex.slice(2, 4), 16)}, ${parseInt(hex.slice(4, 6), 16)})`;
     expect(fill).toBe(rgb);
     expect(await map.locator('line').count()).toBeGreaterThan(90);
-    const cut = ctx.map.cities.filter((c) => !c.supplied).length;
-    await expect(map.locator('[data-supplied="false"]')).toHaveCount(cut);
+    // 보급 끊김은 국가 도시만 표시한다. 공백지는 늘 보급이 없다.
+    const cut = ctx.map.cities.filter((c) => !c.supplied && c.nationId !== null).length;
+    await expect(map.locator('[data-cut="true"]')).toHaveCount(cut);
     await expect(map.locator('[data-mine="true"]')).toHaveAttribute('data-city-key', String(ctx.home.general.cityKey));
 
     // 명령 목록 5칸, 장수·국가·도시 정보

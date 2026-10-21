@@ -148,7 +148,7 @@ export function NationTables({
       key: 'officer',
       label: '직책',
       sortValue: (g) => (isDetailedGeneral(g) ? g.officerLevel : null),
-      render: (g) => (isDetailedGeneral(g) ? officerName(g.officerLevel) : '—'),
+      render: (g) => (isDetailedGeneral(g) ? officerName(g.officerLevel, g.nationId !== null) : '—'),
     },
     {
       key: 'city',

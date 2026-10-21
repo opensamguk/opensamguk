@@ -25,11 +25,14 @@ export function mapLinks(cities: readonly MapCity[]): Array<[MapCity, MapCity]> 
   return links;
 }
 
+// 보급은 국가 도시에만 뜻이 있다. 공백지는 늘 보급이 없으므로 끊김 표시를 하지 않는다.
+export const isCut = (city: Pick<MapCity, 'supplied' | 'nationId'>) => !city.supplied && city.nationId !== null;
+
 // 도시 규모(1~8)에 따라 점 크기를 키운다.
 export const cityRadius = (level: number) => 4 + Math.max(1, Math.min(8, level)) * 0.6;
 
 export function cityLabel(city: MapCity, nation: MapNation | undefined, mine: boolean): string {
-  return [city.name, nation ? nation.name : '공백지', city.supplied ? null : '보급 끊김', mine ? '내 위치' : null]
+  return [city.name, nation ? nation.name : '공백지', isCut(city) ? '보급 끊김' : null, mine ? '내 위치' : null]
     .filter(Boolean)
     .join(', ');
 }
@@ -82,6 +85,7 @@ export function WorldMap({
             data-city-key={city.key}
             data-nation-id={city.nationId ?? ''}
             data-supplied={city.supplied}
+            data-cut={isCut(city) || undefined}
             data-mine={mine || undefined}
             onClick={select}
             onKeyDown={(event) => {
@@ -95,13 +99,13 @@ export function WorldMap({
             {mine ? <circle className={styles.mine} cx={city.x} cy={city.y} r={r + 5} /> : null}
             {selected ? <circle className={styles.selected} cx={city.x} cy={city.y} r={r + 3} /> : null}
             <circle
-              className={city.supplied ? styles.dot : `${styles.dot} ${styles.unsupplied}`}
+              className={isCut(city) ? `${styles.dot} ${styles.unsupplied}` : styles.dot}
               cx={city.x}
               cy={city.y}
               r={r}
               style={{ fill }}
             />
-            {city.supplied ? null : (
+            {!isCut(city) ? null : (
               <path
                 className={styles.cut}
                 d={`M${city.x - r * 0.6} ${city.y - r * 0.6} L${city.x + r * 0.6} ${city.y + r * 0.6}`}
@@ -145,7 +149,7 @@ export function MapLegend({ cities, nations }: { cities: readonly MapCity[]; nat
     .map((nation) => ({ nation, count: counts.get(nation.id) ?? 0 }))
     .filter((entry) => entry.count > 0)
     .sort((a, b) => b.count - a.count || a.nation.id - b.nation.id);
-  const unsupplied = cities.filter((city) => !city.supplied).length;
+  const unsupplied = cities.filter(isCut).length;
   const empty = cities.filter((city) => city.nationId === null).length;
   return (
     <div className={styles.legend} aria-label="지도 범례">
