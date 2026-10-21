@@ -14,6 +14,8 @@ import { LoginPage } from './pages/LoginPage';
 import { MainPage } from './pages/MainPage';
 import { Placeholder } from './pages/Placeholder';
 import { SignupPage } from './pages/SignupPage';
+import { RankingPage } from './ranking/RankingPage';
+import { parseRankingSearch } from './ranking/rankingView';
 import { queryClient, trpc, type Trpc } from './trpc';
 import { EmptyState, ErrorState } from './ui/States';
 
@@ -133,6 +135,14 @@ const recordsRoute = createRoute({
   },
 });
 
+// 순위 (T2-23). 주소: /w/:worldId/ranking?tab=generals|nations&by=…
+const rankingRoute = createRoute({
+  getParentRoute: () => worldRoute,
+  path: 'ranking',
+  validateSearch: parseRankingSearch,
+  component: RankingPage,
+});
+
 const createGeneralRoute = createRoute({
   getParentRoute: () => worldRoute,
   path: 'create',
@@ -152,6 +162,7 @@ const routeTree = rootRoute.addChildren([
     cityRoute,
     nationRoute,
     recordsRoute,
+    rankingRoute,
     createGeneralRoute,
   ]),
   ...(import.meta.env.DEV ? [devUiRoute] : []),
