@@ -1,0 +1,11 @@
+# T3-04 검토용 snippet. T2-15의 HTTPS site 블록에서 import한다.
+# 실제 서비스 설치·기동·배포 명령은 포함하지 않는다.
+(game_security) {
+	header {
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https://cdn.jsdelivr.net data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "same-origin"
+		X-Frame-Options "DENY"
+	}
+}

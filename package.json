@@ -24,6 +24,7 @@
     "engine:run": "pnpm --filter @opensamguk/engine engine:run",
     "db:migrate": "pnpm --filter @opensamguk/db migrate",
     "test:int": "pnpm generate && tsx --env-file-if-exists=.env tools/run-integration.ts",
+    "test:authz": "pnpm generate && tsx --env-file-if-exists=.env tools/run-authz.ts",
     "world:start": "pnpm --filter @opensamguk/engine world:start",
     "world:pause": "pnpm --filter @opensamguk/engine world:pause",
     "world:resume": "pnpm --filter @opensamguk/engine world:resume",
