@@ -3,7 +3,7 @@ import { retryUnlessClientError, errorCode } from '../game/errors';
 import { formatYearMonth, tickDate } from '../game/gameDate';
 import { NoGeneral, QueryError } from '../game/QueryState';
 import type { MapNation, WorldSummary } from '../game/types';
-import { useTRPC } from '../trpc';
+import { trpcClient, useTRPC } from '../trpc';
 import { NationBadge } from '../ui/NationBadge';
 import { EmptyState, LoadingState } from '../ui/States';
 import { Tag } from '../ui/Tag';
@@ -21,25 +21,32 @@ type Clock = Pick<WorldSummary, 'gameDate' | 'nowTick' | 'msPerTick' | 'turnTerm
 const dateOf = (tick: number, clock: Clock) => (clock ? formatYearMonth(tickDate(tick, clock)) : '—');
 const n = (value: number) => value.toLocaleString('ko-KR');
 
+// 기록 조회. tRPC의 infiniteQueryOptions는 입력에 direction을 덧붙이는데 서버의 기록 입력은 strict라 거부한다.
+// 그래서 커서만 넣어 직접 부르고, 쿼리 키는 같은 procedure 아래에 둬 records 무효화에 함께 걸리게 한다.
 function useRecords(kind: RecordKind, worldId: string, enabled: boolean) {
   const trpc = useTRPC();
-  const options = { getNextPageParam: (last: { nextCursor: string | null }) => last.nextCursor ?? undefined };
-  const general = useInfiniteQuery({
-    ...trpc.records.general.infiniteQueryOptions({ worldId }, options),
-    enabled: enabled && kind === 'general',
+  const procedures = {
+    general: { key: trpc.records.general.queryKey({ worldId }), fetch: trpcClient.records.general.query },
+    nation: { key: trpc.records.nation.queryKey({ worldId }), fetch: trpcClient.records.nation.query },
+    world: { key: trpc.records.world.queryKey({ worldId }), fetch: trpcClient.records.world.query },
+  } as const;
+  const procedure = procedures[kind];
+  return useInfiniteQuery({
+    queryKey: [...procedure.key, 'pages'] as const,
+    queryFn: ({ pageParam }) =>
+      (procedure.fetch as (input: { worldId: string; cursor?: string }) => Promise<RecordPage>)(
+        pageParam === undefined ? { worldId } : { worldId, cursor: pageParam },
+      ),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last: RecordPage) => last.nextCursor ?? undefined,
+    enabled,
     retry: retryUnlessClientError,
   });
-  const nation = useInfiniteQuery({
-    ...trpc.records.nation.infiniteQueryOptions({ worldId }, options),
-    enabled: enabled && kind === 'nation',
-    retry: retryUnlessClientError,
-  });
-  const world = useInfiniteQuery({
-    ...trpc.records.world.infiniteQueryOptions({ worldId }, options),
-    enabled: enabled && kind === 'world',
-    retry: retryUnlessClientError,
-  });
-  return { general, nation, world }[kind];
+}
+
+interface RecordPage {
+  items: unknown[];
+  nextCursor: string | null;
 }
 
 // 기록 한 종류를 보여 준다. 최신순 30개씩 받고 더 보기로 이어 받는다. 메인 안에서 늘어나며 다른 화면으로 가지 않는다.
