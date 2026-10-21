@@ -32,11 +32,11 @@ export function mapCity(city: City) {
   };
 }
 
-export function generalInfo(general: General, viewer: Viewer) {
-  const publicInfo = { id: general.id, name: general.name, nationId: general.nationId };
-  if (!visibility(viewer).general(general)) return publicInfo;
+export function ownGeneralInfo(general: General) {
   return {
-    ...publicInfo,
+    id: general.id,
+    name: general.name,
+    nationId: general.nationId,
     portraitId: general.portraitId,
     cityKey: general.cityKey,
     leadership: general.leadership,
@@ -60,6 +60,12 @@ export function generalInfo(general: General, viewer: Viewer) {
     injury: general.injury,
     nextTurnTick: general.nextTurnTick,
   };
+}
+
+export function generalInfo(general: General, viewer: Viewer) {
+  return visibility(viewer).general(general)
+    ? ownGeneralInfo(general)
+    : { id: general.id, name: general.name, nationId: general.nationId };
 }
 
 export function cityInfo(city: City, viewer: Viewer) {

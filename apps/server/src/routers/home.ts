@@ -1,6 +1,6 @@
 import { protectedProcedure, router } from '../trpc';
 import { nextTurnAt, readWorld, requireGeneral, worldInput } from '../queries';
-import { cityInfo, generalInfo, logInfo, logSelect, nationInfo } from '../visibility';
+import { cityInfo, ownGeneralInfo, logInfo, logSelect, nationInfo } from '../visibility';
 
 export const homeRouter = router({
   get: protectedProcedure.input(worldInput).query(({ ctx, input }) =>
@@ -28,7 +28,7 @@ export const homeRouter = router({
         select: logSelect,
       });
       return {
-        general: generalInfo(general, general),
+        general: ownGeneralInfo(general),
         city: cityInfo(city, general),
         nation:
           nation === null
