@@ -63,6 +63,7 @@
 | `/w/:worldId/nation/:nationId` | 국가 정보 |
 | `/w/:worldId/records?tab=general\|nation\|world` | 기록 |
 | `/w/:worldId/create` | 장수 생성 |
+| `/w/:worldId/ranking?tab=generals\|nations&by=…` | 순위. `by`가 탭에 맞지 않으면 그 탭의 첫 기준 (`e2e/ranking.spec.ts`) |
 | `/dev/ui` | 부품 모음 (개발 모드만) |
 
 ### 로그인 가드 (T1-14)

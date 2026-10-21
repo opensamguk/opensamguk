@@ -3,11 +3,18 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RankingView } from './RankingPage';
 import { GeneralRankingTable, NationRankingTable } from './RankingTables';
-import { defaultSearch, formatAt, parseRankingSearch, rankTone, type RankedGeneral } from './rankingView';
+import {
+  defaultSearch,
+  formatAt,
+  parseRankingSearch,
+  rankTone,
+  type RankedGeneral,
+  type RankedNation,
+} from './rankingView';
 
 afterEach(cleanup);
 
-// T2-23 · AC-M2-19 (화면). API(T2-22) 전이라 자료는 계약 모양의 고정값이다. 실제 자료 검증은 E2E에서 한다.
+// T2-23 · AC-M2-19 (화면). 자료는 순위 API 응답 타입(AppRouter)에 맞춘 고정값이다. 실제 자료 검증은 e2e/ranking.spec.ts에서 한다.
 const wei = { id: 1, name: '위', color: '#2f5f9e' };
 const general = (rank: number, generalId: number, name: string, nation = wei): RankedGeneral => ({
   rank,
@@ -16,9 +23,12 @@ const general = (rank: number, generalId: number, name: string, nation = wei): R
   nation,
   dedication: 1000 - rank,
   experience: 500 - rank,
+  wins: 6 - rank,
+  captures: 4,
   merit: 10 - rank,
+  value: 1000 - rank,
 });
-const at = { year: 193, month: 4 };
+const at = { tick: 30000, year: 193, month: 4 };
 const tab = (t: string, label: string, active: boolean) => (
   <span key={t} data-active={active}>
     {label}
@@ -109,7 +119,9 @@ describe('장수 순위 표', () => {
 
 describe('국가 순위 표', () => {
   it('국가·도시·장수·국력만 있고 국고·군량 열은 없다', () => {
-    const items = [{ rank: 1, nationId: 1, name: '위', color: '#2f5f9e', cities: 12, generals: 30, power: 4321 }];
+    const items: RankedNation[] = [
+      { rank: 1, nationId: 1, name: '위', color: '#2f5f9e', cities: 12, generals: 30, power: 4321, value: 12 },
+    ];
     render(<NationRankingTable ranking={{ items, at }} by="cities" onSort={() => {}} />);
     const headers = screen.getAllByRole('columnheader').map((h) => h.textContent);
     expect(headers).toEqual(['순위', '국가', '도시▼', '장수', '국력']);
@@ -119,12 +131,12 @@ describe('국가 순위 표', () => {
 });
 
 describe('화면 상태', () => {
-  it('API 전에는 기다리는 중이라고 알린다', () => {
+  it('불러오는 동안 상태를 알린다', () => {
     render(
-      <RankingView search={defaultSearch('generals')} data={{ state: 'waiting' }} onSort={() => {}} renderTab={tab} />,
+      <RankingView search={defaultSearch('generals')} data={{ state: 'loading' }} onSort={() => {}} renderTab={tab} />,
     );
     expect(screen.getByRole('heading', { level: 1, name: '순위' })).toBeTruthy();
-    expect(screen.getByText('순위 API를 기다리는 중입니다')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toBe('순위를 불러오는 중…');
   });
 
   it('정산 전이면 순위가 없다고 알린다', () => {

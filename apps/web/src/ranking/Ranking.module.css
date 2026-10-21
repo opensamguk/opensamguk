@@ -47,6 +47,10 @@
   padding: var(--space-1) var(--space-2);
   white-space: nowrap;
 }
+/* 전역 .num(0,1,0)보다 .table th(0,1,1)가 이겨서 숫자 머리글이 왼쪽으로 가던 것을 막는다 (GitHub #56). */
+.table th:global(.num) {
+  text-align: right;
+}
 .table td {
   padding: 0 var(--space-2);
   white-space: nowrap;

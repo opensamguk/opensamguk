@@ -1,45 +1,20 @@
-// 순위 화면의 자료 모양과 순수 함수. 모양은 docs/plans/T2-22.md의 API 계약을 따른다.
-// T2-22가 합쳐지면 이 타입 대신 AppRouter에서 꺼낸 타입을 쓴다.
+// 순위 화면의 자료 모양과 순수 함수. 자료 모양은 순위 API(apps/server의 ranking 라우터)에서 꺼낸다.
+import type { AppRouter } from '@opensamguk/server/router';
+import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
+
+type RankingInputs = inferRouterInputs<AppRouter>['ranking'];
+type RankingOutputs = inferRouterOutputs<AppRouter>['ranking'];
 
 export type RankingTab = 'generals' | 'nations';
-export type GeneralSortKey = 'dedication' | 'experience' | 'merit';
-export type NationSortKey = 'cities' | 'generals' | 'power';
+export type GeneralSortKey = RankingInputs['generals']['by'];
+export type NationSortKey = RankingInputs['nations']['by'];
 
-export interface RankingAt {
-  year: number;
-  month: number;
-}
-
-export interface RankedGeneral {
-  rank: number;
-  generalId: number;
-  name: string;
-  nation: { id: number; name: string; color: string } | null;
-  dedication: number;
-  experience: number;
-  merit: number;
-}
-
-export interface RankedNation {
-  rank: number;
-  nationId: number;
-  name: string;
-  color: string;
-  cities: number;
-  generals: number;
-  power: number;
-}
-
-export interface GeneralRanking {
-  top: RankedGeneral[];
-  me: RankedGeneral | null;
-  at: RankingAt | null;
-}
-
-export interface NationRanking {
-  items: RankedNation[];
-  at: RankingAt | null;
-}
+// 응답에는 화면에 쓰지 않는 항목(at.tick, 장수의 wins·captures·value, 국가의 value)도 있다. 보이지 않게 둔다.
+export type GeneralRanking = RankingOutputs['generals'];
+export type NationRanking = RankingOutputs['nations'];
+export type RankedGeneral = GeneralRanking['top'][number];
+export type RankedNation = NationRanking['items'][number];
+export type RankingAt = NonNullable<GeneralRanking['at']>;
 
 export const GENERAL_COLUMNS: ReadonlyArray<{ key: GeneralSortKey; label: string }> = [
   { key: 'dedication', label: '공헌' },

@@ -75,9 +75,6 @@ function RankingBody({
   data: RankingData;
   onSort: (by: GeneralSortKey | NationSortKey) => void;
 }) {
-  if (data.state === 'waiting') {
-    return <EmptyState title="순위 API를 기다리는 중입니다">T2-22가 합쳐지면 연결합니다.</EmptyState>;
-  }
   if (data.state === 'loading') return <p role="status">순위를 불러오는 중…</p>;
   if (data.state === 'error') return <ErrorState title="순위를 불러오지 못했습니다" onRetry={data.retry} />;
   if (data.ranking.at === null) return <EmptyState title={formatAt(null)} />;
