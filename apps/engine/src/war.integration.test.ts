@@ -204,7 +204,9 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
         where: { worldId_tick_nationId: { worldId, tick: 100, nationId: 2 } },
       });
       const events = (history.data as { events: string[] }).events;
-      expect(events.filter((event) => event.includes('천도'))).toEqual([`${initial.nations[1]!.name} 수도 함락, 도시3 천도`]);
+      expect(events.filter((event) => event.includes('천도'))).toEqual([
+        `${initial.nations[1]!.name} 수도 함락, 도시3 천도`,
+      ]);
       await loop.advanceTo(200);
       expect(
         await db.generalLog.findUniqueOrThrow({
