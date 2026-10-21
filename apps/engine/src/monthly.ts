@@ -3,6 +3,7 @@ import { emptyTurns, monthlyDate, runMonthly, type ReplayState, type WorldState 
 import { rngFor } from '@opensamguk/shared';
 import { hashState } from '@opensamguk/shared/node';
 import { loadWorld } from './worldLoader';
+import { persistRanking } from './ranking';
 
 export async function loadReplayState(tx: Prisma.TransactionClient, worldId: string): Promise<ReplayState> {
   const state = await loadWorld(tx, worldId);
@@ -69,5 +70,6 @@ export async function persistMonthly(
       data: nation as unknown as Prisma.InputJsonValue,
     })),
   });
+  await persistRanking(tx, worldId, next, { tick, ...date });
   return next;
 }
