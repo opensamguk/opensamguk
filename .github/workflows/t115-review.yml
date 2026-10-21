@@ -1,0 +1,63 @@
+name: T1-15 independent review probe
+on:
+  push:
+    branches:
+      - review/t115-t_80df705f
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      CI: 'true'
+      DATABASE_URL: postgresql://opensamguk:opensamguk@127.0.0.1:5432/t115_review_test
+      SERVER_PORT: '3001'
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: opensamguk
+          POSTGRES_PASSWORD: opensamguk
+          POSTGRES_DB: t115_review_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U opensamguk -d t115_review_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify exact implementation unchanged
+        run: |
+          test -z "$(git diff df70e50a70492c43f96b3640ce629b3373736fa0 HEAD -- apps packages e2e playwright.config.ts pnpm-lock.yaml package.json)"
+          git rev-parse HEAD
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm generate && pnpm db:migrate
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Capture current 12 actual E2E screenshots
+        run: pnpm e2e e2e/turns.spec.ts --workers=1 --reporter=line
+      - name: Real pending rejection counterexample
+        if: always()
+        run: pnpm e2e --config results/t_80df705f/playwright.review.ts --reporter=line --output test-results-probe
+      - name: Preserve screenshots and trace
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t115-independent-review
+          path: |
+            test-results/
+            test-results-probe/
+          retention-days: 7
