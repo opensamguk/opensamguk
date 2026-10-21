@@ -30,6 +30,15 @@
   jsDelivr 고정 커밋 주소 `https://cdn.jsdelivr.net/gh/peppone-choi/opensamguk-images@48163bd`를 base URL로 씁니다.
 - 파일이 없으면 기본 이미지를 보여 줍니다 (FR-IMG-03). 기본 이미지는 생성 이미지가 생기기 전까지 코드로 그린 실루엣입니다 (T1-17).
 
+### 화면의 해석 (T1-17)
+
+- 코드는 `apps/web/src/portrait/`에 있습니다. 주소는 `portraitUrl(id, variant)`, 화면 부품은 `<Portrait id name variant>`입니다.
+- `VITE_IMAGE_BASE_URL`이 비었거나 없으면 `https://cdn.jsdelivr.net/gh/peppone-choi/opensamguk-images@48163bd`를 씁니다.
+  고정 대상은 이미지 저장소 정리 커밋 `48163bd`이며 태그가 아닌 커밋으로 고정합니다. 2026-10-20에 id 10002의 세 변형이 200으로 응답했습니다.
+- 값의 앞뒤 공백과 끝의 `/`는 떼고 씁니다. 값은 빌드 때 화면에 박히므로 바꾸면 다시 빌드하거나 dev 서버를 다시 띄웁니다.
+- 기본 이미지로 바꾸는 경우는 셋입니다. ID가 null이거나 10001~11000 밖일 때, 그리고 파일을 못 불러왔을 때(`onError`)입니다.
+  기본 이미지는 `fallback.svg` 실루엣 위에 장수 이름 첫 글자를 얹습니다. `alt`는 장수 이름입니다.
+
 ### 시나리오 이름 대응 (T1-19)
 
 - 생성물: `resources/portraits/rtk14-map.json`. `portraits`에 한글 이름 → 숫자 ID를 저장한다.
