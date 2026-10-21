@@ -49,4 +49,20 @@
 
 ## 5. 재생 테스트
 
-<!-- TODO(M1): 시드 + InputEvent 기록 + 예턴 편집 기록으로 같은 상태 해시를 재현 (AC-M1-13). 무엇을 기록해야 재생이 되는지 목록. -->
+새 월드는 생성 시점의 `WorldInit`과 리소스 내용 해시를 `World.replayOrigin`에 저장합니다. 기존 월드는 원본을 추측하지 않고 재생을 거부합니다. 예턴·장수 생성 입력은 `InputEvent`에 남깁니다. 기록 파일은 사용자 식별자를 포함할 수 있으므로 공개하지 않습니다.
+
+### InputEvent 계약 (T1-07 소유, T1-11 사용)
+
+`id`는 DB BigInt 접수 순서입니다. `worldId`, 세션의 `userId`, 선택적 `generalId`, `kind`, `idempotencyKey`, `payload`를 저장합니다. `(worldId, userId, idempotencyKey)`는 유일하며 재요청은 kind·payload 일치 여부를 검사한 뒤 기존 결과를 돌려줍니다. 실패한 요청도 처음 결과를 바꾸지 않습니다.
+
+`general.create` 접수는 `PENDING`, `sequence = null`, `result = null`입니다. 엔진의 성공은 `APPLIED`, 확정 실패는 `REJECTED`로 저장합니다. 성공 결과의 `general`에는 생성된 `InitialGeneral` 전체를 담습니다. 생성 RNG·검증·결과 저장은 T1-11이 담당합니다. `turns.set`은 API의 예턴 30칸 교체·revision 증가와 같은 트랜잭션에서 `APPLIED`로 기록합니다. payload는 `{ turns: [{ commandKey, args }, ...30칸], revision: 저장 전 revision }`, result는 `{ revision: 저장 후 revision }`입니다. `generalId`는 이벤트 열에서 읽습니다.
+
+처리 순서는 `World.actionSequence`로 고정합니다. 입력 완료·턴 실행·월간 정산마다 `nextActionSequence(tx, worldId)`를 한 번 호출합니다. 완료한 입력의 sequence는 양수이며 월드 안에서 유일합니다. `REJECTED`도 sequence와 오류 결과를 남기며 재생 시 상태를 바꾸지 않습니다. `PENDING`에는 sequence를 부여하지 않습니다. DB 제약이 이 구분을 검사합니다.
+
+API와 엔진 모두 월드 행을 장수 행보다 먼저 잠급니다. API는 월드 행 잠금 → 멱등 키 재검사 → 장수 행·revision 검사 → 예턴 및 입력 저장 순서입니다. 엔진은 리스 행 → 월드 행 → 장수 행 순서를 유지합니다. 밀린 턴 도중 접수된 예턴도 actionSequence 덕분에 실제 적용 위치에서 재생됩니다. 시계 tick만으로 입력을 정렬하지 않습니다.
+
+`YearbookSnapshot`은 정산 경계 tick·정산한 연월·actionSequence·국가 요약·도시 소유권·게임 상태 및 예턴 해시를 보존합니다. `NationHistory`에는 같은 경계의 국가 요약을 남깁니다. `World.monthlyTick`은 마지막 정산 경계이며 시계 체크포인트와 별개입니다. 세 값과 정산 상태는 같은 펜싱 트랜잭션으로 저장합니다.
+
+해시는 게임 상태, 정규화한 예턴 30칸, 장수별 revision, 마지막 정산 tick을 포함합니다. DB의 월드 UUID·행 ID·실제 시각·리스는 포함하지 않습니다. 초기 상태는 리소스에서 만든 전체 `WorldInit`을 그대로 보존하고 해시로 검사하므로 현재 리소스 파일이 바뀌어도 기록 안의 원본으로 재생합니다. 형식 버전은 1이며 다른 버전은 거부합니다.
+
+`DATABASE_URL`이 설정된 환경에서 `pnpm exec tsx tools/replay.ts --world <ID> --output <새 파일>`로 일관된 DB 스냅샷을 내보냅니다. 파일은 0600으로 새로 만들며 기존 파일은 덮어쓰지 않습니다. `pnpm exec tsx tools/replay.ts --from <파일> --months 12`는 DB 없이 매달 상태·예턴 해시와 연감을 비교해 일치한 tick과 해시를 출력합니다. 원본 변조, 입력 순서·revision 불일치, 누락된 월간 기록, 지원하지 않는 입력, 해시 불일치는 종료 코드 1입니다. 마지막 연감 이후 입력과 미완료 요청은 해당 내보내기에 포함하지 않습니다.
