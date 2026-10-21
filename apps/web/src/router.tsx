@@ -13,7 +13,6 @@ import { DevUiPage } from './pages/DevUiPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { MainPage } from './pages/MainPage';
-import { Placeholder } from './pages/Placeholder';
 import { SignupPage } from './pages/SignupPage';
 import { CityPage, MapPage, NationPage, RecordsPage } from './pages/WorldPages';
 import { queryClient, trpc, type Trpc } from './trpc';
