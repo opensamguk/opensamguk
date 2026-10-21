@@ -1,5 +1,5 @@
-// GitHub #26, #27: 루트 playwright.config.ts가 CI에서는 test.only와 기존 서버 재사용을 막고, 로컬에서는 예전처럼 동작하는지
-// 실제 Playwright CLI로 확인한다. 서버는 이 시험이 직접 띄운 127.0.0.1 임의 포트만 쓴다.
+// 루트 playwright.config.ts가 CI에서는 test.only와 기존 서버 재사용을 막고 로컬에서는 예전처럼 동작하는지
+// 실제 Playwright CLI로 확인한다 (GitHub #26, #27). 서버는 이 시험이 직접 띄운 127.0.0.1 임의 포트만 쓴다.
 import { spawn } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
@@ -99,7 +99,7 @@ describe('GitHub #26 forbidOnly', { timeout: 90_000 }, () => {
 });
 
 describe('GitHub #27 reuseExistingServer', { timeout: 90_000 }, () => {
-  it('CI에서 포트가 비어 있으면 자기 서버를 띄워 통과하고, 끝나면 그 서버를 정리한다', async () => {
+  it('CI에서 포트가 비어 있으면 자기 서버를 띄워 통과하고 끝나면 그 서버를 정리한다', async () => {
     const port = await freePort();
     const result = await runPlaywright({
       ci: true,

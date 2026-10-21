@@ -1,4 +1,4 @@
-// 루트 playwright.config.ts의 forbidOnly와 webServer.reuseExistingServer를 그대로 쓰고,
+// 루트 playwright.config.ts의 forbidOnly와 webServer.reuseExistingServer를 그대로 쓰고
 // 시험 폴더와 서버 명령·주소만 격리된 것으로 바꾼다. tools/playwright-ci.test.ts가 실제 Playwright CLI로 실행한다.
 import { defineConfig } from '@playwright/test';
 import root from '../../playwright.config';
