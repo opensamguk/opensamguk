@@ -18,7 +18,7 @@ export function runGeneralTurn(state: WorldState, actor: Actor, command: { comma
     next = applyEffects(next, 'code' in result ? [] : result.effects);
     if (queue && next.nations[nationId]) {
       next.nationTurns ??= {};
-      next.nationTurns[nationId] = [...queue.slice(1), { commandKey: 'nation_rest', args: {} }];
+      next.nationTurns[nationId] = Array.from({ length: 30 }, (_, slot) => queue[slot + 1] ?? { commandKey: 'nation_rest', args: {} });
     }
     nation = { commandKey: slot.commandKey, result, nationId };
   }

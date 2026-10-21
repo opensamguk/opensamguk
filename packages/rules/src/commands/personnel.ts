@@ -29,7 +29,7 @@ const establish = (uprising: boolean) => defineCommand({
 });
 const join = (random: boolean) => defineCommand({
   key: random ? 'join_random' : 'join', name: random ? '무작위 임관' : '임관', category: 'strategy',
-  args: random ? z.strictObject({ nationId: positive.optional() }) : z.strictObject({ nationId: positive }),
+  args: random ? z.strictObject({ nationId: z.never().optional() }) : z.strictObject({ nationId: positive }),
   check(view, actor, args) {
     if (view.generals[actor.generalId]!.nationId !== null) return fail('BAD_STATE', '재야 장수만 임관할 수 있습니다.');
     const candidates = Object.values(view.nations).filter((n) => view.cities[n.capitalCityKey]?.nationId === n.id);
