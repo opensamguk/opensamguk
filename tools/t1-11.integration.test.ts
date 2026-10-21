@@ -545,6 +545,26 @@ describe('T1-11 생성 접수와 엔진', () => {
 });
 
 describe('T1-11 군사 명령 API·엔진 결합', () => {
+  it('등용 수락 사전 검사는 같은 월드의 서버 저장 제안을 읽는다', async () => {
+    const { a, worldId, loop } = await fixture(true, (initial) => {
+      initial.generals[0]!.nationId = null;
+      initial.commandMeta = { nextNationId: 3, offers: { 1: 2 } };
+    });
+    const turn = { commandKey: 'accept_invite', args: {} };
+    expect((await request('turns.precheck', { worldId, ...turn }, a.cookie)).data).toEqual({ ok: true });
+    expect(
+      (await request('turns.set', { worldId, revision: 0, slots: [turn, ...empty().slice(1)] }, a.cookie)).data.ok,
+    ).toBe(true);
+    await loop.advanceTo(100);
+    expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } })).toMatchObject({
+      nationId: 2,
+      cityKey: 4,
+    });
+    expect((await request('turns.precheck', { worldId, ...turn }, a.cookie)).data).toMatchObject({
+      ok: false,
+      code: 'BAD_STATE',
+    });
+  });
   it.each([
     ['recruit', true],
     ['recruit', false],
@@ -567,7 +587,7 @@ describe('T1-11 군사 명령 API·엔진 결합', () => {
           atmos: 100,
         });
         initial.cities[1]!.wall = 0;
-        initial.diplomacies = [{ nationA: 1, nationB: 2, state: 'WAR', untilTick: null }];
+        initial.diplomacies = [{ nationA: 1, nationB: 2, state: 'WAR', untilTick: 0 }];
       });
       const unit = initial.unitSet.crewTypes.find((u) => u.armType > 0)!;
       const turn = { commandKey, args: commandKey === 'attack' ? { cityKey: 2 } : { amount: 10, crewType: unit.id } };

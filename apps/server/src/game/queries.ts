@@ -22,5 +22,12 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
   const nations = await tx.nation.findMany({ where: { worldId } });
   const generals = await tx.general.findMany({ where: { worldId } });
   const diplomacies = await tx.diplomacy.findMany({ where: { worldId } });
-  return toWorldState({ startYear: world.startYear, cities, nations, generals, diplomacies } as unknown as WorldInit);
+  return toWorldState({
+    startYear: world.startYear,
+    cities,
+    nations,
+    generals,
+    diplomacies,
+    ...(world.commandMeta ? { commandMeta: world.commandMeta } : {}),
+  } as unknown as WorldInit);
 }
