@@ -117,7 +117,7 @@ ID와 amount는 1~1,000,000 정수입니다. resource는 gold 또는 rice이며 
 
 ## T1-05 명령 정의와 결과
 
-`commands/types.ts`의 CommandDef는 key·표시 이름·대상·zod 인자·precheck·check·execute를 가집니다. `runCommand()`가 입력과 실행 조건을 검사한 뒤 Effect와 로그를 반환하며, `applyEffects()`가 원본을 변경하지 않고 복사본에 적용합니다.
+`commands/types.ts`의 CommandDef는 key·표시 이름·대상·zod 인자·precheck·check·execute를 가집니다. `runCommand()`가 입력과 실행 조건을 검사한 뒤 Effect와 로그를 반환하며 `applyEffects()`가 원본을 변경하지 않고 복사본에 적용합니다.
 
 실패 코드: NO_ACTOR, NOT_NATION, NOT_OWN_CITY, NO_SUPPLY, NO_GOLD, AT_MAX, BAD_ARGS, UNKNOWN_COMMAND. 실패에는 설명이 있고 Effect가 없습니다.
 
