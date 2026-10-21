@@ -27,7 +27,7 @@ const resourceTransfer = (seize: boolean) =>
       const delta = seize ? -args.amount : args.amount;
       nation[args.resource] -= delta;
       target[args.resource] += delta;
-      return success(`${target.name} ${seize ? '몰수' : '포상'}: ${args.amount}`);
+      return success(`${target.name} ${seize ? '몰수' : '포상'}: ${args.resource === 'gold' ? '금' : '쌀'} ${args.amount}`);
     },
   });
 type Proposal = 'peace' | 'pact' | 'break' | 'aid';
@@ -88,7 +88,8 @@ const proposal = (kind: Proposal) =>
           other[args.resource!] += args.amount!;
         }
       }
-      const text = `${nation.name} → ${other.name} ${proposals[kind].name}: ${other.isNpc ? (accepted ? '수락' : '거절') : '응답 대기'}`;
+      const quantity = kind === 'aid' ? ` ${args.resource === 'gold' ? '금' : '쌀'} ${args.amount}` : '';
+      const text = `${nation.name} → ${other.name} ${proposals[kind].name}${quantity}: ${other.isNpc ? (accepted ? '수락' : '거절') : '응답 대기'}`;
       return {
         ...success(text),
         history: [

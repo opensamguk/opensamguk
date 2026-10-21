@@ -156,5 +156,9 @@ describe('명령 경계와 국가 예턴', () => {
     const result = execute(state, 1, 'nation_peace', { nationId: 2 }, 'nation');
     expect(result.state).toEqual(state);
     expect(result.result.history?.[0]?.text).toContain('응답 대기');
+    state.diplomacies = [];
+    const aid = execute(state, 1, 'nation_aid', { nationId: 2, resource: 'rice', amount: 100 }, 'nation');
+    expect(aid.state).toEqual(state);
+    expect(aid.result.history?.[0]?.text).toContain('원조 쌀 100: 응답 대기');
   });
 });
