@@ -13,6 +13,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Runtime pins: recheck official Node releases and the Docker Official postgres index in a PR.
+  # Update only after opposite-side review and exact-head CI; keep both Node patches identical.
   checks:
     name: opensamguk-check
     runs-on: ubuntu-24.04
@@ -31,7 +33,7 @@ jobs:
           version: 10.33.0
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: '24'
+          node-version: '24.22.0'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
@@ -48,7 +50,7 @@ jobs:
       SERVER_PORT: '3001'
     services:
       postgres:
-        image: postgres:18-alpine
+        image: postgres:18.6-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
         env:
           POSTGRES_USER: opensamguk
           POSTGRES_PASSWORD: opensamguk
@@ -74,7 +76,7 @@ jobs:
           version: 10.33.0
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: '24'
+          node-version: '24.22.0'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:int
