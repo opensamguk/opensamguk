@@ -25,11 +25,13 @@ export function CommandPreview({
   home: Home;
   turnTermMinutes: number;
 }) {
-  const times = slotTimes(home.nextTurnAt, turnTermMinutes, home.turnsPreview.length);
+  // args는 JSON 값이라 tRPC 직렬화 타입이 깊다. 여기서는 칸 번호와 명령 키만 쓴다.
+  const turns = home.turnsPreview as unknown as ReadonlyArray<{ slot: number; commandKey: string }>;
+  const times = slotTimes(home.nextTurnAt, turnTermMinutes, turns.length);
   return (
     <div className={styles.commands}>
       <ol className={styles.list} aria-label="예약한 명령">
-        {home.turnsPreview.map((turn, i) => (
+        {turns.map((turn, i) => (
           <li key={turn.slot} className={styles.row} data-slot={turn.slot}>
             <span className={`num ${styles.slot}`}>{turn.slot + 1}</span>
             <span className={`num ${styles.time}`}>{formatClock(times[i] ?? null)}</span>

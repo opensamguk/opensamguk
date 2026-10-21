@@ -33,7 +33,7 @@ test.describe('로그인한 상태', () => {
   test('메뉴로 이동하면 현재 메뉴가 표시된다', async ({ page }) => {
     await page.goto('/w/1');
     await page.getByRole('link', { name: '기록', exact: true }).click();
-    await expect(page).toHaveURL('/w/1/records');
+    await expect(page).toHaveURL(/\/w\/1\/records(\?tab=general)?$/);
     await expect(page.getByRole('link', { name: '기록', exact: true })).toHaveAttribute('aria-current', 'page');
   });
 });

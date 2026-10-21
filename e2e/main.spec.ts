@@ -32,7 +32,8 @@ test.describe.configure({ mode: 'serial' });
 test.beforeAll(async ({ browser }) => {
   test.setTimeout(120_000);
   ctx.worldId = await createRunningWorld(`E2E 메인 ${Date.now()}`, 1);
-  const context = await browser.newContext({ baseURL: BASE });
+  // 이 파일의 test.use(storageState)가 아직 없는 파일을 읽지 않도록 빈 상태로 시작한다.
+  const context = await browser.newContext({ baseURL: BASE, storageState: { cookies: [], origins: [] } });
   const page = await context.newPage();
   await signUpByApi(page);
   const { user } = await query<{ user: { id: string } }>(context.request, 'auth.me');
