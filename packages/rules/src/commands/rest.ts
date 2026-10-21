@@ -4,6 +4,7 @@ import type { CommandDef, Failure } from './types';
 export const rest: CommandDef = {
   key: 'rest',
   name: '휴식',
+  category: 'personal',
   target: 'general',
   args: z.strictObject({}),
   precheck: (view, actor): Failure | null =>
