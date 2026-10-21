@@ -29,7 +29,8 @@ const ctx: { worldId: string; home: HomeData; map: MapData } = {
   map: undefined as unknown as MapData,
 };
 
-test.describe.configure({ mode: 'serial' });
+// 한 파일의 시험은 한 작업자에서 선언 순서대로 돈다. serial로 묶지 않아 한 시험이 실패해도 뒤 시험은 계속 돈다.
+// 실패 뒤 새 작업자에서는 beforeAll이 새 계정으로 다시 돈다.
 
 test.beforeAll(async ({ browser }) => {
   test.setTimeout(120_000);
