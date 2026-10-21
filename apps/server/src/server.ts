@@ -47,7 +47,7 @@ export async function buildServer(options: {
     options.logStream,
   );
   const server = fastify({
-    trustProxy: (options.trustProxy ?? trustProxyValue === '1') ? 1 : false,
+    trustProxy: (options.trustProxy ?? trustProxyValue === '1') ? (_address: string, hop: number) => hop === 0 : false,
     routerOptions: { maxParamLength: 5000 },
     ...(options.logging === false ? { logger: false } : { loggerInstance: log }),
   });
@@ -57,7 +57,10 @@ export async function buildServer(options: {
     reply.header('X-Frame-Options', 'DENY');
     const path = req.url.split('?')[0]!;
     if (path !== '/trpc' && !path.startsWith('/trpc/')) return;
-    if (req.method !== 'POST' && req.headers.accept !== 'text/event-stream') return;
+    const sse = req.headers.accept
+      ?.split(',')
+      .some((value) => value.split(';')[0]?.trim().toLowerCase() === 'text/event-stream');
+    if (req.method !== 'POST' && !sse) return;
     const origin = req.headers.origin;
     if (origin !== undefined ? origin !== publicOrigin : req.headers['sec-fetch-site'] !== 'same-origin')
       return reply.code(403).send({ error: '같은 출처에서 요청하세요.' });

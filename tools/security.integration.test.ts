@@ -163,6 +163,37 @@ describe('T3-04 실제 TCP HTTP·PostgreSQL 보안', () => {
       );
       expect((await send(base, 'auth.login', credentials())).code).toBe('TOO_MANY_REQUESTS');
     }));
+  it('Caddy 한 단계 설정은 오른쪽 실제 전달 IP만 믿는다', async () =>
+    withServer(
+      async (base) => {
+        for (let i = 0; i < 5; i++)
+          expect(
+            (
+              await send(
+                base,
+                'auth.login',
+                { ...credentials(), password: password + '!' },
+                { headers: { 'x-forwarded-for': `198.51.100.${i + 1}, 192.0.2.10` } },
+              )
+            ).code,
+          ).toBe('UNAUTHORIZED');
+        expect(
+          (
+            await send(base, 'auth.login', credentials(), {
+              headers: { 'x-forwarded-for': '198.51.100.99, 192.0.2.10' },
+            })
+          ).code,
+        ).toBe('TOO_MANY_REQUESTS');
+        expect(
+          (
+            await send(base, 'auth.login', credentials(), {
+              headers: { 'x-forwarded-for': '198.51.100.99, 192.0.2.11' },
+            })
+          ).status,
+        ).toBe(200);
+      },
+      { trustProxy: true },
+    ));
   it('동일 IP 로그인31번째는 차단하며 위조 X-Forwarded-For는 기본 설정에서 한도를 피하지 못한다', async () =>
     withServer(async (base) => {
       for (let i = 0; i < 30; i++) expect((await send(base, 'auth.login', credentials())).status).toBe(200);
@@ -245,6 +276,12 @@ describe('T3-04 실제 TCP HTTP·PostgreSQL 보안', () => {
         body: '{}',
       });
       expect(sameOrigin.status).toBe(200);
+      const sseRejected = await fetch(`${base}/trpc/health`, {
+        headers: { accept: 'text/event-stream, */*', origin: 'https://attacker.invalid' },
+      });
+      expect(sseRejected.status).toBe(403);
+      const sseAllowed = await fetch(`${base}/trpc/health`, { headers: { accept: 'text/event-stream', origin } });
+      expect(sseAllowed.status).toBe(200);
       expect(
         (
           await send(base, 'auth.login', credentials(), {
@@ -286,7 +323,7 @@ describe('T3-04 실제 TCP HTTP·PostgreSQL 보안', () => {
     await withServer(async (base) => {
       expect((await send(base, 'auth.login', credentials())).status).toBe(200);
     });
-    for (const secret of [password, user.email, other.email, '127.0.0.1', '198.51.100.2'])
+    for (const secret of [password, user.email, other.email, '127.0.0.2', '198.51.100.2'])
       expect(logText.includes(secret)).toBe(false);
   });
 });
