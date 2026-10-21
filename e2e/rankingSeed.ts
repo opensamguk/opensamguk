@@ -30,13 +30,16 @@ async function settled(emails: string[]) {
   );
   if (!top || !outside || !newcomer) throw new Error('계정 세 개가 필요합니다.');
   const initial = await loadInitialWorld({ scenario: '1030', map: 'che', seed: 'e2e-ranking' });
-  // 모두 등장시켜 상위 100명 밖이 생기게 하고, 첫 정산 전에는 차례가 오지 않게 해 정산만 돌린다.
+  // 130명만 등장시켜 상위 100명 밖이 생기게 한다. 정산은 바뀐 장수를 한 명씩 저장하므로 수를 줄여
+  // 부하가 큰 기계에서도 정산 트랜잭션 제한(30초) 안에 들게 한다. 나머지는 50년 뒤 등장이라 순위에 없다.
+  // 첫 정산 전에는 차례가 오지 않게 해 정산만 돌린다.
   // 시나리오의 공헌·경험은 모두 0이라 기준마다 순서가 달라지도록 지력·통솔에서 값을 준다.
-  const ids = initial.generals.map((g) => g.id);
-  const [firstId, lastId] = [Math.min(...ids), Math.max(...ids)];
+  const ids = initial.generals.map((g) => g.id).sort((a, b) => a - b);
+  const [firstId, lastId] = [ids[0]!, ids.at(-1)!];
+  const appearing = new Set([...ids.slice(0, 129), lastId]);
   initial.generals = initial.generals.map((g) => ({
     ...g,
-    activeFromYear: initial.startYear,
+    activeFromYear: appearing.has(g.id) ? initial.startYear : initial.startYear + 50,
     nextTurnTick: TICKS_PER_MONTH + 1,
     dedication: g.intel * 100,
     experience: g.leadership * 100,
@@ -80,7 +83,7 @@ async function settled(emails: string[]) {
   } finally {
     await releaseLease(db, lease);
   }
-  return { worldId, generals: ids.length };
+  return { worldId, generals: appearing.size };
 }
 
 async function remove(worldIds: string[]) {
