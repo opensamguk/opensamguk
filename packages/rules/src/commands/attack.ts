@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { Rng } from '@opensamguk/shared';
 import { BALANCE } from '../balance';
-import type { Actor } from './types';
+import type { Actor, CommandResult } from './types';
 import type { InitialGeneral } from '../world/bootstrap';
 import type { DeepReadonly } from '../model/world';
 import type { UnitSetResource } from '../world/resources';
@@ -100,12 +100,18 @@ export const attack = defineCommand({
       )
       .sort((a, b) => b.crew - a.crew || a.id - b.id);
     const reports: { generalId: number; text: string }[] = [];
+    const battleAwards: NonNullable<CommandResult['battleAwards']> = [];
     const rounds: string[] = [];
     let cleared = true;
     for (const defender of defenders) {
       feed(g);
       feed(defender);
       fight(g, defender, actor, rng, aTech, bTech);
+      const attackerSurvives = g.crew > 0 && g.atmos > 0;
+      const defenderSurvives = defender.crew > 0 && defender.atmos > 0;
+      if (attackerSurvives && !defenderSurvives) battleAwards.push({ generalId: g.id, wins: 1, captures: 0 });
+      else if (!attackerSurvives && defenderSurvives)
+        battleAwards.push({ generalId: defender.id, wins: 1, captures: 0 });
       const text = `${g.name} 대 ${defender.name}: 공격 ${g.crew}명, 수비 ${defender.crew}명`;
       rounds.push(text);
       reports.push({ generalId: defender.id, text });
@@ -124,6 +130,7 @@ export const attack = defineCommand({
     const captured = cleared && city.wall === 0 && g.crew > 0 && g.atmos > 0;
     const history: { nationId: number; text: string }[] = [];
     if (captured) {
+      battleAwards.push({ generalId: g.id, wins: 0, captures: 1 });
       city.nationId = attackingNation;
       city.defence = 0;
       city.security = Math.round(city.security * BALANCE.CAPTURE_SECURITY_FACTOR);
@@ -151,6 +158,6 @@ export const attack = defineCommand({
     for (const report of reports) report.text += `, ${captured ? '점령' : '수비 유지'}`;
     history.push({ nationId: attackingNation, text: `${rounds.join('; ')}; ${summary}` });
     if (defendingNation !== null) history.push({ nationId: defendingNation, text: summary });
-    return { ...success(`${rounds.join('\n')}\n${summary}`), reports, history };
+    return { ...success(`${rounds.join('\n')}\n${summary}`), reports, history, battleAwards };
   },
 });

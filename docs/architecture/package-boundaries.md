@@ -15,9 +15,9 @@ tools/* ───────────▶ 무엇이든 (배포물에 포함�
 
 - 화살표 반대 방향 import는 금지입니다.
 - `apps/*`끼리는 서로 import하지 않습니다. 공유할 것은 `packages/`로 옮깁니다.
-- `apps/web`은 `packages/rules`를 import하지 않습니다 ⚠️. 화면의 사전 검사는 server API로 받습니다.
+- `apps/web`은 `packages/rules`를 import하지 않습니다. 화면의 사전 검사는 server API로 받습니다.
   (예외가 필요하면 순수 함수만 골라 `packages/shared`로 옮깁니다.)
-- **예외 하나:** `apps/web`은 `@opensamguk/server/router`에서 tRPC `AppRouter` **타입만** import합니다 (`import type`).
+- 예외 하나: `apps/web`은 `@opensamguk/server/router`에서 tRPC `AppRouter` 타입만 import합니다 (`import type`).
   값 import는 lint가 막습니다.
 
 ## 패키지별 책임
@@ -33,7 +33,7 @@ tools/* ───────────▶ 무엇이든 (배포물에 포함�
 
 ## 검사
 
-`eslint.config.js`가 막고, `tools/lint-boundaries.test.ts`가 규칙이 실제로 동작하는지 확인합니다 (`pnpm check`).
+`eslint.config.js`가 막고 `tools/lint-boundaries.test.ts`가 규칙이 실제로 동작하는지 확인합니다 (`pnpm check`).
 
 - import 방향: 패키지별 `no-restricted-imports`.
 - 상대 경로로 다른 패키지 들어가기: 로컬 규칙 `opensamguk/no-cross-package-relative`가 실제로 풀린 경로로 판단해 막습니다.

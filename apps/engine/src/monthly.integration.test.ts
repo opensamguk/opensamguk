@@ -23,10 +23,22 @@ beforeAll(async () => {
 });
 afterAll(async () => {
   await db.world.deleteMany();
+  await db.user.deleteMany({ where: { id: { startsWith: 'monthly-rest-human-' } } });
   await db.$disconnect();
 });
-async function create() {
-  const { worldId } = await saveInitialWorld(db, template, { name: '월간 통합', turnTermMinutes: 60 });
+async function create(human = false) {
+  const initial = structuredClone(template);
+  if (human) {
+    for (const general of initial.generals) {
+      general.userId = `monthly-rest-human-${general.id}`;
+      await db.user.upsert({
+        where: { id: general.userId },
+        update: {},
+        create: { id: general.userId, email: `${general.userId}@example.invalid`, passwordHash: 'test-only' },
+      });
+    }
+  }
+  const { worldId } = await saveInitialWorld(db, initial, { name: '월간 통합', turnTermMinutes: 60 });
   await controlClock(db, worldId, 'start');
   const lease = (await acquireLease(db, worldId))!;
   return { worldId, lease, loop: new TurnLoop(db, lease) };
@@ -66,7 +78,7 @@ async function setTurns(worldId: string, commandKey: string, idempotencyKey: str
 
 describe('AC-M1-12 실제 PostgreSQL 월 경계', () => {
   it('앞선 턴 → 정산 → 같은 tick 턴, 국가 기록·소유권·해시를 한 번만 저장한다', async () => {
-    const { worldId, loop } = await create();
+    const { worldId, loop } = await create(true);
     expect(await loop.advanceTo(10000)).toEqual([
       { generalId: 1, tick: 100, commandKey: 'rest' },
       { generalId: 2, tick: 10000, commandKey: 'rest' },

@@ -83,6 +83,12 @@ export async function persistCommandReports(
   attackerId: number,
   result: CommandResult,
 ) {
+  for (const award of result.battleAwards ?? []) {
+    await tx.general.update({
+      where: { worldId_id: { worldId, id: award.generalId } },
+      data: { battleWins: { increment: award.wins }, captures: { increment: award.captures } },
+    });
+  }
   await tx.battleLog.createMany({
     data: (result.reports ?? []).map((report) => ({ ...report, worldId, tick, attackerId })),
   });
