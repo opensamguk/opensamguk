@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { expect, test, type BrowserContext, type Locator, type Page } from '@playwright/test';
 import { newEmail, signUpByApi } from './account';
+import { e2eWorld } from './game';
 
 // T2-23 · AC-M2-19 (화면). 실제 DB에 월드를 만들고 엔진으로 첫 월간 정산을 돌린 뒤 순위 화면과 API를 함께 본다.
 // 준비는 e2e/rankingSeed.ts가 한다. dev 서버와 같은 DATABASE_URL(.env)을 쓴다.
@@ -69,6 +70,10 @@ test.beforeAll(async ({ browser }, testInfo) => {
     pages[who] = await context.newPage();
     emails.push(await signUpByApi(pages[who], newEmail()));
   }
+  // dev 엔진은 RUNNING 월드 중 가장 먼저 만든 것 하나에 묶인다. 정산 준비가 잠깐 RUNNING으로 두는 순위 월드에
+  // 묶이면 그 월드를 지울 때 엔진이 실행 실패로 멈추고, 뒤의 장수 생성·예턴 E2E가 엔진 없이 돈다.
+  // 그래서 공용 E2E 월드를 먼저 만들어 엔진이 그쪽에 묶이게 한다.
+  await e2eWorld(pages.top);
   worlds.fresh = String(seed('fresh').worldId);
   worlds.settled = String(seed('settled', ...emails).worldId);
 });
