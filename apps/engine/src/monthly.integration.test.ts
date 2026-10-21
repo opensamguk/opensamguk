@@ -13,6 +13,7 @@ import { acquireLease, LeaseLostError, releaseLease, renewLease } from './lease'
 import { controlClock } from './world/clock';
 import { saveInitialWorld, readWorldState } from './world/persistence';
 import { exportReplay, replayArchive } from './replay';
+import { appendNationHistory } from './commandPersistence';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -94,6 +95,32 @@ describe('AC-M1-12 실제 PostgreSQL 월 경계', () => {
     await loop.advanceTo(10000);
     expect(await db.yearbookSnapshot.count({ where: { worldId } })).toBe(1);
     expect(await db.generalLog.count({ where: { worldId } })).toBe(2);
+  });
+
+  it('경계 tick에 먼저 저장한 사건과 월간 요약을 합치고 이후 사건도 보존한다', async () => {
+    const { worldId, loop } = await create(true);
+    await db.$transaction(async (tx) => {
+      await appendNationHistory(tx, worldId, 10000, 1, '정산 전 사건');
+      await appendNationHistory(tx, worldId, 10000, 1, '정산 전 두 번째 사건');
+    });
+    await loop.advanceTo(10000);
+    const where = { worldId_tick_nationId: { worldId, tick: 10000, nationId: 1 } };
+    const snapshot = await db.yearbookSnapshot.findFirstOrThrow({ where: { worldId } });
+    const nation = (snapshot.data as { nations: Array<{ nationId: number }> }).nations.find(
+      (entry) => entry.nationId === 1,
+    )!;
+    expect((await db.nationHistory.findUniqueOrThrow({ where })).data).toEqual({
+      ...nation,
+      events: ['정산 전 사건', '정산 전 두 번째 사건'],
+    });
+    await db.$transaction((tx) => appendNationHistory(tx, worldId, 10000, 1, '정산 후 사건'));
+    const expected = { ...nation, events: ['정산 전 사건', '정산 전 두 번째 사건', '정산 후 사건'] };
+    expect((await db.nationHistory.findUniqueOrThrow({ where })).data).toEqual(expected);
+    await loop.advanceTo(10000);
+    expect((await db.nationHistory.findUniqueOrThrow({ where })).data).toEqual(expected);
+    expect(await db.nationHistory.count({ where: { worldId } })).toBe(2);
+    expect(await db.yearbookSnapshot.count({ where: { worldId } })).toBe(1);
+    expect(replayArchive(await exportReplay(db, worldId), 1)[0]!.stateHash).toBe(snapshot.stateHash);
   });
 
   it.each(['error', 'token', 'expiry'])(
