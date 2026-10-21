@@ -321,7 +321,7 @@ test.describe('예턴 편집', () => {
     await row(page, 1).click();
     await row(page, 2).click();
     await pick(page, '농지 개간');
-    await editor(page).getByRole('button', { name: '1, 2번 칸에 넣기' }).click();
+    await editor(page).getByRole('button', { name: '1~2번 칸에 넣기' }).click();
     await saveButton(page).click();
     await expect(editor(page).getByText('저장했습니다.')).toBeVisible();
     const before = await turns(page, world);
