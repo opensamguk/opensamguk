@@ -208,4 +208,17 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
     await request('auth.logout', undefined, a);
     expect((await request('auth.me', undefined, b)).data).toHaveProperty('user.id', users[1]!.id);
   });
+  it('health의 임의 입력은 계정 정보를 더하거나 DB를 바꾸지 않는다', async () => {
+    const before = await snapshot();
+    const result = await request('health', { userId: users[1]!.id, unexpected: true });
+    expect(result.status).toBe(200);
+    expect(Object.keys(result.data as object).sort()).toEqual(['db', 'ruleset', 'server']);
+    expect(await snapshot()).toEqual(before);
+  });
+  it('제재 계정의 기존 이메일로 다시 가입해도 계정과 세션이 늘지 않는다', async () => {
+    const cookie = await session(2);
+    const before = await snapshot();
+    expect((await request('auth.signup', { email: users[2]!.email, password }, cookie)).code).toBe('CONFLICT');
+    expect(await snapshot()).toEqual(before);
+  });
 });

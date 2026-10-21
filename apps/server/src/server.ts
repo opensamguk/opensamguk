@@ -56,7 +56,7 @@ export async function buildServer(options: {
     reply.header('X-Content-Type-Options', 'nosniff');
     reply.header('Referrer-Policy', 'same-origin');
     reply.header('X-Frame-Options', 'DENY');
-    const path = req.url.split('?')[0]!;
+    const path = req.routeOptions.url ?? req.url.split('?')[0]!;
     if (path !== '/trpc' && !path.startsWith('/trpc/')) return;
     const sse = req.headers.accept
       ?.split(',')
