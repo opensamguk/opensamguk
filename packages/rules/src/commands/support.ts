@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { Rng } from '@opensamguk/shared';
 import { BALANCE } from '../balance';
 import type { WorldState, WorldView } from '../model/world';
+import { cloneWorld } from '../model/clone';
 import type { Actor, CommandDef, CommandResult, Failure } from './types';
 
 export const noArgs = z.strictObject({});
@@ -49,7 +50,7 @@ export function defineCommand<A>(spec: {
     execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): CommandResult {
       const failure = check(view, actor, raw);
       if (failure) throw new Error(failure.message);
-      const state = structuredClone(view) as WorldState;
+      const state = cloneWorld(view);
       const result = spec.change(state, actor, spec.args.parse(raw), rng);
       return { ...result, effects: [{ kind: 'world', state }] };
     },
