@@ -128,7 +128,7 @@ describe('AC-M1-13 재생 기록 검사', () => {
     };
     let sequence = 0;
     while (replay.monthlyTick < 120000) {
-      replay = runReplayAction(replay, initial.seed);
+      replay = runReplayAction(replay, initial.seed, initial.unitSet);
       sequence++;
       if (replay.monthlyTick / 10000 > archive.months.length) {
         archive.months.push({

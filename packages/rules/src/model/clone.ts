@@ -17,7 +17,11 @@ export function cloneWorld(view: WorldView): WorldState {
     nations,
     generals,
     diplomacies: view.diplomacies.map((d) => ({ ...d })),
-    ...(view.commandMeta ? { commandMeta: { nextNationId: view.commandMeta.nextNationId, offers: { ...view.commandMeta.offers } } } : {}),
-    ...(view.nationTurns ? { nationTurns: structuredClone(view.nationTurns) as NonNullable<WorldState['nationTurns']> } : {}),
+    ...(view.commandMeta
+      ? { commandMeta: { nextNationId: view.commandMeta.nextNationId, offers: { ...view.commandMeta.offers } } }
+      : {}),
+    ...(view.nationTurns
+      ? { nationTurns: structuredClone(view.nationTurns) as NonNullable<WorldState['nationTurns']> }
+      : {}),
   };
 }

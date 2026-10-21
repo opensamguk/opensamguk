@@ -11,13 +11,14 @@ export type Effect =
   | Change<'general', 'gold' | 'rice' | 'crew' | 'train' | 'atmos' | 'experience' | 'dedication' | 'injury'>;
 
 export function applyEffects(state: WorldState, effects: readonly Effect[]): WorldState {
-  let next = cloneWorld(state);
+  let next: WorldState | undefined;
   for (const effect of effects) {
     if (effect.kind === 'world') {
       next = cloneWorld(effect.state);
       continue;
     }
     if (!Number.isFinite(effect.value)) throw new Error('효과 값은 유한한 수여야 합니다.');
+    next ??= cloneWorld(state);
     const entity =
       effect.kind === 'city'
         ? next.cities[effect.id]
@@ -35,5 +36,5 @@ export function applyEffects(state: WorldState, effects: readonly Effect[]): Wor
     const value = Math.max(0, Math.min(max, effect.op === 'add' ? old + effect.value : effect.value));
     values[effect.field] = ['trust', 'tech'].includes(effect.field) ? value : Math.round(value);
   }
-  return next;
+  return next ?? cloneWorld(state);
 }

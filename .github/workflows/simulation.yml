@@ -2,14 +2,19 @@ name: NPC simulation
 
 on:
   push:
-    branches: ['wt/t_4816e635']
+    paths:
+      - 'packages/rules/src/**'
+      - 'apps/engine/src/simulation.ts'
+      - 'tools/sim/**'
+      - 'resources/**'
+      - '.github/workflows/simulation.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: simulation-${{ github.ref }}
+  group: simulation-${{ github.sha }}
   cancel-in-progress: true
 
 jobs:
@@ -33,21 +38,42 @@ jobs:
           node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Diagnostic formatting patch
-        run: |
-          pnpm exec prettier --write apps/engine/src/simulation.ts apps/engine/src/turnLoop.ts packages/rules/src/npc packages/rules/src/model/clone.ts packages/rules/src/model/clone.test.ts packages/rules/src/commands/turn.ts packages/rules/src/commands/effects.ts packages/rules/src/commands/support.ts tools/sim .github/workflows/simulation.yml
-          git diff --binary > format.patch
-      - run: pnpm check
+      - name: Runner hardware
+        run: node --input-type=module -e "import os from 'node:os'; console.log(JSON.stringify({node:process.version,cpu:os.cpus()[0].model,logicalCpus:os.cpus().length,memoryBytes:os.totalmem(),platform:os.platform(),arch:os.arch()}))" | tee hardware.json
       - name: Full ten seeds and determinism
-        if: ${{ !cancelled() }}
         run: |
           pnpm sim --seeds 10 --output simulation.jsonl
+          pnpm sim --seed 1 --repeat --output simulation-repeat.jsonl
           pnpm sim --seed 1 --repeat --convergence off --output simulation-off.jsonl
+      - name: Verify complete result set
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          def rows(name):
+              return [json.loads(line) for line in Path(name).read_text().splitlines()]
+          ten = rows('simulation.jsonl')
+          repeated = rows('simulation-repeat.jsonl')
+          off = rows('simulation-off.jsonl')
+          assert len(ten) == 10 and {row['seed'] for row in ten} == {str(i) for i in range(1, 11)}
+          assert len(repeated) == len(off) == 2
+          for row in ten + repeated + off:
+              assert row['scenario'] == '1030' and row['cities'] == 94 and row['generals'] == 491 and row['maxYear'] == 300
+              assert 0 < row['seconds'] <= 900 and row['turns'] > 0
+              assert row['commandCounts'].get('attack', 0) > 0
+              assert row['outcome'] == '통일' and row['winner'] is not None and row['remainingNations'] == 1 or row['outcome'] == '종료연도' and row['winner'] is None and (row['finalYear'], row['finalMonth']) == (300, 12)
+          assert all(row['convergence'] for row in ten + repeated)
+          assert not any(row['convergence'] for row in off)
+          assert ten[0]['stateHash'] == repeated[0]['stateHash'] == repeated[1]['stateHash']
+          assert ten[0]['turns'] == repeated[0]['turns'] == repeated[1]['turns']
+          assert off[0]['stateHash'] == off[1]['stateHash'] and off[0]['turns'] == off[1]['turns']
+          print(json.dumps({'completedSeeds': len(ten), 'repeatOn': True, 'repeatOff': True, 'maximumSeconds': max(row['seconds'] for row in ten + repeated + off)}))
+          PY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: ${{ !cancelled() }}
         with:
           name: simulation-${{ github.sha }}
           path: |
             simulation*.jsonl
-            format.patch
+            hardware.json
           if-no-files-found: error
