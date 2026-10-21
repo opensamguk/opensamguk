@@ -37,6 +37,7 @@
 | M1 작업 계획 [T1-03](./plans/T1-03.md) ~ [T1-17](./plans/T1-17.md), [T1-19](./plans/T1-19.md), [T1-20](./plans/T1-20.md) ~ [T1-25](./plans/T1-25.md) | 계획 완료 | 지금 |
 | M2 작업 계획 [T2-01](./plans/T2-01.md) ~ [T2-17](./plans/T2-17.md), [T2-20](./plans/T2-20.md) ~ [T2-23](./plans/T2-23.md) | 계획 완료 | M2 |
 | M3 작업 계획                           | 예정 | M3 전 |
+| [Phase 2 확장 기술 명세](./plans/phase2-expansion.md) (AC-P2·T4 제안) | 초안 | Phase 2 |
 
 ## architecture/ 무엇이 어디서 실행되나
 
