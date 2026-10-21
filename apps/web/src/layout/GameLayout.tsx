@@ -8,6 +8,7 @@ const NAV = [
   { to: '/w/$worldId/map', label: '지도' },
   { to: '/w/$worldId/turns', label: '예턴' },
   { to: '/w/$worldId/records', label: '기록' },
+  { to: '/w/$worldId/ranking', label: '순위' },
 ] as const;
 
 // 위쪽 띠(월드·연월·다음 턴·메뉴·로그아웃) + 왼쪽 내 장수 요약 + 본문.
