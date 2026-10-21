@@ -48,7 +48,7 @@ const establish = (uprising: boolean) =>
     },
   });
 const join = (random: boolean) =>
-  defineCommand({
+  defineCommand<{ nationId?: number | undefined }>({
     key: random ? 'join_random' : 'join',
     name: random ? '무작위 임관' : '임관',
     category: 'strategy',
