@@ -23,10 +23,11 @@ beforeAll(async () => {
 });
 afterAll(async () => {
   await db.world.deleteMany();
+  await db.user.deleteMany({ where: { id: 'turn-rest-human' } });
   await db.$disconnect();
 });
 
-async function create(count = 1) {
+async function create(count = 1, human = false) {
   const initial = structuredClone(template);
   const city = initial.cities.find((city) => city.nationId !== null)!;
   city.agriculture = 100;
@@ -42,6 +43,15 @@ async function create(count = 1) {
     gold: 1000,
     injury: 3,
   }));
+  if (human) {
+    const userId = 'turn-rest-human';
+    await db.user.upsert({
+      where: { id: userId },
+      update: {},
+      create: { id: userId, email: `${userId}@example.invalid`, passwordHash: 'test-only' },
+    });
+    initial.generals[0]!.userId = userId;
+  }
   const { worldId } = await saveInitialWorld(db, initial, { name: '엔진 통합', turnTermMinutes: 10 });
   await controlClock(db, worldId, 'start');
   return { worldId, cityKey: city.cityKey };
@@ -106,7 +116,7 @@ async function kill(child: ChildProcess) {
 
 describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
   it('시계 주입: 턴 시각에 농업·금·로그·30칸 당김·revision을 함께 저장한다', async () => {
-    const { worldId, cityKey } = await create();
+    const { worldId, cityKey } = await create(1, true);
     await queue(worldId);
     const loop = await engine(worldId);
     expect(await loop.advanceTo(499)).toEqual([]);

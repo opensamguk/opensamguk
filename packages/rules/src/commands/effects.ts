@@ -1,5 +1,6 @@
 import { BALANCE } from '../balance';
 import type { WorldState } from '../model/world';
+import { cloneWorld } from '../model/clone';
 
 type Change<K extends string, F extends string> = { kind: K; id: number; field: F; op: 'add' | 'set'; value: number };
 export type CityField = 'population' | 'agriculture' | 'commerce' | 'security' | 'defence' | 'wall' | 'trust';
@@ -10,13 +11,14 @@ export type Effect =
   | Change<'general', 'gold' | 'rice' | 'crew' | 'train' | 'atmos' | 'experience' | 'dedication' | 'injury'>;
 
 export function applyEffects(state: WorldState, effects: readonly Effect[]): WorldState {
-  let next = structuredClone(state);
+  let next: WorldState | undefined;
   for (const effect of effects) {
     if (effect.kind === 'world') {
-      next = structuredClone(effect.state);
+      next = cloneWorld(effect.state);
       continue;
     }
     if (!Number.isFinite(effect.value)) throw new Error('효과 값은 유한한 수여야 합니다.');
+    next ??= cloneWorld(state);
     const entity =
       effect.kind === 'city'
         ? next.cities[effect.id]
@@ -34,5 +36,5 @@ export function applyEffects(state: WorldState, effects: readonly Effect[]): Wor
     const value = Math.max(0, Math.min(max, effect.op === 'add' ? old + effect.value : effect.value));
     values[effect.field] = ['trust', 'tech'].includes(effect.field) ? value : Math.round(value);
   }
-  return next;
+  return next ?? cloneWorld(state);
 }
