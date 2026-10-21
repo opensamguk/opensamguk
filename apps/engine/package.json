@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=../../.env src/index.ts",
     "engine:run": "tsx --env-file-if-exists=../../.env src/index.ts",
+    "supervisor": "tsx --env-file-if-exists=../../.env src/index.ts",
     "typecheck": "tsc -p tsconfig.json",
     "world:create": "tsx --env-file-if-exists=../../.env src/cli/createWorld.ts",
     "world:start": "tsx --env-file-if-exists=../../.env src/cli/controlWorld.ts start",
