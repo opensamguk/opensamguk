@@ -52,12 +52,13 @@ async function query<R extends keyof Results>(
     `${base}/trpc/${route}?batch=1&input=${encodeURIComponent(JSON.stringify({ 0: input }))}`,
     {
       method,
-      headers: cookie ? { cookie } : {},
+      headers: { ...(cookie ? { cookie } : {}), ...(method === 'POST' ? { 'content-type': 'application/json' } : {}) },
+      ...(method === 'POST' ? { body: JSON.stringify({ 0: input }) } : {}),
     },
   );
-  const body = (
-    (await response.json()) as Array<{ result?: { data: Results[R] }; error?: { data: { code: string } } }>
-  )[0]!;
+  type Envelope = { result?: { data: Results[R] }; error?: { data: { code: string } } };
+  const payload = (await response.json()) as Envelope | Envelope[];
+  const body = Array.isArray(payload) ? payload[0]! : payload;
   return { status: response.status, data: body.result?.data as Results[R], error: body.error?.data.code };
 }
 const routeInput = (route: keyof Results, id = worldId) => ({
@@ -351,6 +352,9 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       expect(second.nextCursor).toBeNull();
       expect((await query(route, { worldId, cursor: '10000' })).data).toEqual({ items: [], nextCursor: null });
       expect(new Set([...first.items, ...second.items].map((row) => row.tick)).size).toBe(35);
+      const exactPage = (await query(route, { worldId, cursor: '310000' })).data;
+      expect(exactPage.items).toHaveLength(30);
+      expect(exactPage.nextCursor).toBeNull();
     },
   );
 
@@ -498,7 +502,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         medianMs: sorted[10],
         p95Ms: sorted[18],
         minMs: sorted[0],
-        target: 'warm median < 50ms; individual samples reported',
+        target: 'one warm request < 50ms; median and individual samples reported',
         node: process.version,
         platform: platform(),
         release: release(),
@@ -507,6 +511,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         database: version[0]!.version,
       }),
     );
+    expect(samples[0]).toBeLessThan(50);
     expect(sorted[10]).toBeLessThan(50);
   });
 });
