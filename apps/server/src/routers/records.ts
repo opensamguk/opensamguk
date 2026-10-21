@@ -20,7 +20,13 @@ export const recordsRouter = router({
       const general = await requireGeneral(tx, input.worldId, ctx.user.id);
       if (general.nationId === null) return { items: [], nextCursor: null };
       const history = await tx.nationHistory.findMany({
-        where: { worldId: input.worldId, nationId: general.nationId, ...beforeCursor(input.cursor) },
+        where: {
+          worldId: input.worldId,
+          nationId: general.nationId,
+          // 사건 전용 JSON은 LIMIT 적용 전에 제외한다. 월간 요약의 nationId만 조회한다.
+          data: { path: ['nationId'], equals: general.nationId },
+          ...beforeCursor(input.cursor),
+        },
         orderBy: { tick: 'desc' },
         take: 31,
         select: { tick: true, data: true },
