@@ -25,7 +25,16 @@
 | `apps/server/src/auth/` | Argon2id, 세션 토큰 해시·만료·연장, 실제 HTTP·DB 테스트 |
 | `apps/server/src/routers/auth.ts` | 가입·로그인·로그아웃·현재 계정 |
 | `apps/server/src/trpc.ts` | 공개·인증 필수 procedure |
-| `apps/server/src/router.ts` | tRPC `AppRouter` (API 계약): `health`, `auth`, `world`, `home`, `city`, `nation`, `records` |
+| `apps/server/src/router.ts` | tRPC `AppRouter` (API 계약): `health`, `auth`, `world`, `home`, `city`, `nation`, `records`, `general`, `turns`, `commands`, `ranking` |
+| `apps/server/src/routers/general.ts`, `turns.ts`, `commands.ts` | 생성 접수·조회, 예턴 편집·사전 검사, 인증 필수 명령 목록 |
+| `apps/server/src/game/` | 소유 장수 조회·공개 projection·30칸 정규화와 표시 이름 |
+| `apps/engine/src/inputs.ts` | PENDING 생성 재검사·General 저장·완료 결과와 순서 기록 |
+| `packages/rules/src/general/create.ts` | 생성 입력 검사·결정적 초기 장수 규칙 |
+| `packages/shared/src/editArray.ts` | 범위 덮어쓰기·밀기·당기기·스냅샷 반복의 일반 배열 유틸 |
+| `tools/t1-11.test.ts`, `t1-11.integration.test.ts` | 편집·생성 규칙·명령 schema, 실제 HTTP·DB 보안·경합·재시작·재생 시험 |
+| `apps/server/src/routers/ranking.ts`, `ranking.integration.test.ts` | 정산 시점 장수 상위 100명·내 순위·국가 전체 순위, 실제 HTTP·DB 권한과 공개 필드 검증 |
+| `packages/rules/src/ranking.ts` | 공헌·경험·전공·국가 순위와 공개 국력 계산, 동률 ID 정렬 |
+| `apps/engine/src/ranking.ts`, `ranking.integration.test.ts` | 월간 트랜잭션의 순위 캐시 교체, 전공 누계·롤백·재생 호환 검증 |
 | `apps/server/src/routers/world.ts` | 기존 `world.list`, 서버 시계 요약과 공개 94도시 지도 |
 | `apps/server/src/routers/home.ts`, `city.ts`, `nation.ts`, `records.ts` | 세션 기준 메인·도시·국가·개인/국가/월드 기록 조회 |
 | `apps/server/src/visibility.ts`, `queries.ts` | 공개 필드 허용 목록과 범위 표, strict 입력, 일관된 읽기, 시각·페이지 변환 |
@@ -51,6 +60,9 @@
 | `tools/run-integration.ts` | 전용 테스트 DB 준비·migration·통합 테스트 실행 |
 
 ## 새 저장 필드를 추가할 때 빠뜨리기 쉬운 것
+
+순위는 `RankingSnapshot`에 월드별 최신 정산의 공개 필드만 저장한다. API는 캐시를 읽고 세션 장수의 순위를 찾으며 조회 중 캐시를 만들지 않는다.
+`General.battleWins`, `General.captures`는 전투 결과에서 집계한 조회용 누계다. 기존 재생 해시를 보존하려고 `worldLoader`와 `world/persistence`의 게임 상태 적재에서는 제외한다. 기존 연감의 비공개 국력 계산은 유지한다.
 
 core2026 지침에서 가져온 체크리스트입니다.
 

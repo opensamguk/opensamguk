@@ -41,10 +41,15 @@ export interface CommandResult {
   logs: LogEntry[];
   reports?: { generalId: number; text: string }[];
   history?: { nationId: number; text: string }[];
+  // 순위용 집계 이벤트이며 재생 상태에는 넣지 않는다.
+  battleAwards?: { generalId: number; wins: number; captures: number }[];
 }
+export const COMMAND_CATEGORIES = ['domestic', 'military', 'strategy', 'personal', 'nation'] as const;
+export type CommandCategory = (typeof COMMAND_CATEGORIES)[number];
 export interface CommandDef<Args = unknown> {
   key: string;
   name: string;
+  category: CommandCategory;
   target: 'general' | 'nation';
   args: z.ZodType<Args>;
   precheck(view: WorldView, actor: Actor, args: Args): Failure | null;
