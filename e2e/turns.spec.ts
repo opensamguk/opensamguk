@@ -4,12 +4,15 @@ import {
   ApiError,
   createGeneralByApi,
   e2eWorld,
+  idleWorld,
   mine,
   mutate,
   newGeneralName,
   setTurns,
   setUserStatus,
+  startEngine,
   stubPortraits,
+  takenGeneralName,
   turns,
   waitNextTurn,
   waitTurnWindow,
@@ -132,6 +135,91 @@ test.describe('장수 생성', () => {
         await page.request.get(`/trpc/general.mine?input=${encodeURIComponent(JSON.stringify({ worldId: world }))}`)
       ).status(),
     ).toBe(401);
+  });
+
+  // 엔진이 5초 안에 처리하지 못하면 서버는 pending을 준다. dev 엔진이 돌지 않는 월드에서 기존 엔진을 직접 켜고 끄며 본다.
+  test('pending 뒤 엔진이 거절하면 새로고침 없이 이유와 입력 폼으로 돌아오고, 이름을 고쳐 다시 보내면 만들어진다', async ({
+    page,
+  }) => {
+    await signUpByApi(page);
+    const world = await idleWorld(page);
+    const taken = await takenGeneralName(world);
+    const name = newGeneralName();
+    const making = page.getByRole('status').filter({ hasText: '장수를 만드는 중' });
+    const nameInput = page.getByLabel('이름', { exact: true });
+
+    await page.goto(`/w/${world}/create`);
+    await nameInput.fill(taken);
+    await page.getByRole('spinbutton', { name: '통솔' }).fill('70');
+    await page.getByRole('spinbutton', { name: '무력' }).fill('50');
+    await page.getByRole('spinbutton', { name: '지력' }).fill('45');
+    await page.getByRole('radio', { name: '초상 2' }).check();
+    const first = page.waitForResponse((r) => r.url().includes('general.create'));
+    await page.getByRole('button', { name: '장수 만들기', exact: true }).click();
+    expect(JSON.stringify(await (await first).json())).toContain('"status":"pending"');
+    await expect(making).toBeVisible();
+    await expect(nameInput).toHaveCount(0);
+    expect((await mine(page, world)).creation?.status).toBe('pending');
+
+    let stop = await startEngine(world);
+    try {
+      await expect(
+        page.getByRole('alert').filter({ hasText: '지난 생성 요청이 거절되었습니다. 이미 사용 중인 장수 이름입니다.' }),
+      ).toBeVisible({ timeout: 30_000 });
+    } finally {
+      await stop();
+    }
+    await expect(making).toHaveCount(0);
+    await expect(nameInput).toHaveValue(taken);
+    await expect(page.getByRole('spinbutton', { name: '통솔' })).toHaveValue('70');
+    await expect(page.getByRole('radio', { name: '초상 2' })).toBeChecked();
+    expect((await mine(page, world)).creation?.status).toBe('rejected');
+    await page.screenshot({ path: 'test-results/t1-15-create-rejected.png', fullPage: true });
+
+    // 엔진을 끈 채 다시 보내 pending → created도 본다.
+    await nameInput.fill(name);
+    const second = page.waitForResponse((r) => r.url().includes('general.create'));
+    await page.getByRole('button', { name: '장수 만들기', exact: true }).click();
+    expect(JSON.stringify(await (await second).json())).toContain('"status":"pending"');
+    await expect(making).toBeVisible();
+
+    stop = await startEngine(world);
+    try {
+      await expect(page).toHaveURL(`/w/${world}`, { timeout: 30_000 });
+    } finally {
+      await stop();
+    }
+    expect((await mine(page, world)).general).toMatchObject({
+      name,
+      portraitId: 10002,
+      leadership: 70,
+      strength: 50,
+      intel: 45,
+    });
+  });
+
+  test('pending 중에 다시 들어와도 기다리고, 엔진이 만들면 메인으로 간다', async ({ page }) => {
+    await signUpByApi(page);
+    const world = await idleWorld(page);
+    const name = newGeneralName();
+    const making = page.getByRole('status').filter({ hasText: '장수를 만드는 중' });
+
+    await page.goto(`/w/${world}/create`);
+    await page.getByLabel('이름', { exact: true }).fill(name);
+    await page.getByRole('button', { name: '장수 만들기', exact: true }).click();
+    await expect(making).toBeVisible({ timeout: 15_000 });
+
+    await page.reload();
+    await expect(making).toBeVisible();
+    await expect(page.getByLabel('이름', { exact: true })).toHaveCount(0);
+
+    const stop = await startEngine(world);
+    try {
+      await expect(page).toHaveURL(`/w/${world}`, { timeout: 30_000 });
+    } finally {
+      await stop();
+    }
+    expect((await mine(page, world)).general?.name).toBe(name);
   });
 });
 

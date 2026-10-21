@@ -13,35 +13,51 @@ import styles from './CreateGeneralPage.module.css';
 
 const EVEN: StatValues = { leadership: '55', strength: '55', intel: '55' };
 
+interface Draft {
+  name: string;
+  stats: StatValues;
+  portraitId: number | null;
+}
+
+const EMPTY_DRAFT: Draft = { name: '', stats: EVEN, portraitId: null };
+
 // /w/:worldId/create. 이름·통솔·무력·지력·초상으로 이 월드의 내 장수를 만든다 (AC-M1-06).
-// 서버가 5초 안에 결과를 못 주면 pending이 온다. 그때는 general.mine을 다시 물어 결과를 기다린다.
+// 월드가 바뀌면 입력과 대기 상태를 처음부터 다시 잡는다.
 export function CreateGeneralPage() {
   const { worldId } = useParams({ from: '/w/$worldId' });
+  return <CreateGeneral key={worldId} worldId={worldId} />;
+}
+
+// 화면 상태는 general.mine 하나로 정한다. 장수가 있으면 안내, 요청이 pending이면 기다림, 그 밖(거절·처음)은 입력 폼이다.
+// 서버가 5초 안에 결과를 못 주면 pending이 온다. 그때 general.mine 캐시를 pending으로 두고 1.5초마다 다시 묻는다.
+// 엔진이 거절하면 general.mine이 rejected가 되어 새로고침 없이 거절 이유와 보낸 입력이 남은 폼으로 돌아온다.
+function CreateGeneral({ worldId }: { worldId: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [waiting, setWaiting] = useState(false);
+  const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
+  // 이 화면에서 기다리던 요청이 만들어졌을 때만 메인으로 보낸다. 처음부터 장수가 있으면 안내만 한다.
+  const [sawPending, setSawPending] = useState(false);
+  const mineKey = trpc.general.mine.queryKey({ worldId });
 
   const mine = useQuery({
     ...trpc.general.mine.queryOptions({ worldId }),
     retry: retryUnlessClientError,
-    refetchInterval: (query) => (waiting || query.state.data?.creation?.status === 'pending' ? 1500 : false),
+    refetchInterval: (query) => (query.state.data?.creation?.status === 'pending' ? 1500 : false),
   });
   const general = mine.data?.general ?? null;
-  const pending = waiting || mine.data?.creation?.status === 'pending';
+  const pending = mine.data?.creation?.status === 'pending';
 
-  // 들어왔을 때 이미 접수된 요청이 있으면 그 결과를 기다린다.
-  const creationStatus = mine.data?.creation?.status;
   useEffect(() => {
-    if (creationStatus === 'pending') setWaiting(true);
-  }, [creationStatus]);
+    if (pending) setSawPending(true);
+  }, [pending]);
 
   // 만들어지면 메인으로 간다. 메인과 위쪽 띠가 새 장수를 보도록 조회를 새로 받는다.
   useEffect(() => {
-    if (!general || !waiting) return;
+    if (!general || !sawPending) return;
     void queryClient.invalidateQueries({ queryKey: trpc.home.get.queryKey({ worldId }) });
     void navigate({ to: '/w/$worldId', params: { worldId } });
-  }, [general, waiting, navigate, queryClient, trpc, worldId]);
+  }, [general, sawPending, navigate, queryClient, trpc, worldId]);
 
   let body;
   if (mine.isError) {
@@ -58,7 +74,7 @@ export function CreateGeneralPage() {
     body = <p className={styles.muted}>불러오는 중…</p>;
   } else if (general) {
     body = (
-      <div className={styles.done} role={waiting ? 'status' : undefined}>
+      <div className={styles.done} role={sawPending ? 'status' : undefined}>
         <Portrait id={general.portraitId} name={general.name} variant="icon" />
         <div>
           <p>
@@ -80,10 +96,17 @@ export function CreateGeneralPage() {
     body = (
       <CreateForm
         worldId={worldId}
+        draft={draft}
+        onDraft={setDraft}
         rejected={mine.data.creation?.status === 'rejected' ? mine.data.creation.message : null}
-        onPending={() => setWaiting(true)}
+        onPending={async () => {
+          // 보내기 전에 시작한 조회가 늦게 와서 pending을 덮지 않게 멈춘다. 결과는 다시 묻기로 받는다.
+          await queryClient.cancelQueries({ queryKey: mineKey });
+          queryClient.setQueryData(mineKey, { general: null, creation: { status: 'pending' as const } });
+        }}
+        onFailed={() => void queryClient.invalidateQueries({ queryKey: mineKey })}
         onCreated={(created) => {
-          queryClient.setQueryData(trpc.general.mine.queryKey({ worldId }), { general: created, creation: null });
+          queryClient.setQueryData(mineKey, { general: created, creation: null });
           void queryClient.invalidateQueries({ queryKey: trpc.home.get.queryKey({ worldId }) });
           void navigate({ to: '/w/$worldId', params: { worldId } });
         }}
@@ -114,20 +137,29 @@ type Created = NonNullable<inferRouterOutputs<AppRouter>['general']['mine']['gen
 
 function CreateForm({
   worldId,
+  draft,
+  onDraft,
   rejected,
   onPending,
+  onFailed,
   onCreated,
 }: {
   worldId: string;
+  draft: Draft;
+  onDraft: (update: (prev: Draft) => Draft) => void;
   rejected: string | null;
-  onPending: () => void;
+  onPending: () => Promise<void>;
+  onFailed: () => void;
   onCreated: (general: Created) => void;
 }) {
   const trpc = useTRPC();
   const create = useMutation(trpc.general.create.mutationOptions());
-  const [name, setName] = useState('');
-  const [stats, setStats] = useState<StatValues>(EVEN);
-  const [portraitId, setPortraitId] = useState<number | null>(null);
+  // 입력은 화면(CreateGeneral)이 갖는다. 기다리는 동안 폼이 사라졌다가 거절로 돌아와도 보낸 값이 남는다.
+  const { name, stats, portraitId } = draft;
+  const setName = (value: string) => onDraft((prev) => ({ ...prev, name: value }));
+  const setStats = (update: (prev: StatValues) => StatValues) =>
+    onDraft((prev) => ({ ...prev, stats: update(prev.stats) }));
+  const setPortraitId = (value: number | null) => onDraft((prev) => ({ ...prev, portraitId: value }));
   const [touched, setTouched] = useState(false);
   const check = checkCreation(name, stats);
   const problemsId = useId();
@@ -142,8 +174,10 @@ function CreateForm({
       {
         onSuccess: (result) => {
           if (result.status === 'created') onCreated(result.general);
-          else onPending();
+          else void onPending();
         },
+        // 연결이 끊겨 응답만 못 받았거나 다른 요청이 진행 중이면 서버에 pending이 남아 있을 수 있다. 상태를 다시 묻는다.
+        onError: onFailed,
       },
     );
   };
@@ -198,7 +232,7 @@ function CreateForm({
         <p className={styles.remaining} aria-live="polite" data-testid="remaining">
           남은 점수 <strong className="num">{check.remaining}</strong>
         </p>
-        <button type="button" className={styles.secondary} onClick={() => setStats(EVEN)}>
+        <button type="button" className={styles.secondary} onClick={() => setStats(() => EVEN)}>
           고르게 나누기
         </button>
       </fieldset>

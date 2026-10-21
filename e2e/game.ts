@@ -60,6 +60,64 @@ export async function e2eWorld(page: Page): Promise<string> {
   return (worldId = id);
 }
 
+let idleWorldId: string | undefined;
+
+// pnpm dev의 엔진이 돌리지 않는 두 번째 월드. 생성 요청이 엔진 처리 전까지 pending으로 남는 경우를 만든다.
+// 이 월드의 입력은 시험이 startEngine으로 기존 엔진을 직접 켤 때만 처리된다.
+export async function idleWorld(page: Page): Promise<string> {
+  // dev 엔진이 먼저 만든 월드에 묶인 뒤에 만든다. 엔진은 가장 먼저 만든 RUNNING 월드 하나만 고른다.
+  await e2eWorld(page);
+  if (idleWorldId) return idleWorldId;
+  const created = run([
+    'world:create',
+    '--scenario',
+    '1030',
+    '--map',
+    'che',
+    '--seed',
+    `e2e-idle-${Date.now()}`,
+    '--turn-term',
+    '1',
+    '--name',
+    'E2E 대기 월드',
+  ]);
+  const id = (JSON.parse(created.trim().split('\n').at(-1)!) as { worldId: string }).worldId;
+  run(['world:start', '--world', id]);
+  return (idleWorldId = id);
+}
+
+// 기존 엔진(apps/engine의 runEngine)을 이 월드에만 켠다. 돌려받은 함수를 부르면 실행권을 놓고 멈춘다.
+export async function startEngine(world: string): Promise<() => Promise<void>> {
+  const { createDb } = await import('../packages/db/src/index');
+  const { runEngine } = await import('../apps/engine/src/main');
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error('DATABASE_URL이 필요합니다.');
+  const db = createDb(url);
+  const controller = new AbortController();
+  const running = runEngine(db, { worldId: world, signal: controller.signal });
+  return async () => {
+    controller.abort();
+    try {
+      await running;
+    } finally {
+      await db.$disconnect();
+    }
+  };
+}
+
+// 월드에 이미 있는 NPC 장수 이름. 같은 이름으로 만들면 엔진이 NAME_TAKEN으로 거절한다.
+export async function takenGeneralName(world: string): Promise<string> {
+  const { createDb } = await import('../packages/db/src/index');
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error('DATABASE_URL이 필요합니다.');
+  const db = createDb(url);
+  try {
+    return (await db.general.findFirstOrThrow({ where: { worldId: world }, select: { name: true } })).name;
+  } finally {
+    await db.$disconnect();
+  }
+}
+
 function run(args: string[]): string {
   const result = spawnSync('pnpm', ['-s', ...args], { encoding: 'utf8', env: process.env });
   if (result.status !== 0) throw new Error(`pnpm ${args[0]} 실패: ${result.stderr}`);
