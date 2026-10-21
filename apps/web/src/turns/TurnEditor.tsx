@@ -381,8 +381,8 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
         </table>
       </div>
       <p id={helpId} className={styles.help}>
-        칸을 누르면 고르고, Shift를 누른 채 누르면 범위를 고릅니다. 키보드는 위아래 화살표로 옮기고 Space로 고르며
-        Enter로 명령 찾기로 갑니다. 경고가 있어도 저장되며 실행할 때 다시 검사합니다.
+        칸을 누르면 고르거나 풉니다. Shift를 누른 채 누르면 범위를 고릅니다. 키보드는 위아래 화살표로 옮기고 Space로
+        고르며 Enter로 명령 찾기에 갑니다. 경고가 있어도 저장되며 실행할 때 다시 검사합니다.
       </p>
 
       {commands.isError ? (
