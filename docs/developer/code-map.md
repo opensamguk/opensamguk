@@ -43,6 +43,12 @@
 | `apps/web/src/LoginPage.tsx` | 자리표시 로그인 화면과 서버 상태 표시 |
 | `apps/web/apiTarget.ts` | dev 프록시가 쓸 API 서버 주소 (`SERVER_PORT`) |
 | `apps/web/src/trpc.ts` | tRPC 클라이언트 (`AppRouter` 타입만 import) |
+| `apps/web/src/pages/MainPage.tsx` | 메인 작업 화면 (D-018, R1 배치). 지도·명령 목록·도시·국가·장수·기록 칸을 한 화면에 둔다 |
+| `apps/web/src/main/` | 메인 칸 부품: `WorldMap`(94도시 SVG), `CityInfo`, `NationInfo`(국가 요약·표), `GeneralInfo`, `CommandPanel`(T1-15 편집기 자리), `Records`(기록 3종 더 보기) |
+| `apps/web/src/game/` | 화면 공용: 응답 타입(`types.ts`, 공개 범위 상세 필드), 조회 훅, 다음 턴 카운트다운·0초 재조회(`countdown.ts`), 오류 코드, 기록 연월, 명령·직책 이름 |
+| `apps/web/src/layout/GameLayout.tsx` | 위쪽 띠(월드·연월·다음 턴·메뉴)와 본문 |
+| `apps/web/src/pages/WorldPages.tsx` | 직접 주소용 보조 화면: 지도·도시·국가·기록 |
+| `e2e/main.spec.ts`, `e2e/world.ts` | 실제 엔진 월드로 메인 작업 화면 E2E (턴 1분 월드 생성·시작, 시험 계정 장수 붙이기) |
 | `packages/db/prisma/schema.prisma` | DB schema. 생성물은 `packages/db/src/generated/` (Git 제외) |
 | `packages/shared/src/gameDate.ts` | 게임 달력 |
 | `eslint.config.js` | 패키지 경계·결정성 규칙 |
