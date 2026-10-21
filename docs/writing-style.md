@@ -63,7 +63,12 @@
 ## 6. 확인
 
 - 쓴 사람이 §3·§4로 직접 본다. 리뷰어는 문구도 본다. §3의 원본 S1 패턴(A-7, A-8, C-5, C-10, C-11, D-1~D-3, J-2)이 남아 있으면 통과시키지 않는다.
-- 자동 검사는 `pnpm lint:text`다 (T1-25에서 만든다).
+- 자동 검사는 `pnpm lint:text`다. 위 S1 패턴 9개를 찾아 `파일:줄 [ID] 걸린 표현`으로 출력한다. 기본은 경고만 내고 성공하며 `pnpm lint:text --strict`는 1건이라도 있으면 실패한다(종료 코드 1, 사용 오류는 2). 경로를 주면 그 아래만 본다. 예: `pnpm lint:text docs/plans`
+  - 대상은 `docs/**/*.md`, `AGENTS.md`, `README.md`와 `apps/web/src`의 문자열·JSX 텍스트, `packages/rules/src`와 `apps/server/src`의 한글 문자열이다. 테스트 파일과 코드 주석, `private/`는 보지 않는다.
+  - 코드 블록, 인라인 코드, URL, 링크 주소, 표에서 경로만 든 칸은 건너뛴다. 코드 블록은 펜스 블록과 들여쓴 블록(4칸 이상)이며 인용(`>`)과 목록 안의 것도 포함한다. 코드 문자열·템플릿·JSX 속성 안의 URL도 그 부분만 건너뛴다.
+  - D-1은 문서당 3회까지, J-2는 4회까지, C-10은 1회까지 허용한다. 번호 절(`1.`, `Ⅱ.`, `(3)`, `제2장`)과 콜론 앞이 ID뿐인 헤딩(`D-017: …`)은 C-10에서 뺀다. 발화 표지(말했다·밝혔다·따르면)가 붙은 따옴표는 J-2에서 뺀다.
+  - 기계는 화면 이름 인용과 강조를 가리지 못한다. 규칙을 지킨 글이 걸리면 그 줄 끝에 예외를 적는다. 문서는 `<!-- lint-text-ignore ID -->`, 코드는 `// lint-text-ignore ID`(JSX 안에서는 `{/* lint-text-ignore ID */}`)이다. ID는 여러 개를 공백이나 쉼표로 이어 쓴다. 코드의 예외는 실제 주석에 적은 것만 인정하고 문자열이나 JSX 텍스트에 적은 것은 무시한다. 예외를 둔 곳은 문서당 횟수에서도 빠진다.
+  - `pnpm check` 연결은 T1-23·T1-24가 기존 글을 고친 뒤 한다.
 - Claude Code에서는 원본 스킬로 윤문할 수 있다: `/plugin marketplace add epoko77-ai/im-not-ai`, `/plugin install humanize-korean@im-not-ai`, 그 뒤 `/humanize`.
 - Codex에는 같은 커밋의 `humanize-korean` 스킬을 설치했다. 다음 턴부터 `$humanize-korean`으로 사용할 수 있다. 별도 환경에서는 [Codex 설치 안내](https://github.com/epoko77-ai/im-not-ai/blob/b37e0206d31fffd9149bf57168d4d62eb2086bee/INSTALL.md#codex-cli)를 따른다.
 - 기존 글을 스킬로 윤문할 때 변경률은 스킬의 검증 스크립트로 측정한다. Codex 스킬 기준 30% 이상이면 경고하고, 50% 이상이면 결과를 채택하지 않고 되돌려 한 번 재실행한다. 수치·조건·부정·추측·의무의 의미가 달라졌으면 변경률과 관계없이 되돌린다.

@@ -92,6 +92,79 @@ afterAll(async () => {
 });
 
 describe('T1-11 실제 HTTP·PostgreSQL 권한', () => {
+  it('home과 mine의 공개 장수 필드는 유지하고 내부 소유권·성향·revision을 숨긴다', async () => {
+    const { a, worldId } = await fixture();
+    const home = await request('home.get', { worldId }, a.cookie);
+    const mine = await request('general.mine', { worldId }, a.cookie);
+    const fields = [
+      'id',
+      'name',
+      'nationId',
+      'portraitId',
+      'cityKey',
+      'leadership',
+      'strength',
+      'intel',
+      'officerLevel',
+      'birthYear',
+      'deathYear',
+      'activeFromYear',
+      'personality',
+      'special',
+      'gold',
+      'rice',
+      'crew',
+      'crewType',
+      'train',
+      'atmos',
+      'experience',
+      'dedication',
+      'age',
+      'injury',
+      'nextTurnTick',
+    ].sort();
+    expect(home.code).toBeUndefined();
+    expect(mine.code).toBeUndefined();
+    expect(Object.keys(home.data.general).sort()).toEqual(fields);
+    expect(Object.keys(mine.data.general).sort()).toEqual(fields);
+    expect(home.data.general).toEqual(mine.data.general);
+    expect(mine.data).toHaveProperty('creation', null);
+    expect(home.data).not.toHaveProperty('creation');
+    for (const key of ['userId', 'affinity', 'turnRevision']) {
+      expect(home.data.general).not.toHaveProperty(key);
+      expect(mine.data.general).not.toHaveProperty(key);
+    }
+  });
+  it('기존 9개 명령과 사전 검사는 서버 소유 장수만 쓰고 actor·target·unitSet 삽입을 거부한다', async () => {
+    const { a, worldId } = await fixture();
+    const before = await unchanged(worldId);
+    const list = (await request('commands.list', { worldId }, a.cookie)).data;
+    expect(list.map((d: { key: string }) => d.key).sort()).toEqual([
+      'commerce',
+      'defence',
+      'farm',
+      'goodwill',
+      'research',
+      'rest',
+      'security',
+      'settle',
+      'wall',
+    ]);
+    for (const command of list) {
+      expect(command.argsSchema).toMatchObject({ type: 'object', properties: {}, additionalProperties: false });
+      expect((await request('turns.precheck', { worldId, commandKey: command.key }, a.cookie)).code).toBeUndefined();
+    }
+    for (const extra of [{ actor: { generalId: 2 } }, { target: 'nation' }, { unitSet: {} }]) {
+      expect((await request('turns.precheck', { worldId, commandKey: 'rest', ...extra }, a.cookie)).code).toBe(
+        'BAD_REQUEST',
+      );
+      expect((await request('turns.precheck', { worldId, commandKey: 'rest', args: extra }, a.cookie)).code).toBe(
+        'BAD_REQUEST',
+      );
+      expect((await request('commands.list', { worldId, ...extra }, a.cookie)).code).toBe('BAD_REQUEST');
+    }
+    expect(await unchanged(worldId)).toEqual(before);
+  });
   it('7개 API 모두 잘못된 세션·만료·삭제·제재·탈퇴와 권한 필드 삽입을 거부한다', async () => {
     const { a, worldId } = await fixture();
     const calls = [
