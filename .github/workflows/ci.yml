@@ -81,3 +81,19 @@ jobs:
       - run: pnpm db:migrate
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm e2e --workers=1 --reporter=line
+        continue-on-error: false
+      - name: Upload T1-16 screenshots (QA probe only, not for merge)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: t1-16-screens
+          path: |
+            test-results/**/*.png
+            test-results/**/error-context.md
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Dump nation history shapes (QA probe only, not for merge)
+        if: always()
+        run: |
+          psql "$DATABASE_URL" -c "SELECT tick, \"nationId\", left(data::text, 160) AS data FROM \"NationHistory\" WHERE NOT (data ? 'cities') ORDER BY tick LIMIT 10;"
+          psql "$DATABASE_URL" -c "SELECT count(*) FILTER (WHERE data ? 'cities') AS summary_rows, count(*) FILTER (WHERE NOT (data ? 'cities')) AS events_only_rows FROM \"NationHistory\";"
