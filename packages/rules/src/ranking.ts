@@ -1,3 +1,7 @@
+// 국력 구성 참고: core2026 df6c926, monthlyNationStatsHandler.ts (MIT, resources/NOTICE.md).
+import { rngFor } from '@opensamguk/shared';
+import type { WorldView } from './model/world';
+
 export type GeneralRankingBy = 'dedication' | 'experience' | 'merit';
 export type NationRankingBy = 'cities' | 'generals' | 'power';
 
@@ -23,9 +27,44 @@ export interface NationRankingRow {
 export type RankedGeneral = GeneralRankingRow & { rank: number; value: number; merit: number };
 export type RankedNation = NationRankingRow & { rank: number; value: number };
 
-export function publicNationPower(cities: number, generals: number, tech: number): number {
-  // 도시·장수 수와 함께 공개해도 기술 원값을 역산할 수 없도록 구간만 쓴다.
-  return cities + generals + Math.min(11, Math.floor(tech / 1_000));
+export function publicNationPower(
+  state: WorldView,
+  nationId: number,
+  at: { seed: string; tick: number; year: number },
+): number {
+  const nation = state.nations[nationId];
+  if (!nation) return 0;
+  const generals = Object.values(state.generals)
+    .filter((general) => general.nationId === nationId && general.activeFromYear <= at.year)
+    .sort((a, b) => a.id - b.id);
+  const cities = Object.values(state.cities)
+    .filter((city) => city.nationId === nationId && city.supplied)
+    .sort((a, b) => a.cityKey - b.cityKey);
+  const resources = generals.reduce((sum, general) => sum + general.gold + general.rice, nation.gold + nation.rice);
+  let population = 0,
+    current = 0,
+    maximum = 0;
+  for (const city of cities) {
+    population += city.population;
+    current += city.population + city.agriculture + city.commerce + city.security + city.wall + city.defence;
+    maximum +=
+      city.populationMax + city.agricultureMax + city.commerceMax + city.securityMax + city.wallMax + city.defenceMax;
+  }
+  const cityPower = maximum > 0 ? Math.round((population * current) / maximum / 100) : 0;
+  let generalPower = 0,
+    experience = 0;
+  for (const general of generals) {
+    generalPower +=
+      (general.leadership >= 40 ? general.leadership * 2 : 0) +
+      Math.sqrt(general.intel * general.strength) +
+      general.leadership / 4;
+    experience += general.experience + general.dedication;
+  }
+  const base = Math.round(
+    (Math.round(resources / 100) + nation.tech + cityPower + generalPower + Math.round(experience / 100)) / 10,
+  );
+  const multiplier = 0.95 + rngFor(at.seed, 'ranking-power', at.tick, nationId).next() * 0.1;
+  return Math.round(base * multiplier);
 }
 
 export function generalMerit(wins: number, captures: number): number {

@@ -105,6 +105,19 @@ describe('AC-M2-19 전투 전공', () => {
     expect(result.battleAwards).toEqual([{ generalId: 1, wins: 0, captures: 1 }]);
   });
 
+  it('무주공산 점령은 승리 없이 점령만 기록한다', () => {
+    const state = commandWorld();
+    state.cities[2]!.nationId = null;
+    state.cities[2]!.wall = 0;
+    state.diplomacies = [];
+    const before = structuredClone(state);
+    const result = runCommand(state, actor, 'attack', { cityKey: 2 }, rngFor('unowned-capture'));
+    if ('code' in result) throw new Error(result.message);
+    expect(result.battleAwards).toEqual([{ generalId: 1, wins: 0, captures: 1 }]);
+    expect(applyEffects(state, result.effects).cities[2]!.nationId).toBe(1);
+    expect(state).toEqual(before);
+  });
+
   it('성벽 공격만 하다 패하면 승리와 점령을 기록하지 않는다', () => {
     const state = commandWorld();
     state.generals[1]!.crew = 20;

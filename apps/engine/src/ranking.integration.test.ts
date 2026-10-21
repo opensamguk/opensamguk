@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { createDb } from '@opensamguk/db';
 import { hashState } from '@opensamguk/shared/node';
-import { publicNationPower } from '@opensamguk/rules';
+import { publicNationPower, toWorldState } from '@opensamguk/rules';
 import { monthlyFixture } from '../test/monthlyFixture';
 import { warFixture } from '../test/warFixture';
 import { saveInitialWorld, readWorldState } from './world/persistence';
@@ -47,9 +47,10 @@ describe('T2-22 / AC-M2-19 엔진 순위 집계', () => {
     expect(generals.map((g) => g.id)).toEqual([1, 2]);
     expect(generals[0]).toMatchObject({ wins: 7, captures: 3 });
     const nations = first.nations as Array<{ id: number; cities: number; generals: number; power: number }>;
+    const settled = toWorldState(await readWorldState(db, worldId));
     for (const nation of nations) {
       expect(nation.power).toBe(
-        publicNationPower(nation.cities, nation.generals, initial.nations[nation.id - 1]!.tech),
+        publicNationPower(settled, nation.id, { seed: initial.seed, tick: 10000, year: initial.startYear }),
       );
     }
     expect(JSON.stringify(first)).not.toMatch(/gold|rice|crew|population|userId|affinity|leadership/);
