@@ -35,6 +35,13 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
+      - name: Temporary formatting diagnostics
+        if: always()
+        run: |
+          pnpm exec prettier --write apps/engine/src/war.integration.test.ts
+          git diff -- apps/engine/src/war.integration.test.ts
+          pnpm test
+          pnpm lint:text --strict packages/rules/src/commands/attack.ts docs/architecture/command-protocol.md docs/plans/T1-08.md
       - run: pnpm --filter @opensamguk/web build
 
   database-browser:
