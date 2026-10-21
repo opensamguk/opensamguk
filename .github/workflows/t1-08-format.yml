@@ -31,3 +31,4 @@ jobs:
           name: task-format
           path: formatted.patch
       - run: pnpm generate && pnpm lint && pnpm typecheck && pnpm test
+      - run: pnpm lint:text --strict packages/rules/src/commands docs/architecture/command-protocol.md docs/numeric-state-policy.md docs/plans/T1-08.md
