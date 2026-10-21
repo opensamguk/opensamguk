@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createDb, nextActionSequence, type Prisma } from '@opensamguk/db';
-import { emptyTurns, runGeneralTurn, toWorldState, type WorldInit } from '@opensamguk/rules';
+import { emptyTurns, refreshSupply, runGeneralTurn, toWorldState, type WorldInit } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { warFixture } from '../test/warFixture';
 import { saveInitialWorld, readWorldState } from './world/persistence';
@@ -216,9 +216,17 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
     initial.generals[1]!.crew = 10000;
     initial.generals[2]!.nationId = 1;
     initial.generals[2]!.cityKey = 3;
+    const ready = toWorldState(initial);
+    refreshSupply(ready);
+    initial.cities = Object.values(ready.cities);
     const { worldId, loop, lease } = await create(initial);
     await queue(worldId, 2, 'attack', { cityKey: 2 });
     await loop.advanceTo(100);
+    expect(
+      await db.generalLog.findUniqueOrThrow({
+        where: { worldId_generalId_tick: { worldId, generalId: 2, tick: 100 } },
+      }),
+    ).toMatchObject({ kind: 'success' });
     expect((await readWorldState(db, worldId)).cities[2]).toMatchObject({ supplied: false, agriculture: 100 });
     for (const tick of [200, 5000, 9999]) {
       await loop.advanceTo(tick);

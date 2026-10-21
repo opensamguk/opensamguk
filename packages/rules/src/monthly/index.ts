@@ -2,6 +2,7 @@ import type { GameDate, Rng } from '@opensamguk/shared';
 import { BALANCE } from '../balance';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import type { WorldState, WorldView } from '../model/world';
+import { refreshSupply } from '../supply';
 
 export const MONTHLY_STAGES = ['income', 'population', 'supply', 'diplomacy', 'yearbook'] as const;
 export interface NationSummary {
@@ -80,23 +81,9 @@ export function settlePopulation(state: WorldView, taxRate: number = BALANCE.MON
 
 export function settleSupply(state: WorldView): WorldState {
   const next = structuredClone(state) as WorldState;
-  const supplied = new Set<number>();
-  for (const nation of nationsById(next)) {
-    const capital = next.cities[nation.capitalCityKey];
-    if (!capital || capital.nationId !== nation.id) continue;
-    const queue = [capital.cityKey];
-    supplied.add(capital.cityKey);
-    for (let i = 0; i < queue.length; i++) {
-      for (const id of [...next.cities[queue[i]!]!.connections].sort((a, b) => a - b)) {
-        if (supplied.has(id) || next.cities[id]?.nationId !== nation.id) continue;
-        supplied.add(id);
-        queue.push(id);
-      }
-    }
-  }
+  refreshSupply(next);
   for (const city of citiesById(next)) {
     const target = next.cities[city.cityKey]!;
-    target.supplied = supplied.has(city.cityKey);
     // 재야 도시에는 보급 단절 페널티를 부과하지 않는다.
     if (city.nationId === null || target.supplied) continue;
     for (const field of ['agriculture', 'commerce', 'security', 'defence', 'wall'] as const) {
