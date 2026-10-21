@@ -1,0 +1,53 @@
+name: NPC simulation
+
+on:
+  push:
+    branches: ['wt/t_4816e635']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: simulation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  simulation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify source commit
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Diagnostic formatting patch
+        run: |
+          pnpm exec prettier --write apps/engine/src/simulation.ts apps/engine/src/turnLoop.ts packages/rules/src/npc packages/rules/src/model/clone.ts packages/rules/src/model/clone.test.ts packages/rules/src/commands/turn.ts packages/rules/src/commands/effects.ts packages/rules/src/commands/support.ts tools/sim .github/workflows/simulation.yml
+          git diff --binary > format.patch
+      - run: pnpm check
+      - name: Full ten seeds and determinism
+        if: ${{ !cancelled() }}
+        run: |
+          pnpm sim --seeds 10 --output simulation.jsonl
+          pnpm sim --seed 1 --repeat --convergence off --output simulation-off.jsonl
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ !cancelled() }}
+        with:
+          name: simulation-${{ github.sha }}
+          path: |
+            simulation*.jsonl
+            format.patch
+          if-no-files-found: error
