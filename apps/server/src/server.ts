@@ -40,7 +40,7 @@ export async function buildServer(options: {
       async createContext({ req, res }) {
         const now = (options.now ?? Date.now)();
         const identity = await authenticate(options.db, req.cookies.sid, now);
-        if (identity && req.cookies.sid)
+        if (identity?.renewed && req.cookies.sid)
           res.setCookie('sid', req.cookies.sid, {
             httpOnly: true,
             sameSite: 'lax',

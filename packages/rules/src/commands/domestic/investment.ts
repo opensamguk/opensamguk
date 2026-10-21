@@ -71,6 +71,7 @@ export function makeInvestment(spec: Spec): CommandDef {
   return {
     key: spec.key,
     name: spec.name,
+    category: 'domestic',
     target: 'general',
     args: z.strictObject({}),
     precheck: check,

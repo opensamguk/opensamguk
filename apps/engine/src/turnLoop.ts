@@ -13,6 +13,7 @@ import { assertLease, databaseNow, lockLease, type Lease } from './lease';
 import { loadWorld } from './worldLoader';
 import { persistEffects, shiftTurns } from './persist';
 import { persistMonthly } from './monthly';
+import { processCreation } from './inputs';
 
 export const CLOCK_CHECKPOINT_MS = 5_000;
 type TurnHooks = { beforeCommit?: (tx: Prisma.TransactionClient) => Promise<void>; elapsedNow?: () => number };
@@ -82,7 +83,11 @@ export class TurnLoop {
         await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${worldId} FOR UPDATE`;
         const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
         if (world.status !== 'RUNNING') {
-          return { tick: world.clockTick, state: null, execution: null, checkpointed: false, progressed: false };
+          const progressed = await processCreation(tx, world, world.clockTick);
+          if (progressed) await this.hooks.beforeCommit?.(tx);
+          signal?.throwIfAborted();
+          await assertLease(tx, this.lease);
+          return { tick: world.clockTick, state: null, execution: null, checkpointed: false, progressed };
         }
         const now = (await databaseNow(tx)).getTime();
         const clock = { ...world, clockAnchorAt: world.clockAnchorAt?.getTime() ?? null };
@@ -90,6 +95,13 @@ export class TurnLoop {
         const tick = target ?? checkpoint.clockTick;
         if (tick < world.clockTick) throw new Error('이미 저장된 시계보다 뒤로 진행할 수 없습니다.');
         if (tick > 2_147_483_647 - TICKS_PER_MONTH) throw new Error('게임 tick 저장 범위를 넘었습니다.');
+        if (await processCreation(tx, world, tick)) {
+          const state = await loadWorld(tx, worldId);
+          await this.hooks.beforeCommit?.(tx);
+          signal?.throwIfAborted();
+          await assertLease(tx, this.lease);
+          return { tick, state, execution: null, checkpointed: false, progressed: true };
+        }
         const boundary = world.monthlyTick + TICKS_PER_MONTH;
         const year = monthlyDate(world.startYear, boundary).year;
         const due = await tx.general.findFirst({

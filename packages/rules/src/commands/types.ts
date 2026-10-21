@@ -18,9 +18,12 @@ export interface CommandResult {
   effects: Effect[];
   logs: LogEntry[];
 }
+export const COMMAND_CATEGORIES = ['domestic', 'military', 'strategy', 'personal', 'nation'] as const;
+export type CommandCategory = (typeof COMMAND_CATEGORIES)[number];
 export interface CommandDef<Args = Record<string, never>> {
   key: string;
   name: string;
+  category: CommandCategory;
   target: 'general' | 'nation';
   args: z.ZodType<Args>;
   precheck(view: WorldView, actor: Actor, args: Args): Failure | null;
