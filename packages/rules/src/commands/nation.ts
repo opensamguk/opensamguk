@@ -27,7 +27,9 @@ const resourceTransfer = (seize: boolean) =>
       const delta = seize ? -args.amount : args.amount;
       nation[args.resource] -= delta;
       target[args.resource] += delta;
-      return success(`${target.name} ${seize ? '몰수' : '포상'}: ${args.resource === 'gold' ? '금' : '쌀'} ${args.amount}`);
+      return success(
+        `${target.name} ${seize ? '몰수' : '포상'}: ${args.resource === 'gold' ? '금' : '쌀'} ${args.amount}`,
+      );
     },
   });
 type Proposal = 'peace' | 'pact' | 'break' | 'aid';
