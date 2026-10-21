@@ -7,6 +7,7 @@ import {
   redirect,
   useRouter,
 } from '@tanstack/react-router';
+import { CreateGeneralPage } from './general/CreateGeneralPage';
 import { GameLayout } from './layout/GameLayout';
 import { DevUiPage } from './pages/DevUiPage';
 import { HomePage } from './pages/HomePage';
@@ -15,6 +16,7 @@ import { MainPage } from './pages/MainPage';
 import { Placeholder } from './pages/Placeholder';
 import { SignupPage } from './pages/SignupPage';
 import { queryClient, trpc, type Trpc } from './trpc';
+import { TurnsPage } from './turns/TurnsPage';
 import { EmptyState, ErrorState } from './ui/States';
 
 // 주소 체계: docs/plans/T1-13.md. 로그인 가드: docs/frontend-ui-guidelines.md §4.
@@ -96,7 +98,7 @@ const mapRoute = createRoute({
 const turnsRoute = createRoute({
   getParentRoute: () => worldRoute,
   path: 'turns',
-  component: () => <Placeholder title="예턴 편집" task="T1-15" />,
+  component: TurnsPage,
 });
 
 const cityRoute = createRoute({
@@ -136,7 +138,7 @@ const recordsRoute = createRoute({
 const createGeneralRoute = createRoute({
   getParentRoute: () => worldRoute,
   path: 'create',
-  component: () => <Placeholder title="장수 생성" task="T1-15" />,
+  component: CreateGeneralPage,
 });
 
 const devUiRoute = createRoute({ getParentRoute: () => rootRoute, path: 'dev/ui', component: DevUiPage });
