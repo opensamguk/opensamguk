@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import { buildServer } from '../apps/server/src/server';
 import { hashPassword } from '../apps/server/src/auth/password';
-import { newSession } from '../apps/server/src/auth/session';
+import { hashToken, newSession } from '../apps/server/src/auth/session';
 import { readFixture } from '../apps/server/test/readFixture';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 
@@ -231,11 +231,16 @@ describe('T3-04 실제 TCP HTTP·PostgreSQL 보안', () => {
         );
         expect(response.data).toHaveProperty('ok', true);
       }
+      await db.session.update({
+        where: { id: hashToken(ownCookie.slice(4)) },
+        data: { expiresAt: new Date(now + 120_000) },
+      });
       const before = await snapshot();
       const data = { worldId, revision: 120, op: { shift: 1 } };
       const blocked = await send(base, 'turns.edit', data, { headers: { cookie: ownCookie } });
       expect(blocked.code).toBe('TOO_MANY_REQUESTS');
       expect(blocked.headers['retry-after']).toBe(String(Math.ceil((60_000 - (now % 60_000)) / 1000)));
+      expect(blocked.headers['set-cookie']).toBeUndefined();
       expect(await snapshot()).toEqual(before);
       expect(
         (await send(base, 'turns.edit', { ...data, revision: 0 }, { headers: { cookie: otherCookie } })).data,

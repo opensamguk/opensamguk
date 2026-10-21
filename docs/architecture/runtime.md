@@ -28,7 +28,7 @@
 | `VITE_IMAGE_BASE_URL` | 초상 이미지 base URL     | 비우면 jsDelivr 고정 커밋 주소 ([이미지 자산 §2](../image-assets.md#2-초상-id와-경로)) | 아니오 (공개값) | 사용 중 |
 
 세션 쿠키 `sid`는 HttpOnly·SameSite=Lax·Path=/이며 `NODE_ENV=production`에서 Secure를 붙입니다.
-DB에는 토큰 원문 대신 SHA-256만 저장하고 만료는 활동 시 DB와 쿠키 모두 30일로 연장합니다.
+DB에는 토큰 원문 대신 SHA-256만 저장하고 성공한 활동의 응답에서 DB와 쿠키 모두 30일로 연장합니다. 거부한 요청은 갱신 대상 시점이어도 세션 만료를 바꾸지 않습니다.
 계정 상태가 ACTIVE가 아니거나 세션이 만료되면 인증하지 않습니다. 요청 로그에는 URL·본문·쿠키·원본 오류를 기록하지 않습니다.
 
 운영 설정에서 Secure를 끄면 서버가 시작하지 않습니다. `/trpc` POST와 SSE 요청은 `Origin`이 `PUBLIC_ORIGIN`과 같아야 합니다. Origin이 없을 때만 `Sec-Fetch-Site: same-origin`을 받습니다. 잘못된 Origin을 다른 헤더로 덮어 허용하지 않습니다. 변경 요청은 `application/json`(선택적 charset 허용)만 받고 다른 형식은 415입니다. Origin 거부는 403이며 인증·본문 처리보다 먼저 실행합니다. CORS를 열지 않습니다.

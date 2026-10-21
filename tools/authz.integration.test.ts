@@ -137,7 +137,9 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
           const cookie =
             category === 'unauthenticated'
               ? undefined
-              : await session(category === 'sanctioned' ? 2 : path === 'general.create' ? 3 : 0);
+              : await session(
+                  category === 'sanctioned' ? 2 : category === 'otherUser' || path === 'general.create' ? 3 : 0,
+                );
           const data =
             category === 'invalidInput'
               ? { unexpected: true }
@@ -146,7 +148,11 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
                 : input(path);
           const before = await snapshot();
           const result = await request(path, data, cookie);
-          if (category === 'invalidInput') {
+          if (category === 'otherUser') {
+            // 이 월드에 자기 장수가 없는 사용자는 남의 장수·예턴·기록을 대신 고를 수 없다.
+            expect(result.code).toBe('NOT_FOUND');
+            expect(await snapshot()).toEqual(before);
+          } else if (category === 'invalidInput') {
             expect(result.code).toBe('BAD_REQUEST');
             expect(await snapshot()).toEqual(before);
           } else if (

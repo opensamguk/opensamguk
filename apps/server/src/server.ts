@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import cookie from '@fastify/cookie';
 import type { PrismaClient } from '@opensamguk/db';
 import { fastifyTRPCPlugin, type FastifyTRPCPluginOptions } from '@trpc/server/adapters/fastify';
-import fastify from 'fastify';
+import fastify, { type FastifyRequest } from 'fastify';
 import pino, { type DestinationStream } from 'pino';
 import { authenticate, SESSION_SECONDS } from './auth/session';
 import { hashPassword } from './auth/password';
@@ -35,6 +35,7 @@ export async function buildServer(options: {
     throw new Error('TRUST_PROXY는 0 또는 1이어야 합니다.');
   const clock = options.now ?? Date.now;
   const rateLimiter = createRateLimiter({ now: clock });
+  const requestTimes = new WeakMap<FastifyRequest, number>();
   const log = pino(
     {
       serializers: {
@@ -71,6 +72,22 @@ export async function buildServer(options: {
       return reply.code(415).send({ error: 'JSON 본문이 필요합니다.' });
   });
   await server.register(cookie);
+  server.addHook('onSend', async (req, reply, payload) => {
+    const now = requestTimes.get(req);
+    // 거부한 요청은 세션 만료 시각도 바꾸지 않는다. 성공 응답에서만 기존 갱신 계약을 적용한다.
+    if (reply.statusCode === 200 && now !== undefined && req.cookies.sid) {
+      const identity = await authenticate(options.db, req.cookies.sid, now);
+      if (identity?.renewed)
+        reply.setCookie('sid', req.cookies.sid, {
+          httpOnly: true,
+          sameSite: 'lax',
+          secure: secureCookies,
+          path: '/',
+          maxAge: SESSION_SECONDS,
+        });
+    }
+    return payload;
+  });
   const dummyPasswordHash = await hashPassword(randomBytes(32).toString('hex'));
 
   await server.register(fastifyTRPCPlugin, {
@@ -79,15 +96,8 @@ export async function buildServer(options: {
       router: appRouter,
       async createContext({ req, res }) {
         const now = clock();
-        const identity = await authenticate(options.db, req.cookies.sid, now);
-        if (identity?.renewed && req.cookies.sid)
-          res.setCookie('sid', req.cookies.sid, {
-            httpOnly: true,
-            sameSite: 'lax',
-            secure: secureCookies,
-            path: '/',
-            maxAge: SESSION_SECONDS,
-          });
+        requestTimes.set(req, now);
+        const identity = await authenticate(options.db, req.cookies.sid, now, false);
         return {
           db: options.db,
           reply: res,

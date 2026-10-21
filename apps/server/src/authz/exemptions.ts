@@ -52,32 +52,9 @@ export const exemptions: AuthzExemption[] = [
     category: 'otherUser',
     reason: '서버 세션의 장수만 조회한다. 타인 generalId 지정은 입력 계약에 없다.',
   },
-  {
-    path: 'turns.get',
-    category: 'otherUser',
-    reason: '서버 세션 장수의 예턴만 읽는다. 타인 generalId 지정은 BAD_REQUEST다.',
-  },
-  {
-    path: 'turns.set',
-    category: 'otherUser',
-    reason: '서버 세션 장수의 예턴만 바꾼다. 타인 generalId 지정은 BAD_REQUEST이며 revision 불변을 확인한다.',
-  },
-  {
-    path: 'turns.edit',
-    category: 'otherUser',
-    reason: '서버 세션 장수의 예턴만 편집한다. 타인 generalId 지정은 BAD_REQUEST이며 revision 불변을 확인한다.',
-  },
-  {
-    path: 'turns.precheck',
-    category: 'otherUser',
-    reason: '서버 세션 장수로만 검사한다. 타인 generalId 지정은 BAD_REQUEST다.',
-  },
+
   { path: 'commands.list', category: 'otherUser', reason: '인증 사용자 공통 명령 정의이며 타인 소유 자원이 없다.' },
-  {
-    path: 'home.get',
-    category: 'otherUser',
-    reason: '서버 세션 장수의 홈만 조회한다. 타인 userId 지정은 입력 계약에 없다.',
-  },
+
   {
     path: 'city.get',
     category: 'otherUser',
@@ -88,16 +65,7 @@ export const exemptions: AuthzExemption[] = [
     category: 'otherUser',
     reason: '타국 조회 자체는 허용한다. 실제 조회 시험이 국가별 비공개 필드 제거를 검증한다.',
   },
-  {
-    path: 'records.general',
-    category: 'otherUser',
-    reason: '세션 장수 기록만 조회한다. 타인 generalId 지정은 BAD_REQUEST다.',
-  },
-  {
-    path: 'records.nation',
-    category: 'otherUser',
-    reason: '세션 장수 소속 국가 기록만 조회한다. 타인 nationId 지정은 BAD_REQUEST다.',
-  },
+
   { path: 'records.world', category: 'otherUser', reason: '공통 공개 연감이며 타인 소유 자원이 없다.' },
   {
     path: 'ranking.generals',
