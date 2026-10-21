@@ -2,9 +2,9 @@
 
 > 상태: 뼈대 · 필요 시점: M2 · 관련 AC: M2-08, M2-09, M2-10, M3-09, M3-10
 > 참고: core2026 `release-operations.md`, `e2e-caddy-routing.md`, `developer/game-clock-recovery.md` (셋을 합침)
-> 이 문서가 답할 질문: 서버 1대에 어떻게 배포하고, 되돌리고, 백업하고, 장애에 대응하나?
+> 이 문서가 답할 질문: 서버 1대에 어떻게 배포하고 되돌리고 백업하고 장애에 대응하나?
 
-## 1. 구성 ⚠️ A13
+## 1. 구성 (가정 A13)
 
 서버 1대 + Docker Compose (PostgreSQL, server, engine, Caddy) + Cloudflare(DNS·CDN)
 
