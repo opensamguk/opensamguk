@@ -25,7 +25,11 @@
 | `apps/server/src/auth/` | Argon2id, 세션 토큰 해시·만료·연장, 실제 HTTP·DB 테스트 |
 | `apps/server/src/routers/auth.ts` | 가입·로그인·로그아웃·현재 계정 |
 | `apps/server/src/trpc.ts` | 공개·인증 필수 procedure |
-| `apps/server/src/router.ts` | tRPC `AppRouter` (API 계약): `health`, `auth` |
+| `apps/server/src/router.ts` | tRPC `AppRouter` (API 계약): `health`, `auth`, `world`, `home`, `city`, `nation`, `records` |
+| `apps/server/src/routers/world.ts` | 기존 `world.list`, 서버 시계 요약과 공개 94도시 지도 |
+| `apps/server/src/routers/home.ts`, `city.ts`, `nation.ts`, `records.ts` | 세션 기준 메인·도시·국가·개인/국가/월드 기록 조회 |
+| `apps/server/src/visibility.ts`, `queries.ts` | 공개 필드 허용 목록과 범위 표, strict 입력, 일관된 읽기, 시각·페이지 변환 |
+| `apps/server/src/visibility.test.ts`, `routers/reads.integration.test.ts` | 아군·적·재야 공개 범위와 실제 TCP·PostgreSQL 권한·페이지·94도시 성능 검증 |
 | `apps/engine/src/index.ts`, `main.ts` | `engine:run --world <ID>`·dev 월드 선택, 갱신·종료 |
 | `apps/engine/src/lease.ts` | DB 시각 기준 실행권 획득·갱신·해제·펜싱 |
 | `apps/engine/src/worldLoader.ts`, `turnLoop.ts`, `persist.ts` | 현재 상태 적재, manual/realtime 턴 실행, 원자적 저장 |
