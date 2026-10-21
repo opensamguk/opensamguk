@@ -112,6 +112,7 @@ describe('AC-M2-19 전투 전공', () => {
     state.diplomacies = [];
     const before = structuredClone(state);
     const result = runCommand(state, actor, 'attack', { cityKey: 2 }, rngFor('unowned-capture'));
+    if ('code' in result) throw new Error(result.message);
     expect(result.battleAwards).toEqual([{ generalId: 1, wins: 0, captures: 1 }]);
     expect(applyEffects(state, result.effects).cities[2]!.nationId).toBe(1);
     expect(state).toEqual(before);
