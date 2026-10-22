@@ -16,3 +16,4 @@ export * from './supply';
 export * from './commands/turn';
 export * from './ranking';
 export * from './npc';
+export * from './battle/simulate';

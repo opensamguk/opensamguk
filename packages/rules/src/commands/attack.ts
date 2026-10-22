@@ -1,53 +1,12 @@
 import { z } from 'zod';
-import type { Rng } from '@opensamguk/shared';
 import { BALANCE } from '../balance';
-import type { Actor, CommandResult } from './types';
+import { simulateBattle } from '../battle/simulate';
+import type { CommandResult } from './types';
 import type { InitialGeneral } from '../world/bootstrap';
-import type { DeepReadonly } from '../model/world';
-import type { UnitSetResource } from '../world/resources';
 import { refreshSupply } from '../supply';
 import { defineCommand, fail, positive, relation, removeNation, success } from './support';
 
-type Unit = DeepReadonly<UnitSetResource['crewTypes'][number]>;
 type Force = Pick<InitialGeneral, 'crew' | 'crewType' | 'train' | 'atmos' | 'rice'>;
-function unit(actor: Actor, id: number): Unit {
-  const result = actor.unitSet?.crewTypes.find((u) => u.id === id);
-  if (!result) throw new Error('전투 병종이 없습니다.');
-  return result;
-}
-function coefficient(table: Unit['attackCoef'], arm: number) {
-  return Array.isArray(table) ? 1 : ((table as Readonly<Record<string, number>>)[String(arm)] ?? 1);
-}
-function damage(a: Force, b: Force, actor: Actor, rng: Rng, tech: number, defence: number) {
-  const attacking = unit(actor, a.crewType),
-    defending = unit(actor, b.crewType);
-  const power =
-    ((a.crew *
-      (attacking.attack / Math.max(1, defending.defence + defence)) *
-      coefficient(attacking.attackCoef, defending.armType)) /
-      Math.max(0.01, coefficient(defending.defenceCoef, attacking.armType))) *
-    ((50 + a.train) / 150) *
-    ((50 + a.atmos) / 150) *
-    (1 + tech / BALANCE.MAX_TECH) *
-    BALANCE.DAMAGE_FACTOR *
-    (0.9 + rng.next() * 0.2);
-  return Math.min(b.crew, Math.max(1, Math.round(power)));
-}
-function fight(a: Force, b: Force, actor: Actor, rng: Rng, aTech: number, bTech: number, defence = 0) {
-  for (
-    let phase = 0;
-    phase < BALANCE.BATTLE_PHASES && a.crew > 0 && b.crew > 0 && a.atmos > 0 && b.atmos > 0;
-    phase++
-  ) {
-    // 양쪽 피해는 같은 페이즈 시작 상태로 계산하고 동시에 적용한다.
-    const toB = damage(a, b, actor, rng, aTech, defence),
-      toA = damage(b, a, actor, rng, bTech, 0);
-    a.crew -= toA;
-    b.crew -= toB;
-    a.atmos = Math.max(0, a.atmos - BALANCE.BATTLE_ATMOS_LOSS);
-    b.atmos = Math.max(0, b.atmos - BALANCE.BATTLE_ATMOS_LOSS);
-  }
-}
 function feed(force: Force) {
   force.rice = Math.max(0, force.rice - Math.ceil(force.crew * BALANCE.BATTLE_RICE_PER_CREW));
   if (force.rice === 0) force.atmos = Math.max(0, force.atmos - BALANCE.STARVATION_ATMOS_LOSS);
@@ -106,7 +65,12 @@ export const attack = defineCommand({
     for (const defender of defenders) {
       feed(g);
       feed(defender);
-      fight(g, defender, actor, rng, aTech, bTech);
+      const battle = simulateBattle(
+        { attacker: g, defender, attackerTech: aTech, defenderTech: bTech, unitSet: actor.unitSet! },
+        rng,
+      );
+      Object.assign(g, battle.attacker);
+      Object.assign(defender, battle.defender);
       const attackerSurvives = g.crew > 0 && g.atmos > 0;
       const defenderSurvives = defender.crew > 0 && defender.atmos > 0;
       if (attackerSurvives && !defenderSurvives) battleAwards.push({ generalId: g.id, wins: 1, captures: 0 });
@@ -123,7 +87,19 @@ export const attack = defineCommand({
     if (cleared && g.crew > 0 && g.atmos > 0) {
       const wall: Force = { crew: city.wall, crewType: 1000, train: 100, atmos: 100, rice: 0 };
       feed(g);
-      fight(g, wall, actor, rng, aTech, bTech, city.defence);
+      const battle = simulateBattle(
+        {
+          attacker: g,
+          defender: wall,
+          attackerTech: aTech,
+          defenderTech: bTech,
+          defence: city.defence,
+          unitSet: actor.unitSet!,
+        },
+        rng,
+      );
+      Object.assign(g, battle.attacker);
+      Object.assign(wall, battle.defender);
       city.wall = wall.crew;
       rounds.push(`성벽 교전: 공격 ${g.crew}명, 성벽 ${city.wall}`);
     }
