@@ -12,7 +12,7 @@
 | ---------------------------- | ------------------------------------------------------------ | ---- |
 | 기획                         | PRD·요구사항·인수조건·차별화 선택                            | ✅ v0.2 (가정 원장 일부 남음) | <!-- lint-text-ignore C-5 -->
 | M1 혼자 + NPC로 한 판 완주   | [AC-M1 22개](docs/product/acceptance-criteria.md#m1) 통과    | 진행 중 (✅ 20 · 🟨 1 · ⬜ 1) | <!-- lint-text-ignore C-5 -->
-| M2 지인 테스트 (참가자는 같은 수의 독립 에이전트로 대체, [D-021](docs/product/decisions.md#d-021-지인-참가-시험을-독립-에이전트-참가-시험으로-바꾸고-공개를-승인한다-2026-10-21)) | [AC-M2 19개](docs/product/acceptance-criteria.md#m2) 통과    | 진행 중 (✅ 1 · 🟨 0 · ⬜ 18) | <!-- lint-text-ignore C-5 -->
+| M2 지인 테스트 (참가자는 같은 수의 독립 에이전트로 대체, [D-021](docs/product/decisions.md#d-021-지인-참가-시험을-독립-에이전트-참가-시험으로-바꾸고-공개를-승인한다-2026-10-21)) | [AC-M2 19개](docs/product/acceptance-criteria.md#m2) 통과    | 진행 중 (✅ 2 · 🟨 0 · ⬜ 17) | <!-- lint-text-ignore C-5 -->
 | M3 공개 오픈 = MVP 완료      | [AC-M3 16개](docs/product/acceptance-criteria.md#m3) 통과    | 진행 중 (✅ 0 · 🟨 1 · ⬜ 15) | <!-- lint-text-ignore C-5 -->
 
 MVP는 M1·M2·M3 전체이며 M1만 끝나도 MVP 완료가 아닙니다. Phase 2(확장)는 M2와 다른 범위입니다 ([단계 계획](docs/product/phases.md)).
