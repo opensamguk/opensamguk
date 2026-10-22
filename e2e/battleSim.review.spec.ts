@@ -157,6 +157,8 @@ test('independent production CSP, real Worker 480 differential cases, seed and n
       2,
     ),
   );
+  // The existing topbar's 375px layout belongs to T3-10, not the simulator.
+  await page.setViewportSize({ width: 1280, height: 800 });
   const closed = new Promise<void>((resolve) => uiWorker.once('close', () => resolve()));
   await page.getByRole('navigation', { name: '게임 메뉴' }).getByRole('link', { name: '메인', exact: true }).click();
   await closed;
