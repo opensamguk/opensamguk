@@ -10,6 +10,7 @@
     "dev": "pnpm --parallel --filter \"./apps/*\" dev",
     "generate": "pnpm --filter @opensamguk/db generate",
     "lint": "eslint .",
+    "lint:text": "tsx tools/lint-text/cli.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "pnpm -r typecheck",
@@ -23,11 +24,13 @@
     "engine:run": "pnpm --filter @opensamguk/engine engine:run",
     "db:migrate": "pnpm --filter @opensamguk/db migrate",
     "test:int": "pnpm generate && tsx --env-file-if-exists=.env tools/run-integration.ts",
+    "test:authz": "pnpm generate && tsx --env-file-if-exists=.env tools/run-authz.ts",
     "world:start": "pnpm --filter @opensamguk/engine world:start",
     "world:pause": "pnpm --filter @opensamguk/engine world:pause",
     "world:resume": "pnpm --filter @opensamguk/engine world:resume",
     "world:status": "pnpm --filter @opensamguk/engine world:status",
-    "portraits:map": "tsx tools/portrait-map/generate.ts"
+    "portraits:map": "tsx tools/portrait-map/generate.ts",
+    "sim": "tsx tools/sim/cli.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

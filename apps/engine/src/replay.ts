@@ -129,7 +129,7 @@ export function replayArchive(value: unknown, months = 12): { tick: number; stat
         if (action.tick > tick || (action.kind === 'monthly' && sequence !== expected.sequence)) {
           throw new Error(`정산 순서가 다릅니다: ${tick}`);
         }
-        replay = runReplayAction(replay, origin.initial.seed);
+        replay = runReplayAction(replay, origin.initial.seed, origin.initial.unitSet);
       }
     }
     const stateHash = hashState(replay);

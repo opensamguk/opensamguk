@@ -11,6 +11,15 @@ export function EmptyState({ title, children }: { title: string; children?: Reac
   );
 }
 
+// 불러오는 중. 빈 상태·오류와 다르게 보이도록 테두리 없이 한 줄로 둔다.
+export function LoadingState({ children = '불러오는 중' }: { children?: ReactNode }) {
+  return (
+    <p className={styles.loading} role="status" aria-live="polite" data-state="loading">
+      {children}
+    </p>
+  );
+}
+
 export function ErrorState({ title, onRetry }: { title: string; onRetry?: () => void }) {
   return (
     <div className={styles.error} role="alert" data-state="error">

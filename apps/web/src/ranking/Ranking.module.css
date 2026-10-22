@@ -1,0 +1,126 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+}
+.at {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+.tabs {
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--color-border);
+}
+.tab {
+  padding: var(--space-1) var(--space-3);
+  color: var(--color-text);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+}
+.tabActive {
+  border-bottom-color: var(--color-accent);
+  font-weight: 600;
+}
+.wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  overflow-x: auto;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border-strong);
+  padding: var(--space-1) var(--space-2);
+  white-space: nowrap;
+}
+/* 전역 .num(0,1,0)보다 .table th(0,1,1)가 이겨서 숫자 머리글이 왼쪽으로 가던 것을 막는다 (GitHub #56). */
+.table th:global(.num) {
+  text-align: right;
+}
+.table td {
+  padding: 0 var(--space-2);
+  white-space: nowrap;
+}
+.table tbody tr {
+  height: var(--row-height);
+  border-bottom: 1px solid var(--color-border);
+}
+.sortButton {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.sortButton[aria-pressed='true'] {
+  color: var(--color-text);
+}
+.sortMark {
+  display: inline-block;
+  width: 1em;
+  font-size: var(--text-xs);
+}
+.rankBadge {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius);
+  text-align: center;
+  font-weight: 700;
+  color: var(--color-accent-text);
+}
+.rankBadge[data-tone='gold'] {
+  background: var(--color-warning);
+}
+.rankBadge[data-tone='jade'] {
+  background: var(--color-success);
+}
+.rankBadge[data-tone='muted'] {
+  background: var(--color-text-muted);
+}
+.name {
+  font-weight: 600;
+}
+.meRow {
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+.meChip {
+  margin-left: var(--space-1);
+  padding: 0 var(--space-1);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius);
+  color: var(--color-accent);
+  font-size: var(--text-xs);
+}
+.outside {
+  border-top: 2px solid var(--color-border-strong);
+}
+.gap {
+  text-align: center;
+  color: var(--color-text-muted);
+}
+.jump {
+  font: inherit;
+  font-size: var(--text-sm);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}

@@ -1,10 +1,9 @@
 .shell {
   display: grid;
-  grid-template-columns: var(--sidebar-width) 1fr;
   grid-template-rows: var(--topbar-height) 1fr;
   grid-template-areas:
-    'top top'
-    'side main';
+    'top'
+    'main';
   min-height: 100vh;
 }
 .topbar {
@@ -45,15 +44,9 @@
 .active:hover {
   background: var(--color-accent);
 }
-.sidebar {
-  grid-area: side;
-  padding: var(--space-4);
-  border-right: 1px solid var(--color-border);
-  background: var(--color-surface-muted);
-}
 .content {
   grid-area: main;
-  padding: var(--space-4) var(--space-6);
+  padding: var(--space-3) var(--space-4);
   min-width: 0;
 }
 .logout {

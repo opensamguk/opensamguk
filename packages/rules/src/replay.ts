@@ -1,6 +1,6 @@
 import { rngFor } from '@opensamguk/shared';
-import { applyEffects } from './commands/effects';
-import { runCommand } from './commands/registry';
+import { runGeneralTurn } from './commands/turn';
+import type { UnitSetResource } from './world/resources';
 import { TICKS_PER_MONTH } from './clock/constants';
 import { toWorldState, type WorldState } from './model/world';
 import { monthlyDate, runMonthly } from './monthly/index';
@@ -46,7 +46,7 @@ export function nextGameAction(replay: ReplayState) {
     : { kind: 'monthly' as const, tick: boundary };
 }
 
-export function runReplayAction(replay: ReplayState, seed: string): ReplayState {
+export function runReplayAction(replay: ReplayState, seed: string, unitSet?: UnitSetResource): ReplayState {
   const action = nextGameAction(replay);
   if (action.kind === 'monthly') {
     const date = monthlyDate(replay.state.startYear, action.tick);
@@ -56,14 +56,8 @@ export function runReplayAction(replay: ReplayState, seed: string): ReplayState 
   const next = structuredClone(replay);
   const turns = next.turns[action.generalId] ?? emptyTurns();
   const command = turns[0]!;
-  const result = runCommand(
-    next.state,
-    { generalId: action.generalId },
-    command.commandKey,
-    command.args,
-    rngFor(seed, 'turn', action.tick, action.generalId),
-  );
-  next.state = applyEffects(next.state, 'code' in result ? [] : result.effects);
+  const result = runGeneralTurn(next.state, { generalId: action.generalId, tick: action.tick, unitSet }, command, seed);
+  next.state = result.state;
   next.state.generals[action.generalId]!.nextTurnTick += TICKS_PER_MONTH;
   next.turns[action.generalId] = [...turns.slice(1), { commandKey: 'rest', args: {} }];
   next.revisions[action.generalId] = (next.revisions[action.generalId] ?? 0) + 1;

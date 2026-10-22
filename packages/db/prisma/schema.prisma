@@ -39,6 +39,9 @@ model World {
   inputEvents     InputEvent[]
   nationHistory   NationHistory[]
   yearbooks       YearbookSnapshot[]
+  commandMeta     Json?
+  battleLogs      BattleLog[]
+  ranking         RankingSnapshot?
 }
 
 enum WorldStatus {
@@ -73,6 +76,7 @@ model Nation {
   generals       General[]
   diplomacyAsA   Diplomacy[] @relation("NationA")
   diplomacyAsB   Diplomacy[] @relation("NationB")
+  turns          NationTurn[]
 
   @@id([worldId, id])
 }
@@ -138,12 +142,15 @@ model General {
   atmos          Int
   experience     Int
   dedication     Int
+  battleWins     Int @default(0)
+  captures       Int @default(0)
   age            Int
   injury         Int
   nextTurnTick   Int
   turnRevision   Int @default(0)
   turns          GeneralTurn[]
   logs           GeneralLog[]
+  battleLogs     BattleLog[]
   world          World   @relation(fields: [worldId], references: [id], onDelete: Cascade)
   nation         Nation? @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: NoAction)
   city           City    @relation(fields: [worldId, cityKey], references: [worldId, cityKey], onDelete: NoAction)
@@ -186,6 +193,29 @@ model GeneralLog {
   general    General @relation(fields: [worldId, generalId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([worldId, generalId, tick])
+}
+
+model NationTurn {
+  worldId    String
+  nationId   Int
+  slot       Int
+  commandKey String @default("nation_rest")
+  args       Json @default("{}")
+  nation     Nation @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([worldId, nationId, slot])
+}
+
+model BattleLog {
+  worldId   String
+  tick      Int
+  attackerId Int
+  generalId Int
+  text      String
+  world     World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  general   General @relation(fields: [worldId, generalId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([worldId, tick, attackerId, generalId])
 }
 
 enum UserStatus {
@@ -274,4 +304,14 @@ model YearbookSnapshot {
   world     World @relation(fields: [worldId], references: [id], onDelete: Cascade)
 
   @@id([worldId, tick])
+}
+
+model RankingSnapshot {
+  worldId  String @id
+  tick     Int
+  year     Int
+  month    Int
+  generals Json
+  nations  Json
+  world    World @relation(fields: [worldId], references: [id], onDelete: Cascade)
 }

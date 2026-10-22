@@ -1,5 +1,6 @@
 import type { Prisma } from '@opensamguk/db';
 import type { WorldState } from '@opensamguk/rules';
+import { loadCommandState } from './commandPersistence';
 
 export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): Promise<WorldState> {
   const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
@@ -24,11 +25,15 @@ export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): 
       }),
     ),
     generals: Object.fromEntries(
-      generals.map(({ turnRevision, ...general }) => {
+      generals.map(({ turnRevision, battleWins, captures, ...general }) => {
         void turnRevision;
+        // 순위용 누계는 게임 규칙 입력이 아니다. 기존 재생 해시에 섞지 않는다.
+        void battleWins;
+        void captures;
         return [general.id, stripWorldId(general)];
       }),
     ),
     diplomacies: diplomacies.map(stripWorldId),
+    ...(await loadCommandState(tx, worldId)),
   };
 }

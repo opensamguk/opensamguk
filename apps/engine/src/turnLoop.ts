@@ -1,18 +1,20 @@
 import type { Prisma, PrismaClient } from '@opensamguk/db';
 import { nextActionSequence } from '@opensamguk/db';
 import {
-  applyEffects,
   checkpointClock,
+  commandRegistry,
   monthlyDate,
-  runCommand,
+  runGeneralTurn,
+  unitSetSchema,
   TICKS_PER_MONTH,
   type WorldState,
 } from '@opensamguk/rules';
-import { rngFor } from '@opensamguk/shared';
+import { appendNationHistory, persistCommandReports } from './commandPersistence';
 import { assertLease, databaseNow, lockLease, type Lease } from './lease';
 import { loadWorld } from './worldLoader';
 import { persistEffects, shiftTurns } from './persist';
 import { persistMonthly } from './monthly';
+import { processCreation } from './inputs';
 
 export const CLOCK_CHECKPOINT_MS = 5_000;
 type TurnHooks = { beforeCommit?: (tx: Prisma.TransactionClient) => Promise<void>; elapsedNow?: () => number };
@@ -82,7 +84,11 @@ export class TurnLoop {
         await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${worldId} FOR UPDATE`;
         const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
         if (world.status !== 'RUNNING') {
-          return { tick: world.clockTick, state: null, execution: null, checkpointed: false, progressed: false };
+          const progressed = await processCreation(tx, world, world.clockTick);
+          if (progressed) await this.hooks.beforeCommit?.(tx);
+          signal?.throwIfAborted();
+          await assertLease(tx, this.lease);
+          return { tick: world.clockTick, state: null, execution: null, checkpointed: false, progressed };
         }
         const now = (await databaseNow(tx)).getTime();
         const clock = { ...world, clockAnchorAt: world.clockAnchorAt?.getTime() ?? null };
@@ -90,6 +96,13 @@ export class TurnLoop {
         const tick = target ?? checkpoint.clockTick;
         if (tick < world.clockTick) throw new Error('이미 저장된 시계보다 뒤로 진행할 수 없습니다.');
         if (tick > 2_147_483_647 - TICKS_PER_MONTH) throw new Error('게임 tick 저장 범위를 넘었습니다.');
+        if (await processCreation(tx, world, tick)) {
+          const state = await loadWorld(tx, worldId);
+          await this.hooks.beforeCommit?.(tx);
+          signal?.throwIfAborted();
+          await assertLease(tx, this.lease);
+          return { tick, state, execution: null, checkpointed: false, progressed: true };
+        }
         const boundary = world.monthlyTick + TICKS_PER_MONTH;
         const year = monthlyDate(world.startYear, boundary).year;
         const due = await tx.general.findFirst({
@@ -114,19 +127,34 @@ export class TurnLoop {
           const command = await tx.generalTurn.findUnique({
             where: { worldId_generalId_slot: { worldId, generalId: due.id, slot: 0 } },
           });
-          const commandKey = command?.commandKey ?? 'rest';
-          const result = runCommand(
+          const turn = runGeneralTurn(
             state,
-            { generalId: due.id },
-            commandKey,
-            command?.args ?? {},
-            rngFor(world.seed, 'turn', due.nextTurnTick, due.id),
+            { generalId: due.id, tick: due.nextTurnTick, unitSet: unitSetSchema.parse(world.unitSet) },
+            { commandKey: command?.commandKey ?? 'rest', args: command?.args ?? {} },
+            world.seed,
           );
+          const commandKey = turn.commandKey;
+          const result = turn.result;
           const failed = 'code' in result;
-          const effects = failed ? [] : result.effects;
-          next = applyEffects(state, effects);
+          next = turn.state;
           next.generals[due.id]!.nextTurnTick = due.nextTurnTick + TICKS_PER_MONTH;
-          await persistEffects(tx, worldId, next, effects);
+          await persistEffects(tx, worldId, next, [{ kind: 'world', state: next }]);
+          if (!failed) await persistCommandReports(tx, worldId, due.nextTurnTick, due.id, result);
+          if (turn.nation) {
+            const national = turn.nation.result;
+            const nationId = turn.nation.nationId;
+            if (!('code' in national)) await persistCommandReports(tx, worldId, due.nextTurnTick, due.id, national);
+            if ('code' in national || !national.history?.some((entry) => entry.nationId === nationId)) {
+              const name = commandRegistry.get(turn.nation.commandKey)?.name ?? '국가 명령';
+              await appendNationHistory(
+                tx,
+                worldId,
+                due.nextTurnTick,
+                nationId,
+                `${name}: ${'code' in national ? `${national.code}: ${national.message}` : national.logs.map((log) => log.text).join('\n')}`,
+              );
+            }
+          }
           await tx.generalLog.create({
             data: {
               worldId,
