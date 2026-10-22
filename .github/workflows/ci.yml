@@ -15,7 +15,7 @@ jobs:
       CI: 'true'
       DATABASE_URL: postgresql://opensamguk:opensamguk@127.0.0.1:5432/owner_observation_test
       SERVER_PORT: '3001'
-      OWNER_SNAPSHOT_DIR: ${{ runner.temp }}/owner-observation
+      OWNER_SNAPSHOT_DIR: ${{ github.workspace }}/owner-observation
       APP_SHA: 24e1a8ad0d744d7f3264c9d13f2586161c49d04e
     services:
       postgres:
@@ -32,13 +32,13 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           persist-credentials: false
-          fetch-depth: 2
+          fetch-depth: 0
       - name: Prove exact application source and record runtime
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p "$OWNER_SNAPSHOT_DIR"
-          test "$(git rev-parse HEAD^)" = "$APP_SHA"
+          git cat-file -e "$APP_SHA^{commit}"
           git diff --name-only "$APP_SHA" HEAD > "$OWNER_SNAPSHOT_DIR/branch-diff.txt"
           test -z "$(git diff --name-only "$APP_SHA" HEAD -- . ':!.github')"
           git rev-parse HEAD > "$OWNER_SNAPSHOT_DIR/capture-commit.txt"
@@ -96,7 +96,7 @@ jobs:
         with:
           name: main24e1a8-actual-observation
           path: |
-            ${{ runner.temp }}/owner-observation
+            ${{ github.workspace }}/owner-observation
             test-results/**/error-context.md
           retention-days: 7
           if-no-files-found: error
