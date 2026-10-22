@@ -1,6 +1,6 @@
 # Phase 2 확장 기술 명세 (제안)
 
-> 상태: 제안 초안 (2026-10-21) · 1차 기술 검토 R67-1~9 반영 · 재검토 R67-8-R 반영 · main `2380904` 병합과 경로 재확인 · 2026-10-22 D-022 명령 범위 정정 반영 · 계획: Claude · 기술 검토: Codex
+> 상태: 제안 초안 (2026-10-21) · 1차 기술 검토 R67-1~9 반영 · 재검토 R67-8-R 반영 · main `2380904` 병합과 경로 재확인 · 2026-10-22 D-022 명령 범위 정정 반영 · 2026-10-22 누락 명령 19행(T4-57~T4-75)·대응표 `queueIds`·C14 버전 문구 편입 · 계획: Claude · 기술 검토: Codex
 > 근거: [단계 계획 Phase 2](../product/phases.md#phase-2-확장-mvp-뒤), [백로그](../product/backlog.md), [차별화 기능 후보](../product/differentiation.md), [요구사항 §4](../product/requirements.md#4-범위-밖), [PRD §6.3](../product/prd.md)
 > 이 문서의 AC-P2와 T4 작업은 **제안**이다. 인수조건·단계 계획·결정 기록에는 아직 들어가지 않았다.
 
@@ -10,7 +10,7 @@ Phase 2는 M2가 아니다. M2는 지인 테스트 관문(MVP의 일부)이고 P
 
 - main에 이미 있는 엔진, 명령 37개, 월간 정산, 재생, 순위는 Phase 2의 바탕이다. Phase 2 성과로 세지 않는다.
 - M1·M2·M3 AC는 Phase 2 완료 근거가 될 수 없다. 명령이 아닌 기능의 AC-P2는 MVP 관문에 들어가지 않는다.
-- 2026-10-22 소유자 정정([D-022](../product/decisions.md#d-022-mvp-완료에는-모든-명령이-들어간다-2026-10-22))으로 명령에 딸린 작업은 MVP 필수다. §6 상태 칸에 `MVP 필수 (D-022)`로 표시했다. T4·AC-P2 ID는 추적 ID로 그대로 두고 M4 관문을 만들지 않는다. 명령의 완료 판정은 AC-M1-14와 [명령 대응표](../product/command-coverage.json)가 하고 이 문서의 AC-P2 증거는 대응표 단계 증거로 쓴다. D-022는 이 문서의 계약(C1~C20), 미결정(§9), 승인 항목(§8)의 세부 정책을 승인하지 않는다. A-02·A-03·A-04의 명령은 MVP 범위에 들어왔으나 작업 분해는 아직 없다.
+- 2026-10-22 소유자 정정([D-022](../product/decisions.md#d-022-mvp-완료에는-모든-명령이-들어간다-2026-10-22))으로 명령에 딸린 작업은 MVP 필수다. §6 상태 칸에 `MVP 필수 (D-022)`로 표시했다. T4·AC-P2 ID는 추적 ID로 그대로 두고 M4 관문을 만들지 않는다. 명령의 완료 판정은 AC-M1-14와 [명령 대응표](../product/command-coverage.json)가 하고 이 문서의 AC-P2 증거는 대응표 단계 증거로 쓴다. D-022는 이 문서의 계약(C1~C20), 미결정(§9), 승인 항목(§8)의 세부 정책을 승인하지 않는다. A-02·A-03·A-04의 명령은 MVP 범위에 들어왔으나 작업 분해는 아직 없다고 PR #67 대응표의 `blockers`에 적혀 있다. 그 19개는 [누락 명령 문서](./mvp-command-gaps.md)의 검토를 거쳐 §6 끝의 T4-57~T4-75로 하나씩 나눴고 대응표 `queueIds`에 같은 ID를 더했다. 미해결 원본 3개(`general:che_NPC능동`, `general:cr_건국`, `general:che_무작위건국`)는 작업 분해 없이 분모 91에 그대로 남는다.
 - M2가 요구하는 두 번째 시나리오(PRD §6.4의 공백지 180년, AC-M2-01)는 M2 범위다. 아래 시나리오 추가(AC-P2-24)에서 세지 않는다.
 - 계획 작성과 Codex 기술 검토는 구현 완료나 세부 정책 승인이 아니다. 세부 정책은 §9의 결정 목록으로 따로 받는다.
 - 작업의 준비 정도는 §6.1의 세 단계로만 말한다. 지금 구현 준비인 T4 작업은 없다. 이 문서의 계약(C1~C20)도 제안이며 기술 검토가 새 API·DB 계약을 수용한 것이 아니다.
@@ -103,7 +103,7 @@ Phase 2는 M2가 아니다. M2는 지인 테스트 관문(MVP의 일부)이고 P
 
 - T4-02(순수 경로): `WorldState.ext`와 확장별 상태 조각(§7) 계약, `cloneWorld`·`toWorldState`·`WorldInit`의 `ext` 복제, 순수 재생 reducer가 `ext`를 그대로 넘기는 것. 끈 월드에는 키가 생기지 않는다(C3).
 - T4-03(DB 경로): 월드 생성·bootstrap에서 켠 월드의 `ext` 초기화, `worldLoader`의 `ext` 적재, 턴·월간 저장의 `ext` 쓰기, 월간 정산의 `ext` 처리 → 저장 → `loadReplayState` → `stateHash` 순서.
-- 재생 기록 버전: 끈 월드는 지금의 `ReplayOrigin`·`ReplayArchive` version 1과 바이트가 같다. 켠 월드는 version 2로 쓰고 origin에 고정 프리셋 사본과 확장 리소스 사본을 담는다. `resourceHash`는 version 2에서만 그 둘을 더한다. `replayArchive`는 1과 2를 모두 읽는다. 소유는 T4-03이다.
+- 재생 기록 버전: 끈 월드는 지금의 `ReplayOrigin`·`ReplayArchive` version 1과 바이트가 같고 기존 v1 origin과 저장된 해시는 바뀌지 않는다. version 2는 먼저 정상 통합되는 T1-26 종료 기록의 archive v2가 단일 소유한다(총괄 결정, [T4-02 2.4.6](./T4-02.md#246-t4-03과의-경계)). 켠 월드 기록은 T4-03 상세 계획이 그때 main의 형식에 맞춘다. 호환되지 않는 확장이 필요하면 다음 미사용 버전(지금 예상은 v3)을 쓰고 origin에 고정 프리셋 사본과 확장 리소스 사본을 담는다. `resourceHash`는 그 버전에서만 그 둘을 더한다. 읽기 허용 조합과 섞인 모양의 거부도 그 계획에 적는다. 소유는 T4-03이다.
 - 검증: 기존 v1·끈 월드 골든 보존(바이트 비교). 켠 월드는 저장 → 엔진 재시작 → 복원 상태 해시 일치와 12개월 순수 재생 동등성을 따로 본다.
 
 #### C15 즉시 행동 InputEvent 수명 (R67-3)
@@ -279,12 +279,37 @@ main에는 이미 로그인한 사용자가 월간 연감을 읽는 `records.wor
 | T4-54 | 토너먼트 경기 규칙 | P2-15 | Codex → Claude | T4-30, 병합 T4-25 | `packages/rules/src/tournament/match.ts` | 같은 시드 같은 결과 | 미정 | 결정 대기 (U-09 종목) |
 | T4-55 | 국호·국기 변경권 부여 | P2-10 | Codex → Claude | T4-16 | `ext/nationIdentity/grant.ts` | 부여 조건·1회 | 미정 | 결정 대기 (U-04) · MVP 필수 (D-022) |
 | T4-56 | 타임랩스 실제 사건과 과거 이름·색 투영 | P2-17 (2차) | Codex → Claude | T4-35, 병합 T4-31, T4-38 | 계약 뒤 정함 (저장이 필요하면 S7) | 공개 사건 투영 저장·조회, 해산·국호 변경 뒤 과거 프레임 | 미정 | 승인 대기 (A-11), 계약 먼저 |
+| T4-57 | [내정 특기 초기화](./mvp-command-gaps.md#t4-57-reset_domestic_trait-내정-특기-초기화) (`reset_domestic_trait`, general) | M1-14 | Codex → Claude | 계약 T4-02, T4-07[준비], T4-25 · 구현 T4-02, T4-07[준비], T4-25 · 연결 T4-03, T4-04 · 결정 U-07, U-01, U-19 | `ext/reset_domestic_trait/` | 명령별 성공·대표 실패, 연결 뒤 대응표 11단계 | 0.5일 | 결정 대기 (U-07) · MVP 필수 (D-022) |
+| T4-58 | [전투 특기 초기화](./mvp-command-gaps.md#t4-58-reset_war_trait-전투-특기-초기화) (`reset_war_trait`, general) | M1-14 | Codex → Claude | 계약 T4-02, T4-07[준비], T4-25 · 구현 T4-02, T4-07[준비], T4-25 · 연결 T4-03, T4-04 · 결정 U-07, U-01, U-19 | `ext/reset_war_trait/` | 명령별 성공·대표 실패, 연결 뒤 대응표 11단계 | 0.5일 | 결정 대기 (U-07) · MVP 필수 (D-022) |
+| T4-59 | [증여](./mvp-command-gaps.md#t4-59-gift-증여) (`gift`, general) | M1-14 | Codex → Claude | 계약 T4-02 · 구현 T4-02 · 연결 T4-03, T4-04 · 결정 U-19 | `ext/gift/` | 명령별 성공·대표 실패, 연결 뒤 대응표 11단계 | 0.5일 | 계획 가능, 계약은 U-19 · MVP 필수 (D-022) |
+| T4-60 | [단련](./mvp-command-gaps.md#t4-60-drill-단련) (`drill`, general) | M1-14 | Codex → Claude | 계약 T4-02 · 구현 T4-02 · 연결 T4-03, T4-04 · 결정 MQ-1, U-19 | `ext/drill/` | 명령별 성공·대표 실패, 연결 뒤 대응표 11단계 | 0.5일 | 결정 대기 (MQ-1) · MVP 필수 (D-022) |
+| T4-61 | [숙련전환](./mvp-command-gaps.md#t4-61-convert_proficiency-숙련전환) (`convert_proficiency`, general) | M1-14 | Codex → Claude | 계약 T4-02, T4-60 · 구현 T4-02, T4-60 · 연결 T4-03, T4-04 · 결정 MQ-1, U-19 | `ext/convert_proficiency/` | 명령별 성공·대표 실패, 연결 뒤 대응표 11단계 | 0.5일 | 결정 대기 (MQ-1) · MVP 필수 (D-022) |
+| T4-62 | [전투태세](./mvp-command-gaps.md#t4-62-battle_ready-전투태세) (`battle_ready`, general) | M1-14 | Codex → Claude | 계약 T4-02, T4-07[준비], T4-48[방랑] · 구현 T4-02, T4-07[준비], T4-48[방랑] · 연결 T4-03, T4-04 · 결정 U-01, U-19, MQ-1 | `ext/battle_ready/` | 명령별 성공·대표 실패, 연결 뒤 대응표 11단계 | 0.5일 | 결정 대기 (U-01) · MVP 필수 (D-022) |
+| T4-63 | [맹훈련](./mvp-command-gaps.md#t4-63-intense_training-맹훈련) (`intense_training`, general) | M1-14 | Codex → Claude | 계약 T4-02, T4-48[방랑] · 구현 T4-02, T4-48[방랑] · 연결 T4-03, T4-04 · 결정 U-19, MQ-1 | `ext/intense_training/` | 명령별 성공·대표 실패, 연결 뒤 대응표 11단계 | 0.5일 | 계획 가능, 계약은 U-19·T4-48 표식 · MVP 필수 (D-022) |
+| T4-64 | [견문](./mvp-command-gaps.md#t4-64-travel-견문) (`travel`, general) | M1-14 | Codex → Claude | 계약 T4-02 · 구현 T4-02 · 연결 T4-03, T4-04 · 결정 U-19 | `ext/travel/` | 명령별 성공·대표 실패, 연결 뒤 대응표 11단계 | 0.5일 | 계획 가능, 계약은 U-19 · MVP 필수 (D-022) |
+| T4-65 | [은퇴](./mvp-command-gaps.md#t4-65-retire-은퇴) (`retire`, general) | M1-14 | Codex → Claude | 계약 T4-02, T4-07[준비] · 구현 T4-02, T4-07[준비] · 연결 T4-03, T4-04 · 결정 A-08, U-01, U-19 | `ext/retire/` | 명령별 성공·대표 실패, 연결 뒤 대응표 11단계 | 0.5일 | 결정·승인 대기 (A-08) · MVP 필수 (D-022) |
+| T4-66 | [인재탐색](./mvp-command-gaps.md#t4-66-scout_talent-인재탐색) (`scout_talent`, general) | M1-14 | Codex → Claude | 계약 T4-02, T4-03 · 구현 T4-02, T4-03 · 연결 T4-04 · 결정 MQ-5, U-19 | `ext/scout_talent/` | 명령별 성공·대표 실패, 연결 뒤 대응표 11단계 | 0.5일 | 계약 먼저 (명령이 만든 장수의 저장) · MVP 필수 (D-022) |
+| T4-67 | [물자조달](./mvp-command-gaps.md#t4-67-procure-물자조달) (`procure`, general) | M1-14 | Codex → Claude | 계약 T4-02, T4-48[방랑] · 구현 T4-02, T4-48[방랑] · 연결 T4-03, T4-04 · 결정 U-19 | `ext/procure/` | 명령별 성공·대표 실패, 연결 뒤 대응표 11단계 | 0.5일 | 계획 가능, 계약은 U-19·T4-48 표식 · MVP 필수 (D-022) |
+| T4-68 | [장수대상임관](./mvp-command-gaps.md#t4-68-join_general-장수대상임관) (`join_general`, general) | M1-14 | Codex → Claude | 계약 T4-02 · 구현 T4-02 · 연결 T4-03, T4-04 · 결정 MQ-2, U-19(MQ-2에서 임관 경험을 둘 때) | `ext/join_general/` | 명령별 성공·대표 실패, 연결 뒤 대응표 11단계 | 0.5일 | 계획 가능, 계약은 MQ-2·U-19 · MVP 필수 (D-022) |
+| T4-69 | [접경귀환](./mvp-command-gaps.md#t4-69-return_border-접경귀환) (`return_border`, general) | M1-14 | Codex → Claude | 계약 T4-02, T4-48[방랑] · 구현 T4-02, T4-48[방랑] · 연결 T4-03, T4-04 · 결정 없음 | `ext/return_border/` | 명령별 성공·대표 실패, 연결 뒤 대응표 11단계 | 0.5일 | 계획 가능, 계약은 T4-48 표식 · MVP 필수 (D-022) |
+| T4-70 | [부대 탈퇴 지시](./mvp-command-gaps.md#t4-70-nation_troop_expel-부대-탈퇴-지시) (`nation_troop_expel`, nation) | M1-14 | Codex → Claude | 계약 T4-02, T4-19 · 구현 T4-02, T4-19 · 연결 T4-20, T4-21, T4-50, T4-51 · 결정 T2-05 직책 범위 | `ext/nation_troop_expel/` | 명령별 성공·대표 실패, 연결 뒤 대응표 11단계 | 0.5일 | 선행 대기 (T4-19~T4-21) · MVP 필수 (D-022) |
+| T4-71 | [무작위 수도 이전](./mvp-command-gaps.md#t4-71-nation_random_capital-무작위-수도-이전) (`nation_random_capital`, nation) | M1-14 | Codex → Claude | 계약 T4-02, T4-07[준비] · 구현 T4-02, T4-07[준비] · 연결 T4-50, T4-51 · 결정 MQ-4 (UQ-3과 한 묶음), U-01 | `ext/nation_random_capital/` | 명령별 성공·대표 실패, 연결 뒤 대응표 11단계 | 0.5일 | 결정 대기 (MQ-4) · MVP 필수 (D-022) |
+| T4-72 | [초토화](./mvp-command-gaps.md#t4-72-nation_scorch-초토화) (`nation_scorch`, nation) | M1-14 | Codex → Claude | 계약 T4-02, T4-07[준비], T2-07[외교] · 구현 T4-02, T4-07[준비], T2-07 또는 T4-03[외교] · 연결 T4-50, T4-51 · 결정 U-01, U-19, MQ-3 | `ext/nation_scorch/` | 명령별 성공·대표 실패, 연결 뒤 대응표 11단계 | 0.5일 | 결정 대기 (U-01) · MVP 필수 (D-022) |
+| T4-73 | [증축](./mvp-command-gaps.md#t4-73-nation_expand-증축) (`nation_expand`, nation) | M1-14 | Codex → Claude | 계약 T4-02, T4-07[준비] · 구현 T4-02, T4-07[준비] · 연결 T4-50, T4-51 · 결정 U-01, U-19 | `ext/nation_expand/` | 명령별 성공·대표 실패, 연결 뒤 대응표 11단계 | 0.5일 | 결정 대기 (U-01) · MVP 필수 (D-022) |
+| T4-74 | [감축](./mvp-command-gaps.md#t4-74-nation_shrink-감축) (`nation_shrink`, nation) | M1-14 | Codex → Claude | 계약 T4-02, T4-07[준비], T4-73 · 구현 T4-02, T4-07[준비], T4-73 · 연결 T4-50, T4-51 · 결정 U-01, U-19 | `ext/nation_shrink/` | 명령별 성공·대표 실패, 연결 뒤 대응표 11단계 | 0.5일 | 결정 대기 (U-01) · MVP 필수 (D-022) |
+| T4-75 | [인구이동](./mvp-command-gaps.md#t4-75-nation_migrate-인구이동) (`nation_migrate`, nation) | M1-14 | Codex → Claude | 계약 T4-02 · 구현 T4-02 · 연결 T4-50, T4-51 · 결정 U-19 | `ext/nation_migrate/` | 명령별 성공·대표 실패, 연결 뒤 대응표 11단계 | 0.5일 | 계획 가능, 계약은 U-19 · MVP 필수 (D-022) |
 
 `ext/`는 `packages/rules/src/commands/ext/`다. 각 규칙 작업은 명령마다 `<key>.test.ts`에 성공 1건·대표 실패 1건을 두고 T4-02의 확장 대조 시험이 확장 목록과 시험 파일을 자동으로 맞춰 본다.
 
 D7·D8·D9·D14(T4-42~T4-45)와 T4-54~T4-56은 결정이 나면 규칙·조회·화면으로 다시 나누거나 크기를 정한다. 지금 크기를 적으면 근거 없는 숫자가 되므로 미정으로 둔다.
 
 추정이 있는 49개 작업의 합은 한 담당 기준 약 31일이다. Codex 줄이 약 24일, Claude 줄이 약 7일이며 둘은 병렬로 진행한다. 미정 7개는 이 합에 없다.
+
+T4-57~T4-75는 §8 A-02·A-03·A-04에서 온 명령 19개를 [누락 명령 문서](./mvp-command-gaps.md)의 검토(PR #136 `391432c`, 기술 검토 [5611758624](https://github.com/peppone-choi/opensamguk/pull/136#pullrequestreview-5611758624))대로 하나씩 옮긴 행이다. 행마다 상세는 그 문서 5절로 링크했다. 대응표의 key·대상·원본 ID는 PR #67 `5457700`과 같고 `queueIds`에 그 행의 ID만 더했다. 이 편입은 추적 대응이며 제품 정책 승인, 정식 AC 채택, 구현 허가가 아니다.
+
+이 19행의 선행 칸은 그 문서 [4절](./mvp-command-gaps.md#4-19개-대응표)의 세 선행과 결정을 그대로 옮겼다. 계약은 상세 계획이 반대쪽 기술 검토를 통과해야 하는 작업, 구현은 규칙 PR 전에 main에 병합돼 있어야 하는 작업, 연결은 api 이후 단계 증거 전에 병합돼 있어야 하는 작업이다. MQ-1~MQ-5는 그 문서 [7절](./mvp-command-gaps.md#7-소유자-질문-묶음)의 질문이며 §9의 U가 아니다. [준비]는 원작 준비 턴이 있는 8행이 T4-07에 닿는다는 뜻이며 U-01이 준비 턴 없는 한 턴 실행을 고를 때만 빠진다. [방랑]은 4행이 T4-48의 방랑 국가 표식을 기다린다는 뜻이며 국가 규모 0을 방랑으로 읽지 않는다. [외교]는 T4-72가 T2-07 외교 제한 턴 계약을 기다린다는 뜻이며 구현 선행은 그 값의 위치에 따라 T2-07 또는 T4-03이다. 제한 턴 검사와 평시 검사는 빼지 않는다. T4-68의 임관 경험 700·100은 원작 인용이며 MQ-2 (나)에서 경험을 주기로 할 때만 U-19 환산 대상이다.
+
+19행의 추정은 행마다 규칙 PR 하나(0.5일)이며 위 합에 넣지 않았다. T4-66, T4-70, T4-71은 한 PR을 넘을 위험이 있다(그 문서 3.4절).
 
 ### 6.1 준비 단계
 
@@ -311,7 +336,7 @@ T4-15(선양·해산)와 T4-52(모반), T4-16(변경 명령)과 T4-55(변경권 
 | `apps/server/src/visibility.ts` | T4-35 → T4-12 → T4-25 → T4-38 → T4-56 | 비공개 필드 추가는 권한 시험과 같은 PR |
 | `apps/server/src/routers/commands.ts`, `turns.ts`, `game/slots.ts` | T4-03 | resolver 연결은 T4-03 하나만 (C13) |
 | T2-05 `nationTurns` 라우터 | T4-50 | 검사 연결 한 곳만. 나머지는 T2-05 소유 |
-| `packages/rules/src/commands/ext/registry.ts`, `ext/state.ts` | T4-02 → T4-17 → T4-20 → T4-48 → T4-52 → T4-23 → T4-53 → T4-28 → T4-31 | 조각 등록만. T4-17이 T4-05·06·11·14·15·16을, T4-53이 T4-08~T4-10을 등록한다 |
+| `packages/rules/src/commands/ext/registry.ts`, `ext/state.ts` | T4-02 → T4-17 → T4-20 → T4-48 → T4-52 → T4-23 → T4-53 → T4-28 → T4-31 → T4-57~T4-75(ID 오름차순) | 조각 등록만. T4-17이 T4-05·06·11·14·15·16을, T4-53이 T4-08~T4-10을 등록한다. T4-57~T4-75는 등록 줄의 최종 위치일 뿐이다. 각 행은 병합 직전 최신 main에서 자기 줄을 ID 순서 자리에 더하며 이 칸에서 `병합` 선행을 만들지 않는다. 앞 ID의 결정 대기가 뒤 ID의 선행이 되지 않는다 |
 | `packages/rules/src/index.ts` | T4-33 → T4-30 → T4-02 → T4-18 → T4-49 → T4-25 → T4-54 | export 한 줄씩. 확장 명령은 `ext/registry.ts` 한 export로 나간다 |
 | `packages/rules/src/model/world.ts`, `model/clone.ts`, `replay.ts`, `commands/types.ts`, `commands/turn.ts`, `world/bootstrap.ts` | T4-02 → T4-49 → T4-48 | C13·C14·C15·C17 |
 | `packages/rules/src/commands/attack.ts` | T4-33 → T4-18 → T4-48 | T4-33이 계산을 꺼내고 T4-18은 그 함수에만 수정자 자리를 단다 |
