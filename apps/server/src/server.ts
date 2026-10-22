@@ -23,7 +23,12 @@ export async function buildServer(options: {
   const secureCookies = options.secureCookies ?? production;
   if (production && !secureCookies) throw new Error('운영 세션 쿠키에는 Secure가 필요합니다.');
   const publicOrigin = options.publicOrigin ?? process.env.PUBLIC_ORIGIN ?? (production ? '' : 'http://127.0.0.1:5173');
-  const originUrl = new URL(publicOrigin);
+  let originUrl: URL;
+  try {
+    originUrl = new URL(publicOrigin);
+  } catch {
+    throw new Error('PUBLIC_ORIGIN에 화면의 출처를 지정하세요.');
+  }
   if (
     originUrl.origin !== publicOrigin ||
     !['http:', 'https:'].includes(originUrl.protocol) ||

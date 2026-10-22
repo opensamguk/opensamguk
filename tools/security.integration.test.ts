@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { request as httpRequest } from 'node:http';
 import { Writable } from 'node:stream';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import { buildServer } from '../apps/server/src/server';
 import { hashPassword } from '../apps/server/src/auth/password';
@@ -132,6 +132,85 @@ afterAll(async () => {
   await db.world.deleteMany();
   await db.user.deleteMany();
   await db.$disconnect();
+});
+
+describe('T3-04 #113 공개 출처 시작 검사', () => {
+  const sensitive = 'public-origin-test-secret';
+  afterEach(() => vi.unstubAllEnvs());
+
+  describe.each(['option', 'env'] as const)('%s 설정', (source) => {
+    it.each([
+      ['누락', undefined],
+      ['빈 값', ''],
+      ['공백', ' '],
+      ['상대 경로', `/${sensitive}`],
+      ['파싱 불가', `https://[${sensitive}`],
+      ['잘못된 scheme', `ftp://${sensitive}.example.test`],
+      ['자격증명', `https://user:${sensitive}@game.example.test`],
+      ['경로', `https://game.example.test/${sensitive}`],
+      ['끝 슬래시', 'https://game.example.test/'],
+      ['query', `https://game.example.test?token=${sensitive}`],
+      ['fragment', `https://game.example.test#${sensitive}`],
+      ['대문자 호스트', 'https://GAME.example.test'],
+      ['기본 포트', 'https://game.example.test:443'],
+      ['운영 HTTP', 'http://game.example.test'],
+    ])('%s 설정을 원문 없는 고정 안내 Error로 거부한다', async (_name, publicOrigin) => {
+      vi.stubEnv('PUBLIC_ORIGIN', source === 'env' ? publicOrigin : undefined);
+      const error: unknown = await buildServer({
+        db,
+        production: true,
+        logging: false,
+        ...(source === 'option' && publicOrigin !== undefined ? { publicOrigin } : {}),
+      }).then(
+        async (app) => {
+          await app.close();
+          return undefined;
+        },
+        (error: unknown) => error,
+      );
+      expect(error).toBeInstanceOf(Error);
+      expect(error).not.toBeInstanceOf(TypeError);
+      if (!(error instanceof Error)) throw new Error('시작 검사가 오류를 반환해야 합니다.');
+      expect(error.message).toBe('PUBLIC_ORIGIN에 화면의 출처를 지정하세요.');
+      for (const key of ['input', 'cause', 'code']) expect(error).not.toHaveProperty(key);
+      const serialized = JSON.stringify(error, Object.getOwnPropertyNames(error));
+      for (const text of [error.message, error.stack ?? '', serialized]) {
+        expect(text).not.toContain(sensitive);
+        expect(text).not.toContain('ERR_INVALID_URL');
+        if (publicOrigin?.trim()) expect(text).not.toContain(publicOrigin);
+      }
+    });
+  });
+
+  it('Secure 검사는 잘못된 공개 출처보다 먼저 거부한다', async () => {
+    vi.stubEnv('PUBLIC_ORIGIN', undefined);
+    await expect(buildServer({ db, production: true, secureCookies: false })).rejects.toThrow(
+      '운영 세션 쿠키에는 Secure가 필요합니다.',
+    );
+  });
+
+  it.each(['option', 'env'] as const)('%s의 정상 HTTPS는 실제 HTTP 로그인과 Secure 쿠키를 유지한다', async (source) => {
+    const publicOrigin = 'https://game.example.test';
+    vi.stubEnv('PUBLIC_ORIGIN', source === 'env' ? publicOrigin : 'not-a-valid-origin');
+    await withServer(
+      async (base) => {
+        const response = await send(base, 'auth.login', credentials(), { headers: { origin: publicOrigin } });
+        expect(response.status).toBe(200);
+        expect(response.headers['set-cookie']!.join(';')).toContain('Secure');
+      },
+      { production: true, publicOrigin: source === 'option' ? publicOrigin : undefined },
+    );
+  });
+
+  it('개발 미설정은 기존 출처를 쓰고 환경변수보다 옵션을 우선한다', async () => {
+    vi.stubEnv('PUBLIC_ORIGIN', undefined);
+    await withServer(async (base) => expect((await send(base, 'auth.login', credentials())).status).toBe(200), {
+      production: false,
+      publicOrigin: undefined,
+    });
+    vi.stubEnv('PUBLIC_ORIGIN', 'https://different.example.test');
+    await withServer(async (base) => expect((await send(base, 'auth.login', credentials())).status).toBe(200));
+  });
 });
 
 describe('T3-04 실제 TCP HTTP·PostgreSQL 보안', () => {
