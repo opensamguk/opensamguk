@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { signUpByApi } from './account';
+import { appOrigin, createAccount } from './account';
 import { e2eWorld, setTurns, turns, waitNextTurn, waitTurnWindow } from './game';
 import { bindGeneral, query } from './world';
 
@@ -37,7 +37,7 @@ test.beforeAll(async ({ browser }) => {
   // 이 파일의 test.use(storageState)가 아직 없는 파일을 읽지 않도록 빈 상태로 시작한다.
   const context = await browser.newContext({ baseURL: BASE, storageState: { cookies: [], origins: [] } });
   const page = await context.newPage();
-  await signUpByApi(page);
+  await createAccount(page);
   ctx.worldId = await e2eWorld(page);
   const { user } = await query<{ user: { id: string } }>(context.request, 'auth.me');
   await bindGeneral(ctx.worldId, user.id);
@@ -412,10 +412,12 @@ test.describe('장수가 있는 계정', () => {
 
 test('장수 생성 API로 만든 재야 장수는 메인에서 바로 재야 상태로 보인다', async ({ page }) => {
   test.setTimeout(60_000);
-  await signUpByApi(page);
+  await createAccount(page);
   const name = `E${String(Date.now() % 100_000).padStart(5, '0')}`;
+  // 서버는 /trpc POST에 화면과 같은 출처의 Origin을 요구한다 (T3-04). page.request는 Origin을 붙이지 않는다.
   const created = await page.request.post('/trpc/general.create', {
     data: { worldId: ctx.worldId, name, leadership: 55, strength: 55, intel: 55, portraitId: null },
+    headers: { Origin: appOrigin() },
   });
   expect(created.ok()).toBe(true);
   await expect
@@ -439,7 +441,7 @@ test('장수 생성 API로 만든 재야 장수는 메인에서 바로 재야 �
 });
 
 test('장수가 없는 계정은 장수 만들기 안내와 공개 지도를 본다', async ({ page }) => {
-  await signUpByApi(page);
+  await createAccount(page);
   await openMain(page);
   await expect(
     page.getByRole('region', { name: '명령 목록', exact: true }).getByText('이 월드에 내 장수가 없습니다'),
@@ -453,7 +455,7 @@ test('장수가 없는 계정은 장수 만들기 안내와 공개 지도를 본
 });
 
 test('없는 월드는 안내를 보여 준다', async ({ page }) => {
-  await signUpByApi(page);
+  await createAccount(page);
   await page.goto(`/w/${crypto.randomUUID()}`);
   await expect(
     page.getByRole('region', { name: '지도', exact: true }).getByText('월드를 찾을 수 없습니다'),
