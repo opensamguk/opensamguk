@@ -38,7 +38,7 @@ function worker(worldId: string) {
     env: { ...process.env, TEST_DATABASE_URL: url },
     stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
   });
-  const batches: { batch: number; count: number; more: boolean }[] = [];
+  const batches: { batch: number; count: number; more: boolean; startedAt: number; finishedAt: number }[] = [];
   child.on('message', (batch: (typeof batches)[number]) => batches.push(batch));
   return { child, batches };
 }
@@ -60,6 +60,8 @@ it('실제 가속 자식은 배치·리스 갱신·2초 정지·재개·SIGKILL 
   try {
     await until(() => first.batches.length >= 3);
     expect(first.batches.slice(0, 3).every((batch) => batch.more && batch.count <= 64)).toBe(true);
+    for (let i = 1; i < 3; i++)
+      expect(first.batches[i]!.startedAt - first.batches[i - 1]!.finishedAt).toBeLessThan(100);
     const original = await db.engineLease.findUniqueOrThrow({ where: { worldId } });
     await until(
       async () => (await db.engineLease.findUniqueOrThrow({ where: { worldId } })).expiresAt > original.expiresAt,

@@ -60,6 +60,8 @@ function createWorld(seed: string, name: string): string {
     seed,
     '--turn-term',
     '1',
+    '--end-year',
+    '300',
     '--name',
     name,
   ]);

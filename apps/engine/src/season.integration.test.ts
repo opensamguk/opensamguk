@@ -250,6 +250,29 @@ it('가속 poll은 배치마다 반환하고 runEngine은 종료 후 리스를 �
   if (lease) await releaseLease(db, lease);
 });
 
+it('월드를 지정하지 않은 runEngine은 종료 뒤 다음 RUNNING 월드로 넘어간다', async () => {
+  const first = await fixture('END_YEAR'),
+    second = await fixture('END_YEAR');
+  const ids = [first.worldId, second.worldId];
+  for (const [index, worldId] of ids.entries()) {
+    await db.world.update({ where: { id: worldId }, data: { createdAt: new Date(index) } });
+    await controlClock(db, worldId, 'accelerate');
+  }
+  const controller = new AbortController();
+  const running = runEngine(db, { signal: controller.signal });
+  try {
+    const deadline = performance.now() + 10000;
+    while ((await db.worldResult.count({ where: { worldId: { in: ids } } })) !== 2) {
+      if (performance.now() > deadline) throw new Error('다음 월드 종료 시간 초과');
+      await delay(20);
+    }
+  } finally {
+    controller.abort();
+    await running;
+  }
+  for (const worldId of ids) await checkEnd(worldId, 'END_YEAR');
+});
+
 it('운영 모드는 PREOPEN·ENDED·같은 모드를 거부하고 동시 전환은 한 번 적용한다', async () => {
   const initial = await seasonInitial('END_YEAR');
   const { worldId } = await saveInitialWorld(db, initial, {

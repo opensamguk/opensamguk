@@ -117,6 +117,11 @@ it('같은 사람 판에서 realtime 턴·가속·예턴 편집·충돌·정지�
     const loop = new TurnLoop(db, lease);
     await loop.advanceTo(100);
     expect((await db.generalLog.findFirstOrThrow({ where: { worldId } })).commandKey).toBe('farm');
+    await loop.advanceTo(10100);
+    await loop.advanceTo(20100);
+    expect(
+      (await db.generalLog.findMany({ where: { worldId }, orderBy: { tick: 'asc' } })).map((log) => log.commandKey),
+    ).toEqual(['farm', 'commerce', 'rest']);
     await controlClock(db, worldId, 'accelerate');
     expect((await request('home.get', { worldId }, a.cookie)).data.nextTurnAt).toBeNull();
     const mine = (await request('turns.get', { worldId }, a.cookie)).data;
@@ -182,6 +187,17 @@ it('가속 턴 commit과 겹친 API edit는 STALE이며 재시도한 편집은 �
     const polling = loop.poll();
     await barrier;
     const editing = request('turns.edit', { worldId, revision: 1, op: { shift: 1 } }, a.cookie);
+    const deadline = performance.now() + 5000;
+    while (
+      !(
+        await db.$queryRaw<
+          unknown[]
+        >`SELECT 1 FROM pg_stat_activity WHERE pid <> pg_backend_pid() AND wait_event_type = 'Lock' AND query LIKE '%SELECT id FROM "World"%FOR UPDATE%'`
+      ).length
+    ) {
+      if (performance.now() > deadline) throw new Error('가속 편집의 월드 잠금 대기 시간 초과');
+      await delay(10);
+    }
     release();
     expect((await editing).data).toMatchObject({ ok: false, reason: 'STALE' });
     await polling;

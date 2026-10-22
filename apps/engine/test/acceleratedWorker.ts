@@ -10,7 +10,7 @@ try {
   await runEngine(db, {
     worldId: process.argv[2]!,
     signal: controller.signal,
-    onBatch: (batch) => {
+    onBatch: (batch, timing) => {
       batches++;
       if (batches <= 4 || !batch.more)
         process.send?.({
@@ -18,7 +18,7 @@ try {
           count: batch.executions.length,
           more: batch.more,
           status: batch.status,
-          at: performance.now(),
+          ...timing,
         });
     },
   });

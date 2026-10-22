@@ -46,7 +46,7 @@ export async function runEngine(
     worldId?: string;
     signal: AbortSignal;
     onStatus?: (status: string) => void;
-    onBatch?: (batch: PollBatch) => void;
+    onBatch?: (batch: PollBatch, timing: { startedAt: number; finishedAt: number }) => void;
   },
 ) {
   const { signal } = options;
@@ -122,8 +122,9 @@ export async function runEngine(
     try {
       let ended = false;
       while (!session.signal.aborted) {
+        const startedAt = performance.now();
         const batch = await loop.poll(session.signal);
-        options.onBatch?.(batch);
+        options.onBatch?.(batch, { startedAt, finishedAt: performance.now() });
         if (batch.status === 'ENDED' && !batch.more) {
           ended = true;
           break;
