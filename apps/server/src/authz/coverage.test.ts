@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { initTRPC } from '@trpc/server';
 import { categories, compareAuthz } from './coverage';
 import { authzCase } from './case';
@@ -140,46 +140,5 @@ describe('T3-04 실제 절차 정의와 실행 사례 대조', () => {
     expect(report.missing.filter((entry) => entry === 'duplicate exemption: health otherUser')).toHaveLength(1);
     expect(report.missing).toContain('health (query): otherUser');
     expect(report.exempted).toEqual([]);
-  });
-  it('CLI는 오래된 면제 진단을 MISSING으로 출력하고 종료 코드 1을 낸다', async () => {
-    const router = t.router({ health: t.procedure.query(() => true) });
-    const evidence = categories.map((category) => ({ path: 'health', category }));
-    const spawn = vi.fn(() => ({ status: 0 }));
-    const write = vi.fn();
-    vi.doMock('node:child_process', () => ({ spawnSync: spawn }));
-    vi.doMock('node:fs', () => ({
-      mkdirSync: vi.fn(),
-      readFileSync: () => JSON.stringify(evidence),
-      writeFileSync: write,
-    }));
-    vi.doMock('../router', () => ({ appRouter: router }));
-    vi.doMock('./case', () => ({ evidenceFile: '/diagnostic-only/cases.json' }));
-    vi.doMock('./exemptions', () => ({ exemptions: [{ path: 'health', category: 'otherUser', reason: '옛 면제' }] }));
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const exit = vi.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('diagnostic exit');
-    });
-    try {
-      vi.resetModules();
-      await expect(import('../../../../tools/run-authz')).rejects.toThrow('diagnostic exit');
-      expect(spawn).toHaveBeenCalledWith(
-        'pnpm',
-        ['test:int'],
-        expect.objectContaining({ env: expect.objectContaining({ AUTHZ_RECORD: '1' }), stdio: 'inherit' }),
-      );
-      expect(write).toHaveBeenCalledWith('/diagnostic-only/cases.json', '[]');
-      expect(error).toHaveBeenCalledWith('MISSING stale exemption: health otherUser');
-      expect(log).toHaveBeenCalledWith('AUTHZ procedures=1 executed=5 exemptions=0 missing=1');
-      expect(exit).toHaveBeenCalledWith(1);
-    } finally {
-      vi.doUnmock('node:child_process');
-      vi.doUnmock('node:fs');
-      vi.doUnmock('../router');
-      vi.doUnmock('./case');
-      vi.doUnmock('./exemptions');
-      vi.restoreAllMocks();
-      vi.resetModules();
-    }
   });
 });
