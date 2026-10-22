@@ -179,6 +179,8 @@
   border-radius: var(--radius);
   color: var(--color-info);
   font-size: var(--text-xs);
+  /* 좁은 명령 칸에서도 한 단어로 둔다. 줄이 모자라면 태그 전체가 다음 줄로 간다 (#112). */
+  white-space: nowrap;
 }
 
 .check {
