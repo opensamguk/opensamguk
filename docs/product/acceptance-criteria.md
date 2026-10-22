@@ -18,7 +18,7 @@
 
 | 관문                           | 전체 | ✅ | 🟨 | ⬜ | <!-- lint-text-ignore C-5 -->
 | ------------------------------ | ---- | -- | -- | -- |
-| M1 혼자 + NPC로 한 판 완주     | 22   | 19 | 1  | 2  |
+| M1 혼자 + NPC로 한 판 완주     | 22   | 20 | 1  | 1  |
 | M2 지인 테스트 | 19 | 1 | 0 | 18 |
 | M3 공개 오픈 = MVP 완료 | 16 | 0 | 1 | 15 |
 
@@ -95,7 +95,7 @@
 
 | ID        | 조건 | 검증 방법 | 상태 | 증거 |
 | --------- | ---- | --------- | ---- | ---- |
-| AC-M1-22  | 문서, 화면 문구, 게임 문구, 서버 오류 메시지가 [글쓰기 규칙](../writing-style.md)을 따른다. 자동 검사에서 S1 패턴이 0건이다 | `pnpm lint:text` + 반대쪽 리뷰 | ⬜ | | <!-- lint-text-ignore C-5 -->
+| AC-M1-22  | 문서, 화면 문구, 게임 문구, 서버 오류 메시지가 [글쓰기 규칙](../writing-style.md)을 따른다. 자동 검사에서 S1 패턴이 0건이다 | `pnpm lint:text` + 반대쪽 리뷰 | ✅ | 문구 정리 세 단계가 main에 있다: T1-25 PR #6 `ce0560a`, T1-24 PR #64 `6105638`, T1-23 PR #128 `2380904`. strict 연결은 PR #130 Codex 구현(`19c9bac`)을 Claude가 head `0407469`에서 리뷰 통과했다(2026-10-22). `pnpm check`의 lint 뒤에 `pnpm lint:text --strict`만 들어갔다. 전체 195파일(문서 91, web 50, rules 28, server 26) 0건, 기본 대상 밖 엔진·shared·db·tools 39파일 탐침 0건, 예외 주석 188곳 대조. 구현자 로컬에서 A-7 반례 문서 하나로 `pnpm check`가 strict 단계 종료 코드 1. exact-head CI [39730834565](https://github.com/peppone-choi/opensamguk/actions/runs/39730834565)·[39730839018](https://github.com/peppone-choi/opensamguk/actions/runs/39730839018): frozen 설치, 단위 458개, 실제 PostgreSQL 328개, Chromium 60/60개(skip 0), 웹 빌드 통과. 병합은 별도. [T1-23 최종 리뷰](../plans/T1-23.md#최종-strict-연결-리뷰-claude) | <!-- lint-text-ignore C-5 -->
 
 ### 관문 데모
 
