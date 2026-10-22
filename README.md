@@ -16,6 +16,7 @@
 | M3 공개 오픈 = MVP 완료      | [AC-M3 16개](docs/product/acceptance-criteria.md#m3) 통과    | 진행 중 (✅ 0 · 🟨 1 · ⬜ 15) | <!-- lint-text-ignore C-5 -->
 
 MVP는 M1·M2·M3 전체이며 M1만 끝나도 MVP 완료가 아닙니다. Phase 2(확장)는 M2와 다른 범위입니다 ([단계 계획](docs/product/phases.md)).
+Phase 2 인수조건 가운데 정본에 오른 것은 [AC-P2-16](docs/product/acceptance-criteria.md#p2) 하나입니다 ([D-023](docs/product/decisions.md#d-023-ac-p2-16을-인수조건에-올리고-수동-1회-계산-몫만-계약으로-채택한다-2026-10-22)). 수동 입력으로 전투를 한 번 계산하는 몫(가)은 계약과 독립 기술 리뷰를 거쳤지만 PR [#132](https://github.com/peppone-choi/opensamguk/pull/132)가 아직 병합되지 않았고 실제 턴과 같은 결과를 내는 몫(나)이 남아 진행 중입니다. 위 관문 집계와 MVP 진행률에는 넣지 않습니다.
 
 진행률의 기준은 [인수조건](docs/product/acceptance-criteria.md)의 상태 하나뿐입니다.
 위 숫자는 main [`76d56d0`](https://github.com/peppone-choi/opensamguk/commit/76d56d0db57f0e8d8686938591781632c71b2a20)의 AC-M1-22·AC-M2-01 수용과 PR [#67](https://github.com/peppone-choi/opensamguk/pull/67)의 D-022에 따른 AC-M1-14 재개(✅ → 🟨)를 합친 인수조건 문서에서 AC 행 57개의 상태 칸을 다시 센 값입니다. <!-- lint-text-ignore C-5 -->
