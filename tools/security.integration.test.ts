@@ -154,7 +154,7 @@ describe('T3-04 #113 공개 출처 시작 검사', () => {
       ['대문자 호스트', 'https://GAME.example.test'],
       ['기본 포트', 'https://game.example.test:443'],
       ['운영 HTTP', 'http://game.example.test'],
-    ])('%s는 원문 없는 고정 안내 Error로 거부한다', async (_name, publicOrigin) => {
+    ])('%s 설정을 원문 없는 고정 안내 Error로 거부한다', async (_name, publicOrigin) => {
       vi.stubEnv('PUBLIC_ORIGIN', source === 'env' ? publicOrigin : undefined);
       const error: unknown = await buildServer({
         db,
