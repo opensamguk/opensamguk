@@ -18,8 +18,8 @@
 
 | 관문                           | 전체 | ✅ | 🟨 | ⬜ | <!-- lint-text-ignore C-5 -->
 | ------------------------------ | ---- | -- | -- | -- |
-| M1 혼자 + NPC로 한 판 완주     | 22   | 20 | 1  | 1  |
-| M2 지인 테스트 | 19 | 1 | 0 | 18 |
+| M1 혼자 + NPC로 한 판 완주     | 22   | 19 | 2  | 1  |
+| M2 지인 테스트 | 19 | 2 | 0 | 17 |
 | M3 공개 오픈 = MVP 완료 | 16 | 0 | 1 | 15 |
 
 차별화 기능 AC: M2-06(D1), M2-14(D16), M2-15(D2), M2-16(D11), M2-17(D12), M2-18(D6), M3-12(D17), M3-13(D3), M3-14(D15), M3-15(D10)
@@ -73,7 +73,7 @@
 
 | ID        | 조건 | 검증 방법 | 상태 | 증거 |
 | --------- | ---- | --------- | ---- | ---- |
-| AC-M1-14  | MVP 명령 37개 각각에 성공 1건과 대표 실패 1건 테스트가 있다. 명령 목록과 테스트 목록이 자동으로 대조된다 (가정 A4) | rules 단위 테스트 + 대조 스크립트 | ✅ | 2026-10-21 Claude 재리뷰 통과(PR #38 `81ffd1b`): `packages/rules/src/commands/registry.test.ts` `37개 key, 장수27·국가10과 행동 검사 목록이 정확히 일치한다`, `tools/command-coverage.test.ts` `AC-M1-14 모든 registry key에 성공·실패 행동 테스트 파일이 있다`, `war.test.ts` `37종 잘못된 인자를 거부하고 국가 명령은 군주·대상을 따로 검사한다`, 기존 9종 `tools/commands.test.ts` 27개. exact head CI [39537902044](https://github.com/peppone-choi/opensamguk/actions/runs/39537902044) 단위 291개 통과. [T1-08 재리뷰](../plans/T1-08.md#재리뷰-claude-2026-10-21) | <!-- lint-text-ignore C-5 -->
+| AC-M1-14  | 2026-10-22 소유자 정정([D-022](./decisions.md#d-022-mvp-완료에는-모든-명령이-들어간다-2026-10-22)): MVP의 모든 명령이 완료된다. core2026 `df6c926`의 원본 90개(장수 55·국가 35)마다 [명령 대응표](./command-coverage.json)에 우리 명령이나 미해결 항목이 하나씩 있다. 명령마다 화면·API·권한·엔진·효과·비용·실패·저장·재시작·재생·독립 리뷰·exact SHA 검증·병합이 증거로 확인되거나 이유 있는 해당 없음이다. 원래 조건(MVP 명령 37개 각각에 성공 1건과 대표 실패 1건 테스트가 있고 명령 목록과 테스트 목록이 자동으로 대조된다)은 부분집합으로 계속 지킨다 | `node tools/command-coverage.mjs`(대응표 정합, registry·문서 대조) + `node tools/command-coverage.mjs --require-complete`(제품 전체 완료) + 기존 rules 단위 테스트·대조 스크립트 | 🟨 | 전체 명령: 미완료. 2026-10-22 대응표 정합 통과, 정본 분모 91(명령 88 + 미해결 원본 3), 전 단계 완료 0. 숫자는 위 명령의 출력이 기준이다. 37개 부분집합 이력: 2026-10-21 Claude 재리뷰 통과(PR #38 `81ffd1b`): `packages/rules/src/commands/registry.test.ts` `37개 key, 장수27·국가10과 행동 검사 목록이 정확히 일치한다`, `tools/command-coverage.test.ts` `AC-M1-14 모든 registry key에 성공·실패 행동 테스트 파일이 있다`, `war.test.ts` `37종 잘못된 인자를 거부하고 국가 명령은 군주·대상을 따로 검사한다`, 기존 9종 `tools/commands.test.ts` 27개. exact head CI [39537902044](https://github.com/peppone-choi/opensamguk/actions/runs/39537902044) 단위 291개 통과. [T1-08 재리뷰](../plans/T1-08.md#재리뷰-claude-2026-10-21) | <!-- lint-text-ignore C-5 -->
 | AC-M1-15  | 출병하면 수비 장수와 차례로 싸우고 성벽을 거쳐 점령한다. 마지막 도시를 잃은 국가는 멸망하고 소속 장수는 재야가 된다 | 시나리오 테스트 | ✅ | 2026-10-21 Claude 재리뷰 통과(PR #38 `81ffd1b`): `packages/rules/src/commands/war.test.ts` `수비2명·성벽 순서, 마지막 도시 멸망·재야·국가 예턴 삭제와 같은 시드 결과`, `apps/engine/src/war.integration.test.ts` `국가포상·수비2명·성벽·멸망·재야·국가예턴 삭제와 로그를 한 번 저장하고 12개월 재생한다`, `전투 저장 직전 %s이면 소유권·국가·양쪽 로그·예턴·메모리를 모두 롤백한다`. exact head CI [39537902044](https://github.com/peppone-choi/opensamguk/actions/runs/39537902044) PostgreSQL 91개 통과. [T1-08 재리뷰](../plans/T1-08.md#재리뷰-claude-2026-10-21) | <!-- lint-text-ignore C-5 -->
 | AC-M1-16  | 수도와 끊긴 도시는 보급 끊김으로 표시되고 월간 손해를 본다. 연결을 되찾으면 풀린다 | 단위 테스트 | ✅ | 2026-10-21 Claude 재리뷰 통과(PR #38 `81ffd1b`): `packages/rules/src/commands/war.test.ts` `회랑 점령 직후 단절 표시, 월간 손해, 재점령 직후 회복과 다음 달 손해 중단`, `수도 함락 뒤 인구 $populations 기준 수도 $capital에서 보급하고 반격한다`, `apps/engine/src/war.integration.test.ts` `회랑 점령·단절 월간 손해·재점령 회복을 저장하고 2개월 재생한다`, `수도 함락 %s 뒤 자동 천도·보급·반격·역사를 저장하고 롤백·재생한다`. exact head CI [39537902044](https://github.com/peppone-choi/opensamguk/actions/runs/39537902044) 단위 291개·PostgreSQL 91개 통과. [T1-08 재리뷰](../plans/T1-08.md#재리뷰-claude-2026-10-21) | <!-- lint-text-ignore C-5 -->
 
@@ -111,7 +111,7 @@
 
 | ID        | 조건 | 검증 방법 | 상태 | 증거 |
 | --------- | ---- | --------- | ---- | ---- |
-| AC-M2-01  | 월드 2개(시나리오·턴 간격이 다름)가 동시에 진행된다. 한 월드를 멈추거나 그 엔진을 죽여도 다른 월드는 계속 진행된다 | 통합 테스트 | ⬜ | | <!-- lint-text-ignore C-5 -->
+| AC-M2-01  | 월드 2개(시나리오·턴 간격이 다름)가 동시에 진행된다. 한 월드를 멈추거나 그 엔진을 죽여도 다른 월드는 계속 진행된다 | 통합 테스트 | ✅ | T2-01 Claude 독립 리뷰 통과(PR #66 `48c4db1`, 2026-10-22). `apps/engine/src/supervisor.integration.test.ts` 7개가 실제 PostgreSQL·감독·엔진 자식 프로세스에서 A(1030, 10분)·B(시작 연도를 바꾼 fixture, 60분)의 manual 3개월 독립 진행, B SIGKILL 동안 A 진행과 B 백오프 재시작, A 정지 중 tick 고정과 B 진행, 5분 안 5회 종료 중단, 종료·삭제 월드 정리, 중복 감독의 리스 펜싱, 30초 heartbeat와 재생 해시 불변을 확인했다. exact-head CI [39742317016](https://github.com/peppone-choi/opensamguk/actions/runs/39742317016)·[39742320690](https://github.com/peppone-choi/opensamguk/actions/runs/39742320690): 단위 460개, 실제 PostgreSQL 335개, Chromium 61/61개(skip 0), 웹 빌드 통과. 병합은 별도. [T2-01 리뷰](../plans/T2-01.md#리뷰-claude) | <!-- lint-text-ignore C-5 -->
 | AC-M2-02  | 로그인 뒤 로비에서 월드 목록(상태·시나리오·턴 간격·인원·시작일)을 보고 참가할 수 있다 | E2E | ⬜ | | <!-- lint-text-ignore C-5 -->
 | AC-M2-03  | 규칙 프리셋 파일 하나로 턴 간격·시작 조건·명령 세트·NPC 설정이 바뀐다 (D5) | 단위 테스트 + 프리셋 2종으로 월드 생성 | ⬜ | | <!-- lint-text-ignore C-5 -->
 | AC-M2-04  | 개인·국가·외교 메시지를 주고받고 읽음이 표시된다. 공개 범위 밖 메시지 조회는 거부된다 | API 권한 테스트 | ⬜ | | <!-- lint-text-ignore C-5 -->
@@ -155,3 +155,13 @@
 | AC-M3-14  | **(D15 역할별 입장)** 입장 화면에서 시나리오 인물을 역할(군주·중견·부하·재야)별로 보고 골라 시작한다. 이미 사람이 맡은 인물은 목록에서 빠진다. 직접 만드는 방식도 그대로 된다 | E2E | ⬜ | | <!-- lint-text-ignore C-5 -->
 | AC-M3-15  | **(D10 월단평)** 달이 바뀔 때 그달의 공개 평판 순위와 한 줄 평이 월드 정세에 나온다. 같은 사건 종류는 장수당 한 달에 한 번만 센다 | 골든 테스트 | ⬜ | | <!-- lint-text-ignore C-5 -->
 | AC-M3-16  | 도메인과 HTTPS로 누구나 가입해 참가할 수 있고 첫 공개 월드가 시작된다. 공개에 대한 소유자 승인은 D-021에 있으나 승인만으로 통과하지 않는다 | 공개 URL 접속 기록 | ⬜ | | <!-- lint-text-ignore C-5 -->
+
+<a id="p2"></a>
+
+## P2. Phase 2 확장 (MVP 관문 밖)
+
+Phase 2 AC는 M1~M3 관문이 아니다. 위 요약표, README 관문 집계, MVP 진행률에 넣지 않는다. 지금 정식으로 오른 것은 AC-P2-16 하나다([D-023](./decisions.md#d-023-ac-p2-16을-인수조건에-올리고-수동-1회-계산-몫만-계약으로-채택한다-2026-10-22)). 나머지 AC-P2는 [Phase 2 명세 §5](../plans/phase2-expansion.md#5-인수조건-제안)의 제안 그대로다. 상태와 증거 규칙은 위 쓰는 법과 같다.
+
+| ID        | 조건 | 검증 방법 | 상태 | 증거 |
+| --------- | ---- | --------- | ---- | ---- |
+| AC-P2-16  | 전투 시뮬레이터에 양쪽 병력·병종·훈련·사기·기술을 넣으면 Web Worker에서 실제 출병과 같은 계산 함수로 결과를 낸다. 같은 입력·시드면 실제 전투와 결과가 같다. 계산 중에도 입력이 막히지 않는다. 다른 국가의 비공개 값을 자동으로 채우지 않는다. 증거는 두 몫으로 따로 받는다. (가) 수동 입력 1회 계산(T4-34). 입력은 지금 `BattleInput`의 양쪽 `crew`·`crewType`·`train`·`atmos`, `attackerTech`·`defenderTech`, 성벽일 때만 `defence`, 다듬지 않은 시드 문자열과 저장소의 공개 basic 병종표뿐이다. 실제 Web Worker가 `simulateBattle(input, createRng(seed))`를 한 번 실행해 시드, 양쪽 남은 병력·사기, 입력 가정을 보인다. 같은 입력과 시드면 결과가 같다. 잘못된 입력은 화면과 Worker가 함께 막고 오래된 답은 버린다. 취소·오류·화면 이탈 때 Worker를 닫고 메인 30칸의 저장하지 않은 초안은 그대로다. 계산 코드는 별도 Worker 묶음에만 있고 배포 CSP 아래에서 동작한다. 새 API·DB, 비공개 값 조회와 자동 채움, 새 전투 수치·승률은 없다. (나) 실제 턴 동등성. 턴 RNG 흐름, 교전 전 군량 소비, 수비 장수 여럿과 성벽으로 이어지는 교전까지 실제 출병과 같은 결과를 낸다 | (가) Worker 차등 단위 시험 + 실제 빌드 Worker의 Chromium E2E + 묶음 확인. (나) rules 골든 + Chromium E2E | 🟨 | 전체 미완료. 2026-10-22 [D-023](./decisions.md#d-023-ac-p2-16을-인수조건에-올리고-수동-1회-계산-몫만-계약으로-채택한다-2026-10-22)으로 이 항목과 (가) 계약을 정식 반영했다. (가) 계약 원문은 PR #132의 [T4-34 계획](https://github.com/peppone-choi/opensamguk/blob/dce127bebda6d6b657c9f39acffe2398623e6fb5/docs/plans/T4-34.md)이며 Codex 계획 검토 [5610239606](https://github.com/peppone-choi/opensamguk/pull/132#pullrequestreview-5610239606)(head `35b0d7c`, `PASS_PLAN_CONTRACT`)이 수용했다. 구현 `4a99437`은 Codex 독립 리뷰 [5612224678](https://github.com/peppone-choi/opensamguk/pull/132#pullrequestreview-5612224678)(head `dce127b`, `PASS_IMPLEMENTATION_SCOPE`)을 통과했다. exact head CI [39755838684](https://github.com/peppone-choi/opensamguk/actions/runs/39755838684)·[39755844932](https://github.com/peppone-choi/opensamguk/actions/runs/39755844932)에서 단위 508개, 실제 PostgreSQL·HTTP 328개, Chromium 67개(skip 0), strict 202파일 0건, 웹 빌드가 통과했고 구현 SHA의 독립 CI [39751385485](https://github.com/peppone-choi/opensamguk/actions/runs/39751385485)도 단위·PostgreSQL·Chromium 수와 웹 빌드가 같다. 비병합 검증 [39755050739](https://github.com/peppone-choi/opensamguk/actions/runs/39755050739)(`16fdb6c`)은 실제 빌드 Worker에 시드 240개로 장수·성벽 480건을 보내 직접 함수와 같음을 확인하고 잘못된 요청 4건을 막았다. `deploy/security.caddy`의 CSP를 건 Chromium에서 위반 0건이었다. 이 수치는 PR #132 source의 기존 증거이며 정본 반영 문서 PR의 CI가 아니다. PR #132가 아직 병합되지 않아 (가)도 main 통합 전이다. (나)는 남아 있다. (가)를 따로 완료 AC로 세지 않는다 | <!-- lint-text-ignore C-5 -->
