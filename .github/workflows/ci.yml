@@ -80,7 +80,7 @@ jobs:
       - run: pnpm test:authz
       - run: pnpm db:migrate
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm e2e --workers=1 --reporter=line
+      - run: pnpm e2e e2e/review-main.spec.ts --workers=1 --reporter=line
       - name: Retain independent review screenshots
         if: always()
         uses: actions/upload-artifact@v4

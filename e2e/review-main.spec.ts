@@ -10,7 +10,20 @@ test('독립 리뷰: 기록 세 종류 30/60/65건, 권한과 지도 키보드 �
   await createAccount(page);
   const result = spawnSync(
     'pnpm',
-    ['-s', 'world:create', '--scenario', '1030', '--map', 'che', '--seed', 'review-pages', '--name', '리뷰 기록 월드'],
+    [
+      '-s',
+      'world:create',
+      '--scenario',
+      '1030',
+      '--map',
+      'che',
+      '--seed',
+      'review-pages',
+      '--turn-term',
+      '1',
+      '--name',
+      '리뷰 기록 월드',
+    ],
     { encoding: 'utf8', env: process.env },
   );
   expect(result.status, result.stderr).toBe(0);
