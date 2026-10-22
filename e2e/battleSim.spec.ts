@@ -18,13 +18,26 @@ const unitSet = unitSetSchema.parse(
 );
 
 test.beforeAll(async ({ browser }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
   const context = await browser.newContext({ baseURL: BASE, storageState: { cookies: [], origins: [] } });
   const page = await context.newPage();
   await createAccount(page);
   ctx.worldId = await e2eWorld(page);
   const { user } = await query<{ user: { id: string } }>(context.request, 'auth.me');
   await bindGeneral(ctx.worldId, user.id);
+  // pnpm dev는 Worker가 처음 import하는 의존성(rules의 zod 등)을 첫 요청 때 최적화하고 화면을 다시 읽을 수 있다.
+  // 시험 본문이 그 재읽기에 걸리지 않도록 진짜 Worker로 한 번 계산해 둔다. 빌드 묶음에는 이 단계가 없다.
+  await page.goto(`/w/${ctx.worldId}/simulator`);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await expect(page.getByRole('heading', { level: 1, name: '전투 시뮬레이터' })).toBeVisible({ timeout: 30_000 });
+    await page.getByRole('button', { name: '실행', exact: true }).click();
+    const done = await expect(page.getByTestId('battle-result'))
+      .toHaveAttribute('data-state', 'done', { timeout: 30_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (done) break;
+  }
+  await expect(page.getByTestId('battle-result')).toHaveAttribute('data-state', 'done');
   await context.storageState({ path: STORAGE });
   await context.close();
 });
@@ -143,7 +156,7 @@ test('메뉴로 들어가 진짜 Worker가 계산한 결과가 Node의 simulateB
 
   await fillCase(page, GENERAL_CASE);
   await page.getByRole('button', { name: '실행', exact: true }).click();
-  await expect.poll(() => shown(page)).toEqual(summary(GENERAL_CASE));
+  await expect.poll(() => shown(page), { timeout: 15_000 }).toEqual(summary(GENERAL_CASE));
   const first = await shown(page);
   expect(workers.some((w) => w.url().includes('battle.worker'))).toBe(true);
   await expect(result(page).getByTestId('result-stale')).toHaveCount(0);

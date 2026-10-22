@@ -31,7 +31,9 @@ function wall(overrides: Partial<BattleRunRequest> = {}): BattleRunRequest {
   return general({ defender: { crew: 3000, crewType: 1000, train: 100, atmos: 100 }, defence: 2000, ...overrides });
 }
 
-beforeEach(() => vi.mocked(simulateBattle).mockClear());
+beforeEach(() => {
+  vi.mocked(simulateBattle).mockClear();
+});
 
 describe('compute와 simulateBattle의 차등', () => {
   it('상한 상수가 rules의 BALANCE와 같다', () => {

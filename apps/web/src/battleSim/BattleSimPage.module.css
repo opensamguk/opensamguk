@@ -1,5 +1,6 @@
+/* 위쪽 띠의 좁은 화면 처리는 T3-10 범위다. 띠가 본문 칸을 넓혀도 이 화면은 창 폭 안에 둔다. */
 .page {
-  max-width: 880px;
+  max-width: min(880px, calc(100vw - 2 * var(--space-4)));
   min-width: 0;
 }
 
