@@ -165,6 +165,44 @@ async function kill(child: ChildProcess) {
   await exit;
 }
 
+it('종료 전에 접수된 PENDING 생성은 게임 상태를 바꾸지 않고 afterEnd REJECTED로 닫힌다', async () => {
+  const { worldId } = await fixture('UNIFIED');
+  const lease = (await acquireLease(db, worldId))!;
+  let inserted = false;
+  try {
+    const loop = new TurnLoop(db, lease, {
+      beforeCommit: async (tx) => {
+        if (!inserted && (await tx.worldResult.findUnique({ where: { worldId } }))) {
+          await tx.inputEvent.create({
+            data: {
+              worldId,
+              userId: 'pending-before-end',
+              kind: 'general.create',
+              idempotencyKey: 'pending-before-end',
+              payload: {},
+              status: 'PENDING',
+              sequence: null,
+            },
+          });
+          inserted = true;
+        }
+      },
+    });
+    await loop.advanceTo(120000);
+    const archive = await exportReplay(db, worldId);
+    expect(archive.afterEnd).toHaveLength(1);
+    expect(archive.afterEnd[0]).toMatchObject({
+      status: 'REJECTED',
+      kind: 'general.create',
+      sequence: archive.end!.sequence + 1,
+      result: { code: 'WORLD_CLOSED' },
+    });
+    await checkEnd(worldId, 'UNIFIED');
+  } finally {
+    await releaseLease(db, lease);
+  }
+});
+
 it('종료 연도 정산과 같은 tick인 장수 턴은 실행하지 않는다', async () => {
   const initial = await seasonInitial('END_YEAR');
   const template = await seasonInitial('UNIFIED');

@@ -11,7 +11,7 @@ import {
   renewLease,
   type Lease,
 } from './lease';
-import { TurnLoop } from './turnLoop';
+import { TurnLoop, type PollBatch } from './turnLoop';
 
 export const HEARTBEAT_MS = 30_000;
 
@@ -42,7 +42,12 @@ export function engineFailureMessage(error: unknown): string {
 
 export async function runEngine(
   db: PrismaClient,
-  options: { worldId?: string; signal: AbortSignal; onStatus?: (status: string) => void },
+  options: {
+    worldId?: string;
+    signal: AbortSignal;
+    onStatus?: (status: string) => void;
+    onBatch?: (batch: PollBatch) => void;
+  },
 ) {
   const { signal } = options;
   let lastStatus: string | undefined;
@@ -118,6 +123,7 @@ export async function runEngine(
       let ended = false;
       while (!session.signal.aborted) {
         const batch = await loop.poll(session.signal);
+        options.onBatch?.(batch);
         if (batch.status === 'ENDED' && !batch.more) {
           ended = true;
           break;

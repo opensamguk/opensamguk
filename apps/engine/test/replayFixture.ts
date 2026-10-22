@@ -87,6 +87,7 @@ export async function unifiedArchive(afterMonth = false) {
     .slice(0, 2)
     .map((city) => ({ ...city, connections: [city.cityKey === 1 ? 2 : 1], wall: 0, defence: 0 }));
   initial.generals = initial.generals.slice(0, 1);
+  if (afterMonth) initial.generals[0]!.userId = 'replay-human-fixture';
   delete initial.nationTurns;
   const turns = emptyTurns();
   turns[0] = { commandKey: 'attack', args: { cityKey: 2 } };
