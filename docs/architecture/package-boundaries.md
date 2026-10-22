@@ -17,8 +17,13 @@ tools/* ───────────▶ 무엇이든 (배포물에 포함�
 - `apps/*`끼리는 서로 import하지 않습니다. 공유할 것은 `packages/`로 옮깁니다.
 - `apps/web`은 `packages/rules`를 import하지 않습니다. 화면의 사전 검사는 server API로 받습니다.
   (예외가 필요하면 순수 함수만 골라 `packages/shared`로 옮깁니다.)
-- 예외 하나: `apps/web`은 `@opensamguk/server/router`에서 tRPC `AppRouter` 타입만 import합니다 (`import type`).
+- 예외: `apps/web`은 `@opensamguk/server/router`에서 tRPC `AppRouter` 타입만 import합니다 (`import type`).
   값 import는 lint가 막습니다.
+- 전투 시뮬레이터 예외 두 개 ([T4-34](../plans/T4-34.md)). 둘 다 정확한 파일 하나에만 열고 `tools/lint-boundaries.test.ts`가 확인합니다.
+  - E1: `apps/web/src/battleSim/compute.ts`와 `compute.test.ts`만 `@opensamguk/rules`에서 `simulateBattle`·`unitSetSchema`·`BALANCE` 값과 타입을 import합니다.
+    `compute.ts`는 Worker 파일만 import하므로 이 코드는 Worker 묶음에만 들어갑니다. 이 두 파일도 `@opensamguk/shared/node`, engine·db 값, server 값, node 내장 모듈은 막힙니다.
+  - E2: `apps/web/src/battleSim/publicUnitSet.ts`만 공개 병종표 `resources/unitset/basic.json` 하나를 상대 경로로 import합니다.
+    이 파일에서만 `opensamguk/no-cross-package-relative`를 끄고 다른 상대 경로는 `no-restricted-imports`가 막습니다.
 
 ## 패키지별 책임
 
