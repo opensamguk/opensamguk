@@ -15,7 +15,7 @@
     "format:check": "prettier --check .",
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
-    "check": "pnpm generate && pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm -s next",
+    "check": "pnpm generate && pnpm lint && pnpm lint:text --strict && pnpm format:check && pnpm typecheck && pnpm test && pnpm -s next",
     "e2e": "playwright test",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
