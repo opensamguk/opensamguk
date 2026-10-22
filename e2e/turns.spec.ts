@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { newEmail, signUpByApi, TEST_PASSWORD } from './account';
+import { newEmail, createAccount, TEST_PASSWORD } from './account';
 import {
   ApiError,
   createGeneralByApi,
@@ -37,7 +37,7 @@ async function login(page: Page, email: string) {
 
 // 새 계정과 장수를 만들고 예턴 화면을 연다. 30칸은 모두 휴식으로 시작한다.
 async function openEditor(page: Page) {
-  const email = await signUpByApi(page);
+  const email = await createAccount(page);
   const world = await e2eWorld(page);
   await createGeneralByApi(page, world);
   await waitTurnWindow(page, world);
@@ -64,7 +64,7 @@ test.describe('장수 생성', () => {
   });
 
   test('합계를 넘으면 막고 이유를 보이며, 정상 생성하면 메인으로 가고 두 번째 생성은 거부된다', async ({ page }) => {
-    await signUpByApi(page);
+    await createAccount(page);
     const world = await e2eWorld(page);
     const name = newGeneralName();
     await page.goto(`/w/${world}/create`);
@@ -106,11 +106,11 @@ test.describe('장수 생성', () => {
   });
 
   test('잘못된 이름은 보내기 전에 막고, 이미 쓰는 이름은 서버 안내를 보여 준다', async ({ page }) => {
-    await signUpByApi(page);
+    await createAccount(page);
     const world = await e2eWorld(page);
     const taken = (await createGeneralByApi(page, world)).name;
     await page.context().clearCookies();
-    await signUpByApi(page);
+    await createAccount(page);
 
     await page.goto(`/w/${world}/create`);
     await page.getByLabel('이름').fill('조 운');
@@ -124,7 +124,7 @@ test.describe('장수 생성', () => {
   });
 
   test('제재된 계정은 생성되지 않고 다시 로그인하라고 안내한다', async ({ page }) => {
-    const email = await signUpByApi(page);
+    const email = await createAccount(page);
     const world = await e2eWorld(page);
     await page.goto(`/w/${world}/create`);
     await page.getByLabel('이름').fill(newGeneralName());
@@ -143,7 +143,7 @@ test.describe('장수 생성', () => {
   test('pending 뒤 엔진이 거절하면 새로고침 없이 이유와 입력 폼으로 돌아오고, 이름을 고쳐 다시 보내면 만들어진다', async ({
     page,
   }) => {
-    await signUpByApi(page);
+    await createAccount(page);
     const world = await idleWorld(page);
     const taken = await takenGeneralName(world);
     const name = newGeneralName();
@@ -201,7 +201,7 @@ test.describe('장수 생성', () => {
   });
 
   test('pending 중에 다시 들어와도 기다리고, 엔진이 만들면 메인으로 간다', async ({ page }) => {
-    await signUpByApi(page);
+    await createAccount(page);
     const world = await idleWorld(page);
     const name = newGeneralName();
     const making = page.getByRole('status').filter({ hasText: '장수를 만드는 중' });
@@ -436,7 +436,7 @@ test.describe('예턴 편집', () => {
 });
 
 test('장수가 없으면 예턴 대신 장수 생성으로 안내한다', async ({ page }) => {
-  await signUpByApi(page, newEmail());
+  await createAccount(page, newEmail());
   const world = await e2eWorld(page);
   await page.goto(`/w/${world}/turns`);
   await expect(page.getByText('이 월드에 내 장수가 없습니다')).toBeVisible();

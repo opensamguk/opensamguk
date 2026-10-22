@@ -1,6 +1,7 @@
 import type { PrismaClient } from '@opensamguk/db';
 import type {} from '@fastify/cookie';
 import type { FastifyReply } from 'fastify';
+import type { createRateLimiter } from './security/rateLimit';
 
 export interface Context {
   db: PrismaClient;
@@ -10,4 +11,6 @@ export interface Context {
   now: number;
   secureCookies: boolean;
   dummyPasswordHash: string;
+  ip: string;
+  rateLimiter: ReturnType<typeof createRateLimiter>;
 }
