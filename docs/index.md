@@ -20,7 +20,7 @@
 | [PRD](./product/prd.md)                        | 초안 | 지금 |
 | [요구사항](./product/requirements.md)          | 초안 | 지금 |
 | [인수조건](./product/acceptance-criteria.md)   | 초안 | 지금 |
-| [명령 대응표](./product/command-coverage.json) (D-022, AC-M1-14). 원작 90개 대조와 명령별 11단계 증거. 검사는 `node tools/command-coverage.mjs`, 제품 전체 완료는 `--require-complete` | 정본 | 지금 |
+| [명령 대응표](./product/command-coverage.json) (D-022, AC-M1-14). 원작 90개 대조와 명령별 11단계 증거. 대조 기준(원본 ID 전집·승인된 추가와 대체·verified 검증 기록)은 [대응표 고정 기준](./product/command-coverage-baseline.json)에 따로 둔다. 검사는 `node tools/command-coverage.mjs`, 제품 전체 완료는 `--require-complete`, 커밋·시험 파일 확인은 `--verify-git`, 실행 결과 원격 확인은 `--verify-ci` | 정본 | 지금 |
 | [단계 계획](./product/phases.md)               | 초안 | 지금 |
 | [데이터 모델](./product/data-model.md)         | 초안 | 지금 |
 | [차별화 기능 후보](./product/differentiation.md) | 초안 | 지금 |

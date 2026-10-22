@@ -523,13 +523,13 @@
           "evidence": [
             {
               "kind": "review",
-              "ref": "docs/plans/T1-11.md",
-              "sha": "1ffde70"
+              "ref": "docs/plans/T1-11.md#리뷰-claude",
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39540683895",
-              "sha": "1ffde70"
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "test",
@@ -559,12 +559,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -583,12 +583,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -739,13 +739,13 @@
           "evidence": [
             {
               "kind": "review",
-              "ref": "docs/plans/T1-11.md",
-              "sha": "1ffde70"
+              "ref": "docs/plans/T1-11.md#리뷰-claude",
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39540683895",
-              "sha": "1ffde70"
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "test",
@@ -775,12 +775,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -799,12 +799,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -955,13 +955,13 @@
           "evidence": [
             {
               "kind": "review",
-              "ref": "docs/plans/T1-11.md",
-              "sha": "1ffde70"
+              "ref": "docs/plans/T1-11.md#리뷰-claude",
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39540683895",
-              "sha": "1ffde70"
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "test",
@@ -991,12 +991,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -1015,12 +1015,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -1171,13 +1171,13 @@
           "evidence": [
             {
               "kind": "review",
-              "ref": "docs/plans/T1-11.md",
-              "sha": "1ffde70"
+              "ref": "docs/plans/T1-11.md#리뷰-claude",
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39540683895",
-              "sha": "1ffde70"
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "test",
@@ -1207,12 +1207,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -1231,12 +1231,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -1387,13 +1387,13 @@
           "evidence": [
             {
               "kind": "review",
-              "ref": "docs/plans/T1-11.md",
-              "sha": "1ffde70"
+              "ref": "docs/plans/T1-11.md#리뷰-claude",
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39540683895",
-              "sha": "1ffde70"
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "test",
@@ -1423,12 +1423,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -1447,12 +1447,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -1603,13 +1603,13 @@
           "evidence": [
             {
               "kind": "review",
-              "ref": "docs/plans/T1-11.md",
-              "sha": "1ffde70"
+              "ref": "docs/plans/T1-11.md#리뷰-claude",
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39540683895",
-              "sha": "1ffde70"
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "test",
@@ -1639,12 +1639,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -1663,12 +1663,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -1819,13 +1819,13 @@
           "evidence": [
             {
               "kind": "review",
-              "ref": "docs/plans/T1-11.md",
-              "sha": "1ffde70"
+              "ref": "docs/plans/T1-11.md#리뷰-claude",
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39540683895",
-              "sha": "1ffde70"
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "test",
@@ -1855,12 +1855,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -1879,12 +1879,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -2035,13 +2035,13 @@
           "evidence": [
             {
               "kind": "review",
-              "ref": "docs/plans/T1-11.md",
-              "sha": "1ffde70"
+              "ref": "docs/plans/T1-11.md#리뷰-claude",
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39540683895",
-              "sha": "1ffde70"
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "test",
@@ -2071,12 +2071,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -2095,12 +2095,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -2251,13 +2251,13 @@
           "evidence": [
             {
               "kind": "review",
-              "ref": "docs/plans/T1-11.md",
-              "sha": "1ffde70"
+              "ref": "docs/plans/T1-11.md#리뷰-claude",
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39540683895",
-              "sha": "1ffde70"
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "test",
@@ -2287,12 +2287,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -2311,12 +2311,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -2467,13 +2467,13 @@
           "evidence": [
             {
               "kind": "review",
-              "ref": "docs/plans/T1-11.md",
-              "sha": "1ffde70"
+              "ref": "docs/plans/T1-11.md#리뷰-claude",
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39540683895",
-              "sha": "1ffde70"
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "test",
@@ -2503,12 +2503,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -2527,12 +2527,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -2683,13 +2683,13 @@
           "evidence": [
             {
               "kind": "review",
-              "ref": "docs/plans/T1-11.md",
-              "sha": "1ffde70"
+              "ref": "docs/plans/T1-11.md#리뷰-claude",
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39540683895",
-              "sha": "1ffde70"
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "test",
@@ -2719,12 +2719,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -2743,12 +2743,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -2899,13 +2899,13 @@
           "evidence": [
             {
               "kind": "review",
-              "ref": "docs/plans/T1-11.md",
-              "sha": "1ffde70"
+              "ref": "docs/plans/T1-11.md#리뷰-claude",
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39540683895",
-              "sha": "1ffde70"
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "test",
@@ -2935,12 +2935,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -2959,12 +2959,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -3115,13 +3115,13 @@
           "evidence": [
             {
               "kind": "review",
-              "ref": "docs/plans/T1-11.md",
-              "sha": "1ffde70"
+              "ref": "docs/plans/T1-11.md#리뷰-claude",
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39540683895",
-              "sha": "1ffde70"
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "test",
@@ -3151,12 +3151,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -3175,12 +3175,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -3331,13 +3331,13 @@
           "evidence": [
             {
               "kind": "review",
-              "ref": "docs/plans/T1-11.md",
-              "sha": "1ffde70"
+              "ref": "docs/plans/T1-11.md#리뷰-claude",
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39540683895",
-              "sha": "1ffde70"
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "test",
@@ -3367,12 +3367,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -3391,12 +3391,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -3547,13 +3547,13 @@
           "evidence": [
             {
               "kind": "review",
-              "ref": "docs/plans/T1-11.md",
-              "sha": "1ffde70"
+              "ref": "docs/plans/T1-11.md#리뷰-claude",
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39540683895",
-              "sha": "1ffde70"
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "test",
@@ -3583,12 +3583,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -3607,12 +3607,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -3763,13 +3763,13 @@
           "evidence": [
             {
               "kind": "review",
-              "ref": "docs/plans/T1-11.md",
-              "sha": "1ffde70"
+              "ref": "docs/plans/T1-11.md#리뷰-claude",
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39540683895",
-              "sha": "1ffde70"
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "test",
@@ -3799,12 +3799,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -3823,12 +3823,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -3979,13 +3979,13 @@
           "evidence": [
             {
               "kind": "review",
-              "ref": "docs/plans/T1-11.md",
-              "sha": "1ffde70"
+              "ref": "docs/plans/T1-11.md#리뷰-claude",
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39540683895",
-              "sha": "1ffde70"
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "test",
@@ -4015,12 +4015,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -4039,12 +4039,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -4195,13 +4195,13 @@
           "evidence": [
             {
               "kind": "review",
-              "ref": "docs/plans/T1-11.md",
-              "sha": "1ffde70"
+              "ref": "docs/plans/T1-11.md#리뷰-claude",
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39540683895",
-              "sha": "1ffde70"
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "test",
@@ -4231,12 +4231,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -4255,12 +4255,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -4411,13 +4411,13 @@
           "evidence": [
             {
               "kind": "review",
-              "ref": "docs/plans/T1-11.md",
-              "sha": "1ffde70"
+              "ref": "docs/plans/T1-11.md#리뷰-claude",
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39540683895",
-              "sha": "1ffde70"
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "test",
@@ -4447,12 +4447,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -4471,12 +4471,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -4627,13 +4627,13 @@
           "evidence": [
             {
               "kind": "review",
-              "ref": "docs/plans/T1-11.md",
-              "sha": "1ffde70"
+              "ref": "docs/plans/T1-11.md#리뷰-claude",
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39540683895",
-              "sha": "1ffde70"
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "test",
@@ -4663,12 +4663,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -4687,12 +4687,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -4843,13 +4843,13 @@
           "evidence": [
             {
               "kind": "review",
-              "ref": "docs/plans/T1-11.md",
-              "sha": "1ffde70"
+              "ref": "docs/plans/T1-11.md#리뷰-claude",
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39540683895",
-              "sha": "1ffde70"
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "test",
@@ -4879,12 +4879,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -4903,12 +4903,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -5059,13 +5059,13 @@
           "evidence": [
             {
               "kind": "review",
-              "ref": "docs/plans/T1-11.md",
-              "sha": "1ffde70"
+              "ref": "docs/plans/T1-11.md#리뷰-claude",
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39540683895",
-              "sha": "1ffde70"
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "test",
@@ -5095,12 +5095,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -5119,12 +5119,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -5275,13 +5275,13 @@
           "evidence": [
             {
               "kind": "review",
-              "ref": "docs/plans/T1-11.md",
-              "sha": "1ffde70"
+              "ref": "docs/plans/T1-11.md#리뷰-claude",
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39540683895",
-              "sha": "1ffde70"
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "test",
@@ -5311,12 +5311,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -5335,12 +5335,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -5491,13 +5491,13 @@
           "evidence": [
             {
               "kind": "review",
-              "ref": "docs/plans/T1-11.md",
-              "sha": "1ffde70"
+              "ref": "docs/plans/T1-11.md#리뷰-claude",
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39540683895",
-              "sha": "1ffde70"
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "test",
@@ -5527,12 +5527,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -5551,12 +5551,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -5707,13 +5707,13 @@
           "evidence": [
             {
               "kind": "review",
-              "ref": "docs/plans/T1-11.md",
-              "sha": "1ffde70"
+              "ref": "docs/plans/T1-11.md#리뷰-claude",
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39540683895",
-              "sha": "1ffde70"
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "test",
@@ -5743,12 +5743,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -5767,12 +5767,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -5923,13 +5923,13 @@
           "evidence": [
             {
               "kind": "review",
-              "ref": "docs/plans/T1-11.md",
-              "sha": "1ffde70"
+              "ref": "docs/plans/T1-11.md#리뷰-claude",
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39540683895",
-              "sha": "1ffde70"
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "test",
@@ -5959,12 +5959,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -5983,12 +5983,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -6139,13 +6139,13 @@
           "evidence": [
             {
               "kind": "review",
-              "ref": "docs/plans/T1-11.md",
-              "sha": "1ffde70"
+              "ref": "docs/plans/T1-11.md#리뷰-claude",
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39540683895",
-              "sha": "1ffde70"
+              "sha": "1ffde70cfca4419ee23c972695005165fa3c8ed9"
             },
             {
               "kind": "test",
@@ -6175,12 +6175,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -6199,12 +6199,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -6374,12 +6374,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -6398,12 +6398,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -6573,12 +6573,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -6597,12 +6597,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -6772,12 +6772,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -6796,12 +6796,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -6971,12 +6971,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -6995,12 +6995,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -7170,12 +7170,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -7194,12 +7194,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -7369,12 +7369,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
@@ -7393,12 +7393,12 @@
             {
               "kind": "review",
               "ref": "docs/plans/T1-08.md#재리뷰-claude-2026-10-21",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39537902044",
-              "sha": "81ffd1b"
+              "sha": "81ffd1b65be7b2799a74ee6de2fdac8f984cd00c"
             },
             {
               "kind": "test",
