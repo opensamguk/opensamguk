@@ -40,6 +40,7 @@
 | M2 작업 계획 [T2-01](./plans/T2-01.md) ~ [T2-17](./plans/T2-17.md), [T2-20](./plans/T2-20.md) ~ [T2-23](./plans/T2-23.md) | 계획 완료 | M2 |
 | [T4-01 `pnpm next`의 Phase 2 절 분리](./plans/T4-01.md) (AC-M1-14 후속 제안, 도구 수정 전, 기술 검토 전) | 제안 | MVP·Phase 2 |
 | [T3-04 요청 제한·CSRF·권한 대조](./plans/T3-04.md) | 현재 API 선행 구현 리뷰 | M3 전 |
+| [T4-02 확장 명령 resolver·`ext` 순수 경로 상세 계획](./plans/T4-02.md), [누락 명령 19개(T4-57~T4-75)·미해결 원본 3개 실행 단위](./plans/mvp-command-gaps.md) (AC-M1-14 후속 제안, 원고 `391432c` 기술계약 검토 통과, 사용자 승인·구현 허가 별도) | 제안 | MVP |
 | 나머지 M3 작업 계획                    | 예정 | M3 전 |
 | [Phase 2 확장 기술 명세](./plans/phase2-expansion.md) (AC-P2·T4 제안) | 초안 | Phase 2 |
 
