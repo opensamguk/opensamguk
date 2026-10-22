@@ -1,0 +1,303 @@
+/* 30칸 예턴 편집기. 메인 명령 칸처럼 좁은 자리에도 들어가도록 세로로 쌓는다. */
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+.saveBar,
+.selectBar,
+.editBar,
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.saveState {
+  margin: 0;
+  margin-right: auto;
+  font-weight: 600;
+}
+
+.primary,
+.secondary,
+.chip,
+.linkButton {
+  font: inherit;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.primary {
+  padding: var(--space-1) var(--space-3);
+  border: 0;
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  font-weight: 600;
+}
+
+.secondary {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.secondary:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.chip {
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+}
+
+.chip[aria-pressed='true'] {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+}
+
+.linkButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent);
+  text-decoration: underline;
+  font-size: var(--text-xs);
+}
+
+.notice:empty {
+  display: none;
+}
+
+.notice {
+  color: var(--color-info);
+}
+
+.errorText {
+  margin: 0;
+  color: var(--color-danger);
+}
+
+.alert {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--color-warning) 8%, transparent);
+}
+
+.alert p {
+  margin: 0 0 var(--space-2);
+}
+
+.tableWrap {
+  max-height: calc(var(--row-height) * 12);
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-surface-muted);
+  border-bottom: 1px solid var(--color-border-strong);
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table td {
+  height: var(--row-height);
+  padding: 2px var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+.row {
+  cursor: pointer;
+  user-select: none;
+}
+
+.row:hover {
+  background: var(--color-surface-muted);
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+/* 고른 칸은 배경색과 왼쪽 굵은 선을 함께 쓴다 (색만으로 알리지 않는다). */
+.selected,
+.selected:hover {
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  box-shadow: inset 4px 0 0 var(--color-accent);
+}
+
+.when {
+  white-space: nowrap;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.when time {
+  margin-left: var(--space-1);
+}
+
+.command {
+  font-weight: 600;
+}
+
+.args {
+  color: var(--color-text-muted);
+}
+
+.changedTag {
+  margin-left: var(--space-1);
+  padding: 0 var(--space-1);
+  border: 1px solid var(--color-info);
+  border-radius: var(--radius);
+  color: var(--color-info);
+  font-size: var(--text-xs);
+}
+
+.check {
+  font-size: var(--text-xs);
+}
+
+.ok {
+  color: var(--color-success);
+}
+
+.warn {
+  color: var(--color-warning);
+}
+
+.help {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.pickerHead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: flex-end;
+}
+
+.search {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 160px;
+}
+
+.search input,
+.argLabel input,
+.argLabel select,
+.inline input {
+  font: inherit;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.commandList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-2);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.group {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.group legend {
+  padding: 0 var(--space-1);
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.commandOption {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 24px;
+  cursor: pointer;
+}
+
+.argForm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.argRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.argLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.putRow {
+  display: flex;
+}
+
+.inline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.inline input {
+  width: 4.5em;
+}
