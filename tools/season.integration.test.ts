@@ -5,11 +5,11 @@ import { createDb } from '../packages/db/src/index';
 import { buildServer } from '../apps/server/src/server';
 import { newSession } from '../apps/server/src/auth/session';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
-import { acquireLease, releaseLease } from '../apps/engine/src/lease';
+import { acquireLease, releaseLease, type Lease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { exportReplay, replayToEnd } from '../apps/engine/src/replay';
-import { prepareSeasonWorld, finishSeasonWorld, seasonInitial } from '../apps/engine/test/seasonFixture';
+import { prepareSeasonWorld, seasonInitial } from '../apps/engine/test/seasonFixture';
 import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
 
 const url = process.env.TEST_DATABASE_URL;
@@ -68,35 +68,58 @@ for (const reason of ['END_YEAR', 'UNIFIED'] as const) {
     it('서로 다른 로그인 계정은 장수 없이 공개 결과를 읽고 권한·입력 오류를 구분한다', async () => {
       const a = await identity(),
         b = await identity();
-      const { worldId, initial } = await prepareSeasonWorld(db, reason);
+      let reserved: Lease | null = null;
+      const { worldId, initial } = await prepareSeasonWorld(db, reason, {
+        beforeStart: async (id) => {
+          expect((await db.world.findUniqueOrThrow({ where: { id } })).status).toBe('PREOPEN');
+          reserved = await acquireLease(db, id);
+          expect(reserved).not.toBeNull();
+        },
+      });
       worlds.push(worldId);
-      expect((await request('world.summary', { worldId }, a.cookie)).data).toMatchObject({
-        clockMode: 'REALTIME',
-        endYear: initial.startYear,
-        result: null,
-      });
-      await finishSeasonWorld(db, worldId);
-      const first = await request('world.summary', { worldId }, a.cookie);
-      expect(first.data).toEqual((await request('world.summary', { worldId }, b.cookie)).data);
-      expect(first.data).toMatchObject({
-        status: 'ENDED',
-        clockMode: 'ACCELERATED',
-        gameDate: { year: initial.startYear, month: reason === 'END_YEAR' ? 12 : 1 },
-        result: { reason },
-      });
-      expect(Object.keys(first.data.result).sort()).toEqual(
-        ['reason', 'year', 'month', 'winner', 'remainingNations', 'endedAt'].sort(),
-      );
-      expect(first.data.result.winner).toEqual(
-        reason === 'END_YEAR'
-          ? null
-          : { nationId: 1, name: initial.nations[0]!.name, color: initial.nations[0]!.color },
-      );
-      expect((await request('world.summary', { worldId })).code).toBe('UNAUTHORIZED');
-      expect((await request('world.summary', { worldId: 'invalid' }, a.cookie)).code).toBe('BAD_REQUEST');
-      expect((await request('world.summary', { worldId: randomUUID() }, a.cookie)).code).toBe('NOT_FOUND');
-      await db.user.update({ where: { id: b.id }, data: { status: 'SANCTIONED' } });
-      expect((await request('world.summary', { worldId }, b.cookie)).code).toBe('UNAUTHORIZED');
+      try {
+        expect((await request('world.summary', { worldId }, a.cookie)).data).toMatchObject({
+          clockMode: 'REALTIME',
+          endYear: initial.startYear,
+          result: null,
+        });
+        expect((await request('world.summary', { worldId }, b.cookie)).data.clockMode).toBe('REALTIME');
+        await controlClock(db, worldId, 'accelerate');
+        for (const account of [a, b])
+          expect((await request('world.summary', { worldId }, account.cookie)).data).toMatchObject({
+            clockMode: 'ACCELERATED',
+            result: null,
+          });
+        expect(await acquireLease(db, worldId)).toBeNull();
+        const loop = new TurnLoop(db, reserved!);
+        for (;;) {
+          const batch = await loop.poll();
+          if (batch.status === 'ENDED' && !batch.more) break;
+        }
+        const first = await request('world.summary', { worldId }, a.cookie);
+        expect(first.data).toEqual((await request('world.summary', { worldId }, b.cookie)).data);
+        expect(first.data).toMatchObject({
+          status: 'ENDED',
+          clockMode: 'ACCELERATED',
+          gameDate: { year: initial.startYear, month: reason === 'END_YEAR' ? 12 : 1 },
+          result: { reason },
+        });
+        expect(Object.keys(first.data.result).sort()).toEqual(
+          ['reason', 'year', 'month', 'winner', 'remainingNations', 'endedAt'].sort(),
+        );
+        expect(first.data.result.winner).toEqual(
+          reason === 'END_YEAR'
+            ? null
+            : { nationId: 1, name: initial.nations[0]!.name, color: initial.nations[0]!.color },
+        );
+        expect((await request('world.summary', { worldId })).code).toBe('UNAUTHORIZED');
+        expect((await request('world.summary', { worldId: 'invalid' }, a.cookie)).code).toBe('BAD_REQUEST');
+        expect((await request('world.summary', { worldId: randomUUID() }, a.cookie)).code).toBe('NOT_FOUND');
+        await db.user.update({ where: { id: b.id }, data: { status: 'SANCTIONED' } });
+        expect((await request('world.summary', { worldId }, b.cookie)).code).toBe('UNAUTHORIZED');
+      } finally {
+        if (reserved) await releaseLease(db, reserved);
+      }
     });
   });
 }

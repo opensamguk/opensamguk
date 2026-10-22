@@ -70,7 +70,11 @@ export async function recordTestTurns(
 }
 
 // 호출자가 두 계정으로 REALTIME/ACCELERATED를 관측한 뒤 runEngine을 시작할 수 있다.
-export async function prepareSeasonWorld(db: PrismaClient, reason: 'END_YEAR' | 'UNIFIED') {
+export async function prepareSeasonWorld(
+  db: PrismaClient,
+  reason: 'END_YEAR' | 'UNIFIED',
+  options: { beforeStart?: (worldId: string) => Promise<void> } = {},
+) {
   const initial = await seasonInitial(reason);
   const { worldId } = await saveInitialWorld(db, initial, {
     name: `종료 시험 ${reason}`,
@@ -78,6 +82,7 @@ export async function prepareSeasonWorld(db: PrismaClient, reason: 'END_YEAR' | 
     endYear: initial.startYear,
   });
   if (reason === 'UNIFIED') await recordTestTurns(db, worldId, 1, 'attack', { cityKey: 2 });
+  await options.beforeStart?.(worldId);
   await controlClock(db, worldId, 'start');
   return { worldId, initial };
 }
