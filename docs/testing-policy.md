@@ -146,6 +146,18 @@ Linux x64, Node v24.21.0)에서 측정했습니다. 원본 로그의 `EXPECTED_S
 원본 JSONL 세 개와 하드웨어 기록은 위 실행의
 `simulation-8c273f013120b4d17db549ccc9029cdc531ec312` artifact(ID `12322850788`)에 있습니다.
 
+### T1-26 실제 DB 가속 측정
+
+소스 `28965fdc601c55741f8d91c28c0edcee6bd1b4ea`의 [측정 39840023546](https://github.com/peppone-choi/opensamguk/actions/runs/39840023546)에서 `tools/season-throughput.ts`를 실행했습니다. GitHub 표준 Ubuntu 24.04 실행기(AMD EPYC 7763, 4 vCPU, 메모리 15989MiB, Node v24.21.0)와 PostgreSQL 18.6을 썼습니다. 같은 DB의 1030·94도시·491명 월드를 `ACCELERATED`로 바꾸고 실제 `TurnLoop.poll`을 두 정산까지 실행했습니다. NPC 선택 옵션은 기존 엔진 그대로이며 이 두 달은 50년 뒤 수렴 보조가 발동하기 전입니다. 원본 출력의 `convergence:false`는 잘못 붙인 라벨이라 도구를 `unchanged-engine-default`·`assistanceEligible:false`로 바로잡았습니다. 규칙이나 기존 재생 동작은 바꾸지 않았습니다.
+
+| 장수 턴 | 정산 | 경과 초 | 장수 턴/초 | 개월/분 | 배치 수 | 배치당 최대 장수 턴 |
+| ------- | ---- | ------- | ---------- | ------- | ------- | ----------------- |
+| 530 | 2 | 35.935 | 14.749 | 3.339 | 119 | 5 |
+
+같은 처리율로 191년 1월부터 300년 12월까지 1320개월을 선형 환산하면 23716.812초입니다. 뒤에 등장하는 장수·국가 변화·실행기 부하를 반영한 완료 보장은 아닙니다. 두 달을 실제 DB에서 저장한 뒤 내보낸 재생의 월간 해시도 대조했습니다. 마지막 해시는 `5f02418dd431153aa920cbcfab1a956afe37e8e1e578e87950c9f84cf2634ba7`입니다. 이 측정은 300년 완주나 개발 PC 시간 증거가 아닙니다. 종료 연도·수치·규칙은 바꾸지 않았습니다.
+
+실제 DB의 종료·롤백·SIGKILL·가속 수명 시험은 `apps/engine/src/season.integration.test.ts`와 `accelerated.integration.test.ts`, 실제 HTTP는 `tools/season.integration.test.ts`, 이전 schema의 migration 해시 보존은 `tools/season-migration.integration.test.ts`에서 검증합니다. 짧은 종료 fixture는 AC-M1-17이나 독립 15분 플레이의 증거로 세지 않습니다.
+
 ## 5. 통합 테스트 준비
 
 ```sh

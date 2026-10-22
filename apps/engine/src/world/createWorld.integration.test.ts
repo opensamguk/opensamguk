@@ -78,6 +78,11 @@ describe('AC-M1-03 실제 DB 월드 생성', () => {
       await expect(saveInitialWorld(db, state, { ...options, turnTermMinutes })).rejects.toThrow('턴 간격');
     }
     await expect(saveInitialWorld(db, state, { ...options, name: '  ' })).rejects.toThrow('월드 이름');
+    for (const endYear of [state.startYear - 1, 10001, 1.5, NaN, undefined]) {
+      await expect(saveInitialWorld(db, state, { ...options, endYear: endYear as number })).rejects.toThrow(
+        '종료 연도',
+      );
+    }
     expect(await db.world.count()).toBe(before);
   });
 

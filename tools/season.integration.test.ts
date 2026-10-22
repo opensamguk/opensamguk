@@ -145,6 +145,70 @@ it('같은 사람 판에서 realtime 턴·가속·예턴 편집·충돌·정지�
   }
 });
 
+it('가속 턴 commit과 겹친 API edit는 STALE이며 재시도한 편집은 다음 턴에서 한 번 실행한다', async () => {
+  const a = await identity();
+  const initial = await monthlyFixture();
+  initial.generals = [{ ...initial.generals[0]!, userId: a.id }];
+  const { worldId } = await saveInitialWorld(db, initial, {
+    name: '가속 편집 경합',
+    turnTermMinutes: 60,
+    endYear: null,
+  });
+  worlds.push(worldId);
+  await controlClock(db, worldId, 'start');
+  await controlClock(db, worldId, 'accelerate');
+  const slots = turns();
+  slots[0] = { commandKey: 'farm', args: {} };
+  expect((await request('turns.set', { worldId, revision: 0, slots }, a.cookie)).data.ok).toBe(true);
+  const lease = (await acquireLease(db, worldId))!;
+  let reached!: () => void, release!: () => void;
+  const barrier = new Promise<void>((resolve) => {
+    reached = resolve;
+  });
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let first = true;
+  const loop = new TurnLoop(db, lease, {
+    beforeCommit: async () => {
+      if (first) {
+        first = false;
+        reached();
+        await gate;
+      }
+    },
+  });
+  try {
+    const polling = loop.poll();
+    await barrier;
+    const editing = request('turns.edit', { worldId, revision: 1, op: { shift: 1 } }, a.cookie);
+    release();
+    expect((await editing).data).toMatchObject({ ok: false, reason: 'STALE' });
+    await polling;
+    const revision = (await request('turns.get', { worldId }, a.cookie)).data.revision;
+    const saved = await request(
+      'turns.edit',
+      { worldId, revision, op: { put: { from: 0, to: 0, commandKey: 'commerce', args: {} } } },
+      a.cookie,
+    );
+    expect(saved.data.ok).toBe(true);
+    const general = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
+    await loop.advanceTo(general.nextTurnTick);
+    expect(
+      await db.generalLog.findUniqueOrThrow({
+        where: { worldId_generalId_tick: { worldId, generalId: 1, tick: general.nextTurnTick } },
+      }),
+    ).toMatchObject({ commandKey: 'commerce' });
+    expect((await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } })).turnRevision).toBe(
+      saved.data.revision + 1,
+    );
+    expect(await db.inputEvent.count({ where: { worldId } })).toBe(2);
+  } finally {
+    release();
+    await releaseLease(db, lease);
+  }
+});
+
 it('마지막 정산 뒤 API 예턴·장수 생성을 포함해 장수 턴 통일을 재생하고 종료 뒤 입력은 기록 없이 거부한다', async () => {
   const a = await identity(),
     b = await identity();

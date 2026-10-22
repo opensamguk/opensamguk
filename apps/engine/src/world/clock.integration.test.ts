@@ -59,10 +59,16 @@ describe('AC-M1-04 실제 DB 시계', () => {
           .trim()
           .split('\n')
           .at(-1)!,
-      ) as { status: string; tick: number };
+      ) as { status: string; tick: number; clockMode: string; endYear: number | null };
     expect(run('start').status).toBe('RUNNING');
     const paused = run('pause');
     expect(run('status').tick).toBe(paused.tick);
     expect(run('resume').status).toBe('RUNNING');
+    expect(run('accelerate').clockMode).toBe('ACCELERATED');
+    const acceleratedPause = run('pause');
+    expect(run('status').tick).toBe(acceleratedPause.tick);
+    expect(run('resume').clockMode).toBe('ACCELERATED');
+    expect(run('realtime').clockMode).toBe('REALTIME');
+    expect(run('status').endYear).toBeNull();
   });
 });

@@ -147,8 +147,7 @@ function readArchive(value: unknown): ReplayArchive | ReplayArchiveV2 {
       !Array.isArray(afterEnd) ||
       (end !== null &&
         (!end ||
-          !Number.isSafeInteger(end.sequence) ||
-          end.sequence < 1 ||
+          !validSequence(end.sequence) ||
           !Number.isSafeInteger(end.tick) ||
           end.tick < 0 ||
           !['UNIFIED', 'END_YEAR'].includes(end.reason) ||
