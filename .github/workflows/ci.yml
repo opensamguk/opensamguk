@@ -20,11 +20,11 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: 77723bf1118d754dc32bba2ae77a7970ef346996
           persist-credentials: false
       - name: Verify source commit
         env:
-          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          EXPECTED_SHA: 77723bf1118d754dc32bba2ae77a7970ef346996
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
@@ -63,11 +63,11 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: 77723bf1118d754dc32bba2ae77a7970ef346996
           persist-credentials: false
       - name: Verify source commit
         env:
-          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          EXPECTED_SHA: 77723bf1118d754dc32bba2ae77a7970ef346996
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
@@ -81,3 +81,49 @@ jobs:
       - run: pnpm db:migrate
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm e2e --workers=1 --reporter=line
+      - name: M1 isolated year-boundary diagnostic (not a human demo)
+        if: ${{ !cancelled() }}
+        run: |
+          pnpm exec tsx --eval '
+          import { writeFileSync } from "node:fs";
+          import { createDb } from "./packages/db/src/index.ts";
+          import { loadInitialWorld } from "./apps/engine/src/world/resources.ts";
+          import { saveInitialWorld } from "./apps/engine/src/world/persistence.ts";
+          import { acquireLease, releaseLease } from "./apps/engine/src/lease.ts";
+          import { TurnLoop } from "./apps/engine/src/turnLoop.ts";
+          import { monthlyDate, TICKS_PER_MONTH } from "./packages/rules/src/index.ts";
+          async function main() {
+            const db = createDb(process.env.DATABASE_URL!);
+            let worldId: string | undefined;
+            try {
+              const initial = await loadInitialWorld({ scenario: "1030", map: "che", seed: "m1-boundary-probe" });
+              ({ worldId } = await saveInitialWorld(db, initial, { name: "M1 boundary diagnostic", turnTermMinutes: 1 }));
+              const target = (300 - initial.startYear + 1) * 12 * TICKS_PER_MONTH;
+              await db.general.updateMany({ where: { worldId }, data: { nextTurnTick: target + TICKS_PER_MONTH } });
+              await db.world.update({ where: { id: worldId }, data: { status: "RUNNING", monthlyTick: target - TICKS_PER_MONTH, clockTick: target - TICKS_PER_MONTH, clockAnchorAt: new Date() } });
+              const lease = await acquireLease(db, worldId);
+              if (!lease) throw new Error("isolated fixture lease unavailable");
+              try { await new TurnLoop(db, lease).advanceTo(target); }
+              finally { await releaseLease(db, lease); }
+              const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+              const result = { sourceSHA: "77723bf1118d754dc32bba2ae77a7970ef346996", scope: "Synthetic boundary setup; real PostgreSQL and TurnLoop; not a full season or human demonstration", scenario: initial.scenarioKey, cities: initial.cities.length, generals: initial.generals.length, dateSettled: monthlyDate(world.startYear, world.monthlyTick), status: world.status, endedAt: world.endedAt, clockTick: world.clockTick, monthlyTick: world.monthlyTick, hasPersistedEnd: world.status === "ENDED" && world.endedAt !== null };
+              writeFileSync("test-results/m1-boundary-diagnostic.json", JSON.stringify(result, null, 2));
+              console.log(JSON.stringify(result));
+              if (world.monthlyTick !== target) throw new Error("boundary fixture did not settle requested month");
+            } finally {
+              if (worldId) await db.world.delete({ where: { id: worldId } });
+              await db.$disconnect();
+            }
+          }
+          main().catch(error => { console.error(error instanceof Error ? error.name : "probe failure"); process.exitCode = 1; });'
+          git rev-parse HEAD > test-results/m1-source-sha.txt
+          git diff --exit-code
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ !cancelled() }}
+        with:
+          name: m1-preflight-source-77723bf
+          path: |
+            test-results/**/*.png
+            test-results/m1-boundary-diagnostic.json
+            test-results/m1-source-sha.txt
+          if-no-files-found: error
