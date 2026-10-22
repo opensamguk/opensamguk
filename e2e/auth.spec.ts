@@ -77,7 +77,9 @@ test('다른 사이트 주소는 next로 받지 않는다', async ({ page }) => 
   await page.goto('/login?next=//evil.example/');
   await fill(page, email, TEST_PASSWORD);
   await page.getByRole('button', { name: '로그인' }).click();
-  await expect(page.getByRole('heading', { level: 1, name: '참가할 월드' })).toBeVisible();
+  // 첫 주소(/)로 간다. 열린 월드가 있으면 첫 RUNNING 월드 메인으로, 없으면 참가할 월드 안내로 이어진다 (T1-16).
+  await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:5173\/(w\/[0-9a-f-]{36})?$/);
+  await expect(page.getByRole('heading', { level: 1, name: /^(참가할 월드|메인)$/ })).toBeVisible();
   expect(new URL(page.url()).host).toBe('127.0.0.1:5173');
 });
 
@@ -118,9 +120,10 @@ test('다른 탭에서 로그아웃하면 이 탭의 다음 이동도 로그인�
   await other.getByRole('button', { name: '로그아웃' }).click();
   await expect(other).toHaveURL('/login');
 
-  await page.getByRole('link', { name: '지도' }).click();
+  // 지도는 메인 안에 있어 메뉴에서 뺐다 (D-020). 메뉴의 기록으로 이동해 본다.
+  await page.getByRole('link', { name: '기록', exact: true }).click();
   await expect(page).toHaveURL(/\/login\?next=/);
-  expect(new URL(page.url()).searchParams.get('next')).toBe('/w/1/map');
+  expect(new URL(page.url()).searchParams.get('next')).toMatch(/^\/w\/1\/records(\?tab=general)?$/);
 });
 
 test('세션이 서버에서 없어지면 다음 이동은 로그인으로 간다', async ({ page }) => {
