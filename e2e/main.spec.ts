@@ -232,6 +232,13 @@ test.describe('장수가 있는 계정', () => {
     await expect(row(page, 4)).toContainText(enemy.name);
     await expect(draftState(page)).toHaveText('저장하지 않은 편집 2건');
     await shot(page, '10-main-turn-draft.png');
+    // #112: 좁은 명령 칸에서도 바뀜 태그는 줄 상자 하나에 놓인다. 바/뀜 두 줄이면 상자가 둘이다.
+    for (const slot of [1, 4])
+      expect(
+        await row(page, slot)
+          .getByText('바뀜', { exact: true })
+          .evaluate((tag) => tag.getClientRects().length),
+      ).toBe(1);
 
     await save(page);
     const saved = await turns(page, ctx.worldId);
