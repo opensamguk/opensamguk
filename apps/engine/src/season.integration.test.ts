@@ -238,6 +238,7 @@ it('가속 모드·정지·재개·realtime 복귀는 같은 월드 tick을 보�
   expect(realtime.tick).toBe(before.tick);
   expect((await controlClock(db, worldId, 'status', 5000)).tick).toBe(before.tick);
   expect((await controlClock(db, worldId, 'status', 8600)).tick).toBe(before.tick + 10);
+  await controlClock(db, worldId, 'pause', 8600);
 });
 
 it('가속 poll은 배치마다 반환하고 runEngine은 종료 후 리스를 놓고 정상 종료한다', async () => {
@@ -259,17 +260,20 @@ it('월드를 지정하지 않은 runEngine은 종료 뒤 다음 RUNNING 월드�
     await controlClock(db, worldId, 'accelerate');
   }
   const controller = new AbortController();
-  const running = runEngine(db, { signal: controller.signal });
+  let ended = 0;
+  const timeout = setTimeout(() => controller.abort(), 10000);
   try {
-    const deadline = performance.now() + 10000;
-    while ((await db.worldResult.count({ where: { worldId: { in: ids } } })) !== 2) {
-      if (performance.now() > deadline) throw new Error('다음 월드 종료 시간 초과');
-      await delay(20);
-    }
+    await runEngine(db, {
+      signal: controller.signal,
+      onBatch: (batch) => {
+        if (batch.status === 'ENDED' && !batch.more && ++ended === 2) controller.abort();
+      },
+    });
   } finally {
     controller.abort();
-    await running;
+    clearTimeout(timeout);
   }
+  expect(ended).toBe(2);
   for (const worldId of ids) await checkEnd(worldId, 'END_YEAR');
 });
 
