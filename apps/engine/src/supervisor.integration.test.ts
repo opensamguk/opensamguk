@@ -5,7 +5,7 @@ import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { createDb } from '@opensamguk/db';
 import { TICKS_PER_MONTH } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
-import { acquireLease, LeaseLostError, releaseLease } from './lease';
+import { acquireLease, databaseNow, LeaseLostError, releaseLease } from './lease';
 import { HEARTBEAT_MS, writeHeartbeat } from './main';
 import { exportReplay, replayArchive } from './replay';
 import { CRASH_MESSAGE, runSupervisor, type SupervisorEvent } from './supervisor';
@@ -200,6 +200,70 @@ describe('AC-M2-01 실제 PostgreSQL·감독·자식 프로세스', () => {
     await stop(managed.child);
     console.log('T2-01: ENDED/deleted removal, cascading heartbeat, SIGTERM cleanup PASS');
   }, 45_000);
+
+  it.each(['deleted', 'ENDED'] as const)(
+    'RUNNING A를 %s로 제거한 뒤에도 같은 B 자식이 새 월간 정산·연감·재생을 저장한다',
+    async (removal) => {
+      const a = await create();
+      const b = await create(true);
+      const managed = supervisor();
+      await Promise.all([ready(a), ready(b)]);
+      expect(starts(managed.events, a)).toHaveLength(1);
+      expect(starts(managed.events, b)).toHaveLength(1);
+      const bPid = starts(managed.events, b)[0]!.pid!;
+      const lease = await db.engineLease.findUniqueOrThrow({ where: { worldId: b } });
+      await advance(b, 1);
+
+      if (removal === 'deleted') await db.world.delete({ where: { id: a } });
+      else await db.world.update({ where: { id: a }, data: { status: 'ENDED' } });
+      await until(() => managed.events.some((event) => event.kind === 'removed' && event.worldId === a));
+      for (const event of starts(managed.events, a)) expect(alive(event.pid!)).toBe(false);
+      if (removal === 'deleted') {
+        expect(await db.world.findUnique({ where: { id: a } })).toBeNull();
+        expect(await db.engineHeartbeat.findUnique({ where: { worldId: a } })).toBeNull();
+        expect(await db.engineLease.findUnique({ where: { worldId: a } })).toBeNull();
+      } else {
+        expect((await db.world.findUniqueOrThrow({ where: { id: a } })).status).toBe('ENDED');
+        const endedLease = await db.engineLease.findUniqueOrThrow({ where: { worldId: a } });
+        expect(endedLease.expiresAt.getTime()).toBeLessThanOrEqual((await databaseNow(db)).getTime());
+      }
+
+      // removed와 A의 실제 PID 종료를 확인한 다음에만 B의 기준값과 새 월간 도래를 잡는다.
+      const baseline = await db.world.findUniqueOrThrow({ where: { id: b } });
+      expect(baseline.status).toBe('RUNNING');
+      expect(baseline.monthlyTick).toBe(TICKS_PER_MONTH);
+      const before = await db.yearbookSnapshot.count({ where: { worldId: b } });
+      expect(before).toBe(1);
+      const months = baseline.monthlyTick / TICKS_PER_MONTH + 1;
+      await advance(b, months);
+      const progressed = await db.world.findUniqueOrThrow({ where: { id: b } });
+      expect(progressed.status).toBe('RUNNING');
+      expect(progressed.monthlyTick).toBe(baseline.monthlyTick + TICKS_PER_MONTH);
+      expect(await db.yearbookSnapshot.count({ where: { worldId: b } })).toBe(before + 1);
+      const archive = await exportReplay(db, b);
+      const replayed = replayArchive(archive, months);
+      expect(replayed).toHaveLength(months);
+      expect(replayed.at(-1)).toEqual({ tick: progressed.monthlyTick, stateHash: archive.months.at(-1)!.stateHash });
+      const currentLease = await db.engineLease.findUniqueOrThrow({ where: { worldId: b } });
+      expect(currentLease.ownerId).toBe(lease.ownerId);
+      expect(currentLease.fencingToken).toBe(lease.fencingToken);
+      expect(currentLease.expiresAt.getTime()).toBeGreaterThan((await databaseNow(db)).getTime());
+      expect((await db.engineHeartbeat.findUniqueOrThrow({ where: { worldId: b } })).lastError).toBeNull();
+      expect(alive(managed.child.pid!)).toBe(true);
+      expect(alive(bPid)).toBe(true);
+      expect(starts(managed.events, b)).toHaveLength(1);
+      expect(managed.events.filter((event) => event.worldId === b && event.kind !== 'started')).toEqual([]);
+      await stop(managed.child);
+      expect(managed.child.exitCode).toBe(0);
+      expect(alive(bPid)).toBe(false);
+      const releasedLease = await db.engineLease.findUniqueOrThrow({ where: { worldId: b } });
+      expect(releasedLease.expiresAt.getTime()).toBeLessThanOrEqual((await databaseNow(db)).getTime());
+      console.log(
+        `T2-01 #123: A ${removal} removed/PIDs exited, B monthlyTick ${baseline.monthlyTick}->${progressed.monthlyTick}, Yearbook ${before}->${before + 1}, replay hashes match, same PID/lease, supervisor alive, SIGTERM cleanup PASS`,
+      );
+    },
+    45_000,
+  );
 
   it('감독 둘의 중복 자식도 한 리스만 쓰고 소유 감독 종료 뒤 낡은 토큰을 거부한다', async () => {
     const a = await create();
