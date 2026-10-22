@@ -36,6 +36,14 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm --filter @opensamguk/web build
+      - run: python3 review-t434/scan.py > bundle-evidence.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ !cancelled() }}
+        with:
+          name: t434-bundles
+          path: |
+            apps/web/dist/
+            bundle-evidence.json
 
   database-browser:
     name: opensamguk-database-browser
@@ -80,4 +88,18 @@ jobs:
       - run: pnpm test:authz
       - run: pnpm db:migrate
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm e2e --workers=1 --reporter=line
+      - run: pnpm e2e battleSim.spec.ts --workers=1 --reporter=line
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ !cancelled() }}
+        with:
+          name: t434-baseline-screenshots
+          path: test-results/**/*.png
+      - run: pnpm --filter @opensamguk/web build
+      - run: pnpm exec playwright test --config review-t434/playwright.config.ts --workers=1 --reporter=line
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ !cancelled() }}
+        with:
+          name: t434-production-csp
+          path: |
+            review-output/**/*.png
+            review-output/**/production-evidence.json
