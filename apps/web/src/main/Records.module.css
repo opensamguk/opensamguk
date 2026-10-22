@@ -3,10 +3,9 @@
   gap: var(--space-2);
 }
 .compact .lines,
-.compact .table {
+.compact .tableScroll {
   max-height: 260px;
   overflow-y: auto;
-  display: block;
 }
 .lines {
   list-style: none;
@@ -64,6 +63,26 @@
   height: var(--row-height);
   border-bottom: 1px solid var(--color-border);
   white-space: nowrap;
+}
+.table th,
+.table td {
+  padding: 0 var(--space-2);
+}
+.table th:first-child,
+.table td:first-child {
+  padding-left: 0;
+}
+.table th:last-child,
+.table td:last-child {
+  padding-right: 0;
+}
+/* 전역 .num보다 .table th가 이겨 숫자 머리글이 왼쪽으로 가지 않게 한다 (순위 표와 같은 처리). */
+.table th:global(.num) {
+  text-align: right;
+}
+.table td.dateCell {
+  text-align: left;
+  color: var(--color-text-muted);
 }
 .more {
   justify-self: start;

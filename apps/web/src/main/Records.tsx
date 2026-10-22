@@ -157,47 +157,49 @@ export function GeneralLogList({ items, clock }: { items: readonly GeneralItem[]
 
 function NationHistoryTable({ items, clock }: { items: readonly NationItem[]; clock: Clock }) {
   return (
-    <table className={styles.table}>
-      <thead>
-        <tr>
-          <th scope="col">연월</th>
-          <th scope="col" className="num">
-            속령
-          </th>
-          <th scope="col" className="num">
-            장수
-          </th>
-          <th scope="col" className="num">
-            국고
-          </th>
-          <th scope="col" className="num">
-            군량
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {items.map((item, i) => {
-          const older = items[i + 1];
-          return (
-            <tr key={item.tick}>
-              <td className="num">{dateOf(item.tick, clock)}</td>
-              <td className="num">
-                {n(item.cities)} {older ? <ValueDelta value={item.cities - older.cities} /> : null}
-              </td>
-              <td className="num">
-                {n(item.generals)} {older ? <ValueDelta value={item.generals - older.generals} /> : null}
-              </td>
-              <td className="num">
-                {n(item.gold)} {older ? <ValueDelta value={item.gold - older.gold} /> : null}
-              </td>
-              <td className="num">
-                {n(item.rice)} {older ? <ValueDelta value={item.rice - older.rice} /> : null}
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+    <div className={styles.tableScroll}>
+      <table className={styles.table}>
+        <thead>
+          <tr>
+            <th scope="col">연월</th>
+            <th scope="col" className="num">
+              속령
+            </th>
+            <th scope="col" className="num">
+              장수
+            </th>
+            <th scope="col" className="num">
+              국고
+            </th>
+            <th scope="col" className="num">
+              군량
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item, i) => {
+            const older = items[i + 1];
+            return (
+              <tr key={item.tick}>
+                <td className={`num ${styles.dateCell}`}>{dateOf(item.tick, clock)}</td>
+                <td className="num">
+                  {n(item.cities)} {older ? <ValueDelta value={item.cities - older.cities} /> : null}
+                </td>
+                <td className="num">
+                  {n(item.generals)} {older ? <ValueDelta value={item.generals - older.generals} /> : null}
+                </td>
+                <td className="num">
+                  {n(item.gold)} {older ? <ValueDelta value={item.gold - older.gold} /> : null}
+                </td>
+                <td className="num">
+                  {n(item.rice)} {older ? <ValueDelta value={item.rice - older.rice} /> : null}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
