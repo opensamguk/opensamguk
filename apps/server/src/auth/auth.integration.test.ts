@@ -3,7 +3,7 @@ import { Writable } from 'node:stream';
 import { beforeAll, afterAll, describe, expect, it } from 'vitest';
 import { createDb } from '@opensamguk/db';
 import { buildServer } from '../server';
-import { hashToken, SESSION_SECONDS } from './session';
+import { hashToken, SESSION_SECONDS, SESSION_RENEW_MS } from './session';
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
 const db = createDb(url);
@@ -31,7 +31,7 @@ async function request(name: string, input?: unknown, sid?: string) {
   const response = await app.inject({
     method: name === 'me' ? 'GET' : 'POST',
     url: `/trpc/auth.${name}?batch=1`,
-    headers: { ...(sid ? { cookie: sid } : {}) },
+    headers: { origin: 'http://127.0.0.1:5173', ...(sid ? { cookie: sid } : {}) },
     ...(name === 'me' ? {} : { payload: input === undefined ? {} : { 0: input } }),
   });
   const body = response.json()[0] as {
@@ -74,13 +74,21 @@ describe('AC-M1-05 실제 HTTP·DB 인증', () => {
     ).toBeNull();
     const login = await request('login', { email: 'alice@example.com', password });
     const id = hashToken(login.cookie!.slice(4));
+    const originalExpiry = (await db.session.findUniqueOrThrow({ where: { id } })).expiresAt.getTime();
     now += 60_000;
     const active = await request('me', undefined, login.cookie);
-    expect(active.header).toContain(`Max-Age=${SESSION_SECONDS}`);
+    expect(active.header).toBeUndefined();
+    expect((await db.session.findUniqueOrThrow({ where: { id } })).expiresAt.getTime()).toBe(originalExpiry);
+    now = originalExpiry - SESSION_RENEW_MS - 1;
+    expect((await request('me', undefined, login.cookie)).header).toBeUndefined();
+    now += 1;
+    const renewed = await Promise.all([request('me', undefined, login.cookie), request('me', undefined, login.cookie)]);
+    expect(renewed.every((r) => r.body.result?.data.user?.email === 'alice@example.com')).toBe(true);
+    expect(renewed.filter((r) => r.header?.includes(`Max-Age=${SESSION_SECONDS}`))).toHaveLength(1);
     expect((await db.session.findUniqueOrThrow({ where: { id } })).expiresAt.getTime()).toBe(
       now + SESSION_SECONDS * 1000,
     );
-    await db.session.update({ where: { id }, data: { expiresAt: new Date(now - 1) } });
+    await db.session.update({ where: { id }, data: { expiresAt: new Date(now) } });
     expect((await request('me', undefined, login.cookie)).body.result?.data.user).toBeNull();
   });
   it('중복·잘못된 비밀번호·없는 계정·잘못된 입력을 구분한다', async () => {

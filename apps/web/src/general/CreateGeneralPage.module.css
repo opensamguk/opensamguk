@@ -1,0 +1,149 @@
+.page {
+  max-width: 640px;
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.input {
+  font: inherit;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.input[aria-invalid='true'] {
+  border-color: var(--color-danger);
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.stats,
+.portraits {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.stats legend,
+.portraits legend {
+  padding: 0 var(--space-1);
+  font-weight: 600;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat input {
+  width: 5em;
+}
+
+.remaining {
+  margin: 0;
+  padding: var(--space-1) 0;
+}
+
+.portraitOption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.problems ul {
+  margin: 0;
+  padding-left: var(--space-4);
+  color: var(--color-warning);
+  font-size: var(--text-sm);
+}
+
+.errorText {
+  margin: 0;
+  color: var(--color-danger);
+}
+
+.alert {
+  padding: var(--space-3);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius);
+}
+
+.alert p {
+  margin: 0 0 var(--space-2);
+}
+
+.actions {
+  display: flex;
+}
+
+.submit {
+  font: inherit;
+  font-weight: 600;
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  cursor: pointer;
+}
+
+.submit:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.secondary {
+  font: inherit;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.pending {
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius);
+}
+
+.done {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.done p {
+  margin: 0 0 var(--space-2);
+}

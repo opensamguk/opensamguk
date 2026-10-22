@@ -32,25 +32,31 @@ GAME 규칙을 WALL 시각으로 판정하지 않습니다. 반대도 마찬가�
 
 ## 4. tick과 장수 턴 배치
 
-1개월 = 10,000 tick입니다. 현실 1 tick = `turnTermMinutes × 60,000 / 10,000` ms이며, 게임 연월은 시작 연도 1월에서 완료된 개월 수만큼 더합니다. 원작의 36,000,000 tick보다 단순하게 줄였습니다.
+1개월 = 10,000 tick입니다. 현실 1 tick = `turnTermMinutes × 60,000 / 10,000` ms이며 게임 연월은 시작 연도 1월에서 완료된 개월 수만큼 더합니다. 원작의 36,000,000 tick보다 단순하게 줄였습니다.
 새 월드의 장수는 `rngFor(seed, 'turn-offset', generalId).int(0, 9_999)`로 첫 달 안의 턴 위치를 정합니다. 실행할 때마다 `nextTurnTick`에 10,000을 더합니다. 같은 tick은 장수 ID 오름차순입니다. 이 분산은 도시 배치용 bootstrap RNG와 독립적입니다. 기존 월드에 저장된 `nextTurnTick`과 초기 상태 해시는 migration에서 바꾸지 않습니다.
 
 M1에서는 운영 중 턴 간격을 바꾸는 명령을 제공하지 않습니다. 이후 변경 기능은 이전 비율로 체크포인트를 저장한 뒤 새 간격·기준 시각을 함께 바꿔야 하며 장수의 `nextTurnTick` 순서는 유지해야 합니다.
 
 ## 5. 일시정지와 재개
 
-PREOPEN → RUNNING → PAUSED ⇄ RUNNING → ENDED만 허용합니다. 정지 시 현재 tick을 저장하고 재개 시 기준 시각을 현재로 옮겨, 정지한 시간은 계산에서 제외합니다.
+PREOPEN → RUNNING → PAUSED ⇄ RUNNING → ENDED만 허용합니다. 정지 시 현재 tick을 저장하고 재개 시 기준 시각을 현재로 옮겨 정지한 시간은 계산에서 제외합니다.
 
-운영 명령은 `pnpm world:start/pause/resume/status --world <ID>`입니다. 상태 전환은 DB 트랜잭션과 revision 조건으로 보호하며, status 조회는 완료된 tick을 저장합니다. 자투리 tick은 남기고 벽시계가 역행하면 저장된 tick을 유지합니다.
+운영 명령은 `pnpm world:start/pause/resume/status --world <ID>`입니다. 상태 전환은 DB 트랜잭션과 revision 조건으로 보호하며 status 조회는 완료된 tick을 저장합니다. 자투리 tick은 남기고 벽시계가 역행하면 저장된 tick을 유지합니다.
 
 운영 명령과 realtime 엔진은 모두 DB UTC 시각을 기준으로 삼습니다. 운영 명령은 월드 행을 잠근 뒤 최신 시계와 현재 DB 시각을 읽어 엔진의 턴 저장·체크포인트와 직렬화합니다. RUNNING이 아니면 밀린 턴도 처리하지 않습니다. 재개하면 저장된 `nextTurnTick`부터 따라잡습니다.
 
 엔진은 턴 저장 시와 턴이 없는 동안 5초 간격으로 시계를 체크포인트합니다. 나머지 100ms 폴링은 시계·실행 대상만 확인하며 전체 월드를 적재하거나 쓰지 않습니다. 메모리에서 본 tick 최댓값은 저장 사이에도 유지합니다. `checkpointClock`의 최소 tick 인자로 이를 전달해, 벽시계 역행 시 tick과 그 tick의 기준 시각을 함께 보존합니다. 체크포인트 간격은 monotonic 시각으로 재고 자투리 tick도 남깁니다.
 
-manual 엔진은 `advanceTo(tick)`까지 처리하고 그 tick을 저장합니다. 이미 저장한 tick보다 작은 값은 거부하며, paused 상태에서는 호출해도 진행하지 않습니다. manual에서도 실행권·저장 원자성 검사는 운영과 같습니다.
+manual 엔진은 `advanceTo(tick)`까지 처리하고 그 tick을 저장합니다. 이미 저장한 tick보다 작은 값은 거부하며 paused 상태에서는 호출해도 진행하지 않습니다. manual에서도 실행권·저장 원자성 검사는 운영과 같습니다.
 
 ## 6. 월간 정산 순서
 
 세금·봉급 → 인구·민심 → 보급 → 외교 기한 → 연감 (AC-M1-12)
 
-<!-- TODO(M1): 각 단계의 입력·출력과 RNG 소비 순서. -->
+`TurnLoop`는 `World.monthlyTick + 10,000`을 다음 경계로 삼습니다. 그 tick보다 앞선 장수 턴을 모두 처리한 뒤 정산하고 같은 tick의 장수 턴은 정산 뒤에 실행합니다. 목표 시각까지 여러 달이 밀려도 턴과 정산을 이 순서로 교차합니다. 시계 체크포인트가 먼저 저장됐더라도 `monthlyTick`이 남아 있어 재시작 때 정산을 빠뜨리지 않습니다.
+
+한 달의 상태 변경, `NationHistory`, `YearbookSnapshot`, `monthlyTick`, `actionSequence`는 리스 행과 월드 행을 잠근 한 트랜잭션에 저장합니다. commit 직전 소유자·펜싱 토큰·DB 시각 기준 만료를 다시 확인합니다. commit 전 실패나 종료는 전부 롤백하며 commit 후 재시작은 다음 경계부터 진행합니다. 정지 중에는 밀린 달도 처리하지 않습니다.
+
+`runMonthly(state, boundaryTick, rng)`는 종료한 달을 정산합니다. 시작 연도 1월의 정산 tick은 10,000이며 120,000은 12월입니다. 1·7월 금, 4·10월 쌀 수입을 인구 증가 전 값으로 계산하고 소속 장수에게 봉급을 나눕니다. 그다음 인구·민심, 수도에서 같은 나라 도시만 지나는 BFS 보급, 외교 기한, 국가 요약과 도시 소유권 연감을 만듭니다. 미등장 장수는 봉급·장수 수에서 제외하며 턴을 쌓지 않습니다. 등장 연도 1월부터 기존 offset에서 턴을 받습니다.
+
+국가·도시·장수는 ID 순으로, 외교는 국가 쌍 순으로 처리합니다. RNG는 `rngFor(seed, 'monthly', 정산 연, 월)`을 전달하되 현재 다섯 단계는 난수를 소비하지 않습니다. 재해·사건·사망·관직 보정은 이번 범위에 넣지 않았습니다. 세율·봉급률 등은 `packages/rules/src/balance.ts`에 있습니다.

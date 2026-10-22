@@ -25,14 +25,35 @@
 | `apps/server/src/auth/` | Argon2id, 세션 토큰 해시·만료·연장, 실제 HTTP·DB 테스트 |
 | `apps/server/src/routers/auth.ts` | 가입·로그인·로그아웃·현재 계정 |
 | `apps/server/src/trpc.ts` | 공개·인증 필수 procedure |
-| `apps/server/src/router.ts` | tRPC `AppRouter` (API 계약): `health`, `auth` |
-| `apps/engine/src/index.ts`, `main.ts` | `engine:run --world <ID>`·dev 월드 선택, 갱신·종료 |
+| `apps/server/src/router.ts` | tRPC `AppRouter` (API 계약): `health`, `auth`, `world`, `home`, `city`, `nation`, `records`, `general`, `turns`, `commands`, `ranking` |
+| `apps/server/src/routers/general.ts`, `turns.ts`, `commands.ts` | 생성 접수·조회, 예턴 편집·사전 검사, 인증 필수 명령 목록 |
+| `apps/server/src/game/` | 소유 장수 조회·공개 projection·30칸 정규화와 표시 이름 |
+| `apps/engine/src/inputs.ts` | PENDING 생성 재검사·General 저장·완료 결과와 순서 기록 |
+| `packages/rules/src/general/create.ts` | 생성 입력 검사·결정적 초기 장수 규칙 |
+| `packages/shared/src/editArray.ts` | 범위 덮어쓰기·밀기·당기기·스냅샷 반복의 일반 배열 유틸 |
+| `tools/t1-11.test.ts`, `t1-11.integration.test.ts` | 편집·생성 규칙·명령 schema, 실제 HTTP·DB 보안·경합·재시작·재생 시험 |
+| `apps/server/src/routers/ranking.ts`, `ranking.integration.test.ts` | 정산 시점 장수 상위 100명·내 순위·국가 전체 순위, 실제 HTTP·DB 권한과 공개 필드 검증 |
+| `packages/rules/src/ranking.ts` | 공헌·경험·전공·국가 순위와 공개 국력 계산, 동률 ID 정렬 |
+| `apps/engine/src/ranking.ts`, `ranking.integration.test.ts` | 월간 트랜잭션의 순위 캐시 교체, 전공 누계·롤백·재생 호환 검증 |
+| `apps/server/src/routers/world.ts` | 기존 `world.list`, 서버 시계 요약과 공개 94도시 지도 |
+| `apps/server/src/routers/home.ts`, `city.ts`, `nation.ts`, `records.ts` | 세션 기준 메인·도시·국가·개인/국가/월드 기록 조회. 국가 기록은 DB JSON 조건으로 월간 요약만 페이지 처리 |
+| `apps/server/src/visibility.ts`, `queries.ts` | 공개 필드 허용 목록과 범위 표, strict 입력, 일관된 읽기, 시각·페이지 변환 |
+| `apps/server/src/visibility.test.ts`, `routers/reads.integration.test.ts` | 아군·적·재야 공개 범위와 실제 TCP·PostgreSQL 권한·페이지·94도시 성능 검증 |
+| `apps/engine/src/index.ts`, `main.ts` | 기본 감독 진입점, `engine:run --world <ID>` 단일 월드 실행, 리스·30초 heartbeat·종료 |
+| `apps/engine/src/supervisor.ts` | 10초 월드 발견, 월드별 자식·백오프·반복 크래시 중단·자기 자식 정리 |
+| `apps/engine/src/supervisor.integration.test.ts`, `test/supervisorWorker.ts` | 실제 감독·엔진·DB의 수동 3개월·kill·정지·중복 감독·오류 격리 검증 |
 | `apps/engine/src/lease.ts` | DB 시각 기준 실행권 획득·갱신·해제·펜싱 |
 | `apps/engine/src/worldLoader.ts`, `turnLoop.ts`, `persist.ts` | 현재 상태 적재, manual/realtime 턴 실행, 원자적 저장 |
 | `apps/engine/src/turnLoop.integration.test.ts` | 실제 DB, SIGKILL·동시 엔진·재시작·토큰 검증 |
 | `apps/web/src/LoginPage.tsx` | 자리표시 로그인 화면과 서버 상태 표시 |
 | `apps/web/apiTarget.ts` | dev 프록시가 쓸 API 서버 주소 (`SERVER_PORT`) |
 | `apps/web/src/trpc.ts` | tRPC 클라이언트 (`AppRouter` 타입만 import) |
+| `apps/web/src/pages/MainPage.tsx` | 메인 작업 화면 (D-020, R1 배치). 지도·명령 목록(T1-15 `TurnEditor`)·도시·국가·장수·기록 칸을 한 화면에 둔다 |
+| `apps/web/src/main/` | 메인 칸 부품: `WorldMap`(94도시 SVG), `CityInfo`, `NationInfo`(국가 요약·표), `GeneralInfo`, `Records`(기록 3종 더 보기) |
+| `apps/web/src/game/` | 화면 공용: 응답 타입(`types.ts`, 공개 범위 상세 필드), 조회 훅, 다음 턴 카운트다운·0초 재조회(`countdown.ts`), 오류 코드, 기록 연월, 명령·직책 이름 |
+| `apps/web/src/layout/GameLayout.tsx` | 위쪽 띠(월드·연월·다음 턴·메뉴)와 본문 |
+| `apps/web/src/pages/WorldPages.tsx` | 직접 주소용 보조 화면: 지도·도시·국가·기록 |
+| `e2e/main.spec.ts`, `e2e/world.ts` | 실제 엔진 월드로 메인 작업 화면 E2E (턴 1분 월드 생성·시작, 시험 계정 장수 붙이기) |
 | `packages/db/prisma/schema.prisma` | DB schema. 생성물은 `packages/db/src/generated/` (Git 제외) |
 | `packages/shared/src/gameDate.ts` | 게임 달력 |
 | `eslint.config.js` | 패키지 경계·결정성 규칙 |
@@ -47,6 +68,11 @@
 | `tools/run-integration.ts` | 전용 테스트 DB 준비·migration·통합 테스트 실행 |
 
 ## 새 저장 필드를 추가할 때 빠뜨리기 쉬운 것
+
+순위는 `RankingSnapshot`에 월드별 최신 정산의 공개 필드만 저장한다. API는 캐시를 읽고 세션 장수의 순위를 찾으며 조회 중 캐시를 만들지 않는다.
+`General.battleWins`, `General.captures`는 전투 결과에서 집계한 조회용 누계다. 기존 재생 해시를 보존하려고 `worldLoader`와 `world/persistence`의 게임 상태 적재에서는 제외한다. 기존 연감의 비공개 국력 계산은 유지한다.
+
+순위의 공개 국력은 D-019의 자원·기술·보급 도시 내정·장수 능력·경험·공헌 합성값이다. 월별 배율은 국가마다 별도 시드 RNG로 계산한다. 월간 정산의 같은 트랜잭션에서 최종 상태로 계산한 국력만 순위 캐시에 저장하며 계산에 쓴 사유 값은 공개하지 않는다.
 
 core2026 지침에서 가져온 체크리스트입니다.
 
