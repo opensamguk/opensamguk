@@ -33,6 +33,7 @@ model World {
   generals        General[]
   diplomacies     Diplomacy[]
   engineLease     EngineLease?
+  engineHeartbeat EngineHeartbeat?
   monthlyTick     Int         @default(0)
   actionSequence  Int         @default(0)
   replayOrigin    Json?
@@ -168,6 +169,15 @@ model EngineLease {
   fencingToken Int
   expiresAt    DateTime
   world        World @relation(fields: [worldId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model EngineHeartbeat {
+  worldId   String   @id
+  at        DateTime @db.Timestamptz(3)
+  lastTick  Int
+  lagMs     Int
+  lastError String?
+  world     World    @relation(fields: [worldId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model GeneralTurn {
