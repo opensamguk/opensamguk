@@ -1,7 +1,38 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import type { PrismaClient } from '@opensamguk/db';
-import { acquireLease, LEASE_TTL_MS, LeaseLostError, releaseLease, renewLease } from './lease';
+import {
+  acquireLease,
+  assertLease,
+  databaseNow,
+  LEASE_TTL_MS,
+  LeaseLostError,
+  lockLease,
+  releaseLease,
+  renewLease,
+  type Lease,
+} from './lease';
 import { TurnLoop } from './turnLoop';
+
+export const HEARTBEAT_MS = 30_000;
+
+export async function writeHeartbeat(db: PrismaClient, lease: Lease, lagMs: number): Promise<void> {
+  await db.$transaction(async (tx) => {
+    await lockLease(tx, lease);
+    const world = await tx.world.findUniqueOrThrow({ where: { id: lease.worldId }, select: { clockTick: true } });
+    const data = {
+      at: await databaseNow(tx),
+      lastTick: world.clockTick,
+      lagMs: Math.min(2_147_483_647, Math.max(0, Math.floor(lagMs))),
+      lastError: null,
+    };
+    await tx.engineHeartbeat.upsert({
+      where: { worldId: lease.worldId },
+      create: { worldId: lease.worldId, ...data },
+      update: data,
+    });
+    await assertLease(tx, lease);
+  });
+}
 
 export function engineFailureMessage(error: unknown): string {
   if (error instanceof LeaseLostError) return `[engine] ${error.name}: ${error.message}`;
@@ -67,6 +98,22 @@ export async function runEngine(
         }
       }
     })();
+    let heartbeatError: unknown;
+    const heartbeat = (async () => {
+      let due = performance.now();
+      try {
+        while (!session.signal.aborted) {
+          await writeHeartbeat(db, lease, performance.now() - due);
+          due = performance.now() + HEARTBEAT_MS;
+          await delay(HEARTBEAT_MS, undefined, { signal: session.signal });
+        }
+      } catch (error) {
+        if (!session.signal.aborted) {
+          heartbeatError = error;
+          session.abort();
+        }
+      }
+    })();
     try {
       while (!session.signal.aborted) {
         await loop.poll(session.signal);
@@ -77,6 +124,7 @@ export async function runEngine(
         }
       }
       if (renewalError) throw renewalError;
+      if (heartbeatError) throw heartbeatError;
       return;
     } catch (error) {
       if (!signal.aborted) throw error;
@@ -85,6 +133,7 @@ export async function runEngine(
       session.abort();
       signal.removeEventListener('abort', forwardAbort);
       await renewal;
+      await heartbeat;
       await releaseLease(db, lease);
       report('실행권 해제');
     }

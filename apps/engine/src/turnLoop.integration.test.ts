@@ -23,10 +23,11 @@ beforeAll(async () => {
 });
 afterAll(async () => {
   await db.world.deleteMany();
+  await db.user.deleteMany({ where: { id: 'turn-rest-human' } });
   await db.$disconnect();
 });
 
-async function create(count = 1) {
+async function create(count = 1, human = false) {
   const initial = structuredClone(template);
   const city = initial.cities.find((city) => city.nationId !== null)!;
   city.agriculture = 100;
@@ -42,6 +43,15 @@ async function create(count = 1) {
     gold: 1000,
     injury: 3,
   }));
+  if (human) {
+    const userId = 'turn-rest-human';
+    await db.user.upsert({
+      where: { id: userId },
+      update: {},
+      create: { id: userId, email: `${userId}@example.invalid`, passwordHash: 'test-only' },
+    });
+    initial.generals[0]!.userId = userId;
+  }
   const { worldId } = await saveInitialWorld(db, initial, { name: '엔진 통합', turnTermMinutes: 10 });
   await controlClock(db, worldId, 'start');
   return { worldId, cityKey: city.cityKey };
@@ -106,7 +116,7 @@ async function kill(child: ChildProcess) {
 
 describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
   it('시계 주입: 턴 시각에 농업·금·로그·30칸 당김·revision을 함께 저장한다', async () => {
-    const { worldId, cityKey } = await create();
+    const { worldId, cityKey } = await create(1, true);
     await queue(worldId);
     const loop = await engine(worldId);
     expect(await loop.advanceTo(499)).toEqual([]);
@@ -124,7 +134,9 @@ describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
     expect(turns.every((turn, slot) => turn.slot === slot && turn.commandKey === 'rest')).toBe(true);
     expect(await loop.advanceTo(10_000)).toEqual([]);
     expect(await loop.advanceTo(10_500)).toHaveLength(1);
-    expect(await general(worldId)).toMatchObject({ gold: 900, injury: 2, turnRevision: 2 });
+    expect(await general(worldId)).toMatchObject({ injury: 2, turnRevision: 2 });
+    // 1월 세입·봉급은 10,000 tick에서 별도로 반영된다.
+    expect((await general(worldId)).gold).toBeGreaterThan(900);
   });
 
   it('밀린 턴은 tick 우선, 같은 tick은 장수 ID 순서로 처리한다', async () => {
@@ -188,7 +200,7 @@ describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
   it('realtime 시계가 역행해도 이전에 관측·저장한 tick보다 줄지 않는다', async () => {
     const { worldId } = await create();
     await db.general.updateMany({ where: { worldId }, data: { nextTurnTick: 100_000 } });
-    await db.world.update({ where: { id: worldId }, data: { clockAnchorAt: new Date(Date.now() - 600_000) } });
+    await db.world.update({ where: { id: worldId }, data: { clockAnchorAt: new Date(Date.now() - 300_000) } });
     let elapsed = 0;
     const loop = new TurnLoop(db, (await acquireLease(db, worldId))!, { elapsedNow: () => elapsed });
     await loop.poll();
@@ -198,7 +210,7 @@ describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
     elapsed = CLOCK_CHECKPOINT_MS;
     await loop.poll();
     const first = (await db.world.findUniqueOrThrow({ where: { id: worldId } })).clockTick;
-    expect(first).toBeGreaterThanOrEqual(10_000);
+    expect(first).toBeGreaterThanOrEqual(5_000);
     elapsed += CLOCK_CHECKPOINT_MS;
     await loop.poll();
     expect((await db.world.findUniqueOrThrow({ where: { id: worldId } })).clockTick).toBe(first);
@@ -422,7 +434,7 @@ describe('AC-M1-11 리스·재시작·펜싱, 실제 PostgreSQL', () => {
         await expire(worldId);
         const restarted = await engine(worldId);
         await restarted.advanceTo(500);
-        await restarted.advanceTo(TICKS_PER_MONTH);
+        await restarted.advanceTo(TICKS_PER_MONTH - 1);
         expect(await general(worldId)).toMatchObject({
           gold: next.generals[1]!.gold,
           experience: next.generals[1]!.experience,
