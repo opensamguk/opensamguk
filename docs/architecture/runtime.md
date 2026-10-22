@@ -41,6 +41,12 @@ DB에는 토큰 원문 대신 SHA-256만 저장하고 성공한 활동의 응답
 
 서버 응답에는 `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`, `X-Frame-Options: DENY`를 붙입니다. CSP·HSTS의 검토용 Caddy 소스와 적용 경계는 [릴리스 운영](../release-operations.md#5-프록시-경로)에 있습니다.
 
+### 세션 갱신 오류
+
+인증 단계의 세션 조회 오류는 요청 실패로 처리하며 handler를 실행하지 않습니다. 인증과 handler가 성공한 HTTP 200 응답의 선택적 갱신은 별도로 처리합니다. 이때 세션 조회나 만료 연장에 실패해도 원래 상태 코드와 본문을 보존하고 `세션 갱신 실패`라는 고정 경고만 남깁니다. 오류 원문이나 식별자는 기록하지 않으며 새 `sid` 쿠키를 보내거나 메모리에서 만료를 연장하지 않습니다. DB 갱신 결과가 불명확해도 업무 변경을 다시 실행하거나 되돌리지 않습니다. 거부 응답과 혼합 batch의 207은 계속 갱신 대상에서 제외합니다.
+
+`turns.set`·`turns.edit`는 같은 revision과 본문을 다시 보내면 기존 `STALE` 응답과 최신 snapshot을 돌려줍니다. 클라이언트가 지정하는 requestId 계약은 없습니다. `tools/session-renewal.integration.test.ts`는 파일 전용 DB를 생성해 실제 loopback HTTP로 검증합니다. PostgreSQL trigger의 세션 UPDATE 예외와 InputEvent 커밋에 맞춘 세션 테이블 rename으로 갱신 SELECT 오류를 각각 넣고 `finally`에서 복구합니다. 업무 예턴·InputEvent·revision의 1회 반영, 원래 200 응답, 쿠키·만료 불변과 같은 revision 재전송을 확인합니다. 인증 단계 SELECT 오류, 정상·동시 갱신, 만료·제재·429·잘못된 입력·207, 로그인·로그아웃 쿠키도 같은 시험에서 확인합니다. 소켓·운영 DB 장애를 주입하는 시험은 아닙니다.
+
 ## 3. 로컬 실행
 
 ```sh

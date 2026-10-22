@@ -83,15 +83,20 @@ export async function buildServer(options: {
     const status = payload instanceof Response ? payload.status : reply.statusCode;
     // 거부한 요청은 세션 만료 시각도 바꾸지 않는다. 성공 응답에서만 기존 갱신 계약을 적용한다.
     if (status === 200 && now !== undefined && req.cookies.sid) {
-      const identity = await authenticate(options.db, req.cookies.sid, now);
-      if (identity?.renewed)
-        reply.setCookie('sid', req.cookies.sid, {
-          httpOnly: true,
-          sameSite: 'lax',
-          secure: secureCookies,
-          path: '/',
-          maxAge: SESSION_SECONDS,
-        });
+      try {
+        const identity = await authenticate(options.db, req.cookies.sid, now);
+        if (identity?.renewed)
+          reply.setCookie('sid', req.cookies.sid, {
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: secureCookies,
+            path: '/',
+            maxAge: SESSION_SECONDS,
+          });
+      } catch {
+        // 선택적 갱신 실패로 이미 처리한 요청의 성공 응답을 바꾸지 않는다.
+        server.log.warn('세션 갱신 실패');
+      }
     }
     return payload;
   });
