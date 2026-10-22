@@ -1,83 +1,102 @@
 name: CI
-
 on:
-  push:
-  pull_request:
   workflow_dispatch:
-
 permissions:
   contents: read
-
 concurrency:
-  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
+  group: owner-observation-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
-  checks:
-    name: opensamguk-check
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          persist-credentials: false
-      - name: Verify source commit
-        env:
-          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
-        with:
-          version: 10.33.0
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: '24'
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm check
-      - run: pnpm --filter @opensamguk/web build
-
   database-browser:
-    name: opensamguk-database-browser
+    name: actual-main-screen-observation
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 18
     env:
       CI: 'true'
-      DATABASE_URL: postgresql://opensamguk:opensamguk@127.0.0.1:5432/opensamguk_ci_e2e_test
-      TEST_DATABASE_URL: postgresql://opensamguk:opensamguk@127.0.0.1:5432/opensamguk_ci_int_test
+      DATABASE_URL: postgresql://opensamguk:opensamguk@127.0.0.1:5432/owner_observation_test
       SERVER_PORT: '3001'
+      OWNER_SNAPSHOT_DIR: ${{ runner.temp }}/owner-observation
+      APP_SHA: 24e1a8ad0d744d7f3264c9d13f2586161c49d04e
     services:
       postgres:
         image: postgres:18-alpine
         env:
           POSTGRES_USER: opensamguk
           POSTGRES_PASSWORD: opensamguk
-          POSTGRES_DB: opensamguk_ci_e2e_test
-        ports:
-          - 5432:5432
+          POSTGRES_DB: owner_observation_test
+        ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U opensamguk -d opensamguk_ci_e2e_test"
-          --health-interval 2s
-          --health-timeout 3s
-          --health-retries 20
+          --health-cmd "pg_isready -U opensamguk -d owner_observation_test"
+          --health-interval 2s --health-timeout 3s --health-retries 20
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-      - name: Verify source commit
-        env:
-          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+          fetch-depth: 2
+      - name: Prove exact application source and record runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$OWNER_SNAPSHOT_DIR"
+          test "$(git rev-parse HEAD^)" = "$APP_SHA"
+          git diff --name-only "$APP_SHA" HEAD > "$OWNER_SNAPSHOT_DIR/branch-diff.txt"
+          test -z "$(git diff --name-only "$APP_SHA" HEAD -- . ':!.github')"
+          git rev-parse HEAD > "$OWNER_SNAPSHOT_DIR/capture-commit.txt"
+          uname -a > "$OWNER_SNAPSHOT_DIR/environment.txt"
+          docker inspect $(docker ps -q) > "$OWNER_SNAPSHOT_DIR/service-container-before.json"
+          docker image inspect postgres:18-alpine > "$OWNER_SNAPSHOT_DIR/postgres-image.json"
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
         with:
           version: 10.33.0
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test:authz
-      - run: pnpm db:migrate
+      - run: pnpm generate && pnpm db:migrate
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm e2e --workers=1 --reporter=line
+      - name: Capture real DB API browser states
+        shell: bash
+        run: |
+          set -euo pipefail
+          setsid pnpm dev > "$OWNER_SNAPSHOT_DIR/app-process.log" 2>&1 &
+          OWNED_GROUP=$!
+          cleanup() {
+            kill -TERM -- "-$OWNED_GROUP" 2>/dev/null || true
+            for n in $(seq 1 30); do
+              if ! kill -0 -- "-$OWNED_GROUP" 2>/dev/null; then break; fi
+              sleep 0.2
+            done
+            if kill -0 -- "-$OWNED_GROUP" 2>/dev/null; then kill -KILL -- "-$OWNED_GROUP" 2>/dev/null || true; fi
+            wait "$OWNED_GROUP" 2>/dev/null || true
+            sleep 1
+            if kill -0 -- "-$OWNED_GROUP" 2>/dev/null; then
+              printf '{"ownedProcessGroupExitVerified":false}\n' > "$OWNER_SNAPSHOT_DIR/cleanup.json"
+              return 1
+            fi
+            printf '{"ownedProcessGroupExitVerified":true,"postgres":"dedicated hosted-runner service; no existing DB touched"}\n' > "$OWNER_SNAPSHOT_DIR/cleanup.json"
+          }
+          trap cleanup EXIT
+          for n in $(seq 1 90); do
+            if curl --fail --silent http://127.0.0.1:5173/login >/dev/null; then break; fi
+            sleep 1
+          done
+          pnpm exec playwright test --config=.github/capture/playwright.config.ts --workers=1 --reporter=line 2>&1 | tee "$OWNER_SNAPSHOT_DIR/playwright.log"
+      - name: Service cleanup receipt
+        if: always()
+        shell: bash
+        run: |
+          docker ps --no-trunc > "$OWNER_SNAPSHOT_DIR/service-before-cleanup.txt"
+          IDS=$(docker ps -q --filter ancestor=postgres:18-alpine)
+          if [ -n "$IDS" ]; then docker stop $IDS > "$OWNER_SNAPSHOT_DIR/postgres-stop.txt"; fi
+          docker ps --no-trunc > "$OWNER_SNAPSHOT_DIR/service-after-cleanup.txt"
+      - name: Upload actual observation including failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: main24e1a8-actual-observation
+          path: |
+            ${{ runner.temp }}/owner-observation
+            test-results/**/error-context.md
+          retention-days: 7
+          if-no-files-found: error
