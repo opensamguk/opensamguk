@@ -44,6 +44,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 backend = subprocess.Popen(['pnpm', '--filter', '@opensamguk/server', 'dev'], cwd=ROOT,
                            start_new_session=True)
+import time
+for attempt in range(100):
+    try:
+        urllib.request.urlopen('http://127.0.0.1:3001/trpc/auth.me', timeout=1)
+        break
+    except urllib.error.HTTPError:
+        break
+    except OSError:
+        time.sleep(0.2)
+else:
+    backend.terminate()
+    raise RuntimeError('review backend did not become ready')
 server = http.server.ThreadingHTTPServer(('127.0.0.1', 5173), Handler)
 
 def stop(_signum, _frame):
