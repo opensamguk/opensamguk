@@ -13,8 +13,10 @@ import { DevUiPage } from './pages/DevUiPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { MainPage } from './pages/MainPage';
-import { Placeholder } from './pages/Placeholder';
 import { SignupPage } from './pages/SignupPage';
+import { CityPage, MapPage, NationPage, RecordsPage } from './pages/WorldPages';
+import { RankingPage } from './ranking/RankingPage';
+import { parseRankingSearch } from './ranking/rankingView';
 import { queryClient, trpc, type Trpc } from './trpc';
 import { TurnsPage } from './turns/TurnsPage';
 import { EmptyState, ErrorState } from './ui/States';
@@ -55,6 +57,13 @@ const indexRoute = createRoute({
   path: '/',
   beforeLoad: async ({ context }) => {
     if (!(await currentUser(context))) throw redirect({ to: '/login' });
+    // 첫 RUNNING 월드로 보낸다. 없으면 이 화면에 열린 월드가 없다고 보여 준다 (T1-16, world.list).
+    const { worlds } = await context.queryClient.fetchQuery({
+      ...context.trpc.world.list.queryOptions(),
+      staleTime: 0,
+    });
+    const first = worlds[0];
+    if (first) throw redirect({ to: '/w/$worldId', params: { worldId: first.id }, replace: true });
   },
   component: HomePage,
   errorComponent: GuardError,
@@ -87,13 +96,20 @@ const worldRoute = createRoute({
   errorComponent: GuardError,
 });
 
-const worldIndexRoute = createRoute({ getParentRoute: () => worldRoute, path: '/', component: MainPage });
-
-const mapRoute = createRoute({
+// 메인 작업 화면. ?city는 지도에서 고른 도시다 (없으면 내 장수의 도시).
+const mainSearch = (search: Record<string, unknown>): { city?: number } => {
+  const city = Number(search.city);
+  return Number.isInteger(city) && city > 0 && city <= 2_147_483_647 ? { city } : {};
+};
+const worldIndexRoute = createRoute({
   getParentRoute: () => worldRoute,
-  path: 'map',
-  component: () => <Placeholder title="지도" task="T1-16" />,
+  path: '/',
+  validateSearch: mainSearch,
+  component: MainPage,
 });
+
+// 아래 주소는 직접 접근·새로고침 호환용 보조 화면이다. 핵심 조작은 메인에서 한다 (소유자 UI 정정 2026-10-21).
+const mapRoute = createRoute({ getParentRoute: () => worldRoute, path: 'map', component: MapPage });
 
 const turnsRoute = createRoute({
   getParentRoute: () => worldRoute,
@@ -104,18 +120,18 @@ const turnsRoute = createRoute({
 const cityRoute = createRoute({
   getParentRoute: () => worldRoute,
   path: 'city/$cityKey',
-  component: function CityPage() {
+  component: function CityRoute() {
     const { cityKey } = cityRoute.useParams();
-    return <Placeholder title={`도시 정보 · ${cityKey}`} task="T1-16" />;
+    return <CityPage key={cityKey} cityKeyParam={cityKey} />;
   },
 });
 
 const nationRoute = createRoute({
   getParentRoute: () => worldRoute,
   path: 'nation/$nationId',
-  component: function NationPage() {
+  component: function NationRoute() {
     const { nationId } = nationRoute.useParams();
-    return <Placeholder title={`국가 정보 · ${nationId}`} task="T1-16" />;
+    return <NationPage key={nationId} nationIdParam={nationId} />;
   },
 });
 
@@ -128,11 +144,18 @@ const recordsRoute = createRoute({
   validateSearch: (search: Record<string, unknown>): { tab: RecordTab } => ({
     tab: RECORD_TABS.includes(search.tab as RecordTab) ? (search.tab as RecordTab) : 'general',
   }),
-  component: function RecordsPage() {
+  component: function RecordsRoute() {
     const { tab } = recordsRoute.useSearch();
-    const label = { general: '내 장수', nation: '국가 역사', world: '월드 정세' }[tab];
-    return <Placeholder title={`기록 · ${label}`} task="T1-16" />;
+    return <RecordsPage tab={tab} />;
   },
+});
+
+// 순위 (T2-23). 주소: /w/:worldId/ranking?tab=generals|nations&by=…
+const rankingRoute = createRoute({
+  getParentRoute: () => worldRoute,
+  path: 'ranking',
+  validateSearch: parseRankingSearch,
+  component: RankingPage,
 });
 
 const createGeneralRoute = createRoute({
@@ -154,6 +177,7 @@ const routeTree = rootRoute.addChildren([
     cityRoute,
     nationRoute,
     recordsRoute,
+    rankingRoute,
     createGeneralRoute,
   ]),
   ...(import.meta.env.DEV ? [devUiRoute] : []),
