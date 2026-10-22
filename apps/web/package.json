@@ -8,6 +8,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@opensamguk/rules": "workspace:*",
     "@opensamguk/shared": "workspace:*",
     "@tanstack/react-query": "^5.104.5",
     "@tanstack/react-router": "^1.170.45",

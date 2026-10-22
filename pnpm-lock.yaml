@@ -83,6 +83,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@opensamguk/rules':
+        specifier: workspace:*
+        version: link:../../packages/rules
       '@opensamguk/shared':
         specifier: workspace:*
         version: link:../../packages/shared

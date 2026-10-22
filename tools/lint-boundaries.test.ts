@@ -91,3 +91,57 @@ describe('패키지 경계', () => {
     );
   });
 });
+
+// T4-34 예외 E1·E2 (docs/architecture/package-boundaries.md). 정확한 파일만 열리고 이웃 파일은 계속 막힌다.
+describe('전투 시뮬레이터 예외', () => {
+  const rulesValue = "import { simulateBattle } from '@opensamguk/rules';\nexport { simulateBattle };\n";
+  const unitSetJson = "import basic from '../../../../resources/unitset/basic.json';\nexport { basic };\n";
+
+  it('E1: compute.ts·compute.test.ts만 rules의 정해진 값과 타입을 import한다', async () => {
+    const allowed =
+      "import { BALANCE, simulateBattle, unitSetSchema, type UnitSetResource } from '@opensamguk/rules';\n" +
+      'export type U = UnitSetResource;\nexport { BALANCE, simulateBattle, unitSetSchema };\n';
+    for (const file of ['apps/web/src/battleSim/compute.ts', 'apps/web/src/battleSim/compute.test.ts']) {
+      expect(await ruleIds(allowed, file), file).toEqual([]);
+      const other = "import { buildInitialWorld } from '@opensamguk/rules';\nexport { buildInitialWorld };\n";
+      expect(await ruleIds(other, file), file).toContain('no-restricted-imports');
+    }
+    for (const file of [
+      'apps/web/src/battleSim/request.ts',
+      'apps/web/src/battleSim/battle.worker.ts',
+      'apps/web/src/battleSim/BattleSimPage.tsx',
+      'apps/web/src/x.ts',
+    ]) {
+      expect(await ruleIds(rulesValue, file), file).toContain('no-restricted-imports');
+    }
+  });
+
+  it('E1 파일도 shared/node·engine·db·server 값과 node 내장 모듈은 막힌다', async () => {
+    const file = 'apps/web/src/battleSim/compute.ts';
+    for (const code of [
+      "export * from '@opensamguk/shared/node';\n",
+      "import { x } from '@opensamguk/engine';\nexport { x };\n",
+      "import { createDb } from '@opensamguk/db';\nexport { createDb };\n",
+      "import { appRouter } from '@opensamguk/server/router';\nexport { appRouter };\n",
+      "import * as fs from 'node:fs';\nexport { fs };\n",
+    ]) {
+      expect(await ruleIds(code, file), code).toContain('no-restricted-imports');
+    }
+  });
+
+  it('E2: publicUnitSet.ts만 basic.json 하나를 상대 경로로 읽는다', async () => {
+    expect(await ruleIds(unitSetJson, 'apps/web/src/battleSim/publicUnitSet.ts')).toEqual([]);
+    const otherJson = "import map from '../../../../resources/map/che.json';\nexport { map };\n";
+    expect(await ruleIds(otherJson, 'apps/web/src/battleSim/publicUnitSet.ts')).toContain('no-restricted-imports');
+    expect(await ruleIds(rulesValue, 'apps/web/src/battleSim/publicUnitSet.ts')).toContain('no-restricted-imports');
+    for (const file of ['apps/web/src/battleSim/request.ts', 'apps/web/src/battleSim/compute.ts']) {
+      expect(await ruleIds(unitSetJson, file), file).toContain('opensamguk/no-cross-package-relative');
+    }
+    expect(
+      await ruleIds(
+        "import basic from '../../../resources/unitset/basic.json';\nexport { basic };\n",
+        'apps/web/src/x.ts',
+      ),
+    ).toContain('opensamguk/no-cross-package-relative');
+  });
+});
