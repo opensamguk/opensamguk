@@ -1,0 +1,112 @@
+{
+  "date": {
+    "year": 191,
+    "month": 1
+  },
+  "yearbook": {
+    "nations": [
+      {
+        "nationId": 1,
+        "cities": 2,
+        "generals": 1,
+        "power": 2360,
+        "gold": 120,
+        "rice": 200
+      },
+      {
+        "nationId": 2,
+        "cities": 2,
+        "generals": 1,
+        "power": 2360,
+        "gold": 120,
+        "rice": 200
+      }
+    ],
+    "cities": [
+      {
+        "cityKey": 1,
+        "nationId": 1
+      },
+      {
+        "cityKey": 2,
+        "nationId": 2
+      },
+      {
+        "cityKey": 3,
+        "nationId": 1
+      },
+      {
+        "cityKey": 4,
+        "nationId": 2
+      }
+    ]
+  },
+  "cities": [
+    {
+      "cityKey": 1,
+      "population": 1020,
+      "agriculture": 200,
+      "commerce": 100,
+      "trust": 80,
+      "supplied": true
+    },
+    {
+      "cityKey": 2,
+      "population": 1020,
+      "agriculture": 200,
+      "commerce": 100,
+      "trust": 80,
+      "supplied": true
+    },
+    {
+      "cityKey": 3,
+      "population": 1020,
+      "agriculture": 180,
+      "commerce": 90,
+      "trust": 80,
+      "supplied": false
+    },
+    {
+      "cityKey": 4,
+      "population": 1020,
+      "agriculture": 200,
+      "commerce": 100,
+      "trust": 80,
+      "supplied": true
+    }
+  ],
+  "generals": [
+    {
+      "id": 1,
+      "gold": 1020,
+      "rice": 1000,
+      "train": 20,
+      "atmos": 30,
+      "nextTurnTick": 100
+    },
+    {
+      "id": 2,
+      "gold": 1020,
+      "rice": 1000,
+      "train": 30,
+      "atmos": 40,
+      "nextTurnTick": 10000
+    },
+    {
+      "id": 3,
+      "gold": 1000,
+      "rice": 1000,
+      "train": 30,
+      "atmos": 40,
+      "nextTurnTick": 10500
+    }
+  ],
+  "diplomacies": [
+    {
+      "nationA": 1,
+      "nationB": 2,
+      "state": "WAR",
+      "untilTick": 10000
+    }
+  ]
+}

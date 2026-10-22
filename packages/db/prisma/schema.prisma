@@ -33,6 +33,16 @@ model World {
   generals        General[]
   diplomacies     Diplomacy[]
   engineLease     EngineLease?
+  engineHeartbeat EngineHeartbeat?
+  monthlyTick     Int         @default(0)
+  actionSequence  Int         @default(0)
+  replayOrigin    Json?
+  inputEvents     InputEvent[]
+  nationHistory   NationHistory[]
+  yearbooks       YearbookSnapshot[]
+  commandMeta     Json?
+  battleLogs      BattleLog[]
+  ranking         RankingSnapshot?
 }
 
 enum WorldStatus {
@@ -67,6 +77,7 @@ model Nation {
   generals       General[]
   diplomacyAsA   Diplomacy[] @relation("NationA")
   diplomacyAsB   Diplomacy[] @relation("NationB")
+  turns          NationTurn[]
 
   @@id([worldId, id])
 }
@@ -132,12 +143,15 @@ model General {
   atmos          Int
   experience     Int
   dedication     Int
+  battleWins     Int @default(0)
+  captures       Int @default(0)
   age            Int
   injury         Int
   nextTurnTick   Int
   turnRevision   Int @default(0)
   turns          GeneralTurn[]
   logs           GeneralLog[]
+  battleLogs     BattleLog[]
   world          World   @relation(fields: [worldId], references: [id], onDelete: Cascade)
   nation         Nation? @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: NoAction)
   city           City    @relation(fields: [worldId, cityKey], references: [worldId, cityKey], onDelete: NoAction)
@@ -155,6 +169,15 @@ model EngineLease {
   fencingToken Int
   expiresAt    DateTime
   world        World @relation(fields: [worldId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model EngineHeartbeat {
+  worldId   String   @id
+  at        DateTime @db.Timestamptz(3)
+  lastTick  Int
+  lagMs     Int
+  lastError String?
+  world     World    @relation(fields: [worldId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model GeneralTurn {
@@ -180,6 +203,29 @@ model GeneralLog {
   general    General @relation(fields: [worldId, generalId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([worldId, generalId, tick])
+}
+
+model NationTurn {
+  worldId    String
+  nationId   Int
+  slot       Int
+  commandKey String @default("nation_rest")
+  args       Json @default("{}")
+  nation     Nation @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([worldId, nationId, slot])
+}
+
+model BattleLog {
+  worldId   String
+  tick      Int
+  attackerId Int
+  generalId Int
+  text      String
+  world     World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  general   General @relation(fields: [worldId, generalId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([worldId, tick, attackerId, generalId])
 }
 
 enum UserStatus {
@@ -220,4 +266,62 @@ model Diplomacy {
   b         Nation @relation("NationB", fields: [worldId, nationB], references: [worldId, id], onDelete: NoAction)
 
   @@id([worldId, nationA, nationB])
+}
+
+enum InputEventStatus {
+  PENDING
+  APPLIED
+  REJECTED
+}
+
+model InputEvent {
+  id             BigInt @id @default(autoincrement())
+  worldId        String
+  userId         String
+  generalId      Int?
+  kind           String
+  idempotencyKey String
+  payload        Json
+  status         InputEventStatus @default(PENDING)
+  sequence       Int?
+  result         Json?
+  createdAt      DateTime @default(now())
+  world          World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@unique([worldId, userId, idempotencyKey])
+  @@unique([worldId, sequence])
+  @@index([worldId, status, id])
+}
+
+model NationHistory {
+  worldId  String
+  tick     Int
+  nationId Int
+  data     Json
+  world    World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@id([worldId, tick, nationId])
+}
+
+model YearbookSnapshot {
+  worldId   String
+  tick      Int
+  year      Int
+  month     Int
+  sequence  Int
+  data      Json
+  stateHash String
+  world     World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@id([worldId, tick])
+}
+
+model RankingSnapshot {
+  worldId  String @id
+  tick     Int
+  year     Int
+  month    Int
+  generals Json
+  nations  Json
+  world    World @relation(fields: [worldId], references: [id], onDelete: Cascade)
 }

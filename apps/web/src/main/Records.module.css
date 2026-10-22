@@ -1,0 +1,102 @@
+.records {
+  display: grid;
+  gap: var(--space-2);
+}
+.compact .lines,
+.compact .tableScroll {
+  max-height: 260px;
+  overflow-y: auto;
+}
+.lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: var(--text-sm);
+}
+.line {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  min-height: 22px;
+  border-bottom: 1px solid var(--color-border);
+}
+.date {
+  color: var(--color-text-muted);
+  min-width: 7em;
+  text-align: left;
+  white-space: nowrap;
+}
+.text {
+  min-width: 0;
+}
+.yearbook {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.nations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+}
+.nationEntry {
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: center;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.table th {
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 1px solid var(--color-border-strong);
+  height: var(--row-height);
+}
+.table td {
+  height: var(--row-height);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+.table th,
+.table td {
+  padding: 0 var(--space-2);
+}
+.table th:first-child,
+.table td:first-child {
+  padding-left: 0;
+}
+.table th:last-child,
+.table td:last-child {
+  padding-right: 0;
+}
+/* 전역 .num보다 .table th가 이겨 숫자 머리글이 왼쪽으로 가지 않게 한다 (순위 표와 같은 처리). */
+.table th:global(.num) {
+  text-align: right;
+}
+.table td.dateCell {
+  text-align: left;
+  color: var(--color-text-muted);
+}
+.more {
+  justify-self: start;
+  font: inherit;
+  font-size: var(--text-sm);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+}
+.error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+}

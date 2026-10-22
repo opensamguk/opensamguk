@@ -21,6 +21,12 @@
   margin-top: var(--space-2);
   font-size: var(--text-sm);
 }
+.loading {
+  margin: 0;
+  padding: var(--space-3) 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
 .retry {
   margin-top: var(--space-3);
   font: inherit;

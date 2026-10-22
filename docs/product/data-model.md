@@ -1,12 +1,12 @@
 # 데이터 모델
 
 > 상태: 확정 v0.2 (2026-10-20, D-011)
-> 코드가 생기면 Prisma schema(`packages/db/prisma/schema.prisma`)가 기준이 되고, 이 문서는 개요만 남깁니다.
+> 코드가 생기면 Prisma schema(`packages/db/prisma/schema.prisma`)가 기준이 되고 이 문서는 개요만 남깁니다.
 
 ## 원칙
 
 - **모든 게임 데이터에 `worldId`가 있다.** 다중 월드를 처음부터 지원하기 위해서입니다. 한 DB, 한 schema에서
-  `worldId`로 나눕니다. ⚠️ core2026은 profile마다 schema를 나누지만, 1인 운영에서는 하나가 단순합니다.
+  `worldId`로 나눕니다. core2026은 profile마다 schema를 나누지만 1인 운영에서는 하나가 단순합니다.
 - **게임 상태는 엔진만 바꾼다.** API는 예턴(`GeneralTurn`, `NationTurn`)과 요청 기록(`InputEvent`)만 씁니다.
 - **게임 시간은 tick으로 저장한다.** 날짜 문자열은 화면용입니다. 자세한 규칙은 [게임 시계](../architecture/game-clock.md)에 있습니다.
 - **나중 기능은 자리만 둔다.** Phase 2 테이블은 이름만 정해 두고 만들지 않습니다.
