@@ -9,7 +9,7 @@ import { e2eDatabaseUrl } from './account';
 import { removeWorlds } from './rankingCleanup';
 
 // T2-23 · AC-M2-19 순위 E2E 정리. CI에서 e2e/rankingSeed.ts remove가 감독 엔진의 턴과 교착(40P01)해 P2034로
-// 끝나고 순위 월드가 남은 일이 있었다. 엔진 턴은 EngineLease 행을 잠근 뒤 World 행을 잠그고, 월드 삭제는 World 행을
+// 끝나고 순위 월드가 남은 일이 있었다. 엔진 턴은 EngineLease 행을 잠근 뒤 World 행을 잠근다. 월드 삭제는 World 행을
 // 지운 뒤 cascade로 EngineLease 행을 지운다. 여기서는 실제 PostgreSQL 두 연결로 그 순서를 그대로 만든다.
 // 앞의 넷은 DB 없이 다시 시도 규칙만 본다. 뒤의 넷은 E2E 전용 DB(_test)에서 실제 교착과 정리를 본다.
 
@@ -153,9 +153,9 @@ test.describe('실제 PostgreSQL', () => {
     return counts;
   }
 
-  // 엔진 턴과 같은 순서로 잠근다. 리스를 잡고 한 트랜잭션에서 EngineLease 행을 잠근 채 삭제를 시작시키고,
+  // 엔진 턴과 같은 순서로 잠근다. 리스를 잡고 한 트랜잭션에서 EngineLease 행을 잠근 채 삭제를 시작시킨다.
   // 삭제가 World 행을 쥔 채 이 연결의 EngineLease 잠금을 기다리는 것을 pg_blocking_pids로 확인한 뒤 World 행을 잠근다.
-  // 먼저 기다리기 시작한 삭제가 deadlock_timeout 뒤 교착을 찾아 스스로 끊긴다. 이 연결의 World 잠금이 풀리면
+  // 먼저 기다리기 시작한 삭제가 deadlock_timeout 뒤 교착을 찾아 스스로 끊긴다. 이 연결이 World 잠금을 얻으면
   // 삭제가 끊겼다는 뜻이다. 반대로 이 연결이 끊기면 재현되지 않은 것이라 NOT_REPRODUCED로 실패한다.
   async function collide<T>(worldId: string, start: () => Promise<T>): Promise<PromiseSettledResult<T>> {
     const lease = await acquireLease(db, worldId, randomUUID(), 60_000);
