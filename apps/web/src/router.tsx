@@ -7,6 +7,7 @@ import {
   redirect,
   useRouter,
 } from '@tanstack/react-router';
+import { BattleSimPage } from './battleSim/BattleSimPage';
 import { CreateGeneralPage } from './general/CreateGeneralPage';
 import { GameLayout } from './layout/GameLayout';
 import { DevUiPage } from './pages/DevUiPage';
@@ -158,6 +159,9 @@ const rankingRoute = createRoute({
   component: RankingPage,
 });
 
+// 전투 시뮬레이터 (T4-34). 사용자가 넣은 가정으로 교전 한 번을 Web Worker에서 계산하는 보조 화면이다.
+const simulatorRoute = createRoute({ getParentRoute: () => worldRoute, path: 'simulator', component: BattleSimPage });
+
 const createGeneralRoute = createRoute({
   getParentRoute: () => worldRoute,
   path: 'create',
@@ -178,6 +182,7 @@ const routeTree = rootRoute.addChildren([
     nationRoute,
     recordsRoute,
     rankingRoute,
+    simulatorRoute,
     createGeneralRoute,
   ]),
   ...(import.meta.env.DEV ? [devUiRoute] : []),
