@@ -12,6 +12,7 @@ import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { removeWorlds } from './rankingCleanup';
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error('DATABASE_URL이 없습니다.');
@@ -86,9 +87,9 @@ async function settled(emails: string[]) {
   return { worldId, generals: appearing.size };
 }
 
+// 감독 엔진의 턴과 겹친 교착(P2034)만 같은 삭제를 다시 한다. 다른 오류와 세 번째 실패는 그대로 던져 0이 아닌 값으로 끝난다.
 async function remove(worldIds: string[]) {
-  await db.world.deleteMany({ where: { id: { in: worldIds } } });
-  return { removed: worldIds.length };
+  return removeWorlds(db, worldIds);
 }
 
 try {
