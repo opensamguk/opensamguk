@@ -257,6 +257,15 @@ describe('T2-18/T3-15 evidence tooling, never product acceptance', () => {
     expect(report.notReadyReasons).toContain('PREREQUISITE_cross-review');
     expect(report.productStatus).toBe('NOT_READY');
   });
+  it('does not join character creation in one world to turns in another', async () => {
+    const f = await fixture();
+    const action = f.actions.find((a) => a.participantId === 'P1' && a.step === 'general_create')!;
+    action.worldId = 'world-1';
+    const result = parseResult(f.records.get(action.resultRef)!.value);
+    result.worldId = 'world-1';
+    f.put(action.resultRef, 'result', result);
+    expect((await validateBundle(await f.save(), f.sourceSHA)).issues).toContain('WORLD_PLAY_SEQUENCE');
+  });
   it('does not authenticate native provenance or accept an AC even for a structurally complete actual-labelled bundle', async () => {
     const f = await fixture();
     // Deliberate label spoof: only a reviewer resolving native IDs can authenticate origin.

@@ -203,7 +203,7 @@ export async function validateBundle(manifestFile: string, expectedSHA: string):
         check(
           own.some((a) => {
             const result = artifact(a.resultRef, 'result', parseResult);
-            return result.observationRef === d.observationRef && result.at <= d.at;
+            return a.requestRef !== d.requestRef && result.observationRef === d.observationRef && result.at < d.at;
           }),
           'NATIVE_OBSERVATION_CHAIN_MISSING',
         );
@@ -250,6 +250,21 @@ export async function validateBundle(manifestFile: string, expectedSHA: string):
       );
       const outcome = m.outcomes.find((o) => o.worldId === w.worldId);
       check(outcome?.rollbackCount === 0, 'ROLLBACK_NONZERO_OR_MISSING');
+      const members = m.participants.filter((p) =>
+        actions.some((a) => a.participantId === p.participantId && a.worldId === w.worldId),
+      );
+      for (const p of members) {
+        let last = w.startsAt;
+        for (const step of ['lobby', 'general_create', 'turn_submit', 'turn_result']) {
+          const action = actions
+            .filter(
+              (a) => a.participantId === p.participantId && a.worldId === w.worldId && a.step === step && a.at >= last,
+            )
+            .sort((a, b) => a.at.localeCompare(b.at))[0];
+          check(action, 'WORLD_PLAY_SEQUENCE');
+          if (action) last = artifact(action.resultRef, 'result', parseResult).at;
+        }
+      }
       if (m.mode === 'm2') {
         check(outcome?.completionRef, 'SEASON_NOT_ENDED');
         if (outcome?.completionRef) {
