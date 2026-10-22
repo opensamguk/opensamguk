@@ -1,12 +1,11 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
+import { appOrigin, e2eDatabaseUrl, withE2eDb } from './account';
 
 // 실제 서버·DB·엔진으로 게임 화면을 시험하는 도우미 (T1-15).
 // pnpm dev의 엔진은 RUNNING 월드 중 가장 먼저 만든 것 하나만 돌린다. world.list도 같은 순서라 그 첫 월드를 쓴다.
 // 없으면 1분 턴 월드를 만들고 시작한다. 1분 턴이라 시험 중에도 장수 턴이 실행된다 (waitTurnWindow 참고).
-
-if (!process.env.DATABASE_URL && existsSync('.env')) process.loadEnvFile('.env');
+// DB를 직접 쓰는 도우미는 account.ts의 e2eDatabaseUrl로 E2E 전용 DB(_test)만 쓴다.
 
 type Json = Record<string, unknown>;
 
@@ -32,8 +31,13 @@ export async function query<T = Json>(page: Page, path: string, input?: unknown)
   return (await unwrap(await page.request.get(`/trpc/${path}${search}`), path)) as T;
 }
 
+// 서버는 /trpc POST에 같은 출처의 Origin을 요구한다 (T3-04). 브라우저와 달리 page.request는 Origin을 붙이지 않으므로
+// 화면과 같은 출처를 직접 적는다. 본문은 data로 보내 Content-Type이 application/json이 된다.
 export async function mutate<T = Json>(page: Page, path: string, input: unknown): Promise<T> {
-  return (await unwrap(await page.request.post(`/trpc/${path}`, { data: input }), path)) as T;
+  return (await unwrap(
+    await page.request.post(`/trpc/${path}`, { data: input, headers: { Origin: appOrigin() } }),
+    path,
+  )) as T;
 }
 
 let worldId: string | undefined;
@@ -90,9 +94,7 @@ export async function idleWorld(page: Page): Promise<string> {
 export async function startEngine(world: string): Promise<() => Promise<void>> {
   const { createDb } = await import('../packages/db/src/index');
   const { runEngine } = await import('../apps/engine/src/main');
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error('DATABASE_URL이 필요합니다.');
-  const db = createDb(url);
+  const db = createDb(e2eDatabaseUrl());
   const controller = new AbortController();
   const running = runEngine(db, { worldId: world, signal: controller.signal });
   return async () => {
@@ -107,18 +109,13 @@ export async function startEngine(world: string): Promise<() => Promise<void>> {
 
 // 월드에 이미 있는 NPC 장수 이름. 같은 이름으로 만들면 엔진이 NAME_TAKEN으로 거절한다.
 export async function takenGeneralName(world: string): Promise<string> {
-  const { createDb } = await import('../packages/db/src/index');
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error('DATABASE_URL이 필요합니다.');
-  const db = createDb(url);
-  try {
-    return (await db.general.findFirstOrThrow({ where: { worldId: world }, select: { name: true } })).name;
-  } finally {
-    await db.$disconnect();
-  }
+  return withE2eDb(
+    async (db) => (await db.general.findFirstOrThrow({ where: { worldId: world }, select: { name: true } })).name,
+  );
 }
 
 function run(args: string[]): string {
+  e2eDatabaseUrl();
   const result = spawnSync('pnpm', ['-s', ...args], { encoding: 'utf8', env: process.env });
   if (result.status !== 0) throw new Error(`pnpm ${args[0]} 실패: ${result.stderr}`);
   return result.stdout;
@@ -207,16 +204,8 @@ export async function waitNextTurn(page: Page, world: string, timeoutMs = 150_00
 
 // 제재(SANCTIONED)는 관리자 화면이 아직 없어(M3) DB로 바꾼다.
 export async function setUserStatus(email: string, status: 'ACTIVE' | 'SANCTIONED') {
-  const { createDb } = await import('../packages/db/src/index');
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error('DATABASE_URL이 필요합니다.');
-  const db = createDb(url);
-  try {
-    const updated = await db.user.updateMany({ where: { email }, data: { status } });
-    if (updated.count !== 1) throw new Error('계정을 찾지 못했습니다.');
-  } finally {
-    await db.$disconnect();
-  }
+  const updated = await withE2eDb((db) => db.user.updateMany({ where: { email }, data: { status } }));
+  if (updated.count !== 1) throw new Error('계정을 찾지 못했습니다.');
 }
 
 // 초상 이미지는 외부 저장소 주소다. 네트워크에 기대지 않도록 시험용 그림으로 바꾼다.

@@ -1,8 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
-import { newEmail, signUpByApi, TEST_PASSWORD } from './account';
+import { newEmail, createAccount, TEST_PASSWORD } from './account';
 
 // T1-14 · AC-M1-05: 화면으로 가입·로그인·로그아웃, 오류 문구, 로그인 가드.
 // 주소는 문자열(baseURL 기준 전체 주소)로 비교한다. /\/w\/1$/ 같은 정규식은 /login?next=/w/1에도 맞는다.
+// 가입 한도(같은 IP 1시간 10번) 안에서 화면 가입은 첫 시험과 중복 이메일 시험만 실제로 보낸다. 나머지 계정은 createAccount로 만든다.
 async function fill(page: Page, email: string, password: string) {
   await page.getByLabel('이메일').fill(email);
   await page.getByLabel('비밀번호', { exact: true }).fill(password);
@@ -32,7 +33,7 @@ test('가입 → 메인 → 로그아웃 → 로그인 → 메인', async ({ pag
 });
 
 test('틀린 비밀번호는 안내한다', async ({ page }) => {
-  const email = await signUpByApi(page);
+  const email = await createAccount(page);
   await page.context().clearCookies();
   await page.goto('/login');
   await fill(page, email, 'wrong-password-01');
@@ -42,7 +43,7 @@ test('틀린 비밀번호는 안내한다', async ({ page }) => {
 });
 
 test('이미 가입된 이메일은 안내한다', async ({ page }) => {
-  const email = await signUpByApi(page);
+  const email = await createAccount(page);
   await page.context().clearCookies();
   await page.goto('/signup');
   await fill(page, email, TEST_PASSWORD);
@@ -60,7 +61,7 @@ test('입력 형식이 틀리면 보내기 전에 안내한다', async ({ page }
 });
 
 test('로그아웃 상태에서 게임 주소 → 로그인 → 원래 주소로 복귀', async ({ page }) => {
-  const email = await signUpByApi(page);
+  const email = await createAccount(page);
   await page.context().clearCookies();
   await page.goto('/w/1/records?tab=world');
   await expect(page).toHaveURL(/\/login\?next=/);
@@ -71,7 +72,7 @@ test('로그아웃 상태에서 게임 주소 → 로그인 → 원래 주소로
 });
 
 test('다른 사이트 주소는 next로 받지 않는다', async ({ page }) => {
-  const email = await signUpByApi(page);
+  const email = await createAccount(page);
   await page.context().clearCookies();
   await page.goto('/login?next=//evil.example/');
   await fill(page, email, TEST_PASSWORD);
@@ -83,7 +84,7 @@ test('다른 사이트 주소는 next로 받지 않는다', async ({ page }) => 
 });
 
 test('Tab과 Enter만으로 로그인한다', async ({ page }) => {
-  const email = await signUpByApi(page);
+  const email = await createAccount(page);
   await page.context().clearCookies();
   await page.goto('/login?next=/w/1');
   await page.locator('body').focus();
@@ -110,7 +111,7 @@ test('비밀번호 보이기 토글', async ({ page }) => {
 
 // T1-14 Codex 리뷰 1: 가드가 캐시만 믿으면 다른 탭에서 로그아웃한 뒤에도 게임 화면으로 이동한다.
 test('다른 탭에서 로그아웃하면 이 탭의 다음 이동도 로그인으로 간다', async ({ page, context }) => {
-  await signUpByApi(page);
+  await createAccount(page);
   await page.goto('/w/1');
   await expect(page.getByRole('heading', { level: 1, name: '메인' })).toBeVisible();
 
@@ -126,7 +127,7 @@ test('다른 탭에서 로그아웃하면 이 탭의 다음 이동도 로그인�
 });
 
 test('세션이 서버에서 없어지면 다음 이동은 로그인으로 간다', async ({ page }) => {
-  await signUpByApi(page);
+  await createAccount(page);
   await page.goto('/w/1');
   await expect(page.getByRole('heading', { level: 1, name: '메인' })).toBeVisible();
   await page.context().clearCookies();
@@ -136,7 +137,7 @@ test('세션이 서버에서 없어지면 다음 이동은 로그인으로 간�
 
 // T1-14 Codex 리뷰 2: 다시 시도는 실패 당시 값이 아니라 지금 화면의 값을 보낸다.
 test('네트워크 실패 뒤 입력을 고치고 다시 시도하면 고친 값으로 로그인한다', async ({ page }) => {
-  const email = await signUpByApi(page);
+  const email = await createAccount(page);
   await page.context().clearCookies();
   await page.goto('/login?next=/w/1');
 

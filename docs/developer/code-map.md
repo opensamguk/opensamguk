@@ -36,7 +36,7 @@
 | `packages/rules/src/ranking.ts` | 공헌·경험·전공·국가 순위와 공개 국력 계산, 동률 ID 정렬 |
 | `apps/engine/src/ranking.ts`, `ranking.integration.test.ts` | 월간 트랜잭션의 순위 캐시 교체, 전공 누계·롤백·재생 호환 검증 |
 | `apps/server/src/routers/world.ts` | 기존 `world.list`, 서버 시계 요약과 공개 94도시 지도 |
-| `apps/server/src/routers/home.ts`, `city.ts`, `nation.ts`, `records.ts` | 세션 기준 메인·도시·국가·개인/국가/월드 기록 조회 |
+| `apps/server/src/routers/home.ts`, `city.ts`, `nation.ts`, `records.ts` | 세션 기준 메인·도시·국가·개인/국가/월드 기록 조회. 국가 기록은 DB JSON 조건으로 월간 요약만 페이지 처리 |
 | `apps/server/src/visibility.ts`, `queries.ts` | 공개 필드 허용 목록과 범위 표, strict 입력, 일관된 읽기, 시각·페이지 변환 |
 | `apps/server/src/visibility.test.ts`, `routers/reads.integration.test.ts` | 아군·적·재야 공개 범위와 실제 TCP·PostgreSQL 권한·페이지·94도시 성능 검증 |
 | `apps/engine/src/index.ts`, `main.ts` | `engine:run --world <ID>`·dev 월드 선택, 갱신·종료 |

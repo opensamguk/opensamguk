@@ -13,6 +13,7 @@ const NAV = [
   { to: '/w/$worldId', label: '메인', exact: true },
   { to: '/w/$worldId/turns', label: '예턴' },
   { to: '/w/$worldId/records', label: '기록' },
+  { to: '/w/$worldId/ranking', label: '순위' },
 ] as const;
 
 const STATUS_TEXT: Record<string, string> = { PREOPEN: '개시 전', PAUSED: '일시 정지', ENDED: '종료' };

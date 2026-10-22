@@ -52,7 +52,11 @@ async function query<R extends keyof Results>(
     `${base}/trpc/${route}?batch=1&input=${encodeURIComponent(JSON.stringify({ 0: input }))}`,
     {
       method,
-      headers: { ...(cookie ? { cookie } : {}), ...(method === 'POST' ? { 'content-type': 'application/json' } : {}) },
+      headers: {
+        origin: 'http://127.0.0.1:5173',
+        ...(cookie ? { cookie } : {}),
+        ...(method === 'POST' ? { 'content-type': 'application/json' } : {}),
+      },
       ...(method === 'POST' ? { body: JSON.stringify({ 0: input }) } : {}),
     },
   );
@@ -137,7 +141,22 @@ async function fixtureWorld(label: string) {
         worldId: id,
         nationId: nation.id,
         tick: (index + 1) * 10_000,
-        data: summary(nation.id),
+        data: { ...summary(nation.id), events: [`${label}-monthly-event-${index + 1}`] },
+      })),
+    ),
+  });
+  // 사건이 LIMIT 31 앞·사이·뒤를 채워도 요약 페이지와 cursor는 바뀌지 않는다.
+  await db.nationHistory.createMany({
+    data: state.nations.flatMap((nation) =>
+      [
+        ...Array.from({ length: 40 }, (_, index) => 400000 + index),
+        ...Array.from({ length: 35 }, (_, index) => (index + 1) * 10000 - 1),
+        ...Array.from({ length: 40 }, (_, index) => index + 1),
+      ].map((tick) => ({
+        worldId: id,
+        nationId: nation.id,
+        tick,
+        data: { events: [`${label}-nation-${nation.id}-event-${tick}`] },
       })),
     ),
   });
@@ -357,6 +376,32 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       expect(exactPage.nextCursor).toBeNull();
     },
   );
+
+  it('사건이 붙은 월간 요약은 허용 필드만 반환하고 사건 전용 국가는 빈 페이지다', async () => {
+    const own = await query('records.nation', { worldId });
+    expect(own.status).toBe(200);
+    expect(own.data.items[0]).toEqual({
+      tick: 350000,
+      nationId: 1,
+      cities: 1,
+      generals: 2,
+      gold: 77001,
+      rice: 88001,
+    });
+    const eventWorld = await fixtureWorld('event-only');
+    try {
+      await db.nationHistory.deleteMany({ where: { worldId: eventWorld, tick: { gte: 10000, lte: 350000 } } });
+      for (const cookie of [users[0]!.cookie, users[1]!.cookie, users[2]!.cookie]) {
+        expect(await query('records.nation', { worldId: eventWorld }, cookie)).toEqual({
+          status: 200,
+          error: undefined,
+          data: { items: [], nextCursor: null },
+        });
+      }
+    } finally {
+      await db.world.delete({ where: { id: eventWorld } });
+    }
+  });
 
   it('로그는 세션 장수·국가·월드 경계를 지키고 공개 연감은 국력·자원·해시를 빼낸다', async () => {
     for (const [index, id] of [
