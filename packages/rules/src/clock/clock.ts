@@ -3,6 +3,7 @@ import { TICKS_PER_MONTH } from './constants';
 export type ClockStatus = 'PREOPEN' | 'RUNNING' | 'PAUSED' | 'ENDED';
 export interface Clock {
   status: ClockStatus;
+  clockMode?: 'REALTIME' | 'ACCELERATED';
   clockTick: number;
   clockAnchorAt: number | null;
   turnTermMinutes: number;
@@ -24,7 +25,7 @@ function validate(clock: Clock, now: number) {
 
 export function nowTick(clock: Clock, now: number): number {
   validate(clock, now);
-  if (clock.status !== 'RUNNING') return clock.clockTick;
+  if (clock.status !== 'RUNNING' || clock.clockMode === 'ACCELERATED') return clock.clockTick;
   const msPerTick = (clock.turnTermMinutes * 60_000) / TICKS_PER_MONTH;
   return clock.clockTick + Math.max(0, Math.floor((now - clock.clockAnchorAt!) / msPerTick));
 }
@@ -33,7 +34,7 @@ export function nowTick(clock: Clock, now: number): number {
 export function checkpointClock(clock: Clock, now: number, minimumTick = 0): Clock {
   if (!Number.isSafeInteger(minimumTick) || minimumTick < 0) throw new Error('잘못된 최소 tick입니다.');
   const tick = Math.max(minimumTick, nowTick(clock, now));
-  if (clock.status !== 'RUNNING') return { ...clock };
+  if (clock.status !== 'RUNNING' || clock.clockMode === 'ACCELERATED') return { ...clock };
   return {
     ...clock,
     clockTick: tick,

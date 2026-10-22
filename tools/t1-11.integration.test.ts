@@ -56,7 +56,7 @@ async function fixture(own = true, configure?: (initial: Awaited<ReturnType<type
   if (own) initial.generals[0]!.userId = a.id;
   initial.generals[1]!.userId = b.id;
   configure?.(initial);
-  const { worldId } = await saveInitialWorld(db, initial, { name: 'T1-11 시험', turnTermMinutes: 60 });
+  const { worldId } = await saveInitialWorld(db, initial, { name: 'T1-11 시험', turnTermMinutes: 60, endYear: null });
   worlds.push(worldId);
   await controlClock(db, worldId, 'start');
   const lease = (await acquireLease(db, worldId))!;

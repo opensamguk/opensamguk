@@ -115,7 +115,7 @@ beforeAll(async () => {
   state = await readFixture();
   state.generals[0]!.userId = users[0]!.id;
   state.generals[2]!.userId = users[1]!.id;
-  ({ worldId } = await saveInitialWorld(db, state, { name: '권한 대조', turnTermMinutes: 60 }));
+  ({ worldId } = await saveInitialWorld(db, state, { name: '권한 대조', turnTermMinutes: 60, endYear: null }));
   await db.world.update({ where: { id: worldId }, data: { status: 'RUNNING', clockAnchorAt: new Date(now) } });
   base = await app.listen({ host: '127.0.0.1', port: 0 });
 });

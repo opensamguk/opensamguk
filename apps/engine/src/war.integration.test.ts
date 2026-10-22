@@ -20,7 +20,7 @@ afterAll(async () => {
 });
 async function create(initial?: WorldInit) {
   initial ??= await warFixture();
-  const { worldId } = await saveInitialWorld(db, initial, { name: '전투 통합', turnTermMinutes: 60 });
+  const { worldId } = await saveInitialWorld(db, initial, { name: '전투 통합', turnTermMinutes: 60, endYear: null });
   await controlClock(db, worldId, 'start');
   const lease = (await acquireLease(db, worldId))!;
   return { initial, worldId, lease, loop: new TurnLoop(db, lease) };

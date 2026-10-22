@@ -18,6 +18,7 @@ async function create() {
   return saveInitialWorld(db, await loadInitialWorld({ scenario: '1030', map: 'che', seed: 'clock' }), {
     name: '시계',
     turnTermMinutes: 10,
+    endYear: null,
   });
 }
 describe('AC-M1-04 실제 DB 시계', () => {

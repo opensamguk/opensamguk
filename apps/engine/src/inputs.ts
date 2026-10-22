@@ -30,9 +30,9 @@ export async function processCreation(
     return true;
   };
   await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${event.userId} FOR SHARE`;
+  if (world.status !== 'RUNNING') return reject('WORLD_CLOSED');
   const actor = await tx.user.findUnique({ where: { id: event.userId } });
   if (!actor || actor.status !== 'ACTIVE') return reject('ACTOR_INACTIVE');
-  if (world.status !== 'RUNNING') return reject('WORLD_CLOSED');
   const parsed = validateGeneralCreation(event.payload, world.statRules);
   if (!parsed.ok) return reject(parsed.code);
   const existing = await tx.general.findMany({

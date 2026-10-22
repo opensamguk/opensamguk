@@ -17,6 +17,10 @@ model World {
   unitSetKey      String
   seed            String
   startYear       Int
+  endYear         Int?
+  clockMode       WorldClockMode @default(REALTIME)
+  outcomeFromSequence Int @default(0)
+  result          WorldResult?
   turnTermMinutes Int
   status          WorldStatus @default(PREOPEN)
   clockTick       Int         @default(0)
@@ -50,6 +54,32 @@ enum WorldStatus {
   RUNNING
   PAUSED
   ENDED
+}
+
+enum WorldClockMode {
+  REALTIME
+  ACCELERATED
+}
+
+enum WorldEndReason {
+  UNIFIED
+  END_YEAR
+}
+
+model WorldResult {
+  worldId          String @id
+  world            World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  reason           WorldEndReason
+  winnerNationId   Int?
+  winnerName       String?
+  winnerColor      String?
+  endedYear        Int
+  endedMonth       Int
+  endedTick        Int
+  endedSequence    Int
+  remainingNations Int
+  finalStateHash   String
+  endedAt          DateTime
 }
 
 enum DiplomacyState {

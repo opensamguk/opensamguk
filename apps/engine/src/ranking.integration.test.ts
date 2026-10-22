@@ -22,7 +22,11 @@ afterAll(async () => {
 describe('T2-22 / AC-M2-19 엔진 순위 집계', () => {
   it('첫 정산에서 등장 장수만 집계하고 캐시 롤백·교체와 기존 재생 해시를 보존한다', async () => {
     const initial = await monthlyFixture();
-    const { worldId, stateHash } = await saveInitialWorld(db, initial, { name: '순위 월간', turnTermMinutes: 60 });
+    const { worldId, stateHash } = await saveInitialWorld(db, initial, {
+      name: '순위 월간',
+      turnTermMinutes: 60,
+      endYear: null,
+    });
     worlds.push(worldId);
     expect(hashState(await readWorldState(db, worldId))).toBe(stateHash);
     await db.general.update({ where: { worldId_id: { worldId, id: 1 } }, data: { battleWins: 7, captures: 3 } });
@@ -72,7 +76,7 @@ describe('T2-22 / AC-M2-19 엔진 순위 집계', () => {
 
   it('전투 누계는 실패한 턴에서 롤백되고 재시도·엔진 재시작에도 한 번만 저장된다', async () => {
     const initial = await warFixture();
-    const { worldId } = await saveInitialWorld(db, initial, { name: '순위 전투', turnTermMinutes: 60 });
+    const { worldId } = await saveInitialWorld(db, initial, { name: '순위 전투', turnTermMinutes: 60, endYear: null });
     worlds.push(worldId);
     await controlClock(db, worldId, 'start');
     const lease = (await acquireLease(db, worldId))!;

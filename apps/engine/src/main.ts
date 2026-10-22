@@ -1,4 +1,4 @@
-import { setTimeout as delay } from 'node:timers/promises';
+import { setTimeout as delay, setImmediate as yieldImmediate } from 'node:timers/promises';
 import type { PrismaClient } from '@opensamguk/db';
 import {
   acquireLease,
@@ -115,16 +115,26 @@ export async function runEngine(
       }
     })();
     try {
+      let ended = false;
       while (!session.signal.aborted) {
-        await loop.poll(session.signal);
+        const batch = await loop.poll(session.signal);
+        if (batch.status === 'ENDED' && !batch.more) {
+          ended = true;
+          break;
+        }
         try {
-          await delay(100, undefined, { signal: session.signal });
+          if (batch.more) await yieldImmediate(undefined, { signal: session.signal });
+          else await delay(100, undefined, { signal: session.signal });
         } catch {
           break;
         }
       }
       if (renewalError) throw renewalError;
       if (heartbeatError) throw heartbeatError;
+      if (ended && !options.worldId) {
+        worldId = undefined;
+        continue;
+      }
       return;
     } catch (error) {
       if (!signal.aborted) throw error;
