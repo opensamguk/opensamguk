@@ -207,11 +207,11 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
     expect(errorsOf(table(), withDocs({ baseline: failed }))).toContain(
       '검증 기록 T1-08-rereview-81ffd1b: 실행 39537902044의 결과가 success가 아니다 (failure)',
     );
+    const reviewOriginal = context.readDoc('docs/plans/T1-08.md');
+    const reviewRejected = reviewOriginal.replace('- 결과: 통과. 검토한 SHA는', '- 결과: 수정 필요. 검토한 SHA는');
+    expect(reviewRejected, 'T1-08 리뷰 절 치환이 원문을 바꾸지 않았다').not.toBe(reviewOriginal);
     const rejected = withDocs({
-      readDoc: (path: string) =>
-        path === 'docs/plans/T1-08.md'
-          ? context.readDoc(path).replace('- 결과: 통과. 검토한 SHA는', '- 결과: 수정 필요. 검토한 SHA는')
-          : context.readDoc(path),
+      readDoc: (path: string) => (path === 'docs/plans/T1-08.md' ? reviewRejected : context.readDoc(path)),
     });
     expect(errorsOf(table(), rejected)).toContain('검증 기록 T1-08-rereview-81ffd1b: 리뷰 절의 결과가 통과가 아니다');
     const unrelated = structuredClone(context.baseline) as Baseline;
@@ -257,6 +257,39 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
   });
 
   it('반례 R67-COV-3: 문서의 거짓 전체 완료, 옛 37개 범위, 분모·집계 불일치는 각각 실패한다', () => {
+    // M1 집계는 숫자를 박아 두지 않고 현재 정본 문서(README 관문 행·인수조건 요약 행)에서 읽는다.
+    // 문서 집계가 바뀌어도 반례가 no-op 치환으로 조용히 빠지지 않게 한다.
+    const readmeM1Line = context.readme.split('\n').find((line: string) => line.startsWith('| M1 '))!;
+    const readmeM1 = /진행 중 \(✅ (\d+) · 🟨 (\d+) · ⬜ (\d+)\)/.exec(readmeM1Line ?? '');
+    expect(readmeM1, 'README M1 관문 행에 진행 중 집계가 있어야 한다').not.toBeNull();
+    const acSummary = context.acceptance.split('\n## 요약')[1]!.split('\n## ')[0]!;
+    const acM1Line = acSummary.split('\n').find((line: string) => line.startsWith('| M1 '))!;
+    const acM1 = /^(\| M1 [^|]*\|)(\s*)(\d+)(\s*\|\s*)(\d+)(\s*\|\s*)(\d+)(\s*\|\s*)(\d+)(\s*\|.*)$/.exec(
+      acM1Line ?? '',
+    );
+    expect(acM1, '인수조건 요약에 M1 행이 있어야 한다').not.toBeNull();
+    const [m1Ok, m1Partial, m1Todo] = readmeM1!.slice(1).map(Number) as [number, number, number];
+    const m1Total = Number(acM1![3]);
+    // 정본은 README와 인수조건 요약이 같은 집계이고, M1은 아직 통과하지 않았다(🟨+⬜ > 0).
+    expect([acM1![5], acM1![7], acM1![9]].map(Number)).toEqual([m1Ok, m1Partial, m1Todo]);
+    expect(m1Ok + m1Partial + m1Todo).toBe(m1Total);
+    expect(m1Partial + m1Todo).toBeGreaterThan(0);
+    const readmeProgress = readmeM1![0];
+    // 합계를 보존한 채 ✅ 하나를 늘린 거짓 집계: 🟨가 있으면 🟨에서, 없으면 ⬜에서 하나 옮긴다.
+    const fake = m1Partial > 0 ? [m1Ok + 1, m1Partial - 1, m1Todo] : [m1Ok + 1, m1Partial, m1Todo - 1];
+    const real = `${m1Ok}/${m1Partial}/${m1Todo}`;
+    const fakeAcM1Line = [
+      acM1![1],
+      acM1![2],
+      m1Total,
+      acM1![4],
+      fake[0],
+      acM1![6],
+      fake[1],
+      acM1![8],
+      fake[2],
+      acM1![10],
+    ].join('');
     const cases: [Partial<Context>, string][] = [
       [
         {
@@ -267,10 +300,18 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
         },
         'README: 명령 대응표 출력(원작/정본/전 단계 완료) 불일치 (문서 37/37/37, 원장 90/91/0)',
       ],
-      [{ readme: context.readme.replace('진행 중 (✅ 18 · 🟨 2 · ⬜ 2)', '통과') }, 'README M1: AC가 전부 ✅가 아닌데'],
       [
-        { readme: context.readme.replace('진행 중 (✅ 18 · 🟨 2 · ⬜ 2)', '진행 중 (✅ 19 · 🟨 1 · ⬜ 2)') },
-        'README M1: 19/1/2인데 인수조건은 18/2/2이다',
+        { readme: context.readme.replace(readmeM1Line, readmeM1Line.replace(readmeProgress, '통과')) },
+        'README M1: AC가 전부 ✅가 아닌데',
+      ],
+      [
+        {
+          readme: context.readme.replace(
+            readmeM1Line,
+            readmeM1Line.replace(readmeProgress, `진행 중 (✅ ${fake[0]} · 🟨 ${fake[1]} · ⬜ ${fake[2]})`),
+          ),
+        },
+        `README M1: ${fake.join('/')}인데 인수조건은 ${real}이다`,
       ],
       [
         {
@@ -310,8 +351,8 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
         '인수조건 AC-M1-14: 옛 37개 범위가 부분집합 이력 밖에 있다',
       ],
       [
-        { acceptance: context.acceptance.replace('| 22   | 18 | 2  | 2  |', '| 22   | 19 | 1  | 2  |') },
-        '인수조건 요약: M1가 22/19/1/2인데 AC 행을 다시 세면 22/18/2/2이다',
+        { acceptance: context.acceptance.replace(acM1Line, fakeAcM1Line) },
+        `인수조건 요약: M1가 ${m1Total}/${fake.join('/')}인데 AC 행을 다시 세면 ${m1Total}/${real}이다`,
       ],
       [
         { prd: context.prd.replace('**장수 명령 27개 (M1 부분집합)**', '**장수 명령 27개**') },
@@ -340,7 +381,13 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
         'Phase 2 명세 §6: T4-05 상태에 MVP 필수 (D-022)가 없다',
       ],
     ];
-    for (const [change, message] of cases) expect(errorsOf(table(), withDocs(change))).toContain(message);
+    for (const [change, message] of cases) {
+      // 모든 문서 반례는 실제 원문을 바꿔야 한다. 치환 대상이 사라져 no-op이 되면 여기서 실패한다.
+      for (const [key, mutated] of Object.entries(change) as [keyof Context, unknown][]) {
+        expect(mutated, `${message}: ${String(key)} 치환이 원문을 바꾸지 않았다`).not.toBe(context[key]);
+      }
+      expect(errorsOf(table(), withDocs(change))).toContain(message);
+    }
     const noTrade = table();
     noTrade.commands = noTrade.commands.filter((command) => command.id !== 'trade');
     expect(errorsOf(noTrade)).toContain(
