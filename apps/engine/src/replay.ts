@@ -16,6 +16,8 @@ import {
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 
+const MAX_ACTION_SEQUENCE = 2_147_483_647;
+
 export interface ReplayOrigin {
   version: 1;
   initial: WorldInit;
@@ -147,7 +149,7 @@ function readArchive(value: unknown): ReplayArchive | ReplayArchiveV2 {
       !Array.isArray(afterEnd) ||
       (end !== null &&
         (!end ||
-          !validSequence(end.sequence) ||
+          !validSequence(end.sequence, MAX_ACTION_SEQUENCE) ||
           !Number.isSafeInteger(end.tick) ||
           end.tick < 0 ||
           !['UNIFIED', 'END_YEAR'].includes(end.reason) ||
@@ -191,8 +193,8 @@ function readArchive(value: unknown): ReplayArchive | ReplayArchiveV2 {
   return archive;
 }
 
-function validSequence(sequence: number): boolean {
-  return Number.isSafeInteger(sequence) && sequence > 0 && sequence <= 10_000_000;
+function validSequence(sequence: number, maximum = 10_000_000): boolean {
+  return Number.isSafeInteger(sequence) && sequence > 0 && sequence <= maximum;
 }
 
 function checkOutcome(
@@ -237,6 +239,7 @@ function checkMonthBoundary(
   replay: ReplayState,
   tick: number,
   previousSequence: number,
+  maximumSequence = 10_000_000,
 ): asserts expected is ReplayArchive['months'][number] {
   const date = monthlyDate(replay.state.startYear, tick);
   if (
@@ -244,7 +247,7 @@ function checkMonthBoundary(
     expected.tick !== tick ||
     expected.year !== date.year ||
     expected.month !== date.month ||
-    !validSequence(expected.sequence) ||
+    !validSequence(expected.sequence, maximumSequence) ||
     expected.sequence <= previousSequence
   ) {
     throw new Error('월간 기록의 경계·연월·순서가 올바르지 않습니다.');
@@ -277,7 +280,7 @@ export function replayArchive(value: unknown, months = 12): { tick: number; stat
   for (let i = 0; i < months; i++) {
     const expected = archive.months[i]!;
     const tick = (i + 1) * TICKS_PER_MONTH;
-    checkMonthBoundary(expected, replay, tick, sequence);
+    checkMonthBoundary(expected, replay, tick, sequence, archive.version === 2 ? MAX_ACTION_SEQUENCE : 10_000_000);
     if (archive.version === 2 && archive.end && expected.sequence > archive.end.sequence) {
       throw new Error('종료 뒤 월간 기록이 있습니다.');
     }
@@ -316,7 +319,7 @@ export function replayToEnd(value: unknown): ReplayEnd {
     const action = nextGameAction(replay);
     if (action.kind === 'monthly') {
       const expected = archive.months[monthIndex];
-      checkMonthBoundary(expected, replay, (monthIndex + 1) * TICKS_PER_MONTH, sequence - 1);
+      checkMonthBoundary(expected, replay, (monthIndex + 1) * TICKS_PER_MONTH, sequence - 1, MAX_ACTION_SEQUENCE);
       if (expected.sequence !== sequence) throw new Error(`정산 순서가 다릅니다: ${action.tick}`);
     }
     replay = runReplayAction(replay, origin.initial.seed, origin.initial.unitSet);

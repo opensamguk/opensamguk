@@ -114,6 +114,35 @@ describe('T1-26 재생 보관 형식', () => {
     expect(replayArchive(withoutEnd, 11)).toHaveLength(11);
     expect(() => replayArchive(withoutEnd, 12)).toThrow('먼저');
   });
+
+  it('v2 월간 번호는 DB Int 범위이며 v1의 1천만 상한은 보존한다', async () => {
+    const legacy = await golden();
+    legacy.months[0]!.sequence = 10_000_001;
+    expect(() => replayArchive(legacy, 1)).toThrow('경계');
+    for (const sequence of [10_000_001, 2_147_483_647]) {
+      const current = asV2(await golden());
+      current.months[0]!.sequence = sequence;
+      expect(() => replayArchive(current, 1)).toThrow('정산 순서');
+    }
+  });
+
+  it('v2 종료 번호는 1천만을 넘어도 유효하며 DB Int 초과만 거부한다', async () => {
+    const archive = await unifiedArchive();
+    for (const sequence of [10_000_001, 2_147_483_647]) {
+      archive.end!.sequence = sequence;
+      // 번호 형식은 통과하지만 실제 통일은 더 이른 두 번째 사건이므로 즉시 거부한다.
+      expect(() => replayToEnd(archive)).toThrow('먼저 끝났습니다');
+    }
+    archive.end!.sequence = 2_147_483_648;
+    expect(() => replayToEnd(archive)).toThrow('재생 설정');
+  });
+
+  it('v2 종료 재생의 월간 경계도 1천만 이후 번호를 형식 오류로 거부하지 않는다', async () => {
+    const archive = await endYearArchive();
+    archive.months[0]!.sequence = 10_000_001;
+    archive.end!.sequence = 2_147_483_647;
+    expect(() => replayToEnd(archive)).toThrow('정산 순서');
+  });
 });
 
 describe('T1-26 종료 재생', () => {
