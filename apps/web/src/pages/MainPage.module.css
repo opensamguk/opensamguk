@@ -1,29 +1,86 @@
-.grid {
+/* 원작 core2026 MainView(R1) 데스크톱 배치: 10열 격자. 지도 1~7열, 명령 목록 8~10열(두 행), 지도 아래 도시,
+   그 아래 국가(1~5열)·장수(6~10열), 맨 아래 기록. 좁은 화면 접기 순서는 M3(T3-10)에서 다듬는다. */
+.page {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-areas:
-    'general city nation'
-    'turns logs logs';
+  gap: var(--space-3);
+}
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
   gap: var(--space-4);
 }
-.panel {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: var(--space-3) var(--space-4);
+.h1 {
+  margin: 0;
 }
-.general {
-  grid-area: general;
+.progress {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
 }
-.city {
+.layout {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  grid-template-areas:
+    'map map map map map map map commands commands commands'
+    'city city city city city city city commands commands commands'
+    'nation nation nation nation nation general general general general general'
+    'records records records records records records records records records records';
+  gap: var(--space-3);
+  align-items: start;
+}
+.layout > [data-main-area='map'] {
+  grid-area: map;
+}
+.layout > [data-main-area='commands'] {
+  grid-area: commands;
+  align-self: stretch;
+}
+.layout > [data-main-area='city'] {
   grid-area: city;
 }
-.nation {
+.layout > [data-main-area='nation'] {
   grid-area: nation;
+  align-self: stretch;
 }
-.turns {
-  grid-area: turns;
+.layout > [data-main-area='general'] {
+  grid-area: general;
+  align-self: stretch;
 }
-.logs {
-  grid-area: logs;
+.records {
+  grid-area: records;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  align-items: start;
+}
+.records > [data-main-area='world-records'] {
+  grid-column: 1 / -1;
+}
+.mapBody {
+  padding: var(--space-2);
+}
+.action {
+  font: inherit;
+  font-size: var(--text-xs);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+@media (max-width: 1100px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'map' 'commands' 'city' 'general' 'nation' 'records';
+  }
+  .records {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

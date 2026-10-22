@@ -13,6 +13,7 @@ coverage/
 # 테스트 산출물
 playwright-report/
 test-results/
+apps/server/.authz/
 
 # Prisma 생성물
 packages/db/src/generated/
