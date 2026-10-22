@@ -10,11 +10,12 @@ const unitSet = unitSetSchema.parse(JSON.parse(readFileSync('resources/unitset/b
 const policy = readFileSync('deploy/security.caddy', 'utf8').match(/Content-Security-Policy "([^"]+)"/)![1]!;
 
 test('independent production CSP, real Worker 480 differential cases, seed and narrow screenshot', async ({ page }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(90_000);
   await createAccount(page);
   const world = await e2eWorld(page);
   const { user } = await query<{ user: { id: string } }>(page.request, 'auth.me');
   await bindGeneral(world, user.id);
+  console.log('production fixture ready');
   const violations: string[] = [];
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -34,6 +35,7 @@ test('independent production CSP, real Worker 480 differential cases, seed and n
   const workerUrl = uiWorker.url();
   expect(new URL(workerUrl).origin).toBe('http://127.0.0.1:5173');
   expect(workerUrl).toMatch(/\/assets\/battle\.worker-.*\.js$/);
+  console.log('production UI Worker ready', workerUrl);
   await page.screenshot({ path: test.info().outputPath('production-csp-result.png'), fullPage: true });
   const first = await page.getByTestId('battle-result').innerText();
   await page.getByRole('button', { name: '같은 값으로 다시 실행' }).click();
@@ -82,6 +84,7 @@ test('independent production CSP, real Worker 480 differential cases, seed and n
     { url: workerUrl, messages: requests },
   );
   expect(replies).toHaveLength(480);
+  console.log('production differential replies', replies.length);
   requests.forEach(({ type: _type, requestId, seed, ...input }, index) => {
     expect(_type).toBe('run');
     const expected = simulateBattle({ ...input, unitSet }, createRng(seed));
@@ -121,6 +124,7 @@ test('independent production CSP, real Worker 480 differential cases, seed and n
     { url: workerUrl, messages: invalid },
   );
   for (const reply of rejected) expect(reply).toMatchObject({ type: 'error', code: 'INVALID_INPUT' });
+  console.log('production invalid replies', rejected.length);
 
   await page.setViewportSize({ width: 375, height: 800 });
   const section = page.getByRole('region', { name: '전투 시뮬레이터', exact: true });
@@ -156,4 +160,5 @@ test('independent production CSP, real Worker 480 differential cases, seed and n
   const closed = new Promise<void>((resolve) => uiWorker.once('close', () => resolve()));
   await page.getByRole('navigation', { name: '게임 메뉴' }).getByRole('link', { name: '메인', exact: true }).click();
   await closed;
+  console.log('production UI Worker closed');
 });

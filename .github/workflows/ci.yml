@@ -95,9 +95,9 @@ jobs:
           name: t434-baseline-screenshots
           path: test-results/**/*.png
       - run: pnpm --filter @opensamguk/web build
-      - run: pnpm exec playwright test --config review-t434/playwright.config.ts --workers=1 --reporter=line
+      - run: timeout --kill-after=10s 150s pnpm exec playwright test --config review-t434/playwright.config.ts --workers=1 --reporter=line
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: ${{ !cancelled() }}
+        if: ${{ always() }}
         with:
           name: t434-production-csp
           path: |

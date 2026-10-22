@@ -42,8 +42,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(target.read_bytes())
 
 
-backend = subprocess.Popen(['pnpm', '--filter', '@opensamguk/server', 'dev'], cwd=ROOT,
-                           start_new_session=True)
+backend = subprocess.Popen(['pnpm', '--filter', '@opensamguk/server', 'dev'], cwd=ROOT)
 import time
 for attempt in range(100):
     try:
@@ -68,10 +67,9 @@ try:
     server.serve_forever()
 finally:
     server.server_close()
-    import os
-    os.killpg(backend.pid, signal.SIGTERM)
+    backend.terminate()
     try:
         backend.wait(timeout=10)
     except subprocess.TimeoutExpired:
-        os.killpg(backend.pid, signal.SIGKILL)
+        backend.kill()
         backend.wait()
