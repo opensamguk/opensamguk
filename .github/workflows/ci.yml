@@ -81,3 +81,11 @@ jobs:
       - run: pnpm db:migrate
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm e2e --workers=1 --reporter=line
+      - name: Retain independent review screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t1-16-independent-review-screens
+          path: test-results/**/*.png
+          if-no-files-found: error
+          retention-days: 7
