@@ -1,6 +1,6 @@
 # Phase 2 확장 기술 명세 (제안)
 
-> 상태: 제안 초안 (2026-10-21) · 1차 기술 검토 R67-1~9 반영 · 재검토 R67-8-R 반영 · main `2380904` 병합과 경로 재확인 · 계획: Claude · 기술 검토: Codex
+> 상태: 제안 초안 (2026-10-21) · 1차 기술 검토 R67-1~9 반영 · 재검토 R67-8-R 반영 · main `2380904` 병합과 경로 재확인 · 2026-10-22 D-022 명령 범위 정정 반영 · 계획: Claude · 기술 검토: Codex
 > 근거: [단계 계획 Phase 2](../product/phases.md#phase-2-확장-mvp-뒤), [백로그](../product/backlog.md), [차별화 기능 후보](../product/differentiation.md), [요구사항 §4](../product/requirements.md#4-범위-밖), [PRD §6.3](../product/prd.md)
 > 이 문서의 AC-P2와 T4 작업은 **제안**이다. 인수조건·단계 계획·결정 기록에는 아직 들어가지 않았다.
 
@@ -9,7 +9,8 @@
 Phase 2는 M2가 아니다. M2는 지인 테스트 관문(MVP의 일부)이고 Phase 2는 MVP 위에 덧대는 확장이다. 그래서 다음을 지킨다.
 
 - main에 이미 있는 엔진, 명령 37개, 월간 정산, 재생, 순위는 Phase 2의 바탕이다. Phase 2 성과로 세지 않는다.
-- M1·M2·M3 AC는 Phase 2 완료 근거가 될 수 없다. 반대로 AC-P2는 MVP 관문에 들어가지 않는다.
+- M1·M2·M3 AC는 Phase 2 완료 근거가 될 수 없다. 명령이 아닌 기능의 AC-P2는 MVP 관문에 들어가지 않는다.
+- 2026-10-22 소유자 정정([D-022](../product/decisions.md#d-022-mvp-완료에는-모든-명령이-들어간다-2026-10-22))으로 명령에 딸린 작업은 MVP 필수다. §6 상태 칸에 `MVP 필수 (D-022)`로 표시했다. T4·AC-P2 ID는 추적 ID로 그대로 두고 M4 관문을 만들지 않는다. 명령의 완료 판정은 AC-M1-14와 [명령 대응표](../product/command-coverage.json)가 하고 이 문서의 AC-P2 증거는 대응표 단계 증거로 쓴다. D-022는 이 문서의 계약(C1~C20), 미결정(§9), 승인 항목(§8)의 세부 정책을 승인하지 않는다. A-02·A-03·A-04의 명령은 MVP 범위에 들어왔으나 작업 분해는 아직 없다.
 - M2가 요구하는 두 번째 시나리오(PRD §6.4의 공백지 180년, AC-M2-01)는 M2 범위다. 아래 시나리오 추가(AC-P2-24)에서 세지 않는다.
 - 계획 작성과 Codex 기술 검토는 구현 완료나 세부 정책 승인이 아니다. 세부 정책은 §9의 결정 목록으로 따로 받는다.
 - 작업의 준비 정도는 §6.1의 세 단계로만 말한다. 지금 구현 준비인 T4 작업은 없다. 이 문서의 계약(C1~C20)도 제안이며 기술 검토가 새 API·DB 계약을 수용한 것이 아니다.
@@ -223,29 +224,29 @@ main에는 이미 로그인한 사용자가 월간 연감을 읽는 `records.wor
 | ID | 작업 | AC | 구현 → 리뷰 | 선행 | 단독 소유 경로 (공유는 §7) | 증거 | 추정 | 상태 |
 | -- | ---- | -- | ----------- | ---- | -------------------------- | ---- | ---- | ---- |
 | T4-01 | `pnpm next` Phase 2 절 | P2-01 | Claude → Codex | — | `tools/next-task.mjs`, `tools/next-task.test.ts` | 단위 시험, 출력 전후 비교 | 0.5일 | 계획 가능 (상세 계획 우선) |
-| T4-02 | 확장 명령 틀, 월드별 resolver, `ext` 순수 경로 (C13·C14) | P2-02 | Codex → Claude | 병합 T4-30 | `commands/resolve.ts`, `ext/registry.ts`, `ext/state.ts` | 37개 대조 유지, resolver 켬·끔, `ext` 복제·재생 reducer, 끈 월드 재생 해시 불변 | 1일 | 계획 가능, 계약은 G-03 |
-| T4-03 | 확장 상태 저장, 명령 켜기, 서버·엔진 연결 (S1, C13·C14) | P2-02 | Codex → Claude | T4-02, T2-02, G-01 | 새 migration, `apps/engine/src/extState.ts` | 켠 월드 HTTP 저장→사전 검사→실행→표시, 끈 월드 거부 이유, 롤백·SIGKILL·재시작·재생, v1 골든 | 1.5일 | 선행 대기 (T2-02, G-01) |
-| T4-04 | 일반 명령 확장 인자 입력 화면 | P2-02 | Claude → Codex | T4-03, T1-16 | `apps/web/src/turns/extArgs.ts` | E2E 켬·끔 월드 | 0.5일 | 선행 대기 |
-| T4-05 | 계략 4종 규칙 | P2-03 | Codex → Claude | T4-02 | `ext/stratagem/` | 명령별 성공·실패, 같은 시드 | 0.5일 | 계획 가능, 계약은 U-19 |
-| T4-06 | 전략 명령 3종 규칙 (준비 턴 없음) | P2-04 | Codex → Claude | T4-02 | `ext/strategy/` | 성공·실패·재사용 대기·권한 | 0.5일 | 계획 가능, 계약은 U-19 |
-| T4-07 | 준비 턴 기제 | P2-05 | Codex → Claude | T4-03, 병합 T4-48 | `ext/prepare/`, `apps/engine/src/extPrepare.ts` | 연속 칸·중단·재생 | 1일 | 결정 대기 (U-01) |
-| T4-08 | 전략 명령 5종 규칙 (준비 턴 있음) | P2-05 | Codex → Claude | T4-07 | `ext/strategyPrepared/` | 명령별 성공·실패 | 0.5일 | 결정 대기 (U-01, U-19) |
-| T4-09 | 특수 병종 연구 6종 (보·궁·기 계열) | P2-06 | Codex → Claude | T4-07 | `ext/research/`, `resources/unitset/` 확장 파일 | 연구 전후 모병, 재생 | 0.5일 | 결정 대기 (U-01, U-02) |
-| T4-10 | 특수 병종 3종 (음귀병·무희·화륜차) | P2-06 | Codex → Claude | T4-09 | `ext/research/` 이어서 | 새 계열 상성 | 0.5일 | 결정·승인 대기 (U-03, A-03) |
-| T4-11 | 첩보 규칙 | P2-07 | Codex → Claude | T4-02 | `ext/intel/` | 거리·성공·실패·기록 내용 | 0.5일 | 계획 가능, 계약은 U-19 |
-| T4-12 | 첩보 기록 저장·조회 API (S2) | P2-07 | Codex → Claude | T4-03, T4-11, 병합 T4-35 | `apps/server/src/routers/intel.ts`, 새 migration | PostgreSQL, HTTP 권한 4종 | 0.5일 | 선행 대기 |
-| T4-13 | 첩보 기록 화면 | P2-07 | Claude → Codex | T4-12, 병합 T4-36 | `apps/web/src/intel/` | E2E | 0.5일 | 선행 대기 |
-| T4-14 | 강행 규칙 | P2-08 | Codex → Claude | T4-02 | `ext/forcedMarch/` | 거리·이동·실패 | 0.5일 | 계획 가능, 계약은 U-19 |
-| T4-15 | 선양·해산 규칙 | P2-09 | Codex → Claude | T4-02 | `ext/succession/` | 권한·해산 조건 | 0.5일 | 계획 가능, 계약은 U-19 |
-| T4-16 | 국호·국기 변경 명령과 이름 검사 | P2-10 | Codex → Claude | T4-02 | `ext/nationIdentity/` | 이름 검사, 변경권 없음·사용 뒤 거부 | 0.5일 | 계획 가능 |
-| T4-17 | 확장 명령 1차 반영과 엔진 시험 | P2-03, 04, 07~10 | Codex → Claude | T4-03, T4-05, T4-06, T4-11, T4-14~T4-16 | `apps/engine/src/ext.integration.test.ts` | 실행·롤백·12개월 재생, 일반 명령 HTTP 저장→실행 | 1일 | 선행 대기 |
-| T4-18 | 효과 합산 틀 (장비·특기 공용) | P2-12, P2-13 | Codex → Claude | T4-33, 병합 T4-02 | `packages/rules/src/modifiers/` | 수정자 없을 때 내정·전투 골든 불변 | 0.5일 | 선행 대기 (T4-33) |
-| T4-19 | 부대 규칙과 집합 | P2-11 | Codex → Claude | T4-02 | `ext/troop/` | 집합 이동·국가 경계 | 0.5일 | 계획 가능, 계약은 U-19 |
-| T4-20 | 부대 저장·즉시 행동 API (S3) | P2-11 | Codex → Claude | T4-03, T4-19, T4-49, 병합 T4-12, T4-17 | `apps/server/src/routers/troop.ts`, `apps/engine/src/troopInputs.ts` | InputEvent 재생, HTTP 권한 | 1일 | 선행 대기 (C15) |
-| T4-21 | 부대 화면 | P2-11 | Claude → Codex | T4-20, 병합 T4-13 | `apps/web/src/troop/` | E2E | 0.5일 | 선행 대기 |
-| T4-22 | 장비 목록과 장비매매 규칙 | P2-12 | Codex → Claude | T4-18 | `ext/equipment/`, `resources/items/` | 매매·장착 골든 | 0.5일 | 결정 대기 (U-06, U-19) |
-| T4-23 | 장비 저장·조회 API (S4) | P2-12 | Codex → Claude | T4-03, T4-22, 병합 T4-20, T4-52 | `apps/server/src/routers/equipment.ts`, 새 migration | PostgreSQL, HTTP 권한 | 0.5일 | 선행 대기 |
-| T4-24 | 장비 화면 | P2-12 | Claude → Codex | T4-23, 병합 T4-41 | `apps/web/src/equipment/` | E2E | 0.5일 | 선행 대기 |
+| T4-02 | 확장 명령 틀, 월드별 resolver, `ext` 순수 경로 (C13·C14) | P2-02 | Codex → Claude | 병합 T4-30 | `commands/resolve.ts`, `ext/registry.ts`, `ext/state.ts` | 37개 대조 유지, resolver 켬·끔, `ext` 복제·재생 reducer, 끈 월드 재생 해시 불변 | 1일 | 계획 가능, 계약은 G-03 · MVP 필수 (D-022) |
+| T4-03 | 확장 상태 저장, 명령 켜기, 서버·엔진 연결 (S1, C13·C14) | P2-02 | Codex → Claude | T4-02, T2-02, G-01 | 새 migration, `apps/engine/src/extState.ts` | 켠 월드 HTTP 저장→사전 검사→실행→표시, 끈 월드 거부 이유, 롤백·SIGKILL·재시작·재생, v1 골든 | 1.5일 | 선행 대기 (T2-02, G-01) · MVP 필수 (D-022) |
+| T4-04 | 일반 명령 확장 인자 입력 화면 | P2-02 | Claude → Codex | T4-03, T1-16 | `apps/web/src/turns/extArgs.ts` | E2E 켬·끔 월드 | 0.5일 | 선행 대기 · MVP 필수 (D-022) |
+| T4-05 | 계략 4종 규칙 | P2-03 | Codex → Claude | T4-02 | `ext/stratagem/` | 명령별 성공·실패, 같은 시드 | 0.5일 | 계획 가능, 계약은 U-19 · MVP 필수 (D-022) |
+| T4-06 | 전략 명령 3종 규칙 (준비 턴 없음) | P2-04 | Codex → Claude | T4-02 | `ext/strategy/` | 성공·실패·재사용 대기·권한 | 0.5일 | 계획 가능, 계약은 U-19 · MVP 필수 (D-022) |
+| T4-07 | 준비 턴 기제 | P2-05 | Codex → Claude | T4-03, 병합 T4-48 | `ext/prepare/`, `apps/engine/src/extPrepare.ts` | 연속 칸·중단·재생 | 1일 | 결정 대기 (U-01) · MVP 필수 (D-022) |
+| T4-08 | 전략 명령 5종 규칙 (준비 턴 있음) | P2-05 | Codex → Claude | T4-07 | `ext/strategyPrepared/` | 명령별 성공·실패 | 0.5일 | 결정 대기 (U-01, U-19) · MVP 필수 (D-022) |
+| T4-09 | 특수 병종 연구 6종 (보·궁·기 계열) | P2-06 | Codex → Claude | T4-07 | `ext/research/`, `resources/unitset/` 확장 파일 | 연구 전후 모병, 재생 | 0.5일 | 결정 대기 (U-01, U-02) · MVP 필수 (D-022) |
+| T4-10 | 특수 병종 3종 (음귀병·무희·화륜차) | P2-06 | Codex → Claude | T4-09 | `ext/research/` 이어서 | 새 계열 상성 | 0.5일 | 결정·승인 대기 (U-03, A-03) · MVP 필수 (D-022) |
+| T4-11 | 첩보 규칙 | P2-07 | Codex → Claude | T4-02 | `ext/intel/` | 거리·성공·실패·기록 내용 | 0.5일 | 계획 가능, 계약은 U-19 · MVP 필수 (D-022) |
+| T4-12 | 첩보 기록 저장·조회 API (S2) | P2-07 | Codex → Claude | T4-03, T4-11, 병합 T4-35 | `apps/server/src/routers/intel.ts`, 새 migration | PostgreSQL, HTTP 권한 4종 | 0.5일 | 선행 대기 · MVP 필수 (D-022) |
+| T4-13 | 첩보 기록 화면 | P2-07 | Claude → Codex | T4-12, 병합 T4-36 | `apps/web/src/intel/` | E2E | 0.5일 | 선행 대기 · MVP 필수 (D-022) |
+| T4-14 | 강행 규칙 | P2-08 | Codex → Claude | T4-02 | `ext/forcedMarch/` | 거리·이동·실패 | 0.5일 | 계획 가능, 계약은 U-19 · MVP 필수 (D-022) |
+| T4-15 | 선양·해산 규칙 | P2-09 | Codex → Claude | T4-02 | `ext/succession/` | 권한·해산 조건 | 0.5일 | 계획 가능, 계약은 U-19 · MVP 필수 (D-022) |
+| T4-16 | 국호·국기 변경 명령과 이름 검사 | P2-10 | Codex → Claude | T4-02 | `ext/nationIdentity/` | 이름 검사, 변경권 없음·사용 뒤 거부 | 0.5일 | 계획 가능 · MVP 필수 (D-022) |
+| T4-17 | 확장 명령 1차 반영과 엔진 시험 | P2-03, 04, 07~10 | Codex → Claude | T4-03, T4-05, T4-06, T4-11, T4-14~T4-16 | `apps/engine/src/ext.integration.test.ts` | 실행·롤백·12개월 재생, 일반 명령 HTTP 저장→실행 | 1일 | 선행 대기 · MVP 필수 (D-022) |
+| T4-18 | 효과 합산 틀 (장비·특기 공용) | P2-12, P2-13 | Codex → Claude | T4-33, 병합 T4-02 | `packages/rules/src/modifiers/` | 수정자 없을 때 내정·전투 골든 불변 | 0.5일 | 선행 대기 (T4-33) · MVP 필수 (D-022) |
+| T4-19 | 부대 규칙과 집합 | P2-11 | Codex → Claude | T4-02 | `ext/troop/` | 집합 이동·국가 경계 | 0.5일 | 계획 가능, 계약은 U-19 · MVP 필수 (D-022) |
+| T4-20 | 부대 저장·즉시 행동 API (S3) | P2-11 | Codex → Claude | T4-03, T4-19, T4-49, 병합 T4-12, T4-17 | `apps/server/src/routers/troop.ts`, `apps/engine/src/troopInputs.ts` | InputEvent 재생, HTTP 권한 | 1일 | 선행 대기 (C15) · MVP 필수 (D-022) |
+| T4-21 | 부대 화면 | P2-11 | Claude → Codex | T4-20, 병합 T4-13 | `apps/web/src/troop/` | E2E | 0.5일 | 선행 대기 · MVP 필수 (D-022) |
+| T4-22 | 장비 목록과 장비매매 규칙 | P2-12 | Codex → Claude | T4-18 | `ext/equipment/`, `resources/items/` | 매매·장착 골든 | 0.5일 | 결정 대기 (U-06, U-19) · MVP 필수 (D-022) |
+| T4-23 | 장비 저장·조회 API (S4) | P2-12 | Codex → Claude | T4-03, T4-22, 병합 T4-20, T4-52 | `apps/server/src/routers/equipment.ts`, 새 migration | PostgreSQL, HTTP 권한 | 0.5일 | 선행 대기 · MVP 필수 (D-022) |
+| T4-24 | 장비 화면 | P2-12 | Claude → Codex | T4-23, 병합 T4-41 | `apps/web/src/equipment/` | E2E | 0.5일 | 선행 대기 · MVP 필수 (D-022) |
 | T4-25 | 특기 효과 규칙과 조회 필드 | P2-13 | Codex → Claude | T4-18, 병합 T4-49 | `packages/rules/src/traits/` | 특기별 골든 | 0.5일 | 결정 대기 (U-07, U-19) |
 | T4-26 | 특기 표시 화면 | P2-13 | Claude → Codex | T4-25 | `apps/web/src/general/Traits.tsx` | E2E | 0.5일 | 선행 대기 |
 | T4-27 | 경매 규칙 | P2-14 | Codex → Claude | T4-22 | `ext/auction/` | 입찰·낙찰·유찰 | 0.5일 | 결정 대기 (U-08) |
@@ -255,7 +256,7 @@ main에는 이미 로그인한 사용자가 월간 연감을 읽는 `records.wor
 | T4-31 | 토너먼트 저장·참가 API·진행 (S6) | P2-15 | Codex → Claude | T4-03, T4-30, T4-49, T4-54, 병합 T4-28 | `apps/server/src/routers/tournament.ts`, `apps/engine/src/tournament.ts` | 롤백·재생, HTTP 권한 | 1일 | 결정 대기 (U-09) |
 | T4-32 | 토너먼트 화면 | P2-15 | Claude → Codex | T4-31, 병합 T4-29 | `apps/web/src/tournament/` | E2E | 0.5일 | 선행 대기 |
 | T4-33 | 기존 출병 전투 계산의 동작 불변 추출 | P2-16 | Codex → Claude | — | `packages/rules/src/battle/simulate.ts` | 출병 결과 골든, 같은 입력·시드 일치, RNG 소비 불변, 끈 월드 12개월 재생 | 0.5일 | 계획 가능 (상세 계획 우선) |
-| T4-34 | 전투 시뮬레이터 화면 (Web Worker) | P2-16 | Claude → Codex | T4-33 | `apps/web/src/battleSim/` | Chromium E2E, Worker 실행 | 0.5일 | 선행 대기 (T4-33) |
+| T4-34 | 전투 시뮬레이터 화면 (Web Worker) | P2-16 | Claude → Codex | T4-33 | `apps/web/src/battleSim/` | Chromium E2E, Worker 실행 | 0.5일 | 선행 대기 (T4-33) · 상세 계약 작성 중(t_06271c79, `T4-34.md`). 명령이 아니라 MVP로 옮기지 않는다 |
 | T4-35 | 기존 월간 영토 스냅샷 로그인 조회 API (C20) | P2-17 (1차) | Codex → Claude | — | `records.world` 확장 또는 `apps/server/src/routers/timelapse.ts` (C20, T4-35.md에서 하나로 정함) | 실제 PostgreSQL 월별 자료, HTTP 4종, 비공개 필드 차단, 페이지 경계·빈 기록 | 0.5일 | 계획 가능 (상세 계획 우선) |
 | T4-36 | 월간 영토 재생 화면 | P2-17 (1차) | Claude → Codex | T4-35, U-20, 병합 T4-34 | `apps/web/src/timelapse/` | Chromium E2E | 0.5일 | 결정 대기 (U-20) |
 | T4-37 | 타임랩스 공유·내보내기 | P2-17 (2차) | Claude → Codex | T4-36 | `apps/web/src/timelapse/export.ts` | E2E | 0.5일 | 결정 대기 (U-10) |
@@ -269,14 +270,14 @@ main에는 이미 로그인한 사용자가 월간 연감을 읽는 `records.wor
 | T4-45 | D14 계략 패 | P2-23 | 결정 뒤 나눔 | U-16, T4-05, T4-06 | — | — | 미정 | 결정 대기 |
 | T4-46 | 시나리오 추가 | P2-24 | Codex → Claude | — | `resources/scenario/` 새 파일, `resources/NOTICE.md` 고지 | 월드 생성·해시 통합 | 0.5일 | 결정 대기 (U-17) |
 | T4-47 | Phase 2 통합 회귀와 최종 관문 (C19) | P2-25 | Codex → Claude | 다른 T4 작업 전부 (완료 또는 미완료 목록 등재), 병합 T4-31, T4-48 | `tools/sim/` 확장 프리셋 옵션, `apps/engine/src/ext.coverage.integration.test.ts` | coverage 하한, 확장별·조합·끈 월드 증거, sim 10시드 시간 | 1일 | 선행 대기 |
-| T4-48 | 방랑 국가 계약과 통합 (C17) | P2-08 | Codex → Claude | T4-03, T4-14, 병합 T4-18, T4-20, T4-40 | `ext/wander/` | 방랑 국가 전 경로 통합, 기본 국가 골든 | 1일 | 계획 가능, 계약은 U-19·U-21 |
-| T4-49 | 즉시 행동 InputEvent 계약과 처리 틀 (C15) | P2-11, 14, 15 | Codex → Claude | T4-03, G-02, 병합 T4-12, T4-18 | `packages/rules/src/inputs/`, `apps/engine/src/inputs/` | kind별 APPLIED·REJECTED, 멱등 재시도·다른 payload 거부, 재접속 조회, PAUSED·ENDED, 롤백·재생 | 1일 | 계획 가능, 계약은 G-02 |
-| T4-50 | 국가 예턴 resolver 연결 | P2-02 | Codex → Claude | T4-03, T2-05 | `nationTurns` 라우터의 검사 연결 한 곳 (파일은 T2-05 소유) | 켠·끈 월드 국가 명령 HTTP 저장·사전 검사·실행 | 0.5일 | 선행 대기 |
-| T4-51 | 국가 명령 확장 인자 입력 화면 | P2-02 | Claude → Codex | T4-50, T2-06 | T2-06 국가 예턴 화면 옆 `extArgs.ts` (경로는 T2-06 병합 뒤 확정) | E2E 켬·끔 월드 | 0.5일 | 선행 대기 |
-| T4-52 | 모반 규칙 | P2-09 | Codex → Claude | T4-02, T2-13, 병합 T4-48 | `ext/rebellion/` | 미접속 기준·권한 | 0.5일 | 결정 대기 (U-05) |
-| T4-53 | 준비 턴 명령·연구 반영과 엔진 시험 | P2-05, P2-06 | Codex → Claude | T4-07~T4-10, 병합 T4-23 | `apps/engine/src/extPrepared.integration.test.ts` | 연속 칸·중단·재생, 연구 전후 모병 | 0.5일 | 결정 대기 (U-01~U-03) |
+| T4-48 | 방랑 국가 계약과 통합 (C17) | P2-08 | Codex → Claude | T4-03, T4-14, 병합 T4-18, T4-20, T4-40 | `ext/wander/` | 방랑 국가 전 경로 통합, 기본 국가 골든 | 1일 | 계획 가능, 계약은 U-19·U-21 · MVP 필수 (D-022) |
+| T4-49 | 즉시 행동 InputEvent 계약과 처리 틀 (C15) | P2-11, 14, 15 | Codex → Claude | T4-03, G-02, 병합 T4-12, T4-18 | `packages/rules/src/inputs/`, `apps/engine/src/inputs/` | kind별 APPLIED·REJECTED, 멱등 재시도·다른 payload 거부, 재접속 조회, PAUSED·ENDED, 롤백·재생 | 1일 | 계획 가능, 계약은 G-02 · MVP 필수 (D-022) |
+| T4-50 | 국가 예턴 resolver 연결 | P2-02 | Codex → Claude | T4-03, T2-05 | `nationTurns` 라우터의 검사 연결 한 곳 (파일은 T2-05 소유) | 켠·끈 월드 국가 명령 HTTP 저장·사전 검사·실행 | 0.5일 | 선행 대기 · MVP 필수 (D-022) |
+| T4-51 | 국가 명령 확장 인자 입력 화면 | P2-02 | Claude → Codex | T4-50, T2-06 | T2-06 국가 예턴 화면 옆 `extArgs.ts` (경로는 T2-06 병합 뒤 확정) | E2E 켬·끔 월드 | 0.5일 | 선행 대기 · MVP 필수 (D-022) |
+| T4-52 | 모반 규칙 | P2-09 | Codex → Claude | T4-02, T2-13, 병합 T4-48 | `ext/rebellion/` | 미접속 기준·권한 | 0.5일 | 결정 대기 (U-05) · MVP 필수 (D-022) |
+| T4-53 | 준비 턴 명령·연구 반영과 엔진 시험 | P2-05, P2-06 | Codex → Claude | T4-07~T4-10, 병합 T4-23 | `apps/engine/src/extPrepared.integration.test.ts` | 연속 칸·중단·재생, 연구 전후 모병 | 0.5일 | 결정 대기 (U-01~U-03) · MVP 필수 (D-022) |
 | T4-54 | 토너먼트 경기 규칙 | P2-15 | Codex → Claude | T4-30, 병합 T4-25 | `packages/rules/src/tournament/match.ts` | 같은 시드 같은 결과 | 미정 | 결정 대기 (U-09 종목) |
-| T4-55 | 국호·국기 변경권 부여 | P2-10 | Codex → Claude | T4-16 | `ext/nationIdentity/grant.ts` | 부여 조건·1회 | 미정 | 결정 대기 (U-04) |
+| T4-55 | 국호·국기 변경권 부여 | P2-10 | Codex → Claude | T4-16 | `ext/nationIdentity/grant.ts` | 부여 조건·1회 | 미정 | 결정 대기 (U-04) · MVP 필수 (D-022) |
 | T4-56 | 타임랩스 실제 사건과 과거 이름·색 투영 | P2-17 (2차) | Codex → Claude | T4-35, 병합 T4-31, T4-38 | 계약 뒤 정함 (저장이 필요하면 S7) | 공개 사건 투영 저장·조회, 해산·국호 변경 뒤 과거 프레임 | 미정 | 승인 대기 (A-11), 계약 먼저 |
 
 `ext/`는 `packages/rules/src/commands/ext/`다. 각 규칙 작업은 명령마다 `<key>.test.ts`에 성공 1건·대표 실패 1건을 두고 T4-02의 확장 대조 시험이 확장 목록과 시험 파일을 자동으로 맞춰 본다.
@@ -321,7 +322,7 @@ T4-15(선양·해산)와 T4-52(모반), T4-16(변경 명령)과 T4-55(변경권 
 | `apps/engine/src/simulation.ts` | T4-48 → T4-47 | 통일 판정은 T4-48, 확장 시나리오 옵션은 T4-47 |
 | `apps/web/src/turns/` | T4-04 → T4-41 | T1-15·T1-16 소유. 새 인자 입력은 `extArgs.ts`에 두고 연결 한 곳만 고친다(T4-04). T4-41은 `schedule.ts`의 시각 계산을 서버 예정 시각 표시로 바꾸는 것만 한다(C18). T1-16은 main에서 완료됐다 |
 | `apps/web/src/router.tsx`, `layout/GameLayout.tsx` | T4-34 → T4-36 → T4-13 → T4-21 → T4-41 → T4-24 → T4-29 → T4-32 | 경로·메뉴 한 줄씩. D-018과 같은 최소 수정 |
-| `tools/command-coverage.test.ts` | T4-02 | 확장 목록 대조를 같은 파일에 더한다 |
+| `tools/command-coverage.test.ts`, `tools/command-coverage.mjs`, `docs/product/command-coverage.json` | D-022 대응표(AC-M1-14) → T4-02 → 각 명령 작업 | T4-02는 확장 목록 대조를 같은 파일에 더한다. 명령 작업은 자기 행의 단계·증거만 고친다 |
 | `docs/product/phases.md`, `acceptance-criteria.md`, `decisions.md` | 정식 반영 PR | t_b4277a9e 완료 뒤 한정 hunk. 이 문서의 작업이 직접 고치지 않는다 |
 
 ## 8. 승인이 필요한 항목
@@ -382,7 +383,7 @@ T4-18은 T4-33 뒤, T4-34는 T4-33 뒤, T4-36은 T4-35와 U-20 뒤다. 명령을
 
 ## 11. 하지 않는 것
 
-- phases.md, acceptance-criteria.md, decisions.md, 기존 T1~T3 계획, 코드, schema, 패키지 수정
+- phases.md, acceptance-criteria.md, decisions.md, 기존 T1~T3 계획, 코드, schema, 패키지 수정. 2026-10-22의 D-022 반영은 소유자 정정에 따른 AC-M1-14 작업이며 이 문서의 제안을 정식 반영한 것이 아니다
 - 원작 코드 복사. 규칙 작업에서 원작을 옮기면 파일 머리에 출처를 적고 `resources/NOTICE.md`에 고지한다
 - 비공개 v1 자료 인용·복사
 - 새 유료 API, GCP 기동, 운영·게임 초기화, 배포
