@@ -1,6 +1,7 @@
 import { parseArgs } from 'node:util';
 import { createDb } from '@opensamguk/db';
 import { engineFailureMessage, runEngine } from './main';
+import { runSupervisor } from './supervisor';
 
 async function main() {
   const { values } = parseArgs({ options: { world: { type: 'string' } } });
@@ -12,11 +13,18 @@ async function main() {
   process.on('SIGTERM', shutdown);
   try {
     console.log('[engine] 시작');
-    await runEngine(db, {
-      ...(values.world ? { worldId: values.world } : {}),
-      signal: controller.signal,
-      onStatus: (status) => console.log(`[engine] ${status}`),
-    });
+    if (values.world) {
+      await runEngine(db, {
+        worldId: values.world,
+        signal: controller.signal,
+        onStatus: (status) => console.log(`[engine] ${status}`),
+      });
+    } else {
+      await runSupervisor(db, {
+        signal: controller.signal,
+        onEvent: (event) => console.log(`[supervisor] ${event.kind}`),
+      });
+    }
   } finally {
     process.off('SIGINT', shutdown);
     process.off('SIGTERM', shutdown);
