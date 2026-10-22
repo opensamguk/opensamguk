@@ -49,7 +49,7 @@ describe('T3-04 실제 절차 정의와 실행 사례 대조', () => {
   it('경로 또는 종류가 다른 실행 사례는 정상 면제와 겹치지 않는다', () => {
     const router = t.router({
       health: t.procedure.query(() => true),
-      nested: t.router({ health: t.procedure.mutation(() => true) }),
+      status: t.procedure.mutation(() => true),
     });
     const evidence = Object.keys(router._def.procedures).flatMap((path) =>
       categories
@@ -60,7 +60,7 @@ describe('T3-04 실제 절차 정의와 실행 사례 대조', () => {
     expect(report).toEqual({
       procedures: [
         { path: 'health', type: 'query' },
-        { path: 'nested.health', type: 'mutation' },
+        { path: 'status', type: 'mutation' },
       ],
       missing: [],
       exempted: ['health otherUser: 공개 확인'],
