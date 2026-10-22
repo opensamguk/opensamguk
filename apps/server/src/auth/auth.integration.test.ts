@@ -31,7 +31,7 @@ async function request(name: string, input?: unknown, sid?: string) {
   const response = await app.inject({
     method: name === 'me' ? 'GET' : 'POST',
     url: `/trpc/auth.${name}?batch=1`,
-    headers: { ...(sid ? { cookie: sid } : {}) },
+    headers: { origin: 'http://127.0.0.1:5173', ...(sid ? { cookie: sid } : {}) },
     ...(name === 'me' ? {} : { payload: input === undefined ? {} : { 0: input } }),
   });
   const body = response.json()[0] as {

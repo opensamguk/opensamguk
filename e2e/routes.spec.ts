@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { signUpByApi } from './account';
+import { createAccount } from './account';
 
 // T1-13: 주소마다 직접 접근·새로고침이 되고 위쪽 띠가 보인다. 게임 화면은 로그인이 필요하다 (T1-14).
 const GAME_PAGES: Array<[string, string]> = [
@@ -15,7 +15,7 @@ const GAME_PAGES: Array<[string, string]> = [
 
 test.describe('로그인한 상태', () => {
   test.beforeEach(async ({ page }) => {
-    await signUpByApi(page);
+    await createAccount(page);
   });
 
   for (const [path, heading] of GAME_PAGES) {
