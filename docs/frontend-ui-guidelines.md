@@ -118,6 +118,7 @@ T1-15 편집기(`apps/web/src/turns/TurnEditor.tsx`)의 조작입니다. 메인 
 | `/w/:worldId/records?tab=general\|nation\|world` | 기록 넓게 보기 (보조) |
 | `/w/:worldId/create` | 장수 생성 |
 | `/w/:worldId/ranking?tab=generals\|nations&by=…` | 순위. `by`가 탭에 맞지 않으면 그 탭의 첫 기준 (`e2e/ranking.spec.ts`) |
+| `/w/:worldId/simulator` | 전투 시뮬레이터 (보조, T4-34). 넣은 가정으로 교전 한 번을 Web Worker에서 계산. 서버 요청 없음 |
 | `/dev/ui` | 부품 모음 (개발 모드만) |
 
 ### 로그인 가드 (T1-14)
