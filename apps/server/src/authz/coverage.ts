@@ -21,15 +21,30 @@ export function compareAuthz(
   const missing: string[] = [];
   const exempted: string[] = [];
   const known = new Set(procedures.map(({ path }) => path));
+  const grouped = new Map<string, AuthzExemption[]>();
   for (const exemption of exemptions) {
-    if (!known.has(exemption.path) || !exemption.reason.trim())
-      missing.push(`invalid exemption: ${exemption.path} ${exemption.category}`);
+    const key = JSON.stringify([exemption.path, exemption.category]);
+    const entries = grouped.get(key) ?? [];
+    entries.push(exemption);
+    grouped.set(key, entries);
+  }
+  const validExemptions: AuthzExemption[] = [];
+  for (const entries of grouped.values()) {
+    const exemption = entries[0]!;
+    const { path, category } = exemption;
+    const invalid = !known.has(path) || entries.some((entry) => !entry.reason.trim());
+    const duplicate = entries.length > 1;
+    const stale = evidence.some((entry) => entry.path === path && entry.category === category);
+    if (invalid) missing.push(`invalid exemption: ${path} ${category}`);
+    if (duplicate) missing.push(`duplicate exemption: ${path} ${category}`);
+    if (stale) missing.push(`stale exemption: ${path} ${category}`);
+    if (!invalid && !duplicate && !stale) validExemptions.push(exemption);
   }
   for (const { path, type } of procedures) {
     for (const category of categories) {
       if (evidence.some((entry) => entry.path === path && entry.category === category)) continue;
-      const exemption = exemptions.find((entry) => entry.path === path && entry.category === category);
-      if (exemption?.reason.trim()) exempted.push(`${path} ${category}: ${exemption.reason}`);
+      const exemption = validExemptions.find((entry) => entry.path === path && entry.category === category);
+      if (exemption) exempted.push(`${path} ${category}: ${exemption.reason}`);
       else missing.push(`${path} (${type}): ${category}`);
     }
   }
