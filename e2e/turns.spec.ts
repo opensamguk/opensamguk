@@ -8,6 +8,7 @@ import {
   mine,
   mutate,
   newGeneralName,
+  releaseIdleWorld,
   setTurns,
   setUserStatus,
   startEngine,
@@ -53,6 +54,7 @@ async function pick(page: Page, command: string) {
 
 test.describe('장수 생성', () => {
   test.beforeEach(async ({ page }) => stubPortraits(page));
+  test.afterAll(releaseIdleWorld);
 
   test('로그인하지 않으면 생성·예턴 화면 대신 로그인으로 보낸다', async ({ page }) => {
     await page.goto('/w/00000000-0000-4000-8000-000000000000/create');
@@ -137,7 +139,7 @@ test.describe('장수 생성', () => {
     ).toBe(401);
   });
 
-  // 엔진이 5초 안에 처리하지 못하면 서버는 pending을 준다. dev 엔진이 돌지 않는 월드에서 기존 엔진을 직접 켜고 끄며 본다.
+  // 엔진이 5초 안에 처리하지 못하면 서버는 pending을 준다. 시험이 실행권을 쥔 대기 월드에서 엔진 턴 루프를 직접 켜고 끄며 본다.
   test('pending 뒤 엔진이 거절하면 새로고침 없이 이유와 입력 폼으로 돌아오고, 이름을 고쳐 다시 보내면 만들어진다', async ({
     page,
   }) => {
