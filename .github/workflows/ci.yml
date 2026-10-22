@@ -81,3 +81,13 @@ jobs:
       - run: pnpm db:migrate
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm e2e --workers=1 --reporter=line
+      - name: Upload T1-16 screenshots (QA probe only, not for merge)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: t1-16-screens
+          path: |
+            test-results/**/*.png
+            test-results/**/error-context.md
+          retention-days: 7
+          if-no-files-found: warn
