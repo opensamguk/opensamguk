@@ -219,6 +219,9 @@ describe('T2-18/T3-15 evidence tooling, never product acceptance', () => {
       'reversed onboarding',
       (f) => {
         f.actions[0]!.at = f.at(300);
+        const result = parseResult(f.records.get('result-0-0')!.value);
+        result.at = f.at(301);
+        f.put('result-0-0', 'result', result);
       },
       'ONBOARDING_ORDER',
     ],

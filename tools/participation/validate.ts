@@ -52,12 +52,14 @@ export async function validateBundle(manifestFile: string, expectedSHA: string):
   try {
     sha(expectedSHA);
     const root = await realpath(dirname(manifestFile));
+    let totalBytes = 0;
     async function readLocal(file: string) {
       const resolved = await realpath(join(root, file));
       const rel = relative(root, resolved);
       if (rel.startsWith('..') || isAbsolute(rel)) throw new Error('UNSAFE_PATH');
       const info = await stat(resolved);
-      if (!info.isFile() || info.size > MAX_BYTES) throw new Error('INVALID_FILE');
+      totalBytes += info.size;
+      if (!info.isFile() || info.size > MAX_BYTES || totalBytes > MAX_BYTES * 8) throw new Error('INVALID_FILE');
       const content = await readFile(resolved, 'utf8');
       if (privateText.test(content)) throw new Error('PRIVATE_DATA');
       return content;
