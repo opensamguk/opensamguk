@@ -23,6 +23,7 @@ import { persistMonthly, loadReplayState } from './monthly';
 import { hashState } from '@opensamguk/shared/node';
 import { processPendingInput } from './inputs';
 import { engineResolver, persistExt, verifyWorldExt } from './extState';
+import { assertWorldCapabilities } from './capsGate';
 
 export const CLOCK_CHECKPOINT_MS = 5_000;
 export const ENGINE_BATCH_STEPS = 64;
@@ -121,6 +122,7 @@ export class TurnLoop {
         // 일시정지·재개와 턴 commit이 같은 월드 행에서 직렬화된다.
         await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${worldId} FOR UPDATE`;
         const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
+        await assertWorldCapabilities(tx, world);
         if (!this.extVerified) await verifyWorldExt(tx, world);
         const baselineActiveTick = await policyBaseline(tx, world);
         if (world.status !== 'RUNNING') {

@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import type { PrismaClient } from '@opensamguk/db';
+import type { Prisma, PrismaClient } from '@opensamguk/db';
 import type { Lease } from './lease';
 import { processPendingInput } from './inputs';
 import { TurnLoop } from './turnLoop';
@@ -20,6 +20,11 @@ function fixture(status: 'PAUSED' | 'RUNNING', human: boolean, modern = false) {
   const world = {
     id: 'binding-world',
     status,
+    preset: null,
+    treatyFormat: null,
+    replayOrigin: null,
+    endYear: null,
+    outcomeFromSequence: 0,
     policyFromSequence: modern ? 0 : null,
     actionSequence: 7,
     clockTick: 600,
@@ -42,6 +47,12 @@ function fixture(status: 'PAUSED' | 'RUNNING', human: boolean, modern = false) {
       throw new Error(`예상하지 않은 원시 조회: ${sql}`);
     }),
     world: { findUniqueOrThrow: vi.fn().mockResolvedValue(world) },
+    treaty: {
+      findMany: vi.fn(async ({ where }: Prisma.TreatyFindManyArgs) => {
+        if (!locked || where?.worldId !== world.id) throw new Error('잠근 월드의 조약 조회가 아닙니다.');
+        return [];
+      }),
+    },
     general: { findFirst: vi.fn().mockResolvedValue(human ? { id: 1 } : null) },
   };
   const db = { $transaction: vi.fn(async (run: (value: typeof tx) => unknown) => run(tx)) };
