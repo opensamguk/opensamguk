@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { applyOps, SLOT_COUNT, toSaveSlots, type Turn } from '../turns/draft';
+import { applyOps, SLOT_COUNT, toSaveSlots, toTurn, type Turn } from '../turns/draft';
 import type { GameDate, InspectionRow, MemberTimeline, SlotView, Suggestion, TimelineCell } from './contract';
 import { InspectionTable, officerName } from './InspectionPage';
 import { beyondNote, cellFor, suggestionDiff, suggestionOps, VERDICT_VIEW, visibleMonths } from './timeline';
@@ -90,18 +90,18 @@ describe('작전에 맞추기', () => {
 
   it('바뀌는 칸만 put으로 넣고 표시 이름은 버린다', () => {
     expect(suggestionOps(suggestion)).toEqual([
-      { put: { indices: [1], turn: { commandKey: 'recruit', args: { amount: 1200, crewType: 1 } } } },
-      { put: { indices: [4], turn: { commandKey: 'attack', args: { cityKey: 12 } } } },
+      { put: { indices: [1], turn: { commandKey: 'recruit', args: { amount: 1200, crewType: 1 }, explicit: true } } },
+      { put: { indices: [4], turn: { commandKey: 'attack', args: { cityKey: 12 }, explicit: true } } },
     ]);
   });
 
   it('고치던 초안 위에 넣으면 작전 밖 칸과 다른 편집은 그대로이고 저장 입력은 메인 편집기와 같다', () => {
-    const draft: Turn[] = current.map((s) => ({ commandKey: s.commandKey, args: { ...(s.args as object) } }));
-    draft[9] = { commandKey: 'farm', args: {} };
+    const draft: Turn[] = current.map((s) => toTurn(s));
+    draft[9] = { commandKey: 'farm', args: {}, explicit: true };
     const next = applyOps(draft, suggestionOps(suggestion));
-    expect(next[0]).toEqual({ commandKey: 'train', args: {} });
-    expect(next[9]).toEqual({ commandKey: 'farm', args: {} });
-    expect(next[4]).toEqual({ commandKey: 'attack', args: { cityKey: 12 } });
+    expect(next[0]).toEqual({ commandKey: 'train', args: {}, explicit: true });
+    expect(next[9]).toEqual({ commandKey: 'farm', args: {}, explicit: true });
+    expect(next[4]).toEqual({ commandKey: 'attack', args: { cityKey: 12 }, explicit: true });
     const saved = toSaveSlots(next);
     expect(saved[2]).toBeNull();
     expect(saved[4]).toEqual({ commandKey: 'attack', args: { cityKey: 12 } });

@@ -54,7 +54,7 @@ describe('작전에 맞추기 패널', () => {
     fireEvent.click(screen.getByRole('button', { name: '초안에 넣기' }));
     expect(draft.edit).toHaveBeenCalledTimes(2);
     expect(draft.edit).toHaveBeenLastCalledWith({
-      put: { indices: [5], turn: { commandKey: 'attack', args: { cityKey: 12 } } },
+      put: { indices: [5], turn: { commandKey: 'attack', args: { cityKey: 12 }, explicit: true } },
     });
     expect(draft.submit).not.toHaveBeenCalled();
     expect(screen.getByRole('status').textContent).toContain('제안 2칸을 초안에 넣었습니다');
