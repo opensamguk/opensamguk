@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { pnpmCli } from '../tools/node-cli';
 import { createAccount, e2eDatabaseUrl, newEmail, TEST_PASSWORD, withE2eDb } from './account';
 import { createGeneralByApi, e2eWorld, query } from './game';
 
@@ -10,7 +11,7 @@ type LobbyWorld = { id: string; name: string; status: string; startedAt: string 
 
 function run(args: string[]): string {
   e2eDatabaseUrl();
-  const result = spawnSync('pnpm', ['-s', ...args], { encoding: 'utf8', env: process.env });
+  const result = spawnSync(...pnpmCli(['-s', ...args]), { encoding: 'utf8', env: process.env });
   if (result.status !== 0) throw new Error(`pnpm ${args[0]} 실패: ${result.stderr}`);
   return result.stdout;
 }
