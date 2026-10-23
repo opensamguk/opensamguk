@@ -54,6 +54,7 @@ model World {
   publicMaps      PublicMapSnapshot[]
   messages        Message[]
   notices         Notice[]
+  operations      Operation[]
 }
 
 enum WorldStatus {
@@ -119,6 +120,7 @@ model Nation {
   noticeRevision Int @default(0)
   noticeUpdatedAt DateTime?
   noticeUpdatedBy String?
+  operations     Operation[]
 
   @@id([worldId, id])
 }
@@ -151,6 +153,7 @@ model City {
   nation        Nation? @relation("OwnedCities", fields: [worldId, nationId], references: [worldId, id], onDelete: NoAction)
   capitalOf     Nation[] @relation("Capital")
   generals      General[]
+  operationTargets Operation[]
 
   @@id([worldId, cityKey])
   @@unique([worldId, name])
@@ -198,6 +201,8 @@ model General {
   turns          GeneralTurn[]
   logs           GeneralLog[]
   battleLogs     BattleLog[]
+  operationsCreated Operation[]
+  operationMembers OperationMember[]
   world          World   @relation(fields: [worldId], references: [id], onDelete: Cascade)
   nation         Nation? @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: NoAction)
   city           City    @relation(fields: [worldId, cityKey], references: [worldId, cityKey], onDelete: NoAction)
@@ -207,6 +212,43 @@ model General {
   @@index([worldId, nationId])
   @@index([worldId, cityKey])
   @@index([worldId, nextTurnTick, id])
+}
+
+enum OperationStatus {
+  OPEN
+  CLOSED
+}
+
+model Operation {
+  id            String          @id @default(uuid())
+  worldId       String
+  nationId      Int
+  targetCityKey Int
+  targetTick    BigInt
+  minCrew       Int
+  minTrain      Int
+  minAtmos      Int
+  status        OperationStatus @default(OPEN)
+  createdById   Int
+  world         World           @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  nation        Nation          @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: Cascade)
+  target        City            @relation(fields: [worldId, targetCityKey], references: [worldId, cityKey], onDelete: NoAction)
+  createdBy     General         @relation(fields: [worldId, createdById], references: [worldId, id], onDelete: Cascade)
+  members       OperationMember[]
+
+  @@unique([worldId, id])
+  @@index([worldId, nationId, status, targetTick, id])
+}
+
+model OperationMember {
+  worldId     String
+  operationId String
+  generalId   Int
+  operation   Operation @relation(fields: [worldId, operationId], references: [worldId, id], onDelete: Cascade)
+  general     General   @relation(fields: [worldId, generalId], references: [worldId, id], onDelete: Cascade)
+
+  @@id([operationId, generalId])
+  @@index([worldId, generalId])
 }
 
 model EngineLease {
