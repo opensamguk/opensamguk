@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "yearbook:backfill": "tsx --env-file-if-exists=../../.env src/cli/backfillYearbookNations.ts",
     "dev": "tsx watch --env-file-if-exists=../../.env src/index.ts",
     "engine:run": "tsx --env-file-if-exists=../../.env src/index.ts",
     "supervisor": "tsx --env-file-if-exists=../../.env src/index.ts",

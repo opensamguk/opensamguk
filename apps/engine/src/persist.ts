@@ -1,16 +1,18 @@
 import type { Prisma } from '@opensamguk/db';
 import type { Effect, WorldState } from '@opensamguk/rules';
 import { persistCommandState } from './commandPersistence';
+import type { ActionAt } from './nationArchive';
 
 export async function persistEffects(
   tx: Prisma.TransactionClient,
   worldId: string,
   state: WorldState,
   effects: readonly Effect[],
+  at: ActionAt,
 ) {
   // 규칙에서 보정한 최종값만 저장한다. 같은 필드의 효과가 여럿이어도 한 번 쓴다.
   if (effects.some((effect) => effect.kind === 'world')) {
-    await persistCommandState(tx, worldId, state);
+    await persistCommandState(tx, worldId, state, at);
     return;
   }
   const changes = new Map<string, Exclude<Effect, { kind: 'world' }>>();
