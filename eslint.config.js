@@ -169,4 +169,29 @@ export default defineConfig([
       ],
     },
   },
+  // 예외 E3 (T4-76): 지도 편집기는 순수 자원 검증 하위 경로 하나만 읽는다.
+  {
+    files: ['apps/web/src/mapEditor/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@opensamguk/db', '@opensamguk/db/*', '@opensamguk/engine', '@opensamguk/engine/*'],
+              message: BOUNDARY_MESSAGE,
+            },
+            {
+              group: ['@opensamguk/server', '@opensamguk/server/*'],
+              allowTypeImports: true,
+              message: BOUNDARY_MESSAGE,
+            },
+            { regex: '^@opensamguk/rules(?:$|/(?!resource-validation$))', message: BOUNDARY_MESSAGE },
+            { regex: '^@opensamguk/shared/node(?:$|/)', message: BOUNDARY_MESSAGE },
+            { group: NODE_BUILTINS, message: BOUNDARY_MESSAGE },
+          ],
+        },
+      ],
+    },
+  },
 ]);

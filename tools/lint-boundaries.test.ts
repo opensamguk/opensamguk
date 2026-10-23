@@ -145,3 +145,54 @@ describe('전투 시뮬레이터 예외', () => {
     ).toContain('opensamguk/no-cross-package-relative');
   });
 });
+
+describe('T4-76 순수 자원 검증기 예외 E3', () => {
+  const validation = "export { validateMap } from '@opensamguk/rules/resource-validation';\n";
+  it('지도 편집기에서만 정확한 하위 경로를 허용한다', async () => {
+    for (const file of ['apps/web/src/mapEditor/validate.ts', 'apps/web/src/mapEditor/contract.ts']) {
+      expect(await ruleIds(validation, file)).toEqual([]);
+      expect(
+        await ruleIds("export type { ResourceReport } from '@opensamguk/rules/resource-validation';\n", file),
+      ).toEqual([]);
+    }
+    for (const file of [
+      'apps/web/src/main/WorldMap.tsx',
+      'apps/web/src/battleSim/request.ts',
+      'apps/web/src/admin/maps/x.ts',
+    ]) {
+      expect(await ruleIds(validation, file), file).toContain('no-restricted-imports');
+    }
+  });
+  it('E3도 root·내부 경로·Node·DB 값은 읽지 못한다', async () => {
+    for (const spec of [
+      '@opensamguk/rules',
+      '@opensamguk/rules/resource-validation/internal',
+      '@opensamguk/rules/src/world/resources',
+      '@opensamguk/db',
+      '@opensamguk/engine',
+      '@opensamguk/shared/node',
+      'node:fs',
+      'fs/promises',
+    ]) {
+      expect(await ruleIds(`export * from '${spec}';\n`, 'apps/web/src/mapEditor/validate.ts'), spec).toContain(
+        'no-restricted-imports',
+      );
+    }
+    expect(
+      await ruleIds(
+        "export * from '../../../../packages/rules/src/world/validate/index';\n",
+        'apps/web/src/mapEditor/validate.ts',
+      ),
+    ).toContain('opensamguk/no-cross-package-relative');
+  });
+  it('새 rules 검증기도 IO·현재 시각·난수를 쓸 수 없다', async () => {
+    const file = 'packages/rules/src/world/validate/map.ts';
+    for (const spec of ['node:fs', 'fs', '@opensamguk/db', '@opensamguk/shared/node']) {
+      expect(await ruleIds(`export * from '${spec}';\n`, file)).toContain('no-restricted-imports');
+    }
+    expect(await ruleIds('export const x = fetch("/");\n', file)).toContain('no-restricted-globals');
+    expect(await ruleIds('export const x = Date.now();\n', file)).toContain('no-restricted-properties');
+    expect(await ruleIds('export const x = new Date();\n', file)).toContain('no-restricted-syntax');
+    expect(await ruleIds('export const x = Math.random();\n', file)).toContain('no-restricted-properties');
+  });
+});

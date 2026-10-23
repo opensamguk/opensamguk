@@ -50,6 +50,14 @@ Node `crypto` 구현은 `@opensamguk/shared/node`에 분리하며 rules·브라�
   중간 실패는 전체를 롤백합니다. 모든 관계는 `worldId`를 포함하는 외래키로 격리합니다.
 - 단위 테스트는 `tools/world-bootstrap.test.ts`, 실제 DB 검증은 `apps/engine/src/world/createWorld.integration.test.ts`입니다.
 
+### 편집 자원 검증 (T4-76)
+
+`@opensamguk/rules/resource-validation`은 파일이나 DB를 읽지 않고 지도·시나리오·병종·능력치·초상을 검사합니다. `version`이 없는 지도는 기존 v1 schema로 읽고 `version: 2`는 캔버스와 표시용 지형을 포함한 엄격한 형식으로 읽습니다. `normalizeMapToV2`는 입력을 복제하고 버린 칸의 경로를 돌려줍니다. v1의 유한수 `trade`·`frontState`와 출처 `$comment`는 보존합니다.
+
+보고의 `status`는 `pass`·`fail`·`incomplete`입니다. 오류가 있으면 `fail`, 참조 검사에 필요한 맥락이 빠지거나 깨졌으면 `incomplete`입니다. 경고만 있으면 통과할 수 있습니다. 지도에는 관련 시나리오 전체를 `scenarios`로 넘기며 참조 대상이 없을 때는 `[]`를 명시합니다. 한도·진단 코드·검사 순서와 호출자 책임은 [T4-76 계약](../plans/T4-76.md#계약)에 있습니다.
+
+기존 `buildInitialWorld`의 schema와 거부 검사는 그대로입니다. 새 검증기는 아직 엔진 로더나 게시 API에 연결하지 않았습니다. v2의 캔버스·지형은 `WorldInit`에 들어가지 않고 이동·전투·해시 계산도 바꾸지 않습니다. 내장 v1 지도와 정규화한 v2 지도에 표시 지형을 더해도 같은 초기 상태와 해시가 나오는지 시험합니다.
+
 ## 4. 프리셋 형식 (M2)
 
 `resources/preset/{regular,speed,beginner,hardcore}.json`을 읽어 월드를 만듭니다.
