@@ -20,6 +20,22 @@ export * from './commands/registry';
 export { extSliceKeys, restoreExtState } from './commands/ext/state';
 export * from './monthly/index';
 export * from './replay';
+export {
+  ORIGIN_CAPS,
+  ARCHIVE_CAPS,
+  CAPS_INPUT_OWNERS,
+  parseCapsOrigin,
+  selectSupportedCapabilities,
+  capsResourceHashInput,
+  validateCapsRecordedInput,
+  startCapsReplay,
+  applyCapsRecordedInput,
+  runCapsReplayAction,
+  type CapabilityDescriptor,
+  type CapsOrigin,
+  type CapabilitySelection,
+} from './replayCapabilities';
+export { selectWorldCapabilities, projectTreatyRows, type WorldCapabilities } from './capsWorld';
 export * from './general/create';
 export * from './general/creationBlock';
 export * from './supply';
@@ -41,6 +57,8 @@ export {
   TREATY_INPUTS,
   validateTreatyRecord,
   validateTreatyState,
+  validateClosedTreatyRow,
+  decodeTreatyRecord,
   treatyRespondByTick,
   applyTreatyInput,
   settleTreaties,
@@ -54,6 +72,7 @@ export type {
   TreatyClause,
   FirstTreatyClause,
   TreatyState,
+  ClosedTreatyRow,
   TreatyInput,
   TreatyApplied,
   TreatyRejectCode,
@@ -74,6 +93,35 @@ export {
   APPOINTABLE_OFFICER_LEVELS,
   isAppointableOfficerLevel,
 } from './personnel/permissions';
+export {
+  PERSONNEL_INPUTS,
+  applyPersonnelInput,
+  validatePersonnelRecord,
+  replayPersonnelInput,
+  finishPersonnelStep,
+  applyNationTurnsRecord,
+  PersonnelInvariantError,
+} from './personnel';
+export type {
+  PersonnelInputKind,
+  PersonnelRecordKind,
+  PersonnelRejectCode,
+  PersonnelRecordedInput,
+  AppliedPersonnelInput,
+  NationTurnsRecord,
+  PendingPersonnelEvent,
+  PersonnelInputContext,
+  PersonnelInputOutcome,
+  PersonnelStepResult,
+  PersonnelRecordContext,
+  OfficeTurns,
+  OfficeRevisions,
+  OfficeState,
+  OfficeView,
+  PersonnelChange,
+  ClosedOffer,
+  PersonnelLog,
+} from './personnel';
 export * from './tournament/bracket';
 export {
   createCommandResolver,
