@@ -1,18 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createDb, nextActionSequence, type Prisma } from '@opensamguk/db';
-import {
-  initialReplayState,
-  settleDiplomacy,
-  settleTreaties,
-  type TreatyInput,
-  type WorldState,
-} from '@opensamguk/rules';
-import { hashState } from '@opensamguk/shared/node';
+import { settleDiplomacy, settleTreaties, type TreatyInput, type WorldState } from '@opensamguk/rules';
 import { monthlyFixture } from '../test/monthlyFixture';
 import { loadWorld } from './worldLoader';
 import { loadTreaties, persistTreatyClosures } from './treatyState';
 import { processTreatyInput } from './treatyInput';
+import { saveInitialWorld } from './world/persistence';
+import { controlClock } from './world/clock';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -31,12 +26,10 @@ afterAll(async () => {
   }
 });
 
-// 원시 DB 저장 경계 fixture다. cap6 선택·origin 생성·CLI·리스·loop 검증이 아니다.
+// 실제 factory로 만든 저장 경계 fixture다. CLI·리스·loop 검증은 별도다.
 async function fixture(npc = false) {
   const initial = await monthlyFixture();
-  const worldId = randomUUID();
   const userIds = [randomUUID(), randomUUID(), randomUUID()];
-  worlds.add(worldId);
   userIds.forEach((id) => users.add(id));
   initial.nations = initial.nations.map((nation) => ({ ...nation, gold: 1000, isNpc: npc && nation.id === 2 }));
   initial.generals = initial.generals.map((general, index) => ({
@@ -44,41 +37,20 @@ async function fixture(npc = false) {
     userId: npc && index === 1 ? null : userIds[index]!,
     officerLevel: index < 2 ? 12 : 1,
   }));
-  await db.$transaction(async (tx) => {
-    await tx.user.createMany({
-      data: userIds
-        .filter((_, index) => !npc || index !== 1)
-        .map((id) => ({ id, email: `${id}@example.invalid`, passwordHash: 'test-only' })),
-    });
-    await tx.world.create({
-      data: {
-        id: worldId,
-        name: '조약 저장 경계',
-        scenarioKey: initial.scenarioKey,
-        mapKey: initial.mapKey,
-        unitSetKey: initial.unitSetKey,
-        seed: initial.seed,
-        startYear: initial.startYear,
-        turnTermMinutes: 60,
-        status: 'RUNNING',
-        treatyFormat: 1,
-        initialStateHash: hashState(initialReplayState(initial)),
-        statRules: initial.statRules,
-        unitSet: initial.unitSet as unknown as Prisma.InputJsonValue,
-      },
-    });
-    await tx.nation.createMany({
-      data: initial.nations.map((nation) => ({ ...nation, worldId, capitalCityKey: null })),
-    });
-    await tx.city.createMany({ data: initial.cities.map((city) => ({ ...city, worldId })) });
-    for (const nation of initial.nations)
-      await tx.nation.update({
-        where: { worldId_id: { worldId, id: nation.id } },
-        data: { capitalCityKey: nation.capitalCityKey },
-      });
-    await tx.general.createMany({ data: initial.generals.map((general) => ({ ...general, worldId })) });
-    await tx.diplomacy.createMany({ data: initial.diplomacies.map((relation) => ({ ...relation, worldId })) });
+  await db.user.createMany({
+    data: userIds
+      .filter((_, index) => !npc || index !== 1)
+      .map((id) => ({ id, email: `${id}@example.invalid`, passwordHash: 'test-only' })),
   });
+  const { worldId } = await saveInitialWorld(db, initial, {
+    name: '조약 저장 경계',
+    turnTermMinutes: 60,
+    endYear: null,
+    replayFormat: 'legacy',
+    treatyFormat: 1,
+  });
+  worlds.add(worldId);
+  await controlClock(db, worldId, 'start', 0);
   return { worldId, userIds };
 }
 
@@ -189,6 +161,8 @@ describe('T2-07 / AC-M2-06 실제 PostgreSQL 조약 저장 component', () => {
 
   it('원시 저장 세계를 enabled-world나 origin6 생성 증거로 삼지 않는다', async () => {
     const { worldId } = await fixture();
+    // 이 음성 사례만 실제 생성 뒤 origin을 지워 파손 행을 만든다.
+    await db.$executeRaw`UPDATE "World" SET "replayOrigin" = NULL WHERE id = ${worldId}`;
     const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
     expect(world.treatyFormat).toBe(1);
     expect(world.replayOrigin).toBeNull();
