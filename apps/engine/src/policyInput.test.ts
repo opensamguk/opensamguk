@@ -41,7 +41,8 @@ function fixture() {
     marker,
     generals,
     tx,
-    run: () => processPendingInput(tx as unknown as Prisma.TransactionClient, world, 999),
+    run: (baselineActiveTick?: number) =>
+      processPendingInput(tx as unknown as Prisma.TransactionClient, world, 999, baselineActiveTick),
   };
 }
 
@@ -94,3 +95,66 @@ it.each(['ENDED', 'futureF', 'userId', 'generalId', 'key', 'overflow'] as const)
     expect(f.tx.inputEvent.updateMany).not.toHaveBeenCalled();
   },
 );
+
+function humanFixture() {
+  const f = fixture();
+  f.generals.push({ id: 2, userId: 'human' });
+  f.tx.generalTurn.findMany.mockResolvedValue(
+    [1, 2].flatMap((generalId) =>
+      emptyQueue().map((slot, index) => ({ ...slot, explicit: generalId === 2, generalId, slot: index })),
+    ),
+  );
+  return f;
+}
+
+it.each([0, 600])(
+  '사람 전환의 명시 기준 %s는 기록과 사람 열에만 쓰고 활동 시각은 지어내지 않는다',
+  async (baseline) => {
+    const f = humanFixture();
+    expect(await f.run(baseline)).toBe(true);
+    expect(f.tx.inputEvent.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'APPLIED',
+          sequence: 8,
+          result: expect.objectContaining({ baselineActiveTick: baseline, clockTick: 600 }),
+        }),
+      }),
+    );
+    expect(f.tx.general.updateMany).toHaveBeenNthCalledWith(1, {
+      where: { worldId: 'world' },
+      data: { defaultPolicy: 'none', lastActiveTick: null, lastActiveAt: null },
+    });
+    expect(f.tx.general.updateMany).toHaveBeenNthCalledWith(2, {
+      where: { worldId: 'world', userId: { not: null } },
+      data: { lastActiveTick: baseline },
+    });
+  },
+);
+
+it.each([1, 599, 601, 999, 0.5, -1, NaN, Infinity])(
+  '사람 전환의 잘못된 명시 기준 %s는 쓰기 전에 거부한다',
+  async (baseline) => {
+    const f = humanFixture();
+    await expect(f.run(baseline)).rejects.toThrow('명시 활동 기준');
+    expect(f.tx.world.update).not.toHaveBeenCalled();
+    expect(f.tx.general.updateMany).not.toHaveBeenCalled();
+    expect(f.tx.inputEvent.updateMany).not.toHaveBeenCalled();
+  },
+);
+
+it('인자 없는 사람 전환은 순서 상한에서도 계속 기다리고 NPC에 명시 값을 넣으면 거부한다', async () => {
+  const f = humanFixture();
+  f.world.actionSequence = 2_147_483_647;
+  expect(await f.run()).toBeNull();
+  expect(f.tx.world.update).not.toHaveBeenCalled();
+  expect(f.tx.general.updateMany).not.toHaveBeenCalled();
+  await expect(fixture().run(0)).rejects.toThrow('사람 장수가 없는 전환');
+});
+
+it('PENDING이 없으면 명시 인자는 쓰이지 않는다', async () => {
+  const f = fixture();
+  f.tx.inputEvent.findFirst.mockResolvedValue(null);
+  expect(await f.run(600)).toBe(false);
+  expect(f.tx.world.update).not.toHaveBeenCalled();
+});

@@ -12,8 +12,9 @@ import { hashState } from '@opensamguk/shared/node';
 import { monthlyFixture } from '../test/monthlyFixture';
 import { replayArchive, resourceHash, type ReplayArchiveV5 } from './replay';
 
-async function npcTransitionArchive() {
+async function transitionArchive(baselineActiveTick: number | null = null, human = false) {
   const initial = await monthlyFixture();
+  if (human) initial.generals[0]!.userId = 'human';
   let replay = initialReplayState(initial);
   let sequence = 0;
   const months: ReplayArchiveV5['months'] = [];
@@ -41,11 +42,11 @@ async function npcTransitionArchive() {
     kind: 'system.policy.enable',
     status: 'APPLIED',
     payload: { version: 5, emptySlots: [3] },
-    result: { fromSequence, emptySlots: [3], clockTick: 60000, turnTermMinutes: 30, baselineActiveTick: null },
+    result: { fromSequence, emptySlots: [3], clockTick: 60000, turnTermMinutes: 30, baselineActiveTick },
   };
-  // NPC 전용 순수 기록이므로 기존 인간 장수의 미정 기준을 선택하거나 DB에 적용하지 않는다.
-  expect(initial.generals.every((general) => general.userId === null)).toBe(true);
-  replay = enableReplayPolicy(replay, 30, null, [3]);
+  // 이 순수 fixture의 명시 인자는 운영 기준 선택이나 실제 기존 사람 월드 전환이 아니다.
+  expect(initial.generals.some((general) => general.userId !== null)).toBe(human);
+  replay = enableReplayPolicy(replay, 30, baselineActiveTick, [3]);
   const rejected: RecordedInput = {
     sequence: ++sequence,
     generalId: 1,
@@ -72,7 +73,7 @@ async function npcTransitionArchive() {
 }
 
 it('archive5는 NPC의 중간 전환 전 여섯 달 해시와 전환 뒤 여섯 달을 함께 재생한다', async () => {
-  const { archive, firstSix } = await npcTransitionArchive();
+  const { archive, firstSix } = await transitionArchive();
   const result = replayArchive(archive, 12);
   expect(result).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
   expect(result.slice(0, 6)).toEqual(firstSix.map(({ tick, stateHash }) => ({ tick, stateHash })));
@@ -80,7 +81,7 @@ it('archive5는 NPC의 중간 전환 전 여섯 달 해시와 전환 뒤 여섯 
 });
 
 it('표지 수·정확한 untouched 집합·미지원 거절 kind·추가 config를 엄격히 검사한다', async () => {
-  const { archive } = await npcTransitionArchive();
+  const { archive } = await transitionArchive();
   expect(() => replayArchive({ ...archive, inputs: archive.inputs.slice(1) })).toThrow();
   const forged = structuredClone(archive);
   forged.inputs[0]!.payload = { version: 5, emptySlots: [2] };
@@ -101,7 +102,7 @@ it('사람 장수의 null 활동 기준은 도우미와 F 경계 양쪽에서 �
   const initial = await monthlyFixture();
   initial.generals[0]!.userId = 'human';
   expect(() => enableReplayPolicy(initialReplayState(initial), 30, null)).toThrow('활동 기준');
-  const { archive } = await npcTransitionArchive();
+  const { archive } = await transitionArchive();
   // 손상된 archive의 origin 해시도 다시 맞춰야 F의 상태 검사까지 도달한다.
   archive.origin.initial.generals[0]!.userId = 'human';
   archive.origin.initialStateHash = hashState(archive.origin.initial);
@@ -119,6 +120,17 @@ it('사람 장수의 null 활동 기준은 도우미와 F 경계 양쪽에서 �
     baselineActiveTick: null,
   };
   archive.inputs = [marker];
-  archive.months.push({ ...(await npcTransitionArchive()).archive.months[0]!, sequence: 2 });
+  archive.months.push({ ...(await transitionArchive()).archive.months[0]!, sequence: 2 });
   expect(() => replayArchive(archive, 1)).toThrow('활동 기준');
+});
+
+it('사람 fixture의 두 명시 기준은 옛 여섯 달을 보존하고 기록된 활동값으로만 재생한다', async () => {
+  const zero = await transitionArchive(0, true);
+  const tick = await transitionArchive(60000, true);
+  expect(zero.firstSix).toEqual(tick.firstSix);
+  expect(zero.archive.months.slice(6).map((month) => month.stateHash)).not.toEqual(
+    tick.archive.months.slice(6).map((month) => month.stateHash),
+  );
+  for (const { archive } of [zero, tick])
+    expect(replayArchive(archive, 12)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
 });

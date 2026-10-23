@@ -25,6 +25,7 @@ export async function processPendingInput(
   tx: Prisma.TransactionClient,
   world: Prisma.WorldGetPayload<Record<string, never>>,
   tick: number,
+  baselineActiveTick?: number,
 ): Promise<boolean | null> {
   const event = await tx.inputEvent.findFirst({
     where: {
@@ -67,7 +68,20 @@ export async function processPendingInput(
     if (JSON.stringify(emptyIds) !== JSON.stringify(payload.emptySlots))
       throw new Error('전환 표지와 빈칸 집합이 다릅니다.');
     // 앞선 생성 입력이 사람 장수를 더한 경우도 현재 상태로 판정한다.
-    if (generals.some((general) => general.userId !== null)) return null;
+    const hasHuman = generals.some((general) => general.userId !== null);
+    let appliedBaseline: number | null = null;
+    if (hasHuman) {
+      // 일반 엔진 호출은 이 인자를 넘기지 않아 사용자 결정 전 대기를 유지한다.
+      if (baselineActiveTick === undefined) return null;
+      if (
+        !Number.isSafeInteger(baselineActiveTick) ||
+        (baselineActiveTick !== 0 && baselineActiveTick !== world.clockTick)
+      )
+        throw new Error('명시 활동 기준은 0 또는 잠근 월드 tick이어야 합니다.');
+      appliedBaseline = baselineActiveTick;
+    } else if (baselineActiveTick !== undefined) {
+      throw new Error('사람 장수가 없는 전환에는 활동 기준을 넣지 않습니다.');
+    }
     if (world.actionSequence >= 2_147_483_647) throw new Error('전환 순서 저장 범위를 넘었습니다.');
     const fromSequence = await nextActionSequence(tx, world.id);
     const result = policyMarkerResultSchema.parse({
@@ -75,7 +89,7 @@ export async function processPendingInput(
       emptySlots: payload.emptySlots,
       clockTick: world.clockTick,
       turnTermMinutes: world.turnTermMinutes,
-      baselineActiveTick: null,
+      baselineActiveTick: appliedBaseline,
     });
     const savedWorld = await tx.world.updateMany({
       where: { id: world.id, policyFromSequence: null },
@@ -86,6 +100,11 @@ export async function processPendingInput(
       where: { worldId: world.id },
       data: { defaultPolicy: 'none', lastActiveTick: null, lastActiveAt: null },
     });
+    if (appliedBaseline !== null)
+      await tx.general.updateMany({
+        where: { worldId: world.id, userId: { not: null } },
+        data: { lastActiveTick: appliedBaseline },
+      });
     const savedMarker = await tx.inputEvent.updateMany({
       where: { id: event.id, status: 'PENDING' },
       data: { status: 'APPLIED', sequence: fromSequence, result },
