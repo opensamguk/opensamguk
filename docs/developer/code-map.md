@@ -42,7 +42,7 @@
 | `packages/rules/src/ranking.ts` | 공헌·경험·전공·국가 순위와 공개 국력 계산, 동률 ID 정렬 |
 | `apps/engine/src/ranking.ts`, `ranking.integration.test.ts` | 월간 트랜잭션의 순위 캐시 교체, 전공 누계·롤백·재생 호환 검증 |
 | `apps/engine/src/nationArchive.ts`, `nationArchive.integration.test.ts`, `cli/backfillYearbookNations.ts` | T4-56 (가) PR1: 삭제 직전 국가 표시값과 월간 프레임의 이름·색 저장, 실제 PostgreSQL 롤백·재시작·재생과 legacy 백필 검증 |
-| `apps/server/src/routers/timelapse.ts`, `timelapse.test.ts`, `timelapse.integration.test.ts` | T4-35: 월간 도시 소유를 오래된 순으로 읽는 로그인 API. 현재 국가 이름·색만 함께 읽고 국력·자원은 내지 않는다 |
+| `apps/server/src/routers/timelapse.ts`, `timelapse.test.ts`, `timelapse.integration.test.ts` | T4-35·T4-56 (가): 월간 도시 소유를 오래된 순으로 읽는 로그인 API. 프레임마다 저장한 국가 이름·색과 별도의 현재 표시값을 읽고 국력·자원은 내지 않는다 |
 | `apps/server/src/routers/world.ts` | 기존 `world.list`, 서버 시계 요약과 공개 94도시 지도 |
 | `apps/server/src/routers/home.ts`, `city.ts`, `nation.ts`, `records.ts` | 세션 기준 메인·도시·국가·개인/국가/월드 기록 조회. 국가 기록은 DB JSON 조건으로 월간 요약만 페이지 처리 |
 | `apps/server/src/visibility.ts`, `queries.ts` | 공개 필드 허용 목록과 범위 표, strict 입력, 일관된 읽기, 시각·페이지 변환 |
@@ -89,6 +89,8 @@
 ## 새 저장 필드를 추가할 때 빠뜨리기 쉬운 것
 
 T4-56의 `RemovedNation`과 `YearbookNation`은 공개 표시값 보관이며 `WorldState`·재생 해시·보관 파일에는 넣지 않는다. 기존 프레임의 백필은 `pnpm db:migrate` 뒤 `pnpm --filter @opensamguk/engine yearbook:backfill`으로 보고를 확인하고 `--apply`로 실행한다. 현재 국가·삭제 보존·생성 기록의 이름과 색이 모두 일치할 때만 채운다. 근거가 없으면 부분 프레임으로 남기고 충돌이면 그 월드 전체를 롤백한다. 이름·색 변경을 넣는 T4-16은 같은 PR에서 이 CLI와 script를 지워야 한다.
+
+`timelapse.frames`는 같은 RepeatableRead 트랜잭션에서 월간 도시 소유와 `YearbookNation`을 읽는다. 각 프레임의 `nations`에는 그 달 도시를 소유한 국가의 저장된 ID·이름·색만 담는다. `currentNations`에는 이 페이지의 도시 소유 ID 가운데 지금 살아 있는 국가의 표시값을 따로 담는다. 과거 저장값이 없으면 해당 국가를 `nations`에서 생략하며 현재값이나 회색으로 채우지 않는다. `RemovedNation`은 이 조회로 공개하지 않는다.
 
 순위는 `RankingSnapshot`에 월드별 최신 정산의 공개 필드만 저장한다. API는 캐시를 읽고 세션 장수의 순위를 찾으며 조회 중 캐시를 만들지 않는다.
 `General.battleWins`, `General.captures`는 전투 결과에서 집계한 조회용 누계다. 기존 재생 해시를 보존하려고 `worldLoader`와 `world/persistence`의 게임 상태 적재에서는 제외한다. 기존 연감의 비공개 국력 계산은 유지한다.
