@@ -1,9 +1,43 @@
 import { z } from 'zod';
-import { protectedProcedure, router } from '../trpc';
+import { protectedProcedure, publicProcedure, router } from '../trpc';
 import { readWorld, worldInput, worldSummary } from '../queries';
-import { mapCity } from '../visibility';
+import { mapCity, publicMapInfo } from '../visibility';
 
 export const worldRouter = router({
+  publicMaps: publicProcedure.input(z.void()).query(async ({ ctx }) => {
+    const { delayMinutes } = ctx.publicMapConfig;
+    const worlds = await ctx.db.world.findMany({
+      where: { status: { in: ['RUNNING', 'PAUSED'] } },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        publicMaps: {
+          where: { takenAt: { lte: new Date(ctx.now - delayMinutes * 60_000) } },
+          orderBy: { takenAt: 'desc' },
+          take: 1,
+          select: { takenAt: true, year: true, month: true, data: true },
+        },
+      },
+    });
+    return {
+      delayMinutes,
+      worlds: worlds.map(({ id, name, status, publicMaps }) => {
+        const snapshot = publicMaps[0];
+        const data = snapshot && publicMapInfo(snapshot.data);
+        return {
+          id,
+          name,
+          status: status as 'RUNNING' | 'PAUSED',
+          map:
+            snapshot && data
+              ? { takenAt: snapshot.takenAt.toISOString(), year: snapshot.year, month: snapshot.month, ...data }
+              : null,
+        };
+      }),
+    };
+  }),
   list: protectedProcedure.input(z.void()).query(async ({ ctx }) => {
     const worlds = await ctx.db.world.findMany({
       where: { status: 'RUNNING' },

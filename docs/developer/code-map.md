@@ -69,6 +69,17 @@
 | `apps/engine/src/cli/createWorld.ts` | `pnpm world:create` |
 | `tools/run-integration.ts` | 전용 테스트 DB 준비·migration·통합 테스트 실행 |
 
+## 공개 지도 (T2-24)
+
+| 위치 | 역할 |
+| ---- | ---- |
+| `packages/shared/src/publicMap.ts`, `publicMap.test.ts` | 지연·간격 설정의 공통 검사와 기본값 |
+| `apps/engine/src/publicMap.ts`, `turnLoop.ts` | 실제 시각 지도 사본 저장·정리, 턴 트랜잭션과 실행권 연결 |
+| `apps/server/src/routers/world.ts`, `visibility.ts`, `publicMap.test.ts` | 무인증 지연 조회·공개 필드 투영·설정 시작 거부 검사 |
+| `tools/public-map.integration.test.ts` | 실제 HTTP·PostgreSQL의 지연 경계·오염 JSON·리스·롤백·재시작·12개월 재생 검증 |
+
+`packages/db/prisma/migrations/20261023010000_public_map_snapshot/migration.sql`이 `PublicMapSnapshot`을 만듭니다. 실제 HTTP와 엔진을 함께 실행하는 시험은 패키지 사이 상대 import 경계를 지키도록 배포물 밖의 `tools/`에 둡니다. `tools/authz.integration.test.ts`와 서버의 `authz/exemptions.ts`에는 새 공개 조회를 대조 대상으로 등록합니다.
+
 ## 새 저장 필드를 추가할 때 빠뜨리기 쉬운 것
 
 순위는 `RankingSnapshot`에 월드별 최신 정산의 공개 필드만 저장한다. API는 캐시를 읽고 세션 장수의 순위를 찾으며 조회 중 캐시를 만들지 않는다.
