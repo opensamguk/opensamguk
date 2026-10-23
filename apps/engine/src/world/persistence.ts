@@ -1,6 +1,13 @@
 import type { PrismaClient, Prisma } from '@opensamguk/db';
 import type { WorldInit } from '@opensamguk/rules';
-import { parsePreset, presetRules, statRulesSchema, unitSetSchema, type WorldPreset } from '@opensamguk/rules';
+import {
+  emptyQueue,
+  parsePreset,
+  presetRules,
+  statRulesSchema,
+  unitSetSchema,
+  type WorldPreset,
+} from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { loadCommandState } from '../commandPersistence';
 
@@ -11,6 +18,7 @@ export async function saveInitialWorld(
     name: string;
     turnTermMinutes: number;
     endYear: number | null;
+    replayFormat?: 'legacy' | 'policy';
     preset?: { key: string; value: WorldPreset };
   },
 ) {
@@ -45,6 +53,7 @@ export async function saveInitialWorld(
           startYear: state.startYear,
           endYear: options.endYear,
           initialStateHash: stateHash,
+          ...(options.replayFormat === 'legacy' ? {} : { policyFromSequence: 0 }),
           replayOrigin: {
             version: 1,
             initial,
@@ -74,7 +83,21 @@ export async function saveInitialWorld(
           data: { capitalCityKey: nation.capitalCityKey },
         });
       }
-      await tx.general.createMany({ data: state.generals.map((general) => ({ ...general, worldId })) });
+      await tx.general.createMany({
+        data: state.generals.map((general) => ({
+          ...general,
+          worldId,
+          ...(options.replayFormat === 'legacy'
+            ? {}
+            : { defaultPolicy: 'none', lastActiveTick: general.userId === null ? null : 0 }),
+        })),
+      });
+      if (options.replayFormat !== 'legacy')
+        await tx.generalTurn.createMany({
+          data: state.generals.flatMap((general) =>
+            emptyQueue().map((turn, slot) => ({ ...turn, args: {}, worldId, generalId: general.id, slot })),
+          ),
+        });
       await tx.diplomacy.createMany({ data: state.diplomacies.map((diplomacy) => ({ ...diplomacy, worldId })) });
       await tx.nationTurn.createMany({
         data: Object.entries(state.nationTurns ?? {}).flatMap(([nationId, slots]) =>
@@ -108,7 +131,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
       const generals = await tx.general.findMany({
         where: { worldId },
         orderBy: { id: 'asc' },
-        omit: { noticeSeen: true },
+        omit: { noticeSeen: true, defaultPolicy: true, lastActiveTick: true, lastActiveAt: true },
       });
       const diplomacies = await tx.diplomacy.findMany({
         where: { worldId },

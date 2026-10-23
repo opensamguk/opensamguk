@@ -8,11 +8,13 @@ import {
   validateGeneralCreation,
   type CreationCode,
   type InitialGeneral,
+  policyKeySchema,
 } from '@opensamguk/rules';
 import { z } from 'zod';
 import { router, protectedProcedure } from '../trpc';
-import { requireWorld, worldInput } from '../game/queries';
+import { requireGeneral, requireWorld, worldInput } from '../game/queries';
 import { ownGeneral } from '../game/projection';
+import { readPolicy, requirePolicyReady } from '../game/policy';
 
 const codes = {
   ALREADY_EXISTS: 'CONFLICT',
@@ -46,6 +48,72 @@ const creationInputParser = {
   },
 };
 export const generalRouter = router({
+  policy: protectedProcedure.input(worldInput).query(({ ctx, input }) =>
+    ctx.db.$transaction(
+      async (tx) => {
+        await requireWorld(tx, input.worldId);
+        const general = await requireGeneral(tx, input.worldId, ctx.user.id);
+        return readPolicy(tx, input.worldId, ctx.user.id, general.id);
+      },
+      { isolationLevel: 'RepeatableRead' },
+    ),
+  ),
+  setPolicy: protectedProcedure
+    .input(worldInput.extend({ policy: policyKeySchema }))
+    .mutation(async ({ ctx, input }) => {
+      const started = performance.now();
+      const eventId = await ctx.db.$transaction(async (tx) => {
+        const world = await requireWorld(tx, input.worldId, true);
+        requirePolicyReady(world);
+        const general = await requireGeneral(tx, input.worldId, ctx.user.id, true);
+        const key = `general.setPolicy:${randomUUID()}`;
+        const payload = JSON.stringify({ policy: input.policy });
+        await tx.$executeRaw`INSERT INTO "InputEvent" ("worldId","userId","generalId",kind,"idempotencyKey",payload,status)
+        VALUES (${input.worldId},${ctx.user.id},${general.id},'general.setPolicy',${key},${payload}::jsonb,'PENDING') ON CONFLICT DO NOTHING`;
+        const event = await tx.inputEvent.findFirstOrThrow({
+          where: { worldId: input.worldId, generalId: general.id, kind: 'general.setPolicy', status: 'PENDING' },
+          orderBy: { id: 'asc' },
+        });
+        if ((event.payload as { policy: string }).policy !== input.policy)
+          throw new TRPCError({ code: 'CONFLICT', message: '다른 기본 방침 요청을 처리하고 있습니다.' });
+        return event.id;
+      });
+      const deadline = performance.now() + 5000;
+      while (true) {
+        const event = await ctx.db.inputEvent.findUniqueOrThrow({ where: { id: eventId } });
+        const remaining = deadline - performance.now();
+        if (event.status !== 'PENDING' || remaining <= 0) {
+          const session = await ctx.db.session.findFirst({
+            where: {
+              id: ctx.sessionId!,
+              userId: ctx.user.id,
+              expiresAt: { gt: new Date(ctx.now + performance.now() - started) },
+              user: { status: 'ACTIVE' },
+            },
+          });
+          if (!session) throw new TRPCError({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' });
+          if (event.status === 'PENDING') return { status: 'pending' as const };
+          if (event.status === 'REJECTED') {
+            const result = event.result as { code: string; message: string };
+            const code =
+              result.code === 'ACTOR_INACTIVE'
+                ? 'UNAUTHORIZED'
+                : result.code === 'WORLD_CLOSED'
+                  ? 'PRECONDITION_FAILED'
+                  : result.code === 'NO_GENERAL'
+                    ? 'FORBIDDEN'
+                    : 'BAD_REQUEST';
+            throw new TRPCError({ code, message: result.message });
+          }
+          const policy = await ctx.db.$transaction(
+            (tx) => readPolicy(tx, input.worldId, ctx.user.id, event.generalId!),
+            { isolationLevel: 'RepeatableRead' },
+          );
+          return { status: 'applied' as const, policy };
+        }
+        await delay(Math.min(100, remaining));
+      }
+    }),
   create: protectedProcedure.input(creationInputParser).mutation(async ({ ctx, input }) => {
     const started = performance.now();
     const { worldId, ...payload } = input;

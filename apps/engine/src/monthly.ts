@@ -1,5 +1,14 @@
 import type { Prisma } from '@opensamguk/db';
-import { emptyTurns, monthlyDate, runMonthly, type ReplayState, type WorldState } from '@opensamguk/rules';
+import {
+  assertSlotSet,
+  isPolicyKey,
+  isPolicyMode,
+  emptyTurns,
+  monthlyDate,
+  runMonthly,
+  type ReplayState,
+  type WorldState,
+} from '@opensamguk/rules';
 import { rngFor } from '@opensamguk/shared';
 import { hashState } from '@opensamguk/shared/node';
 import { loadWorld } from './worldLoader';
@@ -11,13 +20,33 @@ export async function loadReplayState(tx: Prisma.TransactionClient, worldId: str
   const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
   const generals = await tx.general.findMany({ where: { worldId } });
   const slots = await tx.generalTurn.findMany({ where: { worldId }, orderBy: { slot: 'asc' } });
+  const modern = isPolicyMode({ fromSequence: world.policyFromSequence ?? null, actionSequence: world.actionSequence });
   const turns = Object.fromEntries(generals.map(({ id }) => [id, emptyTurns()]));
-  for (const slot of slots) turns[slot.generalId]![slot.slot] = { commandKey: slot.commandKey, args: slot.args };
+  for (const general of generals) if (modern) assertSlotSet(slots.filter((slot) => slot.generalId === general.id));
+  for (const slot of slots)
+    turns[slot.generalId]![slot.slot] = {
+      commandKey: slot.commandKey,
+      args: slot.args,
+      ...(modern ? { explicit: slot.explicit } : {}),
+    };
+  const policy: ReplayState['policy'] = modern
+    ? { turnTermMinutes: world.turnTermMinutes, policies: {}, lastActiveTicks: {} }
+    : undefined;
+  if (policy)
+    for (const general of generals) {
+      if (!isPolicyKey(general.defaultPolicy)) throw new Error('저장된 기본 방침이 올바르지 않습니다.');
+      policy.policies[general.id] = general.defaultPolicy;
+      if (general.userId !== null) {
+        if (general.lastActiveTick === null) throw new Error('사람 장수의 활동 tick이 없습니다.');
+        policy.lastActiveTicks[general.id] = general.lastActiveTick;
+      }
+    }
   return {
     state,
     turns,
     revisions: Object.fromEntries(generals.map(({ id, turnRevision }) => [id, turnRevision])),
     monthlyTick: world.monthlyTick,
+    ...(policy ? { policy } : {}),
   };
 }
 

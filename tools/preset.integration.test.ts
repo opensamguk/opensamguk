@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import {
   initialReplayState,
+  enableReplayPolicy,
   presetRules,
   runCommand,
   applyEffects,
@@ -167,7 +168,9 @@ describe('T2-02 실제 DB 생성·고정', () => {
     const initial = await readWorldState(db, result.worldId);
     expect(hashState(initial)).toBe(result.stateHash);
     const replay = await db.$transaction((tx) => loadReplayState(tx, result.worldId));
-    expect(hashState(replay)).toBe(hashState(initialReplayState(initial)));
+    expect(hashState(replay)).toBe(
+      hashState(enableReplayPolicy(initialReplayState(initial), preset.turnTermMinutes, 0)),
+    );
     expect((world.replayOrigin as unknown as { initial: WorldInit }).initial).toEqual(initial);
   });
   it('속성 월드의 실제 엔진이 다음 턴을 10분 뒤로 잡는다', async () => {
@@ -543,6 +546,7 @@ describe('T2-02 참가·권한·재생', () => {
     ) as ReplayArchive;
     const { worldId } = await saveInitialWorld(db, archive.origin.initial, {
       name: '레거시 골든',
+      replayFormat: 'legacy',
       turnTermMinutes: 60,
       endYear: null,
     });
