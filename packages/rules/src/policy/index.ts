@@ -34,12 +34,12 @@ export function isInactive(lastActiveTick: number, tick: number, turnTermMinutes
     !Number.isSafeInteger(lastActiveTick) ||
     lastActiveTick < 0 ||
     !Number.isSafeInteger(tick) ||
-    tick < lastActiveTick ||
-    !Number.isFinite(turnTermMinutes) ||
+    tick < 0 ||
+    !Number.isSafeInteger(turnTermMinutes) ||
     turnTermMinutes <= 0
   )
     throw new Error('활동 tick과 턴 간격을 확인하세요.');
-  return tick - lastActiveTick > ((INACTIVE_AFTER_DAYS * 1440) / turnTermMinutes) * TICKS_PER_MONTH;
+  return BigInt(tick - lastActiveTick) * BigInt(turnTermMinutes) > BigInt(INACTIVE_AFTER_DAYS * 1440 * TICKS_PER_MONTH);
 }
 
 export interface PolicySlot {

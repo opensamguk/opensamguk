@@ -27,23 +27,32 @@ describe('AC-M2-17 기본 방침 순수 규칙', () => {
     for (const key of POLICY_KEYS) expect(isPolicyKey(key)).toBe(true);
   });
 
-  it.each([30, 60])('턴 간격 %i분인 월드는 진행 시간 14일을 초과해야 미접속이다', (minutes) => {
+  it.each([10, 30, 60])('턴 간격 %i분인 월드는 진행 시간 14일을 초과해야 미접속이다', (minutes) => {
     const start = 1234;
     const threshold = ((INACTIVE_AFTER_DAYS * 1440) / minutes) * TICKS_PER_MONTH;
     expect(isInactive(start, start + threshold, minutes)).toBe(false);
     expect(isInactive(start, start + threshold + 1, minutes)).toBe(true);
     // 현실 시각이나 정지 시간은 입력에 없으며 tick이 같으면 결과도 같다.
     expect(isInactive(start, start, minutes)).toBe(false);
+    expect(isInactive(start + 1, start, minutes)).toBe(false);
   });
 
   it('잘못된 활동 tick이나 턴 간격은 거부한다', () => {
     for (const args of [
       [-1, 1, 30],
-      [2, 1, 30],
+      [0, -1, 30],
       [0, 1, 0],
       [0, 1, NaN],
     ])
       expect(() => isInactive(args[0]!, args[1]!, args[2]!)).toThrow();
+  });
+
+  it('나누어떨어지지 않는 턴 간격도 정수 곱으로 판정한다', () => {
+    const numerator = INACTIVE_AFTER_DAYS * 1440 * TICKS_PER_MONTH;
+    const tick = Math.floor(numerator / 13);
+    expect(isInactive(0, tick, 13)).toBe(false);
+    expect(isInactive(0, tick + 1, 13)).toBe(true);
+    expect(isInactive(0, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER)).toBe(true);
   });
 
   it('사람 장수는 방침 범위의 내정·훈련·휴식만 고르고 NPC와 소유권을 바꾸지 않는다', () => {

@@ -3,7 +3,19 @@ import { commandRegistry, runCommand } from '../commands/registry';
 import type { CommandResolver } from '../commands/resolve';
 import type { Actor, CommandResult } from '../commands/types';
 import type { WorldView } from '../model/world';
-import { choosePolicyCommand, policyOptions, type PolicyKey } from './index';
+import { choosePolicyCommand, policyOptions, type PolicyKey, type PolicySlot } from './index';
+
+export function runPolicySlot(
+  view: WorldView,
+  actor: Actor,
+  slot: PolicySlot,
+  policy: PolicyKey,
+  seed: string,
+  resolver?: CommandResolver,
+) {
+  if (slot.explicit !== false || view.generals[actor.generalId]?.userId == null) return null;
+  return runPolicyCommand(view, actor, policy, seed, resolver);
+}
 
 export function runPolicyCommand(
   view: WorldView,
