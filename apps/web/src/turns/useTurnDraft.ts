@@ -4,7 +4,7 @@ import { useTRPC } from '../trpc';
 import { useWorldEnded } from '../game/queries';
 import { errorCode, retryUnlessClientError, serverMessage } from './apiError';
 import { applyOp, applyOps, SLOT_COUNT, toSaveSlots, toTurn, type EditOp, type Turn } from './draft';
-import type { TurnSource } from './source';
+import type { DisplaySlot, TurnSource } from './source';
 
 export { draftStorageKey } from './source';
 
@@ -141,7 +141,8 @@ export function useStoredSelection(draftKey: string) {
   return [selected, setSelected] as const;
 }
 
-export function useTurnDraft(worldId: string, source: TurnSource) {
+// 칸 모양 S는 연결(source)이 정한다. 저장 결과를 같은 S로 조회 캐시에 넣어 서버가 준 칸 정보를 잃지 않는다.
+export function useTurnDraft<S extends DisplaySlot>(worldId: string, source: TurnSource<S>) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { storageKey } = source;
@@ -252,5 +253,5 @@ export function useTurnDraft(worldId: string, source: TurnSource) {
   };
 }
 
-// 편집기 바깥 부품(작전 맞추기, T2-12)이 같은 초안에 편집을 넣을 때 받는 상태.
-export type TurnDraftState = ReturnType<typeof useTurnDraft>;
+// 편집기 바깥 부품(작전 맞추기, T2-12)이 같은 초안에 편집을 넣을 때 받는 상태. 칸 모양은 편집기가 읽는 최소 모양으로 본다.
+export type TurnDraftState = ReturnType<typeof useTurnDraft<DisplaySlot>>;
