@@ -225,8 +225,8 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
       ]);
       await loop.advanceTo(200);
       expect(
-        await db.generalLog.findUniqueOrThrow({
-          where: { worldId_generalId_tick: { worldId, generalId: 2, tick: 200 } },
+        await db.generalLog.findFirstOrThrow({
+          where: { worldId, generalId: 2, tick: 200, sequence: null },
         }),
       ).toMatchObject({ kind: 'success', text: expect.stringContaining('도시2 점령:') });
       expect(await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId, cityKey: 2 } } })).toMatchObject({
@@ -362,8 +362,8 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
     await queue(worldId, 2, 'attack', { cityKey: 2 });
     await loop.advanceTo(100);
     expect(
-      await db.generalLog.findUniqueOrThrow({
-        where: { worldId_generalId_tick: { worldId, generalId: 2, tick: 100 } },
+      await db.generalLog.findFirstOrThrow({
+        where: { worldId, generalId: 2, tick: 100, sequence: null },
       }),
     ).toMatchObject({ kind: 'success' });
     expect((await readWorldState(db, worldId)).cities[2]).toMatchObject({ supplied: false, agriculture: 100 });

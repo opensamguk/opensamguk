@@ -245,13 +245,13 @@ it.each(['zero', 'tick'] as const)(
     } finally {
       wall.mockRestore();
     }
-    const rest = await db.generalLog.findUniqueOrThrow({
-      where: { worldId_generalId_tick: { worldId: f.worldId, generalId: 1, tick: 60100 } },
+    const rest = await db.generalLog.findFirstOrThrow({
+      where: { worldId: f.worldId, generalId: 1, tick: 60100, sequence: null },
     });
     expect(rest.commandKey).toBe('rest');
     expect(rest.text).not.toContain('기본 방침');
-    const farm = await db.generalLog.findUniqueOrThrow({
-      where: { worldId_generalId_tick: { worldId: f.worldId, generalId: 1, tick: 70100 } },
+    const farm = await db.generalLog.findFirstOrThrow({
+      where: { worldId: f.worldId, generalId: 1, tick: 70100, sequence: null },
     });
     expect(farm.commandKey).toBe('farm');
     expect(farm.text).not.toContain('기본 방침');

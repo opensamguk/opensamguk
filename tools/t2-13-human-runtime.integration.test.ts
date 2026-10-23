@@ -245,8 +245,8 @@ it('정상 RUNNING은 지평과 다른 잠근 T로 전환하고 옛 생성 포�
     [60100, 'rest'],
     [70100, 'farm'],
   ] as const) {
-    const log = await db.generalLog.findUniqueOrThrow({
-      where: { worldId_generalId_tick: { worldId: f.worldId, generalId: 1, tick } },
+    const log = await db.generalLog.findFirstOrThrow({
+      where: { worldId: f.worldId, generalId: 1, tick, sequence: null },
     });
     expect(log.commandKey).toBe(commandKey);
     expect(log.text).not.toContain('기본 방침');
