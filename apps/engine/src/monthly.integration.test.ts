@@ -145,9 +145,11 @@ describe('AC-M1-12 실제 PostgreSQL 월 경계', () => {
       expect(await readWorldState(db, worldId)).toEqual(before);
       expect(await db.world.findUniqueOrThrow({ where: { id: worldId } })).toEqual(world);
       expect(await db.yearbookSnapshot.count({ where: { worldId } })).toBe(0);
+      expect(await db.yearbookNation.count({ where: { worldId } })).toBe(0);
       expect(await db.nationHistory.count({ where: { worldId } })).toBe(0);
       await loop.advanceTo(10000);
       expect(await db.yearbookSnapshot.count({ where: { worldId } })).toBe(1);
+      expect(await db.yearbookNation.count({ where: { worldId } })).toBe(Object.keys(before.nations).length);
     },
   );
 
@@ -186,11 +188,15 @@ describe('AC-M1-12 실제 PostgreSQL 월 경계', () => {
         child.kill('SIGKILL');
         await exited;
         expect(await db.yearbookSnapshot.count({ where: { worldId } })).toBe(phase === 'committed' ? 1 : 0);
+        expect(await db.yearbookNation.count({ where: { worldId } })).toBe(
+          phase === 'committed' ? template.nations.length : 0,
+        );
         await db.$executeRaw`UPDATE "EngineLease" SET "expiresAt" = (clock_timestamp() AT TIME ZONE 'UTC') - interval '1 second' WHERE "worldId" = ${worldId}`;
         const restarted = new TurnLoop(db, (await acquireLease(db, worldId))!);
         await restarted.advanceTo(10000);
         await restarted.advanceTo(10000);
         expect(await db.yearbookSnapshot.count({ where: { worldId } })).toBe(1);
+        expect(await db.yearbookNation.count({ where: { worldId } })).toBe(template.nations.length);
         expect(await db.nationHistory.count({ where: { worldId } })).toBe(2);
         expect(replayArchive(await exportReplay(db, worldId), 1)).toHaveLength(1);
       } finally {

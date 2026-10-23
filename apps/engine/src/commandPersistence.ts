@@ -1,6 +1,7 @@
 import type { Prisma } from '@opensamguk/db';
 import type { CommandResult, WorldState } from '@opensamguk/rules';
 import { loadWorld } from './worldLoader';
+import { archiveRemovedNation, type ActionAt } from './nationArchive';
 
 export async function loadCommandState(
   tx: Prisma.TransactionClient,
@@ -19,7 +20,12 @@ export async function loadCommandState(
   };
 }
 
-export async function persistCommandState(tx: Prisma.TransactionClient, worldId: string, state: WorldState) {
+export async function persistCommandState(
+  tx: Prisma.TransactionClient,
+  worldId: string,
+  state: WorldState,
+  at: ActionAt,
+) {
   const before = await loadWorld(tx, worldId);
   for (const nation of Object.values(state.nations)) {
     if (!before.nations[nation.id]) {
@@ -70,6 +76,7 @@ export async function persistCommandState(tx: Prisma.TransactionClient, worldId:
   }
   for (const nation of Object.values(before.nations)) {
     if (!state.nations[nation.id]) {
+      await archiveRemovedNation(tx, worldId, nation, at);
       await tx.nation.update({ where: { worldId_id: { worldId, id: nation.id } }, data: { capitalCityKey: null } });
       await tx.nation.delete({ where: { worldId_id: { worldId, id: nation.id } } });
     }
