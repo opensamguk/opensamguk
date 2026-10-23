@@ -16,8 +16,11 @@ import {
   policyMarkerResultSchema,
   assertSlotSet,
   validateGeneralCreation,
+  TREATY_INPUTS,
+  selectWorldCapabilities,
   type CreationCode,
 } from '@opensamguk/rules';
+import { processTreatyInput } from './treatyInput';
 
 // 호출자가 리스와 World를 잠근 뒤 같은 펜싱 트랜잭션에서 실행한다.
 // null이면 직접 호출에서 활동 기준을 넘기지 않은 경우이며 게임 행동도 실행하지 않는다.
@@ -30,12 +33,18 @@ export async function processPendingInput(
   const event = await tx.inputEvent.findFirst({
     where: {
       worldId: world.id,
-      kind: { in: ['general.create', 'general.setPolicy', 'general.active', 'system.policy.enable'] },
       status: 'PENDING',
     },
     orderBy: { id: 'asc' },
   });
   if (!event) return false;
+  if (Object.hasOwn(TREATY_INPUTS, event.kind)) {
+    if (selectWorldCapabilities(world).kind !== 'caps') throw new Error('조약을 끈 월드의 조약 입력입니다.');
+    await processTreatyInput(tx, world, event, tick);
+    return true;
+  }
+  if (!['system.policy.enable', 'general.setPolicy', 'general.active', 'general.create'].includes(event.kind))
+    throw new Error('처리할 수 없는 대기 입력입니다.');
   const modern = isPolicyMode({ fromSequence: world.policyFromSequence, actionSequence: world.actionSequence });
   if (event.kind === 'system.policy.enable') {
     if (world.status === 'ENDED' || world.policyFromSequence !== null)
