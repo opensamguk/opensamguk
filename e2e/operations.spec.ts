@@ -29,7 +29,8 @@ async function member(browser: Browser, world: string, nationId: number, officer
   return { page, generalId: general.id };
 }
 
-// 새 장수는 병력·훈련·사기가 0이다. 기준 1000/60/60 제안은 모병 1·훈련 6·사기 6·출병 1의 14칸이 목표 전에 있어야 해서 목표를 지금+16개월로 둔다.
+// 새 장수는 병력·훈련·사기가 0이다. 기준 1000/60/60 제안은 모병 1·훈련 6·사기 6·출병 1의 14칸이 목표 전에 있어야 한다.
+// 첫 칸이 다음 달 첫 tick이어도 준비가 index 2부터 들어가 STALE 시험의 index 1 farm과 겹치지 않도록 목표를 지금+17개월로 둔다.
 async function setup(page: Page) {
   await createAccount(page);
   const world = await e2eWorld(page);
@@ -40,7 +41,7 @@ async function setup(page: Page) {
   const summary = await query<{ gameDate: { year: number; month: number } }>(page, 'world.summary', { worldId: world });
   const [ours, theirs] = map.nations;
   const target = map.cities.find((c) => c.nationId === theirs!.id)!;
-  const at = summary.gameDate.year * 12 + summary.gameDate.month - 1 + 16;
+  const at = summary.gameDate.year * 12 + summary.gameDate.month - 1 + 17;
   return {
     world,
     ours: ours!.id,
