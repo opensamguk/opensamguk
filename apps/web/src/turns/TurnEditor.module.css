@@ -168,6 +168,12 @@
   font-weight: 600;
 }
 
+/* 비워 둔 칸. 직접 넣은 명령(굵은 .command)과 구분하려고 흐린 보통 굵기로 두고, 괄호 안 방침 이름을 글자로 함께 쓴다 (NFR-08). */
+.emptySlot {
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
 .args {
   color: var(--color-text-muted);
 }

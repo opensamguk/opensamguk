@@ -84,7 +84,7 @@ export function CommandPicker({
 
   const put = () => {
     if (!command || blockedReason || built.missing.length > 0) return;
-    onPut({ commandKey: command.key, args: built.args });
+    onPut({ commandKey: command.key, args: built.args, explicit: true });
   };
 
   const onSearchKey = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -94,7 +94,7 @@ export function CommandPicker({
     if (!first) return;
     const next = choose(first.key);
     if (next && argFields(next.argsSchema).length === 0) {
-      if (!blockedReason) onPut({ commandKey: next.key, args: {} });
+      if (!blockedReason) onPut({ commandKey: next.key, args: {}, explicit: true });
     } else {
       // 인자 칸이 그려진 뒤 옮긴다.
       requestAnimationFrame(() => firstArgRef.current?.focus());
