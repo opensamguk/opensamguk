@@ -3,6 +3,8 @@ import type { ReplayState, RecordedInput } from '../replay';
 import { emptyQueue, POLICY_KEYS, type PolicyKey } from './index';
 
 export const policyKeySchema = z.enum(POLICY_KEYS);
+export const setPolicyPayloadSchema = z.strictObject({ policy: policyKeySchema });
+export const activityPayloadSchema = z.strictObject({});
 export const policyTickSchema = z.number().int().min(0).max(2_147_483_647);
 const positive = policyTickSchema.min(1);
 export const emptyGeneralIdsSchema = z
@@ -52,10 +54,44 @@ const envelopeSchema = z.strictObject({
   result: z.unknown(),
 });
 const rejectionSchema = z.strictObject({ code: z.string().min(1), message: z.string().min(1) });
+const generalNumericKeys = [
+  'affinity',
+  'cityKey',
+  'leadership',
+  'strength',
+  'intel',
+  'officerLevel',
+  'birthYear',
+  'deathYear',
+  'activeFromYear',
+  'gold',
+  'rice',
+  'crew',
+  'crewType',
+  'train',
+  'atmos',
+  'experience',
+  'dedication',
+  'age',
+  'injury',
+] as const;
+const recordedGeneralSchema = z.strictObject({
+  ...Object.fromEntries(generalNumericKeys.map((key) => [key, z.number().finite()])),
+  id: positive,
+  nextTurnTick: policyTickSchema,
+  userId: z.string().min(1),
+  name: z.string(),
+  portraitId: z.number().nullable(),
+  nationId: z.number().nullable(),
+  personality: z.string().nullable(),
+  special: z.string().nullable(),
+});
 
 // archive 5 전용 검사다. 구버전의 REJECTED 허용 동작은 바꾸지 않는다.
 export function validatePolicyRecordedInput(value: unknown, modern: boolean): asserts value is RecordedInput {
   const input = envelopeSchema.parse(value);
+  if (!modern && input.kind !== 'turns.set' && input.kind !== 'general.create')
+    throw new Error('전환 전 방침 입력입니다.');
   if (input.status === 'REJECTED') {
     if (input.kind === 'system.policy.enable') throw new Error('전환 표지는 거절 상태일 수 없습니다.');
     rejectionSchema.parse(input.result);
@@ -76,18 +112,18 @@ export function validatePolicyRecordedInput(value: unknown, modern: boolean): as
       : z.strictObject({ revision: positive })
     ).parse(input.result);
   } else if (input.kind === 'general.create') {
-    const general = z.record(z.string(), z.unknown());
+    const general = recordedGeneralSchema;
     (modern ? z.strictObject({ general, activeTick: policyTickSchema }) : z.strictObject({ general })).parse(
       input.result,
     );
   } else {
     if (!modern) throw new Error('전환 전 방침 입력입니다.');
     if (input.kind === 'general.setPolicy') {
-      const payload = z.strictObject({ policy: policyKeySchema }).parse(input.payload);
+      const payload = setPolicyPayloadSchema.parse(input.payload);
       const result = z.strictObject({ policy: policyKeySchema, activeTick: policyTickSchema }).parse(input.result);
       if (payload.policy !== result.policy) throw new Error('방침 접수와 집행 값이 다릅니다.');
     } else {
-      z.strictObject({}).parse(input.payload);
+      activityPayloadSchema.parse(input.payload);
       z.strictObject({ activeTick: policyTickSchema }).parse(input.result);
     }
   }

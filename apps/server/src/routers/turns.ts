@@ -1,13 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { TRPCError } from '@trpc/server';
 import { nextActionSequence, type Prisma } from '@opensamguk/db';
-import { commandRegistry, unitSetSchema, type QueuedTurn } from '@opensamguk/rules';
+import { commandRegistry, emptyTurn, unitSetSchema, type QueuedTurn } from '@opensamguk/rules';
 import { editArray, type ArrayEdit } from '@opensamguk/shared';
 import { z } from 'zod';
 import { router, protectedProcedure } from '../trpc';
 import { requireWorld, requireGeneral, readView, worldInput } from '../game/queries';
 import { commandInput, slotInput, parseSlot, readSlots, displaySlots } from '../game/slots';
 import type { Context } from '../context';
+import { requirePolicyReady } from '../game/policy';
 
 const revision = z.number().int().min(0).max(2_147_483_646);
 const index = z.number().int().min(0).max(29);
@@ -37,6 +38,7 @@ async function save(
   return ctx.db.$transaction(async (tx) => {
     const world = await requireWorld(tx, input.worldId, true);
     if (world.status === 'ENDED') throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '종료된 월드입니다.' });
+    requirePolicyReady(world);
     // 키 재검사는 장수 잠금·revision 비교보다 먼저 한다 (§5).
     const previous = await tx.inputEvent.findUnique({
       where: { worldId_userId_idempotencyKey: { worldId: input.worldId, userId: ctx.user.id, idempotencyKey: key } },
@@ -54,6 +56,7 @@ async function save(
         generalId: actor.id,
         slot,
         commandKey: turn.commandKey,
+        explicit: turn.explicit ?? true,
         args: turn.args as Prisma.InputJsonValue,
       })),
     });
@@ -62,7 +65,7 @@ async function save(
       data: { turnRevision: { increment: 1 } },
     });
     const nextRevision = actor.turnRevision + 1;
-    await tx.inputEvent.create({
+    const event = await tx.inputEvent.create({
       data: {
         worldId: input.worldId,
         userId: ctx.user.id,
@@ -72,7 +75,14 @@ async function save(
         status: 'APPLIED',
         sequence: await nextActionSequence(tx, input.worldId),
         payload: { turns, revision: actor.turnRevision } as unknown as Prisma.InputJsonValue,
-        result: { revision: nextRevision },
+        result: { revision: nextRevision, activeTick: world.clockTick },
+      },
+    });
+    await tx.general.update({
+      where: { worldId_id: { worldId: input.worldId, id: actor.id } },
+      data: {
+        lastActiveTick: Math.max(actor.lastActiveTick ?? 0, world.clockTick),
+        lastActiveAt: event.createdAt,
       },
     });
     return { ok: true as const, revision: nextRevision, slots: displaySlots(turns) };
@@ -100,7 +110,7 @@ export const turnsRouter = router({
       'put' in input.op
         ? { put: { from: input.op.put.from, to: input.op.put.to, value: parseSlot(input.op.put) } }
         : input.op;
-    return save(ctx, input, (old) => editArray(old, op, () => ({ commandKey: 'rest', args: {} })));
+    return save(ctx, input, (old) => editArray(old, op, emptyTurn));
   }),
   precheck: protectedProcedure.input(worldInput.extend(commandInput)).query(({ ctx, input }) => {
     const turn = parseSlot(input);

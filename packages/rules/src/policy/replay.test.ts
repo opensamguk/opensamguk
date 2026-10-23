@@ -1,7 +1,6 @@
 import { expect, it } from 'vitest';
 import { commandInitial } from '../../test/commandFixture';
 import { applyRecordedInput, initialReplayState, runReplayAction } from '../replay';
-import { hashState } from '@opensamguk/shared/node';
 import { assertSlotSet, emptyQueue, isPolicyMode } from './index';
 import { assertReplayPolicy, emptyGeneralIdsSchema, enableReplayPolicy, validatePolicyRecordedInput } from './replay';
 
@@ -34,9 +33,9 @@ it('전환은 기존 세계·확장 상태를 보존하고 직접 휴식과 빈�
   const initial = commandInitial();
   initial.generals[0]!.userId = 'human';
   const legacy = initialReplayState(initial);
-  const beforeHash = hashState(legacy);
+  const beforeHash = JSON.stringify(legacy);
   const next = enableReplayPolicy(legacy, 30, 0, [2]);
-  expect(hashState(legacy)).toBe(beforeHash);
+  expect(JSON.stringify(legacy)).toBe(beforeHash);
   expect(next.state).toEqual(legacy.state);
   expect(next.turns[1]![0]!.explicit).toBe(true);
   expect(next.turns[2]![0]!.explicit).toBe(false);

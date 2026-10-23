@@ -10,7 +10,8 @@ import {
   emptyTurns,
   emptyQueue,
   isPolicyMode,
-  policyKeySchema,
+  setPolicyPayloadSchema,
+  activityPayloadSchema,
   policyMarkerPayloadSchema,
   assertSlotSet,
   validateGeneralCreation,
@@ -77,13 +78,15 @@ export async function processPendingInput(
     await tx.$queryRaw`SELECT id FROM "General" WHERE "worldId" = ${world.id} AND id = ${event.generalId} FOR UPDATE`;
     const general = await tx.general.findUnique({ where: { worldId_id: { worldId: world.id, id: event.generalId } } });
     if (!general || general.userId !== event.userId) return rejectInput('NO_GENERAL', '내 장수가 아닙니다.');
-    const payload = event.payload as { policy?: unknown };
-    const policy = event.kind === 'general.setPolicy' ? policyKeySchema.safeParse(payload?.policy) : null;
-    if (policy && !policy.success) return rejectInput('BAD_POLICY', '기본 방침이 올바르지 않습니다.');
+    const parsed = (event.kind === 'general.setPolicy' ? setPolicyPayloadSchema : activityPayloadSchema).safeParse(
+      event.payload,
+    );
+    if (!parsed.success) return rejectInput('BAD_POLICY', '활동·기본 방침 입력이 올바르지 않습니다.');
+    const policy = event.kind === 'general.setPolicy' ? setPolicyPayloadSchema.parse(event.payload).policy : null;
     await tx.general.update({
       where: { worldId_id: { worldId: world.id, id: general.id } },
       data: {
-        ...(policy?.success ? { defaultPolicy: policy.data } : {}),
+        ...(policy ? { defaultPolicy: policy } : {}),
         lastActiveTick: Math.max(general.lastActiveTick ?? 0, tick),
         lastActiveAt: event.createdAt,
       },
@@ -93,7 +96,7 @@ export async function processPendingInput(
       data: {
         status: 'APPLIED',
         sequence: await nextActionSequence(tx, world.id),
-        result: { ...(policy?.success ? { policy: policy.data } : {}), activeTick: tick },
+        result: { ...(policy ? { policy } : {}), activeTick: tick },
       },
     });
     return true;
