@@ -27,7 +27,7 @@
 ### C-M1. 자원 카탈로그와 바뀌지 않는 판
 
 - 새 모델 `GameResource`에 자원을 판 단위로 둔다. 기본 키는 `id`(UUID)이고 `(kind, name, version)`에 유일 제약을 둔다. 종류마다 이름 공간이 따로라 지도 `che`와 시나리오 `che`가 함께 있어도 된다. API와 감사 로그는 `id`로, 화면 주소는 `kind`·`name`·`version`으로 행을 가리킨다.
-- 열은 `kind`(`MAP`·`SCENARIO`·`UNIT_SET`·`STAT_RULES`·`PORTRAIT_MAP`), `name`, `version`(1 이상), `status`(`DRAFT`·`PUBLISHED`), `content`(`jsonb`), `hash`(정규 해시, 초안에도 있다), `source`(출처와 라이선스 한 줄, NOT NULL), `mapKey`(시나리오만, 짝 지도 판의 정규 키), `revision`, `createdBy`·`updatedBy`·`publishedBy`, `createdAt`·`updatedAt`·`publishedAt`이다. 모델과 CHECK는 [T4-77](./T4-77.md)의 migration이 만든다. 종류·이름마다 초안 하나를 지키는 부분 유일 색인과 복제 원본 `baseKey` 열은 [T4-78](./T4-78.md)의 migration이 더한다.
+- 열은 `kind`(`MAP`·`SCENARIO`·`UNIT_SET`·`STAT_RULES`·`PORTRAIT_MAP`), `name`, `version`(1 이상), `status`(`DRAFT`·`PUBLISHED`), `content`(`jsonb`), `hash`(정규 해시, 초안에도 있다), `source`(출처와 라이선스 한 줄, NOT NULL), `mapKey`(시나리오만, 짝 지도 판의 정규 키), `revision`, `createdBy`·`updatedBy`·`publishedBy`, `createdAt`·`updatedAt`·`publishedAt`이다. 모델과 CHECK는 [T4-77](./T4-77.md)의 migration이 만든다. [T4-78](./T4-78.md)의 새 migration은 둘을 더한다. 종류·이름마다 초안 하나를 지키는 부분 유일 색인 `(kind, name) WHERE status = 'DRAFT'`와 복제 원본의 정규 키를 적는 `baseKey` 열(`String?`)이다. 초기화 SQL이 넣은 내장 판의 `baseKey`는 null이다.
 - 이름은 영문·숫자·밑줄·하이픈 1~40자(`^[a-zA-Z0-9_-]{1,40}$`, T4-78 규칙)다.
 - 정규 키는 모든 이름에서 같다. 1판은 이름만(`che`) 쓰고 2판부터 `<이름>@<판 번호>`(`che@2`)로 쓴다. 입력 `che@1`도 받아 `che`로 바꾼다. 이름만 쓴 키는 늘 1판을 가리키고 가장 최근 판을 뜻하지 않는다. 월드·감사·바탕 그림 경로에 남기는 키는 정규 키다.
 - 내장 자원의 1판 이름은 지도 `che`, 시나리오 `1030`, 병종 `basic`, 능력치 규칙 `default`, 초상 대응표 `rtk14-map`이다. 지금 키가 그대로 1판의 정규 키라 기존 월드의 `mapKey`·`scenarioKey`와 재생 기록은 바꾸지 않는다.
