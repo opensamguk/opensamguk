@@ -134,6 +134,9 @@ export function GameLayout() {
           open={messagesOpen}
           onToggle={() => (messagesOpen ? closeMessages() : setMessagesOpen(true))}
         />
+        <Link to="/settings/notifications" className={styles.account}>
+          알림 설정
+        </Link>
         <LogoutButton className={styles.logout} />
       </header>
       <main className={styles.content}>
