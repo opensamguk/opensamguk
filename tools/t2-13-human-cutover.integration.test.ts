@@ -164,8 +164,34 @@ it.each(['zero', 'tick'] as const)(
   '명시 %s fixture의 전환 전후 6개월을 재생하고 일반 호출은 선택하지 않는다',
   async (candidate) => {
     const f = await fixture(2, 0);
-    await seedOldCommand(f);
+    const oldUser = await user();
+    const oldPart = Math.floor(f.initial.statRules.total / 3);
+    const oldCreation = await db.inputEvent.create({
+      data: {
+        worldId: f.worldId,
+        userId: oldUser,
+        kind: 'general.create',
+        idempotencyKey: randomUUID(),
+        payload: {
+          name: '옛생성장수',
+          leadership: oldPart,
+          strength: oldPart,
+          intel: f.initial.statRules.total - oldPart * 2,
+          portraitId: null,
+        },
+      },
+    });
     await controlClock(db, f.worldId, 'resume');
+    await f.loop.advanceTo(0);
+    const oldApplied = await db.inputEvent.findUniqueOrThrow({ where: { id: oldCreation.id } });
+    expect(oldApplied).toMatchObject({ status: 'APPLIED', sequence: 1 });
+    expect(oldApplied.result).not.toHaveProperty('activeTick');
+    const oldGeneral = await db.general.findFirstOrThrow({ where: { worldId: f.worldId, userId: oldUser } });
+    expect(oldGeneral).toMatchObject({ lastActiveTick: null, lastActiveAt: null });
+    const oldTurns = await db.generalTurn.findMany({ where: { worldId: f.worldId, generalId: oldGeneral.id } });
+    expect(oldTurns).toHaveLength(30);
+    expect(oldTurns.every((turn) => turn.explicit)).toBe(true);
+    await seedOldCommand(f);
     await f.loop.advanceTo(60000);
     const legacy = await exportReplay(db, f.worldId);
     expect(legacy.version).toBe(2);
@@ -180,6 +206,7 @@ it.each(['zero', 'tick'] as const)(
     const cutover = await snapshot(f.worldId);
     expect(cutover.turns).toEqual(before.turns);
     expect(cutover.generals.every((general) => general.lastActiveAt === null)).toBe(true);
+    expect(cutover.generals.find((general) => general.userId === oldUser)).toMatchObject({ lastActiveTick: baseline });
     const prefix = await exportReplay(db, f.worldId);
     expect(prefix.version).toBe(5);
     expect(prefix.origin).toEqual(legacy.origin);
@@ -208,7 +235,7 @@ it.each(['zero', 'tick'] as const)(
     await new TurnLoop(db, f.lease).advanceTo(120000);
     const archive = await exportReplay(db, f.worldId);
     expect(archive.months.slice(0, 6)).toEqual(legacy.months);
-    expect(archive.inputs.filter((input) => input.kind === 'general.create')).toHaveLength(1);
+    expect(archive.inputs.filter((input) => input.kind === 'general.create')).toHaveLength(2);
     expect(archive.inputs.every((input) => input.status === 'APPLIED')).toBe(true);
     const expected = archive.months.map(({ tick, stateHash }) => ({ tick, stateHash }));
     expect(replayArchive(archive, 12)).toEqual(expected);
@@ -294,9 +321,14 @@ it.each(['zero', 'tick'] as const)(
     await explicit(f, candidate === 'zero' ? 0 : before.world.clockTick);
     const after = await snapshot(f.worldId);
     expect(after.inputs.find((input) => input.id === event.id)).toMatchObject({ status: 'APPLIED', sequence: 2 });
-    expect(
-      after.turns.filter((turn) => turn.generalId === before.inputs[0]!.generalId).every((turn) => turn.explicit),
-    ).toBe(true);
+    const created = after.generals.find((general) => general.id === before.inputs[0]!.generalId);
+    expect(created).toMatchObject({
+      lastActiveTick: candidate === 'zero' ? 0 : before.world.clockTick,
+      lastActiveAt: null,
+    });
+    const createdTurns = after.turns.filter((turn) => turn.generalId === created!.id);
+    expect(createdTurns).toHaveLength(30);
+    expect(createdTurns.every((turn) => turn.explicit)).toBe(true);
   },
 );
 
