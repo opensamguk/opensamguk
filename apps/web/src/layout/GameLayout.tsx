@@ -1,10 +1,12 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, Outlet, useParams } from '@tanstack/react-router';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { LogoutButton } from '../auth/LogoutButton';
 import { formatRemaining, useTurnCountdown } from '../game/countdown';
 import { errorCode, isNotFound } from '../game/errors';
 import { useHome, useWorldSummary } from '../game/queries';
+import type { WorldSummary } from '../game/types';
+import { liveRefresh, topbarStatus } from '../game/worldWatch';
 import { useTRPC } from '../trpc';
 import styles from './GameLayout.module.css';
 
@@ -17,12 +19,10 @@ const NAV = [
   { to: '/w/$worldId/simulator', label: '전투 시뮬레이터' },
 ] as const;
 
-const STATUS_TEXT: Record<string, string> = { PREOPEN: '개시 전', PAUSED: '일시 정지', ENDED: '종료' };
-
 // 위쪽 띠에는 월드 이름·현재 연월·다음 턴까지 남은 시간·메뉴·로그아웃. 본문은 화면 폭을 다 쓴다.
 export function GameLayout() {
   const { worldId } = useParams({ from: '/w/$worldId' });
-  const summary = useWorldSummary(worldId);
+  const summary = useWorldSummary(worldId, true);
   const home = useHome(worldId);
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -35,16 +35,33 @@ export function GameLayout() {
   }, [queryClient, trpc, worldId]);
   const nextTurnAt = home.data?.nextTurnAt ?? null;
   const countdown = useTurnCountdown(nextTurnAt, refresh);
+  const noGeneral = home.isError && errorCode(home.error) === 'NOT_FOUND';
+
+  // world.summary를 새로 받을 때마다 상태·모드 전환과 가속 중 갱신을 판단한다 (worldWatch.ts).
+  // 끝난 판은 위 주기 조회가 멈추므로 여기서도 더 묻지 않는다.
+  const watched = useRef<(Pick<WorldSummary, 'status' | 'clockMode'> & { worldId: string }) | undefined>(undefined);
+  const data = summary.data;
+  useEffect(() => {
+    if (!data) return;
+    const next = { worldId, status: data.status, clockMode: data.clockMode };
+    const previous = watched.current?.worldId === worldId ? watched.current : undefined;
+    const homeKey = trpc.home.get.queryKey({ worldId });
+    const homeNotFound = errorCode(queryClient.getQueryState(homeKey)?.error) === 'NOT_FOUND';
+    const plan = liveRefresh(previous, next, homeNotFound);
+    watched.current = next;
+    if (plan.home) void queryClient.invalidateQueries({ queryKey: homeKey });
+    if (plan.records) void queryClient.invalidateQueries({ queryKey: trpc.records.pathKey() });
+    if (plan.board)
+      for (const queryKey of [trpc.world.map.queryKey({ worldId }), trpc.city.pathKey(), trpc.nation.pathKey()])
+        void queryClient.invalidateQueries({ queryKey });
+  }, [data, summary.dataUpdatedAt, queryClient, trpc, worldId]);
 
   const worldName =
     summary.data?.name ?? (summary.isError && isNotFound(summary.error) ? '월드를 찾을 수 없습니다' : '월드');
-  const date = summary.data ? `${summary.data.gameDate.year}년 ${summary.data.gameDate.month}월` : '연월 —';
-  const status = summary.data?.status;
-  let nextText = '다음 턴까지 —';
-  if (status && status !== 'RUNNING') nextText = STATUS_TEXT[status] ?? status;
-  else if (home.isError && errorCode(home.error) === 'NOT_FOUND') nextText = '내 장수 없음';
-  else if (countdown.seconds !== null)
-    nextText = countdown.waiting ? '턴 처리 중' : `다음 턴까지 ${formatRemaining(countdown.seconds)}`;
+  // 끝난 판은 결과에 저장한 종료 연월을 쓴다. 서버의 gameDate도 같은 값이다.
+  const shown = data?.result ?? data?.gameDate;
+  const date = shown ? `${shown.year}년 ${shown.month}월` : '연월 —';
+  const nextText = topbarStatus(data, noGeneral, countdown, formatRemaining);
 
   return (
     <div className={styles.shell}>
@@ -57,6 +74,7 @@ export function GameLayout() {
           className={styles.meta}
           data-testid="next-turn"
           data-next-turn-at={nextTurnAt ?? undefined}
+          data-clock-mode={data?.clockMode}
           aria-live="off"
         >
           {nextText}

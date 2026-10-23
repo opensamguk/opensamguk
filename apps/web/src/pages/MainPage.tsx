@@ -8,6 +8,7 @@ import { GeneralInfo } from '../main/GeneralInfo';
 import { NationInfo } from '../main/NationInfo';
 import { Panel } from '../main/Panel';
 import { RECORD_LABELS, RecordList } from '../main/Records';
+import { SeasonResult } from '../main/SeasonResult';
 import { MapLegend, WorldMap } from '../main/WorldMap';
 import { TurnEditor } from '../turns/TurnEditor';
 import { EmptyState, LoadingState } from '../ui/States';
@@ -61,6 +62,9 @@ export function MainPage() {
           </p>
         ) : null}
       </header>
+
+      {/* 끝난 판이면 결과를 맨 위에 둔다. 나머지 칸은 그대로 읽는다 (T1-27). */}
+      {summary.data?.status === 'ENDED' ? <SeasonResult result={summary.data.result} /> : null}
 
       <div className={styles.layout}>
         <Panel
