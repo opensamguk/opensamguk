@@ -12,6 +12,7 @@ import { DiplomacyPage, parseDiplomacySearch } from './diplomacy/DiplomacyPage';
 import { CreateGeneralPage } from './general/CreateGeneralPage';
 import { GameLayout } from './layout/GameLayout';
 import { LobbyPage } from './lobby/LobbyPage';
+import { MessagesPage } from './messages/MessagesPage';
 import { DevUiPage } from './pages/DevUiPage';
 import { LoginPage } from './pages/LoginPage';
 import { MainPage } from './pages/MainPage';
@@ -184,6 +185,8 @@ const diplomacyRoute = createRoute({
     return <DiplomacyPage tab={tab} />;
   },
 });
+// 메시지 전체 화면 (T2-10). 메인 오른쪽 메시지 패널과 같은 부품이다.
+const messagesRoute = createRoute({ getParentRoute: () => worldRoute, path: 'messages', component: MessagesPage });
 
 const createGeneralRoute = createRoute({
   getParentRoute: () => worldRoute,
@@ -210,6 +213,7 @@ const routeTree = rootRoute.addChildren([
     rankingRoute,
     simulatorRoute,
     diplomacyRoute,
+    messagesRoute,
     createGeneralRoute,
   ]),
   ...(import.meta.env.DEV ? [devUiRoute] : []),

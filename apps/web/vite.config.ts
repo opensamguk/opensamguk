@@ -17,6 +17,8 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       proxy: {
         '/trpc': apiTarget,
+        // 월드 SSE (T2-09). 응답을 묶지 않고 그대로 흘려보낸다.
+        '/sse': apiTarget,
       },
     },
   };

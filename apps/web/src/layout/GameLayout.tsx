@@ -1,10 +1,13 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, Outlet, useParams } from '@tanstack/react-router';
-import { useCallback } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { LogoutButton } from '../auth/LogoutButton';
 import { formatRemaining, useTurnCountdown } from '../game/countdown';
 import { errorCode, isNotFound } from '../game/errors';
 import { useHome, useWorldSummary } from '../game/queries';
+import { MessageButton, MessageDrawer, RealtimeStatusText } from '../messages/MessageDock';
+import { NationNoticePopup } from '../messages/NationNotice';
+import { useWorldEvents } from '../realtime/useWorldEvents';
 import { useTRPC } from '../trpc';
 import styles from './GameLayout.module.css';
 
@@ -28,13 +31,24 @@ export function GameLayout() {
   const home = useHome(worldId);
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  // 월드 SSE(T2-10). 알림마다 해당 query만 다시 받고, 이어질 때마다(ready) 화면 전체를 한 번 다시 받는다.
+  const realtime = useWorldEvents(worldId);
+  const [messagesOpen, setMessagesOpen] = useState(false);
+  const messageButton = useRef<HTMLButtonElement>(null);
+  const closeMessages = useCallback(() => {
+    setMessagesOpen(false);
+    messageButton.current?.focus();
+  }, []);
 
   // 0초가 되면 내 장수·월드 요약·기록을 다시 받는다. 같은 쿼리를 쓰는 메인 칸도 함께 바뀐다.
+  // SSE가 이어져 있으면 turn.result·monthly.done이 그 일을 하므로 끊긴 동안에만 쓴다 (T1-16 임시 방식의 대체, T2-10).
+  const realtimeOpen = realtime.status === 'open';
   const refresh = useCallback(() => {
+    if (realtimeOpen) return;
     void queryClient.invalidateQueries({ queryKey: trpc.home.get.queryKey({ worldId }) });
     void queryClient.invalidateQueries({ queryKey: trpc.world.summary.queryKey({ worldId }) });
     void queryClient.invalidateQueries({ queryKey: trpc.records.pathKey() });
-  }, [queryClient, trpc, worldId]);
+  }, [queryClient, realtimeOpen, trpc, worldId]);
   const nextTurnAt = home.data?.nextTurnAt ?? null;
   const countdown = useTurnCountdown(nextTurnAt, refresh);
 
@@ -66,6 +80,7 @@ export function GameLayout() {
         >
           {nextText}
         </span>
+        <RealtimeStatusText status={realtime.status} />
         <nav className={styles.nav} aria-label="게임 메뉴">
           {NAV.map((item) => (
             <Link
@@ -80,11 +95,19 @@ export function GameLayout() {
             </Link>
           ))}
         </nav>
+        <MessageButton
+          ref={messageButton}
+          worldId={worldId}
+          open={messagesOpen}
+          onToggle={() => (messagesOpen ? closeMessages() : setMessagesOpen(true))}
+        />
         <LogoutButton className={styles.logout} />
       </header>
       <main className={styles.content}>
         <Outlet />
       </main>
+      {messagesOpen ? <MessageDrawer worldId={worldId} onClose={closeMessages} /> : null}
+      <NationNoticePopup worldId={worldId} />
     </div>
   );
 }
