@@ -149,41 +149,87 @@ describe('전투 시뮬레이터 예외', () => {
 describe('T4-76 순수 자원 검증기 예외 E3', () => {
   const validation = "export { validateMap } from '@opensamguk/rules/resource-validation';\n";
   it('지도 편집기에서만 정확한 하위 경로를 허용한다', async () => {
-    for (const file of ['apps/web/src/mapEditor/validate.ts', 'apps/web/src/mapEditor/contract.ts']) {
+    for (const file of [
+      'apps/web/src/mapEditor/validate.ts',
+      'apps/web/src/mapEditor/contract.ts',
+      'apps/web/src/mapEditor/validate.test.ts',
+      'apps/web/src/mapEditor/x.test.tsx',
+    ]) {
       expect(await ruleIds(validation, file)).toEqual([]);
       expect(
         await ruleIds("export type { ResourceReport } from '@opensamguk/rules/resource-validation';\n", file),
       ).toEqual([]);
+      expect(await ruleIds("export type { AppRouter } from '@opensamguk/server/router';\n", file)).toEqual([]);
     }
     for (const file of [
       'apps/web/src/main/WorldMap.tsx',
       'apps/web/src/battleSim/request.ts',
       'apps/web/src/admin/maps/x.ts',
+      'apps/web/src/admin/maps/x.test.ts',
+      'apps/web/src/x.test.ts',
     ]) {
       expect(await ruleIds(validation, file), file).toContain('no-restricted-imports');
     }
   });
-  it('E3도 root·내부 경로·Node·DB 값은 읽지 못한다', async () => {
-    for (const spec of [
-      '@opensamguk/rules',
-      '@opensamguk/rules/resource-validation/internal',
-      '@opensamguk/rules/src/world/resources',
-      '@opensamguk/db',
-      '@opensamguk/engine',
-      '@opensamguk/shared/node',
-      'node:fs',
-      'fs/promises',
+  it('E3 제품과 시험 모두 root·내부 경로·DB·server 값은 읽지 못한다', async () => {
+    for (const file of [
+      'apps/web/src/mapEditor/validate.ts',
+      'apps/web/src/mapEditor/validate.test.ts',
+      'apps/web/src/mapEditor/x.test.tsx',
     ]) {
-      expect(await ruleIds(`export * from '${spec}';\n`, 'apps/web/src/mapEditor/validate.ts'), spec).toContain(
-        'no-restricted-imports',
-      );
+      for (const spec of [
+        '@opensamguk/rules',
+        '@opensamguk/rules/resource-validation/internal',
+        '@opensamguk/rules/src/world/resources',
+        '@opensamguk/db',
+        '@opensamguk/engine',
+        '@opensamguk/shared/node',
+        '@opensamguk/server/router',
+      ]) {
+        expect(await ruleIds(`export * from '${spec}';\n`, file), `${file}: ${spec}`).toContain(
+          'no-restricted-imports',
+        );
+      }
+      expect(
+        await ruleIds("export * from '../../../../packages/rules/src/world/validate/index';\n", file),
+        file,
+      ).toContain('opensamguk/no-cross-package-relative');
     }
-    expect(
-      await ruleIds(
-        "export * from '../../../../packages/rules/src/world/validate/index';\n",
-        'apps/web/src/mapEditor/validate.ts',
-      ),
-    ).toContain('opensamguk/no-cross-package-relative');
+  });
+  it('E3 제품 파일은 Node를 읽지 못하고 시험처럼 보이는 이름도 예외가 아니다', async () => {
+    for (const file of [
+      'apps/web/src/mapEditor/validate.ts',
+      'apps/web/src/mapEditor/fixtures.ts',
+      'apps/web/src/mapEditor/MapEditorPage.tsx',
+      'apps/web/src/mapEditor/x.test-helper.ts',
+      'apps/web/src/mapEditor/x.test.ts.bak.ts',
+    ]) {
+      for (const spec of ['node:fs', 'fs/promises', 'node:zlib']) {
+        expect(await ruleIds(`export * from '${spec}';\n`, file), `${file}: ${spec}`).toContain(
+          'no-restricted-imports',
+        );
+      }
+    }
+  });
+  it('E3 시험의 Node 허용은 ts·중첩 tsx 시험 글롭 안에서만 적용된다', async () => {
+    for (const file of [
+      'apps/web/src/mapEditor/contract.test.ts',
+      'apps/web/src/mapEditor/sketch.test.ts',
+      'apps/web/src/mapEditor/validate.test.ts',
+      'apps/web/src/mapEditor/nested/x.test.tsx',
+    ]) {
+      for (const spec of ['node:fs', 'fs/promises', 'node:zlib']) {
+        expect(await ruleIds(`export * from '${spec}';\n`, file), `${file}: ${spec}`).toEqual([]);
+      }
+    }
+  });
+  it('기존 세 지도 편집기 시험 파일을 바꾸지 않고 전체 내용을 lint한다', async () => {
+    const files = ['contract.test.ts', 'sketch.test.ts', 'validate.test.ts'].map(
+      (name) => `apps/web/src/mapEditor/${name}`,
+    );
+    const results = await eslint.lintFiles(files);
+    expect(results).toHaveLength(3);
+    for (const result of results) expect(result.messages, result.filePath).toEqual([]);
   });
   it('새 rules 검증기도 IO·현재 시각·난수를 쓸 수 없다', async () => {
     const file = 'packages/rules/src/world/validate/map.ts';
