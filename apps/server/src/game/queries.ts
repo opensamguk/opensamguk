@@ -20,7 +20,10 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
   const world = await requireWorld(tx, worldId);
   const cities = await tx.city.findMany({ where: { worldId } });
   const nations = await tx.nation.findMany({ where: { worldId } });
-  const generals = await tx.general.findMany({ where: { worldId } });
+  const generals = await tx.general.findMany({
+    where: { worldId },
+    omit: { defaultPolicy: true, lastActiveTick: true, lastActiveAt: true },
+  });
   const diplomacies = await tx.diplomacy.findMany({ where: { worldId } });
   return toWorldState({
     ...(world.preset ? { presetRules: presetRules(parsePreset(world.preset)) } : {}),

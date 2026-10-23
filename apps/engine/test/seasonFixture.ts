@@ -42,6 +42,7 @@ export async function recordTestTurns(
     await tx.generalTurn.createMany({
       data: turns.map((turn, slot) => ({
         ...turn,
+        explicit: true,
         worldId,
         generalId,
         slot,
@@ -77,6 +78,7 @@ export async function prepareSeasonWorld(
 ) {
   const initial = await seasonInitial(reason);
   const { worldId } = await saveInitialWorld(db, initial, {
+    replayFormat: 'legacy',
     name: `종료 시험 ${reason}`,
     turnTermMinutes: 60,
     endYear: initial.startYear,
