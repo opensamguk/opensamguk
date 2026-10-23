@@ -43,6 +43,7 @@ model World {
   monthlyTick     Int         @default(0)
   actionSequence  Int         @default(0)
   policyFromSequence Int?
+  treatyFormat    Int?
   replayOrigin    Json?
   inputEvents     InputEvent[]
   nationHistory   NationHistory[]
@@ -56,6 +57,37 @@ model World {
   notices         Notice[]
   operations      Operation[]
   extSlices       WorldExtSlice[]
+  treaties        Treaty[]
+}
+
+enum TreatyStatus {
+  PROPOSED
+  ACTIVE
+  REJECTED
+  EXPIRED
+  ENDED
+}
+
+model Treaty {
+  worldId        String
+  id             Int
+  fromNationId   Int
+  toNationId     Int
+  clauses        Json
+  status         TreatyStatus
+  proposedTick   Int
+  respondByTick  Int
+  startTick      Int?
+  endTick        Int?
+  closedSequence Int?
+  costFrom       Int?
+  costTo         Int?
+  world          World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@id([worldId, id])
+  @@index([worldId, status, id])
+  @@index([worldId, fromNationId, id])
+  @@index([worldId, toNationId, id])
 }
 
 model WorldExtSlice {
