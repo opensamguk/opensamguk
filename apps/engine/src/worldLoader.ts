@@ -9,7 +9,10 @@ export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): 
     where: { worldId },
     omit: { notice: true, noticeRevision: true, noticeUpdatedAt: true, noticeUpdatedBy: true },
   });
-  const generals = await tx.general.findMany({ where: { worldId }, omit: { noticeSeen: true } });
+  const generals = await tx.general.findMany({
+    where: { worldId },
+    omit: { noticeSeen: true, defaultPolicy: true, lastActiveTick: true, lastActiveAt: true },
+  });
   const diplomacies = await tx.diplomacy.findMany({
     where: { worldId },
     orderBy: [{ nationA: 'asc' }, { nationB: 'asc' }],

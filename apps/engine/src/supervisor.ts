@@ -161,7 +161,15 @@ export async function runSupervisor(
             where: {
               OR: [
                 { status: { in: ['RUNNING', 'PAUSED'] } },
-                { status: 'ENDED', inputEvents: { some: { kind: 'general.create', status: 'PENDING' } } },
+                {
+                  status: 'ENDED',
+                  inputEvents: {
+                    some: {
+                      kind: { in: ['general.create', 'general.setPolicy', 'general.active'] },
+                      status: 'PENDING',
+                    },
+                  },
+                },
               ],
             },
             select: { id: true },

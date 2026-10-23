@@ -48,6 +48,18 @@ export interface PolicySlot {
   explicit: boolean;
 }
 
+export function isPolicyMode(input: { fromSequence: number | null; actionSequence: number }): boolean {
+  return input.fromSequence !== null && input.actionSequence >= input.fromSequence;
+}
+
+export const emptyTurn = (): PolicySlot => ({ commandKey: 'rest', args: {}, explicit: false });
+export const emptyQueue = (): PolicySlot[] => Array.from({ length: 30 }, emptyTurn);
+
+export function assertSlotSet(slots: readonly { slot: number }[]): void {
+  if (slots.length !== 30 || [...slots].sort((a, b) => a.slot - b.slot).some((row, index) => row.slot !== index))
+    throw new Error('예턴 칸은 0부터 29까지 한 칸씩 있어야 합니다.');
+}
+
 // explicit이 없는 옛 휴식도 직접 넣은 휴식으로 읽는다.
 export function normalizeSlot(slot: { commandKey: string; args: unknown; explicit?: boolean }): PolicySlot {
   return { ...slot, explicit: slot.explicit ?? true };

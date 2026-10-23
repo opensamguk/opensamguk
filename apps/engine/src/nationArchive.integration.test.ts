@@ -44,6 +44,7 @@ async function create(initial?: WorldInit) {
     });
   }
   const { worldId } = await saveInitialWorld(db, initial, {
+    replayFormat: 'legacy',
     name: '국가 표시값 보존',
     turnTermMinutes: 60,
     endYear: null,
@@ -62,6 +63,7 @@ async function queue(worldId: string, generalId: number, commandKey: string, arg
     await tx.generalTurn.createMany({
       data: turns.map((turn, slot) => ({
         ...turn,
+        explicit: true,
         worldId,
         generalId,
         slot,

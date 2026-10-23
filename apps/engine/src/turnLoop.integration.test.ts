@@ -52,15 +52,20 @@ async function create(count = 1, human = false) {
     });
     initial.generals[0]!.userId = userId;
   }
-  const { worldId } = await saveInitialWorld(db, initial, { name: '엔진 통합', turnTermMinutes: 10, endYear: null });
+  const { worldId } = await saveInitialWorld(db, initial, {
+    replayFormat: 'legacy',
+    name: '엔진 통합',
+    turnTermMinutes: 10,
+    endYear: null,
+  });
   await controlClock(db, worldId, 'start');
   return { worldId, cityKey: city.cityKey };
 }
 async function queue(worldId: string, generalId = 1, commandKey = 'farm') {
   await db.generalTurn.createMany({
     data: [
-      { worldId, generalId, slot: 0, commandKey, args: {} },
-      { worldId, generalId, slot: 1, commandKey: 'rest', args: {} },
+      { worldId, generalId, slot: 0, explicit: true, commandKey, args: {} },
+      { worldId, generalId, slot: 1, explicit: true, commandKey: 'rest', args: {} },
     ],
   });
 }

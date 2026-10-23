@@ -112,6 +112,7 @@ async function fixtureWorld(label: string) {
       generalId: 1,
       slot,
       commandKey: 'rest',
+      explicit: true,
       args: { label, slot },
     })),
   });

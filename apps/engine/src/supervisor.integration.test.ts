@@ -71,6 +71,7 @@ async function create(second = false) {
   // 실제 월간 정산과 NPC 규칙은 유지하고 자식 장애 시험의 실행량만 줄인다.
   initial.generals = initial.generals.slice(0, 2);
   const result = await saveInitialWorld(db, initial, {
+    replayFormat: 'legacy',
     name: second ? '감독 B' : '감독 A',
     turnTermMinutes: second ? 60 : 10,
     endYear: null,
