@@ -1,6 +1,16 @@
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useRouterState } from '@tanstack/react-router';
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
 import { emptySlotLabel } from '../policy/policyText';
 import { usePolicyQuery } from '../policy/usePolicy';
 import { TRADE_COMMAND_KEY } from '../diplomacy/contract';
@@ -25,7 +35,7 @@ import {
 import { slotTimes, type SlotTime } from './schedule';
 import { personalSource, type TurnSource, type TurnSourceFactory } from './source';
 import styles from './TurnEditor.module.css';
-import { useStoredSelection, useTurnDraft } from './useTurnDraft';
+import { useStoredSelection, useTurnDraft, type TurnDraftState } from './useTurnDraft';
 
 export interface TurnEditorProps {
   worldId: string;
@@ -33,11 +43,13 @@ export interface TurnEditorProps {
   selectedCityKey: number | null;
   // 칸 수와 조회·저장 연결. 없으면 개인 30칸(turns.*)이다. 국가 직책 12칸은 nationTurns.*를 넘긴다 (T2-06).
   source?: TurnSourceFactory;
+  // 편집기 위에 같은 초안 훅 상태를 쓰는 부품을 둔다(작전 맞추기, T2-12). 훅을 하나만 두어야 초안이 갈라지지 않는다.
+  renderTop?: ((draft: TurnDraftState) => ReactNode) | undefined;
 }
 
 // 예턴 편집기. 메인 명령 칸(T1-16)과 /w/:worldId/turns가 개인 30칸으로, 국가 예턴(T2-06)이 직책 12칸으로 같은 부품을 쓴다.
 // 편집 초안·revision·선택·충돌 처리는 이 안에서 한다. 바깥에서 지도 선택이 바뀌거나 조회가 다시 돌아도 초안은 그대로다.
-export function TurnEditor({ worldId, selectedCityKey, source = personalSource }: TurnEditorProps) {
+export function TurnEditor({ worldId, selectedCityKey, source = personalSource, renderTop }: TurnEditorProps) {
   const trpc = useTRPC();
   const me = useQuery({ ...trpc.auth.me.queryOptions(), retry: retryUnlessClientError });
   const userId = me.data?.user?.id;
@@ -47,7 +59,7 @@ export function TurnEditor({ worldId, selectedCityKey, source = personalSource }
     if (me.isError) return <ErrorState title="불러오지 못했습니다" onRetry={() => void me.refetch()} />;
     return <p className={styles.muted}>예턴을 불러오는 중…</p>;
   }
-  return <Editor key={made.storageKey} worldId={worldId} selectedCityKey={selectedCityKey} source={made} />;
+  return <Editor key={made.storageKey} worldId={worldId} selectedCityKey={selectedCityKey} source={made} renderTop={renderTop} />;
 }
 
 function AuthLost() {
@@ -68,10 +80,12 @@ function Editor({
   worldId,
   selectedCityKey,
   source,
+  renderTop,
 }: {
   worldId: string;
   selectedCityKey: number | null;
   source: TurnSource;
+  renderTop?: TurnEditorProps['renderTop'];
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -283,6 +297,7 @@ function Editor({
 
   return (
     <div className={styles.editor} data-testid="turn-editor">
+      {renderTop?.(state)}
       <div className={styles.saveBar}>
         <p className={styles.saveState} data-testid="draft-state">
           {editCount > 0 ? `저장하지 않은 편집 ${editCount}건` : '저장된 목록'}

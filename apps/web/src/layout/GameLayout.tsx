@@ -8,6 +8,7 @@ import { useHome, useWorldSummary } from '../game/queries';
 import { MessageButton, MessageDrawer, RealtimeStatusText } from '../messages/MessageDock';
 import { NationNoticePopup } from '../messages/NationNotice';
 import { useWorldEvents } from '../realtime/useWorldEvents';
+import { OFFICER_MIN_LEVEL } from '../operations/contract';
 import { useTRPC } from '../trpc';
 import styles from './GameLayout.module.css';
 
@@ -20,6 +21,7 @@ const NAV = [
   { to: '/w/$worldId/ranking', label: '순위' },
   { to: '/w/$worldId/simulator', label: '전투 시뮬레이터' },
   { to: '/w/$worldId/diplomacy', label: '외교' },
+  { to: '/w/$worldId/operations', label: '작전' },
 ] as const;
 
 const STATUS_TEXT: Record<string, string> = { PREOPEN: '개시 전', PAUSED: '일시 정지', ENDED: '종료' };
@@ -94,6 +96,17 @@ export function GameLayout() {
               {item.label}
             </Link>
           ))}
+          {/* 감찰은 직책자만 받는다(T2-12). 메뉴를 보일지만 여기서 정하고 권한은 서버가 다시 본다. */}
+          {(home.data?.general.officerLevel ?? 0) >= OFFICER_MIN_LEVEL ? (
+            <Link
+              to="/w/$worldId/nation/inspection"
+              params={{ worldId }}
+              className={styles.navLink}
+              activeProps={{ className: `${styles.navLink} ${styles.active}`, 'aria-current': 'page' }}
+            >
+              감찰
+            </Link>
+          ) : null}
         </nav>
         <MessageButton
           ref={messageButton}

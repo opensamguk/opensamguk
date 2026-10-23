@@ -249,3 +249,6 @@ export function useTurnDraft(worldId: string, source: TurnSource) {
     submit,
   };
 }
+
+// 편집기 바깥 부품(작전 맞추기, T2-12)이 같은 초안에 편집을 넣을 때 받는 상태.
+export type TurnDraftState = ReturnType<typeof useTurnDraft>;
