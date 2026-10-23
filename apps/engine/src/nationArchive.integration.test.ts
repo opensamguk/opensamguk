@@ -516,9 +516,11 @@ describe('T4-56 / AC-P2-17 실제 PostgreSQL legacy 백필', () => {
     const good = await create(await monthlyFixture());
     await good.loop.advanceTo(10000);
     await db.yearbookNation.deleteMany({ where: { worldId: good.worldId } });
-    const reports = await backfillWorlds(db, true);
+    const reports = await backfillWorlds(db);
     expect(reports.find(({ worldId }) => worldId === bad.worldId)!.status).toBe('conflict');
-    expect(reports.find(({ worldId }) => worldId === good.worldId)!.inserted).toBe(2);
+    expect(reports.find(({ worldId }) => worldId === good.worldId)).toMatchObject({ inserted: 0, wouldInsert: 2 });
+    expect(await archived(good.worldId)).toEqual([]);
+    expect(await backfillWorld(db, good.worldId, true)).toMatchObject({ status: 'ok', inserted: 2 });
     await db.yearbookNation.deleteMany({ where: { worldId: good.worldId } });
     await db.nation.update({ where: { worldId_id: { worldId: good.worldId, id: 1 } }, data: { color: '#abcdef' } });
     expect(await backfillWorld(db, good.worldId, true)).toMatchObject({
