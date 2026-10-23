@@ -29,7 +29,8 @@ export interface Failure {
     | 'BAD_STATE'
     | 'NO_POPULATION'
     | 'NO_OFFER'
-    | 'NO_UNIT_SET';
+    | 'NO_UNIT_SET'
+    | 'COMMAND_DISABLED';
   message: string;
 }
 export interface LogEntry {

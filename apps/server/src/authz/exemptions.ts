@@ -68,6 +68,12 @@ export const exemptions: AuthzExemption[] = [
 
   { path: 'records.world', category: 'otherUser', reason: '공통 공개 연감이며 타인 소유 자원이 없다.' },
   {
+    path: 'timelapse.frames',
+    category: 'otherUser',
+    reason:
+      '공통 공개 영토 기록이며 타인 소유 자원이 없다. 다른 계정의 같은 응답은 timelapse 실제 HTTP 시험이 확인한다.',
+  },
+  {
     path: 'ranking.generals',
     category: 'otherUser',
     reason: '순위는 공통 공개 정보이고 me만 세션 장수로 정한다. 임의 generalId 지정은 BAD_REQUEST다.',

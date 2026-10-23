@@ -1,3 +1,4 @@
+import type { CommandResolver } from './resolve';
 import { rngFor } from '@opensamguk/shared';
 import { BALANCE } from '../balance';
 import type { WorldState } from '../model/world';
@@ -12,7 +13,9 @@ export function runGeneralTurn(
   command: { commandKey: string; args: unknown },
   seed: string,
   options: Pick<NpcContext, 'convergence'> = {},
+  resolver?: CommandResolver,
 ) {
+  const run = resolver ? resolver.run.bind(resolver) : runCommand;
   const general = state.generals[actor.generalId]!;
   const nationId = general.nationId;
   let next = state;
@@ -35,7 +38,7 @@ export function runGeneralTurn(
       const decision = chooseNationTurn(next, general, rngFor(seed, 'npc-nation', actor.tick ?? 0, nationId), context);
       if (decision.chosen) slot = { commandKey: decision.chosen.key, args: decision.chosen.args };
     }
-    const result = runCommand(
+    const result = run(
       next,
       { ...actor, target: 'nation' },
       slot.commandKey,
@@ -66,7 +69,7 @@ export function runGeneralTurn(
     );
     if (decision.chosen) selected = { commandKey: decision.chosen.key, args: decision.chosen.args };
   }
-  const result = runCommand(
+  const result = run(
     next,
     { ...actor, target: 'general' },
     selected.commandKey,
