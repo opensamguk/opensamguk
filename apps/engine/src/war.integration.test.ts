@@ -20,7 +20,16 @@ afterAll(async () => {
 });
 async function create(initial?: WorldInit) {
   initial ??= await warFixture();
-  const { worldId } = await saveInitialWorld(db, initial, { name: '전투 통합', turnTermMinutes: 60 });
+  // 12개월 전투·재생 회귀가 조기 통일로 끝나지 않도록 접근할 수 없는 중립 도시를 남긴다.
+  initial.cities.push({
+    ...initial.cities[0]!,
+    cityKey: 999,
+    name: '재생 경계 도시',
+    nationId: null,
+    connections: [],
+    supplied: false,
+  });
+  const { worldId } = await saveInitialWorld(db, initial, { name: '전투 통합', turnTermMinutes: 60, endYear: null });
   await controlClock(db, worldId, 'start');
   const lease = (await acquireLease(db, worldId))!;
   return { initial, worldId, lease, loop: new TurnLoop(db, lease) };

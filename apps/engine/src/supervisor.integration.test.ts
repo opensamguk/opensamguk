@@ -73,6 +73,7 @@ async function create(second = false) {
   const result = await saveInitialWorld(db, initial, {
     name: second ? '감독 B' : '감독 A',
     turnTermMinutes: second ? 60 : 10,
+    endYear: null,
   });
   owned.push(result.worldId);
   await db.world.update({

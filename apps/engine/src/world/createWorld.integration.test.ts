@@ -9,7 +9,7 @@ const url = process.env.TEST_DATABASE_URL;
 if (!url || !/\/[a-z][a-z0-9_]*_test$/.test(new URL(url).pathname))
   throw new Error('pnpm test:int로 전용 테스트 DB를 준비하세요.');
 const db = createDb(url);
-const options = { name: 'AC-M1-03 integration', turnTermMinutes: 10 };
+const options = { name: 'AC-M1-03 integration', turnTermMinutes: 10, endYear: null };
 const input = { scenario: '1030', map: 'che', seed: 'integration-seed' };
 
 beforeAll(async () => {
@@ -78,6 +78,11 @@ describe('AC-M1-03 실제 DB 월드 생성', () => {
       await expect(saveInitialWorld(db, state, { ...options, turnTermMinutes })).rejects.toThrow('턴 간격');
     }
     await expect(saveInitialWorld(db, state, { ...options, name: '  ' })).rejects.toThrow('월드 이름');
+    for (const endYear of [state.startYear - 1, 10001, 1.5, NaN, undefined]) {
+      await expect(saveInitialWorld(db, state, { ...options, endYear: endYear as number })).rejects.toThrow(
+        '종료 연도',
+      );
+    }
     expect(await db.world.count()).toBe(before);
   });
 
@@ -122,6 +127,8 @@ describe('AC-M1-03 실제 DB 월드 생성', () => {
         'cli-seed',
         '--turn-term',
         '7',
+        '--end-year',
+        '300',
         '--name',
         'CLI 통합 검증',
       ],

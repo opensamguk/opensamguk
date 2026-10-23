@@ -11,7 +11,9 @@
     "world:start": "tsx --env-file-if-exists=../../.env src/cli/controlWorld.ts start",
     "world:pause": "tsx --env-file-if-exists=../../.env src/cli/controlWorld.ts pause",
     "world:resume": "tsx --env-file-if-exists=../../.env src/cli/controlWorld.ts resume",
-    "world:status": "tsx --env-file-if-exists=../../.env src/cli/controlWorld.ts status"
+    "world:status": "tsx --env-file-if-exists=../../.env src/cli/controlWorld.ts status",
+    "world:accelerate": "tsx --env-file-if-exists=../../.env src/cli/controlWorld.ts accelerate",
+    "world:realtime": "tsx --env-file-if-exists=../../.env src/cli/controlWorld.ts realtime"
   },
   "dependencies": {
     "@opensamguk/rules": "workspace:*",

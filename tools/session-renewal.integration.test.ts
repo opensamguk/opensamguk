@@ -156,7 +156,7 @@ beforeEach(async () => {
   });
   const state = await readFixture();
   state.generals[0]!.userId = user.id;
-  ({ worldId } = await saveInitialWorld(db, state, { name: '세션 갱신 시험', turnTermMinutes: 60 }));
+  ({ worldId } = await saveInitialWorld(db, state, { name: '세션 갱신 시험', turnTermMinutes: 60, endYear: null }));
   const session = newSession(now);
   token = session.token;
   sessionId = session.id;

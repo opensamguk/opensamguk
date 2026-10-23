@@ -18,6 +18,9 @@ const worldSelect = {
   id: true,
   name: true,
   status: true,
+  clockMode: true,
+  endYear: true,
+  result: true,
   startYear: true,
   clockTick: true,
   clockAnchorAt: true,
@@ -51,10 +54,27 @@ export async function requireGeneral(db: Prisma.TransactionClient, worldId: stri
 
 export function worldSummary(world: ReadWorld, now: number) {
   const tick = nowTick({ ...world, clockAnchorAt: world.clockAnchorAt?.getTime() ?? null }, now);
+  const row = world.status === 'ENDED' ? world.result : null;
+  const result = row
+    ? {
+        reason: row.reason,
+        year: row.endedYear,
+        month: row.endedMonth,
+        winner:
+          row.winnerNationId === null
+            ? null
+            : { nationId: row.winnerNationId, name: row.winnerName!, color: row.winnerColor! },
+        remainingNations: row.remainingNations,
+        endedAt: row.endedAt.toISOString(),
+      }
+    : null;
   return {
     name: world.name,
     status: world.status,
-    gameDate: toGameDate(world.startYear, tick),
+    gameDate: result ? { year: result.year, month: result.month } : toGameDate(world.startYear, tick),
+    clockMode: world.clockMode,
+    endYear: world.endYear,
+    result,
     nowTick: tick,
     msPerTick: (world.turnTermMinutes * 60_000) / TICKS_PER_MONTH,
     turnTermMinutes: world.turnTermMinutes,
@@ -62,7 +82,7 @@ export function worldSummary(world: ReadWorld, now: number) {
 }
 
 export function nextTurnAt(world: ReadWorld, tick: number): string | null {
-  if (world.status !== 'RUNNING' || world.clockAnchorAt === null) return null;
+  if (world.status !== 'RUNNING' || world.clockMode === 'ACCELERATED' || world.clockAnchorAt === null) return null;
   return new Date(
     world.clockAnchorAt.getTime() + ((tick - world.clockTick) * world.turnTermMinutes * 60_000) / TICKS_PER_MONTH,
   ).toISOString();

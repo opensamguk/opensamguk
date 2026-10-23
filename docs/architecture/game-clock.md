@@ -26,9 +26,11 @@ GAME 규칙을 WALL 시각으로 판정하지 않습니다. 반대도 마찬가�
 
 | 모드        | 동작                                       | 쓰는 곳 |
 | ----------- | ------------------------------------------ | ------- |
-| realtime    | 벽시계 경과를 tick으로 바꿔 진행           | 운영 월드 |
-| manual      | 벽시계를 읽지 않고 최대 속도로 진행        | 시뮬레이터, 테스트, 관문 데모의 가속 (FR-ENG-07) |
-| paused      | tick이 멈춤                                | 일시정지 |
+| `REALTIME` | 벽시계 경과를 tick으로 바꿔 진행 | 기본 운영 모드 |
+| `ACCELERATED` | 실행권을 가진 같은 엔진이 다음 장수 턴·월 경계 중 이른 사건으로 진행 | 같은 판 가속 (FR-ENG-07) |
+| manual | `advanceTo(tick)`의 명시 목표까지만 진행 | 시험·도구 |
+
+운영 모드는 `World.clockMode`에 저장합니다. `PAUSED`는 별도 모드가 아닌 월드 상태이며 정지·재개해도 모드는 그대로입니다. 가속 중과 `ENDED`에서는 벽시계로 tick을 외삽하지 않습니다. 가속 중 `home.get.nextTurnAt`은 `null`입니다.
 
 ## 4. tick과 장수 턴 배치
 
@@ -42,6 +44,8 @@ M1에서는 운영 중 턴 간격을 바꾸는 명령을 제공하지 않습니�
 PREOPEN → RUNNING → PAUSED ⇄ RUNNING → ENDED만 허용합니다. 정지 시 현재 tick을 저장하고 재개 시 기준 시각을 현재로 옮겨 정지한 시간은 계산에서 제외합니다.
 
 운영 명령은 `pnpm world:start/pause/resume/status --world <ID>`입니다. 상태 전환은 DB 트랜잭션과 revision 조건으로 보호하며 status 조회는 완료된 tick을 저장합니다. 자투리 tick은 남기고 벽시계가 역행하면 저장된 tick을 유지합니다.
+
+`pnpm world:accelerate --world <ID>`와 `pnpm world:realtime --world <ID>`는 RUNNING·PAUSED에서만 다른 모드로 바꿉니다. 같은 모드·PREOPEN·ENDED는 거부합니다. 가속 전환은 그 순간의 realtime tick을 저장하고 realtime 복귀는 저장 tick을 유지한 채 기준 시각만 DB 현재 시각으로 옮깁니다. `world:status`는 모드·종료 연도·저장된 결과도 출력합니다. 종료 뒤 조회는 시계를 쓰지 않습니다.
 
 운영 명령과 realtime 엔진은 모두 DB UTC 시각을 기준으로 삼습니다. 운영 명령은 월드 행을 잠근 뒤 최신 시계와 현재 DB 시각을 읽어 엔진의 턴 저장·체크포인트와 직렬화합니다. RUNNING이 아니면 밀린 턴도 처리하지 않습니다. 재개하면 저장된 `nextTurnTick`부터 따라잡습니다.
 
@@ -60,3 +64,11 @@ manual 엔진은 `advanceTo(tick)`까지 처리하고 그 tick을 저장합니�
 `runMonthly(state, boundaryTick, rng)`는 종료한 달을 정산합니다. 시작 연도 1월의 정산 tick은 10,000이며 120,000은 12월입니다. 1·7월 금, 4·10월 쌀 수입을 인구 증가 전 값으로 계산하고 소속 장수에게 봉급을 나눕니다. 그다음 인구·민심, 수도에서 같은 나라 도시만 지나는 BFS 보급, 외교 기한, 국가 요약과 도시 소유권 연감을 만듭니다. 미등장 장수는 봉급·장수 수에서 제외하며 턴을 쌓지 않습니다. 등장 연도 1월부터 기존 offset에서 턴을 받습니다.
 
 국가·도시·장수는 ID 순으로, 외교는 국가 쌍 순으로 처리합니다. RNG는 `rngFor(seed, 'monthly', 정산 연, 월)`을 전달하되 현재 다섯 단계는 난수를 소비하지 않습니다. 재해·사건·사망·관직 보정은 이번 범위에 넣지 않았습니다. 세율·봉급률 등은 `packages/rules/src/balance.ts`에 있습니다.
+
+## 7. 기수 종료와 배치
+
+`seasonOutcome`은 장수 턴(국가 명령 포함) 직후와 월간 정산 직후에 판정합니다. 한 국가가 중립 도시까지 모두 가졌으면 `UNIFIED`이고 그 국가가 승자입니다. 월드에 명시한 `endYear`년 12월 정산을 마쳤으면 `END_YEAR`이며 승자는 없습니다. 같은 tick의 장수 턴은 실행하지 않습니다. 기존 월드의 `endYear = null`은 통일로만 끝납니다. 운영 기본 종료 연도는 없으며 데모의 300년은 생성 인자입니다.
+
+결정 사건의 상태·로그·예턴·정산과 `World.status = ENDED`·DB 시각 `endedAt`·`WorldResult`를 같은 트랜잭션에 저장합니다. `endedTick`·`endedSequence`는 그 사건의 값이며 저장 시계는 기존 tick보다 작아지지 않습니다. 12월 경계 tick은 다음 해 1월이므로 조회는 결과에 기록한 종료 연월을 씁니다. 최종 해시는 결정 사건 저장 직후의 `{ state, turns, revisions, monthlyTick }` 네 키를 해시합니다. 설정·시각·결과는 해시에 넣지 않습니다.
+
+`poll`은 모드와 무관하게 최대 64개의 진행 step 또는 250ms 뒤 첫 step 경계에서 돌아옵니다. 반환은 `{ executions, more, status }`이며 실행 결과는 그 배치 것만 남깁니다. 상한에 닿으면 `more = true`이고 엔진은 `setImmediate`로 양보한 뒤 다음 배치를 실행합니다. 그 밖에는 100ms 기다립니다. `advanceTo`는 배치 상한 없이 목표까지의 전체 턴 결과를 반환하되 종료 사건에서 멈춥니다. 종료 뒤에는 남은 PENDING 생성 요청을 `WORLD_CLOSED`로 거부하는 기록만 남기고 턴·정산·시계·결과는 쓰지 않습니다.

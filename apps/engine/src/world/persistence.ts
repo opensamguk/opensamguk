@@ -7,7 +7,7 @@ import { loadCommandState } from '../commandPersistence';
 export async function saveInitialWorld(
   db: PrismaClient,
   state: WorldInit,
-  options: { name: string; turnTermMinutes: number },
+  options: { name: string; turnTermMinutes: number; endYear: number | null },
 ) {
   if (
     !options.name.trim() ||
@@ -18,6 +18,11 @@ export async function saveInitialWorld(
     throw new Error('월드 이름과 턴 간격(1~2147483647분)을 확인하세요.');
   }
   const stateHash = hashState(state);
+  if (
+    options.endYear !== null &&
+    (!Number.isSafeInteger(options.endYear) || options.endYear < state.startYear || options.endYear > 10000)
+  )
+    throw new Error('종료 연도는 시작 연도 이상, 10000 이하 정수여야 합니다.');
   const world = await db.$transaction(
     async (tx) => {
       const world = await tx.world.create({
@@ -29,6 +34,7 @@ export async function saveInitialWorld(
           unitSetKey: state.unitSetKey,
           seed: state.seed,
           startYear: state.startYear,
+          endYear: options.endYear,
           initialStateHash: stateHash,
           replayOrigin: {
             version: 1,
