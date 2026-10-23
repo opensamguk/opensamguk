@@ -301,18 +301,21 @@ AC-P2-16과 D-027으로 채택한 AC-P2-01, AC-P2-02·03·12·13·15·17의 (가
 | T4-73 | [증축](./mvp-command-gaps.md#t4-73-nation_expand-증축) (`nation_expand`, nation) | M1-14 | Codex → Claude | 계약 T4-02, T4-07[준비] · 구현 T4-02, T4-07[준비] · 연결 T4-50, T4-51 · 결정 U-01, U-19 | `ext/nation_expand/` | 명령별 성공·대표 실패, 연결 뒤 대응표 11단계 | 0.5일 | 결정 대기 (U-01) · MVP 필수 (D-022) |
 | T4-74 | [감축](./mvp-command-gaps.md#t4-74-nation_shrink-감축) (`nation_shrink`, nation) | M1-14 | Codex → Claude | 계약 T4-02, T4-07[준비], T4-73 · 구현 T4-02, T4-07[준비], T4-73 · 연결 T4-50, T4-51 · 결정 U-01, U-19 | `ext/nation_shrink/` | 명령별 성공·대표 실패, 연결 뒤 대응표 11단계 | 0.5일 | 결정 대기 (U-01) · MVP 필수 (D-022) |
 | T4-75 | [인구이동](./mvp-command-gaps.md#t4-75-nation_migrate-인구이동) (`nation_migrate`, nation) | M1-14 | Codex → Claude | 계약 T4-02 · 구현 T4-02 · 연결 T4-50, T4-51 · 결정 U-19 | `ext/nation_migrate/` | 명령별 성공·대표 실패, 연결 뒤 대응표 11단계 | 0.5일 | 계획 가능, 계약은 U-19 · MVP 필수 (D-022) |
-| T4-76 | [지도 형식 v2(지형 층)와 자원 검증기 (C-M2·C-M3·C-M3a)](./map-editor.md) | P2-27 | Codex → Claude | — | `packages/rules/src/world/map/`, `packages/rules/src/world/validate/` | 종류별 검증 항목 통과·실패, 내장 판 통과 | 1일 | 계획 가능 (D-028) |
-| T4-77 | [초기화 자원 카탈로그 DB, 초기화 SQL, JSON 삭제 (C-M1·C-M1a·C-M1b)](./map-editor.md) | P2-26 | Codex → Claude | T4-76, 병합 T4-86 | 새 migration, `packages/db/sql/resources-init.sql`, `apps/engine/src/world/resources.ts`, `tools/sim/`, `tools/portrait-map/`, JSON 읽는 시험 이전, `.github/workflows/simulation.yml` | SQL 두 번 같음, 변환 대조, 이전 전 고정물 재생 해시 같음, DB 시뮬레이터 결과 해시 같음, JSON 0개 | 2.5일 | 계획 가능 (D-028) |
-| T4-78 | [자원 초안 저장·판 복제·게시 API와 감사, 모든 종류 (C-M4)](./map-editor.md) | P2-27 | Codex → Claude | T4-77, T3-05 | `apps/server/src/routers/resourceAdmin.ts` | 권한·제재·무인증 거부, revision 충돌, 게시 판 불변 | 1일 | 계획 가능 (D-028) |
-| T4-79 | [월드 생성에서 지도·시나리오 판 고르기](./map-editor.md) | P2-27 | Codex → Claude | T4-78, T2-02 | `apps/engine/src/cli/createWorld.ts` | 새 판으로 월드 생성, 기존 월드 그대로 | 0.5일 | 계획 가능 (D-028) |
+| T4-76 | [지도 형식 v2(지형 층)와 자원 검증기 (C-M2·C-M3·C-M3a)](./T4-76.md) | P2-27 | Codex → Claude | — | `packages/rules/src/world/map/`, `packages/rules/src/world/validate/` | 종류별 검증 항목 통과·실패, 내장 판 통과 | 1일 | 상세 계획 초안, G-03 전 (D-028) |
+| T4-77 | [초기화 자원 카탈로그 DB, 초기화 SQL, JSON 삭제 (C-M1·C-M1a·C-M1b)](./T4-77.md) | P2-26 | Codex → Claude | T4-76, 병합 T4-86, T4-88 (PR 2만) | 새 migration(schema는 §7), `packages/db/sql/resources-init.sql`, `tools/resources-sql/`, `tools/init-resources.ts`, `apps/engine/src/world/resources.ts`, `apps/engine/src/cli/createWorld.ts`, `tools/sim/`, `tools/season-throughput.ts`, `tools/portrait-map/`, JSON 읽는 시험 이전, `tools/run-integration.ts`(한 줄), 루트 `package.json`(script 두 줄), `.github/workflows/simulation.yml`·`ci.yml`·`season-throughput.yml`, `resources/NOTICE.md`, `e2e/rankingSeed.ts`(호출 인자 두 곳, Claude 리뷰) | SQL 두 번 같음, 변환 대조, 이전 전 고정물 재생 해시 같음, DB 시뮬레이터 결과 해시 같음, JSON 0개 | 2.5일 | 상세 계획 초안, G-03 전 (D-028) |
+| T4-78 | [자원 초안 저장·판 복제·게시 API와 감사, 모든 종류 (C-M4)](./T4-78.md) | P2-27 | Codex → Claude | T4-77, T3-05 | `apps/server/src/routers/resourceAdmin.ts`, 새 migration(초안 하나 색인과 `baseKey`, schema는 §7) | 권한·제재·무인증 거부, revision 충돌, 게시 판 불변 | 1일 | 상세 계획 초안, G-03 전 (D-028) |
+| T4-79 | [월드 생성에서 지도·시나리오 판 고르기](./T4-79.md) | P2-27 | Codex → Claude | T4-78, T2-02 | `apps/engine/src/cli/createWorld.ts` | 새 판으로 월드 생성, 기존 월드 그대로 | 0.5일 | 상세 계획 초안, G-03 전 (D-028) |
 | T4-80 | [지도 편집 캔버스 (서버 없이 JSON 가져오기·내보내기, 밑그림 내보내기)](./map-editor.md) | P2-27 | Claude → Codex | T4-76 | `apps/web/src/mapEditor/` | Playwright 도시 추가·이동·삭제, 연결, 지형, 검증 오류, 왕복 | 1.5일 | 계획 가능 (D-028) |
-| T4-81 | [편집 캔버스를 관리자 콘솔과 게시 API에 연결](./map-editor.md) | P2-27 | Claude → Codex | T4-80, T4-78, T3-06 | `apps/web/src/admin/maps/` | E2E 초안 저장·게시, 권한 없는 계정 화면 | 0.5일 | 계획 가능 (D-028) |
-| T4-82 | [che 지형 층 초안 그리기](./map-editor.md) | P2-28 | Claude → Codex | T4-80 | `resources/map-terrain/che.json` (Codex 소유 경로라 반영은 Codex 리뷰로) | 검증기 통과, 밑그림 내보내기 | 0.5일 | 계획 가능 (D-028) |
-| T4-83 | [도트 바탕 그림 생성과 출처 기록](./map-editor.md) | P2-28 | Codex → Claude | T4-82 | 이미지 저장소 `maps/<지도 키>/base.webp`, 출처 표 | 밑그림 해시·생성 도구·일시 기록, 외부 그림 입력 없음 | 0.5일 | 계획 가능 (D-028) |
-| T4-84 | [메인·공개 지도에 바탕 그림 깔기](./map-editor.md) | P2-28 | Claude → Codex | T4-83, T2-25 | `apps/web/src/main/WorldMap.tsx` | E2E 그림 있는 판·없는 판 | 0.5일 | 계획 가능 (D-028) |
-| T4-85 | [월드의 병종·능력치 규칙 판 조회 API](./map-editor.md) | P2-26 | Codex → Claude | T4-77 | `apps/server/src/routers/resources.ts` | 월드별 판 반환, 무인증·다른 월드 범위 시험 | 0.5일 | 계획 가능 (D-028) |
-| T4-86 | [전투 시뮬레이터와 E2E가 번들 JSON 대신 API·DB 값 쓰기](./map-editor.md) | P2-26 | Claude → Codex | T4-85 | `apps/web/src/battleSim/`, `e2e/battleSim.spec.ts`, `e2e/rankingSeed.ts` | E2E 결과 동일, 번들에 JSON 없음 | 0.5일 | 계획 가능 (D-028) |
-| T4-87 | [시나리오·병종·능력치 규칙·초상 대응표 편집 화면](./map-editor.md) | P2-27 | Claude → Codex | T4-78, T3-06 | `apps/web/src/admin/resources/` | Playwright 초안 저장·검증 오류·게시, 새 판 월드 생성 | 1.5일 | 계획 가능 (D-028) |
+| T4-81 | [편집 캔버스를 관리자 콘솔과 게시 API에 연결](./T4-81.md) | P2-27 | Claude → Codex | T4-80, T4-78, T3-06, T4-76, T3-05, T4-88 | `apps/web/src/admin/maps/`, 관리자 경로 파일은 §7 | E2E 초안 저장·게시, 권한 없는 계정 화면 | 0.5일 | 상세 계획 초안, G-03 전 (D-028) |
+| T4-82 | [che 지형 층 초안 그리기](./T4-82.md) | P2-28 | Claude → Codex | T4-80, T4-76 | `tools/map-terrain/che.v2.json`(`resources/` 밖 도구 입력, 도시까지 든 v2 지도), `tools/map-terrain/che.sources.json`, `apps/web/src/mapEditor/terrainSources.ts` | 검증기 통과, 밑그림 내보내기, 래스터 해시 | 1.5일 | 상세 계획 초안, G-03 전 (D-028) |
+| T4-83 | [도트 바탕 그림 생성과 출처 기록](./T4-83.md) | P2-28 | Codex → Claude | T4-82, T4-78 | 이미지 저장소 `maps/<정규 키>/base.webp`, `maps/provenance.tsv`, `tools/map-base/` | 밑그림 파일·래스터 해시, 생성 도구·일시 기록, 외부 그림 입력 없음 | 0.5일 | 상세 계획 초안, G-03 전 (D-028) |
+| T4-84 | [메인·공개 지도에 바탕 그림 깔기](./T4-84.md) | P2-28 | Claude → Codex | T4-83, T2-25, T4-89 | `apps/web/src/main/WorldMap.tsx` | E2E 그림 있는 판·없는 판 | 0.5일 | 상세 계획 초안, G-03 전 (D-028) |
+| T4-85 | [월드의 병종·능력치 규칙 판 조회 API](./T4-85.md) | P2-26 | Codex → Claude | — | `apps/server/src/routers/resources.ts`, 등록 줄은 §7 | 월드별 판 반환, 무인증·다른 월드 범위 시험 | 0.5일 | 상세 계획 초안, G-03 전 (D-028) |
+| T4-86 | [전투 시뮬레이터와 E2E가 번들 JSON 대신 API·DB 값 쓰기](./T4-86.md) | P2-26 | Claude → Codex | T4-85 | `apps/web/src/battleSim/`, `e2e/battleSim.spec.ts` | E2E 결과 동일, 번들에 JSON 없음 | 0.5일 | 상세 계획 초안, G-03 전 (D-028) |
+| T4-87 | [시나리오·병종·능력치 규칙·초상 대응표 편집 화면](./T4-87.md) | P2-27 | Claude → Codex | T4-78, T3-06, T4-81, T4-76 | `apps/web/src/admin/resources/`, 관리자 경로 파일은 §7 | Playwright 초안 저장·검증 오류·게시, 새 판 월드 생성 | 1.5일 | 상세 계획 초안, G-03 전 (D-028) |
+| T4-88 | [편집 캔버스를 rules v2 타입·검증기로 맞추고 che 시험 입력 바꾸기](./map-editor.md#5-작업-순서) | P2-27 | Claude → Codex | T4-76 | `apps/web/src/mapEditor/contract.ts`·`validate.ts`와 그 시험, `e2e/mapEditor.spec.ts` | 편집기 단위·E2E가 rules 타입·검증기로 통과, 화면 소스에 `resources/map/` 경로 없음 | 0.5일 | 계획 가능 (D-028) |
+| T4-89 | [`world.map`·`world.publicMaps`의 바탕 그림 칸과 DB 자리](./map-editor.md#4-도트-바탕-지도) | P2-28 | Codex → Claude | T4-78 | `apps/server/src/routers/world.ts`의 두 응답 칸, 새 migration(schema는 §7) | 그림 있는 판·없는 판 응답, 공개 범위 시험이 판 경로 밖의 값을 내지 않음 | 0.5일 | 계획 가능 (D-028) |
+| T4-90 | [관리자 월드 생성 양식의 판 고르기](./map-editor.md#5-작업-순서) | P2-27 | Claude → Codex | T4-79, T3-06 | T3-06 관리자 월드 생성 양식의 판 고르기 칸 | E2E 판을 골라 월드 생성, 시나리오의 짝 지도 고정 | 0.5일 | 계획 가능 (D-028) |
 
 `ext/`는 `packages/rules/src/commands/ext/`다. 각 규칙 작업은 명령마다 `<key>.test.ts`에 성공 1건·대표 실패 1건을 두고 T4-02의 확장 대조 시험이 확장 목록과 시험 파일을 자동으로 맞춰 본다.
 
@@ -326,7 +329,7 @@ T4-57~T4-75는 §8 A-02·A-03·A-04에서 온 명령 19개를 [누락 명령 문
 
 19행의 추정은 행마다 규칙 PR 하나(0.5일)이며 위 합에 넣지 않았다. T4-66, T4-70, T4-71은 한 PR을 넘을 위험이 있다(그 문서 3.4절).
 
-T4-76~T4-87은 D-028(2026-10-23)로 더한 초기화 자원 DB 이전·지도 편집기·도트 바탕 지도 작업이다. 설계는 [지도 편집기 설계](./map-editor.md)이고 추정 합 약 11일은 위 합에 넣지 않았다.
+T4-76~T4-90은 D-028(2026-10-23)로 더한 초기화 자원 DB 이전·지도 편집기·도트 바탕 지도 작업이다. 설계는 [지도 편집기 설계](./map-editor.md)이고 사용자가 같은 날 승인했다. T4-76~T4-79·T4-81~T4-87의 상세 계획은 각 계획 브랜치에 있고 Codex 기술 검토(G-03) 전이라 상태 칸은 계획 준비에 머문다. T4-88~T4-90은 여섯 계획을 대조하며 더한 행이고 상세 계획은 아직 없다. 선행은 [단계 계획](../product/phases.md) Phase 2 표와 같다. T4-77은 PR 1(DB 이전)과 PR 2(JSON 삭제)로 나뉘고 `병합 T4-86, T4-88`은 PR 2에만 걸린다. `e2e/rankingSeed.ts`의 로더 호출 두 곳은 T4-77 PR 1이 고치고 Claude가 리뷰한다(T4-77 Z-5). T4-82 추정은 근거 조사와 네 층 그리기를 반영해 0.5일에서 1.5일로 올렸다(T4-82 MT-5). 추정 합 약 13.5일은 위 합에 넣지 않았다.
 
 ### 6.1 준비 단계
 
@@ -349,7 +352,10 @@ T4-15(선양·해산)와 T4-52(모반), T4-16(변경 명령)과 T4-55(변경권 
 | 공유 파일 | 반영 순서 | 규칙 |
 | --------- | --------- | ---- |
 | `packages/db/prisma/schema.prisma`, `migrations/` | T4-56 PR 1 → T4-03 → T4-12 → T4-20 → T4-23 → T4-28 → T4-31 | C8. 기존·공유·적용된 migration은 고치지 않는다. T4-56 PR 1은 `RemovedNation`·`YearbookNation`만 더한다(D-027). T2-24(PR #161 `PublicMapSnapshot`)는 이 표 밖의 기존 작업이며 자기 schema 몫을 그대로 소유한다. 뒤에 병합하는 쪽이 최신 main에서 migration을 새로 만들고 번호 순서는 구현 기록에서 확인한다 |
+| 같은 파일, D-028 묶음 | T4-77 PR 1 → T4-78 → T4-89 | T4-77이 `GameResource` 표·enum·CHECK·게시 판 불변 트리거를, T4-78이 초안 하나 부분 유일 색인과 `baseKey` 열을, T4-89가 판마다 바탕 그림 자리를 더한다. 이 묶음은 바로 위 행의 순서와 따로 가며 그 행의 작업과 `병합` 선행을 만들지 않는다. 같은 날 겹치면 뒤에 병합하는 쪽이 최신 main에서 migration을 새로 만든다(T4-77 Z-8, T4-78 Q-06) |
 | `apps/server/src/router.ts`, `authz/exemptions.ts`, `tools/authz.integration.test.ts` | T4-35 → T4-12 → T4-49 → T4-20 → T4-23 → T4-28 → T4-31 | 등록 한 줄씩. 권한 증거와 면제는 등록과 같은 PR (C7). T4-56 (가)는 새 절차가 없어 고치지 않는다 |
+| 같은 파일, D-028 묶음 | T4-85 → T4-78 (T3-05 뒤) | T4-85는 `resources` 라우터 등록 한 줄과 권한 표, T4-78은 `resourceAdmin` 등록 한 줄, 경로 여섯 줄, 표 두 줄이다. T3-05는 M3 대기열의 작업이라 이 표가 소유하지 않는다. 등록 줄만 더하므로 T4-57~T4-75처럼 병합 직전 최신 main에서 자기 줄을 더하고 바로 위 행의 작업과 `병합` 선행을 만들지 않는다(T4-85 Q1, T4-78 Q-06) |
+| T3-06이 만든 관리자 콘솔 경로·메뉴 파일 | T3-06 → T4-81 → T4-87 | 경로·메뉴 한 줄씩. 파일 이름은 T3-06이 정한다. T4-87은 이미 T4-81 뒤라 새 선행이 생기지 않는다. T4-90은 T3-06의 월드 생성 양식 안에 칸을 더하고 경로를 더하지 않는다는 가정이다. 경로가 필요해지면 T4-87 뒤에 둔다(T4-81 Q-81-8) |
 | `apps/server/src/visibility.ts` | T4-35 → T4-12 → T4-25 → T4-38 | 비공개 필드 추가는 권한 시험과 같은 PR. T4-56 (가)는 공개 메타데이터만 내므로 고치지 않는다 |
 | `apps/server/src/routers/timelapse.ts`, `timelapse.test.ts`, `timelapse.integration.test.ts` | T4-35 → T4-56 PR 2 | T4-56 PR 2는 `items[].nations`만 더하고 라우터 등록·권한·공개 범위는 바꾸지 않는다 |
 | `apps/server/src/routers/commands.ts`, `turns.ts`, `game/slots.ts` | T4-03 | resolver 연결은 T4-03 하나만 (C13) |
