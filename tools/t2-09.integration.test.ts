@@ -68,9 +68,9 @@ async function until(predicate: () => boolean | Promise<boolean>, ms = 2000) {
   }
 }
 const streams: Array<{ abort: () => void; done: () => boolean }> = [];
-async function stream(user = 0, endpoint = base) {
+async function stream(user = 0, endpoint = base, streamWorldId = worldId) {
   const controller = new AbortController();
-  const response = await fetch(`${endpoint}/sse?worldId=${worldId}`, {
+  const response = await fetch(`${endpoint}/sse?worldId=${streamWorldId}`, {
     headers: { origin, cookie: users[user]!.cookie },
     signal: controller.signal,
   });
@@ -516,6 +516,45 @@ describe('T2-09 국가 공지 revision', () => {
 });
 
 describe('T2-09 실제 PostgreSQL LISTEN·SSE', () => {
+  it('다른 사용자가 같은 월드나 다른 월드에 연결해도 기존 연결에 ready를 다시 보내지 않는다', async () => {
+    const a = await stream();
+    const readyCount = () => a.events.filter((event) => event.kind === 'ready').length;
+    expect(readyCount()).toBe(1);
+    await stream(1);
+    await stream(2, base, otherWorldId);
+    await signal({ kind: 'monthly.done', target: 'world' });
+    await until(() => a.events.some((event) => event.kind === 'monthly.done'));
+    expect(readyCount()).toBe(1);
+  });
+  it('다른 서버의 두 사용자가 보낸 개인 메시지는 요청 시작부터 2초 안에 상대 SSE에 닿는다', async () => {
+    const child = await worker();
+    try {
+      const local = await stream();
+      const remote = await stream(1, child.base);
+      for (const [sender, recipient, endpoint, receiver] of [
+        [0, 2, base, remote],
+        [1, 1, child.base, local],
+      ] as const) {
+        const started = Date.now();
+        const sent = await call<Outputs['message']['send']>(
+          'message.send',
+          { worldId, scope: 'PRIVATE', toGeneralId: recipient, body: '서버 간 수신 시간' },
+          sender,
+          endpoint,
+        );
+        expect(sent.status).toBe(200);
+        await until(() => receiver.events.some((event) => event.kind === 'message.new'));
+        const index = receiver.events.findIndex((event) => event.kind === 'message.new');
+        expect(receiver.receivedAt[index]! - started).toBeLessThan(2000);
+        expect(
+          (await call<Outputs['message']['list']>('message.list', { worldId, scope: 'PRIVATE' }, 1 - sender)).data!
+            .items,
+        ).toContainEqual(expect.objectContaining({ id: sent.data!.item.id, body: '서버 간 수신 시간' }));
+      }
+    } finally {
+      await child.close();
+    }
+  }, 60000);
   it('인증·월드·출처를 검사하고 ready 이후 하트비트를 보낸다', async () => {
     const denied = await fetch(`${base}/sse?worldId=${worldId}`);
     expect(denied.status).toBe(401);

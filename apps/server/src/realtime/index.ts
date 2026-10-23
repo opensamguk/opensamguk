@@ -157,6 +157,7 @@ export function registerRealtime<L extends FastifyBaseLogger>(
     }
     connecting = (async () => {
       let client = listener;
+      const restoring = client === null;
       if (!client) {
         const connectionString = options.connectionString ?? process.env.DATABASE_URL;
         if (!connectionString) throw new Error('알림 DB 설정이 없습니다.');
@@ -200,7 +201,7 @@ export function registerRealtime<L extends FastifyBaseLogger>(
             if (listener !== client) throw new Error('알림 연결이 끊겼습니다.');
             listening.add(channel);
           }
-        await broadcastReady();
+        if (restoring) await broadcastReady();
       } catch (error) {
         broken(client);
         throw error;
