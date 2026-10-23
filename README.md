@@ -12,14 +12,14 @@
 | ---------------------------- | ------------------------------------------------------------ | ---- |
 | 기획                         | PRD·요구사항·인수조건·차별화 선택                            | ✅ v0.2 (가정 원장 일부 남음) | <!-- lint-text-ignore C-5 -->
 | M1 혼자 + NPC로 한 판 완주   | [AC-M1 22개](docs/product/acceptance-criteria.md#m1) 통과    | 진행 중 (✅ 19 · 🟨 2 · ⬜ 1) | <!-- lint-text-ignore C-5 -->
-| M2 지인 테스트 (참가자는 같은 수의 독립 에이전트로 대체, [D-021](docs/product/decisions.md#d-021-지인-참가-시험을-독립-에이전트-참가-시험으로-바꾸고-공개를-승인한다-2026-10-21)) | [AC-M2 19개](docs/product/acceptance-criteria.md#m2) 통과    | 진행 중 (✅ 2 · 🟨 0 · ⬜ 17) | <!-- lint-text-ignore C-5 -->
+| M2 지인 테스트 (참가자는 같은 수의 독립 에이전트로 대체, [D-021](docs/product/decisions.md#d-021-지인-참가-시험을-독립-에이전트-참가-시험으로-바꾸고-공개를-승인한다-2026-10-21)) | [AC-M2 20개](docs/product/acceptance-criteria.md#m2) 통과    | 진행 중 (✅ 2 · 🟨 0 · ⬜ 18) | <!-- lint-text-ignore C-5 -->
 | M3 공개 오픈 = MVP 완료      | [AC-M3 16개](docs/product/acceptance-criteria.md#m3) 통과    | 진행 중 (✅ 0 · 🟨 1 · ⬜ 15) | <!-- lint-text-ignore C-5 -->
 
 MVP는 M1·M2·M3 전체이며 M1만 끝나도 MVP 완료가 아닙니다. Phase 2(확장)는 M2와 다른 범위입니다 ([단계 계획](docs/product/phases.md)).
 Phase 2 인수조건 가운데 정본에 오른 것은 [AC-P2-16](docs/product/acceptance-criteria.md#p2) 하나입니다 ([D-023](docs/product/decisions.md#d-023-ac-p2-16을-인수조건에-올리고-수동-1회-계산-몫만-계약으로-채택한다-2026-10-22)). 수동 입력으로 전투를 한 번 계산하는 몫(가)은 계약과 독립 기술 리뷰를 거쳐 PR [#132](https://github.com/peppone-choi/opensamguk/pull/132)로 main에 병합됐습니다. 실제 턴과 같은 결과를 내는 몫(나)이 남아 AC-P2-16은 진행 중입니다. 위 관문 집계와 MVP 진행률에는 넣지 않습니다.
 
 진행률의 기준은 [인수조건](docs/product/acceptance-criteria.md)의 상태 하나뿐입니다.
-위 숫자는 main [`76d56d0`](https://github.com/peppone-choi/opensamguk/commit/76d56d0db57f0e8d8686938591781632c71b2a20)의 AC-M1-22·AC-M2-01 수용과 PR [#67](https://github.com/peppone-choi/opensamguk/pull/67)의 D-022에 따른 AC-M1-14 재개(✅ → 🟨)를 합친 인수조건 문서에서 AC 행 57개의 상태 칸을 다시 센 값입니다. <!-- lint-text-ignore C-5 -->
+위 숫자는 main [`76d56d0`](https://github.com/peppone-choi/opensamguk/commit/76d56d0db57f0e8d8686938591781632c71b2a20)의 AC-M1-22·AC-M2-01 수용과 PR [#67](https://github.com/peppone-choi/opensamguk/pull/67)의 D-022에 따른 AC-M1-14 재개(✅ → 🟨)를 합친 인수조건 문서에서 AC 행 58개(M1 22·M2 20·M3 16)의 상태 칸을 다시 센 값입니다. <!-- lint-text-ignore C-5 -->
 문서에 기록된 상태를 센 것이며 새로 돌린 제품 전체 QA 결과가 아닙니다. 관문은 그 관문의 AC가 전부 ✅일 때만 통과합니다. <!-- lint-text-ignore C-5 -->
 AC 57개 기준의 통과 비율은 옛 범위의 집계일 뿐 MVP 전체 진행률이 아닙니다. 2026-10-22 소유자 정정([D-022](docs/product/decisions.md#d-022-mvp-완료에는-모든-명령이-들어간다-2026-10-22))으로 MVP는 모든 명령을 완료해야 합니다. AC-M1-14도 다시 진행 중입니다. 명령 진행은 [명령 대응표](docs/product/command-coverage.json)를 `node tools/command-coverage.mjs`로 세어 봅니다. 2026-10-22 출력은 원작 비교 분모 90개, 정본 분모 91개, 전 단계 완료 0개입니다. <!-- lint-text-ignore C-5 -->
 누가 무엇을 할 차례인지는 `pnpm next`로 봅니다 (계획 Claude → 구현 담당 → 리뷰 반대쪽).
