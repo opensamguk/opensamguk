@@ -75,6 +75,9 @@ export function GameLayout() {
             </Link>
           ))}
         </nav>
+        <Link to="/settings/notifications" className={styles.account}>
+          알림 설정
+        </Link>
         <LogoutButton className={styles.logout} />
       </header>
       <main className={styles.content}>

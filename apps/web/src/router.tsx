@@ -10,6 +10,7 @@ import {
 import { BattleSimPage } from './battleSim/BattleSimPage';
 import { CreateGeneralPage } from './general/CreateGeneralPage';
 import { GameLayout } from './layout/GameLayout';
+import { NotificationSettingsPage } from './notifications/NotificationSettingsPage';
 import { DevUiPage } from './pages/DevUiPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
@@ -84,6 +85,17 @@ const signupRoute = createRoute({
   path: 'signup',
   validateSearch: authSearch,
   component: SignupPage,
+});
+
+// 계정 단위 알림 설정 (T2-21). 월드와 무관하고 로그인이 필요하다.
+const notificationSettingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'settings/notifications',
+  beforeLoad: async ({ context, location }) => {
+    if (!(await currentUser(context))) throw redirect({ to: '/login', search: { next: location.href } });
+  },
+  component: NotificationSettingsPage,
+  errorComponent: GuardError,
 });
 
 // 게임 화면은 모두 로그인이 필요하다. 로그인 뒤 원래 주소로 돌아오도록 next에 담는다.
@@ -174,6 +186,7 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
   signupRoute,
+  notificationSettingsRoute,
   worldRoute.addChildren([
     worldIndexRoute,
     mapRoute,
