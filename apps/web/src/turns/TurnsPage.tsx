@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from '@tanstack/react-router';
+import { PolicyBar } from '../policy/PolicyBar';
 import { useTRPC } from '../trpc';
 import { retryUnlessClientError } from './apiError';
 import { slotTimes } from './schedule';
@@ -14,7 +15,10 @@ export function TurnsPage() {
     <section className={styles.page}>
       <h1>예턴 편집</h1>
       <div className={styles.layout}>
-        <TurnEditor worldId={worldId} selectedCityKey={null} />
+        <div className={styles.editorColumn}>
+          <PolicyBar worldId={worldId} />
+          <TurnEditor worldId={worldId} selectedCityKey={null} />
+        </div>
         <RecentResults worldId={worldId} />
       </div>
     </section>

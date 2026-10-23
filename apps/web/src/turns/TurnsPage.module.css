@@ -9,6 +9,10 @@
   align-items: start;
 }
 
+.editorColumn {
+  min-width: 0;
+}
+
 @media (max-width: 900px) {
   .layout {
     grid-template-columns: 1fr;

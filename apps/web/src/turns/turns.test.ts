@@ -14,13 +14,16 @@ import {
   type EditOp,
   type Turn,
 } from './draft';
+import type { SlotView } from '../policy/contract';
 import { slotTimes } from './schedule';
 import { draftStorageKey, readStored } from './useTurnDraft';
 
-const farm: Turn = { commandKey: 'farm', args: {} };
-const rest = (): Turn => ({ commandKey: 'rest', args: {} });
+const farm: Turn = { commandKey: 'farm', args: {}, explicit: true };
+const rest = (): Turn => ({ commandKey: 'rest', args: {}, explicit: false });
+const restByHand = (): Turn => ({ commandKey: 'rest', args: {}, explicit: true });
 const empty = () => Array.from({ length: SLOT_COUNT }, rest);
-const numbered = () => Array.from({ length: SLOT_COUNT }, (_, i): Turn => ({ commandKey: `c${i}`, args: {} }));
+const numbered = () =>
+  Array.from({ length: SLOT_COUNT }, (_, i): Turn => ({ commandKey: `c${i}`, args: {}, explicit: true }));
 
 describe('예턴 초안 편집', () => {
   it('흩어진 칸은 이어진 구간으로 묶어 넣는다', () => {
@@ -60,17 +63,43 @@ describe('예턴 초안 편집', () => {
     expect(latest[0]!.commandKey).toBe('c0');
   });
 
-  it('저장 입력은 표시 이름을 빼고 휴식은 null로 보낸다', () => {
-    const turns = [toTurn({ commandKey: 'move', args: { cityKey: 3 }, name: '이동' } as never), rest()];
-    expect(toSaveSlots(turns)).toEqual([{ commandKey: 'move', args: { cityKey: 3 } }, null]);
+  it('저장 입력은 표시 이름을 빼고 빈칸은 null, 직접 넣은 휴식은 객체로 보낸다', () => {
+    const view: SlotView = { commandKey: 'move', args: { cityKey: 3 }, name: '이동', explicit: true };
+    const turns = [toTurn(view), rest(), restByHand()];
+    expect(toSaveSlots(turns)).toEqual([
+      { commandKey: 'move', args: { cityKey: 3 } },
+      null,
+      { commandKey: 'rest', args: {} },
+    ]);
+  });
+
+  it('SlotView의 explicit을 그대로 읽고, explicit이 없는 옛 응답은 휴식만 빈칸으로 읽는다', () => {
+    expect(toTurn({ commandKey: 'rest', args: {}, explicit: true })).toEqual(restByHand());
+    expect(toTurn({ commandKey: 'rest', args: {}, explicit: false })).toEqual(rest());
     expect(toTurn({ commandKey: 'rest' })).toEqual(rest());
+    expect(toTurn({ commandKey: 'farm' })).toEqual(farm);
   });
 
   it('인자 키 순서가 달라도 같은 명령으로 본다', () => {
-    expect(turnKey({ commandKey: 'donate', args: { amount: 1, resource: 'gold' } })).toBe(
-      turnKey({ commandKey: 'donate', args: { resource: 'gold', amount: 1 } }),
+    expect(turnKey({ commandKey: 'donate', args: { amount: 1, resource: 'gold' }, explicit: true })).toBe(
+      turnKey({ commandKey: 'donate', args: { resource: 'gold', amount: 1 }, explicit: true }),
     );
     expect(sameTurns(empty(), empty())).toBe(true);
+  });
+
+  it('빈칸과 직접 넣은 휴식은 다른 칸이다', () => {
+    expect(turnKey(rest())).not.toBe(turnKey(restByHand()));
+    const cleared = applyOps(numbered(), [{ put: { indices: [0], turn: rest() } }]);
+    expect(cleared[0]).toEqual(rest());
+    expect(sameTurns(cleared, numbered())).toBe(false);
+  });
+
+  it('당기기·밀기로 생긴 칸은 빈칸이고 반복은 복사한 칸의 구분을 지킨다', () => {
+    const base = applyOps(empty(), [{ put: { indices: [0], turn: restByHand() } }]);
+    expect(applyOps(base, [{ shift: 1 }])[0]).toEqual(rest());
+    expect(applyOps(base, [{ shift: -1 }])[29]).toEqual(rest());
+    const repeated = applyOps(base, [{ repeat: { from: 0, to: 1, times: 1 } }]);
+    expect(repeated.slice(0, 4)).toEqual([restByHand(), rest(), restByHand(), rest()]);
   });
 
   it('전체·홀수·짝수 칸과 반복 가능한 구간', () => {
@@ -165,5 +194,15 @@ describe('초안 보관', () => {
     expect(readStored(store(JSON.stringify({ draft: { ...draft, turns: [] }, pending: null })), 'k').draft).toBeNull();
     expect(readStored(store('{깨진'), 'k')).toEqual({ draft: null, pending: null });
     expect(readStored(store(JSON.stringify({ draft: null, pending: { ops: [{ bad: 1 }] } })), 'k').pending).toBeNull();
+  });
+
+  it('explicit 없이 보관한 옛 초안은 휴식을 빈칸으로, 명령을 직접 넣은 칸으로 읽는다', () => {
+    const old = (commandKey: string) => ({ commandKey, args: {} });
+    const turns = Array.from({ length: SLOT_COUNT }, (_, i) => old(i === 0 ? 'farm' : 'rest'));
+    const draft = { baseRevision: 1, ops: [{ put: { indices: [0], turn: old('farm') } }], turns };
+    const read = readStored(store(JSON.stringify({ draft, pending: null })), 'k').draft!;
+    expect(read.turns[0]).toEqual(farm);
+    expect(read.turns[1]).toEqual(rest());
+    expect(read.ops[0]).toEqual({ put: { indices: [0], turn: farm } });
   });
 });

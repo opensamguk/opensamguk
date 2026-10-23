@@ -37,6 +37,7 @@ const STORAGE_PREFIX = 'opensamguk.turnDraft.v1';
 // 키에 계정 ID를 넣어 다른 계정으로 로그인하면 보이지 않게 한다.
 export const draftStorageKey = (userId: string, worldId: string) => `${STORAGE_PREFIX}:${userId}:${worldId}`;
 
+// explicit이 없는 칸은 T2-14 전에 보관한 초안이다. 그때 휴식은 빈칸으로 저장됐으므로 toTurn과 같은 규칙으로 읽는다.
 function isTurn(value: unknown): value is Turn {
   if (typeof value !== 'object' || value === null) return false;
   const turn = value as Record<string, unknown>;
@@ -44,8 +45,13 @@ function isTurn(value: unknown): value is Turn {
     typeof turn.commandKey === 'string' &&
     typeof turn.args === 'object' &&
     turn.args !== null &&
-    !Array.isArray(turn.args)
+    !Array.isArray(turn.args) &&
+    (turn.explicit === undefined || typeof turn.explicit === 'boolean')
   );
+}
+
+function normalizeOp(op: EditOp): EditOp {
+  return 'put' in op ? { put: { ...op.put, turn: toTurn(op.put.turn) } } : op;
 }
 
 function isOp(value: unknown): value is EditOp {
@@ -80,9 +86,15 @@ export function readStored(storage: Storage | undefined, key: string): Stored {
       draft.turns.length === SLOT_COUNT &&
       draft.turns.every(isTurn);
     const okPending = !!pending && Array.isArray(pending.ops) && pending.ops.every(isOp);
+    const goodDraft = okDraft ? (draft as unknown as Draft) : null;
+    const goodPending = okPending ? (pending as unknown as Pending) : null;
     return {
-      draft: okDraft ? (draft as unknown as Draft) : null,
-      pending: okPending ? (pending as unknown as Pending) : null,
+      draft: goodDraft && {
+        baseRevision: goodDraft.baseRevision,
+        ops: goodDraft.ops.map(normalizeOp),
+        turns: goodDraft.turns.map(toTurn),
+      },
+      pending: goodPending && { ops: goodPending.ops.map(normalizeOp) },
     };
   } catch {
     return empty;
@@ -118,7 +130,7 @@ export function useTurnDraft(worldId: string, storageKey: string) {
 
   useEffect(() => writeStored(sessionStore(), storageKey, stored), [storageKey, stored]);
 
-  const serverTurns = useMemo(() => server.data?.slots.map(toTurn) ?? null, [server.data]);
+  const serverTurns = useMemo(() => server.data?.slots.map((slot) => toTurn(slot)) ?? null, [server.data]);
   const turns = pending ? serverTurns : (draft?.turns ?? serverTurns);
 
   const edit = useCallback(
