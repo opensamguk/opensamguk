@@ -5,10 +5,14 @@ import { appRouter } from '../apps/server/src/router';
 import { evidenceFile } from '../apps/server/src/authz/case';
 import { compareAuthz, type AuthzEvidence } from '../apps/server/src/authz/coverage';
 import { exemptions } from '../apps/server/src/authz/exemptions';
+import { pnpmCli } from './node-cli';
 
 mkdirSync(dirname(evidenceFile), { recursive: true });
 writeFileSync(evidenceFile, '[]');
-const result = spawnSync('pnpm', ['test:int'], { env: { ...process.env, AUTHZ_RECORD: '1' }, stdio: 'inherit' });
+const result = spawnSync(...pnpmCli(['test:int']), {
+  env: { ...process.env, AUTHZ_RECORD: '1' },
+  stdio: 'inherit',
+});
 if (result.error || result.status !== 0) process.exit(result.status ?? 1);
 const evidence: AuthzEvidence[] = JSON.parse(readFileSync(evidenceFile, 'utf8'));
 const report = compareAuthz(appRouter, evidence, exemptions);
