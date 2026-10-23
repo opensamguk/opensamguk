@@ -1022,30 +1022,72 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
   });
 
   it('반복한 Git 시험 경로의 오류는 단계·참조별로 남고 다음 호출은 다른 저장소를 다시 확인한다', () => {
-    const valid = 'tools/command-coverage.test.ts';
-    const missing = ['tools/coverage-missing.test.ts#first', 'tools/coverage-missing.test.ts#second'];
-    const stage = {
-      status: 'verified',
-      evidence: [
-        { kind: 'review', ref: 'review', sha: SHA_81 },
-        ...[valid, ...missing].map((ref) => ({ kind: 'test', ref })),
-      ],
-    };
-    const doc = { commands: [{ id: 'farm', stages: { engine: stage, effectsCostsFailures: stage } }] };
-    const missingErrors = ['engine', 'effectsCostsFailures'].flatMap((name) =>
-      missing.map((ref) => `commands[farm].${name}: 시험 ${ref}가 검증 SHA ${SHA_81}에 없다`),
-    );
-    expect(verifyGitShas(doc, root)).toEqual(missingErrors);
     const dir = mkdtempSync(join(tmpdir(), 'coverage-git-'));
     try {
-      expect(verifyGitShas(doc, dir)).toEqual([
-        `증거 SHA ${SHA_81}가 저장소에 없다`,
-        `commands[farm].engine: 시험 ${valid}가 검증 SHA ${SHA_81}에 없다`,
-        ...missingErrors.slice(0, 2),
-        `commands[farm].effectsCostsFailures: 시험 ${valid}가 검증 SHA ${SHA_81}에 없다`,
-        ...missingErrors.slice(2),
-      ]);
-      expect(verifyGitShas(doc, root)).toEqual(missingErrors);
+      const config = join(dir, 'empty.gitconfig');
+      const hooks = join(dir, 'empty-hooks');
+      writeFileSync(config, '');
+      mkdirSync(hooks);
+      const gitEnv = {
+        ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.toUpperCase().startsWith('GIT_'))),
+        GIT_CONFIG_NOSYSTEM: '1',
+        GIT_CONFIG_GLOBAL: config,
+      };
+      const git = (repo: string, ...args: string[]) => {
+        const result = spawnSync('git', args, { cwd: repo, encoding: 'utf8', env: gitEnv });
+        expect(result.status, result.stderr).toBe(0);
+        return result.stdout.trim();
+      };
+      const valid = 'tools/coverage-present.test.ts';
+      const missing = ['tools/coverage-missing.test.ts#first', 'tools/coverage-missing.test.ts#second'];
+      const makeRepo = (name: string) => {
+        const repo = join(dir, name);
+        mkdirSync(join(repo, 'tools'), { recursive: true });
+        git(repo, 'init', '-q', '--template=');
+        git(repo, 'config', '--local', 'user.name', 'coverage fixture');
+        git(repo, 'config', '--local', 'user.email', 'coverage-fixture@example.invalid');
+        git(repo, 'config', '--local', 'commit.gpgsign', 'false');
+        git(repo, 'config', '--local', 'core.hooksPath', hooks);
+        git(repo, 'config', '--local', 'core.autocrlf', 'false');
+        writeFileSync(join(repo, valid), `// fixture ${name}\n`);
+        git(repo, 'add', '--', valid);
+        git(repo, 'commit', '-q', '--no-verify', '-m', `fixture ${name}`);
+        const sha = git(repo, 'rev-parse', 'HEAD');
+        expect(sha).toMatch(/^[0-9a-f]{40}$/);
+        expect(git(repo, 'ls-tree', '-r', '--name-only', sha)).toBe(valid);
+        return { repo, sha };
+      };
+      const a = makeRepo('a');
+      const b = makeRepo('b');
+      expect(a.sha).not.toBe(b.sha);
+      const doc = (sha: string) => {
+        const stage = {
+          status: 'verified',
+          evidence: [
+            { kind: 'review', ref: 'review', sha },
+            ...[valid, ...missing].map((ref) => ({ kind: 'test', ref })),
+          ],
+        };
+        return { commands: [{ id: 'farm', stages: { engine: stage, effectsCostsFailures: stage } }] };
+      };
+      const missingErrors = (sha: string) =>
+        ['engine', 'effectsCostsFailures'].flatMap((name) =>
+          missing.map((ref) => `commands[farm].${name}: 시험 ${ref}가 검증 SHA ${sha}에 없다`),
+        );
+      const absentErrors = [
+        `증거 SHA ${a.sha}가 저장소에 없다`,
+        `commands[farm].engine: 시험 ${valid}가 검증 SHA ${a.sha}에 없다`,
+        ...missingErrors(a.sha).slice(0, 2),
+        `commands[farm].effectsCostsFailures: 시험 ${valid}가 검증 SHA ${a.sha}에 없다`,
+        ...missingErrors(a.sha).slice(2),
+      ];
+      expect(verifyGitShas(doc(a.sha), a.repo)).toEqual(missingErrors(a.sha));
+      expect(verifyGitShas(doc(a.sha), b.repo)).toEqual(absentErrors);
+      expect(verifyGitShas(doc(b.sha), b.repo)).toEqual(missingErrors(b.sha));
+      const plain = join(dir, 'plain');
+      mkdirSync(plain);
+      expect(verifyGitShas(doc(a.sha), plain)).toEqual(absentErrors);
+      expect(verifyGitShas(doc(a.sha), a.repo)).toEqual(missingErrors(a.sha));
     } finally {
       expect(dirname(dir)).toBe(tmpdir());
       rmSync(dir, { recursive: true, force: true });
