@@ -137,6 +137,12 @@ describe('공개 지도 빈 상태', () => {
 });
 
 describe('공개 범위', () => {
+  // 서버 응답 모양(T2-24)대로 도시 key·links는 문자열이다.
+  const rawCity = (key: number, nationId: number | null, links: number[] = []) => ({
+    ...city(key, nationId, links),
+    key: String(key),
+    links: links.map(String),
+  });
   // 서버가 실수로 공개 범위 밖 값을 섞어 보낸 응답.
   const raw = {
     delayMinutes: 10,
@@ -153,8 +159,8 @@ describe('공개 범위', () => {
           month: 3,
           tick: 5,
           cities: [
-            { ...city(1, 1, [2]), supplied: false, generals: [{ name: '조조' }], troops: 5000, population: 1 },
-            { ...city(2, 1, [1]), supplied: false },
+            { ...rawCity(1, 1, [2]), supplied: false, generals: [{ name: '조조' }], troops: 5000, population: 1 },
+            { ...rawCity(2, 1, [1]), supplied: false },
           ],
           nations: [{ id: 1, name: '위', color: '#000080', gold: 9999, rice: 9999 }],
           generals: [{ id: 1, name: '조조', crew: 5000 }],

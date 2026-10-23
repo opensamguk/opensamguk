@@ -27,10 +27,6 @@
   text-decoration: none;
   cursor: pointer;
 }
-/* 비어 있는 동안은 칸 사이 간격도 차지하지 않는다. */
-.mapSlot:empty {
-  display: none;
-}
 .heading {
   margin: 0 0 var(--space-2);
   font-size: var(--text-lg);
