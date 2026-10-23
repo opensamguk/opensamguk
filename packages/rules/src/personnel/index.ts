@@ -9,6 +9,28 @@ export {
 } from './assignments';
 export type { AssignmentResult } from './assignments';
 export {
+  PERSONNEL_INPUTS,
+  applyPersonnelInput,
+  validatePersonnelRecord,
+  replayPersonnelInput,
+  finishPersonnelStep,
+  applyNationTurnsRecord,
+} from './inputs';
+export type {
+  PersonnelInputKind,
+  PersonnelRecordKind,
+  PersonnelRejectCode,
+  PersonnelRecordedInput,
+  AppliedPersonnelInput,
+  NationTurnsRecord,
+  PendingPersonnelEvent,
+  PersonnelInputContext,
+  PersonnelInputOutcome,
+  PersonnelStepResult,
+  PersonnelRecordContext,
+} from './inputs';
+export type { OfficeTurns, OfficeRevisions, OfficeState, OfficeView } from './offices';
+export {
   OFFICER_ROLES,
   APPOINTABLE_OFFICER_LEVELS,
   NATION_COMMAND_PERMISSIONS,
