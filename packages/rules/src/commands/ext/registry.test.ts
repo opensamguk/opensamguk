@@ -21,11 +21,12 @@ function verifyCatalog(
   expect([...testedKeys].sort()).toEqual([...keys].sort());
 }
 
-it('운영 확장 목록·조각·관계는 비어 있고 기본 37개와 분리된다', () => {
-  expect(extensionCommands).toEqual([]);
+it('운영 계략 네 정의와 무상태 관계가 순서대로 짝을 이루고 기본 37개와 분리된다', () => {
+  const keys = ['fire_attack', 'sabotage', 'incite', 'plunder'];
+  expect(extensionCommands.map(({ key, target }) => [key, target])).toEqual(keys.map((key) => [key, 'general']));
   expect(extSlices).toEqual([]);
-  expect(extCommandBindings).toEqual([]);
-  verifyCatalog(extensionCommands, extCommandBindings, []);
+  expect(extCommandBindings).toEqual(keys.map((commandKey) => ({ commandKey, target: 'general', sliceKeys: [] })));
+  verifyCatalog(extensionCommands, extCommandBindings, keys);
 });
 
 it('관계 누락·남는 관계·대상 불일치·중복·기본 충돌·시험 누락을 검출한다', () => {
