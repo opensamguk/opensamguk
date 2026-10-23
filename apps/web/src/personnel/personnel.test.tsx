@@ -234,7 +234,7 @@ describe('국가 칸 저장', () => {
 
   it('국가 사전 검사의 거부 이유를 편집기 경고 문구로 바꾼다', () => {
     const source = nationSource(fakeApi({}), tab, { onOfficeChanged: vi.fn() })(context);
-    const check = source.precheck({ commandKey: 'nation_reward', args: {} });
+    const check = source.precheck({ commandKey: 'nation_reward', args: {}, explicit: true });
     expect(check.select({ ok: false, reason: '국고가 모자랍니다' })).toEqual({
       ok: false,
       message: '국고가 모자랍니다',

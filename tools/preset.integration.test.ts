@@ -169,14 +169,15 @@ describe('T2-02 실제 DB 생성·고정', () => {
     const replay = await db.$transaction((tx) => loadReplayState(tx, result.worldId));
     expect(hashState(replay)).toBe(hashState(initialReplayState(initial)));
     expect((world.replayOrigin as unknown as { initial: WorldInit }).initial).toEqual(initial);
-
   });
   it('속성 월드의 실제 엔진이 다음 턴을 10분 뒤로 잡는다', async () => {
-    const { worldId } = await fixture(await loadPreset('speed'), (initial) => { initial.generals = [initial.generals[0]!]; });
+    const { worldId } = await fixture(await loadPreset('speed'), (initial) => {
+      initial.generals = [initial.generals[0]!];
+    });
     await advance(worldId, 100);
     const general = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
     const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
-    expect((general.nextTurnTick - 100) * world.turnTermMinutes * 60000 / 10000).toBe(600000);
+    expect(((general.nextTurnTick - 100) * world.turnTermMinutes * 60000) / 10000).toBe(600000);
   });
   it('CLI 덮어쓰기는 실제 칸에만 남고 원본 스냅샷은 보존한다', async () => {
     const output = execFileSync(
@@ -246,11 +247,12 @@ describe('T2-02 실제 DB 생성·고정', () => {
       await writeFile(join(temp, 'preset/custom.json'), JSON.stringify(raw));
       const preset = await loadPreset('custom', rootUrl);
       expect(preset.commands).toBeNull();
-      const { worldId } = await saveInitialWorld(
-        db,
-        commandInitial(),
-        { name: '맞춤 프리셋', turnTermMinutes: 30, endYear: null, preset: { key: 'custom', value: preset } },
-      );
+      const { worldId } = await saveInitialWorld(db, commandInitial(), {
+        name: '맞춤 프리셋',
+        turnTermMinutes: 30,
+        endYear: null,
+        preset: { key: 'custom', value: preset },
+      });
       const before = await db.world.count();
       for (const patch of [
         { npc: { fillRatio: 0.5, aggression: 1 } },
