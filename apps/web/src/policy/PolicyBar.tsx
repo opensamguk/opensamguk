@@ -1,16 +1,23 @@
 import { Link, useRouterState } from '@tanstack/react-router';
 import { useId } from 'react';
 import { errorCode } from '../turns/apiError';
-import type { PolicyKey } from './contract';
 import styles from './PolicyBar.module.css';
-import { directionParticle, findOption, policySentence } from './policyText';
-import { policyView, usePolicyChange, usePolicyQuery } from './usePolicy';
+import {
+  directionParticle,
+  findOption,
+  inactiveSentence,
+  optionFor,
+  policySentence,
+  rejectionSentence,
+} from './policyText';
+import { policyView, useHomePolicySync, usePolicyChange, usePolicyQuery } from './usePolicy';
 
 // 예턴 편집 위의 기본 방침 고르기 (T2-14). 고르면 예턴 저장과 따로 바로 보낸다.
-// 엔진이 처리하기 전에는 고른 방침 옆에 처리 중을 두고, 거절되면 이유를 보이며 고르기 칸을 지금 방침으로 되돌린다.
+// 엔진이 처리하기 전에는 고른 방침 옆에 처리 중을 둔다. 거절되면 이유를 보이며 고르기 칸을 지금 방침으로 되돌린다.
 export function PolicyBar({ worldId }: { worldId: string }) {
   const query = usePolicyQuery(worldId);
   const change = usePolicyChange(worldId);
+  useHomePolicySync(worldId, query.data?.current);
   const selectId = useId();
   const href = useRouterState({ select: (state) => state.location.href });
 
@@ -49,7 +56,10 @@ export function PolicyBar({ worldId }: { worldId: string }) {
           className={styles.select}
           value={view.selected}
           disabled={view.processing}
-          onChange={(e) => change.choose(e.target.value as PolicyKey)}
+          onChange={(e) => {
+            const option = optionFor(data, e.target.value);
+            if (option) change.choose(option.key);
+          }}
         >
           {data.options.map((option) => (
             <option key={option.key} value={option.key}>
@@ -67,11 +77,12 @@ export function PolicyBar({ worldId }: { worldId: string }) {
           ? ` 엔진이 처리하면 ${selected.name}${directionParticle(selected.name)} 바뀝니다.`
           : null}
       </p>
+      <p className={styles.muted} data-testid="policy-inactive">
+        {inactiveSentence(data)}
+      </p>
       {view.rejected ? (
         <p className={styles.error} role="alert" data-testid="policy-rejected">
-          {findOption(data, view.rejected.policy)?.name ?? view.rejected.policy}
-          {directionParticle(findOption(data, view.rejected.policy)?.name ?? '')} 바꾸지 못했습니다.{' '}
-          {view.rejected.reason}
+          {rejectionSentence(data, view.rejected)}
         </p>
       ) : null}
       {change.error?.kind === 'error' ? (
