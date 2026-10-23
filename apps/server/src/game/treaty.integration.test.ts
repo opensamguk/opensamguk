@@ -356,7 +356,7 @@ describe('T2-07 / AC-M2-06 서버 조약 leaf 실제 PostgreSQL 경계', () => {
       await expect(read(attempt)).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
-  it.each(['0', '2147483648', '2'])('없는 응답 대상 %s와 비당사자를 같은 오류로 돌려준다', async (treatyId) => {
+  it.each(['0', '2147483648', '2'])('응답 대상 %s의 구조·범위와 비당사자 접근을 막는다', async (treatyId) => {
     const f = await fixture();
     const p = await proposal(f);
     await expect(submit(f.identity(2), { treatyId: p.treatyId, accept: true }, 'treaty.respond')).rejects.toMatchObject(
