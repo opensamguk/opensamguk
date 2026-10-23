@@ -71,6 +71,17 @@
 | `apps/engine/src/cli/createWorld.ts` | `pnpm world:create` |
 | `tools/run-integration.ts` | 전용 테스트 DB 준비·migration·통합 테스트 실행 |
 
+## 공개 지도 (T2-24)
+
+| 위치 | 역할 |
+| ---- | ---- |
+| `packages/shared/src/publicMap.ts`, `publicMap.test.ts` | 지연·간격 설정의 공통 검사와 기본값 |
+| `apps/engine/src/publicMap.ts`, `turnLoop.ts` | 실제 시각 지도 사본 저장·정리, 턴 트랜잭션과 실행권 연결 |
+| `apps/server/src/routers/world.ts`, `visibility.ts`, `publicMap.test.ts` | 무인증 지연 조회·공개 필드 투영·설정 시작 거부 검사 |
+| `tools/public-map.integration.test.ts` | 실제 HTTP·PostgreSQL의 지연 경계·오염 JSON·리스·롤백·재시작·12개월 재생 검증 |
+
+`packages/db/prisma/migrations/20261023010000_public_map_snapshot/migration.sql`이 `PublicMapSnapshot`을 만듭니다. 실제 HTTP와 엔진을 함께 실행하는 시험은 패키지 사이 상대 import 경계를 지키도록 배포물 밖의 `tools/`에 둡니다. `tools/authz.integration.test.ts`와 서버의 `authz/exemptions.ts`에는 새 공개 조회를 대조 대상으로 등록합니다.
+
 ## 새 저장 필드를 추가할 때 빠뜨리기 쉬운 것
 
 T4-56의 `RemovedNation`과 `YearbookNation`은 공개 표시값 보관이며 `WorldState`·재생 해시·보관 파일에는 넣지 않는다. 기존 프레임의 백필은 `pnpm db:migrate` 뒤 `pnpm --filter @opensamguk/engine yearbook:backfill`으로 보고를 확인하고 `--apply`로 실행한다. 현재 국가·삭제 보존·생성 기록의 이름과 색이 모두 일치할 때만 채운다. 근거가 없으면 부분 프레임으로 남기고 충돌이면 그 월드 전체를 롤백한다. 이름·색 변경을 넣는 T4-16은 같은 PR에서 이 CLI와 script를 지워야 한다.

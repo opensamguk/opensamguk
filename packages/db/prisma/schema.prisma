@@ -48,6 +48,7 @@ model World {
   commandMeta     Json?
   battleLogs      BattleLog[]
   ranking         RankingSnapshot?
+  publicMaps      PublicMapSnapshot[]
 }
 
 enum WorldStatus {
@@ -379,4 +380,16 @@ model RankingSnapshot {
   generals Json
   nations  Json
   world    World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+}
+
+model PublicMapSnapshot {
+  worldId String
+  takenAt DateTime
+  tick    Int
+  year    Int
+  month   Int
+  data    Json
+  world   World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@id([worldId, takenAt])
 }

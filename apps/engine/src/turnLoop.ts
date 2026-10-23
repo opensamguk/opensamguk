@@ -1,3 +1,5 @@
+import { publicMapConfig } from '@opensamguk/shared';
+import { persistPublicMap } from './publicMap';
 import type { Prisma, PrismaClient } from '@opensamguk/db';
 import { nextActionSequence } from '@opensamguk/db';
 import {
@@ -28,7 +30,11 @@ export interface PollBatch {
   more: boolean;
   status: WorldStatus;
 }
-type TurnHooks = { beforeCommit?: (tx: Prisma.TransactionClient) => Promise<void>; elapsedNow?: () => number };
+type TurnHooks = {
+  beforeCommit?: (tx: Prisma.TransactionClient) => Promise<void>;
+  elapsedNow?: () => number;
+  publicMapNow?: () => number;
+};
 export interface TurnExecution {
   generalId: number;
   tick: number;
@@ -41,6 +47,7 @@ export class TurnLoop {
   private busy = false;
   private readonly elapsedNow: () => number;
   private nextCheckpointAt: number;
+  private readonly mapConfig = publicMapConfig(process.env);
 
   constructor(
     private readonly db: PrismaClient,
@@ -253,6 +260,16 @@ export class TurnLoop {
           },
         });
         if (saved.count !== 1) throw new Error('월드 시계가 바뀌어 저장을 취소했습니다.');
+        if (next && progressed && !outcome) {
+          await persistPublicMap(
+            tx,
+            this.lease,
+            next,
+            endedTick!,
+            this.hooks.publicMapNow?.() ?? (await databaseNow(tx)).getTime(),
+            this.mapConfig,
+          );
+        }
         if (progressed) await this.hooks.beforeCommit?.(tx);
         signal?.throwIfAborted();
         await assertLease(tx, this.lease);
