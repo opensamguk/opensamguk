@@ -8,10 +8,11 @@ export const MAP_HEIGHT = 500;
 const NEUTRAL = '#d6d0c4';
 
 // 연결선은 양쪽에 같은 연결이 있으므로 한 번만 그린다. 없는 도시를 가리키는 연결은 버린다.
-export function mapLinks(cities: readonly MapCity[]): Array<[MapCity, MapCity]> {
+// 지도 편집기(mapEditor)도 같은 함수로 연결선을 그려서 key·links만 요구한다.
+export function mapLinks<T extends Pick<MapCity, 'key' | 'links'>>(cities: readonly T[]): Array<[T, T]> {
   const byKey = new Map(cities.map((city) => [city.key, city]));
   const seen = new Set<string>();
-  const links: Array<[MapCity, MapCity]> = [];
+  const links: Array<[T, T]> = [];
   for (const city of cities) {
     for (const key of city.links) {
       const other = byKey.get(key);

@@ -3,6 +3,7 @@ import {
   createRootRouteWithContext,
   createRoute,
   createRouter,
+  lazyRouteComponent,
   Outlet,
   redirect,
   useRouter,
@@ -169,6 +170,15 @@ const createGeneralRoute = createRoute({
 });
 
 const devUiRoute = createRoute({ getParentRoute: () => rootRoute, path: 'dev/ui', component: DevUiPage });
+// 지도 편집기 (T4-80). devUiRoute처럼 개발 모드에서만 경로 목록에 넣는다. 관리자 콘솔 연결은 T4-81이다.
+// 정의도 개발 모드에서만 만들어 운영 빌드에는 편집기 묶음이 생기지 않는다.
+const mapEditorRoute = import.meta.env.DEV
+  ? createRoute({
+      getParentRoute: () => rootRoute,
+      path: 'dev/map-editor',
+      component: lazyRouteComponent(() => import('./mapEditor/MapEditorPage'), 'MapEditorPage'),
+    })
+  : null;
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -186,6 +196,7 @@ const routeTree = rootRoute.addChildren([
     createGeneralRoute,
   ]),
   ...(import.meta.env.DEV ? [devUiRoute] : []),
+  ...(mapEditorRoute ? [mapEditorRoute] : []),
 ]);
 
 export const router = createRouter({ routeTree, context: { queryClient, trpc } });
