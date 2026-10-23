@@ -42,6 +42,20 @@ function importRule(allowed, { banBuiltins = false, typeOnly = [] } = {}) {
   return ['error', { patterns }];
 }
 
+const E3_PATTERNS = [
+  {
+    group: ['@opensamguk/db', '@opensamguk/db/*', '@opensamguk/engine', '@opensamguk/engine/*'],
+    message: BOUNDARY_MESSAGE,
+  },
+  {
+    group: ['@opensamguk/server', '@opensamguk/server/*'],
+    allowTypeImports: true,
+    message: BOUNDARY_MESSAGE,
+  },
+  { regex: '^@opensamguk/rules(?:$|/(?!resource-validation$))', message: BOUNDARY_MESSAGE },
+  { regex: '^@opensamguk/shared/node(?:$|/)', message: BOUNDARY_MESSAGE },
+];
+
 const NO_MATH_RANDOM = {
   object: 'Math',
   property: 'random',
@@ -176,22 +190,16 @@ export default defineConfig([
       'no-restricted-imports': [
         'error',
         {
-          patterns: [
-            {
-              group: ['@opensamguk/db', '@opensamguk/db/*', '@opensamguk/engine', '@opensamguk/engine/*'],
-              message: BOUNDARY_MESSAGE,
-            },
-            {
-              group: ['@opensamguk/server', '@opensamguk/server/*'],
-              allowTypeImports: true,
-              message: BOUNDARY_MESSAGE,
-            },
-            { regex: '^@opensamguk/rules(?:$|/(?!resource-validation$))', message: BOUNDARY_MESSAGE },
-            { regex: '^@opensamguk/shared/node(?:$|/)', message: BOUNDARY_MESSAGE },
-            { group: NODE_BUILTINS, message: BOUNDARY_MESSAGE },
-          ],
+          patterns: [...E3_PATTERNS, { group: NODE_BUILTINS, message: BOUNDARY_MESSAGE }],
         },
       ],
+    },
+  },
+  // E3 시험은 기존 Node 허용을 유지하고 나머지 경계는 제품과 같이 지킨다.
+  {
+    files: ['apps/web/src/mapEditor/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: E3_PATTERNS }],
     },
   },
 ]);
