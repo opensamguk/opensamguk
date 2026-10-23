@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { rm, writeFile, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -12,10 +12,24 @@ async function fixture(mode: 'm2' | 'm3' = 'm2') {
   dirs.push(f.dir);
   return f;
 }
-const runCli = (...args: string[]) =>
-  spawnSync(process.execPath, ['--import', 'tsx', 'tools/participation/cli.ts', ...args], {
-    encoding: 'utf8',
-    timeout: 20_000,
+const runCli = (...args: string[]): Promise<{ status: number | null; stdout: string; stderr: string }> =>
+  new Promise((resolve) => {
+    const child = spawn(process.execPath, ['--import', 'tsx', 'tools/participation/cli.ts', ...args], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 20_000,
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.setEncoding('utf8').on('data', (chunk: string) => {
+      stdout += chunk;
+    });
+    child.stderr.setEncoding('utf8').on('data', (chunk: string) => {
+      stderr += chunk;
+    });
+    child.once('error', (error) => {
+      stderr += error.message;
+    });
+    child.once('close', (status) => resolve({ status, stdout, stderr }));
   });
 afterEach(async () => {
   await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
@@ -32,10 +46,29 @@ describe('T2-18/T3-15 evidence tooling, never product acceptance', () => {
     expect(report.notReadyReasons).toEqual(['SYNTHETIC_TOOL_TEST_ONLY']);
     expect(report.counts).toEqual({ participants: 5, worlds: mode === 'm2' ? 2 : 1, actions: mode === 'm2' ? 45 : 40 });
     expect(report.acStatus).toBe('NOT_ASSESSED');
-    const result = runCli('validate', '--manifest', manifest, '--source-sha', f.sourceSHA, '--fixture');
+  });
+  it.each(['m2', 'm3'] as const)('keeps the %s real CLI fixture and ordinary exit contracts', async (mode) => {
+    const f = await fixture(mode);
+    const manifest = await f.save();
+    const [result, ordinary] = await Promise.all([
+      runCli('validate', '--manifest', manifest, '--source-sha', f.sourceSHA, '--fixture'),
+      runCli('validate', '--manifest', manifest, '--source-sha', f.sourceSHA),
+    ]);
     expect(result.status, result.stderr).toBe(0);
-    expect(JSON.parse(result.stdout).notice).toContain('No season PASS');
-    expect(runCli('validate', '--manifest', manifest, '--source-sha', f.sourceSHA).status).toBe(1);
+    expect(ordinary.status, ordinary.stderr).toBe(1);
+    for (const execution of [result, ordinary]) {
+      const report = JSON.parse(execution.stdout);
+      expect(report.toolStatus).toBe('VALID');
+      expect(report.productStatus).toBe('NOT_READY');
+      expect(report.acStatus).toBe('NOT_ASSESSED');
+      expect(report.notReadyReasons).toEqual(['SYNTHETIC_TOOL_TEST_ONLY']);
+      expect(report.counts).toEqual({
+        participants: 5,
+        worlds: mode === 'm2' ? 2 : 1,
+        actions: mode === 'm2' ? 45 : 40,
+      });
+      expect(report.notice).toContain('No season PASS');
+    }
   });
   const negatives: [string, (f: Awaited<ReturnType<typeof fixture>>) => void, string][] = [
     [
@@ -247,7 +280,7 @@ describe('T2-18/T3-15 evidence tooling, never product acceptance', () => {
     const report = await validateBundle(manifest, f.sourceSHA);
     expect(report.productStatus).toBe('NOT_READY');
     expect(report.issues).toContain(code);
-    expect(runCli('validate', '--manifest', manifest, '--source-sha', f.sourceSHA, '--fixture').status).toBe(1);
+    expect((await runCli('validate', '--manifest', manifest, '--source-sha', f.sourceSHA, '--fixture')).status).toBe(1);
   });
   it('requires current prerequisites even when all evidence shapes are present', async () => {
     const f = await fixture();
@@ -293,7 +326,7 @@ describe('T2-18/T3-15 evidence tooling, never product acceptance', () => {
       const f = await fixture();
       const manifest = await f.save();
       await writeFile(manifest, JSON.stringify({ ...f.m, [key]: 'private-value-never-echo' }));
-      const result = runCli('validate', '--manifest', manifest, '--source-sha', f.sourceSHA);
+      const result = await runCli('validate', '--manifest', manifest, '--source-sha', f.sourceSHA);
       expect(result.status).toBe(1);
       expect(result.stdout + result.stderr).not.toContain('private-value-never-echo');
       expect(JSON.parse(result.stdout).productStatus).toBe('NOT_READY');
@@ -332,8 +365,13 @@ describe('T2-18/T3-15 evidence tooling, never product acceptance', () => {
     await writeFile(join(f.dir, 'actions.jsonl'), broken);
     await writeFile(manifest, JSON.stringify(f.m));
     expect((await validateBundle(manifest, f.sourceSHA)).productStatus).toBe('NOT_READY');
-    expect(runCli('validate', '--manifest', join(f.dir, 'missing.json'), '--source-sha', f.sourceSHA).status).toBe(1);
-    expect(runCli('invalid').status).toBe(2);
-    expect(runCli('probe', '--base-url', 'http://not-loopback.invalid', '--source-sha', f.sourceSHA).status).toBe(2);
+    const [missing, invalid, badProbe] = await Promise.all([
+      runCli('validate', '--manifest', join(f.dir, 'missing.json'), '--source-sha', f.sourceSHA),
+      runCli('invalid'),
+      runCli('probe', '--base-url', 'http://not-loopback.invalid', '--source-sha', f.sourceSHA),
+    ]);
+    expect(missing.status, missing.stderr).toBe(1);
+    expect(invalid.status, invalid.stderr).toBe(2);
+    expect(badProbe.status, badProbe.stderr).toBe(2);
   });
 });
