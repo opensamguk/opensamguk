@@ -22,6 +22,7 @@ function fixture(status: 'PAUSED' | 'RUNNING', human: boolean, modern = false) {
     status,
     preset: null,
     treatyFormat: null,
+    personnelFormat: null,
     replayOrigin: null,
     endYear: null,
     outcomeFromSequence: 0,

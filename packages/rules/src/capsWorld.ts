@@ -12,6 +12,7 @@ import {
 
 export interface WorldCapsRow {
   treatyFormat: number | null;
+  personnelFormat: number | null;
   policyFromSequence: number | null;
   actionSequence: number;
   turnTermMinutes: number;
@@ -29,6 +30,7 @@ const positive = storedInteger.min(1);
 // DB 타입이나 preset에 의존하지 않고 저장된 선택만 본다.
 export function selectWorldCapabilities(row: WorldCapsRow): WorldCapabilities {
   const treatyFormat = z.literal(1).nullable().parse(row.treatyFormat);
+  const personnelFormat = z.literal(1).nullable().parse(row.personnelFormat);
   const actionSequence = storedInteger.parse(row.actionSequence);
   const policy =
     row.policyFromSequence === null
@@ -50,11 +52,14 @@ export function selectWorldCapabilities(row: WorldCapsRow): WorldCapabilities {
       origin.version === 1)
   ) {
     if (treatyFormat !== null) throw new Error('조약 저장 형식과 생성 기록이 다릅니다.');
+    if (personnelFormat !== null) throw new Error('인사 저장 형식과 생성 기록이 다릅니다.');
     return { kind: 'legacy', policy };
   }
   const parsed = parseCapsOrigin(origin);
   if ((parsed.capabilities.treaty !== undefined) !== (treatyFormat === 1))
     throw new Error('조약 저장 형식과 생성 기록이 다릅니다.');
+  if (Object.hasOwn(parsed.capabilities, 'personnel') !== (personnelFormat === 1))
+    throw new Error('인사 저장 형식과 생성 기록이 다릅니다.');
   const selection = selectSupportedCapabilities(parsed, {
     endYear: row.endYear,
     outcomeFromSequence: row.outcomeFromSequence,

@@ -56,6 +56,7 @@ async function fixture(caps = true, modern = false) {
     preset: null,
     commandMeta: null,
     treatyFormat: caps ? 1 : null,
+    personnelFormat: null,
     replayOrigin: caps ? origin : null,
     policyFromSequence: modern ? 0 : null,
     actionSequence: 0,

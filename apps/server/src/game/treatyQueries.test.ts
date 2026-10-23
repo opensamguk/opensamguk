@@ -53,6 +53,7 @@ function world(patch: Partial<World> = {}): World {
     actionSequence: 30,
     policyFromSequence: null,
     treatyFormat: null,
+    personnelFormat: null,
     replayOrigin: null,
     commandMeta: null,
     ...patch,
