@@ -77,9 +77,9 @@ test('다른 사이트 주소는 next로 받지 않는다', async ({ page }) => 
   await page.goto('/login?next=//evil.example/');
   await fill(page, email, TEST_PASSWORD);
   await page.getByRole('button', { name: '로그인' }).click();
-  // 첫 주소(/)로 간다. 열린 월드가 있으면 첫 RUNNING 월드 메인으로, 없으면 참가할 월드 안내로 이어진다 (T1-16).
-  await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:5173\/(w\/[0-9a-f-]{36})?$/);
-  await expect(page.getByRole('heading', { level: 1, name: /^(참가할 월드|메인)$/ })).toBeVisible();
+  // 안전한 next가 없으면 로비로 간다 (T2-04).
+  await expect(page).toHaveURL('/lobby');
+  await expect(page.getByRole('heading', { level: 1, name: '로비' })).toBeVisible();
   expect(new URL(page.url()).host).toBe('127.0.0.1:5173');
 });
 

@@ -10,8 +10,8 @@ import {
 import { BattleSimPage } from './battleSim/BattleSimPage';
 import { CreateGeneralPage } from './general/CreateGeneralPage';
 import { GameLayout } from './layout/GameLayout';
+import { LobbyPage } from './lobby/LobbyPage';
 import { DevUiPage } from './pages/DevUiPage';
-import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { MainPage } from './pages/MainPage';
 import { SignupPage } from './pages/SignupPage';
@@ -58,17 +58,14 @@ const indexRoute = createRoute({
   path: '/',
   beforeLoad: async ({ context }) => {
     if (!(await currentUser(context))) throw redirect({ to: '/login' });
-    // 첫 RUNNING 월드로 보낸다. 없으면 이 화면에 열린 월드가 없다고 보여 준다 (T1-16, world.list).
-    const { worlds } = await context.queryClient.fetchQuery({
-      ...context.trpc.world.list.queryOptions(),
-      staleTime: 0,
-    });
-    const first = worlds[0];
-    if (first) throw redirect({ to: '/w/$worldId', params: { worldId: first.id }, replace: true });
+    // 로그인했으면 로비로 보낸다 (T2-04). 예전에는 첫 RUNNING 월드로 보냈다 (T1-16).
+    throw redirect({ to: '/lobby', replace: true });
   },
-  component: HomePage,
   errorComponent: GuardError,
 });
+
+// 로비 (T2-04). 로그인하지 않아도 월드 목록을 본다. 참가 버튼만 로그인 여부로 바뀐다.
+const lobbyRoute = createRoute({ getParentRoute: () => rootRoute, path: 'lobby', component: LobbyPage });
 
 const authSearch = (search: Record<string, unknown>): { next?: string } =>
   typeof search.next === 'string' ? { next: search.next } : {};
@@ -172,6 +169,7 @@ const devUiRoute = createRoute({ getParentRoute: () => rootRoute, path: 'dev/ui'
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
+  lobbyRoute,
   loginRoute,
   signupRoute,
   worldRoute.addChildren([
