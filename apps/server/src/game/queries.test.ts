@@ -125,6 +125,7 @@ it('T4-17 B ext 단독 readView도 잔존 조약만 한 번 검사한다 (단위
   const preset = parsePreset({ ...regular, commands });
   // 조약 분기용 손 행이다. 확장 프리셋 대조와 실제 ON은 이 시험의 범위가 아니다.
   const changes = {
+    preset,
     treatyFormat: null,
     policyFromSequence: 0,
     replayOrigin: {

@@ -115,6 +115,7 @@ async function fixture(
     const commands = { general: ['fire_attack'], nation: [] };
     const preset = parsePreset({ ...regular, commands });
     origin.initial.presetRules = presetRules(preset);
+    origin.initialStateHash = hashState(origin.initial);
     origin.capabilities = { version: 1, ext: { version: 1, commands, preset, resources: {}, sliceKeys: [] } };
   }
   origin.resourceHash = hashState(capsResourceHashInput(origin));
@@ -137,7 +138,7 @@ async function fixture(
     turnTermMinutes: 30,
     endYear: null,
     outcomeFromSequence: 0,
-    preset: null,
+    preset: caps === 'ext' ? origin.capabilities.ext!.preset : null,
     commandMeta: null,
   };
   const trace: string[] = [];

@@ -1,8 +1,10 @@
 import { TRPCError } from '@trpc/server';
 import type { Prisma } from '@opensamguk/db';
+import { assertStorableJson } from '@opensamguk/db';
 import {
   assertSlotSet,
   commandRegistry,
+  extensionCommands,
   emptyQueue,
   emptyTurn,
   type PolicySlot,
@@ -10,15 +12,37 @@ import {
   type CommandResolver,
 } from '@opensamguk/rules';
 import { z } from 'zod';
+import { worldResolver } from './resolver';
 export const commandInput = { commandKey: z.string().min(1).max(64), args: z.unknown().optional() };
 export const slotInput = z.strictObject(commandInput).nullable();
-export function parseSlot(input: { commandKey: string; args?: unknown } | null): PolicySlot {
+export function invalidSlot(): never {
+  throw new TRPCError({ code: 'BAD_REQUEST', message: '명령과 인자를 확인하세요.' });
+}
+export function parseSlot(input: { commandKey: string; args?: unknown } | null, allowExtensions = false): PolicySlot {
   if (input === null) return emptyTurn();
-  const def = commandRegistry.get(input.commandKey);
+  const def =
+    commandRegistry.get(input.commandKey) ??
+    (allowExtensions ? extensionCommands.find((candidate) => candidate.key === input.commandKey) : undefined);
   const args = def?.args.safeParse(input.args === undefined ? {} : input.args);
-  if (!def || def.target !== 'general' || !args?.success)
-    throw new TRPCError({ code: 'BAD_REQUEST', message: '명령과 인자를 확인하세요.' });
+  if (!def || def.target !== 'general' || !args?.success) invalidSlot();
+  if (!commandRegistry.has(def.key)) {
+    try {
+      assertStorableJson(args.data, 'args');
+    } catch {
+      invalidSlot();
+    }
+  }
   return { commandKey: def.key, args: args.data, explicit: true };
+}
+export function hasExtensionSlot(turns: readonly QueuedTurn[]) {
+  return turns.some((turn) => !commandRegistry.has(turn.commandKey));
+}
+export function assertEnabledSlots(world: Parameters<typeof worldResolver>[0], turns: readonly QueuedTurn[]) {
+  if (!hasExtensionSlot(turns)) return;
+  const { commands, resolver } = worldResolver(world);
+  if (commands === null) invalidSlot();
+  if (turns.some((turn) => !resolver.get(turn.commandKey)))
+    throw new TRPCError({ code: 'BAD_REQUEST', message: '이 월드에서 꺼진 명령입니다.' });
 }
 export function displaySlots(turns: QueuedTurn[], resolver?: CommandResolver) {
   return turns.map((turn) => ({

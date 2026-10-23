@@ -42,9 +42,17 @@ it('등록된 무상태 계략도 1a-off 생성·적재 대상으로 받지 않�
   await expect(verifyWorldExt(tx, { id: 'off', preset: enabled })).rejects.toThrow(
     '확장 명령을 켠 월드는 아직 지원하지 않습니다.',
   );
-  await expect(loadExt(tx, 'off', enabled.commands)).rejects.toThrow();
   expect(read).not.toHaveBeenCalled();
   expect(write).not.toHaveBeenCalled();
+});
+
+it('선택 대조를 마친 무상태 확장은 빈 행만 복원한다', async () => {
+  const commands = { general: ['fire_attack'], nation: [] };
+  const empty = transaction();
+  expect(await loadExt(empty.tx, 'ext', commands)).toBeUndefined();
+  const orphan = transaction([{ key: 'orphan', value: null }]);
+  await expect(loadExt(orphan.tx, 'ext', commands)).rejects.toThrow();
+  expect(orphan.write).not.toHaveBeenCalled();
 });
 
 it('끈 월드의 빈 행은 ext 키를 만들지 않고 남는 조각은 실제 복원 함수가 거부한다', async () => {

@@ -13,6 +13,7 @@ import {
   runCapsReplayAction,
   seasonOutcome,
   selectSupportedCapabilities,
+  restoreExtState,
   startCapsReplay,
   statRulesSchema,
   TICKS_PER_MONTH,
@@ -356,6 +357,7 @@ export function readCapsArchive(value: unknown): CapsArchive {
   checkInitial(archive.origin.initial);
   const origin = parseCapsOrigin(archive.origin);
   const selection = selectSupportedCapabilities(origin, archive.config);
+  if ('ext' in selection) restoreExtState(selection.ext.commands, origin.initial.ext);
   const coverage = archive.end?.sequence ?? archive.months.at(-1)?.sequence ?? 0;
   let previous = 0;
   for (const [index, month] of archive.months.entries()) {
