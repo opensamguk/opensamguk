@@ -72,6 +72,8 @@
 | `GeneralLog`       | id(BigInt), worldId, generalId, tick, commandKey, kind, text, createdAt. (worldId, generalId, tick) 고유 | M1   |
 | `NationHistory`    | id, worldId, nationId(없으면 월드 정세), tick, text               | M1   |
 | `YearbookSnapshot` | (worldId, tick) PK, data(국가별 국력, 도시별 소유 국가, 장수 수)  | M1   |
+| `RemovedNation` | (worldId, nationId) PK, name, color, removedSequence, removedTick. 국가 행을 지우는 엔진 트랜잭션이 지우기 직전에 만든다. API로 내지 않는다 (T4-56 (가), D-027) | Phase 2 |
+| `YearbookNation` | (worldId, tick, nationId) PK이며 (worldId, tick)은 `YearbookSnapshot` FK, name, color. 월간 정산이 스냅샷과 같은 트랜잭션에서 그 프레임 국가마다 만든다. 공개 메타데이터만 두고 국가의 비공개 상태는 두지 않는다 (T4-56 (가), D-027) | Phase 2 |
 | `WorldResult` | worldId(PK이자 World FK), reason(UNIFIED·END_YEAR), winnerNationId·winnerName·winnerColor(nullable 종료 시점 사본), endedYear, endedMonth, endedTick, endedSequence, remainingNations, finalStateHash, endedAt(DB 시각) | M1 |
 
 `YearbookSnapshot.data`에 도시별 소유 국가를 꼭 넣습니다. 천하 타임랩스(D4)가 이것만으로 재생합니다.
