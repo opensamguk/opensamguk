@@ -1,7 +1,8 @@
 import { TRPCError } from '@trpc/server';
-import type { Prisma } from '@opensamguk/db';
-import { toWorldState, parsePreset, presetRules, type WorldInit } from '@opensamguk/rules';
+import { readWorldExtRows, type Prisma } from '@opensamguk/db';
+import { toWorldState, presetRules, restoreExtState, type WorldInit } from '@opensamguk/rules';
 import { z } from 'zod';
+import { worldResolver } from './resolver';
 export const worldInput = z.strictObject({ worldId: z.string().min(1).max(64) });
 export async function requireWorld(tx: Prisma.TransactionClient, worldId: string, lock = false) {
   if (lock) await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${worldId} FOR UPDATE`;
@@ -18,6 +19,8 @@ export async function requireGeneral(tx: Prisma.TransactionClient, worldId: stri
 }
 export async function readView(tx: Prisma.TransactionClient, worldId: string) {
   const world = await requireWorld(tx, worldId);
+  const { preset, commands } = worldResolver(world);
+  const ext = restoreExtState(commands, await readWorldExtRows(tx, worldId));
   const cities = await tx.city.findMany({ where: { worldId } });
   const nations = await tx.nation.findMany({ where: { worldId } });
   const generals = await tx.general.findMany({
@@ -26,7 +29,8 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
   });
   const diplomacies = await tx.diplomacy.findMany({ where: { worldId } });
   return toWorldState({
-    ...(world.preset ? { presetRules: presetRules(parsePreset(world.preset)) } : {}),
+    ...(preset ? { presetRules: presetRules(preset) } : {}),
+    ...(ext ? { ext } : {}),
     startYear: world.startYear,
     cities,
     nations,

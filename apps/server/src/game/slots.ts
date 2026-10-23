@@ -7,6 +7,7 @@ import {
   emptyTurn,
   type PolicySlot,
   type QueuedTurn,
+  type CommandResolver,
 } from '@opensamguk/rules';
 import { z } from 'zod';
 export const commandInput = { commandKey: z.string().min(1).max(64), args: z.unknown().optional() };
@@ -19,11 +20,11 @@ export function parseSlot(input: { commandKey: string; args?: unknown } | null):
     throw new TRPCError({ code: 'BAD_REQUEST', message: '명령과 인자를 확인하세요.' });
   return { commandKey: def.key, args: args.data, explicit: true };
 }
-export function displaySlots(turns: QueuedTurn[]) {
+export function displaySlots(turns: QueuedTurn[], resolver?: CommandResolver) {
   return turns.map((turn) => ({
     ...turn,
     explicit: turn.explicit ?? true,
-    name: commandRegistry.get(turn.commandKey)?.name ?? turn.commandKey,
+    name: (resolver ? resolver.get(turn.commandKey) : commandRegistry.get(turn.commandKey))?.name ?? turn.commandKey,
   }));
 }
 export async function readSlots(tx: Prisma.TransactionClient, worldId: string, generalId: number) {
