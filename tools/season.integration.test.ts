@@ -11,6 +11,7 @@ import { controlClock } from '../apps/engine/src/world/clock';
 import { exportReplay, replayToEnd } from '../apps/engine/src/replay';
 import { prepareSeasonWorld, seasonInitial } from '../apps/engine/test/seasonFixture';
 import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
+import { CREATION_ERRORS } from '../packages/rules/src/index';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -50,7 +51,7 @@ async function request(path: string, input: unknown, cookie?: string) {
     },
   );
   const [body] = await response.json();
-  return { data: body.result?.data, code: body.error?.data.code };
+  return { data: body.result?.data, code: body.error?.data.code, message: body.error?.message };
 }
 const creation = { name: '기수시험장수', leadership: 55, strength: 55, intel: 55, portraitId: 10001 };
 const turns = () => Array.from({ length: 30 }, () => null as null | { commandKey: string; args: object });
@@ -296,7 +297,16 @@ it('마지막 정산 뒤 API 예턴·장수 생성을 포함해 장수 턴 통�
           : path === 'turns.edit'
             ? { worldId, revision: 0, op: { shift: 1 } }
             : { worldId, revision: 0, slots: turns() };
-      expect((await request(path, input, a.cookie)).code).toBe('PRECONDITION_FAILED');
+      const response = await request(path, input, a.cookie);
+      if (path === 'general.create') {
+        // T2-03 L4: 이미 있는 내 장수 판정이 월드 종료보다 먼저다.
+        expect(response).toMatchObject({ code: 'CONFLICT', message: CREATION_ERRORS.ALREADY_EXISTS });
+        const newcomer = await identity();
+        expect(await request(path, input, newcomer.cookie)).toMatchObject({
+          code: 'PRECONDITION_FAILED',
+          message: CREATION_ERRORS.WORLD_CLOSED,
+        });
+      } else expect(response.code).toBe('PRECONDITION_FAILED');
     }
     expect(await state(worldId)).toEqual(before);
   } finally {
