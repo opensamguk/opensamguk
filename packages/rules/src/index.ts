@@ -65,6 +65,15 @@ export type {
 } from './diplomacy/treatyTypes';
 export * from './battle/simulate';
 export * from './season';
+export {
+  officerTitle,
+  canManagePersonnel,
+  canUseNationTurns,
+  canExecuteNationCommand,
+  nationCommandKeys,
+  APPOINTABLE_OFFICER_LEVELS,
+  isAppointableOfficerLevel,
+} from './personnel/permissions';
 export * from './tournament/bracket';
 export {
   createCommandResolver,
