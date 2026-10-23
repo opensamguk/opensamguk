@@ -984,6 +984,8 @@ it('P23 실제 휴식·방침·정복 턴 앞뒤의 treaties는 깊이 같고 �
     ).toMatchObject({ commandKey: modern ? 'farm' : 'rest' });
   }
   const initial = commandInitial();
+  // 도시 2 점령이 통일 조건을 채우도록 P23 사본의 중립 도시를 생성 전에 배정한다.
+  initial.cities[2]!.nationId = 1;
   initial.generals[1]!.crew = 0;
   initial.cities[1]!.wall = 0;
   initial.cities[1]!.defence = 0;
