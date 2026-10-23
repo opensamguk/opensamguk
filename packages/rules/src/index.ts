@@ -63,10 +63,13 @@ export {
   applyTreatyInput,
   settleTreaties,
   treatyClosures,
+  quoteTreatyProposal,
   type TreatyAmounts,
   type TreatyFeeResult,
   type TreatyRelation,
   type TreatyWorldState,
+  type TreatyQuoteCode,
+  type TreatyQuoteResult,
 } from './diplomacy/treaty';
 export type {
   TreatyClause,
