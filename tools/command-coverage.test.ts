@@ -65,8 +65,8 @@ const SHA_1FF = '1ffde70cfca4419ee23c972695005165fa3c8ed9';
 const RUN = (id: string | number) => `https://github.com/peppone-choi/opensamguk/actions/runs/${id}`;
 
 describe('T4-02 등록된 확장 명령 대조', () => {
-  const fixture = (files: Record<string, string>, run: (dir: string) => void) => {
-    const dir = mkdtempSync(join(tmpdir(), 'coverage-ext-'));
+  const fixture = (files: Record<string, string>, run: (dir: string) => void, parent = tmpdir()) => {
+    const dir = mkdtempSync(join(parent, 'coverage-ext-'));
     try {
       for (const [path, source] of Object.entries(files)) {
         const file = join(dir, 'packages/rules/src/commands', path);
@@ -79,6 +79,29 @@ describe('T4-02 등록된 확장 명령 대조', () => {
     }
   };
   const command = (key: string, target = 'general') => `({ key: '${key}', target: '${target}' })`;
+  const actualSupport = () =>
+    Object.fromEntries(
+      ['support.ts', '../balance.ts', '../model/clone.ts', 'ext/state.ts'].map((file) => [
+        file,
+        readFileSync(join(root, 'packages/rules/src/commands', file), 'utf8'),
+      ]),
+    );
+  const importWithTsx = (dir: string, expression: string) => {
+    const file = pathToFileURL(join(dir, 'packages/rules/src/commands/ext/registry.ts')).href;
+    const runtime = spawnSync(
+      process.execPath,
+      [
+        '--import',
+        import.meta.resolve('tsx'),
+        '--input-type=module',
+        '-e',
+        `const {extensionCommands}=await import(${JSON.stringify(file)}); console.log(JSON.stringify(${expression}));`,
+      ],
+      { encoding: 'utf8' },
+    );
+    expect(runtime.status, runtime.stderr).toBe(0);
+    return JSON.parse(runtime.stdout);
+  };
   const emptyLegacyRegistry = (dir: string) => {
     for (const file of [
       'domestic/investment.ts',
@@ -103,6 +126,7 @@ describe('T4-02 등록된 확장 명령 대조', () => {
     fixture(
       {
         'ext/registry.ts': `import type { Missing } from 'not-installed';
+        export type { Missing } from './not-referenced.ts';
         import { registered as chosen } from './barrel.ts';
         const alias = chosen; const local = [...alias];
         function mutateLater() { local.push(${command('deferred_command')}); }
@@ -234,6 +258,66 @@ describe('T4-02 등록된 확장 명령 대조', () => {
     );
   });
 
+  it('실제 support.ts와 zod 인자 스키마를 쓰는 장수·국가 명령을 실제 import와 대조한다', () => {
+    const spec = `name: '시험', category: 'strategy',
+      args: schema.strictObject({cityKey: positive, kind: schema.enum(['gold', 'rice']).optional()}),
+      check() { return null; }, change() { return {logs: []}; }`;
+    fixture(
+      {
+        ...actualSupport(),
+        'ext/actions.ts': `import { z as schema } from 'zod';
+        import { defineCommand as define, positive } from '../support.ts';
+        export const first = define({key: 'fire_attack', ${spec}});
+        export const second = define({key: 'nation_research_fire_wheel', target: 'nation', ${spec}});`,
+        'ext/registry.ts': `import {first, second} from './actions.ts'; export const extensionCommands = [first, second];`,
+      },
+      (dir) => {
+        const runtime = importWithTsx(
+          dir,
+          `({registry: extensionCommands.map(({key,target})=>({key,target})),
+          valid: extensionCommands[0].args.safeParse({cityKey:1,kind:'rice'}).success,
+          invalid: extensionCommands[0].args.safeParse({cityKey:0,kind:'other'}).success})`,
+        );
+        expect(runtime.valid).toBe(true);
+        expect(runtime.invalid).toBe(false);
+        expect(readExtensionRegistryKeys(dir)).toEqual(runtime.registry);
+        expect(runtime.registry).toEqual([
+          { key: 'fire_attack', target: 'general' },
+          { key: 'nation_research_fire_wheel', target: 'nation' },
+        ]);
+      },
+      join(root, 'packages/rules'),
+    );
+  });
+
+  it('실제 support→clone→state 아래 모듈의 숨은 등록도 실제 실행과 대조해 거부한다', () => {
+    const common = actualSupport();
+    fixture(
+      {
+        ...common,
+        'ext/state.ts': `import {unused} from './hidden.ts'; export const loaded = unused;\n${common['ext/state.ts']}`,
+        'ext/registry.ts': `import {defineCommand} from '../support.ts';
+        export const dependency = defineCommand;
+        export {list as extensionCommands} from './definitions.ts';`,
+        'ext/definitions.ts': `export const list = [${command('fire_attack')}];`,
+        'ext/hidden.ts': `import {list} from './definitions.ts';
+        export const unused = list.push(${command('hidden_command')});`,
+      },
+      (dir) => {
+        expect(importWithTsx(dir, 'extensionCommands')).toEqual([
+          { key: 'fire_attack', target: 'general' },
+          { key: 'hidden_command', target: 'general' },
+        ]);
+        expect(() => readExtensionRegistryKeys(dir)).toThrow(/ext[\\/]hidden.ts/);
+        emptyLegacyRegistry(dir);
+        const result = main(['--root', dir, '--file', tablePath]);
+        expect(result.code).toBe(1);
+        expect(result.output).toContain('hidden.ts');
+      },
+      join(root, 'packages/rules'),
+    );
+  });
+
   it.each([
     ['push 등록', `export const extensionCommands = []; extensionCommands.push(${command('fire_attack')});`],
     [
@@ -256,6 +340,19 @@ describe('T4-02 등록된 확장 명령 대조', () => {
     ['없는 참조', `export const extensionCommands = [missing];`],
     ['구문 오류', `export const extensionCommands = [;`],
     ['사용하지 않는 외부 import', `import { unused } from 'not-installed'; export const extensionCommands = [];`],
+    [
+      'zod 인자의 숨은 실행',
+      `import {z} from 'zod'; const schema = z.strictObject({x: list.push(1)}); export const extensionCommands = [];`,
+    ],
+    [
+      'zod의 지원하지 않는 실행 API',
+      `import {z} from 'zod'; const schema = z.preprocess(() => list.push(1), z.number()); export const extensionCommands = [];`,
+    ],
+    [
+      'Set 이름을 가진 함수',
+      `function Set() { list.push(${command('hidden_command')}); }
+      const list = []; const value = new Set(['a']); export const extensionCommands = list;`,
+    ],
     ['초기값의 객체 속성 실행', `const sibling = { changed: list.push(1) }; export const extensionCommands = [];`],
     ['객체 계산 속성 실행', `const sibling = { [list.push(1)]: 0 }; export const extensionCommands = [];`],
     [
