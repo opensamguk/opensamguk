@@ -26,6 +26,14 @@ export function cloneWorldWithRegistry(view: WorldView, registry: ExtStateRegist
     nations,
     generals,
     diplomacies: view.diplomacies.map((d) => ({ ...d })),
+    ...(view.treaties?.length
+      ? {
+          treaties: view.treaties.map((treaty) => ({
+            ...treaty,
+            clauses: treaty.clauses.map((clause) => ({ ...clause })),
+          })),
+        }
+      : {}),
     ...(view.commandMeta
       ? { commandMeta: { nextNationId: view.commandMeta.nextNationId, offers: { ...view.commandMeta.offers } } }
       : {}),

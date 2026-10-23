@@ -32,6 +32,34 @@ export * from './operation/calendar';
 export * from './operation/timeline';
 export * from './operation/forecast';
 export * from './operation/suggest';
+export {
+  calculateTreatyFee,
+  settleTreatyFees,
+  meetsTreatyPeaceRequirement,
+  canNpcAcceptTreaty,
+  TREATY_INPUTS,
+  validateTreatyRecord,
+  applyTreatyInput,
+  settleTreaties,
+  treatyClosures,
+  type TreatyAmounts,
+  type TreatyFeeResult,
+  type TreatyRelation,
+  type TreatyWorldState,
+} from './diplomacy/treaty';
+export type {
+  TreatyClause,
+  FirstTreatyClause,
+  TreatyState,
+  TreatyInput,
+  TreatyApplied,
+  TreatyRejectCode,
+  TreatyRejected,
+  TreatyRecord,
+  TreatyRecordContext,
+  TreatyClosure,
+  TreatyApplyResult,
+} from './diplomacy/treatyTypes';
 export * from './battle/simulate';
 export * from './season';
 export * from './tournament/bracket';
