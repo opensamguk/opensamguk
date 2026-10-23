@@ -1,6 +1,8 @@
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useRouterState } from '@tanstack/react-router';
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { TRADE_COMMAND_KEY } from '../diplomacy/contract';
+import { useTradeCityChoices } from '../diplomacy/tradeTargets';
 import { useTRPC } from '../trpc';
 import { DisabledReason } from '../ui/DisabledReason';
 import { EmptyState, ErrorState } from '../ui/States';
@@ -19,7 +21,7 @@ import {
 } from './draft';
 import { slotTimes } from './schedule';
 import styles from './TurnEditor.module.css';
-import { draftStorageKey, useTurnDraft } from './useTurnDraft';
+import { draftStorageKey, useStoredSelection, useTurnDraft } from './useTurnDraft';
 
 export interface TurnEditorProps {
   worldId: string;
@@ -79,7 +81,7 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
   });
   const summary = useQuery({ ...trpc.world.summary.queryOptions({ worldId }), retry: retryUnlessClientError });
 
-  const [selected, setSelected] = useState<Set<number>>(() => new Set());
+  const [selected, setSelected] = useStoredSelection(storageKey);
   const [anchor, setAnchor] = useState<number | null>(null);
   const [focus, setFocus] = useState(0);
   const [shiftBy, setShiftBy] = useState('1');
@@ -95,6 +97,11 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
   }, [revision, queryClient, trpc]);
 
   const commandList: CommandInfo[] = useMemo(() => commands.data ?? [], [commands.data]);
+  // 교역 명령의 대상 도시는 교역 조약이 있는 이웃 도시만 후보로 둔다 (T2-08). 저장은 이 편집기의 같은 경로로 한다.
+  const cityChoicesFor = useTradeCityChoices(
+    worldId,
+    commandList.some((c) => c.key === TRADE_COMMAND_KEY),
+  );
   const commandName = useCallback(
     (key: string) => commandList.find((c) => c.key === key)?.name ?? (key === 'rest' ? '휴식' : key),
     [commandList],
@@ -398,6 +405,7 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
           targetLabel={targetLabel}
           searchRef={searchRef}
           onPut={onPut}
+          cityChoicesFor={cityChoicesFor}
         />
       )}
 

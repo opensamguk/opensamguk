@@ -99,6 +99,35 @@ function writeStored(storage: Storage | undefined, key: string, value: Stored) {
 
 const sessionStore = () => (typeof window === 'undefined' ? undefined : window.sessionStorage);
 
+// 고른 칸도 같은 탭에 둔다. 외교실이나 작전판에 갔다 돌아와도 초안과 함께 선택이 남는다 (T2-08·T2-12 초안 보존).
+export const selectionStorageKey = (draftKey: string) => `${draftKey}:selection`;
+
+export function readSelection(storage: Storage | undefined, key: string): Set<number> {
+  try {
+    const parsed: unknown = JSON.parse(storage?.getItem(key) ?? '[]');
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((i): i is number => Number.isInteger(i) && i >= 0 && i < SLOT_COUNT));
+  } catch {
+    return new Set();
+  }
+}
+
+export function writeSelection(storage: Storage | undefined, key: string, selected: ReadonlySet<number>) {
+  try {
+    if (selected.size === 0) storage?.removeItem(key);
+    else storage?.setItem(key, JSON.stringify([...selected].sort((a, b) => a - b)));
+  } catch {
+    // 저장 공간이 막혀 있어도 화면 선택은 계속한다.
+  }
+}
+
+export function useStoredSelection(draftKey: string) {
+  const key = selectionStorageKey(draftKey);
+  const [selected, setSelected] = useState<Set<number>>(() => readSelection(sessionStore(), key));
+  useEffect(() => writeSelection(sessionStore(), key, selected), [key, selected]);
+  return [selected, setSelected] as const;
+}
+
 export function useTurnDraft(worldId: string, storageKey: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();

@@ -19,6 +19,12 @@ export const CATEGORY_LABELS: Record<string, string> = {
 };
 const CATEGORY_ORDER = ['domestic', 'military', 'strategy', 'personal'];
 
+// 명령마다 대상 도시 후보를 바꿀 때 쓴다 (교역 대상, T2-08). note는 후보가 없을 때의 이유 같은 안내다.
+export interface CityChoices {
+  options: Array<{ key: number; name: string }>;
+  note: string | null;
+}
+
 interface Props {
   commands: CommandInfo[];
   cities: Array<{ key: number; name: string }>;
@@ -30,6 +36,8 @@ interface Props {
   targetLabel: string;
   searchRef: RefObject<HTMLInputElement | null>;
   onPut: (turn: Turn) => void;
+  // 없거나 null을 돌려주면 지도의 모든 도시가 후보다.
+  cityChoicesFor?: ((commandKey: string) => CityChoices | null) | undefined;
 }
 
 // 명령 고르기: 분류별 목록 + 이름 검색, 인자가 있으면 대상 칸을 띄운다.
@@ -44,6 +52,7 @@ export function CommandPicker({
   targetLabel,
   searchRef,
   onPut,
+  cityChoicesFor,
 }: Props) {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<string>('all');
@@ -64,14 +73,23 @@ export function CommandPicker({
   const required = useMemo(() => (command ? requiredKeys(command.argsSchema) : []), [command]);
   const built = buildArgs(fields, required, values);
   const sortedCities = useMemo(() => [...cities].sort((a, b) => a.name.localeCompare(b.name, 'ko')), [cities]);
+  const choices = command && cityChoicesFor ? cityChoicesFor(command.key) : null;
+  const cityOptions = choices?.options ?? sortedCities;
+  // 지도에서 고른 도시는 후보 안에 있을 때만 기본값과 되돌리기 힌트로 쓴다.
+  const mapCityFor = (key: string | undefined) => {
+    if (selectedCityKey === null) return null;
+    const limited = key ? cityChoicesFor?.(key) : null;
+    return !limited || limited.options.some((c) => c.key === selectedCityKey) ? selectedCityKey : null;
+  };
 
   // 고를 때 기본값을 채운다. 대상 도시는 지도에서 고른 도시를 먼저 둔다 (힌트일 뿐 바로 넣지는 않는다).
   const choose = (key: string) => {
     setChosen(key);
     const next = commands.find((c) => c.key === key);
     const initial: Record<string, string> = {};
+    const mapCity = mapCityFor(next?.key);
     for (const field of next ? argFields(next.argsSchema) : []) {
-      if (field.kind === 'city' && selectedCityKey !== null) initial[field.key] = String(selectedCityKey);
+      if (field.kind === 'city' && mapCity !== null) initial[field.key] = String(mapCity);
       if (field.kind === 'integer' && field.key === 'crewType' && defaultCrewType !== undefined)
         initial[field.key] = String(defaultCrewType);
       if (field.kind === 'boolean') initial[field.key] = 'true';
@@ -184,13 +202,17 @@ export function CommandPicker({
               key={field.key}
               field={field}
               value={values[field.key] ?? ''}
-              cities={sortedCities}
+              cities={cityOptions}
               nations={nations}
               inputRef={i === 0 ? firstArgRef : undefined}
               onKeyDown={onArgKey}
               onChange={(value) => setValues((prev) => ({ ...prev, [field.key]: value }))}
+              note={field.kind === 'city' ? (choices?.note ?? null) : null}
               mapHint={
-                field.kind === 'city' && selectedCityKey !== null && values[field.key] !== String(selectedCityKey)
+                field.kind === 'city' &&
+                selectedCityKey !== null &&
+                mapCityFor(command.key) !== null &&
+                values[field.key] !== String(selectedCityKey)
                   ? {
                       name: cities.find((c) => c.key === selectedCityKey)?.name ?? `도시 ${selectedCityKey}`,
                       use: () => setValues((prev) => ({ ...prev, [field.key]: String(selectedCityKey) })),
@@ -223,6 +245,7 @@ function ArgInput({
   inputRef,
   onChange,
   onKeyDown,
+  note,
   mapHint,
 }: {
   field: ArgField;
@@ -232,6 +255,7 @@ function ArgInput({
   inputRef: RefObject<HTMLElement | null> | undefined;
   onChange: (value: string) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
+  note: string | null;
   mapHint: { name: string; use: () => void } | null;
 }) {
   const ref = inputRef as RefObject<HTMLInputElement & HTMLSelectElement> | undefined;
@@ -299,6 +323,11 @@ function ArgInput({
         <button type="button" className={styles.linkButton} onClick={mapHint.use}>
           지도에서 고른 도시({mapHint.name}) 쓰기
         </button>
+      ) : null}
+      {note ? (
+        <p className={styles.muted} role="note">
+          {note}
+        </p>
       ) : null}
     </div>
   );
