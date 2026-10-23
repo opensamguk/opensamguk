@@ -21,6 +21,21 @@ export interface TreatyState {
   endTick: number | null;
 }
 
+export interface ClosedTreatyRow {
+  id: number;
+  fromNationId: number;
+  toNationId: number;
+  clauses: FirstTreatyClause[];
+  status: 'REJECTED' | 'EXPIRED' | 'ENDED';
+  proposedTick: number;
+  respondByTick: number;
+  startTick: number | null;
+  endTick: number | null;
+  costFrom: number | null;
+  costTo: number | null;
+  closedSequence: number;
+}
+
 export type TreatyInput =
   | { kind: 'treaty.propose'; payload: { toNationId: number; clauses: TreatyClause[] } }
   | { kind: 'treaty.respond'; payload: { treatyId: string; accept: boolean } };
