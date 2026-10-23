@@ -63,8 +63,6 @@ export const exemptions: AuthzExemption[] = [
     reason: '서버 세션의 장수만 조회한다. 타인 generalId 지정은 입력 계약에 없다.',
   },
 
-  { path: 'commands.list', category: 'otherUser', reason: '인증 사용자 공통 명령 정의이며 타인 소유 자원이 없다.' },
-
   {
     path: 'city.get',
     category: 'otherUser',
