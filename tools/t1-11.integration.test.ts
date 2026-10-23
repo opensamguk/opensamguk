@@ -609,8 +609,8 @@ describe('T1-11 군사 명령 API·엔진 결합', () => {
       ).toMatchObject({ ok: true, revision: 1 });
       expect((await request('turns.get', { worldId }, a.cookie)).data.slots[0]).toMatchObject(turn);
       await loop.advanceTo(100);
-      const log = await db.generalLog.findUniqueOrThrow({
-        where: { worldId_generalId_tick: { worldId, generalId: 1, tick: 100 } },
+      const log = await db.generalLog.findFirstOrThrow({
+        where: { worldId, generalId: 1, tick: 100, sequence: null },
       });
       expect(log).toMatchObject({ commandKey, kind: accepted ? 'success' : 'failure' });
       if (!accepted) expect(log.text).toContain(preview.data.code);
@@ -882,8 +882,8 @@ describe('T1-11 30칸·revision·경합·재검사', () => {
     }
     await running;
     expect((await saving).data).toMatchObject({ ok: false, reason: 'STALE', revision: 2 });
-    const log = await db.generalLog.findUniqueOrThrow({
-      where: { worldId_generalId_tick: { worldId, generalId: 1, tick: 100 } },
+    const log = await db.generalLog.findFirstOrThrow({
+      where: { worldId, generalId: 1, tick: 100, sequence: null },
     });
     expect(log).toMatchObject({ kind: 'failure', commandKey: 'farm' });
     expect(log.text).toContain('NO_GOLD');
