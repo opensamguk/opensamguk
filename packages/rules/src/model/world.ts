@@ -4,6 +4,16 @@ import { cloneExtStateWithRegistry, extSlices, extCommandBindings, type ExtState
 import type { InitialCity, InitialGeneral, InitialNation, InitialDiplomacy, WorldInit } from '../world/bootstrap';
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 export type WorldExt = Record<string, JsonValue>;
+export interface AssignmentOffer {
+  id: string;
+  nationId: number;
+  issuerGeneralId: number;
+  cityKey: number;
+  createdTick: number;
+  expiresTick: number;
+}
+export type OfficeTurns = Record<number, Record<number, { commandKey: string; args: unknown }[]>>;
+export type OfficeRevisions = Record<number, Record<number, { revision: number; tenure: number }>>;
 export interface WorldState {
   presetRules?: PresetRules;
   ext?: WorldExt;
@@ -15,6 +25,8 @@ export interface WorldState {
   treaties?: TreatyState[];
   commandMeta?: { nextNationId: number; offers: Record<number, number> };
   nationTurns?: Record<number, { commandKey: string; args: unknown }[]>;
+  assignmentOffers?: Record<number, AssignmentOffer>;
+  officeTurns?: OfficeTurns;
 }
 type DeepReadonlyFields<T> = T extends object ? { readonly [K in keyof T]: DeepReadonly<T[K]> } : T;
 export type DeepReadonly<T> = [T] extends [JsonValue]

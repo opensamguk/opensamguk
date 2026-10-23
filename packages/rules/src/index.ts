@@ -93,6 +93,35 @@ export {
   APPOINTABLE_OFFICER_LEVELS,
   isAppointableOfficerLevel,
 } from './personnel/permissions';
+export {
+  PERSONNEL_INPUTS,
+  applyPersonnelInput,
+  validatePersonnelRecord,
+  replayPersonnelInput,
+  finishPersonnelStep,
+  applyNationTurnsRecord,
+  PersonnelInvariantError,
+} from './personnel';
+export type {
+  PersonnelInputKind,
+  PersonnelRecordKind,
+  PersonnelRejectCode,
+  PersonnelRecordedInput,
+  AppliedPersonnelInput,
+  NationTurnsRecord,
+  PendingPersonnelEvent,
+  PersonnelInputContext,
+  PersonnelInputOutcome,
+  PersonnelStepResult,
+  PersonnelRecordContext,
+  OfficeTurns,
+  OfficeRevisions,
+  OfficeState,
+  OfficeView,
+  PersonnelChange,
+  ClosedOffer,
+  PersonnelLog,
+} from './personnel';
 export * from './tournament/bracket';
 export {
   createCommandResolver,

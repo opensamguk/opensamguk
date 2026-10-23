@@ -1,12 +1,9 @@
-import type { DeepReadonly, WorldView } from '../model/world';
+import type { DeepReadonly, WorldView, OfficeRevisions } from '../model/world';
 import { canUseNationTurns } from './permissions';
 import { PersonnelInvariantError, type PersonnelState } from './types';
 
-export type OfficeTurns = Record<number, Record<number, { commandKey: string; args: unknown }[]>>;
-export type OfficeRevisions = Record<number, Record<number, { revision: number; tenure: number }>>;
-export interface OfficeState extends PersonnelState {
-  officeTurns?: OfficeTurns;
-}
+export type { OfficeTurns, OfficeRevisions } from '../model/world';
+export type OfficeState = PersonnelState;
 export type OfficeView = DeepReadonly<OfficeState>;
 type Occupants = Record<number, Record<number, number>>;
 

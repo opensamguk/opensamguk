@@ -3,7 +3,7 @@ import { rngFor } from '@opensamguk/shared';
 import { runGeneralTurn } from './commands/turn';
 import type { UnitSetResource } from './world/resources';
 import { TICKS_PER_MONTH } from './clock/constants';
-import { toWorldState, type WorldState } from './model/world';
+import { toWorldState, type WorldState, type OfficeRevisions } from './model/world';
 import { monthlyDate, runMonthly } from './monthly/index';
 import type { InitialGeneral, WorldInit } from './world/bootstrap';
 import { emptyTurn, emptyQueue } from './policy';
@@ -20,6 +20,7 @@ export interface ReplayState {
   revisions: Record<number, number>;
   monthlyTick: number;
   policy?: ReplayPolicy;
+  offices?: OfficeRevisions;
 }
 export interface RecordedInput {
   sequence: number;
