@@ -52,7 +52,7 @@ async function create(count = 1, human = false) {
     });
     initial.generals[0]!.userId = userId;
   }
-  const { worldId } = await saveInitialWorld(db, initial, { name: '엔진 통합', turnTermMinutes: 10 });
+  const { worldId } = await saveInitialWorld(db, initial, { name: '엔진 통합', turnTermMinutes: 10, endYear: null });
   await controlClock(db, worldId, 'start');
   return { worldId, cityKey: city.cityKey };
 }

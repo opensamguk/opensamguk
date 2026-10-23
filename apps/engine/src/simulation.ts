@@ -6,19 +6,14 @@ import {
   runMonthly,
   TICKS_PER_MONTH,
   toWorldState,
+  unifiedNation,
+  seasonOutcome,
   type WorldInit,
-  type WorldState,
 } from '@opensamguk/rules';
 
 export const DEFAULT_SIMULATION_MAX_YEAR = 300;
 
-export function unifiedNation(state: WorldState): number | null {
-  const nations = Object.values(state.nations);
-  const cities = Object.values(state.cities);
-  return nations.length === 1 && cities.length > 0 && cities.every((city) => city.nationId === nations[0]!.id)
-    ? nations[0]!.id
-    : null;
-}
+export { unifiedNation } from '@opensamguk/rules';
 
 export function simulateGame(
   initial: WorldInit,
@@ -61,14 +56,15 @@ export function simulateGame(
       commandCounts[turn.commandKey] = (commandCounts[turn.commandKey] ?? 0) + 1;
       if (turn.nation)
         nationCommandCounts[turn.nation.commandKey] = (nationCommandCounts[turn.nation.commandKey] ?? 0) + 1;
-      winner = unifiedNation(state);
+      winner = seasonOutcome(state, { endYear: maxYear })?.winnerNationId ?? null;
       if (winner !== null) break;
     }
     if (winner !== null) break;
     state = runMonthly(state, boundary, rngFor(initial.seed, 'monthly', date.year, date.month)).state;
     if (date.month === 12) options.onYear?.(date.year, turns);
-    winner = unifiedNation(state);
-    if (date.year === maxYear && date.month === 12) break;
+    const outcome = seasonOutcome(state, { endYear: maxYear, settled: date });
+    winner = outcome?.winnerNationId ?? null;
+    if (outcome) break;
   }
   const stateHash = hashState(state);
   return {

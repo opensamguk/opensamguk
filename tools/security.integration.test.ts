@@ -126,7 +126,7 @@ beforeAll(async () => {
   const state = await readFixture();
   state.generals[0]!.userId = user.id;
   state.generals[2]!.userId = other.id;
-  ({ worldId } = await saveInitialWorld(db, state, { name: '보안 HTTP', turnTermMinutes: 60 }));
+  ({ worldId } = await saveInitialWorld(db, state, { name: '보안 HTTP', turnTermMinutes: 60, endYear: null }));
 });
 afterAll(async () => {
   await db.world.deleteMany();

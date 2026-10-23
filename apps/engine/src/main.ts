@@ -1,4 +1,4 @@
-import { setTimeout as delay } from 'node:timers/promises';
+import { setTimeout as delay, setImmediate as yieldImmediate } from 'node:timers/promises';
 import type { PrismaClient } from '@opensamguk/db';
 import {
   acquireLease,
@@ -11,7 +11,7 @@ import {
   renewLease,
   type Lease,
 } from './lease';
-import { TurnLoop } from './turnLoop';
+import { TurnLoop, type PollBatch } from './turnLoop';
 
 export const HEARTBEAT_MS = 30_000;
 
@@ -42,7 +42,12 @@ export function engineFailureMessage(error: unknown): string {
 
 export async function runEngine(
   db: PrismaClient,
-  options: { worldId?: string; signal: AbortSignal; onStatus?: (status: string) => void },
+  options: {
+    worldId?: string;
+    signal: AbortSignal;
+    onStatus?: (status: string) => void;
+    onBatch?: (batch: PollBatch, timing: { startedAt: number; finishedAt: number }) => void;
+  },
 ) {
   const { signal } = options;
   let lastStatus: string | undefined;
@@ -115,16 +120,28 @@ export async function runEngine(
       }
     })();
     try {
+      let ended = false;
       while (!session.signal.aborted) {
-        await loop.poll(session.signal);
+        const startedAt = performance.now();
+        const batch = await loop.poll(session.signal);
+        options.onBatch?.(batch, { startedAt, finishedAt: performance.now() });
+        if (batch.status === 'ENDED' && !batch.more) {
+          ended = true;
+          break;
+        }
         try {
-          await delay(100, undefined, { signal: session.signal });
+          if (batch.more) await yieldImmediate(undefined, { signal: session.signal });
+          else await delay(100, undefined, { signal: session.signal });
         } catch {
           break;
         }
       }
       if (renewalError) throw renewalError;
       if (heartbeatError) throw heartbeatError;
+      if (ended && !options.worldId) {
+        worldId = undefined;
+        continue;
+      }
       return;
     } catch (error) {
       if (!signal.aborted) throw error;

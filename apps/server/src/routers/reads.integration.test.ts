@@ -204,13 +204,16 @@ afterAll(async () => {
 });
 
 describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
-  it('summary는 서버 시계로 연월·tick·tick 간격만 반환한다', async () => {
+  it('summary는 서버 시계와 공개 기수 설정을 반환한다', async () => {
     expect(await query('world.summary', { worldId })).toEqual({
       status: 200,
       error: undefined,
       data: {
         name: 'primary',
         status: 'RUNNING',
+        clockMode: 'REALTIME',
+        endYear: null,
+        result: null,
         gameDate: { year: state.startYear, month: 1 },
         nowTick: 200,
         msPerTick: 6,

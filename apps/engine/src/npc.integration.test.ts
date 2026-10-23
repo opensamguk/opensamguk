@@ -27,7 +27,7 @@ async function create() {
     create: { id: 'npc-test-human', email: 'npc-test-human@example.invalid', passwordHash: 'test-only' },
   });
   initial.generals[0]!.userId = 'npc-test-human';
-  const { worldId } = await saveInitialWorld(db, initial, { name: 'NPC 통합', turnTermMinutes: 60 });
+  const { worldId } = await saveInitialWorld(db, initial, { name: 'NPC 통합', turnTermMinutes: 60, endYear: null });
   await controlClock(db, worldId, 'start');
   const lease = (await acquireLease(db, worldId))!;
   return { initial, worldId, lease };

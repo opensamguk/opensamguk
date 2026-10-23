@@ -30,7 +30,7 @@
                                           ├─1:N─ Message
                                           ├─1:N─ GeneralLog, NationHistory
                                           ├─1:N─ YearbookSnapshot (달마다)
-                                          └─1:1─ SeasonResult (기수 결과)
+                                          └─1:1─ WorldResult (기수 결과)
 ```
 
 ## 계정 영역
@@ -48,7 +48,7 @@
 
 | 테이블        | 주요 필드                                                                                  | 관문 |
 | ------------- | ------------------------------------------------------------------------------------------ | ---- |
-| `World`       | id, name, scenarioKey, mapKey, unitSetKey, startYear, status(PREOPEN·RUNNING·PAUSED·ENDED), turnTermMinutes, seed, clockTick, initialStateHash, statRules, unitSet. clockAnchorAt·startedAt·endedAt는 T1-04 이후 | M1 |
+| `World` | id, name, scenarioKey, mapKey, unitSetKey, startYear, endYear(기본값 없는 nullable), status(PREOPEN·RUNNING·PAUSED·ENDED), clockMode(REALTIME·ACCELERATED, 기본 REALTIME), turnTermMinutes, seed, clockTick, clockAnchorAt, clockRevision, startedAt, endedAt, initialStateHash, replayOrigin, outcomeFromSequence, statRules, unitSet | M1 |
 | `EngineLease` | worldId(PK), ownerId, fencingToken, expiresAt                                              | M1   |
 | `InputEvent`  | id, worldId, actorUserId, generalId, kind, payload, idempotencyKey(월드 안에서 고유), status(PENDING·DONE·FAILED), result, createdAt, processedAt | M1 |
 
@@ -72,9 +72,11 @@
 | `GeneralLog`       | id(BigInt), worldId, generalId, tick, commandKey, kind, text, createdAt. (worldId, generalId, tick) 고유 | M1   |
 | `NationHistory`    | id, worldId, nationId(없으면 월드 정세), tick, text               | M1   |
 | `YearbookSnapshot` | (worldId, tick) PK, data(국가별 국력, 도시별 소유 국가, 장수 수)  | M1   |
-| `SeasonResult`     | worldId(PK), endedTick, winnerNationId, rankings                  | M3   |
+| `WorldResult` | worldId(PK이자 World FK), reason(UNIFIED·END_YEAR), winnerNationId·winnerName·winnerColor(nullable 종료 시점 사본), endedYear, endedMonth, endedTick, endedSequence, remainingNations, finalStateHash, endedAt(DB 시각) | M1 |
 
 `YearbookSnapshot.data`에 도시별 소유 국가를 꼭 넣습니다. 천하 타임랩스(D4)가 이것만으로 재생합니다.
+
+`WorldResult`는 결정 사건과 같은 트랜잭션에서 한 번만 생성합니다. `outcomeFromSequence`는 새 월드에서 0이며 기존 월드는 migration 직전 `actionSequence`로 채웁니다. 종료 재생은 그 번호 이후의 게임 사건만 판정합니다. 저장된 초기·월간 해시와 origin v1은 바꾸지 않습니다. archive v2의 설정·종료 정보는 네 키 `ReplayState` 밖에 둡니다. 종료 뒤 닫힌 생성 요청은 `afterEnd`에 REJECTED로만 남고 최종 해시를 바꾸지 않습니다.
 
 ## 차별화 기능 자리 (D-010 선택분)
 

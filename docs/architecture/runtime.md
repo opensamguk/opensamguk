@@ -13,7 +13,7 @@
 | PostgreSQL    | 1                            | 저장 |
 | Caddy         | 1                            | HTTPS, 프록시 |
 
-`pnpm dev`와 인자 없는 `pnpm engine:run`은 감독을 실행합니다. 감독은 10초마다 RUNNING·PAUSED 월드를 조회하고 월드마다 자식 하나를 유지합니다. PREOPEN·ENDED·삭제 월드의 자식은 내립니다. `pnpm engine:run --world <ID>`는 기존처럼 지정한 월드 하나만 실행하며 `runEngine` 직접 호출도 유지합니다. `pnpm --filter @opensamguk/engine supervisor`로도 감독을 실행할 수 있습니다.
+`pnpm dev`와 인자 없는 `pnpm engine:run`은 감독을 실행합니다. 감독은 10초마다 RUNNING·PAUSED 월드와 PENDING 생성이 남은 ENDED 월드를 조회하고 월드마다 자식 하나를 유지합니다. PREOPEN·처리가 끝난 ENDED·삭제 월드의 자식은 내립니다. `pnpm engine:run --world <ID>`는 기존처럼 지정한 월드 하나만 실행하며 `runEngine` 직접 호출도 유지합니다. `pnpm --filter @opensamguk/engine supervisor`로도 감독을 실행할 수 있습니다.
 
 ## 2. 환경변수
 
@@ -64,11 +64,11 @@ pnpm db:down           # DB 끄기 (데이터는 볼륨에 남음)
 월드 생성 (T1-03):
 
 ```sh
-pnpm world:create --scenario 1030 --map che --seed demo --turn-term 10 --name 군웅할거
+pnpm world:create --scenario 1030 --map che --seed demo --turn-term 10 --end-year 300 --name 군웅할거
 ```
 
 생성된 월드 ID와 초기 상태 SHA-256을 출력합니다. 상태는 `PREOPEN`, 초기 tick은 0입니다.
-이름과 턴 간격(1~2147483647분)을 검사하고 리소스 검사나 DB 저장 실패 시 부분 월드를 남기지 않습니다.
+이름과 턴 간격(1~2147483647분), 필수 종료 연도(시작 연도 이상 10000 이하 정수)를 검사하고 리소스 검사나 DB 저장 실패 시 부분 월드를 남기지 않습니다. 300은 이 예시의 명시 인자이며 운영 기본값은 없습니다. `saveInitialWorld`도 종료 연도나 통일 전용 `null`을 명시해서 받습니다.
 월드 시작·일시정지·재개는 아래 월드 상태 전환 명령을 사용합니다.
 
 - web은 `/trpc` 요청을 server로 프록시합니다. 프록시 대상 포트는 server와 같은 `SERVER_PORT`를 따릅니다
@@ -81,11 +81,13 @@ pnpm world:create --scenario 1030 --map che --seed demo --turn-term 10 --name �
 
 1. 월드별 `EngineLease`를 획득합니다. 없거나 DB 시각 기준으로 만료된 리스만 가져오며 fencingToken을 증가시킵니다. 획득하지 못하면 1초마다 재시도합니다.
 2. 만료 시간은 15초, 갱신은 5초마다입니다. 게임 시계의 manual/realtime 여부와 관계없이 리스는 DB UTC 시각을 씁니다.
-3. 리스 행과 월드 행을 잠그고 시계·실행할 장수를 확인합니다. 실행할 턴이 있을 때만 DB에서 전체 월드 상태·현재 예턴을 읽습니다. 장수는 `nextTurnTick`, ID 오름차순으로 실행합니다. 빈 예턴은 휴식입니다. 밀린 턴은 제한 없이 따라잡고 다음 조회까지 100ms 기다립니다. 턴이 없는 realtime 폴링은 전체 적재를 생략하고 시계만 5초마다 체크포인트합니다. 이 간격은 프로세스의 monotonic 시각으로 재며 PAUSED/PREOPEN/ENDED에서는 쓰지 않습니다.
+3. 리스 행과 월드 행을 잠그고 시계·실행할 장수를 확인합니다. 장수는 `nextTurnTick`, ID 오름차순으로 실행합니다. 빈 사람 예턴은 휴식입니다. 밀린 사건은 64step·250ms 배치로 나눕니다. 상한에 닿으면 `setImmediate`로 양보하고 아니면 100ms 기다립니다. 가속은 벽시계 대신 다음 사건을 목표로 삼습니다. 턴이 없는 realtime 폴링은 전체 적재를 생략하고 시계만 5초마다 체크포인트합니다. 이 간격은 프로세스의 monotonic 시각으로 재며 PAUSED/PREOPEN/ENDED에서는 쓰지 않습니다.
 4. 상태 변경·로그·예턴 당김·다음 턴·시계 체크포인트를 한 트랜잭션에 저장합니다. commit 직전에 소유자·토큰·만료를 다시 검사합니다. 리스 행 잠금은 commit/rollback까지 유지되어 실행권 이전과 낡은 쓰기가 겹치지 않습니다.
 5. 갱신 실패·토큰 불일치·리스 만료는 프로세스 오류 종료입니다. 실행권 상실은 `LeaseLostError` 이름·이유를 출력하고 DB 오류 원문은 연결 정보 보호를 위해 출력하지 않습니다. SIGINT/SIGTERM은 처리 중 트랜잭션을 취소하고 리스를 해제한 뒤 DB 연결을 닫습니다. 리스 해제는 만료 시각만 바꾸고 토큰을 지우지 않습니다.
 
 테스트·시뮬레이터는 `TurnLoop.advanceTo(tick)`으로 게임 시간을 직접 주입합니다. 운영은 `poll()`로 DB 시각과 월드 기준 시각에서 tick을 계산합니다. PAUSED/PREOPEN/ENDED에서는 턴을 처리하지 않습니다.
+
+종료 사건과 결과 저장 뒤에는 남은 PENDING 생성을 거부하고 실행권을 해제합니다. `--world` 자식은 코드 0으로 끝나며 감독은 ENDED의 정상 종료를 장애 횟수에 넣지 않습니다. 그 자식의 heartbeat·리스 갱신 루프도 끝납니다. `runEngine`을 월드 지정 없이 직접 부르면 다음 RUNNING 월드를 찾습니다. 정상 종료 뒤 결과를 다시 만들거나 다음 사건을 실행하지 않습니다.
 
 감독은 비정상 종료한 자식을 1·2·4초 순으로 기다려 다시 시작합니다. 최대 대기는 60초이고 5분 이상 살아 있던 자식은 백오프 단계를 초기화합니다. 5분 안에 5회 종료한 월드는 자동 재시작을 멈추고 `EngineHeartbeat.lastError`에 고정 안내를 남깁니다. 원인을 고친 뒤 감독을 다시 시작하면 재시도합니다. 이 중단은 감독 인스턴스별로 적용하며 World 상태와 게임 입력은 바꾸지 않습니다. 감독이 둘이어도 자식의 기존 EngineLease 펜싱이 동시 게임 쓰기를 막습니다.
 
@@ -98,3 +100,5 @@ SIGINT·SIGTERM을 받은 감독은 새 자식을 시작하지 않고 자기 자
 ## 5. 월드 상태 전환
 
 `pnpm world:start --world <ID>`로 시작합니다. `world:pause`, `world:resume`, `world:status`도 같은 인자를 받습니다. 정지 중에는 tick이 고정됩니다. 엔진과 운영 명령은 DB의 UTC 시각(`clock_timestamp()`)을 rules에 인자로 주입하며 기준 시각·tick·revision을 저장합니다. 테스트만 시각을 명시적으로 주입합니다. 운영 명령도 먼저 월드 행을 `FOR UPDATE`로 잠근 뒤 최신 상태와 DB 시각을 읽습니다. 실행 중인 턴·체크포인트를 기다려 직렬화하므로 엔진의 revision 증가 때문에 정상 정지·재개가 거부되지 않습니다. 이미 정지한 월드를 다시 정지하는 등 잘못된 상태 전환은 계속 거부합니다.
+
+`pnpm world:accelerate --world <ID>`와 `pnpm world:realtime --world <ID>`로 같은 판의 시계 모드만 바꿉니다. RUNNING·PAUSED에서 다른 모드로만 전환하며 정지·재개는 모드를 보존합니다. 가속 배율이나 강제 종료 명령은 없습니다. `world:status`에서 모드·종료 연도·종료 결과를 확인합니다.

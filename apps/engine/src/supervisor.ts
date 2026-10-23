@@ -113,14 +113,27 @@ export async function runSupervisor(
     state.child = child;
     state.exited = new Promise<void>((resolve) => {
       let finished = false;
-      const finish = () => {
+      const finish = async (code?: number | null) => {
         if (finished) return;
         finished = true;
+        if (code === 0) {
+          try {
+            const world = await db.world.findUnique({ where: { id: worldId }, select: { status: true } });
+            if (world?.status === 'ENDED') {
+              delete state.child;
+              state.stopping = true;
+              resolve();
+              return;
+            }
+          } catch {
+            /* DB 오류는 기존 재시작 경로에서 다룬다. */
+          }
+        }
         failed();
         resolve();
       };
-      child.once('error', finish);
-      child.once('exit', finish);
+      child.once('error', () => void finish());
+      child.once('exit', (code) => void finish(code));
     });
     emit({ worldId, kind: 'started', ...(child.pid === undefined ? {} : { pid: child.pid }) });
   }
@@ -145,7 +158,12 @@ export async function runSupervisor(
         discoverAt = now() + DISCOVERY_MS;
         try {
           const active = await db.world.findMany({
-            where: { status: { in: ['RUNNING', 'PAUSED'] } },
+            where: {
+              OR: [
+                { status: { in: ['RUNNING', 'PAUSED'] } },
+                { status: 'ENDED', inputEvents: { some: { kind: 'general.create', status: 'PENDING' } } },
+              ],
+            },
             select: { id: true },
             orderBy: { id: 'asc' },
           });
