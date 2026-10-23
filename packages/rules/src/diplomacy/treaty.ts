@@ -468,6 +468,42 @@ export function quoteTreatyProposal(
   return { cost, problem: null };
 }
 
+export type TreatyResponseGuideCode = 'EXPIRED' | 'TREATY_RELATION' | 'INSUFFICIENT_GOLD';
+export type TreatyResponseGuide = Readonly<{
+  accept: Readonly<{ code: TreatyResponseGuideCode; message: string }> | null;
+  reject: Readonly<{ code: 'EXPIRED'; message: string }> | null;
+}>;
+
+// 받은 제안의 안내다. 제안국 국고를 읽지 않으며 최종 집행은 엔진이 판정한다.
+export function guideTreatyResponse(
+  input: Readonly<{
+    treaty: DeepReadonly<TreatyState>;
+    tick: number;
+    relation: TreatyRelation;
+    responderCityCount: number;
+    responderGold: number;
+  }>,
+): TreatyResponseGuide {
+  const treaty = validateTreatyState(input.treaty);
+  if (treaty.status !== 'PROPOSED') throw new RangeError('응답을 기다리는 조약이 아닙니다.');
+  tickSchema.max(MAX_ENGINE_TICK).parse(input.tick);
+  nonNegativeSafeInteger(input.responderCityCount, 'responderCityCount');
+  nonNegativeSafeInteger(input.responderGold, 'responderGold');
+  z.enum(['NONE', 'WAR', 'DECLARED', 'NON_AGGRESSION']).parse(input.relation);
+  if (input.tick >= treaty.respondByTick) {
+    const expired = { code: 'EXPIRED', message: rejectionMessages.EXPIRED } as const;
+    return { accept: expired, reject: expired };
+  }
+  const deny = (code: TreatyResponseGuideCode): TreatyResponseGuide => ({
+    accept: { code, message: rejectionMessages[code] },
+    reject: null,
+  });
+  if (!relationAllowsClauses(input.relation, treaty.clauses)) return deny('TREATY_RELATION');
+  const months = treaty.clauses.find((clause) => clause.kind === 'nonAggression')?.months ?? null;
+  if (input.responderGold < calculateTreatyFee(input.responderCityCount, months)) return deny('INSUFFICIENT_GOLD');
+  return { accept: null, reject: null };
+}
+
 function putTreaties(state: TreatyWorldState, treaties: TreatyState[]): void {
   if (treaties.length) state.treaties = treaties.sort((a, b) => a.id - b.id);
   else delete state.treaties;

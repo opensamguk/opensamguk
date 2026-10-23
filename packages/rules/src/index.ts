@@ -64,12 +64,15 @@ export {
   settleTreaties,
   treatyClosures,
   quoteTreatyProposal,
+  guideTreatyResponse,
   type TreatyAmounts,
   type TreatyFeeResult,
   type TreatyRelation,
   type TreatyWorldState,
   type TreatyQuoteCode,
   type TreatyQuoteResult,
+  type TreatyResponseGuide,
+  type TreatyResponseGuideCode,
 } from './diplomacy/treaty';
 export type {
   TreatyClause,
