@@ -235,8 +235,8 @@ it('가속 턴 commit과 겹친 API edit는 STALE이며 재시도한 편집은 �
     const general = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
     await loop.advanceTo(general.nextTurnTick);
     expect(
-      await db.generalLog.findUniqueOrThrow({
-        where: { worldId_generalId_tick: { worldId, generalId: 1, tick: general.nextTurnTick } },
+      await db.generalLog.findFirstOrThrow({
+        where: { worldId, generalId: 1, tick: general.nextTurnTick, sequence: null },
       }),
     ).toMatchObject({ commandKey: 'commerce' });
     expect((await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } })).turnRevision).toBe(

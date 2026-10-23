@@ -58,6 +58,44 @@ model World {
   operations      Operation[]
   extSlices       WorldExtSlice[]
   treaties        Treaty[]
+  assignmentOffers AssignmentOffer[]
+}
+
+enum AssignmentOfferStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  SUPERSEDED
+  CANCELLED
+}
+
+enum AssignmentOfferResolvedBy {
+  RESPONSE
+  EXPIRY
+}
+
+enum AssignmentOfferCancelReason {
+  CITY_LOST
+  TARGET_LEFT
+  ISSUER_LOST_OFFICE
+}
+
+model AssignmentOffer {
+  worldId         String
+  id              String
+  nationId        Int
+  issuerGeneralId Int
+  targetGeneralId Int
+  cityKey         Int
+  status          AssignmentOfferStatus
+  resolvedBy      AssignmentOfferResolvedBy?
+  cancelReason    AssignmentOfferCancelReason?
+  createdTick     Int
+  expiresTick     Int
+  resolvedTick    Int?
+  world           World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@id([worldId, id])
 }
 
 enum TreatyStatus {
@@ -332,10 +370,11 @@ model GeneralLog {
   commandKey String
   kind       String
   text       String
+  sequence   Int?
+  ordinal    Int @default(0)
   createdAt  DateTime @default(now())
   general    General @relation(fields: [worldId, generalId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
 
-  @@unique([worldId, generalId, tick])
 }
 
 model NationTurn {
