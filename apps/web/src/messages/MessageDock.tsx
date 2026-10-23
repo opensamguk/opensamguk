@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import { useEffect, useRef, type Ref } from 'react';
 import type { RealtimeStatus } from '../realtime/useWorldEvents';
+import { useAuthority, useAuthorityWatch } from './authority';
 import { MessagePanel } from './MessagePanel';
 import { unreadTotal } from './merge';
 import { useUnread } from './queries';
@@ -9,6 +10,7 @@ import styles from './MessageDock.module.css';
 export const DRAWER_ID = 'message-drawer';
 
 // 위쪽 띠의 메시지 단추. 안 읽음 배지는 볼 수 있는 범위의 안 읽음 수를 더한 값이다.
+// GameLayout에 늘 붙어 있으므로 메시지·공지 권한 감시(authority.ts)도 여기서 한 번만 돌린다.
 export function MessageButton({
   worldId,
   open,
@@ -20,8 +22,10 @@ export function MessageButton({
   onToggle: () => void;
   ref?: Ref<HTMLButtonElement>;
 }) {
+  useAuthorityWatch(worldId);
+  const authority = useAuthority(worldId);
   const unread = useUnread(worldId);
-  const total = unreadTotal(unread.data);
+  const total = unreadTotal(authority.ready ? unread.data : undefined);
   return (
     <button
       ref={ref}

@@ -1,12 +1,35 @@
 import { useQueryClient, type QueryClient, type QueryKey } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { messageKeys, noticeKeys, sseUrl, WORLD_EVENT_KINDS, type WorldEvent } from '../messages/contract';
+import type { MessageScope } from '../messages/contract';
 import { useTRPC, type Trpc } from '../trpc';
 
 // 월드 SSE(T2-09)를 받아 알림 종류별로 해당 query만 다시 조회한다 (계획 docs/plans/T2-10.md "결정").
 // 알림은 무효화 신호뿐이다. 같은 알림이 두 번 오거나 순서가 바뀌어도 재조회는 늘 최신을 읽으므로 결과가 같다.
 // 재조회는 서버 데이터만 바꾼다. 예턴 초안(sessionStorage), 지도 선택(주소의 ?city), 메시지 작성 칸과 공지 고치기 초안
 // (messages/drafts.ts)은 query 캐시 밖에 있어 ready 전체 재조회에도 지워지지 않는다.
+
+// SSE는 tRPC 밖의 HTTP 계약이라 AppRouter 타입이 없다. 기준은 apps/server/src/realtime/index.ts다.
+// GET /sse?worldId=, 이벤트 이름이 kind이고 data는 {kind, scope?}뿐이다. 본문·ID·수치는 싣지 않는다.
+// 연결마다 ready가 먼저 오고 서버의 LISTEN 연결이 되살아나면 모든 연결에 다시 온다. ': hb' 줄은 주석이라 브라우저가 버린다.
+export type WorldEvent =
+  | { kind: 'ready' }
+  | { kind: 'turn.result' }
+  | { kind: 'message.new'; scope: MessageScope }
+  | { kind: 'monthly.done' }
+  | { kind: 'offer.new' }
+  | { kind: 'treaty.new' }
+  | { kind: 'notice.updated'; scope: 'nation' | 'world' };
+export const WORLD_EVENT_KINDS = [
+  'ready',
+  'turn.result',
+  'message.new',
+  'monthly.done',
+  'offer.new',
+  'treaty.new',
+  'notice.updated',
+] as const satisfies readonly WorldEvent['kind'][];
+
+export const sseUrl = (worldId: string) => `/sse?worldId=${encodeURIComponent(worldId)}`;
 
 export type RealtimeStatus = 'connecting' | 'open' | 'reconnecting';
 
@@ -27,7 +50,10 @@ export function invalidationTargets(event: WorldEvent, worldId: string, trpc: Tr
         trpc.records.general.pathKey(),
       ];
     case 'message.new':
-      return [messageKeys.list(worldId, event.scope), messageKeys.unread(worldId)];
+      return [
+        trpc.message.list.infiniteQueryKey({ worldId, scope: event.scope }),
+        trpc.message.unread.queryKey({ worldId }),
+      ];
     case 'monthly.done':
       return [
         trpc.world.summary.queryKey({ worldId }),
@@ -40,7 +66,11 @@ export function invalidationTargets(event: WorldEvent, worldId: string, trpc: Tr
     case 'treaty.new':
       return [[['treaty']]];
     case 'notice.updated':
-      return [event.scope === 'nation' ? noticeKeys.nation(worldId) : noticeKeys.world(worldId)];
+      return [
+        event.scope === 'nation'
+          ? trpc.notice.nation.get.queryKey({ worldId })
+          : trpc.notice.world.list.queryKey({ worldId }),
+      ];
   }
 }
 
@@ -93,7 +123,8 @@ interface ConnectionOptions {
   createSource?: (url: string) => EventSourceLike;
 }
 
-// 연결 하나와 그 재연결. 브라우저가 스스로 다시 잇는 동안(CONNECTING)은 기다리고, 닫혔으면(CLOSED) 간격을 늘려 가며 새로 연다.
+// 연결 하나와 그 재연결. 오류가 나면 서버 응답 상태(400·401·403·404·503 등)로 짐작하지 않고 실제 readyState만 본다.
+// 브라우저가 스스로 다시 잇는 동안(CONNECTING)은 기다리고, 닫혔으면(CLOSED) 간격을 늘려 가며 새로 연다.
 export class WorldEventConnection {
   private source: EventSourceLike | null = null;
   private status: RealtimeStatus = 'connecting';
