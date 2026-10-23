@@ -44,6 +44,7 @@ const paths = [
   'records.general',
   'records.nation',
   'records.world',
+  'timelapse.frames',
   'ranking.generals',
   'ranking.nations',
 ] as const;

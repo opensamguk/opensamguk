@@ -130,3 +130,15 @@ const publicYearbook = z.object({
 });
 export const worldRecordInfo = (data: Prisma.JsonValue) => publicYearbook.parse(data);
 export const nationRecordInfo = (data: Prisma.JsonValue) => memberNationSummary.parse(data);
+
+const timelapseYearbook = z.object({
+  cities: z.array(z.object({ cityKey: z.number().int(), nationId: z.number().int().nullable() })),
+});
+export const timelapseFrameInfo = (data: Prisma.JsonValue) => ({
+  cities: [...timelapseYearbook.parse(data).cities].sort((a, b) => a.cityKey - b.cityKey),
+});
+export const publicNationDisplaySelect = {
+  id: true,
+  name: true,
+  color: true,
+} as const satisfies Prisma.NationSelect;

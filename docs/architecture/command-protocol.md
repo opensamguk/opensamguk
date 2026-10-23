@@ -16,6 +16,8 @@
 | 실행 검사  | 실행 순간의 조건. 실패하면 실패 이유를 남긴다           |
 | 실행       | 상태 변경 묶음과 로그를 돌려준다. 직접 저장하지 않는다  |
 
+확장 명령은 `commands/ext/registry.ts`의 `extensionCommands`에 따로 등록합니다. 명령과 상태 조각의 관계는 `CommandDef`에 넣지 않고 `extCommandBindings`에 둡니다. 상태가 없는 확장 명령도 빈 `sliceKeys` 행을 하나 둡니다.
+
 ## 2. 실행 흐름
 
 ```text
@@ -23,6 +25,10 @@
                                          └─ 성공: 실행 ─▶ 상태 변경 묶음 + 로그 + RNG 소비
                                                          ─▶ engine이 한 트랜잭션으로 저장
 ```
+
+월드별 `createCommandResolver(enabled)`는 없는 key, 꺼진 확장 key(`COMMAND_DISABLED`), 대상, 인자 순서로 검사합니다. 그 뒤 `precheck`는 사전 검사를, `run`은 실행 검사와 실행을 호출합니다. 기본 37개 명령은 늘 켜져 있고 `enabled = null`은 확장을 모두 끕니다. `enabled`에는 확장 key만 받으며 기본 key, 없는 key, 중복, 대상 불일치는 설정 오류로 거부합니다. 프리셋을 `enabled`로 해석하는 정책과 서버·엔진 연결은 T4-03에서 다룹니다.
+
+`runGeneralTurn`의 여섯째 인자와 `runReplayAction`의 넷째 인자로 resolver를 넘길 수 있습니다. 생략하면 기존 `runCommand`를 쓰고 NPC 후보 목록과 RNG 스트림은 유지합니다.
 
 ## 3. core2026에서 줄인 것
 
@@ -32,6 +38,8 @@
   (재생 테스트 AC-M1-13이 깨지기 때문).
 
 ## 4. 명령 목록
+
+기본 목록과 확장 목록은 분리합니다. T4-02의 운영 `extensionCommands`, `extSlices`, `extCommandBindings`는 빈 배열로 시작합니다. resolver는 기본 등록 순서 뒤에 켠 확장 명령을 확장 등록 순서로 붙입니다.
 
 PRD [§6.3](../product/prd.md#63-mvp-명령-세트)의 37개입니다. `commands/registry.ts`가 key와 target을 소유합니다. category는 target에서 유도하지 않습니다. 아래 표의 기존 9개 category 필드는 T1-11에서 붙이며 T1-08은 신규 28개 값을 명시합니다. `commands.list`는 general 27개만 노출합니다. nation 10개는 별도 국가 예턴에서 실행합니다.
 
@@ -86,7 +94,8 @@ ID와 amount는 1~1,000,000 정수입니다. resource는 gold 또는 rice이며 
 | NO_GOLD, NO_RICE | 비용·이전 자원 부족 |
 | AT_MAX | 능력·도시·병력 상한 |
 | BAD_ARGS | 인자 파싱 실패 또는 target 불일치 |
-| UNKNOWN_COMMAND | 레지스트리에 없는 key |
+| UNKNOWN_COMMAND | 기본·확장 레지스트리에 없는 key |
+| COMMAND_DISABLED | 이 월드에서 꺼진 확장 key |
 | NO_CREW | 병력·공격 사기 부족 |
 | NOT_RULER | 국가 명령·등용을 비군주가 실행 |
 | BAD_TARGET | 대상 국가·도시·장수 조건 불충족 |
