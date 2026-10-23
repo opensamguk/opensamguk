@@ -46,6 +46,7 @@ export const lobbyRouter = router({
               turnTermMinutes: true,
               startedAt: true,
               createdAt: true,
+              result: { select: { endedYear: true, endedMonth: true } },
               _count: { select: { generals: { where: { userId: { not: null } } } } },
             },
           });
@@ -89,10 +90,13 @@ export const lobbyRouter = router({
               presetName: preset?.success ? preset.data.name : null,
               scenarioTitle: scenarioTitles.get(world.scenarioKey)!,
               startYear: world.startYear,
-              gameDate: toGameDate(
-                world.startYear,
-                nowTick({ ...world, clockAnchorAt: world.clockAnchorAt?.getTime() ?? null }, ctx.now),
-              ),
+              gameDate:
+                world.status === 'ENDED' && world.result
+                  ? { year: world.result.endedYear, month: world.result.endedMonth }
+                  : toGameDate(
+                      world.startYear,
+                      nowTick({ ...world, clockAnchorAt: world.clockAnchorAt?.getTime() ?? null }, ctx.now),
+                    ),
               turnTermMinutes: world.turnTermMinutes,
               startedAt: world.startedAt?.toISOString() ?? null,
               humanGenerals: world._count.generals,

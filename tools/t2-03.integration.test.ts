@@ -11,6 +11,7 @@ import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { CREATION_ERRORS, toGameDate } from '../packages/rules/src/index';
 import { loadPreset } from '../apps/engine/src/world/resources';
+import { prepareSeasonWorld, finishSeasonWorld } from '../apps/engine/test/seasonFixture';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -166,6 +167,24 @@ describe('T2-03 실제 로비 HTTP·PostgreSQL', () => {
     expect(result.text).not.toContain(world.seed);
   });
 
+  it('실제 엔진이 기록한 종료 연월을 로비와 메인이 함께 쓴다', async () => {
+    const user = await identity();
+    const { worldId } = await prepareSeasonWorld(db, 'END_YEAR');
+    worlds.push(worldId);
+    const ended = await finishSeasonWorld(db, worldId);
+    const lobby = await call<Row[]>('lobby.worlds', { includeEnded: true }, user.cookie);
+    const summary = await call<{ gameDate: { year: number; month: number } }>(
+      'world.summary',
+      { worldId },
+      user.cookie,
+    );
+    const row = lobby.data!.find((world) => world.id === worldId)!;
+    expect(row.status).toBe('ENDED');
+    expect(row.gameDate).toEqual({ year: ended.endedYear, month: ended.endedMonth });
+    expect(row.gameDate).toEqual(summary.data!.gameDate);
+    expect(row.gameDate.month).toBe(12);
+  });
+
   for (const status of ['RUNNING', 'PREOPEN', 'PAUSED', 'ENDED'] as const) {
     for (const kind of ['none', 'own', 'pending'] as const) {
       it(`${status}·${kind}의 생성 판정을 실제 HTTP로 읽는다`, async () => {
@@ -282,26 +301,29 @@ describe('T2-03 실제 로비 HTTP·PostgreSQL', () => {
     });
   }
 
-  it('장수 없는 닫힌 월드의 잘못된 입력은 접수와 엔진 모두 WORLD_CLOSED다', async () => {
-    const user = await identity();
-    const { worldId } = await fixture('PAUSED');
-    const invalid = { ...payload, leadership: 0, name: '!' };
-    expect((await call('general.create', { worldId, ...invalid }, user.cookie)).message).toBe(
-      CREATION_ERRORS.WORLD_CLOSED,
-    );
-    expect(await db.inputEvent.count({ where: { worldId } })).toBe(0);
-    const event = await enqueue(worldId, user.id, invalid);
-    const lease = (await acquireLease(db, worldId))!;
-    try {
-      await new TurnLoop(db, lease).advanceTo(0);
-    } finally {
-      await releaseLease(db, lease);
-    }
-    expect(await db.inputEvent.findUnique({ where: { id: event.id } })).toMatchObject({
-      status: 'REJECTED',
-      result: { code: 'WORLD_CLOSED' },
-    });
-  });
+  it.each(['PAUSED', 'PREOPEN', 'ENDED'] as const)(
+    '장수 없는 %s 월드의 잘못된 입력은 접수와 엔진 모두 WORLD_CLOSED다',
+    async (status) => {
+      const user = await identity();
+      const { worldId } = await fixture(status);
+      const invalid = { ...payload, leadership: 0, name: '!' };
+      expect((await call('general.create', { worldId, ...invalid }, user.cookie)).message).toBe(
+        CREATION_ERRORS.WORLD_CLOSED,
+      );
+      expect(await db.inputEvent.count({ where: { worldId } })).toBe(0);
+      const event = await enqueue(worldId, user.id, invalid);
+      const lease = (await acquireLease(db, worldId))!;
+      try {
+        await new TurnLoop(db, lease).advanceTo(0);
+      } finally {
+        await releaseLease(db, lease);
+      }
+      expect(await db.inputEvent.findUnique({ where: { id: event.id } })).toMatchObject({
+        status: 'REJECTED',
+        result: { code: 'WORLD_CLOSED' },
+      });
+    },
+  );
 
   it('같은 접수는 한 행이고 다른 내용은 충돌하며 엔진 생성 뒤 mine으로 회수한다', async () => {
     const user = await identity();
