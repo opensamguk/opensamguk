@@ -8,7 +8,7 @@
 ## 독자별 시작점
 
 - 지금 무엇을 하는지 알고 싶다면 → [인수조건](./product/acceptance-criteria.md)
-- 게임을 처음 하는 플레이어 → [플레이어 가이드](./user/index.md) (M2에 작성)
+- 게임을 처음 하는 플레이어 → [플레이어 가이드](./user/index.md) (초안, 게임 안에서는 `/help`)
 - 코드를 처음 보는 개발자 → [개발자 핸드북](./developer/index.md)
 - 운영자 → [릴리스 운영](./release-operations.md), [관리자 콘솔](./admin-console.md)
 
@@ -83,15 +83,15 @@
 
 | 문서                                                     | 상태 | 필요 시점 |
 | -------------------------------------------------------- | ---- | --------- |
-| [시작하기](./user/index.md)                              | 뼈대 | M2 |
-| [장수와 도시, 내정](./user/general-and-city.md)          | 뼈대 | M2 |
-| [시간과 턴](./user/time-and-turns.md)                    | 뼈대 | M2 |
-| [전쟁과 예턴 조합](./user/war-and-orders.md)             | 뼈대 | M2 |
-| [지도와 보급](./user/map-and-supply.md)                  | 뼈대 | M2 |
-| [국가 재정과 외교](./user/economy-and-diplomacy.md)      | 뼈대 | M2 |
-| [국가 운영과 주요 기능](./user/nation-and-features.md)   | 뼈대 | M2 |
-| [용어 사전](./user/glossary.md)                          | 뼈대 | M2 |
-| [명령과 실행 시기](./user/commands-and-timing.md)        | 뼈대 | M2 |
+| [시작하기](./user/index.md)                              | 초안 (T2-17, 리뷰 전) | M2 |
+| [장수와 도시, 내정](./user/general-and-city.md)          | 초안 (T2-17, 리뷰 전) | M2 |
+| [시간과 턴](./user/time-and-turns.md)                    | 초안 (T2-17, 리뷰 전) | M2 |
+| [전쟁과 예턴 조합](./user/war-and-orders.md)             | 초안 (T2-17, 리뷰 전) | M2 |
+| [지도와 보급](./user/map-and-supply.md)                  | 초안 (T2-17, 리뷰 전) | M2 |
+| [국가 재정과 외교](./user/economy-and-diplomacy.md)      | 초안 (T2-17, 리뷰 전) | M2 |
+| [국가 운영과 주요 기능](./user/nation-and-features.md)   | 초안 (T2-17, 리뷰 전) | M2 |
+| [용어 사전](./user/glossary.md)                          | 초안 (T2-17, 리뷰 전) | M2 |
+| [명령과 실행 시기](./user/commands-and-timing.md)        | 초안 (T2-17, 리뷰 전) | M2 |
 | 명령 전체 목록 (command-catalog.generated.md, 코드에서 생성) | 예정 | M2 |
 
 ## design/ 기능 설계
