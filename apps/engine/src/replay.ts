@@ -13,6 +13,14 @@ import {
   seasonOutcome,
   toGameDate,
   type ReplayState,
+  assertReplayPolicy,
+  enableReplayPolicy,
+  isPolicyMode,
+  policyFormatSchema,
+  policyMarkerPayloadSchema,
+  policyMarkerResultSchema,
+  validatePolicyRecordedInput,
+  type PolicyFormat,
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 
@@ -48,6 +56,11 @@ export interface ReplayArchiveV2 {
   end: ReplayEnd | null;
   afterEnd: RecordedInput[];
 }
+export interface ReplayArchiveV5 extends Omit<ReplayArchiveV2, 'version' | 'config'> {
+  version: 5;
+  config: ReplayArchiveV2['config'] & { policy: PolicyFormat };
+}
+type Archive = ReplayArchive | ReplayArchiveV2 | ReplayArchiveV5;
 export function resourceHash(initial: WorldInit) {
   return hashState({
     scenarioKey: initial.scenarioKey,
@@ -58,7 +71,7 @@ export function resourceHash(initial: WorldInit) {
   });
 }
 
-export async function exportReplay(db: PrismaClient, worldId: string): Promise<ReplayArchiveV2> {
+export async function exportReplay(db: PrismaClient, worldId: string): Promise<ReplayArchiveV2 | ReplayArchiveV5> {
   return db.$transaction(
     async (tx) => {
       const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
@@ -88,10 +101,8 @@ export async function exportReplay(db: PrismaClient, worldId: string): Promise<R
           afterEnd.push(input);
         }
       }
-      return {
-        version: 2,
+      const common = {
         origin: world.replayOrigin as unknown as ReplayOrigin,
-        config: { endYear: world.endYear, outcomeFromSequence: world.outcomeFromSequence },
         inputs,
         months: months.map(({ tick, year, month, sequence, stateHash, data }) => ({
           tick,
@@ -114,20 +125,46 @@ export async function exportReplay(db: PrismaClient, worldId: string): Promise<R
           : null,
         afterEnd,
       };
+      const config = { endYear: world.endYear, outcomeFromSequence: world.outcomeFromSequence };
+      if (world.policyFromSequence != null) {
+        if (!isPolicyMode({ fromSequence: world.policyFromSequence, actionSequence: world.actionSequence }))
+          throw new Error('방침 전환 순서가 올바르지 않습니다.');
+        return {
+          ...common,
+          version: 5 as const,
+          config: {
+            ...config,
+            policy: {
+              version: 1 as const,
+              fromSequence: world.policyFromSequence,
+              turnTermMinutes: world.turnTermMinutes,
+            },
+          },
+        };
+      }
+      return {
+        version: 2 as const,
+        origin: common.origin,
+        config,
+        inputs: common.inputs,
+        months: common.months,
+        end: common.end,
+        afterEnd: common.afterEnd,
+      };
     },
     { isolationLevel: 'RepeatableRead' },
   );
 }
 
-function readArchive(value: unknown): ReplayArchive | ReplayArchiveV2 {
-  const archive = value as ReplayArchive | ReplayArchiveV2;
+function readArchive(value: unknown): Archive {
+  const archive = value as Archive;
   if (
     !archive ||
-    ![1, 2].includes(archive.version) ||
+    ![1, 2, 5].includes(archive.version) ||
     archive.origin?.version !== 1 ||
     !Array.isArray(archive.months) ||
     !Array.isArray(archive.inputs) ||
-    ['config', 'end', 'afterEnd'].some((key) => Object.hasOwn(archive, key) !== (archive.version === 2))
+    ['config', 'end', 'afterEnd'].some((key) => Object.hasOwn(archive, key) !== (archive.version !== 1))
   ) {
     throw new Error('재생 기록 형식과 버전을 확인하세요.');
   }
@@ -135,7 +172,7 @@ function readArchive(value: unknown): ReplayArchive | ReplayArchiveV2 {
   if (origin.initialStateHash !== hashState(origin.initial) || origin.resourceHash !== resourceHash(origin.initial)) {
     throw new Error('월드 생성 기록 또는 리소스 해시가 다릅니다.');
   }
-  if (archive.version === 2) {
+  if (archive.version !== 1) {
     const { config, end, afterEnd } = archive;
     if (
       !config ||
@@ -185,12 +222,86 @@ function readArchive(value: unknown): ReplayArchive | ReplayArchiveV2 {
       !Number.isSafeInteger(input.sequence) ||
       input.sequence <= previous ||
       !['APPLIED', 'REJECTED'].includes(input.status) ||
-      (archive.version === 2 && input.sequence > (archive.end?.sequence ?? archive.months.at(-1)?.sequence ?? 0))
+      (archive.version !== 1 && input.sequence > (archive.end?.sequence ?? archive.months.at(-1)?.sequence ?? 0))
     )
       throw new Error('입력 기록의 순서·상태가 올바르지 않습니다.');
     previous = input.sequence;
   }
+  if (archive.version === 5) validatePolicyArchive(archive);
   return archive;
+}
+
+function exactKeys(value: object, keys: string[]) {
+  return Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+}
+function validatePolicyArchive(archive: ReplayArchiveV5) {
+  if (
+    !exactKeys(archive, ['version', 'origin', 'config', 'inputs', 'months', 'end', 'afterEnd']) ||
+    !exactKeys(archive.config, ['endYear', 'outcomeFromSequence', 'policy']) ||
+    !exactKeys(archive.origin, ['version', 'initial', 'initialStateHash', 'resourceHash'])
+  )
+    throw new Error('방침 보관 파일의 키가 올바르지 않습니다.');
+  const format = policyFormatSchema.parse(archive.config.policy);
+  const coverage = archive.end?.sequence ?? archive.months.at(-1)?.sequence ?? 0;
+  const markers = archive.inputs.filter((input) => input.kind === 'system.policy.enable');
+  if (markers.length !== (format.fromSequence > 0 && format.fromSequence <= coverage ? 1 : 0))
+    throw new Error('방침 전환 표지 수가 올바르지 않습니다.');
+  for (const input of [...archive.inputs, ...archive.afterEnd]) {
+    validatePolicyRecordedInput(
+      input,
+      isPolicyMode({ fromSequence: format.fromSequence, actionSequence: input.sequence }),
+    );
+    if (input.kind === 'system.policy.enable') {
+      const payload = policyMarkerPayloadSchema.parse(input.payload);
+      const result = policyMarkerResultSchema.parse(input.result);
+      if (
+        input.sequence !== format.fromSequence ||
+        input.status !== 'APPLIED' ||
+        input.generalId !== null ||
+        result.fromSequence !== input.sequence ||
+        result.turnTermMinutes !== format.turnTermMinutes ||
+        JSON.stringify(payload.emptySlots) !== JSON.stringify(result.emptySlots)
+      )
+        throw new Error('방침 전환 표지가 설정과 다릅니다.');
+    }
+  }
+}
+
+function startReplay(archive: Archive) {
+  const initial = initialReplayState(archive.origin.initial);
+  return archive.version === 5 && archive.config.policy.fromSequence === 0
+    ? enableReplayPolicy(initial, archive.config.policy.turnTermMinutes, 0)
+    : initial;
+}
+function applyArchiveInput(
+  archive: Archive,
+  replay: ReplayState,
+  input: RecordedInput,
+  untouched: Set<number>,
+  lastActionTick: number,
+) {
+  if (archive.version === 5 && input.sequence === archive.config.policy.fromSequence) {
+    if (input.kind !== 'system.policy.enable') throw new Error('방침 전환 순서에 표지가 없습니다.');
+    const result = policyMarkerResultSchema.parse(input.result);
+    const expected = [...untouched].filter((id) => replay.state.generals[id]).sort((a, b) => a - b);
+    if (
+      JSON.stringify(expected) !== JSON.stringify(result.emptySlots) ||
+      result.clockTick < lastActionTick ||
+      expected.some((id) =>
+        replay.turns[id]!.some(
+          (turn) =>
+            !exactKeys(turn, ['commandKey', 'args']) ||
+            turn.commandKey !== 'rest' ||
+            JSON.stringify(turn.args) !== '{}',
+        ),
+      )
+    )
+      throw new Error('방침 전환 전 칸 집합이나 시계가 다릅니다.');
+    return enableReplayPolicy(replay, result.turnTermMinutes, result.baselineActiveTick, result.emptySlots);
+  }
+  if (input.status === 'APPLIED' && input.kind === 'turns.set' && input.generalId !== null)
+    untouched.delete(input.generalId);
+  return applyRecordedInput(replay, input);
 }
 
 function validSequence(sequence: number, maximum = 10_000_000): boolean {
@@ -198,7 +309,7 @@ function validSequence(sequence: number, maximum = 10_000_000): boolean {
 }
 
 function checkOutcome(
-  archive: ReplayArchiveV2,
+  archive: ReplayArchiveV2 | ReplayArchiveV5,
   replay: ReplayState,
   sequence: number,
   action: ReturnType<typeof nextGameAction>,
@@ -255,6 +366,7 @@ function checkMonthBoundary(
 }
 
 function checkMonth(replay: ReplayState, expected: ReplayArchive['months'][number]): string {
+  assertReplayPolicy(replay);
   const stateHash = hashState(replay);
   if (
     replay.monthlyTick !== expected.tick ||
@@ -274,26 +386,32 @@ export function replayArchive(value: unknown, months = 12): { tick: number; stat
   if (archive.months.length < months) throw new Error('비교할 월간 기록이 부족합니다.');
   const { origin } = archive;
   const inputs = new Map(archive.inputs.map((input) => [input.sequence, input]));
-  let replay = initialReplayState(origin.initial);
+  let replay = startReplay(archive);
+  const untouched = new Set(origin.initial.generals.map((general) => general.id));
+  let lastActionTick = 0;
   let sequence = 0;
   const hashes: { tick: number; stateHash: string }[] = [];
   for (let i = 0; i < months; i++) {
     const expected = archive.months[i]!;
     const tick = (i + 1) * TICKS_PER_MONTH;
-    checkMonthBoundary(expected, replay, tick, sequence, archive.version === 2 ? MAX_ACTION_SEQUENCE : 10_000_000);
-    if (archive.version === 2 && archive.end && expected.sequence > archive.end.sequence) {
+    checkMonthBoundary(expected, replay, tick, sequence, archive.version !== 1 ? MAX_ACTION_SEQUENCE : 10_000_000);
+    if (archive.version !== 1 && archive.end && expected.sequence > archive.end.sequence) {
       throw new Error('종료 뒤 월간 기록이 있습니다.');
     }
     while (sequence < expected.sequence) {
       const input = inputs.get(++sequence);
-      if (input) replay = applyRecordedInput(replay, input);
+      if (input) replay = applyArchiveInput(archive, replay, input, untouched, lastActionTick);
       else {
+        if (archive.version === 5 && archive.config.policy.fromSequence === sequence)
+          throw new Error('방침 전환 표지가 없습니다.');
         const action = nextGameAction(replay);
         if (action.tick > tick || (action.kind === 'monthly' && sequence !== expected.sequence)) {
           throw new Error(`정산 순서가 다릅니다: ${tick}`);
         }
         replay = runReplayAction(replay, origin.initial.seed, origin.initial.unitSet);
-        if (archive.version === 2) checkOutcome(archive, replay, sequence, action);
+        lastActionTick = action.tick;
+        if (action.kind === 'turn') untouched.delete(action.generalId);
+        if (archive.version !== 1) checkOutcome(archive, replay, sequence, action);
       }
     }
     const stateHash = checkMonth(replay, expected);
@@ -304,18 +422,22 @@ export function replayArchive(value: unknown, months = 12): { tick: number; stat
 
 export function replayToEnd(value: unknown): ReplayEnd {
   const archive = readArchive(value);
-  if (archive.version !== 2 || !archive.end) throw new Error('종료 기록이 있는 v2 보관 파일이 필요합니다.');
+  if (archive.version === 1 || !archive.end) throw new Error('종료 기록이 있는 v2 보관 파일이 필요합니다.');
   const { origin, end } = archive;
   const inputs = new Map(archive.inputs.map((input) => [input.sequence, input]));
-  let replay = initialReplayState(origin.initial);
+  let replay = startReplay(archive);
+  const untouched = new Set(origin.initial.generals.map((general) => general.id));
+  let lastActionTick = 0;
   let monthIndex = 0;
   for (let sequence = 1; sequence <= end.sequence; sequence++) {
     const input = inputs.get(sequence);
     if (input) {
       if (sequence === end.sequence) throw new Error('종료 번호에 게임 사건이 없습니다.');
-      replay = applyRecordedInput(replay, input);
+      replay = applyArchiveInput(archive, replay, input, untouched, lastActionTick);
       continue;
     }
+    if (archive.version === 5 && archive.config.policy.fromSequence === sequence)
+      throw new Error('방침 전환 표지가 없습니다.');
     const action = nextGameAction(replay);
     if (action.kind === 'monthly') {
       const expected = archive.months[monthIndex];
@@ -323,6 +445,8 @@ export function replayToEnd(value: unknown): ReplayEnd {
       if (expected.sequence !== sequence) throw new Error(`정산 순서가 다릅니다: ${action.tick}`);
     }
     replay = runReplayAction(replay, origin.initial.seed, origin.initial.unitSet);
+    lastActionTick = action.tick;
+    if (action.kind === 'turn') untouched.delete(action.generalId);
     if (action.kind === 'monthly') checkMonth(replay, archive.months[monthIndex++]!);
     checkOutcome(archive, replay, sequence, action);
   }

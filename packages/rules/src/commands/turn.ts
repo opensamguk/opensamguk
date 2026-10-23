@@ -6,13 +6,15 @@ import type { Actor, CommandResult, Failure } from './types';
 import { applyEffects } from './effects';
 import { commandRegistry, runCommand } from './registry';
 import { chooseGeneralTurn, chooseNationTurn, type NpcContext } from '../npc';
+import { runPolicyCommand } from '../policy/execute';
+import type { PolicyKey } from '../policy';
 
 export function runGeneralTurn(
   state: WorldState,
   actor: Actor,
-  command: { commandKey: string; args: unknown },
+  command: { commandKey: string; args: unknown; explicit?: boolean },
   seed: string,
-  options: Pick<NpcContext, 'convergence'> = {},
+  options: Pick<NpcContext, 'convergence'> & { policy?: PolicyKey } = {},
   resolver?: CommandResolver,
 ) {
   const run = resolver ? resolver.run.bind(resolver) : runCommand;
@@ -56,6 +58,11 @@ export function runGeneralTurn(
     nation = { commandKey: slot.commandKey, result, nationId };
   }
   let selected = command;
+  if (general.userId !== null && command.explicit === false && options.policy !== undefined) {
+    const policy = runPolicyCommand(next, { ...actor, target: 'general' }, options.policy, seed, resolver);
+    next = applyEffects(next, policy.result.effects);
+    return { state: next, result: policy.result, nation, commandKey: policy.commandKey };
+  }
   if (
     general.userId === null &&
     command.commandKey === 'rest' &&
