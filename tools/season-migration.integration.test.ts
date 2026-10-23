@@ -115,7 +115,10 @@ it('T1-26 이전 실제 DB 행을 migration해도 초기·월간 해시·origin�
       worldId,
     );
     await apply(migration);
-    const world = await legacy.world.findUniqueOrThrow({ where: { id: worldId } });
+    const world = await legacy.world.findUniqueOrThrow({
+      where: { id: worldId },
+      select: { endYear: true, clockMode: true, outcomeFromSequence: true },
+    });
     expect(world.endYear).toBeNull();
     expect(world.clockMode).toBe('REALTIME');
     expect(world.outcomeFromSequence).toBe(last.sequence);
@@ -128,6 +131,12 @@ it('T1-26 이전 실제 DB 행을 migration해도 초기·월간 해시·origin�
     expect(
       await legacy.$queryRawUnsafe('SELECT id,"nextTurnTick" FROM "General" WHERE "worldId" = $1 ORDER BY id', worldId),
     ).toEqual(ticks);
+    // The current engine client expects the latest schema, after the target migration was checked separately.
+    for (const directory of (await readdir(root, { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory() && entry.name > migration)
+      .map((entry) => entry.name)
+      .sort())
+      await apply(directory);
     expect(hashState(await legacy.$transaction((tx) => loadReplayState(tx, worldId)))).toBe(last.stateHash);
     const exported = await exportReplay(legacy, worldId);
     expect(exported.version).toBe(2);

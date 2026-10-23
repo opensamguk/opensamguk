@@ -8,7 +8,10 @@ import { GeneralInfo } from '../main/GeneralInfo';
 import { NationInfo } from '../main/NationInfo';
 import { Panel } from '../main/Panel';
 import { RECORD_LABELS, RecordList } from '../main/Records';
+import { SeasonResult } from '../main/SeasonResult';
 import { MapLegend, WorldMap } from '../main/WorldMap';
+import { PolicyBar } from '../policy/PolicyBar';
+import { OfferBox } from '../personnel/OfferBox';
 import { TurnEditor } from '../turns/TurnEditor';
 import { EmptyState, LoadingState } from '../ui/States';
 import styles from './MainPage.module.css';
@@ -62,6 +65,11 @@ export function MainPage() {
         ) : null}
       </header>
 
+      {/* 끝난 판이면 결과를 맨 위에 둔다. 나머지 칸은 그대로 읽는다 (T1-27). */}
+      {summary.data?.status === 'ENDED' ? <SeasonResult result={summary.data.result} /> : null}
+      {/* 발령 제안(T2-06, D11). 편집기와 형제라 응답 결과가 와도 예턴 초안과 지도 선택은 그대로다. */}
+      <OfferBox worldId={worldId} />
+
       <div className={styles.layout}>
         <Panel
           title="지도"
@@ -96,6 +104,7 @@ export function MainPage() {
         {/* 30칸 예턴 편집기(T1-15). 지도 선택은 대상 도시 기본값으로만 넘긴다. 조회 상태와 무관하게 늘 같은 자리에 두어
             도시 선택·재조회 때 다시 만들지 않는다. 그래서 저장하지 않은 편집과 고른 칸이 유지된다. */}
         <Panel title="명령 목록" area="commands">
+          <PolicyBar worldId={worldId} />
           <TurnEditor worldId={worldId} selectedCityKey={cityKey} />
         </Panel>
 

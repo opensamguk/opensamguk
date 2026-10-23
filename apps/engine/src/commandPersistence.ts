@@ -1,6 +1,8 @@
 import type { Prisma } from '@opensamguk/db';
+import type { RealtimeSignal } from '@opensamguk/db';
 import type { CommandResult, WorldState } from '@opensamguk/rules';
 import { loadWorld } from './worldLoader';
+import { archiveRemovedNation, type ActionAt } from './nationArchive';
 
 export async function loadCommandState(
   tx: Prisma.TransactionClient,
@@ -19,7 +21,12 @@ export async function loadCommandState(
   };
 }
 
-export async function persistCommandState(tx: Prisma.TransactionClient, worldId: string, state: WorldState) {
+export async function persistCommandState(
+  tx: Prisma.TransactionClient,
+  worldId: string,
+  state: WorldState,
+  at: ActionAt,
+) {
   const before = await loadWorld(tx, worldId);
   for (const nation of Object.values(state.nations)) {
     if (!before.nations[nation.id]) {
@@ -70,6 +77,7 @@ export async function persistCommandState(tx: Prisma.TransactionClient, worldId:
   }
   for (const nation of Object.values(before.nations)) {
     if (!state.nations[nation.id]) {
+      await archiveRemovedNation(tx, worldId, nation, at);
       await tx.nation.update({ where: { worldId_id: { worldId, id: nation.id } }, data: { capitalCityKey: null } });
       await tx.nation.delete({ where: { worldId_id: { worldId, id: nation.id } } });
     }
@@ -110,4 +118,17 @@ export async function appendNationHistory(
     create: { worldId, tick, nationId, data: { events: [text] } },
     update: { data: { ...data, events: [...events, text] } },
   });
+}
+
+export function commandRealtimeSignals(before: WorldState, state: WorldState): RealtimeSignal[] {
+  const signals: RealtimeSignal[] = [];
+  for (const [id, nationId] of Object.entries(state.commandMeta?.offers ?? {}))
+    if (before.commandMeta?.offers[Number(id)] !== nationId)
+      signals.push({ kind: 'offer.new', target: { generalId: Number(id) } });
+  for (const diplomacy of state.diplomacies) {
+    const prior = before.diplomacies.find((d) => d.nationA === diplomacy.nationA && d.nationB === diplomacy.nationB);
+    if (JSON.stringify(prior) !== JSON.stringify(diplomacy))
+      signals.push({ kind: 'treaty.new', target: { nationIds: [diplomacy.nationA, diplomacy.nationB] } });
+  }
+  return signals;
 }

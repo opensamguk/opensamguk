@@ -1,13 +1,18 @@
 import type { PrismaClient, Prisma } from '@opensamguk/db';
 import type { WorldInit } from '@opensamguk/rules';
-import { statRulesSchema, unitSetSchema } from '@opensamguk/rules';
+import { parsePreset, presetRules, statRulesSchema, unitSetSchema, type WorldPreset } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { loadCommandState } from '../commandPersistence';
 
 export async function saveInitialWorld(
   db: PrismaClient,
   state: WorldInit,
-  options: { name: string; turnTermMinutes: number; endYear: number | null },
+  options: {
+    name: string;
+    turnTermMinutes: number;
+    endYear: number | null;
+    preset?: { key: string; value: WorldPreset };
+  },
 ) {
   if (
     !options.name.trim() ||
@@ -17,7 +22,10 @@ export async function saveInitialWorld(
   ) {
     throw new Error('월드 이름과 턴 간격(1~2147483647분)을 확인하세요.');
   }
-  const stateHash = hashState(state);
+  const preset = options.preset ? parsePreset(options.preset.value) : null;
+  if (options.preset && !/^[a-zA-Z0-9_-]+$/.test(options.preset.key)) throw new Error('프리셋 ID를 확인하세요.');
+  const initial = preset ? { ...state, presetRules: presetRules(preset) } : state;
+  const stateHash = hashState(initial);
   if (
     options.endYear !== null &&
     (!Number.isSafeInteger(options.endYear) || options.endYear < state.startYear || options.endYear > 10000)
@@ -28,6 +36,7 @@ export async function saveInitialWorld(
       const world = await tx.world.create({
         data: {
           name: options.name,
+          ...(preset ? { presetKey: options.preset!.key, preset: preset as Prisma.InputJsonValue } : {}),
           turnTermMinutes: options.turnTermMinutes,
           scenarioKey: state.scenarioKey,
           mapKey: state.mapKey,
@@ -38,7 +47,7 @@ export async function saveInitialWorld(
           initialStateHash: stateHash,
           replayOrigin: {
             version: 1,
-            initial: state,
+            initial,
             resourceHash: hashState({
               scenarioKey: state.scenarioKey,
               mapKey: state.mapKey,
@@ -91,8 +100,16 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
     async (tx) => {
       const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
       const cities = await tx.city.findMany({ where: { worldId }, orderBy: { cityKey: 'asc' } });
-      const nations = await tx.nation.findMany({ where: { worldId }, orderBy: { id: 'asc' } });
-      const generals = await tx.general.findMany({ where: { worldId }, orderBy: { id: 'asc' } });
+      const nations = await tx.nation.findMany({
+        where: { worldId },
+        orderBy: { id: 'asc' },
+        omit: { notice: true, noticeRevision: true, noticeUpdatedAt: true, noticeUpdatedBy: true },
+      });
+      const generals = await tx.general.findMany({
+        where: { worldId },
+        orderBy: { id: 'asc' },
+        omit: { noticeSeen: true },
+      });
       const diplomacies = await tx.diplomacy.findMany({
         where: { worldId },
         orderBy: [{ nationA: 'asc' }, { nationB: 'asc' }],
@@ -102,6 +119,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
         return value;
       };
       return {
+        ...(world.preset ? { presetRules: presetRules(parsePreset(world.preset)) } : {}),
         seed: world.seed,
         scenarioKey: world.scenarioKey,
         mapKey: world.mapKey,

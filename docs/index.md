@@ -8,7 +8,7 @@
 ## 독자별 시작점
 
 - 지금 무엇을 하는지 알고 싶다면 → [인수조건](./product/acceptance-criteria.md)
-- 게임을 처음 하는 플레이어 → [플레이어 가이드](./user/index.md) (M2에 작성)
+- 게임을 처음 하는 플레이어 → [플레이어 가이드](./user/index.md) (초안, 게임 안에서는 `/help`)
 - 코드를 처음 보는 개발자 → [개발자 핸드북](./developer/index.md)
 - 운영자 → [릴리스 운영](./release-operations.md), [관리자 콘솔](./admin-console.md)
 
@@ -47,10 +47,18 @@
 | M3 작업 계획 [T3-10 반응형 375px](./plans/T3-10.md) | 계획 완료 (사용자 검토 대기) | M2 완료 뒤 |
 | M3 작업 계획 [T3-05](./plans/T3-05.md), [T3-06](./plans/T3-06.md), [T3-11](./plans/T3-11.md), [T3-14](./plans/T3-14.md) | 계획 완료 | M3 |
 | 나머지 M3 작업 계획                    | 예정 | M3 전 |
+| [T4-36 월간 영토 재생 화면](./plans/T4-36.md) (AC-P2-17 (나) 재생 화면 제안, U-20 정정(D-027)의 멸망 국가 보존값 사용. 계획 기술 검토 조건부 수용, 서버 무관 화면 부품만 구현 중. 보존 계약·정식 AC 채택 전) | 제안 | Phase 2 |
 | [Phase 2 확장 기술 명세](./plans/phase2-expansion.md) (AC-P2·T4 제안) | 초안 | Phase 2 |
+| [T4-56 멸망 국가 이름·색 보존](./plans/T4-56.md) (과거 국가 표시값의 저장·조회. PR 1 저장 구현, 독립 리뷰와 정확 SHA CI 전) | 구현 | Phase 2 |
+| [초기화 자원 DB 이전·자원 편집기·도트 바탕 지도](./plans/map-editor.md) (D-028, T4-76~T4-87) | 초안 | Phase 2 |
+| [T4-80 지도 편집 캔버스](./plans/T4-80.md) (AC-P2-27 일부, 서버 없는 편집·검증·v2와 밑그림 내보내기) | 구현 중 | Phase 2 |
 | [T4-34 전투 시뮬레이터 화면](./plans/T4-34.md) (AC-P2-16 (가), D-023. PR #132로 main `494272b` 병합. AC-P2-16 (나)는 남음) | 구현 병합 | Phase 2 |
 | [T4-30 토너먼트 대진 틀](./plans/T4-30.md), [T4-35 월간 영토 스냅샷 조회 API](./plans/T4-35.md) (AC-P2-15 (가), AC-P2-17 1차 API. Codex 계획 기술 검토 수용, 정본 한정 반영은 통합 커밋 전, 로컬 구현 WIP) | 계획 검토 수용 | Phase 2 |
+| [T4-05 계략 4종 규칙](./plans/T4-05.md) (AC-P2-03·AC-M1-14 후속, 규칙 구현 중, 운영 등록·엔진 연결은 별도) | 구현 중 | MVP·Phase 2 |
 | [T4-18 효과 합산 틀](./plans/T4-18.md) (AC-P2-12·13 순수 공통 기반 몫. Codex 계획 기술 검토 수용, D-027 한정 반영은 통합 커밋 전) | 계획 검토 수용 | Phase 2 |
+| [T4-56 (가) 멸망한 국가를 포함한 과거 국가 이름·색 저장](./plans/T4-56.md) (AC-P2-17 (다) 저장·조회 몫, D-027 후속 채택) | 구현 중 | Phase 2 |
+| [T4-05 계략 4종 규칙](./plans/T4-05.md) (AC-P2-03. 원작 수치 분리표와 U-19 결정 제안, 계약 준비 전) | 제안 | MVP |
+| [T4-03 확장 명령 저장·서버·엔진·재생 연결](./plans/T4-03.md) (AC-P2-02 (나), AC-M1-14 후속. 1차 기술 검토 반영, 재검토 대기, 채택 전) | 제안 | MVP |
 
 ## architecture/ 무엇이 어디서 실행되나
 
@@ -85,15 +93,15 @@
 
 | 문서                                                     | 상태 | 필요 시점 |
 | -------------------------------------------------------- | ---- | --------- |
-| [시작하기](./user/index.md)                              | 뼈대 | M2 |
-| [장수와 도시, 내정](./user/general-and-city.md)          | 뼈대 | M2 |
-| [시간과 턴](./user/time-and-turns.md)                    | 뼈대 | M2 |
-| [전쟁과 예턴 조합](./user/war-and-orders.md)             | 뼈대 | M2 |
-| [지도와 보급](./user/map-and-supply.md)                  | 뼈대 | M2 |
-| [국가 재정과 외교](./user/economy-and-diplomacy.md)      | 뼈대 | M2 |
-| [국가 운영과 주요 기능](./user/nation-and-features.md)   | 뼈대 | M2 |
-| [용어 사전](./user/glossary.md)                          | 뼈대 | M2 |
-| [명령과 실행 시기](./user/commands-and-timing.md)        | 뼈대 | M2 |
+| [시작하기](./user/index.md)                              | 초안 (T2-17, 리뷰 전) | M2 |
+| [장수와 도시, 내정](./user/general-and-city.md)          | 초안 (T2-17, 리뷰 전) | M2 |
+| [시간과 턴](./user/time-and-turns.md)                    | 초안 (T2-17, 리뷰 전) | M2 |
+| [전쟁과 예턴 조합](./user/war-and-orders.md)             | 초안 (T2-17, 리뷰 전) | M2 |
+| [지도와 보급](./user/map-and-supply.md)                  | 초안 (T2-17, 리뷰 전) | M2 |
+| [국가 재정과 외교](./user/economy-and-diplomacy.md)      | 초안 (T2-17, 리뷰 전) | M2 |
+| [국가 운영과 주요 기능](./user/nation-and-features.md)   | 초안 (T2-17, 리뷰 전) | M2 |
+| [용어 사전](./user/glossary.md)                          | 초안 (T2-17, 리뷰 전) | M2 |
+| [명령과 실행 시기](./user/commands-and-timing.md)        | 초안 (T2-17, 리뷰 전) | M2 |
 | 명령 전체 목록 (command-catalog.generated.md, 코드에서 생성) | 예정 | M2 |
 
 ## design/ 기능 설계

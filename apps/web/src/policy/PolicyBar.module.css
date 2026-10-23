@@ -1,0 +1,66 @@
+/* 예턴 편집 위 기본 방침 줄. 편집기(TurnEditor.module.css)와 같은 토큰을 쓴다. */
+.bar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.label {
+  font-weight: 600;
+}
+
+.select {
+  min-height: 28px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.select:disabled {
+  border-style: dashed;
+  color: var(--color-text-muted);
+}
+
+.state {
+  color: var(--color-info);
+  font-size: var(--text-sm);
+}
+
+.sentence,
+.muted,
+.error {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.sentence,
+.muted {
+  color: var(--color-text-muted);
+}
+
+.error {
+  color: var(--color-danger);
+}
+
+.linkButton {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}

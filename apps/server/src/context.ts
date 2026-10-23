@@ -1,3 +1,4 @@
+import type { PublicMapConfig } from '@opensamguk/shared';
 import type { PrismaClient } from '@opensamguk/db';
 import type {} from '@fastify/cookie';
 import type { FastifyReply } from 'fastify';
@@ -5,6 +6,7 @@ import type { createRateLimiter } from './security/rateLimit';
 
 export interface Context {
   db: PrismaClient;
+  publicMapConfig: PublicMapConfig;
   user: { id: string; email: string } | null;
   sessionId: string | null;
   reply: FastifyReply;
@@ -13,4 +15,5 @@ export interface Context {
   dummyPasswordHash: string;
   ip: string;
   rateLimiter: ReturnType<typeof createRateLimiter>;
+  closeSession?: ((sessionId: string) => void) | undefined;
 }

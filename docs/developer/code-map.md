@@ -25,7 +25,11 @@
 | `apps/server/src/auth/` | Argon2id, 세션 토큰 해시·만료·연장, 실제 HTTP·DB 테스트 |
 | `apps/server/src/routers/auth.ts` | 가입·로그인·로그아웃·현재 계정 |
 | `apps/server/src/trpc.ts` | 공개·인증 필수 procedure |
-| `apps/server/src/router.ts` | tRPC `AppRouter` (API 계약): `health`, `auth`, `world`, `home`, `city`, `nation`, `records`, `general`, `turns`, `commands`, `ranking`, `timelapse` |
+| `apps/server/src/router.ts` | tRPC `AppRouter` (API 계약): `health`, `auth`, `world`, `home`, `city`, `nation`, `records`, `general`, `turns`, `commands`, `ranking`, `timelapse`, `message`, `notice` |
+| `apps/server/src/routers/message.ts`, `notice.ts`, `apps/server/src/messaging.ts` | 현재 세션·소속·직책 기준 메시지·공지, 읽음과 revision, DB 잠금 전송 제한 |
+| `apps/server/src/realtime/` | 전용 LISTEN 연결과 SSE, 현재 권한 재검사, 하트비트·재구독·세션 종료 |
+| `packages/db/src/realtime.ts` | 저장 commit 뒤 별도 SQL로 알림 전송. 송신 실패가 저장 결과를 바꾸지 않는다 |
+| `tools/notice-publish.ts`, `t2-09.integration.test.ts` | 로비·월드 공지와 운영자 WORLD 메시지 작성, 실제 PostgreSQL·HTTP·SSE 시험 |
 | `apps/server/src/routers/general.ts`, `turns.ts`, `commands.ts` | 생성 접수·조회, 예턴 편집·사전 검사, 인증 필수 명령 목록 |
 | `apps/server/src/game/` | 소유 장수 조회·공개 projection·30칸 정규화와 표시 이름 |
 | `apps/engine/src/inputs.ts` | PENDING 생성 재검사·General 저장·완료 결과와 순서 기록 |
@@ -37,6 +41,7 @@
 | `apps/server/src/routers/ranking.ts`, `ranking.integration.test.ts` | 정산 시점 장수 상위 100명·내 순위·국가 전체 순위, 실제 HTTP·DB 권한과 공개 필드 검증 |
 | `packages/rules/src/ranking.ts` | 공헌·경험·전공·국가 순위와 공개 국력 계산, 동률 ID 정렬 |
 | `apps/engine/src/ranking.ts`, `ranking.integration.test.ts` | 월간 트랜잭션의 순위 캐시 교체, 전공 누계·롤백·재생 호환 검증 |
+| `apps/engine/src/nationArchive.ts`, `nationArchive.integration.test.ts`, `cli/backfillYearbookNations.ts` | T4-56 (가) PR1: 삭제 직전 국가 표시값과 월간 프레임의 이름·색 저장, 실제 PostgreSQL 롤백·재시작·재생과 legacy 백필 검증 |
 | `apps/server/src/routers/timelapse.ts`, `timelapse.test.ts`, `timelapse.integration.test.ts` | T4-35: 월간 도시 소유를 오래된 순으로 읽는 로그인 API. 현재 국가 이름·색만 함께 읽고 국력·자원은 내지 않는다 |
 | `apps/server/src/routers/world.ts` | 기존 `world.list`, 서버 시계 요약과 공개 94도시 지도 |
 | `apps/server/src/routers/home.ts`, `city.ts`, `nation.ts`, `records.ts` | 세션 기준 메인·도시·국가·개인/국가/월드 기록 조회. 국가 기록은 DB JSON 조건으로 월간 요약만 페이지 처리 |
@@ -70,7 +75,20 @@
 | `apps/engine/src/cli/createWorld.ts` | `pnpm world:create` |
 | `tools/run-integration.ts` | 전용 테스트 DB 준비·migration·통합 테스트 실행 |
 
+## 공개 지도 (T2-24)
+
+| 위치 | 역할 |
+| ---- | ---- |
+| `packages/shared/src/publicMap.ts`, `publicMap.test.ts` | 지연·간격 설정의 공통 검사와 기본값 |
+| `apps/engine/src/publicMap.ts`, `turnLoop.ts` | 실제 시각 지도 사본 저장·정리, 턴 트랜잭션과 실행권 연결 |
+| `apps/server/src/routers/world.ts`, `visibility.ts`, `publicMap.test.ts` | 무인증 지연 조회·공개 필드 투영·설정 시작 거부 검사 |
+| `tools/public-map.integration.test.ts` | 실제 HTTP·PostgreSQL의 지연 경계·오염 JSON·리스·롤백·재시작·12개월 재생 검증 |
+
+`packages/db/prisma/migrations/20261023010000_public_map_snapshot/migration.sql`이 `PublicMapSnapshot`을 만듭니다. 실제 HTTP와 엔진을 함께 실행하는 시험은 패키지 사이 상대 import 경계를 지키도록 배포물 밖의 `tools/`에 둡니다. `tools/authz.integration.test.ts`와 서버의 `authz/exemptions.ts`에는 새 공개 조회를 대조 대상으로 등록합니다.
+
 ## 새 저장 필드를 추가할 때 빠뜨리기 쉬운 것
+
+T4-56의 `RemovedNation`과 `YearbookNation`은 공개 표시값 보관이며 `WorldState`·재생 해시·보관 파일에는 넣지 않는다. 기존 프레임의 백필은 `pnpm db:migrate` 뒤 `pnpm --filter @opensamguk/engine yearbook:backfill`으로 보고를 확인하고 `--apply`로 실행한다. 현재 국가·삭제 보존·생성 기록의 이름과 색이 모두 일치할 때만 채운다. 근거가 없으면 부분 프레임으로 남기고 충돌이면 그 월드 전체를 롤백한다. 이름·색 변경을 넣는 T4-16은 같은 PR에서 이 CLI와 script를 지워야 한다.
 
 순위는 `RankingSnapshot`에 월드별 최신 정산의 공개 필드만 저장한다. API는 캐시를 읽고 세션 장수의 순위를 찾으며 조회 중 캐시를 만들지 않는다.
 `General.battleWins`, `General.captures`는 전투 결과에서 집계한 조회용 누계다. 기존 재생 해시를 보존하려고 `worldLoader`와 `world/persistence`의 게임 상태 적재에서는 제외한다. 기존 연감의 비공개 국력 계산은 유지한다.

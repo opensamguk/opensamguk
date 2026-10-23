@@ -89,11 +89,10 @@ async function save(page: Page) {
 test.describe('장수가 있는 계정', () => {
   test.use({ storageState: STORAGE });
 
-  test('첫 주소는 첫 RUNNING 월드로 보낸다', async ({ page }) => {
-    const { worlds } = await query<{ worlds: Array<{ id: string }> }>(page.request, 'world.list');
-    expect(worlds.length).toBeGreaterThan(0);
+  // T2-04부터 첫 주소는 첫 RUNNING 월드 대신 로비로 보낸다.
+  test('로그인한 첫 주소는 로비로 보낸다', async ({ page }) => {
     await page.goto('/');
-    await expect(page).toHaveURL(`/w/${worlds[0]!.id}`);
+    await expect(page).toHaveURL('/lobby');
   });
 
   test('메인 한 화면에 지도·명령 목록·도시·국가·장수·기록이 함께 있다', async ({ page }) => {

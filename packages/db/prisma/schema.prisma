@@ -12,6 +12,8 @@ datasource db {
 model World {
   id              String      @id @default(uuid())
   name            String
+  presetKey       String?
+  preset          Json?
   scenarioKey     String
   mapKey          String
   unitSetKey      String
@@ -44,9 +46,13 @@ model World {
   inputEvents     InputEvent[]
   nationHistory   NationHistory[]
   yearbooks       YearbookSnapshot[]
+  removedNations  RemovedNation[]
   commandMeta     Json?
   battleLogs      BattleLog[]
   ranking         RankingSnapshot?
+  publicMaps      PublicMapSnapshot[]
+  messages        Message[]
+  notices         Notice[]
 }
 
 enum WorldStatus {
@@ -108,6 +114,10 @@ model Nation {
   diplomacyAsA   Diplomacy[] @relation("NationA")
   diplomacyAsB   Diplomacy[] @relation("NationB")
   turns          NationTurn[]
+  notice         String @default("")
+  noticeRevision Int @default(0)
+  noticeUpdatedAt DateTime?
+  noticeUpdatedBy String?
 
   @@id([worldId, id])
 }
@@ -179,6 +189,8 @@ model General {
   injury         Int
   nextTurnTick   Int
   turnRevision   Int @default(0)
+  noticeSeen     Json?
+  messageReads   MessageRead[]
   turns          GeneralTurn[]
   logs           GeneralLog[]
   battleLogs     BattleLog[]
@@ -342,8 +354,32 @@ model YearbookSnapshot {
   data      Json
   stateHash String
   world     World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  nations   YearbookNation[]
 
   @@id([worldId, tick])
+}
+
+model RemovedNation {
+  worldId         String
+  nationId        Int
+  name            String
+  color           String
+  removedSequence Int
+  removedTick     Int
+  world           World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@id([worldId, nationId])
+}
+
+model YearbookNation {
+  worldId  String
+  tick     Int
+  nationId Int
+  name     String
+  color    String
+  snapshot YearbookSnapshot @relation(fields: [worldId, tick], references: [worldId, tick], onDelete: Cascade)
+
+  @@id([worldId, tick, nationId])
 }
 
 model RankingSnapshot {
@@ -354,4 +390,73 @@ model RankingSnapshot {
   generals Json
   nations  Json
   world    World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+}
+
+model PublicMapSnapshot {
+  worldId String
+  takenAt DateTime
+  tick    Int
+  year    Int
+  month   Int
+  data    Json
+  world   World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@id([worldId, takenAt])
+}
+
+enum MessageScope {
+  PRIVATE
+  NATION
+  DIPLOMACY
+  WORLD
+}
+
+model Message {
+  id                String        @id @default(uuid())
+  worldId           String
+  scope             MessageScope
+  senderId          Int?
+  senderNationId    Int?
+  recipientId       Int?
+  recipientNationId Int?
+  fromParty         Json
+  toParty           Json?
+  body              String
+  sentAt            DateTime      @default(now()) @db.Timestamptz(3)
+  year              Int
+  month             Int
+  world             World         @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  reads             MessageRead[]
+
+  @@unique([worldId, id])
+  @@index([worldId, scope, sentAt, id])
+  @@index([worldId, senderId, sentAt])
+}
+
+model MessageRead {
+  worldId   String
+  messageId String
+  generalId Int
+  message   Message @relation(fields: [worldId, messageId], references: [worldId, id], onDelete: Cascade)
+  general   General @relation(fields: [worldId, generalId], references: [worldId, id], onDelete: Cascade)
+
+  @@id([messageId, generalId])
+}
+
+enum NoticeScope {
+  LOBBY
+  WORLD
+}
+
+model Notice {
+  id          String      @id @default(uuid())
+  scope       NoticeScope
+  worldId     String?
+  title       String?
+  body        String
+  pinned      Boolean     @default(false)
+  publishedAt DateTime    @default(now()) @db.Timestamptz(3)
+  world       World?      @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@index([scope, worldId, publishedAt, id])
 }

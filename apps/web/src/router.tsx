@@ -3,22 +3,32 @@ import {
   createRootRouteWithContext,
   createRoute,
   createRouter,
+  lazyRouteComponent,
   Outlet,
   redirect,
   useRouter,
 } from '@tanstack/react-router';
 import { BattleSimPage } from './battleSim/BattleSimPage';
+import { DiplomacyPage, parseDiplomacySearch } from './diplomacy/DiplomacyPage';
 import { CreateGeneralPage } from './general/CreateGeneralPage';
+import { HelpPage } from './help/HelpPage';
 import { GameLayout } from './layout/GameLayout';
+import { LobbyPage } from './lobby/LobbyPage';
+import { MessagesPage } from './messages/MessagesPage';
+import { NotificationSettingsPage } from './notifications/NotificationSettingsPage';
 import { DevUiPage } from './pages/DevUiPage';
-import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { MainPage } from './pages/MainPage';
 import { SignupPage } from './pages/SignupPage';
+import { NationTurnsPage } from './personnel/NationTurnsPage';
+import { PersonnelPage } from './personnel/PersonnelPage';
 import { CityPage, MapPage, NationPage, RecordsPage } from './pages/WorldPages';
 import { RankingPage } from './ranking/RankingPage';
 import { parseRankingSearch } from './ranking/rankingView';
 import { queryClient, trpc, type Trpc } from './trpc';
+import { InspectionPage } from './operations/InspectionPage';
+import { OperationDetailPage } from './operations/OperationDetailPage';
+import { OperationsPage } from './operations/OperationsPage';
 import { TurnsPage } from './turns/TurnsPage';
 import { EmptyState, ErrorState } from './ui/States';
 
@@ -58,17 +68,14 @@ const indexRoute = createRoute({
   path: '/',
   beforeLoad: async ({ context }) => {
     if (!(await currentUser(context))) throw redirect({ to: '/login' });
-    // 첫 RUNNING 월드로 보낸다. 없으면 이 화면에 열린 월드가 없다고 보여 준다 (T1-16, world.list).
-    const { worlds } = await context.queryClient.fetchQuery({
-      ...context.trpc.world.list.queryOptions(),
-      staleTime: 0,
-    });
-    const first = worlds[0];
-    if (first) throw redirect({ to: '/w/$worldId', params: { worldId: first.id }, replace: true });
+    // 로그인했으면 로비로 보낸다 (T2-04). 예전에는 첫 RUNNING 월드로 보냈다 (T1-16).
+    throw redirect({ to: '/lobby', replace: true });
   },
-  component: HomePage,
   errorComponent: GuardError,
 });
+
+// 로비 (T2-04). 로그인하지 않아도 월드 목록을 본다. 참가 버튼만 로그인 여부로 바뀐다.
+const lobbyRoute = createRoute({ getParentRoute: () => rootRoute, path: 'lobby', component: LobbyPage });
 
 const authSearch = (search: Record<string, unknown>): { next?: string } =>
   typeof search.next === 'string' ? { next: search.next } : {};
@@ -84,6 +91,17 @@ const signupRoute = createRoute({
   path: 'signup',
   validateSearch: authSearch,
   component: SignupPage,
+});
+
+// 계정 단위 알림 설정 (T2-21). 월드와 무관하고 로그인이 필요하다.
+const notificationSettingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'settings/notifications',
+  beforeLoad: async ({ context, location }) => {
+    if (!(await currentUser(context))) throw redirect({ to: '/login', search: { next: location.href } });
+  },
+  component: NotificationSettingsPage,
+  errorComponent: GuardError,
 });
 
 // 게임 화면은 모두 로그인이 필요하다. 로그인 뒤 원래 주소로 돌아오도록 next에 담는다.
@@ -136,6 +154,18 @@ const nationRoute = createRoute({
   },
 });
 
+// 인사부와 국가 예턴 (T2-06). nation/:nationId보다 고정 경로가 먼저 맞는다.
+const personnelRoute = createRoute({
+  getParentRoute: () => worldRoute,
+  path: 'nation/personnel',
+  component: PersonnelPage,
+});
+const nationTurnsRoute = createRoute({
+  getParentRoute: () => worldRoute,
+  path: 'nation/turns',
+  component: NationTurnsPage,
+});
+
 const RECORD_TABS = ['general', 'nation', 'world'] as const;
 type RecordTab = (typeof RECORD_TABS)[number];
 
@@ -162,30 +192,99 @@ const rankingRoute = createRoute({
 // 전투 시뮬레이터 (T4-34). 사용자가 넣은 가정으로 교전 한 번을 Web Worker에서 계산하는 보조 화면이다.
 const simulatorRoute = createRoute({ getParentRoute: () => worldRoute, path: 'simulator', component: BattleSimPage });
 
+// 외교실 (T2-08). 주소: /w/:worldId/diplomacy?tab=incoming|outgoing|active|ended|broken|write|trust
+const diplomacyRoute = createRoute({
+  getParentRoute: () => worldRoute,
+  path: 'diplomacy',
+  validateSearch: parseDiplomacySearch,
+  component: function DiplomacyRoute() {
+    const { tab } = diplomacyRoute.useSearch();
+    return <DiplomacyPage tab={tab} />;
+  },
+});
+// 메시지 전체 화면 (T2-10). 메인 오른쪽 메시지 패널과 같은 부품이다.
+const messagesRoute = createRoute({ getParentRoute: () => worldRoute, path: 'messages', component: MessagesPage });
+
+// 국가 작전판 (T2-12). 목록·만들기, 작전 타임라인, 감찰. nation/inspection은 nation/$nationId보다 먼저 맞는다(정적 경로 우선).
+const operationsRoute = createRoute({
+  getParentRoute: () => worldRoute,
+  path: 'operations',
+  component: OperationsPage,
+});
+const operationRoute = createRoute({
+  getParentRoute: () => worldRoute,
+  path: 'operations/$operationId',
+  component: function OperationRoute() {
+    const { operationId } = operationRoute.useParams();
+    return <OperationDetailPage key={operationId} operationId={operationId} />;
+  },
+});
+const inspectionRoute = createRoute({
+  getParentRoute: () => worldRoute,
+  path: 'nation/inspection',
+  component: InspectionPage,
+});
+
 const createGeneralRoute = createRoute({
   getParentRoute: () => worldRoute,
   path: 'create',
   component: CreateGeneralPage,
 });
 
+// 도움말 (T2-17). 플레이어 가이드 9개와 생성 명령 목록. 로그인 없이 연다.
+const helpRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'help',
+  component: () => <HelpPage doc="index" />,
+});
+const helpDocRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'help/$doc',
+  component: function HelpDocRoute() {
+    const { doc } = helpDocRoute.useParams();
+    return <HelpPage doc={doc} />;
+  },
+});
+
 const devUiRoute = createRoute({ getParentRoute: () => rootRoute, path: 'dev/ui', component: DevUiPage });
+// 지도 편집기 (T4-80). devUiRoute처럼 개발 모드에서만 경로 목록에 넣는다. 관리자 콘솔 연결은 T4-81이다.
+// 정의도 개발 모드에서만 만들어 운영 빌드에는 편집기 묶음이 생기지 않는다.
+const mapEditorRoute = import.meta.env.DEV
+  ? createRoute({
+      getParentRoute: () => rootRoute,
+      path: 'dev/map-editor',
+      component: lazyRouteComponent(() => import('./mapEditor/MapEditorPage'), 'MapEditorPage'),
+    })
+  : null;
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
+  lobbyRoute,
   loginRoute,
   signupRoute,
+  notificationSettingsRoute,
+  helpRoute,
+  helpDocRoute,
   worldRoute.addChildren([
     worldIndexRoute,
     mapRoute,
     turnsRoute,
     cityRoute,
     nationRoute,
+    personnelRoute,
+    nationTurnsRoute,
     recordsRoute,
     rankingRoute,
     simulatorRoute,
+    diplomacyRoute,
+    messagesRoute,
+    operationsRoute,
+    operationRoute,
+    inspectionRoute,
     createGeneralRoute,
   ]),
   ...(import.meta.env.DEV ? [devUiRoute] : []),
+  ...(mapEditorRoute ? [mapEditorRoute] : []),
 ]);
 
 export const router = createRouter({ routeTree, context: { queryClient, trpc } });

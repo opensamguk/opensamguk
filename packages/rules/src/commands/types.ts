@@ -30,7 +30,8 @@ export interface Failure {
     | 'NO_POPULATION'
     | 'NO_OFFER'
     | 'NO_UNIT_SET'
-    | 'COMMAND_DISABLED';
+    | 'COMMAND_DISABLED'
+    | 'PROTECTED';
   message: string;
 }
 export interface LogEntry {

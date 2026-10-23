@@ -156,6 +156,8 @@ export const nationCommands = [
     target: 'nation',
     args: z.strictObject({ nationId: positive }),
     check(view, actor, args) {
+      if (Math.floor((actor.tick ?? 0) / TICKS_PER_MONTH) < (view.presetRules?.protection.peaceMonths ?? 0))
+        return fail('PROTECTED', '초반 보호 기간에는 선전포고할 수 없습니다.');
       const id = view.generals[actor.generalId]!.nationId!;
       if (!view.nations[args.nationId] || args.nationId === id) return fail('BAD_TARGET', '다른 국가를 골라야 합니다.');
       return relation(view, id, args.nationId) ? fail('BAD_STATE', '중립 국가에만 선전포고할 수 있습니다.') : null;

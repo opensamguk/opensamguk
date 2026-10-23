@@ -34,7 +34,10 @@ function chooser(view: WorldView, general: General, rng: Rng, context: NpcContex
       const command = commandRegistry.get(key);
       const parsed = command?.args.safeParse(args);
       if (command?.target === target && parsed?.success && !command.check(view, actor, parsed.data)) {
-        candidates.push({ key, args, score, reason });
+        const aggression = view.presetRules?.npc.aggression ?? 1;
+        const weighted =
+          aggression !== 1 && (key === 'attack' || key === 'nation_declare') ? score * aggression : score;
+        candidates.push({ key, args, score: weighted, reason });
       }
     },
     finish(): NpcDecision {

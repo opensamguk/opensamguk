@@ -1,3 +1,4 @@
+import type { PresetRules } from '../world/preset';
 import { cloneExtStateWithRegistry, extSlices, extCommandBindings, type ExtStateRegistry } from '../commands/ext/state';
 import type { WorldState, WorldView } from './world';
 
@@ -19,6 +20,7 @@ export function cloneWorldWithRegistry(view: WorldView, registry: ExtStateRegist
   for (const key in view.generals) generals[key] = { ...view.generals[key]! };
   return {
     ...(ext ? { ext } : {}),
+    ...(view.presetRules ? { presetRules: structuredClone(view.presetRules) as PresetRules } : {}),
     startYear: view.startYear,
     cities,
     nations,

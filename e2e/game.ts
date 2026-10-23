@@ -109,7 +109,7 @@ async function waitEngineReady(world: string) {
   }
 }
 
-interface LeaseHold {
+export interface LeaseHold {
   db: PrismaClient;
   lease: Lease;
   done: AbortController;
@@ -138,7 +138,7 @@ export async function idleWorld(page: Page): Promise<string> {
   return id;
 }
 
-async function holdLease(world: string): Promise<LeaseHold> {
+export async function holdLease(world: string): Promise<LeaseHold> {
   const { createDb } = await import('../packages/db/src/index');
   const { acquireLease, renewLease, LEASE_TTL_MS } = await import('../apps/engine/src/lease');
   const db = createDb(databaseUrl());
@@ -166,7 +166,7 @@ async function holdLease(world: string): Promise<LeaseHold> {
   return hold;
 }
 
-async function releaseHold(hold: LeaseHold) {
+export async function releaseHold(hold: LeaseHold) {
   const { releaseLease } = await import('../apps/engine/src/lease');
   hold.done.abort();
   await hold.renewal;

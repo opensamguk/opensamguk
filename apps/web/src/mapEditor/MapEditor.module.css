@@ -1,0 +1,386 @@
+/* 지도 편집기 (T4-80). 지형 색은 밑그림 팔레트(contract.ts)에서 오고 나머지는 토큰을 쓴다. */
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: var(--space-4);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.header h1 {
+  margin: 0;
+}
+
+.muted {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger);
+}
+
+.ok {
+  margin: 0;
+  color: var(--color-success);
+}
+
+.fileButton {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+}
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.meta {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.toolbar button,
+.drawingBar button,
+.form button,
+.links button {
+  font: inherit;
+  font-size: var(--text-sm);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.toolbar button[aria-pressed='true'] {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-text);
+}
+
+.toolbar button:disabled,
+.drawingBar button:disabled {
+  cursor: not-allowed;
+  color: var(--color-text-muted);
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.drawingBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--color-info);
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+}
+
+.body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: var(--space-3);
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.canvasWrap {
+  min-width: 0;
+}
+
+.canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background: var(--color-surface-muted);
+  touch-action: none;
+  user-select: none;
+}
+
+.canvas[data-tool='select'] {
+  cursor: grab;
+}
+
+.canvas[data-tool='city'],
+.canvas[data-tool='coast'],
+.canvas[data-tool='lakes'],
+.canvas[data-tool='mountains'],
+.canvas[data-tool='rivers'] {
+  cursor: crosshair;
+}
+
+.ground {
+  opacity: 0.35;
+}
+
+.shape {
+  fill-opacity: 0.45;
+  stroke: var(--color-border-strong);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.shapeSelected {
+  stroke: var(--color-info);
+  stroke-width: 2;
+}
+
+.openShape {
+  fill: none;
+  stroke: var(--color-danger);
+  stroke-width: 2;
+  stroke-dasharray: 4 3;
+}
+
+.river {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.riverHit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 8;
+  pointer-events: stroke;
+}
+
+.shapeSelected .river {
+  stroke-width: 3;
+}
+
+.link {
+  stroke: var(--color-border-strong);
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+}
+
+.city {
+  cursor: pointer;
+}
+
+.dot {
+  fill: var(--color-surface);
+  stroke: var(--color-text);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.city:hover .dot {
+  stroke-width: 2;
+}
+
+.selected {
+  fill: none;
+  stroke: var(--color-info);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.linkFrom {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 3;
+  stroke-dasharray: 3 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.label {
+  font-size: 9px;
+  font-weight: 600;
+  text-anchor: middle;
+  fill: var(--color-text);
+  paint-order: stroke;
+  stroke: var(--color-surface);
+  stroke-width: 2.5px;
+  pointer-events: none;
+}
+
+.vertex {
+  fill: var(--color-surface);
+  stroke: var(--color-info);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  cursor: move;
+}
+
+.vertexSelected {
+  fill: var(--color-info);
+}
+
+.drawing polyline {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 2;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.drawing circle {
+  fill: var(--color-accent);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  padding-top: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1px solid var(--color-border-strong);
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.panel {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.panel h2 {
+  margin-bottom: var(--space-2);
+}
+
+.panel h3 {
+  margin: var(--space-2) 0 var(--space-1);
+  font-size: var(--text-md);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.form p {
+  margin: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.field input,
+.field select {
+  font: inherit;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.links {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.links li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.form .danger {
+  align-self: flex-start;
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+.issues {
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.issues button {
+  width: 100%;
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.issueTag {
+  font-weight: 700;
+  color: var(--color-danger);
+}

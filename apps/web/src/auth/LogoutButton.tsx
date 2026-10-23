@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
+import { clearDrafts } from '../messages/drafts';
 import { useTRPC } from '../trpc';
 
 export function LogoutButton({ className }: { className?: string | undefined }) {
@@ -10,6 +11,7 @@ export function LogoutButton({ className }: { className?: string | undefined }) 
     ...trpc.auth.logout.mutationOptions(),
     onSuccess: async () => {
       queryClient.clear();
+      clearDrafts();
       queryClient.setQueryData(trpc.auth.me.queryKey(), { user: null });
       await navigate({ to: '/login', replace: true });
     },

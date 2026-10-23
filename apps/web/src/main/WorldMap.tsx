@@ -7,11 +7,15 @@ export const MAP_WIDTH = 700;
 export const MAP_HEIGHT = 500;
 const NEUTRAL = '#d6d0c4';
 
+// 공개 지도(T2-25)는 보급 값을 받지 않는다. 보급이 없는 도시는 끊김 표시를 하지 않는다.
+type DrawnCity = Omit<MapCity, 'supplied'> & { supplied?: boolean };
+
 // 연결선은 양쪽에 같은 연결이 있으므로 한 번만 그린다. 없는 도시를 가리키는 연결은 버린다.
-export function mapLinks(cities: readonly MapCity[]): Array<[MapCity, MapCity]> {
+// 지도 편집기(mapEditor)도 같은 함수로 연결선을 그려서 key·links만 요구한다.
+export function mapLinks<T extends Pick<MapCity, 'key' | 'links'>>(cities: readonly T[]): Array<[T, T]> {
   const byKey = new Map(cities.map((city) => [city.key, city]));
   const seen = new Set<string>();
-  const links: Array<[MapCity, MapCity]> = [];
+  const links: Array<[T, T]> = [];
   for (const city of cities) {
     for (const key of city.links) {
       const other = byKey.get(key);
@@ -26,30 +30,32 @@ export function mapLinks(cities: readonly MapCity[]): Array<[MapCity, MapCity]> 
 }
 
 // 보급은 국가 도시에만 뜻이 있다. 공백지는 늘 보급이 없으므로 끊김 표시를 하지 않는다.
-export const isCut = (city: Pick<MapCity, 'supplied' | 'nationId'>) => !city.supplied && city.nationId !== null;
+export const isCut = (city: Pick<DrawnCity, 'supplied' | 'nationId'>) =>
+  city.supplied === false && city.nationId !== null;
 
 // 도시 규모(1~8)에 따라 점 크기를 키운다.
 export const cityRadius = (level: number) => 4 + Math.max(1, Math.min(8, level)) * 0.6;
 
-export function cityLabel(city: MapCity, nation: MapNation | undefined, mine: boolean): string {
+export function cityLabel(city: DrawnCity, nation: MapNation | undefined, mine: boolean): string {
   return [city.name, nation ? nation.name : '공백지', isCut(city) ? '보급 끊김' : null, mine ? '내 위치' : null]
     .filter(Boolean)
     .join(', ');
 }
 
 // 94도시 지도. 도시를 누르면 onSelect로 알려 준다. 화면 이동은 부모가 정한다 (메인은 같은 화면 안에서 도시 정보만 바꾼다).
+// onSelect가 없으면 읽기 전용이다 (공개 지도, T2-25). 도시를 눌러도 아무 일이 없고 초점도 받지 않는다.
 export function WorldMap({
   cities,
   nations,
-  myCityKey,
-  selectedKey,
+  myCityKey = null,
+  selectedKey = null,
   onSelect,
 }: {
-  cities: readonly MapCity[];
+  cities: readonly DrawnCity[];
   nations: readonly MapNation[];
-  myCityKey: number | null;
-  selectedKey: number | null;
-  onSelect: (key: number) => void;
+  myCityKey?: number | null;
+  selectedKey?: number | null;
+  onSelect?: (key: number) => void;
 }) {
   const nationById = new Map(nations.map((nation) => [nation.id, nation]));
   return (
@@ -73,27 +79,30 @@ export function WorldMap({
         const selected = city.key === selectedKey;
         const r = cityRadius(city.level);
         const labelWidth = Array.from(city.name).length * 10 + 6;
-        const select = () => onSelect(city.key);
+        const select = onSelect ? () => onSelect(city.key) : undefined;
         return (
           <g
             key={city.key}
-            className={styles.city}
-            role="button"
-            tabIndex={0}
+            className={select ? styles.city : styles.readOnlyCity}
+            role={select ? 'button' : 'img'}
+            tabIndex={select ? 0 : undefined}
             aria-label={cityLabel(city, nation, mine)}
-            aria-pressed={selected}
+            aria-pressed={select ? selected : undefined}
             data-city-key={city.key}
             data-nation-id={city.nationId ?? ''}
             data-supplied={city.supplied}
             data-cut={isCut(city) || undefined}
             data-mine={mine || undefined}
             onClick={select}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                select();
-              }
-            }}
+            onKeyDown={
+              select &&
+              ((event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  select();
+                }
+              })
+            }
           >
             <title>{cityLabel(city, nation, mine)}</title>
             {mine ? <circle className={styles.mine} cx={city.x} cy={city.y} r={r + 5} /> : null}
@@ -141,7 +150,16 @@ export function WorldMap({
 }
 
 // 지도 아래 범례. 색만으로 뜻을 전하지 않도록 기호와 글자를 같이 쓴다.
-export function MapLegend({ cities, nations }: { cities: readonly MapCity[]; nations: readonly MapNation[] }) {
+// readOnly(공개 지도)에서는 내 위치와 보급 끊김을 빼고 국가 색 견본과 공백지만 둔다.
+export function MapLegend({
+  cities,
+  nations,
+  readOnly = false,
+}: {
+  cities: readonly DrawnCity[];
+  nations: readonly MapNation[];
+  readOnly?: boolean;
+}) {
   const counts = new Map<number, number>();
   for (const city of cities)
     if (city.nationId !== null) counts.set(city.nationId, (counts.get(city.nationId) ?? 0) + 1);
@@ -153,18 +171,22 @@ export function MapLegend({ cities, nations }: { cities: readonly MapCity[]; nat
   const empty = cities.filter((city) => city.nationId === null).length;
   return (
     <div className={styles.legend} aria-label="지도 범례">
-      <span className={styles.legendItem}>
-        <svg width="14" height="14" aria-hidden="true">
-          <circle cx="7" cy="7" r="5" className={styles.mine} />
-        </svg>
-        내 위치
-      </span>
-      <span className={styles.legendItem}>
-        <svg width="14" height="14" aria-hidden="true">
-          <circle cx="7" cy="7" r="5" className={`${styles.dot} ${styles.unsupplied}`} style={{ fill: NEUTRAL }} />
-        </svg>
-        보급 끊김 {unsupplied}
-      </span>
+      {readOnly ? null : (
+        <>
+          <span className={styles.legendItem}>
+            <svg width="14" height="14" aria-hidden="true">
+              <circle cx="7" cy="7" r="5" className={styles.mine} />
+            </svg>
+            내 위치
+          </span>
+          <span className={styles.legendItem}>
+            <svg width="14" height="14" aria-hidden="true">
+              <circle cx="7" cy="7" r="5" className={`${styles.dot} ${styles.unsupplied}`} style={{ fill: NEUTRAL }} />
+            </svg>
+            보급 끊김 {unsupplied}
+          </span>
+        </>
+      )}
       <span className={styles.legendItem}>
         <svg width="14" height="14" aria-hidden="true">
           <circle cx="7" cy="7" r="5" className={styles.dot} style={{ fill: NEUTRAL }} />

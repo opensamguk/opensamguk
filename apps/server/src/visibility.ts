@@ -2,9 +2,9 @@ import type { Prisma } from '@opensamguk/db';
 import { BALANCE } from '@opensamguk/rules';
 import { z } from 'zod';
 
-type General = Omit<Prisma.GeneralGetPayload<true>, 'battleWins' | 'captures'>;
+type General = Omit<Prisma.GeneralGetPayload<true>, 'battleWins' | 'captures' | 'noticeSeen'>;
 type City = Prisma.CityGetPayload<true>;
-type Nation = Prisma.NationGetPayload<true>;
+type Nation = Omit<Prisma.NationGetPayload<true>, 'notice' | 'noticeRevision' | 'noticeUpdatedAt' | 'noticeUpdatedBy'>;
 export type Viewer = Pick<General, 'id' | 'nationId' | 'cityKey'> | null;
 
 export function visibility(viewer: Viewer) {
@@ -142,3 +142,24 @@ export const publicNationDisplaySelect = {
   name: true,
   color: true,
 } as const satisfies Prisma.NationSelect;
+
+const publicMapData = z.object({
+  cities: z.array(
+    z.object({
+      key: z.string(),
+      name: z.string(),
+      level: z.number().int(),
+      x: z.number(),
+      y: z.number(),
+      nationId: z.number().int().nullable(),
+      links: z.array(z.string()),
+    }),
+  ),
+  nations: z.array(z.object({ id: z.number().int(), name: z.string(), color: z.string() })),
+});
+
+// 오염되거나 형식이 깨진 사본은 현재 상태로 대체하지 않는다.
+export function publicMapInfo(data: Prisma.JsonValue) {
+  const result = publicMapData.safeParse(data);
+  return result.success ? result.data : null;
+}

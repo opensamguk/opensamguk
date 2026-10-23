@@ -1,0 +1,36 @@
+{
+  "name": "초보",
+  "turnTermMinutes": 30,
+  "scenario": "1030",
+  "map": "che",
+  "unitSet": "basic",
+  "commands": null,
+  "npc": {
+    "fillRatio": 1,
+    "aggression": 0.5
+  },
+  "protection": {
+    "foundUntilMonths": 12,
+    "peaceMonths": 24,
+    "maxGeneralsPerNation": null
+  },
+  "boost": {
+    "smallWorld": [
+      {
+        "below": 300,
+        "multiplier": 1.2
+      }
+    ],
+    "lateJoin": {
+      "fromYear": 3,
+      "experienceRatio": 0.8,
+      "percentile": 0.2,
+      "goldPerYear": 100,
+      "ricePerYear": 100,
+      "maxYears": 5
+    }
+  },
+  "features": {
+    "advisor": true
+  }
+}

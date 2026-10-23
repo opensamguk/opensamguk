@@ -1,3 +1,4 @@
+import { TICKS_PER_MONTH } from '../clock/constants';
 import { z } from 'zod';
 import { BALANCE } from '../balance';
 import { simulateBattle } from '../battle/simulate';
@@ -25,6 +26,8 @@ function makeAttack(collect: typeof collectModifiers) {
     category: 'military',
     args: z.strictObject({ cityKey: positive }),
     check(view, actor, args) {
+      if (Math.floor((actor.tick ?? 0) / TICKS_PER_MONTH) < (view.presetRules?.protection.peaceMonths ?? 0))
+        return fail('PROTECTED', '초반 보호 기간에는 출병할 수 없습니다.');
       const g = view.generals[actor.generalId]!;
       if (g.nationId === null) return fail('NOT_NATION', '국가에 소속되어야 합니다.');
       const from = view.cities[g.cityKey],

@@ -16,13 +16,22 @@ export const CATEGORY_LABELS: Record<string, string> = {
   military: '군사',
   strategy: '전략',
   personal: '개인',
+  nation: '국가',
 };
-const CATEGORY_ORDER = ['domestic', 'military', 'strategy', 'personal'];
+const CATEGORY_ORDER = ['domestic', 'military', 'strategy', 'personal', 'nation'];
+
+// 명령마다 대상 도시 후보를 바꿀 때 쓴다 (교역 대상, T2-08). note는 후보가 없을 때의 이유 같은 안내다.
+export interface CityChoices {
+  options: Array<{ key: number; name: string }>;
+  note: string | null;
+}
 
 interface Props {
   commands: CommandInfo[];
   cities: Array<{ key: number; name: string }>;
   nations: Array<{ id: number; name: string }>;
+  // 있으면 대상 장수(generalId)를 이름으로 고른다 (국가 칸, T2-06).
+  generals?: Array<{ id: number; name: string }> | undefined;
   selectedCityKey: number | null;
   defaultCrewType: number | undefined;
   // 넣을 수 없을 때의 이유. null이면 넣을 수 있다.
@@ -30,6 +39,8 @@ interface Props {
   targetLabel: string;
   searchRef: RefObject<HTMLInputElement | null>;
   onPut: (turn: Turn) => void;
+  // 없거나 null을 돌려주면 지도의 모든 도시가 후보다.
+  cityChoicesFor?: ((commandKey: string) => CityChoices | null) | undefined;
 }
 
 // 명령 고르기: 분류별 목록 + 이름 검색, 인자가 있으면 대상 칸을 띄운다.
@@ -38,12 +49,14 @@ export function CommandPicker({
   commands,
   cities,
   nations,
+  generals,
   selectedCityKey,
   defaultCrewType,
   blockedReason,
   targetLabel,
   searchRef,
   onPut,
+  cityChoicesFor,
 }: Props) {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<string>('all');
@@ -64,14 +77,23 @@ export function CommandPicker({
   const required = useMemo(() => (command ? requiredKeys(command.argsSchema) : []), [command]);
   const built = buildArgs(fields, required, values);
   const sortedCities = useMemo(() => [...cities].sort((a, b) => a.name.localeCompare(b.name, 'ko')), [cities]);
+  const choices = command && cityChoicesFor ? cityChoicesFor(command.key) : null;
+  const cityOptions = choices?.options ?? sortedCities;
+  // 지도에서 고른 도시는 후보 안에 있을 때만 기본값과 되돌리기 힌트로 쓴다.
+  const mapCityFor = (key: string | undefined) => {
+    if (selectedCityKey === null) return null;
+    const limited = key ? cityChoicesFor?.(key) : null;
+    return !limited || limited.options.some((c) => c.key === selectedCityKey) ? selectedCityKey : null;
+  };
 
   // 고를 때 기본값을 채운다. 대상 도시는 지도에서 고른 도시를 먼저 둔다 (힌트일 뿐 바로 넣지는 않는다).
   const choose = (key: string) => {
     setChosen(key);
     const next = commands.find((c) => c.key === key);
     const initial: Record<string, string> = {};
+    const mapCity = mapCityFor(next?.key);
     for (const field of next ? argFields(next.argsSchema) : []) {
-      if (field.kind === 'city' && selectedCityKey !== null) initial[field.key] = String(selectedCityKey);
+      if (field.kind === 'city' && mapCity !== null) initial[field.key] = String(mapCity);
       if (field.kind === 'integer' && field.key === 'crewType' && defaultCrewType !== undefined)
         initial[field.key] = String(defaultCrewType);
       if (field.kind === 'boolean') initial[field.key] = 'true';
@@ -84,7 +106,7 @@ export function CommandPicker({
 
   const put = () => {
     if (!command || blockedReason || built.missing.length > 0) return;
-    onPut({ commandKey: command.key, args: built.args });
+    onPut({ commandKey: command.key, args: built.args, explicit: true });
   };
 
   const onSearchKey = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -94,7 +116,7 @@ export function CommandPicker({
     if (!first) return;
     const next = choose(first.key);
     if (next && argFields(next.argsSchema).length === 0) {
-      if (!blockedReason) onPut({ commandKey: next.key, args: {} });
+      if (!blockedReason) onPut({ commandKey: next.key, args: {}, explicit: true });
     } else {
       // 인자 칸이 그려진 뒤 옮긴다.
       requestAnimationFrame(() => firstArgRef.current?.focus());
@@ -133,7 +155,7 @@ export function CommandPicker({
           />
         </label>
         <div className={styles.categories} role="group" aria-label="명령 분류">
-          {['all', ...CATEGORY_ORDER].map((key) => (
+          {['all', ...CATEGORY_ORDER.filter((key) => commands.some((c) => c.category === key))].map((key) => (
             <button
               key={key}
               type="button"
@@ -184,13 +206,18 @@ export function CommandPicker({
               key={field.key}
               field={field}
               value={values[field.key] ?? ''}
-              cities={sortedCities}
+              cities={cityOptions}
               nations={nations}
+              generals={generals}
               inputRef={i === 0 ? firstArgRef : undefined}
               onKeyDown={onArgKey}
               onChange={(value) => setValues((prev) => ({ ...prev, [field.key]: value }))}
+              note={field.kind === 'city' ? (choices?.note ?? null) : null}
               mapHint={
-                field.kind === 'city' && selectedCityKey !== null && values[field.key] !== String(selectedCityKey)
+                field.kind === 'city' &&
+                selectedCityKey !== null &&
+                mapCityFor(command.key) !== null &&
+                values[field.key] !== String(selectedCityKey)
                   ? {
                       name: cities.find((c) => c.key === selectedCityKey)?.name ?? `도시 ${selectedCityKey}`,
                       use: () => setValues((prev) => ({ ...prev, [field.key]: String(selectedCityKey) })),
@@ -220,23 +247,38 @@ function ArgInput({
   value,
   cities,
   nations,
+  generals,
   inputRef,
   onChange,
   onKeyDown,
+  note,
   mapHint,
 }: {
   field: ArgField;
   value: string;
   cities: Array<{ key: number; name: string }>;
   nations: Array<{ id: number; name: string }>;
+  generals: Array<{ id: number; name: string }> | undefined;
   inputRef: RefObject<HTMLElement | null> | undefined;
   onChange: (value: string) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
+  note: string | null;
   mapHint: { name: string; use: () => void } | null;
 }) {
   const ref = inputRef as RefObject<HTMLInputElement & HTMLSelectElement> | undefined;
   let control;
-  if (field.kind === 'city' || field.kind === 'nation' || field.kind === 'boolean' || field.kind === 'enum') {
+  if (field.key === 'generalId' && generals) {
+    control = (
+      <select ref={ref} value={value} onChange={(e) => onChange(e.target.value)} onKeyDown={onKeyDown}>
+        <option value="">고르세요</option>
+        {generals.map((g) => (
+          <option key={g.id} value={String(g.id)}>
+            {g.name}
+          </option>
+        ))}
+      </select>
+    );
+  } else if (field.kind === 'city' || field.kind === 'nation' || field.kind === 'boolean' || field.kind === 'enum') {
     const options =
       field.kind === 'city'
         ? cities.map((c) => ({ value: String(c.key), label: c.name }))
@@ -292,13 +334,18 @@ function ArgInput({
   return (
     <div className={styles.argRow}>
       <label className={styles.argLabel}>
-        <span>{field.label}</span>
+        <span>{field.key === 'generalId' && generals ? '대상 장수' : field.label}</span>
         {control}
       </label>
       {mapHint ? (
         <button type="button" className={styles.linkButton} onClick={mapHint.use}>
           지도에서 고른 도시({mapHint.name}) 쓰기
         </button>
+      ) : null}
+      {note ? (
+        <p className={styles.muted} role="note">
+          {note}
+        </p>
       ) : null}
     </div>
   );

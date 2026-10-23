@@ -1,5 +1,7 @@
+import { publicMapConfig } from '@opensamguk/shared';
+import { persistPublicMap } from './publicMap';
 import type { Prisma, PrismaClient } from '@opensamguk/db';
-import { nextActionSequence } from '@opensamguk/db';
+import { nextActionSequence, notifyWorld, type RealtimeSignal } from '@opensamguk/db';
 import {
   checkpointClock,
   commandRegistry,
@@ -11,7 +13,7 @@ import {
   TICKS_PER_MONTH,
   type WorldState,
 } from '@opensamguk/rules';
-import { appendNationHistory, persistCommandReports } from './commandPersistence';
+import { appendNationHistory, persistCommandReports, commandRealtimeSignals } from './commandPersistence';
 import { assertLease, databaseNow, lockLease, type Lease } from './lease';
 import { loadWorld } from './worldLoader';
 import { persistEffects, shiftTurns } from './persist';
@@ -28,7 +30,11 @@ export interface PollBatch {
   more: boolean;
   status: WorldStatus;
 }
-type TurnHooks = { beforeCommit?: (tx: Prisma.TransactionClient) => Promise<void>; elapsedNow?: () => number };
+type TurnHooks = {
+  beforeCommit?: (tx: Prisma.TransactionClient) => Promise<void>;
+  elapsedNow?: () => number;
+  publicMapNow?: () => number;
+};
 export interface TurnExecution {
   generalId: number;
   tick: number;
@@ -41,6 +47,7 @@ export class TurnLoop {
   private busy = false;
   private readonly elapsedNow: () => number;
   private nextCheckpointAt: number;
+  private readonly mapConfig = publicMapConfig(process.env);
 
   constructor(
     private readonly db: PrismaClient,
@@ -95,7 +102,8 @@ export class TurnLoop {
 
   private async step(target: number | undefined, signal?: AbortSignal) {
     const { worldId } = this.lease;
-    return this.db.$transaction(
+    const signals: RealtimeSignal[] = [];
+    const result = await this.db.$transaction(
       async (tx) => {
         await lockLease(tx, this.lease);
         // 일시정지·재개와 턴 commit이 같은 월드 행에서 직렬화된다.
@@ -176,7 +184,11 @@ export class TurnLoop {
           const failed = 'code' in result;
           next = turn.state;
           next.generals[due.id]!.nextTurnTick = due.nextTurnTick + TICKS_PER_MONTH;
-          await persistEffects(tx, worldId, next, [{ kind: 'world', state: next }]);
+          signals.push(...commandRealtimeSignals(state, next));
+          await persistEffects(tx, worldId, next, [{ kind: 'world', state: next }], {
+            sequence,
+            tick: due.nextTurnTick,
+          });
           if (!failed) await persistCommandReports(tx, worldId, due.nextTurnTick, due.id, result);
           if (turn.nation) {
             const national = turn.nation.result;
@@ -250,6 +262,18 @@ export class TurnLoop {
           },
         });
         if (saved.count !== 1) throw new Error('월드 시계가 바뀌어 저장을 취소했습니다.');
+        if (next && progressed && !outcome) {
+          await persistPublicMap(
+            tx,
+            this.lease,
+            next,
+            endedTick!,
+            this.hooks.publicMapNow?.() ?? (await databaseNow(tx)).getTime(),
+            this.mapConfig,
+          );
+        }
+        if (monthly) signals.push({ kind: 'monthly.done', target: 'world' });
+        if (execution) signals.push({ kind: 'turn.result', target: { generalId: execution.generalId } });
         if (progressed) await this.hooks.beforeCommit?.(tx);
         signal?.throwIfAborted();
         await assertLease(tx, this.lease);
@@ -264,5 +288,8 @@ export class TurnLoop {
       },
       { timeout: 30_000 },
     );
+    for (const signal of signals)
+      await notifyWorld(this.db, worldId, signal, () => console.warn('실시간 알림 전송 실패'));
+    return result;
   }
 }

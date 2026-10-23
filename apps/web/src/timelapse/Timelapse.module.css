@@ -1,0 +1,123 @@
+.timelapse {
+  display: grid;
+  gap: var(--space-2);
+}
+.note,
+.status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.date {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-align: left;
+}
+.map {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 560px;
+  aspect-ratio: 7 / 5;
+  user-select: none;
+}
+.ground {
+  fill: var(--color-surface-muted);
+}
+.link {
+  stroke: var(--color-border-strong);
+  stroke-width: 1.2;
+}
+.dot {
+  stroke: var(--color-text-muted);
+  stroke-width: 1;
+}
+.unrecorded {
+  fill: none;
+  stroke-dasharray: 2 2;
+}
+.label {
+  font-size: 10px;
+  font-weight: 600;
+  text-anchor: middle;
+  fill: var(--color-text);
+  paint-order: stroke;
+  stroke: var(--color-surface);
+  stroke-width: 3px;
+}
+/* 국가 기록이 없는 달. 지도와 같은 자리를 차지해 재생 중 조작 줄이 흔들리지 않게 한다. */
+.missing {
+  display: grid;
+  place-content: center;
+  gap: var(--space-1);
+  aspect-ratio: 7 / 5;
+  max-height: 560px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+.missing p {
+  margin: 0;
+}
+.missingTitle {
+  font-weight: 600;
+  color: var(--color-text);
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-variant-numeric: tabular-nums;
+}
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1px solid var(--color-border-strong);
+}
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.button {
+  font: inherit;
+  font-size: var(--text-sm);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+}
+.button:disabled {
+  color: var(--color-text-muted);
+  cursor: default;
+}
+.play {
+  min-width: 4.5em;
+}
+.range {
+  flex: 1 1 160px;
+  min-width: 120px;
+}
+.error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+}
