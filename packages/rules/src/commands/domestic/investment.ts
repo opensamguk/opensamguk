@@ -3,6 +3,7 @@ import { BALANCE } from '../../balance';
 import type { WorldView } from '../../model/world';
 import type { Actor, CommandDef, Failure } from '../types';
 import type { CityField, Effect } from '../effects';
+import { applyModifiers, collectModifiers, collectModifiersWith, type ModifierProvider } from '../../modifiers';
 
 type Spec = {
   key: string;
@@ -52,6 +53,16 @@ function isFront(view: WorldView, cityKey: number): boolean {
 }
 
 export function makeInvestment(spec: Spec): CommandDef {
+  return makeInvestmentWithCollector(spec, collectModifiers);
+}
+
+export function makeInvestmentWithProviders(spec: Spec, providers: readonly ModifierProvider[]): CommandDef {
+  return makeInvestmentWithCollector(spec, (view, generalId, context) =>
+    collectModifiersWith(providers, view, generalId, context),
+  );
+}
+
+function makeInvestmentWithCollector(spec: Spec, collect: typeof collectModifiers): CommandDef {
   const cost = BALANCE.DEVEL_COST * (spec.costFactor ?? 1);
   function check(view: WorldView, actor: Actor): Failure | null {
     const general = view.generals[actor.generalId];
@@ -87,6 +98,9 @@ export function makeInvestment(spec: Spec): CommandDef {
       if (critical < 0.1) score *= 2.2 + rng.next() * 0.8;
       else if (critical < 0.2) score *= 0.2 + rng.next() * 0.2;
       if (isFront(view, city.cityKey)) score *= BALANCE.FRONT_FACTOR;
+      score = applyModifiers(score, collect(view, general.id, { stage: 'domestic.score', commandKey: spec.key }), {
+        min: 0,
+      });
       const points = Math.round(score);
       // 인구·민심의 단위만 바꾼다. 경험·공헌은 기존 점수로 계산한다.
       const cityScore = score * (spec.effectFactor ?? 1);
