@@ -137,6 +137,15 @@ async function seedLegacy(client: PgClient) {
       await insert(client, 'GeneralTurn', { ...turn, worldId, generalId: Number(id), slot, explicit: true });
   for (const diplomacy of replay.state.diplomacies) await insert(client, 'Diplomacy', { ...diplomacy, worldId });
   for (const month of archive.months) await insert(client, 'YearbookSnapshot', { ...month, worldId });
+  expect(JSON.parse(await rawArchive(client, worldId))).toEqual({
+    version: 2,
+    origin: archive.origin,
+    config: { endYear: null, outcomeFromSequence: last.sequence },
+    inputs: [],
+    months: archive.months,
+    end: null,
+    afterEnd: [],
+  });
   await seedWorld(client, 'preserved');
   await insert(client, 'Nation', {
     worldId: 'preserved',
@@ -156,15 +165,57 @@ async function seedLegacy(client: PgClient) {
 
 async function existingRows(client: PgClient) {
   const tables = await client.query(
-    "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' AND table_name <> 'WorldExtSlice' ORDER BY table_name",
+    "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' AND table_name NOT IN ('WorldExtSlice', 'Treaty') ORDER BY table_name",
   );
   const rows: Record<string, unknown> = {};
   for (const { table_name: table } of tables.rows) {
     if (typeof table !== 'string' || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(table))
       throw new Error('잘못된 시험 표 이름입니다.');
-    rows[table] = (await client.query(`SELECT to_jsonb(t) AS data FROM "${table}" t ORDER BY to_jsonb(t)::text`)).rows;
+    rows[table] = (
+      await client.query(`SELECT to_jsonb(t) - 'treatyFormat' AS data FROM "${table}" t ORDER BY to_jsonb(t)::text`)
+    ).rows;
   }
   return rows;
+}
+
+// 후보 전 스키마에서 현재 export의 F null·종료 없음·입력 없음 갈래를 raw 행으로 읽는다.
+async function rawArchive(client: PgClient, worldId: string) {
+  const worlds = (
+    await client.query(
+      'SELECT "replayOrigin", "endYear", "outcomeFromSequence", "policyFromSequence" FROM "World" WHERE id=$1',
+      [worldId],
+    )
+  ).rows;
+  expect(worlds).toHaveLength(1);
+  const world = worlds[0]!;
+  expect(world.replayOrigin).not.toBeNull();
+  expect(world.policyFromSequence).toBeNull();
+  for (const table of ['WorldResult', 'InputEvent'])
+    expect(
+      (await client.query(`SELECT count(*)::int AS count FROM "${table}" WHERE "worldId"=$1`, [worldId])).rows,
+    ).toEqual([{ count: 0 }]);
+  const months = (
+    await client.query(
+      'SELECT tick, year, month, sequence, "stateHash", data FROM "YearbookSnapshot" WHERE "worldId"=$1 ORDER BY tick',
+      [worldId],
+    )
+  ).rows;
+  return JSON.stringify({
+    version: 2,
+    origin: world.replayOrigin,
+    config: { endYear: world.endYear, outcomeFromSequence: world.outcomeFromSequence },
+    inputs: [],
+    months: months.map(({ tick, year, month, sequence, stateHash, data }) => ({
+      tick,
+      year,
+      month,
+      sequence,
+      stateHash,
+      data,
+    })),
+    end: null,
+    afterEnd: [],
+  });
 }
 
 async function verifySchema(client: PgClient) {
@@ -347,19 +398,37 @@ it.each(['empty', 'legacy'] as const)(
     await withDatabase(mode, async (client, db) => {
       const directories = (await readdir(migrations)).filter((name) => /^\d/.test(name)).sort();
       const previous = directories.filter((name) => name < migration);
+      const later = directories.filter((name) => name > migration);
       expect(previous.at(-1)).toBe('20261023071000_nation_offices');
+      expect(later).toEqual(['20261023073000_treaties']);
       for (const directory of previous)
         await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
       if (mode === 'legacy') await seedLegacy(client);
       const rows = await existingRows(client);
-      const beforeExport = mode === 'legacy' ? JSON.stringify(await exportReplay(db, 'legacy')) : undefined;
-      if (mode === 'legacy')
-        expect(hashState(await db.$transaction((tx) => loadReplayState(tx, 'legacy')))).toBe(GOLDEN);
+      const beforeExport = mode === 'legacy' ? await rawArchive(client, 'legacy') : undefined;
       await client.query(await readFile(new URL(`${migration}/migration.sql`, migrations), 'utf8'));
       expect(await existingRows(client)).toEqual(rows);
       expect((await client.query('SELECT count(*)::int AS count FROM "WorldExtSlice"')).rows).toEqual([{ count: 0 }]);
+      if (mode === 'legacy') expect(await rawArchive(client, 'legacy')).toBe(beforeExport);
       await verifySchema(client);
       await verifyStorage(client, db);
+      const settled = await existingRows(client);
+      const readSlices = async () =>
+        (
+          await client.query(
+            'SELECT "worldId", "key", "value"::text AS value FROM "WorldExtSlice" ORDER BY "worldId", "key"',
+          )
+        ).rows;
+      const slices = await readSlices();
+      // 후보 검증을 마친 뒤 후행 SQL을 적용해야 최신 앱의 스키마와 맞는다.
+      for (const directory of later)
+        await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
+      expect(await existingRows(client)).toEqual(settled);
+      expect(await readSlices()).toEqual(slices);
+      expect(
+        (await client.query('SELECT count(*)::int AS count FROM "World" WHERE "treatyFormat" IS NOT NULL')).rows,
+      ).toEqual([{ count: 0 }]);
+      expect((await client.query('SELECT count(*)::int AS count FROM "Treaty"')).rows).toEqual([{ count: 0 }]);
       if (mode === 'legacy') {
         const exported = await exportReplay(db, 'legacy');
         expect(exported.version).toBe(2);
