@@ -61,7 +61,15 @@ export function TurnEditor({ worldId, selectedCityKey, source = personalSource, 
     if (me.isError) return <ErrorState title="불러오지 못했습니다" onRetry={() => void me.refetch()} />;
     return <p className={styles.muted}>예턴을 불러오는 중…</p>;
   }
-  return <Editor key={made.storageKey} worldId={worldId} selectedCityKey={selectedCityKey} source={made} renderTop={renderTop} />;
+  return (
+    <Editor
+      key={made.storageKey}
+      worldId={worldId}
+      selectedCityKey={selectedCityKey}
+      source={made}
+      renderTop={renderTop}
+    />
+  );
 }
 
 function AuthLost() {
