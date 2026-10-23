@@ -117,6 +117,8 @@ export function buildArgs(
 export interface ArgNames {
   city: (key: number) => string | undefined;
   nation: (id: number) => string | undefined;
+  // 국가 칸(T2-06)만 넘긴다. 없으면 장수는 번호로 적는다.
+  general?: ((id: number) => string | undefined) | undefined;
 }
 
 // 칸에 넣은 인자를 짧게 적는다. 도시·국가는 지도 데이터의 이름을 쓴다.
@@ -125,6 +127,8 @@ export function describeArgs(args: Record<string, unknown>, names: ArgNames): st
   for (const [key, value] of Object.entries(args)) {
     if (key === 'cityKey' && typeof value === 'number') parts.push(names.city(value) ?? `도시 ${value}`);
     else if (key === 'nationId' && typeof value === 'number') parts.push(names.nation(value) ?? `국가 ${value}`);
+    else if (key === 'generalId' && typeof value === 'number' && names.general)
+      parts.push(names.general(value) ?? `장수 ${value}`);
     else if (key === 'buy' && typeof value === 'boolean') parts.push(value ? '쌀 사기' : '쌀 팔기');
     else if (key === 'resource' && typeof value === 'string') parts.push(ENUM_LABELS[value] ?? value);
     else parts.push(`${LABELS[key] ?? key} ${String(value)}`);

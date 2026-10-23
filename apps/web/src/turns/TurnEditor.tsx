@@ -5,41 +5,44 @@ import { useTRPC } from '../trpc';
 import { DisabledReason } from '../ui/DisabledReason';
 import { EmptyState, ErrorState } from '../ui/States';
 import { errorCode, retryUnlessClientError } from './apiError';
-import { describeArgs } from './args';
+import { describeArgs, type ArgNames } from './args';
 import { CommandPicker, type CommandInfo } from './CommandPicker';
 import {
   describeSelection,
   quickSelect,
   rangeBetween,
   repeatRange,
-  SLOT_COUNT,
+  toTurn,
   turnKey,
   type QuickSelect,
   type Turn,
 } from './draft';
-import { slotTimes } from './schedule';
+import { slotTimes, type SlotTime } from './schedule';
+import { personalSource, type TurnSource, type TurnSourceFactory } from './source';
 import styles from './TurnEditor.module.css';
-import { draftStorageKey, useTurnDraft } from './useTurnDraft';
+import { useTurnDraft } from './useTurnDraft';
 
 export interface TurnEditorProps {
   worldId: string;
   // 메인 지도에서 고른 도시(city.key). 대상 도시 칸의 기본값으로만 쓴다. 권한 근거가 아니며 편집을 바꾸거나 저장하지 않는다.
   selectedCityKey: number | null;
+  // 칸 수와 조회·저장 연결. 없으면 개인 30칸(turns.*)이다. 국가 직책 12칸은 nationTurns.*를 넘긴다 (T2-06).
+  source?: TurnSourceFactory;
 }
 
-// 30칸 예턴 편집기. 메인 명령 칸(T1-16)과 /w/:worldId/turns가 같은 부품을 쓴다.
+// 예턴 편집기. 메인 명령 칸(T1-16)과 /w/:worldId/turns가 개인 30칸으로, 국가 예턴(T2-06)이 직책 12칸으로 같은 부품을 쓴다.
 // 편집 초안·revision·선택·충돌 처리는 이 안에서 한다. 바깥에서 지도 선택이 바뀌거나 조회가 다시 돌아도 초안은 그대로다.
-export function TurnEditor({ worldId, selectedCityKey }: TurnEditorProps) {
+export function TurnEditor({ worldId, selectedCityKey, source = personalSource }: TurnEditorProps) {
   const trpc = useTRPC();
   const me = useQuery({ ...trpc.auth.me.queryOptions(), retry: retryUnlessClientError });
   const userId = me.data?.user?.id;
-  if (!userId) {
+  const made = useMemo(() => (userId ? source({ trpc, userId, worldId }) : null), [source, trpc, userId, worldId]);
+  if (!made) {
     if (me.data && !me.data.user) return <AuthLost />;
     if (me.isError) return <ErrorState title="불러오지 못했습니다" onRetry={() => void me.refetch()} />;
     return <p className={styles.muted}>예턴을 불러오는 중…</p>;
   }
-  const storageKey = draftStorageKey(userId, worldId);
-  return <Editor key={storageKey} worldId={worldId} selectedCityKey={selectedCityKey} storageKey={storageKey} />;
+  return <Editor key={made.storageKey} worldId={worldId} selectedCityKey={selectedCityKey} source={made} />;
 }
 
 function AuthLost() {
@@ -56,14 +59,26 @@ function AuthLost() {
 
 type PrecheckResult = { ok: true } | { ok: false; message: string } | { ok: 'error'; message: string } | undefined;
 
-function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { storageKey: string }) {
+function Editor({
+  worldId,
+  selectedCityKey,
+  source,
+}: {
+  worldId: string;
+  selectedCityKey: number | null;
+  source: TurnSource;
+}) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const state = useTurnDraft(worldId, storageKey);
+  const state = useTurnDraft(worldId, source);
   const { server, turns, serverTurns, draft, pending, notice } = state;
+  const slotCount = source.slotCount;
+  const readOnly = source.readOnly;
 
   const commands = useQuery({
-    ...trpc.commands.list.queryOptions({ worldId }),
+    queryKey: source.commands.queryKey,
+    queryFn: source.commands.queryFn,
+    select: source.commands.select,
     staleTime: Infinity,
     retry: retryUnlessClientError,
   });
@@ -90,9 +105,10 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
 
   // 서버 목록이 바뀌면(저장·턴 실행) 사전 검사도 새로 받는다. 장수 상태가 바뀌었을 수 있다.
   const revision = server.data?.revision;
+  const precheckRoot = source.precheckRoot;
   useEffect(() => {
-    if (revision !== undefined) void queryClient.invalidateQueries({ queryKey: trpc.turns.precheck.pathKey() });
-  }, [revision, queryClient, trpc]);
+    if (revision !== undefined) void queryClient.invalidateQueries({ queryKey: precheckRoot });
+  }, [revision, queryClient, precheckRoot]);
 
   const commandList: CommandInfo[] = useMemo(() => commands.data ?? [], [commands.data]);
   const commandName = useCallback(
@@ -101,26 +117,35 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
   );
   const cities = useMemo(() => map.data?.cities ?? [], [map.data]);
   const nations = useMemo(() => map.data?.nations ?? [], [map.data]);
+  const generals = source.generals;
   const names = useMemo(
     () => ({
       city: (key: number) => cities.find((c) => c.key === key)?.name,
       nation: (id: number) => nations.find((n) => n.id === id)?.name,
+      general: generals ? (id: number) => generals.find((g) => g.id === id)?.name : undefined,
     }),
-    [cities, nations],
+    [cities, nations, generals],
   );
 
   // 같은 명령·인자는 사전 검사를 한 번만 묻는다. 휴식은 묻지 않는다.
+  // 읽기 전용 칸은 내 상태로 검사할 수 없으므로 묻지 않는다.
   const distinct = useMemo(() => {
     const seen = new Map<string, Turn>();
-    for (const turn of turns ?? []) if (turn.commandKey !== 'rest') seen.set(turnKey(turn), turn);
+    if (readOnly === null)
+      for (const turn of turns ?? []) if (turn.commandKey !== 'rest') seen.set(turnKey(turn), turn);
     return [...seen.entries()];
-  }, [turns]);
+  }, [turns, readOnly]);
   const prechecks = useQueries({
-    queries: distinct.map(([, turn]) => ({
-      ...trpc.turns.precheck.queryOptions({ worldId, commandKey: turn.commandKey, args: turn.args }),
-      staleTime: 15_000,
-      retry: retryUnlessClientError,
-    })),
+    queries: distinct.map(([, turn]) => {
+      const check = source.precheck(turn);
+      return {
+        queryKey: check.queryKey,
+        queryFn: check.queryFn,
+        select: check.select,
+        staleTime: 15_000,
+        retry: retryUnlessClientError,
+      };
+    }),
   });
   const precheckByKey = new Map<string, PrecheckResult>();
   distinct.forEach(([key], i) => {
@@ -134,10 +159,12 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
       });
   });
 
-  const times30 = slotTimes(SLOT_COUNT, summary.data, home.data?.general.nextTurnTick, home.data?.nextTurnAt);
+  const times30: SlotTime[] = source.timed
+    ? slotTimes(slotCount, summary.data, home.data?.general.nextTurnTick, home.data?.nextTurnAt)
+    : Array.from({ length: slotCount }, () => ({ date: null, time: null, iso: null }));
 
   const focusRow = (i: number) => {
-    const next = Math.max(0, Math.min(SLOT_COUNT - 1, i));
+    const next = Math.max(0, Math.min(slotCount - 1, i));
     setFocus(next);
     rowRefs.current[next]?.focus();
   };
@@ -164,9 +191,8 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
     const key = event.key;
     if (key === 'ArrowDown' || key === 'ArrowUp' || key === 'Home' || key === 'End') {
       event.preventDefault();
-      const next =
-        key === 'ArrowDown' ? focus + 1 : key === 'ArrowUp' ? focus - 1 : key === 'Home' ? 0 : SLOT_COUNT - 1;
-      const clamped = Math.max(0, Math.min(SLOT_COUNT - 1, next));
+      const next = key === 'ArrowDown' ? focus + 1 : key === 'ArrowUp' ? focus - 1 : key === 'Home' ? 0 : slotCount - 1;
+      const clamped = Math.max(0, Math.min(slotCount - 1, next));
       if (event.shiftKey) addRange(anchor ?? focus, clamped);
       focusRow(clamped);
     } else if (key === ' ') {
@@ -191,16 +217,16 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
         : null;
   const putBlocked = busyReason ?? (selected.size === 0 ? '칸을 먼저 고르세요.' : null);
   const shiftN = Number(shiftBy);
-  const shiftOk = Number.isInteger(shiftN) && shiftN >= 1 && shiftN <= SLOT_COUNT - 1;
-  const repeat = repeatRange(selected);
+  const shiftOk = Number.isInteger(shiftN) && shiftN >= 1 && shiftN <= slotCount - 1;
+  const repeat = repeatRange(selected, slotCount);
   const timesN = Number(times);
-  const timesOk = Number.isInteger(timesN) && timesN >= 1 && timesN <= SLOT_COUNT - 1;
+  const timesOk = Number.isInteger(timesN) && timesN >= 1 && timesN <= slotCount - 1;
   const repeatReason =
     busyReason ??
     (!repeat
-      ? '이어진 칸 한 구간을 고르세요. 30번 칸에서 끝나는 구간은 반복할 자리가 없습니다.'
+      ? `이어진 칸 한 구간을 고르세요. ${slotCount}번 칸에서 끝나는 구간은 반복할 자리가 없습니다.`
       : !timesOk
-        ? '반복 횟수는 1~29입니다.'
+        ? `반복 횟수는 1~${slotCount - 1}입니다.`
         : null);
 
   const onPut = (turn: Turn) => {
@@ -230,6 +256,16 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
   const editCount = draft?.ops.length ?? 0;
   const selectionText = selected.size === 0 ? '없음' : `${describeSelection(selected)}번 칸`;
   const targetLabel = selected.size === 0 ? '고른 칸' : `${describeSelection(selected)}번 칸`;
+
+  if (readOnly !== null)
+    return (
+      <div className={styles.editor} data-testid="turn-editor" data-readonly="true">
+        <p className={styles.saveState} data-testid="readonly-reason">
+          읽기 전용: {readOnly}
+        </p>
+        <ReadOnlySlots label={source.gridLabel} slots={server.data?.slots ?? []} times={times30} names={names} />
+      </div>
+    );
 
   return (
     <div className={styles.editor} data-testid="turn-editor">
@@ -288,7 +324,7 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
             type="button"
             className={styles.chip}
             onClick={() => {
-              setSelected(quickSelect(kind));
+              setSelected(quickSelect(kind, slotCount));
               setAnchor(null);
             }}
           >
@@ -312,7 +348,7 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
           className={styles.table}
           role="grid"
           aria-multiselectable="true"
-          aria-label="예턴 30칸"
+          aria-label={source.gridLabel}
           aria-describedby={helpId}
           onKeyDown={onGridKey}
         >
@@ -393,6 +429,7 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
           cities={cities}
           nations={nations}
           selectedCityKey={selectedCityKey}
+          generals={generals}
           defaultCrewType={home.data?.general.crewType}
           blockedReason={putBlocked}
           targetLabel={targetLabel}
@@ -408,15 +445,15 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
             type="number"
             className="num"
             min={1}
-            max={SLOT_COUNT - 1}
+            max={slotCount - 1}
             value={shiftBy}
             onChange={(e) => setShiftBy(e.target.value)}
           />
         </label>
         {busyReason || !shiftOk ? (
           <>
-            <DisabledReason reason={busyReason ?? '칸 수는 1~29입니다.'}>당기기</DisabledReason>
-            <DisabledReason reason={busyReason ?? '칸 수는 1~29입니다.'}>밀기</DisabledReason>
+            <DisabledReason reason={busyReason ?? `칸 수는 1~${slotCount - 1}입니다.`}>당기기</DisabledReason>
+            <DisabledReason reason={busyReason ?? `칸 수는 1~${slotCount - 1}입니다.`}>밀기</DisabledReason>
           </>
         ) : (
           <>
@@ -444,7 +481,7 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
             type="number"
             className="num"
             min={1}
-            max={SLOT_COUNT - 1}
+            max={slotCount - 1}
             value={times}
             onChange={(e) => setTimes(e.target.value)}
           />
@@ -462,6 +499,53 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+// 남의 직책 칸(T2-06). 명령 이름은 서버가 칸에 실어 준 것을 쓴다. 내 직책이 못 쓰는 명령도 이름이 보인다.
+function ReadOnlySlots({
+  label,
+  slots,
+  times,
+  names,
+}: {
+  label: string;
+  slots: Array<{ commandKey: string; args?: unknown; name: string }>;
+  times: SlotTime[];
+  names: ArgNames;
+}) {
+  return (
+    <div className={styles.tableWrap}>
+      <table className={styles.table} aria-label={label}>
+        <thead>
+          <tr>
+            <th scope="col" className="num">
+              칸
+            </th>
+            <th scope="col">실행 시기</th>
+            <th scope="col">명령</th>
+          </tr>
+        </thead>
+        <tbody>
+          {slots.map((slot, i) => {
+            const args = describeArgs(toTurn(slot).args, names);
+            const time = times[i];
+            return (
+              <tr key={i} className={styles.row} data-slot={i + 1}>
+                <td className="num">{i + 1}</td>
+                <td className={styles.when}>
+                  <span>{time?.date ?? '—'}</span>
+                </td>
+                <td>
+                  <span className={styles.command}>{slot.name}</span>
+                  {args ? <span className={styles.args}> {args}</span> : null}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

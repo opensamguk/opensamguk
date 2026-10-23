@@ -3,8 +3,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTRPC } from '../trpc';
 import { errorCode, retryUnlessClientError, serverMessage } from './apiError';
 import { applyOp, applyOps, SLOT_COUNT, toSaveSlots, toTurn, type EditOp, type Turn } from './draft';
+import type { TurnSource } from './source';
 
-// 화면에 모아 둔 편집. 저장은 [저장] 한 번에 turns.set으로 30칸을 보낸다 (계획: 편집은 모았다가 한 번 저장).
+export { draftStorageKey } from './source';
+
+// 화면에 모아 둔 편집. 저장은 [저장] 한 번에 칸 전체를 보낸다 (계획: 편집은 모았다가 한 번 저장).
 // baseRevision은 편집을 시작한 서버 목록의 revision이다. 서버가 그 사이 바뀌었으면 STALE이 돌아온다.
 export interface Draft {
   baseRevision: number;
@@ -30,11 +33,8 @@ export type SaveNotice =
   | { kind: 'reapplied' }
   | null;
 
-const STORAGE_PREFIX = 'opensamguk.turnDraft.v1';
-
 // 저장하지 않은 편집은 이 탭의 sessionStorage에 둔다. 새로고침이나 다시 로그인한 뒤에도 이어서 저장할 수 있다.
-// 키에 계정 ID를 넣어 다른 계정으로 로그인하면 보이지 않게 한다.
-export const draftStorageKey = (userId: string, worldId: string) => `${STORAGE_PREFIX}:${userId}:${worldId}`;
+// 키는 source.storageKey다 (source.ts).
 
 function isTurn(value: unknown): value is Turn {
   if (typeof value !== 'object' || value === null) return false;
@@ -62,7 +62,7 @@ function isOp(value: unknown): value is EditOp {
   return false;
 }
 
-export function readStored(storage: Storage | undefined, key: string): Stored {
+export function readStored(storage: Storage | undefined, key: string, slotCount = SLOT_COUNT): Stored {
   const empty: Stored = { draft: null, pending: null };
   try {
     const raw = storage?.getItem(key);
@@ -76,7 +76,7 @@ export function readStored(storage: Storage | undefined, key: string): Stored {
       Array.isArray(draft.ops) &&
       draft.ops.every(isOp) &&
       Array.isArray(draft.turns) &&
-      draft.turns.length === SLOT_COUNT &&
+      draft.turns.length === slotCount &&
       draft.turns.every(isTurn);
     const okPending = !!pending && Array.isArray(pending.ops) && pending.ops.every(isOp);
     return {
@@ -99,18 +99,20 @@ function writeStored(storage: Storage | undefined, key: string, value: Stored) {
 
 const sessionStore = () => (typeof window === 'undefined' ? undefined : window.sessionStorage);
 
-export function useTurnDraft(worldId: string, storageKey: string) {
+export function useTurnDraft(worldId: string, source: TurnSource) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const turnsKey = trpc.turns.get.queryKey({ worldId });
+  const { storageKey } = source;
   const server = useQuery({
-    ...trpc.turns.get.queryOptions({ worldId }),
+    queryKey: source.list.queryKey,
+    queryFn: source.list.queryFn,
+    select: source.list.select,
     // 엔진이 턴을 실행하면 목록이 당겨진다. 편집 중이 아니면 바로 보이도록 자주 묻는다.
     refetchInterval: 10_000,
     retry: retryUnlessClientError,
   });
 
-  const [stored, setStored] = useState<Stored>(() => readStored(sessionStore(), storageKey));
+  const [stored, setStored] = useState<Stored>(() => readStored(sessionStore(), storageKey, source.slotCount));
   const [notice, setNotice] = useState<SaveNotice>(null);
   const { draft, pending } = stored;
 
@@ -122,7 +124,7 @@ export function useTurnDraft(worldId: string, storageKey: string) {
   const edit = useCallback(
     (op: EditOp) => {
       const data = server.data;
-      if (!data || !serverTurns) return;
+      if (!data || !serverTurns || source.readOnly !== null) return;
       setNotice(null);
       setStored((prev) => {
         if (prev.pending) return prev;
@@ -130,7 +132,7 @@ export function useTurnDraft(worldId: string, storageKey: string) {
         return { draft: { ...base, ops: [...base.ops, op], turns: applyOp(base.turns, op) }, pending: null };
       });
     },
-    [server.data, serverTurns],
+    [server.data, serverTurns, source.readOnly],
   );
 
   const discard = useCallback(() => {
@@ -151,9 +153,9 @@ export function useTurnDraft(worldId: string, storageKey: string) {
   }, [server.data, serverTurns]);
 
   const save = useMutation({
-    ...trpc.turns.set.mutationOptions(),
+    mutationFn: source.save,
     onSuccess: (result) => {
-      queryClient.setQueryData(turnsKey, { revision: result.revision, slots: result.slots });
+      source.writeList(queryClient, { revision: result.revision, slots: result.slots });
       if (result.ok) {
         // 저장 중에는 편집을 막으므로 지금 초안이 곧 저장한 내용이다.
         setStored({ draft: null, pending: null });
@@ -167,7 +169,13 @@ export function useTurnDraft(worldId: string, storageKey: string) {
     onError: (error) => {
       const code = errorCode(error);
       if (code === 'UNAUTHORIZED') setNotice({ kind: 'auth' });
-      else
+      else if (code === 'PRECONDITION_FAILED' && source.onOfficeChanged) {
+        // 본 직책과 지금 직책이 다르다. 예전 초안을 다른 칸에 다시 저장하지 않도록 바로 버린다.
+        const empty: Stored = { draft: null, pending: null };
+        writeStored(sessionStore(), storageKey, empty);
+        setStored(empty);
+        source.onOfficeChanged(serverMessage(error) ?? '직책이 바뀌었습니다. 국가 예턴을 다시 불러오세요.');
+      } else
         setNotice({
           kind: 'error',
           message: serverMessage(error) ?? '저장하지 못했습니다. 연결을 확인하고 다시 저장하세요.',
@@ -178,8 +186,8 @@ export function useTurnDraft(worldId: string, storageKey: string) {
   const submit = useCallback(() => {
     if (!draft || save.isPending) return;
     setNotice(null);
-    save.mutate({ worldId, revision: draft.baseRevision, slots: toSaveSlots(draft.turns) });
-  }, [draft, save, worldId]);
+    save.mutate({ revision: draft.baseRevision, slots: toSaveSlots(draft.turns) });
+  }, [draft, save]);
 
   const authLost = notice?.kind === 'auth' || (server.isError && errorCode(server.error) === 'UNAUTHORIZED');
 

@@ -26,8 +26,8 @@ export function toTurn(slot: { commandKey: string; args?: unknown }): Turn {
 }
 
 // 흩어진 칸 번호를 이어진 구간으로 묶는다. [1,2,3,7] → [[1,3],[7,7]]
-export function runs(indices: Iterable<number>): Array<[number, number]> {
-  const sorted = [...new Set(indices)].filter((i) => i >= 0 && i < SLOT_COUNT).sort((a, b) => a - b);
+export function runs(indices: Iterable<number>, slotCount = SLOT_COUNT): Array<[number, number]> {
+  const sorted = [...new Set(indices)].filter((i) => i >= 0 && i < slotCount).sort((a, b) => a - b);
   const result: Array<[number, number]> = [];
   for (const i of sorted) {
     const last = result.at(-1);
@@ -40,7 +40,7 @@ export function runs(indices: Iterable<number>): Array<[number, number]> {
 export function applyOp(turns: readonly Turn[], op: EditOp): Turn[] {
   if ('put' in op) {
     let next = [...turns];
-    for (const [from, to] of runs(op.put.indices))
+    for (const [from, to] of runs(op.put.indices, turns.length))
       next = editArray(next, { put: { from, to, value: op.put.turn } }, rest);
     return next;
   }
@@ -69,20 +69,23 @@ export function turnKey(turn: Turn): string {
   return JSON.stringify([turn.commandKey, args]);
 }
 
-// 반복은 이어진 한 구간만 된다. 마지막 칸(30번)이 끝인 구간은 뒤에 붙일 자리가 없다.
-export function repeatRange(selected: ReadonlySet<number>): { from: number; to: number } | null {
-  const ranges = runs(selected);
+// 반복은 이어진 한 구간만 된다. 마지막 칸(개인 30번, 국가 12번)이 끝인 구간은 뒤에 붙일 자리가 없다.
+export function repeatRange(
+  selected: ReadonlySet<number>,
+  slotCount = SLOT_COUNT,
+): { from: number; to: number } | null {
+  const ranges = runs(selected, slotCount);
   if (ranges.length !== 1) return null;
   const [from, to] = ranges[0]!;
-  return to >= SLOT_COUNT - 1 ? null : { from, to };
+  return to >= slotCount - 1 ? null : { from, to };
 }
 
 export type QuickSelect = 'all' | 'odd' | 'even';
 
 // 칸 번호는 화면에 1부터 보인다. 홀수 칸은 1·3·5…번(인덱스 0·2·4…)이다.
-export function quickSelect(kind: QuickSelect): Set<number> {
+export function quickSelect(kind: QuickSelect, slotCount = SLOT_COUNT): Set<number> {
   return new Set(
-    Array.from({ length: SLOT_COUNT }, (_, i) => i).filter((i) =>
+    Array.from({ length: slotCount }, (_, i) => i).filter((i) =>
       kind === 'all' ? true : kind === 'odd' ? i % 2 === 0 : i % 2 === 1,
     ),
   );

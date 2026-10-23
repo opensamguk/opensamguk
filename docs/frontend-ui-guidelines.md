@@ -115,6 +115,8 @@ T1-15 편집기(`apps/web/src/turns/TurnEditor.tsx`)의 조작입니다. 메인 
 | `/w/:worldId/turns` | 예턴 편집 단독 화면 (보조, T1-15 편집기 재사용) |
 | `/w/:worldId/city/:cityKey` | 도시 정보 (보조, 직접 링크) |
 | `/w/:worldId/nation/:nationId` | 국가 정보 (보조, 다른 국가는 공개 범위만) |
+| `/w/:worldId/nation/personnel` | 인사부 (T2-06). 소속 장수 표, 군주의 임명·해임. 위쪽 띠 메뉴 `국가` |
+| `/w/:worldId/nation/turns` | 국가 예턴 (T2-06). 직책 탭마다 12칸, 내 직책 칸만 편집하고 남의 칸은 읽기 전용. T1-15 편집기 재사용 |
 | `/w/:worldId/records?tab=general\|nation\|world` | 기록 넓게 보기 (보조) |
 | `/w/:worldId/create` | 장수 생성 |
 | `/w/:worldId/ranking?tab=generals\|nations&by=…` | 순위. `by`가 탭에 맞지 않으면 그 탭의 첫 기준 (`e2e/ranking.spec.ts`) |
