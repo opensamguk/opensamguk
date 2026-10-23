@@ -1,3 +1,5 @@
+// S8 기준 파일의 읽기·쓰기는 시험에만 필요하다. 제품 규칙에는 파일 접근을 넣지 않는다.
+// eslint-disable-next-line no-restricted-imports
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { format } from 'prettier';

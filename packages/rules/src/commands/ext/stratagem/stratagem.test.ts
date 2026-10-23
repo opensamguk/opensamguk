@@ -280,18 +280,18 @@ describe.each(stratagemCommands)('$key shared contract', (def) => {
     it(`rejects args ${JSON.stringify(raw)}`, () => {
       expect(resolver.run(world(), actor, def.key, raw, script([]).rng)).toMatchObject({ code: 'BAD_ARGS' });
     });
-  it('rejects wrong target; disabled definitions stay separate from production', () => {
+  it('rejects wrong target and permits enabled production definitions', () => {
     expect(resolver.run(world(), { ...actor, target: 'nation' }, def.key, args, script([]).rng)).toMatchObject({
       code: 'BAD_ARGS',
     });
     expect(
       createCommandResolverWithCommands(null, stratagemCommands).run(world(), actor, def.key, args, script([]).rng),
     ).toMatchObject({ code: 'COMMAND_DISABLED' });
-    expect(() => createCommandResolver(enabled)).toThrow('확장 명령 설정을 확인하세요');
+    expect(createCommandResolver(enabled).get(def.key)).toBe(def);
   });
-  it('production resolver does not register definition', () => {
+  it('production resolver disables the registered definition by default', () => {
     expect(createCommandResolver(null).run(world(), actor, def.key, args, script([]).rng)).toMatchObject({
-      code: 'UNKNOWN_COMMAND',
+      code: 'COMMAND_DISABLED',
     });
     expect(createCommandResolver(null).list('general').length + createCommandResolver(null).list('nation').length).toBe(
       37,

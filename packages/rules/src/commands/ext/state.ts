@@ -17,7 +17,12 @@ export interface ExtStateRegistry {
   }[];
 }
 export const extSlices: readonly ExtSlice[] = [];
-export const extCommandBindings: ExtStateRegistry['bindings'] = [];
+export const extCommandBindings: ExtStateRegistry['bindings'] = [
+  { commandKey: 'fire_attack', target: 'general', sliceKeys: [] },
+  { commandKey: 'sabotage', target: 'general', sliceKeys: [] },
+  { commandKey: 'incite', target: 'general', sliceKeys: [] },
+  { commandKey: 'plunder', target: 'general', sliceKeys: [] },
+];
 const reserved = new Set(['__proto__', 'constructor', 'prototype']);
 
 function fail(key: string): never {

@@ -121,6 +121,104 @@ describe('T4-02 등록된 확장 명령 대조', () => {
     }
   };
 
+  const stratagemFixture = () => ({
+    ...actualSupport(),
+    ...Object.fromEntries(
+      [
+        'ext/registry.ts',
+        'ext/stratagem/index.ts',
+        'ext/stratagem/base.ts',
+        'ext/stratagem/fire_attack.ts',
+        'ext/stratagem/sabotage.ts',
+        'ext/stratagem/incite.ts',
+        'ext/stratagem/plunder.ts',
+        '../clock/clock.ts',
+        '../clock/constants.ts',
+      ].map((file) => [
+        file,
+        readFileSync(join(root, 'packages/rules/src/commands', file), 'utf8').replaceAll('\r\n', '\n'),
+      ]),
+    ),
+  });
+
+  it('T4-17 실제 계략 import와 정적 목록·인자 검사가 같다', () => {
+    fixture(
+      stratagemFixture(),
+      (dir) => {
+        const runtime = importWithTsx(
+          dir,
+          `extensionCommands.map(def => ({ key: def.key, target: def.target, valid: def.args.safeParse({cityKey:1}).success, invalid: def.args.safeParse({cityKey:0}).success }))`,
+        );
+        expect(runtime).toEqual(readExtensionRegistryKeys(dir).map((def) => ({ ...def, valid: true, invalid: false })));
+        expect(runtime).toHaveLength(4);
+      },
+      join(root, 'packages/rules'),
+    );
+  });
+
+  it.each(['factory', 'property-key', 'spec-helper', 'definition-spread', 'zod-default', 'hidden-fifth'])(
+    'T4-17 지원 밖 %s를 실행하지 않고 CLI exit 1로 거부한다',
+    (kind) => {
+      const files = stratagemFixture();
+      const base = 'ext/stratagem/base.ts';
+      const fire = 'ext/stratagem/fire_attack.ts';
+      if (kind === 'factory') {
+        files[base] +=
+          `\nexport function makeStratagem(spec) { return { key: spec.key, name: spec.name, category: 'strategy', target: 'general', args: stratagemArgs, check: checkStratagem, precheck: checkStratagem, execute: (view, actor, raw, rng) => executeStratagem(spec, view, actor, raw, rng) }; }\n`;
+        for (const key of ['fire_attack', 'sabotage', 'incite', 'plunder']) {
+          const path = `ext/stratagem/${key}.ts`;
+          const spec = files[path]!.match(/export const \w+Spec: StratagemSpec = (\{[\s\S]*?\});/)![1]!;
+          files[path] = `import { makeStratagem } from './base';\nexport const ${key} = makeStratagem(${spec});\n`;
+        }
+      } else if (kind === 'property-key') {
+        files[fire] = files[fire]!.replace(
+          "export const fire_attack: CommandDef = {\n  key: 'fire_attack',",
+          'export const fire_attack: CommandDef = {\n  key: fireAttackSpec.key,',
+        );
+      } else if (kind === 'spec-helper') {
+        files[fire] = files[fire]!.replace(
+          /export const fireAttackSpec: StratagemSpec = (\{[\s\S]*?\n\});/,
+          "const make = (key) => ($1);\nexport const fireAttackSpec = make('fire_attack');",
+        );
+      } else if (kind === 'definition-spread') {
+        files['ext/stratagem/sabotage.ts'] = files['ext/stratagem/sabotage.ts']!.replace(
+          'export const sabotage: CommandDef = {',
+          "export const sabotage: CommandDef = { ...{ category: 'strategy' },",
+        );
+      } else if (kind === 'zod-default') {
+        files[base] = files[base]!.replace('cityKey: positive', 'cityKey: positive.default(1)');
+      } else {
+        files[base] += "\nexport function makeHidden(key) { return { key, target: 'general' }; }\n";
+        files['ext/stratagem/index.ts'] =
+          "import { makeHidden } from './base';\n" +
+          files['ext/stratagem/index.ts']!.replace(
+            '[fire_attack, sabotage, incite, plunder]',
+            "[fire_attack, sabotage, incite, plunder, makeHidden('hidden_command')]",
+          );
+      }
+      fixture(
+        files,
+        (dir) => {
+          if (kind === 'factory' || kind === 'hidden-fifth') {
+            const runtime = importWithTsx(dir, 'extensionCommands.map(({key,target}) => ({key,target}))');
+            expect(runtime).toEqual([
+              ...extensionCommands.map(({ key, target }) => ({ key, target })),
+              ...(kind === 'hidden-fifth' ? [{ key: 'hidden_command', target: 'general' }] : []),
+            ]);
+          }
+          expect(() => readExtensionRegistryKeys(dir)).toThrow(
+            kind === 'factory' ? '선언 makeStratagem을 찾지 못했다' : undefined,
+          );
+          emptyLegacyRegistry(dir);
+          const result = main(['--root', dir, '--file', tablePath]);
+          expect(result.code).toBe(1);
+          expect(result.output).toContain('registry를 읽지 못했다');
+        },
+        join(root, 'packages/rules'),
+      );
+    },
+  );
+
   it('운영 확장 목록의 key·target이 실제 extensionCommands와 순서까지 같다', () => {
     expect(readExtensionRegistryKeys(root)).toEqual(extensionCommands.map(({ key, target }) => ({ key, target })));
   });
@@ -629,7 +727,10 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
       evidence: [{ kind: 'test', ref: 'packages/rules/src/commands/farm.test.ts' }],
     };
     row(doc, 'fire_attack').stages.engine = { status: 'verified', evidence: [{ kind: 'ci', ref: RUN(1) }] };
-    const errors = errorsOf(doc);
+    const errors = errorsOf(
+      doc,
+      withDocs({ extensionRegistry: context.extensionRegistry.filter(({ key }) => key !== 'fire_attack') }),
+    );
     expect(errors).toContain('commands[farm].ui: verified에는 검증한 정확한 전체 SHA가 있어야 한다');
     expect(errors).toContain('commands[fire_attack].engine: verified에는 검증한 정확한 전체 SHA가 있어야 한다');
     expect(errors).toContain('commands[fire_attack].engine: registry에 없는 key인데 구현됐다고 적었다');
@@ -1012,6 +1113,7 @@ describe('전체 완료 게이트 (합성 저장소)', () => {
   const synthetic = (complete: boolean, change: Partial<Context> = {}): Context =>
     withDocs({
       registry: [{ key: 'farm', target: 'general' }],
+      extensionRegistry: [],
       baseline: baseline(),
       readDoc: (path: string) => (path === 'docs/plans/T1-08.md' ? reviewDoc : ''),
       ...docs(complete),
