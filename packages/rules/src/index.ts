@@ -35,3 +35,12 @@ export {
   type ExtInitContext,
   type ExtSlice,
 } from './commands/resolve';
+export {
+  applyModifiers,
+  type Modifier,
+  type ModifierOp,
+  type ModifierStage,
+  type ModifierContext,
+  type ModifierProvider,
+  type BattleModifiers,
+} from './modifiers';
