@@ -12,7 +12,7 @@ import { CRASH_MESSAGE, runSupervisor, type SupervisorEvent } from './supervisor
 import { controlClock } from './world/clock';
 import { saveInitialWorld } from './world/persistence';
 import { loadInitialWorld } from './world/resources';
-import { stopOwnedChild } from './process-lifecycle';
+import { requestShutdown } from './process-lifecycle';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -40,11 +40,9 @@ function alive(pid: number) {
 async function stop(child: ChildProcess, signal: NodeJS.Signals = 'SIGTERM') {
   if (child.exitCode !== null || child.signalCode !== null) return;
   const exited = once(child, 'exit');
-  if (signal === 'SIGTERM' || signal === 'SIGINT') await stopOwnedChild(child, exited, signal);
-  else {
-    child.kill(signal);
-    await exited;
-  }
+  if (signal === 'SIGTERM' || signal === 'SIGINT') requestShutdown(child, signal);
+  else child.kill(signal);
+  await exited;
 }
 
 afterEach(async () => {
