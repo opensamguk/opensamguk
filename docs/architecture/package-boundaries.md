@@ -25,6 +25,8 @@ tools/* ───────────▶ 무엇이든 (배포물에 포함�
   - E2: `apps/web/src/battleSim/publicUnitSet.ts`만 공개 병종표 `resources/unitset/basic.json` 하나를 상대 경로로 import합니다.
     이 파일에서만 `opensamguk/no-cross-package-relative`를 끄고 다른 상대 경로는 `no-restricted-imports`가 막습니다.
 
+지도 편집기 예외 E3 ([T4-76](../plans/T4-76.md)): `apps/web/src/mapEditor/**`에서 `@opensamguk/rules/resource-validation`의 값과 타입만 읽습니다. rules 본 경로와 다른 하위 경로, `shared/node`, engine·db, server 값, Node 내장 모듈과 다른 패키지의 상대 경로 import는 막습니다. 공개 하위 경로는 순수 schema·검증 함수·타입·상수만 내보냅니다. 화면의 기존 임시 검증 코드를 바꾸는 작업은 후속 담당이 맡습니다.
+
 ## 패키지별 책임
 
 | 패키지             | 넣는 것                                           | 넣지 않는 것 |
