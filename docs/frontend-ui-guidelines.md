@@ -181,6 +181,7 @@ T1-15 편집기(`apps/web/src/turns/TurnEditor.tsx`)의 조작입니다. 메인 
 | `/w/:worldId/operations` | 작전 목록과 만들기 (T2-12). 만들기 칸은 서버의 `canCreate`가 ok일 때만 |
 | `/w/:worldId/operations/:operationId` | 작전 타임라인(참여 장수 × 월)과 내 예턴 맞추기. 다른 국가 작전은 안내만 |
 | `/w/:worldId/nation/inspection` | 감찰 (T2-12). 메뉴는 직책자(officerLevel 5 이상)에게만 보인다 |
+| `/help`, `/help/:doc` | 도움말 (T2-17). `docs/user/` 가이드 9개와 생성 명령 목록을 웹 빌드에 묶어 보여 줌. 로그인 없이 열림, 서버 요청 없음 |
 | `/dev/ui` | 부품 모음 (개발 모드만) |
 
 ### 로그인 가드 (T1-14)
@@ -205,6 +206,7 @@ T1-15 편집기(`apps/web/src/turns/TurnEditor.tsx`)의 조작입니다. 메인 
 - 버튼은 `auth.me`와 `myGeneral`, `createBlockedReason`만 보고 고릅니다 (`apps/web/src/lobby/lobbyView.ts`의 `lobbyAction`). 내 장수가 있으면 `들어가기`, 없으면 `장수 만들기`, 로그인 안 했으면 `로그인하고 참가`(`/login?next=/lobby`)입니다. 서버가 이유를 주면 그 버튼을 `DisabledReason`으로 막고 이유를 보입니다.
 - 월드가 0개면 `EmptyState`, 목록이나 `auth.me`를 못 받으면 `ErrorState`와 다시 시도입니다. 공지를 못 받으면 공지 자리에만 `ErrorState`를 둡니다.
 - T2-03 API가 main에 들어오기 전까지 응답 타입은 `apps/web/src/lobby/contract.ts`에 둡니다.
+- 위쪽 띠 메뉴는 메인·예턴·기록·순위·전투 시뮬레이터·도움말입니다. 보조 화면에는 메인에서 보기 링크가 있습니다. 왼쪽 장수 요약 띠는 메인 폭을 위해 없앴습니다 (§2).
 
 ### 로그인·가입 화면
 

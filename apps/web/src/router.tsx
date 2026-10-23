@@ -10,6 +10,7 @@ import {
 import { BattleSimPage } from './battleSim/BattleSimPage';
 import { DiplomacyPage, parseDiplomacySearch } from './diplomacy/DiplomacyPage';
 import { CreateGeneralPage } from './general/CreateGeneralPage';
+import { HelpPage } from './help/HelpPage';
 import { GameLayout } from './layout/GameLayout';
 import { LobbyPage } from './lobby/LobbyPage';
 import { MessagesPage } from './messages/MessagesPage';
@@ -229,6 +230,21 @@ const createGeneralRoute = createRoute({
   component: CreateGeneralPage,
 });
 
+// 도움말 (T2-17). 플레이어 가이드 9개와 생성 명령 목록. 로그인 없이 연다.
+const helpRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'help',
+  component: () => <HelpPage doc="index" />,
+});
+const helpDocRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'help/$doc',
+  component: function HelpDocRoute() {
+    const { doc } = helpDocRoute.useParams();
+    return <HelpPage doc={doc} />;
+  },
+});
+
 const devUiRoute = createRoute({ getParentRoute: () => rootRoute, path: 'dev/ui', component: DevUiPage });
 
 const routeTree = rootRoute.addChildren([
@@ -237,6 +253,8 @@ const routeTree = rootRoute.addChildren([
   loginRoute,
   signupRoute,
   notificationSettingsRoute,
+  helpRoute,
+  helpDocRoute,
   worldRoute.addChildren([
     worldIndexRoute,
     mapRoute,
