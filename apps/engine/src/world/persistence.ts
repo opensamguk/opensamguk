@@ -59,6 +59,7 @@ export async function saveInitialWorld(
     }),
     initialStateHash: stateHash,
   };
+  let creationState = state;
   if (options.treatyFormat === 1) {
     const origin: CapsOrigin = {
       version: ORIGIN_CAPS,
@@ -68,7 +69,9 @@ export async function saveInitialWorld(
       capabilities: { version: 1, treaty: { version: 1 } },
     };
     origin.resourceHash = hashState(capsResourceHashInput(origin));
-    replayOrigin = parseCapsOrigin(origin);
+    const parsedOrigin = parseCapsOrigin(origin);
+    replayOrigin = parsedOrigin;
+    creationState = parsedOrigin.initial;
   }
   const world = await db.$transaction(
     async (tx) => {
@@ -77,35 +80,35 @@ export async function saveInitialWorld(
           name: options.name,
           ...(preset ? { presetKey: options.preset!.key, preset: preset as Prisma.InputJsonValue } : {}),
           turnTermMinutes: options.turnTermMinutes,
-          scenarioKey: state.scenarioKey,
-          mapKey: state.mapKey,
-          unitSetKey: state.unitSetKey,
-          seed: state.seed,
-          startYear: state.startYear,
+          scenarioKey: creationState.scenarioKey,
+          mapKey: creationState.mapKey,
+          unitSetKey: creationState.unitSetKey,
+          seed: creationState.seed,
+          startYear: creationState.startYear,
           endYear: options.endYear,
           initialStateHash: stateHash,
           ...(options.replayFormat === 'legacy' ? {} : { policyFromSequence: 0 }),
           ...(options.treatyFormat === 1 ? { treatyFormat: 1 } : {}),
           replayOrigin: replayOrigin as Prisma.InputJsonValue,
-          statRules: state.statRules,
-          unitSet: state.unitSet as Prisma.InputJsonValue,
-          ...(state.commandMeta ? { commandMeta: state.commandMeta as Prisma.InputJsonValue } : {}),
+          statRules: creationState.statRules,
+          unitSet: creationState.unitSet as Prisma.InputJsonValue,
+          ...(creationState.commandMeta ? { commandMeta: creationState.commandMeta as Prisma.InputJsonValue } : {}),
         },
       });
       const worldId = world.id;
       // 국가↔수도 순환 참조는 같은 트랜잭션에서 도시를 만든 뒤 연결한다.
       await tx.nation.createMany({
-        data: state.nations.map((nation) => ({ ...nation, worldId, capitalCityKey: null })),
+        data: creationState.nations.map((nation) => ({ ...nation, worldId, capitalCityKey: null })),
       });
-      await tx.city.createMany({ data: state.cities.map((city) => ({ ...city, worldId })) });
-      for (const nation of state.nations) {
+      await tx.city.createMany({ data: creationState.cities.map((city) => ({ ...city, worldId })) });
+      for (const nation of creationState.nations) {
         await tx.nation.update({
           where: { worldId_id: { worldId, id: nation.id } },
           data: { capitalCityKey: nation.capitalCityKey },
         });
       }
       await tx.general.createMany({
-        data: state.generals.map((general) => ({
+        data: creationState.generals.map((general) => ({
           ...general,
           worldId,
           ...(options.replayFormat === 'legacy'
@@ -115,13 +118,15 @@ export async function saveInitialWorld(
       });
       if (options.replayFormat !== 'legacy')
         await tx.generalTurn.createMany({
-          data: state.generals.flatMap((general) =>
+          data: creationState.generals.flatMap((general) =>
             emptyQueue().map((turn, slot) => ({ ...turn, args: {}, worldId, generalId: general.id, slot })),
           ),
         });
-      await tx.diplomacy.createMany({ data: state.diplomacies.map((diplomacy) => ({ ...diplomacy, worldId })) });
+      await tx.diplomacy.createMany({
+        data: creationState.diplomacies.map((diplomacy) => ({ ...diplomacy, worldId })),
+      });
       await tx.nationTurn.createMany({
-        data: Object.entries(state.nationTurns ?? {}).flatMap(([nationId, slots]) =>
+        data: Object.entries(creationState.nationTurns ?? {}).flatMap(([nationId, slots]) =>
           slots.map((slot, i) => ({
             worldId,
             nationId: Number(nationId),
