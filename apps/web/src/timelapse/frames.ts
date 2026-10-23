@@ -1,16 +1,23 @@
 import type { MapCity } from '../game/types';
 
-// 영토 재생의 응답 모양 (T4-35 계약). 서버 타입을 연결하기 전이라 지역 타입으로 둔다.
-// 연결할 때 실제 응답 타입이 여기에 할당되는지 satisfies로 묶어 계약이 바뀌면 타입 검사가 깨지게 한다.
+// 영토 재생의 응답 모양 (T4-35 계약, nations는 T4-56 프레임 조회). 그리는 부품이 서버 타입 없이 돌도록 지역 타입으로 둔다.
+// 실제 응답 타입이 여기에 할당되는지는 TimelapsePanel.tsx의 satisfies가 묶어 계약이 바뀌면 타입 검사가 깨진다.
 export interface FrameCity {
   cityKey: number;
   nationId: number | null;
+}
+export interface StoredNation {
+  id: number;
+  name: string;
+  color: string;
 }
 export interface TimelapseFrame {
   tick: number;
   year: number;
   month: number;
   cities: readonly FrameCity[];
+  // 그 달 정산 때 저장된 국가 이름·색. 그 프레임 도시 소유에 나오는 국가만 온다.
+  nations: readonly StoredNation[];
 }
 export interface TimelapsePage {
   items: readonly TimelapseFrame[];
@@ -47,12 +54,6 @@ export function joinPages(pages: readonly TimelapsePage[]): JoinedFrames {
     if (!last || page.nextCursor !== String(last.tick)) return { ok: false, frames, error: 'cursor' };
   }
   return { ok: true, frames };
-}
-
-export interface StoredNation {
-  id: number;
-  name: string;
-  color: string;
 }
 
 // 지도 도시 하나의 이 달 모습. nation이 null이면 프레임에 그 도시가 없다.
