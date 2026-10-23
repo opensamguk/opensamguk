@@ -205,6 +205,8 @@ export class TurnLoop {
             );
             if (!isPolicyKey(actor.defaultPolicy)) throw new Error('기본 방침이 올바르지 않습니다.');
           }
+          const treatiesHash =
+            world.treatyFormat === 1 ? hashState(state.treaties ? { treaties: state.treaties } : {}) : null;
           const turn = runGeneralTurn(
             state,
             { generalId: due.id, tick: due.nextTurnTick, unitSet: unitSetSchema.parse(world.unitSet) },
@@ -217,6 +219,11 @@ export class TurnLoop {
             modern ? { policy: actor.defaultPolicy as import('@opensamguk/rules').PolicyKey } : {},
             engineResolver(world).resolver,
           );
+          if (
+            treatiesHash !== null &&
+            treatiesHash !== hashState(turn.state.treaties ? { treaties: turn.state.treaties } : {})
+          )
+            throw new Error('턴 실행 중 조약 목록이 바뀌었습니다.');
           const commandKey = turn.commandKey;
           const result = turn.result;
           const failed = 'code' in result;
