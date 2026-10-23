@@ -71,8 +71,10 @@
 
 > 원작과 다른 점
 >
-> 오픈삼국은 원작에 없는 기능을 핵심 규칙 위에 덧붙입니다. 같은 나라 장수가 목표와 시점을 맞추는 작전판, 빈 칸의 기본 방침, 조약서 외교, 교역, 알림이 준비 중입니다. 들어오는 대로 이 안내에 더합니다.
+> 오픈삼국은 원작에 없는 기능을 핵심 규칙 위에 덧붙입니다. 같은 나라 장수가 목표와 시점을 맞추는 작전판은 메뉴의 [작전]에 있고 쓰는 법은 [전쟁과 예턴 조합](./war-and-orders.md)에 적었습니다.
+> 군주·참모·수뇌는 메뉴의 [감찰]에서 소속 장수의 병력·훈련·사기, 예턴 앞 5칸, 마지막 접속을 봅니다. 오래 접속하지 않은 장수는 서버가 정한 대로 표시됩니다.
+> 빈 칸의 기본 방침, 조약서 외교, 교역, 알림이 준비 중입니다. 들어오는 대로 이 안내에 더합니다.
 
 다음은 [용어 사전](./glossary.md)입니다.
 
-근거: `apps/web/src/game/names.ts`, `packages/rules/src/commands/personnel.ts`, `packages/rules/src/commands/personal.ts`, `packages/rules/src/commands/support.ts`, `packages/rules/src/ranking.ts`, `apps/server/src/visibility.ts`, `apps/server/src/routers/records.ts`, `apps/web/src/main/NationInfo.tsx`, `apps/web/src/ranking/rankingView.ts`
+근거: `apps/web/src/game/names.ts`, `packages/rules/src/commands/personnel.ts`, `packages/rules/src/commands/personal.ts`, `packages/rules/src/commands/support.ts`, `packages/rules/src/ranking.ts`, `apps/server/src/visibility.ts`, `apps/server/src/routers/records.ts`, `apps/web/src/main/NationInfo.tsx`, `apps/web/src/ranking/rankingView.ts`, `apps/web/src/operations/InspectionPage.tsx`
