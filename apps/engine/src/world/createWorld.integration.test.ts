@@ -21,6 +21,32 @@ afterAll(async () => {
 });
 
 describe('AC-M1-03 실제 DB 월드 생성', () => {
+  const cliArgs = [
+    '--scenario',
+    '1030',
+    '--map',
+    'che',
+    '--seed',
+    'cli-seed',
+    '--turn-term',
+    '7',
+    '--end-year',
+    '300',
+    '--name',
+    'CLI 통합 검증',
+  ];
+  const runCli = (args: readonly string[]) =>
+    execFileSync(
+      process.execPath,
+      ['--env-file-if-exists=.env', '--import', 'tsx', 'apps/engine/src/cli/createWorld.ts', ...args],
+      {
+        cwd: new URL('../../../../', import.meta.url),
+        env: { ...process.env, DATABASE_URL: url },
+        encoding: 'utf8',
+        timeout: 30_000,
+      },
+    );
+
   it('94개 도시·21개 국가·491명·외교 7쌍을 저장하고 재적재 해시가 같다', async () => {
     const state = await loadInitialWorld(input);
     const first = await saveInitialWorld(db, state, options);
@@ -113,37 +139,29 @@ describe('AC-M1-03 실제 DB 월드 생성', () => {
   });
 
   it('CLI가 받은 설정을 저장하고 월드 ID와 실제 상태 해시를 출력한다', async () => {
-    const root = new URL('../../../../', import.meta.url);
-    const output = execFileSync(
-      'pnpm',
-      [
-        '-s',
-        'world:create',
-        '--scenario',
-        '1030',
-        '--map',
-        'che',
-        '--seed',
-        'cli-seed',
-        '--turn-term',
-        '7',
-        '--end-year',
-        '300',
-        '--name',
-        'CLI 통합 검증',
-      ],
-      {
-        cwd: root,
-        env: { ...process.env, DATABASE_URL: url },
-        encoding: 'utf8',
-        timeout: 30_000,
-      },
-    );
+    const output = runCli(cliArgs);
     const result = JSON.parse(output.trim().split('\n').at(-1)!) as { worldId: string; stateHash: string };
     expect(hashState(await readWorldState(db, result.worldId))).toBe(result.stateHash);
     expect(await db.world.findUniqueOrThrow({ where: { id: result.worldId } })).toMatchObject({
       name: 'CLI 통합 검증',
       turnTermMinutes: 7,
     });
+  });
+
+  it('CLI의 필수 인수 누락은 종료 코드 1이고 월드를 쓰지 않는다', async () => {
+    const before = await db.world.count();
+    let failure: unknown;
+    try {
+      runCli(cliArgs.slice(0, -2));
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toMatchObject({
+      status: 1,
+      stderr: expect.stringContaining('scenario, map, seed, turn-term, end-year, name이 필요합니다.'),
+    });
+    const { stdout, stderr } = failure as { stdout: string; stderr: string };
+    expect(`${stdout}${stderr}`.includes(url!)).toBe(false);
+    expect(await db.world.count()).toBe(before);
   });
 });
