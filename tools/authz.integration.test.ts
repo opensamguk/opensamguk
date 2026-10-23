@@ -149,11 +149,27 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
               : path === 'auth.login' && category === 'sanctioned'
                 ? { email: users[2]!.email, password }
                 : input(path);
+          const commandsOwner = path === 'commands.list' && category === 'otherUser' ? await session() : undefined;
           const before = await snapshot();
           const result = await request(path, data, cookie);
           if (category === 'otherUser') {
-            // 이 월드에 자기 장수가 없는 사용자는 남의 장수·예턴·기록을 대신 고를 수 없다.
-            expect(result.code).toBe('NOT_FOUND');
+            if (path === 'commands.list') {
+              const owner = await request(path, data, commandsOwner);
+              expect(owner.status).toBe(200);
+              expect(owner.code).toBeUndefined();
+              expect(result.status).toBe(200);
+              expect(result.code).toBeUndefined();
+              expect(result.data).toEqual(owner.data);
+              expect(result.data).toEqual(
+                expect.arrayContaining([
+                  expect.objectContaining({ key: 'rest' }),
+                  expect.objectContaining({ key: 'farm' }),
+                ]),
+              );
+            } else {
+              // 이 월드에 자기 장수가 없는 사용자는 남의 장수·예턴·기록을 대신 고를 수 없다.
+              expect(result.code).toBe('NOT_FOUND');
+            }
             expect(await snapshot()).toEqual(before);
           } else if (category === 'invalidInput') {
             expect(result.code).toBe('BAD_REQUEST');

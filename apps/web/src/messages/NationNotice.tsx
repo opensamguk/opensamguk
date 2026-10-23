@@ -1,42 +1,62 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useRef, useState } from 'react';
 import { serverMessage } from '../turns/apiError';
+import { useTRPC } from '../trpc';
 import { DisabledReason } from '../ui/DisabledReason';
 import { ErrorState } from '../ui/States';
-import { api, noticeKeys, type NationNotice } from './contract';
-import { useDraft } from './drafts';
+import { authorityEpoch, useAuthority } from './authority';
+import { BODY_MAX, BODY_TOO_LONG, bodyLength, type NationNotice } from './contract';
+import { readDraft, useDraft, writeDraft } from './drafts';
 import { formatTime } from './MessagePanel';
 import { useNationNotice } from './queries';
 import styles from './NationNotice.module.css';
 
-const NOTICE_MAX = 1_000;
-const seenKey = (notice: NationNotice) => `${notice.nationId}:${notice.revision}`;
+const seenKey = (notice: Pick<NationNotice, 'nationId' | 'revision'>) => `${notice.nationId}:${notice.revision}`;
 
 // 국가 공지 팝업. 바뀐 공지(unseen)를 첫 접속 때 한 번 띄운다 (T2-09 국가 공지 읽음, 검토 R63-3R).
 // 닫을 때는 팝업을 열 때 담아 둔 nationId·revision을 보낸다. 그사이 SSE나 ready 재조회로 캐시가 바뀌어도 캐시 값을 보내지 않는다.
-// 응답의 unseen이 아직 true면(그사이 새 공지, 또는 다른 국가로 옮김) 그 응답 본문으로 한 번 더 띄운다. null이면(재야) 띄우지 않는다.
+// markSeen을 부를 때와 응답을 받을 때의 권한 epoch가 같으면 응답을 따른다. unseen이 아직 true면(그사이 새 공지, 또는 다른 국가로
+// 옮김) 그 응답 본문으로 한 번 더 띄우고 null이면(재야) 띄우지 않는다. epoch가 바뀌었으면 응답은 버리고, 권한이 바뀔 때 비운
+// notice.nation.get을 새로 받은 값으로 다음 팝업을 정한다. 무엇을 띄울지는 늘 서버의 unseen이 정한다.
 export function NationNoticePopup({ worldId }: { worldId: string }) {
+  const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const authority = useAuthority(worldId);
   const notice = useNationNotice(worldId);
+  const { mutateAsync: markSeen } = useMutation(trpc.notice.nation.markSeen.mutationOptions());
   const [shown, setShown] = useState<NationNotice | null>(null);
   const [closing, setClosing] = useState(false);
   // 읽음 처리에 실패한 판은 이 탭에서 다시 띄우지 않는다. 다음 접속 때 다시 뜬다.
   const failed = useRef(new Set<string>());
-  const data = notice.data;
+  const data = authority.ready ? notice.data : undefined;
 
+  // 서버가 권한을 거둬 ready가 꺼지면 띄운 공지도 거둔다. 국가를 옮기는 것만으로는 ready가 꺼지지 않으므로
+  // 그때 띄운 판은 남아 닫을 때 그 판을 보낸다.
+  if (!authority.ready && shown) setShown(null);
+
+  // 이 render가 본 epoch다. effect가 실행될 때 epoch가 이미 바뀌었으면 그 render의 data는 예전 권한의 값이라 띄우지 않는다.
+  // 새 epoch로 다시 그려진 render의 effect가 새 data로 정한다.
+  const renderEpoch = authority.epoch;
   useEffect(() => {
+    if (renderEpoch !== authorityEpoch(worldId)) return;
     if (shown || closing || !data?.unseen || failed.current.has(seenKey(data))) return;
     setShown(data);
-  }, [closing, data, shown]);
+  }, [closing, data, renderEpoch, shown, worldId]);
 
   const close = async () => {
     if (!shown) return;
     const { nationId, revision } = shown;
+    const epoch = authorityEpoch(worldId);
+    const queryKey = trpc.notice.nation.get.queryKey({ worldId });
     setShown(null);
     setClosing(true);
     try {
-      const result = await api.notice.nation.markSeen.mutate({ worldId, nationId, revision });
-      queryClient.setQueryData(noticeKeys.nation(worldId), result);
+      const result = await markSeen({ worldId, nationId, revision });
+      if (authorityEpoch(worldId) !== epoch) return;
+      // 읽음 처리 전에 시작한 공지 재조회는 읽기 전 값을 가져올 수 있다. 그 요청을 취소하고 서버가 준 읽음 뒤 값을 넣는다.
+      await queryClient.cancelQueries({ queryKey });
+      if (authorityEpoch(worldId) !== epoch) return;
+      queryClient.setQueryData(queryKey, result);
       if (result?.unseen) setShown(result);
     } catch {
       failed.current.add(`${nationId}:${revision}`);
@@ -100,32 +120,40 @@ function NoticeMeta({ notice }: { notice: NationNotice }) {
   );
 }
 
-// 메인 국가 정보 칸의 공지. 군주·참모(canEdit)만 고친다. 고치는 중인 글은 drafts.ts에 두어 재조회로 지워지지 않는다.
+// 메인 국가 정보 칸의 공지. 서버가 준 canEdit이 true일 때만 고친다. 고치는 중인 글은 drafts.ts에 소속 국가별로 두어
+// 재조회로 지워지지 않고, 국가를 옮기면 예전 국가의 초안이 새 국가로 가지 않는다.
 export function NationNoticeBox({ worldId }: { worldId: string }) {
+  const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const authority = useAuthority(worldId);
   const notice = useNationNotice(worldId);
-  const [draft, setDraft] = useDraft<string | null>(`notice:edit:${worldId}`, null);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const draftKey = `notice:edit:${worldId}:${authority.nationId ?? 'none'}`;
+  const [draft, setDraft] = useDraft<string | null>(draftKey, null);
+  const set = useMutation(trpc.notice.nation.set.mutationOptions());
   const fieldId = useId();
 
   if (notice.isError)
     return <ErrorState title="국가 공지를 불러오지 못했습니다" onRetry={() => void notice.refetch()} />;
-  const data = notice.data;
+  const data = authority.ready ? notice.data : undefined;
   if (!data) return null;
+  const editing = draft !== null && data.canEdit;
+  const length = draft === null ? 0 : bodyLength(draft);
+  const error = set.isError
+    ? (serverMessage(set.error) ?? '저장하지 못했습니다. 연결을 확인하고 다시 저장하세요.')
+    : null;
 
   const save = async () => {
-    if (draft === null || saving) return;
-    setSaving(true);
-    setError(null);
+    if (draft === null || set.isPending || length > BODY_MAX) return;
+    const epoch = authorityEpoch(worldId);
+    const body = draft;
     try {
-      const result = await api.notice.nation.set.mutate({ worldId, body: draft });
-      queryClient.setQueryData(noticeKeys.nation(worldId), result);
-      setDraft(null);
-    } catch (caught) {
-      setError(serverMessage(caught) ?? '저장하지 못했습니다. 연결을 확인하고 다시 저장하세요.');
-    } finally {
-      setSaving(false);
+      const result = await set.mutateAsync({ worldId, body });
+      if (readDraft<string | null>(draftKey, null) === body) writeDraft(draftKey, null);
+      // 응답 전에 권한이 바뀌었으면 새 권한의 공지 칸에 예전 응답을 넣지 않는다.
+      if (authorityEpoch(worldId) !== epoch) return;
+      queryClient.setQueryData(trpc.notice.nation.get.queryKey({ worldId }), result);
+    } catch {
+      if (authorityEpoch(worldId) !== epoch) set.reset();
     }
   };
 
@@ -133,7 +161,7 @@ export function NationNoticeBox({ worldId }: { worldId: string }) {
     <section className={styles.box} aria-label="국가 공지" data-testid="nation-notice">
       <div className={styles.boxHead}>
         <h3 className={styles.boxTitle}>국가 공지</h3>
-        {draft !== null ? null : data.canEdit ? (
+        {editing ? null : data.canEdit ? (
           <button type="button" className={styles.secondary} onClick={() => setDraft(data.body)}>
             고치기
           </button>
@@ -141,7 +169,7 @@ export function NationNoticeBox({ worldId }: { worldId: string }) {
           <DisabledReason reason="군주와 참모만 고칠 수 있습니다.">고치기</DisabledReason>
         )}
       </div>
-      {draft === null ? (
+      {!editing ? (
         <>
           {data.body ? <p className={styles.body}>{data.body}</p> : <p className={styles.empty}>공지가 없습니다.</p>}
           <NoticeMeta notice={data} />
@@ -157,15 +185,14 @@ export function NationNoticeBox({ worldId }: { worldId: string }) {
           <label htmlFor={fieldId} className={styles.label}>
             <span>공지 내용</span>
             <span aria-hidden="true">
-              {draft.length}/{NOTICE_MAX}
+              {length}/{BODY_MAX}
             </span>
           </label>
           <textarea
             id={fieldId}
             className={styles.textarea}
             rows={4}
-            maxLength={NOTICE_MAX}
-            value={draft}
+            value={draft ?? ''}
             onChange={(event) => setDraft(event.target.value)}
           />
           {error ? (
@@ -174,15 +201,19 @@ export function NationNoticeBox({ worldId }: { worldId: string }) {
             </p>
           ) : null}
           <div className={styles.actions}>
-            <button type="submit" className={styles.primary} disabled={saving}>
-              {saving ? '저장하는 중' : '저장'}
-            </button>
+            {length > BODY_MAX ? (
+              <DisabledReason reason={BODY_TOO_LONG}>저장</DisabledReason>
+            ) : (
+              <button type="submit" className={styles.primary} disabled={set.isPending}>
+                {set.isPending ? '저장하는 중' : '저장'}
+              </button>
+            )}
             <button
               type="button"
               className={styles.secondary}
-              disabled={saving}
+              disabled={set.isPending}
               onClick={() => {
-                setError(null);
+                set.reset();
                 setDraft(null);
               }}
             >

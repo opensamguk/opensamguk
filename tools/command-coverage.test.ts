@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, normalize } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { commands, extensionCommands } from '../packages/rules/src/index';
@@ -1016,7 +1016,7 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
         'commands[farm].ui: verified는 독립 리뷰 기록(review)과 같은 SHA의 실행(ci)',
       );
     } finally {
-      expect(dirname(dir)).toBe(tmpdir());
+      expect(dirname(dir)).toBe(normalize(tmpdir()));
       rmSync(dir, { recursive: true, force: true });
     }
   });
@@ -1089,7 +1089,7 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
       expect(verifyGitShas(doc(a.sha), plain)).toEqual(absentErrors);
       expect(verifyGitShas(doc(a.sha), a.repo)).toEqual(missingErrors(a.sha));
     } finally {
-      expect(dirname(dir)).toBe(tmpdir());
+      expect(dirname(dir)).toBe(normalize(tmpdir()));
       rmSync(dir, { recursive: true, force: true });
     }
   });
