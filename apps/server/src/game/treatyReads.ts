@@ -336,7 +336,8 @@ export async function listTreaties(
       return {
         nation: publicNation(n),
         relation: current,
-        relationEndAt: d?.state === 'NON_AGGRESSION' ? toGameDate(world.startYear, d.untilTick) : null,
+        relationEndAt:
+          d?.state === 'DECLARED' || d?.state === 'NON_AGGRESSION' ? toGameDate(world.startYear, d.untilTick) : null,
       };
     });
   return {

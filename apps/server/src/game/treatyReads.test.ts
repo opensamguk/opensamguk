@@ -268,6 +268,17 @@ describe('T2-07 / AC-M2-06 새 조회 leaf 보조 단위', () => {
         relationEndAt: toGameDate(191, 120000),
       },
     ]);
+    for (const state of ['DECLARED', 'WAR'] as const) {
+      f.diplomacies.mockResolvedValue([{ worldId: 'world', nationA: 1, nationB: 2, state, untilTick: 120000 }]);
+      const page = await listTreaties(f.db, identity);
+      expect(page.targets).toEqual([
+        {
+          nation: { id: 2, name: nation(2).name, color: nation(2).color },
+          relation: state,
+          relationEndAt: state === 'DECLARED' ? toGameDate(191, 120000) : null,
+        },
+      ]);
+    }
     expect(f.treaties).toHaveBeenNthCalledWith(1, {
       where: { worldId: 'world', fromNationId: 1, id: { lt: 101 } },
       orderBy: { id: 'desc' },
