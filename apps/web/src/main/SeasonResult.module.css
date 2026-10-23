@@ -1,0 +1,39 @@
+/* 메인 맨 위 결과 칸. 다른 메인 칸과 같은 바탕·테두리를 쓰고, 끝난 판임을 알리려 왼쪽에 강조 테두리 하나만 더한다. */
+.result {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-accent);
+  border-radius: var(--radius);
+}
+.title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-6);
+  margin: 0;
+}
+.cell {
+  display: grid;
+  gap: var(--space-1);
+}
+.cell dt {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.cell dd {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+.lead {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}

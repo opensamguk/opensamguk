@@ -23,12 +23,12 @@ export function TurnsPage() {
 
 function RecentResults({ worldId }: { worldId: string }) {
   const trpc = useTRPC();
+  const summary = useQuery({ ...trpc.world.summary.queryOptions({ worldId }), retry: retryUnlessClientError });
   const home = useQuery({
     ...trpc.home.get.queryOptions({ worldId }),
-    refetchInterval: 15_000,
+    refetchInterval: summary.data?.status === 'ENDED' ? false : 15_000,
     retry: retryUnlessClientError,
   });
-  const summary = useQuery({ ...trpc.world.summary.queryOptions({ worldId }), retry: retryUnlessClientError });
   const logs = home.data?.recentLogs ?? [];
   return (
     <section className={styles.results} aria-labelledby="recent-results">

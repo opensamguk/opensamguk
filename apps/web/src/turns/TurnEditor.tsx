@@ -21,6 +21,8 @@ import { slotTimes } from './schedule';
 import styles from './TurnEditor.module.css';
 import { draftStorageKey, useTurnDraft } from './useTurnDraft';
 
+const ENDED_REASON = '끝난 판이라 예턴을 바꿀 수 없습니다.';
+
 export interface TurnEditorProps {
   worldId: string;
   // 메인 지도에서 고른 도시(city.key). 대상 도시 칸의 기본값으로만 쓴다. 권한 근거가 아니며 편집을 바꾸거나 저장하지 않는다.
@@ -72,12 +74,14 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
     staleTime: 30_000,
     retry: retryUnlessClientError,
   });
+  const summary = useQuery({ ...trpc.world.summary.queryOptions({ worldId }), retry: retryUnlessClientError });
+  // 끝난 판은 예턴을 바꿀 수 없다. 서버도 거부하므로 화면은 막고 이유만 보여 주며 주기 조회도 멈춘다 (T1-27).
+  const ended = summary.data?.status === 'ENDED';
   const home = useQuery({
     ...trpc.home.get.queryOptions({ worldId }),
-    refetchInterval: 15_000,
+    refetchInterval: ended ? false : 15_000,
     retry: retryUnlessClientError,
   });
-  const summary = useQuery({ ...trpc.world.summary.queryOptions({ worldId }), retry: retryUnlessClientError });
 
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
   const [anchor, setAnchor] = useState<number | null>(null);
@@ -182,13 +186,15 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
     }
   };
 
-  const busyReason = state.saving
-    ? '저장하는 중입니다.'
-    : pending
-      ? '먼저 위 충돌 안내에서 다시 적용할지 고르세요.'
-      : !server.data
-        ? '예턴을 불러온 뒤에 고칠 수 있습니다.'
-        : null;
+  const busyReason = ended
+    ? ENDED_REASON
+    : state.saving
+      ? '저장하는 중입니다.'
+      : pending
+        ? '먼저 위 충돌 안내에서 다시 적용할지 고르세요.'
+        : !server.data
+          ? '예턴을 불러온 뒤에 고칠 수 있습니다.'
+          : null;
   const putBlocked = busyReason ?? (selected.size === 0 ? '칸을 먼저 고르세요.' : null);
   const shiftN = Number(shiftBy);
   const shiftOk = Number.isInteger(shiftN) && shiftN >= 1 && shiftN <= SLOT_COUNT - 1;
@@ -237,12 +243,14 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
         <p className={styles.saveState} data-testid="draft-state">
           {editCount > 0 ? `저장하지 않은 편집 ${editCount}건` : '저장된 목록'}
         </p>
-        {draft && !state.saving ? (
+        {draft && !state.saving && !ended ? (
           <button type="button" className={styles.primary} onClick={state.submit}>
             저장
           </button>
         ) : (
-          <DisabledReason reason={state.saving ? '저장하는 중입니다.' : '바꾼 칸이 없습니다.'}>저장</DisabledReason>
+          <DisabledReason reason={ended ? ENDED_REASON : state.saving ? '저장하는 중입니다.' : '바꾼 칸이 없습니다.'}>
+            저장
+          </DisabledReason>
         )}
         {draft ? (
           <button type="button" className={styles.secondary} onClick={state.discard} disabled={state.saving}>
@@ -251,6 +259,11 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
         ) : null}
       </div>
 
+      {ended ? (
+        <p className={styles.muted} data-testid="turns-locked">
+          {ENDED_REASON}
+        </p>
+      ) : null}
       <div role="status" className={styles.notice}>
         {state.saving ? '저장하는 중…' : null}
         {notice?.kind === 'saved' ? '저장했습니다.' : null}

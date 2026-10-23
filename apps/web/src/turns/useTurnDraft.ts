@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTRPC } from '../trpc';
+import { useWorldEnded } from '../game/queries';
 import { errorCode, retryUnlessClientError, serverMessage } from './apiError';
 import { applyOp, applyOps, SLOT_COUNT, toSaveSlots, toTurn, type EditOp, type Turn } from './draft';
 
@@ -103,10 +104,11 @@ export function useTurnDraft(worldId: string, storageKey: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const turnsKey = trpc.turns.get.queryKey({ worldId });
+  const ended = useWorldEnded(worldId);
   const server = useQuery({
     ...trpc.turns.get.queryOptions({ worldId }),
-    // 엔진이 턴을 실행하면 목록이 당겨진다. 편집 중이 아니면 바로 보이도록 자주 묻는다.
-    refetchInterval: 10_000,
+    // 엔진이 턴을 실행하면 목록이 당겨진다. 편집 중이 아니면 바로 보이도록 자주 묻는다. 끝난 판은 더 당겨지지 않는다.
+    refetchInterval: ended ? false : 10_000,
     retry: retryUnlessClientError,
   });
 
