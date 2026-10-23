@@ -166,7 +166,7 @@ const nationTurnsRoute = createRoute({
   component: NationTurnsPage,
 });
 
-const RECORD_TABS = ['general', 'nation', 'world'] as const;
+const RECORD_TABS = ['general', 'nation', 'world', 'timelapse'] as const;
 type RecordTab = (typeof RECORD_TABS)[number];
 
 const recordsRoute = createRoute({

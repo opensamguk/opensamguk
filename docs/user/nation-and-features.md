@@ -58,9 +58,12 @@
 | 개인 기록 | 내 장수 명령의 결과와 실패 이유 |
 | 국가 기록 | 내 나라의 달별 도시 수, 장수 수, 국고, 군량. 재야면 비어 있습니다 |
 | 중원 정세 | 달별로 나라마다 가진 도시 수와 장수 수, 공백지 수 |
+| 영토 재생 | 달별로 도시마다 어느 나라 땅이었는지 지도로 다시 봄 |
 | 순위 | 장수는 공헌·경험·전공, 나라는 도시·장수·국력 기준 |
 
 세 기록은 메인 아래쪽에 있고 메뉴의 [기록]에서 넓게 봅니다. 국가 기록과 중원 정세는 월간 정산 뒤에 쌓입니다.
+
+영토 재생은 메뉴의 [기록]에서 영토 재생 탭을 고르면 나옵니다. 가장 오래된 달에서 시작하고 [재생]을 누르면 1초에 한 달씩 넘어갑니다. [이전]·[다음]과 재생 위치 막대로 달을 옮기면 재생이 멈춥니다. 나라 이름과 색은 그 달에 기록된 값이라 뒤에 멸망했거나 이름·색이 바뀐 나라도 그 달 모습으로 그려집니다. 어느 달에 나라 기록이 빠져 있으면 그 달만 지도 대신 `이 시점의 국가 기록이 없습니다.`가 보이고 다른 달은 그대로 볼 수 있습니다. 보는 동안 정산된 새 달은 탭을 다시 열면 나타납니다.
 
 순위는 메뉴의 [순위]에 있고 월간 정산 때 저장한 값입니다. 전공은 출병에서 이긴 수와 점령한 수를 더한 값입니다.
 국력은 자원, 기술, 보급 연결 도시의 개발도, 장수 능력을 더한 값에 작은 난수를 곱해 보여 줍니다. 다른 나라의 기술을 정확히 거꾸로 계산하지 못하게 하려는 것입니다.
@@ -75,4 +78,4 @@
 
 다음은 [용어 사전](./glossary.md)입니다.
 
-근거: `apps/web/src/game/names.ts`, `packages/rules/src/commands/personnel.ts`, `packages/rules/src/commands/personal.ts`, `packages/rules/src/commands/support.ts`, `packages/rules/src/ranking.ts`, `apps/server/src/visibility.ts`, `apps/server/src/routers/records.ts`, `apps/web/src/main/NationInfo.tsx`, `apps/web/src/ranking/rankingView.ts`
+근거: `apps/web/src/game/names.ts`, `packages/rules/src/commands/personnel.ts`, `packages/rules/src/commands/personal.ts`, `packages/rules/src/commands/support.ts`, `packages/rules/src/ranking.ts`, `apps/server/src/visibility.ts`, `apps/server/src/routers/records.ts`, `apps/web/src/main/NationInfo.tsx`, `apps/web/src/ranking/rankingView.ts`, `apps/web/src/timelapse/`
