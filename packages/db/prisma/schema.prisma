@@ -116,6 +116,8 @@ model Nation {
   diplomacyAsA   Diplomacy[] @relation("NationA")
   diplomacyAsB   Diplomacy[] @relation("NationB")
   turns          NationTurn[]
+  offices        NationOffice[]
+  officeTurns    NationOfficeTurn[]
   notice         String @default("")
   noticeRevision Int @default(0)
   noticeUpdatedAt DateTime?
@@ -303,6 +305,29 @@ model NationTurn {
   nation     Nation @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([worldId, nationId, slot])
+}
+
+model NationOffice {
+  worldId      String
+  nationId     Int
+  officerLevel Int
+  turnRevision Int @default(0)
+  tenure       Int @default(0)
+  nation       Nation @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([worldId, nationId, officerLevel])
+}
+
+model NationOfficeTurn {
+  worldId      String
+  nationId     Int
+  officerLevel Int
+  slot         Int
+  commandKey   String @default("nation_rest")
+  args         Json @default("{}")
+  nation       Nation @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([worldId, nationId, officerLevel, slot])
 }
 
 model BattleLog {
