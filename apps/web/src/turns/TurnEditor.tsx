@@ -33,7 +33,7 @@ import {
   type Turn,
 } from './draft';
 import { slotTimes, type SlotTime } from './schedule';
-import { personalSource, type TurnSource, type TurnSourceFactory } from './source';
+import { personalSource, type DisplaySlot, type TurnSource, type TurnSourceFactory } from './source';
 import styles from './TurnEditor.module.css';
 import { useStoredSelection, useTurnDraft, type TurnDraftState } from './useTurnDraft';
 
@@ -48,19 +48,29 @@ export function homePollMs(ended: boolean) {
     ended || errorCode(query.state.error) === 'NOT_FOUND' ? false : HOME_POLL_MS;
 }
 
-export interface TurnEditorProps {
+export interface TurnEditorProps<S extends DisplaySlot = DisplaySlot> {
   worldId: string;
   // 메인 지도에서 고른 도시(city.key). 대상 도시 칸의 기본값으로만 쓴다. 권한 근거가 아니며 편집을 바꾸거나 저장하지 않는다.
   selectedCityKey: number | null;
   // 칸 수와 조회·저장 연결. 없으면 개인 30칸(turns.*)이다. 국가 직책 12칸은 nationTurns.*를 넘긴다 (T2-06).
-  source?: TurnSourceFactory;
+  source?: TurnSourceFactory<S>;
   // 편집기 위에 같은 초안 훅 상태를 쓰는 부품을 둔다(작전 맞추기, T2-12). 훅을 하나만 두어야 초안이 갈라지지 않는다.
   renderTop?: ((draft: TurnDraftState) => ReactNode) | undefined;
 }
 
 // 예턴 편집기. 메인 명령 칸(T1-16)과 /w/:worldId/turns가 개인 30칸으로, 국가 예턴(T2-06)이 직책 12칸으로 같은 부품을 쓴다.
 // 편집 초안·revision·선택·충돌 처리는 이 안에서 한다. 바깥에서 지도 선택이 바뀌거나 조회가 다시 돌아도 초안은 그대로다.
-export function TurnEditor({ worldId, selectedCityKey, source = personalSource, renderTop }: TurnEditorProps) {
+// 개인 칸과 넘겨받은 칸은 칸 모양이 달라 갈래를 나눠 넘긴다. 두 갈래 모두 같은 SourceEditor다.
+export function TurnEditor<S extends DisplaySlot>({ source, ...props }: TurnEditorProps<S>) {
+  return source ? <SourceEditor {...props} source={source} /> : <SourceEditor {...props} source={personalSource} />;
+}
+
+function SourceEditor<S extends DisplaySlot>({
+  worldId,
+  selectedCityKey,
+  source,
+  renderTop,
+}: Omit<TurnEditorProps<S>, 'source'> & { source: TurnSourceFactory<S> }) {
   const trpc = useTRPC();
   const me = useQuery({ ...trpc.auth.me.queryOptions(), retry: retryUnlessClientError });
   const userId = me.data?.user?.id;
@@ -95,7 +105,7 @@ function AuthLost() {
 
 type PrecheckResult = { ok: true } | { ok: false; message: string } | { ok: 'error'; message: string } | undefined;
 
-function Editor({
+function Editor<S extends DisplaySlot>({
   worldId,
   selectedCityKey,
   source,
@@ -103,7 +113,7 @@ function Editor({
 }: {
   worldId: string;
   selectedCityKey: number | null;
-  source: TurnSource;
+  source: TurnSource<S>;
   renderTop?: TurnEditorProps['renderTop'];
 }) {
   const trpc = useTRPC();

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { QueryClient } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { TRPCClientError } from '@trpc/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -201,6 +202,26 @@ describe('국가 칸 저장', () => {
     expect(input.slots[0]).toEqual({ commandKey: 'nation_assign', args: { generalId: 2, cityKey: 5 } });
     expect(input.slots.slice(1).every((slot) => slot === null)).toBe(true);
     expect(JSON.stringify(input.slots)).not.toContain('name');
+  });
+
+  it('저장 결과는 그 직책 탭의 revision과 칸만 바꾸고 직책 정보와 다른 탭은 그대로 둔다', () => {
+    const queryClient = new QueryClient();
+    const lord: NationTurnTab = {
+      ...tab,
+      office: { nationId: 4, officerLevel: 12, tenure: 1 },
+      officerLevel: 12,
+      title: '군주',
+      holder: { generalId: 1, name: '유비' },
+      edit: { ok: false, reason: '내 직책 칸이 아닙니다' },
+    };
+    const source = nationSource(fakeApi({}), tab, { onOfficeChanged: vi.fn() })(context);
+    queryClient.setQueryData(source.list.queryKey, { tabs: [lord, tab] });
+    const slots = tab.slots.map((slot, i) =>
+      i === 1 ? { commandKey: 'nation_reward', args: { generalId: 2, amount: 100 }, name: '포상' } : slot,
+    );
+    source.writeList(queryClient, { revision: 10, slots });
+    expect(queryClient.getQueryData(source.list.queryKey)).toEqual({ tabs: [lord, { ...tab, revision: 10, slots }] });
+    expect(source.list.select(queryClient.getQueryData(source.list.queryKey))).toEqual({ revision: 10, slots });
   });
 
   it('남의 칸은 서버가 준 이유로 읽기 전용이고 내 칸만 실행 시기를 센다', () => {
