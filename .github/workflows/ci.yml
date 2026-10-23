@@ -101,7 +101,8 @@ jobs:
   database-e2e:
     name: opensamguk-database-e2e (${{ matrix.shard }}/4)
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    # Worst cold case seen in PR #219: apt download 13m28s + shard 1/4 E2E about 12 min (three 180 s test timeouts) + setup 1.5 min.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -144,22 +145,21 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm generate
       - run: pnpm db:migrate
-      # The slow part of `--with-deps` is downloading .deb files from the Ubuntu mirror (8m52s at 48 kB/s in job 120378660050).
-      # Keep the downloaded packages and browsers in one cache keyed by Playwright version and runner image.
-      # Only pushes to main save it, so PR branches do not fill the 10 GB repository cache with copies.
-      - name: Playwright cache key
+      # The slow part of `--with-deps` is downloading .deb files from the Ubuntu mirror
+      # (8m52s in job 120378660050, 13m28s in job 120415754413). The browser zip itself downloads in about 1 s.
+      # Keep only the downloaded packages (about 25 MB), keyed by Playwright version and runner image.
+      # A PR run can restore its own scope or main's cache, so every scope saves on a miss.
+      - name: Playwright apt cache key
         id: playwright
         run: |
           version="$(pnpm exec playwright --version | awk '{print $2}')"
-          echo "key=playwright-$version-$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
-          echo "prefix=playwright-$version-$ImageOS-" >> "$GITHUB_OUTPUT"
-      - name: Restore Playwright cache
+          echo "key=playwright-apt-$version-$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
+          echo "prefix=playwright-apt-$version-$ImageOS-" >> "$GITHUB_OUTPUT"
+      - name: Restore Playwright apt cache
         id: playwright-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
-          path: |
-            ~/.cache/ms-playwright
-            ~/.cache/playwright-apt
+          path: ~/.cache/playwright-apt
           key: ${{ steps.playwright.outputs.key }}
           restore-keys: ${{ steps.playwright.outputs.prefix }}
       - name: Install Playwright Chromium and system packages
@@ -173,13 +173,11 @@ jobs:
           pnpm exec playwright install --with-deps chromium
           sudo rm -rf "$APT_ARCHIVES/partial" "$APT_ARCHIVES/lock"
           sudo chown -R "$(id -u):$(id -g)" "$APT_ARCHIVES"
-          echo "cached debs: $(find "$APT_ARCHIVES" -name '*.deb' | wc -l), $(du -sh "$APT_ARCHIVES" ~/.cache/ms-playwright | awk '{print $1}' | paste -sd' ')"
-      - name: Save Playwright cache
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.playwright-cache.outputs.cache-hit != 'true' && matrix.shard == 1
+          echo "cached debs: $(find "$APT_ARCHIVES" -name '*.deb' | wc -l), $(du -sh "$APT_ARCHIVES" | awk '{print $1}')"
+      - name: Save Playwright apt cache
+        if: steps.playwright-cache.outputs.cache-hit != 'true' && matrix.shard == 1
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
-          path: |
-            ~/.cache/ms-playwright
-            ~/.cache/playwright-apt
+          path: ~/.cache/playwright-apt
           key: ${{ steps.playwright.outputs.key }}
       - run: pnpm e2e --shard=${{ matrix.shard }}/4 --workers=1 --reporter=line
