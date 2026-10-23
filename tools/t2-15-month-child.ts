@@ -8,6 +8,159 @@ export function rehearsalStoragePath(value: string, platform: NodeJS.Platform = 
   return platform === 'win32' ? /^[eE]:[\\/]/.test(value) && win32.isAbsolute(value) : posix.isAbsolute(value);
 }
 
+type ArchiveReason =
+  | 'archive-header'
+  | 'archive-size'
+  | 'archive-end'
+  | 'archive-type'
+  | 'archive-path'
+  | 'archive-duplicate'
+  | 'archive-conflict'
+  | 'archive-link-target'
+  | 'archive-link-missing'
+  | 'archive-link-kind'
+  | 'archive-link-chain'
+  | 'archive-tracked-kind'
+  | 'archive-denominator';
+
+export class RehearsalArchiveError extends Error {
+  constructor(reason: ArchiveReason) {
+    super(reason);
+    this.name = 'RehearsalArchiveError';
+  }
+}
+
+type ArchiveEntry =
+  | { path: string; kind: 'directory' }
+  | { path: string; kind: 'regular'; data: Buffer }
+  | { path: string; kind: 'link'; target: string; tarMode: string };
+
+type RehearsalArchivePlan = {
+  directories: string[];
+  files: { path: string; data: Buffer; source: 'regular' | 'link'; linkTarget?: string }[];
+  links: { name: string; target: string; resolved: string; tarMode: string }[];
+  counts: { regular: number; link: number; directory: number; globalPax: number; headers: number };
+};
+
+// Git ustar 전체를 먼저 검증한다. 실제 링크와 디스크 대상 조회는 쓰지 않는다.
+export function readRehearsalArchive(data: Buffer): RehearsalArchivePlan {
+  function reject(reason: ArchiveReason): never {
+    throw new RehearsalArchiveError(reason);
+  }
+  const entries = new Map<string, ArchiveEntry>();
+  const names = new Set<string>();
+  const counts = { regular: 0, link: 0, directory: 0, globalPax: 0, headers: 0 };
+  const invalidCharacters = (value: string) =>
+    /[\\:]/.test(value) ||
+    [...value].some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127);
+  let ended = false;
+  for (let offset = 0; offset + 512 <= data.length;) {
+    const header = data.subarray(offset, offset + 512);
+    if (header.every((byte) => byte === 0)) {
+      ended = true;
+      break;
+    }
+    const field = (start: number, size: number) =>
+      header
+        .subarray(start, start + size)
+        .toString('utf8')
+        .replace(/\0.*$/s, '');
+    const octal = (start: number, size: number, reason: ArchiveReason) => {
+      const value = field(start, size).trim();
+      if (!/^[0-7]+$/.test(value)) return reject(reason);
+      const number = Number.parseInt(value, 8);
+      if (!Number.isSafeInteger(number) || number < 0) return reject(reason);
+      return number;
+    };
+    if (field(257, 6) !== 'ustar') reject('archive-header');
+    let checksum = 0;
+    for (let index = 0; index < 512; index++) checksum += index >= 148 && index < 156 ? 32 : header[index]!;
+    if (octal(148, 8, 'archive-header') !== checksum) reject('archive-header');
+    const size = octal(124, 12, 'archive-size');
+    const next = offset + 512 + Math.ceil(size / 512) * 512;
+    if (!Number.isSafeInteger(next) || next > data.length) reject('archive-size');
+    const type = field(156, 1);
+    if (!['0', '', '2', '5', 'g'].includes(type)) reject('archive-type');
+    if ((type === '2' || type === '5') && size !== 0) reject('archive-size');
+    if (!field(0, 100)) reject('archive-path');
+    let name = [field(345, 155), field(0, 100)].filter(Boolean).join('/');
+    if (type === '5' && name.endsWith('/')) name = name.slice(0, -1);
+    if (
+      !name ||
+      posix.isAbsolute(name) ||
+      win32.isAbsolute(name) ||
+      invalidCharacters(name) ||
+      name.split('/').some((part) => part === '' || part === '.' || part === '..')
+    )
+      reject('archive-path');
+    if (names.has(name)) reject('archive-duplicate');
+    names.add(name);
+    counts.headers++;
+    if (type === 'g') counts.globalPax++;
+    else if (type === '5') {
+      entries.set(name, { path: name, kind: 'directory' });
+      counts.directory++;
+    } else if (type === '2') {
+      entries.set(name, { path: name, kind: 'link', target: field(157, 100), tarMode: field(100, 8).trim() });
+      counts.link++;
+    } else {
+      entries.set(name, { path: name, kind: 'regular', data: data.subarray(offset + 512, offset + 512 + size) });
+      counts.regular++;
+    }
+    offset = next;
+  }
+  if (!ended) reject('archive-end');
+  for (const entry of entries.values()) {
+    for (let parent = posix.dirname(entry.path); parent !== '.'; parent = posix.dirname(parent)) {
+      const found = entries.get(parent);
+      if (found && found.kind !== 'directory') reject('archive-conflict');
+    }
+  }
+  const files: RehearsalArchivePlan['files'] = [];
+  const directories: string[] = [];
+  const links: RehearsalArchivePlan['links'] = [];
+  for (const entry of entries.values()) {
+    if (entry.kind === 'directory') directories.push(entry.path);
+    else if (entry.kind === 'regular') files.push({ path: entry.path, data: entry.data, source: 'regular' });
+  }
+  for (const entry of entries.values()) {
+    if (entry.kind !== 'link') continue;
+    const target = entry.target;
+    if (!target || posix.isAbsolute(target) || win32.isAbsolute(target) || invalidCharacters(target))
+      reject('archive-link-target');
+    const resolved = posix.normalize(posix.join(posix.dirname(entry.path), target));
+    if (resolved === '.' || resolved === '..' || resolved.startsWith('../')) reject('archive-link-target');
+    const found = entries.get(resolved);
+    if (!found) reject('archive-link-missing');
+    if (found.kind === 'directory') reject('archive-link-kind');
+    if (found.kind === 'link') reject('archive-link-chain');
+    files.push({ path: entry.path, data: found.data, source: 'link', linkTarget: target });
+    links.push({ name: entry.path, target, resolved, tarMode: entry.tarMode });
+  }
+  return { directories, files, links, counts };
+}
+
+// ls-tree의 추적 regular·link 집합을 모두 대조한다. export-ignore로 분모를 줄이지 않는다.
+export function checkRehearsalArchiveTree(lsTree: Buffer, plan: RehearsalArchivePlan): void {
+  const expected = new Map(plan.files.map((file) => [file.path, file.source]));
+  const linkNames = new Set(plan.links.map((link) => link.name));
+  const seen = new Set<string>();
+  const text = lsTree.toString('utf8');
+  if (text && !text.endsWith('\0')) throw new RehearsalArchiveError('archive-tracked-kind');
+  for (const row of text.split('\0').filter(Boolean)) {
+    const tab = row.indexOf('\t');
+    const header = /^([0-9]{6}) (blob|commit) ([0-9a-f]{40})$/.exec(row.slice(0, tab));
+    if (tab < 0 || !header || header[2] !== 'blob' || !['100644', '100755', '120000'].includes(header[1]!))
+      throw new RehearsalArchiveError('archive-tracked-kind');
+    const name = row.slice(tab + 1);
+    const link = header[1] === '120000';
+    if (seen.has(name) || expected.get(name) !== (link ? 'link' : 'regular') || linkNames.has(name) !== link)
+      throw new RehearsalArchiveError('archive-denominator');
+    seen.add(name);
+  }
+  if (seen.size !== expected.size) throw new RehearsalArchiveError('archive-denominator');
+}
+
 export type RehearsalStageRecord = {
   name: string;
   status: 'passed' | 'failed';

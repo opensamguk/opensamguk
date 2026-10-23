@@ -5,7 +5,14 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createRehearsalStages, rehearsalStoragePath, type RehearsalStageRecord } from './t2-15-month-child';
+import {
+  checkRehearsalArchiveTree,
+  createRehearsalStages,
+  readRehearsalArchive,
+  RehearsalArchiveError,
+  rehearsalStoragePath,
+  type RehearsalStageRecord,
+} from './t2-15-month-child';
 
 const tools = dirname(fileURLToPath(import.meta.url));
 const bash = process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : '/bin/bash';
@@ -274,6 +281,230 @@ afterEach(async () => {
   vi.useRealTimers();
   await Promise.allSettled([...running]);
   for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true });
+});
+
+describe('T2-15 B1 archive 읽기', () => {
+  type Entry = { name: string; type?: string; data?: Buffer; target?: string; prefix?: string };
+  const body = Buffer.from('AGENTS\r\n한글\0');
+  function checksum(header: Buffer) {
+    header.write('        ', 148, 8);
+    header.write(
+      header
+        .reduce((sum, byte) => sum + byte, 0)
+        .toString(8)
+        .padStart(6, '0') + '\0 ',
+      148,
+      8,
+    );
+  }
+  function tar(entries: Entry[]) {
+    const blocks: Buffer[] = [];
+    for (const entry of entries) {
+      const data = entry.data ?? Buffer.alloc(0),
+        header = Buffer.alloc(512);
+      header.write(entry.name, 0, 100);
+      header.write('0000644\0', 100, 8);
+      header.write('0000000\0', 108, 8);
+      header.write('0000000\0', 116, 8);
+      header.write(data.length.toString(8).padStart(11, '0') + '\0', 124, 12);
+      header.write('00000000000\0', 136, 12);
+      header.write(entry.type ?? '0', 156, 1);
+      if (entry.target) header.write(entry.target, 157, 100);
+      header.write('ustar\0', 257, 6);
+      header.write('00', 263, 2);
+      if (entry.prefix) header.write(entry.prefix, 345, 155);
+      checksum(header);
+      blocks.push(header, data, Buffer.alloc((512 - (data.length % 512)) % 512));
+    }
+    return Buffer.concat([...blocks, Buffer.alloc(1024)]);
+  }
+  const tree = (rows: { name: string; mode?: string; kind?: string }[]) =>
+    Buffer.from(
+      rows.map((row) => `${row.mode ?? '100644'} ${row.kind ?? 'blob'} ${'a'.repeat(40)}\t${row.name}\0`).join(''),
+    );
+  const regular: Entry = { name: 'AGENTS.md', data: body };
+  const link: Entry = { name: 'CLAUDE.md', type: '2', target: 'AGENTS.md' };
+  function rejected(data: Buffer, reason: string) {
+    let error: unknown;
+    try {
+      readRehearsalArchive(data);
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(RehearsalArchiveError);
+    expect(error).toHaveProperty('message', reason);
+  }
+  it('추적 링크를 같은 archive regular 바이트로 채우고 원래 payload는 바꾸지 않는다', () => {
+    const archive = tar([regular, { name: 'runtime.ts', data: binary }, link]),
+      before = Buffer.from(archive);
+    const plan = readRehearsalArchive(archive);
+    expect(plan.files.map((f) => [f.path, f.source])).toEqual([
+      ['AGENTS.md', 'regular'],
+      ['runtime.ts', 'regular'],
+      ['CLAUDE.md', 'link'],
+    ]);
+    expect(plan.files[0]!.data.equals(body)).toBe(true);
+    expect(plan.files[1]!.data.equals(binary)).toBe(true);
+    expect(plan.files[2]!.data).toBe(plan.files[0]!.data);
+    expect(plan.links).toEqual([{ name: 'CLAUDE.md', target: 'AGENTS.md', resolved: 'AGENTS.md', tarMode: '0000644' }]);
+    expect(plan.counts).toEqual({ regular: 2, link: 1, directory: 0, globalPax: 0, headers: 3 });
+    expect(archive.equals(before)).toBe(true);
+  });
+  it('대상보다 먼저 나온 링크도 분모에 남긴다', () => {
+    const plan = readRehearsalArchive(tar([link, regular]));
+    expect(plan.files).toHaveLength(2);
+    expect(plan.files[1]!.data.equals(body)).toBe(true);
+  });
+  it('하위 경로의 상대 대상이 루트 안이면 허용하고 ustar prefix를 읽는다', () => {
+    const plan = readRehearsalArchive(
+      tar([regular, { name: 'CLAUDE.md', prefix: 'docs', type: '2', target: '../AGENTS.md' }]),
+    );
+    expect(plan.links[0]).toMatchObject({ name: 'docs/CLAUDE.md', target: '../AGENTS.md', resolved: 'AGENTS.md' });
+    expect(plan.files[1]!.data.equals(body)).toBe(true);
+  });
+  it('디렉터리와 global pax를 파일로 세지 않고 빈 typeflag도 regular로 읽는다', () => {
+    const plan = readRehearsalArchive(
+      tar([
+        { name: 'pax_global_header', type: 'g', data: Buffer.from('comment=source') },
+        { name: 'docs/', type: '5' },
+        regular,
+        link,
+        { name: 'docs/a', type: '', data: binary },
+        { name: 'docs/b', data: body },
+      ]),
+    );
+    expect(plan.directories).toEqual(['docs']);
+    expect(plan.files.map((f) => f.path).sort()).toEqual(['AGENTS.md', 'CLAUDE.md', 'docs/a', 'docs/b']);
+    expect(plan.counts).toEqual({ regular: 3, link: 1, directory: 1, globalPax: 1, headers: 6 });
+  });
+  it.each([
+    '/etc/x',
+    'C:/x',
+    'c:x',
+    '//server/share',
+    '\\\\server\\share',
+    'sub\\a',
+    'a:b',
+    '',
+    '.',
+    '../outside',
+    'a/../../x',
+  ])('루트 밖이거나 이식 불가능한 링크 대상 %s를 거부한다', (target) => {
+    rejected(tar([regular, { ...link, target }]), 'archive-link-target');
+  });
+  it('대상이 없으면 디스크에서 찾지 않고 거부한다', () => {
+    rejected(tar([{ ...link, target: 'missing-private-marker' }]), 'archive-link-missing');
+  });
+  it('제어 문자는 항목 이름과 링크 대상 모두에서 거부한다', () => {
+    rejected(tar([{ name: 'private\nname' }]), 'archive-path');
+    rejected(tar([regular, { ...link, target: 'AGENTS.md\n' }]), 'archive-link-target');
+  });
+  it('디렉터리 대상은 regular로 채울 수 없으므로 거부한다', () => {
+    rejected(
+      tar([
+        { name: 'docs/', type: '5' },
+        { ...link, target: 'docs' },
+      ]),
+      'archive-link-kind',
+    );
+  });
+  it.each(
+    [
+      [{ name: 'a', type: '2', target: 'a' }],
+      [
+        { name: 'a', type: '2', target: 'b' },
+        { name: 'b', type: '2', target: 'a' },
+      ],
+      [{ name: 'a', type: '2', target: 'b' }, { name: 'b', type: '2', target: 'AGENTS.md' }, regular],
+    ].map((entries) => ({ entries })),
+  )('자기 순환·상호 순환·링크 사슬 %j를 거부한다', ({ entries }) => {
+    rejected(tar(entries), 'archive-link-chain');
+  });
+  it.each(
+    [
+      [regular, regular],
+      [regular, { name: 'AGENTS.md', type: '2', target: 'elsewhere' }],
+      [{ name: 'AGENTS.md/', type: '5' }, regular],
+    ].map((entries) => ({ entries })),
+  )('종류와 관계없이 중복 경로 %j를 쓰기 전에 거부한다', ({ entries }) => {
+    rejected(tar(entries), 'archive-duplicate');
+  });
+  it.each(['0', '2'])('부모 경로가 type %s 파일이면 자식 경로를 거부한다', (type) => {
+    rejected(tar([{ name: 'a', type, target: 'AGENTS.md' }, { name: 'a/b', data: body }, regular]), 'archive-conflict');
+  });
+  it.each(['../x', '/x', 'C:/x', 'a\\b', 'a/./b', '', 'a//b', 'a:b'])('항목 경로 %s의 이탈·별칭을 거부한다', (name) =>
+    rejected(tar([{ name }]), 'archive-path'),
+  );
+  it.each(['1', '3', '4', '6', '7', 'x', 'L', 'K'])('지원하지 않는 type %s를 거부한다', (type) => {
+    rejected(tar([{ name: 'unsupported', type }]), 'archive-type');
+  });
+  it('size 필드는 8진 숫자만 받는다', () => {
+    const data = tar([regular]);
+    data.fill(0, 124, 136);
+    data.write('12abc', 124);
+    checksum(data.subarray(0, 512));
+    rejected(data, 'archive-size');
+  });
+  it.each(['2', '5'])('type %s에 payload가 있으면 거부한다', (type) => {
+    rejected(tar([{ name: 'payload', type, data: Buffer.from('x'), target: 'AGENTS.md' }, regular]), 'archive-size');
+  });
+  it('선언한 payload가 버퍼 밖이면 거부한다', () => {
+    const data = tar([regular]);
+    data.write('00000001000\0', 124, 12);
+    checksum(data.subarray(0, 512));
+    rejected(data.subarray(0, 516), 'archive-size');
+  });
+  it('header checksum이 다르면 거부한다', () => {
+    const data = tar([regular]);
+    data[0] = data[0]! ^ 1;
+    rejected(data, 'archive-header');
+  });
+  it('ustar magic이 없으면 거부한다', () => {
+    const data = tar([regular]);
+    data.fill(0, 257, 263);
+    checksum(data.subarray(0, 512));
+    rejected(data, 'archive-header');
+  });
+  it('끝 표시 없이 잘린 archive는 plan을 돌려주지 않는다', () => {
+    rejected(tar([regular]).subarray(0, 1024), 'archive-end');
+  });
+  it('거부 오류에는 입력 이름이나 대상 원문을 넣지 않는다', () => {
+    const marker = 'private-marker-archive';
+    rejected(tar([{ name: marker, type: '2', target: `../../${marker}` }]), 'archive-link-target');
+  });
+  it('ls-tree의 regular·실행 파일·링크 분모가 모두 같아야 한다', () => {
+    const plan = readRehearsalArchive(tar([regular, { name: 'run.sh', data: binary }, link]));
+    expect(() =>
+      checkRehearsalArchiveTree(
+        tree([{ name: 'run.sh', mode: '100755' }, { name: 'CLAUDE.md', mode: '120000' }, { name: 'AGENTS.md' }]),
+        plan,
+      ),
+    ).not.toThrow();
+  });
+  it.each(['missing', 'extra', 'link-as-regular', 'regular-as-link', 'duplicate'])(
+    'ls-tree의 %s 분모 불일치를 거부한다',
+    (mode) => {
+      const plan = readRehearsalArchive(tar([regular, link]));
+      let rows = [
+        { name: 'AGENTS.md', mode: '100644' },
+        { name: 'CLAUDE.md', mode: '120000' },
+      ];
+      if (mode === 'missing') rows = rows.slice(0, 1);
+      if (mode === 'extra') rows.push({ name: 'extra', mode: '100644' });
+      if (mode === 'link-as-regular') rows[1]!.mode = '100644';
+      if (mode === 'regular-as-link') rows[0]!.mode = '120000';
+      if (mode === 'duplicate') rows.push(rows[0]!);
+      expect(() => checkRehearsalArchiveTree(tree(rows), plan)).toThrowError('archive-denominator');
+    },
+  );
+  it.each([
+    { mode: '160000', kind: 'commit' },
+    { mode: '100600', kind: 'blob' },
+  ])('추적 mode %j를 임의 파일로 바꾸지 않고 거부한다', (row) => {
+    expect(() =>
+      checkRehearsalArchiveTree(tree([{ name: 'AGENTS.md', ...row }]), readRehearsalArchive(tar([regular]))),
+    ).toThrowError('archive-tracked-kind');
+  });
 });
 
 describe('T2-15 B1 단계 기한과 남은 작업', () => {

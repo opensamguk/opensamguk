@@ -12,7 +12,14 @@ import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { readWorldState, saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { onShutdownRequest, stopOwnedChild } from '../apps/engine/src/process-lifecycle';
-import { advanceWithLease, createRehearsalStages, rehearsalStoragePath } from './t2-15-month-child';
+import {
+  advanceWithLease,
+  checkRehearsalArchiveTree,
+  createRehearsalStages,
+  readRehearsalArchive,
+  RehearsalArchiveError,
+  rehearsalStoragePath,
+} from './t2-15-month-child';
 
 // T2-15/AC-M2-09: 기존 전용 슬롯만 사용한다. 기본 DB·compose·운영 비밀 경로는 없다.
 const checkout = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -374,30 +381,80 @@ async function atBoundary(db: PrismaClient) {
 }
 const stage = (name: string, action: () => Promise<void>) => stages.run(name, action);
 
-// git archive의 regular file만 소유 사본 아래에 푼다. 경로 이탈·링크는 거부한다.
-async function unpackTar(data: Buffer) {
-  for (let offset = 0; offset + 512 <= data.length;) {
+// 모든 header와 추적 분모를 검증한 뒤 파일을 쓴다. 링크는 archive 안 regular 바이트로 채운다.
+async function unpackTar(data: Buffer, lsTree: Buffer, head: string) {
+  controller.signal.throwIfAborted();
+  const plan = (() => {
+    try {
+      const result = readRehearsalArchive(data);
+      checkRehearsalArchiveTree(lsTree, result);
+      return result;
+    } catch (error) {
+      return fail(error instanceof RehearsalArchiveError ? error.message : 'archive-read');
+    }
+  })();
+  for (const directory of plan.directories) {
     controller.signal.throwIfAborted();
-    const header = data.subarray(offset, offset + 512);
-    if (header.every((byte) => byte === 0)) break;
-    const field = (start: number, size: number) =>
-      header
-        .subarray(start, start + size)
-        .toString('utf8')
-        .replace(/\0.*$/s, '');
-    const size = Number.parseInt(field(124, 12).trim(), 8) || 0;
-    if (!Number.isSafeInteger(size) || size < 0 || offset + 512 + size > data.length) fail('archive-size');
-    const type = field(156, 1),
-      name = [field(345, 155), field(0, 100)].filter(Boolean).join('/');
-    const destination = resolve(copy, name);
+    const destination = resolve(copy, directory);
     if (!inside(copy, destination)) fail('archive-path');
-    if (type === '0' || type === '') {
-      await mkdir(dirname(destination), { recursive: true });
-      await writeFile(destination, data.subarray(offset + 512, offset + 512 + size), { flag: 'wx', mode: 0o600 });
-    } else if (type === '5') await mkdir(destination, { recursive: true });
-    else if (type !== 'g') fail('archive-type');
-    offset += 512 + Math.ceil(size / 512) * 512;
+    await mkdir(destination, { recursive: true });
   }
+  let filesWritten = 0;
+  for (const file of plan.files) {
+    controller.signal.throwIfAborted();
+    const destination = resolve(copy, file.path);
+    if (!inside(copy, destination)) fail('archive-path');
+    await mkdir(dirname(destination), { recursive: true });
+    await writeFile(destination, file.data, { flag: 'wx', mode: 0o600 });
+    filesWritten++;
+  }
+  const materializedLinks = [];
+  for (const link of plan.links) {
+    controller.signal.throwIfAborted();
+    const expected = plan.files.find((file) => file.path === link.resolved && file.source === 'regular')!;
+    const [linkBytes, targetBytes] = await Promise.all([
+      readFile(resolve(copy, link.name)),
+      readFile(resolve(copy, link.resolved)),
+    ]);
+    const targetSha256 = digest(expected.data);
+    if (digest(linkBytes) !== targetSha256 || digest(targetBytes) !== targetSha256) fail('archive-materialize');
+    materializedLinks.push({
+      ...link,
+      gitMode: '120000',
+      materializedAs: 'regular',
+      bytes: linkBytes.length,
+      sha256: digest(linkBytes),
+      targetSha256,
+      readbackEqual: true,
+    });
+  }
+  const regularFiles = plan.files.filter((file) => file.source === 'regular');
+  evidence.archive = {
+    source: head,
+    tarSha256: digest(data),
+    tarBytes: data.length,
+    counts: { ...plan.counts, filesWritten },
+    trackedTree: {
+      blobs: plan.files.length,
+      regularModes: plan.counts.regular,
+      linkModes: plan.counts.link,
+      equalToPlan: true,
+      pathListSha256: digest(
+        plan.files
+          .map((file) => file.path)
+          .sort()
+          .join('\n'),
+      ),
+    },
+    regularContentDigest: digest(
+      regularFiles
+        .map((file) => `${file.path}\0${digest(file.data)}\n`)
+        .sort()
+        .join(''),
+    ),
+    materializedLinks,
+    fsLinksCreated: 0,
+  };
 }
 
 async function cleanup() {
@@ -557,7 +614,8 @@ describe('T2-15 B1 실제 복구 리허설', () => {
         if ((await command(git, ['status', '--porcelain', '--untracked-files=no'], checkout, gitEnv)).length)
           fail('source-has-tracked-edits');
         const tar = await command(git, ['archive', '--format=tar', head], checkout, gitEnv);
-        await unpackTar(tar);
+        const lsTree = await command(git, ['ls-tree', '-r', '-z', '--full-tree', head], checkout, gitEnv);
+        await unpackTar(tar, lsTree, head);
         if (await exists(join(copy, '.env'))) fail('archive-has-env');
         evidence.source = head;
         sourceCommit = head;
