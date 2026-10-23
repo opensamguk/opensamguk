@@ -183,12 +183,29 @@ const envelope = z.strictObject({
   payload: z.unknown(),
   result: z.unknown(),
 });
+const treatyStateSchema = z.strictObject({
+  id: positive.max(MAX_STORED_INT),
+  fromNationId: positive,
+  toNationId: positive,
+  clauses: z.unknown(),
+  status: z.enum(['PROPOSED', 'ACTIVE']),
+  proposedTick: tickSchema.max(MAX_ENGINE_TICK),
+  respondByTick: tickSchema.max(MAX_STORED_INT),
+  startTick: tickSchema.max(MAX_ENGINE_TICK).nullable(),
+  endTick: tickSchema.max(MAX_STORED_INT).nullable(),
+});
 
 function checkedTickAdd(tick: number, months: number): number {
   const result = tick + months * TICKS_PER_MONTH;
   if (!Number.isSafeInteger(result) || result > MAX_STORED_INT)
     throw new RangeError('조약 기한 저장 범위를 넘었습니다.');
   return result;
+}
+
+// 거절된 NPC 제안도 이 기한을 이력에 남긴다.
+export function treatyRespondByTick(proposedTick: number): number {
+  proposalTimingSchema.shape.tick.parse(proposedTick);
+  return checkedTickAdd(proposedTick, RESPONSE_MONTHS);
 }
 
 // 조항과 관계를 검사한 뒤 실제 기간과 상대 국가의 NPC 여부를 넘긴다.
@@ -210,6 +227,30 @@ function assertProposedTiming(treaty: DeepReadonly<TreatyState>): void {
     treaty.respondByTick !== checkedTickAdd(treaty.proposedTick, RESPONSE_MONTHS)
   )
     throw new RangeError('저장된 조약의 제안 시각과 응답 기한을 확인하세요.');
+}
+
+// 비용·응답 주체·국가의 현재 상태는 이 canonical 행에 없으므로 추정하지 않는다.
+export function validateTreatyState(value: unknown): TreatyState {
+  const row = treatyStateSchema.parse(value);
+  const { clauses } = proposeStored.parse({ toNationId: row.toNationId, clauses: row.clauses });
+  if (domainClauses(clauses)) throw new RangeError('저장된 조약의 조항을 확인하세요.');
+  if (row.fromNationId === row.toNationId) throw new RangeError('저장된 조약의 당사국을 확인하세요.');
+  const treaty: TreatyState = { ...row, clauses: clauses.filter(isFirstClause) };
+  if (treaty.respondByTick !== checkedTickAdd(treaty.proposedTick, RESPONSE_MONTHS))
+    throw new RangeError('저장된 조약의 응답 기한을 확인하세요.');
+  if (treaty.status === 'PROPOSED') {
+    if (treaty.startTick !== null || treaty.endTick !== null)
+      throw new RangeError('아직 수락하지 않은 조약에 시작이나 종료 시각이 있습니다.');
+    assertProposedTiming(treaty);
+    return treaty;
+  }
+  if (treaty.startTick === null || treaty.startTick < treaty.proposedTick || treaty.startTick >= treaty.respondByTick)
+    throw new RangeError('저장된 조약의 시작 시각을 확인하세요.');
+  const months = treaty.clauses.find((clause) => clause.kind === 'nonAggression')?.months ?? null;
+  const expectedEnd = months === null ? null : checkedTickAdd(treaty.startTick, months);
+  if (treaty.endTick !== expectedEnd || (treaty.endTick !== null && treaty.endTick > LAST_MONTHLY_TICK))
+    throw new RangeError('저장된 조약의 종료 시각을 확인하세요.');
+  return treaty;
 }
 
 // 전체 archive 외피·sequence 순서는 호출자가 검사한다. APPLIED의 게임 결과는 재실행 뒤 대조해야 한다.

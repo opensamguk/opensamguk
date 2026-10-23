@@ -40,6 +40,8 @@ export {
   canRepresentTreatyProposal,
   TREATY_INPUTS,
   validateTreatyRecord,
+  validateTreatyState,
+  treatyRespondByTick,
   applyTreatyInput,
   settleTreaties,
   treatyClosures,
