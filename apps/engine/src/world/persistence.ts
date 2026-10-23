@@ -6,6 +6,10 @@ import {
   presetRules,
   statRulesSchema,
   unitSetSchema,
+  ORIGIN_CAPS,
+  capsResourceHashInput,
+  parseCapsOrigin,
+  type CapsOrigin,
   type WorldPreset,
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
@@ -20,6 +24,7 @@ export async function saveInitialWorld(
     turnTermMinutes: number;
     endYear: number | null;
     replayFormat?: 'legacy' | 'policy';
+    treatyFormat?: 1;
     preset?: { key: string; value: WorldPreset };
   },
 ) {
@@ -41,6 +46,30 @@ export async function saveInitialWorld(
     (!Number.isSafeInteger(options.endYear) || options.endYear < state.startYear || options.endYear > 10000)
   )
     throw new Error('종료 연도는 시작 연도 이상, 10000 이하 정수여야 합니다.');
+  if (options.treatyFormat !== undefined && options.treatyFormat !== 1) throw new Error('조약 생성 형식을 확인하세요.');
+  let replayOrigin: unknown = {
+    version: 1,
+    initial,
+    resourceHash: hashState({
+      scenarioKey: state.scenarioKey,
+      mapKey: state.mapKey,
+      unitSetKey: state.unitSetKey,
+      statRules: state.statRules,
+      unitSet: state.unitSet,
+    }),
+    initialStateHash: stateHash,
+  };
+  if (options.treatyFormat === 1) {
+    const origin: CapsOrigin = {
+      version: ORIGIN_CAPS,
+      initial,
+      initialStateHash: stateHash,
+      resourceHash: '',
+      capabilities: { version: 1, treaty: { version: 1 } },
+    };
+    origin.resourceHash = hashState(capsResourceHashInput(origin));
+    replayOrigin = parseCapsOrigin(origin);
+  }
   const world = await db.$transaction(
     async (tx) => {
       const world = await tx.world.create({
@@ -56,18 +85,8 @@ export async function saveInitialWorld(
           endYear: options.endYear,
           initialStateHash: stateHash,
           ...(options.replayFormat === 'legacy' ? {} : { policyFromSequence: 0 }),
-          replayOrigin: {
-            version: 1,
-            initial,
-            resourceHash: hashState({
-              scenarioKey: state.scenarioKey,
-              mapKey: state.mapKey,
-              unitSetKey: state.unitSetKey,
-              statRules: state.statRules,
-              unitSet: state.unitSet,
-            }),
-            initialStateHash: stateHash,
-          } as unknown as Prisma.InputJsonValue,
+          ...(options.treatyFormat === 1 ? { treatyFormat: 1 } : {}),
+          replayOrigin: replayOrigin as Prisma.InputJsonValue,
           statRules: state.statRules,
           unitSet: state.unitSet as Prisma.InputJsonValue,
           ...(state.commandMeta ? { commandMeta: state.commandMeta as Prisma.InputJsonValue } : {}),

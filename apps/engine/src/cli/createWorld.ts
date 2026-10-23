@@ -13,12 +13,13 @@ async function main() {
       'turn-term': { type: 'string' },
       'end-year': { type: 'string' },
       name: { type: 'string' },
+      treaty: { type: 'boolean' },
       help: { type: 'boolean' },
     },
   });
   if (values.help) {
     console.log(
-      'pnpm world:create [--preset <key>] [--scenario 1030 --map che --turn-term <분>] --seed <문자열> --end-year <연도> --name <이름>',
+      'pnpm world:create [--preset <key>] [--scenario 1030 --map che --turn-term <분>] --seed <문자열> --end-year <연도> --name <이름> [--treaty]',
     );
     return;
   }
@@ -40,6 +41,7 @@ async function main() {
           name,
           turnTermMinutes,
           ...(preset ? { preset: { key: values.preset!, value: preset } } : {}),
+          ...(values.treaty ? { treatyFormat: 1 } : {}),
           endYear: Number(values['end-year']),
         }),
       ),
