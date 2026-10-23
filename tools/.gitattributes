@@ -1,0 +1,2 @@
+backup.sh text eol=lf
+restore.sh text eol=lf
