@@ -5,6 +5,7 @@ import { promisify } from 'node:util';
 import { expect, test } from '@playwright/test';
 import { acquireLease, lockLease } from '../apps/engine/src/lease';
 import type { PrismaClient } from '../packages/db/src/index';
+import { pnpmCli } from '../tools/node-cli';
 import { e2eDatabaseUrl } from './account';
 import { removeWorlds } from './rankingCleanup';
 
@@ -194,7 +195,7 @@ test.describe('실제 PostgreSQL', () => {
   }
 
   function cli(args: string[], env: NodeJS.ProcessEnv = process.env) {
-    return execFileAsync('pnpm', ['exec', 'tsx', '--env-file-if-exists=.env', 'e2e/rankingSeed.ts', ...args], {
+    return execFileAsync(...pnpmCli(['exec', 'tsx', '--env-file-if-exists=.env', 'e2e/rankingSeed.ts', ...args]), {
       encoding: 'utf8',
       env,
     });
