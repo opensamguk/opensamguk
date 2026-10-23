@@ -10,6 +10,7 @@ import {
 import { BattleSimPage } from './battleSim/BattleSimPage';
 import { CreateGeneralPage } from './general/CreateGeneralPage';
 import { GameLayout } from './layout/GameLayout';
+import { MessagesPage } from './messages/MessagesPage';
 import { DevUiPage } from './pages/DevUiPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
@@ -162,6 +163,9 @@ const rankingRoute = createRoute({
 // 전투 시뮬레이터 (T4-34). 사용자가 넣은 가정으로 교전 한 번을 Web Worker에서 계산하는 보조 화면이다.
 const simulatorRoute = createRoute({ getParentRoute: () => worldRoute, path: 'simulator', component: BattleSimPage });
 
+// 메시지 전체 화면 (T2-10). 메인 오른쪽 메시지 패널과 같은 부품이다.
+const messagesRoute = createRoute({ getParentRoute: () => worldRoute, path: 'messages', component: MessagesPage });
+
 const createGeneralRoute = createRoute({
   getParentRoute: () => worldRoute,
   path: 'create',
@@ -183,6 +187,7 @@ const routeTree = rootRoute.addChildren([
     recordsRoute,
     rankingRoute,
     simulatorRoute,
+    messagesRoute,
     createGeneralRoute,
   ]),
   ...(import.meta.env.DEV ? [devUiRoute] : []),

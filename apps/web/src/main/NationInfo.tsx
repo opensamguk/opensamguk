@@ -5,6 +5,7 @@ import { retryUnlessClientError } from '../game/errors';
 import { officerName } from '../game/names';
 import { QueryError } from '../game/QueryState';
 import { isDetailedGeneral, isMemberNation, type Home, type MapCity, type NationView } from '../game/types';
+import { NationNoticeBox } from '../messages/NationNotice';
 import { useTRPC } from '../trpc';
 import { DataTable, type Column } from '../ui/DataTable';
 import { NationBadge } from '../ui/NationBadge';
@@ -82,6 +83,7 @@ export function NationInfo({
         {open ? '소속 장수·도시 접기' : '소속 장수·도시 펼치기'}
       </button>
       {open ? <NationTables worldId={worldId} nationId={nation.id} onSelectCity={onSelectCity} /> : null}
+      <NationNoticeBox worldId={worldId} />
     </div>
   );
 }
