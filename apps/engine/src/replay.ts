@@ -21,8 +21,10 @@ import {
   policyMarkerResultSchema,
   validatePolicyRecordedInput,
   type PolicyFormat,
+  selectWorldCapabilities,
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
+import { exportCapsArchive, replayCapsArchive, replayCapsToEnd, type CapsArchive } from './replayCaps';
 
 const MAX_ACTION_SEQUENCE = 2_147_483_647;
 
@@ -71,11 +73,16 @@ export function resourceHash(initial: WorldInit) {
   });
 }
 
-export async function exportReplay(db: PrismaClient, worldId: string): Promise<ReplayArchiveV2 | ReplayArchiveV5> {
+export async function exportReplay(
+  db: PrismaClient,
+  worldId: string,
+): Promise<ReplayArchiveV2 | ReplayArchiveV5 | CapsArchive> {
   return db.$transaction(
     async (tx) => {
       const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
       if (world.replayOrigin === null) throw new Error('생성 기록이 없는 월드는 재생할 수 없습니다.');
+      const capabilities = selectWorldCapabilities(world);
+      if (capabilities.kind === 'caps') return exportCapsArchive(tx, world, capabilities);
       const months = await tx.yearbookSnapshot.findMany({ where: { worldId }, orderBy: { tick: 'asc' } });
       const result = await tx.worldResult.findUnique({ where: { worldId } });
       const lastSequence = result?.endedSequence ?? months.at(-1)?.sequence ?? 0;
@@ -382,6 +389,8 @@ function checkMonth(replay: ReplayState, expected: ReplayArchive['months'][numbe
 }
 
 export function replayArchive(value: unknown, months = 12): { tick: number; stateHash: string }[] {
+  if (value !== null && typeof value === 'object' && 'version' in value && value.version === 6)
+    return replayCapsArchive(value, months);
   if (!Number.isSafeInteger(months) || months < 1 || months > 12000) {
     throw new Error('재생 개월 수를 확인하세요.');
   }
@@ -424,6 +433,8 @@ export function replayArchive(value: unknown, months = 12): { tick: number; stat
 }
 
 export function replayToEnd(value: unknown): ReplayEnd {
+  if (value !== null && typeof value === 'object' && 'version' in value && value.version === 6)
+    return replayCapsToEnd(value);
   const archive = readArchive(value);
   if (archive.version === 1 || !archive.end) throw new Error('종료 기록이 있는 v2 보관 파일이 필요합니다.');
   const { origin, end } = archive;
