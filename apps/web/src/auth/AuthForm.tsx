@@ -30,7 +30,8 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string | undefined
       // 이전 사용자의 캐시가 남지 않게 비우고, 가드가 다시 묻지 않도록 로그인 결과를 바로 넣는다.
       queryClient.clear();
       queryClient.setQueryData(trpc.auth.me.queryKey(), { user });
-      await navigate({ href: safeNext(next) ?? '/', replace: true });
+      // 안전한 next가 없으면 로비로 간다 (T2-04).
+      await navigate({ href: safeNext(next) ?? '/lobby', replace: true });
     },
   });
 

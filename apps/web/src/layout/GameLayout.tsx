@@ -51,6 +51,9 @@ export function GameLayout() {
   return (
     <div className={styles.shell}>
       <header className={styles.topbar}>
+        <Link to="/lobby" className={styles.navLink}>
+          로비
+        </Link>
         <span className={styles.world}>{worldName}</span>
         <span className={styles.meta} data-testid="game-date">
           {date}
