@@ -14,8 +14,8 @@ import {
   type EditOp,
   type Turn,
 } from './draft';
-import type { SlotView } from '../policy/contract';
 import { slotTimes } from './schedule';
+import type { PersonalSlot } from './source';
 import { draftStorageKey, readStored } from './useTurnDraft';
 
 const farm: Turn = { commandKey: 'farm', args: {}, explicit: true };
@@ -64,7 +64,7 @@ describe('예턴 초안 편집', () => {
   });
 
   it('저장 입력은 표시 이름을 빼고 빈칸은 null, 직접 넣은 휴식은 객체로 보낸다', () => {
-    const view: SlotView = { commandKey: 'move', args: { cityKey: 3 }, name: '이동', explicit: true };
+    const view: PersonalSlot = { commandKey: 'move', args: { cityKey: 3 }, name: '이동', explicit: true };
     const turns = [toTurn(view), rest(), restByHand()];
     expect(toSaveSlots(turns)).toEqual([
       { commandKey: 'move', args: { cityKey: 3 } },
