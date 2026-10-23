@@ -212,8 +212,61 @@ export function readExtensionRegistryKeys(root) {
     const methods = receiver?.zodRoot ? zodConstructors : receiver?.zodSchema ? zodMethods : null;
     if (!methods?.has(node.expression.name.text) || node.questionDotToken || node.expression.questionDotToken)
       return null;
-    for (const argument of node.arguments) pureInitializer(file, argument);
+    for (const argument of node.arguments) zodArgument(file, argument);
     return { zodSchema: true };
+  };
+  const argumentActive = new Set();
+  const argumentBinding = (file, name, exported = false) => {
+    const id = `${file}:${exported ? 'export:' : ''}${name}`;
+    if (argumentActive.has(id)) fail(file, `zod 인자의 순환 참조 ${name}`);
+    argumentActive.add(id);
+    try {
+      const found = moduleAt(file)[exported ? 'exports' : 'bindings'].get(name);
+      if (!found) fail(file, `zod 인자 선언 ${name}을 찾지 못했다`);
+      if (found.specifier) return argumentBinding(importFile(file, found.specifier), found.name, true);
+      if (found.file) return argumentBinding(found.file, found.name, found.exported);
+      if (!found.constant || !found.node) fail(file, `zod 인자 ${name}은 초기값이 있는 const여야 한다`);
+      zodArgument(file, found.node);
+    } finally {
+      argumentActive.delete(id);
+    }
+  };
+  // zod는 생성 중 인자를 형 변환할 수 있다. 별칭 안의 함수 값도 이 경계에서는 허용하지 않는다.
+  const zodArgument = (file, node) => {
+    if (ts.isIdentifier(node)) return argumentBinding(file, node.text);
+    if (
+      ts.isStringLiteral(node) ||
+      ts.isNumericLiteral(node) ||
+      ts.isBigIntLiteral(node) ||
+      ts.isNoSubstitutionTemplateLiteral(node) ||
+      [ts.SyntaxKind.TrueKeyword, ts.SyntaxKind.FalseKeyword, ts.SyntaxKind.NullKeyword].includes(node.kind)
+    )
+      return;
+    if (
+      ts.isParenthesizedExpression(node) ||
+      ts.isAsExpression(node) ||
+      ts.isSatisfiesExpression(node) ||
+      ts.isTypeAssertionExpression(node) ||
+      ts.isNonNullExpression(node)
+    )
+      return zodArgument(file, node.expression);
+    if (ts.isArrayLiteralExpression(node)) {
+      for (const element of node.elements)
+        zodArgument(file, ts.isSpreadElement(element) ? element.expression : element);
+      return;
+    }
+    if (ts.isObjectLiteralExpression(node)) {
+      for (const property of node.properties) {
+        if (!property.name || ts.isComputedPropertyName(property.name))
+          fail(file, 'zod 인자의 spread·계산 속성은 읽을 수 없다');
+        if (ts.isPropertyAssignment(property)) zodArgument(file, property.initializer);
+        else if (ts.isShorthandPropertyAssignment(property)) argumentBinding(file, property.name.text);
+        else fail(file, 'zod 인자의 메서드·접근자는 읽을 수 없다');
+      }
+      return;
+    }
+    if (ts.isCallExpression(node) && zodValue(file, node)) return;
+    fail(file, `지원하지 않는 zod 인자 ${ts.SyntaxKind[node.kind]}`);
   };
   // const 선언도 초기값을 실행한다. 참조하지 않은 선언까지 제한된 순수 구문인지 확인한다.
   // 함수 본문은 모듈 초기화 때 실행되지 않으므로 검사하지 않는다.

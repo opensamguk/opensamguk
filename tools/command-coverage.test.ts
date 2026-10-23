@@ -319,6 +319,119 @@ describe('T4-02 등록된 확장 명령 대조', () => {
   });
 
   it.each([
+    ['enum의 toString', `z.enum([{toString() { list.push(hidden); return 'gold'; }} as any])`],
+    ['length의 valueOf', `z.array(z.string()).length({valueOf() { list.push(hidden); return 1; }} as any)`],
+  ])('zod %s 형 변환의 숨은 등록을 실제 실행과 대조해 거부한다', (_name, schema) => {
+    fixture(
+      {
+        'ext/definitions.ts': `export const list = [${command('fire_attack')}];
+          export const hidden = ${command('hidden_command')};`,
+        'ext/registry.ts': `import {z} from 'zod'; import {list, hidden} from './definitions.ts';
+          const schema = ${schema}; export {list as extensionCommands} from './definitions.ts';`,
+      },
+      (dir) => {
+        const runtime = importWithTsx(dir, 'extensionCommands');
+        expect(runtime[0]).toEqual({ key: 'fire_attack', target: 'general' });
+        expect(runtime.slice(1).length).toBeGreaterThan(0);
+        expect(runtime.slice(1).every((entry: { key: string }) => entry.key === 'hidden_command')).toBe(true);
+        expect(() => readExtensionRegistryKeys(dir)).toThrow('확장 registry');
+        emptyLegacyRegistry(dir);
+        const result = main(['--root', dir, '--file', tablePath]);
+        expect(result.code).toBe(1);
+        expect(result.output).toContain('registry를 읽지 못했다: 확장 registry');
+      },
+      join(root, 'packages/rules'),
+    );
+  });
+
+  it.each([
+    [
+      'const 함수 별칭',
+      `const hook = () => { list.push(hidden); return 'gold'; };
+      const alias = hook; const schema = z.enum([{toString: alias} as any]);`,
+    ],
+    ['import 함수 별칭', `const alias = importedHook; const schema = z.enum([{toString: alias} as any]);`],
+    ['함수 shorthand', `const toString = importedHook; const schema = z.enum([{toString} as any]);`],
+    [
+      '배열 별칭과 spread',
+      `const item = {toString: importedHook}; const items = [item];
+      const alias = items; const schema = z.enum([...alias] as any);`,
+    ],
+    ['import 객체·배열 별칭', `const alias = importedItems; const schema = z.enum([...alias] as any);`],
+    ['객체 spread', `const item = {toString: importedHook}; const schema = z.enum([{...item} as any]);`],
+  ])('zod %s 안 함수의 숨은 등록을 실제 실행과 대조해 거부한다', (_name, source) => {
+    fixture(
+      {
+        'ext/definitions.ts': `export const list = [${command('fire_attack')}];
+          export const hidden = ${command('hidden_command')};`,
+        'ext/hooks.ts': `import {list, hidden} from './definitions.ts';
+          export const hook = function () { list.push(hidden); return 'gold'; };
+          export const items = [{toString: hook}];`,
+        'ext/aliases.ts': `export {hook as convert, items as entries} from './hooks.ts';`,
+        'ext/registry.ts': `import {z} from 'zod'; import {list, hidden} from './definitions.ts';
+          import {convert as importedHook, entries as importedItems} from './aliases.ts';
+          ${source} export {list as extensionCommands} from './definitions.ts';`,
+      },
+      (dir) => {
+        expect(importWithTsx(dir, 'extensionCommands')).toEqual([
+          { key: 'fire_attack', target: 'general' },
+          { key: 'hidden_command', target: 'general' },
+        ]);
+        expect(() => readExtensionRegistryKeys(dir)).toThrow('확장 registry');
+        emptyLegacyRegistry(dir);
+        expect(main(['--root', dir, '--file', tablePath]).code).toBe(1);
+      },
+      join(root, 'packages/rules'),
+    );
+  });
+
+  it.each([
+    `z.literal(() => 1)`,
+    `z.literal(function () { return 1; })`,
+    `z.literal({nested: [() => 1]} as any)`,
+    `z.literal({get value() { return 1; }} as any)`,
+    `z.literal({set value(input) {} } as any)`,
+    `z.literal({get toString() { return () => 'gold'; }} as any)`,
+    `z.literal({set toString(input) {} } as any)`,
+    `z.literal({convert() { return 1; }} as any)`,
+  ])('zod 인자의 함수·중첩 함수·접근자를 거부한다: %s', (schema) => {
+    fixture(
+      { 'ext/registry.ts': `import {z} from 'zod'; const schema = ${schema}; export const extensionCommands = [];` },
+      (dir) => expect(() => readExtensionRegistryKeys(dir)).toThrow('확장 registry'),
+    );
+  });
+
+  it('zod 인자의 const·import 별칭과 함수 없는 객체·배열은 실제 스키마와 대조한다', () => {
+    fixture(
+      {
+        ...actualSupport(),
+        'ext/values.ts': `export const choices = ['gold', 'rice'] as const; export const limit = 1;`,
+        'ext/aliases.ts': `export {choices as kinds, limit as minimum} from './values.ts';`,
+        'ext/registry.ts': `import {z as schema} from 'zod';
+          import {defineCommand, positive} from '../support.ts';
+          import {kinds as options, minimum as lower} from './aliases.ts';
+          const names = [...options]; const min = lower;
+          const fields = {cityKey: positive, kind: schema.enum(names), tags: schema.array(schema.string()).min(min)};
+          const args = schema.strictObject(fields);
+          export const extensionCommands = [defineCommand({key: 'fire_attack', name: '시험',
+            category: 'strategy', args, check() { return null; }, change() { return {logs: []}; }})];`,
+      },
+      (dir) => {
+        const runtime = importWithTsx(
+          dir,
+          `({registry: extensionCommands.map(({key,target})=>({key,target})),
+            valid: extensionCommands[0].args.safeParse({cityKey:1,kind:'gold',tags:['a']}).success,
+            invalid: extensionCommands[0].args.safeParse({cityKey:0,kind:'other',tags:[]}).success})`,
+        );
+        expect(runtime.valid).toBe(true);
+        expect(runtime.invalid).toBe(false);
+        expect(readExtensionRegistryKeys(dir)).toEqual(runtime.registry);
+      },
+      join(root, 'packages/rules'),
+    );
+  });
+
+  it.each([
     ['push 등록', `export const extensionCommands = []; extensionCommands.push(${command('fire_attack')});`],
     [
       '조건부 등록',
