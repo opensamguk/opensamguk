@@ -15,7 +15,8 @@
 // README·PRD·단계 계획·인수조건·Phase 2 명세의 범위·분모·상태·집계는 아래 문장 계약으로 원장과 대조한다.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
+import ts from 'typescript';
 import { fileURLToPath } from 'node:url';
 
 export const STAGES = [
@@ -69,6 +70,160 @@ export function readRegistryKeys(root) {
   return keys;
 }
 
+// 확장 목록에서 참조한 const·상대 import만 따라간다. 다른 명령 정의는 읽지 않는다.
+export function readExtensionRegistryKeys(root) {
+  const entry = resolve(root, 'packages/rules/src/commands/ext/registry.ts');
+  const support = resolve(root, 'packages/rules/src/commands/support.ts');
+  const modules = new Map();
+  const active = new Set();
+  const fail = (file, message) => {
+    throw new Error(`확장 registry ${relative(root, file)}: ${message}`);
+  };
+  const moduleAt = (file) => {
+    if (modules.has(file)) return modules.get(file);
+    const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
+    if (source.parseDiagnostics.length) fail(file, 'TypeScript 구문을 읽지 못했다');
+    const bindings = new Map();
+    const exports = new Map();
+    const put = (map, name, value) => {
+      if (map.has(name)) fail(file, `선언 ${name}이 두 번 있다`);
+      map.set(name, value);
+    };
+    const fromModule = (specifier, name) => ({ specifier, name });
+    for (const statement of source.statements) {
+      if (ts.isImportDeclaration(statement)) {
+        const clause = statement.importClause;
+        if (!clause || clause.isTypeOnly) continue;
+        if (clause.name) put(bindings, clause.name.text, fromModule(statement.moduleSpecifier, 'default'));
+        const named = clause.namedBindings;
+        if (named && ts.isNamedImports(named))
+          for (const item of named.elements)
+            if (!item.isTypeOnly)
+              put(
+                bindings,
+                item.name.text,
+                fromModule(statement.moduleSpecifier, (item.propertyName ?? item.name).text),
+              );
+      } else if (ts.isVariableStatement(statement)) {
+        const exported = statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword);
+        for (const declaration of statement.declarationList.declarations) {
+          if (!ts.isIdentifier(declaration.name)) continue;
+          const name = declaration.name.text;
+          put(bindings, name, {
+            node: declaration.initializer,
+            constant: Boolean(statement.declarationList.flags & ts.NodeFlags.Const),
+          });
+          if (exported) put(exports, name, { file, name });
+        }
+      } else if (ts.isExportDeclaration(statement) && !statement.isTypeOnly) {
+        if (statement.exportClause && ts.isNamedExports(statement.exportClause))
+          for (const item of statement.exportClause.elements)
+            if (!item.isTypeOnly)
+              put(
+                exports,
+                item.name.text,
+                statement.moduleSpecifier
+                  ? fromModule(statement.moduleSpecifier, (item.propertyName ?? item.name).text)
+                  : { file, name: (item.propertyName ?? item.name).text },
+              );
+      } else if (ts.isExportAssignment(statement) && !statement.isExportEquals) {
+        put(exports, 'default', { node: statement.expression, constant: true });
+      } else if (
+        ts.isStatement(statement) &&
+        !ts.isDeclarationStatement(statement) &&
+        !ts.isEmptyStatement(statement)
+      ) {
+        fail(file, `최상위 실행문 ${ts.SyntaxKind[statement.kind]}은 읽을 수 없다`);
+      }
+    }
+    const result = { bindings, exports };
+    modules.set(file, result);
+    return result;
+  };
+  const binding = (file, name, exported = false) => {
+    if (file === support && name === 'defineCommand' && exported) return { factory: true };
+    const id = `${file}:${exported ? 'export:' : ''}${name}`;
+    if (active.has(id)) fail(file, `순환 참조 ${name}`);
+    active.add(id);
+    try {
+      const found = moduleAt(file)[exported ? 'exports' : 'bindings'].get(name);
+      if (!found) fail(file, `선언 ${name}을 찾지 못했다`);
+      if (found.specifier) {
+        if (!ts.isStringLiteral(found.specifier) || !found.specifier.text.startsWith('.'))
+          fail(file, '상대 경로 import만 읽을 수 있다');
+        const base = resolve(dirname(file), found.specifier.text);
+        const target = [base, `${base}.ts`, join(base, 'index.ts')].find(
+          (path) => path.endsWith('.ts') && existsSync(path),
+        );
+        if (!target) fail(file, `import ${found.specifier.text} 파일이 없다`);
+        return binding(target, found.name, true);
+      }
+      if (found.file) return binding(found.file, found.name, found.exported);
+      if (!found.constant || !found.node) fail(file, `${name}은 초기값이 있는 const여야 한다`);
+      return value(file, found.node);
+    } finally {
+      active.delete(id);
+    }
+  };
+  const object = (file, node, defaultTarget) => {
+    const fields = new Map();
+    for (const property of node.properties) {
+      if (ts.isSpreadAssignment(property) || !property.name || ts.isComputedPropertyName(property.name))
+        fail(file, '명령 정의의 spread·계산 속성은 읽을 수 없다');
+      const name = property.name.text;
+      if (name !== 'key' && name !== 'target') continue;
+      if (fields.has(name)) fail(file, `${name} 속성이 두 번 있다`);
+      if (ts.isPropertyAssignment(property)) fields.set(name, value(file, property.initializer));
+      else if (ts.isShorthandPropertyAssignment(property)) fields.set(name, binding(file, name));
+      else fail(file, `${name}은 값 속성이어야 한다`);
+    }
+    const key = fields.get('key');
+    const target = fields.has('target') ? fields.get('target') : defaultTarget;
+    if (typeof key !== 'string' || !/^[a-z][a-z0-9_]*$/.test(key)) fail(file, 'key는 명령 ID 문자열이어야 한다');
+    if (!TARGETS.includes(target)) fail(file, `${key}의 target은 general 또는 nation이어야 한다`);
+    return { key, target };
+  };
+  const value = (file, node) => {
+    if (
+      ts.isParenthesizedExpression(node) ||
+      ts.isAsExpression(node) ||
+      ts.isSatisfiesExpression(node) ||
+      ts.isTypeAssertionExpression(node)
+    )
+      return value(file, node.expression);
+    if (ts.isIdentifier(node)) return binding(file, node.text);
+    if (ts.isStringLiteral(node)) return node.text;
+    if (ts.isObjectLiteralExpression(node)) return object(file, node);
+    if (ts.isArrayLiteralExpression(node)) {
+      const list = [];
+      for (const element of node.elements) {
+        const item = value(file, ts.isSpreadElement(element) ? element.expression : element);
+        if (ts.isSpreadElement(element)) {
+          if (!Array.isArray(item)) fail(file, '배열 spread 대상은 배열이어야 한다');
+          list.push(...item);
+        } else list.push(item);
+      }
+      return list;
+    }
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+      const callee = binding(file, node.expression.text);
+      if (callee.factory && node.arguments.length === 1 && ts.isObjectLiteralExpression(node.arguments[0]))
+        return object(file, node.arguments[0], 'general');
+    }
+    fail(file, `지원하지 않는 등록 표현식 ${ts.SyntaxKind[node.kind]}`);
+  };
+  const commands = binding(entry, 'extensionCommands', true);
+  if (!Array.isArray(commands)) fail(entry, 'extensionCommands는 배열이어야 한다');
+  const seen = new Set();
+  for (const command of commands) {
+    if (!command || typeof command.key !== 'string' || !TARGETS.includes(command.target))
+      fail(entry, '목록 항목은 명령 정의여야 한다');
+    if (seen.has(command.key)) fail(entry, `명령 ${command.key}이 두 번 있다`);
+    seen.add(command.key);
+  }
+  return commands;
+}
+
 export function loadContext(root) {
   const read = (path) => (existsSync(join(root, path)) ? readFileSync(join(root, path), 'utf8') : '');
   const plans = existsSync(join(root, 'docs/plans')) ? readdirSync(join(root, 'docs/plans')) : [];
@@ -81,6 +236,7 @@ export function loadContext(root) {
   return {
     root,
     registry: readRegistryKeys(root),
+    extensionRegistry: readExtensionRegistryKeys(root),
     baseline,
     readme: read('README.md'),
     prd: read('docs/product/prd.md'),
@@ -624,7 +780,12 @@ export function analyze(doc, context) {
       if (!referenceExists(ref, context)) errors.push(`unresolved[${item.id}]: 결정 ${ref}가 문서에 없다`);
   }
 
-  const registry = new Map(context.registry.map((entry) => [entry.key, entry.target]));
+  const legacyRegistry = new Map(context.registry.map((entry) => [entry.key, entry.target]));
+  const registry = new Map(legacyRegistry);
+  for (const { key, target } of context.extensionRegistry ?? []) {
+    if (registry.has(key)) errors.push(`확장 registry key ${key}가 기본·확장 목록과 겹친다`);
+    else registry.set(key, target);
+  }
   const commandIds = new Map();
   const gaps = [];
   const rows = [];
@@ -731,10 +892,10 @@ export function analyze(doc, context) {
   const summary = {
     reference: { total: references.length, general: refCount('general'), nation: refCount('nation') },
     legacySubset: {
-      registryKeys: registry.size,
-      general: [...registry.values()].filter((target) => target === 'general').length,
-      nation: [...registry.values()].filter((target) => target === 'nation').length,
-      inTable: [...registry.keys()].filter((key) => commandIds.has(key)).length,
+      registryKeys: legacyRegistry.size,
+      general: [...legacyRegistry.values()].filter((target) => target === 'general').length,
+      nation: [...legacyRegistry.values()].filter((target) => target === 'nation').length,
+      inTable: [...legacyRegistry.keys()].filter((key) => commandIds.has(key)).length,
     },
     denominator: commands.length + unresolvedCount,
     commands: commands.length,
@@ -872,7 +1033,12 @@ export function main(argv, { root: defaultRoot, fetchRun } = {}) {
   } catch (error) {
     return { code: 2, output: `대응표를 읽지 못했다: ${error.message}` };
   }
-  const context = loadContext(root);
+  let context;
+  try {
+    context = loadContext(root);
+  } catch (error) {
+    return { code: 1, output: `registry를 읽지 못했다: ${error.message}` };
+  }
   const result = analyze(doc, context);
   if (flags.has('--verify-git')) result.errors.push(...verifyGitShas(doc, root, context.baseline));
   if (flags.has('--verify-ci')) result.errors.push(...verifyCiRuns(context.baseline, fetchRun));

@@ -106,7 +106,7 @@ ID와 amount는 1~1,000,000 정수입니다. resource는 gold 또는 rice이며 
 | NO_OFFER | 수락할 유효 등용 제안 없음 |
 | NO_UNIT_SET | 모집·교전 병종 리소스 없음 |
 
-실패는 Effect가 없으며 예턴을 소비하고 이유를 기록합니다. `registry.test.ts`는 37개 key와 행동 검사 목록을 대조합니다. 파일을 읽는 검사는 rules의 I/O 금지를 지키도록 `tools/command-coverage.test.ts`에 둡니다. 각 key 파일의 성공·실패 검사는 `contracts.ts`의 상태 변화·비용·실패 코드를 실제 실행해 확인합니다.
+실패는 Effect가 없으며 예턴을 소비하고 이유를 기록합니다. `registry.test.ts`는 37개 key와 행동 검사 목록을 대조합니다. 파일을 읽는 검사는 rules의 I/O 금지를 지키도록 `tools/command-coverage.test.ts`에 둡니다. `command-coverage.mjs`는 확장 registry의 실제 참조를 따라 key와 target을 읽고 대응표의 누락·대상 불일치를 검사합니다. 시험은 읽은 순서를 실제 `extensionCommands`와 대조합니다. 도구가 모르는 등록 표현식은 실패하며 미등록 파일의 정의는 목록에 넣지 않습니다. 기본 37개 부분집합 집계와 전체 명령 분모는 분리합니다. 각 key 파일의 성공·실패 검사는 `contracts.ts`의 상태 변화·비용·실패 코드를 실제 실행해 확인합니다.
 
 ### 국가 예턴과 M1 처리
 
