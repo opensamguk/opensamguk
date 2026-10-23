@@ -1,6 +1,13 @@
 import { TRPCError } from '@trpc/server';
 import { readWorldExtRows, type Prisma } from '@opensamguk/db';
-import { toWorldState, presetRules, restoreExtState, type WorldInit } from '@opensamguk/rules';
+import {
+  toWorldState,
+  presetRules,
+  restoreExtState,
+  selectWorldCapabilities,
+  projectTreatyRows,
+  type WorldInit,
+} from '@opensamguk/rules';
 import { z } from 'zod';
 import { worldResolver } from './resolver';
 export const worldInput = z.strictObject({ worldId: z.string().min(1).max(64) });
@@ -20,6 +27,27 @@ export async function requireGeneral(tx: Prisma.TransactionClient, worldId: stri
 export async function readView(tx: Prisma.TransactionClient, worldId: string) {
   const world = await requireWorld(tx, worldId);
   const { preset, commands } = worldResolver(world);
+  const capabilities = selectWorldCapabilities(world);
+  const treatyRows = await tx.treaty.findMany({
+    where: { worldId },
+    orderBy: { id: 'asc' },
+    select: {
+      id: true,
+      fromNationId: true,
+      toNationId: true,
+      clauses: true,
+      status: true,
+      proposedTick: true,
+      respondByTick: true,
+      startTick: true,
+      endTick: true,
+      costFrom: true,
+      costTo: true,
+      closedSequence: true,
+    },
+  });
+  if (capabilities.kind === 'legacy' && treatyRows.length) throw new Error('조약을 끈 월드에 조약 저장 행이 있습니다.');
+  const treaties = capabilities.kind === 'caps' ? projectTreatyRows(treatyRows) : undefined;
   const ext = restoreExtState(commands, await readWorldExtRows(tx, worldId));
   const cities = await tx.city.findMany({ where: { worldId } });
   const nations = await tx.nation.findMany({ where: { worldId } });
@@ -28,7 +56,7 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
     omit: { defaultPolicy: true, lastActiveTick: true, lastActiveAt: true },
   });
   const diplomacies = await tx.diplomacy.findMany({ where: { worldId } });
-  return toWorldState({
+  const state = toWorldState({
     ...(preset ? { presetRules: presetRules(preset) } : {}),
     ...(ext ? { ext } : {}),
     startYear: world.startYear,
@@ -38,4 +66,5 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
     diplomacies,
     ...(world.commandMeta ? { commandMeta: world.commandMeta } : {}),
   } as unknown as WorldInit);
+  return { ...state, ...(treaties ? { treaties } : {}) };
 }

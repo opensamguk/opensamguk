@@ -6,6 +6,8 @@ import {
   emptyTurns,
   monthlyDate,
   runMonthly,
+  selectWorldCapabilities,
+  settleTreaties,
   type ReplayState,
   type WorldState,
 } from '@opensamguk/rules';
@@ -15,6 +17,7 @@ import { loadWorld } from './worldLoader';
 import { persistRanking } from './ranking';
 import { persistYearbookNations } from './nationArchive';
 import { persistExt } from './extState';
+import { persistTreatyClosures } from './treatyState';
 
 export async function loadReplayState(tx: Prisma.TransactionClient, worldId: string): Promise<ReplayState> {
   const state = await loadWorld(tx, worldId);
@@ -59,9 +62,10 @@ export async function persistMonthly(
   sequence: number,
 ): Promise<WorldState> {
   const before = await loadWorld(tx, worldId);
+  const capabilities = selectWorldCapabilities(await tx.world.findUniqueOrThrow({ where: { id: worldId } }));
   const date = monthlyDate(before.startYear, tick);
   const result = runMonthly(before, tick, rngFor(seed, 'monthly', date.year, date.month));
-  const next = result.state;
+  const next = capabilities.kind === 'caps' ? settleTreaties(result.state, tick) : result.state;
   // 모든 변경은 같은 리스·월드 잠금을 잡은 트랜잭션 안에서 최종값으로 쓴다.
   for (const city of Object.values(next.cities)) {
     const old = before.cities[city.cityKey]!;
@@ -82,6 +86,7 @@ export async function persistMonthly(
   await tx.diplomacy.deleteMany({ where: { worldId } });
   await tx.diplomacy.createMany({ data: next.diplomacies.map((entry) => ({ ...entry, worldId })) });
   await persistExt(tx, worldId, before.ext, next.ext);
+  if (capabilities.kind === 'caps') await persistTreatyClosures(tx, worldId, before, next, { tick, sequence });
   await tx.world.update({ where: { id: worldId }, data: { monthlyTick: tick } });
   const snapshot = await loadReplayState(tx, worldId);
   await tx.yearbookSnapshot.create({

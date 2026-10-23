@@ -160,7 +160,6 @@ export async function runSupervisor(
                   status: 'ENDED',
                   inputEvents: {
                     some: {
-                      kind: { in: ['general.create', 'general.setPolicy', 'general.active'] },
                       status: 'PENDING',
                     },
                   },

@@ -348,6 +348,13 @@ describe('T1-26 내보내기와 네 키 상태', () => {
       },
       world: {
         findUniqueOrThrow: async () => ({
+          id: worldId,
+          preset: null,
+          treatyFormat: null,
+          replayOrigin: null,
+          policyFromSequence: null,
+          actionSequence: 0,
+          turnTermMinutes: 30,
           startYear: initial.startYear,
           monthlyTick: 0,
           endYear: initial.startYear,
@@ -355,6 +362,12 @@ describe('T1-26 내보내기와 네 키 상태', () => {
           outcomeFromSequence: 77,
           commandMeta: null,
         }),
+      },
+      treaty: {
+        findMany: async ({ where }: Prisma.TreatyFindManyArgs) => {
+          if (where?.worldId !== worldId) throw new Error('예상하지 않은 조약 월드 조회입니다.');
+          return [];
+        },
       },
       city: { findMany: async () => withWorld(initial.cities) },
       nation: { findMany: async () => withWorld(initial.nations) },

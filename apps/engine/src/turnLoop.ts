@@ -23,6 +23,7 @@ import { persistMonthly, loadReplayState } from './monthly';
 import { hashState } from '@opensamguk/shared/node';
 import { processPendingInput } from './inputs';
 import { engineResolver, persistExt, verifyWorldExt } from './extState';
+import { assertWorldCapabilities } from './capsGate';
 
 export const CLOCK_CHECKPOINT_MS = 5_000;
 export const ENGINE_BATCH_STEPS = 64;
@@ -121,6 +122,7 @@ export class TurnLoop {
         // 일시정지·재개와 턴 commit이 같은 월드 행에서 직렬화된다.
         await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${worldId} FOR UPDATE`;
         const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
+        await assertWorldCapabilities(tx, world);
         if (!this.extVerified) await verifyWorldExt(tx, world);
         const baselineActiveTick = await policyBaseline(tx, world);
         if (world.status !== 'RUNNING') {
@@ -203,6 +205,8 @@ export class TurnLoop {
             );
             if (!isPolicyKey(actor.defaultPolicy)) throw new Error('기본 방침이 올바르지 않습니다.');
           }
+          const treatiesHash =
+            world.treatyFormat === 1 ? hashState(state.treaties ? { treaties: state.treaties } : {}) : null;
           const turn = runGeneralTurn(
             state,
             { generalId: due.id, tick: due.nextTurnTick, unitSet: unitSetSchema.parse(world.unitSet) },
@@ -215,6 +219,11 @@ export class TurnLoop {
             modern ? { policy: actor.defaultPolicy as import('@opensamguk/rules').PolicyKey } : {},
             engineResolver(world).resolver,
           );
+          if (
+            treatiesHash !== null &&
+            treatiesHash !== hashState(turn.state.treaties ? { treaties: turn.state.treaties } : {})
+          )
+            throw new Error('턴 실행 중 조약 목록이 바뀌었습니다.');
           const commandKey = turn.commandKey;
           const result = turn.result;
           const failed = 'code' in result;
