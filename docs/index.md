@@ -48,7 +48,7 @@
 | M3 작업 계획 [T3-05](./plans/T3-05.md), [T3-06](./plans/T3-06.md), [T3-11](./plans/T3-11.md), [T3-14](./plans/T3-14.md) | 계획 완료 | M3 |
 | 나머지 M3 작업 계획                    | 예정 | M3 전 |
 | [Phase 2 확장 기술 명세](./plans/phase2-expansion.md) (AC-P2·T4 제안) | 초안 | Phase 2 |
-| [초기화 자원 DB 이전·지도 편집기·도트 바탕 지도](./plans/map-editor.md) (D-027, T4-76~T4-84) | 초안 | Phase 2 |
+| [초기화 자원 DB 이전·자원 편집기·도트 바탕 지도](./plans/map-editor.md) (D-027, T4-76~T4-87) | 초안 | Phase 2 |
 | [T4-34 전투 시뮬레이터 화면](./plans/T4-34.md) (AC-P2-16 (가), D-023. PR #132로 main `494272b` 병합. AC-P2-16 (나)는 남음) | 구현 병합 | Phase 2 |
 
 ## architecture/ 무엇이 어디서 실행되나

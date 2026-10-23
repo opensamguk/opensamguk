@@ -216,8 +216,8 @@ main에는 이미 로그인한 사용자가 월간 연감을 읽는 `records.wor
 | AC-P2-23 | D14 계략 패. 계략만 패로 묶고 다른 명령은 그대로다 | U-16 결정 뒤 확정 |
 | AC-P2-24 | 승인된 추가 시나리오마다 월드를 만들면 도시·국가·장수가 저장되고 같은 시드 두 번의 상태 해시가 같다 | 통합 시험 (AC-M1-03 방식) |
 | AC-P2-25 | 확장 실행은 C19의 결정적 입력 시나리오로 증명한다. 확장 명령 key마다 엔진에서 성공·대표 실패 1건 이상, 즉시 행동 kind마다 APPLIED·REJECTED 1건 이상이 실행된다. 확장마다 켠 월드, 모두 켠 월드, 끈 월드의 DB·HTTP·Chromium·롤백·재생 증거가 있다. 모두 켠 프리셋으로 `pnpm sim --seeds 10`이 오류 없이 끝나고 시간이 기록된다. 개발 PC 시간은 AC-M1-18 기준으로 따로 적는다. 새 API 전부가 AC-M3-03의 권한 대조(`compareAuthz`)에서 빠진 범주 0건이다. 모든 T4 작업이 완료이거나 미완료 목록에 이유와 함께 있다 | coverage 시험 + sim 기록 + 재생 + 권한 대조 |
-| AC-P2-26 | 월드 초기화 자원(지도·시나리오·병종·기본 능력치 규칙·초상 대응표)을 DB의 판으로 읽어 월드를 만든다. 내장 자원은 들여오기로 같은 키의 불변 판이 된다. 이전 전 고정물의 재생 해시가 이전 뒤에도 같다. 같은 키에 다른 내용을 들여오면 실패한다 (D-027, 정식 반영) | PostgreSQL + 재생 고정물 대조 + 공급자 일치 단위 시험 |
-| AC-P2-27 | 운영자가 관리자 콘솔에서 지도 판을 복제해 지형·도시 위치·연결·도시 추가와 삭제를 편집하고 검증을 통과한 판만 게시한다. 게시한 판은 바뀌지 않고 새 월드를 만들 때 고를 수 있으며 진행 중인 월드는 영향받지 않는다. 권한 없는 계정의 편집·게시는 거부되고 모든 변경이 감사 로그에 남는다 (D-027, 정식 반영) | HTTP 권한 + PostgreSQL + E2E |
+| AC-P2-26 | 월드 초기화 자원(지도·시나리오·병종·기본 능력치 규칙·초상 대응표)을 DB의 판으로 읽어 월드를 만든다. 내장 JSON은 초기화 SQL로 같은 키의 불변 판이 되고 저장소에서 지워진다. 이전 전 고정물의 재생 해시와 시뮬레이션 결과가 이전 뒤에도 같다. 같은 키에 다른 내용을 넣으면 실패한다 (D-027, 정식 반영) | PostgreSQL + 재생 고정물 대조 + 공급자 일치 단위 시험 |
+| AC-P2-27 | 운영자가 관리자 콘솔에서 자원 판을 복제해 편집하고 검증을 통과한 판만 게시한다. 지도는 지형·도시 위치·연결·도시 추가와 삭제를, 시나리오·병종·능력치 규칙·초상 대응표는 표 편집으로 고친다. 게시한 판은 바뀌지 않고 새 월드를 만들 때 고를 수 있으며 진행 중인 월드는 영향받지 않는다. 권한 없는 계정의 편집·게시는 거부되고 모든 변경이 감사 로그에 남는다 (D-027, 정식 반영) | HTTP 권한 + PostgreSQL + E2E |
 | AC-P2-28 | 게시한 지도 판마다 우리 밑그림만 입력으로 만든 도트 바탕 그림과 출처 기록이 있다. 메인·공개 지도는 이 그림을 도시 점과 연결선 아래에 깐다. 그림이 없는 판은 바탕 없이 그린다 (D-027, 정식 반영) | 이미지 출처 기록 + E2E |
 
 ## 6. 작업 분해
@@ -301,15 +301,18 @@ main에는 이미 로그인한 사용자가 월간 연감을 읽는 `records.wor
 | T4-73 | [증축](./mvp-command-gaps.md#t4-73-nation_expand-증축) (`nation_expand`, nation) | M1-14 | Codex → Claude | 계약 T4-02, T4-07[준비] · 구현 T4-02, T4-07[준비] · 연결 T4-50, T4-51 · 결정 U-01, U-19 | `ext/nation_expand/` | 명령별 성공·대표 실패, 연결 뒤 대응표 11단계 | 0.5일 | 결정 대기 (U-01) · MVP 필수 (D-022) |
 | T4-74 | [감축](./mvp-command-gaps.md#t4-74-nation_shrink-감축) (`nation_shrink`, nation) | M1-14 | Codex → Claude | 계약 T4-02, T4-07[준비], T4-73 · 구현 T4-02, T4-07[준비], T4-73 · 연결 T4-50, T4-51 · 결정 U-01, U-19 | `ext/nation_shrink/` | 명령별 성공·대표 실패, 연결 뒤 대응표 11단계 | 0.5일 | 결정 대기 (U-01) · MVP 필수 (D-022) |
 | T4-75 | [인구이동](./mvp-command-gaps.md#t4-75-nation_migrate-인구이동) (`nation_migrate`, nation) | M1-14 | Codex → Claude | 계약 T4-02 · 구현 T4-02 · 연결 T4-50, T4-51 · 결정 U-19 | `ext/nation_migrate/` | 명령별 성공·대표 실패, 연결 뒤 대응표 11단계 | 0.5일 | 계획 가능, 계약은 U-19 · MVP 필수 (D-022) |
-| T4-76 | [지도 형식 v2(지형 층)와 검증기 (C-M2·C-M3)](./map-editor.md) | P2-27 | Codex → Claude | — | `packages/rules/src/world/map/` | 검증 항목별 통과·실패, che 통과 | 0.5일 | 계획 가능 (D-027) |
-| T4-77 | [초기화 자원 카탈로그 DB, 들여오기, DB·파일 공급자 (C-M1)](./map-editor.md) | P2-26 | Codex → Claude | T4-76 | 새 migration, `apps/engine/src/world/resources.ts`, `tools/resources-import/`, `tools/sim/`, `.github/workflows/simulation.yml` | 두 번 들여오기 같음, 공급자 일치, 이전 전 고정물 재생 해시 같음, DB 시뮬레이터 결과 해시 같음 | 2일 | 계획 가능 (D-027) |
-| T4-78 | [지도 초안 저장·판 복제·게시 API와 감사 (C-M4)](./map-editor.md) | P2-27 | Codex → Claude | T4-77, T3-05 | `apps/server/src/routers/mapAdmin.ts` | 권한·제재·무인증 거부, revision 충돌, 게시 판 불변 | 1일 | 계획 가능 (D-027) |
+| T4-76 | [지도 형식 v2(지형 층)와 자원 검증기 (C-M2·C-M3·C-M3a)](./map-editor.md) | P2-27 | Codex → Claude | — | `packages/rules/src/world/map/`, `packages/rules/src/world/validate/` | 종류별 검증 항목 통과·실패, 내장 판 통과 | 1일 | 계획 가능 (D-027) |
+| T4-77 | [초기화 자원 카탈로그 DB, 초기화 SQL, JSON 삭제 (C-M1·C-M1a·C-M1b)](./map-editor.md) | P2-26 | Codex → Claude | T4-76, 병합 T4-86 | 새 migration, `packages/db/sql/resources-init.sql`, `apps/engine/src/world/resources.ts`, `tools/sim/`, `tools/portrait-map/`, JSON 읽는 시험 이전, `.github/workflows/simulation.yml` | SQL 두 번 같음, 변환 대조, 이전 전 고정물 재생 해시 같음, DB 시뮬레이터 결과 해시 같음, JSON 0개 | 2.5일 | 계획 가능 (D-027) |
+| T4-78 | [자원 초안 저장·판 복제·게시 API와 감사, 모든 종류 (C-M4)](./map-editor.md) | P2-27 | Codex → Claude | T4-77, T3-05 | `apps/server/src/routers/resourceAdmin.ts` | 권한·제재·무인증 거부, revision 충돌, 게시 판 불변 | 1일 | 계획 가능 (D-027) |
 | T4-79 | [월드 생성에서 지도·시나리오 판 고르기](./map-editor.md) | P2-27 | Codex → Claude | T4-78, T2-02 | `apps/engine/src/cli/createWorld.ts` | 새 판으로 월드 생성, 기존 월드 그대로 | 0.5일 | 계획 가능 (D-027) |
 | T4-80 | [지도 편집 캔버스 (서버 없이 JSON 가져오기·내보내기, 밑그림 내보내기)](./map-editor.md) | P2-27 | Claude → Codex | T4-76 | `apps/web/src/mapEditor/` | Playwright 도시 추가·이동·삭제, 연결, 지형, 검증 오류, 왕복 | 1.5일 | 계획 가능 (D-027) |
 | T4-81 | [편집 캔버스를 관리자 콘솔과 게시 API에 연결](./map-editor.md) | P2-27 | Claude → Codex | T4-80, T4-78, T3-06 | `apps/web/src/admin/maps/` | E2E 초안 저장·게시, 권한 없는 계정 화면 | 0.5일 | 계획 가능 (D-027) |
 | T4-82 | [che 지형 층 초안 그리기](./map-editor.md) | P2-28 | Claude → Codex | T4-80 | `resources/map-terrain/che.json` (Codex 소유 경로라 반영은 Codex 리뷰로) | 검증기 통과, 밑그림 내보내기 | 0.5일 | 계획 가능 (D-027) |
 | T4-83 | [도트 바탕 그림 생성과 출처 기록](./map-editor.md) | P2-28 | Codex → Claude | T4-82 | 이미지 저장소 `maps/<지도 키>/base.webp`, 출처 표 | 밑그림 해시·생성 도구·일시 기록, 외부 그림 입력 없음 | 0.5일 | 계획 가능 (D-027) |
 | T4-84 | [메인·공개 지도에 바탕 그림 깔기](./map-editor.md) | P2-28 | Claude → Codex | T4-83, T2-25 | `apps/web/src/main/WorldMap.tsx` | E2E 그림 있는 판·없는 판 | 0.5일 | 계획 가능 (D-027) |
+| T4-85 | [월드의 병종·능력치 규칙 판 조회 API](./map-editor.md) | P2-26 | Codex → Claude | T4-77 | `apps/server/src/routers/resources.ts` | 월드별 판 반환, 무인증·다른 월드 범위 시험 | 0.5일 | 계획 가능 (D-027) |
+| T4-86 | [전투 시뮬레이터와 E2E가 번들 JSON 대신 API·DB 값 쓰기](./map-editor.md) | P2-26 | Claude → Codex | T4-85 | `apps/web/src/battleSim/`, `e2e/battleSim.spec.ts`, `e2e/rankingSeed.ts` | E2E 결과 동일, 번들에 JSON 없음 | 0.5일 | 계획 가능 (D-027) |
+| T4-87 | [시나리오·병종·능력치 규칙·초상 대응표 편집 화면](./map-editor.md) | P2-27 | Claude → Codex | T4-78, T3-06 | `apps/web/src/admin/resources/` | Playwright 초안 저장·검증 오류·게시, 새 판 월드 생성 | 1.5일 | 계획 가능 (D-027) |
 
 `ext/`는 `packages/rules/src/commands/ext/`다. 각 규칙 작업은 명령마다 `<key>.test.ts`에 성공 1건·대표 실패 1건을 두고 T4-02의 확장 대조 시험이 확장 목록과 시험 파일을 자동으로 맞춰 본다.
 
@@ -323,7 +326,7 @@ T4-57~T4-75는 §8 A-02·A-03·A-04에서 온 명령 19개를 [누락 명령 문
 
 19행의 추정은 행마다 규칙 PR 하나(0.5일)이며 위 합에 넣지 않았다. T4-66, T4-70, T4-71은 한 PR을 넘을 위험이 있다(그 문서 3.4절).
 
-T4-76~T4-84는 D-027(2026-10-23)로 더한 초기화 자원 DB 이전·지도 편집기·도트 바탕 지도 작업이다. 설계는 [지도 편집기 설계](./map-editor.md)이고 추정 합 약 7.5일은 위 합에 넣지 않았다.
+T4-76~T4-87은 D-027(2026-10-23)로 더한 초기화 자원 DB 이전·지도 편집기·도트 바탕 지도 작업이다. 설계는 [지도 편집기 설계](./map-editor.md)이고 추정 합 약 11일은 위 합에 넣지 않았다.
 
 ### 6.1 준비 단계
 
