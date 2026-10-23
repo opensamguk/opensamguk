@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { errorCode, serverMessage } from '../turns/apiError';
-import { sendAction, treatyApi, TREATY_PATH_KEY, type ActionInput, type RequestId } from './contract';
+import { fetchRequest, sendAction, TREATY_PATH_KEY, type ActionInput, type RequestId } from './contract';
 import {
   applyCheckError,
   applyOutcome,
@@ -35,6 +35,7 @@ export function useTreatyRequests(worldId: string, storageKey: string) {
       ref.current = next;
       writeTracked(sessionStore(), storageKey, next.tracked);
       setState(next);
+      // 끝난 요청의 조약은 ID만 담는다. 카드 전체는 목록을 다시 받아 갱신한다.
       if (next.finished.length > before.finished.length)
         void queryClient.invalidateQueries({ queryKey: TREATY_PATH_KEY });
     },
@@ -61,7 +62,7 @@ export function useTreatyRequests(worldId: string, storageKey: string) {
     [deliver, update],
   );
 
-  // 응답을 받지 못한 요청은 같은 requestId와 같은 내용으로 다시 보낸다.
+  // 접수됐는지 모르는 요청은 같은 requestId와 같은 내용으로 다시 보낸다. 이미 접수됐으면 서버가 그 결과를 돌려준다.
   const resend = useCallback(
     (requestId: RequestId) => {
       const item = ref.current.tracked.find((t) => t.requestId === requestId);
@@ -83,8 +84,7 @@ export function useTreatyRequests(worldId: string, storageKey: string) {
       for (const item of ref.current.tracked) {
         if (!shouldPoll(item.phase) || inFlight.current.has(item.requestId)) continue;
         inFlight.current.add(item.requestId);
-        treatyApi.request
-          .query({ worldId, requestId: item.requestId })
+        fetchRequest(worldId, item.requestId)
           .then(
             (outcome) => update((prev) => applyOutcome(prev, outcome)),
             (error: unknown) => update((prev) => applyCheckError(prev, item.requestId, errorCode(error))),
