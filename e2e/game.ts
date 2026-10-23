@@ -3,6 +3,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
 import type { Lease } from '../apps/engine/src/lease';
 import type { PrismaClient } from '../packages/db/src/index';
+import { pnpmCli } from '../tools/node-cli';
 import { appOrigin, e2eDatabaseUrl, withE2eDb } from './account';
 
 // 실제 서버·DB·엔진으로 게임 화면을 시험하는 도우미 (T1-15).
@@ -221,7 +222,7 @@ export async function takenGeneralName(world: string): Promise<string> {
 
 function run(args: string[]): string {
   e2eDatabaseUrl();
-  const result = spawnSync('pnpm', ['-s', ...args], { encoding: 'utf8', env: process.env });
+  const result = spawnSync(...pnpmCli(['-s', ...args]), { encoding: 'utf8', env: process.env });
   if (result.status !== 0) throw new Error(`pnpm ${args[0]} 실패: ${result.stderr}`);
   return result.stdout;
 }
