@@ -319,7 +319,7 @@ it('방침 월드에서 HTTP 장수 생성 뒤 빈칸·활동과 archive5의 12�
   const newcomer = await user();
   const request = rpc(
     'general.create',
-    { worldId: f.worldId, name: '새방침장수', leadership: 55, strength: 55, intel: 55, portraitId: 10001 },
+    { worldId: f.worldId, name: '새방침장수', leadership: 70, strength: 65, intel: 65, portraitId: 10001 },
     newcomer.cookie,
     true,
   );
@@ -420,7 +420,7 @@ it('표지가 없는 옛 월드는 쓰기를 거부하되 기존 생성·직접 
   const newcomer = await user();
   const request = rpc(
     'general.create',
-    { worldId: f.worldId, name: '옛생성장수', leadership: 55, strength: 55, intel: 55, portraitId: 10001 },
+    { worldId: f.worldId, name: '옛생성장수', leadership: 70, strength: 65, intel: 65, portraitId: 10001 },
     newcomer.cookie,
     true,
   );
