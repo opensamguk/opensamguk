@@ -134,8 +134,10 @@ async function fixture() {
       minTrain: 90,
       minAtmos: 90,
       createdById: 1,
-      members: { create: [1, 2].map((generalId) => ({ worldId, generalId })) },
     },
+  });
+  await db.operationMember.createMany({
+    data: [1, 2].map((generalId) => ({ worldId, operationId: operation.id, generalId })),
   });
   const createInput = {
     worldId,
