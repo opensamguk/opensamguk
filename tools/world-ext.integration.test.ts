@@ -5,7 +5,8 @@ import { assertStorableJson } from '../packages/db/src/storableJson';
 import { readWorldExtRows, writeWorldExtChanges } from '../packages/db/src/worldExt';
 import { testDatabaseUrl } from './test-database';
 
-const url = testDatabaseUrl(process.env);
+// run-integration은 안전 검사 뒤 두 URL을 시험 DB로 맞춘다. 여기서는 시험 DB 이름을 다시 검사한다.
+const url = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
 const schema = `t403_${randomUUID().replaceAll('-', '')}`;
 url.searchParams.set('options', `-c search_path=${schema}`);
 const db = createDb(url.href);
