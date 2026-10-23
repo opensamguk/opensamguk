@@ -10,6 +10,7 @@ import { cityRouter } from './routers/city';
 import { nationRouter } from './routers/nation';
 import { recordsRouter } from './routers/records';
 import { rankingRouter } from './routers/ranking';
+import { timelapseRouter } from './routers/timelapse';
 
 export const appRouter = router({
   auth: authRouter,
@@ -22,6 +23,7 @@ export const appRouter = router({
   nation: nationRouter,
   records: recordsRouter,
   ranking: rankingRouter,
+  timelapse: timelapseRouter,
   // 화면이 서버와 DB 연결을 확인하는 데 쓴다 (AC-M1-02).
   health: publicProcedure.query(async ({ ctx }) => {
     let db: 'ok' | 'down' = 'ok';

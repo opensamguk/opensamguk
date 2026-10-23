@@ -33,6 +33,7 @@
 | `packages/shared/src/editArray.ts` | 범위 덮어쓰기·밀기·당기기·스냅샷 반복의 일반 배열 유틸 |
 | `tools/t1-11.test.ts`, `t1-11.integration.test.ts` | 편집·생성 규칙·명령 schema, 실제 HTTP·DB 보안·경합·재시작·재생 시험 |
 | `apps/server/src/routers/ranking.ts`, `ranking.integration.test.ts` | 정산 시점 장수 상위 100명·내 순위·국가 전체 순위, 실제 HTTP·DB 권한과 공개 필드 검증 |
+| `apps/server/src/routers/timelapse.ts`, `timelapse.test.ts`, `timelapse.integration.test.ts` | T4-35: 월간 도시 소유를 오래된 순으로 읽는 로그인 API. 현재 국가 이름·색만 함께 읽고 국력·자원은 내지 않는다 |
 | `packages/rules/src/ranking.ts` | 공헌·경험·전공·국가 순위와 공개 국력 계산, 동률 ID 정렬 |
 | `apps/engine/src/ranking.ts`, `ranking.integration.test.ts` | 월간 트랜잭션의 순위 캐시 교체, 전공 누계·롤백·재생 호환 검증 |
 | `apps/server/src/routers/world.ts` | 기존 `world.list`, 서버 시계 요약과 공개 94도시 지도 |
