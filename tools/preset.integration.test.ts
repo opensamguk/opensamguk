@@ -20,7 +20,7 @@ import { buildServer } from '../apps/server/src/server';
 import { appRouter } from '../apps/server/src/router';
 import { newSession } from '../apps/server/src/auth/session';
 import { commandInitial } from '../packages/rules/test/commandFixture';
-import { loadInitialWorld, loadPreset, resourceRoot } from '../apps/engine/src/world/resources';
+import { loadPreset, resourceRoot } from '../apps/engine/src/world/resources';
 import { saveInitialWorld, readWorldState } from '../apps/engine/src/world/persistence';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
