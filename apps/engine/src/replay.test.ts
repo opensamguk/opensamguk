@@ -3,7 +3,14 @@ import { readFile } from 'node:fs/promises';
 import type { Prisma, PrismaClient } from '@opensamguk/db';
 import * as rules from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
-import { exportReplay, replayArchive, replayToEnd, type ReplayArchive, type ReplayArchiveV2 } from './replay';
+import {
+  exportReplay,
+  replayArchive,
+  replayToEnd,
+  type ReplayArchive,
+  type ReplayArchiveV2,
+  type ReplayArchiveV5,
+} from './replay';
 import { loadReplayState } from './monthly';
 import { endYearArchive, recordedArchive, rejectedInput, unifiedArchive } from '../test/replayFixture';
 import { monthlyFixture } from '../test/monthlyFixture';
@@ -264,11 +271,20 @@ describe('T1-26 종료 재생', () => {
   });
 });
 
-function exportDatabase(archive: ReplayArchiveV2, ended = true) {
+function exportDatabase(archive: ReplayArchiveV2 | ReplayArchiveV5, ended = true) {
   const end = archive.end;
   const events = [...archive.inputs, ...archive.afterEnd];
   const tx = {
-    world: { findUniqueOrThrow: vi.fn(async () => ({ replayOrigin: archive.origin, ...archive.config })) },
+    world: {
+      findUniqueOrThrow: vi.fn(async () => ({
+        replayOrigin: archive.origin,
+        treatyFormat: null,
+        policyFromSequence: archive.version === 5 ? archive.config.policy.fromSequence : null,
+        actionSequence: archive.end?.sequence ?? archive.months.at(-1)?.sequence ?? 0,
+        turnTermMinutes: 30,
+        ...archive.config,
+      })),
+    },
     worldResult: {
       findUnique: vi.fn(async () =>
         ended && end
@@ -288,6 +304,20 @@ function exportDatabase(archive: ReplayArchiveV2, ended = true) {
 }
 
 describe('T1-26 내보내기와 네 키 상태', () => {
+  it('origin1·archive5의 F0 설정과 수출 bytes를 보존한다', async () => {
+    const initial = await monthlyFixture();
+    const base = recordedArchive(initial, 0);
+    const expected: ReplayArchiveV5 = {
+      ...base,
+      version: 5,
+      config: { ...base.config, policy: { version: 1, fromSequence: 0, turnTermMinutes: 30 } },
+    };
+    const { db } = exportDatabase(expected, false);
+    const first = await exportReplay(db, 'legacy-policy');
+    expect(first).toEqual(expected);
+    expect(JSON.stringify(await exportReplay(db, 'legacy-policy'))).toBe(JSON.stringify(first));
+  });
+
   it.each([false, true])('WorldResult의 끝 번호까지 입력을 내보낸다. 정산 뒤: %s', async (afterMonth) => {
     const expected = await unifiedArchive(afterMonth);
     expected.afterEnd = [rejectedInput(expected.end!.sequence + 1)];
@@ -348,6 +378,13 @@ describe('T1-26 내보내기와 네 키 상태', () => {
       },
       world: {
         findUniqueOrThrow: async () => ({
+          id: worldId,
+          preset: null,
+          treatyFormat: null,
+          replayOrigin: null,
+          policyFromSequence: null,
+          actionSequence: 0,
+          turnTermMinutes: 30,
           startYear: initial.startYear,
           monthlyTick: 0,
           endYear: initial.startYear,
@@ -355,6 +392,12 @@ describe('T1-26 내보내기와 네 키 상태', () => {
           outcomeFromSequence: 77,
           commandMeta: null,
         }),
+      },
+      treaty: {
+        findMany: async ({ where }: Prisma.TreatyFindManyArgs) => {
+          if (where?.worldId !== worldId) throw new Error('예상하지 않은 조약 월드 조회입니다.');
+          return [];
+        },
       },
       city: { findMany: async () => withWorld(initial.cities) },
       nation: { findMany: async () => withWorld(initial.nations) },

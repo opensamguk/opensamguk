@@ -6,6 +6,10 @@ import {
   presetRules,
   statRulesSchema,
   unitSetSchema,
+  ORIGIN_CAPS,
+  capsResourceHashInput,
+  parseCapsOrigin,
+  type CapsOrigin,
   type WorldPreset,
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
@@ -20,6 +24,7 @@ export async function saveInitialWorld(
     turnTermMinutes: number;
     endYear: number | null;
     replayFormat?: 'legacy' | 'policy';
+    treatyFormat?: 1;
     preset?: { key: string; value: WorldPreset };
   },
 ) {
@@ -41,6 +46,33 @@ export async function saveInitialWorld(
     (!Number.isSafeInteger(options.endYear) || options.endYear < state.startYear || options.endYear > 10000)
   )
     throw new Error('종료 연도는 시작 연도 이상, 10000 이하 정수여야 합니다.');
+  if (options.treatyFormat !== undefined && options.treatyFormat !== 1) throw new Error('조약 생성 형식을 확인하세요.');
+  let replayOrigin: unknown = {
+    version: 1,
+    initial,
+    resourceHash: hashState({
+      scenarioKey: state.scenarioKey,
+      mapKey: state.mapKey,
+      unitSetKey: state.unitSetKey,
+      statRules: state.statRules,
+      unitSet: state.unitSet,
+    }),
+    initialStateHash: stateHash,
+  };
+  let creationState = state;
+  if (options.treatyFormat === 1) {
+    const origin: CapsOrigin = {
+      version: ORIGIN_CAPS,
+      initial,
+      initialStateHash: stateHash,
+      resourceHash: '',
+      capabilities: { version: 1, treaty: { version: 1 } },
+    };
+    origin.resourceHash = hashState(capsResourceHashInput(origin));
+    const parsedOrigin = parseCapsOrigin(origin);
+    replayOrigin = parsedOrigin;
+    creationState = parsedOrigin.initial;
+  }
   const world = await db.$transaction(
     async (tx) => {
       const world = await tx.world.create({
@@ -48,45 +80,35 @@ export async function saveInitialWorld(
           name: options.name,
           ...(preset ? { presetKey: options.preset!.key, preset: preset as Prisma.InputJsonValue } : {}),
           turnTermMinutes: options.turnTermMinutes,
-          scenarioKey: state.scenarioKey,
-          mapKey: state.mapKey,
-          unitSetKey: state.unitSetKey,
-          seed: state.seed,
-          startYear: state.startYear,
+          scenarioKey: creationState.scenarioKey,
+          mapKey: creationState.mapKey,
+          unitSetKey: creationState.unitSetKey,
+          seed: creationState.seed,
+          startYear: creationState.startYear,
           endYear: options.endYear,
           initialStateHash: stateHash,
           ...(options.replayFormat === 'legacy' ? {} : { policyFromSequence: 0 }),
-          replayOrigin: {
-            version: 1,
-            initial,
-            resourceHash: hashState({
-              scenarioKey: state.scenarioKey,
-              mapKey: state.mapKey,
-              unitSetKey: state.unitSetKey,
-              statRules: state.statRules,
-              unitSet: state.unitSet,
-            }),
-            initialStateHash: stateHash,
-          } as unknown as Prisma.InputJsonValue,
-          statRules: state.statRules,
-          unitSet: state.unitSet as Prisma.InputJsonValue,
-          ...(state.commandMeta ? { commandMeta: state.commandMeta as Prisma.InputJsonValue } : {}),
+          ...(options.treatyFormat === 1 ? { treatyFormat: 1 } : {}),
+          replayOrigin: replayOrigin as Prisma.InputJsonValue,
+          statRules: creationState.statRules,
+          unitSet: creationState.unitSet as Prisma.InputJsonValue,
+          ...(creationState.commandMeta ? { commandMeta: creationState.commandMeta as Prisma.InputJsonValue } : {}),
         },
       });
       const worldId = world.id;
       // 국가↔수도 순환 참조는 같은 트랜잭션에서 도시를 만든 뒤 연결한다.
       await tx.nation.createMany({
-        data: state.nations.map((nation) => ({ ...nation, worldId, capitalCityKey: null })),
+        data: creationState.nations.map((nation) => ({ ...nation, worldId, capitalCityKey: null })),
       });
-      await tx.city.createMany({ data: state.cities.map((city) => ({ ...city, worldId })) });
-      for (const nation of state.nations) {
+      await tx.city.createMany({ data: creationState.cities.map((city) => ({ ...city, worldId })) });
+      for (const nation of creationState.nations) {
         await tx.nation.update({
           where: { worldId_id: { worldId, id: nation.id } },
           data: { capitalCityKey: nation.capitalCityKey },
         });
       }
       await tx.general.createMany({
-        data: state.generals.map((general) => ({
+        data: creationState.generals.map((general) => ({
           ...general,
           worldId,
           ...(options.replayFormat === 'legacy'
@@ -96,13 +118,15 @@ export async function saveInitialWorld(
       });
       if (options.replayFormat !== 'legacy')
         await tx.generalTurn.createMany({
-          data: state.generals.flatMap((general) =>
+          data: creationState.generals.flatMap((general) =>
             emptyQueue().map((turn, slot) => ({ ...turn, args: {}, worldId, generalId: general.id, slot })),
           ),
         });
-      await tx.diplomacy.createMany({ data: state.diplomacies.map((diplomacy) => ({ ...diplomacy, worldId })) });
+      await tx.diplomacy.createMany({
+        data: creationState.diplomacies.map((diplomacy) => ({ ...diplomacy, worldId })),
+      });
       await tx.nationTurn.createMany({
-        data: Object.entries(state.nationTurns ?? {}).flatMap(([nationId, slots]) =>
+        data: Object.entries(creationState.nationTurns ?? {}).flatMap(([nationId, slots]) =>
           slots.map((slot, i) => ({
             worldId,
             nationId: Number(nationId),
