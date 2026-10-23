@@ -422,15 +422,17 @@ it('정상 T 전환 뒤 로그인·생성을 순서대로 처리하고 실제 �
   });
   expect(nextLogin).toMatchObject({ status: 'APPLIED', result: { activeTick: 60000 } });
   expect(await actor()).toMatchObject({ lastActiveTick: 60000, lastActiveAt: nextLogin.createdAt });
+  const revision = (await rpc<Slots>('turns.get', { worldId: f.worldId }, f.alice.cookie)).data!.revision;
+  expect(revision).toBe(6);
   const slots = Array.from({ length: 30 }, () => null);
-  const saved = await rpc<Slots>('turns.set', { worldId: f.worldId, revision: 0, slots }, f.alice.cookie, true);
-  expect(saved.data).toMatchObject({ ok: true, revision: 1 });
+  const saved = await rpc<Slots>('turns.set', { worldId: f.worldId, revision, slots }, f.alice.cookie, true);
+  expect(saved.data).toMatchObject({ ok: true, revision: revision + 1 });
   const editEvent = await db.inputEvent.findFirstOrThrow({
     where: { worldId: f.worldId, kind: 'turns.set' },
     orderBy: { id: 'desc' },
   });
   expect(await actor()).toMatchObject({ lastActiveTick: 60000, lastActiveAt: editEvent.createdAt });
-  const stale = await rpc<Slots>('turns.set', { worldId: f.worldId, revision: 0, slots }, f.alice.cookie, true);
+  const stale = await rpc<Slots>('turns.set', { worldId: f.worldId, revision, slots }, f.alice.cookie, true);
   expect(stale.data).toMatchObject({ ok: false, reason: 'STALE' });
   expect(await actor()).toMatchObject({ lastActiveTick: 60000, lastActiveAt: editEvent.createdAt });
   expect((await rpc('general.policy', { worldId: f.worldId }, f.alice.cookie)).data).toMatchObject({
