@@ -15,7 +15,7 @@ import { generalsText, lobbyAction, metaText, myGeneralText, startedText, STATUS
 
 afterEach(cleanup);
 
-// T2-03 계약 모양의 월드 하나. D-025 승인 전 응답이라 maxHumanGenerals 키가 없다.
+// AppRouter의 lobby.worlds 응답 모양을 따른 월드 하나. D-025 승인 전 응답이라 maxHumanGenerals 키가 없다.
 const world = (extra: Partial<LobbyWorld> = {}): LobbyWorld => ({
   id: '00000000-0000-4000-8000-000000000001',
   name: '1월드',
@@ -55,10 +55,9 @@ describe('카드 글자', () => {
     expect(startedText(null)).toBe('시작 전');
   });
 
-  it('정원 키가 없으면 인원만, 있으면 인원/정원, null이면 —', () => {
-    expect(generalsText({ humanGenerals: 34 })).toBe('장수 34');
-    expect(generalsText({ humanGenerals: 3, maxHumanGenerals: 10 })).toBe('장수 3/10');
-    expect(generalsText({ humanGenerals: 34, maxHumanGenerals: null })).toBe('장수 34/—');
+  it('응답에 정원 키가 없으면(D-025 승인 전) 인원만 쓴다', () => {
+    expect('maxHumanGenerals' in world()).toBe(false);
+    expect(generalsText(world())).toBe('장수 34');
   });
 
   it('시나리오·연월·턴 간격·인원·시작일을 한 줄로 잇는다', () => {
@@ -153,6 +152,40 @@ describe('월드 카드', { timeout: 30_000 }, () => {
     cleanup();
     await renderInRouter(<WorldList loggedIn={false} worlds={[world()]} />);
     expect(screen.getByRole('link', { name: '로그인하고 참가' }).getAttribute('href')).toBe('/login?next=%2Flobby');
+  });
+
+  // PR183 E2E 반례: 월드 이름에 상태 글자가 들어 있으면 부분 일치로는 배지와 제목을 함께 잡는다.
+  it('월드 이름에 상태 글자가 있어도 상태 배지는 하나이고 색을 가진다', async () => {
+    await renderInRouter(
+      <WorldList
+        loggedIn
+        worlds={[
+          world({
+            name: 'E2E 가오픈 1',
+            status: 'PREOPEN',
+            startedAt: null,
+            createBlockedReason: '아직 열리지 않은 월드입니다',
+          }),
+          world({
+            id: '00000000-0000-4000-8000-000000000002',
+            name: 'E2E 멈춤 2',
+            status: 'PAUSED',
+            createBlockedReason: '멈춘 월드입니다',
+          }),
+        ]}
+      />,
+    );
+    for (const [name, text, tone] of [
+      ['E2E 가오픈 1', '가오픈', 'info'],
+      ['E2E 멈춤 2', '멈춤', 'warning'],
+    ] as const) {
+      const card = screen.getByRole('article', { name });
+      expect(within(card).getAllByText(new RegExp(text))).toHaveLength(2);
+      const badges = within(card).getAllByText(text, { exact: true });
+      expect(badges).toHaveLength(1);
+      expect(badges[0]!.getAttribute('data-tone')).toBe(tone);
+      expect(within(card).getByRole('heading', { level: 3 }).textContent).toBe(name);
+    }
   });
 
   it('끝난 월드가 오면 끝남으로 쓴다', async () => {
