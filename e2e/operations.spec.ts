@@ -3,8 +3,8 @@ import { createAccount, withE2eDb } from './account';
 import { createGeneralByApi, e2eWorld, mutate, query, setTurns, stubPortraits, turns } from './game';
 
 // T2-12 · AC-M2-15 화면: 국가 작전판과 감찰.
-// operation·inspection 라우터(T2-11, Codex)가 main에 들어오기 전에는 이 시험이 돌지 않는다. 그 전의 결과는 증거로 세지 않는다.
-// 계약: docs/plans/T2-11.md API 계약, 화면: docs/plans/T2-12.md.
+// 계약은 AppRouter의 operation·inspection 라우터(T2-11, Codex)다. 이 시험은 부모가 배정한 통합 슬롯에서만 돌리고 그 전에는 증거로 세지 않는다.
+// 화면: docs/plans/T2-12.md "실제 API 대조와 착수 정정" 절.
 
 test.describe.configure({ timeout: 180_000 });
 
@@ -71,6 +71,8 @@ test.describe('국가 작전판', () => {
     const timeline = chief.page.getByTestId('operation-timeline');
     await expect(timeline.locator('tbody tr').first()).toHaveAttribute('data-verdict', /READY|LATE|WEAK|MISSING/);
     await expect(timeline).toContainText(/준비됨|늦음|미흡|없음/);
+    // 새 장수의 예턴은 비워 둔 칸이다. 직접 넣은 휴식과 다른 글자로 보인다.
+    await expect(timeline.locator('td[data-kind="empty"]').first()).toHaveText('빈 칸');
 
     await soldier.page.goto(`/w/${s.world}/operations`);
     await expect(soldier.page.getByRole('button', { name: '작전 만들기' })).toHaveCount(0);

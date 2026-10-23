@@ -11,16 +11,16 @@ import { DisabledReason } from '../ui/DisabledReason';
 import { NationBadge } from '../ui/NationBadge';
 import { EmptyState, LoadingState } from '../ui/States';
 import { Tag } from '../ui/Tag';
-import { operationApi, operationQueryKey, OPERATION_PATH_KEY, type CreateInput, type OperationRow } from './contract';
+import type { CreateInput, OperationRow } from './contract';
 import styles from './Operations.module.css';
 
 // 국가 작전 목록과 만들기 (T2-12, AC-M2-15). 목록은 서버가 정한 순서(OPEN 먼저, 목표 tick 이른 순) 그대로 둔다.
 export function OperationsPage() {
   const worldId = useWorldId();
+  const trpc = useTRPC();
   const home = useHome(worldId);
   const list = useQuery({
-    queryKey: operationQueryKey('list', { worldId }),
-    queryFn: () => operationApi.list.query({ worldId }),
+    ...trpc.operation.list.queryOptions({ worldId }),
     refetchInterval: 15_000,
     retry: retryUnlessClientError,
   });
@@ -127,13 +127,15 @@ function CreateForm({ worldId, nationId }: { worldId: string; nationId: number }
   );
   const generals = nation.data?.generals ?? [];
 
-  const create = useMutation({
-    mutationFn: (input: CreateInput) => operationApi.create.mutate({ worldId, ...input }),
-    onSuccess: ({ id }) => {
-      void queryClient.invalidateQueries({ queryKey: OPERATION_PATH_KEY });
-      void navigate({ to: '/w/$worldId/operations/$operationId', params: { worldId, operationId: id } });
-    },
-  });
+  // 만들기는 작전 메타데이터만 저장한다. 작전 경로만 다시 받고 예턴 캐시는 건드리지 않는다.
+  const create = useMutation(
+    trpc.operation.create.mutationOptions({
+      onSuccess: ({ id }) => {
+        void queryClient.invalidateQueries({ queryKey: trpc.operation.pathKey() });
+        void navigate({ to: '/w/$worldId/operations/$operationId', params: { worldId, operationId: id } });
+      },
+    }),
+  );
 
   const input: CreateInput | null = (() => {
     const target = toInt(cityKey);
@@ -164,7 +166,7 @@ function CreateForm({ worldId, nationId }: { worldId: string; nationId: number }
       aria-label="작전 만들기"
       onSubmit={(e) => {
         e.preventDefault();
-        if (input) create.mutate(input);
+        if (input) create.mutate({ worldId, ...input });
       }}
     >
       <h2>작전 만들기</h2>
