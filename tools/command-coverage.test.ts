@@ -79,6 +79,21 @@ describe('T4-02 등록된 확장 명령 대조', () => {
     }
   };
   const command = (key: string, target = 'general') => `({ key: '${key}', target: '${target}' })`;
+  const emptyLegacyRegistry = (dir: string) => {
+    for (const file of [
+      'domestic/investment.ts',
+      'rest.ts',
+      'military.ts',
+      'attack.ts',
+      'personnel.ts',
+      'personal.ts',
+      'nation.ts',
+    ]) {
+      const path = join(dir, 'packages/rules/src/commands', file);
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, '');
+    }
+  };
 
   it('운영 확장 목록의 key·target이 실제 extensionCommands와 순서까지 같다', () => {
     expect(readExtensionRegistryKeys(root)).toEqual(extensionCommands.map(({ key, target }) => ({ key, target })));
@@ -87,23 +102,19 @@ describe('T4-02 등록된 확장 명령 대조', () => {
   it('실제 import 별칭·재수출·const 별칭·배열 참조와 spread만 따라가고 미등록 이웃 정의는 빼놓는다', () => {
     fixture(
       {
-        'ext/registry.ts': `import { registered as chosen } from './barrel.ts';
+        'ext/registry.ts': `import type { Missing } from 'not-installed';
+        import { registered as chosen } from './barrel.ts';
         const alias = chosen; const local = [...alias];
+        function mutateLater() { local.push(${command('deferred_command')}); }
+        const delayed = () => local.push(${command('deferred_command')});
         export const extensionCommands = ([...local] as const) satisfies readonly unknown[];`,
         'ext/barrel.ts': `export { active as registered } from './definitions.ts';`,
-        'ext/definitions.ts': `import { unavailable } from 'not-installed';
-        const first = ${command('fire_attack')};
+        'ext/definitions.ts': `const first = ${command('fire_attack')};
         export const unusedSibling = ${command('never_registered')};
         export const active = [first, ${command('nation_research_fire_wheel', 'nation')}];`,
         'ext/not-referenced.ts': 'this file is not valid TypeScript @',
       },
       (dir) => {
-        const actualSource = join(dir, 'packages/rules/src/commands/ext/definitions.ts');
-        // 실행 fixture는 설치되지 않은 외부 import를 뺀다. 정적 탐색은 사용한 참조만 읽는다.
-        writeFileSync(
-          actualSource,
-          readFileSync(actualSource, 'utf8').replace("import { unavailable } from 'not-installed';", ''),
-        );
         const file = pathToFileURL(join(dir, 'packages/rules/src/commands/ext/registry.ts')).href;
         const runtime = spawnSync(
           process.execPath,
@@ -117,14 +128,85 @@ describe('T4-02 등록된 확장 명령 대조', () => {
         expect(runtime.status, runtime.stderr).toBe(0);
         expect(readExtensionRegistryKeys(dir)).toEqual(JSON.parse(runtime.stdout));
         expect(readExtensionRegistryKeys(dir).map(({ key }: { key: string }) => key)).not.toContain('never_registered');
-        writeFileSync(
-          actualSource,
-          `import { unavailable } from 'not-installed';\n${readFileSync(actualSource, 'utf8')}`,
-        );
-        expect(readExtensionRegistryKeys(dir)).toHaveLength(2);
       },
     );
   });
+
+  it.each([
+    [
+      '부작용 import',
+      {
+        'ext/registry.ts': `import './register.ts'; export { list as extensionCommands } from './definitions.ts';`,
+        'ext/definitions.ts': `export const list = [${command('fire_attack')}];`,
+        'ext/register.ts': `import { list } from './definitions.ts'; list.push(${command('hidden_command')});`,
+      },
+    ],
+    [
+      '참조하지 않은 const 초기값',
+      {
+        'ext/registry.ts': `import { list } from './definitions.ts'; export const extensionCommands = list;`,
+        'ext/definitions.ts': `export const list = [${command('fire_attack')}];
+        const changed = list.push(${command('hidden_command')});`,
+      },
+    ],
+    [
+      'class static block',
+      {
+        'ext/registry.ts': `import { list } from './definitions.ts'; export const extensionCommands = list;`,
+        'ext/definitions.ts': `export const list = [${command('fire_attack')}];
+        class Register { static { list.push(${command('hidden_command')}); } }`,
+      },
+    ],
+    [
+      'registry 자체의 const 초기값',
+      {
+        'ext/registry.ts': `const list = [${command('fire_attack')}];
+        const changed = list.push(${command('hidden_command')}); export const extensionCommands = list;`,
+      },
+    ],
+    [
+      '사용하지 않는 named import의 모듈 초기화',
+      {
+        'ext/registry.ts': `import { unused } from './register.ts'; export { list as extensionCommands } from './definitions.ts';`,
+        'ext/definitions.ts': `export const list = [${command('fire_attack')}];`,
+        'ext/register.ts': `import { list } from './definitions.ts';
+        export const unused = list.push(${command('hidden_command')});`,
+      },
+    ],
+    [
+      'class static 필드 초기값',
+      {
+        'ext/registry.ts': `export const extensionCommands = [${command('fire_attack')}];
+        class Register { static changed = extensionCommands.push(${command('hidden_command')}); }`,
+      },
+    ],
+  ] satisfies [string, Record<string, string>][])(
+    '%s의 숨은 등록은 실제로 실행되지만 정적 도구와 CLI는 거부한다',
+    (_name, files) => {
+      fixture(files, (dir) => {
+        const file = pathToFileURL(join(dir, 'packages/rules/src/commands/ext/registry.ts')).href;
+        const runtime = spawnSync(
+          process.execPath,
+          [
+            '--input-type=module',
+            '-e',
+            `const {extensionCommands}=await import(${JSON.stringify(file)}); console.log(JSON.stringify(extensionCommands));`,
+          ],
+          { encoding: 'utf8' },
+        );
+        expect(runtime.status, runtime.stderr).toBe(0);
+        expect(JSON.parse(runtime.stdout)).toEqual([
+          { key: 'fire_attack', target: 'general' },
+          { key: 'hidden_command', target: 'general' },
+        ]);
+        expect(() => readExtensionRegistryKeys(dir)).toThrow('확장 registry');
+        emptyLegacyRegistry(dir);
+        const result = main(['--root', dir, '--file', tablePath]);
+        expect(result.code).toBe(1);
+        expect(result.output).toContain('registry를 읽지 못했다: 확장 registry');
+      });
+    },
+  );
 
   it('공통 defineCommand의 기본 general과 명시 nation을 실제 실행 결과와 대조한다', () => {
     fixture(
@@ -173,6 +255,13 @@ describe('T4-02 등록된 확장 명령 대조', () => {
     ['순환 참조', `const first = second; const second = first; export const extensionCommands = first;`],
     ['없는 참조', `export const extensionCommands = [missing];`],
     ['구문 오류', `export const extensionCommands = [;`],
+    ['사용하지 않는 외부 import', `import { unused } from 'not-installed'; export const extensionCommands = [];`],
+    ['초기값의 객체 속성 실행', `const sibling = { changed: list.push(1) }; export const extensionCommands = [];`],
+    ['객체 계산 속성 실행', `const sibling = { [list.push(1)]: 0 }; export const extensionCommands = [];`],
+    [
+      '객체 접근자 실행',
+      `export const extensionCommands = [{ get key() { return 'fire_attack'; }, target: 'general' }];`,
+    ],
   ])('%s은 조용히 생략하지 않고 실패한다', (_name, source) => {
     fixture({ 'ext/registry.ts': source }, (dir) => {
       expect(() => readExtensionRegistryKeys(dir)).toThrow('확장 registry');
@@ -209,22 +298,32 @@ describe('T4-02 등록된 확장 명령 대조', () => {
 
   it('등록 표현식을 읽지 못하면 CLI도 exit 1로 실패한다', () => {
     fixture({ 'ext/registry.ts': 'export const extensionCommands = createUnknown();' }, (dir) => {
-      for (const file of [
-        'domestic/investment.ts',
-        'rest.ts',
-        'military.ts',
-        'attack.ts',
-        'personnel.ts',
-        'personal.ts',
-        'nation.ts',
-      ]) {
-        const path = join(dir, 'packages/rules/src/commands', file);
-        mkdirSync(dirname(path), { recursive: true });
-        writeFileSync(path, '');
-      }
+      emptyLegacyRegistry(dir);
       const result = main(['--root', dir, '--file', tablePath]);
       expect(result.code).toBe(1);
       expect(result.output).toContain('registry를 읽지 못했다: 확장 registry');
+    });
+  });
+
+  it('CRLF로 저장한 문서도 LF 문서와 같은 검증 문맥과 리뷰 절로 읽는다', () => {
+    fixture({ 'ext/registry.ts': 'export const extensionCommands = [];' }, (dir) => {
+      emptyLegacyRegistry(dir);
+      const docs = {
+        'README.md': '# 개발\r\n| M1 | 진행 중 |\r\n',
+        'docs/product/acceptance-criteria.md': '## 요약\r\n| M1 a | 1 | 0 | 1 | 0 |\r\n',
+        'docs/plans/T1-08.md': '## 리뷰 (Claude)\r\n- 결과: 통과\r\n',
+      };
+      for (const [path, source] of Object.entries(docs)) {
+        const file = join(dir, path);
+        mkdirSync(dirname(file), { recursive: true });
+        writeFileSync(file, source);
+      }
+      const loaded = loadContext(dir);
+      expect(loaded.readme).toBe('# 개발\n| M1 | 진행 중 |\n');
+      expect(loaded.acceptance).toBe('## 요약\n| M1 a | 1 | 0 | 1 | 0 |\n');
+      expect(findSection(loaded.readDoc('docs/plans/T1-08.md'), '리뷰-claude')).toBe(
+        '## 리뷰 (Claude)\n- 결과: 통과\n',
+      );
     });
   });
 });
@@ -597,13 +696,14 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
     expect(verified.output).toContain('commands[farm].ui: verified는 독립 리뷰 기록(review)과 같은 SHA의 실행(ci)');
   });
 
-  it('리뷰 절 앵커는 GitHub 제목 규칙으로 찾고 다음 같은 수준 제목에서 끝난다', () => {
+  it.each(['\n', '\r\n'])('리뷰 절 앵커는 개행 %j에서도 같은 제목 범위를 찾는다', (newline) => {
     const text = '# T\n## 리뷰 (Claude)\n- 결과: 통과\n### 재리뷰 (Claude, 2026-10-21)\n- b\n## 다음\n- c';
-    expect(findSection(text, '리뷰-claude')).toBe(
+    const source = text.replace(/\n/g, newline);
+    expect(findSection(source, '리뷰-claude')).toBe(
       '## 리뷰 (Claude)\n- 결과: 통과\n### 재리뷰 (Claude, 2026-10-21)\n- b',
     );
-    expect(findSection(text, '재리뷰-claude-2026-10-21')).toBe('### 재리뷰 (Claude, 2026-10-21)\n- b');
-    expect(findSection(text, '없는-절')).toBeNull();
+    expect(findSection(source, '재리뷰-claude-2026-10-21')).toBe('### 재리뷰 (Claude, 2026-10-21)\n- b');
+    expect(findSection(source, '없는-절')).toBeNull();
   });
 });
 

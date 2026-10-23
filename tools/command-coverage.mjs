@@ -70,7 +70,7 @@ export function readRegistryKeys(root) {
   return keys;
 }
 
-// 확장 목록에서 참조한 const·상대 import만 따라간다. 다른 명령 정의는 읽지 않는다.
+// 확장 목록의 const·상대 import를 따라간다. 읽는 모듈의 초기화도 검사해 숨은 목록 변경을 거부한다.
 export function readExtensionRegistryKeys(root) {
   const entry = resolve(root, 'packages/rules/src/commands/ext/registry.ts');
   const support = resolve(root, 'packages/rules/src/commands/support.ts');
@@ -79,12 +79,24 @@ export function readExtensionRegistryKeys(root) {
   const fail = (file, message) => {
     throw new Error(`확장 registry ${relative(root, file)}: ${message}`);
   };
+  const importFile = (file, specifier) => {
+    if (!ts.isStringLiteral(specifier) || !specifier.text.startsWith('.'))
+      fail(file, '상대 경로 import만 읽을 수 있다');
+    const base = resolve(dirname(file), specifier.text);
+    const target = [base, `${base}.ts`, join(base, 'index.ts')].find(
+      (path) => path.endsWith('.ts') && existsSync(path),
+    );
+    if (!target) fail(file, `import ${specifier.text} 파일이 없다`);
+    return target;
+  };
   const moduleAt = (file) => {
     if (modules.has(file)) return modules.get(file);
     const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
     if (source.parseDiagnostics.length) fail(file, 'TypeScript 구문을 읽지 못했다');
     const bindings = new Map();
     const exports = new Map();
+    const imports = [];
+    const initializers = [];
     const put = (map, name, value) => {
       if (map.has(name)) fail(file, `선언 ${name}이 두 번 있다`);
       map.set(name, value);
@@ -93,7 +105,10 @@ export function readExtensionRegistryKeys(root) {
     for (const statement of source.statements) {
       if (ts.isImportDeclaration(statement)) {
         const clause = statement.importClause;
-        if (!clause || clause.isTypeOnly) continue;
+        if (!clause) fail(file, '부작용 import는 읽을 수 없다');
+        if (clause.isTypeOnly) continue;
+        // 개별 type import만 있더라도 import {}가 남아 모듈을 초기화할 수 있다.
+        imports.push(statement.moduleSpecifier);
         if (clause.name) put(bindings, clause.name.text, fromModule(statement.moduleSpecifier, 'default'));
         const named = clause.namedBindings;
         if (named && ts.isNamedImports(named))
@@ -107,15 +122,17 @@ export function readExtensionRegistryKeys(root) {
       } else if (ts.isVariableStatement(statement)) {
         const exported = statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword);
         for (const declaration of statement.declarationList.declarations) {
-          if (!ts.isIdentifier(declaration.name)) continue;
+          if (!ts.isIdentifier(declaration.name)) fail(file, '구조 분해 선언은 읽을 수 없다');
           const name = declaration.name.text;
           put(bindings, name, {
             node: declaration.initializer,
             constant: Boolean(statement.declarationList.flags & ts.NodeFlags.Const),
           });
+          if (declaration.initializer) initializers.push(declaration.initializer);
           if (exported) put(exports, name, { file, name });
         }
       } else if (ts.isExportDeclaration(statement) && !statement.isTypeOnly) {
+        if (statement.moduleSpecifier) imports.push(statement.moduleSpecifier);
         if (statement.exportClause && ts.isNamedExports(statement.exportClause))
           for (const item of statement.exportClause.elements)
             if (!item.isTypeOnly)
@@ -128,9 +145,11 @@ export function readExtensionRegistryKeys(root) {
               );
       } else if (ts.isExportAssignment(statement) && !statement.isExportEquals) {
         put(exports, 'default', { node: statement.expression, constant: true });
+        initializers.push(statement.expression);
       } else if (
-        ts.isStatement(statement) &&
-        !ts.isDeclarationStatement(statement) &&
+        !ts.isFunctionDeclaration(statement) &&
+        !ts.isInterfaceDeclaration(statement) &&
+        !ts.isTypeAliasDeclaration(statement) &&
         !ts.isEmptyStatement(statement)
       ) {
         fail(file, `최상위 실행문 ${ts.SyntaxKind[statement.kind]}은 읽을 수 없다`);
@@ -138,6 +157,12 @@ export function readExtensionRegistryKeys(root) {
     }
     const result = { bindings, exports };
     modules.set(file, result);
+    for (const specifier of imports) {
+      const target = importFile(file, specifier);
+      // defineCommand는 아래 evaluator가 알고 있는 공통 생성자다.
+      if (target !== support) moduleAt(target);
+    }
+    for (const initializer of initializers) pureInitializer(file, initializer);
     return result;
   };
   const binding = (file, name, exported = false) => {
@@ -149,14 +174,7 @@ export function readExtensionRegistryKeys(root) {
       const found = moduleAt(file)[exported ? 'exports' : 'bindings'].get(name);
       if (!found) fail(file, `선언 ${name}을 찾지 못했다`);
       if (found.specifier) {
-        if (!ts.isStringLiteral(found.specifier) || !found.specifier.text.startsWith('.'))
-          fail(file, '상대 경로 import만 읽을 수 있다');
-        const base = resolve(dirname(file), found.specifier.text);
-        const target = [base, `${base}.ts`, join(base, 'index.ts')].find(
-          (path) => path.endsWith('.ts') && existsSync(path),
-        );
-        if (!target) fail(file, `import ${found.specifier.text} 파일이 없다`);
-        return binding(target, found.name, true);
+        return binding(importFile(file, found.specifier), found.name, true);
       }
       if (found.file) return binding(found.file, found.name, found.exported);
       if (!found.constant || !found.node) fail(file, `${name}은 초기값이 있는 const여야 한다`);
@@ -164,6 +182,50 @@ export function readExtensionRegistryKeys(root) {
     } finally {
       active.delete(id);
     }
+  };
+  // const 선언도 초기값을 실행한다. 참조하지 않은 선언까지 제한된 순수 구문인지 확인한다.
+  // 함수 본문은 모듈 초기화 때 실행되지 않으므로 검사하지 않는다.
+  const pureInitializer = (file, node) => {
+    if (
+      ts.isIdentifier(node) ||
+      ts.isStringLiteral(node) ||
+      ts.isNumericLiteral(node) ||
+      ts.isBigIntLiteral(node) ||
+      ts.isNoSubstitutionTemplateLiteral(node) ||
+      ts.isArrowFunction(node) ||
+      ts.isFunctionExpression(node) ||
+      [ts.SyntaxKind.TrueKeyword, ts.SyntaxKind.FalseKeyword, ts.SyntaxKind.NullKeyword].includes(node.kind)
+    )
+      return;
+    if (
+      ts.isParenthesizedExpression(node) ||
+      ts.isAsExpression(node) ||
+      ts.isSatisfiesExpression(node) ||
+      ts.isTypeAssertionExpression(node) ||
+      ts.isNonNullExpression(node)
+    )
+      return pureInitializer(file, node.expression);
+    if (ts.isArrayLiteralExpression(node)) {
+      for (const element of node.elements)
+        pureInitializer(file, ts.isSpreadElement(element) ? element.expression : element);
+      return;
+    }
+    if (ts.isObjectLiteralExpression(node)) {
+      for (const property of node.properties) {
+        if (!property.name || ts.isComputedPropertyName(property.name))
+          fail(file, '초기값의 spread·계산 속성은 읽을 수 없다');
+        if (ts.isPropertyAssignment(property)) pureInitializer(file, property.initializer);
+        else if (!ts.isShorthandPropertyAssignment(property) && !ts.isMethodDeclaration(property))
+          fail(file, '초기값의 접근자 속성은 읽을 수 없다');
+      }
+      return;
+    }
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+      const callee = binding(file, node.expression.text);
+      if (callee.factory && node.arguments.length === 1 && ts.isObjectLiteralExpression(node.arguments[0]))
+        return pureInitializer(file, node.arguments[0]);
+    }
+    fail(file, `지원하지 않는 모듈 초기값 ${ts.SyntaxKind[node.kind]}`);
   };
   const object = (file, node, defaultTarget) => {
     const fields = new Map();
@@ -225,7 +287,8 @@ export function readExtensionRegistryKeys(root) {
 }
 
 export function loadContext(root) {
-  const read = (path) => (existsSync(join(root, path)) ? readFileSync(join(root, path), 'utf8') : '');
+  const read = (path) =>
+    existsSync(join(root, path)) ? readFileSync(join(root, path), 'utf8').replace(/\r\n/g, '\n') : '';
   const plans = existsSync(join(root, 'docs/plans')) ? readdirSync(join(root, 'docs/plans')) : [];
   let baseline;
   try {
@@ -278,7 +341,7 @@ export function slugify(heading) {
 
 /** 문서에서 앵커 제목부터 같은 수준 이상의 다음 제목 전까지를 돌려준다. 없으면 null. */
 export function findSection(text, anchor) {
-  const lines = text.split('\n');
+  const lines = text.split(/\r?\n/);
   const seen = new Map();
   let fence = false;
   let start = -1;
