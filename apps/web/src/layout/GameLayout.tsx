@@ -92,6 +92,9 @@ export function GameLayout() {
               {item.label}
             </Link>
           ))}
+          <Link to="/help/$doc" params={{ doc: 'index' }} className={styles.navLink}>
+            도움말
+          </Link>
         </nav>
         <LogoutButton className={styles.logout} />
       </header>
