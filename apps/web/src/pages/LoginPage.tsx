@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link } from '@tanstack/react-router';
 import { AuthForm } from '../auth/AuthForm';
 import styles from '../auth/AuthPage.module.css';
+import { PublicMapTabs } from '../publicMap/PublicMapTabs';
 import { useTRPC } from '../trpc';
 
 const route = getRouteApi('/login');
@@ -11,19 +12,23 @@ export function LoginPage() {
   const trpc = useTRPC();
   const health = useQuery(trpc.health.queryOptions());
 
+  // 양식이 먼저다. 넓은 화면에서는 오른쪽, 640px 이하에서는 양식 아래에 공개 지도를 둔다 (T2-25).
   return (
-    <main className={styles.page}>
-      <h1>로그인</h1>
-      <AuthForm mode="login" next={next} />
-      <p className={styles.switch}>
-        계정이 없으면{' '}
-        <Link to="/signup" search={next ? { next } : {}}>
-          가입하기
-        </Link>
-      </p>
-      <p role="status" className={styles.status}>
-        {statusText(health)}
-      </p>
+    <main className={styles.withMap}>
+      <div className={styles.formColumn}>
+        <h1>로그인</h1>
+        <AuthForm mode="login" next={next} />
+        <p className={styles.switch}>
+          계정이 없으면{' '}
+          <Link to="/signup" search={next ? { next } : {}}>
+            가입하기
+          </Link>
+        </p>
+        <p role="status" className={styles.status}>
+          {statusText(health)}
+        </p>
+      </div>
+      <PublicMapTabs />
     </main>
   );
 }

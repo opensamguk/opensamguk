@@ -13,3 +13,21 @@
   font-size: var(--text-xs);
   color: var(--color-text-muted);
 }
+.withMap {
+  display: grid;
+  grid-template-columns: 360px minmax(0, 640px);
+  justify-content: center;
+  align-items: start;
+  gap: var(--space-8) 48px;
+  margin: 64px auto;
+  padding: 0 var(--space-4);
+}
+.formColumn {
+  min-width: 0;
+}
+@media (max-width: 640px) {
+  .withMap {
+    grid-template-columns: minmax(0, 1fr);
+    margin-top: var(--space-8);
+  }
+}
