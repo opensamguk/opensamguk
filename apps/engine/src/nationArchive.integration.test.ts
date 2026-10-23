@@ -1,6 +1,7 @@
 import { spawn, execFile } from 'node:child_process';
 import { once } from 'node:events';
 import { promisify } from 'node:util';
+import { randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createDb, nextActionSequence, type Prisma } from '@opensamguk/db';
 import { emptyTurns, runGeneralTurn, toWorldState, type WorldInit } from '@opensamguk/rules';
@@ -18,9 +19,11 @@ const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
 const db = createDb(url);
 const execute = promisify(execFile);
+const userPrefix = `archive-human-${randomUUID()}-`;
+const worldIds: string[] = [];
 afterAll(async () => {
-  await db.world.deleteMany();
-  await db.user.deleteMany({ where: { id: { startsWith: 'archive-human-' } } });
+  await db.world.deleteMany({ where: { id: { in: worldIds } } });
+  await db.user.deleteMany({ where: { id: { startsWith: userPrefix } } });
   await db.$disconnect();
 });
 
@@ -36,7 +39,7 @@ async function create(initial?: WorldInit) {
     supplied: false,
   });
   for (const general of initial.generals) {
-    general.userId = `archive-human-${general.id}`;
+    general.userId = `${userPrefix}${general.id}`;
     await db.user.upsert({
       where: { id: general.userId },
       update: {},
@@ -48,6 +51,7 @@ async function create(initial?: WorldInit) {
     turnTermMinutes: 60,
     endYear: null,
   });
+  worldIds.push(worldId);
   await controlClock(db, worldId, 'start');
   const lease = (await acquireLease(db, worldId))!;
   return { initial, worldId, lease, loop: new TurnLoop(db, lease) };
@@ -512,9 +516,11 @@ describe('T4-56 / AC-P2-17 실제 PostgreSQL legacy 백필', () => {
     const good = await create(await monthlyFixture());
     await good.loop.advanceTo(10000);
     await db.yearbookNation.deleteMany({ where: { worldId: good.worldId } });
-    const reports = await backfillWorlds(db, true);
+    const reports = await backfillWorlds(db);
     expect(reports.find(({ worldId }) => worldId === bad.worldId)!.status).toBe('conflict');
-    expect(reports.find(({ worldId }) => worldId === good.worldId)!.inserted).toBe(2);
+    expect(reports.find(({ worldId }) => worldId === good.worldId)).toMatchObject({ inserted: 0, wouldInsert: 2 });
+    expect(await archived(good.worldId)).toEqual([]);
+    expect(await backfillWorld(db, good.worldId, true)).toMatchObject({ status: 'ok', inserted: 2 });
     await db.yearbookNation.deleteMany({ where: { worldId: good.worldId } });
     await db.nation.update({ where: { worldId_id: { worldId: good.worldId, id: 1 } }, data: { color: '#abcdef' } });
     expect(await backfillWorld(db, good.worldId, true)).toMatchObject({
