@@ -119,7 +119,7 @@ test.describe('국가 작전판', () => {
     await expect(editor(chief.page).getByTestId('draft-state')).toHaveText('저장하지 않은 편집 1건');
 
     await chief.page.getByRole('button', { name: '내 예턴을 작전에 맞추기' }).click();
-    await chief.page.getByRole('button', { name: '초안에 넣기' }).click();
+    await chief.page.getByRole('button', { name: '초안에 넣기', exact: true }).click();
     await expect(chief.page.getByRole('alertdialog', { name: '초안 덮기 확인' })).toContainText(
       '저장하지 않은 편집 1건',
     );
@@ -148,7 +148,7 @@ test.describe('국가 작전판', () => {
     });
     await chief.page.goto(`/w/${s.world}/operations/${id}`);
     await chief.page.getByRole('button', { name: '내 예턴을 작전에 맞추기' }).click();
-    await chief.page.getByRole('button', { name: '초안에 넣기' }).click();
+    await chief.page.getByRole('button', { name: '초안에 넣기', exact: true }).click();
     // 다른 탭의 저장.
     await setTurns(chief.page, s.world, [null, { commandKey: 'farm' }]);
     await editor(chief.page).getByRole('button', { name: '저장', exact: true }).click();
