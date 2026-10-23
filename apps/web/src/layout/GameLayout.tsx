@@ -17,6 +17,7 @@ const NAV = [
   { to: '/w/$worldId/records', label: '기록' },
   { to: '/w/$worldId/ranking', label: '순위' },
   { to: '/w/$worldId/simulator', label: '전투 시뮬레이터' },
+  { to: '/w/$worldId/diplomacy', label: '외교' },
 ] as const;
 
 // 위쪽 띠에는 월드 이름·현재 연월·다음 턴까지 남은 시간·메뉴·로그아웃. 본문은 화면 폭을 다 쓴다.
