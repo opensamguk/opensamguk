@@ -539,10 +539,7 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
       ],
       [
         {
-          phase2: context.phase2.replace(
-            '| 계획 가능, 계약은 U-19 · MVP 필수 (D-022) |',
-            '| 계획 가능, 계약은 U-19 · Phase 2 |',
-          ),
+          phase2: context.phase2.replace(/^(\| T4-05 \|[^\n]*) · MVP 필수 \(D-022\)/m, '$1 · Phase 2'),
         },
         'Phase 2 명세 §6: T4-05 상태에 MVP 필수 (D-022)가 없다',
       ],
