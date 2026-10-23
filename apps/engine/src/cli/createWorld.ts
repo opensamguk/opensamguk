@@ -1,11 +1,12 @@
 import { parseArgs } from 'node:util';
 import { createDb } from '@opensamguk/db';
-import { loadInitialWorld } from '../world/resources';
+import { loadInitialWorld, loadPreset } from '../world/resources';
 import { saveInitialWorld } from '../world/persistence';
 
 async function main() {
   const { values } = parseArgs({
     options: {
+      preset: { type: 'string' },
       scenario: { type: 'string' },
       map: { type: 'string' },
       seed: { type: 'string' },
@@ -17,23 +18,28 @@ async function main() {
   });
   if (values.help) {
     console.log(
-      'pnpm world:create --scenario 1030 --map che --seed <문자열> --turn-term <분> --end-year <연도> --name <이름>',
+      'pnpm world:create [--preset <key>] [--scenario 1030 --map che --turn-term <분>] --seed <문자열> --end-year <연도> --name <이름>',
     );
     return;
   }
-  const { scenario, map, seed, name } = values;
-  if (!scenario || !map || !seed || !name || !values['turn-term'] || !values['end-year'])
+  const preset = values.preset !== undefined ? await loadPreset(values.preset) : null;
+  const scenario = values.scenario ?? preset?.scenario;
+  const map = values.map ?? preset?.map;
+  const turnTermMinutes = values['turn-term'] === undefined ? preset?.turnTermMinutes : Number(values['turn-term']);
+  const { seed, name } = values;
+  if (!scenario || !map || !seed || !name || turnTermMinutes === undefined || !values['end-year'])
     throw new Error('scenario, map, seed, turn-term, end-year, name이 필요합니다.');
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) throw new Error('DATABASE_URL이 없습니다. .env.example을 .env로 복사하세요.');
-  const state = await loadInitialWorld({ scenario, map, seed });
+  const state = await loadInitialWorld({ scenario, map, seed, ...(preset ? { unitSet: preset.unitSet } : {}) });
   const db = createDb(databaseUrl);
   try {
     console.log(
       JSON.stringify(
         await saveInitialWorld(db, state, {
           name,
-          turnTermMinutes: Number(values['turn-term']),
+          turnTermMinutes,
+          ...(preset ? { preset: { key: values.preset!, value: preset } } : {}),
           endYear: Number(values['end-year']),
         }),
       ),

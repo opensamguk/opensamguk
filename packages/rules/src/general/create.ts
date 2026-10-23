@@ -4,6 +4,33 @@ import { monthlyDate } from '../monthly/index';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { statRulesSchema, unitSetSchema } from '../world/resources';
 import type { InitialGeneral } from '../world/bootstrap';
+import type { PresetRules } from '../world/preset';
+
+export interface CreationBonus {
+  gold: number;
+  rice: number;
+  experience: number;
+}
+
+export function lateJoinBonus(
+  config: PresetRules['boost']['lateJoin'],
+  relativeYear: number,
+  generals: readonly Pick<InitialGeneral, 'id' | 'nationId' | 'experience'>[],
+): CreationBonus {
+  const bonus = { gold: 1000, rice: 1000, experience: 0 };
+  if (!config) return bonus;
+  const years = Math.min(relativeYear, config.maxYears);
+  bonus.gold += config.goldPerYear * years;
+  bonus.rice += config.ricePerYear * years;
+  if (relativeYear >= config.fromYear) {
+    const members = generals
+      .filter((general) => general.nationId !== null)
+      .sort((a, b) => a.experience - b.experience || a.id - b.id);
+    const value = members[Math.max(1, Math.round(members.length * config.percentile)) - 1];
+    if (value) bonus.experience = Math.round(value.experience * config.experienceRatio);
+  }
+  return bonus;
+}
 
 const dbInt = z.number().int().min(0).max(2_147_483_647);
 export const generalCreationSchema = z.strictObject({
@@ -61,6 +88,7 @@ export function buildCreatedGeneral(input: {
   tick: number;
   cityKeys: number[];
   unitSet: unknown;
+  bonus?: CreationBonus;
 }): InitialGeneral {
   const rng = rngFor(input.seed, 'create', input.userId);
   // 고정 소비 순서: cityKey 오름차순 후보의 도시, affinity, 턴 offset.
@@ -86,13 +114,13 @@ export function buildCreatedGeneral(input: {
     activeFromYear: birthYear + 15,
     personality: null,
     special: null,
-    gold: 1000,
-    rice: 1000,
+    gold: input.bonus?.gold ?? 1000,
+    rice: input.bonus?.rice ?? 1000,
     crew: 0,
     crewType: unitSetSchema.parse(input.unitSet).defaultCrewTypeId,
     train: 0,
     atmos: 0,
-    experience: 0,
+    experience: input.bonus?.experience ?? 0,
     dedication: 0,
     age: 20,
     injury: 0,

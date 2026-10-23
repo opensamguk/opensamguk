@@ -1,5 +1,5 @@
 import type { Prisma } from '@opensamguk/db';
-import type { WorldState } from '@opensamguk/rules';
+import { parsePreset, presetRules, type WorldState } from '@opensamguk/rules';
 import { loadCommandState } from './commandPersistence';
 
 export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): Promise<WorldState> {
@@ -19,6 +19,7 @@ export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): 
     return value;
   };
   return {
+    ...(world.preset ? { presetRules: presetRules(parsePreset(world.preset)) } : {}),
     startYear: world.startYear,
     cities: Object.fromEntries(cities.map((city) => [city.cityKey, stripWorldId(city)])),
     nations: Object.fromEntries(

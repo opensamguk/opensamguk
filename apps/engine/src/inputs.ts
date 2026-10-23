@@ -1,6 +1,10 @@
 import { nextActionSequence, type Prisma } from '@opensamguk/db';
 import {
   buildCreatedGeneral,
+  lateJoinBonus,
+  parsePreset,
+  monthlyDate,
+  TICKS_PER_MONTH,
   creationFailure,
   emptyTurns,
   validateGeneralCreation,
@@ -46,7 +50,19 @@ export async function processCreation(
     select: { cityKey: true },
     orderBy: { cityKey: 'asc' },
   });
+  const preset = world.preset ? parsePreset(world.preset) : null;
+  const bonus = preset?.boost.lateJoin
+    ? lateJoinBonus(
+        preset.boost.lateJoin,
+        monthlyDate(world.startYear, world.monthlyTick + TICKS_PER_MONTH).year - world.startYear,
+        await tx.general.findMany({
+          where: { worldId: world.id },
+          select: { id: true, nationId: true, experience: true },
+        }),
+      )
+    : undefined;
   const general = buildCreatedGeneral({
+    ...(bonus ? { bonus } : {}),
     payload: parsed.value,
     seed: world.seed,
     userId: event.userId,

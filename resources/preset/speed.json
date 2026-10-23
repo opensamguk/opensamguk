@@ -1,0 +1,31 @@
+{
+  "name": "속성",
+  "turnTermMinutes": 10,
+  "scenario": "1030",
+  "map": "che",
+  "unitSet": "basic",
+  "commands": null,
+  "npc": {
+    "fillRatio": 1,
+    "aggression": 1
+  },
+  "protection": {
+    "foundUntilMonths": 0,
+    "peaceMonths": 0,
+    "maxGeneralsPerNation": null
+  },
+  "boost": {
+    "smallWorld": null,
+    "lateJoin": {
+      "fromYear": 3,
+      "experienceRatio": 0.8,
+      "percentile": 0.2,
+      "goldPerYear": 0,
+      "ricePerYear": 0,
+      "maxYears": 0
+    }
+  },
+  "features": {
+    "advisor": false
+  }
+}
