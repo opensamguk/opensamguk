@@ -183,6 +183,7 @@ T1-15 편집기(`apps/web/src/turns/TurnEditor.tsx`)의 조작입니다. 메인 
 | `/w/:worldId/nation/inspection` | 감찰 (T2-12). 메뉴는 직책자(officerLevel 5 이상)에게만 보인다 |
 | `/help`, `/help/:doc` | 도움말 (T2-17). `docs/user/` 가이드 9개와 생성 명령 목록을 웹 빌드에 묶어 보여 줌. 로그인 없이 열림, 서버 요청 없음 |
 | `/dev/ui` | 부품 모음 (개발 모드만) |
+| `/dev/map-editor` | 지도 편집기 (개발 모드만, T4-80). 지금 형식·v2 지도 JSON 불러오기, 도시·연결·지형 편집, 검증 목록, v2 JSON과 5색 밑그림 PNG 내려받기. 서버 요청 없음. 관리자 콘솔 연결은 T4-81 |
 
 ### 로그인 가드 (T1-14)
 
