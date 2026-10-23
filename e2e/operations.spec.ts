@@ -125,7 +125,7 @@ test.describe('국가 작전판', () => {
     );
     await chief.page.getByRole('button', { name: '덮고 넣기' }).click();
     await editor(chief.page).getByRole('button', { name: '저장', exact: true }).click();
-    await expect(editor(chief.page).getByRole('status')).toContainText('저장했습니다');
+    await expect(editor(chief.page).locator(':scope > [role="status"]')).toContainText('저장했습니다');
 
     const saved = await turns(chief.page, s.world);
     expect(saved.slots.some((slot) => slot.commandKey === 'attack')).toBe(true);
@@ -158,6 +158,7 @@ test.describe('국가 작전판', () => {
     );
     await editor(chief.page).getByRole('button', { name: '내 편집 다시 적용' }).click();
     await editor(chief.page).getByRole('button', { name: '저장', exact: true }).click();
+    await expect(editor(chief.page).locator(':scope > [role="status"]')).toContainText('저장했습니다');
     const saved = await turns(chief.page, s.world);
     expect(saved.slots[1]!.commandKey).toBe('farm');
     expect(saved.slots.some((slot) => slot.commandKey === 'attack')).toBe(true);
