@@ -30,7 +30,7 @@ it.each(['defend', 'drill'] as const)('AC-M2-17 방침 %s의 두 명령이 모�
   state.cities[1]!.wall = state.cities[1]!.wallMax;
   const result = runPolicyCommand(state, { generalId: 1 }, policy, 'policy');
   expect(result.commandKey).toBe('rest');
-  expect(result.result.logs[0]!.text).toMatch(/^기본 방침 실패: .+ → 휴식$/);
+  expect(result.result.logs[0]!.text).toBe('기본 방침 실패: 이미 최대치입니다. → 휴식');
 });
 
 it('AC-M2-17 직접 명령·직접 휴식·옛 휴식은 미접속이어도 방침으로 덮지 않는다', () => {
@@ -92,7 +92,9 @@ it.each(['maximum', 'gold', 'supply'] as const)(
     if (failure === 'supply') state.cities[1]!.supplied = false;
     const result = runPolicyCommand(state, { generalId: 1 }, 'farm', 'policy');
     expect(result.commandKey).toBe('rest');
-    expect(result.result.logs[0]!.text).toMatch(/^기본 방침 실패: .+ → 휴식$/);
+    expect(result.result.logs[0]!.text).toBe(
+      `기본 방침 실패: ${{ maximum: '이미 최대치입니다.', gold: '금이 부족합니다.', supply: '보급이 끊긴 도시입니다.' }[failure]} → 휴식`,
+    );
     const next = applyEffects(state, result.result.effects);
     expect(next.generals[1]!.injury).toBeLessThan(general.injury);
     expect(next.generals[1]!.gold).toBe(general.gold);

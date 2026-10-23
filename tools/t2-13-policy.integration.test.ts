@@ -48,13 +48,11 @@ async function fixture(options: { farmMax?: boolean; npc?: boolean } = {}) {
     bob = await user();
   const initial = commandInitial();
   if (options.farmMax) initial.cities[0]!.agriculture = initial.cities[0]!.agricultureMax;
-  initial.generals = initial.generals
-    .slice(0, 2)
-    .map((general, i) => ({
-      ...general,
-      userId: i ? (options.npc ? null : bob.id) : alice.id,
-      nextTurnTick: i ? 5000 : 100,
-    }));
+  initial.generals = initial.generals.slice(0, 2).map((general, i) => ({
+    ...general,
+    userId: i ? (options.npc ? null : bob.id) : alice.id,
+    nextTurnTick: i ? 5000 : 100,
+  }));
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '방침 실제 HTTP',
     turnTermMinutes: 30,
@@ -288,7 +286,7 @@ it('방침 실패는 같은 턴에서 비용 없이 휴식하고 실제 장수 �
     where: { worldId_generalId_tick: { worldId: f.worldId, generalId: 1, tick: 100 } },
   });
   expect(log.commandKey).toBe('rest');
-  expect(log.text).toMatch(/^기본 방침 실패: .+ → 휴식$/);
+  expect(log.text).toBe('기본 방침 실패: 이미 최대치입니다. → 휴식');
 });
 
 it('활동과 방침을 id 순으로 집행하며 commit 실패는 상태·결과·sequence를 함께 되돌린다', async () => {

@@ -111,16 +111,12 @@ it('부분 칸이면 DDL까지 롤백하고 정상 전환 준비는 옛 기록�
   expect((await client.query('SELECT slot FROM "GeneralTurn"')).rows).toHaveLength(29);
   await insert('GeneralTurn', { worldId, generalId: 1, slot: 29, commandKey: 'rest', args: {} });
   for (const invalid of [-1, 30]) {
-    await client.query('UPDATE "GeneralTurn" SET slot=$1 WHERE "worldId"=$2 AND "generalId"=1 AND slot=29', [
-      invalid,
-      worldId,
-    ]);
-    await expect(client.query(policySql)).rejects.toThrow('Invalid legacy turn slot set');
-    await client.query('ROLLBACK');
-    await client.query('UPDATE "GeneralTurn" SET slot=29 WHERE "worldId"=$1 AND "generalId"=1 AND slot=$2', [
-      worldId,
-      invalid,
-    ]);
+    await expect(
+      client.query('UPDATE "GeneralTurn" SET slot=$1 WHERE "worldId"=$2 AND "generalId"=1 AND slot=29', [
+        invalid,
+        worldId,
+      ]),
+    ).rejects.toMatchObject({ code: '23514' });
   }
   await insert('InputEvent', {
     worldId,
@@ -158,8 +154,8 @@ it('부분 칸이면 DDL까지 롤백하고 정상 전환 준비는 옛 기록�
   );
   expect((await client.query('SELECT id FROM "InputEvent" WHERE "worldId"=$1', [endedWorldId])).rows).toHaveLength(0);
   await expect(
-    insert('GeneralTurn', { worldId, generalId: 1, slot: 30, commandKey: 'rest', args: {} }),
-  ).rejects.toThrow();
+    insert('GeneralTurn', { worldId: endedWorldId, generalId: 2, slot: 0, commandKey: 'rest', args: {} }),
+  ).rejects.toMatchObject({ code: '23502', column: 'explicit' });
   for (const kind of ['general.setPolicy', 'system.policy.enable']) {
     const input = {
       worldId,
@@ -171,7 +167,11 @@ it('부분 칸이면 DDL까지 롤백하고 정상 전환 준비는 옛 기록�
       status: 'PENDING',
     };
     if (kind === 'general.setPolicy') await insert('InputEvent', input);
-    await expect(insert('InputEvent', { ...input, idempotencyKey: randomUUID() })).rejects.toThrow();
+    await expect(insert('InputEvent', { ...input, idempotencyKey: randomUUID() })).rejects.toMatchObject({
+      code: '23505',
+      constraint:
+        kind === 'general.setPolicy' ? 'InputEvent_pending_policy_unique' : 'InputEvent_policy_transition_unique',
+    });
   }
   await expect(
     client.query(`UPDATE "GeneralTurn" SET explicit=false,"commandKey"='farm' WHERE "generalId"=1 AND slot=0`),
@@ -183,17 +183,18 @@ it('부분 칸이면 DDL까지 롤백하고 정상 전환 준비는 옛 기록�
     )
   ).rows;
   expect(columns[0]!.column_default).toBeNull();
-  for (const key of ['first', 'second'])
-    await insert('InputEvent', {
-      worldId,
-      userId: 'migration-human',
-      generalId: 1,
-      kind: 'general.active',
-      idempotencyKey: key,
-      payload: {},
-      status: 'PENDING',
-    }).catch((error) => {
-      if (key !== 'second') throw error;
-    });
+  const active = {
+    worldId,
+    userId: 'migration-human',
+    generalId: 1,
+    kind: 'general.active',
+    payload: {},
+    status: 'PENDING',
+  };
+  await insert('InputEvent', { ...active, idempotencyKey: 'first' });
+  await expect(insert('InputEvent', { ...active, idempotencyKey: 'second' })).rejects.toMatchObject({
+    code: '23505',
+    constraint: 'InputEvent_pending_active_unique',
+  });
   expect((await client.query(`SELECT id FROM "InputEvent" WHERE kind='general.active'`)).rows).toHaveLength(1);
 });
