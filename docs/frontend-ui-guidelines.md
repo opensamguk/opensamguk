@@ -138,6 +138,7 @@ T1-15 편집기(`apps/web/src/turns/TurnEditor.tsx`)의 조작입니다. 메인 
 ### 로비 (T2-04)
 
 - 공지(`lobby.notices`)는 서버 순서대로 두고 첫 줄만 펼칩니다. 한 번에 하나만 엽니다.
+- 공지와 월드 목록 사이에 지연 공개 지도 자리(`data-slot="public-map"`)가 있습니다. 지도는 T2-25가 넣습니다 (D-026). 비어 있으면 보이지 않습니다.
 - 월드 카드에는 상태(`진행 중`·`가오픈`·`멈춤`·`끝남`, `Tag`로 글자와 색을 함께), 프리셋 이름(null이면 칸 없음), 이름, `시나리오(시작 연도) · 게임 연월 · 턴 N분 · 장수 N · 시작 M/D`가 있습니다. 시작하지 않은 월드는 `시작 전`입니다.
 - 정원 키(`maxHumanGenerals`)가 응답에 없으면 인원만 씁니다. D-025 승인 뒤 키가 오면 `장수 3/10`, null이면 `장수 34/—`입니다.
 - 버튼은 `auth.me`와 `myGeneral`, `createBlockedReason`만 보고 고릅니다 (`apps/web/src/lobby/lobbyView.ts`의 `lobbyAction`). 내 장수가 있으면 `들어가기`, 없으면 `장수 만들기`, 로그인 안 했으면 `로그인하고 참가`(`/login?next=/lobby`)입니다. 서버가 이유를 주면 그 버튼을 `DisabledReason`으로 막고 이유를 보입니다.

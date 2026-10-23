@@ -52,6 +52,8 @@ export function LobbyPage() {
       ) : notices.data && notices.data.length > 0 ? (
         <NoticeBoard notices={notices.data} />
       ) : null}
+      {/* 지연 공개 지도 자리 (D-026). 지도 부품은 T2-25가 이 자리에 넣는다. */}
+      <div className={styles.mapSlot} data-slot="public-map" />
       <section aria-labelledby="lobby-worlds" className={styles.worlds}>
         <h2 id="lobby-worlds" className={styles.heading}>
           월드
