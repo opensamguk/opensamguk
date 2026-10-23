@@ -171,6 +171,14 @@ test('실시간 월드를 가속하면 두 화면이 따라오고 종료 연도�
     for (const screen of [a, b])
       await expect(screen.page.getByTestId('next-turn')).toHaveText('가속 진행 중', { timeout: 20_000 });
 
+    // 장수가 없는 화면은 가속 중에도 home.get을 주기 조회하지 않는다. 전환 때 받은 한 번이 지나간 뒤부터 센다.
+    // 같은 동안 world.summary는 5초마다 받으므로 주기 조회는 살아 있다. 16초는 예턴 편집기의 15초 주기를 넘긴다.
+    await b.page.waitForTimeout(2_000);
+    b.calls = [];
+    await b.page.waitForTimeout(16_000);
+    expect(b.calls.filter((name) => name === 'home.get')).toEqual([]);
+    expect(b.calls.filter((name) => name === 'world.summary').length).toBeGreaterThanOrEqual(2);
+
     // 가속 중 5초 주기로 연월이 바뀌는지 본다. 석 달만 진행한 뒤 멈추고 화면이 4월을 받는지 확인한다.
     const { TICKS_PER_MONTH } = await import('../packages/rules/src/index');
     await world.loop.advanceTo(3 * TICKS_PER_MONTH);

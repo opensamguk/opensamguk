@@ -4,7 +4,7 @@ import { PolicyBar } from '../policy/PolicyBar';
 import { useTRPC } from '../trpc';
 import { retryUnlessClientError } from './apiError';
 import { slotTimes } from './schedule';
-import { TurnEditor } from './TurnEditor';
+import { homePollMs, TurnEditor } from './TurnEditor';
 import styles from './TurnsPage.module.css';
 
 // /w/:worldId/turns. 메인 명령 칸과 같은 편집기를 넓게 쓰는 보조 화면이다 (핵심 조작은 메인에서 한다).
@@ -30,7 +30,7 @@ function RecentResults({ worldId }: { worldId: string }) {
   const summary = useQuery({ ...trpc.world.summary.queryOptions({ worldId }), retry: retryUnlessClientError });
   const home = useQuery({
     ...trpc.home.get.queryOptions({ worldId }),
-    refetchInterval: summary.data?.status === 'ENDED' ? false : 15_000,
+    refetchInterval: homePollMs(summary.data?.status === 'ENDED'),
     retry: retryUnlessClientError,
   });
   const logs = home.data?.recentLogs ?? [];
