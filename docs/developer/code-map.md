@@ -25,7 +25,8 @@
 | `apps/server/src/auth/` | Argon2id, 세션 토큰 해시·만료·연장, 실제 HTTP·DB 테스트 |
 | `apps/server/src/routers/auth.ts` | 가입·로그인·로그아웃·현재 계정 |
 | `apps/server/src/trpc.ts` | 공개·인증 필수 procedure |
-| `apps/server/src/router.ts` | tRPC `AppRouter` (API 계약): `health`, `auth`, `world`, `home`, `city`, `nation`, `records`, `general`, `turns`, `commands`, `ranking`, `timelapse`, `message`, `notice` |
+| `apps/server/src/router.ts` | tRPC `AppRouter` (API 계약): `health`, `auth`, `world`, `home`, `city`, `nation`, `records`, `general`, `turns`, `commands`, `ranking`, `timelapse`, `message`, `notice`, `lobby` |
+| `apps/server/src/routers/lobby.ts`, `lobby.test.ts` | 공개 월드 목록·로비 공지, 내 장수·생성 대기와 시나리오 이름 조회 |
 | `apps/server/src/routers/message.ts`, `notice.ts`, `apps/server/src/messaging.ts` | 현재 세션·소속·직책 기준 메시지·공지, 읽음과 revision, DB 잠금 전송 제한 |
 | `apps/server/src/realtime/` | 전용 LISTEN 연결과 SSE, 현재 권한 재검사, 하트비트·재구독·세션 종료 |
 | `packages/db/src/realtime.ts` | 저장 commit 뒤 별도 SQL로 알림 전송. 송신 실패가 저장 결과를 바꾸지 않는다 |
@@ -34,6 +35,7 @@
 | `apps/server/src/game/` | 소유 장수 조회·공개 projection·30칸 정규화와 표시 이름 |
 | `apps/engine/src/inputs.ts` | PENDING 생성 재검사·General 저장·완료 결과와 순서 기록 |
 | `packages/rules/src/general/create.ts` | 생성 입력 검사·결정적 초기 장수 규칙 |
+| `packages/rules/src/general/creationBlock.ts`, `creationBlock.test.ts` | 로비·생성 접수·엔진이 같이 쓰는 장수 생성 판정 순서 |
 | `packages/rules/src/tournament/bracket.ts` | 종목 독립 대진 순수 함수. DB·시각·`Math.random`을 쓰지 않는다 |
 | `packages/rules/src/modifiers/` | 효과 합산과 빈 제공자 목록. 투자 점수·전투 피해·출병 전달 세 곳에 연결한다 |
 | `packages/shared/src/editArray.ts` | 범위 덮어쓰기·밀기·당기기·스냅샷 반복의 일반 배열 유틸 |

@@ -3,11 +3,13 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { TRPCError } from '@trpc/server';
 import {
   CREATION_ERRORS,
+  creationBlock,
   generalCreationSchema,
   validateGeneralCreation,
   type CreationCode,
   type InitialGeneral,
 } from '@opensamguk/rules';
+import { z } from 'zod';
 import { router, protectedProcedure } from '../trpc';
 import { requireWorld, worldInput } from '../game/queries';
 import { ownGeneral } from '../game/projection';
@@ -28,22 +30,44 @@ function rejection(result: unknown) {
   const known = code as CreationCode;
   return { code: known, message: CREATION_ERRORS[known] };
 }
+const createInput = generalCreationSchema.extend(worldInput.shape);
+const creationEnvelope = worldInput.extend({
+  name: z.unknown(),
+  leadership: z.unknown(),
+  strength: z.unknown(),
+  intel: z.unknown(),
+  portraitId: z.unknown(),
+});
+const creationInputParser = {
+  parse(value: unknown): z.input<typeof createInput> {
+    // 허용한 키와 월드 ID부터 검사하고 생성 필드는 장수·월드 판정 뒤에 검사한다.
+    creationEnvelope.parse(value);
+    return value as z.input<typeof createInput>;
+  },
+};
 export const generalRouter = router({
-  create: protectedProcedure.input(generalCreationSchema.extend(worldInput.shape)).mutation(async ({ ctx, input }) => {
+  create: protectedProcedure.input(creationInputParser).mutation(async ({ ctx, input }) => {
     const started = performance.now();
     const { worldId, ...payload } = input;
     const id = await ctx.db.$transaction(async (tx) => {
       const world = await requireWorld(tx, worldId, true);
-      if (world.status !== 'RUNNING')
-        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: CREATION_ERRORS.WORLD_CLOSED });
-      const checked = validateGeneralCreation(payload, world.statRules);
-      if (!checked.ok) throw new TRPCError({ code: 'BAD_REQUEST', message: checked.message });
       const existing = await tx.general.findUnique({ where: { worldId_userId: { worldId, userId: ctx.user.id } } });
-      if (existing) throw new TRPCError({ code: 'CONFLICT', message: CREATION_ERRORS.ALREADY_EXISTS });
       const pending = await tx.inputEvent.findFirst({
         where: { worldId, userId: ctx.user.id, kind: 'general.create', status: 'PENDING' },
         orderBy: { id: 'asc' },
       });
+      const block = creationBlock({
+        status: world.status,
+        hasGeneral: existing !== null,
+        hasPending: pending !== null,
+      });
+      if (block && block.code !== 'PENDING')
+        throw new TRPCError({ code: codes[block.code], message: CREATION_ERRORS[block.code] });
+      const parsed = createInput.safeParse(input);
+      if (!parsed.success)
+        throw new TRPCError({ code: 'BAD_REQUEST', message: parsed.error.message, cause: parsed.error });
+      const checked = validateGeneralCreation(payload, world.statRules);
+      if (!checked.ok) throw new TRPCError({ code: 'BAD_REQUEST', message: checked.message });
       if (pending) {
         // PostgreSQL jsonb의 키 순서는 입력 객체 순서와 다르다.
         const equal =

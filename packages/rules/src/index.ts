@@ -20,6 +20,7 @@ export * from './commands/registry';
 export * from './monthly/index';
 export * from './replay';
 export * from './general/create';
+export * from './general/creationBlock';
 export * from './supply';
 export * from './commands/turn';
 export * from './ranking';
