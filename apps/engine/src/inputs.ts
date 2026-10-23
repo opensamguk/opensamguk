@@ -13,6 +13,7 @@ import {
   setPolicyPayloadSchema,
   activityPayloadSchema,
   policyMarkerPayloadSchema,
+  policyMarkerResultSchema,
   assertSlotSet,
   validateGeneralCreation,
   type CreationCode,
@@ -36,7 +37,18 @@ export async function processPendingInput(
   if (!event) return false;
   const modern = isPolicyMode({ fromSequence: world.policyFromSequence, actionSequence: world.actionSequence });
   if (event.kind === 'system.policy.enable') {
-    if (world.status === 'ENDED' || modern) throw new Error('전환 표지의 월드 상태가 올바르지 않습니다.');
+    if (world.status === 'ENDED' || world.policyFromSequence !== null)
+      throw new Error('전환 표지의 월드 상태가 올바르지 않습니다.');
+    if (world.status === 'PREOPEN') return null;
+    if (
+      event.status !== 'PENDING' ||
+      event.sequence !== null ||
+      event.result !== null ||
+      event.userId !== 'system:policy' ||
+      event.generalId !== null ||
+      event.idempotencyKey !== 'system.policy.enable:5'
+    )
+      throw new Error('전환 표지의 출처가 올바르지 않습니다.');
     const payload = policyMarkerPayloadSchema.parse(event.payload);
     const generals = await tx.general.findMany({ where: { worldId: world.id }, orderBy: { id: 'asc' } });
     const slots = await tx.generalTurn.findMany({ where: { worldId: world.id } });
@@ -54,8 +66,32 @@ export async function processPendingInput(
     }
     if (JSON.stringify(emptyIds) !== JSON.stringify(payload.emptySlots))
       throw new Error('전환 표지와 빈칸 집합이 다릅니다.');
-    // 기존 사람 장수의 기준 T/0은 사용자 결정 전이다. 값을 선택해 APPLIED로 만들지 않는다.
-    return null;
+    // 앞선 생성 입력이 사람 장수를 더한 경우도 현재 상태로 판정한다.
+    if (generals.some((general) => general.userId !== null)) return null;
+    if (world.actionSequence >= 2_147_483_647) throw new Error('전환 순서 저장 범위를 넘었습니다.');
+    const fromSequence = await nextActionSequence(tx, world.id);
+    const result = policyMarkerResultSchema.parse({
+      fromSequence,
+      emptySlots: payload.emptySlots,
+      clockTick: world.clockTick,
+      turnTermMinutes: world.turnTermMinutes,
+      baselineActiveTick: null,
+    });
+    const savedWorld = await tx.world.updateMany({
+      where: { id: world.id, policyFromSequence: null },
+      data: { policyFromSequence: fromSequence },
+    });
+    if (savedWorld.count !== 1) throw new Error('전환 표지의 월드가 변경됐습니다.');
+    await tx.general.updateMany({
+      where: { worldId: world.id },
+      data: { defaultPolicy: 'none', lastActiveTick: null, lastActiveAt: null },
+    });
+    const savedMarker = await tx.inputEvent.updateMany({
+      where: { id: event.id, status: 'PENDING' },
+      data: { status: 'APPLIED', sequence: fromSequence, result },
+    });
+    if (savedMarker.count !== 1) throw new Error('전환 표지가 변경됐습니다.');
+    return true;
   }
   if (event.kind !== 'general.create') {
     const rejectInput = async (code: string, message: string) => {

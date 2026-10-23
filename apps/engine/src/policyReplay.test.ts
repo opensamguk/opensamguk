@@ -41,11 +41,11 @@ async function npcTransitionArchive() {
     kind: 'system.policy.enable',
     status: 'APPLIED',
     payload: { version: 5, emptySlots: [3] },
-    result: { fromSequence, emptySlots: [3], clockTick: 60000, turnTermMinutes: 30, baselineActiveTick: 0 },
+    result: { fromSequence, emptySlots: [3], clockTick: 60000, turnTermMinutes: 30, baselineActiveTick: null },
   };
   // NPC 전용 순수 기록이므로 기존 인간 장수의 미정 기준을 선택하거나 DB에 적용하지 않는다.
   expect(initial.generals.every((general) => general.userId === null)).toBe(true);
-  replay = enableReplayPolicy(replay, 30, 0, [3]);
+  replay = enableReplayPolicy(replay, 30, null, [3]);
   const rejected: RecordedInput = {
     sequence: ++sequence,
     generalId: 1,
@@ -90,4 +90,35 @@ it('표지 수·정확한 untouched 집합·미지원 거절 kind·추가 config
   unknown.inputs[1]!.kind = '모르는 거절 종류';
   expect(() => replayArchive(unknown)).toThrow();
   expect(() => replayArchive({ ...archive, config: { ...archive.config, unexpected: true } })).toThrow();
+  for (const baselineActiveTick of [0, 60001]) {
+    const forgedBaseline = structuredClone(archive);
+    forgedBaseline.inputs[0]!.result = { ...(forgedBaseline.inputs[0]!.result as object), baselineActiveTick };
+    expect(() => replayArchive(forgedBaseline)).toThrow();
+  }
+});
+
+it('사람 장수의 null 활동 기준은 도우미와 F 경계 양쪽에서 거부한다', async () => {
+  const initial = await monthlyFixture();
+  initial.generals[0]!.userId = 'human';
+  expect(() => enableReplayPolicy(initialReplayState(initial), 30, null)).toThrow('활동 기준');
+  const { archive } = await npcTransitionArchive();
+  // 손상된 archive의 origin 해시도 다시 맞춰야 F의 상태 검사까지 도달한다.
+  archive.origin.initial.generals[0]!.userId = 'human';
+  archive.origin.initialStateHash = hashState(archive.origin.initial);
+  archive.months = [];
+  // 월 해시 대조 전에 F에 도달하도록 전환을 첫 입력으로 옮긴다.
+  archive.config.policy.fromSequence = 1;
+  const marker = archive.inputs[0]!;
+  marker.sequence = 1;
+  marker.payload = { version: 5, emptySlots: [1, 2, 3] };
+  marker.result = {
+    fromSequence: 1,
+    emptySlots: [1, 2, 3],
+    clockTick: 0,
+    turnTermMinutes: 30,
+    baselineActiveTick: null,
+  };
+  archive.inputs = [marker];
+  archive.months.push({ ...(await npcTransitionArchive()).archive.months[0]!, sequence: 2 });
+  expect(() => replayArchive(archive, 1)).toThrow('활동 기준');
 });

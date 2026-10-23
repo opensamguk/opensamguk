@@ -283,6 +283,9 @@ function applyArchiveInput(
   if (archive.version === 5 && input.sequence === archive.config.policy.fromSequence) {
     if (input.kind !== 'system.policy.enable') throw new Error('방침 전환 순서에 표지가 없습니다.');
     const result = policyMarkerResultSchema.parse(input.result);
+    const hasHuman = Object.values(replay.state.generals).some((general) => general.userId !== null);
+    if ((hasHuman && result.baselineActiveTick === null) || (!hasHuman && result.baselineActiveTick !== null))
+      throw new Error('전환 표지의 사람 장수와 활동 기준이 맞지 않습니다.');
     const expected = [...untouched].filter((id) => replay.state.generals[id]).sort((a, b) => a - b);
     if (
       JSON.stringify(expected) !== JSON.stringify(result.emptySlots) ||

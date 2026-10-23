@@ -23,9 +23,9 @@ export const policyMarkerResultSchema = z
     emptySlots: emptyGeneralIdsSchema,
     clockTick: policyTickSchema,
     turnTermMinutes: positive,
-    baselineActiveTick: policyTickSchema,
+    baselineActiveTick: policyTickSchema.nullable(),
   })
-  .refine((value) => value.baselineActiveTick <= value.clockTick);
+  .refine((value) => value.baselineActiveTick === null || value.baselineActiveTick <= value.clockTick);
 export const policySlotSchema = z
   .strictObject({ commandKey: z.string().min(1), args: z.unknown(), explicit: z.boolean() })
   .refine(
@@ -138,18 +138,21 @@ export interface ReplayPolicy {
 export function enableReplayPolicy(
   replay: ReplayState,
   turnTermMinutes: number,
-  baselineActiveTick: number,
+  baselineActiveTick: number | null,
   emptyIds?: readonly number[],
 ): ReplayState {
   const next = structuredClone(replay);
   const ids = Object.keys(next.state.generals).map(Number);
   const empty = new Set(emptyIds ?? ids);
+  const humans = ids.filter((id) => next.state.generals[id]!.userId !== null);
+  const lastActiveTicks: Record<number, number> = {};
+  if (baselineActiveTick === null) {
+    if (humans.length) throw new Error('사람 장수의 활동 기준이 없습니다.');
+  } else for (const id of humans) lastActiveTicks[id] = baselineActiveTick;
   next.policy = {
     turnTermMinutes,
     policies: Object.fromEntries(ids.map((id) => [id, 'none' as const])),
-    lastActiveTicks: Object.fromEntries(
-      ids.filter((id) => next.state.generals[id]!.userId !== null).map((id) => [id, baselineActiveTick]),
-    ),
+    lastActiveTicks,
   };
   for (const id of ids)
     next.turns[id] = empty.has(id) ? emptyQueue() : next.turns[id]!.map((slot) => ({ ...slot, explicit: true }));
