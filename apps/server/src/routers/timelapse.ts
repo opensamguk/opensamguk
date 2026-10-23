@@ -35,7 +35,31 @@ export const timelapseRouter = router({
               orderBy: { id: 'asc' },
               select: publicNationDisplaySelect,
             });
-      return { items, currentNations, nextCursor: result.nextCursor };
+      const savedNations =
+        items.length === 0 || nationIds.length === 0
+          ? []
+          : await tx.yearbookNation.findMany({
+              where: {
+                worldId: input.worldId,
+                tick: { in: items.map(({ tick }) => tick) },
+                nationId: { in: nationIds },
+              },
+              orderBy: [{ tick: 'asc' }, { nationId: 'asc' }],
+              select: { tick: true, nationId: true, name: true, color: true },
+            });
+      return {
+        items: items.map((frame) => {
+          const owners = new Set(frame.cities.map(({ nationId }) => nationId));
+          return {
+            ...frame,
+            nations: savedNations
+              .filter(({ tick, nationId }) => tick === frame.tick && owners.has(nationId))
+              .map(({ nationId, name, color }) => ({ id: nationId, name, color })),
+          };
+        }),
+        currentNations,
+        nextCursor: result.nextCursor,
+      };
     }),
   ),
 });

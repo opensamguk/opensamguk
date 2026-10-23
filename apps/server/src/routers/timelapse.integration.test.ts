@@ -60,6 +60,10 @@ function snapshotData(index: number) {
   };
 }
 
+function savedDisplay(label: string, index: number, id: number) {
+  return { id, name: `${label}-past-${id}-${index}`, color: id === 3 ? '#334455' : '#112233' };
+}
+
 async function fixtureWorld(label: string, count: number, withGenerals = false) {
   const world = await db.world.create({
     data: {
@@ -101,6 +105,15 @@ async function fixtureWorld(label: string, count: number, withGenerals = false) 
         data: snapshotData(index),
       })),
     });
+  if (count > 0)
+    await db.yearbookNation.createMany({
+      data: Array.from({ length: count }, (_, index) =>
+        [99, 3, 2, 1].map((id) => {
+          const { name, color } = savedDisplay(label, index, id);
+          return { worldId: world.id, tick: (index + 1) * 10000, nationId: id, name, color };
+        }),
+      ).flat(),
+    });
   return world.id;
 }
 
@@ -115,6 +128,8 @@ async function gameSnapshot() {
     db.inputEvent.findMany({ orderBy: { id: 'asc' } }),
     db.nationHistory.findMany({ orderBy: [{ worldId: 'asc' }, { nationId: 'asc' }, { tick: 'asc' }] }),
     db.yearbookSnapshot.findMany({ orderBy: [{ worldId: 'asc' }, { tick: 'asc' }] }),
+    db.yearbookNation.findMany({ orderBy: [{ worldId: 'asc' }, { tick: 'asc' }, { nationId: 'asc' }] }),
+    db.removedNation.findMany({ orderBy: [{ worldId: 'asc' }, { nationId: 'asc' }] }),
   ]);
   return createHash('sha256')
     .update(JSON.stringify(tables, (_, value) => (typeof value === 'bigint' ? String(value) : value)))
@@ -139,6 +154,16 @@ beforeAll(async () => {
   worldId = await fixtureWorld('primary', 35, true);
   otherWorldId = await fixtureWorld('other', 30);
   emptyWorldId = await fixtureWorld('empty', 0);
+  await db.removedNation.create({
+    data: {
+      worldId,
+      nationId: 3,
+      name: '삭제 직전 이름',
+      color: '#abcdef',
+      removedSequence: 100,
+      removedTick: 360000,
+    },
+  });
   base = await app.listen({ host: '127.0.0.1', port: 0 });
 });
 
@@ -190,7 +215,7 @@ describe('T4-35 / AC-P2-17 실제 TCP HTTP·PostgreSQL 영토 스냅샷', () => 
     const first = (await query({ worldId })).data!;
     const second = (await query({ worldId, cursor: first.nextCursor })).data!;
     for (const [index, frame] of [...first.items, ...second.items].entries()) {
-      expect(frame).toEqual({
+      expect(frame).toMatchObject({
         tick: (index + 1) * 10000,
         year: 191 + Math.floor(index / 12),
         month: (index % 12) + 1,
@@ -207,8 +232,9 @@ describe('T4-35 / AC-P2-17 실제 TCP HTTP·PostgreSQL 영토 스냅샷', () => 
       const { data } = await query({ worldId, ...(cursor ? { cursor } : {}) });
       expect(Object.keys(data!).sort()).toEqual(['currentNations', 'items', 'nextCursor']);
       for (const frame of data!.items) {
-        expect(Object.keys(frame).sort()).toEqual(['cities', 'month', 'tick', 'year']);
+        expect(Object.keys(frame).sort()).toEqual(['cities', 'month', 'nations', 'tick', 'year']);
         for (const city of frame.cities) expect(Object.keys(city).sort()).toEqual(['cityKey', 'nationId']);
+        for (const nation of frame.nations) expect(Object.keys(nation).sort()).toEqual(['color', 'id', 'name']);
       }
       for (const nation of data!.currentNations) expect(Object.keys(nation).sort()).toEqual(['color', 'id', 'name']);
       const encoded = JSON.stringify(data);
@@ -282,6 +308,58 @@ describe('T4-35 / AC-P2-17 실제 TCP HTTP·PostgreSQL 영토 스냅샷', () => 
     } finally {
       await db.world.delete({ where: { id } });
     }
+  });
+
+  it('H14 현재 행이 없는 멸망 국가도 프레임에 저장한 이름·색으로 반환한다', async () => {
+    const data = (await query({ worldId, cursor: '300000' })).data!;
+    expect(data.currentNations.map(({ id }) => id)).toEqual([1, 2]);
+    for (const [offset, frame] of data.items.entries()) {
+      expect(frame.nations.find(({ id }) => id === 3)).toEqual(savedDisplay('primary', offset + 30, 3));
+    }
+  });
+
+  it('H15 같은 국가도 각 프레임의 이름·색을 읽고 현재 표시값과 구분한다', async () => {
+    const data = (await query({ worldId })).data!;
+    expect(data.items[0]!.nations.find(({ id }) => id === 2)).toEqual(savedDisplay('primary', 0, 2));
+    expect(data.items[1]!.nations.find(({ id }) => id === 2)).toEqual(savedDisplay('primary', 1, 2));
+    const current = state.nations.find(({ id }) => id === 2)!;
+    expect(data.currentNations.find(({ id }) => id === 2)).toEqual({ id: 2, name: current.name, color: current.color });
+  });
+
+  it('H16 부분·legacy 프레임의 결측 국가는 생략하고 현재 이름·색으로 메우지 않는다', async () => {
+    const missing = await db.yearbookNation.findUniqueOrThrow({
+      where: { worldId_tick_nationId: { worldId, tick: 10000, nationId: 2 } },
+    });
+    const legacy = await fixtureWorld('legacy', 1);
+    try {
+      await db.yearbookNation.delete({ where: { worldId_tick_nationId: { worldId, tick: 10000, nationId: 2 } } });
+      const frame = (await query({ worldId })).data!.items[0]!;
+      expect(frame.cities.some(({ nationId }) => nationId === 2)).toBe(true);
+      expect(frame.nations).toEqual([savedDisplay('primary', 0, 1)]);
+      await db.yearbookNation.deleteMany({ where: { worldId: legacy } });
+      const legacyData = (await query({ worldId: legacy })).data!;
+      expect(legacyData.items[0]!.nations).toEqual([]);
+      expect(legacyData.currentNations).toHaveLength(2);
+    } finally {
+      await db.yearbookNation.create({ data: missing });
+      await db.world.delete({ where: { id: legacy } });
+    }
+  });
+
+  it('H17 반환한 tick·월드·프레임별 실제 소유 국가만 읽고 삭제 보존은 공개하지 않는다', async () => {
+    const data = (await query({ worldId })).data!;
+    expect(data.items[0]!.nations).toEqual([savedDisplay('primary', 0, 1), savedDisplay('primary', 0, 2)]);
+    // 국가 1은 같은 페이지 다른 프레임의 소유자지만 이 프레임에는 도시가 없다.
+    expect(data.items[1]!.nations).toEqual([savedDisplay('primary', 1, 2)]);
+    for (const frame of data.items) {
+      expect(frame.nations.some(({ id }) => id === 3 || id === 99)).toBe(false);
+      expect(frame.nations.map(({ id }) => id)).toEqual(frame.nations.map(({ id }) => id).sort((a, b) => a - b));
+      expect(frame.nations.every(({ name }) => name.startsWith('primary-'))).toBe(true);
+      expect(frame.nations.some(({ name }) => name.includes('-30'))).toBe(false);
+    }
+    const encoded = JSON.stringify((await query({ worldId, cursor: '300000' })).data);
+    expect(encoded).not.toContain('삭제 직전 이름');
+    expect(encoded).not.toContain('other-past-');
   });
 
   it('H6 공개 영토 기록이므로 동국·적국·재야·장수 없는 사용자에게 같은 응답을 허용한다', async () => {
