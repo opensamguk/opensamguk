@@ -16,8 +16,9 @@ export const CATEGORY_LABELS: Record<string, string> = {
   military: '군사',
   strategy: '전략',
   personal: '개인',
+  nation: '국가',
 };
-const CATEGORY_ORDER = ['domestic', 'military', 'strategy', 'personal'];
+const CATEGORY_ORDER = ['domestic', 'military', 'strategy', 'personal', 'nation'];
 
 // 명령마다 대상 도시 후보를 바꿀 때 쓴다 (교역 대상, T2-08). note는 후보가 없을 때의 이유 같은 안내다.
 export interface CityChoices {
@@ -29,6 +30,8 @@ interface Props {
   commands: CommandInfo[];
   cities: Array<{ key: number; name: string }>;
   nations: Array<{ id: number; name: string }>;
+  // 있으면 대상 장수(generalId)를 이름으로 고른다 (국가 칸, T2-06).
+  generals?: Array<{ id: number; name: string }> | undefined;
   selectedCityKey: number | null;
   defaultCrewType: number | undefined;
   // 넣을 수 없을 때의 이유. null이면 넣을 수 있다.
@@ -46,6 +49,7 @@ export function CommandPicker({
   commands,
   cities,
   nations,
+  generals,
   selectedCityKey,
   defaultCrewType,
   blockedReason,
@@ -151,7 +155,7 @@ export function CommandPicker({
           />
         </label>
         <div className={styles.categories} role="group" aria-label="명령 분류">
-          {['all', ...CATEGORY_ORDER].map((key) => (
+          {['all', ...CATEGORY_ORDER.filter((key) => commands.some((c) => c.category === key))].map((key) => (
             <button
               key={key}
               type="button"
@@ -204,6 +208,7 @@ export function CommandPicker({
               value={values[field.key] ?? ''}
               cities={cityOptions}
               nations={nations}
+              generals={generals}
               inputRef={i === 0 ? firstArgRef : undefined}
               onKeyDown={onArgKey}
               onChange={(value) => setValues((prev) => ({ ...prev, [field.key]: value }))}
@@ -242,6 +247,7 @@ function ArgInput({
   value,
   cities,
   nations,
+  generals,
   inputRef,
   onChange,
   onKeyDown,
@@ -252,6 +258,7 @@ function ArgInput({
   value: string;
   cities: Array<{ key: number; name: string }>;
   nations: Array<{ id: number; name: string }>;
+  generals: Array<{ id: number; name: string }> | undefined;
   inputRef: RefObject<HTMLElement | null> | undefined;
   onChange: (value: string) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
@@ -260,7 +267,18 @@ function ArgInput({
 }) {
   const ref = inputRef as RefObject<HTMLInputElement & HTMLSelectElement> | undefined;
   let control;
-  if (field.kind === 'city' || field.kind === 'nation' || field.kind === 'boolean' || field.kind === 'enum') {
+  if (field.key === 'generalId' && generals) {
+    control = (
+      <select ref={ref} value={value} onChange={(e) => onChange(e.target.value)} onKeyDown={onKeyDown}>
+        <option value="">고르세요</option>
+        {generals.map((g) => (
+          <option key={g.id} value={String(g.id)}>
+            {g.name}
+          </option>
+        ))}
+      </select>
+    );
+  } else if (field.kind === 'city' || field.kind === 'nation' || field.kind === 'boolean' || field.kind === 'enum') {
     const options =
       field.kind === 'city'
         ? cities.map((c) => ({ value: String(c.key), label: c.name }))
@@ -316,7 +334,7 @@ function ArgInput({
   return (
     <div className={styles.argRow}>
       <label className={styles.argLabel}>
-        <span>{field.label}</span>
+        <span>{field.key === 'generalId' && generals ? '대상 장수' : field.label}</span>
         {control}
       </label>
       {mapHint ? (

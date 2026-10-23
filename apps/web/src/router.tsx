@@ -16,6 +16,8 @@ import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { MainPage } from './pages/MainPage';
 import { SignupPage } from './pages/SignupPage';
+import { NationTurnsPage } from './personnel/NationTurnsPage';
+import { PersonnelPage } from './personnel/PersonnelPage';
 import { CityPage, MapPage, NationPage, RecordsPage } from './pages/WorldPages';
 import { RankingPage } from './ranking/RankingPage';
 import { parseRankingSearch } from './ranking/rankingView';
@@ -137,6 +139,18 @@ const nationRoute = createRoute({
   },
 });
 
+// 인사부와 국가 예턴 (T2-06). nation/:nationId보다 고정 경로가 먼저 맞는다.
+const personnelRoute = createRoute({
+  getParentRoute: () => worldRoute,
+  path: 'nation/personnel',
+  component: PersonnelPage,
+});
+const nationTurnsRoute = createRoute({
+  getParentRoute: () => worldRoute,
+  path: 'nation/turns',
+  component: NationTurnsPage,
+});
+
 const RECORD_TABS = ['general', 'nation', 'world'] as const;
 type RecordTab = (typeof RECORD_TABS)[number];
 
@@ -192,6 +206,8 @@ const routeTree = rootRoute.addChildren([
     turnsRoute,
     cityRoute,
     nationRoute,
+    personnelRoute,
+    nationTurnsRoute,
     recordsRoute,
     rankingRoute,
     simulatorRoute,
