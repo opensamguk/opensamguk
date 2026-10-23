@@ -1,4 +1,5 @@
 import type { PresetRules } from '../world/preset';
+import type { TreatyState } from '../diplomacy/treatyTypes';
 import { cloneExtStateWithRegistry, extSlices, extCommandBindings, type ExtStateRegistry } from '../commands/ext/state';
 import type { InitialCity, InitialGeneral, InitialNation, InitialDiplomacy, WorldInit } from '../world/bootstrap';
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
@@ -11,6 +12,7 @@ export interface WorldState {
   nations: Record<number, InitialNation>;
   generals: Record<number, InitialGeneral>;
   diplomacies: InitialDiplomacy[];
+  treaties?: TreatyState[];
   commandMeta?: { nextNationId: number; offers: Record<number, number> };
   nationTurns?: Record<number, { commandKey: string; args: unknown }[]>;
 }
