@@ -97,6 +97,8 @@ pnpm world:create --scenario 1030 --map che --seed demo --turn-term 10 --end-yea
 
 SIGINT·SIGTERM을 받은 감독은 새 자식을 시작하지 않고 자기 자식에 SIGTERM을 보냅니다. 5초 뒤에도 살아 있으면 그 PID에만 SIGKILL을 보냅니다. 모든 자식 종료와 진행 중 오류 기록을 기다린 뒤 자기 DB 연결을 닫습니다. 다른 감독·직접 실행한 엔진·서버 프로세스에는 신호를 보내지 않습니다. 운영 호스트 서비스 설치와 배포는 T2-15에서 따로 합니다.
 
+Windows에서는 부모가 연 IPC 채널로 정상 종료를 요청하며 같은 abort·리스 해제 경로를 거칩니다. 요청이 전달되지 않거나 무시되면 같은 5초 뒤 소유 자식에만 SIGKILL을 보냅니다.
+
 ## 5. 월드 상태 전환
 
 `pnpm world:start --world <ID>`로 시작합니다. `world:pause`, `world:resume`, `world:status`도 같은 인자를 받습니다. 정지 중에는 tick이 고정됩니다. 엔진과 운영 명령은 DB의 UTC 시각(`clock_timestamp()`)을 rules에 인자로 주입하며 기준 시각·tick·revision을 저장합니다. 테스트만 시각을 명시적으로 주입합니다. 운영 명령도 먼저 월드 행을 `FOR UPDATE`로 잠근 뒤 최신 상태와 DB 시각을 읽습니다. 실행 중인 턴·체크포인트를 기다려 직렬화하므로 엔진의 revision 증가 때문에 정상 정지·재개가 거부되지 않습니다. 이미 정지한 월드를 다시 정지하는 등 잘못된 상태 전환은 계속 거부합니다.

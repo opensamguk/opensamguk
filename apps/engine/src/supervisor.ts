@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import type { PrismaClient } from '@opensamguk/db';
+import { stopOwnedChild } from './process-lifecycle';
 
 export const DISCOVERY_MS = 10_000;
 export const CRASH_WINDOW_MS = 5 * 60_000;
@@ -40,7 +41,7 @@ function spawnEngine(worldId: string): ChildProcess {
     ['--import', 'tsx', fileURLToPath(new URL('./index.ts', import.meta.url)), '--world', worldId],
     {
       env: process.env,
-      stdio: 'ignore',
+      stdio: process.platform === 'win32' ? ['ignore', 'ignore', 'ignore', 'ipc'] : 'ignore',
     },
   );
 }
@@ -142,13 +143,7 @@ export async function runSupervisor(
     state.stopping = true;
     const child = state.child;
     if (!child) return;
-    const force = setTimeout(() => child.kill('SIGKILL'), 5000);
-    try {
-      child.kill('SIGTERM');
-      await state.exited;
-    } finally {
-      clearTimeout(force);
-    }
+    await stopOwnedChild(child, state.exited!);
   }
 
   let discoverAt = 0;
