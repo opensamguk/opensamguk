@@ -1,6 +1,7 @@
 import { spawn, execFile } from 'node:child_process';
 import { once } from 'node:events';
 import { promisify } from 'node:util';
+import { randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createDb, nextActionSequence, type Prisma } from '@opensamguk/db';
 import { emptyTurns, runGeneralTurn, toWorldState, type WorldInit } from '@opensamguk/rules';
@@ -18,9 +19,11 @@ const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
 const db = createDb(url);
 const execute = promisify(execFile);
+const userPrefix = `archive-human-${randomUUID()}-`;
+const worldIds: string[] = [];
 afterAll(async () => {
-  await db.world.deleteMany();
-  await db.user.deleteMany({ where: { id: { startsWith: 'archive-human-' } } });
+  await db.world.deleteMany({ where: { id: { in: worldIds } } });
+  await db.user.deleteMany({ where: { id: { startsWith: userPrefix } } });
   await db.$disconnect();
 });
 
@@ -36,7 +39,7 @@ async function create(initial?: WorldInit) {
     supplied: false,
   });
   for (const general of initial.generals) {
-    general.userId = `archive-human-${general.id}`;
+    general.userId = `${userPrefix}${general.id}`;
     await db.user.upsert({
       where: { id: general.userId },
       update: {},
@@ -48,6 +51,7 @@ async function create(initial?: WorldInit) {
     turnTermMinutes: 60,
     endYear: null,
   });
+  worldIds.push(worldId);
   await controlClock(db, worldId, 'start');
   const lease = (await acquireLease(db, worldId))!;
   return { initial, worldId, lease, loop: new TurnLoop(db, lease) };
