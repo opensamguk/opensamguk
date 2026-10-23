@@ -130,3 +130,24 @@ const publicYearbook = z.object({
 });
 export const worldRecordInfo = (data: Prisma.JsonValue) => publicYearbook.parse(data);
 export const nationRecordInfo = (data: Prisma.JsonValue) => memberNationSummary.parse(data);
+
+const publicMapData = z.object({
+  cities: z.array(
+    z.object({
+      key: z.string(),
+      name: z.string(),
+      level: z.number().int(),
+      x: z.number(),
+      y: z.number(),
+      nationId: z.number().int().nullable(),
+      links: z.array(z.string()),
+    }),
+  ),
+  nations: z.array(z.object({ id: z.number().int(), name: z.string(), color: z.string() })),
+});
+
+// 오염되거나 형식이 깨진 사본은 현재 상태로 대체하지 않는다.
+export function publicMapInfo(data: Prisma.JsonValue) {
+  const result = publicMapData.safeParse(data);
+  return result.success ? result.data : null;
+}

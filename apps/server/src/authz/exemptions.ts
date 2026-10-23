@@ -3,6 +3,11 @@ import type { AuthzExemption } from './coverage';
 // 타인 ID를 받지 않는 절차는 타인 소유 자원 거부를 정의하지 않는다.
 // 별도 실제 HTTP 시험은 각 절차의 actor ID 주입 거부와 DB 불변을 확인한다.
 export const exemptions: AuthzExemption[] = [
+  {
+    path: 'world.publicMaps',
+    category: 'otherUser',
+    reason: '무인증 공통 지연 지도이며 타인 소유 자원을 지정하지 않는다. ID 주입은 거부한다.',
+  },
   { path: 'health', category: 'otherUser', reason: '공개 상태 확인이며 계정·장수 대상이 없다.' },
   {
     path: 'health',

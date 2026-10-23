@@ -102,3 +102,18 @@ SIGINT·SIGTERM을 받은 감독은 새 자식을 시작하지 않고 자기 자
 `pnpm world:start --world <ID>`로 시작합니다. `world:pause`, `world:resume`, `world:status`도 같은 인자를 받습니다. 정지 중에는 tick이 고정됩니다. 엔진과 운영 명령은 DB의 UTC 시각(`clock_timestamp()`)을 rules에 인자로 주입하며 기준 시각·tick·revision을 저장합니다. 테스트만 시각을 명시적으로 주입합니다. 운영 명령도 먼저 월드 행을 `FOR UPDATE`로 잠근 뒤 최신 상태와 DB 시각을 읽습니다. 실행 중인 턴·체크포인트를 기다려 직렬화하므로 엔진의 revision 증가 때문에 정상 정지·재개가 거부되지 않습니다. 이미 정지한 월드를 다시 정지하는 등 잘못된 상태 전환은 계속 거부합니다.
 
 `pnpm world:accelerate --world <ID>`와 `pnpm world:realtime --world <ID>`로 같은 판의 시계 모드만 바꿉니다. RUNNING·PAUSED에서 다른 모드로만 전환하며 정지·재개는 모드를 보존합니다. 가속 배율이나 강제 종료 명령은 없습니다. `world:status`에서 모드·종료 연도·종료 결과를 확인합니다.
+
+
+## 공개 지도 사본 (T2-24, AC-M2-20)
+
+엔진과 서버는 같은 `PUBLIC_MAP_DELAY_MINUTES`(기본 10분), `PUBLIC_MAP_INTERVAL_MINUTES`(기본 5분)를 읽습니다. 값은 날짜 범위 안의 양의 십진 정수(분)여야 하며 간격이 지연보다 길면 두 프로세스가 시작을 거부합니다. `packages/shared/src/publicMap.ts`가 두 값을 함께 검사합니다.
+
+`PublicMapSnapshot`은 월드와 실제 기록 시각을 복합 키로 씁니다. RUNNING 월드의 장수 턴이나 월간 정산 뒤, 마지막 사본부터 저장 간격 이상 지났을 때 엔진이 하나를 찍습니다. 턴이 없는 poll, 장수 생성 입력 처리, PAUSED·ENDED에서는 새 사본을 찍지 않습니다. 종료를 확정하는 처리에서도 추가 사본을 찍지 않고 이전 사본을 남깁니다. 저장과 오래된 사본 삭제는 턴과 같은 리스·월드 잠금·트랜잭션 안에서 처리합니다. 지연 cutoff 이하의 사본 중 최신 하나와 그보다 새로운 사본을 보존합니다. 간격 기준은 DB에서 읽으므로 엔진 재시작 뒤에도 유지됩니다. 턴이 없거나 일시정지한 월드는 사본이 15분보다 오래될 수 있으므로 화면은 `takenAt`으로 실제 나이를 표시해야 합니다.
+
+기록 시각은 상태를 반영한 뒤의 DB 시각입니다. 시험에서는 `TurnLoop`의 `publicMapNow` 시계만 주입합니다. 밀린 턴을 처리할 때 월드 시계의 진행 목표는 아직 반영하지 않은 턴보다 앞설 수 있으므로 사본 `tick`은 방금 반영한 장수 턴 또는 월 경계 tick을 씁니다. 연월은 그 tick의 `toGameDate`입니다. 월간 연감의 지난달 정산 연월을 재사용하지 않습니다.
+
+`world.publicMaps()`는 인증 없이 RUNNING·PAUSED 월드를 `createdAt`, `id` 순서로 읽습니다. 월드마다 요청 시각에서 지연 시간을 뺀 cutoff 이하의 최신 사본만 반환합니다. 아직 사본이 공개되지 않았거나 JSON 필수 필드 형식이 깨졌으면 `map: null`이며 현재 도시·국가 정보로 대체하지 않습니다. 시각은 ISO 문자열이고 응답의 지도에는 사본의 연월만 들어갑니다.
+
+저장과 응답 모두 도시의 `key`, `name`, `level`, `x`, `y`, `nationId`, `links`와 국가의 `id`, `name`, `color`만 담습니다. 계획 DTO에 맞춰 도시 key와 연결 key는 문자열입니다. 기존 인증 `world.map`의 숫자 key와 `supplied`는 그대로 유지합니다. 사본 JSON에 다른 필드가 섞여도 서버는 새로 투영해 버립니다. 장수·병력·보급·국고·출병 정보는 공개하지 않습니다. 사본은 게임 상태·RNG·sequence·재생 archive에 넣지 않아 기존 상태 해시와 v1/v2 형식을 유지합니다.
+
+계획의 기존 요청 제한 설명은 현재 구현과 다릅니다. `publicProcedure`에는 횟수 제한이 없고 `protectedProcedure`의 mutation만 기존 사용자 제한을 받습니다. 이 작업은 새 공개 GET 제한 정책을 추가하지 않습니다. 기존 인증·출처 검사·보안 헤더는 유지합니다.

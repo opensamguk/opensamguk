@@ -1,3 +1,4 @@
+import { publicMapConfig } from '@opensamguk/shared';
 import { randomBytes } from 'node:crypto';
 import cookie from '@fastify/cookie';
 import type { PrismaClient } from '@opensamguk/db';
@@ -19,6 +20,7 @@ export async function buildServer(options: {
   production?: boolean;
   trustProxy?: boolean;
 }) {
+  const mapConfig = publicMapConfig(process.env);
   const production = options.production ?? process.env.NODE_ENV === 'production';
   const secureCookies = options.secureCookies ?? production;
   if (production && !secureCookies) throw new Error('운영 세션 쿠키에는 Secure가 필요합니다.');
@@ -112,6 +114,7 @@ export async function buildServer(options: {
         const identity = await authenticate(options.db, req.cookies.sid, now, false);
         return {
           db: options.db,
+          publicMapConfig: mapConfig,
           reply: res,
           now,
           user: identity?.user ?? null,
