@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
+import { readFile, readdir } from 'node:fs/promises';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createDb } from '@opensamguk/db';
+import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 // eslint-disable-next-line opensamguk/no-cross-package-relative -- 통합 시험에서 루트 Probe와 서버를 연결하는 단일 import다.
 import { probeHealth } from '../../../../tools/monitor/uptimeProbe';
@@ -21,22 +23,241 @@ if (
 )
   throw new Error('전용 통합 시험 DB 이름이 필요합니다.');
 
-const readerName = `t311_health_${randomUUID().replaceAll('-', '')}`;
-const readerUrl = new URL(databaseUrl);
+const ownName = `t311_health_${randomUUID().replaceAll('-', '')}_test`;
+function checkedName() {
+  if (!/^t311_health_[0-9a-f]{32}_test$/.test(ownName)) throw new Error('자체 시험 DB 이름을 확인하세요.');
+  return ownName;
+}
+checkedName();
+const ownUrl = new URL(parsedDatabase);
+ownUrl.pathname = `/${ownName}`;
+const adminUrl = new URL(parsedDatabase);
+adminUrl.pathname = '/postgres';
+const readerName = ownName.slice(0, -5);
+const readerUrl = new URL(ownUrl);
 readerUrl.searchParams.set('application_name', readerName);
 const db = createDb(readerUrl.href);
-const writer = createDb(databaseUrl);
-const observer = createDb(databaseUrl);
+const writer = createDb(ownUrl.href);
+const observer = createDb(ownUrl.href);
+const admin = new Client({ connectionString: adminUrl.href });
+const migrator = new Client({ connectionString: ownUrl.href });
 const ownedWorlds: string[] = [];
 const TIMEOUT_MS = 10_000;
-let identity: { name: string; oid: string } | undefined;
+type Identity = { name: string; oid: string };
+type Ownership = { phase: 'none' | 'creating' | 'ambiguous' | 'dropped' } | ({ phase: 'owned' } & Identity);
+let ownership: Ownership = { phase: 'none' };
+let identity: Identity | undefined;
 let app: Awaited<ReturnType<typeof buildServer>> | undefined;
 let baseUrl: URL | undefined;
+let unavailable: Awaited<ReturnType<typeof buildServer>> | undefined;
+let closed: ReturnType<typeof createDb> | undefined;
+let beforeCatalog: Identity[] | undefined;
+let adminAttempted = false;
+let adminConnected = false;
+let migratorOpen = false;
+let setupStage = 'setup';
+let setupPromise: Promise<void> | undefined;
+let cleanupPromise: Promise<Error[]> | undefined;
+let setupReportedCleanup = false;
+let migrationCount = 0;
+const clientErrors: Error[] = [];
+
+// Raw driver messages, stacks, and causes can contain connection credentials.
+function safeError(stage: string, error: unknown): Error {
+  const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
+  const sqlState = typeof code === 'string' && /^[0-9A-Z]{5}$/.test(code) ? ` (${code})` : '';
+  const clean = new Error(`${stage}${sqlState}: ${ownName}`);
+  if (error instanceof TypeError) clean.name = 'TypeError';
+  else if (error instanceof RangeError) clean.name = 'RangeError';
+  return clean;
+}
+admin.on('error', (error: Error) => clientErrors.push(safeError('admin event', error)));
+migrator.on('error', (error: Error) => clientErrors.push(safeError('migration event', error)));
+
+async function catalog(): Promise<Identity[]> {
+  return (await admin.query<Identity>('SELECT datname AS name, oid::text AS oid FROM pg_database ORDER BY datname'))
+    .rows;
+}
+
+async function setup() {
+  setupStage = 'admin connect';
+  adminAttempted = true;
+  await admin.connect();
+  adminConnected = true;
+  setupStage = 'catalog before';
+  beforeCatalog = await catalog();
+  setupStage = 'create absence';
+  const absent = await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', [ownName]);
+  if (absent.rows.length !== 0) throw new Error('자체 시험 DB 이름이 이미 있습니다.');
+  setupStage = 'create';
+  const createName = checkedName();
+  ownership = { phase: 'creating' };
+  try {
+    await admin.query(`CREATE DATABASE "${createName}"`);
+    setupStage = 'created OID';
+    const created = await admin.query<Identity>(
+      'SELECT datname AS name, oid::text AS oid FROM pg_database WHERE datname = $1',
+      [ownName],
+    );
+    const value = created.rows[0];
+    if (created.rows.length !== 1 || !value || value.name !== ownName || !/^[0-9]+$/.test(value.oid))
+      throw new Error('만든 시험 DB의 OID를 확인하지 못했습니다.');
+    identity = value;
+    ownership = { phase: 'owned', ...value };
+  } catch (error) {
+    ownership = { phase: 'ambiguous' };
+    throw error;
+  }
+  setupStage = 'migration';
+  const directory = new URL('../../../../packages/db/prisma/migrations/', import.meta.url);
+  const migrations = (await readdir(directory)).filter((name) => /^\d/.test(name)).sort();
+  if (migrations.length !== 18 || migrations.at(-1) !== '20261023073000_treaties')
+    throw new Error('준비한 migration 목록이 달라졌습니다.');
+  migratorOpen = true;
+  await migrator.connect();
+  for (const name of migrations) {
+    await migrator.query(await readFile(new URL(`${name}/migration.sql`, directory), 'utf8'));
+    migrationCount += 1;
+  }
+  await migrator.end();
+  migratorOpen = false;
+  setupStage = 'reader identity';
+  expect(await databaseIdentity()).toEqual(identity);
+  const [reader] = await db.$queryRaw<Array<{ name: string }>>`SELECT current_setting('application_name') AS name`;
+  expect(reader?.name).toBe(readerName);
+  expect(await db.world.count()).toBe(0);
+  await Promise.all([writer.$queryRaw`SELECT 1`, observer.$queryRaw`SELECT 1`]);
+  setupStage = 'HTTP listen';
+  app = await buildServer({
+    db,
+    publicOrigin: 'http://127.0.0.1:5173',
+    now: () => 0,
+    logging: false,
+    realtime: { connectionString: ownUrl.href },
+  });
+  baseUrl = new URL(await app.listen({ host: '127.0.0.1', port: 0 }));
+}
+
+async function closeUnavailable(): Promise<Error[]> {
+  const errors: Error[] = [];
+  try {
+    await unavailable?.close();
+    unavailable = undefined;
+  } catch (error) {
+    errors.push(safeError('unavailable app close', error));
+  }
+  try {
+    await closed?.$disconnect();
+    closed = undefined;
+  } catch (error) {
+    errors.push(safeError('unavailable client close', error));
+  }
+  return errors;
+}
+
+async function runCleanup(): Promise<Error[]> {
+  // A timed-out hook must not race its still-pending CREATE or migration.
+  await setupPromise?.catch(() => undefined);
+  const errors = await closeUnavailable();
+  const steps: Array<{ stage: string; ok: boolean }> = [];
+  async function step(stage: string, action: () => Promise<unknown>) {
+    try {
+      await action();
+      steps.push({ stage, ok: true });
+      return true;
+    } catch (error) {
+      errors.push(safeError(stage, error));
+      steps.push({ stage, ok: false });
+      return false;
+    }
+  }
+  let resourcesClosed = errors.length === 0;
+  for (const [stage, action] of [
+    ['app close', async () => app?.close()],
+    ['reader close', async () => db.$disconnect()],
+    ['writer close', async () => writer.$disconnect()],
+    ['observer close', async () => observer.$disconnect()],
+    [
+      'migration close',
+      async () => {
+        if (migratorOpen) {
+          await migrator.end();
+          migratorOpen = false;
+        }
+      },
+    ],
+  ] satisfies Array<[string, () => Promise<unknown>]>) {
+    if (!(await step(stage, action))) resourcesClosed = false;
+  }
+  if (ownership.phase === 'owned') {
+    const owned = ownership;
+    await step('owned DB cleanup', async () => {
+      if (!resourcesClosed) throw new Error('시험 자원을 닫지 못해 DB를 보존합니다.');
+      let connections = -1;
+      for (let attempt = 0; attempt < 50; attempt += 1) {
+        const result = await admin.query<{ n: number }>(
+          'SELECT count(*)::int AS n FROM pg_stat_activity WHERE datid = $1::oid',
+          [owned.oid],
+        );
+        connections = result.rows[0]?.n ?? -1;
+        if (connections === 0) break;
+        if (attempt < 49) await delay(100);
+      }
+      if (connections !== 0) throw new Error('연결이 남아 시험 DB를 보존합니다.');
+      const result = await admin.query<Identity>(
+        'SELECT datname AS name, oid::text AS oid FROM pg_database WHERE datname = $1',
+        [owned.name],
+      );
+      if (result.rows.length !== 1 || result.rows[0]?.oid !== owned.oid)
+        throw new Error('OID가 달라 시험 DB를 보존합니다.');
+      const dropName = checkedName();
+      await admin.query(`DROP DATABASE "${dropName}"`);
+      ownership = { phase: 'dropped' };
+      const absent = await admin.query('SELECT 1 FROM pg_database WHERE datname = $1 OR oid = $2::oid', [
+        owned.name,
+        owned.oid,
+      ]);
+      if (absent.rows.length !== 0) throw new Error('시험 DB가 남았습니다.');
+    });
+  } else if (ownership.phase === 'creating' || ownership.phase === 'ambiguous') {
+    errors.push(safeError('ambiguous DB preserved', undefined));
+  }
+  let additionalDatabases: number | undefined;
+  if (adminConnected && beforeCatalog) {
+    await step('catalog preservation', async () => {
+      const after = await catalog();
+      for (const previous of beforeCatalog!) {
+        if (!after.some((value) => value.name === previous.name && value.oid === previous.oid))
+          throw new Error('기존 DB 목록과 OID가 달라졌습니다.');
+      }
+      additionalDatabases = after.filter(
+        (value) => !beforeCatalog!.some((previous) => previous.name === value.name && previous.oid === value.oid),
+      ).length;
+    });
+  }
+  if (adminAttempted) await step('admin close', async () => admin.end());
+  errors.push(...clientErrors);
+  process.stdout.write(
+    `${JSON.stringify({ fixture: 't311-health', name: ownName, oid: identity?.oid ?? null, migrationCount, ownership: ownership.phase, steps, additionalDatabases, cleanupErrors: errors.length })}\n`,
+  );
+  return errors;
+}
+
+function cleanup(): Promise<Error[]> {
+  cleanupPromise ??= runCleanup();
+  return cleanupPromise;
+}
+
+function failSetup(error: unknown, errors: Error[]): never {
+  const original = safeError(setupStage, error);
+  if (errors.length === 0) throw original;
+  throw new AggregateError([original, ...errors], '건강 통합 시험 준비에 실패했습니다.');
+}
 
 async function databaseIdentity() {
   const [value] = await db.$queryRaw<Array<{ name: string; oid: string }>>`
     SELECT datname AS name, oid::text AS oid FROM pg_database WHERE datname = current_database()`;
-  if (!value || value.name !== parsedDatabase.pathname.slice(1))
+  if (!value || value.name !== ownName || value.oid !== identity?.oid)
     throw new Error('시험 DB 정체성을 확인하지 못했습니다.');
   return value;
 }
@@ -109,14 +330,14 @@ async function expectEngine(body: { ok: boolean; worlds: number; stale: number }
 }
 
 beforeAll(async () => {
-  identity = await databaseIdentity();
-  const [reader] = await db.$queryRaw<Array<{ name: string }>>`SELECT current_setting('application_name') AS name`;
-  expect(reader?.name).toBe(readerName);
-  // Aggregate endpoints count every active world, so this file requires an empty fixture DB.
-  expect(await db.world.count()).toBe(0);
-  await Promise.all([writer.$queryRaw`SELECT 1`, observer.$queryRaw`SELECT 1`]);
-  app = await buildServer({ db, publicOrigin: 'http://127.0.0.1:5173', now: () => 0, logging: false });
-  baseUrl = new URL(await app.listen({ host: '127.0.0.1', port: 0 }));
+  setupPromise = setup();
+  try {
+    await setupPromise;
+  } catch (error) {
+    const errors = await cleanup();
+    setupReportedCleanup = true;
+    failSetup(error, errors);
+  }
 });
 
 afterEach(async () => {
@@ -127,11 +348,9 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
-  try {
-    await app?.close();
-  } finally {
-    await Promise.all([db.$disconnect(), writer.$disconnect(), observer.$disconnect()]);
-  }
+  const errors = await cleanup();
+  if (!setupReportedCleanup && errors.length > 0)
+    throw new AggregateError(errors, '건강 통합 시험 정리에 실패했습니다.');
 });
 
 describe('AC-M3-09 owned PostgreSQL and socket health evidence', () => {
@@ -232,8 +451,10 @@ describe('AC-M3-09 owned PostgreSQL and socket health evidence', () => {
   });
 
   it('serves 503 and a failed Probe for a closed DB port, without stopping PostgreSQL', async () => {
-    const closed = createDb('postgresql://unused@127.0.0.1:1/unused');
-    let unavailable: Awaited<ReturnType<typeof buildServer>> | undefined;
+    closed = createDb('postgresql://unused@127.0.0.1:1/unused');
+    let failure: unknown;
+    let failed = false;
+    let cleanupErrors: Error[];
     try {
       unavailable = await buildServer({ db: closed, publicOrigin: 'http://127.0.0.1:5173', logging: false });
       const target = new URL(await unavailable.listen({ host: '127.0.0.1', port: 0 }));
@@ -252,12 +473,17 @@ describe('AC-M3-09 owned PostgreSQL and socket health evidence', () => {
           { path: '/healthz/engine', outcome: 'status', status: 503 },
         ],
       });
+    } catch (error) {
+      failed = true;
+      failure = error;
     } finally {
-      try {
-        await unavailable?.close();
-      } finally {
-        await closed.$disconnect();
-      }
+      cleanupErrors = await closeUnavailable();
     }
+    if (cleanupErrors.length > 0)
+      throw new AggregateError(
+        failed ? [failure, ...cleanupErrors] : cleanupErrors,
+        '닫힌 포트 시험 정리에 실패했습니다.',
+      );
+    if (failed) throw failure;
   });
 });
