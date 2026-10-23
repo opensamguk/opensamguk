@@ -66,6 +66,8 @@ function prepare(expected: Readiness, turn: QueuedTurn) {
   }
 }
 
+export { prepare as prepareOperationReadiness };
+
 export function calculateOperationTimeline(input: OperationTimelineInput): OperationTimeline {
   if (input.turns.length !== 30) throw new Error('예턴은 30칸이어야 합니다.');
   if (!Number.isSafeInteger(input.deadlineTick) || input.deadlineTick < 0)

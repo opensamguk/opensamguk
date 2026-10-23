@@ -14,6 +14,8 @@ import { timelapseRouter } from './routers/timelapse';
 import { messageRouter } from './routers/message';
 import { noticeRouter } from './routers/notice';
 import { lobbyRouter } from './routers/lobby';
+import { operationRouter } from './routers/operation';
+import { inspectionRouter } from './routers/inspection';
 
 export const appRouter = router({
   auth: authRouter,
@@ -30,6 +32,8 @@ export const appRouter = router({
   message: messageRouter,
   notice: noticeRouter,
   lobby: lobbyRouter,
+  operation: operationRouter,
+  inspection: inspectionRouter,
   // 화면이 서버와 DB 연결을 확인하는 데 쓴다 (AC-M1-02).
   health: publicProcedure.query(async ({ ctx }) => {
     let db: 'ok' | 'down' = 'ok';
