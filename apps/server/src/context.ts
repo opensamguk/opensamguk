@@ -15,4 +15,5 @@ export interface Context {
   dummyPasswordHash: string;
   ip: string;
   rateLimiter: ReturnType<typeof createRateLimiter>;
+  closeSession?: ((sessionId: string) => void) | undefined;
 }

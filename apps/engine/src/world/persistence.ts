@@ -91,8 +91,16 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
     async (tx) => {
       const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
       const cities = await tx.city.findMany({ where: { worldId }, orderBy: { cityKey: 'asc' } });
-      const nations = await tx.nation.findMany({ where: { worldId }, orderBy: { id: 'asc' } });
-      const generals = await tx.general.findMany({ where: { worldId }, orderBy: { id: 'asc' } });
+      const nations = await tx.nation.findMany({
+        where: { worldId },
+        orderBy: { id: 'asc' },
+        omit: { notice: true, noticeRevision: true, noticeUpdatedAt: true, noticeUpdatedBy: true },
+      });
+      const generals = await tx.general.findMany({
+        where: { worldId },
+        orderBy: { id: 'asc' },
+        omit: { noticeSeen: true },
+      });
       const diplomacies = await tx.diplomacy.findMany({
         where: { worldId },
         orderBy: [{ nationA: 'asc' }, { nationB: 'asc' }],

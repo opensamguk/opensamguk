@@ -1,4 +1,5 @@
 import type { Prisma } from '@opensamguk/db';
+import type { RealtimeSignal } from '@opensamguk/db';
 import type { CommandResult, WorldState } from '@opensamguk/rules';
 import { loadWorld } from './worldLoader';
 import { archiveRemovedNation, type ActionAt } from './nationArchive';
@@ -117,4 +118,17 @@ export async function appendNationHistory(
     create: { worldId, tick, nationId, data: { events: [text] } },
     update: { data: { ...data, events: [...events, text] } },
   });
+}
+
+export function commandRealtimeSignals(before: WorldState, state: WorldState): RealtimeSignal[] {
+  const signals: RealtimeSignal[] = [];
+  for (const [id, nationId] of Object.entries(state.commandMeta?.offers ?? {}))
+    if (before.commandMeta?.offers[Number(id)] !== nationId)
+      signals.push({ kind: 'offer.new', target: { generalId: Number(id) } });
+  for (const diplomacy of state.diplomacies) {
+    const prior = before.diplomacies.find((d) => d.nationA === diplomacy.nationA && d.nationB === diplomacy.nationB);
+    if (JSON.stringify(prior) !== JSON.stringify(diplomacy))
+      signals.push({ kind: 'treaty.new', target: { nationIds: [diplomacy.nationA, diplomacy.nationB] } });
+  }
+  return signals;
 }
