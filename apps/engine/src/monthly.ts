@@ -4,6 +4,7 @@ import { rngFor } from '@opensamguk/shared';
 import { hashState } from '@opensamguk/shared/node';
 import { loadWorld } from './worldLoader';
 import { persistRanking } from './ranking';
+import { persistYearbookNations } from './nationArchive';
 
 export async function loadReplayState(tx: Prisma.TransactionClient, worldId: string): Promise<ReplayState> {
   const state = await loadWorld(tx, worldId);
@@ -62,6 +63,7 @@ export async function persistMonthly(
       stateHash: hashState(snapshot),
     },
   });
+  await persistYearbookNations(tx, worldId, tick, next);
   for (const nation of result.yearbook.nations) {
     const where = { worldId_tick_nationId: { worldId, tick, nationId: nation.nationId } };
     // 같은 월드 잠금 안에서 기존 사건을 보존하고 월간 수치를 덧붙인다.
