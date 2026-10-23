@@ -9,6 +9,7 @@ import { requireWorld, requireGeneral, readView, worldInput } from '../game/quer
 import { commandInput, slotInput, parseSlot, readSlots, displaySlots } from '../game/slots';
 import type { Context } from '../context';
 import { requirePolicyReady } from '../game/policy';
+import { worldResolver } from '../game/resolver';
 
 const revision = z.number().int().min(0).max(2_147_483_646);
 const index = z.number().int().min(0).max(29);
@@ -47,7 +48,12 @@ async function save(
     const actor = await requireGeneral(tx, input.worldId, ctx.user.id, true);
     const old = await readSlots(tx, input.worldId, actor.id);
     if (actor.turnRevision !== input.revision)
-      return { ok: false as const, reason: 'STALE' as const, revision: actor.turnRevision, slots: displaySlots(old) };
+      return {
+        ok: false as const,
+        reason: 'STALE' as const,
+        revision: actor.turnRevision,
+        slots: displaySlots(old, worldResolver(world).resolver),
+      };
     const turns = change(old);
     await tx.generalTurn.deleteMany({ where: { worldId: input.worldId, generalId: actor.id } });
     await tx.generalTurn.createMany({
@@ -85,16 +91,19 @@ async function save(
         lastActiveAt: event.createdAt,
       },
     });
-    return { ok: true as const, revision: nextRevision, slots: displaySlots(turns) };
+    return { ok: true as const, revision: nextRevision, slots: displaySlots(turns, worldResolver(world).resolver) };
   });
 }
 export const turnsRouter = router({
   get: protectedProcedure.input(worldInput).query(({ ctx, input }) =>
     ctx.db.$transaction(
       async (tx) => {
-        await requireWorld(tx, input.worldId);
+        const world = await requireWorld(tx, input.worldId);
         const actor = await requireGeneral(tx, input.worldId, ctx.user.id);
-        return { revision: actor.turnRevision, slots: displaySlots(await readSlots(tx, input.worldId, actor.id)) };
+        return {
+          revision: actor.turnRevision,
+          slots: displaySlots(await readSlots(tx, input.worldId, actor.id), worldResolver(world).resolver),
+        };
       },
       { isolationLevel: 'RepeatableRead' },
     ),

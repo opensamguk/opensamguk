@@ -1,9 +1,12 @@
 import type { Prisma } from '@opensamguk/db';
-import { parsePreset, presetRules, type WorldState } from '@opensamguk/rules';
+import { presetRules, type WorldState } from '@opensamguk/rules';
 import { loadCommandState } from './commandPersistence';
+import { engineResolver, loadExt } from './extState';
 
 export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): Promise<WorldState> {
   const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
+  const { preset, commands } = engineResolver(world);
+  const ext = await loadExt(tx, worldId, commands);
   const cities = await tx.city.findMany({ where: { worldId } });
   const nations = await tx.nation.findMany({
     where: { worldId },
@@ -22,7 +25,8 @@ export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): 
     return value;
   };
   return {
-    ...(world.preset ? { presetRules: presetRules(parsePreset(world.preset)) } : {}),
+    ...(preset ? { presetRules: presetRules(preset) } : {}),
+    ...(ext ? { ext } : {}),
     startYear: world.startYear,
     cities: Object.fromEntries(cities.map((city) => [city.cityKey, stripWorldId(city)])),
     nations: Object.fromEntries(
