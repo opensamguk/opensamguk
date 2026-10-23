@@ -44,6 +44,7 @@ model World {
   inputEvents     InputEvent[]
   nationHistory   NationHistory[]
   yearbooks       YearbookSnapshot[]
+  removedNations  RemovedNation[]
   commandMeta     Json?
   battleLogs      BattleLog[]
   ranking         RankingSnapshot?
@@ -343,8 +344,32 @@ model YearbookSnapshot {
   data      Json
   stateHash String
   world     World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  nations   YearbookNation[]
 
   @@id([worldId, tick])
+}
+
+model RemovedNation {
+  worldId         String
+  nationId        Int
+  name            String
+  color           String
+  removedSequence Int
+  removedTick     Int
+  world           World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@id([worldId, nationId])
+}
+
+model YearbookNation {
+  worldId  String
+  tick     Int
+  nationId Int
+  name     String
+  color    String
+  snapshot YearbookSnapshot @relation(fields: [worldId, tick], references: [worldId, tick], onDelete: Cascade)
+
+  @@id([worldId, tick, nationId])
 }
 
 model RankingSnapshot {

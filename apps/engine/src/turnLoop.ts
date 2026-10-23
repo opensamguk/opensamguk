@@ -183,7 +183,10 @@ export class TurnLoop {
           const failed = 'code' in result;
           next = turn.state;
           next.generals[due.id]!.nextTurnTick = due.nextTurnTick + TICKS_PER_MONTH;
-          await persistEffects(tx, worldId, next, [{ kind: 'world', state: next }]);
+          await persistEffects(tx, worldId, next, [{ kind: 'world', state: next }], {
+            sequence,
+            tick: due.nextTurnTick,
+          });
           if (!failed) await persistCommandReports(tx, worldId, due.nextTurnTick, due.id, result);
           if (turn.nation) {
             const national = turn.nation.result;
