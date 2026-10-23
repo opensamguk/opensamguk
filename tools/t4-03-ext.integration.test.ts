@@ -53,11 +53,9 @@ beforeAll(async () => {
   created = true;
   await client.connect();
   const directory = new URL('../packages/db/prisma/migrations/', import.meta.url);
-  const migrations = (await readdir(directory))
-    .filter((name) => /^\d/.test(name) && name <= '20261023072000_world_ext_slices')
-    .sort();
-  expect(migrations).toHaveLength(17);
-  expect(migrations.at(-1)).toBe('20261023072000_world_ext_slices');
+  const migrations = (await readdir(directory)).filter((name) => /^\d/.test(name)).sort();
+  expect(migrations).toHaveLength(18);
+  expect(migrations.at(-1)).toBe('20261023073000_treaties');
   for (const name of migrations)
     await client.query(await readFile(new URL(`${name}/migration.sql`, directory), 'utf8'));
   preset = parsePreset(
