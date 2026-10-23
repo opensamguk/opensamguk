@@ -56,7 +56,7 @@ jobs:
           POSTGRES_PASSWORD: opensamguk
           POSTGRES_DB: opensamguk_ci_e2e_test
         ports:
-          - 5432:5432
+          - 127.0.0.1:5432:5432
         options: >-
           --health-cmd "pg_isready -U opensamguk -d opensamguk_ci_e2e_test"
           --health-interval 2s
@@ -79,9 +79,19 @@ jobs:
           node-version: '24.22.0'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Bind T2-15 restore inputs
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          BIND_PG_SERVICE_ID: ${{ job.services.postgres.id }}
+          BIND_PG_ROLE: opensamguk
+          BIND_PG_ADMIN_DB: postgres
+        run: node tools/ci/t215-binding.mjs prepare
       - run: pnpm test:authz
       - run: pnpm db:migrate
       - name: Use official Ubuntu archive path
         run: sudo bash tools/ci/ubuntu-archive-path.sh /
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm e2e --workers=1 --reporter=line
+      - name: Clean T2-15 binding files
+        if: always()
+        run: node tools/ci/t215-binding.mjs cleanup
