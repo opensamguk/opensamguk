@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { rngFor } from '@opensamguk/shared';
 import { commandInitial, testUnits } from '../test/commandFixture';
+import { createCommandResolver } from './commands/resolve';
+import { parsePreset, presetRules } from './world/preset';
 import { applyTreatyInput, settleTreaties } from './diplomacy/treaty';
 import type { TreatyClause, TreatyInput } from './diplomacy/treatyTypes';
 import { cloneWorld } from './model/clone';
@@ -30,8 +32,43 @@ import {
   type CapabilitySelection,
 } from './replayCapabilities';
 
+const regular = {
+  name: '정규',
+  turnTermMinutes: 60,
+  scenario: '1030',
+  map: 'che',
+  unitSet: 'basic',
+  commands: null,
+  npc: {
+    fillRatio: 1,
+    aggression: 1,
+  },
+  protection: {
+    foundUntilMonths: 0,
+    peaceMonths: 0,
+    maxGeneralsPerNation: null,
+  },
+  boost: {
+    smallWorld: null,
+    lateJoin: null,
+  },
+  features: {
+    advisor: false,
+  },
+};
+
 const selection: CapabilitySelection = { treaty: { version: 1 }, policy: null };
 const config = { endYear: null, outcomeFromSequence: 0 };
+const extPolicy = { version: 1 as const, fromSequence: 0 as const, turnTermMinutes: 30 };
+const stratagems = ['fire_attack', 'incite', 'plunder', 'sabotage'];
+function extOrigin(general = ['fire_attack']): CapsOrigin {
+  const input = origin();
+  const commands = { general, nation: [] };
+  const preset = parsePreset({ ...regular, commands });
+  input.initial.presetRules = presetRules(preset);
+  input.capabilities = { version: 1, ext: { version: 1, commands, preset, resources: {}, sliceKeys: [] } };
+  return input;
+}
 const clauses: TreatyClause[] = [{ kind: 'peace' }, { kind: 'nonAggression', months: 1 }];
 function origin(): CapsOrigin {
   const initial = commandInitial();
@@ -118,6 +155,212 @@ async function hash(value: unknown): Promise<string> {
   const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical(value)));
   return Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
+
+describe('T4-17 / AC-P2-03 (나) B 무상태 확장 선택과 재생', () => {
+  it.each(Array.from({ length: 15 }, (_, mask) => stratagems.filter((_, bit) => (mask + 1) & (1 << bit))))(
+    '정렬된 등록 계략 부분집합 %j를 F=0에서 복제한다',
+    (...general) => {
+      const input = extOrigin(general);
+      const before = structuredClone(input);
+      const chosen = selectSupportedCapabilities(input, { ...config, policy: extPolicy });
+      expect(chosen).toEqual({ ext: input.capabilities.ext, policy: extPolicy });
+      expect(startCapsReplay(input, chosen).state).not.toHaveProperty('ext');
+      expect(input).toEqual(before);
+      if (!('ext' in chosen)) throw new Error('확장 선택이 아닙니다.');
+      chosen.ext.preset.name = '복제 확인';
+      expect(input).toEqual(before);
+    },
+  );
+
+  it.each([
+    {},
+    { version: 2 },
+    { extra: true },
+    { commands: { general: [], nation: [] } },
+    { commands: { general: ['incite', 'fire_attack'], nation: [] } },
+    { commands: { general: ['fire_attack', 'fire_attack'], nation: [] } },
+    { commands: { general: ['rest'], nation: [] } },
+    { commands: { general: ['future'], nation: [] } },
+    { commands: { general: ['fire_attack'], nation: ['nation_rest'] } },
+    { commands: { general: ['fire_attack'], nation: [], extra: true } },
+    { resources: { extra: 1 } },
+    { sliceKeys: ['future'] },
+  ])('원시 ext %j는 운반·해시 입력에 남고 지원 판정에서 거부한다', async (patch) => {
+    const input = extOrigin();
+    input.capabilities.ext = Object.keys(patch).length ? { ...input.capabilities.ext, ...patch } : {};
+    const before = structuredClone(input);
+    expect(parseCapsOrigin(input)).toEqual(before);
+    expect(capsResourceHashInput(input).capabilities).toEqual(before.capabilities);
+    expect(await hash(capsResourceHashInput(input))).toBe(await hash(capsResourceHashInput(before)));
+    expect(() => selectSupportedCapabilities(input, { ...config, policy: extPolicy })).toThrow();
+    expect(input).toEqual(before);
+  });
+
+  it('완전 프리셋·명령 목록·초기 규칙과 손 selection의 원본을 대조한다', () => {
+    const input = extOrigin();
+    const chosen = selectSupportedCapabilities(input, { ...config, policy: extPolicy });
+    const other = selectSupportedCapabilities(extOrigin(['incite']), { ...config, policy: extPolicy });
+    expect(() => startCapsReplay(input, other)).toThrow('생성 기록과 기능 선택');
+    expect(() => startCapsReplay(origin(), chosen)).toThrow('생성 기록과 기능 선택');
+    expect(() => startCapsReplay(input, selection)).toThrow('생성 기록과 기능 선택');
+    for (const change of [
+      (value: CapsOrigin) => {
+        delete (value.capabilities.ext!.preset as Record<string, unknown>).commands;
+      },
+      (value: CapsOrigin) => {
+        (value.capabilities.ext!.preset as Record<string, unknown>).name = ' 정규 ';
+      },
+      (value: CapsOrigin) => {
+        (value.capabilities.ext!.preset as Record<string, unknown>).commands = { general: ['incite'], nation: [] };
+      },
+      (value: CapsOrigin) => {
+        value.initial.presetRules!.npc.aggression = 2;
+      },
+      (value: CapsOrigin) => {
+        delete value.initial.presetRules;
+      },
+    ]) {
+      const changed = structuredClone(input);
+      change(changed);
+      expect(() => selectSupportedCapabilities(changed, { ...config, policy: extPolicy })).toThrow();
+      expect(() => startCapsReplay(changed, chosen)).toThrow();
+    }
+    const reordered = structuredClone(input);
+    const ext = reordered.capabilities.ext!;
+    ext.preset = Object.fromEntries(Object.entries(ext.preset as object).reverse());
+    expect(startCapsReplay(reordered, chosen)).toEqual(startCapsReplay(input, chosen));
+  });
+
+  it('ext의 legacy·중간 전환과 조약·인사 혼합을 거부한다', () => {
+    const input = extOrigin();
+    for (const policy of [undefined, { ...extPolicy, fromSequence: 20 }])
+      expect(() => selectSupportedCapabilities(input, { ...config, ...(policy ? { policy } : {}) })).toThrow();
+    for (const extra of [{ treaty: { version: 1 } }, { personnel: { version: 1 } }])
+      expect(() =>
+        selectSupportedCapabilities({ ...input, capabilities: { ...input.capabilities, ...extra } } as CapsOrigin, {
+          ...config,
+          policy: extPolicy,
+        }),
+      ).toThrow('기능 조합');
+  });
+
+  it('네 진입점은 둘 다 없음·동시 존재·F 오류·미래 자기 키를 모두 거부한다', () => {
+    const input = extOrigin();
+    const chosen = selectSupportedCapabilities(input, { ...config, policy: extPolicy });
+    const replay = startCapsReplay(input, chosen);
+    for (const invalid of [
+      { policy: extPolicy },
+      { ...chosen, treaty: { version: 1 } },
+      { ...chosen, treaty: undefined },
+      { ...chosen, policy: null },
+      { ...chosen, policy: undefined },
+      { ...chosen, policy: { ...extPolicy, fromSequence: 20 } },
+      { ...chosen, policy: { ...extPolicy, turnTermMinutes: 0 } },
+      { ...chosen, personnel: undefined },
+      { ...chosen, future: undefined },
+      { ...chosen, ext: { ...input.capabilities.ext, resources: { future: 1 } } },
+    ]) {
+      const invalidSelection = invalid as unknown as CapabilitySelection;
+      expect(() => startCapsReplay(input, invalidSelection)).toThrow();
+      expect(() => validateCapsRecordedInput(rejection(), { selection: invalidSelection, monthlyTick: 0 })).toThrow();
+      expect(() => applyCapsRecordedInput(replay, rejection(), { selection: invalidSelection })).toThrow();
+      expect(() => runCapsReplayAction(replay, input.initial.seed, testUnits, invalidSelection)).toThrow();
+    }
+  });
+
+  it('APPLIED 예턴만 resolver 허용 목록으로 검사하고 조약 입력은 두 상태 모두 거부한다', () => {
+    const input = extOrigin();
+    const chosen = selectSupportedCapabilities(input, { ...config, policy: extPolicy });
+    const replay = startCapsReplay(input, chosen);
+    const record = (commandKey: string): RecordedInput => ({
+      sequence: 1,
+      generalId: 1,
+      kind: 'turns.set',
+      status: 'APPLIED',
+      payload: { turns: [{ commandKey, args: { cityKey: 2 }, explicit: true }, ...emptyQueue().slice(1)], revision: 0 },
+      result: { revision: 1, activeTick: 0 },
+    });
+    for (const key of ['fire_attack', 'rest', 'farm'])
+      expect(() => validateCapsRecordedInput(record(key), { selection: chosen, monthlyTick: 0 })).not.toThrow();
+    for (const key of ['incite', 'future', 'nation_rest']) {
+      expect(() => applyCapsRecordedInput(replay, record(key), { selection: chosen })).toThrow('예턴 명령');
+      const rejected = {
+        ...record(key),
+        status: 'REJECTED',
+        payload: null,
+        result: { code: 'BAD_INPUT', message: '입력을 확인하세요.' },
+      };
+      expect(applyCapsRecordedInput(replay, rejected, { selection: chosen })).toBe(replay);
+    }
+    // 조약 단독의 기존 base 기록은 확장 허용 목록으로 다시 검사하지 않는다.
+    expect(() =>
+      validateCapsRecordedInput(record('future'), { selection: { ...selection, policy: extPolicy }, monthlyTick: 0 }),
+    ).not.toThrow();
+    for (const kind of ['treaty.propose', 'treaty.respond'])
+      for (const status of ['APPLIED', 'REJECTED'] as const)
+        expect(() => applyCapsRecordedInput(replay, rejection({ kind, status }), { selection: chosen })).toThrow(
+          '조약을 끈 월드',
+        );
+  });
+
+  it('실제 확장 resolver로 비용을 적용하고 12개월 상태·해시가 직접 재생과 같다', async () => {
+    const input = extOrigin();
+    input.initial.generals.forEach((general) => {
+      general.userId = `human-${general.id}`;
+    });
+    const chosen = selectSupportedCapabilities(input, { ...config, policy: extPolicy });
+    let replay = startCapsReplay(input, chosen);
+    const saved: RecordedInput = {
+      sequence: 1,
+      generalId: 1,
+      kind: 'turns.set',
+      status: 'APPLIED',
+      payload: {
+        turns: [{ commandKey: 'fire_attack', args: { cityKey: 2 }, explicit: true }, ...emptyQueue().slice(1)],
+        revision: 0,
+      },
+      result: { revision: 1, activeTick: 0 },
+    };
+    replay = applyCapsRecordedInput(replay, saved, { selection: chosen });
+    let direct = structuredClone(replay);
+    const resolver = createCommandResolver({ general: ['fire_attack'], nation: [] });
+    const gold = replay.state.generals[1]!.gold;
+    const rice = replay.state.generals[1]!.rice;
+    replay = runCapsReplayAction(replay, input.initial.seed, testUnits, chosen);
+    direct = runReplayAction(direct, input.initial.seed, testUnits, resolver);
+    expect(replay.state.generals[1]).toMatchObject({ gold: gold - 100, rice: rice - 100 });
+    expect(replay).toEqual(direct);
+    const monthHashes: string[] = [];
+    while (replay.monthlyTick < 120000) {
+      const tick = replay.monthlyTick;
+      replay = runCapsReplayAction(replay, input.initial.seed, testUnits, chosen);
+      direct = runReplayAction(direct, input.initial.seed, testUnits, resolver);
+      expect(replay).toEqual(direct);
+      expect(replay.state).not.toHaveProperty('ext');
+      expect(replay.state).not.toHaveProperty('treaties');
+      if (tick !== replay.monthlyTick) {
+        const actual = await hash(replay);
+        expect(actual).toBe(await hash(direct));
+        monthHashes.push(actual);
+      }
+    }
+    expect(monthHashes).toHaveLength(12);
+  });
+
+  it('월간 조약 정산은 조약 갈래에서만 실행한다', () => {
+    const active = accepted();
+    active.state.generals = {};
+    active.monthlyTick = 10000;
+    const input = extOrigin();
+    const chosen = selectSupportedCapabilities(input, { ...config, policy: extPolicy });
+    const ext = startCapsReplay(input, chosen);
+    ext.state.generals = {};
+    ext.state.treaties = structuredClone(active.state.treaties!);
+    ext.monthlyTick = 10000;
+    expect(runCapsReplayAction(active, 'month', undefined, selection).state).not.toHaveProperty('treaties');
+    expect(runCapsReplayAction(ext, 'month', undefined, chosen).state.treaties).toEqual(ext.state.treaties);
+  });
+});
 
 describe('T4-03 / AC-P2-02 형식 6 운반과 실행 선택', () => {
   it('C1 정상 origin을 깊이 복제하고 실행 선택을 상태 밖에 둔다', () => {

@@ -56,7 +56,7 @@ export function selectWorldCapabilities(row: WorldCapsRow): WorldCapabilities {
     return { kind: 'legacy', policy };
   }
   const parsed = parseCapsOrigin(origin);
-  if ((parsed.capabilities.treaty !== undefined) !== (treatyFormat === 1))
+  if (Object.hasOwn(parsed.capabilities, 'treaty') !== (treatyFormat === 1))
     throw new Error('조약 저장 형식과 생성 기록이 다릅니다.');
   if (Object.hasOwn(parsed.capabilities, 'personnel') !== (personnelFormat === 1))
     throw new Error('인사 저장 형식과 생성 기록이 다릅니다.');

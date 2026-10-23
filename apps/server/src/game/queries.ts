@@ -46,8 +46,9 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
       closedSequence: true,
     },
   });
-  if (capabilities.kind === 'legacy' && treatyRows.length) throw new Error('조약을 끈 월드에 조약 저장 행이 있습니다.');
-  const treaties = capabilities.kind === 'caps' ? projectTreatyRows(treatyRows) : undefined;
+  const treatyEnabled = capabilities.kind === 'caps' && 'treaty' in capabilities.selection;
+  if (!treatyEnabled && treatyRows.length) throw new Error('조약을 끈 월드에 조약 저장 행이 있습니다.');
+  const treaties = treatyEnabled ? projectTreatyRows(treatyRows) : undefined;
   const ext = restoreExtState(commands, await readWorldExtRows(tx, worldId));
   const cities = await tx.city.findMany({ where: { worldId } });
   const nations = await tx.nation.findMany({ where: { worldId } });

@@ -5,6 +5,8 @@ import {
   runMonthly,
   settleTreaties,
   toWorldState,
+  parsePreset,
+  presetRules,
   type CapsOrigin,
 } from '@opensamguk/rules';
 import { rngFor } from '@opensamguk/shared';
@@ -14,6 +16,36 @@ import { monthlyFixture } from '../test/monthlyFixture';
 import { loadReplayState, persistMonthly } from './monthly';
 import { resourceHash } from './replay';
 import { loadWorld } from './worldLoader';
+
+const regular = {
+  name: '정규',
+  turnTermMinutes: 60,
+  scenario: '1030',
+  map: 'che',
+  unitSet: 'basic',
+  commands: null,
+  npc: {
+    fillRatio: 1,
+    aggression: 1,
+  },
+  protection: {
+    foundUntilMonths: 0,
+    peaceMonths: 0,
+    maxGeneralsPerNation: null,
+  },
+  boost: {
+    smallWorld: null,
+    lateJoin: null,
+  },
+  features: {
+    advisor: false,
+  },
+};
+
+vi.mock('@opensamguk/rules', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@opensamguk/rules')>();
+  return { ...actual, settleTreaties: vi.fn(actual.settleTreaties) };
+});
 
 type Row = Record<string, unknown>;
 type Read = { select?: Record<string, boolean>; omit?: Record<string, boolean> };
@@ -63,7 +95,11 @@ function active(permanent = false): Treaty {
 }
 
 // 실제 월간·투영·닫힘·해시 함수를 호출한다. 메모리 TX이므로 DB 원자성 증거가 아니다.
-async function fixture(treaties: Treaty[] = [], caps = true, policyFromSequence: number | null = null) {
+async function fixture(
+  treaties: Treaty[] = [],
+  caps: boolean | 'ext' = true,
+  policyFromSequence: number | null = null,
+) {
   const initial = await monthlyFixture();
   initial.diplomacies = treaties.some((entry) => entry.endTick === 60000)
     ? [{ nationA: 1, nationB: 2, state: 'NON_AGGRESSION', untilTick: 60000 }]
@@ -75,12 +111,18 @@ async function fixture(treaties: Treaty[] = [], caps = true, policyFromSequence:
     resourceHash: '',
     capabilities: { version: 1, treaty: { version: 1 } },
   };
+  if (caps === 'ext') {
+    const commands = { general: ['fire_attack'], nation: [] };
+    const preset = parsePreset({ ...regular, commands });
+    origin.initial.presetRules = presetRules(preset);
+    origin.capabilities = { version: 1, ext: { version: 1, commands, preset, resources: {}, sliceKeys: [] } };
+  }
   origin.resourceHash = hashState(capsResourceHashInput(origin));
   const world = {
     id: 'world',
     startYear: initial.startYear,
     monthlyTick: 50000,
-    treatyFormat: caps ? 1 : null,
+    treatyFormat: caps === true ? 1 : null,
     personnelFormat: null,
     replayOrigin: caps
       ? origin
@@ -298,6 +340,22 @@ it('off legacy 월간의 상태와 해시는 기존 정산 결과를 유지한�
   expect(f.tx.treaty.updateMany).not.toHaveBeenCalled();
   expect(Object.hasOwn((await loadReplayState(f.client, 'world')).state, 'treaties')).toBe(false);
   expect(f.snapshots[0]!.stateHash).toBe(hashState(await loadReplayState(f.client, 'world')));
+});
+
+it('T4-17 B ext 단독 월간은 조약 정산·마감 쓰기 없이 스냅샷을 남긴다 (단위)', async () => {
+  // 손 origin으로 조약 guard만 본다. 프리셋 ON·생성·적재 증거는 아니다.
+  const f = await fixture([], 'ext', 0);
+  const before = await loadWorld(f.client, f.world.id);
+  const date = monthlyDate(before.startYear, 60000);
+  const expected = runMonthly(before, 60000, rngFor(f.initial.seed, 'monthly', date.year, date.month)).state;
+  vi.mocked(settleTreaties).mockClear();
+  const next = await f.run();
+  expect(next).toEqual(expected);
+  expect(settleTreaties).not.toHaveBeenCalled();
+  expect(f.tx.treaty.updateMany).not.toHaveBeenCalled();
+  expect(f.tx.treaty.findMany.mock.calls.every(([query]) => query.where.status === undefined)).toBe(true);
+  expect(f.snapshots[0]!.stateHash).toBe(hashState(await loadReplayState(f.client, 'world')));
+  expect(next).not.toHaveProperty('treaties');
 });
 
 it('빈 caps 월간은 빈 treaties 키를 만들지 않고 legacy와 같은 replay 해시를 쓴다 (단위)', async () => {

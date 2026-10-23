@@ -49,6 +49,6 @@ export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): 
     ),
     diplomacies: diplomacies.map(stripWorldId),
     ...(await loadCommandState(tx, worldId)),
-    ...(capabilities.kind === 'caps' ? await loadTreaties(tx, worldId) : {}),
+    ...(capabilities.kind === 'caps' && 'treaty' in capabilities.selection ? await loadTreaties(tx, worldId) : {}),
   };
 }

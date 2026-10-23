@@ -25,7 +25,7 @@ export async function assertWorldCapabilities(
       closedSequence: true,
     },
   });
-  if (capabilities.kind === 'legacy') {
+  if (capabilities.kind !== 'caps' || !('treaty' in capabilities.selection)) {
     if (rows.length) throw new Error('조약을 끈 월드에 조약 저장 행이 있습니다.');
   } else {
     projectTreatyRows(rows);

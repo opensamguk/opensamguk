@@ -1,8 +1,34 @@
 import { describe, expect, it } from 'vitest';
 import { commandInitial } from '../test/commandFixture';
+import { parsePreset, presetRules } from './world/preset';
 import * as rules from './index';
 import { selectWorldCapabilities, projectTreatyRows, type WorldCapsRow, type TreatyStorageRow } from './capsWorld';
 import { parseCapsOrigin, type CapsOrigin } from './replayCapabilities';
+
+const regular = {
+  name: '정규',
+  turnTermMinutes: 60,
+  scenario: '1030',
+  map: 'che',
+  unitSet: 'basic',
+  commands: null,
+  npc: {
+    fillRatio: 1,
+    aggression: 1,
+  },
+  protection: {
+    foundUntilMonths: 0,
+    peaceMonths: 0,
+    maxGeneralsPerNation: null,
+  },
+  boost: {
+    smallWorld: null,
+    lateJoin: null,
+  },
+  features: {
+    advisor: false,
+  },
+};
 
 function row(): WorldCapsRow {
   return {
@@ -117,6 +143,27 @@ describe('T4-03 / AC-P2-02 저장된 월드 기능 선택 U1~U11', () => {
     expect(() => selectWorldCapabilities({ ...enabled(), treatyFormat: null })).toThrow('조약 저장 형식');
     const input = { ...enabled(), replayOrigin: { ...origin(), capabilities: { version: 1, ext: {} } } };
     expect(() => selectWorldCapabilities(input)).toThrow('조약 저장 형식');
+  });
+
+  it('T4-17 B ext 단독 F=0은 조약·인사 표지 없이 고르고 다른 F와 표지를 거부한다', () => {
+    const input = origin();
+    const commands = { general: ['fire_attack'], nation: [] };
+    const preset = parsePreset({ ...regular, commands });
+    input.initial.presetRules = presetRules(preset);
+    input.capabilities = { version: 1, ext: { version: 1, commands, preset, resources: {}, sliceKeys: [] } };
+    // DB preset 대조는 Ext 앱 인계 뒤에 붙인다. 이 선택자는 저장된 origin만 본다.
+    const stored = { ...row(), policyFromSequence: 0, replayOrigin: input, preset: null };
+    const before = structuredClone(stored);
+    expect(selectWorldCapabilities(stored)).toEqual({
+      kind: 'caps',
+      origin: input,
+      selection: { ext: input.capabilities.ext, policy: { version: 1, fromSequence: 0, turnTermMinutes: 30 } },
+    });
+    expect(stored).toEqual(before);
+    for (const policyFromSequence of [null, 20])
+      expect(() => selectWorldCapabilities({ ...stored, policyFromSequence, actionSequence: 20 })).toThrow();
+    expect(() => selectWorldCapabilities({ ...stored, treatyFormat: 1 })).toThrow('조약 저장 형식');
+    expect(() => selectWorldCapabilities({ ...stored, personnelFormat: 1 })).toThrow('인사 저장 형식');
   });
 
   it('U5 조약 없는 ext와 인사 descriptor도 운반은 보존하고 실행 선택은 거부한다', () => {

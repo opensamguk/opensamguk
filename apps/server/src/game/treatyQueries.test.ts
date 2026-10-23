@@ -4,11 +4,38 @@ import {
   settleTreaties,
   toWorldState,
   treatyClosures,
+  parsePreset,
+  presetRules,
   type TreatyWorldState,
 } from '@opensamguk/rules';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { readFixture } from '../../test/readFixture';
 import { checkTreatyRow, requireTreatyWorld, toTreatyDetail } from './treatyQueries';
+
+const regular = {
+  name: '정규',
+  turnTermMinutes: 60,
+  scenario: '1030',
+  map: 'che',
+  unitSet: 'basic',
+  commands: null,
+  npc: {
+    fillRatio: 1,
+    aggression: 1,
+  },
+  protection: {
+    foundUntilMonths: 0,
+    peaceMonths: 0,
+    maxGeneralsPerNation: null,
+  },
+  boost: {
+    smallWorld: null,
+    lateJoin: null,
+  },
+  features: {
+    advisor: false,
+  },
+};
 
 type World = Prisma.WorldGetPayload<Record<string, never>>;
 type Treaty = Prisma.TreatyGetPayload<Record<string, never>>;
@@ -197,5 +224,40 @@ describe('T2-07 / AC-M2-06 조약 저장 행과 상세 투영 단위', () => {
   it('legacy를 opt-in으로 만들지 않고 저장 표시 불일치를 내부 오류로 낸다', () => {
     expect(() => requireTreatyWorld(world())).toThrow('조약 기능을 쓰지 않는 월드입니다.');
     expect(() => requireTreatyWorld(world({ treatyFormat: 1 }))).toThrow('저장된 조약을 확인하지 못했습니다.');
+  });
+
+  it('T4-17 B ext 단독은 조약 단독과 달리 같은 PRECONDITION_FAILED로 거부한다', () => {
+    const commands = { general: ['fire_attack'], nation: [] };
+    const preset = parsePreset({ ...regular, commands });
+    const common = {
+      version: 6,
+      initial: { ...initial, presetRules: presetRules(preset) },
+      initialStateHash: 'unit',
+      resourceHash: 'unit',
+    };
+    expect(() =>
+      requireTreatyWorld(
+        world({
+          treatyFormat: 1,
+          replayOrigin: {
+            ...common,
+            capabilities: { version: 1, treaty: { version: 1 } },
+          } as unknown as Prisma.JsonObject,
+        }),
+      ),
+    ).not.toThrow();
+    const stored = world({
+      policyFromSequence: 0,
+      replayOrigin: {
+        ...common,
+        capabilities: { version: 1, ext: { version: 1, commands, preset, resources: {}, sliceKeys: [] } },
+      } as unknown as Prisma.JsonObject,
+    });
+    expect(() => requireTreatyWorld(stored)).toThrow(
+      expect.objectContaining({
+        code: 'PRECONDITION_FAILED',
+        message: '조약 기능을 쓰지 않는 월드입니다.',
+      }),
+    );
   });
 });

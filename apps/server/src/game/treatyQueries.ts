@@ -38,7 +38,7 @@ export function requireTreatyWorld(world: StoredWorld): void {
   } catch {
     invalid();
   }
-  if (selected.kind !== 'caps')
+  if (selected.kind !== 'caps' || !('treaty' in selected.selection))
     throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '조약 기능을 쓰지 않는 월드입니다.' });
 }
 
