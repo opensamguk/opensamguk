@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { inferRouterOutputs } from '@trpc/server';
 import { createDb, type Prisma } from '@opensamguk/db';
@@ -230,6 +231,12 @@ it('만들기와 닫기는 보조 표만 바꾸고 게임 행·큐·해시·sequ
   expect((await rpc('operation.close', { worldId: f.worldId, id: created.data!.id }, f.alice.cookie)).error).toBe(
     'PRECONDITION_FAILED',
   );
+  expect((await rpc('operation.suggest', { worldId: f.worldId, id: created.data!.id }, f.alice.cookie)).error).toBe(
+    'PRECONDITION_FAILED',
+  );
+  expect((await rpc('operation.suggest', { worldId: f.worldId, id: created.data!.id }, f.outsider.cookie)).error).toBe(
+    'FORBIDDEN',
+  );
 });
 
 it('같은 작전의 참여자는 30칸 인자와 explicit을 보고 다른 국가와 없는 ID는 같은 거부를 받는다', async () => {
@@ -246,6 +253,7 @@ it('같은 작전의 참여자는 30칸 인자와 explicit을 보고 다른 국�
   });
   expect(Object.keys(response.data!.target)).toEqual(['cityKey', 'cityName', 'nation']);
   expect((await rpc('operation.get', { worldId: f.worldId, id: f.operationId }, f.eve.cookie)).error).toBe('FORBIDDEN');
+  expect((await rpc('operation.list', { worldId: f.worldId }, f.eve.cookie)).data!.items).toEqual([]);
   expect((await rpc('operation.get', { worldId: f.worldId, id: randomUUID() }, f.alice.cookie)).error).toBe(
     'FORBIDDEN',
   );
@@ -257,10 +265,22 @@ it('같은 작전의 참여자는 30칸 인자와 explicit을 보고 다른 국�
 
 it('국가를 떠난 참여자는 timeline과 집계에서 빠지고 저장 행은 남는다', async () => {
   const f = await fixture();
+  await db.generalTurn.update({
+    where: { worldId_generalId_slot: { worldId: f.worldId, generalId: 2, slot: 0 } },
+    data: { commandKey: 'attack', args: { cityKey: initial.cities[1]!.cityKey } },
+  });
+  expect((await rpc('operation.list', { worldId: f.worldId }, f.alice.cookie)).data!.items[0]).toMatchObject({
+    members: 2,
+    ready: 1,
+  });
   await db.general.update({ where: { worldId_id: { worldId: f.worldId, id: 2 } }, data: { nationId: 2 } });
   const result = await rpc('operation.get', { worldId: f.worldId, id: f.operationId }, f.alice.cookie);
   expect(result.data!.timeline.map((member) => member.generalId)).toEqual([1]);
   expect(result.data!.members).toBe(1);
+  expect((await rpc('operation.list', { worldId: f.worldId }, f.alice.cookie)).data!.items[0]).toMatchObject({
+    members: 1,
+    ready: 0,
+  });
   expect(await db.operationMember.count({ where: { operationId: f.operationId } })).toBe(2);
   expect((await rpc('operation.get', { worldId: f.worldId, id: f.operationId }, f.bob.cookie)).error).toBe('FORBIDDEN');
 });
@@ -286,6 +306,8 @@ it('지난달·잘못된 월·중복·다른 국가 참여자를 거부하고 �
     { memberIds: [1, 1] },
     { memberIds: [3] },
     { targetCityKey: 2147483647 },
+    { targetYear: 2 ** 53 },
+    { targetYear: Number.MAX_SAFE_INTEGER },
   ])
     expect((await rpc('operation.create', { ...f.createInput, ...change }, f.alice.cookie)).error).toBe('BAD_REQUEST');
   const current = await rpc(
@@ -294,16 +316,28 @@ it('지난달·잘못된 월·중복·다른 국가 참여자를 거부하고 �
     f.alice.cookie,
   );
   expect(current.status).toBe(200);
+  await db.generalTurn.update({
+    where: { worldId_generalId_slot: { worldId: f.worldId, generalId: 1, slot: 0 } },
+    data: { commandKey: 'attack', args: { cityKey: initial.cities[1]!.cityKey } },
+  });
   expect(
     (await rpc('operation.get', { worldId: f.worldId, id: current.data!.id }, f.alice.cookie)).data!.timeline.every(
       (member) => member.verdict === 'LATE' || member.verdict === 'MISSING',
     ),
   ).toBe(true);
+  expect(
+    (await rpc('operation.get', { worldId: f.worldId, id: current.data!.id }, f.alice.cookie)).data!.timeline.find(
+      (member) => member.generalId === 1,
+    )!.verdict,
+  ).toBe('LATE');
   const far = await rpc('operation.create', { ...f.createInput, targetYear: 3_000_000_000 }, f.alice.cookie);
   expect(far.status).toBe(200);
   const detail = await rpc('operation.get', { worldId: f.worldId, id: far.data!.id }, f.alice.cookie);
   expect(detail.data!.targetDate.year).toBe(3_000_000_000);
   expect(detail.data!.targetTick).toBeGreaterThan(2147483647);
+  const expectedTick = (3_000_000_000 - initial.startYear) * 12 * 10000;
+  expect(detail.data!.targetTick).toBe(expectedTick);
+  expect((await db.operation.findUniqueOrThrow({ where: { id: far.data!.id } })).targetTick).toBe(BigInt(expectedTick));
   expect(detail.data!.targetAt).toBeNull();
   expect(detail.data!.months.length).toBeLessThanOrEqual(31);
   expect(detail.data!.timeline.every((member) => member.beyondWindow)).toBe(true);
@@ -323,11 +357,32 @@ it('감찰은 legacy null과 NPC를 판정하지 않고 숫자 활동은 14일 �
   result = await rpc('inspection.members', { worldId: f.worldId }, f.alice.cookie);
   expect(result.data!.items.find((row) => row.generalId === 1)!.idle).toBe(true);
   expect(result.data!.items.find((row) => row.generalId === 5)!.idle).toBe(false);
-  await db.world.update({ where: { id: f.worldId }, data: { status: 'ENDED', policyFromSequence: null } });
+  await db.general.update({ where: { worldId_id: { worldId: f.worldId, id: 1 } }, data: { lastActiveTick: null } });
+  result = await rpc('inspection.members', { worldId: f.worldId }, f.alice.cookie);
+  expect(result.status).toBe(200);
+  expect(result.data!.items.find((row) => row.generalId === 1)!.idle).toBe(false);
+  expect(result.data!.items.find((row) => row.generalId === 2)!.idle).toBe(true);
+  await db.world.update({ where: { id: f.worldId }, data: { policyFromSequence: null } });
   await db.general.updateMany({
     where: { worldId: f.worldId },
     data: { lastActiveTick: null, lastActiveAt: null, defaultPolicy: null },
   });
+  const marker = await db.inputEvent.create({
+    data: {
+      worldId: f.worldId,
+      userId: 'system',
+      kind: 'system.policy.enable',
+      idempotencyKey: 'system.policy.enable',
+      payload: {},
+      status: 'PENDING',
+    },
+  });
+  result = await rpc('inspection.members', { worldId: f.worldId }, f.alice.cookie);
+  expect(result.status).toBe(200);
+  expect(result.data!.items.every((row) => !row.idle && row.lastActiveAt === null)).toBe(true);
+  expect((await db.inputEvent.findUniqueOrThrow({ where: { id: marker.id } })).status).toBe('PENDING');
+  await db.inputEvent.delete({ where: { id: marker.id } });
+  await db.world.update({ where: { id: f.worldId }, data: { status: 'ENDED' } });
   result = await rpc('inspection.members', { worldId: f.worldId }, f.alice.cookie);
   expect(result.status).toBe(200);
   expect(result.data!.items.every((row) => !row.idle && row.lastActiveAt === null && row.nextTurnAt === null)).toBe(
@@ -352,7 +407,7 @@ it('제안은 explicit을 보존하고 저장된 30칸과 revision·활동·게�
   expect(await gameSnapshot(f.worldId)).toEqual(before);
 });
 
-it('국가 FK Cascade는 멸망 때 작전 보조 행을 지우고 다른 세계는 건드리지 않는다', async () => {
+it('DB의 국가 FK Cascade는 작전 보조 행을 지우고 다른 세계는 건드리지 않는다', async () => {
   const f = await fixture(),
     other = await fixture();
   await db.general.updateMany({ where: { worldId: f.worldId, nationId: 1 }, data: { nationId: null } });
@@ -363,18 +418,41 @@ it('국가 FK Cascade는 멸망 때 작전 보조 행을 지우고 다른 세계
   expect(await db.operation.count({ where: { worldId: other.worldId } })).toBe(1);
 });
 
+it('실제 months 응답은 목표 다음 달에서 끝나고 먼 미래 실행 칸에도 유한하며 참여자가 없으면 빈 배열이다', async () => {
+  const f = await fixture();
+  let result = await rpc('operation.get', { worldId: f.worldId, id: f.operationId }, f.alice.cookie);
+  expect(result.data!.months).toHaveLength(14);
+  expect(result.data!.months[0]).toEqual({ year: initial.startYear, month: 1 });
+  expect(result.data!.months.at(-1)).toEqual({ year: initial.startYear + 1, month: 2 });
+  await db.general.updateMany({ where: { worldId: f.worldId }, data: { nextTurnTick: 2_000_000_000 } });
+  await db.operation.update({ where: { id: f.operationId }, data: { targetTick: 10_000_000_000n } });
+  result = await rpc('operation.get', { worldId: f.worldId, id: f.operationId }, f.alice.cookie);
+  expect(result.data!.months).toHaveLength(31);
+  expect(result.data!.months.at(-1)).toEqual({ year: initial.startYear + 2, month: 7 });
+  await db.operationMember.deleteMany({ where: { operationId: f.operationId } });
+  result = await rpc('operation.get', { worldId: f.worldId, id: f.operationId }, f.alice.cookie);
+  expect(result.data!.timeline).toEqual([]);
+  expect(result.data!.months).toEqual([]);
+});
+
 it('DB는 서로 다른 월드의 연결과 잘못된 목표·최소값을 거부한다', async () => {
   const f = await fixture(),
     other = await fixture();
   await expect(
     db.operationMember.create({ data: { worldId: other.worldId, operationId: f.operationId, generalId: 4 } }),
   ).rejects.toMatchObject({ code: 'P2003' });
-  for (const tick of [-1n, 9007199254740992n]) {
+  const client = new pg.Client({ connectionString: databaseUrl });
+  await client.connect();
+  try {
+    for (const tick of [-1n, 9007199254740992n]) {
+      await expect(
+        client.query('UPDATE "Operation" SET "targetTick" = $1 WHERE id = $2', [tick.toString(), f.operationId]),
+      ).rejects.toMatchObject({ code: '23514', constraint: 'Operation_targetTick_check' });
+    }
     await expect(
-      db.$executeRaw`UPDATE "Operation" SET "targetTick" = ${tick} WHERE id = ${f.operationId}`,
-    ).rejects.toMatchObject({ code: 'P2010', meta: { code: '23514' } });
+      client.query('UPDATE "Operation" SET "minCrew" = -1 WHERE id = $1', [f.operationId]),
+    ).rejects.toMatchObject({ code: '23514', constraint: 'Operation_min_check' });
+  } finally {
+    await client.end();
   }
-  await expect(db.$executeRaw`UPDATE "Operation" SET "minCrew" = -1 WHERE id = ${f.operationId}`).rejects.toMatchObject(
-    { code: 'P2010', meta: { code: '23514' } },
-  );
 });
