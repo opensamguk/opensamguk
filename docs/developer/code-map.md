@@ -30,6 +30,7 @@
 | `apps/server/src/game/` | 소유 장수 조회·공개 projection·30칸 정규화와 표시 이름 |
 | `apps/engine/src/inputs.ts` | PENDING 생성 재검사·General 저장·완료 결과와 순서 기록 |
 | `packages/rules/src/general/create.ts` | 생성 입력 검사·결정적 초기 장수 규칙 |
+| `packages/rules/src/tournament/bracket.ts` | 종목 독립 대진 순수 함수. DB·시각·`Math.random`을 쓰지 않는다 |
 | `packages/shared/src/editArray.ts` | 범위 덮어쓰기·밀기·당기기·스냅샷 반복의 일반 배열 유틸 |
 | `tools/t1-11.test.ts`, `t1-11.integration.test.ts` | 편집·생성 규칙·명령 schema, 실제 HTTP·DB 보안·경합·재시작·재생 시험 |
 | `apps/server/src/routers/ranking.ts`, `ranking.integration.test.ts` | 정산 시점 장수 상위 100명·내 순위·국가 전체 순위, 실제 HTTP·DB 권한과 공개 필드 검증 |
