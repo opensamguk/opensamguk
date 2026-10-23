@@ -2,7 +2,7 @@ import { rngFor } from '@opensamguk/shared';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { mapSchema, portraitMapSchema, scenarioSchema, statRulesSchema, unitSetSchema } from './resources';
 import type { StatRules, UnitSetResource } from './resources';
-import type { WorldState } from '../model/world';
+import type { WorldState, WorldExt } from '../model/world';
 
 export interface InitialCity {
   cityKey: number;
@@ -81,6 +81,7 @@ export interface InitialDiplomacy {
 }
 
 export interface WorldInit {
+  ext?: WorldExt;
   commandMeta?: WorldState['commandMeta'];
   nationTurns?: WorldState['nationTurns'];
   seed: string;

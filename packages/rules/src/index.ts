@@ -4,7 +4,14 @@ export * from './world/bootstrap';
 export * from './world/resources';
 export * from './clock/constants';
 export * from './clock/clock';
-export * from './model/world';
+export {
+  toWorldState,
+  type JsonValue,
+  type WorldExt,
+  type WorldState,
+  type DeepReadonly,
+  type WorldView,
+} from './model/world';
 export * from './balance';
 export * from './commands/types';
 export * from './commands/effects';
@@ -18,3 +25,22 @@ export * from './ranking';
 export * from './npc';
 export * from './battle/simulate';
 export * from './season';
+export * from './tournament/bracket';
+export {
+  createCommandResolver,
+  extensionCommands,
+  createExtState,
+  type EnabledCommands,
+  type CommandResolver,
+  type ExtInitContext,
+  type ExtSlice,
+} from './commands/resolve';
+export {
+  applyModifiers,
+  type Modifier,
+  type ModifierOp,
+  type ModifierStage,
+  type ModifierContext,
+  type ModifierProvider,
+  type BattleModifiers,
+} from './modifiers';
