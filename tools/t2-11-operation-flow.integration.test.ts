@@ -9,6 +9,8 @@ import { acquireLease, releaseLease, type Lease } from '../apps/engine/src/lease
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { suggestionOps } from '../apps/web/src/operations/timeline';
+import { applyOps, toSaveSlots, toTurn } from '../apps/web/src/turns/draft';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 if (!databaseUrl || !new URL(databaseUrl).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -106,14 +108,9 @@ async function createOperation(f: Awaited<ReturnType<typeof fixture>>, enemy = f
   );
 }
 
-// HTTP에서 받은 칸을 입력 wire로 투영한다. 화면 코드를 바꾸거나 실행 결과를 만들어 넣지 않는다.
-const wire = (slots: Slot[]): SlotInput[] =>
-  slots.map((slot) => (slot.explicit ? { commandKey: slot.commandKey, args: slot.args } : null));
-
-function applySuggestion(suggestion: Results['operation.suggest']) {
-  const draft = structuredClone(suggestion.current);
-  for (const slot of suggestion.changed) draft[slot] = structuredClone(suggestion.slots[slot]!);
-  return draft;
+// 화면의 순수 함수를 그대로 재사용한다. STALE에서는 최신 칸에 같은 제안 편집만 다시 적용한다.
+function applySuggestion(suggestion: Results['operation.suggest'], current: Slot[] = suggestion.current) {
+  return applyOps(current.map(toTurn), suggestionOps(suggestion));
 }
 
 async function snapshot(worldId: string) {
@@ -177,14 +174,21 @@ describe('T2-11 / AC-M2-15 실제 HTTP 저장과 엔진 반영', () => {
     expect(suggestion.noop).toBeNull();
     expect(suggestion.changed).toEqual([0]);
     const draft = applySuggestion(suggestion);
-    const input = wire(draft);
+    const input = toSaveSlots(draft);
     expect(input[0]).toEqual({ commandKey: 'attack', args: { cityKey: 2 } });
     expect(input[1]).toBeNull();
     expect(input[27]).toEqual({ commandKey: 'rest', args: {} });
     expect(input[29]).toEqual({ commandKey: 'farm', args: {} });
     const invalid = await request(
       'turns.set',
-      { worldId: f.worldId, revision: suggestion.revision, slots: draft },
+      {
+        worldId: f.worldId,
+        revision: suggestion.revision,
+        slots: [
+          { commandKey: draft[0]!.commandKey, args: draft[0]!.args, name: suggestion.slots[0]!.name },
+          ...input.slice(1),
+        ],
+      },
       f.commander.cookie,
     );
     expect(invalid.error).toBe('BAD_REQUEST');
@@ -196,10 +200,10 @@ describe('T2-11 / AC-M2-15 실제 HTTP 저장과 엔진 반영', () => {
     );
     expect(saved.ok).toBe(true);
     expect(saved.revision).toBe(suggestion.revision + 1);
-    expect(saved.slots).toEqual(draft);
+    expect(saved.slots.map(toTurn)).toEqual(draft);
     expect(await rpc('turns.get', { worldId: f.worldId }, f.commander.cookie)).toEqual({
       revision: saved.revision,
-      slots: draft,
+      slots: saved.slots,
     });
     for (let slot = 1; slot < 30; slot++) expect(saved.slots[slot]).toEqual(suggestion.current[slot]);
     const detail = await rpc('operation.get', { worldId: f.worldId, id: operation.id }, f.commander.cookie);
@@ -238,6 +242,8 @@ describe('T2-11 / AC-M2-15 실제 HTTP 저장과 엔진 반영', () => {
     const f = await fixture(true);
     const operation = await createOperation(f);
     const suggestion = await rpc('operation.suggest', { worldId: f.worldId, id: operation.id }, f.commander.cookie);
+    expect(suggestion.noop).toBeNull();
+    expect(suggestion.changed).toEqual([0]);
     const edited = await rpc(
       'turns.edit',
       {
@@ -252,7 +258,7 @@ describe('T2-11 / AC-M2-15 실제 HTTP 저장과 엔진 반영', () => {
     const beforeSave = await snapshot(f.worldId);
     const stale = await rpc(
       'turns.set',
-      { worldId: f.worldId, revision: suggestion.revision, slots: wire(applySuggestion(suggestion)) },
+      { worldId: f.worldId, revision: suggestion.revision, slots: toSaveSlots(applySuggestion(suggestion)) },
       f.commander.cookie,
     );
     expect(stale).toEqual({ ok: false, reason: 'STALE', revision: edited.revision, slots: edited.slots });
@@ -263,6 +269,20 @@ describe('T2-11 / AC-M2-15 실제 HTTP 저장과 엔진 반영', () => {
     });
     expect(stale.slots[8]).toMatchObject({ commandKey: 'rest', explicit: true });
     expect(stale.slots[9]).toMatchObject({ commandKey: 'rest', explicit: false });
+    const reapplied = applySuggestion(suggestion, stale.slots);
+    const retry = await rpc(
+      'turns.set',
+      { worldId: f.worldId, revision: stale.revision, slots: toSaveSlots(reapplied) },
+      f.commander.cookie,
+    );
+    expect(retry.ok).toBe(true);
+    expect(retry.revision).toBe(stale.revision + 1);
+    expect(retry.slots.map(toTurn)).toEqual(reapplied);
+    const reread = await rpc('turns.get', { worldId: f.worldId }, f.commander.cookie);
+    expect(reread).toEqual({ revision: retry.revision, slots: retry.slots });
+    expect(reread.slots[0]).toMatchObject({ commandKey: 'attack', args: { cityKey: 2 }, explicit: true });
+    expect(reread.slots[8]).toMatchObject({ commandKey: 'rest', explicit: true });
+    expect(reread.slots[9]).toMatchObject({ commandKey: 'rest', explicit: false });
   });
 
   it('열린 작전이 있는 국가의 마지막 도시 점령은 보존·수도 참조 정리·Cascade를 함께 저장한다', async () => {
@@ -326,7 +346,7 @@ describe('T2-11 / AC-M2-15 실제 HTTP 저장과 엔진 반영', () => {
         },
       },
     });
-    // Prisma 확장은 같은 DB·트랜잭션을 쓰지만 원형 클라이언트 타입의 $on을 노출하지 않는다.
+    // Prisma 확장은 같은 DB·트랜잭션을 쓰지만 $on 노출과 $transaction 제네릭 시그니처가 원형 타입과 다르다.
     // TurnLoop가 쓰는 실제 $transaction과 질의는 확장 연결이 그대로 실행한다.
     const loop = await engine(f.worldId, observed as unknown as typeof db);
     expect(await loop.advanceTo(100)).toEqual([{ generalId: 1, tick: 100, commandKey: 'attack' }]);
