@@ -1,9 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { readFile, readdir, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { readFile, readdir } from 'node:fs/promises';
 import { expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import type { WorldInit } from '../packages/rules/src/index';
+import { testDatabaseUrl } from './test-database';
 
 type PgResult = { rows: Record<string, unknown>[] };
 type PgClient = {
@@ -55,33 +56,20 @@ async function catalog(admin: PgClient): Promise<Catalog> {
   });
 }
 
-// 두 이름은 실행 전 계획에 고정한다. 기존 DB가 같은 이름이면 사용하거나 지우지 않는다.
+// TEST_DATABASE_URL의 서버에 새 UUID DB만 만든다. 기존 DB는 사용하거나 지우지 않는다.
 async function withDatabase(
   mode: 'empty' | 'legacy',
   run: (client: PgClient, db: ReturnType<typeof createDb>) => Promise<void>,
 ) {
-  const base = process.env.TEST_DATABASE_URL;
-  if (!base || !/^\/[a-z][a-z0-9_]*_test$/.test(new URL(base).pathname)) throw new Error('시험 접속값이 필요합니다.');
-  const cluster = new URL(base);
-  if (
-    !['postgres:', 'postgresql:'].includes(cluster.protocol) ||
-    !['127.0.0.1', 'localhost'].includes(cluster.hostname) ||
-    cluster.port !== '5433'
-  )
-    throw new Error('계획에서 지정한 로컬 시험 서버가 아닙니다.');
-  const name = process.env[mode === 'empty' ? 'T205_STORAGE_EMPTY_DATABASE' : 'T205_STORAGE_LEGACY_DATABASE'];
-  if (!name || !new RegExp(`^t205_assignment_${mode}_[a-f0-9]{16}_test$`).test(name))
-    throw new Error('계획에서 고정한 자체 시험 DB 이름이 필요합니다.');
-  const evidenceDir = process.env.T205_STORAGE_EVIDENCE_DIR;
-  if (
-    !evidenceDir ||
-    !resolve(evidenceDir)
-      .replaceAll('\\', '/')
-      .startsWith('E:/codex-artifacts/opensamguk/t2-05-assignment-storage-0976/pg/')
-  )
-    throw new Error('자체 PG 증거 폴더가 필요합니다.');
-  const adminUrl = new URL(base),
-    target = new URL(base);
+  if (!process.env.TEST_DATABASE_URL) throw new Error('시험 접속값이 필요합니다.');
+  const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
+  if (!['127.0.0.1', 'localhost'].includes(source.hostname) || !['5432', '5433'].includes(source.port || '5432'))
+    throw new Error('loopback 5432 또는 5433 시험 서버가 필요합니다.');
+  const name = `t205_assignment_${mode}_${randomUUID().replaceAll('-', '')}_test`;
+  if (!new RegExp(`^t205_assignment_${mode}_[a-f0-9]{32}_test$`).test(name))
+    throw new Error('자체 시험 DB 이름을 확인하세요.');
+  const adminUrl = new URL(source),
+    target = new URL(source);
   adminUrl.pathname = '/postgres';
   target.pathname = `/${name}`;
   const admin = new Client({ connectionString: adminUrl.href });
@@ -101,6 +89,7 @@ async function withDatabase(
     created = true;
     createdOid = (await catalog(admin)).find((row) => row.datname === name)?.oid ?? null;
     expect(createdOid).not.toBeNull();
+    console.info('T2-05 저장표 DB 생성', JSON.stringify({ mode, name, createdOid }));
     await client.connect();
     await run(client, db);
     completed = true;
@@ -123,8 +112,8 @@ async function withDatabase(
       const after = await catalog(admin);
       for (const row of before) expect(after).toContainEqual(row);
       expect(after.some((row) => row.datname === name)).toBe(false);
-      await writeFile(
-        join(evidenceDir, `${mode}-cleanup.json`),
+      console.info(
+        'T2-05 저장표 DB 정리',
         JSON.stringify(
           {
             name,
@@ -143,7 +132,6 @@ async function withDatabase(
           null,
           2,
         ),
-        { flag: 'wx' },
       );
     } finally {
       await admin.end();
@@ -400,8 +388,9 @@ it.each(['empty', 'legacy'] as const)(
     await withDatabase(mode, async (client, db) => {
       const directories = (await readdir(migrations)).filter((name) => /^\d/.test(name)).sort();
       const previous = directories.filter((name) => name < migration);
+      expect(previous).toHaveLength(18);
       expect(previous.at(-1)).toBe(expectedHistoryEnd);
-      expect(directories.filter((name) => name > migration)).toEqual([]);
+      expect(directories).toContain(migration);
       for (const directory of previous)
         await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
       if (mode === 'legacy') await seed(client);
