@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { expect, test, type BrowserContext, type Locator, type Page } from '@playwright/test';
+import { pnpmCli } from '../tools/node-cli';
 import { createAccount } from './account';
 import { e2eWorld } from './game';
 
@@ -8,7 +9,7 @@ import { e2eWorld } from './game';
 test.describe.configure({ mode: 'serial' });
 
 function seed(...args: string[]): Record<string, unknown> {
-  const out = execFileSync('pnpm', ['exec', 'tsx', '--env-file-if-exists=.env', 'e2e/rankingSeed.ts', ...args], {
+  const out = execFileSync(...pnpmCli(['exec', 'tsx', '--env-file-if-exists=.env', 'e2e/rankingSeed.ts', ...args]), {
     encoding: 'utf8',
   });
   return JSON.parse(out.trim().split('\n').at(-1)!) as Record<string, unknown>;
