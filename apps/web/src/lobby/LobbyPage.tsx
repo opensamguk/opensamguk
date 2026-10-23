@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useId, useState } from 'react';
 import { LogoutButton } from '../auth/LogoutButton';
+import { PublicMapTabs } from '../publicMap/PublicMapTabs';
 import { useTRPC } from '../trpc';
 import { DisabledReason } from '../ui/DisabledReason';
 import { EmptyState, ErrorState, LoadingState } from '../ui/States';
@@ -53,8 +54,8 @@ export function LobbyPage() {
       ) : notices.data && notices.data.length > 0 ? (
         <NoticeBoard notices={notices.data} />
       ) : null}
-      {/* 지연 공개 지도 자리 (D-026). 지도 부품은 T2-25가 이 자리에 넣는다. */}
-      <div className={styles.mapSlot} data-slot="public-map" />
+      {/* 지연 공개 지도 (T2-25, D-026). 지도 탭은 월드 카드와 따로 움직인다. */}
+      <PublicMapTabs />
       <section aria-labelledby="lobby-worlds" className={styles.worlds}>
         <h2 id="lobby-worlds" className={styles.heading}>
           월드
