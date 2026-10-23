@@ -7,6 +7,7 @@
     "node": ">=24"
   },
   "scripts": {
+    "notice:publish": "tsx --env-file-if-exists=.env tools/notice-publish.ts",
     "dev": "pnpm --parallel --filter \"./apps/*\" dev",
     "generate": "pnpm --filter @opensamguk/db generate",
     "lint": "eslint .",

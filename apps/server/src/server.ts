@@ -8,6 +8,7 @@ import { authenticate, SESSION_SECONDS } from './auth/session';
 import { hashPassword } from './auth/password';
 import { appRouter, type AppRouter } from './router';
 import { createRateLimiter } from './security/rateLimit';
+import { registerRealtime, type RealtimeOptions } from './realtime';
 
 export async function buildServer(options: {
   db: PrismaClient;
@@ -18,6 +19,7 @@ export async function buildServer(options: {
   publicOrigin?: string;
   production?: boolean;
   trustProxy?: boolean;
+  realtime?: RealtimeOptions;
 }) {
   const production = options.production ?? process.env.NODE_ENV === 'production';
   const secureCookies = options.secureCookies ?? production;
@@ -77,6 +79,7 @@ export async function buildServer(options: {
       return reply.code(415).send({ error: 'JSON 본문이 필요합니다.' });
   });
   await server.register(cookie);
+  const realtime = registerRealtime(server, options.db, publicOrigin, options.realtime, clock);
   server.addHook('onSend', async (req, reply, payload) => {
     const now = requestTimes.get(req);
     // tRPC가 보낸 Web Response의 status는 Fastify가 onSend 뒤에 reply로 옮긴다.
@@ -120,6 +123,7 @@ export async function buildServer(options: {
           dummyPasswordHash,
           ip: req.ip,
           rateLimiter,
+          closeSession: realtime.closeSession,
         };
       },
       onError({ error }) {

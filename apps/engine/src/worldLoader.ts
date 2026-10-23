@@ -5,8 +5,11 @@ import { loadCommandState } from './commandPersistence';
 export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): Promise<WorldState> {
   const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
   const cities = await tx.city.findMany({ where: { worldId } });
-  const nations = await tx.nation.findMany({ where: { worldId } });
-  const generals = await tx.general.findMany({ where: { worldId } });
+  const nations = await tx.nation.findMany({
+    where: { worldId },
+    omit: { notice: true, noticeRevision: true, noticeUpdatedAt: true, noticeUpdatedBy: true },
+  });
+  const generals = await tx.general.findMany({ where: { worldId }, omit: { noticeSeen: true } });
   const diplomacies = await tx.diplomacy.findMany({
     where: { worldId },
     orderBy: [{ nationA: 'asc' }, { nationB: 'asc' }],

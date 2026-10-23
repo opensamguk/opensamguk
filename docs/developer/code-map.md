@@ -25,7 +25,11 @@
 | `apps/server/src/auth/` | Argon2id, 세션 토큰 해시·만료·연장, 실제 HTTP·DB 테스트 |
 | `apps/server/src/routers/auth.ts` | 가입·로그인·로그아웃·현재 계정 |
 | `apps/server/src/trpc.ts` | 공개·인증 필수 procedure |
-| `apps/server/src/router.ts` | tRPC `AppRouter` (API 계약): `health`, `auth`, `world`, `home`, `city`, `nation`, `records`, `general`, `turns`, `commands`, `ranking`, `timelapse` |
+| `apps/server/src/router.ts` | tRPC `AppRouter` (API 계약): `health`, `auth`, `world`, `home`, `city`, `nation`, `records`, `general`, `turns`, `commands`, `ranking`, `timelapse`, `message`, `notice` |
+| `apps/server/src/routers/message.ts`, `notice.ts`, `apps/server/src/messaging.ts` | 현재 세션·소속·직책 기준 메시지·공지, 읽음과 revision, DB 잠금 전송 제한 |
+| `apps/server/src/realtime/` | 전용 LISTEN 연결과 SSE, 현재 권한 재검사, 하트비트·재구독·세션 종료 |
+| `packages/db/src/realtime.ts` | 저장 commit 뒤 별도 SQL로 알림 전송. 송신 실패가 저장 결과를 바꾸지 않는다 |
+| `tools/notice-publish.ts`, `t2-09.integration.test.ts` | 로비·월드 공지와 운영자 WORLD 메시지 작성, 실제 PostgreSQL·HTTP·SSE 시험 |
 | `apps/server/src/routers/general.ts`, `turns.ts`, `commands.ts` | 생성 접수·조회, 예턴 편집·사전 검사, 인증 필수 명령 목록 |
 | `apps/server/src/game/` | 소유 장수 조회·공개 projection·30칸 정규화와 표시 이름 |
 | `apps/engine/src/inputs.ts` | PENDING 생성 재검사·General 저장·완료 결과와 순서 기록 |

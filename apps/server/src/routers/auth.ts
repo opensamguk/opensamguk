@@ -5,6 +5,7 @@ import { hashPassword, verifyPassword } from '../auth/password';
 import { newSession, SESSION_SECONDS } from '../auth/session';
 import { publicProcedure, router } from '../trpc';
 import type { LimitRule, RateLimitDecision } from '../security/rateLimit';
+import { notifySessionClosed } from '@opensamguk/db';
 
 function enforce(ctx: Context, decision: RateLimitDecision) {
   if (decision.allowed) return;
@@ -41,11 +42,17 @@ export const authRouter = router({
           data: { email: input.email, passwordHash },
           select: { id: true, email: true },
         });
-        if (ctx.sessionId) await tx.session.deleteMany({ where: { id: ctx.sessionId } });
+        if (ctx.sessionId) {
+          await tx.session.deleteMany({ where: { id: ctx.sessionId } });
+        }
         await tx.session.create({ data: { id: session.id, userId: user.id, expiresAt: session.expiresAt } });
         return user;
       });
       setCookie(ctx, session.token);
+      if (ctx.sessionId) {
+        ctx.closeSession?.(ctx.sessionId);
+        await notifySessionClosed(ctx.db, ctx.sessionId, () => ctx.reply.log.warn('실시간 알림 전송 실패'));
+      }
       return { user };
     } catch (error) {
       if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002') {
@@ -68,14 +75,26 @@ export const authRouter = router({
     }
     const session = newSession(ctx.now);
     await ctx.db.$transaction(async (tx) => {
-      if (ctx.sessionId) await tx.session.deleteMany({ where: { id: ctx.sessionId } });
+      if (ctx.sessionId) {
+        await tx.session.deleteMany({ where: { id: ctx.sessionId } });
+      }
       await tx.session.create({ data: { id: session.id, userId: user.id, expiresAt: session.expiresAt } });
     });
     setCookie(ctx, session.token);
+    if (ctx.sessionId) {
+      ctx.closeSession?.(ctx.sessionId);
+      await notifySessionClosed(ctx.db, ctx.sessionId, () => ctx.reply.log.warn('실시간 알림 전송 실패'));
+    }
     return { user: { id: user.id, email: user.email } };
   }),
   logout: publicProcedure.input(z.void()).mutation(async ({ ctx }) => {
-    if (ctx.sessionId) await ctx.db.session.deleteMany({ where: { id: ctx.sessionId } });
+    if (ctx.sessionId) {
+      await ctx.db.$transaction(async (tx) => {
+        await tx.session.deleteMany({ where: { id: ctx.sessionId! } });
+      });
+      ctx.closeSession?.(ctx.sessionId);
+      await notifySessionClosed(ctx.db, ctx.sessionId, () => ctx.reply.log.warn('실시간 알림 전송 실패'));
+    }
     ctx.reply.clearCookie('sid', { path: '/', httpOnly: true, sameSite: 'lax', secure: ctx.secureCookies });
     return { ok: true as const };
   }),
