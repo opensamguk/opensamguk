@@ -11,6 +11,7 @@ import { RECORD_LABELS, RecordList } from '../main/Records';
 import { SeasonResult } from '../main/SeasonResult';
 import { MapLegend, WorldMap } from '../main/WorldMap';
 import { PolicyBar } from '../policy/PolicyBar';
+import { OfferBox } from '../personnel/OfferBox';
 import { TurnEditor } from '../turns/TurnEditor';
 import { EmptyState, LoadingState } from '../ui/States';
 import styles from './MainPage.module.css';
@@ -66,6 +67,8 @@ export function MainPage() {
 
       {/* 끝난 판이면 결과를 맨 위에 둔다. 나머지 칸은 그대로 읽는다 (T1-27). */}
       {summary.data?.status === 'ENDED' ? <SeasonResult result={summary.data.result} /> : null}
+      {/* 발령 제안(T2-06, D11). 편집기와 형제라 응답 결과가 와도 예턴 초안과 지도 선택은 그대로다. */}
+      <OfferBox worldId={worldId} />
 
       <div className={styles.layout}>
         <Panel

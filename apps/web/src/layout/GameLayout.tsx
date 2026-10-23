@@ -19,6 +19,7 @@ const NAV = [
   { to: '/w/$worldId', label: '메인', exact: true },
   { to: '/w/$worldId/turns', label: '예턴' },
   { to: '/w/$worldId/records', label: '기록' },
+  { to: '/w/$worldId/nation/personnel', label: '국가' },
   { to: '/w/$worldId/ranking', label: '순위' },
   { to: '/w/$worldId/simulator', label: '전투 시뮬레이터' },
   { to: '/w/$worldId/diplomacy', label: '외교' },
