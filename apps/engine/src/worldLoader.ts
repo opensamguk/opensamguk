@@ -2,10 +2,13 @@ import type { Prisma } from '@opensamguk/db';
 import { presetRules, type WorldState } from '@opensamguk/rules';
 import { loadCommandState } from './commandPersistence';
 import { engineResolver, loadExt } from './extState';
+import { assertWorldCapabilities } from './capsGate';
+import { loadTreaties } from './treatyState';
 
 export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): Promise<WorldState> {
   const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
   const { preset, commands } = engineResolver(world);
+  const capabilities = await assertWorldCapabilities(tx, world);
   const ext = await loadExt(tx, worldId, commands);
   const cities = await tx.city.findMany({ where: { worldId } });
   const nations = await tx.nation.findMany({
@@ -46,5 +49,6 @@ export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): 
     ),
     diplomacies: diplomacies.map(stripWorldId),
     ...(await loadCommandState(tx, worldId)),
+    ...(capabilities.kind === 'caps' ? await loadTreaties(tx, worldId) : {}),
   };
 }
