@@ -1,4 +1,6 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { readFile } from 'node:fs/promises';
+import type { Prisma, PrismaClient } from '@opensamguk/db';
 import {
   applyCapsRecordedInput,
   applyTreatyInput,
@@ -10,14 +12,15 @@ import {
   runCapsReplayAction,
   selectSupportedCapabilities,
   startCapsReplay,
+  selectWorldCapabilities,
   type CapsOrigin,
   type RecordedInput,
   type TreatyInput,
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { monthlyFixture } from '../test/monthlyFixture';
-import { replayArchive as legacyReplay } from './replay';
-import { readCapsArchive, replayCapsArchive, replayCapsToEnd, type CapsArchive } from './replayCaps';
+import { exportReplay, replayArchive as legacyReplay, replayToEnd } from './replay';
+import { exportCapsArchive, readCapsArchive, replayCapsArchive, replayCapsToEnd, type CapsArchive } from './replayCaps';
 
 const clone = <T>(value: T): T => structuredClone(value);
 type Mode = 'off' | 'default' | 'human' | 'npc';
@@ -143,6 +146,229 @@ beforeAll(async () => {
     fixture('human', 7),
   ]);
 });
+
+// DB 수출의 단위 fixture다. 실제 PostgreSQL이나 snapshot 격리의 증거는 아니다.
+function exportFixture(source: CapsArchive, ended = true) {
+  const snapshot = clone(source);
+  const initial = snapshot.origin.initial;
+  const json = (value: unknown): Prisma.JsonValue => JSON.parse(JSON.stringify(value));
+  const world: Prisma.WorldGetPayload<Record<string, never>> = {
+    id: 'caps-export',
+    name: '수출 단위 시험',
+    presetKey: null,
+    preset: null,
+    scenarioKey: initial.scenarioKey,
+    mapKey: initial.mapKey,
+    unitSetKey: initial.unitSetKey,
+    seed: initial.seed,
+    startYear: initial.startYear,
+    endYear: snapshot.config.endYear,
+    clockMode: 'ACCELERATED',
+    outcomeFromSequence: snapshot.config.outcomeFromSequence,
+    turnTermMinutes: 30,
+    status: ended ? 'ENDED' : 'RUNNING',
+    clockTick: snapshot.end?.tick ?? 0,
+    clockAnchorAt: null,
+    clockRevision: 0,
+    startedAt: null,
+    endedAt: null,
+    initialStateHash: snapshot.origin.initialStateHash,
+    statRules: json(initial.statRules),
+    unitSet: json(initial.unitSet),
+    createdAt: new Date(0),
+    monthlyTick: snapshot.months.at(-1)?.tick ?? 0,
+    actionSequence:
+      snapshot.afterEnd.at(-1)?.sequence ?? snapshot.end?.sequence ?? snapshot.months.at(-1)?.sequence ?? 0,
+    policyFromSequence: snapshot.config.policy?.fromSequence ?? null,
+    treatyFormat: 1,
+    replayOrigin: json(snapshot.origin),
+    commandMeta: null,
+  };
+  const currentRows: Prisma.TreatyGetPayload<Record<string, never>>[] = [];
+  const events: (Omit<RecordedInput, 'status'> & { status: RecordedInput['status'] | 'PENDING' })[] = [
+    ...snapshot.inputs,
+    ...snapshot.afterEnd,
+  ];
+  const tx = {
+    world: { findUniqueOrThrow: vi.fn(async () => world) },
+    treaty: {
+      findMany: vi.fn(async ({ select }: { select: Record<string, boolean> }) =>
+        currentRows.map((row) => Object.fromEntries(Object.entries(row).filter(([key]) => select[key]))),
+      ),
+    },
+    yearbookSnapshot: { findMany: vi.fn(async () => snapshot.months) },
+    worldResult: {
+      findUnique: vi.fn(async () =>
+        ended && snapshot.end
+          ? {
+              endedSequence: snapshot.end.sequence,
+              endedTick: snapshot.end.tick,
+              reason: snapshot.end.reason,
+              winnerNationId: snapshot.end.winnerNationId,
+              endedYear: snapshot.end.year,
+              endedMonth: snapshot.end.month,
+              finalStateHash: snapshot.end.finalStateHash,
+            }
+          : null,
+      ),
+    },
+    inputEvent: {
+      findMany: vi.fn(async ({ where }: { where: { sequence: { lte?: number; not?: null } } }) =>
+        events.filter((event) => where.sequence.lte === undefined || event.sequence <= where.sequence.lte),
+      ),
+    },
+    $transaction: vi.fn(() => {
+      throw new Error('중첩 트랜잭션 금지');
+    }),
+  };
+  const transaction = vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx));
+  // Prisma client 전체 대신 읽기 호출만 가진 단위 fixture를 경계에서 한 번 변환한다.
+  const db = { $transaction: transaction } as unknown as PrismaClient;
+  return { snapshot, world, currentRows, events, tx, db, transaction };
+}
+
+describe('T4-03 형식 6 실제 수출 함수와 공개 분기 단위 계약', () => {
+  it.each(['off', 'default', 'human', 'npc'] as const)(
+    'E1 %s는 실제 gate와 같은 RR callback으로 수출하고 bytes가 안정적이다',
+    async (mode) => {
+      const expected = { off, default: defaults, human, npc }[mode];
+      const model = exportFixture(expected);
+      const first = await exportReplay(model.db, model.world.id);
+      const second = await exportReplay(model.db, model.world.id);
+      expect(first).toEqual(expected);
+      expect(JSON.stringify(first)).toBe(JSON.stringify(second));
+      expect(model.transaction).toHaveBeenCalledTimes(2);
+      for (const call of model.transaction.mock.calls)
+        expect(call).toEqual([expect.any(Function), { isolationLevel: 'RepeatableRead' }]);
+      expect(model.tx.world.findUniqueOrThrow).toHaveBeenCalledTimes(2);
+      expect(model.tx.treaty.findMany).toHaveBeenCalledTimes(2);
+      expect(model.tx.$transaction).not.toHaveBeenCalled();
+      expect(model.tx.inputEvent.findMany).toHaveBeenCalledWith({
+        where: { worldId: model.world.id, sequence: { not: null } },
+        orderBy: { sequence: 'asc' },
+      });
+      expect(legacyReplay(first)).toEqual(replayCapsArchive(expected));
+      expect(replayToEnd(first)).toEqual(expected.end);
+    },
+  );
+
+  it('E2 현재 닫힌 조약 행은 실제 gate가 검사하고 얼린 initial·resourceHash에 섞지 않는다', async () => {
+    const model = exportFixture(off);
+    model.currentRows.push({
+      worldId: model.world.id,
+      id: 100,
+      fromNationId: 1,
+      toNationId: 2,
+      clauses,
+      status: 'ENDED',
+      proposedTick: 0,
+      respondByTick: 60000,
+      startTick: 1,
+      endTick: 10001,
+      closedSequence: 20,
+      costFrom: 10,
+      costTo: 10,
+    });
+    expect(await exportReplay(model.db, model.world.id)).toEqual(off);
+    model.currentRows[0]!.closedSequence = null;
+    await expect(exportReplay(model.db, model.world.id)).rejects.toThrow('마감 기록');
+    expect(model.tx.yearbookSnapshot.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('E3 진행 중 coverage까지만 읽고 F가 coverage 밖이면 표지를 빼도 앞 달을 재현한다', async () => {
+    const model = exportFixture(delayed, false);
+    model.snapshot.months = model.snapshot.months.slice(0, 1);
+    const coverage = model.snapshot.months[0]!.sequence;
+    expect(coverage).toBeLessThan(delayed.config.policy!.fromSequence);
+    const archive = await exportReplay(model.db, model.world.id);
+    expect(archive.end).toBeNull();
+    expect(archive.afterEnd).toEqual([]);
+    expect(archive.inputs.map((input) => input.sequence)).toEqual([1, 2]);
+    expect(model.tx.inputEvent.findMany).toHaveBeenCalledWith({
+      where: { worldId: model.world.id, sequence: { lte: coverage } },
+      orderBy: { sequence: 'asc' },
+    });
+    expect(legacyReplay(archive, 1)).toEqual(replayCapsArchive(delayed, 1));
+  });
+
+  it('E4 첫 정산 전 coverage0은 입력을 내보내지 않고 과거 상태를 현재 상태로 바꾸지 않는다', async () => {
+    const model = exportFixture(off, false);
+    model.snapshot.months = [];
+    const archive = await exportReplay(model.db, model.world.id);
+    expect(archive).toEqual({ ...off, months: [], inputs: [], end: null, afterEnd: [] });
+    expect(model.tx.inputEvent.findMany).toHaveBeenCalledWith({
+      where: { worldId: model.world.id, sequence: { lte: 0 } },
+      orderBy: { sequence: 'asc' },
+    });
+  });
+
+  it('E5 틀린 정적 선택·descriptor·생성 해시·initial 구조를 수출하지 않는다', async () => {
+    for (const change of [
+      (model: ReturnType<typeof exportFixture>) => {
+        model.world.treatyFormat = null;
+      },
+      (model: ReturnType<typeof exportFixture>) => {
+        const origin = clone(off.origin);
+        origin.capabilities.ext = {};
+        model.world.replayOrigin = JSON.parse(JSON.stringify(origin));
+      },
+      (model: ReturnType<typeof exportFixture>) => {
+        const origin = clone(off.origin);
+        origin.initialStateHash = 'wrong';
+        model.world.replayOrigin = JSON.parse(JSON.stringify(origin));
+      },
+      (model: ReturnType<typeof exportFixture>) => {
+        const origin = clone(off.origin);
+        Object.assign(origin.initial.cities[0]!, { extra: 1 });
+        origin.initialStateHash = hashState(origin.initial);
+        model.world.replayOrigin = JSON.parse(JSON.stringify(origin));
+      },
+    ]) {
+      const model = exportFixture(off);
+      change(model);
+      await expect(exportReplay(model.db, model.world.id)).rejects.toThrow();
+    }
+  });
+
+  it('E6 미완료·종료 뒤 APPLIED·잘못된 afterEnd tick과 월 coverage를 수출하지 않는다', async () => {
+    const pending = exportFixture(off);
+    pending.events[0]!.status = 'PENDING';
+    await expect(exportReplay(pending.db, pending.world.id)).rejects.toThrow('완료되지');
+    const applied = exportFixture(off);
+    applied.events.at(-1)!.status = 'APPLIED';
+    await expect(exportReplay(applied.db, applied.world.id)).rejects.toThrow('종료 뒤');
+    const backwards = exportFixture(off);
+    (backwards.events.at(-1)!.result as { tick: number }).tick = 0;
+    await expect(exportReplay(backwards.db, backwards.world.id)).rejects.toThrow();
+    const month = exportFixture(off);
+    month.snapshot.months[0]!.sequence = month.snapshot.end!.sequence + 1;
+    await expect(exportReplay(month.db, month.world.id)).rejects.toThrow('경계');
+  });
+
+  it('E7 직접 helper도 실제 gate로 선택을 묶고 별도 TX·가짜 선택을 받지 않는다', async () => {
+    const model = exportFixture(off);
+    const selection = selectWorldCapabilities(model.world);
+    if (selection.kind !== 'caps') throw new Error('caps fixture가 필요합니다.');
+    const tx = model.tx as unknown as Prisma.TransactionClient;
+    expect(await exportCapsArchive(tx, model.world, selection)).toEqual(off);
+    const foreign = clone(selection);
+    foreign.origin.initial.seed = 'other-world';
+    await expect(exportCapsArchive(tx, model.world, foreign)).rejects.toThrow('기능 선택');
+    expect(model.transaction).not.toHaveBeenCalled();
+    expect(model.tx.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('E8 확장 명령을 켠 preset은 실제 resolver 가드에서 읽기 전에 거부한다', async () => {
+    const preset = JSON.parse(
+      await readFile(new URL('../../../resources/preset/regular.json', import.meta.url), 'utf8'),
+    );
+    const model = exportFixture(off);
+    model.world.preset = { ...preset, commands: { general: ['fire_attack'], nation: [] } };
+    await expect(exportReplay(model.db, model.world.id)).rejects.toThrow('확장 명령을 켠 월드');
+    expect(model.tx.treaty.findMany).not.toHaveBeenCalled();
+    expect(model.tx.yearbookSnapshot.findMany).not.toHaveBeenCalled();
+  });
+});
 const marker = (archive: CapsArchive) => archive.inputs.find((input) => input.kind === 'system.policy.enable')!;
 const expectReadFailure = (value: unknown) => expect(() => readCapsArchive(value)).toThrow();
 
@@ -218,7 +444,8 @@ describe('T4-03 / AC-P2-02 archive 6 순수 parser와 걷기', () => {
 
   it('A6 기존 archive2·5 parser는 origin6을 계속 거부한다', () => {
     for (const version of [2, 5]) expect(() => legacyReplay({ ...off, version }, 1)).toThrow('버전');
-    expect(() => legacyReplay(off, 1)).toThrow('버전');
+    expect(legacyReplay(off, 1)).toEqual(replayCapsArchive(off, 1));
+    expect(replayToEnd(off)).toEqual(replayCapsToEnd(off));
   });
 
   it('A7 descriptor의 남는 키와 version2를 거부한다', () => {

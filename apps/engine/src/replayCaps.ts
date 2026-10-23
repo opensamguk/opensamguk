@@ -25,14 +25,86 @@ import {
   type RecordedInput,
   type ReplayState,
   type WorldInit,
+  type WorldCapabilities,
 } from '@opensamguk/rules';
+import type { Prisma } from '@opensamguk/db';
 import { hashState } from '@opensamguk/shared/node';
 import type { ReplayArchiveV2, ReplayEnd } from './replay';
+import { assertWorldCapabilities } from './capsGate';
+import { engineResolver } from './extState';
 
 export interface CapsArchive extends Omit<ReplayArchiveV2, 'version' | 'origin' | 'config'> {
   version: typeof ARCHIVE_CAPS;
   origin: CapsOrigin;
   config: ReplayArchiveV2['config'] & { policy?: PolicyFormat };
+}
+
+// 호출자가 같은 RepeatableRead 트랜잭션에서 읽은 World를 넘긴다. 중첩 트랜잭션을 열지 않는다.
+export async function exportCapsArchive(
+  tx: Prisma.TransactionClient,
+  world: Prisma.WorldGetPayload<Record<string, never>>,
+  caps: Extract<WorldCapabilities, { kind: 'caps' }>,
+): Promise<CapsArchive> {
+  engineResolver(world);
+  const checked = await assertWorldCapabilities(tx, world);
+  if (checked.kind !== 'caps' || hashState(checked) !== hashState(caps))
+    throw new Error('수출할 월드와 기능 선택이 다릅니다.');
+  const worldId = world.id;
+  const months = await tx.yearbookSnapshot.findMany({ where: { worldId }, orderBy: { tick: 'asc' } });
+  const end = await tx.worldResult.findUnique({ where: { worldId } });
+  const coverage = end?.endedSequence ?? months.at(-1)?.sequence ?? 0;
+  const events = await tx.inputEvent.findMany({
+    where: { worldId, sequence: end ? { not: null } : { lte: coverage } },
+    orderBy: { sequence: 'asc' },
+  });
+  const inputs: RecordedInput[] = [];
+  const afterEnd: RecordedInput[] = [];
+  for (const event of events) {
+    if (event.status === 'PENDING' || event.sequence === null) throw new Error('완료되지 않은 입력 기록입니다.');
+    const input: RecordedInput = {
+      sequence: event.sequence,
+      generalId: event.generalId,
+      kind: event.kind,
+      status: event.status,
+      payload: event.payload,
+      result: event.result,
+    };
+    if (input.sequence <= coverage) inputs.push(input);
+    else {
+      if (input.status !== 'REJECTED') throw new Error('종료 뒤 적용된 입력 기록이 있습니다.');
+      afterEnd.push(input);
+    }
+  }
+  return readCapsArchive({
+    version: ARCHIVE_CAPS,
+    origin: checked.origin,
+    config: {
+      endYear: world.endYear,
+      outcomeFromSequence: world.outcomeFromSequence,
+      ...(checked.selection.policy ? { policy: checked.selection.policy } : {}),
+    },
+    inputs,
+    months: months.map(({ tick, year, month, sequence, stateHash, data }) => ({
+      tick,
+      year,
+      month,
+      sequence,
+      stateHash,
+      data,
+    })),
+    end: end
+      ? {
+          sequence: end.endedSequence,
+          tick: end.endedTick,
+          reason: end.reason,
+          winnerNationId: end.winnerNationId,
+          year: end.endedYear,
+          month: end.endedMonth,
+          finalStateHash: end.finalStateHash,
+        }
+      : null,
+    afterEnd,
+  });
 }
 
 type Check = (value: unknown) => boolean;
