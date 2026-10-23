@@ -8387,7 +8387,7 @@
       "target": "general",
       "sourceIds": ["general:che_화계"],
       "replacementReason": null,
-      "approvalRefs": [],
+      "approvalRefs": ["D-027", "T4-05"],
       "acIds": ["AC-P2-03"],
       "queueIds": ["T4-05", "T4-17", "T4-02", "T4-03", "T4-04"],
       "ownerProfile": "opensamguk-implement",
@@ -8415,9 +8415,29 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "effectsCostsFailures": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-05.md#7-결정-기록과-남은-것"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T4-05.md#리뷰-claude",
+              "sha": "3e5b52ae5b7a52edb386c5882ea288c1ae1edfa5"
+            },
+            {
+              "kind": "test",
+              "ref": "packages/rules/src/commands/ext/stratagem/stratagem.test.ts",
+              "sha": "3e5b52ae5b7a52edb386c5882ea288c1ae1edfa5"
+            },
+            {
+              "kind": "test",
+              "ref": "packages/rules/src/commands/ext/stratagem/equivalence.test.ts",
+              "sha": "fba850e5ef506d58f7d098a17433d285e87359b2"
+            }
+          ],
+          "reason": "순수 규칙 정의와 단위 증거뿐이다. 승인된 S0~S7과 탈취 정수화를 담은 정의의 집중 단위 169개(계략 132·기본 명령 호환 37, skip 0)가 3e5b52a에서 통과했다는 Codex 실행 기록이 있다. fba850e에서는 집중 9파일 370개가 통과했고 그 안의 S8 시험이 T4-17 (가) 정의 구조 변경 전 기준 기록 12건과 같았다. 두 실행의 수는 합치지 않는다. 실제 엔진·DB·HTTP 실행의 효과·비용·실패는 확인하지 않았다"
         },
         "persistence": {
           "status": "missing",
@@ -8435,9 +8455,20 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "independentReview": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "review",
+              "ref": "docs/plans/T4-05.md#리뷰-claude",
+              "sha": "3e5b52ae5b7a52edb386c5882ea288c1ae1edfa5"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T4-17.md#리뷰-claude",
+              "sha": "fba850e5ef506d58f7d098a17433d285e87359b2"
+            }
+          ],
+          "reason": "순수 규칙 정의와 T4-17 (가) 범위의 리뷰뿐이다. 실제 Claude의 PASS_IMPLEMENTATION_SCOPE가 두 건 있다. T4-05 리뷰는 3e5b52a의 정의와 원작 df6c926 대조를 봤고 T4-17 (가) 리뷰(세션 f8ec3074-ed60-48c7-9e80-e2aa0f36b053)는 fba850e의 정의 구조 변경·운영 등록·rules와 도구 시험을 봤다. 순수 재생 단위 시험은 실제 재생 증거가 아니다. 엔진·저장·HTTP·화면 연결과 정확 SHA CI는 리뷰 대상이 아니었다"
         },
         "exactShaValidation": {
           "status": "missing",
@@ -8457,7 +8488,7 @@
       "target": "general",
       "sourceIds": ["general:che_파괴"],
       "replacementReason": null,
-      "approvalRefs": [],
+      "approvalRefs": ["D-027", "T4-05"],
       "acIds": ["AC-P2-03"],
       "queueIds": ["T4-05", "T4-17", "T4-02", "T4-03", "T4-04"],
       "ownerProfile": "opensamguk-implement",
@@ -8485,9 +8516,29 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "effectsCostsFailures": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-05.md#7-결정-기록과-남은-것"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T4-05.md#리뷰-claude",
+              "sha": "3e5b52ae5b7a52edb386c5882ea288c1ae1edfa5"
+            },
+            {
+              "kind": "test",
+              "ref": "packages/rules/src/commands/ext/stratagem/stratagem.test.ts",
+              "sha": "3e5b52ae5b7a52edb386c5882ea288c1ae1edfa5"
+            },
+            {
+              "kind": "test",
+              "ref": "packages/rules/src/commands/ext/stratagem/equivalence.test.ts",
+              "sha": "fba850e5ef506d58f7d098a17433d285e87359b2"
+            }
+          ],
+          "reason": "순수 규칙 정의와 단위 증거뿐이다. 승인된 S0~S7과 탈취 정수화를 담은 정의의 집중 단위 169개(계략 132·기본 명령 호환 37, skip 0)가 3e5b52a에서 통과했다는 Codex 실행 기록이 있다. fba850e에서는 집중 9파일 370개가 통과했고 그 안의 S8 시험이 T4-17 (가) 정의 구조 변경 전 기준 기록 12건과 같았다. 두 실행의 수는 합치지 않는다. 실제 엔진·DB·HTTP 실행의 효과·비용·실패는 확인하지 않았다"
         },
         "persistence": {
           "status": "missing",
@@ -8505,9 +8556,20 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "independentReview": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "review",
+              "ref": "docs/plans/T4-05.md#리뷰-claude",
+              "sha": "3e5b52ae5b7a52edb386c5882ea288c1ae1edfa5"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T4-17.md#리뷰-claude",
+              "sha": "fba850e5ef506d58f7d098a17433d285e87359b2"
+            }
+          ],
+          "reason": "순수 규칙 정의와 T4-17 (가) 범위의 리뷰뿐이다. 실제 Claude의 PASS_IMPLEMENTATION_SCOPE가 두 건 있다. T4-05 리뷰는 3e5b52a의 정의와 원작 df6c926 대조를 봤고 T4-17 (가) 리뷰(세션 f8ec3074-ed60-48c7-9e80-e2aa0f36b053)는 fba850e의 정의 구조 변경·운영 등록·rules와 도구 시험을 봤다. 순수 재생 단위 시험은 실제 재생 증거가 아니다. 엔진·저장·HTTP·화면 연결과 정확 SHA CI는 리뷰 대상이 아니었다"
         },
         "exactShaValidation": {
           "status": "missing",
@@ -8527,7 +8589,7 @@
       "target": "general",
       "sourceIds": ["general:che_선동"],
       "replacementReason": null,
-      "approvalRefs": [],
+      "approvalRefs": ["D-027", "T4-05"],
       "acIds": ["AC-P2-03"],
       "queueIds": ["T4-05", "T4-17", "T4-02", "T4-03", "T4-04"],
       "ownerProfile": "opensamguk-implement",
@@ -8555,9 +8617,29 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "effectsCostsFailures": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-05.md#7-결정-기록과-남은-것"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T4-05.md#리뷰-claude",
+              "sha": "3e5b52ae5b7a52edb386c5882ea288c1ae1edfa5"
+            },
+            {
+              "kind": "test",
+              "ref": "packages/rules/src/commands/ext/stratagem/stratagem.test.ts",
+              "sha": "3e5b52ae5b7a52edb386c5882ea288c1ae1edfa5"
+            },
+            {
+              "kind": "test",
+              "ref": "packages/rules/src/commands/ext/stratagem/equivalence.test.ts",
+              "sha": "fba850e5ef506d58f7d098a17433d285e87359b2"
+            }
+          ],
+          "reason": "순수 규칙 정의와 단위 증거뿐이다. 승인된 S0~S7과 탈취 정수화를 담은 정의의 집중 단위 169개(계략 132·기본 명령 호환 37, skip 0)가 3e5b52a에서 통과했다는 Codex 실행 기록이 있다. fba850e에서는 집중 9파일 370개가 통과했고 그 안의 S8 시험이 T4-17 (가) 정의 구조 변경 전 기준 기록 12건과 같았다. 두 실행의 수는 합치지 않는다. 실제 엔진·DB·HTTP 실행의 효과·비용·실패는 확인하지 않았다"
         },
         "persistence": {
           "status": "missing",
@@ -8575,9 +8657,20 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "independentReview": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "review",
+              "ref": "docs/plans/T4-05.md#리뷰-claude",
+              "sha": "3e5b52ae5b7a52edb386c5882ea288c1ae1edfa5"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T4-17.md#리뷰-claude",
+              "sha": "fba850e5ef506d58f7d098a17433d285e87359b2"
+            }
+          ],
+          "reason": "순수 규칙 정의와 T4-17 (가) 범위의 리뷰뿐이다. 실제 Claude의 PASS_IMPLEMENTATION_SCOPE가 두 건 있다. T4-05 리뷰는 3e5b52a의 정의와 원작 df6c926 대조를 봤고 T4-17 (가) 리뷰(세션 f8ec3074-ed60-48c7-9e80-e2aa0f36b053)는 fba850e의 정의 구조 변경·운영 등록·rules와 도구 시험을 봤다. 순수 재생 단위 시험은 실제 재생 증거가 아니다. 엔진·저장·HTTP·화면 연결과 정확 SHA CI는 리뷰 대상이 아니었다"
         },
         "exactShaValidation": {
           "status": "missing",
@@ -8597,7 +8690,7 @@
       "target": "general",
       "sourceIds": ["general:che_탈취"],
       "replacementReason": null,
-      "approvalRefs": [],
+      "approvalRefs": ["D-027", "T4-05"],
       "acIds": ["AC-P2-03"],
       "queueIds": ["T4-05", "T4-17", "T4-02", "T4-03", "T4-04"],
       "ownerProfile": "opensamguk-implement",
@@ -8625,9 +8718,29 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "effectsCostsFailures": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-05.md#7-결정-기록과-남은-것"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T4-05.md#리뷰-claude",
+              "sha": "3e5b52ae5b7a52edb386c5882ea288c1ae1edfa5"
+            },
+            {
+              "kind": "test",
+              "ref": "packages/rules/src/commands/ext/stratagem/stratagem.test.ts",
+              "sha": "3e5b52ae5b7a52edb386c5882ea288c1ae1edfa5"
+            },
+            {
+              "kind": "test",
+              "ref": "packages/rules/src/commands/ext/stratagem/equivalence.test.ts",
+              "sha": "fba850e5ef506d58f7d098a17433d285e87359b2"
+            }
+          ],
+          "reason": "순수 규칙 정의와 단위 증거뿐이다. 승인된 S0~S7과 탈취 정수화를 담은 정의의 집중 단위 169개(계략 132·기본 명령 호환 37, skip 0)가 3e5b52a에서 통과했다는 Codex 실행 기록이 있다. fba850e에서는 집중 9파일 370개가 통과했고 그 안의 S8 시험이 T4-17 (가) 정의 구조 변경 전 기준 기록 12건과 같았다. 두 실행의 수는 합치지 않는다. 실제 엔진·DB·HTTP 실행의 효과·비용·실패는 확인하지 않았다"
         },
         "persistence": {
           "status": "missing",
@@ -8645,9 +8758,20 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "independentReview": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "review",
+              "ref": "docs/plans/T4-05.md#리뷰-claude",
+              "sha": "3e5b52ae5b7a52edb386c5882ea288c1ae1edfa5"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T4-17.md#리뷰-claude",
+              "sha": "fba850e5ef506d58f7d098a17433d285e87359b2"
+            }
+          ],
+          "reason": "순수 규칙 정의와 T4-17 (가) 범위의 리뷰뿐이다. 실제 Claude의 PASS_IMPLEMENTATION_SCOPE가 두 건 있다. T4-05 리뷰는 3e5b52a의 정의와 원작 df6c926 대조를 봤고 T4-17 (가) 리뷰(세션 f8ec3074-ed60-48c7-9e80-e2aa0f36b053)는 fba850e의 정의 구조 변경·운영 등록·rules와 도구 시험을 봤다. 순수 재생 단위 시험은 실제 재생 증거가 아니다. 엔진·저장·HTTP·화면 연결과 정확 SHA CI는 리뷰 대상이 아니었다"
         },
         "exactShaValidation": {
           "status": "missing",
