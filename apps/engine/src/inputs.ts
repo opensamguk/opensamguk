@@ -6,6 +6,7 @@ import {
   monthlyDate,
   TICKS_PER_MONTH,
   creationFailure,
+  creationBlock,
   emptyTurns,
   validateGeneralCreation,
   type CreationCode,
@@ -34,16 +35,20 @@ export async function processCreation(
     return true;
   };
   await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${event.userId} FOR SHARE`;
-  if (world.status !== 'RUNNING') return reject('WORLD_CLOSED');
-  const actor = await tx.user.findUnique({ where: { id: event.userId } });
-  if (!actor || actor.status !== 'ACTIVE') return reject('ACTOR_INACTIVE');
-  const parsed = validateGeneralCreation(event.payload, world.statRules);
-  if (!parsed.ok) return reject(parsed.code);
   const existing = await tx.general.findMany({
     where: { worldId: world.id },
     select: { id: true, userId: true, name: true },
   });
-  if (existing.some((g) => g.userId === event.userId)) return reject('ALREADY_EXISTS');
+  const block = creationBlock({
+    status: world.status,
+    hasGeneral: existing.some((g) => g.userId === event.userId),
+    hasPending: false,
+  });
+  if (block && block.code !== 'PENDING') return reject(block.code);
+  const actor = await tx.user.findUnique({ where: { id: event.userId } });
+  if (!actor || actor.status !== 'ACTIVE') return reject('ACTOR_INACTIVE');
+  const parsed = validateGeneralCreation(event.payload, world.statRules);
+  if (!parsed.ok) return reject(parsed.code);
   if (existing.some((g) => g.name.normalize('NFC').trim() === parsed.value.name)) return reject('NAME_TAKEN');
   const cities = await tx.city.findMany({
     where: { worldId: world.id },
