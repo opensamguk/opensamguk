@@ -111,8 +111,28 @@ async function setup() {
   setupStage = 'migration';
   const directory = new URL('../../../../packages/db/prisma/migrations/', import.meta.url);
   const migrations = (await readdir(directory)).filter((name) => /^\d/.test(name)).sort();
-  if (migrations.length !== 18 || migrations.at(-1) !== '20261023073000_treaties')
-    throw new Error('준비한 migration 목록이 달라졌습니다.');
+  const requiredMigrations = [
+    '20261020000000_initial_world',
+    '20261020010000_world_clock',
+    '20261020020000_accounts',
+    '20261020030000_engine_turns',
+    '20261020040000_monthly_replay',
+    '20261021030000_commands_war',
+    '20261021040000_rankings',
+    '20261021080000_engine_heartbeat',
+    '20261023000000_world_outcome',
+    '20261023010000_public_map_snapshot',
+    '20261023020000_nation_display_archive',
+    '20261023030000_messaging_realtime',
+    '20261023040000_world_presets',
+    '20261023050000_default_policy',
+    '20261023060000_operation_plans',
+    '20261023071000_nation_offices',
+    '20261023072000_world_ext_slices',
+    '20261023073000_treaties',
+  ];
+  if (requiredMigrations.some((name, index) => migrations[index] !== name))
+    throw new Error('필수 migration의 이름과 순서가 달라졌습니다.');
   migratorOpen = true;
   await migrator.connect();
   for (const name of migrations) {
