@@ -1,21 +1,11 @@
 import type { DeepReadonly, WorldState } from '../model/world';
+export type { AssignmentOffer } from '../model/world';
 
-// 공유 상태 모델을 연결할 때 이 필드와 상수를 옮긴다. origin 1에는 넣지 않는다.
+// 발령 제안의 기한과 거절 벌점.
 export const ASSIGNMENT_EXPIRY_MONTHS = 2;
 export const ASSIGNMENT_REJECT_PERCENT = 10;
 
-export interface AssignmentOffer {
-  id: string;
-  nationId: number;
-  issuerGeneralId: number;
-  cityKey: number;
-  createdTick: number;
-  expiresTick: number;
-}
-
-export interface PersonnelState extends WorldState {
-  assignmentOffers?: Record<number, AssignmentOffer>;
-}
+export type PersonnelState = WorldState;
 export type PersonnelView = DeepReadonly<PersonnelState>;
 export type CancelReason = 'CITY_LOST' | 'TARGET_LEFT' | 'ISSUER_LOST_OFFICE';
 type Closure = { id: string; resolvedTick: number };

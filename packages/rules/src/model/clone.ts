@@ -40,5 +40,15 @@ export function cloneWorldWithRegistry(view: WorldView, registry: ExtStateRegist
     ...(view.nationTurns
       ? { nationTurns: structuredClone(view.nationTurns) as NonNullable<WorldState['nationTurns']> }
       : {}),
+    ...(view.assignmentOffers && Object.keys(view.assignmentOffers).length
+      ? {
+          assignmentOffers: Object.fromEntries(
+            Object.entries(view.assignmentOffers).map(([id, offer]) => [id, { ...offer }]),
+          ),
+        }
+      : {}),
+    ...(view.officeTurns && Object.keys(view.officeTurns).length
+      ? { officeTurns: structuredClone(view.officeTurns) as NonNullable<WorldState['officeTurns']> }
+      : {}),
   };
 }
