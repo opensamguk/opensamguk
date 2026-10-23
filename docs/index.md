@@ -50,6 +50,7 @@
 | [Phase 2 확장 기술 명세](./plans/phase2-expansion.md) (AC-P2·T4 제안) | 초안 | Phase 2 |
 | [T4-34 전투 시뮬레이터 화면](./plans/T4-34.md) (AC-P2-16 (가), D-023. PR #132로 main `494272b` 병합. AC-P2-16 (나)는 남음) | 구현 병합 | Phase 2 |
 | [T4-30 토너먼트 대진 틀](./plans/T4-30.md), [T4-35 월간 영토 스냅샷 조회 API](./plans/T4-35.md) (AC-P2-15 (가), AC-P2-17 1차 API. Codex 계획 기술 검토 수용, 정본 한정 반영은 통합 커밋 전, 로컬 구현 WIP) | 계획 검토 수용 | Phase 2 |
+| [T4-05 계략 4종 규칙](./plans/T4-05.md) (AC-P2-03·AC-M1-14 후속, 규칙 구현 중, 운영 등록·엔진 연결은 별도) | 구현 중 | MVP·Phase 2 |
 | [T4-18 효과 합산 틀](./plans/T4-18.md) (AC-P2-12·13 순수 공통 기반 몫. Codex 계획 기술 검토 수용, D-027 한정 반영은 통합 커밋 전) | 계획 검토 수용 | Phase 2 |
 
 ## architecture/ 무엇이 어디서 실행되나
