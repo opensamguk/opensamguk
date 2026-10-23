@@ -21,7 +21,7 @@ Phase 2 인수조건의 정식 범위는 [인수조건 P2](docs/product/acceptan
 진행률의 기준은 [인수조건](docs/product/acceptance-criteria.md)의 상태 하나뿐입니다.
 위 숫자는 main [`76d56d0`](https://github.com/peppone-choi/opensamguk/commit/76d56d0db57f0e8d8686938591781632c71b2a20)의 AC-M1-22·AC-M2-01 수용과 PR [#67](https://github.com/peppone-choi/opensamguk/pull/67)의 D-022에 따른 AC-M1-14 재개(✅ → 🟨)를 합친 인수조건 문서에서 AC 행 58개(M1 22·M2 20·M3 16)의 상태 칸을 다시 센 값입니다. <!-- lint-text-ignore C-5 -->
 문서에 기록된 상태를 센 것이며 새로 돌린 제품 전체 QA 결과가 아닙니다. 관문은 그 관문의 AC가 전부 ✅일 때만 통과합니다. <!-- lint-text-ignore C-5 -->
-AC 57개 기준의 통과 비율은 옛 범위의 집계일 뿐 MVP 전체 진행률이 아닙니다. 2026-10-22 소유자 정정([D-022](docs/product/decisions.md#d-022-mvp-완료에는-모든-명령이-들어간다-2026-10-22))으로 MVP는 모든 명령을 완료해야 합니다. AC-M1-14도 다시 진행 중입니다. 명령 진행은 [명령 대응표](docs/product/command-coverage.json)를 `node tools/command-coverage.mjs`로 세어 봅니다. 2026-10-22 출력은 원작 비교 분모 90개, 정본 분모 91개, 전 단계 완료 0개입니다. <!-- lint-text-ignore C-5 -->
+AC 58개 기준의 통과 비율은 옛 범위의 집계일 뿐 MVP 전체 진행률이 아닙니다. 2026-10-22 소유자 정정([D-022](docs/product/decisions.md#d-022-mvp-완료에는-모든-명령이-들어간다-2026-10-22))으로 MVP는 모든 명령을 완료해야 합니다. AC-M1-14도 다시 진행 중입니다. 명령 진행은 [명령 대응표](docs/product/command-coverage.json)를 `node tools/command-coverage.mjs`로 세어 봅니다. 2026-10-22 출력은 원작 비교 분모 90개, 정본 분모 91개, 전 단계 완료 0개입니다. <!-- lint-text-ignore C-5 -->
 누가 무엇을 할 차례인지는 `pnpm next`로 봅니다 (계획 Claude → 구현 담당 → 리뷰 반대쪽).
 
 ## 문서
