@@ -20,7 +20,7 @@ import {
 } from '@opensamguk/rules';
 
 // 호출자가 리스와 World를 잠근 뒤 같은 펜싱 트랜잭션에서 실행한다.
-// null이면 미확정인 기존 활동 기준을 기다리므로 게임 행동도 실행하지 않는다.
+// null이면 직접 호출에서 활동 기준을 넘기지 않은 경우이며 게임 행동도 실행하지 않는다.
 export async function processPendingInput(
   tx: Prisma.TransactionClient,
   world: Prisma.WorldGetPayload<Record<string, never>>,
@@ -71,7 +71,7 @@ export async function processPendingInput(
     const hasHuman = generals.some((general) => general.userId !== null);
     let appliedBaseline: number | null = null;
     if (hasHuman) {
-      // 일반 엔진 호출은 이 인자를 넘기지 않아 사용자 결정 전 대기를 유지한다.
+      // 정상 엔진은 잠근 월드 tick을 넘기며 직접 호출에서 인자가 없으면 기다린다.
       if (baselineActiveTick === undefined) return null;
       if (
         !Number.isSafeInteger(baselineActiveTick) ||

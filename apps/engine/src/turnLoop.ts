@@ -28,6 +28,14 @@ export const CLOCK_CHECKPOINT_MS = 5_000;
 export const ENGINE_BATCH_STEPS = 64;
 export const ENGINE_BATCH_MS = 250;
 type WorldStatus = Prisma.WorldGetPayload<Record<string, never>>['status'];
+async function policyBaseline(tx: Prisma.TransactionClient, world: Prisma.WorldGetPayload<Record<string, never>>) {
+  if (world.policyFromSequence !== null) return undefined;
+  const human = await tx.general.findFirst({
+    where: { worldId: world.id, userId: { not: null } },
+    select: { id: true },
+  });
+  return human ? world.clockTick : undefined;
+}
 export interface PollBatch {
   executions: TurnExecution[];
   more: boolean;
@@ -112,8 +120,9 @@ export class TurnLoop {
         // 일시정지·재개와 턴 commit이 같은 월드 행에서 직렬화된다.
         await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${worldId} FOR UPDATE`;
         const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
+        const baselineActiveTick = await policyBaseline(tx, world);
         if (world.status !== 'RUNNING') {
-          const inputResult = await processPendingInput(tx, world, world.clockTick);
+          const inputResult = await processPendingInput(tx, world, world.clockTick, baselineActiveTick);
           const progressed = inputResult === true;
           if (progressed) await this.hooks.beforeCommit?.(tx);
           signal?.throwIfAborted();
@@ -146,7 +155,7 @@ export class TurnLoop {
             : checkpoint.clockTick);
         if (tick < world.clockTick) throw new Error('이미 저장된 시계보다 뒤로 진행할 수 없습니다.');
         if (tick > 2_147_483_647 - TICKS_PER_MONTH) throw new Error('게임 tick 저장 범위를 넘었습니다.');
-        const inputResult = await processPendingInput(tx, world, tick);
+        const inputResult = await processPendingInput(tx, world, tick, baselineActiveTick);
         if (inputResult !== false) {
           const state = await loadWorld(tx, worldId);
           await this.hooks.beforeCommit?.(tx);

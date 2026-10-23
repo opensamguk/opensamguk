@@ -207,7 +207,7 @@ it('오래된 리스는 전환을 못 쓰고 새 리스만 집행한다', async 
   expect((await snapshot(f.worldId)).world.policyFromSequence).toBe(1);
 });
 
-it('기존 사람 장수와 표지 앞 생성으로 생긴 사람 장수는 기준 선택 없이 기다린다', async () => {
+it('사용자가 고른 정상 T는 기존 사람 장수와 표지 앞 생성 사람에게 적용된다', async () => {
   for (const existing of [true, false]) {
     const f = await fixture({ human: existing });
     if (existing) await db.world.update({ where: { id: f.worldId }, data: { status: 'PAUSED' } });
@@ -228,15 +228,19 @@ it('기존 사람 장수와 표지 앞 생성으로 생긴 사람 장수는 기�
     const event = await marker(f.worldId);
     await f.loop.advanceTo(0);
     const after = await snapshot(f.worldId);
-    expect(after.world).toMatchObject({ policyFromSequence: null, actionSequence: existing ? 0 : 1 });
+    const fromSequence = existing ? 1 : 2;
+    expect(after.world).toMatchObject({ policyFromSequence: fromSequence, actionSequence: fromSequence });
     expect(after.inputs.find((input) => input.id === event.id)).toMatchObject({
-      status: 'PENDING',
-      sequence: null,
-      result: null,
+      status: 'APPLIED',
+      sequence: fromSequence,
+      result: { fromSequence, clockTick: 0, baselineActiveTick: 0 },
     });
     expect(
       after.generals.every(
-        (general) => general.lastActiveTick === null && general.lastActiveAt === null && general.defaultPolicy === null,
+        (general) =>
+          general.lastActiveTick === (general.userId === null ? null : 0) &&
+          general.lastActiveAt === null &&
+          general.defaultPolicy === 'none',
       ),
     ).toBe(true);
     if (!existing) {

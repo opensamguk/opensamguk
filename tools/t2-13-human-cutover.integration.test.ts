@@ -87,7 +87,7 @@ async function snapshot(worldId: string) {
     inputs: await db.inputEvent.findMany({ where: { worldId }, orderBy: { id: 'asc' } }),
   };
 }
-// 소유 fixture의 준비 검증에만 쓴다. 운영 호출·설정으로 노출하지 않으며 일반 TurnLoop는 값을 넘기지 않는다.
+// 소유 fixture의 명시 인자·무인자 경계를 본다. 정상 TurnLoop는 사용자 결정에 따라 T를 넘긴다.
 async function explicit(f: Awaited<ReturnType<typeof fixture>>, baseline?: number, rollback = false) {
   return db.$transaction(async (tx) => {
     await lockLease(tx, f.lease);
@@ -161,7 +161,7 @@ async function seedOldCommand(f: Awaited<ReturnType<typeof fixture>>) {
   });
 }
 it.each(['zero', 'tick'] as const)(
-  '명시 %s fixture의 전환 전후 6개월을 재생하고 일반 호출은 선택하지 않는다',
+  '명시 %s fixture의 전환 전후 6개월을 재생하고 무인자 집행 경계는 기다린다',
   async (candidate) => {
     const f = await fixture(2, 0);
     const oldUser = await user();
@@ -199,7 +199,7 @@ it.each(['zero', 'tick'] as const)(
     await controlClock(db, f.worldId, 'pause');
     await marker(f.worldId);
     const before = await snapshot(f.worldId);
-    await f.loop.poll();
+    expect(await explicit(f)).toBeNull();
     expect(await snapshot(f.worldId)).toEqual(before);
     const baseline = candidate === 'zero' ? 0 : before.world.clockTick;
     await explicit(f, baseline);
@@ -265,7 +265,7 @@ it.each(['zero', 'tick'] as const)('명시 %s의 commit 실패는 사람 값·F�
   const baseline = candidate === 'zero' ? 0 : before.world.clockTick;
   await expect(explicit(f, baseline, true)).rejects.toThrow('명시 전환 commit 중단');
   expect(await snapshot(f.worldId)).toEqual(before);
-  await f.loop.poll();
+  expect(await explicit(f)).toBeNull();
   expect(await snapshot(f.worldId)).toEqual(before);
   await explicit(f, baseline);
   expect((await snapshot(f.worldId)).world.policyFromSequence).toBe(1);
@@ -281,17 +281,18 @@ it('두 후보 이외의 인자는 실제 트랜잭션에서 쓰기 없이 거�
   }
 });
 
-it('순서 상한에서도 일반 사람 호출은 선택 없이 PENDING이다', async () => {
+it('순서 상한의 무인자 경계는 대기하고 정상 T 호출은 원자적으로 거부한다', async () => {
   const f = await fixture();
   await marker(f.worldId);
   await db.world.update({ where: { id: f.worldId }, data: { actionSequence: 2_147_483_647 } });
   const before = await snapshot(f.worldId);
-  await f.loop.poll();
+  expect(await explicit(f)).toBeNull();
+  await expect(f.loop.poll()).rejects.toThrow('전환 순서 저장 범위');
   expect(await snapshot(f.worldId)).toEqual(before);
 });
 
 it.each(['zero', 'tick'] as const)(
-  '앞 생성은 명시 인자를 읽지 않고 새 사람도 무선택 경로에서 기다린다(%s)',
+  '앞 생성은 명시 인자를 읽지 않고 새 사람도 무인자 집행 경계에서 기다린다(%s)',
   async (candidate) => {
     const f = await fixture(0, 600);
     await controlClock(db, f.worldId, 'resume');
@@ -316,7 +317,7 @@ it.each(['zero', 'tick'] as const)(
     const before = await snapshot(f.worldId);
     expect(before.inputs[0]).toMatchObject({ status: 'APPLIED', sequence: 1 });
     expect(before.inputs[0]!.result).not.toHaveProperty('activeTick');
-    await f.loop.advanceTo(600);
+    expect(await explicit(f)).toBeNull();
     expect(await snapshot(f.worldId)).toEqual(before);
     await explicit(f, candidate === 'zero' ? 0 : before.world.clockTick);
     const after = await snapshot(f.worldId);

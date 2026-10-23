@@ -387,7 +387,7 @@ async function refusedWrites(f: Awaited<ReturnType<typeof fixture>>) {
   expect((await rpc<Slots>('turns.get', { worldId: f.worldId }, f.alice.cookie)).data!.slots).toHaveLength(30);
 }
 
-it('전환 표지가 대기하면 칸 조회만 열고 뒤 생성·활동과 월간·장수 턴을 모두 대기시킨다', async () => {
+it('정상 T 전환 뒤 로그인·생성을 순서대로 처리하고 실제 예턴 저장만 활동을 남긴다', async () => {
   const f = await fixture();
   await legacyWorld(f, true);
   await refusedWrites(f);
@@ -395,17 +395,44 @@ it('전환 표지가 대기하면 칸 조회만 열고 뒤 생성·활동과 월
   await db.inputEvent.create({
     data: { worldId: f.worldId, userId: f.bob.id, kind: 'general.create', idempotencyKey: randomUUID(), payload: {} },
   });
-  const before = await db.$transaction((tx) => loadReplayState(tx, f.worldId));
-  expect(await f.loop.advanceTo(60000)).toEqual([]);
-  expect(await db.$transaction((tx) => loadReplayState(tx, f.worldId))).toEqual(before);
-  expect(await db.inputEvent.count({ where: { worldId: f.worldId, status: 'PENDING', sequence: null } })).toBe(3);
-  expect(await db.yearbookSnapshot.count({ where: { worldId: f.worldId } })).toBe(0);
-  expect(await db.generalLog.count({ where: { worldId: f.worldId } })).toBe(0);
-  expect(await db.world.findUniqueOrThrow({ where: { id: f.worldId } })).toMatchObject({
-    policyFromSequence: null,
-    actionSequence: 0,
-    clockTick: 0,
+  expect((await f.loop.advanceTo(60000)).length).toBeGreaterThan(0);
+  const inputs = await db.inputEvent.findMany({ where: { worldId: f.worldId }, orderBy: { id: 'asc' } });
+  expect(inputs.slice(0, 3)).toMatchObject([
+    { kind: 'system.policy.enable', status: 'APPLIED', sequence: 1, result: { clockTick: 0, baselineActiveTick: 0 } },
+    { kind: 'general.active', status: 'APPLIED', sequence: 2, result: { activeTick: 60000 } },
+    { kind: 'general.create', status: 'REJECTED', sequence: 3, result: { code: 'ALREADY_EXISTS' } },
+  ]);
+  expect(await db.inputEvent.count({ where: { worldId: f.worldId, status: 'PENDING' } })).toBe(0);
+  expect(await db.yearbookSnapshot.count({ where: { worldId: f.worldId } })).toBe(6);
+  const actor = () => db.general.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: 1 } } });
+  expect(await actor()).toMatchObject({ lastActiveTick: 60000, lastActiveAt: inputs[1]!.createdAt });
+  expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: 2 } } })).toMatchObject({
+    lastActiveTick: 0,
+    lastActiveAt: null,
   });
+  expect(await db.world.findUniqueOrThrow({ where: { id: f.worldId } })).toMatchObject({
+    policyFromSequence: 1,
+    clockTick: 60000,
+  });
+  await rpc('auth.login', { email: f.alice.email, password }, undefined, true);
+  await f.loop.advanceTo(60000);
+  const nextLogin = await db.inputEvent.findFirstOrThrow({
+    where: { worldId: f.worldId, kind: 'general.active' },
+    orderBy: { id: 'desc' },
+  });
+  expect(nextLogin).toMatchObject({ status: 'APPLIED', result: { activeTick: 60000 } });
+  expect(await actor()).toMatchObject({ lastActiveTick: 60000, lastActiveAt: nextLogin.createdAt });
+  const slots = Array.from({ length: 30 }, () => null);
+  const saved = await rpc<Slots>('turns.set', { worldId: f.worldId, revision: 0, slots }, f.alice.cookie, true);
+  expect(saved.data).toMatchObject({ ok: true, revision: 1 });
+  const editEvent = await db.inputEvent.findFirstOrThrow({
+    where: { worldId: f.worldId, kind: 'turns.set' },
+    orderBy: { id: 'desc' },
+  });
+  expect(await actor()).toMatchObject({ lastActiveTick: 60000, lastActiveAt: editEvent.createdAt });
+  const stale = await rpc<Slots>('turns.set', { worldId: f.worldId, revision: 0, slots }, f.alice.cookie, true);
+  expect(stale.data).toMatchObject({ ok: false, reason: 'STALE' });
+  expect(await actor()).toMatchObject({ lastActiveTick: 60000, lastActiveAt: editEvent.createdAt });
   expect((await rpc('general.policy', { worldId: f.worldId }, f.alice.cookie)).data).toMatchObject({
     current: 'none',
     pending: null,
