@@ -12,6 +12,7 @@ import { loadInitialWorld } from './world/resources';
 import { readWorldState, saveInitialWorld } from './world/persistence';
 import { controlClock } from './world/clock';
 import { runEngine } from './main';
+import { requestShutdown } from './process-lifecycle';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -491,7 +492,7 @@ describe('AC-M1-11 리스·재시작·펜싱, 실제 PostgreSQL', () => {
     const child = spawn(process.execPath, ['--import', 'tsx', 'apps/engine/src/index.ts', '--world', worldId], {
       cwd: new URL('../../../', import.meta.url),
       env: { ...process.env, DATABASE_URL: url },
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: process.platform === 'win32' ? ['ignore', 'pipe', 'pipe', 'ipc'] : ['ignore', 'pipe', 'pipe'],
     });
     const exited = once(child, 'exit');
     try {
@@ -512,13 +513,13 @@ describe('AC-M1-11 리스·재시작·펜싱, 실제 PostgreSQL', () => {
         };
         function cleanup() {
           clearTimeout(timer);
-          child.stdout.off('data', onData);
+          child.stdout!.off('data', onData);
           child.off('exit', onExit);
         }
-        child.stdout.on('data', onData);
+        child.stdout!.on('data', onData);
         child.once('exit', onExit);
       });
-      child.kill('SIGTERM');
+      requestShutdown(child, 'SIGTERM');
       expect((await exited)[0]).toBe(0);
       expect(await acquireLease(db, worldId)).not.toBeNull();
     } finally {

@@ -3,6 +3,7 @@ import { parseArgs } from 'node:util';
 import { createDb } from '@opensamguk/db';
 import { engineFailureMessage, runEngine } from './main';
 import { runSupervisor } from './supervisor';
+import { onShutdownRequest } from './process-lifecycle';
 
 async function main() {
   publicMapConfig(process.env);
@@ -11,8 +12,7 @@ async function main() {
   const db = createDb(process.env.DATABASE_URL);
   const controller = new AbortController();
   const shutdown = () => controller.abort();
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
+  const removeShutdown = onShutdownRequest(shutdown);
   try {
     console.log('[engine] 시작');
     if (values.world) {
@@ -28,8 +28,7 @@ async function main() {
       });
     }
   } finally {
-    process.off('SIGINT', shutdown);
-    process.off('SIGTERM', shutdown);
+    removeShutdown();
     await db.$disconnect();
     console.log('[engine] 종료');
   }
