@@ -1,3 +1,4 @@
+import type { CommandResolver } from './commands/resolve';
 import { rngFor } from '@opensamguk/shared';
 import { runGeneralTurn } from './commands/turn';
 import type { UnitSetResource } from './world/resources';
@@ -46,7 +47,12 @@ export function nextGameAction(replay: ReplayState) {
     : { kind: 'monthly' as const, tick: boundary };
 }
 
-export function runReplayAction(replay: ReplayState, seed: string, unitSet?: UnitSetResource): ReplayState {
+export function runReplayAction(
+  replay: ReplayState,
+  seed: string,
+  unitSet?: UnitSetResource,
+  resolver?: CommandResolver,
+): ReplayState {
   const action = nextGameAction(replay);
   if (action.kind === 'monthly') {
     const date = monthlyDate(replay.state.startYear, action.tick);
@@ -56,7 +62,14 @@ export function runReplayAction(replay: ReplayState, seed: string, unitSet?: Uni
   const next = structuredClone(replay);
   const turns = next.turns[action.generalId] ?? emptyTurns();
   const command = turns[0]!;
-  const result = runGeneralTurn(next.state, { generalId: action.generalId, tick: action.tick, unitSet }, command, seed);
+  const result = runGeneralTurn(
+    next.state,
+    { generalId: action.generalId, tick: action.tick, unitSet },
+    command,
+    seed,
+    {},
+    resolver,
+  );
   next.state = result.state;
   next.state.generals[action.generalId]!.nextTurnTick += TICKS_PER_MONTH;
   next.turns[action.generalId] = [...turns.slice(1), { commandKey: 'rest', args: {} }];

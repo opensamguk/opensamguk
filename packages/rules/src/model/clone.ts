@@ -1,7 +1,13 @@
+import { cloneExtStateWithRegistry, extSlices, extCommandBindings, type ExtStateRegistry } from '../commands/ext/state';
 import type { WorldState, WorldView } from './world';
 
 // 모든 가변 필드를 복제한다. 평평한 장수 수백 명을 매 턴 직렬화하지 않는다.
 export function cloneWorld(view: WorldView): WorldState {
+  return cloneWorldWithRegistry(view, { slices: extSlices, bindings: extCommandBindings });
+}
+
+export function cloneWorldWithRegistry(view: WorldView, registry: ExtStateRegistry): WorldState {
+  const ext = Object.hasOwn(view, 'ext') ? cloneExtStateWithRegistry(view.ext, registry) : undefined;
   const cities: WorldState['cities'] = {};
   const nations: WorldState['nations'] = {};
   const generals: WorldState['generals'] = {};
@@ -12,6 +18,7 @@ export function cloneWorld(view: WorldView): WorldState {
   for (const key in view.nations) nations[key] = { ...view.nations[key]! };
   for (const key in view.generals) generals[key] = { ...view.generals[key]! };
   return {
+    ...(ext ? { ext } : {}),
     startYear: view.startYear,
     cities,
     nations,
