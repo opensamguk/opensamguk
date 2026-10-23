@@ -20,6 +20,9 @@ import { CityPage, MapPage, NationPage, RecordsPage } from './pages/WorldPages';
 import { RankingPage } from './ranking/RankingPage';
 import { parseRankingSearch } from './ranking/rankingView';
 import { queryClient, trpc, type Trpc } from './trpc';
+import { InspectionPage } from './operations/InspectionPage';
+import { OperationDetailPage } from './operations/OperationDetailPage';
+import { OperationsPage } from './operations/OperationsPage';
 import { TurnsPage } from './turns/TurnsPage';
 import { EmptyState, ErrorState } from './ui/States';
 
@@ -174,6 +177,26 @@ const diplomacyRoute = createRoute({
   },
 });
 
+// 국가 작전판 (T2-12). 목록·만들기, 작전 타임라인, 감찰. nation/inspection은 nation/$nationId보다 먼저 맞는다(정적 경로 우선).
+const operationsRoute = createRoute({
+  getParentRoute: () => worldRoute,
+  path: 'operations',
+  component: OperationsPage,
+});
+const operationRoute = createRoute({
+  getParentRoute: () => worldRoute,
+  path: 'operations/$operationId',
+  component: function OperationRoute() {
+    const { operationId } = operationRoute.useParams();
+    return <OperationDetailPage key={operationId} operationId={operationId} />;
+  },
+});
+const inspectionRoute = createRoute({
+  getParentRoute: () => worldRoute,
+  path: 'nation/inspection',
+  component: InspectionPage,
+});
+
 const createGeneralRoute = createRoute({
   getParentRoute: () => worldRoute,
   path: 'create',
@@ -196,6 +219,9 @@ const routeTree = rootRoute.addChildren([
     rankingRoute,
     simulatorRoute,
     diplomacyRoute,
+    operationsRoute,
+    operationRoute,
+    inspectionRoute,
     createGeneralRoute,
   ]),
   ...(import.meta.env.DEV ? [devUiRoute] : []),
