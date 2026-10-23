@@ -41,10 +41,7 @@ export function runPolicyCommand(
       commandKey: 'rest',
       result: {
         ...rest,
-        logs: [
-          { kind: 'success', text: `기본 방침 실패: ${result.code}, ${result.message} 휴식합니다.` },
-          ...rest.logs,
-        ],
+        logs: [{ kind: 'success', text: `기본 방침 실패: ${result.message} → 휴식` }],
       },
     };
   }

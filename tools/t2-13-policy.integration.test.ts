@@ -7,6 +7,7 @@ import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { exportReplay, replayArchive } from '../apps/engine/src/replay';
+import { loadReplayState } from '../apps/engine/src/monthly';
 import { buildServer } from '../apps/server/src/server';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { newSession } from '../apps/server/src/auth/session';
@@ -42,14 +43,18 @@ async function user(status: 'ACTIVE' | 'SANCTIONED' = 'ACTIVE') {
   await db.session.create({ data: { id: session.id, userId: row.id, expiresAt: session.expiresAt } });
   return { id: row.id, email, cookie: `sid=${session.token}`, sessionId: session.id };
 }
-async function fixture(options: { farmMax?: boolean } = {}) {
+async function fixture(options: { farmMax?: boolean; npc?: boolean } = {}) {
   const alice = await user(),
     bob = await user();
   const initial = commandInitial();
   if (options.farmMax) initial.cities[0]!.agriculture = initial.cities[0]!.agricultureMax;
   initial.generals = initial.generals
     .slice(0, 2)
-    .map((general, i) => ({ ...general, userId: i ? bob.id : alice.id, nextTurnTick: i ? 5000 : 100 }));
+    .map((general, i) => ({
+      ...general,
+      userId: i ? (options.npc ? null : bob.id) : alice.id,
+      nextTurnTick: i ? 5000 : 100,
+    }));
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '방침 실제 HTTP',
     turnTermMinutes: 30,
@@ -283,7 +288,7 @@ it('방침 실패는 같은 턴에서 비용 없이 휴식하고 실제 장수 �
     where: { worldId_generalId_tick: { worldId: f.worldId, generalId: 1, tick: 100 } },
   });
   expect(log.commandKey).toBe('rest');
-  expect(log.text).toContain('AT_MAX');
+  expect(log.text).toMatch(/^기본 방침 실패: .+ → 휴식$/);
 });
 
 it('활동과 방침을 id 순으로 집행하며 commit 실패는 상태·결과·sequence를 함께 되돌린다', async () => {
@@ -309,4 +314,140 @@ it('활동과 방침을 id 순으로 집행하며 commit 실패는 상태·결�
     ['general.active', 1, 'APPLIED'],
     ['general.setPolicy', 2, 'APPLIED'],
   ]);
+});
+
+it('방침 월드에서 HTTP 장수 생성 뒤 빈칸·활동과 archive5의 12개월 재생이 일치한다', async () => {
+  const f = await fixture();
+  const newcomer = await user();
+  const request = rpc(
+    'general.create',
+    { worldId: f.worldId, name: '새방침장수', leadership: 55, strength: 55, intel: 55, portraitId: 10001 },
+    newcomer.cookie,
+    true,
+  );
+  await expect
+    .poll(() => db.inputEvent.count({ where: { worldId: f.worldId, kind: 'general.create', status: 'PENDING' } }))
+    .toBe(1);
+  await f.loop.advanceTo(0);
+  expect((await request).data).toMatchObject({ status: 'created' });
+  const general = await db.general.findUniqueOrThrow({
+    where: { worldId_userId: { worldId: f.worldId, userId: newcomer.id } },
+  });
+  expect(general).toMatchObject({ defaultPolicy: 'none', lastActiveTick: 0, userId: newcomer.id });
+  expect(general.lastActiveAt).not.toBeNull();
+  expect(await db.generalTurn.count({ where: { worldId: f.worldId, generalId: general.id, explicit: false } })).toBe(
+    30,
+  );
+  await f.loop.advanceTo(120000);
+  const archive = await exportReplay(db, f.worldId);
+  expect(archive.version).toBe(5);
+  expect(replayArchive(archive, 12)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
+});
+
+it('방침 월드 NPC는 빈칸에서도 AI를 실행하고 12개월 실제 엔진과 재생이 일치한다', async () => {
+  const f = await fixture({ npc: true });
+  expect(await db.generalTurn.count({ where: { worldId: f.worldId, generalId: 2, explicit: false } })).toBe(30);
+  await f.loop.advanceTo(5000);
+  const log = await db.generalLog.findUniqueOrThrow({
+    where: { worldId_generalId_tick: { worldId: f.worldId, generalId: 2, tick: 5000 } },
+  });
+  expect(log.commandKey).not.toBe('rest');
+  expect(log.text).not.toContain('기본 방침');
+  const npc = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: 2 } } });
+  expect(npc.userId).toBeNull();
+  expect(npc.lastActiveTick).toBeNull();
+  await f.loop.advanceTo(120000);
+  const archive = await exportReplay(db, f.worldId);
+  expect(replayArchive(archive, 12)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
+});
+
+async function legacyWorld(f: Awaited<ReturnType<typeof fixture>>, marker: boolean) {
+  await db.world.update({ where: { id: f.worldId }, data: { policyFromSequence: null } });
+  await db.general.updateMany({
+    where: { worldId: f.worldId },
+    data: { defaultPolicy: null, lastActiveTick: null, lastActiveAt: null },
+  });
+  if (!marker) await db.generalTurn.updateMany({ where: { worldId: f.worldId }, data: { explicit: true } });
+  else
+    await db.inputEvent.create({
+      data: {
+        worldId: f.worldId,
+        userId: 'system:policy',
+        kind: 'system.policy.enable',
+        idempotencyKey: 'system.policy.enable:5',
+        payload: { version: 5, emptySlots: [1, 2] },
+      },
+    });
+}
+async function refusedWrites(f: Awaited<ReturnType<typeof fixture>>) {
+  for (const [path, input] of [
+    ['turns.set', { revision: 0, slots: Array.from({ length: 30 }, () => null) }],
+    ['turns.edit', { revision: 0, op: { shift: 1 } }],
+    ['general.setPolicy', { policy: 'farm' }],
+  ] as const)
+    expect((await rpc(path, { worldId: f.worldId, ...input }, f.alice.cookie, true)).error).toBe('PRECONDITION_FAILED');
+  expect((await rpc<Slots>('turns.get', { worldId: f.worldId }, f.alice.cookie)).data!.slots).toHaveLength(30);
+}
+
+it('전환 표지가 대기하면 칸 조회만 열고 뒤 생성·활동과 월간·장수 턴을 모두 대기시킨다', async () => {
+  const f = await fixture();
+  await legacyWorld(f, true);
+  await refusedWrites(f);
+  await rpc('auth.login', { email: f.alice.email, password }, undefined, true);
+  await db.inputEvent.create({
+    data: { worldId: f.worldId, userId: f.bob.id, kind: 'general.create', idempotencyKey: randomUUID(), payload: {} },
+  });
+  const before = await db.$transaction((tx) => loadReplayState(tx, f.worldId));
+  expect(await f.loop.advanceTo(60000)).toEqual([]);
+  expect(await db.$transaction((tx) => loadReplayState(tx, f.worldId))).toEqual(before);
+  expect(await db.inputEvent.count({ where: { worldId: f.worldId, status: 'PENDING', sequence: null } })).toBe(3);
+  expect(await db.yearbookSnapshot.count({ where: { worldId: f.worldId } })).toBe(0);
+  expect(await db.generalLog.count({ where: { worldId: f.worldId } })).toBe(0);
+  expect(await db.world.findUniqueOrThrow({ where: { id: f.worldId } })).toMatchObject({
+    policyFromSequence: null,
+    actionSequence: 0,
+    clockTick: 0,
+  });
+  expect((await rpc('general.policy', { worldId: f.worldId }, f.alice.cookie)).data).toMatchObject({
+    current: 'none',
+    pending: null,
+    lastRejected: null,
+  });
+});
+
+it('표지가 없는 옛 월드는 쓰기를 거부하되 기존 생성·직접 휴식·옛 큐 모양을 보존한다', async () => {
+  const f = await fixture();
+  await legacyWorld(f, false);
+  await refusedWrites(f);
+  const newcomer = await user();
+  const request = rpc(
+    'general.create',
+    { worldId: f.worldId, name: '옛생성장수', leadership: 55, strength: 55, intel: 55, portraitId: 10001 },
+    newcomer.cookie,
+    true,
+  );
+  await expect
+    .poll(() => db.inputEvent.count({ where: { worldId: f.worldId, kind: 'general.create', status: 'PENDING' } }))
+    .toBe(1);
+  await f.loop.advanceTo(100);
+  expect((await request).data).toMatchObject({ status: 'created' });
+  const general = await db.general.findUniqueOrThrow({
+    where: { worldId_userId: { worldId: f.worldId, userId: newcomer.id } },
+  });
+  expect(general).toMatchObject({ defaultPolicy: null, lastActiveTick: null, lastActiveAt: null });
+  expect(await db.generalTurn.count({ where: { worldId: f.worldId, generalId: general.id, explicit: true } })).toBe(30);
+  expect(
+    await db.generalLog.findUniqueOrThrow({
+      where: { worldId_generalId_tick: { worldId: f.worldId, generalId: 1, tick: 100 } },
+    }),
+  ).toMatchObject({ commandKey: 'rest' });
+  const replay = await db.$transaction((tx) => loadReplayState(tx, f.worldId));
+  expect(replay).not.toHaveProperty('policy');
+  expect(
+    Object.values(replay.turns)
+      .flat()
+      .every((slot) => !Object.hasOwn(slot, 'explicit')),
+  ).toBe(true);
+  const input = await db.inputEvent.findFirstOrThrow({ where: { worldId: f.worldId, kind: 'general.create' } });
+  expect(input.result).not.toHaveProperty('activeTick');
 });

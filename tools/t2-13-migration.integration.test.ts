@@ -23,6 +23,7 @@ const policyMigration = '20261023050000_default_policy';
 const initial = commandInitial();
 initial.generals[0]!.userId = 'migration-human';
 const worldId = randomUUID();
+const endedWorldId = randomUUID();
 const policySql = await readFile(new URL(`${policyMigration}/migration.sql`, migrations), 'utf8');
 
 async function insert(table: string, row: Record<string, unknown>) {
@@ -70,6 +71,24 @@ beforeAll(async () => {
   for (const general of initial.generals) await insert('General', { ...general, worldId });
   for (let slot = 0; slot < 29; slot++)
     await insert('GeneralTurn', { worldId, generalId: 1, slot, commandKey: 'rest', args: {} });
+  await insert('World', {
+    id: endedWorldId,
+    name: '끝난 옛 월드',
+    scenarioKey: initial.scenarioKey,
+    mapKey: initial.mapKey,
+    unitSetKey: initial.unitSetKey,
+    seed: initial.seed,
+    startYear: initial.startYear,
+    turnTermMinutes: 30,
+    status: 'ENDED',
+    initialStateHash: hashState(initial),
+    statRules: initial.statRules,
+    unitSet: initial.unitSet,
+  });
+  for (const nation of initial.nations)
+    await insert('Nation', { ...nation, worldId: endedWorldId, capitalCityKey: null });
+  for (const city of initial.cities) await insert('City', { ...city, worldId: endedWorldId });
+  await insert('General', { ...initial.generals[1]!, worldId: endedWorldId });
 });
 afterAll(async () => {
   await client.query('ROLLBACK');
@@ -91,6 +110,29 @@ it('부분 칸이면 DDL까지 롤백하고 정상 전환 준비는 옛 기록�
   ).toHaveLength(0);
   expect((await client.query('SELECT slot FROM "GeneralTurn"')).rows).toHaveLength(29);
   await insert('GeneralTurn', { worldId, generalId: 1, slot: 29, commandKey: 'rest', args: {} });
+  for (const invalid of [-1, 30]) {
+    await client.query('UPDATE "GeneralTurn" SET slot=$1 WHERE "worldId"=$2 AND "generalId"=1 AND slot=29', [
+      invalid,
+      worldId,
+    ]);
+    await expect(client.query(policySql)).rejects.toThrow('Invalid legacy turn slot set');
+    await client.query('ROLLBACK');
+    await client.query('UPDATE "GeneralTurn" SET slot=29 WHERE "worldId"=$1 AND "generalId"=1 AND slot=$2', [
+      worldId,
+      invalid,
+    ]);
+  }
+  await insert('InputEvent', {
+    worldId,
+    userId: 'system:policy',
+    kind: 'system.policy.enable',
+    idempotencyKey: 'existing',
+    payload: {},
+    status: 'PENDING',
+  });
+  await expect(client.query(policySql)).rejects.toThrow('Policy transition already exists');
+  await client.query('ROLLBACK');
+  await client.query(`DELETE FROM "InputEvent" WHERE "worldId"=$1 AND "idempotencyKey"='existing'`, [worldId]);
   await client.query(policySql);
   expect((await client.query('SELECT "replayOrigin","clockTick","actionSequence" FROM "World"')).rows).toEqual(before);
   expect((await client.query('SELECT "policyFromSequence" FROM "World"')).rows[0]!.policyFromSequence).toBeNull();
@@ -111,6 +153,26 @@ it('부분 칸이면 DDL까지 롤백하고 정상 전환 준비는 옛 기록�
     result: null,
     payload: { version: 5, emptySlots: initial.generals.filter((g) => g.id !== 1).map((g) => g.id) },
   });
+  expect((await client.query('SELECT slot FROM "GeneralTurn" WHERE "worldId"=$1', [endedWorldId])).rows).toHaveLength(
+    0,
+  );
+  expect((await client.query('SELECT id FROM "InputEvent" WHERE "worldId"=$1', [endedWorldId])).rows).toHaveLength(0);
+  await expect(
+    insert('GeneralTurn', { worldId, generalId: 1, slot: 30, commandKey: 'rest', args: {} }),
+  ).rejects.toThrow();
+  for (const kind of ['general.setPolicy', 'system.policy.enable']) {
+    const input = {
+      worldId,
+      userId: 'migration-human',
+      generalId: 1,
+      kind,
+      idempotencyKey: randomUUID(),
+      payload: {},
+      status: 'PENDING',
+    };
+    if (kind === 'general.setPolicy') await insert('InputEvent', input);
+    await expect(insert('InputEvent', { ...input, idempotencyKey: randomUUID() })).rejects.toThrow();
+  }
   await expect(
     client.query(`UPDATE "GeneralTurn" SET explicit=false,"commandKey"='farm' WHERE "generalId"=1 AND slot=0`),
   ).rejects.toThrow();

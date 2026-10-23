@@ -31,7 +31,10 @@ describe('T2-02 실제 PostgreSQL migration', () => {
         ) as { origin: { initialStateHash: string } };
         await cp(join(dbRoot, 'prisma/migrations'), migrations, {
           recursive: true,
-          filter: (source) => !source.includes(migration),
+          filter: (source) => {
+            const directory = source.slice(join(dbRoot, 'prisma/migrations').length).split(/[\\/]/)[1];
+            return !directory || !/^\d/.test(directory) || directory < migration;
+          },
         });
         const initialMigrations = (await readdir(migrations)).filter((name) => /^\d/.test(name));
         expect(initialMigrations.length).toBeGreaterThan(0);

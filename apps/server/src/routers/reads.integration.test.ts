@@ -263,7 +263,13 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     });
     expect(data.nextTurnAt).toBe(new Date(anchor + 2400).toISOString());
     expect(data.turnsPreview).toEqual(
-      Array.from({ length: 5 }, (_, slot) => ({ slot, commandKey: 'rest', args: { label: 'primary', slot } })),
+      Array.from({ length: 5 }, (_, slot) => ({
+        slot,
+        commandKey: 'rest',
+        args: { label: 'primary', slot },
+        name: '휴식',
+        explicit: true,
+      })),
     );
     expect(data.recentLogs.map((log) => log.text)).toEqual(
       Array.from({ length: 10 }, (_, index) => `primary-actor-1-log-${35 - index}`),
@@ -338,7 +344,9 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     const { data } = await query('home.get', { worldId }, users[2]!.cookie);
     expect(data.nation).toBeNull();
     expect(data.general).toMatchObject({ id: 4, nationId: null, gold: 11004 });
-    expect(data.turnsPreview).toEqual(Array.from({ length: 5 }, (_, slot) => ({ slot, commandKey: 'rest', args: {} })));
+    expect(data.turnsPreview).toEqual(
+      Array.from({ length: 5 }, (_, slot) => ({ slot, commandKey: 'rest', args: {}, name: '휴식', explicit: false })),
+    );
     expect((await query('records.nation', { worldId }, users[2]!.cookie)).data).toEqual({
       items: [],
       nextCursor: null,
