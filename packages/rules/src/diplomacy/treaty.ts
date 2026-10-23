@@ -75,11 +75,18 @@ type TreatyView = DeepReadonly<TreatyWorldState>;
 
 // PostgreSQL Int와 actionSequence의 저장 범위다.
 const MAX_STORED_INT = 2_147_483_647;
+const MAX_ENGINE_TICK = MAX_STORED_INT - TICKS_PER_MONTH;
+const LAST_MONTHLY_TICK = Math.floor(MAX_ENGINE_TICK / TICKS_PER_MONTH) * TICKS_PER_MONTH;
 const RESPONSE_MONTHS = 6;
 const clauseKinds = ['peace', 'nonAggression', 'passage', 'tribute', 'trade', 'cityTransfer', 'note'] as const;
 const integer = z.number().int().min(-Number.MAX_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER);
 const positive = integer.min(1);
 const tickSchema = integer.min(0);
+const proposalTimingSchema = z.strictObject({
+  tick: tickSchema.max(MAX_ENGINE_TICK),
+  nonAggressionMonths: integer.min(1).max(120).nullable(),
+  npc: z.boolean(),
+});
 const treatyIdSchema = z.string().regex(/^[1-9][0-9]*$/);
 const clauseSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('peace') }),
@@ -182,6 +189,27 @@ function checkedTickAdd(tick: number, months: number): number {
   if (!Number.isSafeInteger(result) || result > MAX_STORED_INT)
     throw new RangeError('조약 기한 저장 범위를 넘었습니다.');
   return result;
+}
+
+// 조항과 관계를 검사한 뒤 실제 기간과 상대 국가의 NPC 여부를 넘긴다.
+export function canRepresentTreatyProposal(
+  options: Readonly<{ tick: number; nonAggressionMonths: number | null; npc: boolean }>,
+): boolean {
+  const { tick, nonAggressionMonths: months, npc } = proposalTimingSchema.parse(options);
+  const deadline = tick + RESPONSE_MONTHS * TICKS_PER_MONTH;
+  if (npc)
+    return deadline <= MAX_STORED_INT && (months === null || tick + months * TICKS_PER_MONTH <= LAST_MONTHLY_TICK);
+  return months === null ? deadline <= LAST_MONTHLY_TICK : deadline - 1 + months * TICKS_PER_MONTH <= LAST_MONTHLY_TICK;
+}
+
+// PROPOSED는 사람 상대 제안에서만 생긴다. 읽은 행의 기한만 검사한다.
+function assertProposedTiming(treaty: DeepReadonly<TreatyState>): void {
+  const months = treaty.clauses.find((clause) => clause.kind === 'nonAggression')?.months ?? null;
+  if (
+    !canRepresentTreatyProposal({ tick: treaty.proposedTick, nonAggressionMonths: months, npc: false }) ||
+    treaty.respondByTick !== checkedTickAdd(treaty.proposedTick, RESPONSE_MONTHS)
+  )
+    throw new RangeError('저장된 조약의 제안 시각과 응답 기한을 확인하세요.');
 }
 
 // 전체 archive 외피·sequence 순서는 호출자가 검사한다. APPLIED의 게임 결과는 재실행 뒤 대조해야 한다.
@@ -293,7 +321,7 @@ export function applyTreatyInput(
   context: { tick: number; sequence: number },
 ): TreatyApplyResult<TreatyWorldState> {
   const { tick, sequence } = context;
-  tickSchema.max(MAX_STORED_INT).parse(tick);
+  tickSchema.max(MAX_ENGINE_TICK).parse(tick);
   positive.max(MAX_STORED_INT).parse(sequence);
   positive.parse(input.generalId);
   const payload = TREATY_INPUTS[input.kind].payloadSchema.parse(input.payload);
@@ -317,11 +345,21 @@ export function applyTreatyInput(
     const proposal = proposeStored.parse(payload);
     if (proposal.toNationId === actor.nationId || !state.nations[proposal.toNationId]) return reject('BAD_TARGET');
     if (state.treaties?.some((entry) => entry.id === sequence)) throw new Error('이미 사용한 조약 순서입니다.');
+    const clauses = proposal.clauses.filter(isFirstClause);
+    if (!relationAllows(state, actor.nationId, proposal.toNationId, clauses)) return reject('TREATY_RELATION');
+    if (
+      !canRepresentTreatyProposal({
+        tick,
+        nonAggressionMonths: clauses.find((clause) => clause.kind === 'nonAggression')?.months ?? null,
+        npc: state.nations[proposal.toNationId]!.isNpc,
+      })
+    )
+      return reject('BAD_INPUT');
     treaty = {
       id: sequence,
       fromNationId: actor.nationId,
       toNationId: proposal.toNationId,
-      clauses: structuredClone(proposal.clauses.filter(isFirstClause)),
+      clauses: structuredClone(clauses),
       status: 'PROPOSED',
       proposedTick: tick,
       respondByTick: checkedTickAdd(tick, RESPONSE_MONTHS),
@@ -332,6 +370,7 @@ export function applyTreatyInput(
     const respond = respondPayload.parse(payload);
     const found = state.treaties?.find((entry) => String(entry.id) === respond.treatyId);
     if (!found) return reject('TREATY_NOT_PROPOSED');
+    if (found.status === 'PROPOSED') assertProposedTiming(found);
     if (!state.nations[found.fromNationId] || !state.nations[found.toNationId]) return reject('BAD_TARGET');
     if (actor.nationId !== found.toNationId) return reject('NOT_PARTY');
     if (found.status !== 'PROPOSED') return reject('TREATY_NOT_PROPOSED');
@@ -350,7 +389,8 @@ export function applyTreatyInput(
     );
     return { ok: true, state: next, result: { outcome: 'DECLINED', by, tick, treatyId: resultId } };
   }
-  if (!relationAllows(state, treaty.fromNationId, treaty.toNationId, treaty.clauses)) return reject('TREATY_RELATION');
+  if (input.kind === 'treaty.respond' && !relationAllows(state, treaty.fromNationId, treaty.toNationId, treaty.clauses))
+    return reject('TREATY_RELATION');
   if (input.kind === 'treaty.propose' && !npc) {
     const next = structuredClone(state) as TreatyWorldState;
     putTreaties(next, [...(next.treaties ?? []), treaty]);
