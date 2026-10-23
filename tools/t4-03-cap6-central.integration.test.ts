@@ -62,6 +62,7 @@ const loops = new Map<string, TurnLoop>();
 const children = new Map<ChildProcess, Promise<unknown>>();
 const createdResources: URL[] = [];
 let created = false;
+let ownOid: string | undefined;
 let oldDatabases: Record<string, unknown>[] = [];
 let migrationNames: string[] = [];
 const evidence: Record<string, unknown> = { ownName, executed: false, migrations: [], children: [] };
@@ -78,9 +79,14 @@ async function databases() {
 beforeAll(async () => {
   await admin.connect();
   oldDatabases = await databases();
+  expect(oldDatabases).toHaveLength(19);
   evidence.oldDatabases = oldDatabases;
   await admin.query(`CREATE DATABASE "${ownName}"`);
   created = true;
+  const ownRows = (await admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname=$1', [ownName])).rows;
+  expect(ownRows).toHaveLength(1);
+  ownOid = ownRows[0]!.oid as string;
+  evidence.createdOid = ownOid;
   await client.connect();
   const directory = new URL('../packages/db/prisma/migrations/', import.meta.url);
   migrationNames = (await readdir(directory)).filter((name) => /^\d/.test(name)).sort();
@@ -101,7 +107,7 @@ beforeAll(async () => {
       level: 1,
       region: 1,
       position: { x: id, y: 1 },
-      connections: [3 - id],
+      connections: [],
       initial: values,
       max: {
         ...values,
@@ -141,24 +147,33 @@ beforeAll(async () => {
 
 afterAll(async () => {
   try {
-    for (const [child, exited] of children) await stopOwnedChild(child, exited);
+    for (const [child, exited] of children) {
+      await stopOwnedChild(child, exited);
+      children.delete(child);
+    }
     if (created) for (const lease of leases) await releaseLease(db, lease);
   } finally {
     try {
       await db.$disconnect();
       await client.end();
       if (created) {
+        expect(children.size).toBe(0);
+        expect((evidence.children as Array<{ exited: boolean }>).every((child) => child.exited)).toBe(true);
+        const beforeDrop = (await admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname=$1', [ownName]))
+          .rows;
+        evidence.oidBeforeDrop = beforeDrop;
+        expect(ownOid).toBeDefined();
+        expect(beforeDrop).toEqual([{ oid: ownOid }]);
+        evidence.databasesBeforeDrop = await databases();
+        expect(evidence.databasesBeforeDrop).toEqual(oldDatabases);
         const connections = (
-          await admin.query(
-            "SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1 AND backend_type='client backend'",
-            [ownName],
-          )
+          await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1', [ownName])
         ).rows;
         evidence.connectionsBeforeDrop = connections;
+        expect(connections).toEqual([{ count: 0 }]);
         // 일반 DROP만 쓴다. 다른 연결 종료와 FORCE는 허용하지 않는다.
         await admin.query(`DROP DATABASE "${ownName}"`);
         evidence.absent = (await admin.query('SELECT datname FROM pg_database WHERE datname=$1', [ownName])).rows;
-        expect(connections).toEqual([{ count: 0 }]);
         expect(evidence.absent).toEqual([]);
         evidence.databasesAfter = await databases();
         expect(evidence.databasesAfter).toEqual(oldDatabases);
@@ -166,6 +181,7 @@ afterAll(async () => {
     } finally {
       try {
         for (const resource of createdResources) await unlink(resource);
+        evidence.resourcesRemoved = true;
       } finally {
         try {
           await admin.end();
@@ -187,6 +203,7 @@ type FixtureOptions = {
   npcTarget?: boolean;
   gold?: number;
   targetGold?: number;
+  separated?: boolean;
   status?: 'PREOPEN' | 'PAUSED' | 'RUNNING';
   treaty?: boolean;
   end?: boolean;
@@ -195,6 +212,7 @@ type FixtureOptions = {
 async function fixture(options: FixtureOptions = {}) {
   const users = await Promise.all([user(), user()]);
   const initial = options.initial ?? (await monthlyFixture());
+  if (options.separated) initial.cities = initial.cities.map((city) => ({ ...city, connections: [] }));
   initial.generals = initial.generals.slice(0, 2).map((general, i) => ({
     ...general,
     userId: options.human === false || (options.npcTarget && i === 1) ? null : users[i]!.id,
@@ -318,6 +336,30 @@ async function corruptTreaty(worldId: string) {
     },
   });
 }
+function childEnv() {
+  const env: NodeJS.ProcessEnv = { ...process.env, DATABASE_URL: ownUrl.href };
+  delete env.TEST_DATABASE_URL;
+  return env;
+}
+function trackChild(child: ChildProcess, kind: 'cli' | 'engine', worldId?: string) {
+  const record = {
+    pid: child.pid,
+    kind,
+    worldId,
+    exited: false,
+    code: null as number | null,
+    signal: null as string | null,
+  };
+  (evidence.children as unknown[]).push(record);
+  const exited = once(child, 'exit').then((values) => {
+    record.exited = true;
+    record.code = values[0] as number | null;
+    record.signal = values[1] as string | null;
+    return values;
+  });
+  children.set(child, exited);
+  return exited;
+}
 async function cliWorld(treaty: boolean) {
   const child = spawn(
     process.execPath,
@@ -341,13 +383,12 @@ async function cliWorld(treaty: boolean) {
     ],
     {
       cwd: root,
-      env: { ...process.env, DATABASE_URL: ownUrl.href },
+      env: childEnv(),
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     },
   );
-  const exited = once(child, 'exit');
-  children.set(child, exited);
+  const exited = trackChild(child, 'cli');
   const output: Buffer[] = [];
   child.stdout!.on('data', (data: Buffer) => output.push(data));
   child.stderr!.resume();
@@ -366,15 +407,13 @@ async function cliWorld(treaty: boolean) {
 function spawnEngine(worldId: string) {
   const child = spawn(process.execPath, ['--import', 'tsx', 'apps/engine/src/index.ts', '--world', worldId], {
     cwd: root,
-    env: { ...process.env, DATABASE_URL: ownUrl.href },
+    env: childEnv(),
     windowsHide: true,
     stdio: process.platform === 'win32' ? ['ignore', 'pipe', 'pipe', 'ipc'] : ['ignore', 'pipe', 'pipe'],
   });
-  const exited = once(child, 'exit');
-  children.set(child, exited);
+  trackChild(child, 'engine', worldId);
   child.stdout!.resume();
   child.stderr!.resume();
-  (evidence.children as unknown[]).push({ pid: child.pid, worldId });
   return child;
 }
 async function stopEngine(child: ChildProcess) {
@@ -872,7 +911,7 @@ it('P21 W1~W4의 12개월 DB 해시·수출 바이트·종료 재생을 대조�
   const cli = await cliWorld(true);
   await db.world.update({ where: { id: cli.worldId }, data: { status: 'RUNNING', clockAnchorAt: new Date() } });
   const w3 = await fixture({ format: 'positive', end: true });
-  const w4 = await fixture({ format: 'positive', human: false, end: true });
+  const w4 = await fixture({ format: 'positive', human: false, end: true, separated: true });
   for (const f of [w1, w3]) {
     const event = await propose(f);
     await respond(f, String(event.sequence));
@@ -991,7 +1030,11 @@ it('P25 origin null인 옛 월드는 세 상태에서 돌고 수출을 거부하
     // 생성 기록이 없던 과거 저장 형식의 회귀 fixture다. 활성화 증거로 쓰지 않는다.
     await client.query('UPDATE "World" SET "replayOrigin"=NULL WHERE id=$1', [f.worldId]);
     await db.world.update({ where: { id: f.worldId }, data: { status } });
-    await (await loopFor(f.worldId)).advanceTo(0);
+    await (await loopFor(f.worldId)).advanceTo(status === 'RUNNING' ? TICKS_PER_MONTH : 0);
+    if (status === 'RUNNING') {
+      expect(await db.generalLog.count({ where: { worldId: f.worldId } })).toBeGreaterThan(0);
+      expect(await db.yearbookSnapshot.count({ where: { worldId: f.worldId } })).toBe(1);
+    }
     expect((await db.world.findUniqueOrThrow({ where: { id: f.worldId } })).treatyFormat).toBeNull();
     await expect(exportReplay(db, f.worldId)).rejects.toThrow('생성 기록이 없는 월드는 재생할 수 없습니다.');
     await corruptTreaty(f.worldId);
