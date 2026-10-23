@@ -2,6 +2,7 @@ import type { Rng } from '@opensamguk/shared';
 import { BALANCE } from '../balance';
 import type { DeepReadonly } from '../model/world';
 import type { UnitSetResource } from '../world/resources';
+import { applyModifiers, type BattleModifiers } from '../modifiers';
 
 export type BattleForce = { crew: number; crewType: number; train: number; atmos: number };
 export type BattleInput = {
@@ -11,6 +12,8 @@ export type BattleInput = {
   defenderTech: number;
   defence?: number;
   unitSet: DeepReadonly<UnitSetResource>;
+  attackerModifiers?: BattleModifiers;
+  defenderModifiers?: BattleModifiers;
 };
 
 type Unit = DeepReadonly<UnitSetResource['crewTypes'][number]>;
@@ -29,10 +32,12 @@ function damage(
   rng: Rng,
   tech: number,
   defence: number,
+  attackerModifiers?: BattleModifiers,
+  defenderModifiers?: BattleModifiers,
 ) {
   const attacking = unit(unitSet, a.crewType),
     defending = unit(unitSet, b.crewType);
-  const power =
+  let power =
     ((a.crew *
       (attacking.attack / Math.max(1, defending.defence + defence)) *
       coefficient(attacking.attackCoef, defending.armType)) /
@@ -42,6 +47,8 @@ function damage(
     (1 + tech / BALANCE.MAX_TECH) *
     BALANCE.DAMAGE_FACTOR *
     (0.9 + rng.next() * 0.2);
+  power = applyModifiers(power, attackerModifiers?.dealt ?? []);
+  power = applyModifiers(power, defenderModifiers?.taken ?? []);
   return Math.min(b.crew, Math.max(1, Math.round(power)));
 }
 function copyForce(force: Readonly<BattleForce>): BattleForce {
@@ -58,8 +65,26 @@ export function simulateBattle(input: BattleInput, rng: Rng): { attacker: Battle
     phase++
   ) {
     // 양쪽 피해는 같은 페이즈 시작 상태로 계산하고 동시에 적용한다.
-    const toDefender = damage(attacker, defender, unitSet, rng, attackerTech, defence),
-      toAttacker = damage(defender, attacker, unitSet, rng, defenderTech, 0);
+    const toDefender = damage(
+        attacker,
+        defender,
+        unitSet,
+        rng,
+        attackerTech,
+        defence,
+        input.attackerModifiers,
+        input.defenderModifiers,
+      ),
+      toAttacker = damage(
+        defender,
+        attacker,
+        unitSet,
+        rng,
+        defenderTech,
+        0,
+        input.defenderModifiers,
+        input.attackerModifiers,
+      );
     attacker.crew -= toAttacker;
     defender.crew -= toDefender;
     attacker.atmos = Math.max(0, attacker.atmos - BALANCE.BATTLE_ATMOS_LOSS);
