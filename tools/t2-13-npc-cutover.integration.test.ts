@@ -146,6 +146,33 @@ it.each([false, true])('PREOPEN은 기다리고 시작 뒤 첫 단계에서 집�
   expect(await db.generalLog.count({ where: { worldId: f.worldId } })).toBe(0);
 });
 
+it('RUNNING 전환은 진행 지평 대신 잠근 시계를 기록하고 다음 단계부터 게임 턴을 실행한다', async () => {
+  const f = await fixture();
+  await marker(f.worldId);
+  await controlClock(db, f.worldId, 'start');
+  let checked = false;
+  const loop = new TurnLoop(db, f.lease, {
+    beforeCommit: async (tx) => {
+      if (checked) return;
+      checked = true;
+      const event = await tx.inputEvent.findFirstOrThrow({
+        where: { worldId: f.worldId, kind: 'system.policy.enable' },
+      });
+      expect(event).toMatchObject({
+        status: 'APPLIED',
+        sequence: 1,
+        result: { clockTick: 0, baselineActiveTick: null },
+      });
+      expect(await tx.generalLog.count({ where: { worldId: f.worldId } })).toBe(0);
+      expect((await tx.world.findUniqueOrThrow({ where: { id: f.worldId } })).clockTick).toBe(0);
+    },
+  });
+  const executions = await loop.advanceTo(100);
+  expect(checked).toBe(true);
+  expect(executions).toEqual([{ generalId: 1, tick: 100, commandKey: expect.any(String) }]);
+  expect((await snapshot(f.worldId)).world).toMatchObject({ clockTick: 100, actionSequence: 2, policyFromSequence: 1 });
+});
+
 it('commit 실패는 F·순서·장수·표지를 모두 되돌리고 재시도는 한 번만 집행한다', async () => {
   const f = await fixture();
   await db.world.update({ where: { id: f.worldId }, data: { status: 'PAUSED' } });
