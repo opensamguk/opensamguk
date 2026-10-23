@@ -1,8 +1,10 @@
+import type { PresetRules } from '../world/preset';
 import { cloneExtStateWithRegistry, extSlices, extCommandBindings, type ExtStateRegistry } from '../commands/ext/state';
 import type { InitialCity, InitialGeneral, InitialNation, InitialDiplomacy, WorldInit } from '../world/bootstrap';
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 export type WorldExt = Record<string, JsonValue>;
 export interface WorldState {
+  presetRules?: PresetRules;
   ext?: WorldExt;
   startYear: number;
   cities: Record<number, InitialCity>;
@@ -33,6 +35,7 @@ export function toWorldStateWithRegistry(initial: WorldInit, registry: ExtStateR
   const state = structuredClone(initial);
   return {
     ...(ext ? { ext } : {}),
+    ...(state.presetRules ? { presetRules: state.presetRules } : {}),
     startYear: state.startYear,
     cities: Object.fromEntries(state.cities.map((city) => [city.cityKey, city])),
     nations: Object.fromEntries(state.nations.map((nation) => [nation.id, nation])),

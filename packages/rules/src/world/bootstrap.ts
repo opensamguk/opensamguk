@@ -1,3 +1,4 @@
+import type { PresetRules } from './preset';
 import { rngFor } from '@opensamguk/shared';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { mapSchema, portraitMapSchema, scenarioSchema, statRulesSchema, unitSetSchema } from './resources';
@@ -81,6 +82,7 @@ export interface InitialDiplomacy {
 }
 
 export interface WorldInit {
+  presetRules?: PresetRules;
   ext?: WorldExt;
   commandMeta?: WorldState['commandMeta'];
   nationTurns?: WorldState['nationTurns'];

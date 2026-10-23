@@ -103,7 +103,10 @@ function makeInvestmentWithCollector(spec: Spec, collect: typeof collectModifier
       });
       const points = Math.round(score);
       // 인구·민심의 단위만 바꾼다. 경험·공헌은 기존 점수로 계산한다.
-      const cityScore = score * (spec.effectFactor ?? 1);
+      const thresholds = view.presetRules?.boost.smallWorld;
+      const humanCount = thresholds ? Object.values(view.generals).filter((g) => g.userId !== null).length : 0;
+      const multiplier = thresholds?.find((row) => humanCount < row.below)?.multiplier ?? 1;
+      const cityScore = score * (spec.effectFactor ?? 1) * multiplier;
       const change = spec.field === 'trust' ? cityScore : Math.round(cityScore);
       const effect: Effect =
         spec.field === 'tech'

@@ -1,6 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import type { Prisma } from '@opensamguk/db';
-import { toWorldState, type WorldInit } from '@opensamguk/rules';
+import { toWorldState, parsePreset, presetRules, type WorldInit } from '@opensamguk/rules';
 import { z } from 'zod';
 export const worldInput = z.strictObject({ worldId: z.string().min(1).max(64) });
 export async function requireWorld(tx: Prisma.TransactionClient, worldId: string, lock = false) {
@@ -23,6 +23,7 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
   const generals = await tx.general.findMany({ where: { worldId } });
   const diplomacies = await tx.diplomacy.findMany({ where: { worldId } });
   return toWorldState({
+    ...(world.preset ? { presetRules: presetRules(parsePreset(world.preset)) } : {}),
     startYear: world.startYear,
     cities,
     nations,

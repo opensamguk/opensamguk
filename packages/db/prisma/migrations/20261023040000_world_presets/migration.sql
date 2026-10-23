@@ -1,0 +1,1 @@
+ALTER TABLE "World" ADD COLUMN "presetKey" TEXT, ADD COLUMN "preset" JSONB;

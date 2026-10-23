@@ -1,0 +1,24 @@
+{
+  "name": "하드코어",
+  "turnTermMinutes": 60,
+  "scenario": "1030",
+  "map": "che",
+  "unitSet": "basic",
+  "commands": null,
+  "npc": {
+    "fillRatio": 1,
+    "aggression": 1.5
+  },
+  "protection": {
+    "foundUntilMonths": 0,
+    "peaceMonths": 0,
+    "maxGeneralsPerNation": null
+  },
+  "boost": {
+    "smallWorld": null,
+    "lateJoin": null
+  },
+  "features": {
+    "advisor": false
+  }
+}

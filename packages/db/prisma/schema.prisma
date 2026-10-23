@@ -12,6 +12,8 @@ datasource db {
 model World {
   id              String      @id @default(uuid())
   name            String
+  presetKey       String?
+  preset          Json?
   scenarioKey     String
   mapKey          String
   unitSetKey      String
