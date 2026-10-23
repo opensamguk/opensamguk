@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import type { AppRouter } from '@opensamguk/server/router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { TRPCClientError, type TRPCLink } from '@trpc/client';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -689,7 +689,8 @@ describe('국가 공지 팝업', () => {
     renderWith(<NationNoticePopup worldId={WORLD} />);
     const dialog = await screen.findByRole('dialog', { name: '국가 공지' });
     expect(dialog.textContent).toContain('A 공지');
-    expect(document.activeElement?.textContent).toBe('확인');
+    // 초점은 팝업이 그려진 뒤 effect에서 옮긴다. 그 effect가 끝나 팝업 안의 바로 그 [확인] 단추가 초점을 받는지 본다.
+    await waitFor(() => expect(document.activeElement).toBe(within(dialog).getByRole('button', { name: '확인' })));
     // 팝업을 띄운 사이 재조회로 캐시가 다른 국가의 판으로 바뀐다.
     act(() => client.setQueryData(keys.notice, notice(2, 3, 'B 공지')));
     on('notice.nation.markSeen', () => notice(2, 3, 'B 공지'));

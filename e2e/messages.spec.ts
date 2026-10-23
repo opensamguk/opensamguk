@@ -1,4 +1,4 @@
-import type { Page, Response } from '@playwright/test';
+import type { CDPSession, Page, Request, Response } from '@playwright/test';
 import {
   advanceTurn,
   apiMutate,
@@ -65,13 +65,210 @@ async function openMain(user: T210User, world: T210World) {
 }
 
 // 브라우저 문맥을 끊었다 잇는다. SSE가 다시 열리면 서버가 ready를 보낸다.
+// 4·8번만 이 도우미를 쓴다. 단계와 단언·시간은 그대로 두고, 그 사이 실제로 일어난 일을 읽기만 해 첨부한다.
 async function reconnect(page: Page) {
-  await page.context().setOffline(true);
-  await expect(realtime(page)).toHaveAttribute('data-realtime', 'reconnecting', { timeout: 10_000 });
-  const since = Date.now();
-  await page.context().setOffline(false);
-  await expect(realtime(page)).toHaveAttribute('data-realtime', 'open', { timeout: 30_000 });
-  return since;
+  const watch = await watchNetwork(page);
+  try {
+    await watch.snapshot('beforeOffline');
+    await page.context().setOffline(true);
+    await watch.snapshot('afterOffline');
+    await expect(realtime(page)).toHaveAttribute('data-realtime', 'reconnecting', { timeout: 10_000 });
+    const since = Date.now();
+    await page.context().setOffline(false);
+    await expect(realtime(page)).toHaveAttribute('data-realtime', 'open', { timeout: 30_000 });
+    await watch.snapshot('afterReconnect');
+    return since;
+  } catch (error) {
+    await watch.snapshot('failure');
+    throw error;
+  } finally {
+    await watch.finish();
+  }
+}
+
+const SSE_PATH = '/sse';
+const isSse = (url: string) => {
+  try {
+    return new URL(url).pathname === SSE_PATH;
+  } catch {
+    return false;
+  }
+};
+// 진단 실패는 어느 단계였는지(meta 키·snapshot 필드)와 고정 분류만 남긴다. 오류 메시지·stack·주소는 읽지 않는다.
+const describeError = (error: unknown) => (error instanceof Error ? 'unavailable: Error' : 'unavailable: non-Error');
+// 브라우저가 준 실패 문장 전체 대신 관측된 네트워크 오류 코드(net::ERR_…)만 남긴다. 코드가 없으면 고정값이다.
+const networkErrorCode = (errorText: string | undefined) =>
+  errorText?.match(/(?:net::)?ERR_[A-Z0-9_]+/)?.[0] ?? 'unknown';
+const DIAGNOSTIC_GROUP = 't210-reconnect-diagnostics';
+
+// 재연결 진단. 사건을 만들거나 객체·요청을 바꾸지 않고 읽기만 한다.
+// - 이 페이지의 /sse 요청: Playwright request·response·requestfailed 사건에서 로컬 순번, 상대 시각, HTTP 상태,
+//   네트워크 오류 코드(ERR_…)만 남긴다.
+//   주소·쿼리·헤더·쿠키·본문·수신 메시지는 남기지 않는다.
+// - native EventSource: CDP Runtime.queryObjects로 이미 있는 객체를 찾아 /sse인 것의 readyState만 읽는다.
+//   (https://chromedevtools.github.io/devtools-protocol/tot/Runtime/#method-queryObjects)
+// - navigator.onLine 값과 window online·offline 사건: 시점마다 값을 읽고, 사건은 듣기만 하는 리스너로 모은다.
+// 진단을 할 수 없으면 그 이유를 meta에 적고 시험 결과는 바꾸지 않는다.
+async function watchNetwork(page: Page) {
+  const started = Date.now();
+  const at = () => Date.now() - started;
+  const meta: Record<string, string> = {};
+  const snapshots: Array<Record<string, unknown>> = [];
+  const sse: Array<Record<string, unknown>> = [];
+  const order = new Map<Request, number>();
+  const seq = (request: Request) => {
+    let n = order.get(request);
+    if (n === undefined) {
+      n = order.size + 1;
+      order.set(request, n);
+    }
+    return n;
+  };
+  const onRequest = (request: Request) => {
+    if (isSse(request.url())) sse.push({ n: seq(request), event: 'request', at: at() });
+  };
+  const onResponse = (response: Response) => {
+    if (isSse(response.url()))
+      sse.push({ n: seq(response.request()), event: 'response', at: at(), status: response.status() });
+  };
+  const onFailed = (request: Request) => {
+    if (isSse(request.url()))
+      sse.push({
+        n: seq(request),
+        event: 'failed',
+        at: at(),
+        errorCode: networkErrorCode(request.failure()?.errorText),
+      });
+  };
+  page.on('request', onRequest);
+  page.on('response', onResponse);
+  page.on('requestfailed', onFailed);
+
+  try {
+    await page.evaluate(() => {
+      const log: Array<{ type: string; pageAt: number }> = [];
+      const listen = (event: Event) => log.push({ type: event.type, pageAt: Math.round(performance.now()) });
+      window.addEventListener('online', listen);
+      window.addEventListener('offline', listen);
+      (window as unknown as Record<string, unknown>).__t210NetworkLog = { log, listen };
+    });
+  } catch (error) {
+    meta.windowEvents = describeError(error);
+  }
+
+  let cdp: CDPSession | undefined;
+  try {
+    cdp = await page.context().newCDPSession(page);
+  } catch (error) {
+    meta.cdp = describeError(error);
+  }
+
+  // 힙에 있는 EventSource 중 /sse인 것의 readyState 개수. 닫힌 객체는 수거 전이면 남아 있을 수 있다.
+  const readyStates = async () => {
+    if (!cdp) return meta.cdp ?? 'unavailable';
+    const prototype = await cdp.send('Runtime.evaluate', {
+      expression: 'EventSource.prototype',
+      objectGroup: DIAGNOSTIC_GROUP,
+    });
+    if (!prototype.result.objectId) return 'unavailable: EventSource.prototype';
+    const found = await cdp.send('Runtime.queryObjects', {
+      prototypeObjectId: prototype.result.objectId,
+      objectGroup: DIAGNOSTIC_GROUP,
+    });
+    if (!found.objects.objectId) return 'unavailable: queryObjects';
+    const counted = await cdp.send('Runtime.callFunctionOn', {
+      objectId: found.objects.objectId,
+      functionDeclaration: `function () {
+        const counts = { connecting: 0, open: 0, closed: 0 };
+        for (const source of Array.from(this)) {
+          let path = '';
+          try { path = new URL(source.url, location.href).pathname; } catch { path = ''; }
+          if (path !== ${JSON.stringify(SSE_PATH)}) continue;
+          if (source.readyState === 0) counts.connecting += 1;
+          else if (source.readyState === 1) counts.open += 1;
+          else counts.closed += 1;
+        }
+        return counts;
+      }`,
+      returnByValue: true,
+      objectGroup: DIAGNOSTIC_GROUP,
+    });
+    await cdp.send('Runtime.releaseObjectGroup', { objectGroup: DIAGNOSTIC_GROUP });
+    return counted.result.value as unknown;
+  };
+
+  return {
+    async snapshot(label: string) {
+      const entry: Record<string, unknown> = { label, at: at() };
+      try {
+        Object.assign(
+          entry,
+          await page.evaluate(() => ({ navigatorOnLine: navigator.onLine, pageAt: Math.round(performance.now()) })),
+        );
+      } catch (error) {
+        entry.navigatorOnLine = describeError(error);
+      }
+      try {
+        entry.eventSourceReadyStates = await readyStates();
+      } catch (error) {
+        entry.eventSourceReadyStates = describeError(error);
+      }
+      snapshots.push(entry);
+    },
+    // 리스너·CDP 세션을 거두고 첨부한다. 여기서 난 오류는 meta에만 적고 던지지 않아 본 실패를 가리지 않는다.
+    async finish() {
+      page.off('request', onRequest);
+      page.off('response', onResponse);
+      page.off('requestfailed', onFailed);
+      let windowEvents: unknown = meta.windowEvents ?? null;
+      if (!meta.windowEvents) {
+        try {
+          windowEvents = await page.evaluate(() => {
+            const store = (window as unknown as Record<string, unknown>).__t210NetworkLog as
+              { log: Array<{ type: string; pageAt: number }>; listen: (event: Event) => void } | undefined;
+            if (!store) return null;
+            window.removeEventListener('online', store.listen);
+            window.removeEventListener('offline', store.listen);
+            delete (window as unknown as Record<string, unknown>).__t210NetworkLog;
+            return store.log;
+          });
+        } catch (error) {
+          meta.windowEventsCleanup = describeError(error);
+        }
+      }
+      if (cdp) {
+        try {
+          await cdp.send('Runtime.releaseObjectGroup', { objectGroup: DIAGNOSTIC_GROUP });
+        } catch (error) {
+          meta.cdpRelease = describeError(error);
+        }
+        try {
+          await cdp.detach();
+        } catch (error) {
+          meta.cdpDetach = describeError(error);
+        }
+      }
+      const report = {
+        limits: [
+          'EventSource onerror는 따로 듣지 않는다. 네트워크 실패(failed)와 native readyState 표본으로 구별한다.',
+          'SSE 수신 메시지(ready 등)는 기록하지 않는다. ready 뒤 재조회는 시험의 tRPC 요청 확인으로 본다.',
+          'readyState는 힙의 객체를 센 값이라 수거되지 않은 닫힌 객체가 섞일 수 있다.',
+        ],
+        meta,
+        snapshots,
+        sse,
+        windowEvents,
+      };
+      try {
+        await test.info().attach('t210-reconnect-diagnostics', {
+          body: JSON.stringify(report, null, 2),
+          contentType: 'application/json',
+        });
+      } catch {
+        // 첨부 실패는 시험 결과를 바꾸지 않는다.
+      }
+    },
+  };
 }
 
 // 팝업의 [확인]을 누르고 markSeen 응답까지 받는다. 화면은 응답 전에 팝업을 내리므로 저장이 끝난 것은 응답으로 확인한다.

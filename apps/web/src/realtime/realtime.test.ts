@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+// 브라우저의 online·offline 힌트를 실제 window 사건으로 보내려고 jsdom에서 돌린다. EventSource는 아래 FakeSource로 바꾼다.
 import { QueryClient } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MessageScope } from '../messages/contract';
@@ -47,6 +49,12 @@ class FakeSource implements EventSourceLike {
   }
 }
 
+// 시험이 연 연결은 끝날 때 모두 멈춘다. 연결이 window 힌트를 듣게 되면 다음 시험으로 새지 않게 하려는 것이다.
+const opened: WorldEventConnection[] = [];
+afterEach(() => {
+  for (const connection of opened.splice(0)) connection.stop();
+});
+
 function connect(onEvent?: (event: WorldEvent) => void) {
   const sources: FakeSource[] = [];
   const statuses: RealtimeStatus[] = [];
@@ -65,8 +73,12 @@ function connect(onEvent?: (event: WorldEvent) => void) {
     },
   });
   connection.start();
+  opened.push(connection);
   return { connection, sources, statuses, events, last: () => sources.at(-1)! };
 }
+
+const hint = (type: 'online' | 'offline') => window.dispatchEvent(new Event(type));
+const active = (sources: FakeSource[]) => sources.filter((source) => !source.closed);
 
 describe('SSE 알림 해석', () => {
   it('알려진 종류만 받고 범위가 맞지 않으면 버린다', () => {
@@ -225,5 +237,123 @@ describe('SSE 연결', () => {
     expect(c.sources).toHaveLength(1);
     expect(c.sources[0]!.closed).toBe(true);
     expect(c.statuses).toEqual([]);
+  });
+});
+
+// 브라우저의 online·offline 사건은 연결이 바뀌었을 수 있다는 힌트일 뿐이다(navigator 값은 믿지 않는다).
+// 힌트가 오면 지금 연결을 새 요청 하나로 바꾸고, 상태는 그 새 요청의 실제 open·error·ready만 따른다.
+describe('SSE 연결과 브라우저 네트워크 힌트', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('offline 힌트는 상태를 바꾸지 않고 연결을 새 요청 하나로 바꾸며 그 요청이 열리면 연결됨이 그대로다', () => {
+    const c = connect();
+    const first = c.last();
+    first.open();
+    hint('offline');
+    expect(first.closed).toBe(true);
+    expect(c.sources).toHaveLength(2);
+    expect(c.statuses).toEqual(['open']);
+    // 힌트가 틀렸고 서버에 닿는다. 새 요청이 열리면 기능을 그대로 쓴다.
+    c.last().open();
+    vi.advanceTimersByTime(DOWN_NOTICE_MS * 2);
+    expect(c.statuses).toEqual(['open']);
+    c.last().emit('ready');
+    expect(c.events).toEqual([{ kind: 'ready' }]);
+  });
+
+  it('offline 힌트 뒤 새 요청이 실제로 실패하면 3초 뒤 다시 잇는 중이 되고 서버가 닫았으면 간격 재연결을 한다', () => {
+    const c = connect();
+    c.last().open();
+    hint('offline');
+    expect(c.sources).toHaveLength(2);
+    c.last().fail(2);
+    expect(c.statuses).toEqual(['open']);
+    vi.advanceTimersByTime(1_000);
+    expect(c.sources).toHaveLength(3);
+    expect(active(c.sources)).toHaveLength(1);
+    vi.advanceTimersByTime(DOWN_NOTICE_MS - 1_000 - 1);
+    expect(c.statuses).toEqual(['open']);
+    vi.advanceTimersByTime(1);
+    expect(c.statuses).toEqual(['open', 'reconnecting']);
+  });
+
+  it('online 힌트는 기다리던 간격 재연결을 미루지 않고 바로 한 번 새로 열며 그 요청의 열림과 ready를 따른다', () => {
+    const c = connect();
+    c.last().open();
+    c.last().fail(2);
+    expect(c.sources).toHaveLength(1);
+    hint('online');
+    expect(c.sources).toHaveLength(2);
+    // 취소된 1초 간격 재연결이 하나를 더 만들지 않는다.
+    vi.advanceTimersByTime(1_000);
+    expect(c.sources).toHaveLength(2);
+    c.last().open();
+    c.last().emit('ready');
+    expect(c.statuses).toEqual(['open']);
+    expect(c.events).toEqual([{ kind: 'ready' }]);
+  });
+
+  it('online 힌트는 열려 있는 연결을 다시 만들지 않는다', () => {
+    const c = connect();
+    c.last().open();
+    hint('online');
+    expect(c.sources).toHaveLength(1);
+    expect(c.last().closed).toBe(false);
+    expect(c.statuses).toEqual(['open']);
+  });
+
+  it('힌트로 바꾼 뒤 옛 연결의 늦은 열림·오류·알림은 무시한다', () => {
+    const c = connect();
+    const old = c.last();
+    old.open();
+    hint('offline');
+    expect(c.sources).toHaveLength(2);
+    old.emit('ready');
+    old.fail(2);
+    vi.advanceTimersByTime(60_000);
+    expect(c.events).toEqual([]);
+    expect(c.sources).toHaveLength(2);
+    // 새 요청이 열리지 않아 3초 뒤 다시 잇는 중이다. 옛 연결이 늦게 열려도 되돌리지 않는다.
+    expect(c.statuses).toEqual(['open', 'reconnecting']);
+    old.open();
+    expect(c.statuses).toEqual(['open', 'reconnecting']);
+  });
+
+  it('닫힌 연결의 오류가 거듭 와도 간격 재연결은 하나만 기다린다', () => {
+    const c = connect();
+    const first = c.last();
+    first.open();
+    first.fail(2);
+    first.fail(2);
+    vi.advanceTimersByTime(60_000);
+    expect(c.sources).toHaveLength(2);
+    expect(active(c.sources)).toEqual([c.last()]);
+  });
+
+  it('멈춘 뒤에는 브라우저 힌트와 남은 타이머가 아무것도 만들지 않는다', () => {
+    const c = connect();
+    c.last().fail(2);
+    c.connection.stop();
+    hint('offline');
+    hint('online');
+    vi.advanceTimersByTime(60_000);
+    expect(c.sources).toHaveLength(1);
+    expect(c.statuses).toEqual([]);
+    expect(c.events).toEqual([]);
+  });
+
+  it('같은 힌트가 거듭 와도 살아 있는 연결은 하나이고 ready는 그 연결에서 한 번만 받는다', () => {
+    const c = connect();
+    c.last().open();
+    hint('offline');
+    hint('offline');
+    expect(c.sources.length).toBeGreaterThan(1);
+    expect(active(c.sources)).toEqual([c.last()]);
+    hint('online');
+    expect(active(c.sources)).toEqual([c.last()]);
+    c.last().open();
+    for (const source of c.sources) source.emit('ready');
+    expect(c.events).toEqual([{ kind: 'ready' }]);
   });
 });

@@ -114,6 +114,7 @@ export interface EventSourceLike {
   addEventListener(type: string, listener: (event: MessageEvent<string>) => void): void;
   close(): void;
 }
+const OPEN = 1;
 const CLOSED = 2;
 
 interface ConnectionOptions {
@@ -125,6 +126,11 @@ interface ConnectionOptions {
 
 // 연결 하나와 그 재연결. 오류가 나면 서버 응답 상태(400·401·403·404·503 등)로 짐작하지 않고 실제 readyState만 본다.
 // 브라우저가 스스로 다시 잇는 동안(CONNECTING)은 기다리고, 닫혔으면(CLOSED) 간격을 늘려 가며 새로 연다.
+//
+// 브라우저의 online·offline 사건은 연결이 바뀌었을 수 있다는 힌트로만 쓴다. navigator 값으로 상태나 기능을 정하지 않는다.
+// 쉬고 있는 기존 stream은 네트워크가 바뀌어도 오류를 바로 알리지 않을 수 있어서, 힌트가 오면 지금 연결을 새 요청 하나로 바꾸고
+// 그 요청의 실제 open·error·ready를 따른다(HTML 표준 SSE 처리 모델). 힌트가 틀려 서버에 닿으면 새 요청이 열려 그대로 쓴다.
+// online 힌트는 지금 연결이 열려 있으면 무시하고, 아니면 기다리던 간격 재연결을 취소하고 바로 한 번 새로 연다.
 export class WorldEventConnection {
   private source: EventSourceLike | null = null;
   private status: RealtimeStatus = 'connecting';
@@ -132,20 +138,50 @@ export class WorldEventConnection {
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private failures = 0;
   private stopped = false;
+  private listening = false;
 
   constructor(private readonly options: ConnectionOptions) {}
 
   start() {
     this.stopped = false;
+    if (!this.listening && typeof window !== 'undefined') {
+      window.addEventListener('offline', this.onOffline);
+      window.addEventListener('online', this.onOnline);
+      this.listening = true;
+    }
     this.watchDown();
     this.open();
   }
 
   stop() {
     this.stopped = true;
+    if (this.listening) {
+      window.removeEventListener('offline', this.onOffline);
+      window.removeEventListener('online', this.onOnline);
+      this.listening = false;
+    }
     this.source?.close();
     this.source = null;
     this.clear();
+  }
+
+  private readonly onOffline = () => {
+    if (!this.stopped) this.replace();
+  };
+
+  private readonly onOnline = () => {
+    if (this.stopped || this.source?.readyState === OPEN) return;
+    this.replace();
+  };
+
+  // 지금 연결을 닫고 새 요청 하나로 바꾼다. 상태는 바꾸지 않고, 새 요청이 3초 안에 열리지 않을 때만 다시 잇는 중이 된다.
+  private replace() {
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    this.retryTimer = null;
+    this.source?.close();
+    this.source = null;
+    this.watchDown();
+    this.open();
   }
 
   private open() {
@@ -163,7 +199,10 @@ export class WorldEventConnection {
       if (this.source !== source || this.stopped) return;
       this.watchDown();
       if (source.readyState !== CLOSED) return;
+      // 닫힌 연결은 지금 연결에서 뺀다. 같은 연결의 오류가 또 와도 간격 재연결 타이머는 하나뿐이다.
       source.close();
+      this.source = null;
+      if (this.retryTimer) clearTimeout(this.retryTimer);
       const delay = RECONNECT_DELAYS_MS[Math.min(this.failures, RECONNECT_DELAYS_MS.length - 1)];
       this.failures += 1;
       this.retryTimer = setTimeout(() => {
