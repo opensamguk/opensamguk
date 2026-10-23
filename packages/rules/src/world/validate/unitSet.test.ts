@@ -18,6 +18,11 @@ describe('T4-76 병종 검증', () => {
       'unitset-wall-missing',
       'unitset-crew-id-duplicate',
     ]);
+    expect(validateUnitSet(unit).issues[1]).toMatchObject({
+      code: 'unitset-wall-missing',
+      severity: 'error',
+      target: { kind: 'root' },
+    });
   });
   it('모병 불가·없는 계통과 계수는 조언 경고이며 record 순서에 의존하지 않는다', () => {
     const unit = unitFixture();

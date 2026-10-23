@@ -23,6 +23,52 @@ describe('T4-76 지도 검증', () => {
     expect(report.ran).toEqual(['limits', 'shape']);
     expect(report.skipped.every((item) => item.reason === 'blocked')).toBe(true);
   });
+  it('모르는 판의 코드·심각도·위치와 차단 그룹을 확인한다', () => {
+    const report = complete({ ...mapFixture(), version: 3 });
+    expect(report).toMatchObject({
+      status: 'fail',
+      ran: ['limits', 'shape'],
+      issues: [{ code: 'map-version-unknown', severity: 'error', target: { kind: 'path', path: ['version'] } }],
+      skipped: ['cities', 'links', 'network', 'terrain', 'scenario-refs'].map((group) => ({
+        group,
+        reason: 'blocked',
+      })),
+    });
+  });
+  it.each([
+    { label: '글자 위치', input: { ...mapFixture(), cities: [{ ...makeCity(), position: '잘못된 위치' }] } },
+    { label: 'v2 추가 칸', input: { ...v2Fixture(), extra: true } },
+    { label: '좌표 NaN', input: { ...v2Fixture(), cities: [{ ...makeCity(), position: { x: NaN, y: 0 } }] } },
+    { label: '캔버스 NaN', input: { ...v2Fixture(), canvas: { width: NaN, height: 500 } } },
+  ])('$label 형식 오류 뒤 관계 검사를 막는다', ({ input }) => {
+    const report = complete(input);
+    expect(report.status).toBe('fail');
+    expect(report.ran).toEqual(['limits', 'shape']);
+    expect(report.issues.length).toBeGreaterThan(0);
+    expect(report.issues.every((item) => item.code === 'shape-invalid' && item.severity === 'error')).toBe(true);
+    expect(report.skipped).toEqual(
+      ['cities', 'links', 'network', 'terrain', 'scenario-refs'].map((group) => ({ group, reason: 'blocked' })),
+    );
+  });
+  it.each([
+    ['level', 0],
+    ['level', 9],
+    ['region', 0],
+    ['region', 9],
+  ] as const)('%s %i는 권장 범위 경고만 내고 게시를 막지 않는다', (field, value) => {
+    const map = mapFixture();
+    map.cities[0]![field] = value;
+    expect(complete(map)).toMatchObject({
+      status: 'pass',
+      issues: [
+        {
+          code: `city-${field}-range`,
+          severity: 'warning',
+          target: { kind: 'city', index: 0 },
+        },
+      ],
+    });
+  });
   it('도시 오류의 대상과 순서를 보존하고 원본을 바꾸지 않는다', () => {
     const map = mapFixture();
     Object.assign(map.cities[1]!, { id: 1, name: '도시1', level: 0, region: 9, position: { x: -1, y: 10 } });
@@ -41,6 +87,10 @@ describe('T4-76 지도 검증', () => {
       true,
     );
     expect(map).toEqual(before);
+    expect(report.issues.find((item) => item.code === 'city-out-of-canvas')).toMatchObject({
+      severity: 'error',
+      target: { kind: 'city', index: 1 },
+    });
   });
   it('빈 이름은 형식 오류이고 공백 이름은 게시를 막지 않는 경고다', () => {
     for (const name of ['   ', ' 도시 ']) {
@@ -60,12 +110,23 @@ describe('T4-76 지도 검증', () => {
     map.cities[0]!.connections = [2, 2, 1, 99];
     map.cities[1]!.connections = [];
     expect(codes(complete(map))).toEqual([
-      'link-one-way',
       'link-duplicate',
       'link-self',
       'link-missing-city',
+      'link-one-way',
       'network-split',
     ]);
+    expect(complete(map)).toMatchObject({
+      status: 'fail',
+      issues: [
+        ...['link-duplicate', 'link-self', 'link-missing-city', 'link-one-way'].map((code) => ({
+          code,
+          severity: 'error',
+          target: { kind: 'city', index: 0 },
+        })),
+        { code: 'network-split', severity: 'error', target: { kind: 'city', index: 1 } },
+      ],
+    });
     expect(complete(mapFixture()).issues).toEqual([]);
   });
   it('좌표 튜플 형식과 고리 점 수·닫힘을 다른 단계에서 검사한다', () => {
@@ -79,6 +140,14 @@ describe('T4-76 지도 검증', () => {
     ];
     map.terrain.rivers = [{ points: [[701, 0]] }];
     expect(codes(complete(map))).toEqual(['terrain-open', 'terrain-open', 'terrain-out-of-canvas']);
+    expect(complete(map)).toMatchObject({
+      status: 'fail',
+      issues: [
+        { code: 'terrain-open', severity: 'error', target: { kind: 'terrain', layer: 'coast', index: 0 } },
+        { code: 'terrain-open', severity: 'error', target: { kind: 'terrain', layer: 'rivers', index: 0 } },
+        { code: 'terrain-out-of-canvas', severity: 'error', target: { kind: 'terrain', layer: 'rivers', index: 0 } },
+      ],
+    });
     map.terrain.coast = [
       [
         [0, 0],

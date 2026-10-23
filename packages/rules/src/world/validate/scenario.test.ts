@@ -34,6 +34,19 @@ describe('T4-76 시나리오 검증', () => {
       'scenario-diplomacy-invalid',
       'scenario-diplomacy-duplicate',
     ]);
+    expect(validateScenario(scenario, { map: mapFixture() }).issues[0]).toMatchObject({
+      code: 'scenario-nation-name-duplicate',
+      severity: 'error',
+      target: { kind: 'nation', index: 1 },
+    });
+  });
+  it('장수 이름 중복은 같은 초상 이름을 쓰는 경고만 낸다', () => {
+    const scenario = scenarioFixture();
+    scenario.general.push(structuredClone(scenario.general[0]!));
+    expect(validateScenario(scenario, { map: mapFixture() })).toMatchObject({
+      status: 'pass',
+      issues: [{ code: 'scenario-general-name-duplicate', severity: 'warning', target: { kind: 'general', index: 1 } }],
+    });
   });
   it('외교 중복은 마지막 적용을 알리는 경고이며 참조 오류와 구분한다', () => {
     const scenario = scenarioFixture();

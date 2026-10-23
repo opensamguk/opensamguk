@@ -44,20 +44,22 @@ export function validateMap(input: unknown, ctx?: { scenarios?: ReadonlyArray<un
   map.cities.forEach((city, index) => {
     const target = { kind: 'city', index } as const;
     const seen = new Set<number>();
+    const diagnostics: ResourceIssue[][] = [[], [], [], []];
     for (const id of city.connections) {
       if (seen.has(id)) {
-        out.add(issue('link-duplicate', target, { id }));
+        diagnostics[0]!.push(issue('link-duplicate', target, { id }));
         continue;
       }
       seen.add(id);
       if (id === city.id) {
-        out.add(issue('link-self', target, { id }));
+        diagnostics[1]!.push(issue('link-self', target, { id }));
         continue;
       }
       const other = ids.get(id);
-      if (other === undefined) out.add(issue('link-missing-city', target, { id }));
-      else if (!links[other]!.has(city.id)) out.add(issue('link-one-way', target, { id }));
+      if (other === undefined) diagnostics[2]!.push(issue('link-missing-city', target, { id }));
+      else if (!links[other]!.has(city.id)) diagnostics[3]!.push(issue('link-one-way', target, { id }));
     }
+    for (const group of diagnostics) for (const item of group) out.add(item);
   });
   out.did('network');
   const reached = new Set<number>([0]);

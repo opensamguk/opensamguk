@@ -30,7 +30,7 @@ const cases = [
   'diagnostics',
 ] as const;
 type Case = (typeof cases)[number];
-function sample(name: Case): () => { status: string; issues: unknown[]; truncated: boolean; ran: string[] } {
+function sample(name: Case): () => { status: string; issues: { code: string }[]; truncated: boolean; ran: string[] } {
   if (name === 'city-edges') {
     const map = {
       ...mapFixture(),
@@ -122,7 +122,19 @@ if (requested !== -1) {
   const result = run();
   const elapsedMs = performance.now() - start;
   const expected = name === 'scenario-owned' || name === 'diagnostics' ? 'fail' : 'pass';
-  if (result.status !== expected || !result.ran.includes('shape'))
+  const terminal =
+    name === 'scenario-owned'
+      ? 'map-refs'
+      : name === 'unit-coefficients'
+        ? 'crew-types'
+        : name === 'portraits'
+          ? 'portraits'
+          : 'scenario-refs';
+  if (
+    result.status !== expected ||
+    !result.ran.includes(terminal) ||
+    result.issues.some((item) => item.code === 'shape-invalid')
+  )
     throw new Error('표본이 의도한 검사 단계에 도달하지 않았습니다.');
   console.log(
     JSON.stringify({
@@ -144,6 +156,7 @@ if (requested !== -1) {
   const sourceFiles = [
     script,
     resolve(root, 'packages/rules/package.json'),
+    resolve(root, 'packages/rules/src/world/resources.ts'),
     ...['map', 'validate'].flatMap((dir) =>
       readdirSync(resolve(root, `packages/rules/src/world/${dir}`))
         .filter((name) => name.endsWith('.ts'))
@@ -151,6 +164,12 @@ if (requested !== -1) {
     ),
   ].sort();
   const hash = createHash('sha256');
+  const zodVersion = (
+    JSON.parse(readFileSync(resolve(root, 'packages/rules/node_modules/zod/package.json'), 'utf8')) as {
+      version: string;
+    }
+  ).version;
+  hash.update('zod-version\0').update(zodVersion).update('\0');
   for (const file of sourceFiles)
     hash.update(relative(root, file).replaceAll('\\', '/')).update('\0').update(readFileSync(file)).update('\0');
   const rows = cases.map((name) => {
@@ -174,6 +193,7 @@ if (requested !== -1) {
       {
         version: 1,
         node: process.version,
+        zodVersion,
         platform: platform(),
         cpu: cpus()[0]?.model,
         totalMemoryBytes: totalmem(),

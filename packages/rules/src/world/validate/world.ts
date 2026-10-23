@@ -3,6 +3,7 @@ import { validateScenario } from './scenario';
 import { validateUnitSet } from './unitSet';
 import { validateStatRules } from './statRules';
 import { validatePortraitMap } from './portraitMap';
+import type { ResourceReport } from './issues';
 
 export function validateWorldResources(input: {
   map: unknown;
@@ -19,7 +20,7 @@ export function validateWorldResources(input: {
     portraitMap: validatePortraitMap(input.portraitMap ?? { portraits: {} }),
   };
   const values = Object.values(reports);
-  const status = values.some((report) => report.status === 'fail')
+  const status: ResourceReport<unknown>['status'] = values.some((report) => report.status === 'fail')
     ? 'fail'
     : values.some((report) => report.status === 'incomplete')
       ? 'incomplete'

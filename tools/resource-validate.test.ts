@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import map from '../resources/map/che.json';
 import scenario from '../resources/scenario/1030.json';
@@ -73,7 +74,7 @@ describe('T4-76 실제 내장 자원과 기존 생성 함수', () => {
     const require = createRequire(new URL('../packages/rules/package.json', import.meta.url));
     const resolved = require.resolve('@opensamguk/rules/resource-validation');
     expect(resolved.replaceAll('\\', '/')).toBe(
-      new URL('../packages/rules/src/world/validate/index.ts', import.meta.url).pathname.replace(/^\/(\w:)/, '$1'),
+      fileURLToPath(new URL('../packages/rules/src/world/validate/index.ts', import.meta.url)).replaceAll('\\', '/'),
     );
     expect(() => require.resolve('@opensamguk/rules/resource-validation/limits')).toThrow();
   });

@@ -35,8 +35,8 @@ export const mapV2Schema = z.strictObject({
   terrain: z.strictObject({
     coast: z.array(z.array(point)),
     lakes: z.array(z.array(point)),
-    mountains: z.array(z.array(point)),
     rivers: z.array(z.strictObject({ name: z.string().min(1).optional(), points: z.array(point) })),
+    mountains: z.array(z.array(point)),
   }),
 });
 export type MapResourceV2 = z.infer<typeof mapV2Schema>;
