@@ -20,6 +20,22 @@ export * from './commands/registry';
 export { extSliceKeys, restoreExtState } from './commands/ext/state';
 export * from './monthly/index';
 export * from './replay';
+export {
+  ORIGIN_CAPS,
+  ARCHIVE_CAPS,
+  CAPS_INPUT_OWNERS,
+  parseCapsOrigin,
+  selectSupportedCapabilities,
+  capsResourceHashInput,
+  validateCapsRecordedInput,
+  startCapsReplay,
+  applyCapsRecordedInput,
+  runCapsReplayAction,
+  type CapabilityDescriptor,
+  type CapsOrigin,
+  type CapabilitySelection,
+} from './replayCapabilities';
+export { selectWorldCapabilities, projectTreatyRows, type WorldCapabilities } from './capsWorld';
 export * from './general/create';
 export * from './general/creationBlock';
 export * from './supply';
