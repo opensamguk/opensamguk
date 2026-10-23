@@ -29,6 +29,7 @@ const paths = [
   'auth.logout',
   'auth.me',
   'world.list',
+  'world.publicMaps',
   'world.summary',
   'world.map',
   'general.create',
@@ -50,7 +51,7 @@ const paths = [
 ] as const;
 type Path = (typeof paths)[number];
 function input(path: Path): unknown {
-  if (['health', 'auth.me', 'auth.logout', 'world.list'].includes(path)) return undefined;
+  if (['health', 'auth.me', 'auth.logout', 'world.list', 'world.publicMaps'].includes(path)) return undefined;
   if (path === 'auth.signup') return { email: `${randomUUID()}@example.test`, password };
   if (path === 'auth.login') return { email: users[0]!.email, password };
   if (path === 'general.create')
@@ -88,6 +89,7 @@ async function snapshot() {
     db.general.findMany({ orderBy: [{ worldId: 'asc' }, { id: 'asc' }] }),
     db.generalTurn.findMany({ orderBy: [{ worldId: 'asc' }, { generalId: 'asc' }, { slot: 'asc' }] }),
     db.inputEvent.findMany({ orderBy: { id: 'asc' } }),
+    db.publicMapSnapshot.findMany({ orderBy: [{ worldId: 'asc' }, { takenAt: 'asc' }] }),
     db.city.findMany({ orderBy: [{ worldId: 'asc' }, { cityKey: 'asc' }] }),
     db.nation.findMany({ orderBy: [{ worldId: 'asc' }, { id: 'asc' }] }),
   ]);
@@ -134,7 +136,7 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
       it(
         `${path} ${category}`,
         authzCase(path, category, async () => {
-          const publicPath = path.startsWith('auth.') || path === 'health';
+          const publicPath = path.startsWith('auth.') || path === 'health' || path === 'world.publicMaps';
           const cookie =
             category === 'unauthenticated'
               ? undefined
