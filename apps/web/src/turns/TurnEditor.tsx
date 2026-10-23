@@ -39,6 +39,15 @@ import { useStoredSelection, useTurnDraft, type TurnDraftState } from './useTurn
 
 const ENDED_REASON = '끝난 판이라 예턴을 바꿀 수 없습니다.';
 
+const HOME_POLL_MS = 15_000;
+
+// 예턴 편집기와 예턴 화면 최근 결과의 home.get 주기. 끝난 판이거나 직전 응답이 NOT_FOUND(내 장수 없음)면 멈춘다.
+// 같은 쿼리를 관찰하는 위쪽 띠가 상태·모드 전환 때 한 번 무효화하므로 그때 성공하면 주기가 다시 켜진다 (T1-27).
+export function homePollMs(ended: boolean) {
+  return (query: { state: { error: unknown } }): number | false =>
+    ended || errorCode(query.state.error) === 'NOT_FOUND' ? false : HOME_POLL_MS;
+}
+
 export interface TurnEditorProps {
   worldId: string;
   // 메인 지도에서 고른 도시(city.key). 대상 도시 칸의 기본값으로만 쓴다. 권한 근거가 아니며 편집을 바꾸거나 저장하지 않는다.
@@ -121,7 +130,7 @@ function Editor({
   const ended = summary.data?.status === 'ENDED';
   const home = useQuery({
     ...trpc.home.get.queryOptions({ worldId }),
-    refetchInterval: ended ? false : 15_000,
+    refetchInterval: homePollMs(ended),
     retry: retryUnlessClientError,
   });
   // 빈 칸이 실제로 무엇을 할지 보여 주려고 지금 방침을 읽는다. 못 읽으면 빈 칸은 휴식으로 보인다.
