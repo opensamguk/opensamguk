@@ -36,14 +36,23 @@ afterAll(async () => {
   }
 });
 
-async function fixture(options: { policy?: boolean; off?: boolean; npc?: boolean } = {}) {
+async function fixture(
+  options: {
+    policy?: boolean;
+    off?: boolean;
+    npc?: boolean;
+    proposerLevel?: number;
+    responderLevel?: number;
+    targetGold?: number;
+  } = {},
+) {
   const initial = await readFixture();
   const userIds = initial.generals.map(() => randomUUID());
   const sessionIds = userIds.map(() => randomUUID());
   userIds.forEach((id) => users.add(id));
   initial.nations = initial.nations.map((nation) => ({
     ...nation,
-    gold: 1000,
+    gold: nation.id === 2 ? (options.targetGold ?? 1000) : 1000,
     isNpc: options.npc === true && nation.id === 2,
   }));
   initial.nations.push({
@@ -59,7 +68,8 @@ async function fixture(options: { policy?: boolean; off?: boolean; npc?: boolean
     ...general,
     userId: options.npc && index === 1 ? null : userIds[index]!,
     nationId: [1, 2, 3, 1][index]!,
-    officerLevel: index === 3 ? 1 : 12,
+    officerLevel:
+      index === 0 ? (options.proposerLevel ?? 12) : index === 1 ? (options.responderLevel ?? 12) : index === 3 ? 1 : 12,
   }));
   initial.diplomacies = [{ nationA: 1, nationB: 2, state: 'WAR', untilTick: 0 }];
   await db.user.createMany({
@@ -185,8 +195,7 @@ describe('T2-07 / AC-M2-06 서버 조약 leaf 실제 PostgreSQL 경계', () => {
   });
 
   it.each([12, 11])('직위 %i 접수는 게임 상태를 보존하고 SQL NULL 대기 입력 하나만 쓴다', async (officerLevel) => {
-    const f = await fixture();
-    await db.general.update({ where: { worldId_id: { worldId: f.worldId, id: 1 } }, data: { officerLevel } });
+    const f = await fixture({ proposerLevel: officerLevel });
     const before = await snapshot(f.worldId);
     await submit(f.identity());
     expect(await snapshot(f.worldId)).toEqual(before);
@@ -312,8 +321,7 @@ describe('T2-07 / AC-M2-06 서버 조약 leaf 실제 PostgreSQL 경계', () => {
   );
 
   it.each([1, 10])('직위 %i 새 접수를 막는다', async (officerLevel) => {
-    const f = await fixture();
-    await db.general.update({ where: { worldId_id: { worldId: f.worldId, id: 1 } }, data: { officerLevel } });
+    const f = await fixture({ proposerLevel: officerLevel });
     await expect(submit(f.identity())).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(await events(f.worldId)).toEqual([]);
   });
@@ -369,9 +377,8 @@ describe('T2-07 / AC-M2-06 서버 조약 leaf 실제 PostgreSQL 경계', () => {
   });
 
   it.each([12, 11])('직위 %i 응답 접수도 상태를 보존하고 중복 대상을 막는다', async (officerLevel) => {
-    const f = await fixture();
+    const f = await fixture({ responderLevel: officerLevel });
     const p = await proposal(f);
-    await db.general.update({ where: { worldId_id: { worldId: f.worldId, id: 2 } }, data: { officerLevel } });
     const identity = f.identity(1);
     const before = await snapshot(f.worldId);
     expect(await submit(identity, { treatyId: p.treatyId, accept: false }, 'treaty.respond')).toEqual({
@@ -448,14 +455,13 @@ describe('T2-07 / AC-M2-06 서버 조약 leaf 실제 PostgreSQL 경계', () => {
   });
 
   it.each([true, false])('NPC 최대 마감의 이력을 현재 NPC flag로 재판정하지 않는다 (수락 %s)', async (accept) => {
-    const f = await fixture({ npc: true });
-    if (!accept) await db.nation.update({ where: { worldId_id: { worldId: f.worldId, id: 2 } }, data: { gold: 0 } });
+    const f = await fixture({ npc: true, targetGold: accept ? 1000 : 0 });
     const identity = f.identity();
     await submit(identity);
     expect((await complete(identity, 2147423647)).status).toBe('APPLIED');
     if (accept) await closeTreaties(f.worldId, 2147440000);
     await db.nation.update({ where: { worldId_id: { worldId: f.worldId, id: 2 } }, data: { isNpc: false } });
-    await db.world.update({ where: { id: f.worldId }, data: { monthlyTick: 2147480000, status: 'ENDED' } });
+    await db.world.update({ where: { id: f.worldId }, data: { monthlyTick: 2147470000, status: 'ENDED' } });
     expect(await read(identity)).toMatchObject({
       status: 'applied',
       outcome: accept ? 'ACCEPTED' : 'DECLINED',
@@ -487,20 +493,21 @@ describe('T2-07 / AC-M2-06 서버 조약 leaf 실제 PostgreSQL 경계', () => {
     },
   );
 
-  it.each(['sequence', 'general', 'result', 'payload'] as const)(
+  it.each(['generalZero', 'generalMissing', 'kind', 'payload'] as const)(
     '파손 PENDING %s는 고정 오류로 닫는다',
     async (field) => {
       const f = await fixture();
       const identity = f.identity();
       await submit(identity);
       const event = (await events(f.worldId))[0]!;
+      // completion CHECK를 지킨 채 서버가 거절할 파손 행을 만든다.
       const data: Prisma.InputEventUpdateInput =
-        field === 'sequence'
-          ? { sequence: 1 }
-          : field === 'general'
+        field === 'generalZero'
+          ? { generalId: 0 }
+          : field === 'generalMissing'
             ? { generalId: null }
-            : field === 'result'
-              ? { result: { private: '노출 금지' } }
+            : field === 'kind'
+              ? { kind: 'unrelated' }
               : { payload: { private: '노출 금지' } };
       await db.inputEvent.update({ where: { id: event.id }, data });
       await expect(read(identity)).rejects.toMatchObject({
@@ -537,9 +544,10 @@ describe('T2-07 / AC-M2-06 서버 조약 leaf 실제 PostgreSQL 경계', () => {
       const f = await fixture();
       const p = await proposal(f);
       const event = (await events(f.worldId))[0]!;
+      // 양수 2는 DB 제약을 지나지만 제안 결과의 treatyId 1과 맞지 않는다.
       const data: Prisma.InputEventUpdateInput =
         field === 'sequence'
-          ? { sequence: null }
+          ? { sequence: 2 }
           : field === 'outcome'
             ? { result: { outcome: 'ACCEPTED', private: '노출 금지' } }
             : field === 'payload'
