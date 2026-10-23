@@ -1,0 +1,224 @@
+/* 국가 작전판과 감찰 (T2-12). 판정은 Tag의 아이콘·글자·색을 함께 쓴다. */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+.warn {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.ok {
+  color: var(--color-success);
+}
+
+.primary,
+.secondary {
+  font: inherit;
+  border-radius: var(--radius);
+  cursor: pointer;
+  padding: var(--space-1) var(--space-3);
+}
+
+.primary {
+  border: 0;
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  font-weight: 600;
+}
+
+.secondary {
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text);
+  align-self: flex-start;
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.head h1 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.meta,
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  margin: var(--space-1) 0 0;
+}
+
+.table,
+.timeline,
+.diff {
+  border-collapse: collapse;
+}
+
+.table th,
+.table td,
+.timeline th,
+.timeline td,
+.diff th,
+.diff td {
+  height: var(--row-height);
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.table .num,
+.diff .num {
+  text-align: right;
+}
+
+.timelineWrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  overflow-x: auto;
+}
+
+.timeline thead th {
+  position: sticky;
+  top: 0;
+  background: var(--color-surface);
+  white-space: nowrap;
+}
+
+.timeline td {
+  white-space: nowrap;
+}
+
+.sub {
+  display: block;
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.targetCol {
+  border-left: 2px solid var(--color-accent);
+}
+
+.targetMark {
+  color: var(--color-accent);
+  font-size: var(--text-xs);
+}
+
+.sortie {
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.otherSortie {
+  color: var(--color-text-muted);
+}
+
+.me {
+  background: var(--color-surface-muted);
+}
+
+.idle {
+  background: color-mix(in srgb, var(--color-warning) 10%, transparent);
+}
+
+.mine {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 760px;
+}
+
+.mine h2,
+.create h2,
+.preview h3 {
+  margin: 0;
+  font-size: var(--text-md);
+}
+
+.align {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.align p {
+  margin: 0;
+}
+
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+}
+
+.confirm {
+  padding: var(--space-2);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius);
+}
+
+.create {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 760px;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+}
+
+.field {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.field input[type='number'] {
+  width: 96px;
+}
+
+.members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.member {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}

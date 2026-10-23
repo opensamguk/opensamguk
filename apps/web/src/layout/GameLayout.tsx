@@ -7,6 +7,7 @@ import { errorCode, isNotFound } from '../game/errors';
 import { useHome, useWorldSummary } from '../game/queries';
 import type { WorldSummary } from '../game/types';
 import { liveRefresh, topbarStatus } from '../game/worldWatch';
+import { OFFICER_MIN_LEVEL } from '../operations/contract';
 import { useTRPC } from '../trpc';
 import styles from './GameLayout.module.css';
 
@@ -18,6 +19,7 @@ const NAV = [
   { to: '/w/$worldId/ranking', label: '순위' },
   { to: '/w/$worldId/simulator', label: '전투 시뮬레이터' },
   { to: '/w/$worldId/diplomacy', label: '외교' },
+  { to: '/w/$worldId/operations', label: '작전' },
 ] as const;
 
 // 위쪽 띠에는 월드 이름·현재 연월·다음 턴까지 남은 시간·메뉴·로그아웃. 본문은 화면 폭을 다 쓴다.
@@ -93,6 +95,17 @@ export function GameLayout() {
               {item.label}
             </Link>
           ))}
+          {/* 감찰은 직책자만 받는다(T2-12). 메뉴를 보일지만 여기서 정하고 권한은 서버가 다시 본다. */}
+          {(home.data?.general.officerLevel ?? 0) >= OFFICER_MIN_LEVEL ? (
+            <Link
+              to="/w/$worldId/nation/inspection"
+              params={{ worldId }}
+              className={styles.navLink}
+              activeProps={{ className: `${styles.navLink} ${styles.active}`, 'aria-current': 'page' }}
+            >
+              감찰
+            </Link>
+          ) : null}
           <Link to="/help/$doc" params={{ doc: 'index' }} className={styles.navLink}>
             도움말
           </Link>
