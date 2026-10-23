@@ -11,6 +11,9 @@ import {
   runGeneralTurn,
   unitSetSchema,
   TICKS_PER_MONTH,
+  assertSlotSet,
+  isPolicyKey,
+  isPolicyMode,
   type WorldState,
 } from '@opensamguk/rules';
 import { appendNationHistory, persistCommandReports, commandRealtimeSignals } from './commandPersistence';
@@ -19,12 +22,20 @@ import { loadWorld } from './worldLoader';
 import { persistEffects, shiftTurns } from './persist';
 import { persistMonthly, loadReplayState } from './monthly';
 import { hashState } from '@opensamguk/shared/node';
-import { processCreation } from './inputs';
+import { processPendingInput } from './inputs';
 
 export const CLOCK_CHECKPOINT_MS = 5_000;
 export const ENGINE_BATCH_STEPS = 64;
 export const ENGINE_BATCH_MS = 250;
 type WorldStatus = Prisma.WorldGetPayload<Record<string, never>>['status'];
+async function policyBaseline(tx: Prisma.TransactionClient, world: Prisma.WorldGetPayload<Record<string, never>>) {
+  if (world.policyFromSequence !== null) return undefined;
+  const human = await tx.general.findFirst({
+    where: { worldId: world.id, userId: { not: null } },
+    select: { id: true },
+  });
+  return human ? world.clockTick : undefined;
+}
 export interface PollBatch {
   executions: TurnExecution[];
   more: boolean;
@@ -109,8 +120,10 @@ export class TurnLoop {
         // 일시정지·재개와 턴 commit이 같은 월드 행에서 직렬화된다.
         await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${worldId} FOR UPDATE`;
         const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
+        const baselineActiveTick = await policyBaseline(tx, world);
         if (world.status !== 'RUNNING') {
-          const progressed = await processCreation(tx, world, world.clockTick);
+          const inputResult = await processPendingInput(tx, world, world.clockTick, baselineActiveTick);
+          const progressed = inputResult === true;
           if (progressed) await this.hooks.beforeCommit?.(tx);
           signal?.throwIfAborted();
           await assertLease(tx, this.lease);
@@ -142,12 +155,20 @@ export class TurnLoop {
             : checkpoint.clockTick);
         if (tick < world.clockTick) throw new Error('이미 저장된 시계보다 뒤로 진행할 수 없습니다.');
         if (tick > 2_147_483_647 - TICKS_PER_MONTH) throw new Error('게임 tick 저장 범위를 넘었습니다.');
-        if (await processCreation(tx, world, tick)) {
+        const inputResult = await processPendingInput(tx, world, tick, baselineActiveTick);
+        if (inputResult !== false) {
           const state = await loadWorld(tx, worldId);
           await this.hooks.beforeCommit?.(tx);
           signal?.throwIfAborted();
           await assertLease(tx, this.lease);
-          return { tick, state, execution: null, checkpointed: false, progressed: true, status: world.status };
+          return {
+            tick,
+            state,
+            execution: null,
+            checkpointed: false,
+            progressed: inputResult === true,
+            status: world.status,
+          };
         }
         const due = await tx.general.findFirst({
           where: { worldId, nextTurnTick: { lte: tick }, activeFromYear: { lte: year } },
@@ -173,11 +194,23 @@ export class TurnLoop {
           const command = await tx.generalTurn.findUnique({
             where: { worldId_generalId_slot: { worldId, generalId: due.id, slot: 0 } },
           });
+          const modern = isPolicyMode({ fromSequence: world.policyFromSequence, actionSequence: world.actionSequence });
+          if (modern) {
+            assertSlotSet(
+              await tx.generalTurn.findMany({ where: { worldId, generalId: due.id }, select: { slot: true } }),
+            );
+            if (!isPolicyKey(actor.defaultPolicy)) throw new Error('기본 방침이 올바르지 않습니다.');
+          }
           const turn = runGeneralTurn(
             state,
             { generalId: due.id, tick: due.nextTurnTick, unitSet: unitSetSchema.parse(world.unitSet) },
-            { commandKey: command?.commandKey ?? 'rest', args: command?.args ?? {} },
+            {
+              commandKey: command?.commandKey ?? 'rest',
+              args: command?.args ?? {},
+              ...(modern ? { explicit: command!.explicit } : {}),
+            },
             world.seed,
+            modern ? { policy: actor.defaultPolicy as import('@opensamguk/rules').PolicyKey } : {},
           );
           const commandKey = turn.commandKey;
           const result = turn.result;

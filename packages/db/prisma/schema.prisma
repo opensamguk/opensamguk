@@ -42,6 +42,7 @@ model World {
   engineHeartbeat EngineHeartbeat?
   monthlyTick     Int         @default(0)
   actionSequence  Int         @default(0)
+  policyFromSequence Int?
   replayOrigin    Json?
   inputEvents     InputEvent[]
   nationHistory   NationHistory[]
@@ -189,6 +190,9 @@ model General {
   injury         Int
   nextTurnTick   Int
   turnRevision   Int @default(0)
+  defaultPolicy  String?
+  lastActiveTick Int?
+  lastActiveAt   DateTime?
   noticeSeen     Json?
   messageReads   MessageRead[]
   turns          GeneralTurn[]
@@ -228,6 +232,7 @@ model GeneralTurn {
   slot       Int
   commandKey String @default("rest")
   args       Json @default("{}")
+  explicit   Boolean
   general    General @relation(fields: [worldId, generalId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([worldId, generalId, slot])

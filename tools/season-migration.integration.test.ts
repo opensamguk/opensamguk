@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { createRequire } from 'node:module';
 import { readFile, readdir } from 'node:fs/promises';
 import { expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
@@ -17,17 +18,24 @@ it('T1-26 이전 실제 DB 행을 migration해도 초기·월간 해시·origin�
   adminUrl.pathname = '/postgres';
   const admin = createDb(adminUrl.href),
     legacy = createDb(target.href);
+  const dbRequire = createRequire(new URL('../packages/db/package.json', import.meta.url));
+  const require = createRequire(dbRequire.resolve('@prisma/adapter-pg'));
+  const { Client } = require('pg') as {
+    Client: new (options: { connectionString: string }) => {
+      connect(): Promise<void>;
+      query(sql: string): Promise<unknown>;
+      end(): Promise<void>;
+    };
+  };
+  const migrationClient = new Client({ connectionString: target.href });
   await admin.$executeRawUnsafe(`CREATE DATABASE "${name}"`);
   try {
+    await migrationClient.connect();
     const root = new URL('../packages/db/prisma/migrations/', import.meta.url);
     const migration = '20261023000000_world_outcome';
     const apply = async (directory: string) => {
       const text = await readFile(new URL(`${directory}/migration.sql`, root), 'utf8');
-      for (const statement of text
-        .split(';')
-        .map((part) => part.trim())
-        .filter(Boolean))
-        await legacy.$executeRawUnsafe(statement);
+      await migrationClient.query(text);
     };
     for (const directory of (await readdir(root, { withFileTypes: true }))
       .filter((entry) => entry.isDirectory() && entry.name < migration)
@@ -144,6 +152,7 @@ it('T1-26 이전 실제 DB 행을 migration해도 초기·월간 해시·origin�
     expect(exported.months.map((month) => month.stateHash)).toEqual(archive.months.map((month) => month.stateHash));
     expect(replayArchive(exported, 12)).toEqual(replayArchive(archive, 12));
   } finally {
+    await migrationClient.end();
     await legacy.$disconnect();
     await admin.$executeRawUnsafe(`DROP DATABASE "${name}" WITH (FORCE)`);
     await admin.$disconnect();
