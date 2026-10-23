@@ -137,6 +137,13 @@ describe('공개 지도 빈 상태', () => {
 });
 
 describe('공개 범위', () => {
+  // 서버 사본은 도시 key·links를 문자열로 준다(T2-24).
+  const responseCity = (key: number, nationId: number | null, links: number[] = []) => ({
+    ...city(key, nationId),
+    key: String(key),
+    links: links.map(String),
+  });
+
   // 서버가 실수로 공개 범위 밖 값을 섞어 보낸 응답.
   const raw = {
     delayMinutes: 10,
@@ -145,7 +152,7 @@ describe('공개 범위', () => {
       {
         id: 'w1',
         name: '첫 천하',
-        status: 'RUNNING',
+        status: 'RUNNING' as const,
         ownerId: 'u1',
         map: {
           takenAt: takenAt(14, 10),
@@ -153,19 +160,23 @@ describe('공개 범위', () => {
           month: 3,
           tick: 5,
           cities: [
-            { ...city(1, 1, [2]), supplied: false, generals: [{ name: '조조' }], troops: 5000, population: 1 },
-            { ...city(2, 1, [1]), supplied: false },
+            {
+              ...responseCity(1, 1, [2]),
+              supplied: false,
+              generals: [{ name: '조조' }],
+              troops: 5000,
+              population: 1,
+            },
+            { ...responseCity(2, 1, [1]), supplied: false },
           ],
           nations: [{ id: 1, name: '위', color: '#000080', gold: 9999, rice: 9999 }],
           generals: [{ id: 1, name: '조조', crew: 5000 }],
         },
       },
-      { id: 'w9', name: '끝난 천하', status: 'ENDED', map: null },
-      { id: 'w8', name: '준비 천하', status: 'PREPARING', map: null },
     ],
   };
 
-  it('공개 범위 안의 키만 남기고 RUNNING·PAUSED 밖의 월드는 버린다', () => {
+  it('공개 범위 안의 키만 남기고 도시 키와 연결은 숫자로 바꾼다', () => {
     expect(toPublicMaps(raw)).toEqual({
       delayMinutes: 10,
       worlds: [
@@ -189,18 +200,34 @@ describe('공개 범위', () => {
     render(<PublicMapView data={toPublicMaps(raw)} now={now} />);
     const area = screen.getByTestId('public-map');
     expect(tabs()).toHaveLength(1);
+    expect(screen.getByRole('img', { name: '도시1, 위' })).toBeTruthy();
     expect(area.querySelector('[data-cut]')).toBeNull();
     expect(area.querySelector('[data-supplied]')).toBeNull();
     expect(area.textContent).not.toMatch(/조조|5000|9999|보급|내 위치/);
   });
 
-  it('모양이 틀린 응답과 사본은 버린다', () => {
-    expect(toPublicMaps(null)).toEqual({ delayMinutes: 0, worlds: [] });
-    const broken = toPublicMaps({
-      delayMinutes: -1,
-      worlds: [{ id: 'w1', name: '첫 천하', status: 'RUNNING', map: { takenAt: 'not-a-date', year: 190, month: 3 } }],
+  it('숫자로 읽을 수 없는 도시 키와 연결은 버리고 사본 없는 월드는 그대로 둔다', () => {
+    const map = raw.worlds[0]!.map;
+    const odd = toPublicMaps({
+      delayMinutes: 10,
+      worlds: [
+        {
+          id: 'w1',
+          name: '첫 천하',
+          status: 'PAUSED',
+          map: {
+            ...map,
+            cities: [
+              { ...responseCity(1, 1), links: ['2', '', '-3', '1.5'] },
+              { ...responseCity(2, 1), key: 'x2' },
+            ],
+          },
+        },
+        { id: 'w2', name: '둘째 천하', status: 'RUNNING', map: null },
+      ],
     });
-    expect(broken).toEqual({ delayMinutes: 0, worlds: [{ id: 'w1', name: '첫 천하', status: 'RUNNING', map: null }] });
+    expect(odd.worlds[0]!.map!.cities).toEqual([city(1, 1, [2])]);
+    expect(odd.worlds[1]).toEqual({ id: 'w2', name: '둘째 천하', status: 'RUNNING', map: null });
   });
 });
 
