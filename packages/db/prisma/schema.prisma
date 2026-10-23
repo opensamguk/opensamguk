@@ -55,6 +55,16 @@ model World {
   messages        Message[]
   notices         Notice[]
   operations      Operation[]
+  extSlices       WorldExtSlice[]
+}
+
+model WorldExtSlice {
+  worldId String
+  key     String
+  value   Json
+  world   World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@id([worldId, key])
 }
 
 enum WorldStatus {
