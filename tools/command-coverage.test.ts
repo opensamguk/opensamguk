@@ -17,6 +17,7 @@ import {
   readRegistryKeys,
   readExtensionRegistryKeys,
   verifyCiRuns,
+  verifyGitShas,
 } from './command-coverage.mjs';
 
 it('AC-M1-14 모든 registry key에 성공·실패 행동 테스트 파일이 있다', async () => {
@@ -63,6 +64,8 @@ const withDocs = (change: Partial<Context>): Context => ({ ...context, ...change
 const SHA_81 = '81ffd1b65be7b2799a74ee6de2fdac8f984cd00c';
 const SHA_1FF = '1ffde70cfca4419ee23c972695005165fa3c8ed9';
 const RUN = (id: string | number) => `https://github.com/peppone-choi/opensamguk/actions/runs/${id}`;
+const runCli = (...args: string[]) =>
+  spawnSync(process.execPath, ['tools/command-coverage.mjs', ...args], { cwd: root, encoding: 'utf8' });
 
 describe('T4-02 등록된 확장 명령 대조', () => {
   const fixture = (files: Record<string, string>, run: (dir: string) => void, parent = tmpdir()) => {
@@ -576,16 +579,14 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
   });
 
   it('기본 실행은 정합이면 0, --require-complete는 남은 일이 있으면 1로 끝난다 (실제 node 실행)', () => {
-    const run = (...args: string[]) =>
-      spawnSync(process.execPath, ['tools/command-coverage.mjs', ...args], { cwd: root, encoding: 'utf8' });
-    const plain = run();
+    const plain = runCli();
     expect(plain.status, plain.stdout + plain.stderr).toBe(0);
     expect(plain.stdout).toContain('대응표 정합: 통과');
     expect(plain.stdout).toContain('제품 전체 완료: 미완료');
-    const gate = run('--require-complete');
+    const gate = runCli('--require-complete');
     expect(gate.status).toBe(1);
     expect(gate.stdout).toContain('남음 nation_research_fire_wheel');
-    expect(run('--모르는').status).toBe(2);
+    expect(runCli('--모르는').status).toBe(2);
   });
 
   it('반례: 원본 삭제는 고정 원본 전집 누락과 모르는 원본 대응으로 실패한다', () => {
@@ -886,24 +887,68 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
 
   it('반례: 고친 대응표 파일도 CLI 기본 실행과 --verify-git이 1로 끝난다', () => {
     const dir = mkdtempSync(join(tmpdir(), 'coverage-'));
-    const removed = table();
-    removed.commands = removed.commands.filter((command) => command.id !== 'attack');
-    writeFileSync(join(dir, 'removed.json'), JSON.stringify(removed));
-    const result = main(['--file', join(dir, 'removed.json')], { root });
-    expect(result.code).toBe(1);
-    expect(result.output).toContain('registry key attack(general)가 대응표에 없다');
-    const fake = table();
-    row(fake, 'farm').stages.ui = {
+    try {
+      const removed = table();
+      removed.commands = removed.commands.filter((command) => command.id !== 'attack');
+      writeFileSync(join(dir, 'removed.json'), JSON.stringify(removed));
+      const result = main(['--file', join(dir, 'removed.json')], { root });
+      expect(result.code).toBe(1);
+      expect(result.output).toContain('registry key attack(general)가 대응표에 없다');
+      const plainCli = runCli('--file', join(dir, 'removed.json'));
+      expect(plainCli.status, plainCli.stdout + plainCli.stderr).toBe(1);
+      expect(plainCli.stdout).toContain('registry key attack(general)가 대응표에 없다');
+      const fake = table();
+      row(fake, 'farm').stages.ui = {
+        status: 'verified',
+        evidence: [
+          { kind: 'ci', ref: RUN(1) },
+          { kind: 'doc', ref: 'docs/plans/T1-05.md', sha: 'ab6f803bfcefac4907d7fb9b87eae4fd7740934d' },
+        ],
+      };
+      writeFileSync(join(dir, 'fake.json'), JSON.stringify(fake));
+      const verified = main(['--file', join(dir, 'fake.json'), '--verify-git'], { root });
+      expect(verified.code).toBe(1);
+      expect(verified.output).toContain('commands[farm].ui: verified는 독립 리뷰 기록(review)과 같은 SHA의 실행(ci)');
+      const verifiedCli = runCli('--file', join(dir, 'fake.json'), '--verify-git');
+      expect(verifiedCli.status, verifiedCli.stdout + verifiedCli.stderr).toBe(1);
+      expect(verifiedCli.stdout).toContain(
+        'commands[farm].ui: verified는 독립 리뷰 기록(review)과 같은 SHA의 실행(ci)',
+      );
+    } finally {
+      expect(dirname(dir)).toBe(tmpdir());
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('반복한 Git 시험 경로의 오류는 단계·참조별로 남고 다음 호출은 다른 저장소를 다시 확인한다', () => {
+    const valid = 'tools/command-coverage.test.ts';
+    const missing = ['tools/coverage-missing.test.ts#first', 'tools/coverage-missing.test.ts#second'];
+    const stage = {
       status: 'verified',
       evidence: [
-        { kind: 'ci', ref: RUN(1) },
-        { kind: 'doc', ref: 'docs/plans/T1-05.md', sha: 'ab6f803bfcefac4907d7fb9b87eae4fd7740934d' },
+        { kind: 'review', ref: 'review', sha: SHA_81 },
+        ...[valid, ...missing].map((ref) => ({ kind: 'test', ref })),
       ],
     };
-    writeFileSync(join(dir, 'fake.json'), JSON.stringify(fake));
-    const verified = main(['--file', join(dir, 'fake.json'), '--verify-git'], { root });
-    expect(verified.code).toBe(1);
-    expect(verified.output).toContain('commands[farm].ui: verified는 독립 리뷰 기록(review)과 같은 SHA의 실행(ci)');
+    const doc = { commands: [{ id: 'farm', stages: { engine: stage, effectsCostsFailures: stage } }] };
+    const missingErrors = ['engine', 'effectsCostsFailures'].flatMap((name) =>
+      missing.map((ref) => `commands[farm].${name}: 시험 ${ref}가 검증 SHA ${SHA_81}에 없다`),
+    );
+    expect(verifyGitShas(doc, root)).toEqual(missingErrors);
+    const dir = mkdtempSync(join(tmpdir(), 'coverage-git-'));
+    try {
+      expect(verifyGitShas(doc, dir)).toEqual([
+        `증거 SHA ${SHA_81}가 저장소에 없다`,
+        `commands[farm].engine: 시험 ${valid}가 검증 SHA ${SHA_81}에 없다`,
+        ...missingErrors.slice(0, 2),
+        `commands[farm].effectsCostsFailures: 시험 ${valid}가 검증 SHA ${SHA_81}에 없다`,
+        ...missingErrors.slice(2),
+      ]);
+      expect(verifyGitShas(doc, root)).toEqual(missingErrors);
+    } finally {
+      expect(dirname(dir)).toBe(tmpdir());
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it.each(['\n', '\r\n'])('리뷰 절 앵커는 개행 %j에서도 같은 제목 범위를 찾는다', (newline) => {

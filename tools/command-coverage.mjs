@@ -1086,6 +1086,19 @@ const git = (root, args) => execFileSync('git', args, { cwd: root, stdio: 'ignor
 export function verifyGitShas(doc, root, baseline = null) {
   const errors = [];
   const seen = new Set();
+  const testPaths = new Map();
+  const hasTestPath = (sha, path) => {
+    const object = `${sha}:${path}`;
+    if (!testPaths.has(object)) {
+      try {
+        git(root, ['cat-file', '-e', object]);
+        testPaths.set(object, true);
+      } catch {
+        testPaths.set(object, false);
+      }
+    }
+    return testPaths.get(object);
+  };
   const check = (sha) => {
     if (seen.has(sha)) return;
     seen.add(sha);
@@ -1103,9 +1116,7 @@ export function verifyGitShas(doc, root, baseline = null) {
       if (!sha) continue;
       for (const item of stage.evidence ?? [])
         if (item?.kind === 'test' && !/^https?:/.test(item.ref)) {
-          try {
-            git(root, ['cat-file', '-e', `${sha}:${item.ref.split('#')[0]}`]);
-          } catch {
+          if (!hasTestPath(sha, item.ref.split('#')[0])) {
             errors.push(`commands[${command.id}].${name}: 시험 ${item.ref}가 검증 SHA ${sha}에 없다`);
           }
         }
