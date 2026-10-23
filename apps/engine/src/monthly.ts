@@ -14,6 +14,7 @@ import { hashState } from '@opensamguk/shared/node';
 import { loadWorld } from './worldLoader';
 import { persistRanking } from './ranking';
 import { persistYearbookNations } from './nationArchive';
+import { persistExt } from './extState';
 
 export async function loadReplayState(tx: Prisma.TransactionClient, worldId: string): Promise<ReplayState> {
   const state = await loadWorld(tx, worldId);
@@ -80,6 +81,7 @@ export async function persistMonthly(
   }
   await tx.diplomacy.deleteMany({ where: { worldId } });
   await tx.diplomacy.createMany({ data: next.diplomacies.map((entry) => ({ ...entry, worldId })) });
+  await persistExt(tx, worldId, before.ext, next.ext);
   await tx.world.update({ where: { id: worldId }, data: { monthlyTick: tick } });
   const snapshot = await loadReplayState(tx, worldId);
   await tx.yearbookSnapshot.create({

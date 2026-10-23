@@ -336,6 +336,16 @@ describe('T1-26 내보내기와 네 키 상태', () => {
     const worldId = 'shape-test';
     const withWorld = <T extends object>(rows: T[]) => rows.map((row) => ({ ...row, worldId }));
     const tx = {
+      $queryRaw: async (strings: TemplateStringsArray, ...values: unknown[]) => {
+        const sql = strings.join('?').trim().replace(/\s+/g, ' ');
+        if (
+          sql === 'SELECT "key", "value" FROM "WorldExtSlice" WHERE "worldId" = ? ORDER BY "key"' &&
+          values.length === 1 &&
+          values[0] === worldId
+        )
+          return [];
+        throw new Error(`예상하지 않은 원시 조회: ${sql}`);
+      },
       world: {
         findUniqueOrThrow: async () => ({
           startYear: initial.startYear,

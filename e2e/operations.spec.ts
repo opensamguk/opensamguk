@@ -3,8 +3,8 @@ import { createAccount, withE2eDb } from './account';
 import { createGeneralByApi, e2eWorld, mutate, query, setTurns, stubPortraits, turns } from './game';
 
 // T2-12 · AC-M2-15 화면: 국가 작전판과 감찰.
-// operation·inspection 라우터(T2-11, Codex)가 main에 들어오기 전에는 이 시험이 돌지 않는다. 그 전의 결과는 증거로 세지 않는다.
-// 계약: docs/plans/T2-11.md API 계약, 화면: docs/plans/T2-12.md.
+// 계약은 AppRouter의 operation·inspection 라우터(T2-11, Codex)다. 이 시험은 부모가 배정한 통합 슬롯에서만 돌리고 그 전에는 증거로 세지 않는다.
+// 화면: docs/plans/T2-12.md "실제 API 대조와 착수 정정" 절.
 
 test.describe.configure({ timeout: 180_000 });
 
@@ -29,6 +29,8 @@ async function member(browser: Browser, world: string, nationId: number, officer
   return { page, generalId: general.id };
 }
 
+// 새 장수는 병력·훈련·사기가 0이다. 기준 1000/60/60 제안은 모병 1·훈련 6·사기 6·출병 1의 14칸이 목표 전에 있어야 한다.
+// 첫 칸이 다음 달 첫 tick이어도 준비가 index 2부터 들어가 STALE 시험의 index 1 farm과 겹치지 않도록 목표를 지금+17개월로 둔다.
 async function setup(page: Page) {
   await createAccount(page);
   const world = await e2eWorld(page);
@@ -39,7 +41,7 @@ async function setup(page: Page) {
   const summary = await query<{ gameDate: { year: number; month: number } }>(page, 'world.summary', { worldId: world });
   const [ours, theirs] = map.nations;
   const target = map.cities.find((c) => c.nationId === theirs!.id)!;
-  const at = summary.gameDate.year * 12 + summary.gameDate.month - 1 + 4;
+  const at = summary.gameDate.year * 12 + summary.gameDate.month - 1 + 17;
   return {
     world,
     ours: ours!.id,
@@ -71,6 +73,8 @@ test.describe('국가 작전판', () => {
     const timeline = chief.page.getByTestId('operation-timeline');
     await expect(timeline.locator('tbody tr').first()).toHaveAttribute('data-verdict', /READY|LATE|WEAK|MISSING/);
     await expect(timeline).toContainText(/준비됨|늦음|미흡|없음/);
+    // 새 장수의 예턴은 비워 둔 칸이다. 직접 넣은 휴식과 다른 글자로 보인다.
+    await expect(timeline.locator('td[data-kind="empty"]').first()).toHaveText('빈 칸');
 
     await soldier.page.goto(`/w/${s.world}/operations`);
     await expect(soldier.page.getByRole('button', { name: '작전 만들기' })).toHaveCount(0);
@@ -115,13 +119,13 @@ test.describe('국가 작전판', () => {
     await expect(editor(chief.page).getByTestId('draft-state')).toHaveText('저장하지 않은 편집 1건');
 
     await chief.page.getByRole('button', { name: '내 예턴을 작전에 맞추기' }).click();
-    await chief.page.getByRole('button', { name: '초안에 넣기' }).click();
+    await chief.page.getByRole('button', { name: '초안에 넣기', exact: true }).click();
     await expect(chief.page.getByRole('alertdialog', { name: '초안 덮기 확인' })).toContainText(
       '저장하지 않은 편집 1건',
     );
     await chief.page.getByRole('button', { name: '덮고 넣기' }).click();
     await editor(chief.page).getByRole('button', { name: '저장', exact: true }).click();
-    await expect(editor(chief.page).getByRole('status')).toContainText('저장했습니다');
+    await expect(editor(chief.page).locator(':scope > [role="status"]')).toContainText('저장했습니다');
 
     const saved = await turns(chief.page, s.world);
     expect(saved.slots.some((slot) => slot.commandKey === 'attack')).toBe(true);
@@ -144,7 +148,7 @@ test.describe('국가 작전판', () => {
     });
     await chief.page.goto(`/w/${s.world}/operations/${id}`);
     await chief.page.getByRole('button', { name: '내 예턴을 작전에 맞추기' }).click();
-    await chief.page.getByRole('button', { name: '초안에 넣기' }).click();
+    await chief.page.getByRole('button', { name: '초안에 넣기', exact: true }).click();
     // 다른 탭의 저장.
     await setTurns(chief.page, s.world, [null, { commandKey: 'farm' }]);
     await editor(chief.page).getByRole('button', { name: '저장', exact: true }).click();
@@ -154,6 +158,7 @@ test.describe('국가 작전판', () => {
     );
     await editor(chief.page).getByRole('button', { name: '내 편집 다시 적용' }).click();
     await editor(chief.page).getByRole('button', { name: '저장', exact: true }).click();
+    await expect(editor(chief.page).locator(':scope > [role="status"]')).toContainText('저장했습니다');
     const saved = await turns(chief.page, s.world);
     expect(saved.slots[1]!.commandKey).toBe('farm');
     expect(saved.slots.some((slot) => slot.commandKey === 'attack')).toBe(true);

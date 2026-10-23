@@ -29,8 +29,18 @@ function fixture(status: 'PAUSED' | 'RUNNING', human: boolean, modern = false) {
     startYear: 190,
     turnTermMinutes: 30,
   };
+  let locked = false;
   const tx = {
-    $queryRaw: vi.fn(),
+    $queryRaw: vi.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      const sql = strings.join('?').trim().replace(/\s+/g, ' ');
+      if (values.length !== 1 || values[0] !== world.id) throw new Error(`예상하지 않은 원시 조회 인자: ${sql}`);
+      if (sql === 'SELECT id FROM "World" WHERE id = ? FOR UPDATE') {
+        locked = true;
+        return undefined;
+      }
+      if (locked && sql === 'SELECT "key", "value" FROM "WorldExtSlice" WHERE "worldId" = ? ORDER BY "key"') return [];
+      throw new Error(`예상하지 않은 원시 조회: ${sql}`);
+    }),
     world: { findUniqueOrThrow: vi.fn().mockResolvedValue(world) },
     general: { findFirst: vi.fn().mockResolvedValue(human ? { id: 1 } : null) },
   };

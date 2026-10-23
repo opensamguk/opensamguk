@@ -1,7 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { commandWorld } from '../../test/commandFixture';
 import { settleDiplomacy } from '../monthly/index';
-import { applyTreatyInput, settleTreaties, treatyClosures, TREATY_INPUTS, validateTreatyRecord } from './treaty';
+import {
+  applyTreatyInput,
+  canRepresentTreatyProposal,
+  settleTreaties,
+  treatyClosures,
+  TREATY_INPUTS,
+  validateTreatyRecord,
+  validateTreatyState,
+  treatyRespondByTick,
+} from './treaty';
+import {
+  validateTreatyState as publicValidateTreatyState,
+  treatyRespondByTick as publicTreatyRespondByTick,
+} from '../index';
 import type { TreatyWorldState } from './treaty';
 import type { TreatyClause, TreatyInput, TreatyRecord } from './treatyTypes';
 import { calculateTreatyFee, canNpcAcceptTreaty, meetsTreatyPeaceRequirement, settleTreatyFees } from './treaty';
@@ -373,14 +386,203 @@ describe('T2-07 / AC-M2-06 첫 세 조항 처리', () => {
     expect(() => propose(first, [{ kind: 'note', text: '중복 순서' }])).toThrow();
   });
 
-  it('저장 범위를 넘는 파생 기한은 줄이지 않고 예외로 알린다', () => {
+  it('표현할 수 없는 제안은 거절하고 파손된 저장 기한은 예외로 알린다', () => {
     const state = freezeDeep(humanWorld());
-    expect(() => propose(state, peacePact, 2147483647 - 59999)).toThrow(RangeError);
+    expect(propose(state, peacePact, 2147483647 - 59999)).toMatchObject({ ok: false, result: { code: 'BAD_INPUT' } });
     expect(state).not.toHaveProperty('treaties');
-    const nearEnd = pending([{ kind: 'peace' }, { kind: 'nonAggression', months: 120 }], 2147483647 - 60000);
-    expect(() => respond(nearEnd, 2147483647 - 1)).toThrow(RangeError);
+    const nearEnd = pending([{ kind: 'peace' }, { kind: 'nonAggression', months: 120 }]);
+    nearEnd.treaties![0]!.proposedTick = 2147483647 - 60000;
+    nearEnd.treaties![0]!.respondByTick = 2147483647;
+    expect(() => respond(freezeDeep(nearEnd), 2147483647 - 10000)).toThrow(RangeError);
     expect(nearEnd.treaties?.[0]?.status).toBe('PROPOSED');
     expect(() => settleTreaties(state, 1500)).toThrow(RangeError);
+  });
+});
+
+describe('T2-07 / AC-M2-06 제안 기한의 표현 가능성', () => {
+  const lastMonthlyTick = 2147470000;
+  const lastEngineTick = 2147473647;
+  const limits = [
+    { npc: false, months: null, last: 2147410000 },
+    { npc: false, months: 1, last: 2147400001 },
+    { npc: false, months: 120, last: 2146210001 },
+    { npc: true, months: null, last: 2147423647 },
+    { npc: true, months: 1, last: 2147423647 },
+    { npc: true, months: 4, last: 2147423647 },
+    { npc: true, months: 5, last: 2147420000 },
+    { npc: true, months: 120, last: 2146270000 },
+  ];
+
+  it.each(limits)('끝점은 허용하고 다음 tick은 거절한다 (%j)', ({ npc, months, last }) => {
+    const clauses: TreatyClause[] =
+      months === null ? [{ kind: 'note', text: '기록' }] : [{ kind: 'peace' }, { kind: 'nonAggression', months }];
+    const state = humanWorld();
+    state.nations[2]!.isNpc = npc;
+    const options = freezeDeep({ tick: last, nonAggressionMonths: months, npc });
+    expect(canRepresentTreatyProposal(options)).toBe(true);
+    expect(canRepresentTreatyProposal({ ...options, tick: last + 1 })).toBe(false);
+    const accepted = propose(freezeDeep(state), clauses, last);
+    if (!accepted.ok) throw new Error('끝점 제안 실패');
+    expect(accepted.result.outcome).toBe(npc ? 'ACCEPTED' : 'PROPOSED');
+    expect(accepted.state.treaties?.[0]?.respondByTick).toBe(last + 60000);
+    expect(propose(state, clauses, last + 1)).toMatchObject({ ok: false, result: { code: 'BAD_INPUT' } });
+    expect(state).not.toHaveProperty('treaties');
+    expect(state.nations[1]!.gold).toBe(100000);
+    expect(state.nations[2]!.gold).toBe(100000);
+  });
+
+  it.each(limits.filter(({ npc }) => !npc))(
+    '사람의 마지막 응답에서도 기간을 줄이지 않는다 (%j)',
+    ({ months, last }) => {
+      const clauses: TreatyClause[] =
+        months === null ? [{ kind: 'note', text: '기록' }] : [{ kind: 'peace' }, { kind: 'nonAggression', months }];
+      const state = pending(clauses, last);
+      const snapshot = structuredClone(state);
+      const deadline = last + 60000;
+      const accepted = respond(freezeDeep(state), deadline - 1);
+      if (!accepted.ok) throw new Error('마지막 tick 수락 실패');
+      expect(accepted.result).toMatchObject({
+        outcome: 'ACCEPTED',
+        by: 'HUMAN',
+        endTick: months === null ? null : lastMonthlyTick,
+      });
+      expect(accepted.state.treaties?.[0]?.startTick).toBe(deadline - 1);
+      if (months !== null) {
+        expect(accepted.state.treaties![0]!.endTick! - (deadline - 1)).toBe(months * 10000);
+        const ended = settleTreaties(settleDiplomacy(accepted.state, lastMonthlyTick), lastMonthlyTick);
+        expect(ended).not.toHaveProperty('treaties');
+        expect(ended.diplomacies).toEqual([]);
+      }
+      for (const accept of [false, true])
+        expect(respond(state, deadline, accept)).toMatchObject({ ok: false, result: { code: 'EXPIRED' } });
+      expect(state).toEqual(snapshot);
+      expect(settleTreaties(state, Math.ceil(deadline / 10000) * 10000)).not.toHaveProperty('treaties');
+    },
+  );
+
+  it.each([
+    { months: null, tick: 2147423647 },
+    { months: 1, tick: 2147413648 },
+    { months: 120, tick: 2146223648 },
+  ])('Int에 들어가도 닫을 월 경계를 진행할 수 없으면 거절한다 (%j)', ({ months, tick }) => {
+    const deadline = tick + 60000;
+    const end = months === null ? deadline : deadline - 1 + months * 10000;
+    expect(end).toBeLessThanOrEqual(2147483647);
+    expect(Math.ceil(end / 10000) * 10000).toBeGreaterThan(lastEngineTick);
+    expect(canRepresentTreatyProposal({ tick, nonAggressionMonths: months, npc: false })).toBe(false);
+    const clauses: TreatyClause[] =
+      months === null ? [{ kind: 'note', text: '기록' }] : [{ kind: 'peace' }, { kind: 'nonAggression', months }];
+    expect(propose(humanWorld(), clauses, tick)).toMatchObject({ ok: false, result: { code: 'BAD_INPUT' } });
+  });
+
+  it.each([
+    { months: null, tick: 2147423647 },
+    { months: 120, tick: 2146270000 },
+  ])('NPC는 같은 입력에서 응답하므로 사람의 응답 기간을 예약하지 않는다 (%j)', ({ months, tick }) => {
+    const clauses: TreatyClause[] =
+      months === null ? [{ kind: 'note', text: '기록' }] : [{ kind: 'peace' }, { kind: 'nonAggression', months }];
+    const state = humanWorld();
+    expect(propose(state, clauses, tick)).toMatchObject({ ok: false, result: { code: 'BAD_INPUT' } });
+    state.nations[2]!.isNpc = true;
+    const result = propose(state, clauses, tick);
+    if (!result.ok) throw new Error('NPC 끝점 수락 실패');
+    expect(result.result).toMatchObject({
+      outcome: 'ACCEPTED',
+      by: 'NPC',
+      tick,
+      endTick: months === null ? null : lastMonthlyTick,
+    });
+    expect(result.state.treaties?.[0]?.startTick).toBe(tick);
+  });
+
+  it.each([
+    { tick: -1 },
+    { tick: 1.5 },
+    { tick: 2147473648 },
+    { tick: NaN },
+    { nonAggressionMonths: 0 },
+    { nonAggressionMonths: 121 },
+    { nonAggressionMonths: 1.5 },
+    { npc: 'true' },
+  ])('helper 인자가 파손되면 false로 숨기지 않는다 (%j)', (corrupt) => {
+    const options = { tick: 0, nonAggressionMonths: 1, npc: false, ...corrupt };
+    expect(() => canRepresentTreatyProposal(options as Parameters<typeof canRepresentTreatyProposal>[0])).toThrow();
+  });
+
+  it('기존 엔진 상한을 넘는 apply context는 게임 거절로 바꾸지 않는다', () => {
+    const state = freezeDeep(humanWorld());
+    expect(() => propose(state, peacePact, lastEngineTick + 1)).toThrow();
+    expect(state).not.toHaveProperty('treaties');
+  });
+
+  it('표현 불가보다 기존 조항·장수·직책·상대·관계 거절을 먼저 판정한다', () => {
+    const state = freezeDeep(humanWorld());
+    const input = { kind: 'treaty.propose' as const, generalId: 1, payload: { toNationId: 2, clauses: peacePact } };
+    const run = (value: typeof input) =>
+      applyTreatyInput(state, freezeDeep(value), { tick: lastEngineTick, sequence: 10 });
+    expect(run({ ...input, payload: { ...input.payload, clauses: [{ kind: 'trade', months: 1 }] } })).toMatchObject({
+      ok: false,
+      result: { code: 'CLAUSE_NOT_CONNECTED' },
+    });
+    expect(run({ ...input, generalId: 99 })).toMatchObject({ ok: false, result: { code: 'NO_GENERAL' } });
+    expect(run({ ...input, generalId: 3 })).toMatchObject({ ok: false, result: { code: 'NO_PERMISSION' } });
+    expect(run({ ...input, payload: { ...input.payload, toNationId: 1 } })).toMatchObject({
+      ok: false,
+      result: { code: 'BAD_TARGET' },
+    });
+    expect(run({ ...input, payload: { ...input.payload, toNationId: 99 } })).toMatchObject({
+      ok: false,
+      result: { code: 'BAD_TARGET' },
+    });
+    expect(
+      run({ ...input, payload: { ...input.payload, clauses: [{ kind: 'nonAggression', months: 1 }] } }),
+    ).toMatchObject({ ok: false, result: { code: 'TREATY_RELATION' } });
+    expect(run(input)).toMatchObject({ ok: false, result: { code: 'BAD_INPUT' } });
+    expect(state).not.toHaveProperty('treaties');
+  });
+
+  it('NPC 비용보다 표현 가능성을 먼저 확인한다', () => {
+    const state = humanWorld();
+    state.nations[2]!.isNpc = true;
+    state.nations[1]!.gold = 0;
+    expect(propose(freezeDeep(state), peacePact, lastEngineTick)).toMatchObject({
+      ok: false,
+      result: { code: 'BAD_INPUT' },
+    });
+  });
+
+  it('늦은 응답에서도 당사자·상태·기한의 기존 거절 순서를 유지한다', () => {
+    const state = pending();
+    state.diplomacies = [];
+    expect(respond(state, lastEngineTick)).toMatchObject({ ok: false, result: { code: 'EXPIRED' } });
+    expect(respond(state, lastEngineTick, true, 1)).toMatchObject({ ok: false, result: { code: 'NOT_PARTY' } });
+    delete state.nations[1];
+    expect(respond(state, lastEngineTick)).toMatchObject({ ok: false, result: { code: 'BAD_TARGET' } });
+    const accepted = respond(pending());
+    if (!accepted.ok) throw new Error('수락 준비 실패');
+    expect(respond(accepted.state, lastEngineTick)).toMatchObject({
+      ok: false,
+      result: { code: 'TREATY_NOT_PROPOSED' },
+    });
+  });
+
+  it.each([false, true])('저장된 PROPOSED의 파손 기한은 수락·거절 모두 throw다 (%s)', (accept) => {
+    const states = [pending(), pending(peacePact, 2147400001)];
+    states[0]!.treaties![0]!.respondByTick++;
+    states[1]!.treaties![0]!.proposedTick++;
+    states[1]!.treaties![0]!.respondByTick++;
+    for (const state of states) {
+      const before = structuredClone(state);
+      expect(() => respond(freezeDeep(state), lastEngineTick, accept)).toThrow(RangeError);
+      expect(state).toEqual(before);
+    }
+  });
+
+  it('파손된 국고의 RangeError와 중복 sequence를 BAD_INPUT으로 감추지 않는다', () => {
+    const state = pending();
+    state.nations[2]!.gold = NaN;
+    expect(() => respond(freezeDeep(state))).toThrow(RangeError);
+    expect(() => propose(pending(), peacePact, lastEngineTick)).toThrow('이미 사용한 조약 순서');
   });
 });
 
@@ -565,5 +767,166 @@ describe('T2-07 / AC-M2-06 구조 검사와 게임 거절', () => {
     const record = validateTreatyRecord(forged, recordContext);
     const replay = applyTreatyInput(state, record as TreatyInput & { generalId: number }, { tick: 1500, sequence: 10 });
     expect(replay.result).not.toEqual(record.result);
+  });
+});
+
+describe('T2-07 / AC-M2-06 canonical 조약 상태 검증', () => {
+  function active(clauses = peacePact, tick = 1500, npc = false) {
+    const state = humanWorld();
+    state.nations[2]!.isNpc = npc;
+    const proposal = propose(state, clauses, tick);
+    if (!proposal.ok) throw new Error('제안 준비 실패');
+    const result = npc ? proposal : respond(proposal.state, tick + 1);
+    if (!result.ok) throw new Error('수락 준비 실패');
+    return result.state.treaties![0]!;
+  }
+
+  it('공개 함수가 PROPOSED를 복사해 검사하며 입력과 조항을 바꾸지 않는다', () => {
+    const row = freezeDeep(pending().treaties![0]!);
+    expect(publicValidateTreatyState).toBe(validateTreatyState);
+    const parsed = publicValidateTreatyState(row);
+    expect(parsed).toEqual(row);
+    expect(parsed).not.toBe(row);
+    expect(parsed.clauses).not.toBe(row.clauses);
+    expect(parsed.clauses[0]).not.toBe(row.clauses[0]);
+  });
+
+  it.each([false, true])('사람·NPC가 수락한 불가침 ACTIVE를 읽는다 (NPC %s)', (npc) => {
+    const row = freezeDeep(active(peacePact, 1500, npc));
+    expect(validateTreatyState(row)).toEqual(row);
+  });
+
+  it.each(['peace', 'note'] as const)('끝 시각이 null인 %s ACTIVE를 읽는다', (kind) => {
+    const row = active(kind === 'peace' ? [{ kind }] : [{ kind, text: '기록' }]);
+    expect(validateTreatyState(row)).toEqual(row);
+    expect(() => validateTreatyState({ ...row, endTick: 1501 })).toThrow();
+  });
+
+  it.each([
+    { months: null, tick: 2147423647 },
+    { months: 120, tick: 2146270000 },
+  ])('응답 주체가 없는 ACTIVE를 사람 제안으로 가정하지 않는다 (%j)', ({ months, tick }) => {
+    const clauses: TreatyClause[] =
+      months === null ? [{ kind: 'note', text: '기록' }] : [{ kind: 'peace' }, { kind: 'nonAggression', months }];
+    const row = active(clauses, tick, true);
+    expect(validateTreatyState(row)).toEqual(row);
+    expect(row).not.toHaveProperty('by');
+  });
+
+  it('NFC로 몰래 바꾸거나 조항을 다시 정렬하지 않는다', () => {
+    const row = pending([{ kind: 'note', text: '\u1100\u1161' }]).treaties![0]!;
+    expect(validateTreatyState(row).clauses).toEqual([{ kind: 'note', text: '\u1100\u1161' }]);
+    expect(() =>
+      validateTreatyState({ ...row, clauses: [{ kind: 'note', text: '기록' }, { kind: 'peace' }] }),
+    ).toThrow();
+  });
+
+  it.each([
+    { id: 0 },
+    { id: '10' },
+    { id: 2147483648 },
+    { fromNationId: 0 },
+    { toNationId: 1 },
+    { proposedTick: 1.5 },
+    { proposedTick: 2147473648 },
+    { respondByTick: -1 },
+    { respondByTick: 2147483648 },
+    { startTick: undefined },
+    { worldId: 'storage-only' },
+    { costFrom: 0 },
+    { costTo: 0 },
+    { closedSequence: null },
+    { by: 'NPC' },
+    { status: 'REJECTED' },
+    { status: 'EXPIRED' },
+    { status: 'ENDED' },
+  ])('모양·식별자·저장 전용 칸을 canonical 행에 허용하지 않는다 (%j)', (corrupt) => {
+    const row = freezeDeep(pending().treaties![0]!);
+    expect(() => validateTreatyState({ ...row, ...corrupt })).toThrow();
+  });
+
+  it.each([
+    { clauses: [] },
+    { clauses: [{ kind: 'peace' }, { kind: 'peace' }] },
+    { clauses: [{ kind: 'trade', months: 1 }] },
+    { clauses: [{ kind: 'nonAggression', months: 0 }] },
+    { clauses: [{ kind: 'nonAggression', months: 121 }] },
+    { clauses: [{ kind: 'nonAggression', months: 1.5 }] },
+    { clauses: [{ kind: 'note', text: '' }] },
+    { clauses: [{ kind: 'note', text: '가'.repeat(301) }] },
+    { clauses: [{ kind: 'peace', actor: 1 }] },
+  ])('구조와 기존 도메인 검사를 지난 첫 세 조항만 읽는다 (%j)', (corrupt) => {
+    expect(() => validateTreatyState({ ...pending().treaties![0]!, ...corrupt })).toThrow();
+  });
+
+  it('PROPOSED의 시작·끝·전체 응답 기한이 파손되면 throw한다', () => {
+    const row = pending().treaties![0]!;
+    const atLast = pending(peacePact, 2147400001).treaties![0]!;
+    for (const corrupt of [
+      { ...row, startTick: row.proposedTick },
+      { ...row, endTick: row.respondByTick },
+      { ...row, respondByTick: row.respondByTick + 1 },
+      { ...atLast, proposedTick: atLast.proposedTick + 1, respondByTick: atLast.respondByTick + 1 },
+    ])
+      expect(() => validateTreatyState(corrupt)).toThrow();
+  });
+
+  it('ACTIVE의 시작 시각은 제안 이상, 응답 기한 미만이어야 한다', () => {
+    const row = active();
+    for (const startTick of [null, row.proposedTick - 1, row.respondByTick]) {
+      expect(() => validateTreatyState({ ...row, startTick })).toThrow();
+    }
+  });
+
+  it('ACTIVE의 원기간과 닫을 수 있는 월 경계를 검사한다', () => {
+    const row = active();
+    expect(() => validateTreatyState({ ...row, endTick: null })).toThrow();
+    expect(() => validateTreatyState({ ...row, endTick: row.endTick! + 1 })).toThrow();
+    expect(() =>
+      validateTreatyState({
+        ...row,
+        proposedTick: 2147413647,
+        respondByTick: 2147473647,
+        startTick: 2147473646,
+        endTick: 2147483646,
+      }),
+    ).toThrow();
+  });
+});
+
+describe('T2-07 / AC-M2-06 이력의 응답 기한', () => {
+  it.each([
+    [0, 60000],
+    [1500, 61500],
+    [2147423647, 2147483647],
+  ])('제안 tick %i의 응답 기한은 %i다', (tick, expected) => {
+    expect(publicTreatyRespondByTick).toBe(treatyRespondByTick);
+    expect(publicTreatyRespondByTick(tick)).toBe(expected);
+  });
+
+  it.each([-1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1, 2147473648])(
+    '파손된 제안 tick은 throw다 (%s)',
+    (tick) => {
+      expect(() => treatyRespondByTick(tick)).toThrow();
+    },
+  );
+
+  it('정상 engine tick이어도 기한이 Int를 넘으면 줄이지 않는다', () => {
+    expect(() => treatyRespondByTick(2147423648)).toThrow(RangeError);
+  });
+
+  it('열린 행이 없는 NPC 거절 이력도 같은 6개월 기한을 쓴다', () => {
+    const state = humanWorld();
+    state.nations[2]!.isNpc = true;
+    state.nations[2]!.gold = 0;
+    const result = propose(freezeDeep(state));
+    if (!result.ok) throw new Error('NPC 거절 준비 실패');
+    expect(result.result).toMatchObject({ outcome: 'DECLINED', by: 'NPC' });
+    expect(result.state).not.toHaveProperty('treaties');
+    const human = propose();
+    if (!human.ok || human.result.outcome !== 'PROPOSED') throw new Error('사람 제안 준비 실패');
+    expect(treatyRespondByTick(result.result.tick)).toBe(human.result.respondByTick);
+    expect(state.nations[1]!.gold).toBe(100000);
+    expect(state.nations[2]!.gold).toBe(0);
   });
 });

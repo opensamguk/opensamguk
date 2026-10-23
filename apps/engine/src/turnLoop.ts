@@ -4,7 +4,6 @@ import type { Prisma, PrismaClient } from '@opensamguk/db';
 import { nextActionSequence, notifyWorld, type RealtimeSignal } from '@opensamguk/db';
 import {
   checkpointClock,
-  commandRegistry,
   monthlyDate,
   toGameDate,
   seasonOutcome,
@@ -23,6 +22,7 @@ import { persistEffects, shiftTurns } from './persist';
 import { persistMonthly, loadReplayState } from './monthly';
 import { hashState } from '@opensamguk/shared/node';
 import { processPendingInput } from './inputs';
+import { engineResolver, persistExt, verifyWorldExt } from './extState';
 
 export const CLOCK_CHECKPOINT_MS = 5_000;
 export const ENGINE_BATCH_STEPS = 64;
@@ -55,6 +55,7 @@ export interface TurnExecution {
 export class TurnLoop {
   private highWaterTick = 0;
   private committedState: WorldState | null = null;
+  private extVerified = false;
   private busy = false;
   private readonly elapsedNow: () => number;
   private nextCheckpointAt: number;
@@ -120,6 +121,7 @@ export class TurnLoop {
         // 일시정지·재개와 턴 commit이 같은 월드 행에서 직렬화된다.
         await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${worldId} FOR UPDATE`;
         const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
+        if (!this.extVerified) await verifyWorldExt(tx, world);
         const baselineActiveTick = await policyBaseline(tx, world);
         if (world.status !== 'RUNNING') {
           const inputResult = await processPendingInput(tx, world, world.clockTick, baselineActiveTick);
@@ -211,6 +213,7 @@ export class TurnLoop {
             },
             world.seed,
             modern ? { policy: actor.defaultPolicy as import('@opensamguk/rules').PolicyKey } : {},
+            engineResolver(world).resolver,
           );
           const commandKey = turn.commandKey;
           const result = turn.result;
@@ -222,13 +225,14 @@ export class TurnLoop {
             sequence,
             tick: due.nextTurnTick,
           });
+          await persistExt(tx, worldId, state.ext, next.ext);
           if (!failed) await persistCommandReports(tx, worldId, due.nextTurnTick, due.id, result);
           if (turn.nation) {
             const national = turn.nation.result;
             const nationId = turn.nation.nationId;
             if (!('code' in national)) await persistCommandReports(tx, worldId, due.nextTurnTick, due.id, national);
             if ('code' in national || !national.history?.some((entry) => entry.nationId === nationId)) {
-              const name = commandRegistry.get(turn.nation.commandKey)?.name ?? '국가 명령';
+              const name = engineResolver(world).resolver.get(turn.nation.commandKey)?.name ?? '국가 명령';
               await appendNationHistory(
                 tx,
                 worldId,
@@ -321,6 +325,7 @@ export class TurnLoop {
       },
       { timeout: 30_000 },
     );
+    this.extVerified = true;
     for (const signal of signals)
       await notifyWorld(this.db, worldId, signal, () => console.warn('실시간 알림 전송 실패'));
     return result;

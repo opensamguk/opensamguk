@@ -180,8 +180,8 @@ T1-15 편집기(`apps/web/src/turns/TurnEditor.tsx`)의 조작입니다. 메인 
 | `/w/:worldId/diplomacy?tab=incoming\|outgoing\|active\|ended\|broken\|write\|trust` | 외교실 (T2-08). 받은 제안·보낸 제안·진행 중·끝남·파기됨, 조약서 쓰기, 국가별 신의. 모르는 `tab`은 받은 제안 |
 | `/w/:worldId/messages` | 메시지 전체 화면 (T2-10). 메인 오른쪽 메시지 패널과 같은 부품 |
 | `/w/:worldId/operations` | 작전 목록과 만들기 (T2-12). 만들기 칸은 서버의 `canCreate`가 ok일 때만 |
-| `/w/:worldId/operations/:operationId` | 작전 타임라인(참여 장수 × 월)과 내 예턴 맞추기. 다른 국가 작전은 안내만 |
-| `/w/:worldId/nation/inspection` | 감찰 (T2-12). 메뉴는 직책자(officerLevel 5 이상)에게만 보인다 |
+| `/w/:worldId/operations/:operationId` | 작전 타임라인(참여 장수 × 월)과 내 예턴 맞추기. 일반 참여자도 모든 참여자 칸의 명령과 인자를 보고 빈 칸과 직접 휴식을 글자로 나눈다. 기본 열은 목표와 `months` 마지막 달 중 이른 달 전 6개월이다. 열 밖 칸은 줄마다 [30칸 모두 보기]로 서버 `cells` 전부를 칸 번호·연월·명령과 인자로 펼친다. 저장 충돌 뒤 새 제안을 받기 전과 받지 못했을 때는 초안에 넣기를 막는다. 다른 국가 작전은 서버의 `FORBIDDEN` 문장과 안내만 |
+| `/w/:worldId/nation/inspection` | 감찰 (T2-12). 메뉴는 직책자(officerLevel 5 이상)에게만 보인다. 앞 5칸은 빈 칸과 직접 휴식을 나누고 `lastActiveAt`이 null이면 기록 없음, 강조는 서버 `idle`만 따른다 |
 | `/help`, `/help/:doc` | 도움말 (T2-17). `docs/user/` 가이드 9개와 생성 명령 목록을 웹 빌드에 묶어 보여 줌. 로그인 없이 열림, 서버 요청 없음 |
 | `/dev/ui` | 부품 모음 (개발 모드만) |
 | `/dev/map-editor` | 지도 편집기 (개발 모드만, T4-80). 지금 형식·v2 지도 JSON 불러오기, 도시·연결·지형 편집, 검증 목록, v2 JSON과 5색 밑그림 PNG 내려받기. 서버 요청 없음. 관리자 콘솔 연결은 T4-81 |
