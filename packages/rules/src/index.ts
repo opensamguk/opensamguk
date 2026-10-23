@@ -17,6 +17,7 @@ export * from './balance';
 export * from './commands/types';
 export * from './commands/effects';
 export * from './commands/registry';
+export { extSliceKeys, restoreExtState } from './commands/ext/state';
 export * from './monthly/index';
 export * from './replay';
 export * from './general/create';
