@@ -11,6 +11,7 @@
     "migrate": "prisma migrate deploy"
   },
   "dependencies": {
+    "@opensamguk/shared": "workspace:*",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1"
   },

@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { cp, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { createRequire } from 'node:module';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -12,6 +13,8 @@ if (!url || !/^\/[a-z][a-z0-9_]*_test$/.test(new URL(url).pathname))
   throw new Error('T2-02 전용 테스트 DB가 필요합니다.');
 const root = fileURLToPath(new URL('../', import.meta.url));
 const dbRoot = join(root, 'packages/db');
+const require = createRequire(join(dbRoot, 'package.json'));
+const prismaCli = join(require.resolve('prisma/package.json'), '..', 'build/index.js');
 const migration = '20261023040000_world_presets';
 
 describe('T2-02 실제 PostgreSQL migration', () => {
@@ -43,7 +46,7 @@ describe('T2-02 실제 PostgreSQL migration', () => {
           `import { defineConfig } from 'prisma/config';\nexport default defineConfig({ schema: ${JSON.stringify(join(dbRoot, 'prisma/schema.prisma'))}, migrations: { path: ${JSON.stringify(migrations)} }, datasource: { url: process.env.DATABASE_URL } });\n`,
         );
         const deploy = () =>
-          run('pnpm', ['--filter', '@opensamguk/db', 'exec', 'prisma', 'migrate', 'deploy', '--config', config], {
+          run(process.execPath, [prismaCli, 'migrate', 'deploy', '--config', config], {
             cwd: root,
             env: { ...process.env, DATABASE_URL: database.href },
             timeout: 60_000,

@@ -3,7 +3,16 @@ import { rngFor } from '@opensamguk/shared';
 import { commandInitial, commandWorld } from '../../../test/commandFixture';
 import { cloneWorld, cloneWorldWithRegistry } from '../../model/clone';
 import { toWorldState, toWorldStateWithRegistry, type JsonValue } from '../../model/world';
-import { createExtState, createExtStateWithRegistry, type ExtStateRegistry, type ExtSlice } from './state';
+import {
+  createExtState,
+  createExtStateWithRegistry,
+  extSliceKeys,
+  extSliceKeysWithRegistry,
+  restoreExtState,
+  restoreExtStateWithRegistry,
+  type ExtStateRegistry,
+  type ExtSlice,
+} from './state';
 
 function fixture() {
   const slices: ExtSlice[] = ['s_shared', 's_a', 's_n'].map((key) => ({
@@ -28,6 +37,64 @@ function freeze<T>(value: T): T {
   return value;
 }
 const enabled = { general: ['t_a', 't_b'], nation: ['t_n'] };
+
+it('복원할 조각 key는 정렬한 합집합이며 명령 결합을 검증한다', () => {
+  expect(extSliceKeys(null)).toEqual([]);
+  expect(extSliceKeysWithRegistry(enabled, fixture())).toEqual(['s_a', 's_n', 's_shared']);
+  expect(extSliceKeysWithRegistry({ general: ['t_b', 't_a'], nation: ['t_n'] }, fixture())).toEqual(
+    extSliceKeysWithRegistry(enabled, fixture()),
+  );
+  for (const input of [null, { general: [], nation: [] }, { general: ['t_free'], nation: [] }])
+    expect(extSliceKeysWithRegistry(input, fixture())).toEqual([]);
+  for (const input of [
+    { general: ['missing'], nation: [] },
+    { general: ['t_n'], nation: [] },
+    { general: ['t_a', 't_a'], nation: [] },
+    { general: [], nation: ['t_a'] },
+  ])
+    expect(() => extSliceKeysWithRegistry(input, fixture())).toThrow();
+  expect(() => extSliceKeys({ general: ['t_a'], nation: [] })).toThrow();
+});
+
+it('조각이 없는 월드는 undefined만 복원하고 운영 목록은 시험 key를 거부한다', () => {
+  expect(restoreExtState(null, undefined)).toBeUndefined();
+  for (const input of [null, { general: [], nation: [] }, { general: ['t_free'], nation: [] }]) {
+    expect(restoreExtStateWithRegistry(input, undefined, fixture())).toBeUndefined();
+    for (const raw of [null, {}, [], { s_shared: { nested: [] } }])
+      expect(() => restoreExtStateWithRegistry(input, raw, fixture())).toThrow();
+  }
+  expect(() => restoreExtState({ general: ['t_a'], nation: [] }, { s_a: { nested: [] } })).toThrow();
+});
+
+it('복원은 기대 조각이 빠지거나 남은 값과 조각 검증 실패를 거부한다', () => {
+  const input = { general: ['t_b'], nation: [] };
+  for (const raw of [
+    undefined,
+    null,
+    {},
+    { s_a: { nested: [] } },
+    { s_shared: { nested: [] }, s_a: { nested: [] } },
+    { s_shared: 1 },
+    { s_shared: { nested: [undefined] } },
+    Object.defineProperty({}, 's_shared', { get: () => ({ nested: [] }), enumerable: true }),
+    Object.assign(Object.create({ inherited: true }), { s_shared: { nested: [] } }),
+  ])
+    expect(() => restoreExtStateWithRegistry(input, raw, fixture())).toThrow();
+  const registry = fixture();
+  registry.slices[0] = { ...registry.slices[0]!, key: '__proto__' };
+  expect(() => restoreExtStateWithRegistry(null, undefined, registry)).toThrow();
+});
+
+it('복원값은 얼린 원시 값과 가변 참조를 나누지 않고 create를 부르지 않는다', () => {
+  const registry = fixture();
+  const raw = freeze({ s_shared: { nested: [1] } });
+  const first = restoreExtStateWithRegistry({ general: ['t_b'], nation: [] }, raw, registry)!;
+  const second = restoreExtStateWithRegistry({ general: ['t_b'], nation: [] }, raw, registry)!;
+  (first.s_shared as { nested: number[] }).nested.push(2);
+  expect(raw.s_shared.nested).toEqual([1]);
+  expect(second.s_shared).toEqual({ nested: [1] });
+  for (const slice of registry.slices) expect(slice.create).not.toHaveBeenCalled();
+});
 
 it('운영 등록은 비어 있고 끈 월드·빈 목록·상태 없는 명령은 조각을 만들지 않는다', () => {
   const registry = fixture();

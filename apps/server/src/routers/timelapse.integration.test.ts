@@ -14,6 +14,8 @@ const db = createDb(url);
 const now = 1_800_000_000_003;
 const app = await buildServer({ db, now: () => now, logging: false });
 const users: Array<{ id: string; cookie: string }> = [];
+const fixtureId = randomUUID();
+const worldIds: string[] = [];
 let base: string;
 let worldId: string;
 let otherWorldId: string;
@@ -61,7 +63,8 @@ function snapshotData(index: number) {
 }
 
 function savedDisplay(label: string, index: number, id: number) {
-  return { id, name: `${label}-past-${id}-${index}`, color: id === 3 ? '#334455' : '#112233' };
+  const color = `#${(id * 1000 + index).toString(16).padStart(6, '0')}`;
+  return { id, name: `${label}-past-${id}-${index}`, color };
 }
 
 async function fixtureWorld(label: string, count: number, withGenerals = false) {
@@ -80,6 +83,7 @@ async function fixtureWorld(label: string, count: number, withGenerals = false) 
       unitSet: {},
     },
   });
+  worldIds.push(world.id);
   await db.nation.createMany({
     data: state.nations.map((nation) => ({ ...nation, worldId: world.id, capitalCityKey: null })),
   });
@@ -137,14 +141,12 @@ async function gameSnapshot() {
 }
 
 beforeAll(async () => {
-  await db.world.deleteMany();
-  await db.user.deleteMany();
   state = await readFixture();
   for (let index = 0; index < 4; index++) {
     const session = newSession(now);
     const user = await db.user.create({
       data: {
-        email: `timelapse-${index}@example.test`,
+        email: `timelapse-${fixtureId}-${index}@example.test`,
         passwordHash: 'not-used-for-session-auth',
         sessions: { create: { id: session.id, expiresAt: session.expiresAt } },
       },
@@ -169,8 +171,8 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await app.close();
-  await db.world.deleteMany();
-  await db.user.deleteMany();
+  await db.world.deleteMany({ where: { id: { in: worldIds } } });
+  await db.user.deleteMany({ where: { id: { in: users.map(({ id }) => id) } } });
   await db.$disconnect();
 });
 
@@ -320,6 +322,7 @@ describe('T4-35 / AC-P2-17 실제 TCP HTTP·PostgreSQL 영토 스냅샷', () => 
 
   it('H15 같은 국가도 각 프레임의 이름·색을 읽고 현재 표시값과 구분한다', async () => {
     const data = (await query({ worldId })).data!;
+    expect(savedDisplay('primary', 0, 2).color).not.toBe(savedDisplay('primary', 1, 2).color);
     expect(data.items[0]!.nations.find(({ id }) => id === 2)).toEqual(savedDisplay('primary', 0, 2));
     expect(data.items[1]!.nations.find(({ id }) => id === 2)).toEqual(savedDisplay('primary', 1, 2));
     const current = state.nations.find(({ id }) => id === 2)!;

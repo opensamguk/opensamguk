@@ -6,7 +6,7 @@ import { useTRPC } from '../trpc';
 import { DisabledReason } from '../ui/DisabledReason';
 import { EmptyState, ErrorState, LoadingState } from '../ui/States';
 import { Tag } from '../ui/Tag';
-import { lobbyNoticesQuery, lobbyWorldsQuery, type LobbyNotice, type LobbyWorld } from './contract';
+import type { LobbyNotice, LobbyWorld } from './contract';
 import { lobbyAction, metaText, myGeneralText, shortDate, STATUS_LABEL } from './lobbyView';
 import styles from './LobbyPage.module.css';
 
@@ -14,8 +14,9 @@ import styles from './LobbyPage.module.css';
 export function LobbyPage() {
   const trpc = useTRPC();
   const me = useQuery({ ...trpc.auth.me.queryOptions(), staleTime: 0 });
-  const worlds = useQuery(lobbyWorldsQuery());
-  const notices = useQuery(lobbyNoticesQuery());
+  // M2 화면은 includeEnded를 보내지 않는다. 끝난 월드는 서버 기본값대로 빠진다.
+  const worlds = useQuery({ ...trpc.lobby.worlds.queryOptions(), staleTime: 0 });
+  const notices = useQuery(trpc.lobby.notices.queryOptions());
   const loggedIn = Boolean(me.data?.user);
 
   let body;
