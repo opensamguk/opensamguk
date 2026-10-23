@@ -1,6 +1,8 @@
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useRouterState } from '@tanstack/react-router';
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { emptySlotLabel } from '../policy/policyText';
+import { usePolicyQuery } from '../policy/usePolicy';
 import { useTRPC } from '../trpc';
 import { DisabledReason } from '../ui/DisabledReason';
 import { EmptyState, ErrorState } from '../ui/States';
@@ -9,6 +11,7 @@ import { describeArgs } from './args';
 import { CommandPicker, type CommandInfo } from './CommandPicker';
 import {
   describeSelection,
+  EMPTY,
   quickSelect,
   rangeBetween,
   repeatRange,
@@ -78,6 +81,9 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
     retry: retryUnlessClientError,
   });
   const summary = useQuery({ ...trpc.world.summary.queryOptions({ worldId }), retry: retryUnlessClientError });
+  // 빈 칸이 실제로 무엇을 할지 보여 주려고 지금 방침을 읽는다. 못 읽으면 빈 칸은 휴식으로 보인다.
+  const policy = usePolicyQuery(worldId);
+  const emptyLabel = emptySlotLabel(policy.data);
 
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
   const [anchor, setAnchor] = useState<number | null>(null);
@@ -112,7 +118,7 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
   // 같은 명령·인자는 사전 검사를 한 번만 묻는다. 휴식은 묻지 않는다.
   const distinct = useMemo(() => {
     const seen = new Map<string, Turn>();
-    for (const turn of turns ?? []) if (turn.commandKey !== 'rest') seen.set(turnKey(turn), turn);
+    for (const turn of turns ?? []) if (turn.explicit && turn.commandKey !== 'rest') seen.set(turnKey(turn), turn);
     return [...seen.entries()];
   }, [turns]);
   const prechecks = useQueries({
@@ -208,6 +214,7 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
     state.edit({ put: { indices: [...selected].sort((a, b) => a - b), turn } });
     rowRefs.current[focus]?.focus();
   };
+  const onClear = () => onPut(EMPTY);
 
   if (!turns) {
     if (state.authLost) return <AuthLost />;
@@ -331,6 +338,7 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
               const isSelected = selected.has(i);
               const changed = !!draft && !pending && !!serverTurns && turnKey(serverTurns[i]!) !== turnKey(turn);
               const check = turn.commandKey === 'rest' ? undefined : precheckByKey.get(turnKey(turn));
+              const isEmpty = !turn.explicit;
               const args = describeArgs(turn.args, names);
               const time = times30[i]!;
               return (
@@ -346,6 +354,7 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
                     .filter(Boolean)
                     .join(' ')}
                   data-slot={i + 1}
+                  data-empty={isEmpty ? 'true' : undefined}
                   onClick={(e) => onRowClick(e, i)}
                   onFocus={() => setFocus(i)}
                 >
@@ -357,7 +366,13 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
                     {time.time ? <time dateTime={time.iso ?? undefined}>{time.time}</time> : null}
                   </td>
                   <td role="gridcell">
-                    <span className={styles.command}>{commandName(turn.commandKey)}</span>
+                    {isEmpty ? (
+                      <span className={styles.emptySlot} title="비워 둔 칸입니다. 기본 방침대로 실행합니다.">
+                        ({emptyLabel.tag}) {emptyLabel.command}
+                      </span>
+                    ) : (
+                      <span className={styles.command}>{commandName(turn.commandKey)}</span>
+                    )}
                     {args ? <span className={styles.args}> {args}</span> : null}
                     {changed ? <span className={styles.changedTag}>바뀜</span> : null}
                   </td>
@@ -402,6 +417,18 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
       )}
 
       <div className={styles.editBar} role="group" aria-label="칸 옮기기와 반복">
+        {putBlocked ? (
+          <DisabledReason reason={putBlocked}>고른 칸 비우기</DisabledReason>
+        ) : (
+          <button
+            type="button"
+            className={styles.secondary}
+            title="고른 칸을 빈 칸으로 되돌립니다. 빈 칸은 기본 방침대로 실행합니다"
+            onClick={onClear}
+          >
+            고른 칸 비우기
+          </button>
+        )}
         <label className={styles.inline}>
           <span>칸 수</span>
           <input
@@ -423,7 +450,7 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
             <button
               type="button"
               className={styles.secondary}
-              title="모든 칸을 앞으로 당기고 끝을 휴식으로 채웁니다"
+              title="모든 칸을 앞으로 당기고 끝을 빈 칸으로 채웁니다"
               onClick={() => state.edit({ shift: -shiftN })}
             >
               당기기
@@ -431,7 +458,7 @@ function Editor({ worldId, selectedCityKey, storageKey }: TurnEditorProps & { st
             <button
               type="button"
               className={styles.secondary}
-              title="모든 칸을 뒤로 밀고 앞을 휴식으로 채웁니다"
+              title="모든 칸을 뒤로 밀고 앞을 빈 칸으로 채웁니다"
               onClick={() => state.edit({ shift: shiftN })}
             >
               밀기
