@@ -37,6 +37,7 @@ export {
   settleTreatyFees,
   meetsTreatyPeaceRequirement,
   canNpcAcceptTreaty,
+  canRepresentTreatyProposal,
   TREATY_INPUTS,
   validateTreatyRecord,
   applyTreatyInput,
