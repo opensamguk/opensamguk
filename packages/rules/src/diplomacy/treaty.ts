@@ -3,6 +3,7 @@ import { TICKS_PER_MONTH } from '../clock/constants';
 import type { DeepReadonly, WorldState } from '../model/world';
 import { canExecuteNationCommand } from '../personnel/permissions';
 import type {
+  ClosedTreatyRow,
   FirstTreatyClause,
   TreatyApplyResult,
   TreatyClause,
@@ -194,6 +195,20 @@ const treatyStateSchema = z.strictObject({
   startTick: tickSchema.max(MAX_ENGINE_TICK).nullable(),
   endTick: tickSchema.max(MAX_STORED_INT).nullable(),
 });
+const closedTreatySchema = z.strictObject({
+  id: positive.max(MAX_STORED_INT),
+  fromNationId: positive.max(MAX_STORED_INT),
+  toNationId: positive.max(MAX_STORED_INT),
+  clauses: z.unknown(),
+  status: z.enum(['REJECTED', 'EXPIRED', 'ENDED']),
+  proposedTick: tickSchema.max(MAX_ENGINE_TICK),
+  respondByTick: tickSchema.max(MAX_STORED_INT),
+  startTick: tickSchema.max(MAX_STORED_INT).nullable(),
+  endTick: tickSchema.max(MAX_STORED_INT).nullable(),
+  costFrom: tickSchema.max(MAX_STORED_INT).nullable(),
+  costTo: tickSchema.max(MAX_STORED_INT).nullable(),
+  closedSequence: positive.max(MAX_STORED_INT),
+});
 
 function checkedTickAdd(tick: number, months: number): number {
   const result = tick + months * TICKS_PER_MONTH;
@@ -253,10 +268,47 @@ export function validateTreatyState(value: unknown): TreatyState {
   return treaty;
 }
 
-// 전체 archive 외피·sequence 순서는 호출자가 검사한다. APPLIED의 게임 결과는 재실행 뒤 대조해야 한다.
-export function validateTreatyRecord(value: unknown, context: TreatyRecordContext): TreatyRecord {
-  if (context.treaty?.version !== 1) throw new Error('조약 기능이 켜진 기록이 아닙니다.');
-  nonNegativeSafeInteger(context.monthlyTick, 'monthlyTick');
+// 저장 칸만 검사한다. 당시 국가·비용·마감 경위는 재생 대조가 맡는다.
+export function validateClosedTreatyRow(value: unknown): ClosedTreatyRow {
+  const row = closedTreatySchema.parse(value);
+  const { clauses } = proposeStored.parse({ toNationId: row.toNationId, clauses: row.clauses });
+  if (domainClauses(clauses)) throw new RangeError('저장된 조약의 조항을 확인하세요.');
+  if (row.fromNationId === row.toNationId) throw new RangeError('저장된 조약의 당사국을 확인하세요.');
+  if (row.respondByTick !== treatyRespondByTick(row.proposedTick))
+    throw new RangeError('저장된 조약의 응답 기한을 확인하세요.');
+  if (row.closedSequence < row.id || (row.status !== 'REJECTED' && row.closedSequence === row.id))
+    throw new RangeError('닫힌 조약의 마감 순서를 확인하세요.');
+  const months = clauses.find((clause) => clause.kind === 'nonAggression')?.months ?? null;
+  if (row.status === 'ENDED') {
+    if (
+      row.startTick === null ||
+      row.startTick < row.proposedTick ||
+      row.startTick >= row.respondByTick ||
+      row.startTick > LAST_MONTHLY_TICK ||
+      row.costFrom === null ||
+      row.costTo === null
+    )
+      throw new RangeError('끝난 조약의 시작 시각과 납부 기록을 확인하세요.');
+    const expectedEnd = months === null ? null : checkedTickAdd(row.startTick, months);
+    if (row.endTick !== expectedEnd || (row.endTick !== null && row.endTick > LAST_MONTHLY_TICK))
+      throw new RangeError('저장된 조약의 종료 시각을 확인하세요.');
+  } else {
+    if (row.startTick !== null || row.endTick !== null || row.costFrom !== null || row.costTo !== null)
+      throw new RangeError('수락하지 않은 조약에 시작·종료·납부 기록이 있습니다.');
+    // REJECTED는 사람·NPC 공통 범위다. 저장되지 않은 응답 주체를 추정하지 않는다.
+    if (
+      !canRepresentTreatyProposal({
+        tick: row.proposedTick,
+        nonAggressionMonths: months,
+        npc: row.status === 'REJECTED',
+      })
+    )
+      throw new RangeError('닫힌 조약의 제안 시각을 확인하세요.');
+  }
+  return { ...row, clauses: clauses.filter(isFirstClause) };
+}
+
+function parseTreatyRecord(value: unknown): TreatyRecord {
   const record = envelope.parse(value);
   const payload = TREATY_INPUTS[record.kind].payloadSchema.parse(record.payload);
   const result =
@@ -270,16 +322,11 @@ export function validateTreatyRecord(value: unknown, context: TreatyRecordContex
           })
           .parse(record.result);
   if (result.tick > MAX_STORED_INT) throw new RangeError('기록 tick 저장 범위를 넘었습니다.');
-  if (context.endTick !== undefined) {
-    nonNegativeSafeInteger(context.endTick, 'endTick');
-    if (
-      record.status !== 'REJECTED' ||
-      !('code' in result) ||
-      result.code !== 'WORLD_CLOSED' ||
-      result.tick < context.endTick
-    )
-      throw new Error('종료 뒤 조약 기록을 확인하세요.');
-  } else if (result.tick < context.monthlyTick) throw new Error('이미 정산한 시각보다 앞선 조약 기록입니다.');
+  return { ...record, payload, result } as TreatyRecord;
+}
+
+function assertTreatyRecordConsistency(record: TreatyRecord): void {
+  const { payload, result } = record;
   if (record.status === 'APPLIED' && 'outcome' in result) {
     const expectedId =
       record.kind === 'treaty.propose' ? String(record.sequence) : respondPayload.parse(payload).treatyId;
@@ -302,7 +349,33 @@ export function validateTreatyRecord(value: unknown, context: TreatyRecordContex
         throw new Error('응답 기록의 결과가 다릅니다.');
     }
   }
-  return { ...record, payload, result } as TreatyRecord;
+}
+
+// 과거 완료 기록의 구조와 자기 일관성만 본다. 현재 월드 상태로 결과를 다시 판정하지 않는다.
+export function decodeTreatyRecord(value: unknown): TreatyRecord {
+  const record = parseTreatyRecord(value);
+  assertTreatyRecordConsistency(record);
+  return record;
+}
+
+// 전체 archive 외피·sequence 순서는 호출자가 검사한다. APPLIED의 게임 결과는 재실행 뒤 대조해야 한다.
+export function validateTreatyRecord(value: unknown, context: TreatyRecordContext): TreatyRecord {
+  if (context.treaty?.version !== 1) throw new Error('조약 기능이 켜진 기록이 아닙니다.');
+  nonNegativeSafeInteger(context.monthlyTick, 'monthlyTick');
+  const record = parseTreatyRecord(value);
+  const { result } = record;
+  if (context.endTick !== undefined) {
+    nonNegativeSafeInteger(context.endTick, 'endTick');
+    if (
+      record.status !== 'REJECTED' ||
+      !('code' in result) ||
+      result.code !== 'WORLD_CLOSED' ||
+      result.tick < context.endTick
+    )
+      throw new Error('종료 뒤 조약 기록을 확인하세요.');
+  } else if (result.tick < context.monthlyTick) throw new Error('이미 정산한 시각보다 앞선 조약 기록입니다.');
+  assertTreatyRecordConsistency(record);
+  return record;
 }
 
 const rejectionMessages: Record<TreatyRejectCode, string> = {
