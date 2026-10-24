@@ -392,7 +392,8 @@ async function expectWrite(path: Path, data: unknown, f: Fixture, before: Rows) 
     const actor = expected.generals.find((general) => general.id === 1)!;
     actor.lastActiveTick = 105;
     actor.lastActiveAt = event.createdAt;
-    expected.offices.push({ worldId: f.worldId, nationId: 1, officerLevel: 12, tenure: 0, turnRevision: 1 });
+    // digest는 JSON 키 순서도 읽으므로 Prisma 반환 열 순서를 따른다. 비교하는 칸과 값은 그대로다.
+    expected.offices.push({ worldId: f.worldId, nationId: 1, officerLevel: 12, turnRevision: 1, tenure: 0 });
     expected.offices.sort((a, b) => a.nationId - b.nationId || a.officerLevel - b.officerLevel);
     expected.officeTurns.push(
       ...restSlots().map(({ commandKey, args }, slot) => ({
