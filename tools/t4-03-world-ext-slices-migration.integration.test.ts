@@ -171,9 +171,9 @@ async function existingRows(client: PgClient) {
   for (const { table_name: table } of tables.rows) {
     if (typeof table !== 'string' || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(table))
       throw new Error('잘못된 시험 표 이름입니다.');
-    rows[table] = (
-      await client.query(`SELECT to_jsonb(t) - 'treatyFormat' AS data FROM "${table}" t ORDER BY to_jsonb(t)::text`)
-    ).rows;
+    const data =
+      table === 'World' ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat'" : "to_jsonb(t) - 'treatyFormat'";
+    rows[table] = (await client.query(`SELECT ${data} AS data FROM "${table}" t ORDER BY to_jsonb(t)::text`)).rows;
   }
   return rows;
 }
@@ -400,7 +400,12 @@ it.each(['empty', 'legacy'] as const)(
       const previous = directories.filter((name) => name < migration);
       const later = directories.filter((name) => name > migration);
       expect(previous.at(-1)).toBe('20261023071000_nation_offices');
-      expect(later).toEqual(['20261023073000_treaties', '20261023074000_assignment_storage']);
+      expect(later).toEqual([
+        '20261023073000_treaties',
+        '20261023074000_assignment_storage',
+        '20261024000000_world_personnel_format',
+        '20261025000000_input_event_step_tick',
+      ]);
       for (const directory of previous)
         await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
       if (mode === 'legacy') await seedLegacy(client);
@@ -428,6 +433,9 @@ it.each(['empty', 'legacy'] as const)(
       expect(
         (await client.query('SELECT count(*)::int AS count FROM "World" WHERE "treatyFormat" IS NOT NULL')).rows,
       ).toEqual([{ count: 0 }]);
+      expect((await client.query('SELECT DISTINCT "personnelFormat" FROM "World"')).rows).toEqual([
+        { personnelFormat: null },
+      ]);
       expect((await client.query('SELECT count(*)::int AS count FROM "Treaty"')).rows).toEqual([{ count: 0 }]);
       expect((await client.query('SELECT count(*)::int AS count FROM "AssignmentOffer"')).rows).toEqual([{ count: 0 }]);
       if (mode === 'legacy') {
