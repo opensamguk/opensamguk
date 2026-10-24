@@ -7,14 +7,13 @@ v1의 기존 명령 구현을 재사용해 TypeScript 엔진·API에 이식·연
 
 ## 지금 어디쯤인가
 
-| 범위 | 전체 AC | 통과 |
-| --- | ---: | ---: |
-| M1 혼자와 NPC로 한 판 완주 | 22 | 20 |
-| M2 독립 에이전트 참가 시험 | 20 | 4 |
-| M3 공개 오픈 | 16 | 0 |
-| Phase 2 확장 | 28 | 1 |
+| 관문 | 완료 조건 | 상태 |
+| --- | --- | --- |
+| M1 혼자와 NPC로 한 판 완주 | [AC-M1 22개](docs/product/acceptance-criteria.md#m1) 통과 | 진행 중 (✅ 20 · 🟨 2 · ⬜ 0) | <!-- lint-text-ignore C-5 -->
+| M2 독립 에이전트 참가 시험 | [AC-M2 20개](docs/product/acceptance-criteria.md#m2) 통과 | 진행 중 (✅ 4 · 🟨 3 · ⬜ 13) | <!-- lint-text-ignore C-5 -->
+| M3 공개 오픈 | [AC-M3 16개](docs/product/acceptance-criteria.md#m3) 통과 | 진행 중 (✅ 0 · 🟨 1 · ⬜ 15) | <!-- lint-text-ignore C-5 -->
 
-완료 판정과 검증 증거는 [인수조건](docs/product/acceptance-criteria.md)에서 확인합니다. MVP는 M1·M2·M3의 58개 AC이며 Phase 2의 28개는 별도로 집계합니다. 모든 명령은 D-022에 따라 MVP 범위에 포함됩니다. 명령별 진행은 [명령 대응표](docs/product/command-coverage.json)와 `node tools/command-coverage.mjs`로 확인합니다. 다음 작업과 선행은 `pnpm next`와 [단계 계획](docs/product/phases.md)에서 봅니다.
+완료 판정과 검증 증거는 [인수조건](docs/product/acceptance-criteria.md)에서 확인합니다. MVP는 M1·M2·M3의 58개 AC입니다. Phase 2 확장은 별도로 집계하며 전체 AC 28개 가운데 1개가 통과했습니다. 모든 명령은 D-022에 따라 MVP 범위에 포함됩니다. 명령별 진행은 [명령 대응표](docs/product/command-coverage.json)와 `node tools/command-coverage.mjs`로 확인합니다. 현재 원작 비교 분모 90개, 정본 분모 91개, 전 단계 완료 0개입니다. 다음 작업과 선행은 `pnpm next`와 [단계 계획](docs/product/phases.md)에서 봅니다.
 
 집계 기준은 2026-10-24에 확인한 [인수조건](docs/product/acceptance-criteria.md)의 상태입니다.
 
