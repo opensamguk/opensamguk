@@ -195,9 +195,34 @@ describe('공개 범위', () => {
     render(<PublicMapView data={toPublicMaps(raw)} now={now} />);
     const area = screen.getByTestId('public-map');
     expect(tabs()).toHaveLength(1);
+    expect(screen.getByRole('img', { name: '도시1, 위' })).toBeTruthy();
     expect(area.querySelector('[data-cut]')).toBeNull();
     expect(area.querySelector('[data-supplied]')).toBeNull();
     expect(area.textContent).not.toMatch(/조조|5000|9999|보급|내 위치/);
+  });
+
+  it('숫자로 읽을 수 없는 도시 키와 연결은 버리고 사본 없는 월드는 그대로 둔다', () => {
+    const map = raw.worlds[0]!.map;
+    const odd = toPublicMaps({
+      delayMinutes: 10,
+      worlds: [
+        {
+          id: 'w1',
+          name: '첫 천하',
+          status: 'PAUSED',
+          map: {
+            ...map,
+            cities: [
+              { ...rawCity(1, 1), links: ['2', '', '-3', '1.5'] },
+              { ...rawCity(2, 1), key: 'x2' },
+            ],
+          },
+        },
+        { id: 'w2', name: '둘째 천하', status: 'RUNNING', map: null },
+      ],
+    });
+    expect(odd.worlds[0]!.map!.cities).toEqual([city(1, 1)]);
+    expect(odd.worlds[1]).toEqual({ id: 'w2', name: '둘째 천하', status: 'RUNNING', map: null });
   });
 
   it('모양이 틀린 응답과 사본은 버린다', () => {

@@ -13,6 +13,7 @@ export type CityView = Outputs['city']['get'];
 export type NationView = Outputs['nation']['get'];
 export type GeneralView = CityView['generals'][number];
 export type GeneralLog = Home['recentLogs'][number];
+export type PublicMapsResponse = Outputs['world']['publicMaps'];
 
 // 공개 범위 밖이면 서버가 필드를 빼고 보낸다 (apps/server/src/visibility.ts, docs/plans/T1-12.md).
 // cityInfo·nationInfo는 공개 모양과 상세 모양을 함께 반환하지만, 반환 타입 추론에서 상세 쪽이 공개 쪽에 흡수돼

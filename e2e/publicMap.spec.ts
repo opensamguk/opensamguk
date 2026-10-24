@@ -530,3 +530,39 @@ test('375px에서는 로그인 양식 아래로 지도가 내려가고 가로 �
   expect(map && map.x >= 0 && map.x + map.width <= 375).toBe(true);
   await page.screenshot({ path: 'test-results/t2-25-login-375.png', fullPage: true });
 });
+
+// 원206의 지연 뒤 사본 전환도 실제 엔진 사본 B로 확인한다. 다른 시험이 쓰는 시각은 끝에 되돌린다.
+test('지연 시간이 지난 사본 B를 다시 받으면 그 사본의 도시 소유·국가 이름·색을 그린다', async ({ page }) => {
+  const { ga, b } = fixture();
+  const eligible = floorMinute(Date.now() - 11 * MINUTE);
+  const moved = await withE2eDb((db) =>
+    db.publicMapSnapshot.updateMany({
+      where: { worldId: ga.id, takenAt: new Date(b) },
+      data: { takenAt: new Date(eligible) },
+    }),
+  );
+  expect(moved.count).toBe(1);
+  try {
+    const raw = await open(page, '/login');
+    expect(raw.worlds[0]!.map).toEqual({
+      takenAt: iso(eligible),
+      year: 191,
+      month: 2,
+      cities: RAW_GA.cities.map((city) => (city.key === '3' ? { ...city, nationId: 2 } : city)),
+      nations: RAW_GA.nations.map((nation) => (nation.id === B_NATION.id ? B_NATION : nation)),
+    });
+    const city = worldMap(page).locator('[data-city-key="3"]');
+    await expect(city).toHaveAttribute('aria-label', `낙양, ${B_NATION.name}`);
+    await expect(city).toHaveAttribute('data-nation-id', '2');
+    await expect(city.locator('circle')).toHaveCSS('fill', 'rgb(0, 170, 0)');
+    await expect(area(page).getByLabel('지도 범례')).toContainText(`${B_NATION.name} 3`);
+    await expect(area(page)).not.toContainText(NOW_NATION.name);
+  } finally {
+    await withE2eDb((db) =>
+      db.publicMapSnapshot.updateMany({
+        where: { worldId: ga.id, takenAt: new Date(eligible) },
+        data: { takenAt: new Date(b) },
+      }),
+    );
+  }
+});
