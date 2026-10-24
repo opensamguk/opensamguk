@@ -3,9 +3,22 @@ import {
   TICKS_PER_MONTH,
   treatyClosures,
   validateTreatyState,
+  validateNationTrustState,
   type DeepReadonly,
   type WorldState,
 } from '@opensamguk/rules';
+
+export async function loadNationTrust(
+  tx: Prisma.TransactionClient,
+  worldId: string,
+): Promise<Pick<WorldState, 'nationTrust'>> {
+  const rows = await tx.nationTrust.findMany({
+    where: { worldId },
+    orderBy: { nationId: 'asc' },
+    select: { nationId: true, brokenTreaties: true, lastBrokenTick: true },
+  });
+  return rows.length ? { nationTrust: validateNationTrustState(rows) } : {};
+}
 
 export async function loadTreaties(
   tx: Prisma.TransactionClient,

@@ -47,7 +47,7 @@ type RecentAction = {
   kind: TreatyRequestKind;
   treatyId: string | null;
   result: 'APPLIED' | 'REJECTED';
-  outcome: 'PROPOSED' | 'ACCEPTED' | 'DECLINED' | null;
+  outcome: 'PROPOSED' | 'ACCEPTED' | 'DECLINED' | 'BROKEN' | null;
   reason: string | null;
 };
 export type TreatyListPage = {

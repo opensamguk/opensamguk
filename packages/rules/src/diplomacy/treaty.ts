@@ -107,6 +107,13 @@ const proposeStored = proposeRaw.refine(
   '조항 저장 순서를 확인하세요.',
 );
 const respondPayload = z.strictObject({ treatyId: treatyIdSchema, accept: z.boolean() });
+const breakPayload = z.strictObject({ treatyId: treatyIdSchema });
+const brokenResult = z.strictObject({
+  outcome: z.literal('BROKEN'),
+  tick: tickSchema.max(MAX_ENGINE_TICK),
+  treatyId: treatyIdSchema,
+  brokenByNationId: positive.max(MAX_STORED_INT),
+});
 
 function clauseOrder(clause: TreatyClause): number {
   return clauseKinds.indexOf(clause.kind);
@@ -136,6 +143,15 @@ const respondRejectCodes = [
   'INSUFFICIENT_GOLD',
   'COUNTERPART_UNAVAILABLE',
 ] as const;
+const breakRejectCodes = [
+  'WORLD_CLOSED',
+  'ACTOR_INACTIVE',
+  'NO_GENERAL',
+  'NO_PERMISSION',
+  'BAD_TARGET',
+  'NOT_PARTY',
+  'TREATY_NOT_ACTIVE',
+] as const;
 
 // raw 요청의 정규화와 저장된 payload의 검사를 구분한다. 중앙 kind 목록에는 여기서 등록하지 않는다.
 export const TREATY_INPUTS = Object.freeze({
@@ -154,6 +170,11 @@ export const TREATY_INPUTS = Object.freeze({
     payloadSchema: respondPayload,
     rejectedCodes: respondRejectCodes,
     normalizePayload: (value: unknown) => respondPayload.parse(value),
+  }),
+  'treaty.break': Object.freeze({
+    payloadSchema: breakPayload,
+    rejectedCodes: breakRejectCodes,
+    normalizePayload: (value: unknown) => breakPayload.parse(value),
   }),
 });
 
@@ -182,7 +203,7 @@ const appliedResult = z.discriminatedUnion('outcome', [proposedResult, acceptedR
 const envelope = z.strictObject({
   sequence: positive.max(MAX_STORED_INT),
   generalId: positive,
-  kind: z.enum(['treaty.propose', 'treaty.respond']),
+  kind: z.enum(['treaty.propose', 'treaty.respond', 'treaty.break']),
   status: z.enum(['APPLIED', 'REJECTED']),
   payload: z.unknown(),
   result: z.unknown(),
@@ -382,7 +403,7 @@ function parseTreatyRecord(value: unknown): TreatyRecord {
   const payload = TREATY_INPUTS[record.kind].payloadSchema.parse(record.payload);
   const result =
     record.status === 'APPLIED'
-      ? appliedResult.parse(record.result)
+      ? (record.kind === 'treaty.break' ? brokenResult : appliedResult).parse(record.result)
       : z
           .strictObject({
             tick: tickSchema,
@@ -396,7 +417,16 @@ function parseTreatyRecord(value: unknown): TreatyRecord {
 
 function assertTreatyRecordConsistency(record: TreatyRecord): void {
   const { payload, result } = record;
+  if (record.kind === 'treaty.break') {
+    if (record.status === 'APPLIED') {
+      const broken = brokenResult.parse(result);
+      if (broken.treatyId !== breakPayload.parse(payload).treatyId || Number(broken.treatyId) >= record.sequence)
+        throw new Error('조약 기록의 ID가 다릅니다.');
+    }
+    return;
+  }
   if (record.status === 'APPLIED' && 'outcome' in result) {
+    if (result.outcome === 'BROKEN') throw new Error('파기 결과가 다른 조약 행동에 기록됐습니다.');
     const expectedId =
       record.kind === 'treaty.propose' ? String(record.sequence) : respondPayload.parse(payload).treatyId;
     if (result.treatyId !== expectedId) throw new Error('조약 기록의 ID가 다릅니다.');
@@ -432,6 +462,8 @@ export function validateTreatyRecord(value: unknown, context: TreatyRecordContex
   if (context.treaty?.version !== 1) throw new Error('조약 기능이 켜진 기록이 아닙니다.');
   nonNegativeSafeInteger(context.monthlyTick, 'monthlyTick');
   const record = parseTreatyRecord(value);
+  if (record.kind === 'treaty.break' && context.treatyBreak?.version !== 1)
+    throw new Error('조약 파기 기능이 켜진 기록이 아닙니다.');
   const { result } = record;
   if (context.endTick !== undefined) {
     nonNegativeSafeInteger(context.endTick, 'endTick');
@@ -457,6 +489,7 @@ const rejectionMessages: Record<TreatyRejectCode, string> = {
   BAD_TARGET: '조약 상대 국가를 확인하세요.',
   NOT_PARTY: '받은 조약에만 응답할 수 있습니다.',
   TREATY_NOT_PROPOSED: '응답을 기다리는 조약이 아닙니다.',
+  TREATY_NOT_ACTIVE: '진행 중인 조약이 아닙니다.',
   EXPIRED: '조약 응답 기한이 지났습니다.',
   TREATY_RELATION: '현재 외교 관계에서 맺을 수 없는 조항입니다.',
   INSUFFICIENT_GOLD: '국고의 금이 부족합니다.',
@@ -590,7 +623,14 @@ export function applyTreatyInput(
   const payload = TREATY_INPUTS[input.kind].payloadSchema.parse(input.payload);
   const reject = (code: TreatyRejectCode): TreatyApplyResult<TreatyWorldState> => ({
     ok: false,
-    result: { tick, code, message: rejectionMessages[code] },
+    result: {
+      tick,
+      code,
+      message:
+        input.kind === 'treaty.break' && code === 'NOT_PARTY'
+          ? '당사국인 조약만 파기할 수 있습니다.'
+          : rejectionMessages[code],
+    },
   });
   if (input.kind === 'treaty.propose') {
     const domain = domainClauses(proposeStored.parse(payload).clauses);
@@ -602,6 +642,35 @@ export function applyTreatyInput(
     return reject('NO_PERMISSION');
   const fromActor = state.nations[actor.nationId];
   if (!fromActor) return reject('BAD_TARGET');
+  if (input.kind === 'treaty.break') {
+    const requested = breakPayload.parse(payload);
+    const found = state.treaties?.find((entry) => String(entry.id) === requested.treatyId);
+    if (!found) return reject('TREATY_NOT_ACTIVE');
+    if (!state.nations[found.fromNationId] || !state.nations[found.toNationId]) return reject('BAD_TARGET');
+    if (actor.nationId !== found.fromNationId && actor.nationId !== found.toNationId) return reject('NOT_PARTY');
+    if (found.status !== 'ACTIVE') return reject('TREATY_NOT_ACTIVE');
+    const checked = validateTreatyState(found);
+    if (state.nationTrust !== undefined) validateNationTrustState(state.nationTrust);
+    const next = structuredClone(state) as TreatyWorldState;
+    putTreaties(
+      next,
+      (next.treaties ?? []).filter((entry) => entry.id !== checked.id),
+    );
+    if (checked.clauses.some((clause) => clause.kind === 'nonAggression')) {
+      const nationA = Math.min(checked.fromNationId, checked.toNationId);
+      const nationB = Math.max(checked.fromNationId, checked.toNationId);
+      const pair = next.diplomacies.find((entry) => entry.nationA === nationA && entry.nationB === nationB);
+      if (!pair || pair.state !== 'NON_AGGRESSION' || pair.untilTick !== checked.endTick)
+        throw new Error('파기할 조약의 불가침 관계를 확인하세요.');
+      next.diplomacies = next.diplomacies.filter((entry) => entry !== pair);
+    }
+    next.nationTrust = nextNationTrust(state.nationTrust, actor.nationId, tick);
+    return {
+      ok: true,
+      state: next,
+      result: { outcome: 'BROKEN', tick, treatyId: requested.treatyId, brokenByNationId: actor.nationId },
+    };
+  }
   let treaty: TreatyState;
   let response: boolean | null = null;
   if (input.kind === 'treaty.propose') {

@@ -13,7 +13,7 @@ export type TreatyRequestState =
       status: 'applied';
       requestId: string;
       kind: TreatyRequestKind;
-      outcome: 'PROPOSED' | 'ACCEPTED' | 'DECLINED';
+      outcome: 'PROPOSED' | 'ACCEPTED' | 'DECLINED' | 'BROKEN';
       treatyId: string;
       treaty: TreatyDetail | null;
     }

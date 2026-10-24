@@ -61,7 +61,8 @@ export type TreatyBroken = {
 
 export type TreatyInput =
   | { kind: 'treaty.propose'; payload: { toNationId: number; clauses: TreatyClause[] } }
-  | { kind: 'treaty.respond'; payload: { treatyId: string; accept: boolean } };
+  | { kind: 'treaty.respond'; payload: { treatyId: string; accept: boolean } }
+  | { kind: 'treaty.break'; payload: { treatyId: string } };
 
 export type TreatyApplied =
   | { outcome: 'PROPOSED'; tick: number; treatyId: string; respondByTick: number }
@@ -73,7 +74,8 @@ export type TreatyApplied =
       cost: { from: number; to: number };
       endTick: number | null;
     }
-  | { outcome: 'DECLINED'; by: 'HUMAN' | 'NPC'; tick: number; treatyId: string };
+  | { outcome: 'DECLINED'; by: 'HUMAN' | 'NPC'; tick: number; treatyId: string }
+  | TreatyBroken;
 
 export type TreatyRejectCode =
   | 'WORLD_CLOSED'
@@ -84,6 +86,7 @@ export type TreatyRejectCode =
   | 'NO_PERMISSION'
   | 'BAD_TARGET'
   | 'NOT_PARTY'
+  | 'TREATY_NOT_ACTIVE'
   | 'TREATY_NOT_PROPOSED'
   | 'EXPIRED'
   | 'TREATY_RELATION'
@@ -104,6 +107,7 @@ export type TreatyRecord = TreatyInput & {
 // 형식 6 외피를 검사한 호출자가 선택된 정적 조약 capability를 넘긴다.
 export interface TreatyRecordContext {
   treaty: { version: number } | null;
+  treatyBreak?: { version: number } | null;
   monthlyTick: number;
   endTick?: number;
 }
