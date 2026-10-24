@@ -17,6 +17,14 @@ core2026 파일을 옮길 때 출처(MIT, © 2025 devsam)를 남깁니다.
 
 내장 `che` 1판은 `version` 없는 v1입니다. v2는 `version: 2`, 정수 `canvas.width`·`canvas.height`, 필수 `terrain`과 네 층(`coast`, `lakes`, `mountains`, `rivers`)을 더합니다. `$comment`는 선택이며 도시 칸은 v1과 같습니다. v2는 모든 깊이에서 모르는 칸을 거부합니다. `defaults`는 `trust`·`supplyState`·선택 `trade`·선택 `frontState`만 받습니다. `normalizeMapToV2`는 v1을 700×500과 빈 지형으로 올리고 출처 고지를 보존하며 `meta`를 버립니다. 지도 초안의 저장과 게시는 v2만 받는 서버 작업(T4-78)에서 연결합니다.
 
+검증용 `mapV1Schema`는 `$comment`와 `defaults.trade`·`defaults.frontState`를 선택 칸으로 보존합니다. 따라서 `normalizeMapToV2(validateMap(content).value!)`로 이어도 출처가 남습니다. 월드 생성용 `world/resources.ts`의 `mapSchema`는 그대로이며 이 선택 칸을 초기 상태에 넣지 않습니다.
+
+| 공개 경로 | 이름 | 역할 |
+| --------- | ---- | ---- |
+| `@opensamguk/rules/resources` | `mapResourceSchema` | v1·v2를 분기해 읽는 자원 검증용 형식입니다. |
+| `@opensamguk/rules/resources` | `mapV1Schema`, `mapV2Schema` | 각 판 형식을 읽으며 v1에서도 출처와 선택 기본 칸을 보존합니다. |
+| `@opensamguk/rules` | `mapSchema` | 기존 월드 생성용 v1 형식이며 모르는 칸을 버립니다. |
+
 캔버스와 지형은 표시 전용이며 `WorldInit`에 들어가지 않습니다. 같은 도시를 가진 v1·v2의 초기 상태·상태 해시·자원 해시는 같습니다. 좌표 경계는 안에 포함하고 해안이 없으면 바탕이 땅입니다. 해안이 있으면 바탕은 바다이며 다각형 전체를 짝홀 규칙으로 채웁니다. 산맥·호수·강을 차례로 덧칠합니다. 자기 교차는 허용합니다.
 
 밑그림의 색과 순서는 `MAP_SKETCH_PALETTE`가 정합니다.
@@ -59,11 +67,13 @@ Node `crypto` 구현은 `@opensamguk/shared/node`에 분리하며 rules·브라�
 
 게시 검증기는 `@opensamguk/rules/resources`의 `validateResource`와 종류별 함수입니다. 결과는 `{ ok, issues, value }`이며 형식 실패면 `value`는 null이고 뜻 검사는 멈춥니다. 경고만 있으면 `ok`는 true입니다. `value`는 표시용으로만 쓰고 받은 원문을 저장합니다. 기존 `buildInitialWorld`의 마지막 방어선은 그대로 두며 `tools/resource-validate.test.ts`가 거부 사례와 v1·v2 해시 불변을 대조합니다. 카탈로그에서 짝 지도 유무·게시 여부를 확인하고 게시를 막는 연결은 T4-78 몫입니다.
 
+짝 지도의 형식만 잘못됐으면 `scenario-map-invalid`를 내고 시나리오의 도시 참조 검사만 건너뜁니다. 시나리오 자체의 ID·이름·소유·소속·생몰년·외교 검사는 계속합니다. `shape-invalid` 문구는 zod 오류 코드를 한국어로 바꾸고 점으로 이은 경로를 넣으며 루트 경로는 `$`로 씁니다. `terrain-out-of-canvas`는 선마다 하나이며 캔버스 밖 점 수와 첫 점 번호를 알립니다.
+
 코드·문구·고정 params 키의 정본은 `packages/rules/src/world/validate/issues.ts`의 `RESOURCE_ISSUES`입니다. 계획 파일의 구현 기록은 조율 세션이 채우므로 여기에도 코드별 키를 남깁니다. 지도 한도는 도시 300개, 선 하나당 점 2,000개, 지형 전체 점 20,000개, 캔버스 700×500입니다.
 
 | 코드 | params 키 |
 | ---- | --------- |
-| `shape-invalid` | `detail` |
+| `shape-invalid` | `path` (점으로 이은 경로, 루트는 `$`), `detail` (한국어 설명) |
 | `resource-id-mismatch` | `id`, `expectedId` |
 | `map-canvas-range` | `width`, `height` |
 | `map-too-large`, `terrain-too-large` | `count`, `limit` |
@@ -78,7 +88,7 @@ Node `crypto` 구현은 `@opensamguk/shared/node`에 분리하며 rules·브라�
 | `network-split` | `name`, `id` |
 | `terrain-open` | `count` |
 | `terrain-degenerate` | `count`, `minimum` |
-| `terrain-out-of-canvas` | `pointIndex`, `x`, `y` |
+| `terrain-out-of-canvas` | `outsideCount` (밖 점 수), `firstPointIndex` (첫 밖 점의 0부터 센 번호) |
 | `scenario-invalid` | `key` |
 | `scenario-map-missing` | `mapKey` (미지정이면 키 생략) |
 | `scenario-map-unpublished` | `mapKey` |

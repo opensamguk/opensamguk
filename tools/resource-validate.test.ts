@@ -40,12 +40,9 @@ describe('AC-P2-27 내장 자원과 월드 생성 대응', () => {
     ]);
   });
   it('v1 복제·빈 지형·해안 추가 모두 초기 상태와 두 해시를 보존한다', () => {
-    // 원본 JSON은 schema가 읽기 전에 넘겨 출처와 trade·frontState도 보존한다.
-    const v2 = normalizeMapToV2({
-      ...map,
-      defaults: { ...map.defaults, supplyState: map.defaults.supplyState as 0 | 1 },
-    });
+    const v2 = normalizeMapToV2(validateMap(map).value!);
     expect(v2.$comment).toBe(map.$comment);
+    expect(v2.defaults).toEqual(map.defaults);
     expect(v2.canvas).toEqual({ width: 700, height: 500 });
     expect(v2.cities).toHaveLength(94);
     expect(v2.terrain).toEqual({ coast: [], lakes: [], mountains: [], rivers: [] });

@@ -1,4 +1,4 @@
-import { mapSchema, MAP_DEFAULT_CANVAS, MAP_LIMITS, type MapResource, type Point } from '../map/format';
+import { mapResourceSchema, MAP_DEFAULT_CANVAS, MAP_LIMITS, type MapResource, type Point } from '../map/format';
 import { isClosedRing, pointInRings } from '../map/geometry';
 import { scenarioSchema } from '../resources';
 import { checkId, report, resourceIssue, shapeIssues, type ValidationReport } from './issues';
@@ -10,7 +10,7 @@ export interface MapValidationContext {
 }
 
 export function validateMap(content: unknown, ctx: MapValidationContext = {}): ValidationReport<MapResource> {
-  const parsed = mapSchema.safeParse(content);
+  const parsed = mapResourceSchema.safeParse(content);
   if (!parsed.success) return report<MapResource>(null, shapeIssues(parsed.error));
   const value = parsed.data;
   const v2 = value.version === 2 ? value : null;
@@ -33,10 +33,12 @@ export function validateMap(content: unknown, ctx: MapValidationContext = {}): V
     else ids.set(city.id, index);
     const name = city.name.trim();
     if (!name) issues.push(resourceIssue('city-name-empty', { id: city.id }, target));
-    const firstName = names.get(name);
-    if (firstName !== undefined)
-      issues.push(resourceIssue('city-name-duplicate', { name, firstIndex: firstName }, target));
-    else names.set(name, index);
+    else {
+      const firstName = names.get(name);
+      if (firstName !== undefined)
+        issues.push(resourceIssue('city-name-duplicate', { name, firstIndex: firstName }, target));
+      else names.set(name, index);
+    }
     const { x, y } = city.position;
     if (outside([x, y])) issues.push(resourceIssue('city-out-of-canvas', { name: city.name, x, y }, target));
     if (city.level < 1 || city.level > 8)
@@ -103,9 +105,16 @@ export function validateMap(content: unknown, ctx: MapValidationContext = {}): V
         const count = new Set(points.map(([x, y]) => `${x},${y}`)).size;
         const minimum = river ? 2 : 3;
         if (count < minimum) issues.push(resourceIssue('terrain-degenerate', { count, minimum }, target));
-        points.forEach(([x, y], pointIndex) => {
-          if (outside([x, y])) issues.push(resourceIssue('terrain-out-of-canvas', { pointIndex, x, y }, target));
+        let outsideCount = 0;
+        let firstPointIndex = -1;
+        points.forEach((point, pointIndex) => {
+          if (outside(point)) {
+            outsideCount++;
+            if (firstPointIndex === -1) firstPointIndex = pointIndex;
+          }
         });
+        if (outsideCount > 0)
+          issues.push(resourceIssue('terrain-out-of-canvas', { outsideCount, firstPointIndex }, target));
         if (points.length > MAP_LIMITS.pointsPerLine)
           issues.push(
             resourceIssue('terrain-too-large', { count: points.length, limit: MAP_LIMITS.pointsPerLine }, target),

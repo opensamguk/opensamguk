@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { validateResource as publicValidateResource, type MapResourceV2 } from '@opensamguk/rules/resources';
+import * as publicResources from '@opensamguk/rules/resources';
+import { mapSchema as legacyMapSchema } from '@opensamguk/rules';
 import {
   validatePortraitMap,
   validateResource,
@@ -15,6 +17,14 @@ describe('능력치·초상·공개 검증기', () => {
     const map: MapResourceV2 = mapFixture();
     expect(publicValidateResource).toBe(validateResource);
     expect(publicValidateResource('MAP', map).ok).toBe(true);
+  });
+  it('공개 지도 형식 이름과 기존 월드 생성용 이름을 구별합니다.', () => {
+    const map = mapFixture();
+    expect(publicResources.mapResourceSchema.parse(map)).toEqual(map);
+    expect(publicResources).not.toHaveProperty('mapSchema');
+    const legacy = legacyMapSchema.parse(map);
+    expect(legacy).not.toHaveProperty('version');
+    expect(legacy).not.toHaveProperty('terrain');
   });
   it.each([
     { total: 30, min: 20, max: 10 },

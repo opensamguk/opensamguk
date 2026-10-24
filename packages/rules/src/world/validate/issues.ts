@@ -16,7 +16,7 @@ export type IssueTarget =
 
 // 코드마다 문구에 넣는 params 키를 이 표에 고정한다.
 export const RESOURCE_ISSUES = {
-  'shape-invalid': ['형식이 맞지 않습니다', ['detail']],
+  'shape-invalid': ['형식이 맞지 않습니다', ['path', 'detail']],
   'resource-id-mismatch': ['자원 ID가 카탈로그 이름과 다릅니다', ['id', 'expectedId']],
   'map-canvas-range': ['캔버스는 700×500이어야 합니다', ['width', 'height']],
   'map-too-large': ['도시 수가 한도를 넘습니다', ['count', 'limit']],
@@ -34,7 +34,7 @@ export const RESOURCE_ISSUES = {
   'network-split': ['모든 도시가 하나의 연결망에 이어져야 합니다', ['name', 'id']],
   'terrain-open': ['지형을 이루는 점 수나 끝점이 맞지 않습니다', ['count']],
   'terrain-degenerate': ['지형의 서로 다른 점이 부족합니다', ['count', 'minimum']],
-  'terrain-out-of-canvas': ['지형 좌표가 캔버스 밖입니다', ['pointIndex', 'x', 'y']],
+  'terrain-out-of-canvas': ['지형 좌표가 캔버스 밖입니다', ['outsideCount', 'firstPointIndex']],
   'terrain-too-large': ['지형 점 수가 한도를 넘습니다', ['count', 'limit']],
   'city-off-land': ['도시가 땅 밖이나 호수 안에 있습니다', ['name', 'x', 'y']],
   'scenario-invalid': ['참조 시나리오 형식이 맞지 않습니다', ['key']],
@@ -102,17 +102,59 @@ export function report<T>(value: T | null, issues: ResourceIssue[]): ValidationR
   return { ok: !issues.some((issue) => issue.severity === 'error'), issues, value };
 }
 
+function shapeDetail(issue: z.ZodError['issues'][number]): string {
+  switch (issue.code) {
+    case 'invalid_type':
+      switch (issue.expected) {
+        case 'number':
+          return '숫자여야 함';
+        case 'int':
+          return '정수여야 함';
+        case 'string':
+          return '문자열이어야 함';
+        case 'boolean':
+          return '참 또는 거짓이어야 함';
+        case 'array':
+          return '목록이어야 함';
+        case 'object':
+          return '객체여야 함';
+        case 'null':
+          return '빈 값이어야 함';
+        default:
+          return '값의 종류가 맞아야 함';
+      }
+    case 'too_small':
+      return `길이나 값이 ${String(issue.minimum)}${issue.inclusive ? ' 이상이어야 함' : '보다 커야 함'}`;
+    case 'too_big':
+      return `길이나 값이 ${String(issue.maximum)}${issue.inclusive ? ' 이하여야 함' : '보다 작아야 함'}`;
+    case 'unrecognized_keys':
+      return `허용하지 않은 칸이 있음: ${issue.keys.join(', ')}`;
+    case 'invalid_value':
+      return '허용된 값이어야 함';
+    case 'invalid_format':
+      return '지정된 형식이어야 함';
+    case 'invalid_union':
+      return '허용된 형식 중 하나여야 함';
+    case 'invalid_key':
+      return '키 형식이 맞아야 함';
+    case 'invalid_element':
+      return '목록 항목의 형식이 맞아야 함';
+    case 'not_multiple_of':
+      return `값이 ${String(issue.divisor)}의 배수여야 함`;
+    default:
+      return '지정된 조건에 맞아야 함';
+  }
+}
+
 export function shapeIssues(error: z.ZodError): ResourceIssue[] {
-  return error.issues.map((issue) =>
-    resourceIssue(
+  return error.issues.map((issue) => {
+    const path = issue.path.map((part) => (typeof part === 'symbol' ? String(part) : part));
+    return resourceIssue(
       'shape-invalid',
-      { detail: issue.message },
-      {
-        kind: 'path',
-        path: issue.path.map((part) => (typeof part === 'symbol' ? String(part) : part)),
-      },
-    ),
-  );
+      { path: path.join('.') || '$', detail: shapeDetail(issue) },
+      { kind: 'path', path },
+    );
+  });
 }
 
 export function checkId(id: string, expectedId?: string): ResourceIssue[] {

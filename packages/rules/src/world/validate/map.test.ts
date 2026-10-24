@@ -191,6 +191,66 @@ const cases: Array<[ResourceIssueCode, (map: MapResourceV2) => void, IssueTarget
 ];
 
 describe('AC-P2-27 지도 검증', () => {
+  it('공백뿐인 이름은 빈 이름 오류만 내고 중복 비교에서 뺍니다.', () => {
+    const map = mapFixture();
+    map.cities[0]!.name = ' ';
+    map.cities[1]!.name = '\t ';
+    expect(validateMap(map).issues.map((issue) => [issue.code, issue.target])).toEqual([
+      ['city-name-empty', { kind: 'city', index: 0 }],
+      ['city-name-empty', { kind: 'city', index: 1 }],
+    ]);
+    map.cities[0]!.name = '도시';
+    map.cities[1]!.name = ' 도시 ';
+    expect(validateMap(map).issues.map((issue) => issue.code)).toEqual(['city-name-duplicate']);
+  });
+
+  it.each(['coast', 'lakes', 'mountains', 'rivers'] as const)(
+    '%s의 캔버스 밖 점을 선마다 하나로 묶습니다.',
+    (layer) => {
+      const map = mapFixture();
+      const points: Ring = [[0, 0], ...Array.from({ length: 1998 }, (_, i): [number, number] => [-1, i % 500]), [0, 0]];
+      if (layer === 'rivers')
+        map.terrain.rivers = [
+          { points },
+          {
+            points: [
+              [0, 0],
+              [700, 500],
+            ],
+          },
+          {
+            points: [
+              [700, 500],
+              [701, 500],
+            ],
+          },
+        ];
+      else
+        map.terrain[layer] = [
+          points,
+          coast,
+          [
+            [0, 0],
+            [701, 0],
+            [700, 500],
+            [0, 0],
+          ],
+        ];
+      const issues = validateMap(map).issues.filter((issue) => issue.code === 'terrain-out-of-canvas');
+      expect(issues).toHaveLength(2);
+      expect(issues[0]).toMatchObject({
+        target: { kind: 'terrain', layer, index: 0 },
+        params: { outsideCount: 1998, firstPointIndex: 1 },
+      });
+      expect(issues[1]).toMatchObject({
+        target: { kind: 'terrain', layer, index: 2 },
+        params: { outsideCount: 1, firstPointIndex: 1 },
+      });
+      expect(issues[0]!.params).not.toHaveProperty('x');
+      expect(issues[0]!.params).not.toHaveProperty('pointIndex');
+    },
+  );
+
   it.each(cases)('%s 실패와 고친 통과', (code, change, target) => {
     const good = mapFixture();
     expect(validateMap(good, { expectedId: 'map' })).toMatchObject({ ok: true, issues: [] });

@@ -68,7 +68,9 @@
 | `tools/next-task.mjs` | `pnpm next`: 다음 작업과 담당 출력 |
 | `resources/` | 지정된 core2026 리소스·초상 대응표와 `NOTICE.md` 출처 고지 |
 | `tools/portrait-map/` | 초상 이름 대응 생성기, 원본 스냅샷, 후속 수정용 `manual.json` |
-| `packages/rules/src/world/` | 리소스 schema와 순수 초기 상태 변환. `map/`은 지도 v1·v2 형식·기하·변환, `validate/`는 다섯 종류 게시 검증과 `@opensamguk/rules/resources` 공개 경로 |
+| `packages/rules/src/world/` | 리소스 schema와 순수 초기 상태 변환이며 `map/`은 지도 v1·v2 형식·기하·변환, `validate/`는 다섯 종류 게시 검증과 `@opensamguk/rules/resources` 공개 경로를 담습니다. |
+| `packages/rules/src/world/map/format.ts` | 공개 `mapResourceSchema`는 v1·v2를 읽고 검증용 `mapV1Schema`는 출처·선택 기본 칸을 보존하며 기존 월드 생성용 `world/resources.ts`의 `mapSchema`는 그대로 둡니다. |
+| `packages/rules/src/world/validate/issues.ts` | `shape-invalid`의 params는 `path`·한국어 `detail`이며 `terrain-out-of-canvas`는 선마다 한 항목과 `outsideCount`·`firstPointIndex`를 돌려줍니다. |
 | `packages/shared/src/rng.ts` | FNV-1a + Mulberry32 시드 RNG와 용도별 스트림 |
 | `packages/shared/src/node/hashState.ts` | Node 전용 상태 SHA-256 |
 | `apps/engine/src/world/` | 리소스 파일 읽기, 초기 상태 저장·재적재와 통합 테스트 |

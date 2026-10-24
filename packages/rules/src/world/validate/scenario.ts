@@ -1,4 +1,4 @@
-import { mapSchema, type MapResource } from '../map/format';
+import { mapResourceSchema, type MapResource } from '../map/format';
 import { scenarioSchema, type ScenarioResource } from '../resources';
 import { checkId, report, resourceIssue, shapeIssues, type ResourceIssue, type ValidationReport } from './issues';
 
@@ -35,10 +35,10 @@ export function validateScenario(content: unknown, ctx: ScenarioValidationContex
   const parsed = scenarioSchema.safeParse(content);
   if (!parsed.success) return report<ScenarioResource>(null, shapeIssues(parsed.error));
   const value = parsed.data;
-  const map = mapSchema.safeParse(ctx.map);
-  if (!map.success) return report(value, [resourceIssue('scenario-map-invalid', {})]);
+  const map = mapResourceSchema.safeParse(ctx.map);
   const issues = checkId(value.id, ctx.expectedId);
-  const refs = scenarioCityIssues(value, map.data);
+  if (!map.success) issues.push(resourceIssue('scenario-map-invalid', {}));
+  const refs = map.success ? scenarioCityIssues(value, map.data) : [];
   const nationNames = new Map<string, number>();
   const owners = new Map<string, number>();
   value.nation.forEach((nation, index) => {

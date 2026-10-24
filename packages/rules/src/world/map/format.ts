@@ -13,7 +13,13 @@ export const terrainSchema = z.strictObject({
   mountains: z.array(ringSchema),
   rivers: z.array(z.strictObject({ name: z.string().min(1).optional(), points: z.array(pointSchema) })),
 });
-export const mapV1Schema = legacyMapSchema;
+export const mapV1Schema = legacyMapSchema.extend({
+  $comment: z.string().optional(),
+  defaults: legacyMapSchema.shape.defaults.extend({
+    trade: z.number().finite().optional(),
+    frontState: z.number().finite().optional(),
+  }),
+});
 export const mapV2Schema = z.strictObject({
   $comment: z.string().optional(),
   version: z.literal(2),
@@ -39,7 +45,7 @@ export const mapV2Schema = z.strictObject({
 });
 
 // version이 있으면 v1의 모르는 칸 버리기로 우회하지 않는다.
-export const mapSchema = z.unknown().transform<MapResource>((content, ctx) => {
+export const mapResourceSchema = z.unknown().transform<MapResource>((content, ctx) => {
   const versioned = typeof content === 'object' && content !== null && 'version' in content;
   const parsed = (versioned ? mapV2Schema : mapV1Schema).safeParse(content);
   if (parsed.success) return parsed.data;
@@ -51,27 +57,19 @@ export type Point = z.infer<typeof pointSchema>;
 export type Ring = z.infer<typeof ringSchema>;
 export type Terrain = z.infer<typeof terrainSchema>;
 export type MapCity = z.infer<typeof legacyMapSchema>['cities'][number];
-export type MapResourceV1 = z.infer<typeof legacyMapSchema> & {
+export type MapResourceV1 = z.infer<typeof mapV1Schema> & {
   version?: never;
-  $comment?: string;
-  defaults: { trade?: number; frontState?: number };
 };
 export type MapResourceV2 = z.infer<typeof mapV2Schema>;
 export type MapResource = MapResourceV1 | MapResourceV2;
 
 export function normalizeMapToV2(map: MapResource): MapResourceV2 {
   if (map.version === 2) return map;
-  const parsed = legacyMapSchema.parse(map);
+  const parsed = mapV1Schema.parse(map);
   return {
     ...parsed,
-    ...(map.$comment === undefined ? {} : { $comment: map.$comment }),
     version: 2,
     canvas: { ...MAP_DEFAULT_CANVAS },
-    defaults: {
-      ...parsed.defaults,
-      ...(map.defaults.trade === undefined ? {} : { trade: map.defaults.trade }),
-      ...(map.defaults.frontState === undefined ? {} : { frontState: map.defaults.frontState }),
-    },
     terrain: { coast: [], lakes: [], mountains: [], rivers: [] },
   };
 }

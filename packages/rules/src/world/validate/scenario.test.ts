@@ -90,16 +90,47 @@ describe('시나리오 검증', () => {
     });
     expect(result.ok).toBe(code === 'scenario-diplomacy-duplicate');
   });
-  it('짝 지도 형식 실패는 하나만 내며 시나리오 형식 실패는 경로를 낸다', () => {
+  it('짝 지도 형식 실패와 지도 없이 판정할 오류를 함께 냅니다.', () => {
     const scenario = scenarioFixture();
     scenario.general[0]![3] = 999;
-    expect(validateScenario(scenario, { map: {} }).issues.map((i) => i.code)).toEqual(['scenario-map-invalid']);
+    expect(validateScenario(scenario, { map: {} }).issues.map((i) => i.code)).toEqual([
+      'scenario-map-invalid',
+      'scenario-general-nation-missing',
+    ]);
     const invalid = validateScenario({ ...scenario, startYear: -1 }, { map: {} });
     expect(invalid.value).toBeNull();
     expect(invalid.issues).toEqual([
       expect.objectContaining({ code: 'shape-invalid', target: { kind: 'path', path: ['startYear'] } }),
     ]);
     expect(validateScenario(scenarioFixture(), { map: mapFixture() }).ok).toBe(true);
+  });
+  it('짝 지도 형식 오류여도 ID·이름·소유·생몰년·외교 검사를 계속합니다.', () => {
+    const scenario = scenarioFixture();
+    scenario.nation[1]![0] = scenario.nation[0]![0];
+    scenario.nation[1]![8] = ['도시1', '없는도시'];
+    scenario.general[1]![1] = scenario.general[0]![1];
+    scenario.general[1]![3] = 999;
+    scenario.general[1]![4] = '없는도시';
+    scenario.general[1]![9] = 221;
+    scenario.diplomacy.push([2, 1, 0, 0], [1, 3, 0, 0]);
+    const ctx = { map: {}, expectedId: 'other' };
+    const result = validateScenario(scenario, ctx);
+    expect(result).toEqual(validateScenario(scenario, ctx));
+    expect(result.issues.map((i) => i.code)).toEqual([
+      'resource-id-mismatch',
+      'scenario-map-invalid',
+      'scenario-nation-name-duplicate',
+      'scenario-city-owner-duplicate',
+      'scenario-general-name-duplicate',
+      'scenario-general-nation-missing',
+      'scenario-general-years',
+      'scenario-diplomacy-invalid',
+      'scenario-diplomacy-duplicate',
+    ]);
+    expect(result.value).toEqual(scenario);
+    const withMap = validateScenario(scenario, { ...ctx, map: mapFixture() });
+    expect(withMap.issues.map((i) => i.code)).toContain('scenario-nation-city-missing');
+    expect(withMap.issues.map((i) => i.code)).toContain('scenario-general-city-missing');
   });
   it('없는 외교 국가·같은 국가·도시 목록 안의 중복 소유를 거부한다', () => {
     for (const pair of [

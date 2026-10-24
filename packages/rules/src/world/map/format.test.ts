@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { mapFixture } from '../validate/fixtures';
 import { validateMap } from '../validate/map';
-import { mapSchema, normalizeMapToV2, MAP_SKETCH_PALETTE } from './format';
+import { mapResourceSchema, normalizeMapToV2, MAP_SKETCH_PALETTE } from './format';
 
 describe('AC-P2-27 지도 형식', () => {
   it('v1은 모르는 칸을 버리며 v2 변환은 출처와 네 기본 칸을 보존한다', () => {
@@ -15,7 +15,7 @@ describe('AC-P2-27 지도 형식', () => {
       cities: v1.cities.map((city) => ({ ...city, meta: {} })),
     };
     const before = structuredClone(input);
-    expect(mapSchema.parse(input)).not.toHaveProperty('meta');
+    expect(mapResourceSchema.parse(input)).not.toHaveProperty('meta');
     const result = normalizeMapToV2(input);
     expect(result).toMatchObject({
       version: 2,
@@ -30,6 +30,25 @@ describe('AC-P2-27 지도 형식', () => {
     expect(normalizeMapToV2(result)).toBe(result);
     expect(validateMap(result)).toMatchObject({ ok: true, issues: [] });
     expect(input).toEqual(before);
+  });
+
+  it('v1 검증 결과를 v2로 올려도 출처와 선택 기본 칸을 보존합니다.', () => {
+    const fixture = mapFixture();
+    const input = {
+      id: fixture.id,
+      name: fixture.name,
+      cities: fixture.cities,
+      $comment: 'MIT 출처',
+      meta: { ignored: true },
+      defaults: { ...fixture.defaults, trade: 0, frontState: 1, ignored: true },
+    };
+    const value = validateMap(input).value!;
+    expect(value).toMatchObject({ $comment: input.$comment, defaults: { trade: 0, frontState: 1 } });
+    expect(value).not.toHaveProperty('meta');
+    expect(value.defaults).not.toHaveProperty('ignored');
+    expect(normalizeMapToV2(value)).toMatchObject({ $comment: input.$comment, defaults: { trade: 0, frontState: 1 } });
+    const withoutOptional = validateMap({ ...input, $comment: undefined, defaults: fixture.defaults }).value!;
+    expect(normalizeMapToV2(withoutOptional).defaults).toEqual(fixture.defaults);
   });
 
   it.each([
