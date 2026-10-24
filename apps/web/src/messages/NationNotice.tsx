@@ -3,7 +3,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { serverMessage } from '../turns/apiError';
 import { DisabledReason } from '../ui/DisabledReason';
 import { ErrorState } from '../ui/States';
-import { api, noticeKeys, type NationNotice } from './contract';
+import { api, noticeKeys, type NationNotice } from './api';
 import { useDraft } from './drafts';
 import { formatTime } from './MessagePanel';
 import { useNationNotice } from './queries';

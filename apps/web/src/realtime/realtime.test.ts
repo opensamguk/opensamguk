@@ -1,6 +1,6 @@
 import { QueryClient } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { messageKeys, noticeKeys } from '../messages/contract';
+import { messageKeys, noticeKeys } from '../messages/api';
 import { readDraft, writeDraft } from '../messages/drafts';
 import { trpc } from '../trpc';
 import {
