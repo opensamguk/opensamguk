@@ -57,4 +57,25 @@ describe('T2-26 생성 형식', () => {
     ).rejects.toThrow();
     expect(transaction).not.toHaveBeenCalled();
   });
+  it.each([
+    [['test-a'], []],
+    [['test-a'], ['test-b']],
+    [
+      ['test-a', 'test-b'],
+      ['test-b', 'test-a'],
+    ],
+  ])('상태 %j와 옵션 %j의 기능 목록이 다르면 쓰기 전에 거부한다', async (stateFeatures, optionFeatures) => {
+    const transaction = vi.fn();
+    const db = { $transaction: transaction } as unknown as PrismaClient;
+    const initial = { ...(await monthlyFixture()), ruleFeatures: stateFeatures };
+    await expect(
+      saveInitialWorld(db, initial, {
+        name: '목록 충돌',
+        turnTermMinutes: 60,
+        endYear: null,
+        ruleFeatures: optionFeatures,
+      }),
+    ).rejects.toThrow('월드 상태와 생성 옵션의 규칙 기능 목록이 다릅니다.');
+    expect(transaction).not.toHaveBeenCalled();
+  });
 });

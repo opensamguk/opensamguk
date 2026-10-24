@@ -30,6 +30,12 @@ export async function saveInitialWorld(
   const preset = options.preset ? parsePreset(options.preset.value) : null;
   if (options.preset && !/^[a-zA-Z0-9_-]+$/.test(options.preset.key)) throw new Error('프리셋 ID를 확인하세요.');
   const { ruleFeatures: stateFeatures, ...base } = state;
+  if (
+    Object.hasOwn(state, 'ruleFeatures') &&
+    options.ruleFeatures !== undefined &&
+    JSON.stringify(stateFeatures) !== JSON.stringify(options.ruleFeatures)
+  )
+    throw new Error('월드 상태와 생성 옵션의 규칙 기능 목록이 다릅니다.');
   if (Object.hasOwn(state, 'ruleFeatures')) checkRuleFeatures(stateFeatures);
   if (options.ruleFeatures !== undefined && !Array.isArray(options.ruleFeatures))
     throw new Error('규칙 기능 목록은 배열이어야 합니다.');

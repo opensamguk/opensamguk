@@ -6,7 +6,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { createDb, type Prisma } from '@opensamguk/db';
 import { type WorldInit } from '@opensamguk/rules';
 import { monthlyFixture } from '../test/monthlyFixture';
-import { featureRegistry } from '../test/replayFeaturesFixture';
+import { featureRegistry, generateReplayV2EngineArchive } from '../test/replayFeaturesFixture';
 import { saveInitialWorld, readWorldState } from './world/persistence';
 import { controlClock } from './world/clock';
 import { acquireLease, lockLease, releaseLease, renewLease, type Lease } from './lease';
@@ -160,6 +160,24 @@ describe('T2-26 실제 DB 형식·C2', () => {
     const archive = await exportReplay(db, value.worldId);
     expect(archive.afterEnd).toHaveLength(1);
     expect(archive.afterEnd[0]!.result).toMatchObject({ code: 'WORLD_CLOSED' });
+    expect(replayToEnd(archive)).toEqual(archive.end);
+  });
+  it('형식 1 엔진의 입력·턴·월간·종료 수출 바이트를 53dd348과 유지한다', async () => {
+    // 기준 파일이 없으면 실패한다. 조율 세션이 53dd348의 실제 DB 수출로 만들어야 한다.
+    const expected = await readFile(new URL('../test/fixtures/replay-v2-engine-53dd348.json', import.meta.url), 'utf8');
+    const archive = await generateReplayV2EngineArchive(db, (database, initial, options) =>
+      saveInitialWorld(database, initial, { ...options, replayFormat: 1 }),
+    );
+    expect(archive.inputs.map(({ kind, status }) => [kind, status])).toEqual([
+      ['general.create', 'APPLIED'],
+      ['turns.set', 'APPLIED'],
+      ['general.create', 'REJECTED'],
+    ]);
+    expect(archive.months).toHaveLength(12);
+    expect(archive.end?.reason).toBe('END_YEAR');
+    expect(archive.afterEnd).toHaveLength(1);
+    expect(archive.afterEnd[0]!.result).toMatchObject({ code: 'WORLD_CLOSED' });
+    expect(JSON.stringify(archive)).toBe(expected);
     expect(replayToEnd(archive)).toEqual(archive.end);
   });
   it('archive 2 고정 수출 바이트를 실제 DB에서도 유지한다', async () => {

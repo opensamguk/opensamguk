@@ -1,6 +1,7 @@
 import type { JsonValue, WorldView } from './model/world';
 import type { WorldInit } from './world/bootstrap';
-import { applyCreationInput, applyTurnsInput, type RecordedInput, type ReplayState } from './replay';
+import { applyCreationInput, applyTurnsInput } from './replayInputs';
+import type { RecordedInput, ReplayState } from './replay';
 
 export interface ReplayOriginV1 {
   version: 1;
