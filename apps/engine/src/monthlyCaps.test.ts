@@ -121,6 +121,8 @@ async function fixture(
   origin.resourceHash = hashState(capsResourceHashInput(origin));
   const world = {
     id: 'world',
+    replayFormat: 1,
+    ruleFeatures: [],
     startYear: initial.startYear,
     monthlyTick: 50000,
     treatyFormat: caps === true ? 1 : null,

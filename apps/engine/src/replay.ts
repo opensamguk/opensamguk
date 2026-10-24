@@ -30,6 +30,7 @@ import {
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { exportCapsArchive, replayCapsArchive, replayCapsToEnd, type CapsArchive } from './replayCaps';
+import { checkStoredReplayFormat } from './features';
 
 export type { ReplayOriginV3 } from '@opensamguk/rules';
 
@@ -107,6 +108,7 @@ export async function exportReplay(
     async (tx) => {
       const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
       if (world.replayOrigin === null) throw new Error('생성 기록이 없는 월드는 재생할 수 없습니다.');
+      checkStoredReplayFormat(world);
       const v3 = world.replayFormat === 3;
       if (!v3) {
         const capabilities = selectWorldCapabilities(world);

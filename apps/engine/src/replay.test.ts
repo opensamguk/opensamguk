@@ -277,6 +277,8 @@ function exportDatabase(archive: ReplayArchiveV2 | ReplayArchiveV5, ended = true
   const tx = {
     world: {
       findUniqueOrThrow: vi.fn(async () => ({
+        replayFormat: 1,
+        ruleFeatures: [],
         replayOrigin: archive.origin,
         treatyFormat: null,
         personnelFormat: null,
@@ -380,6 +382,8 @@ describe('T1-26 내보내기와 네 키 상태', () => {
       world: {
         findUniqueOrThrow: async () => ({
           id: worldId,
+          replayFormat: 1,
+          ruleFeatures: [],
           preset: null,
           treatyFormat: null,
           personnelFormat: null,

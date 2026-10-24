@@ -49,6 +49,8 @@ async function fixture(caps = true, modern = false) {
   origin.resourceHash = hashState(rules.capsResourceHashInput(origin));
   const world = {
     id: '00000000-0000-4000-8000-000000000003',
+    replayFormat: 1,
+    ruleFeatures: [],
     status: 'RUNNING',
     startYear: initial.startYear,
     seed: initial.seed,

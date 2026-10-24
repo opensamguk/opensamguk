@@ -18,6 +18,8 @@ function fixture(status: World['status'] = 'PAUSED', caps = false, beforeCommit?
   origin.resourceHash = hashState(capsResourceHashInput(origin));
   const world = {
     id: 'world',
+    replayFormat: 1,
+    ruleFeatures: [],
     status,
     preset: null,
     treatyFormat: caps ? 1 : null,
@@ -167,6 +169,21 @@ it.each(statuses)('%s의 off 잔여 행은 입력·sequence 전에 같은 잠금
   expect(f.tx.inputEvent.findFirst).not.toHaveBeenCalled();
   expect(f.tx.world.update).not.toHaveBeenCalled();
   expect(f.tx.world.updateMany).not.toHaveBeenCalled();
+  expect(f.loop.state).toBeNull();
+});
+
+it.each(statuses)('%s의 형식 1에 남은 기능 사본은 S3에서 입력·순서·시계 쓰기 전에 멈춘다 (단위)', async (status) => {
+  const f = fixture(status);
+  f.world.ruleFeatures = ['test-a'];
+  f.world.replayOrigin = { ...legacy.origin, version: 1 } as unknown as Prisma.JsonValue;
+  f.events.push(pending('general.create'));
+  await expect(f.loop.advanceTo(999)).rejects.toThrow('사본');
+  expect(f.tx.treaty.findMany).not.toHaveBeenCalled();
+  expect(f.tx.inputEvent.findFirst).not.toHaveBeenCalled();
+  expect(f.tx.inputEvent.updateMany).not.toHaveBeenCalled();
+  expect(f.tx.world.update).not.toHaveBeenCalled();
+  expect(f.tx.world.updateMany).not.toHaveBeenCalled();
+  expect(f.events[0]).toMatchObject({ status: 'PENDING', sequence: null, tick: null });
   expect(f.loop.state).toBeNull();
 });
 

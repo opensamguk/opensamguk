@@ -244,7 +244,7 @@ export class TurnLoop {
             world.seed,
             modern ? { policy: actor.defaultPolicy as import('@opensamguk/rules').PolicyKey } : {},
             engineResolver(world).resolver,
-            personnelBefore ? { offices: personnelBefore.offices! } : undefined,
+            ...(personnelBefore ? ([{ offices: personnelBefore.offices! }] as const) : []),
           );
           if (
             treatiesHash !== null &&

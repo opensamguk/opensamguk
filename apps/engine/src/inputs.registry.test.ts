@@ -4,6 +4,7 @@ import { ruleRegistry } from '@opensamguk/rules';
 import { processInputs, queuedInputHandlers } from './inputs';
 import {
   checkWorldReplay,
+  checkStoredReplayFormat,
   engineRegistry,
   type EngineRegistry,
   type EngineWorld,
@@ -121,6 +122,16 @@ describe('T2-26 통합 입력 처리기', () => {
 });
 
 describe('T2-26 엔진 시작 대조와 서버 기능 확인', () => {
+  it('기존 형식으로 바꾼 뒤 남은 기능 사본은 capability 선택 전에 거부한다', () => {
+    for (const replayOrigin of [null, { version: 1, initial: {} }, { version: 6 }]) {
+      expect(() => checkStoredReplayFormat({ replayFormat: 1, ruleFeatures: ['test-a'], replayOrigin })).toThrow(
+        '사본',
+      );
+    }
+    expect(() =>
+      checkStoredReplayFormat({ replayFormat: 1, ruleFeatures: [], replayOrigin: { version: 6 } }),
+    ).not.toThrow();
+  });
   it('형식 1의 null 원본만 허용한다', () => {
     expect(() => checkWorldReplay({ replayOrigin: null, replayFormat: 1, ruleFeatures: [] })).not.toThrow();
     for (const value of [
