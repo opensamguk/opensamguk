@@ -4,13 +4,15 @@ import type { Prisma, PrismaClient } from '@opensamguk/db';
 import { nextActionSequence, notifyWorld, type RealtimeSignal } from '@opensamguk/db';
 import {
   checkpointClock,
-  commandRegistry,
   monthlyDate,
   toGameDate,
   seasonOutcome,
   runGeneralTurn,
   unitSetSchema,
   TICKS_PER_MONTH,
+  assertSlotSet,
+  isPolicyKey,
+  isPolicyMode,
   type WorldState,
 } from '@opensamguk/rules';
 import { appendNationHistory, persistCommandReports, commandRealtimeSignals } from './commandPersistence';
@@ -19,12 +21,22 @@ import { loadWorld } from './worldLoader';
 import { persistEffects, shiftTurns } from './persist';
 import { persistMonthly, loadReplayState } from './monthly';
 import { hashState } from '@opensamguk/shared/node';
-import { processCreation } from './inputs';
+import { processPendingInput } from './inputs';
+import { engineResolver, persistExt, verifyWorldExt } from './extState';
+import { assertWorldCapabilities } from './capsGate';
 
 export const CLOCK_CHECKPOINT_MS = 5_000;
 export const ENGINE_BATCH_STEPS = 64;
 export const ENGINE_BATCH_MS = 250;
 type WorldStatus = Prisma.WorldGetPayload<Record<string, never>>['status'];
+async function policyBaseline(tx: Prisma.TransactionClient, world: Prisma.WorldGetPayload<Record<string, never>>) {
+  if (world.policyFromSequence !== null) return undefined;
+  const human = await tx.general.findFirst({
+    where: { worldId: world.id, userId: { not: null } },
+    select: { id: true },
+  });
+  return human ? world.clockTick : undefined;
+}
 export interface PollBatch {
   executions: TurnExecution[];
   more: boolean;
@@ -44,6 +56,7 @@ export interface TurnExecution {
 export class TurnLoop {
   private highWaterTick = 0;
   private committedState: WorldState | null = null;
+  private extVerified = false;
   private busy = false;
   private readonly elapsedNow: () => number;
   private nextCheckpointAt: number;
@@ -109,8 +122,12 @@ export class TurnLoop {
         // 일시정지·재개와 턴 commit이 같은 월드 행에서 직렬화된다.
         await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${worldId} FOR UPDATE`;
         const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
+        await assertWorldCapabilities(tx, world);
+        if (!this.extVerified) await verifyWorldExt(tx, world);
+        const baselineActiveTick = await policyBaseline(tx, world);
         if (world.status !== 'RUNNING') {
-          const progressed = await processCreation(tx, world, world.clockTick);
+          const inputResult = await processPendingInput(tx, world, world.clockTick, baselineActiveTick);
+          const progressed = inputResult === true;
           if (progressed) await this.hooks.beforeCommit?.(tx);
           signal?.throwIfAborted();
           await assertLease(tx, this.lease);
@@ -142,12 +159,20 @@ export class TurnLoop {
             : checkpoint.clockTick);
         if (tick < world.clockTick) throw new Error('이미 저장된 시계보다 뒤로 진행할 수 없습니다.');
         if (tick > 2_147_483_647 - TICKS_PER_MONTH) throw new Error('게임 tick 저장 범위를 넘었습니다.');
-        if (await processCreation(tx, world, tick)) {
+        const inputResult = await processPendingInput(tx, world, tick, baselineActiveTick);
+        if (inputResult !== false) {
           const state = await loadWorld(tx, worldId);
           await this.hooks.beforeCommit?.(tx);
           signal?.throwIfAborted();
           await assertLease(tx, this.lease);
-          return { tick, state, execution: null, checkpointed: false, progressed: true, status: world.status };
+          return {
+            tick,
+            state,
+            execution: null,
+            checkpointed: false,
+            progressed: inputResult === true,
+            status: world.status,
+          };
         }
         const due = await tx.general.findFirst({
           where: { worldId, nextTurnTick: { lte: tick }, activeFromYear: { lte: year } },
@@ -173,12 +198,32 @@ export class TurnLoop {
           const command = await tx.generalTurn.findUnique({
             where: { worldId_generalId_slot: { worldId, generalId: due.id, slot: 0 } },
           });
+          const modern = isPolicyMode({ fromSequence: world.policyFromSequence, actionSequence: world.actionSequence });
+          if (modern) {
+            assertSlotSet(
+              await tx.generalTurn.findMany({ where: { worldId, generalId: due.id }, select: { slot: true } }),
+            );
+            if (!isPolicyKey(actor.defaultPolicy)) throw new Error('기본 방침이 올바르지 않습니다.');
+          }
+          const treatiesHash =
+            world.treatyFormat === 1 ? hashState(state.treaties ? { treaties: state.treaties } : {}) : null;
           const turn = runGeneralTurn(
             state,
             { generalId: due.id, tick: due.nextTurnTick, unitSet: unitSetSchema.parse(world.unitSet) },
-            { commandKey: command?.commandKey ?? 'rest', args: command?.args ?? {} },
+            {
+              commandKey: command?.commandKey ?? 'rest',
+              args: command?.args ?? {},
+              ...(modern ? { explicit: command!.explicit } : {}),
+            },
             world.seed,
+            modern ? { policy: actor.defaultPolicy as import('@opensamguk/rules').PolicyKey } : {},
+            engineResolver(world).resolver,
           );
+          if (
+            treatiesHash !== null &&
+            treatiesHash !== hashState(turn.state.treaties ? { treaties: turn.state.treaties } : {})
+          )
+            throw new Error('턴 실행 중 조약 목록이 바뀌었습니다.');
           const commandKey = turn.commandKey;
           const result = turn.result;
           const failed = 'code' in result;
@@ -189,13 +234,14 @@ export class TurnLoop {
             sequence,
             tick: due.nextTurnTick,
           });
+          await persistExt(tx, worldId, state.ext, next.ext);
           if (!failed) await persistCommandReports(tx, worldId, due.nextTurnTick, due.id, result);
           if (turn.nation) {
             const national = turn.nation.result;
             const nationId = turn.nation.nationId;
             if (!('code' in national)) await persistCommandReports(tx, worldId, due.nextTurnTick, due.id, national);
             if ('code' in national || !national.history?.some((entry) => entry.nationId === nationId)) {
-              const name = commandRegistry.get(turn.nation.commandKey)?.name ?? '국가 명령';
+              const name = engineResolver(world).resolver.get(turn.nation.commandKey)?.name ?? '국가 명령';
               await appendNationHistory(
                 tx,
                 worldId,
@@ -288,6 +334,7 @@ export class TurnLoop {
       },
       { timeout: 30_000 },
     );
+    this.extVerified = true;
     for (const signal of signals)
       await notifyWorld(this.db, worldId, signal, () => console.warn('실시간 알림 전송 실패'));
     return result;

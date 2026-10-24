@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { errorCode, retryUnlessClientError } from '../game/errors';
 import { formatYearMonth } from '../game/gameDate';
 import { QueryError } from '../game/QueryState';
 import { useWorldId, useWorldMap } from '../game/queries';
+import { useTRPC } from '../trpc';
 import { serverMessage } from '../turns/apiError';
 import type { ArgNames } from '../turns/args';
 import { formatTime } from '../turns/schedule';
@@ -14,23 +15,26 @@ import { NationBadge } from '../ui/NationBadge';
 import { EmptyState, LoadingState } from '../ui/States';
 import { Tag } from '../ui/Tag';
 import { AlignPanel } from './AlignPanel';
-import {
-  operationApi,
-  operationQueryKey,
-  OPERATION_PATH_KEY,
-  SORTIE_COMMAND_KEY,
-  type MemberTimeline,
-  type OperationDetail,
-} from './contract';
+import { SORTIE_COMMAND_KEY, type MemberTimeline, type OperationDetail } from './contract';
 import styles from './Operations.module.css';
-import { beyondNote, cellFor, sameMonth, shortDate, VERDICT_VIEW, visibleMonths } from './timeline';
+import {
+  beyondNote,
+  cellFor,
+  EMPTY_SLOT_TITLE,
+  sameMonth,
+  shortDate,
+  slotLabel,
+  VERDICT_VIEW,
+  visibleMonths,
+  type SlotLabel,
+} from './timeline';
 
 // 작전 상세: 참여 장수 × 월 타임라인과 내 예턴 맞추기 (T2-12, AC-M2-15).
 export function OperationDetailPage({ operationId }: { operationId: string }) {
   const worldId = useWorldId();
+  const trpc = useTRPC();
   const detail = useQuery({
-    queryKey: operationQueryKey('get', { worldId, id: operationId }),
-    queryFn: () => operationApi.get.query({ worldId, id: operationId }),
+    ...trpc.operation.get.queryOptions({ worldId, id: operationId }),
     refetchInterval: 15_000,
     retry: retryUnlessClientError,
   });
@@ -40,7 +44,7 @@ export function OperationDetailPage({ operationId }: { operationId: string }) {
   else if (detail.isError && errorCode(detail.error) === 'FORBIDDEN')
     body = (
       <EmptyState title="볼 수 없는 작전입니다">
-        작전은 같은 국가의 참여 장수와 직책자만 봅니다.{' '}
+        {serverMessage(detail.error) ?? '작전은 같은 국가의 참여 장수와 직책자만 봅니다.'}{' '}
         <Link to="/w/$worldId/operations" params={{ worldId }}>
           작전 목록으로
         </Link>
@@ -64,6 +68,7 @@ export function OperationDetailPage({ operationId }: { operationId: string }) {
 
 function Detail({ worldId, op }: { worldId: string; op: OperationDetail }) {
   const map = useWorldMap(worldId);
+  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -78,10 +83,12 @@ function Detail({ worldId, op }: { worldId: string; op: OperationDetail }) {
     };
   }, [map.data]);
 
-  const close = useMutation({
-    mutationFn: () => operationApi.close.mutate({ worldId, id: op.id }),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: OPERATION_PATH_KEY }),
-  });
+  // 닫기는 작전 메타데이터만 바꾼다. 작전 경로만 다시 받고 예턴 캐시는 건드리지 않는다.
+  const close = useMutation(
+    trpc.operation.close.mutationOptions({
+      onSuccess: () => void queryClient.invalidateQueries({ queryKey: trpc.operation.pathKey() }),
+    }),
+  );
 
   return (
     <>
@@ -93,7 +100,7 @@ function Detail({ worldId, op }: { worldId: string; op: OperationDetail }) {
         <p className={styles.meta}>
           <span>
             목표 {formatYearMonth(op.targetDate)}
-            {op.targetAt ? ` (${formatTime(new Date(op.targetAt), new Date())})` : null}
+            {op.targetAt !== null ? ` (${formatTime(new Date(op.targetAt), new Date())})` : null}
           </span>
           <span className="num">
             기준 병력 {op.min.crew.toLocaleString('ko-KR')} · 훈련 {op.min.train} · 사기 {op.min.atmos}
@@ -137,13 +144,21 @@ function Detail({ worldId, op }: { worldId: string; op: OperationDetail }) {
           </thead>
           <tbody>
             {op.timeline.map((member) => (
-              <MemberRow key={member.generalId} member={member} months={months} target={op.targetDate} min={op.min} />
+              <MemberRow
+                key={member.generalId}
+                member={member}
+                months={months}
+                target={op.targetDate}
+                min={op.min}
+                names={names}
+              />
             ))}
           </tbody>
         </table>
+        {op.timeline.length === 0 ? <p className={styles.muted}>지금 국가에 남은 참여 장수가 없습니다.</p> : null}
         {hidden > 0 || expanded ? (
           <button type="button" className={styles.secondary} onClick={() => setExpanded((v) => !v)}>
-            {expanded ? '목표 전 6개월만 보기' : `앞의 ${hidden}개월 더 보기`}
+            {expanded ? '앞의 달 접기' : `앞의 ${hidden}개월 더 보기`}
           </button>
         ) : null}
       </section>
@@ -153,7 +168,7 @@ function Detail({ worldId, op }: { worldId: string; op: OperationDetail }) {
           {closing ? (
             <>
               <span>작전을 닫으면 판정과 맞추기를 더 쓰지 않습니다.</span>
-              <button type="button" className={styles.primary} onClick={() => close.mutate()}>
+              <button type="button" className={styles.primary} onClick={() => close.mutate({ worldId, id: op.id })}>
                 닫기 확정
               </button>
               <button type="button" className={styles.secondary} onClick={() => setClosing(false)}>
@@ -192,20 +207,37 @@ function Detail({ worldId, op }: { worldId: string; op: OperationDetail }) {
   );
 }
 
-function MemberRow({
+function CellText({ label }: { label: SlotLabel }) {
+  if (label.kind !== 'empty') return <>{label.text}</>;
+  return (
+    <span className={styles.muted} title={EMPTY_SLOT_TITLE}>
+      {label.text}
+    </span>
+  );
+}
+
+// 참여 장수 한 줄. 일반 참여자도 다른 참여자의 명령과 인자를 본다(U62-1). 비워 둔 칸의 방침 명령은 짐작하지 않는다.
+export function MemberRow({
   member,
   months,
   target,
   min,
+  names,
 }: {
   member: MemberTimeline;
   months: OperationDetail['months'];
   target: OperationDetail['targetDate'];
   min: OperationDetail['min'];
+  names: ArgNames;
 }) {
   const verdict = VERDICT_VIEW[member.verdict];
-  const late = beyondNote(member, months);
-  const next = member.cells[0]?.at;
+  const late = beyondNote(member, months, names);
+  // 열은 서버 months만큼이라 목표가 가까우면 뒤 칸이 열 밖이다. 같은 줄에서 서버 cells 전부를 순서대로 펼친다.
+  const [allSlots, setAllSlots] = useState(false);
+  const listId = useId();
+  // 다음 턴 시각이 null이면(정지·시작 전·가속 등) 서버가 준 게임 연월만 적는다.
+  const next = member.cells[0];
+  const nextText = next ? (next.at !== null ? formatTime(new Date(next.at), new Date()) : shortDate(next.date)) : null;
   const short = (key: 'crew' | 'train' | 'atmos') => member.expected[key] < min[key];
   return (
     <tr
@@ -218,8 +250,31 @@ function MemberRow({
         {member.isMe ? <span className={styles.muted}> (나)</span> : null}
         <span className={styles.sub}>
           {member.cityName}
-          {next ? ` · 다음 턴 ${formatTime(new Date(next), new Date())}` : null}
+          {nextText !== null ? ` · 다음 턴 ${nextText}` : null}
         </span>
+        <button
+          type="button"
+          className={styles.slotToggle}
+          aria-expanded={allSlots}
+          aria-controls={allSlots ? listId : undefined}
+          aria-label={`${member.name}의 예턴 ${member.cells.length}칸 ${allSlots ? '접기' : '모두 보기'}`}
+          onClick={() => setAllSlots((v) => !v)}
+        >
+          {allSlots ? '칸 접기' : `${member.cells.length}칸 모두 보기`}
+        </button>
+        {allSlots ? (
+          <ol id={listId} className={styles.allSlots} aria-label={`${member.name}의 예턴 ${member.cells.length}칸`}>
+            {member.cells.map((cell) => {
+              const label = slotLabel(cell.turn, names);
+              return (
+                <li key={cell.slot} data-slot={cell.slot + 1} data-kind={label.kind}>
+                  <span className="num">{cell.slot + 1}번 칸</span>{' '}
+                  <span className={`${styles.muted} num`}>{shortDate(cell.date)}</span> <CellText label={label} />
+                </li>
+              );
+            })}
+          </ol>
+        ) : null}
       </th>
       <td>
         <Tag tone={verdict.tone}>
@@ -237,7 +292,7 @@ function MemberRow({
       {months.map((m) => {
         const cell = cellFor(member, m);
         const isSortie = !!cell && !!member.sortie && cell.slot === member.sortie.slot;
-        const rest = !cell || cell.turn.commandKey === 'rest';
+        const label = cell ? slotLabel(cell.turn, names) : null;
         return (
           <td
             key={shortDate(m)}
@@ -248,9 +303,11 @@ function MemberRow({
             ]
               .filter(Boolean)
               .join(' ')}
-            title={cell?.at ? formatTime(new Date(cell.at), new Date()) : undefined}
+            title={cell && cell.at !== null ? formatTime(new Date(cell.at), new Date()) : undefined}
+            data-slot={cell ? cell.slot + 1 : undefined}
+            data-kind={label?.kind}
           >
-            {rest ? <span className={styles.muted}>·</span> : cell.turn.name}
+            {label === null ? null : <CellText label={label} />}
           </td>
         );
       })}

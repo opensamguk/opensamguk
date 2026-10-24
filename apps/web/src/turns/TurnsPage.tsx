@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from '@tanstack/react-router';
+import { formatYearMonth, personalLogDate } from '../game/gameDate';
 import { PolicyBar } from '../policy/PolicyBar';
 import { useTRPC } from '../trpc';
 import { retryUnlessClientError } from './apiError';
-import { slotTimes } from './schedule';
-import { TurnEditor } from './TurnEditor';
+import { homePollMs, TurnEditor } from './TurnEditor';
 import styles from './TurnsPage.module.css';
 
 // /w/:worldId/turns. 메인 명령 칸과 같은 편집기를 넓게 쓰는 보조 화면이다 (핵심 조작은 메인에서 한다).
@@ -30,7 +30,7 @@ function RecentResults({ worldId }: { worldId: string }) {
   const summary = useQuery({ ...trpc.world.summary.queryOptions({ worldId }), retry: retryUnlessClientError });
   const home = useQuery({
     ...trpc.home.get.queryOptions({ worldId }),
-    refetchInterval: summary.data?.status === 'ENDED' ? false : 15_000,
+    refetchInterval: homePollMs(summary.data?.status === 'ENDED'),
     retry: retryUnlessClientError,
   });
   const logs = home.data?.recentLogs ?? [];
@@ -44,7 +44,8 @@ function RecentResults({ worldId }: { worldId: string }) {
       ) : (
         <ol className={styles.logs} data-testid="recent-results">
           {logs.map((log) => {
-            const date = summary.data ? slotTimes(1, summary.data, log.tick, null)[0]?.date : null;
+            const logDate = summary.data ? personalLogDate(log.tick, summary.data) : null;
+            const date = logDate ? formatYearMonth(logDate) : null;
             return (
               <li key={log.id} className={log.kind === 'failure' ? styles.failure : undefined}>
                 <span className={styles.logHead}>

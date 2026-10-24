@@ -1,14 +1,24 @@
 import { useQuery } from '@tanstack/react-query';
 import { useId, useRef, useState, type KeyboardEvent } from 'react';
 import { MapLegend, WorldMap } from '../main/WorldMap';
+import { useTRPC } from '../trpc';
 import { Tag } from '../ui/Tag';
-import { publicMapsQueryOptions } from './contract';
-import { delayText, snapshotTimeText, type PublicMaps } from './publicMaps';
+import { delayText, snapshotTimeText, toPublicMaps, type PublicMaps } from './publicMaps';
 import styles from './PublicMapTabs.module.css';
+
+// 사본은 엔진이 5분마다 찍는다(T2-24). 1분마다 다시 받으면 새 사본이 늦어도 1분 안에 보인다.
+const REFRESH_MS = 60_000;
 
 // 로그인 화면과 로비의 지연 공개 지도 (T2-25, D-026). 진행 중인 월드를 탭으로 고르고 지도는 하나만 그린다.
 export function PublicMapTabs() {
-  const maps = useQuery(publicMapsQueryOptions());
+  const trpc = useTRPC();
+  const maps = useQuery(
+    trpc.world.publicMaps.queryOptions(undefined, {
+      select: toPublicMaps,
+      staleTime: REFRESH_MS,
+      refetchInterval: REFRESH_MS,
+    }),
+  );
   return <PublicMapView data={maps.data} failed={maps.isError && !maps.data} />;
 }
 

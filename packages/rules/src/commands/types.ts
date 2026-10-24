@@ -9,6 +9,7 @@ export interface Actor {
   target?: 'general' | 'nation';
   tick?: number;
   unitSet?: DeepReadonly<UnitSetResource> | undefined;
+  authority?: 'office';
 }
 export interface Failure {
   code:

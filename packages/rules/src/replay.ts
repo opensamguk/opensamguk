@@ -3,19 +3,25 @@ import { rngFor } from '@opensamguk/shared';
 import { runGeneralTurn } from './commands/turn';
 import type { UnitSetResource } from './world/resources';
 import { TICKS_PER_MONTH } from './clock/constants';
-import { toWorldState, type WorldState } from './model/world';
+import { toWorldState, type WorldState, type OfficeRevisions } from './model/world';
 import { monthlyDate, runMonthly } from './monthly/index';
 import type { InitialGeneral, WorldInit } from './world/bootstrap';
+import { emptyTurn, emptyQueue } from './policy';
+import { type ReplayPolicy, validatePolicyRecordedInput } from './policy/replay';
+import { completePersonnelStep } from './personnel/step';
 
 export interface QueuedTurn {
   commandKey: string;
   args: unknown;
+  explicit?: boolean;
 }
 export interface ReplayState {
   state: WorldState;
   turns: Record<number, QueuedTurn[]>;
   revisions: Record<number, number>;
   monthlyTick: number;
+  policy?: ReplayPolicy;
+  offices?: OfficeRevisions;
 }
 export interface RecordedInput {
   sequence: number;
@@ -60,6 +66,7 @@ export function runReplayAction(
     return { ...replay, state: result.state, monthlyTick: action.tick };
   }
   const next = structuredClone(replay);
+  const personnel = Object.hasOwn(replay, 'offices');
   const turns = next.turns[action.generalId] ?? emptyTurns();
   const command = turns[0]!;
   const result = runGeneralTurn(
@@ -67,22 +74,34 @@ export function runReplayAction(
     { generalId: action.generalId, tick: action.tick, unitSet },
     command,
     seed,
-    {},
+    next.policy ? { policy: next.policy.policies[action.generalId]! } : {},
     resolver,
+    personnel ? { offices: next.offices! } : undefined,
   );
   next.state = result.state;
   next.state.generals[action.generalId]!.nextTurnTick += TICKS_PER_MONTH;
-  next.turns[action.generalId] = [...turns.slice(1), { commandKey: 'rest', args: {} }];
+  if (personnel) {
+    const packet = completePersonnelStep(
+      replay.state,
+      replay.offices!,
+      { state: next.state, ...result.personnel! },
+      action.tick,
+    );
+    next.state = packet.state;
+    next.offices = packet.offices;
+  }
+  next.turns[action.generalId] = [...turns.slice(1), next.policy ? emptyTurn() : { commandKey: 'rest', args: {} }];
   next.revisions[action.generalId] = (next.revisions[action.generalId] ?? 0) + 1;
   return next;
 }
 
 export function applyRecordedInput(replay: ReplayState, input: RecordedInput): ReplayState {
+  if (replay.policy) validatePolicyRecordedInput(input, true);
   if (input.status === 'REJECTED') return replay;
   const next = structuredClone(replay);
   if (input.kind === 'turns.set') {
     const payload = input.payload as { turns?: QueuedTurn[]; revision?: number };
-    const result = input.result as { revision?: number };
+    const result = input.result as { revision?: number; activeTick?: number };
     const id = input.generalId;
     if (
       id === null ||
@@ -97,6 +116,8 @@ export function applyRecordedInput(replay: ReplayState, input: RecordedInput): R
     }
     next.turns[id] = structuredClone(payload.turns);
     next.revisions[id] = result.revision!;
+    if (next.policy && next.state.generals[id]!.userId !== null)
+      next.policy.lastActiveTicks[id] = Math.max(next.policy.lastActiveTicks[id]!, result.activeTick!);
   } else if (input.kind === 'general.create') {
     const general = (input.result as { general?: InitialGeneral }).general;
     if (
@@ -111,8 +132,20 @@ export function applyRecordedInput(replay: ReplayState, input: RecordedInput): R
       throw new Error('장수 생성 결과가 올바르지 않습니다.');
     }
     next.state.generals[general.id] = structuredClone(general);
-    next.turns[general.id] = emptyTurns();
+    next.turns[general.id] = next.policy ? emptyQueue() : emptyTurns();
     next.revisions[general.id] = 0;
+    if (next.policy) {
+      if (typeof general.userId !== 'string') throw new Error('생성한 사람 장수의 사용자가 없습니다.');
+      next.policy.policies[general.id] = 'none';
+      next.policy.lastActiveTicks[general.id] = (input.result as { activeTick: number }).activeTick;
+    }
+  } else if (next.policy && (input.kind === 'general.setPolicy' || input.kind === 'general.active')) {
+    const id = input.generalId;
+    if (id === null || !next.state.generals[id] || next.state.generals[id]!.userId === null)
+      throw new Error('활동 입력의 사람 장수가 없습니다.');
+    const result = input.result as { activeTick: number; policy?: import('./policy').PolicyKey };
+    if (input.kind === 'general.setPolicy') next.policy.policies[id] = result.policy!;
+    next.policy.lastActiveTicks[id] = Math.max(next.policy.lastActiveTicks[id]!, result.activeTick);
   } else {
     throw new Error(`재생할 수 없는 입력 종류입니다: ${input.kind}`);
   }

@@ -17,7 +17,12 @@ export interface ExtStateRegistry {
   }[];
 }
 export const extSlices: readonly ExtSlice[] = [];
-export const extCommandBindings: ExtStateRegistry['bindings'] = [];
+export const extCommandBindings: ExtStateRegistry['bindings'] = [
+  { commandKey: 'fire_attack', target: 'general', sliceKeys: [] },
+  { commandKey: 'sabotage', target: 'general', sliceKeys: [] },
+  { commandKey: 'incite', target: 'general', sliceKeys: [] },
+  { commandKey: 'plunder', target: 'general', sliceKeys: [] },
+];
 const reserved = new Set(['__proto__', 'constructor', 'prototype']);
 
 function fail(key: string): never {
@@ -72,14 +77,13 @@ export function createExtState(enabled: EnabledCommands | null, context: ExtInit
   return createExtStateWithRegistry(enabled, context, { slices: extSlices, bindings: extCommandBindings });
 }
 
-// 내부 helper는 시험에서만 다른 목록을 받는다. 명령 정의를 import하면 clone 경로가 순환한다.
-export function createExtStateWithRegistry(
-  enabled: EnabledCommands | null,
-  context: ExtInitContext,
-  registry: ExtStateRegistry,
-): WorldExt | undefined {
+export function extSliceKeys(enabled: EnabledCommands | null): string[] {
+  return extSliceKeysWithRegistry(enabled, { slices: extSlices, bindings: extCommandBindings });
+}
+
+export function extSliceKeysWithRegistry(enabled: EnabledCommands | null, registry: ExtStateRegistry): string[] {
   validateRegistry(registry);
-  if (enabled === null) return undefined;
+  if (enabled === null) return [];
   const bindings = new Map(registry.bindings.map((binding) => [binding.commandKey, binding]));
   const selected = new Set<string>();
   const seen = new Set<string>();
@@ -91,6 +95,36 @@ export function createExtStateWithRegistry(
       for (const sliceKey of binding.sliceKeys) selected.add(sliceKey);
     }
   }
+  return [...selected].sort();
+}
+
+export function restoreExtState(enabled: EnabledCommands | null, raw: unknown): WorldExt | undefined {
+  return restoreExtStateWithRegistry(enabled, raw, { slices: extSlices, bindings: extCommandBindings });
+}
+
+export function restoreExtStateWithRegistry(
+  enabled: EnabledCommands | null,
+  raw: unknown,
+  registry: ExtStateRegistry,
+): WorldExt | undefined {
+  const expected = extSliceKeysWithRegistry(enabled, registry);
+  if (expected.length === 0) {
+    if (raw !== undefined) fail('ext');
+    return undefined;
+  }
+  if (raw === null || typeof raw !== 'object') fail('ext');
+  const actual = Reflect.ownKeys(raw);
+  if (actual.length !== expected.length || expected.some((key) => !Object.hasOwn(raw, key))) fail('ext');
+  return cloneExtStateWithRegistry(raw, registry);
+}
+
+// 내부 helper는 시험에서만 다른 목록을 받는다. 명령 정의를 import하면 clone 경로가 순환한다.
+export function createExtStateWithRegistry(
+  enabled: EnabledCommands | null,
+  context: ExtInitContext,
+  registry: ExtStateRegistry,
+): WorldExt | undefined {
+  const selected = new Set(extSliceKeysWithRegistry(enabled, registry));
   if (selected.size === 0) return undefined;
   const ext: WorldExt = {};
   for (const slice of registry.slices) {

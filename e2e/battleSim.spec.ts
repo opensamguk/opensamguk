@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { expect, test, type Page, type Worker } from '@playwright/test';
 import { simulateBattle, unitSetSchema } from '../packages/rules/src/index';
 import { createRng } from '../packages/shared/src/index';
-import { createAccount } from './account';
+import { appOrigin, createAccount } from './account';
 import { e2eWorld, setTurns, waitTurnWindow } from './game';
 import { bindGeneral, query } from './world';
 
@@ -10,7 +10,6 @@ import { bindGeneral, query } from './world';
 // 기대값은 손으로 적지 않고 Node에서 같은 packages/rules의 simulateBattle과 resources/unitset/basic.json으로 계산한다.
 // 실제 PostgreSQL은 로그인과 메인 초안 경로에만 쓴다. 시뮬레이터는 서버를 부르지 않는다.
 
-const BASE = 'http://127.0.0.1:5173';
 const STORAGE = 'test-results/t4-34-battle-sim-storage.json';
 const ctx = { worldId: '' };
 const unitSet = unitSetSchema.parse(
@@ -19,7 +18,7 @@ const unitSet = unitSetSchema.parse(
 
 test.beforeAll(async ({ browser }) => {
   test.setTimeout(240_000);
-  const context = await browser.newContext({ baseURL: BASE, storageState: { cookies: [], origins: [] } });
+  const context = await browser.newContext({ baseURL: appOrigin(), storageState: { cookies: [], origins: [] } });
   const page = await context.newPage();
   await createAccount(page);
   ctx.worldId = await e2eWorld(page);
@@ -79,8 +78,9 @@ const group = (page: Page, name: '공격' | '수비') => page.getByRole('group',
 const box = (page: Page, side: '공격' | '수비', name: string) =>
   group(page, side).getByRole('textbox', { name, exact: true });
 const result = (page: Page) => page.getByTestId('battle-result');
-// GameLayout 위쪽 띠가 원래 부르는 조회. 시뮬레이터가 더하는 요청은 없어야 한다.
-const TOPBAR_QUERIES = ['auth.me', 'home.get', 'world.summary'];
+// GameLayout이 원래 부르는 조회. 위쪽 띠의 세 조회와 메시지 단추의 안 읽음 수(MessageDock), 국가 공지 팝업(NationNotice)이다.
+// 둘 다 권한 값이 정해지거나 SSE ready로 전체를 다시 받을 때 다시 묻는다. 시뮬레이터가 더하는 요청은 없어야 한다.
+const TOPBAR_QUERIES = ['auth.me', 'home.get', 'world.summary', 'message.unread', 'notice.nation.get'];
 
 async function openSimulatorFromMenu(page: Page) {
   await page.goto(`/w/${ctx.worldId}`);

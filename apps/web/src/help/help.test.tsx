@@ -95,7 +95,7 @@ describe('가이드 9개', () => {
   it('각 가이드는 다음 문서 링크와 근거 줄로 끝난다', () => {
     for (const guide of GUIDE_ORDER) {
       const source = GUIDES[guide.doc]!;
-      expect(source, guide.doc).toMatch(/\n근거: .+\n$/);
+      expect(source, guide.doc).toMatch(/\r?\n근거: .+\r?\n$/);
       expect(source, guide.doc).toMatch(/(다음은|처음으로 돌아가려면) \[/);
     }
   });

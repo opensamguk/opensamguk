@@ -1,143 +1,62 @@
-import { trpcClient } from '../trpc';
+import type { AppRouter } from '@opensamguk/server/router';
+import type { inferRouterOutputs } from '@trpc/server';
+import { trpc, trpcClient } from '../trpc';
 
-// 임시 계약. docs/plans/T2-07.md "API 계약"·"즉시 행동 처리" 절의 응답 모양을 그대로 옮겼다.
-// treaty 라우터는 아직 AppRouter에 없다. Codex API가 main에 들어오면 AppRouter 타입으로 바꾼다.
-// 그때 이 파일의 타입은 inferRouterOutputs로, treatyApi는 useTRPC()의 trpc.treaty.*로 갈아 끼운다.
-// 쿼리 키는 tRPC tanstack 키 모양으로 맞춰 두어서 바꾼 뒤에도 무효화 키가 같다.
-//
-// 서버 응답이 사용자 결정에 따라 달라질 수 있는 부분도 여기에만 모았다 (아래 "미결정" 표시).
+// 외교실이 쓰는 타입. 모두 AppRouter treaty의 실제 출력에서 꺼낸다 (T2-07 첫 세 조항, AC-M2-06).
+// 서버가 주지 않는 신의·파기·교역 대상·남은 개월·뒤 네 조항은 타입에도 화면에도 두지 않는다.
 
-export type GameDate = { year: number; month: number };
-export type NationRef = { id: number; name: string; color: string };
+type Outputs = inferRouterOutputs<AppRouter>['treaty'];
 
-// 화면은 code로만 분기하고 reason은 DisabledReason으로 보여 준다. 권한 검사가 먼저라 NO_PERMISSION이면 다른 이유는 오지 않는다.
-export type DenyCode = 'NO_PERMISSION' | 'NOT_PARTY' | 'IN_PROGRESS' | 'WRONG_STATUS' | 'EXPIRED' | 'INSUFFICIENT_GOLD';
-export type Allowed = { ok: true } | { ok: false; code: DenyCode; reason: string };
-
-export type Clause =
-  | { kind: 'peace' }
-  | { kind: 'nonAggression'; months: number }
-  | { kind: 'passage'; cityKeys: number[] }
-  | { kind: 'tribute'; payerNationId: number; gold: number; rice: number; months: number }
-  | { kind: 'trade'; months: number }
-  | { kind: 'cityTransfer'; cityKey: number; giverNationId: number }
-  | { kind: 'note'; text: string };
+export type TreatyListPage = Outputs['list'];
+export type TreatyItem = TreatyListPage['items'][number];
+export type TreatyStatus = TreatyItem['status'];
+export type NationRef = NonNullable<TreatyItem['from']>;
+export type Allowed = NonNullable<TreatyItem['canAccept']>;
+export type TreatyTarget = TreatyListPage['targets'][number];
+export type Relation = TreatyTarget['relation'];
+export type PendingAction = TreatyListPage['pending'][number];
+export type RecentAction = TreatyListPage['myRecent'][number];
+// 저장된 조항. 첫 세 조항(종전·불가침·기록만 남길 약속)뿐이다.
+export type Clause = TreatyItem['clauses'][number];
 export type ClauseKind = Clause['kind'];
-export type ClauseView = Clause & { enforced: boolean; cityNames?: string[] };
+export type Quote = Outputs['quote'];
+export type RequestState = Outputs['request'];
+export type RequestKind = RequestState['kind'];
+// 끝난 요청의 조약. 국가 ID만 있고 지금 장수의 국가가 당사국이 아니면 null이다.
+export type FinishedTreaty = Extract<RequestState, { status: 'applied' }>['treaty'];
+export type RequestId = RequestState['requestId'];
 
-export type TreatyStatus = 'PROPOSED' | 'ACTIVE' | 'ENDED' | 'BROKEN' | 'REJECTED' | 'EXPIRED';
-export type TrustRow = { nation: NationRef; brokenTreaties: number; lastBrokenAt: GameDate | null };
-export type TreatyRow = {
-  id: string;
-  from: NationRef;
-  to: NationRef;
-  incoming: boolean;
-  clauses: ClauseView[];
-  status: TreatyStatus;
-  proposedSeq: number;
-  proposedAt: GameDate;
-  respondBy: GameDate | null;
-  startAt: GameDate | null;
-  endAt: GameDate | null;
-  monthsLeft: number | null;
-  brokenBy: NationRef | null;
-  cost: { mine: number; theirs: number };
-  counterpartTrust: TrustRow;
-  canAccept: Allowed | null;
-  canReject: Allowed | null;
-  canBreak: Allowed | null;
-};
-
-export type RequestId = string;
-export type ActionKind = 'propose' | 'respond' | 'break';
-export type InputOutcome =
-  { status: 'applied'; requestId: RequestId; treaty: TreatyRow | null } | { status: 'pending'; requestId: RequestId };
-export type RequestState = InputOutcome | { status: 'rejected'; requestId: RequestId; code: string; reason: string };
-export type PendingAction = {
-  requestId: RequestId;
-  kind: ActionKind;
-  treatyId: string | null;
-  toNation: NationRef | null;
-  accept: boolean | null;
-  requestedBy: { generalId: number; name: string };
-};
-export type RecentAction = {
-  requestId: RequestId;
-  kind: ActionKind;
-  treatyId: string | null;
-  result: 'APPLIED' | 'REJECTED';
-  reason: string | null;
-};
-export type Relation = 'WAR' | 'DECLARED' | 'NON_AGGRESSION' | 'NONE';
-export type TreatyTarget = { nation: NationRef; relation: Relation; relationEndAt: GameDate | null; trust: TrustRow };
-export type TradeTarget = {
-  cityKey: number;
-  cityName: string;
-  nation: NationRef;
-  treatyId: string;
-  tradeEndsAt: GameDate;
-};
-
-export type TreatyList = {
-  canPropose: Allowed;
-  targets: TreatyTarget[];
-  items: TreatyRow[];
-  pending: PendingAction[];
-  myRecent: RecentAction[];
-};
-export type Quote = { cost: { mine: number; theirs: number }; problems: { index: number; reason: string }[] };
-export type TradeTargets = { fromCityKey: number | null; items: TradeTarget[]; blocked: string | null };
-
-export type ProposeInput = { toNationId: number; clauses: Clause[]; expiresInMonths: number };
+// 서버 입력의 toNationId·clauses는 unknown으로 받고 서버가 정규화한다. 화면은 첫 세 조항만 만들어 보낸다.
+export type ProposeInput = { toNationId: number; clauses: Clause[] };
 export type RespondInput = { treatyId: string; accept: boolean };
-export type BreakInput = { treatyId: string };
 export type ActionInput =
-  | { kind: 'propose'; input: ProposeInput }
-  | { kind: 'respond'; input: RespondInput }
-  | { kind: 'break'; input: BreakInput };
+  | { kind: Extract<RequestKind, 'treaty.propose'>; input: ProposeInput }
+  | { kind: Extract<RequestKind, 'treaty.respond'>; input: RespondInput };
 
-type WithWorld<T> = T & { worldId: string };
-type Query<I, O> = { query: (input: I) => Promise<O> };
-type Mutation<I, O> = { mutate: (input: I) => Promise<O> };
+// 조약 쿼리 전체(목록·견적·요청). 결과가 확정되면 이 키로 한 번에 다시 받는다.
+export const TREATY_PATH_KEY = trpc.treaty.pathKey();
 
-interface TreatyClient {
-  list: Query<{ worldId: string }, TreatyList>;
-  trust: Query<{ worldId: string }, { items: TrustRow[] }>;
-  quote: Query<WithWorld<{ toNationId: number; clauses: Clause[] }>, Quote>;
-  request: Query<{ worldId: string; requestId: RequestId }, RequestState>;
-  tradeTargets: Query<{ worldId: string }, TradeTargets>;
-  propose: Mutation<WithWorld<ProposeInput & { requestId: RequestId }>, InputOutcome>;
-  respond: Mutation<WithWorld<RespondInput & { requestId: RequestId }>, InputOutcome>;
-  break: Mutation<WithWorld<BreakInput & { requestId: RequestId }>, InputOutcome>;
+// 목록 한 쪽. 서버 입력이 strict라 infiniteQueryOptions가 붙이는 direction을 거부하므로 직접 부른다 (messages/queries.ts와 같은 이유).
+export function fetchTreatyPage(worldId: string, cursor: string | null, signal: AbortSignal) {
+  return trpcClient.treaty.list.query(cursor === null ? { worldId } : { worldId, cursor }, { signal });
 }
 
-// trpcClient는 경로를 런타임에 만드는 프록시라 타입에 없는 프로시저도 /trpc/treaty.* 로 간다. 캐스트는 이 한 곳에만 둔다.
-export const treatyApi = (trpcClient as unknown as { treaty: TreatyClient }).treaty;
-
-export const treatyQueryKey = (procedure: keyof TreatyClient, input: Record<string, unknown>) =>
-  [['treaty', procedure], { input, type: 'query' }] as const;
-// 조약 쿼리 전체. 결과가 확정되면 목록·신의·교역 대상을 한 번에 다시 받는다.
-export const TREATY_PATH_KEY = [['treaty']] as const;
-
-// 보내기: 행동 종류에 맞는 프로시저를 같은 requestId로 부른다.
-export function sendAction(worldId: string, requestId: RequestId, action: ActionInput): Promise<InputOutcome> {
-  if (action.kind === 'propose') return treatyApi.propose.mutate({ worldId, requestId, ...action.input });
-  if (action.kind === 'respond') return treatyApi.respond.mutate({ worldId, requestId, ...action.input });
-  return treatyApi.break.mutate({ worldId, requestId, ...action.input });
+// 보내기. 행동 종류에 맞는 절차를 같은 requestId로 부른다. 엔진 거절도 HTTP 200의 rejected 값으로 온다.
+export function sendAction(worldId: string, requestId: RequestId, action: ActionInput): Promise<RequestState> {
+  if (action.kind === 'treaty.propose')
+    return trpcClient.treaty.propose.mutate({ worldId, requestId, ...action.input });
+  return trpcClient.treaty.respond.mutate({ worldId, requestId, ...action.input });
 }
 
-// 계약 상수. 서버가 같은 값으로 검사한다 (T2-07 조항 결정).
+// 결과 되찾기. 본인이 보낸 requestId만 서버가 찾아 준다.
+export function fetchRequest(worldId: string, requestId: RequestId): Promise<RequestState> {
+  return trpcClient.treaty.request.query({ worldId, requestId });
+}
+
+// 화면 검사용 상수. 최종 판단은 서버 정규화와 엔진이 한다 (packages/rules diplomacy/treaty.ts).
 export const NON_AGGRESSION_MONTHS = { min: 1, max: 120 };
 export const NOTE_MAX_LENGTH = 300;
-// 제안 기한 6개월 (T2-07 조항 결정). 입력 칸을 두지 않고 이 값으로 보낸다.
-export const PROPOSAL_EXPIRES_MONTHS = 6;
-// 장수 명령 교역 (T2-07 범위). 인자 모양은 계획에 없어 출병처럼 정수 cityKey 하나로 가정했다.
-// 편집기는 commands.list의 argsSchema로 칸을 만들므로 cityKey면 이 후보 목록을 쓴다. 계약이 확정되면 맞춘다.
+// 받은 쪽이 답할 기한. 엔진이 정하는 값이고 제안 입력에는 없다.
+export const PROPOSAL_RESPONSE_MONTHS = 6;
+// 장수 명령 교역 (T2-08). 교역 조항과 교역 대상 조회가 서버에 없어 후보를 만들지 않는다 (tradeTargets.ts).
 export const TRADE_COMMAND_KEY = 'trade';
-
-// 미결정 U62-6: 형식 1 월드에서 treaty.* 쓰기를 막을지. 막으면 서버가 이유 문장과 함께 거부한다.
-// 화면은 코드를 추측하지 않고 오류 문장을 그대로 보여 준다. 읽기는 빈 목록을 준다는 초안이라 빈 상태로 그린다.
-// 미결정 U62-3: 상대 쪽 사정으로 수락이 거절될 때 이유 코드(초안 COUNTERPART_UNAVAILABLE)와 문장.
-// 화면은 rejected의 reason 문장만 보여 주고 code로 분기하지 않는다.
-// 미결정 U62-2a: 비용 공식. 화면은 quote·cost 숫자만 보여 주고 직접 계산하지 않는다.
-// 미결정 U62-5: 재생 형식 2 소유. 화면 응답 모양에는 영향이 없다.

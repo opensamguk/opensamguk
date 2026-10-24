@@ -4,6 +4,11 @@ import type { AuthzExemption } from './coverage';
 // 별도 실제 HTTP 시험은 각 절차의 actor ID 주입 거부와 DB 불변을 확인한다.
 export const exemptions: AuthzExemption[] = [
   {
+    path: 'lobby.notices',
+    category: 'otherUser',
+    reason: '무인증 공통 로비 공지이며 계정이나 타인 소유 자원을 지정하지 않는다. ID 주입은 거부한다.',
+  },
+  {
     path: 'world.publicMaps',
     category: 'otherUser',
     reason: '무인증 공통 지연 지도이며 타인 소유 자원을 지정하지 않는다. ID 주입은 거부한다.',
@@ -58,8 +63,6 @@ export const exemptions: AuthzExemption[] = [
     reason: '서버 세션의 장수만 조회한다. 타인 generalId 지정은 입력 계약에 없다.',
   },
 
-  { path: 'commands.list', category: 'otherUser', reason: '인증 사용자 공통 명령 정의이며 타인 소유 자원이 없다.' },
-
   {
     path: 'city.get',
     category: 'otherUser',
@@ -77,6 +80,11 @@ export const exemptions: AuthzExemption[] = [
     category: 'otherUser',
     reason:
       '공통 공개 영토 기록이며 타인 소유 자원이 없다. 다른 계정의 같은 응답은 timelapse 실제 HTTP 시험이 확인한다.',
+  },
+  {
+    path: 'timelapse.publicFrames',
+    category: 'otherUser',
+    reason: '무인증 종료 월드 공개 재생이며 계정이나 타인 소유 자원을 지정하지 않는다. ID 주입은 거부한다.',
   },
   {
     path: 'ranking.generals',

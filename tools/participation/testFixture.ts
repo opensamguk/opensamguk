@@ -157,13 +157,14 @@ export async function syntheticBundle(mode: 'm2' | 'm3' = 'm2') {
           ),
         ),
       );
-    m.artifacts = [];
-    for (const [ref, item] of records) {
-      const content = JSON.stringify(item.value);
-      const file = `${ref}.json`;
-      await writeFile(join(dir, file), content);
-      m.artifacts.push({ ref, file, sha256: digest(content), kind: item.kind });
-    }
+    m.artifacts = await Promise.all(
+      [...records].map(async ([ref, item]) => {
+        const content = JSON.stringify(item.value);
+        const file = `${ref}.json`;
+        await writeFile(join(dir, file), content);
+        return { ref, file, sha256: digest(content), kind: item.kind };
+      }),
+    );
     const events = actions.map((a) => JSON.stringify(a)).join('\n') + '\n';
     m.events.sha256 = digest(events);
     await writeFile(join(dir, m.events.file), events);

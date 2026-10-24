@@ -1,13 +1,24 @@
 import { randomUUID } from 'node:crypto';
 import { TRPCError } from '@trpc/server';
 import { nextActionSequence, type Prisma } from '@opensamguk/db';
-import { commandRegistry, unitSetSchema, type QueuedTurn } from '@opensamguk/rules';
+import { emptyTurn, unitSetSchema, type QueuedTurn } from '@opensamguk/rules';
 import { editArray, type ArrayEdit } from '@opensamguk/shared';
 import { z } from 'zod';
 import { router, protectedProcedure } from '../trpc';
 import { requireWorld, requireGeneral, readView, worldInput } from '../game/queries';
-import { commandInput, slotInput, parseSlot, readSlots, displaySlots } from '../game/slots';
+import {
+  commandInput,
+  slotInput,
+  parseSlot,
+  readSlots,
+  displaySlots,
+  assertEnabledSlots,
+  hasExtensionSlot,
+  invalidSlot,
+} from '../game/slots';
 import type { Context } from '../context';
+import { requirePolicyReady } from '../game/policy';
+import { worldResolver } from '../game/resolver';
 
 const revision = z.number().int().min(0).max(2_147_483_646);
 const index = z.number().int().min(0).max(29);
@@ -28,15 +39,32 @@ const opSchema = z.union([
       .refine((r) => r.from <= r.to),
   }),
 ]);
+async function submittedWorld(
+  tx: Prisma.TransactionClient,
+  worldId: string,
+  lock: boolean,
+  submitted: readonly QueuedTurn[],
+) {
+  try {
+    return await requireWorld(tx, worldId, lock);
+  } catch (error) {
+    // 끈 월드와 없는 월드의 확장 key는 예전 입력 오류를 보존한다.
+    if (hasExtensionSlot(submitted) && error instanceof TRPCError && error.code === 'NOT_FOUND') invalidSlot();
+    throw error;
+  }
+}
 async function save(
   ctx: Context & { user: NonNullable<Context['user']> },
   input: { worldId: string; revision: number },
   change: (old: QueuedTurn[]) => QueuedTurn[],
+  submitted: readonly QueuedTurn[] = [],
 ) {
   const key = `turns.set:${randomUUID()}`;
   return ctx.db.$transaction(async (tx) => {
-    const world = await requireWorld(tx, input.worldId, true);
+    const world = await submittedWorld(tx, input.worldId, true, submitted);
+    assertEnabledSlots(world, submitted);
     if (world.status === 'ENDED') throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '종료된 월드입니다.' });
+    requirePolicyReady(world);
     // 키 재검사는 장수 잠금·revision 비교보다 먼저 한다 (§5).
     const previous = await tx.inputEvent.findUnique({
       where: { worldId_userId_idempotencyKey: { worldId: input.worldId, userId: ctx.user.id, idempotencyKey: key } },
@@ -45,7 +73,12 @@ async function save(
     const actor = await requireGeneral(tx, input.worldId, ctx.user.id, true);
     const old = await readSlots(tx, input.worldId, actor.id);
     if (actor.turnRevision !== input.revision)
-      return { ok: false as const, reason: 'STALE' as const, revision: actor.turnRevision, slots: displaySlots(old) };
+      return {
+        ok: false as const,
+        reason: 'STALE' as const,
+        revision: actor.turnRevision,
+        slots: displaySlots(old, worldResolver(world).resolver),
+      };
     const turns = change(old);
     await tx.generalTurn.deleteMany({ where: { worldId: input.worldId, generalId: actor.id } });
     await tx.generalTurn.createMany({
@@ -54,6 +87,7 @@ async function save(
         generalId: actor.id,
         slot,
         commandKey: turn.commandKey,
+        explicit: turn.explicit ?? true,
         args: turn.args as Prisma.InputJsonValue,
       })),
     });
@@ -62,7 +96,7 @@ async function save(
       data: { turnRevision: { increment: 1 } },
     });
     const nextRevision = actor.turnRevision + 1;
-    await tx.inputEvent.create({
+    const event = await tx.inputEvent.create({
       data: {
         worldId: input.worldId,
         userId: ctx.user.id,
@@ -72,19 +106,29 @@ async function save(
         status: 'APPLIED',
         sequence: await nextActionSequence(tx, input.worldId),
         payload: { turns, revision: actor.turnRevision } as unknown as Prisma.InputJsonValue,
-        result: { revision: nextRevision },
+        result: { revision: nextRevision, activeTick: world.clockTick },
       },
     });
-    return { ok: true as const, revision: nextRevision, slots: displaySlots(turns) };
+    await tx.general.update({
+      where: { worldId_id: { worldId: input.worldId, id: actor.id } },
+      data: {
+        lastActiveTick: Math.max(actor.lastActiveTick ?? 0, world.clockTick),
+        lastActiveAt: event.createdAt,
+      },
+    });
+    return { ok: true as const, revision: nextRevision, slots: displaySlots(turns, worldResolver(world).resolver) };
   });
 }
 export const turnsRouter = router({
   get: protectedProcedure.input(worldInput).query(({ ctx, input }) =>
     ctx.db.$transaction(
       async (tx) => {
-        await requireWorld(tx, input.worldId);
+        const world = await requireWorld(tx, input.worldId);
         const actor = await requireGeneral(tx, input.worldId, ctx.user.id);
-        return { revision: actor.turnRevision, slots: displaySlots(await readSlots(tx, input.worldId, actor.id)) };
+        return {
+          revision: actor.turnRevision,
+          slots: displaySlots(await readSlots(tx, input.worldId, actor.id), worldResolver(world).resolver),
+        };
       },
       { isolationLevel: 'RepeatableRead' },
     ),
@@ -92,24 +136,28 @@ export const turnsRouter = router({
   set: protectedProcedure
     .input(worldInput.extend({ revision, slots: z.array(slotInput).length(30) }))
     .mutation(({ ctx, input }) => {
-      const turns = input.slots.map(parseSlot);
-      return save(ctx, input, () => turns);
+      const turns = input.slots.map((slot) => parseSlot(slot, true));
+      return save(ctx, input, () => turns, turns);
     }),
   edit: protectedProcedure.input(worldInput.extend({ revision, op: opSchema })).mutation(({ ctx, input }) => {
     const op: ArrayEdit<QueuedTurn> =
       'put' in input.op
-        ? { put: { from: input.op.put.from, to: input.op.put.to, value: parseSlot(input.op.put) } }
+        ? { put: { from: input.op.put.from, to: input.op.put.to, value: parseSlot(input.op.put, true) } }
         : input.op;
-    return save(ctx, input, (old) => editArray(old, op, () => ({ commandKey: 'rest', args: {} })));
+    return save(ctx, input, (old) => editArray(old, op, emptyTurn), 'put' in op ? [op.put.value] : []);
   }),
   precheck: protectedProcedure.input(worldInput.extend(commandInput)).query(({ ctx, input }) => {
-    const turn = parseSlot(input);
+    const turn = parseSlot(input, true);
     return ctx.db.$transaction(
       async (tx) => {
-        const world = await requireWorld(tx, input.worldId);
+        const world = await submittedWorld(tx, input.worldId, false, [turn]);
+        const extended = hasExtensionSlot([turn]) ? worldResolver(world) : undefined;
+        if (extended?.commands === null) invalidSlot();
         const actor = await requireGeneral(tx, input.worldId, ctx.user.id);
         const view = await readView(tx, input.worldId);
-        const def = commandRegistry.get(turn.commandKey)!;
+        const def = (extended ?? worldResolver(world)).resolver.get(turn.commandKey);
+        if (!def)
+          return { ok: false as const, code: 'COMMAND_DISABLED' as const, message: '이 월드에서 꺼진 명령입니다.' };
         const failure = def.precheck(
           view,
           { generalId: actor.id, tick: actor.nextTurnTick, unitSet: unitSetSchema.parse(world.unitSet) },

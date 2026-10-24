@@ -166,7 +166,7 @@ const nationTurnsRoute = createRoute({
   component: NationTurnsPage,
 });
 
-const RECORD_TABS = ['general', 'nation', 'world'] as const;
+const RECORD_TABS = ['general', 'nation', 'world', 'timelapse'] as const;
 type RecordTab = (typeof RECORD_TABS)[number];
 
 const recordsRoute = createRoute({
@@ -192,7 +192,7 @@ const rankingRoute = createRoute({
 // 전투 시뮬레이터 (T4-34). 사용자가 넣은 가정으로 교전 한 번을 Web Worker에서 계산하는 보조 화면이다.
 const simulatorRoute = createRoute({ getParentRoute: () => worldRoute, path: 'simulator', component: BattleSimPage });
 
-// 외교실 (T2-08). 주소: /w/:worldId/diplomacy?tab=incoming|outgoing|active|ended|broken|write|trust
+// 외교실 (T2-08). 주소: /w/:worldId/diplomacy?tab=incoming|outgoing|active|ended|write
 const diplomacyRoute = createRoute({
   getParentRoute: () => worldRoute,
   path: 'diplomacy',

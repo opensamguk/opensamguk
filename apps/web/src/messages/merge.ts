@@ -27,24 +27,20 @@ export function mergeMessages(pages: readonly (readonly MessageItem[])[]): Messa
   return [...byId.values()].sort(compareMessages);
 }
 
-export function listItems(data: InfiniteData<MessageListResponse> | undefined): MessageItem[] {
+type Pages<P> = InfiniteData<MessageListResponse, P> | undefined;
+
+export function listItems<P>(data: Pages<P>): MessageItem[] {
   return data ? mergeMessages(data.pages.map((page) => page.items)) : [];
 }
 
 // 보낸 행을 첫 쪽 맨 위에 넣는다. 아직 목록을 받지 않았으면 그대로 두고 다음 조회를 기다린다.
-export function prependSent(
-  data: InfiniteData<MessageListResponse> | undefined,
-  item: MessageItem,
-): InfiniteData<MessageListResponse> | undefined {
+export function prependSent<P>(data: Pages<P>, item: MessageItem): Pages<P> {
   const [first, ...rest] = data?.pages ?? [];
   if (!data || !first) return data;
   return { ...data, pages: [{ ...first, items: [item, ...first.items.filter((m) => m.id !== item.id)] }, ...rest] };
 }
 
-export function markItemsRead(
-  data: InfiniteData<MessageListResponse> | undefined,
-  ids: ReadonlySet<string>,
-): InfiniteData<MessageListResponse> | undefined {
+export function markItemsRead<P>(data: Pages<P>, ids: ReadonlySet<string>): Pages<P> {
   if (!data) return data;
   return {
     ...data,

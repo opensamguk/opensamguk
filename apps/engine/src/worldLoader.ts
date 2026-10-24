@@ -1,15 +1,24 @@
 import type { Prisma } from '@opensamguk/db';
-import { parsePreset, presetRules, type WorldState } from '@opensamguk/rules';
+import { presetRules, type WorldState } from '@opensamguk/rules';
 import { loadCommandState } from './commandPersistence';
+import { engineResolver, loadExt } from './extState';
+import { assertWorldCapabilities } from './capsGate';
+import { loadTreaties } from './treatyState';
 
 export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): Promise<WorldState> {
   const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
+  const { preset, commands } = engineResolver(world);
+  const capabilities = await assertWorldCapabilities(tx, world);
+  const ext = await loadExt(tx, worldId, commands);
   const cities = await tx.city.findMany({ where: { worldId } });
   const nations = await tx.nation.findMany({
     where: { worldId },
     omit: { notice: true, noticeRevision: true, noticeUpdatedAt: true, noticeUpdatedBy: true },
   });
-  const generals = await tx.general.findMany({ where: { worldId }, omit: { noticeSeen: true } });
+  const generals = await tx.general.findMany({
+    where: { worldId },
+    omit: { noticeSeen: true, defaultPolicy: true, lastActiveTick: true, lastActiveAt: true },
+  });
   const diplomacies = await tx.diplomacy.findMany({
     where: { worldId },
     orderBy: [{ nationA: 'asc' }, { nationB: 'asc' }],
@@ -19,7 +28,8 @@ export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): 
     return value;
   };
   return {
-    ...(world.preset ? { presetRules: presetRules(parsePreset(world.preset)) } : {}),
+    ...(preset ? { presetRules: presetRules(preset) } : {}),
+    ...(ext ? { ext } : {}),
     startYear: world.startYear,
     cities: Object.fromEntries(cities.map((city) => [city.cityKey, stripWorldId(city)])),
     nations: Object.fromEntries(
@@ -39,5 +49,6 @@ export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): 
     ),
     diplomacies: diplomacies.map(stripWorldId),
     ...(await loadCommandState(tx, worldId)),
+    ...(capabilities.kind === 'caps' && 'treaty' in capabilities.selection ? await loadTreaties(tx, worldId) : {}),
   };
 }

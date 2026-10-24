@@ -42,6 +42,9 @@ model World {
   engineHeartbeat EngineHeartbeat?
   monthlyTick     Int         @default(0)
   actionSequence  Int         @default(0)
+  policyFromSequence Int?
+  treatyFormat    Int?
+  personnelFormat Int?
   replayOrigin    Json?
   inputEvents     InputEvent[]
   nationHistory   NationHistory[]
@@ -53,6 +56,86 @@ model World {
   publicMaps      PublicMapSnapshot[]
   messages        Message[]
   notices         Notice[]
+  operations      Operation[]
+  extSlices       WorldExtSlice[]
+  treaties        Treaty[]
+  assignmentOffers AssignmentOffer[]
+}
+
+enum AssignmentOfferStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  SUPERSEDED
+  CANCELLED
+}
+
+enum AssignmentOfferResolvedBy {
+  RESPONSE
+  EXPIRY
+}
+
+enum AssignmentOfferCancelReason {
+  CITY_LOST
+  TARGET_LEFT
+  ISSUER_LOST_OFFICE
+}
+
+model AssignmentOffer {
+  worldId         String
+  id              String
+  nationId        Int
+  issuerGeneralId Int
+  targetGeneralId Int
+  cityKey         Int
+  status          AssignmentOfferStatus
+  resolvedBy      AssignmentOfferResolvedBy?
+  cancelReason    AssignmentOfferCancelReason?
+  createdTick     Int
+  expiresTick     Int
+  resolvedTick    Int?
+  world           World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@id([worldId, id])
+}
+
+enum TreatyStatus {
+  PROPOSED
+  ACTIVE
+  REJECTED
+  EXPIRED
+  ENDED
+}
+
+model Treaty {
+  worldId        String
+  id             Int
+  fromNationId   Int
+  toNationId     Int
+  clauses        Json
+  status         TreatyStatus
+  proposedTick   Int
+  respondByTick  Int
+  startTick      Int?
+  endTick        Int?
+  closedSequence Int?
+  costFrom       Int?
+  costTo         Int?
+  world          World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@id([worldId, id])
+  @@index([worldId, status, id])
+  @@index([worldId, fromNationId, id])
+  @@index([worldId, toNationId, id])
+}
+
+model WorldExtSlice {
+  worldId String
+  key     String
+  value   Json
+  world   World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@id([worldId, key])
 }
 
 enum WorldStatus {
@@ -114,10 +197,13 @@ model Nation {
   diplomacyAsA   Diplomacy[] @relation("NationA")
   diplomacyAsB   Diplomacy[] @relation("NationB")
   turns          NationTurn[]
+  offices        NationOffice[]
+  officeTurns    NationOfficeTurn[]
   notice         String @default("")
   noticeRevision Int @default(0)
   noticeUpdatedAt DateTime?
   noticeUpdatedBy String?
+  operations     Operation[]
 
   @@id([worldId, id])
 }
@@ -150,6 +236,7 @@ model City {
   nation        Nation? @relation("OwnedCities", fields: [worldId, nationId], references: [worldId, id], onDelete: NoAction)
   capitalOf     Nation[] @relation("Capital")
   generals      General[]
+  operationTargets Operation[]
 
   @@id([worldId, cityKey])
   @@unique([worldId, name])
@@ -189,11 +276,16 @@ model General {
   injury         Int
   nextTurnTick   Int
   turnRevision   Int @default(0)
+  defaultPolicy  String?
+  lastActiveTick Int?
+  lastActiveAt   DateTime?
   noticeSeen     Json?
   messageReads   MessageRead[]
   turns          GeneralTurn[]
   logs           GeneralLog[]
   battleLogs     BattleLog[]
+  operationsCreated Operation[]
+  operationMembers OperationMember[]
   world          World   @relation(fields: [worldId], references: [id], onDelete: Cascade)
   nation         Nation? @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: NoAction)
   city           City    @relation(fields: [worldId, cityKey], references: [worldId, cityKey], onDelete: NoAction)
@@ -203,6 +295,43 @@ model General {
   @@index([worldId, nationId])
   @@index([worldId, cityKey])
   @@index([worldId, nextTurnTick, id])
+}
+
+enum OperationStatus {
+  OPEN
+  CLOSED
+}
+
+model Operation {
+  id            String          @id @default(uuid())
+  worldId       String
+  nationId      Int
+  targetCityKey Int
+  targetTick    BigInt
+  minCrew       Int
+  minTrain      Int
+  minAtmos      Int
+  status        OperationStatus @default(OPEN)
+  createdById   Int
+  world         World           @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  nation        Nation          @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: Cascade)
+  target        City            @relation(fields: [worldId, targetCityKey], references: [worldId, cityKey], onDelete: NoAction)
+  createdBy     General         @relation(fields: [worldId, createdById], references: [worldId, id], onDelete: Cascade)
+  members       OperationMember[]
+
+  @@unique([worldId, id])
+  @@index([worldId, nationId, status, targetTick, id])
+}
+
+model OperationMember {
+  worldId     String
+  operationId String
+  generalId   Int
+  operation   Operation @relation(fields: [worldId, operationId], references: [worldId, id], onDelete: Cascade)
+  general     General   @relation(fields: [worldId, generalId], references: [worldId, id], onDelete: Cascade)
+
+  @@id([operationId, generalId])
+  @@index([worldId, generalId])
 }
 
 model EngineLease {
@@ -228,6 +357,7 @@ model GeneralTurn {
   slot       Int
   commandKey String @default("rest")
   args       Json @default("{}")
+  explicit   Boolean
   general    General @relation(fields: [worldId, generalId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([worldId, generalId, slot])
@@ -241,10 +371,11 @@ model GeneralLog {
   commandKey String
   kind       String
   text       String
+  sequence   Int?
+  ordinal    Int @default(0)
   createdAt  DateTime @default(now())
   general    General @relation(fields: [worldId, generalId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
 
-  @@unique([worldId, generalId, tick])
 }
 
 model NationTurn {
@@ -256,6 +387,29 @@ model NationTurn {
   nation     Nation @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([worldId, nationId, slot])
+}
+
+model NationOffice {
+  worldId      String
+  nationId     Int
+  officerLevel Int
+  turnRevision Int @default(0)
+  tenure       Int @default(0)
+  nation       Nation @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([worldId, nationId, officerLevel])
+}
+
+model NationOfficeTurn {
+  worldId      String
+  nationId     Int
+  officerLevel Int
+  slot         Int
+  commandKey   String @default("nation_rest")
+  args         Json @default("{}")
+  nation       Nation @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([worldId, nationId, officerLevel, slot])
 }
 
 model BattleLog {
@@ -326,6 +480,7 @@ model InputEvent {
   payload        Json
   status         InputEventStatus @default(PENDING)
   sequence       Int?
+  stepTick       Int?
   result         Json?
   createdAt      DateTime @default(now())
   world          World @relation(fields: [worldId], references: [id], onDelete: Cascade)
@@ -459,4 +614,33 @@ model Notice {
   world       World?      @relation(fields: [worldId], references: [id], onDelete: Cascade)
 
   @@index([scope, worldId, publishedAt, id])
+}
+
+enum GameResourceKind {
+  MAP
+  SCENARIO
+  UNIT_SET
+  STAT_RULES
+  PORTRAIT_MAP
+}
+
+enum GameResourceStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model GameResource {
+  id          String             @id @default(uuid())
+  kind        GameResourceKind
+  name        String
+  version     Int
+  status      GameResourceStatus
+  content     Json               // jsonb. 원본 JSON 전체
+  contentHash String             // hashState(content), 소문자 16진수 64자리
+  source      String             // 출처와 라이선스 한 줄
+  createdBy   String?            // 내장 판은 null. 사용자 관계는 T3-05·T4-78
+  createdAt   DateTime           @default(now())
+  publishedAt DateTime?
+
+  @@unique([kind, name, version])
 }

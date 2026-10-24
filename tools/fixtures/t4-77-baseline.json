@@ -1,0 +1,224 @@
+{
+  "version": 1,
+  "resources": {
+    "resources/map/che.json": {
+      "contentHash": "00f98f5aa2b5576cb71b56aacc23fc781d0b832066f82f757868c9b9b291ddd7",
+      "lfBytes": 69936
+    },
+    "resources/scenario/1030.json": {
+      "contentHash": "009ef7f179d06ec70dbd226135cad2b3b4029eccdf337072b7cd26cb3550d466",
+      "lfBytes": 125890
+    },
+    "resources/unitset/basic.json": {
+      "contentHash": "5e31e9e3a9fcb45b9fdd001337fe77b93325f8a599a3b8dca0e9fb1e80ffe360",
+      "lfBytes": 2547
+    },
+    "resources/scenario/default.json": {
+      "contentHash": "600c153d4e6a96da757ff946d399a0ef2dfa5bff650424efb654fe570fd0579e",
+      "lfBytes": 286
+    },
+    "resources/portraits/rtk14-map.json": {
+      "contentHash": "aeda0d1caa490d7b8cb08d872bee5971adf94fc26e82e005a8d7ea7a2dce9c03",
+      "lfBytes": 13692
+    }
+  },
+  "sourceFingerprints": {
+    "apps/engine/src/replay.ts": "a93207070cb6005cc9eb94ccda5f64648ffc873bd871ec24b7b7dd3f18ddbe09",
+    "apps/engine/src/simulation.test.ts": "f0848ee21a41fb9cd698988541e8e1eb46eea33c0788d9d07bad99c010450631",
+    "apps/engine/src/turnLoop.integration.test.ts": "642cd796816b80db4c375b1816c262c0f5215ae819ab316041c04723e621746f",
+    "apps/engine/src/world/clock.integration.test.ts": "6763b617738ae362ad462f0e7bccaccc70753cc99875ae4d9ba7e5e0fc7718a9",
+    "apps/engine/src/world/resources.test.ts": "e69d5211635881fbc1714c3cdf5ca55779f9134da0b0a948f4830b71345118d4",
+    "apps/engine/src/world/resources.ts": "80c5a08856352974333397b18f0bf626ac53a41612e78ec2ecbb83ef4b5c7a75",
+    "apps/engine/test/monthlyFixture.ts": "2ba5b6e71fde3c49288a2f7c17bf3c14402e36197809c7bb4b59b0e5b28bb2a8",
+    "apps/engine/test/warFixture.ts": "ec42a42f1df2281b9cdbff6341dd335f8265e71dbbc93067cfb97b8deb943ebf",
+    "apps/server/test/readFixture.ts": "4ccff870b2a5d68e92f8f4f35cd2e8211860dffefcc5abc026bbecf780bb69d3",
+    "e2e/rankingSeed.ts": "cd9f5f5289ea83a3aef5596472cf3f8b60904253aa4f4861d4947e6635ff5efe",
+    "packages/rules/src/world/bootstrap.ts": "cbf99e9a570b796147ac6d2ad9f43575ca504c36f166b4a5dc563856bf29ba10",
+    "packages/shared/src/node/hashState.ts": "f23ca4636b6960883e10698a9ff6b3afafeb3a9ad818945e4516dd41f067ee19",
+    "tools/commands.test.ts": "b1d8cba064ad45451b27ade22e57ae2dca0a9668581f233db5551ba2783ace35",
+    "tools/portrait-map/convert.test.ts": "dddac57c12996c1b6829409c4060cbac13e121dee41edb964f1d535adf155333",
+    "tools/resource-validate.test.ts": "3c09dfb91301b0b87c0c0b4746e54058c6e76114503c9c86063f0d578e222eb4",
+    "tools/season-throughput.ts": "9ef2f2f3bfa131c2725f7528b71dca8a167ea317f8c8f4ef663a8f464a0b4bde",
+    "tools/world-bootstrap.test.ts": "e527e1aaf10304e699a552557141e0eda8e4d69f0114637f83d9a451fd5f26c3",
+    "tools/world-presets.test.ts": "e4d04f7173e9ce9d833ad4efd31256ff5836189d8bc92ae77c2ae38690705e9e"
+  },
+  "seeds": {
+    "1": {
+      "initialStateHash": "cf70c04f6b171c040027f44c7e5df2ab817df94428352257d8aa5a4892ecab76",
+      "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
+      "cities": 94,
+      "nations": 21,
+      "generals": 491,
+      "diplomacies": 7,
+      "portraits": 429,
+      "inputResourceCount": 5
+    },
+    "t2-02-legacy-baseline": {
+      "initialStateHash": "2952fcf863e11af5879fd8af160d9a729b9032ce443d838eb633d8d901189e16",
+      "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
+      "cities": 94,
+      "nations": 21,
+      "generals": 491,
+      "diplomacies": 7,
+      "portraits": 429,
+      "inputResourceCount": 5
+    },
+    "loader": {
+      "initialStateHash": "0aae9f41538290f6cc753cbc40fb3f5f69f71a881df0284dcfa899b000122c15",
+      "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
+      "cities": 94,
+      "nations": 21,
+      "generals": 491,
+      "diplomacies": 7,
+      "portraits": 429,
+      "inputResourceCount": 5
+    },
+    "test-world": {
+      "initialStateHash": "b3d61c6ba1d39b08e46fa648728db9d1b4a32f704cf4414045955d0c7fe2adbf",
+      "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
+      "cities": 94,
+      "nations": 21,
+      "generals": 491,
+      "diplomacies": 7,
+      "portraits": 0,
+      "inputResourceCount": 4
+    },
+    "command-fixture": {
+      "initialStateHash": "8d32dae06c41399450a35227d71be93ead9bdd0b5f89319c953aeb33aaed0670",
+      "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
+      "cities": 94,
+      "nations": 21,
+      "generals": 491,
+      "diplomacies": 7,
+      "portraits": 0,
+      "inputResourceCount": 4
+    },
+    "portraits": {
+      "initialStateHash": "eb9975803403db1756d4a2964d0fe1a7a816306ed625aa26239ba683764d53f6",
+      "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
+      "cities": 94,
+      "nations": 21,
+      "generals": 491,
+      "diplomacies": 7,
+      "portraits": 429,
+      "inputResourceCount": 5
+    },
+    "T1-12-visibility": {
+      "initialStateHash": "181a8442596788a3df22675a6f16e8574cad14f98d3c2ab51041c6437152e24b",
+      "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
+      "cities": 94,
+      "nations": 21,
+      "generals": 491,
+      "diplomacies": 7,
+      "portraits": 0,
+      "inputResourceCount": 4
+    },
+    "memory-replay": {
+      "initialStateHash": "0850f0cab85dbd4eb991dbd8bc8142e5062b46d19bb73add7114296ca8fcfad0",
+      "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
+      "cities": 94,
+      "nations": 21,
+      "generals": 491,
+      "diplomacies": 7,
+      "portraits": 429,
+      "inputResourceCount": 5
+    },
+    "engine-test": {
+      "initialStateHash": "0d054c7391de9b49206805104517305ce9a945eb7d087ef3f489ed0f4c71c669",
+      "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
+      "cities": 94,
+      "nations": 21,
+      "generals": 491,
+      "diplomacies": 7,
+      "portraits": 429,
+      "inputResourceCount": 5
+    },
+    "clock": {
+      "initialStateHash": "4938a7c3dc817bfc06a527b43f3b84cf2a874c1c85ea6240dfb9af4c9e14d1db",
+      "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
+      "cities": 94,
+      "nations": 21,
+      "generals": 491,
+      "diplomacies": 7,
+      "portraits": 429,
+      "inputResourceCount": 5
+    },
+    "e2e-ranking": {
+      "initialStateHash": "475efe32f296888f396dbea23da2dbdefb091f28c081ffab634705d36bfa2cdd",
+      "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
+      "cities": 94,
+      "nations": 21,
+      "generals": 491,
+      "diplomacies": 7,
+      "portraits": 429,
+      "inputResourceCount": 5
+    },
+    "e2e-ranking-fresh": {
+      "initialStateHash": "944781710e34de9f15394d9813516f83123c645d2c1851a6bcb8aa148d915c51",
+      "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
+      "cities": 94,
+      "nations": 21,
+      "generals": 491,
+      "diplomacies": 7,
+      "portraits": 429,
+      "inputResourceCount": 5
+    },
+    "t4-76-che": {
+      "initialStateHash": "d43899d6a0dd87758b405f9eeeff09e2e8b11db3e906ff6174c9bec2fe1d9f6b",
+      "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
+      "cities": 94,
+      "nations": 21,
+      "generals": 491,
+      "diplomacies": 7,
+      "portraits": 429,
+      "inputResourceCount": 5
+    }
+  },
+  "fixtures": {
+    "monthlyFixture": {
+      "initialStateHash": "209c972a25848dd16cacc05e9f36ebb50124e8c032b9f39f57896556593b5eb8",
+      "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
+      "cities": 4,
+      "nations": 2,
+      "generals": 3,
+      "diplomacies": 1,
+      "portraits": 0
+    },
+    "warFixture": {
+      "initialStateHash": "063110222aa63eb412e1f9a480f7948f19d681f32c8960125f7d1032a51ad768",
+      "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
+      "cities": 4,
+      "nations": 2,
+      "generals": 4,
+      "diplomacies": 1,
+      "portraits": 0
+    },
+    "readFixtureFull": {
+      "initialStateHash": "4dde8fdc2b2a414d94d39c355cc34c731fb9c08cca1f4a95905128678fae4db5",
+      "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
+      "cities": 94,
+      "nations": 2,
+      "generals": 4,
+      "diplomacies": 0,
+      "portraits": 0
+    },
+    "visibilitySubset": {
+      "initialStateHash": "b663332d447b1315d7027e52d51898eaffb1ddabc167982748955518efc78373",
+      "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
+      "cities": 3,
+      "nations": 2,
+      "generals": 4,
+      "diplomacies": 0,
+      "portraits": 0
+    },
+    "smallWorld": {
+      "initialStateHash": "a8d87ee8648b5f34bc8caa3893409912bd3abf819185aa2a30014ef76ff13caa",
+      "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff",
+      "cities": 94,
+      "nations": 21,
+      "generals": 5,
+      "diplomacies": 7,
+      "portraits": 0
+    }
+  }
+}

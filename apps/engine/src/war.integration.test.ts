@@ -29,7 +29,12 @@ async function create(initial?: WorldInit) {
     connections: [],
     supplied: false,
   });
-  const { worldId } = await saveInitialWorld(db, initial, { name: '전투 통합', turnTermMinutes: 60, endYear: null });
+  const { worldId } = await saveInitialWorld(db, initial, {
+    replayFormat: 'legacy',
+    name: '전투 통합',
+    turnTermMinutes: 60,
+    endYear: null,
+  });
   await controlClock(db, worldId, 'start');
   const lease = (await acquireLease(db, worldId))!;
   return { initial, worldId, lease, loop: new TurnLoop(db, lease) };
@@ -47,6 +52,7 @@ async function queue(worldId: string, generalId: number, commandKey: string, arg
         generalId,
         slot,
         commandKey: t.commandKey,
+        explicit: true,
         args: t.args as Prisma.InputJsonValue,
       })),
     });
@@ -219,8 +225,8 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
       ]);
       await loop.advanceTo(200);
       expect(
-        await db.generalLog.findUniqueOrThrow({
-          where: { worldId_generalId_tick: { worldId, generalId: 2, tick: 200 } },
+        await db.generalLog.findFirstOrThrow({
+          where: { worldId, generalId: 2, tick: 200, sequence: null },
         }),
       ).toMatchObject({ kind: 'success', text: expect.stringContaining('도시2 점령:') });
       expect(await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId, cityKey: 2 } } })).toMatchObject({
@@ -356,8 +362,8 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
     await queue(worldId, 2, 'attack', { cityKey: 2 });
     await loop.advanceTo(100);
     expect(
-      await db.generalLog.findUniqueOrThrow({
-        where: { worldId_generalId_tick: { worldId, generalId: 2, tick: 100 } },
+      await db.generalLog.findFirstOrThrow({
+        where: { worldId, generalId: 2, tick: 100, sequence: null },
       }),
     ).toMatchObject({ kind: 'success' });
     expect((await readWorldState(db, worldId)).cities[2]).toMatchObject({ supplied: false, agriculture: 100 });

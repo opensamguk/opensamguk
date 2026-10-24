@@ -1,7 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { officerName } from '../game/names';
 import type { Home, MapNation } from '../game/types';
-import { homePolicy } from '../policy/contract';
 import { Portrait } from '../portrait/Portrait';
 import { NationBadge } from '../ui/NationBadge';
 import { Tag } from '../ui/Tag';
@@ -32,7 +31,6 @@ export function GeneralInfo({
   onSelectCity: (key: number) => void;
 }) {
   const g = home.general;
-  const policy = homePolicy(home);
   return (
     <div className={styles.general} data-general-id={g.id}>
       <div className={styles.head}>
@@ -69,11 +67,7 @@ export function GeneralInfo({
           { label: '경험', value: n(g.experience) },
           { label: '공헌', value: n(g.dedication) },
           { label: '다음 턴', value: formatClock(home.nextTurnAt) },
-          {
-            label: '기본 방침',
-            value: policy?.name ?? '—',
-            title: policy ? undefined : '기본 방침을 아직 받지 못했습니다',
-          },
+          { label: '기본 방침', value: g.policy.name },
         ]}
       />
     </div>

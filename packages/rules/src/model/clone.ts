@@ -26,11 +26,29 @@ export function cloneWorldWithRegistry(view: WorldView, registry: ExtStateRegist
     nations,
     generals,
     diplomacies: view.diplomacies.map((d) => ({ ...d })),
+    ...(view.treaties?.length
+      ? {
+          treaties: view.treaties.map((treaty) => ({
+            ...treaty,
+            clauses: treaty.clauses.map((clause) => ({ ...clause })),
+          })),
+        }
+      : {}),
     ...(view.commandMeta
       ? { commandMeta: { nextNationId: view.commandMeta.nextNationId, offers: { ...view.commandMeta.offers } } }
       : {}),
     ...(view.nationTurns
       ? { nationTurns: structuredClone(view.nationTurns) as NonNullable<WorldState['nationTurns']> }
+      : {}),
+    ...(view.assignmentOffers && Object.keys(view.assignmentOffers).length
+      ? {
+          assignmentOffers: Object.fromEntries(
+            Object.entries(view.assignmentOffers).map(([id, offer]) => [id, { ...offer }]),
+          ),
+        }
+      : {}),
+    ...(view.officeTurns && Object.keys(view.officeTurns).length
+      ? { officeTurns: structuredClone(view.officeTurns) as NonNullable<WorldState['officeTurns']> }
       : {}),
   };
 }

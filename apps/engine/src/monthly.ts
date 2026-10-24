@@ -1,23 +1,56 @@
 import type { Prisma } from '@opensamguk/db';
-import { emptyTurns, monthlyDate, runMonthly, type ReplayState, type WorldState } from '@opensamguk/rules';
+import {
+  assertSlotSet,
+  isPolicyKey,
+  isPolicyMode,
+  emptyTurns,
+  monthlyDate,
+  runMonthly,
+  selectWorldCapabilities,
+  settleTreaties,
+  type ReplayState,
+  type WorldState,
+} from '@opensamguk/rules';
 import { rngFor } from '@opensamguk/shared';
 import { hashState } from '@opensamguk/shared/node';
 import { loadWorld } from './worldLoader';
 import { persistRanking } from './ranking';
 import { persistYearbookNations } from './nationArchive';
+import { persistExt } from './extState';
+import { persistTreatyClosures } from './treatyState';
 
 export async function loadReplayState(tx: Prisma.TransactionClient, worldId: string): Promise<ReplayState> {
   const state = await loadWorld(tx, worldId);
   const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
   const generals = await tx.general.findMany({ where: { worldId } });
   const slots = await tx.generalTurn.findMany({ where: { worldId }, orderBy: { slot: 'asc' } });
+  const modern = isPolicyMode({ fromSequence: world.policyFromSequence ?? null, actionSequence: world.actionSequence });
   const turns = Object.fromEntries(generals.map(({ id }) => [id, emptyTurns()]));
-  for (const slot of slots) turns[slot.generalId]![slot.slot] = { commandKey: slot.commandKey, args: slot.args };
+  for (const general of generals) if (modern) assertSlotSet(slots.filter((slot) => slot.generalId === general.id));
+  for (const slot of slots)
+    turns[slot.generalId]![slot.slot] = {
+      commandKey: slot.commandKey,
+      args: slot.args,
+      ...(modern ? { explicit: slot.explicit } : {}),
+    };
+  const policy: ReplayState['policy'] = modern
+    ? { turnTermMinutes: world.turnTermMinutes, policies: {}, lastActiveTicks: {} }
+    : undefined;
+  if (policy)
+    for (const general of generals) {
+      if (!isPolicyKey(general.defaultPolicy)) throw new Error('저장된 기본 방침이 올바르지 않습니다.');
+      policy.policies[general.id] = general.defaultPolicy;
+      if (general.userId !== null) {
+        if (general.lastActiveTick === null) throw new Error('사람 장수의 활동 tick이 없습니다.');
+        policy.lastActiveTicks[general.id] = general.lastActiveTick;
+      }
+    }
   return {
     state,
     turns,
     revisions: Object.fromEntries(generals.map(({ id, turnRevision }) => [id, turnRevision])),
     monthlyTick: world.monthlyTick,
+    ...(policy ? { policy } : {}),
   };
 }
 
@@ -29,9 +62,11 @@ export async function persistMonthly(
   sequence: number,
 ): Promise<WorldState> {
   const before = await loadWorld(tx, worldId);
+  const capabilities = selectWorldCapabilities(await tx.world.findUniqueOrThrow({ where: { id: worldId } }));
   const date = monthlyDate(before.startYear, tick);
   const result = runMonthly(before, tick, rngFor(seed, 'monthly', date.year, date.month));
-  const next = result.state;
+  const treatyEnabled = capabilities.kind === 'caps' && 'treaty' in capabilities.selection;
+  const next = treatyEnabled ? settleTreaties(result.state, tick) : result.state;
   // 모든 변경은 같은 리스·월드 잠금을 잡은 트랜잭션 안에서 최종값으로 쓴다.
   for (const city of Object.values(next.cities)) {
     const old = before.cities[city.cityKey]!;
@@ -51,6 +86,8 @@ export async function persistMonthly(
   }
   await tx.diplomacy.deleteMany({ where: { worldId } });
   await tx.diplomacy.createMany({ data: next.diplomacies.map((entry) => ({ ...entry, worldId })) });
+  await persistExt(tx, worldId, before.ext, next.ext);
+  if (treatyEnabled) await persistTreatyClosures(tx, worldId, before, next, { tick, sequence });
   await tx.world.update({ where: { id: worldId }, data: { monthlyTick: tick } });
   const snapshot = await loadReplayState(tx, worldId);
   await tx.yearbookSnapshot.create({

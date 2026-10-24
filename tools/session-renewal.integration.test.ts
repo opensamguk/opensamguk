@@ -9,6 +9,7 @@ import { hashToken, newSession, SESSION_RENEW_MS, SESSION_SECONDS } from '../app
 import { displaySlots } from '../apps/server/src/game/slots';
 import { readFixture } from '../apps/server/test/readFixture';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { pnpmCli } from './node-cli';
 
 const sourceUrl = process.env.TEST_DATABASE_URL;
 if (!sourceUrl || !/^[a-z][a-z0-9_]*_test$/.test(new URL(sourceUrl).pathname.slice(1)))
@@ -137,8 +138,9 @@ function safeWarnings(count: number) {
 beforeAll(async () => {
   await admin.$executeRawUnsafe(`CREATE DATABASE "${databaseName}"`);
   databaseCreated = true;
-  const result = spawnSync('pnpm', ['--filter', '@opensamguk/db', 'migrate'], {
-    env: { ...process.env, DATABASE_URL: databaseUrl.href },
+  const env = { ...process.env, DATABASE_URL: databaseUrl.href };
+  const result = spawnSync(...pnpmCli(['--filter', '@opensamguk/db', 'migrate']), {
+    env,
     encoding: 'utf8',
     timeout: 60_000,
   });

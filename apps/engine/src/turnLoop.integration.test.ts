@@ -12,6 +12,7 @@ import { loadInitialWorld } from './world/resources';
 import { readWorldState, saveInitialWorld } from './world/persistence';
 import { controlClock } from './world/clock';
 import { runEngine } from './main';
+import { requestShutdown } from './process-lifecycle';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -52,15 +53,20 @@ async function create(count = 1, human = false) {
     });
     initial.generals[0]!.userId = userId;
   }
-  const { worldId } = await saveInitialWorld(db, initial, { name: '엔진 통합', turnTermMinutes: 10, endYear: null });
+  const { worldId } = await saveInitialWorld(db, initial, {
+    replayFormat: 'legacy',
+    name: '엔진 통합',
+    turnTermMinutes: 10,
+    endYear: null,
+  });
   await controlClock(db, worldId, 'start');
   return { worldId, cityKey: city.cityKey };
 }
 async function queue(worldId: string, generalId = 1, commandKey = 'farm') {
   await db.generalTurn.createMany({
     data: [
-      { worldId, generalId, slot: 0, commandKey, args: {} },
-      { worldId, generalId, slot: 1, commandKey: 'rest', args: {} },
+      { worldId, generalId, slot: 0, explicit: true, commandKey, args: {} },
+      { worldId, generalId, slot: 1, explicit: true, commandKey: 'rest', args: {} },
     ],
   });
 }
@@ -491,7 +497,7 @@ describe('AC-M1-11 리스·재시작·펜싱, 실제 PostgreSQL', () => {
     const child = spawn(process.execPath, ['--import', 'tsx', 'apps/engine/src/index.ts', '--world', worldId], {
       cwd: new URL('../../../', import.meta.url),
       env: { ...process.env, DATABASE_URL: url },
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: process.platform === 'win32' ? ['ignore', 'pipe', 'pipe', 'ipc'] : ['ignore', 'pipe', 'pipe'],
     });
     const exited = once(child, 'exit');
     try {
@@ -512,13 +518,13 @@ describe('AC-M1-11 리스·재시작·펜싱, 실제 PostgreSQL', () => {
         };
         function cleanup() {
           clearTimeout(timer);
-          child.stdout.off('data', onData);
+          child.stdout!.off('data', onData);
           child.off('exit', onExit);
         }
-        child.stdout.on('data', onData);
+        child.stdout!.on('data', onData);
         child.once('exit', onExit);
       });
-      child.kill('SIGTERM');
+      requestShutdown(child, 'SIGTERM');
       expect((await exited)[0]).toBe(0);
       expect(await acquireLease(db, worldId)).not.toBeNull();
     } finally {

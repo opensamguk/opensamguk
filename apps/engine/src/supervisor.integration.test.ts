@@ -12,6 +12,7 @@ import { CRASH_MESSAGE, runSupervisor, type SupervisorEvent } from './supervisor
 import { controlClock } from './world/clock';
 import { saveInitialWorld } from './world/persistence';
 import { loadInitialWorld } from './world/resources';
+import { requestShutdown } from './process-lifecycle';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -39,20 +40,37 @@ function alive(pid: number) {
 async function stop(child: ChildProcess, signal: NodeJS.Signals = 'SIGTERM') {
   if (child.exitCode !== null || child.signalCode !== null) return;
   const exited = once(child, 'exit');
-  child.kill(signal);
+  if (signal === 'SIGTERM' || signal === 'SIGINT') requestShutdown(child, signal);
+  else child.kill(signal);
   await exited;
 }
 
 afterEach(async () => {
-  await Promise.all(supervisors.map(({ child }) => stop(child)));
-  for (const supervisor of supervisors) {
-    expect(supervisor.child.exitCode).toBe(0);
+  const managed = supervisors.splice(0);
+  const worldIds = owned.splice(0);
+  const errors: unknown[] = [];
+  const results = await Promise.allSettled(managed.map(({ child }) => stop(child)));
+  for (const result of results) if (result.status === 'rejected') errors.push(result.reason);
+  const check = (assertion: () => void) => {
+    try {
+      assertion();
+    } catch (error) {
+      errors.push(error);
+    }
+  };
+  for (const supervisor of managed) {
+    check(() => expect(supervisor.child.exitCode).toBe(0));
     for (const event of supervisor.events) {
-      if (event.kind === 'started') expect(alive(event.pid!)).toBe(false);
+      if (event.kind === 'started') check(() => expect(alive(event.pid!)).toBe(false));
     }
   }
-  supervisors.length = 0;
-  await db.world.deleteMany({ where: { id: { in: owned.splice(0) } } });
+  try {
+    await db.world.deleteMany({ where: { id: { in: worldIds } } });
+  } catch (error) {
+    errors.push(error);
+  }
+  if (errors.length === 1) throw errors[0];
+  if (errors.length > 1) throw new AggregateError(errors, '감독 시험 정리에 실패했습니다.');
 });
 afterAll(() => db.$disconnect());
 
@@ -71,6 +89,7 @@ async function create(second = false) {
   // 실제 월간 정산과 NPC 규칙은 유지하고 자식 장애 시험의 실행량만 줄인다.
   initial.generals = initial.generals.slice(0, 2);
   const result = await saveInitialWorld(db, initial, {
+    replayFormat: 'legacy',
     name: second ? '감독 B' : '감독 A',
     turnTermMinutes: second ? 60 : 10,
     endYear: null,
@@ -335,17 +354,22 @@ describe('AC-M2-01 실제 PostgreSQL·감독·자식 프로세스', () => {
     const children: ChildProcess[] = [];
     const unrelated = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
     let childReady = false;
+    let shutdownReceived = 0;
     const running = runSupervisor(db, {
       signal: controller.signal,
       spawnChild: () => {
         const child = spawn(
           process.execPath,
-          ['-e', 'process.on("SIGTERM", () => {}); process.send("ready"); setInterval(() => {}, 1000)'],
+          [
+            '-e',
+            'process.on("SIGTERM", () => process.send("ignored")); process.on("message", () => process.send("ignored")); process.send("ready"); setInterval(() => {}, 1000)',
+          ],
           { stdio: ['ignore', 'ignore', 'ignore', 'ipc'] },
         );
         children.push(child);
-        child.on('message', () => {
-          childReady = true;
+        child.on('message', (message) => {
+          if (message === 'ready') childReady = true;
+          if (message === 'ignored') shutdownReceived++;
         });
         return child;
       },
@@ -357,6 +381,7 @@ describe('AC-M2-01 실제 PostgreSQL·감독·자식 프로세스', () => {
       await running;
       expect(performance.now() - started).toBeGreaterThanOrEqual(4900);
       expect(children[0]!.signalCode).toBe('SIGKILL');
+      expect(shutdownReceived).toBe(1);
       expect(alive(unrelated.pid!)).toBe(true);
     } finally {
       controller.abort();

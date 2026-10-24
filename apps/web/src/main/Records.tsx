@@ -1,6 +1,6 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { retryUnlessClientError, errorCode } from '../game/errors';
-import { formatYearMonth, tickDate } from '../game/gameDate';
+import { formatYearMonth, personalLogDate, tickDate } from '../game/gameDate';
 import { NoGeneral, QueryError } from '../game/QueryState';
 import type { MapNation, WorldSummary } from '../game/types';
 import { trpcClient, useTRPC } from '../trpc';
@@ -17,8 +17,9 @@ export const RECORD_LABELS: Record<RecordKind, string> = {
   world: '중원 정세',
 };
 
-type Clock = Pick<WorldSummary, 'gameDate' | 'nowTick' | 'msPerTick' | 'turnTermMinutes'> | undefined;
+type Clock = Pick<WorldSummary, 'startYear' | 'gameDate' | 'nowTick' | 'msPerTick' | 'turnTermMinutes'> | undefined;
 const dateOf = (tick: number, clock: Clock) => (clock ? formatYearMonth(tickDate(tick, clock)) : '—');
+const logDateOf = (tick: number, clock: Clock) => (clock ? formatYearMonth(personalLogDate(tick, clock)) : '—');
 const n = (value: number) => value.toLocaleString('ko-KR');
 
 // 기록 조회. tRPC의 infiniteQueryOptions는 입력에 direction을 덧붙이는데 서버의 기록 입력은 strict라 거부한다.
@@ -146,7 +147,7 @@ export function GeneralLogList({ items, clock }: { items: readonly GeneralItem[]
     <ol className={styles.lines}>
       {items.map((item) => (
         <li key={item.id} className={styles.line} data-log-kind={item.kind}>
-          <span className={`num ${styles.date}`}>{dateOf(item.tick, clock)}</span>
+          <span className={`num ${styles.date}`}>{logDateOf(item.tick, clock)}</span>
           {item.kind === 'failure' ? <Tag tone="danger">실패</Tag> : null}
           <span className={styles.text}>{item.text}</span>
         </li>

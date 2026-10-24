@@ -24,6 +24,8 @@ export const nationDraftKey = (userId: string, worldId: string, office: Office) 
   `${NATION_DRAFT_PREFIX}:${userId}:${worldId}:${office.nationId}:${office.officerLevel}:${office.tenure}`;
 
 type TabsData = { tabs: NationTurnTab[] };
+// 국가 칸은 임시 계약(PersonnelApi)의 칸 모양 그대로 캐시와 저장 결과에 쓴다. 개인 칸 모양과 섞지 않는다.
+type NationSlot = NationTurnTab['slots'][number];
 
 // 국가 직책 12칸 연결. 저장은 읽은 탭의 office와 revision을 그대로 돌려보낸다 (T2-05 국가 예턴 절).
 export function nationSource(
@@ -33,7 +35,7 @@ export function nationSource(
     generals?: Array<{ id: number; name: string }> | undefined;
     onOfficeChanged: (message: string) => void;
   },
-): TurnSourceFactory {
+): TurnSourceFactory<NationSlot> {
   const level = tab.officerLevel;
   const office = tab.office;
   return ({ userId, worldId }) => {
@@ -50,7 +52,7 @@ export function nationSource(
           return { revision: found?.revision ?? 0, slots: found?.slots ?? [] };
         },
       },
-      writeList: (queryClient: QueryClient, list: TurnList) =>
+      writeList: (queryClient: QueryClient, list: TurnList<NationSlot>) =>
         queryClient.setQueryData<TabsData>(listKey, (old) =>
           old
             ? {

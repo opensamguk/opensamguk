@@ -1,6 +1,8 @@
+// @vitest-environment jsdom
+// 브라우저의 online·offline 힌트를 실제 window 사건으로 보내려고 jsdom에서 돌린다. EventSource는 아래 FakeSource로 바꾼다.
 import { QueryClient } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { messageKeys, noticeKeys } from '../messages/api';
+import type { MessageScope } from '../messages/api';
 import { readDraft, writeDraft } from '../messages/drafts';
 import { trpc } from '../trpc';
 import {
@@ -8,12 +10,17 @@ import {
   DOWN_NOTICE_MS,
   invalidationTargets,
   parseWorldEvent,
+  sseUrl,
   WorldEventConnection,
   type EventSourceLike,
   type RealtimeStatus,
+  type WorldEvent,
 } from './useWorldEvents';
 
 const WORLD = 'w1';
+// 메시지 화면(messages/queries.ts)과 같은 생성 키다.
+const listKey = (scope: MessageScope) => trpc.message.list.infiniteQueryKey({ worldId: WORLD, scope });
+const unreadKey = trpc.message.unread.queryKey({ worldId: WORLD });
 
 class FakeSource implements EventSourceLike {
   readyState = 0;
@@ -42,13 +49,22 @@ class FakeSource implements EventSourceLike {
   }
 }
 
-function connect() {
+// 시험이 연 연결은 끝날 때 모두 멈춘다. 연결이 window 힌트를 듣게 되면 다음 시험으로 새지 않게 하려는 것이다.
+const opened: WorldEventConnection[] = [];
+afterEach(() => {
+  for (const connection of opened.splice(0)) connection.stop();
+});
+
+function connect(onEvent?: (event: WorldEvent) => void) {
   const sources: FakeSource[] = [];
   const statuses: RealtimeStatus[] = [];
   const events: unknown[] = [];
   const connection = new WorldEventConnection({
     url: '/sse?worldId=w1',
-    onEvent: (event) => events.push(event),
+    onEvent: (event) => {
+      events.push(event);
+      onEvent?.(event);
+    },
     onStatus: (status) => statuses.push(status),
     createSource: (url) => {
       const source = new FakeSource(url);
@@ -57,8 +73,12 @@ function connect() {
     },
   });
   connection.start();
+  opened.push(connection);
   return { connection, sources, statuses, events, last: () => sources.at(-1)! };
 }
+
+const hint = (type: 'online' | 'offline') => window.dispatchEvent(new Event(type));
+const active = (sources: FakeSource[]) => sources.filter((source) => !source.closed);
 
 describe('SSE 알림 해석', () => {
   it('알려진 종류만 받고 범위가 맞지 않으면 버린다', () => {
@@ -70,11 +90,11 @@ describe('SSE 알림 해석', () => {
     expect(parseWorldEvent('unknown', '{}')).toBeNull();
   });
 
-  it('알림 종류마다 계획의 query만 다시 조회한다', () => {
+  it('알림 종류마다 계획의 query만 다시 조회하고 메시지 키는 생성된 infinite 키 모양이다', () => {
     expect(invalidationTargets({ kind: 'ready' }, WORLD, trpc)).toBe('all');
     expect(invalidationTargets({ kind: 'message.new', scope: 'PRIVATE' }, WORLD, trpc)).toEqual([
-      messageKeys.list(WORLD, 'PRIVATE'),
-      messageKeys.unread(WORLD),
+      [['message', 'list'], { input: { worldId: WORLD, scope: 'PRIVATE' }, type: 'infinite' }],
+      [['message', 'unread'], { input: { worldId: WORLD }, type: 'query' }],
     ]);
     expect(invalidationTargets({ kind: 'turn.result' }, WORLD, trpc)).toEqual([
       trpc.home.get.queryKey({ worldId: WORLD }),
@@ -82,16 +102,20 @@ describe('SSE 알림 해석', () => {
       trpc.records.general.pathKey(),
     ]);
     expect(invalidationTargets({ kind: 'notice.updated', scope: 'nation' }, WORLD, trpc)).toEqual([
-      noticeKeys.nation(WORLD),
+      trpc.notice.nation.get.queryKey({ worldId: WORLD }),
     ]);
+    expect(invalidationTargets({ kind: 'notice.updated', scope: 'world' }, WORLD, trpc)).toEqual([
+      trpc.notice.world.list.queryKey({ worldId: WORLD }),
+    ]);
+    expect(sseUrl('w 1')).toBe('/sse?worldId=w%201');
   });
 });
 
 describe('SSE 재조회와 초안', () => {
   const seed = (client: QueryClient) => {
-    client.setQueryData(messageKeys.list(WORLD, 'PRIVATE'), { pages: [], pageParams: [] });
-    client.setQueryData(messageKeys.list(WORLD, 'NATION'), { pages: [], pageParams: [] });
-    client.setQueryData(messageKeys.unread(WORLD), { PRIVATE: 1, NATION: 0, DIPLOMACY: null, WORLD: 0 });
+    client.setQueryData(listKey('PRIVATE'), { pages: [], pageParams: [] });
+    client.setQueryData(listKey('NATION'), { pages: [], pageParams: [] });
+    client.setQueryData(unreadKey, { PRIVATE: 1, NATION: 0, DIPLOMACY: null, WORLD: 0 });
     client.setQueryData(trpc.turns.get.queryKey({ worldId: WORLD }), { revision: 1, slots: [] });
   };
   const invalidated = (client: QueryClient, key: readonly unknown[]) => client.getQueryState(key)?.isInvalidated;
@@ -100,9 +124,9 @@ describe('SSE 재조회와 초안', () => {
     const client = new QueryClient();
     seed(client);
     applyWorldEvent(client, trpc, WORLD, { kind: 'message.new', scope: 'PRIVATE' });
-    expect(invalidated(client, messageKeys.list(WORLD, 'PRIVATE'))).toBe(true);
-    expect(invalidated(client, messageKeys.unread(WORLD))).toBe(true);
-    expect(invalidated(client, messageKeys.list(WORLD, 'NATION'))).toBe(false);
+    expect(invalidated(client, listKey('PRIVATE'))).toBe(true);
+    expect(invalidated(client, unreadKey)).toBe(true);
+    expect(invalidated(client, listKey('NATION'))).toBe(false);
     expect(invalidated(client, trpc.turns.get.queryKey({ worldId: WORLD }))).toBe(false);
   });
 
@@ -110,16 +134,30 @@ describe('SSE 재조회와 초안', () => {
     const client = new QueryClient();
     seed(client);
     writeDraft('messages:compose:w1:PRIVATE', { body: '쓰던 글', toGeneralId: 3, toNationId: null });
-    writeDraft('notice:edit:w1', '고치던 공지');
+    writeDraft('messages:compose:w1:NATION:1', { body: '국가에 쓰던 글', toGeneralId: null, toNationId: null });
+    writeDraft('notice:edit:w1:1', '고치던 공지');
     applyWorldEvent(client, trpc, WORLD, { kind: 'ready' });
-    expect(invalidated(client, messageKeys.list(WORLD, 'NATION'))).toBe(true);
+    expect(invalidated(client, listKey('NATION'))).toBe(true);
     expect(invalidated(client, trpc.turns.get.queryKey({ worldId: WORLD }))).toBe(true);
     expect(readDraft('messages:compose:w1:PRIVATE', null)).toEqual({
       body: '쓰던 글',
       toGeneralId: 3,
       toNationId: null,
     });
-    expect(readDraft('notice:edit:w1', null)).toBe('고치던 공지');
+    expect(readDraft('messages:compose:w1:NATION:1', null)).toMatchObject({ body: '국가에 쓰던 글' });
+    expect(readDraft('notice:edit:w1:1', null)).toBe('고치던 공지');
+  });
+
+  it('연결로 받은 ready 하나는 화면 query 전체 무효화를 정확히 한 번 부른다', () => {
+    const client = new QueryClient();
+    seed(client);
+    const invalidate = vi.spyOn(client, 'invalidateQueries');
+    const c = connect((event) => applyWorldEvent(client, trpc, WORLD, event));
+    c.last().open();
+    c.last().emit('ready', '{"kind":"ready"}');
+    expect(invalidate).toHaveBeenCalledTimes(1);
+    expect(invalidate).toHaveBeenCalledWith();
+    c.connection.stop();
   });
 });
 
@@ -156,6 +194,16 @@ describe('SSE 연결', () => {
     expect(c.statuses).toEqual(['open', 'reconnecting', 'open']);
   });
 
+  it('오류 뒤 readyState가 CONNECTING이면 새 연결을 만들지 않고 브라우저 재시도를 기다린다', () => {
+    const c = connect();
+    c.last().open();
+    c.last().fail(0);
+    vi.advanceTimersByTime(60_000);
+    expect(c.sources).toHaveLength(1);
+    expect(c.sources[0]!.closed).toBe(false);
+    expect(c.statuses).toEqual(['open', 'reconnecting']);
+  });
+
   it('첫 연결이 3초 안에 열리지 않아도 다시 잇는 중을 띄운다', () => {
     const c = connect();
     vi.advanceTimersByTime(DOWN_NOTICE_MS + 1);
@@ -189,5 +237,123 @@ describe('SSE 연결', () => {
     expect(c.sources).toHaveLength(1);
     expect(c.sources[0]!.closed).toBe(true);
     expect(c.statuses).toEqual([]);
+  });
+});
+
+// 브라우저의 online·offline 사건은 연결이 바뀌었을 수 있다는 힌트일 뿐이다(navigator 값은 믿지 않는다).
+// 힌트가 오면 지금 연결을 새 요청 하나로 바꾸고, 상태는 그 새 요청의 실제 open·error·ready만 따른다.
+describe('SSE 연결과 브라우저 네트워크 힌트', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('offline 힌트는 상태를 바꾸지 않고 연결을 새 요청 하나로 바꾸며 그 요청이 열리면 연결됨이 그대로다', () => {
+    const c = connect();
+    const first = c.last();
+    first.open();
+    hint('offline');
+    expect(first.closed).toBe(true);
+    expect(c.sources).toHaveLength(2);
+    expect(c.statuses).toEqual(['open']);
+    // 힌트가 틀렸고 서버에 닿는다. 새 요청이 열리면 기능을 그대로 쓴다.
+    c.last().open();
+    vi.advanceTimersByTime(DOWN_NOTICE_MS * 2);
+    expect(c.statuses).toEqual(['open']);
+    c.last().emit('ready');
+    expect(c.events).toEqual([{ kind: 'ready' }]);
+  });
+
+  it('offline 힌트 뒤 새 요청이 실제로 실패하면 3초 뒤 다시 잇는 중이 되고 서버가 닫았으면 간격 재연결을 한다', () => {
+    const c = connect();
+    c.last().open();
+    hint('offline');
+    expect(c.sources).toHaveLength(2);
+    c.last().fail(2);
+    expect(c.statuses).toEqual(['open']);
+    vi.advanceTimersByTime(1_000);
+    expect(c.sources).toHaveLength(3);
+    expect(active(c.sources)).toHaveLength(1);
+    vi.advanceTimersByTime(DOWN_NOTICE_MS - 1_000 - 1);
+    expect(c.statuses).toEqual(['open']);
+    vi.advanceTimersByTime(1);
+    expect(c.statuses).toEqual(['open', 'reconnecting']);
+  });
+
+  it('online 힌트는 기다리던 간격 재연결을 미루지 않고 바로 한 번 새로 열며 그 요청의 열림과 ready를 따른다', () => {
+    const c = connect();
+    c.last().open();
+    c.last().fail(2);
+    expect(c.sources).toHaveLength(1);
+    hint('online');
+    expect(c.sources).toHaveLength(2);
+    // 취소된 1초 간격 재연결이 하나를 더 만들지 않는다.
+    vi.advanceTimersByTime(1_000);
+    expect(c.sources).toHaveLength(2);
+    c.last().open();
+    c.last().emit('ready');
+    expect(c.statuses).toEqual(['open']);
+    expect(c.events).toEqual([{ kind: 'ready' }]);
+  });
+
+  it('online 힌트는 열려 있는 연결을 다시 만들지 않는다', () => {
+    const c = connect();
+    c.last().open();
+    hint('online');
+    expect(c.sources).toHaveLength(1);
+    expect(c.last().closed).toBe(false);
+    expect(c.statuses).toEqual(['open']);
+  });
+
+  it('힌트로 바꾼 뒤 옛 연결의 늦은 열림·오류·알림은 무시한다', () => {
+    const c = connect();
+    const old = c.last();
+    old.open();
+    hint('offline');
+    expect(c.sources).toHaveLength(2);
+    old.emit('ready');
+    old.fail(2);
+    vi.advanceTimersByTime(60_000);
+    expect(c.events).toEqual([]);
+    expect(c.sources).toHaveLength(2);
+    // 새 요청이 열리지 않아 3초 뒤 다시 잇는 중이다. 옛 연결이 늦게 열려도 되돌리지 않는다.
+    expect(c.statuses).toEqual(['open', 'reconnecting']);
+    old.open();
+    expect(c.statuses).toEqual(['open', 'reconnecting']);
+  });
+
+  it('닫힌 연결의 오류가 거듭 와도 간격 재연결은 하나만 기다린다', () => {
+    const c = connect();
+    const first = c.last();
+    first.open();
+    first.fail(2);
+    first.fail(2);
+    vi.advanceTimersByTime(60_000);
+    expect(c.sources).toHaveLength(2);
+    expect(active(c.sources)).toEqual([c.last()]);
+  });
+
+  it('멈춘 뒤에는 브라우저 힌트와 남은 타이머가 아무것도 만들지 않는다', () => {
+    const c = connect();
+    c.last().fail(2);
+    c.connection.stop();
+    hint('offline');
+    hint('online');
+    vi.advanceTimersByTime(60_000);
+    expect(c.sources).toHaveLength(1);
+    expect(c.statuses).toEqual([]);
+    expect(c.events).toEqual([]);
+  });
+
+  it('같은 힌트가 거듭 와도 살아 있는 연결은 하나이고 ready는 그 연결에서 한 번만 받는다', () => {
+    const c = connect();
+    c.last().open();
+    hint('offline');
+    hint('offline');
+    expect(c.sources.length).toBeGreaterThan(1);
+    expect(active(c.sources)).toEqual([c.last()]);
+    hint('online');
+    expect(active(c.sources)).toEqual([c.last()]);
+    c.last().open();
+    for (const source of c.sources) source.emit('ready');
+    expect(c.events).toEqual([{ kind: 'ready' }]);
   });
 });

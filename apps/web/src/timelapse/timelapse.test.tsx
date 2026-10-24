@@ -1,18 +1,22 @@
 // @vitest-environment jsdom
 import { focusManager, onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { TRPCClientError } from '@trpc/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { MapCity } from '../game/types';
+import { savedNationSource, type SavedFrame } from './displaySource';
 import {
   frameView,
   joinPages,
   type FrameNation,
   type NationDisplaySource,
+  type StoredNation,
   type TimelapseFrame,
   type TimelapsePage,
 } from './frames';
 import { useTimelapsePages, type FetchTimelapsePage, type TimelapseInput } from './pages';
 import { initialPlayback, isWaiting, playback } from './playback';
+import { TimelapseScreen, type TimelapseMap } from './TimelapsePanel';
 import { TimelapseView } from './TimelapseView';
 
 afterEach(() => {
@@ -388,4 +392,404 @@ describe('U10·U11 캐시 정책', () => {
     view.unmount();
     expect(signals[1]!.aborted).toBe(true);
   });
+});
+
+// 아래는 조회 연결 뒤의 시험이다. 프레임마다 그 tick의 저장 국가(nations)를 서버 응답처럼 둔다.
+type Saved = TimelapseFrame & SavedFrame;
+const saved = (i: number, owners: Array<number | null>, nations: StoredNation[]): Saved => ({
+  ...frame(i, owners),
+  nations,
+});
+
+// 서버 응답 모양. currentNations는 지금 국가 행 값이라 화면은 읽지 않아야 한다.
+type ServerPage = TimelapsePage<Saved> & { currentNations: StoredNation[] };
+function savedPageOf(frames: readonly Saved[], cursor?: string, currentNations: StoredNation[] = []): ServerPage {
+  const after = cursor === undefined ? -1 : Number(cursor);
+  const rest = frames.filter((f) => f.tick > after);
+  const items = rest.slice(0, 30);
+  const last = items.at(-1);
+  return { items, currentNations, nextCursor: rest.length > 30 && last ? String(last.tick) : null };
+}
+const cursorOf = (input: TimelapseInput) => ('cursor' in input ? input.cursor : undefined);
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+// 첫 렌더가 부하에 밀린 기록이 있어(구현 기록) 연결 시험은 기다림을 넉넉히 둔다.
+const wait = { timeout: 5_000 };
+const SLOW = 15_000;
+const flush = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 0)));
+
+describe('U12 저장값 출처 (savedNationSource)', () => {
+  const frames: Saved[] = [
+    saved(
+      0,
+      [1, 2],
+      [
+        { id: 1, name: '옛위', color: '#112233' },
+        { id: 2, name: '촉', color: '#008000' },
+      ],
+    ),
+    saved(1, [1, 2], [{ id: 1, name: '새위', color: '#445566' }]),
+    saved(
+      2,
+      [1],
+      [
+        { id: 1, name: '위', color: '#000080' },
+        { id: 1, name: '두번째위', color: '#000000' },
+      ],
+    ),
+  ];
+  // 같은 응답의 지금 국가 행 값. 출처에는 넣을 자리가 없고 어느 결과에도 나오면 안 된다.
+  const currentNations: StoredNation[] = [
+    { id: 1, name: '지금위', color: '#ff0000' },
+    { id: 2, name: '지금촉', color: '#00ff00' },
+  ];
+  const source = savedNationSource(frames);
+
+  it('프레임마다 그 프레임 nations의 이름과 색을 그대로 쓴다', () => {
+    expect(source.resolve(10_000, 1)).toEqual({ kind: 'stored', id: 1, name: '옛위', color: '#112233' });
+    expect(source.resolve(20_000, 1)).toEqual({ kind: 'stored', id: 1, name: '새위', color: '#445566' });
+    expect(source.resolve(10_000, 2)).toEqual({ kind: 'stored', id: 2, name: '촉', color: '#008000' });
+  });
+
+  it('그 프레임에 없는 id는 다른 프레임에 있어도 missing이고 같은 id가 두 번이면 missing이다', () => {
+    expect(source.resolve(20_000, 2)).toEqual({ kind: 'missing', id: 2 });
+    expect(source.resolve(30_000, 1)).toEqual({ kind: 'missing', id: 1 });
+    expect(frameView(frames[1]!, [city(1), city(2)], source)).toEqual({ kind: 'missing', nationIds: [2] });
+    expect(frameView(frames[2]!, [city(1)], source)).toEqual({ kind: 'missing', nationIds: [1] });
+  });
+
+  it('받지 않은 tick은 missing, null은 empty이고 지금 국가 행 값은 어디에도 나오지 않는다', () => {
+    expect(source.resolve(40_000, 1)).toEqual({ kind: 'missing', id: 1 });
+    expect(source.resolve(10_000, null)).toEqual({ kind: 'empty' });
+    const results = JSON.stringify(
+      [10_000, 20_000, 30_000, 40_000].flatMap((tick) => [1, 2, null].map((id) => source.resolve(tick, id))),
+    );
+    for (const nation of currentNations) {
+      expect(results).not.toContain(nation.name);
+      expect(results).not.toContain(nation.color);
+    }
+  });
+});
+
+describe('U13 전체 무효화 (실제 QueryClient)', () => {
+  const queryKey = ['timelapse', 'frames', 'w1', 'pages'];
+
+  function Harness({ fetchPage }: { fetchPage: FetchTimelapsePage }) {
+    const { frames, hasMore } = useTimelapsePages('w1', fetchPage, queryKey, false);
+    return (
+      <p data-testid="loaded">
+        {frames.length}
+        {hasMore ? '+' : ''}
+      </p>
+    );
+  }
+
+  function setup(fetchPage: FetchTimelapsePage) {
+    const client = new QueryClient();
+    const mount = () =>
+      render(
+        <QueryClientProvider client={client}>
+          <Harness fetchPage={fetchPage} />
+        </QueryClientProvider>,
+      );
+    return { client, mount };
+  }
+  const loaded = () => screen.getByTestId('loaded').textContent;
+
+  it(
+    '다 받은 뒤 invalidateQueries()를 불러도 다시 받지 않고 떼고 다시 붙이면 첫 페이지부터 받는다',
+    async () => {
+      const stored = Array.from({ length: 35 }, (_, i) => frame(i, [null]));
+      const calls: TimelapseInput[] = [];
+      const fetchPage: FetchTimelapsePage = (input) => {
+        calls.push(input);
+        return Promise.resolve(pagesOf(stored, cursorOf(input)));
+      };
+      const { client, mount } = setup(fetchPage);
+
+      const view = mount();
+      await waitFor(() => expect(loaded()).toBe('35'), wait);
+      expect(calls).toHaveLength(2);
+      act(() => void client.invalidateQueries());
+      await flush();
+      act(() => void client.invalidateQueries());
+      await flush();
+      expect(calls).toHaveLength(2);
+      expect(loaded()).toBe('35');
+
+      view.unmount();
+      await waitFor(() => expect(client.getQueryCache().find({ queryKey })).toBeUndefined(), wait);
+      stored.push(frame(35, [null]));
+      mount();
+      await waitFor(() => expect(loaded()).toBe('36'), wait);
+      expect(calls.slice(2)).toEqual([{ worldId: 'w1' }, { worldId: 'w1', cursor: '300000' }]);
+    },
+    SLOW,
+  );
+
+  it(
+    '둘째 페이지를 받는 중에 무효화해도 그 요청이 끊기지 않고 첫 페이지를 다시 받지 않는다',
+    async () => {
+      const stored = Array.from({ length: 35 }, (_, i) => frame(i, [null]));
+      const calls: TimelapseInput[] = [];
+      const signals: AbortSignal[] = [];
+      const second = deferred<TimelapsePage>();
+      const fetchPage: FetchTimelapsePage = (input, { signal }) => {
+        calls.push(input);
+        signals.push(signal);
+        return 'cursor' in input ? second.promise : Promise.resolve(pagesOf(stored));
+      };
+      const { client, mount } = setup(fetchPage);
+
+      mount();
+      await waitFor(() => expect(calls).toHaveLength(2), wait);
+      expect(loaded()).toBe('30+');
+      act(() => void client.invalidateQueries());
+      await flush();
+      expect(signals[1]!.aborted).toBe(false);
+      expect(calls).toHaveLength(2);
+
+      second.resolve(pagesOf(stored, '300000'));
+      await waitFor(() => expect(loaded()).toBe('35'), wait);
+      expect(calls).toEqual([{ worldId: 'w1' }, { worldId: 'w1', cursor: '300000' }]);
+    },
+    SLOW,
+  );
+
+  it(
+    '첫 페이지를 기다리는 중에 무효화하면 진행 중 요청에 합쳐져 첫 페이지 요청은 하나뿐이다',
+    async () => {
+      const stored = Array.from({ length: 35 }, (_, i) => frame(i, [null]));
+      const calls: TimelapseInput[] = [];
+      const first = deferred<TimelapsePage>();
+      const fetchPage: FetchTimelapsePage = (input) => {
+        calls.push(input);
+        return 'cursor' in input ? Promise.resolve(pagesOf(stored, input.cursor)) : first.promise;
+      };
+      const { client, mount } = setup(fetchPage);
+
+      const view = mount();
+      await waitFor(() => expect(calls).toHaveLength(1), wait);
+      act(() => void client.invalidateQueries());
+      await flush();
+      expect(calls).toHaveLength(1);
+
+      first.resolve(pagesOf(stored));
+      await waitFor(() => expect(loaded()).toBe('35'), wait);
+      expect(calls).toEqual([{ worldId: 'w1' }, { worldId: 'w1', cursor: '300000' }]);
+
+      // 무효화가 있었어도 떼고 다시 붙이면 캐시가 없어 첫 페이지부터 받는다 (U10 그대로).
+      view.unmount();
+      await waitFor(() => expect(client.getQueryCache().find({ queryKey })).toBeUndefined(), wait);
+      mount();
+      await waitFor(() => expect(loaded()).toBe('35'), wait);
+      expect(calls.slice(2)).toEqual([{ worldId: 'w1' }, { worldId: 'w1', cursor: '300000' }]);
+    },
+    SLOW,
+  );
+});
+
+describe('U14 TimelapseScreen 상태 (실제 QueryClient, 주입한 fetchPage와 지도)', () => {
+  const queryKey = ['timelapse', 'frames', 'w1', 'pages'];
+  const map = [city(1, [2]), city(2, [1])];
+  const ready: TimelapseMap = { data: { cities: map }, isError: false, error: null, refetch: () => undefined };
+  const pending: TimelapseMap = { data: undefined, isError: false, error: null, refetch: () => undefined };
+  const wei = { id: 1, name: '위', color: '#000080' };
+  const three = [saved(0, [1, null], [wei]), saved(1, [1, 1], [wei]), saved(2, [1, null], [wei])];
+  const notFound = TRPCClientError.from({
+    error: { message: 'NOT_FOUND', code: -32004, data: { code: 'NOT_FOUND', httpStatus: 404 } },
+  });
+
+  function show(fetchPage: FetchTimelapsePage<Saved>, mapState: TimelapseMap = ready) {
+    const client = new QueryClient();
+    const view = render(
+      <QueryClientProvider client={client}>
+        <TimelapseScreen worldId="w1" fetchPage={fetchPage} queryKey={queryKey} map={mapState} retry={false} />
+      </QueryClientProvider>,
+    );
+    return { client, view };
+  }
+  const dateLine = () => screen.getByTestId('timelapse-date').textContent;
+
+  it(
+    '첫 페이지 대기와 지도 대기는 role="status"다',
+    async () => {
+      const first = show(() => new Promise<ServerPage>(() => undefined));
+      expect(screen.getByRole('status').textContent).toBe('불러오는 중');
+      first.view.unmount();
+
+      const { client } = show(() => Promise.resolve(savedPageOf(three)), pending);
+      await waitFor(() => expect(client.getQueryData(queryKey)).toBeDefined(), wait);
+      expect(screen.getByRole('status').textContent).toBe('불러오는 중');
+      expect(document.querySelector('svg')).toBeNull();
+    },
+    SLOW,
+  );
+
+  it(
+    '첫 페이지 NOT_FOUND는 월드를 찾을 수 없습니다이고 다시 시도가 없다',
+    async () => {
+      show(() => Promise.reject(notFound));
+      expect(await screen.findByText('월드를 찾을 수 없습니다', undefined, wait)).toBeTruthy();
+      expect(screen.queryByRole('button', { name: '다시 시도' })).toBeNull();
+      expect(screen.queryByRole('alert')).toBeNull();
+    },
+    SLOW,
+  );
+
+  it(
+    '그 밖의 첫 페이지 오류는 다시 시도이고 누르면 같은 입력으로 다시 받아 첫 달을 그린다',
+    async () => {
+      const calls: TimelapseInput[] = [];
+      let fail = true;
+      show((input) => {
+        calls.push(input);
+        if (fail) return Promise.reject(new Error('연결 끊김'));
+        return Promise.resolve(savedPageOf(three, cursorOf(input)));
+      });
+      const alert = await screen.findByRole('alert', undefined, wait);
+      expect(alert.textContent).toContain('불러오지 못했습니다');
+      fail = false;
+      fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+      expect(await screen.findByRole('img', undefined, wait)).toBeTruthy();
+      expect(dateLine()).toBe('190년 1월 (1/3)');
+      expect(calls).toEqual([{ worldId: 'w1' }, { worldId: 'w1' }]);
+    },
+    SLOW,
+  );
+
+  it(
+    '빈 응답은 빈 상태 문구다',
+    async () => {
+      show(() => Promise.resolve(savedPageOf([])));
+      const empty = await screen.findByText('영토 기록이 아직 없습니다. 월간 정산 뒤에 쌓입니다', undefined, wait);
+      expect(empty.closest('[data-state="empty"]')).toBeTruthy();
+      expect(document.querySelector('svg')).toBeNull();
+    },
+    SLOW,
+  );
+
+  it(
+    '35개 두 페이지는 첫 페이지와 cursor 300000으로 정확히 두 번 받는다',
+    async () => {
+      const stored = Array.from({ length: 35 }, (_, i) => saved(i, [1, null], [wei]));
+      const calls: TimelapseInput[] = [];
+      show((input) => {
+        calls.push(input);
+        return Promise.resolve(savedPageOf(stored, cursorOf(input)));
+      });
+      expect(await screen.findByText('35개월 불러옴', undefined, wait)).toBeTruthy();
+      await flush();
+      expect(calls).toEqual([{ worldId: 'w1' }, { worldId: 'w1', cursor: '300000' }]);
+      expect(dateLine()).toBe('190년 1월 (1/35)');
+    },
+    SLOW,
+  );
+
+  it(
+    '둘째 페이지 오류는 받은 30개월을 그대로 두고 다시 시도 뒤 35개월이 된다',
+    async () => {
+      const stored = Array.from({ length: 35 }, (_, i) => saved(i, [1, null], [wei]));
+      let fail = true;
+      show((input) => {
+        if ('cursor' in input && fail) return Promise.reject(new Error('연결 끊김'));
+        return Promise.resolve(savedPageOf(stored, cursorOf(input)));
+      });
+      const nextError = () => screen.queryByText('다음 기록을 불러오지 못했습니다.');
+      await waitFor(() => expect(nextError()).toBeTruthy(), wait);
+      expect(screen.getByText('30개월 불러옴')).toBeTruthy();
+      expect(screen.getByRole('img')).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: '다음' }));
+      expect(dateLine()).toBe('190년 2월 (2/30)');
+      fail = false;
+      fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+      expect(await screen.findByText('35개월 불러옴', undefined, wait)).toBeTruthy();
+      await waitFor(() => expect(nextError()).toBeNull(), wait);
+    },
+    SLOW,
+  );
+
+  it(
+    '지도 조회 오류는 QueryError이고 좌표 없이 프레임만 그리지 않는다',
+    async () => {
+      const refetch = vi.fn();
+      const { client } = show(() => Promise.resolve(savedPageOf(three)), {
+        data: undefined,
+        isError: true,
+        error: new Error('연결 끊김'),
+        refetch,
+      });
+      await waitFor(() => expect(client.getQueryData(queryKey)).toBeDefined(), wait);
+      expect((await screen.findByRole('alert', undefined, wait)).textContent).toContain('불러오지 못했습니다');
+      expect(document.querySelector('svg')).toBeNull();
+      expect(screen.queryByTestId('timelapse-date')).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+      expect(refetch).toHaveBeenCalledTimes(1);
+    },
+    SLOW,
+  );
+
+  it(
+    '프레임 nations에 없고 currentNations에만 있는 국가는 그 프레임을 기록 없음으로 막고 이름을 어디에도 쓰지 않는다',
+    async () => {
+      const frames = [saved(0, [1, 2], [wei]), saved(1, [1, 1], [wei])];
+      const current = [wei, { id: 2, name: '지금만있는나라', color: '#00ff00' }];
+      show((input) => Promise.resolve(savedPageOf(frames, cursorOf(input), current)));
+      expect(await screen.findByText('이 시점의 국가 기록이 없습니다.', undefined, wait)).toBeTruthy();
+      expect(dateLine()).toBe('190년 1월 (1/2) 국가 기록 없음');
+      expect(document.querySelector('svg')).toBeNull();
+      expect(document.body.textContent).not.toContain('지금만있는나라');
+
+      fireEvent.click(screen.getByRole('button', { name: '다음' }));
+      expect(screen.getByRole('img')).toBeTruthy();
+      expect(document.body.textContent).not.toContain('지금만있는나라');
+      expect(document.body.innerHTML).not.toContain('0, 255, 0');
+    },
+    SLOW,
+  );
+
+  it(
+    '국가 1의 지금 값과 저장값이 다르면 도시 title·범례·점 채움은 저장값이다',
+    async () => {
+      const frames = [saved(0, [1, null], [{ id: 1, name: '옛위', color: '#112233' }])];
+      const current = [{ id: 1, name: '지금위', color: '#ff0000' }];
+      show((input) => Promise.resolve(savedPageOf(frames, cursorOf(input), current)));
+      await screen.findByRole('img', undefined, wait);
+      const first = document.querySelector('[data-city-key="1"]')!;
+      expect(first.getAttribute('data-nation-id')).toBe('1');
+      expect(first.querySelector('title')?.textContent).toBe('도시1, 옛위');
+      expect((first.querySelector('circle') as SVGCircleElement).style.fill).toBe('rgb(17, 34, 51)');
+      expect(screen.getByLabelText('이 달의 국가별 도시 수').textContent).toContain('옛위 1');
+      expect(document.body.textContent).not.toContain('지금위');
+      expect(document.body.innerHTML).not.toContain('255, 0, 0');
+    },
+    SLOW,
+  );
+
+  it(
+    '둘째 페이지를 받는 중에 언마운트하면 그 요청의 signal이 끊긴다',
+    async () => {
+      const stored = Array.from({ length: 35 }, (_, i) => saved(i, [1, null], [wei]));
+      const signals: AbortSignal[] = [];
+      const { view } = show((input, { signal }) => {
+        signals.push(signal);
+        if (!('cursor' in input)) return Promise.resolve(savedPageOf(stored));
+        return new Promise<ServerPage>((_, reject) => signal.addEventListener('abort', () => reject(signal.reason)));
+      });
+      await waitFor(() => expect(signals).toHaveLength(2), wait);
+      expect(screen.getByText('30개월 불러옴')).toBeTruthy();
+      view.unmount();
+      expect(signals[1]!.aborted).toBe(true);
+    },
+    SLOW,
+  );
 });

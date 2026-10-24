@@ -2,11 +2,12 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useId, useState } from 'react';
 import { LogoutButton } from '../auth/LogoutButton';
+import { PublicMapTabs } from '../publicMap/PublicMapTabs';
 import { useTRPC } from '../trpc';
 import { DisabledReason } from '../ui/DisabledReason';
 import { EmptyState, ErrorState, LoadingState } from '../ui/States';
 import { Tag } from '../ui/Tag';
-import { lobbyNoticesQuery, lobbyWorldsQuery, type LobbyNotice, type LobbyWorld } from './contract';
+import type { LobbyNotice, LobbyWorld } from './contract';
 import { lobbyAction, metaText, myGeneralText, shortDate, STATUS_LABEL } from './lobbyView';
 import styles from './LobbyPage.module.css';
 
@@ -14,8 +15,9 @@ import styles from './LobbyPage.module.css';
 export function LobbyPage() {
   const trpc = useTRPC();
   const me = useQuery({ ...trpc.auth.me.queryOptions(), staleTime: 0 });
-  const worlds = useQuery(lobbyWorldsQuery());
-  const notices = useQuery(lobbyNoticesQuery());
+  // M2 화면은 includeEnded를 보내지 않는다. 끝난 월드는 서버 기본값대로 빠진다.
+  const worlds = useQuery({ ...trpc.lobby.worlds.queryOptions(), staleTime: 0 });
+  const notices = useQuery(trpc.lobby.notices.queryOptions());
   const loggedIn = Boolean(me.data?.user);
 
   let body;
@@ -52,8 +54,8 @@ export function LobbyPage() {
       ) : notices.data && notices.data.length > 0 ? (
         <NoticeBoard notices={notices.data} />
       ) : null}
-      {/* 지연 공개 지도 자리 (D-026). 지도 부품은 T2-25가 이 자리에 넣는다. */}
-      <div className={styles.mapSlot} data-slot="public-map" />
+      {/* 지연 공개 지도 (T2-25, D-026). 지도 탭은 월드 카드와 따로 움직인다. */}
+      <PublicMapTabs />
       <section aria-labelledby="lobby-worlds" className={styles.worlds}>
         <h2 id="lobby-worlds" className={styles.heading}>
           월드
