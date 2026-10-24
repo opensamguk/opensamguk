@@ -323,13 +323,13 @@ test('재접속: 처리 중에 새로 고치면 다시 처리 중이고 결과 �
   await expect(notice(page)).toHaveCount(0);
 });
 
-test('탭을 닫은 사이 끝난 접수: 다시 들어오면 결과 안내가 한 번 보인다', async ({ browser }) => {
+test('탭을 닫은 사이 끝난 접수: 다시 들어오면 결과 안내가 한 번 보인다', async () => {
   const { page } = member;
   await insertOffer();
   await page.goto(`/w/${world}`);
   await offerBox(page).getByRole('button', { name: '수락' }).click();
   await expect(offerBox(page).getByRole('status')).toHaveText('처리 중');
-  const cookies = await page.context().cookies();
+  const context = page.context();
   await page.close();
   await withEngine(() =>
     expect
@@ -346,8 +346,6 @@ test('탭을 닫은 사이 끝난 접수: 다시 들어오면 결과 안내가 �
       .toBe(0),
   );
 
-  const context = await browser.newContext();
-  await context.addCookies(cookies);
   const again = await context.newPage();
   await stubPortraits(again);
   await again.goto(`/w/${world}`);
