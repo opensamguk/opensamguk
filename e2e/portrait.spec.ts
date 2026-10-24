@@ -5,7 +5,7 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 // 화면 하나에 base URL 하나가 박히므로 값을 달리한 Vite 서버 두 개를 직접 띄운다. 부품 모음(/dev/ui)은 로그인이 필요 없다.
 // 이미지 요청은 page.route로 가로채 시험용 그림을 돌려준다. 실제 초상 파일과 외부 네트워크에 기대지 않는다.
 
-const DEFAULT_BASE = 'https://cdn.jsdelivr.net/gh/peppone-choi/opensamguk-images@48163bd';
+const DEFAULT_BASE = 'https://cdn.jsdelivr.net/gh/opensamguk/opensamguk-images@48163bd1ce8d54c54c94fb5484b05f9db9e50c62';
 const ALT_BASE = 'http://images-b.opensamguk.test/set-b';
 
 interface Server {
