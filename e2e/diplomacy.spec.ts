@@ -45,6 +45,7 @@ const setGold = (world: string, nationId: number, gold: number) =>
 const card = (page: Page) => page.getByTestId('treaty-card').first();
 
 // API로 제안하고 엔진 처리 결과까지 기다린다. 화면 시험의 준비 단계다.
+// treaty.propose 입력은 worldId·requestId·toNationId·clauses뿐이다. 제안 기한은 엔진이 정하고 다른 키는 서버가 거부한다.
 async function proposeByApi(page: Page, world: string, toNationId: number, clauses: unknown[]) {
   const requestId = crypto.randomUUID();
   const outcome = await mutate<{ status: string }>(page, 'treaty.propose', {
@@ -52,7 +53,6 @@ async function proposeByApi(page: Page, world: string, toNationId: number, claus
     requestId,
     toNationId,
     clauses,
-    expiresInMonths: 6,
   });
   if (outcome.status === 'pending')
     await expect
@@ -157,7 +157,8 @@ test.describe('외교실', () => {
     const b = await officer(browser, world, y!.id, 12);
     await setGold(world, x!.id, 100_000);
     await setGold(world, y!.id, 100_000);
-    await proposeByApi(a.page, world, y!.id, [{ kind: 'trade', months: 12 }]);
+    // 엔진은 첫 세 조항(종전·불가침·기록)만 잇는다. 교역 조항은 CLAUSE_NOT_CONNECTED로 거절되어 받은 제안이 생기지 않는다.
+    await proposeByApi(a.page, world, y!.id, [{ kind: 'nonAggression', months: 12 }]);
 
     // 첫 응답만 서버에 닿게 한 뒤 브라우저에는 끊긴 것으로 보인다.
     const sent: string[] = [];
@@ -186,7 +187,9 @@ test.describe('외교실', () => {
     await setGold(world, x!.id, 100_000);
     await a.page.goto(`/w/${world}/diplomacy?tab=write`);
     await a.page.getByLabel('상대').selectOption(String(y!.id));
-    await a.page.getByLabel('교역 허용').check();
+    // 교역 허용은 서버가 아직 잇지 않은 조항이라 화면에서 고를 수 없다. 화면이 보낼 수 있는 불가침으로 제안한다.
+    await a.page.getByLabel('불가침').check();
+    await a.page.getByLabel('기간(개월)').fill('12');
     // 보내기 요청을 붙잡아 둔 채 새로 고친다. 저장된 requestId로 결과를 묻는다.
     await a.page.route('**/trpc/treaty.propose**', async (route) => {
       await route.fetch();
