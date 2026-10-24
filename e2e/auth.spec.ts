@@ -128,34 +128,21 @@ test('다른 탭에서 로그아웃하면 이 탭의 다음 이동도 로그인�
 
 test('세션이 서버에서 없어지면 다음 이동은 로그인으로 간다', async ({ page }) => {
   await createAccount(page);
-  await page.goto('/w/1');
-  await expect(page.getByRole('heading', { level: 1, name: '메인' })).toBeVisible();
-  let releaseRequests!: () => void;
-  const released = new Promise<void>((resolve) => {
-    releaseRequests = resolve;
+  // 초기 인사 조회가 인증된 채 끝나야 쿠키 삭제 뒤의 이동 가드만 검증한다.
+  const recentReady = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return (
+      response.request().method() === 'GET' &&
+      url.pathname.startsWith('/trpc/') &&
+      url.pathname.slice('/trpc/'.length).split(',').includes('personnel.recent')
+    );
   });
-  const pending: Promise<void>[] = [];
-  const holdRequests: Parameters<Page['route']>[1] = (route) => {
-    const continued = released.then(() => route.continue());
-    pending.push(continued);
-    return continued;
-  };
-  // 쿠키 삭제 뒤의 자동 조회는 메뉴를 누른 다음 실제 서버로 보낸다.
-  await page.route('**/trpc/**', holdRequests);
-  const failures: unknown[] = [];
-  try {
-    await page.context().clearCookies();
-    await page.getByRole('link', { name: '예턴' }).click();
-  } catch (error) {
-    failures.push(error);
-  } finally {
-    releaseRequests();
-    const removed = await Promise.allSettled([page.unroute('**/trpc/**', holdRequests)]);
-    const continued = await Promise.allSettled(pending);
-    for (const result of [...removed, ...continued]) if (result.status === 'rejected') failures.push(result.reason);
-  }
-  if (failures.length === 1) throw failures[0];
-  if (failures.length > 1) throw new AggregateError(failures, '세션 이동과 요청 정리에 실패했습니다.');
+  const [, recent] = await Promise.all([page.goto('/w/1'), recentReady]);
+  const finishedError = await recent.finished();
+  if (finishedError) throw finishedError;
+  await expect(page.getByRole('heading', { level: 1, name: '메인' })).toBeVisible();
+  await page.context().clearCookies();
+  await page.getByRole('link', { name: '예턴' }).click();
   await expect(page).toHaveURL(/\/login\?next=/);
 });
 
