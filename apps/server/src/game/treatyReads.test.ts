@@ -63,6 +63,8 @@ function world(patch: Partial<World> = {}): World {
     actionSequence: 100,
     policyFromSequence: null,
     treatyFormat: 1,
+    replayFormat: 1,
+    ruleFeatures: [],
     personnelFormat: null,
     replayOrigin: json({
       version: 6,
@@ -86,6 +88,7 @@ function general(patch: Partial<General> = {}): General {
     defaultPolicy: null,
     lastActiveTick: null,
     lastActiveAt: null,
+    residenceTick: null,
     noticeSeen: null,
     ...patch,
   };
@@ -138,6 +141,7 @@ function pending(patch: Partial<Event> = {}): Event {
     status: 'PENDING',
     sequence: null,
     stepTick: null,
+    tick: null,
     result: null,
     createdAt: new Date(0),
     ...patch,

@@ -80,6 +80,8 @@ function world(patch: Partial<World> = {}): World {
     actionSequence: 30,
     policyFromSequence: null,
     treatyFormat: null,
+    replayFormat: 1,
+    ruleFeatures: [],
     personnelFormat: null,
     replayOrigin: null,
     commandMeta: null,

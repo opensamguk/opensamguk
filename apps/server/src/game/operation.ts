@@ -27,6 +27,8 @@ type ReadWorld = Parameters<Parameters<typeof readWorld>[2]>[1];
 type OperationWorld = ReadWorld & {
   policyFromSequence: number | null;
   actionSequence: number;
+  replayFormat: number;
+  ruleFeatures: string[];
   unitSet: Prisma.JsonValue;
   tick: number;
 };
@@ -118,7 +120,7 @@ async function readOperation<T>(
   return readWorld(ctx.db, worldId, async (tx, world) => {
     const extra = await tx.world.findUniqueOrThrow({
       where: { id: worldId },
-      select: { policyFromSequence: true, actionSequence: true, unitSet: true },
+      select: { policyFromSequence: true, actionSequence: true, unitSet: true, replayFormat: true, ruleFeatures: true },
     });
     const actor = await requireGeneral(tx, worldId, ctx.user.id);
     return read(tx, { ...world, ...extra, tick: clock(world, ctx.now) }, actor);
@@ -137,7 +139,10 @@ function forecastInput(
   turns: Awaited<ReturnType<typeof readSlots>>,
   view: WorldView,
 ) {
-  const policyMode = isPolicyMode({ fromSequence: world.policyFromSequence, actionSequence: world.actionSequence });
+  const policyMode =
+    world.replayFormat === 3
+      ? world.ruleFeatures.includes('policy')
+      : isPolicyMode({ fromSequence: world.policyFromSequence, actionSequence: world.actionSequence });
   const policy = policyMode && general.userId !== null ? general.defaultPolicy : 'none';
   if (!isPolicyKey(policy)) throw new Error('저장된 기본 방침이 올바르지 않습니다.');
   return {

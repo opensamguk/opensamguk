@@ -113,7 +113,7 @@ describe('T2-07 / AC-M2-06 연결하지 않는 요청 입구 보조 단위', () 
       submitTreatyRequest(db, { ...identity, requestId: 'bad', kind: 'treaty.propose', payload: {} }),
     ).rejects.toHaveProperty('code', 'BAD_REQUEST');
     await expect(
-      submitTreatyRequest(db, { ...identity, kind: 'treaty.break' as TreatyRequestKind, payload: {} }),
+      submitTreatyRequest(db, { ...identity, kind: 'treaty.future' as TreatyRequestKind, payload: {} }),
     ).rejects.toHaveProperty('code', 'BAD_REQUEST');
     await expect(readTreatyRequest(db, { ...identity, requestId: 'bad' })).rejects.toHaveProperty(
       'code',

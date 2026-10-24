@@ -9,11 +9,13 @@ export type TreatyClause =
 
 export type FirstTreatyClause = Extract<TreatyClause, { kind: 'peace' | 'nonAggression' | 'note' }>;
 
+export type ConnectedTreatyClause = FirstTreatyClause | Extract<TreatyClause, { kind: 'trade' }>;
+
 export interface TreatyState {
   id: number;
   fromNationId: number;
   toNationId: number;
-  clauses: FirstTreatyClause[];
+  clauses: ConnectedTreatyClause[];
   status: 'PROPOSED' | 'ACTIVE';
   proposedTick: number;
   respondByTick: number;
@@ -25,7 +27,7 @@ export interface ClosedTreatyRow {
   id: number;
   fromNationId: number;
   toNationId: number;
-  clauses: FirstTreatyClause[];
+  clauses: ConnectedTreatyClause[];
   status: 'REJECTED' | 'EXPIRED' | 'ENDED';
   proposedTick: number;
   respondByTick: number;
@@ -36,9 +38,33 @@ export interface ClosedTreatyRow {
   closedSequence: number;
 }
 
+export interface BrokenTreatyRow extends Omit<ClosedTreatyRow, 'status' | 'startTick' | 'costFrom' | 'costTo'> {
+  status: 'BROKEN';
+  startTick: number;
+  costFrom: number;
+  costTo: number;
+}
+
+export interface NationTrustState {
+  nationId: number;
+  brokenTreaties: number;
+  lastBrokenTick: number;
+}
+
+export type TreatyBreakRejectCode =
+  'WORLD_CLOSED' | 'ACTOR_INACTIVE' | 'NO_GENERAL' | 'NO_PERMISSION' | 'BAD_TARGET' | 'NOT_PARTY' | 'TREATY_NOT_ACTIVE';
+
+export type TreatyBroken = {
+  outcome: 'BROKEN';
+  tick: number;
+  treatyId: string;
+  brokenByNationId: number;
+};
+
 export type TreatyInput =
   | { kind: 'treaty.propose'; payload: { toNationId: number; clauses: TreatyClause[] } }
-  | { kind: 'treaty.respond'; payload: { treatyId: string; accept: boolean } };
+  | { kind: 'treaty.respond'; payload: { treatyId: string; accept: boolean } }
+  | { kind: 'treaty.break'; payload: { treatyId: string } };
 
 export type TreatyApplied =
   | { outcome: 'PROPOSED'; tick: number; treatyId: string; respondByTick: number }
@@ -50,7 +76,8 @@ export type TreatyApplied =
       cost: { from: number; to: number };
       endTick: number | null;
     }
-  | { outcome: 'DECLINED'; by: 'HUMAN' | 'NPC'; tick: number; treatyId: string };
+  | { outcome: 'DECLINED'; by: 'HUMAN' | 'NPC'; tick: number; treatyId: string }
+  | TreatyBroken;
 
 export type TreatyRejectCode =
   | 'WORLD_CLOSED'
@@ -61,6 +88,7 @@ export type TreatyRejectCode =
   | 'NO_PERMISSION'
   | 'BAD_TARGET'
   | 'NOT_PARTY'
+  | 'TREATY_NOT_ACTIVE'
   | 'TREATY_NOT_PROPOSED'
   | 'EXPIRED'
   | 'TREATY_RELATION'
@@ -81,6 +109,8 @@ export type TreatyRecord = TreatyInput & {
 // 형식 6 외피를 검사한 호출자가 선택된 정적 조약 capability를 넘긴다.
 export interface TreatyRecordContext {
   treaty: { version: number } | null;
+  treatyBreak?: { version: number } | null;
+  treatyTrade?: { version: number } | null;
   monthlyTick: number;
   endTick?: number;
 }

@@ -6,6 +6,7 @@ import {
   quoteTreatyProposal,
   toGameDate,
   TREATY_INPUTS,
+  validateNationTrustState,
   type TreatyQuoteCode,
   type TreatyRelation,
   type TreatyResponseGuideCode,
@@ -15,11 +16,21 @@ import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { recordsInput } from '../queries';
 import { requireGeneral, requireWorld } from './queries';
-import { checkTreatyRow, requireTreatyWorld, toTreatyDetail, type TreatyDetail } from './treatyQueries';
+import {
+  checkTreatyRow,
+  enabledTreatyKinds,
+  requireTreatyBreakWorld,
+  requireTreatyWorld,
+  toTreatyDetail,
+  treatyBreakEnabled,
+  treatyTradeEnabled,
+  type TreatyDetail,
+} from './treatyQueries';
 import { normalizeTreatyRequestPayload, type TreatyRequestKind } from './treatyRequests';
 
 type GameDate = { year: number; month: number };
 type NationRef = { id: number; name: string; color: string };
+export type TrustRow = { nation: NationRef; brokenTreaties: number; lastBrokenAt: GameDate | null };
 export type TreatyDenyCode = 'NO_PERMISSION' | 'WORLD_CLOSED' | 'IN_PROGRESS' | 'BAD_TARGET' | TreatyResponseGuideCode;
 export type TreatyAllowed = { ok: true } | { ok: false; code: TreatyDenyCode; reason: string };
 export type TreatyListItem = TreatyDetail & {
@@ -32,6 +43,8 @@ export type TreatyListItem = TreatyDetail & {
   estimate: { mine: number; theirs: number } | null;
   canAccept: TreatyAllowed | null;
   canReject: TreatyAllowed | null;
+  canBreak?: TreatyAllowed;
+  brokenBy?: NationRef;
 };
 type TreatyTarget = { nation: NationRef; relation: TreatyRelation; relationEndAt: GameDate | null };
 type PendingAction = {
@@ -47,10 +60,11 @@ type RecentAction = {
   kind: TreatyRequestKind;
   treatyId: string | null;
   result: 'APPLIED' | 'REJECTED';
-  outcome: 'PROPOSED' | 'ACCEPTED' | 'DECLINED' | null;
+  outcome: 'PROPOSED' | 'ACCEPTED' | 'DECLINED' | 'BROKEN' | null;
   reason: string | null;
 };
 export type TreatyListPage = {
+  breakEnabled?: true;
   canPropose: TreatyAllowed;
   targets: TreatyTarget[];
   items: TreatyListItem[];
@@ -63,7 +77,7 @@ export type TreatyQuote = {
   problem: { code: TreatyQuoteCode; reason: string } | null;
 };
 
-const kindSchema = z.enum(['treaty.propose', 'treaty.respond']);
+const kindSchema = z.enum(Object.keys(TREATY_INPUTS) as [TreatyRequestKind, ...TreatyRequestKind[]]);
 const requestSchema = z.uuid();
 function invalid(): never {
   throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: '조약 조회 결과를 확인하지 못했습니다.' });
@@ -86,26 +100,31 @@ function allowed(code: TreatyDenyCode, reason: string): TreatyAllowed {
 function publicNation(nation: NationRef): NationRef {
   return { id: nation.id, name: nation.name, color: nation.color };
 }
-function quote(input: Parameters<typeof quoteTreatyProposal>[0]) {
+function quote(input: Parameters<typeof quoteTreatyProposal>[0], tradeEnabled = false) {
   try {
-    return quoteTreatyProposal(input);
+    return quoteTreatyProposal(input, { tradeEnabled });
   } catch {
     invalid();
   }
 }
-function responseGuide(input: Parameters<typeof guideTreatyResponse>[0]) {
+function responseGuide(input: Parameters<typeof guideTreatyResponse>[0], tradeEnabled = false) {
   try {
-    return guideTreatyResponse(input);
+    return guideTreatyResponse(input, { tradeEnabled });
   } catch {
     invalid();
   }
 }
-async function recentActions(tx: Prisma.TransactionClient, worldId: string, userId: string): Promise<RecentAction[]> {
+async function recentActions(
+  tx: Prisma.TransactionClient,
+  world: Awaited<ReturnType<typeof requireWorld>>,
+  userId: string,
+): Promise<RecentAction[]> {
+  const worldId = world.id;
   const events = await tx.inputEvent.findMany({
     where: {
       worldId,
       userId,
-      kind: { in: ['treaty.propose', 'treaty.respond'] },
+      kind: { in: enabledTreatyKinds(world) },
       status: { in: ['APPLIED', 'REJECTED'] },
     },
     orderBy: { sequence: 'desc' },
@@ -117,14 +136,17 @@ async function recentActions(tx: Prisma.TransactionClient, worldId: string, user
     const requestId = requestIdOf(kind, event.idempotencyKey);
     let record: ReturnType<typeof decodeTreatyRecord>;
     try {
-      record = decodeTreatyRecord({
-        sequence: event.sequence,
-        generalId: event.generalId,
-        kind,
-        status: event.status,
-        payload: event.payload,
-        result: event.result,
-      });
+      record = decodeTreatyRecord(
+        {
+          sequence: event.sequence,
+          generalId: event.generalId,
+          kind,
+          status: event.status,
+          payload: event.payload,
+          result: event.result,
+        },
+        { tradeEnabled: treatyTradeEnabled(world) },
+      );
     } catch {
       invalid();
     }
@@ -154,7 +176,8 @@ export async function listTreaties(
   const world = await requireWorld(tx, input.worldId);
   requireTreatyWorld(world);
   const actor = await requireGeneral(tx, input.worldId, input.userId);
-  const myRecent = await recentActions(tx, input.worldId, input.userId);
+  const myRecent = await recentActions(tx, world, input.userId);
+  const breakEnabled = treatyBreakEnabled(world);
   const noPermission = allowed('NO_PERMISSION', '조약을 처리할 권한이 없습니다.');
   const worldClosed = allowed('WORLD_CLOSED', '실행 중인 월드가 아닙니다.');
   const permission = actor.nationId !== null && canExecuteNationCommand(actor.officerLevel, 'nation_pact');
@@ -164,7 +187,16 @@ export async function listTreaties(
       ? worldClosed
       : { ok: true };
   const nationId = actor.nationId;
-  if (nationId === null) return { canPropose, targets: [], items: [], nextCursor: null, pending: [], myRecent };
+  if (nationId === null)
+    return {
+      ...(breakEnabled ? { breakEnabled: true } : {}),
+      canPropose,
+      targets: [],
+      items: [],
+      nextCursor: null,
+      pending: [],
+      myRecent,
+    };
 
   const nations = await tx.nation.findMany({
     where: { worldId: input.worldId },
@@ -190,6 +222,57 @@ export async function listTreaties(
   });
   const page = [...outgoing, ...incoming].sort((a, b) => b.id - a.id).slice(0, 31);
   const checked = page.slice(0, 30).map((row) => checkTreatyRow(world, row));
+  const brokenRows = checked.filter((row) => row.status === 'BROKEN');
+  const brokenBy = new Map<number, NationRef>();
+  if (brokenRows.length) {
+    const events = await tx.inputEvent.findMany({
+      where: { worldId: input.worldId, sequence: { in: brokenRows.map((row) => row.closedSequence) } },
+    });
+    const authors = new Map<number, number>();
+    for (const row of brokenRows) {
+      const matching = events.filter((event) => event.sequence === row.closedSequence);
+      if (matching.length !== 1) invalid();
+      const event = matching[0]!;
+      let record: ReturnType<typeof decodeTreatyRecord>;
+      try {
+        record = decodeTreatyRecord(
+          {
+            sequence: event.sequence,
+            generalId: event.generalId,
+            kind: event.kind,
+            status: event.status,
+            payload: event.payload,
+            result: event.result,
+          },
+          { tradeEnabled: treatyTradeEnabled(world) },
+        );
+      } catch {
+        invalid();
+      }
+      if (
+        record.kind !== 'treaty.break' ||
+        record.status !== 'APPLIED' ||
+        record.result.outcome !== 'BROKEN' ||
+        record.result.treatyId !== String(row.id) ||
+        ![row.fromNationId, row.toNationId].includes(record.result.brokenByNationId)
+      )
+        invalid();
+      authors.set(row.id, record.result.brokenByNationId);
+    }
+    const missing = [...new Set(authors.values())].filter((id) => !refs.has(id));
+    const removed = missing.length
+      ? await tx.removedNation.findMany({
+          where: { worldId: input.worldId, nationId: { in: missing } },
+          select: { nationId: true, name: true, color: true },
+        })
+      : [];
+    for (const [id, author] of authors) {
+      const past = removed.find((row) => row.nationId === author);
+      const nation = refs.get(author) ?? (past ? { id: past.nationId, name: past.name, color: past.color } : null);
+      if (!nation) invalid();
+      brokenBy.set(id, nation);
+    }
+  }
   const proposedNationIds = [
     ...new Set(checked.filter((row) => row.status === 'PROPOSED').flatMap((row) => [row.fromNationId, row.toNationId])),
   ];
@@ -211,7 +294,7 @@ export async function listTreaties(
     where: {
       worldId: input.worldId,
       status: 'PENDING',
-      kind: { in: ['treaty.propose', 'treaty.respond'] },
+      kind: { in: enabledTreatyKinds(world) },
       generalId: { in: generals.map((g) => g.id) },
     },
     orderBy: { id: 'asc' },
@@ -241,11 +324,12 @@ export async function listTreaties(
       kind,
       treatyId: 'treatyId' in payload ? payload.treatyId : null,
       toNation: 'toNationId' in payload ? (refs.get(payload.toNationId) ?? null) : null,
-      accept: 'accept' in payload ? payload.accept : null,
+      accept: 'accept' in payload && typeof payload.accept === 'boolean' ? payload.accept : null,
       requestedBy: { name: names.get(event.generalId)! },
     };
   });
   const responding = new Set(pending.filter((p) => p.kind === 'treaty.respond').map((p) => p.treatyId));
+  const breaking = new Set(pending.filter((p) => p.kind === 'treaty.break').map((p) => p.treatyId));
   let ownGold: number | undefined;
   const items: TreatyListItem[] = [];
   for (const row of checked) {
@@ -256,13 +340,16 @@ export async function listTreaties(
     const current = relations.get(row.fromNationId === nationId ? row.toNationId : row.fromNationId)?.state ?? 'NONE';
     let estimate: TreatyListItem['estimate'] = null;
     if (row.status === 'PROPOSED' && from !== null && to !== null) {
-      const result = quote({
-        fromNationId: row.fromNationId,
-        toNationId: row.toNationId,
-        clauses: row.clauses,
-        fromCityCount: cityCounts.get(row.fromNationId) ?? 0,
-        target: { relation: current, cityCount: cityCounts.get(row.toNationId) ?? 0 },
-      });
+      const result = quote(
+        {
+          fromNationId: row.fromNationId,
+          toNationId: row.toNationId,
+          clauses: row.clauses,
+          fromCityCount: cityCounts.get(row.fromNationId) ?? 0,
+          target: { relation: current, cityCount: cityCounts.get(row.toNationId) ?? 0 },
+        },
+        treatyTradeEnabled(world),
+      );
       if (result.cost === null) invalid();
       estimate = detail.incoming
         ? { mine: result.cost.to, theirs: result.cost.from }
@@ -303,13 +390,16 @@ export async function listTreaties(
           startTick: row.startTick,
           endTick: row.endTick,
         };
-        const guidance = responseGuide({
-          treaty,
-          tick: world.clockTick,
-          relation: current,
-          responderCityCount: cityCounts.get(row.toNationId) ?? 0,
-          responderGold: ownGold,
-        });
+        const guidance = responseGuide(
+          {
+            treaty,
+            tick: world.clockTick,
+            relation: current,
+            responderCityCount: cityCounts.get(row.toNationId) ?? 0,
+            responderGold: ownGold,
+          },
+          treatyTradeEnabled(world),
+        );
         canAccept = guidance.accept === null ? { ok: true } : allowed(guidance.accept.code, guidance.accept.message);
         canReject = guidance.reject === null ? { ok: true } : allowed(guidance.reject.code, guidance.reject.message);
       }
@@ -326,6 +416,20 @@ export async function listTreaties(
       estimate,
       canAccept,
       canReject,
+      ...(breakEnabled && row.status === 'ACTIVE'
+        ? {
+            canBreak: !permission
+              ? noPermission
+              : world.status !== 'RUNNING'
+                ? worldClosed
+                : breaking.has(detail.id)
+                  ? allowed('IN_PROGRESS', '요청을 처리하는 중입니다.')
+                  : from === null || to === null
+                    ? allowed('BAD_TARGET', '조약 상대 국가가 없습니다.')
+                    : { ok: true as const },
+          }
+        : {}),
+      ...(row.status === 'BROKEN' ? { brokenBy: brokenBy.get(row.id)! } : {}),
     });
   }
   const targets = nations
@@ -341,6 +445,7 @@ export async function listTreaties(
       };
     });
   return {
+    ...(breakEnabled ? { breakEnabled: true } : {}),
     canPropose,
     targets,
     items,
@@ -348,6 +453,50 @@ export async function listTreaties(
     pending,
     myRecent,
   };
+}
+
+export async function listTrust(
+  tx: Prisma.TransactionClient,
+  input: { worldId: string; userId: string },
+): Promise<{ items: TrustRow[] }> {
+  const world = await requireWorld(tx, input.worldId);
+  requireTreatyBreakWorld(world);
+  await requireGeneral(tx, input.worldId, input.userId);
+  const [nations, removed, rows] = await Promise.all([
+    tx.nation.findMany({ where: { worldId: input.worldId }, select: { id: true, name: true, color: true } }),
+    tx.removedNation.findMany({
+      where: { worldId: input.worldId },
+      select: { nationId: true, name: true, color: true },
+    }),
+    tx.nationTrust.findMany({
+      where: { worldId: input.worldId },
+      orderBy: { nationId: 'asc' },
+      select: { nationId: true, brokenTreaties: true, lastBrokenTick: true },
+    }),
+  ]);
+  let trust: ReturnType<typeof validateNationTrustState>;
+  try {
+    trust = rows.length ? validateNationTrustState(rows) : [];
+  } catch {
+    invalid();
+  }
+  const current = new Map(nations.map((nation) => [nation.id, publicNation(nation)]));
+  for (const row of trust) {
+    if (current.has(row.nationId)) continue;
+    const past = removed.find((nation) => nation.nationId === row.nationId);
+    if (!past) invalid();
+    current.set(past.nationId, { id: past.nationId, name: past.name, color: past.color });
+  }
+  const items = [...current.values()].map((nation): TrustRow => {
+    const row = trust.find((entry) => entry.nationId === nation.id);
+    return {
+      nation,
+      brokenTreaties: row?.brokenTreaties ?? 0,
+      lastBrokenAt: row ? toGameDate(world.startYear, row.lastBrokenTick) : null,
+    };
+  });
+  items.sort((a, b) => b.brokenTreaties - a.brokenTreaties || a.nation.id - b.nation.id);
+  return { items };
 }
 
 // 세션의 userId로 권한부터 확인한다. 같은 RepeatableRead 안에서만 읽는다.
@@ -387,13 +536,16 @@ export async function quoteTreaty(
     const cityCount = await tx.city.count({ where: { worldId: input.worldId, nationId: payload.toNationId } });
     targetValue = { relation: relation?.state ?? 'NONE', cityCount };
   }
-  const result = quote({
-    fromNationId: actor.nationId,
-    toNationId: payload.toNationId,
-    clauses: payload.clauses,
-    fromCityCount,
-    target: targetValue,
-  });
+  const result = quote(
+    {
+      fromNationId: actor.nationId,
+      toNationId: payload.toNationId,
+      clauses: payload.clauses,
+      fromCityCount,
+      target: targetValue,
+    },
+    treatyTradeEnabled(world),
+  );
   return {
     cost: result.cost === null ? null : { mine: result.cost.from, theirs: result.cost.to },
     problem: result.problem === null ? null : { code: result.problem.code, reason: result.problem.message },

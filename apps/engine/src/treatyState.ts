@@ -3,13 +3,28 @@ import {
   TICKS_PER_MONTH,
   treatyClosures,
   validateTreatyState,
+  validateNationTrustState,
   type DeepReadonly,
+  type TreatyOptions,
   type WorldState,
 } from '@opensamguk/rules';
+
+export async function loadNationTrust(
+  tx: Prisma.TransactionClient,
+  worldId: string,
+): Promise<Pick<WorldState, 'nationTrust'>> {
+  const rows = await tx.nationTrust.findMany({
+    where: { worldId },
+    orderBy: { nationId: 'asc' },
+    select: { nationId: true, brokenTreaties: true, lastBrokenTick: true },
+  });
+  return rows.length ? { nationTrust: validateNationTrustState(rows) } : {};
+}
 
 export async function loadTreaties(
   tx: Prisma.TransactionClient,
   worldId: string,
+  options: TreatyOptions = {},
 ): Promise<Pick<WorldState, 'treaties'>> {
   const rows = await tx.treaty.findMany({
     where: { worldId, status: { in: ['PROPOSED', 'ACTIVE'] } },
@@ -21,17 +36,20 @@ export async function loadTreaties(
       throw new Error('아직 수락하지 않은 조약에 납부 기록이 있습니다.');
     if (row.status === 'ACTIVE' && ![row.costFrom, row.costTo].every(storedCost))
       throw new Error('수락한 조약의 납부 기록을 확인하세요.');
-    return validateTreatyState({
-      id: row.id,
-      fromNationId: row.fromNationId,
-      toNationId: row.toNationId,
-      clauses: row.clauses,
-      status: row.status,
-      proposedTick: row.proposedTick,
-      respondByTick: row.respondByTick,
-      startTick: row.startTick,
-      endTick: row.endTick,
-    });
+    return validateTreatyState(
+      {
+        id: row.id,
+        fromNationId: row.fromNationId,
+        toNationId: row.toNationId,
+        clauses: row.clauses,
+        status: row.status,
+        proposedTick: row.proposedTick,
+        respondByTick: row.respondByTick,
+        startTick: row.startTick,
+        endTick: row.endTick,
+      },
+      options,
+    );
   });
   return treaties.length ? { treaties } : {};
 }
