@@ -17,7 +17,7 @@ const { Client } = createRequire(dbRequire.resolve('@prisma/adapter-pg'))('pg') 
 };
 const migrations = new URL('../packages/db/prisma/migrations/', import.meta.url);
 const marker = '20261025000000_input_event_step_tick';
-const required20 = [
+const required21 = [
   '20261020000000_initial_world',
   '20261020010000_world_clock',
   '20261020020000_accounts',
@@ -37,6 +37,7 @@ const required20 = [
   '20261023072000_world_ext_slices',
   '20261023073000_treaties',
   '20261023074000_assignment_storage',
+  '20261024000000_replay_features',
   '20261024000000_world_personnel_format',
 ];
 
@@ -239,13 +240,13 @@ it('T2-05 N4 입력 tick migration은 기존 행·null·0을 보존하고 CHECK�
     expect(createdOid).not.toBeNull();
     await client.connect();
     const directories = (await readdir(migrations)).filter((directory) => /^\d{14}_/.test(directory)).sort();
-    expect(directories.slice(0, required20.length)).toEqual(required20);
-    expect(directories[required20.length]).toBe(marker);
+    expect(directories.slice(0, required21.length)).toEqual(required21);
+    expect(directories[required21.length]).toBe(marker);
     async function apply(directory: string) {
       await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
       applied.push(directory);
     }
-    for (const directory of required20) await apply(directory);
+    for (const directory of required21) await apply(directory);
     expect(await column(client)).toEqual([]);
     await seed(client);
     const old = await snapshot(client);
@@ -265,7 +266,7 @@ it('T2-05 N4 입력 tick migration은 기존 행·null·0을 보존하고 CHECK�
     expect(String(constraints[0]!.definition)).toContain('status = \'APPLIED\'::"InputEventStatus"');
     expect(String(constraints[0]!.definition)).toContain('"stepTick" >= 0');
     expect(await snapshot(client, oldColumns)).toEqual(old);
-    for (const directory of directories.slice(required20.length + 1)) await apply(directory);
+    for (const directory of directories.slice(required21.length + 1)) await apply(directory);
     expect(await snapshot(client, oldColumns)).toEqual(old);
     expect((await client.query('SELECT "stepTick" FROM "InputEvent" ORDER BY id')).rows).toEqual([
       { stepTick: null },
@@ -285,9 +286,9 @@ it('T2-05 N4 입력 tick migration은 기존 행·null·0을 보존하고 CHECK�
       JSON.stringify({
         name,
         applied,
-        requiredPrefix: required20.length,
+        requiredPrefix: required21.length,
         marker,
-        tailCount: directories.length - required20.length - 1,
+        tailCount: directories.length - required21.length - 1,
         preservedRows: old.length,
         zeroKinds: ['general.create', 'nationTurns.set'],
         rejectedWrites: 7,

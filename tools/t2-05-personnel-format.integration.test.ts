@@ -5,6 +5,7 @@ import { expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import {
   capsResourceHashInput,
+  checkReplayOrigin,
   parseCapsOrigin,
   selectSupportedCapabilities,
   selectWorldCapabilities,
@@ -34,7 +35,7 @@ const { Client } = createRequire(dbRequire.resolve('@prisma/adapter-pg'))('pg') 
 };
 const migrations = new URL('../packages/db/prisma/migrations/', import.meta.url);
 const marker = '20261024000000_world_personnel_format';
-const required19 = [
+const required20 = [
   '20261020000000_initial_world',
   '20261020010000_world_clock',
   '20261020020000_accounts',
@@ -54,6 +55,7 @@ const required19 = [
   '20261023072000_world_ext_slices',
   '20261023073000_treaties',
   '20261023074000_assignment_storage',
+  '20261024000000_replay_features',
 ];
 
 async function catalog(admin: PgClient): Promise<Catalog> {
@@ -164,13 +166,13 @@ it('PG-B8-1 인사 표지 migration은 구 SQL fixture를 보존하고 현재 fa
     expect(createdOid).not.toBeNull();
     await client.connect();
     const directories = (await readdir(migrations)).filter((directory) => /^\d{14}_/.test(directory)).sort();
-    expect(directories.slice(0, required19.length)).toEqual(required19);
-    expect(directories[required19.length]).toBe(marker);
+    expect(directories.slice(0, required20.length)).toEqual(required20);
+    expect(directories[required20.length]).toBe(marker);
     async function apply(directory: string) {
       await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
       applied.push(directory);
     }
-    for (const directory of directories.slice(0, required19.length)) await apply(directory);
+    for (const directory of directories.slice(0, required20.length)) await apply(directory);
     expect(await markerColumn(client)).toEqual([]);
 
     // 구 schema의 직접 SQL metadata fixture다. 옛 선택자나 게임 경로를 실행하지 않는다.
@@ -223,7 +225,7 @@ it('PG-B8-1 인사 표지 migration은 구 SQL fixture를 보존하고 현재 fa
       expect(atMarker[index]!.stateHash).toEqual(old[index]!.stateHash);
       expect(atMarker[index]!.resourceHash).toEqual(old[index]!.resourceHash);
     }
-    for (const directory of directories.slice(required19.length + 1)) await apply(directory);
+    for (const directory of directories.slice(required20.length + 1)) await apply(directory);
     const afterTails = await snapshots(client, ids);
     for (let index = 0; index < old.length; index++) {
       expect(afterTails[index]!.data.personnelFormat).toBeNull();
@@ -244,6 +246,8 @@ it('PG-B8-1 인사 표지 migration은 구 SQL fixture를 보존하고 현재 fa
     for (const id of ids) {
       const row = await db.world.findUniqueOrThrow({ where: { id } });
       expect(row.personnelFormat).toBeNull();
+      expect(row.replayFormat).toBe(1);
+      expect(row.ruleFeatures).toEqual([]);
       expect(selectWorldCapabilities(row)).toEqual(expectedSelections.get(id));
     }
     const initial = commandInitial();
@@ -267,7 +271,7 @@ it('PG-B8-1 인사 표지 migration은 구 SQL fixture를 보존하고 현재 fa
             resourceHash: '',
             capabilities: { version: 1, treaty: { version: 1 } },
           })
-        : { version: 1, initial, initialStateHash: initialHash, resourceHash: '' };
+        : { version: 3, initial, initialStateHash: initialHash, resourceHash: '' };
       expectedOrigin.resourceHash = treaty
         ? hashState(capsResourceHashInput(expectedOrigin as Parameters<typeof capsResourceHashInput>[0]))
         : hashState({
@@ -281,13 +285,17 @@ it('PG-B8-1 인사 표지 migration은 구 SQL fixture를 보존하고 현재 fa
       expect(row.initialStateHash).toBe(initialHash);
       expect(row.personnelFormat).toBeNull();
       expect(row.treatyFormat).toBe(treaty ? 1 : null);
-      expect(row.policyFromSequence).toBe(0);
+      expect(row.replayFormat).toBe(treaty ? 1 : 3);
+      expect(row.ruleFeatures).toEqual([]);
+      expect(row.policyFromSequence).toBe(treaty ? 0 : null);
       expect(row.replayOrigin).toEqual(expectedOrigin);
-      expect(selectWorldCapabilities(row)).toEqual(
-        treaty
-          ? { kind: 'caps', origin: expectedOrigin, selection: { treaty: { version: 1 }, policy } }
-          : { kind: 'legacy', policy },
-      );
+      if (treaty)
+        expect(selectWorldCapabilities(row)).toEqual({
+          kind: 'caps',
+          origin: expectedOrigin,
+          selection: { treaty: { version: 1 }, policy },
+        });
+      else expect(() => checkReplayOrigin(row.replayOrigin)).not.toThrow();
     }
     expect(
       (
@@ -311,9 +319,9 @@ it('PG-B8-1 인사 표지 migration은 구 SQL fixture를 보존하고 현재 fa
       JSON.stringify({
         name,
         applied,
-        requiredPrefix: required19.length,
+        requiredPrefix: required20.length,
         marker,
-        tailCount: directories.length - required19.length - 1,
+        tailCount: directories.length - required20.length - 1,
         oldSqlFixtureRows: 2,
         currentFactoryRows: factoryIds.length,
       }),
