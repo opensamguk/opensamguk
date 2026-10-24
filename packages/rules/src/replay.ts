@@ -8,6 +8,7 @@ import { monthlyDate, runMonthly } from './monthly/index';
 import type { InitialGeneral, WorldInit } from './world/bootstrap';
 import { emptyTurn, emptyQueue } from './policy';
 import { type ReplayPolicy, validatePolicyRecordedInput } from './policy/replay';
+import { completePersonnelStep } from './personnel/step';
 
 export interface QueuedTurn {
   commandKey: string;
@@ -65,6 +66,7 @@ export function runReplayAction(
     return { ...replay, state: result.state, monthlyTick: action.tick };
   }
   const next = structuredClone(replay);
+  const personnel = Object.hasOwn(replay, 'offices');
   const turns = next.turns[action.generalId] ?? emptyTurns();
   const command = turns[0]!;
   const result = runGeneralTurn(
@@ -74,9 +76,20 @@ export function runReplayAction(
     seed,
     next.policy ? { policy: next.policy.policies[action.generalId]! } : {},
     resolver,
+    personnel ? { offices: next.offices! } : undefined,
   );
   next.state = result.state;
   next.state.generals[action.generalId]!.nextTurnTick += TICKS_PER_MONTH;
+  if (personnel) {
+    const packet = completePersonnelStep(
+      replay.state,
+      replay.offices!,
+      { state: next.state, ...result.personnel! },
+      action.tick,
+    );
+    next.state = packet.state;
+    next.offices = packet.offices;
+  }
   next.turns[action.generalId] = [...turns.slice(1), next.policy ? emptyTurn() : { commandKey: 'rest', args: {} }];
   next.revisions[action.generalId] = (next.revisions[action.generalId] ?? 0) + 1;
   return next;
