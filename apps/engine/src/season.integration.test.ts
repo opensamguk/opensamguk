@@ -210,6 +210,7 @@ it('종료 연도 정산과 같은 tick인 장수 턴은 실행하지 않는다'
     { ...template.generals[0]!, nationId: 1, cityKey: 1, crew: 0, gold: 0, rice: 0, nextTurnTick: 120000 },
   ];
   const { worldId } = await saveInitialWorld(db, initial, {
+    replayFormat: 'legacy',
     name: '경계',
     turnTermMinutes: 60,
     endYear: initial.startYear,
@@ -280,6 +281,7 @@ it('월드를 지정하지 않은 runEngine은 종료 뒤 다음 RUNNING 월드�
 it('운영 모드는 PREOPEN·ENDED·같은 모드를 거부하고 동시 전환은 한 번 적용한다', async () => {
   const initial = await seasonInitial('END_YEAR');
   const { worldId } = await saveInitialWorld(db, initial, {
+    replayFormat: 'legacy',
     name: '거부',
     turnTermMinutes: 60,
     endYear: initial.startYear,

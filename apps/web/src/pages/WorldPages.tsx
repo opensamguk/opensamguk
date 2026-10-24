@@ -8,6 +8,7 @@ import { NationSummaryGrid, NationTables, useNation } from '../main/NationInfo';
 import { Panel } from '../main/Panel';
 import { RECORD_LABELS, RecordList, type RecordKind } from '../main/Records';
 import { MapLegend, WorldMap } from '../main/WorldMap';
+import { TimelapsePanel } from '../timelapse/TimelapsePanel';
 import { NationBadge } from '../ui/NationBadge';
 import { EmptyState, LoadingState } from '../ui/States';
 import styles from './WorldPages.module.css';
@@ -131,14 +132,18 @@ export function NationPage({ nationIdParam }: { nationIdParam: string }) {
   );
 }
 
-const RECORD_TABS: Array<{ kind: RecordKind; label: string }> = [
+type RecordTab = RecordKind | 'timelapse';
+
+const RECORD_TABS: Array<{ kind: RecordTab; label: string }> = [
   { kind: 'general', label: '내 장수' },
   { kind: 'nation', label: '국가 역사' },
   { kind: 'world', label: '월드 정세' },
+  { kind: 'timelapse', label: '영토 재생' },
 ];
 
 // /w/:worldId/records?tab=: 기록을 넓게 이어 본다. 메인 아래 기록 칸과 같은 목록이다.
-export function RecordsPage({ tab }: { tab: RecordKind }) {
+// 영토 재생 탭은 월간 영토 기록을 오래된 달부터 지도로 다시 본다 (T4-36).
+export function RecordsPage({ tab }: { tab: RecordTab }) {
   const worldId = useWorldId();
   const summary = useWorldSummary(worldId);
   const map = useWorldMap(worldId);
@@ -164,16 +169,22 @@ export function RecordsPage({ tab }: { tab: RecordKind }) {
           </Link>
         ))}
       </nav>
-      <Panel title={RECORD_LABELS[tab]}>
-        <RecordList
-          key={tab}
-          kind={tab}
-          worldId={worldId}
-          clock={summary.data}
-          nations={map.data?.nations ?? []}
-          hasNation={home.data ? home.data.nation !== null : true}
-        />
-      </Panel>
+      {tab === 'timelapse' ? (
+        <Panel title="영토 재생">
+          <TimelapsePanel key={worldId} worldId={worldId} />
+        </Panel>
+      ) : (
+        <Panel title={RECORD_LABELS[tab]}>
+          <RecordList
+            key={tab}
+            kind={tab}
+            worldId={worldId}
+            clock={summary.data}
+            nations={map.data?.nations ?? []}
+            hasNation={home.data ? home.data.nation !== null : true}
+          />
+        </Panel>
+      )}
     </section>
   );
 }

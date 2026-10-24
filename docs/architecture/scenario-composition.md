@@ -15,6 +15,50 @@
 
 core2026 파일을 옮길 때 출처(MIT, © 2025 devsam)를 남깁니다.
 
+내장 `che` 1판은 `version` 없는 v1입니다. v2는 `version: 2`, 정수 `canvas.width`·`canvas.height`, 필수 `terrain`과 네 층(`coast`, `lakes`, `mountains`, `rivers`)을 더합니다. `$comment`는 선택이며 도시 칸은 v1과 같습니다. v2는 모든 깊이에서 모르는 칸을 거부합니다. `defaults`는 `trust`·`supplyState`·선택 `trade`·선택 `frontState`만 받습니다. `normalizeMapToV2`는 v1을 700×500과 빈 지형으로 올리고 출처 고지를 보존하며 `meta`를 버립니다. 지도 초안의 저장과 게시는 v2만 받는 서버 작업(T4-78)에서 연결합니다.
+
+검증용 `mapV1Schema`는 `$comment`와 `defaults.trade`·`defaults.frontState`를 선택 칸으로 보존합니다. 따라서 `normalizeMapToV2(validateMap(content).value!)`로 이어도 출처가 남습니다. 월드 생성용 `world/resources.ts`의 `mapSchema`는 그대로이며 이 선택 칸을 초기 상태에 넣지 않습니다.
+
+| 공개 경로 | 이름 | 역할 |
+| --------- | ---- | ---- |
+| `@opensamguk/rules/resources` | `mapResourceSchema` | v1·v2를 분기해 읽는 자원 검증용 형식입니다. |
+| `@opensamguk/rules/resources` | `mapV1Schema`, `mapV2Schema` | 각 판 형식을 읽으며 v1에서도 출처와 선택 기본 칸을 보존합니다. |
+| `@opensamguk/rules` | `mapSchema` | 기존 월드 생성용 v1 형식이며 모르는 칸을 버립니다. |
+
+캔버스와 지형은 표시 전용이며 `WorldInit`에 들어가지 않습니다. 같은 도시를 가진 v1·v2의 초기 상태·상태 해시·자원 해시는 같습니다. 좌표 경계는 안에 포함하고 해안이 없으면 바탕이 땅입니다. 해안이 있으면 바탕은 바다이며 다각형 전체를 짝홀 규칙으로 채웁니다. 산맥·호수·강을 차례로 덧칠합니다. 자기 교차는 허용합니다.
+
+밑그림의 색과 순서는 `MAP_SKETCH_PALETTE`가 정합니다.
+
+| 번호 | 층 | 색 |
+| ---- | -- | -- |
+| 0 | 바다 | `#2b5d8c` |
+| 1 | 땅 | `#cbb98a` |
+| 2 | 강 | `#4f8fd0` |
+| 3 | 산 | `#7a6347` |
+| 4 | 호수 | `#6aa6d8` |
+
+### T4-46 묶음 A
+
+다음 9종은 `che` 지도 1판, `basic` 병종 1판, `default` 능력치 규칙 1판과 `rtk14-map` 초상 대응표를 씁니다. 모두 도시 94개와 장수 491명을 합성합니다. 다른 묶음의 재료나 행 수를 이 값으로 정하지 않습니다.
+
+| 시나리오 | 시작 연도 | 국가 수 | 사본 차이 |
+| --- | --- | --- | --- |
+| 1010 | 181 | 2 | 없음 |
+| 1020 | 187 | 20 | 없음 |
+| 1040 | 193 | 15 | 없음 |
+| 1060 | 199 | 10 | 없음 |
+| 1070 | 204 | 11 | 없음 |
+| 1090 | 216 | 4 | 조조 도시 목록의 두 번째 하비 하나 삭제 |
+| 1100 | 222 | 5 | 조비 도시 목록의 두 번째 하비 하나 삭제 |
+| 1110 | 225 | 4 | 조예 도시 목록의 두 번째 하비 하나 삭제 |
+| 1120 | 188 | 13 | 없음 |
+
+`tools/fixtures/t4-46-scenarios.json`은 원작 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`의 시나리오 83행을 보존합니다. 기존 `1030`은 `existing`, 위 9종은 `ready`, 도시 없는 국가가 있는 `1050`·`1080`은 T4-48 대기의 `blocked`, 나머지 71종은 `unverified`입니다. `ready`는 생성기에 넣을 준비 상태이며 AC 완료가 아닙니다. 전체 AC-P2-24의 분모는 83종입니다.
+
+사본에서 출처와 `id`를 빼고 삭제한 하비를 원위치에 넣으면 fixture의 원작 JSON과 같습니다. 원작 바이트의 SHA-256과 사본의 `contentHash`, 두 시드의 초기 상태 해시도 따로 고정합니다. `1030` 파일·초기 해시와 내장 다섯 DB 판은 바꾸지 않습니다. 원작 `extends`·`general_ex`·`history`·`life`·`fiction`·`const`·`cities`는 이 묶음에 한해 기존 `1030`처럼 보존하되 로더에서 읽지 않습니다.
+
+별도 생성물 `packages/db/sql/resources-scenarios.sql`은 `ready` 9종만 넣습니다. `pnpm db:init-resources` 뒤 `pnpm db:init-scenarios`로 적용합니다. 실제 DB 합성은 T4-77 S3의 `loadInitialWorldFromDb`를 쓰며 기존 파일 로더도 남아 있습니다. 병합과 운영 반영은 T4-77 S3 선행 및 정확한 SHA의 CI 검증 뒤입니다.
+
 ## 2. 합성 순서
 
 ```text
@@ -43,12 +87,62 @@ Node `crypto` 구현은 `@opensamguk/shared/node`에 분리하며 rules·브라�
 
 ## 3. 검증
 
+게시 검증기는 `@opensamguk/rules/resources`의 `validateResource`와 종류별 함수입니다. 결과는 `{ ok, issues, value }`이며 형식 실패면 `value`는 null이고 뜻 검사는 멈춥니다. 경고만 있으면 `ok`는 true입니다. `value`는 표시용으로만 쓰고 받은 원문을 저장합니다. 기존 `buildInitialWorld`의 마지막 방어선은 그대로 두며 `tools/resource-validate.test.ts`가 거부 사례와 v1·v2 해시 불변을 대조합니다. 카탈로그에서 짝 지도 유무·게시 여부를 확인하고 게시를 막는 연결은 T4-78 몫입니다.
+
+짝 지도의 형식만 잘못됐으면 `scenario-map-invalid`를 내고 시나리오의 도시 참조 검사만 건너뜁니다. 시나리오 자체의 ID·이름·소유·소속·생몰년·외교 검사는 계속합니다. `shape-invalid` 문구는 zod 오류 코드를 한국어로 바꾸고 점으로 이은 경로를 넣으며 루트 경로는 `$`로 씁니다. `terrain-out-of-canvas`는 선마다 하나이며 캔버스 밖 점 수와 첫 점 번호를 알립니다.
+
+코드·문구·고정 params 키의 정본은 `packages/rules/src/world/validate/issues.ts`의 `RESOURCE_ISSUES`입니다. 계획 파일의 구현 기록은 조율 세션이 채우므로 여기에도 코드별 키를 남깁니다. 지도 한도는 도시 300개, 선 하나당 점 2,000개, 지형 전체 점 20,000개, 캔버스 700×500입니다.
+
+| 코드 | params 키 |
+| ---- | --------- |
+| `shape-invalid` | `path` (점으로 이은 경로, 루트는 `$`), `detail` (한국어 설명) |
+| `resource-id-mismatch` | `id`, `expectedId` |
+| `map-canvas-range` | `width`, `height` |
+| `map-too-large`, `terrain-too-large` | `count`, `limit` |
+| `city-id-duplicate` | `id`, `firstIndex` |
+| `city-name-empty` | `id` |
+| `city-name-duplicate`, `scenario-nation-name-duplicate`, `scenario-general-name-duplicate`, `unitset-crew-name-duplicate` | `name`, `firstIndex` |
+| `city-out-of-canvas`, `city-off-land` | `name`, `x`, `y` |
+| `city-level-range` | `name`, `level` |
+| `city-region-range` | `name`, `region` |
+| `city-initial-over-max` | `name`, `field`, `initial`, `max` |
+| `link-duplicate`, `link-self`, `link-missing-city`, `link-one-way` | `name`, `cityId` |
+| `network-split` | `name`, `id` |
+| `terrain-open` | `count` |
+| `terrain-degenerate` | `count`, `minimum` |
+| `terrain-out-of-canvas` | `outsideCount` (밖 점 수), `firstPointIndex` (첫 밖 점의 0부터 센 번호) |
+| `scenario-invalid` | `key` |
+| `scenario-map-missing` | `mapKey` (미지정이면 키 생략) |
+| `scenario-map-unpublished` | `mapKey` |
+| `scenario-map-invalid`, `unitset-wall-missing` | 없음 |
+| `scenario-nation-city-missing`, `scenario-general-city-missing` | `name`, `city` |
+| `scenario-city-owner-duplicate` | `city`, `firstIndex` |
+| `scenario-general-nation-missing` | `name`, `nationId` |
+| `scenario-general-years` | `name`, `birthYear`, `deathYear` |
+| `scenario-diplomacy-invalid` | `nationA`, `nationB` |
+| `scenario-diplomacy-duplicate` | `nationA`, `nationB`, `firstIndex` |
+| `unitset-arm-key-invalid` | `key` |
+| `unitset-crew-id-duplicate` | `id`, `firstIndex` |
+| `unitset-crew-arm-missing` | `name`, `armType` |
+| `unitset-coef-arm-missing` | `name`, `field`, `key` |
+| `unitset-default-missing`, `unitset-default-not-recruitable` | `id` |
+| `stat-rules-inconsistent` | `total`, `min`, `max` |
+| `portrait-id-duplicate` | `id`, `firstName` |
+
 - 도시 ID·이름 중복, 없는 도시·단방향·자기 자신 연결, 초기값의 최대치 초과를 거부합니다.
 - 없는 국가 도시·수도, 도시 소유 중복, 장수의 잘못된 국가·도시, 외교의 없는 국가·동일 국가 쌍을 거부합니다.
 - 기본 병종이 없거나 병종 ID가 중복되면 거부합니다.
 - 엔진이 월드·국가·도시·장수·외교를 한 트랜잭션으로 저장합니다. 국가↔수도 참조는 도시 생성 뒤 연결하며
   중간 실패는 전체를 롤백합니다. 모든 관계는 `worldId`를 포함하는 외래키로 격리합니다.
 - 단위 테스트는 `tools/world-bootstrap.test.ts`, 실제 DB 검증은 `apps/engine/src/world/createWorld.integration.test.ts`입니다.
+
+### 편집 자원 검증 (T4-76)
+
+`@opensamguk/rules/resource-validation`은 파일이나 DB를 읽지 않고 지도·시나리오·병종·능력치·초상을 검사합니다. `version`이 없는 지도는 기존 v1 schema로 읽고 `version: 2`는 캔버스와 표시용 지형을 포함한 엄격한 형식으로 읽습니다. `normalizeMapToV2`는 입력을 복제하고 버린 칸의 경로를 돌려줍니다. v1의 유한수 `trade`·`frontState`와 출처 `$comment`는 보존합니다.
+
+보고의 `status`는 `pass`·`fail`·`incomplete`입니다. 오류가 있으면 `fail`, 참조 검사에 필요한 맥락이 빠지거나 깨졌으면 `incomplete`입니다. 경고만 있으면 통과할 수 있습니다. 지도에는 관련 시나리오 전체를 `scenarios`로 넘기며 참조 대상이 없을 때는 `[]`를 명시합니다. 한도·진단 코드·검사 순서와 호출자 책임은 [T4-76 계약](../plans/T4-76.md#계약)에 있습니다.
+
+기존 `buildInitialWorld`의 schema와 거부 검사는 그대로입니다. 새 검증기는 아직 엔진 로더나 게시 API에 연결하지 않았습니다. v2의 캔버스·지형은 `WorldInit`에 들어가지 않고 이동·전투·해시 계산도 바꾸지 않습니다. 내장 v1 지도와 정규화한 v2 지도에 표시 지형을 더해도 같은 초기 상태와 해시가 나오는지 시험합니다.
 
 ## 4. 프리셋 형식 (M2)
 

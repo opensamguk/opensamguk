@@ -1,5 +1,6 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { lintSource, RULE_IDS, type RuleId } from './lint-text';
 import { main } from './cli';
 import { classify, collectTargets } from './targets';
+import { nodeCli } from '../node-cli';
 
 const md = (source: string) => lintSource({ path: 'doc.md', source, kind: 'markdown' });
 const code = (source: string, path = 'a.tsx', koreanOnly = false) =>
@@ -417,14 +419,17 @@ describe('AC-M1-22 T1-25 pnpm lint:text 명령', () => {
     expect(run(fixture({ 'docs/a.md': '`가지고 있다`\n' }), '--strict').status).toBe(0);
   });
 
-  it('실제 명령의 종료 코드: 경고 0, --strict 1', { timeout: 60_000 }, () => {
+  it('실제 명령의 종료 코드: 경고 0, --strict 1, 사용 오류 2', { timeout: 60_000 }, () => {
     const dir = fixture({ 'docs/a.md': '무력을 가지고 있다\n' });
-    const tsx = fileURLToPath(new URL('../../node_modules/.bin/tsx', import.meta.url));
+    const tsx = createRequire(import.meta.url).resolve('tsx/cli');
     const cli = fileURLToPath(new URL('cli.ts', import.meta.url));
-    const warn = spawnSync(tsx, [cli], { cwd: dir, encoding: 'utf8' });
+    const runCli = (...args: string[]) => spawnSync(...nodeCli(tsx, [cli, ...args]), { cwd: dir, encoding: 'utf8' });
+    const warn = runCli();
     expect(warn.status).toBe(0);
     expect(warn.stdout).toContain('docs/a.md:1 [A-7] 가지고 있');
-    expect(spawnSync(tsx, [cli, '--strict'], { cwd: dir, encoding: 'utf8' }).status).toBe(1);
+    expect(runCli('--strict').status).toBe(1);
+    expect(runCli('nope')).toMatchObject({ status: 2, stderr: expect.stringContaining('경로가 없습니다: nope') });
+    expect(runCli('--fix').status).toBe(2);
   });
 
   it('실제 명령: 여러 줄 인라인 코드는 0, 코드 밖 문장과 역슬래시 백틱은 1', { timeout: 60_000 }, () => {
@@ -433,9 +438,10 @@ describe('AC-M1-22 T1-25 pnpm lint:text 명령', () => {
       'docs/after.md': '앞말 `첫줄\n가지고 있다\n끝줄` 뒷말\n\n가지고 있다\n',
       'docs/escaped.md': '\\`가지고 있다\\`\n',
     });
-    const tsx = fileURLToPath(new URL('../../node_modules/.bin/tsx', import.meta.url));
+    const tsx = createRequire(import.meta.url).resolve('tsx/cli');
     const cli = fileURLToPath(new URL('cli.ts', import.meta.url));
-    const strict = (path: string) => spawnSync(tsx, [cli, '--strict', path], { cwd: dir, encoding: 'utf8' });
+    const strict = (path: string) =>
+      spawnSync(...nodeCli(tsx, [cli, '--strict', path]), { cwd: dir, encoding: 'utf8' });
     expect(strict('docs/span.md').status).toBe(0);
     const after = strict('docs/after.md');
     expect(after.status).toBe(1);

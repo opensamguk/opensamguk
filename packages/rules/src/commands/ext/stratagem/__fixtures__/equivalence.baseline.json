@@ -1,0 +1,261 @@
+{
+  "baseSha": "2dccb0f6b85970a858ac44985f36aa47006feed2",
+  "caseCount": 12,
+  "cases": [
+    {
+      "key": "fire_attack",
+      "scenario": "success",
+      "seed": "stratagem-success",
+      "result": {
+        "effects": [
+          { "kind": "general", "id": 1, "field": "gold", "op": "add", "value": -100 },
+          { "kind": "general", "id": 1, "field": "rice", "op": "add", "value": -100 },
+          { "kind": "general", "id": 1, "field": "experience", "op": "add", "value": 269 },
+          { "kind": "general", "id": 1, "field": "dedication", "op": "add", "value": 179 },
+          { "kind": "city", "id": 2, "field": "agriculture", "op": "add", "value": -497 },
+          { "kind": "city", "id": 2, "field": "commerce", "op": "add", "value": -687 }
+        ],
+        "logs": [{ "kind": "success", "text": "화계 성공: 도시2 농업 497, 상업 687 감소, 장수 0명 부상" }],
+        "reports": [],
+        "history": [{ "nationId": 2, "text": "도시2: 화계로 농업 497, 상업 687 감소" }]
+      },
+      "check": null,
+      "precheck": null,
+      "executeError": null,
+      "trace": [
+        { "call": "next", "value": 0.476172219729051 },
+        { "call": "int(100,800)", "value": 497 },
+        { "call": "int(100,800)", "value": 687 },
+        { "call": "int(201,300)", "value": 269 },
+        { "call": "int(141,210)", "value": 179 }
+      ],
+      "next": [0.34996860823594034, 0.1140667530708015, 0.5807843820657581]
+    },
+    {
+      "key": "fire_attack",
+      "scenario": "probability-failure",
+      "seed": "seed-1",
+      "result": {
+        "effects": [
+          { "kind": "general", "id": 1, "field": "gold", "op": "add", "value": -100 },
+          { "kind": "general", "id": 1, "field": "rice", "op": "add", "value": -100 },
+          { "kind": "general", "id": 1, "field": "experience", "op": "add", "value": 53 },
+          { "kind": "general", "id": 1, "field": "dedication", "op": "add", "value": 40 }
+        ],
+        "logs": [{ "kind": "success", "text": "화계 실패: 도시2" }]
+      },
+      "check": null,
+      "precheck": null,
+      "executeError": null,
+      "trace": [
+        { "call": "next", "value": 0.8126733123790473 },
+        { "call": "int(1,100)", "value": 53 },
+        { "call": "int(1,70)", "value": 40 }
+      ],
+      "next": [0.9833635643590242, 0.445600054692477, 0.10736620659008622]
+    },
+    {
+      "key": "fire_attack",
+      "scenario": "precheck-failure",
+      "seed": "stratagem-success",
+      "result": { "code": "NO_GOLD", "message": "금이 부족합니다." },
+      "check": { "code": "NO_GOLD", "message": "금이 부족합니다." },
+      "precheck": { "code": "NO_GOLD", "message": "금이 부족합니다." },
+      "executeError": "금이 부족합니다.",
+      "trace": [],
+      "next": [0.476172219729051, 0.5676371618174016, 0.8376272798050195]
+    },
+    {
+      "key": "sabotage",
+      "scenario": "success",
+      "seed": "stratagem-success",
+      "result": {
+        "effects": [
+          { "kind": "general", "id": 1, "field": "gold", "op": "add", "value": -100 },
+          { "kind": "general", "id": 1, "field": "rice", "op": "add", "value": -100 },
+          { "kind": "general", "id": 1, "field": "experience", "op": "add", "value": 269 },
+          { "kind": "general", "id": 1, "field": "dedication", "op": "add", "value": 179 },
+          { "kind": "city", "id": 2, "field": "defence", "op": "add", "value": -497 },
+          { "kind": "city", "id": 2, "field": "wall", "op": "add", "value": -600 }
+        ],
+        "logs": [{ "kind": "success", "text": "파괴 성공: 도시2 수비 497, 성벽 600 감소, 장수 0명 부상" }],
+        "reports": [],
+        "history": [{ "nationId": 2, "text": "도시2: 파괴로 수비 497, 성벽 600 감소" }]
+      },
+      "check": null,
+      "precheck": null,
+      "executeError": null,
+      "trace": [
+        { "call": "next", "value": 0.476172219729051 },
+        { "call": "int(100,800)", "value": 497 },
+        { "call": "int(100,800)", "value": 687 },
+        { "call": "int(201,300)", "value": 269 },
+        { "call": "int(141,210)", "value": 179 }
+      ],
+      "next": [0.34996860823594034, 0.1140667530708015, 0.5807843820657581]
+    },
+    {
+      "key": "sabotage",
+      "scenario": "probability-failure",
+      "seed": "seed-1",
+      "result": {
+        "effects": [
+          { "kind": "general", "id": 1, "field": "gold", "op": "add", "value": -100 },
+          { "kind": "general", "id": 1, "field": "rice", "op": "add", "value": -100 },
+          { "kind": "general", "id": 1, "field": "experience", "op": "add", "value": 53 },
+          { "kind": "general", "id": 1, "field": "dedication", "op": "add", "value": 40 }
+        ],
+        "logs": [{ "kind": "success", "text": "파괴 실패: 도시2" }]
+      },
+      "check": null,
+      "precheck": null,
+      "executeError": null,
+      "trace": [
+        { "call": "next", "value": 0.8126733123790473 },
+        { "call": "int(1,100)", "value": 53 },
+        { "call": "int(1,70)", "value": 40 }
+      ],
+      "next": [0.9833635643590242, 0.445600054692477, 0.10736620659008622]
+    },
+    {
+      "key": "sabotage",
+      "scenario": "precheck-failure",
+      "seed": "stratagem-success",
+      "result": { "code": "NO_GOLD", "message": "금이 부족합니다." },
+      "check": { "code": "NO_GOLD", "message": "금이 부족합니다." },
+      "precheck": { "code": "NO_GOLD", "message": "금이 부족합니다." },
+      "executeError": "금이 부족합니다.",
+      "trace": [],
+      "next": [0.476172219729051, 0.5676371618174016, 0.8376272798050195]
+    },
+    {
+      "key": "incite",
+      "scenario": "success",
+      "seed": "stratagem-success",
+      "result": {
+        "effects": [
+          { "kind": "general", "id": 1, "field": "gold", "op": "add", "value": -100 },
+          { "kind": "general", "id": 1, "field": "rice", "op": "add", "value": -100 },
+          { "kind": "general", "id": 1, "field": "experience", "op": "add", "value": 269 },
+          { "kind": "general", "id": 1, "field": "dedication", "op": "add", "value": 179 },
+          { "kind": "city", "id": 2, "field": "security", "op": "add", "value": -497 },
+          { "kind": "city", "id": 2, "field": "trust", "op": "add", "value": -13.726781917270273 }
+        ],
+        "logs": [{ "kind": "success", "text": "선동 성공: 도시2 치안 497, 민심 13.7 감소, 장수 0명 부상" }],
+        "reports": [],
+        "history": [{ "nationId": 2, "text": "도시2: 선동으로 치안 497, 민심 13.7 감소" }]
+      },
+      "check": null,
+      "precheck": null,
+      "executeError": null,
+      "trace": [
+        { "call": "next", "value": 0.476172219729051 },
+        { "call": "int(100,800)", "value": 497 },
+        { "call": "next", "value": 0.8376272798050195 },
+        { "call": "int(201,300)", "value": 269 },
+        { "call": "int(141,210)", "value": 179 }
+      ],
+      "next": [0.34996860823594034, 0.1140667530708015, 0.5807843820657581]
+    },
+    {
+      "key": "incite",
+      "scenario": "probability-failure",
+      "seed": "seed-1",
+      "result": {
+        "effects": [
+          { "kind": "general", "id": 1, "field": "gold", "op": "add", "value": -100 },
+          { "kind": "general", "id": 1, "field": "rice", "op": "add", "value": -100 },
+          { "kind": "general", "id": 1, "field": "experience", "op": "add", "value": 53 },
+          { "kind": "general", "id": 1, "field": "dedication", "op": "add", "value": 40 }
+        ],
+        "logs": [{ "kind": "success", "text": "선동 실패: 도시2" }]
+      },
+      "check": null,
+      "precheck": null,
+      "executeError": null,
+      "trace": [
+        { "call": "next", "value": 0.8126733123790473 },
+        { "call": "int(1,100)", "value": 53 },
+        { "call": "int(1,70)", "value": 40 }
+      ],
+      "next": [0.9833635643590242, 0.445600054692477, 0.10736620659008622]
+    },
+    {
+      "key": "incite",
+      "scenario": "precheck-failure",
+      "seed": "stratagem-success",
+      "result": { "code": "NO_GOLD", "message": "금이 부족합니다." },
+      "check": { "code": "NO_GOLD", "message": "금이 부족합니다." },
+      "precheck": { "code": "NO_GOLD", "message": "금이 부족합니다." },
+      "executeError": "금이 부족합니다.",
+      "trace": [],
+      "next": [0.476172219729051, 0.5676371618174016, 0.8376272798050195]
+    },
+    {
+      "key": "plunder",
+      "scenario": "success",
+      "seed": "stratagem-success",
+      "result": {
+        "effects": [
+          { "kind": "general", "id": 1, "field": "gold", "op": "add", "value": -100 },
+          { "kind": "general", "id": 1, "field": "rice", "op": "add", "value": -100 },
+          { "kind": "general", "id": 1, "field": "experience", "op": "add", "value": 269 },
+          { "kind": "general", "id": 1, "field": "dedication", "op": "add", "value": 179 },
+          { "kind": "nation", "id": 2, "field": "gold", "op": "add", "value": -447 },
+          { "kind": "nation", "id": 2, "field": "rice", "op": "add", "value": -653 },
+          { "kind": "nation", "id": 1, "field": "gold", "op": "add", "value": 313 },
+          { "kind": "nation", "id": 1, "field": "rice", "op": "add", "value": 457 },
+          { "kind": "general", "id": 1, "field": "gold", "op": "add", "value": 134 },
+          { "kind": "general", "id": 1, "field": "rice", "op": "add", "value": 196 }
+        ],
+        "logs": [{ "kind": "success", "text": "탈취 성공: 도시2 금 447, 쌀 653 획득" }],
+        "history": [{ "nationId": 2, "text": "도시2: 금 447, 쌀 653 도난" }]
+      },
+      "check": null,
+      "precheck": null,
+      "executeError": null,
+      "trace": [
+        { "call": "next", "value": 0.476172219729051 },
+        { "call": "int(100,800)", "value": 497 },
+        { "call": "int(100,800)", "value": 687 },
+        { "call": "int(201,300)", "value": 269 },
+        { "call": "int(141,210)", "value": 179 }
+      ],
+      "next": [0.34996860823594034, 0.1140667530708015, 0.5807843820657581]
+    },
+    {
+      "key": "plunder",
+      "scenario": "probability-failure",
+      "seed": "seed-1",
+      "result": {
+        "effects": [
+          { "kind": "general", "id": 1, "field": "gold", "op": "add", "value": -100 },
+          { "kind": "general", "id": 1, "field": "rice", "op": "add", "value": -100 },
+          { "kind": "general", "id": 1, "field": "experience", "op": "add", "value": 53 },
+          { "kind": "general", "id": 1, "field": "dedication", "op": "add", "value": 40 }
+        ],
+        "logs": [{ "kind": "success", "text": "탈취 실패: 도시2" }]
+      },
+      "check": null,
+      "precheck": null,
+      "executeError": null,
+      "trace": [
+        { "call": "next", "value": 0.8126733123790473 },
+        { "call": "int(1,100)", "value": 53 },
+        { "call": "int(1,70)", "value": 40 }
+      ],
+      "next": [0.9833635643590242, 0.445600054692477, 0.10736620659008622]
+    },
+    {
+      "key": "plunder",
+      "scenario": "precheck-failure",
+      "seed": "stratagem-success",
+      "result": { "code": "NO_GOLD", "message": "금이 부족합니다." },
+      "check": { "code": "NO_GOLD", "message": "금이 부족합니다." },
+      "precheck": { "code": "NO_GOLD", "message": "금이 부족합니다." },
+      "executeError": "금이 부족합니다.",
+      "trace": [],
+      "next": [0.476172219729051, 0.5676371618174016, 0.8376272798050195]
+    }
+  ]
+}

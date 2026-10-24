@@ -66,6 +66,7 @@ export function PersonnelPage() {
         <PersonnelBoardView
           board={board.data}
           busyTarget={action.busy ? (action.busyTarget ?? '') : null}
+          busyLabel={action.busyLabel}
           onAppoint={(generalId, officerLevel) =>
             void action.submit({ kind: 'personnel.appoint', generalId, officerLevel }, `level-${officerLevel}`)
           }
@@ -86,11 +87,12 @@ interface BoardProps {
   board: PersonnelBoard;
   // 처리 중인 접수가 있으면 그 대상(level-<직책>). 다시 접속해 되살린 접수는 빈 문자열이다. 없으면 null.
   busyTarget: string | null;
+  busyLabel?: string;
   onAppoint: (generalId: number, officerLevel: number) => void;
   onDismiss: (generalId: number, officerLevel: number) => void;
 }
 
-export function PersonnelBoardView({ board, busyTarget, onAppoint, onDismiss }: BoardProps) {
+export function PersonnelBoardView({ board, busyTarget, busyLabel = '처리 중', onAppoint, onDismiss }: BoardProps) {
   const nameOf = (id: number) => board.members.find((m) => m.generalId === id)?.name ?? `장수 ${id}`;
   const holders = new Set(board.levels.map((level) => level.holderId).filter((id) => id !== null));
   // 직책이 없는 장수만 후보로 둔다. 최종 판단은 서버가 한다.
@@ -120,6 +122,7 @@ export function PersonnelBoardView({ board, busyTarget, onAppoint, onDismiss }: 
                     appoint={board.appoint}
                     candidates={candidates}
                     busy={busyTarget === null ? null : busyTarget === `level-${level.officerLevel}`}
+                    busyLabel={busyLabel}
                     onAppoint={onAppoint}
                     onDismiss={onDismiss}
                   />
@@ -170,6 +173,7 @@ function LevelControl({
   appoint,
   candidates,
   busy,
+  busyLabel,
   onAppoint,
   onDismiss,
 }: {
@@ -178,6 +182,7 @@ function LevelControl({
   candidates: PersonnelMember[];
   // null: 처리 중인 접수 없음. true: 이 직책을 처리 중. false: 다른 접수를 처리 중.
   busy: boolean | null;
+  busyLabel: string;
   onAppoint: (generalId: number, officerLevel: number) => void;
   onDismiss: (generalId: number, officerLevel: number) => void;
 }) {
@@ -188,10 +193,12 @@ function LevelControl({
   if (busy !== null)
     return (
       <span className={styles.controls}>
-        <DisabledReason reason="요청을 처리하는 중입니다.">{label}</DisabledReason>
+        <DisabledReason reason={busyLabel === '보내는 중' ? '요청을 보내는 중입니다.' : '요청을 처리하는 중입니다.'}>
+          {label}
+        </DisabledReason>
         {busy ? (
           <span className={styles.busy} role="status">
-            처리 중
+            {busyLabel}
           </span>
         ) : null}
       </span>

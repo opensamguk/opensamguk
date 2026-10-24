@@ -1,4 +1,6 @@
+import type { AppRouter } from '@opensamguk/server/router';
 import type { QueryClient, QueryFunction, QueryKey } from '@tanstack/react-query';
+import type { inferRouterOutputs } from '@trpc/server';
 import { trpcClient, type Trpc } from '../trpc';
 import type { CommandInfo } from './CommandPicker';
 import { SLOT_COUNT, type Turn } from './draft';
@@ -6,22 +8,25 @@ import { SLOT_COUNT, type Turn } from './draft';
 // 예턴 편집기가 읽고 쓰는 칸 목록. 개인 30칸(turns.*)과 국가 직책 12칸(nationTurns.*, T2-06)이 같은 편집기를 쓴다.
 // 편집기는 칸 수와 조회·저장 함수를 여기서만 받는다. 개인 칸은 personalSource가 지금 연결을 그대로 넘긴다.
 
+// 편집기가 칸에서 읽는 최소 모양. 연결마다 칸 모양 S는 그 API가 준 그대로 두고 조회 캐시와 저장 결과에 같은 S를 쓴다.
 export interface DisplaySlot {
   commandKey: string;
   args?: unknown;
   name: string;
 }
 
-export interface TurnList {
+// 개인 칸은 AppRouter의 turns.get 칸 모양이다. 서버가 explicit을 실으면 캐시와 저장 결과에도 그대로 남는다.
+export type PersonalSlot = inferRouterOutputs<AppRouter>['turns']['get']['slots'][number];
+
+export interface TurnList<S extends DisplaySlot = DisplaySlot> {
   revision: number;
-  slots: DisplaySlot[];
+  slots: S[];
 }
 
 export type SaveSlots = Array<{ commandKey: string; args: Record<string, unknown> } | null>;
 
-export type SaveResult =
-  | { ok: true; revision: number; slots: DisplaySlot[] }
-  | { ok: false; reason: 'STALE'; revision: number; slots: DisplaySlot[] };
+export type SaveResult<S extends DisplaySlot = DisplaySlot> =
+  { ok: true; revision: number; slots: S[] } | { ok: false; reason: 'STALE'; revision: number; slots: S[] };
 
 export type Check = { ok: true } | { ok: false; message: string };
 
@@ -31,15 +36,15 @@ export interface SourceQuery<T> {
   select: (data: unknown) => T;
 }
 
-export interface TurnSource {
+export interface TurnSource<S extends DisplaySlot = DisplaySlot> {
   slotCount: number;
   // 저장하지 않은 편집을 두는 sessionStorage 키. 계정·월드(국가 칸은 본 직책까지)가 다르면 다른 키다.
   storageKey: string;
   gridLabel: string;
-  list: SourceQuery<TurnList>;
+  list: SourceQuery<TurnList<S>>;
   // 저장 뒤 받은 칸을 조회 캐시에 넣는다.
-  writeList: (queryClient: QueryClient, list: TurnList) => void;
-  save: (input: { revision: number; slots: SaveSlots }) => Promise<SaveResult>;
+  writeList: (queryClient: QueryClient, list: TurnList<S>) => void;
+  save: (input: { revision: number; slots: SaveSlots }) => Promise<SaveResult<S>>;
   commands: SourceQuery<CommandInfo[]>;
   precheck: (turn: Turn) => SourceQuery<Check>;
   // 서버 목록이 바뀌면 이 키 아래 사전 검사를 다시 받는다.
@@ -60,7 +65,7 @@ export interface SourceContext {
   worldId: string;
 }
 
-export type TurnSourceFactory = (context: SourceContext) => TurnSource;
+export type TurnSourceFactory<S extends DisplaySlot = DisplaySlot> = (context: SourceContext) => TurnSource<S>;
 
 const STORAGE_PREFIX = 'opensamguk.turnDraft.v1';
 
@@ -68,7 +73,7 @@ const STORAGE_PREFIX = 'opensamguk.turnDraft.v1';
 export const draftStorageKey = (userId: string, worldId: string) => `${STORAGE_PREFIX}:${userId}:${worldId}`;
 
 // 개인 30칸. T1-15 연결 그대로다.
-export const personalSource: TurnSourceFactory = ({ trpc, userId, worldId }) => {
+export const personalSource: TurnSourceFactory<PersonalSlot> = ({ trpc, userId, worldId }) => {
   const get = trpc.turns.get.queryOptions({ worldId });
   const commands = trpc.commands.list.queryOptions({ worldId });
   return {
@@ -78,7 +83,7 @@ export const personalSource: TurnSourceFactory = ({ trpc, userId, worldId }) => 
     list: {
       queryKey: get.queryKey,
       queryFn: get.queryFn as QueryFunction<unknown>,
-      select: (data) => data as TurnList,
+      select: (data) => data as TurnList<PersonalSlot>,
     },
     writeList: (queryClient, list) => queryClient.setQueryData(get.queryKey, list),
     save: ({ revision, slots }) => trpcClient.turns.set.mutate({ worldId, revision, slots }),

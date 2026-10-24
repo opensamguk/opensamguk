@@ -18,6 +18,7 @@ export type NationNoticeResponse = Outputs['notice']['nation']['get'];
 export type NationNotice = NonNullable<NationNoticeResponse>;
 export type WorldNoticeResponse = Outputs['notice']['world']['list'];
 export type SendInput = Inputs['message']['send'];
+export type SendScope = SendInput['scope'];
 
 export const MESSAGE_SCOPES = ['PRIVATE', 'NATION', 'DIPLOMACY', 'WORLD'] as const satisfies readonly MessageScope[];
 
@@ -58,3 +59,8 @@ export const noticeKeys = {
   nation: (worldId: string) => trpc.notice.nation.get.queryKey({ worldId }),
   world: (worldId: string) => trpc.notice.world.list.queryKey({ worldId }),
 };
+
+// 메시지·국가 공지 본문 한도. 서버 bodyLimit(apps/server/src/messaging.ts)과 같이 유니코드 코드포인트로 센다.
+export const BODY_MAX = 1_000;
+export const BODY_TOO_LONG = '본문은 1,000자까지 쓸 수 있습니다.';
+export const bodyLength = (value: string) => [...value].length;

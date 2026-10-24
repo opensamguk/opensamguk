@@ -83,6 +83,7 @@ export interface InitialDiplomacy {
 
 export interface WorldInit {
   presetRules?: PresetRules;
+  ruleFeatures?: string[];
   ext?: WorldExt;
   commandMeta?: WorldState['commandMeta'];
   nationTurns?: WorldState['nationTurns'];

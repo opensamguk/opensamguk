@@ -1,17 +1,29 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
+import type { OperationDetail } from '../apps/web/src/operations/contract';
 import { createAccount, withE2eDb } from './account';
-import { createGeneralByApi, e2eWorld, mutate, query, setTurns, stubPortraits, turns } from './game';
+import {
+  createGeneralByApi,
+  idleWorld,
+  mutate,
+  query,
+  releaseIdleWorld,
+  setTurns,
+  startEngine,
+  stubPortraits,
+  turns,
+} from './game';
 
 // T2-12 · AC-M2-15 화면: 국가 작전판과 감찰.
-// operation·inspection 라우터(T2-11, Codex)가 main에 들어오기 전에는 이 시험이 돌지 않는다. 그 전의 결과는 증거로 세지 않는다.
-// 그래서 묶음 전체를 보류한다. T2-11이 병합되면 아래 test.fixme 줄을 지우고 실제로 돌린다.
-// 계약: docs/plans/T2-11.md API 계약, 화면: docs/plans/T2-12.md.
+// 계약은 AppRouter의 operation·inspection 라우터(T2-11, Codex)다. 이 시험은 부모가 배정한 통합 슬롯에서만 돌리고 그 전에는 증거로 세지 않는다.
+// 화면: docs/plans/T2-12.md "실제 API 대조와 착수 정정" 절.
 
 test.describe.configure({ timeout: 180_000 });
+test.afterEach(releaseIdleWorld);
 
 interface Member {
   page: Page;
   generalId: number;
+  name: string;
 }
 
 // 새 계정·장수를 만들고 DB에서 nationId 국가의 장수로 둔다. 수뇌 5~10, 일반 1 (T2-05 표).
@@ -19,7 +31,14 @@ async function member(browser: Browser, world: string, nationId: number, officer
   const page = await (await browser.newContext()).newPage();
   await stubPortraits(page);
   await createAccount(page);
-  const general = await createGeneralByApi(page, world);
+  const stop = await startEngine(world);
+  const general = await (async () => {
+    try {
+      return await createGeneralByApi(page, world);
+    } finally {
+      await stop();
+    }
+  })();
   await withE2eDb(async (db) => {
     const city = await db.city.findFirstOrThrow({ where: { worldId: world, nationId }, select: { cityKey: true } });
     await db.general.update({
@@ -27,12 +46,14 @@ async function member(browser: Browser, world: string, nationId: number, officer
       data: { nationId, officerLevel, cityKey: city.cityKey, crew: 0 },
     });
   });
-  return { page, generalId: general.id };
+  return { page, generalId: general.id, name: general.name };
 }
 
+// 새 장수는 병력·훈련·사기가 0이다. 기준 1000/60/60 제안은 모병 1·훈련 6·사기 6·출병 1의 14칸이 목표 전에 있어야 한다.
+// 첫 칸이 다음 달 첫 tick이어도 준비가 index 2부터 들어가 STALE 시험의 index 1 farm과 겹치지 않도록 목표를 지금+17개월로 둔다.
 async function setup(page: Page) {
   await createAccount(page);
-  const world = await e2eWorld(page);
+  const world = await idleWorld(page);
   const map = await query<{
     cities: Array<{ key: number; nationId: number | null }>;
     nations: Array<{ id: number }>;
@@ -40,7 +61,7 @@ async function setup(page: Page) {
   const summary = await query<{ gameDate: { year: number; month: number } }>(page, 'world.summary', { worldId: world });
   const [ours, theirs] = map.nations;
   const target = map.cities.find((c) => c.nationId === theirs!.id)!;
-  const at = summary.gameDate.year * 12 + summary.gameDate.month - 1 + 4;
+  const at = summary.gameDate.year * 12 + summary.gameDate.month - 1 + 17;
   return {
     world,
     ours: ours!.id,
@@ -53,7 +74,6 @@ async function setup(page: Page) {
 const editor = (page: Page) => page.getByTestId('turn-editor');
 
 test.describe('국가 작전판', () => {
-  test.fixme(true, 'T2-11 operation·inspection 라우터가 main에 없다. 병합 뒤 이 줄을 지운다 (docs/plans/T2-12.md)');
   test('수뇌가 작전을 만들면 판정이 아이콘과 글자로 보이고 일반 장수는 만들기 단추가 없다', async ({
     browser,
     page,
@@ -62,17 +82,27 @@ test.describe('국가 작전판', () => {
     const chief = await member(browser, s.world, s.ours, 5);
     const soldier = await member(browser, s.world, s.ours, 1);
 
+    // 기능을 끈 월드의 새 장수는 명시 휴식 30칸으로 시작한다. 이 시험의 빈 칸과 휴식은 직접 저장한다.
+    await setTurns(
+      chief.page,
+      s.world,
+      Array.from({ length: 30 }, (_, i) => (i === 16 ? { commandKey: 'rest' } : null)),
+    );
+
     await chief.page.goto(`/w/${s.world}/operations`);
     const form = chief.page.getByRole('form', { name: '작전 만들기' });
     await form.getByLabel('목표 도시').selectOption(String(s.target.key));
     await form.getByLabel('목표 연').fill(String(s.targetDate.year));
     await form.getByLabel('목표 월').fill(String(s.targetDate.month));
-    await form.getByRole('checkbox').first().check();
+    await form.getByRole('checkbox', { name: chief.name, exact: true }).check();
     await form.getByRole('button', { name: '작전 만들기' }).click();
     await expect(chief.page).toHaveURL(/\/operations\/[^/]+$/);
     const timeline = chief.page.getByTestId('operation-timeline');
     await expect(timeline.locator('tbody tr').first()).toHaveAttribute('data-verdict', /READY|LATE|WEAK|MISSING/);
     await expect(timeline).toContainText(/준비됨|늦음|미흡|없음/);
+    // 이 시험이 저장한 빈 칸과 명시 휴식이 서로 다른 글자로 보이는지 본다.
+    await expect(timeline.locator('td[data-kind="empty"]').first()).toHaveText('빈 칸');
+    await expect(timeline.locator('td[data-kind="rest"]').first()).toHaveText('휴식');
 
     await soldier.page.goto(`/w/${s.world}/operations`);
     await expect(soldier.page.getByRole('button', { name: '작전 만들기' })).toHaveCount(0);
@@ -117,13 +147,13 @@ test.describe('국가 작전판', () => {
     await expect(editor(chief.page).getByTestId('draft-state')).toHaveText('저장하지 않은 편집 1건');
 
     await chief.page.getByRole('button', { name: '내 예턴을 작전에 맞추기' }).click();
-    await chief.page.getByRole('button', { name: '초안에 넣기' }).click();
+    await chief.page.getByRole('button', { name: '초안에 넣기', exact: true }).click();
     await expect(chief.page.getByRole('alertdialog', { name: '초안 덮기 확인' })).toContainText(
       '저장하지 않은 편집 1건',
     );
     await chief.page.getByRole('button', { name: '덮고 넣기' }).click();
     await editor(chief.page).getByRole('button', { name: '저장', exact: true }).click();
-    await expect(editor(chief.page).getByRole('status')).toContainText('저장했습니다');
+    await expect(editor(chief.page).locator(':scope > [role="status"]')).toContainText('저장했습니다');
 
     const saved = await turns(chief.page, s.world);
     expect(saved.slots.some((slot) => slot.commandKey === 'attack')).toBe(true);
@@ -146,7 +176,7 @@ test.describe('국가 작전판', () => {
     });
     await chief.page.goto(`/w/${s.world}/operations/${id}`);
     await chief.page.getByRole('button', { name: '내 예턴을 작전에 맞추기' }).click();
-    await chief.page.getByRole('button', { name: '초안에 넣기' }).click();
+    await chief.page.getByRole('button', { name: '초안에 넣기', exact: true }).click();
     // 다른 탭의 저장.
     await setTurns(chief.page, s.world, [null, { commandKey: 'farm' }]);
     await editor(chief.page).getByRole('button', { name: '저장', exact: true }).click();
@@ -156,6 +186,7 @@ test.describe('국가 작전판', () => {
     );
     await editor(chief.page).getByRole('button', { name: '내 편집 다시 적용' }).click();
     await editor(chief.page).getByRole('button', { name: '저장', exact: true }).click();
+    await expect(editor(chief.page).locator(':scope > [role="status"]')).toContainText('저장했습니다');
     const saved = await turns(chief.page, s.world);
     expect(saved.slots[1]!.commandKey).toBe('farm');
     expect(saved.slots.some((slot) => slot.commandKey === 'attack')).toBe(true);
@@ -179,5 +210,73 @@ test.describe('국가 작전판', () => {
     await chief.page.goto(`/w/${s.world}`);
     await chief.page.getByRole('link', { name: '감찰' }).click();
     await expect(chief.page.getByTestId('inspection-table')).toBeVisible();
+  });
+
+  // U62-4a대로 출병 tick이 목표 연월 첫 tick보다 작아야 제때이고 같으면 늦음이다. 기준을 0/0/0으로 두어 준비 부족이 아닌 시간 경계만 본다.
+  // 목표 첫 tick은 world.summary 한 응답의 연월과 nowTick으로 따로 셈한다. operation.get 응답에서 기대값을 만들지 않는다.
+  // DB는 이 장수 행의 nextTurnTick 하나만 다음 달 첫 tick으로 옮겨 출병 칸이 목표 첫 tick에 닿게 한다. 출병은 실제 turns.set으로 저장한다.
+  test('출병 칸의 tick이 목표 연월 첫 tick과 같으면 서버와 화면 모두 늦음이다', async ({ browser, page }) => {
+    const s = await setup(page);
+    const chief = await member(browser, s.world, s.ours, 5);
+    const summary = await query<{ gameDate: { year: number; month: number }; nowTick: number }>(
+      chief.page,
+      'world.summary',
+      { worldId: s.world },
+    );
+    const monthOf = (date: { year: number; month: number }) => date.year * 12 + date.month - 1;
+    const ahead = monthOf(s.targetDate) - monthOf(summary.gameDate);
+    expect(ahead).toBeGreaterThan(1);
+    expect(ahead).toBeLessThanOrEqual(30);
+    const firstTick = (Math.floor(summary.nowTick / 10_000) + ahead) * 10_000;
+    const sortieSlot = ahead - 1;
+    const nextTurnTick = firstTick - sortieSlot * 10_000;
+
+    await withE2eDb((db) =>
+      db.general.update({ where: { worldId_id: { worldId: s.world, id: chief.generalId } }, data: { nextTurnTick } }),
+    );
+    const { revision } = await turns(chief.page, s.world);
+    const saved = await mutate<{ ok: boolean }>(chief.page, 'turns.set', {
+      worldId: s.world,
+      revision,
+      slots: Array.from({ length: 30 }, (_, i) =>
+        i === sortieSlot ? { commandKey: 'attack', args: { cityKey: s.target.key } } : null,
+      ),
+    });
+    expect(saved.ok).toBe(true);
+    const { id } = await mutate<{ id: string }>(chief.page, 'operation.create', {
+      worldId: s.world,
+      targetCityKey: s.target.key,
+      targetYear: s.targetDate.year,
+      targetMonth: s.targetDate.month,
+      min: { crew: 0, train: 0, atmos: 0 },
+      memberIds: [chief.generalId],
+    });
+
+    const detail = await query<OperationDetail>(chief.page, 'operation.get', { worldId: s.world, id });
+    expect(detail.targetDate).toEqual(s.targetDate);
+    expect(detail.targetTick).toBe(firstTick);
+    expect(detail.targetTick % 10_000).toBe(0);
+    expect(detail.target.cityKey).toBe(s.target.key);
+    expect(detail.min).toEqual({ crew: 0, train: 0, atmos: 0 });
+    expect(detail.timeline.map((m) => m.generalId)).toEqual([chief.generalId]);
+    const mine = detail.timeline.find((m) => m.generalId === chief.generalId);
+    expect(mine?.cells[0]?.tick).toBe(nextTurnTick);
+    expect(mine?.beyondWindow).toBe(false);
+    expect(mine?.sortie?.slot).toBe(sortieSlot);
+    expect(mine?.sortie?.tick).toBe(firstTick);
+    expect(mine?.sortie?.date).toEqual(s.targetDate);
+    expect(mine?.sortie?.turn.commandKey).toBe('attack');
+    expect(mine?.sortie?.turn.args).toEqual({ cityKey: s.target.key });
+    expect(mine?.cells[sortieSlot - 1]?.tick).toBe(firstTick - 10_000);
+    expect(mine?.verdict).toBe('LATE');
+
+    await chief.page.goto(`/w/${s.world}/operations/${id}`);
+    const timeline = chief.page.getByTestId('operation-timeline');
+    const line = timeline.locator(`tbody tr[data-general-id="${chief.generalId}"]`);
+    await expect(line).toHaveCount(1);
+    await expect(line).toHaveAttribute('data-verdict', 'LATE');
+    await expect(line.locator('td').first()).toBeVisible();
+    await expect(line.locator('td').first()).toContainText('늦음');
+    await expect(line.locator(`td[data-slot="${sortieSlot + 1}"]`)).toContainText('출병');
   });
 });

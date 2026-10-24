@@ -1,7 +1,8 @@
 import type { MapCity } from '../game/types';
 
-// 영토 재생의 응답 모양 (T4-35 계약). 서버 타입을 연결하기 전이라 지역 타입으로 둔다.
-// 연결할 때 실제 응답 타입이 여기에 할당되는지 satisfies로 묶어 계약이 바뀌면 타입 검사가 깨지게 한다.
+// 영토 재생이 읽는 응답의 최소 모양 (T4-35·T4-56 계약). 실제 응답 타입은 TimelapsePanel.tsx가 AppRouter에서 꺼내
+// 이 모양과 SavedFrame을 함께 만족하는지 타입 인자로 묶는다. 서버 응답이 바뀌면 웹 typecheck가 깨진다.
+// 페이지 잇기는 프레임 타입 인자를 그대로 넘겨 nations 같은 칸이 빠지지 않는다.
 export interface FrameCity {
   cityKey: number;
   nationId: number | null;
@@ -12,8 +13,8 @@ export interface TimelapseFrame {
   month: number;
   cities: readonly FrameCity[];
 }
-export interface TimelapsePage {
-  items: readonly TimelapseFrame[];
+export interface TimelapsePage<F extends TimelapseFrame = TimelapseFrame> {
+  items: readonly F[];
   nextCursor: string | null;
 }
 
@@ -21,18 +22,18 @@ export interface TimelapsePage {
 export type FrameNation =
   { kind: 'empty' } | { kind: 'stored'; id: number; name: string; color: string } | { kind: 'missing'; id: number };
 
-// 과거 표시값의 출처. 보존 계약이 정해지면 그 응답 필드에 묶은 구현 하나를 넘긴다.
+// 과거 표시값의 출처. 화면에서 쓰는 구현은 응답의 items[].nations에 묶은 displaySource.ts 하나다.
 // 지금 국가 행 값(currentNations)으로 만들지 않는다.
 export interface NationDisplaySource {
   resolve(frameTick: number, nationId: number | null): FrameNation;
 }
 
-export type JoinedFrames =
-  { ok: true; frames: TimelapseFrame[] } | { ok: false; frames: TimelapseFrame[]; error: 'order' | 'cursor' };
+export type JoinedFrames<F extends TimelapseFrame = TimelapseFrame> =
+  { ok: true; frames: F[] } | { ok: false; frames: F[]; error: 'order' | 'cursor' };
 
 // 페이지를 잇는다. 오름차순과 cursor가 계약과 다르면 정렬해서 덮지 않고 그 앞까지만 내고 오류를 알린다.
-export function joinPages(pages: readonly TimelapsePage[]): JoinedFrames {
-  const frames: TimelapseFrame[] = [];
+export function joinPages<F extends TimelapseFrame>(pages: readonly TimelapsePage<F>[]): JoinedFrames<F> {
+  const frames: F[] = [];
   for (const [i, page] of pages.entries()) {
     for (const frame of page.items) {
       const last = frames.at(-1);
@@ -55,9 +56,13 @@ export interface StoredNation {
   color: string;
 }
 
+// 영토 재생이 지도 도시에서 읽는 칸. 로그인 재생의 world.map 도시(MapCity)도, 공유 화면의 공개 지도 다섯 칸을
+// 이름만 옮긴 값도 그대로 들어간다. 지금 소유·규모·보급(nationId·level·supplied)은 요구하지 않는다 (docs/plans/T4-37.md 3.4).
+export type TimelapseMapCity = Pick<MapCity, 'key' | 'name' | 'x' | 'y' | 'links'>;
+
 // 지도 도시 하나의 이 달 모습. nation이 null이면 프레임에 그 도시가 없다.
 export interface FrameCityView {
-  city: MapCity;
+  city: TimelapseMapCity;
   nation: Exclude<FrameNation, { kind: 'missing' }> | null;
 }
 export interface LegendEntry {
@@ -70,7 +75,11 @@ export type FrameView =
 
 // 지도 좌표와 프레임 소유를 잇는다. 지도에서는 이름·좌표·연결만 쓰고 지금 소유·규모·보급은 쓰지 않는다.
 // 소유 국가 하나라도 저장값이 없으면 자료 오류라 그 프레임 전체를 그리지 않는다.
-export function frameView(frame: TimelapseFrame, map: readonly MapCity[], source: NationDisplaySource): FrameView {
+export function frameView(
+  frame: TimelapseFrame,
+  map: readonly TimelapseMapCity[],
+  source: NationDisplaySource,
+): FrameView {
   const owners = new Map<number, FrameNation>();
   const missing: number[] = [];
   const byKey = new Map<number, FrameCity>();

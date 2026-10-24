@@ -6,6 +6,7 @@ import { newSession, SESSION_SECONDS } from '../auth/session';
 import { publicProcedure, router } from '../trpc';
 import type { LimitRule, RateLimitDecision } from '../security/rateLimit';
 import { notifySessionClosed } from '@opensamguk/db';
+import { queueLoginActivity } from '../game/policy';
 
 function enforce(ctx: Context, decision: RateLimitDecision) {
   if (decision.allowed) return;
@@ -79,6 +80,7 @@ export const authRouter = router({
         await tx.session.deleteMany({ where: { id: ctx.sessionId } });
       }
       await tx.session.create({ data: { id: session.id, userId: user.id, expiresAt: session.expiresAt } });
+      await queueLoginActivity(tx, user.id);
     });
     setCookie(ctx, session.token);
     if (ctx.sessionId) {

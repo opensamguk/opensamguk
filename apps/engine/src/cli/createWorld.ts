@@ -10,15 +10,17 @@ async function main() {
       scenario: { type: 'string' },
       map: { type: 'string' },
       seed: { type: 'string' },
+      'rule-features': { type: 'string' },
       'turn-term': { type: 'string' },
       'end-year': { type: 'string' },
       name: { type: 'string' },
+      treaty: { type: 'boolean' },
       help: { type: 'boolean' },
     },
   });
   if (values.help) {
     console.log(
-      'pnpm world:create [--preset <key>] [--scenario 1030 --map che --turn-term <분>] --seed <문자열> --end-year <연도> --name <이름>',
+      'pnpm world:create [--preset <key>] [--rule-features a,b] [--scenario 1030 --map che --turn-term <분>] --seed <문자열> --end-year <연도> --name <이름> [--treaty]',
     );
     return;
   }
@@ -37,9 +39,11 @@ async function main() {
     console.log(
       JSON.stringify(
         await saveInitialWorld(db, state, {
+          ...(values['rule-features'] !== undefined ? { ruleFeatures: values['rule-features'].split(',') } : {}),
           name,
           turnTermMinutes,
           ...(preset ? { preset: { key: values.preset!, value: preset } } : {}),
+          ...(values.treaty ? { treatyFormat: 1 } : {}),
           endYear: Number(values['end-year']),
         }),
       ),

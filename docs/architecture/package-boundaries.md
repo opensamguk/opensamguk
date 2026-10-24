@@ -24,6 +24,10 @@ tools/* ───────────▶ 무엇이든 (배포물에 포함�
     `compute.ts`는 Worker 파일만 import하므로 이 코드는 Worker 묶음에만 들어갑니다. 이 두 파일도 `@opensamguk/shared/node`, engine·db 값, server 값, node 내장 모듈은 막힙니다.
   - E2: `apps/web/src/battleSim/publicUnitSet.ts`만 공개 병종표 `resources/unitset/basic.json` 하나를 상대 경로로 import합니다.
     이 파일에서만 `opensamguk/no-cross-package-relative`를 끄고 다른 상대 경로는 `no-restricted-imports`가 막습니다.
+- E3 (T4-76): `apps/web/src/mapEditor/**`, `apps/web/src/admin/maps/**`, `apps/web/src/admin/resources/**`는 `@opensamguk/rules/resources`의 값과 타입만 읽습니다. rules 본 경로와 다른 하위 경로, shared/node, engine·db 값, server 값, Node 내장 모듈은 막습니다. 기존 `mapEditor/{contract,validate,sketch}.test.ts` 세 시험만 고정물 읽기와 PNG 해제에 쓰는 `node:fs`·`node:zlib`를 허용합니다. 다른 시험 파일에는 이 예외를 열지 않습니다.
+  공개 모듈 `packages/rules/src/world/{map,validate}/`는 zod, 기존 `world/resources.ts`, 두 폴더의 형식·기하·검증 모듈만 읽습니다. 게임 실행 코드나 shared/node를 끌어올 수 없으며 경계 시험이 이를 확인합니다.
+
+지도 편집기 예외 E3 ([T4-76](../plans/T4-76.md)): `apps/web/src/mapEditor/**`에서 `@opensamguk/rules/resource-validation`의 값과 타입만 읽습니다. rules 본 경로와 다른 하위 경로, `shared/node`, engine·db, server 값, Node 내장 모듈과 다른 패키지의 상대 경로 import는 막습니다. 공개 하위 경로는 순수 schema·검증 함수·타입·상수만 내보냅니다. 화면의 기존 임시 검증 코드를 바꾸는 작업은 후속 담당이 맡습니다.
 
 ## 패키지별 책임
 

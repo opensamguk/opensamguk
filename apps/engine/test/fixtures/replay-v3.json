@@ -1,0 +1,323 @@
+{
+  "version": 3,
+  "origin": {
+    "version": 3,
+    "initial": {
+      "seed": "war-database",
+      "scenarioKey": "1030",
+      "mapKey": "che",
+      "unitSetKey": "basic",
+      "startYear": 191,
+      "statRules": { "total": 165, "min": 15, "max": 80 },
+      "unitSet": {
+        "id": "basic",
+        "name": "basic",
+        "defaultCrewTypeId": 1100,
+        "armTypes": { "1": "보병", "2": "궁병", "3": "기병" },
+        "crewTypes": [
+          {
+            "id": 1000,
+            "armType": 0,
+            "name": "성벽",
+            "attack": 100,
+            "defence": 100,
+            "speed": 7,
+            "avoid": 0,
+            "magicCoef": 0,
+            "cost": 99,
+            "rice": 9,
+            "attackCoef": [],
+            "defenceCoef": { "1": 1.2 }
+          },
+          {
+            "id": 1100,
+            "armType": 1,
+            "name": "보병",
+            "attack": 100,
+            "defence": 150,
+            "speed": 7,
+            "avoid": 10,
+            "magicCoef": 0,
+            "cost": 9,
+            "rice": 9,
+            "attackCoef": { "2": 1.2, "3": 0.8 },
+            "defenceCoef": { "2": 0.8, "3": 1.2 }
+          },
+          {
+            "id": 1200,
+            "armType": 2,
+            "name": "궁병",
+            "attack": 100,
+            "defence": 100,
+            "speed": 7,
+            "avoid": 20,
+            "magicCoef": 0,
+            "cost": 10,
+            "rice": 10,
+            "attackCoef": { "1": 0.8, "3": 1.2 },
+            "defenceCoef": { "1": 1.2, "3": 0.8 }
+          },
+          {
+            "id": 1300,
+            "armType": 3,
+            "name": "기병",
+            "attack": 150,
+            "defence": 100,
+            "speed": 7,
+            "avoid": 5,
+            "magicCoef": 0,
+            "cost": 11,
+            "rice": 11,
+            "attackCoef": { "1": 1.2, "2": 0.8 },
+            "defenceCoef": { "1": 0.8, "2": 1.2 }
+          }
+        ]
+      },
+      "cities": [
+        {
+          "cityKey": 1,
+          "name": "도시1",
+          "level": 8,
+          "region": 1,
+          "x": 345,
+          "y": 130,
+          "connections": [2],
+          "nationId": 1,
+          "population": 20000,
+          "populationMax": 50000,
+          "agriculture": 100,
+          "agricultureMax": 1000,
+          "commerce": 100,
+          "commerceMax": 1000,
+          "security": 100,
+          "securityMax": 1000,
+          "defence": 0,
+          "defenceMax": 1000,
+          "wall": 0,
+          "wallMax": 1000,
+          "trust": 80,
+          "supplied": true
+        },
+        {
+          "cityKey": 2,
+          "name": "도시2",
+          "level": 8,
+          "region": 2,
+          "x": 330,
+          "y": 215,
+          "connections": [1],
+          "nationId": 2,
+          "population": 20000,
+          "populationMax": 50000,
+          "agriculture": 100,
+          "agricultureMax": 1000,
+          "commerce": 100,
+          "commerceMax": 1000,
+          "security": 100,
+          "securityMax": 1000,
+          "defence": 0,
+          "defenceMax": 1000,
+          "wall": 0,
+          "wallMax": 1000,
+          "trust": 80,
+          "supplied": true
+        }
+      ],
+      "nations": [
+        {
+          "id": 1,
+          "name": "조조",
+          "color": "#000080",
+          "gold": 100000,
+          "rice": 100000,
+          "description": "여포에게 본거지를 빼앗긴 위기의 조조",
+          "tech": 0,
+          "philosophy": "병가",
+          "level": 2,
+          "capitalCityKey": 1,
+          "isNpc": true
+        },
+        {
+          "id": 2,
+          "name": "원소",
+          "color": "#FFFF00",
+          "gold": 100000,
+          "rice": 100000,
+          "description": "기주에서 세력을 넓이고 있는 원소",
+          "tech": 0,
+          "philosophy": "법가",
+          "level": 2,
+          "capitalCityKey": 2,
+          "isNpc": true
+        }
+      ],
+      "generals": [
+        {
+          "id": 1,
+          "userId": "replay-human-fixture",
+          "affinity": 1,
+          "name": "소제1",
+          "portraitId": null,
+          "nationId": 1,
+          "cityKey": 1,
+          "leadership": 100,
+          "strength": 11,
+          "intel": 48,
+          "officerLevel": 12,
+          "birthYear": 168,
+          "deathYear": 190,
+          "activeFromYear": 175,
+          "personality": "유지",
+          "special": null,
+          "gold": 100000,
+          "rice": 100000,
+          "crew": 10000,
+          "crewType": 1100,
+          "train": 100,
+          "atmos": 100,
+          "experience": 0,
+          "dedication": 0,
+          "age": 23,
+          "injury": 0,
+          "nextTurnTick": 100
+        }
+      ],
+      "diplomacies": [{ "nationA": 1, "nationB": 2, "state": "WAR", "untilTick": 0 }]
+    },
+    "initialStateHash": "930828fe3feca8fb864a9a8ce85219e56cb991525ba8c9e9f0a7d0e9c6681a3b",
+    "resourceHash": "cd4f078025abbe5f2cff8a1d43f6a8a33e8a28e3d5ead1ef8ac3659d5ae483ff"
+  },
+  "config": { "endYear": null, "outcomeFromSequence": 0 },
+  "inputs": [
+    {
+      "sequence": 3,
+      "generalId": 1,
+      "kind": "turns.set",
+      "status": "APPLIED",
+      "payload": {
+        "revision": 1,
+        "turns": [
+          { "commandKey": "attack", "args": { "cityKey": 2 } },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} },
+          { "commandKey": "rest", "args": {} }
+        ]
+      },
+      "result": { "revision": 2 },
+      "tick": null
+    },
+    {
+      "sequence": 4,
+      "generalId": 99,
+      "kind": "general.create",
+      "status": "APPLIED",
+      "payload": {},
+      "result": {
+        "general": {
+          "id": 99,
+          "userId": "replay-human-fixture",
+          "affinity": 1,
+          "name": "재생 시험 장수",
+          "portraitId": null,
+          "nationId": 1,
+          "cityKey": 1,
+          "leadership": 100,
+          "strength": 11,
+          "intel": 48,
+          "officerLevel": 12,
+          "birthYear": 168,
+          "deathYear": 190,
+          "activeFromYear": 201,
+          "personality": "유지",
+          "special": null,
+          "gold": 100000,
+          "rice": 100000,
+          "crew": 0,
+          "crewType": 1100,
+          "train": 100,
+          "atmos": 100,
+          "experience": 0,
+          "dedication": 0,
+          "age": 23,
+          "injury": 0,
+          "nextTurnTick": 12000
+        }
+      },
+      "tick": 10000
+    }
+  ],
+  "months": [
+    {
+      "tick": 10000,
+      "year": 191,
+      "month": 1,
+      "sequence": 2,
+      "stateHash": "5815e23d66cdb7dcc01677838f3e0402bcd465fc334d3c821b3311125409e3de",
+      "data": {
+        "nations": [
+          { "nationId": 1, "cities": 1, "generals": 1, "power": 230800, "gold": 100200, "rice": 100000 },
+          { "nationId": 2, "cities": 1, "generals": 0, "power": 221000, "gold": 100400, "rice": 100000 }
+        ],
+        "cities": [
+          { "cityKey": 1, "nationId": 1 },
+          { "cityKey": 2, "nationId": 2 }
+        ]
+      }
+    }
+  ],
+  "end": {
+    "sequence": 5,
+    "tick": 10100,
+    "reason": "UNIFIED",
+    "winnerNationId": 1,
+    "year": 191,
+    "month": 2,
+    "finalStateHash": "04e44cefa7e4cc7b7181b57dfe77381941f3adf9bfd11191b9d75abb5778500c"
+  },
+  "afterEnd": [
+    {
+      "sequence": 6,
+      "generalId": null,
+      "kind": "general.create",
+      "status": "REJECTED",
+      "payload": {},
+      "result": { "reason": "WORLD_CLOSED" },
+      "tick": 999999
+    },
+    {
+      "sequence": 7,
+      "generalId": null,
+      "kind": "turns.set",
+      "status": "REJECTED",
+      "payload": {},
+      "result": { "reason": "WORLD_CLOSED" },
+      "tick": null
+    }
+  ]
+}

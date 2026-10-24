@@ -21,16 +21,36 @@ export function cloneWorldWithRegistry(view: WorldView, registry: ExtStateRegist
   return {
     ...(ext ? { ext } : {}),
     ...(view.presetRules ? { presetRules: structuredClone(view.presetRules) as PresetRules } : {}),
+    ...(view.ruleFeatures ? { ruleFeatures: [...view.ruleFeatures] } : {}),
     startYear: view.startYear,
     cities,
     nations,
     generals,
     diplomacies: view.diplomacies.map((d) => ({ ...d })),
+    ...(view.treaties?.length
+      ? {
+          treaties: view.treaties.map((treaty) => ({
+            ...treaty,
+            clauses: treaty.clauses.map((clause) => ({ ...clause })),
+          })),
+        }
+      : {}),
+    ...(view.nationTrust?.length ? { nationTrust: view.nationTrust.map((entry) => ({ ...entry })) } : {}),
     ...(view.commandMeta
       ? { commandMeta: { nextNationId: view.commandMeta.nextNationId, offers: { ...view.commandMeta.offers } } }
       : {}),
     ...(view.nationTurns
       ? { nationTurns: structuredClone(view.nationTurns) as NonNullable<WorldState['nationTurns']> }
+      : {}),
+    ...(view.assignmentOffers && Object.keys(view.assignmentOffers).length
+      ? {
+          assignmentOffers: Object.fromEntries(
+            Object.entries(view.assignmentOffers).map(([id, offer]) => [id, { ...offer }]),
+          ),
+        }
+      : {}),
+    ...(view.officeTurns && Object.keys(view.officeTurns).length
+      ? { officeTurns: structuredClone(view.officeTurns) as NonNullable<WorldState['officeTurns']> }
       : {}),
   };
 }

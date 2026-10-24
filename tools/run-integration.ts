@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { createDb } from '../packages/db/src/index';
 import { testDatabaseUrl } from './test-database';
+import { pnpmCli } from './node-cli';
 
 const url = testDatabaseUrl(process.env);
 const databaseName = url.pathname.slice(1);
@@ -19,9 +20,10 @@ try {
 
 const env = { ...process.env, DATABASE_URL: url.href, TEST_DATABASE_URL: url.href };
 function run(args: string[]) {
-  const result = spawnSync('pnpm', args, { env, stdio: 'inherit' });
+  const result = spawnSync(...pnpmCli(args, env), { env, stdio: 'inherit' });
   if (result.error) throw new Error('통합 테스트 하위 명령을 실행하지 못했습니다.');
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 run(['--filter', '@opensamguk/db', 'migrate']);
+run(['db:init-resources']);
 run(['exec', 'vitest', 'run', '--config', 'vitest.integration.config.ts']);

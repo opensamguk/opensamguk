@@ -26,8 +26,10 @@ export async function persistCommandState(
   worldId: string,
   state: WorldState,
   at: ActionAt,
+  previous?: WorldState,
 ) {
-  const before = await loadWorld(tx, worldId);
+  // 같은 잠긴 트랜잭션에서 읽은 사본은 다시 조회하지 않는다.
+  const before = previous ?? (await loadWorld(tx, worldId));
   for (const nation of Object.values(state.nations)) {
     if (!before.nations[nation.id]) {
       await tx.nation.create({ data: { ...nation, worldId, capitalCityKey: null } });

@@ -51,3 +51,25 @@ as the name is changed.
  channel, found a company, or anything you can ever imagine. Bring your wild
  imagination into reality. Make something happen.
 ```
+
+## S2 이후 추가 출처
+
+### T4-46 추가 시나리오의 출처
+
+원작은 위 core2026 커밋 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`이고 MIT © 2025 devsam을 따른다. 원작 전체 시나리오의 출처 83행과 원문을 복사한 9종의 바이트를 fixture에 남겼다.
+
+- `resources/scenario/scenario_1010.json` → `resources/scenario/1010.json`
+- `resources/scenario/scenario_1020.json` → `resources/scenario/1020.json`
+- `resources/scenario/scenario_1040.json` → `resources/scenario/1040.json`
+- `resources/scenario/scenario_1060.json` → `resources/scenario/1060.json`
+- `resources/scenario/scenario_1070.json` → `resources/scenario/1070.json`
+- `resources/scenario/scenario_1090.json` → `resources/scenario/1090.json`, 조조 도시 목록의 두 번째 하비 하나 삭제
+- `resources/scenario/scenario_1100.json` → `resources/scenario/1100.json`, 조비 도시 목록의 두 번째 하비 하나 삭제
+- `resources/scenario/scenario_1110.json` → `resources/scenario/1110.json`, 조예 도시 목록의 두 번째 하비 하나 삭제
+- `resources/scenario/scenario_1120.json` → `resources/scenario/1120.json`
+- 위 9종의 원작 바이트 문자열과 전체 83종의 경로·blob·SHA-256 → `tools/fixtures/t4-46-scenarios.json`
+- 위 9개 사본의 내용·출처와 이 고지 전문 → `packages/db/sql/resources-scenarios.sql`
+
+각 사본과 fixture 머리에 출처를 적었다. 1090·1100·1110은 첫 번째 하비와 국가·도시 순서를 유지한다. 원작 칸과 값은 이 세 원소와 출처·식별용 칸 외에는 바꾸지 않았다. 추가한 9종의 최상위 `extends`·`general_ex`·`history`·`life`·`fiction`·`const`·`cities` 칸은 기존 1030과 같이 보존하되 로더에서 읽지 않는다. 이 처리를 나머지 미검증 시나리오로 넓히지 않는다.
+- 토너먼트 경기: `packages/logic/src/tournament/battle.ts` → `packages/rules/src/tournament/match.ts`. 등급 비율을 빼고 100합 뒤 잔여 기력으로 승자를 정하며 동률이면 원정이 이긴다. 조별 무승부 경기·HTML 기록·통계는 옮기지 않았다.
+- 첩보 단계와 비용: `packages/logic/src/actions/turn/general/che_첩보.ts` → `packages/rules/src/commands/ext/intel/`. 거리별 정보 항목과 기술 비교 경계를 옮겼고 비용은 금·쌀 각 60으로 고정한다.

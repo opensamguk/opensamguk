@@ -10,6 +10,7 @@ import { hashPassword } from './auth/password';
 import { appRouter, type AppRouter } from './router';
 import { createRateLimiter } from './security/rateLimit';
 import { registerRealtime, type RealtimeOptions } from './realtime';
+import { registerOpsHealth } from './ops/health';
 
 export async function buildServer(options: {
   db: PrismaClient;
@@ -105,6 +106,7 @@ export async function buildServer(options: {
     }
     return payload;
   });
+  registerOpsHealth(server, options.db);
   const dummyPasswordHash = await hashPassword(randomBytes(32).toString('hex'));
 
   await server.register(fastifyTRPCPlugin, {

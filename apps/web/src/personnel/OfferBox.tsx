@@ -28,13 +28,14 @@ export function OfferBox({ worldId }: { worldId: string }) {
         <OfferCard
           offer={offer}
           busy={action.busy}
+          busyLabel={action.busyLabel}
           onRespond={(accept) =>
             void action.submit({ kind: 'offer.respond', offerId: offer.id, accept }, accept ? 'accept' : 'reject')
           }
         />
       ) : action.busy ? (
         <p className={styles.busy} role="status">
-          발령 응답을 처리하는 중입니다.
+          {action.state.phase === 'sending' ? '발령 응답을 보내는 중입니다.' : '발령 응답을 처리하는 중입니다.'}
         </p>
       ) : null}
     </div>
@@ -62,15 +63,23 @@ export function Notices({ notices }: { notices: Notice[] }) {
 export function OfferCard({
   offer,
   busy,
+  busyLabel = '처리 중',
   onRespond,
 }: {
   offer: AssignmentOfferView;
   busy: boolean;
+  busyLabel?: string;
   onRespond: (accept: boolean) => void;
 }) {
   const { issuer, targetCity, expires, rejectCost, respond } = offer;
   // 응답할 수 없으면 서버가 준 이유, 이 화면이 보내는 중이면 처리 중.
-  const blocked = busy ? '요청을 처리하는 중입니다.' : respond.ok ? null : respond.reason;
+  const blocked = busy
+    ? busyLabel === '보내는 중'
+      ? '요청을 보내는 중입니다.'
+      : '요청을 처리하는 중입니다.'
+    : respond.ok
+      ? null
+      : respond.reason;
   return (
     <section className={styles.offer} aria-label="발령 제안">
       <p className={styles.offerText}>
@@ -98,7 +107,7 @@ export function OfferCard({
         )}
         {busy ? (
           <span className={styles.busy} role="status">
-            처리 중
+            {busyLabel}
           </span>
         ) : null}
       </div>

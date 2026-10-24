@@ -134,9 +134,11 @@ describe('T1-11 실제 HTTP·PostgreSQL 권한', () => {
     ].sort();
     expect(home.code).toBeUndefined();
     expect(mine.code).toBeUndefined();
-    expect(Object.keys(home.data.general).sort()).toEqual(fields);
+    expect(Object.keys(home.data.general).sort()).toEqual([...fields, 'policy'].sort());
     expect(Object.keys(mine.data.general).sort()).toEqual(fields);
-    expect(home.data.general).toEqual(mine.data.general);
+    const { policy, ...homeGeneral } = home.data.general;
+    expect(policy).toEqual({ key: 'none', name: '없음' });
+    expect(homeGeneral).toEqual(mine.data.general);
     expect(mine.data).toHaveProperty('creation', null);
     expect(home.data).not.toHaveProperty('creation');
     for (const key of ['userId', 'affinity', 'turnRevision']) {
@@ -607,8 +609,8 @@ describe('T1-11 군사 명령 API·엔진 결합', () => {
       ).toMatchObject({ ok: true, revision: 1 });
       expect((await request('turns.get', { worldId }, a.cookie)).data.slots[0]).toMatchObject(turn);
       await loop.advanceTo(100);
-      const log = await db.generalLog.findUniqueOrThrow({
-        where: { worldId_generalId_tick: { worldId, generalId: 1, tick: 100 } },
+      const log = await db.generalLog.findFirstOrThrow({
+        where: { worldId, generalId: 1, tick: 100, sequence: null },
       });
       expect(log).toMatchObject({ commandKey, kind: accepted ? 'success' : 'failure' });
       if (!accepted) expect(log.text).toContain(preview.data.code);
@@ -778,7 +780,7 @@ describe('T1-11 30칸·revision·경합·재검사', () => {
     expect(result.ok).toBe(true);
     expect(result.slots).toHaveLength(30);
     expect(result.revision).toBe(1);
-    expect(result.slots[29]).toEqual({ commandKey: 'rest', args: {}, name: '휴식' });
+    expect(result.slots[29]).toEqual({ commandKey: 'rest', args: {}, name: '휴식', explicit: false });
     expect((await request('turns.get', { worldId }, a.cookie)).data).toEqual({
       revision: result.revision,
       slots: result.slots,
@@ -880,8 +882,8 @@ describe('T1-11 30칸·revision·경합·재검사', () => {
     }
     await running;
     expect((await saving).data).toMatchObject({ ok: false, reason: 'STALE', revision: 2 });
-    const log = await db.generalLog.findUniqueOrThrow({
-      where: { worldId_generalId_tick: { worldId, generalId: 1, tick: 100 } },
+    const log = await db.generalLog.findFirstOrThrow({
+      where: { worldId, generalId: 1, tick: 100, sequence: null },
     });
     expect(log).toMatchObject({ kind: 'failure', commandKey: 'farm' });
     expect(log.text).toContain('NO_GOLD');

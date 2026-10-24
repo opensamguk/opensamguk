@@ -137,6 +137,12 @@ describe('공개 지도 빈 상태', () => {
 });
 
 describe('공개 범위', () => {
+  // 서버 응답 모양(T2-24)대로 도시 key·links는 문자열이다.
+  const rawCity = (key: number, nationId: number | null, links: number[] = []) => ({
+    ...city(key, nationId, links),
+    key: String(key),
+    links: links.map(String),
+  });
   // 서버가 실수로 공개 범위 밖 값을 섞어 보낸 응답.
   const raw = {
     delayMinutes: 10,
@@ -153,8 +159,8 @@ describe('공개 범위', () => {
           month: 3,
           tick: 5,
           cities: [
-            { ...city(1, 1, [2]), supplied: false, generals: [{ name: '조조' }], troops: 5000, population: 1 },
-            { ...city(2, 1, [1]), supplied: false },
+            { ...rawCity(1, 1, [2]), supplied: false, generals: [{ name: '조조' }], troops: 5000, population: 1 },
+            { ...rawCity(2, 1, [1]), supplied: false },
           ],
           nations: [{ id: 1, name: '위', color: '#000080', gold: 9999, rice: 9999 }],
           generals: [{ id: 1, name: '조조', crew: 5000 }],
@@ -189,9 +195,34 @@ describe('공개 범위', () => {
     render(<PublicMapView data={toPublicMaps(raw)} now={now} />);
     const area = screen.getByTestId('public-map');
     expect(tabs()).toHaveLength(1);
+    expect(screen.getByRole('img', { name: '도시1, 위' })).toBeTruthy();
     expect(area.querySelector('[data-cut]')).toBeNull();
     expect(area.querySelector('[data-supplied]')).toBeNull();
     expect(area.textContent).not.toMatch(/조조|5000|9999|보급|내 위치/);
+  });
+
+  it('숫자로 읽을 수 없는 도시 키와 연결은 버리고 사본 없는 월드는 그대로 둔다', () => {
+    const map = raw.worlds[0]!.map;
+    const odd = toPublicMaps({
+      delayMinutes: 10,
+      worlds: [
+        {
+          id: 'w1',
+          name: '첫 천하',
+          status: 'PAUSED',
+          map: {
+            ...map,
+            cities: [
+              { ...rawCity(1, 1), links: ['2', '', '-3', '1.5'] },
+              { ...rawCity(2, 1), key: 'x2' },
+            ],
+          },
+        },
+        { id: 'w2', name: '둘째 천하', status: 'RUNNING', map: null },
+      ],
+    });
+    expect(odd.worlds[0]!.map!.cities).toEqual([city(1, 1)]);
+    expect(odd.worlds[1]).toEqual({ id: 'w2', name: '둘째 천하', status: 'RUNNING', map: null });
   });
 
   it('모양이 틀린 응답과 사본은 버린다', () => {

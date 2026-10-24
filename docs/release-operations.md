@@ -20,7 +20,22 @@
 
 ## 4. 백업과 복구
 
-<!-- TODO(M2): 매일 pg_dump, 7일 보관 (NFR-14). 복구 리허설 절차 (AC-M2-09). -->
+T2-15 B1은 검토 중입니다. `tools/backup.sh`와 `tools/restore.sh`는 지정한 기존 컨테이너만 사용합니다. 컨테이너 ID 64자와 PostgreSQL `system_identifier`를 대조하며 compose를 탐색하거나 컨테이너를 기동하지 않습니다. `DOCKER_HOST`는 로컬 daemon으로 명시하고 `DOCKER_CONFIG`는 소유 빈 디렉터리로 지정합니다. 비밀번호나 연결 URL을 인자로 주지 않습니다. 컨테이너 안 local socket 인증이 맞지 않으면 멈춥니다.
+
+```sh
+bash tools/backup.sh --docker <docker 절대 경로> --container <64자 ID> --system-identifier <숫자> --db-user <role> --admin-db <카탈로그 DB> --source-db <원본 DB> --backup-dir <절대 경로> --reason rehearsal --release-sha <검토한 실제 소스 커밋 40자 SHA>
+bash tools/restore.sh --docker <docker 절대 경로> --container <64자 ID> --system-identifier <숫자> --db-user <role> --admin-db <카탈로그 DB> --archive <dump 절대 경로> --manifest <manifest 절대 경로> --target-db <새 t215_dst_UUID32_test 이름>
+```
+
+Windows 시험은 PATH의 Bash 대신 `C:/Program Files/Git/bin/bash.exe`를 사용합니다. `rehearsal`·`pre-deploy` 백업은 다른 연결이 없고 유효한 엔진 리스가 없는 원본만 받습니다. 덤프 전후의 표·sequence 내용 해시도 같아야 합니다. `daily`는 덤프 snapshot을 기준으로 하며 내용 해시는 남기지 않습니다. 바이너리는 Bash 파일 redirection으로 전달합니다.
+
+dump와 성공 manifest가 한 쌍이어야 백업 성공입니다. manifest에는 아카이브 SHA-256과 같은 snapshot의 적용 migration 목록을 남깁니다. 성공 실행 뒤에만 7일보다 오래된 성공 백업을 정리합니다. 외부 복사는 `not-configured`입니다. 매일 실행할 일정 설치와 외부 복사는 아직 하지 않았습니다.
+
+복구는 새 리허설 대상만 받으며 기존 DB를 덮어쓰지 않습니다. 복원 실패 시 이번 실행이 만든 대상의 OID와 연결 0을 확인해야 삭제합니다. 운영 복구 대상의 비밀 파일·cutover 계약은 B2·B3 배정 전이므로 운영 복구는 거부합니다.
+
+리허설의 준비와 각 진행 단계는 자체 20초 기한을 둡니다. 기한을 넘기면 다음 진행을 막고 남은 작업의 종료를 기다린 뒤 자기 DB만 정리합니다. 기존 시험의 30초 상한은 늘리지 않습니다. 실제 준비·정리 시간은 아직 확인하지 않았습니다.
+
+실제 리허설은 아직 실행하지 않았습니다. 부모가 기존 전용 PG 슬롯과 `T215_*` 입력을 배정해야 합니다. local 인증, stdin 순차 `pg_restore`, archive 사본의 오프라인 설치·generate 30초 내 완료는 미검증입니다. backup의 필수 `--release-sha`는 40자리 16진 문자열을 그대로 manifest에 기록합니다. 누락·형식 오류는 Docker 호출과 파일 생성 전에 거부하며 Git fallback은 없습니다. B1은 검토한 실제 소스 HEAD를 전달해 manifest와 대조합니다. B2가 운영 current SHA를 얻어 전달할 방법을 정합니다. 추적 수정이 없는 시험 대상 커밋이 필요하며 현재 작업은 커밋하지 않았습니다. 단위·정적 검증만으로 AC-M2-09를 완료 처리하지 않습니다.
 
 ## 5. 프록시 경로
 

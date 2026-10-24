@@ -49,6 +49,7 @@ it('실제 가속 자식은 배치·리스 갱신·2초 정지·재개·SIGKILL 
   const initial = await monthlyFixture();
   initial.generals = [{ ...initial.generals[0]!, userId: user.id }];
   const { worldId } = await saveInitialWorld(db, initial, {
+    replayFormat: 'legacy',
     name: '끝없는 가속 시험',
     turnTermMinutes: 60,
     endYear: null,

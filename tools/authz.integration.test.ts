@@ -20,6 +20,7 @@ const app = await buildServer({ db, now: () => now, publicOrigin: origin, loggin
 const password = randomUUID();
 let base: string;
 let worldId: string;
+let endedWorldId: string;
 let users: Array<{ id: string; email: string }>;
 let state: Awaited<ReturnType<typeof readFixture>>;
 const paths = [
@@ -46,6 +47,7 @@ const paths = [
   'records.nation',
   'records.world',
   'timelapse.frames',
+  'timelapse.publicFrames',
   'ranking.generals',
   'ranking.nations',
 ] as const;
@@ -54,6 +56,7 @@ function input(path: Path): unknown {
   if (['health', 'auth.me', 'auth.logout', 'world.list', 'world.publicMaps'].includes(path)) return undefined;
   if (path === 'auth.signup') return { email: `${randomUUID()}@example.test`, password };
   if (path === 'auth.login') return { email: users[0]!.email, password };
+  if (path === 'timelapse.publicFrames') return { worldId: endedWorldId };
   if (path === 'general.create')
     return { worldId, name: '보안장수', leadership: 55, strength: 55, intel: 55, portraitId: 10001 };
   if (path === 'turns.set') return { worldId, revision: 0, slots: Array.from({ length: 30 }, () => null) };
@@ -120,6 +123,45 @@ beforeAll(async () => {
   state.generals[2]!.userId = users[1]!.id;
   ({ worldId } = await saveInitialWorld(db, state, { name: '권한 대조', turnTermMinutes: 60, endYear: null }));
   await db.world.update({ where: { id: worldId }, data: { status: 'RUNNING', clockAnchorAt: new Date(now) } });
+  ({ worldId: endedWorldId } = await saveInitialWorld(db, state, {
+    name: '종료 월드 권한 대조',
+    turnTermMinutes: 60,
+    endYear: null,
+  }));
+  await db.world.update({ where: { id: endedWorldId }, data: { status: 'ENDED' } });
+  await db.worldResult.create({
+    data: {
+      worldId: endedWorldId,
+      reason: 'END_YEAR',
+      endedYear: 191,
+      endedMonth: 1,
+      endedTick: 10000,
+      endedSequence: 1,
+      remainingNations: state.nations.length,
+      finalStateHash: 'public-timelapse-final',
+      endedAt: new Date(now),
+    },
+  });
+  await db.yearbookSnapshot.create({
+    data: {
+      worldId: endedWorldId,
+      tick: 10000,
+      year: 191,
+      month: 1,
+      sequence: 1,
+      stateHash: 'public-timelapse-frame',
+      data: { cities: state.cities.map(({ cityKey, nationId }) => ({ cityKey, nationId })) },
+    },
+  });
+  await db.yearbookNation.createMany({
+    data: state.nations.map(({ id, name, color }) => ({
+      worldId: endedWorldId,
+      tick: 10000,
+      nationId: id,
+      name,
+      color,
+    })),
+  });
   base = await app.listen({ host: '127.0.0.1', port: 0 });
 });
 afterAll(async () => {
@@ -136,7 +178,11 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
       it(
         `${path} ${category}`,
         authzCase(path, category, async () => {
-          const publicPath = path.startsWith('auth.') || path === 'health' || path === 'world.publicMaps';
+          const publicPath =
+            path.startsWith('auth.') ||
+            path === 'health' ||
+            path === 'world.publicMaps' ||
+            path === 'timelapse.publicFrames';
           const cookie =
             category === 'unauthenticated'
               ? undefined
@@ -149,11 +195,27 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
               : path === 'auth.login' && category === 'sanctioned'
                 ? { email: users[2]!.email, password }
                 : input(path);
+          const commandsOwner = path === 'commands.list' && category === 'otherUser' ? await session() : undefined;
           const before = await snapshot();
           const result = await request(path, data, cookie);
           if (category === 'otherUser') {
-            // 이 월드에 자기 장수가 없는 사용자는 남의 장수·예턴·기록을 대신 고를 수 없다.
-            expect(result.code).toBe('NOT_FOUND');
+            if (path === 'commands.list') {
+              const owner = await request(path, data, commandsOwner);
+              expect(owner.status).toBe(200);
+              expect(owner.code).toBeUndefined();
+              expect(result.status).toBe(200);
+              expect(result.code).toBeUndefined();
+              expect(result.data).toEqual(owner.data);
+              expect(result.data).toEqual(
+                expect.arrayContaining([
+                  expect.objectContaining({ key: 'rest' }),
+                  expect.objectContaining({ key: 'farm' }),
+                ]),
+              );
+            } else {
+              // 이 월드에 자기 장수가 없는 사용자는 남의 장수·예턴·기록을 대신 고를 수 없다.
+              expect(result.code).toBe('NOT_FOUND');
+            }
             expect(await snapshot()).toEqual(before);
           } else if (category === 'invalidInput') {
             expect(result.code).toBe('BAD_REQUEST');
@@ -180,6 +242,12 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
             }
             if (path === 'turns.set' || path === 'turns.edit') expect((result.data as { ok: boolean }).ok).toBe(true);
             if (path === 'health') expect(result.data).toMatchObject({ server: 'ok', db: 'ok' });
+            if (path === 'timelapse.publicFrames') {
+              const data = result.data as { items: unknown[]; map: unknown };
+              expect(data.items).toHaveLength(1);
+              expect(data.map).not.toBeNull();
+              if (category === 'sanctioned') expect(result.data).toEqual((await request(path, input(path))).data);
+            }
           }
         }),
       );

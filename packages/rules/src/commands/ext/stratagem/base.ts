@@ -1,12 +1,13 @@
 // core2026 df6c926 packages/logic/src/actions/turn/general/strategyCommand.ts의 계략 확률·피해 공식을 옮겼다.
 // MIT (c) 2025 devsam. resources/NOTICE.md.
 import { z } from 'zod';
+import type { Rng } from '@opensamguk/shared';
 import { toGameDate } from '../../../clock/clock';
 import type { WorldView } from '../../../model/world';
 import type { InitialGeneral } from '../../../world/bootstrap';
 import type { CityField, Effect } from '../../effects';
 import { fail, ownCity, positive, relation } from '../../support';
-import type { Actor, CommandDef, CommandResult, Failure } from '../../types';
+import type { Actor, CommandResult, Failure } from '../../types';
 
 // S1: 연도와 무관하게 금·쌀 각 100. S2: 부상으로 능력치를 줄이지 않는다.
 // S3: 부상 80 이상은 유지. S4: 불탐 표시·성공 횟수·별도 능력치 경험은 생략한다.
@@ -27,14 +28,14 @@ export const STRATAGEM = {
 
 type Stat = 'leadership' | 'strength' | 'intel';
 type General = WorldView['generals'][number];
-type Spec = {
+export type StratagemSpec = {
   key: string;
   name: string;
   stat: Stat;
   fields?: readonly [CityField, CityField];
   labels?: readonly [string, string];
 };
-const argsSchema = z.strictObject({ cityKey: positive });
+export const stratagemArgs = z.strictObject({ cityKey: positive });
 
 export function effectiveStat(general: Pick<InitialGeneral, Stat>, stat: Stat): number {
   const cross = stat === 'strength' ? general.intel : stat === 'intel' ? general.strength : 0;
@@ -86,10 +87,10 @@ export function plunderYearCoefficient(startYear: number, year: number): number 
   return Math.sqrt(1 + Math.max(0, year - startYear) / 4) / 2;
 }
 
-function check(view: WorldView, actor: Actor, raw: unknown): Failure | null {
+export function checkStratagem(view: WorldView, actor: Actor, raw: unknown): Failure | null {
   const failure = ownCity(view, actor);
   if (failure) return failure;
-  const parsed = argsSchema.safeParse(raw);
+  const parsed = stratagemArgs.safeParse(raw);
   if (!parsed.success) return fail('BAD_ARGS', '명령 인자가 잘못되었습니다.');
   const general = view.generals[actor.generalId]!;
   const city = view.cities[parsed.data.cityKey];
@@ -103,121 +104,116 @@ function check(view: WorldView, actor: Actor, raw: unknown): Failure | null {
   return null;
 }
 
-export function makeStratagem(spec: Spec): CommandDef {
+export function executeStratagem(
+  spec: StratagemSpec,
+  view: WorldView,
+  actor: Actor,
+  raw: unknown,
+  rng: Rng,
+): CommandResult {
+  const failure = checkStratagem(view, actor, raw);
+  if (failure) throw new Error(failure.message);
+  const { cityKey } = stratagemArgs.parse(raw);
+  const general = view.generals[actor.generalId]!;
+  const city = view.cities[cityKey]!;
+  const year = toGameDate(view.startYear, actor.tick ?? 0).year;
+  const success = rng.next() < stratagemProbability(view, actor, cityKey, spec.stat);
+  const injuries: Effect[] = [];
+  const reports: NonNullable<CommandResult['reports']> = [];
+  if (success && spec.fields) {
+    for (const defender of stratagemDefenders(view, cityKey, year)) {
+      if (rng.next() >= STRATAGEM.INJURY_PROBABILITY) continue;
+      // 80 이상도 같은 난수를 소비해 뒤의 피해·성장 스트림을 보존한다.
+      const injury = rng.int(1, 16);
+      if (defender.injury < STRATAGEM.INJURY_MAX)
+        injuries.push({
+          kind: 'general',
+          id: defender.id,
+          field: 'injury',
+          op: 'set',
+          value: Math.min(80, defender.injury + injury),
+        });
+      for (const field of ['crew', 'atmos', 'train'] as const)
+        injuries.push({
+          kind: 'general',
+          id: defender.id,
+          field,
+          op: 'set',
+          value: Math.round(defender[field] * 0.98),
+        });
+      reports.push({ generalId: defender.id, text: `${city.name}: 계략으로 다쳤습니다.` });
+    }
+  }
+  const damage: Effect[] = [];
+  let primary = 0;
+  let secondary = 0;
+  if (success) {
+    primary = rng.int(STRATAGEM.DAMAGE_MIN, STRATAGEM.DAMAGE_MAX);
+    secondary =
+      spec.key === 'incite' ? (100 + rng.next() * 700) / 50 : rng.int(STRATAGEM.DAMAGE_MIN, STRATAGEM.DAMAGE_MAX);
+    if (spec.fields) {
+      primary = Math.min(primary, city[spec.fields[0]]);
+      secondary = Math.min(secondary, city[spec.fields[1]]);
+      damage.push(
+        { kind: 'city', id: cityKey, field: spec.fields[0], op: 'add', value: -primary },
+        { kind: 'city', id: cityKey, field: spec.fields[1], op: 'add', value: -secondary },
+      );
+    } else {
+      const targetNation = view.nations[city.nationId!]!;
+      const coefficient = city.level * plunderYearCoefficient(view.startYear, year);
+      primary = Math.min(
+        primary * coefficient * (0.25 + city.commerce / city.commerceMax / 4),
+        Math.max(0, targetNation.gold),
+      );
+      secondary = Math.min(
+        secondary * coefficient * (0.25 + city.agriculture / city.agricultureMax / 4),
+        Math.max(0, targetNation.rice),
+      );
+      // 정수 자원 효과의 .5 반올림으로 자원이 늘지 않도록 총량을 먼저 고정한다.
+      primary = Math.round(primary);
+      secondary = Math.round(secondary);
+      const goldShare = Math.round(primary * 0.7);
+      const riceShare = Math.round(secondary * 0.7);
+      damage.push(
+        { kind: 'nation', id: targetNation.id, field: 'gold', op: 'add', value: -primary },
+        { kind: 'nation', id: targetNation.id, field: 'rice', op: 'add', value: -secondary },
+        { kind: 'nation', id: general.nationId!, field: 'gold', op: 'add', value: goldShare },
+        { kind: 'nation', id: general.nationId!, field: 'rice', op: 'add', value: riceShare },
+        { kind: 'general', id: general.id, field: 'gold', op: 'add', value: primary - goldShare },
+        { kind: 'general', id: general.id, field: 'rice', op: 'add', value: secondary - riceShare },
+      );
+    }
+  }
+  const experience = success ? rng.int(201, 300) : rng.int(1, 100);
+  const dedication = success ? rng.int(141, 210) : rng.int(1, 70);
+  const effects: Effect[] = [
+    { kind: 'general', id: general.id, field: 'gold', op: 'add', value: -STRATAGEM.COST_GOLD },
+    { kind: 'general', id: general.id, field: 'rice', op: 'add', value: -STRATAGEM.COST_RICE },
+    { kind: 'general', id: general.id, field: 'experience', op: 'add', value: experience },
+    { kind: 'general', id: general.id, field: 'dedication', op: 'add', value: dedication },
+    ...injuries,
+    ...damage,
+  ];
+  if (!success) return { effects, logs: [{ kind: 'success', text: `${spec.name} 실패: ${city.name}` }] };
+  const amounts = spec.fields
+    ? `${spec.labels![0]} ${primary}, ${spec.labels![1]} ${spec.key === 'incite' ? secondary.toFixed(1) : secondary} 감소`
+    : `금 ${Math.round(primary)}, 쌀 ${Math.round(secondary)}`;
   return {
-    key: spec.key,
-    name: spec.name,
-    category: 'strategy',
-    target: 'general',
-    args: argsSchema,
-    check,
-    precheck: check,
-    execute(view, actor, raw, rng) {
-      const failure = check(view, actor, raw);
-      if (failure) throw new Error(failure.message);
-      const { cityKey } = argsSchema.parse(raw);
-      const general = view.generals[actor.generalId]!;
-      const city = view.cities[cityKey]!;
-      const year = toGameDate(view.startYear, actor.tick ?? 0).year;
-      const success = rng.next() < stratagemProbability(view, actor, cityKey, spec.stat);
-      const injuries: Effect[] = [];
-      const reports: NonNullable<CommandResult['reports']> = [];
-      if (success && spec.fields) {
-        for (const defender of stratagemDefenders(view, cityKey, year)) {
-          if (rng.next() >= STRATAGEM.INJURY_PROBABILITY) continue;
-          // 80 이상도 같은 난수를 소비해 뒤의 피해·성장 스트림을 보존한다.
-          const injury = rng.int(1, 16);
-          if (defender.injury < STRATAGEM.INJURY_MAX)
-            injuries.push({
-              kind: 'general',
-              id: defender.id,
-              field: 'injury',
-              op: 'set',
-              value: Math.min(80, defender.injury + injury),
-            });
-          for (const field of ['crew', 'atmos', 'train'] as const)
-            injuries.push({
-              kind: 'general',
-              id: defender.id,
-              field,
-              op: 'set',
-              value: Math.round(defender[field] * 0.98),
-            });
-          reports.push({ generalId: defender.id, text: `${city.name}: 계략으로 다쳤습니다.` });
-        }
-      }
-      const damage: Effect[] = [];
-      let primary = 0;
-      let secondary = 0;
-      if (success) {
-        primary = rng.int(STRATAGEM.DAMAGE_MIN, STRATAGEM.DAMAGE_MAX);
-        secondary =
-          spec.key === 'incite' ? (100 + rng.next() * 700) / 50 : rng.int(STRATAGEM.DAMAGE_MIN, STRATAGEM.DAMAGE_MAX);
-        if (spec.fields) {
-          primary = Math.min(primary, city[spec.fields[0]]);
-          secondary = Math.min(secondary, city[spec.fields[1]]);
-          damage.push(
-            { kind: 'city', id: cityKey, field: spec.fields[0], op: 'add', value: -primary },
-            { kind: 'city', id: cityKey, field: spec.fields[1], op: 'add', value: -secondary },
-          );
-        } else {
-          const targetNation = view.nations[city.nationId!]!;
-          const coefficient = city.level * plunderYearCoefficient(view.startYear, year);
-          primary = Math.min(
-            primary * coefficient * (0.25 + city.commerce / city.commerceMax / 4),
-            Math.max(0, targetNation.gold),
-          );
-          secondary = Math.min(
-            secondary * coefficient * (0.25 + city.agriculture / city.agricultureMax / 4),
-            Math.max(0, targetNation.rice),
-          );
-          // 정수 자원 효과의 .5 반올림으로 자원이 늘지 않도록 총량을 먼저 고정한다.
-          primary = Math.round(primary);
-          secondary = Math.round(secondary);
-          const goldShare = Math.round(primary * 0.7);
-          const riceShare = Math.round(secondary * 0.7);
-          damage.push(
-            { kind: 'nation', id: targetNation.id, field: 'gold', op: 'add', value: -primary },
-            { kind: 'nation', id: targetNation.id, field: 'rice', op: 'add', value: -secondary },
-            { kind: 'nation', id: general.nationId!, field: 'gold', op: 'add', value: goldShare },
-            { kind: 'nation', id: general.nationId!, field: 'rice', op: 'add', value: riceShare },
-            { kind: 'general', id: general.id, field: 'gold', op: 'add', value: primary - goldShare },
-            { kind: 'general', id: general.id, field: 'rice', op: 'add', value: secondary - riceShare },
-          );
-        }
-      }
-      const experience = success ? rng.int(201, 300) : rng.int(1, 100);
-      const dedication = success ? rng.int(141, 210) : rng.int(1, 70);
-      const effects: Effect[] = [
-        { kind: 'general', id: general.id, field: 'gold', op: 'add', value: -STRATAGEM.COST_GOLD },
-        { kind: 'general', id: general.id, field: 'rice', op: 'add', value: -STRATAGEM.COST_RICE },
-        { kind: 'general', id: general.id, field: 'experience', op: 'add', value: experience },
-        { kind: 'general', id: general.id, field: 'dedication', op: 'add', value: dedication },
-        ...injuries,
-        ...damage,
-      ];
-      if (!success) return { effects, logs: [{ kind: 'success', text: `${spec.name} 실패: ${city.name}` }] };
-      const amounts = spec.fields
-        ? `${spec.labels![0]} ${primary}, ${spec.labels![1]} ${spec.key === 'incite' ? secondary.toFixed(1) : secondary} 감소`
-        : `금 ${Math.round(primary)}, 쌀 ${Math.round(secondary)}`;
-      return {
-        effects,
-        logs: [
-          {
-            kind: 'success',
-            text: `${spec.name} 성공: ${city.name} ${amounts}${spec.fields ? `, 장수 ${reports.length}명 부상` : ' 획득'}`,
-          },
-        ],
-        ...(spec.fields ? { reports } : {}),
-        history: [
-          {
-            nationId: city.nationId!,
-            text: spec.fields
-              ? `${city.name}: ${spec.name}${spec.key === 'incite' ? '으로' : '로'} ${amounts}`
-              : `${city.name}: ${amounts} 도난`,
-          },
-        ],
-      };
-    },
+    effects,
+    logs: [
+      {
+        kind: 'success',
+        text: `${spec.name} 성공: ${city.name} ${amounts}${spec.fields ? `, 장수 ${reports.length}명 부상` : ' 획득'}`,
+      },
+    ],
+    ...(spec.fields ? { reports } : {}),
+    history: [
+      {
+        nationId: city.nationId!,
+        text: spec.fields
+          ? `${city.name}: ${spec.name}${spec.key === 'incite' ? '으로' : '로'} ${amounts}`
+          : `${city.name}: ${amounts} 도난`,
+      },
+    ],
   };
 }

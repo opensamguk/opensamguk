@@ -2,7 +2,10 @@ import type { Prisma } from '@opensamguk/db';
 import { BALANCE } from '@opensamguk/rules';
 import { z } from 'zod';
 
-type General = Omit<Prisma.GeneralGetPayload<true>, 'battleWins' | 'captures' | 'noticeSeen'>;
+type General = Omit<
+  Prisma.GeneralGetPayload<true>,
+  'battleWins' | 'captures' | 'noticeSeen' | 'defaultPolicy' | 'lastActiveTick' | 'lastActiveAt'
+>;
 type City = Prisma.CityGetPayload<true>;
 type Nation = Omit<Prisma.NationGetPayload<true>, 'notice' | 'noticeRevision' | 'noticeUpdatedAt' | 'noticeUpdatedBy'>;
 export type Viewer = Pick<General, 'id' | 'nationId' | 'cityKey'> | null;
@@ -142,6 +145,18 @@ export const publicNationDisplaySelect = {
   name: true,
   color: true,
 } as const satisfies Prisma.NationSelect;
+
+export const publicTimelapseCitySelect = {
+  cityKey: true,
+  name: true,
+  x: true,
+  y: true,
+  connections: true,
+} as const satisfies Prisma.CitySelect;
+
+export function publicTimelapseCityInfo(city: Prisma.CityGetPayload<{ select: typeof publicTimelapseCitySelect }>) {
+  return { cityKey: city.cityKey, name: city.name, x: city.x, y: city.y, connections: city.connections };
+}
 
 const publicMapData = z.object({
   cities: z.array(

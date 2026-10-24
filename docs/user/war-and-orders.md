@@ -62,8 +62,16 @@
 
 > 원작과 다른 점
 >
-> 같은 나라 장수들이 공격 목표와 시점을 맞추는 작전판을 준비 중입니다. 지금은 메시지 기능도 없어서 시점 맞추기는 게임 밖에서 합니다.
+> 같은 나라 장수들은 메뉴의 [작전]에서 공격 목표와 시점을 맞춥니다. 원작에는 없는 작전판입니다.
+
+군주·참모·수뇌는 목표 도시, 목표 연월, 기준 병력·훈련·사기, 참여 장수를 골라 작전을 만듭니다. 지난 연월은 목표로 정할 수 없고 서버가 그 이유를 보여 줍니다. 목표가 예턴 30칸보다 멀어도 만들 수 있습니다.
+
+작전 상세에는 참여 장수마다 달별 예턴이 명령과 인자까지 보이고 판정이 붙습니다. 판정은 ○ 준비됨, △ 미흡, ! 늦음, ✕ 없음이며 예턴만 보고 낸 예상입니다. 출병이 목표 연월에 들어서기 전에 실행되어야 제때입니다. 목표 연월에 들어선 뒤의 출병은 그 달 첫 턴이라도 늦음입니다. 30칸이 목표에 닿지 않으면 아직 판정할 수 없다고 적습니다.
+비워 둔 칸은 빈 칸으로, 직접 넣은 휴식은 휴식으로 보입니다. 다른 장수의 빈 칸이 어떤 방침 명령을 할지는 적지 않습니다. 월드가 멈췄거나 시작 전이면 시각 대신 게임 연월만 보입니다.
+
+참여 장수는 [내 예턴을 작전에 맞추기]로 바뀌는 칸의 지금과 제안을 나란히 봅니다. [초안에 넣기]는 그 칸만 아래 예턴 편집기 초안에 넣고 반영은 편집기의 [저장]으로 합니다. 저장하지 않은 편집이 있으면 덮기 전에 묻습니다.
+제안을 만들 수 없으면 그 이유가 보이고 넣기가 막힙니다. 칸마다 붙는 경고는 지금 상태로 본 검사라 실행할 때 다시 검사합니다. 작전을 닫는 일은 만든 장수나 군주가 합니다.
 
 다음은 [지도와 보급](./map-and-supply.md)입니다.
 
-근거: `packages/rules/src/commands/military.ts`, `packages/rules/src/commands/attack.ts`, `packages/rules/src/battle/simulate.ts`, `resources/unitset/basic.json`, `packages/rules/src/balance.ts`, `apps/web/src/battleSim/BattleSimPage.tsx`
+근거: `packages/rules/src/commands/military.ts`, `packages/rules/src/commands/attack.ts`, `packages/rules/src/battle/simulate.ts`, `resources/unitset/basic.json`, `packages/rules/src/balance.ts`, `apps/web/src/battleSim/BattleSimPage.tsx`, `apps/server/src/game/operation.ts`, `packages/rules/src/operation/suggest.ts`, `apps/web/src/operations/OperationDetailPage.tsx`

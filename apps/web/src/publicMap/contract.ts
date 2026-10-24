@@ -1,49 +1,12 @@
-import { queryOptions } from '@tanstack/react-query';
-import { trpcClient } from '../trpc';
-import { toPublicMaps, type PublicMaps } from './publicMaps';
+import type { AppRouter } from '@opensamguk/server/router';
+import type { inferRouterOutputs } from '@trpc/server';
+import type { MapCity, MapNation } from '../game/types';
 
-// 임시 계약. docs/plans/T2-24.md의 조회(서버) 절에 적힌 world.publicMaps 응답 모양을 따른다.
-// Codex API가 main에 들어오면 AppRouter 타입으로 바꾼다. 그때 이 파일의 캐스트와 PublicMapsRaw를 지우고
-// trpc.world.publicMaps.queryOptions()를 쓴다. 쿼리 키는 tRPC 키 모양과 같게 두어 그대로 이어진다.
-// 계획은 PublicCity의 key·links를 string으로 적었지만 근거로 든 mapCity(apps/server/src/visibility.ts)는 number다. 여기서는 number로 받는다.
+// 공개 지도 응답 모양. AppRouter 타입에서만 꺼낸다 (T2-24 API 계약, 패키지 경계).
+// 조회는 화면에서 trpc.world.publicMaps.queryOptions로 부른다. 서버 사본의 도시 key·links는 문자열이다.
+export type PublicMapsOutput = inferRouterOutputs<AppRouter>['world']['publicMaps'];
+export type PublicWorldStatus = PublicMapsOutput['worlds'][number]['status'];
 
-export interface PublicCity {
-  key: number;
-  name: string;
-  level: number;
-  x: number;
-  y: number;
-  nationId: number | null;
-  links: number[];
-}
-
-export interface PublicNation {
-  id: number;
-  name: string;
-  color: string;
-}
-
-export interface PublicMapsRaw {
-  delayMinutes: number;
-  worlds: Array<{
-    id: string;
-    name: string;
-    status: 'RUNNING' | 'PAUSED';
-    map: null | { takenAt: string; year: number; month: number; cities: PublicCity[]; nations: PublicNation[] };
-  }>;
-}
-
-interface PublicMapsClient {
-  world: { publicMaps: { query: () => Promise<unknown> } };
-}
-
-const client = trpcClient as unknown as PublicMapsClient;
-
-// 사본은 엔진이 5분마다 찍는다(T2-24). 1분마다 다시 받으면 새 사본이 늦어도 1분 안에 보인다.
-export const publicMapsQueryOptions = () =>
-  queryOptions<PublicMaps>({
-    queryKey: [['world', 'publicMaps'], { type: 'query' }],
-    queryFn: async () => toPublicMaps(await client.world.publicMaps.query()),
-    staleTime: 60_000,
-    refetchInterval: 60_000,
-  });
+// 화면이 쓰는 도시는 메인 지도(WorldMap)와 같은 숫자 키 단위다. 보급 값은 받지 않는다.
+export type PublicCity = Omit<MapCity, 'supplied'>;
+export type PublicNation = Pick<MapNation, 'id' | 'name' | 'color'>;

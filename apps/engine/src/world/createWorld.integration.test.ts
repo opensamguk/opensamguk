@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb } from '@opensamguk/db';
 import { hashState } from '@opensamguk/shared/node';
-import { loadInitialWorld } from './resources';
+import { loadInitialWorldFromDb } from './resources';
 import { readWorldState, saveInitialWorld } from './persistence';
 
 const url = process.env.TEST_DATABASE_URL;
@@ -21,10 +21,39 @@ afterAll(async () => {
 });
 
 describe('AC-M1-03 실제 DB 월드 생성', () => {
+  const cliArgs = [
+    '--scenario',
+    '1030',
+    '--map',
+    'che',
+    '--seed',
+    'cli-seed',
+    '--turn-term',
+    '7',
+    '--end-year',
+    '300',
+    '--name',
+    'CLI 통합 검증',
+  ];
+  const runCli = (args: readonly string[]) =>
+    execFileSync(
+      process.execPath,
+      ['--env-file-if-exists=.env', '--import', 'tsx', 'apps/engine/src/cli/createWorld.ts', ...args],
+      {
+        cwd: new URL('../../../../', import.meta.url),
+        env: { ...process.env, DATABASE_URL: url },
+        encoding: 'utf8',
+        timeout: 30_000,
+      },
+    );
+
   it('94개 도시·21개 국가·491명·외교 7쌍을 저장하고 재적재 해시가 같다', async () => {
-    const state = await loadInitialWorld(input);
+    const state = await loadInitialWorldFromDb(db, input);
     const first = await saveInitialWorld(db, state, options);
-    const second = await saveInitialWorld(db, await loadInitialWorld(input), { ...options, name: '두 번째 월드' });
+    const second = await saveInitialWorld(db, await loadInitialWorldFromDb(db, input), {
+      ...options,
+      name: '두 번째 월드',
+    });
     expect(second.worldId).not.toBe(first.worldId);
     for (const result of [first, second]) {
       const read = await readWorldState(db, result.worldId);
@@ -50,7 +79,7 @@ describe('AC-M1-03 실제 DB 월드 생성', () => {
   });
 
   it('장수 저장이 실패하면 월드·국가·도시도 모두 롤백한다', async () => {
-    const state = await loadInitialWorld(input);
+    const state = await loadInitialWorldFromDb(db, input);
     state.generals[0]!.cityKey = 99999;
     const before = await Promise.all([
       db.world.count(),
@@ -72,7 +101,7 @@ describe('AC-M1-03 실제 DB 월드 생성', () => {
   });
 
   it('잘못된 이름과 턴 간격은 DB에 쓰기 전에 거부한다', async () => {
-    const state = await loadInitialWorld(input);
+    const state = await loadInitialWorldFromDb(db, input);
     const before = await db.world.count();
     for (const turnTermMinutes of [0, -1, 0.5, NaN, 2_147_483_648]) {
       await expect(saveInitialWorld(db, state, { ...options, turnTermMinutes })).rejects.toThrow('턴 간격');
@@ -87,7 +116,7 @@ describe('AC-M1-03 실제 DB 월드 생성', () => {
   });
 
   it('DB 외래키가 다른 월드 국가·도시 참조를 거부한다', async () => {
-    const state = await loadInitialWorld(input);
+    const state = await loadInitialWorldFromDb(db, input);
     const a = await saveInitialWorld(db, state, options);
     const b = await saveInitialWorld(db, state, options);
     await db.nation.create({
@@ -113,37 +142,29 @@ describe('AC-M1-03 실제 DB 월드 생성', () => {
   });
 
   it('CLI가 받은 설정을 저장하고 월드 ID와 실제 상태 해시를 출력한다', async () => {
-    const root = new URL('../../../../', import.meta.url);
-    const output = execFileSync(
-      'pnpm',
-      [
-        '-s',
-        'world:create',
-        '--scenario',
-        '1030',
-        '--map',
-        'che',
-        '--seed',
-        'cli-seed',
-        '--turn-term',
-        '7',
-        '--end-year',
-        '300',
-        '--name',
-        'CLI 통합 검증',
-      ],
-      {
-        cwd: root,
-        env: { ...process.env, DATABASE_URL: url },
-        encoding: 'utf8',
-        timeout: 30_000,
-      },
-    );
+    const output = runCli(cliArgs);
     const result = JSON.parse(output.trim().split('\n').at(-1)!) as { worldId: string; stateHash: string };
     expect(hashState(await readWorldState(db, result.worldId))).toBe(result.stateHash);
     expect(await db.world.findUniqueOrThrow({ where: { id: result.worldId } })).toMatchObject({
       name: 'CLI 통합 검증',
       turnTermMinutes: 7,
     });
+  });
+
+  it('CLI의 필수 인수 누락은 종료 코드 1이고 월드를 쓰지 않는다', async () => {
+    const before = await db.world.count();
+    let failure: unknown;
+    try {
+      runCli(cliArgs.slice(0, -2));
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toMatchObject({
+      status: 1,
+      stderr: expect.stringContaining('scenario, map, seed, turn-term, end-year, name이 필요합니다.'),
+    });
+    const { stdout, stderr } = failure as { stdout: string; stderr: string };
+    expect(`${stdout}${stderr}`.includes(url!)).toBe(false);
+    expect(await db.world.count()).toBe(before);
   });
 });

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { QueryClient } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { TRPCClientError } from '@trpc/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -203,6 +204,26 @@ describe('국가 칸 저장', () => {
     expect(JSON.stringify(input.slots)).not.toContain('name');
   });
 
+  it('저장 결과는 그 직책 탭의 revision과 칸만 바꾸고 직책 정보와 다른 탭은 그대로 둔다', () => {
+    const queryClient = new QueryClient();
+    const lord: NationTurnTab = {
+      ...tab,
+      office: { nationId: 4, officerLevel: 12, tenure: 1 },
+      officerLevel: 12,
+      title: '군주',
+      holder: { generalId: 1, name: '유비' },
+      edit: { ok: false, reason: '내 직책 칸이 아닙니다' },
+    };
+    const source = nationSource(fakeApi({}), tab, { onOfficeChanged: vi.fn() })(context);
+    queryClient.setQueryData(source.list.queryKey, { tabs: [lord, tab] });
+    const slots = tab.slots.map((slot, i) =>
+      i === 1 ? { commandKey: 'nation_reward', args: { generalId: 2, amount: 100 }, name: '포상' } : slot,
+    );
+    source.writeList(queryClient, { revision: 10, slots });
+    expect(queryClient.getQueryData(source.list.queryKey)).toEqual({ tabs: [lord, { ...tab, revision: 10, slots }] });
+    expect(source.list.select(queryClient.getQueryData(source.list.queryKey))).toEqual({ revision: 10, slots });
+  });
+
   it('남의 칸은 서버가 준 이유로 읽기 전용이고 내 칸만 실행 시기를 센다', () => {
     const other = { ...tab, edit: { ok: false as const, reason: '내 직책 칸이 아닙니다' } };
     const source = nationSource(fakeApi({}), other, { onOfficeChanged: vi.fn() })(context);
@@ -269,6 +290,15 @@ describe('발령 제안 상자', () => {
     fireEvent.click(screen.getByRole('button', { name: /수락/ }));
     expect(onRespond).not.toHaveBeenCalled();
     expect(screen.getByRole('note').textContent).toBe('요청을 처리하는 중입니다.');
+  });
+
+  it('접수 전에도 두 버튼은 막고 상태와 막힌 이유를 보내는 중으로 보인다', () => {
+    const onRespond = vi.fn();
+    render(<OfferCard offer={offer} busy busyLabel="보내는 중" onRespond={onRespond} />);
+    expect(screen.getByRole('status').textContent).toBe('보내는 중');
+    fireEvent.click(screen.getByRole('button', { name: /수락/ }));
+    expect(onRespond).not.toHaveBeenCalled();
+    expect(screen.getByRole('note').textContent).toBe('요청을 보내는 중입니다.');
   });
 
   it('응답할 수 없으면 서버가 준 이유를 펼친다', () => {
@@ -357,5 +387,25 @@ describe('인사부', () => {
     render(<PersonnelBoardView board={board} busyTarget="level-10" onAppoint={vi.fn()} onDismiss={vi.fn()} />);
     expect(screen.queryByRole('combobox')).toBeNull();
     expect(screen.getAllByRole('status').map((s) => s.closest('tr')?.getAttribute('data-level'))).toEqual(['10']);
+  });
+
+  it('인사 접수 전에는 모든 직책을 막고 보낸 직책에만 보내는 중을 보인다', () => {
+    const onAppoint = vi.fn();
+    const onDismiss = vi.fn();
+    render(
+      <PersonnelBoardView
+        board={board}
+        busyTarget="level-10"
+        busyLabel="보내는 중"
+        onAppoint={onAppoint}
+        onDismiss={onDismiss}
+      />,
+    );
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(screen.getByRole('status').textContent).toBe('보내는 중');
+    fireEvent.click(screen.getByRole('button', { name: /임명/ }));
+    expect(onAppoint).not.toHaveBeenCalled();
+    expect(onDismiss).not.toHaveBeenCalled();
+    expect(screen.getByRole('note').textContent).toBe('요청을 보내는 중입니다.');
   });
 });

@@ -7,6 +7,7 @@
     "node": ">=24"
   },
   "scripts": {
+    "e2e:public": "playwright test --config playwright.public.config.ts",
     "notice:publish": "tsx --env-file-if-exists=.env tools/notice-publish.ts",
     "dev": "pnpm --parallel --filter \"./apps/*\" dev",
     "generate": "pnpm --filter @opensamguk/db generate",
@@ -24,6 +25,10 @@
     "world:create": "pnpm --filter @opensamguk/engine world:create",
     "engine:run": "pnpm --filter @opensamguk/engine engine:run",
     "db:migrate": "pnpm --filter @opensamguk/db migrate",
+    "resources:sql": "tsx tools/resources-sql/generate.ts",
+    "resources:sql:scenarios": "tsx tools/resources-sql/generate-scenarios.ts",
+    "db:init-resources": "tsx --env-file-if-exists=.env tools/init-resources.ts",
+    "db:init-scenarios": "tsx --env-file-if-exists=.env tools/init-scenarios.ts",
     "test:int": "pnpm generate && tsx --env-file-if-exists=.env tools/run-integration.ts",
     "test:authz": "pnpm generate && tsx --env-file-if-exists=.env tools/run-authz.ts",
     "world:start": "pnpm --filter @opensamguk/engine world:start",
@@ -33,7 +38,9 @@
     "world:accelerate": "pnpm --filter @opensamguk/engine world:accelerate",
     "world:realtime": "pnpm --filter @opensamguk/engine world:realtime",
     "portraits:map": "tsx tools/portrait-map/generate.ts",
-    "sim": "tsx tools/sim/cli.ts"
+    "sim": "tsx tools/sim/cli.ts",
+    "build:public": "pnpm --filter @opensamguk/web exec vite build --mode public && pnpm assets:check",
+    "assets:check": "tsx tools/public-assets/check.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

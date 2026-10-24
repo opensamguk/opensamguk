@@ -20,10 +20,9 @@ export function startedText(startedAt: string | null): string {
   return startedAt === null ? '시작 전' : `시작 ${shortDate(startedAt)}`;
 }
 
-// 정원 키가 없으면(D-025 승인 전) 인원만, 있으면 인원/정원, 정원이 null이면 —.
-export function generalsText(world: Pick<LobbyWorld, 'humanGenerals' | 'maxHumanGenerals'>): string {
-  if (world.maxHumanGenerals === undefined) return `장수 ${world.humanGenerals}`;
-  return `장수 ${world.humanGenerals}/${world.maxHumanGenerals ?? '—'}`;
+// D-025 승인 전이라 응답에 정원이 없다. 인원만 쓴다.
+export function generalsText(world: Pick<LobbyWorld, 'humanGenerals'>): string {
+  return `장수 ${world.humanGenerals}`;
 }
 
 export function metaText(world: LobbyWorld): string[] {

@@ -25,7 +25,8 @@
 | `apps/server/src/auth/` | Argon2id, 세션 토큰 해시·만료·연장, 실제 HTTP·DB 테스트 |
 | `apps/server/src/routers/auth.ts` | 가입·로그인·로그아웃·현재 계정 |
 | `apps/server/src/trpc.ts` | 공개·인증 필수 procedure |
-| `apps/server/src/router.ts` | tRPC `AppRouter` (API 계약): `health`, `auth`, `world`, `home`, `city`, `nation`, `records`, `general`, `turns`, `commands`, `ranking`, `timelapse`, `message`, `notice` |
+| `apps/server/src/router.ts` | tRPC `AppRouter` (API 계약): `health`, `auth`, `world`, `home`, `city`, `nation`, `records`, `general`, `turns`, `commands`, `ranking`, `timelapse`, `message`, `notice`, `lobby` |
+| `apps/server/src/routers/lobby.ts`, `lobby.test.ts` | 공개 월드 목록·로비 공지, 내 장수·생성 대기와 시나리오 이름 조회 |
 | `apps/server/src/routers/message.ts`, `notice.ts`, `apps/server/src/messaging.ts` | 현재 세션·소속·직책 기준 메시지·공지, 읽음과 revision, DB 잠금 전송 제한 |
 | `apps/server/src/realtime/` | 전용 LISTEN 연결과 SSE, 현재 권한 재검사, 하트비트·재구독·세션 종료 |
 | `packages/db/src/realtime.ts` | 저장 commit 뒤 별도 SQL로 알림 전송. 송신 실패가 저장 결과를 바꾸지 않는다 |
@@ -34,6 +35,7 @@
 | `apps/server/src/game/` | 소유 장수 조회·공개 projection·30칸 정규화와 표시 이름 |
 | `apps/engine/src/inputs.ts` | PENDING 생성 재검사·General 저장·완료 결과와 순서 기록 |
 | `packages/rules/src/general/create.ts` | 생성 입력 검사·결정적 초기 장수 규칙 |
+| `packages/rules/src/general/creationBlock.ts`, `creationBlock.test.ts` | 로비·생성 접수·엔진이 같이 쓰는 장수 생성 판정 순서 |
 | `packages/rules/src/tournament/bracket.ts` | 종목 독립 대진 순수 함수. DB·시각·`Math.random`을 쓰지 않는다 |
 | `packages/rules/src/modifiers/` | 효과 합산과 빈 제공자 목록. 투자 점수·전투 피해·출병 전달 세 곳에 연결한다 |
 | `packages/shared/src/editArray.ts` | 범위 덮어쓰기·밀기·당기기·스냅샷 반복의 일반 배열 유틸 |
@@ -42,13 +44,14 @@
 | `packages/rules/src/ranking.ts` | 공헌·경험·전공·국가 순위와 공개 국력 계산, 동률 ID 정렬 |
 | `apps/engine/src/ranking.ts`, `ranking.integration.test.ts` | 월간 트랜잭션의 순위 캐시 교체, 전공 누계·롤백·재생 호환 검증 |
 | `apps/engine/src/nationArchive.ts`, `nationArchive.integration.test.ts`, `cli/backfillYearbookNations.ts` | T4-56 (가) PR1: 삭제 직전 국가 표시값과 월간 프레임의 이름·색 저장, 실제 PostgreSQL 롤백·재시작·재생과 legacy 백필 검증 |
-| `apps/server/src/routers/timelapse.ts`, `timelapse.test.ts`, `timelapse.integration.test.ts` | T4-35: 월간 도시 소유를 오래된 순으로 읽는 로그인 API. 현재 국가 이름·색만 함께 읽고 국력·자원은 내지 않는다 |
+| `apps/server/src/routers/timelapse.ts`, `timelapse.test.ts`, `timelapse.integration.test.ts` | T4-35·T4-56 (가): 월간 도시 소유를 오래된 순으로 읽는 로그인 API. 프레임마다 저장한 국가 이름·색과 별도의 현재 표시값을 읽고 국력·자원은 내지 않는다 |
 | `apps/server/src/routers/world.ts` | 기존 `world.list`, 서버 시계 요약과 공개 94도시 지도 |
 | `apps/server/src/routers/home.ts`, `city.ts`, `nation.ts`, `records.ts` | 세션 기준 메인·도시·국가·개인/국가/월드 기록 조회. 국가 기록은 DB JSON 조건으로 월간 요약만 페이지 처리 |
 | `apps/server/src/visibility.ts`, `queries.ts` | 공개 필드 허용 목록과 범위 표, strict 입력, 일관된 읽기, 시각·페이지 변환 |
 | `apps/server/src/visibility.test.ts`, `routers/reads.integration.test.ts` | 아군·적·재야 공개 범위와 실제 TCP·PostgreSQL 권한·페이지·94도시 성능 검증 |
 | `apps/engine/src/index.ts`, `main.ts` | 기본 감독 진입점, `engine:run --world <ID>` 단일 월드 실행, 리스·30초 heartbeat·종료 |
 | `apps/engine/src/supervisor.ts` | 10초 월드 발견, 월드별 자식·백오프·반복 크래시 중단·자기 자식 정리 |
+| `apps/engine/src/process-lifecycle.ts`, `process-lifecycle.test.ts`, `test/shutdownFixture.ts` | POSIX 신호·Windows IPC 종료 요청, 소유 자식의 5초 강제 종료와 실제 프로세스 시험 |
 | `apps/engine/src/supervisor.integration.test.ts`, `test/supervisorWorker.ts` | 실제 감독·엔진·DB의 수동 3개월·kill·정지·중복 감독·오류 격리 검증 |
 | `apps/engine/src/lease.ts` | DB 시각 기준 실행권 획득·갱신·해제·펜싱 |
 | `apps/engine/src/worldLoader.ts`, `turnLoop.ts`, `persist.ts` | 현재 상태 적재, manual/realtime 턴 실행, 원자적 저장 |
@@ -61,14 +64,23 @@
 | `apps/web/src/game/` | 화면 공용: 응답 타입(`types.ts`, 공개 범위 상세 필드), 조회 훅, 다음 턴 카운트다운·0초 재조회(`countdown.ts`), 오류 코드, 기록 연월, 명령·직책 이름 |
 | `apps/web/src/layout/GameLayout.tsx` | 위쪽 띠(월드·연월·다음 턴·메뉴)와 본문 |
 | `apps/web/src/pages/WorldPages.tsx` | 직접 주소용 보조 화면: 지도·도시·국가·기록 |
+| `apps/web/src/timelapse/` | 기록의 영토 재생 탭 (T4-36): `timelapse.frames` 페이지 잇기, 프레임별 저장 국가값 출처, 재생 상태, 누를 수 없는 재생 지도. E2E는 `e2e/timelapse.spec.ts`·`e2e/timelapseSeed.ts` |
+| `apps/web/src/timelapse/export.ts`, `exportCanvas.ts`, `SharedTimelapsePage.tsx`, `sharedSource.ts` | T4-37: 지금 달 PNG 그리기 명령(순수 함수)과 캔버스·내려받기, 종료 월드 공유 화면, 공개 조회 응답에서 재생 입력 칸만 고르는 함수. 재생 부품의 지도는 `frames.ts`의 `TimelapseMapCity`(이름·좌표·연결)만 받는다 |
 | `e2e/main.spec.ts`, `e2e/world.ts` | 실제 엔진 월드로 메인 작업 화면 E2E (턴 1분 월드 생성·시작, 시험 계정 장수 붙이기) |
 | `packages/db/prisma/schema.prisma` | DB schema. 생성물은 `packages/db/src/generated/` (Git 제외) |
+| `packages/db/sql/resources-init.sql` | T4-77 생성물. 내장 다섯 자원 1판의 원본 JSON과 `resources/NOTICE.md` 출처를 담은 초기화 SQL이며 손으로 고치지 않는다. DB 적용 초기화 도구의 소스는 준비됐지만 실제 DB 초기화는 검증되지 않았고 공유 script에도 연결되지 않았다. 월드 생성은 지금도 `resources/` 파일을 읽는다 |
+| `tools/resources-sql/convert.ts`, `generate.ts`, `convert.test.ts` | 다섯 자원을 검증해 위 SQL을 만드는 순수 변환·생성기와 단위 시험. 구분자·NUL 거부, S0 `contentHash` 고정, 출처 고지를 본다. DB를 쓰지 않는다 |
+| `tools/init-resources.ts`, `resource-init.integration.test.ts` | T4-77 S2b 준비. 위 SQL을 한 트랜잭션에서 실행하고 같은 트랜잭션에서 S0 해시를 후검증하는 초기화 도구(C4)와 P1~P12·P29 실제 PostgreSQL 시험. 실제 PG 실행은 아직 하지 않았다 |
+| `tools/resources-sql/generate-scenarios.ts`, `packages/db/sql/resources-scenarios.sql` | T4-46 A9의 별도 생성기·SQL. 기존 S2의 다섯 판과 SQL은 고치지 않고 준비된 시나리오만 검증·해시 대조 뒤 한 DO 문으로 만든다. 태그·NUL·내장 키를 거부한다 |
+| `tools/init-scenarios.ts` | 내장 다섯 판을 확인하고 A9 SQL 실행과 저장 행의 해시·출처 대조를 한 트랜잭션에서 처리한다. `pnpm db:init-scenarios`는 삽입·기존 행 수와 실패 키만 출력한다 |
+| `tools/fixtures/t4-46-scenarios.json`, `tools/scenarios.test.ts`, `tools/scenarios.integration.test.ts` | 출처·준비 상태 83행과 A9 원문·최소 수정·고정 해시, 단위 및 실제 PG 시험. 출처 완전성·원형 복원·재현성·SQL 문자열화·원자 거부·DB 합성·한 달 정산을 검증한다. 준비 상태로 AC 완료를 판정하지 않는다 |
 | `packages/shared/src/gameDate.ts` | 게임 달력 |
 | `eslint.config.js` | 패키지 경계·결정성 규칙 |
 | `tools/next-task.mjs` | `pnpm next`: 다음 작업과 담당 출력 |
 | `resources/` | 지정된 core2026 리소스·초상 대응표와 `NOTICE.md` 출처 고지 |
 | `tools/portrait-map/` | 초상 이름 대응 생성기, 원본 스냅샷, 후속 수정용 `manual.json` |
-| `packages/rules/src/world/` | 리소스 schema와 순수 초기 상태 변환 |
+| `packages/rules/src/world/` | 리소스 schema와 순수 초기 상태 변환. `map/`은 지도 v2 형식·변환, `validate/`는 자원 5종 순수 검증과 한도 |
+| `packages/rules/src/world/resourceEditor/`, `tools/resource-editor-validate.test.ts`, `tools/resource-editor-boundaries.test.ts` | PR233 편집기용 지도 형식·기하·검증과 원본 시험. 공개 경로는 `@opensamguk/rules/resources`이며 기존 `resource-validation`의 보고 계약과 구분한다 |
 | `packages/shared/src/rng.ts` | FNV-1a + Mulberry32 시드 RNG와 용도별 스트림 |
 | `packages/shared/src/node/hashState.ts` | Node 전용 상태 SHA-256 |
 | `apps/engine/src/world/` | 리소스 파일 읽기, 초기 상태 저장·재적재와 통합 테스트 |
@@ -89,6 +101,8 @@
 ## 새 저장 필드를 추가할 때 빠뜨리기 쉬운 것
 
 T4-56의 `RemovedNation`과 `YearbookNation`은 공개 표시값 보관이며 `WorldState`·재생 해시·보관 파일에는 넣지 않는다. 기존 프레임의 백필은 `pnpm db:migrate` 뒤 `pnpm --filter @opensamguk/engine yearbook:backfill`으로 보고를 확인하고 `--apply`로 실행한다. 현재 국가·삭제 보존·생성 기록의 이름과 색이 모두 일치할 때만 채운다. 근거가 없으면 부분 프레임으로 남기고 충돌이면 그 월드 전체를 롤백한다. 이름·색 변경을 넣는 T4-16은 같은 PR에서 이 CLI와 script를 지워야 한다.
+
+`timelapse.frames`는 한 RepeatableRead 트랜잭션에서 월간 도시 소유와 `YearbookNation`을 읽는다. 각 프레임의 `nations`에는 그 달 도시를 소유한 국가의 저장된 ID·이름·색만 담는다. `currentNations`에는 이 페이지의 도시 소유 ID 가운데 지금 살아 있는 국가의 표시값을 따로 담는다. 과거 저장값이 없으면 해당 국가를 `nations`에서 생략하며 현재값이나 회색으로 채우지 않는다. `RemovedNation`은 이 조회로 공개하지 않는다.
 
 순위는 `RankingSnapshot`에 월드별 최신 정산의 공개 필드만 저장한다. API는 캐시를 읽고 세션 장수의 순위를 찾으며 조회 중 캐시를 만들지 않는다.
 `General.battleWins`, `General.captures`는 전투 결과에서 집계한 조회용 누계다. 기존 재생 해시를 보존하려고 `worldLoader`와 `world/persistence`의 게임 상태 적재에서는 제외한다. 기존 연감의 비공개 국력 계산은 유지한다.

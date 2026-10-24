@@ -71,6 +71,7 @@ export function worldSummary(world: ReadWorld, now: number) {
   return {
     name: world.name,
     status: world.status,
+    startYear: world.startYear,
     gameDate: result ? { year: result.year, month: result.month } : toGameDate(world.startYear, tick),
     clockMode: world.clockMode,
     endYear: world.endYear,
