@@ -1,11 +1,13 @@
 import type { JsonValue, WorldView } from './model/world';
 import type { WorldInit } from './world/bootstrap';
+import type { CommandDef } from './commands/types';
 import { applyCreationInput, applyPolicyInput, applyTurnsInput } from './replayInputs';
 import {
   personnelFeature,
   policyFeature,
   treatyFeature,
   treatyBreakFeature,
+  treatyTradeFeature,
   personnelInputKinds,
   treatyInputKinds,
   treatyBreakInputKind,
@@ -29,6 +31,7 @@ export interface RuleFeatureDefinition {
   key: string;
   requires: readonly string[];
   conflicts: readonly string[];
+  commandBindings?: readonly { definition: CommandDef; sliceKeys: readonly string[] }[];
   checkOrigin?(context: { initial: WorldInit; data: JsonValue | undefined }): void;
   checkArchive?(context: {
     origin: ReplayOriginV3;
@@ -55,7 +58,7 @@ export interface RuleRegistry {
   monthlyOrder?: readonly string[];
 }
 export const ruleRegistry: RuleRegistry = {
-  features: [personnelFeature, policyFeature, treatyFeature, treatyBreakFeature],
+  features: [personnelFeature, policyFeature, treatyFeature, treatyBreakFeature, treatyTradeFeature],
   monthlyOrder: ['treaty', 'personnel'],
   inputKinds: [
     { kind: 'turns.set', feature: null, route: 'direct', apply: applyTurnsInput },

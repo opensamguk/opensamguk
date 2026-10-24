@@ -148,8 +148,22 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   },
   {
     key: 'treaty',
-    loadWorld: async (tx, worldId, state) => ({ ...state, ...(await loadTreaties(tx, worldId)) }),
-    queuedInputs: { 'treaty.propose': processTreatyQueuedInput, 'treaty.respond': processTreatyQueuedInput },
+    loadWorld: async (tx, worldId, state) => ({
+      ...state,
+      ...(await loadTreaties(tx, worldId, { tradeEnabled: state.ruleFeatures?.includes('treaty-trade') ?? false })),
+    }),
+    queuedInputs: {
+      'treaty.propose': (tx, world, event, context) =>
+        processTreatyQueuedInput(tx, world, event, {
+          ...context,
+          treatyTradeEnabled: world.ruleFeatures.includes('treaty-trade'),
+        }),
+      'treaty.respond': (tx, world, event, context) =>
+        processTreatyQueuedInput(tx, world, event, {
+          ...context,
+          treatyTradeEnabled: world.ruleFeatures.includes('treaty-trade'),
+        }),
+    },
     async persistMonthly(tx, worldId, before, next, _effects, context) {
       await persistTreatyClosures(tx, worldId, before.state, next.state, context);
     },
@@ -159,7 +173,12 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
     loadWorld: async (tx, worldId, state) => ({ ...state, ...(await loadNationTrust(tx, worldId)) }),
     queuedInputs: {
       'treaty.break': (tx, world, event, context) =>
-        processTreatyQueuedInput(tx, world, event, { ...context, treatyBreakEnabled: true }),
+        processTreatyQueuedInput(tx, world, event, {
+          ...context,
+          treatyBreakEnabled: true,
+          treatyTradeEnabled: world.ruleFeatures.includes('treaty-trade'),
+        }),
     },
   },
+  { key: 'treaty-trade' },
 ];

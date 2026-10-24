@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { TREATY_INPUTS, validateTreatyState } from './diplomacy/treaty';
+import { TREATY_INPUTS, validateTreatyState, validateClosedTreatyRow, type TreatyOptions } from './diplomacy/treaty';
 import type { TreatyState } from './diplomacy/treatyTypes';
 import { isPolicyMode } from './policy';
 import { policyFormatSchema, type PolicyFormat } from './policy/replay';
@@ -98,7 +98,7 @@ const storageSchema = z.strictObject({
 });
 
 // 서버가 worldId를 뺀 저장 행을 넘긴다. 비용·마감 기록은 상태에 싣지 않는다.
-export function projectTreatyRows(rows: readonly unknown[]): TreatyState[] | undefined {
+export function projectTreatyRows(rows: readonly unknown[], options: TreatyOptions = {}): TreatyState[] | undefined {
   const treaties: TreatyState[] = [];
   const ids = new Set<number>();
   for (const value of rows) {
@@ -109,6 +109,7 @@ export function projectTreatyRows(rows: readonly unknown[]): TreatyState[] | und
     TREATY_INPUTS['treaty.propose'].payloadSchema.parse({ toNationId: row.toNationId, clauses: row.clauses });
     if (row.status !== 'PROPOSED' && row.status !== 'ACTIVE') {
       if (row.closedSequence === null) throw new Error('닫힌 조약에 마감 기록이 없습니다.');
+      if (options.tradeEnabled) validateClosedTreatyRow(row, options);
       continue;
     }
     if (
@@ -118,17 +119,20 @@ export function projectTreatyRows(rows: readonly unknown[]): TreatyState[] | und
     )
       throw new Error('열린 조약의 납부·마감 기록을 확인하세요.');
     treaties.push(
-      validateTreatyState({
-        id: row.id,
-        fromNationId: row.fromNationId,
-        toNationId: row.toNationId,
-        clauses: row.clauses,
-        status: row.status,
-        proposedTick: row.proposedTick,
-        respondByTick: row.respondByTick,
-        startTick: row.startTick,
-        endTick: row.endTick,
-      }),
+      validateTreatyState(
+        {
+          id: row.id,
+          fromNationId: row.fromNationId,
+          toNationId: row.toNationId,
+          clauses: row.clauses,
+          status: row.status,
+          proposedTick: row.proposedTick,
+          respondByTick: row.respondByTick,
+          startTick: row.startTick,
+          endTick: row.endTick,
+        },
+        options,
+      ),
     );
   }
   return treaties.length ? treaties.sort((a, b) => a.id - b.id) : undefined;

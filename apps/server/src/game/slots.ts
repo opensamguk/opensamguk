@@ -5,6 +5,7 @@ import {
   assertSlotSet,
   commandRegistry,
   extensionCommands,
+  ruleRegistry,
   emptyQueue,
   emptyTurn,
   type PolicySlot,
@@ -22,7 +23,14 @@ export function parseSlot(input: { commandKey: string; args?: unknown } | null, 
   if (input === null) return emptyTurn();
   const def =
     commandRegistry.get(input.commandKey) ??
-    (allowExtensions ? extensionCommands.find((candidate) => candidate.key === input.commandKey) : undefined);
+    (allowExtensions
+      ? [
+          ...extensionCommands,
+          ...ruleRegistry.features.flatMap(
+            (feature) => feature.commandBindings?.map((binding) => binding.definition) ?? [],
+          ),
+        ].find((candidate) => candidate.key === input.commandKey)
+      : undefined);
   const args = def?.args.safeParse(input.args === undefined ? {} : input.args);
   if (!def || def.target !== 'general' || !args?.success) invalidSlot();
   if (!commandRegistry.has(def.key)) {
@@ -40,7 +48,7 @@ export function hasExtensionSlot(turns: readonly QueuedTurn[]) {
 export function assertEnabledSlots(world: Parameters<typeof worldResolver>[0], turns: readonly QueuedTurn[]) {
   if (!hasExtensionSlot(turns)) return;
   const { commands, resolver } = worldResolver(world);
-  if (commands === null) invalidSlot();
+  if (commands === null && turns.some((turn) => !resolver.get(turn.commandKey))) invalidSlot();
   if (turns.some((turn) => !resolver.get(turn.commandKey)))
     throw new TRPCError({ code: 'BAD_REQUEST', message: '이 월드에서 꺼진 명령입니다.' });
 }

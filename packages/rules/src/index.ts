@@ -171,3 +171,4 @@ export type { PersonnelMonthResult } from './personnel/monthStep';
 export { updateResidenceAnchors } from './personnel/residence';
 export * from './commands/ext/intel/record';
 export { trade, findTradeRoutes, type TradeRoute } from './commands/trade';
+export { resolverForRuleFeatures } from './ruleCommands';

@@ -9,6 +9,7 @@ import { updateResidenceAnchors } from './personnel/residence';
 import { completePersonnelStep, type PersonnelStepPacket } from './personnel/step';
 import { applyTreatyInput, settleTreaties, validateTreatyRecord } from './diplomacy/treaty';
 import { validatePolicyInput } from './replayInputs';
+import { trade } from './commands/trade';
 
 const tickSchema = z.number().int().min(0).max(2_147_483_647);
 const policyDataSchema = z.strictObject({ version: z.literal(1), turnTermMinutes: tickSchema.min(1) });
@@ -169,12 +170,13 @@ export const treatyFeature: RuleFeatureDefinition = {
   checkOrigin({ data, initial }) {
     if (data !== undefined || Object.hasOwn(initial, 'treaties')) throw new Error('조약 초기 상태를 확인하세요.');
   },
-  checkArchive({ inputs, end }) {
+  checkArchive({ origin, inputs, end }) {
     for (const input of inputs) {
       if (!['treaty.propose', 'treaty.respond'].includes(input.kind)) continue;
       const { tick, ...record } = input;
       const validated = validateTreatyRecord(record, {
         treaty: { version: 1 },
+        ...(origin.initial.ruleFeatures?.includes('treaty-trade') ? { treatyTrade: { version: 1 } } : {}),
         monthlyTick: 0,
         ...(end && input.sequence > end.sequence ? { endTick: end.tick } : {}),
       });
@@ -194,13 +196,14 @@ export const treatyBreakFeature: RuleFeatureDefinition = {
     if (data !== undefined || Object.hasOwn(initial, 'nationTrust'))
       throw new Error('조약 파기 초기 상태를 확인하세요.');
   },
-  checkArchive({ inputs, end }) {
+  checkArchive({ origin, inputs, end }) {
     for (const input of inputs) {
       if (input.kind !== 'treaty.break') continue;
       const { tick, ...record } = input;
       const validated = validateTreatyRecord(record, {
         treaty: { version: 1 },
         treatyBreak: { version: 1 },
+        ...(origin.initial.ruleFeatures?.includes('treaty-trade') ? { treatyTrade: { version: 1 } } : {}),
         monthlyTick: 0,
         ...(end && input.sequence > end.sequence ? { endTick: end.tick } : {}),
       });
@@ -209,11 +212,22 @@ export const treatyBreakFeature: RuleFeatureDefinition = {
   },
 };
 
+export const treatyTradeFeature: RuleFeatureDefinition = {
+  key: 'treaty-trade',
+  requires: ['treaty'],
+  conflicts: [],
+  commandBindings: [{ definition: trade, sliceKeys: [] }],
+  checkOrigin({ data }) {
+    if (data !== undefined) throw new Error('교역 기능의 초기 자료를 확인하세요.');
+  },
+};
+
 function applyTreaty(replay: ReplayState, input: RecordedInput): ReplayState {
   const { tick, ...record } = input;
   const context = {
     treaty: { version: 1 as const },
     ...(replay.state.ruleFeatures?.includes('treaty-break') ? { treatyBreak: { version: 1 as const } } : {}),
+    ...(replay.state.ruleFeatures?.includes('treaty-trade') ? { treatyTrade: { version: 1 as const } } : {}),
     monthlyTick: replay.monthlyTick,
   };
   const validated = validateTreatyRecord(record, context);
@@ -221,6 +235,7 @@ function applyTreaty(replay: ReplayState, input: RecordedInput): ReplayState {
   const result = applyTreatyInput(replay.state, validated, {
     tick: tickSchema.parse(tick),
     sequence: validated.sequence,
+    tradeEnabled: replay.state.ruleFeatures?.includes('treaty-trade') ?? false,
   });
   if (!result.ok) throw new Error('조약 적용 기록을 재현하지 못했습니다.');
   const recomputed = validateTreatyRecord({ ...validated, result: result.result }, context);

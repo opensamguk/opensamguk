@@ -2,6 +2,7 @@ import { emptyTurns, validatePolicyInput } from './replayInputs';
 export { emptyTurns, applyTurnsInput, applyCreationInput } from './replayInputs';
 import { hasRuleFeature, ruleRegistry, settleMonthlyFeatures, type RuleRegistry } from './ruleRegistry';
 import type { CommandResolver } from './commands/resolve';
+import { resolverForRuleFeatures } from './ruleCommands';
 import { rngFor } from '@opensamguk/shared';
 import { runGeneralTurn } from './commands/turn';
 import type { UnitSetResource } from './world/resources';
@@ -101,7 +102,7 @@ export function runReplayAction(
     command,
     seed,
     next.policy ? { policy: next.policy.policies[action.generalId]! } : {},
-    resolver,
+    resolver ?? resolverForRuleFeatures(next.state, registry),
     personnel ? { offices: next.offices! } : undefined,
   );
   next.state = result.state;

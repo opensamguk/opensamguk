@@ -157,7 +157,7 @@ export const turnsRouter = router({
       async (tx) => {
         const world = await submittedWorld(tx, input.worldId, false, [turn]);
         const extended = hasExtensionSlot([turn]) ? worldResolver(world) : undefined;
-        if (extended?.commands === null) invalidSlot();
+        if (extended?.commands === null && !extended.resolver.get(turn.commandKey)) invalidSlot();
         const actor = await requireGeneral(tx, input.worldId, ctx.user.id);
         const view = await readView(tx, input.worldId);
         const def = (extended ?? worldResolver(world)).resolver.get(turn.commandKey);

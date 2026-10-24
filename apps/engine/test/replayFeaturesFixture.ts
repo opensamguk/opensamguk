@@ -104,7 +104,7 @@ export async function featureArchive(features: string[]): Promise<ReplayArchiveV
     while (replay.monthlyTick === month * 10000) {
       const action = nextGameAction(replay);
       sequence++;
-      replay = runReplayAction(replay, initial.seed, initial.unitSet);
+      replay = runReplayAction(replay, initial.seed, initial.unitSet, undefined, featureRegistry);
       if (action.kind === 'monthly')
         archive.months.push({
           tick: action.tick,

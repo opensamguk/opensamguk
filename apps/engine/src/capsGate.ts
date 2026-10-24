@@ -3,6 +3,7 @@ import {
   projectTreatyRows,
   selectWorldCapabilities,
   validateBrokenTreatyRow,
+  validateClosedTreatyRow,
   type WorldCapabilities,
 } from '@opensamguk/rules';
 import { checkStoredReplayFormat } from './features';
@@ -39,11 +40,18 @@ export async function assertWorldCapabilities(
   if (!enabled) {
     if (rows.length) throw new Error('조약을 끈 월드에 조약 저장 행이 있습니다.');
   } else {
+    const options = { tradeEnabled: modern && world.ruleFeatures.includes('treaty-trade') };
+    if (modern)
+      for (const row of rows)
+        if (!['PROPOSED', 'ACTIVE', 'BROKEN'].includes(row.status)) validateClosedTreatyRow(row, options);
     const broken = rows.filter((row) => row.status === 'BROKEN');
     if (modern && world.ruleFeatures.includes('treaty-break')) {
-      for (const row of broken) validateBrokenTreatyRow(row);
-      projectTreatyRows(rows.filter((row) => row.status !== 'BROKEN'));
-    } else projectTreatyRows(rows);
+      for (const row of broken) validateBrokenTreatyRow(row, options);
+      projectTreatyRows(
+        rows.filter((row) => row.status !== 'BROKEN'),
+        options,
+      );
+    } else projectTreatyRows(rows, options);
   }
   if (modern && !world.ruleFeatures.includes('treaty-break')) {
     const trust = await tx.nationTrust.count({ where: { worldId: world.id } });

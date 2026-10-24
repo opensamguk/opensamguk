@@ -1,9 +1,18 @@
-import { parsePreset, presetCommands, resolverForPreset, selectWorldCapabilities } from '@opensamguk/rules';
+import {
+  parsePreset,
+  presetCommands,
+  resolverForPreset,
+  resolverForRuleFeatures,
+  selectWorldCapabilities,
+} from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 
-type ResolverWorld = { preset: unknown; replayOrigin?: unknown } & Partial<
-  Parameters<typeof selectWorldCapabilities>[0]
->;
+type ResolverWorld = {
+  preset: unknown;
+  replayOrigin?: unknown;
+  replayFormat?: number;
+  ruleFeatures?: readonly string[];
+} & Partial<Parameters<typeof selectWorldCapabilities>[0]>;
 
 export function worldResolver(world: ResolverWorld) {
   const preset = world.preset ? parsePreset(world.preset) : null;
@@ -26,5 +35,12 @@ export function worldResolver(world: ResolverWorld) {
     )
       throw new Error('확장 명령과 생성 기록이 다릅니다.');
   } else if (hasExt) throw new Error('확장 명령과 생성 기록이 다릅니다.');
-  return { preset, commands, resolver: resolverForPreset(preset) };
+  return {
+    preset,
+    commands,
+    resolver:
+      (world.replayFormat === 3
+        ? resolverForRuleFeatures(world.ruleFeatures ? { ruleFeatures: world.ruleFeatures } : {})
+        : undefined) ?? resolverForPreset(preset),
+  };
 }

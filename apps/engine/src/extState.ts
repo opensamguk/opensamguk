@@ -3,6 +3,7 @@ import {
   parsePreset,
   presetCommands,
   resolverForPreset,
+  resolverForRuleFeatures,
   restoreExtState,
   selectWorldCapabilities,
   type EnabledCommands,
@@ -10,9 +11,12 @@ import {
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 
-type ResolverWorld = { preset: unknown; replayOrigin?: unknown } & Partial<
-  Parameters<typeof selectWorldCapabilities>[0]
->;
+type ResolverWorld = {
+  preset: unknown;
+  replayOrigin?: unknown;
+  replayFormat?: number;
+  ruleFeatures?: readonly string[];
+} & Partial<Parameters<typeof selectWorldCapabilities>[0]>;
 
 export function engineResolver(world: ResolverWorld) {
   const preset = world.preset ? parsePreset(world.preset) : null;
@@ -36,7 +40,14 @@ export function engineResolver(world: ResolverWorld) {
     )
       throw new Error('확장 명령과 생성 기록이 다릅니다.');
   } else if (hasExt) throw new Error('확장 명령과 생성 기록이 다릅니다.');
-  return { preset, commands, resolver: resolverForPreset(preset) };
+  return {
+    preset,
+    commands,
+    resolver:
+      (world.replayFormat === 3
+        ? resolverForRuleFeatures(world.ruleFeatures ? { ruleFeatures: world.ruleFeatures } : {})
+        : undefined) ?? resolverForPreset(preset),
+  };
 }
 
 export async function loadExt(tx: Prisma.TransactionClient, worldId: string, commands: EnabledCommands | null) {
