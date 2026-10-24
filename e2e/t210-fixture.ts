@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { createServer, type AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -398,6 +398,11 @@ export const test = base.extend<{ world: T210World }, { t210Stack: T210Stack }>(
         const webPort = await freePort();
         const webOrigin = `http://127.0.0.1:${webPort}`;
         db = createDb(databaseUrl);
+        const { initializeResources } = await import('../tools/init-resources');
+        await initializeResources(
+          db,
+          await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
+        );
         api = await buildServer({
           db,
           logging: false,
