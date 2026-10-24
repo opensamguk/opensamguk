@@ -7,7 +7,7 @@ export const ASSIGNMENT_REJECT_PERCENT = 10;
 
 export type PersonnelState = WorldState;
 export type PersonnelView = DeepReadonly<PersonnelState>;
-export type CancelReason = 'CITY_LOST' | 'TARGET_LEFT' | 'ISSUER_LOST_OFFICE';
+export type CancelReason = 'NATION_DESTROYED' | 'CITY_LOST' | 'TARGET_LEFT' | 'ISSUER_LOST_OFFICE';
 type Closure = { id: string; resolvedTick: number };
 export type ClosedOffer = Closure &
   (
@@ -42,7 +42,7 @@ export type RespondResult = {
   dedicationLost: number;
 };
 
-// 사전 검사를 통과한 PENDING이 깨졌거나 미결 B1이면 저장을 중단한다.
+// 사전 검사를 통과한 PENDING이 깨졌으면 저장을 중단한다.
 export class PersonnelInvariantError extends Error {}
 
 export function assertTick(tick: number): void {

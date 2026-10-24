@@ -104,14 +104,21 @@ describe('인사 step의 저장 묶음', () => {
     expect(packet.state.generals[4]).toMatchObject({ nationId: null, officerLevel: 0 });
   });
 
-  it('국가 멸망과 PENDING은 B1 불변식을 그대로 드러내고 입력을 보존한다', () => {
+  it('국가 멸망 제안의 B·W·F와 취소 기록을 남기고 입력을 보존한다', () => {
     const before = applied(assignGeneral(personnelWorld(), 4, 3, 4, 100)).state;
     const state = structuredClone(before);
     removeNation(state, 1);
     const raw = unchanged(state);
     const saved = structuredClone({ before, raw });
-    expect(() => completePersonnelStep(deepFreeze(before), {}, deepFreeze(raw), 200)).toThrow(PersonnelInvariantError);
-    expect(() => completePersonnelStep(before, {}, raw, 200)).toThrow('국가 멸망 시 발령 처리는 B1 결정이 필요합니다.');
+    const packet = completePersonnelStep(deepFreeze(before), {}, deepFreeze(raw), 200);
+    expect(packet.assignment.before).toEqual({ assignmentOffers: before.assignmentOffers });
+    expect(packet.assignment.beforeFinish).toEqual({ assignmentOffers: raw.state.assignmentOffers });
+    expect(packet.assignment.final).toEqual({});
+    expect(packet.assignment.closedOffers).toEqual([
+      { id: '100-4-3', status: 'CANCELLED', resolvedBy: null, resolvedTick: 200, cancelReason: 'NATION_DESTROYED' },
+    ]);
+    expect(packet.state.generals).toEqual(raw.state.generals);
+    expect(packet.logs.map(({ commandKey }) => commandKey)).toEqual(['offer.cancel']);
     expect({ before, raw }).toEqual(saved);
   });
 

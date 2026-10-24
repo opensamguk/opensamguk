@@ -27,14 +27,13 @@ export function assignmentRejectCost(dedication: number): number {
   return dedication - Math.round(dedication - (dedication * ASSIGNMENT_REJECT_PERCENT) / 100);
 }
 
-// B1이 정해지기 전에는 사라진 국가를 U2의 세 사유로 처리하지 않는다.
+// 국가가 사라졌으면 다른 취소 조건보다 먼저 판정한다.
 export function assignmentCancelReason(
   view: PersonnelView,
   targetGeneralId: number,
   offer: AssignmentOffer,
 ): CancelReason | null {
-  if (!view.nations[offer.nationId])
-    throw new PersonnelInvariantError('국가 멸망 시 발령 처리는 B1 결정이 필요합니다.');
+  if (!view.nations[offer.nationId]) return 'NATION_DESTROYED';
   if (view.cities[offer.cityKey]?.nationId !== offer.nationId) return 'CITY_LOST';
   if (view.generals[targetGeneralId]?.nationId !== offer.nationId) return 'TARGET_LEFT';
   const issuer = view.generals[offer.issuerGeneralId];
@@ -162,6 +161,7 @@ export function respondAssignment(
 }
 
 const cancelText: Record<CancelReason, string> = {
+  NATION_DESTROYED: '국가가 멸망해 발령 제안이 취소됐습니다.',
   CITY_LOST: '목표 도시를 잃어 발령 제안이 취소됐습니다.',
   TARGET_LEFT: '국가를 떠나 발령 제안이 취소됐습니다.',
   ISSUER_LOST_OFFICE: '발령자가 직책을 잃어 발령 제안이 취소됐습니다.',

@@ -72,13 +72,19 @@ describe('월간 인사의 raw 만료 앞부분', () => {
     expect(new Set(raw.closedOffers.map((offer) => offer.id)).size).toBe(2);
   });
 
-  it('멸망한 국가의 PENDING을 B1 오류로 남긴다', () => {
+  it('멸망한 국가의 PENDING은 기한 수락 전에 벌점 없이 취소한다', () => {
     const settled = pending();
     removeNation(settled, 1);
     const saved = structuredClone(settled);
-    expect(() => expirePersonnelMonth(deepFreeze(settled), {}, 20000)).toThrow(
-      '국가 멸망 시 발령 처리는 B1 결정이 필요합니다.',
-    );
+    const raw = expirePersonnelMonth(deepFreeze(settled), {}, 20000);
+    expect(raw.closedOffers).toEqual([
+      { id: '0-4-3', status: 'CANCELLED', resolvedBy: null, resolvedTick: 20000, cancelReason: 'NATION_DESTROYED' },
+    ]);
+    expect(raw.state.generals).toEqual(settled.generals);
+    expect(raw.state.generals[3]).toMatchObject({ cityKey: 1, dedication: 95 });
+    expect(raw.logs.map(({ commandKey }) => commandKey)).toEqual(['offer.cancel']);
+    expect(Object.hasOwn(raw.state, 'assignmentOffers')).toBe(false);
+    expect(expirePersonnelMonth(raw.state, {}, 30000).closedOffers).toEqual([]);
     expect(settled).toEqual(saved);
   });
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyEffects } from '../commands/effects';
+import { removeNation } from '../commands/support';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { appointOfficer, dismissOfficer } from './appointments';
 import {
@@ -178,6 +179,7 @@ describe('발령 제안과 응답', () => {
 });
 
 const invalidations: [string, CancelReason, (state: PersonnelState) => void][] = [
+  ['국가 멸망', 'NATION_DESTROYED', (state) => removeNation(state, 1)],
   [
     '목표 도시 상실',
     'CITY_LOST',
@@ -290,11 +292,15 @@ describe('U2 수락 전 자동 취소', () => {
     expect(() => assignGeneral(deepFreeze(state), 1, 3, 4, 124)).toThrow(PersonnelInvariantError);
   });
 
-  it('사유가 겹치면 도시, 대상, 발령자 순으로 하나만 적는다', () => {
+  it('사유가 겹치면 국가, 도시, 대상, 발령자 순으로 하나만 적는다', () => {
     const state = offered();
     state.cities[4]!.nationId = 2;
     state.generals[3]!.nationId = null;
     state.generals[4]!.officerLevel = 1;
+    const nation = state.nations[1]!;
+    delete state.nations[1];
+    expect(assignmentCancelReason(state, 3, state.assignmentOffers![3]!)).toBe('NATION_DESTROYED');
+    state.nations[1] = nation;
     expect(assignmentCancelReason(state, 3, state.assignmentOffers![3]!)).toBe('CITY_LOST');
     state.cities[4]!.nationId = 1;
     expect(assignmentCancelReason(state, 3, state.assignmentOffers![3]!)).toBe('TARGET_LEFT');
@@ -332,13 +338,60 @@ describe('U2 수락 전 자동 취소', () => {
     });
   });
 
-  it('국가 멸망은 B1 결정 전까지 U2 취소로 넓히지 않는다', () => {
+  it('국가 멸망은 제안만 닫고 입력을 보존한다', () => {
     const state = offered();
-    delete state.nations[1];
+    removeNation(state, 1);
     const before = structuredClone(state);
-    expect(() => closeInvalidOffers(deepFreeze(state), 124)).toThrow('B1');
-    expect(() => expireAssignments(state, 30000)).toThrow('B1');
-    expect(() => respondAssignment(state, 3, '123-4-3', true, 124)).toThrow('B1');
+    const outcome = closeInvalidOffers(deepFreeze(state), 124);
+    const expected = structuredClone(before);
+    delete expected.assignmentOffers;
+    expect(outcome.state).toEqual(expected);
+    expect(outcome.closedOffers).toEqual([
+      { id: '123-4-3', status: 'CANCELLED', resolvedBy: null, resolvedTick: 124, cancelReason: 'NATION_DESTROYED' },
+    ]);
+    expect(outcome.logs).toEqual([
+      { generalId: 3, commandKey: 'offer.cancel', kind: 'success', text: '국가가 멸망해 발령 제안이 취소됐습니다.' },
+    ]);
+    expect(state).toEqual(before);
+  });
+
+  it('멸망한 국가의 제안만 대상 순서로 닫고 다른 국가의 제안은 남긴다', () => {
+    let state = offered();
+    state.generals[7] = { ...state.generals[3]!, id: 7, userId: 'target7' };
+    state.generals[8] = { ...state.generals[3]!, id: 8, userId: 'target8', nationId: 2, cityKey: 2 };
+    state = applied(assignGeneral(state, 4, 7, 4, 123)).state;
+    state = applied(assignGeneral(state, 2, 8, 2, 123)).state;
+    removeNation(state, 1);
+    const before = structuredClone(state);
+    const outcome = closeInvalidOffers(deepFreeze(state), 124);
+    const expected = structuredClone(before);
+    delete expected.assignmentOffers![3];
+    delete expected.assignmentOffers![7];
+    expect(outcome.state).toEqual(expected);
+    expect(outcome.closedOffers).toEqual([
+      { id: '123-4-3', status: 'CANCELLED', resolvedBy: null, resolvedTick: 124, cancelReason: 'NATION_DESTROYED' },
+      { id: '123-4-7', status: 'CANCELLED', resolvedBy: null, resolvedTick: 124, cancelReason: 'NATION_DESTROYED' },
+    ]);
+    expect(outcome.logs.map(({ generalId, commandKey }) => ({ generalId, commandKey }))).toEqual([
+      { generalId: 3, commandKey: 'offer.cancel' },
+      { generalId: 7, commandKey: 'offer.cancel' },
+    ]);
+    const remaining = new Set(Object.values(outcome.state.assignmentOffers!).map(({ id }) => id));
+    expect(
+      Object.values(before.assignmentOffers!)
+        .filter(({ id }) => !remaining.has(id))
+        .map(({ id }) => id),
+    ).toEqual(outcome.closedOffers.map(({ id }) => id));
+    expect(closeInvalidOffers(outcome.state, 125)).toEqual({ state: outcome.state, closedOffers: [], logs: [] });
+    expect(state).toEqual(before);
+  });
+
+  it.each([true, false])('이미 응답한 제안은 국가 멸망 뒤에도 다시 닫지 않는다 (%s)', (accept) => {
+    const state = applied(respondAssignment(offered(), 3, '123-4-3', accept, 124)).state;
+    removeNation(state, 1);
+    const before = structuredClone(state);
+    expect(closeInvalidOffers(deepFreeze(state), 125)).toEqual({ state: before, closedOffers: [], logs: [] });
+    expect(Object.hasOwn(before, 'assignmentOffers')).toBe(false);
     expect(state).toEqual(before);
   });
 });

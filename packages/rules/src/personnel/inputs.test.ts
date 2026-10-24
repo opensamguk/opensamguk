@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { removeNation } from '../commands/support';
 import { assignGeneral } from './assignments';
 import {
   applyNationTurnsRecord,
@@ -201,11 +202,25 @@ describe('선택된 인사 입력', () => {
     expect(replayPersonnelInput(state, record)).toEqual(outcome.change);
     expect(finishPersonnelStep(state, outcome.change, {}, 200).closedOffers).toHaveLength(1);
   });
-  it('국가 멸망 B1은 일반 취소로 바꾸지 않고 종료 누락도 거부한다', () => {
+  it('국가 멸망 제안을 닫고 종료 누락은 계속 거부한다', () => {
     const state = applied(assignGeneral(world(), 4, 3, 4, 123)).state;
     const gone = structuredClone(state);
-    delete gone.nations[1];
-    expect(() => finishPersonnelStep(state, { state: gone, closedOffers: [], logs: [] }, {}, 200)).toThrow();
+    removeNation(gone, 1);
+    const saved = structuredClone({ state, gone });
+    const result = finishPersonnelStep(
+      deepFreeze(state),
+      deepFreeze({ state: gone, closedOffers: [], logs: [] }),
+      {},
+      200,
+    );
+    expect(result.closedOffers).toEqual([
+      { id: '123-4-3', status: 'CANCELLED', resolvedBy: null, resolvedTick: 200, cancelReason: 'NATION_DESTROYED' },
+    ]);
+    expect(result.logs.map(({ commandKey }) => commandKey)).toEqual(['offer.cancel']);
+    expect(result.state.generals).toEqual(gone.generals);
+    expect(result.state.generals[3]!.dedication).toBe(95);
+    expect(Object.hasOwn(result.state, 'assignmentOffers')).toBe(false);
+    expect({ state, gone }).toEqual(saved);
     const lost = structuredClone(state);
     delete lost.assignmentOffers;
     expect(() => finishPersonnelStep(state, { state: lost, closedOffers: [], logs: [] }, {}, 200)).toThrow();
