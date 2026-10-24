@@ -212,6 +212,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       data: {
         name: 'primary',
         status: 'RUNNING',
+        startYear: state.startYear,
         clockMode: 'REALTIME',
         endYear: null,
         result: null,
@@ -221,6 +222,68 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         turnTermMinutes: 1,
       },
     });
+  });
+
+  it('다른 계정과 장수 없는 계정도 같은 공개 시작 연도를 읽는다', async () => {
+    const expected = (await query('world.summary', { worldId })).data;
+    for (const user of users.slice(1)) {
+      const result = await query('world.summary', { worldId }, user.cookie);
+      expect(result.status).toBe(200);
+      expect(result.data).toEqual(expected);
+      expect(result.data.startYear).toBe(state.startYear);
+    }
+  });
+
+  it.each([120000, 135000])('종료 결과 연월과 저장 tick %i에도 시작 연도는 같다', async (clockTick) => {
+    const endedWorldId = await fixtureWorld('ended-year');
+    try {
+      await db.world.update({
+        where: { id: endedWorldId },
+        data: { status: 'ENDED', startYear: 300, endYear: 300, clockTick, clockMode: 'ACCELERATED' },
+      });
+      await db.worldResult.create({
+        data: {
+          worldId: endedWorldId,
+          reason: 'END_YEAR',
+          endedYear: 300,
+          endedMonth: 12,
+          endedTick: 120000,
+          endedSequence: 1,
+          remainingNations: state.nations.length,
+          finalStateHash: 'ended-fixture-hash',
+          endedAt: new Date(now),
+        },
+      });
+      const before = await db.world.findUniqueOrThrow({ where: { id: endedWorldId }, include: { result: true } });
+      const expected: Results['world.summary'] = {
+        name: 'ended-year',
+        status: 'ENDED',
+        startYear: 300,
+        gameDate: { year: 300, month: 12 },
+        clockMode: 'ACCELERATED',
+        endYear: 300,
+        result: {
+          reason: 'END_YEAR',
+          year: 300,
+          month: 12,
+          winner: null,
+          remainingNations: state.nations.length,
+          endedAt: new Date(now).toISOString(),
+        },
+        nowTick: clockTick,
+        msPerTick: 6,
+        turnTermMinutes: 1,
+      };
+      for (const user of users) {
+        const result = await query('world.summary', { worldId: endedWorldId }, user.cookie);
+        expect(result).toEqual({ status: 200, error: undefined, data: expected });
+      }
+      expect(await db.world.findUniqueOrThrow({ where: { id: endedWorldId }, include: { result: true } })).toEqual(
+        before,
+      );
+    } finally {
+      await db.world.delete({ where: { id: endedWorldId } });
+    }
   });
 
   it('94도시 지도는 정렬한 공개 필드·연결·보급과 국가 색만 반환한다', async () => {
@@ -361,6 +424,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         expect((await query('home.get', { worldId })).data.nextTurnAt).toBeNull();
         expect((await query('world.summary', { worldId })).data).toMatchObject({
           status,
+          startYear: state.startYear,
           nowTick: 12345,
           gameDate: { year: state.startYear, month: 2 },
         });
