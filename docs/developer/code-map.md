@@ -71,6 +71,9 @@
 | `packages/db/sql/resources-init.sql` | T4-77 생성물. 내장 다섯 자원 1판의 원본 JSON과 `resources/NOTICE.md` 출처를 담은 초기화 SQL이며 손으로 고치지 않는다. DB 적용 초기화 도구의 소스는 준비됐지만 실제 DB 초기화는 검증되지 않았고 공유 script에도 연결되지 않았다. 월드 생성은 지금도 `resources/` 파일을 읽는다 |
 | `tools/resources-sql/convert.ts`, `generate.ts`, `convert.test.ts` | 다섯 자원을 검증해 위 SQL을 만드는 순수 변환·생성기와 단위 시험. 구분자·NUL 거부, S0 `contentHash` 고정, 출처 고지를 본다. DB를 쓰지 않는다 |
 | `tools/init-resources.ts`, `resource-init.integration.test.ts` | T4-77 S2b 준비. 위 SQL을 한 트랜잭션에서 실행하고 같은 트랜잭션에서 S0 해시를 후검증하는 초기화 도구(C4)와 P1~P12·P29 실제 PostgreSQL 시험. 실제 PG 실행은 아직 하지 않았다 |
+| `tools/resources-sql/generate-scenarios.ts`, `packages/db/sql/resources-scenarios.sql` | T4-46 A9의 별도 생성기·SQL. 기존 S2의 다섯 판과 SQL은 고치지 않고 준비된 시나리오만 검증·해시 대조 뒤 한 DO 문으로 만든다. 태그·NUL·내장 키를 거부한다 |
+| `tools/init-scenarios.ts` | 내장 다섯 판을 확인하고 A9 SQL 실행과 저장 행의 해시·출처 대조를 한 트랜잭션에서 처리한다. `pnpm db:init-scenarios`는 삽입·기존 행 수와 실패 키만 출력한다 |
+| `tools/fixtures/t4-46-scenarios.json`, `tools/scenarios.test.ts`, `tools/scenarios.integration.test.ts` | 출처·준비 상태 83행과 A9 원문·최소 수정·고정 해시, 단위 및 실제 PG 시험. 출처 완전성·원형 복원·재현성·SQL 문자열화·원자 거부·DB 합성·한 달 정산을 검증한다. 준비 상태로 AC 완료를 판정하지 않는다 |
 | `packages/shared/src/gameDate.ts` | 게임 달력 |
 | `eslint.config.js` | 패키지 경계·결정성 규칙 |
 | `tools/next-task.mjs` | `pnpm next`: 다음 작업과 담당 출력 |

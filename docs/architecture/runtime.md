@@ -121,3 +121,16 @@ Windows에서는 부모가 연 IPC 채널로 정상 종료를 요청하며 같�
 저장과 응답 모두 도시의 `key`, `name`, `level`, `x`, `y`, `nationId`, `links`와 국가의 `id`, `name`, `color`만 담습니다. 계획 DTO에 맞춰 도시 key와 연결 key는 문자열입니다. 기존 인증 `world.map`의 숫자 key와 `supplied`는 그대로 유지합니다. 사본 JSON에 다른 필드가 섞여도 서버는 새로 투영해 버립니다. 장수·병력·보급·국고·출병 정보는 공개하지 않습니다. 사본은 게임 상태·RNG·sequence·재생 archive에 넣지 않아 기존 상태 해시와 v1/v2 형식을 유지합니다.
 
 계획의 기존 요청 제한 설명은 현재 구현과 다릅니다. `publicProcedure`에는 횟수 제한이 없고 `protectedProcedure`의 mutation만 기존 사용자 제한을 받습니다. 이 작업은 새 공개 GET 제한 정책을 추가하지 않습니다. 기존 인증·출처 검사·보안 헤더는 유지합니다.
+
+## T4-46 추가 시나리오 초기화
+
+기존 migration을 적용한 뒤 내장 다섯 판을 먼저 넣고 추가 시나리오를 넣습니다.
+
+```sh
+pnpm db:init-resources
+pnpm db:init-scenarios
+```
+
+두 번째 명령은 `packages/db/sql/resources-scenarios.sql`을 한 트랜잭션에서 실행합니다. 기존 내장 판을 확인한 뒤 A9의 내용·해시·상태·출처를 대조합니다. 같은 판은 기존 행으로 세고 다른 판이 같은 키에 있으면 전체 삽입을 되돌립니다. 내장 다섯 판과 `1030`은 덮지 않습니다. 출력에는 삽입·기존 행 수와 실패 키만 남깁니다.
+
+`pnpm resources:sql:scenarios`는 83행 출처 fixture에서 `ready`인 9종만 읽어 별도 SQL을 다시 만듭니다. 기존 `resources:sql`이나 `resources-init.sql`은 바꾸지 않습니다. `ready`는 생성 대상이며 AC 완료가 아닙니다. 원형 복원·두 시드·SQL 바이트는 `tools/scenarios.test.ts`, 초기화·원자 거부·DB 합성·한 달 정산은 `tools/scenarios.integration.test.ts`에서 확인합니다. DB 시험은 조율된 실행창의 자기 전용 `_test` DB에서만 돌리고 정식 증거는 정확한 SHA의 CI에서 남깁니다.
