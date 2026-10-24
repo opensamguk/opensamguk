@@ -2,6 +2,10 @@ name: NPC simulation
 
 on:
   push:
+    # 필수 검사가 아니고 한 번에 최대 180분을 쓴다. 작업 브랜치 push마다 돌리면 다른 PR의 필수 검사가 실행기를 기다리므로
+    # 병합된 뒤 main push에서만 돈다. 브랜치에서 미리 보려면 workflow_dispatch로 돌린다. 태그는 예전처럼 받는다.
+    branches: [main]
+    tags: ['**']
     paths:
       - 'packages/rules/src/**'
       - 'apps/engine/src/simulation.ts'

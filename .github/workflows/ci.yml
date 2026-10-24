@@ -1,8 +1,16 @@
 name: CI
 
 on:
+  # push는 main과 태그만 받는다. 작업 브랜치는 pull_request 실행이 검사하므로 push로 한 번 더 돌리지 않는다.
+  # 같은 커밋을 두 번 돌리면 조직의 동시 실행 한도(20개)를 두 배로 써서 다른 PR의 검사가 밀린다.
+  # merge queue 임시 브랜치(gh-readonly-queue/**)도 이 목록 밖이라 아래 merge_group 실행만 돈다.
   push:
+    branches: [main]
+    tags: ['**']
   pull_request:
+  # merge queue는 대기열의 병합 결과에 필수 검사(opensamguk-check, opensamguk-database-browser)를 다시 돌린다.
+  # 이 이벤트가 없으면 대기열에 들어간 PR이 검사를 기다리다 멈춘다. checkout ref는 github.sha(병합 결과)로 떨어진다.
+  merge_group:
   workflow_dispatch:
 
 permissions:
