@@ -4,6 +4,8 @@ import { createGeneralByApi, e2eWorld, mutate, query, stubPortraits } from './ga
 
 // T2-08 · AC-M2-06, AC-M2-14 화면: 외교실 조약서와 예턴 편집의 교역 대상.
 // treaty 라우터(T2-07, Codex)가 main에 들어오기 전에는 이 시험이 돌지 않는다. 그 전의 결과는 증거로 세지 않는다.
+// 그래서 두 묶음을 PENDING_API로 보류한다. T2-07이 병합되면 두 test.fixme 줄을 지우고 실제로 돌린다.
+const PENDING_API = 'T2-07 treaty 라우터가 main에 없다. 병합 뒤 이 줄을 지운다 (docs/plans/T2-08.md)';
 // 계약: docs/plans/T2-07.md API 계약, 화면: docs/plans/T2-08.md.
 
 test.describe.configure({ timeout: 180_000 });
@@ -74,6 +76,7 @@ async function acceptByApi(page: Page, world: string) {
 }
 
 test.describe('외교실', () => {
+  test.fixme(true, PENDING_API);
   let world: string;
   let map: MapData;
 
@@ -241,6 +244,7 @@ test.describe('외교실', () => {
 });
 
 test.describe('예턴 편집의 교역 대상', () => {
+  test.fixme(true, PENDING_API);
   test('교역 조약 뒤 메인 편집기에서 교역 대상을 고르고, 외교실에 갔다 와도 초안과 선택이 남는다', async ({
     browser,
     page,
