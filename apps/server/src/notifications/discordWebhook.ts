@@ -95,7 +95,15 @@ function sendOnce(
     const controller = new AbortController();
     let finished = false;
     let observed: Extract<DiscordWebhookSendResult, { kind: 'HTTP_OBSERVED' }> | undefined;
-    const timer = setTimeout(() => finish(observed ?? { kind: 'UNKNOWN', code: 'TIMEOUT' }, true), 10000);
+    const deadline = performance.now() + 10000;
+    let timer = setTimeout(expire, 10000);
+
+    function expire(): void {
+      if (finished) return;
+      const remaining = deadline - performance.now();
+      if (remaining > 0) timer = setTimeout(expire, Math.ceil(remaining));
+      else finish(observed ?? { kind: 'UNKNOWN', code: 'TIMEOUT' }, true);
+    }
 
     function finish(result: DiscordWebhookSendResult, abort = false): void {
       if (finished) return;

@@ -165,7 +165,7 @@ async function seedLegacy(client: PgClient) {
 
 async function existingRows(client: PgClient) {
   const tables = await client.query(
-    "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' AND table_name NOT IN ('WorldExtSlice', 'Treaty') ORDER BY table_name",
+    "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' AND table_name NOT IN ('WorldExtSlice', 'Treaty', 'AssignmentOffer') ORDER BY table_name",
   );
   const rows: Record<string, unknown> = {};
   for (const { table_name: table } of tables.rows) {
@@ -400,7 +400,7 @@ it.each(['empty', 'legacy'] as const)(
       const previous = directories.filter((name) => name < migration);
       const later = directories.filter((name) => name > migration);
       expect(previous.at(-1)).toBe('20261023071000_nation_offices');
-      expect(later).toEqual(['20261023073000_treaties']);
+      expect(later).toEqual(['20261023073000_treaties', '20261023074000_assignment_storage']);
       for (const directory of previous)
         await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
       if (mode === 'legacy') await seedLegacy(client);
@@ -429,6 +429,7 @@ it.each(['empty', 'legacy'] as const)(
         (await client.query('SELECT count(*)::int AS count FROM "World" WHERE "treatyFormat" IS NOT NULL')).rows,
       ).toEqual([{ count: 0 }]);
       expect((await client.query('SELECT count(*)::int AS count FROM "Treaty"')).rows).toEqual([{ count: 0 }]);
+      expect((await client.query('SELECT count(*)::int AS count FROM "AssignmentOffer"')).rows).toEqual([{ count: 0 }]);
       if (mode === 'legacy') {
         const exported = await exportReplay(db, 'legacy');
         expect(exported.version).toBe(2);
