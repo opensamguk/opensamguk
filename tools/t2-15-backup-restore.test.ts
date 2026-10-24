@@ -1,10 +1,10 @@
-import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { OwnedChildScope } from './test-support/owned-child-scope';
 import {
   checkRehearsalArchiveTree,
   createRehearsalStages,
@@ -24,24 +24,36 @@ const binary = Buffer.from([80, 71, 68, 77, 80, 0, 13, 10, 255]);
 const migration = '20260101000000_initial';
 const checksum = 'd'.repeat(64);
 const sha = (data: string | Buffer) => createHash('sha256').update(data).digest('hex');
-const roots: string[] = [];
-const running = new Set<Promise<unknown>>();
+let currentScope: OwnedChildScope | undefined;
+beforeEach(() => {
+  const scope = new OwnedChildScope({ label: 'backup', traceDir: process.env.OPENSAMGUK_CHILD_TRACE_DIR });
+  currentScope = scope;
+  return () => {
+    if (currentScope === scope) currentScope = undefined;
+    return scope.close();
+  };
+});
+function requireScope() {
+  if (!currentScope) throw new Error('CHILD_SCOPE_MISSING');
+  return currentScope;
+}
 
 // 운영 슬롯과 T215_* 없이 OS 임시 폴더를 쓰며, 루트 주입은 선택 사항이다.
-async function fixture(temporaryRoot = tmpdir()) {
-  const root = await mkdtemp(join(temporaryRoot, 't215-unit-'));
-  roots.push(root);
-  const backup = join(root, 'backup dir');
-  const config = join(root, 'docker-config');
-  const fakeBin = join(root, 'bin');
-  const fake = join(root, 'fake-docker');
-  await mkdir(backup);
-  await mkdir(config);
-  await mkdir(fakeBin);
-  const shellRoot = root.replaceAll('\\', '/').replaceAll("'", "'\\''");
-  await writeFile(
-    fake,
-    `#!/usr/bin/env bash
+async function fixture(temporaryRoot = tmpdir(), scope = requireScope()) {
+  return scope.fixture(async (register) => {
+    const root = await mkdtemp(join(temporaryRoot, 't215-unit-'));
+    await register(root, { parent: temporaryRoot, prefix: 't215-unit-' });
+    const backup = join(root, 'backup dir');
+    const config = join(root, 'docker-config');
+    const fakeBin = join(root, 'bin');
+    const fake = join(root, 'fake-docker');
+    await mkdir(backup);
+    await mkdir(config);
+    await mkdir(fakeBin);
+    const shellRoot = root.replaceAll('\\', '/').replaceAll("'", "'\\''");
+    await writeFile(
+      fake,
+      `#!/usr/bin/env bash
 set -euo pipefail
 root='${shellRoot}'
 printf 'CALL' >>"$root/calls"
@@ -113,174 +125,165 @@ case "$command" in
   *) exit 1;;
 esac
 `,
-    { mode: 0o700 },
-  );
-  await writeFile(join(root, 'binary'), binary);
-  await writeFile(
-    join(root, 'migration-sql'),
-    `COPY public._prisma_migrations (id, checksum, finished_at, migration_name, logs, rolled_back_at, started_at, applied_steps_count) FROM stdin;\nx\t${checksum}\t2026-01-01\t${migration}\t\\N\t\\N\t2026-01-01\t1\n\\.\n`,
-  );
-  const env: NodeJS.ProcessEnv = {
-    SystemRoot: process.env.SystemRoot,
-    PATH: process.platform === 'win32' ? 'C:/Program Files/Git/usr/bin;C:/Program Files/Git/bin' : '/usr/bin:/bin',
-    DOCKER_HOST: process.platform === 'win32' ? 'npipe:////./pipe/t215-unit-unused' : 'unix:///t215-unit-unused',
-    DOCKER_CONFIG: config,
-    HOME: root,
-    USERPROFILE: root,
-    TEMP: root,
-    TMP: root,
-    TMPDIR: root,
-  };
-  async function run(
-    script: 'backup' | 'restore',
-    args: string[],
-    extra: NodeJS.ProcessEnv = {},
-    scriptDirectory = tools,
-  ) {
-    const child = spawn(bash, [join(scriptDirectory, `${script}.sh`), ...args], {
-      cwd: root,
-      env: { ...env, ...extra },
-      shell: false,
-      windowsHide: true,
-    });
-    let stdout = '',
-      stderr = '';
-    child.stdout.on('data', (data: Buffer) => {
-      stdout += data.toString('utf8');
-    });
-    child.stderr.on('data', (data: Buffer) => {
-      stderr += data.toString('utf8');
-    });
-    const exited = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((accept, reject) => {
-      child.once('error', reject);
-      child.once('close', (code, signal) => accept({ code, signal }));
-    });
-    running.add(exited);
-    let result;
-    try {
-      result = await exited;
-    } finally {
-      running.delete(exited);
-    }
-    return { ...result, stdout, stderr };
-  }
-  const common = [
-    '--docker',
-    fake,
-    '--container',
-    container,
-    '--system-identifier',
-    system,
-    '--db-user',
-    'tester',
-    '--admin-db',
-    'postgres',
-  ];
-  const backupArgs = [
-    ...common,
-    '--release-sha',
-    'f'.repeat(40),
-    '--source-db',
-    source,
-    '--backup-dir',
-    backup,
-    '--reason',
-    'rehearsal',
-  ];
-  async function calls() {
-    return readFile(join(root, 'calls'), 'utf8').catch(() => '');
-  }
-  async function flag(name: string) {
-    await writeFile(join(root, name), '1');
-  }
-  async function failTool(name: 'sha256sum' | 'mv' | 'sync', point: 'hash' | 'dump-mv' | 'manifest-mv' | 'sync') {
-    const guard =
-      point === 'hash'
-        ? `[[ ! -f '${shellRoot}/dump-ran' ]] || exit 1`
-        : point === 'dump-mv'
-          ? 'for last; do :; done; case "$last" in *.dump) exit 1;; esac'
-          : point === 'manifest-mv'
-            ? 'for last; do :; done; case "$last" in *.manifest.json) exit 1;; esac'
-            : 'exit 1';
-    await writeFile(join(fakeBin, name), `#!/usr/bin/env bash\n${guard}\nexec /usr/bin/${name} "$@"\n`, {
-      mode: 0o700,
-    });
-    const toBashPath = (path: string) =>
-      path.replaceAll('\\', '/').replace(/^([A-Za-z]):/, (_, drive: string) => `/${drive.toLowerCase()}`);
-    const startup = join(root, 'unit-bash-env');
-    await writeFile(startup, `export PATH='${toBashPath(fakeBin)}':"$PATH"\n`);
-    env.BASH_ENV = toBashPath(startup);
-  }
-  async function restoreInput(patch: Record<string, unknown> = {}) {
-    const data = {
-      format: 't215-pg-custom-v1',
-      success: true,
-      source: { name: source, oid: '100', systemIdentifier: system },
-      dumpMajor: 17,
-      consistency: 'quiesced',
-      sha256: sha(binary),
-      size: binary.length,
-      contentHash: sha('table\tWorld\t1\taaaa'),
-      contentHashReason: 'quiesced',
-      releaseSha: 'f'.repeat(40),
-      migrations: [{ name: migration, checksum }],
-      ...patch,
-    };
-    const archive = join(backup, 'input.dump'),
-      manifest = join(backup, 'input.manifest.json');
-    await writeFile(archive, binary);
-    await writeFile(manifest, JSON.stringify(data));
-    const origin = data.source as { name: string; oid: string; systemIdentifier: string };
-    await writeFile(
-      join(root, 'manifest-header'),
-      [
-        origin.name,
-        origin.oid,
-        origin.systemIdentifier,
-        data.dumpMajor,
-        data.consistency,
-        data.sha256,
-        data.contentHash ?? 'null',
-        data.contentHashReason,
-        data.size,
-      ].join('|') + '\n',
+      { mode: 0o700 },
     );
-    return [...common, '--archive', archive, '--manifest', manifest, '--target-db', target];
-  }
-  async function oldBackup(days: number) {
-    const oldManifest = `backup-20000101t000000z-${'e'.repeat(32)}.manifest.json`;
-    const oldDump = oldManifest.replace('.manifest.json', '.dump');
-    const createdUnix = Math.floor(Date.now() / 1000) - days * 86400;
-    const data = {
-      format: 't215-pg-custom-v1',
-      success: true,
-      source: { name: source, oid: '100', systemIdentifier: system },
-      dumpMajor: 17,
-      serverVersion: 170002,
-      releaseSha: 'f'.repeat(40),
-      createdUnix,
-      startedUtc: '2000-01-01T00:00:00Z',
-      finishedUtc: '2000-01-01T00:00:00Z',
-      sha256: sha(binary),
-      size: binary.length,
-      consistency: 'quiesced',
-      contentHash: sha('table\tWorld\t1\taaaa'),
-      contentHashReason: 'quiesced',
-      externalCopy: 'not-configured',
-      migrations: [{ name: migration, checksum }],
+    await writeFile(join(root, 'binary'), binary);
+    await writeFile(
+      join(root, 'migration-sql'),
+      `COPY public._prisma_migrations (id, checksum, finished_at, migration_name, logs, rolled_back_at, started_at, applied_steps_count) FROM stdin;\nx\t${checksum}\t2026-01-01\t${migration}\t\\N\t\\N\t2026-01-01\t1\n\\.\n`,
+    );
+    const env: NodeJS.ProcessEnv = {
+      SystemRoot: process.env.SystemRoot,
+      PATH: process.platform === 'win32' ? 'C:/Program Files/Git/usr/bin;C:/Program Files/Git/bin' : '/usr/bin:/bin',
+      DOCKER_HOST: process.platform === 'win32' ? 'npipe:////./pipe/t215-unit-unused' : 'unix:///t215-unit-unused',
+      DOCKER_CONFIG: config,
+      HOME: root,
+      USERPROFILE: root,
+      TEMP: root,
+      TMP: root,
+      TMPDIR: root,
     };
-    await writeFile(join(backup, oldDump), binary);
-    await writeFile(join(backup, oldManifest), JSON.stringify(data));
-    await writeFile(join(root, 'retention-header'), `${createdUnix}|${sha(binary)}|${binary.length}\n`);
-    return { oldDump, oldManifest };
-  }
-  return { root, backup, fake, env, run, common, backupArgs, calls, flag, failTool, restoreInput, oldBackup };
+    async function run(
+      script: 'backup' | 'restore',
+      args: string[],
+      extra: NodeJS.ProcessEnv = {},
+      scriptDirectory = tools,
+    ) {
+      const owned = scope.start(bash, [join(scriptDirectory, `${script}.sh`), ...args], {
+        cwd: root,
+        env: { ...env, ...extra },
+        shell: false,
+        windowsHide: true,
+      });
+      const child = owned.child;
+      let stdout = '',
+        stderr = '';
+      child.stdout!.on('data', (data: Buffer) => {
+        stdout += data.toString('utf8');
+      });
+      child.stderr!.on('data', (data: Buffer) => {
+        stderr += data.toString('utf8');
+      });
+      const result = await owned.closed;
+      if (result.error) throw result.error;
+      return { ...result, stdout, stderr };
+    }
+    const common = [
+      '--docker',
+      fake,
+      '--container',
+      container,
+      '--system-identifier',
+      system,
+      '--db-user',
+      'tester',
+      '--admin-db',
+      'postgres',
+    ];
+    const backupArgs = [
+      ...common,
+      '--release-sha',
+      'f'.repeat(40),
+      '--source-db',
+      source,
+      '--backup-dir',
+      backup,
+      '--reason',
+      'rehearsal',
+    ];
+    async function calls() {
+      return readFile(join(root, 'calls'), 'utf8').catch(() => '');
+    }
+    async function flag(name: string) {
+      await writeFile(join(root, name), '1');
+    }
+    async function failTool(name: 'sha256sum' | 'mv' | 'sync', point: 'hash' | 'dump-mv' | 'manifest-mv' | 'sync') {
+      const guard =
+        point === 'hash'
+          ? `[[ ! -f '${shellRoot}/dump-ran' ]] || exit 1`
+          : point === 'dump-mv'
+            ? 'for last; do :; done; case "$last" in *.dump) exit 1;; esac'
+            : point === 'manifest-mv'
+              ? 'for last; do :; done; case "$last" in *.manifest.json) exit 1;; esac'
+              : 'exit 1';
+      await writeFile(join(fakeBin, name), `#!/usr/bin/env bash\n${guard}\nexec /usr/bin/${name} "$@"\n`, {
+        mode: 0o700,
+      });
+      const toBashPath = (path: string) =>
+        path.replaceAll('\\', '/').replace(/^([A-Za-z]):/, (_, drive: string) => `/${drive.toLowerCase()}`);
+      const startup = join(root, 'unit-bash-env');
+      await writeFile(startup, `export PATH='${toBashPath(fakeBin)}':"$PATH"\n`);
+      env.BASH_ENV = toBashPath(startup);
+    }
+    async function restoreInput(patch: Record<string, unknown> = {}) {
+      const data = {
+        format: 't215-pg-custom-v1',
+        success: true,
+        source: { name: source, oid: '100', systemIdentifier: system },
+        dumpMajor: 17,
+        consistency: 'quiesced',
+        sha256: sha(binary),
+        size: binary.length,
+        contentHash: sha('table\tWorld\t1\taaaa'),
+        contentHashReason: 'quiesced',
+        releaseSha: 'f'.repeat(40),
+        migrations: [{ name: migration, checksum }],
+        ...patch,
+      };
+      const archive = join(backup, 'input.dump'),
+        manifest = join(backup, 'input.manifest.json');
+      await writeFile(archive, binary);
+      await writeFile(manifest, JSON.stringify(data));
+      const origin = data.source as { name: string; oid: string; systemIdentifier: string };
+      await writeFile(
+        join(root, 'manifest-header'),
+        [
+          origin.name,
+          origin.oid,
+          origin.systemIdentifier,
+          data.dumpMajor,
+          data.consistency,
+          data.sha256,
+          data.contentHash ?? 'null',
+          data.contentHashReason,
+          data.size,
+        ].join('|') + '\n',
+      );
+      return [...common, '--archive', archive, '--manifest', manifest, '--target-db', target];
+    }
+    async function oldBackup(days: number) {
+      const oldManifest = `backup-20000101t000000z-${'e'.repeat(32)}.manifest.json`;
+      const oldDump = oldManifest.replace('.manifest.json', '.dump');
+      const createdUnix = Math.floor(Date.now() / 1000) - days * 86400;
+      const data = {
+        format: 't215-pg-custom-v1',
+        success: true,
+        source: { name: source, oid: '100', systemIdentifier: system },
+        dumpMajor: 17,
+        serverVersion: 170002,
+        releaseSha: 'f'.repeat(40),
+        createdUnix,
+        startedUtc: '2000-01-01T00:00:00Z',
+        finishedUtc: '2000-01-01T00:00:00Z',
+        sha256: sha(binary),
+        size: binary.length,
+        consistency: 'quiesced',
+        contentHash: sha('table\tWorld\t1\taaaa'),
+        contentHashReason: 'quiesced',
+        externalCopy: 'not-configured',
+        migrations: [{ name: migration, checksum }],
+      };
+      await writeFile(join(backup, oldDump), binary);
+      await writeFile(join(backup, oldManifest), JSON.stringify(data));
+      await writeFile(join(root, 'retention-header'), `${createdUnix}|${sha(binary)}|${binary.length}\n`);
+      return { oldDump, oldManifest };
+    }
+    return { root, backup, fake, env, run, common, backupArgs, calls, flag, failTool, restoreInput, oldBackup, scope };
+  });
 }
 
-afterEach(async () => {
+afterEach(() => {
   vi.useRealTimers();
-  await Promise.allSettled([...running]);
-  for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true });
 });
 
 describe('T2-15 B1 archive 읽기', () => {
@@ -919,7 +922,7 @@ describe('T2-15 B1 백업·복구 경계', () => {
   });
   it('외부 루트 주입은 선택 사항이다', async () => {
     const f = await fixture();
-    const nested = await fixture(f.root);
+    const nested = await fixture(f.root, f.scope);
     expect(resolve(nested.root).startsWith(resolve(f.root))).toBe(true);
   });
 });
