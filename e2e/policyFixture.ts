@@ -21,7 +21,7 @@ import { holdLease, releaseHold, type LeaseHold } from './game';
 // 고정 이름 t2-14-fixture-{setup,cleanup}.json에는 마지막 worker 것을 한 벌 더 쓴다.
 //
 // 시험마다 새 계정과 새 월드를 만든다. 월드는 엔진 월간 fixture를 복사하고 그 계정이 주인인 사람 장수 하나를 초기 상태에 더한다.
-// 기본 saveInitialWorld(새 월드 F = 0)로 저장하고 실행권을 먼저 잡은 뒤 엔진 controlClock으로 연다. 엔진은 시험이 쥔 실행권으로
+// saveInitialWorld의 형식 3에 policy 기능을 지정해 저장하고 실행권을 잡은 뒤 엔진 controlClock으로 연다. 엔진은 시험이 쥔 실행권으로
 // 실제 TurnLoop.advanceTo만 돈다(manual). 활동 시각·explicit·전환 표지·InputEvent 결과·시계·tick은 쓰지 않는다.
 // 월드 행 직접 쓰기는 거절 조건 fixture(closeWorldForRejection) 한 곳뿐이다.
 
@@ -166,6 +166,7 @@ async function createWorld(kind: WorldKind): Promise<PolicyWorld> {
       name,
       turnTermMinutes: 1440,
       endYear: null,
+      ruleFeatures: ['policy'],
     });
     return { userId: user.id, worldId: saved.worldId };
   });
