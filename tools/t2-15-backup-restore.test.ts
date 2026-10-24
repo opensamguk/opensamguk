@@ -132,9 +132,18 @@ esac
       join(root, 'migration-sql'),
       `COPY public._prisma_migrations (id, checksum, finished_at, migration_name, logs, rolled_back_at, started_at, applied_steps_count) FROM stdin;\nx\t${checksum}\t2026-01-01\t${migration}\t\\N\t\\N\t2026-01-01\t1\n\\.\n`,
     );
+    // 가짜 Docker 단위 시험의 sync는 호출을 기록하고 성공한다. failTool은 같은 파일을 덮어써 실패를 주입한다.
+    await writeFile(join(fakeBin, 'sync'), `#!/usr/bin/env bash\nprintf 'SYNC %s\\n' "$#" >>'${shellRoot}/calls'\n`, {
+      mode: 0o700,
+    });
+    const toBashPath = (path: string) =>
+      path.replaceAll('\\', '/').replace(/^([A-Za-z]):/, (_, drive: string) => `/${drive.toLowerCase()}`);
+    const startup = join(root, 'unit-bash-env');
+    await writeFile(startup, `export PATH='${toBashPath(fakeBin)}':"$PATH"\n`);
     const env: NodeJS.ProcessEnv = {
       SystemRoot: process.env.SystemRoot,
       PATH: process.platform === 'win32' ? 'C:/Program Files/Git/usr/bin;C:/Program Files/Git/bin' : '/usr/bin:/bin',
+      BASH_ENV: toBashPath(startup),
       DOCKER_HOST: process.platform === 'win32' ? 'npipe:////./pipe/t215-unit-unused' : 'unix:///t215-unit-unused',
       DOCKER_CONFIG: config,
       HOME: root,
@@ -209,11 +218,6 @@ esac
       await writeFile(join(fakeBin, name), `#!/usr/bin/env bash\n${guard}\nexec /usr/bin/${name} "$@"\n`, {
         mode: 0o700,
       });
-      const toBashPath = (path: string) =>
-        path.replaceAll('\\', '/').replace(/^([A-Za-z]):/, (_, drive: string) => `/${drive.toLowerCase()}`);
-      const startup = join(root, 'unit-bash-env');
-      await writeFile(startup, `export PATH='${toBashPath(fakeBin)}':"$PATH"\n`);
-      env.BASH_ENV = toBashPath(startup);
     }
     async function restoreInput(patch: Record<string, unknown> = {}) {
       const data = {
@@ -708,6 +712,7 @@ describe('T2-15 B1 백업·복구 경계', () => {
     args[args.indexOf('--release-sha') + 1] = release;
     const result = await f.run('backup', args, {}, archiveTools);
     expect(result.code, result.stderr).toBe(0);
+    expect((await f.calls()).match(/^SYNC 0$/gm)).toHaveLength(1);
     const files = await readdir(f.backup);
     const receipt = JSON.parse(
       await readFile(
