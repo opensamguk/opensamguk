@@ -82,6 +82,11 @@ export const exemptions: AuthzExemption[] = [
       '공통 공개 영토 기록이며 타인 소유 자원이 없다. 다른 계정의 같은 응답은 timelapse 실제 HTTP 시험이 확인한다.',
   },
   {
+    path: 'timelapse.publicFrames',
+    category: 'otherUser',
+    reason: '무인증 종료 월드 공개 재생이며 계정이나 타인 소유 자원을 지정하지 않는다. ID 주입은 거부한다.',
+  },
+  {
     path: 'ranking.generals',
     category: 'otherUser',
     reason: '순위는 공통 공개 정보이고 me만 세션 장수로 정한다. 임의 generalId 지정은 BAD_REQUEST다.',
