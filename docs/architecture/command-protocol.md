@@ -18,6 +18,8 @@
 
 확장 명령은 `commands/ext/registry.ts`의 `extensionCommands`에 따로 등록합니다. 명령과 상태 조각의 관계는 `CommandDef`에 넣지 않고 `extCommandBindings`에 둡니다. 상태가 없는 확장 명령도 빈 `sliceKeys` 행을 하나 둡니다.
 
+확장 상태 조각을 바꾸는 명령은 복제한 상태를 담은 `{ kind: 'world', state }` 효과 하나를 냅니다. `makeSpyCommand`는 복제 함수를 인자로 받으며 운영에서는 `cloneWorld`를 씁니다. 운영 등록 전의 단위 시험은 `intelSlice`와 `spyBinding`을 아는 `cloneWorldWithRegistry`를 주입합니다.
+
 ## 2. 실행 흐름
 
 ```text
@@ -36,10 +38,17 @@
   병종 상성과 기술 보정만 둡니다. 특기·장비는 Phase 2에서 이 문서에 효과 계산 단계를 추가합니다.
 - 원작과 RNG 소비 순서를 맞추지 않습니다. 대신 **우리 자신의** RNG 소비 순서는 바꾸지 않습니다
   (재생 테스트 AC-M1-13이 깨지기 때문).
+- 첩보는 통솔 경험, 지도 실시간 열람과 월간 감소, 전체 공지를 뺐습니다. 실행 시점 정보를 국가별 기록으로 남기고 대상 국가에 알립니다.
 
 ## 4. 명령 목록
 
 기본 목록과 확장 목록은 분리합니다. T4-02의 운영 `extensionCommands`, `extSlices`, `extCommandBindings`는 빈 배열로 시작합니다. resolver는 기본 등록 순서 뒤에 켠 확장 명령을 확장 등록 순서로 붙입니다.
+
+첩보 정의와 상태 조각은 T4-11에서 만들고 운영 등록은 T4-17에서 합니다.
+
+| key | 표시 이름 | target | category | 인자 |
+| --- | --- | --- | --- | --- |
+| spy | 첩보 | general | military | cityKey |
 
 PRD [§6.3](../product/prd.md#63-mvp-명령-세트)의 37개입니다. `commands/registry.ts`가 key와 target을 소유합니다. category는 target에서 유도하지 않습니다. 아래 표의 기존 9개 category 필드는 T1-11에서 붙이며 T1-08은 신규 28개 값을 명시합니다. `commands.list`는 general 27개만 노출합니다. nation 10개는 별도 국가 예턴에서 실행합니다.
 

@@ -45,3 +45,4 @@ export {
   type ModifierProvider,
   type BattleModifiers,
 } from './modifiers';
+export * from './commands/ext/intel/record';
