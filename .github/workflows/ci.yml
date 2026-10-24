@@ -39,15 +39,30 @@ jobs:
       - run: pnpm check
       - run: pnpm --filter @opensamguk/web build
 
+  # Required check name. It passes only when the authz job and every E2E shard passed (cancelled or skipped fails).
   database-browser:
     name: opensamguk-database-browser
+    if: always()
+    needs: [database-authz, database-e2e]
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 5
+    steps:
+      - name: Require authz and every E2E shard
+        env:
+          AUTHZ: ${{ needs.database-authz.result }}
+          E2E: ${{ needs.database-e2e.result }}
+        run: |
+          echo "authz=$AUTHZ e2e=$E2E"
+          test "$AUTHZ" = success
+          test "$E2E" = success
+
+  database-authz:
+    name: opensamguk-database-authz
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     env:
       CI: 'true'
-      DATABASE_URL: postgresql://opensamguk:opensamguk@127.0.0.1:5432/opensamguk_ci_e2e_test
       TEST_DATABASE_URL: postgresql://opensamguk:opensamguk@127.0.0.1:5432/opensamguk_ci_int_test
-      SERVER_PORT: '3001'
     services:
       postgres:
         image: postgres:18.6-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
@@ -80,6 +95,89 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:authz
+
+  # Each shard has its own PostgreSQL service, so shards never share a database.
+  # Every spec creates its own world and accounts when missing (e2e/game.ts e2eWorld), so file order across shards does not matter.
+  database-e2e:
+    name: opensamguk-database-e2e (${{ matrix.shard }}/4)
+    runs-on: ubuntu-24.04
+    # Worst cold case seen in PR #219: apt download 13m28s + shard 1/4 E2E about 12 min (three 180 s test timeouts) + setup 1.5 min.
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    env:
+      CI: 'true'
+      DATABASE_URL: postgresql://opensamguk:opensamguk@127.0.0.1:5432/opensamguk_ci_e2e_test
+      SERVER_PORT: '3001'
+      APT_ARCHIVES: /home/runner/.cache/playwright-apt
+    services:
+      postgres:
+        image: postgres:18.6-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+        env:
+          POSTGRES_USER: opensamguk
+          POSTGRES_PASSWORD: opensamguk
+          POSTGRES_DB: opensamguk_ci_e2e_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U opensamguk -d opensamguk_ci_e2e_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify source commit
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.22.0'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm generate
       - run: pnpm db:migrate
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm e2e --workers=1 --reporter=line
+      # The slow part of `--with-deps` is downloading .deb files from the Ubuntu mirror
+      # (8m52s in job 120378660050, 13m28s in job 120415754413). The browser zip itself downloads in about 1 s.
+      # Keep only the downloaded packages (about 25 MB), keyed by Playwright version and runner image.
+      # Only pushes to main save it. PR runs restore main's cache, so branch scopes do not keep their own copies.
+      - name: Playwright apt cache key
+        id: playwright
+        run: |
+          version="$(pnpm exec playwright --version | awk '{print $2}')"
+          echo "key=playwright-apt-$version-$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
+          echo "prefix=playwright-apt-$version-$ImageOS-" >> "$GITHUB_OUTPUT"
+      - name: Restore Playwright apt cache
+        id: playwright-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.cache/playwright-apt
+          key: ${{ steps.playwright.outputs.key }}
+          restore-keys: ${{ steps.playwright.outputs.prefix }}
+      - name: Install Playwright Chromium and system packages
+        run: |
+          mkdir -p "$APT_ARCHIVES/partial"
+          {
+            echo "Dir::Cache::Archives \"$APT_ARCHIVES\";"
+            echo 'APT::Keep-Downloaded-Packages "true";'
+            echo 'Binary::apt-get::APT::Keep-Downloaded-Packages "true";'
+          } | sudo tee /etc/apt/apt.conf.d/90playwright-archives
+          pnpm exec playwright install --with-deps chromium
+          sudo rm -rf "$APT_ARCHIVES/partial" "$APT_ARCHIVES/lock"
+          sudo chown -R "$(id -u):$(id -g)" "$APT_ARCHIVES"
+          echo "cached debs: $(find "$APT_ARCHIVES" -name '*.deb' | wc -l), $(du -sh "$APT_ARCHIVES" | awk '{print $1}')"
+      - name: Save Playwright apt cache
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.playwright-cache.outputs.cache-hit != 'true' && matrix.shard == 1
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.cache/playwright-apt
+          key: ${{ steps.playwright.outputs.key }}
+      - run: pnpm e2e --shard=${{ matrix.shard }}/4 --workers=1 --reporter=line
