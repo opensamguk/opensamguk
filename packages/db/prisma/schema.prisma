@@ -480,6 +480,7 @@ model InputEvent {
   payload        Json
   status         InputEventStatus @default(PENDING)
   sequence       Int?
+  stepTick       Int?
   result         Json?
   createdAt      DateTime @default(now())
   world          World @relation(fields: [worldId], references: [id], onDelete: Cascade)
