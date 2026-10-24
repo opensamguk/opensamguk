@@ -155,7 +155,7 @@ async function createFixture(config: { beforeCatalog?: boolean; initialize?: boo
     try {
       await dispose();
     } catch (cleanup) {
-      throw new AggregateError([error, cleanup], '시험 준비와 자기 DB 정리가 실패했습니다.');
+      throw new AggregateError([error, cleanup], '시험 준비와 자기 DB 정리가 실패했습니다.', { cause: cleanup });
     }
     throw error;
   }
@@ -175,7 +175,8 @@ async function withDatabase(
   try {
     await fixture.dispose();
   } catch (cleanup) {
-    if (failure) throw new AggregateError([failure, cleanup], '시험과 자기 DB 정리가 실패했습니다.');
+    if (failure)
+      throw new AggregateError([failure, cleanup], '시험과 자기 DB 정리가 실패했습니다.', { cause: cleanup });
     throw cleanup;
   }
   if (failure) throw failure;
