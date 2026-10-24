@@ -1,4 +1,4 @@
-import type { ActionInput, FinishedTreaty, RecentAction, RequestId, RequestKind, RequestState } from './contract';
+import type { ActionInput, FinishedTreaty, RecentAction, RequestId, RequestState } from './contract';
 
 // 즉시 행동(제안·수락·거절)의 요청 추적. docs/plans/T2-08.md 화면 절, T2-07 "요청 식별과 재전송".
 // 단추를 누르면 requestId를 만들어 보내기 전에 이 탭의 sessionStorage에 둔다. 결과가 확정될 때만 지운다.
@@ -22,7 +22,7 @@ export interface Finished {
   action: ActionInput;
   result: FinishedResult;
   // applied일 때 엔진이 정한 결과. DECLINED는 받은 제안을 거절한 것이다.
-  outcome: 'PROPOSED' | 'ACCEPTED' | 'DECLINED' | null;
+  outcome: Extract<RequestState, { status: 'applied' }>['outcome'] | null;
   reason: string | null;
   // applied일 때 서버가 준 조약. 국가 ID만 있고 지금 장수의 국가가 당사국이 아니면 null이다.
   treaty: FinishedTreaty;
@@ -188,11 +188,11 @@ export function phaseText(phase: Phase): string {
   }
 }
 
-type Outcome = NonNullable<Finished['outcome']>;
+type Outcome = Exclude<NonNullable<Finished['outcome']>, 'BROKEN'>;
 
 // 엔진이 처리한 결과 문구. 같은 DECLINED라도 누가 거절했는지가 다르다.
 // 제안한 쪽이 받는 DECLINED는 상대(예: NPC 즉시 판단)가 거절한 것이다. 응답한 쪽이 받는 DECLINED는 내가 거절한 것이다.
-const APPLIED_TEXT: Record<RequestKind, Record<Outcome, string>> = {
+const APPLIED_TEXT: Record<ActionInput['kind'], Record<Outcome, string>> = {
   'treaty.propose': {
     PROPOSED: '제안을 보냈습니다. 상대가 답하면 목록에 나옵니다.',
     ACCEPTED: '상대가 제안을 받아 조약을 맺었습니다.',
@@ -205,7 +205,7 @@ const APPLIED_TEXT: Record<RequestKind, Record<Outcome, string>> = {
   },
 };
 
-const RECENT_TEXT: Record<RequestKind, Record<Outcome, string>> = {
+const RECENT_TEXT: Record<ActionInput['kind'], Record<Outcome, string>> = {
   'treaty.propose': { PROPOSED: '제안을 보냄', ACCEPTED: '상대가 수락해 조약을 맺음', DECLINED: '상대가 거절함' },
   'treaty.respond': { PROPOSED: '처리됨', ACCEPTED: '수락해 조약을 맺음', DECLINED: '받은 제안을 거절함' },
 };
@@ -215,12 +215,14 @@ export function finishedText(item: Finished): string {
     return `${actionLabel(item.action)} 요청을 서버가 받지 않았습니다. ${item.reason ?? ''}`.trim();
   if (item.result === 'rejected')
     return `${actionLabel(item.action)} 요청이 거절되었습니다. ${item.reason ?? ''}`.trim();
+  if (item.outcome === 'BROKEN') return '조약을 파기했습니다.';
   return item.outcome === null ? '처리되었습니다.' : APPLIED_TEXT[item.action.kind][item.outcome];
 }
 
 // 목록의 최근 처리된 내 요청 한 줄. 엔진이 받아 처리한 결과와 받아들이지 않은 거절을 나눈다.
 export function recentText(item: RecentAction): string {
-  const kind = item.kind === 'treaty.propose' ? '제안' : '응답';
+  const kind = item.kind === 'treaty.propose' ? '제안' : item.kind === 'treaty.break' ? '파기' : '응답';
   if (item.result === 'REJECTED') return `${kind} · 받아들여지지 않음${item.reason ? ` (${item.reason})` : ''}`;
-  return `${kind} · ${item.outcome === null ? '처리됨' : RECENT_TEXT[item.kind][item.outcome]}`;
+  if (item.outcome === 'BROKEN') return `${kind} · 조약을 파기함`;
+  return `${kind} · ${item.outcome === null || item.kind === 'treaty.break' ? '처리됨' : RECENT_TEXT[item.kind][item.outcome]}`;
 }

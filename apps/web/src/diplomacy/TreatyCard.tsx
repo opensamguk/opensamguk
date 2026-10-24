@@ -12,6 +12,7 @@ export const STATUS_LABELS: Record<TreatyStatus, { text: string; tone: TagTone }
   ENDED: { text: '끝남', tone: 'muted' },
   REJECTED: { text: '거절됨', tone: 'muted' },
   EXPIRED: { text: '기한 지남', tone: 'muted' },
+  BROKEN: { text: '파기됨', tone: 'danger' },
 };
 
 // 당사국 행이 없으면(멸망) 서버는 null을 준다. 이름을 지어내지 않고 ID와 함께 없는 국가라고 적는다.
