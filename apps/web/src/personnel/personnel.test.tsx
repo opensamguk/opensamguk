@@ -292,6 +292,15 @@ describe('발령 제안 상자', () => {
     expect(screen.getByRole('note').textContent).toBe('요청을 처리하는 중입니다.');
   });
 
+  it('접수 전에도 두 버튼은 막고 상태와 막힌 이유를 보내는 중으로 보인다', () => {
+    const onRespond = vi.fn();
+    render(<OfferCard offer={offer} busy busyLabel="보내는 중" onRespond={onRespond} />);
+    expect(screen.getByRole('status').textContent).toBe('보내는 중');
+    fireEvent.click(screen.getByRole('button', { name: /수락/ }));
+    expect(onRespond).not.toHaveBeenCalled();
+    expect(screen.getByRole('note').textContent).toBe('요청을 보내는 중입니다.');
+  });
+
   it('응답할 수 없으면 서버가 준 이유를 펼친다', () => {
     render(
       <OfferCard
@@ -378,5 +387,25 @@ describe('인사부', () => {
     render(<PersonnelBoardView board={board} busyTarget="level-10" onAppoint={vi.fn()} onDismiss={vi.fn()} />);
     expect(screen.queryByRole('combobox')).toBeNull();
     expect(screen.getAllByRole('status').map((s) => s.closest('tr')?.getAttribute('data-level'))).toEqual(['10']);
+  });
+
+  it('인사 접수 전에는 모든 직책을 막고 보낸 직책에만 보내는 중을 보인다', () => {
+    const onAppoint = vi.fn();
+    const onDismiss = vi.fn();
+    render(
+      <PersonnelBoardView
+        board={board}
+        busyTarget="level-10"
+        busyLabel="보내는 중"
+        onAppoint={onAppoint}
+        onDismiss={onDismiss}
+      />,
+    );
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(screen.getByRole('status').textContent).toBe('보내는 중');
+    fireEvent.click(screen.getByRole('button', { name: /임명/ }));
+    expect(onAppoint).not.toHaveBeenCalled();
+    expect(onDismiss).not.toHaveBeenCalled();
+    expect(screen.getByRole('note').textContent).toBe('요청을 보내는 중입니다.');
   });
 });

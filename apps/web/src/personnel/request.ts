@@ -25,8 +25,10 @@ export async function sendAction(
   worldId: string,
   requestId: string,
   action: ActionInput,
+  isCurrent: () => boolean = () => true,
 ): Promise<SendOutcome> {
   for (let attempt = 0; attempt < 2; attempt++) {
+    if (!isCurrent()) return { type: 'lost' };
     try {
       return { type: 'state', state: await api.act({ worldId, requestId, action }) };
     } catch (error) {
@@ -36,6 +38,21 @@ export async function sendAction(
     }
   }
   return { type: 'lost' };
+}
+
+export type CheckOutcome = SendOutcome | { type: 'absent' };
+
+// 조회는 재접수하지 않는다. 전송 중의 NOT_FOUND는 아직 접수가 끝나지 않았을 수 있다.
+export async function checkAction(api: PersonnelApi, worldId: string, requestId: string): Promise<CheckOutcome> {
+  try {
+    return { type: 'state', state: (await api.request({ worldId, requestId })).state };
+  } catch (error) {
+    const code = errorCode(error);
+    if (code === 'NOT_FOUND') return { type: 'absent' };
+    if (code !== undefined)
+      return { type: 'error', code, message: serverMessage(error) ?? '요청을 확인하지 못했습니다.' };
+    return { type: 'lost' };
+  }
 }
 
 export function newRequestId(): string {
