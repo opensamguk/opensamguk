@@ -164,3 +164,4 @@ export type { PersonnelStepPacket } from './personnel/step';
 export { runPersonnelMonth } from './personnel/monthStep';
 export type { PersonnelMonthResult } from './personnel/monthStep';
 export { updateResidenceAnchors } from './personnel/residence';
+export * from './commands/ext/intel/record';

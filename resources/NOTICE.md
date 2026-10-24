@@ -9,6 +9,7 @@
 - 계략 4종 공식: `packages/logic/src/actions/turn/general/strategyCommand.ts`, `che_화계.ts`, `che_파괴.ts`, `che_선동.ts`, `che_탈취.ts` → `packages/rules/src/commands/ext/stratagem/`. 비용·부상·미보급 탈취·기록과 RNG 판정은 T4-05의 S0~S7 결정과 기술 계약을 따른다.
 - 공개 국력: `app/game-engine/src/turn/monthlyNationStatsHandler.ts` → `packages/rules/src/ranking.ts`의 자원·도시·장수 합성식. 난수는 우리 시드 RNG를 쓰며 숙련도·전투 교환비·NPC 보정·국가 등급 조건은 옮기지 않았다.
 - 토너먼트 경기: `packages/logic/src/tournament/battle.ts` → `packages/rules/src/tournament/match.ts`. 등급 비율을 빼고 100합 뒤 잔여 기력으로 승자를 정하며 동률이면 원정이 이긴다. 조별 무승부 경기·HTML 기록·통계는 옮기지 않았다.
+- 첩보 단계와 비용: `packages/logic/src/actions/turn/general/che_첩보.ts` → `packages/rules/src/commands/ext/intel/`. 거리별 정보 항목과 기술 비교 경계를 옮겼고 비용은 금·쌀 각 60으로 고정한다.
 
 각 JSON의 `$comment`에 출처를 남겼고, 시나리오 식별용 `id`를 추가했습니다.
 병종은 성벽·보병·궁병·기병 4종만 남기고 제외한 병종의 계수도 제거했습니다.
