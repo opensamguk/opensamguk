@@ -148,7 +148,7 @@ jobs:
       # The slow part of `--with-deps` is downloading .deb files from the Ubuntu mirror
       # (8m52s in job 120378660050, 13m28s in job 120415754413). The browser zip itself downloads in about 1 s.
       # Keep only the downloaded packages (about 25 MB), keyed by Playwright version and runner image.
-      # A PR run can restore its own scope or main's cache, so every scope saves on a miss.
+      # Only pushes to main save it. PR runs restore main's cache, so branch scopes do not keep their own copies.
       - name: Playwright apt cache key
         id: playwright
         run: |
@@ -175,7 +175,7 @@ jobs:
           sudo chown -R "$(id -u):$(id -g)" "$APT_ARCHIVES"
           echo "cached debs: $(find "$APT_ARCHIVES" -name '*.deb' | wc -l), $(du -sh "$APT_ARCHIVES" | awk '{print $1}')"
       - name: Save Playwright apt cache
-        if: steps.playwright-cache.outputs.cache-hit != 'true' && matrix.shard == 1
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.playwright-cache.outputs.cache-hit != 'true' && matrix.shard == 1
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.cache/playwright-apt
