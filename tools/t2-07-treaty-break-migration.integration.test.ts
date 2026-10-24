@@ -16,7 +16,7 @@ const { Client } = createRequire(requireDb.resolve('@prisma/adapter-pg'))('pg') 
 };
 const marker = '20261027000000_treaty_break_trust';
 const directory = new URL('../packages/db/prisma/migrations/', import.meta.url);
-const previous22 = [
+const previous23 = [
   '20261020000000_initial_world',
   '20261020010000_world_clock',
   '20261020020000_accounts',
@@ -36,6 +36,7 @@ const previous22 = [
   '20261023072000_world_ext_slices',
   '20261023073000_treaties',
   '20261023074000_assignment_storage',
+  '20261024000000_replay_features',
   '20261024000000_world_personnel_format',
   '20261025000000_input_event_step_tick',
   '20261026000000_game_resource',
@@ -113,8 +114,8 @@ async function ownDatabase(mode: 'empty' | 'upgrade' | 'constraints', run: (clie
 
 async function previous(client: PgClient) {
   const names = (await readdir(directory)).filter((name) => /^\d{14}_/.test(name)).sort();
-  expect(names.slice(0, 23)).toEqual([...previous22, marker]);
-  for (const name of previous22)
+  expect(names.slice(0, 24)).toEqual([...previous23, marker]);
+  for (const name of previous23)
     await client.query(await readFile(new URL(`${name}/migration.sql`, directory), 'utf8'));
 }
 const migrate = async (client: PgClient) =>

@@ -45,6 +45,8 @@ model World {
   policyFromSequence Int?
   treatyFormat    Int?
   personnelFormat Int?
+  replayFormat    Int @default(1)
+  ruleFeatures    String[] @default([])
   replayOrigin    Json?
   inputEvents     InputEvent[]
   nationHistory   NationHistory[]
@@ -493,6 +495,7 @@ model InputEvent {
   status         InputEventStatus @default(PENDING)
   sequence       Int?
   stepTick       Int?
+  tick           Int?
   result         Json?
   createdAt      DateTime @default(now())
   world          World @relation(fields: [worldId], references: [id], onDelete: Cascade)
