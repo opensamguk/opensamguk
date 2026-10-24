@@ -34,6 +34,7 @@ export function cloneWorldWithRegistry(view: WorldView, registry: ExtStateRegist
           })),
         }
       : {}),
+    ...(view.nationTrust?.length ? { nationTrust: view.nationTrust.map((entry) => ({ ...entry })) } : {}),
     ...(view.commandMeta
       ? { commandMeta: { nextNationId: view.commandMeta.nextNationId, offers: { ...view.commandMeta.offers } } }
       : {}),

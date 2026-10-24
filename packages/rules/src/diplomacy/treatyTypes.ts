@@ -36,6 +36,29 @@ export interface ClosedTreatyRow {
   closedSequence: number;
 }
 
+export interface BrokenTreatyRow extends Omit<ClosedTreatyRow, 'status' | 'startTick' | 'costFrom' | 'costTo'> {
+  status: 'BROKEN';
+  startTick: number;
+  costFrom: number;
+  costTo: number;
+}
+
+export interface NationTrustState {
+  nationId: number;
+  brokenTreaties: number;
+  lastBrokenTick: number;
+}
+
+export type TreatyBreakRejectCode =
+  'WORLD_CLOSED' | 'ACTOR_INACTIVE' | 'NO_GENERAL' | 'NO_PERMISSION' | 'BAD_TARGET' | 'NOT_PARTY' | 'TREATY_NOT_ACTIVE';
+
+export type TreatyBroken = {
+  outcome: 'BROKEN';
+  tick: number;
+  treatyId: string;
+  brokenByNationId: number;
+};
+
 export type TreatyInput =
   | { kind: 'treaty.propose'; payload: { toNationId: number; clauses: TreatyClause[] } }
   | { kind: 'treaty.respond'; payload: { treatyId: string; accept: boolean } };

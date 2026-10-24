@@ -3,9 +3,12 @@ import { TICKS_PER_MONTH } from '../clock/constants';
 import type { DeepReadonly, WorldState } from '../model/world';
 import { canExecuteNationCommand } from '../personnel/permissions';
 import type {
+  BrokenTreatyRow,
   ClosedTreatyRow,
   FirstTreatyClause,
+  NationTrustState,
   TreatyApplyResult,
+  TreatyBroken,
   TreatyClause,
   TreatyClosure,
   TreatyInput,
@@ -306,6 +309,72 @@ export function validateClosedTreatyRow(value: unknown): ClosedTreatyRow {
       throw new RangeError('닫힌 조약의 제안 시각을 확인하세요.');
   }
   return { ...row, clauses: clauses.filter(isFirstClause) };
+}
+
+export function validateBrokenTreatyRow(value: unknown): BrokenTreatyRow {
+  const row = closedTreatySchema
+    .extend({
+      status: z.literal('BROKEN'),
+      startTick: tickSchema.max(MAX_ENGINE_TICK),
+      costFrom: tickSchema.max(MAX_STORED_INT),
+      costTo: tickSchema.max(MAX_STORED_INT),
+    })
+    .parse(value);
+  const { costFrom, costTo, closedSequence, ...open } = row;
+  const active = validateTreatyState({ ...open, status: 'ACTIVE' });
+  if (closedSequence <= row.id) throw new RangeError('파기한 조약의 마감 순서를 확인하세요.');
+  return { ...row, clauses: active.clauses, costFrom, costTo, closedSequence };
+}
+
+export function validateNationTrustState(value: unknown): NationTrustState[] {
+  const entries = z
+    .array(
+      z.strictObject({
+        nationId: positive.max(MAX_STORED_INT),
+        brokenTreaties: positive.max(MAX_STORED_INT),
+        lastBrokenTick: tickSchema.max(MAX_ENGINE_TICK),
+      }),
+    )
+    .min(1)
+    .parse(value);
+  if (entries.some((entry, i) => i > 0 && entries[i - 1]!.nationId >= entry.nationId))
+    throw new RangeError('국가 신의 기록의 국가 번호 순서를 확인하세요.');
+  return entries;
+}
+
+export function nextNationTrust(
+  entries: DeepReadonly<NationTrustState[]> | undefined,
+  nationId: number,
+  tick: number,
+): NationTrustState[] {
+  const next = entries === undefined ? [] : validateNationTrustState(entries);
+  positive.max(MAX_STORED_INT).parse(nationId);
+  tickSchema.max(MAX_ENGINE_TICK).parse(tick);
+  const previous = next.find((entry) => entry.nationId === nationId);
+  if (previous) {
+    if (tick < previous.lastBrokenTick) throw new RangeError('국가 신의 기록의 파기 시각을 확인하세요.');
+    previous.brokenTreaties = positive.max(MAX_STORED_INT).parse(previous.brokenTreaties + 1);
+    previous.lastBrokenTick = tick;
+  } else {
+    next.push({ nationId, brokenTreaties: 1, lastBrokenTick: tick });
+    next.sort((a, b) => a.nationId - b.nationId);
+  }
+  return next;
+}
+
+export function treatyBreakRecipients(before: TreatyView, result: TreatyBroken): number[] {
+  const recipients = new Set<number>();
+  for (const treaty of before.treaties ?? []) {
+    if (treaty.status !== 'ACTIVE') continue;
+    const other =
+      treaty.fromNationId === result.brokenByNationId
+        ? treaty.toNationId
+        : treaty.toNationId === result.brokenByNationId
+          ? treaty.fromNationId
+          : null;
+    if (other !== null && other !== result.brokenByNationId && before.nations[other]) recipients.add(other);
+  }
+  return [...recipients].sort((a, b) => a - b);
 }
 
 function parseTreatyRecord(value: unknown): TreatyRecord {
