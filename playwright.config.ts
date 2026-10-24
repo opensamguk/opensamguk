@@ -6,6 +6,7 @@ const isCI = Boolean(process.env.CI);
 // 먼저 `pnpm db:up`으로 DB를 띄운다. 로컬에서는 dev 서버가 이미 떠 있으면 그대로 쓴다.
 export default defineConfig({
   testDir: 'e2e',
+  testIgnore: '**/public-assets.spec.ts',
   forbidOnly: isCI,
   use: { baseURL: 'http://127.0.0.1:5173' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],

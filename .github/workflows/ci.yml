@@ -38,6 +38,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm --filter @opensamguk/web build
+      - run: pnpm build:public
 
   database-browser:
     name: opensamguk-database-browser
@@ -92,6 +93,8 @@ jobs:
         run: sudo bash tools/ci/ubuntu-archive-path.sh /
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm e2e --workers=1 --reporter=line
+      - run: pnpm build:public
+      - run: pnpm e2e:public --reporter=line
       - name: Clean T2-15 binding files
         if: always()
         run: node tools/ci/t215-binding.mjs cleanup
