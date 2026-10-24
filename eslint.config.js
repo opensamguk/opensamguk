@@ -48,6 +48,30 @@ const NO_MATH_RANDOM = {
   message: '게임 난수는 @opensamguk/shared의 시드 RNG만 씁니다 (FR-ENG-06).',
 };
 
+function resourceEditorRule(testBuiltins = false) {
+  return [
+    'error',
+    {
+      patterns: [
+        {
+          group: ['@opensamguk/db', '@opensamguk/db/*', '@opensamguk/engine', '@opensamguk/engine/*'],
+          message: BOUNDARY_MESSAGE,
+        },
+        { group: ['@opensamguk/server', '@opensamguk/server/*'], allowTypeImports: true, message: BOUNDARY_MESSAGE },
+        { regex: '^@opensamguk/rules(?:$|/(?!resources$))', message: BOUNDARY_MESSAGE },
+        {
+          group: [
+            '/@opensamguk/shared/node',
+            ...NODE_BUILTINS.filter((pattern) => !testBuiltins || pattern !== '/node:*'),
+          ],
+          message: BOUNDARY_MESSAGE,
+        },
+        ...(testBuiltins ? [{ regex: '^node:(?!(?:fs|zlib)$)', message: BOUNDARY_MESSAGE }] : []),
+      ],
+    },
+  ];
+}
+
 export default defineConfig([
   globalIgnores(['**/node_modules/', '**/dist/', 'packages/db/src/generated/', 'playwright-report/', 'test-results/']),
   js.configs.recommended,
@@ -163,6 +187,41 @@ export default defineConfig([
             {
               regex: '^(?!\\.\\./\\.\\./\\.\\./\\.\\./resources/unitset/basic\\.json$)\\.',
               message: 'publicUnitSet.ts는 resources/unitset/basic.json만 상대 경로로 읽습니다 (E2).',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // 예외 E3 (T4-76): 자원 편집기는 브라우저용 검증 하위 경로만 읽는다.
+  {
+    files: ['apps/web/src/mapEditor/**', 'apps/web/src/admin/maps/**', 'apps/web/src/admin/resources/**'],
+    rules: {
+      'no-restricted-imports': resourceEditorRule(),
+    },
+  },
+  // 기존 고정물 읽기·PNG 해제 시험 세 개의 Node 입력만 유지한다. 화면 배포물에는 들어가지 않는다.
+  {
+    files: [
+      'apps/web/src/mapEditor/contract.test.ts',
+      'apps/web/src/mapEditor/validate.test.ts',
+      'apps/web/src/mapEditor/sketch.test.ts',
+    ],
+    rules: { 'no-restricted-imports': resourceEditorRule(true) },
+  },
+  // E3 공개 모듈은 형식·검증·기하 내부 모듈과 zod만 읽는다.
+  {
+    files: ['packages/rules/src/world/map/**/*.ts', 'packages/rules/src/world/validate/**/*.ts'],
+    ignores: ['**/*.test.ts', '**/fixtures.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex:
+                '^(?!zod$|\\.\\./resources$|\\./(?:format|geometry|issues|map|scenario|unitSet|statRules|portraitMap)$|\\.\\./map/(?:format|geometry)$)',
+              message: '자원 공개 모듈은 zod·자원 형식·검증 내부 모듈만 읽습니다 (E3).',
             },
           ],
         },

@@ -36,6 +36,71 @@ describe('결정성 규칙', () => {
   });
 });
 
+describe('자원 편집기 예외 E3', () => {
+  const folders = ['mapEditor', 'admin/maps', 'admin/resources'];
+  it('지정한 세 폴더에서 resources 값과 타입만 읽는다', async () => {
+    for (const folder of folders) {
+      const file = `apps/web/src/${folder}/x.ts`;
+      expect(
+        await ruleIds("export { validateMap, type MapResourceV2 } from '@opensamguk/rules/resources';\n", file),
+      ).toEqual([]);
+      for (const spec of [
+        '@opensamguk/rules',
+        '@opensamguk/rules/other',
+        '@opensamguk/rules/resources/deep',
+        '@opensamguk/shared/node',
+        '@opensamguk/db',
+        '@opensamguk/engine',
+        '@opensamguk/server/router',
+        'node:fs',
+        'fs/promises',
+      ]) {
+        expect(await ruleIds(`import * as x from '${spec}';\nexport { x };\n`, file), `${file}: ${spec}`).toContain(
+          'no-restricted-imports',
+        );
+      }
+    }
+  });
+  it('다른 화면 폴더에는 resources를 열지 않는다', async () => {
+    for (const folder of ['main', 'admin', 'mapEditorOther', 'admin/mapsOther']) {
+      expect(
+        await ruleIds("export { validateMap } from '@opensamguk/rules/resources';\n", `apps/web/src/${folder}/x.ts`),
+      ).toContain('no-restricted-imports');
+    }
+  });
+  it('공개 모듈은 zod·형식·검증 내부 모듈만 읽는다', async () => {
+    for (const file of ['packages/rules/src/world/map/x.ts', 'packages/rules/src/world/validate/x.ts']) {
+      for (const spec of ['zod', '../resources', '../map/format', './issues']) {
+        expect(await ruleIds(`export * from '${spec}';\n`, file)).toEqual([]);
+      }
+      for (const spec of [
+        'node:fs',
+        '@opensamguk/shared',
+        '@opensamguk/shared/node',
+        '../../world/bootstrap',
+        '../../battle/simulate',
+        '@opensamguk/rules',
+      ]) {
+        expect(await ruleIds(`export * from '${spec}';\n`, file), spec).toContain('no-restricted-imports');
+      }
+    }
+  });
+  it('기존 시험 세 개만 node:fs·node:zlib를 읽고 다른 Node 모듈은 막는다', async () => {
+    for (const name of ['contract', 'validate', 'sketch']) {
+      const file = `apps/web/src/mapEditor/${name}.test.ts`;
+      for (const spec of ['node:fs', 'node:zlib']) {
+        expect(await ruleIds(`export * from '${spec}';\n`, file)).toEqual([]);
+      }
+      for (const spec of ['node:child_process', 'node:fs/promises', 'fs', '@opensamguk/db']) {
+        expect(await ruleIds(`export * from '${spec}';\n`, file)).toContain('no-restricted-imports');
+      }
+    }
+    expect(await ruleIds("export * from 'node:fs';\n", 'apps/web/src/mapEditor/other.test.ts')).toContain(
+      'no-restricted-imports',
+    );
+  });
+});
+
 describe('패키지 경계', () => {
   it('rules는 db를 import할 수 없다', async () => {
     expect(
