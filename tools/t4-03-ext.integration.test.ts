@@ -126,7 +126,7 @@ async function fixture(options: { preset?: WorldPreset; legacy?: boolean; status
     name: '확장 끈 월드',
     turnTermMinutes: 60,
     endYear: null,
-    ...(options.legacy ? { replayFormat: 'legacy' as const } : {}),
+    replayFormat: options.legacy ? 'legacy' : 'policy',
     ...(options.preset ? { preset: { key: 'off', value: options.preset } } : {}),
   });
   await db.world.update({

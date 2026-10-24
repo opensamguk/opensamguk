@@ -9,6 +9,7 @@ import { createDb, type Prisma } from '../packages/db/src/index';
 import {
   calculateTreatyFee,
   capsResourceHashInput,
+  checkReplayOrigin,
   emptyQueue,
   parseCapsOrigin,
   parsePreset,
@@ -486,13 +487,51 @@ it('P2 non-null commands preset은 생성 전에 거부하고 World 행을 남�
   expect(await db.world.count()).toBe(count);
 });
 
-it('P3 flag 없는 실제 CLI는 origin1과 null 형식을 보존한다', async () => {
+it('P3 기능 없는 새 CLI는 origin3과 빈 기능 목록, 조약 꺼짐을 기록한다', async () => {
   const result = await cliWorld(false);
   const world = await db.world.findUniqueOrThrow({ where: { id: result.worldId } });
-  expect(world.replayOrigin).toMatchObject({ version: 1, initialStateHash: result.stateHash });
+  const origin = world.replayOrigin;
+  checkReplayOrigin(origin);
+  expect(origin).toMatchObject({ version: 3, initialStateHash: result.stateHash });
+  expect(world.replayFormat).toBe(3);
+  expect(world.ruleFeatures).toEqual([]);
+  expect(world.policyFromSequence).toBeNull();
   expect(world.treatyFormat).toBeNull();
-  expect(world.policyFromSequence).toBe(0);
   expect(await db.treaty.count({ where: { worldId: world.id } })).toBe(0);
+  expect(world.initialStateHash).toBe(result.stateHash);
+  expect(hashState(origin.initial)).toBe(result.stateHash);
+  expect(hashState(await readWorldState(db, world.id))).toBe(result.stateHash);
+  expect(origin.resourceHash).toBe(
+    hashState({
+      scenarioKey: origin.initial.scenarioKey,
+      mapKey: origin.initial.mapKey,
+      unitSetKey: origin.initial.unitSetKey,
+      statRules: origin.initial.statRules,
+      unitSet: origin.initial.unitSet,
+    }),
+  );
+});
+
+it('P3 명시 방침 factory는 origin1과 방침 표지 0, 조약 꺼짐을 보존한다', async () => {
+  const initial = await monthlyFixture();
+  const result = await saveInitialWorld(db, initial, {
+    name: '명시 방침 형식',
+    turnTermMinutes: 60,
+    endYear: null,
+    replayFormat: 'policy',
+  });
+  const world = await db.world.findUniqueOrThrow({ where: { id: result.worldId } });
+  const origin = world.replayOrigin;
+  checkReplayOrigin(origin);
+  expect(origin).toMatchObject({ version: 1, initialStateHash: result.stateHash });
+  expect(world.replayFormat).toBe(1);
+  expect(world.ruleFeatures).toEqual([]);
+  expect(world.policyFromSequence).toBe(0);
+  expect(world.treatyFormat).toBeNull();
+  expect(await db.treaty.count({ where: { worldId: world.id } })).toBe(0);
+  expect(world.initialStateHash).toBe(result.stateHash);
+  expect(result.stateHash).toBe(hashState(initial));
+  expect(hashState(origin.initial)).toBe(result.stateHash);
   expect(selectWorldCapabilities(world).kind).toBe('legacy');
 });
 
