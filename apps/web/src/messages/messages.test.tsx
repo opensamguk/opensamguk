@@ -4,7 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { TRPCClientError } from '@trpc/client';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { MessageItem, NationNotice, UnreadResponse } from './contract';
+import type { MessageItem, NationNotice, UnreadResponse } from './api';
 import { clearDrafts } from './drafts';
 import { mergeMessages, prependSent, unreadReceivedIds, unreadTotal, visibleScopes } from './merge';
 
@@ -22,11 +22,11 @@ const fake = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('./contract', async (importOriginal) => ({ ...(await importOriginal<object>()), api: fake }));
+vi.mock('./api', async (importOriginal) => ({ ...(await importOriginal<object>()), api: fake }));
 
 const { MessagePanel } = await import('./MessagePanel');
 const { NationNoticePopup } = await import('./NationNotice');
-const { noticeKeys } = await import('./contract');
+const { noticeKeys } = await import('./api');
 
 const item = (id: string, extra: Partial<MessageItem> = {}): MessageItem => ({
   id,
