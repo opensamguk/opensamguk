@@ -129,6 +129,7 @@ export type {
   PersonnelLog,
 } from './personnel';
 export * from './tournament/bracket';
+export * from './tournament/match';
 export {
   createCommandResolver,
   extensionCommands,
