@@ -39,7 +39,12 @@ async function create(human = false) {
       });
     }
   }
-  const { worldId } = await saveInitialWorld(db, initial, { name: '월간 통합', turnTermMinutes: 60, endYear: null });
+  const { worldId } = await saveInitialWorld(db, initial, {
+    replayFormat: 1,
+    name: '월간 통합',
+    turnTermMinutes: 60,
+    endYear: null,
+  });
   await controlClock(db, worldId, 'start');
   const lease = (await acquireLease(db, worldId))!;
   return { worldId, lease, loop: new TurnLoop(db, lease) };

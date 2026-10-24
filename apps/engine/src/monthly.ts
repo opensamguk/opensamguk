@@ -2,23 +2,29 @@ import type { Prisma } from '@opensamguk/db';
 import { emptyTurns, monthlyDate, runMonthly, type ReplayState, type WorldState } from '@opensamguk/rules';
 import { rngFor } from '@opensamguk/shared';
 import { hashState } from '@opensamguk/shared/node';
+import { engineFeatures } from './features';
 import { loadWorld } from './worldLoader';
 import { persistRanking } from './ranking';
 import { persistYearbookNations } from './nationArchive';
 
 export async function loadReplayState(tx: Prisma.TransactionClient, worldId: string): Promise<ReplayState> {
   const state = await loadWorld(tx, worldId);
-  const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
+  const world = await tx.world.findUniqueOrThrow({ where: { id: worldId }, select: { monthlyTick: true } });
   const generals = await tx.general.findMany({ where: { worldId } });
   const slots = await tx.generalTurn.findMany({ where: { worldId }, orderBy: { slot: 'asc' } });
   const turns = Object.fromEntries(generals.map(({ id }) => [id, emptyTurns()]));
   for (const slot of slots) turns[slot.generalId]![slot.slot] = { commandKey: slot.commandKey, args: slot.args };
-  return {
+  let replay: ReplayState = {
     state,
     turns,
     revisions: Object.fromEntries(generals.map(({ id, turnRevision }) => [id, turnRevision])),
     monthlyTick: world.monthlyTick,
   };
+  for (const feature of engineFeatures
+    .filter((feature) => state.ruleFeatures?.includes(feature.key))
+    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)))
+    replay = (await feature.loadReplayState?.(tx, worldId, replay)) ?? replay;
+  return replay;
 }
 
 export async function persistMonthly(
@@ -52,6 +58,10 @@ export async function persistMonthly(
   await tx.diplomacy.deleteMany({ where: { worldId } });
   await tx.diplomacy.createMany({ data: next.diplomacies.map((entry) => ({ ...entry, worldId })) });
   await tx.world.update({ where: { id: worldId }, data: { monthlyTick: tick } });
+  for (const feature of engineFeatures
+    .filter((feature) => next.ruleFeatures?.includes(feature.key))
+    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)))
+    await feature.persistMonthly?.(tx, worldId, before, next);
   const snapshot = await loadReplayState(tx, worldId);
   await tx.yearbookSnapshot.create({
     data: {

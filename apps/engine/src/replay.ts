@@ -1,7 +1,12 @@
 import type { PrismaClient } from '@opensamguk/db';
 import {
   applyRecordedInput,
-  initialReplayState,
+  initialReplayStateWithRegistry,
+  checkReplayOrigin,
+  ruleRegistry,
+  type RuleRegistry,
+  type ReplayOriginV3,
+  type ReplayOriginV1,
   nextGameAction,
   runReplayAction,
   TICKS_PER_MONTH,
@@ -16,14 +21,11 @@ import {
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 
+export type { ReplayOriginV3 } from '@opensamguk/rules';
+
 const MAX_ACTION_SEQUENCE = 2_147_483_647;
 
-export interface ReplayOrigin {
-  version: 1;
-  initial: WorldInit;
-  initialStateHash: string;
-  resourceHash: string;
-}
+export type ReplayOrigin = ReplayOriginV1;
 export interface ReplayArchive {
   version: 1;
   origin: ReplayOrigin;
@@ -48,21 +50,45 @@ export interface ReplayArchiveV2 {
   end: ReplayEnd | null;
   afterEnd: RecordedInput[];
 }
-export function resourceHash(initial: WorldInit) {
-  return hashState({
+function resourceFields(initial: WorldInit) {
+  return {
     scenarioKey: initial.scenarioKey,
     mapKey: initial.mapKey,
     unitSetKey: initial.unitSetKey,
     statRules: initial.statRules,
     unitSet: initial.unitSet,
-  });
+  };
+}
+export function resourceHash(initial: WorldInit) {
+  return hashState(resourceFields(initial));
+}
+export function resourceHashV3(origin: ReplayOriginV3) {
+  return origin.featureData
+    ? hashState({ ...resourceFields(origin.initial), featureData: origin.featureData })
+    : resourceHash(origin.initial);
 }
 
-export async function exportReplay(db: PrismaClient, worldId: string): Promise<ReplayArchiveV2> {
+export interface ReplayArchiveV3 extends Omit<ReplayArchiveV2, 'version' | 'origin' | 'inputs' | 'afterEnd'> {
+  version: 3;
+  origin: ReplayOriginV3;
+  inputs: (RecordedInput & { tick: number | null })[];
+  afterEnd: (RecordedInput & { tick: number | null })[];
+}
+type AnyArchive = ReplayArchive | ReplayArchiveV2 | ReplayArchiveV3;
+
+export async function exportReplay(db: PrismaClient, worldId: string): Promise<ReplayArchiveV2 | ReplayArchiveV3> {
   return db.$transaction(
     async (tx) => {
       const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
       if (world.replayOrigin === null) throw new Error('생성 기록이 없는 월드는 재생할 수 없습니다.');
+      const origin: unknown = world.replayOrigin;
+      checkReplayOrigin(origin);
+      const v3 = origin.version === 3;
+      if (
+        origin.initialStateHash !== hashState(origin.initial) ||
+        origin.resourceHash !== (origin.version === 3 ? resourceHashV3(origin) : resourceHash(origin.initial))
+      )
+        throw new Error('월드 생성 기록 또는 리소스 해시가 다릅니다.');
       const months = await tx.yearbookSnapshot.findMany({ where: { worldId }, orderBy: { tick: 'asc' } });
       const result = await tx.worldResult.findUnique({ where: { worldId } });
       const lastSequence = result?.endedSequence ?? months.at(-1)?.sequence ?? 0;
@@ -81,6 +107,7 @@ export async function exportReplay(db: PrismaClient, worldId: string): Promise<R
           status: event.status,
           payload: event.payload,
           result: event.result,
+          ...(v3 ? { tick: event.tick } : {}),
         };
         if (input.sequence <= lastSequence) inputs.push(input);
         else {
@@ -88,9 +115,9 @@ export async function exportReplay(db: PrismaClient, worldId: string): Promise<R
           afterEnd.push(input);
         }
       }
-      return {
-        version: 2,
-        origin: world.replayOrigin as unknown as ReplayOrigin,
+      const archive = {
+        version: v3 ? 3 : 2,
+        origin,
         config: { endYear: world.endYear, outcomeFromSequence: world.outcomeFromSequence },
         inputs,
         months: months.map(({ tick, year, month, sequence, stateHash, data }) => ({
@@ -114,28 +141,34 @@ export async function exportReplay(db: PrismaClient, worldId: string): Promise<R
           : null,
         afterEnd,
       };
+      readArchive(archive);
+      return archive as ReplayArchiveV2 | ReplayArchiveV3;
     },
     { isolationLevel: 'RepeatableRead' },
   );
 }
 
-function readArchive(value: unknown): ReplayArchive | ReplayArchiveV2 {
-  const archive = value as ReplayArchive | ReplayArchiveV2;
+export function readArchive(value: unknown, registry: RuleRegistry = ruleRegistry): AnyArchive {
+  const archive = value as AnyArchive;
   if (
     !archive ||
-    ![1, 2].includes(archive.version) ||
-    archive.origin?.version !== 1 ||
+    ![1, 2, 3].includes(archive.version) ||
+    archive.origin?.version !== (archive.version === 3 ? 3 : 1) ||
     !Array.isArray(archive.months) ||
     !Array.isArray(archive.inputs) ||
-    ['config', 'end', 'afterEnd'].some((key) => Object.hasOwn(archive, key) !== (archive.version === 2))
+    ['config', 'end', 'afterEnd'].some((key) => Object.hasOwn(archive, key) !== (archive.version !== 1))
   ) {
     throw new Error('재생 기록 형식과 버전을 확인하세요.');
   }
   const { origin } = archive;
-  if (origin.initialStateHash !== hashState(origin.initial) || origin.resourceHash !== resourceHash(origin.initial)) {
+  checkReplayOrigin(origin, registry);
+  if (
+    origin.initialStateHash !== hashState(origin.initial) ||
+    origin.resourceHash !== (origin.version === 3 ? resourceHashV3(origin) : resourceHash(origin.initial))
+  ) {
     throw new Error('월드 생성 기록 또는 리소스 해시가 다릅니다.');
   }
-  if (archive.version === 2) {
+  if (archive.version !== 1) {
     const { config, end, afterEnd } = archive;
     if (
       !config ||
@@ -185,12 +218,48 @@ function readArchive(value: unknown): ReplayArchive | ReplayArchiveV2 {
       !Number.isSafeInteger(input.sequence) ||
       input.sequence <= previous ||
       !['APPLIED', 'REJECTED'].includes(input.status) ||
-      (archive.version === 2 && input.sequence > (archive.end?.sequence ?? archive.months.at(-1)?.sequence ?? 0))
+      (archive.version !== 1 && input.sequence > (archive.end?.sequence ?? archive.months.at(-1)?.sequence ?? 0))
     )
       throw new Error('입력 기록의 순서·상태가 올바르지 않습니다.');
     previous = input.sequence;
   }
+  const allInputs = [...archive.inputs, ...(archive.version !== 1 ? archive.afterEnd : [])];
+  for (const input of allInputs) {
+    if (archive.version !== 3) {
+      if (Object.hasOwn(input, 'tick')) throw new Error('형식 1·2 입력에 tick을 넣을 수 없습니다.');
+      continue;
+    }
+    const kind = registry.inputKinds.find((kind) => kind.kind === input.kind);
+    if (!kind) throw new Error('등록되지 않은 입력 종류입니다.');
+    if (
+      !Object.hasOwn(input, 'tick') ||
+      (kind.route === 'direct' ? input.tick !== null : !Number.isSafeInteger(input.tick) || input.tick! < 0)
+    )
+      throw new Error('입력의 처리 tick을 확인하세요.');
+    if (
+      input.status === 'APPLIED' &&
+      kind.feature !== null &&
+      !archive.origin.initial.ruleFeatures?.includes(kind.feature)
+    )
+      throw new Error('이 월드에서 켜지 않은 기능입니다.');
+  }
+  if (archive.version === 3)
+    for (const key of archive.origin.initial.ruleFeatures ?? []) {
+      registry.features
+        .find((feature) => feature.key === key)!
+        .checkArchive?.({ origin: archive.origin, inputs: allInputs.sort((a, b) => a.sequence - b.sequence) });
+    }
   return archive;
+}
+
+function applyArchiveInput(archive: AnyArchive, replay: ReplayState, input: RecordedInput, registry: RuleRegistry) {
+  if (
+    archive.version === 3 &&
+    registry.inputKinds.find((kind) => kind.kind === input.kind)!.route === 'queued' &&
+    (input.tick! < replay.monthlyTick || input.tick! >= replay.monthlyTick + TICKS_PER_MONTH)
+  )
+    throw new Error('입력의 처리 tick이 재생 월 창을 벗어났습니다.');
+  return applyRecordedInput(replay, input, registry);
 }
 
 function validSequence(sequence: number, maximum = 10_000_000): boolean {
@@ -198,7 +267,7 @@ function validSequence(sequence: number, maximum = 10_000_000): boolean {
 }
 
 function checkOutcome(
-  archive: ReplayArchiveV2,
+  archive: ReplayArchiveV2 | ReplayArchiveV3,
   replay: ReplayState,
   sequence: number,
   action: ReturnType<typeof nextGameAction>,
@@ -266,27 +335,31 @@ function checkMonth(replay: ReplayState, expected: ReplayArchive['months'][numbe
   return stateHash;
 }
 
-export function replayArchive(value: unknown, months = 12): { tick: number; stateHash: string }[] {
+export function replayArchive(
+  value: unknown,
+  months = 12,
+  registry: RuleRegistry = ruleRegistry,
+): { tick: number; stateHash: string }[] {
   if (!Number.isSafeInteger(months) || months < 1 || months > 12000) {
     throw new Error('재생 개월 수를 확인하세요.');
   }
-  const archive = readArchive(value);
+  const archive = readArchive(value, registry);
   if (archive.months.length < months) throw new Error('비교할 월간 기록이 부족합니다.');
   const { origin } = archive;
   const inputs = new Map(archive.inputs.map((input) => [input.sequence, input]));
-  let replay = initialReplayState(origin.initial);
+  let replay = initialReplayStateWithRegistry(origin.initial, registry);
   let sequence = 0;
   const hashes: { tick: number; stateHash: string }[] = [];
   for (let i = 0; i < months; i++) {
     const expected = archive.months[i]!;
     const tick = (i + 1) * TICKS_PER_MONTH;
-    checkMonthBoundary(expected, replay, tick, sequence, archive.version === 2 ? MAX_ACTION_SEQUENCE : 10_000_000);
-    if (archive.version === 2 && archive.end && expected.sequence > archive.end.sequence) {
+    checkMonthBoundary(expected, replay, tick, sequence, archive.version !== 1 ? MAX_ACTION_SEQUENCE : 10_000_000);
+    if (archive.version !== 1 && archive.end && expected.sequence > archive.end.sequence) {
       throw new Error('종료 뒤 월간 기록이 있습니다.');
     }
     while (sequence < expected.sequence) {
       const input = inputs.get(++sequence);
-      if (input) replay = applyRecordedInput(replay, input);
+      if (input) replay = applyArchiveInput(archive, replay, input, registry);
       else {
         const action = nextGameAction(replay);
         if (action.tick > tick || (action.kind === 'monthly' && sequence !== expected.sequence)) {
@@ -302,18 +375,18 @@ export function replayArchive(value: unknown, months = 12): { tick: number; stat
   return hashes;
 }
 
-export function replayToEnd(value: unknown): ReplayEnd {
-  const archive = readArchive(value);
-  if (archive.version !== 2 || !archive.end) throw new Error('종료 기록이 있는 v2 보관 파일이 필요합니다.');
+export function replayToEnd(value: unknown, registry: RuleRegistry = ruleRegistry): ReplayEnd {
+  const archive = readArchive(value, registry);
+  if (archive.version === 1 || !archive.end) throw new Error('종료 기록이 있는 v2·v3 보관 파일이 필요합니다.');
   const { origin, end } = archive;
   const inputs = new Map(archive.inputs.map((input) => [input.sequence, input]));
-  let replay = initialReplayState(origin.initial);
+  let replay = initialReplayStateWithRegistry(origin.initial, registry);
   let monthIndex = 0;
   for (let sequence = 1; sequence <= end.sequence; sequence++) {
     const input = inputs.get(sequence);
     if (input) {
       if (sequence === end.sequence) throw new Error('종료 번호에 게임 사건이 없습니다.');
-      replay = applyRecordedInput(replay, input);
+      replay = applyArchiveInput(archive, replay, input, registry);
       continue;
     }
     const action = nextGameAction(replay);

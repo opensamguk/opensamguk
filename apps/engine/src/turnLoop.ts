@@ -19,7 +19,8 @@ import { loadWorld } from './worldLoader';
 import { persistEffects, shiftTurns } from './persist';
 import { persistMonthly, loadReplayState } from './monthly';
 import { hashState } from '@opensamguk/shared/node';
-import { processCreation } from './inputs';
+import { processInputs } from './inputs';
+import { checkWorldReplay } from './features';
 
 export const CLOCK_CHECKPOINT_MS = 5_000;
 export const ENGINE_BATCH_STEPS = 64;
@@ -45,6 +46,8 @@ export class TurnLoop {
   private highWaterTick = 0;
   private committedState: WorldState | null = null;
   private busy = false;
+  private replayChecked = false;
+  private replayOrigin: Prisma.JsonValue = null;
   private readonly elapsedNow: () => number;
   private nextCheckpointAt: number;
   private readonly mapConfig = publicMapConfig(process.env);
@@ -103,14 +106,24 @@ export class TurnLoop {
   private async step(target: number | undefined, signal?: AbortSignal) {
     const { worldId } = this.lease;
     const signals: RealtimeSignal[] = [];
+    let replayOrigin = this.replayOrigin;
     const result = await this.db.$transaction(
       async (tx) => {
         await lockLease(tx, this.lease);
         // 일시정지·재개와 턴 commit이 같은 월드 행에서 직렬화된다.
         await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${worldId} FOR UPDATE`;
-        const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
+        const world = await tx.world.findUniqueOrThrow({ where: { id: worldId }, omit: { replayOrigin: true } });
+        if (!this.replayChecked) {
+          replayOrigin = (await tx.world.findUniqueOrThrow({ where: { id: worldId }, select: { replayOrigin: true } }))
+            .replayOrigin;
+          checkWorldReplay({ ...world, replayOrigin });
+        }
         if (world.status !== 'RUNNING') {
-          const progressed = await processCreation(tx, world, world.clockTick);
+          const deferInputs =
+            world.replayFormat === 3 &&
+            world.status === 'PAUSED' &&
+            world.monthlyTick + TICKS_PER_MONTH <= world.clockTick;
+          const progressed = !deferInputs && (await processInputs(tx, { ...world, replayOrigin }, world.clockTick));
           if (progressed) await this.hooks.beforeCommit?.(tx);
           signal?.throwIfAborted();
           await assertLease(tx, this.lease);
@@ -142,7 +155,8 @@ export class TurnLoop {
             : checkpoint.clockTick);
         if (tick < world.clockTick) throw new Error('이미 저장된 시계보다 뒤로 진행할 수 없습니다.');
         if (tick > 2_147_483_647 - TICKS_PER_MONTH) throw new Error('게임 tick 저장 범위를 넘었습니다.');
-        if (await processCreation(tx, world, tick)) {
+        const catchUp = world.replayFormat === 3 && boundary <= tick;
+        if (!catchUp && (await processInputs(tx, { ...world, replayOrigin }, tick))) {
           const state = await loadWorld(tx, worldId);
           await this.hooks.beforeCommit?.(tx);
           signal?.throwIfAborted();
@@ -288,6 +302,8 @@ export class TurnLoop {
       },
       { timeout: 30_000 },
     );
+    this.replayChecked = true;
+    this.replayOrigin = replayOrigin;
     for (const signal of signals)
       await notifyWorld(this.db, worldId, signal, () => console.warn('실시간 알림 전송 실패'));
     return result;

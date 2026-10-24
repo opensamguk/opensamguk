@@ -46,6 +46,7 @@ afterAll(async () => {
 async function world() {
   const initial = structuredClone(template);
   const { worldId } = await saveInitialWorld(db, initial, {
+    replayFormat: 1,
     name: '공개 지도 시험',
     turnTermMinutes: 60,
     endYear: null,

@@ -48,9 +48,13 @@
 
 | 테이블        | 주요 필드                                                                                  | 관문 |
 | ------------- | ------------------------------------------------------------------------------------------ | ---- |
-| `World` | id, name, scenarioKey, mapKey, unitSetKey, startYear, endYear(기본값 없는 nullable), status(PREOPEN·RUNNING·PAUSED·ENDED), clockMode(REALTIME·ACCELERATED, 기본 REALTIME), turnTermMinutes, seed, clockTick, clockAnchorAt, clockRevision, startedAt, endedAt, initialStateHash, replayOrigin, outcomeFromSequence, statRules, unitSet | M1 |
+| `World` | id, name, scenarioKey, mapKey, unitSetKey, startYear, endYear(기본값 없는 nullable), status(PREOPEN·RUNNING·PAUSED·ENDED), clockMode(REALTIME·ACCELERATED, 기본 REALTIME), turnTermMinutes, seed, clockTick, clockAnchorAt, clockRevision, startedAt, endedAt, initialStateHash, replayOrigin, replayFormat(기본 1), ruleFeatures(기본 빈 배열), outcomeFromSequence, statRules, unitSet | M1 |
 | `EngineLease` | worldId(PK), ownerId, fencingToken, expiresAt                                              | M1   |
-| `InputEvent`  | id, worldId, actorUserId, generalId, kind, payload, idempotencyKey(월드 안에서 고유), status(PENDING·DONE·FAILED), result, createdAt, processedAt | M1 |
+| `InputEvent`  | id, worldId, userId, generalId, kind, payload, idempotencyKey(월드·계정 안에서 고유), status(PENDING·APPLIED·REJECTED), sequence, tick(nullable), result, createdAt | M1 |
+
+`World.replayOrigin`이 정본이며 `replayFormat`·`ruleFeatures`는 읽기용 사본입니다. 기존 행은 형식 1·빈 목록이고 새 생성은 형식 3을 명시합니다. 생성 뒤 사본을 바꾸지 않으며 엔진 시작 때 원본과 대조합니다. 기능 목록은 생성 기록에서 비지 않은 오름차순 배열이고 기능이 없으면 키를 생략합니다. DB 사본은 빈 배열을 허용합니다. 모르는 기능·의존 누락·충돌 조합은 생성과 재생 전에 거부합니다.
+
+`InputEvent.tick`은 형식 3 대기 입력의 처리 tick이고 즉시 입력은 null입니다. PENDING이면 tick이 null이어야 한다는 DB CHECK가 있습니다. 기존 행은 null로 남고 archive 1·2 수출에는 tick 키를 넣지 않습니다. 변경 migration은 `20261024000000_replay_features`입니다.
 
 ## 게임 상태 영역
 

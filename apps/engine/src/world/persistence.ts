@@ -2,12 +2,17 @@ import type { PrismaClient, Prisma } from '@opensamguk/db';
 import type { WorldInit } from '@opensamguk/rules';
 import { parsePreset, presetRules, statRulesSchema, unitSetSchema, type WorldPreset } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
+import { checkRuleFeatures, checkReplayOrigin, type JsonValue, type ReplayOriginV3 } from '@opensamguk/rules';
+import { resourceHash, resourceHashV3 } from '../replay';
 import { loadCommandState } from '../commandPersistence';
 
 export async function saveInitialWorld(
   db: PrismaClient,
   state: WorldInit,
   options: {
+    ruleFeatures?: string[];
+    featureData?: Record<string, JsonValue>;
+    replayFormat?: 1 | 3;
     name: string;
     turnTermMinutes: number;
     endYear: number | null;
@@ -24,7 +29,28 @@ export async function saveInitialWorld(
   }
   const preset = options.preset ? parsePreset(options.preset.value) : null;
   if (options.preset && !/^[a-zA-Z0-9_-]+$/.test(options.preset.key)) throw new Error('프리셋 ID를 확인하세요.');
-  const initial = preset ? { ...state, presetRules: presetRules(preset) } : state;
+  const { ruleFeatures: stateFeatures, ...base } = state;
+  if (Object.hasOwn(state, 'ruleFeatures')) checkRuleFeatures(stateFeatures);
+  if (options.ruleFeatures !== undefined && !Array.isArray(options.ruleFeatures))
+    throw new Error('규칙 기능 목록은 배열이어야 합니다.');
+  const features = options.ruleFeatures ?? stateFeatures ?? [];
+  if (!Array.isArray(features)) throw new Error('규칙 기능 목록은 배열이어야 합니다.');
+  if (features.length) checkRuleFeatures(features);
+  const initial = {
+    ...base,
+    ...(preset ? { presetRules: presetRules(preset) } : {}),
+    ...(features.length ? { ruleFeatures: [...features] } : {}),
+  };
+  const replayFormat = options.replayFormat ?? 3;
+  const origin = {
+    version: replayFormat,
+    initial,
+    initialStateHash: hashState(initial),
+    resourceHash: resourceHash(initial),
+    ...(options.featureData !== undefined ? { featureData: options.featureData } : {}),
+  };
+  checkReplayOrigin(origin);
+  if (origin.version === 3) origin.resourceHash = resourceHashV3(origin as ReplayOriginV3);
   const stateHash = hashState(initial);
   if (
     options.endYear !== null &&
@@ -45,18 +71,9 @@ export async function saveInitialWorld(
           startYear: state.startYear,
           endYear: options.endYear,
           initialStateHash: stateHash,
-          replayOrigin: {
-            version: 1,
-            initial,
-            resourceHash: hashState({
-              scenarioKey: state.scenarioKey,
-              mapKey: state.mapKey,
-              unitSetKey: state.unitSetKey,
-              statRules: state.statRules,
-              unitSet: state.unitSet,
-            }),
-            initialStateHash: stateHash,
-          } as unknown as Prisma.InputJsonValue,
+          replayFormat,
+          ruleFeatures: features,
+          replayOrigin: origin as unknown as Prisma.InputJsonValue,
           statRules: state.statRules,
           unitSet: state.unitSet as Prisma.InputJsonValue,
           ...(state.commandMeta ? { commandMeta: state.commandMeta as Prisma.InputJsonValue } : {}),
@@ -98,7 +115,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
   // 일관된 스냅샷에서 읽어 해시 비교 중 다른 트랜잭션의 변경이 섞이지 않게 한다.
   return db.$transaction(
     async (tx) => {
-      const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
+      const world = await tx.world.findUniqueOrThrow({ where: { id: worldId }, omit: { replayOrigin: true } });
       const cities = await tx.city.findMany({ where: { worldId }, orderBy: { cityKey: 'asc' } });
       const nations = await tx.nation.findMany({
         where: { worldId },
@@ -120,6 +137,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
       };
       return {
         ...(world.preset ? { presetRules: presetRules(parsePreset(world.preset)) } : {}),
+        ...(world.ruleFeatures?.length ? { ruleFeatures: [...world.ruleFeatures] } : {}),
         seed: world.seed,
         scenarioKey: world.scenarioKey,
         mapKey: world.mapKey,

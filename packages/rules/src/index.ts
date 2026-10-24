@@ -45,3 +45,5 @@ export {
   type ModifierProvider,
   type BattleModifiers,
 } from './modifiers';
+
+export * from './ruleRegistry';

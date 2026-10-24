@@ -1,9 +1,10 @@
 import type { Prisma } from '@opensamguk/db';
 import { parsePreset, presetRules, type WorldState } from '@opensamguk/rules';
+import { engineFeatures } from './features';
 import { loadCommandState } from './commandPersistence';
 
 export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): Promise<WorldState> {
-  const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
+  const world = await tx.world.findUniqueOrThrow({ where: { id: worldId }, omit: { replayOrigin: true } });
   const cities = await tx.city.findMany({ where: { worldId } });
   const nations = await tx.nation.findMany({
     where: { worldId },
@@ -18,7 +19,8 @@ export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): 
     void ignored;
     return value;
   };
-  return {
+  let state: WorldState = {
+    ...(world.ruleFeatures?.length ? { ruleFeatures: [...world.ruleFeatures] } : {}),
     ...(world.preset ? { presetRules: presetRules(parsePreset(world.preset)) } : {}),
     startYear: world.startYear,
     cities: Object.fromEntries(cities.map((city) => [city.cityKey, stripWorldId(city)])),
@@ -40,4 +42,9 @@ export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): 
     diplomacies: diplomacies.map(stripWorldId),
     ...(await loadCommandState(tx, worldId)),
   };
+  for (const feature of engineFeatures
+    .filter((feature) => world.ruleFeatures?.includes(feature.key))
+    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)))
+    state = (await feature.loadWorld?.(tx, worldId, state)) ?? state;
+  return state;
 }

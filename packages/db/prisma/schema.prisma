@@ -42,6 +42,8 @@ model World {
   engineHeartbeat EngineHeartbeat?
   monthlyTick     Int         @default(0)
   actionSequence  Int         @default(0)
+  replayFormat    Int @default(1)
+  ruleFeatures    String[] @default([])
   replayOrigin    Json?
   inputEvents     InputEvent[]
   nationHistory   NationHistory[]
@@ -326,6 +328,7 @@ model InputEvent {
   payload        Json
   status         InputEventStatus @default(PENDING)
   sequence       Int?
+  tick           Int?
   result         Json?
   createdAt      DateTime @default(now())
   world          World @relation(fields: [worldId], references: [id], onDelete: Cascade)

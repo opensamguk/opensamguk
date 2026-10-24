@@ -5,6 +5,7 @@ export type JsonValue = null | boolean | number | string | JsonValue[] | { [key:
 export type WorldExt = Record<string, JsonValue>;
 export interface WorldState {
   presetRules?: PresetRules;
+  ruleFeatures?: string[];
   ext?: WorldExt;
   startYear: number;
   cities: Record<number, InitialCity>;
@@ -36,6 +37,7 @@ export function toWorldStateWithRegistry(initial: WorldInit, registry: ExtStateR
   return {
     ...(ext ? { ext } : {}),
     ...(state.presetRules ? { presetRules: state.presetRules } : {}),
+    ...(state.ruleFeatures ? { ruleFeatures: state.ruleFeatures } : {}),
     startYear: state.startYear,
     cities: Object.fromEntries(state.cities.map((city) => [city.cityKey, city])),
     nations: Object.fromEntries(state.nations.map((nation) => [nation.id, nation])),
