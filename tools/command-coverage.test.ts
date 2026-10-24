@@ -580,7 +580,8 @@ describe('T4-02 등록된 확장 명령 대조', () => {
   });
 
   it('등록한 확장의 누락·다른 대상·기본 key와 충돌을 실패시키고 기본 37개 집계는 보존한다', () => {
-    fixture({ 'ext/registry.ts': `export const extensionCommands = [${command('fire_attack')}];` }, (dir) => {
+    const registeredCommands = ['fire_attack', 'sabotage', 'incite', 'plunder'].map((key) => command(key)).join(',');
+    fixture({ 'ext/registry.ts': `export const extensionCommands = [${registeredCommands}];` }, (dir) => {
       const extensionRegistry = readExtensionRegistryKeys(dir);
       const ctx = withDocs({ extensionRegistry });
       const valid = analyze(table(), ctx);
@@ -591,15 +592,18 @@ describe('T4-02 등록된 확장 명령 대조', () => {
       const doc = table();
       doc.commands = doc.commands.filter(({ id }) => id !== 'fire_attack');
       expect(errorsOf(doc, ctx)).toContain('registry key fire_attack(general)가 대응표에 없다');
-      expect(errorsOf(table(), withDocs({ extensionRegistry: [{ key: 'fire_attack', target: 'nation' }] }))).toContain(
+      const wrongTargetRegistry = extensionRegistry.map((entry: { key: string; target: string }) =>
+        entry.key === 'fire_attack' ? { ...entry, target: 'nation' } : entry,
+      );
+      expect(errorsOf(table(), withDocs({ extensionRegistry: wrongTargetRegistry }))).toContain(
         'commands[fire_attack]: registry target nation와 다르다',
       );
-      expect(errorsOf(table(), withDocs({ extensionRegistry: [{ key: 'farm', target: 'general' }] }))).toContain(
-        '확장 registry key farm가 기본·확장 목록과 겹친다',
-      );
+      expect(
+        errorsOf(table(), withDocs({ extensionRegistry: [...extensionRegistry, { key: 'farm', target: 'general' }] })),
+      ).toContain('확장 registry key farm가 기본·확장 목록과 겹친다');
       writeFileSync(
         join(dir, 'packages/rules/src/commands/ext/registry.ts'),
-        `export const extensionCommands = [${command('not_in_table')}];`,
+        `export const extensionCommands = [${registeredCommands},${command('not_in_table')}];`,
       );
       expect(errorsOf(table(), withDocs({ extensionRegistry: readExtensionRegistryKeys(dir) }))).toContain(
         'registry key not_in_table(general)가 대응표에 없다',
