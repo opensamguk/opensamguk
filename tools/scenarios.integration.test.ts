@@ -137,7 +137,7 @@ async function allRows(native: PgClient) {
 }
 async function cli(url: URL) {
   const env = { ...process.env, DATABASE_URL: url.href, TEST_DATABASE_URL: url.href };
-  const [executable, args] = pnpmCli(['db:init-scenarios'], env);
+  const [executable, args] = pnpmCli(['db:init-scenarios']);
   const child = spawn(executable, args, { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
   let stdout = '';
   let stderr = '';
