@@ -174,7 +174,9 @@ async function existingRows(client: PgClient) {
     const data =
       table === 'World'
         ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures'"
-        : "to_jsonb(t) - 'treatyFormat'";
+        : table === 'General'
+          ? "to_jsonb(t) - 'residenceTick'"
+          : "to_jsonb(t) - 'treatyFormat'";
     rows[table] = (await client.query(`SELECT ${data} AS data FROM "${table}" t ORDER BY to_jsonb(t)::text`)).rows;
   }
   return rows;
@@ -411,6 +413,8 @@ it.each(['empty', 'legacy'] as const)(
         '20261025000000_input_event_step_tick',
         '20261026000000_game_resource',
         '20261027000000_treaty_break_trust',
+        '20261028000000_assignment_nation_destroyed',
+        '20261029000000_general_residence_tick',
       ]);
       for (const directory of previous)
         await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
