@@ -359,6 +359,14 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
     expect(errorsOf(otherRun)).toContain(
       'commands[farm].engine: 실행 39540683895는 검증 기록 T1-08-rereview-81ffd1b가 확인한 실행이 아니다',
     );
+    const ciRef = (owner: string) => {
+      const doc = table();
+      row(doc, 'farm').stages.engine!.evidence.find((item) => item.kind === 'ci')!.ref =
+        `https://github.com/${owner}/opensamguk/actions/runs/39537902044`;
+      return errorsOf(doc);
+    };
+    expect(ciRef('opensamguk')).toBe(errorsOf(table()));
+    expect(ciRef('someone')).toContain('의 실행 주소여야 한다');
     const beforeReview = table();
     row(beforeReview, 'farm').stages.engine!.evidence.find((item) => item.kind === 'review')!.ref =
       'docs/plans/T1-08.md#계획-claude';

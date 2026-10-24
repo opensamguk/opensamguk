@@ -40,7 +40,8 @@ const IMPLEMENTATION_STAGES = ['engine', 'effectsCostsFailures'];
 const SHA = /^[0-9a-f]{7,40}$/;
 const FULL_SHA = /^[0-9a-f]{40}$/;
 const RUN = /actions\/runs\/\d+/;
-const REPO_RUN = /^https:\/\/github\.com\/peppone-choi\/opensamguk\/actions\/runs\/(\d+)$/;
+// 2026-10-24 저장소가 opensamguk 조직으로 옮겨졌다. 옮기기 전 기록은 옛 주소를 그대로 둔다.
+const REPO_RUN = /^https:\/\/github\.com\/(?:opensamguk|peppone-choi)\/opensamguk\/actions\/runs\/(\d+)$/;
 const REF_TOKEN = /\b([UAG])-(\d{2})\b/g;
 const DECISION_TOKEN = /\bD-(\d{3})\b/g;
 const GATES = ['M1', 'M2', 'M3'];
@@ -475,7 +476,10 @@ function checkVerified(where, commandId, stageName, evidence, records, errors) {
   const record = matched[0];
   for (const item of runs) {
     const id = REPO_RUN.exec(item.ref)?.[1];
-    if (!id) errors.push(`${where}: ci 증거 ${item.ref}는 peppone-choi/opensamguk의 실행 주소여야 한다`);
+    if (!id)
+      errors.push(
+        `${where}: ci 증거 ${item.ref}는 opensamguk/opensamguk(옛 peppone-choi/opensamguk)의 실행 주소여야 한다`,
+      );
     else if (!record.runs.some((run) => run.id === id))
       errors.push(`${where}: 실행 ${id}는 검증 기록 ${record.id}가 확인한 실행이 아니다`);
     if (item.sha !== record.sha) errors.push(`${where}: 실행 ${id ?? item.ref}의 SHA가 검증 기록 SHA와 다르다`);
@@ -960,7 +964,7 @@ export function verifyGitShas(doc, root, baseline = null) {
 }
 
 function ghRun(id) {
-  const out = execFileSync('gh', ['api', `repos/peppone-choi/opensamguk/actions/runs/${id}`], { encoding: 'utf8' });
+  const out = execFileSync('gh', ['api', `repos/opensamguk/opensamguk/actions/runs/${id}`], { encoding: 'utf8' });
   return JSON.parse(out);
 }
 
