@@ -23,6 +23,7 @@ import {
   requireTreatyWorld,
   toTreatyDetail,
   treatyBreakEnabled,
+  treatyTradeEnabled,
   type TreatyDetail,
 } from './treatyQueries';
 import { normalizeTreatyRequestPayload, type TreatyRequestKind } from './treatyRequests';
@@ -99,16 +100,16 @@ function allowed(code: TreatyDenyCode, reason: string): TreatyAllowed {
 function publicNation(nation: NationRef): NationRef {
   return { id: nation.id, name: nation.name, color: nation.color };
 }
-function quote(input: Parameters<typeof quoteTreatyProposal>[0]) {
+function quote(input: Parameters<typeof quoteTreatyProposal>[0], tradeEnabled = false) {
   try {
-    return quoteTreatyProposal(input);
+    return quoteTreatyProposal(input, { tradeEnabled });
   } catch {
     invalid();
   }
 }
-function responseGuide(input: Parameters<typeof guideTreatyResponse>[0]) {
+function responseGuide(input: Parameters<typeof guideTreatyResponse>[0], tradeEnabled = false) {
   try {
-    return guideTreatyResponse(input);
+    return guideTreatyResponse(input, { tradeEnabled });
   } catch {
     invalid();
   }
@@ -135,14 +136,17 @@ async function recentActions(
     const requestId = requestIdOf(kind, event.idempotencyKey);
     let record: ReturnType<typeof decodeTreatyRecord>;
     try {
-      record = decodeTreatyRecord({
-        sequence: event.sequence,
-        generalId: event.generalId,
-        kind,
-        status: event.status,
-        payload: event.payload,
-        result: event.result,
-      });
+      record = decodeTreatyRecord(
+        {
+          sequence: event.sequence,
+          generalId: event.generalId,
+          kind,
+          status: event.status,
+          payload: event.payload,
+          result: event.result,
+        },
+        { tradeEnabled: treatyTradeEnabled(world) },
+      );
     } catch {
       invalid();
     }
@@ -231,14 +235,17 @@ export async function listTreaties(
       const event = matching[0]!;
       let record: ReturnType<typeof decodeTreatyRecord>;
       try {
-        record = decodeTreatyRecord({
-          sequence: event.sequence,
-          generalId: event.generalId,
-          kind: event.kind,
-          status: event.status,
-          payload: event.payload,
-          result: event.result,
-        });
+        record = decodeTreatyRecord(
+          {
+            sequence: event.sequence,
+            generalId: event.generalId,
+            kind: event.kind,
+            status: event.status,
+            payload: event.payload,
+            result: event.result,
+          },
+          { tradeEnabled: treatyTradeEnabled(world) },
+        );
       } catch {
         invalid();
       }
@@ -333,13 +340,16 @@ export async function listTreaties(
     const current = relations.get(row.fromNationId === nationId ? row.toNationId : row.fromNationId)?.state ?? 'NONE';
     let estimate: TreatyListItem['estimate'] = null;
     if (row.status === 'PROPOSED' && from !== null && to !== null) {
-      const result = quote({
-        fromNationId: row.fromNationId,
-        toNationId: row.toNationId,
-        clauses: row.clauses,
-        fromCityCount: cityCounts.get(row.fromNationId) ?? 0,
-        target: { relation: current, cityCount: cityCounts.get(row.toNationId) ?? 0 },
-      });
+      const result = quote(
+        {
+          fromNationId: row.fromNationId,
+          toNationId: row.toNationId,
+          clauses: row.clauses,
+          fromCityCount: cityCounts.get(row.fromNationId) ?? 0,
+          target: { relation: current, cityCount: cityCounts.get(row.toNationId) ?? 0 },
+        },
+        treatyTradeEnabled(world),
+      );
       if (result.cost === null) invalid();
       estimate = detail.incoming
         ? { mine: result.cost.to, theirs: result.cost.from }
@@ -380,13 +390,16 @@ export async function listTreaties(
           startTick: row.startTick,
           endTick: row.endTick,
         };
-        const guidance = responseGuide({
-          treaty,
-          tick: world.clockTick,
-          relation: current,
-          responderCityCount: cityCounts.get(row.toNationId) ?? 0,
-          responderGold: ownGold,
-        });
+        const guidance = responseGuide(
+          {
+            treaty,
+            tick: world.clockTick,
+            relation: current,
+            responderCityCount: cityCounts.get(row.toNationId) ?? 0,
+            responderGold: ownGold,
+          },
+          treatyTradeEnabled(world),
+        );
         canAccept = guidance.accept === null ? { ok: true } : allowed(guidance.accept.code, guidance.accept.message);
         canReject = guidance.reject === null ? { ok: true } : allowed(guidance.reject.code, guidance.reject.message);
       }
@@ -523,13 +536,16 @@ export async function quoteTreaty(
     const cityCount = await tx.city.count({ where: { worldId: input.worldId, nationId: payload.toNationId } });
     targetValue = { relation: relation?.state ?? 'NONE', cityCount };
   }
-  const result = quote({
-    fromNationId: actor.nationId,
-    toNationId: payload.toNationId,
-    clauses: payload.clauses,
-    fromCityCount,
-    target: targetValue,
-  });
+  const result = quote(
+    {
+      fromNationId: actor.nationId,
+      toNationId: payload.toNationId,
+      clauses: payload.clauses,
+      fromCityCount,
+      target: targetValue,
+    },
+    treatyTradeEnabled(world),
+  );
   return {
     cost: result.cost === null ? null : { mine: result.cost.from, theirs: result.cost.to },
     problem: result.problem === null ? null : { code: result.problem.code, reason: result.problem.message },

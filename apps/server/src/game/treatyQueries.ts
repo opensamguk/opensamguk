@@ -3,11 +3,12 @@ import {
   projectTreatyRows,
   selectWorldCapabilities,
   validateClosedTreatyRow,
+  validateTreatyState,
   validateBrokenTreatyRow,
   TREATY_INPUTS,
   type BrokenTreatyRow,
   type ClosedTreatyRow,
-  type FirstTreatyClause,
+  type ConnectedTreatyClause,
   type TreatyState,
 } from '@opensamguk/rules';
 import { TRPCError } from '@trpc/server';
@@ -23,7 +24,7 @@ export type TreatyDetail = {
   fromNationId: number;
   toNationId: number;
   incoming: boolean;
-  clauses: FirstTreatyClause[];
+  clauses: ConnectedTreatyClause[];
   status: 'PROPOSED' | 'ACTIVE' | 'REJECTED' | 'EXPIRED' | 'ENDED' | 'BROKEN';
   proposedTick: number;
   respondByTick: number | null;
@@ -50,6 +51,12 @@ export function requireTreatyWorld(world: StoredWorld): void {
   }
   if (selected.kind !== 'caps' || !('treaty' in selected.selection))
     throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '조약 기능을 쓰지 않는 월드입니다.' });
+}
+
+export function treatyTradeEnabled(world: StoredWorld): boolean {
+  return (
+    world.replayFormat === 3 && world.ruleFeatures.includes('treaty') && world.ruleFeatures.includes('treaty-trade')
+  );
 }
 
 export function treatyBreakEnabled(world: StoredWorld): boolean {
@@ -83,13 +90,26 @@ export function checkTreatyRow(world: StoredWorld, row: StoredTreaty): CheckedTr
       invalid();
     let checked: CheckedTreatyRow;
     if (storage.status === 'PROPOSED' || storage.status === 'ACTIVE') {
-      const treaties = projectTreatyRows([storage]);
+      const treaties = treatyTradeEnabled(world)
+        ? (() => {
+            const { costFrom, costTo, closedSequence, ...open } = storage;
+            if (
+              closedSequence !== null ||
+              (open.status === 'PROPOSED' && (costFrom !== null || costTo !== null)) ||
+              (open.status === 'ACTIVE' && (costFrom === null || costTo === null))
+            )
+              invalid();
+            for (const cost of [costFrom, costTo])
+              if (cost !== null && (!Number.isSafeInteger(cost) || cost < 0 || cost > 2147483647)) invalid();
+            return [validateTreatyState(open, { tradeEnabled: true })];
+          })()
+        : projectTreatyRows([storage]);
       if (treaties?.length !== 1) invalid();
       checked = { ...treaties[0]!, costFrom: storage.costFrom, costTo: storage.costTo, closedSequence: null };
     } else if (storage.status === 'BROKEN') {
       if (!treatyBreakEnabled(world)) invalid();
-      checked = validateBrokenTreatyRow(storage);
-    } else checked = validateClosedTreatyRow(storage);
+      checked = validateBrokenTreatyRow(storage, { tradeEnabled: treatyTradeEnabled(world) });
+    } else checked = validateClosedTreatyRow(storage, { tradeEnabled: treatyTradeEnabled(world) });
     if (
       checked.id > world.actionSequence ||
       (checked.closedSequence !== null && checked.closedSequence > world.actionSequence)

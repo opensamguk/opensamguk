@@ -64,6 +64,8 @@ export {
   treatyBreakRecipients,
   decodeTreatyRecord,
   treatyRespondByTick,
+  treatyClauseEndTick,
+  type TreatyOptions,
   applyTreatyInput,
   settleTreaties,
   treatyClosures,
@@ -81,6 +83,7 @@ export {
 export type {
   TreatyClause,
   FirstTreatyClause,
+  ConnectedTreatyClause,
   TreatyState,
   ClosedTreatyRow,
   BrokenTreatyRow,
@@ -156,3 +159,5 @@ export {
   type ModifierProvider,
   type BattleModifiers,
 } from './modifiers';
+
+export { trade, findTradeRoutes, type TradeRoute } from './commands/trade';

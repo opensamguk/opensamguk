@@ -6,6 +6,7 @@ import type {
   BrokenTreatyRow,
   ClosedTreatyRow,
   FirstTreatyClause,
+  ConnectedTreatyClause,
   NationTrustState,
   TreatyApplyResult,
   TreatyBroken,
@@ -17,6 +18,21 @@ import type {
   TreatyRejectCode,
   TreatyState,
 } from './treatyTypes';
+
+export type TreatyOptions = Readonly<{ tradeEnabled?: boolean }>;
+
+function connectedClauses(clauses: readonly TreatyClause[]): ConnectedTreatyClause[] {
+  return clauses.filter((clause): clause is ConnectedTreatyClause => isFirstClause(clause) || clause.kind === 'trade');
+}
+
+function longestMonths(clauses: readonly TreatyClause[]): number | null {
+  const periods = clauses.flatMap((c) => (c.kind === 'nonAggression' || c.kind === 'trade' ? [c.months] : []));
+  return periods.length ? Math.max(...periods) : null;
+}
+
+export function treatyClauseEndTick(startTick: number, months: number): number {
+  return checkedTickAdd(startTick, months);
+}
 
 export type TreatyAmounts = Readonly<{ from: number; to: number }>;
 
@@ -260,7 +276,7 @@ export function canRepresentTreatyProposal(
 
 // PROPOSED는 사람 상대 제안에서만 생긴다. 읽은 행의 기한만 검사한다.
 function assertProposedTiming(treaty: DeepReadonly<TreatyState>): void {
-  const months = treaty.clauses.find((clause) => clause.kind === 'nonAggression')?.months ?? null;
+  const months = longestMonths(treaty.clauses);
   if (
     !canRepresentTreatyProposal({ tick: treaty.proposedTick, nonAggressionMonths: months, npc: false }) ||
     treaty.respondByTick !== checkedTickAdd(treaty.proposedTick, RESPONSE_MONTHS)
@@ -269,12 +285,12 @@ function assertProposedTiming(treaty: DeepReadonly<TreatyState>): void {
 }
 
 // 비용·응답 주체·국가의 현재 상태는 이 canonical 행에 없으므로 추정하지 않는다.
-export function validateTreatyState(value: unknown): TreatyState {
+export function validateTreatyState(value: unknown, options: TreatyOptions = {}): TreatyState {
   const row = treatyStateSchema.parse(value);
   const { clauses } = proposeStored.parse({ toNationId: row.toNationId, clauses: row.clauses });
-  if (domainClauses(clauses)) throw new RangeError('저장된 조약의 조항을 확인하세요.');
+  if (domainClauses(clauses, options)) throw new RangeError('저장된 조약의 조항을 확인하세요.');
   if (row.fromNationId === row.toNationId) throw new RangeError('저장된 조약의 당사국을 확인하세요.');
-  const treaty: TreatyState = { ...row, clauses: clauses.filter(isFirstClause) };
+  const treaty: TreatyState = { ...row, clauses: connectedClauses(clauses) };
   if (treaty.respondByTick !== checkedTickAdd(treaty.proposedTick, RESPONSE_MONTHS))
     throw new RangeError('저장된 조약의 응답 기한을 확인하세요.');
   if (treaty.status === 'PROPOSED') {
@@ -285,7 +301,7 @@ export function validateTreatyState(value: unknown): TreatyState {
   }
   if (treaty.startTick === null || treaty.startTick < treaty.proposedTick || treaty.startTick >= treaty.respondByTick)
     throw new RangeError('저장된 조약의 시작 시각을 확인하세요.');
-  const months = treaty.clauses.find((clause) => clause.kind === 'nonAggression')?.months ?? null;
+  const months = longestMonths(treaty.clauses);
   const expectedEnd = months === null ? null : checkedTickAdd(treaty.startTick, months);
   if (treaty.endTick !== expectedEnd || (treaty.endTick !== null && treaty.endTick > LAST_MONTHLY_TICK))
     throw new RangeError('저장된 조약의 종료 시각을 확인하세요.');
@@ -293,16 +309,16 @@ export function validateTreatyState(value: unknown): TreatyState {
 }
 
 // 저장 칸만 검사한다. 당시 국가·비용·마감 경위는 재생 대조가 맡는다.
-export function validateClosedTreatyRow(value: unknown): ClosedTreatyRow {
+export function validateClosedTreatyRow(value: unknown, options: TreatyOptions = {}): ClosedTreatyRow {
   const row = closedTreatySchema.parse(value);
   const { clauses } = proposeStored.parse({ toNationId: row.toNationId, clauses: row.clauses });
-  if (domainClauses(clauses)) throw new RangeError('저장된 조약의 조항을 확인하세요.');
+  if (domainClauses(clauses, options)) throw new RangeError('저장된 조약의 조항을 확인하세요.');
   if (row.fromNationId === row.toNationId) throw new RangeError('저장된 조약의 당사국을 확인하세요.');
   if (row.respondByTick !== treatyRespondByTick(row.proposedTick))
     throw new RangeError('저장된 조약의 응답 기한을 확인하세요.');
   if (row.closedSequence < row.id || (row.status !== 'REJECTED' && row.closedSequence === row.id))
     throw new RangeError('닫힌 조약의 마감 순서를 확인하세요.');
-  const months = clauses.find((clause) => clause.kind === 'nonAggression')?.months ?? null;
+  const months = longestMonths(clauses);
   if (row.status === 'ENDED') {
     if (
       row.startTick === null ||
@@ -329,10 +345,10 @@ export function validateClosedTreatyRow(value: unknown): ClosedTreatyRow {
     )
       throw new RangeError('닫힌 조약의 제안 시각을 확인하세요.');
   }
-  return { ...row, clauses: clauses.filter(isFirstClause) };
+  return { ...row, clauses: connectedClauses(clauses) };
 }
 
-export function validateBrokenTreatyRow(value: unknown): BrokenTreatyRow {
+export function validateBrokenTreatyRow(value: unknown, options: TreatyOptions = {}): BrokenTreatyRow {
   const row = closedTreatySchema
     .extend({
       status: z.literal('BROKEN'),
@@ -342,7 +358,7 @@ export function validateBrokenTreatyRow(value: unknown): BrokenTreatyRow {
     })
     .parse(value);
   const { costFrom, costTo, closedSequence, ...open } = row;
-  const active = validateTreatyState({ ...open, status: 'ACTIVE' });
+  const active = validateTreatyState({ ...open, status: 'ACTIVE' }, options);
   if (closedSequence <= row.id) throw new RangeError('파기한 조약의 마감 순서를 확인하세요.');
   return { ...row, clauses: active.clauses, costFrom, costTo, closedSequence };
 }
@@ -415,7 +431,7 @@ function parseTreatyRecord(value: unknown): TreatyRecord {
   return { ...record, payload, result } as TreatyRecord;
 }
 
-function assertTreatyRecordConsistency(record: TreatyRecord): void {
+function assertTreatyRecordConsistency(record: TreatyRecord, options: TreatyOptions): void {
   const { payload, result } = record;
   if (record.kind === 'treaty.break') {
     if (record.status === 'APPLIED') {
@@ -432,14 +448,14 @@ function assertTreatyRecordConsistency(record: TreatyRecord): void {
     if (result.treatyId !== expectedId) throw new Error('조약 기록의 ID가 다릅니다.');
     if (record.kind === 'treaty.propose') {
       const proposal = proposeStored.parse(payload);
-      if (domainClauses(proposal.clauses)) throw new Error('적용한 제안의 조항을 확인하세요.');
+      if (domainClauses(proposal.clauses, options)) throw new Error('적용한 제안의 조항을 확인하세요.');
       if (result.outcome === 'PROPOSED') {
         if (result.respondByTick !== checkedTickAdd(result.tick, RESPONSE_MONTHS))
           throw new Error('조약 응답 기한이 다릅니다.');
       } else if (result.by !== 'NPC') throw new Error('제안 기록의 응답 주체가 다릅니다.');
       if (result.outcome === 'ACCEPTED') {
-        const months = proposal.clauses.find((c) => c.kind === 'nonAggression')?.months;
-        const expectedEnd = months === undefined ? null : checkedTickAdd(result.tick, months);
+        const months = longestMonths(proposal.clauses);
+        const expectedEnd = months === null ? null : checkedTickAdd(result.tick, months);
         if (result.endTick !== expectedEnd) throw new Error('조약 종료 시각이 다릅니다.');
       }
     } else {
@@ -451,9 +467,9 @@ function assertTreatyRecordConsistency(record: TreatyRecord): void {
 }
 
 // 과거 완료 기록의 구조와 자기 일관성만 본다. 현재 월드 상태로 결과를 다시 판정하지 않는다.
-export function decodeTreatyRecord(value: unknown): TreatyRecord {
+export function decodeTreatyRecord(value: unknown, options: TreatyOptions = {}): TreatyRecord {
   const record = parseTreatyRecord(value);
-  assertTreatyRecordConsistency(record);
+  assertTreatyRecordConsistency(record, options);
   return record;
 }
 
@@ -475,7 +491,7 @@ export function validateTreatyRecord(value: unknown, context: TreatyRecordContex
     )
       throw new Error('종료 뒤 조약 기록을 확인하세요.');
   } else if (result.tick < context.monthlyTick) throw new Error('이미 정산한 시각보다 앞선 조약 기록입니다.');
-  assertTreatyRecordConsistency(record);
+  assertTreatyRecordConsistency(record, { tradeEnabled: context.treatyTrade?.version === 1 });
   return record;
 }
 
@@ -496,30 +512,41 @@ const rejectionMessages: Record<TreatyRejectCode, string> = {
   COUNTERPART_UNAVAILABLE: '상대 국가의 사정으로 수락하지 못했습니다.',
 };
 
-function domainClauses(clauses: readonly TreatyClause[]): TreatyRejectCode | null {
+function domainClauses(clauses: readonly TreatyClause[], options: TreatyOptions): TreatyRejectCode | null {
   if (
     clauses.length === 0 ||
     new Set(clauses.map((c) => c.kind)).size !== clauses.length ||
-    clauses.some((c) => c.kind === 'nonAggression' && (c.months < 1 || c.months > 120)) ||
+    clauses.some(
+      (c) =>
+        (c.kind === 'nonAggression' || (options.tradeEnabled && c.kind === 'trade')) &&
+        (c.months < 1 || c.months > 120),
+    ) ||
     clauses.some(
       (c) =>
         c.kind === 'note' && ([...c.text.normalize('NFC')].length < 1 || [...c.text.normalize('NFC')].length > 300),
     )
   )
     return 'BAD_INPUT';
-  return clauses.some((c) => !isFirstClause(c)) ? 'CLAUSE_NOT_CONNECTED' : null;
+  return clauses.some((c) => !isFirstClause(c) && !(options.tradeEnabled && c.kind === 'trade'))
+    ? 'CLAUSE_NOT_CONNECTED'
+    : null;
 }
 
 function isFirstClause(clause: TreatyClause): clause is FirstTreatyClause {
   return clause.kind === 'peace' || clause.kind === 'nonAggression' || clause.kind === 'note';
 }
 
-function relationAllows(state: TreatyView, from: number, to: number, clauses: readonly FirstTreatyClause[]): boolean {
+function relationAllows(
+  state: TreatyView,
+  from: number,
+  to: number,
+  clauses: readonly ConnectedTreatyClause[],
+): boolean {
   const relation = state.diplomacies.find((d) => d.nationA === Math.min(from, to) && d.nationB === Math.max(from, to));
   return relationAllowsClauses(relation?.state ?? 'NONE', clauses);
 }
 
-function relationAllowsClauses(current: TreatyRelation, clauses: readonly FirstTreatyClause[]): boolean {
+function relationAllowsClauses(current: TreatyRelation, clauses: readonly ConnectedTreatyClause[]): boolean {
   const peace = clauses.some((c) => c.kind === 'peace');
   const nonAggression = clauses.some((c) => c.kind === 'nonAggression');
   return (
@@ -544,6 +571,7 @@ export function quoteTreatyProposal(
     fromCityCount: number;
     target: Readonly<{ relation: TreatyRelation; cityCount: number }> | null;
   }>,
+  options: TreatyOptions = {},
 ): TreatyQuoteResult {
   const { clauses } = proposeStored.parse({ toNationId: proposal.toNationId, clauses: proposal.clauses });
   positive.parse(proposal.fromNationId);
@@ -556,12 +584,12 @@ export function quoteTreatyProposal(
     cost,
     problem: { code, message: rejectionMessages[code] },
   });
-  const domain = domainClauses(clauses);
+  const domain = domainClauses(clauses, options);
   if (domain === 'BAD_INPUT' || domain === 'CLAUSE_NOT_CONNECTED') return problem(domain);
   if (domain !== null) throw new Error('조약 견적의 조항 판정을 확인하세요.');
   if (proposal.toNationId === proposal.fromNationId || proposal.target === null) return problem('BAD_TARGET');
-  const firstClauses = clauses.filter(isFirstClause);
-  const months = firstClauses.find((clause) => clause.kind === 'nonAggression')?.months ?? null;
+  const firstClauses = connectedClauses(clauses);
+  const months = longestMonths(firstClauses);
   const cost = {
     from: calculateTreatyFee(proposal.fromCityCount, months),
     to: calculateTreatyFee(proposal.target.cityCount, months),
@@ -585,8 +613,9 @@ export function guideTreatyResponse(
     responderCityCount: number;
     responderGold: number;
   }>,
+  options: TreatyOptions = {},
 ): TreatyResponseGuide {
-  const treaty = validateTreatyState(input.treaty);
+  const treaty = validateTreatyState(input.treaty, options);
   if (treaty.status !== 'PROPOSED') throw new RangeError('응답을 기다리는 조약이 아닙니다.');
   tickSchema.max(MAX_ENGINE_TICK).parse(input.tick);
   nonNegativeSafeInteger(input.responderCityCount, 'responderCityCount');
@@ -601,7 +630,7 @@ export function guideTreatyResponse(
     reject: null,
   });
   if (!relationAllowsClauses(input.relation, treaty.clauses)) return deny('TREATY_RELATION');
-  const months = treaty.clauses.find((clause) => clause.kind === 'nonAggression')?.months ?? null;
+  const months = longestMonths(treaty.clauses);
   if (input.responderGold < calculateTreatyFee(input.responderCityCount, months)) return deny('INSUFFICIENT_GOLD');
   return { accept: null, reject: null };
 }
@@ -614,9 +643,10 @@ function putTreaties(state: TreatyWorldState, treaties: TreatyState[]): void {
 export function applyTreatyInput(
   state: TreatyView,
   input: TreatyInput & { generalId: number },
-  context: { tick: number; sequence: number },
+  context: { tick: number; sequence: number; tradeEnabled?: boolean },
 ): TreatyApplyResult<TreatyWorldState> {
   const { tick, sequence } = context;
+  const options: TreatyOptions = { tradeEnabled: context.tradeEnabled ?? false };
   tickSchema.max(MAX_ENGINE_TICK).parse(tick);
   positive.max(MAX_STORED_INT).parse(sequence);
   positive.parse(input.generalId);
@@ -633,7 +663,7 @@ export function applyTreatyInput(
     },
   });
   if (input.kind === 'treaty.propose') {
-    const domain = domainClauses(proposeStored.parse(payload).clauses);
+    const domain = domainClauses(proposeStored.parse(payload).clauses, options);
     if (domain) return reject(domain);
   }
   const actor = state.generals[input.generalId];
@@ -649,18 +679,21 @@ export function applyTreatyInput(
     if (!state.nations[found.fromNationId] || !state.nations[found.toNationId]) return reject('BAD_TARGET');
     if (actor.nationId !== found.fromNationId && actor.nationId !== found.toNationId) return reject('NOT_PARTY');
     if (found.status !== 'ACTIVE') return reject('TREATY_NOT_ACTIVE');
-    const checked = validateTreatyState(found);
+    const checked = validateTreatyState(found, options);
     if (state.nationTrust !== undefined) validateNationTrustState(state.nationTrust);
     const next = structuredClone(state) as TreatyWorldState;
     putTreaties(
       next,
       (next.treaties ?? []).filter((entry) => entry.id !== checked.id),
     );
-    if (checked.clauses.some((clause) => clause.kind === 'nonAggression')) {
+    const nonAggression = checked.clauses.find((clause) => clause.kind === 'nonAggression');
+    const nonAggressionEnd = nonAggression ? checkedTickAdd(checked.startTick!, nonAggression.months) : null;
+    const monthlyTick = Math.floor(tick / TICKS_PER_MONTH) * TICKS_PER_MONTH;
+    if (nonAggressionEnd !== null && (!options.tradeEnabled || nonAggressionEnd > monthlyTick)) {
       const nationA = Math.min(checked.fromNationId, checked.toNationId);
       const nationB = Math.max(checked.fromNationId, checked.toNationId);
       const pair = next.diplomacies.find((entry) => entry.nationA === nationA && entry.nationB === nationB);
-      if (!pair || pair.state !== 'NON_AGGRESSION' || pair.untilTick !== checked.endTick)
+      if (!pair || pair.state !== 'NON_AGGRESSION' || pair.untilTick !== nonAggressionEnd)
         throw new Error('파기할 조약의 불가침 관계를 확인하세요.');
       next.diplomacies = next.diplomacies.filter((entry) => entry !== pair);
     }
@@ -677,12 +710,12 @@ export function applyTreatyInput(
     const proposal = proposeStored.parse(payload);
     if (proposal.toNationId === actor.nationId || !state.nations[proposal.toNationId]) return reject('BAD_TARGET');
     if (state.treaties?.some((entry) => entry.id === sequence)) throw new Error('이미 사용한 조약 순서입니다.');
-    const clauses = proposal.clauses.filter(isFirstClause);
+    const clauses = connectedClauses(proposal.clauses);
     if (!relationAllows(state, actor.nationId, proposal.toNationId, clauses)) return reject('TREATY_RELATION');
     if (
       !canRepresentTreatyProposal({
         tick,
-        nonAggressionMonths: clauses.find((clause) => clause.kind === 'nonAggression')?.months ?? null,
+        nonAggressionMonths: longestMonths(clauses),
         npc: state.nations[proposal.toNationId]!.isNpc,
       })
     )
@@ -707,7 +740,7 @@ export function applyTreatyInput(
     if (actor.nationId !== found.toNationId) return reject('NOT_PARTY');
     if (found.status !== 'PROPOSED') return reject('TREATY_NOT_PROPOSED');
     if (tick >= found.respondByTick) return reject('EXPIRED');
-    treaty = structuredClone(found) as TreatyState;
+    treaty = validateTreatyState(found, options);
     response = respond.accept;
   }
   const npc = input.kind === 'treaty.propose' && state.nations[treaty.toNationId]!.isNpc;
@@ -732,7 +765,7 @@ export function applyTreatyInput(
       result: { outcome: 'PROPOSED', tick, treatyId: resultId, respondByTick: treaty.respondByTick },
     };
   }
-  const months = treaty.clauses.find((c) => c.kind === 'nonAggression')?.months ?? null;
+  const months = longestMonths(treaty.clauses);
   const cities = Object.values(state.cities);
   const cost = {
     from: calculateTreatyFee(cities.filter((c) => c.nationId === treaty.fromNationId).length, months),
@@ -775,12 +808,13 @@ export function applyTreatyInput(
           d.nationB === Math.max(treaty.fromNationId, treaty.toNationId)
         ),
     );
-    if (treaty.endTick !== null)
+    const nonAggressionMonths = treaty.clauses.find((c) => c.kind === 'nonAggression')?.months;
+    if (nonAggressionMonths !== undefined)
       next.diplomacies.push({
         nationA: Math.min(treaty.fromNationId, treaty.toNationId),
         nationB: Math.max(treaty.fromNationId, treaty.toNationId),
         state: 'NON_AGGRESSION',
-        untilTick: treaty.endTick,
+        untilTick: checkedTickAdd(tick, nonAggressionMonths),
       });
     next.diplomacies.sort((a, b) => a.nationA - b.nationA || a.nationB - b.nationB);
   }

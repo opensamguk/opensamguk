@@ -12,6 +12,7 @@ import {
   toTreatyDetail,
   type TreatyDetail,
 } from './treatyQueries';
+import { treatyTradeEnabled } from './treatyQueries';
 
 export type TreatyRequestKind = keyof typeof TREATY_INPUTS;
 export type TreatyRequestState =
@@ -185,14 +186,17 @@ export async function readTreatyRequest(tx: Prisma.TransactionClient, input: Ide
   }
   let record: ReturnType<typeof decodeTreatyRecord>;
   try {
-    record = decodeTreatyRecord({
-      sequence: event.sequence,
-      generalId: event.generalId,
-      kind,
-      status: event.status,
-      payload: event.payload,
-      result: event.result,
-    });
+    record = decodeTreatyRecord(
+      {
+        sequence: event.sequence,
+        generalId: event.generalId,
+        kind,
+        status: event.status,
+        payload: event.payload,
+        result: event.result,
+      },
+      { tradeEnabled: treatyTradeEnabled(world) },
+    );
   } catch {
     invalid();
   }

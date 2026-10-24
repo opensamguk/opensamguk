@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { Context } from '../context';
 import { worldInput } from '../game/queries';
 import { listTreaties, listTrust, quoteTreaty } from '../game/treatyReads';
+import { listTradeTargets } from '../game/treatyTrade';
 import { breakInput, trustInput } from '../game/treatyBreakInput';
 import {
   readTreatyRequest,
@@ -46,6 +47,16 @@ async function submitAndWait(
 }
 
 export const treatyRouter = router({
+  tradeTargets: protectedProcedure.input(worldInput).query(({ ctx, input }) => {
+    const started = performance.now();
+    return ctx.db.$transaction(
+      async (tx) => {
+        await requireLiveSession(tx, identity(ctx, started));
+        return listTradeTargets(tx, { ...input, userId: ctx.user.id });
+      },
+      { isolationLevel: 'RepeatableRead' },
+    );
+  }),
   list: protectedProcedure.input(listInput).query(({ ctx, input }) => {
     const started = performance.now();
     return ctx.db.$transaction(
@@ -92,16 +103,14 @@ export const treatyRouter = router({
       isolationLevel: 'RepeatableRead',
     });
   }),
-  break: protectedProcedure
-    .input(breakInput)
-    .mutation(({ ctx, input }) =>
-      submitAndWait(ctx, {
-        worldId: input.worldId,
-        requestId: input.requestId,
-        kind: 'treaty.break',
-        payload: { treatyId: input.treatyId },
-      }),
-    ),
+  break: protectedProcedure.input(breakInput).mutation(({ ctx, input }) =>
+    submitAndWait(ctx, {
+      worldId: input.worldId,
+      requestId: input.requestId,
+      kind: 'treaty.break',
+      payload: { treatyId: input.treatyId },
+    }),
+  ),
   trust: protectedProcedure.input(trustInput).query(({ ctx, input }) => {
     const started = performance.now();
     return ctx.db.$transaction(

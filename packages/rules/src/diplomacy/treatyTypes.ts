@@ -9,11 +9,13 @@ export type TreatyClause =
 
 export type FirstTreatyClause = Extract<TreatyClause, { kind: 'peace' | 'nonAggression' | 'note' }>;
 
+export type ConnectedTreatyClause = FirstTreatyClause | Extract<TreatyClause, { kind: 'trade' }>;
+
 export interface TreatyState {
   id: number;
   fromNationId: number;
   toNationId: number;
-  clauses: FirstTreatyClause[];
+  clauses: ConnectedTreatyClause[];
   status: 'PROPOSED' | 'ACTIVE';
   proposedTick: number;
   respondByTick: number;
@@ -25,7 +27,7 @@ export interface ClosedTreatyRow {
   id: number;
   fromNationId: number;
   toNationId: number;
-  clauses: FirstTreatyClause[];
+  clauses: ConnectedTreatyClause[];
   status: 'REJECTED' | 'EXPIRED' | 'ENDED';
   proposedTick: number;
   respondByTick: number;
@@ -108,6 +110,7 @@ export type TreatyRecord = TreatyInput & {
 export interface TreatyRecordContext {
   treaty: { version: number } | null;
   treatyBreak?: { version: number } | null;
+  treatyTrade?: { version: number } | null;
   monthlyTick: number;
   endTick?: number;
 }

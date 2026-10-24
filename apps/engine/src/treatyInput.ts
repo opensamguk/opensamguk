@@ -87,6 +87,7 @@ type TreatyQueuedContext = {
   tick: number;
   sequence: number;
   treatyBreakEnabled?: boolean;
+  treatyTradeEnabled?: boolean;
   emit?: (signal: RealtimeSignal) => void;
 };
 
@@ -118,6 +119,7 @@ async function resolveTreatyInput(
     throw new Error('조약 입력의 순서 저장 범위를 넘었습니다.');
   const context: TreatyRecordContext = {
     treaty: { version: 1 },
+    ...(at.treatyTradeEnabled ? { treatyTrade: { version: 1 } } : {}),
     ...(at.treatyBreakEnabled ? { treatyBreak: { version: 1 } } : {}),
     monthlyTick: world.monthlyTick,
   };
@@ -145,9 +147,20 @@ async function resolveTreatyInput(
   const before: WorldState = native
     ? (await loadReplayState(tx, world.id)).state
     : { ...(await loadWorld(tx, world.id)), ...(await loadTreaties(tx, world.id)) };
-  const applied = applyTreatyInput(before, input, { tick, sequence });
+  const applied = applyTreatyInput(before, input, { tick, sequence, tradeEnabled: at.treatyTradeEnabled ?? false });
   const record = complete(applied.ok ? 'APPLIED' : 'REJECTED', applied.result);
-  if (applied.ok) await persistApplied(tx, world, input, before, applied.state, applied.result, sequence, at.emit);
+  if (applied.ok)
+    await persistApplied(
+      tx,
+      world,
+      input,
+      before,
+      applied.state,
+      applied.result,
+      sequence,
+      at.emit,
+      at.treatyTradeEnabled ?? false,
+    );
   return record;
 }
 
@@ -160,6 +173,7 @@ async function persistApplied(
   result: TreatyApplied,
   sequence: number,
   emit?: (signal: RealtimeSignal) => void,
+  tradeEnabled = false,
 ): Promise<void> {
   const worldId = world.id;
   const id = Number(result.treatyId);
@@ -169,7 +183,7 @@ async function persistApplied(
     if (stored.status !== 'ACTIVE' || stored.closedSequence !== null) throw new Error('파기할 조약이 변경됐습니다.');
     const { worldId: ignored, ...row } = stored;
     void ignored;
-    validateBrokenTreatyRow({ ...row, status: 'BROKEN', closedSequence: sequence });
+    validateBrokenTreatyRow({ ...row, status: 'BROKEN', closedSequence: sequence }, { tradeEnabled });
     const closed = await tx.treaty.updateMany({
       where: { worldId, id, status: 'ACTIVE', closedSequence: null },
       data: { status: 'BROKEN', closedSequence: sequence },
@@ -226,7 +240,10 @@ async function persistApplied(
     return;
   }
   if (result.outcome === 'ACCEPTED') {
-    const row = validateTreatyState(next.treaties?.find((entry) => entry.id === id));
+    const row = validateTreatyState(
+      next.treaties?.find((entry) => entry.id === id),
+      { tradeEnabled },
+    );
     for (const nationId of [row.fromNationId, row.toNationId]) {
       const oldGold = before.nations[nationId]!.gold;
       const gold = next.nations[nationId]!.gold;
@@ -268,7 +285,10 @@ async function persistApplied(
         },
       });
     } else {
-      const row = validateTreatyState(next.treaties?.find((entry) => entry.id === id));
+      const row = validateTreatyState(
+        next.treaties?.find((entry) => entry.id === id),
+        { tradeEnabled },
+      );
       await tx.treaty.create({
         data: {
           ...row,
