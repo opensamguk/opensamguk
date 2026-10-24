@@ -4,9 +4,16 @@ import { TRPCError } from '@trpc/server';
 import { isDeepStrictEqual } from 'node:util';
 import { z } from 'zod';
 import { requireGeneral, requireWorld } from './queries';
-import { checkTreatyRow, requireTreatyWorld, toTreatyDetail, type TreatyDetail } from './treatyQueries';
+import {
+  checkTreatyRow,
+  enabledTreatyKinds,
+  requireTreatyBreakWorld,
+  requireTreatyWorld,
+  toTreatyDetail,
+  type TreatyDetail,
+} from './treatyQueries';
 
-export type TreatyRequestKind = 'treaty.propose' | 'treaty.respond';
+export type TreatyRequestKind = keyof typeof TREATY_INPUTS;
 export type TreatyRequestState =
   | { status: 'pending'; requestId: string; kind: TreatyRequestKind }
   | {
@@ -21,7 +28,7 @@ export type TreatyRequestState =
 
 type Identity = { worldId: string; userId: string; sessionId: string; at: Date; requestId: string };
 const requestSchema = z.uuid();
-const kindSchema = z.enum(['treaty.propose', 'treaty.respond']);
+const kindSchema = z.enum(Object.keys(TREATY_INPUTS) as [TreatyRequestKind, ...TreatyRequestKind[]]);
 
 function invalid(): never {
   throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: '조약 요청 기록을 확인하지 못했습니다.' });
@@ -70,8 +77,13 @@ export async function requireLiveSession(
   if (!session) throw new TRPCError({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' });
 }
 
-async function findRequest(tx: Prisma.TransactionClient, input: Identity, requestId: string) {
-  const keys = [`treaty.propose:${requestId}`, `treaty.respond:${requestId}`];
+async function findRequest(
+  tx: Prisma.TransactionClient,
+  input: Identity,
+  requestId: string,
+  kinds: readonly TreatyRequestKind[],
+) {
+  const keys = kinds.map((kind) => `${kind}:${requestId}`);
   const events = await tx.inputEvent.findMany({
     where: { worldId: input.worldId, userId: input.userId, idempotencyKey: { in: keys } },
   });
@@ -101,8 +113,9 @@ export async function submitTreatyRequest(
   await requireLiveSession(tx, input);
   const world = await requireWorld(tx, input.worldId, true);
   requireTreatyWorld(world);
+  if (kind === 'treaty.break') requireTreatyBreakWorld(world);
   const payload = normalizeTreatyRequestPayload(kind, input.payload);
-  const existing = await findRequest(tx, input, requestId);
+  const existing = await findRequest(tx, input, requestId, enabledTreatyKinds(world));
   if (existing) {
     if (existing.kind !== kind) conflict();
     if (!isDeepStrictEqual(storedPayload(kind, existing.event.payload), payload)) conflict();
@@ -112,14 +125,14 @@ export async function submitTreatyRequest(
   const actor = await requireGeneral(tx, input.worldId, input.userId, true);
   if (actor.nationId === null || !canExecuteNationCommand(actor.officerLevel, 'nation_pact'))
     throw new TRPCError({ code: 'FORBIDDEN', message: '조약을 처리할 권한이 없습니다.' });
-  if (kind === 'treaty.respond') {
+  if (kind === 'treaty.respond' || kind === 'treaty.break') {
     if (!('treatyId' in payload)) invalid();
     const id = Number(payload.treatyId);
-    if (!Number.isInteger(id) || id < 1 || id > 2_147_483_647)
-      throw new TRPCError({ code: 'NOT_FOUND', message: '응답할 조약이 없습니다.' });
+    const message = kind === 'treaty.break' ? '파기할 조약이 없습니다.' : '응답할 조약이 없습니다.';
+    if (!Number.isInteger(id) || id < 1 || id > 2_147_483_647) throw new TRPCError({ code: 'NOT_FOUND', message });
     const treaty = await tx.treaty.findUnique({ where: { worldId_id: { worldId: input.worldId, id } } });
     if (!treaty || (actor.nationId !== treaty.fromNationId && actor.nationId !== treaty.toNationId))
-      throw new TRPCError({ code: 'NOT_FOUND', message: '응답할 조약이 없습니다.' });
+      throw new TRPCError({ code: 'NOT_FOUND', message });
     checkTreatyRow(world, treaty);
   }
   const pending = await tx.inputEvent.findMany({
@@ -155,7 +168,7 @@ export async function readTreatyRequest(tx: Prisma.TransactionClient, input: Ide
   await requireLiveSession(tx, input);
   const world = await requireWorld(tx, input.worldId);
   requireTreatyWorld(world);
-  const found = await findRequest(tx, input, requestId);
+  const found = await findRequest(tx, input, requestId, enabledTreatyKinds(world));
   if (!found) throw new TRPCError({ code: 'NOT_FOUND', message: '조약 요청이 없습니다.' });
   const { event, kind } = found;
   if (event.status === 'PENDING') {

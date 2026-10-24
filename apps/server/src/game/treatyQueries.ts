@@ -3,6 +3,9 @@ import {
   projectTreatyRows,
   selectWorldCapabilities,
   validateClosedTreatyRow,
+  validateBrokenTreatyRow,
+  TREATY_INPUTS,
+  type BrokenTreatyRow,
   type ClosedTreatyRow,
   type FirstTreatyClause,
   type TreatyState,
@@ -12,14 +15,16 @@ import { TRPCError } from '@trpc/server';
 type StoredWorld = Prisma.WorldGetPayload<Record<string, never>>;
 type StoredTreaty = Prisma.TreatyGetPayload<Record<string, never>>;
 export type CheckedTreatyRow =
-  (TreatyState & { costFrom: number | null; costTo: number | null; closedSequence: null }) | ClosedTreatyRow;
+  | (TreatyState & { costFrom: number | null; costTo: number | null; closedSequence: null })
+  | ClosedTreatyRow
+  | BrokenTreatyRow;
 export type TreatyDetail = {
   id: string;
   fromNationId: number;
   toNationId: number;
   incoming: boolean;
   clauses: FirstTreatyClause[];
-  status: 'PROPOSED' | 'ACTIVE' | 'REJECTED' | 'EXPIRED' | 'ENDED';
+  status: 'PROPOSED' | 'ACTIVE' | 'REJECTED' | 'EXPIRED' | 'ENDED' | 'BROKEN';
   proposedTick: number;
   respondByTick: number | null;
   startTick: number | null;
@@ -32,6 +37,11 @@ function invalid(): never {
 }
 
 export function requireTreatyWorld(world: StoredWorld): void {
+  if (world.replayFormat === 3) {
+    if (!world.ruleFeatures.includes('treaty'))
+      throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '조약 기능을 쓰지 않는 월드입니다.' });
+    return;
+  }
   let selected: ReturnType<typeof selectWorldCapabilities>;
   try {
     selected = selectWorldCapabilities(world);
@@ -40,6 +50,24 @@ export function requireTreatyWorld(world: StoredWorld): void {
   }
   if (selected.kind !== 'caps' || !('treaty' in selected.selection))
     throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '조약 기능을 쓰지 않는 월드입니다.' });
+}
+
+export function treatyBreakEnabled(world: StoredWorld): boolean {
+  return (
+    world.replayFormat === 3 && world.ruleFeatures.includes('treaty') && world.ruleFeatures.includes('treaty-break')
+  );
+}
+
+export function requireTreatyBreakWorld(world: StoredWorld): void {
+  requireTreatyWorld(world);
+  if (!treatyBreakEnabled(world))
+    throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '조약 파기를 쓰지 않는 월드입니다.' });
+}
+
+export function enabledTreatyKinds(world: StoredWorld): Array<keyof typeof TREATY_INPUTS> {
+  return (Object.keys(TREATY_INPUTS) as Array<keyof typeof TREATY_INPUTS>).filter(
+    (kind) => kind !== 'treaty.break' || treatyBreakEnabled(world),
+  );
 }
 
 // 호출자는 같은 트랜잭션에서 실제 World를 선택하고 requireTreatyWorld를 먼저 부른다.
@@ -58,6 +86,9 @@ export function checkTreatyRow(world: StoredWorld, row: StoredTreaty): CheckedTr
       const treaties = projectTreatyRows([storage]);
       if (treaties?.length !== 1) invalid();
       checked = { ...treaties[0]!, costFrom: storage.costFrom, costTo: storage.costTo, closedSequence: null };
+    } else if (storage.status === 'BROKEN') {
+      if (!treatyBreakEnabled(world)) invalid();
+      checked = validateBrokenTreatyRow(storage);
     } else checked = validateClosedTreatyRow(storage);
     if (
       checked.id > world.actionSequence ||
@@ -74,7 +105,7 @@ export function toTreatyDetail(row: CheckedTreatyRow, viewerNationId: number | n
   if (viewerNationId === null || (viewerNationId !== row.fromNationId && viewerNationId !== row.toNationId))
     return null;
   let cost: TreatyDetail['cost'] = null;
-  if (row.status === 'ACTIVE' || row.status === 'ENDED') {
+  if (row.status === 'ACTIVE' || row.status === 'ENDED' || row.status === 'BROKEN') {
     if (row.costFrom === null || row.costTo === null) invalid();
     cost = { from: row.costFrom, to: row.costTo };
   }
