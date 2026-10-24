@@ -12,6 +12,7 @@ import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { initializeResources, ResourceInitializationError } from './init-resources';
 import { BODY_TAG, RESOURCE_INPUTS } from './resources-sql/convert';
+import { INITIAL_NOTICE_FIXTURE, verifyInitialNotice } from './resources-sql/notice';
 import { testDatabaseUrl } from './test-database';
 
 const root = new URL('../', import.meta.url);
@@ -289,7 +290,7 @@ it('P10 DB 출처와 SQL의 MIT 전문·초상 고지는 원문과 같다', asyn
       .split('\n')
       .map((line) => (line === '--' ? '' : line.slice(3)))
       .join('\n');
-    expect(header).toBe((await readFile(new URL('resources/NOTICE.md', root), 'utf8')).replaceAll('\r\n', '\n'));
+    expect(header).toBe(verifyInitialNotice(await readFile(new URL(INITIAL_NOTICE_FIXTURE, root), 'utf8')));
   });
 });
 

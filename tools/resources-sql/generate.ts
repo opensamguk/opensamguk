@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { convertResourcesToSql, RESOURCE_INPUTS, type ResourceTexts } from './convert';
+import { checkNoticeAppendOnly, INITIAL_NOTICE_FIXTURE, verifyInitialNotice } from './notice';
 
 const root = new URL('../../', import.meta.url);
 const input = Object.fromEntries(
@@ -8,7 +9,9 @@ const input = Object.fromEntries(
     RESOURCE_INPUTS.map(async (resource) => [resource.slot, await readFile(new URL(resource.path, root), 'utf8')]),
   ),
 ) as ResourceTexts;
-const sql = convertResourcesToSql(input, await readFile(new URL('resources/NOTICE.md', root), 'utf8'));
+const notice = verifyInitialNotice(await readFile(new URL(INITIAL_NOTICE_FIXTURE, root), 'utf8'));
+checkNoticeAppendOnly(await readFile(new URL('resources/NOTICE.md', root), 'utf8'), notice);
+const sql = convertResourcesToSql(input, notice);
 const output = new URL('packages/db/sql/resources-init.sql', root);
 await mkdir(new URL('./', output), { recursive: true });
 await writeFile(output, sql, 'utf8');
