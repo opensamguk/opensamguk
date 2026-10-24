@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { beforeAll, afterAll, describe, expect, it } from 'vitest';
 import { createDb } from '@opensamguk/db';
 import { controlClock } from './clock';
-import { loadInitialWorld } from './resources';
+import { loadInitialWorldFromDb } from './resources';
 import { saveInitialWorld } from './persistence';
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -15,7 +15,7 @@ afterAll(async () => {
   await db.$disconnect();
 });
 async function create() {
-  return saveInitialWorld(db, await loadInitialWorld({ scenario: '1030', map: 'che', seed: 'clock' }), {
+  return saveInitialWorld(db, await loadInitialWorldFromDb(db, { scenario: '1030', map: 'che', seed: 'clock' }), {
     name: '시계',
     turnTermMinutes: 10,
     endYear: null,

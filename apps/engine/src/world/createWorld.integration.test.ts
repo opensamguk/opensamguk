@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb } from '@opensamguk/db';
 import { hashState } from '@opensamguk/shared/node';
-import { loadInitialWorld } from './resources';
+import { loadInitialWorldFromDb } from './resources';
 import { readWorldState, saveInitialWorld } from './persistence';
 
 const url = process.env.TEST_DATABASE_URL;
@@ -48,9 +48,12 @@ describe('AC-M1-03 실제 DB 월드 생성', () => {
     );
 
   it('94개 도시·21개 국가·491명·외교 7쌍을 저장하고 재적재 해시가 같다', async () => {
-    const state = await loadInitialWorld(input);
+    const state = await loadInitialWorldFromDb(db, input);
     const first = await saveInitialWorld(db, state, options);
-    const second = await saveInitialWorld(db, await loadInitialWorld(input), { ...options, name: '두 번째 월드' });
+    const second = await saveInitialWorld(db, await loadInitialWorldFromDb(db, input), {
+      ...options,
+      name: '두 번째 월드',
+    });
     expect(second.worldId).not.toBe(first.worldId);
     for (const result of [first, second]) {
       const read = await readWorldState(db, result.worldId);
@@ -76,7 +79,7 @@ describe('AC-M1-03 실제 DB 월드 생성', () => {
   });
 
   it('장수 저장이 실패하면 월드·국가·도시도 모두 롤백한다', async () => {
-    const state = await loadInitialWorld(input);
+    const state = await loadInitialWorldFromDb(db, input);
     state.generals[0]!.cityKey = 99999;
     const before = await Promise.all([
       db.world.count(),
@@ -98,7 +101,7 @@ describe('AC-M1-03 실제 DB 월드 생성', () => {
   });
 
   it('잘못된 이름과 턴 간격은 DB에 쓰기 전에 거부한다', async () => {
-    const state = await loadInitialWorld(input);
+    const state = await loadInitialWorldFromDb(db, input);
     const before = await db.world.count();
     for (const turnTermMinutes of [0, -1, 0.5, NaN, 2_147_483_648]) {
       await expect(saveInitialWorld(db, state, { ...options, turnTermMinutes })).rejects.toThrow('턴 간격');
@@ -113,7 +116,7 @@ describe('AC-M1-03 실제 DB 월드 생성', () => {
   });
 
   it('DB 외래키가 다른 월드 국가·도시 참조를 거부한다', async () => {
-    const state = await loadInitialWorld(input);
+    const state = await loadInitialWorldFromDb(db, input);
     const a = await saveInitialWorld(db, state, options);
     const b = await saveInitialWorld(db, state, options);
     await db.nation.create({
