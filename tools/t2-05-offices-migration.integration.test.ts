@@ -181,7 +181,9 @@ async function existingRows(client: PgClient) {
     'YearbookSnapshot',
   ]) {
     const data =
-      table === 'World' ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat'" : "to_jsonb(t) - 'treatyFormat'";
+      table === 'World'
+        ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures'"
+        : "to_jsonb(t) - 'treatyFormat'";
     rows[table] = (await client.query(`SELECT ${data} AS data FROM "${table}" t ORDER BY to_jsonb(t)::text`)).rows;
   }
   return rows;
@@ -318,6 +320,7 @@ it.each(['empty', 'legacy'] as const)(
         '20261023072000_world_ext_slices',
         '20261023073000_treaties',
         '20261023074000_assignment_storage',
+        '20261024000000_replay_features',
         '20261024000000_world_personnel_format',
         '20261025000000_input_event_step_tick',
         '20261026000000_game_resource',
@@ -364,6 +367,9 @@ it.each(['empty', 'legacy'] as const)(
       ).toEqual([{ count: 0 }]);
       expect((await client.query('SELECT DISTINCT "personnelFormat" FROM "World"')).rows).toEqual([
         { personnelFormat: null },
+      ]);
+      expect((await client.query('SELECT DISTINCT "replayFormat", "ruleFeatures" FROM "World"')).rows).toEqual([
+        { replayFormat: 1, ruleFeatures: [] },
       ]);
       for (const table of ['Treaty', 'WorldExtSlice', 'AssignmentOffer'])
         expect((await client.query(`SELECT count(*)::int AS count FROM "${table}"`)).rows).toEqual([{ count: 0 }]);
