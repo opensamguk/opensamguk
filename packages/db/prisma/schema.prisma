@@ -59,6 +59,7 @@ model World {
   operations      Operation[]
   extSlices       WorldExtSlice[]
   treaties        Treaty[]
+  nationTrust     NationTrust[]
   assignmentOffers AssignmentOffer[]
 }
 
@@ -105,6 +106,7 @@ enum TreatyStatus {
   REJECTED
   EXPIRED
   ENDED
+  BROKEN
 }
 
 model Treaty {
@@ -127,6 +129,16 @@ model Treaty {
   @@index([worldId, status, id])
   @@index([worldId, fromNationId, id])
   @@index([worldId, toNationId, id])
+}
+
+model NationTrust {
+  worldId        String
+  nationId       Int
+  brokenTreaties Int
+  lastBrokenTick Int
+  world          World @relation(fields: [worldId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@id([worldId, nationId])
 }
 
 model WorldExtSlice {
