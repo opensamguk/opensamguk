@@ -405,7 +405,7 @@ it.each(['empty', 'legacy'] as const)(
       await verifyIndexes(client);
       await verifyOffers(client, db);
       await verifyLogs(client, db);
-      await db.world.delete({ where: { id: 'one' } });
+      expect(await db.world.deleteMany({ where: { id: 'one' } })).toEqual({ count: 1 });
       expect(await db.assignmentOffer.count({ where: { worldId: 'one' } })).toBe(0);
       expect(await db.assignmentOffer.count({ where: { worldId: 'two' } })).toBe(1);
     });

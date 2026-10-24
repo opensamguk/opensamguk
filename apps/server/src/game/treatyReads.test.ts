@@ -63,6 +63,7 @@ function world(patch: Partial<World> = {}): World {
     actionSequence: 100,
     policyFromSequence: null,
     treatyFormat: 1,
+    personnelFormat: null,
     replayOrigin: json({
       version: 6,
       initial,
@@ -136,6 +137,7 @@ function pending(patch: Partial<Event> = {}): Event {
     payload: { toNationId: 2, clauses: [{ kind: 'nonAggression', months: 12 }] },
     status: 'PENDING',
     sequence: null,
+    stepTick: null,
     result: null,
     createdAt: new Date(0),
     ...patch,

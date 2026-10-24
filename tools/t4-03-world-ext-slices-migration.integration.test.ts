@@ -319,6 +319,7 @@ async function verifyStorage(client: PgClient, db: Db) {
       await writeWorldExtChanges(tx, 'slices', next, { ...next, changed: [99] });
       await tx.inputEvent.create({
         data: { worldId: 'slices', userId: 'fixture', kind: 'general.active', idempotencyKey: key, payload: {} },
+        select: { id: true },
       });
       throw new Error('commit boundary');
     }),
