@@ -671,14 +671,28 @@ describe('실제 로컬 HTTP 전송', () => {
     }
   });
 
-  it('응답이 없으면 실제 10초에 취소하고 TIMEOUT으로 끝난다', async () => {
+  it('응답이 없으면 실제 10초에 취소하고 TIMEOUT으로 끝난다', async ({ annotate }) => {
     const local = await receiver(() => {});
+    let abortedAt: number | undefined;
+    const transport: DiscordWebhookTransport = (endpoint, init) => {
+      init.signal.addEventListener(
+        'abort',
+        () => {
+          abortedAt = performance.now();
+        },
+        { once: true },
+      );
+      return local.transport(endpoint, init);
+    };
     try {
       const started = performance.now();
-      expect(await send(input, { transport: local.transport })).toEqual({ kind: 'UNKNOWN', code: 'TIMEOUT' });
+      expect(await send(input, { transport })).toEqual({ kind: 'UNKNOWN', code: 'TIMEOUT' });
       const elapsed = performance.now() - started;
       expect(elapsed).toBeGreaterThanOrEqual(10000);
       expect(elapsed).toBeLessThan(11500);
+      expect(abortedAt).toBeDefined();
+      expect(abortedAt! - started).toBeGreaterThanOrEqual(10000);
+      await annotate(JSON.stringify({ elapsedMs: elapsed, abortElapsedMs: abortedAt! - started }), 'timing');
       assertRequest(local);
       expect(local.calls[0]!.init.signal.aborted).toBe(true);
     } finally {
