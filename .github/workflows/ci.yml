@@ -2,7 +2,12 @@ name: CI
 
 on:
   push:
+    # merge queue가 만드는 임시 브랜치는 아래 merge_group 실행이 검사한다. push로 한 번 더 돌리지 않는다.
+    branches-ignore: ['gh-readonly-queue/**']
   pull_request:
+  # merge queue는 대기열의 병합 결과에 필수 검사(opensamguk-check, opensamguk-database-browser)를 다시 돌린다.
+  # 이 이벤트가 없으면 대기열에 들어간 PR이 검사를 기다리다 멈춘다. checkout ref는 github.sha(병합 결과)로 떨어진다.
+  merge_group:
   workflow_dispatch:
 
 permissions:

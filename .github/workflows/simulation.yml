@@ -2,6 +2,8 @@ name: NPC simulation
 
 on:
   push:
+    # merge queue의 임시 브랜치에서는 돌리지 않는다. 필수 검사가 아니며 병합 뒤 main push에서 돈다.
+    branches-ignore: ['gh-readonly-queue/**']
     paths:
       - 'packages/rules/src/**'
       - 'apps/engine/src/simulation.ts'
