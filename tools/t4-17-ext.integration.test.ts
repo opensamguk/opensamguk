@@ -165,7 +165,7 @@ function slots(value: FixedCase) {
   const { commandKey, args } = value.command;
   return [{ commandKey, args }, ...Array<null>(29).fill(null)];
 }
-async function save(f: Fixture) {
+async function save(f: Fixture, expectedSequence = 1) {
   const result = await rpc(
     'turns.set',
     { worldId: f.worldId, revision: 0, slots: slots(f.value) },
@@ -178,7 +178,7 @@ async function save(f: Fixture) {
     generalId: 1,
     kind: 'turns.set',
     status: 'APPLIED',
-    sequence: 1,
+    sequence: expectedSequence,
   });
 }
 async function loopFor(worldId: string, hooks: ConstructorParameters<typeof TurnLoop>[2] = {}) {
@@ -293,7 +293,7 @@ it('N1 HTTP는 무인증·제재·다른 사용자·잘못된 인자·revision�
   expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: 1 } } })).toMatchObject({
     turnRevision: 0,
   });
-  await save(f);
+  await save(f, 2);
   expect((await rpc('turns.set', input, f.alice.cookie, true)).data).toMatchObject({
     ok: false,
     reason: 'STALE',

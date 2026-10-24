@@ -273,7 +273,7 @@ it('새 예턴을 정규 router로 저장하고 세션의 장수·revision·활�
   ).toMatchObject({ ok: true });
 });
 
-it('무인증·제재·다른 사용자·잘못된 인자를 실제 procedure 경계로 검사한다 (네트워크 없음)', async () => {
+it('무인증·다른 사용자·잘못된 인자는 procedure로, 제재는 세션 함수로 검사한다 (네트워크 없음)', async () => {
   const unauth = api(world(), null);
   await expect(unauth.caller.set({ worldId: 'unit-ext', revision: 0, slots: clientSlots() })).rejects.toMatchObject({
     code: 'UNAUTHORIZED',
@@ -339,7 +339,7 @@ function archiveFixture(): CapsArchive {
     payload: { turns: slots(), revision: 0 },
     result: { revision: 1, activeTick: 0 },
   };
-  // App archive walker is the subject. Independent rules walk supplies month receipts.
+  // 앱 재생기를 검사한다. 규칙 함수를 따로 순회해 월간 대조값을 만든다.
   let replay = startCapsReplay(source, selected);
   replay = applyCapsRecordedInput(replay, input, { selection: selected });
   const months: CapsArchive['months'] = [];
