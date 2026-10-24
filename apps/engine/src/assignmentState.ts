@@ -79,7 +79,10 @@ function readClosure(value: unknown): ClosedOffer {
   if (
     status === 'CANCELLED' &&
     resolvedBy === null &&
-    (cancelReason === 'CITY_LOST' || cancelReason === 'TARGET_LEFT' || cancelReason === 'ISSUER_LOST_OFFICE')
+    (cancelReason === 'CITY_LOST' ||
+      cancelReason === 'TARGET_LEFT' ||
+      cancelReason === 'ISSUER_LOST_OFFICE' ||
+      cancelReason === 'NATION_DESTROYED')
   )
     return { id, status, resolvedBy, cancelReason, resolvedTick };
   throw new Error('발령 제안의 종료 상태 조합이 올바르지 않습니다.');

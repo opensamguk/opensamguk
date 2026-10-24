@@ -8,10 +8,10 @@ import {
   type WorldPreset,
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
-import { expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { monthlyFixture } from '../../test/monthlyFixture';
 import { readCapsArchive } from '../replayCaps';
-import { saveInitialWorld } from './persistence';
+import { readWorldState, saveInitialWorld } from './persistence';
 
 const preset = JSON.parse(
   readFileSync(new URL('../../../../resources/preset/regular.json', import.meta.url), 'utf8'),
@@ -68,25 +68,206 @@ function initialOrigin(initial: WorldInit) {
   };
 }
 
-it.each(formats)('조약 옵션 미지정은 기존 origin1과 %s 정책 생성을 보존한다 (메모리 TX 단위)', async (format) => {
+it.each(formats)('조약 옵션 미지정은 %s 선택의 생성 형식과 정책 경로를 구분한다 (메모리 TX 단위)', async (format) => {
   const initial = await monthlyFixture();
   const original = structuredClone(initial);
   const f = database();
   const result = await saveInitialWorld(f.db, initial, options(format));
   const data = f.tx.world.create.mock.calls[0]![0].data;
   expect(Object.hasOwn(data, 'treatyFormat')).toBe(false);
-  expect(JSON.stringify(data.replayOrigin)).toBe(JSON.stringify(initialOrigin(initial)));
+  const expected = initialOrigin(initial);
+  expect(JSON.stringify(data.replayOrigin)).toBe(
+    JSON.stringify(
+      format === 'default'
+        ? { version: 3, initial, initialStateHash: expected.initialStateHash, resourceHash: expected.resourceHash }
+        : expected,
+    ),
+  );
   expect(result).toEqual({ worldId: f.worldId, stateHash: hashState(initial) });
   expect(initial).toEqual(original);
-  if (format === 'legacy') {
+  if (format === 'legacy' || format === 'default') {
     expect(Object.hasOwn(data, 'policyFromSequence')).toBe(false);
     expect(f.tx.generalTurn.createMany).not.toHaveBeenCalled();
   } else {
     expect(data.policyFromSequence).toBe(0);
     expect(f.tx.generalTurn.createMany.mock.calls[0]![0].data).toHaveLength(initial.generals.length * 30);
   }
+  if (format === 'default') expect(data).toMatchObject({ replayFormat: 3, ruleFeatures: [] });
   expect(f.forbidden).not.toHaveBeenCalled();
   expect(f.transaction).toHaveBeenCalledExactlyOnceWith(expect.any(Function), { timeout: 30000 });
+});
+
+describe('기능 표시 형식의 초기 저장', () => {
+  it.each([undefined, 1, 3] as const)('형식 %s는 기능 없는 초기·리소스 해시를 보존한다', async (replayFormat) => {
+    const initial = await monthlyFixture();
+    const f = database();
+    await saveInitialWorld(f.db, initial, {
+      ...options(),
+      ...(replayFormat === undefined ? {} : { replayFormat }),
+    });
+    const data = f.tx.world.create.mock.calls[0]![0].data;
+    const expected = initialOrigin(initial);
+    expect(data).toMatchObject({ replayFormat: replayFormat ?? 3, ruleFeatures: [] });
+    expect(data.replayOrigin).toEqual({ ...expected, version: replayFormat ?? 3 });
+    expect(Object.hasOwn(data, 'policyFromSequence')).toBe(false);
+    expect(f.tx.generalTurn.createMany).not.toHaveBeenCalled();
+    expect(f.forbidden).not.toHaveBeenCalled();
+  });
+
+  it.each([null, 'policy', {}, ['unknown'], ['policy', 'policy']])(
+    '잘못된 기능 목록 %j는 저장 전에 거부한다',
+    async (ruleFeatures) => {
+      const f = database();
+      await expect(
+        saveInitialWorld(f.db, await monthlyFixture(), { ...options(), ruleFeatures: ruleFeatures as string[] }),
+      ).rejects.toThrow();
+      expect(f.transaction).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    { state: ['policy'], option: [] },
+    { state: ['policy'], option: ['personnel'] },
+    { state: ['policy', 'personnel'], option: ['personnel', 'policy'] },
+  ])('상태와 옵션의 기능 목록이 다르면 저장하지 않는다 (%j)', async (value) => {
+    const initial = await monthlyFixture();
+    Object.assign(initial, { ruleFeatures: value.state });
+    const f = database();
+    await expect(saveInitialWorld(f.db, initial, { ...options(), ruleFeatures: value.option })).rejects.toThrow(
+      '기능 목록이 다릅니다',
+    );
+    expect(f.transaction).not.toHaveBeenCalled();
+  });
+
+  it.each(['legacy', 'policy'] as const)('기존 %s 옵션에 기능 목록을 섞지 않는다', async (replayFormat) => {
+    const f = database();
+    await expect(
+      saveInitialWorld(f.db, await monthlyFixture(), { ...options(), replayFormat, ruleFeatures: [] }),
+    ).rejects.toThrow('기존 생성 옵션');
+    expect(f.transaction).not.toHaveBeenCalled();
+  });
+
+  it.each([{ treatyFormat: 1 as const }, { extFormat: 1 as const }])(
+    '형식 3에 기존 생성 옵션 %j를 섞지 않는다',
+    async (oldFormat) => {
+      const f = database();
+      await expect(
+        saveInitialWorld(f.db, await monthlyFixture(), { ...options(), replayFormat: 3, ...oldFormat }),
+      ).rejects.toThrow('기존 생성 옵션');
+      expect(f.transaction).not.toHaveBeenCalled();
+    },
+  );
+
+  it('정책 기능은 생성 간격을 자료에 고정하고 기존 전환 표지는 쓰지 않는다', async () => {
+    const initial = await monthlyFixture();
+    initial.generals[0]!.userId = 'initial-person';
+    const f = database();
+    await saveInitialWorld(f.db, initial, { ...options(), ruleFeatures: ['policy'] });
+    const data = f.tx.world.create.mock.calls[0]![0].data;
+    expect(data.replayOrigin).toMatchObject({
+      version: 3,
+      initial: { ruleFeatures: ['policy'] },
+      featureData: { policy: { version: 1, turnTermMinutes: 30 } },
+    });
+    expect(Object.hasOwn(data, 'policyFromSequence')).toBe(false);
+    expect(f.tx.generalTurn.createMany.mock.calls[0]![0].data).toHaveLength(initial.generals.length * 30);
+    const rows = f.tx.general.createMany.mock.calls[0]![0].data as Record<string, unknown>[];
+    expect(rows.find((row) => row.userId === 'initial-person')).toMatchObject({
+      defaultPolicy: 'none',
+      lastActiveTick: 0,
+    });
+    expect(rows.filter((row) => row.userId === null).every((row) => row.lastActiveTick === null)).toBe(true);
+  });
+
+  it.each([
+    { version: 1, turnTermMinutes: 31 },
+    { version: 2, turnTermMinutes: 30 },
+    null,
+    { version: 1, turnTermMinutes: 30, extra: true },
+  ])('정책 자료 %j를 임의로 고쳐서 저장하지 않는다', async (policy) => {
+    const f = database();
+    await expect(
+      saveInitialWorld(f.db, await monthlyFixture(), {
+        ...options(),
+        ruleFeatures: ['policy'],
+        featureData: { policy },
+      }),
+    ).rejects.toThrow();
+    expect(f.transaction).not.toHaveBeenCalled();
+  });
+
+  it('형식 1에는 기능 자료를 넣지 않는다', async () => {
+    const f = database();
+    await expect(
+      saveInitialWorld(f.db, await monthlyFixture(), { ...options(), replayFormat: 1, featureData: { policy: {} } }),
+    ).rejects.toThrow();
+    expect(f.transaction).not.toHaveBeenCalled();
+  });
+
+  it('새 기본 형식도 TX 대기 중 바뀐 입력을 초기 행에 섞지 않는다', async () => {
+    const initial = await monthlyFixture();
+    const original = structuredClone(initial);
+    const f = database();
+    f.transaction.mockImplementationOnce(async (run) => {
+      initial.cities[0]!.population++;
+      return run(f.tx as unknown as Prisma.TransactionClient);
+    });
+    await saveInitialWorld(f.db, initial, options());
+    expect(f.tx.world.create.mock.calls[0]![0].data.replayOrigin).toMatchObject({ initial: original });
+    expect(f.tx.city.createMany.mock.calls[0]![0].data).toEqual(
+      original.cities.map((city) => ({ ...city, worldId: f.worldId })),
+    );
+  });
+
+  it('초기 상태를 읽을 때 기능 목록은 운반하고 활동·거주 열은 공개하지 않는다', async () => {
+    const initial = await monthlyFixture();
+    const worldId = 'private-initial';
+    const world = {
+      ...initial,
+      id: worldId,
+      preset: null,
+      replayFormat: 3,
+      ruleFeatures: ['policy'],
+      commandMeta: null,
+    };
+    const generalRows = initial.generals.map((general) => ({
+      ...general,
+      worldId,
+      turnRevision: 0,
+      battleWins: 0,
+      captures: 0,
+      noticeSeen: {},
+      defaultPolicy: 'none',
+      lastActiveTick: null,
+      lastActiveAt: null,
+      residenceTick: null,
+    }));
+    const findGenerals = vi.fn(async ({ omit }: { omit: Record<string, boolean> }) =>
+      generalRows.map((row) => Object.fromEntries(Object.entries(row).filter(([key]) => !omit[key]))),
+    );
+    const tx = {
+      world: { findUniqueOrThrow: vi.fn().mockResolvedValue(world) },
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      city: { findMany: vi.fn().mockResolvedValue(initial.cities.map((city) => ({ ...city, worldId }))) },
+      nation: { findMany: vi.fn().mockResolvedValue(initial.nations.map((nation) => ({ ...nation, worldId }))) },
+      general: { findMany: findGenerals },
+      diplomacy: { findMany: vi.fn().mockResolvedValue(initial.diplomacies.map((row) => ({ ...row, worldId }))) },
+      nationTurn: { findMany: vi.fn().mockResolvedValue([]) },
+    };
+    const db = {
+      $transaction: vi.fn(async (run: (client: Prisma.TransactionClient) => Promise<unknown>) =>
+        run(tx as unknown as Prisma.TransactionClient),
+      ),
+    };
+    const state = await readWorldState(db as unknown as PrismaClient, worldId);
+    expect(state).toEqual({ ...initial, ruleFeatures: ['policy'] });
+    expect(findGenerals.mock.calls[0]![0].omit).toMatchObject({
+      defaultPolicy: true,
+      lastActiveTick: true,
+      lastActiveAt: true,
+      residenceTick: true,
+    });
+  });
 });
 
 it.each(formats)('명시 treatyFormat1은 %s 선택과 독립인 실제 origin6를 한 TX에 쓴다 (단위)', async (format) => {
