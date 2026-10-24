@@ -22,6 +22,8 @@ test.describe.configure({ mode: 'serial' });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const NAP12: Clause[] = [{ kind: 'nonAggression', months: 12 }];
 const READ_ONLY = '이 직책은 외교 문서를 읽기만 합니다.';
+// 받은 제안 카드(TreatyCard)의 읽기 전용 안내. 조약서 쓰기 탭의 READ_ONLY와 문장이 다르다.
+const CARD_READ_ONLY = '외교 문서는 군주와 참모가 답합니다. 이 직책은 읽기만 합니다.';
 const UNSUPPORTED = '아직 지원하지 않는 조항입니다.';
 const RECENT = 'section[aria-label="최근 처리된 내 요청"]';
 const won = (value: number) => value.toLocaleString('ko-KR');
@@ -406,7 +408,7 @@ test.describe('첫 세 조항 외교실', () => {
     await chief.page.goto(`/w/${chief.worldId}/diplomacy?tab=incoming`);
     const incoming = card(chief.page, p3.treatyId);
     await expect(incoming.getByTestId('treaty-estimate')).toContainText(`우리 금 ${won(item!.estimate!.mine)}`);
-    await expect(incoming).toContainText(`외교 문서는 군주와 참모가 답합니다. ${READ_ONLY}`);
+    await expect(incoming.getByText(CARD_READ_ONLY, { exact: true })).toBeVisible();
     await expect(incoming.getByRole('button')).toHaveCount(0);
 
     await chief.page.goto(`/w/${chief.worldId}/diplomacy?tab=write`);
