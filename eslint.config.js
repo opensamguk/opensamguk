@@ -52,9 +52,15 @@ const E3_PATTERNS = [
     allowTypeImports: true,
     message: BOUNDARY_MESSAGE,
   },
-  { regex: '^@opensamguk/rules(?:$|/(?!resource-validation$))', message: BOUNDARY_MESSAGE },
+  { regex: '^@opensamguk/rules(?:$|/(?!(?:resource-validation|resources)$))', message: BOUNDARY_MESSAGE },
   { regex: '^@opensamguk/shared/node(?:$|/)', message: BOUNDARY_MESSAGE },
 ];
+
+const RESOURCE_EDITOR_PATTERNS = E3_PATTERNS.map((pattern) =>
+  pattern.regex?.startsWith('^@opensamguk/rules')
+    ? { ...pattern, regex: '^@opensamguk/rules(?:$|/(?!resources$))' }
+    : pattern,
+);
 
 const NO_MATH_RANDOM = {
   object: 'Math',
@@ -200,6 +206,55 @@ export default defineConfig([
     files: ['apps/web/src/mapEditor/**/*.test.{ts,tsx}'],
     rules: {
       'no-restricted-imports': ['error', { patterns: E3_PATTERNS }],
+    },
+  },
+  {
+    files: ['apps/web/src/admin/maps/**', 'apps/web/src/admin/resources/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { patterns: [...RESOURCE_EDITOR_PATTERNS, { group: NODE_BUILTINS, message: BOUNDARY_MESSAGE }] },
+      ],
+    },
+  },
+  {
+    files: [
+      'apps/web/src/admin/maps/contract.test.ts',
+      'apps/web/src/admin/maps/validate.test.ts',
+      'apps/web/src/admin/maps/sketch.test.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            ...RESOURCE_EDITOR_PATTERNS,
+            { group: NODE_BUILTINS.filter((pattern) => pattern !== '/node:*'), message: BOUNDARY_MESSAGE },
+            { regex: '^node:(?!(?:fs|zlib)$)', message: BOUNDARY_MESSAGE },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: [
+      'packages/rules/src/world/resourceEditor/map/**/*.ts',
+      'packages/rules/src/world/resourceEditor/validate/**/*.ts',
+    ],
+    ignores: ['**/*.test.ts', '**/fixtures.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex:
+                '^(?!zod$|\\.\\./resources$|\\./(?:format|geometry|issues|map|scenario|unitSet|statRules|portraitMap)$|\\.\\./map/(?:format|geometry)$)',
+              message: '자원 공개 모듈은 zod·자원 형식·검증 내부 모듈만 읽습니다 (E3).',
+            },
+          ],
+        },
+      ],
     },
   },
 ]);

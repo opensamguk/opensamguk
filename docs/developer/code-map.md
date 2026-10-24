@@ -76,6 +76,7 @@
 | `resources/` | 지정된 core2026 리소스·초상 대응표와 `NOTICE.md` 출처 고지 |
 | `tools/portrait-map/` | 초상 이름 대응 생성기, 원본 스냅샷, 후속 수정용 `manual.json` |
 | `packages/rules/src/world/` | 리소스 schema와 순수 초기 상태 변환. `map/`은 지도 v2 형식·변환, `validate/`는 자원 5종 순수 검증과 한도 |
+| `packages/rules/src/world/resourceEditor/`, `tools/resource-editor-validate.test.ts`, `tools/resource-editor-boundaries.test.ts` | PR233 편집기용 지도 형식·기하·검증과 원본 시험. 공개 경로는 `@opensamguk/rules/resources`이며 기존 `resource-validation`의 보고 계약과 구분한다 |
 | `packages/shared/src/rng.ts` | FNV-1a + Mulberry32 시드 RNG와 용도별 스트림 |
 | `packages/shared/src/node/hashState.ts` | Node 전용 상태 SHA-256 |
 | `apps/engine/src/world/` | 리소스 파일 읽기, 초기 상태 저장·재적재와 통합 테스트 |
