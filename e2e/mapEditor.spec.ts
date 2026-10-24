@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { expect, test, type Download, type Page } from '@playwright/test';
 
 // T4-80 · AC-P2-27 일부: 지도 편집 캔버스 한 흐름. 서버를 부르지 않는다 (개발 화면 /dev/map-editor).
 // che 불러오기 → 도시 추가·끌어서 이동·삭제 → 연결 → 강 그리기 → 검증 오류 → 고치기 → v2 내려받기 → 다시 불러와 같음.
 // T4-77이 resources/map/che.json을 지우면 이 입력을 DB에서 내보낸 che로 바꾼다 (docs/plans/T4-80.md).
-const CHE_PATH = new URL('../resources/map/che.json', import.meta.url).pathname;
+const CHE_PATH = fileURLToPath(new URL('../resources/map/che.json', import.meta.url));
 type Che = { cities: Array<{ id: number; name: string; position: { x: number; y: number }; connections: number[] }> };
 const che = JSON.parse(readFileSync(CHE_PATH, 'utf8')) as Che;
 type Exported = Che & { version: number; terrain: { rivers: Array<{ points: number[][] }> } };

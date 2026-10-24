@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { retryUnlessClientError } from '../game/errors';
-import { api, messageKeys, noticeKeys, type MessageScope } from './contract';
+import { api, messageKeys, noticeKeys, type MessageScope } from './api';
 
 // 같은 키를 쓰므로 위쪽 띠 배지·패널 탭·전체 화면이 요청 하나를 나눠 쓴다.
 export function useUnread(worldId: string, enabled = true) {
