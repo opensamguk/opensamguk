@@ -10,6 +10,7 @@ import {
   RESOURCE_INPUTS,
   type ResourceTexts,
 } from './convert';
+import { INITIAL_NOTICE_FIXTURE, verifyInitialNotice } from './notice';
 
 const root = new URL('../../', import.meta.url);
 const input = Object.fromEntries(
@@ -17,7 +18,7 @@ const input = Object.fromEntries(
     RESOURCE_INPUTS.map(async (resource) => [resource.slot, await readFile(new URL(resource.path, root), 'utf8')]),
   ),
 ) as ResourceTexts;
-const notice = await readFile(new URL('resources/NOTICE.md', root), 'utf8');
+const notice = verifyInitialNotice(await readFile(new URL(INITIAL_NOTICE_FIXTURE, root), 'utf8'));
 const baseline = JSON.parse(await readFile(new URL('tools/fixtures/t4-77-baseline.json', root), 'utf8')) as {
   resources: Record<string, { contentHash: string; lfBytes: number }>;
 };
