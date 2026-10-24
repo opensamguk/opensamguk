@@ -82,6 +82,7 @@ enum AssignmentOfferCancelReason {
   CITY_LOST
   TARGET_LEFT
   ISSUER_LOST_OFFICE
+  NATION_DESTROYED
 }
 
 model AssignmentOffer {
@@ -293,6 +294,7 @@ model General {
   defaultPolicy  String?
   lastActiveTick Int?
   lastActiveAt   DateTime?
+  residenceTick  Int?
   noticeSeen     Json?
   messageReads   MessageRead[]
   turns          GeneralTurn[]

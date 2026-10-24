@@ -114,7 +114,12 @@ async function ownDatabase(mode: 'empty' | 'upgrade' | 'constraints', run: (clie
 
 async function previous(client: PgClient) {
   const names = (await readdir(directory)).filter((name) => /^\d{14}_/.test(name)).sort();
-  expect(names.slice(0, 24)).toEqual([...previous23, marker]);
+  expect(names).toEqual([
+    ...previous23,
+    marker,
+    '20261028000000_assignment_nation_destroyed',
+    '20261029000000_general_residence_tick',
+  ]);
   for (const name of previous23)
     await client.query(await readFile(new URL(`${name}/migration.sql`, directory), 'utf8'));
 }

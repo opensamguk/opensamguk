@@ -1,0 +1,1 @@
+ALTER TYPE "AssignmentOfferCancelReason" ADD VALUE 'NATION_DESTROYED';
