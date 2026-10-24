@@ -147,7 +147,8 @@ async function fixture(caps = true, modern = false) {
     }),
   };
   vi.mocked(loadWorld).mockImplementation(async () => structuredClone(state));
-  vi.mocked(persistEffects).mockImplementation(async (_tx, _worldId, next) => {
+  vi.mocked(persistEffects).mockImplementation(async (_tx, _worldId, next, _effects, _at, before) => {
+    expect(before).toEqual(state);
     state = structuredClone(next);
   });
   vi.mocked(shiftTurns).mockResolvedValue(undefined);

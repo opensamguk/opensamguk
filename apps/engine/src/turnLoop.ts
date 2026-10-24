@@ -276,10 +276,14 @@ export class TurnLoop {
               : null;
           if (personnelPacket) next = personnelPacket.state;
           signals.push(...commandRealtimeSignals(state, next));
-          await persistEffects(tx, worldId, next, [{ kind: 'world', state: next }], {
-            sequence,
-            tick: due.nextTurnTick,
-          });
+          await persistEffects(
+            tx,
+            worldId,
+            next,
+            [{ kind: 'world', state: next }],
+            { sequence, tick: due.nextTurnTick },
+            state,
+          );
           await persistExt(tx, worldId, state.ext, next.ext);
           if (personnelBefore && personnelPacket && anchors)
             await persistPersonnelPacket(tx, worldId, personnelBefore, personnelPacket, anchors, due.nextTurnTick);

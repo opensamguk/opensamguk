@@ -9,10 +9,11 @@ export async function persistEffects(
   state: WorldState,
   effects: readonly Effect[],
   at: ActionAt,
+  previous?: WorldState,
 ) {
   // 규칙에서 보정한 최종값만 저장한다. 같은 필드의 효과가 여럿이어도 한 번 쓴다.
   if (effects.some((effect) => effect.kind === 'world')) {
-    await persistCommandState(tx, worldId, state, at);
+    await persistCommandState(tx, worldId, state, at, previous);
     return;
   }
   const changes = new Map<string, Exclude<Effect, { kind: 'world' }>>();
