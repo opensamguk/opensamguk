@@ -7,14 +7,7 @@ import { DisabledReason } from '../ui/DisabledReason';
 import { NationBadge } from '../ui/NationBadge';
 import { EmptyState, ErrorState, LoadingState } from '../ui/States';
 import { Tag } from '../ui/Tag';
-import {
-  api,
-  messageKeys,
-  type MessageItem,
-  type MessageListResponse,
-  type MessageScope,
-  type Party,
-} from './contract';
+import { api, messageKeys, type MessageItem, type MessageListResponse, type MessageScope, type Party } from './api';
 import { useDraft } from './drafts';
 import { listItems, markItemsRead, prependSent, unreadReceivedIds, visibleScopes } from './merge';
 import { useMessageList, useRecipients, useUnread, useWorldNotices } from './queries';
