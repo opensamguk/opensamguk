@@ -39,7 +39,8 @@ async function personnelWorld(): Promise<string> {
   const { worldId } = await withE2eDb((db) =>
     saveInitialWorld(db, initial, {
       name: 'E2E 인사 대기 월드',
-      turnTermMinutes: 1,
+      // 인사 접수 시험에 실시간 월간 캐치업이 끼지 않게 한다. 실행권만 쥐어도 시계는 흐른다.
+      turnTermMinutes: 60,
       endYear: 300,
       replayFormat: 3,
       ruleFeatures: ['personnel', 'policy'],
