@@ -4,7 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { TRPCClientError } from '@trpc/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { MapCity } from '../game/types';
-import { savedNationSource, type SavedFrame } from './displaySource';
+import { savedNationSource, savedNationSource as storedNationSource, type SavedFrame } from './displaySource';
 import {
   frameView,
   joinPages,
@@ -14,7 +14,6 @@ import {
   type TimelapseFrame,
   type TimelapsePage,
 } from './frames';
-import { storedNationSource } from './displaySource';
 import { useTimelapsePages, type FetchTimelapsePage, type TimelapseInput } from './pages';
 import { initialPlayback, isWaiting, playback } from './playback';
 import { TimelapseScreen, type TimelapseMap } from './TimelapsePanel';
@@ -36,7 +35,7 @@ const city = (key: number, links: number[] = []): MapCity => ({
   links,
 });
 
-const frame = (i: number, owners: Array<number | null>): TimelapseFrame => ({
+const frame = (i: number, owners: Array<number | null>): TimelapseFrame & SavedFrame => ({
   tick: (i + 1) * 10_000,
   year: 190 + Math.floor(i / 12),
   month: (i % 12) + 1,
