@@ -1,19 +1,24 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
+import { setTimeout as delay } from 'node:timers/promises';
+import { controlClock } from '../apps/engine/src/world/clock';
+import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { createAccount, withE2eDb } from './account';
 import {
   ApiError,
   createGeneralByApi,
-  idleWorld,
+  holdLease,
   mutate,
   query,
-  releaseIdleWorld,
-  startEngine,
+  releaseHold,
   stubPortraits,
   type OwnGeneral,
+  type LeaseHold,
 } from './game';
 
 // T2-06 · AC-M2-05, AC-M2-16 화면: 인사부, 국가 예턴 12칸, 메인 발령 제안 상자.
-// 엔진은 시험이 쥔 대기 월드(idleWorld)에서 startEngine으로만 돈다. 그래서 수락을 누른 뒤 엔진을 멈춘 채 처리 중을 볼 수 있다.
+// 인사·방침을 원생성한 월드의 실행권을 시험이 쥔다. 수락 뒤에도 엔진을 멈춘 채 처리 중을 볼 수 있다.
 // T2-05 API(personnel.*, offers.*, nationTurns.*)가 없는 서버에서는 시험 전체를 건너뛴다. 그동안의 결과는 증거가 아니다.
 
 test.describe.configure({ mode: 'serial', timeout: 240_000 });
@@ -27,6 +32,23 @@ let world: string;
 let ruler: Seat;
 let member: Seat;
 let nationId: number;
+let hold: LeaseHold | undefined;
+
+async function personnelWorld(): Promise<string> {
+  const initial = await loadInitialWorld({ scenario: '1030', map: 'che', seed: `e2e-personnel-${Date.now()}` });
+  const { worldId } = await withE2eDb((db) =>
+    saveInitialWorld(db, initial, {
+      name: 'E2E 인사 대기 월드',
+      turnTermMinutes: 1,
+      endYear: 300,
+      replayFormat: 3,
+      ruleFeatures: ['personnel', 'policy'],
+    }),
+  );
+  hold = await holdLease(worldId);
+  await withE2eDb((db) => controlClock(db, worldId, 'start'));
+  return worldId;
+}
 
 async function hasPersonnelApi(page: Page, worldId: string): Promise<boolean> {
   try {
@@ -48,11 +70,27 @@ async function seat(browser: Browser): Promise<Page> {
 
 // 엔진이 접수를 처리할 동안만 돌린다.
 async function withEngine<T>(work: () => Promise<T>): Promise<T> {
-  const stop = await startEngine(world);
+  if (!hold) throw new Error('인사 시험 월드의 실행권이 없습니다.');
+  const lease = hold;
+  const loop = new TurnLoop(lease.db, lease.lease);
+  const controller = new AbortController();
+  const running = (async () => {
+    try {
+      while (!controller.signal.aborted) {
+        if (lease.lost) throw lease.lost;
+        await loop.poll(controller.signal);
+        await delay(100, undefined, { signal: controller.signal });
+      }
+    } catch (error) {
+      if (!controller.signal.aborted) throw error;
+    }
+  })();
+  void running.catch(() => undefined);
   try {
     return await work();
   } finally {
-    await stop();
+    controller.abort();
+    await running;
   }
 }
 
@@ -108,19 +146,24 @@ const notice = (page: Page) => page.getByTestId('personnel-notice');
 
 test.beforeAll(async ({ browser }) => {
   const first = await seat(browser);
-  world = await idleWorld(first);
-  test.skip(!(await hasPersonnelApi(first, world)), 'T2-05 인사 API가 아직 서버에 없다');
+  world = await personnelWorld();
   const second = await seat(browser);
   await withEngine(async () => {
     ruler = { page: first, general: await createGeneralByApi(first, world) };
     member = { page: second, general: await createGeneralByApi(second, world) };
   });
+  test.skip(!(await hasPersonnelApi(first, world)), 'T2-05 인사 API가 아직 서버에 없다');
   await placeInNation();
 });
-test.afterAll(releaseIdleWorld);
+test.afterAll(async () => {
+  if (hold) await releaseHold(hold);
+  hold = undefined;
+});
 
 test('권한: 일반 장수는 인사 칸이 잠기고 서버가 준 이유를 본다', async () => {
   const { page } = member;
+  const board = await query<{ appoint: { ok: false; reason: string } }>(page, 'personnel.officers', { worldId: world });
+  expect(board.appoint).toEqual({ ok: false, reason: '군주만 임명·해임할 수 있습니다.' });
   await page.goto(`/w/${world}/nation/personnel`);
   await expect(page.getByRole('heading', { level: 1, name: '인사부' })).toBeVisible();
   await expect(page.getByRole('combobox')).toHaveCount(0);
@@ -128,7 +171,18 @@ test('권한: 일반 장수는 인사 칸이 잠기고 서버가 준 이유를 �
     .getByRole('button', { name: /임명|해임/ })
     .first()
     .click();
-  await expect(page.getByRole('note').first()).toHaveText(/.+/);
+  await expect(page.getByRole('note').first()).toHaveText(board.appoint.reason);
+  const before = await withE2eDb((db) => db.inputEvent.count({ where: { worldId: world } }));
+  for (const path of ['personnel.appoint', 'personnel.dismiss'])
+    await expect(
+      mutate(page, path, {
+        worldId: world,
+        requestId: crypto.randomUUID(),
+        generalId: member.general.id,
+        ...(path === 'personnel.appoint' ? { officerLevel: 5 } : {}),
+      }),
+    ).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' });
+  expect(await withE2eDb((db) => db.inputEvent.count({ where: { worldId: world } }))).toBe(before);
   await page.goto(`/w/${world}/nation/turns`);
   await expect(page.getByText('국가 예턴 권한이 없습니다')).toBeVisible();
 });
