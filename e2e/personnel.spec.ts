@@ -241,31 +241,106 @@ test('국가 칸 저장: 고친 뒤 해임·재임명되면 저장이 거부되�
   await expect(page.getByTestId('draft-state')).toHaveText('저장하지 않은 편집 1건');
 
   const tab = (
-    await query<{ tabs: Array<{ officerLevel: number; holder: { generalId: number } | null }> }>(
-      ruler.page,
-      'nationTurns.get',
-      { worldId: world },
-    )
+    await query<{
+      tabs: Array<{
+        officerLevel: number;
+        holder: { generalId: number } | null;
+        office: { nationId: number; officerLevel: number; tenure: number };
+        revision: number;
+      }>;
+    }>(ruler.page, 'nationTurns.get', { worldId: world })
   ).tabs.find((t) => t.holder?.generalId === member.general.id)!;
-  await withEngine(async () => {
-    await mutate(ruler.page, 'personnel.dismiss', {
-      worldId: world,
-      requestId: crypto.randomUUID(),
-      generalId: member.general.id,
-    });
-    await mutate(ruler.page, 'personnel.appoint', {
-      worldId: world,
-      requestId: crypto.randomUUID(),
-      generalId: member.general.id,
-      officerLevel: tab.officerLevel,
-    });
-  });
+  type SaveInput = { worldId: string; office: typeof tab.office; revision: number; slots: unknown[] };
+  let held: { request: import('@playwright/test').Request; input: SaveInput; index: number } | undefined;
+  let releaseSave!: () => void;
+  const gate = new Promise<void>((resolve) => (releaseSave = resolve));
+  const deliveries: Promise<void>[] = [];
+  const saveUrl = (url: URL) =>
+    url.pathname
+      .replace(/^\/trpc\//, '')
+      .split(',')
+      .includes('nationTurns.set');
+  // 옛 직책으로 누른 실제 POST만 늦춘다. 조회와 서버 응답은 바꾸지 않는다.
+  const holdSave = (route: import('@playwright/test').Route) => {
+    const delivery = (async () => {
+      const request = route.request();
+      if (request.method() !== 'POST') return route.continue();
+      const url = new URL(request.url());
+      const index = url.pathname
+        .replace(/^\/trpc\//, '')
+        .split(',')
+        .indexOf('nationTurns.set');
+      const body = request.postDataJSON() as SaveInput & Record<string, SaveInput>;
+      const input = url.searchParams.get('batch') === '1' ? body[String(index)] : body;
+      if (input?.worldId === world && !held) {
+        held = { request, input, index };
+        await gate;
+      }
+      await route.continue();
+    })();
+    deliveries.push(delivery);
+    void delivery.catch(() => undefined);
+    return delivery;
+  };
+  let responseWait: Promise<import('@playwright/test').Response> | undefined;
+  let cleanupFailure: PromiseRejectedResult | undefined;
+  await page.route(saveUrl, holdSave);
+  try {
+    await editor.getByRole('button', { name: '저장', exact: true }).click();
+    await expect.poll(() => held !== undefined, { timeout: 30_000 }).toBe(true);
+    expect(held!.input.office).toEqual(tab.office);
+    expect(held!.input.revision).toBe(tab.revision);
+    expect(held!.input.slots).toHaveLength(12);
 
-  await editor.getByRole('button', { name: '저장', exact: true }).click();
-  await expect(page.getByTestId('office-changed')).toBeVisible();
-  await expect(page.getByTestId('draft-state')).toHaveText('저장된 목록');
-  await page.reload();
-  await expect(page.getByTestId('draft-state')).toHaveText('저장된 목록');
+    await withEngine(async () => {
+      for (const kind of ['personnel.dismiss', 'personnel.appoint'] as const) {
+        const requestId = crypto.randomUUID();
+        await mutate(ruler.page, kind, {
+          worldId: world,
+          requestId,
+          generalId: member.general.id,
+          ...(kind === 'personnel.appoint' ? { officerLevel: tab.officerLevel } : {}),
+        });
+        await expect
+          .poll(() => query(ruler.page, 'personnel.request', { worldId: world, requestId }), { timeout: 30_000 })
+          .toMatchObject({ kind, state: { requestId, status: 'applied' } });
+      }
+    });
+
+    responseWait = page.waitForResponse((response) => response.request() === held!.request, { timeout: 30_000 });
+    void responseWait.catch(() => undefined);
+    releaseSave();
+    const response = await responseWait;
+    expect(response.ok()).toBe(false);
+    type Reply = { error?: { data?: { code?: string } } };
+    const reply = (await response.json()) as Reply | Reply[];
+    expect((Array.isArray(reply) ? reply[held!.index] : reply)?.error?.data?.code).toBe('PRECONDITION_FAILED');
+    await expect(page.getByTestId('office-changed')).toBeVisible();
+    await expect(page.getByTestId('draft-state')).toHaveText('저장된 목록');
+    await page.reload();
+    await expect(page.getByTestId('draft-state')).toHaveText('저장된 목록');
+    await expect(editor.locator('tr[data-slot]')).toHaveCount(12);
+    const fresh = await query<{
+      tabs: Array<{
+        holder: { generalId: number } | null;
+        office: typeof tab.office;
+        slots: Array<{ commandKey: string }>;
+      }>;
+    }>(page, 'nationTurns.get', { worldId: world });
+    const current = fresh.tabs.find((candidate) => candidate.holder?.generalId === member.general.id);
+    expect(current).toBeDefined();
+    expect(current!.office.tenure).toBeGreaterThan(tab.office.tenure);
+    expect(current!.slots).toHaveLength(12);
+    expect(current!.slots.every((slot) => slot.commandKey === 'nation_rest')).toBe(true);
+  } finally {
+    releaseSave();
+    const cleanup: PromiseSettledResult<unknown>[] = await Promise.allSettled([
+      Promise.resolve().then(() => page.unroute(saveUrl, holdSave)),
+    ]);
+    cleanup.push(...(await Promise.allSettled([...deliveries, ...(responseWait ? [responseWait] : [])])));
+    cleanupFailure = cleanup.find((result) => result.status === 'rejected');
+  }
+  if (cleanupFailure) throw cleanupFailure.reason;
 });
 
 test('대기와 화면 상태 보존: 엔진을 멈춘 채 수락하면 처리 중이고 연타해도 요청은 하나다', async () => {
