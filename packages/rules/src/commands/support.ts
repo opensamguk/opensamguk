@@ -4,6 +4,8 @@ import { BALANCE } from '../balance';
 import type { WorldState, WorldView } from '../model/world';
 import { cloneWorld } from '../model/clone';
 import type { Actor, CommandDef, CommandResult, Failure } from './types';
+import { canExecuteNationCommand } from '../personnel/permissions';
+import { PersonnelInvariantError } from '../personnel/types';
 
 export const noArgs = z.strictObject({});
 export const positive = z.number().int().positive().max(1_000_000);
@@ -24,6 +26,16 @@ export function ruler(view: WorldView, actor: Actor): Failure | null {
     return fail('NOT_NATION', '국가에 소속되어야 합니다.');
   return general.officerLevel === BALANCE.RULER_LEVEL ? null : fail('NOT_RULER', '군주만 실행할 수 있습니다.');
 }
+function nationGate(view: WorldView, actor: Actor, key: string): Failure | null {
+  if (actor.authority !== 'office') return ruler(view, actor);
+  const general = view.generals[actor.generalId];
+  if (!general) return fail('NO_ACTOR', '장수가 없습니다.');
+  if (general.nationId === null || !view.nations[general.nationId])
+    return fail('NOT_NATION', '국가에 소속되어야 합니다.');
+  if (!canExecuteNationCommand(general.officerLevel, key))
+    throw new PersonnelInvariantError('직책 칸 명령과 인자가 올바르지 않습니다.');
+  return null;
+}
 export function defineCommand<A>(spec: {
   key: string;
   name: string;
@@ -37,7 +49,9 @@ export function defineCommand<A>(spec: {
     if (!view.generals[actor.generalId]) return fail('NO_ACTOR', '장수가 없습니다.');
     const parsed = spec.args.safeParse(raw);
     if (!parsed.success) return fail('BAD_ARGS', '명령 인자가 잘못되었습니다.');
-    return (spec.target === 'nation' ? ruler(view, actor) : null) ?? spec.check(view, actor, parsed.data);
+    return (
+      (spec.target === 'nation' ? nationGate(view, actor, spec.key) : null) ?? spec.check(view, actor, parsed.data)
+    );
   };
   const definition = {
     key: spec.key,
