@@ -1,17 +1,29 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import type { OperationDetail } from '../apps/web/src/operations/contract';
 import { createAccount, withE2eDb } from './account';
-import { createGeneralByApi, e2eWorld, mutate, query, setTurns, stubPortraits, turns } from './game';
+import {
+  createGeneralByApi,
+  idleWorld,
+  mutate,
+  query,
+  releaseIdleWorld,
+  setTurns,
+  startEngine,
+  stubPortraits,
+  turns,
+} from './game';
 
 // T2-12 · AC-M2-15 화면: 국가 작전판과 감찰.
 // 계약은 AppRouter의 operation·inspection 라우터(T2-11, Codex)다. 이 시험은 부모가 배정한 통합 슬롯에서만 돌리고 그 전에는 증거로 세지 않는다.
 // 화면: docs/plans/T2-12.md "실제 API 대조와 착수 정정" 절.
 
 test.describe.configure({ timeout: 180_000 });
+test.afterEach(releaseIdleWorld);
 
 interface Member {
   page: Page;
   generalId: number;
+  name: string;
 }
 
 // 새 계정·장수를 만들고 DB에서 nationId 국가의 장수로 둔다. 수뇌 5~10, 일반 1 (T2-05 표).
@@ -19,7 +31,14 @@ async function member(browser: Browser, world: string, nationId: number, officer
   const page = await (await browser.newContext()).newPage();
   await stubPortraits(page);
   await createAccount(page);
-  const general = await createGeneralByApi(page, world);
+  const stop = await startEngine(world);
+  const general = await (async () => {
+    try {
+      return await createGeneralByApi(page, world);
+    } finally {
+      await stop();
+    }
+  })();
   await withE2eDb(async (db) => {
     const city = await db.city.findFirstOrThrow({ where: { worldId: world, nationId }, select: { cityKey: true } });
     await db.general.update({
@@ -27,14 +46,14 @@ async function member(browser: Browser, world: string, nationId: number, officer
       data: { nationId, officerLevel, cityKey: city.cityKey, crew: 0 },
     });
   });
-  return { page, generalId: general.id };
+  return { page, generalId: general.id, name: general.name };
 }
 
 // 새 장수는 병력·훈련·사기가 0이다. 기준 1000/60/60 제안은 모병 1·훈련 6·사기 6·출병 1의 14칸이 목표 전에 있어야 한다.
 // 첫 칸이 다음 달 첫 tick이어도 준비가 index 2부터 들어가 STALE 시험의 index 1 farm과 겹치지 않도록 목표를 지금+17개월로 둔다.
 async function setup(page: Page) {
   await createAccount(page);
-  const world = await e2eWorld(page);
+  const world = await idleWorld(page);
   const map = await query<{
     cities: Array<{ key: number; nationId: number | null }>;
     nations: Array<{ id: number }>;
@@ -63,19 +82,27 @@ test.describe('국가 작전판', () => {
     const chief = await member(browser, s.world, s.ours, 5);
     const soldier = await member(browser, s.world, s.ours, 1);
 
+    // 기능을 끈 월드의 새 장수는 명시 휴식 30칸으로 시작한다. 이 시험의 빈 칸과 휴식은 직접 저장한다.
+    await setTurns(
+      chief.page,
+      s.world,
+      Array.from({ length: 30 }, (_, i) => (i === 16 ? { commandKey: 'rest' } : null)),
+    );
+
     await chief.page.goto(`/w/${s.world}/operations`);
     const form = chief.page.getByRole('form', { name: '작전 만들기' });
     await form.getByLabel('목표 도시').selectOption(String(s.target.key));
     await form.getByLabel('목표 연').fill(String(s.targetDate.year));
     await form.getByLabel('목표 월').fill(String(s.targetDate.month));
-    await form.getByRole('checkbox').first().check();
+    await form.getByRole('checkbox', { name: chief.name, exact: true }).check();
     await form.getByRole('button', { name: '작전 만들기' }).click();
     await expect(chief.page).toHaveURL(/\/operations\/[^/]+$/);
     const timeline = chief.page.getByTestId('operation-timeline');
     await expect(timeline.locator('tbody tr').first()).toHaveAttribute('data-verdict', /READY|LATE|WEAK|MISSING/);
     await expect(timeline).toContainText(/준비됨|늦음|미흡|없음/);
-    // 새 장수의 예턴은 비워 둔 칸이다. 직접 넣은 휴식과 다른 글자로 보인다.
+    // 이 시험이 저장한 빈 칸과 명시 휴식이 서로 다른 글자로 보이는지 본다.
     await expect(timeline.locator('td[data-kind="empty"]').first()).toHaveText('빈 칸');
+    await expect(timeline.locator('td[data-kind="rest"]').first()).toHaveText('휴식');
 
     await soldier.page.goto(`/w/${s.world}/operations`);
     await expect(soldier.page.getByRole('button', { name: '작전 만들기' })).toHaveCount(0);
