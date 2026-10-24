@@ -14,6 +14,7 @@ import {
   type TimelapseFrame,
   type TimelapsePage,
 } from './frames';
+import { storedNationSource } from './displaySource';
 import { useTimelapsePages, type FetchTimelapsePage, type TimelapseInput } from './pages';
 import { initialPlayback, isWaiting, playback } from './playback';
 import { TimelapseScreen, type TimelapseMap } from './TimelapsePanel';
@@ -40,6 +41,7 @@ const frame = (i: number, owners: Array<number | null>): TimelapseFrame => ({
   year: 190 + Math.floor(i / 12),
   month: (i % 12) + 1,
   cities: owners.map((nationId, k) => ({ cityKey: k + 1, nationId })),
+  nations: [],
 });
 
 // 시험용 출처. 프레임 tick마다 그때 저장된 국가 값을 둔다. 없는 국가는 missing이다.
@@ -112,6 +114,19 @@ describe('U2 표시값 출처', () => {
     expect(screen.getByLabelText('이 달의 국가별 도시 수').textContent).toContain('새한 2');
     expect(document.body.textContent).not.toContain(currentNations[0]!.name);
     expect(document.body.innerHTML).not.toContain('255, 0, 0');
+  });
+
+  it('응답 출처는 그 프레임의 nations만 읽고 다른 달 값이나 빠진 국가를 메우지 않는다', () => {
+    const answered = [
+      { ...frame(0, [1, 2]), nations: [{ id: 1, name: '옛한', color: '#112233' }] },
+      { ...frame(1, [1, 1]), nations: [{ id: 1, name: '새한', color: '#778899' }] },
+    ];
+    const fromResponse = storedNationSource(answered);
+    expect(fromResponse.resolve(10_000, 1)).toEqual({ kind: 'stored', id: 1, name: '옛한', color: '#112233' });
+    expect(fromResponse.resolve(20_000, 1)).toEqual({ kind: 'stored', id: 1, name: '새한', color: '#778899' });
+    expect(fromResponse.resolve(10_000, 2)).toEqual({ kind: 'missing', id: 2 });
+    expect(fromResponse.resolve(30_000, 1)).toEqual({ kind: 'missing', id: 1 });
+    expect(fromResponse.resolve(10_000, null)).toEqual({ kind: 'empty' });
   });
 });
 
