@@ -5,6 +5,8 @@ import { createGeneralByApi, e2eWorld, query } from './game';
 
 // T2-04 · AC-M2-02: 로비에서 월드 목록을 보고 참가한다. 실제 서버·DB·엔진으로 돈다.
 // lobby.worlds·lobby.notices(T2-03)가 main에 들어오기 전에는 이 파일의 결과를 증거로 세지 않는다.
+// 그래서 로비 목록을 부르는 네 시험은 test.fixme로 보류한다. T2-03이 병합되면 test로 되돌린다 (docs/plans/T2-04.md).
+// 로그인 뒤 이동 묶음은 로비 API 없이 돌아 그대로 실행한다.
 // D-025(가오픈 생성·총정원)는 승인 전이라 승인 전 모습만 시험한다.
 
 type LobbyWorld = { id: string; name: string; status: string; startedAt: string | null };
@@ -44,7 +46,7 @@ async function login(page: Page, email: string) {
   await page.getByRole('button', { name: '로그인' }).click();
 }
 
-test('로그인 → 로비 → 장수 만들기 → 메인 → 로비로 돌아오면 들어가기', async ({ page }) => {
+test.fixme('로그인 → 로비 → 장수 만들기 → 메인 → 로비로 돌아오면 들어가기', async ({ page }) => {
   test.setTimeout(120_000);
   const email = await createAccount(page);
   const world = await e2eWorld(page);
@@ -72,7 +74,7 @@ test('로그인 → 로비 → 장수 만들기 → 메인 → 로비로 돌아�
   await expect(page).toHaveURL(`/w/${world}`);
 });
 
-test('가오픈 월드는 승인 전이라 막힌 장수 만들기와 이유, 시작 전을 보인다', async ({ page }) => {
+test.fixme('가오픈 월드는 승인 전이라 막힌 장수 만들기와 이유, 시작 전을 보인다', async ({ page }) => {
   test.setTimeout(120_000);
   await createAccount(page);
   const name = `E2E 가오픈 ${Date.now() % 100_000}`;
@@ -86,7 +88,7 @@ test('가오픈 월드는 승인 전이라 막힌 장수 만들기와 이유, �
   await expect(target.getByRole('note')).toHaveText('아직 열리지 않은 월드입니다');
 });
 
-test('상태 글자와 색: 진행 중·가오픈·멈춤, 끝난 월드는 기본으로 숨긴다', async ({ page }) => {
+test.fixme('상태 글자와 색: 진행 중·가오픈·멈춤, 끝난 월드는 기본으로 숨긴다', async ({ page }) => {
   test.setTimeout(180_000);
   await createAccount(page);
   await e2eWorld(page);
@@ -104,7 +106,7 @@ test('상태 글자와 색: 진행 중·가오픈·멈춤, 끝난 월드는 기�
   await page.screenshot({ path: 'test-results/t2-04-lobby.png', fullPage: true });
 });
 
-test('로그인하지 않아도 목록을 보고 로그인하고 참가는 로그인 뒤 로비로 돌아온다', async ({ page }) => {
+test.fixme('로그인하지 않아도 목록을 보고 로그인하고 참가는 로그인 뒤 로비로 돌아온다', async ({ page }) => {
   const email = await createAccount(page);
   await page.context().clearCookies();
   await page.goto('/lobby');

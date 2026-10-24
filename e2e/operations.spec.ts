@@ -4,6 +4,7 @@ import { createGeneralByApi, e2eWorld, mutate, query, setTurns, stubPortraits, t
 
 // T2-12 · AC-M2-15 화면: 국가 작전판과 감찰.
 // operation·inspection 라우터(T2-11, Codex)가 main에 들어오기 전에는 이 시험이 돌지 않는다. 그 전의 결과는 증거로 세지 않는다.
+// 그래서 묶음 전체를 보류한다. T2-11이 병합되면 아래 test.fixme 줄을 지우고 실제로 돌린다.
 // 계약: docs/plans/T2-11.md API 계약, 화면: docs/plans/T2-12.md.
 
 test.describe.configure({ timeout: 180_000 });
@@ -52,6 +53,7 @@ async function setup(page: Page) {
 const editor = (page: Page) => page.getByTestId('turn-editor');
 
 test.describe('국가 작전판', () => {
+  test.fixme(true, 'T2-11 operation·inspection 라우터가 main에 없다. 병합 뒤 이 줄을 지운다 (docs/plans/T2-12.md)');
   test('수뇌가 작전을 만들면 판정이 아이콘과 글자로 보이고 일반 장수는 만들기 단추가 없다', async ({
     browser,
     page,
