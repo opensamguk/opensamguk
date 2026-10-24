@@ -5,10 +5,8 @@ import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { buildInitialWorld, type WorldInit } from '../packages/rules/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
 import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
 import { warFixture } from '../apps/engine/test/warFixture';
-import { readFixture } from '../apps/server/test/readFixture';
 
 const root = new URL('../', import.meta.url);
 const output = new URL('fixtures/t4-77-baseline.json', import.meta.url);
@@ -24,12 +22,12 @@ const resources = {
 const seedInputs = [
   ['t2-02-legacy-baseline', 'tools/world-presets.test.ts', true],
   ['1', 'tools/season-throughput.ts', true],
-  ['loader', 'apps/engine/src/world/resources.test.ts', true],
+  ['loader', 'apps/engine/src/world/resources.integration.test.ts', true],
   ['test-world', 'tools/world-bootstrap.test.ts', false],
   ['command-fixture', 'tools/commands.test.ts', false],
   ['portraits', 'tools/portrait-map/convert.test.ts', true],
   ['T1-12-visibility', 'apps/server/test/readFixture.ts', false],
-  ['memory-replay', 'apps/engine/src/simulation.test.ts', true],
+  ['memory-replay', 'apps/engine/src/simulation.integration.test.ts', true],
   ['engine-test', 'apps/engine/src/turnLoop.integration.test.ts', true],
   ['clock', 'apps/engine/src/world/clock.integration.test.ts', true],
   ['e2e-ranking', 'e2e/rankingSeed.ts', true],
@@ -38,22 +36,44 @@ const seedInputs = [
 ] as const;
 
 // export되지 않은 smallWorld 사영이다. 원 함수가 달라지면 채록을 멈춘다.
-const smallWorldSource = `async function smallWorld(): Promise<WorldInit> {
-  const initial = await loadInitialWorld({ scenario: '1030', map: 'che', seed: 'memory-replay' });
-  initial.generals = initial.generals
+const smallWorldSource = `  initial.generals = initial.generals
     .slice(0, 5)
     .map((general, i) => ({ ...general, activeFromYear: i === 4 ? initial.startYear + 1 : initial.startYear }));
-  return initial;
-}`;
+  return initial;`;
 
-async function smallWorld(): Promise<WorldInit> {
-  const source = await readFile(new URL('apps/engine/src/simulation.test.ts', root), 'utf8');
+async function smallWorld(initial: WorldInit): Promise<WorldInit> {
+  const source = await readFile(new URL('apps/engine/src/simulation.integration.test.ts', root), 'utf8');
   assert.ok(source.replaceAll('\r\n', '\n').includes(smallWorldSource), 'smallWorld 원 함수가 바뀌었습니다.');
-  const initial = await loadInitialWorld({ scenario: '1030', map: 'che', seed: 'memory-replay' });
   initial.generals = initial.generals
     .slice(0, 5)
     .map((general, i) => ({ ...general, activeFromYear: i === 4 ? initial.startYear + 1 : initial.startYear }));
   return initial;
+}
+
+// DB 소비자로 옮긴 readFixture의 기존 네 자원 사영을 파일 모드에서 보존한다.
+function readFixture(state: WorldInit): WorldInit {
+  state.nations = state.nations
+    .slice(0, 2)
+    .map((nation, index) => ({ ...nation, id: index + 1, capitalCityKey: state.cities[index]!.cityKey }));
+  state.cities = state.cities.map((city, index) => ({
+    ...city,
+    nationId: index === 0 ? 1 : index === 1 ? 2 : null,
+    supplied: index === 0,
+  }));
+  state.generals = state.generals.slice(0, 4).map((general, index) => ({
+    ...general,
+    id: index + 1,
+    nationId: index < 2 ? 1 : index === 2 ? 2 : null,
+    cityKey: state.cities[0]!.cityKey,
+    nextTurnTick: 500,
+    gold: 11001 + index,
+    rice: 12001 + index,
+    crew: 13001 + index,
+    train: 41 + index,
+    atmos: 51 + index,
+  }));
+  state.diplomacies = [];
+  return state;
 }
 
 async function collectBaseline() {
@@ -75,9 +95,14 @@ async function collectBaseline() {
   const seeds = Object.fromEntries(
     await Promise.all(
       seedInputs.map(async ([seed, , withPortraitMap]) => {
-        const initial = withPortraitMap
-          ? await loadInitialWorld({ scenario: '1030', map: 'che', seed })
-          : buildInitialWorld({ map, scenario, unitSet, statRules, seed });
+        const initial = buildInitialWorld({
+          map,
+          scenario,
+          unitSet,
+          statRules,
+          ...(withPortraitMap ? { portraitMap } : {}),
+          seed,
+        });
         return [seed, { ...record(initial), inputResourceCount: withPortraitMap ? 5 : 4 }];
       }),
     ),
@@ -97,7 +122,12 @@ async function collectBaseline() {
     seeds['portraits']!.initialStateHash,
   );
   assert.equal(seeds['portraits']!.portraits, 429);
-  const [monthly, war, full, small] = await Promise.all([monthlyFixture(), warFixture(), readFixture(), smallWorld()]);
+  const [monthly, war, full, small] = await Promise.all([
+    monthlyFixture(),
+    warFixture(),
+    readFixture(buildInitialWorld({ map, scenario, unitSet, statRules, seed: 'T1-12-visibility' })),
+    smallWorld(buildInitialWorld({ map, scenario, unitSet, statRules, portraitMap, seed: 'memory-replay' })),
+  ]);
   const subset = {
     ...full,
     cities: full.cities.slice(0, 3),

@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { readPublishedResources, type GameResourceKind, type PublishedResource } from '@opensamguk/db';
+import type { readPublishedResources, GameResourceKind, PublishedResource } from '@opensamguk/db';
 import { buildInitialWorld, parsePreset, type WorldInit } from '@opensamguk/rules';
 
 export const resourceRoot = new URL('../../../../resources/', import.meta.url);
@@ -40,6 +40,10 @@ export async function readInitialResources(
   db: Parameters<typeof readPublishedResources>[0],
   options: { scenario: string; map: string; unitSet?: string },
 ): Promise<InitialResources> {
+  resourceKey(options.scenario);
+  resourceKey(options.map);
+  resourceKey(options.unitSet ?? 'basic');
+  const { readPublishedResources } = await import('@opensamguk/db');
   const [map, scenario, unitSet, statRules, portraitMap] = await readPublishedResources(db, [
     { kind: 'MAP', name: options.map, version: 1 },
     { kind: 'SCENARIO', name: options.scenario, version: 1 },
