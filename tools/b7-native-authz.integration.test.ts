@@ -646,7 +646,13 @@ describe('B7 기존 대기 활동과 새 인사 접수의 실제 DB 회귀', () 
                 officerLevel: path === 'personnel.appoint' ? 11 : 1,
                 title: path === 'personnel.appoint' ? '참모' : '장수',
               };
-        expect(applied.inputs[1]).toEqual({ ...admission, status: 'APPLIED', sequence: 2, tick: 100, result });
+        expect(applied.inputs[1]).toEqual({
+          ...admission,
+          status: 'APPLIED',
+          sequence: 2,
+          tick: 100,
+          result: { ...result, tick: 100 },
+        });
         const expectedGenerals = structuredClone(before.generals);
         const actor = expectedGenerals.find((general) => general.id === 1)!;
         actor.lastActiveTick = 105;
