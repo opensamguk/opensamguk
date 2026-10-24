@@ -224,6 +224,18 @@ describe('T4-46 / AC-P2-24 A9 출처와 합성', () => {
     expect(() => convert({ ...input, '1010': raw })).toThrow('NUL 문자: SCENARIO/1010/1');
   });
 
+  it.each([SCENARIO_CONTENT_TAG, SCENARIO_BODY_TAG, CONTENT_TAG, BODY_TAG])(
+    'S4 source의 %s 태그 충돌은 키만 내고 거부한다',
+    (tag) => {
+      const rows = scenarioRows.map((row) =>
+        row.key === '1010' ? { ...row, source: `숨긴 출처 ${tag}; SELECT '원문';` } : row,
+      );
+      expect(() => convert(input, rows)).toThrow('구분자 충돌: SCENARIO/1010/1');
+      expect(() => convert(input, rows)).not.toThrow('숨긴 출처');
+      expect(() => convert(input, rows)).not.toThrow(tag);
+    },
+  );
+
   it.each(['{"a":"\0"}', '{"숨긴 원문":'])('S4 잘못된 JSON 내용을 출력하지 않는다 (%#)', (raw) => {
     expect(() => convert({ ...input, '1010': raw })).toThrow('JSON 오류: SCENARIO/1010/1');
     expect(() => convert({ ...input, '1010': raw })).not.toThrow('숨긴 원문');

@@ -53,6 +53,8 @@ function hasNul(value: unknown): boolean {
 
 function literal(value: string, key: string): string {
   if (value.includes('\0')) throw new Error(`시나리오 NUL 문자: ${key}`);
+  if ([SCENARIO_CONTENT_TAG, SCENARIO_BODY_TAG, CONTENT_TAG, BODY_TAG].some((tag) => value.includes(tag)))
+    throw new Error(`시나리오 구분자 충돌: ${key}`);
   return `'${value.replaceAll("'", "''")}'`;
 }
 
