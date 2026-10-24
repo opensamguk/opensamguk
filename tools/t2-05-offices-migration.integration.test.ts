@@ -321,6 +321,7 @@ it.each(['empty', 'legacy'] as const)(
         '20261024000000_world_personnel_format',
         '20261025000000_input_event_step_tick',
         '20261026000000_game_resource',
+        '20261027000000_treaty_break_trust',
       ]);
       for (const directory of previous) {
         await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));

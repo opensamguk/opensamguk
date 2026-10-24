@@ -165,7 +165,7 @@ async function seedLegacy(client: PgClient) {
 
 async function existingRows(client: PgClient) {
   const tables = await client.query(
-    "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' AND table_name NOT IN ('WorldExtSlice', 'Treaty', 'AssignmentOffer', 'GameResource') ORDER BY table_name",
+    "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' AND table_name NOT IN ('WorldExtSlice', 'Treaty', 'AssignmentOffer', 'GameResource', 'NationTrust') ORDER BY table_name",
   );
   const rows: Record<string, unknown> = {};
   for (const { table_name: table } of tables.rows) {
@@ -407,6 +407,7 @@ it.each(['empty', 'legacy'] as const)(
         '20261024000000_world_personnel_format',
         '20261025000000_input_event_step_tick',
         '20261026000000_game_resource',
+        '20261027000000_treaty_break_trust',
       ]);
       for (const directory of previous)
         await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
