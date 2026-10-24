@@ -13,7 +13,8 @@ import {
 } from './notice';
 
 const root = new URL('../../', import.meta.url);
-const initial = await readFile(new URL(INITIAL_NOTICE_FIXTURE, root), 'utf8');
+const rawInitial = await readFile(new URL(INITIAL_NOTICE_FIXTURE, root), 'utf8');
+const initial = rawInitial.replaceAll('\r\n', '\n');
 const tournament = '- 토너먼트 경기: core2026 df6c926; MIT (c) 2025 devsam.';
 const appended = `${initial}\n${APPEND_HEADING}\n\n${tournament}\n`;
 
@@ -22,7 +23,7 @@ describe('T4-77 S2 NOTICE 원문과 추가 출처', () => {
     expect(gitBlobSha1(initial)).toBe(INITIAL_NOTICE_GIT_BLOB);
     expect(createHash('sha256').update(initial).digest('hex')).toBe(INITIAL_NOTICE_SHA256);
     expect(Buffer.byteLength(initial)).toBe(INITIAL_NOTICE_LF_BYTES);
-    expect(verifyInitialNotice(initial)).toBe(initial);
+    expect(verifyInitialNotice(rawInitial)).toBe(initial);
   });
 
   it('NT2 빈 글과 hello의 Git blob 해시를 계산한다', () => {
