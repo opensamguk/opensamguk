@@ -1,11 +1,11 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import type { InspectionRow, OperationDetail } from '../apps/web/src/operations/contract';
 import { createAccount, withE2eDb } from './account';
-import { createGeneralByApi, e2eWorld, mutate, query } from './game';
+import { createGeneralByApi, idleWorld, mutate, query, releaseIdleWorld, startEngine } from './game';
 
 // T2-12 · AC-M2-15 화면 증거 보완. 준비 부족의 미흡 표시와 작전·감찰 공개 범위를 실제 API와 화면으로 본다.
 // 계약은 AppRouter의 operation·inspection 라우터다. 응답 가로채기, 가짜 응답, 초상 stub은 쓰지 않는다.
-// 명령 tick은 진행하지 않는다. 판정은 예턴만 본 예상이라 실제 출병·전투 실행의 증거가 아니다.
+// 장수 생성 요청을 처리한 뒤 엔진을 멈춘다. 판정은 예턴만 본 예상이라 실제 출병·전투 실행의 증거가 아니다.
 // 이 시험은 부모가 배정한 격리 슬롯에서만 돌리고 그 전에는 증거로 세지 않는다.
 // 기록: docs/plans/T2-12.md "작전판 표시 증거 보완" 절.
 
@@ -80,7 +80,11 @@ const cityName = (cities: City[], key: number) => {
 
 const contexts: BrowserContext[] = [];
 test.afterEach(async () => {
-  await Promise.all(contexts.splice(0).map((context) => context.close()));
+  try {
+    await Promise.all(contexts.splice(0).map((context) => context.close()));
+  } finally {
+    await releaseIdleWorld();
+  }
 });
 
 // 원 operations.spec의 member와 같은 순서로 만든다. 초상 stub은 부르지 않는다.
@@ -90,7 +94,14 @@ async function member(browser: Browser, world: string, nationId: number, officer
   contexts.push(context);
   const page = await context.newPage();
   await createAccount(page);
-  const general = await createGeneralByApi(page, world);
+  const stop = await startEngine(world);
+  const general = await (async () => {
+    try {
+      return await createGeneralByApi(page, world);
+    } finally {
+      await stop();
+    }
+  })();
   await withE2eDb(async (db) => {
     const city = await db.city.findFirstOrThrow({ where: { worldId: world, nationId }, select: { cityKey: true } });
     await db.general.update({
@@ -109,7 +120,7 @@ async function shape(world: string, generalId: number, data: Readiness & { nextT
 
 async function setup(page: Page) {
   await createAccount(page);
-  const world = await e2eWorld(page);
+  const world = await idleWorld(page);
   const map = await query<{ cities: City[]; nations: Array<{ id: number }> }>(page, 'world.map', { worldId: world });
   const summary = await query<{ gameDate: GameDate }>(page, 'world.summary', { worldId: world });
   const [ours, theirs] = map.nations;
@@ -128,7 +139,7 @@ async function setup(page: Page) {
   };
 }
 
-// 시각 기준은 world.summary 한 응답이다. 다음 달 첫 tick은 nowTick보다 커서 advanceTo(0) 펌프에서 장수 턴이 실행되지 않는다.
+// 시각 기준은 world.summary 한 응답이다. 생성 뒤 엔진을 멈춘 상태에서 다음 달 첫 tick을 정한다.
 async function clock(page: Page, world: string) {
   const summary = await query<{ gameDate: GameDate; nowTick: number }>(page, 'world.summary', { worldId: world });
   const nextTurnTick = (Math.floor(summary.nowTick / TICKS_PER_MONTH) + 1) * TICKS_PER_MONTH;
