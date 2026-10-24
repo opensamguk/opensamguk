@@ -14,20 +14,20 @@
 
 ## product/ 무엇을 왜 언제까지
 
-| 문서                                           | 상태 | 필요 시점 |
-| ---------------------------------------------- | ---- | --------- |
-| [안내](./product/README.md)                    | 초안 | 지금 |
-| [PRD](./product/prd.md)                        | 초안 | 지금 |
-| [요구사항](./product/requirements.md)          | 초안 | 지금 |
-| [인수조건](./product/acceptance-criteria.md)   | 초안 | 지금 |
-| [명령 대응표](./product/command-coverage.json) (D-022, AC-M1-14). 원작 90개 대조와 명령별 11단계 증거. 대조 기준(원본 ID 전집·승인된 추가와 대체·verified 검증 기록)은 [대응표 고정 기준](./product/command-coverage-baseline.json)에 따로 둔다. 검사는 `node tools/command-coverage.mjs`, 제품 전체 완료는 `--require-complete`, 커밋·시험 파일 확인은 `--verify-git`, 실행 결과 원격 확인은 `--verify-ci` | 정본 | 지금 |
-| [단계 계획](./product/phases.md)               | 초안 | 지금 |
-| [데이터 모델](./product/data-model.md)         | 초안 | 지금 |
-| [차별화 기능 후보](./product/differentiation.md) | 초안 | 지금 |
-| [아이디어 수집](./product/idea-harvest.md)     | 초안 | 지금 |
-| [결정 기록](./product/decisions.md)            | 초안 | 상시 |
-| [백로그](./product/backlog.md)                 | 초안 | 상시 |
-| [core2026 문서 대응표](./product/doc-map.md)   | 초안 | 지금 |
+| 문서                                                                                                                                                                                                                                                                                                                                                                                                        | 상태 | 필요 시점 |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- | --------- |
+| [안내](./product/README.md)                                                                                                                                                                                                                                                                                                                                                                                 | 초안 | 지금      |
+| [PRD](./product/prd.md)                                                                                                                                                                                                                                                                                                                                                                                     | 초안 | 지금      |
+| [요구사항](./product/requirements.md)                                                                                                                                                                                                                                                                                                                                                                       | 초안 | 지금      |
+| [인수조건](./product/acceptance-criteria.md)                                                                                                                                                                                                                                                                                                                                                                | 초안 | 지금      |
+| [명령 대응표](./product/command-coverage.json) (D-022, AC-M1-14). 원작 90개 대조와 명령별 11단계 증거. 대조 기준(원본 ID 전집·승인된 추가와 대체·verified 검증 기록)은 [대응표 고정 기준](./product/command-coverage-baseline.json)에 따로 둔다. 검사는 `node tools/command-coverage.mjs`, 제품 전체 완료는 `--require-complete`, 커밋·시험 파일 확인은 `--verify-git`, 실행 결과 원격 확인은 `--verify-ci` | 정본 | 지금      |
+| [단계 계획](./product/phases.md)                                                                                                                                                                                                                                                                                                                                                                            | 초안 | 지금      |
+| [데이터 모델](./product/data-model.md)                                                                                                                                                                                                                                                                                                                                                                      | 초안 | 지금      |
+| [차별화 기능 후보](./product/differentiation.md)                                                                                                                                                                                                                                                                                                                                                            | 초안 | 지금      |
+| [아이디어 수집](./product/idea-harvest.md)                                                                                                                                                                                                                                                                                                                                                                  | 초안 | 지금      |
+| [결정 기록](./product/decisions.md)                                                                                                                                                                                                                                                                                                                                                                         | 초안 | 상시      |
+| [백로그](./product/backlog.md)                                                                                                                                                                                                                                                                                                                                                                              | 초안 | 상시      |
+| [core2026 문서 대응표](./product/doc-map.md)                                                                                                                                                                                                                                                                                                                                                                | 초안 | 지금      |
 
 ## plans/ 작업 계획 (계획 → 구현 → 리뷰 기록)
 
@@ -69,66 +69,67 @@
 | [T4-05 계략 4종 규칙](./plans/T4-05.md) (AC-P2-03. 원작 수치 분리표와 U-19 결정 제안, 계약 준비 전) | 제안 | MVP |
 | [T4-03 확장 명령 저장·서버·엔진·재생 연결](./plans/T4-03.md) (AC-P2-02 (나), AC-M1-14 후속. 1차 기술 검토 반영, 재검토 대기, 채택 전) | 제안 | MVP |
 | [T4-17 확장 명령 첫 운영 등록 (계략 4종 한정)](./plans/T4-17.md) (AC-P2-03 (나) 등록 몫, AC-M1-14 후속. 정적 대조 도구가 읽는 정의 모양과 T4-03 경계. 계획 기술 검토·채택 전) | 제안 | MVP |
+| [T4-91 종료 월드 타임랩스 공개 조회 API](./plans/T4-91.md) (가칭 T4-37b. AC-P2-17 2차 공유의 서버 몫, T4-37 3.3 요청. 계획 기술 검토(G-03) 통과, D-030 채택. 구현 선행 T4-56 (가)와 실제 검증 전) | 구현 | Phase 2 |
 
 ## architecture/ 무엇이 어디서 실행되나
 
-| 문서                                                     | 상태 | 필요 시점 |
-| -------------------------------------------------------- | ---- | --------- |
-| [아키텍처 개요](./architecture/overview.md)              | 초안 | M1 |
-| [런타임](./architecture/runtime.md)                      | 뼈대 | M1 |
-| [패키지 경계](./architecture/package-boundaries.md)      | 초안 | M1 |
-| [게임 시계](./architecture/game-clock.md)                | 뼈대 | M1 |
-| [시나리오 합성](./architecture/scenario-composition.md)  | 뼈대 | M1 |
-| [명령 프로토콜](./architecture/command-protocol.md)      | 뼈대 | M1 |
-| [실시간 갱신](./architecture/realtime.md)                | 뼈대 | M2 |
-| 성능 기준 (performance.md)                               | 예정 | M3 전 |
+| 문서                                                    | 상태 | 필요 시점 |
+| ------------------------------------------------------- | ---- | --------- |
+| [아키텍처 개요](./architecture/overview.md)             | 초안 | M1        |
+| [런타임](./architecture/runtime.md)                     | 뼈대 | M1        |
+| [패키지 경계](./architecture/package-boundaries.md)     | 초안 | M1        |
+| [게임 시계](./architecture/game-clock.md)               | 뼈대 | M1        |
+| [시나리오 합성](./architecture/scenario-composition.md) | 뼈대 | M1        |
+| [명령 프로토콜](./architecture/command-protocol.md)     | 뼈대 | M1        |
+| [실시간 갱신](./architecture/realtime.md)               | 뼈대 | M2        |
+| 성능 기준 (performance.md)                              | 예정 | M3 전     |
 
 ## resources/ 원본 출처
 
-| 문서 | 상태 | 필요 시점 |
-| ---- | ---- | --------- |
-| [리소스 출처와 MIT 고지](../resources/NOTICE.md) | 초안 | M1 |
+| 문서                                             | 상태 | 필요 시점 |
+| ------------------------------------------------ | ---- | --------- |
+| [리소스 출처와 MIT 고지](../resources/NOTICE.md) | 초안 | M1        |
 
 ## developer/ 어디를 고치나
 
-| 문서                                                          | 상태 | 필요 시점 |
-| ------------------------------------------------------------- | ---- | --------- |
-| [개발자 핸드북](./developer/index.md)                         | 뼈대 | M1 |
-| [파일 지도](./developer/code-map.md)                          | 뼈대 | M1 |
-| [요청·턴·저장 흐름](./developer/request-turn-persistence.md)  | 뼈대 | M1 |
-| 처음 읽는 사람을 위한 구조 안내 (first-steps.md)              | 예정 | M2 |
-| 경험자를 위한 시스템 읽기 (system-walkthrough.md)             | 예정 | M2 |
+| 문서                                                         | 상태 | 필요 시점 |
+| ------------------------------------------------------------ | ---- | --------- |
+| [개발자 핸드북](./developer/index.md)                        | 뼈대 | M1        |
+| [파일 지도](./developer/code-map.md)                         | 뼈대 | M1        |
+| [요청·턴·저장 흐름](./developer/request-turn-persistence.md) | 뼈대 | M1        |
+| 처음 읽는 사람을 위한 구조 안내 (first-steps.md)             | 예정 | M2        |
+| 경험자를 위한 시스템 읽기 (system-walkthrough.md)            | 예정 | M2        |
 
 ## user/ 플레이어 가이드
 
-| 문서                                                     | 상태 | 필요 시점 |
-| -------------------------------------------------------- | ---- | --------- |
-| [시작하기](./user/index.md)                              | 초안 (T2-17, 리뷰 전) | M2 |
-| [장수와 도시, 내정](./user/general-and-city.md)          | 초안 (T2-17, 리뷰 전) | M2 |
-| [시간과 턴](./user/time-and-turns.md)                    | 초안 (T2-17, 리뷰 전) | M2 |
-| [전쟁과 예턴 조합](./user/war-and-orders.md)             | 초안 (T2-17, 리뷰 전) | M2 |
-| [지도와 보급](./user/map-and-supply.md)                  | 초안 (T2-17, 리뷰 전) | M2 |
-| [국가 재정과 외교](./user/economy-and-diplomacy.md)      | 초안 (T2-17, 리뷰 전) | M2 |
-| [국가 운영과 주요 기능](./user/nation-and-features.md)   | 초안 (T2-17, 리뷰 전) | M2 |
-| [용어 사전](./user/glossary.md)                          | 초안 (T2-17, 리뷰 전) | M2 |
-| [명령과 실행 시기](./user/commands-and-timing.md)        | 초안 (T2-17, 리뷰 전) | M2 |
-| 명령 전체 목록 (command-catalog.generated.md, 코드에서 생성) | 예정 | M2 |
+| 문서                                                         | 상태                  | 필요 시점 |
+| ------------------------------------------------------------ | --------------------- | --------- |
+| [시작하기](./user/index.md)                                  | 초안 (T2-17, 리뷰 전) | M2        |
+| [장수와 도시, 내정](./user/general-and-city.md)              | 초안 (T2-17, 리뷰 전) | M2        |
+| [시간과 턴](./user/time-and-turns.md)                        | 초안 (T2-17, 리뷰 전) | M2        |
+| [전쟁과 예턴 조합](./user/war-and-orders.md)                 | 초안 (T2-17, 리뷰 전) | M2        |
+| [지도와 보급](./user/map-and-supply.md)                      | 초안 (T2-17, 리뷰 전) | M2        |
+| [국가 재정과 외교](./user/economy-and-diplomacy.md)          | 초안 (T2-17, 리뷰 전) | M2        |
+| [국가 운영과 주요 기능](./user/nation-and-features.md)       | 초안 (T2-17, 리뷰 전) | M2        |
+| [용어 사전](./user/glossary.md)                              | 초안 (T2-17, 리뷰 전) | M2        |
+| [명령과 실행 시기](./user/commands-and-timing.md)            | 초안 (T2-17, 리뷰 전) | M2        |
+| 명령 전체 목록 (command-catalog.generated.md, 코드에서 생성) | 예정                  | M2        |
 
 ## design/ 기능 설계
 
-| 문서                                   | 상태 | 필요 시점 |
-| -------------------------------------- | ---- | --------- |
-| [설계 문서 틀](./design/README.md)     | 초안 | 차별화 기능 착수 전 |
-| [화면 레퍼런스](./design/references/README.md) | 확정 (A10 확인 완료) | 지금 |
+| 문서                                           | 상태                 | 필요 시점           |
+| ---------------------------------------------- | -------------------- | ------------------- |
+| [설계 문서 틀](./design/README.md)             | 초안                 | 차별화 기능 착수 전 |
+| [화면 레퍼런스](./design/references/README.md) | 확정 (A10 확인 완료) | 지금                |
 
 ## 운영·품질
 
-| 문서                                               | 상태 | 필요 시점 |
-| -------------------------------------------------- | ---- | --------- |
-| [테스트 정책](./testing-policy.md)                 | 뼈대 | M1 |
-| [수치 상태 정책](./numeric-state-policy.md)        | 뼈대 | M1 |
-| [UI 지침](./frontend-ui-guidelines.md)             | 초안 | M1 |
-| [글쓰기 규칙](./writing-style.md)                  | 초안 | 지금 |
-| [이미지 자산](./image-assets.md)                   | 초안 | M1 |
-| [릴리스 운영](./release-operations.md)             | 뼈대 | M2 |
-| [관리자 콘솔](./admin-console.md)                  | 뼈대 | M3 |
+| 문서                                        | 상태 | 필요 시점 |
+| ------------------------------------------- | ---- | --------- |
+| [테스트 정책](./testing-policy.md)          | 뼈대 | M1        |
+| [수치 상태 정책](./numeric-state-policy.md) | 뼈대 | M1        |
+| [UI 지침](./frontend-ui-guidelines.md)      | 초안 | M1        |
+| [글쓰기 규칙](./writing-style.md)           | 초안 | 지금      |
+| [이미지 자산](./image-assets.md)            | 초안 | M1        |
+| [릴리스 운영](./release-operations.md)      | 뼈대 | M2        |
+| [관리자 콘솔](./admin-console.md)           | 뼈대 | M3        |
