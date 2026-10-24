@@ -222,7 +222,8 @@ describe('국가 공지 팝업', () => {
     renderWith(<NationNoticePopup worldId="w1" />);
     const dialog = await screen.findByRole('dialog', { name: '국가 공지' });
     expect(dialog.textContent).toContain('A 공지');
-    expect(document.activeElement?.textContent).toBe('확인');
+    // 포커스는 창이 뜬 뒤 effect에서 옮기므로 한 박자 늦을 수 있다.
+    await waitFor(() => expect(document.activeElement?.textContent).toBe('확인'));
     // 팝업을 띄운 사이 재조회로 캐시가 다른 국가의 판으로 바뀐다.
     act(() => client.setQueryData(noticeKeys.nation('w1'), notice(2, 3, 'B 공지')));
     fake.notice.nation.markSeen.mutate.mockResolvedValueOnce(notice(2, 3, 'B 공지'));
