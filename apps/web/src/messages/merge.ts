@@ -5,7 +5,7 @@ import {
   type MessageListResponse,
   type MessageScope,
   type UnreadResponse,
-} from './contract';
+} from './api';
 
 // 서버 순서: sentAt 내림차순, 같으면 id 내림차순 (T2-09 message.list).
 export function compareMessages(a: MessageItem, b: MessageItem): number {

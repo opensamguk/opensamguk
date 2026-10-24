@@ -1,6 +1,6 @@
 import { useQueryClient, type QueryClient, type QueryKey } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { messageKeys, noticeKeys, sseUrl, WORLD_EVENT_KINDS, type WorldEvent } from '../messages/contract';
+import { messageKeys, noticeKeys, sseUrl, WORLD_EVENT_KINDS, type WorldEvent } from '../messages/api';
 import { useTRPC, type Trpc } from '../trpc';
 
 // 월드 SSE(T2-09)를 받아 알림 종류별로 해당 query만 다시 조회한다 (계획 docs/plans/T2-10.md "결정").
