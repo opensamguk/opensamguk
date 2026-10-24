@@ -1,7 +1,7 @@
 import { NON_AGGRESSION_MONTHS, NOTE_MAX_LENGTH, type Clause, type ClauseKind, type Relation } from './contract';
 
 // 조약서 쓰기의 순수 계산. 화면 검사는 보내기 전에 돕는 것이고 최종 판단은 서버(quote·엔진)가 한다.
-// 서버가 연결한 조항은 종전·불가침·기록만 남길 약속 셋이다. 나머지 넷은 고를 수 없게 보이기만 한다.
+// 이 편집기는 종전·불가침·기록만 남길 약속 셋을 만든다. 나머지 넷은 고를 수 없게 보인다.
 
 export interface ComposeState {
   toNationId: number | null;
@@ -21,9 +21,10 @@ export const CLAUSE_LABELS: Record<ClauseKind, string> = {
   peace: '종전',
   nonAggression: '불가침',
   note: '기록만 남길 약속',
+  trade: '교역 허용',
 };
 
-// 아직 서버가 받지 않는 조항. 보내면 quote와 엔진이 CLAUSE_NOT_CONNECTED로 거절한다. 다른 조항으로 바꿔 보내지 않는다.
+// 이 편집기에서 아직 선택하지 않는 조항. 서버 지원은 월드의 기능 선택에 따른다.
 export const UNSUPPORTED_CLAUSE_LABELS = ['통행 허용', '정기 원조', '교역 허용', '도시 이양'] as const;
 export const UNSUPPORTED_CLAUSE_REASON = '아직 지원하지 않는 조항입니다.';
 
@@ -83,5 +84,7 @@ export function describeClause(clause: Clause): string {
       return `불가침 ${clause.months}개월`;
     case 'note':
       return `기록만 남길 약속 (${clause.text})`;
+    case 'trade':
+      return `교역 허용 ${clause.months}개월`;
   }
 }
