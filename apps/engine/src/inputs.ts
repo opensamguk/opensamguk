@@ -245,6 +245,7 @@ export async function processPendingInput(
       status: 'APPLIED',
       generalId: general.id,
       sequence: await nextActionSequence(tx, world.id),
+      ...(world.personnelFormat === 1 ? { stepTick: tick } : {}),
       result: { general, ...(modern ? { activeTick: tick } : {}) } as unknown as Prisma.InputJsonValue,
     },
   });
