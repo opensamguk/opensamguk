@@ -45,6 +45,8 @@ model World {
   policyFromSequence Int?
   treatyFormat    Int?
   personnelFormat Int?
+  replayFormat    Int @default(1)
+  ruleFeatures    String[] @default([])
   replayOrigin    Json?
   inputEvents     InputEvent[]
   nationHistory   NationHistory[]
@@ -59,6 +61,7 @@ model World {
   operations      Operation[]
   extSlices       WorldExtSlice[]
   treaties        Treaty[]
+  nationTrust     NationTrust[]
   assignmentOffers AssignmentOffer[]
 }
 
@@ -79,6 +82,7 @@ enum AssignmentOfferCancelReason {
   CITY_LOST
   TARGET_LEFT
   ISSUER_LOST_OFFICE
+  NATION_DESTROYED
 }
 
 model AssignmentOffer {
@@ -105,6 +109,7 @@ enum TreatyStatus {
   REJECTED
   EXPIRED
   ENDED
+  BROKEN
 }
 
 model Treaty {
@@ -127,6 +132,16 @@ model Treaty {
   @@index([worldId, status, id])
   @@index([worldId, fromNationId, id])
   @@index([worldId, toNationId, id])
+}
+
+model NationTrust {
+  worldId        String
+  nationId       Int
+  brokenTreaties Int
+  lastBrokenTick Int
+  world          World @relation(fields: [worldId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@id([worldId, nationId])
 }
 
 model WorldExtSlice {
@@ -279,6 +294,7 @@ model General {
   defaultPolicy  String?
   lastActiveTick Int?
   lastActiveAt   DateTime?
+  residenceTick  Int?
   noticeSeen     Json?
   messageReads   MessageRead[]
   turns          GeneralTurn[]
@@ -481,6 +497,7 @@ model InputEvent {
   status         InputEventStatus @default(PENDING)
   sequence       Int?
   stepTick       Int?
+  tick           Int?
   result         Json?
   createdAt      DateTime @default(now())
   world          World @relation(fields: [worldId], references: [id], onDelete: Cascade)

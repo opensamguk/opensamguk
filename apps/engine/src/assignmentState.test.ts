@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDb, type Prisma } from '@opensamguk/db';
-import { finishPersonnelStep, type ClosedOffer, type WorldState } from '@opensamguk/rules';
+import { completePersonnelStep, finishPersonnelStep, type ClosedOffer, type WorldState } from '@opensamguk/rules';
 import {
   loadAssignmentState,
   persistAssignmentState,
@@ -174,12 +174,14 @@ describe('발령 제안 차이 저장', () => {
     { ...closure(), resolvedBy: 'EXPIRY' },
     { ...closure(), status: 'REJECTED' },
     { ...closure(), status: 'SUPERSEDED', resolvedBy: null },
-    ...(['CITY_LOST', 'TARGET_LEFT', 'ISSUER_LOST_OFFICE'] as const).map((cancelReason): ClosedOffer => ({
-      ...closure(),
-      status: 'CANCELLED',
-      resolvedBy: null,
-      cancelReason,
-    })),
+    ...(['CITY_LOST', 'TARGET_LEFT', 'ISSUER_LOST_OFFICE', 'NATION_DESTROYED'] as const).map(
+      (cancelReason): ClosedOffer => ({
+        ...closure(),
+        status: 'CANCELLED',
+        resolvedBy: null,
+        cancelReason,
+      }),
+    ),
   ] satisfies ClosedOffer[])('합법 종료 조합을 PENDING 조건으로 한 번 적용한다 (%j)', async (closed) => {
     const before = snapshot([7, offer]);
     seed(before);
@@ -276,6 +278,45 @@ describe('발령 제안 차이 저장', () => {
     });
     expect(h.create.mock.invocationCallOrder[0]).toBeLessThan(h.update.mock.invocationCallOrder[0]!);
   });
+
+  it('국가가 사라진 상태의 실제 마무리 packet을 같은 PENDING 행에 한 번 저장한다', async () => {
+    const before: WorldState = {
+      startYear: 191,
+      cities: {},
+      generals: {},
+      diplomacies: [],
+      assignmentOffers: { 7: offer },
+      nations: {
+        1: {
+          id: 1,
+          name: '국가',
+          color: '#123456',
+          gold: 0,
+          rice: 0,
+          description: '',
+          tech: 0,
+          philosophy: '',
+          level: 0,
+          capitalCityKey: 1,
+          isNpc: false,
+        },
+      },
+    };
+    const settled = structuredClone(before);
+    delete settled.nations[1];
+    const packet = completePersonnelStep(before, {}, { state: settled, offices: {}, closedOffers: [], logs: [] }, 200);
+    const pending = before.assignmentOffers![7]!;
+    h.find.mockResolvedValue([row(7, pending)]);
+    await persistAssignmentState(h.db, worldId, packet.assignment);
+    expect(packet.assignment.closedOffers).toEqual([
+      { id: pending.id, status: 'CANCELLED', resolvedBy: null, cancelReason: 'NATION_DESTROYED', resolvedTick: 200 },
+    ]);
+    expect(h.update).toHaveBeenCalledExactlyOnceWith({
+      where: { worldId, id: pending.id, status: 'PENDING' },
+      data: { status: 'CANCELLED', resolvedBy: null, cancelReason: 'NATION_DESTROYED', resolvedTick: 200 },
+    });
+    expect(h.create).not.toHaveBeenCalled();
+  });
 });
 
 describe('발령 제안 사전 거부', () => {
@@ -328,6 +369,8 @@ describe('발령 제안 사전 거부', () => {
     { status: 'CANCELLED', resolvedBy: null },
     { status: 'ACCEPTED', cancelReason: 'CITY_LOST' },
     { status: 'CANCELLED', resolvedBy: null, cancelReason: 'OTHER' },
+    { status: 'CANCELLED', resolvedBy: 'RESPONSE', cancelReason: 'NATION_DESTROYED' },
+    { status: 'ACCEPTED', resolvedBy: 'RESPONSE', cancelReason: 'NATION_DESTROYED' },
   ])('금지된 종료 조합을 거부한다 (%j)', async (changes) => {
     const closed = { ...closure(), ...changes } as ClosedOffer;
     await expect(persistAssignmentState(h.db, worldId, delta(before, empty, [closed]))).rejects.toThrow(

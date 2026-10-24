@@ -1,14 +1,20 @@
 import type { Prisma } from '@opensamguk/db';
 import { presetRules, type WorldState } from '@opensamguk/rules';
+import { engineFeatures } from './features';
 import { loadCommandState } from './commandPersistence';
 import { engineResolver, loadExt } from './extState';
 import { assertWorldCapabilities } from './capsGate';
 import { loadTreaties } from './treatyState';
+import { assertPersonnelStorage } from './personnelState';
+import { assertNoResidenceAnchors } from './residenceState';
 
 export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): Promise<WorldState> {
   const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
   const { preset, commands } = engineResolver(world);
   const capabilities = await assertWorldCapabilities(tx, world);
+  if (world.replayFormat === 3) await assertPersonnelStorage(tx, worldId, world.ruleFeatures.includes('personnel'));
+  if (world.replayFormat === 3 && !world.ruleFeatures.includes('personnel'))
+    await assertNoResidenceAnchors(tx, worldId);
   const ext = await loadExt(tx, worldId, commands);
   const cities = await tx.city.findMany({ where: { worldId } });
   const nations = await tx.nation.findMany({
@@ -17,7 +23,7 @@ export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): 
   });
   const generals = await tx.general.findMany({
     where: { worldId },
-    omit: { noticeSeen: true, defaultPolicy: true, lastActiveTick: true, lastActiveAt: true },
+    omit: { noticeSeen: true, defaultPolicy: true, lastActiveTick: true, lastActiveAt: true, residenceTick: true },
   });
   const diplomacies = await tx.diplomacy.findMany({
     where: { worldId },
@@ -27,8 +33,9 @@ export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): 
     void ignored;
     return value;
   };
-  return {
+  let state: WorldState = {
     ...(preset ? { presetRules: presetRules(preset) } : {}),
+    ...(world.ruleFeatures?.length ? { ruleFeatures: [...world.ruleFeatures] } : {}),
     ...(ext ? { ext } : {}),
     startYear: world.startYear,
     cities: Object.fromEntries(cities.map((city) => [city.cityKey, stripWorldId(city)])),
@@ -51,4 +58,9 @@ export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): 
     ...(await loadCommandState(tx, worldId)),
     ...(capabilities.kind === 'caps' && 'treaty' in capabilities.selection ? await loadTreaties(tx, worldId) : {}),
   };
+  for (const feature of engineFeatures
+    .filter((feature) => world.ruleFeatures?.includes(feature.key))
+    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)))
+    state = (await feature.loadWorld?.(tx, worldId, state)) ?? state;
+  return state;
 }

@@ -58,6 +58,10 @@ export {
   validateTreatyRecord,
   validateTreatyState,
   validateClosedTreatyRow,
+  validateBrokenTreatyRow,
+  validateNationTrustState,
+  nextNationTrust,
+  treatyBreakRecipients,
   decodeTreatyRecord,
   treatyRespondByTick,
   applyTreatyInput,
@@ -79,6 +83,10 @@ export type {
   FirstTreatyClause,
   TreatyState,
   ClosedTreatyRow,
+  BrokenTreatyRow,
+  NationTrustState,
+  TreatyBroken,
+  TreatyBreakRejectCode,
   TreatyInput,
   TreatyApplied,
   TreatyRejectCode,
@@ -148,3 +156,11 @@ export {
   type ModifierProvider,
   type BattleModifiers,
 } from './modifiers';
+
+export * from './ruleRegistry';
+export { applyPersonnelInputStep } from './personnel/inputStep';
+export { completePersonnelStep } from './personnel/step';
+export type { PersonnelStepPacket } from './personnel/step';
+export { runPersonnelMonth } from './personnel/monthStep';
+export type { PersonnelMonthResult } from './personnel/monthStep';
+export { updateResidenceAnchors } from './personnel/residence';

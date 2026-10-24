@@ -16,11 +16,13 @@ import {
   policyMarkerResultSchema,
   assertSlotSet,
   validateGeneralCreation,
-  TREATY_INPUTS,
   selectWorldCapabilities,
   type CreationCode,
 } from '@opensamguk/rules';
 import { processTreatyInput } from './treatyInput';
+import { loadReplayState } from './monthly';
+
+import { engineRegistry, type EngineRegistry, type QueuedInputHandler } from './features';
 
 // 호출자가 리스와 World를 잠근 뒤 같은 펜싱 트랜잭션에서 실행한다.
 // null이면 직접 호출에서 활동 기준을 넘기지 않은 경우이며 게임 행동도 실행하지 않는다.
@@ -38,7 +40,7 @@ export async function processPendingInput(
     orderBy: { id: 'asc' },
   });
   if (!event) return false;
-  if (Object.hasOwn(TREATY_INPUTS, event.kind)) {
+  if (event.kind === 'treaty.propose' || event.kind === 'treaty.respond') {
     const capabilities = selectWorldCapabilities(world);
     if (capabilities.kind !== 'caps' || !('treaty' in capabilities.selection))
       throw new Error('조약을 끈 월드의 조약 입력입니다.');
@@ -167,17 +169,98 @@ export async function processPendingInput(
     });
     return true;
   }
-  const reject = async (code: CreationCode) => {
-    await tx.inputEvent.update({
-      where: { id: event.id },
-      data: {
-        status: 'REJECTED',
-        sequence: await nextActionSequence(tx, world.id),
-        result: creationFailure(code),
-      },
-    });
-    return true;
-  };
+  const outcome = await processGeneralCreation(tx, world, event, { tick, sequence: world.actionSequence + 1 });
+  await tx.inputEvent.update({
+    where: { id: event.id },
+    data: {
+      ...outcome,
+      sequence: await nextActionSequence(tx, world.id),
+      ...(outcome.status === 'APPLIED' && world.personnelFormat === 1 ? { stepTick: tick } : {}),
+    },
+  });
+  return true;
+}
+
+export function queuedInputHandlers(registry: EngineRegistry = engineRegistry): Record<string, QueuedInputHandler> {
+  const handlers: Record<string, QueuedInputHandler> = { 'general.create': processGeneralCreation };
+  const kinds = registry.rules.inputKinds;
+  for (const feature of registry.features) {
+    if (!registry.rules.features.some((definition) => definition.key === feature.key))
+      throw new Error('엔진 기능이 규칙 목록에 없습니다.');
+    for (const [kind, handler] of Object.entries(feature.queuedInputs ?? {})) {
+      if (
+        Object.hasOwn(handlers, kind) ||
+        !kinds.some(
+          (definition) =>
+            definition.kind === kind && definition.feature === feature.key && definition.route === 'queued',
+        )
+      )
+        throw new Error('대기 입력 처리기가 중복되거나 규칙 목록과 다릅니다.');
+      handlers[kind] = handler;
+    }
+  }
+  if (
+    Object.keys(handlers).some(
+      (kind) => kinds.filter((definition) => definition.kind === kind && definition.route === 'queued').length !== 1,
+    ) ||
+    kinds.some((definition) => definition.route === 'queued' && !Object.hasOwn(handlers, definition.kind))
+  )
+    throw new Error('대기 입력 처리기가 없습니다.');
+  return handlers;
+}
+
+export async function processInputs(
+  tx: Prisma.TransactionClient,
+  world: Prisma.WorldGetPayload<Record<string, never>>,
+  tick: number,
+  registry: EngineRegistry = engineRegistry,
+  emit?: (signal: import('@opensamguk/db').RealtimeSignal) => void,
+): Promise<boolean> {
+  const event = await tx.inputEvent.findFirst({
+    where: { worldId: world.id, status: 'PENDING' },
+    orderBy: { id: 'asc' },
+  });
+  if (!event) return false;
+  const kind = registry.rules.inputKinds.find((definition) => definition.kind === event.kind);
+  if (!kind || kind.route !== 'queued') throw new Error('등록되지 않은 대기 입력 종류입니다.');
+  const handlers = queuedInputHandlers(registry);
+  const sequence = await nextActionSequence(tx, world.id);
+  const before = world.ruleFeatures.includes('personnel') ? await loadReplayState(tx, world.id) : null;
+  const outcome =
+    kind.feature !== null && !world.ruleFeatures.includes(kind.feature)
+      ? {
+          status: 'REJECTED' as const,
+          result: { code: 'FEATURE_DISABLED', message: '이 월드에서 켜지 않은 기능입니다.' },
+        }
+      : await handlers[event.kind]!(tx, world, event, { tick, sequence, ...(emit ? { emit } : {}) });
+  if (before && outcome.status === 'APPLIED') {
+    const input = {
+      sequence,
+      tick,
+      generalId: outcome.generalId ?? event.generalId,
+      kind: event.kind,
+      status: outcome.status,
+      payload: event.payload,
+      result: outcome.result,
+    };
+    for (const feature of registry.features)
+      if (world.ruleFeatures.includes(feature.key) && feature.key !== kind.feature)
+        await feature.afterQueuedInput?.(tx, world, before, input);
+  }
+  const updated = await tx.inputEvent.updateMany({
+    where: { id: event.id, status: 'PENDING' },
+    data: { ...outcome, sequence, tick: world.replayFormat === 3 ? tick : null },
+  });
+  if (updated.count !== 1) throw new Error('입력 상태가 바뀌어 저장을 취소했습니다.');
+  return true;
+}
+
+const processGeneralCreation: QueuedInputHandler = async (tx, world, event, { tick }) => {
+  const reject = (code: CreationCode) => ({ status: 'REJECTED' as const, result: creationFailure(code) });
+  const modern =
+    world.replayFormat === 3
+      ? world.ruleFeatures.includes('policy')
+      : isPolicyMode({ fromSequence: world.policyFromSequence, actionSequence: world.actionSequence });
   await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${event.userId} FOR SHARE`;
   const existing = await tx.general.findMany({
     where: { worldId: world.id },
@@ -239,15 +322,9 @@ export async function processPendingInput(
       slot,
     })),
   });
-  await tx.inputEvent.update({
-    where: { id: event.id },
-    data: {
-      status: 'APPLIED',
-      generalId: general.id,
-      sequence: await nextActionSequence(tx, world.id),
-      ...(world.personnelFormat === 1 ? { stepTick: tick } : {}),
-      result: { general, ...(modern ? { activeTick: tick } : {}) } as unknown as Prisma.InputJsonValue,
-    },
-  });
-  return true;
-}
+  return {
+    status: 'APPLIED',
+    generalId: general.id,
+    result: { general, ...(modern ? { activeTick: tick } : {}) } as unknown as Prisma.InputJsonValue,
+  };
+};

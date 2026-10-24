@@ -16,6 +16,9 @@ import {
   extSliceKeys,
   type CapsOrigin,
   type WorldPreset,
+  checkRuleFeatures,
+  checkReplayOrigin,
+  type JsonValue,
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { loadCommandState } from '../commandPersistence';
@@ -28,7 +31,9 @@ export async function saveInitialWorld(
     name: string;
     turnTermMinutes: number;
     endYear: number | null;
-    replayFormat?: 'legacy' | 'policy';
+    replayFormat?: 'legacy' | 'policy' | 1 | 3;
+    ruleFeatures?: string[];
+    featureData?: Record<string, JsonValue>;
     treatyFormat?: 1;
     extFormat?: 1;
     preset?: { key: string; value: WorldPreset };
@@ -41,6 +46,54 @@ export async function saveInitialWorld(
     options.turnTermMinutes > 2_147_483_647
   ) {
     throw new Error('월드 이름과 턴 간격(1~2147483647분)을 확인하세요.');
+  }
+  if (options.replayFormat !== undefined && ![1, 3, 'legacy', 'policy'].includes(options.replayFormat))
+    throw new Error('재생 생성 형식을 확인하세요.');
+  const featureFormat =
+    typeof options.replayFormat === 'number' ||
+    (options.replayFormat === undefined && options.extFormat === undefined && options.treatyFormat === undefined);
+  if (
+    (featureFormat && (options.extFormat !== undefined || options.treatyFormat !== undefined)) ||
+    (!featureFormat &&
+      (Object.hasOwn(state, 'ruleFeatures') || options.ruleFeatures !== undefined || options.featureData !== undefined))
+  )
+    throw new Error('기능 표시 형식과 기존 생성 옵션을 함께 쓸 수 없습니다.');
+  const frozen = structuredClone(state);
+  const { ruleFeatures: stateFeatures, ...base } = frozen;
+  let features: string[] = [];
+  let featureData = options.featureData === undefined ? undefined : structuredClone(options.featureData);
+  if (featureFormat) {
+    if (
+      Object.hasOwn(frozen, 'ruleFeatures') &&
+      options.ruleFeatures !== undefined &&
+      JSON.stringify(stateFeatures) !== JSON.stringify(options.ruleFeatures)
+    )
+      throw new Error('월드 상태와 생성 옵션의 규칙 기능 목록이 다릅니다.');
+    if (Object.hasOwn(frozen, 'ruleFeatures')) checkRuleFeatures(stateFeatures);
+    if (options.ruleFeatures !== undefined && !Array.isArray(options.ruleFeatures))
+      throw new Error('규칙 기능 목록은 배열이어야 합니다.');
+    const selected = options.ruleFeatures ?? stateFeatures ?? [];
+    if (!Array.isArray(selected)) throw new Error('규칙 기능 목록은 배열이어야 합니다.');
+    features = selected.length ? checkRuleFeatures(selected) : [];
+    if (
+      featureData !== undefined &&
+      (featureData === null || typeof featureData !== 'object' || Array.isArray(featureData))
+    )
+      throw new Error('규칙 기능 자료를 확인하세요.');
+    if (features.includes('policy')) {
+      const policy = featureData?.policy;
+      if (
+        policy !== undefined &&
+        (policy === null ||
+          typeof policy !== 'object' ||
+          Array.isArray(policy) ||
+          policy.version !== 1 ||
+          policy.turnTermMinutes !== options.turnTermMinutes)
+      )
+        throw new Error('정책 기능 자료와 월드 턴 간격이 다릅니다.');
+      if (policy === undefined)
+        featureData = { ...featureData, policy: { version: 1, turnTermMinutes: options.turnTermMinutes } };
+    }
   }
   const parsedPreset = options.preset ? parsePreset(options.preset.value) : null;
   if (options.extFormat !== undefined && options.extFormat !== 1) throw new Error('확장 생성 형식을 확인하세요.');
@@ -60,7 +113,11 @@ export async function saveInitialWorld(
         })
       : engineResolver({ preset: parsedPreset }).preset;
   if (options.preset && !/^[a-zA-Z0-9_-]+$/.test(options.preset.key)) throw new Error('프리셋 ID를 확인하세요.');
-  const initial = preset ? { ...state, presetRules: presetRules(preset) } : state;
+  const initial = {
+    ...(featureFormat ? base : frozen),
+    ...(preset ? { presetRules: presetRules(preset) } : {}),
+    ...(features.length ? { ruleFeatures: features } : {}),
+  };
   const stateHash = hashState(initial);
   if (
     options.endYear !== null &&
@@ -80,7 +137,26 @@ export async function saveInitialWorld(
     }),
     initialStateHash: stateHash,
   };
-  let creationState = state;
+  let creationState = initial;
+  if (featureFormat) {
+    const origin = {
+      version: typeof options.replayFormat === 'number' ? options.replayFormat : 3,
+      initial,
+      initialStateHash: stateHash,
+      resourceHash: '',
+      ...(featureData !== undefined ? { featureData } : {}),
+    };
+    checkReplayOrigin(origin);
+    const resources = {
+      scenarioKey: initial.scenarioKey,
+      mapKey: initial.mapKey,
+      unitSetKey: initial.unitSetKey,
+      statRules: initial.statRules,
+      unitSet: initial.unitSet,
+    };
+    origin.resourceHash = hashState({ ...resources, ...(featureData !== undefined ? { featureData } : {}) });
+    replayOrigin = origin;
+  }
   if (options.extFormat === 1) {
     const commands = presetCommands(preset)!;
     if (
@@ -133,7 +209,14 @@ export async function saveInitialWorld(
           startYear: creationState.startYear,
           endYear: options.endYear,
           initialStateHash: stateHash,
-          ...(options.replayFormat === 'legacy' ? {} : { policyFromSequence: 0 }),
+          ...(featureFormat
+            ? {
+                replayFormat: typeof options.replayFormat === 'number' ? options.replayFormat : 3,
+                ruleFeatures: features,
+              }
+            : options.replayFormat === 'legacy'
+              ? {}
+              : { policyFromSequence: 0 }),
           ...(options.treatyFormat === 1 ? { treatyFormat: 1 } : {}),
           replayOrigin: replayOrigin as Prisma.InputJsonValue,
           statRules: creationState.statRules,
@@ -157,12 +240,12 @@ export async function saveInitialWorld(
         data: creationState.generals.map((general) => ({
           ...general,
           worldId,
-          ...(options.replayFormat === 'legacy'
+          ...((featureFormat ? !features.includes('policy') : options.replayFormat === 'legacy')
             ? {}
             : { defaultPolicy: 'none', lastActiveTick: general.userId === null ? null : 0 }),
         })),
       });
-      if (options.replayFormat !== 'legacy')
+      if (featureFormat ? features.includes('policy') : options.replayFormat !== 'legacy')
         await tx.generalTurn.createMany({
           data: creationState.generals.flatMap((general) =>
             emptyQueue().map((turn, slot) => ({ ...turn, args: {}, worldId, generalId: general.id, slot })),
@@ -205,7 +288,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
       const generals = await tx.general.findMany({
         where: { worldId },
         orderBy: { id: 'asc' },
-        omit: { noticeSeen: true, defaultPolicy: true, lastActiveTick: true, lastActiveAt: true },
+        omit: { noticeSeen: true, defaultPolicy: true, lastActiveTick: true, lastActiveAt: true, residenceTick: true },
       });
       const diplomacies = await tx.diplomacy.findMany({
         where: { worldId },
@@ -217,6 +300,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
       };
       return {
         ...(preset ? { presetRules: presetRules(preset) } : {}),
+        ...(world.ruleFeatures?.length ? { ruleFeatures: [...world.ruleFeatures] } : {}),
         ...(ext ? { ext } : {}),
         seed: world.seed,
         scenarioKey: world.scenarioKey,

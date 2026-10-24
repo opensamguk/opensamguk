@@ -545,6 +545,7 @@ describe('T2-02 참가·권한·재생', () => {
       await readFile(new URL('../apps/engine/test/fixtures/replay-v1-b8f5074.json', import.meta.url), 'utf8'),
     ) as ReplayArchive;
     const { worldId } = await saveInitialWorld(db, archive.origin.initial, {
+      replayFormat: 1,
       name: '레거시 골든',
       replayFormat: 'legacy',
       turnTermMinutes: 60,

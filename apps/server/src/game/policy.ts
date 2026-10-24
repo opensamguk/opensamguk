@@ -8,20 +8,19 @@ export async function readPolicy(tx: Prisma.TransactionClient, worldId: string, 
   const general = await tx.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: generalId } } });
   const current = general.defaultPolicy ?? 'none';
   if (!isPolicyKey(current)) throw new Error('저장된 기본 방침이 올바르지 않습니다.');
-  const latest =
-    world.policyFromSequence === null
-      ? null
-      : await tx.inputEvent.findFirst({
-          where: { worldId, userId, generalId, kind: 'general.setPolicy' },
-          orderBy: { id: 'desc' },
-        });
-  const pending =
-    world.policyFromSequence === null
-      ? null
-      : await tx.inputEvent.findFirst({
-          where: { worldId, userId, generalId, kind: 'general.setPolicy', status: 'PENDING' },
-          orderBy: { id: 'asc' },
-        });
+  const enabled = world.replayFormat === 3 ? world.ruleFeatures.includes('policy') : world.policyFromSequence !== null;
+  const latest = !enabled
+    ? null
+    : await tx.inputEvent.findFirst({
+        where: { worldId, userId, generalId, kind: 'general.setPolicy' },
+        orderBy: { id: 'desc' },
+      });
+  const pending = !enabled
+    ? null
+    : await tx.inputEvent.findFirst({
+        where: { worldId, userId, generalId, kind: 'general.setPolicy', status: 'PENDING' },
+        orderBy: { id: 'asc' },
+      });
   const pendingKey = (pending?.payload as { policy?: unknown } | undefined)?.policy;
   const rejectedKey = (latest?.payload as { policy?: unknown } | undefined)?.policy;
   return {
@@ -47,7 +46,9 @@ export async function queueLoginActivity(tx: Prisma.TransactionClient, userId: s
     await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${worldId} FOR SHARE`;
     const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
     if (world.status === 'ENDED') continue;
+    if (world.replayFormat === 3 && !world.ruleFeatures.includes('policy')) continue;
     if (
+      world.replayFormat !== 3 &&
       world.policyFromSequence === null &&
       !(await tx.inputEvent.findFirst({
         where: { worldId, kind: 'system.policy.enable', status: 'PENDING' },
@@ -61,8 +62,13 @@ export async function queueLoginActivity(tx: Prisma.TransactionClient, userId: s
   }
 }
 
-export function requirePolicyReady(world: { status: string; policyFromSequence: number | null }) {
+export function requirePolicyReady(world: {
+  status: string;
+  policyFromSequence: number | null;
+  replayFormat?: number;
+  ruleFeatures?: readonly string[];
+}) {
   if (world.status === 'ENDED') throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '종료된 월드입니다.' });
-  if (world.policyFromSequence === null)
+  if (world.replayFormat === 3 ? !world.ruleFeatures?.includes('policy') : world.policyFromSequence === null)
     throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '기본 방침 전환을 기다리고 있습니다.' });
 }

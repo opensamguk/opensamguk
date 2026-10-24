@@ -59,6 +59,25 @@ export async function assertNoOfficeRows(tx: Prisma.TransactionClient, worldId: 
   if (office || turn) throw new Error('인사 기능을 끈 월드에 직책 저장 행이 있습니다.');
 }
 
+// 기능 선택을 마친 호출자가 같은 트랜잭션에서 네 표의 저장 경계를 대조한다.
+export async function assertPersonnelStorage(
+  tx: Prisma.TransactionClient,
+  worldId: string,
+  enabled: boolean,
+): Promise<void> {
+  if (enabled) {
+    const legacy = await tx.nationTurn.findFirst({ where: { worldId }, select: { nationId: true } });
+    if (legacy) throw new Error('인사 기능을 켠 월드에 기존 국가 예턴이 있습니다.');
+    return;
+  }
+  const [office, turn, offer] = await Promise.all([
+    tx.nationOffice.findFirst({ where: { worldId }, select: { nationId: true } }),
+    tx.nationOfficeTurn.findFirst({ where: { worldId }, select: { nationId: true } }),
+    tx.assignmentOffer.findFirst({ where: { worldId }, select: { id: true } }),
+  ]);
+  if (office || turn || offer) throw new Error('인사 기능을 끈 월드에 인사 저장 행이 있습니다.');
+}
+
 export async function loadOfficeState(
   tx: Prisma.TransactionClient,
   worldId: string,

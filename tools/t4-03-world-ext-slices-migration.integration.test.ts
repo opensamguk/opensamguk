@@ -165,14 +165,18 @@ async function seedLegacy(client: PgClient) {
 
 async function existingRows(client: PgClient) {
   const tables = await client.query(
-    "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' AND table_name NOT IN ('WorldExtSlice', 'Treaty', 'AssignmentOffer', 'GameResource') ORDER BY table_name",
+    "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' AND table_name NOT IN ('WorldExtSlice', 'Treaty', 'AssignmentOffer', 'GameResource', 'NationTrust') ORDER BY table_name",
   );
   const rows: Record<string, unknown> = {};
   for (const { table_name: table } of tables.rows) {
     if (typeof table !== 'string' || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(table))
       throw new Error('잘못된 시험 표 이름입니다.');
     const data =
-      table === 'World' ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat'" : "to_jsonb(t) - 'treatyFormat'";
+      table === 'World'
+        ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures'"
+        : table === 'General'
+          ? "to_jsonb(t) - 'residenceTick'"
+          : "to_jsonb(t) - 'treatyFormat'";
     rows[table] = (await client.query(`SELECT ${data} AS data FROM "${table}" t ORDER BY to_jsonb(t)::text`)).rows;
   }
   return rows;
@@ -404,9 +408,13 @@ it.each(['empty', 'legacy'] as const)(
       expect(later).toEqual([
         '20261023073000_treaties',
         '20261023074000_assignment_storage',
+        '20261024000000_replay_features',
         '20261024000000_world_personnel_format',
         '20261025000000_input_event_step_tick',
         '20261026000000_game_resource',
+        '20261027000000_treaty_break_trust',
+        '20261028000000_assignment_nation_destroyed',
+        '20261029000000_general_residence_tick',
       ]);
       for (const directory of previous)
         await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
@@ -437,6 +445,9 @@ it.each(['empty', 'legacy'] as const)(
       ).toEqual([{ count: 0 }]);
       expect((await client.query('SELECT DISTINCT "personnelFormat" FROM "World"')).rows).toEqual([
         { personnelFormat: null },
+      ]);
+      expect((await client.query('SELECT DISTINCT "replayFormat", "ruleFeatures" FROM "World"')).rows).toEqual([
+        { replayFormat: 1, ruleFeatures: [] },
       ]);
       expect((await client.query('SELECT count(*)::int AS count FROM "Treaty"')).rows).toEqual([{ count: 0 }]);
       expect((await client.query('SELECT count(*)::int AS count FROM "AssignmentOffer"')).rows).toEqual([{ count: 0 }]);

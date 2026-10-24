@@ -182,6 +182,8 @@ function exportFixture(source: CapsArchive, ended = true) {
     policyFromSequence: snapshot.config.policy?.fromSequence ?? null,
     treatyFormat: 1,
     personnelFormat: null,
+    replayFormat: 1,
+    ruleFeatures: [],
     replayOrigin: json(snapshot.origin),
     commandMeta: null,
   };

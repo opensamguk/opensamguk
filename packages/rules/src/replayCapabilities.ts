@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { createCommandResolver, type EnabledCommands } from './commands/resolve';
 import { extSliceKeys } from './commands/ext/state';
-import { TREATY_INPUTS, applyTreatyInput, settleTreaties, validateTreatyRecord } from './diplomacy/treaty';
+import { applyTreatyInput, settleTreaties, validateTreatyRecord } from './diplomacy/treaty';
 import { isPolicyMode } from './policy';
 import {
   enableReplayPolicy,
@@ -56,7 +56,8 @@ export const CAPS_INPUT_OWNERS: Readonly<Record<string, CapsOwner>> = Object.fre
   'general.setPolicy': 'policy',
   'general.active': 'policy',
   'system.policy.enable': 'policy',
-  ...Object.fromEntries(Object.keys(TREATY_INPUTS).map((kind) => [kind, 'treaty' as const])),
+  'treaty.propose': 'treaty',
+  'treaty.respond': 'treaty',
 });
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

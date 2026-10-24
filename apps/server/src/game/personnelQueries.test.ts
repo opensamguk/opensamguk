@@ -50,6 +50,7 @@ function general(changes: Partial<General> = {}): General {
     defaultPolicy: null,
     lastActiveTick: null,
     lastActiveAt: null,
+    residenceTick: null,
     noticeSeen: null,
     ...changes,
   };

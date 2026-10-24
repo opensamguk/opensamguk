@@ -64,7 +64,8 @@ async function save(
     const world = await submittedWorld(tx, input.worldId, true, submitted);
     assertEnabledSlots(world, submitted);
     if (world.status === 'ENDED') throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '종료된 월드입니다.' });
-    requirePolicyReady(world);
+    const policyEnabled = world.replayFormat === 3 ? world.ruleFeatures.includes('policy') : true;
+    if (policyEnabled) requirePolicyReady(world);
     // 키 재검사는 장수 잠금·revision 비교보다 먼저 한다 (§5).
     const previous = await tx.inputEvent.findUnique({
       where: { worldId_userId_idempotencyKey: { worldId: input.worldId, userId: ctx.user.id, idempotencyKey: key } },
@@ -105,17 +106,21 @@ async function save(
         idempotencyKey: key,
         status: 'APPLIED',
         sequence: await nextActionSequence(tx, input.worldId),
-        payload: { turns, revision: actor.turnRevision } as unknown as Prisma.InputJsonValue,
-        result: { revision: nextRevision, activeTick: world.clockTick },
+        payload: {
+          turns: policyEnabled ? turns : turns.map(({ commandKey, args }) => ({ commandKey, args })),
+          revision: actor.turnRevision,
+        } as unknown as Prisma.InputJsonValue,
+        result: { revision: nextRevision, ...(policyEnabled ? { activeTick: world.clockTick } : {}) },
       },
     });
-    await tx.general.update({
-      where: { worldId_id: { worldId: input.worldId, id: actor.id } },
-      data: {
-        lastActiveTick: Math.max(actor.lastActiveTick ?? 0, world.clockTick),
-        lastActiveAt: event.createdAt,
-      },
-    });
+    if (policyEnabled)
+      await tx.general.update({
+        where: { worldId_id: { worldId: input.worldId, id: actor.id } },
+        data: {
+          lastActiveTick: Math.max(actor.lastActiveTick ?? 0, world.clockTick),
+          lastActiveAt: event.createdAt,
+        },
+      });
     return { ok: true as const, revision: nextRevision, slots: displaySlots(turns, worldResolver(world).resolver) };
   });
 }

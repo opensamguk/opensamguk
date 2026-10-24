@@ -6,6 +6,7 @@ import {
   restoreExtState,
   selectWorldCapabilities,
   projectTreatyRows,
+  validateBrokenTreatyRow,
   type WorldInit,
 } from '@opensamguk/rules';
 import { z } from 'zod';
@@ -17,6 +18,10 @@ export async function requireWorld(tx: Prisma.TransactionClient, worldId: string
   if (!world) throw new TRPCError({ code: 'NOT_FOUND', message: '월드가 없습니다.' });
   return world;
 }
+export function requireRuleFeature(world: { ruleFeatures: readonly string[] }, key: string): void {
+  if (!world.ruleFeatures.includes(key))
+    throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '이 월드에서 켜지 않은 기능입니다.' });
+}
 export async function requireGeneral(tx: Prisma.TransactionClient, worldId: string, userId: string, lock = false) {
   if (lock)
     await tx.$queryRaw`SELECT id FROM "General" WHERE "worldId" = ${worldId} AND "userId" = ${userId} FOR UPDATE`;
@@ -27,7 +32,7 @@ export async function requireGeneral(tx: Prisma.TransactionClient, worldId: stri
 export async function readView(tx: Prisma.TransactionClient, worldId: string) {
   const world = await requireWorld(tx, worldId);
   const { preset, commands } = worldResolver(world);
-  const capabilities = selectWorldCapabilities(world);
+  const capabilities = world.replayFormat === 3 ? null : selectWorldCapabilities(world);
   const treatyRows = await tx.treaty.findMany({
     where: { worldId },
     orderBy: { id: 'asc' },
@@ -46,19 +51,27 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
       closedSequence: true,
     },
   });
-  const treatyEnabled = capabilities.kind === 'caps' && 'treaty' in capabilities.selection;
+  const treatyEnabled =
+    world.replayFormat === 3
+      ? world.ruleFeatures.includes('treaty')
+      : capabilities?.kind === 'caps' && 'treaty' in capabilities.selection;
   if (!treatyEnabled && treatyRows.length) throw new Error('조약을 끈 월드에 조약 저장 행이 있습니다.');
-  const treaties = treatyEnabled ? projectTreatyRows(treatyRows) : undefined;
+  const breakEnabled = world.replayFormat === 3 && world.ruleFeatures.includes('treaty-break');
+  if (breakEnabled) for (const row of treatyRows) if (row.status === 'BROKEN') validateBrokenTreatyRow(row);
+  const treaties = treatyEnabled
+    ? projectTreatyRows(breakEnabled ? treatyRows.filter((row) => row.status !== 'BROKEN') : treatyRows)
+    : undefined;
   const ext = restoreExtState(commands, await readWorldExtRows(tx, worldId));
   const cities = await tx.city.findMany({ where: { worldId } });
   const nations = await tx.nation.findMany({ where: { worldId } });
   const generals = await tx.general.findMany({
     where: { worldId },
-    omit: { defaultPolicy: true, lastActiveTick: true, lastActiveAt: true },
+    omit: { defaultPolicy: true, lastActiveTick: true, lastActiveAt: true, residenceTick: true },
   });
   const diplomacies = await tx.diplomacy.findMany({ where: { worldId } });
   const state = toWorldState({
     ...(preset ? { presetRules: presetRules(preset) } : {}),
+    ...(world.ruleFeatures?.length ? { ruleFeatures: [...world.ruleFeatures] } : {}),
     ...(ext ? { ext } : {}),
     startYear: world.startYear,
     cities,
