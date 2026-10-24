@@ -56,7 +56,8 @@ async function ownDatabase(
   if (!process.env.TEST_DATABASE_URL) throw new Error('거주 tick 시험 접속값이 필요합니다.');
   let source: URL;
   try {
-    source = testDatabaseUrl(process.env);
+    // runner가 개발 DB와 분리한 뒤 전달한 시험 접속값만 다시 검사한다.
+    source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
   } catch {
     throw new Error('거주 tick 시험 접속값을 확인하세요.');
   }
