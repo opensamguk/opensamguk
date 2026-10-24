@@ -169,7 +169,11 @@ export async function processPendingInput(
     });
     return true;
   }
-  const outcome = await processGeneralCreation(tx, world, event, { tick, sequence: world.actionSequence + 1 });
+  // 기존 엔진의 종료 뒤 생성 거절은 중복 장수 판정보다 먼저다. 형식 3 처리기는 아래에서 따로 호출한다.
+  const outcome =
+    world.status === 'ENDED'
+      ? { status: 'REJECTED' as const, result: creationFailure('WORLD_CLOSED') }
+      : await processGeneralCreation(tx, world, event, { tick, sequence: world.actionSequence + 1 });
   await tx.inputEvent.update({
     where: { id: event.id },
     data: {

@@ -57,6 +57,8 @@ async function fixture(options: { farmMax?: boolean; npc?: boolean } = {}) {
     name: '방침 실제 HTTP',
     turnTermMinutes: 30,
     endYear: null,
+    // 이 회귀 시험은 archive 5와 기존 전환 표지 계약을 검증한다.
+    replayFormat: 'policy',
   });
   worlds.push(worldId);
   await db.world.update({ where: { id: worldId }, data: { status: 'RUNNING', clockAnchorAt: new Date(now) } });
@@ -252,8 +254,18 @@ it('로그인은 여러 월드 활동을 중복 없이 접수하고 ENDED와 실
   const f = await fixture();
   const initial = commandInitial();
   initial.generals = [{ ...initial.generals[0]!, userId: f.alice.id }];
-  const other = await saveInitialWorld(db, initial, { name: '다른 활동 월드', turnTermMinutes: 60, endYear: null });
-  const ended = await saveInitialWorld(db, initial, { name: '끝난 활동 월드', turnTermMinutes: 60, endYear: null });
+  const other = await saveInitialWorld(db, initial, {
+    name: '다른 활동 월드',
+    turnTermMinutes: 60,
+    endYear: null,
+    replayFormat: 'policy',
+  });
+  const ended = await saveInitialWorld(db, initial, {
+    name: '끝난 활동 월드',
+    turnTermMinutes: 60,
+    endYear: null,
+    replayFormat: 'policy',
+  });
   worlds.push(other.worldId, ended.worldId);
   await db.world.update({ where: { id: ended.worldId }, data: { status: 'ENDED' } });
   const login = { email: f.alice.email, password };
