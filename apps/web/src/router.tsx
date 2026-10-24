@@ -25,6 +25,7 @@ import { PersonnelPage } from './personnel/PersonnelPage';
 import { CityPage, MapPage, NationPage, RecordsPage } from './pages/WorldPages';
 import { RankingPage } from './ranking/RankingPage';
 import { parseRankingSearch } from './ranking/rankingView';
+import { SharedTimelapsePage } from './timelapse/SharedTimelapsePage';
 import { queryClient, trpc, type Trpc } from './trpc';
 import { InspectionPage } from './operations/InspectionPage';
 import { OperationDetailPage } from './operations/OperationDetailPage';
@@ -246,6 +247,16 @@ const helpDocRoute = createRoute({
   },
 });
 
+// 종료 월드 영토 재생 공유 (T4-37). 로그인 없이 연다. 종료 월드가 아니면 공개 조회가 거부하고 화면이 안내한다.
+const sharedTimelapseRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'share/timelapse/$worldId',
+  component: function SharedTimelapseRoute() {
+    const { worldId } = sharedTimelapseRoute.useParams();
+    return <SharedTimelapsePage key={worldId} worldId={worldId} />;
+  },
+});
+
 const devUiRoute = createRoute({ getParentRoute: () => rootRoute, path: 'dev/ui', component: DevUiPage });
 // 지도 편집기 (T4-80). devUiRoute처럼 개발 모드에서만 경로 목록에 넣는다. 관리자 콘솔 연결은 T4-81이다.
 // 정의도 개발 모드에서만 만들어 운영 빌드에는 편집기 묶음이 생기지 않는다.
@@ -265,6 +276,7 @@ const routeTree = rootRoute.addChildren([
   notificationSettingsRoute,
   helpRoute,
   helpDocRoute,
+  sharedTimelapseRoute,
   worldRoute.addChildren([
     worldIndexRoute,
     mapRoute,

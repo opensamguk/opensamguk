@@ -1,16 +1,16 @@
 import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { createServer, type AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, parse, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
-import { test as base } from '@playwright/test';
+import { test as base, type Download, type Page } from '@playwright/test';
 import type { Prisma, PrismaClient } from '../packages/db/src/index';
 import { nodeCli } from '../tools/node-cli';
-import { e2eDatabaseUrl } from './account';
+import { e2eDatabaseUrl, withE2eDb } from './account';
 
 // T4-36 · AC-P2-17 (나) 영토 재생 E2E만 쓰는 실제 DB·API·웹 묶음과 월드 준비 (docs/plans/T4-36.md 4.2).
 // worker마다 새 _test DB를 만들고 migration을 적용한 뒤 그 DB를 쓰는 자기 API 서버(포트 0)와 Vite 웹 서버(빈 포트)를 띄운다.
@@ -76,6 +76,15 @@ export interface PreparedWorld {
   startYear: number;
   ticks: number[];
 }
+// T4-37 공유 E2E용. E는 3개월을 넣은 뒤 ENDED와 WorldResult로 끝낸 월드, R은 1개월을 넣고 RUNNING으로 둔 월드다.
+// 엔진의 종료 경로를 시험하지 않고 이 fixture가 만든 월드 행만 바꾼다 (lobby.spec.ts의 끝난 월드 fixture와 같은 방식).
+export const eFrame = (k: number): FrameSpec =>
+  [
+    { month: 1, owners: [1, 2, null, 1, null], nations: [SAVED.wei, SAVED.wu] },
+    { month: 2, owners: [1, 1, null, 1, null], nations: [SAVED.wei] },
+    { month: 3, owners: [2, 2, 1, 1, null], nations: [SAVED.wei, SAVED.wu] },
+  ][k]!;
+
 export interface PreparedWorlds {
   a: PreparedWorld;
   b: PreparedWorld;
@@ -84,6 +93,9 @@ export interface PreparedWorlds {
   p: PreparedWorld;
   // P 첫 정산(tick 10000)에 엔진이 저장한 국가 1·2의 값. E4·E5의 기대값이다.
   pSaved: { first: StoredNation; removed: StoredNation };
+  e: PreparedWorld;
+  eResult: { endedYear: number; endedMonth: number };
+  r: PreparedWorld;
 }
 export interface TimelapseStack {
   database: string;
@@ -147,7 +159,9 @@ async function migrate(url: string, temp: string): Promise<string> {
 // 의존성 캐시는 실행기가 넘긴 임시 폴더 아래 자기 폴더에 두어 5173 서버의 캐시를 고치지 않는다.
 async function startWeb(port: number, apiOrigin: string, cacheDir: string): Promise<ViteServer> {
   const webRoot = join(root, 'apps/web');
-  const vitePath = createRequire(join(webRoot, 'package.json')).resolve('vite');
+  const webRequire = createRequire(join(webRoot, 'package.json'));
+  const vitePath = webRequire.resolve('vite');
+  const fontRoot = dirname(webRequire.resolve('pretendard/package.json'));
   const { createServer: createVite } = (await import(pathToFileURL(vitePath).href)) as {
     createServer: (config: Record<string, unknown>) => Promise<ViteServer>;
   };
@@ -157,7 +171,13 @@ async function startWeb(port: number, apiOrigin: string, cacheDir: string): Prom
     cacheDir,
     logLevel: 'error',
     clearScreen: false,
-    server: { host: '127.0.0.1', port, strictPort: true, proxy: { '/trpc': apiOrigin, '/sse': apiOrigin } },
+    server: {
+      host: '127.0.0.1',
+      port,
+      strictPort: true,
+      fs: { allow: [root, fontRoot] },
+      proxy: { '/trpc': apiOrigin, '/sse': apiOrigin },
+    },
   });
   try {
     await vite.listen();
@@ -204,6 +224,51 @@ export async function insertFrame(db: PrismaClient, world: PreparedWorld, spec: 
   return tick;
 }
 
+// T4-37 PNG 확인 도구. 그림 계약 크기는 700×656 CSS 픽셀에 배율 2다. 화면 코드에서 가져오지 않고 숫자로 적는다.
+export const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+export const PNG_WIDTH = 1400;
+export const PNG_HEIGHT = 1312;
+const PNG_SCALE = 2;
+const PNG_HEADER = 40;
+export const NEUTRAL = '#d6d0c4';
+
+// 실제 다운로드 파일의 PNG 머리 8바이트와 IHDR의 너비·높이(16~23바이트, 빅엔디언)를 읽는다.
+export async function readPng(download: Download) {
+  const bytes = await readFile(await download.path());
+  return {
+    bytes,
+    signature: [...bytes.subarray(0, 8)],
+    chunk: bytes.subarray(12, 16).toString('latin1'),
+    width: bytes.readUInt32BE(16),
+    height: bytes.readUInt32BE(20),
+  };
+}
+
+// 브라우저의 이미지 디코더로 받은 파일 바이트를 열어 한 점의 색을 읽는다. 화면 캔버스를 읽지 않는다.
+export async function pixelOf(page: Page, bytes: Buffer, x: number, y: number) {
+  return page.evaluate(
+    async ({ base64, x, y }) => {
+      const data = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+      const bitmap = await createImageBitmap(new Blob([data], { type: 'image/png' }));
+      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+      const context = canvas.getContext('2d')!;
+      context.drawImage(bitmap, 0, 0);
+      return [...context.getImageData(x, y, 1, 1).data.slice(0, 3)];
+    },
+    { base64: bytes.toString('base64'), x, y },
+  );
+}
+
+export const rgbOf = (hex: string) => [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16));
+
+// 도시 점 가운데의 그림 좌표. 그림은 제목 띠(40) 아래에 지도 좌표 그대로 그리고 배율 2로 만든다. 좌표는 DB 도시 행에서 읽는다.
+export async function dotCenter(worldId: string, cityKey: number) {
+  const { x, y } = await withE2eDb((db) =>
+    db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId, cityKey } }, select: { x: true, y: true } }),
+  );
+  return { x: Math.round(x * PNG_SCALE), y: Math.round((y + PNG_HEADER) * PNG_SCALE) };
+}
+
 // 시험이 넣은 프레임을 지운다. YearbookNation은 외래 키 cascade로 함께 지워진다.
 export async function removeFrame(db: PrismaClient, worldId: string, tick: number) {
   await db.yearbookSnapshot.deleteMany({ where: { worldId, tick } });
@@ -224,11 +289,64 @@ async function borderWorld() {
     ...initial.cities[0]!,
     cityKey: 999,
     name: '보존 검증 경계 도시',
+    x: 630,
+    y: 440,
     nationId: null,
     connections: [],
     supplied: false,
   });
   return initial;
+}
+
+export const LEGEND_NATIONS: StoredNation[] = Array.from({ length: 16 }, (_, i) => ({
+  id: i + 1,
+  name: `범례국${i + 1}`,
+  color: `#${(0x101010 + i * 0x080503).toString(16).padStart(6, '0')}`,
+}));
+
+// E8만 쓰는 실제 DB 월드. 국가마다 도시 하나와 공백 도시 하나를 두고 첫 달 저장값을 넣는다.
+export async function createLegendWorld(db: PrismaClient): Promise<PreparedWorld> {
+  const [{ saveInitialWorld }, { toGameDate }] = await Promise.all([
+    import('../apps/engine/src/world/persistence'),
+    import('../packages/rules/src/index'),
+  ]);
+  const initial = await borderWorld();
+  const city = initial.cities[0]!;
+  const nation = initial.nations[0]!;
+  initial.cities = Array.from({ length: 17 }, (_, i) => ({
+    ...city,
+    cityKey: i + 1,
+    name: `범례 도시 ${i + 1}`,
+    x: 40 + (i % 8) * 80,
+    y: 80 + Math.floor(i / 8) * 80,
+    connections: [],
+    nationId: i < 16 ? i + 1 : null,
+  }));
+  initial.nations = LEGEND_NATIONS.map((entry) => ({ ...nation, ...entry, capitalCityKey: entry.id }));
+  const name = `E2E 범례 ${randomUUID().slice(0, 8)}`;
+  const { worldId } = await saveInitialWorld(db, initial, {
+    replayFormat: 'legacy',
+    name,
+    turnTermMinutes: 60,
+    endYear: null,
+  });
+  const tick = 10_000;
+  const { year, month } = toGameDate(initial.startYear, tick);
+  await db.yearbookSnapshot.create({
+    data: {
+      worldId,
+      tick,
+      year,
+      month,
+      sequence: 1,
+      stateHash: PREP_HASH,
+      data: { cities: initial.cities.map(({ cityKey, nationId }) => ({ cityKey, nationId })) },
+    },
+  });
+  await db.yearbookNation.createMany({
+    data: LEGEND_NATIONS.map(({ id, name, color }) => ({ worldId, tick, nationId: id, name, color })),
+  });
+  return { id: worldId, name, startYear: initial.startYear, ticks: [tick] };
 }
 
 async function prepareWorlds(db: PrismaClient): Promise<PreparedWorlds> {
@@ -266,6 +384,33 @@ async function prepareWorlds(db: PrismaClient): Promise<PreparedWorlds> {
   const b = await seeded('B', [0, 1, 2].map(bFrame));
   const c = await seeded('C', []);
   const m = await seeded('M', [0, 1, 2].map(mFrame));
+
+  // T4-37 공유 E2E. E는 프레임을 넣은 뒤 끝난 월드로, R은 진행 중 월드로 이 행만 바꾼다.
+  const e = await seeded('E', [0, 1, 2].map(eFrame));
+  const ended = rules.toGameDate(e.startYear, e.ticks.at(-1)!);
+  const endedAt = new Date();
+  await db.world.update({ where: { id: e.id }, data: { status: 'ENDED', endedAt } });
+  await db.worldResult.create({
+    data: {
+      worldId: e.id,
+      reason: 'END_YEAR',
+      winnerNationId: null,
+      winnerName: null,
+      winnerColor: null,
+      endedYear: ended.year,
+      endedMonth: ended.month,
+      endedTick: e.ticks.at(-1)!,
+      endedSequence: e.ticks.length,
+      remainingNations: 2,
+      finalStateHash: PREP_HASH,
+      endedAt,
+    },
+  });
+  const r = await seeded('R', [eFrame(0)]);
+  await db.world.update({
+    where: { id: r.id },
+    data: { status: 'RUNNING', clockAnchorAt: endedAt, startedAt: endedAt },
+  });
 
   // P는 실제 엔진으로 정산 저장과 출병 멸망을 지난다 (nationArchive.integration.test.ts R1/S3와 같은 장면).
   const initial = await borderWorld();
@@ -354,7 +499,17 @@ async function prepareWorlds(db: PrismaClient): Promise<PreparedWorlds> {
     p.ticks.push(...frames.map(({ tick }) => tick));
     await controlClock(db, p.id, 'pause');
     const toStored = ({ nationId, name, color }: (typeof first)[number]) => ({ id: nationId, name, color });
-    return { a, b, c, m, p, pSaved: { first: toStored(first[0]!), removed: toStored(first[1]!) } };
+    return {
+      a,
+      b,
+      c,
+      m,
+      p,
+      pSaved: { first: toStored(first[0]!), removed: toStored(first[1]!) },
+      e,
+      eResult: { endedYear: ended.year, endedMonth: ended.month },
+      r,
+    };
   } finally {
     // 준비가 끝나면 실행권을 놓는다. 감독 엔진이 없으므로 그 뒤 월드 상태는 시험이 바꾸는 것뿐이다.
     await lease.releaseLease(db, held);
@@ -426,7 +581,7 @@ export const test = base.extend<object, { timelapseStack: TimelapseStack }>({
         cacheDir = await mkdtemp(join(temp, vitePrefix));
         vite = await startWeb(webPort, apiOrigin, cacheDir);
 
-        const { a, b, c, m, p } = worlds;
+        const { a, b, c, m, p, e, r } = worlds;
         await record('t4-36-fixture-setup.json', {
           database,
           apiOrigin,
@@ -434,7 +589,15 @@ export const test = base.extend<object, { timelapseStack: TimelapseStack }>({
           tempDrive: parse(temp).root,
           exists: await exists(),
           migrate: migrated.trim().split('\n').slice(-3),
-          frames: { a: a.ticks.length, b: b.ticks.length, c: c.ticks.length, m: m.ticks.length, p: p.ticks.length },
+          frames: {
+            a: a.ticks.length,
+            b: b.ticks.length,
+            c: c.ticks.length,
+            m: m.ticks.length,
+            p: p.ticks.length,
+            e: e.ticks.length,
+            r: r.ticks.length,
+          },
         });
         await use({ database, databaseUrl, apiOrigin, webOrigin, worlds });
       } catch (error) {

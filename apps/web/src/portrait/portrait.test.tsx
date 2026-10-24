@@ -43,7 +43,9 @@ describe('resolveImageBaseUrl', () => {
   it('비었으면 jsDelivr 고정 커밋 주소', () => {
     expect(resolveImageBaseUrl(undefined)).toBe(DEFAULT_IMAGE_BASE_URL);
     expect(resolveImageBaseUrl('  ')).toBe(DEFAULT_IMAGE_BASE_URL);
-    expect(DEFAULT_IMAGE_BASE_URL).toBe('https://cdn.jsdelivr.net/gh/peppone-choi/opensamguk-images@48163bd');
+    expect(DEFAULT_IMAGE_BASE_URL).toBe(
+      'https://cdn.jsdelivr.net/gh/opensamguk/opensamguk-images@48163bd1ce8d54c54c94fb5484b05f9db9e50c62',
+    );
   });
 
   it('끝의 /와 공백은 뗀다', () => {

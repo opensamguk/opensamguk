@@ -65,6 +65,7 @@
 | `apps/web/src/layout/GameLayout.tsx` | 위쪽 띠(월드·연월·다음 턴·메뉴)와 본문 |
 | `apps/web/src/pages/WorldPages.tsx` | 직접 주소용 보조 화면: 지도·도시·국가·기록 |
 | `apps/web/src/timelapse/` | 기록의 영토 재생 탭 (T4-36): `timelapse.frames` 페이지 잇기, 프레임별 저장 국가값 출처, 재생 상태, 누를 수 없는 재생 지도. E2E는 `e2e/timelapse.spec.ts`·`e2e/timelapseSeed.ts` |
+| `apps/web/src/timelapse/export.ts`, `exportCanvas.ts`, `SharedTimelapsePage.tsx`, `sharedSource.ts` | T4-37: 지금 달 PNG 그리기 명령(순수 함수)과 캔버스·내려받기, 종료 월드 공유 화면, 공개 조회 응답에서 재생 입력 칸만 고르는 함수. 재생 부품의 지도는 `frames.ts`의 `TimelapseMapCity`(이름·좌표·연결)만 받는다 |
 | `e2e/main.spec.ts`, `e2e/world.ts` | 실제 엔진 월드로 메인 작업 화면 E2E (턴 1분 월드 생성·시작, 시험 계정 장수 붙이기) |
 | `packages/db/prisma/schema.prisma` | DB schema. 생성물은 `packages/db/src/generated/` (Git 제외) |
 | `packages/db/sql/resources-init.sql` | T4-77 생성물. 내장 다섯 자원 1판의 원본 JSON과 `resources/NOTICE.md` 출처를 담은 초기화 SQL이며 손으로 고치지 않는다. DB 적용 초기화 도구의 소스는 준비됐지만 실제 DB 초기화는 검증되지 않았고 공유 script에도 연결되지 않았다. 월드 생성은 지금도 `resources/` 파일을 읽는다 |

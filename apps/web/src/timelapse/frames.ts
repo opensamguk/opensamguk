@@ -56,9 +56,13 @@ export interface StoredNation {
   color: string;
 }
 
+// 영토 재생이 지도 도시에서 읽는 칸. 로그인 재생의 world.map 도시(MapCity)도, 공유 화면의 공개 지도 다섯 칸을
+// 이름만 옮긴 값도 그대로 들어간다. 지금 소유·규모·보급(nationId·level·supplied)은 요구하지 않는다 (docs/plans/T4-37.md 3.4).
+export type TimelapseMapCity = Pick<MapCity, 'key' | 'name' | 'x' | 'y' | 'links'>;
+
 // 지도 도시 하나의 이 달 모습. nation이 null이면 프레임에 그 도시가 없다.
 export interface FrameCityView {
-  city: MapCity;
+  city: TimelapseMapCity;
   nation: Exclude<FrameNation, { kind: 'missing' }> | null;
 }
 export interface LegendEntry {
@@ -71,7 +75,11 @@ export type FrameView =
 
 // 지도 좌표와 프레임 소유를 잇는다. 지도에서는 이름·좌표·연결만 쓰고 지금 소유·규모·보급은 쓰지 않는다.
 // 소유 국가 하나라도 저장값이 없으면 자료 오류라 그 프레임 전체를 그리지 않는다.
-export function frameView(frame: TimelapseFrame, map: readonly MapCity[], source: NationDisplaySource): FrameView {
+export function frameView(
+  frame: TimelapseFrame,
+  map: readonly TimelapseMapCity[],
+  source: NationDisplaySource,
+): FrameView {
   const owners = new Map<number, FrameNation>();
   const missing: number[] = [];
   const byKey = new Map<number, FrameCity>();

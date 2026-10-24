@@ -1,7 +1,8 @@
-import { useEffect, useReducer, useRef } from 'react';
-import type { MapCity } from '../game/types';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import { MAP_HEIGHT, MAP_WIDTH, mapLinks } from '../main/WorldMap';
 import { EmptyState } from '../ui/States';
+import { frameDrawing, pngFileName, type PngDrawing } from './export';
+import { downloadPng } from './exportCanvas';
 import {
   frameDate,
   frameView,
@@ -9,9 +10,17 @@ import {
   type LegendEntry,
   type NationDisplaySource,
   type TimelapseFrame,
+  type TimelapseMapCity,
 } from './frames';
 import { initialPlayback, isWaiting, playback } from './playback';
 import styles from './Timelapse.module.css';
+
+export type DownloadPng = (drawing: PngDrawing, fileName: string) => Promise<void>;
+type ExportState = 'idle' | 'working' | 'failed' | 'blocked';
+const EXPORT_MESSAGE: Partial<Record<ExportState, string>> = {
+  failed: '그림을 만들지 못했습니다.',
+  blocked: '국가 기록이 없는 달은 내려받을 수 없습니다.',
+};
 
 // 공백지 색. 메인 지도(WorldMap.tsx)와 같은 값이다.
 const NEUTRAL = '#d6d0c4';
@@ -21,6 +30,7 @@ const CONTRACT_ERROR = '기록 순서가 맞지 않아 더 불러오지 않았�
 
 // 월간 영토 재생. 프레임·지도 좌표·과거 표시값 출처를 받아 그린다. 조회와 진입점은 부모가 맡는다.
 // 두 달의 소유 차이로 사건 문구를 만들지 않고 지금 국가 행 값도 쓰지 않는다.
+// 지도는 이름·좌표·연결만 받는다(TimelapseMapCity). 로그인 재생과 공유 화면이 같은 부품과 같은 PNG 버튼을 쓴다 (T4-37 2.1).
 export function TimelapseView({
   frames,
   map,
@@ -29,17 +39,27 @@ export function TimelapseView({
   nextError,
   onRetryNext,
   contractError,
+  worldName = '월드',
+  download = downloadPng,
 }: {
   frames: readonly TimelapseFrame[];
-  map: readonly MapCity[];
+  map: readonly TimelapseMapCity[];
   source: NationDisplaySource;
   hasMore: boolean;
   nextError: boolean;
   onRetryNext: () => void;
   contractError: 'order' | 'cursor' | null;
+  worldName?: string;
+  download?: DownloadPng;
 }) {
   const [state, dispatch] = useReducer(playback, initialPlayback);
+  const [exporting, setExporting] = useState<ExportState>('idle');
   const count = frames.length;
+  const shownTick = frames[Math.min(state.index, count - 1)]?.tick;
+  // 다른 달로 옮기면 앞 달의 실패·막힘 안내를 지운다. 만드는 중이면 끝날 때까지 둔다.
+  useEffect(() => {
+    setExporting((current) => (current === 'working' ? current : 'idle'));
+  }, [shownTick]);
   // 타이머는 재생을 켜고 끌 때만 다시 건다. 그 사이 늘어난 프레임 수는 ref로 읽는다.
   const live = useRef({ count, hasMore });
   useEffect(() => {
@@ -63,6 +83,24 @@ export function TimelapseView({
   const date = frameDate(frame);
   const waiting = isWaiting(state, count, hasMore);
   const last = index >= count - 1;
+
+  // 지금 달을 PNG 한 장으로 내려받는다. 재생 중이면 그 자리에서 멈춘다. 기록 없는 달은 그림을 만들지 않는다.
+  const exportFrame = async () => {
+    if (exporting === 'working') return;
+    dispatch({ type: 'seek', index, count });
+    if (view.kind !== 'ok') {
+      setExporting('blocked');
+      return;
+    }
+    setExporting('working');
+    try {
+      await download(frameDrawing({ worldName, date, view }), pngFileName(worldName, frame));
+      setExporting('idle');
+    } catch {
+      setExporting('failed');
+    }
+  };
+  const exportMessage = EXPORT_MESSAGE[exporting];
 
   return (
     <section className={styles.timelapse} aria-label="영토 재생" data-frame-tick={frame.tick}>
@@ -123,7 +161,24 @@ export function TimelapseView({
           aria-valuetext={`${date} (${index + 1}/${count})`}
           onChange={(event) => dispatch({ type: 'seek', index: Number(event.target.value), count })}
         />
+        {/* 기록 없는 달에는 숨기지 않고 점선으로 두며 누르면 이유를 보인다 (UI 지침 §1). */}
+        <button
+          type="button"
+          className={styles.button}
+          style={view.kind === 'ok' ? undefined : { borderStyle: 'dashed' }}
+          aria-disabled={view.kind === 'ok' ? undefined : true}
+          disabled={exporting === 'working'}
+          data-testid="timelapse-download"
+          onClick={() => void exportFrame()}
+        >
+          {exporting === 'working' ? '만드는 중' : '이 달 그림 내려받기'}
+        </button>
       </div>
+      {exportMessage ? (
+        <p className={styles.error} role="status" data-testid="timelapse-download-message">
+          {exportMessage}
+        </p>
+      ) : null}
       <p className={styles.status}>
         <span className="num">{count}개월 불러옴</span>
         {waiting ? <span>다음 기록을 불러오는 중</span> : null}
