@@ -1,7 +1,14 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
-import { TICKS_PER_MONTH } from '../packages/rules/src/index';
+import {
+  TICKS_PER_MONTH,
+  officerTitle,
+  toGameDate,
+  assignmentRejectCost,
+  ASSIGNMENT_REJECT_PERCENT,
+  canExecuteNationCommand,
+} from '../packages/rules/src/index';
 import { ASSIGNMENT_EXPIRY_MONTHS } from '../packages/rules/src/personnel/types';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { newSession } from '../apps/server/src/auth/session';
@@ -11,6 +18,7 @@ import { categories } from '../apps/server/src/authz/coverage';
 import { appRouter } from '../apps/server/src/router';
 import { buildServer } from '../apps/server/src/server';
 import { readFixture } from '../apps/server/test/readFixture';
+import { worldResolver } from '../apps/server/src/game/resolver';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -42,7 +50,7 @@ let initial: Awaited<ReturnType<typeof readFixture>>;
 
 beforeAll(async () => {
   const passwordHash = await hashPassword(randomUUID());
-  for (let index = 0; index < 3; index++) {
+  for (let index = 0; index < 4; index++) {
     const user = await db.user.create({
       data: { email: `${randomUUID()}@example.test`, passwordHash, status: index === 2 ? 'SANCTIONED' : 'ACTIVE' },
     });
@@ -65,7 +73,8 @@ afterAll(async () => {
   await db.$disconnect();
 });
 
-async function fixture(path: Path) {
+async function fixture(path: Path, options: { owner?: number; requestId?: string } = {}) {
+  const owner = options.owner ?? 0;
   const state = structuredClone(initial);
   // 형식 3의 기원은 NPC만 담는다. 접속 계정 연결은 생성 후 현재 DB 상태에만 둔다.
   for (const general of state.generals) general.userId = null;
@@ -88,14 +97,26 @@ async function fixture(path: Path) {
     data: { status: 'RUNNING', clockTick: 100, clockAnchorAt: new Date(now) },
   });
   for (const [id, userId] of [
-    [1, users[0]!],
+    [1, users[owner]!],
     [3, users[1]!],
   ] as const)
     await db.general.update({
       where: { worldId_id: { worldId, id } },
-      data: { userId, defaultPolicy: 'none', lastActiveTick: 0, residenceTick: 0 },
+      data: {
+        userId,
+        defaultPolicy: 'none',
+        lastActiveTick: path === 'nationTurns.set' || path === 'nationTurns.edit' ? 105 : 0,
+        residenceTick: 105,
+        lastActiveAt: new Date(now - 1000),
+      },
     });
-  const requestId = randomUUID();
+  if (path.startsWith('nationTurns.')) {
+    await db.nationOffice.create({ data: { worldId, nationId: 1, officerLevel: 11, tenure: 2, turnRevision: 4 } });
+    await db.nationOfficeTurn.create({
+      data: { worldId, nationId: 1, officerLevel: 11, slot: 0, commandKey: 'nation_rest', args: {} },
+    });
+  }
+  const requestId = options.requestId ?? randomUUID();
   const offerId = '0-2-1';
   if (path.startsWith('offers.'))
     await db.assignmentOffer.create({
@@ -117,7 +138,7 @@ async function fixture(path: Path) {
       data: [
         {
           worldId,
-          userId: users[0]!,
+          userId: users[owner]!,
           generalId: 1,
           kind: 'personnel.dismiss',
           idempotencyKey: `personnel:${requestId}`,
@@ -126,7 +147,7 @@ async function fixture(path: Path) {
         },
         {
           worldId,
-          userId: users[0]!,
+          userId: users[owner]!,
           generalId: 1,
           kind: 'general.active',
           idempotencyKey: `general.active:personnel:${requestId}`,
@@ -136,7 +157,7 @@ async function fixture(path: Path) {
       ],
     });
   }
-  return { worldId, requestId, offerId };
+  return { worldId, requestId, offerId, owner };
 }
 
 function input(path: Path, f: Fixture): Record<string, unknown> {
@@ -181,10 +202,10 @@ function digest(value: unknown) {
     .update(JSON.stringify(value, (_, v) => (typeof v === 'bigint' ? String(v) : v)))
     .digest('hex');
 }
-async function snapshot(worldId: string) {
+async function readRows(worldId: string) {
   const where = { worldId };
   // 계정·세션도 비교하되 실패 출력에는 원문과 자격 증명을 남기지 않는다.
-  const rows = {
+  return {
     world: await db.world.findUniqueOrThrow({ where: { id: worldId } }),
     generals: await db.general.findMany({ where, orderBy: { id: 'asc' } }),
     cities: await db.city.findMany({ where, orderBy: { cityKey: 'asc' } }),
@@ -200,18 +221,43 @@ async function snapshot(worldId: string) {
     accounts: await db.user.findMany({ where: { id: { in: users } }, orderBy: { id: 'asc' } }),
     sessions: await db.session.findMany({ where: { userId: { in: users } }, orderBy: { id: 'asc' } }),
   };
+}
+type Rows = Awaited<ReturnType<typeof readRows>>;
+function hashes(rows: Rows) {
   return Object.fromEntries(Object.entries(rows).map(([key, value]) => [key, digest(value)]));
 }
+async function snapshot(worldId: string) {
+  return hashes(await readRows(worldId));
+}
+const levels = [12, 11, 10, 9, 8, 7, 6, 5];
+const restSlots = () => Array.from({ length: 12 }, () => ({ commandKey: 'nation_rest', args: {}, name: '휴식' }));
 
-function expectRead(path: Path, data: unknown, f: Fixture, foreign = false) {
+function expectRead(path: Path, data: unknown, f: Fixture, rows: Rows, foreign = false) {
+  const actor = rows.generals.find((general) => general.userId === users[foreign ? 1 : f.owner])!;
   if (path === 'personnel.officers') {
-    expect(data).toMatchObject({ appoint: { ok: true } });
-    expect(data).toHaveProperty(
-      'members',
-      foreign
-        ? [expect.objectContaining({ generalId: 3 })]
-        : [expect.objectContaining({ generalId: 1 }), expect.objectContaining({ generalId: 2 })],
-    );
+    const members = rows.generals
+      .filter((general) => general.nationId === actor.nationId)
+      .sort((a, b) => b.officerLevel - a.officerLevel || a.id - b.id);
+    expect(data).toEqual({
+      appoint: { ok: true },
+      levels: levels.slice(1).map((officerLevel) => ({
+        officerLevel,
+        title: officerTitle(officerLevel),
+        holderId: members.find((general) => general.officerLevel === officerLevel)?.id ?? null,
+      })),
+      members: members.map((general) => {
+        const city = rows.cities.find((row) => row.cityKey === general.cityKey)!;
+        return {
+          generalId: general.id,
+          name: general.name,
+          officerLevel: general.officerLevel,
+          title: officerTitle(general.officerLevel),
+          isHuman: general.userId !== null,
+          city: { cityKey: city.cityKey, name: city.name },
+          dedication: general.dedication,
+        };
+      }),
+    });
   } else if (path === 'personnel.request') {
     expect(data).toEqual({ kind: 'personnel.dismiss', state: { status: 'pending', requestId: f.requestId } });
   } else if (path === 'personnel.recent') {
@@ -219,32 +265,80 @@ function expectRead(path: Path, data: unknown, f: Fixture, foreign = false) {
       foreign ? [] : [{ kind: 'personnel.dismiss', state: { status: 'pending', requestId: f.requestId } }],
     );
   } else if (path === 'offers.mine') {
-    expect(data).toEqual(foreign ? [] : [expect.objectContaining({ id: f.offerId, respond: { ok: true } })]);
+    expect(data).toEqual(
+      rows.offers
+        .filter((offer) => offer.targetGeneralId === actor.id)
+        .map((offer) => {
+          const issuer = rows.generals.find((general) => general.id === offer.issuerGeneralId)!;
+          const city = rows.cities.find((row) => row.cityKey === offer.cityKey)!;
+          return {
+            id: offer.id,
+            issuer: { generalId: issuer.id, name: issuer.name },
+            targetCity: { cityKey: city.cityKey, name: city.name },
+            expires: { ...toGameDate(rows.world.startYear, offer.expiresTick), monthsLeft: ASSIGNMENT_EXPIRY_MONTHS },
+            rejectCost: {
+              dedicationPercent: ASSIGNMENT_REJECT_PERCENT,
+              dedication: assignmentRejectCost(actor.dedication),
+            },
+            respond: { ok: true },
+          };
+        }),
+    );
   } else if (path === 'nationTurns.get') {
-    const tabs = (data as { tabs: Array<{ office: { nationId: number }; slots: unknown[]; edit: { ok: boolean } }> })
-      .tabs;
-    expect(tabs).toHaveLength(8);
-    expect(tabs.every((tab) => tab.office.nationId === (foreign ? 2 : 1) && tab.slots.length === 12)).toBe(true);
-    expect(tabs.filter((tab) => tab.edit.ok)).toHaveLength(1);
+    expect(data).toEqual({
+      tabs: levels.map((officerLevel) => {
+        const office = rows.offices.find((row) => row.nationId === actor.nationId && row.officerLevel === officerLevel);
+        const holder = rows.generals.find(
+          (general) => general.nationId === actor.nationId && general.officerLevel === officerLevel,
+        );
+        return {
+          office: { nationId: actor.nationId, officerLevel, tenure: office?.tenure ?? 0 },
+          officerLevel,
+          title: officerTitle(officerLevel),
+          holder: holder ? { generalId: holder.id, name: holder.name } : null,
+          edit:
+            actor.officerLevel === officerLevel
+              ? { ok: true }
+              : { ok: false, reason: '자기 직책 칸만 고칠 수 있습니다.' },
+          revision: office?.turnRevision ?? 0,
+          slots: restSlots(),
+        };
+      }),
+    });
   } else if (path === 'nationCommands.list') {
-    expect(data).toEqual(expect.arrayContaining([expect.objectContaining({ key: 'nation_rest' })]));
+    // 명령 카탈로그의 자료형은 허용하되 응답 객체와 중첩 JSON schema에 DB 칸을 더할 수 없다.
+    expect(data).toEqual(
+      worldResolver(rows.world)
+        .resolver.list('nation')
+        .filter((def) => canExecuteNationCommand(actor.officerLevel, def.key))
+        .map((def) => ({ key: def.key, name: def.name, argsSchema: def.args.toJSONSchema({ io: 'input' }) })),
+    );
   } else if (path === 'nationCommands.precheck') {
     expect(data).toEqual({ ok: true });
   } else throw new Error(`조회 검증이 없는 경로: ${path}`);
 }
 
-async function expectWrite(path: Path, data: unknown, f: Fixture, before: Awaited<ReturnType<typeof snapshot>>) {
-  const events = await db.inputEvent.findMany({ where: { worldId: f.worldId }, orderBy: { id: 'asc' } });
-  const after = await snapshot(f.worldId);
+async function expectWrite(path: Path, data: unknown, f: Fixture, before: Rows) {
+  const after = await readRows(f.worldId);
+  const events = after.inputs;
+  const expected = structuredClone(before);
   if (path === 'personnel.appoint' || path === 'personnel.dismiss' || path === 'offers.respond') {
     expect(data).toEqual({ status: 'pending', requestId: f.requestId });
     expect(events).toHaveLength(2);
-    expect(events[0]).toMatchObject({
-      userId: users[0],
+    const admission = events[0]!;
+    const activity = events[1]!;
+    expect(admission).toEqual({
+      id: admission.id,
+      worldId: f.worldId,
+      createdAt: admission.createdAt,
+      userId: users[f.owner],
       generalId: 1,
       kind: path === 'offers.respond' ? 'offer.respond' : path,
       status: 'PENDING',
       sequence: null,
+      tick: null,
+      stepTick: null,
+      result: null,
       idempotencyKey: `personnel:${f.requestId}`,
       payload:
         path === 'personnel.appoint'
@@ -253,44 +347,147 @@ async function expectWrite(path: Path, data: unknown, f: Fixture, before: Awaite
             ? { generalId: 2 }
             : { offerId: f.offerId, accept: true },
     });
-    expect(events[1]).toMatchObject({
-      userId: users[0],
+    expect(activity).toEqual({
+      id: activity.id,
+      worldId: f.worldId,
+      createdAt: activity.createdAt,
+      userId: users[f.owner],
       generalId: 1,
       kind: 'general.active',
       status: 'PENDING',
       sequence: null,
+      tick: null,
+      stepTick: null,
+      result: null,
+      payload: {},
       idempotencyKey: `general.active:personnel:${f.requestId}`,
     });
-    expect({ ...after, inputs: before.inputs }).toEqual(before);
+    expected.inputs = events;
   } else {
-    expect(data).toMatchObject({ ok: true, revision: 1 });
-    expect(data).toHaveProperty(
-      'slots',
-      Array.from({ length: 12 }, () => expect.objectContaining({ commandKey: 'nation_rest', args: {} })),
-    );
+    expect(data).toEqual({ ok: true, revision: 1, slots: restSlots() });
     expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({
-      userId: users[0],
+    const event = events[0]!;
+    expect(event.idempotencyKey).toMatch(/^nationTurns\.set:[0-9a-f-]{36}$/);
+    expect(event).toEqual({
+      id: event.id,
+      worldId: f.worldId,
+      userId: users[f.owner],
       generalId: 1,
       kind: 'nationTurns.set',
+      idempotencyKey: event.idempotencyKey,
       status: 'APPLIED',
       sequence: 1,
       tick: 100,
+      stepTick: null,
+      payload: {
+        office: { nationId: 1, officerLevel: 12, tenure: 0 },
+        revision: 0,
+        turns: restSlots().map(({ commandKey, args }) => ({ commandKey, args })),
+      },
+      result: { revision: 1, activeTick: 100 },
+      createdAt: event.createdAt,
     });
-    expect(await db.nationOffice.findMany({ where: { worldId: f.worldId } })).toEqual([
-      { worldId: f.worldId, nationId: 1, officerLevel: 12, tenure: 0, turnRevision: 1 },
-    ]);
-    expect(await db.nationOfficeTurn.count({ where: { worldId: f.worldId, nationId: 1, officerLevel: 12 } })).toBe(12);
-    expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: 1 } } })).toMatchObject({
-      lastActiveTick: 100,
-      residenceTick: 0,
+    // 허용된 칸만 기대 상태에 반영한다. 나머지 World/General 칸과 다른 장수도 전부 비교한다.
+    expected.world.actionSequence = 1;
+    const actor = expected.generals.find((general) => general.id === 1)!;
+    actor.lastActiveTick = 105;
+    actor.lastActiveAt = event.createdAt;
+    expected.offices.push({ worldId: f.worldId, nationId: 1, officerLevel: 12, tenure: 0, turnRevision: 1 });
+    expected.offices.sort((a, b) => a.nationId - b.nationId || a.officerLevel - b.officerLevel);
+    expected.officeTurns.push(
+      ...restSlots().map(({ commandKey, args }, slot) => ({
+        worldId: f.worldId,
+        nationId: 1,
+        officerLevel: 12,
+        slot,
+        commandKey,
+        args,
+      })),
+    );
+    expected.officeTurns.sort((a, b) => a.nationId - b.nationId || a.officerLevel - b.officerLevel || a.slot - b.slot);
+    expected.inputs.push(event);
+  }
+  expect(hashes(after)).toEqual(hashes(expected));
+}
+
+async function expectNoWriteRejection(
+  path: Path,
+  data: Record<string, unknown>,
+  f: Fixture,
+  code: string,
+  status: number,
+  cookie = cookies[0],
+) {
+  const before = await snapshot(f.worldId);
+  const result = await request(path, data, cookie);
+  expect(result.code).toBe(code);
+  expect(result.status).toBe(status);
+  expect(await snapshot(f.worldId)).toEqual(before);
+}
+
+async function expectRetryBoundary(path: Path, f: Fixture, first: unknown) {
+  const before = await snapshot(f.worldId);
+  const retry = await request(path, input(path, f), cookies[0]);
+  expect(retry.code).toBeUndefined();
+  expect(retry.status).toBe(200);
+  if (path === 'nationTurns.set' || path === 'nationTurns.edit') {
+    expect(retry.data).toEqual({ ok: false, reason: 'STALE', revision: 1, slots: restSlots() });
+  } else {
+    expect(retry.data).toEqual(first);
+    const changed =
+      path === 'personnel.appoint'
+        ? { officerLevel: 10 }
+        : path === 'personnel.dismiss'
+          ? { generalId: 4 }
+          : { accept: false };
+    await expectNoWriteRejection(path, { ...input(path, f), ...changed }, f, 'CONFLICT', 409);
+    const otherKind = path === 'personnel.dismiss' ? 'personnel.appoint' : 'personnel.dismiss';
+    await expectNoWriteRejection(otherKind, input(otherKind, f), f, 'CONFLICT', 409);
+    await expectNoWriteRejection(path, { ...input(path, f), requestId: randomUUID() }, f, 'CONFLICT', 409);
+  }
+  expect(await snapshot(f.worldId)).toEqual(before);
+}
+
+async function expectCrossWorld(path: Path, f: Fixture) {
+  // 같은 요청·제안·직책 번호를 다른 소유자의 월드에도 두어 월드와 세션을 함께 대조한다.
+  const other = await fixture(path, { owner: 3, requestId: f.requestId });
+  const before = [await snapshot(f.worldId), await snapshot(other.worldId)];
+  for (const [target, source, cookie] of [
+    [other, f, cookies[0]],
+    [f, other, cookies[3]],
+  ] as const) {
+    const result = await request(path, { ...input(path, source), worldId: target.worldId }, cookie);
+    if (path === 'personnel.recent') {
+      expect(result.status).toBe(200);
+      expect(result.code).toBeUndefined();
+      expect(result.data).toEqual([]);
+    } else {
+      expect(result.status).toBe(404);
+      expect(result.code).toBe('NOT_FOUND');
+    }
+  }
+  expect([await snapshot(f.worldId), await snapshot(other.worldId)]).toEqual(before);
+}
+
+async function expectLowerRole(path: Path, f: Fixture) {
+  if (
+    ![
+      'personnel.appoint',
+      'personnel.dismiss',
+      'nationTurns.get',
+      'nationTurns.set',
+      'nationTurns.edit',
+      'nationCommands.list',
+      'nationCommands.precheck',
+    ].includes(path)
+  )
+    return;
+  for (const nationId of [1, null]) {
+    await db.general.update({
+      where: { worldId_id: { worldId: f.worldId, id: 3 } },
+      data: { nationId, officerLevel: nationId === null ? 0 : 1 },
     });
-    expect(await db.world.findUniqueOrThrow({ where: { id: f.worldId } })).toMatchObject({
-      actionSequence: 1,
-      clockTick: 100,
-    });
-    for (const key of ['world', 'generals', 'offices', 'officeTurns', 'inputs']) after[key] = before[key]!;
-    expect(after).toEqual(before);
+    await expectNoWriteRejection(path, input(path, f), f, 'FORBIDDEN', 403, cookies[1]);
   }
 }
 
@@ -306,14 +503,17 @@ describe('B7 실제 HTTP·PostgreSQL 인가 기록', () => {
               ? undefined
               : cookies[category === 'sanctioned' ? 2 : category === 'otherUser' ? 1 : 0];
           const data = category === 'invalidInput' ? { ...input(path, f), userId: users[1] } : input(path, f);
-          const before = await snapshot(f.worldId);
+          const beforeRows = await readRows(f.worldId);
+          const before = hashes(beforeRows);
           const result = await request(path, data, cookie);
           if (category === 'success') {
             expect(result.status).toBe(200);
             expect(result.code).toBeUndefined();
-            if (isMutation(path)) await expectWrite(path, result.data, f, before);
-            else {
-              expectRead(path, result.data, f);
+            if (isMutation(path)) {
+              await expectWrite(path, result.data, f, beforeRows);
+              await expectRetryBoundary(path, f, result.data);
+            } else {
+              expectRead(path, result.data, f, beforeRows);
               expect(await snapshot(f.worldId)).toEqual(before);
             }
           } else if (category === 'otherUser') {
@@ -331,9 +531,11 @@ describe('B7 실제 HTTP·PostgreSQL 인가 기록', () => {
             } else {
               expect(result.status).toBe(200);
               expect(result.code).toBeUndefined();
-              expectRead(path, result.data, f, true);
+              expectRead(path, result.data, f, beforeRows, true);
             }
             expect(await snapshot(f.worldId)).toEqual(before);
+            await expectCrossWorld(path, f);
+            await expectLowerRole(path, f);
           } else {
             expect(result.code).toBe(category === 'invalidInput' ? 'BAD_REQUEST' : 'UNAUTHORIZED');
             expect(result.status).toBe(category === 'invalidInput' ? 400 : 401);
