@@ -86,6 +86,15 @@ async function reconnect(page: Page) {
   }
 }
 
+// 서버의 LISTEN 전용 연결(이 묶음의 applicationName)을 끊는다. 서버는 다시 LISTEN한 뒤 모든 SSE 연결에 ready를 보낸다.
+// 고르기와 끊기를 한 쿼리에 두면 조건 평가 순서에 따라 다른 연결까지 끊을 수 있어 둘로 나눈다 (main 6a8a70d 재연결 시험의 단계).
+async function dropListener(world: T210World) {
+  const rows = await world.hold.db.$queryRaw<Array<{ pid: number }>>`SELECT pid FROM pg_stat_activity
+WHERE application_name = ${world.stack.applicationName} AND datname = ${world.stack.database}`;
+  if (rows.length === 0) throw new Error('서버의 LISTEN 연결을 찾지 못했습니다');
+  for (const { pid } of rows) await world.hold.db.$queryRaw`SELECT pg_terminate_backend(${pid}::int)`;
+}
+
 const SSE_PATH = '/sse';
 const isSse = (url: string) => {
   try {
@@ -422,6 +431,18 @@ test.describe('메시지와 실시간 갱신', () => {
     const rowsAfter = await messageIds(page, drawer);
     expect(new Set(rowsAfter).size).toBe(rowsAfter.length);
     expect(rowsAfter).toEqual(rowsBefore);
+
+    // 브라우저 연결은 그대로이고 서버 LISTEN만 되살아난 경우. 온라인 복귀 재조회와 섞이지 않게 ready만으로 다시 읽는지 본다.
+    const afterReady = page.waitForRequest((request) =>
+      trpcCalls(request).some((call) => call.path === 'message.unread'),
+    );
+    await dropListener(world);
+    await afterReady;
+    await expect(realtime(page)).toHaveAttribute('data-realtime', 'open');
+    await expect(page).toHaveURL(selected);
+    await expect(page.getByTestId('draft-state')).toHaveText('저장하지 않은 편집 1건');
+    await expect(compose).toHaveValue('끊긴 동안 쓰던 글');
+    await expect(noticeBox.getByRole('textbox')).toHaveValue('고치던 공지');
   });
 
   test('5 공지를 고치면 소속 장수가 다음 접속 때 팝업을 보고, 띄운 채 다시 고치면 띄운 판을 보낸 뒤 새 판을 한 번 더 본다', async ({
