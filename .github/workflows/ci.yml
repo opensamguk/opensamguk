@@ -46,6 +46,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm --filter @opensamguk/web build
+      - run: pnpm build:public
 
   # Required check name. It passes only when the authz job and every E2E shard passed (cancelled or skipped fails).
   database-browser:
@@ -202,3 +203,9 @@ jobs:
           path: ~/.cache/playwright-apt
           key: ${{ steps.playwright.outputs.key }}
       - run: pnpm e2e --shard=${{ matrix.shard }}/4 --workers=1 --reporter=line
+      - name: Build public assets
+        if: matrix.shard == 1
+        run: pnpm build:public
+      - name: Check public assets in Chromium
+        if: matrix.shard == 1
+        run: pnpm e2e:public --reporter=line

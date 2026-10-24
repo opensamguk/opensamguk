@@ -1,0 +1,13 @@
+{
+  "decision": "D-031",
+  "portraitPolicy": "fallback-only",
+  "remoteImageBases": [],
+  "externalAssetOrigins": [],
+  "portraitVariants": ["portrait", "icon", "thumb"],
+  "bundledImages": [
+    {
+      "source": "apps/web/src/portrait/fallback.svg",
+      "sha256": "052abd2acf1186a7b9c39f0a24dcf1ef0b5dffa367b19c28368e4747d243ded7"
+    }
+  ]
+}
