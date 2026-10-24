@@ -8,7 +8,7 @@ import { rngFor } from '@opensamguk/shared';
 import { acquireLease, LeaseLostError, releaseLease, renewLease } from './lease';
 import { CLOCK_CHECKPOINT_MS, TurnLoop } from './turnLoop';
 import * as worldLoader from './worldLoader';
-import { loadInitialWorld } from './world/resources';
+import { loadInitialWorldFromDb } from './world/resources';
 import { readWorldState, saveInitialWorld } from './world/persistence';
 import { controlClock } from './world/clock';
 import { runEngine } from './main';
@@ -20,7 +20,7 @@ const db = createDb(url);
 let template: WorldInit;
 beforeAll(async () => {
   await db.world.deleteMany();
-  template = await loadInitialWorld({ scenario: '1030', map: 'che', seed: 'engine-test' });
+  template = await loadInitialWorldFromDb(db, { scenario: '1030', map: 'che', seed: 'engine-test' });
 });
 afterAll(async () => {
   await db.world.deleteMany();

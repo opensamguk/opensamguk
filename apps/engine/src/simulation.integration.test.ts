@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
+import { createDb } from '@opensamguk/db';
 import { hashState } from '@opensamguk/shared/node';
 import {
   initialReplayState,
@@ -8,11 +9,16 @@ import {
   toWorldState,
   type WorldInit,
 } from '@opensamguk/rules';
-import { loadInitialWorld } from './world/resources';
+import { loadInitialWorldFromDb } from './world/resources';
 import { DEFAULT_SIMULATION_MAX_YEAR, simulateGame, unifiedNation } from './simulation';
 
+const url = process.env.TEST_DATABASE_URL;
+if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
+const db = createDb(url);
+afterAll(() => db.$disconnect());
+
 async function smallWorld(): Promise<WorldInit> {
-  const initial = await loadInitialWorld({ scenario: '1030', map: 'che', seed: 'memory-replay' });
+  const initial = await loadInitialWorldFromDb(db, { scenario: '1030', map: 'che', seed: 'memory-replay' });
   initial.generals = initial.generals
     .slice(0, 5)
     .map((general, i) => ({ ...general, activeFromYear: i === 4 ? initial.startYear + 1 : initial.startYear }));

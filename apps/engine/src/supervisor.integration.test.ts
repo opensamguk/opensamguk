@@ -11,7 +11,7 @@ import { exportReplay, replayArchive } from './replay';
 import { CRASH_MESSAGE, runSupervisor, type SupervisorEvent } from './supervisor';
 import { controlClock } from './world/clock';
 import { saveInitialWorld } from './world/persistence';
-import { loadInitialWorld } from './world/resources';
+import { loadInitialWorldFromDb } from './world/resources';
 import { requestShutdown } from './process-lifecycle';
 
 const url = process.env.TEST_DATABASE_URL;
@@ -75,7 +75,7 @@ afterEach(async () => {
 afterAll(() => db.$disconnect());
 
 async function create(second = false) {
-  const initial = await loadInitialWorld({
+  const initial = await loadInitialWorldFromDb(db, {
     scenario: '1030',
     map: 'che',
     seed: second ? 'supervisor-b' : 'supervisor-a',
