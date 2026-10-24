@@ -615,3 +615,32 @@ model Notice {
 
   @@index([scope, worldId, publishedAt, id])
 }
+
+enum GameResourceKind {
+  MAP
+  SCENARIO
+  UNIT_SET
+  STAT_RULES
+  PORTRAIT_MAP
+}
+
+enum GameResourceStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model GameResource {
+  id          String             @id @default(uuid())
+  kind        GameResourceKind
+  name        String
+  version     Int
+  status      GameResourceStatus
+  content     Json               // jsonb. 원본 JSON 전체
+  contentHash String             // hashState(content), 소문자 16진수 64자리
+  source      String             // 출처와 라이선스 한 줄
+  createdBy   String?            // 내장 판은 null. 사용자 관계는 T3-05·T4-78
+  createdAt   DateTime           @default(now())
+  publishedAt DateTime?
+
+  @@unique([kind, name, version])
+}
