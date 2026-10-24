@@ -118,6 +118,8 @@ export {
   finishPersonnelStep,
   applyNationTurnsRecord,
   PersonnelInvariantError,
+  assignmentRejectCost,
+  ASSIGNMENT_REJECT_PERCENT,
 } from './personnel';
 export type {
   PersonnelInputKind,

@@ -4,13 +4,13 @@ import { z } from 'zod';
 
 const kinds = ['personnel.appoint', 'personnel.dismiss', 'offer.respond'] as const;
 type PersonnelKind = (typeof kinds)[number];
-type AppointResult = { generalId: number; officerLevel: number; title: string };
-type RespondResult = {
+export type AppointResult = { generalId: number; officerLevel: number; title: string };
+export type RespondResult = {
   offerStatus: 'ACCEPTED' | 'REJECTED';
   city: { cityKey: number; name: string };
   dedicationLost: number;
 };
-type RequestState<R> =
+export type RequestState<R> =
   | { status: 'pending'; requestId: string }
   | { status: 'applied'; requestId: string; result: R }
   | { status: 'rejected'; requestId: string; code: string; message: string };
