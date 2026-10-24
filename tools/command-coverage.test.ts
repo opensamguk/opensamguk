@@ -99,7 +99,7 @@ describe('T4-02 등록된 확장 명령 대조', () => {
       process.execPath,
       [
         '--import',
-        import.meta.resolve('tsx/esm'),
+        import.meta.resolve('tsx'),
         '--input-type=module',
         '-e',
         `const {extensionCommands}=await import(${JSON.stringify(file)}); console.log(JSON.stringify(${expression}));`,
