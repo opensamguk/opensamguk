@@ -68,6 +68,7 @@ function event(kind: string, id = 1n): Event {
     idempotencyKey: `${kind}:request`,
     status: 'PENDING',
     sequence: null,
+    tick: null,
     stepTick: null,
     result: null,
     createdAt: new Date(0),

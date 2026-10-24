@@ -21,6 +21,7 @@ export function cloneWorldWithRegistry(view: WorldView, registry: ExtStateRegist
   return {
     ...(ext ? { ext } : {}),
     ...(view.presetRules ? { presetRules: structuredClone(view.presetRules) as PresetRules } : {}),
+    ...(view.ruleFeatures ? { ruleFeatures: [...view.ruleFeatures] } : {}),
     startYear: view.startYear,
     cities,
     nations,
@@ -34,6 +35,7 @@ export function cloneWorldWithRegistry(view: WorldView, registry: ExtStateRegist
           })),
         }
       : {}),
+    ...(view.nationTrust?.length ? { nationTrust: view.nationTrust.map((entry) => ({ ...entry })) } : {}),
     ...(view.commandMeta
       ? { commandMeta: { nextNationId: view.commandMeta.nextNationId, offers: { ...view.commandMeta.offers } } }
       : {}),

@@ -5,6 +5,9 @@
 
 # 데이터. 생성 스크립트 출력과 바이트 단위로 같아야 한다
 resources/
+apps/engine/test/fixtures/replay-v2-53dd348.json
+apps/engine/test/fixtures/replay-v2-engine-53dd348.json
+apps/engine/test/fixtures/replay-v3.json
 
 # 기존 migration은 고치지 않는다
 packages/db/prisma/migrations/

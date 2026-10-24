@@ -1,3 +1,6 @@
+import { emptyTurns, validatePolicyInput } from './replayInputs';
+export { emptyTurns, applyTurnsInput, applyCreationInput } from './replayInputs';
+import { hasRuleFeature, ruleRegistry, settleMonthlyFeatures, type RuleRegistry } from './ruleRegistry';
 import type { CommandResolver } from './commands/resolve';
 import { rngFor } from '@opensamguk/shared';
 import { runGeneralTurn } from './commands/turn';
@@ -5,10 +8,11 @@ import type { UnitSetResource } from './world/resources';
 import { TICKS_PER_MONTH } from './clock/constants';
 import { toWorldState, type WorldState, type OfficeRevisions } from './model/world';
 import { monthlyDate, runMonthly } from './monthly/index';
-import type { InitialGeneral, WorldInit } from './world/bootstrap';
-import { emptyTurn, emptyQueue } from './policy';
-import { type ReplayPolicy, validatePolicyRecordedInput } from './policy/replay';
+import type { WorldInit } from './world/bootstrap';
+import { emptyTurn } from './policy';
+import { type ReplayPolicy } from './policy/replay';
 import { completePersonnelStep } from './personnel/step';
+import { updateResidenceAnchors } from './personnel/residence';
 
 export interface QueuedTurn {
   commandKey: string;
@@ -22,24 +26,40 @@ export interface ReplayState {
   monthlyTick: number;
   policy?: ReplayPolicy;
   offices?: OfficeRevisions;
+  residenceAnchors?: Record<number, number>;
 }
 export interface RecordedInput {
   sequence: number;
+  tick?: number | null;
   generalId: number | null;
   kind: string;
   status: 'APPLIED' | 'REJECTED';
   payload: unknown;
   result: unknown;
 }
-export const emptyTurns = (): QueuedTurn[] => Array.from({ length: 30 }, () => ({ commandKey: 'rest', args: {} }));
 
-export function initialReplayState(initial: WorldInit): ReplayState {
-  return {
+export function initialReplayState(initial: WorldInit, featureData?: ReplayOriginData): ReplayState {
+  return initialReplayStateWithRegistry(initial, ruleRegistry, featureData);
+}
+
+type ReplayOriginData = Record<string, import('./model/world').JsonValue>;
+export function initialReplayStateWithRegistry(
+  initial: WorldInit,
+  registry: RuleRegistry,
+  featureData?: ReplayOriginData,
+): ReplayState {
+  let replay: ReplayState = {
     state: toWorldState(initial),
     turns: Object.fromEntries(initial.generals.map(({ id }) => [id, emptyTurns()])),
     revisions: Object.fromEntries(initial.generals.map(({ id }) => [id, 0])),
     monthlyTick: 0,
   };
+  for (const key of initial.ruleFeatures ?? []) {
+    const feature = registry.features.find((feature) => feature.key === key);
+    if (!feature) throw new Error(`모르는 규칙 기능입니다: ${key}`);
+    replay = feature.initReplayState?.(replay, { initial, data: featureData?.[key] }) ?? replay;
+  }
+  return replay;
 }
 
 export function nextGameAction(replay: ReplayState) {
@@ -58,12 +78,18 @@ export function runReplayAction(
   seed: string,
   unitSet?: UnitSetResource,
   resolver?: CommandResolver,
+  registry: RuleRegistry = ruleRegistry,
 ): ReplayState {
   const action = nextGameAction(replay);
   if (action.kind === 'monthly') {
     const date = monthlyDate(replay.state.startYear, action.tick);
     const result = runMonthly(replay.state, action.tick, rngFor(seed, 'monthly', date.year, date.month));
-    return { ...replay, state: result.state, monthlyTick: action.tick };
+    return settleMonthlyFeatures(
+      replay,
+      { ...replay, state: result.state, monthlyTick: action.tick },
+      action.tick,
+      registry,
+    ).replay;
   }
   const next = structuredClone(replay);
   const personnel = Object.hasOwn(replay, 'offices');
@@ -89,65 +115,58 @@ export function runReplayAction(
     );
     next.state = packet.state;
     next.offices = packet.offices;
+    if (replay.residenceAnchors)
+      next.residenceAnchors = updateResidenceAnchors({
+        before: replay.state,
+        after: next.state,
+        anchors: replay.residenceAnchors,
+        tick: action.tick,
+        createdHumanId: null,
+      });
   }
   next.turns[action.generalId] = [...turns.slice(1), next.policy ? emptyTurn() : { commandKey: 'rest', args: {} }];
   next.revisions[action.generalId] = (next.revisions[action.generalId] ?? 0) + 1;
   return next;
 }
 
-export function applyRecordedInput(replay: ReplayState, input: RecordedInput): ReplayState {
-  if (replay.policy) validatePolicyRecordedInput(input, true);
-  if (input.status === 'REJECTED') return replay;
-  const next = structuredClone(replay);
-  if (input.kind === 'turns.set') {
-    const payload = input.payload as { turns?: QueuedTurn[]; revision?: number };
-    const result = input.result as { revision?: number; activeTick?: number };
-    const id = input.generalId;
+export function applyRecordedInput(
+  replay: ReplayState,
+  input: RecordedInput,
+  registry: RuleRegistry = ruleRegistry,
+): ReplayState {
+  if (
+    replay.policy &&
+    (!replay.state.ruleFeatures ||
+      ['turns.set', 'general.create', 'general.setPolicy', 'general.active'].includes(input.kind))
+  )
+    validatePolicyInput(input);
+  const kind = registry.inputKinds.find((kind) => kind.kind === input.kind);
+  if (input.status === 'REJECTED') {
     if (
-      id === null ||
-      !next.state.generals[id] ||
-      payload.revision !== next.revisions[id] ||
-      result.revision !== payload.revision! + 1 ||
-      !Array.isArray(payload.turns) ||
-      payload.turns.length !== 30 ||
-      payload.turns.some((turn) => !turn || typeof turn.commandKey !== 'string' || !Object.hasOwn(turn, 'args'))
+      kind?.feature &&
+      !hasRuleFeature(replay.state, kind.feature) &&
+      !(kind.feature === 'policy' && replay.policy && !replay.state.ruleFeatures)
     ) {
-      throw new Error('예턴 입력 기록의 장수·revision·30칸을 확인하세요.');
+      const result = input.result as { code?: unknown; message?: unknown } | null;
+      if (
+        !result ||
+        result.code !== 'FEATURE_DISABLED' ||
+        typeof result.message !== 'string' ||
+        Object.keys(result).some((key) => key !== 'code' && key !== 'message')
+      )
+        throw new Error('끈 기능의 입력 거절 기록이 다릅니다.');
     }
-    next.turns[id] = structuredClone(payload.turns);
-    next.revisions[id] = result.revision!;
-    if (next.policy && next.state.generals[id]!.userId !== null)
-      next.policy.lastActiveTicks[id] = Math.max(next.policy.lastActiveTicks[id]!, result.activeTick!);
-  } else if (input.kind === 'general.create') {
-    const general = (input.result as { general?: InitialGeneral }).general;
-    if (
-      !general ||
-      !Number.isSafeInteger(general.id) ||
-      general.id !== input.generalId ||
-      next.state.generals[general.id] ||
-      !next.state.cities[general.cityKey] ||
-      !Number.isSafeInteger(general.nextTurnTick) ||
-      general.nextTurnTick < next.monthlyTick
-    ) {
-      throw new Error('장수 생성 결과가 올바르지 않습니다.');
-    }
-    next.state.generals[general.id] = structuredClone(general);
-    next.turns[general.id] = next.policy ? emptyQueue() : emptyTurns();
-    next.revisions[general.id] = 0;
-    if (next.policy) {
-      if (typeof general.userId !== 'string') throw new Error('생성한 사람 장수의 사용자가 없습니다.');
-      next.policy.policies[general.id] = 'none';
-      next.policy.lastActiveTicks[general.id] = (input.result as { activeTick: number }).activeTick;
-    }
-  } else if (next.policy && (input.kind === 'general.setPolicy' || input.kind === 'general.active')) {
-    const id = input.generalId;
-    if (id === null || !next.state.generals[id] || next.state.generals[id]!.userId === null)
-      throw new Error('활동 입력의 사람 장수가 없습니다.');
-    const result = input.result as { activeTick: number; policy?: import('./policy').PolicyKey };
-    if (input.kind === 'general.setPolicy') next.policy.policies[id] = result.policy!;
-    next.policy.lastActiveTicks[id] = Math.max(next.policy.lastActiveTicks[id]!, result.activeTick);
-  } else {
-    throw new Error(`재생할 수 없는 입력 종류입니다: ${input.kind}`);
+    return replay;
+  }
+  if (!kind) throw new Error(`재생할 수 없는 입력 종류입니다: ${input.kind}`);
+  const legacyPolicy = kind.feature === 'policy' && replay.policy && !replay.state.ruleFeatures;
+  if (kind.feature !== null && !hasRuleFeature(replay.state, kind.feature) && !legacyPolicy)
+    throw new Error('이 월드에서 켜지 않은 기능입니다.');
+  let next = kind.apply(replay, input);
+  for (const key of replay.state.ruleFeatures ?? []) {
+    if (key === kind.feature) continue;
+    const feature = registry.features.find((feature) => feature.key === key);
+    next = feature?.afterAppliedInput?.(replay, next, input) ?? next;
   }
   return next;
 }

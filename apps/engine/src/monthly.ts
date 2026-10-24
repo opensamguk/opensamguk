@@ -6,6 +6,9 @@ import {
   emptyTurns,
   monthlyDate,
   runMonthly,
+  buildYearbook,
+  ruleRegistry,
+  settleMonthlyFeatures,
   selectWorldCapabilities,
   settleTreaties,
   type ReplayState,
@@ -13,6 +16,7 @@ import {
 } from '@opensamguk/rules';
 import { rngFor } from '@opensamguk/shared';
 import { hashState } from '@opensamguk/shared/node';
+import { engineFeatures } from './features';
 import { loadWorld } from './worldLoader';
 import { persistRanking } from './ranking';
 import { persistYearbookNations } from './nationArchive';
@@ -24,7 +28,10 @@ export async function loadReplayState(tx: Prisma.TransactionClient, worldId: str
   const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
   const generals = await tx.general.findMany({ where: { worldId } });
   const slots = await tx.generalTurn.findMany({ where: { worldId }, orderBy: { slot: 'asc' } });
-  const modern = isPolicyMode({ fromSequence: world.policyFromSequence ?? null, actionSequence: world.actionSequence });
+  const modern =
+    world.replayFormat === 3
+      ? world.ruleFeatures.includes('policy')
+      : isPolicyMode({ fromSequence: world.policyFromSequence ?? null, actionSequence: world.actionSequence });
   const turns = Object.fromEntries(generals.map(({ id }) => [id, emptyTurns()]));
   for (const general of generals) if (modern) assertSlotSet(slots.filter((slot) => slot.generalId === general.id));
   for (const slot of slots)
@@ -45,13 +52,18 @@ export async function loadReplayState(tx: Prisma.TransactionClient, worldId: str
         policy.lastActiveTicks[general.id] = general.lastActiveTick;
       }
     }
-  return {
+  let replay: ReplayState = {
     state,
     turns,
     revisions: Object.fromEntries(generals.map(({ id, turnRevision }) => [id, turnRevision])),
     monthlyTick: world.monthlyTick,
     ...(policy ? { policy } : {}),
   };
+  for (const feature of engineFeatures
+    .filter((feature) => state.ruleFeatures?.includes(feature.key))
+    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)))
+    replay = (await feature.loadReplayState?.(tx, worldId, replay)) ?? replay;
+  return replay;
 }
 
 export async function persistMonthly(
@@ -61,12 +73,23 @@ export async function persistMonthly(
   tick: number,
   sequence: number,
 ): Promise<WorldState> {
-  const before = await loadWorld(tx, worldId);
-  const capabilities = selectWorldCapabilities(await tx.world.findUniqueOrThrow({ where: { id: worldId } }));
+  const beforeReplay = await loadReplayState(tx, worldId);
+  const before = beforeReplay.state;
+  const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
+  const capabilities = world.replayFormat === 3 ? null : selectWorldCapabilities(world);
   const date = monthlyDate(before.startYear, tick);
   const result = runMonthly(before, tick, rngFor(seed, 'monthly', date.year, date.month));
-  const treatyEnabled = capabilities.kind === 'caps' && 'treaty' in capabilities.selection;
-  const next = treatyEnabled ? settleTreaties(result.state, tick) : result.state;
+  const treatyEnabled = capabilities?.kind === 'caps' && 'treaty' in capabilities.selection;
+  const settled = { ...beforeReplay, state: result.state, monthlyTick: tick };
+  const features =
+    world.replayFormat === 3
+      ? settleMonthlyFeatures(beforeReplay, settled, tick)
+      : {
+          replay: { ...settled, state: treatyEnabled ? settleTreaties(result.state, tick) : result.state },
+          effects: {} as Record<string, unknown>,
+        };
+  const next = features.replay.state;
+  const yearbook = world.replayFormat === 3 ? buildYearbook(next, date.year) : result.yearbook;
   // 모든 변경은 같은 리스·월드 잠금을 잡은 트랜잭션 안에서 최종값으로 쓴다.
   for (const city of Object.values(next.cities)) {
     const old = before.cities[city.cityKey]!;
@@ -88,6 +111,14 @@ export async function persistMonthly(
   await tx.diplomacy.createMany({ data: next.diplomacies.map((entry) => ({ ...entry, worldId })) });
   await persistExt(tx, worldId, before.ext, next.ext);
   if (treatyEnabled) await persistTreatyClosures(tx, worldId, before, next, { tick, sequence });
+  for (const key of ruleRegistry.monthlyOrder ?? []) {
+    const feature = engineFeatures.find((feature) => feature.key === key);
+    if (feature && next.ruleFeatures?.includes(key))
+      await feature.persistMonthly?.(tx, worldId, beforeReplay, features.replay, features.effects[key], {
+        tick,
+        sequence,
+      });
+  }
   await tx.world.update({ where: { id: worldId }, data: { monthlyTick: tick } });
   const snapshot = await loadReplayState(tx, worldId);
   await tx.yearbookSnapshot.create({
@@ -96,12 +127,12 @@ export async function persistMonthly(
       tick,
       ...date,
       sequence,
-      data: result.yearbook as unknown as Prisma.InputJsonValue,
+      data: yearbook as unknown as Prisma.InputJsonValue,
       stateHash: hashState(snapshot),
     },
   });
   await persistYearbookNations(tx, worldId, tick, next);
-  for (const nation of result.yearbook.nations) {
+  for (const nation of yearbook.nations) {
     const where = { worldId_tick_nationId: { worldId, tick, nationId: nation.nationId } };
     // 같은 월드 잠금 안에서 기존 사건을 보존하고 월간 수치를 덧붙인다.
     const previous = await tx.nationHistory.findUnique({ where });
