@@ -5,7 +5,9 @@
 
 // 이미지 서버(T2-15) 전 개발 기본값. 이미지 저장소 2026-10-20 정리 커밋에 고정한다. 공개 빌드에서는 빈 값이다.
 export const DEFAULT_IMAGE_BASE_URL =
-  import.meta.env.MODE === 'public' ? '' : 'https://cdn.jsdelivr.net/gh/opensamguk/opensamguk-images@48163bd1ce8d54c54c94fb5484b05f9db9e50c62';
+  import.meta.env.MODE === 'public'
+    ? ''
+    : 'https://cdn.jsdelivr.net/gh/opensamguk/opensamguk-images@48163bd1ce8d54c54c94fb5484b05f9db9e50c62';
 
 export const PORTRAIT_ID_MIN = 10001;
 export const PORTRAIT_ID_MAX = 11000;
