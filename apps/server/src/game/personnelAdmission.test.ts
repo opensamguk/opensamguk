@@ -15,8 +15,10 @@ function fixture() {
   const actor = { id: 1, nationId: 1 as number | null, officerLevel: 12, userId: 'user' };
   const target = { id: 3, nationId: 1, officerLevel: 1 };
   let previous: Pick<Event, 'kind' | 'payload'> | null = null;
+  let pendingActivity = false;
   const tx = {
     $queryRaw: vi.fn(async () => []),
+    $executeRaw: vi.fn<(sql: TemplateStringsArray, ...values: unknown[]) => Promise<number>>(async () => 1),
     session: { findFirst: vi.fn(async (): Promise<object | null> => ({ id: 'session' })) },
     world: { findUnique: vi.fn(async () => world) },
     general: {
@@ -29,7 +31,10 @@ function fixture() {
     inputEvent: {
       findUnique: vi.fn(async () => previous),
       findMany: vi.fn(async (): Promise<object[]> => []),
-      create: vi.fn(async () => ({})),
+      create: vi.fn(async ({ data }: { data: { kind: string } }) => {
+        if (pendingActivity && data.kind === 'general.active') throw new Error('InputEvent_pending_active_unique');
+        return {};
+      }),
     },
   };
   const client = tx as unknown as Prisma.TransactionClient;
@@ -43,15 +48,29 @@ function fixture() {
     target,
     tx,
     submit,
+    pendingActivity: () => {
+      pendingActivity = true;
+    },
     previous: (value: typeof previous) => {
       previous = value;
     },
   };
 }
 
+function expectActivityInsert(f: ReturnType<typeof fixture>) {
+  expect(f.tx.$executeRaw).toHaveBeenCalledOnce();
+  const [sql, ...values] = f.tx.$executeRaw.mock.calls[0]!;
+  expect(values).toEqual(['world', 'user', 1, `general.active:personnel:${identity.requestId}`]);
+  expect(sql.join('?').replace(/\s+/g, ' ').trim()).toBe(
+    'INSERT INTO "InputEvent" ("worldId","userId","generalId",kind,"idempotencyKey",payload,status) ' +
+      "VALUES (?,?,?,'general.active',?,'{}'::jsonb,'PENDING') " +
+      'ON CONFLICT ("worldId","generalId") WHERE status=\'PENDING\' AND kind=\'general.active\' DO NOTHING',
+  );
+}
+
 describe('인사 접수 B7 활동 경계', () => {
   it.each(['personnel.appoint', 'personnel.dismiss', 'offer.respond'] as const)(
-    '새 %s 접수에만 같은 트랜잭션의 활동 한 건을 더한다',
+    '새 %s 접수에만 같은 트랜잭션에서 활동 한 건을 접수한다',
     async (kind) => {
       const f = fixture();
       if (kind === 'personnel.dismiss') f.target.officerLevel = 5;
@@ -62,22 +81,11 @@ describe('인사 접수 B7 활동 경계', () => {
             ? { generalId: 3 }
             : { generalId: 3, officerLevel: 5 };
       expect(await f.submit(kind, payload)).toEqual({ created: true });
-      expect(f.tx.inputEvent.create).toHaveBeenCalledTimes(2);
+      expect(f.tx.inputEvent.create).toHaveBeenCalledOnce();
       expect(f.tx.inputEvent.create).toHaveBeenNthCalledWith(1, {
         data: expect.objectContaining({ generalId: 1, kind, payload, status: 'PENDING', sequence: null }),
       });
-      expect(f.tx.inputEvent.create).toHaveBeenNthCalledWith(2, {
-        data: {
-          worldId: 'world',
-          userId: 'user',
-          generalId: 1,
-          kind: 'general.active',
-          idempotencyKey: `general.active:personnel:${identity.requestId}`,
-          payload: {},
-          status: 'PENDING',
-          sequence: null,
-        },
-      });
+      expectActivityInsert(f);
     },
   );
   it('정책을 끄면 인사 접수만 만든다', async () => {
@@ -85,6 +93,34 @@ describe('인사 접수 B7 활동 경계', () => {
     f.world.ruleFeatures = ['personnel'];
     await f.submit();
     expect(f.tx.inputEvent.create).toHaveBeenCalledOnce();
+    expect(f.tx.$executeRaw).not.toHaveBeenCalled();
+  });
+  it.each(['personnel.appoint', 'personnel.dismiss', 'offer.respond'] as const)(
+    '기존 PENDING 활동과 충돌한 %s도 접수하고 기존 활동을 덮어쓰지 않는다',
+    async (kind) => {
+      const f = fixture();
+      if (kind === 'personnel.dismiss') f.target.officerLevel = 5;
+      f.pendingActivity();
+      f.tx.$executeRaw.mockResolvedValue(0);
+      const payload =
+        kind === 'offer.respond'
+          ? { offerId: 'offer:1', accept: true }
+          : kind === 'personnel.dismiss'
+            ? { generalId: 3 }
+            : { generalId: 3, officerLevel: 5 };
+      expect(await f.submit(kind, payload)).toEqual({ created: true });
+      expect(f.tx.inputEvent.create).toHaveBeenCalledOnce();
+      expectActivityInsert(f);
+      // 별도 활동 조회 뒤 갱신하는 대신 INSERT의 고유 제약으로 원자적으로 합친다.
+      expect(f.tx.inputEvent.findMany).toHaveBeenCalledOnce();
+    },
+  );
+  it('기존 형식에는 인사·활동 접수를 모두 쓰지 않는다', async () => {
+    const f = fixture();
+    f.world.replayFormat = 1;
+    await expect(f.submit()).rejects.toHaveProperty('code', 'PRECONDITION_FAILED');
+    expect(f.tx.inputEvent.create).not.toHaveBeenCalled();
+    expect(f.tx.$executeRaw).not.toHaveBeenCalled();
   });
   it('종료·강등 뒤의 같은 요청 재전송도 새 접수나 활동을 만들지 않는다', async () => {
     const f = fixture();
@@ -94,6 +130,7 @@ describe('인사 접수 B7 활동 경계', () => {
     expect(await f.submit()).toEqual({ created: false });
     expect(f.tx.general.findUnique).not.toHaveBeenCalled();
     expect(f.tx.inputEvent.create).not.toHaveBeenCalled();
+    expect(f.tx.$executeRaw).not.toHaveBeenCalled();
   });
   it.each([
     { kind: 'personnel.dismiss', payload: { generalId: 3 } },
@@ -104,6 +141,7 @@ describe('인사 접수 B7 활동 경계', () => {
     await expect(f.submit()).rejects.toHaveProperty('code', 'CONFLICT');
     expect(f.tx.general.findUnique).not.toHaveBeenCalled();
     expect(f.tx.inputEvent.create).not.toHaveBeenCalled();
+    expect(f.tx.$executeRaw).not.toHaveBeenCalled();
   });
   it('권한 없는 행위자는 대상 조회와 접수·활동 없이 거부한다', async () => {
     const f = fixture();
@@ -111,6 +149,7 @@ describe('인사 접수 B7 활동 경계', () => {
     await expect(f.submit()).rejects.toHaveProperty('code', 'FORBIDDEN');
     expect(f.tx.general.findUnique).toHaveBeenCalledOnce();
     expect(f.tx.inputEvent.create).not.toHaveBeenCalled();
+    expect(f.tx.$executeRaw).not.toHaveBeenCalled();
   });
   it.each([
     { generalId: 3, officerLevel: 12 },
@@ -119,12 +158,14 @@ describe('인사 접수 B7 활동 경계', () => {
     const f = fixture();
     await expect(f.submit('personnel.appoint', payload)).rejects.toHaveProperty('code', 'BAD_REQUEST');
     expect(f.tx.inputEvent.create).not.toHaveBeenCalled();
+    expect(f.tx.$executeRaw).not.toHaveBeenCalled();
   });
   it.each(['PREOPEN', 'PAUSED', 'ENDED'])('%s 월드는 새 접수나 활동을 쓰지 않는다', async (status) => {
     const f = fixture();
     f.world.status = status;
     await expect(f.submit()).rejects.toHaveProperty('code', 'PRECONDITION_FAILED');
     expect(f.tx.inputEvent.create).not.toHaveBeenCalled();
+    expect(f.tx.$executeRaw).not.toHaveBeenCalled();
   });
   it('제재·만료 세션은 월드를 읽기 전에 거부한다', async () => {
     const f = fixture();
@@ -132,6 +173,7 @@ describe('인사 접수 B7 활동 경계', () => {
     await expect(f.submit()).rejects.toHaveProperty('code', 'UNAUTHORIZED');
     expect(f.tx.world.findUnique).not.toHaveBeenCalled();
     expect(f.tx.inputEvent.create).not.toHaveBeenCalled();
+    expect(f.tx.$executeRaw).not.toHaveBeenCalled();
     expect(f.tx.session.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({ userId: 'user', expiresAt: { gt: identity.at }, user: { status: 'ACTIVE' } }),
@@ -143,6 +185,7 @@ describe('인사 접수 B7 활동 경계', () => {
     f.tx.inputEvent.findMany.mockResolvedValue([{ id: 10n }]);
     await expect(f.submit()).rejects.toHaveProperty('code', 'CONFLICT');
     expect(f.tx.inputEvent.create).not.toHaveBeenCalled();
+    expect(f.tx.$executeRaw).not.toHaveBeenCalled();
   });
   it('다른 장수의 발령과 이미 끝난 발령은 각각 NOT_FOUND와 CONFLICT다', async () => {
     const f = fixture();
@@ -157,10 +200,22 @@ describe('인사 접수 B7 활동 경계', () => {
       'CONFLICT',
     );
     expect(f.tx.inputEvent.create).not.toHaveBeenCalled();
+    expect(f.tx.$executeRaw).not.toHaveBeenCalled();
   });
   it('동반 활동 저장 실패는 삼키지 않고 호출자 트랜잭션으로 전파한다', async () => {
     const f = fixture();
-    f.tx.inputEvent.create.mockResolvedValueOnce({}).mockRejectedValueOnce(new Error('activity storage failure'));
+    f.tx.$executeRaw.mockRejectedValueOnce(new Error('activity storage failure'));
     await expect(f.submit()).rejects.toThrow('activity storage failure');
+    expect(f.tx.inputEvent.create).toHaveBeenCalledOnce();
+  });
+  it('활동의 다른 고유 제약 오류도 삼키지 않는다', async () => {
+    const f = fixture();
+    const failure = Object.assign(new Error('idempotency unique violation'), {
+      code: '23505',
+      constraint: 'InputEvent_worldId_userId_idempotencyKey_key',
+    });
+    f.tx.$executeRaw.mockRejectedValueOnce(failure);
+    await expect(f.submit()).rejects.toBe(failure);
+    expect(f.tx.inputEvent.create).toHaveBeenCalledOnce();
   });
 });

@@ -117,18 +117,12 @@ export async function submitPersonnelRequest(
       sequence: null,
     },
   });
-  if (world.ruleFeatures.includes('policy'))
-    await tx.inputEvent.create({
-      data: {
-        worldId: world.id,
-        userId: input.userId,
-        generalId: actor.id,
-        kind: 'general.active',
-        idempotencyKey: `general.active:personnel:${request.data}`,
-        payload: {},
-        status: 'PENDING',
-        sequence: null,
-      },
-    });
+  if (world.ruleFeatures.includes('policy')) {
+    // 대기 활동만 합친다. 기존 행은 보존하고 다른 저장 오류는 접수와 함께 롤백한다.
+    const activityKey = `general.active:personnel:${request.data}`;
+    await tx.$executeRaw`INSERT INTO "InputEvent" ("worldId","userId","generalId",kind,"idempotencyKey",payload,status)
+      VALUES (${world.id},${input.userId},${actor.id},'general.active',${activityKey},'{}'::jsonb,'PENDING')
+      ON CONFLICT ("worldId","generalId") WHERE status='PENDING' AND kind='general.active' DO NOTHING`;
+  }
   return { created: true };
 }

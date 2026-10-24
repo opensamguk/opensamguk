@@ -19,6 +19,9 @@ import { appRouter } from '../apps/server/src/router';
 import { buildServer } from '../apps/server/src/server';
 import { readFixture } from '../apps/server/test/readFixture';
 import { worldResolver } from '../apps/server/src/game/resolver';
+import { submitPersonnelRequest } from '../apps/server/src/game/personnelAdmission';
+import { acquireLease, releaseLease } from '../apps/engine/src/lease';
+import { TurnLoop } from '../apps/engine/src/turnLoop';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -545,4 +548,134 @@ describe('B7 실제 HTTP·PostgreSQL 인가 기록', () => {
         }),
       );
     }
+});
+
+describe('B7 기존 대기 활동과 새 인사 접수의 실제 DB 회귀', () => {
+  it.each(['personnel.appoint', 'personnel.dismiss', 'offers.respond'] as const)(
+    '%s는 기존 활동을 보존해 접수하고 엔진에서 잠근 tick으로 처리한다',
+    async (path) => {
+      const f = await fixture(path);
+      await db.general.update({ where: { worldId_id: { worldId: f.worldId, id: 1 } }, data: { lastActiveTick: 105 } });
+      const existing = await db.inputEvent.create({
+        data: {
+          worldId: f.worldId,
+          userId: users[0]!,
+          generalId: 1,
+          kind: 'general.active',
+          idempotencyKey: `general.active:${randomUUID()}`,
+          payload: {},
+          createdAt: new Date(now - 2000),
+        },
+      });
+      const before = await readRows(f.worldId);
+      const kind = path === 'offers.respond' ? 'offer.respond' : path;
+      const { worldId, requestId, ...payload } = input(path, f);
+      // 합쳐진 활동도 접수와 같은 트랜잭션에 속하며, 뒤의 오류는 새 접수만 전부 취소한다.
+      await expect(
+        db.$transaction(async (tx) => {
+          expect(
+            await submitPersonnelRequest(tx, {
+              worldId: f.worldId,
+              requestId: f.requestId,
+              kind,
+              payload,
+              userId: users[0]!,
+              sessionId: before.sessions.find((session) => session.userId === users[0])!.id,
+              at: new Date(now),
+            }),
+          ).toEqual({ created: true });
+          throw new Error('coalesced admission rollback');
+        }),
+      ).rejects.toThrow('coalesced admission rollback');
+      expect(await snapshot(f.worldId)).toEqual(hashes(before));
+      expect({ worldId, requestId }).toEqual({ worldId: f.worldId, requestId: f.requestId });
+
+      // 엔진을 아직 돌리지 않은 상태에서 정확히 같은 UUID의 두 HTTP 요청을 보낸다.
+      const replies = await Promise.all([
+        request(path, input(path, f), cookies[0]),
+        request(path, input(path, f), cookies[0]),
+      ]);
+      for (const reply of replies)
+        expect(reply).toEqual({ status: 200, code: undefined, data: { status: 'pending', requestId: f.requestId } });
+      const queued = await readRows(f.worldId);
+      expect(queued.inputs).toHaveLength(2);
+      expect(queued.inputs[0]).toEqual(existing);
+      const admission = queued.inputs[1]!;
+      expect(admission).toEqual({
+        id: admission.id,
+        worldId: f.worldId,
+        userId: users[0],
+        generalId: 1,
+        kind,
+        idempotencyKey: `personnel:${f.requestId}`,
+        payload,
+        status: 'PENDING',
+        sequence: null,
+        stepTick: null,
+        tick: null,
+        result: null,
+        createdAt: admission.createdAt,
+      });
+      const expectedQueued = structuredClone(before);
+      expectedQueued.inputs.push(admission);
+      expect(hashes(queued)).toEqual(hashes(expectedQueued));
+
+      const lease = await acquireLease(db, f.worldId);
+      if (!lease) throw new Error('인사 회귀 시험 실행권이 없습니다.');
+      try {
+        expect(await new TurnLoop(db, lease).advanceTo(100)).toEqual([]);
+        const applied = await readRows(f.worldId);
+        expect(applied.inputs).toHaveLength(2);
+        expect(applied.inputs[0]).toEqual({
+          ...existing,
+          status: 'APPLIED',
+          sequence: 1,
+          tick: 100,
+          result: { activeTick: 100 },
+        });
+        const destination = before.cities.find((city) => city.cityKey === before.offers[0]?.cityKey);
+        const result =
+          path === 'offers.respond'
+            ? {
+                offerStatus: 'ACCEPTED',
+                city: { cityKey: destination!.cityKey, name: destination!.name },
+                dedicationLost: 0,
+              }
+            : {
+                generalId: 2,
+                officerLevel: path === 'personnel.appoint' ? 11 : 1,
+                title: path === 'personnel.appoint' ? '참모' : '장수',
+              };
+        expect(applied.inputs[1]).toEqual({ ...admission, status: 'APPLIED', sequence: 2, tick: 100, result });
+        const expectedGenerals = structuredClone(before.generals);
+        const actor = expectedGenerals.find((general) => general.id === 1)!;
+        actor.lastActiveTick = 105;
+        actor.lastActiveAt = existing.createdAt;
+        if (path === 'offers.respond') {
+          actor.cityKey = destination!.cityKey;
+          actor.residenceTick = 100;
+          expect(applied.offers).toEqual([
+            { ...before.offers[0]!, status: 'ACCEPTED', resolvedBy: 'RESPONSE', resolvedTick: 100 },
+          ]);
+        } else
+          expectedGenerals.find((general) => general.id === 2)!.officerLevel = path === 'personnel.appoint' ? 11 : 1;
+        expect(digest(applied.generals)).toBe(digest(expectedGenerals));
+        expect(applied.world).toMatchObject({ clockTick: 100, actionSequence: 2 });
+        expect(applied.generalTurns).toEqual(before.generalTurns);
+        expect(applied.cities).toEqual(before.cities);
+        expect(applied.nations).toEqual(before.nations);
+        expect(applied.accounts.map(digest)).toEqual(before.accounts.map(digest));
+        expect(applied.sessions.map(digest)).toEqual(before.sessions.map(digest));
+        const after = await snapshot(f.worldId);
+        expect(await request(path, input(path, f), cookies[0])).toEqual({
+          status: 200,
+          code: undefined,
+          data: { status: 'applied', requestId: f.requestId, result },
+        });
+        expect(await snapshot(f.worldId)).toEqual(after);
+      } finally {
+        await releaseLease(db, lease);
+      }
+    },
+  );
 });
