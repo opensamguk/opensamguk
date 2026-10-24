@@ -199,8 +199,37 @@ test('임명: 군주가 수뇌를 임명하면 수뇌가 국가 예턴 12칸을 
   await member.page.goto(`/w/${world}/nation/turns`);
   const editor = member.page.getByTestId('turn-editor');
   await expect(editor.locator('tr[data-slot]')).toHaveCount(12);
+  await expect(editor).not.toHaveAttribute('data-readonly', 'true');
   await expect(editor.locator('[data-readonly]')).toHaveCount(0);
+  await expect(editor.getByTestId('draft-state')).toHaveText('저장된 목록');
+  await editor.getByRole('button', { name: '저장 (사용 불가)', exact: true }).click();
+  await expect(editor.getByRole('note')).toHaveText('바꾼 칸이 없습니다.');
+
+  const ownOffice = async () => {
+    const { tabs } = await query<{
+      tabs: Array<{
+        holder: { generalId: number } | null;
+        edit: { ok: boolean };
+        revision: number;
+        slots: Array<{ commandKey: string; args: unknown }>;
+      }>;
+    }>(member.page, 'nationTurns.get', { worldId: world });
+    const tab = tabs.find((candidate) => candidate.holder?.generalId === member.general.id);
+    expect(tab).toBeDefined();
+    expect(tab!.edit.ok).toBe(true);
+    expect(tab!.slots).toHaveLength(12);
+    return tab!;
+  };
+  const before = await ownOffice();
+  expect(before.slots.every((slot) => slot.commandKey === 'nation_rest')).toBe(true);
+  await editor.getByRole('button', { name: '밀기', exact: true }).click();
+  await expect(editor.getByTestId('draft-state')).toHaveText('저장하지 않은 편집 1건');
   await expect(editor.getByRole('button', { name: '저장', exact: true })).toBeVisible();
+  await editor.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(editor.getByTestId('draft-state')).toHaveText('저장된 목록');
+  const saved = await ownOffice();
+  expect(saved.revision).toBe(before.revision + 1);
+  expect(saved.slots).toEqual(before.slots);
 });
 
 test('국가 칸 저장: 고친 뒤 해임·재임명되면 저장이 거부되고 빈 12칸을 다시 받는다', async () => {
