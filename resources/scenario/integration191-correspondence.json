@@ -1,0 +1,66 @@
+{
+  "removed": [
+    {
+      "nationId": 1,
+      "legacyCityId": 81,
+      "name": "정도",
+      "role": "FIELD",
+      "targetId": null
+    },
+    {
+      "nationId": 3,
+      "legacyCityId": 89,
+      "name": "장판",
+      "role": "FIELD",
+      "targetId": null
+    },
+    {
+      "nationId": 10,
+      "legacyCityId": 77,
+      "name": "역경",
+      "role": "FIELD",
+      "targetId": null
+    },
+    {
+      "nationId": 12,
+      "legacyCityId": 12,
+      "name": "서주",
+      "role": "CAPITAL_RELOCATION",
+      "targetId": 21
+    },
+    {
+      "nationId": 14,
+      "legacyCityId": 82,
+      "name": "합비",
+      "role": "FIELD",
+      "targetId": null
+    },
+    {
+      "nationId": 17,
+      "legacyCityId": 60,
+      "name": "안평",
+      "role": "CAPITAL_RELOCATION",
+      "targetId": 99
+    }
+  ],
+  "relocations": [
+    {
+      "oldId": 12,
+      "oldName": "서주",
+      "nationId": 12,
+      "targetId": 21,
+      "targetName": "하비",
+      "reason": "도겸은 원본에서 서주12와 하비21을 소유한다. 새53도시에서는 기존 소유 도시 하비21에 수도 기능을 통합한다.",
+      "source": "resources/scenario/1030.json nation[11]; resources/map/che.json"
+    },
+    {
+      "oldId": 60,
+      "oldName": "안평",
+      "nationId": 17,
+      "targetId": 99,
+      "targetName": "양평",
+      "reason": "원본 국가17 공손도의 본거지는 새판의 요동 양평으로 명시한다. 옛 안평 좌표나 다른 안평 지명의 동치를 주장하지 않는다.",
+      "source": "https://zh.wikisource.org/zh-hant/三國志/卷08#公孫度"
+    }
+  ]
+}

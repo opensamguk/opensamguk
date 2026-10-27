@@ -1,0 +1,30 @@
+[
+  {
+    "kind": "MAP",
+    "name": "integration",
+    "version": 1,
+    "contentHash": "1795eb84f9a292c93fd7fd09abd0d9fcdc5e436c8aa77a2d424e7efb70264d75",
+    "source": "INT-03; core2026 df6c926 MIT / Natural Earth 5.1.2 public domain; resources/NOTICE.md"
+  },
+  {
+    "kind": "SCENARIO",
+    "name": "integration191",
+    "version": 1,
+    "contentHash": "75966c60851560ecc5d6619798d5e950132e1c6856288a11346b0183fa3bba3b",
+    "source": "INT-04; main 1030 core2026 df6c926 MIT / INT-16 sourced491; resources/NOTICE.md"
+  },
+  {
+    "kind": "STAT_RULES",
+    "name": "five-stats",
+    "version": 1,
+    "contentHash": "88549956961d71214ab2e85b81ee3e2a21746ec1912a6110b1d047141e4a8602",
+    "source": "OpenSamguk D-038; docs/product/five-stats.md; MIT"
+  },
+  {
+    "kind": "PORTRAIT_MAP",
+    "name": "191-map",
+    "version": 1,
+    "contentHash": "4e068f96c8227df00984bca0a881c4031b7072733d03684c7be72932014463c8",
+    "source": "INT-16 portraits metadata; KOEI private development only; resources/NOTICE.md"
+  }
+]

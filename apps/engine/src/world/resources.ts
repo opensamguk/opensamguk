@@ -3,6 +3,13 @@ import type { readPublishedResources, GameResourceKind, PublishedResource } from
 import { buildInitialWorld, parsePreset, type WorldInit } from '@opensamguk/rules';
 
 export const resourceRoot = new URL('../../../../resources/', import.meta.url);
+export interface WorldResourceSelection {
+  scenario: string;
+  map: string;
+  unitSet?: string;
+  statRules?: string;
+  portraitMap?: string;
+}
 
 function resourceKey(value: string): string {
   if (!/^[a-zA-Z0-9_-]+$/.test(value)) throw new Error('리소스 ID는 영문·숫자·밑줄·하이픈만 허용합니다.');
@@ -13,17 +20,14 @@ export async function loadPreset(key: string, root: URL = resourceRoot) {
   return parsePreset(JSON.parse(await readFile(new URL(`preset/${resourceKey(key)}.json`, root), 'utf8')));
 }
 
-export async function loadInitialWorld(
-  options: { scenario: string; map: string; seed: string; unitSet?: string },
-  root: URL = resourceRoot,
-) {
+export async function loadInitialWorld(options: WorldResourceSelection & { seed: string }, root: URL = resourceRoot) {
   const readJson = async (path: string): Promise<unknown> => JSON.parse(await readFile(new URL(path, root), 'utf8'));
   const [map, scenario, unitSet, statRules, portraitMap] = await Promise.all([
     readJson(`map/${resourceKey(options.map)}.json`),
     readJson(`scenario/${resourceKey(options.scenario)}.json`),
     readJson(`unitset/${resourceKey(options.unitSet ?? 'basic')}.json`),
-    readJson('scenario/default.json'),
-    readJson('portraits/rtk14-map.json'),
+    readJson(`scenario/${resourceKey(options.statRules ?? 'default')}.json`),
+    readJson(`portraits/${resourceKey(options.portraitMap ?? 'rtk14-map')}.json`),
   ]);
   return buildInitialWorld({ map, scenario, unitSet, statRules, portraitMap, seed: options.seed });
 }
@@ -38,18 +42,20 @@ export interface InitialResources {
 
 export async function readInitialResources(
   db: Parameters<typeof readPublishedResources>[0],
-  options: { scenario: string; map: string; unitSet?: string },
+  options: WorldResourceSelection,
 ): Promise<InitialResources> {
   resourceKey(options.scenario);
   resourceKey(options.map);
   resourceKey(options.unitSet ?? 'basic');
+  resourceKey(options.statRules ?? 'default');
+  resourceKey(options.portraitMap ?? 'rtk14-map');
   const { readPublishedResources } = await import('@opensamguk/db');
   const [map, scenario, unitSet, statRules, portraitMap] = await readPublishedResources(db, [
     { kind: 'MAP', name: options.map, version: 1 },
     { kind: 'SCENARIO', name: options.scenario, version: 1 },
     { kind: 'UNIT_SET', name: options.unitSet ?? 'basic', version: 1 },
-    { kind: 'STAT_RULES', name: 'default', version: 1 },
-    { kind: 'PORTRAIT_MAP', name: 'rtk14-map', version: 1 },
+    { kind: 'STAT_RULES', name: options.statRules ?? 'default', version: 1 },
+    { kind: 'PORTRAIT_MAP', name: options.portraitMap ?? 'rtk14-map', version: 1 },
   ]);
   return { map: map!, scenario: scenario!, unitSet: unitSet!, statRules: statRules!, portraitMap: portraitMap! };
 }
@@ -94,7 +100,7 @@ export function composeInitialWorld(resources: InitialResources, seed: string): 
 
 export async function loadInitialWorldFromDb(
   db: Parameters<typeof readPublishedResources>[0],
-  options: { scenario: string; map: string; seed: string; unitSet?: string },
+  options: WorldResourceSelection & { seed: string },
 ): Promise<WorldInit> {
   return composeInitialWorld(await readInitialResources(db, options), options.seed);
 }
