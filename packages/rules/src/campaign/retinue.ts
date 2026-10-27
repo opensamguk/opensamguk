@@ -6,7 +6,7 @@ import { FIVE_STAT_KEYS, fiveStatsSchema, type FiveStats } from '../general/five
 
 export const INITIAL_RENOWN_CAPACITY = 30;
 export type SourcedFiveStats = FiveStats & { source: string };
-export type RetinuePerson = { id: number; worldId: string; nationId: number; stats: SourcedFiveStats };
+export type RetinuePerson = { id: number; worldId: string; nationId: number | null; stats: SourcedFiveStats };
 export type RetinueLink = { masterId: number; personId: number; relation: 'STAFF' | 'LIEUTENANT' | 'GUEST' };
 const natural = (n: number) => Number.isSafeInteger(n) && n >= 0;
 const positive = (n: number) => natural(n) && n > 0;
@@ -22,7 +22,7 @@ export function buildRetinueHierarchy(people: readonly RetinuePerson[], links: r
   for (const p of people) {
     if (
       !positive(p.id) ||
-      !positive(p.nationId) ||
+      (p.nationId !== null && !positive(p.nationId)) ||
       typeof p.worldId !== 'string' ||
       !p.worldId.trim() ||
       persons.has(p.id)
@@ -107,7 +107,7 @@ export type CampaignUnit = { id: number; ownerId: number; commanderId: number; t
 export type CampaignDeployment = {
   id: number;
   worldId: string;
-  nationId: number;
+  nationId: number | null;
   ownerId: number;
   commanderId: number;
   unitIds: readonly number[];
