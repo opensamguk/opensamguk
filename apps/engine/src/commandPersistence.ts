@@ -30,6 +30,7 @@ export async function persistCommandState(
   state: WorldState,
   at: ActionAt,
   previous?: WorldState,
+  beforeNationRemoval?: () => Promise<void>,
 ) {
   // 같은 잠긴 트랜잭션에서 읽은 사본은 다시 조회하지 않는다.
   const before = previous ?? (await loadWorld(tx, worldId));
@@ -81,6 +82,8 @@ export async function persistCommandState(
       });
     else await tx.$executeRaw`UPDATE "World" SET "commandMeta" = NULL WHERE id = ${worldId}`;
   }
+  // 새 국가의 FK 대상은 생긴 뒤, 멸망 국가의 직책이 연쇄 삭제되기 전에 후속 상태를 저장한다.
+  await beforeNationRemoval?.();
   for (const nation of Object.values(before.nations)) {
     if (!state.nations[nation.id]) {
       await archiveRemovedNation(tx, worldId, nation, at);
