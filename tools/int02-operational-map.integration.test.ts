@@ -211,3 +211,58 @@ it('INT-02 실제 조약 견적·목록·수락 비용과 국가 표시에서 �
     await releaseLease(db, lease);
   }
 });
+
+it('INT-02 교역 후보 API는 관문 출발과 관문 목표를 제외한다', async () => {
+  const input = operationalInput();
+  input.map.routes.push({
+    id: 'route:3',
+    from: 'city:1',
+    to: 'city:2',
+    mode: 'LAND',
+    direction: 'BOTH',
+    enabled: true,
+  });
+  const value = buildInitialWorld(input);
+  value.ruleFeatures!.push('policy', 'treaty', 'treaty-trade');
+  value.cities.find((city) => city.cityKey === 99)!.nationId = 2;
+  value.generals[0]!.userId = userId;
+  Object.assign(value.generals[0]!, { leadership: 55, strength: 55, intel: 55, politics: 55, charm: 55 });
+  const { worldId: id } = await saveInitialWorld(db, value, {
+    name: 'INT02 교역 관문 제외',
+    turnTermMinutes: 60,
+    endYear: null,
+  });
+  worlds.push(id);
+  await controlClock(db, id, 'start');
+  // 활성 조약을 둔 조회 고정물이다. 조약 입력·비용·재생은 위의 실제 엔진 검사에서 다룬다.
+  await db.world.update({ where: { id }, data: { actionSequence: 1 } });
+  await db.treaty.create({
+    data: {
+      worldId: id,
+      id: 1,
+      fromNationId: 1,
+      toNationId: 2,
+      clauses: [{ kind: 'trade', months: 12 }],
+      status: 'ACTIVE',
+      proposedTick: 0,
+      respondByTick: 60000,
+      startTick: 0,
+      endTick: 120000,
+      costFrom: 100,
+      costTo: 100,
+      closedSequence: null,
+    },
+  });
+  const targets = (await request('treaty.tradeTargets', { worldId: id })).data;
+  expect(targets.items.map((row: { cityKey: number }) => row.cityKey)).toEqual([2]);
+  expect(targets.blocked).toBeNull();
+  await db.general.update({
+    where: { worldId_id: { worldId: id, id: value.generals[0]!.id } },
+    data: { cityKey: 99, nationId: 2 },
+  });
+  expect((await request('treaty.tradeTargets', { worldId: id })).data).toMatchObject({
+    fromCityKey: 99,
+    items: [],
+    blocked: '자기 국가 도시에서만 가능합니다.',
+  });
+});
