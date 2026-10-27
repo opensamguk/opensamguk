@@ -42,7 +42,10 @@ export async function persistEffects(
 
 export async function shiftTurns(tx: Prisma.TransactionClient, worldId: string, generalId: number) {
   const slots = await tx.generalTurn.findMany({ where: { worldId, generalId }, orderBy: { slot: 'asc' } });
-  const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
+  const world = await tx.world.findUniqueOrThrow({
+    where: { id: worldId },
+    select: { replayFormat: true, ruleFeatures: true, policyFromSequence: true, actionSequence: true },
+  });
   const modern =
     world.replayFormat === 3
       ? world.ruleFeatures.includes('policy')

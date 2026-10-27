@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb, type PrismaClient } from '../packages/db/src/index';
 import { TICKS_PER_MONTH } from '../packages/rules/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
@@ -55,7 +55,7 @@ interface Fixture {
   url: URL;
 }
 
-async function withDatabase(action: (value: Fixture) => Promise<void>, initialize = true): Promise<void> {
+function ownedDatabase(initialize = true) {
   if (!process.env.TEST_DATABASE_URL) throw new Error('전용 TEST_DATABASE_URL이 필요합니다.');
   const reference = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
   const name = `scenarios_${randomUUID().replaceAll('-', '')}_test`;
@@ -71,74 +71,89 @@ async function withDatabase(action: (value: Fixture) => Promise<void>, initializ
   let created = false;
   let oid: string | undefined;
   let db: PrismaClient | undefined;
-  let failure: unknown;
   const cleanupErrors: unknown[] = [];
-  try {
-    await admin.connect();
-    adminConnected = true;
-    expect((await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', [name])).rows).toEqual([]);
-    await admin.query(`CREATE DATABASE "${name}"`);
-    created = true;
-    oid = (await admin.query<{ oid: string }>('SELECT oid::text AS oid FROM pg_database WHERE datname = $1', [name]))
-      .rows[0]!.oid;
-    await native.connect();
-    connected = true;
-    const migrations = new URL('packages/db/prisma/migrations/', root);
-    const names = (await readdir(migrations, { withFileTypes: true }))
-      .filter((entry) => entry.isDirectory())
-      .map(({ name }) => name)
-      .sort();
-    for (const name of names) await native.query(await readFile(new URL(`${name}/migration.sql`, migrations), 'utf8'));
-    db = createDb(url.href);
-    if (initialize)
-      await initializeResources(db, await readFile(new URL('packages/db/sql/resources-init.sql', root), 'utf8'));
-    await action({ db, native, url });
-  } catch (error) {
-    failure = error;
-  } finally {
-    try {
-      await db?.$disconnect();
-    } catch (error) {
-      cleanupErrors.push(error);
-    }
-    try {
-      if (connected) await native.end();
-    } catch (error) {
-      cleanupErrors.push(error);
-    }
-    if (created && !oid) cleanupErrors.push(new Error('만든 DB의 OID가 없어 정리하지 않았습니다.'));
-    if (created && oid) {
+  return {
+    async setup(): Promise<Fixture> {
+      await admin.connect();
+      adminConnected = true;
+      expect((await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', [name])).rows).toEqual([]);
+      await admin.query(`CREATE DATABASE "${name}"`);
+      created = true;
+      oid = (await admin.query<{ oid: string }>('SELECT oid::text AS oid FROM pg_database WHERE datname = $1', [name]))
+        .rows[0]!.oid;
+      await native.connect();
+      connected = true;
+      const migrations = new URL('packages/db/prisma/migrations/', root);
+      const names = (await readdir(migrations, { withFileTypes: true }))
+        .filter((entry) => entry.isDirectory())
+        .map(({ name }) => name)
+        .sort();
+      for (const name of names)
+        await native.query(await readFile(new URL(`${name}/migration.sql`, migrations), 'utf8'));
+      db = createDb(url.href);
+      if (initialize)
+        await initializeResources(db, await readFile(new URL('packages/db/sql/resources-init.sql', root), 'utf8'));
+      return { db, native, url };
+    },
+    async close(): Promise<void> {
       try {
-        expect((await admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname = $1', [name])).rows).toEqual(
-          [{ oid }],
-        );
-        // Closing the client socket can precede PostgreSQL removing its backend.
-        let activity = await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname = $1', [
-          name,
-        ]);
-        for (let attempt = 0; activity.rows[0]?.count !== 0 && attempt < 20; attempt++) {
-          await delay(50);
-          activity = await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname = $1', [
-            name,
-          ]);
-        }
-        expect(activity.rows).toEqual([{ count: 0 }]);
-        await admin.query(`DROP DATABASE "${name}"`);
-        expect((await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', [name])).rows).toEqual([]);
+        await db?.$disconnect();
       } catch (error) {
         cleanupErrors.push(error);
       }
-    }
-    try {
-      if (adminConnected) await admin.end();
-    } catch (error) {
-      cleanupErrors.push(error);
-    }
+      try {
+        if (connected) await native.end();
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+      if (created && !oid) cleanupErrors.push(new Error('만든 DB의 OID가 없어 정리하지 않았습니다.'));
+      if (created && oid) {
+        try {
+          expect(
+            (await admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname = $1', [name])).rows,
+          ).toEqual([{ oid }]);
+          // Closing the client socket can precede PostgreSQL removing its backend.
+          let activity = await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname = $1', [
+            name,
+          ]);
+          for (let attempt = 0; activity.rows[0]?.count !== 0 && attempt < 20; attempt++) {
+            await delay(50);
+            activity = await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname = $1', [
+              name,
+            ]);
+          }
+          expect(activity.rows).toEqual([{ count: 0 }]);
+          await admin.query(`DROP DATABASE "${name}"`);
+          expect((await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', [name])).rows).toEqual([]);
+        } catch (error) {
+          cleanupErrors.push(error);
+        }
+      }
+      try {
+        if (adminConnected) await admin.end();
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+      if (cleanupErrors.length) throw new AggregateError(cleanupErrors, '자기 DB 정리가 실패했습니다.');
+    },
+  };
+}
+
+async function withDatabase(action: (value: Fixture) => Promise<void>, initialize = true): Promise<void> {
+  const owned = ownedDatabase(initialize);
+  let failure: unknown;
+  try {
+    await action(await owned.setup());
+  } catch (error) {
+    failure = error;
   }
-  if (failure && cleanupErrors.length)
-    throw new AggregateError([failure, ...cleanupErrors], '시험과 자기 DB 정리가 실패했습니다.');
+  try {
+    await owned.close();
+  } catch (error) {
+    if (failure) throw new AggregateError([failure, error], '시험과 자기 DB 정리가 실패했습니다.', { cause: error });
+    throw error;
+  }
   if (failure) throw failure;
-  if (cleanupErrors.length) throw new AggregateError(cleanupErrors, '자기 DB 정리가 실패했습니다.');
 }
 
 async function allRows(native: PgClient) {
@@ -280,32 +295,56 @@ it.each(ready)('S6 $key 두 DB 월드의 행 수와 재적재 해시는 파일 �
   });
 });
 
-it.each(ready)('S8 $key 전체 장수가 있는 DB 월드를 한 달 정산한다', async (row) => {
-  await withDatabase(async ({ db }) => {
-    await initializeScenarios(db, sql);
-    const initial = await loadInitialWorldFromDb(db, { scenario: row.key, map: 'che', seed: 't4-46-a' });
-    const { worldId } = await saveInitialWorld(db, initial, {
-      name: `시나리오 ${row.key} 한 달`,
-      turnTermMinutes: 60,
-      endYear: null,
-    });
-    expect(await db.general.count({ where: { worldId } })).toBe(row.expected!.generals);
-    await controlClock(db, worldId, 'start');
-    const lease = await acquireLease(db, worldId);
-    if (!lease) throw new Error('시나리오 월드의 실행권을 얻지 못했습니다.');
-    try {
-      const loop = new TurnLoop(db, lease);
-      for (let tick = 1000; tick <= TICKS_PER_MONTH; tick += 1000) {
-        await renewLease(db, lease);
-        await loop.advanceTo(tick);
+describe.each(ready)('S8 $key 전체 장수가 있는 DB 월드', (row) => {
+  const owned = ownedDatabase();
+  let fixture: Fixture;
+  let worldId: string;
+  // DB 준비·한 달 정산·소유 DB 정리는 각각 기존 30초 제한을 지킨다.
+  let preparation: Promise<void> | undefined;
+  let execution: Promise<void> | undefined;
+  beforeAll(() => {
+    preparation = (async () => {
+      fixture = await owned.setup();
+      const { db } = fixture;
+      await initializeScenarios(db, sql);
+      const initial = await loadInitialWorldFromDb(db, { scenario: row.key, map: 'che', seed: 't4-46-a' });
+      ({ worldId } = await saveInitialWorld(db, initial, {
+        name: `시나리오 ${row.key} 한 달`,
+        turnTermMinutes: 60,
+        endYear: null,
+      }));
+      expect(await db.general.count({ where: { worldId } })).toBe(row.expected!.generals);
+    })();
+    return preparation;
+  });
+  afterAll(async () => {
+    // Vitest의 hook timeout은 원래 Promise를 취소하지 않는다. 생성이 끝난 뒤 자기 DB를 정리한다.
+    // 준비 오류는 beforeAll이 이미 실패로 기록하며 정리 오류는 이 hook에서 따로 보고한다.
+    await preparation?.catch(() => undefined);
+    await execution?.catch(() => undefined);
+    await owned.close();
+  });
+  it('한 달 정산과 연감 스냅샷을 저장한다', () => {
+    execution = (async () => {
+      const { db } = fixture;
+      await controlClock(db, worldId, 'start');
+      const lease = await acquireLease(db, worldId);
+      if (!lease) throw new Error('시나리오 월드의 실행권을 얻지 못했습니다.');
+      try {
+        const loop = new TurnLoop(db, lease);
+        for (let tick = 1000; tick <= TICKS_PER_MONTH; tick += 1000) {
+          await renewLease(db, lease);
+          await loop.advanceTo(tick);
+        }
+      } finally {
+        await releaseLease(db, lease);
       }
-    } finally {
-      await releaseLease(db, lease);
-    }
-    const saved = await db.world.findUniqueOrThrow({ where: { id: worldId } });
-    expect(saved.clockTick).toBe(TICKS_PER_MONTH);
-    expect(
-      await db.yearbookSnapshot.findUnique({ where: { worldId_tick: { worldId, tick: TICKS_PER_MONTH } } }),
-    ).not.toBeNull();
+      const saved = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+      expect(saved.clockTick).toBe(TICKS_PER_MONTH);
+      expect(
+        await db.yearbookSnapshot.findUnique({ where: { worldId_tick: { worldId, tick: TICKS_PER_MONTH } } }),
+      ).not.toBeNull();
+    })();
+    return execution;
   });
 });
