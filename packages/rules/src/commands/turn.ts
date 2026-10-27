@@ -56,7 +56,7 @@ export function runGeneralTurn(
   let nation: { commandKey: string; result: CommandResult | Failure; nationId: number } | undefined;
   // 국가 예턴은 턴 시작 시 군주가 한 번만 실행한다. 국가 명령 뒤 장수 명령을 재검사한다.
   const npcNation = general.userId === null && nationId !== null && state.nations[nationId]?.isNpc;
-  const context = { ...options, tick: actor.tick ?? 0, unitSet: actor.unitSet };
+  const context = { ...options, tick: actor.tick ?? 0, unitSet: actor.unitSet, resolver };
   if (personnelChange) {
     if (take) {
       let slot = take.slot;
