@@ -69,7 +69,14 @@ const NO_MATH_RANDOM = {
 };
 
 export default defineConfig([
-  globalIgnores(['**/node_modules/', '**/dist/', 'packages/db/src/generated/', 'playwright-report/', 'test-results/']),
+  globalIgnores([
+    '**/node_modules/',
+    '**/dist/',
+    'packages/db/src/generated/',
+    'playwright-report/',
+    'test-results/',
+    '.claude/worktrees/',
+  ]),
   js.configs.recommended,
   tseslint.configs.recommended,
   {

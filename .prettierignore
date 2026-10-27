@@ -1,5 +1,8 @@
 # .gitignore에 있는 것(생성물·테스트 산출물)은 프리티어가 따로 읽어서 건너뛴다. 이유: docs/plans/T1-21.md
 
+# 다른 checkout은 그 작업 디렉터리에서 검사한다.
+.claude/worktrees/
+
 # 문서는 코드 포맷터로 다루지 않는다
 *.md
 

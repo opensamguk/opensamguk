@@ -1,4 +1,8 @@
 import { spawn, type ChildProcess } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { expect, test, type Page, type Route } from '@playwright/test';
 
 // T1-17 · AC-M1-20: base URL 환경변수만 바꿔 띄운 두 화면의 초상 주소가 다르고, 못 불러온 초상은 기본 이미지로 바뀐다.
@@ -8,6 +12,12 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 const DEFAULT_BASE =
   'https://cdn.jsdelivr.net/gh/opensamguk/opensamguk-images@48163bd1ce8d54c54c94fb5484b05f9db9e50c62';
 const ALT_BASE = 'http://images-b.opensamguk.test/set-b';
+const webDir = fileURLToPath(new URL('../apps/web/', import.meta.url));
+const vitePackage = createRequire(join(webDir, 'package.json')).resolve('vite/package.json');
+const viteBin = join(
+  dirname(vitePackage),
+  (JSON.parse(readFileSync(vitePackage, 'utf8')) as { bin: { vite: string } }).bin.vite,
+);
 
 interface Server {
   name: string;
@@ -42,19 +52,38 @@ test.describe.configure({ mode: 'serial' });
 test.beforeAll(async () => {
   test.setTimeout(120_000);
   for (const server of SERVERS) {
-    server.process = spawn(
-      'pnpm',
-      ['--filter', '@opensamguk/web', 'exec', 'vite', '--port', String(server.port), '--strictPort'],
-      { env: { ...process.env, VITE_IMAGE_BASE_URL: server.env }, detached: true, stdio: 'ignore' },
-    );
+    server.process = spawn(process.execPath, [viteBin, '--port', String(server.port), '--strictPort'], {
+      cwd: webDir,
+      env: { ...process.env, VITE_IMAGE_BASE_URL: server.env },
+      windowsHide: true,
+      stdio: 'ignore',
+    });
   }
   for (const server of SERVERS) await waitForServer(`http://127.0.0.1:${server.port}/dev/ui`, server.process!);
 });
 
-test.afterAll(() => {
-  for (const server of SERVERS) {
-    if (server.process?.pid) process.kill(-server.process.pid, 'SIGTERM');
-  }
+test.afterAll(async () => {
+  await Promise.all(
+    SERVERS.map(async (server) => {
+      const child = server.process;
+      if (!child || child.exitCode !== null || child.signalCode !== null) return;
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(`Vite ${server.name} 서버가 종료되지 않았습니다.`)), 10_000);
+        child.once('close', () => {
+          clearTimeout(timer);
+          resolve();
+        });
+        child.once('error', (error) => {
+          clearTimeout(timer);
+          reject(error);
+        });
+        if (!child.kill()) {
+          clearTimeout(timer);
+          reject(new Error(`Vite ${server.name} 종료 신호를 보내지 못했습니다.`));
+        }
+      });
+    }),
+  );
 });
 
 // 어느 서버의 그림인지 보이도록 서버 이름과 경로를 그린 SVG를 돌려준다.
