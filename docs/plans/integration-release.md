@@ -82,7 +82,7 @@ INT-13 편집기는 구현 후 리뷰 대상이며 새 제작 일수에 다시 �
 전용 개발 DB를 환경 변수로 연결한 뒤 새 판을 만든다. 생성된 월드 ID와 초기 해시를 기록하고 기존 월드의 기능 목록은 고치지 않는다.
 
 ```sh
-pnpm world:create --scenario integration191 --map integration --stat-rules five-stats --portrait-map 191-map --rule-features campaign-assignment-v2,campaign-v1,five-stats,operational-map,personnel,policy,stratagem-basic,treaty --seed integration-v01-formal-campaign-191-20261027 --turn-term 60 --end-year 201 --name "통합판 v0.1 정식 인수"
+pnpm world:create --scenario integration191 --map integration --stat-rules five-stats --portrait-map 191-map --rule-features 'campaign-assignment-v2,campaign-v1,five-stats,operational-map,personnel,policy,stratagem-basic,treaty' --seed integration-v01-formal-campaign-191-20261027 --turn-term 60 --end-year 201 --name "통합판 v0.1 정식 인수"
 ```
 
 첫 단계는 합성 최소 월드에서 5능력치 생성·저장·조회·재시작을 확인한다. 그다음 정식 데이터와 53도시 새 판, 이어 실제 API의 휘하·부곡·전투, 마지막에 전체 UI와 한 기수 완주를 시연한다. 합성 월드를 정식 전체 판의 인수로 세지 않는다.
