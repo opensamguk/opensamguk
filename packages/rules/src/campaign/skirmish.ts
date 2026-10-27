@@ -98,7 +98,7 @@ export function fightCampaignWall(
     attacker = unit(state, attackerId),
     city = state.cities[cityKey];
   const aNation = state.generals[attacker.ownerId]!.nationId;
-  if (!city || aNation === null || city.nationId === aNation || city.wall <= 0)
+  if (!city || aNation === null || city.nationId === aNation || city.wall < 0)
     throw new Error('교전할 성벽을 확인하세요.');
   feed(state, attacker);
   const result = simulateBattle(
