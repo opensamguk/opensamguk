@@ -13,6 +13,13 @@ import {
 import { mapFixture, scenarioFixture, unitSetFixture } from './fixtures';
 
 describe('능력치·초상·공개 검증기', () => {
+  it('INT-14 / AC-INT-14 새 판의 다섯 능력치를 같은 개수로 검증한다', () => {
+    const stat = { count: 5, total: 275, min: 15, max: 90 };
+    expect(validateStatRules({ stat })).toMatchObject({ ok: true, value: { stat } });
+    expect(validateStatRules({ stat: { ...stat, total: 451 } }).ok).toBe(false);
+    expect(validateStatRules({ stat: { ...stat, total: 74 } }).ok).toBe(false);
+    expect(validateStatRules({ stat: { ...stat, count: 4 } }).ok).toBe(false);
+  });
   it('공개 하위 경로의 값과 타입을 해석한다', () => {
     const map: MapResourceV2 = mapFixture();
     expect(publicValidateResource).toBe(validateResource);

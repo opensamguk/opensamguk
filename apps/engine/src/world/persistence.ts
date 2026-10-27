@@ -19,10 +19,12 @@ import {
   checkRuleFeatures,
   checkReplayOrigin,
   type JsonValue,
+  checkStatProfile,
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { loadCommandState } from '../commandPersistence';
 import { engineResolver, loadExt } from '../extState';
+import { storedGeneralStats } from '../generalStats';
 
 export async function saveInitialWorld(
   db: PrismaClient,
@@ -119,6 +121,7 @@ export async function saveInitialWorld(
     ...(features.length ? { ruleFeatures: features } : {}),
   };
   const stateHash = hashState(initial);
+  checkStatProfile(initial);
   if (
     options.endYear !== null &&
     (!Number.isSafeInteger(options.endYear) || options.endYear < state.startYear || options.endYear > 10000)
@@ -318,7 +321,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
           void turnRevision;
           void battleWins;
           void captures;
-          return stripWorldId(general);
+          return storedGeneralStats(stripWorldId(general), world.ruleFeatures?.includes('five-stats') ?? false);
         }),
         diplomacies: diplomacies.map(stripWorldId),
         ...(await loadCommandState(tx, worldId)),

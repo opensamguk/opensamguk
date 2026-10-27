@@ -37,6 +37,7 @@ export {
 } from './replayCapabilities';
 export { selectWorldCapabilities, projectTreatyRows, type WorldCapabilities } from './capsWorld';
 export * from './general/create';
+export * from './general/fiveStats';
 export * from './general/creationBlock';
 export * from './supply';
 export * from './commands/turn';

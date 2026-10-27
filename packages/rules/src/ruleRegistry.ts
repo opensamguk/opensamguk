@@ -8,10 +8,12 @@ import {
   treatyFeature,
   treatyBreakFeature,
   treatyTradeFeature,
+  fiveStatsFeature,
   personnelInputKinds,
   treatyInputKinds,
   treatyBreakInputKind,
 } from './ruleFeatures';
+import { checkStatProfile } from './general/fiveStats';
 import type { RecordedInput, ReplayState } from './replay';
 
 export interface ReplayOriginV1 {
@@ -58,7 +60,7 @@ export interface RuleRegistry {
   monthlyOrder?: readonly string[];
 }
 export const ruleRegistry: RuleRegistry = {
-  features: [personnelFeature, policyFeature, treatyFeature, treatyBreakFeature, treatyTradeFeature],
+  features: [personnelFeature, policyFeature, treatyFeature, treatyBreakFeature, treatyTradeFeature, fiveStatsFeature],
   monthlyOrder: ['treaty', 'personnel'],
   inputKinds: [
     { kind: 'turns.set', feature: null, route: 'direct', apply: applyTurnsInput },
@@ -125,6 +127,7 @@ export function checkReplayOrigin(
   const origin = value as ReplayOriginV3 | ReplayOriginV1;
   if (!origin || ![1, 3].includes(origin.version) || !origin.initial || typeof origin.initial !== 'object')
     throw new Error('재생 생성 기록의 버전을 확인하세요.');
+  checkStatProfile(origin.initial);
   if (origin.version === 1) {
     if (Object.hasOwn(origin.initial, 'ruleFeatures') || Object.hasOwn(origin, 'featureData'))
       throw new Error('형식 1 생성 기록에 규칙 기능을 넣을 수 없습니다.');

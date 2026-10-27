@@ -5,6 +5,7 @@ import { TICKS_PER_MONTH } from '../clock/constants';
 import { statRulesSchema, unitSetSchema } from '../world/resources';
 import type { InitialGeneral } from '../world/bootstrap';
 import type { PresetRules } from '../world/preset';
+import { FIVE_STAT_KEYS } from './fiveStats';
 
 export interface CreationBonus {
   gold: number;
@@ -44,6 +45,8 @@ export const generalCreationSchema = z.strictObject({
   leadership: dbInt,
   strength: dbInt,
   intel: dbInt,
+  politics: dbInt.optional(),
+  charm: dbInt.optional(),
   portraitId: z.number().int().min(10001).max(11000).nullable(),
 });
 export type GeneralCreation = z.infer<typeof generalCreationSchema>;
@@ -73,7 +76,16 @@ export function validateGeneralCreation(
     };
   }
   const rules = statRulesSchema.parse({ stat: statRules }).stat;
-  const stats = [parsed.data.leadership, parsed.data.strength, parsed.data.intel];
+  const five = rules.count === 5;
+  if (
+    five
+      ? parsed.data.politics === undefined || parsed.data.charm === undefined
+      : Object.hasOwn(parsed.data, 'politics') || Object.hasOwn(parsed.data, 'charm')
+  )
+    return { ok: false, ...creationFailure('BAD_STATS') };
+  const stats = (five ? FIVE_STAT_KEYS : (['leadership', 'strength', 'intel'] as const)).map(
+    (key) => parsed.data[key]!,
+  );
   if (stats.some((n) => n < rules.min || n > rules.max) || stats.reduce((a, b) => a + b, 0) !== rules.total)
     return { ok: false, ...creationFailure('BAD_STATS') };
   return { ok: true, value: parsed.data };
@@ -101,8 +113,11 @@ export function buildCreatedGeneral(input: {
     throw new Error('장수 저장 범위를 넘었습니다.');
   // monthlyDate는 정산할 달의 끝 경계를 받는다. monthlyTick=0도 첫 달이다.
   const birthYear = monthlyDate(input.startYear, input.monthlyTick + TICKS_PER_MONTH).year - 20;
+  const { politics, charm, ...payload } = input.payload;
+  if ((politics === undefined) !== (charm === undefined)) throw new Error('5능력치 생성 값을 확인하세요.');
   return {
-    ...input.payload,
+    ...payload,
+    ...(politics !== undefined && charm !== undefined ? { politics, charm } : {}),
     id: input.id,
     userId: input.userId,
     affinity,

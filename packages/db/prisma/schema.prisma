@@ -271,6 +271,8 @@ model General {
   leadership     Int
   strength       Int
   intel          Int
+  politics       Int?
+  charm          Int?
   officerLevel   Int
   birthYear      Int
   deathYear      Int

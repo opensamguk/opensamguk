@@ -4,8 +4,8 @@ import { z } from 'zod';
 
 type General = Omit<
   Prisma.GeneralGetPayload<true>,
-  'battleWins' | 'captures' | 'noticeSeen' | 'defaultPolicy' | 'lastActiveTick' | 'lastActiveAt'
->;
+  'battleWins' | 'captures' | 'noticeSeen' | 'defaultPolicy' | 'lastActiveTick' | 'lastActiveAt' | 'politics' | 'charm'
+> & { politics?: number | null; charm?: number | null };
 type City = Prisma.CityGetPayload<true>;
 type Nation = Omit<Prisma.NationGetPayload<true>, 'notice' | 'noticeRevision' | 'noticeUpdatedAt' | 'noticeUpdatedBy'>;
 export type Viewer = Pick<General, 'id' | 'nationId' | 'cityKey'> | null;
@@ -45,6 +45,7 @@ export function ownGeneralInfo(general: General) {
     leadership: general.leadership,
     strength: general.strength,
     intel: general.intel,
+    ...(general.politics != null && general.charm != null ? { politics: general.politics, charm: general.charm } : {}),
     officerLevel: general.officerLevel,
     birthYear: general.birthYear,
     deathYear: general.deathYear,
