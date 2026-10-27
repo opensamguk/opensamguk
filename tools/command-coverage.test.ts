@@ -1210,7 +1210,7 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
     expect(errors).toContain('commands[trade]: AC AC-M9-99가 인수조건·Phase 2 명세에 없다');
   });
 
-  it('반례: 고친 대응표 파일도 CLI 기본 실행과 --verify-git이 1로 끝난다', () => {
+  it('반례: 등록 명령을 뺀 대응표는 함수와 CLI 기본 실행에서 거부한다', () => {
     const dir = mkdtempSync(join(tmpdir(), 'coverage-'));
     try {
       const removed = table();
@@ -1222,6 +1222,15 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
       const plainCli = runCli('--file', join(dir, 'removed.json'));
       expect(plainCli.status, plainCli.stdout + plainCli.stderr).toBe(1);
       expect(plainCli.stdout).toContain('registry key attack(general)가 대응표에 없다');
+    } finally {
+      expect(dirname(dir)).toBe(normalize(tmpdir()));
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('반례: 검증 증거를 꾸민 대응표는 함수와 CLI --verify-git에서 거부한다', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'coverage-'));
+    try {
       const fake = table();
       row(fake, 'farm').stages.ui = {
         status: 'verified',
