@@ -34,3 +34,5 @@ Windows의 전체 PostgreSQL 재실행은1,160건 중1,122건 통과·11건 실�
 구현하지 않은 Codex 담당이 계약·마이그레이션·엔진 로더·API·구형/새 정책 재생을 독립 검토했다. 공개 편집기 검증기의 개수 계산 결함을 수정한 뒤 남은 수정 요구가 없다고 판정했다. 리뷰 담당의 직접 실행은 집중6파일34건이며 PostgreSQL3건은 구현 담당의 별도 실행 증거다. 전체 검사·필수 CI·병합과 정식491명 인수는 아직 남아 있다.
 
 5be4389의 필수 Linux PostgreSQL·권한 CI는 13분54초에 통과했다. Chromium 4분할 중3개는 통과했고 메시지 권한 회수 시험만 작성폼 오류와 목록 재조회 오류를 전역 alert 하나로 찾다가 실패했다. 작성폼의 alert로 선택자를 한정하고 문구·입력 보존·접근성 설명·권한 회수 검사는 유지했다. 실제 PostgreSQL·Chromium 집중1건을8.7초에 통과했고 구현하지 않은 담당이 독립 검토했다. 전체 로컬 PostgreSQL 시간 초과와 최종 CI·병합은 계속 검증한다.
+
+최종 b6ea113은 [필수 CI](https://github.com/opensamguk/opensamguk/actions/runs/40462392182)의 check·실제 PostgreSQL/권한·Chromium4분할을 모두 통과했다. [병합 대기열 검사](https://github.com/opensamguk/opensamguk/actions/runs/40464044203)도 통과했고 [PR #242](https://github.com/opensamguk/opensamguk/pull/242)는 2026-10-27 main의 f14cc8642c244da2b87faeeef4ff6641446dc27f로 병합됐다. AC-INT-14의 계약·생성·저장·조회·재생 검증과 독립 리뷰·병합 증거를 갖췄다. 전체 로컬 PostgreSQL·정식491명·UI·산식과 통합판 한 기수 인수는 각각 INT-01·16·11·15·12에 남는다.

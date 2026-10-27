@@ -59,7 +59,10 @@ root='${shellRoot}'
 printf 'CALL' >>"$root/calls"
 printf ' <%s>' "$@" >>"$root/calls"
 printf '\\n' >>"$root/calls"
-printenv DATABASE_URL PGPASSWORD >>"$root/env" || true
+{
+  if [[ \${DATABASE_URL+x} ]]; then printf '%s\\n' "$DATABASE_URL"; fi
+  if [[ \${PGPASSWORD+x} ]]; then printf '%s\\n' "$PGPASSWORD"; fi
+} >>"$root/env"
 flag() { [[ -f "$root/$1" ]]; }
 if [[ "$1" == inspect ]]; then
   if flag bad-container; then printf '%s true\\n' '${'e'.repeat(64)}';
@@ -96,9 +99,16 @@ case "$command" in
   psql)
     [[ "$interactive" == true ]]
     args=" $* "
-    sql=$(cat)
+    sql=''
+    while IFS= read -r line || [[ -n "$line" ]]; do sql+="$line"$'\\n'; done
+    while [[ "$sql" == *$'\\n' ]]; do sql=\${sql%$'\\n'}; done
     printf '%s\\n' "$sql" >>"$root/sql"
-    printf 'SQL %s\\n' "$(printf '%s\\n' "$sql" | sed -n 's/^-- t215://p')" >>"$root/calls"
+    markers=''
+    while IFS= read -r line; do
+      case "$line" in '-- t215:'*) markers+="\${line#-- t215:}"$'\\n';; esac
+    done <<< "$sql"
+    while [[ "$markers" == *$'\\n' ]]; do markers=\${markers%$'\\n'}; done
+    printf 'SQL %s\\n' "$markers" >>"$root/calls"
     case "$sql" in
       *'-- t215:system'*) if flag bad-system; then echo 987654321; else echo '${system}'; fi;;
       *'-- t215:database-identity'*)
