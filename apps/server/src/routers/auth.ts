@@ -76,6 +76,20 @@ export const authRouter = router({
     }
     const session = newSession(ctx.now);
     await ctx.db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${user.id} FOR SHARE`;
+      const current = await tx.user.findUnique({
+        where: { id: user.id },
+        select: { status: true, passwordHash: true, email: true },
+      });
+      if (
+        !current ||
+        current.status !== 'ACTIVE' ||
+        current.passwordHash !== user.passwordHash ||
+        current.email !== user.email
+      ) {
+        ctx.rateLimiter.consume(failures);
+        throw loginFailure();
+      }
       if (ctx.sessionId) {
         await tx.session.deleteMany({ where: { id: ctx.sessionId } });
       }

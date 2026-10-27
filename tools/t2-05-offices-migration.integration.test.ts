@@ -334,6 +334,7 @@ it.each(['empty', 'legacy'] as const)(
         '20261030000000_five_stats',
         '20261031000000_operational_map',
         '20261101000000_campaign_state',
+        '20261102000000_account_tokens',
       ]);
       for (const directory of previous) {
         await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));

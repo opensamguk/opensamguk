@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { Writable } from 'node:stream';
+import { setTimeout as delay } from 'node:timers/promises';
+import { Client } from 'pg';
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { createDb } from '@opensamguk/db';
 import { issueAccountToken, resetPasswordToken, verifyEmailToken } from './accountTokenStore';
 import { hashToken, newSession } from './session';
-import { verifyPassword } from './password';
+import { hashPassword, verifyPassword } from './password';
 import { buildServer } from '../server';
 
 const url = process.env.TEST_DATABASE_URL;
@@ -28,6 +30,25 @@ function isControlledDeleteFailure(error: unknown, seen = new Set<object>()): bo
   return ['message', 'originalMessage', 'cause', 'meta', 'driverAdapterError', 'error'].some((key) =>
     isControlledDeleteFailure(value[key], seen),
   );
+}
+
+function settled<T>(promise: Promise<T>): Promise<PromiseSettledResult<T>> {
+  return promise.then(
+    (value) => ({ status: 'fulfilled', value }),
+    (reason: unknown) => ({ status: 'rejected', reason }),
+  );
+}
+
+async function waitForLock(applicationName: string) {
+  const deadline = Date.now() + 2000;
+  do {
+    const rows = await db.$queryRaw<Array<{ waiting: boolean }>>`
+      SELECT EXISTS(SELECT 1 FROM pg_stat_activity
+        WHERE application_name=${applicationName} AND wait_event_type='Lock' AND state='active') AS waiting`;
+    if (rows[0]?.waiting) return;
+    await delay(10);
+  } while (Date.now() < deadline);
+  throw new Error('시험 요청이 행 잠금 대기에 도달하지 않았습니다.');
 }
 
 afterEach(async () => {
@@ -193,6 +214,95 @@ describe('실제 PostgreSQL 계정 토큰 저장과 소비', () => {
     expect((await db.accountToken.findUniqueOrThrow({ where: { id: hashToken(issued.token) } })).usedAt).toBeNull();
     expect((await db.user.findUniqueOrThrow({ where: { id: actor.id } })).passwordHash).toBe('before-reset');
     expect(await db.session.count({ where: { userId: actor.id } })).toBe(1);
+  });
+
+  it('재설정이 먼저 저장되면 이전 비밀번호를 확인한 로그인은 세션을 만들지 않는다', async () => {
+    const actor = await user();
+    const oldPassword = randomUUID(),
+      nextPassword = randomUUID();
+    await db.user.update({ where: { id: actor.id }, data: { passwordHash: await hashPassword(oldPassword) } });
+    const session = newSession(now);
+    await db.session.create({ data: { id: session.id, userId: actor.id, expiresAt: session.expiresAt } });
+    const issued = (await issueAccountToken(db, actor.id, 'RESET_PASSWORD', now))!;
+    const suffix = randomUUID().replaceAll('-', '');
+    const resetName = `t302_reset_${suffix}`,
+      loginName = `t302_login_${suffix}`;
+    const resetUrl = new URL(url!),
+      loginUrl = new URL(url!);
+    resetUrl.searchParams.set('application_name', resetName);
+    loginUrl.searchParams.set('application_name', loginName);
+    const resetDb = createDb(resetUrl.href),
+      loginDb = createDb(loginUrl.href);
+    const gate = new Client({ connectionString: url });
+    let gateConnected = false;
+    let app: Awaited<ReturnType<typeof buildServer>> | undefined;
+    let logs = '';
+    const requests: Array<Promise<unknown>> = [],
+      failures: unknown[] = [];
+    try {
+      app = await buildServer({
+        db: loginDb,
+        now: () => now + 2,
+        logStream: new Writable({
+          write(chunk, _encoding, done) {
+            logs += String(chunk);
+            done();
+          },
+        }),
+      });
+      await app.ready();
+      await gate.connect();
+      gateConnected = true;
+      await gate.query('BEGIN');
+      await gate.query('SELECT id FROM "User" WHERE id=$1 FOR UPDATE', [actor.id]);
+      const reset = settled(resetPasswordToken(resetDb, issued.token, nextPassword, now + 1));
+      requests.push(reset);
+      // 재설정을 먼저 대기시키고 이전 비밀번호의 실제 HTTP 로그인을 같은 행 잠금 뒤에 대기시킨다.
+      await waitForLock(resetName);
+      const login = settled(
+        app.inject({
+          method: 'POST',
+          url: '/trpc/auth.login?batch=1',
+          headers: { origin: 'http://127.0.0.1:5173' },
+          payload: { 0: { email: actor.email, password: oldPassword } },
+        }),
+      );
+      requests.push(login);
+      await waitForLock(loginName);
+      await gate.query('COMMIT');
+      const resetResult = await reset,
+        loginResult = await login;
+      if (resetResult.status === 'rejected') throw resetResult.reason;
+      if (loginResult.status === 'rejected') throw loginResult.reason;
+      expect(resetResult.value).toBe(true);
+      expect(loginResult.value.statusCode).toBe(401);
+      expect(loginResult.value.json()[0].error.data.code).toBe('UNAUTHORIZED');
+      expect(await db.session.count({ where: { userId: actor.id } })).toBe(0);
+      expect(
+        await verifyPassword((await db.user.findUniqueOrThrow({ where: { id: actor.id } })).passwordHash, nextPassword),
+      ).toBe(true);
+      for (const secret of [issued.token, oldPassword, nextPassword, actor.email]) expect(logs).not.toContain(secret);
+    } catch (error) {
+      failures.push(error);
+    } finally {
+      if (gateConnected) {
+        try {
+          await gate.query('ROLLBACK');
+        } catch (error) {
+          failures.push(error);
+        }
+      }
+      await Promise.all(requests);
+      for (const result of await Promise.allSettled([
+        app?.close(),
+        gate.end(),
+        resetDb.$disconnect(),
+        loginDb.$disconnect(),
+      ])) {
+        if (result.status === 'rejected') failures.push(result.reason);
+      }
+    }
+    if (failures.length) throw new AggregateError(failures, '로그인·재설정 경합 검사 또는 정리에 실패했습니다.');
   });
 
   it('세션 삭제가 실패하면 토큰 소비와 비밀번호 변경도 롤백한다', async () => {
