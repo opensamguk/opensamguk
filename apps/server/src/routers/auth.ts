@@ -1,7 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import type { Context } from '../context';
-import { hashPassword, verifyPassword } from '../auth/password';
+import { hashPassword, passwordSchema, verifyPassword } from '../auth/password';
 import { newSession, SESSION_SECONDS } from '../auth/session';
 import { publicProcedure, router } from '../trpc';
 import type { LimitRule, RateLimitDecision } from '../security/rateLimit';
@@ -16,7 +16,7 @@ function enforce(ctx: Context, decision: RateLimitDecision) {
 
 const credentials = z.strictObject({
   email: z.string().trim().toLowerCase().email().max(254),
-  password: z.string().min(10).max(128),
+  password: passwordSchema,
 });
 const loginFailure = () => new TRPCError({ code: 'UNAUTHORIZED', message: '이메일 또는 비밀번호가 맞지 않습니다' });
 function setCookie(ctx: Context, token: string) {
