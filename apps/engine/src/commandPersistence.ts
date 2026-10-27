@@ -8,7 +8,7 @@ export async function loadCommandState(
   tx: Prisma.TransactionClient,
   worldId: string,
 ): Promise<Pick<WorldState, 'commandMeta' | 'nationTurns'>> {
-  const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
+  const world = await tx.world.findUniqueOrThrow({ where: { id: worldId }, select: { commandMeta: true } });
   const slots = await tx.nationTurn.findMany({ where: { worldId }, orderBy: [{ nationId: 'asc' }, { slot: 'asc' }] });
   const nationTurns: NonNullable<WorldState['nationTurns']> = {};
   for (const slot of slots) {
