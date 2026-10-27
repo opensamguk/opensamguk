@@ -32,6 +32,11 @@ import { OperationDetailPage } from './operations/OperationDetailPage';
 import { OperationsPage } from './operations/OperationsPage';
 import { TurnsPage } from './turns/TurnsPage';
 import { EmptyState, ErrorState } from './ui/States';
+import { ForgotPasswordPage } from './account/ForgotPasswordPage';
+import { ResetPasswordPage } from './account/ResetPasswordPage';
+import { VerifyEmailPage } from './account/VerifyEmailPage';
+import { AccountPage } from './account/AccountPage';
+import { takeTokenFragment } from './account/tokenEntry';
 
 // 주소 체계: docs/plans/T1-13.md. 로그인 가드: docs/frontend-ui-guidelines.md §4.
 interface RouterContext {
@@ -92,6 +97,48 @@ const signupRoute = createRoute({
   path: 'signup',
   validateSearch: authSearch,
   component: SignupPage,
+});
+
+const forgotPasswordRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'forgot-password',
+  component: ForgotPasswordPage,
+});
+const resetPasswordRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'reset-password',
+  beforeLoad: ({ location, preload }) => ({
+    accountToken: takeTokenFragment(location.hash, !preload),
+    tokenEntryKey: crypto.randomUUID(),
+  }),
+  component: function ResetTokenRoute() {
+    const { tokenEntryKey } = resetPasswordRoute.useRouteContext();
+    return <ResetPasswordPage key={tokenEntryKey} />;
+  },
+});
+const verifyEmailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'verify-email',
+  beforeLoad: async ({ context, location, preload }) => {
+    const accountToken = takeTokenFragment(location.hash, !preload);
+    if (accountToken.kind === 'missing' && !(await currentUser(context)))
+      throw redirect({ to: '/login', search: { next: '/verify-email' } });
+    return { accountToken, tokenEntryKey: crypto.randomUUID() };
+  },
+  component: function VerifyTokenRoute() {
+    const { tokenEntryKey } = verifyEmailRoute.useRouteContext();
+    return <VerifyEmailPage key={tokenEntryKey} />;
+  },
+  errorComponent: GuardError,
+});
+const accountRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'account',
+  beforeLoad: async ({ context }) => {
+    if (!(await currentUser(context))) throw redirect({ to: '/login', search: { next: '/account' } });
+  },
+  component: AccountPage,
+  errorComponent: GuardError,
 });
 
 // 계정 단위 알림 설정 (T2-21). 월드와 무관하고 로그인이 필요하다.
@@ -281,6 +328,10 @@ const routeTree = rootRoute.addChildren([
   lobbyRoute,
   loginRoute,
   signupRoute,
+  forgotPasswordRoute,
+  resetPasswordRoute,
+  verifyEmailRoute,
+  accountRoute,
   notificationSettingsRoute,
   helpRoute,
   helpDocRoute,

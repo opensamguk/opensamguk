@@ -19,6 +19,9 @@ export function LoginPage() {
         <h1>로그인</h1>
         <AuthForm mode="login" next={next} />
         <p className={styles.switch}>
+          <Link to="/forgot-password">비밀번호를 잊었습니다</Link>
+        </p>
+        <p className={styles.switch}>
           계정이 없으면{' '}
           <Link to="/signup" search={next ? { next } : {}}>
             가입하기

@@ -233,6 +233,14 @@ T1-15 편집기(`apps/web/src/turns/TurnEditor.tsx`)의 조작입니다. 메인 
 - 로그아웃은 위쪽 띠 오른쪽 끝에 있습니다.
 - 데이터는 TanStack Query + `@trpc/tanstack-react-query`의 `useTRPC()`로 가져옵니다.
 
+### 인증·재설정 화면 (T3-03)
+
+토큰은 라우트 진입 때 URL 조각에서 읽고 주소에서 바로 지웁니다. query·저장소·로그에 옮기지 않고 토큰 화면은 referrer를 막습니다. TanStack의 이력 알림이 토큰 제거를 새 진입으로 처리하지 않도록 현재 이력의 state와 경로를 보존합니다. 미리 불러오기는 현재 주소를 바꾸지 않습니다.
+
+같은 링크로 다시 들어와도 이전 성공 상태를 이어 쓰지 않습니다. 진입마다 페이지 상태를 새로 만들고 한 진입 안에서는 StrictMode의 중복 인증 요청을 막습니다. 인증·재설정의 성공과 링크 재사용 거부를 실제 서버 응답으로 확인합니다.
+
+화면 오류는 AppRouter의 공개 code·reason으로 고르고 내부 message·cause는 읽지 않습니다.429의 `Retry-After`가 양의 정수 초이면 남은 시간을 보여 주고 재전송을 기다립니다. 없거나 잘못된 값이면 잠시 뒤 다시 하도록 안내합니다.375px에서 가로 넘침이 없고 입력·버튼·계정 이동 링크는44px 이상입니다.
+
 ### 로그인·로비 공개 지도 (T2-25)
 
 > 결정: [D-026](./product/decisions.md#d-026-로그인과-로비에-지연-공개-지도를-둔다-2026-10-23) · 부품: `apps/web/src/publicMap/PublicMapTabs.tsx` · API: `world.publicMaps` (T2-24)

@@ -41,7 +41,12 @@ export function LobbyPage() {
         <h1 className={styles.title}>로비</h1>
         {me.data ? (
           loggedIn ? (
-            <LogoutButton className={styles.account} />
+            <>
+              <Link to="/account" className={styles.account}>
+                내 계정
+              </Link>
+              <LogoutButton className={styles.account} />
+            </>
           ) : (
             <Link to="/login" search={{ next: '/lobby' }} className={styles.account}>
               로그인

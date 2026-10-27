@@ -1,6 +1,6 @@
 import { TRPCClientError } from '@trpc/client';
 import { describe, expect, it } from 'vitest';
-import { describeFailure, safeNext, validateCredentials } from './credentials';
+import { describeFailure, retryAfterSeconds, safeNext, validateCredentials } from './credentials';
 
 describe('validateCredentials', () => {
   it('맞는 입력은 오류가 없다', () => {
@@ -33,6 +33,30 @@ describe('describeFailure', () => {
   it('응답을 못 받은 실패는 다시 시도', () => {
     expect(describeFailure(TRPCClientError.from(new TypeError('Failed to fetch')))).toEqual({ kind: 'retry' });
     expect(describeFailure(serverError('INTERNAL_SERVER_ERROR'))).toEqual({ kind: 'retry' });
+  });
+  it('공개 사유만 읽고 서버 문구나 cause를 쓰지 않는다', () => {
+    const error = TRPCClientError.from({
+      error: {
+        message: 'private-server-message',
+        code: -32000,
+        data: { code: 'BAD_REQUEST', reason: 'TOKEN_INVALID' },
+      },
+    });
+    expect(describeFailure(error)).toEqual({
+      kind: 'message',
+      text: '링크가 만료됐거나 이미 쓰였습니다. 새 링크를 요청하세요.',
+    });
+  });
+  it.each(['45', '0', '-1', '1.5', 'later', '9007199254740992'])('Retry-After 정수 초만 읽는다(%s)', (header) => {
+    const error = TRPCClientError.from(
+      { error: { message: 'private-server-message', code: -32000, data: { code: 'TOO_MANY_REQUESTS', reason: null } } },
+      { meta: { response: new Response(null, { headers: { 'Retry-After': header } }) } },
+    );
+    expect(retryAfterSeconds(error)).toBe(header === '45' ? 45 : null);
+    expect(describeFailure(error)).toEqual({
+      kind: 'message',
+      text: header === '45' ? '45초 뒤에 다시 요청하세요.' : '잠시 뒤 다시 요청하세요.',
+    });
   });
 });
 
