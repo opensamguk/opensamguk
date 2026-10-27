@@ -1,4 +1,5 @@
 import { useNavigate, useSearch } from '@tanstack/react-router';
+import { useQuery } from '@tanstack/react-query';
 import { useCallback, type ReactNode } from 'react';
 import { errorCode } from '../game/errors';
 import { NoGeneral, QueryError } from '../game/QueryState';
@@ -12,8 +13,10 @@ import { SeasonResult } from '../main/SeasonResult';
 import { MapLegend, WorldMap } from '../main/WorldMap';
 import { PolicyBar } from '../policy/PolicyBar';
 import { OfferBox } from '../personnel/OfferBox';
+import { CampaignPanel } from '../personnel/CampaignPanel';
 import { TurnEditor } from '../turns/TurnEditor';
 import { EmptyState, LoadingState } from '../ui/States';
+import { useTRPC } from '../trpc';
 import styles from './MainPage.module.css';
 
 // 메인 작업 화면이다. 원작 core2026 MainView(R1, df6c926)의 데스크톱 배치를 따른다.
@@ -25,6 +28,8 @@ export function MainPage() {
   const navigate = useNavigate({ from: '/w/$worldId/' });
   const summary = useWorldSummary(worldId);
   const home = useHome(worldId);
+  const trpc = useTRPC();
+  const mine = useQuery(trpc.general.mine.queryOptions({ worldId }));
   const map = useWorldMap(worldId);
 
   const selectCity = useCallback(
@@ -132,6 +137,7 @@ export function MainPage() {
             <GeneralInfo
               worldId={worldId}
               home={data}
+              campaignEnabled={mine.data?.creationRules.campaignEnabled ?? false}
               cityName={cityName(data.general.cityKey)}
               nation={data.general.nationId === null ? undefined : nationById.get(data.general.nationId)}
               onSelectCity={selectCity}
@@ -158,6 +164,7 @@ export function MainPage() {
           </Panel>
         </div>
       </div>
+      {mine.data?.general && mine.data.creationRules.campaignEnabled ? <CampaignPanel worldId={worldId} /> : null}
     </section>
   );
 }
