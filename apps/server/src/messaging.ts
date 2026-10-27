@@ -24,6 +24,7 @@ export async function messagingActor(
   if (!ctx.user || !ctx.sessionId) throw new TRPCError({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' });
   if (lock) {
     await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${worldId} FOR SHARE`;
+    await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${ctx.user.id} FOR SHARE`;
     await tx.$queryRaw`SELECT s.id FROM "Session" s JOIN "User" u ON u.id = s."userId" WHERE s.id = ${ctx.sessionId} FOR SHARE OF s, u`;
     await tx.$queryRaw`SELECT id FROM "General" WHERE "worldId" = ${worldId} AND "userId" = ${ctx.user.id} FOR UPDATE`;
   }
