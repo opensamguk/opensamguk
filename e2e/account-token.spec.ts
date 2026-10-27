@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
 import { createAccount, TEST_PASSWORD, withE2eDb } from './account';
 import { accountMailLink } from './mailbox';
 
@@ -13,16 +14,46 @@ async function openMail(page: Page, link: string) {
 }
 async function mobileLayout(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  const controls = await page.locator('main input, main button, main nav a').evaluateAll((elements) =>
+  const controls = await page.locator('main input, main button, main a').evaluateAll((elements) =>
     elements
       .filter((element) => element.getBoundingClientRect().width > 0)
       .map((element) => {
         const rect = element.getBoundingClientRect();
-        return { width: rect.width, height: rect.height };
+        return { element: element.tagName, width: rect.width, height: rect.height };
       }),
   );
-  expect(controls.every((control) => control.width >= 44 && control.height >= 44)).toBe(true);
+  expect(controls.filter((control) => control.width < 44 || control.height < 44)).toEqual([]);
 }
+
+test('실제 가입 화면에서 받은 메일로 이메일을 한 번 인증한다 (375px)', async ({ page }, testInfo) => {
+  const email = `signup-${randomUUID()}@example.test`;
+  try {
+    await page.setViewportSize({ width: 375, height: 900 });
+    await page.goto('/signup');
+    await mobileLayout(page);
+    await page.screenshot({ path: testInfo.outputPath('signup-form-375.png'), fullPage: true });
+    await page.getByLabel('이메일', { exact: true }).fill(email);
+    await page.getByLabel('비밀번호', { exact: true }).fill(TEST_PASSWORD);
+    const after = Date.now();
+    await page.getByRole('button', { name: '가입하기', exact: true }).click();
+    await expect(page).toHaveURL('/lobby');
+    expect(
+      await withE2eDb(async (db) => (await db.user.findUniqueOrThrow({ where: { email } })).emailVerifiedAt === null),
+    ).toBe(true);
+    const link = await accountMailLink(email, '오픈삼국 이메일 인증', after);
+    await openMail(page, link);
+    await expect(page.getByRole('status')).toHaveText('이메일 인증을 마쳤습니다.');
+    await mobileLayout(page);
+    expect(
+      await withE2eDb(async (db) => (await db.user.findUniqueOrThrow({ where: { email } })).emailVerifiedAt !== null),
+    ).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath('signup-verified-375.png'), fullPage: true });
+    await openMail(page, link);
+    await expect(page.getByRole('alert')).toHaveText('링크가 만료됐거나 이미 쓰였습니다. 새 링크를 요청하세요.');
+  } finally {
+    await withE2eDb((db) => db.user.deleteMany({ where: { email } }));
+  }
+});
 
 for (const width of [375, 1280]) {
   test(`계정에서 인증 메일 수신·한 번 인증·재사용 거부 (${width}px)`, async ({ page }, testInfo) => {
@@ -128,9 +159,11 @@ test('토큰 없는 계정 경로는 로그인으로, 잘못된 링크는 재요
 });
 
 test('로그인 실패 한도의 실제 남은 시간을 안내한다', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 900 });
   const email = await createAccount(page);
   await page.context().clearCookies();
   await page.goto('/login');
+  await mobileLayout(page);
   await page.getByLabel('이메일').fill(email);
   await page.getByLabel('비밀번호', { exact: true }).fill('wrong-password-20261028');
   async function submit() {
