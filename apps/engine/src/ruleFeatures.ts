@@ -99,6 +99,7 @@ const processPersonnelInput: QueuedInputHandler = async (tx, world, event, { tic
 };
 
 export const builtInEngineFeatures: readonly EngineFeature[] = [
+  { key: 'campaign-assignment-v2' },
   {
     key: 'campaign-v1',
     queuedInputs: { 'campaign.relationship': processCampaignQueuedInput, 'campaign.unit': processCampaignQueuedInput },
