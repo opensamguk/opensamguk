@@ -1,0 +1,373 @@
+[
+  {
+    "legacyCityId": 1,
+    "oldName": "업",
+    "siteId": "city:1",
+    "name": "업",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 2,
+    "oldName": "허창",
+    "siteId": "city:2",
+    "name": "허창",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 3,
+    "oldName": "낙양",
+    "siteId": "city:3",
+    "name": "낙양",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 4,
+    "oldName": "장안",
+    "siteId": "city:4",
+    "name": "장안",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 5,
+    "oldName": "성도",
+    "siteId": "city:5",
+    "name": "성도",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 6,
+    "oldName": "양양",
+    "siteId": "city:6",
+    "name": "양양",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 7,
+    "oldName": "건업",
+    "siteId": "city:7",
+    "name": "건업",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 8,
+    "oldName": "북평",
+    "siteId": "city:8",
+    "name": "북평",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 9,
+    "oldName": "남피",
+    "siteId": "city:9",
+    "name": "남피",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 10,
+    "oldName": "완",
+    "siteId": "city:10",
+    "name": "완",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 11,
+    "oldName": "수춘",
+    "siteId": "city:11",
+    "name": "수춘",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 13,
+    "oldName": "강릉",
+    "siteId": "city:13",
+    "name": "강릉",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 14,
+    "oldName": "장사",
+    "siteId": "city:14",
+    "name": "장사",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 15,
+    "oldName": "시상",
+    "siteId": "city:15",
+    "name": "시상",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 17,
+    "oldName": "계",
+    "siteId": "city:17",
+    "name": "계",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 18,
+    "oldName": "복양",
+    "siteId": "city:18",
+    "name": "복양",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 19,
+    "oldName": "진류",
+    "siteId": "city:19",
+    "name": "진류",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 20,
+    "oldName": "여남",
+    "siteId": "city:20",
+    "name": "여남",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 21,
+    "oldName": "하비",
+    "siteId": "city:21",
+    "name": "하비",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 22,
+    "oldName": "서량",
+    "siteId": "city:22",
+    "name": "무위",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 23,
+    "oldName": "하내",
+    "siteId": "city:23",
+    "name": "하내",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 24,
+    "oldName": "한중",
+    "siteId": "city:24",
+    "name": "한중",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 25,
+    "oldName": "상용",
+    "siteId": "city:25",
+    "name": "상용",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 27,
+    "oldName": "강주",
+    "siteId": "city:27",
+    "name": "강주",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 28,
+    "oldName": "건녕",
+    "siteId": "city:28",
+    "name": "건녕",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 29,
+    "oldName": "남해",
+    "siteId": "city:29",
+    "name": "남해",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 30,
+    "oldName": "계양",
+    "siteId": "city:30",
+    "name": "계양",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 31,
+    "oldName": "오",
+    "siteId": "city:31",
+    "name": "오",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 35,
+    "oldName": "진양",
+    "siteId": "city:35",
+    "name": "진양",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 36,
+    "oldName": "평원",
+    "siteId": "city:36",
+    "name": "평원",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 37,
+    "oldName": "북해",
+    "siteId": "city:37",
+    "name": "북해",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 38,
+    "oldName": "초",
+    "siteId": "city:38",
+    "name": "초",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 39,
+    "oldName": "패",
+    "siteId": "city:39",
+    "name": "소패",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 40,
+    "oldName": "천수",
+    "siteId": "city:40",
+    "name": "천수",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 41,
+    "oldName": "안정",
+    "siteId": "city:41",
+    "name": "안정",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 42,
+    "oldName": "홍농",
+    "siteId": "city:42",
+    "name": "홍농",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 43,
+    "oldName": "하변",
+    "siteId": "city:43",
+    "name": "무도",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 44,
+    "oldName": "자동",
+    "siteId": "city:44",
+    "name": "자동",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 45,
+    "oldName": "영안",
+    "siteId": "city:45",
+    "name": "영안",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 48,
+    "oldName": "운남",
+    "siteId": "city:48",
+    "name": "운남",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 50,
+    "oldName": "교지",
+    "siteId": "city:50",
+    "name": "교지",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 51,
+    "oldName": "신야",
+    "siteId": "city:51",
+    "name": "신야",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 52,
+    "oldName": "강하",
+    "siteId": "city:52",
+    "name": "강하",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 53,
+    "oldName": "무릉",
+    "siteId": "city:53",
+    "name": "무릉",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 54,
+    "oldName": "영릉",
+    "siteId": "city:54",
+    "name": "영릉",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 56,
+    "oldName": "여강",
+    "siteId": "city:56",
+    "name": "여강",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 57,
+    "oldName": "회계",
+    "siteId": "city:57",
+    "name": "회계",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 83,
+    "oldName": "광릉",
+    "siteId": "city:83",
+    "name": "광릉",
+    "kind": "CITY"
+  },
+  {
+    "legacyCityId": 70,
+    "oldName": "호관",
+    "siteId": "pass:70",
+    "name": "호관",
+    "kind": "PASS"
+  },
+  {
+    "legacyCityId": 71,
+    "oldName": "호로",
+    "siteId": "pass:71",
+    "name": "호로",
+    "kind": "PASS"
+  },
+  {
+    "legacyCityId": 73,
+    "oldName": "함곡",
+    "siteId": "pass:73",
+    "name": "함곡",
+    "kind": "PASS"
+  },
+  {
+    "legacyCityId": 75,
+    "oldName": "양평",
+    "siteId": "pass:75",
+    "name": "양평관",
+    "kind": "PASS"
+  },
+  {
+    "legacyCityId": 87,
+    "oldName": "면죽",
+    "siteId": "pass:87",
+    "name": "면죽",
+    "kind": "PASS"
+  }
+]
