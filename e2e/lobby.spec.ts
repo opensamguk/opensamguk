@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { pnpmCli } from '../tools/node-cli';
-import { createAccount, e2eDatabaseUrl, newEmail, TEST_PASSWORD, withE2eDb } from './account';
+import { appOrigin, createAccount, e2eDatabaseUrl, newEmail, TEST_PASSWORD, withE2eDb } from './account';
 import { createGeneralByApi, e2eWorld, query } from './game';
 
 // T2-04 · AC-M2-02: 로비에서 월드 목록을 보고 참가한다. 실제 서버·DB·엔진으로 돈다.
@@ -210,7 +210,7 @@ test.describe('로그인 뒤 이동', () => {
       await page.goto(next === null ? '/login' : `/login?next=${encodeURIComponent(next)}`);
       await login(page, email);
       await expect(page).toHaveURL(expected);
-      expect(new URL(page.url()).host).toBe('127.0.0.1:5173');
+      expect(new URL(page.url()).origin).toBe(appOrigin());
     });
   }
 });
