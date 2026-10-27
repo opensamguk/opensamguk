@@ -45,6 +45,7 @@ let ownId: number,
   offerId: number,
   tick = 0;
 let formRequest: string, offerRequest: string;
+let declinedNpcId: number, lieutenantId: number;
 const executions = new Set<Promise<unknown>>();
 function track<T>(action: () => Promise<T>): Promise<T> {
   const execution = action();
@@ -382,6 +383,126 @@ it('같은 요청은 한 번만 적용하고 사람 본인의 동의·거절·�
   expect((await board()).links).toEqual([]);
 });
 
+it('서로 동시에 보낸 제안은 revision으로 직렬화하고 본인의 거절은 무료다', async () => {
+  const before = await snapshot(),
+    revision = before.state.campaign!.revision,
+    reservations = await db.generalTurn.findMany({ where: { worldId, generalId: { in: [ownId, targetId] } } });
+  const requests = await Promise.all([
+    submit('campaign.relationship', { type: 'offer', targetId, relation: 'STAFF', revision }),
+    submit('campaign.relationship', { type: 'offer', targetId: ownId, relation: 'STAFF', revision }, 1),
+  ]);
+  await advance();
+  const results = await Promise.all(requests.map((request, index) => receipt(request, index)));
+  expect(results.filter((result) => result.status === 'applied')).toHaveLength(1);
+  expect(results.filter((result) => result.status === 'rejected')).toEqual([
+    expect.objectContaining({ result: expect.objectContaining({ code: 'STALE_REVISION' }) }),
+  ]);
+  const winner = results.findIndex((result) => result.status === 'applied'),
+    pending = (await snapshot()).state.campaign!.offers.find((offer) => offer.status === 'PENDING')!;
+  expect(pending.personId).toBe(winner === 0 ? targetId : ownId);
+  const recipient = winner === 0 ? 1 : 0;
+  const response = await submit(
+    'campaign.relationship',
+    { type: 'respond', offerId: pending.id, accept: false, revision: (await board(recipient)).revision },
+    recipient,
+  );
+  await advance();
+  expect(await receipt(response, recipient)).toMatchObject({ status: 'applied', result: { accepted: false, cost: 0 } });
+  const after = await snapshot();
+  expect(after.state.campaign!.links).toEqual([]);
+  for (const id of [ownId, targetId]) expect(after.state.generals[id]!.gold).toBe(before.state.generals[id]!.gold);
+  expect(await db.generalTurn.findMany({ where: { worldId, generalId: { in: [ownId, targetId] } } })).toEqual(
+    reservations,
+  );
+});
+
+it('반대 방향 제안의 동시 수락은 한 관계만 만들고 순환·강제 수락을 거부한다', async () => {
+  for (const [index, personId] of [targetId, ownId].entries()) {
+    await submit(
+      'campaign.relationship',
+      { type: 'offer', targetId: personId, relation: 'STAFF', revision: (await board(index)).revision },
+      index,
+    );
+    await advance();
+  }
+  const before = await snapshot(),
+    pending = before.state.campaign!.offers.filter((offer) => offer.status === 'PENDING'),
+    revision = before.state.campaign!.revision;
+  expect(pending).toHaveLength(2);
+  const responses = await Promise.all(
+    [ownId, targetId].map((id, index) =>
+      submit(
+        'campaign.relationship',
+        { type: 'respond', offerId: pending.find((offer) => offer.personId === id)!.id, accept: true, revision },
+        index,
+      ),
+    ),
+  );
+  await advance();
+  const results = await Promise.all(responses.map((request, index) => receipt(request, index)));
+  expect(results.filter((result) => result.status === 'applied')).toHaveLength(1);
+  expect(results.filter((result) => result.status === 'rejected')).toEqual([
+    expect.objectContaining({ result: expect.objectContaining({ code: 'STALE_REVISION' }) }),
+  ]);
+  const campaign = (await snapshot()).state.campaign!;
+  expect(campaign.links).toHaveLength(1);
+  const link = campaign.links[0]!,
+    childIndex = link.personId === ownId ? 0 : 1;
+  const cyclic = await submit(
+    'campaign.relationship',
+    { type: 'offer', targetId: link.masterId, relation: 'STAFF', revision: campaign.revision },
+    childIndex,
+  );
+  await advance();
+  expect(await receipt(cyclic, childIndex)).toMatchObject({ status: 'rejected', result: { code: 'RETINUE_CYCLE' } });
+  expect((await snapshot()).state.campaign!.links).toEqual(campaign.links);
+  await submit(
+    'campaign.relationship',
+    { type: 'release', personId: link.personId, revision: (await board(childIndex)).revision },
+    childIndex,
+  );
+  await advance();
+  expect((await snapshot()).state.campaign!.links).toEqual([]);
+});
+
+it('유효한 NPC 거절도 500금을 한 번 쓰고 같은 달 재시도는 금·원장을 바꾸지 않는다', async () => {
+  const before = await snapshot(),
+    actor = before.state.generals[targetId]!;
+  const candidate = Object.values(before.state.generals).find((general) => {
+    const result = applyCampaignRelationship(
+      before.state,
+      { type: 'offer', targetId: general.id, relation: 'LIEUTENANT', revision: before.state.campaign!.revision },
+      targetId,
+      before.state.campaign,
+      { tick, userId: users[1]!, userActive: true },
+    );
+    return general.userId === null && result.ok && result.result.accepted === false;
+  });
+  expect(candidate).toBeDefined();
+  declinedNpcId = candidate!.id;
+  const payload = {
+    type: 'offer',
+    targetId: declinedNpcId,
+    relation: 'LIEUTENANT',
+    revision: before.state.campaign!.revision,
+  };
+  const request = await submit('campaign.relationship', payload, 1);
+  await advance();
+  expect(await receipt(request, 1)).toMatchObject({ status: 'applied', result: { accepted: false, cost: 500 } });
+  const declined = await snapshot();
+  expect(declined.state.generals[targetId]!.gold).toBe(actor.gold - 500);
+  expect(declined.state.campaign!.links).toEqual(before.state.campaign!.links);
+  expect(declined.state.campaign!.attempts).toContainEqual({ masterId: targetId, personId: declinedNpcId, month: 0 });
+  const retry = await submit('campaign.relationship', { ...payload, revision: declined.state.campaign!.revision }, 1);
+  await advance();
+  expect(await receipt(retry, 1)).toMatchObject({ status: 'rejected', result: { code: 'ALREADY_ATTEMPTED' } });
+  expect(hashState(await snapshot())).toBe(hashState(declined));
+  expect(
+    (await http('campaign.relationship', { worldId, requestId: request, payload }, cookies[1], true)).data,
+  ).toMatchObject({ status: 'applied' });
+  expect(hashState(await snapshot())).toBe(hashState(declined));
+});
+
 it('NPC 서약의 실제 시드·500금·월 1회와 원장 재시작을 확인한다', async () => {
   const before = await snapshot(),
     actor = before.state.generals[ownId]!;
@@ -397,6 +518,7 @@ it('NPC 서약의 실제 시드·500금·월 1회와 원장 재시작을 확인�
     return outcome.ok && outcome.result.accepted === true;
   });
   expect(candidate).toBeDefined();
+  lieutenantId = candidate!.id;
   const payload = {
     type: 'offer',
     targetId: candidate!.id,
@@ -442,6 +564,73 @@ it('후반 트랜잭션 실패는 편성과 입력 원장을 함께 롤백하며
   expect(await receipt(requestId)).toMatchObject({ status: 'applied' });
   expect((await board()).units).toHaveLength(2);
   expect((await snapshot(otherWorldId)).state.campaign!.units).toEqual([]);
+  const current = await board(),
+    empty = current.units.find((unit) => unit.id !== unitId)!;
+  const disband = await submit('campaign.unit', { type: 'disband', unitId: empty.id, revision: current.revision });
+  await advance();
+  expect(await receipt(disband)).toMatchObject({ status: 'applied' });
+  expect((await board()).units.map((unit) => unit.id)).toEqual([unitId]);
+});
+
+it('실제 휘하 부곡을 지정한 모병·훈련 예약과 편집이 unitId를 보존한다', async () => {
+  await submit('campaign.unit', {
+    type: 'command',
+    unitId,
+    commanderId: lieutenantId,
+    revision: (await board()).revision,
+  });
+  await advance();
+  const args = { amount: 10, crewType: 1100, unitId };
+  expect((await http('turns.precheck', { worldId, commandKey: 'recruit', args })).data).toMatchObject({
+    ok: true,
+    preview: { goldCost: 88 },
+  });
+  const current = await http<{ revision: number }>('turns.get', { worldId });
+  const saved = await http<{ ok: boolean; revision: number }>(
+    'turns.set',
+    {
+      worldId,
+      revision: current.data!.revision,
+      slots: [{ commandKey: 'recruit', args }, ...Array.from({ length: 29 }, () => null)],
+    },
+    cookies[0],
+    true,
+  );
+  expect(saved.data?.ok).toBe(true);
+  expect(
+    (
+      await http(
+        'turns.edit',
+        {
+          worldId,
+          revision: saved.data!.revision,
+          op: { put: { from: 1, to: 1, commandKey: 'train', args: { unitId } } },
+        },
+        cookies[0],
+        true,
+      )
+    ).data,
+  ).toMatchObject({ ok: true });
+  expect(
+    await db.generalTurn.findUniqueOrThrow({
+      where: { worldId_generalId_slot: { worldId, generalId: ownId, slot: 0 } },
+    }),
+  ).toMatchObject({
+    commandKey: 'recruit',
+    args,
+  });
+  expect(
+    await db.generalTurn.findUniqueOrThrow({
+      where: { worldId_generalId_slot: { worldId, generalId: ownId, slot: 1 } },
+    }),
+  ).toMatchObject({
+    commandKey: 'train',
+    args: { unitId },
+  });
+  expect(await db.generalTurn.count({ where: { worldId, generalId: ownId } })).toBe(30);
+  expect(
+    (await http('turns.precheck', { worldId, commandKey: 'recruit', args: { ...args, unitId: 2147483646 } })).data,
+  ).toMatchObject({ ok: false, code: 'BAD_TARGET' });
 });
 
 it('정식 첫 달 전반의 모든 NPC를 실제 부곡 프로필로 실행한다', async () => {
@@ -457,4 +646,54 @@ it('정식 월 경계의 부곡·입력·월 정산을 같은 시드로 재생�
   expect(first).toHaveLength(1);
   expect(first[0]!.stateHash).toBe(hashState(await snapshot()));
   expect((await snapshot(otherWorldId)).state.campaign!.revision).toBe(0);
+});
+
+it('다음 게임 월에는 거절했던 NPC에게 다시 서약하고 그 달의 시드와 비용을 저장한다', async () => {
+  const before = await snapshot(),
+    actor = before.state.generals[targetId]!,
+    payload = {
+      type: 'offer',
+      targetId: declinedNpcId,
+      relation: 'LIEUTENANT',
+      revision: before.state.campaign!.revision,
+    };
+  const expected = applyCampaignRelationship(before.state, payload, targetId, before.state.campaign, {
+    tick: 10000,
+    userId: users[1]!,
+    userActive: true,
+  });
+  if (!expected.ok) throw new Error(`다음 달 서약 조건: ${expected.code}`);
+  expect(actor.gold).toBeGreaterThanOrEqual(500);
+  const request = await submit('campaign.relationship', payload, 1);
+  await advance(10000);
+  expect(await receipt(request, 1)).toMatchObject({ status: 'applied', result: expected.result });
+  const after = await snapshot();
+  expect(after.state.generals[targetId]!.gold).toBe(actor.gold - 500);
+  expect(after.state.campaign).toEqual(expected.campaign);
+  expect(after.state.campaign!.attempts).toContainEqual({ masterId: targetId, personId: declinedNpcId, month: 1 });
+  expect(after.state.campaign!.attempts).not.toContainEqual({ masterId: targetId, personId: declinedNpcId, month: 0 });
+});
+
+it('예약한 실제 부장 부곡에만 모병하고 훈련 미리보기는 그 지휘관의 상승량을 쓴다', async () => {
+  const before = await snapshot(),
+    actor = before.state.generals[ownId]!;
+  await advance(actor.nextTurnTick);
+  const after = await snapshot(),
+    unit = after.state.campaign!.units.find((unit) => unit.id === unitId)!;
+  expect(unit).toMatchObject({ commanderId: lieutenantId, troops: 10, train: 0, atmos: 0 });
+  expect(after.state.generals[ownId]!.gold).toBe(actor.gold - 88);
+  expect(after.state.generals[ownId]!.crew).toBe(0);
+  expect(after.state.generals[lieutenantId]!.crew).toBe(0);
+  expect((await http('turns.precheck', { worldId, commandKey: 'train', args: { unitId } })).data).toMatchObject({
+    ok: true,
+    preview: { goldCost: 100, gain: 8 + Math.floor(after.state.generals[lieutenantId]!.leadership / 25) },
+  });
+  const forbidden = await submit('campaign.unit', {
+    type: 'disband',
+    unitId,
+    revision: after.state.campaign!.revision,
+  });
+  await advance(actor.nextTurnTick);
+  expect(await receipt(forbidden)).toMatchObject({ status: 'rejected', result: { code: 'TROOPS_PRESENT' } });
+  expect((await snapshot()).state.campaign!.units.find((row) => row.id === unitId)).toEqual(unit);
 });

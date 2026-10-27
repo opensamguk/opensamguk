@@ -75,6 +75,38 @@ it('CLI boolean에 문자열 값을 넣으면 DB를 열기 전에 거부한다 (
   expect(mocks.saveInitialWorld).not.toHaveBeenCalled();
 });
 
+it('자원 프로필과 요청 기능을 합칠 때 정렬한 뒤 의존 관계를 검사한다', async () => {
+  mocks.loadInitialWorld.mockResolvedValue({ seed: 'cli-unit', ruleFeatures: ['five-stats', 'operational-map'] });
+  process.argv = [
+    process.execPath,
+    'createWorld.ts',
+    ...args,
+    '--rule-features',
+    'treaty,campaign-v1,policy,personnel,stratagem-basic',
+  ];
+  await import('./createWorld');
+  await vi.waitFor(() => expect(mocks.disconnect).toHaveBeenCalledOnce());
+  const features = ['campaign-v1', 'five-stats', 'operational-map', 'personnel', 'policy', 'stratagem-basic', 'treaty'];
+  expect(mocks.saveInitialWorld).toHaveBeenCalledExactlyOnceWith(
+    expect.anything(),
+    { seed: 'cli-unit', ruleFeatures: features },
+    expect.objectContaining({ ruleFeatures: features }),
+  );
+  expect(console.error).not.toHaveBeenCalled();
+});
+
+it.each(['campaign-v1,personnel', 'policy,policy', 'unknown-feature'])(
+  '잘못된 기능 %s는 생성하지 않고 연결을 닫는다',
+  async (features) => {
+    process.argv = [process.execPath, 'createWorld.ts', ...args, '--rule-features', features];
+    await import('./createWorld');
+    await vi.waitFor(() => expect(mocks.disconnect).toHaveBeenCalledOnce());
+    expect(process.exitCode).toBe(1);
+    expect(mocks.saveInitialWorld).not.toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalledOnce();
+  },
+);
+
 it('실제 CLI 자식 프로세스의 도움말은 --treaty를 안내한다 (DB 생성 증거 아님)', () => {
   const env = { ...process.env };
   delete env.DATABASE_URL;

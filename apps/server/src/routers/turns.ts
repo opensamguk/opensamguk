@@ -23,6 +23,7 @@ import { worldResolver } from '../game/resolver';
 const revision = z.number().int().min(0).max(2_147_483_646);
 const index = z.number().int().min(0).max(29);
 const range = { from: index, to: index };
+type SubmittedTurn = { commandKey: string; args?: unknown };
 const opSchema = z.union([
   z.strictObject({ put: z.strictObject({ ...range, ...commandInput }).refine((r) => r.from <= r.to) }),
   z.strictObject({
@@ -43,26 +44,31 @@ async function submittedWorld(
   tx: Prisma.TransactionClient,
   worldId: string,
   lock: boolean,
-  submitted: readonly QueuedTurn[],
+  submitted: readonly SubmittedTurn[],
 ) {
   try {
     return await requireWorld(tx, worldId, lock);
   } catch (error) {
     // 끈 월드와 없는 월드의 확장 key는 예전 입력 오류를 보존한다.
-    if (hasExtensionSlot(submitted) && error instanceof TRPCError && error.code === 'NOT_FOUND') invalidSlot();
+    if (error instanceof TRPCError && error.code === 'NOT_FOUND') {
+      for (const turn of submitted) parseSlot(turn, true);
+      if (hasExtensionSlot(submitted)) invalidSlot();
+    }
     throw error;
   }
 }
 async function save(
   ctx: Context & { user: NonNullable<Context['user']> },
   input: { worldId: string; revision: number },
-  change: (old: QueuedTurn[]) => QueuedTurn[],
-  submitted: readonly QueuedTurn[] = [],
+  change: (old: QueuedTurn[], parse: (turn: SubmittedTurn | null) => QueuedTurn) => QueuedTurn[],
+  submitted: readonly SubmittedTurn[] = [],
 ) {
   const key = `turns.set:${randomUUID()}`;
   return ctx.db.$transaction(async (tx) => {
     const world = await submittedWorld(tx, input.worldId, true, submitted);
-    assertEnabledSlots(world, submitted);
+    const resolver = worldResolver(world).resolver;
+    const parse = (turn: SubmittedTurn | null) => parseSlot(turn, true, resolver);
+    assertEnabledSlots(world, submitted.map(parse));
     if (world.status === 'ENDED') throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '종료된 월드입니다.' });
     const policyEnabled = world.replayFormat === 3 ? world.ruleFeatures.includes('policy') : true;
     if (policyEnabled) requirePolicyReady(world);
@@ -80,7 +86,7 @@ async function save(
         revision: actor.turnRevision,
         slots: displaySlots(old, worldResolver(world).resolver),
       };
-    const turns = change(old);
+    const turns = change(old, parse);
     await tx.generalTurn.deleteMany({ where: { worldId: input.worldId, generalId: actor.id } });
     await tx.generalTurn.createMany({
       data: turns.map((turn, slot) => ({
@@ -140,22 +146,34 @@ export const turnsRouter = router({
   ),
   set: protectedProcedure
     .input(worldInput.extend({ revision, slots: z.array(slotInput).length(30) }))
-    .mutation(({ ctx, input }) => {
-      const turns = input.slots.map((slot) => parseSlot(slot, true));
-      return save(ctx, input, () => turns, turns);
-    }),
+    .mutation(({ ctx, input }) =>
+      save(
+        ctx,
+        input,
+        (_old, parse) => input.slots.map(parse),
+        input.slots.filter((slot) => slot !== null),
+      ),
+    ),
   edit: protectedProcedure.input(worldInput.extend({ revision, op: opSchema })).mutation(({ ctx, input }) => {
-    const op: ArrayEdit<QueuedTurn> =
-      'put' in input.op
-        ? { put: { from: input.op.put.from, to: input.op.put.to, value: parseSlot(input.op.put, true) } }
-        : input.op;
-    return save(ctx, input, (old) => editArray(old, op, emptyTurn), 'put' in op ? [op.put.value] : []);
+    const submitted = 'put' in input.op ? [input.op.put] : [];
+    return save(
+      ctx,
+      input,
+      (old, parse) => {
+        const op: ArrayEdit<QueuedTurn> =
+          'put' in input.op
+            ? { put: { from: input.op.put.from, to: input.op.put.to, value: parse(input.op.put) } }
+            : input.op;
+        return editArray(old, op, emptyTurn);
+      },
+      submitted,
+    );
   }),
   precheck: protectedProcedure.input(worldInput.extend(commandInput)).query(({ ctx, input }) => {
-    const turn = parseSlot(input, true);
     return ctx.db.$transaction(
       async (tx) => {
-        const world = await submittedWorld(tx, input.worldId, false, [turn]);
+        const world = await submittedWorld(tx, input.worldId, false, [input]);
+        const turn = parseSlot(input, true, worldResolver(world).resolver);
         const extended = hasExtensionSlot([turn]) ? worldResolver(world) : undefined;
         if (extended?.commands === null && !extended.resolver.get(turn.commandKey)) invalidSlot();
         const actor = await requireGeneral(tx, input.worldId, ctx.user.id);
