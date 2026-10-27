@@ -1,4 +1,4 @@
-import { BALANCE, simulateBattle, unitSetSchema } from '@opensamguk/rules';
+import { BALANCE, simulateBattle, unitSetSchema, commanderBattleModifiers } from '@opensamguk/rules';
 import { createRng } from '@opensamguk/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createCompute } from './compute';
@@ -14,6 +14,75 @@ vi.mock('@opensamguk/rules', async (importOriginal) => {
 
 const unitSet = unitSetSchema.parse(PUBLIC_UNIT_SET);
 const compute = createCompute(PUBLIC_UNIT_SET);
+
+describe('AC-INT-11 통합판의 단일 교전', () => {
+  it.each([0, 50, 100])('지휘관 보정 %i는 엔진과 같은 함수로 한 번 적용하고 원래 두 값을 답한다', (value) => {
+    const commanders = {
+      attacker: { leadership: value, strength: 100 - value },
+      defender: { leadership: 100 - value, strength: value },
+    };
+    const message = general({ commanders });
+    const original = structuredClone(message);
+    const expected = simulateBattle(
+      {
+        attacker: message.attacker,
+        defender: message.defender,
+        attackerTech: message.attackerTech,
+        defenderTech: message.defenderTech,
+        unitSet,
+        attackerModifiers: commanderBattleModifiers(commanders.attacker),
+        defenderModifiers: commanderBattleModifiers(commanders.defender),
+      },
+      createRng(message.seed),
+    );
+    const reply = compute(message);
+    expect(reply).toMatchObject({
+      type: 'result',
+      input: { commanders },
+      attacker: expected.attacker,
+      defender: expected.defender,
+    });
+    expect(compute(message)).toEqual(reply);
+    expect(message).toEqual(original);
+  });
+  it('성벽에는 가짜 지휘관을 만들지 않고 공격 지휘관만 보정한다', () => {
+    const commanders = { attacker: { leadership: 78, strength: 80 } };
+    const message = wall({ commanders });
+    const expected = simulateBattle(
+      {
+        attacker: message.attacker,
+        defender: message.defender,
+        attackerTech: message.attackerTech,
+        defenderTech: message.defenderTech,
+        defence: message.defence!,
+        unitSet,
+        attackerModifiers: commanderBattleModifiers(commanders.attacker),
+      },
+      createRng(message.seed),
+    );
+    expect(compute(message)).toMatchObject({
+      type: 'result',
+      input: { commanders },
+      attacker: expected.attacker,
+      defender: expected.defender,
+    });
+    expect(compute(wall({ commanders: { ...commanders, defender: { leadership: 50, strength: 50 } } }))).toMatchObject({
+      type: 'error',
+      code: 'INVALID_INPUT',
+      field: 'commanders.defender',
+    });
+  });
+  it.each([
+    { attacker: { leadership: 50, strength: 50 } },
+    { attacker: { leadership: 50, strength: 50 }, defender: { leadership: -1, strength: 50 } },
+    { attacker: { leadership: 101, strength: 50 }, defender: { leadership: 50, strength: 50 } },
+    { attacker: { leadership: 50, strength: 50, intel: 50 }, defender: { leadership: 50, strength: 50 } },
+  ])('누락·경계 밖·관련 없는 능력치 입력은 계산하지 않는다 %#', (commanders) => {
+    vi.mocked(simulateBattle).mockClear();
+    expect(compute({ ...general(), commanders })).toMatchObject({ type: 'error', code: 'INVALID_INPUT' });
+    expect(simulateBattle).not.toHaveBeenCalled();
+  });
+});
 
 function general(overrides: Partial<BattleRunRequest> = {}): BattleRunRequest {
   return {
