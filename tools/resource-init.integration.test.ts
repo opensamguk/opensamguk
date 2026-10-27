@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { setTimeout as delay } from 'node:timers/promises';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -129,11 +130,23 @@ async function withDatabase(action: (fixture: Fixture) => Promise<void>, beforeC
           await admin.query<{ oid: string }>('SELECT oid::text AS oid FROM pg_database WHERE datname = $1', [name])
         ).rows;
         expect(current).toEqual([{ oid: createdOID }]);
-        const active = await admin.query<{ count: number }>(
+        let active = await admin.query<{ count: number }>(
           'SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname = $1',
           [name],
         );
+        // 소켓 종료 뒤 PostgreSQL이 자기 backend를 제거할 때까지 확인한다.
+        for (let attempt = 0; active.rows[0]?.count !== 0 && attempt < 20; attempt++) {
+          await delay(50);
+          active = await admin.query<{ count: number }>(
+            'SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname = $1',
+            [name],
+          );
+        }
         expect(active.rows).toEqual([{ count: 0 }]);
+        expect(
+          (await admin.query<{ oid: string }>('SELECT oid::text AS oid FROM pg_database WHERE datname = $1', [name]))
+            .rows,
+        ).toEqual([{ oid: createdOID }]);
         await admin.query(`DROP DATABASE "${name}"`);
         expect((await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', [name])).rows).toEqual([]);
       } catch (error) {
