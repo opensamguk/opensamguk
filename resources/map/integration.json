@@ -1,0 +1,2601 @@
+{
+  "version": 3,
+  "id": "integration",
+  "name": "통합판 삼국 지도",
+  "canvas": {
+    "width": 1000,
+    "height": 700
+  },
+  "basemap": {
+    "source": "natural-earth-5.1.2",
+    "projection": "WGS84 plate carree",
+    "sha256": "7aebb196cd19b2edf936cc5d6ef401d5582e0cb5662f5521b9016930d84da11e",
+    "bounds": [
+      94,
+      17,
+      132.57142857142856,
+      44
+    ]
+  },
+  "defaults": {
+    "trust": 50,
+    "supplyState": 1
+  },
+  "sites": [
+    {
+      "id": "city:1",
+      "name": "업",
+      "position": {
+        "x": 534,
+        "y": 200
+      },
+      "kind": "CITY",
+      "anchorKey": 1,
+      "legacyCityId": 1,
+      "level": 8,
+      "region": 1,
+      "initial": {
+        "population": 150000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 5000,
+        "wall": 5000
+      },
+      "max": {
+        "population": 620500,
+        "agriculture": 12500,
+        "commerce": 11300,
+        "security": 10000,
+        "defence": 11700,
+        "wall": 12200
+      }
+    },
+    {
+      "id": "city:2",
+      "name": "허창",
+      "position": {
+        "x": 514,
+        "y": 259
+      },
+      "kind": "CITY",
+      "anchorKey": 2,
+      "legacyCityId": 2,
+      "level": 8,
+      "region": 2,
+      "initial": {
+        "population": 150000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 5000,
+        "wall": 5000
+      },
+      "max": {
+        "population": 587600,
+        "agriculture": 12100,
+        "commerce": 12400,
+        "security": 10000,
+        "defence": 11700,
+        "wall": 12500
+      }
+    },
+    {
+      "id": "city:3",
+      "name": "낙양",
+      "position": {
+        "x": 478,
+        "y": 243
+      },
+      "kind": "CITY",
+      "anchorKey": 3,
+      "legacyCityId": 3,
+      "level": 8,
+      "region": 2,
+      "initial": {
+        "population": 150000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 5000,
+        "wall": 5000
+      },
+      "max": {
+        "population": 835700,
+        "agriculture": 11700,
+        "commerce": 12000,
+        "security": 10000,
+        "defence": 12100,
+        "wall": 12400
+      }
+    },
+    {
+      "id": "city:4",
+      "name": "장안",
+      "position": {
+        "x": 386,
+        "y": 252
+      },
+      "kind": "CITY",
+      "anchorKey": 4,
+      "legacyCityId": 4,
+      "level": 8,
+      "region": 3,
+      "initial": {
+        "population": 150000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 5000,
+        "wall": 5000
+      },
+      "max": {
+        "population": 592300,
+        "agriculture": 11600,
+        "commerce": 12300,
+        "security": 10000,
+        "defence": 12000,
+        "wall": 11800
+      }
+    },
+    {
+      "id": "city:5",
+      "name": "성도",
+      "position": {
+        "x": 261,
+        "y": 346
+      },
+      "kind": "CITY",
+      "anchorKey": 5,
+      "legacyCityId": 5,
+      "level": 8,
+      "region": 4,
+      "initial": {
+        "population": 150000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 5000,
+        "wall": 5000
+      },
+      "max": {
+        "population": 652500,
+        "agriculture": 12300,
+        "commerce": 12500,
+        "security": 10000,
+        "defence": 12500,
+        "wall": 12300
+      }
+    },
+    {
+      "id": "city:6",
+      "name": "양양",
+      "position": {
+        "x": 470,
+        "y": 311
+      },
+      "kind": "CITY",
+      "anchorKey": 6,
+      "legacyCityId": 6,
+      "level": 8,
+      "region": 6,
+      "initial": {
+        "population": 150000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 5000,
+        "wall": 5000
+      },
+      "max": {
+        "population": 583700,
+        "agriculture": 12000,
+        "commerce": 12600,
+        "security": 10000,
+        "defence": 11500,
+        "wall": 11700
+      }
+    },
+    {
+      "id": "city:7",
+      "name": "건업",
+      "position": {
+        "x": 642,
+        "y": 310
+      },
+      "kind": "CITY",
+      "anchorKey": 7,
+      "legacyCityId": 7,
+      "level": 8,
+      "region": 7,
+      "initial": {
+        "population": 150000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 5000,
+        "wall": 5000
+      },
+      "max": {
+        "population": 638600,
+        "agriculture": 11600,
+        "commerce": 12300,
+        "security": 10000,
+        "defence": 11500,
+        "wall": 11900
+      }
+    },
+    {
+      "id": "city:8",
+      "name": "북평",
+      "position": {
+        "x": 645,
+        "y": 107
+      },
+      "kind": "CITY",
+      "anchorKey": 8,
+      "legacyCityId": 8,
+      "level": 7,
+      "region": 1,
+      "initial": {
+        "population": 150000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 4000,
+        "wall": 4000
+      },
+      "max": {
+        "population": 486200,
+        "agriculture": 10200,
+        "commerce": 9500,
+        "security": 8000,
+        "defence": 10300,
+        "wall": 9900
+      }
+    },
+    {
+      "id": "city:9",
+      "name": "남피",
+      "position": {
+        "x": 589,
+        "y": 155
+      },
+      "kind": "CITY",
+      "anchorKey": 9,
+      "legacyCityId": 9,
+      "level": 7,
+      "region": 1,
+      "initial": {
+        "population": 150000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 4000,
+        "wall": 4000
+      },
+      "max": {
+        "population": 503200,
+        "agriculture": 9900,
+        "commerce": 10100,
+        "security": 8000,
+        "defence": 10100,
+        "wall": 10500
+      }
+    },
+    {
+      "id": "city:10",
+      "name": "완",
+      "position": {
+        "x": 480,
+        "y": 285
+      },
+      "kind": "CITY",
+      "anchorKey": 10,
+      "legacyCityId": 10,
+      "level": 7,
+      "region": 2,
+      "initial": {
+        "population": 150000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 4000,
+        "wall": 4000
+      },
+      "max": {
+        "population": 472400,
+        "agriculture": 10300,
+        "commerce": 10000,
+        "security": 8000,
+        "defence": 10100,
+        "wall": 9900
+      }
+    },
+    {
+      "id": "city:11",
+      "name": "수춘",
+      "position": {
+        "x": 591,
+        "y": 296
+      },
+      "kind": "CITY",
+      "anchorKey": 11,
+      "legacyCityId": 11,
+      "level": 7,
+      "region": 2,
+      "initial": {
+        "population": 150000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 4000,
+        "wall": 4000
+      },
+      "max": {
+        "population": 514300,
+        "agriculture": 9900,
+        "commerce": 9600,
+        "security": 8000,
+        "defence": 9900,
+        "wall": 9500
+      }
+    },
+    {
+      "id": "city:13",
+      "name": "강릉",
+      "position": {
+        "x": 473,
+        "y": 355
+      },
+      "kind": "CITY",
+      "anchorKey": 13,
+      "legacyCityId": 13,
+      "level": 7,
+      "region": 6,
+      "initial": {
+        "population": 150000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 4000,
+        "wall": 4000
+      },
+      "max": {
+        "population": 485000,
+        "agriculture": 10500,
+        "commerce": 9600,
+        "security": 8000,
+        "defence": 9500,
+        "wall": 9600
+      }
+    },
+    {
+      "id": "city:14",
+      "name": "장사",
+      "position": {
+        "x": 492,
+        "y": 410
+      },
+      "kind": "CITY",
+      "anchorKey": 14,
+      "legacyCityId": 14,
+      "level": 7,
+      "region": 6,
+      "initial": {
+        "population": 150000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 4000,
+        "wall": 4000
+      },
+      "max": {
+        "population": 471000,
+        "agriculture": 9700,
+        "commerce": 9900,
+        "security": 8000,
+        "defence": 10000,
+        "wall": 10500
+      }
+    },
+    {
+      "id": "city:15",
+      "name": "시상",
+      "position": {
+        "x": 570,
+        "y": 370
+      },
+      "kind": "CITY",
+      "anchorKey": 15,
+      "legacyCityId": 15,
+      "level": 7,
+      "region": 7,
+      "initial": {
+        "population": 150000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 4000,
+        "wall": 4000
+      },
+      "max": {
+        "population": 525200,
+        "agriculture": 9800,
+        "commerce": 10000,
+        "security": 10000,
+        "defence": 9900,
+        "wall": 9600
+      }
+    },
+    {
+      "id": "city:17",
+      "name": "계",
+      "position": {
+        "x": 581,
+        "y": 106
+      },
+      "kind": "CITY",
+      "anchorKey": 17,
+      "legacyCityId": 17,
+      "level": 6,
+      "region": 1,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 3000,
+        "wall": 3000
+      },
+      "max": {
+        "population": 388500,
+        "agriculture": 7500,
+        "commerce": 8000,
+        "security": 6000,
+        "defence": 7800,
+        "wall": 8100
+      }
+    },
+    {
+      "id": "city:18",
+      "name": "복양",
+      "position": {
+        "x": 544,
+        "y": 215
+      },
+      "kind": "CITY",
+      "anchorKey": 18,
+      "legacyCityId": 18,
+      "level": 6,
+      "region": 2,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 3000,
+        "wall": 3000
+      },
+      "max": {
+        "population": 418500,
+        "agriculture": 8000,
+        "commerce": 8300,
+        "security": 6000,
+        "defence": 8200,
+        "wall": 8000
+      }
+    },
+    {
+      "id": "city:19",
+      "name": "진류",
+      "position": {
+        "x": 528,
+        "y": 239
+      },
+      "kind": "CITY",
+      "anchorKey": 19,
+      "legacyCityId": 19,
+      "level": 6,
+      "region": 2,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 3000,
+        "wall": 3000
+      },
+      "max": {
+        "population": 395700,
+        "agriculture": 8200,
+        "commerce": 8000,
+        "security": 6000,
+        "defence": 8000,
+        "wall": 8300
+      }
+    },
+    {
+      "id": "city:20",
+      "name": "여남",
+      "position": {
+        "x": 528,
+        "y": 285
+      },
+      "kind": "CITY",
+      "anchorKey": 20,
+      "legacyCityId": 20,
+      "level": 6,
+      "region": 2,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 3000,
+        "wall": 3000
+      },
+      "max": {
+        "population": 383100,
+        "agriculture": 7700,
+        "commerce": 8100,
+        "security": 6000,
+        "defence": 8400,
+        "wall": 7700
+      }
+    },
+    {
+      "id": "city:21",
+      "name": "하비",
+      "position": {
+        "x": 621,
+        "y": 251
+      },
+      "kind": "CITY",
+      "anchorKey": 21,
+      "legacyCityId": 21,
+      "level": 6,
+      "region": 2,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 3000,
+        "wall": 3000
+      },
+      "max": {
+        "population": 427800,
+        "agriculture": 8500,
+        "commerce": 8300,
+        "security": 6000,
+        "defence": 8200,
+        "wall": 7800
+      }
+    },
+    {
+      "id": "city:22",
+      "name": "무위",
+      "position": {
+        "x": 224,
+        "y": 157
+      },
+      "kind": "CITY",
+      "anchorKey": 22,
+      "legacyCityId": 22,
+      "level": 6,
+      "region": 3,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 3000,
+        "wall": 3000
+      },
+      "max": {
+        "population": 387400,
+        "agriculture": 7700,
+        "commerce": 7900,
+        "security": 6000,
+        "defence": 8300,
+        "wall": 8000
+      }
+    },
+    {
+      "id": "city:23",
+      "name": "하내",
+      "position": {
+        "x": 491,
+        "y": 231
+      },
+      "kind": "CITY",
+      "anchorKey": 23,
+      "legacyCityId": 23,
+      "level": 6,
+      "region": 3,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 3000,
+        "wall": 3000
+      },
+      "max": {
+        "population": 373600,
+        "agriculture": 7700,
+        "commerce": 8100,
+        "security": 6000,
+        "defence": 8100,
+        "wall": 8000
+      }
+    },
+    {
+      "id": "city:24",
+      "name": "한중",
+      "position": {
+        "x": 338,
+        "y": 282
+      },
+      "kind": "CITY",
+      "anchorKey": 24,
+      "legacyCityId": 24,
+      "level": 6,
+      "region": 4,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 3000,
+        "wall": 3000
+      },
+      "max": {
+        "population": 402700,
+        "agriculture": 7700,
+        "commerce": 8400,
+        "security": 6000,
+        "defence": 8000,
+        "wall": 8500
+      }
+    },
+    {
+      "id": "city:25",
+      "name": "상용",
+      "position": {
+        "x": 421,
+        "y": 305
+      },
+      "kind": "CITY",
+      "anchorKey": 25,
+      "legacyCityId": 25,
+      "level": 6,
+      "region": 4,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 3000,
+        "wall": 3000
+      },
+      "max": {
+        "population": 368700,
+        "agriculture": 7800,
+        "commerce": 7600,
+        "security": 6000,
+        "defence": 7700,
+        "wall": 8100
+      }
+    },
+    {
+      "id": "city:27",
+      "name": "강주",
+      "position": {
+        "x": 326,
+        "y": 374
+      },
+      "kind": "CITY",
+      "anchorKey": 27,
+      "legacyCityId": 27,
+      "level": 6,
+      "region": 4,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 3000,
+        "wall": 3000
+      },
+      "max": {
+        "population": 412600,
+        "agriculture": 7900,
+        "commerce": 8000,
+        "security": 6000,
+        "defence": 8400,
+        "wall": 8100
+      }
+    },
+    {
+      "id": "city:28",
+      "name": "건녕",
+      "position": {
+        "x": 254,
+        "y": 480
+      },
+      "kind": "CITY",
+      "anchorKey": 28,
+      "legacyCityId": 28,
+      "level": 6,
+      "region": 5,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 3000,
+        "wall": 3000
+      },
+      "max": {
+        "population": 376500,
+        "agriculture": 8200,
+        "commerce": 8000,
+        "security": 6000,
+        "defence": 8600,
+        "wall": 8100
+      }
+    },
+    {
+      "id": "city:29",
+      "name": "남해",
+      "position": {
+        "x": 499,
+        "y": 541
+      },
+      "kind": "CITY",
+      "anchorKey": 29,
+      "legacyCityId": 29,
+      "level": 6,
+      "region": 5,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 3000,
+        "wall": 3000
+      },
+      "max": {
+        "population": 380300,
+        "agriculture": 8200,
+        "commerce": 7600,
+        "security": 6000,
+        "defence": 8000,
+        "wall": 8100
+      }
+    },
+    {
+      "id": "city:30",
+      "name": "계양",
+      "position": {
+        "x": 493,
+        "y": 472
+      },
+      "kind": "CITY",
+      "anchorKey": 30,
+      "legacyCityId": 30,
+      "level": 6,
+      "region": 6,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 3000,
+        "wall": 3000
+      },
+      "max": {
+        "population": 395500,
+        "agriculture": 8300,
+        "commerce": 8000,
+        "security": 6000,
+        "defence": 8100,
+        "wall": 7700
+      }
+    },
+    {
+      "id": "city:31",
+      "name": "오",
+      "position": {
+        "x": 690,
+        "y": 329
+      },
+      "kind": "CITY",
+      "anchorKey": 31,
+      "legacyCityId": 31,
+      "level": 6,
+      "region": 7,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 3000,
+        "wall": 3000
+      },
+      "max": {
+        "population": 435500,
+        "agriculture": 7700,
+        "commerce": 8100,
+        "security": 6000,
+        "defence": 7700,
+        "wall": 7600
+      }
+    },
+    {
+      "id": "city:35",
+      "name": "진양",
+      "position": {
+        "x": 481,
+        "y": 159
+      },
+      "kind": "CITY",
+      "anchorKey": 35,
+      "legacyCityId": 35,
+      "level": 5,
+      "region": 1,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 2000,
+        "wall": 2000
+      },
+      "max": {
+        "population": 307400,
+        "agriculture": 5600,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6400,
+        "wall": 5900
+      }
+    },
+    {
+      "id": "city:36",
+      "name": "평원",
+      "position": {
+        "x": 582,
+        "y": 177
+      },
+      "kind": "CITY",
+      "anchorKey": 36,
+      "legacyCityId": 36,
+      "level": 5,
+      "region": 1,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 2000,
+        "wall": 2000
+      },
+      "max": {
+        "population": 307400,
+        "agriculture": 6200,
+        "commerce": 6500,
+        "security": 4000,
+        "defence": 6100,
+        "wall": 6300
+      }
+    },
+    {
+      "id": "city:37",
+      "name": "북해",
+      "position": {
+        "x": 635,
+        "y": 189
+      },
+      "kind": "CITY",
+      "anchorKey": 37,
+      "legacyCityId": 37,
+      "level": 5,
+      "region": 1,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 2000,
+        "wall": 2000
+      },
+      "max": {
+        "population": 314600,
+        "agriculture": 5500,
+        "commerce": 6300,
+        "security": 4000,
+        "defence": 6300,
+        "wall": 5800
+      }
+    },
+    {
+      "id": "city:38",
+      "name": "초",
+      "position": {
+        "x": 565,
+        "y": 263
+      },
+      "kind": "CITY",
+      "anchorKey": 38,
+      "legacyCityId": 38,
+      "level": 5,
+      "region": 2,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 2000,
+        "wall": 2000
+      },
+      "max": {
+        "population": 328600,
+        "agriculture": 6000,
+        "commerce": 6200,
+        "security": 4000,
+        "defence": 6200,
+        "wall": 5700
+      }
+    },
+    {
+      "id": "city:39",
+      "name": "소패",
+      "position": {
+        "x": 594,
+        "y": 240
+      },
+      "kind": "CITY",
+      "anchorKey": 39,
+      "legacyCityId": 39,
+      "level": 5,
+      "region": 2,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 2000,
+        "wall": 2000
+      },
+      "max": {
+        "population": 287700,
+        "agriculture": 6400,
+        "commerce": 5800,
+        "security": 4000,
+        "defence": 5800,
+        "wall": 5900
+      }
+    },
+    {
+      "id": "city:40",
+      "name": "천수",
+      "position": {
+        "x": 309,
+        "y": 244
+      },
+      "kind": "CITY",
+      "anchorKey": 40,
+      "legacyCityId": 40,
+      "level": 5,
+      "region": 3,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 2000,
+        "wall": 2000
+      },
+      "max": {
+        "population": 298500,
+        "agriculture": 5900,
+        "commerce": 6400,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5800
+      }
+    },
+    {
+      "id": "city:41",
+      "name": "안정",
+      "position": {
+        "x": 342,
+        "y": 216
+      },
+      "kind": "CITY",
+      "anchorKey": 41,
+      "legacyCityId": 41,
+      "level": 5,
+      "region": 3,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 2000,
+        "wall": 2000
+      },
+      "max": {
+        "population": 276400,
+        "agriculture": 5700,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 5700,
+        "wall": 6200
+      }
+    },
+    {
+      "id": "city:42",
+      "name": "홍농",
+      "position": {
+        "x": 438,
+        "y": 246
+      },
+      "kind": "CITY",
+      "anchorKey": 42,
+      "legacyCityId": 42,
+      "level": 5,
+      "region": 3,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 2000,
+        "wall": 2000
+      },
+      "max": {
+        "population": 274800,
+        "agriculture": 5700,
+        "commerce": 6300,
+        "security": 4000,
+        "defence": 5800,
+        "wall": 6300
+      }
+    },
+    {
+      "id": "city:43",
+      "name": "무도",
+      "position": {
+        "x": 304,
+        "y": 266
+      },
+      "kind": "CITY",
+      "anchorKey": 43,
+      "legacyCityId": 43,
+      "level": 5,
+      "region": 4,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 2000,
+        "wall": 2000
+      },
+      "max": {
+        "population": 278500,
+        "agriculture": 5800,
+        "commerce": 6200,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5600
+      }
+    },
+    {
+      "id": "city:44",
+      "name": "자동",
+      "position": {
+        "x": 289,
+        "y": 320
+      },
+      "kind": "CITY",
+      "anchorKey": 44,
+      "legacyCityId": 44,
+      "level": 5,
+      "region": 4,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 2000,
+        "wall": 2000
+      },
+      "max": {
+        "population": 287000,
+        "agriculture": 5700,
+        "commerce": 5500,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5800
+      }
+    },
+    {
+      "id": "city:45",
+      "name": "영안",
+      "position": {
+        "x": 402,
+        "y": 336
+      },
+      "kind": "CITY",
+      "anchorKey": 45,
+      "legacyCityId": 45,
+      "level": 5,
+      "region": 4,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 2000,
+        "wall": 2000
+      },
+      "max": {
+        "population": 315300,
+        "agriculture": 6200,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 5800,
+        "wall": 5900
+      }
+    },
+    {
+      "id": "city:48",
+      "name": "운남",
+      "position": {
+        "x": 170,
+        "y": 480
+      },
+      "kind": "CITY",
+      "anchorKey": 48,
+      "legacyCityId": 48,
+      "level": 5,
+      "region": 5,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 2000,
+        "wall": 2000
+      },
+      "max": {
+        "population": 325800,
+        "agriculture": 6200,
+        "commerce": 6000,
+        "security": 4000,
+        "defence": 6400,
+        "wall": 6100
+      }
+    },
+    {
+      "id": "city:50",
+      "name": "교지",
+      "position": {
+        "x": 307,
+        "y": 595
+      },
+      "kind": "CITY",
+      "anchorKey": 50,
+      "legacyCityId": 50,
+      "level": 5,
+      "region": 5,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 2000,
+        "wall": 2000
+      },
+      "max": {
+        "population": 319500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 5800,
+        "wall": 5900
+      }
+    },
+    {
+      "id": "city:51",
+      "name": "신야",
+      "position": {
+        "x": 476,
+        "y": 298
+      },
+      "kind": "CITY",
+      "anchorKey": 51,
+      "legacyCityId": 51,
+      "level": 5,
+      "region": 6,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 2000,
+        "wall": 2000
+      },
+      "max": {
+        "population": 278600,
+        "agriculture": 6000,
+        "commerce": 6200,
+        "security": 4000,
+        "defence": 5800,
+        "wall": 5500
+      }
+    },
+    {
+      "id": "city:52",
+      "name": "강하",
+      "position": {
+        "x": 525,
+        "y": 348
+      },
+      "kind": "CITY",
+      "anchorKey": 52,
+      "legacyCityId": 52,
+      "level": 5,
+      "region": 6,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 2000,
+        "wall": 2000
+      },
+      "max": {
+        "population": 307400,
+        "agriculture": 5500,
+        "commerce": 5600,
+        "security": 4000,
+        "defence": 5700,
+        "wall": 6000
+      }
+    },
+    {
+      "id": "city:53",
+      "name": "무릉",
+      "position": {
+        "x": 458,
+        "y": 388
+      },
+      "kind": "CITY",
+      "anchorKey": 53,
+      "legacyCityId": 53,
+      "level": 5,
+      "region": 6,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 2000,
+        "wall": 2000
+      },
+      "max": {
+        "population": 319600,
+        "agriculture": 5800,
+        "commerce": 6300,
+        "security": 4000,
+        "defence": 6300,
+        "wall": 5800
+      }
+    },
+    {
+      "id": "city:54",
+      "name": "영릉",
+      "position": {
+        "x": 457,
+        "y": 456
+      },
+      "kind": "CITY",
+      "anchorKey": 54,
+      "legacyCityId": 54,
+      "level": 5,
+      "region": 6,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 2000,
+        "wall": 2000
+      },
+      "max": {
+        "population": 284900,
+        "agriculture": 6200,
+        "commerce": 5800,
+        "security": 4000,
+        "defence": 6200,
+        "wall": 6200
+      }
+    },
+    {
+      "id": "city:56",
+      "name": "여강",
+      "position": {
+        "x": 585,
+        "y": 347
+      },
+      "kind": "CITY",
+      "anchorKey": 56,
+      "legacyCityId": 56,
+      "level": 5,
+      "region": 7,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 2000,
+        "wall": 2000
+      },
+      "max": {
+        "population": 290500,
+        "agriculture": 5600,
+        "commerce": 5800,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5500
+      }
+    },
+    {
+      "id": "city:57",
+      "name": "회계",
+      "position": {
+        "x": 689,
+        "y": 363
+      },
+      "kind": "CITY",
+      "anchorKey": 57,
+      "legacyCityId": 57,
+      "level": 5,
+      "region": 7,
+      "initial": {
+        "population": 100000,
+        "agriculture": 1000,
+        "commerce": 1000,
+        "security": 1000,
+        "defence": 2000,
+        "wall": 2000
+      },
+      "max": {
+        "population": 300500,
+        "agriculture": 6400,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6200,
+        "wall": 6400
+      }
+    },
+    {
+      "id": "city:83",
+      "name": "광릉",
+      "position": {
+        "x": 659,
+        "y": 301
+      },
+      "kind": "CITY",
+      "anchorKey": 83,
+      "legacyCityId": 83,
+      "level": 2,
+      "region": 2,
+      "initial": {
+        "population": 5000,
+        "agriculture": 100,
+        "commerce": 100,
+        "security": 100,
+        "defence": 500,
+        "wall": 500
+      },
+      "max": {
+        "population": 100100,
+        "agriculture": 2000,
+        "commerce": 2100,
+        "security": 2000,
+        "defence": 4100,
+        "wall": 4000
+      }
+    },
+    {
+      "id": "city:95",
+      "name": "상당",
+      "position": {
+        "x": 495,
+        "y": 203
+      },
+      "kind": "CITY",
+      "anchorKey": 95,
+      "level": 2,
+      "region": 1,
+      "initial": {
+        "population": 5000,
+        "agriculture": 100,
+        "commerce": 100,
+        "security": 100,
+        "defence": 500,
+        "wall": 500
+      },
+      "max": {
+        "population": 100000,
+        "agriculture": 2000,
+        "commerce": 2000,
+        "security": 2000,
+        "defence": 4000,
+        "wall": 4000
+      }
+    },
+    {
+      "id": "city:96",
+      "name": "서평",
+      "position": {
+        "x": 201,
+        "y": 191
+      },
+      "kind": "CITY",
+      "anchorKey": 96,
+      "level": 2,
+      "region": 3,
+      "initial": {
+        "population": 5000,
+        "agriculture": 100,
+        "commerce": 100,
+        "security": 100,
+        "defence": 500,
+        "wall": 500
+      },
+      "max": {
+        "population": 100000,
+        "agriculture": 2000,
+        "commerce": 2000,
+        "security": 2000,
+        "defence": 4000,
+        "wall": 4000
+      }
+    },
+    {
+      "id": "city:97",
+      "name": "영창",
+      "position": {
+        "x": 134,
+        "y": 489
+      },
+      "kind": "CITY",
+      "anchorKey": 97,
+      "level": 2,
+      "region": 5,
+      "initial": {
+        "population": 5000,
+        "agriculture": 100,
+        "commerce": 100,
+        "security": 100,
+        "defence": 500,
+        "wall": 500
+      },
+      "max": {
+        "population": 100000,
+        "agriculture": 2000,
+        "commerce": 2000,
+        "security": 2000,
+        "defence": 4000,
+        "wall": 4000
+      }
+    },
+    {
+      "id": "city:98",
+      "name": "건안",
+      "position": {
+        "x": 631,
+        "y": 440
+      },
+      "kind": "CITY",
+      "anchorKey": 98,
+      "level": 2,
+      "region": 7,
+      "initial": {
+        "population": 5000,
+        "agriculture": 100,
+        "commerce": 100,
+        "security": 100,
+        "defence": 500,
+        "wall": 500
+      },
+      "max": {
+        "population": 100000,
+        "agriculture": 2000,
+        "commerce": 2000,
+        "security": 2000,
+        "defence": 4000,
+        "wall": 4000
+      }
+    },
+    {
+      "id": "city:99",
+      "name": "양평",
+      "position": {
+        "x": 756,
+        "y": 70
+      },
+      "kind": "CITY",
+      "anchorKey": 99,
+      "level": 2,
+      "region": 1,
+      "initial": {
+        "population": 5000,
+        "agriculture": 100,
+        "commerce": 100,
+        "security": 100,
+        "defence": 500,
+        "wall": 500
+      },
+      "max": {
+        "population": 100000,
+        "agriculture": 2000,
+        "commerce": 2000,
+        "security": 2000,
+        "defence": 4000,
+        "wall": 4000
+      }
+    },
+    {
+      "id": "pass:70",
+      "name": "호관",
+      "position": {
+        "x": 503,
+        "y": 212
+      },
+      "kind": "PASS",
+      "anchorKey": 70,
+      "legacyCityId": 70,
+      "region": 1,
+      "defence": {
+        "initial": 1000,
+        "max": 9500
+      },
+      "wall": {
+        "initial": 1000,
+        "max": 9600
+      }
+    },
+    {
+      "id": "pass:71",
+      "name": "호로",
+      "position": {
+        "x": 501,
+        "y": 245
+      },
+      "kind": "PASS",
+      "anchorKey": 71,
+      "legacyCityId": 71,
+      "region": 2,
+      "defence": {
+        "initial": 1000,
+        "max": 10300
+      },
+      "wall": {
+        "initial": 1000,
+        "max": 9800
+      }
+    },
+    {
+      "id": "pass:73",
+      "name": "함곡",
+      "position": {
+        "x": 427,
+        "y": 241
+      },
+      "kind": "PASS",
+      "anchorKey": 73,
+      "legacyCityId": 73,
+      "region": 3,
+      "defence": {
+        "initial": 1000,
+        "max": 10100
+      },
+      "wall": {
+        "initial": 1000,
+        "max": 10200
+      }
+    },
+    {
+      "id": "pass:75",
+      "name": "양평관",
+      "position": {
+        "x": 328,
+        "y": 283
+      },
+      "kind": "PASS",
+      "anchorKey": 75,
+      "legacyCityId": 75,
+      "region": 4,
+      "defence": {
+        "initial": 1000,
+        "max": 9700
+      },
+      "wall": {
+        "initial": 1000,
+        "max": 9600
+      }
+    },
+    {
+      "id": "pass:87",
+      "name": "면죽",
+      "position": {
+        "x": 264,
+        "y": 328
+      },
+      "kind": "PASS",
+      "anchorKey": 87,
+      "legacyCityId": 87,
+      "region": 4,
+      "defence": {
+        "initial": 1000,
+        "max": 10800
+      },
+      "wall": {
+        "initial": 1000,
+        "max": 9900
+      }
+    },
+    {
+      "id": "pass:100",
+      "name": "동관",
+      "position": {
+        "x": 419,
+        "y": 247
+      },
+      "kind": "PASS",
+      "anchorKey": 100,
+      "region": 4,
+      "defence": {
+        "initial": 5000,
+        "max": 10000
+      },
+      "wall": {
+        "initial": 5000,
+        "max": 10000
+      }
+    },
+    {
+      "id": "pass:101",
+      "name": "무관",
+      "position": {
+        "x": 436,
+        "y": 267
+      },
+      "kind": "PASS",
+      "anchorKey": 101,
+      "region": 4,
+      "defence": {
+        "initial": 5000,
+        "max": 10000
+      },
+      "wall": {
+        "initial": 5000,
+        "max": 10000
+      }
+    },
+    {
+      "id": "pass:102",
+      "name": "검각",
+      "position": {
+        "x": 299,
+        "y": 304
+      },
+      "kind": "PASS",
+      "anchorKey": 102,
+      "region": 4,
+      "defence": {
+        "initial": 5000,
+        "max": 10000
+      },
+      "wall": {
+        "initial": 5000,
+        "max": 10000
+      }
+    },
+    {
+      "id": "field:77",
+      "name": "역경",
+      "position": {
+        "x": 566,
+        "y": 121
+      },
+      "kind": "FIELD"
+    },
+    {
+      "id": "field:78",
+      "name": "계교",
+      "position": {
+        "x": 554,
+        "y": 181
+      },
+      "kind": "FIELD"
+    },
+    {
+      "id": "field:80",
+      "name": "관도",
+      "position": {
+        "x": 517,
+        "y": 240
+      },
+      "kind": "FIELD"
+    },
+    {
+      "id": "field:81",
+      "name": "정도",
+      "position": {
+        "x": 559,
+        "y": 231
+      },
+      "kind": "FIELD"
+    },
+    {
+      "id": "field:82",
+      "name": "합비",
+      "position": {
+        "x": 604,
+        "y": 315
+      },
+      "kind": "FIELD"
+    },
+    {
+      "id": "field:84",
+      "name": "적도",
+      "position": {
+        "x": 256,
+        "y": 223
+      },
+      "kind": "FIELD"
+    },
+    {
+      "id": "field:85",
+      "name": "가정",
+      "position": {
+        "x": 314,
+        "y": 233
+      },
+      "kind": "FIELD"
+    },
+    {
+      "id": "field:86",
+      "name": "기산",
+      "position": {
+        "x": 290,
+        "y": 253
+      },
+      "kind": "FIELD"
+    },
+    {
+      "id": "field:88",
+      "name": "이릉",
+      "position": {
+        "x": 448,
+        "y": 345
+      },
+      "kind": "FIELD"
+    },
+    {
+      "id": "field:89",
+      "name": "장판",
+      "position": {
+        "x": 461,
+        "y": 341
+      },
+      "kind": "FIELD"
+    },
+    {
+      "id": "field:90",
+      "name": "백랑",
+      "position": {
+        "x": 656,
+        "y": 67
+      },
+      "kind": "FIELD"
+    },
+    {
+      "id": "field:91",
+      "name": "적벽",
+      "position": {
+        "x": 509,
+        "y": 367
+      },
+      "kind": "FIELD"
+    },
+    {
+      "id": "field:92",
+      "name": "파양",
+      "position": {
+        "x": 588,
+        "y": 389
+      },
+      "kind": "FIELD"
+    },
+    {
+      "id": "port:13",
+      "name": "강릉항",
+      "position": {
+        "x": 483,
+        "y": 364
+      },
+      "kind": "PORT",
+      "parentCityId": "city:13"
+    },
+    {
+      "id": "port:52",
+      "name": "강하항",
+      "position": {
+        "x": 535,
+        "y": 357
+      },
+      "kind": "PORT",
+      "parentCityId": "city:52"
+    },
+    {
+      "id": "port:15",
+      "name": "시상항",
+      "position": {
+        "x": 580,
+        "y": 379
+      },
+      "kind": "PORT",
+      "parentCityId": "city:15"
+    },
+    {
+      "id": "port:56",
+      "name": "여강항",
+      "position": {
+        "x": 595,
+        "y": 356
+      },
+      "kind": "PORT",
+      "parentCityId": "city:56"
+    },
+    {
+      "id": "port:7",
+      "name": "건업항",
+      "position": {
+        "x": 652,
+        "y": 319
+      },
+      "kind": "PORT",
+      "parentCityId": "city:7"
+    },
+    {
+      "id": "port:31",
+      "name": "오항",
+      "position": {
+        "x": 700,
+        "y": 338
+      },
+      "kind": "PORT",
+      "parentCityId": "city:31"
+    }
+  ],
+  "routes": [
+    {
+      "id": "route:land-99-8",
+      "from": "city:99",
+      "to": "city:8",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true,
+      "via": [
+        "field:90"
+      ]
+    },
+    {
+      "id": "route:land-8-17",
+      "from": "city:8",
+      "to": "city:17",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true,
+      "via": [
+        "field:77"
+      ]
+    },
+    {
+      "id": "route:land-17-9",
+      "from": "city:17",
+      "to": "city:9",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-9-36",
+      "from": "city:9",
+      "to": "city:36",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-36-37",
+      "from": "city:36",
+      "to": "city:37",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-37-21",
+      "from": "city:37",
+      "to": "city:21",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-1-9",
+      "from": "city:1",
+      "to": "city:9",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true,
+      "via": [
+        "field:78"
+      ]
+    },
+    {
+      "id": "route:land-1-18",
+      "from": "city:1",
+      "to": "city:18",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-1-70",
+      "from": "city:1",
+      "to": "pass:70",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-70-95",
+      "from": "pass:70",
+      "to": "city:95",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-95-35",
+      "from": "city:95",
+      "to": "city:35",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-95-23",
+      "from": "city:95",
+      "to": "city:23",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-35-17",
+      "from": "city:35",
+      "to": "city:17",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-23-3",
+      "from": "city:23",
+      "to": "city:3",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-3-71",
+      "from": "city:3",
+      "to": "pass:71",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-71-2",
+      "from": "pass:71",
+      "to": "city:2",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-71-19",
+      "from": "pass:71",
+      "to": "city:19",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-18-19",
+      "from": "city:18",
+      "to": "city:19",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true,
+      "via": [
+        "field:81"
+      ]
+    },
+    {
+      "id": "route:land-19-2",
+      "from": "city:19",
+      "to": "city:2",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-19-39",
+      "from": "city:19",
+      "to": "city:39",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-39-21",
+      "from": "city:39",
+      "to": "city:21",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-39-38",
+      "from": "city:39",
+      "to": "city:38",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-38-2",
+      "from": "city:38",
+      "to": "city:2",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-38-20",
+      "from": "city:38",
+      "to": "city:20",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-2-10",
+      "from": "city:2",
+      "to": "city:10",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-20-10",
+      "from": "city:20",
+      "to": "city:10",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-20-11",
+      "from": "city:20",
+      "to": "city:11",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-21-83",
+      "from": "city:21",
+      "to": "city:83",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-83-11",
+      "from": "city:83",
+      "to": "city:11",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-4-100",
+      "from": "city:4",
+      "to": "pass:100",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-100-42",
+      "from": "pass:100",
+      "to": "city:42",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-42-73",
+      "from": "city:42",
+      "to": "pass:73",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-73-3",
+      "from": "pass:73",
+      "to": "city:3",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-4-101",
+      "from": "city:4",
+      "to": "pass:101",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-101-10",
+      "from": "pass:101",
+      "to": "city:10",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-4-41",
+      "from": "city:4",
+      "to": "city:41",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-41-40",
+      "from": "city:41",
+      "to": "city:40",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true,
+      "via": [
+        "field:85"
+      ]
+    },
+    {
+      "id": "route:land-40-22",
+      "from": "city:40",
+      "to": "city:22",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-22-96",
+      "from": "city:22",
+      "to": "city:96",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-96-40",
+      "from": "city:96",
+      "to": "city:40",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true,
+      "via": [
+        "field:84"
+      ]
+    },
+    {
+      "id": "route:land-40-43",
+      "from": "city:40",
+      "to": "city:43",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true,
+      "via": [
+        "field:86"
+      ]
+    },
+    {
+      "id": "route:land-43-75",
+      "from": "city:43",
+      "to": "pass:75",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-75-24",
+      "from": "pass:75",
+      "to": "city:24",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-75-102",
+      "from": "pass:75",
+      "to": "pass:102",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-102-44",
+      "from": "pass:102",
+      "to": "city:44",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-44-87",
+      "from": "city:44",
+      "to": "pass:87",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-87-5",
+      "from": "pass:87",
+      "to": "city:5",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-24-25",
+      "from": "city:24",
+      "to": "city:25",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-25-51",
+      "from": "city:25",
+      "to": "city:51",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-10-51",
+      "from": "city:10",
+      "to": "city:51",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-51-6",
+      "from": "city:51",
+      "to": "city:6",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-6-13",
+      "from": "city:6",
+      "to": "city:13",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true,
+      "via": [
+        "field:89"
+      ]
+    },
+    {
+      "id": "route:land-25-45",
+      "from": "city:25",
+      "to": "city:45",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-44-27",
+      "from": "city:44",
+      "to": "city:27",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-27-45",
+      "from": "city:27",
+      "to": "city:45",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-45-13",
+      "from": "city:45",
+      "to": "city:13",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true,
+      "via": [
+        "field:88"
+      ]
+    },
+    {
+      "id": "route:land-5-28",
+      "from": "city:5",
+      "to": "city:28",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-28-48",
+      "from": "city:28",
+      "to": "city:48",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-48-97",
+      "from": "city:48",
+      "to": "city:97",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-97-50",
+      "from": "city:97",
+      "to": "city:50",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-50-29",
+      "from": "city:50",
+      "to": "city:29",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-29-30",
+      "from": "city:29",
+      "to": "city:30",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-30-54",
+      "from": "city:30",
+      "to": "city:54",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-54-53",
+      "from": "city:54",
+      "to": "city:53",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-53-13",
+      "from": "city:53",
+      "to": "city:13",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-53-14",
+      "from": "city:53",
+      "to": "city:14",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-14-30",
+      "from": "city:14",
+      "to": "city:30",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-14-15",
+      "from": "city:14",
+      "to": "city:15",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-15-98",
+      "from": "city:15",
+      "to": "city:98",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-98-57",
+      "from": "city:98",
+      "to": "city:57",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-57-31",
+      "from": "city:57",
+      "to": "city:31",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-98-29",
+      "from": "city:98",
+      "to": "city:29",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:land-11-56",
+      "from": "city:11",
+      "to": "city:56",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true,
+      "via": [
+        "field:82"
+      ]
+    },
+    {
+      "id": "route:land-56-7",
+      "from": "city:56",
+      "to": "city:7",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:bridge-1-2",
+      "from": "city:1",
+      "to": "city:2",
+      "mode": "BRIDGE",
+      "direction": "BOTH",
+      "enabled": true,
+      "via": [
+        "field:80"
+      ]
+    },
+    {
+      "id": "route:ford-6-52",
+      "from": "city:6",
+      "to": "city:52",
+      "mode": "FORD",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:river-13-52",
+      "from": "city:13",
+      "to": "city:52",
+      "mode": "RIVER",
+      "direction": "BOTH",
+      "enabled": true,
+      "via": [
+        "field:91"
+      ],
+      "portIds": [
+        "port:13",
+        "port:52"
+      ]
+    },
+    {
+      "id": "route:river-52-15",
+      "from": "city:52",
+      "to": "city:15",
+      "mode": "RIVER",
+      "direction": "BOTH",
+      "enabled": true,
+      "portIds": [
+        "port:52",
+        "port:15"
+      ]
+    },
+    {
+      "id": "route:river-15-56",
+      "from": "city:15",
+      "to": "city:56",
+      "mode": "RIVER",
+      "direction": "BOTH",
+      "enabled": true,
+      "via": [
+        "field:92"
+      ],
+      "portIds": [
+        "port:15",
+        "port:56"
+      ]
+    },
+    {
+      "id": "route:river-56-7",
+      "from": "city:56",
+      "to": "city:7",
+      "mode": "RIVER",
+      "direction": "BOTH",
+      "enabled": true,
+      "portIds": [
+        "port:56",
+        "port:7"
+      ]
+    },
+    {
+      "id": "route:river-7-31",
+      "from": "city:7",
+      "to": "city:31",
+      "mode": "RIVER",
+      "direction": "BOTH",
+      "enabled": true,
+      "portIds": [
+        "port:7",
+        "port:31"
+      ]
+    }
+  ]
+}

@@ -95,3 +95,13 @@ v1에 없는 7명은 2026-10-27 웹에서 확인한 삼국지11 수치를 기록
 `portraits/191-supplement.json`은 인물·게임·원본 URL·바이트 해시와 새 ID 11001~11008만 기록한다. `pnpm portraits:fetch-supplement`가 이 checkout의 Git 제외 폴더 `private/portraits-supplement/`에 원본을 받고 내용 해시를 확인한다. 기존 파일과 해시가 다르면 덮어쓰지 않는다. 원본을 수정하거나 Git·공개 dist에 넣지 않는다. 개발 서버는 등록된 원본만 읽으며 공개 빌드는 기본 SVG를 쓴다.
 
 `portraits/191-map.json`은 인물 원장을 기준으로 기존 초상 483명과 보충 8명을 대응한 새 월드용 표다. 기존 `rtk14-map.json`과 이미 생성한 월드의 초상 ID를 바꾸지 않는다. 운영 시나리오 연결은 INT-04의 별도 검증 대상이다.
+
+## 통합판 운영 지도 (INT-03)
+
+`map/integration.json`·`map/integration-correspondence.json`과 생성기 `tools/map-data/operational.ts`의 기존 도시 ID·경제 값은 core2026 커밋 `df6c926`의 `map/che.json` 파생 자료다. 원저작자 devsam의 MIT 고지를 위 원문과 함께 유지한다.
+
+`map/integration.json`은 위 Natural Earth v5.1.2 지역 GIS와 기존 `campaignSeed.ts`의 53도시·8관문·6항구·13전장 좌표를 재사용한다. GIS 원본 묶음의 바이트 SHA-256을 운영 자원에 고정한다. 생성은 `pnpm exec tsx tools/map-data/build-operational.ts`다. 좌표는 모두 같은 WGS84 투영 모델을 쓰며 실지형은 생성 이미지로 대체하지 않는다.
+
+기존 도시의 게임 경제·방어 값은 `map/che.json`의 같은 ID에서 보존한다. 새 상당95·서평96·영창97·건안98·양평99의 게임 초깃값은 인구5000·농업/상업/치안100·방어/성벽500이고 최대값은 인구100000·농업/상업/치안2000·방어/성벽4000이다. 레벨2와 지역을 생성기에 명시했다. 새 관문은 초기 방어/성벽5000·최대10000이며 경제·인구가 없다. 이 값은 게임 편성 기준이며 역사 인구·세입의 자료로 주장하지 않는다.
+
+81개 육로·도하·교량·수로는 생성기의 명시적 게임 연결이다. Natural Earth가 고대 도로망을 증명한다는 뜻이 아니다. 수로는 소속 도시의 항구 쌍을 쓰고 전장은 선의 경유 표시만 한다. 실제 이동 목표는61개 도시·관문이며 경유 표식 때문에 추가 이동 턴이나 거리 비용이 생기지 않는다. `map/integration-correspondence.json`은 기존 앵커 ID와 새 이름을 대조한다. 서량→무위·패→소패·하변→무도·양평관 이름을 명시하며 요동 양평99를 옛 안평60의 자동 별칭으로 등록하지 않는다.
