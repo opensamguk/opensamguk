@@ -65,9 +65,9 @@ describe('가이드 마크다운', () => {
   });
 });
 
-describe('가이드 9개', () => {
-  it('읽는 순서의 9개가 모두 묶여 있다', () => {
-    expect(GUIDE_ORDER).toHaveLength(9);
+describe('가이드 10개', () => {
+  it('읽는 순서의 10개가 모두 묶여 있다', () => {
+    expect(GUIDE_ORDER).toHaveLength(10);
     for (const guide of GUIDE_ORDER) expect(GUIDES[guide.doc], guide.doc).toBeTypeOf('string');
   });
 
@@ -127,7 +127,7 @@ describe('도움말 화면', () => {
     expect(screen.queryByText(/사실 기준/)).toBeNull();
     const link = screen.getAllByRole('link', { name: '시간과 턴' })[0]!;
     expect(link.getAttribute('href')).toBe('/help/time-and-turns');
-    expect(screen.getByRole('navigation', { name: '가이드 목록' }).querySelectorAll('li')).toHaveLength(10);
+    expect(screen.getByRole('navigation', { name: '가이드 목록' }).querySelectorAll('li')).toHaveLength(11);
   });
 
   it('절 링크는 같은 화면 안 앵커로 바뀐다', async () => {
