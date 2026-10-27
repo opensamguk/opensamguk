@@ -19,9 +19,14 @@ export const slotInput = z.strictObject(commandInput).nullable();
 export function invalidSlot(): never {
   throw new TRPCError({ code: 'BAD_REQUEST', message: '명령과 인자를 확인하세요.' });
 }
-export function parseSlot(input: { commandKey: string; args?: unknown } | null, allowExtensions = false): PolicySlot {
+export function parseSlot(
+  input: { commandKey: string; args?: unknown } | null,
+  allowExtensions = false,
+  resolver?: CommandResolver,
+): PolicySlot {
   if (input === null) return emptyTurn();
   const def =
+    resolver?.get(input.commandKey) ??
     commandRegistry.get(input.commandKey) ??
     (allowExtensions
       ? [
@@ -42,7 +47,7 @@ export function parseSlot(input: { commandKey: string; args?: unknown } | null, 
   }
   return { commandKey: def.key, args: args.data, explicit: true };
 }
-export function hasExtensionSlot(turns: readonly QueuedTurn[]) {
+export function hasExtensionSlot(turns: readonly Pick<QueuedTurn, 'commandKey'>[]) {
   return turns.some((turn) => !commandRegistry.has(turn.commandKey));
 }
 export function assertEnabledSlots(world: Parameters<typeof worldResolver>[0], turns: readonly QueuedTurn[]) {

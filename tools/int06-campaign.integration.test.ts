@@ -45,7 +45,7 @@ let ownId: number,
   offerId: number,
   tick = 0;
 let formRequest: string, offerRequest: string;
-let declinedNpcId: number;
+let declinedNpcId: number, lieutenantId: number;
 const executions = new Set<Promise<unknown>>();
 function track<T>(action: () => Promise<T>): Promise<T> {
   const execution = action();
@@ -518,6 +518,7 @@ it('NPC 서약의 실제 시드·500금·월 1회와 원장 재시작을 확인�
     return outcome.ok && outcome.result.accepted === true;
   });
   expect(candidate).toBeDefined();
+  lieutenantId = candidate!.id;
   const payload = {
     type: 'offer',
     targetId: candidate!.id,
@@ -571,6 +572,67 @@ it('후반 트랜잭션 실패는 편성과 입력 원장을 함께 롤백하며
   expect((await board()).units.map((unit) => unit.id)).toEqual([unitId]);
 });
 
+it('실제 휘하 부곡을 지정한 모병·훈련 예약과 편집이 unitId를 보존한다', async () => {
+  await submit('campaign.unit', {
+    type: 'command',
+    unitId,
+    commanderId: lieutenantId,
+    revision: (await board()).revision,
+  });
+  await advance();
+  const args = { amount: 10, crewType: 1100, unitId };
+  expect((await http('turns.precheck', { worldId, commandKey: 'recruit', args })).data).toMatchObject({
+    ok: true,
+    preview: { goldCost: 88 },
+  });
+  const current = await http<{ revision: number }>('turns.get', { worldId });
+  const saved = await http<{ ok: boolean; revision: number }>(
+    'turns.set',
+    {
+      worldId,
+      revision: current.data!.revision,
+      slots: [{ commandKey: 'recruit', args }, ...Array.from({ length: 29 }, () => null)],
+    },
+    cookies[0],
+    true,
+  );
+  expect(saved.data?.ok).toBe(true);
+  expect(
+    (
+      await http(
+        'turns.edit',
+        {
+          worldId,
+          revision: saved.data!.revision,
+          op: { put: { from: 1, to: 1, commandKey: 'train', args: { unitId } } },
+        },
+        cookies[0],
+        true,
+      )
+    ).data,
+  ).toMatchObject({ ok: true });
+  expect(
+    await db.generalTurn.findUniqueOrThrow({
+      where: { worldId_generalId_slot: { worldId, generalId: ownId, slot: 0 } },
+    }),
+  ).toMatchObject({
+    commandKey: 'recruit',
+    args,
+  });
+  expect(
+    await db.generalTurn.findUniqueOrThrow({
+      where: { worldId_generalId_slot: { worldId, generalId: ownId, slot: 1 } },
+    }),
+  ).toMatchObject({
+    commandKey: 'train',
+    args: { unitId },
+  });
+  expect(await db.generalTurn.count({ where: { worldId, generalId: ownId } })).toBe(30);
+  expect(
+    (await http('turns.precheck', { worldId, commandKey: 'recruit', args: { ...args, unitId: 2147483646 } })).data,
+  ).toMatchObject({ ok: false, code: 'BAD_TARGET' });
+});
+
 it('정식 첫 달 전반의 모든 NPC를 실제 부곡 프로필로 실행한다', async () => {
   await advance(5000);
 });
@@ -610,4 +672,28 @@ it('다음 게임 월에는 거절했던 NPC에게 다시 서약하고 그 달�
   expect(after.state.campaign).toEqual(expected.campaign);
   expect(after.state.campaign!.attempts).toContainEqual({ masterId: targetId, personId: declinedNpcId, month: 1 });
   expect(after.state.campaign!.attempts).not.toContainEqual({ masterId: targetId, personId: declinedNpcId, month: 0 });
+});
+
+it('예약한 실제 부장 부곡에만 모병하고 훈련 미리보기는 그 지휘관의 상승량을 쓴다', async () => {
+  const before = await snapshot(),
+    actor = before.state.generals[ownId]!;
+  await advance(actor.nextTurnTick);
+  const after = await snapshot(),
+    unit = after.state.campaign!.units.find((unit) => unit.id === unitId)!;
+  expect(unit).toMatchObject({ commanderId: lieutenantId, troops: 10, train: 0, atmos: 0 });
+  expect(after.state.generals[ownId]!.gold).toBe(actor.gold - 88);
+  expect(after.state.generals[ownId]!.crew).toBe(0);
+  expect(after.state.generals[lieutenantId]!.crew).toBe(0);
+  expect((await http('turns.precheck', { worldId, commandKey: 'train', args: { unitId } })).data).toMatchObject({
+    ok: true,
+    preview: { goldCost: 100, gain: 8 + Math.floor(after.state.generals[lieutenantId]!.leadership / 25) },
+  });
+  const forbidden = await submit('campaign.unit', {
+    type: 'disband',
+    unitId,
+    revision: after.state.campaign!.revision,
+  });
+  await advance(actor.nextTurnTick);
+  expect(await receipt(forbidden)).toMatchObject({ status: 'rejected', result: { code: 'TROOPS_PRESENT' } });
+  expect((await snapshot()).state.campaign!.units.find((row) => row.id === unitId)).toEqual(unit);
 });
