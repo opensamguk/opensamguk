@@ -140,7 +140,7 @@ export function applyRecordedInput(
     (!replay.state.ruleFeatures ||
       ['turns.set', 'general.create', 'general.setPolicy', 'general.active'].includes(input.kind))
   )
-    validatePolicyInput(input);
+    validatePolicyInput(input, replay.state.ruleFeatures?.includes('five-stats'));
   const kind = registry.inputKinds.find((kind) => kind.kind === input.kind);
   if (input.status === 'REJECTED') {
     if (

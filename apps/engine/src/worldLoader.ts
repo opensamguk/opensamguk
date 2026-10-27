@@ -7,6 +7,7 @@ import { assertWorldCapabilities } from './capsGate';
 import { loadTreaties } from './treatyState';
 import { assertPersonnelStorage } from './personnelState';
 import { assertNoResidenceAnchors } from './residenceState';
+import { storedGeneralStats } from './generalStats';
 
 export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): Promise<WorldState> {
   const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
@@ -51,7 +52,10 @@ export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): 
         // 순위용 누계는 게임 규칙 입력이 아니다. 기존 재생 해시에 섞지 않는다.
         void battleWins;
         void captures;
-        return [general.id, stripWorldId(general)];
+        return [
+          general.id,
+          storedGeneralStats(stripWorldId(general), world.ruleFeatures?.includes('five-stats') ?? false),
+        ];
       }),
     ),
     diplomacies: diplomacies.map(stripWorldId),

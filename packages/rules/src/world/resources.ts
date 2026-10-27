@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { fiveStatsSchema } from '../general/fiveStats';
 
 const natural = z.number().int().nonnegative();
 const positive = z.number().int().positive();
@@ -39,6 +40,17 @@ export const scenarioSchema = z.object({
   id: name,
   title: name,
   startYear: natural,
+  generalStats: z
+    .array(
+      z.strictObject({
+        generalId: positive,
+        stats: fiveStatsSchema,
+        sourceId: name,
+        sourceRevision: name,
+        officerId: positive,
+      }),
+    )
+    .optional(),
   nation: z.array(
     z.tuple([
       name,
@@ -101,9 +113,12 @@ export const unitSetSchema = z.object({
 
 export const statRulesSchema = z.object({
   stat: z
-    .object({ total: positive, min: natural, max: positive })
+    .object({ total: positive, min: natural, max: positive, count: z.literal(5).optional() })
     .refine(
-      (value) => value.min <= value.max && value.total >= 3 * value.min && value.total <= 3 * value.max,
+      (value) =>
+        value.min <= value.max &&
+        value.total >= (value.count ?? 3) * value.min &&
+        value.total <= (value.count ?? 3) * value.max,
       '능력치 합계·최소·최대가 맞지 않습니다.',
     ),
 });

@@ -571,7 +571,7 @@ test.describe('메시지와 실시간 갱신', () => {
 
     await setGeneral(world, r.generalId, { nationId: 1, officerLevel: 1 });
     await page.getByRole('button', { name: '보내기', exact: true }).click();
-    const alert = page.getByRole('alert');
+    const alert = page.locator('form').getByRole('alert');
     await expect(alert).toHaveText('이 범위의 메시지를 읽을 수 없습니다.');
     await expect(box).toHaveValue('동맹을 청합니다');
     await expect(box).toHaveAccessibleDescription('이 범위의 메시지를 읽을 수 없습니다.');

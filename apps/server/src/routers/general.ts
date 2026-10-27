@@ -38,6 +38,8 @@ const creationEnvelope = worldInput.extend({
   leadership: z.unknown(),
   strength: z.unknown(),
   intel: z.unknown(),
+  politics: z.unknown().optional(),
+  charm: z.unknown().optional(),
   portraitId: z.unknown(),
 });
 const creationInputParser = {

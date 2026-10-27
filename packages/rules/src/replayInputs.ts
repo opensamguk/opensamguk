@@ -2,11 +2,13 @@ import type { InitialGeneral } from './world/bootstrap';
 import type { QueuedTurn, RecordedInput, ReplayState } from './replay';
 import { emptyQueue } from './policy';
 import { validatePolicyRecordedInput } from './policy/replay';
+import { assertGeneralStatProfile, FIVE_STAT_KEYS, FIVE_STAT_RULES } from './general/fiveStats';
+import { validateGeneralCreation } from './general/create';
 
-export function validatePolicyInput(input: RecordedInput): void {
+export function validatePolicyInput(input: RecordedInput, five = false): void {
   const { tick, ...legacy } = input;
   void tick;
-  validatePolicyRecordedInput(legacy, true);
+  validatePolicyRecordedInput(legacy, true, five);
   if (input.status === 'APPLIED' && input.kind !== 'turns.set' && input.tick !== undefined && input.tick !== null) {
     if ((input.result as { activeTick?: number }).activeTick !== input.tick)
       throw new Error('활동 tick이 처리 tick과 다릅니다.');
@@ -16,7 +18,7 @@ export function validatePolicyInput(input: RecordedInput): void {
 export const emptyTurns = (): QueuedTurn[] => Array.from({ length: 30 }, () => ({ commandKey: 'rest', args: {} }));
 
 export function applyTurnsInput(replay: ReplayState, input: RecordedInput): ReplayState {
-  if (replay.policy) validatePolicyInput(input);
+  if (replay.policy) validatePolicyInput(input, replay.state.ruleFeatures?.includes('five-stats'));
   const next = structuredClone(replay);
   const payload = input.payload as { turns?: QueuedTurn[]; revision?: number };
   const result = input.result as { revision?: number };
@@ -43,7 +45,7 @@ export function applyTurnsInput(replay: ReplayState, input: RecordedInput): Repl
 }
 
 export function applyCreationInput(replay: ReplayState, input: RecordedInput): ReplayState {
-  if (replay.policy) validatePolicyInput(input);
+  if (replay.policy) validatePolicyInput(input, replay.state.ruleFeatures?.includes('five-stats'));
   const next = structuredClone(replay);
   const general = (input.result as { general?: InitialGeneral }).general;
   if (
@@ -57,6 +59,13 @@ export function applyCreationInput(replay: ReplayState, input: RecordedInput): R
   ) {
     throw new Error('장수 생성 결과가 올바르지 않습니다.');
   }
+  const five = next.state.ruleFeatures?.includes('five-stats') ?? false;
+  assertGeneralStatProfile(general, five);
+  if (five) {
+    const creation = validateGeneralCreation(input.payload, FIVE_STAT_RULES);
+    if (!creation.ok || FIVE_STAT_KEYS.some((key) => creation.value[key] !== general[key]))
+      throw new Error('5능력치 생성 입력과 결과가 다릅니다.');
+  }
   next.state.generals[general.id] = structuredClone(general);
   next.turns[general.id] = next.policy ? emptyQueue() : emptyTurns();
   next.revisions[general.id] = 0;
@@ -69,7 +78,7 @@ export function applyCreationInput(replay: ReplayState, input: RecordedInput): R
 }
 
 export function applyPolicyInput(replay: ReplayState, input: RecordedInput): ReplayState {
-  validatePolicyInput(input);
+  validatePolicyInput(input, replay.state.ruleFeatures?.includes('five-stats'));
   const next = structuredClone(replay);
   const id = input.generalId;
   if (!next.policy || id === null || !next.state.generals[id] || next.state.generals[id]!.userId === null)

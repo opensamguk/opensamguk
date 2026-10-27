@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { FIVE_STAT_KEYS, FIVE_STAT_RULES, checkStatProfile } from './general/fiveStats';
+import { validateGeneralCreation } from './general/create';
 import type { InputKindDefinition, RuleFeatureDefinition } from './ruleRegistry';
 import type { RecordedInput, ReplayState } from './replay';
 import { enableReplayPolicy } from './policy/replay';
@@ -11,6 +13,25 @@ import { applyTreatyInput, settleTreaties, validateTreatyRecord } from './diplom
 import { validatePolicyInput } from './replayInputs';
 import { trade } from './commands/trade';
 
+export const fiveStatsFeature: RuleFeatureDefinition = {
+  key: 'five-stats',
+  requires: [],
+  conflicts: [],
+  checkOrigin({ initial, data }) {
+    if (data !== undefined) throw new Error('5능력치 기능의 별도 초기 자료는 없습니다.');
+    checkStatProfile(initial);
+  },
+  checkArchive({ inputs }) {
+    for (const input of inputs) {
+      if (input.kind !== 'general.create' || input.status !== 'APPLIED') continue;
+      const parsed = validateGeneralCreation(input.payload, FIVE_STAT_RULES);
+      const general = (input.result as { general?: Record<string, unknown> } | null)?.general;
+      if (!parsed.ok || !general || FIVE_STAT_KEYS.some((key) => general[key] !== parsed.value[key]))
+        throw new Error('5능력치 생성 입력과 결과가 다릅니다.');
+    }
+  },
+};
+
 const tickSchema = z.number().int().min(0).max(2_147_483_647);
 const policyDataSchema = z.strictObject({ version: z.literal(1), turnTermMinutes: tickSchema.min(1) });
 
@@ -21,10 +42,10 @@ export const policyFeature: RuleFeatureDefinition = {
   checkOrigin({ data }) {
     policyDataSchema.parse(data);
   },
-  checkArchive({ inputs }) {
+  checkArchive({ origin, inputs }) {
     for (const input of inputs)
       if (['turns.set', 'general.create', 'general.setPolicy', 'general.active'].includes(input.kind))
-        validatePolicyInput(input);
+        validatePolicyInput(input, origin.initial.ruleFeatures?.includes('five-stats'));
   },
   initReplayState(replay, { data }) {
     const config = policyDataSchema.parse(data);

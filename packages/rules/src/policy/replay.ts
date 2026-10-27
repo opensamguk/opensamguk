@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { ReplayState, RecordedInput } from '../replay';
 import { emptyQueue, POLICY_KEYS, type PolicyKey } from './index';
+import { fiveStatsSchema } from '../general/fiveStats';
 
 export const policyKeySchema = z.enum(POLICY_KEYS);
 export const setPolicyPayloadSchema = z.strictObject({ policy: policyKeySchema });
@@ -87,8 +88,12 @@ const recordedGeneralSchema = z.strictObject({
   special: z.string().nullable(),
 });
 
-// archive 5 전용 검사다. 구버전의 REJECTED 허용 동작은 바꾸지 않는다.
-export function validatePolicyRecordedInput(value: unknown, modern: boolean): asserts value is RecordedInput {
+// archive 5와 형식3 정책 기능 검사. 5능력치는 명시한 새 판에서만 받는다.
+export function validatePolicyRecordedInput(
+  value: unknown,
+  modern: boolean,
+  five = false,
+): asserts value is RecordedInput {
   const input = envelopeSchema.parse(value);
   if (!modern && input.kind !== 'turns.set' && input.kind !== 'general.create')
     throw new Error('전환 전 방침 입력입니다.');
@@ -112,7 +117,7 @@ export function validatePolicyRecordedInput(value: unknown, modern: boolean): as
       : z.strictObject({ revision: positive })
     ).parse(input.result);
   } else if (input.kind === 'general.create') {
-    const general = recordedGeneralSchema;
+    const general = five ? recordedGeneralSchema.extend(fiveStatsSchema.shape) : recordedGeneralSchema;
     (modern ? z.strictObject({ general, activeTick: policyTickSchema }) : z.strictObject({ general })).parse(
       input.result,
     );

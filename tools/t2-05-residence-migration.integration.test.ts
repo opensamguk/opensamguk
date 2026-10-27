@@ -96,7 +96,11 @@ async function ownDatabase(
     oid = identity[0]!.oid;
     console.info(JSON.stringify({ event: 't205-residence-created', mode, name, oid }));
     await client.connect();
-    expect((await readdir(migrations)).filter((item) => /^\d{14}_/.test(item)).sort()).toEqual([...previous25, marker]);
+    expect((await readdir(migrations)).filter((item) => /^\d{14}_/.test(item)).sort()).toEqual([
+      ...previous25,
+      marker,
+      '20261030000000_five_stats',
+    ]);
     await run(client, db);
     completed = true;
   } catch (error) {
@@ -248,6 +252,10 @@ it('거주 tick은 null·0·양수를 저장하고 음수를 거부하며 멸망
     await applyPrevious(client);
     await seed(client);
     await apply(client, marker);
+    await apply(client, '20261030000000_five_stats');
+    expect(
+      (await client.query('SELECT id FROM "General" WHERE "politics" IS NOT NULL OR "charm" IS NOT NULL')).rows,
+    ).toEqual([]);
     const where = { worldId_id: { worldId: 'residence-world', id: 1 } };
     for (const residenceTick of [0, 1, 2147483647, null]) {
       expect((await db.general.update({ where, data: { residenceTick } })).residenceTick).toBe(residenceTick);

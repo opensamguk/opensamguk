@@ -1,6 +1,8 @@
 import type { InitialGeneral } from '@opensamguk/rules';
 // 명시한 공개 필드만 반환한다. DB·입력 기록을 그대로 직렬화하지 않는다.
-export function ownGeneral(g: InitialGeneral) {
+export function ownGeneral(
+  g: Omit<InitialGeneral, 'politics' | 'charm'> & { politics?: number | null; charm?: number | null },
+) {
   return {
     id: g.id,
     name: g.name,
@@ -10,6 +12,7 @@ export function ownGeneral(g: InitialGeneral) {
     leadership: g.leadership,
     strength: g.strength,
     intel: g.intel,
+    ...(g.politics != null && g.charm != null ? { politics: g.politics, charm: g.charm } : {}),
     officerLevel: g.officerLevel,
     birthYear: g.birthYear,
     deathYear: g.deathYear,

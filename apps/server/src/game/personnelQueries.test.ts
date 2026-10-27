@@ -28,6 +28,8 @@ function general(changes: Partial<General> = {}): General {
     leadership: 50,
     strength: 50,
     intel: 50,
+    politics: null,
+    charm: null,
     birthYear: 160,
     deathYear: 220,
     activeFromYear: 180,

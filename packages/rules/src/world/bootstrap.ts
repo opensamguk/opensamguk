@@ -55,6 +55,8 @@ export interface InitialGeneral {
   leadership: number;
   strength: number;
   intel: number;
+  politics?: number;
+  charm?: number;
   officerLevel: number;
   birthYear: number;
   deathYear: number;
@@ -113,6 +115,16 @@ export function buildInitialWorld(input: {
   const scenario = scenarioSchema.parse(input.scenario);
   const unitSet = unitSetSchema.parse(input.unitSet);
   const statRules = statRulesSchema.parse(input.statRules).stat;
+  const five = statRules.count === 5;
+  const historicalStats = new Map(scenario.generalStats?.map((row) => [row.generalId, row]));
+  if (
+    five
+      ? historicalStats.size !== scenario.general.length ||
+        historicalStats.size !== scenario.generalStats?.length ||
+        [...historicalStats.keys()].some((id) => id > scenario.general.length)
+      : scenario.generalStats !== undefined
+  )
+    throw new Error('시나리오의 5능력치 인물·출처 대응을 확인하세요.');
   const portraits = portraitMapSchema.parse(input.portraitMap ?? { portraits: {} }).portraits;
   const mapCities = [...map.cities].sort((a, b) => a.id - b.id);
   const byId = new Map(mapCities.map((city) => [city.id, city]));
@@ -244,6 +256,7 @@ export function buildInitialWorld(input: {
       age: Math.max(0, scenario.startYear - birthYear),
       injury: 0,
       nextTurnTick: rngFor(input.seed, 'turn-offset', i + 1).int(0, TICKS_PER_MONTH - 1),
+      ...(five ? historicalStats.get(i + 1)!.stats : {}),
     };
   });
 
@@ -261,6 +274,7 @@ export function buildInitialWorld(input: {
     });
   }
   return {
+    ...(five ? { ruleFeatures: ['five-stats'] } : {}),
     seed: input.seed,
     scenarioKey: scenario.id,
     mapKey: map.id,

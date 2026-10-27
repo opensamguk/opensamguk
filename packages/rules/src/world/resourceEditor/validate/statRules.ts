@@ -8,9 +8,10 @@ export function validateStatRules(content: unknown): ValidationReport<{ stat: St
   if (!parsed.success) return report<{ stat: StatRules }>(null, shapeIssues(parsed.error));
   const value = parsed.data;
   const { total, min, max } = value.stat;
+  const count = value.stat.count ?? 3;
   return report(
     value,
-    min > max || total < 3 * min || total > 3 * max
+    min > max || total < count * min || total > count * max
       ? [resourceIssue('stat-rules-inconsistent', { total, min, max })]
       : [],
   );

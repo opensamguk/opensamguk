@@ -184,7 +184,7 @@ async function existingRows(client: PgClient) {
       table === 'World'
         ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures'"
         : table === 'General'
-          ? "to_jsonb(t) - 'residenceTick'"
+          ? "to_jsonb(t) - 'residenceTick' - 'politics' - 'charm'"
           : "to_jsonb(t) - 'treatyFormat'";
     rows[table] = (await client.query(`SELECT ${data} AS data FROM "${table}" t ORDER BY to_jsonb(t)::text`)).rows;
   }
@@ -329,6 +329,7 @@ it.each(['empty', 'legacy'] as const)(
         '20261027000000_treaty_break_trust',
         '20261028000000_assignment_nation_destroyed',
         '20261029000000_general_residence_tick',
+        '20261030000000_five_stats',
       ]);
       for (const directory of previous) {
         await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
@@ -364,6 +365,9 @@ it.each(['empty', 'legacy'] as const)(
       // 후보 검증을 마친 뒤 후행 SQL을 적용해야 최신 앱의 스키마와 맞는다.
       for (const directory of later)
         await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
+      expect(
+        (await client.query('SELECT id FROM "General" WHERE "politics" IS NOT NULL OR "charm" IS NOT NULL')).rows,
+      ).toEqual([]);
       expect(await existingRows(client)).toEqual(settled);
       expect(await readOffices()).toEqual(offices);
       expect(
