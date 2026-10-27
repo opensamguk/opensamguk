@@ -9,6 +9,7 @@ import {
   treatyBreakFeature,
   treatyTradeFeature,
   fiveStatsFeature,
+  basicStratagemFeature,
   personnelInputKinds,
   treatyInputKinds,
   treatyBreakInputKind,
@@ -60,7 +61,15 @@ export interface RuleRegistry {
   monthlyOrder?: readonly string[];
 }
 export const ruleRegistry: RuleRegistry = {
-  features: [personnelFeature, policyFeature, treatyFeature, treatyBreakFeature, treatyTradeFeature, fiveStatsFeature],
+  features: [
+    personnelFeature,
+    policyFeature,
+    treatyFeature,
+    treatyBreakFeature,
+    treatyTradeFeature,
+    fiveStatsFeature,
+    basicStratagemFeature,
+  ],
   monthlyOrder: ['treaty', 'personnel'],
   inputKinds: [
     { kind: 'turns.set', feature: null, route: 'direct', apply: applyTurnsInput },
