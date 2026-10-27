@@ -48,8 +48,13 @@ export async function shiftTurns(
     Prisma.WorldGetPayload<Record<string, never>>,
     'replayFormat' | 'ruleFeatures' | 'policyFromSequence' | 'actionSequence'
   >,
+  lockedSlots?: readonly Prisma.GeneralTurnGetPayload<Record<string, never>>[],
 ) {
-  const slots = await tx.generalTurn.findMany({ where: { worldId, generalId }, orderBy: { slot: 'asc' } });
+  // 호출자가 같은 World·장수 잠금 아래 명령 실행 직전에 읽은 예턴만 재사용한다.
+  if (lockedSlots?.some((slot) => slot.worldId !== worldId || slot.generalId !== generalId))
+    throw new Error('다른 월드 또는 장수의 예턴을 이동할 수 없습니다.');
+  const slots =
+    lockedSlots ?? (await tx.generalTurn.findMany({ where: { worldId, generalId }, orderBy: { slot: 'asc' } }));
   const world =
     lockedWorld ??
     (await tx.world.findUniqueOrThrow({
