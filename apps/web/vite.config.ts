@@ -6,7 +6,7 @@ import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import { resolveApiTarget } from './apiTarget';
 import { devPortraits } from './devPortraits';
-import { APPROVED_MAP_IMAGES } from '@opensamguk/shared';
+import { APPROVED_MAP_IMAGES } from '@opensamguk/shared/public-map-images';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 
