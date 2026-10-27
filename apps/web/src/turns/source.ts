@@ -28,7 +28,9 @@ export type SaveSlots = Array<{ commandKey: string; args: Record<string, unknown
 export type SaveResult<S extends DisplaySlot = DisplaySlot> =
   { ok: true; revision: number; slots: S[] } | { ok: false; reason: 'STALE'; revision: number; slots: S[] };
 
-export type Check = { ok: true } | { ok: false; message: string };
+type PersonalCheck = inferRouterOutputs<AppRouter>['turns']['precheck'];
+type CommandStatPreview = Extract<PersonalCheck, { preview?: unknown }>['preview'];
+export type Check = ({ ok: true } | { ok: false; message: string }) & { preview?: CommandStatPreview };
 
 export interface SourceQuery<T> {
   queryKey: QueryKey;

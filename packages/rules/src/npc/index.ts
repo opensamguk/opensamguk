@@ -3,6 +3,7 @@ import { BALANCE } from '../balance';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { commandRegistry } from '../commands/registry';
 import { DOMESTIC_SPECS } from '../commands/domestic/investment';
+import { affordableRecruits, commandFiveStats, domesticStatScore, drillGain } from '../commands/statScores';
 import { relation } from '../commands/support';
 import type { Actor } from '../commands/types';
 import type { DeepReadonly, WorldView } from '../model/world';
@@ -87,6 +88,8 @@ function frontlineSteps(view: WorldView, general: General): number[] {
 
 export function chooseGeneralTurn(view: WorldView, general: General, rng: Rng, context: NpcContext = {}): NpcDecision {
   if (general.userId !== null) return { chosen: null, candidates: [] };
+  const stats = commandFiveStats(view, general);
+  const militaryScore = stats ? Math.max(stats.leadership, stats.strength) : 0;
   const choice = chooser(view, general, rng, context, 'general');
   choice.add('rest', {}, 0, '실행할 명령이 없으면 쉰다.');
   if (general.nationId === null) {
@@ -106,22 +109,50 @@ export function chooseGeneralTurn(view: WorldView, general: General, rng: Rng, c
     choice.add(
       spec.key,
       {},
-      (front ? 10 : 70) + Math.round(20 * (1 - value / Math.max(1, max))),
+      (front ? 10 : 70) +
+        Math.round(20 * (1 - value / Math.max(1, max))) +
+        (stats ? domesticStatScore(view, general, spec.key, spec.stat) : 0),
       front ? '도시와 국가의 부족한 내정 수치를 채운다.' : '후방에서는 전선 이동보다 부족한 내정을 먼저 채운다.',
     );
   }
   for (const key of frontlineSteps(view, general))
-    choice.add('move', { cityKey: key }, 60, '후방에서 자기 영토를 따라 가까운 전선으로 한 칸 이동한다.');
+    choice.add(
+      'move',
+      { cityKey: key },
+      60 + militaryScore,
+      '후방에서 자기 영토를 따라 가까운 전선으로 한 칸 이동한다.',
+    );
   if (front && city.nationId === general.nationId) {
     const capacity = general.leadership * BALANCE.CREW_PER_LEADERSHIP;
     const minimum = Math.min(capacity, 2000);
     const unit = context.unitSet?.crewTypes.find((u) => u.id === general.crewType && u.armType > 0);
     if (general.crew < minimum && unit) {
-      const amount = Math.min(capacity - general.crew, city.population, Math.floor(general.gold / unit.cost));
-      if (amount > 0) choice.add('recruit', { amount, crewType: unit.id }, 120, '전선에서 부족한 병력을 모은다.');
+      const limit = Math.min(capacity - general.crew, city.population);
+      const amount = stats
+        ? affordableRecruits(view, general, unit.cost, limit)
+        : Math.min(limit, Math.floor(general.gold / unit.cost));
+      if (amount > 0)
+        choice.add(
+          'recruit',
+          { amount, crewType: unit.id },
+          120 + (stats ? Math.round((stats.charm - 50) / 2) : 0),
+          '전선에서 부족한 병력을 모은다.',
+        );
     }
-    if (general.train < 60) choice.add('train', {}, 100, '출병 전에 병력을 훈련한다.');
-    if (general.atmos < 70) choice.add('morale', {}, 110, '출병에 필요한 사기를 회복한다.');
+    if (general.train < 60)
+      choice.add(
+        'train',
+        {},
+        100 + (stats ? (drillGain(view, general, false) - 10) * 10 : 0),
+        '출병 전에 병력을 훈련한다.',
+      );
+    if (general.atmos < 70)
+      choice.add(
+        'morale',
+        {},
+        110 + (stats ? (drillGain(view, general, true) - 10) * 10 : 0),
+        '출병에 필요한 사기를 회복한다.',
+      );
     if (general.rice < Math.ceil(general.crew * BALANCE.BATTLE_RICE_PER_CREW) * 3)
       choice.add('trade_rice', { amount: Math.min(1000, general.gold), buy: true }, 115, '출병에 쓸 군량을 마련한다.');
     const assisted = context.convergence !== false && (context.tick ?? 0) >= 50 * 12 * TICKS_PER_MONTH;
@@ -132,7 +163,7 @@ export function chooseGeneralTurn(view: WorldView, general: General, rng: Rng, c
       choice.add(
         'attack',
         { cityKey: key },
-        80 + bonus,
+        80 + bonus + militaryScore,
         assisted ? '장기전에서는 영토가 넓은 국가의 출병 점수를 높인다.' : '준비한 병력으로 접경 도시를 공격한다.',
       );
     }

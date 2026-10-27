@@ -1,13 +1,16 @@
 import { z } from 'zod';
 import { BALANCE } from '../balance';
 import { defineCommand, fail, noArgs, ownCity, positive, success } from './support';
+import { drillGain, recruitCost } from './statScores';
+
+export const recruitArgs = z.strictObject({ amount: positive, crewType: positive });
 
 const recruits = (forced: boolean) =>
   defineCommand({
     key: forced ? 'conscript' : 'recruit',
     name: forced ? '징병' : '모병',
     category: 'military',
-    args: z.strictObject({ amount: positive, crewType: positive }),
+    args: recruitArgs,
     check(view, actor, args) {
       const failure = ownCity(view, actor);
       if (failure) return failure;
@@ -20,7 +23,7 @@ const recruits = (forced: boolean) =>
       if (general.crew + args.amount > general.leadership * BALANCE.CREW_PER_LEADERSHIP)
         return fail('AT_MAX', '통솔 가능한 병력을 넘습니다.');
       if (city.population < args.amount) return fail('NO_POPULATION', '도시 인구가 부족합니다.');
-      const cost = Math.ceil(args.amount * unit.cost * (forced ? BALANCE.CONSCRIPT_COST_FACTOR : 1));
+      const cost = recruitCost(view, general, args.amount, unit.cost, forced);
       if (general.gold < cost) return fail('NO_GOLD', '금이 부족합니다.');
       return null;
     },
@@ -28,7 +31,7 @@ const recruits = (forced: boolean) =>
       const general = state.generals[actor.generalId]!;
       const city = state.cities[general.cityKey]!;
       const unit = actor.unitSet!.crewTypes.find((unit) => unit.id === args.crewType)!;
-      general.gold -= Math.ceil(args.amount * unit.cost * (forced ? BALANCE.CONSCRIPT_COST_FACTOR : 1));
+      general.gold -= recruitCost(state, general, args.amount, unit.cost, forced);
       general.train = Math.floor((general.train * general.crew) / (general.crew + args.amount));
       general.atmos = Math.floor((general.atmos * general.crew) / (general.crew + args.amount));
       general.crew += args.amount;
@@ -56,7 +59,7 @@ const drill = (morale: boolean) =>
       const general = state.generals[actor.generalId]!;
       general.gold -= BALANCE.DRILL_COST;
       const field = morale ? 'atmos' : 'train';
-      general[field] = Math.min(100, general[field] + (morale ? BALANCE.ATMOS_GAIN : BALANCE.TRAIN_GAIN));
+      general[field] = Math.min(100, general[field] + drillGain(state, general, morale));
       return success(`${morale ? '사기진작' : '훈련'}: ${general[field]}`);
     },
   });
