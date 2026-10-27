@@ -18,7 +18,7 @@ function fixture() {
       tick: 0,
       userId: 'owner',
       userActive: true,
-      unitSet: testUnits,
+      armyTypes: testUnits.crewTypes.filter((row) => row.armType > 0).map((row) => row.id),
     });
   return { world, apply };
 }
@@ -77,7 +77,7 @@ describe('AC-INT-06 부곡 편성·실제 지휘관 권한', () => {
         tick: 0,
         userId: 'owner',
         userActive: false,
-        unitSet: testUnits,
+        armyTypes: testUnits.crewTypes.filter((row) => row.armType > 0).map((row) => row.id),
       }),
     ).toMatchObject({ ok: false, code: 'ACTOR_INACTIVE' });
     const own = structuredClone(f.world);
@@ -92,7 +92,7 @@ describe('AC-INT-06 부곡 편성·실제 지휘관 권한', () => {
         tick: 0,
         userId: 'owner',
         userActive: true,
-        unitSet: testUnits,
+        armyTypes: testUnits.crewTypes.filter((row) => row.armType > 0).map((row) => row.id),
       },
     );
     if (!removed.ok) throw new Error(removed.code);
@@ -121,7 +121,7 @@ describe('AC-INT-06 부곡 편성·실제 지휘관 권한', () => {
         tick: 0,
         userId: 'owner',
         userActive: true,
-        unitSet: testUnits,
+        armyTypes: testUnits.crewTypes.filter((row) => row.armType > 0).map((row) => row.id),
       },
     );
     expect(reassigned).toMatchObject({ ok: true, campaign: { units: [{ commanderId: 1, troops: 0 }] } });

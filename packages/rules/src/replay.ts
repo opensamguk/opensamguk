@@ -28,6 +28,8 @@ export interface ReplayState {
   policy?: ReplayPolicy;
   offices?: OfficeRevisions;
   residenceAnchors?: Record<number, number>;
+  // 새 부곡 프로필의 불변 병종 허용 목록. 생성 기록의 unitSet에서만 읽는다.
+  campaignArmyTypes?: number[];
 }
 export interface RecordedInput {
   sequence: number;

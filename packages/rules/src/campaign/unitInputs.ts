@@ -1,8 +1,7 @@
 import { z } from 'zod';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { cloneWorld } from '../model/clone';
-import type { DeepReadonly, WorldView } from '../model/world';
-import type { UnitSetResource } from '../world/resources';
+import type { WorldView } from '../model/world';
 import { readCampaignState } from './state';
 
 const integer = z.number().int().min(0).max(2_147_483_647),
@@ -20,7 +19,7 @@ export function applyCampaignUnitInput(
   value: unknown,
   actorId: number,
   campaignValue: unknown,
-  context: { tick: number; userId: string; userActive: boolean; unitSet: DeepReadonly<UnitSetResource> },
+  context: { tick: number; userId: string; userActive: boolean; armyTypes: readonly number[] },
 ) {
   const deny = (code: string, message: string) => ({ ok: false as const, code, message });
   const current = readCampaignState(campaignValue, world);
@@ -71,8 +70,7 @@ export function applyCampaignUnitInput(
       return deny('COMMAND_CAPACITY', '실제 지휘관의 전체 병력 상한을 넘습니다.');
     commanderId = commander.id;
     if (input.type === 'form') {
-      if (!context.unitSet.crewTypes.some((crew) => crew.id === input.crewType && crew.armType > 0))
-        return deny('BAD_CREW_TYPE', '편성할 병종을 확인하세요.');
+      if (!context.armyTypes.includes(input.crewType)) return deny('BAD_CREW_TYPE', '편성할 병종을 확인하세요.');
       if (next.nextUnitId === 2_147_483_647) return deny('ID_LIMIT', '부곡 번호 한도를 넘었습니다.');
       unitId = next.nextUnitId++;
       next.units.push({

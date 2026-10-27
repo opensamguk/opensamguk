@@ -3,6 +3,7 @@ import type { RecordedInput } from '../replay';
 import type { WorldView } from '../model/world';
 import { applyCampaignRelationship, campaignRelationshipInputSchema } from './relationships';
 import { readCampaignState } from './state';
+import { applyCampaignUnitInput, campaignUnitInputSchema } from './unitInputs';
 
 const integer = z.number().int().min(0).max(2_147_483_647);
 export const campaignRelationshipResultSchema = z.strictObject({
@@ -15,6 +16,40 @@ export const campaignRelationshipResultSchema = z.strictObject({
   tick: integer,
 });
 const rejectionSchema = z.strictObject({ code: z.string().min(1), message: z.string().min(1) });
+export const campaignUnitResultSchema = z.strictObject({
+  unitId: integer.min(1),
+  commanderId: integer.min(1),
+  revision: integer.min(1),
+  tick: integer,
+});
+
+export function replayCampaignUnit(world: WorldView, input: RecordedInput, armyTypes: readonly number[]) {
+  if (input.kind !== 'campaign.unit') throw new Error('부곡 입력 종류를 확인하세요.');
+  integer.min(1).parse(input.sequence);
+  integer.parse(input.tick);
+  if (input.status === 'REJECTED') {
+    rejectionSchema.parse(input.result);
+    return world;
+  }
+  const actor = world.generals[integer.min(1).parse(input.generalId)];
+  if (!actor?.userId) throw new Error('부곡 입력의 사람 장수가 없습니다.');
+  const payload = campaignUnitInputSchema.parse(input.payload),
+    recorded = campaignUnitResultSchema.parse(input.result);
+  if (recorded.tick !== input.tick) throw new Error('부곡 처리 tick이 기록과 다릅니다.');
+  const applied = applyCampaignUnitInput(world, payload, actor.id, world.campaign, {
+    tick: recorded.tick,
+    userId: actor.userId,
+    userActive: true,
+    armyTypes,
+  });
+  if (
+    !applied.ok ||
+    JSON.stringify(campaignUnitResultSchema.parse({ ...applied.result, tick: recorded.tick })) !==
+      JSON.stringify(recorded)
+  )
+    throw new Error('부곡 편성·지휘 적용 기록을 재현하지 못했습니다.');
+  return applied.state;
+}
 
 // 계정 제재는 엔진에서 검사한다. 적용 기록은 장수 소유권·자격·시드 결과를 다시 계산한다.
 export function replayCampaignRelationship(world: WorldView, campaignValue: unknown, input: RecordedInput) {
