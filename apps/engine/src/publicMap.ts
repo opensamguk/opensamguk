@@ -11,15 +11,27 @@ export async function persistPublicMap(
   tick: number,
   now: number,
   config: PublicMapConfig,
+  lockedRunningWorld?: { worldId: string; status: 'RUNNING' },
 ): Promise<boolean> {
   if (!Number.isSafeInteger(now) || !Number.isFinite(new Date(now).getTime()))
     throw new Error('공개 지도 기록 시각을 확인하세요.');
-  await lockLease(tx, lease);
   const { worldId } = lease;
-  await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${worldId} FOR UPDATE`;
-  const world = await tx.world.findUniqueOrThrow({ where: { id: worldId }, select: { status: true } });
-  if (world.status !== 'RUNNING') return false;
-  const latest = await tx.publicMapSnapshot.findFirst({ where: { worldId }, orderBy: { takenAt: 'desc' } });
+  // TurnLoop는 같은 tx에서 리스·World를 잠그고 RUNNING 조건부 갱신을 마쳤다.
+  // 단독 호출은 기존 잠금과 상태 검사를 모두 거친다. commit 직전 리스 검사는 유지한다.
+  if (lockedRunningWorld) {
+    if (lockedRunningWorld.worldId !== worldId || lockedRunningWorld.status !== 'RUNNING')
+      throw new Error('잠긴 공개 지도 월드가 다릅니다.');
+  } else {
+    await lockLease(tx, lease);
+    await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${worldId} FOR UPDATE`;
+    const world = await tx.world.findUniqueOrThrow({ where: { id: worldId }, select: { status: true } });
+    if (world.status !== 'RUNNING') return false;
+  }
+  const latest = await tx.publicMapSnapshot.findFirst({
+    where: { worldId },
+    orderBy: { takenAt: 'desc' },
+    select: { takenAt: true },
+  });
   if (latest && now - latest.takenAt.getTime() < config.intervalMinutes * 60_000) return false;
   const date = toGameDate(state.startYear, tick);
   await tx.publicMapSnapshot.create({
