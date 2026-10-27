@@ -52,7 +52,7 @@ async function main() {
     if (values['rule-features'] !== undefined) {
       const requested = values['rule-features'].split(',');
       if (new Set(requested).size !== requested.length) throw new Error('규칙 기능이 중복됩니다.');
-      ruleFeatures = checkRuleFeatures([...new Set([...(state.ruleFeatures ?? []), ...requested])]);
+      ruleFeatures = checkRuleFeatures([...new Set([...(state.ruleFeatures ?? []), ...requested])].sort());
       if (state.ruleFeatures) state.ruleFeatures = ruleFeatures;
     }
     console.log(
