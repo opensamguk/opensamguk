@@ -103,3 +103,17 @@ it('월드 효과도 이전 상태를 전달하고 기존 저장 요청과 원�
   expect(supplied.calls).toEqual(legacy.calls);
   expect(before).toEqual(original);
 });
+
+it('후속 직책 저장은 새 국가 생성 뒤와 멸망 국가의 연쇄 삭제 전에 한 번 실행한다', async () => {
+  const { before, after } = await transition();
+  after.nations[3] = { ...before.nations[2]!, id: 3, name: '새 국가' };
+  const supplied = transaction();
+  const followup = vi.fn(async () => {
+    supplied.calls.push({ method: 'office.transition', args: [] });
+  });
+  await persistEffects(supplied.tx, worldId, after, [{ kind: 'world', state: after }], at, before, followup);
+  expect(followup).toHaveBeenCalledOnce();
+  const methods = supplied.calls.map((call) => call.method);
+  expect(methods.indexOf('nation.create')).toBeLessThan(methods.indexOf('office.transition'));
+  expect(methods.indexOf('office.transition')).toBeLessThan(methods.indexOf('nation.delete'));
+});

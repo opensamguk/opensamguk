@@ -283,10 +283,11 @@ export class TurnLoop {
             [{ kind: 'world', state: next }],
             { sequence, tick: due.nextTurnTick },
             state,
+            personnelBefore && personnelPacket && anchors
+              ? () => persistPersonnelPacket(tx, worldId, personnelBefore, personnelPacket, anchors, due.nextTurnTick)
+              : undefined,
           );
           await persistExt(tx, worldId, state.ext, next.ext);
-          if (personnelBefore && personnelPacket && anchors)
-            await persistPersonnelPacket(tx, worldId, personnelBefore, personnelPacket, anchors, due.nextTurnTick);
           if (!failed) await persistCommandReports(tx, worldId, due.nextTurnTick, due.id, result);
           if (turn.nation) {
             const national = turn.nation.result;
