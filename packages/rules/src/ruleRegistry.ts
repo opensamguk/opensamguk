@@ -18,6 +18,7 @@ import {
 import { checkStatProfile } from './general/fiveStats';
 import { checkOperationalProfile } from './world/map/profile';
 import type { RecordedInput, ReplayState } from './replay';
+import { campaignFeature, campaignInputKinds } from './campaign/feature';
 
 export interface ReplayOriginV1 {
   version: 1;
@@ -72,6 +73,7 @@ export const ruleRegistry: RuleRegistry = {
     fiveStatsFeature,
     operationalMapFeature,
     basicStratagemFeature,
+    campaignFeature,
   ],
   monthlyOrder: ['treaty', 'personnel'],
   inputKinds: [
@@ -82,6 +84,7 @@ export const ruleRegistry: RuleRegistry = {
     ...personnelInputKinds,
     ...treatyInputKinds,
     treatyBreakInputKind,
+    ...campaignInputKinds,
   ],
 };
 

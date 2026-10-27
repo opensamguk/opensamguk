@@ -1,6 +1,23 @@
 import { isDeepStrictEqual } from 'node:util';
 import type { Prisma } from '@opensamguk/db';
-import { readCampaignState, type CampaignState, type WorldView } from '@opensamguk/rules';
+import {
+  campaignArmyTypes,
+  checkReplayOrigin,
+  readCampaignState,
+  type CampaignState,
+  type WorldView,
+} from '@opensamguk/rules';
+
+export function readCampaignArmyTypes(
+  world: Pick<Prisma.WorldGetPayload<Record<string, never>>, 'unitSet' | 'replayOrigin'>,
+): number[] {
+  const origin: unknown = world.replayOrigin;
+  checkReplayOrigin(origin);
+  if (origin.version !== 3 || !origin.initial.ruleFeatures?.includes('campaign-v1'))
+    throw new Error('휘하 프로필의 생성 기록이 없습니다.');
+  if (!isDeepStrictEqual(world.unitSet, origin.initial.unitSet)) throw new Error('운영 병종이 생성 기록과 다릅니다.');
+  return campaignArmyTypes(origin.initial);
+}
 
 // 같은 World 행 잠금 아래 호출한다. General.crew와 부곡에 병력을 중복 저장하지 않는다.
 export function readStoredCampaign(value: unknown, world: WorldView, seed: string): CampaignState | undefined {

@@ -8,6 +8,7 @@ import { loadTreaties } from './treatyState';
 import { assertPersonnelStorage } from './personnelState';
 import { assertNoResidenceAnchorsInRows } from './residenceState';
 import { storedGeneralStats } from './generalStats';
+import { readCampaignArmyTypes, readStoredCampaign } from './campaignState';
 
 export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): Promise<WorldState> {
   const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
@@ -23,6 +24,7 @@ export async function loadWorldAfterCapabilityCheck(
   capabilities: Awaited<ReturnType<typeof assertWorldCapabilities>>,
 ): Promise<WorldState> {
   const worldId = world.id;
+  if (world.ruleFeatures.includes('campaign-v1')) readCampaignArmyTypes(world);
   const { preset, commands } = engineResolver(world);
   if (world.replayFormat === 3) await assertPersonnelStorage(tx, worldId, world.ruleFeatures.includes('personnel'));
   const ext = await loadExt(tx, worldId, commands);
@@ -76,6 +78,8 @@ export async function loadWorldAfterCapabilityCheck(
     ...(await loadCommandState(tx, worldId, world)),
     ...(capabilities.kind === 'caps' && 'treaty' in capabilities.selection ? await loadTreaties(tx, worldId) : {}),
   };
+  const campaign = readStoredCampaign(world.campaignState, state, world.seed);
+  if (campaign) state.campaign = campaign;
   for (const feature of engineFeatures
     .filter((feature) => world.ruleFeatures?.includes(feature.key))
     .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)))

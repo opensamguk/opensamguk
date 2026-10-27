@@ -5,15 +5,10 @@ import { buildInitialWorld } from '../world/bootstrap';
 import { buildCreatedGeneral } from '../general/create';
 import { checkReplayOrigin, ruleRegistry } from '../ruleRegistry';
 import { applyRecordedInput, initialReplayState, initialReplayStateWithRegistry, type RecordedInput } from '../replay';
-import { campaignFeature, campaignInputKinds } from './feature';
 import { applyCampaignUnitInput } from './unitInputs';
 import { applyCampaignRelationship } from './relationships';
 
-const registry = {
-  ...ruleRegistry,
-  features: [...ruleRegistry.features, campaignFeature],
-  inputKinds: [...ruleRegistry.inputKinds, ...campaignInputKinds],
-};
+const registry = ruleRegistry;
 const data = { policy: { version: 1, turnTermMinutes: 60 } };
 function fixture() {
   const initial = buildInitialWorld(operationalInput());

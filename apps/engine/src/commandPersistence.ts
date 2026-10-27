@@ -3,6 +3,7 @@ import type { RealtimeSignal } from '@opensamguk/db';
 import type { CommandResult, WorldState } from '@opensamguk/rules';
 import { loadWorld } from './worldLoader';
 import { archiveRemovedNation, type ActionAt } from './nationArchive';
+import { persistCampaignState } from './campaignState';
 
 export async function loadCommandState(
   tx: Prisma.TransactionClient,
@@ -32,6 +33,7 @@ export async function persistCommandState(
 ) {
   // 같은 잠긴 트랜잭션에서 읽은 사본은 다시 조회하지 않는다.
   const before = previous ?? (await loadWorld(tx, worldId));
+  await persistCampaignState(tx, worldId, before, state);
   for (const nation of Object.values(state.nations)) {
     if (!before.nations[nation.id]) {
       await tx.nation.create({ data: { ...nation, worldId, capitalCityKey: null } });

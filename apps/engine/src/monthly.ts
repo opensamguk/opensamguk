@@ -22,6 +22,7 @@ import { persistRanking } from './ranking';
 import { persistYearbookNations } from './nationArchive';
 import { persistExt } from './extState';
 import { persistTreatyClosures } from './treatyState';
+import { persistCampaignState, readCampaignArmyTypes } from './campaignState';
 
 export async function loadReplayState(tx: Prisma.TransactionClient, worldId: string): Promise<ReplayState> {
   const state = await loadWorld(tx, worldId);
@@ -58,6 +59,7 @@ export async function loadReplayState(tx: Prisma.TransactionClient, worldId: str
     revisions: Object.fromEntries(generals.map(({ id, turnRevision }) => [id, turnRevision])),
     monthlyTick: world.monthlyTick,
     ...(policy ? { policy } : {}),
+    ...(world.ruleFeatures.includes('campaign-v1') ? { campaignArmyTypes: readCampaignArmyTypes(world) } : {}),
   };
   for (const feature of engineFeatures
     .filter((feature) => state.ruleFeatures?.includes(feature.key))
@@ -110,6 +112,7 @@ export async function persistMonthly(
   await tx.diplomacy.deleteMany({ where: { worldId } });
   await tx.diplomacy.createMany({ data: next.diplomacies.map((entry) => ({ ...entry, worldId })) });
   await persistExt(tx, worldId, before.ext, next.ext);
+  await persistCampaignState(tx, worldId, before, next);
   if (treatyEnabled) await persistTreatyClosures(tx, worldId, before, next, { tick, sequence });
   for (const key of ruleRegistry.monthlyOrder ?? []) {
     const feature = engineFeatures.find((feature) => feature.key === key);
