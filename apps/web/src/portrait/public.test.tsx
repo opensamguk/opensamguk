@@ -63,7 +63,7 @@ describe('공개 빌드의 portraitUrl', () => {
 
   it('ID 범위와 변형·크기 계약은 그대로다', async () => {
     const fresh = await freshPortraitUrl();
-    expect([fresh.PORTRAIT_ID_MIN, fresh.PORTRAIT_ID_MAX]).toEqual([10001, 11000]);
+    expect([fresh.PORTRAIT_ID_MIN, fresh.PORTRAIT_ID_MAX]).toEqual([10001, 11008]);
     expect(fresh.PORTRAIT_VARIANTS).toEqual({
       portrait: { ext: 'png', width: 148, height: 210 },
       icon: { ext: 'webp', width: 96, height: 96 },

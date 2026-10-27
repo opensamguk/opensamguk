@@ -40,7 +40,9 @@
     "portraits:map": "tsx tools/portrait-map/generate.ts",
     "sim": "tsx tools/sim/cli.ts",
     "build:public": "pnpm --filter @opensamguk/web exec vite build --mode public && pnpm assets:check",
-    "assets:check": "tsx tools/public-assets/check.ts"
+    "assets:check": "tsx tools/public-assets/check.ts",
+    "officers:check": "tsx tools/officer-stats/check.ts",
+    "portraits:fetch-supplement": "tsx tools/portrait-map/fetch-supplement.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -52,6 +54,7 @@
     "tsx": "^4.23.15",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.72.0",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "zod": "^4.6.7"
   }
 }

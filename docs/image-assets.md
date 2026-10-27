@@ -16,7 +16,7 @@
 
 ## 2. 초상 ID와 경로
 
-- 초상 ID는 10001~11000입니다. 게임 데이터는 이 숫자만 저장합니다 (FR-IMG-01). ID와 경로는 바꾸지 않습니다.
+- 기존 초상 ID10001~11000과 경로를 보존합니다. 개발용 보충8명은11001~11008입니다. 게임 데이터는 숫자 ID만 저장합니다 (FR-IMG-01).
 - `portraits/registry.tsv`: ID ↔ 한자 이름 ↔ 읽기.
 
 | 변형 | 경로 | 형식 | 크기 |
@@ -27,16 +27,16 @@
 
 - 초상 URL = `VITE_IMAGE_BASE_URL` + `/portraits/<변형>/<id>.<확장자>`. base URL만 바꾸면 전부 교체됩니다 (FR-IMG-02).
 - 운영은 우리 이미지 서버가 이 저장소를 제공합니다 (D-016, T2-15). 이미지 서버가 생기기 전 개발 중에는
-  jsDelivr 고정 커밋 주소 `https://cdn.jsdelivr.net/gh/peppone-choi/opensamguk-images@48163bd`를 base URL로 씁니다.
+  GitHub 원본 고정 커밋 주소 `https://raw.githubusercontent.com/opensamguk/opensamguk-images/48163bd1ce8d54c54c94fb5484b05f9db9e50c62`를 base URL로 씁니다.
 - 파일이 없으면 기본 이미지를 보여 줍니다 (FR-IMG-03). 기본 이미지는 생성 이미지가 생기기 전까지 코드로 그린 실루엣입니다 (T1-17).
 
 ### 화면의 해석 (T1-17)
 
 - 코드는 `apps/web/src/portrait/`에 있습니다. 주소는 `portraitUrl(id, variant)`, 화면 부품은 `<Portrait id name variant>`입니다.
-- `VITE_IMAGE_BASE_URL`이 비었거나 없으면 `https://cdn.jsdelivr.net/gh/peppone-choi/opensamguk-images@48163bd`를 씁니다.
+- `VITE_IMAGE_BASE_URL`이 비었거나 없으면 `https://raw.githubusercontent.com/opensamguk/opensamguk-images/48163bd1ce8d54c54c94fb5484b05f9db9e50c62`를 씁니다.
   고정 대상은 이미지 저장소 정리 커밋 `48163bd`이며 태그가 아닌 커밋으로 고정합니다. 2026-10-20에 id 10002의 세 변형이 200으로 응답했습니다.
 - 값의 앞뒤 공백과 끝의 `/`는 떼고 씁니다. 값은 빌드 때 화면에 박히므로 바꾸면 다시 빌드하거나 dev 서버를 다시 띄웁니다.
-- 기본 이미지로 바꾸는 경우는 셋입니다. ID가 null이거나 10001~11000 밖일 때, 그리고 파일을 못 불러왔을 때(`onError`)입니다.
+- ID가 null이거나10001~11008 밖일 때, 파일을 못 불러왔을 때(`onError`) 기본 이미지를 씁니다. 보충11001~11008은 개발 모드에서만 원본을 읽으며 일반 빌드·공개 빌드는 기본 이미지를 씁니다.
   기본 이미지는 `fallback.svg` 실루엣 위에 장수 이름 첫 글자를 얹습니다. `alt`는 장수 이름입니다.
 
 ### 시나리오 이름 대응 (T1-19)
@@ -47,6 +47,14 @@
 - 동명이인 12명·미대응 50명은 null로 남기며 생성물의 `ambiguous`·`unmatched`에 기록한다. 생몰년이 없는 registry만으로는 후보를 구분하지 않는다. 수동 대응에는 registry ID와 구분 근거를 요구한다. 동명이인은 후보 안에서만 선택한다.
 - 후속 보완 (2026-10-20 사용자 요청): 동명이인 12명과 미대응 50명은 나중에 추가·수정한다. 확인한 결과는 `tools/portrait-map/manual.json`의 `matches`에 `{ id, reason }`으로 넣고 재생성한다. 미대응 이름은 번호 별칭 등도 registry ID로 직접 연결할 수 있다. 수동 표는 재생성해도 유지된다.
 - 새 월드를 생성할 때만 적용한다. 기존 월드의 ID를 덮어쓰지 않는다. 화면의 URL·기본 이미지 해석은 T1-17 담당이다.
+
+### 통합판 개발용 보충 (AC-INT-16)
+
+2026-10-27 기존 jsDelivr 주소가 봉기10804·왕준10577 초상에 저장소50MB 제한403을 반환했다. 개발 기본 base는 같은48163bd1 고정 커밋의 GitHub 원본 주소로 바꿨다. 명시한 VITE_IMAGE_BASE_URL은 그대로 우선하며 기존 ID·경로·바이트를 보존한다. 기존483명과 보충8명 모두 실제 PNG/JPEG GET을 확인했다.
+
+기존 ID10001~11000과 주소를 보존하고 로컬 보충 초상 8명에 ID11001~11008을 추가했다. 새 표 `resources/portraits/191-map.json`은 491명 전원을 인물 원장과 대조한다. 기존 월드는 바꾸지 않으며 새 운영 시나리오 연결은 INT-04에서 검증한다.
+
+원본·출처·해시는 `resources/portraits/191-supplement.json`에 있다. `pnpm portraits:fetch-supplement`로 Git 제외 `private/portraits-supplement/`에 원본을 받는다. 개발 서버의 `/__dev-portraits/<id>`가 해시와 바이트 수를 확인해 원본을 보내며 크기·잘림은 기존 Portrait 부품의 표시 규칙을 따른다. 일반 빌드와 공개 빌드는 보충 원본을 포함하지 않고 기본 이미지를 쓴다. [출처 고지](../resources/NOTICE.md)를 따른다.
 
 ## 3. 라이선스 구분 (공개 전 관문)
 
