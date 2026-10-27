@@ -207,6 +207,7 @@ export async function saveInitialWorld(
   const world = await db.$transaction(
     async (tx) => {
       const world = await tx.world.create({
+        select: { id: true },
         data: {
           name: options.name,
           ...(preset ? { presetKey: options.preset!.key, preset: preset as Prisma.InputJsonValue } : {}),
