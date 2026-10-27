@@ -28,6 +28,7 @@
     "resources:sql": "tsx tools/resources-sql/generate.ts",
     "resources:sql:scenarios": "tsx tools/resources-sql/generate-scenarios.ts",
     "db:init-resources": "tsx --env-file-if-exists=.env tools/init-resources.ts",
+    "db:init-integration": "tsx --env-file-if-exists=.env tools/init-integration-resources.ts",
     "db:init-scenarios": "tsx --env-file-if-exists=.env tools/init-scenarios.ts",
     "test:int": "pnpm generate && tsx --env-file-if-exists=.env tools/run-integration.ts",
     "test:authz": "pnpm generate && tsx --env-file-if-exists=.env tools/run-authz.ts",

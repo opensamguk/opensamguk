@@ -1,0 +1,14 @@
+{
+  "$comment": "OpenSamguk D-038 five-stats initial rules; docs/product/five-stats.md; MIT.",
+  "stat": {
+    "count": 5,
+    "total": 275,
+    "min": 15,
+    "max": 90,
+    "npcTotal": 250,
+    "npcMin": 10,
+    "npcMax": 85,
+    "chiefMin": 65
+  },
+  "iconPath": "."
+}
