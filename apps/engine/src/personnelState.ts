@@ -70,12 +70,15 @@ export async function assertPersonnelStorage(
     if (legacy) throw new Error('인사 기능을 켠 월드에 기존 국가 예턴이 있습니다.');
     return;
   }
-  const [office, turn, offer] = await Promise.all([
-    tx.nationOffice.findFirst({ where: { worldId }, select: { nationId: true } }),
-    tx.nationOfficeTurn.findFirst({ where: { worldId }, select: { nationId: true } }),
-    tx.assignmentOffer.findFirst({ where: { worldId }, select: { id: true } }),
-  ]);
-  if (office || turn || offer) throw new Error('인사 기능을 끈 월드에 인사 저장 행이 있습니다.');
+  const rows = await tx.$queryRaw<{ present: boolean }[]>`
+    SELECT EXISTS (
+      SELECT 1 FROM "NationOffice" WHERE "worldId" = ${worldId}
+      UNION ALL SELECT 1 FROM "NationOfficeTurn" WHERE "worldId" = ${worldId}
+      UNION ALL SELECT 1 FROM "AssignmentOffer" WHERE "worldId" = ${worldId}
+    ) AS present
+  `;
+  if (rows.length !== 1 || rows[0]!.present !== false)
+    throw new Error('인사 기능을 끈 월드에 인사 저장 행이 있습니다.');
 }
 
 export async function loadOfficeState(
