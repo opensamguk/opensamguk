@@ -126,3 +126,29 @@ test('토큰 없는 계정 경로는 로그인으로, 잘못된 링크는 재요
   await page.getByRole('link', { name: '새 재설정 메일 받기' }).click();
   await expect(page.getByRole('heading', { name: '비밀번호 재설정' })).toBeVisible();
 });
+
+test('로그인 실패 한도의 실제 남은 시간을 안내한다', async ({ page }) => {
+  const email = await createAccount(page);
+  await page.context().clearCookies();
+  await page.goto('/login');
+  await page.getByLabel('이메일').fill(email);
+  await page.getByLabel('비밀번호', { exact: true }).fill('wrong-password-20261028');
+  async function submit() {
+    const response = page.waitForResponse(
+      (value) => value.request().method() === 'POST' && new URL(value.url()).pathname.includes('auth.login'),
+    );
+    await page.getByRole('button', { name: '로그인', exact: true }).click();
+    return response;
+  }
+  for (let attempt = 0; attempt < 5; attempt++) {
+    expect((await submit()).status()).toBe(401);
+    await expect(page.getByRole('alert')).toHaveText('이메일 또는 비밀번호가 맞지 않습니다');
+  }
+  await page.getByLabel('비밀번호', { exact: true }).fill(TEST_PASSWORD);
+  const limited = await submit();
+  expect(limited.status()).toBe(429);
+  const retryAfter = Number(await limited.headerValue('retry-after'));
+  expect(Number.isInteger(retryAfter) && retryAfter > 0).toBe(true);
+  await expect(page.getByRole('alert')).toHaveText(`${retryAfter}초 뒤에 다시 요청하세요.`);
+  await expect(page).toHaveURL('/login');
+});
