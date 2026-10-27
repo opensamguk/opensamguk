@@ -50,7 +50,7 @@ describe('T1-11 순수 규칙과 공개 명령', () => {
       validateGeneralCreation({ ...payload, leadership: 20, strength: 20, intel: 20 }, { total: 60, min: 10, max: 30 })
         .ok,
     ).toBe(true);
-    expect(validateGeneralCreation({ ...payload, portraitId: 11001 }, stat).ok).toBe(false);
+    expect(validateGeneralCreation({ ...payload, portraitId: 11009 }, stat).ok).toBe(false);
   });
   it('도시 정렬·생성 RNG·다중 월 catch-up은 결정적이며 처리 tick보다 뒤다', () => {
     const input = {

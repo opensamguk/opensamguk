@@ -51,7 +51,7 @@ describe('능력치·초상·공개 검증기', () => {
     expect(result.issues.map((i) => i.code)).toEqual(['shape-invalid']);
   });
   it('초상 범위·빈 이름은 형식 오류이고 같은 ID는 경고다', () => {
-    for (const portraits of [{ 장수: 10000 }, { 장수: 11001 }, { '': 10001 }]) {
+    for (const portraits of [{ 장수: 10000 }, { 장수: 11009 }, { '': 10001 }]) {
       expect(validatePortraitMap({ portraits })).toMatchObject({ ok: false, value: null });
     }
     expect(validatePortraitMap({ portraits: { 장수1: 10001, 장수2: 11000 } }).issues).toEqual([]);

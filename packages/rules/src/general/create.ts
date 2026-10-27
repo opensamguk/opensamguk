@@ -47,7 +47,7 @@ export const generalCreationSchema = z.strictObject({
   intel: dbInt,
   politics: dbInt.optional(),
   charm: dbInt.optional(),
-  portraitId: z.number().int().min(10001).max(11000).nullable(),
+  portraitId: z.number().int().min(10001).max(11008).nullable(),
 });
 export type GeneralCreation = z.infer<typeof generalCreationSchema>;
 export const CREATION_ERRORS = {
