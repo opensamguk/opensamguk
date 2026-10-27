@@ -6,7 +6,7 @@ import { engineResolver, loadExt } from './extState';
 import { assertWorldCapabilities } from './capsGate';
 import { loadTreaties } from './treatyState';
 import { assertPersonnelStorage } from './personnelState';
-import { assertNoResidenceAnchors } from './residenceState';
+import { assertNoResidenceAnchorsInRows } from './residenceState';
 import { storedGeneralStats } from './generalStats';
 
 export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): Promise<WorldState> {
@@ -25,8 +25,6 @@ export async function loadWorldAfterCapabilityCheck(
   const worldId = world.id;
   const { preset, commands } = engineResolver(world);
   if (world.replayFormat === 3) await assertPersonnelStorage(tx, worldId, world.ruleFeatures.includes('personnel'));
-  if (world.replayFormat === 3 && !world.ruleFeatures.includes('personnel'))
-    await assertNoResidenceAnchors(tx, worldId);
   const ext = await loadExt(tx, worldId, commands);
   const cities = await tx.city.findMany({ where: { worldId } });
   const operationalMap = readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin);
@@ -36,8 +34,9 @@ export async function loadWorldAfterCapabilityCheck(
   });
   const generals = await tx.general.findMany({
     where: { worldId },
-    omit: { noticeSeen: true, defaultPolicy: true, lastActiveTick: true, lastActiveAt: true, residenceTick: true },
+    omit: { noticeSeen: true, defaultPolicy: true, lastActiveTick: true, lastActiveAt: true },
   });
+  if (world.replayFormat === 3 && !world.ruleFeatures.includes('personnel')) assertNoResidenceAnchorsInRows(generals);
   const diplomacies = await tx.diplomacy.findMany({
     where: { worldId },
     orderBy: [{ nationA: 'asc' }, { nationB: 'asc' }],
@@ -61,8 +60,9 @@ export async function loadWorldAfterCapabilityCheck(
       }),
     ),
     generals: Object.fromEntries(
-      generals.map(({ turnRevision, battleWins, captures, ...general }) => {
+      generals.map(({ turnRevision, battleWins, captures, residenceTick, ...general }) => {
         void turnRevision;
+        void residenceTick;
         // 순위용 누계는 게임 규칙 입력이 아니다. 기존 재생 해시에 섞지 않는다.
         void battleWins;
         void captures;

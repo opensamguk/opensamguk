@@ -1,6 +1,11 @@
 import type { Prisma } from '@opensamguk/db';
 import { describe, expect, it, vi } from 'vitest';
-import { assertNoResidenceAnchors, loadResidenceAnchors, persistResidenceAnchors } from './residenceState';
+import {
+  assertNoResidenceAnchors,
+  assertNoResidenceAnchorsInRows,
+  loadResidenceAnchors,
+  persistResidenceAnchors,
+} from './residenceState';
 
 type Row = { id: number; userId: string | null; residenceTick: number | null };
 type Anchors = Parameters<typeof persistResidenceAnchors>[2];
@@ -30,6 +35,13 @@ function fixture(
 }
 
 describe('물리 거주 앵커의 비공개 적재', () => {
+  it('같은 트랜잭션의 전체 장수 사본에서도 기능 off의 non-null 앵커를 거부한다', () => {
+    expect(() => assertNoResidenceAnchorsInRows([{ residenceTick: null }])).not.toThrow();
+    expect(() => assertNoResidenceAnchorsInRows([{ residenceTick: null }, { residenceTick: 0 }])).toThrow(
+      '인사 기능을 끈 월드',
+    );
+    expect(() => assertNoResidenceAnchorsInRows([{ residenceTick: 10 }])).toThrow('인사 기능을 끈 월드');
+  });
   it('사람만 실제 저장 tick으로 읽고 월드와 조회 필드를 고정한다', async () => {
     const f = fixture();
     expect(await f.load()).toEqual({ 3: 5, 4: 10 });
