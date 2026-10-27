@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import { resolveApiTarget } from './apiTarget';
+import { devPortraits } from './devPortraits';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 
@@ -79,7 +80,7 @@ export default defineConfig(({ command, mode }) => {
   const isPublic = mode === PUBLIC_MODE;
   if (isPublic && command === 'build') assertNoPublicImageBase(env);
   return {
-    plugins: isPublic ? [react(), publicBuildMeta()] : [react()],
+    plugins: isPublic ? [react(), publicBuildMeta()] : [react(), devPortraits(repoRoot)],
     // 환경변수는 루트 .env 하나로 모은다. 화면에는 VITE_로 시작하는 공개값만 들어간다.
     envDir: repoRoot,
     server: {

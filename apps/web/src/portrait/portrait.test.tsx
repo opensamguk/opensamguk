@@ -10,6 +10,12 @@ afterEach(cleanup);
 const BASE = 'https://images.example.test/v1';
 
 describe('portraitUrl', () => {
+  it('보충 8명은 외부 base와 무관하게 개발 서버 원본을 쓴다', () => {
+    for (let id = 11001; id <= 11008; id++) {
+      expect(portraitUrl(id, 'portrait', BASE)).toBe(`/__dev-portraits/${id}`);
+      expect(portraitUrl(id, 'icon', BASE)).toBe(`/__dev-portraits/${id}`);
+    }
+  });
   it('id 10006은 변형마다 경로와 확장자가 다르다', () => {
     expect(portraitUrl(10006, 'portrait', BASE)).toBe(`${BASE}/portraits/portrait/10006.png`);
     expect(portraitUrl(10006, 'icon', BASE)).toBe(`${BASE}/portraits/icon/10006.webp`);
@@ -28,7 +34,7 @@ describe('portraitUrl', () => {
   });
 
   it('범위 밖·null·정수 아님은 null (기본 이미지)', () => {
-    for (const id of [null, undefined, 0, 10000, 11001, 10006.5, Number.NaN]) {
+    for (const id of [null, undefined, 0, 10000, 11009, 10006.5, Number.NaN]) {
       expect(isPortraitId(id)).toBe(false);
       expect(portraitUrl(id, 'portrait', BASE)).toBeNull();
     }
@@ -40,11 +46,11 @@ describe('portraitUrl', () => {
 });
 
 describe('resolveImageBaseUrl', () => {
-  it('비었으면 jsDelivr 고정 커밋 주소', () => {
+  it('비었으면 GitHub 원본 고정 커밋 주소', () => {
     expect(resolveImageBaseUrl(undefined)).toBe(DEFAULT_IMAGE_BASE_URL);
     expect(resolveImageBaseUrl('  ')).toBe(DEFAULT_IMAGE_BASE_URL);
     expect(DEFAULT_IMAGE_BASE_URL).toBe(
-      'https://cdn.jsdelivr.net/gh/opensamguk/opensamguk-images@48163bd1ce8d54c54c94fb5484b05f9db9e50c62',
+      'https://raw.githubusercontent.com/opensamguk/opensamguk-images/48163bd1ce8d54c54c94fb5484b05f9db9e50c62',
     );
   });
 

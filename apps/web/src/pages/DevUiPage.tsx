@@ -52,6 +52,17 @@ export function DevUiPage() {
         </div>
       </section>
       <section>
+        <h2>191년 보충 초상</h2>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+          {['소제1', '헌제', '사마휘', '우길', '화타', '길평', '교현', '예형'].map((name, index) => (
+            <figure key={name} style={{ margin: 0 }}>
+              <Portrait id={11001 + index} name={name} />
+              <figcaption>{name}</figcaption>
+            </figure>
+          ))}
+        </div>
+      </section>
+      <section>
         <h2>DisabledReason</h2>
         <DisabledReason reason="교전 중인 상대가 아닙니다">출병</DisabledReason>
       </section>

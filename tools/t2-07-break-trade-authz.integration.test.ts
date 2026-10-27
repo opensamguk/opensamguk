@@ -232,9 +232,17 @@ afterAll(async () => {
     if (created && ownOid !== undefined)
       await attempt('OWN_NORMAL_DROP', async () => {
         expect(await identity()).toBe(ownOid);
-        const rows = await admin!.$queryRaw<
-          Array<{ count: number }>
-        >`SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname = ${databaseName}`;
+        const activity = () =>
+          admin!.$queryRaw<
+            Array<{ count: number }>
+          >`SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname = ${databaseName}`;
+        let rows = await activity();
+        // Pool 종료와 PostgreSQL의 소켓 종료 관측 사이에는 짧은 차이가 있다.
+        // 연결 0·OID 검사는 유지하며 자기 연결의 자연 종료만 기다린다.
+        for (let attempt = 0; rows[0]?.count !== 0 && attempt < 20; attempt++) {
+          await delay(50);
+          rows = await activity();
+        }
         expect(rows[0]?.count).toBe(0);
         await admin!.$executeRawUnsafe(`DROP DATABASE "${databaseName}"`);
         expect(await identity()).toBeUndefined();

@@ -5,7 +5,7 @@ const natural = z.number().int().nonnegative();
 const positive = z.number().int().positive();
 const name = z.string().min(1);
 export const portraitMapSchema = z.object({
-  portraits: z.record(name, z.number().int().min(10001).max(11000)),
+  portraits: z.record(name, z.number().int().min(10001).max(11008)),
 });
 const cityValues = z.object({
   population: natural,

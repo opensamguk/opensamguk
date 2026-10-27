@@ -8,7 +8,7 @@ describe('T4-76 초상 대응표 검증', () => {
     expect(validatePortraitMap(raw)).toMatchObject({ status: 'pass', issues: [] });
     expect(raw.stats.count).toBe(2);
   });
-  it.each([10000, 11001, 10001.5])('잘못된 ID %i를 거부한다', (id) => {
+  it.each([10000, 11009, 10001.5])('잘못된 ID %i를 거부한다', (id) => {
     expect(codes(validatePortraitMap({ portraits: { 가: id } }))).toEqual(['shape-invalid']);
   });
   it('record 키 삽입 순서가 달라도 구조 오류 순서가 같다', () => {
