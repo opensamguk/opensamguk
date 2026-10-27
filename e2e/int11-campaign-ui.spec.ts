@@ -165,6 +165,34 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
     await expect
       .poll(async () => (await apiQuery<Board>(owner, 'campaign.get', { worldId })).units[0]!.commanderId)
       .toBe(ownerId);
+    const actor = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: ownerId } } });
+    const turns = await db.general.findUniqueOrThrow({
+      where: { worldId_id: { worldId, id: ownerId } },
+      select: { turnRevision: true },
+    });
+    await apiMutate(world, owner, 'turns.set', {
+      worldId,
+      revision: turns.turnRevision,
+      slots: [
+        { commandKey: 'recruit', args: { amount: 10, crewType: 1100, unitId: after.units[0]!.id } },
+        ...Array.from({ length: 29 }, () => null),
+      ],
+    });
+    tick = actor.nextTurnTick;
+    await advance();
+    await owner.page.reload();
+    const garrison = owner.page.getByRole('table', { name: /^주둔 장수/ });
+    await expect(garrison.getByRole('columnheader', { name: '정치' })).toBeVisible();
+    await expect(garrison.getByRole('columnheader', { name: '매력' })).toBeVisible();
+    const ownRow = garrison
+      .getByRole('row')
+      .filter({ has: owner.page.getByRole('cell', { name: '화면장수0', exact: true }) });
+    await expect(ownRow.getByRole('cell').nth(7)).toHaveText('10');
+    expect((await apiQuery<Board>(owner, 'campaign.get', { worldId })).units[0]!.troops).toBe(10);
+    expect((await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: ownerId } } })).crew).toBe(0);
+    expect(
+      await db.generalTurn.findMany({ where: { worldId, generalId: targetId }, orderBy: { slot: 'asc' } }),
+    ).toEqual(targetTurns);
     await owner.page.setViewportSize({ width: 375, height: 812 });
     await owner.page.reload();
     await expect(panel(owner)).toBeVisible();

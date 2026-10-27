@@ -18,6 +18,8 @@ import { hashPassword } from '../apps/server/src/auth/password';
 import { authzCase } from '../apps/server/src/authz/case';
 import { categories } from '../apps/server/src/authz/coverage';
 import type { readCampaignBoard, readCampaignRequest } from '../apps/server/src/game/campaignApi';
+import type { AppRouter } from '../apps/server/src/router';
+import type { inferRouterOutputs } from '@trpc/server';
 
 // AC-INT-06 실제 191년 21국·491명 원본, HTTP 세션과 펜싱 엔진을 함께 검사한다.
 // 이 파일의 한 달 검사는 AC-INT-12 한 기수 인수를 대신하지 않는다.
@@ -684,6 +686,35 @@ it('예약한 실제 부장 부곡에만 모병하고 훈련 미리보기는 그
   expect(after.state.generals[ownId]!.gold).toBe(actor.gold - 88);
   expect(after.state.generals[ownId]!.crew).toBe(0);
   expect(after.state.generals[lieutenantId]!.crew).toBe(0);
+  const city = await http<inferRouterOutputs<AppRouter>['city']['get']>('city.get', {
+    worldId,
+    cityKey: after.state.generals[lieutenantId]!.cityKey,
+  });
+  expect(city.code).toBeUndefined();
+  expect(city.data).toMatchObject({ campaignEnabled: true, fiveStats: true });
+  expect(city.data!.generals.find((general) => general.id === lieutenantId)).toMatchObject({
+    crew: 0,
+    politics: after.state.generals[lieutenantId]!.politics,
+    charm: after.state.generals[lieutenantId]!.charm,
+    commandedArmy: { troops: 10, train: 0, atmos: 0 },
+  });
+  expect(city.data!.generals.find((general) => general.id === ownId)).toMatchObject({
+    commandedArmy: { troops: 0, train: 0, atmos: 0 },
+  });
+  const stranger = await http<inferRouterOutputs<AppRouter>['city']['get']>(
+    'city.get',
+    {
+      worldId,
+      cityKey: after.state.generals[lieutenantId]!.cityKey,
+    },
+    cookies[2],
+  );
+  const masked = stranger.data!.generals.find((general) => general.id === lieutenantId)!;
+  expect(masked).toEqual({
+    id: lieutenantId,
+    name: after.state.generals[lieutenantId]!.name,
+    nationId: after.state.generals[lieutenantId]!.nationId,
+  });
   expect((await http('turns.precheck', { worldId, commandKey: 'train', args: { unitId } })).data).toMatchObject({
     ok: true,
     preview: { goldCost: 100, gain: 8 + Math.floor(after.state.generals[lieutenantId]!.leadership / 25) },

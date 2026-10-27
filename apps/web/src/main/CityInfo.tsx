@@ -98,7 +98,14 @@ export function CityInfo({
           ))}
         </p>
       ) : null}
-      {showGenerals ? <Garrison generals={data.generals} nations={nationById} /> : null}
+      {showGenerals ? (
+        <Garrison
+          generals={data.generals}
+          nations={nationById}
+          campaign={data.campaignEnabled === true}
+          fiveStats={data.fiveStats === true}
+        />
+      ) : null}
     </div>
   );
 }
@@ -129,12 +136,22 @@ function NeighborLink({
   );
 }
 
-function Garrison({ generals, nations }: { generals: readonly GeneralView[]; nations: Map<number, MapNation> }) {
+function Garrison({
+  generals,
+  nations,
+  campaign,
+  fiveStats,
+}: {
+  generals: readonly GeneralView[];
+  nations: Map<number, MapNation>;
+  campaign: boolean;
+  fiveStats: boolean;
+}) {
   if (generals.length === 0) return <p className={styles.meta}>주둔 장수가 없습니다.</p>;
-  const num = (pick: (g: Extract<GeneralView, { leadership: number }>) => number) => ({
+  const num = (pick: (g: Extract<GeneralView, { leadership: number }>) => number | undefined) => ({
     numeric: true,
-    sortValue: (g: GeneralView) => (isDetailedGeneral(g) ? pick(g) : null),
-    render: (g: GeneralView) => (isDetailedGeneral(g) ? pick(g).toLocaleString('ko-KR') : '—'),
+    sortValue: (g: GeneralView) => (isDetailedGeneral(g) ? (pick(g) ?? null) : null),
+    render: (g: GeneralView) => (isDetailedGeneral(g) ? (pick(g)?.toLocaleString('ko-KR') ?? '—') : '—'),
     title: (g: GeneralView) => (isDetailedGeneral(g) ? undefined : HIDDEN_GENERAL),
   });
   const columns: Column<GeneralView>[] = [
@@ -155,9 +172,27 @@ function Garrison({ generals, nations }: { generals: readonly GeneralView[]; nat
     { key: 'leadership', label: '통솔', ...num((g) => g.leadership) },
     { key: 'strength', label: '무력', ...num((g) => g.strength) },
     { key: 'intel', label: '지력', ...num((g) => g.intel) },
-    { key: 'crew', label: '병력', ...num((g) => g.crew) },
-    { key: 'train', label: '훈련', ...num((g) => g.train) },
-    { key: 'atmos', label: '사기', ...num((g) => g.atmos) },
+    ...(fiveStats
+      ? [
+          { key: 'politics', label: '정치', ...num((g) => g.politics) },
+          { key: 'charm', label: '매력', ...num((g) => g.charm) },
+        ]
+      : []),
+    {
+      key: 'crew',
+      label: campaign ? '지휘 병력' : '병력',
+      ...num((g) => (campaign ? ('commandedArmy' in g ? g.commandedArmy.troops : undefined) : g.crew)),
+    },
+    {
+      key: 'train',
+      label: campaign ? '평균 훈련' : '훈련',
+      ...num((g) => (campaign ? ('commandedArmy' in g ? g.commandedArmy.train : undefined) : g.train)),
+    },
+    {
+      key: 'atmos',
+      label: campaign ? '평균 사기' : '사기',
+      ...num((g) => (campaign ? ('commandedArmy' in g ? g.commandedArmy.atmos : undefined) : g.atmos)),
+    },
   ];
   return (
     <DataTable caption={`주둔 장수 ${generals.length}명`} rows={generals} columns={columns} rowKey={(g) => g.id} />

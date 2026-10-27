@@ -1,6 +1,6 @@
 import { publicGeographySchema } from '@opensamguk/shared';
 import type { Prisma } from '@opensamguk/db';
-import { BALANCE } from '@opensamguk/rules';
+import { BALANCE, type CampaignUnitState } from '@opensamguk/rules';
 import { z } from 'zod';
 
 type General = Omit<
@@ -72,6 +72,30 @@ export function generalInfo(general: General, viewer: Viewer) {
   return visibility(viewer).general(general)
     ? ownGeneralInfo(general)
     : { id: general.id, name: general.name, nationId: general.nationId };
+}
+
+// 병력은 부곡에만 저장한다. 주둔 표는 실제 지휘관별 병력과 병력 가중 평균을 읽는다.
+export function garrisonGeneralInfo(general: General, viewer: Viewer, units?: readonly CampaignUnitState[]) {
+  if (!visibility(viewer).general(general)) return { id: general.id, name: general.name, nationId: general.nationId };
+  const detail = ownGeneralInfo(general);
+  if (units === undefined) return detail;
+  let troops = 0,
+    train = 0,
+    atmos = 0;
+  for (const unit of units) {
+    if (unit.commanderId !== general.id) continue;
+    troops += unit.troops;
+    train += unit.train * unit.troops;
+    atmos += unit.atmos * unit.troops;
+  }
+  return {
+    ...detail,
+    commandedArmy: {
+      troops,
+      train: troops === 0 ? 0 : Math.floor(train / troops),
+      atmos: troops === 0 ? 0 : Math.floor(atmos / troops),
+    },
+  };
 }
 
 export function cityInfo(city: City, viewer: Viewer) {

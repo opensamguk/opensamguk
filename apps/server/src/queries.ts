@@ -25,6 +25,7 @@ const worldSelect = {
   clockTick: true,
   clockAnchorAt: true,
   turnTermMinutes: true,
+  ruleFeatures: true,
 } as const satisfies Prisma.WorldSelect;
 type ReadWorld = Prisma.WorldGetPayload<{ select: typeof worldSelect }>;
 
