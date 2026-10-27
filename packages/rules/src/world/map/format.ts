@@ -10,6 +10,7 @@ import {
   type ResourceReport,
 } from '../validate/issues';
 import { scanLimits } from '../validate/limits';
+import { operationalMapSchema, type OperationalMapResource } from './operational';
 
 export { RESOURCE_LIMITS } from '../validate/limits';
 export const MAP_DEFAULT_CANVAS = Object.freeze({ width: 700, height: 500 });
@@ -41,10 +42,10 @@ export const mapV2Schema = z.strictObject({
 });
 export type MapResourceV2 = z.infer<typeof mapV2Schema>;
 export type Point = [number, number];
-export type MapInput = MapResource | MapResourceV2;
-export function readMapVersion(raw: unknown): 1 | 2 | null {
+export type MapInput = MapResource | MapResourceV2 | OperationalMapResource;
+export function readMapVersion(raw: unknown): 1 | 2 | 3 | null {
   if (!isRecord(raw) || !Object.hasOwn(raw, 'version')) return 1;
-  return raw.version === 2 ? 2 : null;
+  return raw.version === 2 || raw.version === 3 ? raw.version : null;
 }
 export function parseMapInput(raw: unknown, builder: ReportBuilder<MapInput>): MapInput | null {
   builder.did('limits');
@@ -60,7 +61,12 @@ export function parseMapInput(raw: unknown, builder: ReportBuilder<MapInput>): M
     builder.add(issue('map-version-unknown', { kind: 'path', path: ['version'] }));
     return null;
   }
-  const parsed = version === 1 ? mapSchema.safeParse(raw) : mapV2Schema.safeParse(raw);
+  const parsed =
+    version === 1
+      ? mapSchema.safeParse(raw)
+      : version === 2
+        ? mapV2Schema.safeParse(raw)
+        : operationalMapSchema.safeParse(raw);
   if (!parsed.success) {
     addShapeIssues(builder, parsed.error.issues);
     return null;
@@ -73,6 +79,10 @@ export function normalizeMapToV2(raw: unknown): NormalizeMapResult {
   const builder = new ReportBuilder<MapInput>('MAP');
   const parsed = parseMapInput(raw, builder);
   if (!parsed) return { ok: false, report: builder.finish(null) };
+  if ('version' in parsed && parsed.version === 3) {
+    builder.add(issue('map-version-unknown', { kind: 'path', path: ['version'] }));
+    return { ok: false, report: builder.finish(null) };
+  }
   if ('version' in parsed) return { ok: true, map: parsed, dropped: [] };
   const source = raw as Record<string, unknown>;
   const sourceDefaults = source.defaults as Record<string, unknown>;

@@ -9,6 +9,8 @@ import {
   validateBrokenTreatyRow,
   validateClosedTreatyRow,
   type WorldInit,
+  readOperationalMap,
+  attachOperationalKinds,
 } from '@opensamguk/rules';
 import { z } from 'zod';
 import { worldResolver } from './resolver';
@@ -80,7 +82,10 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
     ...(world.ruleFeatures?.length ? { ruleFeatures: [...world.ruleFeatures] } : {}),
     ...(ext ? { ext } : {}),
     startYear: world.startYear,
-    cities,
+    cities: attachOperationalKinds(
+      cities,
+      readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin),
+    ),
     nations,
     generals,
     diplomacies,

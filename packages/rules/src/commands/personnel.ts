@@ -15,6 +15,7 @@ const establish = (uprising: boolean) =>
         return fail('PROTECTED', '초반 보호 기간에는 건국하거나 거병할 수 없습니다.');
       const general = view.generals[actor.generalId]!;
       if (general.nationId !== null) return fail('BAD_STATE', '재야 장수만 가능합니다.');
+      if (view.cities[general.cityKey]?.kind === 'PASS') return fail('BAD_TARGET', '도시에서만 건국할 수 있습니다.');
       if (view.cities[general.cityKey]?.nationId !== null) return fail('NOT_OWN_CITY', '빈 도시에서만 가능합니다.');
       if (Object.values(view.nations).some((nation) => nation.name === args.name))
         return fail('BAD_STATE', '같은 이름의 국가가 있습니다.');

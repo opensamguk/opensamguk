@@ -14,7 +14,11 @@ export const nationRouter = router({
       const cities = await tx.city.findMany({ where: input, orderBy: { cityKey: 'asc' } });
       const generals = await tx.general.findMany({ where: input, orderBy: { id: 'asc' } });
       return {
-        ...nationInfo(nation, { cityCount: cities.length, generalCount: generals.length }, viewer),
+        ...nationInfo(
+          nation,
+          { cityCount: cities.filter((city) => city.kind !== 'PASS').length, generalCount: generals.length },
+          viewer,
+        ),
         cities: cities.map(mapCity),
         generals: generals.map((general) => generalInfo(general, viewer)),
       };

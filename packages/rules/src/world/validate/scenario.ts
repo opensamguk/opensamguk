@@ -1,4 +1,5 @@
 import { parseMapInput, type MapInput } from '../map/format';
+import { operationalAnchors } from '../map/anchors';
 import { scenarioSchema, type ScenarioResource } from '../resources';
 import { addShapeIssues, issue, ReportBuilder, type ResourceReport } from './issues';
 import { scanLimits } from './limits';
@@ -66,8 +67,15 @@ export function validateScenario(input: unknown, ctx?: { map?: unknown }): Resou
     return out.finish(scenario);
   }
   out.did('map-refs');
-  const names = new Set(map.cities.map((city) => city.name));
+  const cities = 'version' in map && map.version === 3 ? operationalAnchors(map) : map.cities;
+  const names = new Set(cities.map((city) => city.name));
   scenario.nation.forEach((nation, index) => {
+    if (
+      'version' in map &&
+      map.version === 3 &&
+      !cities.some((city) => city.name === nation[8][0] && 'kind' in city && city.kind === 'CITY')
+    )
+      out.add(issue('shape-invalid', { kind: 'path', path: ['nation', index, 8, 0] }, { expected: 'CITY' }));
     for (const name of nation[8])
       if (!names.has(name)) out.add(issue('scenario-nation-city-missing', { kind: 'nation', index }, { name }));
   });

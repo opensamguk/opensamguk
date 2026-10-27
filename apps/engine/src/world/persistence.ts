@@ -20,6 +20,9 @@ import {
   checkReplayOrigin,
   type JsonValue,
   checkStatProfile,
+  checkOperationalProfile,
+  readOperationalMap,
+  attachOperationalKinds,
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { loadCommandState } from '../commandPersistence';
@@ -122,6 +125,7 @@ export async function saveInitialWorld(
   };
   const stateHash = hashState(initial);
   checkStatProfile(initial);
+  checkOperationalProfile(initial);
   if (
     options.endYear !== null &&
     (!Number.isSafeInteger(options.endYear) || options.endYear < state.startYear || options.endYear > 10000)
@@ -137,6 +141,7 @@ export async function saveInitialWorld(
       unitSetKey: state.unitSetKey,
       statRules: state.statRules,
       unitSet: state.unitSet,
+      ...(state.operationalMap ? { operationalMap: state.operationalMap } : {}),
     }),
     initialStateHash: stateHash,
   };
@@ -156,6 +161,7 @@ export async function saveInitialWorld(
       unitSetKey: initial.unitSetKey,
       statRules: initial.statRules,
       unitSet: initial.unitSet,
+      ...(initial.operationalMap ? { operationalMap: initial.operationalMap } : {}),
     };
     origin.resourceHash = hashState({ ...resources, ...(featureData !== undefined ? { featureData } : {}) });
     replayOrigin = origin;
@@ -201,6 +207,7 @@ export async function saveInitialWorld(
   const world = await db.$transaction(
     async (tx) => {
       const world = await tx.world.create({
+        select: { id: true },
         data: {
           name: options.name,
           ...(preset ? { presetKey: options.preset!.key, preset: preset as Prisma.InputJsonValue } : {}),
@@ -224,6 +231,9 @@ export async function saveInitialWorld(
           replayOrigin: replayOrigin as Prisma.InputJsonValue,
           statRules: creationState.statRules,
           unitSet: creationState.unitSet as Prisma.InputJsonValue,
+          ...(creationState.operationalMap
+            ? { operationalMap: creationState.operationalMap as Prisma.InputJsonValue }
+            : {}),
           ...(creationState.commandMeta ? { commandMeta: creationState.commandMeta as Prisma.InputJsonValue } : {}),
         },
       });
@@ -301,7 +311,9 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
         void ignored;
         return value;
       };
+      const operationalMap = readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin);
       return {
+        ...(operationalMap ? { operationalMap } : {}),
         ...(preset ? { presetRules: presetRules(preset) } : {}),
         ...(world.ruleFeatures?.length ? { ruleFeatures: [...world.ruleFeatures] } : {}),
         ...(ext ? { ext } : {}),
@@ -312,7 +324,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
         startYear: world.startYear,
         statRules: statRulesSchema.parse({ stat: world.statRules }).stat,
         unitSet: unitSetSchema.parse(world.unitSet),
-        cities: cities.map(stripWorldId),
+        cities: attachOperationalKinds(cities.map(stripWorldId), operationalMap),
         nations: nations.map((nation) => {
           if (nation.capitalCityKey === null) throw new Error(`국가 ${nation.id}의 수도가 없습니다.`);
           return { ...stripWorldId(nation), capitalCityKey: nation.capitalCityKey };

@@ -38,6 +38,7 @@ function world(patch: Partial<World> = {}): World {
   return {
     id: 'world',
     name: '조약 조회 단위',
+    operationalMap: null,
     presetKey: null,
     preset: null,
     scenarioKey: '1030',
@@ -172,6 +173,7 @@ function fixture() {
   const groups = vi.spyOn(db.city, 'groupBy').mockResolvedValue([
     {
       ...initial.cities[0]!,
+      kind: null,
       worldId: 'world',
       nationId: 1,
       _count: { _all: 1 },
@@ -182,6 +184,7 @@ function fixture() {
     },
     {
       ...initial.cities[1]!,
+      kind: null,
       worldId: 'world',
       nationId: 2,
       _count: { _all: 1 },
@@ -328,7 +331,7 @@ describe('T2-07 / AC-M2-06 새 조회 leaf 보조 단위', () => {
     });
     expect(f.groups).toHaveBeenCalledWith({
       by: ['nationId'],
-      where: { worldId: 'world', nationId: { in: [2, 1] } },
+      where: { worldId: 'world', nationId: { in: [2, 1] }, OR: [{ kind: null }, { kind: 'CITY' }] },
       _count: { _all: true },
     });
   });
@@ -649,8 +652,12 @@ describe('T2-07 / AC-M2-06 새 조회 leaf 보조 단위', () => {
       where: { worldId_nationA_nationB: { worldId: 'world', nationA: 1, nationB: 2 } },
       select: { state: true },
     });
-    expect(f.count).toHaveBeenNthCalledWith(1, { where: { worldId: 'world', nationId: 1 } });
-    expect(f.count).toHaveBeenNthCalledWith(2, { where: { worldId: 'world', nationId: 2 } });
+    expect(f.count).toHaveBeenNthCalledWith(1, {
+      where: { worldId: 'world', nationId: 1, OR: [{ kind: null }, { kind: 'CITY' }] },
+    });
+    expect(f.count).toHaveBeenNthCalledWith(2, {
+      where: { worldId: 'world', nationId: 2, OR: [{ kind: null }, { kind: 'CITY' }] },
+    });
     expect(f.nested).not.toHaveBeenCalled();
     expect(f.write).not.toHaveBeenCalled();
     assertNoPrivate(result);

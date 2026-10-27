@@ -24,7 +24,7 @@ describe('T4-76 지도 검증', () => {
     expect(report.skipped.every((item) => item.reason === 'blocked')).toBe(true);
   });
   it('모르는 판의 코드·심각도·위치와 차단 그룹을 확인한다', () => {
-    const report = complete({ ...mapFixture(), version: 3 });
+    const report = complete({ ...mapFixture(), version: 4 });
     expect(report).toMatchObject({
       status: 'fail',
       ran: ['limits', 'shape'],

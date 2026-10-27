@@ -7,9 +7,9 @@ import { type Lease } from './lease';
 import * as monthly from './monthly';
 import { persistEffects, shiftTurns } from './persist';
 import { TurnLoop } from './turnLoop';
-import { loadWorld } from './worldLoader';
+import { loadWorld, loadWorldAfterCapabilityCheck } from './worldLoader';
 
-vi.mock('./worldLoader', () => ({ loadWorld: vi.fn() }));
+vi.mock('./worldLoader', () => ({ loadWorld: vi.fn(), loadWorldAfterCapabilityCheck: vi.fn() }));
 vi.mock('./persist', () => ({ persistEffects: vi.fn(), shiftTurns: vi.fn() }));
 vi.mock('./publicMap', () => ({ persistPublicMap: vi.fn().mockResolvedValue(false) }));
 afterEach(() => {
@@ -147,6 +147,7 @@ async function fixture(caps = true, modern = false) {
     }),
   };
   vi.mocked(loadWorld).mockImplementation(async () => structuredClone(state));
+  vi.mocked(loadWorldAfterCapabilityCheck).mockImplementation(async () => structuredClone(state));
   vi.mocked(persistEffects).mockImplementation(async (_tx, _worldId, next, _effects, _at, before) => {
     expect(before).toEqual(state);
     state = structuredClone(next);

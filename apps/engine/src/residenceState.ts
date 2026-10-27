@@ -35,6 +35,12 @@ export async function assertNoResidenceAnchors(tx: Prisma.TransactionClient, wor
   if (row) throw new Error('인사 기능을 끈 월드에 물리 거주 앵커가 있습니다.');
 }
 
+// 같은 트랜잭션에서 해당 월드의 장수 전체를 읽은 호출자가 재조회 없이 같은 경계를 검사한다.
+export function assertNoResidenceAnchorsInRows(rows: readonly { residenceTick: number | null }[]): void {
+  if (rows.some((row) => row.residenceTick !== null))
+    throw new Error('인사 기능을 끈 월드에 물리 거주 앵커가 있습니다.');
+}
+
 export async function loadResidenceAnchors(
   tx: Prisma.TransactionClient,
   worldId: string,

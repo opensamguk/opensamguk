@@ -4,8 +4,12 @@ import { TICKS_PER_MONTH } from '../clock/constants';
 import { mapSchema, portraitMapSchema, scenarioSchema, statRulesSchema, unitSetSchema } from './resources';
 import type { StatRules, UnitSetResource } from './resources';
 import type { WorldState, WorldExt } from '../model/world';
+import { operationalMapSchema, type OperationalMapResource } from './map/operational';
+import { operationalAnchors } from './map/anchors';
+import { validateMap } from './validate/map';
 
 export interface InitialCity {
+  kind?: 'CITY' | 'PASS';
   cityKey: number;
   name: string;
   level: number;
@@ -84,6 +88,7 @@ export interface InitialDiplomacy {
 }
 
 export interface WorldInit {
+  operationalMap?: OperationalMapResource;
   presetRules?: PresetRules;
   ruleFeatures?: string[];
   ext?: WorldExt;
@@ -111,11 +116,18 @@ export function buildInitialWorld(input: {
   portraitMap?: unknown;
 }): WorldInit {
   if (typeof input.seed !== 'string' || input.seed.length === 0) throw new Error('시드가 비어 있습니다.');
-  const map = mapSchema.parse(input.map);
+  const operational =
+    typeof input.map === 'object' && input.map !== null && 'version' in input.map && input.map.version === 3
+      ? operationalMapSchema.parse(input.map)
+      : undefined;
+  if (operational && validateMap(operational, { scenarios: [] }).status !== 'pass')
+    throw new Error('운영 지도의 연결망을 확인하세요.');
+  const map = operational ? { ...operational, cities: operationalAnchors(operational) } : mapSchema.parse(input.map);
   const scenario = scenarioSchema.parse(input.scenario);
   const unitSet = unitSetSchema.parse(input.unitSet);
   const statRules = statRulesSchema.parse(input.statRules).stat;
   const five = statRules.count === 5;
+  if (operational && !five) throw new Error('운영 지도는 5능력치 프로필이 필요합니다.');
   const historicalStats = new Map(scenario.generalStats?.map((row) => [row.generalId, row]));
   if (
     five
@@ -136,7 +148,7 @@ export function buildInitialWorld(input: {
     if (new Set(city.connections).size !== city.connections.length) throw new Error(`${city.name}: 연결이 중복됩니다.`);
     for (const connection of city.connections) {
       const other = byId.get(connection);
-      if (!other || connection === city.id || !other.connections.includes(city.id)) {
+      if (!other || connection === city.id || (!operational && !other.connections.includes(city.id))) {
         throw new Error(`${city.name} ↔ ${connection}: 연결은 존재하는 다른 도시와 양방향이어야 합니다.`);
       }
     }
@@ -161,6 +173,8 @@ export function buildInitialWorld(input: {
       ownerByCity.set(city.id, id);
       return city.id;
     });
+    if (operational && !mapCities.some((city) => city.name === cityNames[0] && 'kind' in city && city.kind === 'CITY'))
+      throw new Error(`${name}: 수도는 도시여야 합니다.`);
     ownedCities.set(id, cityKeys);
     return {
       id,
@@ -178,6 +192,12 @@ export function buildInitialWorld(input: {
   });
 
   const cities: InitialCity[] = mapCities.map((city) => ({
+    ...(operational
+      ? {
+          kind: operational.sites.find((site) => 'anchorKey' in site && site.anchorKey === city.id)!.kind as
+            'CITY' | 'PASS',
+        }
+      : {}),
     cityKey: city.id,
     name: city.name,
     level: city.level,
@@ -204,7 +224,7 @@ export function buildInitialWorld(input: {
 
   // 배치만 bootstrap 스트림을 소비한다. DB ID·시각은 규칙 상태에 넣지 않는다.
   const rng = rngFor(input.seed, 'bootstrap');
-  const allCities = cities.map((city) => city.cityKey);
+  const allCities = cities.filter((city) => city.kind !== 'PASS').map((city) => city.cityKey);
   const generals: InitialGeneral[] = scenario.general.map((row, i) => {
     const [
       affinity,
@@ -274,7 +294,10 @@ export function buildInitialWorld(input: {
     });
   }
   return {
-    ...(five ? { ruleFeatures: ['five-stats'] } : {}),
+    ...(five || operational
+      ? { ruleFeatures: [...(five ? ['five-stats'] : []), ...(operational ? ['operational-map'] : [])] }
+      : {}),
+    ...(operational ? { operationalMap: operational } : {}),
     seed: input.seed,
     scenarioKey: scenario.id,
     mapKey: map.id,

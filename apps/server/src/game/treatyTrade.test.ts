@@ -81,7 +81,7 @@ describe('T2-07 / AC-M2-14 교역 후보 API leaf', () => {
       blocked: null,
     });
     expect(f.tx.city.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ select: { cityKey: true, name: true, nationId: true } }),
+      expect.objectContaining({ select: { cityKey: true, name: true, nationId: true, kind: true } }),
     );
     expect(f.tx.nation.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ select: { id: true, name: true, color: true } }),

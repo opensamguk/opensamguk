@@ -12,6 +12,7 @@ function fixture(personnelFormat: 1 | null, policyFromSequence: number | null = 
   const world: World = {
     id: 'world',
     name: '입력 시험',
+    operationalMap: null,
     presetKey: null,
     scenarioKey: legacy.origin.initial.scenarioKey,
     mapKey: legacy.origin.initial.mapKey,

@@ -70,6 +70,8 @@ function transaction(rows: unknown[] = [], changes: Record<string, unknown> = {}
     endYear: null,
     outcomeFromSequence: 0,
     replayOrigin: origin,
+    ruleFeatures: [],
+    operationalMap: null,
     ...changes,
   };
   const write = vi.fn(() => {

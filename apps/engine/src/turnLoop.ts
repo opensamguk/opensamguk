@@ -19,7 +19,7 @@ import {
 } from '@opensamguk/rules';
 import { appendNationHistory, persistCommandReports, commandRealtimeSignals } from './commandPersistence';
 import { assertLease, databaseNow, lockLease, type Lease } from './lease';
-import { loadWorld } from './worldLoader';
+import { loadWorld, loadWorldAfterCapabilityCheck } from './worldLoader';
 import { persistEffects, shiftTurns } from './persist';
 import { persistMonthly, loadReplayState } from './monthly';
 import { hashState } from '@opensamguk/shared/node';
@@ -128,7 +128,7 @@ export class TurnLoop {
         await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${worldId} FOR UPDATE`;
         const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
         if (world.replayFormat === 3 && !this.replayChecked) checkWorldReplay(world);
-        await assertWorldCapabilities(tx, world);
+        const capabilities = await assertWorldCapabilities(tx, world);
         if (!this.extVerified) await verifyWorldExt(tx, world);
         const baselineActiveTick = await policyBaseline(tx, world);
         if (world.status !== 'RUNNING') {
@@ -216,19 +216,19 @@ export class TurnLoop {
             world.replayFormat === 3 && world.ruleFeatures.includes('personnel')
               ? await loadReplayState(tx, worldId)
               : null;
-          const state = personnelBefore?.state ?? (await loadWorld(tx, worldId));
+          const state = personnelBefore?.state ?? (await loadWorldAfterCapabilityCheck(tx, world, capabilities));
           const actor = await tx.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: due.id } } });
-          const command = await tx.generalTurn.findUnique({
-            where: { worldId_generalId_slot: { worldId, generalId: due.id, slot: 0 } },
+          const slots = await tx.generalTurn.findMany({
+            where: { worldId, generalId: due.id },
+            orderBy: { slot: 'asc' },
           });
+          const command = slots.find((slot) => slot.slot === 0);
           const modern =
             world.replayFormat === 3
               ? world.ruleFeatures.includes('policy')
               : isPolicyMode({ fromSequence: world.policyFromSequence, actionSequence: world.actionSequence });
           if (modern) {
-            assertSlotSet(
-              await tx.generalTurn.findMany({ where: { worldId, generalId: due.id }, select: { slot: true } }),
-            );
+            assertSlotSet(slots);
             if (!isPolicyKey(actor.defaultPolicy)) throw new Error('기본 방침이 올바르지 않습니다.');
           }
           const treatiesHash =
@@ -313,7 +313,7 @@ export class TurnLoop {
               text: failed ? `${result.code}: ${result.message}` : result.logs.map((log) => log.text).join('\n'),
             },
           });
-          await shiftTurns(tx, worldId, due.id);
+          await shiftTurns(tx, worldId, due.id, { ...world, actionSequence: sequence }, slots);
           const updated = await tx.general.updateMany({
             where: { worldId, id: due.id, nextTurnTick: due.nextTurnTick, turnRevision: actor.turnRevision },
             data: { nextTurnTick: due.nextTurnTick + TICKS_PER_MONTH, turnRevision: { increment: 1 } },
@@ -368,6 +368,10 @@ export class TurnLoop {
             endedTick!,
             this.hooks.publicMapNow?.() ?? (await databaseNow(tx)).getTime(),
             this.mapConfig,
+            {
+              worldId,
+              status: 'RUNNING',
+            },
           );
         }
         if (monthly) signals.push({ kind: 'monthly.done', target: 'world' });

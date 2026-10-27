@@ -73,6 +73,8 @@ function makeInvestmentWithCollector(spec: Spec, collect: typeof collectModifier
     const city = view.cities[general.cityKey];
     if (!city || city.nationId !== general.nationId)
       return { code: 'NOT_OWN_CITY', message: '자기 국가 도시에서만 가능합니다.' };
+    if (city.kind === 'PASS' && spec.field !== 'defence' && spec.field !== 'wall')
+      return { code: 'BAD_TARGET', message: '관문에서는 수비와 성벽을 보강할 수 있습니다.' };
     if (!city.supplied) return { code: 'NO_SUPPLY', message: '보급이 끊긴 도시입니다.' };
     if (general.gold < cost) return { code: 'NO_GOLD', message: '금이 부족합니다.' };
     const value = spec.field === 'tech' ? nation.tech : city[spec.field];

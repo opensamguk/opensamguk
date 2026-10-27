@@ -28,13 +28,13 @@ export async function listTradeTargets(
   const nationId = actor.nationId;
   const home = await tx.city.findUnique({
     where: { worldId_cityKey: { worldId: input.worldId, cityKey: actor.cityKey } },
-    select: { cityKey: true, nationId: true, connections: true },
+    select: { cityKey: true, nationId: true, connections: true, kind: true },
   });
-  if (!home || home.nationId !== nationId) return blocked('자기 국가 도시에서만 가능합니다.');
+  if (!home || home.kind === 'PASS' || home.nationId !== nationId) return blocked('자기 국가 도시에서만 가능합니다.');
   const [cities, nations, diplomacies, rows] = await Promise.all([
     tx.city.findMany({
       where: { worldId: input.worldId, cityKey: { in: home.connections }, nationId: { not: nationId } },
-      select: { cityKey: true, name: true, nationId: true },
+      select: { cityKey: true, name: true, nationId: true, kind: true },
     }),
     tx.nation.findMany({ where: { worldId: input.worldId }, select: { id: true, name: true, color: true } }),
     tx.diplomacy.findMany({
@@ -56,8 +56,13 @@ export async function listTradeTargets(
   const routes = findTradeRoutes(
     {
       cities: {
-        ...Object.fromEntries(cities.map((city) => [city.cityKey, { nationId: city.nationId, connections: [] }])),
-        [home.cityKey]: home,
+        ...Object.fromEntries(
+          cities.map((city) => [
+            city.cityKey,
+            { nationId: city.nationId, connections: [], ...(city.kind === 'PASS' ? { kind: 'PASS' as const } : {}) },
+          ]),
+        ),
+        [home.cityKey]: { nationId: home.nationId, connections: home.connections },
       },
       nations: Object.fromEntries(refs),
       diplomacies,

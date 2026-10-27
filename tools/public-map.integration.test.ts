@@ -140,7 +140,9 @@ it('RUNNING·PAUSED만 createdAt/id 순서로 나열하고 사본 없는 월드�
     ['00000000-0000-4000-8000-000000000003', 'PREOPEN', epoch - minute],
     ['00000000-0000-4000-8000-000000000004', 'ENDED', epoch - minute],
   ] as const)
-    await db.world.create({ data: { ...source, id, status, createdAt: new Date(createdAt) } });
+    await db.world.create({
+      data: { ...source, operationalMap: undefined, id, status, createdAt: new Date(createdAt) },
+    });
   const response = await maps();
   expect(response.data?.worlds.map((entry) => entry.id)).toEqual([
     '00000000-0000-4000-8000-000000000001',
