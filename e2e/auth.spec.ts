@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { newEmail, createAccount, TEST_PASSWORD } from './account';
+import { appOrigin, newEmail, createAccount, TEST_PASSWORD } from './account';
 
 // T1-14 · AC-M1-05: 화면으로 가입·로그인·로그아웃, 오류 문구, 로그인 가드.
 // 주소는 문자열(baseURL 기준 전체 주소)로 비교한다. /\/w\/1$/ 같은 정규식은 /login?next=/w/1에도 맞는다.
@@ -80,7 +80,7 @@ test('다른 사이트 주소는 next로 받지 않는다', async ({ page }) => 
   // 안전한 next가 없으면 로비로 간다 (T2-04).
   await expect(page).toHaveURL('/lobby');
   await expect(page.getByRole('heading', { level: 1, name: '로비' })).toBeVisible();
-  expect(new URL(page.url()).host).toBe('127.0.0.1:5173');
+  expect(new URL(page.url()).origin).toBe(appOrigin());
 });
 
 test('Tab과 Enter만으로 로그인한다', async ({ page }) => {

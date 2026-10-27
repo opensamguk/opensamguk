@@ -20,7 +20,6 @@ interface HomeData {
   recentLogs: unknown[];
 }
 
-const BASE = 'http://127.0.0.1:5173';
 // beforeAll에서 만든 로그인 상태. 각 시험의 브라우저 문맥은 beforeAll 뒤에 만들어지므로 이 파일을 읽는다.
 const STORAGE = 'test-results/t1-16-main-storage.json';
 const ctx: { worldId: string; home: HomeData; map: MapData } = {
@@ -35,7 +34,7 @@ const ctx: { worldId: string; home: HomeData; map: MapData } = {
 test.beforeAll(async ({ browser }) => {
   test.setTimeout(120_000);
   // 이 파일의 test.use(storageState)가 아직 없는 파일을 읽지 않도록 빈 상태로 시작한다.
-  const context = await browser.newContext({ baseURL: BASE, storageState: { cookies: [], origins: [] } });
+  const context = await browser.newContext({ baseURL: appOrigin(), storageState: { cookies: [], origins: [] } });
   const page = await context.newPage();
   await createAccount(page);
   ctx.worldId = await e2eWorld(page);
