@@ -1,3 +1,4 @@
+import { readOperationalMap, operationalMapDisplay } from '@opensamguk/rules';
 import type { Prisma } from '@opensamguk/db';
 import { TRPCError } from '@trpc/server';
 import { protectedProcedure, publicProcedure, router } from '../trpc';
@@ -88,9 +89,20 @@ export const timelapseRouter = router({
       }
       if (world.result === null) throw new Error('종료된 월드의 결과가 없습니다.');
       const { endedYear, endedMonth } = world.result;
+      const layout =
+        input.cursor === undefined
+          ? await tx.world.findUnique({
+              where: { id: input.worldId },
+              select: { operationalMap: true, ruleFeatures: true, replayOrigin: true },
+            })
+          : null;
+      const geography = layout?.ruleFeatures?.includes('operational-map')
+        ? readOperationalMap(layout.operationalMap, layout.ruleFeatures, layout.replayOrigin)
+        : undefined;
       const map =
         input.cursor === undefined
           ? {
+              ...(geography ? { operationalMap: operationalMapDisplay(geography) } : {}),
               cities: (
                 await tx.city.findMany({
                   where: { worldId: input.worldId },

@@ -114,7 +114,12 @@ export function PublicMapView({
               <time dateTime={current.map.takenAt}>{snapshotTimeText(current.map, now)}</time>
               {data.delayMinutes > 0 ? <span>{delayText(data.delayMinutes)}</span> : null}
             </p>
-            <WorldMap key={current.id} cities={current.map.cities} nations={current.map.nations} />
+            <WorldMap
+              key={current.id}
+              cities={current.map.cities}
+              nations={current.map.nations}
+              operationalMap={current.map.operationalMap}
+            />
             <MapLegend cities={current.map.cities} nations={current.map.nations} readOnly />
           </>
         )}

@@ -32,7 +32,6 @@ export const HEADER_HEIGHT = 40;
 const LEGEND_COLUMNS = 4;
 const LEGEND_ROWS = 4;
 const LEGEND_ROW_HEIGHT = 20;
-const LEGEND_TOP = HEADER_HEIGHT + MAP_HEIGHT + 12;
 const LEGEND_HEIGHT = 12 + LEGEND_ROWS * LEGEND_ROW_HEIGHT;
 const FOOTER_HEIGHT = 24;
 export const EXPORT_WIDTH = MAP_WIDTH;
@@ -60,13 +59,22 @@ function legendCells(legend: readonly LegendEntry[], empty: number) {
   return cells;
 }
 
-export function frameDrawing(input: { worldName: string; date: string; view: DrawnView }): PngDrawing {
+export function frameDrawing(input: {
+  worldName: string;
+  date: string;
+  view: DrawnView;
+  canvas?: { width: number; height: number };
+}): PngDrawing {
   const { worldName, date, view } = input;
+  const mapWidth = input.canvas?.width ?? MAP_WIDTH;
+  const mapHeight = input.canvas?.height ?? MAP_HEIGHT;
+  const exportWidth = mapWidth;
+  const legendTop = HEADER_HEIGHT + mapHeight + 12;
   const cells = legendCells(view.legend, view.empty);
   const extraRows = Math.max(0, Math.ceil(cells.length / LEGEND_COLUMNS) - LEGEND_ROWS);
-  const height = EXPORT_HEIGHT + extraRows * LEGEND_ROW_HEIGHT;
+  const height = HEADER_HEIGHT + mapHeight + LEGEND_HEIGHT + FOOTER_HEIGHT + extraRows * LEGEND_ROW_HEIGHT;
   const ops: DrawOp[] = [
-    { kind: 'rect', x: 0, y: 0, w: EXPORT_WIDTH, h: height, fill: COLORS.background },
+    { kind: 'rect', x: 0, y: 0, w: exportWidth, h: height, fill: COLORS.background },
     {
       kind: 'text',
       x: 12,
@@ -76,9 +84,9 @@ export function frameDrawing(input: { worldName: string; date: string; view: Dra
       color: COLORS.text,
       align: 'left',
       weight: 600,
-      maxWidth: EXPORT_WIDTH - 24,
+      maxWidth: exportWidth - 24,
     },
-    { kind: 'rect', x: 0, y: HEADER_HEIGHT, w: MAP_WIDTH, h: MAP_HEIGHT, fill: COLORS.ground },
+    { kind: 'rect', x: 0, y: HEADER_HEIGHT, w: mapWidth, h: mapHeight, fill: COLORS.ground },
   ];
   for (const [a, b] of mapLinks(view.cities.map(({ city }) => city))) {
     ops.push({
@@ -100,10 +108,10 @@ export function frameDrawing(input: { worldName: string; date: string; view: Dra
     const fill = nation.kind === 'stored' ? nation.color : NEUTRAL;
     ops.push({ kind: 'circle', x: city.x, y, r: DOT_R, fill, stroke: COLORS.dotStroke, dashed: false });
   }
-  const cellWidth = EXPORT_WIDTH / LEGEND_COLUMNS;
+  const cellWidth = exportWidth / LEGEND_COLUMNS;
   cells.forEach((cell, i) => {
     const x = (i % LEGEND_COLUMNS) * cellWidth + 12;
-    const y = LEGEND_TOP + Math.floor(i / LEGEND_COLUMNS) * LEGEND_ROW_HEIGHT;
+    const y = legendTop + Math.floor(i / LEGEND_COLUMNS) * LEGEND_ROW_HEIGHT;
     ops.push({ kind: 'rect', x, y, w: 10, h: 10, fill: cell.color, stroke: COLORS.dotStroke });
     ops.push({
       kind: 'text',
@@ -119,16 +127,16 @@ export function frameDrawing(input: { worldName: string; date: string; view: Dra
   });
   ops.push({
     kind: 'text',
-    x: EXPORT_WIDTH - 12,
+    x: exportWidth - 12,
     y: height - 8,
     text: EXPORT_NOTE,
     size: 11,
     color: COLORS.muted,
     align: 'right',
     weight: 400,
-    maxWidth: EXPORT_WIDTH - 24,
+    maxWidth: exportWidth - 24,
   });
-  return { width: EXPORT_WIDTH, height, ops };
+  return { width: exportWidth, height, ops };
 }
 
 // 파일 이름에 쓸 수 없는 글자(경로 구분자, 예약 문자, 제어 문자)는 밑줄로 바꾼다. 비거나 점뿐이면 월드로 둔다.

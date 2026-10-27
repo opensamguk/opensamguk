@@ -9,5 +9,27 @@
       "source": "apps/web/src/portrait/fallback.svg",
       "sha256": "052abd2acf1186a7b9c39f0a24dcf1ef0b5dffa367b19c28368e4747d243ded7"
     }
+  ],
+  "mapImages": [
+    {
+      "sha256": "72300c4014e0ede4b33fe9c22104865a08bede0699c6b3aab6f14e874e44fbe1",
+      "source": "apps/web/src/mapEditor/icons/city.png"
+    },
+    {
+      "sha256": "57e0500ff148b2b2f5c0a24d08f92410bcb39b545cc8f926f11ec0e9c7d6f106",
+      "source": "apps/web/src/mapEditor/icons/pass.png"
+    },
+    {
+      "sha256": "d721d2052afa118fb3bab1f76cafb413db30c989441ba61683dbf648c938bc1e",
+      "source": "apps/web/src/mapEditor/icons/port.png"
+    },
+    {
+      "sha256": "8a631f70bd5798b1b774d6d96ef8729b7eff48572dce446bea453407186be90e",
+      "source": "apps/web/src/mapEditor/icons/field.png"
+    },
+    {
+      "sha256": "0ea160d2cb9d64fb5bed696a93c4cdf118607d4e0df5653d66fd0051bfc5a794",
+      "source": "apps/web/src/mapEditor/geodata/natural-earth-relief.webp"
+    }
   ]
 }

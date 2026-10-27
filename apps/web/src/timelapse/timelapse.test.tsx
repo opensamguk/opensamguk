@@ -18,6 +18,8 @@ import { useTimelapsePages, type FetchTimelapsePage, type TimelapseInput } from 
 import { initialPlayback, isWaiting, playback } from './playback';
 import { TimelapseScreen, type TimelapseMap } from './TimelapsePanel';
 import { TimelapseView } from './TimelapseView';
+import { OPERATIONAL_GIS_SHA256 } from '../main/operationalGeography';
+import type { PublicGeography } from '@opensamguk/shared';
 
 afterEach(() => {
   cleanup();
@@ -64,6 +66,61 @@ function pagesOf(frames: readonly TimelapseFrame[], cursor?: string): TimelapseP
 }
 
 const viewProps = { hasMore: false, nextError: false, onRetryNext: () => {}, contractError: null } as const;
+
+describe('AC-INT-10 운영 지도 재생·그림 저장', () => {
+  const geography: PublicGeography = {
+    id: 'integration',
+    version: 3,
+    canvas: { width: 1000, height: 700 },
+    basemap: {
+      source: 'natural-earth-5.1.2',
+      projection: 'WGS84 plate carree',
+      sha256: OPERATIONAL_GIS_SHA256,
+      bounds: [94, 17, 132.57142857142856, 44],
+    },
+    sites: [{ id: 'city:1', name: '도시1', kind: 'CITY', anchorKey: 1, position: { x: 10, y: 10 } }],
+    routes: [],
+  };
+  it.each(['sha', 'coordinate'] as const)('맞지 않는 %s로는 PNG를 저장하지 않는다', async (fault) => {
+    const download = vi.fn().mockResolvedValue(undefined);
+    const changed =
+      fault === 'sha'
+        ? { ...geography, basemap: { ...geography.basemap, sha256: '0'.repeat(64) } }
+        : { ...geography, sites: [{ ...geography.sites[0]!, position: { x: 20, y: 10 } }] };
+    render(
+      <TimelapseView
+        frames={[frame(0, [null])]}
+        map={[city(1)]}
+        source={storedSource({})}
+        operationalMap={changed}
+        download={download}
+        {...viewProps}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('timelapse-download'));
+    await waitFor(() =>
+      expect(screen.getByTestId('timelapse-download-message').textContent).toContain('지도 판을 확인'),
+    );
+    expect(download).not.toHaveBeenCalled();
+  });
+  it('검증된 지도는 저장된 국가색과 1000×700 좌표를 PNG에 쓴다', async () => {
+    const download = vi.fn().mockResolvedValue(undefined);
+    render(
+      <TimelapseView
+        frames={[frame(0, [1])]}
+        map={[city(1)]}
+        source={storedSource({ 10000: { 1: { name: '옛위', color: '#112233' } } })}
+        operationalMap={geography}
+        download={download}
+        {...viewProps}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('timelapse-download'));
+    await waitFor(() => expect(download).toHaveBeenCalledOnce());
+    expect(download.mock.calls[0]![0]).toMatchObject({ width: 1000 });
+    expect(JSON.stringify(download.mock.calls[0]![0])).toContain('#112233');
+  });
+});
 
 describe('U1 페이지 잇기', () => {
   const frames = Array.from({ length: 35 }, (_, i) => frame(i, [null]));

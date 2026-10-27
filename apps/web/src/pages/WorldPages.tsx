@@ -40,6 +40,7 @@ export function MapPage() {
           <Panel title="중원 지도" flush>
             <div className={styles.mapBody}>
               <WorldMap
+                operationalMap={map.data.operationalMap}
                 cities={map.data.cities}
                 nations={map.data.nations}
                 myCityKey={myCityKey}

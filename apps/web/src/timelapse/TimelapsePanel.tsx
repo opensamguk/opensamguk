@@ -1,3 +1,4 @@
+import type { PublicGeography } from '@opensamguk/shared';
 import type { AppRouter } from '@opensamguk/server/router';
 import type { QueryKey } from '@tanstack/react-query';
 import type { inferRouterOutputs } from '@trpc/server';
@@ -25,7 +26,7 @@ const fetchFrames: FetchTimelapsePage<ServerFrame> = (input, { signal }) =>
 // 지도에서는 도시 이름·좌표·연결만 쓴다. world.map의 도시(MapCity)도 이 모양에 들어간다.
 // cities에 지금 소유(nationId)가 함께 오지만 쓰지 않고, 맨 위 nations(지금 국가 행)만 받을 자리가 없다.
 export interface TimelapseMap {
-  data: { cities: readonly TimelapseMapCity[] } | undefined;
+  data: { cities: readonly TimelapseMapCity[]; operationalMap?: PublicGeography } | undefined;
   isError: boolean;
   error: unknown;
   refetch: () => unknown;
@@ -135,6 +136,7 @@ export function TimelapseScreen<F extends TimelapseFrame & SavedFrame>({
     <TimelapseView
       frames={frames}
       map={map.data.cities}
+      {...(map.data.operationalMap ? { operationalMap: map.data.operationalMap } : {})}
       source={source}
       hasMore={hasMore}
       nextError={query.isFetchNextPageError}

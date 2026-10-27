@@ -1,3 +1,4 @@
+import { publicGeographySchema, type PublicGeography } from '@opensamguk/shared';
 import type { PublicCity, PublicNation, PublicWorldStatus } from './contract';
 
 // 화면이 쓰는 공개 지도. 서버 응답(PublicMapsOutput)에서 공개 범위(D-026: 도시 소유 색과 국가 이름) 안의 키만 골라 담는다.
@@ -8,6 +9,7 @@ export interface PublicMap {
   month: number;
   cities: PublicCity[];
   nations: PublicNation[];
+  operationalMap?: PublicGeography;
 }
 export interface PublicWorld {
   id: string;
@@ -54,7 +56,17 @@ function pickCity(value: unknown): PublicCity | null {
   // 소유가 틀린 도시를 공백지로 바꾸면 거짓 색이 된다. 도시째 버린다.
   if (nationId !== null && !isInt(nationId)) return null;
   if (!Array.isArray(links)) return null;
-  return { key: cityKey, name, level, x, y, nationId, links: links.map(toCityKey).filter(notNull) };
+  if (value.kind !== undefined && value.kind !== 'CITY' && value.kind !== 'PASS') return null;
+  return {
+    key: cityKey,
+    name,
+    level,
+    x,
+    y,
+    nationId,
+    links: links.map(toCityKey).filter(notNull),
+    ...(value.kind ? { kind: value.kind } : {}),
+  };
 }
 
 function pickNation(value: unknown): PublicNation | null {
@@ -75,7 +87,11 @@ function pickMap(value: unknown): PublicMap | null {
     (city) => city.nationId === null || nationIds.has(city.nationId),
   );
   const cityKeys = new Set(pickedCities.map((city) => city.key));
+  const geography =
+    value.operationalMap === undefined ? undefined : publicGeographySchema.safeParse(value.operationalMap);
+  if (geography && !geography.success) return null;
   return {
+    ...(geography?.success ? { operationalMap: geography.data } : {}),
     takenAt,
     year,
     month,

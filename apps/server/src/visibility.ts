@@ -1,3 +1,4 @@
+import { publicGeographySchema } from '@opensamguk/shared';
 import type { Prisma } from '@opensamguk/db';
 import { BALANCE } from '@opensamguk/rules';
 import { z } from 'zod';
@@ -161,11 +162,13 @@ export function publicTimelapseCityInfo(city: Prisma.CityGetPayload<{ select: ty
 }
 
 const publicMapData = z.object({
+  operationalMap: publicGeographySchema.optional(),
   cities: z.array(
     z.object({
       key: z.string(),
       name: z.string(),
       level: z.number().int(),
+      kind: z.enum(['CITY', 'PASS']).optional(),
       x: z.number(),
       y: z.number(),
       nationId: z.number().int().nullable(),

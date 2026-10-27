@@ -1,3 +1,4 @@
+import { publicGeographySchema, type PublicGeography } from '@opensamguk/shared';
 import type { AppRouter } from '@opensamguk/server/router';
 import type { inferRouterOutputs } from '@trpc/server';
 import type { SavedFrame } from './displaySource';
@@ -14,6 +15,7 @@ export type SharedFrame = TimelapseFrame & SavedFrame;
 export interface SharedHead {
   world: { name: string; endedYear: number; endedMonth: number };
   map: TimelapseMapCity[];
+  operationalMap?: PublicGeography;
 }
 
 // 공개 지도 다섯 칸을 재생 부품의 지도 칸 이름(key·links)으로 옮긴다. 규모·소유·보급은 채우지 않는다.
@@ -45,5 +47,11 @@ export class SharedMapMissingError extends Error {
 export function toSharedHead(page: PublicFrames): SharedHead {
   if (page.map === null) throw new SharedMapMissingError();
   const { name, endedYear, endedMonth } = page.world;
-  return { world: { name, endedYear, endedMonth }, map: toSharedMap(page.map.cities) };
+  const geometry =
+    page.map.operationalMap === undefined ? undefined : publicGeographySchema.parse(page.map.operationalMap);
+  return {
+    world: { name, endedYear, endedMonth },
+    map: toSharedMap(page.map.cities),
+    ...(geometry ? { operationalMap: geometry } : {}),
+  };
 }

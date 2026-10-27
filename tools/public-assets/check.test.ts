@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { basename, join, resolve, sep } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { checkPublicAssets, inspectAssetText } from './check';
+import { APPROVED_MAP_IMAGES } from '../../packages/shared/src/publicMapImages';
 
 const original = new URL('../../apps/web/src/portrait/fallback.svg', import.meta.url);
 const fallback = 'apps/web/src/portrait/fallback.svg';
@@ -19,6 +20,7 @@ let manifest: {
   externalAssetOrigins: string[];
   portraitVariants: string[];
   bundledImages: { source: string; sha256: string }[];
+  mapImages?: { source: string; sha256: string }[];
 };
 
 async function put(path: string, value: string | Uint8Array) {
@@ -35,7 +37,12 @@ async function seal() {
       if (entry.isDirectory()) await walk(name);
       else if (name !== 'public-build.json') {
         files[name] = sha(await readFile(resolve(dist, name)));
-        if (/\.(?:svg|png)$/i.test(name)) images.push({ file: name, source: fallback, sha256: files[name]! });
+        if (/\.(?:svg|png|webp)$/i.test(name)) {
+          const source =
+            [...manifest.bundledImages, ...(manifest.mapImages ?? [])].find((image) => image.sha256 === files[name])
+              ?.source ?? fallback;
+          images.push({ file: name, source, sha256: files[name]! });
+        }
       }
     }
   }
@@ -83,6 +90,34 @@ afterEach(async () => {
 });
 
 describe('공개 배포 파일 검사', () => {
+  async function addMapImages() {
+    manifest.mapImages = [];
+    for (const source of APPROVED_MAP_IMAGES) {
+      const bytes = await readFile(new URL(`../../${source}`, import.meta.url));
+      const name = basename(source);
+      const dot = name.lastIndexOf('.');
+      await put(source, bytes);
+      await put(`apps/web/dist/assets/${name.slice(0, dot)}-abcdefgh${name.slice(dot)}`, bytes);
+      manifest.mapImages.push({ source, sha256: sha(bytes) });
+    }
+    await seal();
+  }
+  it('AC-INT-10 원본 해시가 맞는 기존 도트4개와 GIS 지형만 추가로 통과시킨다', async () => {
+    await addMapImages();
+    await expect(checkPublicAssets({ root })).resolves.toEqual({ files: 9, images: 6, decision: 'D-031' });
+  });
+  it('AC-INT-10 지도 이미지의 원본·배출 바이트가 달라지면 거부한다', async () => {
+    await addMapImages();
+    await put('apps/web/dist/assets/city-abcdefgh.png', 'changed-image');
+    await seal();
+    await expect(checkPublicAssets({ root })).rejects.toThrow('image-hash');
+  });
+  it('AC-INT-10 지도 목록에 원작 초상이나 임의 경로를 추가하면 거부한다', async () => {
+    await addMapImages();
+    manifest.mapImages![0]!.source = 'private/portraits-supplement/11001.jpg';
+    await seal();
+    await expect(checkPublicAssets({ root })).rejects.toThrow('decision-policy');
+  });
   it('승인 SVG와 같은 origin 자원만 있는 실제 파일 표본을 통과시킨다', async () => {
     await expect(checkPublicAssets({ root })).resolves.toEqual({ files: 4, images: 1, decision: 'D-031' });
   });

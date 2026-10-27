@@ -1,5 +1,5 @@
 import type { Prisma } from '@opensamguk/db';
-import { toGameDate, type WorldState } from '@opensamguk/rules';
+import { toGameDate, readOperationalMap, operationalMapDisplay, type WorldState } from '@opensamguk/rules';
 import type { PublicMapConfig } from '@opensamguk/shared';
 import { assertLease, lockLease, type Lease } from './lease';
 
@@ -33,6 +33,15 @@ export async function persistPublicMap(
     select: { takenAt: true },
   });
   if (latest && now - latest.takenAt.getTime() < config.intervalMinutes * 60_000) return false;
+  const geography = state.ruleFeatures?.includes('operational-map')
+    ? await tx.world.findUniqueOrThrow({
+        where: { id: worldId },
+        select: { operationalMap: true, ruleFeatures: true, replayOrigin: true },
+      })
+    : null;
+  const map = geography
+    ? readOperationalMap(geography.operationalMap, geography.ruleFeatures, geography.replayOrigin)
+    : undefined;
   const date = toGameDate(state.startYear, tick);
   await tx.publicMapSnapshot.create({
     data: {
@@ -41,12 +50,14 @@ export async function persistPublicMap(
       tick,
       ...date,
       data: {
+        ...(map ? { operationalMap: operationalMapDisplay(map) } : {}),
         cities: Object.values(state.cities)
           .sort((a, b) => a.cityKey - b.cityKey)
           .map((city) => ({
             key: String(city.cityKey),
             name: city.name,
             level: city.level,
+            ...(city.kind ? { kind: city.kind } : {}),
             x: city.x,
             y: city.y,
             nationId: city.nationId,
