@@ -100,6 +100,7 @@ const processPersonnelInput: QueuedInputHandler = async (tx, world, event, { tic
 export const builtInEngineFeatures: readonly EngineFeature[] = [
   { key: 'five-stats' },
   { key: 'operational-map' },
+  { key: 'stratagem-basic' },
   { key: 'policy', queuedInputs: { 'general.setPolicy': processPolicyInput, 'general.active': processPolicyInput } },
   {
     key: 'personnel',

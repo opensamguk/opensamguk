@@ -138,6 +138,7 @@ describe('T4-02 등록된 확장 명령 대조', () => {
         'ext/stratagem/plunder.ts',
         '../clock/clock.ts',
         '../clock/constants.ts',
+        '../general/fiveStats.ts',
       ].map((file) => [
         file,
         readFileSync(join(root, 'packages/rules/src/commands', file), 'utf8').replaceAll('\r\n', '\n'),

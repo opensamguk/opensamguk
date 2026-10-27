@@ -10,6 +10,7 @@ import {
   treatyTradeFeature,
   fiveStatsFeature,
   operationalMapFeature,
+  basicStratagemFeature,
   personnelInputKinds,
   treatyInputKinds,
   treatyBreakInputKind,
@@ -70,6 +71,7 @@ export const ruleRegistry: RuleRegistry = {
     treatyTradeFeature,
     fiveStatsFeature,
     operationalMapFeature,
+    basicStratagemFeature,
   ],
   monthlyOrder: ['treaty', 'personnel'],
   inputKinds: [

@@ -13,6 +13,7 @@ import { applyTreatyInput, settleTreaties, validateTreatyRecord } from './diplom
 import { validatePolicyInput } from './replayInputs';
 import { trade } from './commands/trade';
 import { checkOperationalProfile } from './world/map/profile';
+import { stratagemCommands } from './commands/ext/stratagem';
 
 export const operationalMapFeature: RuleFeatureDefinition = {
   key: 'operational-map',
@@ -21,6 +22,16 @@ export const operationalMapFeature: RuleFeatureDefinition = {
   checkOrigin({ initial, data }) {
     if (data !== undefined) throw new Error('운영 지도는 생성 기록의 불변 원장을 사용합니다.');
     checkOperationalProfile(initial);
+  },
+};
+
+export const basicStratagemFeature: RuleFeatureDefinition = {
+  key: 'stratagem-basic',
+  requires: ['five-stats'],
+  conflicts: [],
+  commandBindings: stratagemCommands.map((definition) => ({ definition, sliceKeys: [] })),
+  checkOrigin({ data }) {
+    if (data !== undefined) throw new Error('기본 계략은 별도 초기 상태를 사용하지 않습니다.');
   },
 };
 
