@@ -119,6 +119,7 @@ async function previous(client: PgClient) {
     marker,
     '20261028000000_assignment_nation_destroyed',
     '20261029000000_general_residence_tick',
+    '20261030000000_five_stats',
   ]);
   for (const name of previous23)
     await client.query(await readFile(new URL(`${name}/migration.sql`, directory), 'utf8'));
