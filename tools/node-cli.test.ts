@@ -70,4 +70,10 @@ process.exitCode = 7;
       expect(() => pnpmCli(['test:int'], env)).toThrow('pnpm으로 실행하세요');
     },
   );
+
+  it('Windows 환경을 복사한 대문자 키도 같은 JS 실행 경로로 검사한다', () => {
+    const entrypoint = join(fixture(), 'pnpm.cjs');
+    expect(pnpmCli(['migrate'], { NPM_EXECPATH: entrypoint })).toEqual([process.execPath, [entrypoint, 'migrate']]);
+    expect(() => pnpmCli(['migrate'], { NPM_EXECPATH: 'pnpm.cmd' })).toThrow('pnpm으로 실행하세요');
+  });
 });

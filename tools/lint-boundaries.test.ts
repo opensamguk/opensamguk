@@ -4,6 +4,11 @@ import { beforeAll, describe, expect, it } from 'vitest';
 // eslint.config.js의 경계 규칙이 실제로 막는지 확인한다 (AC-M1-01).
 const eslint = new ESLint();
 
+it('중첩 checkout만 제외하고 현재 checkout의 소스는 검사한다', async () => {
+  expect(await eslint.isPathIgnored('.claude/worktrees/other/apps/server/src/index.ts')).toBe(true);
+  expect(await eslint.isPathIgnored('apps/server/src/index.ts')).toBe(false);
+});
+
 // Cold plugin loading can exceed a single assertion's timeout on a busy machine.
 beforeAll(async () => {
   await eslint.calculateConfigForFile('packages/rules/src/x.ts');
