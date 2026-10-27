@@ -12,7 +12,7 @@ import {
 const stats: SourcedFiveStats = {
   leadership: 80,
   strength: 80,
-  intelligence: 80,
+  intel: 80,
   politics: 80,
   charm: 80,
   source: 'test:five-stats',
@@ -52,7 +52,7 @@ describe('ported personal retinue forest', () => {
   it('has no legacy five-person cap on the renown profile', () => {
     const people = Array.from({ length: 7 }, (_, i) => ({
       ...person(i + 1),
-      stats: { ...stats, leadership: 0, strength: 0, intelligence: 0, politics: 0, charm: 0 },
+      stats: { ...stats, leadership: 0, strength: 0, intel: 0, politics: 0, charm: 0 },
     }));
     const tree = buildRetinueHierarchy(
       people,
@@ -88,15 +88,24 @@ describe('ported personal retinue forest', () => {
       expect(() => buildRetinueHierarchy(people, [link])).toThrow();
     },
   );
-  it('requires all five sourced stats and safe integer sums', () => {
-    expect(retinuePersonCost({ ...stats, leadership: 0, strength: 0, intelligence: 0, politics: 0, charm: 0 })).toBe(1);
+  it('requires canonical intel and five sourced stats in 0..100', () => {
+    expect(retinuePersonCost({ ...stats, leadership: 0, strength: 0, intel: 0, politics: 0, charm: 0 })).toBe(1);
     expect(retinuePersonCost({ ...stats, charm: 81 })).toBe(9);
     expect(() => retinuePersonCost({ ...stats, politics: undefined as unknown as number })).toThrow(
       'FIVE_STATS_REQUIRED',
     );
     expect(() => retinuePersonCost({ ...stats, source: '' })).toThrow('SOURCE');
     expect(() => retinuePersonCost({ ...stats, strength: -1 })).toThrow();
-    expect(() => retinuePersonCost({ ...stats, leadership: Number.MAX_SAFE_INTEGER })).toThrow('OVERFLOW');
+    expect(() => retinuePersonCost({ ...stats, leadership: Number.MAX_SAFE_INTEGER })).toThrow('FIVE_STATS_REQUIRED');
+    expect(retinuePersonCost({ ...stats, leadership: 55, strength: 55, intel: 55, politics: 55, charm: 55 })).toBe(6);
+    expect(retinuePersonCost({ ...stats, leadership: 100, strength: 100, intel: 100, politics: 100, charm: 100 })).toBe(
+      10,
+    );
+    const legacy = { ...stats, intelligence: 80 };
+    Reflect.deleteProperty(legacy, 'intel');
+    expect(() => retinuePersonCost(legacy)).toThrow('FIVE_STATS_REQUIRED');
+    for (const value of [101, -1, 1.5, NaN, Infinity])
+      expect(() => retinuePersonCost({ ...stats, intel: value })).toThrow('FIVE_STATS_REQUIRED');
   });
 });
 describe('ported bugok deployment gate', () => {
@@ -126,6 +135,45 @@ describe('ported bugok deployment gate', () => {
     expect(assessCampaignDeployment(request, s)).toEqual({ ok: false, reason: 'POSITION_UNAVAILABLE' });
     s.people[1]!.inBattle = true;
     expect(assessCampaignDeployment(request, s)).toEqual({ ok: false, reason: 'BATTLE_PENDING' });
+  });
+  it('ports and field labels are not assembly positions', () => {
+    for (const node of ['port:1', 'field:1']) {
+      const s = snapshot();
+      s.people[0]!.node = node;
+      s.people[1]!.node = node;
+      expect(assessCampaignDeployment(request, s)).toEqual({ ok: false, reason: 'POSITION_UNAVAILABLE' });
+    }
+  });
+  it.each([0, 50, 90, 100])(
+    'commander leadership %i limits all assigned troops even outside this request',
+    (leadership) => {
+      const s = snapshot();
+      s.people[1]!.stats.leadership = leadership;
+      s.people[0]!.stats.leadership = 100;
+      const capacity = leadership * 100;
+      s.units[0]!.troops = Math.max(1, capacity - 1);
+      s.units[1]!.troops = 1;
+      if (leadership > 0) expect(assessCampaignDeployment({ ...request, unitIds: [10] }, s).ok).toBe(true);
+      s.units[1]!.troops = 2;
+      expect(assessCampaignDeployment({ ...request, unitIds: [10] }, s)).toEqual({
+        ok: false,
+        reason: 'COMMAND_CAPACITY',
+      });
+    },
+  );
+  it('self command and active deployments recheck capacity without copying troops', () => {
+    const s = snapshot();
+    s.people[0]!.stats.leadership = 5;
+    for (const unit of s.units) unit.commanderId = 1;
+    const self = { ...request, commanderId: 1 };
+    expect(assessCampaignDeployment(self, s).ok).toBe(true);
+    s.deployed = [{ id: 1, worldId: 'world:a', nationId: 1, ownerId: 1, commanderId: 1, unitIds: [10, 11] }];
+    expect(assessCampaignDeployment(self, s, 1).ok).toBe(true);
+    s.people[0]!.stats.leadership = 4;
+    expect(assessCampaignDeployment(self, s, 1)).toEqual({ ok: false, reason: 'COMMAND_CAPACITY' });
+    expect(s.units.map((unit) => unit.troops)).toEqual([300, 200]);
+    s.units[1]!.troops = Number.MAX_SAFE_INTEGER;
+    expect(assessCampaignDeployment(self, s, 1)).toEqual({ ok: false, reason: 'COMMAND_CAPACITY' });
   });
   it('rejects another owner’s unit, changed commanders, empty units and repeated IDs', () => {
     const s = snapshot();
