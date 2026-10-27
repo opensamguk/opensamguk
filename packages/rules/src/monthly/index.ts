@@ -35,7 +35,7 @@ export function settleIncome(state: WorldView, date: GameDate): WorldState {
   for (const nation of nationsById(next)) {
     const income = Math.round(
       citiesById(next)
-        .filter((city) => city.nationId === nation.id)
+        .filter((city) => city.nationId === nation.id && city.kind !== 'PASS')
         .reduce(
           (sum, city) =>
             sum +
@@ -60,6 +60,7 @@ export function settleIncome(state: WorldView, date: GameDate): WorldState {
 export function settlePopulation(state: WorldView, taxRate: number = BALANCE.MONTHLY_TAX_RATE): WorldState {
   const next = structuredClone(state) as WorldState;
   for (const city of citiesById(next)) {
+    if (city.kind === 'PASS') continue;
     const target = next.cities[city.cityKey]!;
     target.population = Math.max(
       0,
@@ -111,7 +112,7 @@ export function settleDiplomacy(state: WorldView, tick: number): WorldState {
 export function buildYearbook(state: WorldView, year: number): Yearbook {
   return {
     nations: nationsById(state).map((nation) => {
-      const cities = citiesById(state).filter((city) => city.nationId === nation.id);
+      const cities = citiesById(state).filter((city) => city.nationId === nation.id && city.kind !== 'PASS');
       const generals = generalsById(state).filter(
         (general) => general.nationId === nation.id && general.activeFromYear <= year,
       );

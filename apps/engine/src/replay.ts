@@ -84,6 +84,7 @@ export function resourceHash(initial: WorldInit) {
     unitSetKey: initial.unitSetKey,
     statRules: initial.statRules,
     unitSet: initial.unitSet,
+    ...(initial.operationalMap ? { operationalMap: initial.operationalMap } : {}),
   });
 }
 
@@ -96,6 +97,7 @@ export function resourceHashV3(origin: ReplayOriginV3) {
     unitSetKey: initial.unitSetKey,
     statRules: initial.statRules,
     unitSet: initial.unitSet,
+    ...(initial.operationalMap ? { operationalMap: initial.operationalMap } : {}),
     featureData: origin.featureData,
   });
 }

@@ -38,6 +38,7 @@ function world(patch: Partial<World> = {}): World {
   return {
     id: 'world',
     name: '조약 조회 단위',
+    operationalMap: null,
     presetKey: null,
     preset: null,
     scenarioKey: '1030',
@@ -172,6 +173,7 @@ function fixture() {
   const groups = vi.spyOn(db.city, 'groupBy').mockResolvedValue([
     {
       ...initial.cities[0]!,
+      kind: null,
       worldId: 'world',
       nationId: 1,
       _count: { _all: 1 },
@@ -182,6 +184,7 @@ function fixture() {
     },
     {
       ...initial.cities[1]!,
+      kind: null,
       worldId: 'world',
       nationId: 2,
       _count: { _all: 1 },

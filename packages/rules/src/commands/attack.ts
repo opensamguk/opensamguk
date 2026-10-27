@@ -146,7 +146,7 @@ function makeAttack(collect: typeof collectModifiers) {
         if (defendingNation !== null) {
           const nation = state.nations[defendingNation]!;
           const remaining = Object.values(state.cities)
-            .filter((c) => c.nationId === defendingNation)
+            .filter((c) => c.nationId === defendingNation && c.kind !== 'PASS')
             .sort((a, b) => b.population - a.population || a.cityKey - b.cityKey);
           if (!remaining.length) {
             removeNation(state, defendingNation);

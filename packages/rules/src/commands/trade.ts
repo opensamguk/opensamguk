@@ -7,7 +7,7 @@ import { treatyClauseEndTick } from '../diplomacy/treaty';
 import type { Actor, CommandDef, Failure } from './types';
 
 type TradeRouteView = {
-  cities: Readonly<Record<number, { nationId: number | null; connections: readonly number[] }>>;
+  cities: Readonly<Record<number, { nationId: number | null; connections: readonly number[]; kind?: 'CITY' | 'PASS' }>>;
   nations: Readonly<Record<number, unknown>>;
   diplomacies: readonly { nationA: number; nationB: number; state: string }[];
   treaties?: readonly DeepReadonly<TreatyState>[];
@@ -18,11 +18,12 @@ export type TradeRoute = { cityKey: number; treatyId: string; endTick: number };
 export function findTradeRoutes(view: TradeRouteView, nationId: number, cityKey: number, tick: number): TradeRoute[] {
   if (!Number.isSafeInteger(tick) || tick < 0) throw new RangeError('교역 시각을 확인하세요.');
   const home = view.cities[cityKey];
-  if (!home || home.nationId !== nationId || !view.nations[nationId]) return [];
+  if (!home || home.kind === 'PASS' || home.nationId !== nationId || !view.nations[nationId]) return [];
   const monthlyTick = Math.floor(tick / TICKS_PER_MONTH) * TICKS_PER_MONTH;
   const result: TradeRoute[] = [];
   for (const key of [...new Set(home.connections)].sort((a, b) => a - b)) {
     const target = view.cities[key];
+    if (target?.kind === 'PASS') continue;
     const other = target?.nationId;
     if (other === undefined || other === null || other === nationId || !view.nations[other]) continue;
     if (

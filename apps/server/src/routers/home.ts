@@ -16,7 +16,9 @@ export const homeRouter = router({
           ? null
           : await tx.nation.findUniqueOrThrow({
               where: { worldId_id: { worldId: input.worldId, id: general.nationId } },
-              include: { _count: { select: { cities: true, generals: true } } },
+              include: {
+                _count: { select: { cities: { where: { OR: [{ kind: null }, { kind: 'CITY' }] } }, generals: true } },
+              },
             });
       const turns = displaySlots(await readSlots(tx, input.worldId, general.id));
       const logs = await tx.generalLog.findMany({

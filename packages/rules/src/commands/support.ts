@@ -84,6 +84,7 @@ export function relation(view: WorldView, a: number, b: number) {
 export function removeNation(state: WorldState, nationId: number) {
   commandMeta(state);
   delete state.nations[nationId];
+  for (const city of Object.values(state.cities)) if (city.nationId === nationId) city.nationId = null;
   state.diplomacies = state.diplomacies.filter((d) => d.nationA !== nationId && d.nationB !== nationId);
   if (state.nationTurns) {
     delete state.nationTurns[nationId];

@@ -1,5 +1,5 @@
 import type { Prisma } from '@opensamguk/db';
-import { presetRules, type WorldState } from '@opensamguk/rules';
+import { presetRules, readOperationalMap, attachOperationalKinds, type WorldState } from '@opensamguk/rules';
 import { engineFeatures } from './features';
 import { loadCommandState } from './commandPersistence';
 import { engineResolver, loadExt } from './extState';
@@ -18,6 +18,7 @@ export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): 
     await assertNoResidenceAnchors(tx, worldId);
   const ext = await loadExt(tx, worldId, commands);
   const cities = await tx.city.findMany({ where: { worldId } });
+  const operationalMap = readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin);
   const nations = await tx.nation.findMany({
     where: { worldId },
     omit: { notice: true, noticeRevision: true, noticeUpdatedAt: true, noticeUpdatedBy: true },
@@ -39,7 +40,9 @@ export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): 
     ...(world.ruleFeatures?.length ? { ruleFeatures: [...world.ruleFeatures] } : {}),
     ...(ext ? { ext } : {}),
     startYear: world.startYear,
-    cities: Object.fromEntries(cities.map((city) => [city.cityKey, stripWorldId(city)])),
+    cities: Object.fromEntries(
+      attachOperationalKinds(cities.map(stripWorldId), operationalMap).map((city) => [city.cityKey, city]),
+    ),
     nations: Object.fromEntries(
       nations.map((nation) => {
         if (nation.capitalCityKey === null) throw new Error(`국가 ${nation.id}의 수도가 없습니다.`);

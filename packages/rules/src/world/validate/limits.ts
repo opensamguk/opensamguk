@@ -65,6 +65,13 @@ export function scanLimits(kind: ResourceKind, input: unknown): LimitResult {
     return found.sort(codeUnitCompare);
   };
   if (kind === 'MAP') {
+    if (input.version === 3) {
+      array(input.sites, 500, ['sites']);
+      const routes = array(input.routes, 2000, ['routes']);
+      routes?.forEach((route, i) => {
+        if (isRecord(route)) array(route.via, 200, ['routes', i, 'via']);
+      });
+    }
     const cities = array(input.cities, RESOURCE_LIMITS.cities, ['cities']);
     cities?.forEach((city, i) => {
       if (isRecord(city)) array(city.connections, RESOURCE_LIMITS.connections, ['cities', i, 'connections']);

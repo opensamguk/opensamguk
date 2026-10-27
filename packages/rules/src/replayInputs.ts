@@ -54,6 +54,7 @@ export function applyCreationInput(replay: ReplayState, input: RecordedInput): R
     general.id !== input.generalId ||
     next.state.generals[general.id] ||
     !next.state.cities[general.cityKey] ||
+    next.state.cities[general.cityKey]?.kind === 'PASS' ||
     !Number.isSafeInteger(general.nextTurnTick) ||
     general.nextTurnTick < next.monthlyTick
   ) {

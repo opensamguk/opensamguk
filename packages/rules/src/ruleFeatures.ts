@@ -12,6 +12,17 @@ import { completePersonnelStep, type PersonnelStepPacket } from './personnel/ste
 import { applyTreatyInput, settleTreaties, validateTreatyRecord } from './diplomacy/treaty';
 import { validatePolicyInput } from './replayInputs';
 import { trade } from './commands/trade';
+import { checkOperationalProfile } from './world/map/profile';
+
+export const operationalMapFeature: RuleFeatureDefinition = {
+  key: 'operational-map',
+  requires: ['five-stats'],
+  conflicts: [],
+  checkOrigin({ initial, data }) {
+    if (data !== undefined) throw new Error('운영 지도는 생성 기록의 불변 원장을 사용합니다.');
+    checkOperationalProfile(initial);
+  },
+};
 
 export const fiveStatsFeature: RuleFeatureDefinition = {
   key: 'five-stats',

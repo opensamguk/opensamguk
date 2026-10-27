@@ -95,6 +95,7 @@ export function checkStratagem(view: WorldView, actor: Actor, raw: unknown): Fai
   const general = view.generals[actor.generalId]!;
   const city = view.cities[parsed.data.cityKey];
   if (!city) return fail('BAD_TARGET', '없는 도시입니다.');
+  if (city.kind === 'PASS') return fail('BAD_TARGET', '계략의 대상은 도시여야 합니다.');
   if (city.nationId === general.nationId) return fail('BAD_TARGET', '자기 국가 도시에는 계략을 쓸 수 없습니다.');
   if (city.nationId === null) return fail('BAD_TARGET', '공백지에는 계략을 쓸 수 없습니다.');
   if (relation(view, general.nationId!, city.nationId)?.state === 'NON_AGGRESSION')

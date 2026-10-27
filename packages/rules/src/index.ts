@@ -3,6 +3,9 @@ export const RULESET_ID = 'opensamguk-mvp';
 export * from './world/bootstrap';
 export * from './world/preset';
 export * from './world/resources';
+export { readOperationalMap, attachOperationalKinds, operationalMapDisplay } from './world/map/stored';
+export { checkOperationalProfile } from './world/map/profile';
+export type { OperationalMapResource } from './world/map/operational';
 export * from './clock/constants';
 export * from './clock/clock';
 export {

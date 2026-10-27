@@ -1,4 +1,5 @@
 import { MAP_DEFAULT_CANVAS, parseMapInput, type MapInput } from '../map/format';
+import { operationalAnchors } from '../map/anchors';
 import { scenarioSchema } from '../resources';
 import { issue, ReportBuilder, type ResourceIssue, type ResourceReport } from './issues';
 import { RESOURCE_LIMITS, scanLimits, type ScenarioCounts } from './limits';
@@ -13,6 +14,8 @@ export function validateMap(input: unknown, ctx?: { scenarios?: ReadonlyArray<un
     return out.finish(null);
   }
   const canvas = 'version' in map ? map.canvas : MAP_DEFAULT_CANVAS;
+  const operational = 'version' in map && map.version === 3;
+  const cities = 'sites' in map ? operationalAnchors(map) : map.cities;
   const inside = (x: number, y: number) => x >= 0 && y >= 0 && x <= canvas.width && y <= canvas.height;
   out.did('cities');
   if (
@@ -24,8 +27,8 @@ export function validateMap(input: unknown, ctx?: { scenarios?: ReadonlyArray<un
   }
   const ids = new Map<number, number>();
   const names = new Set<string>();
-  const links = map.cities.map((city) => new Set(city.connections));
-  map.cities.forEach((city, index) => {
+  const links = cities.map((city) => new Set(city.connections));
+  cities.forEach((city, index) => {
     const target = { kind: 'city', index } as const;
     if (ids.has(city.id)) out.add(issue('city-id-duplicate', target, { id: city.id }));
     else ids.set(city.id, index);
@@ -34,14 +37,15 @@ export function validateMap(input: unknown, ctx?: { scenarios?: ReadonlyArray<un
     if (city.name.trim() !== city.name || !city.name.trim()) out.add(issue('city-name-blank', target, {}, 'warning'));
     if (!inside(city.position.x, city.position.y))
       out.add(issue('city-out-of-canvas', target, { x: city.position.x, y: city.position.y }));
-    if (city.level < 1 || city.level > 8) out.add(issue('city-level-range', target, { level: city.level }, 'warning'));
+    if ((!operational && city.level < 1) || city.level > 8)
+      out.add(issue('city-level-range', target, { level: city.level }, 'warning'));
     if (city.region < 1 || city.region > 8)
       out.add(issue('city-region-range', target, { region: city.region }, 'warning'));
     for (const field of fields)
       if (city.initial[field] > city.max[field]) out.add(issue('city-initial-over-max', target, { field }));
   });
   out.did('links');
-  map.cities.forEach((city, index) => {
+  cities.forEach((city, index) => {
     const target = { kind: 'city', index } as const;
     const seen = new Set<number>();
     const diagnostics: ResourceIssue[][] = [[], [], [], []];
@@ -57,7 +61,7 @@ export function validateMap(input: unknown, ctx?: { scenarios?: ReadonlyArray<un
       }
       const other = ids.get(id);
       if (other === undefined) diagnostics[2]!.push(issue('link-missing-city', target, { id }));
-      else if (!links[other]!.has(city.id)) diagnostics[3]!.push(issue('link-one-way', target, { id }));
+      else if (!operational && !links[other]!.has(city.id)) diagnostics[3]!.push(issue('link-one-way', target, { id }));
     }
     for (const group of diagnostics) for (const item of group) out.add(item);
   });
@@ -66,19 +70,33 @@ export function validateMap(input: unknown, ctx?: { scenarios?: ReadonlyArray<un
   const queue = [0];
   for (let next = 0; next < queue.length; next++) {
     const index = queue[next]!;
-    const city = map.cities[index]!;
+    const city = cities[index]!;
     for (const id of links[index]!) {
       const other = ids.get(id);
-      if (other === undefined || reached.has(other) || !links[other]!.has(city.id)) continue;
+      if (other === undefined || reached.has(other) || (!operational && !links[other]!.has(city.id))) continue;
       reached.add(other);
       queue.push(other);
     }
   }
-  const first = map.cities.findIndex((_, index) => !reached.has(index));
+  if (operational) {
+    // 시작점으로 돌아올 수도 있어야 한다. 단방향 순환은 허용하고 일방 고립은 거부한다.
+    const returns = new Set([0]);
+    const reverseQueue = [0];
+    for (let next = 0; next < reverseQueue.length; next++) {
+      const target = cities[reverseQueue[next]!]!.id;
+      links.forEach((neighbors, index) => {
+        if (!neighbors.has(target) || returns.has(index)) return;
+        returns.add(index);
+        reverseQueue.push(index);
+      });
+    }
+    for (const index of reached) if (!returns.has(index)) reached.delete(index);
+  }
+  const first = cities.findIndex((_, index) => !reached.has(index));
   if (first !== -1)
-    out.add(issue('network-split', { kind: 'city', index: first }, { count: map.cities.length - reached.size }));
+    out.add(issue('network-split', { kind: 'city', index: first }, { count: cities.length - reached.size }));
   out.did('terrain');
-  if ('version' in map) {
+  if ('version' in map && map.version === 2) {
     for (const layer of ['coast', 'lakes', 'mountains', 'rivers'] as const) {
       const lines = layer === 'rivers' ? map.terrain.rivers.map((river) => river.points) : map.terrain[layer];
       lines.forEach((points, index) => {
@@ -146,6 +164,8 @@ export function validateMap(input: unknown, ctx?: { scenarios?: ReadonlyArray<un
     const source = { kind: 'SCENARIO', index } as const;
     const add = (item: ResourceIssue) => out.add({ ...item, source });
     parsed.data.nation.forEach((nation, i) => {
+      if (operational && !cities.some((city) => city.name === nation[8][0] && 'kind' in city && city.kind === 'CITY'))
+        add(issue('shape-invalid', { kind: 'path', path: ['nation', i, 8, 0] }, { expected: 'CITY' }));
       for (const name of nation[8])
         if (!names.has(name)) add(issue('scenario-nation-city-missing', { kind: 'nation', index: i }, { name }));
     });

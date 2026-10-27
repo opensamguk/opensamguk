@@ -33,6 +33,7 @@ model World {
   initialStateHash String
   statRules       Json
   unitSet         Json
+  operationalMap  Json?
   createdAt       DateTime    @default(now())
   nations         Nation[]
   cities          City[]
@@ -226,6 +227,7 @@ model Nation {
 model City {
   worldId       String
   cityKey       Int
+  kind          String?
   name          String
   level         Int
   region        Int

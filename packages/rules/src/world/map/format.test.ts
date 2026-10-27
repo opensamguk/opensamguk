@@ -6,7 +6,8 @@ describe('T4-76 지도 사본 정규화', () => {
   it('형식 판과 중첩 추가 필드를 구분한다', () => {
     expect(readMapVersion({})).toBe(1);
     expect(readMapVersion({ version: 2 })).toBe(2);
-    for (const version of [null, 1, 3, undefined]) expect(readMapVersion({ version })).toBeNull();
+    expect(readMapVersion({ version: 3 })).toBe(3);
+    for (const version of [null, 1, 4, undefined]) expect(readMapVersion({ version })).toBeNull();
     const v2 = v2Fixture();
     expect(mapV2Schema.safeParse({ ...v2, cities: [{ ...v2.cities[0], meta: {} }] }).success).toBe(false);
     expect(normalizeMapToV2({ ...mapFixture(), version: 3 }).ok).toBe(false);

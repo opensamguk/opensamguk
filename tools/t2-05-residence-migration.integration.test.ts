@@ -100,6 +100,7 @@ async function ownDatabase(
       ...previous25,
       marker,
       '20261030000000_five_stats',
+      '20261031000000_operational_map',
     ]);
     await run(client, db);
     completed = true;
@@ -253,6 +254,9 @@ it('거주 tick은 null·0·양수를 저장하고 음수를 거부하며 멸망
     await seed(client);
     await apply(client, marker);
     await apply(client, '20261030000000_five_stats');
+    await apply(client, '20261031000000_operational_map');
+    expect((await client.query('SELECT id FROM "World" WHERE "operationalMap" IS NOT NULL')).rows).toEqual([]);
+    expect((await client.query('SELECT "cityKey" FROM "City" WHERE "kind" IS NOT NULL')).rows).toEqual([]);
     expect(
       (await client.query('SELECT id FROM "General" WHERE "politics" IS NOT NULL OR "charm" IS NOT NULL')).rows,
     ).toEqual([]);

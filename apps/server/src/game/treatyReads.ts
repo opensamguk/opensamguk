@@ -281,7 +281,11 @@ export async function listTreaties(
       ? []
       : await tx.city.groupBy({
           by: ['nationId'],
-          where: { worldId: input.worldId, nationId: { in: proposedNationIds } },
+          where: {
+            worldId: input.worldId,
+            nationId: { in: proposedNationIds },
+            OR: [{ kind: null }, { kind: 'CITY' }],
+          },
           _count: { _all: true },
         });
   const cityCounts = new Map(counts.map((row) => [row.nationId, row._count._all]));
@@ -532,8 +536,12 @@ export async function quoteTreaty(
       },
       select: { state: true },
     });
-    fromCityCount = await tx.city.count({ where: { worldId: input.worldId, nationId: actor.nationId } });
-    const cityCount = await tx.city.count({ where: { worldId: input.worldId, nationId: payload.toNationId } });
+    fromCityCount = await tx.city.count({
+      where: { worldId: input.worldId, nationId: actor.nationId, OR: [{ kind: null }, { kind: 'CITY' }] },
+    });
+    const cityCount = await tx.city.count({
+      where: { worldId: input.worldId, nationId: payload.toNationId, OR: [{ kind: null }, { kind: 'CITY' }] },
+    });
     targetValue = { relation: relation?.state ?? 'NONE', cityCount };
   }
   const result = quote(

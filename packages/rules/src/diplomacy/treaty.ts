@@ -766,7 +766,7 @@ export function applyTreatyInput(
     };
   }
   const months = longestMonths(treaty.clauses);
-  const cities = Object.values(state.cities);
+  const cities = Object.values(state.cities).filter((city) => city.kind !== 'PASS');
   const cost = {
     from: calculateTreatyFee(cities.filter((c) => c.nationId === treaty.fromNationId).length, months),
     to: calculateTreatyFee(cities.filter((c) => c.nationId === treaty.toNationId).length, months),

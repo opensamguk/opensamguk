@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { protectedProcedure, publicProcedure, router } from '../trpc';
 import { readWorld, worldInput, worldSummary } from '../queries';
 import { mapCity, publicMapInfo } from '../visibility';
+import { readOperationalMap, operationalMapDisplay } from '@opensamguk/rules';
 
 export const worldRouter = router({
   publicMaps: publicProcedure.input(z.void()).query(async ({ ctx }) => {
@@ -57,7 +58,12 @@ export const worldRouter = router({
         orderBy: { id: 'asc' },
         select: { id: true, name: true, color: true },
       });
-      return { cities: cities.map(mapCity), nations };
+      const world = await tx.world.findUniqueOrThrow({
+        where: { id: input.worldId },
+        select: { operationalMap: true, ruleFeatures: true, replayOrigin: true },
+      });
+      const map = readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin);
+      return { cities: cities.map(mapCity), nations, ...(map ? { operationalMap: operationalMapDisplay(map) } : {}) };
     }),
   ),
 });

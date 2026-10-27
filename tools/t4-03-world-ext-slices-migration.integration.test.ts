@@ -173,10 +173,12 @@ async function existingRows(client: PgClient) {
       throw new Error('잘못된 시험 표 이름입니다.');
     const data =
       table === 'World'
-        ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures'"
-        : table === 'General'
-          ? "to_jsonb(t) - 'residenceTick' - 'politics' - 'charm'"
-          : "to_jsonb(t) - 'treatyFormat'";
+        ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures' - 'operationalMap'"
+        : table === 'City'
+          ? "to_jsonb(t) - 'kind'"
+          : table === 'General'
+            ? "to_jsonb(t) - 'residenceTick' - 'politics' - 'charm'"
+            : "to_jsonb(t) - 'treatyFormat'";
     rows[table] = (await client.query(`SELECT ${data} AS data FROM "${table}" t ORDER BY to_jsonb(t)::text`)).rows;
   }
   return rows;
@@ -416,6 +418,7 @@ it.each(['empty', 'legacy'] as const)(
         '20261028000000_assignment_nation_destroyed',
         '20261029000000_general_residence_tick',
         '20261030000000_five_stats',
+        '20261031000000_operational_map',
       ]);
       for (const directory of previous)
         await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
@@ -439,6 +442,8 @@ it.each(['empty', 'legacy'] as const)(
       // 후보 검증을 마친 뒤 후행 SQL을 적용해야 최신 앱의 스키마와 맞는다.
       for (const directory of later)
         await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
+      expect((await client.query('SELECT id FROM "World" WHERE "operationalMap" IS NOT NULL')).rows).toEqual([]);
+      expect((await client.query('SELECT "cityKey" FROM "City" WHERE "kind" IS NOT NULL')).rows).toEqual([]);
       expect(
         (await client.query('SELECT id FROM "General" WHERE "politics" IS NOT NULL OR "charm" IS NOT NULL')).rows,
       ).toEqual([]);

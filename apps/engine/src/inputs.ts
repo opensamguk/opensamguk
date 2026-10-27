@@ -282,7 +282,7 @@ const processGeneralCreation: QueuedInputHandler = async (tx, world, event, { ti
   if (!parsed.ok) return reject(parsed.code);
   if (existing.some((g) => g.name.normalize('NFC').trim() === parsed.value.name)) return reject('NAME_TAKEN');
   const cities = await tx.city.findMany({
-    where: { worldId: world.id },
+    where: { worldId: world.id, OR: [{ kind: null }, { kind: 'CITY' }] },
     select: { cityKey: true },
     orderBy: { cityKey: 'asc' },
   });

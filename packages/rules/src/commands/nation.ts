@@ -141,6 +141,7 @@ export const nationCommands = [
       const nation = view.nations[view.generals[actor.generalId]!.nationId!]!;
       if (view.cities[args.cityKey]?.nationId !== nation.id)
         return fail('NOT_OWN_CITY', '자기 국가 도시만 수도로 정할 수 있습니다.');
+      if (view.cities[args.cityKey]?.kind === 'PASS') return fail('BAD_TARGET', '관문은 수도로 정할 수 없습니다.');
       return nation.capitalCityKey === args.cityKey ? fail('BAD_STATE', '이미 수도입니다.') : null;
     },
     change(state, actor, args) {

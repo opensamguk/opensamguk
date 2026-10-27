@@ -6,7 +6,7 @@ type General = Omit<
   Prisma.GeneralGetPayload<true>,
   'battleWins' | 'captures' | 'noticeSeen' | 'defaultPolicy' | 'lastActiveTick' | 'lastActiveAt' | 'politics' | 'charm'
 > & { politics?: number | null; charm?: number | null };
-type City = Prisma.CityGetPayload<true>;
+type City = Omit<Prisma.CityGetPayload<true>, 'kind'> & { kind?: string | null };
 type Nation = Omit<Prisma.NationGetPayload<true>, 'notice' | 'noticeRevision' | 'noticeUpdatedAt' | 'noticeUpdatedBy'>;
 export type Viewer = Pick<General, 'id' | 'nationId' | 'cityKey'> | null;
 
@@ -25,6 +25,7 @@ export function visibility(viewer: Viewer) {
 export function mapCity(city: City) {
   return {
     key: city.cityKey,
+    ...(city.kind != null ? { kind: city.kind } : {}),
     name: city.name,
     level: city.level,
     x: city.x,
