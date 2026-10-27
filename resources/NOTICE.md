@@ -98,6 +98,8 @@ v1에 없는 7명은 2026-10-27 웹에서 확인한 삼국지11 수치를 기록
 
 ## 통합판 운영 지도 (INT-03)
 
+`map/integration.json`·`map/integration-correspondence.json`과 생성기 `tools/map-data/operational.ts`의 기존 도시 ID·경제 값은 core2026 커밋 `df6c926`의 `map/che.json` 파생 자료다. 원저작자 devsam의 MIT 고지를 위 원문과 함께 유지한다.
+
 `map/integration.json`은 위 Natural Earth v5.1.2 지역 GIS와 기존 `campaignSeed.ts`의 53도시·8관문·6항구·13전장 좌표를 재사용한다. GIS 원본 묶음의 바이트 SHA-256을 운영 자원에 고정한다. 생성은 `pnpm exec tsx tools/map-data/build-operational.ts`다. 좌표는 모두 같은 WGS84 투영 모델을 쓰며 실지형은 생성 이미지로 대체하지 않는다.
 
 기존 도시의 게임 경제·방어 값은 `map/che.json`의 같은 ID에서 보존한다. 새 상당95·서평96·영창97·건안98·양평99의 게임 초깃값은 인구5000·농업/상업/치안100·방어/성벽500이고 최대값은 인구100000·농업/상업/치안2000·방어/성벽4000이다. 레벨2와 지역을 생성기에 명시했다. 새 관문은 초기 방어/성벽5000·최대10000이며 경제·인구가 없다. 이 값은 게임 편성 기준이며 역사 인구·세입의 자료로 주장하지 않는다.

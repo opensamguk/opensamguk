@@ -74,6 +74,17 @@ it('INT-03 차단된 길목을 자동 우회하지 않으며 활성 연결만 �
   expect(validateMap(map).issues.length).toBeGreaterThan(0);
 });
 
+it('INT-03 전체 판의 우회는 명시한 무관·상용 경로를 따르며 새 지름길을 만들지 않는다', () => {
+  const west = buildOperationalMap();
+  west.routes.find((route) => route.id === 'route:land-4-100')!.enabled = false;
+  expect(path(4, 3, west)).toEqual([4, 101, 10, 2, 71, 3]);
+  const shu = buildOperationalMap();
+  shu.routes.find((route) => route.id === 'route:land-75-102')!.enabled = false;
+  expect(path(24, 5, shu)).toEqual([24, 25, 45, 27, 44, 87, 5]);
+  expect(validateMap(west).issues).toEqual([]);
+  expect(validateMap(shu).issues).toEqual([]);
+});
+
 it('INT-03 모든 수로의 양끝은 해당 도시 항구이며 다른 도시 귀속과 전장 목표를 거부한다', () => {
   const map = buildOperationalMap();
   expect(map.routes.filter((route) => route.mode === 'RIVER')).toHaveLength(5);
