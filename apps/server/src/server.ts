@@ -11,6 +11,7 @@ import { appRouter, type AppRouter } from './router';
 import { createRateLimiter } from './security/rateLimit';
 import { registerRealtime, type RealtimeOptions } from './realtime';
 import { registerOpsHealth } from './ops/health';
+import type { MailTransport } from './mail/transport';
 
 export async function buildServer(options: {
   db: PrismaClient;
@@ -22,6 +23,7 @@ export async function buildServer(options: {
   production?: boolean;
   trustProxy?: boolean;
   realtime?: RealtimeOptions;
+  mailTransport?: MailTransport;
 }) {
   const mapConfig = publicMapConfig(process.env);
   const production = options.production ?? process.env.NODE_ENV === 'production';
@@ -128,6 +130,7 @@ export async function buildServer(options: {
           dummyPasswordHash,
           ip: req.ip,
           rateLimiter,
+          accountMail: options.mailTransport ? { transport: options.mailTransport, origin: publicOrigin } : undefined,
           closeSession: realtime.closeSession,
         };
       },

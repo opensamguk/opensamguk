@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { Writable } from 'node:stream';
 import { setTimeout as delay } from 'node:timers/promises';
 import { Client } from 'pg';
-import { afterAll, afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
+import * as passwordModule from './password';
 import { createDb } from '@opensamguk/db';
 import { issueAccountToken, resetPasswordToken, verifyEmailToken } from './accountTokenStore';
 import { hashToken, newSession } from './session';
@@ -58,6 +59,34 @@ afterEach(async () => {
 afterAll(() => db.$disconnect());
 
 describe('실제 PostgreSQL 계정 토큰 저장과 소비', () => {
+  it('무효 후보는 Argon2를 부르지 않고 유효 후보만 실제 해시를 계산한다', async () => {
+    const actor = await user();
+    const password = randomUUID();
+    const spy = vi.spyOn(passwordModule, 'hashPassword');
+    try {
+      expect(await resetPasswordToken(db, newSession(now).token, password, now)).toBe(false);
+      const wrong = (await issueAccountToken(db, actor.id, 'VERIFY_EMAIL', now))!;
+      expect(await resetPasswordToken(db, wrong.token, password, now)).toBe(false);
+      const expired = (await issueAccountToken(db, actor.id, 'RESET_PASSWORD', now))!;
+      expect(await resetPasswordToken(db, expired.token, password, now + 1_800_000)).toBe(false);
+      const used = (await issueAccountToken(db, actor.id, 'RESET_PASSWORD', now))!;
+      await db.accountToken.update({ where: { id: hashToken(used.token) }, data: { usedAt: new Date(now) } });
+      expect(await resetPasswordToken(db, used.token, password, now)).toBe(false);
+      const inactive = (await issueAccountToken(db, actor.id, 'RESET_PASSWORD', now))!;
+      await db.user.update({ where: { id: actor.id }, data: { status: 'SANCTIONED' } });
+      expect(await resetPasswordToken(db, inactive.token, password, now)).toBe(false);
+      expect(spy.mock.calls.length).toBe(0);
+      await db.user.update({ where: { id: actor.id }, data: { status: 'ACTIVE' } });
+      const valid = (await issueAccountToken(db, actor.id, 'RESET_PASSWORD', now))!;
+      expect(await resetPasswordToken(db, valid.token, password, now)).toBe(true);
+      expect(spy.mock.calls.length).toBe(1);
+      expect(
+        await verifyPassword((await db.user.findUniqueOrThrow({ where: { id: actor.id } })).passwordHash, password),
+      ).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
+  });
   it('기존 계정은 미인증이며 원문 대신 해시와 용도·만료 시각을 저장한다', async () => {
     const actor = await user();
     expect(actor.emailVerifiedAt).toBeNull();

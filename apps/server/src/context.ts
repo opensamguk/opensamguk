@@ -3,6 +3,7 @@ import type { PrismaClient } from '@opensamguk/db';
 import type {} from '@fastify/cookie';
 import type { FastifyReply } from 'fastify';
 import type { createRateLimiter } from './security/rateLimit';
+import type { MailTransport } from './mail/transport';
 
 export interface Context {
   db: PrismaClient;
@@ -15,5 +16,6 @@ export interface Context {
   dummyPasswordHash: string;
   ip: string;
   rateLimiter: ReturnType<typeof createRateLimiter>;
+  accountMail?: { transport: MailTransport; origin: string } | undefined;
   closeSession?: ((sessionId: string) => void) | undefined;
 }

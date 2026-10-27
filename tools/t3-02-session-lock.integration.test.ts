@@ -142,7 +142,7 @@ it.each(['message', 'sse'] as const)(
         expect(messageResult.value.body).toBe('');
         expect(logs).not.toContain('실시간 알림 연결 실패');
       }
-      for (const secret of [session.token, issued.token, actor.email]) expect(logs).not.toContain(secret);
+      for (const secret of [session.token, issued.token, actor.email]) expect(logs.includes(secret)).toBe(false);
       expect(await db.session.count({ where: { userId: actor.id } })).toBe(0);
       expect(await db.message.count({ where: { worldId } })).toBe(0);
     } catch (error) {
