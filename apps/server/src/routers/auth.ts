@@ -7,6 +7,8 @@ import { publicProcedure, router } from '../trpc';
 import type { LimitRule, RateLimitDecision } from '../security/rateLimit';
 import { notifySessionClosed } from '@opensamguk/db';
 import { queueLoginActivity } from '../game/policy';
+import { newAccountToken } from '../auth/accountToken';
+import { accountMail } from '../mail/templates';
 
 function enforce(ctx: Context, decision: RateLimitDecision) {
   if (decision.allowed) return;
@@ -37,6 +39,7 @@ export const authRouter = router({
     );
     const passwordHash = await hashPassword(input.password);
     const session = newSession(ctx.now);
+    const verification = ctx.accountMail ? newAccountToken('VERIFY_EMAIL', ctx.now) : null;
     try {
       const user = await ctx.db.$transaction(async (tx) => {
         const user = await tx.user.create({
@@ -47,12 +50,31 @@ export const authRouter = router({
           await tx.session.deleteMany({ where: { id: ctx.sessionId } });
         }
         await tx.session.create({ data: { id: session.id, userId: user.id, expiresAt: session.expiresAt } });
+        if (verification) {
+          await tx.accountToken.create({
+            data: {
+              id: verification.id,
+              userId: user.id,
+              purpose: 'VERIFY_EMAIL',
+              expiresAt: verification.expiresAt,
+            },
+          });
+        }
         return user;
       });
       setCookie(ctx, session.token);
       if (ctx.sessionId) {
         ctx.closeSession?.(ctx.sessionId);
         await notifySessionClosed(ctx.db, ctx.sessionId, () => ctx.reply.log.warn('실시간 알림 전송 실패'));
+      }
+      if (verification && ctx.accountMail) {
+        try {
+          await ctx.accountMail.transport.send(
+            accountMail(user.email, 'VERIFY_EMAIL', ctx.accountMail.origin, verification.token),
+          );
+        } catch {
+          ctx.reply.log.warn('가입 인증 메일 발송 실패');
+        }
       }
       return { user };
     } catch (error) {

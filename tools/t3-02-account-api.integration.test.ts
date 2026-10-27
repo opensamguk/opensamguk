@@ -11,7 +11,7 @@ import { appRouter } from '../apps/server/src/router';
 import { authzCase } from '../apps/server/src/authz/case';
 import { categories } from '../apps/server/src/authz/coverage';
 import { issueAccountToken } from '../apps/server/src/auth/accountTokenStore';
-import { newSession } from '../apps/server/src/auth/session';
+import { hashToken, newSession } from '../apps/server/src/auth/session';
 import { hashPassword, verifyPassword } from '../apps/server/src/auth/password';
 import { createMailTransport } from '../apps/server/src/mail/transport';
 import type { MailTransport } from '../apps/server/src/mail/transport';
@@ -35,6 +35,7 @@ let now: number, directory: string, logs: string;
 let app: Awaited<ReturnType<typeof buildServer>>;
 let actors: Actor[];
 const worlds = new Set<string>();
+const signupEmails = new Set<string>();
 async function server(transport: MailTransport) {
   return buildServer({
     db,
@@ -49,7 +50,12 @@ async function server(transport: MailTransport) {
     }),
   });
 }
-async function call(path: Path | 'auth.login', input: unknown, cookie?: string, requestOrigin: string | null = origin) {
+async function call(
+  path: Path | 'auth.login' | 'auth.signup',
+  input: unknown,
+  cookie?: string,
+  requestOrigin: string | null = origin,
+) {
   const mutation = appRouter._def.procedures[path]._def.type === 'mutation';
   const encoded = JSON.stringify({ 0: input });
   const response = await app.inject({
@@ -65,6 +71,10 @@ async function call(path: Path | 'auth.login', input: unknown, cookie?: string, 
       error?: { data: { code: string; reason: string | null } };
     },
     retryAfter: response.headers['retry-after'],
+    cookie: [response.headers['set-cookie']]
+      .flat()
+      .find((value) => value?.startsWith('sid='))
+      ?.split(';')[0],
   };
 }
 async function mailbox() {
@@ -121,6 +131,8 @@ afterEach(async () => {
   await db.world.deleteMany({ where: { id: { in: [...worlds] } } });
   worlds.clear();
   await db.user.deleteMany({ where: { id: { in: actors.map((actor) => actor.id) } } });
+  await db.user.deleteMany({ where: { email: { in: [...signupEmails] } } });
+  signupEmails.clear();
   if (directory) {
     if (dirname(resolve(directory)) !== resolve(tmpdir()) || !basename(directory).startsWith('t302-account-api-'))
       throw new Error('시험 메일함 정리 경로를 확인하세요.');
@@ -368,4 +380,108 @@ it.each([null, 'https://other.test'])('재설정도 기존 같은 출처 보호�
   ).toBe(403);
   expect(await snapshot()).toBe(before);
   expect(await mailbox()).toHaveLength(0);
+});
+
+it('가입은 계정·세션·인증 해시를 함께 저장한 뒤 메일을 보내고 링크를 한 번만 소비한다', async () => {
+  const email = `${randomUUID()}@example.test`;
+  signupEmails.add(email);
+  const password = randomUUID();
+  let committedBeforeDelivery = false;
+  await app.close();
+  const capture = createMailTransport({ MAIL_TRANSPORT: 'capture', MAIL_CAPTURE_DIR: directory });
+  app = await server({
+    async send(message) {
+      const committed = await db.user.findUnique({ where: { email } });
+      committedBeforeDelivery =
+        committed !== null &&
+        (await db.session.count({ where: { userId: committed.id } })) === 1 &&
+        (await db.accountToken.count({ where: { userId: committed.id } })) === 1;
+      await capture.send(message);
+    },
+  });
+  const response = await call('auth.signup', { email: email.toUpperCase(), password });
+  expect(response.status).toBe(200);
+  expect(committedBeforeDelivery).toBe(true);
+  expect(response.cookie?.startsWith('sid=')).toBe(true);
+  const user = await db.user.findUniqueOrThrow({ where: { email } });
+  expect(user.emailVerifiedAt).toBeNull();
+  expect(await verifyPassword(user.passwordHash, password)).toBe(true);
+  const mail = await mailbox();
+  expect(mail).toHaveLength(1);
+  expect(mail[0]!.to === email).toBe(true);
+  const secret = token(mail[0]!);
+  const rows = await db.accountToken.findMany({ where: { userId: user.id } });
+  expect(rows).toHaveLength(1);
+  expect(rows[0]!.id === hashToken(secret)).toBe(true);
+  expect(rows[0]!.purpose).toBe('VERIFY_EMAIL');
+  expect(rows[0]!.expiresAt.getTime() - now).toBe(86_400_000);
+  expect(rows[0]!.usedAt).toBeNull();
+  expect(await db.session.count({ where: { id: hashToken(response.cookie!.slice(4)), userId: user.id } })).toBe(1);
+  for (const value of [secret, password, email]) expect(logs.includes(value)).toBe(false);
+  for (const value of [secret, password]) expect(JSON.stringify(response.body).includes(value)).toBe(false);
+  expect((await call('account.verifyEmail', { token: secret })).status).toBe(200);
+  expect((await call('account.verifyEmail', { token: secret })).status).toBe(400);
+  expect((await db.user.findUniqueOrThrow({ where: { id: user.id } })).emailVerifiedAt?.getTime()).toBe(now);
+});
+
+it('중복 가입은 기존 계정·세션·인증 토큰을 보존하고 메일을 보내지 않는다', async () => {
+  await issueAccountToken(db, actors[0]!.id, 'VERIFY_EMAIL', now);
+  const before = await snapshot();
+  expect(
+    (await call('auth.signup', { email: actors[0]!.email, password: randomUUID() }, actors[1]!.cookie)).status,
+  ).toBe(409);
+  expect(await snapshot()).toBe(before);
+  expect(await mailbox()).toHaveLength(0);
+});
+
+it('가입 메일 실패 뒤에도 계정은 남고 본인이 새 인증 링크를 요청할 수 있다', async () => {
+  const email = `${randomUUID()}@example.test`;
+  signupEmails.add(email);
+  const privateFailure = randomUUID();
+  await app.close();
+  app = await server({
+    async send() {
+      throw new Error(privateFailure);
+    },
+  });
+  const response = await call('auth.signup', { email, password: randomUUID() });
+  expect(response.status).toBe(200);
+  const user = await db.user.findUniqueOrThrow({ where: { email } });
+  const previous = await db.accountToken.findFirstOrThrow({ where: { userId: user.id } });
+  expect(user.emailVerifiedAt).toBeNull();
+  expect(logs.includes(privateFailure)).toBe(false);
+  expect(logs.includes(email)).toBe(false);
+  await app.close();
+  app = await server(createMailTransport({ MAIL_TRANSPORT: 'capture', MAIL_CAPTURE_DIR: directory }));
+  expect((await call('account.resendVerification', undefined, response.cookie)).status).toBe(200);
+  expect((await db.accountToken.findUniqueOrThrow({ where: { id: previous.id } })).usedAt).not.toBeNull();
+  expect((await call('account.verifyEmail', { token: token((await mailbox())[0]!) })).status).toBe(200);
+});
+
+it('인증 토큰 저장의 실제 DB 오류는 가입·세션 교체를 모두 롤백하고 메일을 보내지 않는다', async () => {
+  const id = randomUUID().replaceAll('-', '');
+  const name = `t302_signup_${id}`;
+  const email = `${id}@example.test`;
+  signupEmails.add(email);
+  expect(id).toMatch(/^[0-9a-f]{32}$/);
+  const before = await snapshot();
+  await db.$executeRawUnsafe(
+    `CREATE FUNCTION "${name}"() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF EXISTS (SELECT 1 FROM "User" WHERE id = NEW."userId" AND email = '${email}') THEN RAISE EXCEPTION 'controlled-signup-token-failure'; END IF; RETURN NEW; END $$`,
+  );
+  try {
+    await db.$executeRawUnsafe(
+      `CREATE TRIGGER "${name}" BEFORE INSERT ON "AccountToken" FOR EACH ROW EXECUTE FUNCTION "${name}"()`,
+    );
+    const failed = await call('auth.signup', { email, password: randomUUID() }, actors[0]!.cookie);
+    expect(failed.status).toBe(500);
+    expect(failed.cookie).toBeUndefined();
+    expect(await db.user.count({ where: { email } })).toBe(0);
+    expect(await snapshot()).toBe(before);
+    expect(await mailbox()).toHaveLength(0);
+  } finally {
+    await db.$executeRawUnsafe(`DROP TRIGGER IF EXISTS "${name}" ON "AccountToken"`);
+    await db.$executeRawUnsafe(`DROP FUNCTION "${name}"()`);
+  }
+  expect((await call('auth.signup', { email, password: randomUUID() }, actors[0]!.cookie)).status).toBe(200);
+  expect(await mailbox()).toHaveLength(1);
 });
