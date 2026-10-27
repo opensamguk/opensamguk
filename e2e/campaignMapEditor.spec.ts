@@ -92,6 +92,7 @@ test('edits a water route; city deletion removes dependent port links and undo r
   await page.getByRole('button', { name: '선택 삭제', exact: true }).click();
   await expect(page.getByTestId('port:13')).toHaveCount(0);
   await expect(page.getByText('도시 52 · 관문 8 · 항구 5 · 전장 13 · 경로 0', { exact: true })).toBeVisible();
+  await expect(page.getByText('52도시 초안', { exact: false })).toBeVisible();
   await page.getByRole('button', { name: '되돌리기', exact: true }).click();
   await expect(page.getByTestId('port:13')).toBeVisible();
   await expect(page.getByText('도시 53 · 관문 8 · 항구 6 · 전장 13 · 경로 1', { exact: true })).toBeVisible();
@@ -121,4 +122,19 @@ test('renders the GIS basemap and all site kinds with the same coordinate contro
   await expect(page.getByLabel('X 좌표', { exact: true })).toBeVisible();
   await expect(page.getByText(/지리 좌표 미확인|현대 도시 기준/)).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath('geographic-editor.png'), fullPage: true });
+  await page.getByRole('combobox', { name: '도구', exact: true }).selectOption('site');
+  const canvas = page.getByRole('img', { name: '통합 지도 캔버스' });
+  await canvas.click({ position: { x: 10, y: 10 } });
+  await expect(page.getByTestId('city:custom-1')).toBeVisible();
+  await expect(page.getByText('54도시 초안', { exact: false })).toBeVisible();
+  await page.getByRole('combobox', { name: '도구', exact: true }).selectOption('site');
+  await page.getByRole('combobox', { name: '새 거점 종류', exact: true }).selectOption('PORT');
+  await canvas.click({ position: { x: 40, y: 40 } });
+  await expect(page.getByTestId('port:custom-1')).toBeVisible();
+  await expect(page.getByRole('combobox', { name: '소속 도시', exact: true })).toHaveValue('city:custom-1');
+  // With a port selected, the next port must use the nearest city instead.
+  await page.getByRole('combobox', { name: '도구', exact: true }).selectOption('site');
+  await canvas.click({ position: { x: 15, y: 15 } });
+  await expect(page.getByTestId('port:custom-2')).toBeVisible();
+  await expect(page.getByRole('combobox', { name: '소속 도시', exact: true })).toHaveValue('city:custom-1');
 });

@@ -43,21 +43,19 @@ Revision: 46faca52ac6bf0db67b3350400e3b92847036af2
 Assets: apps/web/src/mapEditor/icons/*.png (unchanged 32px exports).
 Original paths and SHA-256: apps/web/src/mapEditor/icons/sources.json
 
-SCOPE OF THIS LICENSE
+License evidence at the pinned revision:
+- README.md, License section, includes the repository's own assets/ and web/ work.
+- .license-boundaries.json classifies assets/ and web/ as "mit".
+- ASSET-EXPORTS.md identifies web/{game,gateway}/public/city/ as self-authored exports.
+- THIRD-PARTY-NOTICES.md excludes portraits/ and waryong/; neither is copied here.
+The upstream LICENSE scope introduction predates those own-work paths. The
+README and authoritative boundary manifest record their explicit MIT scope.
+Evidence URLs:
+https://github.com/peppone-choi/opensamguk-images/blob/46faca52ac6bf0db67b3350400e3b92847036af2/README.md
+https://github.com/peppone-choi/opensamguk-images/blob/46faca52ac6bf0db67b3350400e3b92847036af2/.license-boundaries.json
+https://github.com/peppone-choi/opensamguk-images/blob/46faca52ac6bf0db67b3350400e3b92847036af2/ASSET-EXPORTS.md
 
-The MIT license below applies ONLY to the repository's own work: repository
-documentation and metadata (README.md, THIRD-PARTY-NOTICES.md, LICENSE,
-.gitignore, .license-boundaries.json, *.gitattributes) and the tooling under
-tools/ and .github/.
-
-It does NOT apply to the image and asset directories game/, hook/, icons/, and
-portraits/. Those contain third-party derived material or material of
-unrecorded origin. This repository claims no copyright in it and grants no
-license to it. See THIRD-PARTY-NOTICES.md and the per-directory
-LICENSE-NOTICE.md files. The machine-readable boundary is
-.license-boundaries.json, verified by tools/check-license-boundaries.py.
-
-----------------------------------------------------------------------
+The following MIT notice applies to these four self-authored icon exports.
 
 MIT License
 

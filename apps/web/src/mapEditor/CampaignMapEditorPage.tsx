@@ -51,10 +51,10 @@ const siteIcons: Record<CampaignSite['kind'], string> = {
   FIELD: fieldMarker,
 };
 const terrainColors = { PLAIN: '#d8cda7', FOREST: '#647958', MOUNTAIN: '#8a8070', WATER: '#7cabb6' };
-const nextId = (prefix: string, entries: { id: string }[]) => {
+const nextId = (prefix: string, entries: { id: string }[], suffix = '') => {
   let n = 1;
-  while (entries.some((e) => e.id === `${prefix}:${n}`)) n++;
-  return `${prefix}:${n}`;
+  while (entries.some((e) => e.id === `${prefix}:${suffix}${n}`)) n++;
+  return `${prefix}:${suffix}${n}`;
 };
 
 export function CampaignMapEditorPage() {
@@ -203,7 +203,10 @@ export function CampaignMapEditorPage() {
         <div>
           <a href="/dev/map-editor">기존 v2 편집기</a>
           <h1>통합 지도 편집기</h1>
-          <p>53도시 초안 · {dirty ? '내보내지 않은 변경 있음' : '파일 상태와 같음'}</p>
+          <p>
+            {map.sites.filter((s) => s.kind === 'CITY').length}도시 초안 ·{' '}
+            {dirty ? '내보내지 않은 변경 있음' : '파일 상태와 같음'}
+          </p>
         </div>
         <div className={styles.toolbar}>
           <label className={styles.file}>
@@ -353,7 +356,10 @@ export function CampaignMapEditorPage() {
             onPointerCancel={() => setDrag(null)}
             onPointerUp={(e) => {
               const p = position(e);
-              if (!p) return;
+              if (!p) {
+                setDrag(null);
+                return;
+              }
               if (drag) {
                 const current = map.sites.find((s) => s.id === drag.id);
                 if (current && (current.x !== p.x || current.y !== p.y))
@@ -371,8 +377,13 @@ export function CampaignMapEditorPage() {
                 setTool('select');
               }
               if (tool === 'site') {
-                const id = nextId(kind.toLowerCase(), map.sites);
-                const parent = map.sites.find((s) => s.kind === 'CITY');
+                const id = nextId(kind.toLowerCase(), map.sites, 'custom-');
+                const parent =
+                  site?.kind === 'CITY'
+                    ? site
+                    : map.sites
+                        .filter((s) => s.kind === 'CITY')
+                        .sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0];
                 edit({
                   ...map,
                   sites: [

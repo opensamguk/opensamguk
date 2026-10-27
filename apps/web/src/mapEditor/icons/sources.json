@@ -30,5 +30,11 @@
       "sha256": "8a631f70bd5798b1b774d6d96ef8729b7eff48572dce446bea453407186be90e",
       "bytes": 1057
     }
+  ],
+  "licenseEvidence": [
+    "https://github.com/peppone-choi/opensamguk-images/blob/46faca52ac6bf0db67b3350400e3b92847036af2/README.md",
+    "https://github.com/peppone-choi/opensamguk-images/blob/46faca52ac6bf0db67b3350400e3b92847036af2/.license-boundaries.json",
+    "https://github.com/peppone-choi/opensamguk-images/blob/46faca52ac6bf0db67b3350400e3b92847036af2/ASSET-EXPORTS.md",
+    "https://github.com/peppone-choi/opensamguk-images/blob/46faca52ac6bf0db67b3350400e3b92847036af2/THIRD-PARTY-NOTICES.md"
   ]
 }

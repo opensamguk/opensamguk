@@ -17,6 +17,8 @@ it('retains pinned GIS provenance and keeps one coordinate model for every site'
   expect(basemap.land.length).toBeGreaterThan(100);
   expect(basemap.rivers.some((r) => r.path.length > 100)).toBe(true);
   expect(basemap.sources).toHaveLength(4);
+  expect(basemap.relief.sha256).toBe('73eb7a00b182c702e69892332cbd380edc7aa00ccaf68ae0111deefb87303a0e');
+  expect(basemap.relief.archiveVersion).toBe('2.0.0');
   expect(basemap.sources.every((s) => /^[a-f0-9]{64}$/.test(s.sha256))).toBe(true);
   const draft = createCampaignDraft();
   expect(draft.sites.every((s) => s.x >= 0 && s.x <= 1000 && s.y >= 0 && s.y <= 700)).toBe(true);

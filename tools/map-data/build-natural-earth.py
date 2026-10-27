@@ -1,6 +1,6 @@
 """Build the local editor basemap from pinned Natural Earth v5.1.2 GIS vectors.
 
-Run: python3 tools/map-data/build-natural-earth.py
+Run: python3 tools/map-data/build-natural-earth.py --with-relief
 Global downloads stay in ~/.cache/opensamguk. Only the regional derivative is shipped.
 """
 import hashlib
@@ -88,6 +88,8 @@ def line_path(points):
 
 
 def main():
+    if (OUT / 'natural-earth-relief.webp').exists() and '--with-relief' not in sys.argv:
+        raise SystemExit('Existing relief requires --with-relief; refusing to remove its provenance.')
     CACHE.mkdir(parents=True, exist_ok=True)
     OUT.mkdir(parents=True, exist_ok=True)
     output = {'source': 'Natural Earth v5.1.2', 'license': 'Public domain', 'projection': 'WGS84 plate carree', 'bounds': BOUNDS, 'sources': [], 'land': [], 'lakes': [], 'rivers': [], 'places': []}

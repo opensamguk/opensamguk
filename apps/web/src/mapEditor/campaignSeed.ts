@@ -714,7 +714,12 @@ export function createCampaignDraft(): CampaignDraft {
   };
   map.sites = map.sites.map((site) => {
     const name = anchors[site.id];
-    const place = name ? basemap.places.find((p) => p.name === name) : undefined;
+    // Wu uses Suzhou in Jiangsu; Natural Earth also has a Suzhou in Anhui.
+    const matches = name
+      ? basemap.places.filter((p) => p.name === name && (site.id !== 'city:31' || p.longitude > 120))
+      : [];
+    if (name && matches.length !== 1) throw new Error(`Ambiguous or missing city anchor: ${site.id}`);
+    const place = matches[0];
     const point = place ? [place.longitude, place.latitude] : placements[site.id];
     if (site.kind !== 'PORT' && !point) throw new Error(`Missing site placement: ${site.id}`);
     return point ? { ...site, ...projectGeographicPoint(point[0]!, point[1]!) } : site;
