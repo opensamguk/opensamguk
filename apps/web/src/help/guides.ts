@@ -13,6 +13,7 @@ export const GUIDES: Record<string, string> = Object.fromEntries(
 // 읽는 순서 (계획 T2-17 결정: 기초 → 초급 → 중급 → 참고).
 export const GUIDE_ORDER = [
   { doc: 'index', title: '시작하기' },
+  { doc: 'integration-v01', title: '통합판의 5능력치와 휘하·부곡' },
   { doc: 'general-and-city', title: '장수와 도시, 내정' },
   { doc: 'time-and-turns', title: '시간과 턴' },
   { doc: 'war-and-orders', title: '전쟁과 예턴 조합' },

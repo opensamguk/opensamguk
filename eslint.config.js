@@ -167,9 +167,10 @@ export default defineConfig([
             { group: ['@opensamguk/rules/*'], message: BOUNDARY_MESSAGE },
             {
               group: ['@opensamguk/rules'],
-              allowImportNames: ['simulateBattle', 'unitSetSchema', 'BALANCE'],
+              allowImportNames: ['simulateBattle', 'unitSetSchema', 'BALANCE', 'commanderBattleModifiers'],
               allowTypeImports: true,
-              message: 'battleSim은 rules에서 simulateBattle·unitSetSchema·BALANCE와 타입만 import합니다 (E1).',
+              message:
+                'battleSim은 rules에서 simulateBattle·unitSetSchema·BALANCE·commanderBattleModifiers와 타입만 import합니다 (E1).',
             },
             { group: ['/@opensamguk/shared/node', ...NODE_BUILTINS], message: BOUNDARY_MESSAGE },
           ],

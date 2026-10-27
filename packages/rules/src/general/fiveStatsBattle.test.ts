@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyModifiers } from '../modifiers';
-import { fiveStatsBattleModifiers } from './fiveStatsBattle';
+import { commanderBattleModifiers, fiveStatsBattleModifiers } from './fiveStatsBattle';
 
 describe('AC-INT-09 실제 지휘관 전투 보정', () => {
   it.each([
@@ -33,5 +33,15 @@ describe('AC-INT-09 실제 지휘관 전투 보정', () => {
     expect(() =>
       fiveStatsBattleModifiers({ leadership: 50, strength: 50, intel: 50, politics: 50, charm: undefined! }),
     ).toThrow();
+  });
+  it.each([0, 50, 100])('미리보기의 두 값 %i는 실제 5능력치 지휘관의 같은 보정이다', (value) => {
+    const combat = { leadership: value, strength: 100 - value };
+    expect(commanderBattleModifiers(combat)).toEqual(
+      fiveStatsBattleModifiers({ ...combat, intel: 17, politics: 83, charm: 42 }),
+    );
+    for (const invalid of [-1, 101, 0.5, NaN, Infinity, undefined, '50']) {
+      expect(() => commanderBattleModifiers({ ...combat, leadership: invalid as number })).toThrow();
+      expect(() => commanderBattleModifiers({ ...combat, strength: invalid as number })).toThrow();
+    }
   });
 });
