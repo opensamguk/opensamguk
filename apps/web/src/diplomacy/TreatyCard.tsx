@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { formatYearMonth } from '../game/gameDate';
 import { DisabledReason } from '../ui/DisabledReason';
 import { NationBadge } from '../ui/NationBadge';
@@ -47,6 +48,7 @@ interface Props {
   // 이 조약에 결과를 기다리는 요청이 있으면 그 안내. 있으면 단추를 잠근다.
   busy: string | null;
   onRespond: (accept: boolean) => void;
+  onBreak?: () => void;
 }
 
 // 단추 하나. 서버가 준 Allowed만 본다. 권한이 없으면(NO_PERMISSION) 읽기만 하도록 단추를 그리지 않는다.
@@ -99,7 +101,8 @@ function CostFact({ treaty }: { treaty: TreatyItem }) {
   );
 }
 
-export function TreatyCard({ treaty, busy, onRespond }: Props) {
+export function TreatyCard({ treaty, busy, onRespond, onBreak }: Props) {
+  const [confirmBreak, setConfirmBreak] = useState(false);
   const status = STATUS_LABELS[treaty.status];
   const enforced = treaty.clauses.filter((c) => isEnforced(c.kind));
   const recorded = treaty.clauses.filter((c) => !isEnforced(c.kind));
@@ -179,7 +182,24 @@ export function TreatyCard({ treaty, busy, onRespond }: Props) {
       <div className={styles.buttons}>
         <ActionButton allowed={treaty.canAccept} busy={busy} label="수락" onClick={() => onRespond(true)} />
         <ActionButton allowed={treaty.canReject} busy={busy} label="거절" onClick={() => onRespond(false)} />
+        {onBreak && treaty.status === 'ACTIVE' ? (
+          <ActionButton
+            allowed={treaty.canBreak ?? null}
+            busy={busy}
+            label="파기"
+            onClick={() => setConfirmBreak(true)}
+          />
+        ) : null}
       </div>
+      {confirmBreak && onBreak && treaty.status === 'ACTIVE' ? (
+        <div role="group" aria-label="조약 파기 확인">
+          <p>파기하면 신의 기록이 1회 늘어 모든 국가에 보입니다.</p>
+          <ActionButton allowed={treaty.canBreak ?? null} busy={busy} label="파기 확정" onClick={onBreak} />
+          <button type="button" onClick={() => setConfirmBreak(false)}>
+            취소
+          </button>
+        </div>
+      ) : null}
     </article>
   );
 }

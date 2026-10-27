@@ -8,6 +8,7 @@ export interface ComposeState {
   peace: boolean;
   nonAggression: { on: boolean; months: string };
   note: { on: boolean; text: string };
+  trade?: { on: boolean; months: string };
 }
 
 export const emptyCompose = (): ComposeState => ({
@@ -15,6 +16,7 @@ export const emptyCompose = (): ComposeState => ({
   peace: false,
   nonAggression: { on: false, months: '24' },
   note: { on: false, text: '' },
+  trade: { on: false, months: '24' },
 });
 
 export const CLAUSE_LABELS: Record<ClauseKind, string> = {
@@ -61,6 +63,11 @@ export function buildClauses(state: ComposeState, relation: Relation | undefined
       problems.push(`불가침 기간은 ${NON_AGGRESSION_MONTHS.min}~${NON_AGGRESSION_MONTHS.max}개월입니다.`);
     else clauses.push({ kind: 'nonAggression', months });
   }
+  if (state.trade?.on) {
+    const months = positiveInt(state.trade.months);
+    if (months === null || months < 1 || months > 120) problems.push('교역 기간은 1~120개월입니다.');
+    else clauses.push({ kind: 'trade', months });
+  }
   if (state.note.on) {
     const text = state.note.text.trim();
     if (text === '') problems.push('기록만 남길 약속의 문장을 쓰세요.');
@@ -68,7 +75,8 @@ export function buildClauses(state: ComposeState, relation: Relation | undefined
     else clauses.push({ kind: 'note', text });
   }
 
-  if (!state.peace && !state.nonAggression.on && !state.note.on) problems.push('조항을 하나 이상 고르세요.');
+  if (!state.peace && !state.nonAggression.on && !state.note.on && !state.trade?.on)
+    problems.push('조항을 하나 이상 고르세요.');
   return { clauses, problems };
 }
 

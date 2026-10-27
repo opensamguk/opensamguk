@@ -119,6 +119,40 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('외교실 첫 세 조항 화면', () => {
+  it('교역 기능이 있는 월드의 조항 작성은 실제 견적·제안 입력에 교역 기간을 넣는다', async () => {
+    on('treaty.list', () => listPage({ tradeEnabled: true }));
+    on('treaty.quote', () => ({ cost: { mine: 100, theirs: 100 }, problem: null }));
+    on(
+      'treaty.propose',
+      (input) =>
+        ({
+          status: 'applied',
+          requestId: (input as { requestId: string }).requestId,
+          kind: 'treaty.propose',
+          outcome: 'PROPOSED',
+          treatyId: '12',
+          treaty: null,
+        }) satisfies RequestState,
+    );
+    renderPage('write');
+    const form = await screen.findByRole('form', { name: '조약서 쓰기' });
+    fireEvent.change(within(form).getByLabelText('상대'), { target: { value: '2' } });
+    fireEvent.click(within(form).getByLabelText('교역 허용'));
+    fireEvent.change(within(form).getByLabelText('교역 기간(개월)'), { target: { value: '6' } });
+    await waitFor(() =>
+      expect(callsTo('treaty.quote').at(-1)?.input).toEqual({
+        worldId: 'w1',
+        toNationId: 2,
+        clauses: [{ kind: 'trade', months: 6 }],
+      }),
+    );
+    fireEvent.click(within(form).getByRole('button', { name: '제안 보내기' }));
+    await screen.findByText(/제안을 보냈습니다/);
+    expect(callsTo('treaty.propose').at(-1)?.input).toMatchObject({
+      toNationId: 2,
+      clauses: [{ kind: 'trade', months: 6 }],
+    });
+  });
   it('목록은 쪽으로 받고 탭 수는 불러온 쪽 기준이라고 적는다. 다음 쪽은 cursor만 더해 묻는다', async () => {
     const closed = { estimate: null, canAccept: null, canReject: null };
     const outgoing = treaty({ id: '8', incoming: false, fromNationId: 1, toNationId: 3 });
