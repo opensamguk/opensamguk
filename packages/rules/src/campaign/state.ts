@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { WorldView } from '../model/world';
-import { FIVE_STAT_KEYS, fiveStatsSchema } from '../general/fiveStats';
+import { readGeneralFiveStats } from '../general/fiveStats';
 import { buildRetinueHierarchy, INITIAL_RENOWN_CAPACITY, type RetinuePerson } from './retinue';
 
 const integer = z.number().int().min(0).max(2_147_483_647);
@@ -45,7 +45,7 @@ export function campaignPeople(world: WorldView, campaign: Readonly<CampaignStat
     worldId: 'campaign-v1',
     nationId: general.nationId,
     stats: {
-      ...fiveStatsSchema.parse(Object.fromEntries(FIVE_STAT_KEYS.map((key) => [key, general[key]]))),
+      ...readGeneralFiveStats(general),
       source: campaign.sources[String(general.id)] ?? '',
     },
   }));

@@ -5,12 +5,41 @@ import { statRulesSchema } from '../world/resources';
 import { checkReplayOrigin } from '../ruleRegistry';
 import { applyRecordedInput, initialReplayState } from '../replay';
 import { buildCreatedGeneral, validateGeneralCreation } from './create';
-import { FIVE_STAT_KEYS, FIVE_STAT_RULES, FIVE_NPC_STAT_RULES, checkStatProfile } from './fiveStats';
+import {
+  FIVE_STAT_KEYS,
+  FIVE_STAT_RULES,
+  FIVE_NPC_STAT_RULES,
+  checkStatProfile,
+  readGeneralFiveStats,
+  fiveStatsSchema,
+} from './fiveStats';
 import { validatePolicyRecordedInput } from '../policy/replay';
 
 const payload = { name: '새장수', leadership: 55, strength: 55, intel: 55, politics: 55, charm: 55, portraitId: null };
 const legacyRules = { total: 165, min: 15, max: 80 };
 const legacyPayload = { name: payload.name, leadership: 55, strength: 55, intel: 55, portraitId: null };
+it('턴의 능력치 읽기는 정본 스키마와 같은 값·누락·범위 오류를 판정하고 원본을 공유하지 않는다', () => {
+  const base = { leadership: 0, strength: 100, intel: 50, politics: 90, charm: 10 };
+  const read = readGeneralFiveStats({ ...base, id: 1, name: '원본' });
+  expect(read).toEqual(fiveStatsSchema.parse(base));
+  read.intel = 40;
+  expect(base.intel).toBe(50);
+  for (const key of FIVE_STAT_KEYS) {
+    for (const value of [undefined, null, -1, 101, 0.5, NaN, Infinity, '50', true, {}, 50n]) {
+      const invalid = { ...base, [key]: value };
+      const canonical = fiveStatsSchema.safeParse(invalid);
+      expect(canonical.success).toBe(false);
+      if (canonical.success) throw new Error('잘못된 반례입니다.');
+      let actual: unknown;
+      try {
+        readGeneralFiveStats(invalid);
+      } catch (error) {
+        actual = error;
+      }
+      expect(actual).toHaveProperty('issues', canonical.error.issues);
+    }
+  }
+});
 function resources(five = true) {
   const scenario = scenarioFixture();
   if (five)
