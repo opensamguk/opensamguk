@@ -60,7 +60,9 @@ export function MainPage() {
             </span>
             <span>턴 {summary.data.turnTermMinutes}분</span>
             <span>국가 {nations.length}</span>
-            <span>도시 {cities.length}</span>
+            <span>
+              {map.data?.operationalMap ? '거점' : '도시'} {cities.length}
+            </span>
           </p>
         ) : null}
       </header>
@@ -86,6 +88,7 @@ export function MainPage() {
           {map.data ? (
             <div className={styles.mapBody}>
               <WorldMap
+                operationalMap={map.data.operationalMap}
                 cities={cities}
                 nations={nations}
                 myCityKey={myCityKey}

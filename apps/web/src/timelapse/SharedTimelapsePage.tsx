@@ -43,7 +43,9 @@ export function SharedTimelapsePage({ worldId }: { worldId: string }) {
     [trpc, worldId],
   );
   const map: TimelapseMap = {
-    data: head ? { cities: head.map } : undefined,
+    data: head
+      ? { cities: head.map, ...(head.operationalMap ? { operationalMap: head.operationalMap } : {}) }
+      : undefined,
     isError: false,
     error: null,
     refetch: () => undefined,

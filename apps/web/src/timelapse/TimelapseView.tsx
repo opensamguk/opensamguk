@@ -1,3 +1,5 @@
+import type { PublicGeography } from '@opensamguk/shared';
+import { OperationalWorldMap, matchesOperationalGeography } from '../main/OperationalWorldMap';
 import { useEffect, useReducer, useRef, useState } from 'react';
 import { MAP_HEIGHT, MAP_WIDTH, mapLinks } from '../main/WorldMap';
 import { EmptyState } from '../ui/States';
@@ -16,10 +18,11 @@ import { initialPlayback, isWaiting, playback } from './playback';
 import styles from './Timelapse.module.css';
 
 export type DownloadPng = (drawing: PngDrawing, fileName: string) => Promise<void>;
-type ExportState = 'idle' | 'working' | 'failed' | 'blocked';
+type ExportState = 'idle' | 'working' | 'failed' | 'blocked' | 'geography';
 const EXPORT_MESSAGE: Partial<Record<ExportState, string>> = {
   failed: '그림을 만들지 못했습니다.',
   blocked: '국가 기록이 없는 달은 내려받을 수 없습니다.',
+  geography: '지도 판을 확인한 뒤 그림을 내려받으세요.',
 };
 
 // 공백지 색. 메인 지도(WorldMap.tsx)와 같은 값이다.
@@ -41,6 +44,7 @@ export function TimelapseView({
   contractError,
   worldName = '월드',
   download = downloadPng,
+  operationalMap,
 }: {
   frames: readonly TimelapseFrame[];
   map: readonly TimelapseMapCity[];
@@ -51,6 +55,7 @@ export function TimelapseView({
   contractError: 'order' | 'cursor' | null;
   worldName?: string;
   download?: DownloadPng;
+  operationalMap?: PublicGeography;
 }) {
   const [state, dispatch] = useReducer(playback, initialPlayback);
   const [exporting, setExporting] = useState<ExportState>('idle');
@@ -92,9 +97,19 @@ export function TimelapseView({
       setExporting('blocked');
       return;
     }
+    if (
+      operationalMap &&
+      !matchesOperationalGeography(operationalMap, frameGeographyCities(operationalMap, view.cities))
+    ) {
+      setExporting('geography');
+      return;
+    }
     setExporting('working');
     try {
-      await download(frameDrawing({ worldName, date, view }), pngFileName(worldName, frame));
+      await download(
+        frameDrawing({ worldName, date, view, ...(operationalMap ? { canvas: operationalMap.canvas } : {}) }),
+        pngFileName(worldName, frame),
+      );
       setExporting('idle');
     } catch {
       setExporting('failed');
@@ -115,7 +130,7 @@ export function TimelapseView({
         </div>
       ) : (
         <>
-          <FrameMap date={date} cities={view.cities} />
+          <FrameMap date={date} cities={view.cities} {...(operationalMap ? { operationalMap } : {})} />
           <FrameLegend legend={view.legend} empty={view.empty} />
         </>
       )}
@@ -198,7 +213,48 @@ export function TimelapseView({
 }
 
 // 누를 수 없는 그림이다. 도시 점은 포커스를 받지 않고 이름은 title로만 둔다.
-function FrameMap({ date, cities }: { date: string; cities: readonly FrameCityView[] }) {
+function frameGeographyCities(operationalMap: PublicGeography, cities: readonly FrameCityView[]) {
+  return cities.map(({ city, nation }) => {
+    const site = operationalMap.sites.find((site) => site.anchorKey === city.key);
+    return {
+      ...city,
+      ...(site?.kind === 'CITY' || site?.kind === 'PASS' ? { kind: site.kind } : {}),
+      nationId: nation?.kind === 'stored' ? nation.id : null,
+      recorded: nation !== null,
+    };
+  });
+}
+
+function FrameMap({
+  date,
+  cities,
+  operationalMap,
+}: {
+  date: string;
+  cities: readonly FrameCityView[];
+  operationalMap?: PublicGeography;
+}) {
+  if (operationalMap) {
+    const nations = new Map(
+      cities.flatMap(({ nation }) =>
+        nation?.kind === 'stored'
+          ? [[nation.id, { id: nation.id, name: nation.name, color: nation.color }] as const]
+          : [],
+      ),
+    );
+    const drawn = frameGeographyCities(operationalMap, cities);
+    return (
+      <div data-testid="timelapse-map" aria-label={`${date} 영토 지도`}>
+        <OperationalWorldMap
+          map={operationalMap}
+          cities={drawn}
+          nations={[...nations.values()]}
+          myCityKey={null}
+          selectedKey={null}
+        />
+      </div>
+    );
+  }
   return (
     <svg
       className={styles.map}

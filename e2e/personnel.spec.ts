@@ -19,7 +19,7 @@ import {
 
 // T2-06 · AC-M2-05, AC-M2-16 화면: 인사부, 국가 예턴 12칸, 메인 발령 제안 상자.
 // 인사·방침을 원생성한 월드의 실행권을 시험이 쥔다. 수락 뒤에도 엔진을 멈춘 채 처리 중을 볼 수 있다.
-// T2-05 API(personnel.*, offers.*, nationTurns.*)가 없는 서버에서는 시험 전체를 건너뛴다. 그동안의 결과는 증거가 아니다.
+// T2-05 API(personnel.*, offers.*, nationTurns.*)가 없는 서버는 준비 실패로 처리한다.
 
 test.describe.configure({ mode: 'serial', timeout: 240_000 });
 
@@ -153,7 +153,7 @@ test.beforeAll(async ({ browser }) => {
     ruler = { page: first, general: await createGeneralByApi(first, world) };
     member = { page: second, general: await createGeneralByApi(second, world) };
   });
-  test.skip(!(await hasPersonnelApi(first, world)), 'T2-05 인사 API가 아직 서버에 없다');
+  expect(await hasPersonnelApi(first, world), 'T2-05 인사 API가 있어야 합니다.').toBe(true);
   await placeInNation();
 });
 test.afterAll(async () => {

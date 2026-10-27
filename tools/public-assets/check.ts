@@ -4,6 +4,7 @@ import { posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import ts from 'typescript';
+import { APPROVED_MAP_IMAGES } from '../../packages/shared/src/publicMapImages';
 
 const projectRoot = fileURLToPath(new URL('../../', import.meta.url));
 const fallbackSource = 'apps/web/src/portrait/fallback.svg';
@@ -28,6 +29,7 @@ interface Manifest {
   externalAssetOrigins: string[];
   portraitVariants: string[];
   bundledImages: ApprovedImage[];
+  mapImages?: ApprovedImage[];
 }
 interface Metadata {
   schema: number;
@@ -60,7 +62,17 @@ function manifestFrom(value: unknown): Manifest {
     !record(value.bundledImages[0]) ||
     value.bundledImages[0].source !== fallbackSource ||
     typeof value.bundledImages[0].sha256 !== 'string' ||
-    !digestPattern.test(value.bundledImages[0].sha256)
+    !digestPattern.test(value.bundledImages[0].sha256) ||
+    (value.mapImages !== undefined &&
+      (!Array.isArray(value.mapImages) ||
+        value.mapImages.length !== APPROVED_MAP_IMAGES.length ||
+        !value.mapImages.every(
+          (entry, index) =>
+            record(entry) &&
+            entry.source === APPROVED_MAP_IMAGES[index] &&
+            typeof entry.sha256 === 'string' &&
+            digestPattern.test(entry.sha256),
+        )))
   ) {
     throw new PublicAssetsError([
       'manifest/public-assets.json: decision-policy: D-031의 기본 SVG 승인 목록이 아닙니다.',
@@ -91,7 +103,7 @@ function metadataFrom(value: unknown): Metadata {
         record(x) &&
         typeof x.file === 'string' &&
         safeRelative(x.file) &&
-        x.source === fallbackSource &&
+        (x.source === fallbackSource || APPROVED_MAP_IMAGES.some((source) => source === x.source)) &&
         typeof x.sha256 === 'string' &&
         digestPattern.test(x.sha256),
     ) ||
@@ -308,9 +320,13 @@ export async function checkPublicAssets(options: { root?: string; dist?: string 
   const imageSources = [...csp.matchAll(/img-src\s+([^;"\r\n]+)/g)];
   if (imageSources.length !== 1 || imageSources[0]![1]!.trim() !== "'self'")
     failures.push('deploy/security.caddy: image-csp: img-src는 self만 허용합니다.');
-  const sourceHash = digest(await readFile(resolve(root, fallbackSource)));
-  if (sourceHash !== manifest.bundledImages[0]!.sha256)
-    failures.push(`${fallbackSource}: source-hash: 승인한 SVG와 다릅니다.`);
+  const approvedImages = [...manifest.bundledImages, ...(manifest.mapImages ?? [])];
+  const approvedHashes = new Map<string, string>();
+  for (const image of approvedImages) {
+    const actualHash = digest(await readFile(resolve(root, image.source)));
+    if (actualHash !== image.sha256) failures.push(`${image.source}: source-hash: 승인한 자산과 다릅니다.`);
+    approvedHashes.set(image.source, image.sha256);
+  }
   const names = await fileNames(dist),
     recorded = Object.keys(metadata.files).sort();
   const actual = names.filter((name) => name !== metadataName);
@@ -318,8 +334,12 @@ export async function checkPublicAssets(options: { root?: string; dist?: string 
     failures.push(`${metadataName}: file-set: 실제 배포 파일 목록과 다릅니다.`);
   if (!actual.includes('index.html')) failures.push('index.html: missing-entry: 공개 화면이 없습니다.');
   const images = actual.filter((name) => imageExtension.test(name));
-  if (images.length !== 1 || JSON.stringify(metadata.images.map((x) => x.file).sort()) !== JSON.stringify(images))
-    failures.push(`${metadataName}: image-set: 기본 SVG 하나만 있어야 합니다.`);
+  if (
+    images.length !== approvedImages.length ||
+    new Set(metadata.images.map((image) => image.source)).size !== approvedImages.length ||
+    JSON.stringify(metadata.images.map((x) => x.file).sort()) !== JSON.stringify(images)
+  )
+    failures.push(`${metadataName}: image-set: 승인한 기본 SVG와 지도 자산 집합이 아닙니다.`);
   for (const name of actual) {
     const bytes = await readFile(resolve(dist, name));
     if (metadata.files[name] !== digest(bytes)) failures.push(`${name}: file-hash: 빌드 기록과 바이트가 다릅니다.`);
@@ -327,15 +347,21 @@ export async function checkPublicAssets(options: { root?: string; dist?: string 
       failures.push(`${name}: unsupported-asset: 승인하지 않은 배포 파일 형식입니다.`);
     if (imageExtension.test(name)) {
       const entry = metadata.images.find((image) => image.file === name);
-      const originalName = posix.basename(name).replace(/-[A-Za-z0-9_-]{8,}(?=\.[^.]+$)/, '');
+      const emittedBase = posix.basename(name);
+      const sourceBase = entry ? posix.basename(entry.source) : '';
+      const extension = posix.extname(sourceBase);
+      const stem = sourceBase.slice(0, -extension.length);
+      const suffix = emittedBase.slice(stem.length + 1, -extension.length);
       if (
-        originalName !== 'fallback.svg' ||
         !entry ||
-        entry.source !== fallbackSource ||
-        digest(bytes) !== sourceHash ||
-        entry.sha256 !== sourceHash
+        !approvedHashes.has(entry.source) ||
+        !emittedBase.startsWith(`${stem}-`) ||
+        !emittedBase.endsWith(extension) ||
+        !/^[A-Za-z0-9_-]{8,}$/.test(suffix) ||
+        digest(bytes) !== approvedHashes.get(entry.source) ||
+        entry.sha256 !== approvedHashes.get(entry.source)
       )
-        failures.push(`${name}: image-hash: 승인한 기본 SVG가 아닙니다.`);
+        failures.push(`${name}: image-hash: 승인한 기본 SVG나 지도 자산이 아닙니다.`);
     }
     if (/\.(?:html|[cm]?js|css)$/i.test(name))
       failures.push(...inspectAssetText(bytes.toString('utf8'), name, new Set(actual)));
@@ -349,7 +375,7 @@ async function main() {
     const { values } = parseArgs({ options: { dist: { type: 'string' } } });
     const result = await checkPublicAssets(values.dist ? { dist: resolve(values.dist) } : {});
     console.log(
-      `공개 자산 검사 통과: ${result.decision}, 파일 ${result.files}개, 기본 SVG ${result.images}개, 외부 초상 0개`,
+      `공개 자산 검사 통과: ${result.decision}, 파일 ${result.files}개, 승인 이미지 ${result.images}개, 외부 초상 0개`,
     );
   } catch (error) {
     console.error(

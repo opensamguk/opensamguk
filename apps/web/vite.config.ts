@@ -6,6 +6,7 @@ import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import { resolveApiTarget } from './apiTarget';
 import { devPortraits } from './devPortraits';
+import { APPROVED_MAP_IMAGES } from '@opensamguk/shared/public-map-images';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 
@@ -54,7 +55,9 @@ function publicBuildMeta(): Plugin {
     writeBundle: {
       order: 'post',
       async handler() {
-        const fallbackSha = sha256(await readFile(join(repoRoot, FALLBACK_SOURCE)));
+        const imageSources = new Map<string, string>();
+        for (const source of [FALLBACK_SOURCE, ...APPROVED_MAP_IMAGES])
+          imageSources.set(sha256(await readFile(join(repoRoot, source))), source);
         const files: Record<string, string> = {};
         const images: { file: string; source: string | null; sha256: string }[] = [];
         for (const path of (await listFiles(outDir)).sort()) {
@@ -64,7 +67,7 @@ function publicBuildMeta(): Plugin {
           files[file] = digest;
           // 바이트가 기본 SVG와 같을 때만 출처를 적는다. 모르는 그림은 null로 남겨 검사가 걸러 내게 한다.
           if (IMAGE_FILE.test(file)) {
-            images.push({ file, source: digest === fallbackSha ? FALLBACK_SOURCE : null, sha256: digest });
+            images.push({ file, source: imageSources.get(digest) ?? null, sha256: digest });
           }
         }
         const meta = { schema: 1, mode: PUBLIC_MODE, imageBaseUrl: '', images, files };

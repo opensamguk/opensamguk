@@ -1,3 +1,4 @@
+import { OPERATIONAL_GIS_SHA256 } from '../../apps/web/src/main/operationalGeography';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
@@ -111,4 +112,8 @@ it('INT-03 기존 도시 경제 값은 같은 원본 ID의 값을 보존한다',
       max: old.max,
     });
   }
+});
+
+it('INT-10 화면의 GIS 식별값은 운영 자원의 실제 원본 해시와 같다', () => {
+  expect(buildOperationalMap().basemap.sha256).toBe(OPERATIONAL_GIS_SHA256);
 });

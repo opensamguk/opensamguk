@@ -1,3 +1,5 @@
+import type { PublicGeography } from '@opensamguk/shared';
+import { OperationalWorldMap } from './OperationalWorldMap';
 import { readableTextColor } from '../ui/color';
 import type { MapCity, MapNation } from '../game/types';
 import styles from './WorldMap.module.css';
@@ -50,13 +52,27 @@ export function WorldMap({
   myCityKey = null,
   selectedKey = null,
   onSelect,
+  operationalMap,
 }: {
   cities: readonly DrawnCity[];
   nations: readonly MapNation[];
   myCityKey?: number | null;
   selectedKey?: number | null;
   onSelect?: (key: number) => void;
+  operationalMap?: PublicGeography | undefined;
 }) {
+  if (operationalMap)
+    return (
+      <OperationalWorldMap
+        cities={cities}
+        nations={nations}
+        myCityKey={myCityKey}
+        selectedKey={selectedKey}
+        {...(onSelect ? { onSelect } : {})}
+        map={operationalMap}
+      />
+    );
+  if (cities.some((city) => city.kind !== undefined)) return <p role="alert">운영 지도 자료를 다시 불러오세요.</p>;
   const nationById = new Map(nations.map((nation) => [nation.id, nation]));
   return (
     <svg
