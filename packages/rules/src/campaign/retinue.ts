@@ -1,36 +1,28 @@
 // Adapted from opensamguk-v1 bc053629710711d4c5dfa50683bae78f4baeca95:
 // RetinueHierarchy.kt, RenownRules.kt, DeploymentRules.kt (MIT). See NOTICE.
 // Campaign snapshots replace v1 province/card profiles. No runtime state is mutated.
+import { BALANCE } from '../balance';
+import { FIVE_STAT_KEYS, fiveStatsSchema, type FiveStats } from '../general/fiveStats';
+
 export const INITIAL_RENOWN_CAPACITY = 30;
-export type SourcedFiveStats = {
-  leadership: number;
-  strength: number;
-  intelligence: number;
-  politics: number;
-  charm: number;
-  source: string;
-};
+export type SourcedFiveStats = FiveStats & { source: string };
 export type RetinuePerson = { id: number; worldId: string; nationId: number; stats: SourcedFiveStats };
 export type RetinueLink = { masterId: number; personId: number; relation: 'STAFF' | 'LIEUTENANT' | 'GUEST' };
 const natural = (n: number) => Number.isSafeInteger(n) && n >= 0;
 const positive = (n: number) => natural(n) && n > 0;
 export function retinuePersonCost(stats: SourcedFiveStats): number {
   if (!stats || typeof stats.source !== 'string' || !stats.source.trim()) throw new Error('STATS_SOURCE_REQUIRED');
-  const values = [stats.leadership, stats.strength, stats.intelligence, stats.politics, stats.charm];
-  if (!values.every(natural)) throw new Error('FIVE_STATS_REQUIRED');
-  let sum = 0;
-  for (const n of values) {
-    sum += n;
-    if (!Number.isSafeInteger(sum)) throw new Error('STAT_OVERFLOW');
-  }
-  return Math.max(1, Math.floor(sum / 50) + (sum % 50 ? 1 : 0));
+  const parsed = fiveStatsSchema.safeParse(Object.fromEntries(FIVE_STAT_KEYS.map((key) => [key, stats[key]])));
+  if (!parsed.success) throw new Error('FIVE_STATS_REQUIRED');
+  const sum = FIVE_STAT_KEYS.reduce((total, key) => total + parsed.data[key], 0);
+  return Math.max(1, Math.ceil(sum / 50));
 }
 export function buildRetinueHierarchy(people: readonly RetinuePerson[], links: readonly RetinueLink[]) {
   const persons = new Map<number, RetinuePerson>();
   for (const p of people) {
     if (
       !positive(p.id) ||
-      !natural(p.nationId) ||
+      !positive(p.nationId) ||
       typeof p.worldId !== 'string' ||
       !p.worldId.trim() ||
       persons.has(p.id)
@@ -138,6 +130,7 @@ export type DeploymentFailure =
   | 'BATTLE_PENDING'
   | 'UNIT_UNAVAILABLE'
   | 'COMMANDER_CHANGED'
+  | 'COMMAND_CAPACITY'
   | 'ALREADY_DEPLOYED';
 export type DeploymentAssessment =
   { ok: true; ownerId: number; commanderId: number; unitIds: number[] } | { ok: false; reason: DeploymentFailure };
@@ -182,6 +175,14 @@ export function assessCampaignDeployment(
     if (!unit || unit.ownerId !== owner.id || !positive(unit.troops)) return deny('UNIT_UNAVAILABLE');
     if (unit.commanderId !== commander.id) return deny('COMMANDER_CHANGED');
   }
+  const capacity = commander.stats.leadership * BALANCE.CREW_PER_LEADERSHIP;
+  let commanded = 0;
+  for (const unit of state.units.filter((row) => row.commanderId === commander.id)) {
+    if (!natural(unit.troops)) return deny('STATE_UNAVAILABLE');
+    // 요청 밖의 부곡도 합산한다. 뺄셈으로 비교해 잘못된 대형 입력의 합계 overflow도 막는다.
+    if (unit.troops > capacity - commanded) return deny('COMMAND_CAPACITY');
+    commanded += unit.troops;
+  }
   if (
     state.deployed.some(
       (d) =>
@@ -218,8 +219,8 @@ export function assessCampaignDeployment(
     if (
       !owner.node ||
       !commander.node ||
-      !/^(city|pass|port|field):[a-z0-9_-]+$/.test(owner.node) ||
-      !/^(city|pass|port|field):[a-z0-9_-]+$/.test(commander.node)
+      !/^(city|pass):[a-z0-9_-]+$/.test(owner.node) ||
+      !/^(city|pass):[a-z0-9_-]+$/.test(commander.node)
     )
       return deny('POSITION_UNAVAILABLE');
     if (owner.node !== commander.node) return deny('MUST_ASSEMBLE');

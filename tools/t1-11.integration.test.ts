@@ -461,7 +461,7 @@ describe('T1-11 생성 접수와 엔진', () => {
       { leadership: 81 },
       { leadership: 55.5 },
       { portraitId: 10000 },
-      { portraitId: 11001 },
+      { portraitId: 11009 },
       { portraitId: '10001' },
     ])
       expect((await request('general.create', { worldId, ...payload, ...extra }, a.cookie)).code).toBe('BAD_REQUEST');

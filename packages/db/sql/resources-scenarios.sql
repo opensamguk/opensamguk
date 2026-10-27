@@ -75,6 +75,28 @@
 -- - 토너먼트 경기: `packages/logic/src/tournament/battle.ts` → `packages/rules/src/tournament/match.ts`. 등급 비율을 빼고 100합 뒤 잔여 기력으로 승자를 정하며 동률이면 원정이 이긴다. 조별 무승부 경기·HTML 기록·통계는 옮기지 않았다.
 -- - 첩보 단계와 비용: `packages/logic/src/actions/turn/general/che_첩보.ts` → `packages/rules/src/commands/ext/intel/`. 거리별 정보 항목과 기술 비교 경계를 옮겼고 비용은 금·쌀 각 60으로 고정한다.
 --
+-- 예형(禰衡·祢衡)의3·6·83·76·6도 위 삼국지11 목록에서 확인했다. v1의 이형(李衡10455)과는 다른 인물이므로 해당 인물의 능력치나 그림을 대신 쓰지 않는다. 보충 행의 sourceRevision은 URL·인물 표기·정본 순서의5값을 선택해 정규화한 내용 해시이며 웹 페이지 HTML의 바이트 해시가 아니다.
+--
+-- ## 통합판 191년 5능력치 원장
+--
+-- `officers/191-five-stats.json`은 main `7b910312549062ad670e203015c020e13bbf6518`의 491개 장수 ID·이름·순서를 보존한 별도 대응 원장이다. 기존 `scenario/1030.json`의 값과 국가·도시 배치는 바꾸지 않는다. 원장 자체가 운영 시나리오의 연결 완료를 뜻하지 않는다.
+--
+-- 483명의 5능력치는 `peppone-choi/opensamguk-v1`의 `bc053629710711d4c5dfa50683bae78f4baeca95`, `resources/scenario/scenario_3190.json`에서 필요한 행만 가져왔다. 원문 SHA-256은 `e4bc491e14733b46a45606273a7bc3a6dd3bc4082e96eb057a2fc00b83cae1c3`이다. 원본 personPolicies의 `rtk14-workbook:190.1`, workbook SHA-256 `bb8f6db3b5afe732cb5d019cd16e15b92dc1296530ab265f1f7577a04de34e7f`와 officerId를 보존한다. 선택한 483행의 검사 사본은 `tools/fixtures/int16-selected-officers.json`이다. 능력치 이름 intelligence만 intel로 대응하며 수치를 추정하거나 보정하지 않는다.
+--
+-- 한자·인물 ID 대조에는 기존 [opensamguk-images 메타데이터 원장](https://github.com/peppone-choi/opensamguk-images/blob/049091911d954feee54862bea6ddcc70a3ff4e84/portraits/rtk14/officer-id-registry.tsv)을 썼다. 게임의 능력치 자료는 KOEI 삼국지 시리즈의 수치이며 이 고지가 이미지 사용권을 부여하지 않는다.
+--
+-- v1에 없는 7명은 2026-10-27 웹에서 확인한 삼국지11 수치를 기록했다. 기사 본문·이미지는 옮기지 않았으며 각 행에 해당 URL과 자료 판을 남긴다. 출처는 [후소제(후한)](https://d.namu.moe/w/후소제(후한)), [헌제](https://www.namu.moe/w/헌제(삼국지%20시리즈)), [사마휘](https://d.namu.moe/w/사마휘/기타%20창작물), [우길](https://www.namu.moe/w/우길/기타%20창작물), [삼국지11 능력치 목록의 화타·교현](https://zetawiki.com/wiki/삼국지_11_능력치_목록)이다. 헌제의 도전 모드 유협 값은 적용하지 않는다. 교현은 이 게임의 교국로 묘사이며 main 생몰년을 역사 인물의 생몰년으로 교체하지 않는다.
+--
+-- 길평의 29·10·56·54·70은 [팬 제작 신무장 길본](https://wikiwiki.jp/sansinb/みんなの新武将/後漢末～三国#t85e2477)의 예시 값이다. 정식 게임의 능력치가 아니다. 사용자는 2026-10-27 이 값을 길평의 이번 판 확정값으로 채택했다. 원장에 팬 제작 출처·역사 길본과 연의 길평의 차이·사용자 확정 근거를 함께 기록한다.
+--
+-- ## 통합판 개발용 보충 초상
+--
+-- 사용자의 2026-10-27 요청에 따라 [Kongming’s Archives의 삼국지11 초상](https://kongming.net/11/portraits/)에서 소제·헌제·사마휘·우길·화타·교현·예형, [삼국지3 MS-DOS 초상](https://kongming.net/3/portraits/ms-dos/)에서 길평 원본을 확인했다. 그림의 권리자는 KOEI이며 오픈 라이선스 자료가 아니다. D-004·D-031의 개발·비공개 테스트 범위를 따른다.
+--
+-- `portraits/191-supplement.json`은 인물·게임·원본 URL·바이트 해시와 새 ID 11001~11008만 기록한다. `pnpm portraits:fetch-supplement`가 이 checkout의 Git 제외 폴더 `private/portraits-supplement/`에 원본을 받고 내용 해시를 확인한다. 기존 파일과 해시가 다르면 덮어쓰지 않는다. 원본을 수정하거나 Git·공개 dist에 넣지 않는다. 개발 서버는 등록된 원본만 읽으며 공개 빌드는 기본 SVG를 쓴다.
+--
+-- `portraits/191-map.json`은 인물 원장을 기준으로 기존 초상 483명과 보충 8명을 대응한 새 월드용 표다. 기존 `rtk14-map.json`과 이미 생성한 월드의 초상 ID를 바꾸지 않는다. 운영 시나리오 연결은 INT-04의 별도 검증 대상이다.
+--
 
 DO $t4_46_init$
 DECLARE

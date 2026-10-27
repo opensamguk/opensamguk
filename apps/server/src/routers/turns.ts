@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { TRPCError } from '@trpc/server';
 import { nextActionSequence, type Prisma } from '@opensamguk/db';
-import { emptyTurn, unitSetSchema, type QueuedTurn } from '@opensamguk/rules';
+import { commandStatPreview, emptyTurn, unitSetSchema, type QueuedTurn } from '@opensamguk/rules';
 import { editArray, type ArrayEdit } from '@opensamguk/shared';
 import { z } from 'zod';
 import { router, protectedProcedure } from '../trpc';
@@ -163,12 +163,16 @@ export const turnsRouter = router({
         const def = (extended ?? worldResolver(world)).resolver.get(turn.commandKey);
         if (!def)
           return { ok: false as const, code: 'COMMAND_DISABLED' as const, message: '이 월드에서 꺼진 명령입니다.' };
-        const failure = def.precheck(
-          view,
-          { generalId: actor.id, tick: actor.nextTurnTick, unitSet: unitSetSchema.parse(world.unitSet) },
-          turn.args,
-        );
-        return failure ? { ok: false as const, ...failure } : { ok: true as const };
+        const commandActor = {
+          generalId: actor.id,
+          tick: actor.nextTurnTick,
+          unitSet: unitSetSchema.parse(world.unitSet),
+        };
+        const failure = def.precheck(view, commandActor, turn.args);
+        const preview = commandStatPreview(view, commandActor, turn.commandKey, turn.args);
+        return failure
+          ? { ok: false as const, ...failure, ...(preview ? { preview } : {}) }
+          : { ok: true as const, ...(preview ? { preview } : {}) };
       },
       { isolationLevel: 'RepeatableRead' },
     );

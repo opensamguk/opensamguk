@@ -3,14 +3,14 @@
 // 공개 빌드(`vite build --mode public`)는 초상을 기본 이미지로만 보여 준다 (D-031, T3-13).
 // 조건은 빌드 때 상수로 바뀌므로 아래 주소 문자열과 경로 틀이 공개 번들에서 지워진다. 변수에 담지 않고 그 자리에 쓴다.
 
-// 이미지 서버(T2-15) 전 개발 기본값. 이미지 저장소 2026-10-20 정리 커밋에 고정한다. 공개 빌드에서는 빈 값이다.
+// 이미지 서버(T2-15) 전 개발 기본값. jsDelivr의 50MB 패키지 제한을 피하고 같은 고정 커밋의 원본을 읽는다.
 export const DEFAULT_IMAGE_BASE_URL =
   import.meta.env.MODE === 'public'
     ? ''
-    : 'https://cdn.jsdelivr.net/gh/opensamguk/opensamguk-images@48163bd1ce8d54c54c94fb5484b05f9db9e50c62';
+    : 'https://raw.githubusercontent.com/opensamguk/opensamguk-images/48163bd1ce8d54c54c94fb5484b05f9db9e50c62';
 
 export const PORTRAIT_ID_MIN = 10001;
-export const PORTRAIT_ID_MAX = 11000;
+export const PORTRAIT_ID_MAX = 11008;
 
 export const PORTRAIT_VARIANTS = {
   portrait: { ext: 'png', width: 148, height: 210 },
@@ -44,5 +44,6 @@ export function portraitUrl(
 ): string | null {
   if (import.meta.env.MODE === 'public') return null;
   if (!isPortraitId(id)) return null;
+  if (id > 11000) return import.meta.env.DEV ? `/__dev-portraits/${id}` : null;
   return `${base}/portraits/${variant}/${id}.${PORTRAIT_VARIANTS[variant].ext}`;
 }

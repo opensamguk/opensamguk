@@ -10,7 +10,7 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 // 이미지 요청은 page.route로 가로채 시험용 그림을 돌려준다. 실제 초상 파일과 외부 네트워크에 기대지 않는다.
 
 const DEFAULT_BASE =
-  'https://cdn.jsdelivr.net/gh/opensamguk/opensamguk-images@48163bd1ce8d54c54c94fb5484b05f9db9e50c62';
+  'https://raw.githubusercontent.com/opensamguk/opensamguk-images/48163bd1ce8d54c54c94fb5484b05f9db9e50c62';
 const ALT_BASE = 'http://images-b.opensamguk.test/set-b';
 const webDir = fileURLToPath(new URL('../apps/web/', import.meta.url));
 const vitePackage = createRequire(join(webDir, 'package.json')).resolve('vite/package.json');
