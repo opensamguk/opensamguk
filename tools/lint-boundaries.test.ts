@@ -104,8 +104,8 @@ describe('전투 시뮬레이터 예외', () => {
 
   it('E1: compute.ts·compute.test.ts만 rules의 정해진 값과 타입을 import한다', async () => {
     const allowed =
-      "import { BALANCE, simulateBattle, unitSetSchema, type UnitSetResource } from '@opensamguk/rules';\n" +
-      'export type U = UnitSetResource;\nexport { BALANCE, simulateBattle, unitSetSchema };\n';
+      "import { BALANCE, simulateBattle, unitSetSchema, commanderBattleModifiers, type UnitSetResource } from '@opensamguk/rules';\n" +
+      'export type U = UnitSetResource;\nexport { BALANCE, simulateBattle, unitSetSchema, commanderBattleModifiers };\n';
     for (const file of ['apps/web/src/battleSim/compute.ts', 'apps/web/src/battleSim/compute.test.ts']) {
       expect(await ruleIds(allowed, file), file).toEqual([]);
       const other = "import { buildInitialWorld } from '@opensamguk/rules';\nexport { buildInitialWorld };\n";

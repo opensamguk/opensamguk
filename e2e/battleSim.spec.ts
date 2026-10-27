@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page, type Worker } from '@playwright/test';
-import { simulateBattle, unitSetSchema } from '../packages/rules/src/index';
+import { simulateBattle, unitSetSchema, commanderBattleModifiers } from '../packages/rules/src/index';
 import { createRng } from '../packages/shared/src/index';
 import { appOrigin, createAccount } from './account';
 import { e2eWorld, setTurns, waitTurnWindow } from './game';
@@ -142,6 +142,57 @@ async function shot(page: Page, name: string) {
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: test.info().outputPath(name), fullPage: true });
 }
+
+test('AC-INT-11 통합판 지휘관 입력·경계 오류·장수/성벽의 실제 Worker 계산', async ({ page }) => {
+  await openSimulatorFromMenu(page);
+  await page.getByRole('combobox', { name: '계산 규칙' }).selectOption('five-stats');
+  await fillCase(page, GENERAL_CASE);
+  await box(page, '공격', '지휘관 통솔').fill('101');
+  await box(page, '공격', '지휘관 무력').fill('0');
+  await box(page, '수비', '지휘관 통솔').fill('50');
+  await box(page, '수비', '지휘관 무력').fill('100');
+  await expect(box(page, '공격', '지휘관 통솔')).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByRole('button', { name: '실행', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '실행 (사용 불가)' })).toHaveAttribute('data-unavailable', 'true');
+  await box(page, '공격', '지휘관 통솔').fill('100');
+  const commanders = { attacker: { leadership: 100, strength: 0 }, defender: { leadership: 50, strength: 100 } };
+  const { seed, ...input } = GENERAL_CASE;
+  const expectedGeneral = simulateBattle(
+    {
+      ...input,
+      unitSet,
+      attackerModifiers: commanderBattleModifiers(commanders.attacker),
+      defenderModifiers: commanderBattleModifiers(commanders.defender),
+    },
+    createRng(seed),
+  );
+  await page.getByRole('button', { name: '실행', exact: true }).click();
+  await expect
+    .poll(() => shown(page))
+    .toMatchObject({
+      attacker: { crew: expectedGeneral.attacker.crew, atmos: expectedGeneral.attacker.atmos },
+      defender: { crew: expectedGeneral.defender.crew, atmos: expectedGeneral.defender.atmos },
+    });
+  await expect(page.getByTestId('result-commanders')).toHaveText('공격 통솔 100·무력 0, 수비 통솔 50·무력 100');
+  await fillCase(page, WALL_CASE);
+  await expect(box(page, '수비', '지휘관 통솔')).toHaveCount(0);
+  const { seed: wallSeed, ...wallInput } = WALL_CASE;
+  const expectedWall = simulateBattle(
+    { ...wallInput, unitSet, attackerModifiers: commanderBattleModifiers(commanders.attacker) },
+    createRng(wallSeed),
+  );
+  await page.getByRole('button', { name: '실행', exact: true }).click();
+  await expect
+    .poll(() => shown(page))
+    .toMatchObject({
+      attacker: { crew: expectedWall.attacker.crew, atmos: expectedWall.attacker.atmos },
+      defender: { crew: expectedWall.defender.crew, atmos: expectedWall.defender.atmos },
+    });
+  await expect(page.getByTestId('result-commanders')).toHaveText('공격 통솔 100·무력 0, 성벽 보정 없음');
+  await page.setViewportSize({ width: 375, height: 812 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
+  await shot(page, 'int11-commander-wall-mobile.png');
+});
 
 test('메뉴로 들어가 진짜 Worker가 계산한 결과가 Node의 simulateBattle과 같고 다시 실행해도 같다', async ({ page }) => {
   const workers: Worker[] = [];

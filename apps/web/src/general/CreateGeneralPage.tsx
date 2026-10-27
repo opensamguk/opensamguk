@@ -45,8 +45,8 @@ function CreateGeneral({ worldId }: { worldId: string }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
-  // 이 화면에서 기다리던 요청이 만들어졌을 때만 메인으로 보낸다. 처음부터 장수가 있으면 안내만 한다.
-  const [sawPending, setSawPending] = useState(false);
+  // 이 화면에서 보낸 요청이나 대기하던 요청이 만들어지면 메인으로 간다. 처음부터 장수가 있으면 안내만 한다.
+  const [creationStarted, setCreationStarted] = useState(false);
   const mineKey = trpc.general.mine.queryKey({ worldId });
 
   const mine = useQuery({
@@ -58,15 +58,15 @@ function CreateGeneral({ worldId }: { worldId: string }) {
   const pending = mine.data?.creation?.status === 'pending';
 
   useEffect(() => {
-    if (pending) setSawPending(true);
+    if (pending) setCreationStarted(true);
   }, [pending]);
 
   // 만들어지면 메인으로 간다. 메인과 위쪽 띠가 새 장수를 보도록 조회를 새로 받는다.
   useEffect(() => {
-    if (!general || !sawPending) return;
+    if (!general || !creationStarted) return;
     void queryClient.invalidateQueries({ queryKey: trpc.home.get.queryKey({ worldId }) });
     void navigate({ to: '/w/$worldId', params: { worldId } });
-  }, [general, sawPending, navigate, queryClient, trpc, worldId]);
+  }, [general, creationStarted, navigate, queryClient, trpc, worldId]);
 
   let body;
   if (mine.isError) {
@@ -83,7 +83,7 @@ function CreateGeneral({ worldId }: { worldId: string }) {
     body = <p className={styles.muted}>불러오는 중…</p>;
   } else if (general) {
     body = (
-      <div className={styles.done} role={sawPending ? 'status' : undefined}>
+      <div className={styles.done} role={creationStarted ? 'status' : undefined}>
         <Portrait id={general.portraitId} name={general.name} variant="icon" />
         <div>
           <p>
@@ -109,6 +109,7 @@ function CreateGeneral({ worldId }: { worldId: string }) {
         draft={draft}
         onDraft={setDraft}
         rejected={mine.data.creation?.status === 'rejected' ? mine.data.creation.message : null}
+        onSubmitting={() => setCreationStarted(true)}
         onPending={async () => {
           // 보내기 전에 시작한 조회가 늦게 와서 pending을 덮지 않게 멈춘다. 결과는 다시 묻기로 받는다.
           await queryClient.cancelQueries({ queryKey: mineKey });
@@ -159,6 +160,7 @@ function CreateForm({
   draft,
   onDraft,
   rejected,
+  onSubmitting,
   onPending,
   onFailed,
   onCreated,
@@ -168,6 +170,7 @@ function CreateForm({
   draft: Draft;
   onDraft: (update: (prev: Draft) => Draft) => void;
   rejected: string | null;
+  onSubmitting: () => void;
   onPending: () => Promise<void>;
   onFailed: () => void;
   onCreated: (general: Created) => void;
@@ -189,6 +192,8 @@ function CreateForm({
     event.preventDefault();
     setTouched(true);
     if (!check.stats || check.problems.length > 0 || create.isPending) return;
+    // 재조회가 생성 응답보다 빨라도 폼의 언마운트로 완료 전환을 잃지 않는다.
+    onSubmitting();
     create.mutate(
       { worldId, name: check.name, ...check.stats, portraitId },
       {

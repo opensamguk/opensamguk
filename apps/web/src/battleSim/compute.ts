@@ -1,6 +1,6 @@
 // E1 (docs/architecture/package-boundaries.md): apps/web에서 @opensamguk/rules 값을 import하는 파일은
 // 이 파일과 compute.test.ts뿐이다. battle.worker.ts만 이 파일을 import하므로 simulateBattle은 Worker 묶음에만 들어간다.
-import { simulateBattle, unitSetSchema, type UnitSetResource } from '@opensamguk/rules';
+import { simulateBattle, unitSetSchema, commanderBattleModifiers, type UnitSetResource } from '@opensamguk/rules';
 import { createRng } from '@opensamguk/shared';
 import { checkRequest, readRequestId, requestBody, type BattleRunInput, type BattleRunReply } from './request';
 
@@ -23,7 +23,20 @@ export function createCompute(rawUnitSet: unknown): (message: unknown) => Battle
       return { type: 'error', requestId: checked.requestId, code: 'INVALID_INPUT', field: checked.field };
     }
     const { seed, ...input } = requestBody(checked.request);
-    const result = simulateBattle({ ...input, unitSet }, createRng(seed));
+    const { commanders, ...forces } = input;
+    const result = simulateBattle(
+      {
+        ...forces,
+        unitSet,
+        ...(commanders
+          ? {
+              attackerModifiers: commanderBattleModifiers(commanders.attacker),
+              ...(commanders.defender ? { defenderModifiers: commanderBattleModifiers(commanders.defender) } : {}),
+            }
+          : {}),
+      },
+      createRng(seed),
+    );
     const echoed: BattleRunInput = input;
     return {
       type: 'result',

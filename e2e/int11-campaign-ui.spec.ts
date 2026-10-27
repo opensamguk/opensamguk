@@ -1,5 +1,6 @@
 import type { AppRouter } from '../apps/server/src/router';
 import type { inferRouterOutputs } from '@trpc/server';
+import type { Route } from '@playwright/test';
 import { test, expect, apiMutate, apiQuery } from './t210-fixture';
 import { rngFor } from '../packages/shared/src/index';
 import { applyCampaignRelationship } from '../packages/rules/src/index';
@@ -74,10 +75,92 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
       await user.page.getByRole('button', { name: '책사', exact: true }).click();
       await expect(user.page.getByRole('spinbutton', { name: '지력', exact: true })).toHaveValue('90');
       await user.page.getByRole('button', { name: '고르게 나누기' }).click();
-      await user.page.getByRole('button', { name: '장수 만들기', exact: true }).click();
-      await pending('general.create');
-      await advance();
-      await expect(user.page).toHaveURL(`${world.stack.webOrigin}/w/${worldId}`);
+      const pattern = '**/trpc/general.create*';
+      let release = () => {};
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const tasks: Promise<PromiseSettledResult<unknown>>[] = [];
+      const track = <T>(task: Promise<T>) => {
+        tasks.push(
+          task.then(
+            (value) => ({ status: 'fulfilled' as const, value }),
+            (reason: unknown) => ({ status: 'rejected' as const, reason }),
+          ),
+        );
+        return task;
+      };
+      const failures: unknown[] = [];
+      let delivered = false;
+      let failed = false;
+      const onFailed = (request: { url(): string }) => {
+        if (request.url().includes('/trpc/general.create')) failed = true;
+      };
+      const holdResponse = (route: Route) => {
+        return track(
+          (async () => {
+            const response = await route.fetch();
+            await gate;
+            delivered = true;
+            await route.fulfill({ response });
+          })(),
+        );
+      };
+      if (index === 0) {
+        await user.page.route(pattern, holdResponse);
+        user.page.on('requestfailed', onFailed);
+      }
+      try {
+        await user.page.getByRole('button', { name: '장수 만들기', exact: true }).click();
+        await pending('general.create');
+        await advance();
+        if (index === 0) {
+          // 실제 생성 응답만 보류한다. ready와 같은 캐시 무효화로 실제 mine 조회가 먼저 도착하게 한다.
+          const observed = track(
+            user.page.waitForResponse(
+              async (response) => {
+                if (
+                  !new URL(response.url()).pathname.split('/').at(-1)?.split(',').includes('general.mine') ||
+                  response.status() >= 400
+                )
+                  return false;
+                const body: unknown = await response.json();
+                return (Array.isArray(body) ? body : [body]).some(
+                  (row) => row?.result?.data?.general?.name === `화면장수${index}`,
+                );
+              },
+              { timeout: 5000 },
+            ),
+          );
+          await user.page.evaluate(
+            async ({ moduleUrl, id }) => {
+              const { queryClient, trpc } = await import(moduleUrl);
+              await queryClient.invalidateQueries({ queryKey: trpc.general.mine.queryKey({ worldId: id }) });
+            },
+            { moduleUrl: '/src/trpc.ts', id: worldId },
+          );
+          await observed;
+          expect(delivered).toBe(false);
+          expect(failed).toBe(false);
+        }
+        await expect(user.page).toHaveURL(`${world.stack.webOrigin}/w/${worldId}`);
+      } catch (error) {
+        failures.push(error);
+      } finally {
+        release();
+        const results = await Promise.all(tasks);
+        for (const result of results) if (result.status === 'rejected') failures.push(result.reason);
+        if (index === 0) {
+          try {
+            if (!user.page.isClosed()) await user.page.unroute(pattern, holdResponse);
+          } catch (error) {
+            failures.push(error);
+          } finally {
+            user.page.off('requestfailed', onFailed);
+          }
+        }
+      }
+      if (failures.length) throw new AggregateError([...new Set(failures)], '장수 생성 경합 검사 실패');
     }
     const humans = await db.general.findMany({
       where: { worldId, userId: { in: [owner.userId, target.userId] } },

@@ -63,10 +63,39 @@ export function BattleSimPage() {
           if (checked.body) run(checked.body);
         }}
       >
+        <label className={styles.field}>
+          계산 규칙
+          <select
+            className={styles.input}
+            value={form.statProfile}
+            onChange={(event) =>
+              setForm((current) => ({ ...current, statProfile: event.target.value as BattleForm['statProfile'] }))
+            }
+          >
+            <option value="legacy">구형 월드, 지휘관 보정 없음</option>
+            <option value="five-stats">통합판 5능력치, 지휘관 보정</option>
+          </select>
+        </label>
+        <p className={styles.muted}>
+          월드의 규칙에 맞춰 고릅니다. 지휘관 값은 가정을 직접 입력하며 실제 장수의 비공개 수치를 불러오지 않습니다.
+        </p>
         <div className={styles.sides}>
           <fieldset className={styles.side}>
             <legend>공격</legend>
             <ForceFields side="attacker" form={form.attacker} problems={problems} onChange={setForce} />
+            {form.statProfile === 'five-stats' ? (
+              <CommanderFields
+                side="attacker"
+                value={form.attackerCommander}
+                problems={problems}
+                onChange={(key, value) =>
+                  setForm((current) => ({
+                    ...current,
+                    attackerCommander: { ...current.attackerCommander, [key]: value },
+                  }))
+                }
+              />
+            ) : null}
             <NumberField
               label="기술"
               field="attackerTech"
@@ -123,6 +152,19 @@ export function BattleSimPage() {
             ) : (
               <ForceFields side="defender" form={form.defender} problems={problems} onChange={setForce} />
             )}
+            {form.statProfile === 'five-stats' && !wall ? (
+              <CommanderFields
+                side="defender"
+                value={form.defenderCommander}
+                problems={problems}
+                onChange={(key, value) =>
+                  setForm((current) => ({
+                    ...current,
+                    defenderCommander: { ...current.defenderCommander, [key]: value },
+                  }))
+                }
+              />
+            ) : null}
             <NumberField
               label="기술"
               field="defenderTech"
@@ -166,6 +208,34 @@ export function BattleSimPage() {
 }
 
 type Problems = ReadonlyMap<string, FieldProblem>;
+
+function CommanderFields({
+  side,
+  value,
+  problems,
+  onChange,
+}: {
+  side: 'attacker' | 'defender';
+  value: { leadership: string; strength: string };
+  problems: Problems;
+  onChange: (key: 'leadership' | 'strength', value: string) => void;
+}) {
+  return (
+    <>
+      {(['leadership', 'strength'] as const).map((key) => (
+        <NumberField
+          key={key}
+          label={key === 'leadership' ? '지휘관 통솔' : '지휘관 무력'}
+          field={`commanders.${side}.${key}`}
+          value={value[key]}
+          problems={problems}
+          hint="0~100, 가정한 실제 지휘관 값"
+          onChange={(next) => onChange(key, next)}
+        />
+      ))}
+    </>
+  );
+}
 
 function ForceFields({
   side,
@@ -349,6 +419,12 @@ function ResultPanel({
             <dd data-testid="result-seed">{state.result.seed}</dd>
             <dt>병종표</dt>
             <dd data-testid="result-unitset">{state.result.unitSetId}</dd>
+            <dt>지휘관 보정</dt>
+            <dd data-testid="result-commanders">
+              {state.result.input.commanders
+                ? `공격 통솔 ${state.result.input.commanders.attacker.leadership}·무력 ${state.result.input.commanders.attacker.strength}, ${state.result.input.commanders.defender ? `수비 통솔 ${state.result.input.commanders.defender.leadership}·무력 ${state.result.input.commanders.defender.strength}` : '성벽 보정 없음'}`
+                : '구형 월드, 보정 없음'}
+            </dd>
           </dl>
           <div className={styles.forces}>
             <ForceResult
