@@ -1,0 +1,40 @@
+{
+  "repository": "https://github.com/peppone-choi/opensamguk-images",
+  "revision": "46faca52ac6bf0db67b3350400e3b92847036af2",
+  "license": "MIT",
+  "provenance": "Existing ImageGen city artwork, exported by the original city icon builder; recovered unchanged from pre-deletion history.",
+  "anchor": "bottom-center",
+  "nativeSize": 32,
+  "assets": [
+    {
+      "kind": "city",
+      "source": "web/game/public/city/1x/cast_6.png",
+      "sha256": "72300c4014e0ede4b33fe9c22104865a08bede0699c6b3aab6f14e874e44fbe1",
+      "bytes": 1239
+    },
+    {
+      "kind": "pass",
+      "source": "web/game/public/city/1x/cast_3.png",
+      "sha256": "57e0500ff148b2b2f5c0a24d08f92410bcb39b545cc8f926f11ec0e9c7d6f106",
+      "bytes": 1200
+    },
+    {
+      "kind": "port",
+      "source": "web/game/public/city/1x/cast_1.png",
+      "sha256": "d721d2052afa118fb3bab1f76cafb413db30c989441ba61683dbf648c938bc1e",
+      "bytes": 1006
+    },
+    {
+      "kind": "field",
+      "source": "web/game/public/city/1x/cast_2.png",
+      "sha256": "8a631f70bd5798b1b774d6d96ef8729b7eff48572dce446bea453407186be90e",
+      "bytes": 1057
+    }
+  ],
+  "licenseEvidence": [
+    "https://github.com/peppone-choi/opensamguk-images/blob/46faca52ac6bf0db67b3350400e3b92847036af2/README.md",
+    "https://github.com/peppone-choi/opensamguk-images/blob/46faca52ac6bf0db67b3350400e3b92847036af2/.license-boundaries.json",
+    "https://github.com/peppone-choi/opensamguk-images/blob/46faca52ac6bf0db67b3350400e3b92847036af2/ASSET-EXPORTS.md",
+    "https://github.com/peppone-choi/opensamguk-images/blob/46faca52ac6bf0db67b3350400e3b92847036af2/THIRD-PARTY-NOTICES.md"
+  ]
+}

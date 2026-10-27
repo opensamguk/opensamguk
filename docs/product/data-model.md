@@ -1,5 +1,7 @@
 # 데이터 모델
 
+> 2026-10-27 D-037·038 우선. 현재 제작은 [동결 통합판 v0.1](../plans/integration-release.md)과 [5능력치](./five-stats.md)를 따른다. 아래 이전 M1~M3 설계·코드 상태는 이력/기존 판의 설명이며 새 판은 통솔·무력·지력·정치·매력을 쓴다.
+
 > 상태: 확정 v0.2 (2026-10-20, D-011)
 > 코드가 생기면 Prisma schema(`packages/db/prisma/schema.prisma`)가 기준이 되고 이 문서는 개요만 남깁니다.
 

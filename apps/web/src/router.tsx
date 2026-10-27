@@ -268,6 +268,14 @@ const mapEditorRoute = import.meta.env.DEV
     })
   : null;
 
+const campaignMapEditorRoute = import.meta.env.DEV
+  ? createRoute({
+      getParentRoute: () => rootRoute,
+      path: 'dev/campaign-map-editor',
+      component: lazyRouteComponent(() => import('./mapEditor/CampaignMapEditorPage'), 'CampaignMapEditorPage'),
+    })
+  : null;
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   lobbyRoute,
@@ -297,6 +305,7 @@ const routeTree = rootRoute.addChildren([
   ]),
   ...(import.meta.env.DEV ? [devUiRoute] : []),
   ...(mapEditorRoute ? [mapEditorRoute] : []),
+  ...(campaignMapEditorRoute ? [campaignMapEditorRoute] : []),
 ]);
 
 export const router = createRouter({ routeTree, context: { queryClient, trpc } });

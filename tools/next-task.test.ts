@@ -245,7 +245,7 @@ describe('다음 작업 출력의 Phase 2 절', () => {
     const rows = parseQueue(markdown);
     const isT4 = (row: { milestone: number }) => row.milestone === 4;
     const t4Rows = rows.filter(isT4);
-    const gateRows = rows.filter((row) => !isT4(row));
+    const gateRows = rows.filter((row) => row.milestone < 4);
     const openT4 = t4Rows.filter((row) => row.stage !== '완료').map((row) => row.id);
     const gateIds = (result: ReturnType<typeof nextActions>) => [
       ...Object.values(result.ready).flatMap((items) => ids(items) ?? []),
@@ -263,7 +263,14 @@ describe('다음 작업 출력의 Phase 2 절', () => {
       expect(Object.keys(result)).toEqual(['milestone', 'ready', 'blocked', 'ahead']);
       expect(output).not.toContain('Phase 2');
     } else {
-      expect(Object.keys(result)).toEqual(['milestone', 'ready', 'blocked', 'ahead', 'phase2']);
+      expect(Object.keys(result)).toEqual([
+        'milestone',
+        'ready',
+        'blocked',
+        'ahead',
+        'phase2',
+        ...(rows.some((r) => r.id.startsWith('INT-')) ? ['integration'] : []),
+      ]);
       const { phase2 } = result;
       const phase2Ids = [
         ...Object.values(phase2?.ready ?? {}).flatMap((items) => ids(items) ?? []),
@@ -271,7 +278,7 @@ describe('다음 작업 출력의 Phase 2 절', () => {
         ...(phase2?.ahead.map((row) => row.id) ?? []),
       ];
       expect(phase2Ids.sort()).toEqual([...openT4].sort());
-      expect(nextActions([...t4Rows, ...gateRows])).toEqual(result);
+      expect(nextActions([...t4Rows, ...gateRows, ...rows.filter((r) => r.milestone === 5)])).toEqual(result);
       expect(output.includes(`\n${PHASE2_HEAD}\n`)).toBe(openT4.length > 0);
     }
 
@@ -605,5 +612,52 @@ describe('다음 작업 출력의 Phase 2 절', () => {
     expect(() => parseQueue(table('| T4-01 | 데모 | P2-01 | 사용자 | — | 리뷰 |'))).toThrow(
       new Error('T4-01: 사용자 작업은 구현·완료 단계만 씁니다'),
     );
+  });
+});
+
+describe('통합 대기열', () => {
+  it('INT rows do not become a gate or hide existing Phase 2 work', () => {
+    const rows = parseQueue(
+      table(
+        [
+          '| INT-01 | 통합 | INT-01 | Codex | — | 진행중 |',
+          '| T1-01 | 관문 | M1-01 | Codex | — | 구현 |',
+          '| T4-01 | 확장 | P2-01 | Claude | — | 구현 |',
+          '| INT-02 | 저장 | INT-02 | Codex | INT-01 | 구현 |',
+        ].join('\n'),
+      ),
+    );
+    const result = nextActions(rows);
+    expect(result.milestone).toBe(1);
+    expect(result.integration?.blocked[0]?.waitingOn[0]?.id).toBe('INT-01');
+    const output = render(result);
+    expect(output).toContain('[통합 Codex] 진행중 INT-01');
+    expect(output).toContain('[Phase 2 Claude] 구현 T4-01');
+    expect(output).not.toContain('현재 관문 M5');
+  });
+  it('shows integration review even when every original gate is done', () => {
+    const rows = parseQueue(table('| INT-13 | 편집기 | INT-13 | Codex | — | 리뷰 |'));
+    expect(render(nextActions(rows))).toContain('[통합 Claude] 리뷰 INT-13');
+  });
+  it('keeps missing plans visible and validates unknown integration dependencies', () => {
+    const rows = parseQueue(table('| INT-02 | 저장 | INT-02 | Codex | — | 진행중 |'));
+    expect(nextActions(rows, { hasPlan: () => false }).integration?.ahead[0]?.id).toBe('INT-02');
+    rows[0]!.deps = 'INT-99';
+    expect(() => nextActions(rows)).toThrow('없는 선행 작업');
+  });
+  it('integration ranges exclude interleaved gate rows and reject mixed endpoints', () => {
+    const rows = parseQueue(
+      table(
+        [
+          '| INT-01 | 기준 | INT-01 | Codex | — | 완료 |',
+          '| T1-01 | 관문 | M1-01 | Codex | — | 구현 |',
+          '| INT-02 | 저장 | INT-02 | Codex | — | 완료 |',
+          '| INT-03 | 경로 | INT-03 | Codex | INT-01~INT-02 | 구현 |',
+        ].join('\n'),
+      ),
+    );
+    expect(nextActions(rows).integration?.blocked).toHaveLength(0);
+    rows[3]!.deps = 'INT-01~T1-01';
+    expect(() => nextActions(rows)).toThrow('서로 다른 대기열');
   });
 });

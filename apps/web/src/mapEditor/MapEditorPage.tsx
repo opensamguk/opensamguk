@@ -46,6 +46,7 @@ export function MapEditorPage() {
     <main className={styles.page}>
       <header className={styles.header}>
         <h1>지도 편집기</h1>
+        <a href="/dev/campaign-map-editor">통합 지도 편집기 v3</a>
         <p className={styles.muted}>
           개발 화면입니다. 서버에 저장하지 않고 파일로 불러오고 내려받습니다. 지금 형식과 v2 지도 JSON을 읽습니다.
         </p>
