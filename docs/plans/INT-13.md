@@ -40,3 +40,9 @@ D-035에 따라 생성 지도 시안을 제거하고 실제 GIS 자료로 교체
 병합 전 Claude 독립 리뷰에서 아이콘 고지의 적용 범위와 GIS 재생성 출처 보존을 지적받았다. 원본의 README·정본 라이선스 경계·자작 export 명세로 web/과 assets/의 MIT 근거를 확인해 NOTICE와 아이콘 출처에 명시했다. 기존 지형 파일이 있으면 --with-relief 없이 출처 JSON을 덮어쓰지 못하게 했다. 정상 재생성 결과는 기존 GIS와 같았다.
 
 동명 Suzhou 두 곳은 장쑤 기준으로 고정하고 데이터 순서 변경 반례를 추가했다. 새 거점은 custom- ID를 써 기존 키와 구분하며 새 항구는 선택한 도시 또는 가까운 도시에 귀속한다. 도시 수 헤더와 포인터 취소도 고쳤다. 연결 결과 줄바꿈은 기존 CSS pre-line으로 적용돼 있었다. Claude 수정본 재리뷰 결과는 APPROVE였다. 수정 후 관련 단위 75건과 실제 Chromium 5건을 통과했다. 최종 커밋의 필수 CI와 병합 확인은 별도로 남는다.
+
+## 병합 뒤 인수 근거
+
+2026-10-27 실제 GIS·자작 도트·4종 거점·JSON 왕복·되돌리기·연결 편집의 최종 관련 단위75건과 실제 Chromium5건을 통과했다. Claude의 수정본 독립 리뷰는 APPROVE였다. 운영 게임 연결과 정식 한 기수는 INT-02~04·10·12에 남긴다.
+
+필수 [Linux CI40448514362](https://github.com/opensamguk/opensamguk/actions/runs/40448514362)의7개 검사와 [병합 대기열40449949408](https://github.com/opensamguk/opensamguk/actions/runs/40449949408)가 성공했다. [PR #240](https://github.com/opensamguk/opensamguk/pull/240)를 main `7b910312549062ad670e203015c020e13bbf6518`에 병합했다. 앞선 병합 전 기록을 보존하며 이 절에서 최종 자동 검증·독립 리뷰·병합 근거를 대조한다. 사용자만 수행할 수 있는 전체 플레이 수락을 대신 기록하지 않는다.
