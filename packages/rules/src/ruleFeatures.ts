@@ -12,6 +12,17 @@ import { completePersonnelStep, type PersonnelStepPacket } from './personnel/ste
 import { applyTreatyInput, settleTreaties, validateTreatyRecord } from './diplomacy/treaty';
 import { validatePolicyInput } from './replayInputs';
 import { trade } from './commands/trade';
+import { stratagemCommands } from './commands/ext/stratagem';
+
+export const basicStratagemFeature: RuleFeatureDefinition = {
+  key: 'stratagem-basic',
+  requires: ['five-stats'],
+  conflicts: [],
+  commandBindings: stratagemCommands.map((definition) => ({ definition, sliceKeys: [] })),
+  checkOrigin({ data }) {
+    if (data !== undefined) throw new Error('기본 계략은 별도 초기 상태를 사용하지 않습니다.');
+  },
+};
 
 export const fiveStatsFeature: RuleFeatureDefinition = {
   key: 'five-stats',

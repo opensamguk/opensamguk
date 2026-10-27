@@ -20,5 +20,8 @@ export function resolverForRuleFeatures(
     general: definitions.filter((definition) => definition.target === 'general').map((definition) => definition.key),
     nation: definitions.filter((definition) => definition.target === 'nation').map((definition) => definition.key),
   };
-  return createCommandResolverWithCommands(enabled, [...extensionCommands, ...definitions]);
+  return createCommandResolverWithCommands(enabled, [
+    ...extensionCommands.filter((definition) => !definitions.includes(definition)),
+    ...definitions,
+  ]);
 }
