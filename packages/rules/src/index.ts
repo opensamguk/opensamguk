@@ -181,4 +181,5 @@ export * from './campaign/retinue';
 export * from './campaign/state';
 export * from './campaign/relationships';
 export * from './campaign/record';
+export * from './campaign/unitInputs';
 export { commandStatPreview, type CommandStatPreview } from './commands/statPreview';
