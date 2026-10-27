@@ -11,8 +11,19 @@ import { storedGeneralStats } from './generalStats';
 
 export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): Promise<WorldState> {
   const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
-  const { preset, commands } = engineResolver(world);
   const capabilities = await assertWorldCapabilities(tx, world);
+  return loadWorldAfterCapabilityCheck(tx, world, capabilities);
+}
+
+// 호출자는 같은 트랜잭션의 World 행을 잠그고 바로 앞에서 capability 검사를 마쳐야 한다.
+// 입력을 처리하지 않은 일반 턴에서만 같은 사본을 재사용하며 다음 턴에는 다시 DB에서 검사한다.
+export async function loadWorldAfterCapabilityCheck(
+  tx: Prisma.TransactionClient,
+  world: Prisma.WorldGetPayload<Record<string, never>>,
+  capabilities: Awaited<ReturnType<typeof assertWorldCapabilities>>,
+): Promise<WorldState> {
+  const worldId = world.id;
+  const { preset, commands } = engineResolver(world);
   if (world.replayFormat === 3) await assertPersonnelStorage(tx, worldId, world.ruleFeatures.includes('personnel'));
   if (world.replayFormat === 3 && !world.ruleFeatures.includes('personnel'))
     await assertNoResidenceAnchors(tx, worldId);
@@ -62,7 +73,7 @@ export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): 
       }),
     ),
     diplomacies: diplomacies.map(stripWorldId),
-    ...(await loadCommandState(tx, worldId)),
+    ...(await loadCommandState(tx, worldId, world)),
     ...(capabilities.kind === 'caps' && 'treaty' in capabilities.selection ? await loadTreaties(tx, worldId) : {}),
   };
   for (const feature of engineFeatures
