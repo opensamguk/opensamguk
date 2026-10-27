@@ -1,3 +1,4 @@
+import { setTimeout as delay } from 'node:timers/promises';
 import { randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -92,9 +93,17 @@ afterAll(async () => {
     try {
       await Promise.all([db.$disconnect(), client.end()]);
       if (created) {
-        expect(
-          (await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1', [ownName])).rows,
-        ).toEqual([{ count: 0 }]);
+        // Closing the client socket can precede PostgreSQL removing its backend.
+        let activity = await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1', [
+          ownName,
+        ]);
+        for (let attempt = 0; activity.rows[0]?.count !== 0 && attempt < 20; attempt++) {
+          await delay(50);
+          activity = await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1', [
+            ownName,
+          ]);
+        }
+        expect(activity.rows).toEqual([{ count: 0 }]);
         await admin.query(`DROP DATABASE "${ownName}"`);
         expect((await admin.query('SELECT datname FROM pg_database WHERE datname=$1', [ownName])).rows).toEqual([]);
       }
