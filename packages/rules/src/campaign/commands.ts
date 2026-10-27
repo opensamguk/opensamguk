@@ -30,6 +30,9 @@ function descendants(view: WorldView, id: number) {
 function gate(view: WorldView, actor: Actor, key: string) {
   const general = view.generals[actor.generalId];
   if (!general) return fail('NO_ACTOR', '장수가 없습니다.');
+  // 군사·소속을 건드리지 않는 후보 검사에는 휘하 조건이 없다.
+  // 실제 실행의 전후 상태 검사는 아래 execute 경로에서 계속 수행한다.
+  if (!military.has(key) && !allegiance.has(key)) return null;
   const campaign = readCampaignState(view.campaign, view);
   if (general.userId === null && military.has(key) && campaign.links.some((link) => link.personId === general.id))
     return fail('COMMAND_DISABLED', '휘하 NPC의 군사 행동은 상관의 부곡 명령으로 실행합니다.');

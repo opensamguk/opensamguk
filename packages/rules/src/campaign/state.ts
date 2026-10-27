@@ -71,6 +71,7 @@ export function readCampaignState(value: unknown, world: WorldView, expectedSeed
     state.offers.some((offer) => offer.id >= state.nextOfferId)
   )
     throw new Error('휘하·부곡 번호가 중복되거나 다음 번호를 넘었습니다.');
+  const commandedTroops = new Map<number, number>();
   for (const unit of state.units) {
     const owner = world.generals[unit.ownerId],
       commander = world.generals[unit.commanderId];
@@ -85,14 +86,9 @@ export function readCampaignState(value: unknown, world: WorldView, expectedSeed
           )))
     )
       throw new Error('부곡 소유자와 실제 지휘관의 관계가 다릅니다.');
-  }
-  for (const person of people) {
-    let commanded = 0;
-    for (const unit of state.units.filter((unit) => unit.commanderId === person.id)) {
-      if (unit.troops > person.stats.leadership * 100 - commanded)
-        throw new Error('실제 지휘관의 병력 상한을 넘었습니다.');
-      commanded += unit.troops;
-    }
+    const commanded = commandedTroops.get(commander.id) ?? 0;
+    if (unit.troops > commander.leadership * 100 - commanded) throw new Error('실제 지휘관의 병력 상한을 넘었습니다.');
+    commandedTroops.set(commander.id, commanded + unit.troops);
   }
   const pairs = new Set<string>();
   for (const attempt of state.attempts) {
