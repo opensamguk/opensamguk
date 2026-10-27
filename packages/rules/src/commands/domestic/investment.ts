@@ -4,6 +4,7 @@ import type { WorldView } from '../../model/world';
 import type { Actor, CommandDef, Failure } from '../types';
 import type { CityField, Effect } from '../effects';
 import { applyModifiers, collectModifiers, collectModifiersWith, type ModifierProvider } from '../../modifiers';
+import { domesticStatScore } from '../statScores';
 
 type Spec = {
   key: string;
@@ -95,7 +96,8 @@ function makeInvestmentWithCollector(spec: Spec, collect: typeof collectModifier
       const general = view.generals[actor.generalId]!;
       const city = view.cities[general.cityKey]!;
       // Replay order: base score, critical roll, then a multiplier only for a critical.
-      let score = ((general[spec.stat] * city.trust) / 100) * (0.8 + rng.next() * 0.4);
+      let score =
+        ((domesticStatScore(view, general, spec.key, spec.stat) * city.trust) / 100) * (0.8 + rng.next() * 0.4);
       const critical = rng.next();
       if (critical < 0.1) score *= 2.2 + rng.next() * 0.8;
       else if (critical < 0.2) score *= 0.2 + rng.next() * 0.2;

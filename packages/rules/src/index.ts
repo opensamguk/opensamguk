@@ -178,3 +178,4 @@ export { trade, findTradeRoutes, type TradeRoute } from './commands/trade';
 export { resolverForRuleFeatures } from './ruleCommands';
 
 export * from './campaign/retinue';
+export { commandStatPreview, type CommandStatPreview } from './commands/statPreview';

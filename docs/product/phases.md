@@ -295,7 +295,7 @@ INT 작업은 M1~M3와 Phase 2 관문 계산에서 분리한다. 첫 파일 편�
 | INT-11 | 5능력치·휘하·부곡 입력 화면 | INT-11 | Claude | INT-06, INT-09, INT-10, INT-17 | 구현 |
 | INT-12 | 전체 판·장애·복원·인수 | INT-12 | Codex | INT-09, INT-11 | 구현 |
 | INT-13 | 통합 지도 파일 편집기 | INT-13 | Codex | — | 리뷰 |
-| INT-14 | 5능력치 계약·저장·생성 | INT-14 | Codex | INT-01 | 구현 |
+| INT-14 | 5능력치 계약·저장·생성 | INT-14 | Codex | INT-01 | 완료 |
 | INT-15 | 5능력치 내정·모병·NPC 판단 | INT-15 | Codex | INT-14 | 구현 |
 | INT-16 | 491명 능력치 대조·검수 | INT-16 | Codex | INT-14 | 구현 |
 | INT-17 | 기본 계략 4종 운영 연결 | INT-17 | Codex | INT-14, INT-15 | 구현 |

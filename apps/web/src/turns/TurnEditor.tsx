@@ -33,7 +33,7 @@ import {
   type Turn,
 } from './draft';
 import { slotTimes, type SlotTime } from './schedule';
-import { personalSource, type DisplaySlot, type TurnSource, type TurnSourceFactory } from './source';
+import { personalSource, type Check, type DisplaySlot, type TurnSource, type TurnSourceFactory } from './source';
 import styles from './TurnEditor.module.css';
 import { useStoredSelection, useTurnDraft, type TurnDraftState } from './useTurnDraft';
 
@@ -103,7 +103,7 @@ function AuthLost() {
   );
 }
 
-type PrecheckResult = { ok: true } | { ok: false; message: string } | { ok: 'error'; message: string } | undefined;
+type PrecheckResult = Check | { ok: 'error'; message: string } | undefined;
 
 function Editor<S extends DisplaySlot>({
   worldId,
@@ -209,7 +209,7 @@ function Editor<S extends DisplaySlot>({
   distinct.forEach(([key], i) => {
     const query = prechecks[i];
     if (!query) return;
-    if (query.data) precheckByKey.set(key, query.data.ok ? { ok: true } : { ok: false, message: query.data.message });
+    if (query.data) precheckByKey.set(key, query.data);
     else if (query.isError)
       precheckByKey.set(key, {
         ok: 'error',
@@ -486,6 +486,13 @@ function Editor<S extends DisplaySlot>({
                     ) : (
                       <span className={styles.warn}>경고: {check.message}</span>
                     )}
+                    {check && check.ok !== 'error' && check.preview ? (
+                      <span className={styles.args}>
+                        금 {check.preview.goldCost.toLocaleString()}
+                        {check.preview.statScore !== undefined ? ` · 능력치 점수 ${check.preview.statScore}` : ''}
+                        {check.preview.gain !== undefined ? ` · 상승 ${check.preview.gain}` : ''}
+                      </span>
+                    ) : null}
                   </td>
                 </tr>
               );
