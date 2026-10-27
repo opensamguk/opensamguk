@@ -80,6 +80,8 @@ export function applyCampaignRelationship(
   context: { tick: number; userId: string; userActive: boolean },
 ): Outcome {
   const campaign = readCampaignState(campaignValue, world);
+  if (world.campaign && JSON.stringify(readCampaignState(world.campaign, world)) !== JSON.stringify(campaign))
+    throw new Error('월드와 휘하 입력의 저장 상태가 다릅니다.');
   const parsed = campaignRelationshipInputSchema.safeParse(value);
   if (!parsed.success) return deny('BAD_INPUT', '휘하 입력을 확인하세요.');
   if (!Number.isSafeInteger(context.tick) || context.tick < 0 || context.tick > 2_147_483_647)
@@ -180,6 +182,7 @@ export function applyCampaignRelationship(
       if (unit.ownerId === link.masterId && unit.commanderId === link.personId) unit.commanderId = unit.ownerId;
   }
   next.revision++;
+  if (state.campaign) state.campaign = next;
   readCampaignState(next, state, campaign.seed);
   return {
     ok: true,

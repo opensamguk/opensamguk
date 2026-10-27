@@ -13,6 +13,7 @@ function fixture(personnelFormat: 1 | null, policyFromSequence: number | null = 
     id: 'world',
     name: '입력 시험',
     operationalMap: null,
+    campaignState: null,
     presetKey: null,
     scenarioKey: legacy.origin.initial.scenarioKey,
     mapKey: legacy.origin.initial.mapKey,
