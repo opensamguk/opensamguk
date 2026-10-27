@@ -1,9 +1,31 @@
 import { describe, expect, it } from 'vitest';
-import { checkCreation } from './createForm';
+import { checkCreation, FIVE_STAT_PRESETS, FIVE_STATS } from './createForm';
 
 const stats = (l: string, s: string, i: string) => ({ leadership: l, strength: s, intel: i });
 
 describe('장수 생성 입력 검사', () => {
+  it('월드의5값275·15~90을 검사하고 기존3값 전송에는 정치·매력을 넣지 않는다', () => {
+    const values = { leadership: '55', strength: '55', intel: '55', politics: '55', charm: '55' };
+    const rules = { count: 5, total: 275, min: 15, max: 90 };
+    expect(checkCreation('사람', values, rules).stats).toEqual({
+      leadership: 55,
+      strength: 55,
+      intel: 55,
+      politics: 55,
+      charm: 55,
+    });
+    expect(checkCreation('사람', values).stats).toEqual({ leadership: 55, strength: 55, intel: 55 });
+    expect(checkCreation('사람', { leadership: '55', strength: '55', intel: '55' }, rules).stats).toBeNull();
+    expect(checkCreation('사람', { ...values, politics: '91', charm: '19' }, rules).problems).toContain(
+      '정치는 15~90 사이여야 합니다.',
+    );
+    for (const preset of FIVE_STAT_PRESETS) {
+      const draft = Object.fromEntries(
+        FIVE_STATS.map((stat, index) => [stat.key, String(preset.values[index])]),
+      ) as typeof values;
+      expect(checkCreation('사람', draft, rules).problems).toEqual([]);
+    }
+  });
   it('합계 165, 각각 15~80이면 통과하고 남은 점수는 0이다', () => {
     const check = checkCreation(' 조운 ', stats('80', '70', '15'));
     expect(check.problems).toEqual([]);

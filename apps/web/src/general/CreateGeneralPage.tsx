@@ -8,10 +8,19 @@ import { useTRPC } from '../trpc';
 import { errorCode, retryUnlessClientError, serverMessage } from '../turns/apiError';
 import { DisabledReason } from '../ui/DisabledReason';
 import { EmptyState, ErrorState } from '../ui/States';
-import { checkCreation, PORTRAIT_CHOICES, STAT_RULES, STATS, type StatKey, type StatValues } from './createForm';
+import {
+  checkCreation,
+  PORTRAIT_CHOICES,
+  STATS,
+  FIVE_STATS,
+  FIVE_STAT_PRESETS,
+  type CreationRules,
+  type StatKey,
+  type StatValues,
+} from './createForm';
 import styles from './CreateGeneralPage.module.css';
 
-const EVEN: StatValues = { leadership: '55', strength: '55', intel: '55' };
+const EVEN: StatValues = { leadership: '55', strength: '55', intel: '55', politics: '55', charm: '55' };
 
 interface Draft {
   name: string;
@@ -96,17 +105,26 @@ function CreateGeneral({ worldId }: { worldId: string }) {
     body = (
       <CreateForm
         worldId={worldId}
+        rules={mine.data.creationRules}
         draft={draft}
         onDraft={setDraft}
         rejected={mine.data.creation?.status === 'rejected' ? mine.data.creation.message : null}
         onPending={async () => {
           // 보내기 전에 시작한 조회가 늦게 와서 pending을 덮지 않게 멈춘다. 결과는 다시 묻기로 받는다.
           await queryClient.cancelQueries({ queryKey: mineKey });
-          queryClient.setQueryData(mineKey, { general: null, creation: { status: 'pending' as const } });
+          queryClient.setQueryData(mineKey, {
+            general: null,
+            creation: { status: 'pending' as const },
+            creationRules: mine.data!.creationRules,
+          });
         }}
         onFailed={() => void queryClient.invalidateQueries({ queryKey: mineKey })}
         onCreated={(created) => {
-          queryClient.setQueryData(mineKey, { general: created, creation: null });
+          queryClient.setQueryData(mineKey, {
+            general: created,
+            creation: null,
+            creationRules: mine.data!.creationRules,
+          });
           void queryClient.invalidateQueries({ queryKey: trpc.home.get.queryKey({ worldId }) });
           void navigate({ to: '/w/$worldId', params: { worldId } });
         }}
@@ -137,6 +155,7 @@ type Created = NonNullable<inferRouterOutputs<AppRouter>['general']['mine']['gen
 
 function CreateForm({
   worldId,
+  rules,
   draft,
   onDraft,
   rejected,
@@ -145,6 +164,7 @@ function CreateForm({
   onCreated,
 }: {
   worldId: string;
+  rules: CreationRules;
   draft: Draft;
   onDraft: (update: (prev: Draft) => Draft) => void;
   rejected: string | null;
@@ -161,7 +181,7 @@ function CreateForm({
     onDraft((prev) => ({ ...prev, stats: update(prev.stats) }));
   const setPortraitId = (value: number | null) => onDraft((prev) => ({ ...prev, portraitId: value }));
   const [touched, setTouched] = useState(false);
-  const check = checkCreation(name, stats);
+  const check = checkCreation(name, stats, rules);
   const problemsId = useId();
   const nameId = useId();
 
@@ -212,19 +232,19 @@ function CreateForm({
 
       <fieldset className={styles.stats} aria-describedby={problemsId}>
         <legend>
-          능력치 (합계 {STAT_RULES.total}, 각각 {STAT_RULES.min}~{STAT_RULES.max})
+          능력치 (합계 {rules.total}, 각각 {rules.min}~{rules.max})
         </legend>
-        {STATS.map((stat) => (
+        {(rules.count === 5 ? FIVE_STATS : STATS).map((stat) => (
           <label key={stat.key} className={styles.stat}>
             <span>{stat.label}</span>
             <input
               type="number"
               inputMode="numeric"
               className={`${styles.input} num`}
-              min={STAT_RULES.min}
-              max={STAT_RULES.max}
+              min={rules.min}
+              max={rules.max}
               step={1}
-              value={stats[stat.key]}
+              value={stats[stat.key] ?? ''}
               onChange={(e) => setStats((prev) => ({ ...prev, [stat.key as StatKey]: e.target.value }))}
             />
           </label>
@@ -235,7 +255,32 @@ function CreateForm({
         <button type="button" className={styles.secondary} onClick={() => setStats(() => EVEN)}>
           고르게 나누기
         </button>
+        {rules.count === 5
+          ? FIVE_STAT_PRESETS.map((preset) => (
+              <button
+                type="button"
+                className={styles.secondary}
+                key={preset.name}
+                onClick={() =>
+                  setStats(
+                    () =>
+                      Object.fromEntries(
+                        FIVE_STATS.map((stat, index) => [stat.key, String(preset.values[index])]),
+                      ) as StatValues,
+                  )
+                }
+              >
+                {preset.name}
+              </button>
+            ))
+          : null}
       </fieldset>
+      {rules.count === 5 ? (
+        <p className={styles.hint}>
+          통솔은 지휘 병력·피해 방어, 무력은 공격 피해, 지력은 연구·계략, 정치는 내정, 매력은 모병 비용·민심·NPC 서약에
+          씁니다. 휘하 명망은 별도로 계산합니다.
+        </p>
+      ) : null}
 
       <fieldset className={styles.portraits}>
         <legend>초상</legend>

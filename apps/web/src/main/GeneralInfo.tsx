@@ -23,12 +23,14 @@ export function GeneralInfo({
   cityName,
   nation,
   onSelectCity,
+  campaignEnabled = false,
 }: {
   worldId: string;
   home: Home;
   cityName: string;
   nation: MapNation | undefined;
   onSelectCity: (key: number) => void;
+  campaignEnabled?: boolean;
 }) {
   const g = home.general;
   return (
@@ -58,12 +60,22 @@ export function GeneralInfo({
           { label: '통솔', value: n(g.leadership) },
           { label: '무력', value: n(g.strength) },
           { label: '지력', value: n(g.intel) },
+          ...('politics' in g && 'charm' in g && typeof g.politics === 'number' && typeof g.charm === 'number'
+            ? [
+                { label: '정치', value: n(g.politics) },
+                { label: '매력', value: n(g.charm) },
+              ]
+            : []),
           { label: '나이', value: `${g.age}세` },
           { label: '금', value: n(g.gold) },
           { label: '쌀', value: n(g.rice) },
-          { label: '병력', value: n(g.crew) },
-          { label: '훈련', value: n(g.train) },
-          { label: '사기', value: n(g.atmos) },
+          ...(campaignEnabled
+            ? [{ label: '병력·훈련·사기', value: '부곡별 현황 참조' }]
+            : [
+                { label: '병력', value: n(g.crew) },
+                { label: '훈련', value: n(g.train) },
+                { label: '사기', value: n(g.atmos) },
+              ]),
           { label: '경험', value: n(g.experience) },
           { label: '공헌', value: n(g.dedication) },
           { label: '다음 턴', value: formatClock(home.nextTurnAt) },

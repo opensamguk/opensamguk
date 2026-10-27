@@ -9,6 +9,7 @@ import {
   type CreationCode,
   type InitialGeneral,
   policyKeySchema,
+  statRulesSchema,
 } from '@opensamguk/rules';
 import { z } from 'zod';
 import { router, protectedProcedure } from '../trpc';
@@ -191,11 +192,16 @@ export const generalRouter = router({
   mine: protectedProcedure.input(worldInput).query(({ ctx, input }) =>
     ctx.db.$transaction(
       async (tx) => {
-        await requireWorld(tx, input.worldId);
+        const world = await requireWorld(tx, input.worldId);
+        const creationRules = {
+          ...statRulesSchema.parse({ stat: world.statRules }).stat,
+          count: world.ruleFeatures.includes('five-stats') ? (5 as const) : (3 as const),
+          campaignEnabled: world.ruleFeatures.includes('campaign-v1'),
+        };
         const general = await tx.general.findUnique({
           where: { worldId_userId: { worldId: input.worldId, userId: ctx.user.id } },
         });
-        if (general) return { general: ownGeneral(general), creation: null };
+        if (general) return { general: ownGeneral(general), creation: null, creationRules };
         const event = await tx.inputEvent.findFirst({
           where: { worldId: input.worldId, userId: ctx.user.id, kind: 'general.create' },
           orderBy: { id: 'desc' },
@@ -206,7 +212,7 @@ export const generalRouter = router({
             : event?.status === 'REJECTED'
               ? { status: 'rejected' as const, ...rejection(event.result) }
               : null;
-        return { general: null, creation };
+        return { general: null, creation, creationRules };
       },
       { isolationLevel: 'RepeatableRead' },
     ),

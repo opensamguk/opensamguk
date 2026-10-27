@@ -16,6 +16,7 @@ const LABELS: Record<string, string> = {
   generalId: '대상 장수 번호',
   amount: '수량',
   crewType: '병종 번호',
+  unitId: '부곡 번호',
   buy: '사고팔기',
   resource: '자원',
   name: '나라 이름',

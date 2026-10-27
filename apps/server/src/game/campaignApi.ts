@@ -225,6 +225,7 @@ export async function readCampaignBoard(ctx: ActorContext, worldId: string) {
         revision: campaign.revision,
         status: world.status,
         actorId: actor.id,
+        resources: { gold: actor.gold, rice: actor.rice },
         cityKey: actor.cityKey,
         renownCapacity: INITIAL_RENOWN_CAPACITY,
         armyTypes: initial.unitSet.crewTypes
