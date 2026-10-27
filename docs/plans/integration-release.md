@@ -77,6 +77,14 @@ INT-13 편집기는 구현 후 리뷰 대상이며 새 제작 일수에 다시 �
 
 ## 중간 시연과 종료 조건
 
+새 통합판은 `campaign-v1`과 `campaign-assignment-v2`를 함께 선택해 원생성에 고정한다. 후자는 발령의 기한 수락에도 집결한 NPC 부장이 명시 수락과 같이 동행하도록 고친 판이다. 기존 기능 목록과 원장·월 해시는 변경하지 않는다. 이전 판에서 진행한 플레이는 보존하며 보완판의 한 기수 인수로 대신하지 않는다.
+
+전용 개발 DB를 환경 변수로 연결한 뒤 새 판을 만든다. 생성된 월드 ID와 초기 해시를 기록하고 기존 월드의 기능 목록은 고치지 않는다.
+
+```sh
+pnpm world:create --scenario integration191 --map integration --stat-rules five-stats --portrait-map 191-map --rule-features campaign-assignment-v2,campaign-v1,five-stats,operational-map,personnel,policy,stratagem-basic,treaty --seed integration-v01-formal-campaign-191-20261027 --turn-term 60 --end-year 201 --name "통합판 v0.1 정식 인수"
+```
+
 첫 단계는 합성 최소 월드에서 5능력치 생성·저장·조회·재시작을 확인한다. 그다음 정식 데이터와 53도시 새 판, 이어 실제 API의 휘하·부곡·전투, 마지막에 전체 UI와 한 기수 완주를 시연한다. 합성 월드를 정식 전체 판의 인수로 세지 않는다.
 
 완료는 pnpm check·실제 PostgreSQL 통합·실제 Chromium E2E·고정 시드 재생·두 월드 격리·복원과 반대쪽 리뷰를 통과하고 AC 증거를 채운 상태다. 현재의 전체 검사 실패는 먼저 분류하며 skip·mock·로컬 화면 한 번을 전체 인수로 바꾸지 않는다.

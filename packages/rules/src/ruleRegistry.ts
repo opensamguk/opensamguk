@@ -19,6 +19,7 @@ import { checkStatProfile } from './general/fiveStats';
 import { checkOperationalProfile } from './world/map/profile';
 import type { RecordedInput, ReplayState } from './replay';
 import { campaignFeature, campaignInputKinds } from './campaign/feature';
+import { campaignAssignmentFeature } from './campaign/assignment';
 
 export interface ReplayOriginV1 {
   version: 1;
@@ -74,8 +75,9 @@ export const ruleRegistry: RuleRegistry = {
     operationalMapFeature,
     basicStratagemFeature,
     campaignFeature,
+    campaignAssignmentFeature,
   ],
-  monthlyOrder: ['treaty', 'personnel'],
+  monthlyOrder: ['treaty', 'personnel', 'campaign-assignment-v2'],
   inputKinds: [
     { kind: 'turns.set', feature: null, route: 'direct', apply: applyTurnsInput },
     { kind: 'general.create', feature: null, route: 'queued', apply: applyCreationInput },
