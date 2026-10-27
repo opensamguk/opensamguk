@@ -3,6 +3,7 @@ import { visibilityFixture } from '../test/visibilityFixture';
 import {
   cityInfo,
   generalInfo,
+  garrisonGeneralInfo,
   mapCity,
   nationInfo,
   nationRecordInfo,
@@ -74,5 +75,35 @@ describe('T1-12 / AC-M1-19 공개 범위 표', () => {
       cities: [{ cityKey: 1, nationId: 1 }],
     });
     expect(nationRecordInfo(data.nations[0]!)).toEqual({ nationId: 1, cities: 3, generals: 4, gold: 100, rice: 200 });
+  });
+
+  it('AC-INT-11 지휘 병력은 소유자가 아닌 지휘관으로 합산하고 빈 부곡은 평균에서 뺀다', () => {
+    const general = { ...state.generals[0]!, worldId: 'world', turnRevision: 0, residenceTick: null, crew: 0 };
+    const units = [
+      { id: 1, ownerId: 999, commanderId: general.id, troops: 10, train: 33, atmos: 47, crewType: 1100 },
+      { id: 2, ownerId: general.id, commanderId: general.id, troops: 20, train: 50, atmos: 70, crewType: 1100 },
+      { id: 3, ownerId: general.id, commanderId: 999, troops: 1000, train: 100, atmos: 100, crewType: 1100 },
+      { id: 4, ownerId: general.id, commanderId: general.id, troops: 0, train: 100, atmos: 100, crewType: 1100 },
+    ];
+    const before = structuredClone({ general, units });
+    expect(garrisonGeneralInfo(general, general, units)).toMatchObject({
+      crew: 0,
+      commandedArmy: { troops: 30, train: 44, atmos: 62 },
+    });
+    expect(garrisonGeneralInfo(general, general, [])).toMatchObject({
+      commandedArmy: { troops: 0, train: 0, atmos: 0 },
+    });
+    expect(garrisonGeneralInfo(general, general)).toEqual(generalInfo(general, general));
+    for (const viewer of [
+      null,
+      { id: 999, nationId: 999, cityKey: general.cityKey },
+      { id: 999, nationId: null, cityKey: general.cityKey },
+    ])
+      expect(garrisonGeneralInfo(general, viewer, units)).toEqual({
+        id: general.id,
+        name: general.name,
+        nationId: general.nationId,
+      });
+    expect({ general, units }).toEqual(before);
   });
 });

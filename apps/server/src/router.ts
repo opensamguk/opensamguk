@@ -21,6 +21,7 @@ import { personnelRouter } from './routers/personnel';
 import { offersRouter } from './routers/offers';
 import { nationTurnsRouter } from './routers/nationTurns';
 import { nationCommandsRouter } from './routers/nationCommands';
+import { campaignRouter } from './routers/campaign';
 
 export const appRouter = router({
   auth: authRouter,
@@ -44,6 +45,7 @@ export const appRouter = router({
   offers: offersRouter,
   nationTurns: nationTurnsRouter,
   nationCommands: nationCommandsRouter,
+  campaign: campaignRouter,
   // 화면이 서버와 DB 연결을 확인하는 데 쓴다 (AC-M1-02).
   health: publicProcedure.query(async ({ ctx }) => {
     let db: 'ok' | 'down' = 'ok';

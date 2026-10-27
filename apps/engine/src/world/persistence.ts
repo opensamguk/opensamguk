@@ -23,6 +23,7 @@ import {
   checkOperationalProfile,
   readOperationalMap,
   attachOperationalKinds,
+  emptyCampaignState,
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { loadCommandState } from '../commandPersistence';
@@ -231,6 +232,15 @@ export async function saveInitialWorld(
           replayOrigin: replayOrigin as Prisma.InputJsonValue,
           statRules: creationState.statRules,
           unitSet: creationState.unitSet as Prisma.InputJsonValue,
+          ...(features.includes('campaign-v1')
+            ? {
+                campaignState: emptyCampaignState(
+                  toWorldState(creationState),
+                  creationState.seed,
+                  creationState.scenarioKey,
+                ) as Prisma.InputJsonValue,
+              }
+            : {}),
           ...(creationState.operationalMap
             ? { operationalMap: creationState.operationalMap as Prisma.InputJsonValue }
             : {}),

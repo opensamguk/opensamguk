@@ -39,6 +39,7 @@ function world(patch: Partial<World> = {}): World {
     id: 'world',
     name: '조약 조회 단위',
     operationalMap: null,
+    campaignState: null,
     presetKey: null,
     preset: null,
     scenarioKey: '1030',

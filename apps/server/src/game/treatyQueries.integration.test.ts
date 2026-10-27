@@ -56,6 +56,7 @@ function world(patch: Partial<World> = {}): World {
     id: 'world',
     name: '저장 행 단위',
     operationalMap: null,
+    campaignState: null,
     presetKey: null,
     preset: null,
     scenarioKey: 'command-test',

@@ -96,6 +96,14 @@ type Received = { method: string | undefined; path: string | undefined; contentT
 async function receiver(reply: (request: IncomingMessage, response: ServerResponse) => void) {
   const received: Received[] = [];
   const calls: { url: string; init: DiscordWebhookRequestInit; abortedAtCall: boolean }[] = [];
+  const transportFailures: {
+    name: string;
+    code: string | null;
+    aborted: boolean;
+    received: number;
+    listening: boolean;
+    port: number;
+  }[] = [];
   const server = createServer((request, response) => {
     const chunks: Buffer[] = [];
     request.on('data', (chunk: Buffer) => chunks.push(chunk));
@@ -118,12 +126,26 @@ async function receiver(reply: (request: IncomingMessage, response: ServerRespon
   const transport: DiscordWebhookTransport = (endpoint, init) => {
     calls.push({ url: endpoint, init, abortedAtCall: init.signal.aborted });
     // 운영 URL 검사를 우회하지 않고 신뢰된 시험 전송부만 고정 수신기로 보낸다.
-    return fetch(`${origin}/hook`, init);
+    return fetch(`${origin}/hook`, init).catch((error: unknown) => {
+      const cause = error instanceof Error && error.cause && typeof error.cause === 'object' ? error.cause : null;
+      const code = cause && 'code' in cause ? cause.code : null;
+      // 실패 원문·URL·본문은 남기지 않고 시험 수신기의 연결 상태만 진단한다.
+      transportFailures.push({
+        name: error instanceof TypeError ? 'TypeError' : error instanceof Error ? 'Error' : 'unknown',
+        code: typeof code === 'string' && /^[A-Z][A-Z0-9_]{0,63}$/.test(code) ? code : null,
+        aborted: init.signal.aborted,
+        received: received.length,
+        listening: server.listening,
+        port: address.port,
+      });
+      throw error;
+    });
   };
   return {
     origin,
     received,
     calls,
+    transportFailures,
     transport,
     async close() {
       server.closeAllConnections();
@@ -604,7 +626,12 @@ describe('실제 로컬 HTTP 전송', () => {
     });
     try {
       const result = await send(input, { transport: local.transport });
-      expect(result).toEqual({ kind: 'HTTP_OBSERVED', status, category, retryAfterSeconds: seconds ?? null });
+      expect(result, JSON.stringify(local.transportFailures)).toEqual({
+        kind: 'HTTP_OBSERVED',
+        status,
+        category,
+        retryAfterSeconds: seconds ?? null,
+      });
       await nextTurn();
       assertRequest(local);
       expect(local.calls[0]!.init.signal.aborted).toBe(false);

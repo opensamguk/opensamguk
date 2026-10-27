@@ -156,6 +156,7 @@ function exportFixture(source: CapsArchive, ended = true) {
     id: 'caps-export',
     name: '수출 단위 시험',
     operationalMap: null,
+    campaignState: null,
     presetKey: null,
     preset: null,
     scenarioKey: initial.scenarioKey,

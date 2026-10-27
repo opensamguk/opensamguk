@@ -1,4 +1,5 @@
 import { BALANCE } from '../balance';
+import { applyCampaignPreparation } from '../campaign/preparation';
 import type { WorldView } from '../model/world';
 import { DOMESTIC_SPECS } from './domestic/investment';
 import { recruitArgs } from './military';
@@ -21,6 +22,23 @@ export function commandStatPreview(
   if (!view.ruleFeatures?.includes('five-stats')) return null;
   const general = view.generals[actor.generalId];
   if (!general) return null;
+  if (
+    view.ruleFeatures.includes('campaign-v1') &&
+    (key === 'recruit' || key === 'conscript' || key === 'train' || key === 'morale')
+  ) {
+    const outcome = applyCampaignPreparation(view, actor, key, args);
+    if (!outcome.ok) return null;
+    const next = outcome.state.campaign!.units.find((unit) => unit.id === outcome.unitId)!;
+    const previous = view.campaign!.units.find((unit) => unit.id === outcome.unitId);
+    return {
+      goldCost: general.gold - outcome.state.generals[general.id]!.gold,
+      ...(key === 'train' || key === 'morale'
+        ? {
+            gain: next[key === 'morale' ? 'atmos' : 'train'] - previous![key === 'morale' ? 'atmos' : 'train'],
+          }
+        : {}),
+    };
+  }
   const spec = DOMESTIC_SPECS.find((row) => row.key === key);
   if (spec)
     return {

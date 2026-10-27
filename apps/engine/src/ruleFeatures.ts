@@ -19,6 +19,7 @@ import { persistEffects } from './persist';
 import { loadNationTrust, loadTreaties, persistTreatyClosures } from './treatyState';
 import { processTreatyQueuedInput } from './treatyInput';
 import { loadResidenceAnchors, persistResidenceAnchors } from './residenceState';
+import { persistForeignCampaignInput, processCampaignQueuedInput } from './campaignInput';
 
 export async function persistPersonnelPacket(
   tx: Prisma.TransactionClient,
@@ -98,6 +99,11 @@ const processPersonnelInput: QueuedInputHandler = async (tx, world, event, { tic
 };
 
 export const builtInEngineFeatures: readonly EngineFeature[] = [
+  {
+    key: 'campaign-v1',
+    queuedInputs: { 'campaign.relationship': processCampaignQueuedInput, 'campaign.unit': processCampaignQueuedInput },
+    afterQueuedInput: persistForeignCampaignInput,
+  },
   { key: 'five-stats' },
   { key: 'operational-map' },
   { key: 'stratagem-basic' },

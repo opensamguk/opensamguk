@@ -11,6 +11,7 @@ import {
   type WorldInit,
   readOperationalMap,
   attachOperationalKinds,
+  readCampaignState,
 } from '@opensamguk/rules';
 import { z } from 'zod';
 import { worldResolver } from './resolver';
@@ -91,5 +92,10 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
     diplomacies,
     ...(world.commandMeta ? { commandMeta: world.commandMeta } : {}),
   } as unknown as WorldInit);
+  if (world.ruleFeatures.includes('campaign-v1')) {
+    if (Object.values(state.generals).some((general) => general.crew !== 0))
+      throw new Error('부곡 월드에 중복 병력이 있습니다.');
+    state.campaign = readCampaignState(world.campaignState, state, world.seed);
+  } else if (world.campaignState != null) throw new Error('휘하 기능을 끈 월드에 저장 상태가 있습니다.');
   return { ...state, ...(treaties ? { treaties } : {}) };
 }

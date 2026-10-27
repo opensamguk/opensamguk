@@ -8,6 +8,8 @@ import { relation } from '../commands/support';
 import type { Actor } from '../commands/types';
 import type { DeepReadonly, WorldView } from '../model/world';
 import type { InitialGeneral } from '../world/bootstrap';
+import type { CommandResolver } from '../commands/resolve';
+import { readCampaignState } from '../campaign/state';
 
 export interface NpcCandidate {
   key: string;
@@ -23,6 +25,7 @@ export interface NpcContext {
   tick?: number;
   unitSet?: Actor['unitSet'];
   convergence?: boolean;
+  resolver?: CommandResolver | undefined;
 }
 type General = DeepReadonly<InitialGeneral>;
 const compareText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
@@ -32,7 +35,7 @@ function chooser(view: WorldView, general: General, rng: Rng, context: NpcContex
   const actor: Actor = { generalId: general.id, tick: context.tick ?? 0, unitSet: context.unitSet, target };
   return {
     add(key: string, args: Record<string, unknown>, score: number, reason: string) {
-      const command = commandRegistry.get(key);
+      const command = context.resolver ? context.resolver.get(key) : commandRegistry.get(key);
       const parsed = command?.args.safeParse(args);
       if (command?.target === target && parsed?.success && !command.check(view, actor, parsed.data)) {
         const aggression = view.presetRules?.npc.aggression ?? 1;
@@ -123,37 +126,53 @@ export function chooseGeneralTurn(view: WorldView, general: General, rng: Rng, c
       '후방에서 자기 영토를 따라 가까운 전선으로 한 칸 이동한다.',
     );
   if (front && city.nationId === general.nationId) {
-    const capacity = general.leadership * BALANCE.CREW_PER_LEADERSHIP;
+    const campaign = view.ruleFeatures?.includes('campaign-v1') ? readCampaignState(view.campaign, view) : undefined;
+    const owned = campaign?.units.filter((unit) => unit.ownerId === general.id).sort((a, b) => a.id - b.id);
+    const army = owned?.[0];
+    const commander = army ? view.generals[army.commanderId]! : general;
+    const troops = campaign ? (army?.troops ?? 0) : general.crew;
+    const train = campaign ? (army?.train ?? 0) : general.train;
+    const atmos = campaign ? (army?.atmos ?? 0) : general.atmos;
+    const crewType = army?.crewType ?? general.crewType;
+    const commanded = campaign
+      ? campaign.units.filter((unit) => unit.commanderId === commander.id).reduce((sum, unit) => sum + unit.troops, 0)
+      : general.crew;
+    const capacity = commander.leadership * BALANCE.CREW_PER_LEADERSHIP;
     const minimum = Math.min(capacity, 2000);
-    const unit = context.unitSet?.crewTypes.find((u) => u.id === general.crewType && u.armType > 0);
-    if (general.crew < minimum && unit) {
-      const limit = Math.min(capacity - general.crew, city.population);
+    const unit = context.unitSet?.crewTypes.find((u) => u.id === crewType && u.armType > 0);
+    if (troops < minimum && unit) {
+      const limit = Math.min(capacity - commanded, city.population);
       const amount = stats
         ? affordableRecruits(view, general, unit.cost, limit)
         : Math.min(limit, Math.floor(general.gold / unit.cost));
       if (amount > 0)
         choice.add(
           'recruit',
-          { amount, crewType: unit.id },
+          { amount, crewType: unit.id, ...(army ? { unitId: army.id } : {}) },
           120 + (stats ? Math.round((stats.charm - 50) / 2) : 0),
           '전선에서 부족한 병력을 모은다.',
         );
     }
-    if (general.train < 60)
+    if (train < 60)
       choice.add(
         'train',
-        {},
-        100 + (stats ? (drillGain(view, general, false) - 10) * 10 : 0),
+        army ? { unitId: army.id } : {},
+        100 + (stats ? (drillGain(view, commander, false) - 10) * 10 : 0),
         '출병 전에 병력을 훈련한다.',
       );
-    if (general.atmos < 70)
+    if (atmos < 70)
       choice.add(
         'morale',
-        {},
-        110 + (stats ? (drillGain(view, general, true) - 10) * 10 : 0),
+        army ? { unitId: army.id } : {},
+        110 + (stats ? (drillGain(view, commander, true) - 10) * 10 : 0),
         '출병에 필요한 사기를 회복한다.',
       );
-    if (general.rice < Math.ceil(general.crew * BALANCE.BATTLE_RICE_PER_CREW) * 3)
+    const battleTroops = campaign
+      ? (owned ?? [])
+          .filter((unit) => view.generals[unit.commanderId]!.cityKey === general.cityKey)
+          .reduce((sum, unit) => sum + unit.troops, 0)
+      : general.crew;
+    if (general.rice < Math.ceil(battleTroops * BALANCE.BATTLE_RICE_PER_CREW) * 3)
       choice.add('trade_rice', { amount: Math.min(1000, general.gold), buy: true }, 115, '출병에 쓸 군량을 마련한다.');
     const assisted = context.convergence !== false && (context.tick ?? 0) >= 50 * 12 * TICKS_PER_MONTH;
     const bonus = assisted ? ownCities.length : 0;

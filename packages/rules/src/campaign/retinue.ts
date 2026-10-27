@@ -2,19 +2,22 @@
 // RetinueHierarchy.kt, RenownRules.kt, DeploymentRules.kt (MIT). See NOTICE.
 // Campaign snapshots replace v1 province/card profiles. No runtime state is mutated.
 import { BALANCE } from '../balance';
-import { FIVE_STAT_KEYS, fiveStatsSchema, type FiveStats } from '../general/fiveStats';
+import { FIVE_STAT_KEYS, type FiveStats } from '../general/fiveStats';
 
 export const INITIAL_RENOWN_CAPACITY = 30;
 export type SourcedFiveStats = FiveStats & { source: string };
-export type RetinuePerson = { id: number; worldId: string; nationId: number; stats: SourcedFiveStats };
+export type RetinuePerson = { id: number; worldId: string; nationId: number | null; stats: SourcedFiveStats };
 export type RetinueLink = { masterId: number; personId: number; relation: 'STAFF' | 'LIEUTENANT' | 'GUEST' };
 const natural = (n: number) => Number.isSafeInteger(n) && n >= 0;
 const positive = (n: number) => natural(n) && n > 0;
 export function retinuePersonCost(stats: SourcedFiveStats): number {
   if (!stats || typeof stats.source !== 'string' || !stats.source.trim()) throw new Error('STATS_SOURCE_REQUIRED');
-  const parsed = fiveStatsSchema.safeParse(Object.fromEntries(FIVE_STAT_KEYS.map((key) => [key, stats[key]])));
-  if (!parsed.success) throw new Error('FIVE_STATS_REQUIRED');
-  const sum = FIVE_STAT_KEYS.reduce((total, key) => total + parsed.data[key], 0);
+  let sum = 0;
+  for (const key of FIVE_STAT_KEYS) {
+    const value = stats[key];
+    if (!Number.isInteger(value) || value < 0 || value > 100) throw new Error('FIVE_STATS_REQUIRED');
+    sum += value;
+  }
   return Math.max(1, Math.ceil(sum / 50));
 }
 export function buildRetinueHierarchy(people: readonly RetinuePerson[], links: readonly RetinueLink[]) {
@@ -22,7 +25,7 @@ export function buildRetinueHierarchy(people: readonly RetinuePerson[], links: r
   for (const p of people) {
     if (
       !positive(p.id) ||
-      !positive(p.nationId) ||
+      (p.nationId !== null && !positive(p.nationId)) ||
       typeof p.worldId !== 'string' ||
       !p.worldId.trim() ||
       persons.has(p.id)
@@ -107,7 +110,7 @@ export type CampaignUnit = { id: number; ownerId: number; commanderId: number; t
 export type CampaignDeployment = {
   id: number;
   worldId: string;
-  nationId: number;
+  nationId: number | null;
   ownerId: number;
   commanderId: number;
   unitIds: readonly number[];

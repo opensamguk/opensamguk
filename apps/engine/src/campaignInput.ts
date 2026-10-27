@@ -1,0 +1,66 @@
+import type { Prisma } from '@opensamguk/db';
+import {
+  applyCampaignRelationship,
+  applyCampaignUnitInput,
+  applyRecordedInput,
+  type RecordedInput,
+  type ReplayState,
+} from '@opensamguk/rules';
+import type { EngineWorld, QueuedInputHandler } from './features';
+import { loadReplayState } from './monthly';
+import { persistEffects } from './persist';
+
+export async function processCampaignQueuedInput(
+  tx: Parameters<QueuedInputHandler>[0],
+  world: Parameters<QueuedInputHandler>[1],
+  event: Parameters<QueuedInputHandler>[2],
+  { tick, sequence }: Parameters<QueuedInputHandler>[3],
+): ReturnType<QueuedInputHandler> {
+  const reject = (code: string, message: string) => ({ status: 'REJECTED' as const, result: { code, message } });
+  if (world.status === 'ENDED') return reject('WORLD_CLOSED', '종료된 월드입니다.');
+  await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${event.userId} FOR SHARE`;
+  const user = await tx.user.findUnique({ where: { id: event.userId } });
+  if (!user || user.status !== 'ACTIVE') return reject('ACTOR_INACTIVE', '활성 계정이 아닙니다.');
+  if (event.generalId === null) return reject('NO_GENERAL', '장수가 없습니다.');
+  await tx.$queryRaw`SELECT id FROM "General" WHERE "worldId" = ${world.id} AND id = ${event.generalId} FOR UPDATE`;
+  const before = await loadReplayState(tx, world.id);
+  const context = { tick, userId: event.userId, userActive: true };
+  const outcome =
+    event.kind === 'campaign.relationship'
+      ? applyCampaignRelationship(before.state, event.payload, event.generalId, before.state.campaign, context)
+      : event.kind === 'campaign.unit'
+        ? applyCampaignUnitInput(before.state, event.payload, event.generalId, before.state.campaign, {
+            ...context,
+            armyTypes: before.campaignArmyTypes!,
+          })
+        : null;
+  if (!outcome) throw new Error('휘하·부곡 입력 종류를 확인하세요.');
+  if (!outcome.ok) return reject(outcome.code, outcome.message);
+  await persistEffects(
+    tx,
+    world.id,
+    outcome.state,
+    [{ kind: 'world', state: outcome.state }],
+    { tick, sequence },
+    before.state,
+  );
+  return { status: 'APPLIED', result: { ...outcome.result, tick } as Prisma.InputJsonValue };
+}
+
+// general.create는 General을 먼저 쓴다. 뒤의 인사 후처리가 loadWorld하기 전에 입력 출처도 같은 트랜잭션에 쓴다.
+export async function persistForeignCampaignInput(
+  tx: Prisma.TransactionClient,
+  world: EngineWorld,
+  before: ReplayState,
+  input: RecordedInput,
+) {
+  const next = applyRecordedInput(before, input);
+  await persistEffects(
+    tx,
+    world.id,
+    next.state,
+    [{ kind: 'world', state: next.state }],
+    { tick: input.tick!, sequence: input.sequence },
+    before.state,
+  );
+}

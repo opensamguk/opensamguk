@@ -3,6 +3,7 @@ import { BALANCE } from '../balance';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import type { WorldState, WorldView } from '../model/world';
 import { refreshSupply } from '../supply';
+import { readCampaignState } from '../campaign/state';
 
 export const MONTHLY_STAGES = ['income', 'population', 'supply', 'diplomacy', 'yearbook'] as const;
 export interface NationSummary {
@@ -82,6 +83,8 @@ export function settlePopulation(state: WorldView, taxRate: number = BALANCE.MON
 
 export function settleSupply(state: WorldView): WorldState {
   const next = structuredClone(state) as WorldState;
+  const campaign = state.ruleFeatures?.includes('campaign-v1') ? readCampaignState(next.campaign, next) : undefined;
+  if (campaign) next.campaign = campaign;
   refreshSupply(next);
   for (const city of citiesById(next)) {
     const target = next.cities[city.cityKey]!;
@@ -90,10 +93,22 @@ export function settleSupply(state: WorldView): WorldState {
     for (const field of ['agriculture', 'commerce', 'security', 'defence', 'wall'] as const) {
       target[field] = Math.max(0, Math.round(city[field] * BALANCE.UNSUPPLIED_FACTOR));
     }
-    for (const general of generalsById(next).filter((general) => general.cityKey === city.cityKey)) {
-      next.generals[general.id]!.train = Math.max(0, general.train - BALANCE.UNSUPPLIED_TRAIN_LOSS);
-      next.generals[general.id]!.atmos = Math.max(0, general.atmos - BALANCE.UNSUPPLIED_ATMOS_LOSS);
+    if (campaign) {
+      for (const unit of campaign.units.filter((unit) => next.generals[unit.commanderId]!.cityKey === city.cityKey)) {
+        unit.train = Math.max(0, unit.train - BALANCE.UNSUPPLIED_TRAIN_LOSS);
+        unit.atmos = Math.max(0, unit.atmos - BALANCE.UNSUPPLIED_ATMOS_LOSS);
+      }
+    } else {
+      for (const general of generalsById(next).filter((general) => general.cityKey === city.cityKey)) {
+        next.generals[general.id]!.train = Math.max(0, general.train - BALANCE.UNSUPPLIED_TRAIN_LOSS);
+        next.generals[general.id]!.atmos = Math.max(0, general.atmos - BALANCE.UNSUPPLIED_ATMOS_LOSS);
+      }
     }
+  }
+  if (campaign && JSON.stringify(campaign.units) !== JSON.stringify(state.campaign!.units)) {
+    if (campaign.revision === 2_147_483_647) throw new Error('휘하 변경 번호 한도를 넘었습니다.');
+    campaign.revision++;
+    readCampaignState(campaign, next);
   }
   return next;
 }
@@ -110,6 +125,7 @@ export function settleDiplomacy(state: WorldView, tick: number): WorldState {
 }
 
 export function buildYearbook(state: WorldView, year: number): Yearbook {
+  const campaign = state.ruleFeatures?.includes('campaign-v1') ? readCampaignState(state.campaign, state) : undefined;
   return {
     nations: nationsById(state).map((nation) => {
       const cities = citiesById(state).filter((city) => city.nationId === nation.id && city.kind !== 'PASS');
@@ -124,7 +140,15 @@ export function buildYearbook(state: WorldView, year: number): Yearbook {
           nation.gold +
             nation.rice +
             cities.reduce((sum, city) => sum + city.population, 0) +
-            generals.reduce((sum, general) => sum + general.crew, 0),
+            (campaign
+              ? campaign.units
+                  .filter(
+                    (unit) =>
+                      generals.some((general) => general.id === unit.ownerId) &&
+                      state.generals[unit.commanderId]!.activeFromYear <= year,
+                  )
+                  .reduce((sum, unit) => sum + unit.troops, 0)
+              : generals.reduce((sum, general) => sum + general.crew, 0)),
         ),
         gold: nation.gold,
         rice: nation.rice,
