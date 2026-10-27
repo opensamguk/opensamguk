@@ -2,6 +2,8 @@
 // 이 파일은 packages/rules를 import하지 않는다. 상한은 상수로 두고 compute.test.ts가 BALANCE와 대조한다.
 
 export type BattleForce = { crew: number; crewType: number; train: number; atmos: number };
+export type CommanderStats = { leadership: number; strength: number };
+export type BattleCommanders = { attacker: CommanderStats; defender?: CommanderStats };
 
 // simulateBattle의 BattleInput에서 unitSet을 뺀 부분. 병종표는 Worker가 자기 묶음의 공개 표를 쓴다.
 export type BattleRunInput = {
@@ -10,6 +12,7 @@ export type BattleRunInput = {
   attackerTech: number;
   defenderTech: number;
   defence?: number;
+  commanders?: BattleCommanders;
 };
 export type BattleRunBody = BattleRunInput & { seed: string };
 export type BattleRunRequest = BattleRunBody & { type: 'run'; requestId: number };
@@ -58,7 +61,16 @@ export type FieldProblem = { field: string; problem: Problem; min?: number; max?
 
 export type UnitChoice = { readonly id: number; readonly armType: number };
 
-const REQUEST_KEYS = new Set(['type', 'requestId', 'seed', 'attacker', 'defender', 'attackerTech', 'defenderTech']);
+const REQUEST_KEYS = new Set([
+  'type',
+  'requestId',
+  'seed',
+  'attacker',
+  'defender',
+  'attackerTech',
+  'defenderTech',
+  'commanders',
+]);
 const FORCE_KEYS = ['crew', 'crewType', 'train', 'atmos'] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -150,6 +162,30 @@ export function requestProblems(message: unknown, units: readonly UnitChoice[]):
 
   add('attackerTech', intProblem(message.attackerTech, 0, LIMITS.MAX_TECH));
   add('defenderTech', intProblem(message.defenderTech, 0, LIMITS.MAX_TECH));
+  if ('commanders' in message) {
+    const commanders = message.commanders;
+    if (!isRecord(commanders)) add('commanders', { problem: 'missing' });
+    else {
+      const wall = defender?.crewType === WALL_CREW_TYPE;
+      for (const key of Object.keys(commanders))
+        if (key !== 'attacker' && key !== 'defender') add(`commanders.${key}`, { problem: 'unexpected' });
+      for (const side of ['attacker', 'defender'] as const) {
+        if (side === 'defender' && wall) {
+          if ('defender' in commanders) add('commanders.defender', { problem: 'unexpected' });
+          continue;
+        }
+        const stats = commanders[side];
+        if (!isRecord(stats)) {
+          add(`commanders.${side}`, { problem: 'missing' });
+          continue;
+        }
+        for (const key of Object.keys(stats))
+          if (key !== 'leadership' && key !== 'strength') add(`commanders.${side}.${key}`, { problem: 'unexpected' });
+        for (const key of ['leadership', 'strength'] as const)
+          add(`commanders.${side}.${key}`, intProblem(stats[key], 0, 100));
+      }
+    }
+  }
   return problems;
 }
 
@@ -177,6 +213,13 @@ export function checkRequest(message: unknown, units: readonly UnitChoice[]): Ch
     defenderTech: m.defenderTech,
   };
   if (m.defender.crewType === WALL_CREW_TYPE) request.defence = m.defence!;
+  if (m.commanders) {
+    const copyStats = (stats: CommanderStats) => ({ leadership: stats.leadership, strength: stats.strength });
+    request.commanders = {
+      attacker: copyStats(m.commanders.attacker),
+      ...(m.commanders.defender ? { defender: copyStats(m.commanders.defender) } : {}),
+    };
+  }
   return { ok: true, request };
 }
 
@@ -184,6 +227,9 @@ export function checkRequest(message: unknown, units: readonly UnitChoice[]): Ch
 export type ForceForm = { crew: string; crewType: string; train: string; atmos: string };
 export type DefenderKind = 'general' | 'wall';
 export type BattleForm = {
+  statProfile: 'legacy' | 'five-stats';
+  attackerCommander: { leadership: string; strength: string };
+  defenderCommander: { leadership: string; strength: string };
   attacker: ForceForm;
   defender: ForceForm;
   defenderKind: DefenderKind;
@@ -197,6 +243,9 @@ export type BattleForm = {
 export function defaultForm(defaultCrewTypeId: number): BattleForm {
   const force = (): ForceForm => ({ crew: '1000', crewType: String(defaultCrewTypeId), train: '50', atmos: '50' });
   return {
+    statProfile: 'legacy',
+    attackerCommander: { leadership: '', strength: '' },
+    defenderCommander: { leadership: '', strength: '' },
     attacker: force(),
     defender: force(),
     defenderKind: 'general',
@@ -231,6 +280,16 @@ export function formBody(form: BattleForm): Record<string, unknown> {
     defenderTech: toNumber(form.defenderTech),
   };
   if (form.defenderKind === 'wall') body.defence = toNumber(form.defence);
+  if (form.statProfile === 'five-stats') {
+    const commander = (stats: { leadership: string; strength: string }) => ({
+      leadership: toNumber(stats.leadership),
+      strength: toNumber(stats.strength),
+    });
+    body.commanders = {
+      attacker: commander(form.attackerCommander),
+      ...(form.defenderKind === 'wall' ? {} : { defender: commander(form.defenderCommander) }),
+    };
+  }
   return body;
 }
 
@@ -253,6 +312,7 @@ export function requestBody(request: BattleRunRequest): BattleRunBody {
     defenderTech: request.defenderTech,
   };
   if (request.defence !== undefined) body.defence = request.defence;
+  if (request.commanders) body.commanders = request.commanders;
   return body;
 }
 

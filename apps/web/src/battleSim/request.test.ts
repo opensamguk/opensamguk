@@ -8,6 +8,25 @@ const form = (patch: (f: BattleForm) => BattleForm = (f) => f) => patch(defaultF
 const fields = (f: BattleForm) => checkForm(f, UNIT_CHOICES).problems.map((p) => p.field);
 
 describe('폼 검사', () => {
+  it('통합판을 고르면 명시한 통솔·무력만 보내고 성벽 쪽 값은 보내지 않는다', () => {
+    const base = form((value) => ({ ...value, statProfile: 'five-stats' }));
+    expect(checkForm(base, UNIT_CHOICES).body).toBeNull();
+    const entered = {
+      ...base,
+      attackerCommander: { leadership: '78', strength: '80' },
+      defenderCommander: { leadership: '50', strength: '0' },
+    };
+    expect(checkForm(entered, UNIT_CHOICES).body).toMatchObject({
+      commanders: { attacker: { leadership: 78, strength: 80 }, defender: { leadership: 50, strength: 0 } },
+    });
+    expect(
+      checkForm(
+        { ...entered, defenderKind: 'wall', defenderCommander: { leadership: 'bad', strength: '' } },
+        UNIT_CHOICES,
+      ).body,
+    ).toMatchObject({ commanders: { attacker: { leadership: 78, strength: 80 } } });
+    expect(checkForm({ ...entered, statProfile: 'legacy' }, UNIT_CHOICES).body).not.toHaveProperty('commanders');
+  });
   it('기본값은 게임 상태와 무관한 고정값이고 그대로 보낼 수 있다', () => {
     const checked = checkForm(form(), UNIT_CHOICES);
     expect(checked.problems).toEqual([]);
