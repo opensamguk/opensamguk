@@ -54,13 +54,14 @@ function costText(asked: boolean, data: Quote | undefined, failed: boolean): str
 interface Props {
   worldId: string;
   targets: TreatyTarget[];
+  tradeEnabled?: boolean;
   // 이 상대에게 보낸 제안이 처리 중이면 그 안내. 있으면 보내기를 잠근다.
   busyFor: (toNationId: number) => string | null;
   onPropose: (input: ProposeInput) => void;
 }
 
 // 조약서 쓰기. 조항을 고르면 서버 견적의 비용과 문제, 집행·기록 구분을 바로 보여 준다 (T2-08 화면 절).
-export function TreatyComposer({ worldId, targets, busyFor, onPropose }: Props) {
+export function TreatyComposer({ worldId, targets, busyFor, onPropose, tradeEnabled = false }: Props) {
   const trpc = useTRPC();
   const [form, setForm] = useState<ComposeState>(emptyCompose);
   const ids = { target: useId(), note: useId() };
@@ -177,7 +178,26 @@ export function TreatyComposer({ worldId, targets, busyFor, onPropose }: Props) 
           />
         </ClauseRow>
 
-        {UNSUPPORTED_CLAUSE_LABELS.map((label) => (
+        {tradeEnabled ? (
+          <ClauseRow
+            label={CLAUSE_LABELS.trade}
+            checked={form.trade?.on ?? false}
+            onToggle={(on) => set('trade', { months: form.trade?.months ?? '24', on })}
+          >
+            <label className={styles.inline}>
+              교역 기간(개월)
+              <input
+                type="number"
+                min={1}
+                max={120}
+                step={1}
+                value={form.trade?.months ?? '24'}
+                onChange={(e) => set('trade', { on: form.trade?.on ?? false, months: e.target.value })}
+              />
+            </label>
+          </ClauseRow>
+        ) : null}
+        {UNSUPPORTED_CLAUSE_LABELS.filter((label) => !tradeEnabled || label !== '교역 허용').map((label) => (
           <ClauseRow
             key={label}
             label={label}

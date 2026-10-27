@@ -1,14 +1,24 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { createAccount, withE2eDb } from './account';
-import { createGeneralByApi, e2eWorld, mutate, query, stubPortraits } from './game';
+import { createGeneralByApi, e2eFeatureWorld, mutate, query, stubPortraits } from './game';
 
 // T2-08 · AC-M2-06, AC-M2-14 화면: 외교실 조약서와 예턴 편집의 교역 대상.
-// treaty 라우터(T2-07, Codex)가 main에 들어오기 전에는 이 시험이 돌지 않는다. 그 전의 결과는 증거로 세지 않는다.
-// 그래서 두 묶음을 PENDING_API로 보류한다. T2-07이 병합되면 두 test.fixme 줄을 지우고 실제로 돌린다.
-const PENDING_API = 'T2-07 treaty 라우터가 main에 없다. 병합 뒤 이 줄을 지운다 (docs/plans/T2-08.md)';
+// T2-07이 main에 병합됐으므로 실제 API·엔진으로 실행한다.
 // 계약: docs/plans/T2-07.md API 계약, 화면: docs/plans/T2-08.md.
 
 test.describe.configure({ timeout: 180_000 });
+
+const ownedWorlds = new Set<string>();
+async function diplomacyWorld() {
+  const id = await e2eFeatureWorld(['policy', 'treaty', 'treaty-break', 'treaty-trade'], { npcNations: false });
+  ownedWorlds.add(id);
+  return id;
+}
+
+test.afterEach(async () => {
+  for (const id of ownedWorlds) await withE2eDb((db) => db.world.update({ where: { id }, data: { status: 'PAUSED' } }));
+  ownedWorlds.clear();
+});
 
 interface Ruler {
   page: Page;
@@ -76,13 +86,12 @@ async function acceptByApi(page: Page, world: string) {
 }
 
 test.describe('외교실', () => {
-  test.fixme(true, PENDING_API);
   let world: string;
   let map: MapData;
 
   test.beforeEach(async ({ page }) => {
     await createAccount(page);
-    world = await e2eWorld(page);
+    world = await diplomacyWorld();
     map = await nations(page, world);
   });
 
@@ -98,7 +107,7 @@ test.describe('외교실', () => {
     await a.page.goto(`/w/${world}/diplomacy?tab=write`);
     await a.page.getByLabel('상대').selectOption(String(y!.id));
     await a.page.getByLabel('불가침').check();
-    await a.page.getByLabel('기간(개월)').fill('24');
+    await a.page.getByLabel('기간(개월)', { exact: true }).fill('24');
     await expect(a.page.getByTestId('treaty-cost')).toContainText('비용 우리 금');
     await a.page.getByRole('button', { name: '제안 보내기' }).click();
     // 엔진이 처리하기 전에는 성공 문구가 없다.
@@ -146,8 +155,11 @@ test.describe('외교실', () => {
 
     await b.page.goto(`/w/${world}/diplomacy?tab=incoming`);
     await expect(card(b.page).getByRole('button', { name: '수락' })).toBeVisible();
-    // 화면이 받은 canAccept는 아직 ok다. 그 뒤 국고를 비워 엔진의 최종 판정에서 거절되게 한다.
-    await setGold(world, y!.id, 0);
+    // 클릭 뒤 요청을 전달하기 직전에 국고를 바꿔 엔진의 최종 판정을 검사한다.
+    await b.page.route('**/trpc/treaty.respond**', async (route) => {
+      await setGold(world, y!.id, 0);
+      await route.continue();
+    });
     await card(b.page).getByRole('button', { name: '수락' }).click();
     const requests = b.page.getByTestId('treaty-requests');
     await expect(requests.locator('[data-result="rejected"]')).toContainText('수락 요청이 거절되었습니다');
@@ -167,7 +179,10 @@ test.describe('외교실', () => {
     const sent: string[] = [];
     let dropped = false;
     await b.page.route('**/trpc/treaty.respond**', async (route) => {
-      sent.push((route.request().postDataJSON() as { requestId: string }).requestId);
+      const payload = route.request().postDataJSON() as Record<string, { requestId: string }>;
+      const requestId = payload['0']!.requestId;
+      expect(requestId).toMatch(/^[0-9a-f-]{36}$/);
+      sent.push(requestId);
       if (dropped) return route.continue();
       dropped = true;
       await route.fetch();
@@ -177,6 +192,7 @@ test.describe('외교실', () => {
     await card(b.page).getByRole('button', { name: '수락' }).click();
     await b.page.getByRole('button', { name: '같은 요청 다시 보내기' }).click();
     await expect(b.page.getByTestId('treaty-requests').locator('[data-result="applied"]')).toBeVisible();
+    expect(sent.length).toBeGreaterThanOrEqual(2);
     expect(new Set(sent).size).toBe(1);
     const count = await withE2eDb((db) =>
       db.inputEvent.count({ where: { worldId: world, idempotencyKey: `treaty.respond:${sent[0]}` } }),
@@ -192,13 +208,16 @@ test.describe('외교실', () => {
     await a.page.getByLabel('상대').selectOption(String(y!.id));
     // 교역 허용은 서버가 아직 잇지 않은 조항이라 화면에서 고를 수 없다. 화면이 보낼 수 있는 불가침으로 제안한다.
     await a.page.getByLabel('불가침').check();
-    await a.page.getByLabel('기간(개월)').fill('12');
+    await a.page.getByLabel('기간(개월)', { exact: true }).fill('12');
     // 보내기 요청을 붙잡아 둔 채 새로 고친다. 저장된 requestId로 결과를 묻는다.
+    let delivered = false;
     await a.page.route('**/trpc/treaty.propose**', async (route) => {
       await route.fetch();
+      delivered = true;
       await route.abort('connectionreset');
     });
     await a.page.getByRole('button', { name: '제안 보내기' }).click();
+    await expect.poll(() => delivered).toBe(true);
     await a.page.reload();
     await expect(a.page.getByTestId('treaty-requests').locator('[data-result="applied"]')).toContainText(
       '제안을 보냈습니다',
@@ -247,13 +266,12 @@ test.describe('외교실', () => {
 });
 
 test.describe('예턴 편집의 교역 대상', () => {
-  test.fixme(true, PENDING_API);
   test('교역 조약 뒤 메인 편집기에서 교역 대상을 고르고, 외교실에 갔다 와도 초안과 선택이 남는다', async ({
     browser,
     page,
   }) => {
     await createAccount(page);
-    const world = await e2eWorld(page);
+    const world = await diplomacyWorld();
     const map = await nations(page, world);
     // 서로 이웃한 두 국가 도시를 찾는다.
     const pair = map.cities
@@ -291,7 +309,7 @@ test.describe('예턴 편집의 교역 대상', () => {
 
   test('교역 조약이 없으면 대상 도시 칸에 서버가 준 이유가 보인다', async ({ browser, page }) => {
     await createAccount(page);
-    const world = await e2eWorld(page);
+    const world = await diplomacyWorld();
     const map = await nations(page, world);
     const a = await officer(browser, world, map.nations[0]!.id, 1);
     const editor = a.page.getByTestId('turn-editor');
@@ -299,6 +317,12 @@ test.describe('예턴 편집의 교역 대상', () => {
     await editor.locator('tr[data-slot="1"]').click();
     await editor.getByLabel('명령 찾기').fill('교역');
     await editor.getByRole('radio', { name: '교역' }).check();
-    await expect(editor.getByRole('note')).toBeVisible();
+    const targets = await query<{ items: unknown[]; blocked: string | null }>(a.page, 'treaty.tradeTargets', {
+      worldId: world,
+    });
+    expect(targets.items).toEqual([]);
+    expect(targets.blocked).toBeTruthy();
+    await expect(editor.getByRole('note')).toHaveText(targets.blocked!);
+    await expect(editor.getByRole('combobox', { name: /대상 도시/ }).locator('option')).toHaveCount(1);
   });
 });
