@@ -309,6 +309,7 @@ describe('T1-11 실제 HTTP·PostgreSQL 권한', () => {
     expect((await request('general.mine', { worldId: other.worldId }, a.cookie)).data).toEqual({
       general: null,
       creation: null,
+      creationRules: { total: 165, min: 15, max: 80, count: 3, campaignEnabled: false },
     });
     for (const path of ['turns.get', 'turns.precheck'])
       expect(
