@@ -1,12 +1,23 @@
 import { initTRPC, TRPCError } from '@trpc/server';
 import type { Context } from './context';
+export const PUBLIC_ERROR_REASONS = ['EMAIL_NOT_VERIFIED', 'CONSENT_REQUIRED', 'TOKEN_INVALID'] as const;
+export type PublicErrorReason = (typeof PUBLIC_ERROR_REASONS)[number];
+export class PublicReasonError extends Error {
+  constructor(readonly reason: PublicErrorReason) {
+    super(reason);
+  }
+}
 const t = initTRPC.context<Context>().create({
   errorFormatter({ shape, error }) {
     const { stack, ...data } = shape.data;
     void stack;
+    const reason: PublicErrorReason | null =
+      error.cause instanceof PublicReasonError && PUBLIC_ERROR_REASONS.includes(error.cause.reason)
+        ? error.cause.reason
+        : null;
     return {
       ...shape,
-      data: { ...data, reason: null },
+      data: { ...data, reason },
       message: error.code === 'INTERNAL_SERVER_ERROR' ? '요청을 처리하지 못했습니다.' : shape.message,
     };
   },
