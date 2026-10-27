@@ -37,6 +37,16 @@ function alive(pid: number) {
   }
 }
 
+async function deleteOwnedWorld(worldId: string) {
+  if (!owned.includes(worldId)) throw new Error('시험이 만든 월드만 삭제할 수 있습니다.');
+  await db.$transaction(async (tx) => {
+    // 실행 중인 자식과 같은 순서(리스 → World)로 잠근다.
+    // World부터 삭제하면 CASCADE의 리스 잠금과 자식의 World 잠금이 교착한다.
+    await tx.$queryRaw`SELECT "worldId" FROM "EngineLease" WHERE "worldId" = ${worldId} FOR UPDATE`;
+    await tx.world.delete({ where: { id: worldId } });
+  });
+}
+
 async function stop(child: ChildProcess, signal: NodeJS.Signals = 'SIGTERM') {
   if (child.exitCode !== null || child.signalCode !== null) return;
   const exited = once(child, 'exit');
@@ -212,7 +222,7 @@ describe('AC-M2-01 실제 PostgreSQL·감독·자식 프로세스', () => {
     await db.world.update({ where: { id: b }, data: { status: 'PAUSED' } });
     await ready(b);
     await db.world.update({ where: { id: a }, data: { status: 'ENDED' } });
-    await db.world.delete({ where: { id: b } });
+    await deleteOwnedWorld(b);
     await until(() => managed.events.filter((event) => event.kind === 'removed').length === 2);
     expect(await db.engineHeartbeat.findUnique({ where: { worldId: b } })).toBeNull();
     for (const event of managed.events.filter((event) => event.kind === 'started'))
@@ -234,7 +244,7 @@ describe('AC-M2-01 실제 PostgreSQL·감독·자식 프로세스', () => {
       const lease = await db.engineLease.findUniqueOrThrow({ where: { worldId: b } });
       await advance(b, 1);
 
-      if (removal === 'deleted') await db.world.delete({ where: { id: a } });
+      if (removal === 'deleted') await deleteOwnedWorld(a);
       else await db.world.update({ where: { id: a }, data: { status: 'ENDED' } });
       await until(() => managed.events.some((event) => event.kind === 'removed' && event.worldId === a));
       for (const event of starts(managed.events, a)) expect(alive(event.pid!)).toBe(false);
