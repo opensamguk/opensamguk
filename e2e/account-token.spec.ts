@@ -65,16 +65,27 @@ for (const width of [375, 1280]) {
     if (width === 375) await page.screenshot({ path: testInfo.outputPath('account-375.png'), fullPage: true });
     const after = Date.now();
     await page.getByRole('button', { name: '인증 메일 다시 보내기', exact: true }).click();
-    const link = await accountMailLink(email, '오픈삼국 이메일 인증', after);
+    let link = await accountMailLink(email, '오픈삼국 이메일 인증', after);
     await expect(page.getByRole('button', { name: /인증 메일 다시 보내기 \(/ })).toBeDisabled();
-    await page.reload();
-    const limitedResponse = page.waitForResponse(
-      (response) =>
-        response.request().method() === 'POST' &&
-        new URL(response.url()).pathname.includes('account.resendVerification'),
-    );
-    await page.getByRole('button', { name: '인증 메일 다시 보내기', exact: true }).click();
-    const limited = await limitedResponse;
+    async function requestAfterReload() {
+      await page.reload();
+      const response = page.waitForResponse(
+        (value) =>
+          value.request().method() === 'POST' && new URL(value.url()).pathname.includes('account.resendVerification'),
+      );
+      await page.getByRole('button', { name: '인증 메일 다시 보내기', exact: true }).click();
+      return response;
+    }
+    const retriedAt = Date.now();
+    let limited = await requestAfterReload();
+    // 서버의 실제 분 단위 고정 창이 바뀌면 새 발급은 허용된다. 다음 요청은 같은 창에서 반드시 막힌다.
+    if (limited.status() === 200) {
+      expect(Math.floor(Date.now() / 60_000)).toBeGreaterThan(Math.floor(after / 60_000));
+      const replacement = await accountMailLink(email, '오픈삼국 이메일 인증', retriedAt);
+      expect(replacement !== link).toBe(true);
+      link = replacement;
+      limited = await requestAfterReload();
+    }
     expect(limited.status()).toBe(429);
     const retryAfter = Number(await limited.headerValue('retry-after'));
     expect(Number.isInteger(retryAfter) && retryAfter > 0).toBe(true);
