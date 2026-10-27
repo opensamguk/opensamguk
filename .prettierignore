@@ -13,3 +13,6 @@ apps/engine/test/fixtures/replay-v3.json
 packages/db/prisma/migrations/
 
 pnpm-lock.yaml
+
+# Regional GIS derivative; rebuilt from pinned source hashes.
+apps/web/src/mapEditor/geodata/natural-earth.json

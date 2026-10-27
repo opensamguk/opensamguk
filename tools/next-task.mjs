@@ -9,11 +9,13 @@ const OWNERS = ['Codex', 'Claude', '사용자'];
 const REVIEWER = { Codex: 'Claude', Claude: 'Codex' };
 // T4 행은 Phase 2 대기열이다. 관문(M1~M3) 계산에 넣지 않고 따로 보인다.
 const PHASE2 = 4;
+const INTEGRATION = 5;
+const bucket = (r) => (r.milestone >= PHASE2 ? r.milestone : 0);
 
 export function parseQueue(markdown) {
   const rows = [];
   for (const line of markdown.split('\n')) {
-    const match = line.match(/^\|\s*(T(\d)-\d{2})\s*\|(.*)\|\s*$/);
+    const match = line.match(/^\|\s*((?:T(\d)|INT)-\d{2})\s*\|(.*)\|\s*$/);
     if (!match) continue;
     const cells = match[3].split('|').map((cell) => cell.trim());
     if (cells.length !== 5) throw new Error(`대기열 형식 오류 (칸 ${cells.length}개): ${line}`);
@@ -25,7 +27,7 @@ export function parseQueue(markdown) {
     if (owner === '사용자' && (stage === '계획' || stage === '리뷰')) {
       throw new Error(`${match[1]}: 사용자 작업은 구현·완료 단계만 씁니다`);
     }
-    rows.push({ id: match[1], milestone: Number(match[2]), title, ac, owner, deps, stage });
+    rows.push({ id: match[1], milestone: match[2] ? Number(match[2]) : INTEGRATION, title, ac, owner, deps, stage });
   }
   return rows;
 }
@@ -36,22 +38,23 @@ function resolveDeps(row, rows) {
     const dep = part.trim();
     const milestone = dep.match(/^M(\d)$/);
     if (milestone) {
+      if (Number(milestone[1]) === INTEGRATION) throw new Error(`${row.id}: M5 관문은 없습니다. INT ID로 적습니다`);
+      if (row.milestone === INTEGRATION) throw new Error(`${row.id}: 통합 작업의 선행은 작업 ID로 적습니다`);
       if (Number(milestone[1]) === PHASE2)
         throw new Error(`${row.id}: M4 관문은 없습니다. Phase 2 작업은 T4 ID나 범위로 적습니다`);
       if (row.milestone === PHASE2)
         throw new Error(`${row.id}: Phase 2 작업의 선행은 관문(${dep}) 대신 작업 ID나 범위로 적습니다`);
       return rows.filter((r) => r.milestone === Number(milestone[1]));
     }
-    const range = dep.match(/^(T\d-\d{2})~(T\d-\d{2})$/);
+    const range = dep.match(/^((?:T\d|INT)-\d{2})~((?:T\d|INT)-\d{2})$/);
     if (range) {
       const from = rows.findIndex((r) => r.id === range[1]);
       const to = rows.findIndex((r) => r.id === range[2]);
       if (from < 0 || to < 0) throw new Error(`${row.id}: 없는 선행 범위 ${dep}`);
-      const phase2 = rows[from].milestone === PHASE2;
-      if (phase2 !== (rows[to].milestone === PHASE2))
+      if (bucket(rows[from]) !== bucket(rows[to]))
         throw new Error(`${row.id}: 범위 ${dep}의 두 끝이 서로 다른 대기열(M1~M3, Phase 2)에 있습니다`);
       // 두 끝 사이에 낀 다른 대기열 행은 선행이 아니다. T4가 표 어디에 있든 결과가 같아야 한다.
-      return rows.slice(from, to + 1).filter((r) => (r.milestone === PHASE2) === phase2);
+      return rows.slice(from, to + 1).filter((r) => bucket(r) === bucket(rows[from]));
     }
     const found = rows.find((r) => r.id === dep);
     if (!found) throw new Error(`${row.id}: 없는 선행 작업 ${dep}`);
@@ -103,7 +106,7 @@ function classify(targets, rows, hasPlan, planAhead) {
 // 다음 관문들의 계획 대기 작업을 따로 모은다 (계획은 선행과 상관없이 미리 쓸 수 있다).
 // T4 행은 관문 계산에서 빼고, 하나라도 있으면 phase2에 따로 나눈다. 선행 이름은 표 전체에서 찾는다.
 export function nextActions(rows, { hasPlan = () => true } = {}) {
-  const gateRows = rows.filter((r) => r.milestone !== PHASE2);
+  const gateRows = rows.filter((r) => r.milestone < PHASE2);
   const current = gateRows.find((r) => r.stage !== '완료')?.milestone ?? null;
   const result =
     current === null
@@ -117,17 +120,21 @@ export function nextActions(rows, { hasPlan = () => true } = {}) {
           ),
           ahead: gateRows.filter((r) => r.milestone > current && needsPlan(r, hasPlan)),
         };
-  if (gateRows.length === rows.length) return result;
-
-  // Phase 2 행은 관문과 상관없이 미완료이면 언제나 선행을 푼다. 없는 선행이 바로 드러난다.
-  const ahead = [];
-  const { ready, blocked } = classify(
-    rows.filter((r) => r.milestone === PHASE2 && r.stage !== '완료'),
-    rows,
-    hasPlan,
-    ahead,
-  );
-  return { ...result, phase2: { ready, blocked, ahead } };
+  for (const [milestone, key] of [
+    [PHASE2, 'phase2'],
+    [INTEGRATION, 'integration'],
+  ]) {
+    if (!rows.some((r) => r.milestone === milestone)) continue;
+    const ahead = [];
+    const { ready, blocked } = classify(
+      rows.filter((r) => r.milestone === milestone && r.stage !== '완료'),
+      rows,
+      hasPlan,
+      ahead,
+    );
+    result[key] = { ready, blocked, ahead };
+  }
+  return result;
 }
 
 function ownerLines(ready, prefix) {
@@ -187,11 +194,14 @@ function phase2Lines({ ready, blocked, ahead }) {
   return lines;
 }
 
-export function render({ milestone, ready, blocked, ahead = [], phase2 }) {
+export function render({ milestone, ready, blocked, ahead = [], phase2, integration }) {
   const phase2Open =
     phase2 !== undefined &&
     (Object.keys(phase2.ready).length > 0 || phase2.blocked.length > 0 || phase2.ahead.length > 0);
-  if (milestone === null && !phase2Open) return '모든 작업이 완료됐습니다.';
+  const integrationOpen =
+    integration &&
+    (Object.keys(integration.ready).length > 0 || integration.blocked.length > 0 || integration.ahead.length > 0);
+  if (milestone === null && !phase2Open && !integrationOpen) return '모든 작업이 완료됐습니다.';
   const lines = [];
   if (milestone === null) {
     lines.push('M1~M3 대기열에 남은 작업이 없습니다. 관문 통과는 인수조건으로 판정합니다.');
@@ -215,6 +225,12 @@ export function render({ milestone, ready, blocked, ahead = [], phase2 }) {
     if (blocked.length > 0) lines.push('', `선행 대기 ${waitList(blocked)}`);
   }
   if (phase2Open) lines.push('', ...phase2Lines(phase2));
+  if (integrationOpen) {
+    lines.push('', '[통합] INT 작업은 기존 관문과 분리합니다.', ...ownerLines(integration.ready, '통합 '));
+    if (integration.ahead.length)
+      lines.push(`[통합 계획] ${integration.ahead.length}건: ${planList(integration.ahead)}`);
+    if (integration.blocked.length) lines.push(`통합 선행 대기 ${waitList(integration.blocked)}`);
+  }
   return lines.join('\n');
 }
 
