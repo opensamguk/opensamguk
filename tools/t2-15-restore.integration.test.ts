@@ -601,7 +601,7 @@ describe('T2-15 B1 실제 복구 리허설', () => {
   });
   beforeAll(async () => {
     try {
-      await stage('archive-offline-install-generate', async () => {
+      await stage('source-archive', async () => {
         const gitEnv = {
           ...baseEnv(),
           PATH:
@@ -619,12 +619,29 @@ describe('T2-15 B1 실제 복구 리허설', () => {
         if (await exists(join(copy, '.env'))) fail('archive-has-env');
         evidence.source = head;
         sourceCommit = head;
+      });
+    } catch {
+      /* 입력·준비 실패를 성공으로 바꾸지 않는다. */
+    }
+  });
+  // 독립 작업마다 같은 20초 기한을 적용한다. 앞 단계 실패 시 뒤 단계도 실패한다.
+  beforeAll(async () => {
+    try {
+      await stage('offline-install', async () => {
         await command(
           process.execPath,
           [input!.pnpm, 'install', '--offline', '--frozen-lockfile', '--store-dir', input!.store],
           copy,
           pnpmEnv(),
         );
+      });
+    } catch {
+      /* 입력·준비 실패를 성공으로 바꾸지 않는다. */
+    }
+  });
+  beforeAll(async () => {
+    try {
+      await stage('prisma-generate', async () => {
         await command(process.execPath, [input!.pnpm, '--filter', '@opensamguk/db', 'generate'], copy, pnpmEnv());
       });
     } catch {
