@@ -218,17 +218,17 @@ export class TurnLoop {
               : null;
           const state = personnelBefore?.state ?? (await loadWorldAfterCapabilityCheck(tx, world, capabilities));
           const actor = await tx.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: due.id } } });
-          const command = await tx.generalTurn.findUnique({
-            where: { worldId_generalId_slot: { worldId, generalId: due.id, slot: 0 } },
+          const slots = await tx.generalTurn.findMany({
+            where: { worldId, generalId: due.id },
+            orderBy: { slot: 'asc' },
           });
+          const command = slots.find((slot) => slot.slot === 0);
           const modern =
             world.replayFormat === 3
               ? world.ruleFeatures.includes('policy')
               : isPolicyMode({ fromSequence: world.policyFromSequence, actionSequence: world.actionSequence });
           if (modern) {
-            assertSlotSet(
-              await tx.generalTurn.findMany({ where: { worldId, generalId: due.id }, select: { slot: true } }),
-            );
+            assertSlotSet(slots);
             if (!isPolicyKey(actor.defaultPolicy)) throw new Error('기본 방침이 올바르지 않습니다.');
           }
           const treatiesHash =
@@ -313,7 +313,7 @@ export class TurnLoop {
               text: failed ? `${result.code}: ${result.message}` : result.logs.map((log) => log.text).join('\n'),
             },
           });
-          await shiftTurns(tx, worldId, due.id, { ...world, actionSequence: sequence });
+          await shiftTurns(tx, worldId, due.id, { ...world, actionSequence: sequence }, slots);
           const updated = await tx.general.updateMany({
             where: { worldId, id: due.id, nextTurnTick: due.nextTurnTick, turnRevision: actor.turnRevision },
             data: { nextTurnTick: due.nextTurnTick + TICKS_PER_MONTH, turnRevision: { increment: 1 } },
