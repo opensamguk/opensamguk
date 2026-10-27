@@ -3,7 +3,7 @@ import type { inferRouterOutputs } from '@trpc/server';
 import { trpc, trpcClient } from '../trpc';
 
 // 외교실이 쓰는 타입. 모두 AppRouter treaty의 실제 출력에서 꺼낸다 (T2-07 첫 세 조항, AC-M2-06).
-// 서버가 주지 않는 신의·파기·교역 대상·남은 개월·뒤 네 조항은 타입에도 화면에도 두지 않는다.
+// 권한과 조약 상태는 서버의 실제 출력에 맞춘다.
 
 type Outputs = inferRouterOutputs<AppRouter>['treaty'];
 
@@ -31,7 +31,8 @@ export type ProposeInput = { toNationId: number; clauses: Clause[] };
 export type RespondInput = { treatyId: string; accept: boolean };
 export type ActionInput =
   | { kind: Extract<RequestKind, 'treaty.propose'>; input: ProposeInput }
-  | { kind: Extract<RequestKind, 'treaty.respond'>; input: RespondInput };
+  | { kind: Extract<RequestKind, 'treaty.respond'>; input: RespondInput }
+  | { kind: Extract<RequestKind, 'treaty.break'>; input: { treatyId: string } };
 
 // 조약 쿼리 전체(목록·견적·요청). 결과가 확정되면 이 키로 한 번에 다시 받는다.
 export const TREATY_PATH_KEY = trpc.treaty.pathKey();
@@ -45,6 +46,7 @@ export function fetchTreatyPage(worldId: string, cursor: string | null, signal: 
 export function sendAction(worldId: string, requestId: RequestId, action: ActionInput): Promise<RequestState> {
   if (action.kind === 'treaty.propose')
     return trpcClient.treaty.propose.mutate({ worldId, requestId, ...action.input });
+  if (action.kind === 'treaty.break') return trpcClient.treaty.break.mutate({ worldId, requestId, ...action.input });
   return trpcClient.treaty.respond.mutate({ worldId, requestId, ...action.input });
 }
 

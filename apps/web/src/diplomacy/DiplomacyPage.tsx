@@ -2,6 +2,7 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Link, useRouterState } from '@tanstack/react-router';
 import { useMemo } from 'react';
 import { errorCode, retryUnlessClientError } from '../game/errors';
+import { formatYearMonth } from '../game/gameDate';
 import { NoGeneral, QueryError } from '../game/QueryState';
 import { useHome, useWorldId, useWorldMap } from '../game/queries';
 import { useTRPC } from '../trpc';
@@ -33,9 +34,9 @@ import { useTreatyRequests } from './useTreatyRequests';
 
 // 외교실 (T2-08, AC-M2-06). 받은 제안·보낸 제안·진행 중·끝남·조약서 쓰기를 탭으로 나눈다.
 // 제안·수락·거절은 엔진이 처리한 뒤에 결과가 정해진다. 화면은 applied·rejected를 받기 전에는 성공 문구를 띄우지 않는다.
-// 서버에 없는 신의·파기·교역 대상은 탭도 단추도 두지 않는다.
+// 신의·파기는 월드가 켠 기능과 서버 권한을 따른다.
 
-export const DIPLOMACY_TABS = ['incoming', 'outgoing', 'active', 'ended', 'write'] as const;
+export const DIPLOMACY_TABS = ['incoming', 'outgoing', 'active', 'ended', 'write', 'trust'] as const;
 export type DiplomacyTab = (typeof DIPLOMACY_TABS)[number];
 
 const TAB_LABELS: Record<DiplomacyTab, string> = {
@@ -44,6 +45,7 @@ const TAB_LABELS: Record<DiplomacyTab, string> = {
   active: '진행 중',
   ended: '끝남',
   write: '조약서 쓰기',
+  trust: '신의',
 };
 
 export const parseDiplomacySearch = (search: Record<string, unknown>): { tab: DiplomacyTab } => ({
@@ -60,7 +62,9 @@ export function treatiesForTab(items: readonly TreatyItem[], tab: DiplomacyTab):
     case 'active':
       return items.filter((t) => t.status === 'ACTIVE');
     case 'ended':
-      return items.filter((t) => t.status === 'ENDED' || t.status === 'REJECTED' || t.status === 'EXPIRED');
+      return items.filter(
+        (t) => t.status === 'ENDED' || t.status === 'REJECTED' || t.status === 'EXPIRED' || t.status === 'BROKEN',
+      );
     default:
       return [];
   }
@@ -101,7 +105,7 @@ export function busyText(
 ): string | null {
   const mine = trackedFor(tracked, { treatyId });
   if (mine) return `${actionLabel(mine.action)} ${phaseText(mine.phase)}`;
-  const other = pending.find((p) => p.kind === 'treaty.respond' && p.treatyId === treatyId);
+  const other = pending.find((p) => p.kind !== 'treaty.propose' && p.treatyId === treatyId);
   return other ? `${other.requestedBy.name}의 요청을 처리하는 중입니다.` : null;
 }
 
@@ -194,6 +198,7 @@ function Diplomacy({ worldId, tab, storageKey }: { worldId: string; tab: Diploma
 
       <nav className={styles.tabs} aria-label="외교실 탭">
         {DIPLOMACY_TABS.map((key) => {
+          if (key === 'trust' && !head?.breakEnabled) return null;
           const count = key === 'write' || !head ? null : treatiesForTab(items, key).length;
           return (
             <Link
@@ -226,11 +231,18 @@ function Diplomacy({ worldId, tab, storageKey }: { worldId: string; tab: Diploma
         ) : (
           <LoadingState />
         )
+      ) : tab === 'trust' ? (
+        head.breakEnabled ? (
+          <TrustTable worldId={worldId} />
+        ) : (
+          <EmptyState title="신의 기능을 쓰지 않는 월드입니다" />
+        )
       ) : tab === 'write' ? (
         head.canPropose.ok ? (
           <TreatyComposer
             worldId={worldId}
             targets={head.targets}
+            tradeEnabled={head.tradeEnabled === true}
             busyFor={(toNationId) => {
               const mine = trackedFor(requests.tracked, { toNationId });
               if (mine) return `이 상대에게 보낸 제안이 ${phaseText(mine.phase)}`;
@@ -250,6 +262,7 @@ function Diplomacy({ worldId, tab, storageKey }: { worldId: string; tab: Diploma
             empty={emptyText(TAB_LABELS[tab], list.hasNextPage)}
             busy={(id) => busyText(id, requests.tracked, pending)}
             onRespond={(treatyId, accept) => requests.send({ kind: 'treaty.respond', input: { treatyId, accept } })}
+            onBreak={(treatyId) => requests.send({ kind: 'treaty.break', input: { treatyId } })}
           />
           {list.hasNextPage ? (
             <div className={styles.buttons}>
@@ -349,19 +362,63 @@ function TreatyList({
   empty,
   busy,
   onRespond,
+  onBreak,
 }: {
   treaties: TreatyItem[];
   empty: string;
   busy: (treatyId: string) => string | null;
   onRespond: (treatyId: string, accept: boolean) => void;
+  onBreak: (treatyId: string) => void;
 }) {
   if (treaties.length === 0) return <EmptyState title={empty} />;
   return (
     <div className={styles.cards}>
       {treaties.map((t) => (
-        <TreatyCard key={t.id} treaty={t} busy={busy(t.id)} onRespond={(accept) => onRespond(t.id, accept)} />
+        <TreatyCard
+          key={t.id}
+          treaty={t}
+          busy={busy(t.id)}
+          onRespond={(accept) => onRespond(t.id, accept)}
+          onBreak={() => onBreak(t.id)}
+        />
       ))}
     </div>
+  );
+}
+
+function TrustTable({ worldId }: { worldId: string }) {
+  const trpc = useTRPC();
+  const trust = useQuery({
+    ...trpc.treaty.trust.queryOptions({ worldId }),
+    retry: retryUnlessClientError,
+    refetchInterval: 10_000,
+  });
+  if (trust.isError)
+    return (
+      <QueryError error={trust.error} notFound="신의 기록을 찾을 수 없습니다" onRetry={() => void trust.refetch()} />
+    );
+  if (!trust.data) return <LoadingState />;
+  return (
+    <table className={styles.table} data-testid="trust-table">
+      <thead>
+        <tr>
+          <th scope="col">국가</th>
+          <th scope="col">조약 파기</th>
+          <th scope="col">마지막 파기</th>
+        </tr>
+      </thead>
+      <tbody>
+        {trust.data.items.map((row) => (
+          <tr key={row.nation.id}>
+            <td>
+              <NationBadge name={row.nation.name} color={row.nation.color} />
+            </td>
+            <td>{row.brokenTreaties}회</td>
+            <td>{row.lastBrokenAt ? formatYearMonth(row.lastBrokenAt) : '없음'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 

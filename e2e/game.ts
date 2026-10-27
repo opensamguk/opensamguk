@@ -50,7 +50,7 @@ function databaseUrl(): string {
 }
 
 // PREOPEN 월드를 만든다. 감독은 world:start로 RUNNING이 된 뒤에야 이 월드를 찾는다.
-function createWorld(seed: string, name: string): string {
+function createWorld(seed: string, name: string, ruleFeatures: string[] = []): string {
   const created = run([
     'world:create',
     '--scenario',
@@ -65,11 +65,21 @@ function createWorld(seed: string, name: string): string {
     '300',
     '--name',
     name,
+    ...(ruleFeatures.length ? ['--rule-features', ruleFeatures.join(',')] : []),
   ]);
   return (JSON.parse(created.trim().split('\n').at(-1)!) as { worldId: string }).worldId;
 }
 
 let worldId: string | undefined;
+// 기능 검사는 기존 월드의 설정을 바꾸지 않고 필요한 기능을 켠 전용 월드를 만든다.
+export async function e2eFeatureWorld(ruleFeatures: string[], options: { npcNations?: boolean } = {}): Promise<string> {
+  const id = createWorld(`e2e-features-${Date.now()}`, 'E2E 기능 월드', ruleFeatures);
+  if (options.npcNations !== undefined)
+    await withE2eDb((db) => db.nation.updateMany({ where: { worldId: id }, data: { isNpc: options.npcNations } }));
+  run(['world:start', '--world', id]);
+  await waitEngineReady(id);
+  return id;
+}
 
 export async function e2eWorld(page: Page): Promise<string> {
   if (worldId) return worldId;

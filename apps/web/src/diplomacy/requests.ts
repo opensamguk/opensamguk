@@ -40,7 +40,7 @@ const STORAGE_PREFIX = 'opensamguk.treatyRequests.v2';
 export const requestsStorageKey = (userId: string, worldId: string) => `${STORAGE_PREFIX}:${userId}:${worldId}`;
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
-const FIRST_KINDS = new Set(['peace', 'nonAggression', 'note']);
+const FIRST_KINDS = new Set(['peace', 'nonAggression', 'note', 'trade']);
 
 function isAction(value: unknown): value is ActionInput {
   if (!isObject(value) || !isObject(value.input)) return false;
@@ -51,10 +51,16 @@ function isAction(value: unknown): value is ActionInput {
       Number.isInteger(input.toNationId) &&
       Array.isArray(input.clauses) &&
       (input.clauses as unknown[]).every(
-        (clause) => isObject(clause) && typeof clause.kind === 'string' && FIRST_KINDS.has(clause.kind),
+        (clause) =>
+          isObject(clause) &&
+          typeof clause.kind === 'string' &&
+          FIRST_KINDS.has(clause.kind) &&
+          (clause.kind !== 'trade' ||
+            (Number.isInteger(clause.months) && Number(clause.months) >= 1 && Number(clause.months) <= 120)),
       )
     );
   if (value.kind === 'treaty.respond') return typeof input.treatyId === 'string' && typeof input.accept === 'boolean';
+  if (value.kind === 'treaty.break') return Object.keys(input).length === 1 && typeof input.treatyId === 'string';
   return false;
 }
 
@@ -171,6 +177,7 @@ export function trackedFor(tracked: readonly Tracked[], target: { treatyId?: str
 
 export function actionLabel(action: ActionInput): string {
   if (action.kind === 'treaty.propose') return '제안';
+  if (action.kind === 'treaty.break') return '파기';
   return action.input.accept ? '수락' : '거절';
 }
 
@@ -203,11 +210,13 @@ const APPLIED_TEXT: Record<ActionInput['kind'], Record<Outcome, string>> = {
     ACCEPTED: '조약을 맺었습니다.',
     DECLINED: '제안을 거절했습니다.',
   },
+  'treaty.break': { PROPOSED: '처리되었습니다.', ACCEPTED: '처리되었습니다.', DECLINED: '처리되었습니다.' },
 };
 
 const RECENT_TEXT: Record<ActionInput['kind'], Record<Outcome, string>> = {
   'treaty.propose': { PROPOSED: '제안을 보냄', ACCEPTED: '상대가 수락해 조약을 맺음', DECLINED: '상대가 거절함' },
   'treaty.respond': { PROPOSED: '처리됨', ACCEPTED: '수락해 조약을 맺음', DECLINED: '받은 제안을 거절함' },
+  'treaty.break': { PROPOSED: '처리됨', ACCEPTED: '처리됨', DECLINED: '처리됨' },
 };
 
 export function finishedText(item: Finished): string {
@@ -215,7 +224,7 @@ export function finishedText(item: Finished): string {
     return `${actionLabel(item.action)} 요청을 서버가 받지 않았습니다. ${item.reason ?? ''}`.trim();
   if (item.result === 'rejected')
     return `${actionLabel(item.action)} 요청이 거절되었습니다. ${item.reason ?? ''}`.trim();
-  if (item.outcome === 'BROKEN') return '조약을 파기했습니다.';
+  if (item.outcome === 'BROKEN') return '조약을 파기했습니다. 신의 기록에 남았습니다.';
   return item.outcome === null ? '처리되었습니다.' : APPLIED_TEXT[item.action.kind][item.outcome];
 }
 
