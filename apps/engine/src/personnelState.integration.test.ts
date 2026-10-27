@@ -4,7 +4,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { createDb, type Prisma } from '@opensamguk/db';
 import type { OfficeTurns } from '@opensamguk/rules';
-import { assertNoOfficeRows, loadOfficeState, persistOfficeState } from './personnelState';
+import { assertNoOfficeRows, assertPersonnelStorage, loadOfficeState, persistOfficeState } from './personnelState';
 
 type PgClient = {
   connect(): Promise<void>;
@@ -447,4 +447,31 @@ it('OC-PG-08 뒤 직책 오류를 쓰기 전에 잡고 두 표의 꺼짐 검사�
   const turnRows = await physical(turnOnly);
   await expect(locked(turnOnly, (tx) => assertNoOfficeRows(tx, turnOnly))).rejects.toThrow('직책 저장 행');
   expect(await physical(turnOnly)).toEqual(turnRows);
+});
+
+it('AC-INT-01 꺼진 인사의 통합 조회는 세 표 각각과 닫힌 제안도 거부하고 타월드 행을 섞지 않는다', async () => {
+  const empty = await fixture('personnel-disabled-empty');
+  for (const kind of ['office', 'turn', 'pending', 'closed'] as const) {
+    const worldId = await fixture(`personnel-disabled-${kind}`);
+    if (kind === 'office') await db.nationOffice.create({ data: { worldId, nationId: 1, officerLevel: 5 } });
+    else if (kind === 'turn')
+      await db.nationOfficeTurn.create({ data: { worldId, nationId: 1, officerLevel: 5, slot: 0 } });
+    else
+      await db.assignmentOffer.create({
+        data: {
+          worldId,
+          id: '0-1-2',
+          nationId: 1,
+          issuerGeneralId: 1,
+          targetGeneralId: 2,
+          cityKey: 1,
+          status: kind === 'pending' ? 'PENDING' : 'REJECTED',
+          createdTick: 0,
+          expiresTick: 60000,
+          ...(kind === 'closed' ? { resolvedBy: 'RESPONSE', resolvedTick: 1 } : {}),
+        },
+      });
+    await expect(locked(worldId, (tx) => assertPersonnelStorage(tx, worldId, false))).rejects.toThrow('인사 저장 행');
+    await expect(locked(empty, (tx) => assertPersonnelStorage(tx, empty, false))).resolves.toBeUndefined();
+  }
 });

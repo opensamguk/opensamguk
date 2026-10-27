@@ -8,6 +8,7 @@ function fixture() {
     nationOfficeTurn: { findFirst: vi.fn().mockResolvedValue(null) },
     assignmentOffer: { findFirst: vi.fn().mockResolvedValue(null) },
     nationTurn: { findFirst: vi.fn().mockResolvedValue(null) },
+    $queryRaw: vi.fn().mockResolvedValue([{ present: false }]),
   };
   return {
     tx,
@@ -20,23 +21,19 @@ describe('인사 기능 선택과 네 표의 저장 경계', () => {
     const f = fixture();
     f.tx.nationTurn.findFirst.mockResolvedValue({ nationId: 1 });
     await expect(f.check(false)).resolves.toBeUndefined();
-    for (const table of [f.tx.nationOffice, f.tx.nationOfficeTurn])
-      expect(table.findFirst).toHaveBeenCalledExactlyOnceWith({
-        where: { worldId: 'world' },
-        select: { nationId: true },
-      });
-    expect(f.tx.assignmentOffer.findFirst).toHaveBeenCalledExactlyOnceWith({
-      where: { worldId: 'world' },
-      select: { id: true },
-    });
+    expect(f.tx.$queryRaw).toHaveBeenCalledTimes(1);
+    const [sql, ...values] = f.tx.$queryRaw.mock.calls[0]! as unknown as [TemplateStringsArray, ...unknown[]];
+    for (const table of ['NationOffice', 'NationOfficeTurn', 'AssignmentOffer'])
+      expect(sql.join('?')).toContain(`FROM "${table}" WHERE "worldId" =`);
+    expect(values).toEqual(['world', 'world', 'world']);
     expect(f.tx.nationTurn.findFirst).not.toHaveBeenCalled();
   });
 
-  it.each(['nationOffice', 'nationOfficeTurn', 'assignmentOffer'] as const)(
-    '기능을 끈 월드의 %s 행을 거부한다',
-    async (table) => {
+  it.each([{ rows: [{ present: true }] }, { rows: [] }, { rows: [{ present: null }] }])(
+    '기능을 끈 월드의 저장 행 또는 잘못된 조회 결과 %j를 거부한다',
+    async ({ rows }) => {
       const f = fixture();
-      f.tx[table].findFirst.mockResolvedValue({ id: 'closed-offer', nationId: 1 });
+      f.tx.$queryRaw.mockResolvedValue(rows);
       await expect(f.check(false)).rejects.toThrow('인사 저장 행');
     },
   );
@@ -52,6 +49,7 @@ describe('인사 기능 선택과 네 표의 저장 경계', () => {
     });
     for (const table of [f.tx.nationOffice, f.tx.nationOfficeTurn, f.tx.assignmentOffer])
       expect(table.findFirst).not.toHaveBeenCalled();
+    expect(f.tx.$queryRaw).not.toHaveBeenCalled();
   });
 
   it('기능을 켠 월드에 남은 기존 국가 예턴은 거부한다', async () => {
@@ -62,7 +60,7 @@ describe('인사 기능 선택과 네 표의 저장 경계', () => {
 
   it('저장 경계 조회 실패를 기능이 비어 있는 것으로 처리하지 않는다', async () => {
     const f = fixture();
-    f.tx.assignmentOffer.findFirst.mockRejectedValue(new Error('조회 실패'));
+    f.tx.$queryRaw.mockRejectedValue(new Error('조회 실패'));
     await expect(f.check(false)).rejects.toThrow('조회 실패');
   });
 });
