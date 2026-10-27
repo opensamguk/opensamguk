@@ -8,6 +8,7 @@ import type { InitialGeneral } from '../../../world/bootstrap';
 import type { CityField, Effect } from '../../effects';
 import { fail, ownCity, positive, relation } from '../../support';
 import type { Actor, CommandResult, Failure } from '../../types';
+import { fiveStatsSchema } from '../../../general/fiveStats';
 
 // S1: 연도와 무관하게 금·쌀 각 100. S2: 부상으로 능력치를 줄이지 않는다.
 // S3: 부상 80 이상은 유지. S4: 불탐 표시·성공 횟수·별도 능력치 경험은 생략한다.
@@ -42,6 +43,15 @@ export function effectiveStat(general: Pick<InitialGeneral, Stat>, stat: Stat): 
   return Math.trunc(Math.max(0, Math.min(STRATAGEM.MAX_STAT, general[stat] + Math.round(cross / 4))));
 }
 
+export function stratagemAttackScore(general: InitialGeneral, commandKey: string): number {
+  const { leadership, strength, intel, politics, charm } = general;
+  const stats = fiveStatsSchema.parse({ leadership, strength, intel, politics, charm });
+  if (commandKey === 'fire_attack' || commandKey === 'sabotage') return stats.intel;
+  if (commandKey !== 'plunder' && commandKey !== 'incite') throw new Error('기본 계략의 명령 키를 확인하세요.');
+  const primary = commandKey === 'plunder' ? stats.strength : stats.charm;
+  return Math.round((primary * 70 + stats.intel * 30) / 100);
+}
+
 export function stratagemDistance(view: WorldView, from: number, to: number): number {
   const seen = new Set([from]);
   let frontier = [from];
@@ -66,14 +76,23 @@ export function stratagemDefenders(view: WorldView, cityKey: number, year: numbe
     .sort((a, b) => a.id - b.id);
 }
 
-export function stratagemProbability(view: WorldView, actor: Actor, cityKey: number, stat: Stat): number {
+export function stratagemProbability(
+  view: WorldView,
+  actor: Actor,
+  cityKey: number,
+  stat: Stat,
+  commandKey?: string,
+): number {
   const general = view.generals[actor.generalId]!;
   const city = view.cities[cityKey]!;
   const year = toGameDate(view.startYear, actor.tick ?? 0).year;
   const defenders = stratagemDefenders(view, cityKey, year);
-  const attack = effectiveStat(general, stat) / STRATAGEM.STAT_COEFFICIENT;
+  const modern = view.ruleFeatures?.includes('stratagem-basic') ?? false;
+  const attack =
+    (modern ? stratagemAttackScore(general, commandKey ?? '') : effectiveStat(general, stat)) /
+    STRATAGEM.STAT_COEFFICIENT;
   const defence =
-    Math.max(0, ...defenders.map((g) => effectiveStat(g, stat))) / STRATAGEM.STAT_COEFFICIENT +
+    Math.max(0, ...defenders.map((g) => (modern ? g.intel : effectiveStat(g, stat)))) / STRATAGEM.STAT_COEFFICIENT +
     (Math.log2(defenders.length + 1) - 1.25) * 0.04 +
     city.security / city.securityMax / 5 +
     (city.supplied ? 0.1 : 0);
@@ -118,7 +137,7 @@ export function executeStratagem(
   const general = view.generals[actor.generalId]!;
   const city = view.cities[cityKey]!;
   const year = toGameDate(view.startYear, actor.tick ?? 0).year;
-  const success = rng.next() < stratagemProbability(view, actor, cityKey, spec.stat);
+  const success = rng.next() < stratagemProbability(view, actor, cityKey, spec.stat, spec.key);
   const injuries: Effect[] = [];
   const reports: NonNullable<CommandResult['reports']> = [];
   if (success && spec.fields) {

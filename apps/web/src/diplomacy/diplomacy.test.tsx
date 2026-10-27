@@ -151,6 +151,33 @@ describe('즉시 행동 요청 추적', () => {
     expect(storage.getItem('k')).toBeNull();
   });
 
+  it('파기와 교역 제안은 응답 유실 뒤 같은 ID·내용으로 복구하고 결과를 확정한다', () => {
+    for (const action of [
+      { kind: 'treaty.break', input: { treatyId: '7' } },
+      { kind: 'treaty.propose', input: { toNationId: 2, clauses: [{ kind: 'trade', months: 12 }] } },
+    ] satisfies ActionInput[]) {
+      const storage = memory();
+      const state = applySendError(startRequest(empty, 'kept-id', action), 'kept-id', undefined, undefined);
+      writeTracked(storage, 'k', state.tracked);
+      expect(readTracked(storage, 'k')).toEqual([{ requestId: 'kept-id', action, phase: 'checking' }]);
+      if (action.kind === 'treaty.break') {
+        const finished = applyOutcome(
+          { tracked: readTracked(storage, 'k'), finished: [] },
+          {
+            status: 'applied',
+            requestId: 'kept-id',
+            kind: 'treaty.break',
+            outcome: 'BROKEN',
+            treatyId: '7',
+            treaty: null,
+          },
+        );
+        expect(finished.tracked).toEqual([]);
+        expect(finishedText(finished.finished[0]!)).toContain('신의 기록에 남았습니다');
+      }
+    }
+  });
+
   it('옛 모양(expiresInMonths, propose·break 종류, 뒤 네 조항)은 되살려 다시 보내지 않는다', () => {
     const storage = memory();
     storage.setItem('k', '{깨진');
@@ -323,7 +350,7 @@ describe('외교실 탭과 쪽', () => {
     expect(treatiesForTab(items, 'active').map((t) => t.id)).toEqual(['c']);
     expect(treatiesForTab(items, 'ended').map((t) => t.id)).toEqual(['d', 'e', 'f']);
     expect(parseDiplomacySearch({ tab: 'nope' })).toEqual({ tab: 'incoming' });
-    expect(parseDiplomacySearch({ tab: 'trust' })).toEqual({ tab: 'incoming' });
+    expect(parseDiplomacySearch({ tab: 'trust' })).toEqual({ tab: 'trust' });
     expect(parseDiplomacySearch({ tab: 'broken' })).toEqual({ tab: 'incoming' });
     expect(parseDiplomacySearch({ tab: 'write' })).toEqual({ tab: 'write' });
   });

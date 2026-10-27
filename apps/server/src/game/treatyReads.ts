@@ -65,6 +65,7 @@ type RecentAction = {
 };
 export type TreatyListPage = {
   breakEnabled?: true;
+  tradeEnabled?: true;
   canPropose: TreatyAllowed;
   targets: TreatyTarget[];
   items: TreatyListItem[];
@@ -190,6 +191,7 @@ export async function listTreaties(
   if (nationId === null)
     return {
       ...(breakEnabled ? { breakEnabled: true } : {}),
+      ...(treatyTradeEnabled(world) ? { tradeEnabled: true } : {}),
       canPropose,
       targets: [],
       items: [],
@@ -450,6 +452,7 @@ export async function listTreaties(
     });
   return {
     ...(breakEnabled ? { breakEnabled: true } : {}),
+    ...(treatyTradeEnabled(world) ? { tradeEnabled: true } : {}),
     canPropose,
     targets,
     items,
