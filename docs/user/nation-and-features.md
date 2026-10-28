@@ -82,6 +82,8 @@
 > 군주·참모·수뇌는 메뉴의 [감찰]에서 소속 장수의 병력·훈련·사기, 예턴 앞 5칸, 마지막 접속을 봅니다. 오래 접속하지 않은 장수는 서버가 정한 대로 표시됩니다.
 > 빈 칸의 기본 방침, 조약서 외교, 교역, 알림이 준비 중입니다. 들어오는 대로 이 안내에 더합니다.
 
+월드 이용이 제한되면 게임 화면 위에서 사유와 기한을 확인합니다. 기한은 한국 시각이며 무기한은 기한 없음으로 표시됩니다. 조회와 다른 월드는 계속 이용할 수 있고 기존 예약은 그대로 실행됩니다. 제재가 해제됐거나 기한이 지나면 제재 상태 다시 확인을 누릅니다. 서버가 상태를 확인한 뒤 안내가 사라지며 저장하지 않은 예턴 초안은 유지됩니다.
+
 다음은 [용어 사전](./glossary.md)입니다.
 
 근거: `apps/web/src/game/names.ts`, `packages/rules/src/commands/personnel.ts`, `packages/rules/src/commands/personal.ts`, `packages/rules/src/commands/support.ts`, `packages/rules/src/ranking.ts`, `apps/server/src/visibility.ts`, `apps/server/src/routers/records.ts`, `apps/web/src/main/NationInfo.tsx`, `apps/web/src/ranking/rankingView.ts`, `apps/web/src/operations/InspectionPage.tsx`, `apps/web/src/timelapse/`
