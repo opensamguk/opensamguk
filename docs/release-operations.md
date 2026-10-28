@@ -14,6 +14,18 @@
 
 <!-- TODO(M2): 명령 하나로 배포 (AC-M2-08). migration 적용 → server·engine 재시작 → 상태 확인. -->
 
+### 공개 실행 이미지 (T2-15 B2a)
+
+`deploy/Dockerfile`은 Node24 공식 이미지의 digest와 pnpm10.33.0을 고정하고 lockfile 설치·Prisma 생성을 실행합니다. `server`·`engine`·`migrate` 대상은 같은 소스를 쓰며 `web` 대상은 `build:public`·자산 검사를 거친 정적 파일만 `/web`으로 내보냅니다. API와 엔진은 UID/GID10001로 실행하고 진입점이 실제 Node 프로세스를 `exec`합니다. API의 기존 loopback 바인딩을 유지합니다.
+
+빌드 입력은 검토한 Git archive의 별도 디렉터리입니다. Dockerfile 옆의 `Dockerfile.dockerignore`가 package·lock·앱·패키지·도구·문서·필수 manifest·resources만 받고 `.git`·`.env*`·private·호스트 의존성·백업·로그·시험 산출물을 제외합니다. stdin tar는 이 필터의 검증으로 세지 않습니다. `SOURCE_REVISION`은 실제 기준 커밋40자이고 `SOURCE_TREE_SHA256`은 후보 소스 경로·파일 바이트의 SHA-256입니다. 두 값은 이미지 label에 남으며 후보 해시를 확정 릴리스로 선언하지 않습니다. 깨끗한 소스의 선택·해시 생성·manifest·배포 receipt·current 교체 명령은 B2 후속에 남아 있습니다.
+
+실행 비밀 디렉터리 `/run/secrets`는 UID10001 소유·0700이어야 하고 `database_url`·`mail_api_key`는 같은 소유자·0600의 일반 파일이어야 합니다. 디렉터리를 read-only로 마운트하며 기본0444 Compose secret은 그대로 사용할 수 없습니다. 파일은1~4096바이트의 UTF-8로 줄바꿈·NUL 없이 저장하고 심볼릭 링크를 쓰지 않습니다. DB 파일에는 인증 정보와 DB 경로를 갖춘 PostgreSQL URL을 넣습니다. URL은 진입점의 exec 환경에만 전달하며 `DATABASE_URL`·`MAIL_API_KEY`·`RESEND_API_KEY`를 호스트 환경에서 전달하면 빈 값도 거부합니다. Git·명령 인자·build ARG·이미지 환경·로그·`VITE_*`에는 비밀값을 넣지 않습니다.
+
+메일 후보를 선택한 뒤 `MAIL_TRANSPORT=resend`·인증한 `MAIL_FROM`을 설정합니다. 키는 `/run/secrets/mail_api_key`의 경로만 기존 `MAIL_API_KEY_FILE` 계약으로 전달합니다. 운영 모드의 미설정 메일·capture는 시작 실패가 정상이며 개발 capture 기동을 운영 메일 인수로 세지 않습니다. 서버·도메인·메일 선택과 실제 수신 확인은 아직 남아 있습니다.
+
+2026-10-28 로컬 Linux Docker에서 실제 디렉터리 입력으로4개 대상을 빌드하고 공개102파일·승인 이미지6개·외부 초상0개를 확인했습니다. 내보낸 Linux web의 실제 Chromium4건도5.5초에 통과했습니다. 비밀 canary8경로의 제외, 이미지 설정·history와 저장한 layer998,077,087바이트의 비노출을 검사했습니다. 실제 Linux에서 누락·빈 파일·0444·잘못된 디렉터리/소유자·링크·잘못된 UTF-8·NUL·줄바꿈·4097바이트와 원문 환경의 거부를 확인했습니다. 전용 PostgreSQL의 두 정식191년 월드는42국·982NPC·29,460예약으로 초기화됐고 API·두 엔진의 상태, 정상 종료0·DB 연결0·자기 컨테이너/volume/network 정리를 확인했습니다. 운영 메일·원격 배포·되돌리기·매일 백업·전체 AC-M2-08·09는 미완료입니다.
+
 ## 3. 되돌리기
 
 <!-- TODO(M2): 이전 이미지 태그로 되돌리는 절차. migration이 있으면 어떻게 하나. 리허설 기록 남기기. -->
