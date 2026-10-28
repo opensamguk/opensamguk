@@ -1,0 +1,47 @@
+{
+	admin off
+	persist_config off
+	http_port 8080
+	https_port 8443
+	auto_https disable_redirects
+	servers {
+		protocols h1 h2
+	}
+}
+
+import /etc/caddy/security.caddy
+
+# 외부80/443을 내부8080/8443으로 전달한다. 고포트 TLS 리허설은 별도 설정이다.
+http://{$PUBLIC_HOST}:8080 {
+	redir {$PUBLIC_ORIGIN}{uri} 308
+}
+
+https://{$PUBLIC_HOST}:8443 {
+	import game_security
+	root * /srv/web
+	# 기본 proxy 오류 로그의 query·쿠키 대신 고정 응답으로 오류를 처리한다.
+	handle_errors {
+		import game_security
+		respond "요청을 처리하지 못했습니다." {err.status_code}
+	}
+
+	@api path /trpc /trpc/* /sse /healthz /healthz/engine
+	handle @api {
+		# text/event-stream은 Caddy가 즉시 flush하며 연결 취소를 upstream에 전한다.
+		reverse_proxy 127.0.0.1:3001
+	}
+
+	@file path /assets /assets/*
+	@extension path_regexp \.[^/]+$
+	handle @file {
+		file_server
+	}
+	handle @extension {
+		file_server
+	}
+	handle {
+		header Cache-Control no-store
+		try_files {path} /index.html
+		file_server
+	}
+}
