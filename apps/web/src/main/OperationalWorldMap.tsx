@@ -8,6 +8,7 @@ import passIcon from '../mapEditor/icons/pass.png';
 import portIcon from '../mapEditor/icons/port.png';
 import fieldIcon from '../mapEditor/icons/field.png';
 import { OPERATIONAL_GIS_SHA256, operationalBasemap as basemap } from './operationalGeography';
+import { mapTapTargets, tapCandidates, type MapView } from './mapTapTargets';
 import styles from './OperationalWorldMap.module.css';
 
 type MapData = PublicGeography;
@@ -15,7 +16,7 @@ type DrawnCity = Pick<MapCity, 'key' | 'name' | 'kind' | 'x' | 'y' | 'nationId'>
   supplied?: boolean;
   recorded?: boolean;
 };
-type View = { x: number; y: number; width: number; height: number };
+type View = MapView;
 const whole: View = { x: 0, y: 0, width: 1000, height: 700 };
 const icons = { CITY: cityIcon, PASS: passIcon, PORT: portIcon, FIELD: fieldIcon };
 const labels = { CITY: '도시', PASS: '관문', PORT: '항구 시설', FIELD: '전장 표시' };
@@ -73,8 +74,49 @@ export function OperationalWorldMap({
   onSelect?: (key: number) => void;
 }) {
   const [view, setView] = useState(whole);
-  const drag = useRef<{ pointerId: number; x: number; y: number; view: View } | null>(null);
+  const drag = useRef<{ pointerId: number; x: number; y: number; view: View; mobile: boolean; moved: boolean } | null>(
+    null,
+  );
+  const completedTap = useRef<number | null>(null);
   const svg = useRef<SVGSVGElement>(null);
+  const [layout, setLayout] = useState({ mobile: false, width: 0, height: 0 });
+  const [choices, setChoices] = useState<number[]>([]);
+  const firstChoice = useRef<HTMLButtonElement>(null);
+  const choiceOrigin = useRef<SVGElement | null>(null);
+  const validGeography = matchesOperationalGeography(map, cities);
+  const canSelect = Boolean(onSelect);
+  useEffect(() => {
+    const element = svg.current;
+    if (!validGeography || !element) return;
+    const read = () => {
+      const box = element.getBoundingClientRect();
+      const next = { mobile: window.innerWidth <= 767, width: box.width, height: box.height };
+      setLayout((old) =>
+        old.mobile === next.mobile && old.width === next.width && old.height === next.height ? old : next,
+      );
+    };
+    read();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(read);
+    observer?.observe(element);
+    window.addEventListener('resize', read);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', read);
+    };
+  }, [validGeography]);
+  useEffect(() => {
+    setChoices((old) => (old.length ? [] : old));
+  }, [view.x, view.y, view.width, view.height, layout.mobile, map.id, selectedKey, canSelect]);
+  useEffect(() => {
+    if (choices.length) firstChoice.current?.focus();
+  }, [choices]);
+  useEffect(() => {
+    const active = drag.current;
+    drag.current = null;
+    completedTap.current = null;
+    if (active && svg.current?.hasPointerCapture?.(active.pointerId))
+      svg.current.releasePointerCapture(active.pointerId);
+  }, [layout.mobile]);
   const arrowId = `operational-arrow-${useId().replaceAll(':', '')}`;
   const selectedCity = cities.find((city) => city.key === selectedKey);
   const selectedX = selectedCity?.x;
@@ -87,12 +129,21 @@ export function OperationalWorldMap({
         : old,
     );
   }, [selectedX, selectedY]);
-  if (!matchesOperationalGeography(map, cities))
-    return <p role="alert">지도 판이 맞지 않습니다. 지도를 다시 불러오세요.</p>;
+  if (!validGeography) return <p role="alert">지도 판이 맞지 않습니다. 지도를 다시 불러오세요.</p>;
   const cityByKey = new Map(cities.map((city) => [city.key, city]));
   const nationById = new Map(nations.map((nation) => [nation.id, nation]));
   const siteById = new Map(map.sites.map((site) => [site.id, site]));
   const anchors = map.sites.filter((site) => site.kind === 'CITY' || site.kind === 'PASS');
+  const tapTargets = layout.mobile && onSelect ? mapTapTargets(cities, view, layout) : [];
+  const targetByKey = new Map(tapTargets.map((target) => [target.key, target]));
+  const closeChoices = (restoreFocus: boolean) => {
+    setChoices([]);
+    if (restoreFocus) {
+      const origin = choiceOrigin.current;
+      if (origin?.isConnected && svg.current?.contains(origin)) origin.focus();
+      else svg.current?.focus();
+    }
+  };
   const zoom = (factor: number) =>
     setView((old) => {
       const width = Math.min(1000, Math.max(200, old.width / factor));
@@ -109,9 +160,24 @@ export function OperationalWorldMap({
         return clamp({ x: city.x - width / 2, y: city.y - width * 0.35, width, height: width * 0.7 });
       });
   };
+  const selectAt = (element: SVGSVGElement, clientX: number, clientY: number) => {
+    const matrix = element.getScreenCTM();
+    if (!matrix) return;
+    const point = new DOMPoint(clientX, clientY).matrixTransform(matrix.inverse());
+    const keys = tapCandidates(tapTargets, point);
+    if (keys.length === 1) {
+      choose(keys[0]!);
+      closeChoices(false);
+    } else if (keys.length > 1) {
+      choiceOrigin.current = element.querySelector<SVGElement>(`[data-anchor-key="${keys[0]}"]`);
+      setChoices(keys);
+    }
+  };
   const move = (event: PointerEvent<SVGSVGElement>) => {
     const active = drag.current;
     if (!active || active.pointerId !== event.pointerId) return;
+    if (active.mobile && !active.moved && Math.hypot(event.clientX - active.x, event.clientY - active.y) < 4) return;
+    active.moved = true;
     const box = event.currentTarget.getBoundingClientRect();
     if (!box.width || !box.height) return;
     setView(
@@ -123,7 +189,25 @@ export function OperationalWorldMap({
     );
   };
   return (
-    <div className={styles.frame} data-testid="operational-world-map">
+    <div
+      className={styles.frame}
+      data-testid="operational-world-map"
+      onPointerDownCapture={() => {
+        completedTap.current = null;
+      }}
+      onClickCapture={(event) => {
+        if (
+          layout.mobile &&
+          completedTap.current !== null &&
+          (event.nativeEvent as globalThis.PointerEvent).pointerId === completedTap.current
+        ) {
+          completedTap.current = null;
+          event.preventDefault();
+          event.stopPropagation();
+          firstChoice.current?.focus();
+        }
+      }}
+    >
       <div className={styles.controls}>
         <div className={styles.zoom} role="group" aria-label="지도 배율">
           <button type="button" aria-label="지도 확대" disabled={view.width <= 200} onClick={() => zoom(1.5)}>
@@ -183,16 +267,43 @@ export function OperationalWorldMap({
           }
         }}
         onPointerDown={(event) => {
-          if (event.button !== 0 || (event.target instanceof Element && event.target.closest('[data-anchor-key]')))
+          if (
+            event.button !== 0 ||
+            event.isPrimary === false ||
+            drag.current ||
+            (!layout.mobile && event.target instanceof Element && event.target.closest('[data-anchor-key]'))
+          )
             return;
-          drag.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, view };
+          drag.current = {
+            pointerId: event.pointerId,
+            x: event.clientX,
+            y: event.clientY,
+            view,
+            mobile: layout.mobile,
+            moved: false,
+          };
           event.currentTarget.setPointerCapture(event.pointerId);
         }}
         onPointerMove={move}
-        onPointerUp={() => {
+        onPointerUp={(event) => {
+          const active = drag.current;
+          if (!active || active.pointerId !== event.pointerId) return;
           drag.current = null;
+          if (active.mobile) {
+            completedTap.current = event.pointerId;
+            if (!active.moved) selectAt(event.currentTarget, event.clientX, event.clientY);
+          }
+          if (event.currentTarget.hasPointerCapture(event.pointerId))
+            event.currentTarget.releasePointerCapture(event.pointerId);
         }}
-        onPointerCancel={() => {
+        onPointerCancel={(event) => {
+          if (drag.current?.pointerId !== event.pointerId) return;
+          drag.current = null;
+          if (event.currentTarget.hasPointerCapture(event.pointerId))
+            event.currentTarget.releasePointerCapture(event.pointerId);
+        }}
+        onLostPointerCapture={(event) => {
+          if (drag.current?.pointerId !== event.pointerId) return;
           drag.current = null;
         }}
       >
@@ -275,11 +386,12 @@ export function OperationalWorldMap({
             .filter(Boolean)
             .join(', ');
           const action = city && onSelect ? () => choose(city.key) : undefined;
+          const target = city ? targetByKey.get(city.key) : undefined;
           return (
             <g
               key={site.id}
               role={action ? 'button' : 'img'}
-              tabIndex={action ? 0 : undefined}
+              tabIndex={action ? (layout.mobile && !target ? -1 : 0) : undefined}
               aria-label={label}
               aria-pressed={action ? selected : undefined}
               data-anchor-key={city?.key}
@@ -289,7 +401,13 @@ export function OperationalWorldMap({
               data-mine={mine || undefined}
               data-selected={selected || undefined}
               className={action ? styles.anchor : styles.display}
-              onClick={action}
+              onClick={
+                action
+                  ? (event) => {
+                      if (!layout.mobile || event.detail === 0) action();
+                    }
+                  : undefined
+              }
               onKeyDown={
                 action
                   ? (event) => {
@@ -303,6 +421,18 @@ export function OperationalWorldMap({
               }
             >
               <title>{label}</title>
+              {target ? (
+                <rect
+                  data-testid="map-tap-target"
+                  data-tap-key={target.key}
+                  x={target.x}
+                  y={target.y}
+                  width={target.width}
+                  height={target.height}
+                  fill="transparent"
+                  pointerEvents="all"
+                />
+              ) : null}
               {city && (
                 <circle
                   className={styles.nation}
@@ -346,6 +476,44 @@ export function OperationalWorldMap({
           );
         })}
       </svg>
+      {onSelect && layout.mobile && choices.length > 1 ? (
+        <div
+          className={styles.choices}
+          role="group"
+          aria-label="겹친 거점 선택"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              event.stopPropagation();
+              closeChoices(true);
+            }
+          }}
+        >
+          <p>거점이 가까이 있습니다. 살펴볼 거점을 고르세요.</p>
+          <div>
+            {choices.map((key, index) => {
+              const site = anchors.find((entry) => entry.anchorKey === key);
+              return site ? (
+                <button
+                  key={key}
+                  ref={index === 0 ? firstChoice : undefined}
+                  type="button"
+                  onClick={() => {
+                    choose(key);
+                    closeChoices(false);
+                    svg.current?.querySelector<SVGElement>(`[data-anchor-key="${key}"]`)?.focus();
+                  }}
+                >
+                  {site.name} ({labels[site.kind]})
+                </button>
+              ) : null;
+            })}
+            <button type="button" onClick={() => closeChoices(true)}>
+              선택 취소
+            </button>
+          </div>
+        </div>
+      ) : null}
       <p className={styles.help}>
         드래그나 방향키로 이동 · 확대 뒤 도시·관문 선택 · 항구는 도시 시설 · 전장은 지명 표시
       </p>
