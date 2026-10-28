@@ -2,6 +2,7 @@ import { UPTIME_REF, updateUptimeGit, type UptimeGitDependencies, type UptimeGit
 import { probeHealth } from './uptimeProbe';
 import { nextDelivery, restoreState, serializeState, UPTIME_LIMITS, type StateWarning } from './uptimeState';
 import { sendUptimeNotice } from './uptimeWebhook';
+import { validateUptimeToken } from './uptimeGitAuth';
 
 export interface UptimeRunConfig {
   stateRef: string;
@@ -13,7 +14,7 @@ export interface UptimeRunConfig {
   webhook: string;
 }
 export interface UptimeRunDependencies {
-  /** 시험 생성자에서만 연결하며 CLI·환경·HTTP 입력으로 열지 않는다. */
+  /** 운영 인증과 신뢰한 시험 의존을 연결한다. 시험 경로·명령은 CLI에서 받지 않는다. */
   git?: UptimeGitDependencies;
   clock?: () => number;
   probe?: typeof probeHealth;
@@ -47,7 +48,7 @@ function https(value: string): URL {
   }
 }
 
-export async function runUptime(config: UptimeRunConfig, dependencies: UptimeRunDependencies = {}) {
+export function validateUptimeRunConfig(config: UptimeRunConfig) {
   check(config.stateRef === UPTIME_REF);
   if (config.publicUrl === '') return { mode: 'disabled' as const };
   const publicUrl = https(config.publicUrl),
@@ -63,6 +64,21 @@ export async function runUptime(config: UptimeRunConfig, dependencies: UptimeRun
         !webhook.port &&
         /^\/api(?:\/v[1-9][0-9]*)?\/webhooks\/[1-9][0-9]*\/[^/]+$/.test(webhook.pathname),
     );
+  return { mode: 'enabled' as const, publicUrl, webhook };
+}
+
+export async function runUptime(config: UptimeRunConfig, dependencies: UptimeRunDependencies = {}) {
+  const validated = validateUptimeRunConfig(config);
+  if (validated.mode === 'disabled') return validated;
+  if (dependencies.git?.httpsToken !== undefined) {
+    try {
+      validateUptimeToken(dependencies.git.httpsToken);
+      check(dependencies.git.localRemote === undefined);
+    } catch {
+      throw new UptimeRunError('configuration');
+    }
+  }
+  const { publicUrl, webhook } = validated;
   const warnings: Warning[] = [];
   const time = () => {
     try {
