@@ -24,28 +24,27 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string | undefined
   const [showPassword, setShowPassword] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
-  const options = mode === 'login' ? trpc.auth.login.mutationOptions() : trpc.auth.signup.mutationOptions();
-  const mutation = useMutation({
-    ...options,
-    onSuccess: async ({ user }) => {
-      // 이전 사용자의 캐시가 남지 않게 비우고, 가드가 다시 묻지 않도록 로그인 결과를 바로 넣는다.
-      queryClient.clear();
-      queryClient.setQueryData(trpc.auth.me.queryKey(), { user });
-      try {
-        const account = await queryClient.fetchQuery({ ...trpc.account.get.queryOptions(), staleTime: 0 });
-        if (needsEmailVerification(account)) {
-          await navigate({ to: '/verify-email', search: { next: accountNext(next) ?? '/lobby' }, replace: true });
-          return;
-        }
-      } catch {
-        // 가입·로그인은 이미 성공했다. 입력을 다시 보내지 않고 가드의 조회 재시도로 이어 간다.
-        await navigate({ to: '/', search: { next: accountNext(next) ?? '/lobby' }, replace: true });
+  async function onSuccess() {
+    // 이전 사용자의 캐시를 비운 뒤 서버에서 실제 인증·동의 상태를 다시 읽는다.
+    queryClient.clear();
+    try {
+      await queryClient.fetchQuery({ ...trpc.auth.me.queryOptions(), staleTime: 0 });
+      const account = await queryClient.fetchQuery({ ...trpc.account.get.queryOptions(), staleTime: 0 });
+      if (needsEmailVerification(account)) {
+        await navigate({ to: '/verify-email', search: { next: accountNext(next) ?? '/lobby' }, replace: true });
         return;
       }
-      // 안전한 next가 없으면 로비로 간다 (T2-04).
-      await navigate({ href: accountNext(next) ?? '/lobby', replace: true });
-    },
-  });
+    } catch {
+      // 가입·로그인은 이미 성공했다. 입력을 다시 보내지 않고 가드의 조회 재시도로 이어 간다.
+      await navigate({ to: '/', search: { next: accountNext(next) ?? '/lobby' }, replace: true });
+      return;
+    }
+    // 안전한 next가 없으면 로비로 간다 (T2-04).
+    await navigate({ href: accountNext(next) ?? '/lobby', replace: true });
+  }
+  const login = useMutation({ ...trpc.auth.login.mutationOptions(), onSuccess });
+  const signup = useMutation({ ...trpc.auth.signup.mutationOptions(), onSuccess });
+  const mutation = mode === 'login' ? login : signup;
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

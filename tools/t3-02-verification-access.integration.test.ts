@@ -176,6 +176,8 @@ describe('T3-02 AC-M3-01 실제 PostgreSQL·HTTP 이메일 인증 차단', () =>
     expect((await request('auth.me', undefined, cookies[0], false)).data!.user!).toEqual({
       id: users[0],
       email: (await db.user.findUniqueOrThrow({ where: { id: users[0]! } })).email,
+      emailVerified: false,
+      consentRequired: [],
     });
   });
 

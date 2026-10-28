@@ -6,6 +6,7 @@ import { passwordSchema } from '../auth/password';
 import type { Context } from '../context';
 import { accountMail } from '../mail/templates';
 import { protectedProcedure, publicProcedure, PublicReasonError, router } from '../trpc';
+import { missingConsents } from '../legal/policy';
 
 const tokenInput = z.strictObject({ token: z.string().max(256) });
 const ok = { ok: true as const };
@@ -45,6 +46,8 @@ export const accountRouter = router({
       email: user.email,
       emailVerified: user.emailVerifiedAt !== null,
       emailVerificationRequired: ctx.emailVerificationRequired ?? false,
+      legalPolicyApproved: Boolean(ctx.legalPolicy),
+      consentRequired: missingConsents(ctx.legalPolicy, user.consents),
       consents: user.consents.map((consent) => ({ ...consent, agreedAt: consent.agreedAt.toISOString() })),
     };
   }),

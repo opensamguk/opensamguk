@@ -1,5 +1,6 @@
 import { initTRPC, TRPCError } from '@trpc/server';
 import type { Context } from './context';
+import { missingConsents } from './legal/policy';
 import { activeSanctionWhere } from './auth/sanction';
 export const PUBLIC_ERROR_REASONS = ['EMAIL_NOT_VERIFIED', 'CONSENT_REQUIRED', 'TOKEN_INVALID'] as const;
 export type PublicErrorReason = (typeof PUBLIC_ERROR_REASONS)[number];
@@ -47,18 +48,26 @@ export const protectedProcedure = publicProcedure.use(({ ctx, next, type }) => {
 });
 
 export const verifiedProcedure = protectedProcedure.meta({ accountAccess: 'verified' }).use(async ({ ctx, next }) => {
-  if (ctx.emailVerificationRequired) {
+  if (ctx.legalPolicyRequired && !ctx.legalPolicy)
+    throw new TRPCError({ code: 'SERVICE_UNAVAILABLE', message: '약관을 준비하고 있습니다.' });
+  if (ctx.emailVerificationRequired || ctx.legalPolicy) {
     const user = await ctx.db.user.findUnique({
       where: { id: ctx.user.id },
-      select: { status: true, emailVerifiedAt: true },
+      select: { status: true, emailVerifiedAt: true, consents: { select: { docType: true, version: true } } },
     });
     if (!user || user.status !== 'ACTIVE')
       throw new TRPCError({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' });
-    if (user.emailVerifiedAt === null)
+    if (ctx.emailVerificationRequired && user.emailVerifiedAt === null)
       throw new TRPCError({
         code: 'FORBIDDEN',
         message: '이메일 인증이 필요합니다.',
         cause: new PublicReasonError('EMAIL_NOT_VERIFIED'),
+      });
+    if (missingConsents(ctx.legalPolicy, user.consents).length > 0)
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: '약관 동의가 필요합니다.',
+        cause: new PublicReasonError('CONSENT_REQUIRED'),
       });
   }
   return next();
