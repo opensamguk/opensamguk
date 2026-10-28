@@ -12,6 +12,8 @@
 - 코드를 처음 보는 개발자 → [개발자 핸드북](./developer/index.md)
 - 운영자 → [릴리스 운영](./release-operations.md), [관리자 콘솔](./admin-console.md)
 
+공개 준비의 제재 안내 화면과 검증 범위는 [T3-06 첫 묶음](./plans/T3-06.md#공개-준비-첫-묶음-2026-10-28-ac-m3-04), 사용자 안내는 [국가와 기능](./user/nation-and-features.md)에 있다. 전체 관리자 인수는 진행 중이다.
+
 ## product/ 무엇을 왜 언제까지
 
 현재 제작의 정본은 [동결 출시 범위·구현 비교·작업 일정](./plans/integration-release.md)과 [5능력치 역할](./product/five-stats.md)이다. 2026-10-27 사용자 지시로 동결했다. 새 기능은 보류하고 이 범위의 구현·검증에 집중한다.
