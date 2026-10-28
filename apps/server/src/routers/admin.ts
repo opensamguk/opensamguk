@@ -4,6 +4,7 @@ import { router } from '../trpc';
 import { notifySessionClosed } from '@opensamguk/db';
 import { createSanction, createSanctionInput, liftSanction, liftSanctionInput } from '../admin/sanctionStore';
 import { auditListInput, listAudit, searchUsers, searchUsersInput } from '../admin/read';
+import { listAdminWorlds } from '../admin/worlds';
 import {
   listAdminNotices,
   changeAdminNotice,
@@ -15,6 +16,7 @@ import {
 
 export const adminRouter = router({
   whoami: adminProcedure.input(z.void()).query(() => ({ admin: true as const })),
+  world: router({ list: adminProcedure.input(z.void()).query(({ ctx }) => listAdminWorlds(ctx)) }),
   notice: router({
     list: adminProcedure.input(noticeListInput).query(({ ctx, input }) => listAdminNotices(ctx, input)),
     create: adminProcedure

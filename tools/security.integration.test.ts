@@ -37,16 +37,26 @@ async function send(
   base: string,
   path: string,
   data: unknown,
-  options: { headers?: Record<string, string>; localAddress?: string; method?: string; raw?: string } = {},
+  options: {
+    headers?: Record<string, string>;
+    localAddress?: string;
+    method?: string;
+    raw?: string;
+    rawHeaders?: boolean;
+    batch?: boolean;
+  } = {},
 ): Promise<Response> {
   const body = options.raw ?? JSON.stringify({ 0: data });
   return new Promise((resolve, reject) => {
     const req = httpRequest(
-      `${base}/trpc/${path}?batch=1`,
+      `${base}/trpc/${path}${options.batch === false ? '' : '?batch=1'}`,
       {
         method: options.method ?? 'POST',
         localAddress: options.localAddress,
-        headers: { origin, 'content-type': 'application/json', ...options.headers },
+        headers: {
+          ...(options.rawHeaders ? {} : { origin, 'content-type': 'application/json' }),
+          ...options.headers,
+        },
       },
       (res) => {
         let text = '';
@@ -348,23 +358,33 @@ describe('T3-04 실제 TCP HTTP·PostgreSQL 보안', () => {
         expect(await snapshot()).toEqual(before);
       }
       // 실제 Origin 헤더 자체를 생략한 요청도 확인한다.
-      const res = await fetch(`${base}/trpc/auth.logout?batch=1`, {
-        method: 'POST',
+      const res = await send(base, 'auth.logout', undefined, {
+        rawHeaders: true,
         headers: { 'content-type': 'application/json' },
-        body: '{}',
+        raw: '{}',
       });
       expect(res.status).toBe(403);
-      const sameOrigin = await fetch(`${base}/trpc/auth.logout?batch=1`, {
-        method: 'POST',
+      const sameOrigin = await send(base, 'auth.logout', undefined, {
+        rawHeaders: true,
         headers: { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' },
-        body: '{}',
+        raw: '{}',
       });
       expect(sameOrigin.status).toBe(200);
-      const sseRejected = await fetch(`${base}/trpc/health`, {
+      const sseRejected = await send(base, 'health', undefined, {
+        rawHeaders: true,
+        method: 'GET',
+        batch: false,
+        raw: '',
         headers: { accept: 'text/event-stream, */*', origin: 'https://attacker.invalid' },
       });
       expect(sseRejected.status).toBe(403);
-      const sseAllowed = await fetch(`${base}/trpc/health`, { headers: { accept: 'text/event-stream', origin } });
+      const sseAllowed = await send(base, 'health', undefined, {
+        rawHeaders: true,
+        method: 'GET',
+        batch: false,
+        raw: '',
+        headers: { accept: 'text/event-stream', origin },
+      });
       expect(sseAllowed.status).toBe(200);
       expect(
         (

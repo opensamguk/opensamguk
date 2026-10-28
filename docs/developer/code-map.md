@@ -104,6 +104,10 @@
 
 관리자 공지의 엄격 입력·잠금·멱등·감사는 `apps/server/src/admin/notices.ts`에 있다. `routers/admin.ts`의 네 절차가 사용하며 `lobby.notices`·`notice.world.list`는 숨김 필터만 추가한다. `tools/t3-05-admin-notices.integration.test.ts`는 실제 HTTP·권한·경합·두 정식 월드 격리를 검사하고 `t3-05-notice-migration.integration.test.ts`는 기존 모든 행·sequence와 null 제목·고정 공지를 새 migration 전후로 대조한다. 두 운영 표는 게임 상태·재생 해시에 넣지 않는다.
 
+관리자 공지와 월드 조회의 잠금 뒤 현재 권한 확인은 `apps/server/src/admin/access.ts`가 맡는다. `admin/worlds.ts`의 `admin.world.list`는 명시한 월드·사람 수·heartbeat를 같은 스냅샷에서 읽고 오류 원문을 응답하지 않는다. `tools/t3-05-admin-worlds.integration.test.ts`는 실제 두 정식 월드·사람30칸과 HTTP 권한·잠금 대기 뒤 회수·게임 행 불변을 대조한다. 월드 제어 실행기나 화면의 완료 근거를 대신하지 않는다.
+
+관리자 월드 조회 화면은 `apps/web/src/admin/AdminWorlds.tsx`이며 기존 `usePrivateRead.ts`로 현재 신원과 지연 응답을 검사한다. `e2e/admin-worlds.spec.ts`는 두 정식 월드·사람30칸·행 불변과 수동 조회·네 폭·실제 권한 회수·전송 실패·지연 중 관리자 전환을 검사한다. 실제 검사와 독립 리뷰·보호 병합은 진행 중이다.
+
 T4-56의 `RemovedNation`과 `YearbookNation`은 공개 표시값 보관이며 `WorldState`·재생 해시·보관 파일에는 넣지 않는다. 기존 프레임의 백필은 `pnpm db:migrate` 뒤 `pnpm --filter @opensamguk/engine yearbook:backfill`으로 보고를 확인하고 `--apply`로 실행한다. 현재 국가·삭제 보존·생성 기록의 이름과 색이 모두 일치할 때만 채운다. 근거가 없으면 부분 프레임으로 남기고 충돌이면 그 월드 전체를 롤백한다. 이름·색 변경을 넣는 T4-16은 같은 PR에서 이 CLI와 script를 지워야 한다.
 
 `timelapse.frames`는 한 RepeatableRead 트랜잭션에서 월간 도시 소유와 `YearbookNation`을 읽는다. 각 프레임의 `nations`에는 그 달 도시를 소유한 국가의 저장된 ID·이름·색만 담는다. `currentNations`에는 이 페이지의 도시 소유 ID 가운데 지금 살아 있는 국가의 표시값을 따로 담는다. 과거 저장값이 없으면 해당 국가를 `nations`에서 생략하며 현재값이나 회색으로 채우지 않는다. `RemovedNation`은 이 조회로 공개하지 않는다.
