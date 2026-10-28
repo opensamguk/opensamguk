@@ -153,7 +153,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   logText = '';
   user = await db.user.create({
-    data: { email: `${randomUUID()}@example.test`, passwordHash },
+    data: { email: `${randomUUID()}@example.test`, passwordHash, emailVerifiedAt: new Date(now - 1) },
     select: { id: true, email: true },
   });
   const state = await readFixture();
@@ -269,13 +269,14 @@ describe('T3-04 세션 갱신 장애와 실제 HTTP·PostgreSQL 커밋', () => {
     });
   });
 
-  it.each(['expired', 'sanctioned', 'invalidInput', 'mixed207', 'rateLimited'] as const)(
+  it.each(['expired', 'sanctioned', 'unverified', 'invalidInput', 'mixed207', 'rateLimited'] as const)(
     '%s는 갱신하지 않고 기존 거부·207 정책을 유지한다',
     async (mode) => {
       await withServer(async (base) => {
         if (mode === 'expired')
           await db.session.update({ where: { id: sessionId }, data: { expiresAt: new Date(now) } });
         if (mode === 'sanctioned') await db.user.update({ where: { id: user.id }, data: { status: 'SANCTIONED' } });
+        if (mode === 'unverified') await db.user.update({ where: { id: user.id }, data: { emailVerifiedAt: null } });
         if (mode === 'rateLimited') {
           for (let i = 0; i < 120; i++) {
             const response = await send(base, 'turns.set', mutation(i));
@@ -291,11 +292,23 @@ describe('T3-04 세션 갱신 장애와 실제 HTTP·PostgreSQL 커밋', () => {
               ? await send(base, 'turns.set,turns.set', { ...mutation(), 1: { worldId, revision: -1, slots } })
               : await send(base, 'turns.set', mode === 'invalidInput' ? mutation(-1) : mutation());
           expect(response.status).toBe(
-            mode === 'mixed207' ? 207 : mode === 'invalidInput' ? 400 : mode === 'rateLimited' ? 429 : 401,
+            mode === 'mixed207'
+              ? 207
+              : mode === 'invalidInput'
+                ? 400
+                : mode === 'rateLimited'
+                  ? 429
+                  : mode === 'unverified'
+                    ? 403
+                    : 401,
           );
           expect(response.cookie).toBeNull();
           expect(await faultAttempts()).toBe(0);
           expect(await sessionExpiry()).toEqual(expiry);
+          if (mode === 'unverified')
+            expect(response.body).toMatchObject([
+              { error: { data: { code: 'FORBIDDEN', reason: 'EMAIL_NOT_VERIFIED' } } },
+            ]);
           if (mode === 'mixed207') {
             const envelopes = response.body as Envelope[];
             expect(envelopes[0]).toEqual(success()[0]);
