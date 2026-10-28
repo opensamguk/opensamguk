@@ -3,6 +3,7 @@ import type { AppRouter } from '@opensamguk/server/router';
 import { Link, Outlet, useRouteContext, useRouter } from '@tanstack/react-router';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useTRPCClient } from '../trpc';
+import { publicFailure } from '../auth/credentials';
 import { ErrorState, LoadingState } from '../ui/States';
 import { auditFilter, searchFilter, type AuditFilter } from './filters';
 import { usePrivateRead } from './usePrivateRead';
@@ -40,18 +41,40 @@ function useViewer() {
 
 export function AdminLayout() {
   const viewerId = useViewer(),
+    client = useTRPCClient(),
     router = useRouter(),
     checkGeneration = useRef(0);
-  const [checking, setChecking] = useState(false);
+  const [checking, setChecking] = useState(false),
+    [checkError, setCheckError] = useState(false);
+  const retryCheck = useRef<() => void>(() => {});
   useEffect(() => {
     let mounted = true;
+    setChecking(false);
+    setCheckError(false);
     const check = () => {
       const own = ++checkGeneration.current;
       setChecking(true);
-      void router.invalidate().finally(() => {
-        if (mounted && own === checkGeneration.current) setChecking(false);
+      setCheckError(false);
+      void Promise.allSettled([client.auth.me.query(), client.admin.whoami.query()]).then((results) => {
+        if (!mounted || own !== checkGeneration.current) return;
+        const identity = results[0];
+        const denied = results.some(
+          (result) =>
+            result.status === 'rejected' &&
+            ['UNAUTHORIZED', 'FORBIDDEN'].includes(publicFailure(result.reason)?.code ?? ''),
+        );
+        if (denied || (identity.status === 'fulfilled' && identity.value.user?.id !== viewerId)) {
+          void router.invalidate();
+          return;
+        }
+        if (results.some((result) => result.status === 'rejected')) {
+          setCheckError(true);
+          return;
+        }
+        setChecking(false);
       });
     };
+    retryCheck.current = check;
     window.addEventListener('focus', check);
     window.addEventListener('online', check);
     const visible = () => {
@@ -64,7 +87,7 @@ export function AdminLayout() {
       window.removeEventListener('online', check);
       document.removeEventListener('visibilitychange', visible);
     };
-  }, [router]);
+  }, [router, client, viewerId]);
   return (
     <main className={styles.shell}>
       <header>
@@ -81,15 +104,22 @@ export function AdminLayout() {
         <Link to="/admin/audit" preload={false}>
           감사 기록
         </Link>
+        <Link to="/admin/notices" preload={false}>
+          공지 관리
+        </Link>
       </nav>
       <p>조회 결과에는 개인정보가 포함됩니다. 필요한 범위만 확인하세요.</p>
-      {checking ? (
+      {checkError ? (
+        <ErrorState
+          title="접근 권한을 확인하지 못했습니다. 작성 내용은 이 탭에 보존했습니다."
+          onRetry={() => retryCheck.current()}
+        />
+      ) : checking ? (
         <LoadingState>접근 권한 확인 중</LoadingState>
-      ) : (
-        <section key={viewerId}>
-          <Outlet />
-        </section>
-      )}
+      ) : null}
+      <section key={viewerId} hidden={checking} inert={checking}>
+        <Outlet />
+      </section>
     </main>
   );
 }
@@ -98,8 +128,8 @@ export function AdminHome() {
   return (
     <section>
       <h2>운영 조회</h2>
-      <p>사용자를 찾거나 관리자 조치의 감사 기록을 확인합니다.</p>
-      <p>월드 조작·공지 편집·사용자 상세와 로그인 자료 화면은 준비 중입니다.</p>
+      <p>사용자·감사 기록을 조회하고 로비·월드 공지를 관리합니다.</p>
+      <p>월드 조작·사용자 상세와 로그인 자료 화면은 준비 중입니다.</p>
     </section>
   );
 }
