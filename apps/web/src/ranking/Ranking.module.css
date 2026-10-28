@@ -55,6 +55,9 @@
   padding: 0 var(--space-2);
   white-space: nowrap;
 }
+.table td:global(.num) {
+  white-space: nowrap;
+}
 .table tbody tr {
   height: var(--row-height);
   border-bottom: 1px solid var(--color-border);
@@ -125,7 +128,52 @@
   cursor: pointer;
 }
 
+.mobileSort {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.details {
+  margin: var(--space-1) 0;
+  font-weight: normal;
+}
+.details > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.details dt {
+  color: var(--color-text-muted);
+}
+.details dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
 @media (max-width: 767px) {
+  .head {
+    flex-wrap: wrap;
+  }
+  .wrap {
+    align-items: stretch;
+  }
+  .table th,
+  .table td {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    vertical-align: top;
+    padding: var(--space-1);
+  }
+  .table td span {
+    white-space: normal;
+  }
+  .sortButton,
+  .jump {
+    min-height: 44px;
+    min-width: 44px;
+    box-sizing: border-box;
+    padding: var(--space-1) var(--space-2);
+  }
   .tabs {
     flex-wrap: wrap;
   }
