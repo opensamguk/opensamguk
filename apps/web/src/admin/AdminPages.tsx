@@ -98,6 +98,9 @@ export function AdminLayout() {
         <Link to="/admin" preload={false}>
           안내
         </Link>
+        <Link to="/admin/worlds" preload={false}>
+          월드 목록
+        </Link>
         <Link to="/admin/users" preload={false}>
           사용자 찾기
         </Link>
@@ -128,7 +131,7 @@ export function AdminHome() {
   return (
     <section>
       <h2>운영 조회</h2>
-      <p>사용자·감사 기록을 조회하고 로비·월드 공지를 관리합니다.</p>
+      <p>월드·사용자·감사 기록을 조회하고 로비·월드 공지를 관리합니다.</p>
       <p>월드 조작·사용자 상세와 로그인 자료 화면은 준비 중입니다.</p>
     </section>
   );

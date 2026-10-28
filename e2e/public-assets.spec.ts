@@ -242,9 +242,9 @@ for (const path of ['/', '/login']) {
       .map((asset) => readFileSync(join(distDir, distKey(asset.path, asset.type)), 'utf8'));
     expect(initialScripts.length).toBeGreaterThan(0);
     for (const script of initialScripts) {
-      expect(script).not.toMatch(/관리자 콘솔|사용자 검색 결과|감사 조회 결과/);
+      expect(script).not.toMatch(/관리자 콘솔|사용자 검색 결과|감사 조회 결과|월드 조회 결과/);
       expect(script).not.toMatch(
-        /\.admin\.(?:whoami|user|audit|sanction|notice)|admin\.(?:whoami|user\.search|audit\.list|notice\.(?:list|create|update|hide))/,
+        /\.admin\.(?:whoami|user|audit|sanction|notice|world)|admin\.(?:whoami|user\.search|audit\.list|world\.list|notice\.(?:list|create|update|hide))/,
       );
     }
     expect(
