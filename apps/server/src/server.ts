@@ -14,6 +14,7 @@ import { registerOpsHealth } from './ops/health';
 import type { MailTransport } from './mail/transport';
 import { emailVerificationRequired } from './auth/verificationPolicy';
 import { resolveLegalPolicy, type LegalPolicy } from './legal/policy';
+import { bindLegalPolicy } from './legal/publish';
 
 export async function buildServer(options: {
   db: PrismaClient;
@@ -52,6 +53,7 @@ export async function buildServer(options: {
     throw new Error('TRUST_PROXY는 0 또는 1이어야 합니다.');
   const clock = options.now ?? Date.now;
   const legalPolicy = resolveLegalPolicy(options.legalPolicy, clock());
+  await bindLegalPolicy(options.db, legalPolicy);
   const rateLimiter = createRateLimiter({ now: clock });
   const requestTimes = new WeakMap<FastifyRequest, number>();
   const log = pino(

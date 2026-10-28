@@ -43,6 +43,7 @@
 | `Session`       | id(토큰 해시), userId, expiresAt, ip, deviceHash, createdAt               | M1   |
 | `LoginRecord`   | userId, at, ip, deviceHash, success                                       | M3   |
 | `ConsentRecord` | userId, docType(약관·개인정보), version, agreedAt                         | M3   |
+| `LegalDocumentVersion` | docType·version 복합키, effectiveAt, bodySha256. 발행한 본문·시행일은 같은 판에서 바꾸지 않음 | M3 |
 | `Sanction`      | id, userId, worldId(없으면 전체), reason, expiresAt, createdBy, createdAt, liftedAt, liftedBy, liftReason. 대상 User·World 이력은 NoAction으로 보존 | M3 제재 묶음 검증 중 |
 | `AuditLog`      | id, at, actorKind, actorUserId, action, targetType, targetId, worldId, reason, payload, inputEventId. DB에서 수정·삭제·비우기 거부 | M3 첫 묶음 구현 중 |
 | `Notice` | id, scope, worldId, title, body, pinned, publishedAt, hiddenAt, revision. 기존 제목 없는 WORLD 공지 보존, 숨김은 공개 조회에서 제외 | M3 공지 API 검증 중 |
