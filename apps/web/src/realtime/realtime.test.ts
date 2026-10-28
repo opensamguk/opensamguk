@@ -168,7 +168,9 @@ describe('SSE 재조회와 초안', () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const authKey = trpc.auth.me.queryKey(),
       viewKey = ['delayed-world-view'];
-    const authData = (id: string) => ({ user: { id, email: `${id}@example.invalid` } });
+    const authData = (id: string) => ({
+      user: { id, email: `${id}@example.invalid`, emailVerified: true, consentRequired: [] },
+    });
     let releaseAuth: (value: ReturnType<typeof authData>) => void = () => {},
       releaseView: (value: string) => void = () => {};
     const authResponse = new Promise<ReturnType<typeof authData>>((resolve) => {

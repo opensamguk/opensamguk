@@ -34,6 +34,7 @@ const RECOVERY_MUTATIONS = [
   'auth.login',
   'auth.logout',
   'auth.signup',
+  'legal.agree',
 ];
 
 describe('T3-02 AC-M3-01 이메일 인증 경계', () => {
@@ -43,7 +44,7 @@ describe('T3-02 AC-M3-01 이메일 인증 경계', () => {
       { _def: { type: string; meta?: ProcedureMeta } }
     >;
     const mutations = Object.entries(procedures).filter(([, procedure]) => procedure._def.type === 'mutation');
-    expect(mutations).toHaveLength(29);
+    expect(mutations).toHaveLength(30);
     expect(
       mutations
         .filter(([, procedure]) => procedure._def.meta?.accountAccess === 'verified')

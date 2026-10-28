@@ -10,6 +10,7 @@ import { notifySessionClosed } from '@opensamguk/db';
 import { queueLoginActivity } from '../game/policy';
 import { newAccountToken } from '../auth/accountToken';
 import { accountMail } from '../mail/templates';
+import { missingConsents } from '../legal/policy';
 
 function enforce(ctx: Context, decision: RateLimitDecision) {
   if (decision.allowed) return;
@@ -20,6 +21,9 @@ function enforce(ctx: Context, decision: RateLimitDecision) {
 const credentials = z.strictObject({
   email: z.string().trim().toLowerCase().email().max(254),
   password: passwordSchema,
+});
+const signupInput = credentials.extend({
+  consents: z.strictObject({ terms: z.string().min(1).max(64), privacy: z.string().min(1).max(64) }).optional(),
 });
 const loginFailure = () => new TRPCError({ code: 'UNAUTHORIZED', message: '이메일 또는 비밀번호가 맞지 않습니다' });
 function setCookie(ctx: Context, token: string) {
@@ -35,8 +39,17 @@ function setCookie(ctx: Context, token: string) {
 export const authRouter = router({
   signup: publicProcedure
     .meta({ accountAccess: 'recovery' })
-    .input(credentials)
+    .input(signupInput)
     .mutation(async ({ ctx, input }) => {
+      const policy = ctx.legalPolicy;
+      if (ctx.legalPolicyRequired && !policy)
+        throw new TRPCError({ code: 'SERVICE_UNAVAILABLE', message: '약관을 준비하고 있습니다.' });
+      if (
+        policy
+          ? input.consents?.terms !== policy.terms.version || input.consents?.privacy !== policy.privacy.version
+          : input.consents !== undefined
+      )
+        throw new TRPCError({ code: 'BAD_REQUEST', message: '현재 약관 판을 확인하세요.' });
       enforce(
         ctx,
         ctx.rateLimiter.consume([{ namespace: 'auth.signup.ip', key: ctx.ip, limit: 10, windowMs: 3_600_000 }]),
@@ -64,6 +77,14 @@ export const authRouter = router({
               },
             });
           }
+          if (policy) {
+            await tx.consentRecord.createMany({
+              data: [
+                { userId: user.id, docType: 'TERMS', version: policy.terms.version, agreedAt: new Date(ctx.now) },
+                { userId: user.id, docType: 'PRIVACY', version: policy.privacy.version, agreedAt: new Date(ctx.now) },
+              ],
+            });
+          }
           return user;
         });
         setCookie(ctx, session.token);
@@ -80,7 +101,7 @@ export const authRouter = router({
             ctx.reply.log.warn('가입 인증 메일 발송 실패');
           }
         }
-        return { user };
+        return { user: { ...user, emailVerified: false } };
       } catch (error) {
         if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002') {
           throw new TRPCError({ code: 'CONFLICT', message: '이미 등록된 이메일입니다.' });
@@ -150,5 +171,19 @@ export const authRouter = router({
       ctx.reply.clearCookie('sid', { path: '/', httpOnly: true, sameSite: 'lax', secure: ctx.secureCookies });
       return { ok: true as const };
     }),
-  me: publicProcedure.input(z.void()).query(({ ctx }) => ({ user: ctx.user })),
+  me: publicProcedure.input(z.void()).query(async ({ ctx }) => {
+    if (!ctx.user) return { user: null };
+    const user = await ctx.db.user.findUnique({
+      where: { id: ctx.user.id },
+      select: { status: true, emailVerifiedAt: true, consents: { select: { docType: true, version: true } } },
+    });
+    if (!user || user.status !== 'ACTIVE') return { user: null };
+    return {
+      user: {
+        ...ctx.user,
+        emailVerified: user.emailVerifiedAt !== null,
+        consentRequired: missingConsents(ctx.legalPolicy, user.consents),
+      },
+    };
+  }),
 });

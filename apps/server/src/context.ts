@@ -4,6 +4,7 @@ import type {} from '@fastify/cookie';
 import type { FastifyReply } from 'fastify';
 import type { createRateLimiter } from './security/rateLimit';
 import type { MailTransport } from './mail/transport';
+import type { LegalPolicy } from './legal/policy';
 
 export interface Context {
   db: PrismaClient;
@@ -18,5 +19,7 @@ export interface Context {
   rateLimiter: ReturnType<typeof createRateLimiter>;
   accountMail?: { transport: MailTransport; origin: string } | undefined;
   emailVerificationRequired?: boolean | undefined;
+  legalPolicy?: LegalPolicy | null | undefined;
+  legalPolicyRequired?: boolean | undefined;
   closeSession?: ((sessionId: string) => void) | undefined;
 }

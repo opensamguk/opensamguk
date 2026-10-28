@@ -13,6 +13,7 @@ import { registerRealtime, type RealtimeOptions } from './realtime';
 import { registerOpsHealth } from './ops/health';
 import type { MailTransport } from './mail/transport';
 import { emailVerificationRequired } from './auth/verificationPolicy';
+import { resolveLegalPolicy, type LegalPolicy } from './legal/policy';
 
 export async function buildServer(options: {
   db: PrismaClient;
@@ -26,6 +27,7 @@ export async function buildServer(options: {
   realtime?: RealtimeOptions;
   mailTransport?: MailTransport;
   emailVerificationRequired?: boolean;
+  legalPolicy?: LegalPolicy | null;
 }) {
   const requireVerifiedEmail = emailVerificationRequired(process.env, options);
   const mapConfig = publicMapConfig(process.env);
@@ -49,6 +51,7 @@ export async function buildServer(options: {
   if (trustProxyValue !== undefined && trustProxyValue !== '0' && trustProxyValue !== '1')
     throw new Error('TRUST_PROXY는 0 또는 1이어야 합니다.');
   const clock = options.now ?? Date.now;
+  const legalPolicy = resolveLegalPolicy(options.legalPolicy, clock());
   const rateLimiter = createRateLimiter({ now: clock });
   const requestTimes = new WeakMap<FastifyRequest, number>();
   const log = pino(
@@ -135,6 +138,8 @@ export async function buildServer(options: {
           rateLimiter,
           accountMail: options.mailTransport ? { transport: options.mailTransport, origin: publicOrigin } : undefined,
           emailVerificationRequired: requireVerifiedEmail,
+          legalPolicy,
+          legalPolicyRequired: production,
           closeSession: realtime.closeSession,
         };
       },

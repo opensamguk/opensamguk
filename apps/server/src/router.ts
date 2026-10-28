@@ -2,6 +2,7 @@ import { RULESET_ID } from '@opensamguk/rules';
 import { router, publicProcedure } from './trpc';
 import { authRouter } from './routers/auth';
 import { accountRouter } from './routers/account';
+import { legalRouter } from './routers/legal';
 import { adminRouter } from './routers/admin';
 import { sanctionRouter } from './routers/sanction';
 import { worldRouter } from './routers/world';
@@ -29,6 +30,7 @@ import { campaignRouter } from './routers/campaign';
 export const appRouter = router({
   auth: authRouter,
   account: accountRouter,
+  legal: legalRouter,
   admin: adminRouter,
   sanction: sanctionRouter,
   world: worldRouter,
