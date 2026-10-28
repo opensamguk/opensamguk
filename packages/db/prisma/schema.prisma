@@ -720,9 +720,24 @@ model Notice {
   body        String
   pinned      Boolean     @default(false)
   publishedAt DateTime    @default(now()) @db.Timestamptz(3)
+  hiddenAt    DateTime?   @db.Timestamptz(3)
+  revision    Int        @default(0)
   world       World?      @relation(fields: [worldId], references: [id], onDelete: Cascade)
 
   @@index([scope, worldId, publishedAt, id])
+}
+
+// 감사 기록처럼 원래 월드 삭제 뒤에도 재시도 결과를 보존한다.
+model AdminNoticeRequest {
+  actorUserId   String
+  idempotencyKey String
+  requestHash   String
+  noticeId      String
+  revision      Int
+  hidden        Boolean
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+
+  @@id([actorUserId, idempotencyKey])
 }
 
 enum GameResourceKind {

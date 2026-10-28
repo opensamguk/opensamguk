@@ -4,9 +4,29 @@ import { router } from '../trpc';
 import { notifySessionClosed } from '@opensamguk/db';
 import { createSanction, createSanctionInput, liftSanction, liftSanctionInput } from '../admin/sanctionStore';
 import { auditListInput, listAudit, searchUsers, searchUsersInput } from '../admin/read';
+import {
+  listAdminNotices,
+  changeAdminNotice,
+  noticeListInput,
+  noticeCreateInput,
+  noticeUpdateInput,
+  noticeHideInput,
+} from '../admin/notices';
 
 export const adminRouter = router({
   whoami: adminProcedure.input(z.void()).query(() => ({ admin: true as const })),
+  notice: router({
+    list: adminProcedure.input(noticeListInput).query(({ ctx, input }) => listAdminNotices(ctx, input)),
+    create: adminProcedure
+      .input(noticeCreateInput)
+      .mutation(({ ctx, input }) => changeAdminNotice(ctx, { kind: 'create', input })),
+    update: adminProcedure
+      .input(noticeUpdateInput)
+      .mutation(({ ctx, input }) => changeAdminNotice(ctx, { kind: 'update', input })),
+    hide: adminProcedure
+      .input(noticeHideInput)
+      .mutation(({ ctx, input }) => changeAdminNotice(ctx, { kind: 'hide', input })),
+  }),
   user: router({
     search: adminProcedure
       .input(searchUsersInput)
