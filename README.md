@@ -3,9 +3,20 @@
 여러 사람이 장수 한 명씩을 맡아 나라를 키우고 천하를 다투는 턴 예약형 삼국지 웹 전략 게임입니다.
 원작 「삼국지 모의전투」([devsam/core2026](https://gitea.hided.net/devsam/core2026))의 핵심 루프와 기존 명령을 재사용하면서 현재 구조에 맞게 옮깁니다.
 
-v1의 기존 명령 구현을 재사용해 TypeScript 엔진·API에 이식·연결합니다. 원본 동작과 회귀 사례를 대조하고 승인된 규칙 차이를 반영합니다.
+v1의 필요한 규칙과 데이터를 TypeScript 엔진·API·React에 연결했습니다. 페이지 구조도 v1의 실제 소스를 대조하며 공개 준비 과정에서 맞추고 있습니다.
 
 ## 지금 어디쯤인가
+
+| 범위 | 상태와 근거 |
+| --- | --- |
+| 통합판 v0.1 | 유효 AC-INT 15개 완료. 정식 시나리오 132개월 완주·두 월드 격리·재시작·중복 입력·백업 복원·동일 시드 재생, 실제 PostgreSQL·Chromium 검사와 독립 리뷰 뒤 [PR #264](https://github.com/opensamguk/opensamguk/pull/264)로 병합 |
+| 누구나 가입하는 공개 오픈 | 준비 중. 계정·동의·탈퇴·관리자·운영·부하·접근성·공개 인수의 남은 항목은 [공개 준비 체크리스트](docs/plans/public-opening-v01.md)에 기록. 서버·도메인·메일 서비스와 운영자·문의처는 미정 |
+
+완료 범위는 [동결 출시 계획](docs/plans/integration-release.md), [현재 기능과 동결 범위](docs/product/feature-selection.md), [인수조건](docs/product/acceptance-criteria.md)을 따릅니다. 1턴은 1개월이고 장수 예약은 30칸입니다. 통솔·무력·지력(`intel`)·정치·매력의 5능력치, 191년 21국·491장수, 실제 GIS의 53도시·8관문·6항구 시설·13전장 표시를 씁니다. 사람 장수의 생성·출사·내정·동의에 따른 휘하 영입·부곡 편성·이동·전투·점령·기수 종료가 연결됐습니다.
+
+군현 관리·지속 행군·5자원·피로·카드 명령·실시간/격자 전투·v1 전체 1,000명·원작 90명령 전부·새 공개 초상은 보류합니다. 과거 M1·M2·M3와 Phase 2의 미완료 기록은 보존하며 통합판 완료로 대신하지 않습니다. 다음 작업은 `pnpm next`로 확인합니다. 상태 기준은 2026-10-28입니다.
+
+기존 전체 계획의 관문 집계도 보존합니다. 아래 표는 통합판 완료율과 별도이며 이전 AC의 미완료를 없애지 않습니다.
 
 | 관문 | 완료 조건 | 상태 |
 | --- | --- | --- |
@@ -13,14 +24,22 @@ v1의 기존 명령 구현을 재사용해 TypeScript 엔진·API에 이식·연
 | M2 독립 에이전트 참가 시험 | [AC-M2 20개](docs/product/acceptance-criteria.md#m2) 통과 | 진행 중 (✅ 4 · 🟨 3 · ⬜ 13) | <!-- lint-text-ignore C-5 -->
 | M3 공개 오픈 | [AC-M3 16개](docs/product/acceptance-criteria.md#m3) 통과 | 진행 중 (✅ 0 · 🟨 1 · ⬜ 15) | <!-- lint-text-ignore C-5 -->
 
-완료 판정과 검증 증거는 [인수조건](docs/product/acceptance-criteria.md)에서 확인합니다. MVP는 M1·M2·M3의 58개 AC입니다. Phase 2 확장은 별도로 집계하며 전체 AC 28개 가운데 1개가 통과했습니다. 모든 명령은 D-022에 따라 MVP 범위에 포함됩니다. 명령별 진행은 [명령 대응표](docs/product/command-coverage.json)와 `node tools/command-coverage.mjs`로 확인합니다. 현재 원작 비교 분모 90개, 정본 분모 91개, 전 단계 완료 0개입니다. 다음 작업과 선행은 `pnpm next`와 [단계 계획](docs/product/phases.md)에서 봅니다.
+과거 전체 명령의 미완료 목록은 [명령 대응표](docs/product/command-coverage.json)에 남깁니다. `node tools/command-coverage.mjs`의 현재 원작 비교 분모 90개, 정본 분모 91개, 전 단계 완료 0개입니다. D-038에 따라 이 전체 명령 분모를 이번 통합판의 완료 분모로 쓰지 않습니다.
 
-집계 기준은 2026-10-24에 확인한 [인수조건](docs/product/acceptance-criteria.md)의 상태입니다.
+## 실행 화면
+
+정식 인수 월드의 실제 Chromium 화면입니다. 첫 그림은 132개월을 마친 201년 12월이고 두 번째는 같은 월드의 월간 영토 재생입니다. GIS와 기존 자작 도트를 쓰며 원작 초상은 담지 않았습니다. v1을 참고한 공통 탐색을 반영한 개발 화면이며 전체 UI 인수는 진행 중입니다.
+
+![통합판 메인, 지도와 30칸 예약](docs/screenshots/integration-main.png)
+
+![정식 인수 월드의 월간 영토 재생](docs/screenshots/integration-timelapse.png)
 
 ## 문서
 
 | 알고 싶은 것          | 문서                                                   |
 | --------------------- | ------------------------------------------------------ |
+| 지금 출시하는 범위    | [통합판 v0.1](docs/plans/integration-release.md)       |
+| 공개 전에 남은 일     | [공개 오픈 준비](docs/plans/public-opening-v01.md)    |
 | 무엇을 왜 만드나      | [PRD](docs/product/prd.md)                             |
 | 언제 끝났다고 하나    | [인수조건](docs/product/acceptance-criteria.md)        |
 | 어떤 순서로 하나      | [단계 계획](docs/product/phases.md)                    |
@@ -48,7 +67,20 @@ PostgreSQL · Prisma · Vitest · Playwright · Docker Compose · Caddy
 
 ## 개발
 
-Node.js 24 이상과 pnpm을 씁니다. 로컬 실행의 배경은 [T1-02](docs/plans/T1-02.md), 코드와 검증 규칙은 [개발자 핸드북](docs/developer/index.md)과 [테스트 정책](docs/testing-policy.md)에 있습니다.
+Node.js 24 이상, pnpm 10.33, Docker Compose를 씁니다. 새 개발 환경에서는 `.env.example`을 `.env`로 복사하고 전용 DB와 비어 있는 포트를 지정합니다. 기존 `.env`나 사용자 DB를 덮어쓰지 않습니다. 기본값은 PostgreSQL 5433, API 3001, 웹 5173입니다.
+
+```sh
+pnpm install
+pnpm generate
+pnpm db:up
+pnpm db:migrate
+pnpm db:init-resources
+pnpm db:init-integration
+```
+
+[정식 시나리오 생성 명령](docs/plans/integration-release.md#중간-시연과-종료-조건)으로 새 월드를 만든 뒤 출력된 ID로 `pnpm world:start --world <월드-ID>`를 실행합니다. `pnpm dev`로 web·API·engine을 기동하고 [로컬 게임](http://127.0.0.1:5173)에 접속해 가입·장수 생성을 진행합니다. 개발 메일은 `.mail-outbox`에 저장되며 공개 발송은 별도 설정과 검증이 필요합니다.
+
+코드와 검증 규칙은 [개발자 핸드북](docs/developer/index.md)과 [테스트 정책](docs/testing-policy.md)을 따릅니다.
 
 | 명령 | 용도 |
 | --- | --- |
@@ -63,10 +95,14 @@ Node.js 24 이상과 pnpm을 씁니다. 로컬 실행의 배경은 [T1-02](docs/
 | `pnpm test:int` | 전용 PostgreSQL DB 통합 시험 |
 | `pnpm db:migrate` | DB migration 적용 |
 | `pnpm db:init-resources` | 내장 자원을 GameResource에 초기화 |
+| `pnpm db:init-integration` | 통합판 지도·시나리오·5능력치 자원을 초기화 |
 | `pnpm db:init-scenarios` | 준비된 추가 시나리오 9개를 DB에 초기화 |
 | `pnpm sim` | NPC 시뮬레이터 실행 |
+| `pnpm test:authz` | 실제 HTTP·PostgreSQL 권한 대조 |
+| `pnpm build:public` | 공개 전용 빌드와 자산 검사 |
+| `pnpm e2e:public` | 공개 빌드 Chromium 검사 |
 
-DB 자원 초기화는 `pnpm db:init-resources` 다음 `pnpm db:init-scenarios` 순서로 합니다. 일반 월드 생성 CLI와 순수 시뮬레이터는 현재 JSON을 읽으며 DB 기반 생성·편집 경로는 별도로 있습니다.
+추가 시나리오 9개가 필요하면 `pnpm db:init-scenarios`를 실행합니다. 월드 생성 CLI는 기본 JSON 또는 `--published`의 게시 자원을 읽습니다. 실제 DB 검사는 전용 테스트 DB로 실행하고 Chromium은 `pnpm exec playwright install chromium`으로 준비합니다.
 
 `pnpm sim` 실행만으로 개발 PC 시간 기준인 AC-M1-18이 통과한 것은 아닙니다. 완료 여부는 인수조건의 상태와 증거로 확인합니다.
 
@@ -75,7 +111,7 @@ DB 자원 초기화는 `pnpm db:init-resources` 다음 `pnpm db:init-scenarios` 
 
 이미지 저장소는 [opensamguk/opensamguk-images](https://github.com/opensamguk/opensamguk-images), 기존 배포 저장소는 [opensamguk/opensamguk-docker](https://github.com/opensamguk/opensamguk-docker)로 이전했습니다. 이미지 개발용 고정 커밋 `48163bd1ce8d54c54c94fb5484b05f9db9e50c62`와 초상 ID·경로 계약은 유지합니다.
 
-공개 자산은 기존 기본 SVG(`apps/web/src/portrait/fallback.svg`)만 쓰기로 승인했습니다. 원작 초상은 공개 세트에서 빼고 현재 1030 장수 이름·능력치와 NOTICE는 보존합니다. 외부 초상을 공개하지 않는 승인 목록은 `imageRepoCommit: null`, `imageBaseUrls: []`, `portraitIds: []`입니다. 저장소 이전은 그림의 공개 이용 허락을 뜻하지 않습니다. 공개 빌드·자산 검사·배포와 이미지 서버 직접 제공 정책의 검증은 [T3-13](docs/plans/T3-13.md)과 AC-M3-06에서 따로 확인합니다.
+공개 빌드는 기본 SVG 초상과 승인된 GIS·자작 도트만 묶습니다. 원작 초상은 공개 세트에서 빼고 장수 이름·능력치와 출처·NOTICE는 보존합니다. 외부 초상을 공개하지 않는 승인 목록은 `imageRepoCommit: null`, `imageBaseUrls: []`, `portraitIds: []`입니다. 저장소 이전은 그림의 공개 이용 허락을 뜻하지 않습니다. 공개 빌드·자산 검사·배포와 이미지 서버 직접 제공 정책의 검증은 [T3-13](docs/plans/T3-13.md)과 AC-M3-06에서 따로 확인합니다.
 
 
 ## 참고와 라이선스
