@@ -142,4 +142,4 @@
 | [글쓰기 규칙](./writing-style.md)           | 초안 | 지금      |
 | [이미지 자산](./image-assets.md)            | 초안 | M1        |
 | [릴리스 운영](./release-operations.md)      | 뼈대 | M2        |
-| [관리자 콘솔](./admin-console.md)           | 뼈대 | M3        |
+| [관리자 콘솔](./admin-console.md)           | 역할·감사 첫 묶음 구현 중 | M3        |

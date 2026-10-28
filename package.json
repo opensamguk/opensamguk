@@ -7,6 +7,8 @@
     "node": ">=24"
   },
   "scripts": {
+    "admin:grant": "tsx --env-file-if-exists=.env tools/admin-role.ts grant",
+    "admin:revoke": "tsx --env-file-if-exists=.env tools/admin-role.ts revoke",
     "e2e:public": "playwright test --config playwright.public.config.ts",
     "e2e:account": "playwright test --config playwright.account.config.ts",
     "notice:publish": "tsx --env-file-if-exists=.env tools/notice-publish.ts",
