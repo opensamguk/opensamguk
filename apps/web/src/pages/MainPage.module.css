@@ -65,6 +65,8 @@
   padding: var(--space-2);
 }
 .action {
+  min-width: 44px;
+  min-height: 44px;
   font: inherit;
   font-size: var(--text-xs);
   padding: 0 var(--space-2);
@@ -78,7 +80,7 @@
 @media (max-width: 1100px) {
   .layout {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: 'map' 'commands' 'city' 'general' 'nation' 'records';
+    grid-template-areas: 'map' 'commands' 'city' 'nation' 'general' 'records';
   }
   .records {
     grid-template-columns: minmax(0, 1fr);

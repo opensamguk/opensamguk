@@ -1,0 +1,100 @@
+.navigation {
+  grid-area: navigation;
+  min-width: 0;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.rail {
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  position: sticky;
+  top: 0;
+  max-height: 100dvh;
+  overflow-y: auto;
+}
+.link,
+.close {
+  display: flex;
+  align-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: var(--space-2);
+  border-radius: var(--radius);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.link:hover {
+  background: var(--color-surface-muted);
+}
+.active,
+.active:hover {
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+}
+.mobile {
+  display: none;
+}
+.close {
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+@media (max-width: 767px) {
+  .navigation {
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    border-right: 0;
+    border-top: 1px solid var(--color-border);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .rail {
+    display: none;
+  }
+  .mobile {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    padding: var(--space-1);
+  }
+  .mobile > .link,
+  .more > summary {
+    justify-content: center;
+  }
+  .more {
+    min-width: 0;
+  }
+  .more > summary {
+    list-style: none;
+    cursor: pointer;
+  }
+  .more > summary::-webkit-details-marker {
+    display: none;
+  }
+  .more[open] > summary {
+    background: var(--color-surface-muted);
+  }
+  .menu {
+    position: absolute;
+    bottom: 100%;
+    inset-inline: var(--space-2);
+    max-height: calc(100dvh - 96px - env(safe-area-inset-bottom, 0px));
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-1);
+    padding: var(--space-2);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius);
+    box-shadow: 0 -4px 12px rgb(0 0 0 / 12%);
+  }
+  .close {
+    grid-column: 1 / -1;
+    justify-content: center;
+  }
+}

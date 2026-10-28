@@ -1,5 +1,5 @@
-import { useQueryClient } from '@tanstack/react-query';
-import { Link, Outlet, useParams } from '@tanstack/react-router';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link, Outlet, useLocation, useParams } from '@tanstack/react-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LogoutButton } from '../auth/LogoutButton';
 import { formatRemaining, useTurnCountdown } from '../game/countdown';
@@ -8,30 +8,22 @@ import { useHome, useWorldSummary } from '../game/queries';
 import { MessageButton, MessageDrawer, RealtimeStatusText } from '../messages/MessageDock';
 import { NationNoticePopup } from '../messages/NationNotice';
 import { useWorldEvents } from '../realtime/useWorldEvents';
-import { OFFICER_MIN_LEVEL } from '../operations/contract';
+import { GameNavigation } from './GameNavigation';
 import type { WorldSummary } from '../game/types';
 import { liveRefresh, topbarStatus } from '../game/worldWatch';
 import { useTRPC } from '../trpc';
 import styles from './GameLayout.module.css';
 
 // 핵심 조작은 메인 한 화면에서 한다 (소유자 UI 정정 2026-10-21). 메뉴의 다른 주소는 넓게 보는 보조 화면이다.
-const NAV = [
-  { to: '/w/$worldId', label: '메인', exact: true },
-  { to: '/w/$worldId/turns', label: '예턴' },
-  { to: '/w/$worldId/records', label: '기록' },
-  { to: '/w/$worldId/nation/personnel', label: '국가' },
-  { to: '/w/$worldId/ranking', label: '순위' },
-  { to: '/w/$worldId/simulator', label: '전투 시뮬레이터' },
-  { to: '/w/$worldId/diplomacy', label: '외교' },
-  { to: '/w/$worldId/operations', label: '작전' },
-] as const;
-
 // 위쪽 띠에는 월드 이름·현재 연월·다음 턴까지 남은 시간·메뉴·로그아웃. 본문은 화면 폭을 다 쓴다.
 export function GameLayout() {
   const { worldId } = useParams({ from: '/w/$worldId' });
+  const { pathname } = useLocation();
+  const entry = pathname.replace(/\/$/, '') === `/w/${worldId}/create`;
   const summary = useWorldSummary(worldId, true);
   const home = useHome(worldId);
   const trpc = useTRPC();
+  const mine = useQuery(trpc.general.mine.queryOptions({ worldId }));
   const queryClient = useQueryClient();
   // 월드 SSE(T2-10). 알림마다 해당 query만 다시 받고, 이어질 때마다(ready) 화면 전체를 한 번 다시 받는다.
   const realtime = useWorldEvents(worldId);
@@ -82,7 +74,7 @@ export function GameLayout() {
   const nextText = topbarStatus(data, noGeneral, countdown, formatRemaining);
 
   return (
-    <div className={styles.shell}>
+    <div className={styles.shell} data-has-navigation={!entry}>
       <header className={styles.topbar}>
         <Link to="/lobby" className={styles.navLink}>
           로비
@@ -101,34 +93,6 @@ export function GameLayout() {
           {nextText}
         </span>
         <RealtimeStatusText status={realtime.status} />
-        <nav className={styles.nav} aria-label="게임 메뉴">
-          {NAV.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              params={{ worldId }}
-              activeOptions={{ exact: 'exact' in item, includeSearch: false }}
-              className={styles.navLink}
-              activeProps={{ className: `${styles.navLink} ${styles.active}`, 'aria-current': 'page' }}
-            >
-              {item.label}
-            </Link>
-          ))}
-          {/* 감찰은 직책자만 받는다(T2-12). 메뉴를 보일지만 여기서 정하고 권한은 서버가 다시 본다. */}
-          {(home.data?.general.officerLevel ?? 0) >= OFFICER_MIN_LEVEL ? (
-            <Link
-              to="/w/$worldId/nation/inspection"
-              params={{ worldId }}
-              className={styles.navLink}
-              activeProps={{ className: `${styles.navLink} ${styles.active}`, 'aria-current': 'page' }}
-            >
-              감찰
-            </Link>
-          ) : null}
-          <Link to="/help/$doc" params={{ doc: 'index' }} className={styles.navLink}>
-            도움말
-          </Link>
-        </nav>
         <MessageButton
           ref={messageButton}
           worldId={worldId}
@@ -140,6 +104,13 @@ export function GameLayout() {
         </Link>
         <LogoutButton className={styles.logout} />
       </header>
+      {!entry ? (
+        <GameNavigation
+          worldId={worldId}
+          campaignEnabled={mine.data?.creationRules.campaignEnabled ?? false}
+          officerLevel={home.data?.general.officerLevel ?? 0}
+        />
+      ) : null}
       <main className={styles.content}>
         <Outlet />
       </main>

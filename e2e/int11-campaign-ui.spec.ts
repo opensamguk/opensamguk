@@ -192,6 +192,12 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
     await editor.getByRole('radio', { name: '농지 개간', exact: true }).check();
     await editor.getByRole('button', { name: /에 넣기$/ }).click();
     await expect(editor.locator('tr[data-slot="1"]')).toContainText('농지 개간');
+    const selectedBeforeAnchor = new URL(owner.page.url()).search;
+    await owner.page.getByRole('link', { name: '휘하·부곡', exact: true }).click();
+    expect(new URL(owner.page.url()).search).toBe(selectedBeforeAnchor);
+    expect(new URL(owner.page.url()).hash).toBe('#campaign-title');
+    await expect(owner.page.getByRole('heading', { name: '개인 휘하·부곡', exact: true })).toBeFocused();
+    await expect(editor.locator('tr[data-slot="1"]')).toContainText('농지 개간');
     await panel(owner).getByRole('button', { name: '화면장수1에게 제안', exact: true }).click();
     await pending('campaign.relationship');
     await advance();
