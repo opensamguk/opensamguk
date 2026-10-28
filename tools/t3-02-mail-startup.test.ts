@@ -31,7 +31,7 @@ async function run(args: string[], env: NodeJS.ProcessEnv, timeoutMs = 5000) {
   return { ...result, output, timedOut };
 }
 
-it.each([undefined, 'capture', 'unsupported'])(
+it.each([undefined, 'capture', 'unsupported', 'resend'])(
   '실제 운영 API 실행은 미확정 메일 전송(%s)을 거부한다',
   async (transport) => {
     const env: NodeJS.ProcessEnv = {
@@ -42,6 +42,8 @@ it.each([undefined, 'capture', 'unsupported'])(
     };
     if (transport === undefined) delete env.MAIL_TRANSPORT;
     else env.MAIL_TRANSPORT = transport;
+    delete env.MAIL_FROM;
+    delete env.MAIL_API_KEY_FILE;
     const result = await run(
       ['--import', 'tsx', fileURLToPath(new URL('../apps/server/src/index.ts', import.meta.url))],
       env,

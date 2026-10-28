@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, rename, writeFile, unlink } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
+import { createResendTransport } from './resend';
 
 export interface MailMessage {
   to: string;
@@ -13,8 +14,9 @@ export interface MailTransport {
   send(message: MailMessage): Promise<void>;
 }
 
-/** 개발·실제 HTTP 시험용 메일함이다. 운영 전송은 서비스 결정 뒤 같은 인터페이스로 더한다. */
+/** 개발 메일함 또는 서비스 선택 뒤 명시적으로 설정한 HTTPS 전송을 쓴다. */
 export function createMailTransport(env: NodeJS.ProcessEnv = process.env): MailTransport {
+  if (env.MAIL_TRANSPORT === 'resend') return createResendTransport(env);
   if (env.MAIL_TRANSPORT !== 'capture' || env.NODE_ENV === 'production') {
     throw new Error('메일 전송 설정을 확인하세요.');
   }
