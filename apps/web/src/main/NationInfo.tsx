@@ -103,6 +103,8 @@ export function NationTables({
   if (query.isError)
     return <QueryError error={query.error} notFound="없는 국가입니다" onRetry={() => void query.refetch()} />;
   const data = query.data;
+  const campaign = 'campaignEnabled' in data && data.campaignEnabled;
+  const fiveStats = 'fiveStats' in data && data.fiveStats;
   const capitalKey = isMemberNation(data) ? data.capitalCityKey : null;
   const cityName = new Map(data.cities.map((city) => [city.key, city.name]));
   type City = (typeof data.cities)[number];
@@ -138,10 +140,10 @@ export function NationTables({
     },
   ];
 
-  const num = (pick: (g: Extract<General, { leadership: number }>) => number) => ({
+  const num = (pick: (g: Extract<General, { leadership: number }>) => number | undefined) => ({
     numeric: true,
-    sortValue: (g: General) => (isDetailedGeneral(g) ? pick(g) : null),
-    render: (g: General) => (isDetailedGeneral(g) ? n(pick(g)) : '—'),
+    sortValue: (g: General) => (isDetailedGeneral(g) ? (pick(g) ?? null) : null),
+    render: (g: General) => (isDetailedGeneral(g) ? (pick(g)?.toLocaleString('ko-KR') ?? '—') : '—'),
     title: (g: General) => (isDetailedGeneral(g) ? undefined : HIDDEN_NATION),
   });
   const generalColumns: Column<General>[] = [
@@ -161,9 +163,15 @@ export function NationTables({
     { key: 'leadership', label: '통솔', ...num((g) => g.leadership) },
     { key: 'strength', label: '무력', ...num((g) => g.strength) },
     { key: 'intel', label: '지력', ...num((g) => g.intel) },
-    { key: 'crew', label: '병력', ...num((g) => g.crew) },
-    { key: 'train', label: '훈련', ...num((g) => g.train) },
-    { key: 'atmos', label: '사기', ...num((g) => g.atmos) },
+    ...(fiveStats
+      ? [
+          { key: 'politics', label: '정치', ...num((g) => g.politics) },
+          { key: 'charm', label: '매력', ...num((g) => g.charm) },
+        ]
+      : []),
+    { key: 'crew', label: campaign ? '지휘 병력' : '병력', ...num((g) => armyValues(g).troops) },
+    { key: 'train', label: campaign ? '평균 훈련' : '훈련', ...num((g) => armyValues(g).train) },
+    { key: 'atmos', label: campaign ? '평균 사기' : '사기', ...num((g) => armyValues(g).atmos) },
     {
       key: 'care',
       label: '관리',
@@ -194,16 +202,27 @@ export function NationTables({
   );
 }
 
+type ArmyFields = {
+  crew: number;
+  train: number;
+  atmos: number;
+  commandedArmy?: { troops: number; train: number; atmos: number } | undefined;
+};
+function armyValues(general: ArmyFields) {
+  return general.commandedArmy ?? { troops: general.crew, train: general.train, atmos: general.atmos };
+}
+
 // 관리 필요 표시 (myosam 아이디어). 부상, 병력이 있는데 훈련·사기가 낮은 경우를 노랑으로 표시한다.
-export function careTags(general: { injury: number; crew: number; train: number; atmos: number }): string[] {
+export function careTags(general: ArmyFields & { injury: number }): string[] {
   const tags: string[] = [];
   if (general.injury > 0) tags.push(`부상 ${general.injury}`);
-  if (general.crew > 0 && general.train < 50) tags.push('훈련 부족');
-  if (general.crew > 0 && general.atmos < 50) tags.push('사기 부족');
+  const army = armyValues(general);
+  if (army.troops > 0 && army.train < 50) tags.push('훈련 부족');
+  if (army.troops > 0 && army.atmos < 50) tags.push('사기 부족');
   return tags;
 }
 
-function GeneralCare({ general }: { general: { injury: number; crew: number; train: number; atmos: number } }) {
+function GeneralCare({ general }: { general: ArmyFields & { injury: number } }) {
   const tags = careTags(general);
   return (
     <span className={styles.tags}>

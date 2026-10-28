@@ -93,5 +93,11 @@ describe('관리 필요 표시', () => {
   it('부상, 병력이 있을 때 훈련·사기 부족만 표시한다', () => {
     expect(careTags({ injury: 3, crew: 100, train: 40, atmos: 80 })).toEqual(['부상 3', '훈련 부족']);
     expect(careTags({ injury: 0, crew: 0, train: 0, atmos: 0 })).toEqual([]);
+    expect(
+      careTags({ injury: 2, crew: 0, train: 100, atmos: 100, commandedArmy: { troops: 10, train: 0, atmos: 0 } }),
+    ).toEqual(['부상 2', '훈련 부족', '사기 부족']);
+    expect(
+      careTags({ injury: 0, crew: 500, train: 0, atmos: 0, commandedArmy: { troops: 0, train: 0, atmos: 0 } }),
+    ).toEqual([]);
   });
 });

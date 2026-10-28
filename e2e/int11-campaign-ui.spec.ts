@@ -282,6 +282,41 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
     expect(
       await db.generalTurn.findMany({ where: { worldId, generalId: targetId }, orderBy: { slot: 'asc' } }),
     ).toEqual(targetTurns);
+    const nation = await apiQuery<inferRouterOutputs<AppRouter>['nation']['get']>(owner, 'nation.get', {
+      worldId,
+      nationId: 1,
+    });
+    expect(nation).toMatchObject({ campaignEnabled: true, fiveStats: true });
+    expect(nation.generals.find((general) => general.id === ownerId)).toMatchObject({
+      crew: 0,
+      politics: 55,
+      charm: 55,
+      commandedArmy: { troops: 10, train: 0, atmos: 0 },
+    });
+    expect(nation.generals.find((general) => general.id === npc!.id)).toMatchObject({
+      commandedArmy: { troops: 0, train: 0, atmos: 0 },
+    });
+    await owner.page.getByRole('button', { name: '소속 장수·도시 펼치기', exact: true }).click();
+    const nationTable = owner.page.getByRole('table', { name: /^소속 장수/ });
+    for (const label of ['정치', '매력', '지휘 병력', '평균 훈련', '평균 사기'])
+      await expect(nationTable.getByRole('columnheader', { name: label, exact: true })).toBeVisible();
+    const nationRow = nationTable
+      .getByRole('row')
+      .filter({ has: owner.page.getByRole('cell', { name: '화면장수0', exact: true }) });
+    await expect(nationRow.getByRole('cell').nth(6)).toHaveText('55');
+    await expect(nationRow.getByRole('cell').nth(7)).toHaveText('55');
+    await expect(nationRow.getByRole('cell').nth(8)).toHaveText('10');
+    await expect(nationRow.getByRole('cell').nth(9)).toHaveText('0');
+    await expect(nationRow.getByRole('cell').nth(10)).toHaveText('0');
+    await expect(nationRow.getByRole('cell').nth(11)).toContainText('훈련 부족');
+    await expect(nationRow.getByRole('cell').nth(11)).toContainText('사기 부족');
+    const previousCommanderRow = nationTable
+      .getByRole('row')
+      .filter({ has: owner.page.getByRole('cell', { name: npc!.name, exact: true }) });
+    await expect(previousCommanderRow.getByRole('cell').nth(8)).toHaveText('0');
+    await expect(previousCommanderRow.getByRole('cell').nth(11)).not.toContainText('훈련 부족');
+    await owner.page.screenshot({ path: 'test-results/int11-formal-nation-commanded-army.png', fullPage: true });
+    await owner.page.getByRole('button', { name: '소속 장수·도시 접기', exact: true }).click();
     await owner.page.setViewportSize({ width: 375, height: 812 });
     await owner.page.reload();
     await expect(panel(owner)).toBeVisible();

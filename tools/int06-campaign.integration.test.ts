@@ -721,6 +721,37 @@ it('예약한 실제 부장 부곡에만 모병하고 훈련 미리보기는 그
     name: after.state.generals[lieutenantId]!.name,
     nationId: after.state.generals[lieutenantId]!.nationId,
   });
+  const nationId = after.state.generals[lieutenantId]!.nationId!;
+  const otherBefore = hashState(await snapshot(otherWorldId));
+  const nation = await http<inferRouterOutputs<AppRouter>['nation']['get']>('nation.get', { worldId, nationId });
+  expect(nation.code).toBeUndefined();
+  expect(nation.data).toMatchObject({ campaignEnabled: true, fiveStats: true });
+  expect(nation.data!.generals.find((general) => general.id === lieutenantId)).toMatchObject({
+    crew: 0,
+    politics: after.state.generals[lieutenantId]!.politics,
+    charm: after.state.generals[lieutenantId]!.charm,
+    commandedArmy: { troops: 10, train: 0, atmos: 0 },
+  });
+  expect(nation.data!.generals.find((general) => general.id === ownId)).toMatchObject({
+    commandedArmy: { troops: 0, train: 0, atmos: 0 },
+  });
+  const hiddenNation = await http<inferRouterOutputs<AppRouter>['nation']['get']>(
+    'nation.get',
+    { worldId, nationId },
+    cookies[2],
+  );
+  expect(hiddenNation.data!.generals.find((general) => general.id === lieutenantId)).toEqual(masked);
+  const isolatedNation = await http<inferRouterOutputs<AppRouter>['nation']['get']>('nation.get', {
+    worldId: otherWorldId,
+    nationId,
+  });
+  expect(
+    isolatedNation.data!.generals.every((general) => Object.keys(general).sort().join(',') === 'id,name,nationId'),
+  ).toBe(true);
+  expect((await http('nation.get', { worldId, nationId }, '')).code).toBe('UNAUTHORIZED');
+  expect((await http('nation.get', { worldId, nationId, userId: users[0] })).code).toBe('BAD_REQUEST');
+  expect(hashState(await snapshot())).toBe(hashState(after));
+  expect(hashState(await snapshot(otherWorldId))).toBe(otherBefore);
   expect((await http('turns.precheck', { worldId, commandKey: 'train', args: { unitId } })).data).toMatchObject({
     ok: true,
     preview: { goldCost: 100, gain: 8 + Math.floor(after.state.generals[lieutenantId]!.leadership / 25) },
