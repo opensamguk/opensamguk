@@ -309,3 +309,46 @@
 .inline input {
   width: 4.5em;
 }
+
+@media (max-width: 767px) {
+  .editor {
+    --row-height: 44px;
+  }
+
+  .primary,
+  .secondary,
+  .chip,
+  .linkButton,
+  .commandOption,
+  .editor button[data-unavailable],
+  .search input,
+  .argLabel input,
+  .argLabel select,
+  .inline input {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .search input,
+  .argLabel input,
+  .argLabel select,
+  .inline input {
+    font-size: 16px;
+    box-sizing: border-box;
+  }
+
+  .argLabel,
+  .argRow,
+  .search {
+    min-width: 0;
+  }
+
+  .argLabel input,
+  .argLabel select {
+    max-width: 100%;
+  }
+
+  .inline {
+    flex-wrap: wrap;
+  }
+}

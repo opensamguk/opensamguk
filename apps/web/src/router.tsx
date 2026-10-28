@@ -266,12 +266,13 @@ type RecordTab = (typeof RECORD_TABS)[number];
 const recordsRoute = createRoute({
   getParentRoute: () => worldRoute,
   path: 'records',
-  validateSearch: (search: Record<string, unknown>): { tab: RecordTab } => ({
+  validateSearch: (search: Record<string, unknown>): { tab: RecordTab; city?: number | undefined } => ({
     tab: RECORD_TABS.includes(search.tab as RecordTab) ? (search.tab as RecordTab) : 'general',
+    city: mainSearch(search).city,
   }),
   component: function RecordsRoute() {
-    const { tab } = recordsRoute.useSearch();
-    return <RecordsPage tab={tab} />;
+    const { tab, city } = recordsRoute.useSearch();
+    return <RecordsPage tab={tab} {...(city === undefined ? {} : { city })} />;
   },
 });
 
