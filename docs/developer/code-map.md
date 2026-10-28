@@ -102,6 +102,8 @@
 
 ## 새 저장 필드를 추가할 때 빠뜨리기 쉬운 것
 
+관리자 공지의 엄격 입력·잠금·멱등·감사는 `apps/server/src/admin/notices.ts`에 있다. `routers/admin.ts`의 네 절차가 사용하며 `lobby.notices`·`notice.world.list`는 숨김 필터만 추가한다. `tools/t3-05-admin-notices.integration.test.ts`는 실제 HTTP·권한·경합·두 정식 월드 격리를 검사하고 `t3-05-notice-migration.integration.test.ts`는 기존 모든 행·sequence와 null 제목·고정 공지를 새 migration 전후로 대조한다. 두 운영 표는 게임 상태·재생 해시에 넣지 않는다.
+
 T4-56의 `RemovedNation`과 `YearbookNation`은 공개 표시값 보관이며 `WorldState`·재생 해시·보관 파일에는 넣지 않는다. 기존 프레임의 백필은 `pnpm db:migrate` 뒤 `pnpm --filter @opensamguk/engine yearbook:backfill`으로 보고를 확인하고 `--apply`로 실행한다. 현재 국가·삭제 보존·생성 기록의 이름과 색이 모두 일치할 때만 채운다. 근거가 없으면 부분 프레임으로 남기고 충돌이면 그 월드 전체를 롤백한다. 이름·색 변경을 넣는 T4-16은 같은 PR에서 이 CLI와 script를 지워야 한다.
 
 `timelapse.frames`는 한 RepeatableRead 트랜잭션에서 월간 도시 소유와 `YearbookNation`을 읽는다. 각 프레임의 `nations`에는 그 달 도시를 소유한 국가의 저장된 ID·이름·색만 담는다. `currentNations`에는 이 페이지의 도시 소유 ID 가운데 지금 살아 있는 국가의 표시값을 따로 담는다. 과거 저장값이 없으면 해당 국가를 `nations`에서 생략하며 현재값이나 회색으로 채우지 않는다. `RemovedNation`은 이 조회로 공개하지 않는다.

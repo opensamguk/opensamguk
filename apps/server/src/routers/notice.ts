@@ -74,7 +74,7 @@ export const noticeRouter = router({
       ctx.db.$transaction(async (tx) => {
         await messagingActor(tx, ctx, input.worldId);
         const rows = await tx.notice.findMany({
-          where: { scope: 'WORLD', worldId: input.worldId },
+          where: { scope: 'WORLD', worldId: input.worldId, hiddenAt: null },
           orderBy: [{ pinned: 'desc' }, { publishedAt: 'desc' }, { id: 'desc' }],
           take: 20,
           select: { id: true, body: true, pinned: true, publishedAt: true },

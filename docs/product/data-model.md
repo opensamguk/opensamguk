@@ -45,6 +45,8 @@
 | `ConsentRecord` | userId, docType(약관·개인정보), version, agreedAt                         | M3   |
 | `Sanction`      | id, userId, worldId(없으면 전체), reason, expiresAt, createdBy, createdAt, liftedAt, liftedBy, liftReason. 대상 User·World 이력은 NoAction으로 보존 | M3 제재 묶음 검증 중 |
 | `AuditLog`      | id, at, actorKind, actorUserId, action, targetType, targetId, worldId, reason, payload, inputEventId. DB에서 수정·삭제·비우기 거부 | M3 첫 묶음 구현 중 |
+| `Notice` | id, scope, worldId, title, body, pinned, publishedAt, hiddenAt, revision. 기존 제목 없는 WORLD 공지 보존, 숨김은 공개 조회에서 제외 | M3 공지 API 검증 중 |
+| `AdminNoticeRequest` | (actorUserId, idempotencyKey) PK, requestHash, noticeId, revision, hidden, createdAt. 같은 요청 결과만 보관하며 원문 본문은 중복 저장하지 않음 | M3 공지 API 검증 중 |
 
 ## 월드 운영 영역
 

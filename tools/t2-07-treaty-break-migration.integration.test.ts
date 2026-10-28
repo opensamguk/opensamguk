@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { readFile, readdir } from 'node:fs/promises';
+import { setTimeout as delay } from 'node:timers/promises';
 import { expect, it } from 'vitest';
 import { testDatabaseUrl } from './test-database';
 
@@ -90,9 +91,19 @@ async function ownDatabase(mode: 'empty' | 'upgrade' | 'constraints', run: (clie
           expect((await admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname=$1', [name])).rows).toEqual(
             [{ oid }],
           );
-          expect(
-            (await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1', [name])).rows,
-          ).toEqual([{ count: 0 }]);
+          // client.end 뒤 서버가 연결 종료를 반영한 뒤에만 자기 DB를 지운다.
+          let connections: Row[] = [];
+          for (let observation = 0; observation <= 30; observation++) {
+            connections = (
+              await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1', [name])
+            ).rows;
+            if (connections[0]?.count === 0 || observation === 30) break;
+            await delay(100);
+          }
+          expect(connections).toEqual([{ count: 0 }]);
+          expect((await admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname=$1', [name])).rows).toEqual(
+            [{ oid }],
+          );
           await admin.query(`DROP DATABASE "${name}"`);
           expect((await admin.query('SELECT datname FROM pg_database WHERE datname=$1', [name])).rows).toEqual([]);
           console.info(JSON.stringify({ event: 't207-break-trust-dropped', name, oid, connections: 0, absent: true }));
@@ -125,6 +136,7 @@ async function previous(client: PgClient) {
     '20261102000000_account_tokens',
     '20261103000000_admin_role_audit',
     '20261104000000_account_world_sanctions',
+    '20261105000000_admin_notices',
   ]);
   for (const name of previous23)
     await client.query(await readFile(new URL(`${name}/migration.sql`, directory), 'utf8'));
