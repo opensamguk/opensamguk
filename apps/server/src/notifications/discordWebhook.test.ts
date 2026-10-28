@@ -93,6 +93,14 @@ afterEach(() => {
 });
 
 type Received = { method: string | undefined; path: string | undefined; contentType: string | undefined; body: string };
+// 시험 수신기도 Fetch의 포트 정책을 따른다. 프로토콜 숫자 출처(2026-10-29 확인):
+// https://fetch.spec.whatwg.org/#port-blocking
+const fetchBlockedPorts = new Set([
+  0, 1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 42, 43, 53, 69, 77, 79, 87, 95, 101, 102, 103, 104, 109, 110,
+  111, 113, 115, 117, 119, 123, 135, 137, 139, 143, 161, 179, 389, 427, 465, 512, 513, 514, 515, 526, 530, 531, 532,
+  540, 548, 554, 556, 563, 587, 601, 636, 989, 990, 993, 995, 1719, 1720, 1723, 2049, 3659, 4045, 4190, 5060, 5061,
+  6000, 6566, 6665, 6666, 6667, 6668, 6669, 6679, 6697, 10080,
+]);
 async function receiver(reply: (request: IncomingMessage, response: ServerResponse) => void) {
   const received: Received[] = [];
   const calls: { url: string; init: DiscordWebhookRequestInit; abortedAtCall: boolean }[] = [];
@@ -117,12 +125,38 @@ async function receiver(reply: (request: IncomingMessage, response: ServerRespon
       reply(request, response);
     });
   });
-  await new Promise<void>((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
-  });
-  const address = server.address() as AddressInfo;
-  const origin = `http://127.0.0.1:${address.port}`;
+  let address: AddressInfo | undefined;
+  for (let attempt = 0; attempt < 64; attempt++) {
+    await new Promise<void>((resolve, reject) => {
+      const failed = (error: unknown) => {
+        server.off('listening', listening);
+        server.off('error', failed);
+        reject(error);
+      };
+      const listening = () => {
+        server.off('error', failed);
+        server.off('listening', listening);
+        resolve();
+      };
+      server.once('error', failed);
+      server.once('listening', listening);
+      try {
+        server.listen(0, '127.0.0.1');
+      } catch (error) {
+        failed(error);
+      }
+    });
+    const selected = server.address() as AddressInfo;
+    if (!fetchBlockedPorts.has(selected.port)) {
+      address = selected;
+      break;
+    }
+    // 아직 요청이 없는 자기 수신기만 닫는다. 실제 전송이나 응답은 재시도하지 않는다.
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+  if (!address) throw new Error('Fetch로 접근할 자기 시험 수신기 포트를 얻지 못했습니다.');
+  const selectedPort = address.port;
+  const origin = `http://127.0.0.1:${selectedPort}`;
   const transport: DiscordWebhookTransport = (endpoint, init) => {
     calls.push({ url: endpoint, init, abortedAtCall: init.signal.aborted });
     // 운영 URL 검사를 우회하지 않고 신뢰된 시험 전송부만 고정 수신기로 보낸다.
@@ -136,7 +170,7 @@ async function receiver(reply: (request: IncomingMessage, response: ServerRespon
         aborted: init.signal.aborted,
         received: received.length,
         listening: server.listening,
-        port: address.port,
+        port: selectedPort,
       });
       throw error;
     });
