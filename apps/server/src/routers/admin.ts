@@ -3,9 +3,18 @@ import { adminProcedure } from '../admin/role';
 import { router } from '../trpc';
 import { notifySessionClosed } from '@opensamguk/db';
 import { createSanction, createSanctionInput, liftSanction, liftSanctionInput } from '../admin/sanctionStore';
+import { auditListInput, listAudit, searchUsers, searchUsersInput } from '../admin/read';
 
 export const adminRouter = router({
   whoami: adminProcedure.input(z.void()).query(() => ({ admin: true as const })),
+  user: router({
+    search: adminProcedure
+      .input(searchUsersInput)
+      .query(({ ctx, input }) => searchUsers(ctx.db, ctx.user.id, input, ctx.now)),
+  }),
+  audit: router({
+    list: adminProcedure.input(auditListInput).query(({ ctx, input }) => listAudit(ctx.db, ctx.user.id, input)),
+  }),
   sanction: router({
     create: adminProcedure.input(createSanctionInput).mutation(async ({ ctx, input }) => {
       const result = await createSanction(ctx.db, ctx.user.id, input, ctx.now);
