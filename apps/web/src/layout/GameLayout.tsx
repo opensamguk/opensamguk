@@ -13,6 +13,7 @@ import type { WorldSummary } from '../game/types';
 import { liveRefresh, topbarStatus } from '../game/worldWatch';
 import { useTRPC } from '../trpc';
 import styles from './GameLayout.module.css';
+import { SanctionNotice } from '../sanction/SanctionNotice';
 
 // 핵심 조작은 메인 한 화면에서 한다 (소유자 UI 정정 2026-10-21). 메뉴의 다른 주소는 넓게 보는 보조 화면이다.
 // 위쪽 띠에는 월드 이름·현재 연월·다음 턴까지 남은 시간·메뉴·로그아웃. 본문은 화면 폭을 다 쓴다.
@@ -115,6 +116,7 @@ export function GameLayout() {
         />
       ) : null}
       <main className={styles.content}>
+        <SanctionNotice worldId={worldId} />
         <Outlet />
       </main>
       {messagesOpen ? <MessageDrawer worldId={worldId} onClose={closeMessages} /> : null}

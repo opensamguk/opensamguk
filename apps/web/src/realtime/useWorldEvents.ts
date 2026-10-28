@@ -1,4 +1,4 @@
-import { useQueryClient, type QueryClient, type QueryKey } from '@tanstack/react-query';
+import { hashKey, useQueryClient, type QueryClient, type QueryKey } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { sseUrl, WORLD_EVENT_KINDS, type WorldEvent } from '../messages/api';
 export { sseUrl, WORLD_EVENT_KINDS, type WorldEvent } from '../messages/api';
@@ -55,7 +55,17 @@ export function invalidationTargets(event: WorldEvent, worldId: string, trpc: Tr
 export function applyWorldEvent(queryClient: QueryClient, trpc: Trpc, worldId: string, event: WorldEvent) {
   const targets = invalidationTargets(event, worldId, trpc);
   if (targets === 'all') {
-    void queryClient.invalidateQueries();
+    const authKey = trpc.auth.me.queryKey();
+    const authHash = hashKey(authKey);
+    const authWasFetching = queryClient.getQueryState(authKey)?.fetchStatus === 'fetching';
+    // 화면 데이터는 기존처럼 새로 읽되 공유 인증의 진행 중 가드는 취소하지 않는다.
+    void queryClient.invalidateQueries({ predicate: (query) => query.queryHash !== authHash });
+    const refreshed = queryClient.invalidateQueries({ queryKey: authKey, exact: true }, { cancelRefetch: false });
+    // ready 전 응답에 합류했다면 정착 뒤에도 쓰는 인증 조회를 한 번 더 갱신한다.
+    if (authWasFetching)
+      void refreshed.then(() =>
+        queryClient.refetchQueries({ queryKey: authKey, exact: true, type: 'active' }, { cancelRefetch: false }),
+      );
     return;
   }
   for (const queryKey of targets) void queryClient.invalidateQueries({ queryKey });

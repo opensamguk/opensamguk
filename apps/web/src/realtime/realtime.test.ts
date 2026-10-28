@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // 브라우저의 online·offline 힌트를 실제 window 사건으로 보내려고 jsdom에서 돌린다. EventSource는 아래 FakeSource로 바꾼다.
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MessageScope } from '../messages/api';
 import { readDraft, writeDraft } from '../messages/drafts';
@@ -148,16 +148,88 @@ describe('SSE 재조회와 초안', () => {
     expect(readDraft('notice:edit:w1:1', null)).toBe('고치던 공지');
   });
 
-  it('연결로 받은 ready 하나는 화면 query 전체 무효화를 정확히 한 번 부른다', () => {
+  it('연결로 받은 ready는 인증과 나머지 화면을 나눠 무효화한다', () => {
     const client = new QueryClient();
     seed(client);
     const invalidate = vi.spyOn(client, 'invalidateQueries');
     const c = connect((event) => applyWorldEvent(client, trpc, WORLD, event));
     c.last().open();
     c.last().emit('ready', '{"kind":"ready"}');
-    expect(invalidate).toHaveBeenCalledTimes(1);
-    expect(invalidate).toHaveBeenCalledWith();
+    expect(invalidate).toHaveBeenCalledTimes(2);
+    expect(invalidate).toHaveBeenCalledWith({ predicate: expect.any(Function) });
+    expect(invalidate).toHaveBeenCalledWith(
+      { queryKey: trpc.auth.me.queryKey(), exact: true },
+      { cancelRefetch: false },
+    );
     c.connection.stop();
+  });
+
+  it('AC-M3-04 ready는 지연 가드를 보존하고 기존 화면·인증의 오래된 응답 뒤 최신 값도 받는다', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const authKey = trpc.auth.me.queryKey(),
+      viewKey = ['delayed-world-view'];
+    const authData = (id: string) => ({ user: { id, email: `${id}@example.invalid` } });
+    let releaseAuth: (value: ReturnType<typeof authData>) => void = () => {},
+      releaseView: (value: string) => void = () => {};
+    const authResponse = new Promise<ReturnType<typeof authData>>((resolve) => {
+      releaseAuth = resolve;
+    });
+    const viewResponse = new Promise<string>((resolve) => {
+      releaseView = resolve;
+    });
+    let authCalls = 0,
+      viewCalls = 0,
+      authAborted = false;
+    const auth = {
+      queryKey: authKey,
+      staleTime: Infinity,
+      queryFn: ({ signal }: { signal: AbortSignal }) => {
+        authCalls++;
+        if (authCalls > 1) return Promise.resolve(authData('latest-auth'));
+        signal.addEventListener('abort', () => {
+          authAborted = true;
+        });
+        return authResponse;
+      },
+    };
+    const view = {
+      queryKey: viewKey,
+      staleTime: Infinity,
+      queryFn: () => (++viewCalls === 1 ? viewResponse : Promise.resolve('latest-view')),
+    };
+    client.setQueryData(authKey, authData('cached-auth'));
+    client.setQueryData(viewKey, 'cached-view');
+    const stopAuth = new QueryObserver(client, auth).subscribe(() => {});
+    const stopView = new QueryObserver(client, view).subscribe(() => {});
+    const guard = client.fetchQuery({ ...auth, staleTime: 0 });
+    const oldView = client.fetchQuery({ ...view, staleTime: 0 });
+    void guard.catch(() => undefined);
+    void oldView.catch(() => undefined);
+    try {
+      await vi.waitFor(() => {
+        expect(authCalls).toBe(1);
+        expect(viewCalls).toBe(1);
+      });
+      applyWorldEvent(client, trpc, WORLD, { kind: 'ready' });
+      expect(client.getQueryState(authKey)?.fetchStatus).toBe('fetching');
+      expect(authAborted).toBe(false);
+      await vi.waitFor(() => expect(client.getQueryData(viewKey)).toBe('latest-view'));
+      releaseView('old-view');
+      await Promise.allSettled([oldView]);
+      expect(client.getQueryData(viewKey)).toBe('latest-view');
+      releaseAuth(authData('old-auth'));
+      await expect(guard).resolves.toEqual(authData('old-auth'));
+      await vi.waitFor(() => expect(client.getQueryData(authKey)).toEqual(authData('latest-auth')));
+      expect(authCalls).toBe(2);
+      expect(authAborted).toBe(false);
+    } finally {
+      releaseAuth(authData('old-auth'));
+      releaseView('old-view');
+      await Promise.allSettled([guard, oldView]);
+      stopAuth();
+      stopView();
+      client.clear();
+    }
   });
 });
 
