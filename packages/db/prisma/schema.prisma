@@ -451,17 +451,47 @@ enum UserStatus {
   WITHDRAWN
 }
 
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum AuditActorKind {
+  ADMIN
+  CLI
+  ENGINE
+}
+
 model User {
   id           String @id @default(uuid())
   email        String @unique
   passwordHash String
   status       UserStatus @default(ACTIVE)
+  role         UserRole @default(USER)
   createdAt    DateTime @default(now())
   emailVerifiedAt DateTime?
   sessions     Session[]
   accountTokens AccountToken[]
   consents     ConsentRecord[]
   generals     General[]
+}
+
+model AuditLog {
+  id           BigInt @id @default(autoincrement())
+  at           DateTime @default(now())
+  actorKind    AuditActorKind
+  actorUserId  String?
+  action       String
+  targetType   String
+  targetId     String?
+  worldId      String?
+  reason       String?
+  payload      Json
+  inputEventId BigInt?
+
+  @@index([at])
+  @@index([actorUserId, at])
+  @@index([worldId, at])
 }
 
 enum AccountTokenPurpose {

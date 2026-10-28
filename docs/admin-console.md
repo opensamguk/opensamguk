@@ -1,12 +1,27 @@
 # 관리자 콘솔
 
-> 상태: 뼈대 · 필요 시점: M3 · 관련 AC: M3-04, M3-05, M3-10
+> 상태: 관리자 역할·감사 첫 묶음 구현 중 · 필요 시점: M3 · 관련 AC: M3-04, M3-05, M3-10
 > 참고: core2026 `admin-console.md`, `play-audit-operations.md`, `design/play-audit.md` (부정 플레이 조사 범위만)
 > 이 문서가 답할 질문: 운영자가 어떤 화면에서 무엇을 할 수 있고 무엇이 기록되나?
 
 ## 1. 권한
 
-<!-- TODO(M3): ADMIN 역할만 접근. 모든 조치는 AuditLog에 남는다 (FR-ADM-03). -->
+T3-05 첫 묶음은 관리자 역할과 명령줄의 권한 부여·회수만 다룹니다. 기존 계정과 새 계정의 기본 역할은 USER이며 자동으로 관리자를 지정하지 않습니다. `admin.whoami`는 로그인·필수 이메일 인증 뒤 DB의 ACTIVE·ADMIN을 매번 확인하고 `{ admin: true }`만 돌려줍니다. 역할을 회수하면 기존 세션에서도 다음 요청부터 거부합니다. 요청의 사용자 ID나 역할 값은 권한 근거가 아닙니다.
+
+관리자 지정·회수 API는 없습니다. 대상과 사유를 확정한 서버 운영자가 올바른 DB 환경을 확인한 뒤 `pnpm admin:grant` 또는 `pnpm admin:revoke`를 실행합니다. 이메일과 사유는 명령 인자에 넣지 않고 표준 입력 JSON으로 전달합니다. 입력 파일은 저장소 밖에 둡니다.
+
+```json
+{ "email": "operator@example.invalid", "reason": "운영자 권한 부여" }
+```
+
+```sh
+pnpm admin:grant < /secure/admin-role-request.json
+pnpm admin:revoke < /secure/admin-role-request.json
+```
+
+명령은 대상 사용자 행을 잠근 같은 트랜잭션에서 역할과 감사 행을 확정합니다. 같은 역할을 다시 요청해도 `admin.grant`·`admin.revoke`와 `payload.changed:false`로 감사하며 실패하면 역할도 되돌립니다. 출력은 사용자 UUID·역할·변경 여부·감사 ID만 담습니다. 이메일·비밀번호·세션·키는 출력하거나 감사 payload에 넣지 않습니다. 사유는1~200자이며 개인정보를 적지 않습니다.
+
+감사 기록은 DB 시각·CLI 행위·대상 UUID·사유·전후 역할을 남기고 UPDATE·DELETE·TRUNCATE를 DB trigger로 거부합니다. 사용자 UUID와 자유 입력 사유의 보존 정책 검토는 남아 있습니다. 이번 검증은 전용 시험 DB만 사용했으며 기존 개발 계정·실제 운영자의 권한은 변경하지 않았습니다. 전체 관리자 화면·제재·월드 조작과 AC-M3-04 인수는 후속 묶음입니다.
 
 ## 2. 월드 관리
 
