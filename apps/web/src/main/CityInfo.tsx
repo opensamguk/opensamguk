@@ -195,6 +195,12 @@ function Garrison({
     },
   ];
   return (
-    <DataTable caption={`주둔 장수 ${generals.length}명`} rows={generals} columns={columns} rowKey={(g) => g.id} />
+    <DataTable
+      caption={`주둔 장수 ${generals.length}명`}
+      rows={generals}
+      columns={columns}
+      rowKey={(g) => g.id}
+      mobileDetails={['leadership', 'strength', 'intel', 'politics', 'charm', 'train', 'atmos']}
+    />
   );
 }

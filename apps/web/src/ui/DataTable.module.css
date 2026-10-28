@@ -1,5 +1,6 @@
 .wrap {
   overflow-x: auto;
+  min-width: 0;
 }
 .table {
   width: 100%;
@@ -48,4 +49,94 @@
   font-size: var(--text-xs);
   color: var(--color-text-muted);
   min-width: 1em;
+}
+
+.mobileSort {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.mobileSort label {
+  flex-basis: 100%;
+}
+.mobileSort select,
+.mobileSort button {
+  min-height: 44px;
+  min-width: 44px;
+  max-width: 100%;
+  font: inherit;
+  font-size: 16px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  padding: var(--space-1) var(--space-2);
+}
+.details {
+  margin: var(--space-1) 0;
+  font-weight: normal;
+  font-variant-numeric: tabular-nums;
+}
+.details > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.details dt {
+  color: var(--color-text-muted);
+}
+.details dd {
+  margin: 0;
+}
+.reason {
+  color: var(--color-text-muted);
+}
+
+@media (min-width: 768px) {
+  .responsive .table td,
+  .responsive .table thead th {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    padding-left: var(--space-1);
+    padding-right: var(--space-1);
+  }
+  .responsive .sort {
+    max-width: 100%;
+    gap: 2px;
+  }
+  .responsive .sortLabel {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .responsive .table td span {
+    white-space: normal;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 767px) {
+  .responsive .table td,
+  .responsive .table thead th {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    padding: var(--space-1);
+    vertical-align: top;
+  }
+  .responsive .table td a,
+  .responsive .table td button {
+    display: inline-flex;
+    align-items: center;
+    min-width: 44px;
+    min-height: 44px;
+    box-sizing: border-box;
+  }
+  .responsive .table td span {
+    white-space: normal;
+  }
+}
+
+.responsive .table td:global(.num) {
+  white-space: nowrap;
 }

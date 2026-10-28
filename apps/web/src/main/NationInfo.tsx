@@ -191,12 +191,25 @@ export function NationTables({
         rows={data.cities}
         columns={cityColumns}
         rowKey={(c) => c.key}
+        mobileDetails={[]}
       />
       <DataTable
         caption={`소속 장수 ${data.generals.length}명`}
         rows={data.generals}
         columns={generalColumns}
         rowKey={(g) => g.id}
+        mobileDetails={[
+          'officer',
+          'city',
+          'leadership',
+          'strength',
+          'intel',
+          'politics',
+          'charm',
+          'train',
+          'atmos',
+          'care',
+        ]}
       />
     </div>
   );
