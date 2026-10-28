@@ -1,3 +1,13 @@
+Caddy external runtime image
+Referenced by: deploy/compose.yml
+Image: caddy:2.11.7-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f
+Source: https://github.com/caddyserver/caddy/tree/v2.11.7
+License: Apache-2.0, https://github.com/caddyserver/caddy/blob/v2.11.7/LICENSE
+Official image source: https://github.com/caddyserver/caddy-docker/tree/master/2.11/alpine
+The external image retains its upstream component licenses and notices.
+No Caddy binary or third-party image layers are vendored in this repository.
+
+
 OpenSamguk v1 selected rule adaptations
 
 Source: https://github.com/peppone-choi/opensamguk-v1
