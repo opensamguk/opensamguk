@@ -8,6 +8,7 @@ import {
   restoreState,
   serializeState,
   type Observation,
+  type StateWarning,
   type UptimeState,
 } from './uptimeState';
 import { gitProcess, UptimeGitError, type GitProcessOptions } from './uptimeGitProcess';
@@ -170,16 +171,35 @@ export async function updateUptimeGit(input: UptimeGitInput, dependencies: Uptim
     dependencies.onDirectory?.(directory);
     await writeFile(configuration, '', { flag: 'wx', mode: 0o600 });
     await required(['init', '--quiet', '.']);
+    type Dropped = ReturnType<typeof observe>['dropped'][number];
+    const candidates = new Map<string, { dropped: Dropped[]; warnings: StateWarning[] }>();
+    async function confirmedMetadata(head: string | null, restoredWarnings: StateWarning[]) {
+      const confirmed = new Map<string, Dropped>();
+      const warnings = new Map(restoredWarnings.map((item) => [item.code + '\0' + (item.field ?? ''), item]));
+      if (head)
+        for (const [candidate, metadata] of candidates) {
+          if (candidate !== head) {
+            const ancestor = await git(['merge-base', '--is-ancestor', candidate, head]);
+            if (ancestor.code === 1) continue;
+            if (ancestor.code !== 0) throw new UptimeGitError('read');
+          }
+          for (const item of metadata.dropped) confirmed.set(item.reason + '\0' + item.id, item);
+          for (const item of metadata.warnings) warnings.set(item.code + '\0' + (item.field ?? ''), item);
+        }
+      return { dropped: [...confirmed.values()], warnings: [...warnings.values()] };
+    }
     for (let attempt = 0; attempt < 3; attempt++) {
       const snapshot = await read(attempt);
       const restored = restoreState({ key: input.key, raw: snapshot.raw, now });
       if ('error' in restored) throw new UptimeGitError('state');
       let state: UptimeState, result: string, changed: boolean;
+      let dropped: Dropped[] = [];
       if (input.operation.kind === 'observe') {
         const observation = observe(restored.state, input.operation.observation);
         state = observation.state;
         result = observation.result;
         changed = observation.result === 'applied';
+        dropped = observation.dropped;
       } else {
         const operation = input.operation;
         const update =
@@ -198,7 +218,7 @@ export async function updateUptimeGit(input: UptimeGitInput, dependencies: Uptim
           head: snapshot.head,
           committed: false,
           attempts: attempt + 1,
-          warnings: restored.warnings,
+          ...(await confirmedMetadata(snapshot.head, restored.warnings)),
         };
       await required(snapshot.head ? ['read-tree', snapshot.head] : ['read-tree', '--empty']);
       const blob = await required(['hash-object', '-w', '--stdin'], serializeState(state));
@@ -215,13 +235,22 @@ export async function updateUptimeGit(input: UptimeGitInput, dependencies: Uptim
         `uptime ${input.key} ${input.operation.kind}`,
       ]);
       check(/^[a-f0-9]{40}$/.test(head));
+      if (dropped.length || restored.warnings.length) candidates.set(head, { dropped, warnings: restored.warnings });
       try {
         await dependencies.beforePush?.(attempt);
         const pushed = await git(['push', '--porcelain', remote, `${head}:${input.stateRef}`]);
         if (pushed.code !== 0) continue;
         await dependencies.afterPush?.(attempt);
-        return { state, result, head, committed: true, attempts: attempt + 1, warnings: restored.warnings };
+        return {
+          state,
+          result,
+          head,
+          committed: true,
+          attempts: attempt + 1,
+          ...(await confirmedMetadata(head, restored.warnings)),
+        };
       } catch (error) {
+        if (error instanceof UptimeGitError && error.kind === 'read') throw error;
         if (error instanceof UptimeGitError && !error.cleanupSafe) throw error;
         // 결과가 불명확한 push는 다시 읽은 상태에서 같은 입력으로 계산한다.
       }
