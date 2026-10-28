@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { PrismaClient } from '@opensamguk/db';
+import { activeSanctionWhere, hasGlobalSanction } from './sanction';
 export const SESSION_SECONDS = 30 * 24 * 60 * 60;
 export const SESSION_RENEW_MS = 15 * 24 * 60 * 60 * 1000;
 export function hashToken(token: string) {
@@ -14,15 +15,21 @@ export async function authenticate(db: PrismaClient, token: string | undefined, 
   const id = hashToken(token);
   const session = await db.session.findUnique({ where: { id }, include: { user: true } });
   if (!session || session.expiresAt.getTime() <= now || session.user.status !== 'ACTIVE') return null;
+  if (await hasGlobalSanction(db, session.userId, now)) return null;
   const identity = { sessionId: id, user: { id: session.user.id, email: session.user.email } };
   if (!renew || session.expiresAt.getTime() - now > SESSION_RENEW_MS) return { ...identity, renewed: false };
   const updated = await db.session.updateMany({
-    where: { id, expiresAt: { gt: new Date(now), lte: new Date(now + SESSION_RENEW_MS) }, user: { status: 'ACTIVE' } },
+    where: {
+      id,
+      expiresAt: { gt: new Date(now), lte: new Date(now + SESSION_RENEW_MS) },
+      user: { status: 'ACTIVE', sanctions: { none: { worldId: null, ...activeSanctionWhere(now) } } },
+    },
     data: { expiresAt: new Date(now + SESSION_SECONDS * 1000) },
   });
   if (updated.count === 1) return { ...identity, renewed: true };
   // 다른 요청이 먼저 연장한 경우와 만료·제재를 구분한다.
   const latest = await db.session.findUnique({ where: { id }, include: { user: true } });
   if (!latest || latest.expiresAt.getTime() <= now || latest.user.status !== 'ACTIVE') return null;
+  if (await hasGlobalSanction(db, latest.userId, now)) return null;
   return { sessionId: id, user: { id: latest.user.id, email: latest.user.email }, renewed: false };
 }

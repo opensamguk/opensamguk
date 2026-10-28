@@ -230,7 +230,12 @@ function api(row: unknown = world(), userId: string | null = 'n1-fixture-actor')
     run(tx as unknown as Prisma.TransactionClient),
   );
   const ctx = {
-    db: { $transaction: transaction, world: tx.world } as unknown as PrismaClient,
+    db: {
+      $transaction: transaction,
+      world: tx.world,
+      sanction: { findFirst: vi.fn().mockResolvedValue(null) },
+    } as unknown as PrismaClient,
+    now: 1000,
     user: userId ? { id: userId, email: 'fixture@example.invalid' } : null,
     rateLimiter: createRateLimiter({ now: () => 1000 }),
     reply: { header: vi.fn() },

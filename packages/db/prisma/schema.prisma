@@ -65,6 +65,7 @@ model World {
   treaties        Treaty[]
   nationTrust     NationTrust[]
   assignmentOffers AssignmentOffer[]
+  sanctions       Sanction[]
 }
 
 enum AssignmentOfferStatus {
@@ -474,6 +475,25 @@ model User {
   accountTokens AccountToken[]
   consents     ConsentRecord[]
   generals     General[]
+  sanctions    Sanction[]
+}
+
+model Sanction {
+  id          String @id @default(uuid())
+  userId      String
+  worldId     String?
+  reason      String
+  expiresAt   DateTime?
+  createdBy   String
+  createdAt   DateTime @default(now())
+  liftedAt    DateTime?
+  liftedBy    String?
+  liftReason  String?
+  user        User @relation(fields: [userId], references: [id], onDelete: NoAction)
+  world       World? @relation(fields: [worldId], references: [id], onDelete: NoAction)
+
+  @@index([userId, liftedAt])
+  @@index([worldId])
 }
 
 model AuditLog {

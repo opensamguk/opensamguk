@@ -93,6 +93,7 @@ async function snapshot() {
     db.generalTurn.findMany({ orderBy: [{ worldId: 'asc' }, { generalId: 'asc' }, { slot: 'asc' }] }),
     db.inputEvent.findMany({ orderBy: { id: 'asc' } }),
     db.auditLog.findMany({ orderBy: { id: 'asc' } }),
+    db.sanction.findMany({ orderBy: { id: 'asc' } }),
     db.publicMapSnapshot.findMany({ orderBy: [{ worldId: 'asc' }, { takenAt: 'asc' }] }),
     db.city.findMany({ orderBy: [{ worldId: 'asc' }, { cityKey: 'asc' }] }),
     db.nation.findMany({ orderBy: [{ worldId: 'asc' }, { id: 'asc' }] }),

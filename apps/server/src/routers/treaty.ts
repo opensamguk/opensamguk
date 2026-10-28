@@ -13,7 +13,7 @@ import {
   type TreatyRequestState,
 } from '../game/treatyRequests';
 import { recordsInput } from '../queries';
-import { protectedProcedure, router, verifiedProcedure } from '../trpc';
+import { protectedProcedure, router, worldVerifiedProcedure } from '../trpc';
 
 const listInput = worldInput.extend({ cursor: recordsInput.shape.cursor });
 const quoteInput = worldInput.extend({ toNationId: z.unknown(), clauses: z.unknown() });
@@ -81,7 +81,7 @@ export const treatyRouter = router({
       { isolationLevel: 'RepeatableRead' },
     );
   }),
-  propose: verifiedProcedure.input(proposeInput).mutation(({ ctx, input }) =>
+  propose: worldVerifiedProcedure.input(proposeInput).mutation(({ ctx, input }) =>
     submitAndWait(ctx, {
       worldId: input.worldId,
       requestId: input.requestId,
@@ -89,7 +89,7 @@ export const treatyRouter = router({
       payload: { toNationId: input.toNationId, clauses: input.clauses },
     }),
   ),
-  respond: verifiedProcedure.input(respondInput).mutation(({ ctx, input }) =>
+  respond: worldVerifiedProcedure.input(respondInput).mutation(({ ctx, input }) =>
     submitAndWait(ctx, {
       worldId: input.worldId,
       requestId: input.requestId,
@@ -103,7 +103,7 @@ export const treatyRouter = router({
       isolationLevel: 'RepeatableRead',
     });
   }),
-  break: verifiedProcedure.input(breakInput).mutation(({ ctx, input }) =>
+  break: worldVerifiedProcedure.input(breakInput).mutation(({ ctx, input }) =>
     submitAndWait(ctx, {
       worldId: input.worldId,
       requestId: input.requestId,

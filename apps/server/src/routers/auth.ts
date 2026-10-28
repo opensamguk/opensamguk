@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { Context } from '../context';
 import { hashPassword, passwordSchema, verifyPassword } from '../auth/password';
 import { newSession, SESSION_SECONDS } from '../auth/session';
+import { hasGlobalSanction } from '../auth/sanction';
 import { publicProcedure, router } from '../trpc';
 import type { LimitRule, RateLimitDecision } from '../security/rateLimit';
 import { notifySessionClosed } from '@opensamguk/db';
@@ -116,7 +117,8 @@ export const authRouter = router({
           !current ||
           current.status !== 'ACTIVE' ||
           current.passwordHash !== user.passwordHash ||
-          current.email !== user.email
+          current.email !== user.email ||
+          (await hasGlobalSanction(tx, user.id, ctx.now))
         ) {
           ctx.rateLimiter.consume(failures);
           throw loginFailure();

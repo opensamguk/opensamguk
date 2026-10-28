@@ -107,6 +107,7 @@ async function ownDatabase(
       '20261101000000_campaign_state',
       '20261102000000_account_tokens',
       '20261103000000_admin_role_audit',
+      '20261104000000_account_world_sanctions',
     ]);
     await run(client, db);
     completed = true;
