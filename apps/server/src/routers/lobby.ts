@@ -117,7 +117,7 @@ export const lobbyRouter = router({
     ),
   notices: publicProcedure.input(z.undefined()).query(async ({ ctx }) => {
     const rows = await ctx.db.notice.findMany({
-      where: { scope: 'LOBBY', worldId: null },
+      where: { scope: 'LOBBY', worldId: null, hiddenAt: null },
       orderBy: [{ publishedAt: 'desc' }, { id: 'desc' }],
       take: 20,
       select: { id: true, title: true, body: true, publishedAt: true },
