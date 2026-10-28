@@ -12,6 +12,7 @@ import { createRateLimiter } from './security/rateLimit';
 import { registerRealtime, type RealtimeOptions } from './realtime';
 import { registerOpsHealth } from './ops/health';
 import type { MailTransport } from './mail/transport';
+import { emailVerificationRequired } from './auth/verificationPolicy';
 
 export async function buildServer(options: {
   db: PrismaClient;
@@ -24,7 +25,9 @@ export async function buildServer(options: {
   trustProxy?: boolean;
   realtime?: RealtimeOptions;
   mailTransport?: MailTransport;
+  emailVerificationRequired?: boolean;
 }) {
+  const requireVerifiedEmail = emailVerificationRequired(process.env, options);
   const mapConfig = publicMapConfig(process.env);
   const production = options.production ?? process.env.NODE_ENV === 'production';
   const secureCookies = options.secureCookies ?? production;
@@ -131,6 +134,7 @@ export async function buildServer(options: {
           ip: req.ip,
           rateLimiter,
           accountMail: options.mailTransport ? { transport: options.mailTransport, origin: publicOrigin } : undefined,
+          emailVerificationRequired: requireVerifiedEmail,
           closeSession: realtime.closeSession,
         };
       },

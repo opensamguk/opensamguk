@@ -1,7 +1,7 @@
 import type { Prisma } from '@opensamguk/db';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
-import { protectedProcedure, router } from '../trpc';
+import { protectedProcedure, router, verifiedProcedure } from '../trpc';
 import { worldInput, entityKey } from '../queries';
 import { bodyLimit, databaseTime, isLeader, messagingActor, writeMessaging } from '../messaging';
 import type { Context } from '../context';
@@ -30,7 +30,7 @@ export const noticeRouter = router({
       .query(({ ctx, input }) =>
         ctx.db.$transaction((tx) => nationNotice(tx, ctx, input.worldId), { isolationLevel: 'RepeatableRead' }),
       ),
-    set: protectedProcedure.input(worldInput.extend({ body: bodyLimit }).strict()).mutation(({ ctx, input }) =>
+    set: verifiedProcedure.input(worldInput.extend({ body: bodyLimit }).strict()).mutation(({ ctx, input }) =>
       writeMessaging(ctx, async (tx, notify) => {
         const g = await messagingActor(tx, ctx, input.worldId, true);
         if (!isLeader(g))
@@ -48,7 +48,7 @@ export const noticeRouter = router({
         return nationNotice(tx, ctx, input.worldId);
       }),
     ),
-    markSeen: protectedProcedure
+    markSeen: verifiedProcedure
       .input(worldInput.extend({ nationId: entityKey, revision: z.number().int().min(0).max(2147483647) }).strict())
       .mutation(({ ctx, input }) =>
         ctx.db.$transaction(async (tx) => {
