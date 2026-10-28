@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
+import { expect, test } from './t210-fixture';
 import { createAccount, withE2eDb } from './account';
 import { holdLease, releaseHold } from './game';
 import { loadInitialWorld } from '../apps/engine/src/world/resources';
