@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { setTimeout as delay } from 'node:timers/promises';
 import { expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import { commandInitial } from '../packages/rules/test/commandFixture';
@@ -84,6 +85,8 @@ async function ownDatabase(
     adminClosed = false;
   let oid: string | undefined;
   let connections: number | undefined;
+  let initialConnections: number | undefined;
+  let observations = 0;
   await admin.connect();
   try {
     before = await catalog(admin);
@@ -119,11 +122,32 @@ async function ownDatabase(
           expect((await admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname=$1', [name])).rows).toEqual(
             [{ oid }],
           );
-          const active = (
+          let active = (
             await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1', [name])
           ).rows;
+          if (typeof active[0]?.count === 'number') initialConnections = active[0].count;
+          for (; active[0]?.count !== 0 && observations < 20; observations++) {
+            await delay(50);
+            active = (await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1', [name]))
+              .rows;
+          }
           if (typeof active[0]?.count === 'number') connections = active[0].count;
+          if (connections !== 0)
+            console.error(
+              JSON.stringify({
+                event: 't205-residence-connections-retained',
+                activity: (
+                  await admin.query(
+                    'SELECT pid,state,wait_event_type,wait_event FROM pg_stat_activity WHERE datname=$1',
+                    [name],
+                  )
+                ).rows,
+              }),
+            );
           expect(active).toEqual([{ count: 0 }]);
+          expect((await admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname=$1', [name])).rows).toEqual(
+            [{ oid }],
+          );
           await admin.query(`DROP DATABASE "${name}"`);
           dropped = true;
         }
@@ -146,6 +170,8 @@ async function ownDatabase(
           oid,
           completed,
           ownClosed,
+          initialConnections,
+          observations,
           connections,
           dropped,
           adminClosed,
