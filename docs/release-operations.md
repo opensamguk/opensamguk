@@ -73,13 +73,21 @@ backup의 필수 `--release-sha`는40자리16진 문자열을 그대로 manifest
 
 ## 5. 프록시 경로
 
-<!-- TODO(M2): Caddy 경로 계약. /api, /sse, 정적 화면, 직접 주소 접근과 새로고침. -->
+`deploy/compose.yml`은 검증한 release 이미지와 external volume을 연결하는 T2-15 B2b2 구성입니다. PostgreSQL은 내부 network에만 두며 server의 loopback3001은 Caddy와 같은 namespace에서만 접근합니다. server의8080/8443을 명시한 호스트 주소와 HTTP/HTTPS 포트로 연결합니다. Caddy는 공개 web을 읽기 전용으로 제공합니다. `/trpc`·`/trpc/*`·`/sse`·`/healthz`·`/healthz/engine`만 API로 넘깁니다. 그 밖의 화면 주소는 SPA의 index로 돌아오며 없는 `/assets/*`와 확장자 파일은404로 남습니다.
 
-T3-04의 검토용 헤더 소스는 `deploy/security.caddy`입니다. T2-15가 HTTPS site 블록에서 `game_security` snippet을 import합니다. 이 파일만으로 배포하거나 Caddy를 기동하지 않습니다. 라우팅·인증서·배포 자동화는 T2-15 범위이며 여기서는 실제 운영을 바꾸지 않았습니다.
+`PUBLIC_HOST`는 인증서 hostname이고 `PUBLIC_ORIGIN`은 실제 외부 HTTPS 주소입니다. 운영 ACME에는 외부80/443에서 내부8080/8443으로의 전달이 필요합니다. HTTP 리디렉션은 내부8443을 주소에 넣지 않고 `PUBLIC_ORIGIN`과 요청 URI를 잇습니다. 로컬 고포트 리허설은 별도의 internal issuer 설정과 요청에만 전달하는 private CA를 사용합니다. 호스트 truststore나 운영 TLS 검증을 끄지 않습니다.
 
-CSP는 `default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' https://cdn.jsdelivr.net data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'`입니다. 기존 화면의 국가 색 등 동적 style 속성만 `style-src-attr`로 허용하며 인라인 script와 style 요소는 허용하지 않습니다. 기존 개발 초상 출처 jsDelivr만 명시했으며 이미지 공개 권리 승인과는 별개입니다. 공개 이미지 출처가 확정되면 그 출처만 바꾸고 실제 빌드·브라우저 CSP 위반을 다시 확인합니다. HSTS는 `max-age=31536000`이며 다른 서브도메인까지 강제하는 `includeSubDomains`와 preload는 넣지 않습니다.
+기동 전에 manifest 이미지 ID·web 해시·migration과 external volume의 정확한 이름·용도·owner label·UID·권한을 확인해야 합니다. app secret 디렉터리는10001 소유0700이며 `database_url`·`mail_api_key` 파일은0600입니다. PG 비밀 디렉터리/`pg_password`와 자료 volume은70 소유, Caddy 자료는10001 소유로 준비합니다. 기존 volume을 이름만 보고 채택하지 않습니다. 실제 비밀은 보안 입력으로 미리 준비하며 `deploy/.env.production.example`에는 비밀이 아닌 입력 이름만 있습니다. 비밀 입력·소유 대조·배포 receipt/current를 수행하는 운영 명령은 후속입니다.
+
+Compose 대상은 항상 절대 경로의 `--env-file`, `-f`와 `--project-name`을 명시합니다. 예를 들어 `docker compose --project-name <확인한 대상> --env-file <실제 설정 절대 경로> -f <checkout 절대 경로>/deploy/compose.yml config --quiet`로 필수 설정을 먼저 검사합니다. 이 검사는 secret 파일이나 DB의 migration 상태를 인수하지 않습니다. migration은 수동 tools profile이며 일반 기동에 숨기지 않습니다. 운영 실행은 T2-15의 writer 정지·백업·migration·확인·receipt 계약을 구현한 뒤 수행합니다.
+
+`deploy/Caddyfile`은 `deploy/security.caddy`의 `game_security` snippet을 import합니다. CSP는 `default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self'; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'`입니다. D-031 공개 빌드에 맞춰 외부 초상과 data 이미지를 허용하지 않습니다. 국가 색 등 동적 style 속성만 `style-src-attr`로 허용하며 인라인 script와 style 요소는 허용하지 않습니다. HSTS는 `max-age=31536000`이며 `includeSubDomains`와 preload는 넣지 않습니다. access log와 debug는 켜지 않고 upstream 장애는 고정 오류 응답으로 처리해 query·쿠키가 기본 오류 로그에 남는 경로를 막습니다. [Caddy 프록시](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy), [포트 설정](https://caddyserver.com/docs/caddyfile/options), [Compose 서비스](https://docs.docker.com/reference/compose-file/services/)
 
 운영 API는 `NODE_ENV=production`, 정확한 HTTPS `PUBLIC_ORIGIN`, `TRUST_PROXY=1`로 Caddy 바로 뒤의 loopback에 둡니다. 직접 외부 API 포트를 열지 않습니다. Secure를 끄거나 잘못된 공개 출처를 지정하면 시작하지 않습니다. CORS를 열어 화면·API 출처를 분리하지 않습니다. 요청 제한은 단일 서버 메모리 계수이며 재시작 시 초기화됩니다. 서버를 늘리거나 재시작을 반복하는 운영 방식은 현재 계수기 보장을 벗어납니다.
+
+공식 Caddy binary의 file capability 때문에 Caddy에만 `NET_BIND_SERVICE`를 허용합니다. UID10001·다른 권한 제거·읽기 전용 root·`no-new-privileges`는 유지합니다. API·엔진은 추가 권한이 없고 PostgreSQL은 UID70입니다. 이미지는 manifest의 config ID와 고정한 공식 digest를 사용하며 Compose는 자동으로 pull하지 않습니다.
+
+2026-10-29 별도 Linux Compose의 실제 PostgreSQL·정식 두 월드와 production API로 위 경계를 검증했습니다. 공개106파일은 manifest와 HTTPS 바이트가 같았고 없는 자산404·정확한 외부 주소 리디렉션·보안 헤더·Secure 로그인·CSRF·정책 미승인503·닫힌 upstream의502와 query/쿠키 로그 비노출을 확인했습니다. TLS 요청에만 private CA를 전달했으며 호스트 truststore와 인증서 검증은 바꾸지 않았습니다. 별도 생성자 시험 정책의 인증/동의와 사람 장수 생성·SSE 종료도 통과했고 실제 정책 승인이나 외부 메일 수신으로 세지 않았습니다. 세 서비스 종료0·DB 연결0·정리 오류0이며 사용자 점검 환경은 보존했습니다. 운영 공개 도메인·ACME 인증서·배포/복귀 자동화·전체 AC 인수는 남아 있습니다.
 
 ## 6. 장애 대응
 
