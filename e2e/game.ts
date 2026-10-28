@@ -74,8 +74,9 @@ let worldId: string | undefined;
 // 기능 검사는 기존 월드의 설정을 바꾸지 않고 필요한 기능을 켠 전용 월드를 만든다.
 export async function e2eFeatureWorld(ruleFeatures: string[], options: { npcNations?: boolean } = {}): Promise<string> {
   const id = createWorld(`e2e-features-${Date.now()}`, 'E2E 기능 월드', ruleFeatures);
-  if (options.npcNations !== undefined)
-    await withE2eDb((db) => db.nation.updateMany({ where: { worldId: id }, data: { isNpc: options.npcNations } }));
+  const npcNations = options.npcNations;
+  if (npcNations !== undefined)
+    await withE2eDb((db) => db.nation.updateMany({ where: { worldId: id }, data: { isNpc: npcNations } }));
   run(['world:start', '--world', id]);
   await waitEngineReady(id);
   return id;
