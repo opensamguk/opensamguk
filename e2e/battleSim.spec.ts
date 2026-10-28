@@ -80,7 +80,7 @@ const box = (page: Page, side: '공격' | '수비', name: string) =>
 const result = (page: Page) => page.getByTestId('battle-result');
 // GameLayout이 원래 부르는 조회. 위쪽 띠의 세 조회와 메시지 단추의 안 읽음 수(MessageDock), 국가 공지 팝업(NationNotice)이다.
 // 둘 다 권한 값이 정해지거나 SSE ready로 전체를 다시 받을 때 다시 묻는다. 시뮬레이터가 더하는 요청은 없어야 한다.
-const TOPBAR_QUERIES = ['auth.me', 'home.get', 'world.summary', 'message.unread', 'notice.nation.get'];
+const TOPBAR_QUERIES = ['auth.me', 'home.get', 'world.summary', 'message.unread', 'notice.nation.get', 'sanction.mine'];
 
 async function openSimulatorFromMenu(page: Page) {
   await page.goto(`/w/${ctx.worldId}`);

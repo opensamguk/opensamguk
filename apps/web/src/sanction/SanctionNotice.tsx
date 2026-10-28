@@ -1,22 +1,57 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { hashKey, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from '@tanstack/react-router';
-import { useEffect } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { publicFailure } from '../auth/credentials';
 import { useTRPC, useTRPCClient } from '../trpc';
 import styles from './SanctionNotice.module.css';
 
 const date = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', dateStyle: 'long', timeStyle: 'short' });
+const viewerKey = ['sanction-viewer'] as const;
 
 // 계정 확인 중에는 이전 계정의 사유를 표시하지 않는다.
 export function SanctionNotice({ worldId }: { worldId: string }) {
-  const trpc = useTRPC();
+  const trpc = useTRPC(),
+    client = useTRPCClient(),
+    queryClient = useQueryClient(),
+    router = useRouter();
   const identity = useQuery({
-    ...trpc.auth.me.queryOptions(),
+    queryKey: viewerKey,
+    queryFn: ({ signal }) => client.auth.me.query(undefined, { signal }),
     staleTime: 0,
     refetchOnMount: 'always',
     refetchOnWindowFocus: 'always',
   });
-  if (identity.isFetching) return null;
+  // 가드 쿼리를 active로 만들면 SSE 재조회가 진행 중인 라우트 검사를 취소한다.
+  // 캐시만 구독해 같은 월드 안의 이동에서도 가드가 확인한 계정 변경을 즉시 숨긴다.
+  const guarded = useSyncExternalStore(
+    (notify) =>
+      queryClient.getQueryCache().subscribe((event) => {
+        if (event.query.queryHash === hashKey(trpc.auth.me.queryKey())) notify();
+      }),
+    () => queryClient.getQueryState<Awaited<ReturnType<typeof client.auth.me.query>>>(trpc.auth.me.queryKey()),
+  );
+  const viewerId = identity.data?.user?.id;
+  const guardedViewerId = guarded?.data?.user?.id;
+  useEffect(() => {
+    const refresh = () => void queryClient.invalidateQueries({ queryKey: viewerKey });
+    window.addEventListener('focus', refresh);
+    return () => window.removeEventListener('focus', refresh);
+  }, [queryClient]);
+  useEffect(() => {
+    if (!identity.data || guarded?.status !== 'success' || guardedViewerId === viewerId) return;
+    if (guarded.dataUpdatedAt >= identity.dataUpdatedAt) void queryClient.invalidateQueries({ queryKey: viewerKey });
+    else void router.invalidate();
+  }, [
+    identity.data,
+    identity.dataUpdatedAt,
+    guarded?.status,
+    guarded?.dataUpdatedAt,
+    guardedViewerId,
+    viewerId,
+    queryClient,
+    router,
+  ]);
+  if (identity.isFetching || guarded?.fetchStatus === 'fetching') return null;
   if (identity.isError)
     return (
       <section className={styles.notice} aria-label="제재 상태 확인">
@@ -26,7 +61,7 @@ export function SanctionNotice({ worldId }: { worldId: string }) {
         </button>
       </section>
     );
-  const viewerId = identity.data?.user?.id;
+  if (guarded?.status !== 'success' || guardedViewerId !== viewerId) return null;
   return viewerId ? <ViewerNotice key={viewerId} viewerId={viewerId} worldId={worldId} /> : null;
 }
 
@@ -48,7 +83,8 @@ function ViewerNotice({ viewerId, worldId }: { viewerId: string; worldId: string
         client.sanction.mine.query(undefined, { signal }),
       ]);
       if (identity.user?.id !== viewerId) {
-        void queryClient.invalidateQueries({ queryKey: trpc.auth.me.queryKey() });
+        void queryClient.invalidateQueries({ queryKey: viewerKey });
+        void queryClient.invalidateQueries({ queryKey: trpc.auth.me.queryKey() }, { cancelRefetch: false });
         void router.invalidate();
         throw new Error('계정이 바뀌었습니다. 다시 확인하세요.');
       }

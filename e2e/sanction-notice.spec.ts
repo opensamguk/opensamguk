@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import type { Route, TestInfo } from '@playwright/test';
+import type { CDPSession, Route, TestInfo } from '@playwright/test';
 import { test, expect, apiMutate, apiQuery, type T210World } from './t210-fixture';
 import { TEST_PASSWORD } from './account';
 import { loadInitialWorld } from '../apps/engine/src/world/resources';
@@ -251,140 +251,309 @@ scenario('T3-06 AC-M3-04 정식 두 월드 제재·403·30칸 초안·해제·6�
   }, [() => fixture.close()]);
 });
 
-scenario('T3-06 AC-M3-04 같은 HTTP 배치·다른 탭 로그인·이전 계정 지연 응답의 사유 격리', async ({ world }) => {
-  test.setTimeout(120_000);
-  const fixture = await prepare(world);
-  const {
-    db,
-    admin,
-    actor,
-    peer,
-    worldIds: [worldId],
-  } = fixture;
-  const page = actor.page;
-  const secret = '이전 계정 전용 사유';
-  let release = () => {};
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  const requests: Promise<unknown>[] = [];
-  let ready = () => {};
-  let captureFailed: (error: unknown) => void = () => {};
-  const captured = new Promise<void>((resolve, reject) => {
-    ready = resolve;
-    captureFailed = reject;
-  });
-  void captured.catch(() => undefined);
-  let batched = false;
-  let held = false;
-  const handler = (route: Route) => {
-    const task = (async () => {
-      const paths = new URL(route.request().url()).pathname.split('/').at(-1)!.split(',');
-      if (!paths.includes('sanction.mine') || held) {
-        await route.continue();
-        return;
-      }
-      held = true;
-      batched = paths.includes('auth.me');
-      const response = await route.fetch();
-      expect(await response.text()).toContain(secret);
-      ready();
-      await gate;
-      await route.fulfill({ response });
-    })().catch((error) => {
-      captureFailed(error);
-      throw error;
+scenario(
+  'T3-06 AC-M3-04 지연한 라우트 인증 중 실제 SSE 재연결이 메뉴 이동을 취소하지 않는다',
+  async ({ world }, info) => {
+    test.setTimeout(120_000);
+    const fixture = await prepare(world);
+    const {
+      actor,
+      worldIds: [worldId],
+    } = fixture;
+    const page = actor.page;
+    let network: CDPSession | undefined;
+    let readyEvents = 0;
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    page.on('console', (message) => {
+      if (message.type() === 'error') errors.push(message.text());
     });
-    requests.push(task);
-    return task;
-  };
-  let other: Awaited<ReturnType<typeof actor.context.newPage>> | undefined;
-  await runWithCleanup(async () => {
-    other = await actor.context.newPage();
-    await apiMutate(world, admin, 'admin.sanction.create', {
-      userId: actor.userId,
-      worldId,
-      reason: secret,
-      expiresAt: null,
+    let held = false;
+    let captured = false;
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
     });
-    await page.goto(`/w/${worldId}`);
-    const notice = page.getByRole('status', { name: '이 월드의 이용 제한' });
-    await expect(notice).toContainText(secret);
-    await page.route('**/trpc/**', handler);
-    await notice.getByRole('button').click();
-    await captured;
-    expect(batched).toBe(true);
-    await expect(notice).toHaveCount(0);
-    const account = await db.user.findUniqueOrThrow({ where: { id: peer.userId } });
-    const result = await other.request.post('/trpc/auth.login', {
-      headers: { Origin: world.stack.webOrigin },
-      data: { email: account.email, password: TEST_PASSWORD },
-    });
-    expect(result.status()).toBe(200);
-    await page.evaluate((forbidden) => {
-      const observed = { leaked: false };
-      Object.assign(window, { sanctionPrivacy: observed });
-      const check = () => {
-        if (document.body.textContent?.includes(forbidden)) observed.leaked = true;
-      };
-      new MutationObserver(check).observe(document.body, { childList: true, subtree: true, characterData: true });
-      check();
-    }, secret);
-    await page.evaluate(async (moduleUrl) => {
-      const { queryClient, trpc } = await import(moduleUrl);
-      await queryClient.invalidateQueries({ queryKey: trpc.auth.me.queryKey() });
-    }, '/src/trpc.ts');
-    // 서버에서 받은 새 계정의 batch가 클라이언트 캐시에 적용될 때까지 본다.
-    await expect
-      .poll(() =>
-        page.evaluate(
-          async ({ moduleUrl, userId, id }) => {
-            const { queryClient } = await import(moduleUrl);
-            const state = queryClient.getQueryState(['sanction-notice', userId, id]);
-            return (
-              state?.status === 'success' &&
-              state.fetchStatus === 'idle' &&
-              (state.data as { viewerId?: string } | undefined)?.viewerId === userId
-            );
-          },
-          { moduleUrl: '/src/trpc.ts', userId: peer.userId, id: worldId },
-        ),
-      )
-      .toBe(true);
-    release();
-    const results = await Promise.allSettled(requests);
-    expect(results.every((result) => result.status === 'fulfilled')).toBe(true);
-    await expect
-      .poll(async () => apiQuery<{ user: { id: string } }>(actor, 'auth.me').then((value) => value.user.id))
-      .toBe(peer.userId);
-    await expect
-      .poll(() =>
-        page.evaluate(
-          async ({ moduleUrl, userId, id }) => {
-            const { queryClient } = await import(moduleUrl);
-            return queryClient.getQueryState(['sanction-notice', userId, id])?.fetchStatus !== 'fetching';
-          },
-          { moduleUrl: '/src/trpc.ts', userId: actor.userId, id: worldId },
-        ),
-      )
-      .toBe(true);
-    await page.evaluate(
-      () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
-    );
-    await expect(notice).toHaveCount(0);
-    expect(
-      await page.evaluate(() => (window as unknown as { sanctionPrivacy: { leaked: boolean } }).sanctionPrivacy.leaked),
-    ).toBe(false);
-    await expect(page.getByRole('heading', { name: '메인', exact: true })).toBeVisible();
-  }, [
-    async () => {
+    const requests: Promise<unknown>[] = [];
+    const handler = (route: Route) => {
+      const task = (async () => {
+        if (held || !new URL(route.request().url()).pathname.split('/').at(-1)!.split(',').includes('auth.me')) {
+          await route.continue();
+          return;
+        }
+        held = true;
+        const response = await route.fetch();
+        captured = true;
+        await gate;
+        await route.fulfill({ response });
+      })();
+      requests.push(task);
+      void task.catch(() => undefined);
+      return task;
+    };
+    await runWithCleanup(async () => {
+      network = await actor.context.newCDPSession(page);
+      await network.send('Network.enable');
+      network.on('Network.eventSourceMessageReceived', (event) => {
+        if (event.eventName === 'ready') readyEvents++;
+      });
+      await page.goto(`/w/${worldId}`);
+      await expect(page.getByRole('heading', { name: '메인', exact: true })).toBeVisible();
+      const guardFetching = () =>
+        page.evaluate(async (moduleUrl) => {
+          const { queryClient, trpc } = await import(moduleUrl);
+          return queryClient.getQueryState(trpc.auth.me.queryKey())?.fetchStatus === 'fetching';
+        }, '/src/trpc.ts');
+      await expect.poll(guardFetching).toBe(false);
+      await page.route('**/trpc/**', handler);
+      await page.getByRole('navigation', { name: '게임 메뉴' }).getByRole('link', { name: '전투 시뮬레이터' }).click();
+      await expect.poll(() => captured).toBe(true);
+      await expect.poll(guardFetching).toBe(true);
+      const before = readyEvents;
+      const reconnected = page.waitForResponse(
+        (response) => new URL(response.url()).pathname === '/sse' && response.status() === 200,
+      );
+      // 연결 관리자의 재연결 힌트로 실제 서버의 새 ready 이벤트를 받는다.
+      await page.evaluate(() => window.dispatchEvent(new Event('offline')));
+      await reconnected;
+      await expect.poll(() => readyEvents).toBeGreaterThan(before);
+      // 같은 힌트를 듣는 Query의 offline 상태도 실제 재연결 뒤 online으로 되돌린다.
+      await page.evaluate(() => window.dispatchEvent(new Event('online')));
+      await page.evaluate(
+        () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+      );
+      expect(await guardFetching()).toBe(true);
       release();
       const results = await Promise.allSettled(requests);
-      const errors = results.flatMap((result) => (result.status === 'rejected' ? [result.reason] : []));
-      if (errors.length) throw new AggregateError(errors, '보류 응답 정리 실패');
+      expect(results.every((result) => result.status === 'fulfilled')).toBe(true);
+      await expect(page).toHaveURL(`/w/${worldId}/simulator`);
+      try {
+        await expect(page.getByRole('heading', { name: '전투 시뮬레이터', exact: true })).toBeVisible();
+      } catch (error) {
+        const diagnostic = await page.evaluate(
+          async ({ routerModule, queryModule }) => {
+            const { router } = await import(routerModule),
+              { queryClient } = await import(queryModule);
+            const match = (item: { id: string; status: string; isFetching: unknown }) => ({
+              id: item.id,
+              status: item.status,
+              isFetching: item.isFetching,
+            });
+            return {
+              status: router.state.status,
+              isLoading: router.state.isLoading,
+              location: router.state.location.href,
+              resolved: router.state.resolvedLocation?.href,
+              matches: router.state.matches.map(match),
+              pending: router.state.pendingMatches?.map(match),
+              queries: queryClient
+                .getQueryCache()
+                .getAll()
+                .map(
+                  (query: {
+                    queryHash: string;
+                    state: { status: string; fetchStatus: string; isInvalidated: boolean };
+                    getObserversCount: () => number;
+                  }) => ({
+                    key: query.queryHash,
+                    status: query.state.status,
+                    fetch: query.state.fetchStatus,
+                    invalidated: query.state.isInvalidated,
+                    observers: query.getObserversCount(),
+                  }),
+                ),
+            };
+          },
+          { routerModule: '/src/router.tsx', queryModule: '/src/trpc.ts' },
+        );
+        await info.attach('sse-guard-diagnostic', {
+          body: JSON.stringify({ readyEvents, diagnostic, errors }, null, 2),
+          contentType: 'application/json',
+        });
+        console.log(JSON.stringify({ sseGuardDiagnostic: { readyEvents, diagnostic, errors } }));
+        throw error;
+      }
+      expect(errors).toEqual([]);
+    }, [
+      async () => page.evaluate(() => window.dispatchEvent(new Event('online'))),
+      async () => {
+        release();
+        const results = await Promise.allSettled(requests);
+        const errors = results.flatMap((result) => (result.status === 'rejected' ? [result.reason] : []));
+        if (errors.length) throw new AggregateError(errors, '지연 인증 응답 정리 실패');
+      },
+      () => page.unroute('**/trpc/**', handler),
+      async () => network?.detach(),
+      () => fixture.close(),
+    ]);
+  },
+);
+
+for (const boundary of ['focus', 'route'] as const) {
+  scenario(
+    `T3-06 AC-M3-04 같은 HTTP 배치·다른 탭 로그인·이전 계정 지연 응답의 사유 격리 (${boundary})`,
+    async ({ world }) => {
+      test.setTimeout(120_000);
+      const fixture = await prepare(world);
+      const {
+        db,
+        admin,
+        actor,
+        peer,
+        worldIds: [worldId],
+      } = fixture;
+      const page = actor.page;
+      const secret = '이전 계정 전용 사유';
+      let release = () => {};
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const requests: Promise<unknown>[] = [];
+      let ready = () => {};
+      let captureFailed: (error: unknown) => void = () => {};
+      const captured = new Promise<void>((resolve, reject) => {
+        ready = resolve;
+        captureFailed = reject;
+      });
+      void captured.catch(() => undefined);
+      let batched = false;
+      let held = false;
+      const handler = (route: Route) => {
+        const task = (async () => {
+          const paths = new URL(route.request().url()).pathname.split('/').at(-1)!.split(',');
+          if (!paths.includes('sanction.mine') || held) {
+            await route.continue();
+            return;
+          }
+          held = true;
+          batched = paths.includes('auth.me');
+          const response = await route.fetch();
+          expect(await response.text()).toContain(secret);
+          ready();
+          await gate;
+          await route.fulfill({ response });
+        })().catch((error) => {
+          captureFailed(error);
+          throw error;
+        });
+        requests.push(task);
+        return task;
+      };
+      let other: Awaited<ReturnType<typeof actor.context.newPage>> | undefined;
+      await runWithCleanup(async () => {
+        other = await actor.context.newPage();
+        await apiMutate(world, admin, 'admin.sanction.create', {
+          userId: actor.userId,
+          worldId,
+          reason: secret,
+          expiresAt: null,
+        });
+        await page.goto(`/w/${worldId}`);
+        const notice = page.getByRole('status', { name: '이 월드의 이용 제한' });
+        await expect(notice).toContainText(secret);
+        await page.route('**/trpc/**', handler);
+        await notice.getByRole('button').click();
+        await captured;
+        expect(batched).toBe(true);
+        await expect(notice).toHaveCount(0);
+        const account = await db.user.findUniqueOrThrow({ where: { id: peer.userId } });
+        await other.bringToFront();
+        const result = await other.request.post('/trpc/auth.login', {
+          headers: { Origin: world.stack.webOrigin },
+          data: { email: account.email, password: TEST_PASSWORD },
+        });
+        expect(result.status()).toBe(200);
+        await page.evaluate(() => {
+          const observed = { focus: 0, visible: 0 };
+          Object.assign(window, { sanctionBoundary: observed });
+          window.addEventListener('focus', () => observed.focus++);
+          document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') observed.visible++;
+          });
+        });
+        await page.evaluate((forbidden) => {
+          const observed = { leaked: false };
+          Object.assign(window, { sanctionPrivacy: observed });
+          const check = () => {
+            if (document.body.textContent?.includes(forbidden)) observed.leaked = true;
+          };
+          new MutationObserver(check).observe(document.body, { childList: true, subtree: true, characterData: true });
+          check();
+        }, secret);
+        if (boundary === 'focus') {
+          await page.bringToFront();
+          // headless Chromium은 모든 페이지를 visible로 둔다. 실제 DOM 포커스 힌트로 재확인한다.
+          await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+        } else {
+          // 포커스 이벤트 없이 같은 월드의 자식 경로로 이동해 가드의 새 계정을 반영한다.
+          await page
+            .getByRole('navigation', { name: '게임 메뉴' })
+            .getByRole('link', { name: '전투 시뮬레이터' })
+            .click();
+          await expect(page).toHaveURL(`/w/${worldId}/simulator`);
+        }
+        // 서버에서 받은 새 계정의 batch가 클라이언트 캐시에 적용될 때까지 본다.
+        await expect
+          .poll(() =>
+            page.evaluate(
+              async ({ moduleUrl, userId, id }) => {
+                const { queryClient } = await import(moduleUrl);
+                const state = queryClient.getQueryState(['sanction-notice', userId, id]);
+                return (
+                  state?.status === 'success' &&
+                  state.fetchStatus === 'idle' &&
+                  (state.data as { viewerId?: string } | undefined)?.viewerId === userId
+                );
+              },
+              { moduleUrl: '/src/trpc.ts', userId: peer.userId, id: worldId },
+            ),
+          )
+          .toBe(true);
+        release();
+        const results = await Promise.allSettled(requests);
+        expect(results.every((result) => result.status === 'fulfilled')).toBe(true);
+        await expect
+          .poll(async () => apiQuery<{ user: { id: string } }>(actor, 'auth.me').then((value) => value.user.id))
+          .toBe(peer.userId);
+        await expect
+          .poll(() =>
+            page.evaluate(
+              async ({ moduleUrl, userId, id }) => {
+                const { queryClient } = await import(moduleUrl);
+                return queryClient.getQueryState(['sanction-notice', userId, id])?.fetchStatus !== 'fetching';
+              },
+              { moduleUrl: '/src/trpc.ts', userId: actor.userId, id: worldId },
+            ),
+          )
+          .toBe(true);
+        await page.evaluate(
+          () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+        );
+        await expect(notice).toHaveCount(0);
+        const observed = await page.evaluate(
+          () => (window as unknown as { sanctionBoundary: { focus: number; visible: number } }).sanctionBoundary,
+        );
+        if (boundary === 'route') expect(observed).toEqual({ focus: 0, visible: 0 });
+        else expect(observed.focus).toBeGreaterThan(0);
+        expect(
+          await page.evaluate(
+            () => (window as unknown as { sanctionPrivacy: { leaked: boolean } }).sanctionPrivacy.leaked,
+          ),
+        ).toBe(false);
+        await expect(
+          page.getByRole('heading', { name: boundary === 'focus' ? '메인' : '전투 시뮬레이터', exact: true }),
+        ).toBeVisible();
+      }, [
+        async () => {
+          release();
+          const results = await Promise.allSettled(requests);
+          const errors = results.flatMap((result) => (result.status === 'rejected' ? [result.reason] : []));
+          if (errors.length) throw new AggregateError(errors, '보류 응답 정리 실패');
+        },
+        () => page.unroute('**/trpc/**', handler),
+        async () => other?.close(),
+        () => fixture.close(),
+      ]);
     },
-    () => page.unroute('**/trpc/**', handler),
-    async () => other?.close(),
-    () => fixture.close(),
-  ]);
-});
+  );
+}
