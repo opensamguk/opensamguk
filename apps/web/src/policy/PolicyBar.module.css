@@ -64,3 +64,16 @@
   text-decoration: underline;
   cursor: pointer;
 }
+
+@media (max-width: 767px) {
+  .select,
+  .linkButton,
+  .bar button[data-unavailable] {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .select {
+    font-size: 16px;
+  }
+}

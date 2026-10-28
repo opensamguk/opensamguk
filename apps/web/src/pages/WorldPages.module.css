@@ -39,3 +39,19 @@
   color: var(--color-accent-text);
   border-color: var(--color-accent);
 }
+
+@media (max-width: 767px) {
+  .header,
+  .tabs {
+    flex-wrap: wrap;
+  }
+
+  .back,
+  .tab {
+    display: inline-flex;
+    align-items: center;
+    min-width: 44px;
+    min-height: 44px;
+    box-sizing: border-box;
+  }
+}

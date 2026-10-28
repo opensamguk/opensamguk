@@ -144,7 +144,7 @@ const RECORD_TABS: Array<{ kind: RecordTab; label: string }> = [
 
 // /w/:worldId/records?tab=: 기록을 넓게 이어 본다. 메인 아래 기록 칸과 같은 목록이다.
 // 영토 재생 탭은 월간 영토 기록을 오래된 달부터 지도로 다시 본다 (T4-36).
-export function RecordsPage({ tab }: { tab: RecordTab }) {
+export function RecordsPage({ tab, city }: { tab: RecordTab; city?: number }) {
   const worldId = useWorldId();
   const summary = useWorldSummary(worldId);
   const map = useWorldMap(worldId);
@@ -154,7 +154,7 @@ export function RecordsPage({ tab }: { tab: RecordTab }) {
     <section className={styles.page}>
       <header className={styles.header}>
         <h1>기록 · {label}</h1>
-        {backToMain(worldId)}
+        {backToMain(worldId, city)}
       </header>
       <nav className={styles.tabs} aria-label="기록 종류">
         {RECORD_TABS.map((entry) => (
@@ -162,7 +162,7 @@ export function RecordsPage({ tab }: { tab: RecordTab }) {
             key={entry.kind}
             to="/w/$worldId/records"
             params={{ worldId }}
-            search={{ tab: entry.kind }}
+            search={{ tab: entry.kind, ...(city === undefined ? {} : { city }) }}
             className={styles.tab}
             aria-current={entry.kind === tab ? 'page' : undefined}
           >

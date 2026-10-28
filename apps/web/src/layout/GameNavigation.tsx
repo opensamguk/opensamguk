@@ -27,7 +27,10 @@ export function GameNavigation({
   campaignEnabled: boolean;
   officerLevel: number;
 }) {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
+  const city = Number(search.city);
+  const citySearch = Number.isInteger(city) && city > 0 && city <= 2_147_483_647 ? { city } : {};
+  const navSearch = (to: string) => (to === '/w/$worldId' || to === '/w/$worldId/records' ? citySearch : {});
   const more = useRef<HTMLDetailsElement>(null);
   const summary = useRef<HTMLElement>(null);
   const close = (restoreFocus = false) => {
@@ -64,6 +67,7 @@ export function GameNavigation({
           key={item.to}
           to={item.to}
           params={{ worldId }}
+          search={navSearch(item.to)}
           activeOptions={{ exact: 'exact' in item, includeSearch: false }}
           className={styles.link}
           activeProps={{ className: `${styles.link} ${styles.active}`, 'aria-current': 'page' }}
@@ -110,6 +114,7 @@ export function GameNavigation({
             key={item.to}
             to={item.to}
             params={{ worldId }}
+            search={navSearch(item.to)}
             activeOptions={{ exact: 'exact' in item, includeSearch: false }}
             className={styles.link}
             activeProps={{ className: `${styles.link} ${styles.active}`, 'aria-current': 'page' }}

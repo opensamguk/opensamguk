@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
 import { useTRPC } from '../trpc';
 import { useWorldEnded } from '../game/queries';
 import { errorCode, retryUnlessClientError, serverMessage } from './apiError';
@@ -137,7 +137,7 @@ export function writeSelection(storage: Storage | undefined, key: string, select
 export function useStoredSelection(draftKey: string) {
   const key = selectionStorageKey(draftKey);
   const [selected, setSelected] = useState<Set<number>>(() => readSelection(sessionStore(), key));
-  useEffect(() => writeSelection(sessionStore(), key, selected), [key, selected]);
+  useLayoutEffect(() => writeSelection(sessionStore(), key, selected), [key, selected]);
   return [selected, setSelected] as const;
 }
 
@@ -160,7 +160,7 @@ export function useTurnDraft<S extends DisplaySlot>(worldId: string, source: Tur
   const [notice, setNotice] = useState<SaveNotice>(null);
   const { draft, pending } = stored;
 
-  useEffect(() => writeStored(sessionStore(), storageKey, stored), [storageKey, stored]);
+  useLayoutEffect(() => writeStored(sessionStore(), storageKey, stored), [storageKey, stored]);
 
   const serverTurns = useMemo(() => server.data?.slots.map((slot) => toTurn(slot)) ?? null, [server.data]);
   const turns = pending ? serverTurns : (draft?.turns ?? serverTurns);

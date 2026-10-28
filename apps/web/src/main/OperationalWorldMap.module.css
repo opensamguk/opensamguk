@@ -43,6 +43,12 @@
   min-width: 160px;
   max-width: 100%;
 }
+@media (max-width: 767px) {
+  .controls button {
+    min-width: 44px;
+  }
+}
+
 .map {
   display: block;
   width: 100%;

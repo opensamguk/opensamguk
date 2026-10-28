@@ -124,3 +124,17 @@
   color: var(--color-text);
   cursor: pointer;
 }
+
+@media (max-width: 767px) {
+  .tabs {
+    flex-wrap: wrap;
+  }
+
+  .tab {
+    display: inline-flex;
+    align-items: center;
+    min-width: 44px;
+    min-height: 44px;
+    box-sizing: border-box;
+  }
+}

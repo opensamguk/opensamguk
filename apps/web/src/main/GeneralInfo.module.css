@@ -32,3 +32,15 @@
   cursor: pointer;
   text-decoration: underline;
 }
+
+@media (max-width: 767px) {
+  .place,
+  .line a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    box-sizing: border-box;
+  }
+}
