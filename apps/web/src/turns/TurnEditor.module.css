@@ -123,7 +123,7 @@
   border-bottom: 1px solid var(--color-border-strong);
   font-weight: 600;
   text-align: left;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .table td {
@@ -155,13 +155,17 @@
 }
 
 .when {
-  white-space: nowrap;
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
 }
 
-.when time {
-  margin-left: var(--space-1);
+.when > span {
+  word-break: keep-all;
+}
+
+.when > time {
+  display: block;
+  white-space: nowrap;
 }
 
 .command {
@@ -190,6 +194,7 @@
 }
 
 .check {
+  min-width: 5em;
   font-size: var(--text-xs);
 }
 
