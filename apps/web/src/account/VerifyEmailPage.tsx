@@ -6,6 +6,7 @@ import form from '../auth/AuthForm.module.css';
 import { useTRPC } from '../trpc';
 import { AccountError, AccountFrame } from './AccountParts';
 import styles from './Account.module.css';
+import { accountNext } from './access';
 
 const route = getRouteApi('/verify-email');
 export function VerificationRequest({ email }: { email: string }) {
@@ -60,6 +61,7 @@ export function VerificationRequest({ email }: { email: string }) {
 
 export function VerifyEmailPage() {
   const { accountToken } = route.useRouteContext();
+  const { next } = route.useSearch();
   const trpc = useTRPC(),
     queryClient = useQueryClient();
   const account = useQuery({
@@ -103,6 +105,12 @@ export function VerifyEmailPage() {
   return (
     <AccountFrame title="이메일 인증" privateLink>
       {body}
+      {(accountToken.kind === 'token' && mutation.isSuccess) ||
+      (accountToken.kind === 'missing' && account.data?.emailVerified) ? (
+        <div className={styles.links}>
+          <a href={accountNext(next) ?? '/lobby'}>계속하기</a>
+        </div>
+      ) : null}
       {accountToken.kind === 'token' && mutation.isError && describeFailure(mutation.error).kind === 'retry' ? (
         <button
           type="button"

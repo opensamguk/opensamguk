@@ -3,8 +3,9 @@ import { useNavigate } from '@tanstack/react-router';
 import { useId, useRef, useState, type FormEvent } from 'react';
 import { useTRPC } from '../trpc';
 import { ErrorState } from '../ui/States';
-import { describeFailure, safeNext, validateCredentials, type FieldErrors } from './credentials';
+import { describeFailure, validateCredentials, type FieldErrors } from './credentials';
 import styles from './AuthForm.module.css';
+import { accountNext, needsEmailVerification } from '../account/access';
 
 type Mode = 'login' | 'signup';
 
@@ -30,8 +31,19 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string | undefined
       // 이전 사용자의 캐시가 남지 않게 비우고, 가드가 다시 묻지 않도록 로그인 결과를 바로 넣는다.
       queryClient.clear();
       queryClient.setQueryData(trpc.auth.me.queryKey(), { user });
+      try {
+        const account = await queryClient.fetchQuery({ ...trpc.account.get.queryOptions(), staleTime: 0 });
+        if (needsEmailVerification(account)) {
+          await navigate({ to: '/verify-email', search: { next: accountNext(next) ?? '/lobby' }, replace: true });
+          return;
+        }
+      } catch {
+        // 가입·로그인은 이미 성공했다. 입력을 다시 보내지 않고 가드의 조회 재시도로 이어 간다.
+        await navigate({ to: '/', search: { next: accountNext(next) ?? '/lobby' }, replace: true });
+        return;
+      }
       // 안전한 next가 없으면 로비로 간다 (T2-04).
-      await navigate({ href: safeNext(next) ?? '/lobby', replace: true });
+      await navigate({ href: accountNext(next) ?? '/lobby', replace: true });
     },
   });
 
