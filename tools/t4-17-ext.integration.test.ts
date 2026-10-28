@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { readFile, readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import {
@@ -98,9 +99,39 @@ afterAll(async () => {
         expect((await admin.query('SELECT oid FROM pg_database WHERE datname=$1', [ownName])).rows).toEqual([
           { oid: ownOid },
         ]);
-        expect(
-          (await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1', [ownName])).rows,
-        ).toEqual([{ count: 0 }]);
+        let active = await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1', [
+          ownName,
+        ]);
+        const initialConnections = active.rows[0]?.count;
+        let observations = 0;
+        for (; active.rows[0]?.count !== 0 && observations < 20; observations++) {
+          await delay(50);
+          active = await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1', [ownName]);
+        }
+        console.info(
+          JSON.stringify({
+            event: 't417-ext-connections',
+            initialConnections,
+            connections: active.rows[0]?.count,
+            observations,
+          }),
+        );
+        if (active.rows[0]?.count !== 0)
+          console.error(
+            JSON.stringify({
+              event: 't417-ext-connections-retained',
+              activity: (
+                await admin.query(
+                  'SELECT pid,state,wait_event_type,wait_event FROM pg_stat_activity WHERE datname=$1',
+                  [ownName],
+                )
+              ).rows,
+            }),
+          );
+        expect(active.rows).toEqual([{ count: 0 }]);
+        expect((await admin.query('SELECT oid FROM pg_database WHERE datname=$1', [ownName])).rows).toEqual([
+          { oid: ownOid },
+        ]);
         await admin.query(`DROP DATABASE "${ownName}"`);
         expect((await admin.query('SELECT datname FROM pg_database WHERE datname=$1', [ownName])).rows).toEqual([]);
       }
