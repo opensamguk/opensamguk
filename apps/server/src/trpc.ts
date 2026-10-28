@@ -1,5 +1,6 @@
 import { initTRPC, TRPCError } from '@trpc/server';
 import type { Context } from './context';
+import { activeSanctionWhere } from './auth/sanction';
 export const PUBLIC_ERROR_REASONS = ['EMAIL_NOT_VERIFIED', 'CONSENT_REQUIRED', 'TOKEN_INVALID'] as const;
 export type PublicErrorReason = (typeof PUBLIC_ERROR_REASONS)[number];
 export class PublicReasonError extends Error {
@@ -9,6 +10,7 @@ export class PublicReasonError extends Error {
 }
 export interface ProcedureMeta {
   accountAccess?: 'verified' | 'recovery';
+  worldSanction?: true;
 }
 const t = initTRPC
   .context<Context>()
@@ -61,3 +63,19 @@ export const verifiedProcedure = protectedProcedure.meta({ accountAccess: 'verif
   }
   return next();
 });
+
+export const worldVerifiedProcedure = verifiedProcedure
+  .meta({ worldSanction: true })
+  .use(async ({ ctx, next, getRawInput }) => {
+    const input: unknown = await getRawInput();
+    const worldId = input && typeof input === 'object' && 'worldId' in input ? input.worldId : undefined;
+    // 각 경로의 엄격 입력 검사를 유지하며 ID를 다른 형식에서 변환하지 않는다.
+    if (typeof worldId === 'string') {
+      const sanction = await ctx.db.sanction.findFirst({
+        where: { userId: ctx.user.id, worldId, ...activeSanctionWhere(ctx.now) },
+        select: { id: true },
+      });
+      if (sanction) throw new TRPCError({ code: 'FORBIDDEN', message: '이 월드의 이용이 제한됐습니다.' });
+    }
+    return next();
+  });

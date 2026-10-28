@@ -8,16 +8,18 @@ const requestId = '10000000-0000-4000-8000-000000000001';
 const office = { nationId: 1, officerLevel: 5, tenure: 0 };
 const slots = Array.from({ length: 12 }, () => null);
 function fixture(authenticated = false) {
+  const sanction = vi.fn().mockResolvedValue(null);
   const transaction = vi.fn(() => {
     throw new Error('DB에 도달하면 안 됩니다.');
   });
   const ctx = {
     user: authenticated ? { id: 'user', email: 'user@example.test' } : null,
-    db: { $transaction: transaction },
+    db: { $transaction: transaction, sanction: { findFirst: sanction } },
+    now: 1000,
     rateLimiter: { consume: () => ({ allowed: true }) },
     reply: { header: vi.fn() },
   } as unknown as Context;
-  return { caller: appRouter.createCaller(ctx), transaction };
+  return { caller: appRouter.createCaller(ctx), transaction, sanction };
 }
 const unauthenticated: Array<[string, (caller: Caller) => Promise<unknown>]> = [
   ['personnel.officers', (c) => c.personnel.officers({ worldId })],
@@ -38,6 +40,7 @@ describe('실제 인사 router의 인증과 입력 경계', () => {
     const f = fixture();
     await expect(run(f.caller)).rejects.toHaveProperty('code', 'UNAUTHORIZED');
     expect(f.transaction).not.toHaveBeenCalled();
+    expect(f.sanction).not.toHaveBeenCalled();
   });
   const invalid: Array<[string, (caller: Caller) => Promise<unknown>]> = [
     ['군주 임명', (c) => c.personnel.appoint({ worldId, requestId, generalId: 3, officerLevel: 12 })],
@@ -62,9 +65,12 @@ describe('실제 인사 router의 인증과 입력 경계', () => {
         >[0]),
     ],
   ];
-  it.each(invalid)('%s는 DB와 활동 기록 전에 거부한다', async (_name, run) => {
+  it.each(invalid)('%s는 게임 DB 변경과 활동 기록 전에 거부한다', async (_name, run) => {
     const f = fixture(true);
     await expect(run(f.caller)).rejects.toHaveProperty('code', 'BAD_REQUEST');
     expect(f.transaction).not.toHaveBeenCalled();
+    expect(f.sanction).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ userId: 'user', worldId }) }),
+    );
   });
 });

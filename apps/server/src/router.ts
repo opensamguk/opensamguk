@@ -3,6 +3,7 @@ import { router, publicProcedure } from './trpc';
 import { authRouter } from './routers/auth';
 import { accountRouter } from './routers/account';
 import { adminRouter } from './routers/admin';
+import { sanctionRouter } from './routers/sanction';
 import { worldRouter } from './routers/world';
 import { generalRouter } from './routers/general';
 import { turnsRouter } from './routers/turns';
@@ -29,6 +30,7 @@ export const appRouter = router({
   auth: authRouter,
   account: accountRouter,
   admin: adminRouter,
+  sanction: sanctionRouter,
   world: worldRouter,
   general: generalRouter,
   turns: turnsRouter,

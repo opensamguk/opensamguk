@@ -4,7 +4,7 @@ import { nextActionSequence, type Prisma } from '@opensamguk/db';
 import { commandStatPreview, emptyTurn, unitSetSchema, type QueuedTurn } from '@opensamguk/rules';
 import { editArray, type ArrayEdit } from '@opensamguk/shared';
 import { z } from 'zod';
-import { router, protectedProcedure, verifiedProcedure } from '../trpc';
+import { router, protectedProcedure, worldVerifiedProcedure } from '../trpc';
 import { requireWorld, requireGeneral, readView, worldInput } from '../game/queries';
 import {
   commandInput,
@@ -144,7 +144,7 @@ export const turnsRouter = router({
       { isolationLevel: 'RepeatableRead' },
     ),
   ),
-  set: verifiedProcedure
+  set: worldVerifiedProcedure
     .input(worldInput.extend({ revision, slots: z.array(slotInput).length(30) }))
     .mutation(({ ctx, input }) =>
       save(
@@ -154,7 +154,7 @@ export const turnsRouter = router({
         input.slots.filter((slot) => slot !== null),
       ),
     ),
-  edit: verifiedProcedure.input(worldInput.extend({ revision, op: opSchema })).mutation(({ ctx, input }) => {
+  edit: worldVerifiedProcedure.input(worldInput.extend({ revision, op: opSchema })).mutation(({ ctx, input }) => {
     const submitted = 'put' in input.op ? [input.op.put] : [];
     return save(
       ctx,
