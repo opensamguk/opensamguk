@@ -12,6 +12,7 @@ import {
 } from '../apps/engine/src/assignmentState';
 import { loadOfficeState, persistOfficeState } from '../apps/engine/src/personnelState';
 import { testDatabaseUrl } from './test-database';
+import { confirmDisconnectedDatabase } from './test-db-close';
 
 type PgClient = {
   connect(): Promise<void>;
@@ -165,9 +166,9 @@ async function withDatabase(caseId: CaseId, run: (context: Context) => Promise<v
       if (created) {
         expect(cleanupErrors, '자체 연결과 pool 종료').toHaveLength(0);
         expect((await catalog(admin)).find((row) => row.datname === name)).toEqual({ datname: name, oid: createdOid });
-        const count = await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1', [name]);
-        expect(count.rows).toEqual([{ count: 0 }]);
-        connectionsBeforeDrop = 0;
+        const closed = await confirmDisconnectedDatabase(admin, name, createdOid!);
+        expect(closed.connections).toBe(0);
+        connectionsBeforeDrop = closed.connections;
         await admin.query(`DROP DATABASE ${identifier(name)}`);
         dropped = true;
       }
