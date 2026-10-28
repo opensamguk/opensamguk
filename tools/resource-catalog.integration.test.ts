@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 import { createDb, readPublishedResources, type GameResourceRef, type PrismaClient } from '../packages/db/src/index';
 import { buildInitialWorld, TICKS_PER_MONTH, type WorldInit } from '../packages/rules/src/index';
@@ -98,14 +99,32 @@ async function createFixture(config: { beforeCatalog?: boolean; initialize?: boo
           (await admin.query<{ oid: string }>('SELECT oid::text AS oid FROM pg_database WHERE datname = $1', [name]))
             .rows,
         ).toEqual([{ oid }]);
-        expect(
+        const connections = async () =>
           (
             await admin.query<{ count: number }>(
               'SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname = $1',
               [name],
             )
-          ).rows,
-        ).toEqual([{ count: 0 }]);
+          ).rows;
+        let remaining = await connections();
+        for (let attempt = 0; remaining[0]?.count !== 0 && attempt < 20; attempt++) {
+          await delay(50);
+          remaining = await connections();
+        }
+        if (remaining[0]?.count !== 0)
+          console.error(
+            'RESOURCE_CATALOG_CONNECTIONS',
+            (
+              await admin.query('SELECT pid,state,wait_event_type,wait_event FROM pg_stat_activity WHERE datname=$1', [
+                name,
+              ])
+            ).rows,
+          );
+        expect(remaining).toEqual([{ count: 0 }]);
+        expect(
+          (await admin.query<{ oid: string }>('SELECT oid::text AS oid FROM pg_database WHERE datname=$1', [name]))
+            .rows,
+        ).toEqual([{ oid }]);
         await admin.query(`DROP DATABASE "${name}"`);
         expect((await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', [name])).rows).toEqual([]);
       } catch (error) {

@@ -24,6 +24,11 @@ const admin = createDb(adminUrl.href);
 const db = createDb(databaseUrl.href);
 const origin = 'https://game.example.test';
 const now = 1_800_000_000_001;
+// 실제 정책 승인이 아닌 이 파일의 세션 갱신 전제다. 미승인 운영503은 동의 시험에서 별도로 검사한다.
+const legalPolicy = {
+  terms: { version: 'session-test-terms-1', effectiveAt: '2026-10-01T00:00:00Z' },
+  privacy: { version: 'session-test-privacy-1', effectiveAt: '2026-10-01T00:00:00Z' },
+};
 const expiresAt = new Date(now + 120_000);
 const warning = '세션 갱신 실패';
 const canary = 'SESSION_RENEWAL_DB_CANARY';
@@ -64,7 +69,7 @@ async function sessionExpiry() {
   return (await db.session.findUniqueOrThrow({ where: { id: sessionId } })).expiresAt;
 }
 async function withServer(fn: (base: string) => Promise<void>) {
-  const app = await buildServer({ db, publicOrigin: origin, production: true, now: () => now, logStream });
+  const app = await buildServer({ db, publicOrigin: origin, production: true, now: () => now, logStream, legalPolicy });
   try {
     await fn(await app.listen({ host: '127.0.0.1', port: 0 }));
   } finally {
@@ -155,6 +160,12 @@ beforeEach(async () => {
   user = await db.user.create({
     data: { email: `${randomUUID()}@example.test`, passwordHash, emailVerifiedAt: new Date(now - 1) },
     select: { id: true, email: true },
+  });
+  await db.consentRecord.createMany({
+    data: [
+      { userId: user.id, docType: 'TERMS', version: legalPolicy.terms.version, agreedAt: new Date(now - 1) },
+      { userId: user.id, docType: 'PRIVACY', version: legalPolicy.privacy.version, agreedAt: new Date(now - 1) },
+    ],
   });
   const state = await readFixture();
   state.generals[0]!.userId = user.id;
@@ -253,7 +264,9 @@ describe('T3-04 세션 갱신 장애와 실제 HTTP·PostgreSQL 커밋', () => {
         );
         for (const response of reads) {
           expect(response.status).toBe(200);
-          expect(await response.json()).toEqual({ result: { data: { user } } });
+          expect(await response.json()).toEqual({
+            result: { data: { user: { ...user, emailVerified: true, consentRequired: [] } } },
+          });
         }
         const cookies = reads.map((response) => response.headers.get('set-cookie')).filter((value) => value !== null);
         expect(cookies).toHaveLength(1);
