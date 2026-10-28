@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { setTimeout as delay } from 'node:timers/promises';
 import { expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import { testDatabaseUrl } from './test-database';
@@ -227,6 +228,7 @@ it('T2-05 N4 입력 tick migration은 기존 행·null·0을 보존하고 CHECK�
   let bodyFailed = false,
     cleanupFailed = false;
   let bodyError: unknown, cleanupError: unknown;
+  const closedErrors: unknown[] = [];
   const applied: string[] = [];
   try {
     await admin.connect();
@@ -300,6 +302,7 @@ it('T2-05 N4 입력 tick migration은 기존 행·null·0을 보존하고 CHECK�
     bodyError = error;
   } finally {
     const closed = await Promise.allSettled([client.end(), ...(db ? [db.$disconnect()] : [])]);
+    for (const result of closed) if (result.status === 'rejected') closedErrors.push(result.reason);
     const ownClosed = closed.every((result) => result.status === 'fulfilled');
     try {
       expect(ownClosed, '자체 연결 종료').toBe(true);
@@ -310,11 +313,20 @@ it('T2-05 N4 입력 tick migration은 기존 행·null·0을 보존하고 CHECK�
             datname: name,
             oid: createdOid,
           });
-          const count = (
+          let count = (
             await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1', [name])
           ).rows;
+          for (let attempt = 0; count[0]?.count !== 0 && attempt < 20; attempt++) {
+            await delay(50);
+            count = (await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1', [name]))
+              .rows;
+          }
           if (typeof count[0]?.count === 'number') connectionsBeforeDrop = count[0].count;
           expect(count).toEqual([{ count: 0 }]);
+          expect((await catalog(admin)).find((row) => row.datname === name)).toEqual({
+            datname: name,
+            oid: createdOid,
+          });
           await admin.query(`DROP DATABASE "${name}"`);
           dropped = true;
         }
@@ -330,7 +342,7 @@ it('T2-05 N4 입력 tick migration은 기존 행·null·0을 보존하고 CHECK�
         adminClosed = true;
       } catch (error) {
         cleanupFailed = true;
-        cleanupError ??= error;
+        closedErrors.push(error);
       }
       console.info(
         'T2-05 입력 tick DB 정리',
@@ -354,6 +366,6 @@ it('T2-05 N4 입력 tick migration은 기존 행·null·0을 보존하고 CHECK�
       );
     }
   }
-  if (bodyFailed) throw bodyError;
-  if (cleanupFailed) throw cleanupError;
+  const errors = [...(bodyFailed ? [bodyError] : []), ...closedErrors, ...(cleanupFailed ? [cleanupError] : [])];
+  if (errors.length) throw new AggregateError(errors, '입력 tick migration 본문·연결·정리 검사 실패');
 });
