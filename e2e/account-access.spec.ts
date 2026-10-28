@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test, type BrowserContext, type Page, type TestInfo } from '@playwright/test';
-import { createAccount, TEST_PASSWORD, withE2eDb } from './account';
+import { createAccount, TEST_PASSWORD, withE2eDb, e2eDatabaseUrl } from './account';
 import { accountMailLink } from './mailbox';
-import { holdLease, releaseHold } from './game';
+import { holdLease } from './game';
+import { cleanupHeldWorld } from './heldWorldCleanup';
 import { loadInitialWorld } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
@@ -27,8 +28,15 @@ test.afterEach(async ({ page }) => {
   // 시간 초과된 locator도 정착시킨 뒤 DB를 정리한다. 페이지 종료는 서버의 자기 월드 정리보다 먼저다.
   await page.close();
   await settled();
-  await withE2eDb((db) => db.user.deleteMany({ where: { email: { in: [...emails] } } }));
-  emails.clear();
+  try {
+    await withE2eDb(async (db) => {
+      if (await db.general.count({ where: { user: { email: { in: [...emails] } } } }))
+        throw new Error('월드가 남은 시험 계정을 보존합니다.');
+      await db.user.deleteMany({ where: { email: { in: [...emails] } } });
+    });
+  } finally {
+    emails.clear();
+  }
 });
 function email() {
   const value = `required-${randomUUID()}@example.test`;
@@ -223,6 +231,7 @@ scenario(
       saveInitialWorld(db, initial, { name: '공개 인증 화면 정식191', turnTermMinutes: 60, endYear: 201 }),
     );
     let hold: Awaited<ReturnType<typeof holdLease>> | undefined;
+    let failure: unknown;
     try {
       hold = await holdLease(worldId);
       await controlClock(hold.db, worldId, 'start');
@@ -310,9 +319,23 @@ scenario(
       });
       expect(slots).toHaveLength(30);
       expect(slots.slice(0, 2).map((slot) => slot.commandKey)).toEqual(['farm', 'farm']);
-    } finally {
-      if (hold) await releaseHold(hold);
-      await withE2eDb((db) => db.world.deleteMany({ where: { id: worldId } }));
+    } catch (error) {
+      failure = error;
     }
+    const cleanupErrors: unknown[] = [];
+    try {
+      await page.close();
+    } catch (error) {
+      cleanupErrors.push(error);
+    }
+    if (hold) {
+      try {
+        await cleanupHeldWorld(hold, e2eDatabaseUrl());
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+    } else cleanupErrors.push(new Error('실행권을 확보하지 못한 시험 월드를 보존합니다.'));
+    if (failure || cleanupErrors.length)
+      throw new AggregateError([...(failure ? [failure] : []), ...cleanupErrors], '인증 인수 본문·정리 실패');
   },
 );
