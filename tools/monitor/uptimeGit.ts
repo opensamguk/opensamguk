@@ -12,6 +12,7 @@ import {
   type UptimeState,
 } from './uptimeState';
 import { gitProcess, UptimeGitError, type GitProcessOptions } from './uptimeGitProcess';
+import { validateUptimeToken, writeUptimeAuthConfig } from './uptimeGitAuth';
 
 export const UPTIME_REF = 'refs/heads/ops/uptime-state';
 type Operation =
@@ -23,6 +24,8 @@ export interface UptimeGitInput {
   operation: Operation;
 }
 export interface UptimeGitDependencies {
+  /** 운영 호출의 명시한 HTTPS 인증. URL·인자·상속 환경에는 넣지 않는다. */
+  httpsToken?: string;
   /** 시험 생성자 전용이다. CLI·환경·HTTP 설정으로 연결하지 않는다. */
   localRemote?: string;
   process?: Pick<GitProcessOptions, 'timeoutMs' | 'graceMs' | 'command' | 'onSpawn'>;
@@ -38,6 +41,10 @@ function check(value: unknown): asserts value {
 const controls = (value: string, spaces = false) =>
   [...value].some((character) => character.charCodeAt(0) < (spaces ? 33 : 32) || character.charCodeAt(0) === 127);
 function validate(input: UptimeGitInput, dependencies: UptimeGitDependencies) {
+  if (dependencies.httpsToken !== undefined) {
+    validateUptimeToken(dependencies.httpsToken);
+    check(dependencies.localRemote === undefined);
+  }
   check(input.stateRef === UPTIME_REF);
   check(input.key === 'prod' || /^drill-[A-Za-z0-9_-]{1,64}$/.test(input.key));
   let remote: URL;
@@ -169,7 +176,8 @@ export async function updateUptimeGit(input: UptimeGitInput, dependencies: Uptim
   }
   async function work() {
     dependencies.onDirectory?.(directory);
-    await writeFile(configuration, '', { flag: 'wx', mode: 0o600 });
+    if (dependencies.httpsToken === undefined) await writeFile(configuration, '', { flag: 'wx', mode: 0o600 });
+    else await writeUptimeAuthConfig(directory, input.remote, dependencies.httpsToken);
     await required(['init', '--quiet', '.']);
     type Dropped = ReturnType<typeof observe>['dropped'][number];
     const candidates = new Map<string, { dropped: Dropped[]; warnings: StateWarning[] }>();
