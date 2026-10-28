@@ -1,4 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { once } from 'node:events';
+import { randomInt } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -42,11 +44,21 @@ async function configuration(contents = key) {
 
 async function server(handler: (request: IncomingMessage, response: ServerResponse) => void) {
   const instance = createServer(handler);
+  // 낮은 OS 자동 포트도 Fetch 금지 포트에 걸릴 수 있다. 기존 uptime 시험과 같은 범위에서 원자적으로 연다.
+  // https://fetch.spec.whatwg.org/#port-blocking
+  let bound = false;
+  for (let attempt = 0; attempt < 16; attempt++) {
+    try {
+      instance.listen(randomInt(10081, 65536), '127.0.0.1');
+      await once(instance, 'listening');
+      bound = true;
+      break;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw error;
+    }
+  }
+  if (!bound) throw new Error('loopback HTTP fixture port unavailable after 16 atomic binds');
   servers.push(instance);
-  await new Promise<void>((done, reject) => {
-    instance.once('error', reject);
-    instance.listen(0, '127.0.0.1', done);
-  });
   const url = `http://127.0.0.1:${(instance.address() as AddressInfo).port}/emails`;
   return {
     url,
@@ -101,7 +113,7 @@ it.each([400, 401, 429, 500])('공급자 %s 응답의 민감 본문을 노출하
   expect(error).toBeInstanceOf(Error);
   expect(String(error)).toBe('Error: 계정 메일을 보내지 못했습니다.');
   expect((error as Error).cause).toBeUndefined();
-  expect(requests).toBe(1);
+  expect(requests, `실제 HTTP 도달: ${new URL(local.url).port}번 포트`).toBe(1);
 });
 
 it('실제 redirect를 따라가서 인증 헤더를 다른 서버로 보내지 않는다', async () => {
