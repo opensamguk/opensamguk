@@ -120,7 +120,9 @@ function CampaignBoard({ worldId, userId }: { worldId: string; userId: string })
   };
   return (
     <section className={styles.panel} aria-labelledby="campaign-title">
-      <h2 id="campaign-title">개인 휘하·부곡</h2>
+      <h2 id="campaign-title" tabIndex={-1}>
+        개인 휘하·부곡
+      </h2>
       {notice ? <p role="status">{notice}</p> : null}
       {pending ? (
         <div role="status">

@@ -24,9 +24,16 @@ test.describe('로그인한 상태', () => {
     test(`${path} 직접 접근과 새로고침`, async ({ page }) => {
       await page.goto(path);
       await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible();
-      await expect(page.getByRole('navigation', { name: '게임 메뉴' })).toBeVisible();
+      const navigation = page.getByRole('navigation', { name: '게임 메뉴' });
+      const entry = path === '/w/1/create';
+      if (entry) await expect(navigation).toHaveCount(0);
+      else await expect(navigation).toBeVisible();
+      await expect(page.getByRole('link', { name: '로비', exact: true })).toHaveAttribute('href', '/lobby');
       await page.reload();
       await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible();
+      if (entry) await expect(navigation).toHaveCount(0);
+      else await expect(navigation).toBeVisible();
+      await expect(page.getByRole('link', { name: '로비', exact: true })).toHaveAttribute('href', '/lobby');
     });
   }
 

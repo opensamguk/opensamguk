@@ -413,6 +413,47 @@ test.describe('장수가 있는 계정', () => {
     await expect(page.getByTestId('turn-editor').locator('tr[data-slot]')).toHaveCount(30);
     await shot(page, '09-turns.png');
   });
+
+  for (const width of [375, 767, 768, 1440]) {
+    test(`T3-10 AC-M3-08 v1 공통 메뉴 ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await openMain(page);
+      const nav = page.getByRole('navigation', { name: '게임 메뉴' }).filter({ visible: true });
+      await expect(nav).toHaveCount(1);
+      await page.getByRole('button', { name: '로그아웃', exact: true }).focus();
+      await page.keyboard.press('Tab');
+      await expect(nav.getByRole('link', { name: '메인', exact: true })).toBeFocused();
+      if (width < 768) {
+        const summary = nav.locator('summary');
+        await summary.click();
+        await expect(nav.getByRole('link', { name: '지도', exact: true })).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(summary).toBeFocused();
+        await expect(nav.locator('details')).not.toHaveAttribute('open');
+        await summary.click();
+      }
+      // 구형 월드에는 없는 휘하 앵커를 표시하지 않는다.
+      await expect(nav.getByRole('link', { name: '휘하·부곡', exact: true })).toHaveCount(0);
+      const targets = await nav.locator('a:visible,summary:visible,button:visible').evaluateAll((nodes) =>
+        nodes.map((node) => {
+          const { width, height } = node.getBoundingClientRect();
+          return { text: node.textContent, width, height };
+        }),
+      );
+      for (const target of targets) {
+        expect(target.width, target.text ?? '').toBeGreaterThanOrEqual(44);
+        expect(target.height, target.text ?? '').toBeGreaterThanOrEqual(44);
+      }
+      await nav.getByRole('link', { name: '지도', exact: true }).click();
+      await expect(page.getByTestId('world-map').locator('[data-city-key]')).toHaveCount(94);
+      if (width < 768) await expect(nav.locator('details')).not.toHaveAttribute('open');
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      );
+      expect(overflow).toBe(false);
+      await shot(page, `v1-navigation-${width}.png`);
+    });
+  }
 });
 
 test('장수 생성 API로 만든 재야 장수는 메인에서 바로 재야 상태로 보인다', async ({ page }) => {
@@ -456,7 +497,10 @@ test('장수가 없는 계정은 장수 만들기 안내와 공개 지도를 본
     `/w/${ctx.worldId}/create`,
   );
   await expect(page.getByTestId('next-turn')).toHaveText('내 장수 없음');
+  await expect(page.getByRole('navigation', { name: '게임 메뉴' }).filter({ visible: true })).toHaveCount(1);
   await expect(page.getByRole('region', { name: '중원 정세', exact: true })).toBeVisible();
+  await page.getByRole('link', { name: '장수 만들기' }).first().click();
+  await expect(page.getByRole('navigation', { name: '게임 메뉴' })).toHaveCount(0);
 });
 
 test('없는 월드는 안내를 보여 준다', async ({ page }) => {

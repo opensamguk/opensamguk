@@ -115,6 +115,10 @@
 --
 -- 새 초상표 `portraits/191-map.json`은 위 개발 전용 초상 고지를 따른다. 이 게시 자원에는 이미지 원본을 넣지 않으며 새 공개 초상을 배포하지 않는다.
 --
+-- ## v1 페이지 구조 참고
+--
+-- 페이지 구조는 비공개 참고 저장소 `peppone-choi/opensamguk-v1`의 `bc053629710711d4c5dfa50683bae78f4baeca95`에서 `web/game/components/shell/GameFrame.tsx`, `web/game/lib/nav31.ts`, `web/game/components/campaign/WarRoomPage.tsx`, `web/gateway/components/lobby/LobbyScreen.tsx`를 대조했다. 현재 `apps/web/src/layout/GameNavigation.tsx`는 공통 머리줄·왼쪽 메뉴·모바일 하단 탐색을 참고하며 기존 React 주소와30칸 예약을 유지한다. v1의 게임 규칙·이미지·전체 페이지를 복사하지 않았다. v1은 MIT이며 원 고지는 `Copyright (c) 2026 빼뽀네 (peppone-choi) and OpenSamguk contributors`다. 위 MIT 허가·조건·보증 부인 전문은 이 출처에도 적용된다.
+--
 
 DO $t4_46_init$
 DECLARE
