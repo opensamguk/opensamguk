@@ -392,6 +392,11 @@ const adminAuditRoute = createRoute({
   path: 'audit',
   component: lazyRouteComponent(() => import('./admin/AdminPages'), 'AdminAudit'),
 });
+const adminNoticesRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: 'notices',
+  component: lazyRouteComponent(() => import('./admin/AdminNotices'), 'AdminNotices'),
+});
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -406,7 +411,7 @@ const routeTree = rootRoute.addChildren([
   helpRoute,
   helpDocRoute,
   sharedTimelapseRoute,
-  adminRoute.addChildren([adminIndexRoute, adminUsersRoute, adminAuditRoute]),
+  adminRoute.addChildren([adminIndexRoute, adminUsersRoute, adminAuditRoute, adminNoticesRoute]),
   worldRoute.addChildren([
     worldIndexRoute,
     mapRoute,
