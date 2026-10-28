@@ -80,22 +80,39 @@ test('좁은 메인 명령 칸에서 긴 인자와 긴 대상 도시 이름에�
   await expect(row(page, 2)).toContainText(longest.name);
   await expect(editor(page).getByTestId('draft-state')).toHaveText('저장하지 않은 편집 2건');
 
-  // 단언하기 전에 그림과 잰 값을 남긴다. 고치기 전 코드에서 실패해도 같은 순간의 화면을 비교할 수 있다.
-  const layouts = [await tagLayout(page, 1), await tagLayout(page, 2)];
-  writeFileSync(test.info().outputPath('issue112-layout.json'), JSON.stringify({ city: longest.name, layouts }));
-  await page.evaluate(() => document.fonts.ready);
-  await page.screenshot({ path: test.info().outputPath('issue112-main-long-args.png'), fullPage: true });
-  await page
-    .getByRole('region', { name: '명령 목록', exact: true })
-    .screenshot({ path: test.info().outputPath('issue112-command-region.png') });
-  for (const layout of layouts)
-    expect(layout).toEqual({
-      lineBoxes: 1,
-      textLines: 1,
-      overlapsCommandOrArgs: false,
-      allInsideCell: true,
-      tableScrollsSideways: false,
-      tableScrollsDown: true,
-      pageScrollsSideways: false,
-    });
+  // 글꼴이 정착한 뒤 좁은 명령 칸과 메인 배치 전환 양쪽을 잰다. 실패해도 같은 순간의 그림과 폭을 남긴다.
+  for (const width of [375, 1100, 1101, 1280, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.evaluate(() => document.fonts.ready);
+    const layouts = [await tagLayout(page, 1), await tagLayout(page, 2)];
+    const dimensions = await editor(page)
+      .locator('table')
+      .evaluate((table) => ({
+        tableWidth: table.getBoundingClientRect().width,
+        clientWidth: table.parentElement!.clientWidth,
+        scrollWidth: table.parentElement!.scrollWidth,
+        cells: [...table.rows[1]!.cells].map((cell) => ({
+          width: cell.getBoundingClientRect().width,
+          clientWidth: cell.clientWidth,
+          scrollWidth: cell.scrollWidth,
+        })),
+      }));
+    writeFileSync(
+      test.info().outputPath(`issue112-layout-${width}.json`),
+      JSON.stringify({ width, city: longest.name, dimensions, layouts }),
+    );
+    await page
+      .getByRole('region', { name: '명령 목록', exact: true })
+      .screenshot({ path: test.info().outputPath(`issue112-command-region-${width}.png`) });
+    for (const layout of layouts)
+      expect(layout, `viewport ${width}`).toEqual({
+        lineBoxes: 1,
+        textLines: 1,
+        overlapsCommandOrArgs: false,
+        allInsideCell: true,
+        tableScrollsSideways: false,
+        tableScrollsDown: true,
+        pageScrollsSideways: false,
+      });
+  }
 });
