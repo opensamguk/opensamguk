@@ -236,6 +236,20 @@ for (const path of ['/', '/login']) {
 
     expectOnlyDistAssets(seen);
     const types = new Set(seen.assets.map((asset) => asset.type));
+    // 실제 받은 script의 해시를 위에서 대조한 뒤 초기 번들의 경계를 검사한다.
+    const initialScripts = seen.assets
+      .filter((asset) => asset.type === 'script')
+      .map((asset) => readFileSync(join(distDir, distKey(asset.path, asset.type)), 'utf8'));
+    expect(initialScripts.length).toBeGreaterThan(0);
+    for (const script of initialScripts) {
+      expect(script).not.toMatch(/관리자 콘솔|사용자 검색 결과|감사 조회 결과/);
+      expect(script).not.toMatch(/\.admin\.(?:whoami|user|audit|sanction)|admin\.(?:whoami|user\.search|audit\.list)/);
+    }
+    expect(
+      Object.keys(meta.files)
+        .filter((file) => file.endsWith('.js'))
+        .some((file) => readFileSync(join(distDir, file), 'utf8').includes('관리자 콘솔')),
+    ).toBe(true);
     expect(types.has('script') && types.has('stylesheet')).toBe(true);
     const srcs = await page.locator('img').evaluateAll((imgs) => imgs.map((img) => img.getAttribute('src') ?? ''));
     for (const src of srcs) expect(src).not.toMatch(/portraits|jsdelivr|^data:image/);

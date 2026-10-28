@@ -1,6 +1,6 @@
 # 관리자 콘솔
 
-> 상태: 역할·감사·제재 API 병합, 검색·감사 조회 검증 중 · 필요 시점: M3 · 관련 AC: M3-04, M3-05, M3-10
+> 상태: 역할·감사·제재·검색·감사 조회 API 병합, 조회 화면 구현 중 · 필요 시점: M3 · 관련 AC: M3-04, M3-05, M3-10
 > 참고: core2026 `admin-console.md`, `play-audit-operations.md`, `design/play-audit.md` (부정 플레이 조사 범위만)
 > 이 문서가 답할 질문: 운영자가 어떤 화면에서 무엇을 할 수 있고 무엇이 기록되나?
 
@@ -37,7 +37,7 @@ pnpm admin:revoke < /secure/admin-role-request.json
 
 생성·해제는 같은 트랜잭션에서 `sanction.create`·`sanction.lift` 감사와 확정됩니다. 감사 payload에는 제재 UUID·범위·시각·변경 여부만 담고 이메일·IP·토큰·사유 원문을 중복 넣지 않습니다. 제재 표시 화면·로그인/IP/기기 자료는 별도 묶음입니다.
 
-검증 중인 `admin.user.search`의 query는 사용자 UUID, 이메일 앞부분3~254자, 또는 `{ worldId, generalName }`을 받습니다. 이름 앞부분은1~30자이며 지정 월드의 사람 장수만 찾습니다. 이메일은 소문자로 정규화하고 `%`·`_`·역슬래시를 검색 문자로 처리합니다. 고유 사용자 최대50명을 생성 시각·사용자 ID 내림차순으로 돌려줍니다. 결과 필드는 `userId`·`email`·`status`·`role`·`createdAt`·`activeSanctions`이며 마지막 값은 서버 현재 유효한 전체·월드 제재 개수입니다. 비밀번호·세션·토큰·로그인 자료는 읽지 않습니다. 사용자 상세·로그인 기록을 빈 값으로 대신하지 않습니다.
+보호 main에 병합한 `admin.user.search`의 query는 사용자 UUID, 이메일 앞부분3~254자, 또는 `{ worldId, generalName }`을 받습니다. 이름 앞부분은1~30자이며 지정 월드의 사람 장수만 찾습니다. 이메일은 소문자로 정규화하고 `%`·`_`·역슬래시를 검색 문자로 처리합니다. 고유 사용자 최대50명을 생성 시각·사용자 ID 내림차순으로 돌려줍니다. 결과 필드는 `userId`·`email`·`status`·`role`·`createdAt`·`activeSanctions`이며 마지막 값은 서버 현재 유효한 전체·월드 제재 개수입니다. 비밀번호·세션·토큰·로그인 자료는 읽지 않습니다. 사용자 상세·로그인 기록을 빈 값으로 대신하지 않습니다.
 
 결과와 `user.search` 감사는 같은 RepeatableRead 트랜잭션에서 처리합니다. 행위자 User를 공유 잠금으로 다시 확인하고 ACTIVE·ADMIN이 아니면 거부합니다. 감사 targetType은 `User`, targetId는null이며 이름 검색은 월드 ID만 남깁니다. payload는 `queryKind`·`resultCount` 두 키만 담습니다. 검색어·이름·이메일·검색 대상 UUID·결과 UUID는 남기지 않고0결과도 기록합니다. 감사 쓰기가 실패하면 결과를 응답하지 않습니다.
 
@@ -51,7 +51,7 @@ pnpm admin:revoke < /secure/admin-role-request.json
 
 <!-- TODO(M3): 로그인 IP·기기 해시 기록, 같은 월드에서 공유하는 계정 목록 (AC-M3-05). 수집 범위와 보관 기간은 개인정보처리방침과 맞춘다. -->
 
-검증 중인 `admin.audit.list`는 현재 ACTIVE·ADMIN만 사용할 수 있습니다. `cursor`는 양의 PostgreSQL bigint ID 문자열이고 `from`·`to`는 ISO 시각입니다. `action`은 소문자·숫자·점으로 된 앞부분이며 `actorUserId`·`targetId`·`worldId`는 정확히 일치하는 값만 찾습니다. id 내림차순 최대50개와 다음 cursor를 반환하고 마지막 페이지의 next는null입니다. 감사의 명시한 열만 반환하며 bigint·시각은 문자열입니다. 이 조회는 재귀 감사하지 않습니다. 보존 기간·로그인/IP/기기 수집과 조사 화면은 이 묶음에서 정하지 않습니다.
+보호 main에 병합한 `admin.audit.list`는 현재 ACTIVE·ADMIN만 사용할 수 있습니다. `cursor`는 양의 PostgreSQL bigint ID 문자열이고 `from`·`to`는 ISO 시각입니다. `action`은 소문자·숫자·점으로 된 앞부분이며 `actorUserId`·`targetId`·`worldId`는 정확히 일치하는 값만 찾습니다. id 내림차순 최대50개와 다음 cursor를 반환하고 마지막 페이지의 next는null입니다. 감사의 명시한 열만 반환하며 bigint·시각은 문자열입니다. 이 조회는 재귀 감사하지 않습니다. 보존 기간·로그인/IP/기기 수집과 조사 화면은 이 묶음에서 정하지 않습니다.
 
 ## 6. 엔진 상태
 

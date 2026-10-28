@@ -1,0 +1,78 @@
+.shell {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: var(--space-4);
+}
+.shell header,
+.shell nav {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.shell header {
+  justify-content: space-between;
+}
+.shell a,
+.shell button,
+.shell input,
+.shell select {
+  min-height: 44px;
+  min-width: 44px;
+}
+.shell a {
+  display: inline-flex;
+  align-items: center;
+}
+.shell button,
+.shell input,
+.shell select {
+  font: inherit;
+  padding: var(--space-2);
+}
+.form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: var(--space-3);
+  align-items: end;
+}
+.form label {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.form input,
+.form select {
+  width: 100%;
+  box-sizing: border-box;
+}
+.table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  margin-block: var(--space-4);
+}
+.table th,
+.table td {
+  border: 1px solid var(--color-border);
+  padding: var(--space-2);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.table caption {
+  text-align: left;
+  margin-bottom: var(--space-2);
+}
+.table code,
+.table pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: var(--text-sm);
+}
+.table dd {
+  margin: 0 0 var(--space-2);
+}
+.table dt {
+  color: var(--color-text-muted);
+}

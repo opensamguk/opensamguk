@@ -370,6 +370,29 @@ const campaignMapEditorRoute = import.meta.env.DEV
     })
   : null;
 
+const adminRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'admin',
+  beforeLoad: async ({ location }) => (await import('./admin/access')).requireAdmin(location.href),
+  component: lazyRouteComponent(() => import('./admin/AdminPages'), 'AdminLayout'),
+  errorComponent: GuardError,
+});
+const adminIndexRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/',
+  component: lazyRouteComponent(() => import('./admin/AdminPages'), 'AdminHome'),
+});
+const adminUsersRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: 'users',
+  component: lazyRouteComponent(() => import('./admin/AdminPages'), 'AdminUsers'),
+});
+const adminAuditRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: 'audit',
+  component: lazyRouteComponent(() => import('./admin/AdminPages'), 'AdminAudit'),
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   lobbyRoute,
@@ -383,6 +406,7 @@ const routeTree = rootRoute.addChildren([
   helpRoute,
   helpDocRoute,
   sharedTimelapseRoute,
+  adminRoute.addChildren([adminIndexRoute, adminUsersRoute, adminAuditRoute]),
   worldRoute.addChildren([
     worldIndexRoute,
     mapRoute,
