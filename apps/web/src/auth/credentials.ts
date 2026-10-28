@@ -1,4 +1,5 @@
 import { TRPCClientError } from '@trpc/client';
+import type { AppRouter } from '@opensamguk/server/router';
 
 // 화면 쪽 입력 검사. 서버(apps/server/src/routers/auth.ts)와 같은 범위를 쓰되 최종 판단은 서버 응답이다.
 export const PASSWORD_MIN = 10;
@@ -11,11 +12,16 @@ export interface FieldErrors {
   password?: string;
 }
 
+export function validateEmail(email: string): string | undefined {
+  const trimmed = email.trim();
+  if (trimmed === '') return '이메일을 입력하세요';
+  if (trimmed.length > EMAIL_MAX || !EMAIL_SHAPE.test(trimmed)) return '이메일 형식이 맞지 않습니다';
+  return undefined;
+}
 export function validateCredentials(email: string, password: string): FieldErrors {
   const errors: FieldErrors = {};
-  const trimmed = email.trim();
-  if (trimmed === '') errors.email = '이메일을 입력하세요';
-  else if (trimmed.length > EMAIL_MAX || !EMAIL_SHAPE.test(trimmed)) errors.email = '이메일 형식이 맞지 않습니다';
+  const emailError = validateEmail(email);
+  if (emailError) errors.email = emailError;
   if (password === '') errors.password = '비밀번호를 입력하세요';
   else if (password.length < PASSWORD_MIN || password.length > PASSWORD_MAX) {
     errors.password = `비밀번호는 ${PASSWORD_MIN}~${PASSWORD_MAX}자입니다`;
@@ -26,10 +32,33 @@ export function validateCredentials(email: string, password: string): FieldError
 // 서버가 답한 실패는 문구로, 답을 못 받은 실패(네트워크·서버 오류)는 다시 시도로 보여 준다.
 export type SubmitFailure = { kind: 'message'; text: string } | { kind: 'retry' };
 
+export function publicFailure(error: unknown) {
+  const failure: TRPCClientError<AppRouter> | null = error instanceof TRPCClientError ? error : null;
+  return failure?.data;
+}
+
+export function retryAfterSeconds(error: unknown): number | null {
+  if (!(error instanceof TRPCClientError) || !(error.meta?.response instanceof Response)) return null;
+  const value = error.meta.response.headers.get('Retry-After');
+  if (!value || !/^\d+$/.test(value)) return null;
+  const seconds = Number(value);
+  return Number.isSafeInteger(seconds) && seconds > 0 ? seconds : null;
+}
+
 export function describeFailure(error: unknown): SubmitFailure {
-  const code = error instanceof TRPCClientError ? (error.data as { code?: string } | undefined)?.code : undefined;
+  const data = publicFailure(error);
+  const code = data?.code;
   if (code === 'UNAUTHORIZED') return { kind: 'message', text: '이메일 또는 비밀번호가 맞지 않습니다' };
   if (code === 'CONFLICT') return { kind: 'message', text: '이미 가입된 이메일입니다' };
+  if (code === 'BAD_REQUEST' && data?.reason === 'TOKEN_INVALID')
+    return { kind: 'message', text: '링크가 만료됐거나 이미 쓰였습니다. 새 링크를 요청하세요.' };
+  if (code === 'TOO_MANY_REQUESTS') {
+    const seconds = retryAfterSeconds(error);
+    return {
+      kind: 'message',
+      text: seconds === null ? '잠시 뒤 다시 요청하세요.' : `${seconds}초 뒤에 다시 요청하세요.`,
+    };
+  }
   if (code === 'BAD_REQUEST') return { kind: 'message', text: '입력값을 확인하세요' };
   return { kind: 'retry' };
 }

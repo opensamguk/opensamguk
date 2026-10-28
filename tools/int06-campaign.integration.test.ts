@@ -388,7 +388,10 @@ it('같은 요청은 한 번만 적용하고 사람 본인의 동의·거절·�
 it('서로 동시에 보낸 제안은 revision으로 직렬화하고 본인의 거절은 무료다', async () => {
   const before = await snapshot(),
     revision = before.state.campaign!.revision,
-    reservations = await db.generalTurn.findMany({ where: { worldId, generalId: { in: [ownId, targetId] } } });
+    reservations = await db.generalTurn.findMany({
+      where: { worldId, generalId: { in: [ownId, targetId] } },
+      orderBy: [{ generalId: 'asc' }, { slot: 'asc' }],
+    });
   const requests = await Promise.all([
     submit('campaign.relationship', { type: 'offer', targetId, relation: 'STAFF', revision }),
     submit('campaign.relationship', { type: 'offer', targetId: ownId, relation: 'STAFF', revision }, 1),
@@ -413,9 +416,12 @@ it('서로 동시에 보낸 제안은 revision으로 직렬화하고 본인의 �
   const after = await snapshot();
   expect(after.state.campaign!.links).toEqual([]);
   for (const id of [ownId, targetId]) expect(after.state.generals[id]!.gold).toBe(before.state.generals[id]!.gold);
-  expect(await db.generalTurn.findMany({ where: { worldId, generalId: { in: [ownId, targetId] } } })).toEqual(
-    reservations,
-  );
+  expect(
+    await db.generalTurn.findMany({
+      where: { worldId, generalId: { in: [ownId, targetId] } },
+      orderBy: [{ generalId: 'asc' }, { slot: 'asc' }],
+    }),
+  ).toEqual(reservations);
 });
 
 it('반대 방향 제안의 동시 수락은 한 관계만 만들고 순환·강제 수락을 거부한다', async () => {

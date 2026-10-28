@@ -134,3 +134,15 @@ pnpm db:init-scenarios
 두 번째 명령은 `packages/db/sql/resources-scenarios.sql`을 한 트랜잭션에서 실행합니다. 기존 내장 판을 확인한 뒤 A9의 내용·해시·상태·출처를 대조합니다. 같은 판은 기존 행으로 세고 다른 판이 같은 키에 있으면 전체 삽입을 되돌립니다. 내장 다섯 판과 `1030`은 덮지 않습니다. 출력에는 삽입·기존 행 수와 실패 키만 남깁니다.
 
 `pnpm resources:sql:scenarios`는 83행 출처 fixture에서 `ready`인 9종만 읽어 별도 SQL을 다시 만듭니다. 기존 `resources:sql`이나 `resources-init.sql`은 바꾸지 않습니다. `ready`는 생성 대상이며 AC 완료가 아닙니다. 원형 복원·두 시드·SQL 바이트는 `tools/scenarios.test.ts`, 초기화·원자 거부·DB 합성·한 달 정산은 `tools/scenarios.integration.test.ts`에서 확인합니다. DB 시험은 조율된 실행창의 자기 전용 `_test` DB에서만 돌리고 정식 증거는 정확한 SHA의 CI에서 남깁니다.
+
+## 계정 토큰과 개발 메일함
+
+공개 인증·재설정 소비는 `account.token.ip` 공유 버킷으로 IP당15분30회까지 허용하며 초과 시429와 정수 초 `Retry-After`를 받습니다. 무효 재설정 후보는 저장된 용도·미사용·만료·계정 상태를 먼저 읽어 거부하고 비싼 비밀번호 해시를 계산하지 않습니다. 실제 소비 때는 잠금 안에서 조건을 다시 확인합니다.
+
+개발 API 진입점은 `MAIL_TRANSPORT`가 없으면 capture를 선택합니다. `MAIL_CAPTURE_DIR`는 기본 `.mail-outbox`이며 실행 디렉터리를 기준으로 완성된 JSON 메일을 저장합니다. 주소·URL 조각의 원문 토큰이 있으므로 이 디렉터리는 비밀 파일로 다루고 Git·공개 정적 파일·로그에 넣지 않습니다. `PUBLIC_ORIGIN`으로 인증·재설정 링크의 출처를 고정합니다.
+
+`NODE_ENV=production`에서는 capture와 미설정·미지원 전송을 API 시작 전에 거부합니다. 운영 전송은 서비스 결정 뒤 더하므로 현재 후보로 운영 API를 시작할 수 없습니다. `buildServer`의 전송 주입은 실제 PG/HTTP 시험과 같은 내부 생성 경계이며 운영 진입점의 설정 검사를 대신하지 않습니다.
+
+`account.get`은 본인 이메일·인증 여부·동의 기록을 읽습니다. `account.resendVerification`은 이미 인증됐으면 메일 없이 성공하고 미인증 계정은 분당1번·UTC 하루5번의 공유 계수기를 씁니다. 초과하면429와 정수 초 `Retry-After`를 받습니다. `account.requestPasswordReset`은 정규화한 주소당 시간3번까지만 발송하며 없는 주소·제재·탈퇴·초과·발송 실패도 같은 성공 응답입니다. 한도 초과는 `Retry-After`를 싣지 않습니다.
+
+`account.verifyEmail`과 `account.resetPassword`는 무효·사용·만료 토큰을400·`TOKEN_INVALID`로 거부합니다. 토큰은 SHA-256 해시로만 저장하고 인증24시간·재설정30분·한 번 소비를 적용합니다. 재설정의 비밀번호와 세션 폐기는 같은 트랜잭션이며 commit 뒤 그 세션들의 SSE 종료를 별도 알림으로 전합니다. 다른 계정의 세션·연결은 보존합니다. 가입 동의·미인증 게임 변경 차단·약관·탈퇴·화면과 운영 메일 수신은 아직 연결하지 않았으며 이 API만으로 공개 계정 인수를 완료하지 않습니다.

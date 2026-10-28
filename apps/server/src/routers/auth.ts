@@ -1,12 +1,14 @@
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import type { Context } from '../context';
-import { hashPassword, verifyPassword } from '../auth/password';
+import { hashPassword, passwordSchema, verifyPassword } from '../auth/password';
 import { newSession, SESSION_SECONDS } from '../auth/session';
 import { publicProcedure, router } from '../trpc';
 import type { LimitRule, RateLimitDecision } from '../security/rateLimit';
 import { notifySessionClosed } from '@opensamguk/db';
 import { queueLoginActivity } from '../game/policy';
+import { newAccountToken } from '../auth/accountToken';
+import { accountMail } from '../mail/templates';
 
 function enforce(ctx: Context, decision: RateLimitDecision) {
   if (decision.allowed) return;
@@ -16,7 +18,7 @@ function enforce(ctx: Context, decision: RateLimitDecision) {
 
 const credentials = z.strictObject({
   email: z.string().trim().toLowerCase().email().max(254),
-  password: z.string().min(10).max(128),
+  password: passwordSchema,
 });
 const loginFailure = () => new TRPCError({ code: 'UNAUTHORIZED', message: '이메일 또는 비밀번호가 맞지 않습니다' });
 function setCookie(ctx: Context, token: string) {
@@ -37,6 +39,7 @@ export const authRouter = router({
     );
     const passwordHash = await hashPassword(input.password);
     const session = newSession(ctx.now);
+    const verification = ctx.accountMail ? newAccountToken('VERIFY_EMAIL', ctx.now) : null;
     try {
       const user = await ctx.db.$transaction(async (tx) => {
         const user = await tx.user.create({
@@ -47,12 +50,31 @@ export const authRouter = router({
           await tx.session.deleteMany({ where: { id: ctx.sessionId } });
         }
         await tx.session.create({ data: { id: session.id, userId: user.id, expiresAt: session.expiresAt } });
+        if (verification) {
+          await tx.accountToken.create({
+            data: {
+              id: verification.id,
+              userId: user.id,
+              purpose: 'VERIFY_EMAIL',
+              expiresAt: verification.expiresAt,
+            },
+          });
+        }
         return user;
       });
       setCookie(ctx, session.token);
       if (ctx.sessionId) {
         ctx.closeSession?.(ctx.sessionId);
         await notifySessionClosed(ctx.db, ctx.sessionId, () => ctx.reply.log.warn('실시간 알림 전송 실패'));
+      }
+      if (verification && ctx.accountMail) {
+        try {
+          await ctx.accountMail.transport.send(
+            accountMail(user.email, 'VERIFY_EMAIL', ctx.accountMail.origin, verification.token),
+          );
+        } catch {
+          ctx.reply.log.warn('가입 인증 메일 발송 실패');
+        }
       }
       return { user };
     } catch (error) {
@@ -76,6 +98,20 @@ export const authRouter = router({
     }
     const session = newSession(ctx.now);
     await ctx.db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${user.id} FOR SHARE`;
+      const current = await tx.user.findUnique({
+        where: { id: user.id },
+        select: { status: true, passwordHash: true, email: true },
+      });
+      if (
+        !current ||
+        current.status !== 'ACTIVE' ||
+        current.passwordHash !== user.passwordHash ||
+        current.email !== user.email
+      ) {
+        ctx.rateLimiter.consume(failures);
+        throw loginFailure();
+      }
       if (ctx.sessionId) {
         await tx.session.deleteMany({ where: { id: ctx.sessionId } });
       }

@@ -457,8 +457,45 @@ model User {
   passwordHash String
   status       UserStatus @default(ACTIVE)
   createdAt    DateTime @default(now())
+  emailVerifiedAt DateTime?
   sessions     Session[]
+  accountTokens AccountToken[]
+  consents     ConsentRecord[]
   generals     General[]
+}
+
+enum AccountTokenPurpose {
+  VERIFY_EMAIL
+  RESET_PASSWORD
+}
+
+model AccountToken {
+  id        String @id
+  userId    String
+  purpose   AccountTokenPurpose
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+  @@index([expiresAt])
+}
+
+enum ConsentDocType {
+  TERMS
+  PRIVACY
+}
+
+model ConsentRecord {
+  id        String @id @default(uuid())
+  userId    String
+  docType   ConsentDocType
+  version   String
+  agreedAt  DateTime @default(now())
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, docType, version])
 }
 
 model Session {

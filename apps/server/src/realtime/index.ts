@@ -106,6 +106,7 @@ export function registerRealtime<L extends FastifyBaseLogger>(
     if (!connections.has(connection)) return;
     try {
       await db.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${connection.userId} FOR SHARE`;
         const rows = await tx.$queryRaw<
           Audience[]
         >`SELECT g.id, g."nationId", g."officerLevel" FROM "Session" s JOIN "User" u ON u.id = s."userId" JOIN "General" g ON g."userId" = u.id WHERE s.id = ${connection.sessionId} AND u.id = ${connection.userId} AND g."worldId" = ${connection.worldId} AND u.status = 'ACTIVE' AND s."expiresAt" > clock_timestamp() FOR SHARE OF s, u, g`;

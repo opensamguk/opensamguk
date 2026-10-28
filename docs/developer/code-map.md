@@ -22,7 +22,9 @@
 | ---- | ---- |
 | `apps/server/src/index.ts` | DB 연결과 HTTP 서버 시작·종료 |
 | `apps/server/src/server.ts` | Fastify 생성, 쿠키·인증 context, 비밀값을 제외한 로그 |
-| `apps/server/src/auth/` | Argon2id, 세션 토큰 해시·만료·연장, 실제 HTTP·DB 테스트 |
+| `apps/server/src/auth/` | Argon2id, 세션·계정 토큰 해시·만료·원자 소비, 재설정의 비밀번호·세션 폐기와 실제 HTTP·DB 테스트 |
+| `apps/server/src/mail/`, `routers/account.ts` | 인증·재설정 메일과 개발 capture, 본인 계정 조회·재발급·토큰 소비 API. 운영 전송·가입 동의·미인증 게임 변경 차단·탈퇴는 후속 |
+| `tools/t3-02-account-api.integration.test.ts`, `t3-02-session-lock.integration.test.ts`, `t3-02-mail-startup.test.ts` | 실제 계정 API 권한·메일함·두 API의 SSE 폐기, 재설정/메시지·SSE 교착 회귀와 운영 시작 거부 |
 | `apps/server/src/routers/auth.ts` | 가입·로그인·로그아웃·현재 계정 |
 | `apps/server/src/trpc.ts` | 공개·인증 필수 procedure |
 | `apps/server/src/router.ts` | tRPC `AppRouter` (API 계약): `health`, `auth`, `world`, `home`, `city`, `nation`, `records`, `general`, `turns`, `commands`, `ranking`, `timelapse`, `message`, `notice`, `lobby` |
