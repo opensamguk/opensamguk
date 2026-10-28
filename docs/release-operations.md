@@ -26,13 +26,33 @@
 
 2026-10-28 로컬 Linux Docker에서 실제 디렉터리 입력으로4개 대상을 빌드하고 공개102파일·승인 이미지6개·외부 초상0개를 확인했습니다. 내보낸 Linux web의 실제 Chromium4건도5.5초에 통과했습니다. 비밀 canary8경로의 제외, 이미지 설정·history와 저장한 layer998,077,087바이트의 비노출을 검사했습니다. 실제 Linux에서 누락·빈 파일·0444·잘못된 디렉터리/소유자·링크·잘못된 UTF-8·NUL·줄바꿈·4097바이트와 원문 환경의 거부를 확인했습니다. 전용 PostgreSQL의 두 정식191년 월드는42국·982NPC·29,460예약으로 초기화됐고 API·두 엔진의 상태, 정상 종료0·DB 연결0·자기 컨테이너/volume/network 정리를 확인했습니다. 운영 메일·원격 배포·되돌리기·매일 백업·전체 AC-M2-08·09는 미완료입니다.
 
+### 로컬 산출물 manifest (T2-15 B2b1)
+
+서버·도메인 선택 전에도 `node --import tsx tools/release-artifact.ts /secure/release-build.json`으로 로컬 산출물을 준비할 수 있습니다. 입력은 아래 세 값만 받으며 먼저 origin/main을 fetch하고 해당 소스의 보호 병합·필수 CI·독립 리뷰를 확인합니다. 도구는 fetch·공개 배포·서비스 재시작을 수행하지 않습니다.
+
+```json
+{
+  "sourceRevision": "보호 main 이력의 실제 커밋 40자",
+  "outputDirectory": "/secure/releases",
+  "dockerExecutable": "/usr/bin/docker"
+}
+```
+
+출력 부모는 기존 일반 디렉터리이며 모든 checkout 밖이어야 합니다. 쉼표·따옴표·줄바꿈 경로는 Docker 출력 옵션이 달라지지 않도록 거부합니다. 도구는 `<outputDirectory>/<sourceRevision>`을 독점 생성하고 기존 빈 디렉터리도 덮어쓰지 않습니다. 실패한 자기 partial과 빌드 기록을 자동 삭제하지 않습니다. 성공 전에는 manifest.json이 없습니다.
+
+검증한 Git tree의 경로·종류·알려진 내부 링크만 받아 archive로 추출하고 모든 파일을 원본 blob과 대조합니다. 경로는 `/`로 잇고 UTF-8 바이트 순서로 정렬해 소스 해시와 파일 목록을 만듭니다. Windows의 전역 줄바꿈 설정은 사용하지 않으며 작업 트리의 수정·미추적 파일은 섞지 않습니다. 실제 server·engine·migrate·web를 빌드하고 세 이미지의 ID·소스 label·실행 사용자를 확인합니다. 이미지 archive와 공개 web의 실제 바이트·해시, migration 목록·SQL 해시, 초기화 자료·승인 자산 manifest 해시를 기록합니다. 체크섬을 먼저 쓰고 다시 확인한 뒤 manifest.json을 마지막에 확정합니다.
+
+자료 계약은 아직 `unknown`이며 이를 근거로 되돌리기를 허용하지 않습니다. manifest는 로컬 정적 산출물의 근거이며 DB 대상·사전 백업·실행 단계·current 변경을 담을 배포 receipt를 대신하지 않습니다. Compose/Caddy·전송·배포/복귀 명령과 실제 운영 리허설은 후속입니다.
+
+2026-10-28 보호 main `d82becb`에서 실제4대상 빌드와 소스1293개 Git blob 대조, image archive와 공개 web103파일(자산102개·metadata1개)·migration32개의 기록 바이트/해시를 확인했습니다. 같은 이미지 ID의 실제 Linux에서 정식191년 두 월드·8개 원본 규칙·API/엔진 health·정상 종료와 자기 자원 정리, 내보낸 web의 Chromium4건도 통과했습니다. 도구21건과 전체 check5317건·독립 코드 리뷰의 근거이며 CI·보호 병합과 운영 배포 완료를 뜻하지 않습니다.
+
 ## 3. 되돌리기
 
 <!-- TODO(M2): 이전 이미지 태그로 되돌리는 절차. migration이 있으면 어떻게 하나. 리허설 기록 남기기. -->
 
 ## 4. 백업과 복구
 
-T2-15 B1은 검토 중입니다. `tools/backup.sh`와 `tools/restore.sh`는 지정한 기존 컨테이너만 사용합니다. 컨테이너 ID 64자와 PostgreSQL `system_identifier`를 대조하며 compose를 탐색하거나 컨테이너를 기동하지 않습니다. `DOCKER_HOST`는 로컬 daemon으로 명시하고 `DOCKER_CONFIG`는 소유 빈 디렉터리로 지정합니다. 비밀번호나 연결 URL을 인자로 주지 않습니다. 컨테이너 안 local socket 인증이 맞지 않으면 멈춥니다.
+T2-15 B1의 로컬 fixture 리허설은 검증했습니다. `tools/backup.sh`와 `tools/restore.sh`는 지정한 기존 컨테이너만 사용합니다. 컨테이너 ID64자와 PostgreSQL `system_identifier`를 대조하며 compose를 탐색하거나 컨테이너를 기동하지 않습니다. `DOCKER_HOST`는 로컬 daemon으로 명시하고 `DOCKER_CONFIG`는 소유 빈 디렉터리로 지정합니다. 비밀번호나 연결 URL을 인자로 주지 않습니다. 컨테이너 안 local socket 인증이 맞지 않으면 멈춥니다.
 
 ```sh
 bash tools/backup.sh --docker <docker 절대 경로> --container <64자 ID> --system-identifier <숫자> --db-user <role> --admin-db <카탈로그 DB> --source-db <원본 DB> --backup-dir <절대 경로> --reason rehearsal --release-sha <검토한 실제 소스 커밋 40자 SHA>
@@ -45,9 +65,11 @@ dump와 성공 manifest가 한 쌍이어야 백업 성공입니다. manifest에�
 
 복구는 새 리허설 대상만 받으며 기존 DB를 덮어쓰지 않습니다. 복원 실패 시 이번 실행이 만든 대상의 OID와 연결 0을 확인해야 삭제합니다. 운영 복구 대상의 비밀 파일·cutover 계약은 B2·B3 배정 전이므로 운영 복구는 거부합니다.
 
-리허설의 준비와 각 진행 단계는 자체 20초 기한을 둡니다. 기한을 넘기면 다음 진행을 막고 남은 작업의 종료를 기다린 뒤 자기 DB만 정리합니다. 기존 시험의 30초 상한은 늘리지 않습니다. 실제 준비·정리 시간은 아직 확인하지 않았습니다.
+리허설의 준비와 각 진행 단계는 자체20초 기한을 둡니다. 기한을 넘기면 다음 진행을 막고 남은 작업의 종료를 기다린 뒤 자기 DB만 정리합니다. 기존 시험의30초 상한은 늘리지 않습니다.
 
-실제 리허설은 아직 실행하지 않았습니다. 부모가 기존 전용 PG 슬롯과 `T215_*` 입력을 배정해야 합니다. local 인증, stdin 순차 `pg_restore`, archive 사본의 오프라인 설치·generate 30초 내 완료는 미검증입니다. backup의 필수 `--release-sha`는 40자리 16진 문자열을 그대로 manifest에 기록합니다. 누락·형식 오류는 Docker 호출과 파일 생성 전에 거부하며 Git fallback은 없습니다. B1은 검토한 실제 소스 HEAD를 전달해 manifest와 대조합니다. B2가 운영 current SHA를 얻어 전달할 방법을 정합니다. 추적 수정이 없는 시험 대상 커밋이 필요하며 현재 작업은 커밋하지 않았습니다. 단위·정적 검증만으로 AC-M2-09를 완료 처리하지 않습니다.
+2026-10-28 부모가 배정한 기존 전용 PG 슬롯·`T215_*` 입력과 깨끗한 소스로 실제 리허설11단계를 통과했습니다. 소스 archive·오프라인 설치·Prisma 생성·fixture 준비·실제 custom dump·stdin 복구·다음 월 진행·동일 시드 재생·원본 보존 대조를 확인했습니다. 각 단계는20초 안에 끝났고 정리 오류는0건이었습니다. Windows에서 실행한 이 증거만으로 Linux POSIX 권한이나 매일 백업·외부 보관·운영 cutover를 인수하지 않습니다.
+
+backup의 필수 `--release-sha`는40자리16진 문자열을 그대로 manifest에 기록합니다. 누락·형식 오류는 Docker 호출과 파일 생성 전에 거부하며 Git fallback은 없습니다. B1은 검토한 실제 소스 HEAD를 전달해 manifest와 대조하며 추적 수정이 있으면 시험을 거부합니다. B2가 운영 current SHA를 얻어 전달할 방법을 정합니다. 전체 AC-M2-09는 미완료입니다.
 
 ## 5. 프록시 경로
 
