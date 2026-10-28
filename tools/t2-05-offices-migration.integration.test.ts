@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { readFile, readdir } from 'node:fs/promises';
+import { setTimeout as delay } from 'node:timers/promises';
 import { expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import { initialReplayState, runReplayAction } from '../packages/rules/src/index';
@@ -42,27 +43,57 @@ async function withDatabase(run: (client: PgClient, db: ReturnType<typeof create
   const client = new Client({ connectionString: target.href });
   const db = createDb(target.href);
   let created = false;
+  let oid: string | undefined;
+  const errors: unknown[] = [];
   await admin.connect();
   try {
+    expect((await admin.query('SELECT oid FROM pg_database WHERE datname=$1', [name])).rows).toEqual([]);
     await admin.query(`CREATE DATABASE "${name}"`);
     created = true;
+    oid = (await admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname=$1', [name])).rows[0]?.oid as
+      string | undefined;
+    expect(oid).toMatch(/^\d+$/);
     await client.connect();
     await run(client, db);
+  } catch (error) {
+    errors.push(error);
   } finally {
+    const closed = await Promise.allSettled([client.end(), db.$disconnect()]);
+    for (const result of closed) if (result.status === 'rejected') errors.push(result.reason);
     try {
-      await client.end();
-      await db.$disconnect();
       if (created) {
-        const connections = await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1', [
+        expect(
+          closed.every((result) => result.status === 'fulfilled'),
+          '자체 연결 종료',
+        ).toBe(true);
+        expect(oid).toMatch(/^\d+$/);
+        const ownOid = async () =>
+          (await admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname=$1', [name])).rows;
+        expect(await ownOid()).toEqual([{ oid }]);
+        let connections = await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1', [
           name,
         ]);
+        for (let attempt = 0; connections.rows[0]?.count !== 0 && attempt < 20; attempt++) {
+          await delay(50);
+          connections = await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1', [
+            name,
+          ]);
+        }
         expect(connections.rows).toEqual([{ count: 0 }]);
+        expect(await ownOid()).toEqual([{ oid }]);
         await admin.query(`DROP DATABASE "${name}"`);
       }
+    } catch (error) {
+      errors.push(error);
     } finally {
-      await admin.end();
+      try {
+        await admin.end();
+      } catch (error) {
+        errors.push(error);
+      }
     }
   }
+  if (errors.length) throw new AggregateError(errors, '직책 migration 본문·연결·정리 검사 실패');
 }
 
 async function controlWorld(client: PgClient, id: string) {
@@ -335,6 +366,8 @@ it.each(['empty', 'legacy'] as const)(
         '20261031000000_operational_map',
         '20261101000000_campaign_state',
         '20261102000000_account_tokens',
+        '20261103000000_admin_role_audit',
+        '20261104000000_account_world_sanctions',
       ]);
       for (const directory of previous) {
         await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { protectedProcedure, router, verifiedProcedure } from '../trpc';
+import { protectedProcedure, router, worldVerifiedProcedure } from '../trpc';
 import { worldInput } from '../game/queries';
 import { readPersonnelBoard } from '../game/personnelQueries';
 import { readPersonnelRecent, readPersonnelRequest } from '../game/personnelRequests';
@@ -15,7 +15,7 @@ export const personnelRouter = router({
         readPersonnelBoard(tx, { worldId: input.worldId, userId: ctx.user.id }),
       ),
     ),
-  appoint: verifiedProcedure
+  appoint: worldVerifiedProcedure
     .input(requestInput.extend({ generalId, officerLevel: z.number().int().min(5).max(11) }))
     .mutation(({ ctx, input }) =>
       submitAndWaitPersonnel(ctx, {
@@ -25,7 +25,7 @@ export const personnelRouter = router({
         payload: { generalId: input.generalId, officerLevel: input.officerLevel },
       }),
     ),
-  dismiss: verifiedProcedure.input(requestInput.extend({ generalId })).mutation(({ ctx, input }) =>
+  dismiss: worldVerifiedProcedure.input(requestInput.extend({ generalId })).mutation(({ ctx, input }) =>
     submitAndWaitPersonnel(ctx, {
       worldId: input.worldId,
       requestId: input.requestId,

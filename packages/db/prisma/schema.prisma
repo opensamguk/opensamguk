@@ -65,6 +65,7 @@ model World {
   treaties        Treaty[]
   nationTrust     NationTrust[]
   assignmentOffers AssignmentOffer[]
+  sanctions       Sanction[]
 }
 
 enum AssignmentOfferStatus {
@@ -451,17 +452,66 @@ enum UserStatus {
   WITHDRAWN
 }
 
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum AuditActorKind {
+  ADMIN
+  CLI
+  ENGINE
+}
+
 model User {
   id           String @id @default(uuid())
   email        String @unique
   passwordHash String
   status       UserStatus @default(ACTIVE)
+  role         UserRole @default(USER)
   createdAt    DateTime @default(now())
   emailVerifiedAt DateTime?
   sessions     Session[]
   accountTokens AccountToken[]
   consents     ConsentRecord[]
   generals     General[]
+  sanctions    Sanction[]
+}
+
+model Sanction {
+  id          String @id @default(uuid())
+  userId      String
+  worldId     String?
+  reason      String
+  expiresAt   DateTime?
+  createdBy   String
+  createdAt   DateTime @default(now())
+  liftedAt    DateTime?
+  liftedBy    String?
+  liftReason  String?
+  user        User @relation(fields: [userId], references: [id], onDelete: NoAction)
+  world       World? @relation(fields: [worldId], references: [id], onDelete: NoAction)
+
+  @@index([userId, liftedAt])
+  @@index([worldId])
+}
+
+model AuditLog {
+  id           BigInt @id @default(autoincrement())
+  at           DateTime @default(now())
+  actorKind    AuditActorKind
+  actorUserId  String?
+  action       String
+  targetType   String
+  targetId     String?
+  worldId      String?
+  reason       String?
+  payload      Json
+  inputEventId BigInt?
+
+  @@index([at])
+  @@index([actorUserId, at])
+  @@index([worldId, at])
 }
 
 enum AccountTokenPurpose {
