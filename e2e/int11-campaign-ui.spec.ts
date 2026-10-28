@@ -317,13 +317,74 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
     await expect(previousCommanderRow.getByRole('cell').nth(11)).not.toContainText('훈련 부족');
     await owner.page.screenshot({ path: 'test-results/int11-formal-nation-commanded-army.png', fullPage: true });
     await owner.page.getByRole('button', { name: '소속 장수·도시 접기', exact: true }).click();
-    await owner.page.setViewportSize({ width: 375, height: 812 });
     await owner.page.reload();
     await expect(panel(owner)).toBeVisible();
-    expect(await owner.page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
+    await owner.page.setViewportSize({ width: 1440, height: 900 });
+    await expect(panel(owner).getByRole('button', { name: '빈 부곡 편성', exact: true })).toBeVisible();
+    const controls = panel(owner).locator('button, select');
+    const desktopFonts = await controls.evaluateAll((elements) =>
+      elements.map((element) => getComputedStyle(element).fontSize),
+    );
+    expect(desktopFonts.length).toBeGreaterThan(0);
+    await panel(owner).getByLabel('제안할 관계').selectOption('GUEST');
+    await panel(owner).getByLabel('새 부곡 지휘관').selectOption(String(npc!.id));
+    const selections = await panel(owner)
+      .locator('select')
+      .evaluateAll((elements) => elements.map((element) => element.value));
+    expect(selections.length).toBeGreaterThan(0);
+    await editor.locator('tr[data-slot="30"]').click();
+    await editor.getByLabel('명령 찾기').fill('농지 개간');
+    await editor.getByRole('radio', { name: '농지 개간', exact: true }).check();
+    await editor.getByRole('button', { name: /에 넣기$/ }).click();
+    await expect(editor.locator('tr[data-slot="30"]')).toContainText('농지 개간');
+    const localState = () =>
+      owner.page.evaluate(() => Object.entries(sessionStorage).sort(([a], [b]) => a.localeCompare(b)));
+    const draftBeforeResize = await localState();
+    expect(draftBeforeResize.length).toBeGreaterThan(0);
+    const turnsBeforeResize = await db.generalTurn.findMany({
+      where: { worldId },
+      orderBy: [{ generalId: 'asc' }, { slot: 'asc' }],
+    });
+    const inputsBeforeResize = await db.inputEvent.count({ where: { worldId } });
+    for (const width of [375, 390, 768, 1440]) {
+      await owner.page.setViewportSize({ width, height: 900 });
+      await expect(panel(owner)).toBeVisible();
+      expect(await owner.page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+      expect(await panel(owner).evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+      const sizes = await controls.evaluateAll((elements) =>
+        elements.flatMap((element) => {
+          const { width, height } = element.getBoundingClientRect();
+          if (!width || !height) return [];
+          return [
+            {
+              name: element.getAttribute('aria-label') ?? element.textContent?.trim().slice(0, 40),
+              width,
+              height,
+              fontSize: Number.parseFloat(getComputedStyle(element).fontSize),
+            },
+          ];
+        }),
+      );
+      expect(sizes.length).toBeGreaterThan(0);
+      expect(sizes.filter((size) => size.width < 44 || size.height < 44)).toEqual([]);
+      if (width < 768) expect(sizes.filter((size) => size.fontSize < 16)).toEqual([]);
+      else
+        expect(
+          await controls.evaluateAll((elements) => elements.map((element) => getComputedStyle(element).fontSize)),
+        ).toEqual(desktopFonts);
+      expect(
+        await panel(owner)
+          .locator('select')
+          .evaluateAll((elements) => elements.map((element) => element.value)),
+      ).toEqual(selections);
+      await expect(editor.locator('tr[data-slot="30"]')).toContainText('농지 개간');
+      expect(await localState()).toEqual(draftBeforeResize);
+    }
     expect(
-      (await panel(owner).getByRole('button', { name: '빈 부곡 편성' }).boundingBox())!.height,
-    ).toBeGreaterThanOrEqual(44);
+      await db.generalTurn.findMany({ where: { worldId }, orderBy: [{ generalId: 'asc' }, { slot: 'asc' }] }),
+    ).toEqual(turnsBeforeResize);
+    expect(await db.inputEvent.count({ where: { worldId } })).toBe(inputsBeforeResize);
+    await owner.page.setViewportSize({ width: 375, height: 812 });
     await owner.page.screenshot({ path: 'test-results/int11-formal-campaign-mobile.png', fullPage: true });
   } finally {
     await releaseHold(hold);
