@@ -156,7 +156,8 @@ test.describe('실제 PostgreSQL', () => {
 
   // 엔진 턴과 같은 순서로 잠근다. 리스를 잡고 한 트랜잭션에서 EngineLease 행을 잠근 채 삭제를 시작시킨다.
   // 삭제가 World 행을 쥔 채 이 연결의 EngineLease 잠금을 기다리는 것을 pg_blocking_pids로 확인한 뒤 World 행을 잠근다.
-  // 먼저 기다리기 시작한 삭제가 deadlock_timeout 뒤 교착을 찾아 스스로 끊긴다. 이 연결이 World 잠금을 얻으면
+  // 잠금을 쥔 시험 연결만 감지 시점을 늦춰 삭제가 먼저 교착을 찾게 한다. 시작 순서만으로 감지 순서를 가정하지 않는다.
+  // 이 연결이 World 잠금을 얻으면
   // 삭제가 끊겼다는 뜻이다. 반대로 이 연결이 끊기면 재현되지 않은 것이라 NOT_REPRODUCED로 실패한다.
   async function collide<T>(worldId: string, start: () => Promise<T>): Promise<PromiseSettledResult<T>> {
     const lease = await acquireLease(db, worldId, randomUUID(), 60_000);
@@ -166,6 +167,11 @@ test.describe('실제 PostgreSQL', () => {
     try {
       await db.$transaction(
         async (tx) => {
+          const [timing] = await tx.$queryRaw<{ timeoutMs: number }[]>`
+            SELECT setting::int AS "timeoutMs" FROM pg_settings WHERE name = 'deadlock_timeout'`;
+          if (!timing || timing.timeoutMs >= 10_000)
+            throw new Error('교착 재현은 삭제 연결의 deadlock_timeout이10초 미만인 전용 DB가 필요합니다.');
+          await tx.$executeRaw`SET LOCAL deadlock_timeout = '10s'`;
           await lockLease(tx, lease);
           const [row] = await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
           started = start().then(

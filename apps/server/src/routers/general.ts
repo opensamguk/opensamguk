@@ -12,7 +12,7 @@ import {
   statRulesSchema,
 } from '@opensamguk/rules';
 import { z } from 'zod';
-import { router, protectedProcedure } from '../trpc';
+import { router, protectedProcedure, verifiedProcedure } from '../trpc';
 import { requireGeneral, requireWorld, worldInput } from '../game/queries';
 import { ownGeneral } from '../game/projection';
 import { readPolicy, requirePolicyReady } from '../game/policy';
@@ -61,7 +61,7 @@ export const generalRouter = router({
       { isolationLevel: 'RepeatableRead' },
     ),
   ),
-  setPolicy: protectedProcedure
+  setPolicy: verifiedProcedure
     .input(worldInput.extend({ policy: policyKeySchema }))
     .mutation(async ({ ctx, input }) => {
       const started = performance.now();
@@ -117,7 +117,7 @@ export const generalRouter = router({
         await delay(Math.min(100, remaining));
       }
     }),
-  create: protectedProcedure.input(creationInputParser).mutation(async ({ ctx, input }) => {
+  create: verifiedProcedure.input(creationInputParser).mutation(async ({ ctx, input }) => {
     const started = performance.now();
     const { worldId, ...payload } = input;
     const id = await ctx.db.$transaction(async (tx) => {

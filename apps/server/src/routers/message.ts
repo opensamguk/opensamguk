@@ -1,7 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import { nowTick, toGameDate } from '@opensamguk/rules';
 import { z } from 'zod';
-import { protectedProcedure, router } from '../trpc';
+import { protectedProcedure, router, verifiedProcedure } from '../trpc';
 import { entityKey, worldInput } from '../queries';
 import {
   databaseTime,
@@ -49,7 +49,7 @@ export const messageRouter = router({
         { isolationLevel: 'RepeatableRead' },
       ),
     ),
-  send: protectedProcedure
+  send: verifiedProcedure
     .input(
       worldInput
         .extend({
@@ -153,7 +153,7 @@ export const messageRouter = router({
         { isolationLevel: 'RepeatableRead' },
       ),
     ),
-  markRead: protectedProcedure
+  markRead: verifiedProcedure
     .input(worldInput.extend({ ids: z.array(z.uuid()).min(1).max(100) }).strict())
     .mutation(({ ctx, input }) =>
       ctx.db.$transaction(async (tx) => {

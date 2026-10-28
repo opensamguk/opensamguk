@@ -32,109 +32,121 @@ function setCookie(ctx: Context, token: string) {
 }
 
 export const authRouter = router({
-  signup: publicProcedure.input(credentials).mutation(async ({ ctx, input }) => {
-    enforce(
-      ctx,
-      ctx.rateLimiter.consume([{ namespace: 'auth.signup.ip', key: ctx.ip, limit: 10, windowMs: 3_600_000 }]),
-    );
-    const passwordHash = await hashPassword(input.password);
-    const session = newSession(ctx.now);
-    const verification = ctx.accountMail ? newAccountToken('VERIFY_EMAIL', ctx.now) : null;
-    try {
-      const user = await ctx.db.$transaction(async (tx) => {
-        const user = await tx.user.create({
-          data: { email: input.email, passwordHash },
-          select: { id: true, email: true },
+  signup: publicProcedure
+    .meta({ accountAccess: 'recovery' })
+    .input(credentials)
+    .mutation(async ({ ctx, input }) => {
+      enforce(
+        ctx,
+        ctx.rateLimiter.consume([{ namespace: 'auth.signup.ip', key: ctx.ip, limit: 10, windowMs: 3_600_000 }]),
+      );
+      const passwordHash = await hashPassword(input.password);
+      const session = newSession(ctx.now);
+      const verification = ctx.accountMail ? newAccountToken('VERIFY_EMAIL', ctx.now) : null;
+      try {
+        const user = await ctx.db.$transaction(async (tx) => {
+          const user = await tx.user.create({
+            data: { email: input.email, passwordHash },
+            select: { id: true, email: true },
+          });
+          if (ctx.sessionId) {
+            await tx.session.deleteMany({ where: { id: ctx.sessionId } });
+          }
+          await tx.session.create({ data: { id: session.id, userId: user.id, expiresAt: session.expiresAt } });
+          if (verification) {
+            await tx.accountToken.create({
+              data: {
+                id: verification.id,
+                userId: user.id,
+                purpose: 'VERIFY_EMAIL',
+                expiresAt: verification.expiresAt,
+              },
+            });
+          }
+          return user;
         });
+        setCookie(ctx, session.token);
+        if (ctx.sessionId) {
+          ctx.closeSession?.(ctx.sessionId);
+          await notifySessionClosed(ctx.db, ctx.sessionId, () => ctx.reply.log.warn('실시간 알림 전송 실패'));
+        }
+        if (verification && ctx.accountMail) {
+          try {
+            await ctx.accountMail.transport.send(
+              accountMail(user.email, 'VERIFY_EMAIL', ctx.accountMail.origin, verification.token),
+            );
+          } catch {
+            ctx.reply.log.warn('가입 인증 메일 발송 실패');
+          }
+        }
+        return { user };
+      } catch (error) {
+        if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002') {
+          throw new TRPCError({ code: 'CONFLICT', message: '이미 등록된 이메일입니다.' });
+        }
+        throw error;
+      }
+    }),
+  login: publicProcedure
+    .meta({ accountAccess: 'recovery' })
+    .input(credentials)
+    .mutation(async ({ ctx, input }) => {
+      enforce(
+        ctx,
+        ctx.rateLimiter.consume([{ namespace: 'auth.login.ip', key: ctx.ip, limit: 30, windowMs: 900_000 }]),
+      );
+      const failures: LimitRule[] = [
+        { namespace: 'auth.login.failure', key: JSON.stringify([input.email, ctx.ip]), limit: 5, windowMs: 900_000 },
+      ];
+      enforce(ctx, ctx.rateLimiter.check(failures));
+      const user = await ctx.db.user.findUnique({ where: { email: input.email } });
+      const correct = await verifyPassword(user?.passwordHash ?? ctx.dummyPasswordHash, input.password);
+      if (!user || !correct || user.status !== 'ACTIVE') {
+        ctx.rateLimiter.consume(failures);
+        throw loginFailure();
+      }
+      const session = newSession(ctx.now);
+      await ctx.db.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${user.id} FOR SHARE`;
+        const current = await tx.user.findUnique({
+          where: { id: user.id },
+          select: { status: true, passwordHash: true, email: true },
+        });
+        if (
+          !current ||
+          current.status !== 'ACTIVE' ||
+          current.passwordHash !== user.passwordHash ||
+          current.email !== user.email
+        ) {
+          ctx.rateLimiter.consume(failures);
+          throw loginFailure();
+        }
         if (ctx.sessionId) {
           await tx.session.deleteMany({ where: { id: ctx.sessionId } });
         }
         await tx.session.create({ data: { id: session.id, userId: user.id, expiresAt: session.expiresAt } });
-        if (verification) {
-          await tx.accountToken.create({
-            data: {
-              id: verification.id,
-              userId: user.id,
-              purpose: 'VERIFY_EMAIL',
-              expiresAt: verification.expiresAt,
-            },
-          });
-        }
-        return user;
+        await queueLoginActivity(tx, user.id);
       });
       setCookie(ctx, session.token);
       if (ctx.sessionId) {
         ctx.closeSession?.(ctx.sessionId);
         await notifySessionClosed(ctx.db, ctx.sessionId, () => ctx.reply.log.warn('실시간 알림 전송 실패'));
       }
-      if (verification && ctx.accountMail) {
-        try {
-          await ctx.accountMail.transport.send(
-            accountMail(user.email, 'VERIFY_EMAIL', ctx.accountMail.origin, verification.token),
-          );
-        } catch {
-          ctx.reply.log.warn('가입 인증 메일 발송 실패');
-        }
-      }
-      return { user };
-    } catch (error) {
-      if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002') {
-        throw new TRPCError({ code: 'CONFLICT', message: '이미 등록된 이메일입니다.' });
-      }
-      throw error;
-    }
-  }),
-  login: publicProcedure.input(credentials).mutation(async ({ ctx, input }) => {
-    enforce(ctx, ctx.rateLimiter.consume([{ namespace: 'auth.login.ip', key: ctx.ip, limit: 30, windowMs: 900_000 }]));
-    const failures: LimitRule[] = [
-      { namespace: 'auth.login.failure', key: JSON.stringify([input.email, ctx.ip]), limit: 5, windowMs: 900_000 },
-    ];
-    enforce(ctx, ctx.rateLimiter.check(failures));
-    const user = await ctx.db.user.findUnique({ where: { email: input.email } });
-    const correct = await verifyPassword(user?.passwordHash ?? ctx.dummyPasswordHash, input.password);
-    if (!user || !correct || user.status !== 'ACTIVE') {
-      ctx.rateLimiter.consume(failures);
-      throw loginFailure();
-    }
-    const session = newSession(ctx.now);
-    await ctx.db.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${user.id} FOR SHARE`;
-      const current = await tx.user.findUnique({
-        where: { id: user.id },
-        select: { status: true, passwordHash: true, email: true },
-      });
-      if (
-        !current ||
-        current.status !== 'ACTIVE' ||
-        current.passwordHash !== user.passwordHash ||
-        current.email !== user.email
-      ) {
-        ctx.rateLimiter.consume(failures);
-        throw loginFailure();
-      }
+      return { user: { id: user.id, email: user.email } };
+    }),
+  logout: publicProcedure
+    .meta({ accountAccess: 'recovery' })
+    .input(z.void())
+    .mutation(async ({ ctx }) => {
       if (ctx.sessionId) {
-        await tx.session.deleteMany({ where: { id: ctx.sessionId } });
+        await ctx.db.$transaction(async (tx) => {
+          await tx.session.deleteMany({ where: { id: ctx.sessionId! } });
+        });
+        ctx.closeSession?.(ctx.sessionId);
+        await notifySessionClosed(ctx.db, ctx.sessionId, () => ctx.reply.log.warn('실시간 알림 전송 실패'));
       }
-      await tx.session.create({ data: { id: session.id, userId: user.id, expiresAt: session.expiresAt } });
-      await queueLoginActivity(tx, user.id);
-    });
-    setCookie(ctx, session.token);
-    if (ctx.sessionId) {
-      ctx.closeSession?.(ctx.sessionId);
-      await notifySessionClosed(ctx.db, ctx.sessionId, () => ctx.reply.log.warn('실시간 알림 전송 실패'));
-    }
-    return { user: { id: user.id, email: user.email } };
-  }),
-  logout: publicProcedure.input(z.void()).mutation(async ({ ctx }) => {
-    if (ctx.sessionId) {
-      await ctx.db.$transaction(async (tx) => {
-        await tx.session.deleteMany({ where: { id: ctx.sessionId! } });
-      });
-      ctx.closeSession?.(ctx.sessionId);
-      await notifySessionClosed(ctx.db, ctx.sessionId, () => ctx.reply.log.warn('실시간 알림 전송 실패'));
-    }
-    ctx.reply.clearCookie('sid', { path: '/', httpOnly: true, sameSite: 'lax', secure: ctx.secureCookies });
-    return { ok: true as const };
-  }),
+      ctx.reply.clearCookie('sid', { path: '/', httpOnly: true, sameSite: 'lax', secure: ctx.secureCookies });
+      return { ok: true as const };
+    }),
   me: publicProcedure.input(z.void()).query(({ ctx }) => ({ user: ctx.user })),
 });

@@ -17,5 +17,6 @@ export interface Context {
   ip: string;
   rateLimiter: ReturnType<typeof createRateLimiter>;
   accountMail?: { transport: MailTransport; origin: string } | undefined;
+  emailVerificationRequired?: boolean | undefined;
   closeSession?: ((sessionId: string) => void) | undefined;
 }

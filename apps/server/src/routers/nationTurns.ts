@@ -1,7 +1,7 @@
 import { editArray, type ArrayEdit } from '@opensamguk/shared';
 import type { QueuedTurn } from '@opensamguk/rules';
 import { z } from 'zod';
-import { protectedProcedure, router } from '../trpc';
+import { protectedProcedure, router, verifiedProcedure } from '../trpc';
 import { worldInput } from '../game/queries';
 import { commandInput, slotInput } from '../game/slots';
 import { personnelIdentity, withPersonnel } from '../game/personnelApi';
@@ -58,12 +58,12 @@ export const nationTurnsRouter = router({
     .query(({ ctx, input }) =>
       withPersonnel(ctx, input.worldId, (tx) => readNationOfficeTabs(tx, input.worldId, ctx.user.id)),
     ),
-  set: protectedProcedure
+  set: verifiedProcedure
     .input(saveInput.extend({ slots: z.array(slotInput).length(12) }))
     .mutation(({ ctx, input }) =>
       save(ctx, input, (_old, world, level) => input.slots.map((slot) => parseOfficeTurn(world, level, slot))),
     ),
-  edit: protectedProcedure.input(saveInput.extend({ op: editInput })).mutation(({ ctx, input }) =>
+  edit: verifiedProcedure.input(saveInput.extend({ op: editInput })).mutation(({ ctx, input }) =>
     save(ctx, input, (old, world, level) => {
       const op: ArrayEdit<QueuedTurn> =
         'put' in input.op

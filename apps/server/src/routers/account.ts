@@ -44,39 +44,47 @@ export const accountRouter = router({
     return {
       email: user.email,
       emailVerified: user.emailVerifiedAt !== null,
+      emailVerificationRequired: ctx.emailVerificationRequired ?? false,
       consents: user.consents.map((consent) => ({ ...consent, agreedAt: consent.agreedAt.toISOString() })),
     };
   }),
-  resendVerification: protectedProcedure.input(z.void()).mutation(async ({ ctx }) => {
-    const user = await ctx.db.user.findUniqueOrThrow({
-      where: { id: ctx.user.id },
-      select: { email: true, emailVerifiedAt: true },
-    });
-    if (user.emailVerifiedAt !== null) return ok;
-    if (!ctx.accountMail) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
-    const decision = ctx.rateLimiter.consume([
-      { namespace: 'mail.verify.resend', key: ctx.user.id, limit: 1, windowMs: 60_000 },
-      { namespace: 'mail.verify.resend', key: ctx.user.id, limit: 5, windowMs: 86_400_000 },
-    ]);
-    if (!decision.allowed) {
-      ctx.reply.header('Retry-After', String(decision.retryAfterSeconds));
-      throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: '잠시 뒤 다시 요청하세요.' });
-    }
-    const issued = await issueAccountToken(ctx.db, ctx.user.id, 'VERIFY_EMAIL', ctx.now);
-    if (!issued) throw new TRPCError({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' });
-    try {
-      await send(ctx, user.email, 'VERIFY_EMAIL', issued.token);
-    } catch {
-      ctx.reply.log.warn('인증 메일 발송 실패');
-    }
-    return ok;
-  }),
-  verifyEmail: publicProcedure.input(tokenInput).mutation(async ({ ctx, input }) => {
-    limitTokenAttempts(ctx);
-    if (!(await verifyEmailToken(ctx.db, input.token, ctx.now))) invalidToken();
-    return ok;
-  }),
+  resendVerification: protectedProcedure
+    .meta({ accountAccess: 'recovery' })
+    .input(z.void())
+    .mutation(async ({ ctx }) => {
+      const user = await ctx.db.user.findUniqueOrThrow({
+        where: { id: ctx.user.id },
+        select: { email: true, emailVerifiedAt: true },
+      });
+      if (user.emailVerifiedAt !== null) return ok;
+      if (!ctx.accountMail) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+      const decision = ctx.rateLimiter.consume([
+        { namespace: 'mail.verify.resend', key: ctx.user.id, limit: 1, windowMs: 60_000 },
+        { namespace: 'mail.verify.resend', key: ctx.user.id, limit: 5, windowMs: 86_400_000 },
+      ]);
+      if (!decision.allowed) {
+        ctx.reply.header('Retry-After', String(decision.retryAfterSeconds));
+        throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: '잠시 뒤 다시 요청하세요.' });
+      }
+      const issued = await issueAccountToken(ctx.db, ctx.user.id, 'VERIFY_EMAIL', ctx.now);
+      if (!issued) throw new TRPCError({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' });
+      try {
+        await send(ctx, user.email, 'VERIFY_EMAIL', issued.token);
+      } catch {
+        ctx.reply.log.warn('인증 메일 발송 실패');
+      }
+      return ok;
+    }),
+  verifyEmail: publicProcedure
+    .meta({ accountAccess: 'recovery' })
+    .input(tokenInput)
+    .mutation(async ({ ctx, input }) => {
+      limitTokenAttempts(ctx);
+      if (!(await verifyEmailToken(ctx.db, input.token, ctx.now))) invalidToken();
+      return ok;
+    }),
   requestPasswordReset: publicProcedure
+    .meta({ accountAccess: 'recovery' })
     .input(z.strictObject({ email: z.string().trim().toLowerCase().email().max(254) }))
     .mutation(async ({ ctx, input }) => {
       const decision = ctx.rateLimiter.consume([
@@ -94,6 +102,7 @@ export const accountRouter = router({
       return ok;
     }),
   resetPassword: publicProcedure
+    .meta({ accountAccess: 'recovery' })
     .input(tokenInput.extend({ password: passwordSchema }))
     .mutation(async ({ ctx, input }) => {
       limitTokenAttempts(ctx);
