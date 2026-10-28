@@ -1,4 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import {
   createRootRouteWithContext,
   createRoute,
@@ -37,6 +38,8 @@ import { ResetPasswordPage } from './account/ResetPasswordPage';
 import { VerifyEmailPage } from './account/VerifyEmailPage';
 import { AccountPage } from './account/AccountPage';
 import { takeTokenFragment } from './account/tokenEntry';
+import { accountNext, isVerificationDenied, needsEmailVerification } from './account/access';
+import { publicFailure } from './auth/credentials';
 
 // 주소 체계: docs/plans/T1-13.md. 로그인 가드: docs/frontend-ui-guidelines.md §4.
 interface RouterContext {
@@ -45,7 +48,7 @@ interface RouterContext {
 }
 
 const rootRoute = createRootRouteWithContext<RouterContext>()({
-  component: Outlet,
+  component: RootFrame,
   notFoundComponent: () => (
     <main style={{ maxWidth: 480, margin: '64px auto' }}>
       <EmptyState title="없는 주소입니다" />
@@ -53,11 +56,46 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
   ),
 });
 
+function RootFrame() {
+  const router = useRouter();
+  useEffect(
+    () =>
+      queryClient.getMutationCache().subscribe((event) => {
+        if (event.type !== 'updated' || event.action.type !== 'error' || !isVerificationDenied(event.action.error))
+          return;
+        if (router.state.location.pathname === '/verify-email') return;
+        void queryClient.invalidateQueries({ queryKey: trpc.account.get.queryKey() });
+        void router.navigate({
+          to: '/verify-email',
+          search: { next: accountNext(router.state.location.href) ?? '/lobby' },
+          replace: true,
+        });
+      }),
+    [router],
+  );
+  return <Outlet />;
+}
+
 // 화면 이동마다 서버에 세션을 다시 묻는다. 캐시만 보면 다른 탭에서 로그아웃했거나
 // 세션이 만료된 뒤에도 이전 사용자로 통과한다 (T1-14 Codex 리뷰 1).
 async function currentUser({ queryClient, trpc }: RouterContext) {
   const { user } = await queryClient.fetchQuery({ ...trpc.auth.me.queryOptions(), staleTime: 0 });
   return user;
+}
+
+async function requireGameAccess(context: RouterContext, next: string) {
+  const destination = accountNext(next) ?? '/lobby';
+  if (!(await currentUser(context)))
+    throw redirect({ to: '/login', search: destination === '/' ? {} : { next: destination } });
+  let account;
+  try {
+    account = await context.queryClient.fetchQuery({ ...context.trpc.account.get.queryOptions(), staleTime: 0 });
+  } catch (error) {
+    if (publicFailure(error)?.code === 'UNAUTHORIZED') throw redirect({ to: '/login', search: { next: destination } });
+    throw error;
+  }
+  if (needsEmailVerification(account))
+    throw redirect({ to: '/verify-email', search: { next: destination }, replace: true });
 }
 
 function GuardError() {
@@ -72,10 +110,14 @@ function GuardError() {
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  beforeLoad: async ({ context }) => {
-    if (!(await currentUser(context))) throw redirect({ to: '/login' });
+  validateSearch: (search: Record<string, unknown>): { next?: string } => {
+    const next = accountNext(search.next);
+    return next ? { next } : {};
+  },
+  beforeLoad: async ({ context, search }) => {
+    await requireGameAccess(context, search.next ?? '/');
     // 로그인했으면 로비로 보낸다 (T2-04). 예전에는 첫 RUNNING 월드로 보냈다 (T1-16).
-    throw redirect({ to: '/lobby', replace: true });
+    throw redirect({ href: search.next && search.next !== '/' ? search.next : '/lobby', replace: true });
   },
   errorComponent: GuardError,
 });
@@ -119,10 +161,14 @@ const resetPasswordRoute = createRoute({
 const verifyEmailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'verify-email',
-  beforeLoad: async ({ context, location, preload }) => {
+  validateSearch: (search: Record<string, unknown>): { next?: string } => {
+    const next = accountNext(search.next);
+    return next ? { next } : {};
+  },
+  beforeLoad: async ({ context, location, search, preload }) => {
     const accountToken = takeTokenFragment(location.hash, !preload);
     if (accountToken.kind === 'missing' && !(await currentUser(context)))
-      throw redirect({ to: '/login', search: { next: '/verify-email' } });
+      throw redirect({ to: '/login', search: { next: search.next ?? '/verify-email' } });
     return { accountToken, tokenEntryKey: crypto.randomUUID() };
   },
   component: function VerifyTokenRoute() {
@@ -146,7 +192,7 @@ const notificationSettingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'settings/notifications',
   beforeLoad: async ({ context, location }) => {
-    if (!(await currentUser(context))) throw redirect({ to: '/login', search: { next: location.href } });
+    await requireGameAccess(context, location.href);
   },
   component: NotificationSettingsPage,
   errorComponent: GuardError,
@@ -157,7 +203,7 @@ const worldRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'w/$worldId',
   beforeLoad: async ({ context, location }) => {
-    if (!(await currentUser(context))) throw redirect({ to: '/login', search: { next: location.href } });
+    await requireGameAccess(context, location.href);
   },
   component: GameLayout,
   errorComponent: GuardError,

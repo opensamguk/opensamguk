@@ -99,6 +99,9 @@ export function GameLayout() {
           open={messagesOpen}
           onToggle={() => (messagesOpen ? closeMessages() : setMessagesOpen(true))}
         />
+        <Link to="/account" className={styles.account}>
+          내 계정
+        </Link>
         <Link to="/settings/notifications" className={styles.account}>
           알림 설정
         </Link>
