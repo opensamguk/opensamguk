@@ -299,9 +299,17 @@ describe.each(ready)('S8 $key 전체 장수가 있는 DB 월드', (row) => {
   const owned = ownedDatabase();
   let fixture: Fixture;
   let worldId: string;
-  // DB 준비·한 달 정산·소유 DB 정리는 각각 기존 30초 제한을 지킨다.
+  // 준비·월내 각 구간·정리는 기존 30초 제한을 지킨다. 월 전체의 성능 제한은 아니다.
   let preparation: Promise<void> | undefined;
-  let execution: Promise<void> | undefined;
+  const executions = new Set<Promise<void>>();
+  const checkpoints = Array.from({ length: TICKS_PER_MONTH / 1000 }, (_, index) => (index + 1) * 1000);
+  const batches = [checkpoints.slice(0, 4), checkpoints.slice(4, 8), checkpoints.slice(8)];
+  const executedTicks: number[] = [];
+  const phaseMs: number[] = [];
+  let completedTick = 0,
+    active = false,
+    failed = false,
+    startedAt: number | undefined;
   beforeAll(() => {
     preparation = (async () => {
       fixture = await owned.setup();
@@ -321,30 +329,93 @@ describe.each(ready)('S8 $key 전체 장수가 있는 DB 월드', (row) => {
     // Vitest의 hook timeout은 원래 Promise를 취소하지 않는다. 생성이 끝난 뒤 자기 DB를 정리한다.
     // 준비 오류는 beforeAll이 이미 실패로 기록하며 정리 오류는 이 hook에서 따로 보고한다.
     await preparation?.catch(() => undefined);
-    await execution?.catch(() => undefined);
+    while (executions.size) await Promise.allSettled([...executions]);
+    console.info(
+      JSON.stringify({
+        fixture: 'scenario-S8-month',
+        scenario: row.key,
+        completedTick,
+        executedTicks,
+        phaseMs: phaseMs.map(Math.round),
+        totalPhaseMs: Math.round(phaseMs.reduce((sum, value) => sum + value, 0)),
+        elapsedMonthMs: startedAt === undefined ? null : Math.round(performance.now() - startedAt),
+        failed,
+      }),
+    );
     await owned.close();
   });
-  it('한 달 정산과 연감 스냅샷을 저장한다', () => {
-    execution = (async () => {
-      const { db } = fixture;
-      await controlClock(db, worldId, 'start');
-      const lease = await acquireLease(db, worldId);
-      if (!lease) throw new Error('시나리오 월드의 실행권을 얻지 못했습니다.');
-      try {
-        const loop = new TurnLoop(db, lease);
-        for (let tick = 1000; tick <= TICKS_PER_MONTH; tick += 1000) {
-          await renewLease(db, lease);
-          await loop.advanceTo(tick);
+  for (const [index, ticks] of batches.entries()) {
+    const from = index === 0 ? 0 : batches[index - 1]!.at(-1)!,
+      target = ticks.at(-1)!;
+    it(`월내 ${index + 1}구간 ${from}~${target}tick과 정산 경계를 저장한다`, ({ onTestFailed }) => {
+      // Vitest timeout 뒤 원래 Promise가 성공해도 뒤 구간을 다시 열지 않는다.
+      onTestFailed(() => {
+        failed = true;
+      });
+      if (failed || active || completedTick !== from)
+        throw new Error('시나리오 앞 구간이 실패했거나 아직 끝나지 않았습니다.');
+      active = true;
+      startedAt ??= performance.now();
+      const execution = (async () => {
+        const began = performance.now(),
+          { db } = fixture,
+          errors: unknown[] = [];
+        let lease: Awaited<ReturnType<typeof acquireLease>> = null;
+        try {
+          expect((await db.world.findUniqueOrThrow({ where: { id: worldId } })).clockTick).toBe(from);
+          if (index === 0) await controlClock(db, worldId, 'start');
+          lease = await acquireLease(db, worldId);
+          if (!lease) throw new Error('시나리오 월드의 실행권을 얻지 못했습니다.');
+          const loop = new TurnLoop(db, lease);
+          for (const tick of ticks) {
+            await renewLease(db, lease);
+            await loop.advanceTo(tick);
+            executedTicks.push(tick);
+          }
+          const saved = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+          expect(saved.clockTick).toBe(target);
+          expect(await db.general.count({ where: { worldId } })).toBe(row.expected!.generals);
+          if (target === TICKS_PER_MONTH) {
+            expect(saved.monthlyTick).toBe(TICKS_PER_MONTH);
+            expect(executedTicks).toEqual(checkpoints);
+            expect(
+              await db.yearbookSnapshot.findUnique({
+                where: { worldId_tick: { worldId, tick: TICKS_PER_MONTH } },
+              }),
+            ).not.toBeNull();
+          } else {
+            expect(saved.monthlyTick).toBe(0);
+            expect(
+              await db.yearbookSnapshot.findUnique({
+                where: { worldId_tick: { worldId, tick: TICKS_PER_MONTH } },
+              }),
+            ).toBeNull();
+          }
+        } catch (error) {
+          errors.push(error);
+        } finally {
+          if (lease)
+            try {
+              await releaseLease(db, lease);
+            } catch (error) {
+              errors.push(error);
+            }
+          phaseMs[index] = performance.now() - began;
         }
-      } finally {
-        await releaseLease(db, lease);
-      }
-      const saved = await db.world.findUniqueOrThrow({ where: { id: worldId } });
-      expect(saved.clockTick).toBe(TICKS_PER_MONTH);
-      expect(
-        await db.yearbookSnapshot.findUnique({ where: { worldId_tick: { worldId, tick: TICKS_PER_MONTH } } }),
-      ).not.toBeNull();
-    })();
-    return execution;
-  });
+        if (errors.length) {
+          failed = true;
+          throw new AggregateError(errors, '시나리오 구간 실행과 실행권 해제 실패');
+        }
+        completedTick = target;
+      })();
+      executions.add(execution);
+      void execution
+        .finally(() => {
+          active = false;
+          executions.delete(execution);
+        })
+        .catch(() => undefined);
+      return execution;
+    });
+  }
 });
