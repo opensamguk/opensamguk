@@ -537,6 +537,16 @@ enum ConsentDocType {
   PRIVACY
 }
 
+// 발행한 판의 본문·시행일을 고정한다. 사용자와 게임 데이터는 담지 않는다.
+model LegalDocumentVersion {
+  docType     ConsentDocType
+  version     String
+  effectiveAt DateTime
+  bodySha256  String
+
+  @@id([docType, version])
+}
+
 model ConsentRecord {
   id        String @id @default(uuid())
   userId    String

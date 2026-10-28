@@ -273,7 +273,8 @@ for (const path of ['legal.current', 'legal.agree'])
               ? 401
               : 200;
         expect(result.status).toBe(expected);
-        if (path === 'legal.current' && expected === 200) expect(result.data).toEqual({ status: 'current', ...policy });
+        if (path === 'legal.current' && expected === 200)
+          expect(result.data).toEqual({ status: 'current', ...policy, signupRequiresPolicy: false });
         expect(await db.consentRecord.count({ where: { userId: actor.id } })).toBe(
           path === 'legal.agree' && expected === 200 ? 1 : 0,
         );
@@ -305,7 +306,12 @@ it('승인 전에는 운영 가입·변경·동의를 막고 개발 계정·동�
       cookie = await session(actor.id);
     const server = await serverFor({ policy: null, production });
     const request = (path: string, input: unknown) => call(path, input, cookie, server.address, server.origin);
-    expect((await request('legal.current', undefined)).data).toEqual({ status: 'pending', terms: null, privacy: null });
+    expect((await request('legal.current', undefined)).data).toEqual({
+      status: 'pending',
+      terms: null,
+      privacy: null,
+      signupRequiresPolicy: production,
+    });
     expect((await request('legal.agree', { docType: 'TERMS', version: policy.terms.version })).status).toBe(503);
     expect((await request('account.get', undefined)).data).toMatchObject({
       legalPolicyApproved: false,
@@ -591,6 +597,192 @@ it('두 정식 월드의 미동의 변경은 전부403·무변경이며 실제 �
   expect(await db.generalTurn.count({ where: { worldId, generalId } })).toBe(30);
   expect(await db.world.findUniqueOrThrow({ where: { id: formalWorlds[1]! } })).toEqual(other);
   expect(await db.general.count({ where: { worldId: formalWorlds[1]!, userId: null } })).toBe(491);
+});
+
+function published() {
+  const suffix = randomUUID();
+  return {
+    terms: { version: 'terms-' + suffix, effectiveAt: '2026-10-01T00:00:00Z', bodyText: '시험 이용약관 ' + suffix },
+    privacy: {
+      version: 'privacy-' + suffix,
+      effectiveAt: '2026-10-01T00:00:00Z',
+      bodyText: '시험 개인정보처리방침 ' + suffix,
+    },
+  };
+}
+const versionRows = (value: LegalPolicy) =>
+  db.legalDocumentVersion.findMany({
+    where: {
+      OR: [
+        { docType: 'TERMS', version: value.terms.version },
+        { docType: 'PRIVACY', version: value.privacy.version },
+      ],
+    },
+    orderBy: { docType: 'asc' },
+  });
+
+it('실제 서버는 본문 두 판을 한 번만 고정하고 같은 설정 재시작을 허용한다', async () => {
+  const value = published();
+  const first = await serverFor({ policy: value });
+  expect((await call('legal.current', undefined, undefined, first.address, first.origin)).data).toEqual({
+    status: 'current',
+    ...value,
+    signupRequiresPolicy: false,
+  });
+  const rows = await versionRows(value);
+  expect(rows.length).toBe(2);
+  for (const row of rows) {
+    const document = value[row.docType === 'TERMS' ? 'terms' : 'privacy'];
+    expect(row.bodySha256).toBe(createHash('sha256').update(document.bodyText, 'utf8').digest('hex'));
+    expect(row.effectiveAt.toISOString()).toBe(document.effectiveAt.replace('Z', '.000Z'));
+  }
+  const before = await gameSnapshot(true);
+  await serverFor({ policy: value });
+  expect(await gameSnapshot(true)).toBe(before);
+});
+it('같은 판의 본문·시행일 변경은 시작 전에 거부하며 두 문서와 기존 동의를 보존한다', async () => {
+  const value = published(),
+    actor = await user();
+  await serverFor({ policy: value });
+  await db.consentRecord.createMany({
+    data: [
+      { userId: actor.id, docType: 'TERMS', version: value.terms.version },
+      { userId: actor.id, docType: 'PRIVACY', version: value.privacy.version },
+    ],
+  });
+  const before = await gameSnapshot(true);
+  for (const changed of [
+    { ...value, terms: { ...value.terms, bodyText: '바꾼 시험 본문' } },
+    { ...value, privacy: { ...value.privacy, effectiveAt: '2026-10-02T00:00:00Z' } },
+    {
+      terms: { ...value.terms, version: 'new-' + randomUUID() },
+      privacy: { ...value.privacy, bodyText: '바꾼 시험 본문' },
+    },
+  ]) {
+    await expect(serverFor({ policy: changed })).rejects.toMatchObject({ kind: 'changed' });
+    expect(await gameSnapshot(true)).toBe(before);
+  }
+});
+it('과거 동의의 본문을 알 수 없는 판은 발행하지 않고 원문·기록을 추측해 채우지 않는다', async () => {
+  const value = published(),
+    actor = await user();
+  await db.consentRecord.create({ data: { userId: actor.id, docType: 'PRIVACY', version: value.privacy.version } });
+  const before = await gameSnapshot(true);
+  await expect(serverFor({ policy: value })).rejects.toMatchObject({ kind: 'legacy' });
+  expect(await versionRows(value)).toEqual([]);
+  expect(await gameSnapshot(true)).toBe(before);
+});
+it('새 판의 발행은 옛 동의를 보존하고 현재 판의 동의를 새로 요구한다', async () => {
+  const value = published(),
+    actor = await user(),
+    cookie = await session(actor.id);
+  await serverFor({ policy: value });
+  await db.consentRecord.createMany({
+    data: [
+      { userId: actor.id, docType: 'TERMS', version: value.terms.version },
+      { userId: actor.id, docType: 'PRIVACY', version: value.privacy.version },
+    ],
+  });
+  const previous = await db.consentRecord.findMany({ where: { userId: actor.id }, orderBy: { docType: 'asc' } });
+  const next = published(),
+    server = await serverFor({ policy: next });
+  expect((await call('account.get', undefined, cookie, server.address, server.origin)).data).toMatchObject({
+    consentRequired: ['TERMS', 'PRIVACY'],
+  });
+  expect(await db.consentRecord.findMany({ where: { userId: actor.id }, orderBy: { docType: 'asc' } })).toEqual(
+    previous,
+  );
+  expect(await versionRows(value)).toHaveLength(2);
+  expect(await versionRows(next)).toHaveLength(2);
+});
+it('실제로 동시에 기다린 서로 다른 본문은 한 쌍만 발행한다', async () => {
+  const first = published(),
+    second = {
+      terms: { ...first.terms, bodyText: '다른 시험 약관' },
+      privacy: { ...first.privacy, bodyText: '다른 시험 방침' },
+    };
+  const failures: unknown[] = [];
+  let running: Promise<PromiseSettledResult<Awaited<ReturnType<typeof serverFor>>>[]> | undefined;
+  await client.query('BEGIN');
+  try {
+    await client.query('LOCK TABLE "LegalDocumentVersion" IN SHARE MODE');
+    running = Promise.allSettled([serverFor({ policy: first }), serverFor({ policy: second })]);
+    await expect
+      .poll(
+        async () =>
+          Number(
+            (
+              await admin.query(
+                "SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1 AND wait_event_type='Lock' AND query LIKE '%LegalDocumentVersion%'",
+                [name],
+              )
+            ).rows[0]!.count,
+          ),
+        { timeout: 3000 },
+      )
+      .toBe(2);
+  } catch (error) {
+    failures.push(error);
+  }
+  try {
+    await client.query('ROLLBACK');
+  } catch (error) {
+    failures.push(error);
+  }
+  const results = running ? await running : [];
+  if (failures.length) {
+    for (const result of results) {
+      if (result.status === 'rejected') failures.push(result.reason);
+    }
+    throw new AggregateError(failures, '동시 발행 대기·정리 실패.');
+  }
+  expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+  const rejected = results.find((result) => result.status === 'rejected');
+  expect(rejected?.status === 'rejected' && rejected.reason?.kind === 'changed').toBe(true);
+  const winner = results[0]?.status === 'fulfilled' ? first : second;
+  const rows = await versionRows(first);
+  expect(rows).toHaveLength(2);
+  for (const row of rows)
+    expect(row.bodySha256).toBe(
+      createHash('sha256')
+        .update(winner[row.docType === 'TERMS' ? 'terms' : 'privacy'].bodyText)
+        .digest('hex'),
+    );
+});
+it('A의 me 직후 B로 로그인한 실제 쿠키로 A의 동의를 기록할 수 없다', async () => {
+  const first = await user(),
+    second = await user(),
+    cookie = await session(first.id);
+  expect((await call('auth.me', undefined, cookie)).data).toMatchObject({ user: { id: first.id } });
+  const login = await call('auth.login', { email: second.email, password }, cookie);
+  expect(login.status).toBe(200);
+  expect(login.cookie).toBeDefined();
+  sensitive.add(login.cookie!);
+  sensitive.add(login.cookie!.slice(4));
+  const before = await gameSnapshot(true);
+  expect(
+    (
+      await call(
+        'legal.agree',
+        { docType: 'TERMS', version: policy.terms.version, expectedUserId: first.id },
+        login.cookie,
+      )
+    ).status,
+  ).toBe(401);
+  expect(await gameSnapshot(true)).toBe(before);
+  expect(await db.consentRecord.count({ where: { userId: { in: [first.id, second.id] } } })).toBe(0);
+  for (let i = 0; i < 2; i++)
+    expect(
+      (
+        await call(
+          'legal.agree',
+          { docType: 'TERMS', version: policy.terms.version, expectedUserId: second.id },
+          login.cookie,
+        )
+      ).status,
+    ).toBe(200);
+  expect(await db.consentRecord.count({ where: { userId: second.id } })).toBe(1);
+  expect(await db.consentRecord.count({ where: { userId: first.id } })).toBe(0);
 });
 
 it('실제 요청·오류 로그에 계정·비밀번호·세션·DB 오류 원문을 남기지 않는다', async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { missingConsents, resolveLegalPolicy, type LegalPolicy } from './policy';
+import { hasLegalBodies, missingConsents, resolveLegalPolicy, type LegalPolicy } from './policy';
 
 const now = Date.parse('2026-10-28T00:00:00Z');
 const policy: LegalPolicy = {
@@ -7,6 +7,19 @@ const policy: LegalPolicy = {
   privacy: { version: 'test-privacy-1', effectiveAt: '2026-10-27T00:00:00Z' },
 };
 describe('T3-02 AC-M3-02 승인 전 판과 실제 동의 대조', () => {
+  it('본문은 두 문서가 함께 있어야 하고 공백·UTF8 초과를 거부한다', () => {
+    expect(hasLegalBodies(resolveLegalPolicy(policy, now)!)).toBe(false);
+    const complete = {
+      terms: { ...policy.terms, bodyText: '시험 이용약관' },
+      privacy: { ...policy.privacy, bodyText: '시험 개인정보처리방침' },
+    };
+    expect(hasLegalBodies(resolveLegalPolicy(complete, now)!)).toBe(true);
+    expect(() => resolveLegalPolicy({ ...complete, privacy: policy.privacy }, now)).toThrow();
+    for (const bodyText of ['', ' \n\t', '가'.repeat(21846), 'x'.repeat(65537)])
+      expect(() => resolveLegalPolicy({ ...complete, terms: { ...complete.terms, bodyText } }, now)).toThrow();
+    const boundary = { ...complete, terms: { ...complete.terms, bodyText: '가'.repeat(21845) + 'a' } };
+    expect(resolveLegalPolicy(boundary, now)?.terms.bodyText === boundary.terms.bodyText).toBe(true);
+  });
   it('승인된 현재 판이 없으면 임의 판과 과거 동의를 만들지 않는다', () => {
     expect(resolveLegalPolicy(undefined, now)).toBeNull();
     expect(resolveLegalPolicy(null, now)).toBeNull();

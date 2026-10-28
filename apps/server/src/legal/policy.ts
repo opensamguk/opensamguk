@@ -3,16 +3,31 @@ import { z } from 'zod';
 const document = z.strictObject({
   version: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/),
   effectiveAt: z.iso.datetime(),
+  bodyText: z
+    .string()
+    .max(65536)
+    .refine((value) => value.trim().length > 0 && Buffer.byteLength(value, 'utf8') <= 65536)
+    .optional(),
 });
-const policySchema = z.strictObject({ terms: document, privacy: document });
+const policySchema = z
+  .strictObject({ terms: document, privacy: document })
+  .refine((value) => (value.terms.bodyText === undefined) === (value.privacy.bodyText === undefined));
 export type LegalPolicy = Readonly<{
   terms: Readonly<z.infer<typeof document>>;
   privacy: Readonly<z.infer<typeof document>>;
 }>;
 export type ConsentDocument = 'TERMS' | 'PRIVACY';
+export type PublishedLegalPolicy = Readonly<{
+  terms: LegalPolicy['terms'] & Readonly<{ bodyText: string }>;
+  privacy: LegalPolicy['privacy'] & Readonly<{ bodyText: string }>;
+}>;
+
+export function hasLegalBodies(policy: LegalPolicy): policy is PublishedLegalPolicy {
+  return typeof policy.terms.bodyText === 'string' && typeof policy.privacy.bodyText === 'string';
+}
 
 // 본문·시행일·운영자와 보존 기준의 사용자 승인 뒤 검토 커밋에서만 현재 판을 고정한다.
-const approvedPolicy: LegalPolicy | null = null;
+const approvedPolicy: PublishedLegalPolicy | null = null;
 
 export function resolveLegalPolicy(policy: LegalPolicy | null | undefined, now: number): LegalPolicy | null {
   const candidate = policy === undefined ? approvedPolicy : policy;
