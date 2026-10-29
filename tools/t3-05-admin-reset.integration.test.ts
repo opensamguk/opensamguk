@@ -1354,7 +1354,23 @@ it('AC-M3-04 D2 crash 뒤 실제 새 --world 엔진은 같은 UUID·시드를 �
     failures: unknown[] = [];
   try {
     await checked(() => expect.poll(async () => (await eventFor(payload)).status, { timeout: 23000 }).toBe('APPLIED'));
-    await checked(child.stop);
+    // 초기화로 ENDED가 된 원본 엔진은 스스로 닫혀야 한다. 종료 중인 프로세스에 신호를 더 보내지 않는다.
+    await checked(async () => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([
+          child.done,
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => reject(new Error('자기 초기화 엔진 자연 close 기한 초과: DB 보존')), 10000);
+          }),
+        ]);
+      } finally {
+        clearTimeout(timer);
+      }
+    });
+    expect(child.closed).toBe(true);
+    expect(child.stdoutEnded).toBe(true);
+    expect(child.stderrEnded).toBe(true);
     expect(child.code).toBe(0);
     expect(child.signal).toBeNull();
     const event = await eventFor(payload),
