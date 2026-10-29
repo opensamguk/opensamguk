@@ -51,18 +51,35 @@ const origin = 'http://127.0.0.1:5173',
 let app: Awaited<ReturnType<typeof buildServer>> | undefined;
 let initial: WorldInit, cleanWorld: string, isolatedWorld: string, oldWorld: string;
 const running = new Set<Promise<unknown>>();
+const executionErrors: unknown[] = [];
+let failed = false;
 function track<T>(action: () => Promise<T>) {
-  const promise = action();
+  const promise = Promise.resolve().then(action);
   running.add(promise);
-  void promise.finally(() => running.delete(promise)).catch(() => undefined);
+  void promise.then(
+    () => running.delete(promise),
+    (error) => {
+      failed = true;
+      executionErrors.push(error);
+      running.delete(promise);
+    },
+  );
   return promise;
 }
-function it(name: string, run: () => Promise<void>) {
-  test(name, () => track(run));
+async function settle() {
+  while (running.size) await Promise.allSettled([...running]);
 }
-beforeEach(async () => {
-  await Promise.allSettled([...running]);
-});
+function it(name: string, run: (signal: AbortSignal) => Promise<void>) {
+  test(name, ({ onTestFailed }) => {
+    const controller = new AbortController();
+    onTestFailed(() => {
+      failed = true;
+      controller.abort();
+    });
+    return track(() => run(controller.signal));
+  });
+}
+beforeEach(settle);
 type Receipt = Awaited<ReturnType<typeof readCityResourceRequest>>;
 type Board = Awaited<ReturnType<typeof readCityResourceBoard>>;
 type Actor = { userId: string; generalId: number; cookie: string; unitId: number };
@@ -83,20 +100,25 @@ async function api<T = unknown>(path: string, input: unknown, cookie: string, mu
 async function snapshot(worldId: string, client = db) {
   return client.$transaction((tx) => loadReplayState(tx, worldId), { isolationLevel: 'RepeatableRead' });
 }
-async function withLease<T>(worldId: string, run: (lease: Lease, signal: AbortSignal) => Promise<T>) {
+async function withLease<T>(
+  worldId: string,
+  run: (lease: Lease, signal: AbortSignal) => Promise<T>,
+  outerSignal?: AbortSignal,
+) {
   const lease = await acquireLease(db, worldId);
   if (!lease) throw new Error('검사 실행권이 없습니다.');
   const controller = new AbortController();
+  const signal = outerSignal ? AbortSignal.any([controller.signal, outerSignal]) : controller.signal;
   let renewalFailure: { error: unknown } | undefined;
   const renewal = (async () => {
-    while (!controller.signal.aborted) {
+    while (!signal.aborted) {
       try {
-        await delay(LEASE_TTL_MS / 3, undefined, { signal: controller.signal });
+        await delay(LEASE_TTL_MS / 3, undefined, { signal });
       } catch (error) {
-        if (!controller.signal.aborted) renewalFailure = { error };
+        if (!signal.aborted) renewalFailure = { error };
         break;
       }
-      if (controller.signal.aborted) break;
+      if (signal.aborted) break;
       try {
         await renewLease(db, lease);
       } catch (error) {
@@ -108,7 +130,9 @@ async function withLease<T>(worldId: string, run: (lease: Lease, signal: AbortSi
   const errors: unknown[] = [];
   let result: { value: T } | undefined;
   try {
-    result = { value: await run(lease, controller.signal) };
+    signal.throwIfAborted();
+    result = { value: await run(lease, signal) };
+    signal.throwIfAborted();
   } catch (error) {
     errors.push(error);
   }
@@ -314,13 +338,24 @@ beforeAll(() =>
   }),
 );
 afterAll(async () => {
-  await Promise.allSettled([...running]);
-  const errors: unknown[] = [];
+  await settle();
+  const errors: unknown[] = [...executionErrors];
+  let deletedWorldRows = false;
   for (const close of [
     async () => app?.close(),
-    async () => db.sanction.deleteMany({ where: { OR: [{ worldId: { in: worldIds } }, { userId: { in: userIds } }] } }),
-    async () => db.world.deleteMany({ where: { id: { in: worldIds } } }),
-    async () => db.user.deleteMany({ where: { id: { in: userIds } } }),
+    async () => {
+      if (failed || errors.length) return;
+      await db.sanction.deleteMany({ where: { OR: [{ worldId: { in: worldIds } }, { userId: { in: userIds } }] } });
+    },
+    async () => {
+      if (failed || errors.length) return;
+      await db.world.deleteMany({ where: { id: { in: worldIds } } });
+      deletedWorldRows = true;
+    },
+    async () => {
+      if (!deletedWorldRows) return;
+      await db.user.deleteMany({ where: { id: { in: userIds } } });
+    },
     async () => db.$disconnect(),
   ]) {
     try {
@@ -329,7 +364,8 @@ afterAll(async () => {
       errors.push(error);
     }
   }
-  if (errors.length) throw new AggregateError(errors, 'INT18 검사 자원 정리를 마치지 못했습니다.');
+  console.info(JSON.stringify({ fixture: 'INT18-city-resources', failed, deletedWorldRows, worldIds }));
+  if (errors.length) throw new AggregateError([...new Set(errors)], 'INT18 시험 본문 또는 자원 정리에 실패했습니다.');
 });
 
 describe('AC-INT-18B 정식 원생성·기존 판과 실제 PG', () => {
@@ -520,7 +556,10 @@ describe('AC-INT-18B 정식 자료 기반 권한·잔량 통제 고정물', () =
       expect(event.status).toBe('REJECTED');
       expect(event.result).toMatchObject({ code: 'ACTOR_SANCTIONED' });
       expect((await snapshot(f.worldId)).state.cityResources).toEqual(before.state.cityResources);
-      await db.sanction.update({ where: { id: sanction.id }, data: { liftedAt: new Date(now) } });
+      await db.sanction.update({
+        where: { id: sanction.id },
+        data: { liftedAt: new Date(), liftedBy: 'test-fixture', liftReason: 'INT18 제재 경계 검사 종료' },
+      });
     });
   it('실제 입력 저장 뒤 오류는 도시·부곡·순서·결과를 함께 롤백한다', async () => {
     const f = await authorityFixture(),
@@ -580,13 +619,34 @@ describe('AC-INT-18B 정식 자료 기반 권한·잔량 통제 고정물', () =
   });
 });
 describe('AC-INT-18B 수정하지 않은 정식 491명 첫 달과 원생성 archive', () => {
-  it('첫 달 전반 NPC를 실제 새 판으로 실행한다', async () => {
-    await withLease(cleanWorld, (lease, signal) => new TurnLoop(db, lease).advanceTo(5000, signal));
-  });
-  it('첫 달 후반과 월 정산을 실제 새 판으로 실행한다', async () => {
-    await withLease(cleanWorld, (lease, signal) => new TurnLoop(db, lease).advanceTo(10000, signal));
-  });
+  let completedTick = 0,
+    active = false;
+  for (const target of [2500, 5000, 7500, 10000]) {
+    const from = target - 2500;
+    it(`첫 달 ${from}~${target}tick의 NPC·정산을 실제 새 판으로 실행한다`, async (signal) => {
+      if (failed || active || completedTick !== from)
+        throw new Error('정식 첫 달의 앞 구간이 실패했거나 아직 끝나지 않았습니다.');
+      active = true;
+      try {
+        expect((await db.world.findUniqueOrThrow({ where: { id: cleanWorld } })).clockTick).toBe(from);
+        await withLease(
+          cleanWorld,
+          (lease, leaseSignal) => new TurnLoop(db, lease).advanceTo(target, leaseSignal),
+          signal,
+        );
+        signal.throwIfAborted();
+        expect((await db.world.findUniqueOrThrow({ where: { id: cleanWorld } })).clockTick).toBe(target);
+        signal.throwIfAborted();
+        if (failed) throw new Error('실패한 정식 월 진행 구간을 완료로 기록하지 않습니다.');
+        completedTick = target;
+      } finally {
+        active = false;
+      }
+    });
+  }
   it('정식 원생성 archive의 동일 시드 재생과 DB 월 해시가 같다', async () => {
+    if (failed || active || completedTick !== 10000)
+      throw new Error('정식 첫 달의 모든 구간을 성공하기 전에는 archive를 인수하지 않습니다.');
     const archive = await exportReplay(db, cleanWorld),
       first = replayArchive(archive, 1);
     expect(first).toHaveLength(1);
