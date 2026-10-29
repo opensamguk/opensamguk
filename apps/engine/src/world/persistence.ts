@@ -31,21 +31,30 @@ import { loadCommandState } from '../commandPersistence';
 import { engineResolver, loadExt } from '../extState';
 import { storedGeneralStats } from '../generalStats';
 
-export async function saveInitialWorld(
-  db: PrismaClient,
-  state: WorldInit,
-  options: {
-    name: string;
-    turnTermMinutes: number;
-    endYear: number | null;
-    replayFormat?: 'legacy' | 'policy' | 1 | 3;
-    ruleFeatures?: string[];
-    featureData?: Record<string, JsonValue>;
-    treatyFormat?: 1;
-    extFormat?: 1;
-    preset?: { key: string; value: WorldPreset };
-  },
-) {
+export type InitialWorldOptions = {
+  name: string;
+  turnTermMinutes: number;
+  endYear: number | null;
+  replayFormat?: 'legacy' | 'policy' | 1 | 3;
+  ruleFeatures?: string[];
+  featureData?: Record<string, JsonValue>;
+  treatyFormat?: 1;
+  extFormat?: 1;
+  preset?: { key: string; value: WorldPreset };
+};
+
+export interface PreparedInitialWorld {
+  readonly stateHash: string;
+}
+
+type StorePreparedWorld = (
+  tx: Prisma.TransactionClient,
+  plannedWorldId?: string,
+) => Promise<{ worldId: string; stateHash: string }>;
+const preparedWorlds = new WeakMap<PreparedInitialWorld, StorePreparedWorld>();
+
+export function prepareInitialWorld(state: WorldInit, suppliedOptions: InitialWorldOptions): PreparedInitialWorld {
+  const options = structuredClone(suppliedOptions);
   if (
     !options.name.trim() ||
     !Number.isSafeInteger(options.turnTermMinutes) ||
@@ -206,97 +215,111 @@ export async function saveInitialWorld(
     replayOrigin = parsedOrigin;
     creationState = parsedOrigin.initial;
   }
-  const world = await db.$transaction(
-    async (tx) => {
-      const world = await tx.world.create({
-        select: { id: true },
-        data: {
-          name: options.name,
-          ...(preset ? { presetKey: options.preset!.key, preset: preset as Prisma.InputJsonValue } : {}),
-          turnTermMinutes: options.turnTermMinutes,
-          scenarioKey: creationState.scenarioKey,
-          mapKey: creationState.mapKey,
-          unitSetKey: creationState.unitSetKey,
-          seed: creationState.seed,
-          startYear: creationState.startYear,
-          endYear: options.endYear,
-          initialStateHash: stateHash,
-          ...(featureFormat
-            ? {
-                replayFormat: typeof options.replayFormat === 'number' ? options.replayFormat : 3,
-                ruleFeatures: features,
-              }
-            : options.replayFormat === 'legacy'
-              ? {}
-              : { policyFromSequence: 0 }),
-          ...(options.treatyFormat === 1 ? { treatyFormat: 1 } : {}),
-          replayOrigin: replayOrigin as Prisma.InputJsonValue,
-          statRules: creationState.statRules,
-          unitSet: creationState.unitSet as Prisma.InputJsonValue,
-          ...(features.includes('campaign-v1')
-            ? {
-                campaignState: emptyCampaignState(
-                  toWorldState(creationState),
-                  creationState.seed,
-                  creationState.scenarioKey,
-                ) as Prisma.InputJsonValue,
-              }
-            : {}),
-          ...(features.includes('city-resources-v1')
-            ? { cityResourcesState: emptyCityResourcesState(toWorldState(creationState)) as Prisma.InputJsonValue }
-            : {}),
-          ...(creationState.operationalMap
-            ? { operationalMap: creationState.operationalMap as Prisma.InputJsonValue }
-            : {}),
-          ...(creationState.commandMeta ? { commandMeta: creationState.commandMeta as Prisma.InputJsonValue } : {}),
-        },
-      });
-      const worldId = world.id;
-      // 국가↔수도 순환 참조는 같은 트랜잭션에서 도시를 만든 뒤 연결한다.
-      await tx.nation.createMany({
-        data: creationState.nations.map((nation) => ({ ...nation, worldId, capitalCityKey: null })),
-      });
-      await tx.city.createMany({ data: creationState.cities.map((city) => ({ ...city, worldId })) });
-      for (const nation of creationState.nations) {
-        await tx.nation.update({
-          where: { worldId_id: { worldId, id: nation.id } },
-          data: { capitalCityKey: nation.capitalCityKey },
-        });
-      }
-      await tx.general.createMany({
-        data: creationState.generals.map((general) => ({
-          ...general,
-          worldId,
-          ...((featureFormat ? !features.includes('policy') : options.replayFormat === 'legacy')
+  const prepared = Object.freeze({ stateHash });
+  preparedWorlds.set(prepared, async (tx, plannedWorldId) => {
+    const world = await tx.world.create({
+      select: { id: true },
+      data: {
+        ...(plannedWorldId === undefined ? {} : { id: plannedWorldId }),
+        name: options.name,
+        ...(preset ? { presetKey: options.preset!.key, preset: preset as Prisma.InputJsonValue } : {}),
+        turnTermMinutes: options.turnTermMinutes,
+        scenarioKey: creationState.scenarioKey,
+        mapKey: creationState.mapKey,
+        unitSetKey: creationState.unitSetKey,
+        seed: creationState.seed,
+        startYear: creationState.startYear,
+        endYear: options.endYear,
+        initialStateHash: stateHash,
+        ...(featureFormat
+          ? {
+              replayFormat: typeof options.replayFormat === 'number' ? options.replayFormat : 3,
+              ruleFeatures: features,
+            }
+          : options.replayFormat === 'legacy'
             ? {}
-            : { defaultPolicy: 'none', lastActiveTick: general.userId === null ? null : 0 }),
-        })),
+            : { policyFromSequence: 0 }),
+        ...(options.treatyFormat === 1 ? { treatyFormat: 1 } : {}),
+        replayOrigin: replayOrigin as Prisma.InputJsonValue,
+        statRules: creationState.statRules,
+        unitSet: creationState.unitSet as Prisma.InputJsonValue,
+        ...(features.includes('campaign-v1')
+          ? {
+              campaignState: emptyCampaignState(
+                toWorldState(creationState),
+                creationState.seed,
+                creationState.scenarioKey,
+              ) as Prisma.InputJsonValue,
+            }
+          : {}),
+        ...(features.includes('city-resources-v1')
+          ? { cityResourcesState: emptyCityResourcesState(toWorldState(creationState)) as Prisma.InputJsonValue }
+          : {}),
+        ...(creationState.operationalMap
+          ? { operationalMap: creationState.operationalMap as Prisma.InputJsonValue }
+          : {}),
+        ...(creationState.commandMeta ? { commandMeta: creationState.commandMeta as Prisma.InputJsonValue } : {}),
+      },
+    });
+    const worldId = world.id;
+    // 국가↔수도 순환 참조는 같은 트랜잭션에서 도시를 만든 뒤 연결한다.
+    await tx.nation.createMany({
+      data: creationState.nations.map((nation) => ({ ...nation, worldId, capitalCityKey: null })),
+    });
+    await tx.city.createMany({ data: creationState.cities.map((city) => ({ ...city, worldId })) });
+    for (const nation of creationState.nations) {
+      await tx.nation.update({
+        where: { worldId_id: { worldId, id: nation.id } },
+        data: { capitalCityKey: nation.capitalCityKey },
       });
-      if (featureFormat ? features.includes('policy') : options.replayFormat !== 'legacy')
-        await tx.generalTurn.createMany({
-          data: creationState.generals.flatMap((general) =>
-            emptyQueue().map((turn, slot) => ({ ...turn, args: {}, worldId, generalId: general.id, slot })),
-          ),
-        });
-      await tx.diplomacy.createMany({
-        data: creationState.diplomacies.map((diplomacy) => ({ ...diplomacy, worldId })),
-      });
-      await tx.nationTurn.createMany({
-        data: Object.entries(creationState.nationTurns ?? {}).flatMap(([nationId, slots]) =>
-          slots.map((slot, i) => ({
-            worldId,
-            nationId: Number(nationId),
-            slot: i,
-            commandKey: slot.commandKey,
-            args: slot.args as Prisma.InputJsonValue,
-          })),
+    }
+    await tx.general.createMany({
+      data: creationState.generals.map((general) => ({
+        ...general,
+        worldId,
+        ...((featureFormat ? !features.includes('policy') : options.replayFormat === 'legacy')
+          ? {}
+          : { defaultPolicy: 'none', lastActiveTick: general.userId === null ? null : 0 }),
+      })),
+    });
+    if (featureFormat ? features.includes('policy') : options.replayFormat !== 'legacy')
+      await tx.generalTurn.createMany({
+        data: creationState.generals.flatMap((general) =>
+          emptyQueue().map((turn, slot) => ({ ...turn, args: {}, worldId, generalId: general.id, slot })),
         ),
       });
-      return world;
-    },
-    { timeout: 30_000 },
-  );
-  return { worldId: world.id, stateHash };
+    await tx.diplomacy.createMany({
+      data: creationState.diplomacies.map((diplomacy) => ({ ...diplomacy, worldId })),
+    });
+    await tx.nationTurn.createMany({
+      data: Object.entries(creationState.nationTurns ?? {}).flatMap(([nationId, slots]) =>
+        slots.map((slot, i) => ({
+          worldId,
+          nationId: Number(nationId),
+          slot: i,
+          commandKey: slot.commandKey,
+          args: slot.args as Prisma.InputJsonValue,
+        })),
+      ),
+    });
+    return { worldId: world.id, stateHash };
+  });
+  return prepared;
+}
+
+export async function savePreparedInitialWorld(
+  tx: Prisma.TransactionClient,
+  prepared: PreparedInitialWorld,
+  plannedWorldId?: string,
+) {
+  const store = preparedWorlds.get(prepared);
+  if (!store) throw new Error('검증한 초기 월드 자료가 필요합니다.');
+  return store(tx, plannedWorldId);
+}
+
+export async function saveInitialWorld(db: PrismaClient, state: WorldInit, options: InitialWorldOptions) {
+  const prepared = prepareInitialWorld(state, options);
+  return db.$transaction((tx) => savePreparedInitialWorld(tx, prepared), { timeout: 30_000 });
 }
 
 export async function readWorldState(db: PrismaClient, worldId: string): Promise<WorldInit> {

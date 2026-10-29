@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { beforeAll, beforeEach, afterAll, describe, expect, it } from 'vitest';
+import { beforeAll, beforeEach, afterAll, describe, expect, it, onTestFailed } from 'vitest';
 import { createDb, type PrismaClient } from '../packages/db/src/index';
 import { TICKS_PER_MONTH } from '../packages/rules/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
@@ -55,22 +55,34 @@ function ownedDatabase(initialize = true) {
   const admin = nativeClient(adminUrl.href);
   const native = nativeClient(url.href);
   let adminConnected = false;
-  let connected = false;
+  let adminConnectAttempted = false;
+  let nativeConnectAttempted = false;
   let created = false;
+  let createAttempted = false;
+  let baselineAbsent = false;
+  let failed = false;
   let oid: string | undefined;
   let db: PrismaClient | undefined;
+  let fixture: Fixture | undefined;
+  let closing: Promise<void> | undefined;
   const cleanupErrors: unknown[] = [];
-  return {
+  const owner = {
+    fail() {
+      failed = true;
+    },
     async setup(): Promise<Fixture> {
+      adminConnectAttempted = true;
       await admin.connect();
       adminConnected = true;
       expect((await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', [name])).rows).toEqual([]);
+      baselineAbsent = true;
+      createAttempted = true;
       await admin.query(`CREATE DATABASE "${name}"`);
       created = true;
       oid = (await admin.query<{ oid: string }>('SELECT oid::text AS oid FROM pg_database WHERE datname = $1', [name]))
         .rows[0]!.oid;
+      nativeConnectAttempted = true;
       await native.connect();
-      connected = true;
       const migrations = new URL('packages/db/prisma/migrations/', root);
       const names = (await readdir(migrations, { withFileTypes: true }))
         .filter((entry) => entry.isDirectory())
@@ -81,67 +93,147 @@ function ownedDatabase(initialize = true) {
       db = createDb(url.href);
       if (initialize)
         await initializeResources(db, await readFile(new URL('packages/db/sql/resources-init.sql', root), 'utf8'));
-      return { db, native, url };
+      fixture = { db, native, url };
+      return fixture;
     },
-    async close(): Promise<void> {
-      try {
-        await db?.$disconnect();
-      } catch (error) {
-        cleanupErrors.push(error);
-      }
-      try {
-        if (connected) await native.end();
-      } catch (error) {
-        cleanupErrors.push(error);
-      }
-      if (created && !oid) cleanupErrors.push(new Error('만든 DB의 OID가 없어 정리하지 않았습니다.'));
-      if (created && oid) {
+    close(): Promise<void> {
+      if (closing) return closing;
+      closing = (async () => {
+        const receipt = {
+          event: 'integration-scenario-cleanup',
+          name,
+          oid: oid ?? null,
+          createAttempted,
+          baselineAbsent,
+          created,
+          failed,
+          identityMatched: false,
+          oidRecovered: false,
+          connections: null as number | null,
+          dropped: false,
+          catalogAbsent: false,
+          prismaClosed: false,
+          nativeClosed: !nativeConnectAttempted,
+          adminClosed: !adminConnectAttempted,
+          errors: 0,
+        };
         try {
-          expect(
-            (await admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname = $1', [name])).rows,
-          ).toEqual([{ oid }]);
-          // Closing the client socket can precede PostgreSQL removing its backend.
-          let activity = await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname = $1', [
-            name,
-          ]);
-          for (let attempt = 0; activity.rows[0]?.count !== 0 && attempt < 20; attempt++) {
-            await delay(50);
-            activity = await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname = $1', [
-              name,
-            ]);
-          }
-          expect(activity.rows).toEqual([{ count: 0 }]);
-          await admin.query(`DROP DATABASE "${name}"`);
-          expect((await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', [name])).rows).toEqual([]);
+          // 재접속 시험이 바꾼 최신 Prisma 연결도 이 소유자가 닫는다.
+          await (fixture?.db ?? db)?.$disconnect();
+          receipt.prismaClosed = true;
         } catch (error) {
           cleanupErrors.push(error);
         }
-      }
-      try {
-        if (adminConnected) await admin.end();
-      } catch (error) {
-        cleanupErrors.push(error);
-      }
-      if (cleanupErrors.length) throw new AggregateError(cleanupErrors, '자기 DB 정리가 실패했습니다.');
+        try {
+          if (nativeConnectAttempted) {
+            await native.end();
+            receipt.nativeClosed = true;
+          }
+        } catch (error) {
+          cleanupErrors.push(error);
+        }
+        if (adminConnected && baselineAbsent && createAttempted)
+          try {
+            const identities = (
+              await admin.query<{ oid: string }>('SELECT oid::text AS oid FROM pg_database WHERE datname = $1', [name])
+            ).rows;
+            expect(identities.length).toBeLessThanOrEqual(1);
+            if (identities.length === 0) {
+              expect(created).toBe(false);
+              receipt.catalogAbsent = true;
+            } else {
+              const observedOid = identities[0]!.oid;
+              expect(observedOid).toMatch(/^[1-9]\d*$/);
+              if (oid === undefined) {
+                // 생성 응답 유실 때도 사전에 없던 이 UUID 이름만 읽어서 보존한다.
+                oid = observedOid;
+                receipt.oidRecovered = true;
+                failed = true;
+              }
+              receipt.oid = oid;
+              expect(observedOid).toBe(oid);
+              receipt.identityMatched = true;
+              // 소켓 종료 뒤 PostgreSQL의 backend 정착을 기다린다.
+              for (let attempt = 0; attempt <= 20; attempt++) {
+                const activity = await admin.query<{ count: number }>(
+                  'SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname = $1',
+                  [name],
+                );
+                expect(activity.rows).toHaveLength(1);
+                receipt.connections = activity.rows[0]!.count;
+                if (receipt.connections === 0 || attempt === 20) break;
+                await delay(50);
+              }
+              expect(receipt.connections).toBe(0);
+              expect(
+                (await admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname = $1', [name])).rows,
+              ).toEqual([{ oid }]);
+              if (!failed && cleanupErrors.length === 0) {
+                await admin.query(`DROP DATABASE "${name}"`);
+                receipt.dropped = true;
+                expect((await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', [name])).rows).toEqual([]);
+                receipt.catalogAbsent = true;
+              }
+            }
+          } catch (error) {
+            cleanupErrors.push(error);
+          }
+        try {
+          if (adminConnectAttempted) {
+            await admin.end();
+            receipt.adminClosed = true;
+          }
+        } catch (error) {
+          cleanupErrors.push(error);
+        }
+        receipt.failed = failed || cleanupErrors.length > 0;
+        receipt.errors = cleanupErrors.length;
+        console.log(JSON.stringify(receipt));
+        if (cleanupErrors.length) throw new AggregateError(cleanupErrors, '자기 DB 정리가 실패했습니다.');
+      })();
+      return closing;
     },
   };
+  return owner;
 }
 
-async function withDatabase(action: (value: Fixture) => Promise<void>, initialize = true): Promise<void> {
+const databaseExecutions = new Set<Promise<void>>();
+const databaseFailures: unknown[] = [];
+async function settleDatabases() {
+  while (databaseExecutions.size) await Promise.allSettled([...databaseExecutions]);
+}
+beforeEach(settleDatabases);
+afterAll(async () => {
+  await settleDatabases();
+  if (databaseFailures.length) throw new AggregateError(databaseFailures, '정식 시나리오 본문·자기 DB 정리 실패');
+});
+function withDatabase(action: (value: Fixture) => Promise<void>, initialize = true): Promise<void> {
   const owned = ownedDatabase(initialize);
-  let failure: unknown;
-  try {
-    await action(await owned.setup());
-  } catch (error) {
-    failure = error;
-  }
-  try {
-    await owned.close();
-  } catch (error) {
-    if (failure) throw new AggregateError([failure, error], '시험과 자기 DB 정리가 실패했습니다.', { cause: error });
-    throw error;
-  }
-  if (failure) throw failure;
+  onTestFailed(() => owned.fail());
+  const execution = (async () => {
+    const errors: unknown[] = [];
+    try {
+      await action(await owned.setup());
+    } catch (error) {
+      owned.fail();
+      errors.push(error);
+    }
+    try {
+      await owned.close();
+    } catch (error) {
+      errors.push(error);
+    }
+    if (errors.length) throw new AggregateError(errors, '시험과 자기 DB 정리가 실패했습니다.');
+  })();
+  databaseExecutions.add(execution);
+  void execution.then(
+    () => databaseExecutions.delete(execution),
+    (error: unknown) => {
+      databaseFailures.push(error);
+      databaseExecutions.delete(execution);
+    },
+  );
+  return execution;
 }
 
 async function preservedWorld(db: PrismaClient, worldId: string) {
@@ -301,13 +393,24 @@ describe('AC-INT-04 정식191년 첫 달·재시작·재생·다른 월드 격�
     return preparation;
   });
   afterAll(async () => {
-    await preparation?.catch(() => undefined);
-    await execution?.catch(() => undefined);
-    await fixture?.db.$disconnect();
-    await owned.close();
+    const errors: unknown[] = [];
+    for (const body of [preparation, execution])
+      try {
+        await body;
+      } catch (error) {
+        owned.fail();
+        errors.push(error);
+      }
+    try {
+      await owned.close();
+    } catch (error) {
+      errors.push(error);
+    }
+    if (errors.length) throw new AggregateError(errors, '정식191년 본문·자기 DB 정리 실패');
   });
   beforeEach(async () => {
-    await execution?.catch(() => undefined);
+    onTestFailed(() => owned.fail());
+    await execution?.catch(() => owned.fail());
   });
   it('491명 첫 달 정산은 연감을 저장하고 다른 월드를 보존한다', () => {
     execution = (async () => {

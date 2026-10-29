@@ -22,6 +22,7 @@ import { campaignFeature, campaignInputKinds } from './campaign/feature';
 import { campaignAssignmentFeature } from './campaign/assignment';
 import { ADMIN_CLOCK_KINDS, applyAdminClockRecord } from './clock/admin';
 import { cityResourcesFeature, cityResourceInputKind } from './cityResourcesFeature';
+import { ADMIN_END_KIND, applyAdminEndRecord } from './clock/end';
 
 export interface ReplayOriginV1 {
   version: 1;
@@ -89,6 +90,7 @@ export const ruleRegistry: RuleRegistry = {
       directTick: true,
       apply: applyAdminClockRecord,
     })),
+    { kind: ADMIN_END_KIND, feature: null, route: 'direct', directTick: true, apply: applyAdminEndRecord },
     { kind: 'turns.set', feature: null, route: 'direct', apply: applyTurnsInput },
     { kind: 'general.create', feature: null, route: 'queued', apply: applyCreationInput },
     { kind: 'general.setPolicy', feature: 'policy', route: 'queued', apply: applyPolicyInput },
