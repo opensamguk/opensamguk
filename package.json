@@ -15,6 +15,7 @@
     "e2e:withdrawal": "playwright test --config playwright.withdrawal.config.ts",
     "e2e:sanction": "playwright test --config playwright.sanction.config.ts",
     "e2e:admin-clock": "playwright test --config playwright.clock.config.ts",
+    "e2e:admin-reset": "playwright test --config playwright.reset.config.ts",
     "e2e:admin-end": "playwright test --config playwright.end.config.ts",
     "notice:publish": "tsx --env-file-if-exists=.env tools/notice-publish.ts",
     "dev": "pnpm --parallel --filter \"./apps/*\" dev",
