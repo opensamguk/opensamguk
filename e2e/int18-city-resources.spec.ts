@@ -1107,7 +1107,11 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
           name: '도시 병력 배속',
           exact: true,
         });
-        await form.getByLabel('배속할 부곡', { exact: true }).selectOption(String(actor.unitId));
+        await expect(form).toBeVisible();
+        const unitSelect = form.getByRole('combobox', { name: '배속할 부곡', exact: true });
+        await expect(unitSelect).toBeEnabled();
+        await expect(unitSelect.locator(`option[value="${actor.unitId}"]`)).toHaveCount(1);
+        await unitSelect.selectOption(String(actor.unitId));
         await form.getByLabel('배속 인원', { exact: true }).fill('10');
         const start = browserCalls.length;
         await form.getByRole('button', { name: '도시 수비병을 부곡에 배속', exact: true }).click();
@@ -1219,7 +1223,11 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
         await actor.page.getByRole('button', { name: '내 도시로', exact: true }).click();
         await showResources(main, actor, cityKey);
         await expect(editor.locator('tr[data-slot="4"]')).toContainText('농지 개간');
-        const select = actor.page.getByLabel('배속할 부곡', { exact: true });
+        const form = actor.page.getByRole('form', { name: '도시 병력 배속', exact: true });
+        await expect(form).toBeVisible();
+        const select = form.getByRole('combobox', { name: '배속할 부곡', exact: true });
+        await expect(select).toBeEnabled();
+        await expect(select.locator(`option[value="${actor.unitId}"]`)).toHaveCount(1);
         await touchTarget(select);
         await touchTarget(actor.page.getByLabel('배속 인원', { exact: true }));
         await select.selectOption(String(actor.unitId));
@@ -1306,7 +1314,11 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
           name: '도시 병력 배속',
           exact: true,
         });
-        await form.getByLabel('배속할 부곡', { exact: true }).selectOption(String(actor.unitId));
+        await expect(form).toBeVisible();
+        const unitSelect = form.getByRole('combobox', { name: '배속할 부곡', exact: true });
+        await expect(unitSelect).toBeEnabled();
+        await expect(unitSelect.locator(`option[value="${actor.unitId}"]`)).toHaveCount(1);
+        await unitSelect.selectOption(String(actor.unitId));
         await form.getByLabel('배속 인원', { exact: true }).fill('1');
         const start = browserCalls.length;
         await form.getByRole('button', { name: '도시 수비병을 부곡에 배속', exact: true }).click();
