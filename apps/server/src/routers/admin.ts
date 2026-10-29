@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { adminProcedure } from '../admin/role';
 import { router } from '../trpc';
 import { notifySessionClosed } from '@opensamguk/db';
-import { createSanction, createSanctionInput, liftSanction, liftSanctionInput } from '../admin/sanctionStore';
+import { createAdminSanction, createSanctionInput, liftAdminSanction, liftSanctionInput } from '../admin/sanctionStore';
 import { auditListInput, getUser, getUserInput, listAudit, searchUsers, searchUsersInput } from '../admin/read';
 import { listAdminWorlds } from '../admin/worlds';
 import {
@@ -40,15 +40,13 @@ export const adminRouter = router({
   }),
   sanction: router({
     create: adminProcedure.input(createSanctionInput).mutation(async ({ ctx, input }) => {
-      const result = await createSanction(ctx.db, ctx.user.id, input, ctx.now);
+      const result = await createAdminSanction(ctx, input);
       for (const sessionId of result.closedSessionIds) {
         ctx.closeSession?.(sessionId);
         await notifySessionClosed(ctx.db, sessionId, () => ctx.reply.log.warn('실시간 알림 전송 실패'));
       }
       return { sanctionId: result.sanctionId };
     }),
-    lift: adminProcedure
-      .input(liftSanctionInput)
-      .mutation(({ ctx, input }) => liftSanction(ctx.db, ctx.user.id, input, ctx.now)),
+    lift: adminProcedure.input(liftSanctionInput).mutation(({ ctx, input }) => liftAdminSanction(ctx, input)),
   }),
 });
