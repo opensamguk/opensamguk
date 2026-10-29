@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { randomBytes, randomInt } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -17,6 +17,7 @@ import type { MailMessage } from '../apps/server/src/mail/transport';
 import { initializeResources } from '../tools/init-resources';
 import { e2eDatabaseUrl } from './account';
 import { confirmDisconnectedDatabase } from '../tools/test-db-close';
+import { listenLegalHttp, listenLegalLoopback } from './legalFixturePorts';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const run = promisify(execFile);
@@ -47,13 +48,8 @@ export interface LegalStack {
   peer(): Promise<{ origin: string; close(): Promise<void> }>;
 }
 
-function candidatePort() {
-  // probe를 열었다 닫지 않고 실제 listener가 안전한 후보에 한 번 bind한다. 점유됐으면 실패하고 정리한다.
-  return randomInt(20_000, 50_000);
-}
-
 // 공개 dist를 loopback 출처에서 내보내고 /trpc와 SSE를 자기 실제 API로 중계한다.
-async function staticBridge(apiOrigin: () => string, port: number) {
+async function staticBridge(apiOrigin: () => string) {
   const dist = resolve(root, 'apps/web/dist');
   const manifest = JSON.parse(await readFile(join(dist, 'public-build.json'), 'utf8')) as { mode: string };
   assert.equal(manifest.mode, 'public');
@@ -142,14 +138,14 @@ async function staticBridge(apiOrigin: () => string, port: number) {
       },
     );
   });
-  await new Promise<void>((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(port, '127.0.0.1', resolve);
-  });
-  return async () => {
+  const close = async () => {
     for (const controller of controllers) controller.abort();
     const closed = new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
-    server.closeAllConnections();
+    try {
+      server.closeAllConnections();
+    } catch (error) {
+      jobErrors.push(error);
+    }
     try {
       await closed;
     } catch (error) {
@@ -158,6 +154,21 @@ async function staticBridge(apiOrigin: () => string, port: number) {
     while (jobs.size) await Promise.allSettled([...jobs]);
     if (jobErrors.length) throw new AggregateError(jobErrors, '자기 정적 서버 종료 또는 요청 정착 실패');
   };
+  try {
+    await listenLegalHttp(server);
+    const address = server.address();
+    assert(address !== null && typeof address !== 'string');
+    return { origin: `http://127.0.0.1:${address.port}`, close };
+  } catch (error) {
+    if (server.listening) {
+      try {
+        await close();
+      } catch (cleanupError) {
+        throw new AggregateError([error, cleanupError], '자기 정적 서버 준비 또는 종료 실패', { cause: cleanupError });
+      }
+    }
+    throw error;
+  }
 }
 
 export const test = base.extend<Record<never, never>, { legalStack: LegalStack }>({
@@ -220,8 +231,9 @@ export const test = base.extend<Record<never, never>, { legalStack: LegalStack }
         process.env.TEST_DATABASE_URL = url.href;
         db = createDb(url.href);
         await initializeResources(db, await readFile(join(root, 'packages/db/sql/resources-init.sql'), 'utf8'));
-        const port = candidatePort(),
-          origin = `http://127.0.0.1:${port}`;
+        const bridge = await staticBridge(() => apiOrigin);
+        closeWeb = bridge.close;
+        const origin = bridge.origin;
         const restart = async (
           policy: LegalPolicy | null,
           emailRequired = false,
@@ -239,11 +251,14 @@ export const test = base.extend<Record<never, never>, { legalStack: LegalStack }
             mailTransport: transport,
             realtime: { connectionString: url.href, applicationName: `legal-${suffix}` },
           });
-          await api.listen({ host: '127.0.0.1', port: candidatePort() });
+          await api.ready();
+          await listenLegalLoopback(
+            (port) => api!.listen({ host: '127.0.0.1', port }),
+            () => api!.server.listening,
+          );
           apiOrigin = `http://127.0.0.1:${(api.server.address() as AddressInfo).port}`;
         };
         await restart(null);
-        closeWeb = await staticBridge(() => apiOrigin, port);
         stack = {
           db,
           origin,
@@ -262,7 +277,11 @@ export const test = base.extend<Record<never, never>, { legalStack: LegalStack }
               realtime: { connectionString: url.href, applicationName: `legal-peer-${suffix}` },
             });
             extraServers.add(server);
-            await server.listen({ host: '127.0.0.1', port: candidatePort() });
+            await server.ready();
+            await listenLegalLoopback(
+              (port) => server.listen({ host: '127.0.0.1', port }),
+              () => server.server.listening,
+            );
             return {
               origin: `http://127.0.0.1:${(server.server.address() as AddressInfo).port}`,
               async close() {
@@ -281,7 +300,11 @@ export const test = base.extend<Record<never, never>, { legalStack: LegalStack }
               realtime: { connectionString: url.href, applicationName: `legal-production-${suffix}` },
             });
             extraServers.add(server);
-            await server.listen({ host: '127.0.0.1', port: candidatePort() });
+            await server.ready();
+            await listenLegalLoopback(
+              (port) => server.listen({ host: '127.0.0.1', port }),
+              () => server.server.listening,
+            );
             const previous = apiOrigin;
             const productionOrigin = `http://127.0.0.1:${(server.server.address() as AddressInfo).port}`;
             apiOrigin = productionOrigin;
