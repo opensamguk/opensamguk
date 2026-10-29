@@ -21,6 +21,7 @@ export function findWorkerAncestor(
     exe(pid: number): Promise<string>;
     status(pid: number): Promise<string>;
   },
+  actorUid: number,
 ): Promise<boolean>;
 export function bootstrapDiagnostic(
   phase: unknown,

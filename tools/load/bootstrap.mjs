@@ -52,6 +52,7 @@ const diagnosticCodes = new Set([
   'LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_STATUS_PID_INVALID',
   'LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_STATUS_UID_INVALID',
   'LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_NONROOT',
+  'LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_FOREIGN_UID',
 ]);
 const diagnosticReasons = new Set(['sample_invalid', 'cpu_limit', 'memory_limit', 'cgroup_headroom', 'disk_reserve']);
 const operationFailures = new WeakMap();
@@ -194,7 +195,8 @@ export function assertBootstrapScope(value) {
     throw new Error('LOAD_INSTALL_SCOPE_UNVERIFIED');
 }
 
-export async function findWorkerAncestor(pid, reader) {
+export async function findWorkerAncestor(pid, reader, actorUid) {
+  if (!Number.isSafeInteger(actorUid) || actorUid <= 0) return false;
   const visited = new Set();
   for (let depth = 0; pid > 1 && depth < 32 && !visited.has(pid); depth++) {
     if (!Number.isSafeInteger(pid)) return false;
@@ -216,8 +218,8 @@ export async function findWorkerAncestor(pid, reader) {
       if (Number(statusPid) !== pid)
         throw markOperationFailure('LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_STATUS_PID_INVALID', error);
       if (!uids) throw markOperationFailure('LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_STATUS_UID_INVALID', error);
-      if (uids.slice(1).some((uid) => uid !== '0'))
-        throw markOperationFailure('LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_NONROOT', error);
+      if (uids.slice(1).some((uid) => uid !== '0' && uid !== String(actorUid)))
+        throw markOperationFailure('LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_FOREIGN_UID', error);
       pid = parent;
       continue;
     }
@@ -228,11 +230,15 @@ export async function findWorkerAncestor(pid, reader) {
 }
 
 async function workerAncestor() {
-  return findWorkerAncestor(process.ppid, {
-    stat: (pid) => readFile(`/proc/${pid}/stat`, 'utf8'),
-    exe: (pid) => readlink(`/proc/${pid}/exe`),
-    status: (pid) => readFile(`/proc/${pid}/status`, 'utf8'),
-  });
+  return findWorkerAncestor(
+    process.ppid,
+    {
+      stat: (pid) => readFile(`/proc/${pid}/stat`, 'utf8'),
+      exe: (pid) => readlink(`/proc/${pid}/exe`),
+      status: (pid) => readFile(`/proc/${pid}/status`, 'utf8'),
+    },
+    process.getuid(),
+  );
 }
 
 async function requirePlatform() {

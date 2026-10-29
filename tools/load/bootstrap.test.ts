@@ -59,37 +59,67 @@ describe('L5 의존성 설치 전 bootstrap 경계', () => {
       3: { parent: 2, exe: '/usr/bin/sudo' },
       2: { parent: 1, exe: '/home/runner/actions-runner/bin/Runner.Worker', uid: '1001 1001 1001 1001' },
     });
-    await expect(findWorkerAncestor(4, reader)).resolves.toBe(true);
+    await expect(findWorkerAncestor(4, reader, 1001)).resolves.toBe(true);
     expect(reader.visited).toEqual([4, 3, 2]);
-    await expect(findWorkerAncestor(4, ancestors({ 4: { parent: 1, exe: denied } }))).resolves.toBe(false);
+    await expect(findWorkerAncestor(4, ancestors({ 4: { parent: 1, exe: denied } }), 1001)).resolves.toBe(false);
   });
-  it.each(['1001 1001 1001 1001', '0 1001 0 0', '0 0 0 1001', '0 0 0'])(
-    'UID가 모두 root로 확인되지 않으면 %s를 거부한다',
+  it.each(['EACCES', 'EPERM'])(
+    '현재 실행 UID와 root로만 구성된 조상의 %s도 실제 Worker 증명을 요구한다',
+    async (code) => {
+      const denied = Object.assign(new Error('private-canary'), { code });
+      for (const uid of ['1001 1001 1001 1001', '0 1001 0 1001', '1001 0 1001 0']) {
+        const reader = ancestors({
+          4: { parent: 2, exe: denied, uid },
+          2: { parent: 1, exe: '/home/runner/actions-runner/bin/Runner.Worker' },
+        });
+        await expect(findWorkerAncestor(4, reader, 1001)).resolves.toBe(true);
+        expect(reader.visited).toEqual([4, 2]);
+        await expect(findWorkerAncestor(4, ancestors({ 4: { parent: 1, exe: denied, uid } }), 1001)).resolves.toBe(
+          false,
+        );
+        await expect(findWorkerAncestor(4, ancestors({ 4: { parent: 2, exe: denied, uid } }), 2001)).rejects.toBe(
+          denied,
+        );
+      }
+    },
+  );
+  it('신뢰할 실행 UID가 없으면 환경이나 실제 Worker 경로로 대신하지 않는다', async () => {
+    const reader = ancestors({ 4: { parent: 1, exe: '/bin/Runner.Worker' } });
+    for (const uid of [0, -1, NaN, Infinity, 1001.5, Number.MAX_SAFE_INTEGER + 1])
+      await expect(findWorkerAncestor(4, reader, uid)).resolves.toBe(false);
+    expect(reader.visited).toEqual([]);
+  });
+  it.each(['2001 2001 2001 2001', '0 2001 0 0', '0 0 0 2001', '0 0 0'])(
+    'root·현재 실행 UID 외의 값이나 잘못된 UID %s를 거부한다',
     async (uid) => {
       const denied = Object.assign(new Error('private-canary'), { code: 'EACCES' });
-      await expect(findWorkerAncestor(4, ancestors({ 4: { parent: 2, exe: denied, uid } }))).rejects.toBe(denied);
-      await expect(findWorkerAncestor(4, ancestors({ 4: { parent: 2, exe: denied, statusPid: 5 } }))).rejects.toBe(
-        denied,
-      );
+      await expect(findWorkerAncestor(4, ancestors({ 4: { parent: 2, exe: denied, uid } }), 1001)).rejects.toBe(denied);
+      await expect(
+        findWorkerAncestor(4, ancestors({ 4: { parent: 2, exe: denied, statusPid: 5 } }), 1001),
+      ).rejects.toBe(denied);
     },
   );
   it.each(['ENOENT', 'EIO'])('root라도 exe의 %s 오류는 건너뛰지 않는다', async (code) => {
     const failure = Object.assign(new Error('private-canary'), { code });
-    await expect(findWorkerAncestor(4, ancestors({ 4: { parent: 2, exe: failure } }))).rejects.toBe(failure);
+    await expect(findWorkerAncestor(4, ancestors({ 4: { parent: 2, exe: failure } }), 1001)).rejects.toBe(failure);
   });
   it('status 읽기 실패·PID 불일치·depth·cycle·가짜 worker 경로는 통과하지 못한다', async () => {
     const denied = Object.assign(new Error('private-canary'), { code: 'EPERM' });
     const reader = ancestors({ 4: { parent: 2, exe: denied } });
     const failure = Object.assign(new Error('private-canary'), { code: 'ENOENT' });
     await expect(
-      findWorkerAncestor(4, {
-        ...reader,
-        status: async () => {
-          throw failure;
+      findWorkerAncestor(
+        4,
+        {
+          ...reader,
+          status: async () => {
+            throw failure;
+          },
         },
-      }),
+        1001,
+      ),
     ).rejects.toBe(failure);
-    await expect(findWorkerAncestor(4, { ...reader, stat: async () => '5 (x) S 2 0' })).resolves.toBe(false);
+    await expect(findWorkerAncestor(4, { ...reader, stat: async () => '5 (x) S 2 0' }, 1001)).resolves.toBe(false);
     const deep = ancestors(
       Object.fromEntries(
         Array.from({ length: 34 }, (_, i) => [
@@ -101,31 +131,35 @@ describe('L5 의존성 설치 전 bootstrap 경계', () => {
         ]),
       ),
     );
-    await expect(findWorkerAncestor(2, deep)).resolves.toBe(false);
+    await expect(findWorkerAncestor(2, deep, 1001)).resolves.toBe(false);
     expect(deep.visited).toHaveLength(32);
-    await expect(findWorkerAncestor(3, deep)).resolves.toBe(true);
+    await expect(findWorkerAncestor(3, deep, 1001)).resolves.toBe(true);
     const cycle = ancestors({ 4: { parent: 3, exe: '/usr/bin/sudo' }, 3: { parent: 4, exe: '/usr/bin/sudo' } });
-    await expect(findWorkerAncestor(4, cycle)).resolves.toBe(false);
+    await expect(findWorkerAncestor(4, cycle, 1001)).resolves.toBe(false);
     expect(cycle.visited).toEqual([4, 3]);
-    await expect(findWorkerAncestor(4, ancestors({ 4: { parent: 1, exe: '/bin/Runner.Worker.fake' } }))).resolves.toBe(
-      false,
-    );
+    await expect(
+      findWorkerAncestor(4, ancestors({ 4: { parent: 1, exe: '/bin/Runner.Worker.fake' } }), 1001),
+    ).resolves.toBe(false);
   });
   it('잘못된 PID·PPID·stat 오류는 exe 증명이나 root 상태로 대신하지 않는다', async () => {
     const reader = ancestors({ 4: { parent: 2, exe: '/bin/Runner.Worker' } });
     for (const pid of [1, 0, -1, 4.5, Number.MAX_SAFE_INTEGER + 1, Infinity, NaN])
-      await expect(findWorkerAncestor(pid, reader)).resolves.toBe(false);
+      await expect(findWorkerAncestor(pid, reader, 1001)).resolves.toBe(false);
     expect(reader.visited).toEqual([]);
     for (const stat of ['bad-stat', '4 (x) S 9007199254740992 0', '4 (x) S -1 0'])
-      await expect(findWorkerAncestor(4, { ...reader, stat: async () => stat })).resolves.toBe(false);
+      await expect(findWorkerAncestor(4, { ...reader, stat: async () => stat }, 1001)).resolves.toBe(false);
     const failure = Object.assign(new Error('private-canary'), { code: 'EACCES' });
     await expect(
-      findWorkerAncestor(4, {
-        ...reader,
-        stat: async () => {
-          throw failure;
+      findWorkerAncestor(
+        4,
+        {
+          ...reader,
+          stat: async () => {
+            throw failure;
+          },
         },
-      }),
+        1001,
+      ),
     ).rejects.toBe(failure);
   });
   it.each([
@@ -134,7 +168,7 @@ describe('L5 의존성 설치 전 bootstrap 경계', () => {
     ['status', 'LOAD_BOOTSTRAP_ANCESTOR_STATUS_READ_FAILED'],
     ['pid', 'LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_STATUS_PID_INVALID'],
     ['uid', 'LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_STATUS_UID_INVALID'],
-    ['nonroot', 'LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_NONROOT'],
+    ['nonroot', 'LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_FOREIGN_UID'],
   ])('조상 %s 실패는 원래 오류·errno를 유지하고 고정 연산 코드만 공개한다', async (operation, code) => {
     const canary = 'private-canary postgres://user:password@host/db /proc/987/exe';
     const failure = Object.assign(new Error(canary), { code: operation === 'exe' ? 'EIO' : 'EACCES', path: canary });
@@ -150,10 +184,10 @@ describe('L5 의존성 설치 전 bootstrap 경계', () => {
       };
     if (operation === 'pid') reader.status = async () => 'Pid: 5\nUid: 0 0 0 0\n';
     if (operation === 'uid') reader.status = async () => 'Pid: 4\nUid: 0 0 0\n';
-    if (operation === 'nonroot') reader.status = async () => 'Pid: 4\nUid: 0 1001 0 0\n';
+    if (operation === 'nonroot') reader.status = async () => 'Pid: 4\nUid: 0 2001 0 0\n';
     const expected = ['stat', 'exe', 'status'].includes(operation) ? failure : denied;
     const keys = Object.keys(expected);
-    await expect(findWorkerAncestor(4, reader)).rejects.toBe(expected);
+    await expect(findWorkerAncestor(4, reader, 1001)).rejects.toBe(expected);
     expect(expected.code).toBe(expected === failure ? (operation === 'exe' ? 'EIO' : 'EACCES') : 'EPERM');
     expect(expected.message).toBe(canary);
     expect(Object.keys(expected)).toEqual(keys);
@@ -169,6 +203,7 @@ describe('L5 의존성 설치 전 bootstrap 경계', () => {
     'LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_STATUS_PID_INVALID',
     'LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_STATUS_UID_INVALID',
     'LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_NONROOT',
+    'LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_FOREIGN_UID',
   ])('자식의 %s 고정 코드만 허용하고 연산 원자료는 거부한다', (code) => {
     const result = { phase: 'platform', code, admissionReason: null };
     expect(bootstrapDiagnostic('platform', new Error(code))).toEqual(result);
