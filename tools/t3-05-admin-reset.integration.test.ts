@@ -442,10 +442,15 @@ async function world(options: { ruleFeatures?: ['policy'] } = {}) {
       seed: randomUUID(),
     }),
   );
+  const selected =
+    options.ruleFeatures === undefined
+      ? {}
+      : { ruleFeatures: [...new Set([...(state.ruleFeatures ?? []), ...options.ruleFeatures])] };
+  const featureState = { ...state, ...selected };
   expect(state.nations).toHaveLength(21);
   expect(state.generals).toHaveLength(491);
   const saved = await checked(() =>
-    saveInitialWorld(db, state, { name: '초기화 접수 보존', turnTermMinutes: 30, endYear: 200, ...options }),
+    saveInitialWorld(db, featureState, { name: '초기화 접수 보존', turnTermMinutes: 30, endYear: 200, ...selected }),
   );
   await checked(() => controlClock(db, saved.worldId, 'start'));
   await checked(() => controlClock(db, saved.worldId, 'pause'));
