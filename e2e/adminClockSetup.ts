@@ -58,11 +58,13 @@ export async function clockWorld(stack: LegalStack, releases: Array<() => Promis
 }
 export async function executeClock(world: ClockWorld) {
   if (world.hold.lost) throw world.hold.lost;
-  const { clockTick } = await world.hold.db.world.findUniqueOrThrow({
-    where: { id: world.id },
-    select: { clockTick: true },
-  });
-  await new TurnLoop(world.hold.db, world.hold.lease).advanceTo(clockTick);
+  // 실제 입력 한 commit만 확인한다. 재개 뒤 도래한 NPC 턴은 다음 배치에서 실행한다.
+  let elapsed = 0;
+  const batch = await new TurnLoop(world.hold.db, world.hold.lease, {
+    elapsedNow: () => elapsed++ * 1000,
+  }).poll();
+  expect(batch.more).toBe(true);
+  expect(batch.executions).toEqual([]);
   if (world.hold.lost) throw world.hold.lost;
 }
 export async function clockHuman(page: Page, stack: LegalStack, world: ClockWorld, userId: string) {
