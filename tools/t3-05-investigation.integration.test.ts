@@ -289,7 +289,10 @@ async function start(options: Partial<Parameters<typeof buildServer>[0]> = {}) {
     ...options,
   });
   apps.add(app);
-  return { app, address: await app.listen({ host: '127.0.0.1', port: 0 }) };
+  return {
+    app,
+    address: await app.listen({ host: '127.0.0.1', port: 0, listenTextResolver: () => '관리자 조사 시험 서버 준비' }),
+  };
 }
 
 type Group = {
