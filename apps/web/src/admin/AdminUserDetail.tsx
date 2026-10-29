@@ -25,6 +25,7 @@ export function AdminUserDetail({
   data,
   pending,
   error,
+  disabled = false,
 }: {
   userId: string;
   onChange: (value: string) => void;
@@ -32,6 +33,7 @@ export function AdminUserDetail({
   data: Detail | null;
   pending: boolean;
   error: string | null;
+  disabled?: boolean;
 }) {
   const id = useId();
   return (
@@ -50,12 +52,13 @@ export function AdminUserDetail({
           <input
             id={id}
             value={userId}
+            disabled={disabled}
             onChange={(event) => onChange(event.target.value)}
             maxLength={36}
             autoComplete="off"
           />
         </label>
-        <button type="submit" disabled={pending}>
+        <button type="submit" disabled={pending || disabled}>
           상세 조회
         </button>
       </form>

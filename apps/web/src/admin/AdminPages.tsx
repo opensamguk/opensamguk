@@ -8,6 +8,7 @@ import { ErrorState, LoadingState } from '../ui/States';
 import { auditFilter, searchFilter, type AuditFilter } from './filters';
 import { usePrivateRead } from './usePrivateRead';
 import { AdminUserDetail } from './AdminUserDetail';
+import { AdminSanctionActions } from './AdminSanctionActions';
 import styles from './AdminPages.module.css';
 
 type Outputs = inferRouterOutputs<AppRouter>['admin'];
@@ -133,7 +134,10 @@ export function AdminHome() {
     <section>
       <h2>운영 조회</h2>
       <p>월드·사용자·감사 기록을 조회하고 로비·월드 공지를 관리합니다.</p>
-      <p>사용자 상세에서 참가 장수와 제재 이력을 확인합니다. 월드 조작·제재 변경과 로그인 자료 화면은 준비 중입니다.</p>
+      <p>
+        사용자 상세에서 참가 장수·제재 이력을 확인하고 제재를 등록·해제합니다. 월드 조작과 로그인 자료 화면은 준비
+        중입니다.
+      </p>
     </section>
   );
 }
@@ -141,11 +145,14 @@ export function AdminHome() {
 export function AdminUsers() {
   const viewerId = useViewer(),
     client = useTRPCClient();
+  const searchForm = useRef<HTMLFormElement>(null);
   const query = usePrivateRead<Outputs['user']['search']>(viewerId);
   const detail = usePrivateRead<Outputs['user']['get']>(viewerId);
   const [detailId, setDetailId] = useState(''),
-    [detailError, setDetailError] = useState<string | null>(null);
-  function readDetail(value: string) {
+    [detailError, setDetailError] = useState<string | null>(null),
+    [actionLocked, setActionLocked] = useState(false);
+  function readDetail(value: string, afterAction = false) {
+    if (actionLocked && !afterAction) return;
     detail.clear();
     setDetailError(null);
     const userId = value.trim();
@@ -160,6 +167,7 @@ export function AdminUsers() {
     [error, setError] = useState<string | null>(null);
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (actionLocked) return;
     query.clear();
     detail.clear();
     setError(null);
@@ -174,9 +182,11 @@ export function AdminUsers() {
     <section>
       <h2>사용자 찾기</h2>
       <form
+        ref={searchForm}
         className={styles.form}
         onSubmit={submit}
         onChange={() => {
+          if (actionLocked) return;
           query.clear();
           detail.clear();
           setDetailError(null);
@@ -185,7 +195,7 @@ export function AdminUsers() {
       >
         <label>
           검색 방식
-          <select name="kind" value={kind} onChange={(e) => setKind(e.target.value)}>
+          <select name="kind" value={kind} disabled={actionLocked} onChange={(e) => setKind(e.target.value)}>
             <option value="account">이메일 앞부분·사용자 UUID</option>
             <option value="general">월드·장수 이름</option>
           </select>
@@ -194,20 +204,20 @@ export function AdminUsers() {
           <>
             <label>
               월드 UUID
-              <input name="worldId" required maxLength={36} />
+              <input name="worldId" required maxLength={36} disabled={actionLocked} />
             </label>
             <label>
               장수 이름 앞부분
-              <input name="generalName" required maxLength={30} />
+              <input name="generalName" required maxLength={30} disabled={actionLocked} />
             </label>
           </>
         ) : (
           <label>
             이메일 앞부분 또는 사용자 UUID
-            <input name="query" required minLength={3} maxLength={254} autoComplete="off" />
+            <input name="query" required minLength={3} maxLength={254} autoComplete="off" disabled={actionLocked} />
           </label>
         )}
-        <button type="submit" disabled={query.pending}>
+        <button type="submit" disabled={query.pending || actionLocked}>
           찾기
         </button>
       </form>
@@ -237,6 +247,7 @@ export function AdminUsers() {
                     <br />
                     <button
                       type="button"
+                      disabled={actionLocked}
                       onClick={() => readDetail(user.userId)}
                       aria-label={`${user.email} 상세 보기`}
                     >
@@ -258,7 +269,9 @@ export function AdminUsers() {
       ) : null}
       <AdminUserDetail
         userId={detailId}
+        disabled={actionLocked}
         onChange={(value) => {
+          if (actionLocked) return;
           setDetailId(value);
           detail.clear();
           setDetailError(null);
@@ -267,6 +280,21 @@ export function AdminUsers() {
         data={detail.data}
         pending={detail.pending}
         error={detailError ?? detail.error}
+      />
+      <AdminSanctionActions
+        key={viewerId}
+        viewerId={viewerId}
+        target={detail.data}
+        onRead={(value) => readDetail(value, true)}
+        onClear={() => {
+          detail.clear();
+          query.clear();
+          searchForm.current?.reset();
+          setDetailId('');
+          setDetailError(null);
+          setError(null);
+        }}
+        onLockChange={setActionLocked}
       />
     </section>
   );

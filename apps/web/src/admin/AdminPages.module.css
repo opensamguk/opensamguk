@@ -100,12 +100,21 @@
   min-width: 0;
 }
 .noticeForm input,
+.noticeForm select,
 .noticeForm textarea {
   box-sizing: border-box;
   width: 100%;
   min-height: 44px;
   font: inherit;
   padding: var(--space-2);
+}
+.sanctionActions {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sanctionActions select {
+  min-width: 0;
+  max-width: 100%;
 }
 .noticeForm input[type='checkbox'] {
   width: 44px;
