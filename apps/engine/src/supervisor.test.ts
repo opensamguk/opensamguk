@@ -28,6 +28,12 @@ it('ENDED 발견은 kind와 관계없이 모든 PENDING을 대상으로 한다 (
     where: {
       OR: [
         { status: { in: ['RUNNING', 'PAUSED'] } },
+        {
+          status: 'PREOPEN',
+          inputEvents: {
+            some: { status: 'PENDING', kind: { in: ['admin.world.start', 'admin.world.pause', 'admin.world.resume'] } },
+          },
+        },
         { status: 'ENDED', inputEvents: { some: { status: 'PENDING' } } },
       ],
     },
