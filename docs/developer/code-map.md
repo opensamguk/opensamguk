@@ -26,6 +26,8 @@
 | `apps/server/src/mail/`, `routers/account.ts` | 인증·재설정 메일과 개발 capture, 본인 계정 조회·재발급·토큰 소비 API. 운영 전송·가입 동의·미인증 게임 변경 차단·탈퇴는 후속 |
 | `tools/t3-02-account-api.integration.test.ts`, `t3-02-session-lock.integration.test.ts`, `t3-02-mail-startup.test.ts` | 실제 계정 API 권한·메일함·두 API의 SSE 폐기, 재설정/메시지·SSE 교착 회귀와 운영 시작 거부 |
 | `apps/server/src/routers/auth.ts` | 가입·로그인·로그아웃·현재 계정 |
+| `apps/web/src/admin/AdminEndActions.tsx`, `adminEndModel.ts` | 명시 종료 확인·현재 신원 대조·30초 기한·동일 UUID 수동 결과 조회. 관리자 월드 목록의 시계 조작과 상호 잠금 |
+| `e2e/adminEndSetup.ts`, `admin-end.spec.ts`, `playwright.end.config.ts` | 전용 실제 PostgreSQL·API·엔진·공개 dist의 종료 화면10건. 검증 소스이며 실제 인수는 후속 |
 | `apps/server/src/trpc.ts` | 공개·인증 필수 procedure |
 | `apps/server/src/router.ts` | tRPC `AppRouter` (API 계약): `health`, `auth`, `world`, `home`, `city`, `nation`, `records`, `general`, `turns`, `commands`, `ranking`, `timelapse`, `message`, `notice`, `lobby` |
 | `apps/server/src/routers/lobby.ts`, `lobby.test.ts` | 공개 월드 목록·로비 공지, 내 장수·생성 대기와 시나리오 이름 조회 |

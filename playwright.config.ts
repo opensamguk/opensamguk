@@ -13,6 +13,7 @@ export default defineConfig({
     '**/admin-sanction.spec.ts',
     '**/admin-investigation.spec.ts',
     '**/admin-clock.spec.ts',
+    '**/admin-end.spec.ts',
   ],
   forbidOnly: isCI,
   use: { baseURL: 'http://127.0.0.1:5173' },
