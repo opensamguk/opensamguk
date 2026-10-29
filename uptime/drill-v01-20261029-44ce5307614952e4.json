@@ -1,1 +1,1 @@
-{"version":1,"consecutiveFailures":2,"alerting":true,"lastAlertAt":"2026-10-29T10:25:37.764Z","lastRecoveryAt":null,"updatedAt":"2026-10-29T10:26:33.280Z","lastRunId":"40857533591","pending":[],"lastDelivered":null}
+{"version":1,"consecutiveFailures":0,"alerting":false,"lastAlertAt":"2026-10-29T10:25:37.764Z","lastRecoveryAt":"2026-10-29T10:27:32.272Z","updatedAt":"2026-10-29T10:27:32.272Z","lastRunId":"40857673415","pending":[],"lastDelivered":null}
