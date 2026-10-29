@@ -627,7 +627,7 @@ test('END10 AC-M3-04 guard·늦은 응답·UUID 보존·상호잠금·history·b
     await pending(dialog);
     await page.evaluate(() => history.back());
     await expect(dialog.getByRole('alert')).toContainText('종료 요청 결과를 먼저 확인하세요');
-    expect(new URL(page.url()).pathname).toBe('/admin/worlds');
+    await expect(page).toHaveURL(/\/admin\/worlds$/);
     const input = await ownInput(stack, target.id),
       held = gate(),
       fetched = gate();
