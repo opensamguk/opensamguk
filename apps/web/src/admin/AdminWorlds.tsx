@@ -1,11 +1,12 @@
 import type { inferRouterOutputs } from '@trpc/server';
 import type { AppRouter } from '@opensamguk/server/router';
 import { useRouteContext } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useTRPCClient } from '../trpc';
 import { ErrorState, LoadingState } from '../ui/States';
 import { usePrivateRead } from './usePrivateRead';
 import { AdminClockActions } from './AdminClockActions';
+import { AdminEndActions } from './AdminEndActions';
 import styles from './AdminPages.module.css';
 
 type Worlds = inferRouterOutputs<AppRouter>['admin']['world']['list'];
@@ -20,26 +21,65 @@ export function AdminWorlds() {
   const viewerId = useRouteContext({ from: '/admin' }).adminViewerId,
     client = useTRPCClient(),
     query = usePrivateRead<Worlds>(viewerId);
-  const [locked, setLocked] = useState(false);
+  const [owner, setOwner] = useState<'clock' | 'end' | null>(null);
+  const ownerRef = useRef<'clock' | 'end' | null>(null);
+  const acquireEnd = useCallback(() => {
+    if (ownerRef.current !== null && ownerRef.current !== 'end') return false;
+    ownerRef.current = 'end';
+    setOwner('end');
+    return true;
+  }, []);
+  const releaseEnd = useCallback(() => {
+    if (ownerRef.current === 'end') {
+      ownerRef.current = null;
+      setOwner(null);
+    }
+  }, []);
+  const lockClock = useCallback((locked: boolean) => {
+    if (locked && ownerRef.current === null) {
+      ownerRef.current = 'clock';
+      setOwner('clock');
+    } else if (!locked && ownerRef.current === 'clock') {
+      ownerRef.current = null;
+      setOwner(null);
+    }
+  }, []);
+  useLayoutEffect(() => {
+    ownerRef.current = null;
+    setOwner(null);
+  }, [viewerId]);
   return (
     <section>
       <h2>월드 목록</h2>
       <p>조회 버튼을 누르면 현재 월드와 엔진 기록을 확인합니다. 자동으로 갱신하지 않습니다.</p>
       <button
         type="button"
-        disabled={query.pending || locked}
+        disabled={query.pending || owner !== null}
         onClick={() => void query.read((signal) => client.admin.world.list.query(undefined, { signal }))}
       >
         월드 조회
       </button>
-      <p>월드 생성·종료·초기화 화면은 준비 중입니다.</p>
-      <AdminClockActions
-        key={viewerId}
-        viewerId={viewerId}
-        worlds={query.data}
-        onClear={query.clear}
-        onLockChange={setLocked}
-      />
+      <p>월드 생성·초기화 화면은 준비 중입니다.</p>
+      <div inert={owner === 'end'} aria-hidden={owner === 'end' || undefined}>
+        <AdminClockActions
+          key={viewerId}
+          viewerId={viewerId}
+          worlds={query.data}
+          onClear={query.clear}
+          onLockChange={lockClock}
+        />
+      </div>
+      <div inert={owner === 'clock'} aria-hidden={owner === 'clock' || undefined}>
+        <AdminEndActions
+          key={viewerId}
+          viewerId={viewerId}
+          worlds={query.data}
+          disabled={owner === 'clock'}
+          onAcquire={acquireEnd}
+          onRelease={releaseEnd}
+          onClear={query.clear}
+        />
+      </div>
       {query.pending ? <LoadingState>월드 조회 중</LoadingState> : null}
       {query.error ? <ErrorState title={query.error} /> : null}
       {query.data ? (
