@@ -212,8 +212,8 @@ test('정식191년 메인 영역 이동·초점·375~1440px·30초 재조회 뒤
     await expect(mapPanel.getByRole('alert')).toContainText('불러오지 못했습니다', { timeout: 20_000 });
     await nav.getByRole('button', { name: '지도로 이동', exact: true }).click();
     await expect(mapPanel.getByRole('heading', { name: '지도', exact: true })).toBeFocused();
-    await page.unroute('**/trpc/**');
     await mapPanel.getByRole('button', { name: '다시 시도', exact: true }).click();
+    await page.unroute('**/trpc/**');
     await expect(page.getByTestId('operational-world-map')).toBeVisible();
     // 같은 HTTP 배치의 다른 조회도 중단될 수 있다. 새 문서에서 저장한 목록과 선택 도시를 다시 확인한다.
     await page.reload();
