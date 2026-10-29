@@ -201,6 +201,7 @@ export async function updateUptimeGit(input: UptimeGitInput, dependencies: Uptim
       const restored = restoreState({ key: input.key, raw: snapshot.raw, now });
       if ('error' in restored) throw new UptimeGitError('state');
       let state: UptimeState, result: string, changed: boolean;
+      let decision: 'down' | 'recovery' | null = null;
       let dropped: Dropped[] = [];
       if (input.operation.kind === 'observe') {
         const observation = observe(restored.state, input.operation.observation);
@@ -208,6 +209,9 @@ export async function updateUptimeGit(input: UptimeGitInput, dependencies: Uptim
         result = observation.result;
         changed = observation.result === 'applied';
         dropped = observation.dropped;
+        decision =
+          observation.added[0]?.kind ??
+          (observation.suppressed === 'no_webhook' ? (state.alerting ? 'down' : 'recovery') : null);
       } else {
         const operation = input.operation;
         const update =
@@ -225,6 +229,7 @@ export async function updateUptimeGit(input: UptimeGitInput, dependencies: Uptim
           result,
           head: snapshot.head,
           committed: false,
+          decision,
           attempts: attempt + 1,
           ...(await confirmedMetadata(snapshot.head, restored.warnings)),
         };
@@ -254,6 +259,7 @@ export async function updateUptimeGit(input: UptimeGitInput, dependencies: Uptim
           result,
           head,
           committed: true,
+          decision,
           attempts: attempt + 1,
           ...(await confirmedMetadata(head, restored.warnings)),
         };
