@@ -7,6 +7,7 @@ import { ErrorState, LoadingState } from '../ui/States';
 import { usePrivateRead } from './usePrivateRead';
 import { AdminClockActions } from './AdminClockActions';
 import { AdminEndActions } from './AdminEndActions';
+import { AdminCreateActions } from './AdminCreateActions';
 import styles from './AdminPages.module.css';
 
 type Worlds = inferRouterOutputs<AppRouter>['admin']['world']['list'];
@@ -21,8 +22,20 @@ export function AdminWorlds() {
   const viewerId = useRouteContext({ from: '/admin' }).adminViewerId,
     client = useTRPCClient(),
     query = usePrivateRead<Worlds>(viewerId);
-  const [owner, setOwner] = useState<'clock' | 'end' | null>(null);
-  const ownerRef = useRef<'clock' | 'end' | null>(null);
+  const [owner, setOwner] = useState<'clock' | 'end' | 'create' | null>(null);
+  const ownerRef = useRef<'clock' | 'end' | 'create' | null>(null);
+  const acquireCreate = useCallback(() => {
+    if (ownerRef.current !== null && ownerRef.current !== 'create') return false;
+    ownerRef.current = 'create';
+    setOwner('create');
+    return true;
+  }, []);
+  const releaseCreate = useCallback(() => {
+    if (ownerRef.current === 'create') {
+      ownerRef.current = null;
+      setOwner(null);
+    }
+  }, []);
   const acquireEnd = useCallback(() => {
     if (ownerRef.current !== null && ownerRef.current !== 'end') return false;
     ownerRef.current = 'end';
@@ -59,8 +72,11 @@ export function AdminWorlds() {
       >
         월드 조회
       </button>
-      <p>월드 생성·초기화 화면은 준비 중입니다.</p>
-      <div inert={owner === 'end'} aria-hidden={owner === 'end' || undefined}>
+      <p>월드 초기화 화면은 준비 중입니다.</p>
+      <div
+        inert={owner === 'end' || owner === 'create'}
+        aria-hidden={owner === 'end' || owner === 'create' || undefined}
+      >
         <AdminClockActions
           key={viewerId}
           viewerId={viewerId}
@@ -69,14 +85,27 @@ export function AdminWorlds() {
           onLockChange={lockClock}
         />
       </div>
-      <div inert={owner === 'clock'} aria-hidden={owner === 'clock' || undefined}>
+      <div
+        inert={owner === 'clock' || owner === 'create'}
+        aria-hidden={owner === 'clock' || owner === 'create' || undefined}
+      >
         <AdminEndActions
           key={viewerId}
           viewerId={viewerId}
           worlds={query.data}
-          disabled={owner === 'clock'}
+          disabled={owner === 'clock' || owner === 'create'}
           onAcquire={acquireEnd}
           onRelease={releaseEnd}
+          onClear={query.clear}
+        />
+      </div>
+      <div inert={owner === 'clock' || owner === 'end'} aria-hidden={owner === 'clock' || owner === 'end' || undefined}>
+        <AdminCreateActions
+          key={viewerId}
+          viewerId={viewerId}
+          disabled={owner === 'clock' || owner === 'end'}
+          onAcquire={acquireCreate}
+          onRelease={releaseCreate}
           onClear={query.clear}
         />
       </div>
