@@ -2,6 +2,7 @@ import { nextActionSequence, type Prisma } from '@opensamguk/db';
 import {
   adminEndPayloadSchema,
   ADMIN_END_KIND,
+  ADMIN_RESET_KIND,
   adminEndAppliedSchema,
   adminEndRejectMessages,
   checkAdminEndOrigin,
@@ -12,6 +13,7 @@ import {
 import { hashState } from '@opensamguk/shared/node';
 import { databaseNow } from '../lease';
 import { loadReplayState } from '../monthly';
+import { checkedAdminResetResult } from './reset';
 
 export function checkedAdminEndResult(
   world: Prisma.WorldGetPayload<Record<string, never>>,
@@ -45,11 +47,15 @@ export async function readAdminEndTick(
   world: Prisma.WorldGetPayload<Record<string, never>>,
 ) {
   const records = await tx.inputEvent.findMany({
-    where: { worldId: world.id, kind: ADMIN_END_KIND, status: 'APPLIED' },
+    where: { worldId: world.id, kind: { in: [ADMIN_END_KIND, ADMIN_RESET_KIND] }, status: 'APPLIED' },
     take: 2,
   });
   if (records.length !== 1) throw new Error('종료된 월드의 종료 기록이 없습니다.');
-  return checkedAdminEndResult(world, records[0]!).after.tick;
+  return (
+    records[0]!.kind === ADMIN_RESET_KIND
+      ? checkedAdminResetResult(world, records[0]!)
+      : checkedAdminEndResult(world, records[0]!)
+  ).after.tick;
 }
 
 // 호출자가 리스와 World를 잠근 같은 트랜잭션에서만 처리한다.
