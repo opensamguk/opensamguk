@@ -142,8 +142,10 @@ test('세션이 서버에서 없어지면 다음 이동은 로그인으로 간�
   if (finishedError) throw finishedError;
   await expect(page.getByRole('heading', { level: 1, name: '메인' })).toBeVisible();
   await page.context().clearCookies();
-  await page.getByRole('link', { name: '예턴' }).click();
+  // 예턴은 같은 메인의 영역 이동이므로 실제 페이지 이동인 기록으로 가드를 확인한다.
+  await page.getByRole('link', { name: '기록', exact: true }).click();
   await expect(page).toHaveURL(/\/login\?next=/);
+  expect(new URL(page.url()).searchParams.get('next')).toMatch(/^\/w\/1\/records(\?tab=general)?$/);
 });
 
 // T1-14 Codex 리뷰 2: 다시 시도는 실패 당시 값이 아니라 지금 화면의 값을 보낸다.
