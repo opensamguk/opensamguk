@@ -132,10 +132,10 @@ async function call(path: string, input: unknown, cookie?: string) {
     raw,
   };
 }
-async function gameSnapshot() {
+async function gameSnapshot(all = false) {
   const tables = await db.$queryRaw<
     Array<{ tablename: string }>
-  >`SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename NOT IN ('AuditLog','User','Session','Sanction') ORDER BY tablename`;
+  >`SELECT tablename FROM pg_tables WHERE schemaname='public' AND (${all} OR tablename NOT IN ('AuditLog','User','Session','Sanction')) ORDER BY tablename`;
   const hash = createHash('sha256');
   for (const { tablename } of tables) {
     const quoted = '"' + tablename.replaceAll('"', '""') + '"';
@@ -221,7 +221,7 @@ afterAll(async () => {
   if (errors.length) throw new AggregateError([...new Set(errors)], '관리자 조회 실행·정리 실패');
 });
 
-for (const path of ['admin.user.search', 'admin.audit.list'])
+for (const path of ['admin.user.search', 'admin.user.get', 'admin.audit.list'])
   for (const category of categories)
     it(
       `${path} ${category}`,
@@ -234,7 +234,13 @@ for (const path of ['admin.user.search', 'admin.audit.list'])
         const before = await db.auditLog.count(),
           game = await gameSnapshot();
         const input =
-          category === 'invalidInput' ? { role: 'ADMIN' } : path === 'admin.user.search' ? { query: randomUUID() } : {};
+          category === 'invalidInput'
+            ? { role: 'ADMIN' }
+            : path === 'admin.user.search'
+              ? { query: randomUUID() }
+              : path === 'admin.user.get'
+                ? { userId: actor.id }
+                : {};
         const result = await call(path, input, cookie);
         if (category === 'success') expect(result.status).toBe(200);
         else {
@@ -244,7 +250,7 @@ for (const path of ['admin.user.search', 'admin.audit.list'])
           expect(result.reason).toBe(null);
         }
         expect(await db.auditLog.count()).toBe(
-          before + (category === 'success' && path === 'admin.user.search' ? 1 : 0),
+          before + (category === 'success' && path !== 'admin.audit.list' ? 1 : 0),
         );
         expect(await gameSnapshot()).toBe(game);
       }),
@@ -258,8 +264,12 @@ it('미인증·회수·비활성 관리자와 위조 입력은 조회·감사를
   await db.user.update({ where: { id: revoked.id }, data: { role: 'USER' } });
   const before = await db.auditLog.count(),
     game = await gameSnapshot();
-  for (const path of ['admin.user.search', 'admin.audit.list']) {
-    const input = path.endsWith('search') ? { query: randomUUID() } : {};
+  for (const path of ['admin.user.search', 'admin.user.get', 'admin.audit.list']) {
+    const input = path.endsWith('search')
+      ? { query: randomUUID() }
+      : path === 'admin.user.get'
+        ? { userId: actor.id }
+        : {};
     expect((await call(path, input, cookies[0])).reason).toBe('EMAIL_NOT_VERIFIED');
     expect((await call(path, input, cookies[1])).code).toBe('FORBIDDEN');
     expect((await call(path, input, cookies[2])).code).toBe('UNAUTHORIZED');
@@ -392,6 +402,7 @@ for (const index of [0, 1])
       seed: 'admin-read-formal',
     });
     initial.ruleFeatures = [
+      'campaign-assignment-v2',
       'campaign-v1',
       'five-stats',
       'operational-map',
@@ -485,6 +496,179 @@ it('장수 앞부분 검색은 두 정식 월드·사람/NPC·30칸·InputEvent�
   expect(await gameSnapshot()).toBe(before);
 });
 
+it('상세 조회는 정식 두 월드의 사람 장수만 읽고 최신 제재50건·전체 수·고정 응답과 감사를 남긴다', async () => {
+  const actor = await user('ADMIN'),
+    cookie = await session(actor.id);
+  const rows = Array.from({ length: 51 }, (_, index) => ({
+    id: randomUUID(),
+    userId: formalVictim.id,
+    createdBy: actor.id,
+    worldId: index % 2 ? formalWorlds[0]! : null,
+    reason: index === 0 ? '<script>private-reason</script>\n원문' : `조회 제재 ${index}`,
+    createdAt: new Date(now),
+    expiresAt: index === 0 ? new Date(now) : index === 1 ? new Date(now + 1) : null,
+    liftedAt: index === 2 ? new Date(now) : null,
+    liftedBy: index === 2 ? actor.id : null,
+    liftReason: index === 2 ? '상세 조회 해제 자료' : null,
+  }));
+  await db.sanction.createMany({ data: rows });
+  const game = await gameSnapshot(),
+    count = await db.auditLog.count();
+  const generals = await db.general.findMany({
+    where: { userId: formalVictim.id },
+    orderBy: [{ world: { createdAt: 'desc' } }, { worldId: 'desc' }, { id: 'desc' }],
+    include: { world: true },
+  });
+  expect(generals).toHaveLength(2);
+  const sanctions = [...rows].sort((a, b) => (a.id < b.id ? 1 : -1)).slice(0, 50);
+  const result = await call('admin.user.get', { userId: formalVictim.id }, cookie);
+  expect(result.status).toBe(200);
+  expect(result.data).toEqual({
+    userId: formalVictim.id,
+    email: formalVictim.email,
+    status: formalVictim.status,
+    role: formalVictim.role,
+    createdAt: formalVictim.createdAt.toISOString(),
+    emailVerified: true,
+    generalCount: 2,
+    sanctionCount: 51,
+    generals: generals.map((general) => ({
+      generalId: general.id,
+      name: general.name,
+      nationId: general.nationId,
+      worldId: general.worldId,
+      worldName: general.world.name,
+      worldStatus: general.world.status,
+    })),
+    sanctions: sanctions.map((row) => ({
+      sanctionId: row.id,
+      worldId: row.worldId,
+      worldName: row.worldId === null ? null : generals.find((general) => general.worldId === row.worldId)!.world.name,
+      reason: row.reason,
+      createdAt: row.createdAt.toISOString(),
+      expiresAt: row.expiresAt?.toISOString() ?? null,
+      liftedAt: row.liftedAt?.toISOString() ?? null,
+      active: row.liftedAt === null && (row.expiresAt === null || row.expiresAt.getTime() > now),
+    })),
+  });
+  expect(await db.auditLog.count()).toBe(count + 1);
+  expect(await db.auditLog.findFirst({ where: { actorUserId: actor.id } })).toMatchObject({
+    action: 'user.view',
+    targetType: 'User',
+    targetId: formalVictim.id,
+    worldId: null,
+    reason: null,
+    payload: { resultCount: 1, generalsDisplayed: 2, sanctionsDisplayed: 50 },
+  });
+  for (const value of [
+    passwordHash,
+    victimCookie,
+    'passwordHash',
+    'sessions',
+    'accountTokens',
+    'leadership',
+    'rice',
+    'gold',
+    'crew',
+  ])
+    expect(result.raw.includes(value), '상세 응답 비공개 필드 제외').toBe(false);
+  expect(await gameSnapshot()).toBe(game);
+});
+
+it('목록 경계 전용51개 참가 행도 최대50명과 정확한 전체 수·동률 순서를 반환한다', async () => {
+  // 이 작은 복제 자료는 목록 상한만 검증한다. 정식 두 월드·실제 엔진 증거는 앞 사례에 있다.
+  const actor = await user('ADMIN'),
+    cookie = await session(actor.id),
+    victim = await user();
+  const human = await db.general.findUniqueOrThrow({
+    where: { worldId_userId: { worldId: formalWorlds[0]!, userId: formalVictim.id } },
+  });
+  const ids = Array.from({ length: 51 }, () => randomUUID());
+  await client.query(
+    `INSERT INTO "World" SELECT (jsonb_populate_record(NULL::"World",to_jsonb(w)||jsonb_build_object('id',n.id,'status','PREOPEN','createdAt',$3::timestamp))).* FROM "World" w CROSS JOIN unnest($1::text[]) n(id) WHERE w.id=$2`,
+    [ids, formalWorlds[0], new Date(now).toISOString()],
+  );
+  await client.query(
+    `INSERT INTO "City" SELECT (jsonb_populate_record(NULL::"City",to_jsonb(c)||jsonb_build_object('worldId',n.id,'nationId',NULL))).* FROM "City" c CROSS JOIN unnest($1::text[]) n(id) WHERE c."worldId"=$2 AND c."cityKey"=$3`,
+    [ids, formalWorlds[0], human.cityKey],
+  );
+  await client.query(
+    `INSERT INTO "General" SELECT (jsonb_populate_record(NULL::"General",to_jsonb(g)||jsonb_build_object('worldId',n.id,'userId',$4::text,'nationId',NULL))).* FROM "General" g CROSS JOIN unnest($1::text[]) n(id) WHERE g."worldId"=$2 AND g.id=$3`,
+    [ids, formalWorlds[0], human.id, victim.id],
+  );
+  const before = await gameSnapshot();
+  const response = await call('admin.user.get', { userId: victim.id }, cookie);
+  expect(response.status).toBe(200);
+  expect(response.data).toMatchObject({ generalCount: 51, sanctionCount: 0, sanctions: [] });
+  const generals = (response.data as { generals: { worldId: string; generalId: number; name: string }[] }).generals;
+  expect(generals).toHaveLength(50);
+  expect(generals.map((row) => row.worldId)).toEqual([...ids].sort().reverse().slice(0, 50));
+  expect(generals.every((row) => row.generalId === human.id && row.name === human.name)).toBe(true);
+  expect(await gameSnapshot()).toBe(before);
+});
+
+it('없는 상세 대상은 감사1행을 확정한 뒤 NOT_FOUND이며 잘못된 UUID·추가 입력은 DB를 바꾸지 않는다', async () => {
+  const actor = await user('ADMIN'),
+    cookie = await session(actor.id),
+    userId = randomUUID();
+  const count = await db.auditLog.count();
+  const result = await call('admin.user.get', { userId }, cookie);
+  expect(result.code).toBe('NOT_FOUND');
+  expect(result.data).toBeUndefined();
+  expect(await db.auditLog.count()).toBe(count + 1);
+  expect(await db.auditLog.findFirst({ where: { actorUserId: actor.id } })).toMatchObject({
+    action: 'user.view',
+    targetType: 'User',
+    targetId: userId,
+    payload: { resultCount: 0, generalsDisplayed: 0, sanctionsDisplayed: 0 },
+  });
+  const before = await gameSnapshot(true);
+  for (const input of [
+    null,
+    {},
+    { userId: 'bad' },
+    { userId: actor.id, role: 'ADMIN' },
+    { userId: actor.id, worldId: randomUUID() },
+  ]) {
+    expect((await call('admin.user.get', input, cookie)).code).toBe('BAD_REQUEST');
+    expect(await gameSnapshot(true)).toBe(before);
+  }
+});
+
+it('상세 감사 저장 실패는 존재/부재 모두 결과와 원문을 숨기고 전체 DB 행을 보존한다', async () => {
+  const actor = await user('ADMIN'),
+    cookie = await session(actor.id),
+    victim = await user();
+  const before = await gameSnapshot(true);
+  await client.query(
+    `CREATE FUNCTION test_detail_deny() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='user.view' THEN RAISE EXCEPTION 'private-detail-database-failure'; END IF; RETURN NEW; END $$`,
+  );
+  await client.query(
+    'CREATE TRIGGER test_detail_deny BEFORE INSERT ON "AuditLog" FOR EACH ROW EXECUTE FUNCTION test_detail_deny()',
+  );
+  const failures: unknown[] = [];
+  try {
+    for (const userId of [victim.id, randomUUID()]) {
+      const result = await call('admin.user.get', { userId }, cookie);
+      expect(result.code).toBe('INTERNAL_SERVER_ERROR');
+      expect(result.data).toBeUndefined();
+      for (const value of [victim.email, passwordHash, 'private-detail-database-failure', 'SELECT', 'INSERT'])
+        expect(result.raw.includes(value), '실패 응답 비밀값 제외').toBe(false);
+      expect(await gameSnapshot(true)).toBe(before);
+    }
+  } catch (error) {
+    failures.push(error);
+  }
+  for (const sql of ['DROP TRIGGER test_detail_deny ON "AuditLog"', 'DROP FUNCTION test_detail_deny()']) {
+    try {
+      await client.query(sql);
+    } catch (error) {
+      failures.push(error);
+    }
+  }
+  if (failures.length) throw new AggregateError(failures, '상세 조회 감사 실패·정리 검증 실패');
+});
+
 it('감사 INSERT 실패면 실제 HTTP 결과·입력·DB 오류를 숨기고 게임 상태와 감사를 보존한다', async () => {
   const actor = await user('ADMIN'),
     cookie = await session(actor.id),
@@ -545,6 +729,53 @@ it('권한 회수가 개인정보 읽기보다 먼저 잠기면 실제 동시 HT
   } finally {
     await client.query('ROLLBACK');
   }
+});
+
+it('상세 조회가 관리자 행 잠금에서 기다리는 동안 권한을 회수하면 결과·감사가 없다', async () => {
+  const actor = await user('ADMIN'),
+    cookie = await session(actor.id),
+    victim = await user();
+  const count = await db.auditLog.count(),
+    game = await gameSnapshot(),
+    failures: unknown[] = [];
+  let pending: Promise<Awaited<ReturnType<typeof call>>> | undefined;
+  await client.query('BEGIN');
+  try {
+    await client.query('UPDATE "User" SET role=\'USER\' WHERE id=$1', [actor.id]);
+    pending = track(() => call('admin.user.get', { userId: victim.id }, cookie));
+    await expect
+      .poll(async () =>
+        Number(
+          (
+            await admin.query(
+              "SELECT count(*)::int AS n FROM pg_stat_activity WHERE datname=$1 AND wait_event_type='Lock' AND query LIKE '%FOR SHARE%'",
+              [name],
+            )
+          ).rows[0]!.n,
+        ),
+      )
+      .toBe(1);
+    await client.query('COMMIT');
+    const result = await pending;
+    expect(['FORBIDDEN', 'INTERNAL_SERVER_ERROR']).toContain(result.code);
+    expect(result.data).toBeUndefined();
+    for (const value of [victim.email, victim.id]) expect(result.raw.includes(value)).toBe(false);
+    expect(await db.auditLog.count()).toBe(count);
+    expect(await gameSnapshot()).toBe(game);
+    expect((await db.user.findUniqueOrThrow({ where: { id: actor.id } })).role).toBe('USER');
+  } catch (error) {
+    failures.push(error);
+  }
+  try {
+    await client.query('ROLLBACK');
+  } catch (error) {
+    failures.push(error);
+  }
+  if (pending) {
+    const [result] = await Promise.allSettled([pending]);
+    if (result!.status === 'rejected') failures.push(result.reason);
+  }
+  if (failures.length) throw new AggregateError(failures, '상세 조회 권한 경합·정리 실패');
 });
 
 it('감사 조회는 50개 cursor와 모든 필터를 적용하고 재귀 감사·중복·누락이 없다', async () => {
