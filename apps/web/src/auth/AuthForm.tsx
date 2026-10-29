@@ -5,7 +5,8 @@ import { useTRPC } from '../trpc';
 import { ErrorState } from '../ui/States';
 import { describeFailure, validateCredentials, type FieldErrors } from './credentials';
 import styles from './AuthForm.module.css';
-import { accountNext, needsEmailVerification } from '../account/access';
+import { accountNext, needsConsent, needsEmailVerification } from '../account/access';
+import { useSignupConsent } from '../legal/useSignupConsent';
 
 type Mode = 'login' | 'signup';
 
@@ -23,6 +24,8 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string | undefined
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [showPassword, setShowPassword] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
+  const submitting = useRef(false);
+  const [preparing, setPreparing] = useState(false);
 
   async function onSuccess() {
     // 이전 사용자의 캐시를 비운 뒤 서버에서 실제 인증·동의 상태를 다시 읽는다.
@@ -32,6 +35,10 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string | undefined
       const account = await queryClient.fetchQuery({ ...trpc.account.get.queryOptions(), staleTime: 0 });
       if (needsEmailVerification(account)) {
         await navigate({ to: '/verify-email', search: { next: accountNext(next) ?? '/lobby' }, replace: true });
+        return;
+      }
+      if (needsConsent(account)) {
+        await navigate({ to: '/legal/agree', search: { next: accountNext(next) ?? '/lobby' }, replace: true });
         return;
       }
     } catch {
@@ -45,24 +52,40 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string | undefined
   const login = useMutation({ ...trpc.auth.login.mutationOptions(), onSuccess });
   const signup = useMutation({ ...trpc.auth.signup.mutationOptions(), onSuccess });
   const mutation = mode === 'login' ? login : signup;
+  const busy = preparing || mutation.isPending;
+  const consent = useSignupConsent(mode === 'signup', busy);
 
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (mutation.isPending) return;
+    if (submitting.current || busy) return;
     const data = new FormData(event.currentTarget);
     const email = String(data.get('email') ?? '');
     const password = String(data.get('password') ?? '');
     const errors = validateCredentials(email, password);
     setFieldErrors(errors);
     if (errors.email || errors.password) return;
-    mutation.mutate({ email: email.trim(), password });
+    submitting.current = true;
+    try {
+      if (mode === 'signup') {
+        setPreparing(true);
+        const accepted = await consent.prepare();
+        setPreparing(false);
+        if (!accepted) return;
+        await signup.mutateAsync({ email: email.trim(), password, ...accepted });
+      } else await login.mutateAsync({ email: email.trim(), password });
+    } catch {
+      // mutation의 공개 오류 문구를 쓴다. 성공한 가입 입력을 자동으로 다시 보내지 않는다.
+    } finally {
+      submitting.current = false;
+      setPreparing(false);
+    }
   }
 
   const failure = mutation.isError ? describeFailure(mutation.error) : null;
   const text = TEXT[mode];
 
   return (
-    <form ref={formRef} className={styles.form} onSubmit={onSubmit} noValidate aria-busy={mutation.isPending}>
+    <form ref={formRef} className={styles.form} onSubmit={onSubmit} noValidate aria-busy={busy}>
       <div className={styles.field}>
         <label htmlFor={`${id}-email`}>이메일</label>
         <input
@@ -114,6 +137,7 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string | undefined
         ) : null}
       </div>
 
+      {consent.fields}
       {failure?.kind === 'message' ? (
         <p className={styles.formError} role="alert">
           {failure.text}
@@ -127,8 +151,8 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string | undefined
         />
       ) : null}
 
-      <button type="submit" className={styles.submit} disabled={mutation.isPending}>
-        {mutation.isPending ? text.pending : text.submit}
+      <button type="submit" className={styles.submit} disabled={busy || (mode === 'signup' && !consent.ready)}>
+        {busy ? text.pending : text.submit}
       </button>
     </form>
   );
