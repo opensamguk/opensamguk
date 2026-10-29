@@ -1229,7 +1229,7 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
     }
   });
 
-  it('반례: 검증 증거를 꾸민 대응표는 함수와 CLI --verify-git에서 거부한다', () => {
+  it.each(['함수', 'CLI'] as const)('반례: 검증 증거를 꾸민 대응표는 %s --verify-git에서 거부한다', (entry) => {
     const dir = mkdtempSync(join(tmpdir(), 'coverage-'));
     try {
       const fake = table();
@@ -1241,14 +1241,17 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
         ],
       };
       writeFileSync(join(dir, 'fake.json'), JSON.stringify(fake));
-      const verified = main(['--file', join(dir, 'fake.json'), '--verify-git'], { root });
-      expect(verified.code).toBe(1);
-      expect(verified.output).toContain('commands[farm].ui: verified는 독립 리뷰 기록(review)과 같은 SHA의 실행(ci)');
-      const verifiedCli = runCli('--file', join(dir, 'fake.json'), '--verify-git');
-      expect(verifiedCli.status, verifiedCli.stdout + verifiedCli.stderr).toBe(1);
-      expect(verifiedCli.stdout).toContain(
-        'commands[farm].ui: verified는 독립 리뷰 기록(review)과 같은 SHA의 실행(ci)',
-      );
+      if (entry === '함수') {
+        const verified = main(['--file', join(dir, 'fake.json'), '--verify-git'], { root });
+        expect(verified.code).toBe(1);
+        expect(verified.output).toContain('commands[farm].ui: verified는 독립 리뷰 기록(review)과 같은 SHA의 실행(ci)');
+      } else {
+        const verifiedCli = runCli('--file', join(dir, 'fake.json'), '--verify-git');
+        expect(verifiedCli.status, verifiedCli.stdout + verifiedCli.stderr).toBe(1);
+        expect(verifiedCli.stdout).toContain(
+          'commands[farm].ui: verified는 독립 리뷰 기록(review)과 같은 SHA의 실행(ci)',
+        );
+      }
     } finally {
       expect(dirname(dir)).toBe(normalize(tmpdir()));
       rmSync(dir, { recursive: true, force: true });
