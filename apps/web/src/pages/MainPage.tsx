@@ -1,6 +1,6 @@
-import { useNavigate, useSearch } from '@tanstack/react-router';
+import { useLocation, useNavigate, useSearch } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { useCallback, useRef, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { errorCode } from '../game/errors';
 import { NoGeneral, QueryError } from '../game/QueryState';
 import { useHome, useWorldId, useWorldMap, useWorldSummary } from '../game/queries';
@@ -33,12 +33,16 @@ const SECTIONS = [
 // 지도에서 도시를 고르면 주소의 ?city만 바꾼다. 같은 화면이 유지되므로 다른 칸의 상태(예턴 편집 초안 등)는 그대로다.
 export function MainPage() {
   const page = useRef<HTMLElement>(null);
-  const focusSection = (area: string) => {
+  const focusSection = useCallback((area: string) => {
     const heading = page.current?.querySelector<HTMLElement>(`[data-main-area="${area}"] h2`);
     heading?.focus({ preventScroll: true });
     heading?.scrollIntoView({ block: 'start', behavior: 'instant' });
-  };
+  }, []);
   const worldId = useWorldId();
+  const hash = useLocation({ select: (location) => location.hash });
+  useEffect(() => {
+    if (hash === 'main-commands') focusSection('commands');
+  }, [hash, worldId, focusSection]);
   const { city: selected } = useSearch({ from: '/w/$worldId/' });
   const navigate = useNavigate({ from: '/w/$worldId/' });
   const summary = useWorldSummary(worldId);
