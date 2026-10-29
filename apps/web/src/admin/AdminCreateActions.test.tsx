@@ -80,6 +80,32 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
+  it('선택 항목이 바뀌어도 네 선택 상자의 접근 이름은 화면 라벨과 같다', async () => {
+    setup();
+    fireEvent.click(screen.getByRole('button', { name: '새 월드 생성 준비' }));
+    await screen.findByLabelText('월드 이름');
+    const labels = ['시나리오', '프리셋', '자동 종료', '시드 선택'];
+    const exactLabels = () => {
+      for (const label of labels) {
+        const control = screen.getByRole('combobox', { name: label }) as HTMLSelectElement;
+        // 정확 label 검색은 감싼 label의 option 문구까지 읽으므로 role 검색만으로는 놓친다.
+        const names = control.getAttribute('aria-label')
+          ? [control.getAttribute('aria-label')]
+          : Array.from(control.labels ?? [], (element) => element.textContent?.replace(/\s+/g, ' ').trim());
+        expect(names).toContain(label);
+      }
+    };
+    expect(screen.getAllByRole('combobox')).toHaveLength(labels.length);
+    for (const label of labels)
+      expect(screen.getByRole('combobox', { name: label })).toBe(screen.getByLabelText(label, { exact: true }));
+    exactLabels();
+    fireEvent.change(screen.getByRole('combobox', { name: '프리셋' }), { target: { value: 'regular' } });
+    fireEvent.change(screen.getByRole('combobox', { name: '자동 종료' }), { target: { value: 'none' } });
+    fireEvent.change(screen.getByRole('combobox', { name: '시드 선택' }), { target: { value: 'custom' } });
+    for (const label of labels) expect(screen.getByRole('combobox', { name: label })).toBeTruthy();
+    exactLabels();
+    expect(state.create).not.toHaveBeenCalled();
+  });
   it('검토만으로 생성하지 않고 최종 두 번 클릭도 한 요청만 보낸다', async () => {
     setup();
     await review();

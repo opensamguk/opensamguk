@@ -480,7 +480,7 @@ export function AdminCreateActions({
                   </label>
                   <label>
                     시나리오
-                    <select defaultValue={available.id} disabled={sending}>
+                    <select aria-label="시나리오" defaultValue={available.id} disabled={sending}>
                       <option value={available.id}>{available.label}</option>
                     </select>
                   </label>
@@ -493,6 +493,7 @@ export function AdminCreateActions({
                   <label>
                     프리셋
                     <select
+                      aria-label="프리셋"
                       value={draft.presetKey}
                       name="presetKey"
                       aria-invalid={invalidField === 'presetKey' || undefined}
@@ -543,6 +544,7 @@ export function AdminCreateActions({
                   <label>
                     자동 종료
                     <select
+                      aria-label="자동 종료"
                       value={draft.endMode}
                       disabled={sending}
                       onChange={(e) => change({ endMode: e.target.value === 'none' ? 'none' : 'year' })}
@@ -572,6 +574,7 @@ export function AdminCreateActions({
                   <label>
                     시드 선택
                     <select
+                      aria-label="시드 선택"
                       value={draft.seedMode}
                       disabled={sending}
                       onChange={(e) => change({ seedMode: e.target.value === 'custom' ? 'custom' : 'auto' })}
