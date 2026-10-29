@@ -15,6 +15,7 @@ import type { MailTransport } from './mail/transport';
 import { emailVerificationRequired } from './auth/verificationPolicy';
 import { resolveLegalPolicy, type LegalPolicy } from './legal/policy';
 import { bindLegalPolicy } from './legal/publish';
+import { resolveWithdrawalPolicy, type WithdrawalPolicy } from './auth/withdrawalPolicy';
 
 export async function buildServer(options: {
   db: PrismaClient;
@@ -29,6 +30,7 @@ export async function buildServer(options: {
   mailTransport?: MailTransport;
   emailVerificationRequired?: boolean;
   legalPolicy?: LegalPolicy | null;
+  withdrawalPolicy?: WithdrawalPolicy | null;
 }) {
   const requireVerifiedEmail = emailVerificationRequired(process.env, options);
   const mapConfig = publicMapConfig(process.env);
@@ -53,6 +55,7 @@ export async function buildServer(options: {
     throw new Error('TRUST_PROXY는 0 또는 1이어야 합니다.');
   const clock = options.now ?? Date.now;
   const legalPolicy = resolveLegalPolicy(options.legalPolicy, clock());
+  const withdrawalPolicy = resolveWithdrawalPolicy(options.withdrawalPolicy, legalPolicy);
   await bindLegalPolicy(options.db, legalPolicy);
   const rateLimiter = createRateLimiter({ now: clock });
   const requestTimes = new WeakMap<FastifyRequest, number>();
@@ -142,6 +145,7 @@ export async function buildServer(options: {
           emailVerificationRequired: requireVerifiedEmail,
           legalPolicy,
           legalPolicyRequired: production,
+          withdrawalPolicy,
           closeSession: realtime.closeSession,
         };
       },
