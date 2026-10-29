@@ -128,7 +128,7 @@ const test = base.extend<{ investigation: Journey }>({
       };
       try {
         const key = randomBytes(32).toString('hex');
-        await stack.restart(null, false, { loginAudit: { key, version: 1 } });
+        await stack.restart(null, false, null, { loginAudit: { key, version: 1 } });
         const sharedPage = await page(),
           firstSignup = await signup(sharedPage, stack);
         const did = (await sharedPage.context().cookies(stack.origin)).find((cookie) => cookie.name === 'did')?.value;

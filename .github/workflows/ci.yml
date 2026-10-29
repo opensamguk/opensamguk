@@ -262,6 +262,9 @@ jobs:
       - name: Check current policy and consent in Chromium
         if: matrix.shard == 1
         run: pnpm e2e:legal --reporter=line
+      - name: Check account withdrawal in Chromium
+        if: matrix.shard == 1
+        run: pnpm e2e:withdrawal --reporter=line
       - name: Check admin sanction actions in Chromium
         if: matrix.shard == 1
         run: pnpm e2e:sanction --reporter=line

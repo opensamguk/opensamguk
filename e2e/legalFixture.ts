@@ -13,6 +13,7 @@ import { createDb } from '../packages/db/src/index';
 import { buildServer } from '../apps/server/src/server';
 import type { LegalPolicy } from '../apps/server/src/legal/policy';
 import type { LoginAuditOptions } from '../apps/server/src/auth/loginAudit';
+import type { WithdrawalPolicy } from '../apps/server/src/auth/withdrawalPolicy';
 import type { MailMessage } from '../apps/server/src/mail/transport';
 import { initializeResources } from '../tools/init-resources';
 import { e2eDatabaseUrl } from './account';
@@ -42,9 +43,11 @@ export interface LegalStack {
   restart(
     policy: LegalPolicy | null,
     emailRequired?: boolean,
+    withdrawalPolicy?: WithdrawalPolicy | null,
     options?: { loginAudit?: LoginAuditOptions | null },
   ): Promise<void>;
   productionPending(): Promise<{ origin: string; close(): Promise<void> }>;
+  peer(): Promise<{ origin: string; close(): Promise<void> }>;
 }
 
 // 공개 dist를 loopback 출처에서 내보내고 /trpc와 SSE를 자기 실제 API로 중계한다.
@@ -236,6 +239,7 @@ export const test = base.extend<Record<never, never>, { legalStack: LegalStack }
         const restart = async (
           policy: LegalPolicy | null,
           emailRequired = false,
+          withdrawalPolicy: WithdrawalPolicy | null = null,
           options: { loginAudit?: LoginAuditOptions | null } = {},
         ) => {
           await api?.close();
@@ -247,6 +251,7 @@ export const test = base.extend<Record<never, never>, { legalStack: LegalStack }
             emailVerificationRequired: emailRequired,
             loginAudit: options.loginAudit ?? null,
             legalPolicy: policy,
+            withdrawalPolicy,
             mailTransport: transport,
             realtime: { connectionString: url.href, applicationName: `legal-${suffix}` },
           });
@@ -265,6 +270,30 @@ export const test = base.extend<Record<never, never>, { legalStack: LegalStack }
           messages,
           restart,
           failed: false,
+          async peer() {
+            const server = await buildServer({
+              db: db!,
+              production: false,
+              logging: false,
+              publicOrigin: origin,
+              legalPolicy: null,
+              withdrawalPolicy: null,
+              realtime: { connectionString: url.href, applicationName: `legal-peer-${suffix}` },
+            });
+            extraServers.add(server);
+            await server.ready();
+            await listenLegalLoopback(
+              (port) => server.listen({ host: '127.0.0.1', port }),
+              () => server.server.listening,
+            );
+            return {
+              origin: `http://127.0.0.1:${(server.server.address() as AddressInfo).port}`,
+              async close() {
+                await server.close();
+                extraServers.delete(server);
+              },
+            };
+          },
           async productionPending() {
             const server = await buildServer({
               db: db!,

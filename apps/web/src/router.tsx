@@ -27,7 +27,7 @@ import { CityPage, MapPage, NationPage, RecordsPage } from './pages/WorldPages';
 import { RankingPage } from './ranking/RankingPage';
 import { parseRankingSearch } from './ranking/rankingView';
 import { SharedTimelapsePage } from './timelapse/SharedTimelapsePage';
-import { queryClient, trpc, type Trpc } from './trpc';
+import { queryClient, trpc, trpcClient, type Trpc } from './trpc';
 import { InspectionPage } from './operations/InspectionPage';
 import { OperationDetailPage } from './operations/OperationDetailPage';
 import { OperationsPage } from './operations/OperationsPage';
@@ -193,10 +193,15 @@ const verifyEmailRoute = createRoute({
 const accountRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'account',
-  beforeLoad: async ({ context }) => {
-    if (!(await currentUser(context))) throw redirect({ to: '/login', search: { next: '/account' } });
+  beforeLoad: async () => {
+    const { user } = await trpcClient.auth.me.query();
+    if (!user) throw redirect({ to: '/login', search: { next: '/account' } });
+    return { accountUserId: user.id };
   },
-  component: AccountPage,
+  component: function AccountRoute() {
+    const { accountUserId } = accountRoute.useRouteContext();
+    return <AccountPage key={accountUserId} viewerId={accountUserId} />;
+  },
   errorComponent: GuardError,
 });
 
