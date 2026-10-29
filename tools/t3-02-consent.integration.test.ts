@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -196,7 +196,7 @@ beforeAll(() =>
       },
     });
     servers.push(app);
-    address = await app.listen({ host: '127.0.0.1', port: 0 });
+    address = await listen(app);
   }),
 );
 afterAll(async () => {
@@ -285,6 +285,17 @@ for (const path of ['legal.current', 'legal.agree'])
     );
   }
 
+async function listen(server: Awaited<ReturnType<typeof buildServer>>) {
+  // OS 자동 포트는 Fetch 금지 포트도 고른다. 실제 bind만 제한된 횟수로 다시 시도한다.
+  for (let attempt = 0; attempt < 16; attempt++)
+    try {
+      return await server.listen({ host: '127.0.0.1', port: randomInt(10081, 65536) });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw error;
+    }
+  throw new Error('시험 서버의 빈 HTTP 포트를 찾지 못했습니다.');
+}
+
 async function serverFor(options: { policy: LegalPolicy | null; production?: boolean; at?: number }) {
   const requestOrigin = options.production ? 'https://local.example.invalid' : origin;
   const server = await buildServer({
@@ -297,7 +308,7 @@ async function serverFor(options: { policy: LegalPolicy | null; production?: boo
     ...(options.production ? { production: true } : {}),
   });
   servers.push(server);
-  return { address: await server.listen({ host: '127.0.0.1', port: 0 }), origin: requestOrigin };
+  return { address: await listen(server), origin: requestOrigin };
 }
 
 it('승인 전에는 운영 가입·변경·동의를 막고 개발 계정·동의 기록은 보존한다', async () => {
