@@ -478,6 +478,16 @@ model User {
   sanctions    Sanction[]
 }
 
+model AdminSanctionRequest {
+  actorUserId   String
+  idempotencyKey String
+  requestHash   String
+  sanctionId    String
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+
+  @@id([actorUserId, idempotencyKey])
+}
+
 model Sanction {
   id          String @id @default(uuid())
   userId      String

@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -149,12 +149,12 @@ async function session(userId: string) {
   await db.session.create({ data: { id: value.id, userId, expiresAt: value.expiresAt } });
   return { ...value, cookie: `sid=${value.token}` };
 }
-async function call(path: string, input: unknown, cookie?: string) {
+async function call(path: string, input: unknown, cookie?: string, base = address) {
   const procedures = appRouter._def.procedures as unknown as Record<string, { _def: { type: string } }>;
   const mutation = procedures[path]!._def.type === 'mutation',
     encoded = JSON.stringify({ 0: input });
   const response = await fetch(
-    `${address}/trpc/${path}?batch=1${mutation ? '' : '&input=' + encodeURIComponent(encoded)}`,
+    `${base}/trpc/${path}?batch=1${mutation ? '' : '&input=' + encodeURIComponent(encoded)}`,
     {
       method: mutation ? 'POST' : 'GET',
       headers: { origin, ...(cookie ? { cookie } : {}), ...(mutation ? { 'content-type': 'application/json' } : {}) },
@@ -162,11 +162,13 @@ async function call(path: string, input: unknown, cookie?: string) {
       signal: AbortSignal.timeout(10_000),
     },
   );
-  const [body] = (await response.json()) as Array<{
+  const raw = await response.text();
+  const [body] = JSON.parse(raw) as Array<{
     result?: { data: unknown };
     error?: { data: { code: string; reason: string | null } };
   }>;
   return {
+    raw,
     status: response.status,
     data: body!.result?.data,
     code: body!.error?.data.code,
@@ -218,7 +220,7 @@ beforeAll(
         publicOrigin: origin,
         emailVerificationRequired: true,
       });
-      address = await app.listen({ host: '127.0.0.1', port: 0 });
+      address = await app.listen({ host: '127.0.0.1', port: randomInt(20_000, 50_000) });
     }),
   30_000,
 );
@@ -338,6 +340,345 @@ it('관리자 본인·다른 관리자·미인증 관리자·위조 권한과 �
   expect((await call('admin.sanction.create', base, unverifiedSid)).reason).toBe('EMAIL_NOT_VERIFIED');
   expect(await snapshot()).toBe(before);
 });
+
+it('같은 제재 요청은 순차·동시 재확인해도 한 번 확정하고 다른 내용은 거부한다', async () => {
+  const actor = await user('ADMIN'),
+    victim = await user(),
+    sid = await session(actor.id);
+  await session(victim.id);
+  const input = {
+    userId: victim.id,
+    worldId: null,
+    reason: '  응답 유실 재확인  ',
+    expiresAt: new Date(now + 60_000).toISOString(),
+    expectedUserId: actor.id,
+    idempotencyKey: randomUUID(),
+  };
+  const settled = await Promise.allSettled(
+    Array.from({ length: 3 }, () => call('admin.sanction.create', input, sid.cookie)),
+  );
+  const rejected = settled.filter((result) => result.status === 'rejected');
+  if (rejected.length)
+    throw new AggregateError(
+      rejected.map((result) => result.reason),
+      '동시 제재 요청 정착 실패',
+    );
+  const results = settled.map((result) => {
+    if (result.status !== 'fulfilled') throw new Error('동시 요청이 정착하지 않았습니다.');
+    return result.value;
+  });
+  for (const result of results) expect(result.status).toBe(200);
+  expect(results[0]!.data).toEqual(results[1]!.data);
+  expect(results[1]!.data).toEqual(results[2]!.data);
+  expect(await db.sanction.count({ where: { userId: victim.id } })).toBe(1);
+  expect(await db.auditLog.count({ where: { actorUserId: actor.id, action: 'sanction.create' } })).toBe(1);
+  expect(await db.adminSanctionRequest.count({ where: { actorUserId: actor.id } })).toBe(1);
+  expect(await db.session.count({ where: { userId: victim.id } })).toBe(0);
+  await session(victim.id);
+  await db.user.update({ where: { id: victim.id }, data: { status: 'WITHDRAWN', role: 'ADMIN' } });
+  const before = await snapshot();
+  const retry = await call('admin.sanction.create', { ...input, reason: input.reason.trim() }, sid.cookie);
+  expect(retry.status).toBe(200);
+  expect(retry.data).toEqual(results[0]!.data);
+  expect(await snapshot()).toBe(before);
+  expect((await call('admin.sanction.create', { ...input, reason: '다른 사유' }, sid.cookie)).code).toBe('CONFLICT');
+  expect((await call('admin.sanction.create', { ...input, userId: randomUUID() }, sid.cookie)).code).toBe('CONFLICT');
+  expect((await call('admin.sanction.create', { ...input, worldId: randomUUID() }, sid.cookie)).code).toBe('CONFLICT');
+  expect(await snapshot()).toBe(before);
+  // 원래 성공의 만료 시각이 지난 뒤에도 같은 receipt를 읽는다. 입력의 만료 시각은 바꾸지 않는다.
+  const late = await createSanction(db, actor.id, input, now + 120_000);
+  expect({ sanctionId: late.sanctionId }).toEqual(results[0]!.data);
+  expect(late.closedSessionIds).toEqual([]);
+  expect(await snapshot()).toBe(before);
+});
+
+it('A 본인 조회 뒤 B 관리자 세션의 기대 A 입력과 위조 필드는 어떤 조치도 쓰지 않는다', async () => {
+  const a = await user('ADMIN'),
+    b = await user('ADMIN'),
+    victim = await user(),
+    aSid = await session(a.id),
+    bSid = await session(b.id);
+  expect((await call('auth.me', undefined, aSid.cookie)).status).toBe(200);
+  const sanction = await db.sanction.create({ data: { userId: victim.id, createdBy: a.id, reason: '기존 제재' } });
+  const input = { userId: victim.id, worldId: null, reason: '신원 확인', expiresAt: null };
+  const before = await snapshot();
+  expect(
+    (await call('admin.sanction.create', { ...input, expectedUserId: a.id, idempotencyKey: randomUUID() }, bSid.cookie))
+      .code,
+  ).toBe('UNAUTHORIZED');
+  expect(
+    (await call('admin.sanction.lift', { sanctionId: sanction.id, reason: '해제', expectedUserId: a.id }, bSid.cookie))
+      .code,
+  ).toBe('UNAUTHORIZED');
+  for (const extra of [{ expectedUserId: 'bad' }, { idempotencyKey: 'bad' }, { actorUserId: a.id }])
+    expect((await call('admin.sanction.create', { ...input, ...extra }, bSid.cookie)).code).toBe('BAD_REQUEST');
+  expect(await snapshot()).toBe(before);
+});
+
+it('receipt 쓰기 실패는 제재·감사·세션 삭제를 모두 되돌리고 공개 오류 원문을 숨긴다', async () => {
+  const actor = await user('ADMIN'),
+    victim = await user(),
+    sid = await session(actor.id);
+  await session(victim.id);
+  const failures: unknown[] = [];
+  await client.query(
+    `CREATE FUNCTION t305_fail_receipt() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'private-receipt-failure'; END $$`,
+  );
+  try {
+    await client.query(
+      'CREATE TRIGGER t305_fail_receipt BEFORE INSERT ON "AdminSanctionRequest" FOR EACH ROW EXECUTE FUNCTION t305_fail_receipt()',
+    );
+    try {
+      const before = await snapshot();
+      const response = await call(
+        'admin.sanction.create',
+        {
+          userId: victim.id,
+          worldId: null,
+          reason: '원자성',
+          expiresAt: null,
+          expectedUserId: actor.id,
+          idempotencyKey: randomUUID(),
+        },
+        sid.cookie,
+      );
+      expect(response.code).toBe('INTERNAL_SERVER_ERROR');
+      expect(response.raw.includes('private-receipt-failure')).toBe(false);
+      expect(await snapshot()).toBe(before);
+    } catch (error) {
+      failures.push(error);
+    } finally {
+      try {
+        await client.query('DROP TRIGGER t305_fail_receipt ON "AdminSanctionRequest"');
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+  } catch (error) {
+    failures.push(error);
+  } finally {
+    try {
+      await client.query('DROP FUNCTION t305_fail_receipt()');
+    } catch (error) {
+      failures.push(error);
+    }
+  }
+  if (failures.length) throw new AggregateError(failures, 'receipt 원자성 본문·정리 실패');
+});
+
+it('두 관리자의 반대 대상 동시 제재는 교착 없이 모두 거부한다', async () => {
+  const a = await user('ADMIN'),
+    b = await user('ADMIN'),
+    aSid = await session(a.id),
+    bSid = await session(b.id),
+    before = await snapshot();
+  const jobs: Array<ReturnType<typeof call>> = [],
+    failures: unknown[] = [];
+  let begun = false;
+  try {
+    await client.query('BEGIN');
+    begun = true;
+    const gatePid = Number((await client.query('SELECT pg_backend_pid() AS pid')).rows[0]!.pid);
+    await client.query('SELECT id FROM "User" WHERE id=$1 FOR SHARE', [[a.id, b.id].sort()[0]]);
+    jobs.push(
+      call(
+        'admin.sanction.create',
+        {
+          userId: b.id,
+          worldId: null,
+          reason: '교차 A',
+          expiresAt: null,
+          expectedUserId: a.id,
+          idempotencyKey: randomUUID(),
+        },
+        aSid.cookie,
+      ),
+    );
+    jobs.push(
+      call(
+        'admin.sanction.create',
+        {
+          userId: a.id,
+          worldId: null,
+          reason: '교차 B',
+          expiresAt: null,
+          expectedUserId: b.id,
+          idempotencyKey: randomUUID(),
+        },
+        bSid.cookie,
+      ),
+    );
+    for (const job of jobs) void job.catch(() => undefined);
+    await expect
+      .poll(async () =>
+        Number(
+          (
+            await admin.query(
+              `WITH RECURSIVE blocked AS (
+                  SELECT pid,pg_blocking_pids(pid) AS blockers FROM pg_stat_activity
+                  WHERE datname=$1 AND wait_event_type='Lock' AND query LIKE '%ORDER BY id FOR UPDATE%'
+                ), chain AS (
+                  SELECT pid AS root,unnest(blockers) AS blocker FROM blocked
+                  UNION
+                  SELECT root,unnest(pg_blocking_pids(blocker)) FROM chain WHERE blocker<>$2
+                ) SELECT count(DISTINCT root)::int AS n FROM chain WHERE blocker=$2`,
+              [name, gatePid],
+            )
+          ).rows[0]!.n,
+        ),
+      )
+      .toBe(2);
+    await client.query('COMMIT');
+    begun = false;
+    const results = await Promise.allSettled(jobs);
+    for (const result of results) {
+      expect(result.status).toBe('fulfilled');
+      if (result.status === 'fulfilled') expect(result.value.code).toBe('FORBIDDEN');
+    }
+    expect(await snapshot()).toBe(before);
+  } catch (error) {
+    failures.push(error);
+  } finally {
+    if (begun) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+    for (const result of await Promise.allSettled(jobs)) if (result.status === 'rejected') failures.push(result.reason);
+  }
+  if (failures.length) throw new AggregateError([...new Set(failures)], '교차 제재 경합·정착·정리 실패');
+});
+
+for (const operation of ['create', 'lift'] as const)
+  for (const mode of ['role', 'session-delete', 'session-expiry', 'email', 'sanction', 'consent'] as const)
+    it(`실제 대상 잠금 대기 뒤 관리자 ${mode} 변경은 ${operation} 쓰기를 거부한다`, async () => {
+      const one = await user(),
+        two = await user();
+      const [victim, actor] = [one, two].sort((a, b) => (a.id < b.id ? -1 : 1));
+      await db.user.update({ where: { id: actor!.id }, data: { role: 'ADMIN' } });
+      const sid = await session(actor!.id);
+      const policy = {
+        terms: { version: 'sanction-lock-test', effectiveAt: new Date(now - 1000).toISOString() },
+        privacy: { version: 'sanction-lock-test', effectiveAt: new Date(now - 1000).toISOString() },
+      };
+      let policyServer: Awaited<ReturnType<typeof buildServer>> | undefined,
+        base = address,
+        pending: ReturnType<typeof call> | undefined,
+        begun = false;
+      const failures: unknown[] = [];
+      try {
+        if (mode === 'consent') {
+          policyServer = await buildServer({
+            db,
+            logging: false,
+            now: () => now,
+            publicOrigin: origin,
+            emailVerificationRequired: true,
+            legalPolicy: policy,
+          });
+          base = await policyServer.listen({ host: '127.0.0.1', port: randomInt(20_000, 50_000) });
+          for (const docType of ['TERMS', 'PRIVACY'])
+            expect(
+              (await call('legal.agree', { docType, version: 'sanction-lock-test' }, sid.cookie, base)).status,
+            ).toBe(200);
+        }
+        const existing =
+          operation === 'lift'
+            ? await db.sanction.create({ data: { userId: victim!.id, createdBy: actor!.id, reason: '기존 제재' } })
+            : null;
+        const input =
+          operation === 'create'
+            ? {
+                userId: victim!.id,
+                worldId: null,
+                reason: '대기 중 생성',
+                expiresAt: null,
+                expectedUserId: actor!.id,
+                idempotencyKey: randomUUID(),
+              }
+            : { sanctionId: existing!.id, reason: '대기 중 해제', expectedUserId: actor!.id };
+        await client.query('BEGIN');
+        begun = true;
+        const gatePid = Number((await client.query('SELECT pg_backend_pid() AS pid')).rows[0]!.pid);
+        await client.query('SELECT id FROM "User" WHERE id=$1 FOR UPDATE', [victim!.id]);
+        pending = call('admin.sanction.' + operation, input, sid.cookie, base);
+        void pending.catch(() => undefined);
+        await expect
+          .poll(async () =>
+            Number(
+              (
+                await admin.query(
+                  "SELECT count(*)::int AS n FROM pg_stat_activity WHERE datname=$1 AND wait_event_type='Lock' AND query LIKE '%ORDER BY id FOR UPDATE%' AND $2=ANY(pg_blocking_pids(pid))",
+                  [name, gatePid],
+                )
+              ).rows[0]!.n,
+            ),
+          )
+          .toBe(1);
+        if (mode === 'role') await client.query('UPDATE "User" SET role=\'USER\' WHERE id=$1', [actor!.id]);
+        if (mode === 'email') await client.query('UPDATE "User" SET "emailVerifiedAt"=NULL WHERE id=$1', [actor!.id]);
+        if (mode === 'session-delete') await client.query('DELETE FROM "Session" WHERE id=$1', [sid.id]);
+        if (mode === 'session-expiry')
+          await client.query('UPDATE "Session" SET "expiresAt"=now()-interval \'1 minute\' WHERE id=$1', [sid.id]);
+        if (mode === 'consent') await client.query('DELETE FROM "ConsentRecord" WHERE "userId"=$1', [actor!.id]);
+        if (mode === 'sanction')
+          await client.query('INSERT INTO "Sanction" (id,"userId",reason,"createdBy") VALUES ($1,$2,$3,$2)', [
+            randomUUID(),
+            actor!.id,
+            '대기 중 전체 제재',
+          ]);
+        // 변경은 아직 잠금 안에 있다. 같은 연결의 전체 행 snapshot을 확정 직후 기준으로 쓴다.
+        const before = await snapshotFrom(client);
+        await client.query('COMMIT');
+        begun = false;
+        const response = await pending;
+        expect(response.code).toBe(
+          mode === 'role' || mode === 'email' || mode === 'consent' ? 'FORBIDDEN' : 'UNAUTHORIZED',
+        );
+        expect(response.reason).toBe(
+          mode === 'email' ? 'EMAIL_NOT_VERIFIED' : mode === 'consent' ? 'CONSENT_REQUIRED' : null,
+        );
+        expect(await snapshot()).toBe(before);
+      } catch (error) {
+        failures.push(error);
+      } finally {
+        if (begun) {
+          try {
+            await client.query('ROLLBACK');
+          } catch (error) {
+            failures.push(error);
+          }
+        }
+        if (pending) {
+          const [result] = await Promise.allSettled([pending]);
+          if (result!.status === 'rejected') failures.push(result!.reason);
+        }
+        try {
+          await policyServer?.close();
+        } catch (error) {
+          failures.push(error);
+        }
+      }
+      if (failures.length) throw new AggregateError([...new Set(failures)], '제재 대기 본문·요청 정착·정리 실패');
+    });
+
+async function snapshotFrom(connection: Pg) {
+  const tables = (
+    await connection.query("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename")
+  ).rows;
+  const hash = createHash('sha256');
+  for (const row of tables) {
+    const table = String(row.tablename),
+      quoted = '"' + table.replaceAll('"', '""') + '"';
+    const result = await connection.query(
+      `SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text),'[]'::jsonb)::text AS body FROM ${quoted} t`,
+    );
+    hash.update(table + '\n' + result.rows[0]!.body + '\n');
+  }
+  return hash.digest('hex');
+}
 
 it('전체 제재는 모든 세션을 지우고 재로그인·갱신을 막으며 해제 뒤 다시 로그인한다', async () => {
   const actor = await user('ADMIN'),
@@ -459,7 +800,12 @@ it('감사 INSERT 실패는 제재·세션 삭제와 해제까지 함께 롤백�
   try {
     const before = await snapshot();
     await expect(
-      createSanction(db, actor.id, { userId: victim.id, worldId: null, reason: '실패 시험', expiresAt: null }, now),
+      createSanction(
+        db,
+        actor.id,
+        { userId: victim.id, worldId: null, reason: '실패 시험', expiresAt: null, idempotencyKey: randomUUID() },
+        now,
+      ),
     ).rejects.toThrow();
     expect(await snapshot()).toBe(before);
     await expect(
@@ -512,7 +858,7 @@ it('제재 트랜잭션 뒤 대기 중이던 실제 로그인은 새 세션을 �
     );
     trigger = true;
     loginApp = await buildServer({ db: loginDb, logging: false, now: () => now, publicOrigin: origin });
-    const loginAddress = await loginApp.listen({ host: '127.0.0.1', port: 0 });
+    const loginAddress = await loginApp.listen({ host: '127.0.0.1', port: randomInt(20_000, 50_000) });
     const creating = createSanction(
       createDbClient,
       actor.id,

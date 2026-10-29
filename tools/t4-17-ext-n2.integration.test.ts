@@ -116,6 +116,7 @@ beforeAll(async () => {
     '20261104000000_account_world_sanctions',
     '20261105000000_admin_notices',
     '20261106000000_legal_document_versions',
+    '20261107000000_admin_sanction_requests',
   ]);
   expect(migrations.slice(0, 18).at(-1)).toBe('20261023073000_treaties');
   for (const name of migrations)
