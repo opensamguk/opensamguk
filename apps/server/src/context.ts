@@ -5,6 +5,7 @@ import type { FastifyReply } from 'fastify';
 import type { createRateLimiter } from './security/rateLimit';
 import type { MailTransport } from './mail/transport';
 import type { LegalPolicy } from './legal/policy';
+import type { WithdrawalPolicy } from './auth/withdrawalPolicy';
 
 export interface Context {
   db: PrismaClient;
@@ -21,5 +22,6 @@ export interface Context {
   emailVerificationRequired?: boolean | undefined;
   legalPolicy?: LegalPolicy | null | undefined;
   legalPolicyRequired?: boolean | undefined;
+  withdrawalPolicy?: WithdrawalPolicy | null | undefined;
   closeSession?: ((sessionId: string) => void) | undefined;
 }

@@ -11,6 +11,7 @@ import { queueLoginActivity } from '../game/policy';
 import { newAccountToken } from '../auth/accountToken';
 import { accountMail } from '../mail/templates';
 import { missingConsents } from '../legal/policy';
+import { isWithdrawalTombstoneEmail } from '../auth/withdrawalPolicy';
 
 function enforce(ctx: Context, decision: RateLimitDecision) {
   if (decision.allowed) return;
@@ -23,6 +24,7 @@ const credentials = z.strictObject({
   password: passwordSchema,
 });
 const signupInput = credentials.extend({
+  email: credentials.shape.email.refine((email) => !isWithdrawalTombstoneEmail(email)),
   consents: z.strictObject({ terms: z.string().min(1).max(64), privacy: z.string().min(1).max(64) }).optional(),
 });
 const loginFailure = () => new TRPCError({ code: 'UNAUTHORIZED', message: '이메일 또는 비밀번호가 맞지 않습니다' });
