@@ -5,6 +5,12 @@ import {
   presetRules,
   statRulesSchema,
   worldCreateIntentSchema,
+  ADMIN_RESET_KIND,
+  adminResetPayloadSchema,
+  adminResetAppliedSchema,
+  adminResetSettingsSchema,
+  adminResetResourcesSchema,
+  validateAdminResetRecord,
   type ReplayOriginV3,
   type WorldInit,
   type WorldPreset,
@@ -71,6 +77,7 @@ type Selection = z.infer<typeof selectionSchema>;
 type Reference = z.infer<typeof referenceSchema>;
 type SourceWorld = Prisma.WorldGetPayload<Record<string, never>>;
 type Request = Prisma.WorldCreateRequestGetPayload<Record<string, never>>;
+type ResetEvent = Prisma.InputEventGetPayload<Record<string, never>>;
 export interface ResetPreparationEvidence {
   version: 1;
   sourceWorldId: string;
@@ -80,13 +87,18 @@ export interface ResetPreparationEvidence {
   initialHash: string;
   sourceResourceHash: string;
   sourceSettingsHash: string;
-  provenance: { kind: 'request'; requestId: string } | { kind: 'cli' };
+  provenance: { kind: 'request'; requestId: string } | { kind: 'reset'; requestId: string } | { kind: 'cli' };
+  provenanceFingerprint: string;
   resources: readonly Reference[];
 }
 export interface ResetPreparation {
-  prepared: PreparedInitialWorld;
-  evidence: Readonly<ResetPreparationEvidence>;
+  readonly prepared: PreparedInitialWorld;
+  readonly evidence: Readonly<ResetPreparationEvidence>;
 }
+const trustedPreparations = new WeakMap<
+  ResetPreparation,
+  { prepared: PreparedInitialWorld; evidence: Readonly<ResetPreparationEvidence> }
+>();
 function same(a: unknown, b: unknown) {
   return hashState(a) === hashState(b);
 }
@@ -153,6 +165,155 @@ function sourceOrigin(world: SourceWorld): {
       ...(preset ? { preset: { key: world.presetKey!, value: structuredClone(preset) } } : {}),
     };
     return { origin: structuredClone(origin), preset, options };
+  });
+}
+/** Same C hash recipe; source must be read from the caller's locked World row for apply verification. */
+export function resetSourceSettingsHash(world: SourceWorld): string {
+  return hashState({
+    name: world.name,
+    seed: world.seed,
+    scenario: world.scenarioKey,
+    map: world.mapKey,
+    unitSet: world.unitSetKey,
+    presetKey: world.presetKey,
+    preset: world.preset,
+    turnTermMinutes: world.turnTermMinutes,
+    endYear: world.endYear,
+    ruleFeatures: world.ruleFeatures,
+    origin: world.replayOrigin,
+  });
+}
+export function resetSettingsReference(world: SourceWorld) {
+  const origin = world.replayOrigin as unknown as ReplayOriginV3;
+  return adminResetSettingsSchema.parse({
+    name: world.name,
+    scenarioKey: world.scenarioKey,
+    mapKey: world.mapKey,
+    unitSetKey: world.unitSetKey,
+    presetKey: world.presetKey,
+    presetHash: world.preset === null ? null : hashState(world.preset),
+    turnTermMinutes: world.turnTermMinutes,
+    endYear: world.endYear,
+    ruleFeatures: world.ruleFeatures,
+    featureDataHash: hashState(origin.featureData ?? null),
+  });
+}
+function resetRefs(world: SourceWorld, event: ResetEvent): Reference[] {
+  return fixed('PROVENANCE_INVALID', () => {
+    validateAdminResetRecord(
+      {
+        sequence: event.sequence!,
+        tick: event.tick,
+        generalId: event.generalId,
+        kind: event.kind,
+        status: event.status as 'APPLIED' | 'REJECTED',
+        payload: event.payload,
+        result: event.result,
+      },
+      event.worldId,
+    );
+    const payload = adminResetPayloadSchema.parse(event.payload),
+      result = adminResetAppliedSchema.parse(event.result);
+    if (
+      event.status !== 'APPLIED' ||
+      event.id < 1n ||
+      !z.uuid().safeParse(event.worldId).success ||
+      !z.uuid().safeParse(event.userId).success ||
+      !z.uuid().safeParse(event.idempotencyKey).success ||
+      event.stepTick !== null ||
+      payload.plannedNewWorldId !== world.id ||
+      result.newWorldId !== world.id ||
+      payload.sourceWorldId !== event.worldId ||
+      event.worldId === world.id ||
+      result.effectiveSeed !== world.seed ||
+      result.newInitialHash !== world.initialStateHash ||
+      result.newResourceHash !== (world.replayOrigin as unknown as ReplayOriginV3).resourceHash ||
+      result.newSettingsHash !== resetSourceSettingsHash(world) ||
+      !same(result.settings, resetSettingsReference(world))
+    )
+      fail('PROVENANCE_INVALID');
+    return result.resources;
+  });
+}
+type Provenance =
+  | { kind: 'request'; request: Request; refs: Reference[] }
+  | { kind: 'reset'; event: ResetEvent; refs: Reference[] }
+  | { kind: 'cli' };
+async function provenance(
+  tx: Prisma.TransactionClient,
+  world: SourceWorld,
+  preset: WorldPreset | null,
+  signal: AbortSignal,
+): Promise<Provenance> {
+  signal.throwIfAborted();
+  const requests = await tx.worldCreateRequest.findMany({
+    where: { OR: [{ worldId: world.id }, { plannedWorldId: world.id }] },
+    orderBy: { id: 'asc' },
+    take: 2,
+  });
+  signal.throwIfAborted();
+  const resets = await tx.inputEvent.findMany({
+    where: {
+      kind: ADMIN_RESET_KIND,
+      OR: [
+        { payload: { path: ['plannedNewWorldId'], equals: world.id } },
+        { result: { path: ['newWorldId'], equals: world.id } },
+      ],
+    },
+    orderBy: { id: 'asc' },
+    take: 2,
+  });
+  signal.throwIfAborted();
+  if (requests.length + resets.length > 1) fail('PROVENANCE_INVALID');
+  if (requests[0]) return { kind: 'request', request: requests[0], refs: requestRefs(world, requests[0], preset) };
+  if (resets[0]) return { kind: 'reset', event: resets[0], refs: resetRefs(world, resets[0]) };
+  return { kind: 'cli' };
+}
+function provenanceEvidence(
+  value: Provenance,
+  refs: Reference[],
+): Pick<ResetPreparationEvidence, 'provenance' | 'provenanceFingerprint'> {
+  return fixed('PROVENANCE_INVALID', () => {
+    if (value.kind === 'request') {
+      const r = value.request;
+      return {
+        provenance: { kind: 'request', requestId: r.id },
+        provenanceFingerprint: hashState({
+          id: r.id,
+          requestedBy: r.requestedBy,
+          idempotencyKey: r.idempotencyKey,
+          version: r.version,
+          intentHash: r.intentHash,
+          intent: r.intent,
+          effectiveSeed: r.effectiveSeed,
+          plannedWorldId: r.plannedWorldId,
+          status: r.status,
+          worldId: r.worldId,
+          resolution: r.resolution,
+          errorCode: r.errorCode,
+          processedAt: r.processedAt!.toISOString(),
+        }),
+      };
+    }
+    if (value.kind === 'reset') {
+      const r = value.event;
+      return {
+        provenance: { kind: 'reset', requestId: String(r.id) },
+        provenanceFingerprint: hashState({
+          id: String(r.id),
+          worldId: r.worldId,
+          userId: r.userId,
+          idempotencyKey: r.idempotencyKey,
+          kind: r.kind,
+          status: r.status,
+          payload: r.payload,
+          result: r.result,
+          sequence: r.sequence,
+          tick: r.tick,
+        }),
+      };
+    }
+    return { provenance: { kind: 'cli' }, provenanceFingerprint: hashState(refs) };
   });
 }
 function selectionRefs(selection: Selection, refs: readonly Reference[]) {
@@ -345,16 +506,12 @@ export async function prepareWorldReset(
       signal.throwIfAborted();
       if (!world) fail('WORLD_NOT_FOUND');
       const { origin, preset, options } = sourceOrigin(world);
-      const requests = await tx.worldCreateRequest.findMany({
-        where: { OR: [{ worldId: world.id }, { plannedWorldId: world.id }] },
-        orderBy: { id: 'asc' },
-      });
-      signal.throwIfAborted();
-      if (requests.length > 1) fail('PROVENANCE_INVALID');
-      const request = requests[0];
-      const resources = request
-        ? await resourcesByRefs(tx, requestRefs(world, request, preset), signal)
-        : await legacyResources(tx, world, origin, options, signal);
+      const pin = await provenance(tx, world, preset, signal),
+        request = pin.kind === 'request' ? pin.request : undefined;
+      const resources =
+        pin.kind !== 'cli'
+          ? await resourcesByRefs(tx, pin.refs, signal)
+          : await legacyResources(tx, world, origin, options, signal);
       signal.throwIfAborted();
       // Full original-seed preparation is mandatory before the new seed can be prepared.
       if (prepared(resources, origin, options, world.seed, request).stateHash !== origin.initialStateHash)
@@ -370,24 +527,75 @@ export async function prepareWorldReset(
         sourceInitialHash: origin.initialStateHash,
         initialHash: next.stateHash,
         sourceResourceHash: origin.resourceHash,
-        sourceSettingsHash: hashState({
-          name: world.name,
-          seed: world.seed,
-          scenario: world.scenarioKey,
-          map: world.mapKey,
-          unitSet: world.unitSetKey,
-          presetKey: world.presetKey,
-          preset: world.preset,
-          turnTermMinutes: world.turnTermMinutes,
-          endYear: world.endYear,
-          ruleFeatures: world.ruleFeatures,
-          origin,
-        }),
-        provenance: request ? { kind: 'request', requestId: request.id } : { kind: 'cli' },
+        sourceSettingsHash: resetSourceSettingsHash(world),
+        ...provenanceEvidence(pin, references(resources)),
         resources: references(resources),
       });
-      return Object.freeze({ prepared: next, evidence });
+      const candidate = Object.freeze({ prepared: next, evidence });
+      trustedPreparations.set(candidate, { prepared: next, evidence });
+      return candidate;
     },
     { isolationLevel: 'RepeatableRead', timeout: 30_000 },
   );
+}
+
+/** No nested transaction/composition. Caller holds lease and source World lock in the existing apply TX. */
+export async function verifyResetPreparation(
+  tx: Prisma.TransactionClient,
+  world: SourceWorld,
+  candidate: ResetPreparation,
+  requestEffectiveSeed: string,
+  signal: AbortSignal,
+): Promise<void> {
+  signal.throwIfAborted();
+  const trusted = trustedPreparations.get(candidate);
+  if (
+    !trusted ||
+    candidate.prepared !== trusted.prepared ||
+    candidate.evidence !== trusted.evidence ||
+    candidate.prepared.stateHash !== candidate.evidence.initialHash ||
+    !seed.safeParse(requestEffectiveSeed).success ||
+    candidate.evidence.effectiveSeed !== requestEffectiveSeed
+  )
+    fail('PROVENANCE_INVALID');
+  const evidence = trusted.evidence;
+  const { origin, preset } = sourceOrigin(world);
+  const refs = fixed('PROVENANCE_INVALID', () => adminResetResourcesSchema.parse(evidence.resources));
+  if (
+    refs.find((ref) => ref.kind === 'MAP')?.name !== world.mapKey ||
+    refs.find((ref) => ref.kind === 'SCENARIO')?.name !== world.scenarioKey ||
+    refs.find((ref) => ref.kind === 'UNIT_SET')?.name !== world.unitSetKey
+  )
+    fail('PROVENANCE_INVALID');
+  if (
+    evidence.version !== 1 ||
+    evidence.sourceWorldId !== world.id ||
+    evidence.sourceSeed !== world.seed ||
+    !seed.safeParse(evidence.effectiveSeed).success ||
+    !hash.safeParse(evidence.initialHash).success ||
+    evidence.sourceInitialHash !== origin.initialStateHash ||
+    evidence.sourceResourceHash !== origin.resourceHash ||
+    evidence.sourceSettingsHash !== resetSourceSettingsHash(world)
+  )
+    fail('PROVENANCE_INVALID');
+  const pin = await provenance(tx, world, preset, signal),
+    current = provenanceEvidence(pin, refs);
+  if (
+    !same(current.provenance, evidence.provenance) ||
+    current.provenanceFingerprint !== evidence.provenanceFingerprint ||
+    (pin.kind !== 'cli' &&
+      !same(
+        [...pin.refs].sort((a, b) => a.kind.localeCompare(b.kind)),
+        refs,
+      ))
+  )
+    fail('PROVENANCE_INVALID');
+  for (const ref of refs) {
+    signal.throwIfAborted();
+    await tx.$queryRaw`SELECT id FROM "GameResource" WHERE kind::text=${ref.kind} AND name=${ref.name} AND version=${ref.version} FOR SHARE`;
+    signal.throwIfAborted();
+  }
+  const resources = await resourcesByRefs(tx, refs, signal);
+  signal.throwIfAborted();
+  if (!same(references(resources), refs)) fail('RESOURCE_INVALID');
 }
