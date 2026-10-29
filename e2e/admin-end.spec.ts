@@ -493,10 +493,23 @@ test('END07 AC-M3-04 접수 뒤 실제 역할 회수는 엔진 기각·현재 �
     await changeAdminRole(stack.db, { email: admin.email, role: 'USER', reason: '종료 접수 후 실제 권한 회수 시험' });
     await applyEnd(target);
     expect((await stack.db.inputEvent.findUniqueOrThrow({ where: { id: input.id } })).status).toBe('REJECTED');
-    const response = actualResponse(page, 'admin.world.endRequest');
+    const response = await page.request.get(
+      stack.origin +
+        '/trpc/admin.world.endRequest?input=' +
+        encodeURIComponent(
+          JSON.stringify({ expectedUserId: admin.id, worldId: target.id, idempotencyKey: input.idempotencyKey }),
+        ),
+      { timeout: 10_000 },
+    );
+    await response.body();
+    expect(response.status()).toBe(403);
+    let resultQueries = 0;
+    page.on('request', (request) => {
+      if (sanctionCalls(request, 'admin.world.endRequest')) resultQueries++;
+    });
     await endQuery(dialog).click();
-    expect((await response).status()).toBe(403);
     await expect(page.getByRole('region', { name: '월드 종료 조치', exact: true })).toHaveCount(0);
+    expect(resultQueries).toBe(0);
     expect((await stack.db.world.findUniqueOrThrow({ where: { id: target.id } })).status).toBe('PAUSED');
   }));
 
@@ -517,8 +530,9 @@ test('END08 AC-M3-04 실제 상태 경쟁 REJECTED와 로그아웃 뒤 요청 �
     await pending(second);
     expect(
       (
-        await page.request.post(stack.origin + '/trpc/auth.logout', {
+        await page.request.post(stack.origin + '/trpc/auth.logout?batch=1', {
           headers: { Origin: stack.origin },
+          data: {},
           timeout: 10_000,
         })
       ).status(),
@@ -641,22 +655,28 @@ test('END10 AC-M3-04 guard·늦은 응답·UUID 보존·상호잠금·history·b
     await expect(dialog).toContainText(input.idempotencyKey);
     await page.keyboard.press('Escape');
     await expect(dialog).toBeVisible();
-    let warned = false;
-    page.once('dialog', (prompt) => {
-      void track(routes, async () => {
-        warned = prompt.type() === 'beforeunload';
-        await prompt.dismiss();
-      });
+    const guardUrl = page.url(),
+      documentToken = randomUUID();
+    await page.evaluate(
+      (token) => document.documentElement.setAttribute('data-end-guard-document', token),
+      documentToken,
+    );
+    let guardWrites = 0;
+    page.on('request', (request) => {
+      if (sanctionCalls(request, 'admin.world.requestEnd')) guardWrites++;
     });
-    try {
-      await page.reload({ timeout: 5_000 });
-    } catch (error) {
-      if (!(error instanceof Error) || !error.message.includes('ERR_ABORTED')) throw error;
-    }
-    expect(warned).toBe(true);
-    if (!(await dialog.isVisible()))
-      await page.getByRole('button', { name: '종료 계정과 권한 다시 확인', exact: true }).click();
+    const dismissed = track(routes, async () => {
+      const prompt = await page.waitForEvent('dialog', { timeout: 5_000 });
+      expect(prompt.type()).toBe('beforeunload');
+      await prompt.dismiss();
+    });
+    await Promise.all([dismissed, track(routes, () => page.close({ runBeforeUnload: true }))]);
+    expect(page.isClosed()).toBe(false);
+    expect(page.url()).toBe(guardUrl);
+    await expect(page.locator('html')).toHaveAttribute('data-end-guard-document', documentToken);
+    expect(guardWrites).toBe(0);
     await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText(input.idempotencyKey);
     await applyEnd(target);
     await endQuery(dialog).click();
     await expect(dialog).toContainText('종료 적용 완료');
