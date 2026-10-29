@@ -110,6 +110,7 @@ async function ownDatabase(
       '20261104000000_account_world_sanctions',
       '20261105000000_admin_notices',
       '20261106000000_legal_document_versions',
+      '20261107000000_admin_sanction_requests',
     ]);
     await run(client, db);
     completed = true;
