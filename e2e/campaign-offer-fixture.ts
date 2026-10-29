@@ -91,6 +91,75 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+type ProgressPhase =
+  | 'public-metadata'
+  | 'account-context'
+  | 'account-password'
+  | 'account-create'
+  | 'account-cookie'
+  | 'account-auth'
+  | 'world-resources'
+  | 'world-persist'
+  | 'world-lease'
+  | 'world-start'
+  | 'human-create-page'
+  | 'human-create-form'
+  | 'human-create-input'
+  | 'human-create-advance'
+  | 'human-create-url'
+  | 'join-inputs'
+  | 'join-advance'
+  | 'consent-offer'
+  | 'consent-accept'
+  | 'consent-release'
+  | 'world-snapshot'
+  | 'final-board-navigation'
+  | 'final-board-response'
+  | 'final-panel'
+  | 'test-body'
+  | 'cleanup';
+const diagnosticTaskLabels = new Set([
+  'prepare',
+  'test body',
+  'HTTP query',
+  'HTTP mutation',
+  'engine advance',
+  'acquire lease',
+  'new context',
+  'new page',
+  'password hash',
+  'create account',
+  'session cookie',
+  'create world',
+  'temporary DB client',
+  'route or response observer',
+  'route fetch',
+  'offer click',
+  'manual offer route fetch',
+  'UI goto',
+  'UI waitForResponse',
+  'UI click',
+  'UI fill',
+  'UI json',
+  'UI post',
+  'UI get',
+  'findMany',
+  'findFirstOrThrow',
+  'count',
+  '$transaction',
+  '$queryRaw',
+  '$executeRaw',
+]);
+function diagnosticPending(tasks: Array<{ label: string; settled: boolean }>) {
+  const counts: Record<string, number> = {};
+  for (const task of tasks) {
+    if (task.settled) continue;
+    const label = diagnosticTaskLabels.has(task.label) ? task.label : 'other';
+    counts[label] = (counts[label] ?? 0) + 1;
+  }
+  return counts;
+}
+
 export class OfferFixture {
   constructor(
     private readonly cleanupAuditDb: () => PrismaClient = () => createDb(e2eDatabaseUrl()),
@@ -111,6 +180,23 @@ export class OfferFixture {
   deliveredBoard: Board | undefined;
   closing = false;
   private offerClickStartedAt = 0;
+  private readonly progressStartedAt = Date.now();
+  private currentPhase: ProgressPhase = 'public-metadata';
+  progress(phase: ProgressPhase) {
+    this.currentPhase = phase;
+    console.log('[campaign-offer-phase]', JSON.stringify({ phase, elapsedMs: Date.now() - this.progressStartedAt }));
+  }
+  progressPending(event: 'timeout' | 'finalize') {
+    console.log(
+      '[campaign-offer-pending]',
+      JSON.stringify({
+        event,
+        phase: this.currentPhase,
+        elapsedMs: Date.now() - this.progressStartedAt,
+        pending: diagnosticPending(this.scope.summary()),
+      }),
+    );
+  }
   describeFailure = (reason: unknown) => {
     let text = reason instanceof Error ? `${reason.name}: ${reason.message}` : String(reason);
     text = text.split(/\r?\n/).find((line) => line.trim()) ?? 'Unknown failure';
@@ -126,6 +212,7 @@ export class OfferFixture {
     return text.slice(0, 180);
   };
   run(work: () => Promise<void>) {
+    this.progress('test-body');
     return this.scope.cancellable(this.scope.work('test body', work));
   }
   track<T>(task: Promise<T>) {
@@ -177,10 +264,12 @@ export class OfferFixture {
   async prepare(browser: Browser) {
     if (!this.runtime && process.env.CAMPAIGN_OFFER_PUBLIC_DIST !== '1')
       throw new Error('공개 dist 전용 실행기가 필요합니다.');
+    this.progress('public-metadata');
     const meta = await (await fetch(`${this.origin()}/public-build.json`, { signal: this.scope.signal })).json();
     expect(meta.mode).toBe('public');
     for (let i = 0; i < 2; i++) {
       this.scope.check();
+      this.progress('account-context');
       const context = await this.scope.work(
         'new context',
         () => browser.newContext({ baseURL: this.origin(), viewport: { width: 1440, height: 900 } }),
@@ -192,9 +281,11 @@ export class OfferFixture {
       // 생성 도중 실패해도 자기 context와 계정의 수명을 추적한다.
       const user: User = { page, id: '', email: `e2e-offer-${randomUUID()}@example.test`, cookies: [] };
       this.users.push(user);
+      this.progress('account-password');
       const hash = await this.scope.work('password hash', () => (passwordHash ??= hashPassword(TEST_PASSWORD)));
       this.scope.check();
       const session = newSession(Date.now());
+      this.progress('account-create');
       await this.scope.work(
         'create account',
         () =>
@@ -212,16 +303,19 @@ export class OfferFixture {
           user.id = row.id;
         },
       );
+      this.progress('account-cookie');
       await this.scope.work('session cookie', () =>
         context.addCookies([
           { name: 'sid', value: session.token, url: this.origin(), httpOnly: true, sameSite: 'Lax' },
         ]),
       );
       user.cookies = await context.cookies(this.origin());
+      this.progress('account-auth');
       user.id = (await query<{ user: { id: string } }>(page, 'auth.me')).user.id;
     }
     for (let i = 0; i < 2; i++) {
       // 결과를 골라내지 않는 고정 시드. 두 월드는 사람 UUID·입력·일정을 공유한다.
+      this.progress('world-resources');
       const initial = await loadInitialWorld({
         scenario: 'integration191',
         map: 'integration',
@@ -241,6 +335,7 @@ export class OfferFixture {
       expect(initial.generals).toHaveLength(491);
       expect(initial.nations).toHaveLength(21);
       this.scope.check();
+      this.progress('world-persist');
       const { worldId } = await this.scope.work(
         'create world',
         () =>
@@ -255,20 +350,27 @@ export class OfferFixture {
           }),
         (result) => this.createdWorlds.add(result.worldId),
       );
+      this.progress('world-lease');
       const hold = await this.hold(worldId);
       const world = { id: worldId, hold, tick: 0 };
       this.worlds.push(world);
+      this.progress('world-start');
       await controlClock(hold.db, worldId, 'start');
       for (const [index, user] of this.users.entries()) {
+        this.progress('human-create-page');
         await user.page.goto(`/w/${worldId}/create`);
+        this.progress('human-create-form');
         await expect(user.page.getByRole('spinbutton')).toHaveCount(5);
         await user.page.getByLabel('이름', { exact: true }).fill(`제안장수${index}`);
         await user.page.getByRole('button', { name: '고르게 나누기' }).click();
+        this.progress('human-create-input');
         await user.page.getByRole('button', { name: '장수 만들기', exact: true }).click();
         await expect
           .poll(() => hold.db.inputEvent.count({ where: { worldId, kind: 'general.create', status: 'PENDING' } }))
           .toBe(1);
+        this.progress('human-create-advance');
         await this.advance(world, 0);
+        this.progress('human-create-url');
         await expect(user.page).toHaveURL(`${this.origin()}/w/${worldId}`);
       }
       const humans = await hold.db.general.findMany({
@@ -276,12 +378,14 @@ export class OfferFixture {
         orderBy: { id: 'asc' },
       });
       expect(humans.map((g) => g.id)).toEqual([492, 493]);
+      this.progress('join-inputs');
       for (const user of this.users)
         await mutate(user.page, 'turns.set', {
           worldId,
           revision: 0,
           slots: [{ commandKey: 'join', args: { nationId: 1 } }, ...Array.from({ length: 29 }, () => null)],
         });
+      this.progress('join-advance');
       await this.advance(world, Math.max(...humans.map((g) => g.nextTurnTick)));
       for (const user of this.users) await user.page.goto(`/w/${worldId}`);
       const board = await this.board(world);
@@ -289,7 +393,9 @@ export class OfferFixture {
       expect(board.cityKey).toBe((await this.board(world, 1)).cityKey);
       expect(await hold.db.generalTurn.count({ where: { worldId, generalId: 493 } })).toBe(30);
       // 사람 휘하는 본인의 실제 응답 후에만 성립한다. 이후 해제해 NPC 시험의 초기 상태를 맞춘다.
+      this.progress('world-snapshot');
       const humanBefore = await this.snapshot(world);
+      this.progress('consent-offer');
       const offerId = randomUUID();
       await mutate(this.users[0]!.page, 'campaign.relationship', {
         worldId,
@@ -302,6 +408,7 @@ export class OfferFixture {
       expect(offered.links).toHaveLength(0);
       const humanOffer = offered.offers.find((o) => o.personId === 493 && o.status === 'PENDING');
       expect(humanOffer).toBeDefined();
+      this.progress('consent-accept');
       await mutate(this.users[1]!.page, 'campaign.relationship', {
         worldId,
         requestId: randomUUID(),
@@ -310,6 +417,7 @@ export class OfferFixture {
       await this.advance(world, world.tick);
       const accepted = await this.board(world, 1);
       expect(accepted.links).toContainEqual({ masterId: 492, personId: 493, relation: 'STAFF' });
+      this.progress('consent-release');
       await mutate(this.users[1]!.page, 'campaign.relationship', {
         worldId,
         requestId: randomUUID(),
@@ -317,6 +425,7 @@ export class OfferFixture {
       });
       await this.advance(world, world.tick);
       expect((await this.board(world)).links).toHaveLength(0);
+      this.progress('world-snapshot');
       const humanAfter = await this.snapshot(world);
       for (const id of [492, 493])
         expect(humanAfter.state.generals[id]!.gold).toBe(humanBefore.state.generals[id]!.gold);
@@ -324,6 +433,7 @@ export class OfferFixture {
       expect(humanAfter.revisions).toEqual(humanBefore.revisions);
       this.journal.push({ humanConsent: worldId, requestId: offerId, cost: 0 });
     }
+    this.progress('world-snapshot');
     expect(hashState(await this.snapshot(this.worlds[0]!))).toBe(hashState(await this.snapshot(this.worlds[1]!)));
     const page = this.users[0]!.page;
     const loaded = this.track(
@@ -334,11 +444,14 @@ export class OfferFixture {
         ),
       ),
     );
+    this.progress('final-board-navigation');
     await page.goto(`/w/${this.worlds[0]!.id}`);
+    this.progress('final-board-response');
     const response = await loaded;
     const call = calls(response.request()).find((call) => call.path === 'campaign.get')!;
     const body = await response.json();
     this.deliveredBoard = (Array.isArray(body) ? body[call.index] : body).result.data as Board;
+    this.progress('final-panel');
     await expect(this.panel()).toBeVisible();
   }
   panel() {
@@ -753,7 +866,10 @@ export function assertCleanupPassed(cleanup: Awaited<ReturnType<OfferFixture['cl
 export const test = base.extend<{ offer: OfferFixture }>({
   offer: async ({ browser, offerRuntime }, use, info) => {
     const offer = new OfferFixture(undefined, offerRuntime);
-    const timer = setTimeout(() => offer.scope.cancel(), info.timeout);
+    const timer = setTimeout(() => {
+      offer.progressPending('timeout');
+      offer.scope.cancel();
+    }, info.timeout);
     let fixtureFailed = false;
     try {
       await offer.scope.cancellable(offer.scope.work('prepare', () => offer.prepare(browser)));
@@ -761,15 +877,34 @@ export const test = base.extend<{ offer: OfferFixture }>({
     } catch {
       fixtureFailed = true;
     } finally {
+      offer.progressPending('finalize');
       clearTimeout(timer);
       offer.scope.cancel();
     }
     if (fixtureFailed || info.status !== 'passed') offerRuntime?.failed();
     try {
+      offer.progress('cleanup');
       const cleanup = await offer.cleanup(!fixtureFailed && info.status === 'passed');
       await writeFile(
         info.outputPath('controlled-cleanup-v3.json'),
         JSON.stringify({ cleanup, journal: offer.journal }, null, 2),
+      );
+      console.log(
+        '[campaign-offer-cleanup]',
+        JSON.stringify({
+          fixtureFailed,
+          tasksSettled: cleanup.tasksSettled,
+          pending: diagnosticPending(cleanup.taskSummary),
+          renewalsSettled: cleanup.renewalsSettled,
+          contextsClosed: cleanup.contextsClosed,
+          allTrackedClientsDisconnected: cleanup.allTrackedClientsDisconnected,
+          auditDisconnected: cleanup.auditDisconnected,
+          errors: cleanup.errors.length,
+          taskFailures: cleanup.taskFailureCount,
+          preserveFailureRows: cleanup.preserveFailureRows,
+          worldsDeleted: cleanup.worldsDeleted,
+          accountsDeleted: cleanup.accountsDeleted,
+        }),
       );
       assertCleanupPassed(cleanup, fixtureFailed);
     } catch (error) {
