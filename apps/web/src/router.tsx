@@ -38,7 +38,15 @@ import { ResetPasswordPage } from './account/ResetPasswordPage';
 import { VerifyEmailPage } from './account/VerifyEmailPage';
 import { AccountPage } from './account/AccountPage';
 import { takeTokenFragment } from './account/tokenEntry';
-import { accountNext, isVerificationDenied, needsEmailVerification } from './account/access';
+import {
+  accountNext,
+  isConsentDenied,
+  isVerificationDenied,
+  needsConsent,
+  needsEmailVerification,
+} from './account/access';
+import { LegalDocumentPage } from './legal/LegalDocumentPage';
+import { LegalAgreePage } from './legal/LegalAgreePage';
 import { publicFailure } from './auth/credentials';
 
 // 주소 체계: docs/plans/T1-13.md. 로그인 가드: docs/frontend-ui-guidelines.md §4.
@@ -61,12 +69,16 @@ function RootFrame() {
   useEffect(
     () =>
       queryClient.getMutationCache().subscribe((event) => {
-        if (event.type !== 'updated' || event.action.type !== 'error' || !isVerificationDenied(event.action.error))
-          return;
-        if (router.state.location.pathname === '/verify-email') return;
+        if (event.type !== 'updated' || event.action.type !== 'error') return;
+        const target = isVerificationDenied(event.action.error)
+          ? '/verify-email'
+          : isConsentDenied(event.action.error)
+            ? '/legal/agree'
+            : null;
+        if (!target || router.state.location.pathname === target) return;
         void queryClient.invalidateQueries({ queryKey: trpc.account.get.queryKey() });
         void router.navigate({
-          to: '/verify-email',
+          to: target,
           search: { next: accountNext(router.state.location.href) ?? '/lobby' },
           replace: true,
         });
@@ -96,6 +108,7 @@ async function requireGameAccess(context: RouterContext, next: string) {
   }
   if (needsEmailVerification(account))
     throw redirect({ to: '/verify-email', search: { next: destination }, replace: true });
+  if (needsConsent(account)) throw redirect({ to: '/legal/agree', search: { next: destination }, replace: true });
 }
 
 function GuardError() {
@@ -184,6 +197,35 @@ const accountRoute = createRoute({
     if (!(await currentUser(context))) throw redirect({ to: '/login', search: { next: '/account' } });
   },
   component: AccountPage,
+  errorComponent: GuardError,
+});
+
+const termsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'legal/terms',
+  component: () => <LegalDocumentPage docType="TERMS" />,
+});
+const privacyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'legal/privacy',
+  component: () => <LegalDocumentPage docType="PRIVACY" />,
+});
+const legalAgreeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'legal/agree',
+  validateSearch: (search: Record<string, unknown>): { next?: string } => {
+    const next = accountNext(search.next);
+    return next ? { next } : {};
+  },
+  beforeLoad: async ({ context, search }) => {
+    const user = await currentUser(context);
+    if (!user) throw redirect({ to: '/login', search: { next: search.next ?? '/lobby' } });
+    const account = await context.queryClient.fetchQuery({ ...context.trpc.account.get.queryOptions(), staleTime: 0 });
+    if (needsEmailVerification(account))
+      throw redirect({ to: '/verify-email', search: { next: search.next ?? '/lobby' }, replace: true });
+    return { consentUserId: user.id };
+  },
+  component: LegalAgreePage,
   errorComponent: GuardError,
 });
 
@@ -412,6 +454,9 @@ const routeTree = rootRoute.addChildren([
   resetPasswordRoute,
   verifyEmailRoute,
   accountRoute,
+  termsRoute,
+  privacyRoute,
+  legalAgreeRoute,
   notificationSettingsRoute,
   helpRoute,
   helpDocRoute,

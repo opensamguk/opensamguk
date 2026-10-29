@@ -258,3 +258,6 @@ jobs:
       - name: Check required email verification in Chromium
         if: matrix.shard == 1
         run: pnpm e2e:account --reporter=line
+      - name: Check current policy and consent in Chromium
+        if: matrix.shard == 1
+        run: pnpm e2e:legal --reporter=line
