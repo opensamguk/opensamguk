@@ -1,5 +1,3 @@
-import { createDb } from '@opensamguk/db';
-import { buildServer } from './server';
 import { createMailTransport } from './mail/transport';
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -8,13 +6,13 @@ if (!databaseUrl) {
   process.exit(1);
 }
 
-const db = createDb(databaseUrl);
-const port = Number(process.env.SERVER_PORT ?? 3001);
-
 const mailTransport = createMailTransport({
   ...process.env,
   MAIL_TRANSPORT: process.env.MAIL_TRANSPORT ?? (process.env.NODE_ENV === 'production' ? undefined : 'capture'),
 });
+const [{ createDb }, { buildServer }] = await Promise.all([import('@opensamguk/db'), import('./server')]);
+const db = createDb(databaseUrl);
+const port = Number(process.env.SERVER_PORT ?? 3001);
 const server = await buildServer({ db, mailTransport });
 
 const shutdown = async () => {
