@@ -28,9 +28,13 @@ async function main() {
       });
     }
   } finally {
-    removeShutdown();
-    await db.$disconnect();
-    console.log('[engine] 종료');
+    try {
+      // 월드가 끝난 직후의 종료 요청도 DB 정리를 마칠 때까지 받는다.
+      await db.$disconnect();
+      console.log('[engine] 종료');
+    } finally {
+      removeShutdown();
+    }
   }
 }
 
