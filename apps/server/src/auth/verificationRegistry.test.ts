@@ -8,6 +8,7 @@ const VERIFIED_MUTATIONS = [
   'admin.notice.update',
   'admin.sanction.create',
   'admin.sanction.lift',
+  'admin.world.requestClock',
   'campaign.relationship',
   'campaign.unit',
   'general.create',

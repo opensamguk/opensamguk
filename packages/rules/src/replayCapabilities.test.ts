@@ -454,8 +454,11 @@ describe('T4-03 / AC-P2-02 형식 6 운반과 실행 선택', () => {
 });
 
 describe('T4-03 / AC-P2-02 형식 6 입력 소유와 strict 기록', () => {
-  it('kind 소유는 공통 2·정책 3·실제 조약 2개다', () => {
+  it('kind 소유는 공통 2·정책 3·실제 조약 2개와 형식 3 전용 시계 3개다', () => {
     expect(Object.keys(CAPS_INPUT_OWNERS).sort()).toEqual([
+      'admin.world.pause',
+      'admin.world.resume',
+      'admin.world.start',
       'general.active',
       'general.create',
       'general.setPolicy',
@@ -465,6 +468,15 @@ describe('T4-03 / AC-P2-02 형식 6 입력 소유와 strict 기록', () => {
       'turns.set',
     ]);
   });
+  it.each(['admin.world.start', 'admin.world.pause', 'admin.world.resume'])(
+    '형식 6은 알려진 시계 종류 %s도 명시적으로 거부한다',
+    (kind) => {
+      for (const status of ['APPLIED', 'REJECTED'] as const)
+        expect(() => validateCapsRecordedInput(rejection({ kind, status }), { selection, monthlyTick: 0 })).toThrow(
+          '형식 3',
+        );
+    },
+  );
   it.each(['treaty.break', 'treaty.future', 'alliance.x', 'personnel.appoint', 'toString', '__proto__'])(
     'K1 모르는 %s는 두 status 모두 거부한다',
     (kind) => {

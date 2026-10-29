@@ -28,6 +28,7 @@ import { checkWorldReplay } from './features';
 import { persistPersonnelPacket } from './ruleFeatures';
 import { engineResolver, persistExt, verifyWorldExt } from './extState';
 import { assertWorldCapabilities } from './capsGate';
+import { processAdminClock } from './admin/executor';
 
 export const CLOCK_CHECKPOINT_MS = 5_000;
 export const ENGINE_BATCH_STEPS = 64;
@@ -130,6 +131,13 @@ export class TurnLoop {
         if (world.replayFormat === 3 && !this.replayChecked) checkWorldReplay(world);
         const capabilities = await assertWorldCapabilities(tx, world);
         if (!this.extVerified) await verifyWorldExt(tx, world);
+        const adminClock = world.replayFormat === 3 ? await processAdminClock(tx, world, this.highWaterTick) : null;
+        if (adminClock) {
+          await this.hooks.beforeCommit?.(tx);
+          signal?.throwIfAborted();
+          await assertLease(tx, this.lease);
+          return { ...adminClock, state: null, execution: null, checkpointed: true, progressed: true };
+        }
         const baselineActiveTick = await policyBaseline(tx, world);
         if (world.status !== 'RUNNING') {
           const deferInputs =

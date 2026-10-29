@@ -27,6 +27,8 @@ import {
   validatePolicyRecordedInput,
   type PolicyFormat,
   selectWorldCapabilities,
+  isAdminClockKind,
+  validateAdminClockRecord,
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { exportCapsArchive, replayCapsArchive, replayCapsToEnd, type CapsArchive } from './replayCaps';
@@ -286,6 +288,7 @@ export function readArchive(value: unknown, registry: RuleRegistry = ruleRegistr
     }
     const kind = registry.inputKinds.find((kind) => kind.kind === input.kind);
     if (!kind) throw new Error('등록되지 않은 입력 종류입니다.');
+    if (isAdminClockKind(input.kind)) validateAdminClockRecord(input);
     const numericTick = kind.route === 'queued' || kind.directTick === true;
     if (
       !Object.hasOwn(input, 'tick') ||

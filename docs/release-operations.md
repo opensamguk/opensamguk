@@ -95,4 +95,10 @@ Compose 대상은 항상 절대 경로의 `--env-file`, `-f`와 `--project-name`
 
 ## 7. 모니터링 (M3)
 
-<!-- TODO(M3): 가동 확인, 엔진 하트비트, 디스크·DB 용량 알림 (AC-M3-09). -->
+`Public uptime` 워크플로는 main에서 UTC 매시7·17·27·37·47·57분에 기존 `tools/monitor/uptime.ts`를 실행합니다. 수동 실행도 main만 허용합니다. PUBLIC_URL 저장소 변수가 비면 확인 요청과 원격 상태 입출력 없이 꺼짐 성공이며 변수·secret 등록은 이 변경에 포함하지 않습니다. 의존성 설치와 실제 사이트 확인은 구분합니다.
+
+활성화 전에 운영자가 공개 HTTPS 주소, 기존 `ops/uptime-state` ref의 내용·legacy 상태 의미와 보호 규칙, 외부 알림 대상을 확인합니다. CLI는 `refs/heads/ops/uptime-state`만 쓰며 prod 키의 fast-forward 상태 저장을 사용합니다. 워크플로를 우회해 다른 ref를 허용하거나 강제 push하지 않습니다. OPS_DISCORD_WEBHOOK secret이 없으면 기존 계약대로 판정만 저장하며 외부 수신 완료로 세지 않습니다. 토큰·웹훅 원문을 명령 인자·로그·요약·산출물에 넣지 않습니다.
+
+예약과 입력 없는 수동 실행은 같은 prod concurrency로 진행 취소 없이 직렬화합니다. 기본 대기 실행은 한 개이므로 오래 걸리면 뒤 예약이 교체될 수 있습니다. 각 job은10분으로 제한합니다. GitHub 예약은 혼잡 때문에 늦어질 수 있고 공개 저장소 활동이60일 없으면 자동 중지됩니다. 중지되면 Actions의 해당 워크플로에서 다시 활성화하고 실제 다음 실행을 확인합니다. 예약은 기본 브랜치에 병합된 뒤에만 동작합니다. [예약 실행](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule), [직렬화](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)
+
+로컬 후보는 실제 CLI/Git/HTTP142건·별도 Linux 권한7건과 전체5385건·공개 자산110개·실제 공개 Chromium4건을 통과했습니다. 코드·집중·Linux 근거 리뷰는 승인됐으며 전체 근거·문서의 최종 리뷰와 새 필수CI·정상 보호 병합은 남아 있습니다. 보호 병합 뒤의 미설정 URL 수동 실행,500·500·500·200 장애·회복 drill, 실제 공개 주소와 외부 수신, 디스크·DB 용량 감시와 전체 AC-M3-09 인수도 아직 남아 있습니다. 사용자 점검용5200의 계정·월드는 유지합니다.

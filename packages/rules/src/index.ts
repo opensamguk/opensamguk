@@ -8,6 +8,7 @@ export { checkOperationalProfile } from './world/map/profile';
 export type { OperationalMapResource } from './world/map/operational';
 export * from './clock/constants';
 export * from './clock/clock';
+export * from './clock/admin';
 export {
   toWorldState,
   type JsonValue,
