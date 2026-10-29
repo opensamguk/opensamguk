@@ -14,6 +14,15 @@ export function bootstrapSnapshot(
 export const BOOTSTRAP_DOCKER: DockerBinding;
 export const BUILD_BUDGET: LoadBudget;
 export const BOOTSTRAP_LIMIT_MS: 300000;
+export function bootstrapDiagnostic(
+  phase: unknown,
+  error: unknown,
+  admissionReason?: unknown,
+): {
+  phase: string;
+  code: string;
+  admissionReason: string | null;
+};
 export function bootstrapReason(
   sample: AdmissionSample,
   options: { now: number; cpuPercent?: number; memoryPercent?: number; diskReserveMiB?: number },

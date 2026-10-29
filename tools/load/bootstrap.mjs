@@ -16,6 +16,52 @@ export const BOOTSTRAP_DOCKER = Object.freeze({
 export const BUILD_BUDGET = Object.freeze({ cpu: 1, memoryBytes: 2 * 1024 ** 3, diskBytes: 4 * 1024 ** 3 });
 export const BOOTSTRAP_LIMIT_MS = 300_000;
 
+const diagnosticPhases = new Set([
+  'platform',
+  'source',
+  'docker',
+  'admission-window',
+  'admission-counters',
+  'admission-parse',
+  'admission-cgroups',
+  'admission-decision',
+  'install-scope',
+  'install',
+  'scope-proof',
+  'source-proof',
+  'publish',
+]);
+const diagnosticCodes = new Set([
+  'LOAD_BOOTSTRAP_PLATFORM_UNVERIFIED',
+  'LOAD_BOOTSTRAP_SOURCE_INVALID',
+  'LOAD_BOOTSTRAP_OPTIONS_INVALID',
+  'LOAD_DISPATCH_SOURCE_INVALID',
+  'LOAD_LOCAL_DOCKER_REQUIRED',
+  'LOAD_BOOTSTRAP_DAEMON_UNVERIFIED',
+  'LOAD_BOOTSTRAP_SAMPLE_INVALID',
+  'LOAD_BOOTSTRAP_ADMISSION_REFUSED',
+  'LOAD_INSTALL_SCOPE_EXISTS',
+  'LOAD_INSTALL_SCOPE_UNVERIFIED',
+  'LOAD_INSTALL_TOOL_UNVERIFIED',
+  'LOAD_BOOTSTRAP_NATIVE_UNCONFIRMED',
+  'LOAD_BOOTSTRAP_SOURCE_CHANGED',
+]);
+const diagnosticReasons = new Set(['sample_invalid', 'cpu_limit', 'memory_limit', 'cgroup_headroom', 'disk_reserve']);
+
+// 공개 실패 진단에는 고정 분류만 쓴다. 원문 오류·경로·환경·native 출력은 싣지 않는다.
+export function bootstrapDiagnostic(phase, error, admissionReason) {
+  return {
+    phase: diagnosticPhases.has(phase) ? phase : 'unknown',
+    code:
+      error instanceof Error && diagnosticCodes.has(error.message)
+        ? error.message
+        : error?.code === 'ENOENT'
+          ? 'RESOURCE_MISSING'
+          : 'UNCLASSIFIED',
+    admissionReason: diagnosticReasons.has(admissionReason) ? admissionReason : null,
+  };
+}
+
 export function bootstrapReason(sample, options) {
   const cpuPercent = options.cpuPercent ?? 80,
     memoryPercent = options.memoryPercent ?? 80,
@@ -289,10 +335,11 @@ export async function bootstrapSnapshot(root, native, signal) {
   return snapshotSource(root, (args) => native('git', args, 'source-git', signal, 10000), signal);
 }
 
-async function sample(dockerRoot, output, signal) {
+async function sample(dockerRoot, output, signal, phase) {
   const started = Date.now(),
     before = counter(await readFile('/proc/stat', 'utf8'));
   await delay(60000, undefined, { signal });
+  phase('admission-counters');
   const [cpu, memory, cgroup, info, disk, report] = await Promise.all([
     readFile('/proc/stat', 'utf8'),
     readFile('/proc/meminfo', 'utf8'),
@@ -306,12 +353,14 @@ async function sample(dockerRoot, output, signal) {
     delta = after.total - before.total,
     idle = after.idle - before.idle;
   if (delta <= 0 || idle < 0 || idle > delta) throw new Error('LOAD_BOOTSTRAP_SAMPLE_INVALID');
+  phase('admission-parse');
   const memoryValue = (name) => {
     const raw = new RegExp(`^${name}:\\s+(\\d+) kB$`, 'm').exec(memory)?.[1];
     if (raw === undefined) throw new Error('LOAD_BOOTSTRAP_SAMPLE_INVALID');
     return natural(raw) * 1024;
   };
   const host = { memoryAvailable: memoryValue('MemAvailable'), cores: info.match(/^processor\s*:/gm)?.length ?? 0 };
+  phase('admission-cgroups');
   const groups = await Promise.all([
     groupSample(groupPath(cgroup), host),
     groupSample(BOOTSTRAP_DOCKER.cgroupPath, host),
@@ -353,7 +402,10 @@ async function main() {
     scope = '',
     output,
     failure = false,
-    scopeClosed = false;
+    scopeClosed = false,
+    phase = 'platform',
+    failureDiagnostic,
+    admissionReason;
   const cleanupFailures = [];
   try {
     await requirePlatform();
@@ -400,6 +452,7 @@ async function main() {
     }
     if (process.argv.length !== 2 || process.getuid() === 0 || process.version !== 'v24.22.0')
       throw new Error('LOAD_BOOTSTRAP_OPTIONS_INVALID');
+    phase = 'source';
     const before = await bootstrapSnapshot(root, native, signal);
     requireDispatch({
       repository: process.env.GITHUB_REPOSITORY,
@@ -408,6 +461,7 @@ async function main() {
       dispatchSha: process.env.GITHUB_SHA,
       head: before.head,
     });
+    phase = 'docker';
     if (process.env.DOCKER_HOST !== undefined || process.env.DOCKER_CONTEXT !== undefined)
       throw new Error('LOAD_LOCAL_DOCKER_REQUIRED');
     let endpoint;
@@ -458,14 +512,20 @@ async function main() {
     output = resolve(root, '.load-reports', `bootstrap-${runId}`);
     await mkdir(dirname(output), { recursive: true, mode: 0o700 });
     await mkdir(output, { recursive: false, mode: 0o700 });
-    const admission = await sample(info.root, output, signal);
+    phase = 'admission-window';
+    const admission = await sample(info.root, output, signal, (value) => {
+      phase = value;
+    });
+    phase = 'admission-decision';
     const reason = bootstrapReason(admission, { now: Date.now() });
+    admissionReason = reason;
     await writeFile(
       resolve(output, 'admission.json'),
       JSON.stringify({ admission, reason, budget: BUILD_BUDGET, docker: BOOTSTRAP_DOCKER }) + '\n',
       { flag: 'wx', mode: 0o600 },
     );
     if (reason) throw new Error('LOAD_BOOTSTRAP_ADMISSION_REFUSED');
+    phase = 'install-scope';
     scope = `opensamguk-load-install-${runId}.scope`;
     if (
       (
@@ -492,6 +552,7 @@ async function main() {
       if (process.env[name] !== undefined) safeEnvironment[name] = process.env[name];
     safeEnvironment.HOME = resolve(output, 'home');
     await mkdir(safeEnvironment.HOME, { mode: 0o700 });
+    phase = 'install';
     attempted = true;
     await native(
       'sudo',
@@ -522,6 +583,7 @@ async function main() {
       Math.max(1, BOOTSTRAP_LIMIT_MS - 40000 - (Date.now() - admission.at + admission.cpuWindowMs)),
       safeEnvironment,
     );
+    phase = 'scope-proof';
     const scopeProof = JSON.parse(await readFile(resolve(output, 'scope.json'), 'utf8'));
     if (
       scopeProof.verified !== true ||
@@ -533,8 +595,10 @@ async function main() {
       )
     )
       throw new Error('LOAD_INSTALL_SCOPE_UNVERIFIED');
+    phase = 'source-proof';
     const after = await bootstrapSnapshot(root, native, signal);
     if (before.head !== after.head || before.sha256 !== after.sha256) throw new Error('LOAD_BOOTSTRAP_SOURCE_CHANGED');
+    phase = 'publish';
     await writeFile(resolve(output, 'source.json'), JSON.stringify(before) + '\n', { flag: 'wx', mode: 0o600 });
     await writeFile(
       resolve(root, '.load-reports', 'bootstrap.json'),
@@ -548,8 +612,9 @@ async function main() {
       }) + '\n',
       { flag: 'wx', mode: 0o600 },
     );
-  } catch {
+  } catch (error) {
     failure = true;
+    failureDiagnostic = bootstrapDiagnostic(phase, error, admissionReason);
   } finally {
     const cleanup = async () => {
       if (attempted) {
@@ -591,7 +656,14 @@ async function main() {
         try {
           await writeFile(
             resolve(output, 'lifecycle.json'),
-            JSON.stringify({ failure, scopeClosed, receipts, pending: pending.size, cleanupFailures }) + '\n',
+            JSON.stringify({
+              failure,
+              diagnostic: failureDiagnostic,
+              scopeClosed,
+              receipts,
+              pending: pending.size,
+              cleanupFailures,
+            }) + '\n',
             { flag: 'wx', mode: 0o600 },
           );
         } catch {
@@ -605,8 +677,19 @@ async function main() {
     process.removeListener('SIGINT', stop);
     process.removeListener('SIGTERM', stop);
   }
-  if (failure || cleanupFailures.length || pending.size || (attempted && !scopeClosed))
+  if (failure || cleanupFailures.length || pending.size || (attempted && !scopeClosed)) {
+    process.stderr.write(
+      JSON.stringify({
+        event: 'LOAD_BOOTSTRAP_DIAGNOSTIC',
+        ...failureDiagnostic,
+        scopeAttempted: attempted,
+        scopeClosed,
+        pending: pending.size,
+        cleanupFailed: cleanupFailures.length > 0,
+      }) + '\n',
+    );
     throw new Error('LOAD_BOOTSTRAP_FAILED');
+  }
   process.stdout.write('LOAD_BOOTSTRAP_READY\n');
 }
 

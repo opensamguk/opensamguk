@@ -6,6 +6,7 @@ import {
   BOOTSTRAP_DOCKER,
   BOOTSTRAP_LIMIT_MS,
   bootstrapReason,
+  bootstrapDiagnostic,
   BUILD_BUDGET,
   requireDispatch,
 } from './bootstrap.mjs';
@@ -33,6 +34,26 @@ const site = admissionSite('github-hosted', {
 });
 
 describe('L5 의존성 설치 전 bootstrap 경계', () => {
+  it('공개 실패 진단은 고정 단계·코드·심사 사유만 남긴다', () => {
+    expect(
+      bootstrapDiagnostic('admission-decision', new Error('LOAD_BOOTSTRAP_ADMISSION_REFUSED'), 'memory_limit'),
+    ).toEqual({
+      phase: 'admission-decision',
+      code: 'LOAD_BOOTSTRAP_ADMISSION_REFUSED',
+      admissionReason: 'memory_limit',
+    });
+    const canary = 'private-canary postgres://user:password@host/db /private/path';
+    for (const value of [new Error(canary), { message: canary, code: canary }, canary, null, undefined]) {
+      const result = bootstrapDiagnostic(canary, value, canary);
+      expect(result).toEqual({ phase: 'unknown', code: 'UNCLASSIFIED', admissionReason: null });
+      expect(JSON.stringify(result)).not.toContain('private-canary');
+    }
+    expect(bootstrapDiagnostic('admission-cgroups', Object.assign(new Error(canary), { code: 'ENOENT' }))).toEqual({
+      phase: 'admission-cgroups',
+      code: 'RESOURCE_MISSING',
+      admissionReason: null,
+    });
+  });
   it('bootstrap와 동결된 심사 모델/daemon DTO의 임계값·실패 경로가 같다', () => {
     expect(BOOTSTRAP_DOCKER).toEqual(LOAD_DOCKER);
     expect(BOOTSTRAP_LIMIT_MS).toBe(300000);
