@@ -70,7 +70,8 @@ jobs:
   database-authz:
     name: opensamguk-database-authz
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    # PR #291의 15분 작업 취소를 반영한다. 개별 시험의 30초 제한·worker·검사 항목은 유지한다.
+    timeout-minutes: 30
     env:
       CI: 'true'
       INTEGRATION_SUITE: api

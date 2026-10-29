@@ -7,6 +7,7 @@ import { publicFailure } from '../auth/credentials';
 import { ErrorState, LoadingState } from '../ui/States';
 import { auditFilter, searchFilter, type AuditFilter } from './filters';
 import { usePrivateRead } from './usePrivateRead';
+import { AdminUserDetail } from './AdminUserDetail';
 import styles from './AdminPages.module.css';
 
 type Outputs = inferRouterOutputs<AppRouter>['admin'];
@@ -132,7 +133,7 @@ export function AdminHome() {
     <section>
       <h2>운영 조회</h2>
       <p>월드·사용자·감사 기록을 조회하고 로비·월드 공지를 관리합니다.</p>
-      <p>월드 조작·사용자 상세와 로그인 자료 화면은 준비 중입니다.</p>
+      <p>사용자 상세에서 참가 장수와 제재 이력을 확인합니다. 월드 조작·제재 변경과 로그인 자료 화면은 준비 중입니다.</p>
     </section>
   );
 }
@@ -141,11 +142,26 @@ export function AdminUsers() {
   const viewerId = useViewer(),
     client = useTRPCClient();
   const query = usePrivateRead<Outputs['user']['search']>(viewerId);
+  const detail = usePrivateRead<Outputs['user']['get']>(viewerId);
+  const [detailId, setDetailId] = useState(''),
+    [detailError, setDetailError] = useState<string | null>(null);
+  function readDetail(value: string) {
+    detail.clear();
+    setDetailError(null);
+    const userId = value.trim();
+    setDetailId(userId);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
+      setDetailError('사용자 UUID를 확인하세요.');
+      return;
+    }
+    void detail.read((signal) => client.admin.user.get.query({ userId }, { signal }));
+  }
   const [kind, setKind] = useState('account'),
     [error, setError] = useState<string | null>(null);
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     query.clear();
+    detail.clear();
     setError(null);
     try {
       const input = searchFilter(new FormData(event.currentTarget));
@@ -162,6 +178,8 @@ export function AdminUsers() {
         onSubmit={submit}
         onChange={() => {
           query.clear();
+          detail.clear();
+          setDetailError(null);
           setError(null);
         }}
       >
@@ -216,6 +234,14 @@ export function AdminUsers() {
                     {user.email}
                     <br />
                     <code>{user.userId}</code>
+                    <br />
+                    <button
+                      type="button"
+                      onClick={() => readDetail(user.userId)}
+                      aria-label={`${user.email} 상세 보기`}
+                    >
+                      상세 보기
+                    </button>
                   </td>
                   <td>
                     {user.status} · {user.role}
@@ -230,6 +256,18 @@ export function AdminUsers() {
           </table>
         </>
       ) : null}
+      <AdminUserDetail
+        userId={detailId}
+        onChange={(value) => {
+          setDetailId(value);
+          detail.clear();
+          setDetailError(null);
+        }}
+        onRead={readDetail}
+        data={detail.data}
+        pending={detail.pending}
+        error={detailError ?? detail.error}
+      />
     </section>
   );
 }

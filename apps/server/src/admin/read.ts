@@ -15,6 +15,7 @@ const text = (min: number, max: number) =>
 export const searchUsersInput = z.strictObject({
   query: z.union([text(3, 254), z.strictObject({ worldId: z.uuid(), generalName: text(1, 30) })]),
 });
+export const getUserInput = z.strictObject({ userId: z.uuid() });
 export const auditListInput = z
   .strictObject({
     cursor: z
@@ -118,6 +119,94 @@ export async function searchUsers(
     });
     return result;
   });
+}
+
+export async function getUser(db: PrismaClient, actorId: string, input: z.infer<typeof getUserInput>, now: number) {
+  const result = await readAsAdmin(db, actorId, async (tx) => {
+    const user = await tx.user.findUnique({
+      where: { id: input.userId },
+      select: {
+        id: true,
+        email: true,
+        status: true,
+        role: true,
+        createdAt: true,
+        emailVerifiedAt: true,
+        _count: { select: { generals: true, sanctions: true } },
+        generals: {
+          take: 50,
+          orderBy: [{ world: { createdAt: 'desc' } }, { worldId: 'desc' }, { id: 'desc' }],
+          select: {
+            id: true,
+            name: true,
+            nationId: true,
+            worldId: true,
+            world: { select: { name: true, status: true } },
+          },
+        },
+        sanctions: {
+          take: 50,
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          select: {
+            id: true,
+            worldId: true,
+            world: { select: { name: true } },
+            reason: true,
+            createdAt: true,
+            expiresAt: true,
+            liftedAt: true,
+          },
+        },
+      },
+    });
+    await tx.auditLog.create({
+      data: {
+        actorKind: 'ADMIN',
+        actorUserId: actorId,
+        action: 'user.view',
+        targetType: 'User',
+        targetId: input.userId,
+        payload: {
+          resultCount: user ? 1 : 0,
+          generalsDisplayed: user?.generals.length ?? 0,
+          sanctionsDisplayed: user?.sanctions.length ?? 0,
+        },
+      },
+      select: { id: true },
+    });
+    if (!user) return null;
+    return {
+      userId: user.id,
+      email: user.email,
+      status: user.status,
+      role: user.role,
+      createdAt: user.createdAt.toISOString(),
+      emailVerified: user.emailVerifiedAt !== null,
+      generalCount: user._count.generals,
+      sanctionCount: user._count.sanctions,
+      generals: user.generals.map((general) => ({
+        generalId: general.id,
+        name: general.name,
+        nationId: general.nationId,
+        worldId: general.worldId,
+        worldName: general.world.name,
+        worldStatus: general.world.status,
+      })),
+      sanctions: user.sanctions.map((sanction) => ({
+        sanctionId: sanction.id,
+        worldId: sanction.worldId,
+        worldName: sanction.world?.name ?? null,
+        reason: sanction.reason,
+        createdAt: sanction.createdAt.toISOString(),
+        expiresAt: sanction.expiresAt?.toISOString() ?? null,
+        liftedAt: sanction.liftedAt?.toISOString() ?? null,
+        active: sanction.liftedAt === null && (sanction.expiresAt === null || sanction.expiresAt.getTime() > now),
+      })),
+    };
+  });
+  // 빈 조회도 감사가 commit된 뒤 응답한다. 트랜잭션 안에서 예외를 던지면 감사가 사라진다.
+  if (!result) throw new TRPCError({ code: 'NOT_FOUND', message: '계정을 찾을 수 없습니다.' });
+  return result;
 }
 
 export async function listAudit(db: PrismaClient, actorId: string, input: z.infer<typeof auditListInput>) {
