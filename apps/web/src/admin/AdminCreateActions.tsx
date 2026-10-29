@@ -449,7 +449,7 @@ export function AdminCreateActions({
           ) : null}
           {fresh && reply?.status === 'DONE' ? (
             <div role="status">
-              생성 완료 · 개장 전
+              <p>생성 완료 · 개장 전</p>
               <p>
                 월드 UUID <code>{reply.worldId}</code>
               </p>

@@ -169,7 +169,7 @@ describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
     expect(screen.queryByRole('button', { name: '생성 준비 닫기' })).toBeNull();
     expect(state.create).toHaveBeenCalledTimes(1);
   });
-  it('reload 포인터는 현재 본인의 상태만 수동 조회하며 재전송 입력은 복원하지 않는다', async () => {
+  it('reload 포인터는 본인 상태만 수동 조회하고 완료 문구와 UUID를 구분한다', async () => {
     sessionStorage.setItem(
       `opensamguk:admin-create:v1:${viewerId}`,
       JSON.stringify({ version: 1, viewerId, idempotencyKey: requestKey }),
@@ -180,6 +180,7 @@ describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
     expect(state.status).not.toHaveBeenCalled();
     expect(state.create).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: '같은 요청 접수 확인' })).toBeNull();
+    state.status.mockResolvedValue({ ...pending(requestKey), status: 'DONE', worldId });
     fireEvent.click(screen.getByRole('button', { name: '요청 상태 확인' }));
     await waitFor(() =>
       expect(state.status).toHaveBeenCalledWith(
@@ -187,6 +188,15 @@ describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
         expect.anything(),
       ),
     );
+    const completed = await screen.findByText('생성 완료 · 개장 전', { exact: true });
+    const uuid = screen.getByText(worldId, { exact: true });
+    expect(completed.textContent).toBe('생성 완료 · 개장 전');
+    expect(completed.contains(uuid)).toBe(false);
+    expect(screen.getByRole('status').contains(completed)).toBe(true);
+    expect(screen.getByRole('status').contains(uuid)).toBe(true);
+    expect(screen.queryByLabelText('월드 이름')).toBeNull();
+    expect(state.create).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem(`opensamguk:admin-create:v1:${viewerId}`)).toBeNull();
   });
   it('깨진 보관 정보는 폼과 생성0으로 막는다', async () => {
     sessionStorage.setItem(`opensamguk:admin-create:v1:${viewerId}`, 'broken');
