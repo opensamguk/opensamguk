@@ -13,6 +13,7 @@ export async function listAdminWorlds(ctx: Context) {
             id: true,
             name: true,
             status: true,
+            replayFormat: true,
             scenarioKey: true,
             presetKey: true,
             turnTermMinutes: true,
