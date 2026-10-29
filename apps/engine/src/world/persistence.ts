@@ -24,6 +24,7 @@ import {
   readOperationalMap,
   attachOperationalKinds,
   emptyCampaignState,
+  emptyCityResourcesState,
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { loadCommandState } from '../commandPersistence';
@@ -240,6 +241,9 @@ export async function saveInitialWorld(
                   creationState.scenarioKey,
                 ) as Prisma.InputJsonValue,
               }
+            : {}),
+          ...(features.includes('city-resources-v1')
+            ? { cityResourcesState: emptyCityResourcesState(toWorldState(creationState)) as Prisma.InputJsonValue }
             : {}),
           ...(creationState.operationalMap
             ? { operationalMap: creationState.operationalMap as Prisma.InputJsonValue }

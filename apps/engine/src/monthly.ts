@@ -23,6 +23,7 @@ import { persistYearbookNations } from './nationArchive';
 import { persistExt } from './extState';
 import { persistTreatyClosures } from './treatyState';
 import { persistCampaignState, readCampaignArmyTypes } from './campaignState';
+import { persistCityResourcesState } from './cityResourcesState';
 
 export async function loadReplayState(tx: Prisma.TransactionClient, worldId: string): Promise<ReplayState> {
   const state = await loadWorld(tx, worldId);
@@ -113,6 +114,13 @@ export async function persistMonthly(
   await tx.diplomacy.createMany({ data: next.diplomacies.map((entry) => ({ ...entry, worldId })) });
   await persistExt(tx, worldId, before.ext, next.ext);
   await persistCampaignState(tx, worldId, before, next);
+  await persistCityResourcesState(
+    tx,
+    worldId,
+    before,
+    next,
+    world.ruleFeatures.includes('city-resources-v1') ? readCampaignArmyTypes(world) : [],
+  );
   if (treatyEnabled) await persistTreatyClosures(tx, worldId, before, next, { tick, sequence });
   for (const key of ruleRegistry.monthlyOrder ?? []) {
     const feature = engineFeatures.find((feature) => feature.key === key);
