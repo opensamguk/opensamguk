@@ -32,16 +32,17 @@ const noSecrets = (text: string, privateValues: string[]) =>
   !privateValues.some((value) => text.includes(value)) && !text.includes('127.0.0.1') && !/\b[0-9a-f]{64}\b/.test(text);
 
 async function mutation(page: Page, stack: LegalStack, path: string, data: unknown) {
-  const response = await page.request.post(stack.origin + '/trpc/' + path, {
-    data,
+  const response = await page.request.post(stack.origin + '/trpc/' + path + '?batch=1', {
+    data: data === undefined ? {} : { 0: data },
     headers: { origin: stack.origin },
     timeout: 15_000,
   });
-  const body = (await response.json()) as {
+  const [body] = (await response.json()) as Array<{
     result?: { data: { user?: { id: string; email: string } } };
     error?: { data?: { code?: string } };
-  };
+  }>;
   expect(response.status()).toBe(200);
+  if (!body) throw new Error('실제 변경 요청 응답이 필요합니다.');
   return body.result?.data;
 }
 async function me(page: Page, stack: LegalStack) {
