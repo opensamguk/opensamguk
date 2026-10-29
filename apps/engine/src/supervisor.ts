@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { PrismaClient } from '@opensamguk/db';
 import { ADMIN_CLOCK_KINDS } from '@opensamguk/rules';
 import { stopOwnedChild } from './process-lifecycle';
+import { processWorldCreateRequest } from './admin/createRequests';
 
 export const DISCOVERY_MS = 10_000;
 export const CRASH_WINDOW_MS = 5 * 60_000;
@@ -12,7 +13,7 @@ export const CRASH_MESSAGE =
   '엔진이 5분 안에 5회 종료되어 자동 재시작을 멈췄습니다. 원인을 확인한 뒤 감독을 다시 시작하세요.';
 export type SupervisorEvent = {
   worldId?: string;
-  kind: 'started' | 'retry' | 'halted' | 'removed' | 'discovery-error' | 'record-error';
+  kind: 'started' | 'retry' | 'halted' | 'removed' | 'discovery-error' | 'record-error' | 'creation-error';
   pid?: number;
   delayMs?: number;
 };
@@ -60,6 +61,24 @@ export async function runSupervisor(
   const emit = (event: SupervisorEvent) => options.onEvent?.(event);
   const spawnChild = options.spawnChild ?? spawnEngine;
   const now = () => performance.now();
+  let creationWork: Promise<void> | undefined;
+  function discoverCreation() {
+    if (creationWork || options.signal.aborted) return;
+    const work = processWorldCreateRequest(db, options.signal).then(
+      () => undefined,
+      () => {
+        if (!options.signal.aborted) emit({ kind: 'creation-error' });
+      },
+    );
+    creationWork = work;
+    pending.add(work);
+    const finished = () => {
+      pending.delete(work);
+      if (creationWork === work) creationWork = undefined;
+    };
+    // finally가 만든 미관찰 reject를 남기지 않고 양쪽 정착을 관찰한다.
+    void work.then(finished, finished);
+  }
 
   function recordFailure(worldId: string, halted: boolean) {
     // 한 월드의 쓰기 실패를 다른 월드의 발견·재시작 경로에서 기다리지 않는다.
@@ -188,6 +207,7 @@ export async function runSupervisor(
               worlds.set(worldId, { stopping: false, crashes: [], consecutive: 0, restartAt: 0, halted: false });
             }
           }
+          discoverCreation();
         } catch {
           emit({ kind: 'discovery-error' });
         }

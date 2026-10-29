@@ -6,6 +6,9 @@ import { createAdminSanction, createSanctionInput, liftAdminSanction, liftSancti
 import { auditListInput, getUser, getUserInput, listAudit, searchUsers, searchUsersInput } from '../admin/read';
 import { listAdminWorlds } from '../admin/worlds';
 import { investigateShared, investigateSharedInput } from '../admin/investigation';
+import { requestWorldCreateInput, worldCreateStatusInput } from '@opensamguk/rules';
+import { requestWorldCreate, getWorldCreateRequest } from '../admin/worldCreate';
+
 import { requestWorldEnd, requestWorldEndInput, getWorldEndRequest, worldEndRequestInput } from '../admin/worldEnd';
 import {
   requestWorldClock,
@@ -28,6 +31,10 @@ export const adminRouter = router({
     shared: adminProcedure.input(investigateSharedInput).query(({ ctx, input }) => investigateShared(ctx, input)),
   }),
   world: router({
+    create: adminProcedure.input(requestWorldCreateInput).mutation(({ ctx, input }) => requestWorldCreate(ctx, input)),
+    createStatus: adminProcedure
+      .input(worldCreateStatusInput)
+      .query(({ ctx, input }) => getWorldCreateRequest(ctx, input)),
     list: adminProcedure.input(z.void()).query(({ ctx }) => listAdminWorlds(ctx)),
     requestEnd: adminProcedure.input(requestWorldEndInput).mutation(({ ctx, input }) => requestWorldEnd(ctx, input)),
     endRequest: adminProcedure.input(worldEndRequestInput).query(({ ctx, input }) => getWorldEndRequest(ctx, input)),

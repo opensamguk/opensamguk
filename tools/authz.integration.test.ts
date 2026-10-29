@@ -108,6 +108,7 @@ async function snapshot() {
     db.general.findMany({ orderBy: [{ worldId: 'asc' }, { id: 'asc' }] }),
     db.generalTurn.findMany({ orderBy: [{ worldId: 'asc' }, { generalId: 'asc' }, { slot: 'asc' }] }),
     db.inputEvent.findMany({ orderBy: { id: 'asc' } }),
+    db.worldCreateRequest.findMany({ orderBy: { id: 'asc' } }),
     db.auditLog.findMany({ orderBy: { id: 'asc' } }),
     db.notice.findMany({ orderBy: { id: 'asc' } }),
     db.adminNoticeRequest.findMany({ orderBy: [{ actorUserId: 'asc' }, { idempotencyKey: 'asc' }] }),
