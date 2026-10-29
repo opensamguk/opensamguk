@@ -126,6 +126,7 @@ async function previous(client: PgClient) {
     '20261103000000_admin_role_audit',
     '20261104000000_account_world_sanctions',
     '20261105000000_admin_notices',
+    '20261106000000_legal_document_versions',
   ]);
   for (const name of previous23)
     await client.query(await readFile(new URL(`${name}/migration.sql`, directory), 'utf8'));
