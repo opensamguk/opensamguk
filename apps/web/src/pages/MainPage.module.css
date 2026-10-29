@@ -1,5 +1,5 @@
 /* 원작 core2026 MainView(R1) 데스크톱 배치: 10열 격자. 지도 1~7열, 명령 목록 8~10열(두 행), 지도 아래 도시,
-   그 아래 국가(1~5열)·장수(6~10열), 맨 아래 기록. 좁은 화면 접기 순서는 M3(T3-10)에서 다듬는다. */
+   그 아래 국가(1~5열)·장수(6~10열), 맨 아래 기록. 좁은 화면에서는 지도 다음에 선택한 도시를 둔다. */
 .page {
   display: grid;
   gap: var(--space-3);
@@ -21,6 +21,33 @@
   font-size: var(--text-sm);
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
+}
+.sections {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(44px, 1fr));
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+.sectionLink {
+  min-width: 44px;
+  min-height: 44px;
+  padding: var(--space-1);
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.sectionLink:hover {
+  background: var(--color-surface-muted);
 }
 .layout {
   display: grid;
@@ -80,7 +107,7 @@
 @media (max-width: 1100px) {
   .layout {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: 'map' 'commands' 'city' 'nation' 'general' 'records';
+    grid-template-areas: 'map' 'city' 'commands' 'nation' 'general' 'records';
   }
   .records {
     grid-template-columns: minmax(0, 1fr);

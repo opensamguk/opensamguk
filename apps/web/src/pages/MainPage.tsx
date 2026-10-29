@@ -1,6 +1,6 @@
-import { useNavigate, useSearch } from '@tanstack/react-router';
+import { useLocation, useNavigate, useSearch } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { useCallback, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { errorCode } from '../game/errors';
 import { NoGeneral, QueryError } from '../game/QueryState';
 import { useHome, useWorldId, useWorldMap, useWorldSummary } from '../game/queries';
@@ -19,11 +19,30 @@ import { EmptyState, LoadingState } from '../ui/States';
 import { useTRPC } from '../trpc';
 import styles from './MainPage.module.css';
 
+const SECTIONS = [
+  { area: 'map', label: '지도', name: '지도로 이동' },
+  { area: 'city', label: '도시', name: '도시로 이동' },
+  { area: 'commands', label: '예턴', name: '예턴으로 이동' },
+  { area: 'nation', label: '국가', name: '국가로 이동' },
+  { area: 'general', label: '장수', name: '장수로 이동' },
+  { area: 'general-records', label: '기록', name: '기록으로 이동' },
+] as const;
+
 // 메인 작업 화면이다. 원작 core2026 MainView(R1, df6c926)의 데스크톱 배치를 따른다.
 // 지도(왼쪽)와 명령 목록(오른쪽)을 한 화면에 두고, 지도 아래 도시 정보, 그 아래 국가·장수 정보, 맨 아래 기록을 둔다.
 // 지도에서 도시를 고르면 주소의 ?city만 바꾼다. 같은 화면이 유지되므로 다른 칸의 상태(예턴 편집 초안 등)는 그대로다.
 export function MainPage() {
+  const page = useRef<HTMLElement>(null);
+  const focusSection = useCallback((area: string) => {
+    const heading = page.current?.querySelector<HTMLElement>(`[data-main-area="${area}"] h2`);
+    heading?.focus({ preventScroll: true });
+    heading?.scrollIntoView({ block: 'start', behavior: 'instant' });
+  }, []);
   const worldId = useWorldId();
+  const hash = useLocation({ select: (location) => location.hash });
+  useEffect(() => {
+    if (hash === 'main-commands') focusSection('commands');
+  }, [hash, worldId, focusSection]);
   const { city: selected } = useSearch({ from: '/w/$worldId/' });
   const navigate = useNavigate({ from: '/w/$worldId/' });
   const summary = useWorldSummary(worldId);
@@ -55,7 +74,7 @@ export function MainPage() {
   };
 
   return (
-    <section className={styles.page}>
+    <section className={styles.page} ref={page}>
       <header className={styles.header}>
         <h1 className={styles.h1}>메인</h1>
         {summary.data ? (
@@ -72,6 +91,21 @@ export function MainPage() {
         ) : null}
       </header>
 
+      <nav className={styles.sections} aria-label="메인 영역 바로가기">
+        {SECTIONS.map(({ area, label, name }) => (
+          <button
+            key={area}
+            type="button"
+            className={styles.sectionLink}
+            aria-label={name}
+            aria-controls={`main-${area}`}
+            onClick={() => focusSection(area)}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+
       {/* 끝난 판이면 결과를 맨 위에 둔다. 나머지 칸은 그대로 읽는다 (T1-27). */}
       {summary.data?.status === 'ENDED' ? <SeasonResult result={summary.data.result} /> : null}
       {/* 발령 제안(T2-06, D11). 편집기와 형제라 응답 결과가 와도 예턴 초안과 지도 선택은 그대로다. */}
@@ -81,13 +115,21 @@ export function MainPage() {
         <Panel
           title="지도"
           area="map"
+          headingId="main-map"
           flush
           actions={
-            myCityKey !== null && cityKey !== myCityKey ? (
-              <button type="button" className={styles.action} onClick={() => selectCity(myCityKey)}>
-                내 도시로
-              </button>
-            ) : null
+            <>
+              {cityKey !== null ? (
+                <button type="button" className={styles.action} onClick={() => focusSection('city')}>
+                  도시 정보 보기
+                </button>
+              ) : null}
+              {myCityKey !== null && cityKey !== myCityKey ? (
+                <button type="button" className={styles.action} onClick={() => selectCity(myCityKey)}>
+                  내 도시로
+                </button>
+              ) : null}
+            </>
           }
         >
           {map.data ? (
@@ -109,14 +151,7 @@ export function MainPage() {
           )}
         </Panel>
 
-        {/* 30칸 예턴 편집기(T1-15). 지도 선택은 대상 도시 기본값으로만 넘긴다. 조회 상태와 무관하게 늘 같은 자리에 두어
-            도시 선택·재조회 때 다시 만들지 않는다. 그래서 저장하지 않은 편집과 고른 칸이 유지된다. */}
-        <Panel title="명령 목록" area="commands">
-          <PolicyBar worldId={worldId} />
-          <TurnEditor worldId={worldId} selectedCityKey={cityKey} />
-        </Panel>
-
-        <Panel title="도시 정보" area="city">
+        <Panel title="도시 정보" area="city" headingId="main-city">
           {cityKey !== null ? (
             <CityInfo worldId={worldId} cityKey={cityKey} nations={nations} onSelectCity={selectCity} />
           ) : home.isPending ? (
@@ -126,13 +161,20 @@ export function MainPage() {
           )}
         </Panel>
 
-        <Panel title="국가 정보" area="nation">
+        {/* 30칸 예턴 편집기(T1-15). 지도 선택은 대상 도시 기본값으로만 넘긴다. 조회 상태와 무관하게 늘 같은 자리에 두어
+            도시 선택·재조회 때 다시 만들지 않는다. 그래서 저장하지 않은 편집과 고른 칸이 유지된다. */}
+        <Panel title="명령 목록" area="commands" headingId="main-commands">
+          <PolicyBar worldId={worldId} />
+          <TurnEditor worldId={worldId} selectedCityKey={cityKey} />
+        </Panel>
+
+        <Panel title="국가 정보" area="nation" headingId="main-nation">
           {withHome((data) => (
             <NationInfo worldId={worldId} nation={data.nation} cities={cities} onSelectCity={selectCity} />
           ))}
         </Panel>
 
-        <Panel title="장수 정보" area="general">
+        <Panel title="장수 정보" area="general" headingId="main-general">
           {withHome((data) => (
             <GeneralInfo
               worldId={worldId}
@@ -146,7 +188,7 @@ export function MainPage() {
         </Panel>
 
         <div className={styles.records}>
-          <Panel title={RECORD_LABELS.general} area="general-records">
+          <Panel title={RECORD_LABELS.general} area="general-records" headingId="main-general-records">
             <RecordList kind="general" worldId={worldId} clock={summary.data} nations={nations} compact />
           </Panel>
           <Panel title={RECORD_LABELS.nation} area="nation-records">
