@@ -11,6 +11,7 @@ export default defineConfig({
     '**/account-access.spec.ts',
     '**/legal-consent.spec.ts',
     '**/admin-sanction.spec.ts',
+    '**/admin-clock.spec.ts',
   ],
   forbidOnly: isCI,
   use: { baseURL: 'http://127.0.0.1:5173' },

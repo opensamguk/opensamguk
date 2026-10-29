@@ -4,12 +4,23 @@ on:
   schedule:
     - cron: '7,17,27,37,47,57 * * * *'
   workflow_dispatch:
+    inputs:
+      drill_key:
+        description: '연습 키 (ASCII 영숫자·_·- 1~64자, 비우면 운영 확인)'
+        required: false
+        type: string
+        default: ''
+      drill_status:
+        description: '자기 HTTP 연습 상태 (200 또는 500, drill_key와 함께 입력)'
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
 
 concurrency:
-  group: uptime-prod
+  group: ${{ (inputs.drill_key != '' || inputs.drill_status != '') && 'uptime-drill' || 'uptime-prod' }}
   cancel-in-progress: false
 
 jobs:
@@ -37,6 +48,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Check public health and persist decisions
+        if: inputs.drill_key == '' && inputs.drill_status == ''
         env:
           PUBLIC_URL: ${{ vars.PUBLIC_URL }}
           UPTIME_STATE_REF: refs/heads/ops/uptime-state
@@ -45,3 +57,12 @@ jobs:
           UPTIME_GIT_TOKEN: ${{ github.token }}
           OPS_DISCORD_WEBHOOK: ${{ secrets.OPS_DISCORD_WEBHOOK }}
         run: node --import tsx tools/monitor/uptime.ts
+      - name: Exercise owned HTTP and persist drill decisions
+        if: inputs.drill_key != '' || inputs.drill_status != ''
+        env:
+          UPTIME_STATE_REF: refs/heads/ops/uptime-state
+          UPTIME_GIT_REMOTE: https://github.com/${{ github.repository }}.git
+          UPTIME_GIT_TOKEN: ${{ github.token }}
+          DRILL_KEY: ${{ inputs.drill_key }}
+          DRILL_STATUS: ${{ inputs.drill_status }}
+        run: node --import tsx tools/monitor/uptimeDrill.ts

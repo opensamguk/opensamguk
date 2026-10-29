@@ -1,9 +1,11 @@
 import type { inferRouterOutputs } from '@trpc/server';
 import type { AppRouter } from '@opensamguk/server/router';
 import { useRouteContext } from '@tanstack/react-router';
+import { useState } from 'react';
 import { useTRPCClient } from '../trpc';
 import { ErrorState, LoadingState } from '../ui/States';
 import { usePrivateRead } from './usePrivateRead';
+import { AdminClockActions } from './AdminClockActions';
 import styles from './AdminPages.module.css';
 
 type Worlds = inferRouterOutputs<AppRouter>['admin']['world']['list'];
@@ -18,18 +20,26 @@ export function AdminWorlds() {
   const viewerId = useRouteContext({ from: '/admin' }).adminViewerId,
     client = useTRPCClient(),
     query = usePrivateRead<Worlds>(viewerId);
+  const [locked, setLocked] = useState(false);
   return (
     <section>
       <h2>월드 목록</h2>
       <p>조회 버튼을 누르면 현재 월드와 엔진 기록을 확인합니다. 자동으로 갱신하지 않습니다.</p>
       <button
         type="button"
-        disabled={query.pending}
+        disabled={query.pending || locked}
         onClick={() => void query.read((signal) => client.admin.world.list.query(undefined, { signal }))}
       >
         월드 조회
       </button>
-      <p>월드 생성·일시정지·재개·종료·초기화 화면은 준비 중입니다.</p>
+      <p>월드 생성·종료·초기화 화면은 준비 중입니다.</p>
+      <AdminClockActions
+        key={viewerId}
+        viewerId={viewerId}
+        worlds={query.data}
+        onClear={query.clear}
+        onLockChange={setLocked}
+      />
       {query.pending ? <LoadingState>월드 조회 중</LoadingState> : null}
       {query.error ? <ErrorState title={query.error} /> : null}
       {query.data ? (
