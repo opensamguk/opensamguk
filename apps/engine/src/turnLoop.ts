@@ -30,6 +30,7 @@ import { engineResolver, persistExt, verifyWorldExt } from './extState';
 import { assertWorldCapabilities } from './capsGate';
 import { processAdminClock } from './admin/executor';
 import { observeCommittedStep, type CommitMetricCandidate, type CommitMetricSink } from './metrics';
+import { preparePendingReset, type PendingResetPreparation } from './admin/reset';
 
 export const CLOCK_CHECKPOINT_MS = 5_000;
 export const ENGINE_BATCH_STEPS = 64;
@@ -58,6 +59,15 @@ export interface TurnExecution {
   generalId: number;
   tick: number;
   commandKey: string;
+}
+interface StepResult {
+  status: WorldStatus;
+  tick: number;
+  state: WorldState | null;
+  execution: TurnExecution | null;
+  checkpointed: boolean;
+  progressed: boolean;
+  resetEvent?: Prisma.InputEventGetPayload<Record<string, never>> | undefined;
 }
 
 export class TurnLoop {
@@ -122,6 +132,17 @@ export class TurnLoop {
   }
 
   private async step(target: number | undefined, signal?: AbortSignal) {
+    const first = await this.transactionStep(target, signal);
+    if (!first.resetEvent) return first;
+    const preparation = await preparePendingReset(this.db, this.lease, first.resetEvent, signal);
+    return this.transactionStep(target, signal, preparation);
+  }
+
+  private async transactionStep(
+    target: number | undefined,
+    signal?: AbortSignal,
+    resetPreparation?: PendingResetPreparation,
+  ): Promise<StepResult> {
     const { worldId } = this.lease;
     const signals: RealtimeSignal[] = [];
     let metric: CommitMetricCandidate | undefined;
@@ -134,12 +155,23 @@ export class TurnLoop {
         if (world.replayFormat === 3 && !this.replayChecked) checkWorldReplay(world);
         const capabilities = await assertWorldCapabilities(tx, world);
         if (!this.extVerified) await verifyWorldExt(tx, world);
-        const adminClock = world.replayFormat === 3 ? await processAdminClock(tx, world, this.highWaterTick) : null;
+        const adminClock =
+          world.replayFormat === 3
+            ? await processAdminClock(tx, world, this.highWaterTick, resetPreparation, signal)
+            : null;
         if (adminClock) {
-          await this.hooks.beforeCommit?.(tx);
+          const deferred = adminClock.deferred;
+          if (!deferred) await this.hooks.beforeCommit?.(tx);
           signal?.throwIfAborted();
           await assertLease(tx, this.lease);
-          return { ...adminClock, state: null, execution: null, checkpointed: true, progressed: true };
+          return {
+            ...adminClock,
+            state: null,
+            execution: null,
+            checkpointed: !deferred,
+            progressed: !deferred,
+            resetEvent: adminClock.resetEvent,
+          };
         }
         const baselineActiveTick = await policyBaseline(tx, world);
         if (world.status !== 'RUNNING') {
