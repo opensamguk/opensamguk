@@ -2,7 +2,7 @@ import { parseArgs } from 'node:util';
 import { createDb } from '@opensamguk/db';
 import { checkRuleFeatures } from '@opensamguk/rules';
 import { loadInitialWorld, loadInitialWorldFromDb, loadPreset } from '../world/resources';
-import { saveInitialWorld } from '../world/persistence';
+import { createWorldFromCli } from '../admin/creation';
 
 async function main() {
   const { values } = parseArgs({
@@ -57,7 +57,7 @@ async function main() {
     }
     console.log(
       JSON.stringify(
-        await saveInitialWorld(db, state, {
+        await createWorldFromCli(db, state, {
           ...(ruleFeatures !== undefined ? { ruleFeatures } : {}),
           name,
           turnTermMinutes,
