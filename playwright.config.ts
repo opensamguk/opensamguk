@@ -10,6 +10,7 @@ export default defineConfig({
     '**/public-assets.spec.ts',
     '**/account-access.spec.ts',
     '**/legal-consent.spec.ts',
+    '**/account-withdrawal.spec.ts',
     '**/admin-sanction.spec.ts',
     '**/admin-clock.spec.ts',
     '**/admin-end.spec.ts',
