@@ -1,40 +1,10 @@
 import { once } from 'node:events';
-import { randomInt } from 'node:crypto';
-import { createServer, type RequestListener } from 'node:http';
 import { describe, expect, it } from 'vitest';
+import { withLoopbackHttp as withServer } from '../test-support/loopbackHttp';
 import { probeHealth } from './uptimeProbe';
 
 const PATHS = ['/healthz', '/healthz/engine'] as const;
 const TIMEOUT_MS = 1000;
-
-async function withServer<T>(handler: RequestListener, use: (baseUrl: URL) => Promise<T>): Promise<T> {
-  const server = createServer(handler);
-  // Fetch 금지 포트의 최댓값은10080이다(https://fetch.spec.whatwg.org/#port-blocking).
-  // OS의 자동 포트 범위가 낮아도 실제 HTTP 검사에 금지 포트를 배정하지 않는다.
-  let bound = false;
-  for (let attempt = 0; attempt < 16; attempt++) {
-    try {
-      server.listen(randomInt(10081, 65536), '127.0.0.1');
-      await once(server, 'listening');
-      bound = true;
-      break;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw error;
-    }
-  }
-  if (!bound) throw new Error('loopback HTTP fixture port unavailable after 16 atomic binds');
-  const address = server.address();
-  if (address === null || typeof address === 'string') throw new Error('loopback address missing');
-  try {
-    return await use(new URL(`http://127.0.0.1:${address.port}`));
-  } finally {
-    const closed = new Promise<void>((resolve, reject) => {
-      server.close((error) => (error ? reject(error) : resolve()));
-    });
-    server.closeAllConnections();
-    await closed;
-  }
-}
 
 describe('T3-11 uptime HTTP adapter, not operational acceptance', () => {
   it('uses only the origin and requests both fixed paths without credentials or ambient headers', async () => {
