@@ -251,7 +251,6 @@ jobs:
           key: ${{ steps.playwright.outputs.key }}
       - run: pnpm e2e --shard=${{ matrix.shard }}/4 --workers=1 --reporter=line
       - name: Build public assets
-        if: matrix.shard == 1
         run: pnpm build:public
       - name: Check public assets in Chromium
         if: matrix.shard == 1
@@ -269,13 +268,13 @@ jobs:
         if: matrix.shard == 1
         run: pnpm e2e:sanction --reporter=line
       - name: Check city resources in public Chromium
-        if: matrix.shard == 1
+        if: matrix.shard == 2
         run: pnpm e2e:city-resources --reporter=line
       - name: Check admin world clock actions in Chromium
-        if: matrix.shard == 1
+        if: matrix.shard == 3
         run: pnpm e2e:admin-clock --reporter=line
       - name: Check admin world end actions in Chromium
-        if: matrix.shard == 1
+        if: matrix.shard == 4
         run: pnpm e2e:admin-end --reporter=line
       - name: Check admin world creation actions in Chromium
         if: matrix.shard == 1
