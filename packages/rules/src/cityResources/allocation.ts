@@ -11,11 +11,16 @@ const id = z.number().int().min(1).max(2_147_483_647);
 export const cityAllocationArgs = z.strictObject({ cityKey: id, unitId: id, crewType: id, amount: id });
 
 // 사람 입력과 국가 예약 명령이 같은 소속·직책·집결·수량 검사를 사용한다.
-export function applyCityAllocation(view: WorldView, actor: Actor, value: unknown) {
+export function applyCityAllocation(
+  view: WorldView,
+  actor: Actor,
+  value: unknown,
+  armyTypesOverride?: readonly number[],
+) {
   const fail = (code: Failure['code'], message: string) => ({ ok: false as const, code, message });
   if (!view.ruleFeatures?.includes('city-resources-v1'))
     return fail('COMMAND_DISABLED', '도시 자원을 사용하는 판이 아닙니다.');
-  const armyTypes = actor.unitSet?.crewTypes.filter((row) => row.armType > 0).map((row) => row.id);
+  const armyTypes = armyTypesOverride ?? actor.unitSet?.crewTypes.filter((row) => row.armType > 0).map((row) => row.id);
   const ledger = readCityResourcesState(view.cityResources, view, armyTypes);
   const campaign = readCampaignState(view.campaign, view);
   if (Object.values(view.generals).some((general) => general.crew !== 0))

@@ -187,3 +187,4 @@ export * from './campaign/unitInputs';
 export { campaignArmyTypes, validateCampaignRecord } from './campaign/feature';
 export { commandStatPreview, type CommandStatPreview } from './commands/statPreview';
 export * from './cityResources/state';
+export * from './cityResources/input';
