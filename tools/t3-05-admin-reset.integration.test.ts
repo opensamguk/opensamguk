@@ -432,7 +432,7 @@ async function actor(role: 'ADMIN' | 'USER' = 'ADMIN', verified = true, consent 
   return { id: user.id, cookie: 'sid=' + session.token, sessionId: session.id };
 }
 // 기존 공장으로 만든 전제 조건이다. CLI나 초기화 소비자 실행 근거로 세지 않는다.
-async function world() {
+async function world(options: { ruleFeatures?: ['policy'] } = {}) {
   const state = await checked(() =>
     loadInitialWorldFromDb(db, {
       scenario: 'integration191',
@@ -445,7 +445,7 @@ async function world() {
   expect(state.nations).toHaveLength(21);
   expect(state.generals).toHaveLength(491);
   const saved = await checked(() =>
-    saveInitialWorld(db, state, { name: '초기화 접수 보존', turnTermMinutes: 30, endYear: 200 }),
+    saveInitialWorld(db, state, { name: '초기화 접수 보존', turnTermMinutes: 30, endYear: 200, ...options }),
   );
   await checked(() => controlClock(db, saved.worldId, 'start'));
   await checked(() => controlClock(db, saved.worldId, 'pause'));
@@ -654,7 +654,7 @@ it('AC-M3-04 요청 감사 INSERT 거부는 실제 접수 전체를 롤백하고
     const before = await fullFootprint(),
       result = await request(owner, payload, signal);
     expect(result.status).toBe(500);
-    expect(result.message).toBe('월드 초기화 요청을 처리하지 못했습니다.');
+    expect(result.message).toBe('요청을 처리하지 못했습니다.');
     expect(await fullFootprint()).toBe(before);
     expect(await checked(() => db.inputEvent.count({ where: { worldId: source.id } }))).toBe(0);
   } catch (error) {
@@ -928,7 +928,7 @@ let resetOwner: Actor | undefined,
 it('AC-M3-04 D2 정식21국491명 두 월드에 실제 사람·30예약·기록을 준비한다', async (signal) => {
   resetOwner = await actor();
   for (const index of [0, 1]) {
-    const source = await world();
+    const source = await world({ ruleFeatures: ['policy'] });
     preservedWorlds.push(source.id);
     await human(source.id, resetOwner, signal, index);
     expect(await checked(() => db.nation.count({ where: { worldId: source.id } }))).toBe(21);
@@ -1035,8 +1035,9 @@ for (const mode of ['role', 'status', 'sanction', 'logout', 'revision', 'name', 
   });
 for (const table of ['World', 'Nation', 'General', 'GeneralTurn', 'AuditLog'] as const)
   it('AC-M3-04 D2 ' + table + ' 실제 INSERT 거부는 원본·mapping·새 월드 전체를 롤백한다', async (signal) => {
+    // 초기 GeneralTurn 쓰기는 정책 기능을 고른 월드에서만 발생한다.
     const owner = await actor(),
-      source = await world(),
+      source = await world(table === 'GeneralTurn' ? { ruleFeatures: ['policy'] } : {}),
       payload = input(owner, source);
     await accepted(owner, payload, signal);
     const event = await eventFor(payload),
@@ -1224,14 +1225,16 @@ it('AC-M3-04 D2 현재 User 잠금 대기 뒤 권한 회수는 실제 source·ta
       expect
         .poll(
           async () => {
-            const rows = (
-              await checked(() =>
-                gate.query(
-                  'SELECT pid FROM pg_stat_activity WHERE datname=$1 AND pid<>$2 AND $2=ANY(pg_blocking_pids(pid)) AND query LIKE \'%"User"%FOR SHARE%\'',
-                  [name, blocker],
-                ),
-              )
-            ).rows;
+            // gate 트랜잭션의 통계 snapshot을 재사용하지 않는 독립 조회다.
+            const rows = await checked(
+              () =>
+                db.$queryRaw<Array<{ pid: number }>>`
+                SELECT pid FROM pg_stat_activity
+                WHERE datname=${name} AND pid<>${blocker}
+                  AND ${blocker}=ANY(pg_blocking_pids(pid))
+                  AND query LIKE '%"User"%FOR SHARE%'
+              `,
+            );
             return rows.length;
           },
           { timeout: 5000 },
