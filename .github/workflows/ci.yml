@@ -268,3 +268,6 @@ jobs:
       - name: Check city resources in public Chromium
         if: matrix.shard == 1
         run: pnpm e2e:city-resources --reporter=line
+      - name: Check admin world clock actions in Chromium
+        if: matrix.shard == 1
+        run: pnpm e2e:admin-clock --reporter=line
