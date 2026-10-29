@@ -90,7 +90,12 @@ function it(title: string, work: () => Promise<void>) {
   });
 }
 beforeEach(settle);
-async function start(withdrawal: boolean, production = false, privacyVersion = policy.privacy.version) {
+async function start(
+  withdrawal: boolean,
+  production = false,
+  privacyVersion = policy.privacy.version,
+  now?: () => number,
+) {
   const publicOrigin = production ? 'https://withdrawal.example.test' : origin;
   const app = await buildServer({
     db,
@@ -100,6 +105,7 @@ async function start(withdrawal: boolean, production = false, privacyVersion = p
     emailVerificationRequired: true,
     legalPolicy: policy,
     trustProxy: true,
+    ...(now ? { now } : {}),
     realtime: { connectionString: target.href, heartbeatMs: 60_000 },
     ...(withdrawal ? { withdrawalPolicy: { scheme: 'tombstone-v1' as const, privacyVersion } } : {}),
     logStream: {
@@ -831,10 +837,13 @@ it('실제 동시 로그인은 탈퇴 전에만 확정할 수 있고 탈퇴 뒤 
   }
 });
 it('실제 사용자5회·IP15회 한도를 유지하고 다음 잘못된 암호 시도는429다', async () => {
+  // DB 무변경 검사가 15분 고정 창 경계를 지나도 이 요청열은 같은 창에 속한다.
+  const fixedNow = Date.now();
+  const selected = await start(true, false, policy.privacy.version, () => fixedNow);
   const actor = await user(),
     sid = await session(actor.id);
   for (let index = 0; index < 6; index++) {
-    const result = await withdraw(actor.id, sid.cookie, api, 'x');
+    const result = await withdraw(actor.id, sid.cookie, selected, 'x');
     expect(result.status).toBe(index < 5 ? 401 : 429);
     if (index === 5) expect(Number(result.retryAfter)).toBeGreaterThan(0);
   }
@@ -846,7 +855,7 @@ it('실제 사용자5회·IP15회 한도를 유지하고 다음 잘못된 암호
       'account.withdraw',
       { expectedUserId: other.id, password: 'x' },
       otherSession.cookie,
-      api,
+      selected,
       true,
       '192.0.2.253',
     );
