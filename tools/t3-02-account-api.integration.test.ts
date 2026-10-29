@@ -172,9 +172,16 @@ for (const path of paths)
           expect(await snapshot()).toBe(before);
           expect(await mailbox()).toHaveLength(0);
         } else if (path === 'account.get') {
-          expect(response.body.result?.data.email === actor.email).toBe(true);
-          expect(response.body.result?.data.emailVerified).toBe(false);
-          expect(response.body.result?.data.consents).toEqual([]);
+          expect(response.body.result?.data).toEqual({
+            userId: actor.id,
+            email: actor.email,
+            emailVerified: false,
+            emailVerificationRequired: false,
+            legalPolicyApproved: false,
+            withdrawalAvailable: false,
+            consentRequired: [],
+            consents: [],
+          });
         } else if (path === 'account.resendVerification' || path === 'account.requestPasswordReset') {
           expect(await mailbox()).toHaveLength(category === 'sanctioned' ? 0 : 1);
         } else if (path === 'account.verifyEmail') {
