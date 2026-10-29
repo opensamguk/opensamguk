@@ -314,7 +314,7 @@ export function AdminUsers() {
         onLockChange={setActionLocked}
       />
       <AdminInvestigation
-        key={viewerId}
+        key={`investigation:${viewerId}`}
         viewerId={viewerId}
         disabled={actionLocked}
         source={{
