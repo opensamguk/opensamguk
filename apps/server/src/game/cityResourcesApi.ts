@@ -74,7 +74,7 @@ export async function readCityResourceRequest(ctx: ActorContext, worldId: string
       });
       if (!event || event.kind !== 'city.resources')
         throw new TRPCError({ code: 'NOT_FOUND', message: '도시 자원 요청이 없습니다.' });
-      return requestDto(event);
+      return { userId: ctx.user.id, ...requestDto(event) };
     },
     { isolationLevel: 'RepeatableRead' },
   );
@@ -161,7 +161,7 @@ export async function readCityResourceBoard(ctx: ActorContext, worldId: string, 
         view = await readView(tx, worldId);
       const city = view.cities[cityKey];
       if (!city) throw new TRPCError({ code: 'NOT_FOUND', message: '도시를 찾을 수 없습니다.' });
-      if (!visibility(actor).city(city)) return { cityKey, visible: false as const };
+      if (!visibility(actor).city(city)) return { userId: ctx.user.id, cityKey, visible: false as const };
       const own = actor.nationId !== null && actor.nationId === city.nationId;
       const year = world.startYear + Math.floor(world.clockTick / (12 * TICKS_PER_MONTH));
       const canAllocate =
@@ -191,6 +191,7 @@ export async function readCityResourceBoard(ctx: ActorContext, worldId: string, 
             }))
         : [];
       return {
+        userId: ctx.user.id,
         cityKey,
         visible: true as const,
         status: world.status,

@@ -101,7 +101,7 @@ describe('AC-INT-18B 도시 자원 API 접수', () => {
   it('세션 행위자를 검증하고 InputEvent·활동만 한 번 접수한다', async () => {
     const f = fixture(),
       before = structuredClone(f.view);
-    expect(await f.run()).toEqual({ requestId, status: 'pending' });
+    expect(await f.run()).toEqual({ userId, requestId, status: 'pending' });
     expect(requireGeneral).toHaveBeenCalledWith(expect.anything(), 'own-world', userId, true);
     expect(requireWorld).toHaveBeenCalledWith(expect.anything(), 'own-world', true);
     expect(applyCityResourceInput).toHaveBeenCalledWith(
@@ -232,6 +232,42 @@ describe('AC-INT-18B 도시 자원 API 접수', () => {
       },
     });
   });
+  it.each(['PENDING', 'APPLIED', 'REJECTED'])(
+    '같은 UUID의 다른 계정 %s 응답은 처리한 계정 신원을 남긴다',
+    async (status) => {
+      const f = fixture();
+      f.ctx.user.id = otherUserId;
+      f.setSaved({
+        idempotencyKey: `city.resources:${requestId}`,
+        kind: 'city.resources',
+        generalId: 3,
+        sequence: status === 'PENDING' ? null : 10,
+        tick: status === 'PENDING' ? null : 200,
+        payload: f.payload,
+        status,
+        result:
+          status === 'PENDING'
+            ? null
+            : status === 'APPLIED'
+              ? { ...f.payload, revision: 2, tick: 200 }
+              : { code: 'NO_CREW', message: '병력 부족' },
+      });
+      expect(await readCityResourceRequest(f.ctx, 'own-world', requestId)).toMatchObject({
+        userId: otherUserId,
+        requestId,
+        status: status === 'PENDING' ? 'pending' : status === 'APPLIED' ? 'applied' : 'rejected',
+      });
+      expect(f.tx.inputEvent.findUnique).toHaveBeenCalledWith({
+        where: {
+          worldId_userId_idempotencyKey: {
+            worldId: 'own-world',
+            userId: otherUserId,
+            idempotencyKey: `city.resources:${requestId}`,
+          },
+        },
+      });
+    },
+  );
   it('확정 결과만 엄격하게 읽고 처리 tick이 다른 기록은 실패한다', async () => {
     const f = fixture();
     const event = {
@@ -246,6 +282,7 @@ describe('AC-INT-18B 도시 자원 API 접수', () => {
     };
     f.setSaved(event);
     expect(await readCityResourceRequest(f.ctx, 'own-world', requestId)).toEqual({
+      userId,
       requestId,
       status: 'applied',
       result: event.result,
@@ -254,6 +291,7 @@ describe('AC-INT-18B 도시 자원 API 접수', () => {
     await expect(readCityResourceRequest(f.ctx, 'own-world', requestId)).rejects.toThrow('tick');
     f.setSaved({ ...event, status: 'REJECTED', result: { code: 'NO_CREW', message: '병력 부족' } });
     expect(await readCityResourceRequest(f.ctx, 'own-world', requestId)).toEqual({
+      userId,
       requestId,
       status: 'rejected',
       result: { code: 'NO_CREW', message: '병력 부족' },
@@ -267,14 +305,25 @@ describe('AC-INT-18B 도시 자원 API 접수', () => {
   });
 });
 describe('AC-INT-18B 도시 원장 가시성과 배속 대상', () => {
+  it('응답 신원은 조회를 처리한 세션 계정이며 앞 화면의 계정으로 대체하지 않는다', async () => {
+    const f = fixture();
+    f.ctx.user.id = otherUserId;
+    expect(await readCityResourceBoard(f.ctx, 'own-world', 1)).toMatchObject({ userId: otherUserId, visible: true });
+    expect(await readCityResourceBoard(f.ctx, 'own-world', 2)).toEqual({
+      userId: otherUserId,
+      cityKey: 2,
+      visible: false,
+    });
+  });
   it('다른 국가의 먼 도시 금·쌀·병력을 반환하지 않는다', async () => {
     const f = fixture();
-    expect(await readCityResourceBoard(f.ctx, 'own-world', 2)).toEqual({ cityKey: 2, visible: false });
+    expect(await readCityResourceBoard(f.ctx, 'own-world', 2)).toEqual({ userId, cityKey: 2, visible: false });
   });
   it('자국 도시는 원장을 읽고 권한자는 같은 도시에 집결한 자국 부곡만 본다', async () => {
     const f = fixture();
     const board = await readCityResourceBoard(f.ctx, 'own-world', 1);
     expect(board).toMatchObject({
+      userId,
       visible: true,
       canAllocate: true,
       resources: f.view.cityResources.cities['1'],
