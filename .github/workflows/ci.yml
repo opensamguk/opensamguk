@@ -31,6 +31,7 @@ jobs:
   # Update only after opposite-side review and exact-head CI; keep both Node patches identical.
   checks:
     name: opensamguk-check
+    if: github.event_name != 'workflow_dispatch' || inputs.load_expected_sha == ''
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -57,7 +58,7 @@ jobs:
   # Required check name. Every PG group and E2E shard must pass (cancelled or skipped fails).
   database-browser:
     name: opensamguk-database-browser
-    if: always()
+    if: always() && (github.event_name != 'workflow_dispatch' || inputs.load_expected_sha == '')
     needs: [database-authz, database-engine, database-e2e]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -75,6 +76,7 @@ jobs:
 
   database-authz:
     name: opensamguk-database-authz
+    if: github.event_name != 'workflow_dispatch' || inputs.load_expected_sha == ''
     runs-on: ubuntu-24.04
     # PR #314의 30분 작업 취소를 반영한다. 개별 시험의 제한·worker·검사 항목은 유지한다.
     timeout-minutes: 45
@@ -129,6 +131,7 @@ jobs:
   # Slow engine scenarios use a separate PostgreSQL service. No tests or limits are removed.
   database-engine:
     name: opensamguk-database-engine
+    if: github.event_name != 'workflow_dispatch' || inputs.load_expected_sha == ''
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
@@ -173,6 +176,7 @@ jobs:
   # Every spec creates its own world and accounts when missing (e2e/game.ts e2eWorld), so file order across shards does not matter.
   database-e2e:
     name: opensamguk-database-e2e (${{ matrix.shard }}/4)
+    if: github.event_name != 'workflow_dispatch' || inputs.load_expected_sha == ''
     runs-on: ubuntu-24.04
     # Worst cold case seen in PR #219: apt download 13m28s + shard 1/4 E2E about 12 min (three 180 s test timeouts) + setup 1.5 min.
     timeout-minutes: 30
