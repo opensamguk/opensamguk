@@ -1373,6 +1373,7 @@ it('AC-M3-04 D2 crash 뒤 실제 새 --world 엔진은 같은 UUID·시드를 �
     await checked(() => expect.poll(async () => (await eventFor(payload)).status, { timeout: 23000 }).toBe('APPLIED'));
     await checked(child.stop);
     expect(child.code).toBe(0);
+    expect(child.signal).toBeNull();
     const event = await eventFor(payload),
       source = await checked(() => db.world.findUniqueOrThrow({ where: { id: payload.worldId } })),
       targetWorld = await checked(() => db.world.findUniqueOrThrow({ where: { id: crashPlanned } }));
@@ -1877,7 +1878,13 @@ afterAll(async () => {
       ownership,
       databaseAudit,
       childScopeState: childScope.snapshot().state,
-      children: children.map(({ closed, stdoutEnded, stderrEnded }) => ({ closed, stdoutEnded, stderrEnded })),
+      children: children.map(({ closed, code, signal, stdoutEnded, stderrEnded }) => ({
+        closed,
+        code,
+        signal,
+        stdoutEnded,
+        stderrEnded,
+      })),
       suiteFailed: failed,
       pendingOperations: pending.size,
       errors: errors.length,
