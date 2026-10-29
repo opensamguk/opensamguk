@@ -220,7 +220,7 @@ describe('AC-M1-03 실제 DB 월드 생성', () => {
     expect(await db.world.findUnique({ where: { id: rolledBackId } })).toBeNull();
     for (const table of ['Nation', 'City', 'General', 'GeneralTurn', 'Diplomacy', 'NationTurn']) {
       const rows = await db.$queryRawUnsafe<{ count: number }[]>(
-        `SELECT count(*)::int AS count FROM "${table}" WHERE "worldId"=$1::uuid`,
+        `SELECT count(*)::int AS count FROM "${table}" WHERE "worldId"=$1::text`,
         rolledBackId,
       );
       expect(rows).toEqual([{ count: 0 }]);
