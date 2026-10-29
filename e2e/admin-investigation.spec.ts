@@ -316,7 +316,12 @@ test('T3-06 AC-M3-05 실제 공유 기록·수동 조회·감사·두 월드 격
     const detail = await detailForm(journey);
     await detail.getByRole('button', { name: '상세 조회', exact: true }).click();
     await expect(detail.getByRole('list', { name: '최근 로그인 기록 목록', exact: true }).locator('li')).toHaveCount(2);
-    await expect(detail.getByText(journey.people[0]!.email, { exact: true })).toBeVisible();
+    const identity = detail
+      .locator('dt')
+      .filter({ hasText: /^사용자$/ })
+      .locator('+ dd');
+    await expect(identity).toBeVisible();
+    await expect(identity).toHaveText(`${journey.people[0]!.email} ${journey.people[0]!.id}`, { useInnerText: true });
     await expect(detail.getByText('참가 장수', { exact: true })).toBeVisible();
     const privateValues = (await page.context().cookies(journey.stack.origin)).map((cookie) => cookie.value);
     expect(noSecrets(await detail.innerText(), privateValues), '최근 로그인 DOM의 원문·전체 해시 없음').toBe(true);
