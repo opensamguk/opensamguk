@@ -174,18 +174,40 @@ export function assertBootstrapScope(value) {
     throw new Error('LOAD_INSTALL_SCOPE_UNVERIFIED');
 }
 
-async function workerAncestor() {
-  let pid = process.ppid;
+export async function findWorkerAncestor(pid, reader) {
   const visited = new Set();
   for (let depth = 0; pid > 1 && depth < 32 && !visited.has(pid); depth++) {
+    if (!Number.isSafeInteger(pid)) return false;
     visited.add(pid);
-    const [stat, executable] = await Promise.all([readFile(`/proc/${pid}/stat`, 'utf8'), readlink(`/proc/${pid}/exe`)]);
+    const stat = await reader.stat(pid);
+    const parsed = /^(\d+) \(.+\) \S (\d+) /.exec(stat);
+    if (!parsed || Number(parsed[1]) !== pid) return false;
+    const parent = Number(parsed[2]);
+    if (!Number.isSafeInteger(parent)) return false;
+    let executable;
+    try {
+      executable = await reader.exe(pid);
+    } catch (error) {
+      if (error?.code !== 'EACCES' && error?.code !== 'EPERM') throw error;
+      const status = await reader.status(pid);
+      const statusPid = /^Pid:\s+(\d+)\s*$/m.exec(status)?.[1];
+      const uids = /^Uid:\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*$/m.exec(status);
+      if (Number(statusPid) !== pid || !uids || uids.slice(1).some((uid) => uid !== '0')) throw error;
+      pid = parent;
+      continue;
+    }
     if (/\/bin\/Runner\.Worker$/.test(executable)) return true;
-    const parent = /^\d+ \(.+\) \S (\d+) /.exec(stat)?.[1];
-    if (!parent) return false;
-    pid = Number(parent);
+    pid = parent;
   }
   return false;
+}
+
+async function workerAncestor() {
+  return findWorkerAncestor(process.ppid, {
+    stat: (pid) => readFile(`/proc/${pid}/stat`, 'utf8'),
+    exe: (pid) => readlink(`/proc/${pid}/exe`),
+    status: (pid) => readFile(`/proc/${pid}/status`, 'utf8'),
+  });
 }
 
 async function requirePlatform() {

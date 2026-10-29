@@ -14,6 +14,14 @@ export function bootstrapSnapshot(
 export const BOOTSTRAP_DOCKER: DockerBinding;
 export const BUILD_BUDGET: LoadBudget;
 export const BOOTSTRAP_LIMIT_MS: 300000;
+export function findWorkerAncestor(
+  pid: number,
+  reader: {
+    stat(pid: number): Promise<string>;
+    exe(pid: number): Promise<string>;
+    status(pid: number): Promise<string>;
+  },
+): Promise<boolean>;
 export function bootstrapDiagnostic(
   phase: unknown,
   error: unknown,

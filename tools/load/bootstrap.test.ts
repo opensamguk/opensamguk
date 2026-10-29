@@ -10,6 +10,7 @@ import {
   parseBootstrapDiagnostic,
   BUILD_BUDGET,
   requireDispatch,
+  findWorkerAncestor,
 } from './bootstrap.mjs';
 
 const GiB = 1024 ** 3;
@@ -35,6 +36,98 @@ const site = admissionSite('github-hosted', {
 });
 
 describe('L5 의존성 설치 전 bootstrap 경계', () => {
+  function ancestors(rows: Record<number, { parent: number; exe: string | Error; uid?: string; statusPid?: number }>) {
+    const visited: number[] = [];
+    return {
+      visited,
+      stat: async (pid: number) => {
+        visited.push(pid);
+        return `${pid} (ancestor (name)) S ${rows[pid]!.parent} 0 0`;
+      },
+      exe: async (pid: number) => {
+        const value = rows[pid]!.exe;
+        if (value instanceof Error) throw value;
+        return value;
+      },
+      status: async (pid: number) => `Pid:\t${rows[pid]!.statusPid ?? pid}\nUid:\t${rows[pid]!.uid ?? '0 0 0 0'}\n`,
+    };
+  }
+  it.each(['EACCES', 'EPERM'])('root 중간 조상의 %s만 넘고 실제 Runner.Worker 실행 파일을 확인한다', async (code) => {
+    const denied = Object.assign(new Error('private-canary'), { code });
+    const reader = ancestors({
+      4: { parent: 3, exe: denied },
+      3: { parent: 2, exe: '/usr/bin/sudo' },
+      2: { parent: 1, exe: '/home/runner/actions-runner/bin/Runner.Worker', uid: '1001 1001 1001 1001' },
+    });
+    await expect(findWorkerAncestor(4, reader)).resolves.toBe(true);
+    expect(reader.visited).toEqual([4, 3, 2]);
+    await expect(findWorkerAncestor(4, ancestors({ 4: { parent: 1, exe: denied } }))).resolves.toBe(false);
+  });
+  it.each(['1001 1001 1001 1001', '0 1001 0 0', '0 0 0 1001', '0 0 0'])(
+    'UID가 모두 root로 확인되지 않으면 %s를 거부한다',
+    async (uid) => {
+      const denied = Object.assign(new Error('private-canary'), { code: 'EACCES' });
+      await expect(findWorkerAncestor(4, ancestors({ 4: { parent: 2, exe: denied, uid } }))).rejects.toBe(denied);
+      await expect(findWorkerAncestor(4, ancestors({ 4: { parent: 2, exe: denied, statusPid: 5 } }))).rejects.toBe(
+        denied,
+      );
+    },
+  );
+  it.each(['ENOENT', 'EIO'])('root라도 exe의 %s 오류는 건너뛰지 않는다', async (code) => {
+    const failure = Object.assign(new Error('private-canary'), { code });
+    await expect(findWorkerAncestor(4, ancestors({ 4: { parent: 2, exe: failure } }))).rejects.toBe(failure);
+  });
+  it('status 읽기 실패·PID 불일치·depth·cycle·가짜 worker 경로는 통과하지 못한다', async () => {
+    const denied = Object.assign(new Error('private-canary'), { code: 'EPERM' });
+    const reader = ancestors({ 4: { parent: 2, exe: denied } });
+    const failure = Object.assign(new Error('private-canary'), { code: 'ENOENT' });
+    await expect(
+      findWorkerAncestor(4, {
+        ...reader,
+        status: async () => {
+          throw failure;
+        },
+      }),
+    ).rejects.toBe(failure);
+    await expect(findWorkerAncestor(4, { ...reader, stat: async () => '5 (x) S 2 0' })).resolves.toBe(false);
+    const deep = ancestors(
+      Object.fromEntries(
+        Array.from({ length: 34 }, (_, i) => [
+          i + 2,
+          {
+            parent: i + 3,
+            exe: i === 32 ? '/bin/Runner.Worker' : '/usr/bin/sudo',
+          },
+        ]),
+      ),
+    );
+    await expect(findWorkerAncestor(2, deep)).resolves.toBe(false);
+    expect(deep.visited).toHaveLength(32);
+    await expect(findWorkerAncestor(3, deep)).resolves.toBe(true);
+    const cycle = ancestors({ 4: { parent: 3, exe: '/usr/bin/sudo' }, 3: { parent: 4, exe: '/usr/bin/sudo' } });
+    await expect(findWorkerAncestor(4, cycle)).resolves.toBe(false);
+    expect(cycle.visited).toEqual([4, 3]);
+    await expect(findWorkerAncestor(4, ancestors({ 4: { parent: 1, exe: '/bin/Runner.Worker.fake' } }))).resolves.toBe(
+      false,
+    );
+  });
+  it('잘못된 PID·PPID·stat 오류는 exe 증명이나 root 상태로 대신하지 않는다', async () => {
+    const reader = ancestors({ 4: { parent: 2, exe: '/bin/Runner.Worker' } });
+    for (const pid of [1, 0, -1, 4.5, Number.MAX_SAFE_INTEGER + 1, Infinity, NaN])
+      await expect(findWorkerAncestor(pid, reader)).resolves.toBe(false);
+    expect(reader.visited).toEqual([]);
+    for (const stat of ['bad-stat', '4 (x) S 9007199254740992 0', '4 (x) S -1 0'])
+      await expect(findWorkerAncestor(4, { ...reader, stat: async () => stat })).resolves.toBe(false);
+    const failure = Object.assign(new Error('private-canary'), { code: 'EACCES' });
+    await expect(
+      findWorkerAncestor(4, {
+        ...reader,
+        stat: async () => {
+          throw failure;
+        },
+      }),
+    ).rejects.toBe(failure);
+  });
   it('자식 진단은 고정 필드만 재구성하며 다른 stderr와 확장 필드를 버린다', () => {
     const value = {
       event: 'LOAD_BOOTSTRAP_DIAGNOSTIC',
