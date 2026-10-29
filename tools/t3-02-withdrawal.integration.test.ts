@@ -378,6 +378,7 @@ it('미승인 기본 개발·운영 서버는 탈퇴503이고 계정과 모든 �
     expect(result.status).toBe(503);
     expect(await footprint()).toBe(before);
     expect((await call('account.get', undefined, sid.cookie, selected, false)).data).toMatchObject({
+      userId: actor.id,
       withdrawalAvailable: false,
     });
   }
@@ -386,6 +387,7 @@ it('현재 두 본문 판과 맞는 시험 정책만 활성화하고 잘못된 �
   const actor = await user(),
     sid = await session(actor.id);
   expect((await call('account.get', undefined, sid.cookie, api, false)).data).toMatchObject({
+    userId: actor.id,
     withdrawalAvailable: true,
   });
   for (const value of [

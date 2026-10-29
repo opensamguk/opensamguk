@@ -12,6 +12,7 @@ import { test as base } from '@playwright/test';
 import { createDb } from '../packages/db/src/index';
 import { buildServer } from '../apps/server/src/server';
 import type { LegalPolicy } from '../apps/server/src/legal/policy';
+import type { WithdrawalPolicy } from '../apps/server/src/auth/withdrawalPolicy';
 import type { MailMessage } from '../apps/server/src/mail/transport';
 import { initializeResources } from '../tools/init-resources';
 import { e2eDatabaseUrl } from './account';
@@ -37,8 +38,13 @@ export interface LegalStack {
   database: string;
   failed: boolean;
   messages: MailMessage[];
-  restart(policy: LegalPolicy | null, emailRequired?: boolean): Promise<void>;
+  restart(
+    policy: LegalPolicy | null,
+    emailRequired?: boolean,
+    withdrawalPolicy?: WithdrawalPolicy | null,
+  ): Promise<void>;
   productionPending(): Promise<{ origin: string; close(): Promise<void> }>;
+  peer(): Promise<{ origin: string; close(): Promise<void> }>;
 }
 
 function candidatePort() {
@@ -216,7 +222,11 @@ export const test = base.extend<Record<never, never>, { legalStack: LegalStack }
         await initializeResources(db, await readFile(join(root, 'packages/db/sql/resources-init.sql'), 'utf8'));
         const port = candidatePort(),
           origin = `http://127.0.0.1:${port}`;
-        const restart = async (policy: LegalPolicy | null, emailRequired = false) => {
+        const restart = async (
+          policy: LegalPolicy | null,
+          emailRequired = false,
+          withdrawalPolicy: WithdrawalPolicy | null = null,
+        ) => {
           await api?.close();
           api = await buildServer({
             db: db!,
@@ -225,6 +235,7 @@ export const test = base.extend<Record<never, never>, { legalStack: LegalStack }
             publicOrigin: origin,
             emailVerificationRequired: emailRequired,
             legalPolicy: policy,
+            withdrawalPolicy,
             mailTransport: transport,
             realtime: { connectionString: url.href, applicationName: `legal-${suffix}` },
           });
@@ -240,6 +251,26 @@ export const test = base.extend<Record<never, never>, { legalStack: LegalStack }
           messages,
           restart,
           failed: false,
+          async peer() {
+            const server = await buildServer({
+              db: db!,
+              production: false,
+              logging: false,
+              publicOrigin: origin,
+              legalPolicy: null,
+              withdrawalPolicy: null,
+              realtime: { connectionString: url.href, applicationName: `legal-peer-${suffix}` },
+            });
+            extraServers.add(server);
+            await server.listen({ host: '127.0.0.1', port: candidatePort() });
+            return {
+              origin: `http://127.0.0.1:${(server.server.address() as AddressInfo).port}`,
+              async close() {
+                await server.close();
+                extraServers.delete(server);
+              },
+            };
+          },
           async productionPending() {
             const server = await buildServer({
               db: db!,
