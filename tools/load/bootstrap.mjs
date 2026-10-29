@@ -57,7 +57,9 @@ export function bootstrapDiagnostic(phase, error, admissionReason) {
         ? error.message
         : error?.code === 'ENOENT'
           ? 'RESOURCE_MISSING'
-          : 'UNCLASSIFIED',
+          : error?.code === 'EACCES' || error?.code === 'EPERM'
+            ? 'RESOURCE_DENIED'
+            : 'UNCLASSIFIED',
     admissionReason: diagnosticReasons.has(admissionReason) ? admissionReason : null,
   };
 }
@@ -76,7 +78,9 @@ export function parseBootstrapDiagnostic(line) {
       value.event !== 'LOAD_BOOTSTRAP_DIAGNOSTIC' ||
       value.innerDiagnostic !== null ||
       !(diagnosticPhases.has(value.phase) || value.phase === 'unknown') ||
-      !(diagnosticCodes.has(value.code) || ['RESOURCE_MISSING', 'UNCLASSIFIED'].includes(value.code)) ||
+      !(
+        diagnosticCodes.has(value.code) || ['RESOURCE_MISSING', 'RESOURCE_DENIED', 'UNCLASSIFIED'].includes(value.code)
+      ) ||
       !(value.admissionReason === null || diagnosticReasons.has(value.admissionReason)) ||
       typeof value.scopeAttempted !== 'boolean' ||
       typeof value.scopeClosed !== 'boolean' ||

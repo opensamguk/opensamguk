@@ -52,11 +52,18 @@ describe('L5 의존성 설치 전 bootstrap 경계', () => {
       code: 'LOAD_INSTALL_SCOPE_UNVERIFIED',
       admissionReason: null,
     });
+    expect(parseBootstrapDiagnostic(JSON.stringify({ ...value, code: 'RESOURCE_DENIED' }))).toEqual({
+      phase: 'install-scope',
+      code: 'RESOURCE_DENIED',
+      admissionReason: null,
+    });
     for (const patch of [
       { message: 'private-canary' },
       { innerDiagnostic: { message: 'private-canary' } },
       { phase: 'private-canary' },
       { code: 'private-canary' },
+      { code: 'EACCES' },
+      { code: 'EPERM' },
       { admissionReason: 'private-canary' },
       { scopeClosed: 1 },
       { pending: -1 },
@@ -83,6 +90,23 @@ describe('L5 의존성 설치 전 bootstrap 경계', () => {
     expect(bootstrapDiagnostic('admission-cgroups', Object.assign(new Error(canary), { code: 'ENOENT' }))).toEqual({
       phase: 'admission-cgroups',
       code: 'RESOURCE_MISSING',
+      admissionReason: null,
+    });
+    for (const code of ['EACCES', 'EPERM']) {
+      const result = bootstrapDiagnostic(
+        'platform',
+        Object.assign(new Error(canary), { code, path: canary, syscall: 'readlink' }),
+        canary,
+      );
+      expect(result).toEqual({ phase: 'platform', code: 'RESOURCE_DENIED', admissionReason: null });
+      expect(JSON.stringify(result)).not.toContain('private-canary');
+      expect(
+        bootstrapDiagnostic('source', Object.assign(new Error('LOAD_BOOTSTRAP_SOURCE_INVALID'), { code })),
+      ).toEqual({ phase: 'source', code: 'LOAD_BOOTSTRAP_SOURCE_INVALID', admissionReason: null });
+    }
+    expect(bootstrapDiagnostic('platform', Object.assign(new Error(canary), { code: 'EIO' }))).toEqual({
+      phase: 'platform',
+      code: 'UNCLASSIFIED',
       admissionReason: null,
     });
   });
