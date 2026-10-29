@@ -21,7 +21,8 @@ import {
   type OwnedCreateAudit,
 } from './admin-create-options-boundary';
 
-const source = testDatabaseUrl(process.env);
+if (!process.env.TEST_DATABASE_URL) throw new Error('전용 TEST_DATABASE_URL이 필요합니다.');
+const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
 if (!['localhost', '127.0.0.1'].includes(source.hostname)) throw new Error('loopback 전용 시험 DB가 필요합니다.');
 for (const key of source.searchParams.keys())
   if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
@@ -32,6 +33,7 @@ const name = 't305_create_options_' + suffix + '_test',
 const target = new URL(source),
   adminUrl = new URL(source);
 target.pathname = '/' + name;
+testDatabaseUrl({ TEST_DATABASE_URL: target.href, DATABASE_URL: process.env.DATABASE_URL });
 adminUrl.pathname = '/postgres';
 interface NativePg {
   connect(): Promise<void>;
