@@ -559,6 +559,7 @@ it('두 정식 월드의 미동의 변경은 전부403·무변경이며 실제 �
   expect(paths).toContain('admin.world.create');
 
   expect(paths).toContain('admin.world.requestEnd');
+  expect(paths).toContain('admin.world.requestReset');
   const before = await gameSnapshot(true);
   for (const worldId of formalWorlds)
     for (const path of paths) {

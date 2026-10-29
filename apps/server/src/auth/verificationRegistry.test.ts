@@ -11,6 +11,7 @@ const VERIFIED_MUTATIONS = [
   'admin.world.create',
   'admin.world.requestClock',
   'admin.world.requestEnd',
+  'admin.world.requestReset',
   'campaign.relationship',
   'campaign.unit',
   'cityResources.allocate',

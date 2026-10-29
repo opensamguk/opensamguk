@@ -72,6 +72,127 @@ async function adminEndArchive(features: string[] = []): Promise<ReplayArchiveV3
   };
 }
 
+async function adminResetArchive(): Promise<ReplayArchiveV3> {
+  const archive = await adminEndArchive(),
+    initial = archive.origin.initial,
+    source = '00000000-0000-4000-8000-000000000001',
+    target = '00000000-0000-4000-8000-000000000002';
+  const resources = (['MAP', 'PORTRAIT_MAP', 'SCENARIO', 'STAT_RULES', 'UNIT_SET'] as const).map((kind) => ({
+    kind,
+    name:
+      kind === 'MAP'
+        ? initial.mapKey
+        : kind === 'SCENARIO'
+          ? initial.scenarioKey
+          : kind === 'UNIT_SET'
+            ? initial.unitSetKey
+            : 'fixture',
+    version: 1,
+    contentHash: 'a'.repeat(64),
+  }));
+  archive.inputs[0] = {
+    ...archive.inputs[0]!,
+    kind: rules.ADMIN_RESET_KIND,
+    payload: {
+      version: 1,
+      sourceWorldId: source,
+      plannedNewWorldId: target,
+      effectiveSeed: 'new',
+      intent: { confirmName: '확인', expectedRevision: 2, reason: '초기화', requestedSeed: 'new' },
+    },
+    result: {
+      ...(archive.inputs[0]!.result as object),
+      sourceWorldId: source,
+      newWorldId: target,
+      effectiveSeed: 'new',
+      sourceInitialHash: archive.origin.initialStateHash,
+      sourceResourceHash: archive.origin.resourceHash,
+      sourceSettingsHash: 'b'.repeat(64),
+      newInitialHash: hashState({ ...initial, seed: 'new' }),
+      newResourceHash: archive.origin.resourceHash,
+      newSettingsHash: 'c'.repeat(64),
+      resources,
+      settings: {
+        name: '확인',
+        scenarioKey: initial.scenarioKey,
+        mapKey: initial.mapKey,
+        unitSetKey: initial.unitSetKey,
+        presetKey: null,
+        presetHash: null,
+        turnTermMinutes: 30,
+        endYear: null,
+        ruleFeatures: [],
+        featureDataHash: hashState(null),
+      },
+    },
+  };
+  archive.end = { ...archive.end!, reason: 'ADMIN_RESET', winnerNationId: null };
+  return archive;
+}
+describe('ADMIN-RESET AC-M3-04 원본 terminal 재생', () => {
+  it('월간0건·승자null 원본의 동일 해시를 두 번 재생하며 새 월드는 합치지 않는다', async () => {
+    const archive = await adminResetArchive(),
+      before = roundTrip(archive.origin.initial);
+    expect(readArchive(archive)).toBe(archive);
+    expect(replayToEnd(archive)).toEqual(archive.end);
+    expect(replayToEnd(roundTrip(archive))).toEqual(archive.end);
+    expect(archive.origin.initial).toEqual(before);
+  });
+  it('payload/target·원초기·자원·설정 매핑 변조는 기록 읽기에서 거부한다', async () => {
+    const value = await adminResetArchive(),
+      result = value.inputs[0]!.result as Record<string, unknown>;
+    for (const delta of [
+      { newWorldId: '00000000-0000-4000-8000-000000000003' },
+      { effectiveSeed: 'wrong' },
+      { sourceInitialHash: 'a'.repeat(64) },
+      { sourceResourceHash: 'a'.repeat(64) },
+      { settings: { ...(result.settings as object), mapKey: 'other' } },
+      { settings: { ...(result.settings as object), endYear: 200 } },
+      { settings: { ...(result.settings as object), featureDataHash: 'c'.repeat(64) } },
+    ]) {
+      const changed = roundTrip(value);
+      changed.inputs[0]!.result = { ...result, ...delta };
+      expect(() => readArchive(changed)).toThrow();
+    }
+  });
+  it('다중 reset/END terminal과 구형식은 거부하고 기존 END를 보존한다', async () => {
+    const value = await adminResetArchive(),
+      old = await adminEndArchive();
+    for (const kind of [rules.ADMIN_RESET_KIND, rules.ADMIN_END_KIND]) {
+      const changed = roundTrip(value);
+      changed.afterEnd.push({ ...old.inputs[0]!, kind, sequence: 2 });
+      expect(() => readArchive(changed)).toThrow();
+    }
+    for (const version of [1, 2, 5]) expect(() => readArchive({ ...value, version })).toThrow();
+    expect(replayToEnd(old)).toEqual(old.end);
+  });
+  it('유효hash·연월을 함께 바꿔도 앞선 입력 tick의 역행 cutoff는 거부한다', async () => {
+    const value = await adminResetArchive(),
+      terminal = value.inputs[0]!;
+    value.inputs = [
+      {
+        sequence: 1,
+        tick: 1,
+        generalId: null,
+        kind: 'admin.world.pause',
+        status: 'REJECTED',
+        payload: { version: 1, reason: '정지' },
+        result: { code: 'WORLD_STATE_CHANGED', message: rules.adminClockRejectMessages.WORLD_STATE_CHANGED },
+      },
+      { ...terminal, sequence: 2 },
+    ];
+    value.end = { ...value.end!, sequence: 2 };
+    expect(() => readArchive(value)).toThrow('경계');
+    expect(() => replayToEnd(value)).toThrow('경계');
+  });
+  it('마지막 원본 게임 hash가 다르면 재생 성공으로 세지 않는다', async () => {
+    const value = await adminResetArchive();
+    value.end!.finalStateHash = 'a'.repeat(64);
+    value.inputs[0]!.result = { ...(value.inputs[0]!.result as object), finalStateHash: 'a'.repeat(64) };
+    expect(() => replayToEnd(value)).toThrow('해시');
+  });
+});
+
 describe('ADMIN-END AC-M3-04 형식3 강제 종료', () => {
   it('원생성 상태와 자원 해시까지 대조한다', async () => {
     const value = await adminEndArchive();

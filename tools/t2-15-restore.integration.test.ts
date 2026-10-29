@@ -7,11 +7,20 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, it } from 'vitest';
 import { createDb, type PrismaClient } from '../packages/db/src/index';
 import { TICKS_PER_MONTH } from '../packages/rules/src/index';
+import { adminResetPayloadSchema } from '../packages/rules/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { readWorldState, saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { onShutdownRequest, stopOwnedChild } from '../apps/engine/src/process-lifecycle';
+import { initializeResources } from './init-resources';
+import { initializeIntegrationResources } from './integration-resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { requestWorldReset, getWorldResetRequest } from '../apps/server/src/admin/worldReset';
+import { newSession } from '../apps/server/src/auth/session';
+import type { Context } from '../apps/server/src/context';
+import { exportReplay, replayToEnd } from '../apps/engine/src/replay';
+import { checkedResetTarget } from '../apps/engine/src/admin/reset';
 import {
   advanceWithLease,
   checkRehearsalArchiveTree,
@@ -79,6 +88,12 @@ let initialHash = '',
   targetAtB: unknown;
 const B = 2 * TICKS_PER_MONTH;
 let sourceCommit = '';
+let resetSourceId = '',
+  resetTargetId = '',
+  resetUserId = '',
+  resetSessionId = '',
+  resetKey = '',
+  resetPairBefore: unknown;
 
 class RehearsalError extends Error {}
 const fail = (reason: string): never => {
@@ -378,6 +393,59 @@ async function atBoundary(db: PrismaClient) {
   >`SELECT NOT EXISTS (SELECT 1 FROM "EngineLease" WHERE "worldId"=${worldId} AND "expiresAt">clock_timestamp() AT TIME ZONE 'UTC') AS expired`;
   assert.equal(lease?.expired, true);
   return state;
+}
+function resetContext(db: PrismaClient): Context {
+  return { db, user: { id: resetUserId, email: 'reset-fixture@example.test' }, sessionId: resetSessionId } as Context;
+}
+async function resetPair(db: PrismaClient) {
+  controller.signal.throwIfAborted();
+  const source = await db.world.findUniqueOrThrow({ where: { id: resetSourceId } }),
+    target = await db.world.findUniqueOrThrow({ where: { id: resetTargetId } }),
+    event = await db.inputEvent.findUniqueOrThrow({
+      where: {
+        worldId_userId_idempotencyKey: { worldId: resetSourceId, userId: resetUserId, idempotencyKey: resetKey },
+      },
+    });
+  controller.signal.throwIfAborted();
+  checkedResetTarget(source, event, target);
+  assert.equal(source.status, 'ENDED');
+  assert.equal(target.status, 'PREOPEN');
+  assert.equal(target.startedAt, null);
+  assert.equal(target.clockTick, 0);
+  assert.equal(await db.world.count(), 3);
+  for (const id of [resetSourceId, resetTargetId]) {
+    controller.signal.throwIfAborted();
+    assert.equal(await db.nation.count({ where: { worldId: id } }), 21);
+    assert.equal(await db.general.count({ where: { worldId: id, userId: null } }), 491);
+    assert.equal(await db.general.count({ where: { worldId: id, userId: { not: null } } }), 0);
+    assert.equal(await db.generalTurn.count({ where: { worldId: id } }), 491 * 30);
+  }
+  const query = await getWorldResetRequest(resetContext(db), {
+    expectedUserId: resetUserId,
+    worldId: resetSourceId,
+    idempotencyKey: resetKey,
+  });
+  assert.equal(query.status, 'APPLIED');
+  assert.equal(query.plannedNewWorldId, resetTargetId);
+  const oldArchive = await exportReplay(db, resetSourceId),
+    newArchive = await exportReplay(db, resetTargetId);
+  assert.equal(replayToEnd(oldArchive).reason, 'ADMIN_RESET');
+  assert.deepEqual(replayToEnd(JSON.parse(JSON.stringify(oldArchive))), replayToEnd(oldArchive));
+  const audits = await db.auditLog.findMany({
+    where: { worldId: resetSourceId, action: { in: ['world.reset.requested', 'world.reset.applied'] } },
+    orderBy: { id: 'asc' },
+  });
+  assert.equal(audits.length, 2);
+  assert.deepEqual(
+    audits.map((row) => row.action),
+    ['world.reset.requested', 'world.reset.applied'],
+  );
+  controller.signal.throwIfAborted();
+  return JSON.parse(
+    JSON.stringify({ source, target, event, audits, query, oldArchive, newArchive }, (_key, value) =>
+      typeof value === 'bigint' ? String(value) : value,
+    ),
+  ) as unknown;
 }
 const stage = (name: string, action: () => Promise<void>) => stages.run(name, action);
 
@@ -720,6 +788,112 @@ describe('T2-15 B1 실제 복구 리허설', () => {
         await disconnect(paused);
       }
     }));
+  it('2a 기존 월드를 보존하며 정식 초기화 원본과 실제 관리자 요청을 준비한다', () =>
+    stage('reset-formal-admission', async () => {
+      const db = client(sourceName);
+      const failures: unknown[] = [];
+      try {
+        const existing = await canonical(db);
+        await initializeResources(db, await readFile(join(copy, 'packages/db/sql/resources-init.sql'), 'utf8'));
+        controller.signal.throwIfAborted();
+        await initializeIntegrationResources(db);
+        controller.signal.throwIfAborted();
+        const initial = await loadInitialWorldFromDb(db, {
+          scenario: 'integration191',
+          map: 'integration',
+          statRules: 'five-stats',
+          portraitMap: '191-map',
+          seed: 'reset-backup-source',
+        });
+        controller.signal.throwIfAborted();
+        assert.equal(initial.nations.length, 21);
+        assert.equal(initial.generals.length, 491);
+        resetSourceId = (
+          await saveInitialWorld(db, initial, { name: '초기화 백업 정식191', turnTermMinutes: 30, endYear: 200 })
+        ).worldId;
+        await controlClock(db, resetSourceId, 'start');
+        await controlClock(db, resetSourceId, 'pause');
+        controller.signal.throwIfAborted();
+        const user = await db.user.create({
+          data: {
+            email: 'reset-' + randomUUID() + '@example.test',
+            passwordHash: 'isolated-unusable-fixture-hash',
+            role: 'ADMIN',
+          },
+        });
+        resetUserId = user.id;
+        const session = newSession(Date.now());
+        resetSessionId = session.id;
+        resetKey = randomUUID();
+        await db.session.create({ data: { id: session.id, userId: user.id, expiresAt: session.expiresAt } });
+        const source = await db.world.findUniqueOrThrow({ where: { id: resetSourceId } });
+        const receipt = await requestWorldReset(resetContext(db), {
+          expectedUserId: resetUserId,
+          worldId: resetSourceId,
+          idempotencyKey: resetKey,
+          confirmName: source.name,
+          expectedRevision: source.clockRevision,
+          reason: '격리된 초기화 백업 검증',
+          seed: 'reset-backup-target',
+        });
+        assert.equal(receipt.status, 'PENDING');
+        resetTargetId = receipt.plannedNewWorldId;
+        assert.equal(await db.world.count(), 2);
+        assert.deepEqual(await canonical(db), existing);
+        evidence.resetAdmission = {
+          sourceWorldId: resetSourceId,
+          targetWorldId: resetTargetId,
+          pending: true,
+          existingCanonicalPreserved: true,
+          interface: 'actual API function with isolated DB session; not HTTP evidence',
+        };
+      } catch (error) {
+        failures.push(error);
+      } finally {
+        try {
+          await disconnect(db);
+        } catch (error) {
+          failures.push(error);
+        }
+      }
+      if (failures.length) throw new AggregateError(failures, '초기화 접수 고정물과 연결 정리 실패');
+    }));
+  it('2b fenced 엔진이 초기화 쌍을 원자 저장하고 원본 종료·새 PREOPEN을 확인한다', () =>
+    stage('reset-formal-apply', async () => {
+      const db = client(sourceName);
+      const failures: unknown[] = [];
+      try {
+        const existing = await canonical(db);
+        evidence.resetLease = await advanceWithLease(databaseUrl(sourceName), resetSourceId, 0, controller.signal);
+        resetPairBefore = await resetPair(db);
+        assert.deepEqual(await canonical(db), existing);
+        const event = (resetPairBefore as { event: { payload: unknown } }).event;
+        assert.equal(adminResetPayloadSchema.parse(event.payload).effectiveSeed, 'reset-backup-target');
+        evidence.resetPairBefore = {
+          worlds: 3,
+          formalWorlds: 2,
+          nationsEach: 21,
+          npcEach: 491,
+          humanEach: 0,
+          slotsEach: 491 * 30,
+          sourceWorldId: resetSourceId,
+          targetWorldId: resetTargetId,
+          sha256: hashState(resetPairBefore),
+          oldEnded: true,
+          newPreopen: true,
+          existingCanonicalPreserved: true,
+        };
+      } catch (error) {
+        failures.push(error);
+      } finally {
+        try {
+          await disconnect(db);
+        } catch (error) {
+          failures.push(error);
+        }
+      }
+      if (failures.length) throw new AggregateError(failures, '초기화 백업 고정물과 리스 정리 실패');
+    }));
   it('3 정지한 원본에서 실제 custom dump를 만든다', () =>
     stage('backup', async () => {
       await command(
@@ -798,6 +972,14 @@ describe('T2-15 B1 실제 복구 리허설', () => {
       const db = client(targetName);
       try {
         assert.equal(hashState(await readWorldState(db, worldId)), initialHash);
+        assert.deepEqual(await resetPair(db), resetPairBefore);
+        evidence.resetPairRestored = {
+          equal: true,
+          sha256: hashState(resetPairBefore),
+          mappingAndOrigins: true,
+          inputsAndAudits: true,
+          nativeSingleTransactionRestore: true,
+        };
         controller.signal.throwIfAborted();
         await controlClock(db, worldId, 'resume');
       } finally {
@@ -859,6 +1041,7 @@ describe('T2-15 B1 실제 복구 리허설', () => {
       try {
         const state = await atBoundary(db);
         assert.deepEqual(state, targetAtB);
+        assert.deepEqual(await resetPair(db), resetPairBefore);
         evidence.canonicalAtB = { equal: true, sha256: digest(JSON.stringify(state)) };
       } finally {
         await disconnect(db);
