@@ -7,6 +7,8 @@ import { auditListInput, getUser, getUserInput, listAudit, searchUsers, searchUs
 import { listAdminWorlds } from '../admin/worlds';
 import { requestWorldCreateInput, worldCreateStatusInput } from '@opensamguk/rules';
 import { requestWorldCreate, getWorldCreateRequest } from '../admin/worldCreate';
+import { requestWorldReset, getWorldResetRequest } from '../admin/worldReset';
+import { requestWorldResetInput, worldResetRequestInput } from '@opensamguk/rules';
 
 import { requestWorldEnd, requestWorldEndInput, getWorldEndRequest, worldEndRequestInput } from '../admin/worldEnd';
 import {
@@ -34,6 +36,12 @@ export const adminRouter = router({
     list: adminProcedure.input(z.void()).query(({ ctx }) => listAdminWorlds(ctx)),
     requestEnd: adminProcedure.input(requestWorldEndInput).mutation(({ ctx, input }) => requestWorldEnd(ctx, input)),
     endRequest: adminProcedure.input(worldEndRequestInput).query(({ ctx, input }) => getWorldEndRequest(ctx, input)),
+    requestReset: adminProcedure
+      .input(requestWorldResetInput)
+      .mutation(({ ctx, input }) => requestWorldReset(ctx, input)),
+    resetRequest: adminProcedure
+      .input(worldResetRequestInput)
+      .query(({ ctx, input }) => getWorldResetRequest(ctx, input)),
     requestClock: adminProcedure
       .input(requestWorldClockInput)
       .mutation(({ ctx, input }) => requestWorldClock(ctx, input)),

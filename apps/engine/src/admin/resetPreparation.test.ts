@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import type { Prisma, PrismaClient, PublishedResource } from '@opensamguk/db';
-import { parsePreset, worldCreateIntent, type ReplayOriginV3 } from '@opensamguk/rules';
+import { parsePreset, worldCreateIntent, ADMIN_RESET_KIND, type ReplayOriginV3 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { beforeAll, expect, it, vi } from 'vitest';
 import { composeInitialWorld, type InitialResources } from '../world/resources';
@@ -10,7 +10,14 @@ import {
   type InitialWorldOptions,
   type PreparedInitialWorld,
 } from '../world/persistence';
-import { prepareWorldReset, ResetPreparationError } from './resetPreparation';
+import {
+  prepareWorldReset,
+  ResetPreparationError,
+  verifyResetPreparation,
+  resetSourceSettingsHash,
+  resetSettingsReference,
+  type ResetPreparation,
+} from './resetPreparation';
 
 const worldId = '00000000-0000-4000-8000-000000000001';
 const requestId = '00000000-0000-4000-8000-000000000002';
@@ -40,6 +47,7 @@ const options: InitialWorldOptions = {
 };
 type World = Prisma.WorldGetPayload<Record<string, never>>;
 type Request = Prisma.WorldCreateRequestGetPayload<Record<string, never>>;
+type Event = Prisma.InputEventGetPayload<Record<string, never>>;
 async function capture(prepared: PreparedInitialWorld) {
   let data: Record<string, unknown> = {};
   const createMany = vi.fn(async () => ({ count: 0 }));
@@ -132,11 +140,23 @@ function request(world = sourceWorld): Request {
 function fixture(useRequest = true) {
   const world = structuredClone(sourceWorld),
     requests = useRequest ? [request(world)] : [],
-    rows = structuredClone(Object.values(resources));
+    rows = structuredClone(Object.values(resources)),
+    resets: Event[] = [];
   const tx = {
     world: { findUnique: vi.fn(async () => world) },
     worldCreateRequest: { findMany: vi.fn(async () => requests) },
     gameResource: { findMany: vi.fn(async () => rows) },
+    inputEvent: {
+      findMany: vi.fn(async (args: Prisma.InputEventFindManyArgs) => {
+        expect(args.take).toBe(2);
+        return resets;
+      }),
+    },
+    $queryRaw: vi.fn(async (sql: TemplateStringsArray, ...values: unknown[]) => {
+      expect(sql.join('')).toContain('FOR SHARE');
+      expect(values).toHaveLength(3);
+      return [{ id: 'locked' }];
+    }),
     $executeRaw: vi.fn(async (sql: TemplateStringsArray) => {
       expect(sql.join('')).toBe('SET TRANSACTION READ ONLY');
       return 0;
@@ -145,7 +165,15 @@ function fixture(useRequest = true) {
   const transaction = vi.fn(async (run: (tx: Prisma.TransactionClient) => Promise<unknown>) =>
     run(tx as unknown as Prisma.TransactionClient),
   );
-  return { world, requests, rows, tx, transaction, db: { $transaction: transaction } as unknown as PrismaClient };
+  return {
+    world,
+    requests,
+    rows,
+    resets,
+    tx,
+    transaction,
+    db: { $transaction: transaction } as unknown as PrismaClient,
+  };
 }
 async function reject(f: ReturnType<typeof fixture>, code: ResetPreparationError['code']) {
   await expect(prepareWorldReset(f.db, worldId, 'new-seed', controller().signal)).rejects.toMatchObject({ code });
@@ -396,4 +424,217 @@ it.each(['', '\u0000', '\ud800'])('저장 불가능한 새 시드%j는 SQL 전�
     code: 'INPUT_INVALID',
   });
   expect(f.transaction).not.toHaveBeenCalled();
+});
+
+function resetEvent(world = sourceWorld): Event {
+  const oldWorldId = '00000000-0000-4000-8000-000000000004',
+    origin = world.replayOrigin as unknown as ReplayOriginV3;
+  return {
+    id: 11n,
+    worldId: oldWorldId,
+    userId,
+    idempotencyKey: requestId,
+    generalId: null,
+    kind: ADMIN_RESET_KIND,
+    status: 'APPLIED',
+    sequence: 1,
+    tick: 0,
+    stepTick: null,
+    createdAt: new Date(0),
+    payload: {
+      version: 1,
+      sourceWorldId: oldWorldId,
+      plannedNewWorldId: worldId,
+      effectiveSeed: world.seed,
+      intent: { confirmName: world.name, expectedRevision: 2, reason: '초기화', requestedSeed: world.seed },
+    },
+    result: {
+      version: 1,
+      sourceWorldId: oldWorldId,
+      newWorldId: worldId,
+      effectiveSeed: world.seed,
+      before: { status: 'PAUSED', tick: 0, revision: 2 },
+      after: { status: 'ENDED', tick: 0, revision: 3 },
+      at: new Date(1).toISOString(),
+      finalStateHash: 'a'.repeat(64),
+      sourceInitialHash: 'b'.repeat(64),
+      sourceResourceHash: origin.resourceHash,
+      sourceSettingsHash: 'c'.repeat(64),
+      newInitialHash: world.initialStateHash,
+      newResourceHash: origin.resourceHash,
+      newSettingsHash: resetSourceSettingsHash(world),
+      resources: Object.values(resources)
+        .map(({ kind, name, version, contentHash }) => ({ kind, name, version, contentHash }))
+        .sort((a, b) => a.kind.localeCompare(b.kind)),
+      settings: resetSettingsReference(world),
+    },
+  } as unknown as Event;
+}
+const transactionClient = (f: ReturnType<typeof fixture>) => f.tx as unknown as Prisma.TransactionClient;
+it('D1 공유 settings hash 추출은 승인된 C 원 recipe와 같다', () => {
+  const w = sourceWorld;
+  expect(resetSourceSettingsHash(w)).toBe(
+    hashState({
+      name: w.name,
+      seed: w.seed,
+      scenario: w.scenarioKey,
+      map: w.mapKey,
+      unitSet: w.unitSetKey,
+      presetKey: w.presetKey,
+      preset: w.preset,
+      turnTermMinutes: w.turnTermMinutes,
+      endYear: w.endYear,
+      ruleFeatures: w.ruleFeatures,
+      origin: w.replayOrigin,
+    }),
+  );
+});
+it('D1 APPLIED reset 원장을 출처로 새 월드를 다시 준비한다', async () => {
+  const f = fixture(false);
+  f.resets.push(resetEvent(f.world));
+  const prepared = await prepareWorldReset(f.db, worldId, oldSeed, controller().signal);
+  expect(prepared.evidence.provenance).toEqual({ kind: 'reset', requestId: '11' });
+  expect(prepared.evidence.initialHash).toBe(f.world.initialStateHash);
+  await verifyResetPreparation(transactionClient(f), f.world, prepared, oldSeed, controller().signal);
+  expect(f.tx.inputEvent.findMany.mock.calls[0]![0]).toMatchObject({ take: 2, where: { kind: ADMIN_RESET_KIND } });
+});
+it.each(['PENDING', 'REJECTED'] as const)('D1 존재하는 reset %s는 CLI fallback하지 않는다', async (status) => {
+  const f = fixture(false),
+    event = resetEvent(f.world);
+  event.status = status;
+  f.resets.push(event);
+  await reject(f, 'PROVENANCE_INVALID');
+  expect(f.tx.gameResource.findMany).not.toHaveBeenCalled();
+});
+it('D1 B와 reset 또는 reset 두 개가 같은 target을 가리키면 거부한다', async () => {
+  const a = fixture();
+  a.resets.push(resetEvent(a.world));
+  await reject(a, 'PROVENANCE_INVALID');
+  const b = fixture(false);
+  b.resets.push(resetEvent(b.world), resetEvent(b.world));
+  await reject(b, 'PROVENANCE_INVALID');
+});
+it('D1 reset target·초기hash·settings·resourcehash·manifest 변조를 거부한다', async () => {
+  for (const delta of [
+    { newWorldId: userId },
+    { newInitialHash: 'a'.repeat(64) },
+    { newSettingsHash: 'a'.repeat(64) },
+    { newResourceHash: 'a'.repeat(64) },
+    { settings: { ...resetSettingsReference(sourceWorld), turnTermMinutes: 99 } },
+    { resources: [] },
+  ]) {
+    const f = fixture(false),
+      event = resetEvent(f.world);
+    event.result = { ...(event.result as Prisma.JsonObject), ...delta } as Prisma.JsonValue;
+    f.resets.push(event);
+    await reject(f, 'PROVENANCE_INVALID');
+    expect(f.tx.gameResource.findMany).not.toHaveBeenCalled();
+  }
+});
+it('D1 같은 적용 TX의 verifier는 자원5종을 정렬 FOR SHARE한 뒤 pin을 다시 읽는다', async () => {
+  const f = fixture(),
+    prepared = await prepareWorldReset(f.db, worldId, 'new', controller().signal);
+  await verifyResetPreparation(transactionClient(f), f.world, prepared, 'new', controller().signal);
+  expect(f.transaction).toHaveBeenCalledOnce();
+  expect(f.tx.$queryRaw.mock.calls.map((call) => call.slice(1))).toEqual(
+    prepared.evidence.resources.map((ref) => [ref.kind, ref.name, ref.version]),
+  );
+  expect(f.tx.gameResource.findMany).toHaveBeenCalledTimes(2);
+});
+it('D1 준비 뒤 B 요청의 행위자·processedAt 변경을 같은 TX fingerprint가 거부한다', async () => {
+  for (const field of ['requestedBy', 'processedAt']) {
+    const f = fixture(),
+      prepared = await prepareWorldReset(f.db, worldId, 'new', controller().signal);
+    Object.assign(f.requests[0]!, { [field]: field === 'processedAt' ? new Date(9) : requestId });
+    await expect(
+      verifyResetPreparation(transactionClient(f), f.world, prepared, 'new', controller().signal),
+    ).rejects.toMatchObject({ code: 'PROVENANCE_INVALID' });
+    expect(f.tx.$queryRaw).not.toHaveBeenCalled();
+  }
+});
+it('D1 준비 뒤 원본 설정·고정자원 변경을 적용 전에 거부한다', async () => {
+  const f = fixture(),
+    prepared = await prepareWorldReset(f.db, worldId, 'new', controller().signal);
+  f.world.name = 'changed';
+  await expect(
+    verifyResetPreparation(transactionClient(f), f.world, prepared, 'new', controller().signal),
+  ).rejects.toMatchObject({ code: 'PROVENANCE_INVALID' });
+  const g = fixture(false),
+    pin = await prepareWorldReset(g.db, worldId, 'new', controller().signal);
+  g.rows[0]!.contentHash = 'a'.repeat(64);
+  await expect(
+    verifyResetPreparation(transactionClient(g), g.world, pin, 'new', controller().signal),
+  ).rejects.toMatchObject({ code: 'RESOURCE_INVALID' });
+});
+it('D1 존재하던 provenance가 없어지거나 새 reset이 생겨도 후보를 폐기한다', async () => {
+  const f = fixture(),
+    candidate = await prepareWorldReset(f.db, worldId, 'new', controller().signal);
+  f.requests.length = 0;
+  await expect(
+    verifyResetPreparation(transactionClient(f), f.world, candidate, 'new', controller().signal),
+  ).rejects.toMatchObject({ code: 'PROVENANCE_INVALID' });
+  const g = fixture(false),
+    cli = await prepareWorldReset(g.db, worldId, 'new', controller().signal);
+  g.resets.push(resetEvent(g.world));
+  await expect(
+    verifyResetPreparation(transactionClient(g), g.world, cli, 'new', controller().signal),
+  ).rejects.toMatchObject({ code: 'PROVENANCE_INVALID' });
+});
+it('D1 reset provenance 조회의 DB 실패는 원문 객체를 전파하고 fallback하지 않는다', async () => {
+  const f = fixture(false),
+    error = new Error('transport');
+  f.tx.inputEvent.findMany.mockRejectedValueOnce(error);
+  await expect(prepareWorldReset(f.db, worldId, 'new', controller().signal)).rejects.toBe(error);
+  expect(f.tx.gameResource.findMany).not.toHaveBeenCalled();
+});
+it('D1 verifier 잠금 중 취소 뒤 다음 SQL과 자원 읽기는0이다', async () => {
+  const f = fixture(),
+    candidate = await prepareWorldReset(f.db, worldId, 'new', controller().signal),
+    c = controller();
+  f.tx.$queryRaw.mockImplementationOnce(async () => {
+    c.abort();
+    return [{ id: 'locked' }];
+  });
+  await expect(verifyResetPreparation(transactionClient(f), f.world, candidate, 'new', c.signal)).rejects.toThrow();
+  expect(f.tx.$queryRaw).toHaveBeenCalledOnce();
+  expect(f.tx.gameResource.findMany).toHaveBeenCalledOnce();
+});
+it.each(['initialHash', 'effectiveSeed'] as const)('D1 %s만 치환한 증거는 SQL 전에 거부한다', async (field) => {
+  const f = fixture(),
+    candidate = await prepareWorldReset(f.db, worldId, 'new', controller().signal),
+    changed = {
+      ...candidate,
+      evidence: { ...candidate.evidence, [field]: field === 'initialHash' ? 'a'.repeat(64) : 'other' },
+    };
+  await expect(
+    verifyResetPreparation(transactionClient(f), f.world, changed, 'new', controller().signal),
+  ).rejects.toMatchObject({ code: 'PROVENANCE_INVALID' });
+  expect(f.tx.$queryRaw).not.toHaveBeenCalled();
+  expect(f.tx.gameResource.findMany).toHaveBeenCalledOnce();
+});
+it('D1 다른 시드 후보와 증거를 교차하거나 구조만 복사한 후보는 거부한다', async () => {
+  const f = fixture(),
+    first = await prepareWorldReset(f.db, worldId, 'first', controller().signal),
+    second = await prepareWorldReset(f.db, worldId, 'second', controller().signal);
+  for (const candidate of [
+    { prepared: first.prepared, evidence: second.evidence },
+    { prepared: second.prepared, evidence: first.evidence },
+    { ...first },
+    structuredClone(first),
+    { prepared: { stateHash: first.evidence.initialHash }, evidence: first.evidence },
+  ] satisfies ResetPreparation[])
+    await expect(
+      verifyResetPreparation(transactionClient(f), f.world, candidate, 'first', controller().signal),
+    ).rejects.toMatchObject({ code: 'PROVENANCE_INVALID' });
+  expect(f.tx.$queryRaw).not.toHaveBeenCalled();
+});
+it('D1 신뢰된 준비물도 원 요청의 effectiveSeed와 다르면 거부한다', async () => {
+  const f = fixture(),
+    candidate = await prepareWorldReset(f.db, worldId, 'actual', controller().signal);
+  await expect(
+    verifyResetPreparation(transactionClient(f), f.world, candidate, 'other-request', controller().signal),
+  ).rejects.toMatchObject({ code: 'PROVENANCE_INVALID' });
+  expect(f.tx.$queryRaw).not.toHaveBeenCalled();
+  await verifyResetPreparation(transactionClient(f), f.world, candidate, 'actual', controller().signal);
+  expect(f.tx.$queryRaw).toHaveBeenCalledTimes(5);
 });
