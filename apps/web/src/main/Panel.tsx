@@ -8,17 +8,21 @@ export function Panel({
   actions,
   children,
   flush,
+  headingId,
 }: {
   title: string;
   area?: string;
   actions?: ReactNode;
   children: ReactNode;
   flush?: boolean;
+  headingId?: string;
 }) {
   return (
     <section className={styles.panel} aria-label={title} data-main-area={area}>
       <header className={styles.head}>
-        <h2 className={styles.title}>{title}</h2>
+        <h2 id={headingId} tabIndex={headingId ? -1 : undefined} className={styles.title}>
+          {title}
+        </h2>
         {actions ? <div className={styles.actions}>{actions}</div> : null}
       </header>
       <div className={flush ? `${styles.body} ${styles.flush}` : styles.body}>{children}</div>
