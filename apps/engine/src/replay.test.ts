@@ -5,6 +5,9 @@ import * as rules from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import {
   exportReplay,
+  readArchive,
+  resourceHashV3,
+  type ReplayArchiveV3,
   replayArchive,
   replayToEnd,
   type ReplayArchive,
@@ -24,6 +27,152 @@ const asV2 = (archive: ReplayArchive): ReplayArchiveV2 => ({
   config: { endYear: null, outcomeFromSequence: 0 },
   end: null,
   afterEnd: [],
+});
+
+async function adminEndArchive(features: string[] = []): Promise<ReplayArchiveV3> {
+  const initial = await monthlyFixture();
+  if (features.length) initial.ruleFeatures = features;
+  const origin: rules.ReplayOriginV3 = { version: 3, initial, initialStateHash: hashState(initial), resourceHash: '' };
+  if (features.includes('policy')) origin.featureData = { policy: { version: 1, turnTermMinutes: 60 } };
+  origin.resourceHash = resourceHashV3(origin);
+  const finalStateHash = hashState(
+    rules.initialReplayStateWithRegistry(initial, rules.ruleRegistry, origin.featureData),
+  );
+  return {
+    version: 3,
+    origin,
+    config: { endYear: null, outcomeFromSequence: 0 },
+    months: [],
+    afterEnd: [],
+    inputs: [
+      {
+        sequence: 1,
+        tick: 0,
+        generalId: null,
+        kind: rules.ADMIN_END_KIND,
+        status: 'APPLIED',
+        payload: { version: 1, confirmName: '확인', expectedRevision: 2, reason: '종료' },
+        result: {
+          version: 1,
+          before: { status: 'PAUSED', tick: 0, revision: 2 },
+          after: { status: 'ENDED', tick: 0, revision: 3 },
+          at: '2026-10-29T00:00:00.000Z',
+          finalStateHash,
+        },
+      },
+    ],
+    end: {
+      sequence: 1,
+      tick: 0,
+      reason: 'ADMIN_END',
+      winnerNationId: null,
+      ...rules.toGameDate(initial.startYear, 0),
+      finalStateHash,
+    },
+  };
+}
+
+describe('ADMIN-END AC-M3-04 형식3 강제 종료', () => {
+  it('원생성 상태와 자원 해시까지 대조한다', async () => {
+    const value = await adminEndArchive();
+    const world = { replayFormat: 3, ruleFeatures: [], replayOrigin: value.origin };
+    expect(() => rules.checkAdminEndOrigin(world, rules.checkReplayOrigin, hashState)).not.toThrow();
+    for (const field of ['initialStateHash', 'resourceHash'])
+      expect(() =>
+        rules.checkAdminEndOrigin(
+          { ...world, replayOrigin: { ...value.origin, [field]: '0'.repeat(64) } },
+          rules.checkReplayOrigin,
+          hashState,
+        ),
+      ).toThrow('해시');
+  });
+  it.each(['policy', 'treaty', 'personnel'])('기존 %s 기능의 종료 검증도 통과한다', async (feature) => {
+    const value = await adminEndArchive([feature]);
+    expect(replayToEnd(value)).toEqual(value.end);
+  });
+  it('월간0건·승자 결과 없이 마지막 명시 입력으로 같은 해시를 재생한다', async () => {
+    const value = await adminEndArchive();
+    expect(readArchive(value)).toBe(value);
+    expect(replayToEnd(value)).toEqual(value.end);
+    expect(replayToEnd(roundTrip(value))).toEqual(value.end);
+  });
+  it('종료 경계와 적용 입력이 어긋나거나 구형식이면 거부한다', async () => {
+    const value = await adminEndArchive();
+    for (const changed of [
+      { inputs: [] },
+      { inputs: [value.inputs[0], { ...value.inputs[0], sequence: 2 }] },
+      { end: null },
+      { end: { ...value.end, reason: 'END_YEAR' } },
+      { end: { ...value.end, sequence: 2 } },
+      { end: { ...value.end, tick: 1 } },
+      { end: { ...value.end, year: 0 } },
+      { end: { ...value.end, winnerNationId: 1 } },
+      { end: { ...value.end, extra: true } },
+      { extra: true },
+      {
+        version: 2,
+        origin: { ...value.origin, version: 1 },
+        inputs: value.inputs.map((input) =>
+          Object.fromEntries(Object.entries(input).filter(([key]) => key !== 'tick')),
+        ),
+      },
+      { afterEnd: [{ ...value.inputs[0], sequence: 2 }] },
+    ])
+      expect(() => replayToEnd({ ...value, ...changed })).toThrow();
+  });
+  it('기록과 외피의 해시를 함께 조작해도 실제 재생 해시로 거부한다', async () => {
+    const value = await adminEndArchive();
+    value.end!.finalStateHash = 'b'.repeat(64);
+    (value.inputs[0]!.result as Record<string, unknown>).finalStateHash = value.end!.finalStateHash;
+    expect(() => replayToEnd(value)).toThrow('해시');
+  });
+  it.each(['direct-rejected', 'direct-applied', 'queued-rejected'] as const)(
+    '%s 입력의 처리 tick보다 종료 경계를 과거로 옮기면 거부한다',
+    async (kind) => {
+      const value = await adminEndArchive();
+      const tick = kind === 'queued-rejected' ? 1 : rules.TICKS_PER_MONTH;
+      const ending = value.inputs[0]!;
+      ending.sequence = 2;
+      ending.tick = tick;
+      const applied = ending.result as {
+        before: { tick: number };
+        after: { tick: number };
+        finalStateHash: string;
+      };
+      applied.before.tick = tick;
+      applied.after.tick = tick;
+      value.end = { ...value.end!, sequence: 2, tick, ...rules.toGameDate(value.origin.initial.startYear, tick) };
+      value.inputs.unshift({
+        sequence: 1,
+        tick,
+        generalId: null,
+        kind: kind === 'queued-rejected' ? 'general.active' : 'admin.world.pause',
+        status: kind === 'direct-applied' ? 'APPLIED' : 'REJECTED',
+        payload: kind === 'queued-rejected' ? {} : { version: 1, reason: '운영 점검' },
+        result:
+          kind === 'direct-applied'
+            ? {
+                version: 1,
+                before: { status: 'RUNNING', tick, revision: 0 },
+                after: { status: 'PAUSED', tick, revision: 1 },
+                at: '2026-10-29T00:00:00.000Z',
+              }
+            : kind === 'queued-rejected'
+              ? { code: 'FEATURE_DISABLED', message: '이 판에서 지원하지 않는 기능입니다.' }
+              : { code: 'WORLD_STATE_CHANGED', message: rules.adminClockRejectMessages.WORLD_STATE_CHANGED },
+      });
+      expect(readArchive(value)).toBe(value);
+      expect(replayToEnd(value)).toEqual(value.end);
+      // 상태를 바꾸지 않는 앞선 입력은 같은 최종 해시를 낸다. 연월과 내·외피 해시까지 맞춰도 tick 역행은 거부한다.
+      ending.tick = 0;
+      applied.before.tick = 0;
+      applied.after.tick = 0;
+      applied.finalStateHash = value.end.finalStateHash;
+      value.end = { ...value.end, tick: 0, ...rules.toGameDate(value.origin.initial.startYear, 0) };
+      expect(() => readArchive(value)).toThrow('경계');
+      expect(() => replayToEnd(value)).toThrow('경계');
+    },
+  );
 });
 
 afterEach(() => vi.restoreAllMocks());
