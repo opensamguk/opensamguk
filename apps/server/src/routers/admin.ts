@@ -3,7 +3,7 @@ import { adminProcedure } from '../admin/role';
 import { router } from '../trpc';
 import { notifySessionClosed } from '@opensamguk/db';
 import { createAdminSanction, createSanctionInput, liftAdminSanction, liftSanctionInput } from '../admin/sanctionStore';
-import { auditListInput, listAudit, searchUsers, searchUsersInput } from '../admin/read';
+import { auditListInput, getUser, getUserInput, listAudit, searchUsers, searchUsersInput } from '../admin/read';
 import { listAdminWorlds } from '../admin/worlds';
 import {
   listAdminNotices,
@@ -30,6 +30,7 @@ export const adminRouter = router({
       .mutation(({ ctx, input }) => changeAdminNotice(ctx, { kind: 'hide', input })),
   }),
   user: router({
+    get: adminProcedure.input(getUserInput).query(({ ctx, input }) => getUser(ctx.db, ctx.user.id, input, ctx.now)),
     search: adminProcedure
       .input(searchUsersInput)
       .query(({ ctx, input }) => searchUsers(ctx.db, ctx.user.id, input, ctx.now)),

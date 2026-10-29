@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import type { Page, Request } from '@playwright/test';
 import { test as base, expect, apiMutate, type T210World } from './t210-fixture';
 import { adminRole } from './adminSetup';
@@ -121,9 +121,11 @@ test('T3-06 AC-M3-04 정식191 장수 검색·감사·자동 조회 금지·오�
     });
     const hold = await holdLease(worldId);
     let trigger = false;
-    const requests: Request[] = [];
+    const requests: Request[] = [],
+      detailRequests: Request[] = [];
     page.on('request', (request) => {
       if (calls(request, 'admin.user.search')) requests.push(request);
+      if (calls(request, 'admin.user.get')) detailRequests.push(request);
     });
     await cleanup(async () => {
       await controlClock(hold.db, worldId, 'start');
@@ -151,6 +153,7 @@ test('T3-06 AC-M3-04 정식191 장수 검색·감사·자동 조회 금지·오�
       await input.fill(email);
       await frames(page);
       expect(requests).toHaveLength(0);
+      expect(detailRequests).toHaveLength(0);
       const before = await db.auditLog.count({ where: { actorUserId: admin.userId, action: 'user.search' } });
       await input.press('Enter');
       await expect(page.getByRole('status')).toHaveText('1명');
@@ -158,6 +161,42 @@ test('T3-06 AC-M3-04 정식191 장수 검색·감사·자동 조회 금지·오�
       expect(requests).toHaveLength(1);
       expect(calls(requests[0]!, 'auth.me')).toBe(true);
       expect(await db.auditLog.count({ where: { actorUserId: admin.userId, action: 'user.search' } })).toBe(before + 1);
+      const detail = page.getByRole('region', { name: '사용자 상세', exact: true });
+      const viewCount = await db.auditLog.count({ where: { actorUserId: admin.userId, action: 'user.view' } });
+      const gameBefore = await Promise.all([
+        db.general.findMany({
+          where: { worldId: { in: [worldId, world.id] } },
+          orderBy: [{ worldId: 'asc' }, { id: 'asc' }],
+        }),
+        db.generalTurn.findMany({
+          where: { worldId: { in: [worldId, world.id] } },
+          orderBy: [{ worldId: 'asc' }, { generalId: 'asc' }, { slot: 'asc' }],
+        }),
+        db.inputEvent.findMany({ where: { worldId: { in: [worldId, world.id] } }, orderBy: { id: 'asc' } }),
+      ]);
+      await page.getByRole('button', { name: `${email} 상세 보기`, exact: true }).click();
+      await expect(detail).toContainText(email);
+      await expect(detail).toContainText('조회장수');
+      await expect(detail).toContainText(worldId);
+      await expect(detail).toContainText('전체2명 중2명');
+      expect(detailRequests).toHaveLength(1);
+      expect(calls(detailRequests[0]!, 'auth.me')).toBe(true);
+      expect(await db.auditLog.count({ where: { actorUserId: admin.userId, action: 'user.view' } })).toBe(
+        viewCount + 1,
+      );
+      expect(
+        await Promise.all([
+          db.general.findMany({
+            where: { worldId: { in: [worldId, world.id] } },
+            orderBy: [{ worldId: 'asc' }, { id: 'asc' }],
+          }),
+          db.generalTurn.findMany({
+            where: { worldId: { in: [worldId, world.id] } },
+            orderBy: [{ worldId: 'asc' }, { generalId: 'asc' }, { slot: 'asc' }],
+          }),
+          db.inputEvent.findMany({ where: { worldId: { in: [worldId, world.id] } }, orderBy: { id: 'asc' } }),
+        ]),
+      ).toEqual(gameBefore);
       expect(new URL(page.url()).search).toBe('');
       expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0]);
       const checked = observe(page.waitForResponse((response) => calls(response.request(), 'admin.whoami')));
@@ -166,6 +205,8 @@ test('T3-06 AC-M3-04 정식191 장수 검색·감사·자동 조회 금지·오�
       await frames(page);
       expect(requests).toHaveLength(1);
       await expect(page.getByRole('table')).toHaveCount(0);
+      await expect(detail).not.toContainText(email);
+      expect(detailRequests).toHaveLength(1);
       await input.fill(prefix);
       await page.getByRole('button', { name: '찾기', exact: true }).click();
       await expect(page.getByRole('status')).toHaveText('50명');
@@ -187,7 +228,9 @@ test('T3-06 AC-M3-04 정식191 장수 검색·감사·자동 조회 금지·오�
       await page.getByRole('button', { name: '찾기', exact: true }).click();
       await expect(page.getByRole('status')).toHaveText('1명');
       await expect(page.getByRole('table')).toContainText(email);
-      for (const width of [768, 1024, 1440]) {
+      await page.getByRole('button', { name: `${email} 상세 보기`, exact: true }).click();
+      await expect(detail).toContainText('조회장수');
+      for (const width of [375, 768, 1024, 1440]) {
         await page.setViewportSize({ width, height: 900 });
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
         expect(
@@ -228,6 +271,173 @@ test('T3-06 AC-M3-04 정식191 장수 검색·감사·자동 조회 금지·오�
       () => releaseHold(hold),
     ]);
   }));
+
+test('T3-06 AC-M3-04 상세 수동 조회·제재51건 경계·텍스트·다른 대상·실제 전송 실패와 수동 복구', ({ world }) =>
+  track(async () => {
+    test.setTimeout(120_000);
+    const { admin, actor, peer, db } = await fixture(world),
+      page = admin.page;
+    const at = new Date('2026-10-28T01:00:00.000Z');
+    const reason = '<script>window.adminDetailInjected=true</script>\n실제 원문';
+    await db.sanction.createMany({
+      data: Array.from({ length: 51 }, (_, index) => ({
+        id: index === 0 ? 'ffffffff-ffff-4fff-bfff-ffffffffffff' : randomUUID(),
+        userId: actor.userId,
+        createdBy: admin.userId,
+        worldId: index % 2 ? world.id : null,
+        reason: index === 0 ? reason : `화면 확인 ${index}`,
+        createdAt: at,
+      })),
+    });
+    const account = await db.user.findUniqueOrThrow({ where: { id: actor.userId } }),
+      other = await db.user.findUniqueOrThrow({ where: { id: peer.userId } });
+    const requests: Request[] = [];
+    page.on('request', (request) => {
+      if (calls(request, 'admin.user.get')) requests.push(request);
+    });
+    await page.goto('/admin/users');
+    const detail = page.getByRole('region', { name: '사용자 상세', exact: true }),
+      input = page.getByLabel('상세 조회할 사용자 UUID', { exact: true }),
+      submit = page.getByRole('button', { name: '상세 조회', exact: true });
+    await input.fill('bad');
+    await frames(page);
+    expect(requests).toHaveLength(0);
+    await submit.click();
+    await expect(detail.getByRole('alert')).toContainText('UUID');
+    expect(requests).toHaveLength(0);
+    const count = await db.auditLog.count({ where: { actorUserId: admin.userId, action: 'user.view' } });
+    await input.fill(actor.userId);
+    await input.press('Enter');
+    await expect(detail).toContainText(account.email);
+    await expect(detail).toContainText('전체51건 중50건');
+    await expect(detail).toContainText('표시하지 않은 제재가 있습니다.');
+    await expect(detail.getByRole('list', { name: '제재 이력 목록' }).getByRole('listitem')).toHaveCount(50);
+    await expect(detail).toContainText(reason);
+    expect(await detail.locator('script,img').count()).toBe(0);
+    expect(await page.evaluate(() => Reflect.has(window, 'adminDetailInjected'))).toBe(false);
+    await expect(detail.locator(`time[datetime="${at.toISOString()}"]`).first()).toHaveText(/오전\s*10:00/);
+    expect(requests).toHaveLength(1);
+    expect(await db.auditLog.count({ where: { actorUserId: admin.userId, action: 'user.view' } })).toBe(count + 1);
+    for (const width of [375, 1280]) {
+      await page.setViewportSize({ width, height: 900 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      expect(
+        await detail.locator('input,button').evaluateAll((elements) =>
+          elements
+            .filter((element) => {
+              const box = element.getBoundingClientRect();
+              return box.width < 44 || box.height < 44;
+            })
+            .map((element) => element.tagName),
+        ),
+      ).toEqual([]);
+      await page.screenshot({ path: test.info().outputPath(`admin-user-detail-${width}.png`), fullPage: true });
+    }
+    await input.fill(peer.userId);
+    await expect(detail).not.toContainText(account.email);
+    await submit.click();
+    await expect(detail).toContainText(other.email);
+    expect(requests).toHaveLength(2);
+    await input.fill(randomUUID());
+    await submit.click();
+    await expect(detail.getByRole('alert')).toContainText('조회하지 못했습니다.');
+    await expect(detail).not.toContainText(other.email);
+    expect(requests).toHaveLength(3);
+    expect(await db.auditLog.count({ where: { actorUserId: admin.userId, action: 'user.view' } })).toBe(count + 3);
+    await page.route('**/trpc/**', (route) =>
+      calls(route.request(), 'admin.user.get') ? route.abort('connectionfailed') : route.continue(),
+    );
+    await cleanup(async () => {
+      await input.fill(actor.userId);
+      await submit.click();
+      await expect(detail.getByRole('alert')).toContainText('조회하지 못했습니다.');
+      await expect(detail).not.toContainText(account.email);
+      expect(await db.auditLog.count({ where: { actorUserId: admin.userId, action: 'user.view' } })).toBe(count + 3);
+    }, [() => page.unrouteAll({ behavior: 'wait' })]);
+    await submit.click();
+    await expect(detail).toContainText(account.email);
+    expect(await db.auditLog.count({ where: { actorUserId: admin.userId, action: 'user.view' } })).toBe(count + 4);
+    expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0]);
+  }));
+
+for (const change of ['role', 'account'] as const)
+  test(`T3-06 AC-M3-04 실제 상세 응답 지연 중 ${change} 변경은 요청을 취소하고 개인정보를 소거한다`, ({ world }) =>
+    track(async () => {
+      test.setTimeout(120_000);
+      const { admin, actor, db } = await fixture(world),
+        page = admin.page;
+      const target = await db.user.findUniqueOrThrow({ where: { id: actor.userId } });
+      const other = await admin.context.newPage();
+      let release = () => {},
+        observed = () => {},
+        rejectReady: (error: unknown) => void = () => {};
+      const held = new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+        ready = observe(
+          new Promise<void>((resolve, reject) => {
+            observed = resolve;
+            rejectReady = reject;
+          }),
+        );
+      const routes = new Set<Promise<unknown>>(),
+        routeErrors: unknown[] = [];
+      await page.route('**/trpc/**', (route) => {
+        if (!calls(route.request(), 'admin.user.get')) return route.continue();
+        const pending = (async () => {
+          const response = await route.fetch();
+          expect(response.status()).toBe(200);
+          observed();
+          await held;
+          try {
+            await route.fulfill({ response });
+          } catch (error) {
+            if (!/ERR_ABORTED|NS_BINDING_ABORTED/.test(route.request().failure()?.errorText ?? '')) throw error;
+          }
+        })();
+        routes.add(pending);
+        void pending.catch((error) => {
+          routeErrors.push(error);
+          rejectReady(error);
+        });
+        void pending.finally(() => routes.delete(pending)).catch(() => undefined);
+        return pending;
+      });
+      await cleanup(async () => {
+        await page.goto('/admin/users');
+        await page.getByLabel('상세 조회할 사용자 UUID', { exact: true }).fill(actor.userId);
+        await page.getByRole('button', { name: '상세 조회', exact: true }).click();
+        await ready;
+        if (change === 'role') await adminRole(world, admin, 'revoke');
+        else {
+          const response = await other.request.post(world.stack.webOrigin + '/trpc/auth.login', {
+            headers: { origin: world.stack.webOrigin },
+            data: { email: target.email, password: TEST_PASSWORD },
+          });
+          expect(response.status()).toBe(200);
+          await response.body();
+        }
+        const checked = observe(page.waitForResponse((value) => calls(value.request(), 'admin.whoami'))),
+          aborted = observe(page.waitForEvent('requestfailed', (request) => calls(request, 'admin.user.get')));
+        await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+        await checked;
+        await aborted;
+        await expect(page.getByText('없는 주소입니다', { exact: true })).toBeVisible();
+        release();
+        await Promise.allSettled([...routes]);
+        expect(routeErrors).toEqual([]);
+        await frames(page);
+        await expect(page.locator('body')).not.toContainText(target.email);
+      }, [
+        async () => {
+          release();
+          await Promise.allSettled([...routes]);
+          await page.unrouteAll({ behavior: 'wait' });
+          if (routeErrors.length) throw new AggregateError(routeErrors, '실제 상세 지연 응답 정착 실패');
+        },
+        () => other.close(),
+      ]);
+    }));
 
 test('T3-06 AC-M3-04 실제 인증 필수 서버의 미인증 ADMIN은 인증 화면으로 이동한다', ({ world }) =>
   track(async () => {
