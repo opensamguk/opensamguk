@@ -5,6 +5,8 @@ import { notifySessionClosed } from '@opensamguk/db';
 import { createAdminSanction, createSanctionInput, liftAdminSanction, liftSanctionInput } from '../admin/sanctionStore';
 import { auditListInput, getUser, getUserInput, listAudit, searchUsers, searchUsersInput } from '../admin/read';
 import { listAdminWorlds } from '../admin/worlds';
+import { requestWorldCreateInput, worldCreateStatusInput } from '@opensamguk/rules';
+import { requestWorldCreate, getWorldCreateRequest } from '../admin/worldCreate';
 import {
   requestWorldClock,
   requestWorldClockInput,
@@ -23,6 +25,10 @@ import {
 export const adminRouter = router({
   whoami: adminProcedure.input(z.void()).query(() => ({ admin: true as const })),
   world: router({
+    create: adminProcedure.input(requestWorldCreateInput).mutation(({ ctx, input }) => requestWorldCreate(ctx, input)),
+    createStatus: adminProcedure
+      .input(worldCreateStatusInput)
+      .query(({ ctx, input }) => getWorldCreateRequest(ctx, input)),
     list: adminProcedure.input(z.void()).query(({ ctx }) => listAdminWorlds(ctx)),
     requestClock: adminProcedure
       .input(requestWorldClockInput)

@@ -426,6 +426,7 @@ it.each(['empty', 'legacy'] as const)(
         '20261105000000_admin_notices',
         '20261106000000_legal_document_versions',
         '20261107000000_admin_sanction_requests',
+        '20261110000000_world_create_requests',
       ]);
       for (const directory of previous)
         await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
@@ -464,6 +465,7 @@ it.each(['empty', 'legacy'] as const)(
         AdminNoticeRequest: [],
         LegalDocumentVersion: [],
         AdminSanctionRequest: [],
+        WorldCreateRequest: [],
       });
       expect(await readSlices()).toEqual(slices);
       expect(

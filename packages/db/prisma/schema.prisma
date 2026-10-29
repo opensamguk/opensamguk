@@ -66,6 +66,35 @@ model World {
   nationTrust     NationTrust[]
   assignmentOffers AssignmentOffer[]
   sanctions       Sanction[]
+  createRequest   WorldCreateRequest?
+}
+
+enum WorldCreateStatus {
+  PENDING
+  DONE
+  FAILED
+}
+
+model WorldCreateRequest {
+  id              String @id @default(uuid())
+  requestedBy     String
+  idempotencyKey  String
+  version         Int @default(1)
+  intentHash      String
+  intent          Json
+  effectiveSeed   String
+  plannedWorldId  String @unique
+  resolution      Json?
+  status          WorldCreateStatus @default(PENDING)
+  worldId         String? @unique
+  errorCode       String?
+  createdAt       DateTime @default(now())
+  processedAt     DateTime?
+  actor           User @relation(fields: [requestedBy], references: [id], onDelete: NoAction)
+  world           World? @relation(fields: [worldId], references: [id], onDelete: NoAction)
+
+  @@unique([requestedBy, idempotencyKey])
+  @@index([status, createdAt, id])
 }
 
 enum AssignmentOfferStatus {
@@ -476,6 +505,7 @@ model User {
   consents     ConsentRecord[]
   generals     General[]
   sanctions    Sanction[]
+  worldCreateRequests WorldCreateRequest[]
 }
 
 model AdminSanctionRequest {
