@@ -213,7 +213,7 @@ async function existingRows(client: PgClient) {
   ]) {
     const data =
       table === 'World'
-        ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures' - 'operationalMap' - 'campaignState'"
+        ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures' - 'operationalMap' - 'campaignState' - 'cityResourcesState'"
         : table === 'City'
           ? "to_jsonb(t) - 'kind'"
           : table === 'General'
@@ -409,6 +409,7 @@ it.each(['empty', 'legacy'] as const)(
         await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
       expect((await client.query('SELECT id FROM "World" WHERE "operationalMap" IS NOT NULL')).rows).toEqual([]);
       expect((await client.query('SELECT id FROM "World" WHERE "campaignState" IS NOT NULL')).rows).toEqual([]);
+      expect((await client.query('SELECT id FROM "World" WHERE "cityResourcesState" IS NOT NULL')).rows).toEqual([]);
       expect((await client.query('SELECT "cityKey" FROM "City" WHERE "kind" IS NOT NULL')).rows).toEqual([]);
       expect(
         (await client.query('SELECT id FROM "General" WHERE "politics" IS NOT NULL OR "charm" IS NOT NULL')).rows,
