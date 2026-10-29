@@ -14,6 +14,8 @@ import { assertLease, lockLease, releaseLease } from '../apps/engine/src/lease';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { buildCreatedGeneral, TICKS_PER_MONTH, type WorldInit } from '../packages/rules/src/index';
 import { applyCityPreparation, type CityPreparationKey } from '../packages/rules/src/cityResources/preparation';
+import { recruitCost } from '../packages/rules/src/commands/statScores';
+import { BALANCE } from '../packages/rules/src/balance';
 import { test as legalTest, expect } from './legalFixture';
 import { e2eDatabaseUrl, TEST_PASSWORD } from './account';
 import { holdLease, type LeaseHold } from './game';
@@ -610,16 +612,22 @@ test('AC-INT-18C 공개 빌드 정식 도시 모병·준비·배속·거부·375
     const main = a!,
       isolated = b!,
       oldWorld = legacy!;
-    await test.step('F02 화면 실제 사람 생성·임관·30칸·빈 부곡', async () => {
+    await test.step('F02 화면 실제 사람 생성·임관·각자 2월 이동·30칸·빈 부곡', async () => {
       owner = await createActor(main, '도시검사1');
       other = await createActor(main, '도시검사2');
       // 아직 모집/정산하지 않았으므로 실제 사람 생성 뒤 첫 상세 화면에서만 0 panel을 검사한다.
       await showResources(main, owner, (await person(main, owner)).cityKey);
       await photo(owner.page, info, '01-formal-new-empty-city');
-      const nation = main.initial.nations.find(
-        (row) => main.initial.cities.filter((city) => city.nationId === row.id && city.kind === 'CITY').length >= 2,
-      );
-      if (!nation) throw new Error('두 도시를 가진 정식 국가가 없습니다.');
+      // 공용 금을 먼저 쓰는 NPC를 제거하거나 자금을 채우지 않는다.
+      // 실제 유언국 수도에 임관한 뒤 각 사람이 자기 예약으로 자동까지 이동한다.
+      const nation = main.initial.nations.find((row) => row.id === 4);
+      if (!nation) throw new Error('정식 191년의 유언국이 없습니다.');
+      expect(nation.capitalCityKey).toBe(5);
+      const fundingRoute = [5, 87, 44];
+      for (const key of fundingRoute)
+        expect(main.initial.cities.find((city) => city.cityKey === key)).toMatchObject({ nationId: nation.id });
+      expect(main.initial.cities.find((city) => city.cityKey === 87)?.kind).toBe('PASS');
+      expect(main.initial.cities.find((city) => city.cityKey === 44)?.kind).toBe('CITY');
       nationId = nation.id;
       cityKey = nation.capitalCityKey;
       // 두 사람 예약을 먼저 저장한 뒤 큰 tick까지 진행한다. 시계를 뒤로 이동하지 않는다.
@@ -637,6 +645,60 @@ test('AC-INT-18C 공개 빌드 정식 도시 모병·준비·배속·거부·375
         });
         await actor.page.reload();
       }
+      const movementEvidence: Array<{ generalId: number; tick: number; from: number; to: number }> = [];
+      for (let hop = 1; hop < fundingRoute.length; hop++) {
+        const from = fundingRoute[hop - 1]!,
+          to = fundingRoute[hop]!;
+        const beforeMove = (await snapshot(main)).state;
+        expect(beforeMove.cities[from]!.connections).toContain(to);
+        expect(beforeMove.cities[to]!.nationId).toBe(nationId);
+        const due: Array<{ generalId: number; tick: number }> = [];
+        for (const actor of [owner, other]) {
+          expect((await person(main, actor)).cityKey).toBe(from);
+          const oldTurns = await turns(main, actor);
+          await put(actor, 1, '이동', { '대상 도시': String(to) });
+          const peer = actor === owner ? other : owner;
+          const peerTurns = await turns(main, peer);
+          await save(actor);
+          expect(await turns(main, peer)).toEqual(peerTurns);
+          expect((await turns(main, actor)).slice(1)).toEqual(oldTurns.slice(1));
+          // 예약 저장은 두 사람 어느 쪽의 실제 위치도 옮기지 않는다.
+          for (const separate of [owner, other]) expect((await person(main, separate)).cityKey).toBe(from);
+          const tick = (await person(main, actor)).nextTurnTick;
+          expect(tick, '각 hop은 해당 사람의 다음 한 달 턴으로 실행한다').toBe(
+            people.find((row) => row.id === actor.generalId)!.nextTurnTick + hop * TICKS_PER_MONTH,
+          );
+          due.push({ generalId: actor.generalId, tick });
+        }
+        const executions = await advance(main, Math.max(...due.map((row) => row.tick)));
+        expect(executions.filter((row) => due.some((person) => person.generalId === row.generalId))).toEqual(
+          due
+            .map(({ generalId, tick }) => ({ generalId, tick, commandKey: 'move' }))
+            .sort((left, right) => left.tick - right.tick || left.generalId - right.generalId),
+        );
+        for (const actor of [owner, other]) {
+          const tick = due.find((row) => row.generalId === actor.generalId)!.tick;
+          expect(await person(main, actor)).toMatchObject({ nationId, cityKey: to, officerLevel: 1 });
+          expect(
+            await db.generalLog.findFirstOrThrow({
+              where: { worldId: main.id, generalId: actor.generalId, tick, commandKey: 'move' },
+            }),
+          ).toMatchObject({ kind: 'success' });
+          expect(await turns(main, actor)).toHaveLength(30);
+          movementEvidence.push({ generalId: actor.generalId, tick, from, to });
+          await actor.page.reload();
+        }
+      }
+      cityKey = 44;
+      evidence.normalFundingPrecondition = {
+        nationId,
+        capitalCityKey: nation.capitalCityKey,
+        cityKey,
+        route: fundingRoute,
+        movements: movementEvidence,
+        independentHumanCommands: true,
+        resourceOrPositionInjection: false,
+      };
       const campaign = owner.page.getByRole('region', {
         name: '개인 휘하·부곡',
         exact: true,
@@ -737,6 +799,45 @@ test('AC-INT-18C 공개 빌드 정식 도시 모병·준비·배속·거부·375
           { id: actor.generalId, userId: actor.userId },
         ]);
         expect(humanTick % TICKS_PER_MONTH, '같은 단차에 월 정산 경계를 섞지 않는다').not.toBe(0);
+        const general = before.state.generals[actor.generalId]!,
+          city = before.state.cities[cityKey]!,
+          resource = before.state.cityResources!.cities[String(cityKey)]!,
+          army = main.initial.unitSet.crewTypes.find((row) => row.id === 1100 && row.armType > 0);
+        expect(general).toMatchObject({ cityKey: 44, nationId: 4 });
+        expect(city.nationId).toBe(4);
+        expect(army, '실제 원본 병종 1100이 필요하다').toBeDefined();
+        const recruiting = command.key === 'recruit' || command.key === 'conscript';
+        const requiredGold = recruiting
+          ? recruitCost(before.state, general, Number(command.args.amount), army!.cost, command.key === 'conscript')
+          : BALANCE.DRILL_COST;
+        const garrison = resource.garrison.find((row) => row.crewType === 1100);
+        evidence.fundingPrecondition = {
+          tick: humanTick,
+          commandKey: command.key,
+          cityKey,
+          gold: resource.gold,
+          requiredGold,
+          population: city.population,
+          requiredPopulation: recruiting ? Number(command.args.amount) : 0,
+          garrison: garrison ?? null,
+          actualNpcPrefixCompleted: true,
+        };
+        const previousPreconditions = (evidence.cityCommandPreconditions ?? []) as unknown[];
+        previousPreconditions.push(evidence.fundingPrecondition);
+        evidence.cityCommandPreconditions = previousPreconditions;
+        expect(
+          resource.gold,
+          `${command.key}: NPC 실행 뒤 실제 도시 금이 필요비용 이상이어야 한다`,
+        ).toBeGreaterThanOrEqual(requiredGold);
+        if (recruiting) expect(city.population).toBeGreaterThanOrEqual(Number(command.args.amount));
+        else {
+          expect(garrison, `${command.key}: 실제 모집된 도시 수비병이 필요하다`).toBeDefined();
+          expect(garrison!.troops).toBeGreaterThan(0);
+          expect(
+            garrison![command.key === 'train' ? 'train' : 'atmos'],
+            '원본 NPC 준비 뒤에도 훈련 여유가 있어야 한다',
+          ).toBeLessThan(100);
+        }
         const expected = applyCityPreparation(
           before.state,
           {
@@ -945,7 +1046,7 @@ test('AC-INT-18C 공개 빌드 정식 도시 모병·준비·배속·거부·375
       const identity = await editor.elementHandle();
       const current = (await snapshot(main)).state;
       const second = Object.values(current.cities).find(
-        (city) => city.nationId === nationId && city.cityKey !== cityKey,
+        (city) => city.nationId === nationId && city.cityKey !== cityKey && city.kind === 'CITY',
       );
       if (!second) throw new Error('정식 국가의 두 번째 도시를 찾지 못했습니다.');
       await actor.page.getByTestId('world-map').locator(`[data-city-key="${second.cityKey}"]`).focus();

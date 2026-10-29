@@ -123,7 +123,7 @@ it('T3-05 공지 migration은 두 정식 월드·기존 계정과 모든 기존 
       { name: '기존 정식 월드 둘', turnTermMinutes: 60, endYear: 201 },
     );
     expect(await db.general.count()).toBe(982);
-    const worldId = (await db.world.findFirstOrThrow()).id;
+    const worldId = (await db.world.findFirstOrThrow({ select: { id: true } })).id;
     const noticeIds = [randomUUID(), randomUUID()];
     await client.query('INSERT INTO "Notice" (id,scope,title,body) VALUES ($1,\'LOBBY\',$2,$3)', [
       noticeIds[0],
