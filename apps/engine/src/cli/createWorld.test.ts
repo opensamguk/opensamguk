@@ -6,12 +6,12 @@ const mocks = vi.hoisted(() => ({
   createDb: vi.fn(),
   loadInitialWorld: vi.fn(),
   loadPreset: vi.fn(),
-  saveInitialWorld: vi.fn(),
+  createWorldFromCli: vi.fn(),
   disconnect: vi.fn(),
 }));
 vi.mock('@opensamguk/db', () => ({ createDb: mocks.createDb }));
 vi.mock('../world/resources', () => ({ loadInitialWorld: mocks.loadInitialWorld, loadPreset: mocks.loadPreset }));
-vi.mock('../world/persistence', () => ({ saveInitialWorld: mocks.saveInitialWorld }));
+vi.mock('../admin/creation', () => ({ createWorldFromCli: mocks.createWorldFromCli }));
 const originalArgv = process.argv;
 const originalExitCode = process.exitCode;
 const args = [
@@ -35,7 +35,7 @@ beforeEach(() => {
   vi.stubEnv('DATABASE_URL', 'unit-only-not-a-connection');
   mocks.createDb.mockReturnValue({ $disconnect: mocks.disconnect });
   mocks.loadInitialWorld.mockResolvedValue({ seed: 'cli-unit' });
-  mocks.saveInitialWorld.mockResolvedValue({ worldId: 'created', stateHash: 'hash' });
+  mocks.createWorldFromCli.mockResolvedValue({ worldId: 'created', stateHash: 'hash' });
   mocks.disconnect.mockResolvedValue(undefined);
   vi.spyOn(console, 'log').mockImplementation(() => {});
   vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -52,7 +52,7 @@ it.each([false, true])('CLI는 --treaty 선택=%s를 실제 factory 인자로 �
   await import('./createWorld');
   await vi.waitFor(() => expect(mocks.disconnect).toHaveBeenCalledOnce());
   expect(mocks.createDb).toHaveBeenCalledExactlyOnceWith('unit-only-not-a-connection');
-  expect(mocks.saveInitialWorld).toHaveBeenCalledExactlyOnceWith(
+  expect(mocks.createWorldFromCli).toHaveBeenCalledExactlyOnceWith(
     expect.anything(),
     { seed: 'cli-unit' },
     {
@@ -72,7 +72,7 @@ it('CLI boolean에 문자열 값을 넣으면 DB를 열기 전에 거부한다 (
   await vi.waitFor(() => expect(process.exitCode).toBe(1));
   expect(console.error).toHaveBeenCalledWith(expect.stringContaining('treaty'));
   expect(mocks.createDb).not.toHaveBeenCalled();
-  expect(mocks.saveInitialWorld).not.toHaveBeenCalled();
+  expect(mocks.createWorldFromCli).not.toHaveBeenCalled();
 });
 
 it('자원 프로필과 요청 기능을 합칠 때 정렬한 뒤 의존 관계를 검사한다', async () => {
@@ -87,7 +87,7 @@ it('자원 프로필과 요청 기능을 합칠 때 정렬한 뒤 의존 관계�
   await import('./createWorld');
   await vi.waitFor(() => expect(mocks.disconnect).toHaveBeenCalledOnce());
   const features = ['campaign-v1', 'five-stats', 'operational-map', 'personnel', 'policy', 'stratagem-basic', 'treaty'];
-  expect(mocks.saveInitialWorld).toHaveBeenCalledExactlyOnceWith(
+  expect(mocks.createWorldFromCli).toHaveBeenCalledExactlyOnceWith(
     expect.anything(),
     { seed: 'cli-unit', ruleFeatures: features },
     expect.objectContaining({ ruleFeatures: features }),
@@ -102,7 +102,7 @@ it.each(['campaign-v1,personnel', 'policy,policy', 'unknown-feature'])(
     await import('./createWorld');
     await vi.waitFor(() => expect(mocks.disconnect).toHaveBeenCalledOnce());
     expect(process.exitCode).toBe(1);
-    expect(mocks.saveInitialWorld).not.toHaveBeenCalled();
+    expect(mocks.createWorldFromCli).not.toHaveBeenCalled();
     expect(console.error).toHaveBeenCalledOnce();
   },
 );
