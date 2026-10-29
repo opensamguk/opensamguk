@@ -332,7 +332,15 @@ it('정식 두 월드의 명시 열·사람 수·heartbeat를 반환하고 모�
     { cookie } = await session(actor.id);
   const expected = await db.world.findMany({
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    select: { id: true, name: true, status: true, scenarioKey: true, presetKey: true, turnTermMinutes: true },
+    select: {
+      id: true,
+      name: true,
+      status: true,
+      clockRevision: true,
+      scenarioKey: true,
+      presetKey: true,
+      turnTermMinutes: true,
+    },
   });
   const before = await footprint(),
     response = await call('admin.world.list', undefined, cookie);
