@@ -157,7 +157,7 @@ pnpm db:init-scenarios
 
 `NODE_ENV=production`에서는 capture와 미설정·미지원 전송을 API 시작 전에 거부합니다. Resend 후보도 발신 주소와 올바른 키 파일이 있어야 시작합니다. 실제 서비스 선택·발신 도메인 인증과 수신 인수는 남아 있습니다. `buildServer`의 전송 주입은 실제 PG/HTTP 시험과 같은 내부 생성 경계이며 운영 진입점의 설정 검사를 대신하지 않습니다.
 
-`account.get`은 본인 이메일·인증 여부·동의 기록을 읽습니다. `account.resendVerification`은 이미 인증됐으면 메일 없이 성공하고 미인증 계정은 분당1번·UTC 하루5번의 공유 계수기를 씁니다. 초과하면429와 정수 초 `Retry-After`를 받습니다. `account.requestPasswordReset`은 정규화한 주소당 시간3번까지만 발송하며 없는 주소·제재·탈퇴·초과·발송 실패도 같은 성공 응답입니다. 한도 초과는 `Retry-After`를 싣지 않습니다.
+`account.get`은 서버 세션의 사용자 UUID와 본인 이메일·인증 여부·동의 기록을 읽습니다. `account.resendVerification`은 이미 인증됐으면 메일 없이 성공하고 미인증 계정은 분당1번·UTC 하루5번의 공유 계수기를 씁니다. 초과하면429와 정수 초 `Retry-After`를 받습니다. `account.requestPasswordReset`은 정규화한 주소당 시간3번까지만 발송하며 없는 주소·제재·탈퇴·초과·발송 실패도 같은 성공 응답입니다. 한도 초과는 `Retry-After`를 싣지 않습니다.
 
 `account.verifyEmail`과 `account.resetPassword`는 무효·사용·만료 토큰을400·`TOKEN_INVALID`로 거부합니다. 토큰은 SHA-256 해시로만 저장하고 인증24시간·재설정30분·한 번 소비를 적용합니다. 재설정의 비밀번호와 세션 폐기는 같은 트랜잭션이며 commit 뒤 그 세션들의 SSE 종료를 별도 알림으로 전합니다. 다른 계정의 세션·연결은 보존합니다.
 

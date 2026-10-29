@@ -10,6 +10,7 @@ export * from './clock/constants';
 export * from './clock/clock';
 export * from './clock/admin';
 export * from './clock/end';
+export * from './clock/reset';
 export {
   toWorldState,
   type JsonValue,

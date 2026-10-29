@@ -70,8 +70,8 @@ jobs:
   database-authz:
     name: opensamguk-database-authz
     runs-on: ubuntu-24.04
-    # PR #291의 15분 작업 취소를 반영한다. 개별 시험의 30초 제한·worker·검사 항목은 유지한다.
-    timeout-minutes: 30
+    # PR #314의 30분 작업 취소를 반영한다. 개별 시험의 제한·worker·검사 항목은 유지한다.
+    timeout-minutes: 45
     env:
       CI: 'true'
       INTEGRATION_SUITE: api
@@ -262,6 +262,9 @@ jobs:
       - name: Check current policy and consent in Chromium
         if: matrix.shard == 1
         run: pnpm e2e:legal --reporter=line
+      - name: Check account withdrawal in Chromium
+        if: matrix.shard == 1
+        run: pnpm e2e:withdrawal --reporter=line
       - name: Check admin sanction actions in Chromium
         if: matrix.shard == 1
         run: pnpm e2e:sanction --reporter=line
@@ -274,3 +277,6 @@ jobs:
       - name: Check admin world end actions in Chromium
         if: matrix.shard == 1
         run: pnpm e2e:admin-end --reporter=line
+      - name: Check admin world creation actions in Chromium
+        if: matrix.shard == 1
+        run: pnpm e2e:admin-create --reporter=line
