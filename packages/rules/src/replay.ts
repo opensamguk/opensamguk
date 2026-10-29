@@ -14,6 +14,7 @@ import { emptyTurn } from './policy';
 import { type ReplayPolicy } from './policy/replay';
 import { completePersonnelStep } from './personnel/step';
 import { updateResidenceAnchors } from './personnel/residence';
+import { isAdminClockKind, applyAdminClockRecord } from './clock/admin';
 
 export interface QueuedTurn {
   commandKey: string;
@@ -137,6 +138,7 @@ export function applyRecordedInput(
   input: RecordedInput,
   registry: RuleRegistry = ruleRegistry,
 ): ReplayState {
+  if (isAdminClockKind(input.kind)) return applyAdminClockRecord(replay, input);
   if (
     replay.policy &&
     (!replay.state.ruleFeatures ||

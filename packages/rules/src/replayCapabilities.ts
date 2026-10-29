@@ -22,6 +22,7 @@ import {
 import type { WorldInit } from './world/bootstrap';
 import { parsePreset, presetCommands, presetRules, type WorldPreset } from './world/preset';
 import type { UnitSetResource } from './world/resources';
+import { ADMIN_CLOCK_KINDS } from './clock/admin';
 
 export const ORIGIN_CAPS = 6 as const;
 export const ARCHIVE_CAPS = 6 as const;
@@ -49,8 +50,9 @@ export interface ExtDescriptorV1 {
 export type CapabilitySelection =
   | { treaty: { version: 1 }; policy: PolicyFormat | null }
   | { ext: ExtDescriptorV1; policy: PolicyFormat & { fromSequence: 0 } };
-type CapsOwner = 'common' | 'policy' | 'treaty';
+type CapsOwner = 'common' | 'policy' | 'treaty' | 'clock';
 export const CAPS_INPUT_OWNERS: Readonly<Record<string, CapsOwner>> = Object.freeze({
+  ...Object.fromEntries(ADMIN_CLOCK_KINDS.map((kind) => [kind, 'clock' as const])),
   'turns.set': 'common',
   'general.create': 'common',
   'general.setPolicy': 'policy',
@@ -192,6 +194,7 @@ export function validateCapsRecordedInput(
     throw new Error('형식 6 입력 종류를 확인하세요.');
   const sequence = sequenceSchema.parse(value.sequence);
   const owner = CAPS_INPUT_OWNERS[value.kind]!;
+  if (owner === 'clock') throw new Error('관리자 시계 입력은 재생 형식 3에서만 사용할 수 있습니다.');
   const modern =
     selection.policy !== null &&
     isPolicyMode({ fromSequence: selection.policy.fromSequence, actionSequence: sequence });

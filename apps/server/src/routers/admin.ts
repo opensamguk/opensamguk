@@ -6,6 +6,12 @@ import { createSanction, createSanctionInput, liftSanction, liftSanctionInput } 
 import { auditListInput, getUser, getUserInput, listAudit, searchUsers, searchUsersInput } from '../admin/read';
 import { listAdminWorlds } from '../admin/worlds';
 import {
+  requestWorldClock,
+  requestWorldClockInput,
+  getWorldClockRequest,
+  worldClockRequestInput,
+} from '../admin/worldActions';
+import {
   listAdminNotices,
   changeAdminNotice,
   noticeListInput,
@@ -16,7 +22,15 @@ import {
 
 export const adminRouter = router({
   whoami: adminProcedure.input(z.void()).query(() => ({ admin: true as const })),
-  world: router({ list: adminProcedure.input(z.void()).query(({ ctx }) => listAdminWorlds(ctx)) }),
+  world: router({
+    list: adminProcedure.input(z.void()).query(({ ctx }) => listAdminWorlds(ctx)),
+    requestClock: adminProcedure
+      .input(requestWorldClockInput)
+      .mutation(({ ctx, input }) => requestWorldClock(ctx, input)),
+    clockRequest: adminProcedure
+      .input(worldClockRequestInput)
+      .query(({ ctx, input }) => getWorldClockRequest(ctx, input)),
+  }),
   notice: router({
     list: adminProcedure.input(noticeListInput).query(({ ctx, input }) => listAdminNotices(ctx, input)),
     create: adminProcedure

@@ -20,6 +20,7 @@ import { checkOperationalProfile } from './world/map/profile';
 import type { RecordedInput, ReplayState } from './replay';
 import { campaignFeature, campaignInputKinds } from './campaign/feature';
 import { campaignAssignmentFeature } from './campaign/assignment';
+import { ADMIN_CLOCK_KINDS, applyAdminClockRecord } from './clock/admin';
 
 export interface ReplayOriginV1 {
   version: 1;
@@ -79,6 +80,13 @@ export const ruleRegistry: RuleRegistry = {
   ],
   monthlyOrder: ['treaty', 'personnel', 'campaign-assignment-v2'],
   inputKinds: [
+    ...ADMIN_CLOCK_KINDS.map((kind) => ({
+      kind,
+      feature: null,
+      route: 'direct' as const,
+      directTick: true,
+      apply: applyAdminClockRecord,
+    })),
     { kind: 'turns.set', feature: null, route: 'direct', apply: applyTurnsInput },
     { kind: 'general.create', feature: null, route: 'queued', apply: applyCreationInput },
     { kind: 'general.setPolicy', feature: 'policy', route: 'queued', apply: applyPolicyInput },

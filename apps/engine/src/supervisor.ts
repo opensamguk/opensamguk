@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import type { PrismaClient } from '@opensamguk/db';
+import { ADMIN_CLOCK_KINDS } from '@opensamguk/rules';
 import { stopOwnedChild } from './process-lifecycle';
 
 export const DISCOVERY_MS = 10_000;
@@ -156,6 +157,10 @@ export async function runSupervisor(
             where: {
               OR: [
                 { status: { in: ['RUNNING', 'PAUSED'] } },
+                {
+                  status: 'PREOPEN',
+                  inputEvents: { some: { status: 'PENDING', kind: { in: [...ADMIN_CLOCK_KINDS] } } },
+                },
                 {
                   status: 'ENDED',
                   inputEvents: {
