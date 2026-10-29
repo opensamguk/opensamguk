@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -18,7 +19,7 @@ type Pg = {
 };
 const requireDb = createRequire(new URL('../packages/db/package.json', import.meta.url));
 const { Client } = createRequire(requireDb.resolve('@prisma/adapter-pg'))('pg') as {
-  Client: new (options: { connectionString: string }) => Pg;
+  Client: new (options: { connectionString: string; connectionTimeoutMillis?: number }) => Pg;
 };
 if (!process.env.TEST_DATABASE_URL) throw new Error('전용 시험 DB가 필요합니다.');
 const source = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
@@ -31,8 +32,8 @@ const target = new URL(source),
   adminUrl = new URL(source);
 target.pathname = '/' + name;
 adminUrl.pathname = '/postgres';
-const admin = new Client({ connectionString: adminUrl.href }),
-  gate = new Client({ connectionString: target.href }),
+const admin = new Client({ connectionString: adminUrl.href, connectionTimeoutMillis: 10_000 }),
+  gate = new Client({ connectionString: target.href, connectionTimeoutMillis: 10_000 }),
   db = createDb(target.href);
 const origin = 'http://127.0.0.1:5173',
   key = randomBytes(32).toString('hex'),
@@ -56,6 +57,75 @@ function track<T>(work: () => Promise<T>) {
   );
   return promise;
 }
+const operationSignals = new AsyncLocalStorage<AbortSignal>();
+function suiteGuard(record: (error: unknown) => void) {
+  let failed = false;
+  const fail = (error: unknown) => {
+    failed = true;
+    record(error);
+  };
+  return {
+    get failed() {
+      return failed;
+    },
+    fail,
+    async hook<T>(
+      label: string,
+      work: (signal: AbortSignal) => Promise<T>,
+      tracker: <U>(work: () => Promise<U>) => Promise<U> = (work) => Promise.resolve().then(work),
+      budgetMs = 110_000,
+    ) {
+      const controller = new AbortController();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const original = tracker(() => operationSignals.run(controller.signal, () => work(controller.signal)));
+      try {
+        return await Promise.race([
+          original,
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => {
+              const error = new Error('자기 ' + label + ' hook 내부 기한 초과: DB 보존');
+              fail(error);
+              controller.abort(error);
+              reject(error);
+            }, budgetMs);
+          }),
+        ]);
+      } catch (error) {
+        fail(error);
+        controller.abort(error);
+        throw error;
+      } finally {
+        clearTimeout(timer);
+      }
+    },
+  };
+}
+const suite = suiteGuard((error) => errors.push(error));
+async function checked<T>(work: () => Promise<T>, signal = operationSignals.getStore()): Promise<T> {
+  signal?.throwIfAborted();
+  const result = await work();
+  signal?.throwIfAborted();
+  return result;
+}
+async function cleanupAttempt(work: () => Promise<unknown>, budgetMs = 10_000, tracked = true) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const original = tracked ? track(work) : Promise.resolve().then(work);
+  try {
+    await Promise.race([
+      original,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('자기 cleanup 정착 기한 초과: DB 보존')), budgetMs);
+      }),
+    ]);
+    return true;
+  } catch (error) {
+    suite.fail(error);
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function settle() {
   while (pending.size) await Promise.allSettled([...pending]);
 }
@@ -66,9 +136,9 @@ function it(title: string, work: (signal: AbortSignal) => Promise<void>, timeout
       const controller = new AbortController();
       onTestFailed(() => {
         controller.abort();
-        errors.push(new Error('실패한 자기 로그인 DB를 보존합니다.'));
+        suite.fail(new Error('실패한 자기 로그인 DB를 보존합니다.'));
       });
-      return track(() => work(controller.signal));
+      return track(() => operationSignals.run(controller.signal, () => work(controller.signal)));
     },
     timeout,
   );
@@ -76,90 +146,125 @@ function it(title: string, work: (signal: AbortSignal) => Promise<void>, timeout
 beforeEach(settle);
 beforeAll(
   () =>
-    track(async () => {
-      await admin.connect();
-      expect((await admin.query('SELECT oid FROM pg_database WHERE datname=$1', [name])).rows).toHaveLength(0);
-      await admin.query(`CREATE DATABASE "${name}"`);
-      oid = String(
-        (await admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname=$1', [name])).rows[0]!.oid,
+    suite.hook(
+      'setup',
+      async (signal) => {
+        await checked(() => admin.connect(), signal);
+        await checked(() => admin.query('SET statement_timeout=10000'), signal);
+        await checked(() => admin.query('SET lock_timeout=10000'), signal);
+        expect(
+          (await checked(() => admin.query('SELECT oid FROM pg_database WHERE datname=$1', [name]), signal)).rows,
+        ).toHaveLength(0);
+        await checked(() => admin.query('CREATE DATABASE "' + name + '"'), signal);
+        oid = String(
+          (
+            await checked(
+              () => admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname=$1', [name]),
+              signal,
+            )
+          ).rows[0]!.oid,
+        );
+        await checked(() => admin.query('ALTER DATABASE "' + name + '" SET statement_timeout=10000'), signal);
+        await checked(() => gate.connect(), signal);
+        const migrations = new URL('../packages/db/prisma/migrations/', import.meta.url);
+        for (const migration of (await checked(() => readdir(migrations), signal))
+          .filter((value) => /^\d{14}_/.test(value))
+          .sort()) {
+          signal.throwIfAborted();
+          const sql = await checked(() => readFile(new URL(migration + '/migration.sql', migrations), 'utf8'), signal);
+          await checked(() => gate.query(sql), signal);
+        }
+        passwordHash = await checked(() => hashPassword(password), signal);
+        sensitive.add(passwordHash);
+      },
+      track,
+    ),
+  120_000,
+);
+
+afterAll(
+  () =>
+    suite.hook('cleanup', async (signal) => {
+      const deadline = Date.now() + 110_000;
+      // Both original body and setup remain tracked after a wrapper deadline.
+      await cleanupAttempt(settle, 40_000, false);
+      if (!pending.size)
+        await cleanupAttempt(async () => {
+          const auditSignal = AbortSignal.any([signal, AbortSignal.timeout(30_000)]);
+          if (oid) {
+            const tables = (
+              await checked(
+                () => gate.query("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename"),
+                auditSignal,
+              )
+            ).rows;
+            for (const { tablename } of tables) {
+              auditSignal.throwIfAborted();
+              if (typeof tablename !== 'string') throw new Error('자기 DB 표 이름을 확인하세요.');
+              const quoted = '"' + tablename.replaceAll('"', '""') + '"';
+              const rows = await checked(
+                () =>
+                  gate.query("SELECT COALESCE(jsonb_agg(to_jsonb(t)),'[]'::jsonb)::text AS body FROM " + quoted + ' t'),
+                auditSignal,
+              );
+              const body = String(rows.rows[0]!.body);
+              if ([...databaseSecrets].some((secret) => body.includes(secret)))
+                throw new Error('자기 DB에 원문 비공개 값이 포함됐습니다.');
+            }
+          }
+        }, 30_000);
+      const closers: Array<() => Promise<unknown>> = [...apps].map((app) => () => app.close());
+      closers.push(
+        () => gate.end(),
+        () => db.$disconnect(),
       );
-      await admin.query(`ALTER DATABASE "${name}" SET statement_timeout='10000'`);
-      await gate.connect();
-      const migrations = new URL('../packages/db/prisma/migrations/', import.meta.url);
-      for (const migration of (await readdir(migrations)).filter((value) => /^\d{14}_/.test(value)).sort())
-        await gate.query(await readFile(new URL(migration + '/migration.sql', migrations), 'utf8'));
-      passwordHash = await hashPassword(password);
-      sensitive.add(passwordHash);
+      await Promise.all(closers.map((close) => cleanupAttempt(close)));
+      if (pending.size) suite.fail(new Error('미정착 원 작업이 있어 DB 보존'));
+      const allLogs = logs.join('\n');
+      if (allLogs.includes('127.0.0.1') || [...sensitive].some((value) => allLogs.includes(value)))
+        suite.fail(new Error('전체 종료 로그에 비공개 값이 포함됐습니다.'));
+      let connections: number | undefined,
+        dropped = false;
+      try {
+        if (oid) {
+          ({ connections } = await checked(() => confirmDisconnectedDatabase(admin, name, oid!), signal));
+          if (!suite.failed && !errors.length && !pending.size && !signal.aborted) {
+            if (Date.now() + 30_000 >= deadline) throw new Error('DROP 전 독립 정리 예산 부족: DB 보존');
+            const identity = await checked(
+              () => admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname=$1', [name]),
+              signal,
+            );
+            expect(identity.rows).toEqual([{ oid }]);
+            signal.throwIfAborted();
+            await checked(() => admin.query('DROP DATABASE "' + name + '"'), signal);
+            expect(
+              (await checked(() => admin.query('SELECT oid FROM pg_database WHERE datname=$1', [name]), signal)).rows,
+            ).toHaveLength(0);
+            dropped = true;
+          }
+        }
+      } catch (error) {
+        suite.fail(error);
+      }
+      const adminClosed = await cleanupAttempt(() => admin.end());
+      console.info(
+        JSON.stringify({
+          event: 'login-audit-cleanup',
+          name,
+          oid,
+          connections,
+          dropped,
+          adminClosed,
+          suiteFailed: suite.failed,
+          hookAborted: signal.aborted,
+          pendingOperations: pending.size,
+          errors: errors.length,
+        }),
+      );
+      if (errors.length) throw new AggregateError([...new Set(errors)], '조사 실행·자기 자원 정리 실패');
     }),
   120_000,
 );
-afterAll(async () => {
-  await settle();
-  try {
-    if (oid) {
-      const tables = (await gate.query("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename"))
-        .rows;
-      for (const { tablename } of tables) {
-        if (typeof tablename !== 'string') throw new Error('자기 DB 표 이름을 확인하세요.');
-        const quoted = '"' + tablename.replaceAll('"', '""') + '"';
-        const rows = await gate.query(
-          `SELECT COALESCE(jsonb_agg(to_jsonb(t)),'[]'::jsonb)::text AS body FROM ${quoted} t`,
-        );
-        const body = String(rows.rows[0]!.body);
-        if ([...databaseSecrets].some((secret) => body.includes(secret)))
-          throw new Error('자기 DB에 원문 비공개 값이 포함됐습니다.');
-      }
-    }
-  } catch (error) {
-    errors.push(error);
-  }
-  const closers: Array<() => Promise<unknown>> = [...apps].map((app) => () => app.close());
-  closers.push(
-    () => gate.end(),
-    () => db.$disconnect(),
-  );
-  for (const close of closers)
-    try {
-      await close();
-    } catch (error) {
-      errors.push(error);
-    }
-  const allLogs = logs.join('\n');
-  if (allLogs.includes('127.0.0.1') || [...sensitive].some((value) => allLogs.includes(value)))
-    errors.push(new Error('전체 종료 로그에 비공개 값이 포함됐습니다.'));
-  let connections: number | undefined,
-    dropped = false,
-    adminClosed = false;
-  try {
-    if (oid) {
-      ({ connections } = await confirmDisconnectedDatabase(admin, name, oid));
-      if (!errors.length) {
-        await admin.query(`DROP DATABASE "${name}"`);
-        dropped = true;
-      }
-    }
-  } catch (error) {
-    errors.push(error);
-  }
-  try {
-    await admin.end();
-    adminClosed = true;
-  } catch (error) {
-    errors.push(error);
-  }
-  console.info(
-    JSON.stringify({
-      event: 'login-audit-cleanup',
-      name,
-      oid,
-      connections,
-      dropped,
-      adminClosed,
-      errors: errors.length,
-    }),
-  );
-  if (errors.length) throw new AggregateError([...new Set(errors)], '로그인 조사 실행·정리 실패');
-}, 120_000);
 
 async function start(options: Partial<Parameters<typeof buildServer>[0]> = {}) {
   const app = await buildServer({
@@ -435,6 +540,13 @@ it('AC-M3-05 탈퇴와 실제 로그인 20회 경합에서 탈퇴 뒤 기록·�
     await db.session.create({ data: { id: session.id, userId: user.id, expiresAt: session.expiresAt } });
     await gate.query('BEGIN');
     await gate.query('SELECT id FROM "User" WHERE id=$1 FOR UPDATE', [user.id]);
+    const gatePid = Number((await gate.query('SELECT pg_backend_pid()::int AS pid')).rows[0]!.pid);
+    expect(Number.isSafeInteger(gatePid) && gatePid > 0, '자기 gate backend PID').toBe(true);
+    const beforeWaits = await gate.query(
+      "SELECT pid FROM pg_stat_activity WHERE datname=$1 AND pid<>$2 AND wait_event_type='Lock'",
+      [name, gatePid],
+    );
+    expect(beforeWaits.rows, '요청 전 다른 잠금 대기 없음').toHaveLength(0);
     const login = call(address, 'auth.login', { email, password }, signal);
     const withdraw = withdrawAccount(db, {
       userId: user.id,
@@ -451,14 +563,24 @@ it('AC-M3-05 탈퇴와 실제 로그인 20회 경합에서 탈퇴 뒤 기록·�
       for (;;) {
         signal.throwIfAborted();
         await gate.query('SELECT pg_stat_clear_snapshot()');
-        const waiting = (
-          await gate.query(
-            `SELECT count(*)::int AS n FROM pg_stat_activity
-          WHERE datname=$1 AND pid<>pg_backend_pid() AND wait_event_type='Lock'`,
-            [name],
+        const waiting = await gate.query(
+          `WITH RECURSIVE waiters AS (
+            SELECT pid FROM pg_stat_activity
+            WHERE datname=$1 AND pid<>$2 AND wait_event_type='Lock'
+          ), paths(root,pid,chain) AS (
+            SELECT pid,pid,ARRAY[pid] FROM waiters
+            UNION ALL
+            SELECT paths.root,blocker.pid,paths.chain || blocker.pid
+            FROM paths CROSS JOIN LATERAL unnest(pg_blocking_pids(paths.pid)) AS blocker(pid)
+            WHERE blocker.pid>0 AND NOT blocker.pid=ANY(paths.chain) AND cardinality(paths.chain)<16
           )
-        ).rows[0]!.n;
-        if (Number(waiting) >= 2) break;
+          SELECT DISTINCT root::int AS pid FROM paths WHERE pid=$2 ORDER BY pid`,
+          [name, gatePid],
+        );
+        signal.throwIfAborted();
+        const requestPids = new Set(waiting.rows.map((row) => Number(row.pid)));
+        expect([...requestPids].every((pid) => Number.isSafeInteger(pid) && pid > 0 && pid !== gatePid)).toBe(true);
+        if (requestPids.size === 2) break;
         if (Date.now() >= deadline) throw new Error('두 실제 계정 잠금 대기를 확인하지 못했습니다.');
         await delay(10, undefined, { signal });
       }
