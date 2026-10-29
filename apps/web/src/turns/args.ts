@@ -132,6 +132,7 @@ export function describeArgs(args: Record<string, unknown>, names: ArgNames): st
       parts.push(names.general(value) ?? `장수 ${value}`);
     else if (key === 'buy' && typeof value === 'boolean') parts.push(value ? '쌀 사기' : '쌀 팔기');
     else if (key === 'resource' && typeof value === 'string') parts.push(ENUM_LABELS[value] ?? value);
+    else if (key === 'target' && value === 'city') parts.push('도시 수비병');
     else parts.push(`${LABELS[key] ?? key} ${String(value)}`);
   }
   return parts.join(' · ');

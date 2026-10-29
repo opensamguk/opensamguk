@@ -133,6 +133,13 @@ it('실제 엔진 사본 A/B는 10분 경계를 포함해 늦게 공개되고 �
 it('RUNNING·PAUSED만 createdAt/id 순서로 나열하고 사본 없는 월드는 null이다', async () => {
   const { worldId } = await world();
   const source = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+  const { preset, commandMeta, replayOrigin, operationalMap, campaignState, cityResourcesState, ...sourceScalars } =
+    source;
+  // These legacy list fixtures intentionally omit runtime map/campaign/city ledgers.
+  void [operationalMap, campaignState];
+  expect(source.ruleFeatures).not.toContain('city-resources-v1');
+  expect(cityResourcesState).toBeNull();
+  if (source.statRules === null || source.unitSet === null) throw new Error('정식 능력치·병종 JSON이 필요합니다.');
   await db.world.update({ where: { id: worldId }, data: { createdAt: new Date(epoch + minute) } });
   for (const [id, status, createdAt] of [
     ['00000000-0000-4000-8000-000000000002', 'RUNNING', epoch],
@@ -142,14 +149,22 @@ it('RUNNING·PAUSED만 createdAt/id 순서로 나열하고 사본 없는 월드�
   ] as const)
     await db.world.create({
       data: {
-        ...source,
-        operationalMap: undefined,
-        campaignState: undefined,
+        ...sourceScalars,
+        statRules: source.statRules,
+        unitSet: source.unitSet,
+        ...(preset === null ? {} : { preset }),
+        ...(commandMeta === null ? {} : { commandMeta }),
+        ...(replayOrigin === null ? {} : { replayOrigin }),
         id,
         status,
         createdAt: new Date(createdAt),
       },
     });
+  const ledgers = await db.$queryRaw<
+    Array<{ isNull: boolean }>
+  >`SELECT "cityResourcesState" IS NULL AS "isNull" FROM "World"`;
+  expect(ledgers).toHaveLength(5);
+  expect(ledgers.every((row) => row.isNull)).toBe(true);
   const response = await maps();
   expect(response.data?.worlds.map((entry) => entry.id)).toEqual([
     '00000000-0000-4000-8000-000000000001',

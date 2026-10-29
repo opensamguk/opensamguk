@@ -55,6 +55,7 @@ model World {
   removedNations  RemovedNation[]
   commandMeta     Json?
   campaignState   Json?
+  cityResourcesState Json?
   battleLogs      BattleLog[]
   ranking         RankingSnapshot?
   publicMaps      PublicMapSnapshot[]

@@ -10,11 +10,12 @@ v1의 필요한 규칙과 데이터를 TypeScript 엔진·API·React에 연결�
 | 범위 | 상태와 근거 |
 | --- | --- |
 | 통합판 v0.1 | 유효 AC-INT 15개 완료. 정식 시나리오 132개월 완주·두 월드 격리·재시작·중복 입력·백업 복원·동일 시드 재생, 실제 PostgreSQL·Chromium 검사와 독립 리뷰 뒤 [PR #264](https://github.com/opensamguk/opensamguk/pull/264)로 병합 |
+| 도시 자원 추가 범위 | [INT-18](docs/plans/INT-18.md)의 AC-INT-18A~D 4개는 구현·검증 중. 기존 통합판15개 완료와 별도이며 새 판의 실제 PG·Chromium·한 기수 인수·독립 리뷰·병합이 필요 |
 | 누구나 가입하는 공개 오픈 | 준비 중. 계정·동의·탈퇴·관리자·운영·부하·접근성·공개 인수의 남은 항목은 [공개 준비 체크리스트](docs/plans/public-opening-v01.md)에 기록. 서버·도메인·메일 서비스와 운영자·문의처는 미정 |
 
 완료 범위는 [동결 출시 계획](docs/plans/integration-release.md), [현재 기능과 동결 범위](docs/product/feature-selection.md), [인수조건](docs/product/acceptance-criteria.md)을 따릅니다. 1턴은 1개월이고 장수 예약은 30칸입니다. 통솔·무력·지력(`intel`)·정치·매력의 5능력치, 191년 21국·491장수, 실제 GIS의 53도시·8관문·6항구 시설·13전장 표시를 씁니다. 사람 장수의 생성·출사·내정·동의에 따른 휘하 영입·부곡 편성·이동·전투·점령·기수 종료가 연결됐습니다.
 
-군현 관리·지속 행군·5자원·피로·카드 명령·실시간/격자 전투·v1 전체 1,000명·원작 90명령 전부·새 공개 초상은 보류합니다. 과거 M1·M2·M3와 Phase 2의 미완료 기록은 보존하며 통합판 완료로 대신하지 않습니다. 다음 작업은 `pnpm next`로 확인합니다. 상태 기준은 2026-10-28입니다.
+군현 관리·지속 행군·5자원·피로·카드 명령·실시간/격자 전투·v1 전체 1,000명·원작 90명령 전부·새 공개 초상은 보류합니다. 과거 M1·M2·M3와 Phase 2의 미완료 기록은 보존하며 통합판 완료로 대신하지 않습니다. 다음 작업은 `pnpm next`로 확인합니다. 상태 기준은 2026-10-29입니다.
 
 기존 전체 계획의 관문 집계도 보존합니다. 아래 표는 통합판 완료율과 별도이며 이전 AC의 미완료를 없애지 않습니다.
 
@@ -22,7 +23,9 @@ v1의 필요한 규칙과 데이터를 TypeScript 엔진·API·React에 연결�
 | --- | --- | --- |
 | M1 혼자와 NPC로 한 판 완주 | [AC-M1 22개](docs/product/acceptance-criteria.md#m1) 통과 | 진행 중 (✅ 20 · 🟨 2 · ⬜ 0) | <!-- lint-text-ignore C-5 -->
 | M2 독립 에이전트 참가 시험 | [AC-M2 20개](docs/product/acceptance-criteria.md#m2) 통과 | 진행 중 (✅ 4 · 🟨 3 · ⬜ 13) | <!-- lint-text-ignore C-5 -->
-| M3 공개 오픈 | [AC-M3 16개](docs/product/acceptance-criteria.md#m3) 통과 | 진행 중 (✅ 0 · 🟨 1 · ⬜ 15) | <!-- lint-text-ignore C-5 -->
+| M3 기존 전체 인수 | [AC-M3 16개](docs/product/acceptance-criteria.md#m3) 통과 | 진행 중 (✅ 0 · 🟨 1 · ⬜ 15) | <!-- lint-text-ignore C-5 -->
+
+이번 공개의 M3 필수 조건은 [D-039](docs/product/decisions.md#d-039-공개-준비에서도-v01의-후속-게임-기능을-보존한다-2026-10-29)에 따라 AC-M3-01~11과16의12개입니다. AC-M3-12~15는 후속 미완료로 보존합니다. 도시 금·쌀·수비병과 부곡 배속은 [D-040](docs/product/decisions.md#d-040-도시가-금쌀수비병을-보유하고-권한자가-부곡에-배속한다-2026-10-29)의 추가 범위이며 기존 월드의 자원과 재생을 바꾸지 않습니다.
 
 과거 전체 명령의 미완료 목록은 [명령 대응표](docs/product/command-coverage.json)에 남깁니다. `node tools/command-coverage.mjs`의 현재 원작 비교 분모 90개, 정본 분모 91개, 전 단계 완료 0개입니다. D-038에 따라 이 전체 명령 분모를 이번 통합판의 완료 분모로 쓰지 않습니다.
 

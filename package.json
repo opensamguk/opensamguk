@@ -13,6 +13,7 @@
     "e2e:account": "playwright test --config playwright.account.config.ts",
     "e2e:legal": "playwright test --config playwright.legal.config.ts",
     "e2e:sanction": "playwright test --config playwright.sanction.config.ts",
+    "e2e:city-resources": "playwright test --config playwright.city-resources.config.ts",
     "e2e:admin-clock": "playwright test --config playwright.clock.config.ts",
     "e2e:admin-end": "playwright test --config playwright.end.config.ts",
     "notice:publish": "tsx --env-file-if-exists=.env tools/notice-publish.ts",

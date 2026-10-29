@@ -12,6 +12,7 @@ import { runOfficeAssign, takeOfficeTurn } from '../personnel/officeTurn';
 import { canExecuteNationCommand } from '../personnel/permissions';
 import type { OfficeRevisions } from '../personnel/offices';
 import { assertTick, PersonnelInvariantError, type ClosedOffer, type PersonnelLog } from '../personnel/types';
+import { canExecuteCityNationCommand } from '../cityResources/commands';
 
 export type PersonnelTurnInput = Readonly<{ offices: DeepReadonly<OfficeRevisions> }>;
 export type PersonnelTurnChange = Readonly<{
@@ -73,7 +74,10 @@ export function runGeneralTurn(
         );
         if (decision.chosen) slot = { commandKey: decision.chosen.key, args: decision.chosen.args };
       }
-      if (!canExecuteNationCommand(take.officerLevel, slot.commandKey))
+      if (
+        !canExecuteNationCommand(take.officerLevel, slot.commandKey) &&
+        !canExecuteCityNationCommand(next, take.officerLevel, slot.commandKey)
+      )
         throw new PersonnelInvariantError('직책 칸 명령과 인자가 올바르지 않습니다.');
       let result: CommandResult | Failure;
       if (slot.commandKey === 'nation_assign') {

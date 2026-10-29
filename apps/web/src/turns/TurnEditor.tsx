@@ -515,6 +515,7 @@ function Editor<S extends DisplaySlot>({
           selectedCityKey={selectedCityKey}
           generals={generals}
           defaultCrewType={home.data?.general.crewType}
+          cityResources={summary.data?.cityResourcesEnabled === true}
           blockedReason={putBlocked}
           targetLabel={targetLabel}
           searchRef={searchRef}
