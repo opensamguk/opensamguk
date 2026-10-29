@@ -3,6 +3,7 @@ import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { setTimeout as delay } from 'node:timers/promises';
 import { beforeAll, afterAll, beforeEach, expect, it as test } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
@@ -16,7 +17,7 @@ import { savePreparedInitialWorld } from '../apps/engine/src/world/persistence';
 import { prepareWorldReset } from '../apps/engine/src/admin/resetPreparation';
 import { processWorldCreateRequest } from '../apps/engine/src/admin/createRequests';
 import { controlClock } from '../apps/engine/src/world/clock';
-import { acquireLease, releaseLease } from '../apps/engine/src/lease';
+import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { exportReplay, replayArchive } from '../apps/engine/src/replay';
 import { testDatabaseUrl } from './test-database';
@@ -376,11 +377,35 @@ async function advance(worldId: string, tick: number, signal: AbortSignal) {
   const lease = await checked(() => acquireLease(db, worldId), signal);
   if (!lease) throw new Error('자기 리스가 필요합니다.');
   const failures: unknown[] = [];
+  const stop = new AbortController();
+  const executionSignal = AbortSignal.any([signal, stop.signal]);
+  const renewal = (async () => {
+    while (!executionSignal.aborted) {
+      try {
+        await delay(lease.ttlMs / 3, undefined, { signal: executionSignal });
+      } catch (error) {
+        if (!executionSignal.aborted) failures.push(error);
+        break;
+      }
+      if (executionSignal.aborted) break;
+      try {
+        await checked(() => renewLease(db, lease), executionSignal);
+      } catch (error) {
+        if (!executionSignal.aborted || error !== executionSignal.reason) {
+          failures.push(error);
+          stop.abort(error);
+        }
+        break;
+      }
+    }
+  })();
   try {
-    await checked(() => new TurnLoop(db, lease).advanceTo(tick, signal), signal);
+    await checked(() => new TurnLoop(db, lease).advanceTo(tick, executionSignal), executionSignal);
   } catch (error) {
     failures.push(error);
   } finally {
+    stop.abort();
+    await renewal;
     try {
       await releaseLease(db, lease);
     } catch (error) {
