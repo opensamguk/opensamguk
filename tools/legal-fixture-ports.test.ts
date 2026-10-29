@@ -20,6 +20,33 @@ const fastify = createRequire(new URL('../apps/server/package.json', import.meta
   get(path: string, handler: () => string): void;
 };
 
+async function withOwnedListener<T>(
+  use: () => Promise<T>,
+  close: () => Promise<unknown>,
+  listening: () => boolean,
+): Promise<T> {
+  const errors: unknown[] = [];
+  let result!: T;
+  try {
+    result = await use();
+  } catch (error) {
+    errors.push(error);
+  }
+  try {
+    await close();
+  } catch (error) {
+    errors.push(error);
+  }
+  try {
+    expect(listening()).toBe(false);
+  } catch (error) {
+    errors.push(error);
+  }
+  if (errors.length === 1) throw errors[0];
+  if (errors.length > 1) throw new AggregateError(errors, 'owned listener body or cleanup failed');
+  return result;
+}
+
 it.each(['EADDRINUSE', 'EACCES'])('legal fixture preserves exactly16 Windows %s failures', async (code) => {
   const errors = Array.from({ length: 16 }, () => errorWith(code));
   const listen = vi.fn(async () => {
@@ -65,29 +92,32 @@ it('raw HTTP binds after an actual occupied candidate, removes bind listeners, a
       });
       const before = bindListeners(server);
       let first = true;
-      try {
-        await listenLegalHttp(server, {
-          nextPort: () => {
-            if (first) {
-              first = false;
-              return Number(occupied.port);
-            }
-            return randomInt(20_000, 50_000);
-          },
-        });
-        const address = server.address();
-        expect(address !== null && typeof address !== 'string').toBe(true);
-        if (!address || typeof address === 'string') throw new Error('owned address missing');
-        expect(String(address.port)).not.toBe(occupied.port);
-        expect(await (await fetch(`http://127.0.0.1:${address.port}`)).text()).toBe('new listener');
-        expect(requests).toBe(1);
-        expect(bindListeners(server)).toEqual(before);
-        expect(await (await fetch(occupied)).text()).toBe('occupied');
-      } finally {
-        if (server.listening)
-          await new Promise<void>((resolve, reject) => server.close((e) => (e ? reject(e) : resolve())));
-      }
-      expect(server.listening).toBe(false);
+      await withOwnedListener(
+        async () => {
+          await listenLegalHttp(server, {
+            nextPort: () => {
+              if (first) {
+                first = false;
+                return Number(occupied.port);
+              }
+              return randomInt(20_000, 50_000);
+            },
+          });
+          const address = server.address();
+          expect(address !== null && typeof address !== 'string').toBe(true);
+          if (!address || typeof address === 'string') throw new Error('owned address missing');
+          expect(String(address.port)).not.toBe(occupied.port);
+          expect(await (await fetch(`http://127.0.0.1:${address.port}`)).text()).toBe('new listener');
+          expect(requests).toBe(1);
+          expect(bindListeners(server)).toEqual(before);
+          expect(await (await fetch(occupied)).text()).toBe('occupied');
+        },
+        async () => {
+          if (server.listening)
+            await new Promise<void>((resolve, reject) => server.close((e) => (e ? reject(e) : resolve())));
+        },
+        () => server.listening,
+      );
     },
   );
 });
@@ -131,30 +161,68 @@ it('Fastify reuses the prepared instance after an actual collision and handles e
         requests++;
         return 'fastify listener';
       });
-      await api.ready();
       let first = true;
-      try {
-        const origin = await listenLegalLoopback(
-          (port) => api.listen({ host: '127.0.0.1', port }),
-          () => api.server.listening,
-          {
-            nextPort: () => {
-              if (first) {
-                first = false;
-                return Number(occupied.port);
-              }
-              return randomInt(20_000, 50_000);
+      await withOwnedListener(
+        async () => {
+          await api.ready();
+          const origin = await listenLegalLoopback(
+            (port) => api.listen({ host: '127.0.0.1', port }),
+            () => api.server.listening,
+            {
+              nextPort: () => {
+                if (first) {
+                  first = false;
+                  return Number(occupied.port);
+                }
+                return randomInt(20_000, 50_000);
+              },
             },
-          },
-        );
-        expect(new URL(origin).port).not.toBe(occupied.port);
-        expect(await (await fetch(origin)).text()).toBe('fastify listener');
-        expect(requests).toBe(1);
-        expect(await (await fetch(occupied)).text()).toBe('occupied');
-      } finally {
-        await api.close();
-      }
-      expect(api.server.listening).toBe(false);
+          );
+          expect(new URL(origin).port).not.toBe(occupied.port);
+          expect(await (await fetch(origin)).text()).toBe('fastify listener');
+          expect(requests).toBe(1);
+          expect(await (await fetch(occupied)).text()).toBe('occupied');
+        },
+        () => api.close(),
+        () => api.server.listening,
+      );
     },
   );
 });
+
+it.each(['raw', 'fastify'])(
+  'preserves %s body and close failures and still checks the settled listener',
+  async (kind) => {
+    const bodyError = new Error('owned body failed');
+    const closeError = new Error('owned close failed');
+    const api = kind === 'fastify' ? fastify() : undefined;
+    const socket = api?.server ?? createServer();
+    let settledChecks = 0;
+    const error = await withOwnedListener(
+      async () => {
+        if (api) {
+          await api.ready();
+          await listenLegalLoopback(
+            (port) => api.listen({ host: '127.0.0.1', port }),
+            () => api.server.listening,
+          );
+        } else await listenLegalHttp(socket);
+        throw bodyError;
+      },
+      async () => {
+        if (api) await api.close();
+        else if (socket.listening)
+          await new Promise<void>((resolve, reject) => socket.close((e) => (e ? reject(e) : resolve())));
+        throw closeError;
+      },
+      () => {
+        settledChecks++;
+        return socket.listening;
+      },
+    ).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(AggregateError);
+    expect((error as AggregateError).errors).toEqual([bodyError, closeError]);
+    expect(settledChecks).toBe(1);
+    expect(socket.listening).toBe(false);
+  },
+);
