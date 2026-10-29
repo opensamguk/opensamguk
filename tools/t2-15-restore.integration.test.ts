@@ -808,9 +808,15 @@ describe('T2-15 B1 실제 복구 리허설', () => {
         controller.signal.throwIfAborted();
         assert.equal(initial.nations.length, 21);
         assert.equal(initial.generals.length, 491);
+        const ruleFeatures = [...new Set([...(initial.ruleFeatures ?? []), 'policy'])];
         resetSourceId = (
-          await saveInitialWorld(db, initial, { name: '초기화 백업 정식191', turnTermMinutes: 30, endYear: 200 })
+          await saveInitialWorld(
+            db,
+            { ...initial, ruleFeatures },
+            { name: '초기화 백업 정식191', turnTermMinutes: 30, endYear: 200, ruleFeatures },
+          )
         ).worldId;
+        assert.equal(await db.generalTurn.count({ where: { worldId: resetSourceId } }), 491 * 30);
         await controlClock(db, resetSourceId, 'start');
         await controlClock(db, resetSourceId, 'pause');
         controller.signal.throwIfAborted();
