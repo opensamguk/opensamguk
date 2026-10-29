@@ -24,6 +24,13 @@ export function AccountPage() {
           </dl>
           {!account.data.emailVerified ? <VerificationRequest email={account.data.email} /> : null}
           <h2>동의 기록</h2>
+          {account.data.consentRequired.length > 0 ? (
+            <p>
+              <Link to="/legal/agree" search={{ next: '/account' }}>
+                현재 문서를 확인하고 동의하기
+              </Link>
+            </p>
+          ) : null}
           {account.data.consents.length === 0 ? (
             <p>기록된 동의가 없습니다.</p>
           ) : (
@@ -37,6 +44,8 @@ export function AccountPage() {
             </ul>
           )}
           <nav aria-label="계정 설정" className={styles.links}>
+            <Link to="/legal/terms">이용약관</Link>
+            <Link to="/legal/privacy">개인정보처리방침</Link>
             <Link to="/forgot-password">비밀번호 재설정</Link>
             <Link to="/settings/notifications">알림 설정</Link>
           </nav>
