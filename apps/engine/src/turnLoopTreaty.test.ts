@@ -188,6 +188,10 @@ it.each([false, true])(
     expect(args[4]).toEqual(modern ? { policy: 'none' } : {});
     expect([...args[5]!.list('general'), ...args[5]!.list('nation')]).toHaveLength(37);
     expect(f.tx.treaty.updateMany).not.toHaveBeenCalled();
+    expect(f.world.actionSequence).toBe(1);
+    expect(f.tx.generalLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ sequence: f.world.actionSequence }) }),
+    );
   },
 );
 

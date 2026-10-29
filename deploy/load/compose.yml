@@ -1,0 +1,116 @@
+# AC-M3-07. 전용 프로젝트·새 볼륨만 사용한다. 이미지는 실행 전 source label로 검증한다.
+x-app: &app
+  image: ${LOAD_IMAGE:?}
+  pull_policy: never
+  user: '10001:10001'
+  init: true
+  read_only: true
+  cgroup_parent: system.slice
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs: ['/tmp:rw,noexec,nosuid,size=64m,mode=1777']
+  restart: 'no'
+  stop_grace_period: 20s
+  networks: [backend]
+  volumes:
+    - app-secrets:/run/secrets:ro
+    - evidence:/evidence
+  labels:
+    org.opensamguk.load.run: ${LOAD_RUN_ID:?}
+  logging:
+    driver: json-file
+    options: { max-size: 1m, max-file: '1' }
+
+services:
+  postgres:
+    image: postgres:18.6-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+    pull_policy: never
+    user: '70:70'
+    read_only: true
+    cgroup_parent: system.slice
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+      - /var/run/postgresql:rw,noexec,nosuid,size=16m,mode=3777
+    cpus: 1
+    mem_limit: 2g
+    memswap_limit: 2g
+    environment:
+      POSTGRES_USER: load
+      POSTGRES_DB: ${LOAD_DATABASE:?}
+      POSTGRES_PASSWORD_FILE: /run/secrets/pg_password
+    volumes:
+      - pg-data:/var/lib/postgresql
+      - pg-secrets:/run/secrets:ro
+    networks: [backend]
+    restart: 'no'
+    stop_grace_period: 30s
+    labels: { org.opensamguk.load.run: '${LOAD_RUN_ID:?}' }
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U load -d "$$POSTGRES_DB"']
+      interval: 1s
+      timeout: 2s
+      retries: 30
+    logging:
+      driver: json-file
+      options: { max-size: 1m, max-file: '1' }
+  server:
+    <<: *app
+    cpus: 0.5
+    mem_limit: 1g
+    memswap_limit: 1g
+    command: [node, --import, tsx, tools/load/server.ts]
+    environment:
+      LOAD_RUN_ID: ${LOAD_RUN_ID:?}
+      NODE_ENV: production
+      CAPACITY_MONITOR_ENABLED: '0'
+    ports: ['127.0.0.1::3001']
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:3001/healthz').then(r=>{if(!r.ok)process.exitCode=1}).catch(()=>{process.exitCode=1})",
+        ]
+      interval: 1s
+      timeout: 2s
+      retries: 30
+  engine:
+    <<: *app
+    cpus: 0.5
+    mem_limit: 1g
+    memswap_limit: 1g
+    command: [node, --import, tsx, apps/engine/src/index.ts]
+    environment:
+      ENGINE_METRICS_PATH: /evidence/metrics.jsonl
+      NODE_ENV: production
+  generator:
+    <<: *app
+    cpus: 1
+    mem_limit: 1g
+    memswap_limit: 1g
+    command: [node, --import, tsx, tools/load/worker.ts, generate]
+    environment:
+      LOAD_RUN_ID: ${LOAD_RUN_ID:?}
+      LOAD_MODE: ${LOAD_MODE:?}
+      LOAD_SETUP_DEADLINE: ${LOAD_SETUP_DEADLINE:?}
+      LOAD_BODY_DEADLINE: ${LOAD_BODY_DEADLINE:?}
+      LOAD_SOURCE_HEAD: ${LOAD_SOURCE_HEAD:?}
+      LOAD_SOURCE_SHA256: ${LOAD_SOURCE_SHA256:?}
+      NODE_ENV: production
+
+volumes:
+  pg-data:
+    labels: { org.opensamguk.load.run: '${LOAD_RUN_ID:?}' }
+  pg-secrets:
+    labels: { org.opensamguk.load.run: '${LOAD_RUN_ID:?}' }
+  app-secrets:
+    labels: { org.opensamguk.load.run: '${LOAD_RUN_ID:?}' }
+  evidence:
+    labels: { org.opensamguk.load.run: '${LOAD_RUN_ID:?}' }
+networks:
+  backend:
+    internal: true
+    labels: { org.opensamguk.load.run: '${LOAD_RUN_ID:?}' }

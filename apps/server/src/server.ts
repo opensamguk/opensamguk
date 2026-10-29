@@ -11,6 +11,8 @@ import { appRouter, type AppRouter } from './router';
 import { createRateLimiter } from './security/rateLimit';
 import { registerRealtime, type RealtimeOptions } from './realtime';
 import { registerOpsHealth } from './ops/health';
+import { readCapacityConfig, type CapacityMonitorConfig } from './ops/capacity';
+import { registerCapacityMonitor } from './ops/monitor';
 import type { MailTransport } from './mail/transport';
 import { emailVerificationRequired } from './auth/verificationPolicy';
 import { resolveLegalPolicy, type LegalPolicy } from './legal/policy';
@@ -31,6 +33,7 @@ export async function buildServer(options: {
   emailVerificationRequired?: boolean;
   legalPolicy?: LegalPolicy | null;
   withdrawalPolicy?: WithdrawalPolicy | null;
+  capacityMonitor?: CapacityMonitorConfig | null;
 }) {
   const requireVerifiedEmail = emailVerificationRequired(process.env, options);
   const mapConfig = publicMapConfig(process.env);
@@ -53,6 +56,8 @@ export async function buildServer(options: {
   const trustProxyValue = process.env.TRUST_PROXY;
   if (trustProxyValue !== undefined && trustProxyValue !== '0' && trustProxyValue !== '1')
     throw new Error('TRUST_PROXY는 0 또는 1이어야 합니다.');
+  const capacityConfig =
+    options.capacityMonitor === undefined ? readCapacityConfig(process.env) : options.capacityMonitor;
   const clock = options.now ?? Date.now;
   const legalPolicy = resolveLegalPolicy(options.legalPolicy, clock());
   const withdrawalPolicy = resolveWithdrawalPolicy(options.withdrawalPolicy, legalPolicy);
@@ -162,5 +167,6 @@ export async function buildServer(options: {
         : 500;
     reply.code(status).send({ error: '요청을 처리하지 못했습니다.' });
   });
+  registerCapacityMonitor(server, options.db, capacityConfig);
   return server;
 }

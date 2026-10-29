@@ -1,3 +1,12 @@
+BuildKit external build-only image
+Referenced by: tools/load/ci.ts (manual isolated load workflows)
+Image: moby/buildkit:v0.34.1@sha256:99368f3e46177c6405b9740e4461d91cee004128daeecca78d4ceac50ec1da5c
+Release and source: https://github.com/moby/buildkit/releases/tag/v0.34.1
+License: Apache-2.0, https://github.com/moby/buildkit/blob/v0.34.1/LICENSE
+The external image retains its upstream component licenses and notices.
+No BuildKit binary or third-party image layers are vendored in this repository.
+
+
 Caddy external runtime image
 Referenced by: deploy/compose.yml
 Image: caddy:2.11.7-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f

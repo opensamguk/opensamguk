@@ -29,6 +29,7 @@ import { persistPersonnelPacket } from './ruleFeatures';
 import { engineResolver, persistExt, verifyWorldExt } from './extState';
 import { assertWorldCapabilities } from './capsGate';
 import { processAdminClock } from './admin/executor';
+import { observeCommittedStep, type CommitMetricCandidate, type CommitMetricSink } from './metrics';
 
 export const CLOCK_CHECKPOINT_MS = 5_000;
 export const ENGINE_BATCH_STEPS = 64;
@@ -51,6 +52,7 @@ type TurnHooks = {
   beforeCommit?: (tx: Prisma.TransactionClient) => Promise<void>;
   elapsedNow?: () => number;
   publicMapNow?: () => number;
+  commitMetricSink?: CommitMetricSink;
 };
 export interface TurnExecution {
   generalId: number;
@@ -122,6 +124,7 @@ export class TurnLoop {
   private async step(target: number | undefined, signal?: AbortSignal) {
     const { worldId } = this.lease;
     const signals: RealtimeSignal[] = [];
+    let metric: CommitMetricCandidate | undefined;
     const result = await this.db.$transaction(
       async (tx) => {
         await lockLease(tx, this.lease);
@@ -317,6 +320,7 @@ export class TurnLoop {
               worldId,
               generalId: due.id,
               tick: due.nextTurnTick,
+              sequence,
               commandKey,
               kind: failed ? 'failure' : 'success',
               text: failed ? `${result.code}: ${result.message}` : result.logs.map((log) => log.text).join('\n'),
@@ -388,6 +392,18 @@ export class TurnLoop {
         if (progressed) await this.hooks.beforeCommit?.(tx);
         signal?.throwIfAborted();
         await assertLease(tx, this.lease);
+        if (this.hooks.commitMetricSink && progressed && endedTick !== undefined)
+          metric = {
+            worldId,
+            tick: endedTick,
+            sequence,
+            kind: monthly ? 'monthly' : 'turn',
+            clockMode: world.clockMode,
+            clockTick: world.clockTick,
+            clockAnchorAt: world.clockAnchorAt?.getTime() ?? null,
+            turnTermMinutes: world.turnTermMinutes,
+            explicitAdvance: target !== undefined,
+          };
         return {
           tick: savedTick,
           state: next,
@@ -399,6 +415,7 @@ export class TurnLoop {
       },
       { timeout: 30_000 },
     );
+    if (metric && this.hooks.commitMetricSink) await observeCommittedStep(this.db, metric, this.hooks.commitMetricSink);
     this.extVerified = true;
     this.replayChecked = true;
     for (const signal of signals)
