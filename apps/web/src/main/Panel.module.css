@@ -19,6 +19,11 @@
   margin: 0;
   font-size: var(--text-md);
   font-weight: 700;
+  scroll-margin-block-start: 80px;
+}
+.title:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 4px;
 }
 .actions {
   margin-left: auto;
