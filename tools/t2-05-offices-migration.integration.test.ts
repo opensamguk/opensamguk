@@ -370,6 +370,7 @@ it.each(['empty', 'legacy'] as const)(
         '20261104000000_account_world_sanctions',
         '20261105000000_admin_notices',
         '20261106000000_legal_document_versions',
+        '20261107000000_admin_sanction_requests',
       ]);
       for (const directory of previous) {
         await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));

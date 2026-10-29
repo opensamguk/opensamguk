@@ -1,0 +1,35 @@
+.body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+}
+.consents {
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  min-width: 0;
+}
+.check {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+}
+.check input {
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  flex: 0 0 44px;
+}
+.link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  min-width: 44px;
+}
+.consents summary {
+  min-height: 44px;
+  cursor: pointer;
+  align-content: center;
+}

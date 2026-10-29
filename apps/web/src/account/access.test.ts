@@ -1,6 +1,6 @@
 import { TRPCClientError } from '@trpc/client';
 import { describe, expect, it } from 'vitest';
-import { accountNext, isVerificationDenied, needsEmailVerification } from './access';
+import { accountNext, isConsentDenied, isVerificationDenied, needsConsent, needsEmailVerification } from './access';
 
 describe('T3-03 AC-M3-01 인증 이동 경계', () => {
   it('서버가 필수라고 답한 미인증 계정만 막는다', () => {
@@ -25,6 +25,8 @@ describe('T3-03 AC-M3-01 인증 이동 경계', () => {
     '/forgot-password/',
     '/x/../verify-email/',
     '/x/../login',
+    '/legal/agree?next=/w/abc',
+    '/x/../legal/agree/',
     undefined,
   ])('외부 이동·인증 순환을 거부한다 %j', (next) => {
     expect(accountNext(next)).toBeNull();
@@ -39,5 +41,20 @@ describe('T3-03 AC-M3-01 인증 이동 경계', () => {
     const error = TRPCClientError.from({ error: { code: -32000, message: 'private-fixture', data: { code, reason } } });
     expect(isVerificationDenied(error)).toBe(expected);
     expect(isVerificationDenied(new Error('EMAIL_NOT_VERIFIED'))).toBe(false);
+  });
+
+  it('서버가 요구하는 문서와 실제 동의 거부 사유만 재동의로 보낸다', () => {
+    expect(needsConsent({ consentRequired: [] })).toBe(false);
+    expect(needsConsent({ consentRequired: ['TERMS'] })).toBe(true);
+    for (const [code, reason, expected] of [
+      ['FORBIDDEN', 'CONSENT_REQUIRED', true],
+      ['BAD_REQUEST', 'CONSENT_REQUIRED', false],
+      ['FORBIDDEN', 'EMAIL_NOT_VERIFIED', false],
+    ] as const) {
+      const error = TRPCClientError.from({
+        error: { code: -32000, message: 'private-fixture', data: { code, reason } },
+      });
+      expect(isConsentDenied(error)).toBe(expected);
+    }
   });
 });

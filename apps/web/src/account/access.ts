@@ -15,11 +15,21 @@ export function accountNext(next: unknown): string | null {
   const normalized = safeNext(url.pathname + url.search);
   if (url.origin !== 'http://localhost' || !normalized) return null;
   const pathname = url.pathname.replace(/\/+$/, '') || '/';
-  if (['/login', '/signup', '/verify-email', '/reset-password', '/forgot-password'].includes(pathname)) return null;
+  if (['/login', '/signup', '/verify-email', '/reset-password', '/forgot-password', '/legal/agree'].includes(pathname))
+    return null;
   return normalized;
 }
 
 export function isVerificationDenied(error: unknown): boolean {
   const data = publicFailure(error);
   return data?.code === 'FORBIDDEN' && data.reason === 'EMAIL_NOT_VERIFIED';
+}
+
+export function needsConsent(account: Pick<Account, 'consentRequired'>) {
+  return account.consentRequired.length > 0;
+}
+
+export function isConsentDenied(error: unknown): boolean {
+  const data = publicFailure(error);
+  return data?.code === 'FORBIDDEN' && data.reason === 'CONSENT_REQUIRED';
 }
