@@ -683,7 +683,7 @@ it('AC-M3-04 정식 두 월드·실제 사람 입력·각30칸과 기존 기록�
 it('AC-M3-04 접수는 PENDING·요청 감사만 원자 생성하고 seed생략 중복은 같은 계획을 돌려준다', async (signal) => {
   const before = await footprint(['WorldCreateRequest', 'AuditLog']),
     old = await oldFootprints();
-  const pair = await accepted(actor, signal);
+  const pair = await accepted(actor, signal, { ruleFeatures: ['policy'] });
   firstRequest = pair.receipt;
   expect(firstRequest).toEqual({
     userId: actor.id,
@@ -948,7 +948,9 @@ for (const mode of ['role', 'withdrawn', 'sanction', 'logout'] as const)
   });
 for (const table of ['World', 'Nation', 'City', 'General', 'GeneralTurn', 'WorldCreateRequest', 'AuditLog'])
   it('AC-M3-04 실제 ' + table + ' 적용 쓰기 실패는 월드0·PENDING·기존행을 보존한다', async (signal) => {
-    const receipt = (await accepted(actor, signal)).receipt,
+    // 초기 GeneralTurn 쓰기는 정책 기능을 고른 월드에서만 발생한다.
+    const receipt = (await accepted(actor, signal, table === 'GeneralTurn' ? { ruleFeatures: ['policy'] } : {}))
+        .receipt,
       initial = await row(receipt.requestId);
     const before = await footprint(['WorldCreateRequest']),
       otherRequests = JSON.stringify(
@@ -1273,7 +1275,12 @@ it('AC-M3-04 crash 전용 UUID DB에 전체 migration·게시 자원·PENDING을
   crash.owner = await checked(async () => user('ADMIN', 'ACTIVE', true, crash.db));
   const owner = crash.owner;
   const response = await checked(async () =>
-    create(owner, input(owner, { seed: 'actual-supervisor-crash-fixed' }), signal, crash.address),
+    create(
+      owner,
+      input(owner, { seed: 'actual-supervisor-crash-fixed', ruleFeatures: ['policy'] }),
+      signal,
+      crash.address,
+    ),
   );
   expect(response.status).toBe(200);
   if (!response.data) throw new Error('실제 crash 접수가 필요합니다.');
