@@ -37,6 +37,8 @@
 
 ## 계정 영역
 
+탈퇴 API·DB 후보는 승인된 현재 개인정보 보존 정책이 있을 때만 User를 WITHDRAWN으로 바꾸고 이메일을 `withdrawn+<UUID>@invalid`로 치환하며 무작위 비밀번호 해시·인증 일시 제거·모든 Session/AccountToken 삭제를 한 트랜잭션에서 처리한다. 기본 정책 상수는 null로 운영 연결을 막는다. ConsentRecord·Sanction·AuditLog와 General·예약·게임 원장 보존안의 사용자 승인은 남아 있다. 현재 schema에는 LoginRecord·알림 대상·발송 대기열이 없으며 관계도의 LoginRecord는 후속 설계다. 해당 모델을 추가할 때 탈퇴 삭제와 동시성 검사를 함께 확장한다. UUID 묘비를 영구 익명 처리로 부르지 않는다. 검증 범위와 남은 관문은 [T3-02](../plans/T3-02.md)에 기록한다.
+
 | 테이블          | 주요 필드                                                                 | 관문 |
 | --------------- | ------------------------------------------------------------------------- | ---- |
 | `User`          | id, email(고유), passwordHash, emailVerifiedAt, role(USER·ADMIN), status(ACTIVE·SANCTIONED·WITHDRAWN), createdAt | M1 |
