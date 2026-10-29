@@ -12,6 +12,7 @@ import {
   type Lease,
 } from './lease';
 import { TurnLoop, type PollBatch } from './turnLoop';
+import { engineMetricSink } from './metrics';
 
 export const HEARTBEAT_MS = 30_000;
 
@@ -50,6 +51,7 @@ export async function runEngine(
   },
 ) {
   const { signal } = options;
+  const commitMetricSink = engineMetricSink();
   let lastStatus: string | undefined;
   const report = (status: string) => {
     if (status !== lastStatus) options.onStatus?.(status);
@@ -80,7 +82,7 @@ export async function runEngine(
       continue;
     }
     report('실행권 획득');
-    const loop = new TurnLoop(db, lease);
+    const loop = new TurnLoop(db, lease, commitMetricSink ? { commitMetricSink } : {});
     const session = new AbortController();
     const forwardAbort = () => session.abort(signal.reason);
     signal.addEventListener('abort', forwardAbort, { once: true });

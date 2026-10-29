@@ -57,7 +57,7 @@
 | [T3-03 가입·재설정·약관·탈퇴 화면](./plans/T3-03.md) (AC-M3-01·02 화면 몫, T3-02 계약 사용) | 계획 완료 (사용자 검토 대기) | M3 전 |
 | [T3-13 공개 이미지 세트 반영과 자동 검사](./plans/T3-13.md) (AC-M3-06. 2026-10-23 main `3e5b52a`에 맞춰 다시 씀. 세트 위치·교체, 빠진 이미지·잘못된 ID, 검사가 막는 것, T3-12에서 사용자가 정할 것 U1~U7) | 계획 완료 (사용자 검토 대기, T3-12 결정 전 착수 안 함) | M3 전 |
 | M3 작업 계획 [T3-10 반응형 375px](./plans/T3-10.md) | 계획 완료 (사용자 검토 대기) | M2 완료 뒤 |
-| M3 작업 계획 [T3-05](./plans/T3-05.md), [T3-06](./plans/T3-06.md), [T3-11](./plans/T3-11.md), [T3-14](./plans/T3-14.md) | 계획 완료 | M3 |
+| M3 작업 계획 [T3-05](./plans/T3-05.md), [T3-06](./plans/T3-06.md), [T3-11](./plans/T3-11.md), [T3-14](./plans/T3-14.md) | 계획 완료 · T3-11 정식 부하 도구 연결 중 | M3 |
 | 나머지 M3 작업 계획                    | 예정 | M3 전 |
 | [T4-36 월간 영토 재생 화면](./plans/T4-36.md) (AC-P2-17 (나) 재생 화면 제안, U-20 정정(D-027)의 멸망 국가 보존값 사용. 계획 기술 검토 조건부 수용, 서버 무관 화면 부품만 구현 중. 보존 계약·정식 AC 채택 전) | 제안 | Phase 2 |
 | [Phase 2 확장 기술 명세](./plans/phase2-expansion.md) (AC-P2·T4 제안) | 초안 | Phase 2 |
@@ -80,7 +80,7 @@
 | [T4-17 확장 명령 첫 운영 등록 (계략 4종 한정)](./plans/T4-17.md) (AC-P2-03 (나) 등록 몫, AC-M1-14 후속. 정적 대조 도구가 읽는 정의 모양과 T4-03 경계. 계획 기술 검토·채택 전) | 제안 | MVP |
 | [T4-91 종료 월드 타임랩스 공개 조회 API](./plans/T4-91.md) (가칭 T4-37b. AC-P2-17 2차 공유의 서버 몫, T4-37 3.3 요청. 계획 기술 검토(G-03) 통과, D-030 채택. 구현 선행 T4-56 (가)와 실제 검증 전) | 구현 | Phase 2 |
 
-통합 상세 작업은 [INT-02](./plans/INT-02.md), [INT-03](./plans/INT-03.md), [INT-04](./plans/INT-04.md), [INT-06](./plans/INT-06.md), [INT-09](./plans/INT-09.md), [INT-10](./plans/INT-10.md), [INT-11](./plans/INT-11.md), [INT-12](./plans/INT-12.md), [INT-14](./plans/INT-14.md), [INT-15](./plans/INT-15.md), [INT-16](./plans/INT-16.md), [INT-17](./plans/INT-17.md)에 둔다.
+통합 상세 작업은 [INT-02](./plans/INT-02.md), [INT-03](./plans/INT-03.md), [INT-04](./plans/INT-04.md), [INT-06](./plans/INT-06.md), [INT-09](./plans/INT-09.md), [INT-10](./plans/INT-10.md), [INT-11](./plans/INT-11.md), [INT-12](./plans/INT-12.md), [INT-14](./plans/INT-14.md), [INT-15](./plans/INT-15.md), [INT-16](./plans/INT-16.md), [INT-17](./plans/INT-17.md)에 둔다. 2026-10-29 추가 요청의 [INT-18 도시 자원·수비병·부곡 배속](./plans/INT-18.md)은 기존 완료 증거와 분리한 후속 계획이다. 도시 세수 적립과 모병·수비 비용의 도시 부담은 사용자 확정이며 규칙 검토·구현·실제 인수는 남아 있다.
 
 ## architecture/ 무엇이 어디서 실행되나
 

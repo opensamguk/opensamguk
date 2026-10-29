@@ -226,7 +226,21 @@ it('정상 RUNNING은 지평과 다른 잠근 T로 전환하고 옛 생성 포�
   expect(prefix.months).toEqual(legacy.months);
   expect(replayArchive(prefix, 6)).toEqual(firstSix);
   expect(JSON.stringify(legacy)).toBe(legacyBytes);
-  await new TurnLoop(db, f.lease).advanceTo(120000);
+  const expectedSequences = new Map<number, number>();
+  const nextLoop = new TurnLoop(db, f.lease, {
+    beforeCommit: async (tx) => {
+      if (expectedSequences.size === 2) return;
+      const general = await tx.general.findUniqueOrThrow({
+        where: { worldId_id: { worldId: f.worldId, id: 1 } },
+        select: { nextTurnTick: true, world: { select: { actionSequence: true } } },
+      });
+      for (const tick of [60100, 70100])
+        if (general.nextTurnTick === tick + 10000 && !expectedSequences.has(tick))
+          expectedSequences.set(tick, general.world.actionSequence);
+    },
+  });
+  await nextLoop.advanceTo(120000);
+  expect(expectedSequences.size).toBe(2);
   const archive = await exportReplay(db, f.worldId);
   expect(archive.inputs.filter((input) => input.kind === 'system.policy.enable')).toHaveLength(1);
   expect(archive.months.slice(0, 6)).toEqual(legacy.months);
@@ -246,7 +260,7 @@ it('정상 RUNNING은 지평과 다른 잠근 T로 전환하고 옛 생성 포�
     [70100, 'farm'],
   ] as const) {
     const log = await db.generalLog.findFirstOrThrow({
-      where: { worldId: f.worldId, generalId: 1, tick, sequence: null },
+      where: { worldId: f.worldId, generalId: 1, tick, sequence: expectedSequences.get(tick)! },
     });
     expect(log.commandKey).toBe(commandKey);
     expect(log.text).not.toContain('기본 방침');

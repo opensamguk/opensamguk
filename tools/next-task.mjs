@@ -15,7 +15,7 @@ const bucket = (r) => (r.milestone >= PHASE2 ? r.milestone : 0);
 export function parseQueue(markdown) {
   const rows = [];
   for (const line of markdown.split('\n')) {
-    const match = line.match(/^\|\s*((?:T(\d)|INT)-\d{2})\s*\|(.*)\|\s*$/);
+    const match = line.match(/^\|\s*(T(\d)-\d{2}|INT-\d{2}[A-Z]?)\s*\|(.*)\|\s*$/);
     if (!match) continue;
     const cells = match[3].split('|').map((cell) => cell.trim());
     if (cells.length !== 5) throw new Error(`대기열 형식 오류 (칸 ${cells.length}개): ${line}`);
@@ -46,7 +46,7 @@ function resolveDeps(row, rows) {
         throw new Error(`${row.id}: Phase 2 작업의 선행은 관문(${dep}) 대신 작업 ID나 범위로 적습니다`);
       return rows.filter((r) => r.milestone === Number(milestone[1]));
     }
-    const range = dep.match(/^((?:T\d|INT)-\d{2})~((?:T\d|INT)-\d{2})$/);
+    const range = dep.match(/^(T\d-\d{2}|INT-\d{2}[A-Z]?)~(T\d-\d{2}|INT-\d{2}[A-Z]?)$/);
     if (range) {
       const from = rows.findIndex((r) => r.id === range[1]);
       const to = rows.findIndex((r) => r.id === range[2]);
@@ -236,6 +236,10 @@ export function render({ milestone, ready, blocked, ahead = [], phase2, integrat
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const markdown = readFileSync(new URL('../docs/product/phases.md', import.meta.url), 'utf8');
-  const hasPlan = (id) => existsSync(new URL(`../docs/plans/${id}.md`, import.meta.url));
+  const hasPlan = (id) => {
+    if (existsSync(new URL(`../docs/plans/${id}.md`, import.meta.url))) return true;
+    const parent = id.match(/^(INT-\d{2})[A-Z]$/)?.[1];
+    return Boolean(parent && existsSync(new URL(`../docs/plans/${parent}.md`, import.meta.url)));
+  };
   console.log(render(nextActions(parseQueue(markdown), { hasPlan })));
 }

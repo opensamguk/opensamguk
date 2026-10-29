@@ -32,11 +32,16 @@ import {
   ADMIN_END_KIND,
   validateAdminEndRecord,
   adminEndAppliedSchema,
+  ADMIN_RESET_KIND,
+  validateAdminResetRecord,
+  adminResetAppliedSchema,
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { exportCapsArchive, replayCapsArchive, replayCapsToEnd, type CapsArchive } from './replayCaps';
 import { checkStoredReplayFormat } from './features';
+import { assertStoredCityResources } from './cityResourcesState';
 import { checkedAdminEndResult } from './admin/end';
+import { checkedAdminResetResult, checkedResetTarget } from './admin/reset';
 
 export type { ReplayOriginV3 } from '@opensamguk/rules';
 
@@ -64,7 +69,7 @@ export interface ReplayEnd {
   finalStateHash: string;
 }
 export interface AdminReplayEnd extends Omit<ReplayEnd, 'reason' | 'winnerNationId'> {
-  reason: 'ADMIN_END';
+  reason: 'ADMIN_END' | 'ADMIN_RESET';
   winnerNationId: null;
 }
 export interface ReplayArchiveV2 {
@@ -122,6 +127,7 @@ export async function exportReplay(
       const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
       if (world.replayOrigin === null) throw new Error('생성 기록이 없는 월드는 재생할 수 없습니다.');
       checkStoredReplayFormat(world);
+      await assertStoredCityResources(tx, world);
       const v3 = world.replayFormat === 3;
       if (!v3) {
         const capabilities = selectWorldCapabilities(world);
@@ -132,16 +138,29 @@ export async function exportReplay(
       const completed = v3
         ? await tx.inputEvent.findMany({ where: { worldId, sequence: { not: null } }, orderBy: { sequence: 'asc' } })
         : null;
-      const endings = completed?.filter((event) => event.kind === ADMIN_END_KIND && event.status === 'APPLIED') ?? [];
+      const endings =
+        completed?.filter(
+          (event) =>
+            [ADMIN_END_KIND, ADMIN_RESET_KIND].includes(
+              event.kind as typeof ADMIN_END_KIND | typeof ADMIN_RESET_KIND,
+            ) && event.status === 'APPLIED',
+        ) ?? [];
       if (endings.length > 1 || (result && endings.length)) throw new Error('월드 종료 기록이 중복됩니다.');
       let adminEnd: AdminReplayEnd | null = null;
       if (endings.length) {
         const event = endings[0]!;
-        const applied = checkedAdminEndResult(world, event);
+        const applied =
+          event.kind === ADMIN_RESET_KIND ? checkedAdminResetResult(world, event) : checkedAdminEndResult(world, event);
+        if (event.kind === ADMIN_RESET_KIND) {
+          const target = await tx.world.findUniqueOrThrow({
+            where: { id: adminResetAppliedSchema.parse(event.result).newWorldId },
+          });
+          checkedResetTarget(world, event, target);
+        }
         adminEnd = {
           sequence: event.sequence!,
           tick: event.tick!,
-          reason: 'ADMIN_END',
+          reason: event.kind === ADMIN_RESET_KIND ? 'ADMIN_RESET' : 'ADMIN_END',
           winnerNationId: null,
           ...toGameDate(world.startYear, event.tick!),
           finalStateHash: applied.finalStateHash,
@@ -270,7 +289,10 @@ export function readArchive(value: unknown, registry: RuleRegistry = ruleRegistr
           !validSequence(end.sequence, MAX_ACTION_SEQUENCE) ||
           !Number.isSafeInteger(end.tick) ||
           end.tick < 0 ||
-          !(['UNIFIED', 'END_YEAR'].includes(end.reason) || (archive.version === 3 && end.reason === 'ADMIN_END')) ||
+          !(
+            ['UNIFIED', 'END_YEAR'].includes(end.reason) ||
+            (archive.version === 3 && ['ADMIN_END', 'ADMIN_RESET'].includes(end.reason))
+          ) ||
           (end.reason === 'UNIFIED'
             ? !Number.isSafeInteger(end.winnerNationId) || end.winnerNationId! < 1
             : end.winnerNationId !== null) ||
@@ -312,7 +334,8 @@ export function readArchive(value: unknown, registry: RuleRegistry = ruleRegistr
   const allInputs = [...archive.inputs, ...(archive.version !== 1 ? archive.afterEnd : [])];
   for (const input of allInputs) {
     if (archive.version !== 3) {
-      if (input.kind === ADMIN_END_KIND) throw new Error('관리자 종료는 형식3 기록에만 넣을 수 있습니다.');
+      if (input.kind === ADMIN_END_KIND || input.kind === ADMIN_RESET_KIND)
+        throw new Error('관리자 종료는 형식3 기록에만 넣을 수 있습니다.');
       if (Object.hasOwn(input, 'tick')) throw new Error('기존 형식 입력에 tick을 넣을 수 없습니다.');
       continue;
     }
@@ -320,6 +343,7 @@ export function readArchive(value: unknown, registry: RuleRegistry = ruleRegistr
     if (!kind) throw new Error('등록되지 않은 입력 종류입니다.');
     if (isAdminClockKind(input.kind)) validateAdminClockRecord(input);
     if (input.kind === ADMIN_END_KIND) validateAdminEndRecord(input);
+    if (input.kind === ADMIN_RESET_KIND) validateAdminResetRecord(input);
     const numericTick = kind.route === 'queued' || kind.directTick === true;
     if (
       !Object.hasOwn(input, 'tick') ||
@@ -358,10 +382,10 @@ function exactKeys(value: object, keys: string[]) {
 }
 function validateAdminArchiveEnd(archive: ReplayArchiveV3): void {
   const endings = [...archive.inputs, ...archive.afterEnd].filter(
-    (input) => input.kind === ADMIN_END_KIND && input.status === 'APPLIED',
+    (input) => (input.kind === ADMIN_END_KIND || input.kind === ADMIN_RESET_KIND) && input.status === 'APPLIED',
   );
   const end = archive.end;
-  if (end?.reason !== 'ADMIN_END') {
+  if (end?.reason !== 'ADMIN_END' && end?.reason !== 'ADMIN_RESET') {
     if (endings.length) throw new Error('관리자 종료 입력과 종료 사유가 다릅니다.');
     return;
   }
@@ -373,9 +397,13 @@ function validateAdminArchiveEnd(archive: ReplayArchiveV3): void {
   )
     throw new Error('관리자 종료 기록의 키·개수가 다릅니다.');
   const input = endings[0]!,
-    applied = adminEndAppliedSchema.parse(input.result),
+    applied =
+      end.reason === 'ADMIN_RESET'
+        ? adminResetAppliedSchema.parse(input.result)
+        : adminEndAppliedSchema.parse(input.result),
     date = toGameDate(archive.origin.initial.startYear, end.tick);
   if (
+    input.kind !== (end.reason === 'ADMIN_RESET' ? ADMIN_RESET_KIND : ADMIN_END_KIND) ||
     input.sequence !== end.sequence ||
     input.tick !== end.tick ||
     applied.finalStateHash !== end.finalStateHash ||
@@ -385,6 +413,20 @@ function validateAdminArchiveEnd(archive: ReplayArchiveV3): void {
     archive.months.some((month) => month.sequence >= end.sequence || month.tick > end.tick)
   )
     throw new Error('관리자 종료 경계·연월·해시가 다릅니다.');
+  if (end.reason === 'ADMIN_RESET') {
+    const reset = adminResetAppliedSchema.parse(input.result);
+    if (
+      reset.sourceInitialHash !== archive.origin.initialStateHash ||
+      reset.sourceResourceHash !== resourceHashV3(archive.origin) ||
+      reset.settings.scenarioKey !== archive.origin.initial.scenarioKey ||
+      reset.settings.mapKey !== archive.origin.initial.mapKey ||
+      reset.settings.unitSetKey !== archive.origin.initial.unitSetKey ||
+      reset.settings.endYear !== archive.config.endYear ||
+      reset.settings.featureDataHash !== hashState(archive.origin.featureData ?? null) ||
+      hashState(reset.settings.ruleFeatures) !== hashState(archive.origin.initial.ruleFeatures ?? [])
+    )
+      throw new Error('초기화 원본과 재생 생성 기록이 다릅니다.');
+  }
 }
 function validatePolicyArchive(archive: ReplayArchiveV5) {
   if (
@@ -607,7 +649,11 @@ export function replayToEnd(value: unknown, registry: RuleRegistry = ruleRegistr
     if (input) {
       if (
         sequence === end.sequence &&
-        !(archive.version === 3 && end.reason === 'ADMIN_END' && input.kind === ADMIN_END_KIND)
+        !(
+          archive.version === 3 &&
+          ((end.reason === 'ADMIN_END' && input.kind === ADMIN_END_KIND) ||
+            (end.reason === 'ADMIN_RESET' && input.kind === ADMIN_RESET_KIND))
+        )
       )
         throw new Error('종료 번호에 게임 사건이 없습니다.');
       replay = applyArchiveInput(archive, replay, input, untouched, lastActionTick, registry);
@@ -616,7 +662,7 @@ export function replayToEnd(value: unknown, registry: RuleRegistry = ruleRegistr
     if (archive.version === 5 && archive.config.policy.fromSequence === sequence)
       throw new Error('방침 전환 표지가 없습니다.');
     const action = nextGameAction(replay);
-    if (end.reason === 'ADMIN_END' && action.tick > end.tick)
+    if ((end.reason === 'ADMIN_END' || end.reason === 'ADMIN_RESET') && action.tick > end.tick)
       throw new Error('관리자 종료 tick 뒤에 게임 사건이 있습니다.');
     if (action.kind === 'monthly') {
       const expected = archive.months[monthIndex];
@@ -630,7 +676,7 @@ export function replayToEnd(value: unknown, registry: RuleRegistry = ruleRegistr
     checkOutcome(archive, replay, sequence, action);
   }
   if (monthIndex !== archive.months.length) throw new Error('종료 뒤 월간 기록이 있습니다.');
-  if (end.reason === 'ADMIN_END' && hashState(replay) !== end.finalStateHash)
+  if ((end.reason === 'ADMIN_END' || end.reason === 'ADMIN_RESET') && hashState(replay) !== end.finalStateHash)
     throw new Error('관리자 종료 최종 해시가 다릅니다.');
   return { ...end, finalStateHash: hashState(replay) };
 }

@@ -919,7 +919,7 @@ it('제재 트랜잭션 뒤 대기 중이던 실제 로그인은 새 세션을 �
   if (failures.length) throw new AggregateError([...new Set(failures)], '로그인 경쟁 실행·정리 실패');
 });
 
-it('정식 두191년 월드에서20개 변경 차단·본인 조회·같은 월드 타인과 다른 월드 예약을 보존한다', async () => {
+it('정식 두191년 월드에서21개 변경 차단·본인 조회·같은 월드 타인과 다른 월드 예약을 보존한다', async () => {
   const actor = await user('ADMIN'),
     victim = await user(),
     other = await user();
@@ -1051,10 +1051,24 @@ it('정식 두191년 월드에서20개 변경 차단·본인 조회·같은 월�
   const guarded = Object.entries(procedures)
     .filter(([, procedure]) => procedure._def.meta?.worldSanction)
     .map(([path]) => path);
-  expect(guarded).toHaveLength(20);
+  expect(guarded).toHaveLength(21);
+  expect(guarded).toContain('cityResources.allocate');
+  expect(
+    (await db.world.findUniqueOrThrow({ where: { id: worldId }, select: { ruleFeatures: true } })).ruleFeatures,
+  ).not.toContain('city-resources-v1');
+  const cityInput = {
+    worldId,
+    requestId: randomUUID(),
+    expectedUserId: victim.id,
+    payload: { cityKey: human.cityKey, unitId: 1, crewType: 1100, amount: 1 },
+  };
   const before = await snapshot();
   for (const path of guarded)
-    expect(await call(path, { worldId }, sid)).toMatchObject({ status: 403, code: 'FORBIDDEN', reason: null });
+    expect(await call(path, path === 'cityResources.allocate' ? cityInput : { worldId }, sid)).toMatchObject({
+      status: 403,
+      code: 'FORBIDDEN',
+      reason: null,
+    });
   expect(await snapshot()).toBe(before);
   expect(await db.generalTurn.findMany({ where: { worldId, generalId: peer.id }, orderBy: { slot: 'asc' } })).toEqual(
     peerRows,

@@ -5,6 +5,8 @@ import { appointOfficer, dismissOfficer } from './appointments';
 import { closeInvalidOffers, respondAssignment } from './assignments';
 import { syncOffices, type OfficeRevisions, type OfficeState, type OfficeView } from './offices';
 import { canExecuteNationCommand, canUseNationTurns } from './permissions';
+import { canExecuteCityNationCommand } from '../cityResources/commands';
+import { cityAllocationArgs } from '../cityResources/allocation';
 import {
   clonePersonnel,
   PersonnelInvariantError,
@@ -290,6 +292,10 @@ export function applyNationTurnsRecord(
   )
     invariant('직책 칸의 장수·직책·revision이 다릅니다.');
   for (const turn of turns) {
+    if (canExecuteCityNationCommand(view, actor.officerLevel, turn.commandKey)) {
+      if (!cityAllocationArgs.safeParse(turn.args).success) invariant('직책 칸 명령과 인자가 올바르지 않습니다.');
+      continue;
+    }
     const command = commandRegistry.get(turn.commandKey);
     if (
       !command ||

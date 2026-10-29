@@ -232,7 +232,21 @@ it.each(['zero', 'tick'] as const)(
     ])
       await db.inputEvent.create({ data: { ...data, worldId: f.worldId, idempotencyKey: randomUUID() } });
     await controlClock(db, f.worldId, 'resume');
-    await new TurnLoop(db, f.lease).advanceTo(120000);
+    const expectedSequences = new Map<number, number>();
+    const nextLoop = new TurnLoop(db, f.lease, {
+      beforeCommit: async (tx) => {
+        if (expectedSequences.size === 2) return;
+        const general = await tx.general.findUniqueOrThrow({
+          where: { worldId_id: { worldId: f.worldId, id: 1 } },
+          select: { nextTurnTick: true, world: { select: { actionSequence: true } } },
+        });
+        for (const tick of [60100, 70100])
+          if (general.nextTurnTick === tick + 10000 && !expectedSequences.has(tick))
+            expectedSequences.set(tick, general.world.actionSequence);
+      },
+    });
+    await nextLoop.advanceTo(120000);
+    expect(expectedSequences.size).toBe(2);
     const archive = await exportReplay(db, f.worldId);
     expect(archive.months.slice(0, 6)).toEqual(legacy.months);
     expect(archive.inputs.filter((input) => input.kind === 'general.create')).toHaveLength(2);
@@ -246,12 +260,12 @@ it.each(['zero', 'tick'] as const)(
       wall.mockRestore();
     }
     const rest = await db.generalLog.findFirstOrThrow({
-      where: { worldId: f.worldId, generalId: 1, tick: 60100, sequence: null },
+      where: { worldId: f.worldId, generalId: 1, tick: 60100, sequence: expectedSequences.get(60100)! },
     });
     expect(rest.commandKey).toBe('rest');
     expect(rest.text).not.toContain('기본 방침');
     const farm = await db.generalLog.findFirstOrThrow({
-      where: { worldId: f.worldId, generalId: 1, tick: 70100, sequence: null },
+      where: { worldId: f.worldId, generalId: 1, tick: 70100, sequence: expectedSequences.get(70100)! },
     });
     expect(farm.commandKey).toBe('farm');
     expect(farm.text).not.toContain('기본 방침');

@@ -1,0 +1,47 @@
+name: Smoke isolated load
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact selected source commit SHA (40 lowercase hexadecimal characters)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: smoke-isolated-load
+  cancel-in-progress: false
+
+jobs:
+  load:
+    if: github.repository == 'opensamguk/opensamguk' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    # 정식과 같은71분 상계+action 준비4분. smoke는 AC 정식 통과로 세지 않는다.
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        with:
+          version: 10.33.0
+          run_install: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.22.0'
+      - name: Verify host and install inside owned scope
+        env:
+          LOAD_EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: node tools/load/bootstrap.mjs
+      - name: Build pinned source and run smoke load
+        env:
+          LOAD_EXPECTED_SHA: ${{ inputs.expected_sha }}
+          LOAD_MODE: smoke
+        run: node --import tsx tools/load/ci.ts
+      - name: Explain incomplete evidence
+        if: failure()
+        run: printf '%s\n' 'Load evidence is incomplete. Raw files and logs are not uploaded from this public workflow.' >> "$GITHUB_STEP_SUMMARY"

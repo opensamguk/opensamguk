@@ -48,6 +48,7 @@ function gate(view: WorldView, actor: Actor, key: string) {
   }
   return null;
 }
+export { gate as checkCampaignActor };
 function preparationDefinition(base: CommandDef, key: CampaignPreparationKey): CommandDef {
   const check = (view: WorldView, actor: Actor, value: unknown) => {
     const outcome = applyCampaignPreparation(view, actor, key, value);

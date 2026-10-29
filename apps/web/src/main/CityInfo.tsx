@@ -10,6 +10,7 @@ import { LoadingState } from '../ui/States';
 import { StatTable, type StatRow } from '../ui/StatTable';
 import { Tag } from '../ui/Tag';
 import styles from './CityInfo.module.css';
+import { CityResourcesPanel } from './CityResourcesPanel';
 
 const HIDDEN_CITY = '다른 국가의 도시입니다';
 const HIDDEN_GENERAL = '다른 국가 장수입니다';
@@ -85,6 +86,7 @@ export function CityInfo({
         </p>
       )}
       <StatTable rows={rows} />
+      <CityResourcesPanel worldId={worldId} cityKey={cityKey} />
       {data.links.length > 0 ? (
         <p className={styles.links}>
           <span className={styles.meta}>연결</span>

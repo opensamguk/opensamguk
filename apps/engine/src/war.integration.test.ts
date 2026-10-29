@@ -223,10 +223,11 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
       expect(events.filter((event) => event.includes('천도'))).toEqual([
         `${initial.nations[1]!.name} 수도 함락, 도시3 천도`,
       ]);
+      const counterattackSequence = (await db.world.findUniqueOrThrow({ where: { id: worldId } })).actionSequence + 1;
       await loop.advanceTo(200);
       expect(
         await db.generalLog.findFirstOrThrow({
-          where: { worldId, generalId: 2, tick: 200, sequence: null },
+          where: { worldId, generalId: 2, tick: 200, sequence: counterattackSequence },
         }),
       ).toMatchObject({ kind: 'success', text: expect.stringContaining('도시2 점령:') });
       expect(await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId, cityKey: 2 } } })).toMatchObject({
@@ -360,10 +361,12 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
     initial.cities = Object.values(ready.cities);
     const { worldId, loop, lease } = await create(initial);
     await queue(worldId, 2, 'attack', { cityKey: 2 });
+    await loop.advanceTo(99);
+    const attackSequence = (await db.world.findUniqueOrThrow({ where: { id: worldId } })).actionSequence + 1;
     await loop.advanceTo(100);
     expect(
       await db.generalLog.findFirstOrThrow({
-        where: { worldId, generalId: 2, tick: 100, sequence: null },
+        where: { worldId, generalId: 2, tick: 100, sequence: attackSequence },
       }),
     ).toMatchObject({ kind: 'success' });
     expect((await readWorldState(db, worldId)).cities[2]).toMatchObject({ supplied: false, agriculture: 100 });
