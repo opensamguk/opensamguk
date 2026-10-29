@@ -1,5 +1,9 @@
 # 요청·턴·저장 흐름
 
+## 관리자 월드 생성 후보
+
+ADMIN-CREATE-B는 아직 월드가 없는 접수를 `WorldCreateRequest`에 둔다. API는 현재 User 쓰기 잠금과 Session 읽기 잠금 뒤 기존 요청을 MVCC로 읽으며 요청 행 잠금을 추가하지 않는다. 엔진은 요청 행을 `FOR UPDATE SKIP LOCKED`로 먼저 잠그고 User 읽기 잠금 뒤 현재 자격·제재를 확인한다. 이 순서가 API와 엔진의 User/요청 교착을 막는다. 게시 자원의 버전·해시를 검증하고 최초 해석을 요청에 고정한 뒤 저장 트랜잭션에서 다시 대조한다. 월드·DONE·감사는 한 트랜잭션이며 실패하면 PENDING을 보존한다. 확정 자료 오류는 FAILED와 기각 감사를 함께 쓴다. 접속 오류는 후속 발견에서 재시도한다. 기존 게임 InputEvent·리스·시드 RNG 경계는 유지한다.
+
 > 상태: 뼈대 · 필요 시점: M1 · 관련 AC: M1-08, M1-10, M1-11, M1-13
 > 참고: core2026 `docs/developer/request-turn-persistence.md`, `docs/architecture/api-input-event-replay.md`
 > 이 문서가 답할 질문: 요청 하나와 턴 하나가 언제, 어떤 순서로 저장되고 실패하면 어떻게 되나?

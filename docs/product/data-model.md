@@ -53,6 +53,8 @@
 
 ## 월드 운영 영역
 
+생성 후보의 `WorldCreateRequest`는 월드가 생기기 전의 계정별 요청 원장이다. `requestedBy·idempotencyKey`와 계획한 월드 UUID가 각각 고유하며 입력 정규형·해시·실제 시드·게시 자원 해시와 초기 상태 해시를 고정한다. PENDING은 결과 월드가 없고 DONE은 계획한 UUID의 월드와 해석 자료가 있으며 FAILED는 정해진 거절 코드만 남긴다. 확정한 요청·자원과 종료 결과의 수정은 DB 트리거가 거부한다. 행위자·완료 월드의 FK는 NoAction으로 이력을 보존한다. API는 요청과 접수 감사만 쓰며 실제 월드·DONE·적용 감사는 엔진의 한30초 트랜잭션에서 확정한다. 실제 인수와 보호 병합 전인 ADMIN-CREATE-B 후보이며 전체 AC 완료를 뜻하지 않는다.
+
 | 테이블        | 주요 필드                                                                                  | 관문 |
 | ------------- | ------------------------------------------------------------------------------------------ | ---- |
 | `World` | id, name, scenarioKey, mapKey, unitSetKey, startYear, endYear(기본값 없는 nullable), status(PREOPEN·RUNNING·PAUSED·ENDED), clockMode(REALTIME·ACCELERATED, 기본 REALTIME), turnTermMinutes, seed, clockTick, clockAnchorAt, clockRevision, startedAt, endedAt, initialStateHash, replayOrigin, replayFormat(기본 1), ruleFeatures(기본 빈 배열), outcomeFromSequence, statRules, unitSet | M1 |
