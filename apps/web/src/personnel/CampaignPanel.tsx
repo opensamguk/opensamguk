@@ -52,11 +52,20 @@ function CampaignBoard({ worldId, userId }: { worldId: string; userId: string })
   const [pending, setPending] = useState<Pending | null>(() => recover(storageKey));
   const [notice, setNotice] = useState('');
   const sending = useRef(false);
+  const [preparing, setPreparing] = useState(false);
+  const preparation = useRef(false);
+  const alive = useRef(false);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
   const relationship = useMutation(trpc.campaign.relationship.mutationOptions());
   const unit = useMutation(trpc.campaign.unit.mutationOptions());
   const board = useQuery({
     ...trpc.campaign.get.queryOptions({ worldId }),
-    refetchInterval: (query) => (query.state.data?.status === 'RUNNING' ? 2000 : false),
+    refetchInterval: (query) => (!preparing && query.state.data?.status === 'RUNNING' ? 2000 : false),
     retry: false,
   });
   const request = useQuery({
@@ -94,7 +103,11 @@ function CampaignBoard({ worldId, userId }: { worldId: string; userId: string })
     try {
       const input = { worldId, requestId: action.requestId, payload: action.payload };
       if (action.kind === 'campaign.relationship')
-        await relationship.mutateAsync({ ...input, payload: action.payload });
+        await relationship.mutateAsync({
+          ...input,
+          payload: action.payload,
+          ...(action.payload.type === 'offer' ? { expectedUserId: userId } : {}),
+        });
       else await unit.mutateAsync({ ...input, payload: action.payload });
       await client.invalidateQueries({
         queryKey: trpc.campaign.request.queryKey({ worldId, requestId: action.requestId }),
@@ -110,13 +123,56 @@ function CampaignBoard({ worldId, userId }: { worldId: string; userId: string })
       sending.current = false;
     }
   }
+  async function prepareOffer(payload: Extract<Inputs['relationship']['payload'], { type: 'offer' }>) {
+    if (preparation.current || pending || sending.current) return;
+    const actorId = board.data?.actorId;
+    if (actorId === undefined) return;
+    preparation.current = true;
+    setPreparing(true);
+    setNotice('');
+    try {
+      const fresh = (await board.refetch({ cancelRefetch: true, throwOnError: true })).data;
+      if (!alive.current) return;
+      if (!fresh || fresh.actorId !== actorId || client.getQueryData(trpc.auth.me.queryKey())?.user?.id !== userId) {
+        setNotice('장수나 로그인한 계정이 바뀌었습니다. 화면을 다시 확인하세요.');
+        return;
+      }
+      const target = fresh.people.find((person) => person.id === payload.targetId);
+      if (
+        fresh.status !== 'RUNNING' ||
+        !target ||
+        !fresh.candidates.includes(payload.targetId) ||
+        fresh.renownUsed + target.renownCost > fresh.renownCapacity ||
+        (!target.isHuman &&
+          (fresh.resources.gold < fresh.npcPledge.cost ||
+            fresh.npcPledge.attempts.some(
+              (attempt) => attempt.personId === payload.targetId && attempt.month >= fresh.npcPledge.month,
+            )))
+      ) {
+        setNotice('제안할 현황이 바뀌었습니다. 대상과 비용을 다시 확인하세요.');
+        return;
+      }
+      // 계정 기대값은 send가 최상위에 붙인다. 저장한 pending의 UUID와 내부 payload는 바꾸지 않는다.
+      await send({
+        kind: 'campaign.relationship',
+        requestId: crypto.randomUUID(),
+        payload: { ...payload, revision: fresh.revision },
+      });
+    } catch (error) {
+      if (alive.current) setNotice(serverMessage(error) ?? '현황을 확인하지 못했습니다. 다시 제안하려면 눌러주세요.');
+    } finally {
+      preparation.current = false;
+      if (alive.current) setPreparing(false);
+    }
+  }
   const act = (
     action:
       | Omit<Extract<Pending, { kind: 'campaign.relationship' }>, 'requestId'>
       | Omit<Extract<Pending, { kind: 'campaign.unit' }>, 'requestId'>,
   ) => {
-    if (pending || sending.current) return;
-    void send({ ...action, requestId: crypto.randomUUID() });
+    if (pending || sending.current || preparation.current) return;
+    if (action.kind === 'campaign.relationship' && action.payload.type === 'offer') void prepareOffer(action.payload);
+    else void send({ ...action, requestId: crypto.randomUUID() });
   };
   return (
     <section className={styles.panel} aria-labelledby="campaign-title">
@@ -124,6 +180,7 @@ function CampaignBoard({ worldId, userId }: { worldId: string; userId: string })
         개인 휘하·부곡
       </h2>
       {notice ? <p role="status">{notice}</p> : null}
+      {preparing && !pending ? <p role="status">제안할 현황을 확인하는 중입니다.</p> : null}
       {pending ? (
         <div role="status">
           {request.data?.status === 'pending' ? '엔진이 요청을 처리하는 중입니다.' : '요청 접수를 확인하는 중입니다.'}
@@ -135,7 +192,7 @@ function CampaignBoard({ worldId, userId }: { worldId: string; userId: string })
         </div>
       ) : null}
       {board.data ? (
-        <CampaignControls board={board.data} busy={pending !== null} act={act} />
+        <CampaignControls board={board.data} busy={pending !== null || preparing} preparing={preparing} act={act} />
       ) : board.isError ? (
         <ErrorState
           title={serverMessage(board.error) ?? '휘하 현황을 불러오지 못했습니다'}
@@ -151,7 +208,17 @@ function CampaignBoard({ worldId, userId }: { worldId: string; userId: string })
 type Action =
   | Omit<Extract<Pending, { kind: 'campaign.relationship' }>, 'requestId'>
   | Omit<Extract<Pending, { kind: 'campaign.unit' }>, 'requestId'>;
-function CampaignControls({ board, busy, act }: { board: Board; busy: boolean; act: (action: Action) => void }) {
+function CampaignControls({
+  board,
+  busy,
+  preparing,
+  act,
+}: {
+  board: Board;
+  busy: boolean;
+  preparing: boolean;
+  act: (action: Action) => void;
+}) {
   const [relation, setRelation] = useState<keyof typeof relations>('STAFF');
   const [commander, setCommander] = useState(board.actorId);
   const [crewType, setCrewType] = useState(board.armyTypes[0]?.id ?? 1100);
@@ -232,7 +299,11 @@ function CampaignControls({ board, busy, act }: { board: Board; busy: boolean; a
         </p>
         <label>
           제안할 관계{' '}
-          <select value={relation} onChange={(event) => setRelation(event.target.value as keyof typeof relations)}>
+          <select
+            disabled={preparing}
+            value={relation}
+            onChange={(event) => setRelation(event.target.value as keyof typeof relations)}
+          >
             {Object.entries(relations).map(([key, label]) => (
               <option key={key} value={key}>
                 {label}
