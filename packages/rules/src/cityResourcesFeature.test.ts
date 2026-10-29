@@ -13,7 +13,7 @@ it('INT-18A 기존 월드 복제는 도시 자원 필드나 초기 자원을 추
   const cloned = cloneWorld(old);
   expect(JSON.stringify(cloned)).toBe(before);
   expect(Object.hasOwn(cloned, 'cityResources')).toBe(false);
-  expect(ruleRegistry.features.some((feature) => feature.key === 'city-resources-v1')).toBe(false);
+  expect(ruleRegistry.features.find((feature) => feature.key === 'city-resources-v1')).toBe(cityResourcesFeature);
 });
 
 it('INT-18A 새 원장은 도시별 0에서 시작하고 기존 국고·개인 잔액을 복사하지 않는다', () => {
