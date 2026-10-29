@@ -45,21 +45,41 @@ const diagnosticCodes = new Set([
   'LOAD_INSTALL_TOOL_UNVERIFIED',
   'LOAD_BOOTSTRAP_NATIVE_UNCONFIRMED',
   'LOAD_BOOTSTRAP_SOURCE_CHANGED',
+  'LOAD_BOOTSTRAP_OS_RELEASE_READ_FAILED',
+  'LOAD_BOOTSTRAP_ANCESTOR_STAT_READ_FAILED',
+  'LOAD_BOOTSTRAP_ANCESTOR_EXE_READ_FAILED',
+  'LOAD_BOOTSTRAP_ANCESTOR_STATUS_READ_FAILED',
+  'LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_STATUS_PID_INVALID',
+  'LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_STATUS_UID_INVALID',
+  'LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_NONROOT',
 ]);
 const diagnosticReasons = new Set(['sample_invalid', 'cpu_limit', 'memory_limit', 'cgroup_headroom', 'disk_reserve']);
+const operationFailures = new WeakMap();
+const markOperationFailure = (code, error) => {
+  if (error !== null && (typeof error === 'object' || typeof error === 'function')) operationFailures.set(error, code);
+  return error;
+};
+async function diagnosticRead(code, read) {
+  try {
+    return await read();
+  } catch (error) {
+    throw markOperationFailure(code, error);
+  }
+}
 
 // 공개 실패 진단에는 고정 분류만 쓴다. 원문 오류·경로·환경·native 출력은 싣지 않는다.
 export function bootstrapDiagnostic(phase, error, admissionReason) {
   return {
     phase: diagnosticPhases.has(phase) ? phase : 'unknown',
     code:
-      error instanceof Error && diagnosticCodes.has(error.message)
+      operationFailures.get(error) ??
+      (error instanceof Error && diagnosticCodes.has(error.message)
         ? error.message
         : error?.code === 'ENOENT'
           ? 'RESOURCE_MISSING'
           : error?.code === 'EACCES' || error?.code === 'EPERM'
             ? 'RESOURCE_DENIED'
-            : 'UNCLASSIFIED',
+            : 'UNCLASSIFIED'),
     admissionReason: diagnosticReasons.has(admissionReason) ? admissionReason : null,
   };
 }
@@ -179,7 +199,7 @@ export async function findWorkerAncestor(pid, reader) {
   for (let depth = 0; pid > 1 && depth < 32 && !visited.has(pid); depth++) {
     if (!Number.isSafeInteger(pid)) return false;
     visited.add(pid);
-    const stat = await reader.stat(pid);
+    const stat = await diagnosticRead('LOAD_BOOTSTRAP_ANCESTOR_STAT_READ_FAILED', () => reader.stat(pid));
     const parsed = /^(\d+) \(.+\) \S (\d+) /.exec(stat);
     if (!parsed || Number(parsed[1]) !== pid) return false;
     const parent = Number(parsed[2]);
@@ -188,11 +208,16 @@ export async function findWorkerAncestor(pid, reader) {
     try {
       executable = await reader.exe(pid);
     } catch (error) {
-      if (error?.code !== 'EACCES' && error?.code !== 'EPERM') throw error;
-      const status = await reader.status(pid);
+      if (error?.code !== 'EACCES' && error?.code !== 'EPERM')
+        throw markOperationFailure('LOAD_BOOTSTRAP_ANCESTOR_EXE_READ_FAILED', error);
+      const status = await diagnosticRead('LOAD_BOOTSTRAP_ANCESTOR_STATUS_READ_FAILED', () => reader.status(pid));
       const statusPid = /^Pid:\s+(\d+)\s*$/m.exec(status)?.[1];
       const uids = /^Uid:\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*$/m.exec(status);
-      if (Number(statusPid) !== pid || !uids || uids.slice(1).some((uid) => uid !== '0')) throw error;
+      if (Number(statusPid) !== pid)
+        throw markOperationFailure('LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_STATUS_PID_INVALID', error);
+      if (!uids) throw markOperationFailure('LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_STATUS_UID_INVALID', error);
+      if (uids.slice(1).some((uid) => uid !== '0'))
+        throw markOperationFailure('LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_NONROOT', error);
       pid = parent;
       continue;
     }
@@ -219,7 +244,9 @@ async function requirePlatform() {
     !/^\d+$/.test(process.env.GITHUB_RUN_ID ?? '')
   )
     throw new Error('LOAD_BOOTSTRAP_PLATFORM_UNVERIFIED');
-  const release = await readFile('/etc/os-release', 'utf8');
+  const release = await diagnosticRead('LOAD_BOOTSTRAP_OS_RELEASE_READ_FAILED', () =>
+    readFile('/etc/os-release', 'utf8'),
+  );
   if (!/^ID=ubuntu$/m.test(release) || !/^VERSION_ID="?24\.04"?$/m.test(release) || !(await workerAncestor()))
     throw new Error('LOAD_BOOTSTRAP_PLATFORM_UNVERIFIED');
 }

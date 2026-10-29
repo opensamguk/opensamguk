@@ -128,6 +128,70 @@ describe('L5 의존성 설치 전 bootstrap 경계', () => {
       }),
     ).rejects.toBe(failure);
   });
+  it.each([
+    ['stat', 'LOAD_BOOTSTRAP_ANCESTOR_STAT_READ_FAILED'],
+    ['exe', 'LOAD_BOOTSTRAP_ANCESTOR_EXE_READ_FAILED'],
+    ['status', 'LOAD_BOOTSTRAP_ANCESTOR_STATUS_READ_FAILED'],
+    ['pid', 'LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_STATUS_PID_INVALID'],
+    ['uid', 'LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_STATUS_UID_INVALID'],
+    ['nonroot', 'LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_NONROOT'],
+  ])('조상 %s 실패는 원래 오류·errno를 유지하고 고정 연산 코드만 공개한다', async (operation, code) => {
+    const canary = 'private-canary postgres://user:password@host/db /proc/987/exe';
+    const failure = Object.assign(new Error(canary), { code: operation === 'exe' ? 'EIO' : 'EACCES', path: canary });
+    const denied = Object.assign(new Error(canary), { code: 'EPERM' });
+    const reader = ancestors({ 4: { parent: 2, exe: operation === 'exe' ? failure : denied } });
+    if (operation === 'stat')
+      reader.stat = async () => {
+        throw failure;
+      };
+    if (operation === 'status')
+      reader.status = async () => {
+        throw failure;
+      };
+    if (operation === 'pid') reader.status = async () => 'Pid: 5\nUid: 0 0 0 0\n';
+    if (operation === 'uid') reader.status = async () => 'Pid: 4\nUid: 0 0 0\n';
+    if (operation === 'nonroot') reader.status = async () => 'Pid: 4\nUid: 0 1001 0 0\n';
+    const expected = ['stat', 'exe', 'status'].includes(operation) ? failure : denied;
+    const keys = Object.keys(expected);
+    await expect(findWorkerAncestor(4, reader)).rejects.toBe(expected);
+    expect(expected.code).toBe(expected === failure ? (operation === 'exe' ? 'EIO' : 'EACCES') : 'EPERM');
+    expect(expected.message).toBe(canary);
+    expect(Object.keys(expected)).toEqual(keys);
+    const result = bootstrapDiagnostic('platform', expected);
+    expect(result).toEqual({ phase: 'platform', code, admissionReason: null });
+    expect(JSON.stringify(result)).not.toContain('private-canary');
+  });
+  it.each([
+    'LOAD_BOOTSTRAP_OS_RELEASE_READ_FAILED',
+    'LOAD_BOOTSTRAP_ANCESTOR_STAT_READ_FAILED',
+    'LOAD_BOOTSTRAP_ANCESTOR_EXE_READ_FAILED',
+    'LOAD_BOOTSTRAP_ANCESTOR_STATUS_READ_FAILED',
+    'LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_STATUS_PID_INVALID',
+    'LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_STATUS_UID_INVALID',
+    'LOAD_BOOTSTRAP_ANCESTOR_EXE_DENIED_NONROOT',
+  ])('자식의 %s 고정 코드만 허용하고 연산 원자료는 거부한다', (code) => {
+    const result = { phase: 'platform', code, admissionReason: null };
+    expect(bootstrapDiagnostic('platform', new Error(code))).toEqual(result);
+    const value = {
+      ...result,
+      event: 'LOAD_BOOTSTRAP_DIAGNOSTIC',
+      innerDiagnostic: null,
+      scopeAttempted: false,
+      scopeClosed: false,
+      pending: 0,
+      cleanupFailed: false,
+    };
+    expect(parseBootstrapDiagnostic(JSON.stringify(value))).toEqual(result);
+    for (const patch of [
+      { code: code + ': private-canary' },
+      { operation: 'private-canary' },
+      { path: '/proc/987/exe' },
+      { uid: 0 },
+      { pid: 987 },
+      { errno: 'EACCES' },
+    ])
+      expect(parseBootstrapDiagnostic(JSON.stringify({ ...value, ...patch }))).toBeNull();
+  });
   it('자식 진단은 고정 필드만 재구성하며 다른 stderr와 확장 필드를 버린다', () => {
     const value = {
       event: 'LOAD_BOOTSTRAP_DIAGNOSTIC',
