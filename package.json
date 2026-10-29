@@ -16,6 +16,7 @@
     "e2e:sanction": "playwright test --config playwright.sanction.config.ts",
     "e2e:admin-clock": "playwright test --config playwright.clock.config.ts",
     "e2e:admin-end": "playwright test --config playwright.end.config.ts",
+    "e2e:campaign-offer": "playwright test --config playwright.campaign-offer.config.ts",
     "notice:publish": "tsx --env-file-if-exists=.env tools/notice-publish.ts",
     "dev": "pnpm --parallel --filter \"./apps/*\" dev",
     "generate": "pnpm --filter @opensamguk/db generate",

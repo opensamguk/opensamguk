@@ -1,7 +1,16 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { randomUUID } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
-import { test as base, expect, type Browser, type Cookie, type Page, type Route, type Request } from '@playwright/test';
+import {
+  test as standaloneBase,
+  expect,
+  type Browser,
+  type Cookie,
+  type Page,
+  type Route,
+  type Request,
+} from '@playwright/test';
+import type { OfferRuntime } from './campaign-offer-ci-stack';
 import type { readCampaignBoard } from '../apps/server/src/game/campaignApi';
 import { loadInitialWorld } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
@@ -15,9 +24,19 @@ import { hashPassword } from '../apps/server/src/auth/password';
 import { newSession } from '../apps/server/src/auth/session';
 import { acquireLease, renewLease, releaseLease, lockLease, assertLease, LEASE_TTL_MS } from '../apps/engine/src/lease';
 import { bounded, WorkScope, guardedDb, guardedUi, mayDeleteFixtureRows } from '../tools/campaign-offer-lifetime';
-import { query as rawQuery, mutate as rawMutate, type LeaseHold } from './game';
+import { query as rawQuery, ApiError, type LeaseHold } from './game';
+
+const standalone = standaloneBase.extend<Record<never, never>, { offerRuntime: OfferRuntime | undefined }>({
+  offerRuntime: [undefined, { scope: 'worker' }],
+});
+// 순수 수명 검사는 Playwright worker hook을 불러오지 않는다. 전용 구성만 실제 공개 stack을 사용한다.
+const base =
+  process.env.CAMPAIGN_OFFER_CI_STACK === '1'
+    ? ((await import('./campaign-offer-ci-stack')).test as typeof standalone)
+    : standalone;
 
 const pageScopes = new WeakMap<Page, WorkScope>();
+const pageOrigins = new WeakMap<Page, string>();
 let passwordHash: Promise<string> | undefined;
 export function query<T>(page: Page, path: string, input?: unknown): Promise<T> {
   const scope = pageScopes.get(page);
@@ -27,7 +46,15 @@ export function query<T>(page: Page, path: string, input?: unknown): Promise<T> 
 export function mutate<T = Record<string, unknown>>(page: Page, path: string, input: unknown): Promise<T> {
   const scope = pageScopes.get(page);
   if (!scope) throw new Error('등록된 시험 페이지만 접수할 수 있습니다.');
-  return scope.work('HTTP mutation', () => rawMutate<T>(page, path, input));
+  return scope.work('HTTP mutation', async () => {
+    const response = await page.request.post(`/trpc/${path}`, {
+      data: input,
+      headers: { Origin: pageOrigins.get(page) ?? appOrigin() },
+    });
+    const body = (await response.json()) as { result?: { data?: T }; error?: { data?: { code?: string } } };
+    if (!response.ok()) throw new ApiError(path, response.status(), body.error?.data?.code);
+    return body.result?.data as T;
+  });
 }
 
 export type Board = Awaited<ReturnType<typeof readCampaignBoard>>;
@@ -65,7 +92,13 @@ function deferred<T>() {
 }
 
 export class OfferFixture {
-  constructor(private readonly cleanupAuditDb: () => PrismaClient = () => createDb(e2eDatabaseUrl())) {}
+  constructor(
+    private readonly cleanupAuditDb: () => PrismaClient = () => createDb(e2eDatabaseUrl()),
+    private readonly runtime?: OfferRuntime,
+  ) {}
+  private origin() {
+    return this.runtime?.origin ?? appOrigin();
+  }
   users: User[] = [];
   worlds: World[] = [];
   createdWorlds = new Set<string>();
@@ -142,18 +175,20 @@ export class OfferFixture {
     });
   }
   async prepare(browser: Browser) {
-    if (process.env.CAMPAIGN_OFFER_PUBLIC_DIST !== '1') throw new Error('공개 dist 전용 실행기가 필요합니다.');
-    const meta = await (await fetch(`${appOrigin()}/public-build.json`, { signal: this.scope.signal })).json();
+    if (!this.runtime && process.env.CAMPAIGN_OFFER_PUBLIC_DIST !== '1')
+      throw new Error('공개 dist 전용 실행기가 필요합니다.');
+    const meta = await (await fetch(`${this.origin()}/public-build.json`, { signal: this.scope.signal })).json();
     expect(meta.mode).toBe('public');
     for (let i = 0; i < 2; i++) {
       this.scope.check();
       const context = await this.scope.work(
         'new context',
-        () => browser.newContext({ baseURL: appOrigin(), viewport: { width: 1440, height: 900 } }),
+        () => browser.newContext({ baseURL: this.origin(), viewport: { width: 1440, height: 900 } }),
         (value) => this.contexts.add(value),
       );
       const page = guardedUi(await this.scope.work('new page', () => context.newPage()), this.scope);
       pageScopes.set(page, this.scope);
+      pageOrigins.set(page, this.origin());
       // 생성 도중 실패해도 자기 context와 계정의 수명을 추적한다.
       const user: User = { page, id: '', email: `e2e-offer-${randomUUID()}@example.test`, cookies: [] };
       this.users.push(user);
@@ -178,9 +213,11 @@ export class OfferFixture {
         },
       );
       await this.scope.work('session cookie', () =>
-        context.addCookies([{ name: 'sid', value: session.token, url: appOrigin(), httpOnly: true, sameSite: 'Lax' }]),
+        context.addCookies([
+          { name: 'sid', value: session.token, url: this.origin(), httpOnly: true, sameSite: 'Lax' },
+        ]),
       );
-      user.cookies = await context.cookies(appOrigin());
+      user.cookies = await context.cookies(this.origin());
       user.id = (await query<{ user: { id: string } }>(page, 'auth.me')).user.id;
     }
     for (let i = 0; i < 2; i++) {
@@ -232,7 +269,7 @@ export class OfferFixture {
           .poll(() => hold.db.inputEvent.count({ where: { worldId, kind: 'general.create', status: 'PENDING' } }))
           .toBe(1);
         await this.advance(world, 0);
-        await expect(user.page).toHaveURL(`${appOrigin()}/w/${worldId}`);
+        await expect(user.page).toHaveURL(`${this.origin()}/w/${worldId}`);
       }
       const humans = await hold.db.general.findMany({
         where: { worldId, userId: { in: this.users.map((u) => u.id) } },
@@ -511,7 +548,7 @@ export class OfferFixture {
   observePosts() {
     const rows: Array<{ input: Offer; cookieIsB: boolean; status: number }> = [];
     const page = this.users[0]!.page;
-    const bCookie = this.users[1]!.page.context().cookies(appOrigin());
+    const bCookie = this.users[1]!.page.context().cookies(this.origin());
     page.on('response', (response) => {
       this.track(
         (async () => {
@@ -714,8 +751,8 @@ export function assertCleanupPassed(cleanup: Awaited<ReturnType<OfferFixture['cl
 }
 
 export const test = base.extend<{ offer: OfferFixture }>({
-  offer: async ({ browser }, use, info) => {
-    const offer = new OfferFixture();
+  offer: async ({ browser, offerRuntime }, use, info) => {
+    const offer = new OfferFixture(undefined, offerRuntime);
     const timer = setTimeout(() => offer.scope.cancel(), info.timeout);
     let fixtureFailed = false;
     try {
@@ -727,12 +764,18 @@ export const test = base.extend<{ offer: OfferFixture }>({
       clearTimeout(timer);
       offer.scope.cancel();
     }
-    const cleanup = await offer.cleanup(!fixtureFailed && info.status === 'passed');
-    await writeFile(
-      info.outputPath('controlled-cleanup-v3.json'),
-      JSON.stringify({ cleanup, journal: offer.journal }, null, 2),
-    );
-    assertCleanupPassed(cleanup, fixtureFailed);
+    if (fixtureFailed || info.status !== 'passed') offerRuntime?.failed();
+    try {
+      const cleanup = await offer.cleanup(!fixtureFailed && info.status === 'passed');
+      await writeFile(
+        info.outputPath('controlled-cleanup-v3.json'),
+        JSON.stringify({ cleanup, journal: offer.journal }, null, 2),
+      );
+      assertCleanupPassed(cleanup, fixtureFailed);
+    } catch (error) {
+      offerRuntime?.failed();
+      throw error;
+    }
   },
 });
 export { expect, hashState, randomUUID };
