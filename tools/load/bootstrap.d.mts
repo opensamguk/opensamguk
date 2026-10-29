@@ -23,6 +23,7 @@ export function bootstrapDiagnostic(
   code: string;
   admissionReason: string | null;
 };
+export function parseBootstrapDiagnostic(line: unknown): ReturnType<typeof bootstrapDiagnostic> | null;
 export function bootstrapReason(
   sample: AdmissionSample,
   options: { now: number; cpuPercent?: number; memoryPercent?: number; diskReserveMiB?: number },

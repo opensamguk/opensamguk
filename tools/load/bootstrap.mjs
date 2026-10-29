@@ -62,6 +62,35 @@ export function bootstrapDiagnostic(phase, error, admissionReason) {
   };
 }
 
+// 자식 stderr에서는 우리가 만든 고정 진단 한 줄만 받아 다시 구성한다.
+export function parseBootstrapDiagnostic(line) {
+  if (typeof line !== 'string' || line.length > 4096) return null;
+  try {
+    const value = JSON.parse(line);
+    if (
+      !value ||
+      typeof value !== 'object' ||
+      Array.isArray(value) ||
+      Object.keys(value).sort().join(',') !==
+        'admissionReason,cleanupFailed,code,event,innerDiagnostic,pending,phase,scopeAttempted,scopeClosed' ||
+      value.event !== 'LOAD_BOOTSTRAP_DIAGNOSTIC' ||
+      value.innerDiagnostic !== null ||
+      !(diagnosticPhases.has(value.phase) || value.phase === 'unknown') ||
+      !(diagnosticCodes.has(value.code) || ['RESOURCE_MISSING', 'UNCLASSIFIED'].includes(value.code)) ||
+      !(value.admissionReason === null || diagnosticReasons.has(value.admissionReason)) ||
+      typeof value.scopeAttempted !== 'boolean' ||
+      typeof value.scopeClosed !== 'boolean' ||
+      typeof value.cleanupFailed !== 'boolean' ||
+      !Number.isSafeInteger(value.pending) ||
+      value.pending < 0
+    )
+      return null;
+    return { phase: value.phase, code: value.code, admissionReason: value.admissionReason };
+  } catch {
+    return null;
+  }
+}
+
 export function bootstrapReason(sample, options) {
   const cpuPercent = options.cpuPercent ?? 80,
     memoryPercent = options.memoryPercent ?? 80,
@@ -274,7 +303,27 @@ function nativeRecorder(root, receipts, pending) {
     child.stdout.on('end', () => {
       receipt.stdoutEnded = true;
     });
-    child.stderr.resume();
+    let diagnosticBuffer = '',
+      discardDiagnosticLine = false;
+    child.stderr.on('data', (bytes) => {
+      if (label !== 'scoped-dependencies') return;
+      const pieces = bytes.toString('utf8').split('\n');
+      for (let index = 0; index < pieces.length; index++) {
+        if (!discardDiagnosticLine) {
+          diagnosticBuffer += pieces[index];
+          if (diagnosticBuffer.length > 4096) {
+            diagnosticBuffer = '';
+            discardDiagnosticLine = true;
+          }
+        }
+        if (index < pieces.length - 1) {
+          const diagnostic = !discardDiagnosticLine && parseBootstrapDiagnostic(diagnosticBuffer);
+          if (diagnostic && !receipt.innerDiagnostic) receipt.innerDiagnostic = diagnostic;
+          diagnosticBuffer = '';
+          discardDiagnosticLine = false;
+        }
+      }
+    });
     child.stderr.on('end', () => {
       receipt.stderrEnded = true;
     });
@@ -411,6 +460,7 @@ async function main() {
     await requirePlatform();
     if (process.cwd() !== root) throw new Error('LOAD_BOOTSTRAP_SOURCE_INVALID');
     if (process.argv[2] === 'inner-install') {
+      phase = 'install-scope';
       const runId = process.argv[3] ?? '',
         path = groupPath(await readFile('/proc/self/cgroup', 'utf8'));
       const [cpuMax, memoryMax, swapMax] = await Promise.all(
@@ -425,6 +475,7 @@ async function main() {
         memoryMax,
         swapMax,
       });
+      phase = 'install';
       const version = (await native('pnpm', ['--version'], 'pnpm-version', signal, 10000)).trim();
       if (version !== '10.33.0') throw new Error('LOAD_INSTALL_TOOL_UNVERIFIED');
       await native(
@@ -682,6 +733,7 @@ async function main() {
       JSON.stringify({
         event: 'LOAD_BOOTSTRAP_DIAGNOSTIC',
         ...failureDiagnostic,
+        innerDiagnostic: receipts.find((row) => row.label === 'scoped-dependencies')?.innerDiagnostic ?? null,
         scopeAttempted: attempted,
         scopeClosed,
         pending: pending.size,

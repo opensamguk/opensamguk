@@ -7,6 +7,7 @@ import {
   BOOTSTRAP_LIMIT_MS,
   bootstrapReason,
   bootstrapDiagnostic,
+  parseBootstrapDiagnostic,
   BUILD_BUDGET,
   requireDispatch,
 } from './bootstrap.mjs';
@@ -34,6 +35,37 @@ const site = admissionSite('github-hosted', {
 });
 
 describe('L5 의존성 설치 전 bootstrap 경계', () => {
+  it('자식 진단은 고정 필드만 재구성하며 다른 stderr와 확장 필드를 버린다', () => {
+    const value = {
+      event: 'LOAD_BOOTSTRAP_DIAGNOSTIC',
+      innerDiagnostic: null,
+      phase: 'install-scope',
+      code: 'LOAD_INSTALL_SCOPE_UNVERIFIED',
+      admissionReason: null,
+      scopeAttempted: false,
+      scopeClosed: false,
+      pending: 0,
+      cleanupFailed: false,
+    };
+    expect(parseBootstrapDiagnostic(JSON.stringify(value))).toEqual({
+      phase: 'install-scope',
+      code: 'LOAD_INSTALL_SCOPE_UNVERIFIED',
+      admissionReason: null,
+    });
+    for (const patch of [
+      { message: 'private-canary' },
+      { innerDiagnostic: { message: 'private-canary' } },
+      { phase: 'private-canary' },
+      { code: 'private-canary' },
+      { admissionReason: 'private-canary' },
+      { scopeClosed: 1 },
+      { pending: -1 },
+      { pending: 'private-canary' },
+    ])
+      expect(parseBootstrapDiagnostic(JSON.stringify({ ...value, ...patch }))).toBeNull();
+    for (const line of [null, 'private-canary', 'x'.repeat(4097), '{}', '[]'])
+      expect(parseBootstrapDiagnostic(line)).toBeNull();
+  });
   it('공개 실패 진단은 고정 단계·코드·심사 사유만 남긴다', () => {
     expect(
       bootstrapDiagnostic('admission-decision', new Error('LOAD_BOOTSTRAP_ADMISSION_REFUSED'), 'memory_limit'),
