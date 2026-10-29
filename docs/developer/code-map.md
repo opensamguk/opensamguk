@@ -26,6 +26,8 @@
 | `apps/server/src/mail/`, `routers/account.ts` | 인증·재설정 메일과 개발 capture, 본인 계정 조회·재발급·토큰 소비 API. 운영 전송·가입 동의·미인증 게임 변경 차단·탈퇴는 후속 |
 | `tools/t3-02-account-api.integration.test.ts`, `t3-02-session-lock.integration.test.ts`, `t3-02-mail-startup.test.ts` | 실제 계정 API 권한·메일함·두 API의 SSE 폐기, 재설정/메시지·SSE 교착 회귀와 운영 시작 거부 |
 | `apps/server/src/routers/auth.ts` | 가입·로그인·로그아웃·현재 계정 |
+| `apps/web/src/admin/AdminEndActions.tsx`, `adminEndModel.ts` | 명시 종료 확인·현재 신원 대조·30초 기한·동일 UUID 수동 결과 조회. 관리자 월드 목록의 시계 조작과 상호 잠금 |
+| `e2e/adminEndSetup.ts`, `admin-end.spec.ts`, `playwright.end.config.ts` | 전용 실제 PostgreSQL·API·엔진·공개 dist의 종료 화면10건. 검증 소스이며 실제 인수는 후속 |
 | `apps/server/src/trpc.ts` | 공개·인증 필수 procedure |
 | `apps/server/src/router.ts` | tRPC `AppRouter` (API 계약): `health`, `auth`, `world`, `home`, `city`, `nation`, `records`, `general`, `turns`, `commands`, `ranking`, `timelapse`, `message`, `notice`, `lobby` |
 | `apps/server/src/routers/lobby.ts`, `lobby.test.ts` | 공개 월드 목록·로비 공지, 내 장수·생성 대기와 시나리오 이름 조회 |
@@ -53,6 +55,7 @@
 | `apps/server/src/visibility.test.ts`, `routers/reads.integration.test.ts` | 아군·적·재야 공개 범위와 실제 TCP·PostgreSQL 권한·페이지·94도시 성능 검증 |
 | `apps/engine/src/index.ts`, `main.ts` | 기본 감독 진입점, `engine:run --world <ID>` 단일 월드 실행, 리스·30초 heartbeat·종료 |
 | `apps/engine/src/supervisor.ts` | 10초 월드 발견, 월드별 자식·백오프·반복 크래시 중단·자기 자식 정리 |
+| `apps/server/src/admin/worldCreate.ts`, `apps/engine/src/admin/createRequests.ts`, `packages/rules/src/clock/createRequest.ts` | ADMIN-CREATE-B 후보: 엄격 생성 접수·현재 권한·멱등 원장, 게시 자원·시드 고정과 감독 소비·원자 생성. 실제 인수·독립 리뷰·보호 병합은 미완료 |
 | `apps/engine/src/process-lifecycle.ts`, `process-lifecycle.test.ts`, `test/shutdownFixture.ts` | POSIX 신호·Windows IPC 종료 요청, 소유 자식의 5초 강제 종료와 실제 프로세스 시험 |
 | `apps/engine/src/supervisor.integration.test.ts`, `test/supervisorWorker.ts` | 실제 감독·엔진·DB의 수동 3개월·kill·정지·중복 감독·오류 격리 검증 |
 | `apps/engine/src/lease.ts` | DB 시각 기준 실행권 획득·갱신·해제·펜싱 |
