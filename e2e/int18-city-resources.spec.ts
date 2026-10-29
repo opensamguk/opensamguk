@@ -499,10 +499,27 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
       isolationLevel: 'RepeatableRead',
     });
   }
+  function progress(operation: 'advance' | 'resources', state: 'start' | 'complete', started: number, tick?: number) {
+    const row = {
+      event: 'int18-city-progress',
+      phase: cityRun.phase + 1,
+      operation,
+      state,
+      elapsedMs: Math.round(performance.now() - started),
+      ...(tick === undefined ? {} : { tick }),
+    };
+    const rows = (evidence.elapsedStages ?? []) as unknown[];
+    if (rows.length >= 256) throw new Error('도시 검사 진행 기록의 고정 상한을 넘었습니다.');
+    rows.push(row);
+    evidence.elapsedStages = rows;
+    console.info(JSON.stringify(row));
+  }
   async function advance(world: OwnedWorld, tick: number) {
     cityRun.controller.signal.throwIfAborted();
     if (!world.hold || !world.loop) throw new Error('자기 실행권이 없습니다.');
     if (world.hold.lost) throw world.hold.lost;
+    const started = performance.now();
+    progress('advance', 'start', started, tick);
     const signal = AbortSignal.any([cityRun.controller.signal, AbortSignal.timeout(120_000)]);
     const executions = await track(world.loop.advanceTo(tick, signal));
     signal.throwIfAborted();
@@ -510,6 +527,7 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
     const row = await db.world.findUniqueOrThrow({ where: { id: world.id } });
     expect(row.status).toBe('RUNNING');
     expect(row.clockTick).toBe(tick);
+    progress('advance', 'complete', started, tick);
     return executions;
   }
   async function drain(world: OwnedWorld) {
@@ -697,6 +715,8 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
     return response;
   }
   async function showResources(world: OwnedWorld, actor: Actor, cityKey: number) {
+    const started = performance.now();
+    progress('resources', 'start', started);
     await actor.page.bringToFront();
     const value = await board(world, actor, cityKey);
     const panel = resourcePanel(actor.page);
@@ -726,6 +746,7 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
       for (const [index, count] of [row.troops, row.train, row.atmos].entries())
         await expect(visible.getByRole('cell').nth(index + 1)).toHaveText(count.toLocaleString('ko-KR'));
     }
+    progress('resources', 'complete', started);
     return value;
   }
   let a: OwnedWorld | undefined, b: OwnedWorld | undefined, legacy: OwnedWorld | undefined;
@@ -896,14 +917,10 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
         expect(await turns(main, other)).toHaveLength(30);
         await expect(campaign).toContainText('소유 부곡 1개');
         await photo(owner.page, info, '02-person-30slots-empty-unit');
-      });
-    },
-    async commands(currentInfo) {
-      info = currentInfo;
-      actor = owner!;
-      protectedActor = other!;
-      browserCalls = watch(actor.page);
-      await step('F03', 'F03 실제 세수 후 도시 모병·징병·훈련·사기 예약과 단차감', async () => {
+        // 같은 세수 준비를 첫 검사에 둔다. 다음 검사는 기존 네 명령과 단차 검증을 이어서 실행한다.
+        actor = owner!;
+        protectedActor = other!;
+        browserCalls = watch(actor.page);
         // 임의 자금 없이 실제 월 경계를 진행한다. 금0이면 다음 실제 수확까지 기다린다.
         for (let month = 0; month < 7; month++) {
           const state = (await snapshot(main)).state;
@@ -911,6 +928,11 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
           const current = (await db.world.findUniqueOrThrow({ where: { id: main.id } })).clockTick;
           await advance(main, (Math.floor(current / TICKS_PER_MONTH) + 1) * TICKS_PER_MONTH);
         }
+      });
+    },
+    async commands(currentInfo) {
+      info = currentInfo;
+      await step('F03', 'F03 실제 세수 후 도시 모병·징병·훈련·사기 예약과 단차감', async () => {
         expect((await snapshot(main)).state.cityResources!.cities[String(cityKey)]!.gold).toBeGreaterThanOrEqual(1000);
         await actor.page.reload();
         const commands: Array<{
