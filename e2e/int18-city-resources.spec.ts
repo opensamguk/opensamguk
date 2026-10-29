@@ -468,6 +468,32 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
     void work.finally(() => active.delete(work)).catch(() => undefined);
     return work;
   }
+  function allocationResponse(actor: Actor, worldId: string) {
+    return track(
+      actor.page
+        .waitForResponse(
+          (response) =>
+            response.request().method() === 'POST' &&
+            trpcCalls(response.request()).some((call) => {
+              const input = call.input as Partial<Allocation>;
+              return (
+                call.path === 'cityResources.allocate' &&
+                input.worldId === worldId &&
+                input.expectedUserId === actor.userId
+              );
+            }),
+          { timeout: 10_000 },
+        )
+        .then(async (response) => {
+          expect(response.status()).toBe(200);
+          const calls = trpcCalls(response.request()),
+            index = calls.findIndex((call) => call.path === 'cityResources.allocate');
+          const body: unknown = await response.json();
+          const item = (Array.isArray(body) ? body[index] : body) as { result?: { data?: Receipt } };
+          return { input: calls[index]!.input as Allocation, data: item.result?.data };
+        }),
+    );
+  }
   async function snapshot(world: OwnedWorld) {
     return db.$transaction((tx) => loadReplayState(tx, world.id), {
       isolationLevel: 'RepeatableRead',
@@ -1114,6 +1140,7 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
         await unitSelect.selectOption(String(actor.unitId));
         await form.getByLabel('배속 인원', { exact: true }).fill('10');
         const start = browserCalls.length;
+        const acceptedResponse = allocationResponse(actor, main.id);
         await form.getByRole('button', { name: '도시 수비병을 부곡에 배속', exact: true }).click();
         await actor.page.keyboard.press('Enter');
         await actor.page.keyboard.press('Enter');
@@ -1126,6 +1153,9 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
           expectedUserId: actor.userId,
           payload: rejected.payload,
         });
+        const accepted = await acceptedResponse;
+        expect(accepted.input).toEqual(request);
+        expect(accepted.data).toMatchObject({ userId: actor.userId, requestId: request.requestId, status: 'pending' });
         expect(
           await read<Receipt>(actor.page, 'cityResources.request', {
             worldId: main.id,
@@ -1321,12 +1351,16 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
         await unitSelect.selectOption(String(actor.unitId));
         await form.getByLabel('배속 인원', { exact: true }).fill('1');
         const start = browserCalls.length;
+        const acceptedResponse = allocationResponse(actor, main.id);
         await form.getByRole('button', { name: '도시 수비병을 부곡에 배속', exact: true }).click();
         await expect
           .poll(() => browserCalls.slice(start).filter((call) => call.path === 'cityResources.allocate').length)
           .toBe(1);
         const pending = browserCalls.slice(start).find((call) => call.path === 'cityResources.allocate')!
           .input as Allocation;
+        const admitted = await acceptedResponse;
+        expect(admitted.input).toEqual(pending);
+        expect(admitted.data).toMatchObject({ userId: actor.userId, requestId: pending.requestId, status: 'pending' });
         await expect
           .poll(() =>
             db.inputEvent.count({

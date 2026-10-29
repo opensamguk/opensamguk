@@ -1,4 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import { readFile, readdir } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
@@ -14,6 +17,8 @@ import { newSession } from '../apps/server/src/auth/session';
 import { authzCase } from '../apps/server/src/authz/case';
 import { categories } from '../apps/server/src/authz/coverage';
 import { testDatabaseUrl } from './test-database';
+import { confirmDisconnectedDatabase } from './test-db-close';
+import { initializeResources } from './init-resources';
 
 // AC-INT-18B: 정식 191년 자료의 실제 PG·세션·Fastify 권한 원장이다.
 // 직책·집결·도시 잔액만 통제한다. 첫 달 실행·TCP·Chromium 인수로 세지 않는다.
@@ -23,7 +28,43 @@ if (!['127.0.0.1', 'localhost'].includes(url.hostname)) throw new Error('loopbac
 for (const key of url.searchParams.keys())
   if (['host', 'hostaddr', 'port', 'dbname', 'database', 'service'].includes(key.toLowerCase()))
     throw new Error('접속 대상 질의 인자는 쓸 수 없습니다.');
-const db = createDb(url.href),
+type PgClient = {
+  connect(): Promise<void>;
+  query(sql: string, values?: unknown[]): Promise<{ rows: Record<string, unknown>[] }>;
+  end(): Promise<void>;
+  once(event: 'end', listener: () => void): void;
+  on(event: 'error', listener: (error: unknown) => void): void;
+};
+const requireDb = createRequire(new URL('../packages/db/package.json', import.meta.url));
+const { Client } = createRequire(requireDb.resolve('@prisma/adapter-pg'))('pg') as {
+  Client: new (options: {
+    connectionString: string;
+    connectionTimeoutMillis: number;
+    query_timeout: number;
+    statement_timeout: number;
+  }) => PgClient;
+};
+const databaseName = 'int18_authz_' + randomUUID().replaceAll('-', '') + '_test';
+if (!/^int18_authz_[a-f0-9]{32}_test$/.test(databaseName)) throw new Error('자기 시험 DB 이름이 다릅니다.');
+const target = new URL(url),
+  adminUrl = new URL(url);
+target.pathname = '/' + databaseName;
+adminUrl.pathname = '/postgres';
+testDatabaseUrl({ TEST_DATABASE_URL: target.href, DATABASE_URL: process.env.DATABASE_URL });
+const native = (connectionString: string) =>
+  new Client({ connectionString, connectionTimeoutMillis: 5000, query_timeout: 5000, statement_timeout: 5000 });
+const admin = native(adminUrl.href),
+  gate = native(target.href);
+let adminEnded = false,
+  gateEnded = false;
+admin.once('end', () => {
+  adminEnded = true;
+});
+gate.once('end', () => {
+  gateEnded = true;
+});
+// 환경 변수를 바꾸지 않는다. 이 파일의 모든 도메인 쿼리는 자기 UUID DB만 사용한다.
+const db = createDb(target.href),
   origin = 'http://127.0.0.1:5173',
   now = Date.now();
 const paths = ['cityResources.get', 'cityResources.allocate', 'cityResources.request'] as const;
@@ -33,7 +74,12 @@ const worlds: string[] = [],
   users: string[] = [],
   running = new Set<Promise<unknown>>(),
   failures: unknown[] = [];
-let failed = false,
+let baselineAbsent = false,
+  creationAttempted = false,
+  oid: string | undefined,
+  preparationDone = false,
+  timedOut = false,
+  failed = false,
   app: Awaited<ReturnType<typeof buildServer>> | undefined,
   worldId: string,
   otherWorldId: string,
@@ -44,6 +90,12 @@ let failed = false,
   ownRequestId: string,
   expiredCookie: string,
   revokedCookie: string;
+
+for (const client of [admin, gate])
+  client.on('error', (error) => {
+    failed = true;
+    failures.push(error);
+  });
 
 function track<T>(action: () => Promise<T>) {
   const promise = Promise.resolve().then(action);
@@ -113,6 +165,17 @@ async function drain() {
     await releaseLease(db, lease);
   }
 }
+async function untilCreationPending(userId: string) {
+  // Vitest5 expect.poll은 test 전용이다. 원래 기본 poll의 1000ms/50ms 경계는 유지한다.
+  const deadline = performance.now() + 1000;
+  for (;;) {
+    const count = await db.inputEvent.count({ where: { worldId, userId, kind: 'general.create', status: 'PENDING' } });
+    if (count === 1) return;
+    if (count > 1) throw new Error('고정물 생성 입력이 중복됐습니다.');
+    if (performance.now() >= deadline) throw new Error('고정물 생성 접수를 확인하지 못했습니다.');
+    await delay(Math.min(50, Math.max(1, deadline - performance.now())));
+  }
+}
 async function createActor(index: number): Promise<Actor> {
   const user = await db.user.create({
     data: { email: `${randomUUID()}@example.invalid`, passwordHash: 'non-login-int18-authz' },
@@ -137,9 +200,7 @@ async function createActor(index: number): Promise<Actor> {
       cookie,
     ),
   );
-  await expect
-    .poll(() => db.inputEvent.count({ where: { worldId, userId: user.id, kind: 'general.create', status: 'PENDING' } }))
-    .toBe(1);
+  await untilCreationPending(user.id);
   await drain();
   expect((await creating).data).toMatchObject({ status: 'created' });
   const general = await db.general.findUniqueOrThrow({ where: { worldId_userId: { worldId, userId: user.id } } });
@@ -190,8 +251,85 @@ async function denied(path: Path, value: unknown, cookie: string | undefined, st
   expect(await snapshot()).toBe(before);
 }
 
+// 새 DB 준비 30초 + 기존 월드 준비 30초. 각 훅과 각 시험의 기존 30초 한도는 올리지 않는다.
+async function bounded<T>(action: () => Promise<T>, deadline: number, label: string): Promise<T> {
+  const remaining = deadline - performance.now();
+  if (remaining <= 0) {
+    timedOut = failed = true;
+    throw new Error(label + ' 한도를 넘겨 자기 DB를 보존합니다.');
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.resolve().then(action),
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => {
+          timedOut = failed = true;
+          reject(new Error(label + ' 한도를 넘겨 자기 DB를 보존합니다.'));
+        }, remaining);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+function setup(action: () => Promise<void>) {
+  return bounded(() => track(action), performance.now() + 30_000, '준비 훅');
+}
+function assertPreparing() {
+  if (failed || timedOut) throw new Error('실패한 준비를 계속할 수 없습니다.');
+}
 beforeAll(() =>
-  track(async () => {
+  setup(async () => {
+    await admin.connect();
+    assertPreparing();
+    expect((await admin.query('SELECT oid FROM pg_database WHERE datname=$1', [databaseName])).rows).toEqual([]);
+    baselineAbsent = true;
+    assertPreparing();
+    creationAttempted = true;
+    console.info(
+      JSON.stringify({
+        fixture: 'INT18-city-resources-authz',
+        phase: 'create-attempt',
+        databaseName,
+        baselineAbsent,
+        creationAttempted,
+      }),
+    );
+    await admin.query('CREATE DATABASE "' + databaseName + '"');
+    assertPreparing();
+    const identity = (await admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname=$1', [databaseName]))
+      .rows;
+    expect(identity).toHaveLength(1);
+    expect(typeof identity[0]!.oid === 'string' && /^[1-9]\d*$/.test(identity[0]!.oid)).toBe(true);
+    oid = String(identity[0]!.oid);
+    await gate.connect();
+    expect((await gate.query('SELECT current_database() AS name')).rows).toEqual([{ name: databaseName }]);
+    const directory = new URL('../packages/db/prisma/migrations/', import.meta.url);
+    const migrations = (await readdir(directory, { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory() && /^\d{14}_/.test(entry.name))
+      .map((entry) => entry.name)
+      .sort();
+    expect(migrations.length).toBeGreaterThan(0);
+    for (const migration of migrations) {
+      assertPreparing();
+      await gate.query(await readFile(new URL(migration + '/migration.sql', directory), 'utf8'));
+    }
+    assertPreparing();
+    // run-integration.ts와 같은 게시 자원 초기화 helper와 기존 SQL을 사용한다.
+    await initializeResources(
+      db,
+      await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
+    );
+    assertPreparing();
+    preparationDone = true;
+  }),
+);
+
+beforeAll(() =>
+  setup(async () => {
+    assertPreparing();
+    if (!preparationDone) throw new Error('자기 DB 준비가 끝나지 않았습니다.');
     const initial = await loadInitialWorld({
       scenario: 'integration191',
       map: 'integration',
@@ -311,33 +449,109 @@ beforeAll(() =>
 );
 beforeEach(async () => {
   await settle();
-  await db.sanction.deleteMany({ where: { userId: { in: users } } });
-  await db.user.updateMany({ where: { id: { in: users } }, data: { status: 'ACTIVE' } });
+  return track(async () => {
+    await db.sanction.deleteMany({ where: { userId: { in: users } } });
+    await db.user.updateMany({ where: { id: { in: users } }, data: { status: 'ACTIVE' } });
+  });
 });
 afterAll(async () => {
-  await settle();
-  const errors = [...failures];
-  let removedWorlds = false;
-  for (const close of [
-    async () => app?.close(),
-    async () => {
-      if (failed || errors.length) return;
-      await db.sanction.deleteMany({ where: { userId: { in: users } } });
-      await db.world.deleteMany({ where: { id: { in: worlds } } });
-      removedWorlds = true;
-    },
-    async () => {
-      if (removedWorlds) await db.user.deleteMany({ where: { id: { in: users } } });
-    },
-    async () => db.$disconnect(),
-  ]) {
+  const deadline = performance.now() + 30_000,
+    errors = [...failures];
+  let settled = false,
+    appClosed = false,
+    prismaClosed = false,
+    gateClosed = false,
+    adminClosed = false,
+    dropped = false,
+    connections: number | undefined,
+    sameOid = false,
+    catalogAbsent = false;
+  async function cleanup(action: () => Promise<unknown>, label: string) {
+    // 한 정리가 멎어도 다른 연결의 종료를 시도할 시간을 남긴다. 전체 정리 훅은 30초다.
     try {
-      await close();
+      await bounded(action, Math.min(deadline, performance.now() + 5000), label);
     } catch (error) {
+      failed = true;
       errors.push(error);
     }
   }
-  console.info(JSON.stringify({ fixture: 'INT18-city-resources-authz', failed, removedWorlds, worlds }));
+  await cleanup(async () => {
+    await settle();
+    settled = true;
+  }, '본문 종료');
+  errors.push(...failures);
+  await cleanup(async () => {
+    await app?.close();
+    appClosed = true;
+  }, '서버 종료');
+  await cleanup(async () => {
+    await db.$disconnect();
+    prismaClosed = true;
+  }, 'Prisma 종료');
+  await cleanup(async () => {
+    await gate.end();
+    gateClosed = gateEnded;
+    if (!gateClosed) throw new Error('자기 DB native 연결의 실제 종료를 확인하지 못했습니다.');
+  }, 'native 종료');
+  await cleanup(async () => {
+    if (!creationAttempted) return;
+    const rows = (await admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname=$1', [databaseName])).rows;
+    if (!oid || rows.length !== 1 || rows[0]!.oid !== oid)
+      throw new Error('CREATE 응답 또는 자기 DB OID를 확인하지 못해 DB를 보존합니다.');
+    ({ connections } = await confirmDisconnectedDatabase(admin, databaseName, oid));
+    sameOid = true;
+    if (
+      failed ||
+      timedOut ||
+      errors.length ||
+      !baselineAbsent ||
+      !settled ||
+      !appClosed ||
+      !prismaClosed ||
+      !gateClosed
+    )
+      return;
+    // helper 관찰 뒤 삭제 직전에도 현재 연결 수와 OID를 한 쿼리로 다시 확인한다.
+    const current = (
+      await admin.query(
+        'SELECT oid::text AS oid, (SELECT count(*)::int FROM pg_stat_activity WHERE datname=$1) AS connections FROM pg_database WHERE datname=$1',
+        [databaseName],
+      )
+    ).rows;
+    expect(current).toEqual([{ oid, connections: 0 }]);
+    if (failed || timedOut || running.size) throw new Error('미종료 작업이 있어 자기 DB를 보존합니다.');
+    await admin.query('DROP DATABASE "' + databaseName + '"');
+    dropped = true;
+    expect((await admin.query('SELECT oid FROM pg_database WHERE datname=$1', [databaseName])).rows).toEqual([]);
+    catalogAbsent = true;
+  }, '자기 DB 감사와 정리');
+  await cleanup(async () => {
+    await admin.end();
+    adminClosed = adminEnded;
+    if (!adminClosed) throw new Error('관리 연결의 실제 종료를 확인하지 못했습니다.');
+  }, '관리 연결 종료');
+  console.info(
+    JSON.stringify({
+      fixture: 'INT18-city-resources-authz',
+      databaseName,
+      oid,
+      baselineAbsent,
+      creationAttempted,
+      preparationDone,
+      failed,
+      timedOut,
+      settled,
+      appClosed,
+      prismaClosed,
+      gateClosed,
+      sameOid,
+      connections,
+      dropped,
+      catalogAbsent,
+      adminClosed,
+      worlds,
+    }),
+  );
   if (errors.length) throw new AggregateError([...new Set(errors)], '도시 권한 원장 본문 또는 정리에 실패했습니다.');
 });
 
