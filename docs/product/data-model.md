@@ -37,27 +37,29 @@
 
 ## 계정 영역
 
-탈퇴 API·DB 후보는 승인된 현재 개인정보 보존 정책이 있을 때만 User를 WITHDRAWN으로 바꾸고 이메일을 `withdrawn+<UUID>@invalid`로 치환하며 무작위 비밀번호 해시·인증 일시 제거·모든 Session/AccountToken 삭제를 한 트랜잭션에서 처리한다. 기본 정책 상수는 null로 운영 연결을 막는다. ConsentRecord·Sanction·AuditLog와 General·예약·게임 원장 보존안의 사용자 승인은 남아 있다. 현재 schema에는 LoginRecord·알림 대상·발송 대기열이 없으며 관계도의 LoginRecord는 후속 설계다. 해당 모델을 추가할 때 탈퇴 삭제와 동시성 검사를 함께 확장한다. UUID 묘비를 영구 익명 처리로 부르지 않는다. 검증 범위와 남은 관문은 [T3-02](../plans/T3-02.md)에 기록한다.
+탈퇴 API·DB 후보는 승인된 현재 개인정보 보존 정책이 있을 때만 User를 WITHDRAWN으로 바꾸고 이메일을 `withdrawn+<UUID>@invalid`로 치환하며 무작위 비밀번호 해시·인증 일시 제거·모든 Session/AccountToken/LoginRecord 삭제를 한 트랜잭션에서 처리한다. 기본 정책 상수는 null로 운영 연결을 막는다. ConsentRecord·Sanction·AuditLog와 General·예약·게임 원장 보존안의 사용자 승인은 남아 있다. 현재 schema에는 알림 대상·발송 대기열이 없다. 해당 모델을 추가할 때 탈퇴 삭제와 동시성 검사를 함께 확장한다. UUID 묘비를 영구 익명 처리로 부르지 않는다. 검증 범위와 남은 관문은 [T3-02](../plans/T3-02.md)에 기록한다.
 
-| 테이블          | 주요 필드                                                                 | 관문 |
-| --------------- | ------------------------------------------------------------------------- | ---- |
-| `User`          | id, email(고유), passwordHash, emailVerifiedAt, role(USER·ADMIN), status(ACTIVE·SANCTIONED·WITHDRAWN), createdAt | M1 |
-| `Session`       | id(토큰 해시), userId, expiresAt, ip, deviceHash, createdAt               | M1   |
-| `LoginRecord`   | userId, at, ip, deviceHash, success                                       | M3   |
-| `ConsentRecord` | userId, docType(약관·개인정보), version, agreedAt                         | M3   |
-| `LegalDocumentVersion` | docType·version 복합키, effectiveAt, bodySha256. 발행한 본문·시행일은 같은 판에서 바꾸지 않음 | M3 |
-| `Sanction`      | id, userId, worldId(없으면 전체), reason, expiresAt, createdBy, createdAt, liftedAt, liftedBy, liftReason. 대상 User·World 이력은 NoAction으로 보존 | M3 제재 묶음 검증 중 |
-| `AuditLog`      | id, at, actorKind, actorUserId, action, targetType, targetId, worldId, reason, payload, inputEventId. DB에서 수정·삭제·비우기 거부 | M3 첫 묶음 구현 중 |
-| `Notice` | id, scope, worldId, title, body, pinned, publishedAt, hiddenAt, revision. 기존 제목 없는 WORLD 공지 보존, 숨김은 공개 조회에서 제외 | M3 공지 API 검증 중 |
-| `AdminNoticeRequest` | (actorUserId, idempotencyKey) PK, requestHash, noticeId, revision, hidden, createdAt. 같은 요청 결과만 보관하며 원문 본문은 중복 저장하지 않음 | M3 공지 API 검증 중 |
+| 테이블                 | 주요 필드                                                                                                                                           | 관문                 |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| `User`                 | id, email(고유), passwordHash, emailVerifiedAt, role(USER·ADMIN), status(ACTIVE·SANCTIONED·WITHDRAWN), createdAt                                    | M1                   |
+| `Session`              | id(토큰 해시), userId, expiresAt, createdAt                                                                                                         | M1                   |
+| `LoginRecord`          | id(BigInt), userId, at, success, ipHash, deviceHash(nullable), hashKeyVersion                                                                       | M3 조사 기록 구현 중 |
+| `ConsentRecord`        | userId, docType(약관·개인정보), version, agreedAt                                                                                                   | M3                   |
+| `LegalDocumentVersion` | docType·version 복합키, effectiveAt, bodySha256. 발행한 본문·시행일은 같은 판에서 바꾸지 않음                                                       | M3                   |
+| `Sanction`             | id, userId, worldId(없으면 전체), reason, expiresAt, createdBy, createdAt, liftedAt, liftedBy, liftReason. 대상 User·World 이력은 NoAction으로 보존 | M3 제재 묶음 검증 중 |
+| `AuditLog`             | id, at, actorKind, actorUserId, action, targetType, targetId, worldId, reason, payload, inputEventId. DB에서 수정·삭제·비우기 거부                  | M3 첫 묶음 구현 중   |
+| `Notice`               | id, scope, worldId, title, body, pinned, publishedAt, hiddenAt, revision. 기존 제목 없는 WORLD 공지 보존, 숨김은 공개 조회에서 제외                 | M3 공지 API 검증 중  |
+| `AdminNoticeRequest`   | (actorUserId, idempotencyKey) PK, requestHash, noticeId, revision, hidden, createdAt. 같은 요청 결과만 보관하며 원문 본문은 중복 저장하지 않음      | M3 공지 API 검증 중  |
+
+`LoginRecord`는 전체 IP와 무작위 기기 쿠키를 HMAC-SHA256 hex 64자로만 저장한다. 가입·로그인 성공과 현재 ACTIVE 계정의 로그인 실패를 기록하며 탈퇴한 계정의 새 기록은 User 공유 잠금 아래 다시 확인해 막는다. 성공 기록은 세션과 같은 트랜잭션이다. 운영 키가 있어도 공개 정책이 미확정이면 수집하지 않는다. 실제 PostgreSQL·동시성·브라우저 인수와 독립 리뷰는 남아 있다. 조회의 최대 90일 범위는 보존 정책 승인이 아니며 자동 삭제 작업을 추가하지 않는다.
 
 ## 월드 운영 영역
 
-| 테이블        | 주요 필드                                                                                  | 관문 |
-| ------------- | ------------------------------------------------------------------------------------------ | ---- |
-| `World` | id, name, scenarioKey, mapKey, unitSetKey, startYear, endYear(기본값 없는 nullable), status(PREOPEN·RUNNING·PAUSED·ENDED), clockMode(REALTIME·ACCELERATED, 기본 REALTIME), turnTermMinutes, seed, clockTick, clockAnchorAt, clockRevision, startedAt, endedAt, initialStateHash, replayOrigin, replayFormat(기본 1), ruleFeatures(기본 빈 배열), outcomeFromSequence, statRules, unitSet | M1 |
-| `EngineLease` | worldId(PK), ownerId, fencingToken, expiresAt                                              | M1   |
-| `InputEvent`  | id, worldId, userId, generalId, kind, payload, idempotencyKey(월드·계정 안에서 고유), status(PENDING·APPLIED·REJECTED), sequence, tick(nullable), result, createdAt | M1 |
+| 테이블        | 주요 필드                                                                                                                                                                                                                                                                                                                                                                                | 관문 |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
+| `World`       | id, name, scenarioKey, mapKey, unitSetKey, startYear, endYear(기본값 없는 nullable), status(PREOPEN·RUNNING·PAUSED·ENDED), clockMode(REALTIME·ACCELERATED, 기본 REALTIME), turnTermMinutes, seed, clockTick, clockAnchorAt, clockRevision, startedAt, endedAt, initialStateHash, replayOrigin, replayFormat(기본 1), ruleFeatures(기본 빈 배열), outcomeFromSequence, statRules, unitSet | M1   |
+| `EngineLease` | worldId(PK), ownerId, fencingToken, expiresAt                                                                                                                                                                                                                                                                                                                                            | M1   |
+| `InputEvent`  | id, worldId, userId, generalId, kind, payload, idempotencyKey(월드·계정 안에서 고유), status(PENDING·APPLIED·REJECTED), sequence, tick(nullable), result, createdAt                                                                                                                                                                                                                      | M1   |
 
 `World.replayOrigin`이 정본이며 `replayFormat`·`ruleFeatures`는 읽기용 사본입니다. 기존 행은 형식 1·빈 목록이고 새 생성은 형식 3을 명시합니다. 생성 뒤 사본을 바꾸지 않으며 엔진 시작 때 원본과 대조합니다. 기능 목록은 생성 기록에서 비지 않은 오름차순 배열이고 기능이 없으면 키를 생략합니다. DB 사본은 빈 배열을 허용합니다. 모르는 기능·의존 누락·충돌 조합은 생성과 재생 전에 거부합니다.
 
@@ -67,27 +69,27 @@ AC-INT-06의 `World.campaignState`는 관계·제안·NPC 서약 시도와 부�
 
 ## 게임 상태 영역
 
-| 테이블      | 주요 필드                                                                                   | 관문 |
-| ----------- | ------------------------------------------------------------------------------------------- | ---- |
-| `Nation`    | (worldId, id) PK, name, color, capitalCityKey, gold, rice, description, philosophy, tech, level, isNpc. taxRate·payRate·notice·foundedTick·destroyedTick는 후속 작업 | M1 |
-| `City`      | (worldId, cityKey) PK, name, nationId, population·Max, agriculture·Max, commerce·Max, security·Max, defence·Max, wall·Max, trust(민심), supplied | M1 |
-| `General`   | (worldId, id) PK, userId(NPC면 없음), name, portraitId, nationId, cityKey, officerLevel, leadership, strength, intel, affinity, birthYear, deathYear, activeFromYear, personality, special, gold, rice, crew, crewType, train, atmos, experience, dedication, age, injury, nextTurnTick, turnRevision. defenceMode·npcKind·lastActiveAt는 후속 작업 | M1 |
-| `GeneralTurn` | (worldId, generalId, slot 0~29) PK, commandKey, args. slot 범위는 DB CHECK로 제한           | M1   |
-| `NationTurn`  | (nationId, officerLevel, slot 0~11) PK, commandKey, args                                  | M1   |
-| `Diplomacy`   | (worldId, nationA, nationB) PK (A < B), state(NEUTRAL·DECLARED·WAR·NON_AGGRESSION), untilTick, treatyId | M1 |
-| `DiplomacyProposal` | id, worldId, fromNationId, toNationId, kind, terms, status, expiresTick             | M2   |
-| `Message`   | id, worldId, scope(PRIVATE·NATION·DIPLOMACY·WORLD), fromGeneralId, toGeneralId, toNationId, body, createdAt, readAt | M2 |
+| 테이블              | 주요 필드                                                                                                                                                                                                                                                                                                                                           | 관문 |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
+| `Nation`            | (worldId, id) PK, name, color, capitalCityKey, gold, rice, description, philosophy, tech, level, isNpc. taxRate·payRate·notice·foundedTick·destroyedTick는 후속 작업                                                                                                                                                                                | M1   |
+| `City`              | (worldId, cityKey) PK, name, nationId, population·Max, agriculture·Max, commerce·Max, security·Max, defence·Max, wall·Max, trust(민심), supplied                                                                                                                                                                                                    | M1   |
+| `General`           | (worldId, id) PK, userId(NPC면 없음), name, portraitId, nationId, cityKey, officerLevel, leadership, strength, intel, affinity, birthYear, deathYear, activeFromYear, personality, special, gold, rice, crew, crewType, train, atmos, experience, dedication, age, injury, nextTurnTick, turnRevision. defenceMode·npcKind·lastActiveAt는 후속 작업 | M1   |
+| `GeneralTurn`       | (worldId, generalId, slot 0~29) PK, commandKey, args. slot 범위는 DB CHECK로 제한                                                                                                                                                                                                                                                                   | M1   |
+| `NationTurn`        | (nationId, officerLevel, slot 0~11) PK, commandKey, args                                                                                                                                                                                                                                                                                            | M1   |
+| `Diplomacy`         | (worldId, nationA, nationB) PK (A < B), state(NEUTRAL·DECLARED·WAR·NON_AGGRESSION), untilTick, treatyId                                                                                                                                                                                                                                             | M1   |
+| `DiplomacyProposal` | id, worldId, fromNationId, toNationId, kind, terms, status, expiresTick                                                                                                                                                                                                                                                                             | M2   |
+| `Message`           | id, worldId, scope(PRIVATE·NATION·DIPLOMACY·WORLD), fromGeneralId, toGeneralId, toNationId, body, createdAt, readAt                                                                                                                                                                                                                                 | M2   |
 
 ## 기록 영역
 
-| 테이블             | 주요 필드                                                         | 관문 |
-| ------------------ | ----------------------------------------------------------------- | ---- |
-| `GeneralLog`       | id(BigInt), worldId, generalId, tick, commandKey, kind, text, createdAt. (worldId, generalId, tick) 고유 | M1   |
-| `NationHistory`    | id, worldId, nationId(없으면 월드 정세), tick, text               | M1   |
-| `YearbookSnapshot` | (worldId, tick) PK, data(국가별 국력, 도시별 소유 국가, 장수 수)  | M1   |
-| `RemovedNation` | (worldId, nationId) PK, name, color, removedSequence, removedTick. 국가 행을 지우는 엔진 트랜잭션이 지우기 직전에 만든다. API로 내지 않는다 (T4-56 (가), D-027) | Phase 2 |
-| `YearbookNation` | (worldId, tick, nationId) PK이며 (worldId, tick)은 `YearbookSnapshot` FK, name, color. 월간 정산이 스냅샷과 같은 트랜잭션에서 그 프레임 국가마다 만든다. 공개 메타데이터만 두고 국가의 비공개 상태는 두지 않는다 (T4-56 (가), D-027) | Phase 2 |
-| `WorldResult` | worldId(PK이자 World FK), reason(UNIFIED·END_YEAR), winnerNationId·winnerName·winnerColor(nullable 종료 시점 사본), endedYear, endedMonth, endedTick, endedSequence, remainingNations, finalStateHash, endedAt(DB 시각) | M1 |
+| 테이블             | 주요 필드                                                                                                                                                                                                                            | 관문    |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
+| `GeneralLog`       | id(BigInt), worldId, generalId, tick, commandKey, kind, text, createdAt. (worldId, generalId, tick) 고유                                                                                                                             | M1      |
+| `NationHistory`    | id, worldId, nationId(없으면 월드 정세), tick, text                                                                                                                                                                                  | M1      |
+| `YearbookSnapshot` | (worldId, tick) PK, data(국가별 국력, 도시별 소유 국가, 장수 수)                                                                                                                                                                     | M1      |
+| `RemovedNation`    | (worldId, nationId) PK, name, color, removedSequence, removedTick. 국가 행을 지우는 엔진 트랜잭션이 지우기 직전에 만든다. API로 내지 않는다 (T4-56 (가), D-027)                                                                      | Phase 2 |
+| `YearbookNation`   | (worldId, tick, nationId) PK이며 (worldId, tick)은 `YearbookSnapshot` FK, name, color. 월간 정산이 스냅샷과 같은 트랜잭션에서 그 프레임 국가마다 만든다. 공개 메타데이터만 두고 국가의 비공개 상태는 두지 않는다 (T4-56 (가), D-027) | Phase 2 |
+| `WorldResult`      | worldId(PK이자 World FK), reason(UNIFIED·END_YEAR), winnerNationId·winnerName·winnerColor(nullable 종료 시점 사본), endedYear, endedMonth, endedTick, endedSequence, remainingNations, finalStateHash, endedAt(DB 시각)              | M1      |
 
 `YearbookSnapshot.data`에 도시별 소유 국가를 꼭 넣습니다. 천하 타임랩스(D4)가 이것만으로 재생합니다.
 
@@ -95,27 +97,27 @@ AC-INT-06의 `World.campaignState`는 관계·제안·NPC 서약 시도와 부�
 
 ## 차별화 기능 자리 (D-010 선택분)
 
-| 테이블              | 쓰는 기능       | 주요 필드                                                    | 관문 |
-| ------------------- | --------------- | ------------------------------------------------------------ | ---- |
-| `Treaty`            | D1 조약서 외교, D16 교역 | id, worldId, nations, clauses(교역 허용 포함), status, startTick, endTick, brokenBy | M2 |
-| `NationTrust`       | D1 신의 기록    | worldId, nationId, brokenTreaties, lastBrokenTick            | M2   |
-| `Operation`         | D2 국가 작전판  | id, worldId, nationId, targetCityKey, targetTick, members, status | M2 |
-| `AssignmentOffer`   | D11 발령 응답   | id, worldId, generalId, fromNationId, targetCityKey, status, expiresTick | M2 |
-| `General.defaultPolicy` | D12 기본 방침 | 필드 하나: 방침 key                                         | M2   |
-| `NotificationTarget`| D6 턴 알림      | userId, kind(디스코드·웹 푸시), endpoint, events              | M2   |
-| `OfficeEffect` (리소스 파일) | D17 관직 주재 효과 | 관직별 도시 보정 표. DB가 아닌 `resources/`          | M3   |
-| `ReputationEvent`   | D10 월단평      | worldId, generalId, tick, kind, score                        | M3   |
-| (없음)              | D3 군사 조언, D15 역할별 입장 | 기존 데이터와 NPC AI만 사용                   | M3   |
-| `GeneralRelation`   | D7 (Phase 2)    | worldId, generalA, generalB, kind                            | —    |
+| 테이블                       | 쓰는 기능                     | 주요 필드                                                                           | 관문 |
+| ---------------------------- | ----------------------------- | ----------------------------------------------------------------------------------- | ---- |
+| `Treaty`                     | D1 조약서 외교, D16 교역      | id, worldId, nations, clauses(교역 허용 포함), status, startTick, endTick, brokenBy | M2   |
+| `NationTrust`                | D1 신의 기록                  | worldId, nationId, brokenTreaties, lastBrokenTick                                   | M2   |
+| `Operation`                  | D2 국가 작전판                | id, worldId, nationId, targetCityKey, targetTick, members, status                   | M2   |
+| `AssignmentOffer`            | D11 발령 응답                 | id, worldId, generalId, fromNationId, targetCityKey, status, expiresTick            | M2   |
+| `General.defaultPolicy`      | D12 기본 방침                 | 필드 하나: 방침 key                                                                 | M2   |
+| `NotificationTarget`         | D6 턴 알림                    | userId, kind(디스코드·웹 푸시), endpoint, events                                    | M2   |
+| `OfficeEffect` (리소스 파일) | D17 관직 주재 효과            | 관직별 도시 보정 표. DB가 아닌 `resources/`                                         | M3   |
+| `ReputationEvent`            | D10 월단평                    | worldId, generalId, tick, kind, score                                               | M3   |
+| (없음)                       | D3 군사 조언, D15 역할별 입장 | 기존 데이터와 NPC AI만 사용                                                         | M3   |
+| `GeneralRelation`            | D7 (Phase 2)                  | worldId, generalA, generalB, kind                                                   | —    |
 
 ## 리소스 (DB 밖, `resources/`)
 
-| 리소스     | 출처                        | 내용                                         |
-| ---------- | --------------------------- | -------------------------------------------- |
-| 지도       | core2026 `map_che.json`     | 도시 94개: id, 이름, 등급, 지역, 좌표, 연결, 초기값, 최대치 |
-| 시나리오   | core2026 `scenario_1030.json` 등 | 시작 연도, 국가, 장수, 외교, 도시 소유 |
-| 병종       | core2026 `unitset_basic.json` 참고 | 보병·궁병·기병·성벽과 상성             |
-| 프리셋     | 새로 작성                   | 턴 간격, 명령 세트, NPC 설정 (D5)            |
+| 리소스   | 출처                               | 내용                                                        |
+| -------- | ---------------------------------- | ----------------------------------------------------------- |
+| 지도     | core2026 `map_che.json`            | 도시 94개: id, 이름, 등급, 지역, 좌표, 연결, 초기값, 최대치 |
+| 시나리오 | core2026 `scenario_1030.json` 등   | 시작 연도, 국가, 장수, 외교, 도시 소유                      |
+| 병종     | core2026 `unitset_basic.json` 참고 | 보병·궁병·기병·성벽과 상성                                  |
+| 프리셋   | 새로 작성                          | 턴 간격, 명령 세트, NPC 설정 (D5)                           |
 
 core2026 리소스를 옮길 때는 파일 머리나 `resources/NOTICE`에 출처(MIT, © 2025 devsam)를 남깁니다.
 

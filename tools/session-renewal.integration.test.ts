@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { Writable } from 'node:stream';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
@@ -69,7 +69,15 @@ async function sessionExpiry() {
   return (await db.session.findUniqueOrThrow({ where: { id: sessionId } })).expiresAt;
 }
 async function withServer(fn: (base: string) => Promise<void>) {
-  const app = await buildServer({ db, publicOrigin: origin, production: true, now: () => now, logStream, legalPolicy });
+  const app = await buildServer({
+    db,
+    publicOrigin: origin,
+    production: true,
+    now: () => now,
+    logStream,
+    legalPolicy,
+    loginAudit: { key: randomBytes(32).toString('hex'), version: 1 },
+  });
   try {
     await fn(await app.listen({ host: '127.0.0.1', port: 0 }));
   } finally {

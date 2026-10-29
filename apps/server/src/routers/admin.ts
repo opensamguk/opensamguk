@@ -5,6 +5,7 @@ import { notifySessionClosed } from '@opensamguk/db';
 import { createAdminSanction, createSanctionInput, liftAdminSanction, liftSanctionInput } from '../admin/sanctionStore';
 import { auditListInput, getUser, getUserInput, listAudit, searchUsers, searchUsersInput } from '../admin/read';
 import { listAdminWorlds } from '../admin/worlds';
+import { investigateShared, investigateSharedInput } from '../admin/investigation';
 import {
   requestWorldClock,
   requestWorldClockInput,
@@ -22,6 +23,9 @@ import {
 
 export const adminRouter = router({
   whoami: adminProcedure.input(z.void()).query(() => ({ admin: true as const })),
+  investigate: router({
+    shared: adminProcedure.input(investigateSharedInput).query(({ ctx, input }) => investigateShared(ctx, input)),
+  }),
   world: router({
     list: adminProcedure.input(z.void()).query(({ ctx }) => listAdminWorlds(ctx)),
     requestClock: adminProcedure
@@ -44,7 +48,7 @@ export const adminRouter = router({
       .mutation(({ ctx, input }) => changeAdminNotice(ctx, { kind: 'hide', input })),
   }),
   user: router({
-    get: adminProcedure.input(getUserInput).query(({ ctx, input }) => getUser(ctx.db, ctx.user.id, input, ctx.now)),
+    get: adminProcedure.input(getUserInput).query(({ ctx, input }) => getUser(ctx, input)),
     search: adminProcedure
       .input(searchUsersInput)
       .query(({ ctx, input }) => searchUsers(ctx.db, ctx.user.id, input, ctx.now)),

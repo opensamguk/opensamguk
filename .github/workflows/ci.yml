@@ -265,3 +265,6 @@ jobs:
       - name: Check admin sanction actions in Chromium
         if: matrix.shard == 1
         run: pnpm e2e:sanction --reporter=line
+      - name: Check admin investigation in Chromium
+        if: matrix.shard == 1
+        run: pnpm e2e:investigation --reporter=line

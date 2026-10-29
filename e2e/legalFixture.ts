@@ -12,6 +12,7 @@ import { test as base } from '@playwright/test';
 import { createDb } from '../packages/db/src/index';
 import { buildServer } from '../apps/server/src/server';
 import type { LegalPolicy } from '../apps/server/src/legal/policy';
+import type { LoginAuditOptions } from '../apps/server/src/auth/loginAudit';
 import type { MailMessage } from '../apps/server/src/mail/transport';
 import { initializeResources } from '../tools/init-resources';
 import { e2eDatabaseUrl } from './account';
@@ -38,7 +39,11 @@ export interface LegalStack {
   database: string;
   failed: boolean;
   messages: MailMessage[];
-  restart(policy: LegalPolicy | null, emailRequired?: boolean): Promise<void>;
+  restart(
+    policy: LegalPolicy | null,
+    emailRequired?: boolean,
+    options?: { loginAudit?: LoginAuditOptions | null },
+  ): Promise<void>;
   productionPending(): Promise<{ origin: string; close(): Promise<void> }>;
 }
 
@@ -228,7 +233,11 @@ export const test = base.extend<Record<never, never>, { legalStack: LegalStack }
         const bridge = await staticBridge(() => apiOrigin);
         closeWeb = bridge.close;
         const origin = bridge.origin;
-        const restart = async (policy: LegalPolicy | null, emailRequired = false) => {
+        const restart = async (
+          policy: LegalPolicy | null,
+          emailRequired = false,
+          options: { loginAudit?: LoginAuditOptions | null } = {},
+        ) => {
           await api?.close();
           api = await buildServer({
             db: db!,
@@ -236,6 +245,7 @@ export const test = base.extend<Record<never, never>, { legalStack: LegalStack }
             logging: false,
             publicOrigin: origin,
             emailVerificationRequired: emailRequired,
+            loginAudit: options.loginAudit ?? null,
             legalPolicy: policy,
             mailTransport: transport,
             realtime: { connectionString: url.href, applicationName: `legal-${suffix}` },
@@ -259,6 +269,7 @@ export const test = base.extend<Record<never, never>, { legalStack: LegalStack }
             const server = await buildServer({
               db: db!,
               production: true,
+              loginAudit: { key: randomBytes(32).toString('hex'), version: 1 },
               logging: false,
               publicOrigin: 'https://legal-pending.example.test',
               mailTransport: transport,

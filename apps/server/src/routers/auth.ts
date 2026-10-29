@@ -12,6 +12,7 @@ import { newAccountToken } from '../auth/accountToken';
 import { accountMail } from '../mail/templates';
 import { missingConsents } from '../legal/policy';
 import { isWithdrawalTombstoneEmail } from '../auth/withdrawalPolicy';
+import { writeLoginAudit } from '../auth/loginAudit';
 
 function enforce(ctx: Context, decision: RateLimitDecision) {
   if (decision.allowed) return;
@@ -87,9 +88,19 @@ export const authRouter = router({
               ],
             });
           }
+          if (
+            ctx.loginAudit &&
+            !(await writeLoginAudit(
+              tx,
+              { userId: user.id, email: user.email, success: true, at: ctx.now },
+              ctx.loginAudit,
+            ))
+          )
+            throw loginFailure();
           return user;
         });
         setCookie(ctx, session.token);
+        ctx.loginAudit?.setDeviceCookie();
         if (ctx.sessionId) {
           ctx.closeSession?.(ctx.sessionId);
           await notifySessionClosed(ctx.db, ctx.sessionId, () => ctx.reply.log.warn('실시간 알림 전송 실패'));
@@ -123,35 +134,77 @@ export const authRouter = router({
         { namespace: 'auth.login.failure', key: JSON.stringify([input.email, ctx.ip]), limit: 5, windowMs: 900_000 },
       ];
       enforce(ctx, ctx.rateLimiter.check(failures));
+      // 알려지지 않은 계정과 인증 실패에도 같은 쿠키 동작을 사용한다.
+      ctx.loginAudit?.setDeviceCookie();
       const user = await ctx.db.user.findUnique({ where: { email: input.email } });
       const correct = await verifyPassword(user?.passwordHash ?? ctx.dummyPasswordHash, input.password);
       if (!user || !correct || user.status !== 'ACTIVE') {
         ctx.rateLimiter.consume(failures);
+        if (user?.status === 'ACTIVE' && ctx.loginAudit) {
+          try {
+            await ctx.db.$transaction((tx) =>
+              writeLoginAudit(
+                tx,
+                { userId: user.id, email: input.email, success: false, at: ctx.now },
+                ctx.loginAudit!,
+              ),
+            );
+          } catch {
+            // 기록 오류로 계정의 존재 여부를 응답에 드러내지 않는다.
+            throw loginFailure();
+          }
+        }
         throw loginFailure();
       }
       const session = newSession(ctx.now);
-      await ctx.db.$transaction(async (tx) => {
-        await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${user.id} FOR SHARE`;
-        const current = await tx.user.findUnique({
-          where: { id: user.id },
-          select: { status: true, passwordHash: true, email: true },
+      let rejectedCredentials = false;
+      const accepted = await ctx.db
+        .$transaction(async (tx) => {
+          await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${user.id} FOR SHARE`;
+          const current = await tx.user.findUnique({
+            where: { id: user.id },
+            select: { status: true, passwordHash: true, email: true },
+          });
+          if (
+            !current ||
+            current.status !== 'ACTIVE' ||
+            current.passwordHash !== user.passwordHash ||
+            current.email !== user.email ||
+            (await hasGlobalSanction(tx, user.id, ctx.now))
+          ) {
+            rejectedCredentials = true;
+            ctx.rateLimiter.consume(failures);
+            if (ctx.loginAudit)
+              await writeLoginAudit(
+                tx,
+                { userId: user.id, email: input.email, success: false, at: ctx.now },
+                ctx.loginAudit,
+              );
+            return false;
+          }
+          if (ctx.sessionId) {
+            await tx.session.deleteMany({ where: { id: ctx.sessionId } });
+          }
+          await tx.session.create({ data: { id: session.id, userId: user.id, expiresAt: session.expiresAt } });
+          await queueLoginActivity(tx, user.id);
+          if (
+            ctx.loginAudit &&
+            !(await writeLoginAudit(
+              tx,
+              { userId: user.id, email: user.email, success: true, at: ctx.now },
+              ctx.loginAudit,
+            ))
+          )
+            throw loginFailure();
+          return true;
+        })
+        .catch((error: unknown) => {
+          // 이미 자격 거부를 결정한 경로는 기록 실패도 같은 인증 응답으로 숨긴다.
+          // 성공 경로의 기록 실패는 그대로 실패시켜 세션 생성을 되돌린다.
+          if (rejectedCredentials) throw loginFailure();
+          throw error;
         });
-        if (
-          !current ||
-          current.status !== 'ACTIVE' ||
-          current.passwordHash !== user.passwordHash ||
-          current.email !== user.email ||
-          (await hasGlobalSanction(tx, user.id, ctx.now))
-        ) {
-          ctx.rateLimiter.consume(failures);
-          throw loginFailure();
-        }
-        if (ctx.sessionId) {
-          await tx.session.deleteMany({ where: { id: ctx.sessionId } });
-        }
-        await tx.session.create({ data: { id: session.id, userId: user.id, expiresAt: session.expiresAt } });
-        await queueLoginActivity(tx, user.id);
-      });
+      if (!accepted) throw loginFailure();
       setCookie(ctx, session.token);
       if (ctx.sessionId) {
         ctx.closeSession?.(ctx.sessionId);
