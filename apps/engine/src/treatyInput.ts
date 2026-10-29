@@ -21,6 +21,7 @@ import { loadTreaties } from './treatyState';
 import { loadWorld } from './worldLoader';
 import { loadReplayState } from './monthly';
 import { databaseNow } from './lease';
+import { readAdminEndTick } from './admin/end';
 
 type StoredWorld = Prisma.WorldGetPayload<Record<string, never>>;
 type StoredInput = Prisma.InputEventGetPayload<Record<string, never>>;
@@ -125,8 +126,7 @@ async function resolveTreatyInput(
   };
   if (world.status === 'ENDED') {
     const ended = await tx.worldResult.findUnique({ where: { worldId: world.id }, select: { endedTick: true } });
-    if (!ended) throw new Error('종료된 월드의 종료 기록이 없습니다.');
-    context.endTick = ended.endedTick;
+    context.endTick = ended ? ended.endedTick : await readAdminEndTick(tx, world);
   }
   const complete = (status: 'APPLIED' | 'REJECTED', result: TreatyApplied | TreatyRejected) =>
     validateTreatyRecord(

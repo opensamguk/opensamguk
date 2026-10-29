@@ -44,6 +44,7 @@ export const accountRouter = router({
       },
     });
     return {
+      userId: ctx.user.id,
       email: user.email,
       emailVerified: user.emailVerifiedAt !== null,
       emailVerificationRequired: ctx.emailVerificationRequired ?? false,

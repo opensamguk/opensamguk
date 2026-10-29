@@ -9,6 +9,8 @@ export type { OperationalMapResource } from './world/map/operational';
 export * from './clock/constants';
 export * from './clock/clock';
 export * from './clock/admin';
+export * from './clock/end';
+export * from './clock/reset';
 export {
   toWorldState,
   type JsonValue,
@@ -186,3 +188,4 @@ export * from './campaign/record';
 export * from './campaign/unitInputs';
 export { campaignArmyTypes, validateCampaignRecord } from './campaign/feature';
 export { commandStatPreview, type CommandStatPreview } from './commands/statPreview';
+export * from './clock/createRequest';

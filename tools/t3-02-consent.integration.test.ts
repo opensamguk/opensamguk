@@ -553,8 +553,12 @@ it('두 정식 월드의 미동의 변경은 전부403·무변경이며 실제 �
   const paths = Object.entries(procedures)
     .filter(([, procedure]) => procedure._def.type === 'mutation' && procedure._def.meta?.accountAccess === 'verified')
     .map(([path]) => path);
-  expect(paths).toHaveLength(26);
+  expect(paths).toHaveLength(29);
   expect(paths).toContain('admin.world.requestClock');
+  expect(paths).toContain('admin.world.create');
+
+  expect(paths).toContain('admin.world.requestEnd');
+  expect(paths).toContain('admin.world.requestReset');
   const before = await gameSnapshot(true);
   for (const worldId of formalWorlds)
     for (const path of paths) {

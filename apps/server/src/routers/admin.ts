@@ -5,6 +5,12 @@ import { notifySessionClosed } from '@opensamguk/db';
 import { createAdminSanction, createSanctionInput, liftAdminSanction, liftSanctionInput } from '../admin/sanctionStore';
 import { auditListInput, getUser, getUserInput, listAudit, searchUsers, searchUsersInput } from '../admin/read';
 import { listAdminWorlds } from '../admin/worlds';
+import { requestWorldCreateInput, worldCreateStatusInput } from '@opensamguk/rules';
+import { requestWorldCreate, getWorldCreateRequest } from '../admin/worldCreate';
+import { requestWorldReset, getWorldResetRequest } from '../admin/worldReset';
+import { requestWorldResetInput, worldResetRequestInput } from '@opensamguk/rules';
+
+import { requestWorldEnd, requestWorldEndInput, getWorldEndRequest, worldEndRequestInput } from '../admin/worldEnd';
 import {
   requestWorldClock,
   requestWorldClockInput,
@@ -23,7 +29,19 @@ import {
 export const adminRouter = router({
   whoami: adminProcedure.input(z.void()).query(() => ({ admin: true as const })),
   world: router({
+    create: adminProcedure.input(requestWorldCreateInput).mutation(({ ctx, input }) => requestWorldCreate(ctx, input)),
+    createStatus: adminProcedure
+      .input(worldCreateStatusInput)
+      .query(({ ctx, input }) => getWorldCreateRequest(ctx, input)),
     list: adminProcedure.input(z.void()).query(({ ctx }) => listAdminWorlds(ctx)),
+    requestEnd: adminProcedure.input(requestWorldEndInput).mutation(({ ctx, input }) => requestWorldEnd(ctx, input)),
+    endRequest: adminProcedure.input(worldEndRequestInput).query(({ ctx, input }) => getWorldEndRequest(ctx, input)),
+    requestReset: adminProcedure
+      .input(requestWorldResetInput)
+      .mutation(({ ctx, input }) => requestWorldReset(ctx, input)),
+    resetRequest: adminProcedure
+      .input(worldResetRequestInput)
+      .query(({ ctx, input }) => getWorldResetRequest(ctx, input)),
     requestClock: adminProcedure
       .input(requestWorldClockInput)
       .mutation(({ ctx, input }) => requestWorldClock(ctx, input)),

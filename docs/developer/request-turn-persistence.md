@@ -1,5 +1,17 @@
 # 요청·턴·저장 흐름
 
+## 관리자 초기화 적용 후보 (ADMIN-RESET-D1~D3)
+
+초기화는 기존 원본 월드의 `(worldId, userId, idempotencyKey)` InputEvent를 단일 요청 원장으로 쓴다. 새 표나 migration은 없다. `requestReset`은 World 쓰기 잠금 뒤 현재 User·Session과 관리자 자격·제재·인증·동의를 확인한다. 기존 키를 먼저 대조하고 새 접수만 원본 상태·이름·revision·원생성 형식3을 검사한다. 서버가 처음 만든 새 월드 UUID와 실제 시드를 엄격 payload에 고정하고 PENDING·요청 감사만 함께 확정한다. 같은 정규형 재접수는 원래 결과를 반환한다. `resetRequest`도 현재 자격을 확인하며 본인의 월드·키만 읽는다.
+
+준비 단계는 원본 초기·자원·설정 해시를 확인하고 생성 요청·이전 APPLIED 초기화·CLI 출처를 구분한다. 존재하는 잘못된 출처나 읽기 실패를 CLI 부재로 취급하지 않는다. 첫 fenced 조회 뒤 TX 밖에서 읽기 전용 RepeatableRead 준비를 하며 기존 리스를 유한 갱신한다. 후보는 원 준비 객체·증거·요청 시드와 선두 입력 전체에 결속한다. 공유 검증은 호출자가 소유한 기존30초 적용 트랜잭션에서 동일 출처 fingerprint와 5종 PUBLISHED 자원을 대조하고 자원 행을 정렬된 FOR SHARE로 잠근다. 준비 트랜잭션을 중첩하지 않는다.
+
+적용은 리스→World→현재 User 순서로 잠그고 현재 활성 관리자·전체 제재를 확인한다. 로그아웃만으로 이미 접수한 요청을 취소하지 않는다. 원본 ENDED·새 PREOPEN·APPLIED InputEvent·감사를 함께 확정하고 마지막 취소·fence 검사에 실패하면 모두 롤백한다. 원본 게임·사람·30칸과 이전 입력은 유지하며 새 월드에 사람을 복사하지 않는다. 종료 뒤 일반 입력은 기존 거부 경로로 처리한다. 형식3 `ADMIN_RESET` 재생은 원본 종료 해시와 새 월드의 독립 원생성을 구분한다. 현재는 소스 후보이며 실제 PG·복원·전체 검사·독립 리뷰·보호 병합은 남아 있다.
+
+## 관리자 월드 생성 후보
+
+ADMIN-CREATE-B는 아직 월드가 없는 접수를 `WorldCreateRequest`에 둔다. API는 현재 User 쓰기 잠금과 Session 읽기 잠금 뒤 기존 요청을 MVCC로 읽으며 요청 행 잠금을 추가하지 않는다. 엔진은 요청 행을 `FOR UPDATE SKIP LOCKED`로 먼저 잠그고 User 읽기 잠금 뒤 현재 자격·제재를 확인한다. 이 순서가 API와 엔진의 User/요청 교착을 막는다. 게시 자원의 버전·해시를 검증하고 최초 해석을 요청에 고정한 뒤 저장 트랜잭션에서 다시 대조한다. 월드·DONE·감사는 한 트랜잭션이며 실패하면 PENDING을 보존한다. 확정 자료 오류는 FAILED와 기각 감사를 함께 쓴다. 접속 오류는 후속 발견에서 재시도한다. 기존 게임 InputEvent·리스·시드 RNG 경계는 유지한다.
+
 > 상태: 뼈대 · 필요 시점: M1 · 관련 AC: M1-08, M1-10, M1-11, M1-13
 > 참고: core2026 `docs/developer/request-turn-persistence.md`, `docs/architecture/api-input-event-replay.md`
 > 이 문서가 답할 질문: 요청 하나와 턴 하나가 언제, 어떤 순서로 저장되고 실패하면 어떻게 되나?
