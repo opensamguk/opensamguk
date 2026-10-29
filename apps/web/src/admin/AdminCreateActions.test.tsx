@@ -80,7 +80,7 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
-  it('선택 항목이 바뀌어도 네 선택 상자의 접근 이름은 화면 라벨과 같다', async () => {
+  it('폼의 조건부 입력·선택과 확인 체크 상자의 접근 이름은 화면 라벨과 같다', async () => {
     setup();
     fireEvent.click(screen.getByRole('button', { name: '새 월드 생성 준비' }));
     await screen.findByLabelText('월드 이름');
@@ -95,15 +95,40 @@ describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
         expect(names).toContain(label);
       }
     };
+    const exactInput = (role: 'textbox' | 'spinbutton', label: string) => {
+      const control = screen.getByRole(role, { name: label });
+      expect(control).toBe(screen.getByLabelText(label, { exact: true }));
+      return control;
+    };
     expect(screen.getAllByRole('combobox')).toHaveLength(labels.length);
     for (const label of labels)
       expect(screen.getByRole('combobox', { name: label })).toBe(screen.getByLabelText(label, { exact: true }));
     exactLabels();
     fireEvent.change(screen.getByRole('combobox', { name: '프리셋' }), { target: { value: 'regular' } });
-    fireEvent.change(screen.getByRole('combobox', { name: '자동 종료' }), { target: { value: 'none' } });
-    fireEvent.change(screen.getByRole('combobox', { name: '시드 선택' }), { target: { value: 'custom' } });
-    for (const label of labels) expect(screen.getByRole('combobox', { name: label })).toBeTruthy();
-    exactLabels();
+    for (const endMode of ['year', 'none']) {
+      fireEvent.change(screen.getByRole('combobox', { name: '자동 종료' }), { target: { value: endMode } });
+      for (const seedMode of ['auto', 'custom']) {
+        fireEvent.change(screen.getByRole('combobox', { name: '시드 선택' }), { target: { value: seedMode } });
+        exactLabels();
+        const controls = labels.map((label) => screen.getByRole('combobox', { name: label }));
+        controls.push(exactInput('textbox', '월드 이름'), exactInput('spinbutton', '턴 간격 (분)'));
+        if (endMode === 'year') controls.push(exactInput('spinbutton', '종료 연도'));
+        else expect(screen.queryByRole('spinbutton', { name: '종료 연도' })).toBeNull();
+        if (seedMode === 'custom') {
+          const seed = exactInput('textbox', '시드');
+          controls.push(seed);
+          const description = document.getElementById(seed.getAttribute('aria-describedby')!);
+          expect(description?.textContent).toBe('재현할 게임의 시드입니다. 비밀번호나 인증 키를 입력하지 마세요.');
+        } else expect(screen.queryByRole('textbox', { name: '시드' })).toBeNull();
+        expect(new Set(document.querySelectorAll('form input, form select'))).toEqual(new Set(controls));
+      }
+    }
+    fireEvent.change(exactInput('textbox', '월드 이름'), { target: { value: '접근 이름 확인' } });
+    fireEvent.change(exactInput('textbox', '시드'), { target: { value: 'label-regression' } });
+    fireEvent.click(screen.getByRole('button', { name: '현재 설정 검토' }));
+    await screen.findByRole('dialog');
+    const consent = '이름·현재 설정·시드와 개장 전 생성을 확인했습니다.';
+    expect(screen.getByRole('checkbox', { name: consent })).toBe(screen.getByLabelText(consent, { exact: true }));
     expect(state.create).not.toHaveBeenCalled();
   });
   it('검토만으로 생성하지 않고 최종 두 번 클릭도 한 요청만 보낸다', async () => {

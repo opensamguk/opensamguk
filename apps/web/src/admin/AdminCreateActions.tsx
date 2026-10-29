@@ -587,15 +587,20 @@ export function AdminCreateActions({
                     <label>
                       시드
                       <input
+                        aria-label="시드"
                         value={draft.seed}
                         name="seed"
                         aria-invalid={invalidField === 'seed' || undefined}
-                        aria-describedby={invalidField === 'seed' ? 'create-form-error' : undefined}
+                        aria-describedby={
+                          invalidField === 'seed' ? 'create-seed-help create-form-error' : 'create-seed-help'
+                        }
                         disabled={sending}
                         required
                         onChange={(e) => change({ seed: e.target.value })}
                       />
-                      <small>재현할 게임의 시드입니다. 비밀번호나 인증 키를 입력하지 마세요.</small>
+                      <small id="create-seed-help">
+                        재현할 게임의 시드입니다. 비밀번호나 인증 키를 입력하지 마세요.
+                      </small>
                     </label>
                   ) : null}
                   <button ref={reviewButton} type="submit" disabled={sending}>
