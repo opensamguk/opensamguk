@@ -1,5 +1,5 @@
-import { Link, useLocation } from '@tanstack/react-router';
-import { useEffect, useRef } from 'react';
+import { Link, useLocation, useNavigate } from '@tanstack/react-router';
+import { useEffect, useRef, type MouseEvent } from 'react';
 import { OFFICER_MIN_LEVEL } from '../operations/contract';
 import styles from './GameNavigation.module.css';
 
@@ -8,7 +8,7 @@ import styles from './GameNavigation.module.css';
 // 현재 React 주소와 메인 지도·30칸 예약을 유지하고 연결된 화면만 안내한다.
 const NAV = [
   { to: '/w/$worldId', label: '메인', exact: true },
-  { to: '/w/$worldId/turns', label: '예턴' },
+  { to: '/w/$worldId', label: '예턴', area: 'main-commands' },
   { to: '/w/$worldId/map', label: '지도' },
   { to: '/w/$worldId/nation/personnel', label: '국가' },
   { to: '/w/$worldId/diplomacy', label: '외교' },
@@ -28,6 +28,7 @@ export function GameNavigation({
   officerLevel: number;
 }) {
   const { pathname, search } = useLocation();
+  const navigate = useNavigate();
   const city = Number(search.city);
   const citySearch = Number.isInteger(city) && city > 0 && city <= 2_147_483_647 ? { city } : {};
   const navSearch = (to: string) => (to === '/w/$worldId' || to === '/w/$worldId/records' ? citySearch : {});
@@ -37,6 +38,24 @@ export function GameNavigation({
     if (!more.current?.open) return;
     more.current.open = false;
     if (restoreFocus) summary.current?.focus();
+  };
+  const openTurns = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    )
+      return;
+    event.preventDefault();
+    close();
+    if (pathname.replace(/\/$/, '') === `/w/${worldId}`) {
+      const heading = document.getElementById('main-commands');
+      heading?.focus({ preventScroll: true });
+      heading?.scrollIntoView({ block: 'start', behavior: 'instant' });
+    } else void navigate({ to: '/w/$worldId', params: { worldId }, search: citySearch, hash: 'main-commands' });
   };
   useEffect(() => {
     if (more.current) more.current.open = false;
@@ -60,22 +79,33 @@ export function GameNavigation({
     };
   }, []);
 
+  const navigationLink = (item: (typeof NAV)[number]) =>
+    'area' in item ? (
+      <a
+        key={item.label}
+        href={`/w/${encodeURIComponent(worldId)}${'city' in citySearch ? `?city=${citySearch.city}` : ''}#${item.area}`}
+        className={styles.link}
+        onClick={openTurns}
+      >
+        {item.label}
+      </a>
+    ) : (
+      <Link
+        key={item.label}
+        to={item.to}
+        params={{ worldId }}
+        search={navSearch(item.to)}
+        activeOptions={{ exact: 'exact' in item, includeSearch: false }}
+        className={styles.link}
+        activeProps={{ className: `${styles.link} ${styles.active}`, 'aria-current': 'page' }}
+        onClick={() => close()}
+      >
+        {item.label}
+      </Link>
+    );
   const links = (
     <>
-      {NAV.map((item) => (
-        <Link
-          key={item.to}
-          to={item.to}
-          params={{ worldId }}
-          search={navSearch(item.to)}
-          activeOptions={{ exact: 'exact' in item, includeSearch: false }}
-          className={styles.link}
-          activeProps={{ className: `${styles.link} ${styles.active}`, 'aria-current': 'page' }}
-          onClick={() => close()}
-        >
-          {item.label}
-        </Link>
-      ))}
+      {NAV.map(navigationLink)}
       {campaignEnabled ? (
         pathname.replace(/\/$/, '') === `/w/${worldId}` ? (
           <a className={styles.link} href="#campaign-title" onClick={() => close()}>
@@ -109,20 +139,7 @@ export function GameNavigation({
         {links}
       </nav>
       <nav className={styles.mobile} aria-label="게임 메뉴">
-        {NAV.filter((item) => ['메인', '예턴', '기록'].includes(item.label)).map((item) => (
-          <Link
-            key={item.to}
-            to={item.to}
-            params={{ worldId }}
-            search={navSearch(item.to)}
-            activeOptions={{ exact: 'exact' in item, includeSearch: false }}
-            className={styles.link}
-            activeProps={{ className: `${styles.link} ${styles.active}`, 'aria-current': 'page' }}
-            onClick={() => close()}
-          >
-            {item.label}
-          </Link>
-        ))}
+        {NAV.filter((item) => ['메인', '예턴', '기록'].includes(item.label)).map(navigationLink)}
         <details ref={more} className={styles.more}>
           <summary ref={summary} className={styles.link}>
             전체
