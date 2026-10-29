@@ -29,6 +29,7 @@ import {
   ADMIN_RESET_KIND,
   TICKS_PER_MONTH,
   adminResetPayloadSchema,
+  adminResetResourceSchema,
   adminResetResourcesSchema,
   checkReplayOrigin,
   emptyCityResourcesState,
@@ -1752,8 +1753,13 @@ it('AC-INT-18D AC-M3-04 실제 생성 DONE과 초기화 APPLIED 출처는 같은
   const first = await cityReset(cityOwner, await pauseFreshCityWorld(requestRow.worldId), signal),
     second = await cityReset(cityOwner, await pauseFreshCityWorld(first.next.id), signal);
   expect(first.applied.resources).toEqual(second.applied.resources);
-  const createRefs = adminResetResourcesSchema.parse((requestRow.resolution as { resources?: unknown }).resources);
-  expect(first.applied.resources).toEqual([...createRefs].sort((a, b) => a.kind.localeCompare(b.kind)));
+  const createRefs = adminResetResourcesSchema.parse(
+    adminResetResourceSchema
+      .array()
+      .parse((requestRow.resolution as { resources?: unknown }).resources)
+      .sort((a, b) => a.kind.localeCompare(b.kind)),
+  );
+  expect(first.applied.resources).toEqual(createRefs);
   lastCityTarget = second.next;
 });
 it('AC-INT-18D AC-M3-04 새 도시 원장 NULL은 초기화 전체를 롤백하고 구판은 SQLNULL을 유지한다', async (signal) => {
