@@ -20,6 +20,8 @@ vi.mock('@opensamguk/rules', async (original) => ({
 }));
 beforeEach(() => vi.resetAllMocks());
 const requestId = '10000000-0000-4000-8000-000000000001';
+const userId = '10000000-0000-4000-8000-000000000002';
+const otherUserId = '10000000-0000-4000-8000-000000000003';
 function fixture() {
   const payload = { cityKey: 1, unitId: 1, crewType: 1100, amount: 50 };
   const actor = { id: 2, nationId: 1, officerLevel: 12, cityKey: 1, activeFromYear: 191 };
@@ -68,7 +70,7 @@ function fixture() {
   };
   const ctx = {
     db: { $transaction: vi.fn(async (run: (client: typeof tx) => unknown) => run(tx)) } as unknown as PrismaClient,
-    user: { id: 'own-user' },
+    user: { id: userId },
     sessionId: 'own-session',
     now: 1000,
   };
@@ -81,7 +83,7 @@ function fixture() {
     result: {},
     text: '',
   } as unknown as ReturnType<typeof applyCityResourceInput>);
-  const run = () => submitCityResourceRequest(ctx, { worldId: world.id, requestId, payload });
+  const run = () => submitCityResourceRequest(ctx, { worldId: world.id, requestId, expectedUserId: userId, payload });
   return {
     ctx,
     tx,
@@ -100,18 +102,18 @@ describe('AC-INT-18B 도시 자원 API 접수', () => {
     const f = fixture(),
       before = structuredClone(f.view);
     expect(await f.run()).toEqual({ requestId, status: 'pending' });
-    expect(requireGeneral).toHaveBeenCalledWith(expect.anything(), 'own-world', 'own-user', true);
+    expect(requireGeneral).toHaveBeenCalledWith(expect.anything(), 'own-world', userId, true);
     expect(requireWorld).toHaveBeenCalledWith(expect.anything(), 'own-world', true);
     expect(applyCityResourceInput).toHaveBeenCalledWith(
       f.view,
       f.payload,
       2,
-      expect.objectContaining({ tick: 200, userId: 'own-user', userActive: true }),
+      expect.objectContaining({ tick: 200, userId: userId, userActive: true }),
     );
     expect(f.tx.inputEvent.create).toHaveBeenCalledExactlyOnceWith({
       data: expect.objectContaining({
         worldId: 'own-world',
-        userId: 'own-user',
+        userId: userId,
         generalId: 2,
         kind: 'city.resources',
         payload: f.payload,
@@ -131,14 +133,62 @@ describe('AC-INT-18B 도시 자원 API 접수', () => {
     await expect(f.run()).rejects.toHaveProperty('code', 'CONFLICT');
     expect(f.tx.inputEvent.create).toHaveBeenCalledTimes(1);
   });
+  it('예상 계정이 mutation 세션과 다르면 접수·활동 입력을 만들지 않는다', async () => {
+    const f = fixture();
+    f.ctx.user.id = otherUserId;
+    await expect(f.run()).rejects.toHaveProperty('code', 'CONFLICT');
+    expect(f.ctx.db.$transaction).not.toHaveBeenCalled();
+    expect(f.tx.inputEvent.create).not.toHaveBeenCalled();
+    expect(f.tx.$executeRaw).not.toHaveBeenCalled();
+  });
+  it('조회 뒤 쿠키 계정이 바뀌면 이전 화면의 계정으로 접수할 수 없다', async () => {
+    const f = fixture();
+    expect(await readCityResourceBoard(f.ctx, 'own-world', 1)).toMatchObject({ visible: true, canAllocate: true });
+    f.ctx.user.id = otherUserId;
+    await expect(f.run()).rejects.toHaveProperty('code', 'CONFLICT');
+    f.ctx.user.id = userId;
+    await expect(
+      submitCityResourceRequest(f.ctx, {
+        worldId: 'own-world',
+        requestId,
+        expectedUserId: otherUserId,
+        payload: f.payload,
+      }),
+    ).rejects.toHaveProperty('code', 'CONFLICT');
+    expect(f.tx.inputEvent.create).not.toHaveBeenCalled();
+    expect(f.tx.$executeRaw).not.toHaveBeenCalled();
+  });
+  it.each([undefined, '', 'own-user'])('예상 계정 UUID가 없거나 잘못되면 거부한다 (%s)', async (expectedUserId) => {
+    const f = fixture();
+    await expect(
+      submitCityResourceRequest(f.ctx, {
+        worldId: 'own-world',
+        requestId,
+        expectedUserId: expectedUserId as string,
+        payload: f.payload,
+      }),
+    ).rejects.toHaveProperty('code', 'BAD_REQUEST');
+    expect(f.ctx.db.$transaction).not.toHaveBeenCalled();
+    expect(f.tx.inputEvent.create).not.toHaveBeenCalled();
+  });
   it('UUID·전역 revision·행위자 주입을 엄격히 거부한다', async () => {
     const f = fixture();
     await expect(
-      submitCityResourceRequest(f.ctx, { worldId: 'own-world', requestId: 'invalid', payload: f.payload }),
+      submitCityResourceRequest(f.ctx, {
+        worldId: 'own-world',
+        expectedUserId: userId,
+        requestId: 'invalid',
+        payload: f.payload,
+      }),
     ).rejects.toHaveProperty('code', 'BAD_REQUEST');
     for (const extra of [{ revision: 0 }, { userId: 'other' }, { generalId: 99 }])
       await expect(
-        submitCityResourceRequest(f.ctx, { worldId: 'own-world', requestId, payload: { ...f.payload, ...extra } }),
+        submitCityResourceRequest(f.ctx, {
+          worldId: 'own-world',
+          expectedUserId: userId,
+          requestId,
+          payload: { ...f.payload, ...extra },
+        }),
       ).rejects.toHaveProperty('code', 'BAD_REQUEST');
     expect(f.tx.inputEvent.create).not.toHaveBeenCalled();
   });
@@ -176,7 +226,7 @@ describe('AC-INT-18B 도시 자원 API 접수', () => {
       where: {
         worldId_userId_idempotencyKey: {
           worldId: 'own-world',
-          userId: 'own-user',
+          userId: userId,
           idempotencyKey: `city.resources:${requestId}`,
         },
       },

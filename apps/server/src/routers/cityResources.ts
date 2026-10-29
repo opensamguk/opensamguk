@@ -10,7 +10,7 @@ export const cityResourcesRouter = router({
     .input(worldInput.extend({ cityKey: z.number().int().min(1).max(2_147_483_647) }))
     .query(({ ctx, input }) => readCityResourceBoard(ctx, input.worldId, input.cityKey)),
   allocate: worldVerifiedProcedure
-    .input(request.extend({ payload: cityResourceInputSchema }))
+    .input(request.extend({ expectedUserId: z.uuid(), payload: cityResourceInputSchema }))
     .mutation(({ ctx, input }) => submitCityResourceRequest(ctx, input)),
   request: protectedProcedure
     .input(request)

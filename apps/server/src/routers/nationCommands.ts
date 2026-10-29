@@ -1,4 +1,9 @@
-import { canExecuteNationCommand, canUseNationTurns, unitSetSchema } from '@opensamguk/rules';
+import {
+  canExecuteNationCommand,
+  canExecuteCityNationCommand,
+  canUseNationTurns,
+  unitSetSchema,
+} from '@opensamguk/rules';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { protectedProcedure, router } from '../trpc';
@@ -14,7 +19,11 @@ async function actorCommands(tx: Parameters<typeof requireWorld>[0], worldId: st
     throw new TRPCError({ code: 'FORBIDDEN', message: '국가 예턴 권한이 없습니다.' });
   const commands = worldResolver(world)
     .resolver.list('nation')
-    .filter((def) => canExecuteNationCommand(actor.officerLevel, def.key));
+    .filter(
+      (def) =>
+        canExecuteNationCommand(actor.officerLevel, def.key) ||
+        canExecuteCityNationCommand(world, actor.officerLevel, def.key),
+    );
   return { world, actor, commands };
 }
 export const nationCommandsRouter = router({

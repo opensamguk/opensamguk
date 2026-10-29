@@ -4,6 +4,7 @@ import {
   APPOINTABLE_OFFICER_LEVELS,
   canUseNationTurns,
   canExecuteNationCommand,
+  canExecuteCityNationCommand,
   officerTitle,
   type QueuedTurn,
 } from '@opensamguk/rules';
@@ -33,7 +34,13 @@ export function parseOfficeTurn(
   if (input === null) return emptyOfficeTurn();
   const def = worldResolver(world).resolver.get(input.commandKey);
   const args = def?.args.safeParse(input.args === undefined ? {} : input.args);
-  if (!def || def.target !== 'nation' || !canExecuteNationCommand(level, def.key) || !args?.success) invalid();
+  if (
+    !def ||
+    def.target !== 'nation' ||
+    !(canExecuteNationCommand(level, def.key) || canExecuteCityNationCommand(world, level, def.key)) ||
+    !args?.success
+  )
+    invalid();
   return { commandKey: def.key, args: args.data };
 }
 function displayOfficeTurns(world: World, turns: readonly QueuedTurn[]) {

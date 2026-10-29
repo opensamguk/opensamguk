@@ -81,12 +81,15 @@ export async function readCityResourceRequest(ctx: ActorContext, worldId: string
 }
 export async function submitCityResourceRequest(
   ctx: ActorContext,
-  input: { worldId: string; requestId: string; payload: unknown },
+  input: { worldId: string; requestId: string; expectedUserId: string; payload: unknown },
 ) {
   const request = requestSchema.safeParse(input.requestId),
-    parsed = cityResourceInputSchema.safeParse(input.payload);
-  if (!request.success || !parsed.success)
+    parsed = cityResourceInputSchema.safeParse(input.payload),
+    expectedUser = z.uuid().safeParse(input.expectedUserId);
+  if (!request.success || !parsed.success || !expectedUser.success)
     throw new TRPCError({ code: 'BAD_REQUEST', message: '도시 병력 배속 입력을 확인하세요.' });
+  if (expectedUser.data !== ctx.user.id)
+    throw new TRPCError({ code: 'CONFLICT', message: '로그인 계정이 바뀌었습니다. 화면을 다시 불러오세요.' });
   const started = performance.now();
   await ctx.db.$transaction(async (tx) => {
     const auth = identity(ctx, started);
