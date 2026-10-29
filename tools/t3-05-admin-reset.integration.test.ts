@@ -832,53 +832,56 @@ async function eventFor(payload: ReturnType<typeof input>) {
   );
 }
 async function existingRows(worldIds: string[], sourceId: string, eventId: bigint) {
-  const hash = createHash('sha256');
-  for (const table of await tables()) {
+  const hash = createHash('sha256'),
+    worldIdTables = new Set(
+      (
+        await checked(() =>
+          gate.query(
+            "SELECT table_name FROM information_schema.columns WHERE table_schema='public' AND column_name='worldId'",
+          ),
+        )
+      ).rows.map((row) => String(row.table_name)),
+    ),
+    parts: string[] = [];
+  // 전체 행과 기존 테이블 순서를 한 읽기 snapshot에서 유지한다.
+  for (const [ordinal, table] of (await tables()).entries()) {
     operationSignals.getStore()?.throwIfAborted();
     if (['EngineLease', 'EngineHeartbeat'].includes(table)) continue;
-    const columns = (
-      await checked(() =>
-        gate.query(
-          "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=$1 AND column_name='worldId'",
-          [table],
-        ),
-      )
-    ).rows;
     const quoted = '"' + table.replaceAll('"', '""') + '"';
     let expression = 'to_jsonb(t)',
-      where = '',
-      values: unknown[] = [];
+      where = '';
     if (table === 'World') {
       expression =
         "CASE WHEN id=$2 THEN to_jsonb(t)-ARRAY['status','endedAt','clockRevision','actionSequence'] ELSE to_jsonb(t) END";
       where = ' WHERE id=ANY($1::text[])';
-      values = [worldIds, sourceId];
-    } else if (columns.length) {
+    } else if (worldIdTables.has(table)) {
       where = ' WHERE "worldId"=ANY($1::text[])';
-      values = [worldIds];
       if (table === 'InputEvent') {
-        where += ' AND id<>$2::bigint';
-        values.push(String(eventId));
+        where += ' AND id<>$3::bigint';
       }
       if (table === 'AuditLog') {
-        where += ' AND ("inputEventId" IS NULL OR "inputEventId"<>$2::bigint)';
-        values.push(String(eventId));
+        where += ' AND ("inputEventId" IS NULL OR "inputEventId"<>$3::bigint)';
       }
     }
-    const rows = await checked(() =>
-      gate.query(
-        "SELECT COALESCE(jsonb_agg(snapshot ORDER BY snapshot::text),'[]'::jsonb)::text AS body FROM (SELECT " +
-          expression +
-          ' AS snapshot FROM ' +
-          quoted +
-          ' t' +
-          where +
-          ') rows',
-        values,
-      ),
+    parts.push(
+      'SELECT ' +
+        ordinal +
+        " AS ordinal,'" +
+        table.replaceAll("'", "''") +
+        "'::text AS name,COALESCE(jsonb_agg(snapshot ORDER BY snapshot::text),'[]'::jsonb)::text AS body FROM (SELECT " +
+        expression +
+        ' AS snapshot FROM ' +
+        quoted +
+        ' t' +
+        where +
+        ') rows',
     );
-    hash.update(table + '\n' + String(rows.rows[0]!.body) + '\n');
   }
+  if (!parts.length) return hash.digest('hex');
+  const rows = await checked(() =>
+    gate.query(parts.join(' UNION ALL ') + ' ORDER BY ordinal', [worldIds, sourceId, String(eventId)]),
+  );
+  for (const row of rows.rows) hash.update(String(row.name) + '\n' + String(row.body) + '\n');
   return hash.digest('hex');
 }
 async function assertNoLiveLease(worldId: string) {
@@ -1696,27 +1699,41 @@ it('AC-INT-18D AC-M3-04 실제 게시 CLI의 도시 판과 두 월드 사람30�
 }, 120000);
 it('AC-INT-18D AC-M3-04 도시 초기화는 원본 세수·사람·30칸과 타월드를 보존하고 빈61원장만 만든다', async (signal) => {
   if (!cityOwner || !cliCitySource || !peerCityWorld) throw new Error('앞선 도시 정식 두 월드가 필요합니다.');
+  const started = performance.now(),
+    phase = (name: string) =>
+      console.info(
+        JSON.stringify({ event: 'city-reset-preservation-phase', phase: name, elapsedMs: performance.now() - started }),
+      );
+  phase('started');
   const payload = input(cityOwner, cliCitySource),
     receipt = await accepted(cityOwner, payload, signal),
-    event = await eventFor(payload),
-    before = await existingRows([cliCitySource.id, peerCityWorld.id], cliCitySource.id, event.id),
+    event = await eventFor(payload);
+  phase('admitted');
+  const before = await existingRows([cliCitySource.id, peerCityWorld.id], cliCitySource.id, event.id),
     ledger = structuredClone(cliCitySource.cityResourcesState);
+  phase('before-snapshot');
   expect(await apply(cliCitySource.id, signal)).toMatchObject({ status: 'ENDED' });
+  phase('applied');
   const applied = await eventFor(payload),
     ended = await checked(() => db.world.findUniqueOrThrow({ where: { id: cliCitySource!.id } }));
   lastCityTarget = await assertFreshCityResetWorld(receipt.plannedNewWorldId);
+  phase('fresh-target');
   checkedResetTarget(ended, applied, lastCityTarget);
   expect(ended.cityResourcesState).toEqual(ledger);
   expect(await existingRows([cliCitySource.id, peerCityWorld.id], cliCitySource.id, event.id)).toBe(before);
-  const sourceArchive = await checked(() => exportReplay(db, cliCitySource!.id));
-  expect(replayToEnd(sourceArchive)).toMatchObject({ reason: 'ADMIN_RESET', winnerNationId: null });
-  expect(replayToEnd(JSON.parse(JSON.stringify(sourceArchive)))).toEqual(replayToEnd(sourceArchive));
+  phase('after-snapshot');
+  const sourceArchive = await checked(() => exportReplay(db, cliCitySource!.id)),
+    replayed = replayToEnd(sourceArchive);
+  expect(replayed).toMatchObject({ reason: 'ADMIN_RESET', winnerNationId: null });
+  expect(replayToEnd(JSON.parse(JSON.stringify(sourceArchive)))).toEqual(replayed);
+  phase('replayed');
   const count = await checked(() => db.world.count()),
     same = await call('admin.world.resetRequest', query(payload), signal, cityOwner);
   expect(same.data).toMatchObject({ status: 'APPLIED', plannedNewWorldId: lastCityTarget.id });
   expect(await request(cityOwner, payload, signal)).toEqual(same);
   await apply(cliCitySource.id, signal);
   expect(await checked(() => db.world.count())).toBe(count);
+  phase('idempotency-verified');
 });
 it('AC-INT-18D AC-M3-04 실제 생성 DONE과 초기화 APPLIED 출처는 같은 도시 기능·게시 자료로 다시 초기화한다', async (signal) => {
   if (!cityOwner) throw new Error('도시 초기화 관리자가 필요합니다.');
