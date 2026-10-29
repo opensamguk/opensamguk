@@ -337,6 +337,7 @@ it('정식 두 월드의 명시 열·사람 수·heartbeat를 반환하고 모�
       id: true,
       name: true,
       status: true,
+      clockRevision: true,
       replayFormat: true,
       scenarioKey: true,
       presetKey: true,
