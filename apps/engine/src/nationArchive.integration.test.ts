@@ -173,7 +173,7 @@ describe('T4-56 / AC-P2-17 실제 PostgreSQL 국가 표시값 저장', () => {
     });
     expect(
       await db.generalLog.findFirstOrThrow({
-        where: { worldId, generalId: 1, tick: row.removedTick, sequence: null },
+        where: { worldId, generalId: 1, tick: row.removedTick, sequence: row.removedSequence },
       }),
     ).toMatchObject({ kind: 'success' });
     expect(await archived(worldId)).toEqual(before);
