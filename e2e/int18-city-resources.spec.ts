@@ -510,7 +510,10 @@ test('AC-INT-18C 공개 빌드 정식 도시 모병·준비·배속·거부·375
       await editor.getByLabel('명령 찾기', { exact: true }).fill(name);
       await editor.getByRole('radio', { name, exact: true }).check();
       for (const [label, value] of Object.entries(fields)) {
-        const control = editor.getByLabel(label, { exact: true });
+        const control = editor
+          .getByRole('combobox', { name: label, exact: true })
+          .or(editor.getByRole('spinbutton', { name: label, exact: true }))
+          .or(editor.getByRole('textbox', { name: label, exact: true }));
         if ((await control.evaluate((element) => element.tagName)) === 'SELECT') await control.selectOption(value);
         else await control.fill(value);
       }
@@ -638,8 +641,10 @@ test('AC-INT-18C 공개 빌드 정식 도시 모병·준비·배속·거부·375
         name: '개인 휘하·부곡',
         exact: true,
       });
-      await campaign.getByLabel('새 부곡 지휘관', { exact: true }).selectOption(String(owner.generalId));
-      await campaign.getByLabel('새 부곡 병종', { exact: true }).selectOption('1100');
+      await campaign
+        .getByRole('combobox', { name: '새 부곡 지휘관', exact: true })
+        .selectOption(String(owner.generalId));
+      await campaign.getByRole('combobox', { name: '새 부곡 병종', exact: true }).selectOption('1100');
       await campaign.getByRole('button', { name: '빈 부곡 편성', exact: true }).click();
       await expect
         .poll(() =>
