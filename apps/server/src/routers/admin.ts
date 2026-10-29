@@ -6,6 +6,7 @@ import { createAdminSanction, createSanctionInput, liftAdminSanction, liftSancti
 import { auditListInput, getUser, getUserInput, listAudit, searchUsers, searchUsersInput } from '../admin/read';
 import { listAdminWorlds } from '../admin/worlds';
 import { investigateShared, investigateSharedInput } from '../admin/investigation';
+import { requestWorldEnd, requestWorldEndInput, getWorldEndRequest, worldEndRequestInput } from '../admin/worldEnd';
 import {
   requestWorldClock,
   requestWorldClockInput,
@@ -28,6 +29,8 @@ export const adminRouter = router({
   }),
   world: router({
     list: adminProcedure.input(z.void()).query(({ ctx }) => listAdminWorlds(ctx)),
+    requestEnd: adminProcedure.input(requestWorldEndInput).mutation(({ ctx, input }) => requestWorldEnd(ctx, input)),
+    endRequest: adminProcedure.input(worldEndRequestInput).query(({ ctx, input }) => getWorldEndRequest(ctx, input)),
     requestClock: adminProcedure
       .input(requestWorldClockInput)
       .mutation(({ ctx, input }) => requestWorldClock(ctx, input)),

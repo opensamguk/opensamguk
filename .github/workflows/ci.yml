@@ -268,3 +268,6 @@ jobs:
       - name: Check admin investigation in Chromium
         if: matrix.shard == 1
         run: pnpm e2e:investigation --reporter=line
+      - name: Check admin world clock actions in Chromium
+        if: matrix.shard == 1
+        run: pnpm e2e:admin-clock --reporter=line

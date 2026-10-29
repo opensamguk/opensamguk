@@ -1,9 +1,15 @@
 import { execFileSync } from 'node:child_process';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { randomUUID } from 'node:crypto';
+import { afterAll, beforeEach, describe, expect, it, onTestFailed } from 'vitest';
 import { createDb } from '@opensamguk/db';
 import { hashState } from '@opensamguk/shared/node';
 import { loadInitialWorldFromDb } from './resources';
-import { readWorldState, saveInitialWorld } from './persistence';
+import {
+  prepareInitialWorld,
+  readWorldState,
+  saveInitialWorld as persistInitialWorld,
+  savePreparedInitialWorld,
+} from './persistence';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !/\/[a-z][a-z0-9_]*_test$/.test(new URL(url).pathname))
@@ -12,12 +18,41 @@ const db = createDb(url);
 const options = { name: 'AC-M1-03 integration', turnTermMinutes: 10, endYear: null };
 const input = { scenario: '1030', map: 'che', seed: 'integration-seed' };
 
-beforeAll(async () => {
-  await db.world.deleteMany();
+const ownedWorldIds = new Set<string>();
+const ownedCliAuditIds: bigint[] = [];
+let failed = false;
+async function saveInitialWorld(...args: Parameters<typeof persistInitialWorld>) {
+  const result = await persistInitialWorld(...args);
+  ownedWorldIds.add(result.worldId);
+  return result;
+}
+beforeEach(() => {
+  onTestFailed(() => {
+    failed = true;
+  });
 });
 afterAll(async () => {
-  await db.world.deleteMany();
-  await db.$disconnect();
+  const errors: unknown[] = [];
+  if (!failed) {
+    try {
+      await db.world.deleteMany({ where: { id: { in: [...ownedWorldIds] } } });
+      // 감사는 삭제가 금지된 이력이며 전용 DB의 최종 정리까지 보존한다.
+      const audits = await db.auditLog.findMany({
+        where: { id: { in: ownedCliAuditIds } },
+        select: { id: true },
+        orderBy: { id: 'asc' },
+      });
+      expect(audits.map((row) => row.id)).toEqual([...ownedCliAuditIds].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)));
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  try {
+    await db.$disconnect();
+  } catch (error) {
+    errors.push(error);
+  }
+  if (errors.length) throw new AggregateError(errors, '초기 생성 고정물 정리에 실패했습니다.');
 });
 
 describe('AC-M1-03 실제 DB 월드 생성', () => {
@@ -144,11 +179,108 @@ describe('AC-M1-03 실제 DB 월드 생성', () => {
   it('CLI가 받은 설정을 저장하고 월드 ID와 실제 상태 해시를 출력한다', async () => {
     const output = runCli(cliArgs);
     const result = JSON.parse(output.trim().split('\n').at(-1)!) as { worldId: string; stateHash: string };
+    ownedWorldIds.add(result.worldId);
     expect(hashState(await readWorldState(db, result.worldId))).toBe(result.stateHash);
     expect(await db.world.findUniqueOrThrow({ where: { id: result.worldId } })).toMatchObject({
       name: 'CLI 통합 검증',
       turnTermMinutes: 7,
     });
+    const audits = await db.auditLog.findMany({ where: { worldId: result.worldId } });
+    expect(audits).toHaveLength(1);
+    ownedCliAuditIds.push(audits[0]!.id);
+    expect(audits[0]).toMatchObject({
+      actorKind: 'CLI',
+      actorUserId: null,
+      action: 'world.create.applied',
+      targetType: 'World',
+      targetId: result.worldId,
+      inputEventId: null,
+      payload: { stateHash: result.stateHash },
+    });
+  });
+
+  it('호출자가 소유한 TX에 예정 UUID로 저장하고 후속 실패면 초기 행을 모두 되돌린다', async () => {
+    const initial = await loadInitialWorldFromDb(db, input),
+      prepared = prepareInitialWorld(initial, options);
+    const firstId = randomUUID();
+    const saved = await db.$transaction((tx) => savePreparedInitialWorld(tx, prepared, firstId), { timeout: 30000 });
+    ownedWorldIds.add(saved.worldId);
+    expect(saved).toEqual({ worldId: firstId, stateHash: hashState(initial) });
+    expect(await readWorldState(db, firstId)).toEqual(initial);
+    const rolledBackId = randomUUID();
+    await expect(
+      db.$transaction(
+        async (tx) => {
+          await savePreparedInitialWorld(tx, prepared, rolledBackId);
+          throw new Error('후속 접수 저장 실패');
+        },
+        { timeout: 30000 },
+      ),
+    ).rejects.toThrow('후속 접수 저장 실패');
+    expect(await db.world.findUnique({ where: { id: rolledBackId } })).toBeNull();
+    for (const table of ['Nation', 'City', 'General', 'GeneralTurn', 'Diplomacy', 'NationTurn']) {
+      const rows = await db.$queryRawUnsafe<{ count: number }[]>(
+        `SELECT count(*)::int AS count FROM "${table}" WHERE "worldId"=$1::text`,
+        rolledBackId,
+      );
+      expect(rows).toEqual([{ count: 0 }]);
+    }
+    expect(hashState(await readWorldState(db, firstId))).toBe(saved.stateHash);
+  });
+
+  it('CLI 생성 감사가 실패하면 기존 게임 행과 감사는 보존하고 새 초기 행은 남기지 않는다', async () => {
+    const snapshot = async () => {
+      const result: Record<string, string> = {};
+      for (const table of [
+        'World',
+        'Nation',
+        'City',
+        'General',
+        'GeneralTurn',
+        'Diplomacy',
+        'NationTurn',
+        'AuditLog',
+      ]) {
+        const rows = await db.$queryRawUnsafe<{ rows: string }[]>(
+          `SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text),'[]'::jsonb)::text AS rows FROM "${table}" t`,
+        );
+        result[table] = hashState(rows[0]!.rows);
+      }
+      return result;
+    };
+    const before = await snapshot();
+    await db.$executeRawUnsafe(
+      `CREATE FUNCTION admin_create_a_audit_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='world.create.applied' AND NEW."actorKind"::text='CLI' THEN RAISE EXCEPTION 'CLI_AUDIT_TEST_FAILURE'; END IF; RETURN NEW; END $$`,
+    );
+    const errors: unknown[] = [];
+    try {
+      await db.$executeRawUnsafe(
+        `CREATE TRIGGER admin_create_a_audit_failure BEFORE INSERT ON "AuditLog" FOR EACH ROW EXECUTE FUNCTION admin_create_a_audit_failure()`,
+      );
+      let failure: unknown;
+      try {
+        runCli(cliArgs);
+      } catch (error) {
+        failure = error;
+      }
+      expect(failure).toMatchObject({ status: 1 });
+      const output = failure as { stdout: string; stderr: string };
+      expect(`${output.stdout}${output.stderr}`.includes(url!)).toBe(false);
+      expect(await snapshot()).toEqual(before);
+    } catch (error) {
+      errors.push(error);
+    }
+    for (const sql of [
+      'DROP TRIGGER IF EXISTS admin_create_a_audit_failure ON "AuditLog"',
+      'DROP FUNCTION admin_create_a_audit_failure()',
+    ]) {
+      try {
+        await db.$executeRawUnsafe(sql);
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    if (errors.length) throw new AggregateError(errors, 'CLI 감사 롤백 검증 또는 고정물 정리에 실패했습니다.');
   });
 
   it('CLI의 필수 인수 누락은 종료 코드 1이고 월드를 쓰지 않는다', async () => {

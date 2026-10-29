@@ -1,6 +1,7 @@
 import { nextActionSequence, type Prisma } from '@opensamguk/db';
 import {
   ADMIN_CLOCK_KINDS,
+  ADMIN_END_KIND,
   adminClockPayloadSchema,
   adminClockExpectedStatus,
   adminClockRejectMessages,
@@ -9,6 +10,7 @@ import {
 } from '@opensamguk/rules';
 import { databaseNow } from '../lease';
 import { controlClockInTransaction } from '../world/clock';
+import { processAdminEnd } from './end';
 
 // TurnLoop가 리스→World를 잠근 같은 트랜잭션에서만 호출한다.
 export async function processAdminClock(
@@ -17,10 +19,11 @@ export async function processAdminClock(
   minimumTick: number,
 ) {
   const event = await tx.inputEvent.findFirst({
-    where: { worldId: world.id, status: 'PENDING', kind: { in: [...ADMIN_CLOCK_KINDS] } },
+    where: { worldId: world.id, status: 'PENDING', kind: { in: [...ADMIN_CLOCK_KINDS, ADMIN_END_KIND] } },
     orderBy: { id: 'asc' },
   });
   if (!event) return null;
+  if (event.kind === ADMIN_END_KIND) return processAdminEnd(tx, world, event);
   const payload = adminClockPayloadSchema.parse(event.payload),
     action = event.kind.slice('admin.world.'.length) as AdminClockAction;
   if (event.generalId !== null || event.sequence !== null || event.tick !== null || event.result !== null)
