@@ -324,6 +324,6 @@ D-034로 INT-07·08을 취소했다. 위 순수 행군 이식 착수 기록은 �
 | 작업 | 내용 | AC | 구현 | 선행 | 상태 |
 | ---- | ---- | -- | ---- | ---- | ---- |
 | INT-18A | 도시 금·쌀·수비병 정본과 순수 규칙 판 | INT-18A | Codex | INT-05, INT-09, INT-15 | 진행중 |
-| INT-18B | 도시 자원 DB/API·권한·NPC·재생 | INT-18B | Codex | INT-18A | 계획 |
-| INT-18C | 도시 자원·수비·배속 화면 | INT-18C | Codex | INT-18B | 계획 |
+| INT-18B | 도시 자원 DB/API·권한·NPC·재생 | INT-18B | Codex | INT-18A | 진행중 |
+| INT-18C | 도시 자원·수비·배속 화면 | INT-18C | Codex | INT-18B | 진행중 |
 | INT-18D | 새 도시 자원 판 정식 전체 인수 | INT-18D | Codex | INT-18A, INT-18B, INT-18C | 계획 |

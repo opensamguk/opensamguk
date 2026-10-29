@@ -11,6 +11,7 @@ export default defineConfig({
     '**/account-access.spec.ts',
     '**/legal-consent.spec.ts',
     '**/admin-sanction.spec.ts',
+    '**/int18-city-resources.spec.ts',
   ],
   forbidOnly: isCI,
   use: { baseURL: 'http://127.0.0.1:5173' },
