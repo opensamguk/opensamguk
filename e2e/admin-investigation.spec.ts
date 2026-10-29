@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import type { BrowserContext, Page, Request, Route } from '@playwright/test';
 import { test as base, expect, type LegalStack } from './legalFixture';
 import { TEST_PASSWORD } from './account';
@@ -10,6 +10,7 @@ import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { holdLease } from './game';
 import { releaseLease } from '../apps/engine/src/lease';
+import { investigationFootprint, settleInvestigationRenewals } from './investigationObservation';
 
 type User = { id: string; email: string; page: Page };
 type OwnedWorld = { id: string; hold: Awaited<ReturnType<typeof holdLease>> };
@@ -58,7 +59,7 @@ async function signup(page: Page, stack: LegalStack): Promise<User> {
   return { ...result.user, page };
 }
 async function footprint(stack: LegalStack, excludeAudit = false) {
-  const hash = createHash('sha256');
+  const fingerprint = investigationFootprint();
   const tables = await stack.db.$queryRaw<
     Array<{ tablename: string }>
   >`SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename`;
@@ -68,9 +69,9 @@ async function footprint(stack: LegalStack, excludeAudit = false) {
     const [row] = await stack.db.$queryRawUnsafe<Array<{ body: string }>>(
       `SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text),'[]'::jsonb)::text AS body FROM ${quoted} t`,
     );
-    hash.update(tablename + ':' + row!.body + '\n');
+    fingerprint.table(tablename, row!.body);
   }
-  return hash.digest('hex');
+  return fingerprint.finish();
 }
 async function open(journey: Journey) {
   const page = journey.admin.page;
@@ -205,6 +206,8 @@ const test = base.extend<{ investigation: Journey }>({
           expect(await stack.db.general.count({ where: { worldId, userId: null } })).toBe(491);
         }
         const anonymous = await page();
+        // 본문은 API 읽기만 검사한다. 고정물의 리스 갱신도 비교 전에 정착시키며 행 전체는 계속 보호한다.
+        await settleInvestigationRenewals(worlds.map(({ hold }) => hold));
         await use({
           stack,
           admin,
@@ -312,7 +315,7 @@ test('T3-06 AC-M3-05 실제 공유 기록·수동 조회·감사·두 월드 격
     await region.getByRole('button', { name: '공유 기록 조회', exact: true }).click();
     await expect(region.getByText('공유 묶음 0개', { exact: true })).toBeVisible();
     expect(await auditCount(journey.stack)).toBe(count + 2);
-    expect(await footprint(journey.stack, true)).toBe(before);
+    expect(await footprint(journey.stack, true)).toEqual(before);
     const detail = await detailForm(journey);
     await detail.getByRole('button', { name: '상세 조회', exact: true }).click();
     await expect(detail.getByRole('list', { name: '최근 로그인 기록 목록', exact: true }).locator('li')).toHaveCount(2);
@@ -338,7 +341,7 @@ test('T3-06 AC-M3-05 실제 공유 기록·수동 조회·감사·두 월드 격
       await expect(detail.getByRole('alert')).toBeVisible();
       await expect(detail.getByRole('list', { name: '최근 로그인 기록 목록', exact: true })).toHaveCount(0);
       expect((await detail.innerText()).includes('private recent audit rejected'), '감사 오류 원문 없음').toBe(false);
-      expect(await footprint(journey.stack)).toBe(beforeFailedRead);
+      expect(await footprint(journey.stack)).toEqual(beforeFailedRead);
     } catch (error) {
       failures.push(error);
     } finally {
@@ -377,7 +380,7 @@ test('T3-06 AC-M3-05 일반·무인증·역할 회수는 실제 HTTP 거부이�
       expect(response.status()).toBe(mode === 'anonymous' ? 401 : 403);
       expect(body.result === undefined, '거부 결과 없음').toBe(true);
       expect(body.error?.data?.code).toBe(mode === 'anonymous' ? 'UNAUTHORIZED' : 'FORBIDDEN');
-      expect(await footprint(journey.stack)).toBe(before);
+      expect(await footprint(journey.stack)).toEqual(before);
       if (mode !== 'anonymous') {
         await page.goto(journey.stack.origin + '/admin/users');
         await expect(page.getByRole('region', { name: '다중계정 조사', exact: true })).toHaveCount(0);
