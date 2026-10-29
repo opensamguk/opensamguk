@@ -11,7 +11,8 @@ import { hashState } from '@opensamguk/shared/node';
 import { describe, expect, it, vi } from 'vitest';
 import { monthlyFixture } from '../../test/monthlyFixture';
 import { readCapsArchive } from '../replayCaps';
-import { readWorldState, saveInitialWorld } from './persistence';
+import { prepareInitialWorld, readWorldState, saveInitialWorld, savePreparedInitialWorld } from './persistence';
+import { createWorldFromCli } from '../admin/creation';
 
 const preset = JSON.parse(
   readFileSync(new URL('../../../../resources/preset/regular.json', import.meta.url), 'utf8'),
@@ -35,6 +36,7 @@ function database() {
     throw new Error('초기 생성에서 허용하지 않은 쓰기입니다.');
   });
   const tx = {
+    auditLog: { create: vi.fn(async () => ({})) },
     world: {
       create: vi.fn(async ({ data }: { data: Prisma.WorldCreateInput }) => ({ ...data, id: worldId })),
       update: forbidden,
@@ -53,6 +55,65 @@ function database() {
   );
   return { tx, worldId, transaction, forbidden, db: { $transaction: transaction } as unknown as PrismaClient };
 }
+
+it('준비한 자료는 입력과 옵션의 후속 변경을 보존된 해시에 섞지 않는다', async () => {
+  const initial = await monthlyFixture(),
+    original = structuredClone(initial),
+    selected = options();
+  const prepared = prepareInitialWorld(initial, selected);
+  initial.cities[0]!.population++;
+  selected.name = '뒤늦은 이름';
+  selected.turnTermMinutes = 99;
+  const f = database();
+  const result = await savePreparedInitialWorld(f.tx as unknown as Prisma.TransactionClient, prepared);
+  expect(result).toEqual({ worldId: f.worldId, stateHash: hashState(original) });
+  expect(f.tx.world.create.mock.calls[0]![0].data).toMatchObject({
+    name: '생성 단위 월드',
+    turnTermMinutes: 30,
+    replayOrigin: { initial: original, initialStateHash: hashState(original) },
+  });
+  expect(f.tx.city.createMany.mock.calls[0]![0].data).toEqual(
+    original.cities.map((city) => ({ ...city, worldId: f.worldId })),
+  );
+  expect(Object.isFrozen(prepared)).toBe(true);
+  expect(f.transaction).not.toHaveBeenCalled();
+  expect(f.tx.auditLog.create).not.toHaveBeenCalled();
+});
+
+it('미검증 prepared 복제품은 TX 쓰기 전에 거부하고 예정 UUID는 원본 저장에만 전달한다', async () => {
+  const f = database(),
+    prepared = prepareInitialWorld(await monthlyFixture(), options());
+  await expect(savePreparedInitialWorld(f.tx as unknown as Prisma.TransactionClient, { ...prepared })).rejects.toThrow(
+    '검증한 초기 월드',
+  );
+  expect(f.tx.world.create).not.toHaveBeenCalled();
+  const id = '00000000-0000-4000-8000-000000000099';
+  await savePreparedInitialWorld(f.tx as unknown as Prisma.TransactionClient, prepared, id);
+  expect(f.tx.world.create.mock.calls[0]![0].data.id).toBe(id);
+  expect(f.transaction).not.toHaveBeenCalled();
+});
+
+it('CLI 원생성은 같은30초 TX에서 저장한 월드 ID·해시로 감사를 쓰고 감사 실패를 전파한다', async () => {
+  const initial = await monthlyFixture(),
+    f = database();
+  const result = await createWorldFromCli(f.db, initial, options());
+  expect(f.transaction).toHaveBeenCalledExactlyOnceWith(expect.any(Function), { timeout: 30000 });
+  expect(f.tx.auditLog.create).toHaveBeenCalledExactlyOnceWith({
+    data: {
+      actorKind: 'CLI',
+      action: 'world.create.applied',
+      targetType: 'World',
+      targetId: result.worldId,
+      worldId: result.worldId,
+      payload: { stateHash: result.stateHash },
+    },
+  });
+  const failure = database();
+  failure.tx.auditLog.create.mockRejectedValueOnce(new Error('감사 저장 실패'));
+  await expect(createWorldFromCli(failure.db, initial, options())).rejects.toThrow('감사 저장 실패');
+  expect(failure.tx.world.create).toHaveBeenCalledOnce();
+  expect(failure.transaction).toHaveBeenCalledExactlyOnceWith(expect.any(Function), { timeout: 30000 });
+});
 function initialOrigin(initial: WorldInit) {
   return {
     version: 1,
