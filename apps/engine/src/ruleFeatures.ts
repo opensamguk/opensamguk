@@ -20,6 +20,7 @@ import { loadNationTrust, loadTreaties, persistTreatyClosures } from './treatySt
 import { processTreatyQueuedInput } from './treatyInput';
 import { loadResidenceAnchors, persistResidenceAnchors } from './residenceState';
 import { persistForeignCampaignInput, processCampaignQueuedInput } from './campaignInput';
+import { processCityResourceInput } from './cityResourceInput';
 
 export async function persistPersonnelPacket(
   tx: Prisma.TransactionClient,
@@ -103,8 +104,10 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   {
     key: 'campaign-v1',
     queuedInputs: { 'campaign.relationship': processCampaignQueuedInput, 'campaign.unit': processCampaignQueuedInput },
-    afterQueuedInput: persistForeignCampaignInput,
+    afterQueuedInput: (tx, world, before, input) =>
+      input.kind === 'city.resources' ? Promise.resolve() : persistForeignCampaignInput(tx, world, before, input),
   },
+  { key: 'city-resources-v1', queuedInputs: { 'city.resources': processCityResourceInput } },
   { key: 'five-stats' },
   { key: 'operational-map' },
   { key: 'stratagem-basic' },

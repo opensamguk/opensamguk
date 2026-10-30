@@ -10,6 +10,7 @@ import type { DeepReadonly, WorldView } from '../model/world';
 import type { InitialGeneral } from '../world/bootstrap';
 import type { CommandResolver } from '../commands/resolve';
 import { readCampaignState } from '../campaign/state';
+import { cityNpcAllocations, cityNpcPreparation } from '../cityResources/npc';
 
 export interface NpcCandidate {
   key: string;
@@ -140,7 +141,11 @@ export function chooseGeneralTurn(view: WorldView, general: General, rng: Rng, c
     const capacity = commander.leadership * BALANCE.CREW_PER_LEADERSHIP;
     const minimum = Math.min(capacity, 2000);
     const unit = context.unitSet?.crewTypes.find((u) => u.id === crewType && u.armType > 0);
-    if (troops < minimum && unit) {
+    const cityResources = view.ruleFeatures?.includes('city-resources-v1') ?? false;
+    if (cityResources)
+      for (const candidate of cityNpcPreparation(view, general.id, context))
+        choice.add(candidate.key, candidate.args, candidate.score, candidate.reason);
+    if (!cityResources && troops < minimum && unit) {
       const limit = Math.min(capacity - commanded, city.population);
       const amount = stats
         ? affordableRecruits(view, general, unit.cost, limit)
@@ -153,14 +158,14 @@ export function chooseGeneralTurn(view: WorldView, general: General, rng: Rng, c
           '전선에서 부족한 병력을 모은다.',
         );
     }
-    if (train < 60)
+    if (!cityResources && train < 60)
       choice.add(
         'train',
         army ? { unitId: army.id } : {},
         100 + (stats ? (drillGain(view, commander, false) - 10) * 10 : 0),
         '출병 전에 병력을 훈련한다.',
       );
-    if (atmos < 70)
+    if (!cityResources && atmos < 70)
       choice.add(
         'morale',
         army ? { unitId: army.id } : {},
@@ -196,6 +201,9 @@ export function chooseNationTurn(view: WorldView, ruler: General, rng: Rng, cont
     return { chosen: null, candidates: [] };
   const choice = chooser(view, ruler, rng, context, 'nation');
   choice.add('nation_rest', {}, 0, '국가 명령이 없으면 쉰다.');
+  if (view.ruleFeatures?.includes('city-resources-v1'))
+    for (const candidate of cityNpcAllocations(view, nation.id))
+      choice.add(candidate.key, candidate.args, candidate.score, candidate.reason);
   const cities = Object.values(view.cities).filter((c) => c.nationId === nation.id);
   const capital = view.cities[nation.capitalCityKey];
   if (

@@ -8,6 +8,7 @@ import { listAdminWorlds } from '../admin/worlds';
 import { investigateShared, investigateSharedInput } from '../admin/investigation';
 import { requestWorldCreateInput, worldCreateStatusInput } from '@opensamguk/rules';
 import { requestWorldCreate, getWorldCreateRequest } from '../admin/worldCreate';
+import { creationOptionsInput, getWorldCreationOptions } from '../admin/worldCreateOptions';
 import { requestWorldReset, getWorldResetRequest } from '../admin/worldReset';
 import { requestWorldResetInput, worldResetRequestInput } from '@opensamguk/rules';
 
@@ -33,6 +34,9 @@ export const adminRouter = router({
     shared: adminProcedure.input(investigateSharedInput).query(({ ctx, input }) => investigateShared(ctx, input)),
   }),
   world: router({
+    creationOptions: adminProcedure
+      .input(creationOptionsInput)
+      .query(({ ctx, input }) => getWorldCreationOptions(ctx, input)),
     create: adminProcedure.input(requestWorldCreateInput).mutation(({ ctx, input }) => requestWorldCreate(ctx, input)),
     createStatus: adminProcedure
       .input(worldCreateStatusInput)

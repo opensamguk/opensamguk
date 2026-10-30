@@ -1,4 +1,5 @@
 import { TRPCError } from '@trpc/server';
+import { isDeepStrictEqual } from 'node:util';
 import { readWorldExtRows, type Prisma } from '@opensamguk/db';
 import {
   toWorldState,
@@ -12,6 +13,9 @@ import {
   readOperationalMap,
   attachOperationalKinds,
   readCampaignState,
+  readCityResourcesState,
+  checkReplayOrigin,
+  campaignArmyTypes,
 } from '@opensamguk/rules';
 import { z } from 'zod';
 import { worldResolver } from './resolver';
@@ -97,5 +101,22 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
       throw new Error('부곡 월드에 중복 병력이 있습니다.');
     state.campaign = readCampaignState(world.campaignState, state, world.seed);
   } else if (world.campaignState != null) throw new Error('휘하 기능을 끈 월드에 저장 상태가 있습니다.');
+  if (world.ruleFeatures.includes('city-resources-v1')) {
+    if (
+      world.replayFormat !== 3 ||
+      !world.ruleFeatures.includes('campaign-v1') ||
+      !world.ruleFeatures.includes('campaign-assignment-v2')
+    )
+      throw new Error('도시 자원의 재생 형식과 휘하 기능 의존 관계가 다릅니다.');
+    const origin: unknown = world.replayOrigin;
+    checkReplayOrigin(origin);
+    if (
+      origin.version !== 3 ||
+      !origin.initial.ruleFeatures?.includes('city-resources-v1') ||
+      !isDeepStrictEqual(world.unitSet, origin.initial.unitSet)
+    )
+      throw new Error('도시 자원의 생성 기록과 운영 병종이 다릅니다.');
+    state.cityResources = readCityResourcesState(world.cityResourcesState, state, campaignArmyTypes(origin.initial));
+  } else if (world.cityResourcesState != null) throw new Error('도시 자원 기능을 끈 월드에 저장 상태가 있습니다.');
   return { ...state, ...(treaties ? { treaties } : {}) };
 }

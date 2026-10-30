@@ -8,6 +8,7 @@ import { cloneWorld } from '../model/clone';
 import type { DeepReadonly, WorldState, WorldView } from '../model/world';
 import type { UnitSetResource } from '../world/resources';
 import { readCampaignState, type CampaignUnitState } from './state';
+import { readCityResourcesState } from '../cityResources/state';
 
 function start(view: WorldView) {
   const state = cloneWorld(view);
@@ -116,4 +117,73 @@ export function fightCampaignWall(
   city.wall = result.defender.crew;
   finish(state, attacker, result.attacker);
   return { state, ...result };
+}
+
+// 도시 수비에는 가상의 장수나 5능력치 보정을 만들지 않는다.
+export function fightCampaignCityGarrison(
+  view: WorldView,
+  attackerId: number,
+  cityKey: number,
+  crewType: number,
+  unitSet: DeepReadonly<UnitSetResource>,
+  rng: Rng,
+) {
+  if (!view.ruleFeatures?.includes('city-resources-v1')) throw new Error('도시 수비 규칙이 없는 판입니다.');
+  const state = start(view),
+    attacker = unit(state, attackerId),
+    city = state.cities[cityKey];
+  const aNation = state.generals[attacker.ownerId]!.nationId;
+  if (!city || aNation === null || city.nationId === null || city.nationId === aNation)
+    throw new Error('서로 다른 국가의 도시 수비병만 교전할 수 있습니다.');
+  const ledger = readCityResourcesState(
+    state.cityResources,
+    state,
+    unitSet.crewTypes.filter((row) => row.armType > 0).map((row) => row.id),
+  );
+  state.cityResources = ledger;
+  const resource = ledger.cities[String(cityKey)]!,
+    defender = resource.garrison.find((row) => row.crewType === crewType);
+  if (!defender || defender.troops <= 0) throw new Error('교전할 도시 수비병이 없습니다.');
+  if (defender.atmos > 0) {
+    resource.rice = Math.max(0, resource.rice - Math.ceil(defender.troops * BALANCE.BATTLE_RICE_PER_CREW));
+    if (resource.rice === 0) defender.atmos = Math.max(0, defender.atmos - BALANCE.STARVATION_ATMOS_LOSS);
+  }
+  let returned = 0,
+    overflow = 0;
+  if (defender.atmos === 0) {
+    returned = Math.min(defender.troops, Math.max(0, city.populationMax - city.population));
+    overflow = defender.troops - returned;
+    city.population += returned;
+    resource.garrison = resource.garrison.filter((row) => row.crewType !== crewType);
+    return { state, text: `도시 병종${crewType} 패주: 민간 복귀 ${returned}명, 인구 상한 밖 ${overflow}명` };
+  }
+  feed(state, attacker);
+  const result = simulateBattle(
+    {
+      attacker: force(attacker),
+      defender: { crew: defender.troops, crewType: defender.crewType, train: defender.train, atmos: defender.atmos },
+      attackerTech: state.nations[aNation]!.tech,
+      defenderTech: state.nations[city.nationId]!.tech,
+      defence: city.defence,
+      unitSet,
+      attackerModifiers: modifiers(state, attacker),
+    },
+    rng,
+  );
+  defender.troops = result.defender.crew;
+  defender.train = result.defender.train;
+  defender.atmos = result.defender.atmos;
+  if (defender.atmos === 0) {
+    returned = Math.min(defender.troops, Math.max(0, city.populationMax - city.population));
+    overflow = defender.troops - returned;
+    city.population += returned;
+    defender.troops = 0;
+  }
+  resource.garrison = resource.garrison.filter((row) => row.troops > 0);
+  finish(state, attacker, result.attacker);
+  readCityResourcesState(ledger, state);
+  return {
+    state,
+    text: `부곡${attackerId} 대 도시 병종${crewType}: 공격 ${attacker.troops}명, 수비 ${defender.troops}명, 민간 복귀 ${returned}명, 인구 상한 밖 ${overflow}명`,
+  };
 }

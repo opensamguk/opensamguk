@@ -2,6 +2,7 @@ import { createCommandResolverWithCommands, extensionCommands, type CommandResol
 import type { WorldView } from './model/world';
 import { checkRuleFeatures, ruleRegistry, type RuleRegistry } from './ruleRegistry';
 import { createCampaignCommandResolver } from './campaign/commands';
+import { createCityResourceCommandResolver } from './cityResources/commands';
 
 // 형식 3의 같은 기능 등록표에서 무상태 명령을 고른다. 기존 preset 선택은 따로 보존한다.
 export function resolverForRuleFeatures(
@@ -26,5 +27,6 @@ export function resolverForRuleFeatures(
     ...extensionCommands.filter((definition) => !definitions.includes(definition)),
     ...definitions,
   ]);
-  return campaign ? createCampaignCommandResolver(resolver) : resolver;
+  const selected = campaign ? createCampaignCommandResolver(resolver) : resolver;
+  return features.includes('city-resources-v1') ? createCityResourceCommandResolver(selected) : selected;
 }

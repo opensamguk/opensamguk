@@ -173,7 +173,7 @@ async function existingRows(client: PgClient) {
       throw new Error('잘못된 시험 표 이름입니다.');
     const data =
       table === 'World'
-        ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures' - 'operationalMap' - 'campaignState'"
+        ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures' - 'operationalMap' - 'campaignState' - 'cityResourcesState'"
         : table === 'City'
           ? "to_jsonb(t) - 'kind'"
           : table === 'General'
@@ -426,6 +426,7 @@ it.each(['empty', 'legacy'] as const)(
         '20261105000000_admin_notices',
         '20261106000000_legal_document_versions',
         '20261107000000_admin_sanction_requests',
+        '20261108000000_city_resources_state',
         '20261109000000_login_audit_records',
         '20261110000000_world_create_requests',
       ]);
@@ -453,6 +454,7 @@ it.each(['empty', 'legacy'] as const)(
         await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
       expect((await client.query('SELECT id FROM "World" WHERE "operationalMap" IS NOT NULL')).rows).toEqual([]);
       expect((await client.query('SELECT id FROM "World" WHERE "campaignState" IS NOT NULL')).rows).toEqual([]);
+      expect((await client.query('SELECT id FROM "World" WHERE "cityResourcesState" IS NOT NULL')).rows).toEqual([]);
       expect((await client.query('SELECT "cityKey" FROM "City" WHERE "kind" IS NOT NULL')).rows).toEqual([]);
       expect(
         (await client.query('SELECT id FROM "General" WHERE "politics" IS NOT NULL OR "charm" IS NOT NULL')).rows,
