@@ -8,8 +8,10 @@ import { cloneWorld } from '../model/clone';
 import type { WorldView } from '../model/world';
 import { refreshSupply } from '../supply';
 import { followCampaignCommanders } from './movement';
-import { fightCampaignUnits, fightCampaignWall } from './skirmish';
+import { fightCampaignCityGarrison, fightCampaignUnits, fightCampaignWall } from './skirmish';
 import { readCampaignState, type CampaignUnitState } from './state';
+import { readCityResourcesState } from '../cityResources/state';
+import { disbandCityGarrison } from '../cityResources/ownership';
 
 const argsSchema = z.strictObject({ cityKey: positive });
 const year = (view: WorldView, tick: number) => view.startYear + Math.floor(tick / (12 * TICKS_PER_MONTH));
@@ -68,6 +70,12 @@ function check(view: WorldView, actor: Actor, raw: unknown) {
   const force = attackers(view, actor);
   if (!force.length) return fail('NO_CREW', '같은 거점에 집결한 부곡 병력이나 사기가 부족합니다.');
   const all = [...force, ...defenders(view, actor, target.cityKey)];
+  if (view.ruleFeatures?.includes('city-resources-v1'))
+    readCityResourcesState(
+      view.cityResources,
+      view,
+      actor.unitSet?.crewTypes.filter((row) => row.armType > 0).map((row) => row.id),
+    );
   if (
     !actor.unitSet?.crewTypes.some((unit) => unit.id === 1000) ||
     all.some((row) => !actor.unitSet!.crewTypes.some((unit) => unit.id === row.crewType))
@@ -86,6 +94,8 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
   const attackingIds = attackers(state, actor).map((unit) => unit.id);
   // 출병 시작 때의 수비 순서를 고정한다. 사람의 예약이나 다른 소유자의 부곡을 공격 편성에 넣지 않는다.
   const defendingIds = defenders(state, actor, cityKey).map((unit) => unit.id);
+  const cityResources = state.ruleFeatures?.includes('city-resources-v1') ?? false;
+  const cityDefense = () => (cityResources ? state.cityResources!.cities[String(cityKey)]!.garrison : []);
   const alive = (unit: CampaignUnitState) => unit.troops > 0 && unit.atmos > 0;
   const get = (id: number) => state.campaign!.units.find((unit) => unit.id === id)!;
   const rounds: string[] = [],
@@ -111,6 +121,16 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
       if (alive(d)) break;
     }
     if (defendingIds.some((id) => alive(get(id)))) continue;
+    for (const crewType of cityDefense()
+      .map((row) => row.crewType)
+      .sort((a, b) => a - b)) {
+      if (!alive(get(attackerId))) break;
+      const outcome = fightCampaignCityGarrison(state, attackerId, cityKey, crewType, actor.unitSet!, rng);
+      state = outcome.state;
+      rounds.push(outcome.text);
+      if (cityDefense().some((row) => row.crewType === crewType && row.troops > 0 && row.atmos > 0)) break;
+    }
+    if (cityDefense().some((row) => row.troops > 0 && row.atmos > 0)) continue;
     // 기존 출병은 벽이 0이어도 점령 직전 군량을 한 번 소비한다.
     if (alive(get(attackerId))) {
       state = fightCampaignWall(state, attackerId, cityKey, actor.unitSet!, rng).state;
@@ -120,10 +140,16 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
   }
   const captured =
     !defendingIds.some((id) => alive(get(id))) &&
+    !cityDefense().some((row) => row.troops > 0 && row.atmos > 0) &&
     state.cities[cityKey]!.wall === 0 &&
     attackingIds.some((id) => alive(get(id)));
   const history: NonNullable<CommandResult['history']> = [];
   if (captured) {
+    if (cityResources) {
+      const outcome = disbandCityGarrison(state, cityKey);
+      state = outcome.state;
+      rounds.push(outcome.text);
+    }
     battleAwards.push({ generalId: ownerId, wins: 0, captures: 1 });
     const city = state.cities[cityKey]!;
     city.nationId = nationId;
@@ -137,6 +163,13 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
         .filter((row) => row.nationId === defendingNation && row.kind !== 'PASS')
         .sort((a, b) => b.population - a.population || a.cityKey - b.cityKey);
       if (!remaining.length) {
+        if (cityResources) {
+          for (const neutralized of Object.values(state.cities).filter((row) => row.nationId === defendingNation)) {
+            const ended = disbandCityGarrison(state, neutralized.cityKey);
+            state = ended.state;
+            if (ended.troops) rounds.push(ended.text);
+          }
+        }
         removeNation(state, defendingNation);
         history.push({ nationId: defendingNation, text: `${nation.name} 멸망, 소속 장수 재야` });
       } else if (nation.capitalCityKey === cityKey) {

@@ -6,6 +6,7 @@ export const ENGINE_INTEGRATION_FILES = [
   'apps/engine/src/season.integration.test.ts',
   'apps/engine/src/lease.integration.test.ts',
   // INT-01/AC-INT-01: 권한을 기록하지 않는 긴 PG 검사를 옮겨 API의 전역 대조를 한곳에 유지한다.
+  'tools/int18-city-resources.integration.test.ts',
   'tools/integration-scenario.integration.test.ts',
   'tools/resource-catalog.integration.test.ts',
   'tools/t4-17-ext-n2.integration.test.ts',

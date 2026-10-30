@@ -12,6 +12,7 @@ export default defineConfig({
     '**/legal-consent.spec.ts',
     '**/account-withdrawal.spec.ts',
     '**/admin-sanction.spec.ts',
+    '**/int18-city-resources.spec.ts',
     '**/admin-clock.spec.ts',
     '**/admin-end.spec.ts',
   ],

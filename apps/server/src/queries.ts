@@ -80,6 +80,7 @@ export function worldSummary(world: ReadWorld, now: number) {
     nowTick: tick,
     msPerTick: (world.turnTermMinutes * 60_000) / TICKS_PER_MONTH,
     turnTermMinutes: world.turnTermMinutes,
+    ...(world.ruleFeatures.includes('city-resources-v1') ? { cityResourcesEnabled: true as const } : {}),
   };
 }
 

@@ -14,6 +14,7 @@
     "e2e:legal": "playwright test --config playwright.legal.config.ts",
     "e2e:withdrawal": "playwright test --config playwright.withdrawal.config.ts",
     "e2e:sanction": "playwright test --config playwright.sanction.config.ts",
+    "e2e:city-resources": "playwright test --config playwright.city-resources.config.ts",
     "e2e:admin-clock": "playwright test --config playwright.clock.config.ts",
     "e2e:admin-end": "playwright test --config playwright.end.config.ts",
     "e2e:campaign-offer": "playwright test --config playwright.campaign-offer.config.ts",

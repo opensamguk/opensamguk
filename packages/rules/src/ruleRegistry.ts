@@ -21,6 +21,7 @@ import type { RecordedInput, ReplayState } from './replay';
 import { campaignFeature, campaignInputKinds } from './campaign/feature';
 import { campaignAssignmentFeature } from './campaign/assignment';
 import { ADMIN_CLOCK_KINDS, applyAdminClockRecord } from './clock/admin';
+import { cityResourcesFeature, cityResourceInputKind } from './cityResourcesFeature';
 import { ADMIN_END_KIND, applyAdminEndRecord } from './clock/end';
 import { ADMIN_RESET_KIND, applyAdminResetRecord } from './clock/reset';
 
@@ -79,6 +80,7 @@ export const ruleRegistry: RuleRegistry = {
     basicStratagemFeature,
     campaignFeature,
     campaignAssignmentFeature,
+    cityResourcesFeature,
   ],
   monthlyOrder: ['treaty', 'personnel', 'campaign-assignment-v2'],
   inputKinds: [
@@ -99,6 +101,7 @@ export const ruleRegistry: RuleRegistry = {
     ...treatyInputKinds,
     treatyBreakInputKind,
     ...campaignInputKinds,
+    cityResourceInputKind,
   ],
 };
 

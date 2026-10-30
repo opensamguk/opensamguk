@@ -22,9 +22,21 @@ import { acquireLease, releaseLease, renewLease, type Lease } from '../apps/engi
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { preparePendingReset, processAdminReset, checkedResetTarget } from '../apps/engine/src/admin/reset';
-import { exportReplay, replayToEnd, replayArchive } from '../apps/engine/src/replay';
+import { processWorldCreateRequest } from '../apps/engine/src/admin/createRequests';
+import { exportReplay, replayToEnd, replayArchive, resourceHashV3 } from '../apps/engine/src/replay';
 import { hashState } from '../packages/shared/src/node/hashState';
-import { ADMIN_RESET_KIND, TICKS_PER_MONTH, adminResetPayloadSchema } from '../packages/rules/src/index';
+import {
+  ADMIN_RESET_KIND,
+  TICKS_PER_MONTH,
+  adminResetPayloadSchema,
+  adminResetResourceSchema,
+  adminResetResourcesSchema,
+  checkReplayOrigin,
+  emptyCityResourcesState,
+  initialReplayStateWithRegistry,
+  ruleRegistry,
+  toWorldState,
+} from '../packages/rules/src/index';
 import { OwnedChildScope } from './test-support/owned-child-scope';
 import { stopOwnedChild } from '../apps/engine/src/process-lifecycle';
 
@@ -469,10 +481,10 @@ function input(owner: Actor, source: Awaited<ReturnType<typeof world>>) {
 function query(payload: ReturnType<typeof input>) {
   return { expectedUserId: payload.expectedUserId, worldId: payload.worldId, idempotencyKey: payload.idempotencyKey };
 }
-async function call(path: string, data: unknown, signal: AbortSignal, owner?: Actor) {
+async function call<Data = Receipt>(path: string, data: unknown, signal: AbortSignal, owner?: Actor) {
   return track(async () => {
     signal.throwIfAborted();
-    const mutation = ['admin.world.requestReset', 'general.create', 'turns.set'].includes(path),
+    const mutation = ['admin.world.requestReset', 'admin.world.create', 'general.create', 'turns.set'].includes(path),
       encoded = JSON.stringify({ 0: data });
     const response = await fetch(
       address + '/trpc/' + path + '?batch=1' + (mutation ? '' : '&input=' + encodeURIComponent(encoded)),
@@ -491,7 +503,7 @@ async function call(path: string, data: unknown, signal: AbortSignal, owner?: Ac
     signal.throwIfAborted();
     for (const secret of secrets) if (secret && raw.includes(secret)) throw new Error('응답 비공개 값 노출');
     const [item] = JSON.parse(raw) as Array<{
-      result?: { data: Receipt };
+      result?: { data: Data };
       error?: { message: string; data: { code: string } };
     }>;
     return {
@@ -735,17 +747,19 @@ async function drain(loop: TurnLoop, signal: AbortSignal) {
 const apply = (worldId: string, signal: AbortSignal, hooks: ConstructorParameters<typeof TurnLoop>[2] = {}) =>
   withLease(worldId, signal, (lease, signal) => drain(new TurnLoop(db, lease, hooks), signal));
 function spawnEngine(worldId: string, signal: AbortSignal): EngineChild {
-  signal.throwIfAborted();
-  const started = childScope.start(
-    process.execPath,
-    ['--import', 'tsx', fileURLToPath(new URL('../apps/engine/src/index.ts', import.meta.url)), '--world', worldId],
-    {
-      cwd: fileURLToPath(new URL('../', import.meta.url)),
-      env: { ...process.env, DATABASE_URL: target.href, TEST_DATABASE_URL: target.href },
-      windowsHide: true,
-      stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
-    },
+  return spawnResetTool(
+    [fileURLToPath(new URL('../apps/engine/src/index.ts', import.meta.url)), '--world', worldId],
+    signal,
   );
+}
+function spawnResetTool(args: string[], signal: AbortSignal): EngineChild {
+  signal.throwIfAborted();
+  const started = childScope.start(process.execPath, ['--import', 'tsx', ...args], {
+    cwd: fileURLToPath(new URL('../', import.meta.url)),
+    env: { ...process.env, DATABASE_URL: target.href, TEST_DATABASE_URL: target.href },
+    windowsHide: true,
+    stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+  });
   let resolve!: () => void, stopping: Promise<void> | undefined, spawnError: unknown;
   const item: EngineChild = {
     child: started.child,
@@ -818,53 +832,56 @@ async function eventFor(payload: ReturnType<typeof input>) {
   );
 }
 async function existingRows(worldIds: string[], sourceId: string, eventId: bigint) {
-  const hash = createHash('sha256');
-  for (const table of await tables()) {
+  const hash = createHash('sha256'),
+    worldIdTables = new Set(
+      (
+        await checked(() =>
+          gate.query(
+            "SELECT table_name FROM information_schema.columns WHERE table_schema='public' AND column_name='worldId'",
+          ),
+        )
+      ).rows.map((row) => String(row.table_name)),
+    ),
+    parts: string[] = [];
+  // 전체 행과 기존 테이블 순서를 한 읽기 snapshot에서 유지한다.
+  for (const [ordinal, table] of (await tables()).entries()) {
     operationSignals.getStore()?.throwIfAborted();
     if (['EngineLease', 'EngineHeartbeat'].includes(table)) continue;
-    const columns = (
-      await checked(() =>
-        gate.query(
-          "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=$1 AND column_name='worldId'",
-          [table],
-        ),
-      )
-    ).rows;
     const quoted = '"' + table.replaceAll('"', '""') + '"';
     let expression = 'to_jsonb(t)',
-      where = '',
-      values: unknown[] = [];
+      where = '';
     if (table === 'World') {
       expression =
         "CASE WHEN id=$2 THEN to_jsonb(t)-ARRAY['status','endedAt','clockRevision','actionSequence'] ELSE to_jsonb(t) END";
       where = ' WHERE id=ANY($1::text[])';
-      values = [worldIds, sourceId];
-    } else if (columns.length) {
+    } else if (worldIdTables.has(table)) {
       where = ' WHERE "worldId"=ANY($1::text[])';
-      values = [worldIds];
       if (table === 'InputEvent') {
-        where += ' AND id<>$2::bigint';
-        values.push(String(eventId));
+        where += ' AND id<>$3::bigint';
       }
       if (table === 'AuditLog') {
-        where += ' AND ("inputEventId" IS NULL OR "inputEventId"<>$2::bigint)';
-        values.push(String(eventId));
+        where += ' AND ("inputEventId" IS NULL OR "inputEventId"<>$3::bigint)';
       }
     }
-    const rows = await checked(() =>
-      gate.query(
-        "SELECT COALESCE(jsonb_agg(snapshot ORDER BY snapshot::text),'[]'::jsonb)::text AS body FROM (SELECT " +
-          expression +
-          ' AS snapshot FROM ' +
-          quoted +
-          ' t' +
-          where +
-          ') rows',
-        values,
-      ),
+    parts.push(
+      'SELECT ' +
+        ordinal +
+        " AS ordinal,'" +
+        table.replaceAll("'", "''") +
+        "'::text AS name,COALESCE(jsonb_agg(snapshot ORDER BY snapshot::text),'[]'::jsonb)::text AS body FROM (SELECT " +
+        expression +
+        ' AS snapshot FROM ' +
+        quoted +
+        ' t' +
+        where +
+        ') rows',
     );
-    hash.update(table + '\n' + String(rows.rows[0]!.body) + '\n');
   }
+  if (!parts.length) return hash.digest('hex');
+  const rows = await checked(() =>
+    gate.query(parts.join(' UNION ALL ') + ' ORDER BY ordinal', [worldIds, sourceId, String(eventId)]),
+  );
+  for (const row of rows.rows) hash.update(String(row.name) + '\n' + String(row.body) + '\n');
   return hash.digest('hex');
 }
 async function assertNoLiveLease(worldId: string) {
@@ -1504,6 +1521,316 @@ it('AC-M3-04 D3 접수된 일반 입력은 초기화 뒤 WORLD_CLOSED만 기록�
   }
   for (const result of await settlement) if (result.status === 'rejected') failures.push(result.reason);
   if (failures.length) throw new AggregateError(failures, '일반 입력 응답과 종료 뒤 정리 실패');
+});
+
+// AC-INT-18D/AC-M3-04: dedicated formal-world contract tests, not full-season acceptance.
+const cityResetFeatures = [
+  'campaign-assignment-v2',
+  'campaign-v1',
+  'city-resources-v1',
+  'five-stats',
+  'operational-map',
+  'personnel',
+  'policy',
+];
+type CityResetWorld = Awaited<ReturnType<typeof world>>;
+type CreateReceipt = {
+  userId: string;
+  requestId: string;
+  idempotencyKey: string;
+  status: 'PENDING' | 'DONE' | 'FAILED';
+  worldId: string | null;
+  error: unknown;
+};
+async function assertFreshCityResetWorld(id: string) {
+  const row = await checked(() => db.world.findUniqueOrThrow({ where: { id } }));
+  const origin: unknown = row.replayOrigin;
+  checkReplayOrigin(origin);
+  if (origin.version !== 3) throw new Error('도시 초기화의 형식3 원생성이 필요합니다.');
+  expect(row).toMatchObject({ status: 'PREOPEN', clockTick: 0, clockRevision: 0, startedAt: null, endedAt: null });
+  expect(row.ruleFeatures).toEqual(cityResetFeatures);
+  expect(origin.initial.ruleFeatures).toEqual(cityResetFeatures);
+  expect(row.initialStateHash).toBe(hashState(origin.initial));
+  expect(origin.resourceHash).toBe(resourceHashV3(origin));
+  expect(Object.hasOwn(origin.initial, 'cityResources')).toBe(false);
+  expect(origin.initial.nations).toHaveLength(21);
+  expect(origin.initial.generals).toHaveLength(491);
+  expect(origin.initial.cities.filter((city) => city.kind === 'CITY')).toHaveLength(53);
+  expect(origin.initial.cities.filter((city) => city.kind === 'PASS')).toHaveLength(8);
+  const empty = emptyCityResourcesState(toWorldState(origin.initial)),
+    loaded = await checked(() => db.$transaction((tx) => loadReplayState(tx, id)));
+  expect(Object.keys(empty.cities)).toHaveLength(61);
+  expect(row.cityResourcesState).toEqual(empty);
+  expect(loaded).toEqual(initialReplayStateWithRegistry(origin.initial, ruleRegistry, origin.featureData));
+  expect(loaded.state.cityResources).toEqual(empty);
+  expect(await checked(() => db.nation.count({ where: { worldId: id } }))).toBe(21);
+  expect(await checked(() => db.general.count({ where: { worldId: id, userId: null } }))).toBe(491);
+  expect(await checked(() => db.general.count({ where: { worldId: id, userId: { not: null } } }))).toBe(0);
+  expect(await checked(() => db.generalTurn.count({ where: { worldId: id } }))).toBe(491 * 30);
+  const archive = await checked(() => exportReplay(db, id));
+  expect(archive.origin).toEqual(origin);
+  return row;
+}
+async function pauseFreshCityWorld(id: string) {
+  await checked(() => controlClock(db, id, 'start'));
+  await checked(() => controlClock(db, id, 'pause'));
+  return checked(() => db.world.findUniqueOrThrow({ where: { id } }));
+}
+async function cityReset(owner: Actor, source: CityResetWorld, signal: AbortSignal) {
+  const payload = input(owner, source),
+    receipt = await accepted(owner, payload, signal);
+  expect(await apply(source.id, signal)).toMatchObject({ status: 'ENDED' });
+  const event = await eventFor(payload),
+    ended = await checked(() => db.world.findUniqueOrThrow({ where: { id: source.id } })),
+    next = await assertFreshCityResetWorld(receipt.plannedNewWorldId);
+  expect(event.status).toBe('APPLIED');
+  const applied = checkedResetTarget(ended, event, next);
+  const oldOrigin: unknown = source.replayOrigin,
+    nextOrigin: unknown = next.replayOrigin;
+  checkReplayOrigin(oldOrigin);
+  checkReplayOrigin(nextOrigin);
+  if (oldOrigin.version !== 3 || nextOrigin.version !== 3) throw new Error('도시 초기화 원생성 형식이 다릅니다.');
+  expect(nextOrigin.featureData).toEqual(oldOrigin.featureData);
+  expect(nextOrigin.resourceHash).toBe(oldOrigin.resourceHash);
+  expect(nextOrigin.initial.operationalMap).toEqual(oldOrigin.initial.operationalMap);
+  expect(nextOrigin.initial.statRules).toEqual(oldOrigin.initial.statRules);
+  const identities = (initial: typeof nextOrigin.initial) =>
+    initial.generals.map((general) => ({
+      id: general.id,
+      name: general.name,
+      leadership: general.leadership,
+      strength: general.strength,
+      intel: general.intel,
+      politics: general.politics,
+      charm: general.charm,
+    }));
+  expect(identities(nextOrigin.initial)).toEqual(identities(oldOrigin.initial));
+  expect(next.ruleFeatures).toEqual(source.ruleFeatures);
+  expect(next.seed).toBe(adminResetPayloadSchema.parse(event.payload).effectiveSeed);
+  const oldArchive = await checked(() => exportReplay(db, source.id));
+  expect(replayToEnd(oldArchive)).toMatchObject({ reason: 'ADMIN_RESET', winnerNationId: null });
+  expect(replayToEnd(JSON.parse(JSON.stringify(oldArchive)))).toEqual(replayToEnd(oldArchive));
+  const first = await call('admin.world.resetRequest', query(payload), signal, owner),
+    count = await checked(() => db.world.count());
+  expect(first.status).toBe(200);
+  expect(first.data).toMatchObject({ status: 'APPLIED', plannedNewWorldId: next.id });
+  expect(await request(owner, payload, signal)).toEqual(first);
+  expect(await apply(source.id, signal)).toMatchObject({ status: 'ENDED' });
+  expect(await checked(() => db.world.count())).toBe(count);
+  await assertNoLiveLease(source.id);
+  return { source: ended, next, event, applied };
+}
+let cityOwner: Actor | undefined,
+  cliCitySource: CityResetWorld | undefined,
+  peerCityWorld: CityResetWorld | undefined,
+  lastCityTarget: CityResetWorld | undefined;
+it('AC-INT-18D AC-M3-04 실제 게시 CLI의 도시 판과 두 월드 사람30칸·첫 세수를 준비한다', async (signal) => {
+  cityOwner = await actor();
+  const result = await hook(
+    '도시 게시 CLI',
+    async (deadlineSignal) => {
+      const cliSignal = AbortSignal.any([signal, deadlineSignal]),
+        cli = spawnResetTool(
+          [
+            fileURLToPath(new URL('../apps/engine/src/cli/createWorld.ts', import.meta.url)),
+            '--published',
+            '--scenario',
+            'integration191',
+            '--map',
+            'integration',
+            '--stat-rules',
+            'five-stats',
+            '--portrait-map',
+            '191-map',
+            '--rule-features',
+            cityResetFeatures.join(','),
+            '--seed',
+            'city-reset-cli-source',
+            '--turn-term',
+            '30',
+            '--end-year',
+            '200',
+            '--name',
+            '도시 초기화 CLI 정식191',
+          ],
+          cliSignal,
+        ),
+        output: string[] = [];
+      cli.child.stdout!.on('data', (chunk) => output.push(String(chunk)));
+      await checked(() => cli.done, cliSignal);
+      await checked(cli.stop, signal);
+      expect(cli).toMatchObject({ closed: true, stdoutEnded: true, stderrEnded: true, code: 0, signal: null });
+      return JSON.parse(output.join('').trim()) as { worldId: string; stateHash: string };
+    },
+    true,
+    20000,
+  );
+  signal.throwIfAborted();
+  const cliInitial = await assertFreshCityResetWorld(result.worldId);
+  expect(cliInitial.initialStateHash).toBe(result.stateHash);
+  expect(
+    await checked(() =>
+      db.auditLog.count({ where: { worldId: result.worldId, actorKind: 'CLI', action: 'world.create.applied' } }),
+    ),
+  ).toBe(1);
+  expect(await checked(() => db.worldCreateRequest.count({ where: { plannedWorldId: result.worldId } }))).toBe(0);
+  cliCitySource = await pauseFreshCityWorld(result.worldId);
+  const initial = await checked(() =>
+    loadInitialWorldFromDb(db, {
+      scenario: 'integration191',
+      map: 'integration',
+      statRules: 'five-stats',
+      portraitMap: '191-map',
+      seed: 'city-reset-peer-source',
+    }),
+  );
+  initial.ruleFeatures = [...cityResetFeatures];
+  const peer = await checked(() =>
+    saveInitialWorld(db, initial, {
+      name: '도시 초기화 격리 정식191',
+      turnTermMinutes: 30,
+      endYear: 200,
+      ruleFeatures: [...cityResetFeatures],
+    }),
+  );
+  await assertFreshCityResetWorld(peer.worldId);
+  peerCityWorld = await pauseFreshCityWorld(peer.worldId);
+  for (const [index, row] of [cliCitySource, peerCityWorld].entries())
+    await human(row.id, cityOwner, signal, index + 10);
+  const peerBefore = hashState(await checked(() => db.$transaction((tx) => loadReplayState(tx, peer.worldId))));
+  await checked(() => controlClock(db, cliCitySource!.id, 'resume'));
+  await withLease(cliCitySource.id, signal, (lease, signal) =>
+    new TurnLoop(db, lease).advanceTo(TICKS_PER_MONTH, signal),
+  );
+  await checked(() => controlClock(db, cliCitySource!.id, 'pause'));
+  cliCitySource = await checked(() => db.world.findUniqueOrThrow({ where: { id: cliCitySource!.id } }));
+  const settled = await checked(() => db.$transaction((tx) => loadReplayState(tx, cliCitySource!.id)));
+  expect(Object.values(settled.state.cityResources!.cities).some((city) => city.gold > 0 || city.rice > 0)).toBe(true);
+  expect(hashState(await checked(() => db.$transaction((tx) => loadReplayState(tx, peer.worldId))))).toBe(peerBefore);
+  for (const row of [cliCitySource, peerCityWorld]) {
+    const person = await checked(() =>
+      db.general.findUniqueOrThrow({ where: { worldId_userId: { worldId: row.id, userId: cityOwner!.id } } }),
+    );
+    expect(await checked(() => db.generalTurn.count({ where: { worldId: row.id, generalId: person.id } }))).toBe(30);
+  }
+}, 120000);
+it('AC-INT-18D AC-M3-04 도시 초기화는 원본 세수·사람·30칸과 타월드를 보존하고 빈61원장만 만든다', async (signal) => {
+  if (!cityOwner || !cliCitySource || !peerCityWorld) throw new Error('앞선 도시 정식 두 월드가 필요합니다.');
+  const started = performance.now(),
+    phase = (name: string) =>
+      console.info(
+        JSON.stringify({ event: 'city-reset-preservation-phase', phase: name, elapsedMs: performance.now() - started }),
+      );
+  phase('started');
+  const payload = input(cityOwner, cliCitySource),
+    receipt = await accepted(cityOwner, payload, signal),
+    event = await eventFor(payload);
+  phase('admitted');
+  const before = await existingRows([cliCitySource.id, peerCityWorld.id], cliCitySource.id, event.id),
+    ledger = structuredClone(cliCitySource.cityResourcesState);
+  phase('before-snapshot');
+  expect(await apply(cliCitySource.id, signal)).toMatchObject({ status: 'ENDED' });
+  phase('applied');
+  const applied = await eventFor(payload),
+    ended = await checked(() => db.world.findUniqueOrThrow({ where: { id: cliCitySource!.id } }));
+  lastCityTarget = await assertFreshCityResetWorld(receipt.plannedNewWorldId);
+  phase('fresh-target');
+  checkedResetTarget(ended, applied, lastCityTarget);
+  expect(ended.cityResourcesState).toEqual(ledger);
+  expect(await existingRows([cliCitySource.id, peerCityWorld.id], cliCitySource.id, event.id)).toBe(before);
+  phase('after-snapshot');
+  const sourceArchive = await checked(() => exportReplay(db, cliCitySource!.id)),
+    replayed = replayToEnd(sourceArchive);
+  expect(replayed).toMatchObject({ reason: 'ADMIN_RESET', winnerNationId: null });
+  expect(replayToEnd(JSON.parse(JSON.stringify(sourceArchive)))).toEqual(replayed);
+  phase('replayed');
+  const count = await checked(() => db.world.count()),
+    same = await call('admin.world.resetRequest', query(payload), signal, cityOwner);
+  expect(same.data).toMatchObject({ status: 'APPLIED', plannedNewWorldId: lastCityTarget.id });
+  expect(await request(cityOwner, payload, signal)).toEqual(same);
+  await apply(cliCitySource.id, signal);
+  expect(await checked(() => db.world.count())).toBe(count);
+  phase('idempotency-verified');
+});
+it('AC-INT-18D AC-M3-04 실제 생성 DONE과 초기화 APPLIED 출처는 같은 도시 기능·게시 자료로 다시 초기화한다', async (signal) => {
+  if (!cityOwner) throw new Error('도시 초기화 관리자가 필요합니다.');
+  const key = randomUUID(),
+    response = await call<CreateReceipt>(
+      'admin.world.create',
+      {
+        expectedUserId: cityOwner.id,
+        idempotencyKey: key,
+        name: '도시 DONE 원생성',
+        scenarioKey: 'integration191',
+        mapKey: 'integration',
+        statRulesKey: 'five-stats',
+        portraitMapKey: '191-map',
+        ruleFeatures: cityResetFeatures.filter((feature) => !['five-stats', 'operational-map'].includes(feature)),
+        seed: 'city-reset-done-source',
+        turnTermMinutes: 30,
+        endYear: 200,
+      },
+      signal,
+      cityOwner,
+    );
+  expect(response.status).toBe(200);
+  expect(response.data).toMatchObject({ status: 'PENDING', userId: cityOwner.id, idempotencyKey: key });
+  expect(await checked(() => processWorldCreateRequest(db, signal))).toBe(true);
+  const requestRow = await checked(() =>
+    db.worldCreateRequest.findUniqueOrThrow({
+      where: { requestedBy_idempotencyKey: { requestedBy: cityOwner!.id, idempotencyKey: key } },
+    }),
+  );
+  expect(requestRow.status).toBe('DONE');
+  if (!requestRow.worldId) throw new Error('실제 DONE 월드가 필요합니다.');
+  await assertFreshCityResetWorld(requestRow.worldId);
+  const first = await cityReset(cityOwner, await pauseFreshCityWorld(requestRow.worldId), signal),
+    second = await cityReset(cityOwner, await pauseFreshCityWorld(first.next.id), signal);
+  expect(first.applied.resources).toEqual(second.applied.resources);
+  const createRefs = adminResetResourcesSchema.parse(
+    adminResetResourceSchema
+      .array()
+      .parse((requestRow.resolution as { resources?: unknown }).resources)
+      .sort((a, b) => a.kind.localeCompare(b.kind)),
+  );
+  expect(first.applied.resources).toEqual(createRefs);
+  lastCityTarget = second.next;
+});
+it('AC-INT-18D AC-M3-04 새 도시 원장 NULL은 초기화 전체를 롤백하고 구판은 SQLNULL을 유지한다', async (signal) => {
+  if (!cityOwner || !lastCityTarget) throw new Error('실제 도시 초기화 대상이 필요합니다.');
+  const source = await pauseFreshCityWorld(lastCityTarget.id),
+    payload = input(cityOwner, source),
+    receipt = await accepted(cityOwner, payload, signal);
+  await withLease(source.id, signal, async (lease, signal) => {
+    const before = await fullFootprint(['EngineLease']);
+    await expect(
+      new TurnLoop(db, lease, {
+        beforeCommit: async (tx) => {
+          await tx.$executeRaw`UPDATE "World" SET "cityResourcesState"=NULL WHERE id=${receipt.plannedNewWorldId}`;
+        },
+      }).poll(signal),
+    ).rejects.toThrow();
+    expect(await fullFootprint(['EngineLease'])).toBe(before);
+    expect((await eventFor(payload)).status).toBe('PENDING');
+    expect(await checked(() => db.world.count({ where: { id: receipt.plannedNewWorldId } }))).toBe(0);
+    expect((await checked(() => db.world.findUniqueOrThrow({ where: { id: source.id } }))).cityResourcesState).toEqual(
+      source.cityResourcesState,
+    );
+  });
+  await assertNoLiveLease(source.id);
+  const old = await world({ ruleFeatures: ['policy'] }),
+    oldPayload = input(cityOwner, old),
+    oldReceipt = await accepted(cityOwner, oldPayload, signal);
+  expect(await apply(old.id, signal)).toMatchObject({ status: 'ENDED' });
+  const legacy = await checked(() => db.world.findUniqueOrThrow({ where: { id: oldReceipt.plannedNewWorldId } }));
+  expect(legacy.ruleFeatures).not.toContain('city-resources-v1');
+  expect(legacy.cityResourcesState).toBeNull();
+  expect(
+    Object.hasOwn(
+      (await checked(() => db.$transaction((tx) => loadReplayState(tx, legacy.id)))).state,
+      'cityResources',
+    ),
+  ).toBe(false);
 });
 
 afterAll(async () => {

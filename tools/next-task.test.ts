@@ -616,6 +616,41 @@ describe('다음 작업 출력의 Phase 2 절', () => {
 });
 
 describe('통합 대기열', () => {
+  it('INT 문자 접미사의 선행과 범위를 보존하며 기존 관문을 섞지 않는다', () => {
+    const rows = parseQueue(
+      table(
+        [
+          '| INT-18A | 정본 | INT-18A | Codex | — | 완료 |',
+          '| T1-01 | 관문 | M1-01 | Codex | — | 구현 |',
+          '| INT-18B | 저장 | INT-18B | Codex | INT-18A | 완료 |',
+          '| INT-18C | 화면 | INT-18C | Codex | INT-18A~INT-18B | 진행중 |',
+          '| INT-18D | 인수 | INT-18D | Codex | INT-18C | 구현 |',
+        ].join('\n'),
+      ),
+    );
+    const result = nextActions(rows);
+    expect(result.milestone).toBe(1);
+    expect(result.integration?.ready.Codex?.map((item) => item.row.id)).toEqual(['INT-18C']);
+    expect(result.integration?.blocked.map((item) => [item.row.id, item.waitingOn.map((row) => row.id)])).toEqual([
+      ['INT-18D', ['INT-18C']],
+    ]);
+    expect(render(result)).toContain('[통합 Codex] 진행중 INT-18C');
+    rows.at(-1)!.deps = 'INT-18E';
+    expect(() => nextActions(rows)).toThrow('없는 선행 작업 INT-18E');
+  });
+  it('문자 접미사는 INT 한 글자만 읽으며 T 작업 문법은 유지한다', () => {
+    const rows = parseQueue(
+      table(
+        [
+          '| INT-18A | 정본 | INT-18A | Codex | — | 진행중 |',
+          '| INT-18AA | 오기 | INT-18AA | Codex | — | 진행중 |',
+          '| T1-01A | 오기 | M1-01 | Codex | — | 진행중 |',
+          '| T1-01 | 관문 | M1-01 | Codex | — | 구현 |',
+        ].join('\n'),
+      ),
+    );
+    expect(rows.map((row) => row.id)).toEqual(['INT-18A', 'T1-01']);
+  });
   it('INT rows do not become a gate or hide existing Phase 2 work', () => {
     const rows = parseQueue(
       table(
