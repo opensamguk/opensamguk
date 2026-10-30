@@ -187,3 +187,11 @@
 .endDialog button {
   margin-block: var(--space-1);
 }
+
+.resetTargetLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  min-width: 44px;
+  max-width: 100%;
+}

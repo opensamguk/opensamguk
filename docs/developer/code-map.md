@@ -129,3 +129,6 @@ core2026 지침에서 가져온 체크리스트입니다.
 - [ ] 엔진의 월드 적재
 - [ ] 변경 추적과 저장
 - [ ] 재시작 뒤 다시 읽는 테스트
+
+
+관리자 초기화 화면 후보는 `apps/web/src/admin/AdminResetActions.tsx`와 `adminResetModel.ts`다. 기존 `/admin/worlds`의 시계·종료와 조작권을 나누고 현재 계정·정확한 확인값·고정 UUID를 검사한다. API와 엔진 계약은 바꾸지 않는다. `e2e/admin-reset.spec.ts`·`adminResetSetup.ts`와 `playwright.reset.config.ts`가 전용 실제 인수 소스이며 실행 근거는 별도다.

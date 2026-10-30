@@ -15,6 +15,7 @@ export default defineConfig({
     '**/int18-city-resources.spec.ts',
     '**/admin-clock.spec.ts',
     '**/admin-end.spec.ts',
+    '**/admin-reset.spec.ts',
   ],
   forbidOnly: isCI,
   use: { baseURL: 'http://127.0.0.1:5173' },
