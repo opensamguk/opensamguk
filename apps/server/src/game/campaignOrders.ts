@@ -144,10 +144,11 @@ export async function submitCampaignOrder(
         ...(prior.status === 'APPLIED' ? { result: campaignOrderResultSchema.parse(prior.result) } : {}),
       };
     }
+    // 이 월드에 장수가 없는 계정은 월드 상태와 관계없이 먼저 거부한다.
+    const actor = await requireGeneral(tx, world.id, ctx.user.id, true);
     if (world.status !== 'RUNNING')
       throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '실행 중인 월드가 아닙니다.' });
-    const actor = await requireGeneral(tx, world.id, ctx.user.id, true),
-      view = await readView(tx, world.id);
+    const view = await readView(tx, world.id);
     const recipientId = payload.type === 'issue' ? payload.recipientId : actor.id;
     const recipient = await tx.general.findUnique({ where: { worldId_id: { worldId: world.id, id: recipientId } } });
     if (!recipient) throw new TRPCError({ code: 'NOT_FOUND', message: '수신 장수가 없습니다.' });
