@@ -74,6 +74,79 @@ const diagnosticCodes = new Set([
   'LOAD_NATIVE_COMMAND_FAILED',
 ]);
 let diagnosticPhase = 'options';
+const builderFailureFields = [
+  'schema-other',
+  'schema-id',
+  'schema-name',
+  'schema-image',
+  'schema-state',
+  'schema-running',
+  'schema-pid',
+  'schema-oom-killed',
+  'schema-host-config',
+  'schema-cpu-quota',
+  'schema-cpu-period',
+  'schema-memory',
+  'schema-memory-swap',
+  'schema-cgroup-parent',
+  'schema-cgroup-namespace',
+  'schema-restart-policy',
+  'schema-restart-name',
+  'schema-mounts',
+  'schema-mount-row',
+  'schema-mount-type',
+  'schema-mount-name',
+  'schema-mount-destination',
+  'expected-name',
+  'actual-name',
+  'actual-image',
+  'configured-parent',
+  'kernel-cgroup',
+  'mount-count',
+  'mount-type',
+  'mount-name',
+  'mount-destination',
+] as const;
+type BuilderFailureField = (typeof builderFailureFields)[number];
+const builderFailures = new WeakMap<Error, readonly BuilderFailureField[]>();
+const builderSchemaPaths: Readonly<Record<string, BuilderFailureField>> = {
+  Id: 'schema-id',
+  Name: 'schema-name',
+  Image: 'schema-image',
+  State: 'schema-state',
+  'State.Running': 'schema-running',
+  'State.Pid': 'schema-pid',
+  'State.OOMKilled': 'schema-oom-killed',
+  HostConfig: 'schema-host-config',
+  'HostConfig.CpuQuota': 'schema-cpu-quota',
+  'HostConfig.CpuPeriod': 'schema-cpu-period',
+  'HostConfig.Memory': 'schema-memory',
+  'HostConfig.MemorySwap': 'schema-memory-swap',
+  'HostConfig.CgroupParent': 'schema-cgroup-parent',
+  'HostConfig.CgroupnsMode': 'schema-cgroup-namespace',
+  'HostConfig.RestartPolicy': 'schema-restart-policy',
+  'HostConfig.RestartPolicy.Name': 'schema-restart-name',
+  Mounts: 'schema-mounts',
+  'Mounts.*': 'schema-mount-row',
+  'Mounts.*.Type': 'schema-mount-type',
+  'Mounts.*.Name': 'schema-mount-name',
+  'Mounts.*.Destination': 'schema-mount-destination',
+};
+function builderSchemaField(path: readonly PropertyKey[]): BuilderFailureField {
+  const knownPath = path.map((part, index) =>
+    index === 1 && typeof part === 'number' ? '*' : typeof part === 'string' ? part : '?',
+  );
+  // Only a fixed table value is retained; arbitrary issue paths/messages/values never enter output.
+  const key = knownPath.join('.');
+  return Object.hasOwn(builderSchemaPaths, key) ? builderSchemaPaths[key]! : 'schema-other';
+}
+function builderFailure(error: Error, fields: readonly BuilderFailureField[]): never {
+  builderFailures.set(
+    error,
+    builderFailureFields.filter((field) => fields.includes(field)),
+  );
+  throw error;
+}
 export function ciFailureDiagnostic(phase: unknown, error: unknown) {
   return {
     phase: typeof phase === 'string' && diagnosticPhases.has(phase) ? phase : 'unknown',
@@ -87,6 +160,9 @@ export function ciFailureDiagnostic(phase: unknown, error: unknown) {
             : error instanceof Error && 'code' in error && ['EACCES', 'EPERM'].includes(String(error.code))
               ? 'RESOURCE_DENIED'
               : 'UNCLASSIFIED',
+    ...(error instanceof Error && builderFailures.has(error)
+      ? { builderFields: [...builderFailures.get(error)!] }
+      : {}),
   };
 }
 function reportFailure(error: unknown) {
@@ -141,23 +217,51 @@ const builderSchema = z.looseObject({
 export function verifyBuilder(raw: unknown, expected: { name: string; imageId: string; cgroupText: string }) {
   const parsed = builderSchema.safeParse(raw);
   if (!parsed.success || !/^opensamguk-load-build-[a-f0-9]{32}$/.test(expected.name))
-    throw new Error('LOAD_BUILDER_UNVERIFIED');
+    builderFailure(new Error('LOAD_BUILDER_UNVERIFIED'), [
+      ...(!parsed.success ? parsed.error.issues.map((issue) => builderSchemaField(issue.path)) : []),
+      ...(!/^opensamguk-load-build-[a-f0-9]{32}$/.test(expected.name) ? (['expected-name'] as const) : []),
+    ]);
   const row = parsed.data,
     containerName = `buildx_buildkit_${expected.name}0`,
     volume = `${containerName}_state`;
+  const mismatchFields = (): BuilderFailureField[] => {
+    let kernelMatches = false;
+    try {
+      kernelMatches = selfCgroupPath(expected.cgroupText) === `${LOAD_DOCKER.cgroupPath}/docker-${row.Id}.scope`;
+    } catch {
+      // The original guard's error is rethrown below; diagnostic evaluation never copies it.
+    }
+    const checks: readonly [BuilderFailureField, boolean][] = [
+      ['actual-name', row.Name === `/${containerName}`],
+      ['actual-image', row.Image === expected.imageId],
+      ['configured-parent', ['', LOAD_DOCKER.cgroupParent].includes(row.HostConfig.CgroupParent)],
+      ['kernel-cgroup', kernelMatches],
+      ['mount-count', row.Mounts.length === 1],
+      ['mount-type', row.Mounts[0]?.Type === 'volume'],
+      ['mount-name', row.Mounts[0]?.Name === volume],
+      ['mount-destination', row.Mounts[0]?.Destination === '/var/lib/buildkit'],
+    ];
+    return checks.filter(([, matches]) => !matches).map(([field]) => field);
+  };
   // Buildx의 systemd driver는 CgroupParent를 비워 둔다. 빈 값을 기본 parent의 증거로 쓰지 않고
   // 실제 로컬 커널 경로를 확인하여 system.slice로 해석된 경우만 허용한다.
-  if (
-    row.Name !== `/${containerName}` ||
-    row.Image !== expected.imageId ||
-    !['', LOAD_DOCKER.cgroupParent].includes(row.HostConfig.CgroupParent) ||
-    selfCgroupPath(expected.cgroupText) !== `${LOAD_DOCKER.cgroupPath}/docker-${row.Id}.scope` ||
-    row.Mounts.length !== 1 ||
-    row.Mounts[0]?.Type !== 'volume' ||
-    row.Mounts[0].Name !== volume ||
-    row.Mounts[0].Destination !== '/var/lib/buildkit'
-  )
-    throw new Error('LOAD_BUILDER_UNVERIFIED');
+  try {
+    if (
+      row.Name !== `/${containerName}` ||
+      row.Image !== expected.imageId ||
+      !['', LOAD_DOCKER.cgroupParent].includes(row.HostConfig.CgroupParent) ||
+      selfCgroupPath(expected.cgroupText) !== `${LOAD_DOCKER.cgroupPath}/docker-${row.Id}.scope` ||
+      row.Mounts.length !== 1 ||
+      row.Mounts[0]?.Type !== 'volume' ||
+      row.Mounts[0].Name !== volume ||
+      row.Mounts[0].Destination !== '/var/lib/buildkit'
+    )
+      builderFailure(new Error('LOAD_BUILDER_UNVERIFIED'), mismatchFields());
+  } catch (error) {
+    // Preserve even the original selfCgroupPath exception and its failure semantics.
+    if (error instanceof Error && !builderFailures.has(error)) builderFailures.set(error, mismatchFields());
+    throw error;
+  }
   return {
     id: row.Id,
     pid: row.State.Pid,

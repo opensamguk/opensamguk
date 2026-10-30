@@ -293,3 +293,193 @@ function zObject(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('WORKFLOW_SHAPE_INVALID');
   return value as Record<string, unknown>;
 }
+
+function diagnosticBuilderFixture() {
+  const name = `opensamguk-load-build-${'a'.repeat(32)}`,
+    containerName = `buildx_buildkit_${name}0`;
+  return {
+    row: {
+      Id: 'b'.repeat(64),
+      Name: `/${containerName}`,
+      Image: 'buildkit-image',
+      State: { Running: true, Pid: 123, OOMKilled: false },
+      HostConfig: {
+        CpuQuota: 100000,
+        CpuPeriod: 100000,
+        Memory: 2147483648,
+        MemorySwap: 2147483648,
+        CgroupParent: '',
+        CgroupnsMode: 'private',
+        RestartPolicy: { Name: 'no' },
+      },
+      Mounts: [{ Type: 'volume', Name: `${containerName}_state`, Destination: '/var/lib/buildkit' }],
+    },
+    expected: { name, imageId: 'buildkit-image', cgroupText: `0::/system.slice/docker-${'b'.repeat(64)}.scope\n` },
+  };
+}
+type DiagnosticBuilder = ReturnType<typeof diagnosticBuilderFixture>['row'];
+function builderDiagnostic(raw: unknown, expected = diagnosticBuilderFixture().expected) {
+  try {
+    verifyBuilder(raw, expected);
+  } catch (error) {
+    expect(error).toBeInstanceOf(Error);
+    if (!(error instanceof Error)) throw error;
+    expect(error.message).toBe('LOAD_BUILDER_UNVERIFIED');
+    return ciFailureDiagnostic('builder-runtime', error);
+  }
+  throw new Error('Expected builder rejection');
+}
+
+describe('builder mismatch diagnostics retain only fixed fields', () => {
+  const schemaCases: [string, string, (row: DiagnosticBuilder) => unknown][] = [
+    ['root', 'schema-other', () => 'private-canary'],
+    ['id', 'schema-id', (row) => ({ ...row, Id: 'private-canary' })],
+    ['name', 'schema-name', (row) => ({ ...row, Name: null })],
+    ['image', 'schema-image', (row) => ({ ...row, Image: null })],
+    ['state', 'schema-state', (row) => ({ ...row, State: null })],
+    ['running', 'schema-running', (row) => ({ ...row, State: { ...row.State, Running: false } })],
+    ['pid', 'schema-pid', (row) => ({ ...row, State: { ...row.State, Pid: 0 } })],
+    ['oom', 'schema-oom-killed', (row) => ({ ...row, State: { ...row.State, OOMKilled: true } })],
+    ['host', 'schema-host-config', (row) => ({ ...row, HostConfig: null })],
+    ['quota', 'schema-cpu-quota', (row) => ({ ...row, HostConfig: { ...row.HostConfig, CpuQuota: 200000 } })],
+    ['period', 'schema-cpu-period', (row) => ({ ...row, HostConfig: { ...row.HostConfig, CpuPeriod: 200000 } })],
+    ['memory', 'schema-memory', (row) => ({ ...row, HostConfig: { ...row.HostConfig, Memory: 1 } })],
+    ['swap', 'schema-memory-swap', (row) => ({ ...row, HostConfig: { ...row.HostConfig, MemorySwap: -1 } })],
+    ['parent', 'schema-cgroup-parent', (row) => ({ ...row, HostConfig: { ...row.HostConfig, CgroupParent: null } })],
+    [
+      'namespace',
+      'schema-cgroup-namespace',
+      (row) => ({ ...row, HostConfig: { ...row.HostConfig, CgroupnsMode: 'host' } }),
+    ],
+    ['restart', 'schema-restart-policy', (row) => ({ ...row, HostConfig: { ...row.HostConfig, RestartPolicy: null } })],
+    [
+      'restart name',
+      'schema-restart-name',
+      (row) => ({ ...row, HostConfig: { ...row.HostConfig, RestartPolicy: { Name: 'always' } } }),
+    ],
+    ['mounts', 'schema-mounts', (row) => ({ ...row, Mounts: null })],
+    ['mount row', 'schema-mount-row', (row) => ({ ...row, Mounts: [null] })],
+    ['mount type', 'schema-mount-type', (row) => ({ ...row, Mounts: [{ ...row.Mounts[0], Type: null }] })],
+    ['mount name', 'schema-mount-name', (row) => ({ ...row, Mounts: [{ ...row.Mounts[0], Name: null }] })],
+    [
+      'mount destination',
+      'schema-mount-destination',
+      (row) => ({ ...row, Mounts: [{ ...row.Mounts[0], Destination: null }] }),
+    ],
+  ];
+  it.each(schemaCases)('identifies schema %s without copying invalid values', (_name, field, change) => {
+    const { row } = diagnosticBuilderFixture();
+    expect(builderDiagnostic(change(row))).toEqual({
+      phase: 'builder-runtime',
+      code: 'LOAD_BUILDER_UNVERIFIED',
+      builderFields: [field],
+    });
+  });
+  const runtimeCases: [string, string, (row: DiagnosticBuilder) => DiagnosticBuilder][] = [
+    ['name', 'actual-name', (row) => ({ ...row, Name: '/private-canary' })],
+    ['image', 'actual-image', (row) => ({ ...row, Image: 'private-canary' })],
+    [
+      'parent',
+      'configured-parent',
+      (row) => ({ ...row, HostConfig: { ...row.HostConfig, CgroupParent: 'private-canary' } }),
+    ],
+    ['count', 'mount-count', (row) => ({ ...row, Mounts: [...row.Mounts, ...row.Mounts] })],
+    ['type', 'mount-type', (row) => ({ ...row, Mounts: [{ ...row.Mounts[0]!, Type: 'bind' }] })],
+    ['volume', 'mount-name', (row) => ({ ...row, Mounts: [{ ...row.Mounts[0]!, Name: 'private-canary' }] })],
+    [
+      'destination',
+      'mount-destination',
+      (row) => ({ ...row, Mounts: [{ ...row.Mounts[0]!, Destination: '/private-canary' }] }),
+    ],
+  ];
+  it.each(runtimeCases)('identifies actual %s mismatch without exposing values', (_name, field, change) => {
+    expect(builderDiagnostic(change(diagnosticBuilderFixture().row))).toEqual({
+      phase: 'builder-runtime',
+      code: 'LOAD_BUILDER_UNVERIFIED',
+      builderFields: [field],
+    });
+  });
+  it('identifies expected name and kernel mismatch; malformed kernel input retains its original error', () => {
+    const { row, expected } = diagnosticBuilderFixture();
+    expect(builderDiagnostic(row, { ...expected, name: 'private-canary' }).builderFields).toEqual(['expected-name']);
+    expect(builderDiagnostic(row, { ...expected, cgroupText: '0::/private-canary\n' }).builderFields).toEqual([
+      'kernel-cgroup',
+    ]);
+    try {
+      verifyBuilder(row, { ...expected, cgroupText: 'private-canary' });
+      throw new Error('Expected kernel rejection');
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      if (!(error instanceof Error)) throw error;
+      expect(error.message).toBe('LOAD_CGROUP_SAMPLE_INVALID');
+      expect(ciFailureDiagnostic('builder-runtime', error)).toEqual({
+        phase: 'builder-runtime',
+        code: 'UNCLASSIFIED',
+        builderFields: ['kernel-cgroup'],
+      });
+    }
+  });
+  it('reports every known mismatch once and ignores arbitrary private properties and forged diagnostics', () => {
+    const { row, expected } = diagnosticBuilderFixture();
+    try {
+      verifyBuilder(
+        {
+          ...row,
+          Name: '/private-canary',
+          Image: 'private-canary',
+          HostConfig: { ...row.HostConfig, CgroupParent: 'private-canary' },
+          Mounts: [],
+        },
+        { ...expected, cgroupText: '0::/private-canary\n' },
+      );
+      throw new Error('Expected rejection');
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      if (!(error instanceof Error)) throw error;
+      Object.assign(error, {
+        builderFields: ['private-canary'],
+        stderr: 'private-canary',
+        cause: new Error('private-canary'),
+      });
+      const diagnostic = ciFailureDiagnostic('builder-runtime', error);
+      expect(diagnostic.builderFields).toEqual([
+        'actual-name',
+        'actual-image',
+        'configured-parent',
+        'kernel-cgroup',
+        'mount-count',
+        'mount-type',
+        'mount-name',
+        'mount-destination',
+      ]);
+      expect(JSON.stringify(diagnostic)).not.toContain('canary');
+      Object.assign(diagnostic.builderFields!, { 0: 'private-canary' });
+      expect(JSON.stringify(ciFailureDiagnostic('builder-runtime', error))).not.toContain('canary');
+    }
+    const forged = Object.assign(new Error('LOAD_BUILDER_UNVERIFIED'), { builderFields: ['private-canary'] });
+    expect(ciFailureDiagnostic('builder-runtime', forged)).toEqual({
+      phase: 'builder-runtime',
+      code: 'LOAD_BUILDER_UNVERIFIED',
+    });
+  });
+  it('reports simultaneous schema failures and discards unknown nested private keys', () => {
+    const { row } = diagnosticBuilderFixture();
+    expect(
+      builderDiagnostic({
+        ...row,
+        Id: 'private-canary',
+        HostConfig: { ...row.HostConfig, CpuQuota: -1, CpuPeriod: -1, 'private-canary': 'private-canary' },
+      }),
+    ).toEqual({
+      phase: 'builder-runtime',
+      code: 'LOAD_BUILDER_UNVERIFIED',
+      builderFields: ['schema-id', 'schema-cpu-quota', 'schema-cpu-period'],
+    });
+    expect(
+      verifyBuilder(
+        { ...row, 'private-canary': { 'private-canary': 'private-canary' } },
+        diagnosticBuilderFixture().expected,
+      ).pid,
+    ).toBe(123);
+  });
+});
