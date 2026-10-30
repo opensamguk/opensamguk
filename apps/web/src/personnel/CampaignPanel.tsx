@@ -41,11 +41,42 @@ function recover(key: string): Pending | null {
 export function CampaignPanel({ worldId }: { worldId: string }) {
   const trpc = useTRPC();
   const me = useQuery(trpc.auth.me.queryOptions());
+  const userId = me.data?.user?.id;
+  const previous = useRef({ worldId, userId });
+  // 계정 key가 바뀌면 Board의 요청 상태는 버리되 공개 안내는 남긴다.
+  const [accountChange, setAccountChange] = useState<{ worldId: string; userId: string } | null>(null);
+  useEffect(() => {
+    const before = previous.current;
+    previous.current = { worldId, userId };
+    if (before.worldId === worldId && before.userId && userId && before.userId !== userId)
+      setAccountChange({ worldId, userId });
+    else if (before.worldId !== worldId || !userId) setAccountChange(null);
+  }, [worldId, userId]);
   if (!me.data?.user) return null;
-  return <CampaignBoard key={`${me.data.user.id}:${worldId}`} worldId={worldId} userId={me.data.user.id} />;
+  return (
+    <CampaignBoard
+      key={`${me.data.user.id}:${worldId}`}
+      worldId={worldId}
+      userId={me.data.user.id}
+      accountChanged={accountChange?.worldId === worldId && accountChange.userId === userId}
+      onAction={() =>
+        setAccountChange((current) => (current?.worldId === worldId && current.userId === userId ? null : current))
+      }
+    />
+  );
 }
 
-function CampaignBoard({ worldId, userId }: { worldId: string; userId: string }) {
+function CampaignBoard({
+  worldId,
+  userId,
+  accountChanged,
+  onAction,
+}: {
+  worldId: string;
+  userId: string;
+  accountChanged: boolean;
+  onAction: () => void;
+}) {
   const trpc = useTRPC(),
     client = useQueryClient();
   const storageKey = `campaign.pending:${userId}:${worldId}`;
@@ -97,6 +128,7 @@ function CampaignBoard({ worldId, userId }: { worldId: string; userId: string })
   async function send(action: Pending) {
     if (sending.current) return;
     sending.current = true;
+    onAction();
     setNotice('');
     remember(storageKey, action);
     setPending(action);
@@ -127,6 +159,7 @@ function CampaignBoard({ worldId, userId }: { worldId: string; userId: string })
     if (preparation.current || pending || sending.current) return;
     const actorId = board.data?.actorId;
     if (actorId === undefined) return;
+    onAction();
     preparation.current = true;
     setPreparing(true);
     setNotice('');
@@ -179,7 +212,9 @@ function CampaignBoard({ worldId, userId }: { worldId: string; userId: string })
       <h2 id="campaign-title" tabIndex={-1}>
         개인 휘하·부곡
       </h2>
-      {notice ? <p role="status">{notice}</p> : null}
+      {accountChanged || notice ? (
+        <p role="status">{accountChanged ? '로그인한 계정이 바뀌었습니다. 화면을 다시 확인하세요.' : notice}</p>
+      ) : null}
       {preparing && !pending ? <p role="status">제안할 현황을 확인하는 중입니다.</p> : null}
       {pending ? (
         <div role="status">
