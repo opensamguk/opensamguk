@@ -5,6 +5,13 @@ import { z } from 'zod';
 import { admissionSite, evaluateAdmission } from './admission';
 import { BUILD_BUDGET, requireDispatch } from './bootstrap.mjs';
 import { bindLocalDocker, LOAD_DOCKER } from './docker';
+import {
+  builderKernelFailure,
+  builderKernelMatches,
+  builderNamespaceReader,
+  readBuilderKernelProof,
+  type BuilderKernelProof,
+} from './builderKernel';
 import { commandSettled, OwnedCommands, sourceSnapshot, writeEvidence } from './lifecycle';
 import { readRunnerProvenance, sampleAdmission, selfCgroupPath } from './observe';
 import { evaluateLoadRun, loadRunSchema } from './report';
@@ -215,6 +222,7 @@ export function ciFailureDiagnostic(phase: unknown, error: unknown) {
     ...(error instanceof Error && builderCgroups.has(error)
       ? { builderCgroup: { ...builderCgroups.get(error)! } }
       : {}),
+    ...(builderKernelFailure(error) ? { builderKernelCheck: builderKernelFailure(error) } : {}),
   };
 }
 function reportFailure(error: unknown) {
@@ -266,7 +274,10 @@ const builderSchema = z.looseObject({
   Mounts: z.array(z.looseObject({ Type: z.string(), Name: z.string().optional(), Destination: z.string() })),
 });
 
-export function verifyBuilder(raw: unknown, expected: { name: string; imageId: string; cgroupText: string }) {
+export function verifyBuilder(
+  raw: unknown,
+  expected: { name: string; imageId: string; cgroupText: string; kernelProof?: BuilderKernelProof },
+) {
   const parsed = builderSchema.safeParse(raw);
   if (!parsed.success || !/^opensamguk-load-build-[a-f0-9]{32}$/.test(expected.name))
     builderFailure(new Error('LOAD_BUILDER_UNVERIFIED'), [
@@ -276,10 +287,13 @@ export function verifyBuilder(raw: unknown, expected: { name: string; imageId: s
   const row = parsed.data,
     containerName = `buildx_buildkit_${expected.name}0`,
     volume = `${containerName}_state`;
+  const kernelMatches = () =>
+    selfCgroupPath(expected.cgroupText) === `${LOAD_DOCKER.cgroupPath}/docker-${row.Id}.scope` ||
+    builderKernelMatches(expected.kernelProof, { id: row.Id, pid: row.State.Pid, cgroupText: expected.cgroupText });
   const mismatchFields = (): BuilderFailureField[] => {
-    let kernelMatches = false;
+    let kernelVerified = false;
     try {
-      kernelMatches = selfCgroupPath(expected.cgroupText) === `${LOAD_DOCKER.cgroupPath}/docker-${row.Id}.scope`;
+      kernelVerified = kernelMatches();
     } catch {
       // The original guard's error is rethrown below; diagnostic evaluation never copies it.
     }
@@ -287,7 +301,7 @@ export function verifyBuilder(raw: unknown, expected: { name: string; imageId: s
       ['actual-name', row.Name === `/${containerName}`],
       ['actual-image', row.Image === expected.imageId],
       ['configured-parent', ['', LOAD_DOCKER.cgroupParent].includes(row.HostConfig.CgroupParent)],
-      ['kernel-cgroup', kernelMatches],
+      ['kernel-cgroup', kernelVerified],
       ['mount-count', row.Mounts.length === 1],
       ['mount-type', row.Mounts[0]?.Type === 'volume'],
       ['mount-name', row.Mounts[0]?.Name === volume],
@@ -302,7 +316,7 @@ export function verifyBuilder(raw: unknown, expected: { name: string; imageId: s
       row.Name !== `/${containerName}` ||
       row.Image !== expected.imageId ||
       !['', LOAD_DOCKER.cgroupParent].includes(row.HostConfig.CgroupParent) ||
-      selfCgroupPath(expected.cgroupText) !== `${LOAD_DOCKER.cgroupPath}/docker-${row.Id}.scope` ||
+      !kernelMatches() ||
       row.Mounts.length !== 1 ||
       row.Mounts[0]?.Type !== 'volume' ||
       row.Mounts[0].Name !== volume ||
@@ -610,16 +624,44 @@ async function main() {
       diagnosticPhase = 'builder-runtime';
       const rows: unknown = JSON.parse(await invoke(['inspect', containerName], 'builder-runtime-proof', 10000));
       if (!Array.isArray(rows) || rows.length !== 1) throw new Error('LOAD_BUILDER_UNVERIFIED');
-      const pid = z.looseObject({ State: z.looseObject({ Pid: z.number().int().positive() }) }).parse(rows[0])
-        .State.Pid;
-      builderProof = verifyBuilder(rows[0], {
+      const identity = z
+          .looseObject({ Id: hash, State: z.looseObject({ Pid: z.number().int().positive() }) })
+          .parse(rows[0]),
+        kernelProof = await readBuilderKernelProof(
+          { id: identity.Id, pid: identity.State.Pid },
+          phaseSignal,
+          builderNamespaceReader((args, ownSignal) => {
+            const remaining = deadline - Date.now();
+            if (remaining <= 0) throw new Error('LOAD_IMAGE_PREPARATION_DEADLINE');
+            return commands.run('sudo', args, {
+              label: 'builder-cgroup-namespace-proof',
+              signal: ownSignal,
+              timeoutMs: Math.min(10000, remaining),
+            });
+          }),
+        ),
+        afterRows: unknown = JSON.parse(await invoke(['inspect', containerName], 'builder-runtime-after-proof', 10000));
+      if (!Array.isArray(afterRows) || afterRows.length !== 1) throw new Error('LOAD_BUILDER_UNVERIFIED');
+      // The attested PID must still belong to the same fresh Docker inspect identity.
+      if (
+        !builderKernelMatches(kernelProof, {
+          id: z.looseObject({ Id: hash }).parse(afterRows[0]).Id,
+          pid: z.looseObject({ State: z.looseObject({ Pid: z.number().int().positive() }) }).parse(afterRows[0]).State
+            .Pid,
+          cgroupText: kernelProof.cgroupText,
+        })
+      )
+        throw new Error('LOAD_BUILDER_UNVERIFIED');
+      builderProof = verifyBuilder(afterRows[0], {
         name: builder,
         imageId: buildkitId,
-        cgroupText: await readFile(`/proc/${pid}/cgroup`, 'utf8'),
+        cgroupText: kernelProof.cgroupText,
+        kernelProof,
       });
       diagnosticPhase = 'builder-evidence';
       await writeEvidence(resolve(output, 'builder.json'), {
         ...builderProof,
+        kernel: kernelProof.observed,
         budget: BUILD_BUDGET,
         daemonPreparationIoOutsideBuilderCaps: true,
         image: BUILDKIT_IMAGE,
