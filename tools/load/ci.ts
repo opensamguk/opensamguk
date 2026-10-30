@@ -77,6 +77,7 @@ const diagnosticCodes = new Set([
   'LOAD_BUILDER_EXIT_UNCONFIRMED',
   'LOAD_BUILDER_CHILD_UNSETTLED',
   'LOAD_BUILDER_REMAINS',
+  'LOAD_BUILDER_STOP_EVENTS_UNCONFIRMED',
   'LOAD_CI_FINAL_UNVERIFIED',
   'LOAD_CI_FINAL_FAILED',
   'LOAD_PUBLIC_SUMMARY_UNVERIFIED',
@@ -236,6 +237,8 @@ const cleanupStages = [
   'stop',
   'exit-inspect',
   'exit-check',
+  'stop-events',
+  'stop-events-check',
   'child-settlement',
   'remove',
   'post-container',
@@ -319,6 +322,177 @@ function reportBuilderCleanupFailure(
     );
   } catch {
     // The existing sticky cleanup failure still vetoes success; reporting must not interrupt cleanup.
+  }
+}
+type BuilderStopIdentity = Readonly<{
+  id: string;
+  pid: number;
+  name: string;
+  imageId: string;
+  startedAt: string;
+}>;
+function daemonNanoseconds(value: string): bigint {
+  const parts = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,9}))?Z$/.exec(value);
+  const milliseconds = parts ? Date.parse(`${parts[1]}Z`) : NaN;
+  if (
+    !parts ||
+    !Number.isSafeInteger(milliseconds) ||
+    milliseconds < 0 ||
+    new Date(milliseconds).toISOString().slice(0, 19) !== parts[1]
+  )
+    throw new Error('LOAD_BUILDER_EXIT_UNCONFIRMED');
+  return BigInt(milliseconds) * 1000000n + BigInt((parts[2] ?? '').padEnd(9, '0'));
+}
+function builderStopSchema(expected: { id: string; name: string; imageId: string }) {
+  return z
+    .array(
+      z.object({
+        Id: z.literal(expected.id),
+        Name: z.literal(expected.name),
+        Image: z.literal(expected.imageId),
+        RestartCount: z.literal(0),
+        // Moby omits an empty StopSignal; its documented default is TERM, also explicit in our stop argv.
+        Config: z.object({ StopSignal: z.enum(['', 'SIGTERM']).optional().default('') }),
+        State: z.object({
+          Running: z.boolean(),
+          Paused: z.literal(false),
+          Restarting: z.literal(false),
+          Pid: z.number().int().nonnegative(),
+          ExitCode: z.number().int(),
+          OOMKilled: z.literal(false),
+          StartedAt: z.string(),
+          FinishedAt: z.string(),
+        }),
+      }),
+    )
+    .length(1);
+}
+export function verifyBuilderBeforeStop(
+  raw: unknown,
+  expected: { id: string; pid: number; name: string; imageId: string; startedAt?: string },
+): BuilderStopIdentity {
+  const result = builderStopSchema(expected).safeParse(raw),
+    row = result.success ? result.data[0] : undefined;
+  if (
+    !/^[a-f0-9]{64}$/.test(expected.id) ||
+    !/^\/buildx_buildkit_opensamguk-load-build-[a-f0-9]{32}0$/.test(expected.name) ||
+    !/^sha256:[a-f0-9]{64}$/.test(expected.imageId) ||
+    !Number.isSafeInteger(expected.pid) ||
+    expected.pid <= 0 ||
+    !row ||
+    !row.State.Running ||
+    row.State.Pid !== expected.pid ||
+    row.State.ExitCode !== 0 ||
+    !/^0001-01-01T00:00:00(?:\.0{1,9})?Z$/.test(row.State.FinishedAt) ||
+    (expected.startedAt !== undefined && row.State.StartedAt !== expected.startedAt)
+  )
+    throw new Error('LOAD_BUILDER_IDENTITY_UNCONFIRMED');
+  daemonNanoseconds(row.State.StartedAt);
+  return Object.freeze({
+    id: row.Id,
+    pid: row.State.Pid,
+    name: row.Name,
+    imageId: row.Image,
+    startedAt: row.State.StartedAt,
+  });
+}
+function stoppedBuilder(raw: unknown, expected: BuilderStopIdentity) {
+  const result = builderStopSchema(expected).safeParse(raw),
+    row = result.success ? result.data[0] : undefined;
+  if (
+    !row ||
+    row.State.Running ||
+    row.State.Pid !== 0 ||
+    row.State.ExitCode !== 1 ||
+    row.State.StartedAt !== expected.startedAt ||
+    daemonNanoseconds(row.State.FinishedAt) <= daemonNanoseconds(expected.startedAt)
+  )
+    throw new Error('LOAD_BUILDER_EXIT_UNCONFIRMED');
+  return row;
+}
+export function builderStopEventArguments(raw: unknown, identity: BuilderStopIdentity): string[] {
+  const row = stoppedBuilder(raw, identity),
+    until = daemonNanoseconds(row.State.FinishedAt) + 1000000000n;
+  return [
+    'events',
+    '--since',
+    identity.startedAt,
+    '--until',
+    `${until / 1000000000n}.${String(until % 1000000000n).padStart(9, '0')}`,
+    '--filter',
+    'type=container',
+    '--filter',
+    `container=${identity.id}`,
+    ...['start', 'restart', 'kill', 'die', 'stop', 'oom'].flatMap((action) => ['--filter', `event=${action}`]),
+    '--format',
+    '{"type":{{json .Type}},"action":{{json .Action}},"id":{{json .Actor.ID}},"timeNano":"{{.TimeNano}}","signal":{{json (index .Actor.Attributes "signal")}},"exitCode":{{json (index .Actor.Attributes "exitCode")}}}',
+  ];
+}
+// Pinned BuildKit returns context.Cause(first SIGTERM) and exits1, not0:
+// https://github.com/moby/buildkit/blob/v0.34.1/cmd/buildkitd/main.go#L436-L472
+// https://github.com/moby/buildkit/blob/v0.34.1/util/appcontext/appcontext.go#L48-L51
+// Moby records signal15 kill, exit-code die and completed stop events:
+// https://github.com/moby/moby/blob/v28.0.4/daemon/kill.go#L143-L147
+// https://github.com/moby/moby/blob/v28.0.4/daemon/monitor.go#L95-L119
+// https://github.com/moby/moby/blob/v28.0.4/daemon/stop.go#L70-L92
+export function verifyBuilderStopped(raw: unknown, eventText: string, identity: BuilderStopIdentity) {
+  const row = stoppedBuilder(raw, identity);
+  try {
+    if (eventText.length > 131072) throw new Error();
+    const rows = eventText
+      .trim()
+      .split(/\r?\n/)
+      .map((line) => JSON.parse(line) as unknown);
+    const eventSchema = z
+      .array(
+        z.object({
+          type: z.literal('container'),
+          action: z.enum(['start', 'kill', 'die', 'stop']),
+          id: z.literal(identity.id),
+          timeNano: z.string().regex(/^[1-9]\d{0,19}$/),
+          signal: z.string(),
+          exitCode: z.string(),
+        }),
+      )
+      .length(4);
+    const events = eventSchema.parse(rows);
+    const actions = events.map((e) => e.action).join(',');
+    if (
+      !['start,kill,die,stop', 'start,kill,stop,die'].includes(actions) ||
+      events[1]!.signal !== '15' ||
+      events.find((e) => e.action === 'die')!.exitCode !== '1' ||
+      events.some((e) => (e.action !== 'kill' && e.signal !== '') || (e.action !== 'die' && e.exitCode !== ''))
+    )
+      throw new Error();
+    const time = (action: string) => BigInt(events.find((e) => e.action === action)!.timeNano),
+      start = time('start'),
+      term = time('kill'),
+      die = time('die'),
+      stop = time('stop'),
+      started = daemonNanoseconds(identity.startedAt),
+      finished = daemonNanoseconds(row.State.FinishedAt);
+    // Same daemon/containerd timeline only; no comparison to the runner's wall clock.
+    // SetStopped notifies waiters before monitor logs die, so die/stop may race (Moby state.go291-303).
+    if (!(
+      started <= start &&
+      start < term &&
+      term <= finished &&
+      finished <= die &&
+      finished <= stop &&
+      die < finished + 1000000000n &&
+      stop < finished + 1000000000n
+    ))
+      throw new Error();
+    return {
+      beforeStopIdentityVerified: true,
+      daemonExitOneVerified: true,
+      termEventVerified: true,
+      finishedAfterTermVerified: true,
+      dieAndStopVerified: true,
+      initialStartOnly: true,
+    };
+  } catch {
+    throw new Error('LOAD_BUILDER_STOP_EVENTS_UNCONFIRMED');
   }
 }
 function reportFailure(error: unknown) {
@@ -651,6 +825,8 @@ async function main() {
   };
   let createAttempted = false,
     builderProof: ReturnType<typeof verifyBuilder> | undefined,
+    builderStopProof: BuilderStopIdentity | undefined,
+    builderStopEvidence: ReturnType<typeof verifyBuilderStopped> | undefined,
     builderClosed = false,
     builderDeleted = false,
     failure = false,
@@ -754,6 +930,12 @@ async function main() {
         cgroupText: kernelProof.cgroupText,
         kernelProof,
       });
+      builderStopProof = verifyBuilderBeforeStop(afterRows, {
+        id: builderProof.id,
+        pid: builderProof.pid,
+        name: `/${containerName}`,
+        imageId: buildkitId,
+      });
       diagnosticPhase = 'builder-evidence';
       await writeEvidence(resolve(output, 'builder.json'), {
         ...builderProof,
@@ -813,7 +995,7 @@ async function main() {
       try {
         if (createAttempted) {
           // 생성 결과/ID가 불명이면 삭제하지 않는다. 원자료를 보존하고 수동 확인으로 넘긴다.
-          if (!builderProof) throw new Error('LOAD_BUILDER_IDENTITY_UNCONFIRMED');
+          if (!builderProof || !builderStopProof) throw new Error('LOAD_BUILDER_IDENTITY_UNCONFIRMED');
           cleanupStage = 'identity-inspect';
           const fresh: unknown = JSON.parse(
             await native(['inspect', builderProof.id], 'builder-cleanup-identity', clean.signal),
@@ -827,8 +1009,15 @@ async function main() {
             failedFields = builderCleanupCheckFields(current.error);
             throw new Error('LOAD_BUILDER_IDENTITY_UNCONFIRMED');
           }
+          verifyBuilderBeforeStop(fresh, builderStopProof);
           cleanupStage = 'stop';
-          await native(['stop', '--time', '20', builderProof.id], 'stop-owned-builder', clean.signal, 30000);
+          // The CLI must still exit0 with actual close/EOF; the pinned daemon exits1 after TERM.
+          await native(
+            ['stop', '--signal', 'SIGTERM', '--time', '20', builderProof.id],
+            'stop-owned-builder',
+            clean.signal,
+            30000,
+          );
           cleanupStage = 'exit-inspect';
           const stoppedRaw: unknown = JSON.parse(
             await native(['inspect', builderProof.id], 'builder-actual-exit', clean.signal),
@@ -841,7 +1030,7 @@ async function main() {
                 State: z.looseObject({
                   Running: z.literal(false),
                   Pid: z.literal(0),
-                  ExitCode: z.literal(0),
+                  ExitCode: z.literal(1),
                   OOMKilled: z.literal(false),
                 }),
               }),
@@ -853,6 +1042,11 @@ async function main() {
             failedExitRaw = stoppedRaw;
             throw new Error('LOAD_BUILDER_EXIT_UNCONFIRMED');
           }
+          const eventArgs = builderStopEventArguments(stoppedRaw, builderStopProof);
+          cleanupStage = 'stop-events';
+          const stopEvents = await native(eventArgs, 'builder-stop-events', clean.signal);
+          cleanupStage = 'stop-events-check';
+          builderStopEvidence = verifyBuilderStopped(stoppedRaw, stopEvents, builderStopProof);
           cleanupStage = 'child-settlement';
           if (
             commands.pending.size ||
@@ -911,6 +1105,7 @@ async function main() {
             builderDeleted,
             createAttempted,
             builderProof: builderProof ?? null,
+            builderStopEvidence: builderStopEvidence ?? null,
             commands: commands.receipts,
             pending: commands.pending.size,
             stickyUnsettled: commands.stickyUnsettled,

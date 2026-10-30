@@ -14,6 +14,9 @@ import {
   publicLoadSummary,
   runtimeBuildArguments,
   verifyBuilder,
+  verifyBuilderBeforeStop,
+  builderStopEventArguments,
+  verifyBuilderStopped,
 } from './ci';
 import { userWorkload } from './workload';
 import type { LoadRun } from './report';
@@ -73,7 +76,7 @@ describe('fixed builder cleanup diagnostics', () => {
     expect(diagnostic.builderExit).toEqual({ exitCodeClass: expected, exitCodeValid: true });
     expect(diagnostic.code).toBe('LOAD_BUILDER_EXIT_UNCONFIRMED');
     expect(JSON.stringify(diagnostic)).not.toMatch(/private|canary|"ExitCode"/);
-    // A diagnostic class never changes the original stopped-state success predicate.
+    // Numeric classification alone does not authorize the separate pinned-daemon TERM contract.
     expect(
       z
         .array(z.object({ State: z.object({ ExitCode: z.literal(0) }) }))
@@ -235,6 +238,331 @@ describe('fixed builder cleanup diagnostics', () => {
     });
     expect(JSON.stringify(diagnostic)).not.toContain('canary');
   });
+});
+describe('pinned BuildKit explicit TERM stop contract', () => {
+  const expected = {
+    id: 'a'.repeat(64),
+    pid: 1234,
+    name: `/buildx_buildkit_opensamguk-load-build-${'b'.repeat(32)}0`,
+    imageId: `sha256:${'c'.repeat(64)}`,
+  };
+  const startedAt = '2026-10-30T04:00:00.000000001Z',
+    finishedAt = '2026-10-30T04:00:03.000000005Z';
+  const baseNs = BigInt(Date.parse('2026-10-30T04:00:00Z')) * 1000000n;
+  function live() {
+    return [
+      {
+        Id: expected.id,
+        Name: expected.name,
+        Image: expected.imageId,
+        RestartCount: 0,
+        Config: { StopSignal: 'SIGTERM' },
+        State: {
+          Running: true,
+          Pid: 1234,
+          Paused: false,
+          Restarting: false,
+          OOMKilled: false,
+          ExitCode: 0,
+          StartedAt: startedAt,
+          FinishedAt: '0001-01-01T00:00:00Z',
+        },
+      },
+    ];
+  }
+  function stopped() {
+    const rows = live();
+    Object.assign(rows[0]!.State, { Running: false, Pid: 0, ExitCode: 1, FinishedAt: finishedAt });
+    return rows;
+  }
+  function events() {
+    return [
+      { type: 'container', action: 'start', id: expected.id, timeNano: String(baseNs + 2n), signal: '', exitCode: '' },
+      {
+        type: 'container',
+        action: 'kill',
+        id: expected.id,
+        timeNano: String(baseNs + 2000000000n),
+        signal: '15',
+        exitCode: '',
+      },
+      {
+        type: 'container',
+        action: 'die',
+        id: expected.id,
+        timeNano: String(baseNs + 3000000006n),
+        signal: '',
+        exitCode: '1',
+      },
+      {
+        type: 'container',
+        action: 'stop',
+        id: expected.id,
+        timeNano: String(baseNs + 3000000007n),
+        signal: '',
+        exitCode: '',
+      },
+    ];
+  }
+  const text = (rows: unknown[]) => rows.map((row) => JSON.stringify(row)).join('\n') + '\n';
+  it('requires an initial live identity and the same fresh identity before explicit TERM', () => {
+    const identity = verifyBuilderBeforeStop(live(), expected);
+    expect(verifyBuilderBeforeStop(live(), identity)).toEqual(identity);
+    expect(Object.isFrozen(identity)).toBe(true);
+    expect(verifyBuilderStopped(stopped(), text(events()), identity)).toEqual({
+      beforeStopIdentityVerified: true,
+      daemonExitOneVerified: true,
+      termEventVerified: true,
+      finishedAfterTermVerified: true,
+      dieAndStopVerified: true,
+      initialStartOnly: true,
+    });
+  });
+  it.each(['', 'omitted'])('recognizes the official default TERM when StopSignal is %s', (mode) => {
+    const raw = live();
+    if (mode === 'omitted') Reflect.deleteProperty(raw[0]!.Config, 'StopSignal');
+    else raw[0]!.Config.StopSignal = '';
+    expect(verifyBuilderBeforeStop(raw, expected).startedAt).toBe(startedAt);
+  });
+  const beforeMutations = [
+    (row: ReturnType<typeof live>[number]) => {
+      row.Id = 'd'.repeat(64);
+    },
+    (row: ReturnType<typeof live>[number]) => {
+      row.Name = '/private-canary';
+    },
+    (row: ReturnType<typeof live>[number]) => {
+      row.Image = `sha256:${'d'.repeat(64)}`;
+    },
+    (row: ReturnType<typeof live>[number]) => {
+      row.State.Pid++;
+    },
+    (row: ReturnType<typeof live>[number]) => {
+      row.State.Running = false;
+    },
+    (row: ReturnType<typeof live>[number]) => {
+      row.State.Paused = true;
+    },
+    (row: ReturnType<typeof live>[number]) => {
+      row.State.Restarting = true;
+    },
+    (row: ReturnType<typeof live>[number]) => {
+      row.State.OOMKilled = true;
+    },
+    (row: ReturnType<typeof live>[number]) => {
+      row.RestartCount = 1;
+    },
+    (row: ReturnType<typeof live>[number]) => {
+      row.Config.StopSignal = 'SIGKILL';
+    },
+    (row: ReturnType<typeof live>[number]) => {
+      row.State.StartedAt = '2026-10-30T04:00:01Z';
+    },
+    (row: ReturnType<typeof live>[number]) => {
+      row.State.FinishedAt = finishedAt;
+    },
+  ];
+  it.each(beforeMutations.map((mutate, index) => ({ mutate, index })))(
+    'rejects changed/spontaneously stopped pre-stop identity: $index',
+    ({ mutate }) => {
+      const identity = verifyBuilderBeforeStop(live(), expected),
+        raw = live();
+      mutate(raw[0]!);
+      expect(() => verifyBuilderBeforeStop(raw, identity)).toThrow(/^LOAD_BUILDER_IDENTITY_UNCONFIRMED$/);
+    },
+  );
+  it.each([0, 137, 143, 2])('never accepts stopped daemon code %s as normal pinned TERM', (code) => {
+    const raw = stopped();
+    raw[0]!.State.ExitCode = code;
+    expect(() => verifyBuilderStopped(raw, text(events()), verifyBuilderBeforeStop(live(), expected))).toThrow(
+      /^LOAD_BUILDER_EXIT_UNCONFIRMED$/,
+    );
+  });
+  it.each([{ Running: true }, { Pid: 1234 }])('rejects a still-live post-stop process: %o', (patch) => {
+    const raw = stopped();
+    Object.assign(raw[0]!.State, patch);
+    expect(() => verifyBuilderStopped(raw, text(events()), verifyBuilderBeforeStop(live(), expected))).toThrow(
+      /^LOAD_BUILDER_EXIT_UNCONFIRMED$/,
+    );
+  });
+  it.each(
+    beforeMutations.map((mutate, index) => ({ mutate, index })).filter(({ index }) => ![3, 4, 11].includes(index)),
+  )('rejects replaced/stopped post identity too: $index', ({ mutate }) => {
+    const raw = stopped();
+    mutate(raw[0]!);
+    expect(() => verifyBuilderStopped(raw, text(events()), verifyBuilderBeforeStop(live(), expected))).toThrow(
+      /^LOAD_BUILDER_EXIT_UNCONFIRMED$/,
+    );
+  });
+  it('queries only exact owned finite daemon-time events; never uses the host current time', () => {
+    const identity = verifyBuilderBeforeStop(live(), expected),
+      args = builderStopEventArguments(stopped(), identity);
+    expect(args.slice(0, 7)).toEqual([
+      'events',
+      '--since',
+      startedAt,
+      '--until',
+      `${baseNs / 1000000000n + 4n}.000000005`,
+      '--filter',
+      'type=container',
+    ]);
+    expect(args).toContain(`container=${expected.id}`);
+    expect(args.filter((arg) => arg.startsWith('event='))).toEqual([
+      'event=start',
+      'event=restart',
+      'event=kill',
+      'event=die',
+      'event=stop',
+      'event=oom',
+    ]);
+    expect(args.at(-1)).toContain('"timeNano":"{{.TimeNano}}"');
+    expect(args.at(-1)).not.toMatch(/Env|Labels|Name|Image/);
+  });
+  it('permits the one original start logged after StartedAt, and die/stop completion-log races', () => {
+    const rows = events(),
+      die = rows[2]!,
+      stop = rows[3]!;
+    stop.timeNano = String(baseNs + 3000000006n);
+    die.timeNano = String(baseNs + 3000000007n);
+    expect(
+      verifyBuilderStopped(stopped(), text([rows[0], rows[1], stop, die]), verifyBuilderBeforeStop(live(), expected))
+        .initialStartOnly,
+    ).toBe(true);
+  });
+  const eventMutations = [
+    (rows: ReturnType<typeof events>) => {
+      rows.shift();
+    },
+    (rows: ReturnType<typeof events>) => {
+      rows.pop();
+    },
+    (rows: ReturnType<typeof events>) => {
+      rows[1]!.signal = '9';
+    },
+    (rows: ReturnType<typeof events>) => {
+      rows[2]!.exitCode = '0';
+    },
+    (rows: ReturnType<typeof events>) => {
+      rows[2]!.exitCode = '137';
+    },
+    (rows: ReturnType<typeof events>) => {
+      rows[2]!.exitCode = '143';
+    },
+    (rows: ReturnType<typeof events>) => {
+      rows[2]!.id = 'd'.repeat(64);
+    },
+    (rows: ReturnType<typeof events>) => {
+      rows.push({ ...rows[0]!, action: 'restart' });
+    },
+    (rows: ReturnType<typeof events>) => {
+      rows.push({ ...rows[0]!, action: 'oom' });
+    },
+    (rows: ReturnType<typeof events>) => {
+      rows.push({ ...rows[0]! });
+    },
+    (rows: ReturnType<typeof events>) => {
+      rows[0]!.timeNano = String(baseNs);
+    },
+    (rows: ReturnType<typeof events>) => {
+      rows[1]!.timeNano = String(baseNs + 3000000006n);
+    },
+    (rows: ReturnType<typeof events>) => {
+      rows[2]!.timeNano = String(baseNs + 3000000004n);
+    },
+    (rows: ReturnType<typeof events>) => {
+      rows[3]!.timeNano = String(baseNs + 4000000005n);
+    },
+    (rows: ReturnType<typeof events>) => {
+      rows[2]!.timeNano = 'private-canary';
+    },
+    (rows: ReturnType<typeof events>) => {
+      rows.reverse();
+    },
+  ];
+  it.each(eventMutations.map((mutate, index) => ({ mutate, index })))(
+    'rejects missing/foreign/uncertain signal events: $index',
+    ({ mutate }) => {
+      const rows = events();
+      mutate(rows);
+      expect(() => verifyBuilderStopped(stopped(), text(rows), verifyBuilderBeforeStop(live(), expected))).toThrow(
+        /^LOAD_BUILDER_STOP_EVENTS_UNCONFIRMED$/,
+      );
+    },
+  );
+  it.each(['2026-02-30T04:00:03Z', 'private-canary', '0001-01-01T00:00:00Z', startedAt])(
+    'rejects uncertain/non-increasing daemon time: %s',
+    (finished) => {
+      const raw = stopped();
+      raw[0]!.State.FinishedAt = finished;
+      expect(() => verifyBuilderStopped(raw, text(events()), verifyBuilderBeforeStop(live(), expected))).toThrow(
+        /^LOAD_BUILDER_EXIT_UNCONFIRMED$/,
+      );
+    },
+  );
+  it('does not copy malformed event JSON, metadata, stack or private paths into errors/results', () => {
+    const identity = verifyBuilderBeforeStop(live(), expected);
+    for (const value of ['private-canary', '{"Env":"private-canary"}', 'x'.repeat(131073)])
+      expect(() => verifyBuilderStopped(stopped(), value, identity)).toThrow(/^LOAD_BUILDER_STOP_EVENTS_UNCONFIRMED$/);
+    const rows = events().map((row) => ({ ...row, Env: ['private-canary'], Path: '/private/canary' }));
+    expect(JSON.stringify(verifyBuilderStopped(stopped(), text(rows), identity))).not.toContain('canary');
+  });
+  it.each(['LOAD_NATIVE_COMMAND_FAILED', 'LOAD_NATIVE_CHILD_UNSETTLED'])(
+    'does not inspect events or remove data after stop CLI rejection: %s',
+    async (code) => {
+      const ts = await import('typescript');
+      const source = await readFile(new URL('./ci.ts', import.meta.url), 'utf8');
+      const ast = ts.createSourceFile('ci.ts', source, ts.ScriptTarget.Latest, true);
+      let cleanup: import('typescript').Expression | undefined;
+      const visit = (node: import('typescript').Node) => {
+        if (ts.isVariableDeclaration(node) && node.name.getText(ast) === 'cleanup') cleanup = node.initializer;
+        ts.forEachChild(node, visit);
+      };
+      visit(ast);
+      expect(cleanup).toBeDefined();
+      const labels: string[] = [];
+      const execute = ts.transpileModule(
+        `const { CI_LIMITS, createAttempted, builderProof, builderStopProof, native,
+          verifyBuilderBeforeStop, builderCleanupCheckFields, reportBuilderCleanupFailure,
+          commands, writeEvidence, resolve, output, containerName, z } = deps;
+         let builderClosed=false, builderDeleted=false, failure=false, builderStopEvidence;
+         const buildPhaseStartedAt=Date.now(), cleanupFailures=[];
+         const cleanup=${cleanup!.getText(ast)};
+         await cleanup(); return {builderClosed,builderDeleted,cleanupFailures};`,
+        { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } },
+      ).outputText;
+      const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor as new (
+        key: string,
+        body: string,
+      ) => (deps: unknown) => Promise<unknown>;
+      const result = await new AsyncFunction('deps', execute)({
+        CI_LIMITS,
+        createAttempted: true,
+        builderProof: { id: expected.id },
+        containerName: expected.name.slice(1),
+        builderStopProof: verifyBuilderBeforeStop(live(), expected),
+        native: async (args: string[], label: string) => {
+          labels.push(label);
+          if (label === 'builder-cleanup-identity') return JSON.stringify(live());
+          expect(args).toEqual(['stop', '--signal', 'SIGTERM', '--time', '20', expected.id]);
+          throw new Error(code);
+        },
+        verifyBuilderBeforeStop,
+        builderCleanupCheckFields,
+        reportBuilderCleanupFailure: () => {},
+        commands: { pending: new Set(), stickyUnsettled: false, receipts: [] },
+        writeEvidence: async () => {},
+        resolve: () => '/not-written',
+        output: '/not-written',
+        z,
+      });
+      expect(result).toEqual({
+        builderClosed: false,
+        builderDeleted: false,
+        cleanupFailures: ['BUILDER_CLEANUP_UNCONFIRMED'],
+      });
+      expect(labels).toEqual(['builder-cleanup-identity', 'stop-owned-builder']);
+    },
+  );
 });
 // 공개 요약 경계의 수학 고정물이다. 실제 부하·계정·월드 인수로 세지 않는다.
 function mathematicalSmoke(): LoadRun {
