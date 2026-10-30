@@ -18,6 +18,8 @@
 
 ## 지금 있는 파일
 
+ADMIN-RESET-D 후보의 `packages/rules/src/clock/reset.ts`는 엄격 요청·payload·적용/기각 결과와 기록을 검증한다. `apps/server/src/admin/worldReset.ts`는 현재 관리자 접수·본인 조회와 요청 감사를 맡는다. `apps/engine/src/admin/resetPreparation.ts`는 원생성 복원 준비와 설정·출처 fingerprint·적용 TX의 게시 자원 재검증을 맡는다. `apps/engine/src/admin/reset.ts`는 TX 밖 준비와 fenced 적용·현재 권한·원자 저장·매핑 검증을 맡고 `turnLoop.ts`가 기존30초 TX로 연결한다. `replay.ts`와 `admin/end.ts`는 형식3 초기화 종료와 종료 뒤 입력을 연결한다. `tools/t3-05-admin-reset.integration.test.ts`와 T2-15의 초기화 쌍은 실제 PG·프로세스·백업 복원 시험 소스이며 아직 실행하지 않았다. 독립 리뷰·실제 인수·보호 병합은 남아 있다.
+
 | 경로 | 역할 |
 | ---- | ---- |
 | `apps/server/src/index.ts` | DB 연결과 HTTP 서버 시작·종료 |
@@ -127,3 +129,6 @@ core2026 지침에서 가져온 체크리스트입니다.
 - [ ] 엔진의 월드 적재
 - [ ] 변경 추적과 저장
 - [ ] 재시작 뒤 다시 읽는 테스트
+
+
+관리자 초기화 화면 후보는 `apps/web/src/admin/AdminResetActions.tsx`와 `adminResetModel.ts`다. 기존 `/admin/worlds`의 시계·종료와 조작권을 나누고 현재 계정·정확한 확인값·고정 UUID를 검사한다. API와 엔진 계약은 바꾸지 않는다. `e2e/admin-reset.spec.ts`·`adminResetSetup.ts`와 `playwright.reset.config.ts`가 전용 실제 인수 소스이며 실행 근거는 별도다.

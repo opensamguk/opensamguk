@@ -2,6 +2,7 @@ import { nextActionSequence, type Prisma } from '@opensamguk/db';
 import {
   ADMIN_CLOCK_KINDS,
   ADMIN_END_KIND,
+  ADMIN_RESET_KIND,
   adminClockPayloadSchema,
   adminClockExpectedStatus,
   adminClockRejectMessages,
@@ -11,19 +12,32 @@ import {
 import { databaseNow } from '../lease';
 import { controlClockInTransaction } from '../world/clock';
 import { processAdminEnd } from './end';
+import { processAdminReset, type PendingResetPreparation } from './reset';
 
 // TurnLoop가 리스→World를 잠근 같은 트랜잭션에서만 호출한다.
 export async function processAdminClock(
   tx: Prisma.TransactionClient,
   world: Prisma.WorldGetPayload<Record<string, never>>,
   minimumTick: number,
-) {
+  resetPreparation?: PendingResetPreparation,
+  signal?: AbortSignal,
+): Promise<{
+  status: Prisma.WorldGetPayload<Record<string, never>>['status'];
+  tick: number;
+  deferred?: boolean;
+  resetEvent?: Prisma.InputEventGetPayload<Record<string, never>>;
+} | null> {
   const event = await tx.inputEvent.findFirst({
-    where: { worldId: world.id, status: 'PENDING', kind: { in: [...ADMIN_CLOCK_KINDS, ADMIN_END_KIND] } },
+    where: {
+      worldId: world.id,
+      status: 'PENDING',
+      kind: { in: [...ADMIN_CLOCK_KINDS, ADMIN_END_KIND, ADMIN_RESET_KIND] },
+    },
     orderBy: { id: 'asc' },
   });
   if (!event) return null;
   if (event.kind === ADMIN_END_KIND) return processAdminEnd(tx, world, event);
+  if (event.kind === ADMIN_RESET_KIND) return processAdminReset(tx, world, event, resetPreparation, signal);
   const payload = adminClockPayloadSchema.parse(event.payload),
     action = event.kind.slice('admin.world.'.length) as AdminClockAction;
   if (event.generalId !== null || event.sequence !== null || event.tick !== null || event.result !== null)
