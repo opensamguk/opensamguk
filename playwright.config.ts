@@ -16,6 +16,7 @@ export default defineConfig({
     '**/san10-map.spec.ts',
     '**/admin-clock.spec.ts',
     '**/admin-end.spec.ts',
+    '**/admin-create.spec.ts',
     '**/admin-reset.spec.ts',
   ],
   forbidOnly: isCI,
