@@ -132,10 +132,18 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
         signal: AbortSignal.any([current, AbortSignal.timeout(10_000)]),
       },
     );
-    const [entry] = (await response.json()) as Array<{ result?: { data: T }; error?: { data: { code: string } } }>;
+    const [entry] = (await response.json()) as Array<{
+      result?: { data: T };
+      error?: { message?: string; data: { code: string } };
+    }>;
     current.throwIfAborted();
     if (!entry) throw new Error('INT19 HTTP 응답이 없습니다.');
-    return { data: entry.result?.data, code: entry.error?.data.code, status: response.status };
+    return {
+      data: entry.result?.data,
+      code: entry.error?.data.code,
+      message: entry.error?.message,
+      status: response.status,
+    };
   }
   async function snapshot(id = worldId, client = db) {
     signal();
@@ -963,17 +971,64 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
       expect(ruler.userId).toBeNull();
       // 사람 장수는 관직이 없어 배속할 수 없다. NPC에게 NPC 준비 규칙이 고르는 도시 수비병 모병·사기·훈련을 지시해
       // 배속 조건(훈련60·사기70)을 만들고, NPC군주의 실제 국가 차례가 자기 부곡에 배속할 때까지 진행한다.
+      // 도시 금은 0에서 시작하고 같은 도시 NPC들도 쓰므로, 접수 사전검사가 거부한 후보는 사유를 남기고 다음 후보로 넘긴다.
+      const started = performance.now();
       for (let round = 0; ; round++) {
-        if (round >= 24) throw new Error('INT19 NPC 부곡 배속 관찰 한도를 넘었습니다.');
         const state = await snapshot(),
-          unit = state.state.campaign!.units.find((row) => row.id === unitId)!;
+          unit = state.state.campaign!.units.find((row) => row.id === unitId)!,
+          npcNow = state.state.generals[npcId]!,
+          city = state.state.cityResources!.cities[String(npcNow.cityKey)]!;
         expect(unit).toMatchObject({ ownerId: npcId, commanderId: npcId });
-        if (unit.troops > 0) break;
-        const prepare = cityNpcPreparation(state.state, npcId, { unitSet: initial.unitSet }).find(
-          (row) => row.key !== 'form_unit' && !('unitId' in row.args),
-        );
-        if (prepare) await executeOrder(await issue(npcId, prepare.key, prepare.args));
-        else await executeOrder(await issue(npcId, 'farm'), 'RESOLVED');
+        const garrison = city.garrison.find((row) => row.crewType === unit.crewType);
+        const status = `round=${round} next=${npcNow.nextTurnTick} city=${npcNow.cityKey} gold=${city.gold} garrison=${JSON.stringify(garrison ?? null)} unitTroops=${unit.troops}`;
+        if (unit.troops > 0) {
+          console.info(`INT19 NPC 배속 완료 ${status}`);
+          break;
+        }
+        if (round >= 16 || performance.now() - started > 300_000)
+          throw new Error(`INT19 NPC 부곡 배속 관찰 한도를 넘었습니다. ${status}`);
+        const choices = [
+          ...cityNpcPreparation(state.state, npcId, { unitSet: initial.unitSet }).filter(
+            (row) => row.key !== 'form_unit' && !('unitId' in row.args),
+          ),
+          { key: 'rest', args: {} },
+        ];
+        const denied: string[] = [];
+        let orderId: number | undefined;
+        for (const choice of choices) {
+          const requestId = randomUUID();
+          const result = await api<{ status: string }>(
+            'campaign.order',
+            {
+              worldId,
+              requestId,
+              expectedUserId: a.userId,
+              payload: {
+                type: 'issue',
+                recipientId: npcId,
+                command: { commandKey: choice.key, args: choice.args },
+                revision: (await board()).revision,
+              },
+            },
+            a,
+            true,
+          );
+          if (result.code !== undefined) {
+            expect(result.code).toBe('BAD_REQUEST');
+            denied.push(`${choice.key}:${result.message ?? ''}`);
+            continue;
+          }
+          await drain();
+          const accepted = await receipt(requestId);
+          if (accepted.status !== 'applied' || accepted.kind !== 'campaign.order')
+            throw new Error('INT19 지시 접수 실패');
+          orderId = accepted.result.orderId;
+          console.info(`INT19 NPC 준비 ${status} order=${choice.key} denied=${JSON.stringify(denied)}`);
+          break;
+        }
+        if (orderId === undefined)
+          throw new Error(`INT19 NPC 준비 지시가 모두 거부됐습니다. ${status} ${denied.join(' ')}`);
+        await executeOrder(orderId, 'RESOLVED');
       }
       const before = await snapshot(),
         npc = before.state.generals[npcId]!,
