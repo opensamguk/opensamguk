@@ -1,5 +1,5 @@
 import { useBlocker, useRouter } from '@tanstack/react-router';
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { useTRPCClient } from '../trpc';
 import { publicFailure, retryAfterSeconds } from '../auth/credentials';
 import { ErrorState, LoadingState } from '../ui/States';
@@ -10,6 +10,7 @@ import {
   createPointer,
   createRejections,
   freezeCreation,
+  initialCreateProfile,
   ownCreateReply,
   reviewCreation,
   type CreateCommand,
@@ -22,6 +23,13 @@ import {
 import styles from './AdminCreateActions.module.css';
 
 type Phase = 'idle' | 'unknown' | 'pending' | 'limited' | 'notAccepted' | 'done' | 'failed';
+const resourceLabels = {
+  scenarioKey: '시나리오 자원',
+  mapKey: '지도 자원',
+  unitSetKey: '병종 자원',
+  statRulesKey: '능력치 자원',
+  portraitMapKey: '초상 자원',
+} as const;
 export function AdminCreateActions({
   viewerId,
   disabled,
@@ -69,7 +77,7 @@ export function AdminCreateActions({
     form = useRef<HTMLFormElement>(null),
     opener = useRef<HTMLButtonElement>(null),
     reviewButton = useRef<HTMLButtonElement>(null);
-  const profile = options?.profiles[0],
+  const profile = options?.profiles.find((entry) => entry.id === draft.profileId),
     available = profile?.available ? profile : null,
     preset = available?.presets.find((entry) => entry.key === draft.presetKey),
     unresolved = pointer !== null && !['done', 'failed', 'notAccepted'].includes(phase),
@@ -169,6 +177,7 @@ export function AdminCreateActions({
       return null;
     }
     setOptions(value);
+    setDraft((old) => (old.profileId ? old : { ...old, profileId: initialCreateProfile(value) }));
     setFresh(true);
     return value;
   }
@@ -463,149 +472,203 @@ export function AdminCreateActions({
           ) : null}
           {fresh && !pointer && !recoveryBlocked && !['done', 'failed', 'notAccepted'].includes(phase) ? (
             <>
-              {profile && !profile.available ? <ErrorState title={profile.reason} onRetry={begin} /> : null}
-              {available ? (
+              {options ? (
                 <form ref={form} className={styles.form} onSubmit={prepare}>
-                  <label>
-                    월드 이름
-                    <input
-                      value={draft.name}
-                      name="name"
-                      aria-invalid={invalidField === 'name' || undefined}
-                      aria-describedby={invalidField === 'name' ? 'create-form-error' : undefined}
-                      disabled={sending}
-                      required
-                      onChange={(e) => change({ name: e.target.value })}
-                    />
-                  </label>
+                  {available ? (
+                    <label>
+                      월드 이름
+                      <input
+                        value={draft.name}
+                        name="name"
+                        aria-invalid={invalidField === 'name' || undefined}
+                        aria-describedby={invalidField === 'name' ? 'create-form-error' : undefined}
+                        disabled={sending}
+                        required
+                        onChange={(e) => change({ name: e.target.value })}
+                      />
+                    </label>
+                  ) : null}
                   <label>
                     시나리오
-                    <select aria-label="시나리오" defaultValue={available.id} disabled={sending}>
-                      <option value={available.id}>{available.label}</option>
-                    </select>
-                  </label>
-                  <p>
-                    {available.startYear}년 · {available.counts.nations}국 · NPC {available.counts.generals}명 · 도시{' '}
-                    {available.counts.cities} · 관문 {available.counts.gates}
-                    <br />
-                    5능력치 · 휘하·부곡 · 도시 자원 규칙을 포함합니다.
-                  </p>
-                  <label>
-                    프리셋
                     <select
-                      aria-label="프리셋"
-                      value={draft.presetKey}
-                      name="presetKey"
-                      aria-invalid={invalidField === 'presetKey' || undefined}
-                      aria-describedby={invalidField === 'presetKey' ? 'create-form-error' : undefined}
+                      aria-label="시나리오"
+                      name="profileId"
+                      value={profile?.id ?? ''}
+                      aria-invalid={invalidField === 'profileId' || undefined}
+                      aria-describedby={invalidField === 'profileId' ? 'create-form-error' : undefined}
                       disabled={sending}
                       required
-                      onChange={(e) => {
-                        const selected = available.presets.find((item) => item.key === e.target.value);
+                      onChange={(event) => {
+                        const selected = options.profiles.find((entry) => entry.id === event.target.value);
                         change({
-                          presetKey: e.target.value,
-                          turnTerm: selected ? String(selected.turnTermMinutes) : '',
-                          endYear: draft.endYear || String(available.suggestedEndYear),
+                          profileId: event.target.value,
+                          presetKey: '',
+                          turnTerm: '',
+                          endYear: selected?.available ? String(selected.suggestedEndYear) : '',
                         });
                       }}
                     >
-                      <option value="">프리셋을 선택하세요</option>
-                      {available.presets.map((item) => (
-                        <option key={item.key} value={item.key}>
-                          {item.label} · 기본 {item.turnTermMinutes}분
+                      <option value="">시나리오를 선택하세요</option>
+                      {options.profiles.map((entry) => (
+                        <option key={entry.id} value={entry.id} disabled={!entry.available}>
+                          {entry.label}
                         </option>
                       ))}
                     </select>
                   </label>
-                  {preset ? (
-                    <ul>
-                      {preset.descriptions.map((text) => (
-                        <li key={text}>{text}</li>
-                      ))}
-                    </ul>
+                  {options.profiles.some((entry) => !entry.available) ? (
+                    <div role="note" aria-label="사용할 수 없는 시나리오">
+                      <p>
+                        사용할 수 없는 시나리오는 선택할 수 없습니다. 다른 시나리오를 직접 선택하거나 설정을 다시
+                        확인하세요.
+                      </p>
+                      {options.profiles.map((entry) =>
+                        !entry.available ? (
+                          <div key={entry.id}>
+                            <p>{entry.label}</p>
+                            <ErrorState title={entry.reason} />
+                          </div>
+                        ) : null,
+                      )}
+                      <button type="button" disabled={sending} onClick={begin}>
+                        생성 설정 다시 확인
+                      </button>
+                    </div>
                   ) : null}
-                  <label>
-                    턴 간격 (분)
-                    <input
-                      type="number"
-                      min={1}
-                      max={2147483647}
-                      step={1}
-                      value={draft.turnTerm}
-                      name="turnTerm"
-                      aria-invalid={invalidField === 'turnTerm' || undefined}
-                      aria-describedby={invalidField === 'turnTerm' ? 'create-form-error' : undefined}
-                      disabled={sending}
-                      required
-                      onChange={(e) => change({ turnTerm: e.target.value })}
-                    />
-                  </label>
-                  <p>프리셋을 바꾸면 턴 간격을 해당 기본값으로 다시 넣습니다.</p>
-                  <label>
-                    자동 종료
-                    <select
-                      aria-label="자동 종료"
-                      value={draft.endMode}
-                      disabled={sending}
-                      onChange={(e) => change({ endMode: e.target.value === 'none' ? 'none' : 'year' })}
-                    >
-                      <option value="year">종료 연도 지정</option>
-                      <option value="none">종료 연도 지정 안 함</option>
-                    </select>
-                  </label>
-                  {draft.endMode === 'year' ? (
-                    <label>
-                      종료 연도
-                      <input
-                        type="number"
-                        min={available.startYear}
-                        max={10000}
-                        step={1}
-                        value={draft.endYear}
-                        name="endYear"
-                        aria-invalid={invalidField === 'endYear' || undefined}
-                        aria-describedby={invalidField === 'endYear' ? 'create-form-error' : undefined}
-                        disabled={sending}
-                        required
-                        onChange={(e) => change({ endYear: e.target.value })}
-                      />
-                    </label>
+                  {available ? (
+                    <>
+                      <p>
+                        {available.startYear}년 · {available.counts.nations}국 · NPC {available.counts.generals}명 ·
+                        도시 {available.counts.cities} · 관문 {available.counts.gates}
+                        <br />
+                        5능력치 · 휘하·부곡 · 도시 자원 규칙을 포함합니다.
+                      </p>
+                      <dl>
+                        {(Object.keys(resourceLabels) as Array<keyof typeof resourceLabels>).map((key) => (
+                          <Fragment key={key}>
+                            <dt>{resourceLabels[key]}</dt>
+                            <dd>{available.selection[key]}</dd>
+                          </Fragment>
+                        ))}
+                      </dl>
+                      <label>
+                        프리셋
+                        <select
+                          aria-label="프리셋"
+                          value={draft.presetKey}
+                          name="presetKey"
+                          aria-invalid={invalidField === 'presetKey' || undefined}
+                          aria-describedby={invalidField === 'presetKey' ? 'create-form-error' : undefined}
+                          disabled={sending}
+                          required
+                          onChange={(e) => {
+                            const selected = available.presets.find((item) => item.key === e.target.value);
+                            change({
+                              presetKey: e.target.value,
+                              turnTerm: selected ? String(selected.turnTermMinutes) : '',
+                              endYear: draft.endYear || String(available.suggestedEndYear),
+                            });
+                          }}
+                        >
+                          <option value="">프리셋을 선택하세요</option>
+                          {available.presets.map((item) => (
+                            <option key={item.key} value={item.key}>
+                              {item.label} · 기본 {item.turnTermMinutes}분
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      {preset ? (
+                        <ul>
+                          {preset.descriptions.map((text) => (
+                            <li key={text}>{text}</li>
+                          ))}
+                        </ul>
+                      ) : null}
+                      <label>
+                        턴 간격 (분)
+                        <input
+                          type="number"
+                          min={1}
+                          max={2147483647}
+                          step={1}
+                          value={draft.turnTerm}
+                          name="turnTerm"
+                          aria-invalid={invalidField === 'turnTerm' || undefined}
+                          aria-describedby={invalidField === 'turnTerm' ? 'create-form-error' : undefined}
+                          disabled={sending}
+                          required
+                          onChange={(e) => change({ turnTerm: e.target.value })}
+                        />
+                      </label>
+                      <p>프리셋을 바꾸면 턴 간격을 해당 기본값으로 다시 넣습니다.</p>
+                      <label>
+                        자동 종료
+                        <select
+                          aria-label="자동 종료"
+                          value={draft.endMode}
+                          disabled={sending}
+                          onChange={(e) => change({ endMode: e.target.value === 'none' ? 'none' : 'year' })}
+                        >
+                          <option value="year">종료 연도 지정</option>
+                          <option value="none">종료 연도 지정 안 함</option>
+                        </select>
+                      </label>
+                      {draft.endMode === 'year' ? (
+                        <label>
+                          종료 연도
+                          <input
+                            type="number"
+                            min={available.startYear}
+                            max={10000}
+                            step={1}
+                            value={draft.endYear}
+                            name="endYear"
+                            aria-invalid={invalidField === 'endYear' || undefined}
+                            aria-describedby={invalidField === 'endYear' ? 'create-form-error' : undefined}
+                            disabled={sending}
+                            required
+                            onChange={(e) => change({ endYear: e.target.value })}
+                          />
+                        </label>
+                      ) : null}
+                      <label>
+                        시드 선택
+                        <select
+                          aria-label="시드 선택"
+                          value={draft.seedMode}
+                          disabled={sending}
+                          onChange={(e) => change({ seedMode: e.target.value === 'custom' ? 'custom' : 'auto' })}
+                        >
+                          <option value="auto">자동 생성</option>
+                          <option value="custom">직접 지정</option>
+                        </select>
+                      </label>
+                      {draft.seedMode === 'custom' ? (
+                        <label>
+                          시드
+                          <input
+                            aria-label="시드"
+                            value={draft.seed}
+                            name="seed"
+                            aria-invalid={invalidField === 'seed' || undefined}
+                            aria-describedby={
+                              invalidField === 'seed' ? 'create-seed-help create-form-error' : 'create-seed-help'
+                            }
+                            disabled={sending}
+                            required
+                            onChange={(e) => change({ seed: e.target.value })}
+                          />
+                          <small id="create-seed-help">
+                            재현할 게임의 시드입니다. 비밀번호나 인증 키를 입력하지 마세요.
+                          </small>
+                        </label>
+                      ) : null}
+                      <button ref={reviewButton} type="submit" disabled={sending}>
+                        현재 설정 검토
+                      </button>
+                    </>
                   ) : null}
-                  <label>
-                    시드 선택
-                    <select
-                      aria-label="시드 선택"
-                      value={draft.seedMode}
-                      disabled={sending}
-                      onChange={(e) => change({ seedMode: e.target.value === 'custom' ? 'custom' : 'auto' })}
-                    >
-                      <option value="auto">자동 생성</option>
-                      <option value="custom">직접 지정</option>
-                    </select>
-                  </label>
-                  {draft.seedMode === 'custom' ? (
-                    <label>
-                      시드
-                      <input
-                        aria-label="시드"
-                        value={draft.seed}
-                        name="seed"
-                        aria-invalid={invalidField === 'seed' || undefined}
-                        aria-describedby={
-                          invalidField === 'seed' ? 'create-seed-help create-form-error' : 'create-seed-help'
-                        }
-                        disabled={sending}
-                        required
-                        onChange={(e) => change({ seed: e.target.value })}
-                      />
-                      <small id="create-seed-help">
-                        재현할 게임의 시드입니다. 비밀번호나 인증 키를 입력하지 마세요.
-                      </small>
-                    </label>
-                  ) : null}
-                  <button ref={reviewButton} type="submit" disabled={sending}>
-                    현재 설정 검토
-                  </button>
                 </form>
               ) : null}
             </>
@@ -634,6 +697,12 @@ export function AdminCreateActions({
               <dd>{shownInput.name}</dd>
               <dt>시나리오</dt>
               <dd>{review.scenarioTitle}</dd>
+              {(Object.keys(resourceLabels) as Array<keyof typeof resourceLabels>).map((key) => (
+                <Fragment key={key}>
+                  <dt>{resourceLabels[key]}</dt>
+                  <dd>{shownInput[key]}</dd>
+                </Fragment>
+              ))}
               <dt>프리셋</dt>
               <dd>{review.presetLabel}</dd>
               <dt>턴 간격</dt>
@@ -646,16 +715,15 @@ export function AdminCreateActions({
               </dd>
             </dl>
             <p>
-              191년 · 21국 · NPC 491명 · 도시53 · 관문8 · 9개 기능. 현재 조회한 프리셋과 게시 자원을 사용하며 최종
-              설정은 생성 처리 때 확정됩니다.
+              {review.startYear}년 · {review.counts.nations}국 · NPC {review.counts.generals}명 · 도시
+              {review.counts.cities} · 관문{review.counts.gates} · {shownInput.ruleFeatures?.length}개 기능. 현재 조회한
+              프리셋과 게시 자원을 사용하며 최종 설정은 생성 처리 때 확정됩니다.
             </p>
-            {preset ? (
-              <ul>
-                {preset.descriptions.map((text) => (
-                  <li key={text}>{text}</li>
-                ))}
-              </ul>
-            ) : null}
+            <ul>
+              {review.presetDescriptions.map((text) => (
+                <li key={text}>{text}</li>
+              ))}
+            </ul>
             <label className={styles.check}>
               <input
                 type="checkbox"

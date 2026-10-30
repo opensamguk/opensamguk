@@ -3,6 +3,7 @@ import {
   createFailurePhase,
   createPointer,
   freezeCreation,
+  initialCreateProfile,
   ownCreateReply,
   reviewCreation,
   storedText,
@@ -50,6 +51,19 @@ describe('AC-M3-04 생성 요청 확인·복구 경계', () => {
     ])
       expect(() => reviewCreation(invalid, draft, viewerId, 'seed')).toThrow();
     expect(() => reviewCreation(options, { ...draft, presetKey: 'not-current' }, viewerId, 'seed')).toThrow();
+    for (const profileId of ['', 'missing', 'san10-empty'])
+      expect(() => reviewCreation(options, { ...draft, profileId }, viewerId, 'seed')).toThrow();
+  });
+  it('기본 프로필이 없으면 직접 선택하며 통합판으로 자동 대체하지 않는다', () => {
+    expect(initialCreateProfile(options)).toBe('');
+    expect(initialCreateProfile(options, 'integration-v01')).toBe('integration-v01');
+    expect(initialCreateProfile({ ...options, profiles: [] })).toBe('');
+    const review = reviewCreation(options, draft, viewerId, 'seed');
+    expect(review.profileId).toBe(draft.profileId);
+    expect(review.startYear).toBe(191);
+    expect(review.counts.nations).toBe(21);
+    expect(Object.isFrozen(review.counts)).toBe(true);
+    expect(Object.isFrozen(review.presetDescriptions)).toBe(true);
   });
   it('숫자의 지수·소수·범위 및 저장할 수 없는 문자열을 차단한다', () => {
     for (const turnTerm of ['0', '1.5', '1e2', '2147483648'])

@@ -52,6 +52,7 @@ export async function prepareCreation(page: Page, stack: LegalStack, name = '새
   await page.goto(stack.origin + '/admin/worlds');
   const controls = page.getByRole('region', { name: '새 월드 생성', exact: true });
   await controls.getByRole('button', { name: '새 월드 생성 준비', exact: true }).click();
+  await controls.getByLabel('시나리오', { exact: true }).selectOption('integration-v01');
   await controls.getByLabel('월드 이름', { exact: true }).fill(name);
   await controls.getByLabel('프리셋', { exact: true }).selectOption('regular');
   return controls;
