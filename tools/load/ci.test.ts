@@ -6,6 +6,7 @@ import {
   BUILDKIT_IMAGE,
   CI_LIMITS,
   ciFailureDiagnostic,
+  builderCgroupDiagnostic,
   fixedImageId,
   publicLoadSummary,
   runtimeBuildArguments,
@@ -416,6 +417,7 @@ describe('builder mismatch diagnostics retain only fixed fields', () => {
         phase: 'builder-runtime',
         code: 'UNCLASSIFIED',
         builderFields: ['kernel-cgroup'],
+        builderCgroup: builderCgroupDiagnostic('private-canary', row.Id, row.HostConfig.CgroupParent),
       });
     }
   });
@@ -481,5 +483,84 @@ describe('builder mismatch diagnostics retain only fixed fields', () => {
         diagnosticBuilderFixture().expected,
       ).pid,
     ).toBe(123);
+  });
+});
+
+describe('kernel cgroup location diagnostics never relax the builder guard', () => {
+  const containerId = 'b'.repeat(64),
+    scope = `docker-${containerId}.scope`;
+  it.each([
+    [`0::/system.slice/${scope}\n`, 'exact-owned-scope', true, false, false],
+    [`0::/system.slice/${scope}/init.scope\n`, 'owned-scope-descendant', true, false, true],
+    [`0::/system.slice/${scope}/private-canary\n`, 'owned-scope-descendant', true, false, false],
+    [`0::/system.slice/docker-${'c'.repeat(64)}.scope\n`, 'system-slice-other', false, true, false],
+    [`0::/system.slice/${scope}-private-canary/init.scope\n`, 'system-slice-other', false, false, true],
+    [`0::/private-canary/${scope}\n`, 'other-parent', true, false, false],
+    ['0::/\n', 'hierarchy-root', false, false, false],
+  ] as const)(
+    'classifies only fixed location and exact owned scope components: %s',
+    (text, location, ownedScope, foreignDockerScope, initScopeLeaf) => {
+      const diagnostic = builderCgroupDiagnostic(text, containerId, '');
+      expect(diagnostic).toEqual({
+        location,
+        configuredParent: 'empty',
+        singleUnifiedEntry: true,
+        traversal: false,
+        ownedScope,
+        foreignDockerScope,
+        initScopeLeaf,
+        deletedSuffix: false,
+        procPathContainsMountPrefix: false,
+      });
+      const encoded = JSON.stringify(diagnostic);
+      for (const privateValue of ['canary', containerId, 'system.slice/', 'docker-', '0::'])
+        expect(encoded).not.toContain(privateValue);
+      const { row, expected } = diagnosticBuilderFixture();
+      if (location === 'exact-owned-scope') expect(verifyBuilder(row, { ...expected, cgroupText: text }).pid).toBe(123);
+      else expect(() => verifyBuilder(row, { ...expected, cgroupText: text })).toThrow(/^LOAD_BUILDER_UNVERIFIED$/);
+    },
+  );
+  it('distinguishes malformed/traversal/deleted/mount-prefixed evidence without exporting input', () => {
+    expect(builderCgroupDiagnostic('private-canary', containerId, 'private-canary')).toMatchObject({
+      location: 'invalid',
+      configuredParent: 'other',
+      singleUnifiedEntry: false,
+    });
+    expect(builderCgroupDiagnostic(`0::/system.slice/../${scope}\n`, containerId, '')).toMatchObject({
+      location: 'invalid',
+      traversal: true,
+    });
+    expect(builderCgroupDiagnostic(`0::/system.slice/${scope} (deleted)\n`, containerId, 'system.slice')).toMatchObject(
+      { location: 'system-slice-other', configuredParent: 'system-slice', deletedSuffix: true, ownedScope: false },
+    );
+    expect(builderCgroupDiagnostic(`0::/sys/fs/cgroup/system.slice/${scope}\n`, containerId, '')).toMatchObject({
+      location: 'other-parent',
+      procPathContainsMountPrefix: true,
+    });
+    expect(builderCgroupDiagnostic(`0::/system.slice/${scope}\n0::/private-canary\n`, containerId, '')).toMatchObject({
+      singleUnifiedEntry: false,
+    });
+    expect(builderCgroupDiagnostic(`0::/system.slice/${scope}\n`, 'private-canary', '')).toMatchObject({
+      location: 'invalid',
+      ownedScope: false,
+    });
+  });
+  it('attaches only a fixed classification to the original failure; copied error properties cannot override it', () => {
+    const { row, expected } = diagnosticBuilderFixture();
+    const text = `0::/system.slice/${scope}/private-canary\n`;
+    try {
+      verifyBuilder(row, { ...expected, cgroupText: text });
+      throw new Error('Expected original rejection');
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      if (!(error instanceof Error)) throw error;
+      expect(error.message).toBe('LOAD_BUILDER_UNVERIFIED');
+      Object.assign(error, { builderCgroup: { raw: 'private-canary' }, path: text, raw: row });
+      const diagnostic = ciFailureDiagnostic('builder-runtime', error);
+      expect(diagnostic.builderFields).toEqual(['kernel-cgroup']);
+      expect(diagnostic.builderCgroup?.location).toBe('owned-scope-descendant');
+      expect(JSON.stringify(diagnostic)).not.toContain('canary');
+      expect(JSON.stringify(diagnostic)).not.toContain(containerId);
+    }
   });
 });

@@ -109,6 +109,55 @@ const builderFailureFields = [
 ] as const;
 type BuilderFailureField = (typeof builderFailureFields)[number];
 const builderFailures = new WeakMap<Error, readonly BuilderFailureField[]>();
+const builderCgroups = new WeakMap<Error, ReturnType<typeof builderCgroupDiagnostic>>();
+
+// Diagnostic only: every class is fixed and never authorizes a new cgroup location.
+export function builderCgroupDiagnostic(cgroupText: string, containerId: string, configuredParent: string) {
+  const unified = [...cgroupText.matchAll(/^0::(\/[^\r\n]*)$/gm)],
+    rawPath = unified[0]?.[1],
+    idValid = /^[a-f0-9]{64}$/.test(containerId),
+    traversal = rawPath?.split('/').includes('..') ?? false;
+  let actual: string | undefined;
+  try {
+    actual = selfCgroupPath(cgroupText);
+  } catch {
+    // Values and the parser error stay private. The original verifier rethrows its own error.
+  }
+  const expected = idValid ? `${LOAD_DOCKER.cgroupPath}/docker-${containerId}.scope` : undefined,
+    components = rawPath?.split('/') ?? [],
+    ownedScope = idValid && components.includes(`docker-${containerId}.scope`),
+    foreignDockerScope = components.some(
+      (part) => /^docker-[a-f0-9]{64}\.scope$/.test(part) && part !== `docker-${containerId}.scope`,
+    );
+  const location =
+    actual === undefined || !idValid
+      ? ('invalid' as const)
+      : actual === expected
+        ? ('exact-owned-scope' as const)
+        : actual.startsWith(`${expected}/`)
+          ? ('owned-scope-descendant' as const)
+          : actual === '/sys/fs/cgroup'
+            ? ('hierarchy-root' as const)
+            : actual.startsWith(`${LOAD_DOCKER.cgroupPath}/`)
+              ? ('system-slice-other' as const)
+              : ('other-parent' as const);
+  return {
+    location,
+    configuredParent:
+      configuredParent === ''
+        ? ('empty' as const)
+        : configuredParent === LOAD_DOCKER.cgroupParent
+          ? ('system-slice' as const)
+          : ('other' as const),
+    singleUnifiedEntry: unified.length === 1,
+    traversal,
+    ownedScope,
+    foreignDockerScope,
+    initScopeLeaf: rawPath?.endsWith('/init.scope') ?? false,
+    deletedSuffix: rawPath?.endsWith(' (deleted)') ?? false,
+    procPathContainsMountPrefix: rawPath?.startsWith('/sys/fs/cgroup/') ?? false,
+  };
+}
 const builderSchemaPaths: Readonly<Record<string, BuilderFailureField>> = {
   Id: 'schema-id',
   Name: 'schema-name',
@@ -162,6 +211,9 @@ export function ciFailureDiagnostic(phase: unknown, error: unknown) {
               : 'UNCLASSIFIED',
     ...(error instanceof Error && builderFailures.has(error)
       ? { builderFields: [...builderFailures.get(error)!] }
+      : {}),
+    ...(error instanceof Error && builderCgroups.has(error)
+      ? { builderCgroup: { ...builderCgroups.get(error)! } }
       : {}),
   };
 }
@@ -255,11 +307,19 @@ export function verifyBuilder(raw: unknown, expected: { name: string; imageId: s
       row.Mounts[0]?.Type !== 'volume' ||
       row.Mounts[0].Name !== volume ||
       row.Mounts[0].Destination !== '/var/lib/buildkit'
-    )
-      builderFailure(new Error('LOAD_BUILDER_UNVERIFIED'), mismatchFields());
+    ) {
+      const error = new Error('LOAD_BUILDER_UNVERIFIED'),
+        fields = mismatchFields();
+      if (fields.includes('kernel-cgroup'))
+        builderCgroups.set(error, builderCgroupDiagnostic(expected.cgroupText, row.Id, row.HostConfig.CgroupParent));
+      builderFailure(error, fields);
+    }
   } catch (error) {
     // Preserve even the original selfCgroupPath exception and its failure semantics.
-    if (error instanceof Error && !builderFailures.has(error)) builderFailures.set(error, mismatchFields());
+    if (error instanceof Error && !builderFailures.has(error)) {
+      builderFailures.set(error, mismatchFields());
+      builderCgroups.set(error, builderCgroupDiagnostic(expected.cgroupText, row.Id, row.HostConfig.CgroupParent));
+    }
     throw error;
   }
   return {
