@@ -23,6 +23,77 @@ export const CI_LIMITS = Object.freeze({
   driverMs: 2160000,
   summaryMs: 120000,
 });
+const diagnosticPhases = new Set([
+  'options',
+  'bootstrap-evidence',
+  'source-bind',
+  'runner-provenance',
+  'daemon-bind',
+  'daemon-information',
+  'build-admission',
+  'builder-baseline',
+  'pull-buildkit',
+  'verify-buildkit',
+  'pull-postgres',
+  'verify-postgres',
+  'builder-create',
+  'builder-bootstrap',
+  'builder-runtime',
+  'builder-evidence',
+  'post-builder-admission',
+  'runtime-build',
+  'runtime-image',
+  'builder-cleanup',
+  'source-after-build',
+  'load-driver',
+  'driver-evidence',
+  'source-after-driver',
+  'driver-lifecycle',
+  'public-summary',
+]);
+const diagnosticCodes = new Set([
+  'LOAD_CI_OPTIONS_INVALID',
+  'LOAD_BOOTSTRAP_SCOPE_UNVERIFIED',
+  'LOAD_CI_SOURCE_CHANGED',
+  'LOAD_DISPATCH_SOURCE_INVALID',
+  'LOAD_CI_PLATFORM_UNVERIFIED',
+  'LOAD_CI_DAEMON_UNVERIFIED',
+  'LOAD_BUILD_ADMISSION_DEADLINE',
+  'LOAD_BUILD_ADMISSION_REFUSED',
+  'LOAD_BUILDER_BASELINE_NOT_EMPTY',
+  'LOAD_IMAGE_PREPARATION_DEADLINE',
+  'LOAD_FIXED_IMAGE_UNVERIFIED',
+  'LOAD_BUILDER_UNVERIFIED',
+  'LOAD_IMAGE_SOURCE_INVALID',
+  'LOAD_CI_BUILD_FAILED',
+  'LOAD_CI_FINAL_UNVERIFIED',
+  'LOAD_CI_FINAL_FAILED',
+  'LOAD_PUBLIC_SUMMARY_UNVERIFIED',
+  'LOAD_COMMAND_OPTIONS_INVALID',
+  'LOAD_NATIVE_CHILD_UNSETTLED',
+  'LOAD_NATIVE_COMMAND_FAILED',
+]);
+let diagnosticPhase = 'options';
+export function ciFailureDiagnostic(phase: unknown, error: unknown) {
+  return {
+    phase: typeof phase === 'string' && diagnosticPhases.has(phase) ? phase : 'unknown',
+    code:
+      error instanceof Error && diagnosticCodes.has(error.message)
+        ? error.message
+        : error instanceof z.ZodError
+          ? 'SCHEMA_INVALID'
+          : error instanceof Error && 'code' in error && error.code === 'ENOENT'
+            ? 'RESOURCE_MISSING'
+            : error instanceof Error && 'code' in error && ['EACCES', 'EPERM'].includes(String(error.code))
+              ? 'RESOURCE_DENIED'
+              : 'UNCLASSIFIED',
+  };
+}
+function reportFailure(error: unknown) {
+  process.stderr.write(
+    JSON.stringify({ event: 'LOAD_CI_DIAGNOSTIC', ...ciFailureDiagnostic(diagnosticPhase, error) }) + '\n',
+  );
+}
 const hash = z.string().regex(/^[a-f0-9]{64}$/),
   head = z.string().regex(/^[a-f0-9]{40}$/);
 const sourceSchema = z.strictObject({ head, sha256: hash, files: z.number().int().positive() });
@@ -185,6 +256,7 @@ async function main() {
     },
     Object.values(CI_LIMITS).reduce((sum, value) => sum + value, 0),
   );
+  diagnosticPhase = 'bootstrap-evidence';
   const bootstrap = z
     .strictObject({
       version: z.literal(1),
@@ -209,6 +281,7 @@ async function main() {
       ),
     );
   if (!bootstrapLifecycle.scopeClosed) throw new Error('LOAD_BOOTSTRAP_SCOPE_UNVERIFIED');
+  diagnosticPhase = 'source-bind';
   const before = await sourceSnapshot(commands, signal);
   requireDispatch({
     repository: process.env.GITHUB_REPOSITORY,
@@ -219,6 +292,7 @@ async function main() {
   });
   if (before.head !== bootstrap.source.head || before.sha256 !== bootstrap.source.sha256)
     throw new Error('LOAD_CI_SOURCE_CHANGED');
+  diagnosticPhase = 'runner-provenance';
   const site = admissionSite('github-hosted', await readRunnerProvenance());
   if (!site.accepted) throw new Error('LOAD_CI_PLATFORM_UNVERIFIED');
   const raw = (
@@ -228,6 +302,7 @@ async function main() {
     timeoutMs: number,
     env?: NodeJS.ProcessEnv,
   ) => commands.run('docker', args, { label, signal: ownSignal, timeoutMs, ...(env ? { env } : {}) });
+  diagnosticPhase = 'daemon-bind';
   const docker = await bindLocalDocker(raw, signal);
   const builder = `opensamguk-load-build-${bootstrap.runId}`,
     containerName = `buildx_buildkit_${builder}0`,
@@ -239,6 +314,7 @@ async function main() {
   const env = { ...process.env, DOCKER_CONFIG: dockerConfig };
   const native = (args: readonly string[], label: string, ownSignal = signal, timeoutMs = 10000) =>
     docker.run(args, label, ownSignal, timeoutMs, env);
+  diagnosticPhase = 'daemon-information';
   const info = z
     .looseObject({
       root: z.string().startsWith('/'),
@@ -306,7 +382,9 @@ async function main() {
     buildPhaseStartedAt: number | undefined;
   const cleanupFailures: string[] = [];
   try {
+    diagnosticPhase = 'build-admission';
     await admit(Date.now() + CI_LIMITS.admissionMs, true);
+    diagnosticPhase = 'builder-baseline';
     const listedContainers = (
       await native(['ps', '-aq', '--no-trunc', '--filter', `name=^/${containerName}$`], 'builder-baseline')
     ).trim();
@@ -330,17 +408,22 @@ async function main() {
     try {
       // daemon pull/unpack은 scope/builder cap 밖의 준비 IO이며 cap됐다고 기록하지 않는다.
       // 고정 digest의 pull·검증·실제 재심사·build 모두 원래15분 안에서 마친다.
+      diagnosticPhase = 'pull-buildkit';
       await invoke(['pull', BUILDKIT_IMAGE], 'pull-fixed-buildkit');
+      diagnosticPhase = 'verify-buildkit';
       const buildkitId = fixedImageId(
         JSON.parse(await invoke(['image', 'inspect', BUILDKIT_IMAGE], 'buildkit-image-proof', 10000)),
         BUILDKIT_IMAGE,
       );
+      diagnosticPhase = 'pull-postgres';
       await invoke(['pull', LOAD_POSTGRES_IMAGE], 'pull-fixed-postgres');
+      diagnosticPhase = 'verify-postgres';
       fixedImageId(
         JSON.parse(await invoke(['image', 'inspect', LOAD_POSTGRES_IMAGE], 'postgres-image-proof', 10000)),
         LOAD_POSTGRES_IMAGE,
       );
       createAttempted = true;
+      diagnosticPhase = 'builder-create';
       await invoke(
         [
           'buildx',
@@ -356,7 +439,9 @@ async function main() {
         'create-owned-builder',
         30000,
       );
+      diagnosticPhase = 'builder-bootstrap';
       await invoke(['buildx', 'inspect', builder, '--bootstrap'], 'bootstrap-owned-builder', 120000);
+      diagnosticPhase = 'builder-runtime';
       const rows: unknown = JSON.parse(await invoke(['inspect', containerName], 'builder-runtime-proof', 10000));
       if (!Array.isArray(rows) || rows.length !== 1) throw new Error('LOAD_BUILDER_UNVERIFIED');
       const pid = z.looseObject({ State: z.looseObject({ Pid: z.number().int().positive() }) }).parse(rows[0])
@@ -366,20 +451,24 @@ async function main() {
         imageId: buildkitId,
         cgroupText: await readFile(`/proc/${pid}/cgroup`, 'utf8'),
       });
+      diagnosticPhase = 'builder-evidence';
       await writeEvidence(resolve(output, 'builder.json'), {
         ...builderProof,
         budget: BUILD_BUDGET,
         daemonPreparationIoOutsideBuilderCaps: true,
         image: BUILDKIT_IMAGE,
       });
+      diagnosticPhase = 'post-builder-admission';
       await admit(deadline, false, phaseSignal);
       phaseSignal.throwIfAborted();
       const iid = resolve(output, 'runtime-image-id');
+      diagnosticPhase = 'runtime-build';
       await invoke(
         runtimeBuildArguments(builder, iid, before),
         'build-source-runtime',
         Math.max(1, deadline - Date.now()),
       );
+      diagnosticPhase = 'runtime-image';
       imageId = (await readFile(iid, 'utf8')).trim();
       if (!/^sha256:[a-f0-9]{64}$/.test(imageId)) throw new Error('LOAD_IMAGE_SOURCE_INVALID');
       requireImageSource(
@@ -392,9 +481,11 @@ async function main() {
       // 실제 정리는 아래 독립 단계에서 진행한다. 그 단계의 같은 절대 기한을 유지한다.
       clearTimeout(phaseGuard);
     }
-  } catch {
+  } catch (error) {
+    reportFailure(error);
     failure = true;
   } finally {
+    diagnosticPhase = 'builder-cleanup';
     const cleanup = async () => {
       const cleanupMs = Math.max(
         1,
@@ -502,11 +593,13 @@ async function main() {
     commands.stickyUnsettled
   )
     throw new Error('LOAD_CI_BUILD_FAILED');
+  diagnosticPhase = 'source-after-build';
   const afterBuild = await sourceSnapshot(commands, signal);
   if (before.head !== afterBuild.head || before.sha256 !== afterBuild.sha256) throw new Error('LOAD_CI_SOURCE_CHANGED');
   const driverFailures: Error[] = [];
   let summary: ReturnType<typeof publicLoadSummary> | undefined;
   try {
+    diagnosticPhase = 'load-driver';
     await commands.run(
       process.execPath,
       [
@@ -530,12 +623,14 @@ async function main() {
       ],
       { label: 'actual-load-driver', signal, timeoutMs: CI_LIMITS.driverMs, env },
     );
+    diagnosticPhase = 'driver-evidence';
     const reportPath = resolve(root, '.load-reports', bootstrap.runId);
     const rawRun: unknown = JSON.parse(await readFile(resolve(reportPath, 'run.json'), 'utf8'));
     const lifecycle: unknown = JSON.parse(await readFile(resolve(reportPath, 'lifecycle.json'), 'utf8'));
     summary = publicLoadSummary(rawRun, lifecycle);
     if (summary.sourceHead !== before.head || summary.sourceSha256 !== before.sha256)
       throw new Error('LOAD_CI_SOURCE_CHANGED');
+    diagnosticPhase = 'source-after-driver';
     const after = await sourceSnapshot(commands, signal);
     if (
       after.head !== before.head ||
@@ -545,10 +640,12 @@ async function main() {
       commands.receipts.some((row) => !commandSettled(row) || row.failed || row.exitCode !== 0)
     )
       throw new Error('LOAD_CI_FINAL_UNVERIFIED');
-  } catch {
+  } catch (error) {
+    reportFailure(error);
     driverFailures.push(new Error('LOAD_DRIVER_OR_FINAL_EVIDENCE_FAILED'));
   }
   try {
+    diagnosticPhase = 'driver-lifecycle';
     await writeEvidence(resolve(output, 'driver-lifecycle.json'), {
       driverVerified: driverFailures.length === 0,
       source: before,
@@ -562,6 +659,7 @@ async function main() {
   }
   if (!driverFailures.length && summary) {
     try {
+      diagnosticPhase = 'public-summary';
       await writeEvidence(resolve(output, 'public-summary.json'), summary);
       if (process.env.GITHUB_STEP_SUMMARY)
         await appendFile(
@@ -581,7 +679,8 @@ async function main() {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  void main().catch(() => {
+  void main().catch((error: unknown) => {
+    reportFailure(error);
     process.stderr.write('LOAD_CI_FAILED\n');
     process.exit(1);
   });

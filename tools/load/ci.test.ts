@@ -1,11 +1,55 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
-import { BUILDKIT_IMAGE, CI_LIMITS, fixedImageId, publicLoadSummary, runtimeBuildArguments, verifyBuilder } from './ci';
+import { z } from 'zod';
+import {
+  BUILDKIT_IMAGE,
+  CI_LIMITS,
+  ciFailureDiagnostic,
+  fixedImageId,
+  publicLoadSummary,
+  runtimeBuildArguments,
+  verifyBuilder,
+} from './ci';
 import { userWorkload } from './workload';
 import type { LoadRun } from './report';
 
 const id = (n: number) => `00000000-0000-4000-8000-${n.toString(16).padStart(12, '0')}`;
+describe('fixed CI failure diagnostics', () => {
+  it.each(['LOAD_NATIVE_COMMAND_FAILED', 'LOAD_NATIVE_CHILD_UNSETTLED', 'LOAD_BUILDER_UNVERIFIED'])(
+    'native failure remains a fixed code without copying private properties: %s',
+    (code) => {
+      const error = Object.assign(new Error(code), { stderr: 'private-canary', command: '/private/canary' });
+      expect(ciFailureDiagnostic('builder-create', error)).toEqual({ phase: 'builder-create', code });
+      expect(JSON.stringify(ciFailureDiagnostic('builder-create', error))).not.toContain('canary');
+    },
+  );
+  it('raw messages, stack, paths, causes and arbitrary phase values never enter output', () => {
+    const error = Object.assign(new Error('private-canary', { cause: new Error('nested-canary') }), {
+      code: 'EPRIVATE_CANARY',
+      path: '/private/canary',
+    });
+    expect(ciFailureDiagnostic('private-phase-canary', error)).toEqual({ phase: 'unknown', code: 'UNCLASSIFIED' });
+    expect(ciFailureDiagnostic({}, 'private-canary')).toEqual({ phase: 'unknown', code: 'UNCLASSIFIED' });
+  });
+  it('schema diagnostics discard invalid input values', () => {
+    const parsed = z.literal('fixed').safeParse('private-canary');
+    expect(parsed.success).toBe(false);
+    if (!parsed.success)
+      expect(ciFailureDiagnostic('bootstrap-evidence', parsed.error)).toEqual({
+        phase: 'bootstrap-evidence',
+        code: 'SCHEMA_INVALID',
+      });
+  });
+  it.each([
+    ['ENOENT', 'RESOURCE_MISSING'],
+    ['EACCES', 'RESOURCE_DENIED'],
+    ['EPERM', 'RESOURCE_DENIED'],
+  ])('filesystem errors preserve only a fixed category: %s', (code, expected) => {
+    const error = Object.assign(new Error('/private/canary'), { code, path: '/private/canary' });
+    expect(ciFailureDiagnostic('builder-evidence', error)).toEqual({ phase: 'builder-evidence', code: expected });
+  });
+});
 // 공개 요약 경계의 수학 고정물이다. 실제 부하·계정·월드 인수로 세지 않는다.
 function mathematicalSmoke(): LoadRun {
   const end = 15001,
