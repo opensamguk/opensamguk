@@ -370,16 +370,17 @@ async function human(index: number): Promise<Actor> {
       true,
     ),
   );
-  await expect
-    .poll(async () => {
-      signal();
-      return db.inputEvent.count({
-        where: { worldId, userId: owner.userId, kind: 'general.create', status: 'PENDING' },
-      });
-    })
-    .toBe(1);
+  // beforeAll에서도 부르므로 expect.poll 대신 같은 한도로 직접 기다린다.
+  for (let started = performance.now(); ; await delay(50, undefined, { signal: signal() })) {
+    const count = await db.inputEvent.count({
+      where: { worldId, userId: owner.userId, kind: 'general.create', status: 'PENDING' },
+    });
+    if (count === 1) break;
+    if (performance.now() - started > 10_000) throw new Error('INT19 장수 생성 접수를 확인하지 못했습니다.');
+  }
   await drain();
-  expect((await creating).data?.status).toBe('created');
+  // 생성 응답은 엔진 처리 대기가 길면 정상적으로 pending이므로 완료는 아래 장수 행으로 확인한다.
+  expect(['created', 'pending']).toContain((await creating).data?.status);
   const general = await db.general.findUniqueOrThrow({ where: { worldId_userId: { worldId, userId: owner.userId } } });
   expect(await db.generalTurn.count({ where: { worldId, generalId: general.id } })).toBe(30);
   expect((await snapshot()).state.campaign!.sources[String(general.id)]).toMatch(/^input:\d+#general:/);
