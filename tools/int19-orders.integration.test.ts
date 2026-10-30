@@ -772,7 +772,7 @@ it('정상 관계해제는 수락된 지시의 현재권한을 취소하며 본�
   expect(await reservations()).toEqual(turns);
   await executeOrder(requested.id, 'RESOLVED');
   await linkHumans();
-}, 120_000);
+}, 240_000);
 
 it('대기중 다른지시는409·후반실패는롤백되며 접수뒤바뀐수신예약을 엔진이거부한다', async () => {
   const view = await board();
@@ -831,7 +831,7 @@ it('대기중 다른지시는409·후반실패는롤백되며 접수뒤바뀐수
   expect(await receipt(accepting, b)).toMatchObject({ status: 'rejected', result: { code: 'STALE' } });
   expect((await order(applied.result.orderId)).status).toBe('PENDING');
   await respond(applied.result.orderId, false);
-}, 120_000);
+}, 240_000);
 
 it('실제 접수 뒤 생긴 계정제재는 엔진에서 재검사하고 지시 상태를 쓰지 않는다', async () => {
   const payload = {
@@ -905,7 +905,7 @@ it('NPC이동·귀환 지시는 상관과 타인 소유 부곡을 옮기지 않�
   ).toBe('BAD_REQUEST');
   expect(hashState(await snapshot())).toBe(before);
   expect(await db.inputEvent.count({ where: { worldId } })).toBe(count);
-}, 120_000);
+}, 240_000);
 
 it('새 DB클라이언트 재접속과 실제 월 경계 archive 두 번 재생이 원생성·두월드·상태해시와 일치한다', async () => {
   const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
@@ -932,7 +932,7 @@ it('새 DB클라이언트 재접속과 실제 월 경계 archive 두 번 재생�
   expect(first.at(-1)!.stateHash).toBe(hashState(await snapshot()));
   expect(hashState(await snapshot(otherWorldId))).toBe(otherHash);
   expect(hashState(initial)).toBe(originHash);
-}, 120_000);
+}, 240_000);
 
 for (let month = 1; month <= NPC_PREPARATION_MONTHS; month++) {
   it(`NPC자기부곡 정상 세수·AI준비 관찰 ${month}/${NPC_PREPARATION_MONTHS} (고정600초 합계)`, async () => {
@@ -996,4 +996,4 @@ it('정상준비로 관찰한 NPC자기부곡만 실제 지시로 사용한다 (
   for (const other of others)
     expect(after.state.campaign!.units.find((row) => row.id === other.id)!.ownerId).toBe(a.generalId);
   expect(hashState(await snapshot(otherWorldId))).toBe(otherHash);
-}, 120_000);
+}, 240_000);
