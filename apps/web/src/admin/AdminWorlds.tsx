@@ -8,6 +8,7 @@ import { usePrivateRead } from './usePrivateRead';
 import { AdminClockActions } from './AdminClockActions';
 import { AdminEndActions } from './AdminEndActions';
 import { AdminCreateActions } from './AdminCreateActions';
+import { AdminResetActions } from './AdminResetActions';
 import styles from './AdminPages.module.css';
 
 type Worlds = inferRouterOutputs<AppRouter>['admin']['world']['list'];
@@ -22,8 +23,8 @@ export function AdminWorlds() {
   const viewerId = useRouteContext({ from: '/admin' }).adminViewerId,
     client = useTRPCClient(),
     query = usePrivateRead<Worlds>(viewerId);
-  const [owner, setOwner] = useState<'clock' | 'end' | 'create' | null>(null);
-  const ownerRef = useRef<'clock' | 'end' | 'create' | null>(null);
+  const [owner, setOwner] = useState<'clock' | 'end' | 'create' | 'reset' | null>(null);
+  const ownerRef = useRef<'clock' | 'end' | 'create' | 'reset' | null>(null);
   const acquireCreate = useCallback(() => {
     if (ownerRef.current !== null && ownerRef.current !== 'create') return false;
     ownerRef.current = 'create';
@@ -44,6 +45,18 @@ export function AdminWorlds() {
   }, []);
   const releaseEnd = useCallback(() => {
     if (ownerRef.current === 'end') {
+      ownerRef.current = null;
+      setOwner(null);
+    }
+  }, []);
+  const acquireReset = useCallback(() => {
+    if (ownerRef.current !== null && ownerRef.current !== 'reset') return false;
+    ownerRef.current = 'reset';
+    setOwner('reset');
+    return true;
+  }, []);
+  const releaseReset = useCallback(() => {
+    if (ownerRef.current === 'reset') {
       ownerRef.current = null;
       setOwner(null);
     }
@@ -72,10 +85,9 @@ export function AdminWorlds() {
       >
         월드 조회
       </button>
-      <p>월드 초기화 화면은 준비 중입니다.</p>
       <div
-        inert={owner === 'end' || owner === 'create'}
-        aria-hidden={owner === 'end' || owner === 'create' || undefined}
+        inert={owner === 'end' || owner === 'create' || owner === 'reset'}
+        aria-hidden={owner === 'end' || owner === 'create' || owner === 'reset' || undefined}
       >
         <AdminClockActions
           key={viewerId}
@@ -86,26 +98,43 @@ export function AdminWorlds() {
         />
       </div>
       <div
-        inert={owner === 'clock' || owner === 'create'}
-        aria-hidden={owner === 'clock' || owner === 'create' || undefined}
+        inert={owner === 'clock' || owner === 'create' || owner === 'reset'}
+        aria-hidden={owner === 'clock' || owner === 'create' || owner === 'reset' || undefined}
       >
         <AdminEndActions
           key={viewerId}
           viewerId={viewerId}
           worlds={query.data}
-          disabled={owner === 'clock' || owner === 'create'}
+          disabled={owner === 'clock' || owner === 'create' || owner === 'reset'}
           onAcquire={acquireEnd}
           onRelease={releaseEnd}
           onClear={query.clear}
         />
       </div>
-      <div inert={owner === 'clock' || owner === 'end'} aria-hidden={owner === 'clock' || owner === 'end' || undefined}>
+      <div
+        inert={owner === 'clock' || owner === 'end' || owner === 'reset'}
+        aria-hidden={owner === 'clock' || owner === 'end' || owner === 'reset' || undefined}
+      >
         <AdminCreateActions
           key={viewerId}
           viewerId={viewerId}
-          disabled={owner === 'clock' || owner === 'end'}
+          disabled={owner === 'clock' || owner === 'end' || owner === 'reset'}
           onAcquire={acquireCreate}
           onRelease={releaseCreate}
+          onClear={query.clear}
+        />
+      </div>
+      <div
+        inert={owner === 'clock' || owner === 'end' || owner === 'create'}
+        aria-hidden={owner === 'clock' || owner === 'end' || owner === 'create' || undefined}
+      >
+        <AdminResetActions
+          key={viewerId}
+          viewerId={viewerId}
+          worlds={query.data}
+          disabled={owner === 'clock' || owner === 'end' || owner === 'create'}
+          onAcquire={acquireReset}
+          onRelease={releaseReset}
           onClear={query.clear}
         />
       </div>
