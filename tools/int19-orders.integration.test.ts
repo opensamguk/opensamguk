@@ -30,12 +30,13 @@ import type { readCampaignOrders } from '../apps/server/src/game/campaignOrders'
 import type { readCampaignRequest } from '../apps/server/src/game/campaignApi';
 import { testDatabaseUrl } from './test-database';
 
-// AC-INT-19B: real PostgreSQL, loopback HTTP, original SAN10 191/21 nations/491 officers.
+// AC-INT-19B: real PostgreSQL, loopback HTTP, original integration 191/21 nations/491 officers.
 // Users/sessions/sanctions are authentication fixtures; game state changes only through
 // saveInitialWorld, real API requests and the fenced engine. No SQL game-state injection.
 // This bounded multi-month integration does not represent the 132-month acceptance.
 if (!process.env.TEST_DATABASE_URL) throw new Error('INT19 전용 TEST_DATABASE_URL이 필요합니다.');
-const url = testDatabaseUrl(process.env);
+// 통합 실행기는 DATABASE_URL과 TEST_DATABASE_URL을 같은 테스트 DB로 넘긴다. 이름 규칙만 확인한다.
+const url = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
 if (!['127.0.0.1', 'localhost'].includes(url.hostname) || url.searchParams.has('host') || url.searchParams.has('port'))
   throw new Error('INT19는 loopback 전용 테스트 DB만 사용합니다.');
 const db = createDb(url.toString());
