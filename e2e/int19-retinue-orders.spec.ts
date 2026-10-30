@@ -82,7 +82,8 @@ test('AC-INT-19C 정식491명 장수 지시 발송·수락 실행·거절·NPC �
   try {
     await controlClock(db, worldId, 'start');
     for (const [index, user] of [owner, target].entries()) {
-      // 생성 응답은 엔진 처리를 기다리므로 접수를 확인한 뒤 차례를 진행하고 결과를 받는다.
+      // 생성 응답은 엔진 처리를 잠시 기다리므로 접수를 확인한 뒤 차례를 진행한다.
+      // 대기가 길면 정상 응답도 pending이므로 생성 완료는 DB의 장수 행으로 확인한다.
       const created = apiMutate<{ status: string }>(world, user, 'general.create', {
         worldId,
         name: `지시장수${index}`,
@@ -95,7 +96,8 @@ test('AC-INT-19C 정식491명 장수 지시 발송·수락 실행·거절·NPC �
       });
       await pending('general.create');
       await advance();
-      expect((await created).status).toBe('created');
+      expect(['created', 'pending']).toContain((await created).status);
+      await expect.poll(() => db.general.count({ where: { worldId, userId: user.userId } })).toBe(1);
     }
     const humans = await db.general.findMany({
       where: { worldId, userId: { in: [owner.userId, target.userId] } },
