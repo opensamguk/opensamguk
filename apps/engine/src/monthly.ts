@@ -34,7 +34,15 @@ export async function loadReplayState(tx: Prisma.TransactionClient, worldId: str
       ? world.ruleFeatures.includes('policy')
       : isPolicyMode({ fromSequence: world.policyFromSequence ?? null, actionSequence: world.actionSequence });
   const turns = Object.fromEntries(generals.map(({ id }) => [id, emptyTurns()]));
-  for (const general of generals) if (modern) assertSlotSet(slots.filter((slot) => slot.generalId === general.id));
+  if (modern) {
+    const byGeneral = new Map<number, typeof slots>();
+    for (const slot of slots) {
+      const group = byGeneral.get(slot.generalId);
+      if (group) group.push(slot);
+      else byGeneral.set(slot.generalId, [slot]);
+    }
+    for (const general of generals) assertSlotSet(byGeneral.get(general.id) ?? []);
+  }
   for (const slot of slots)
     turns[slot.generalId]![slot.slot] = {
       commandKey: slot.commandKey,
