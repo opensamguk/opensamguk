@@ -160,6 +160,51 @@ function diagnosticPending(tasks: Array<{ label: string; settled: boolean }>) {
   return counts;
 }
 
+// Request.timing은 응답 전에0이다. 도착 순서와 실제 capture-click 경계만 쓴다.
+export class OfferRequestOrder {
+  private sequence = 0;
+  private readonly arrivals = new WeakMap<object, number>();
+  private boundary: number | null = null;
+  private claimed = false;
+  observe(request: object) {
+    if (!this.arrivals.has(request)) this.arrivals.set(request, ++this.sequence);
+  }
+  arm() {
+    if (this.boundary !== null) throw new Error('한 제안의 클릭 경계는 한 번만 기록합니다.');
+    this.boundary = this.sequence;
+  }
+  beforeClick(request: object) {
+    const arrival = this.arrivals.get(request);
+    return this.boundary !== null && arrival !== undefined && arrival <= this.boundary;
+  }
+  claim(request: object) {
+    const arrival = this.arrivals.get(request);
+    if (this.claimed || this.boundary === null || arrival === undefined || arrival <= this.boundary) return false;
+    this.claimed = true;
+    return true;
+  }
+}
+
+export async function settleIndependentJoins<T>(work: Array<() => Promise<T>>, cancel: () => void): Promise<T[]> {
+  let cancelled = false;
+  const results = await Promise.allSettled(
+    work.map((start) =>
+      Promise.resolve()
+        .then(start)
+        .catch((error: unknown) => {
+          if (!cancelled) {
+            cancelled = true;
+            cancel();
+          }
+          throw error;
+        }),
+    ),
+  );
+  const failures = results.filter((result) => result.status === 'rejected').map((result) => result.reason as unknown);
+  if (failures.length) throw new AggregateError(failures, '독립 월드 출사 처리 실패');
+  return results.map((result) => (result as PromiseFulfilledResult<T>).value);
+}
+
 export class OfferFixture {
   constructor(
     private readonly cleanupAuditDb: () => PrismaClient = () => createDb(e2eDatabaseUrl()),
@@ -179,7 +224,7 @@ export class OfferFixture {
   journal: unknown[] = [];
   deliveredBoard: Board | undefined;
   closing = false;
-  private offerClickStartedAt = 0;
+  private readonly requestOrder = new OfferRequestOrder();
   private readonly progressStartedAt = Date.now();
   private currentPhase: ProgressPhase = 'public-metadata';
   progress(phase: ProgressPhase) {
@@ -276,6 +321,7 @@ export class OfferFixture {
         (value) => this.contexts.add(value),
       );
       const page = guardedUi(await this.scope.work('new page', () => context.newPage()), this.scope);
+      page.on('request', (request) => this.requestOrder.observe(request));
       pageScopes.set(page, this.scope);
       pageOrigins.set(page, this.origin());
       // 생성 도중 실패해도 자기 context와 계정의 수명을 추적한다.
@@ -313,6 +359,7 @@ export class OfferFixture {
       this.progress('account-auth');
       user.id = (await query<{ user: { id: string } }>(page, 'auth.me')).user.id;
     }
+    const joinTargets: Array<{ world: World; tick: number }> = [];
     for (let i = 0; i < 2; i++) {
       // 결과를 골라내지 않는 고정 시드. 두 월드는 사람 UUID·입력·일정을 공유한다.
       this.progress('world-resources');
@@ -385,8 +432,20 @@ export class OfferFixture {
           revision: 0,
           slots: [{ commandKey: 'join', args: { nationId: 1 } }, ...Array.from({ length: 29 }, () => null)],
         });
-      this.progress('join-advance');
-      await this.advance(world, Math.max(...humans.map((g) => g.nextTurnTick)));
+      joinTargets.push({ world, tick: Math.max(...humans.map((g) => g.nextTurnTick)) });
+    }
+    // 서로 다른 월드의 실행권·시드·입력은 독립이다. 둘 다 정착한 뒤 동의 절차를 잇는다.
+    this.progress('join-advance');
+    await settleIndependentJoins(
+      joinTargets.map(
+        ({ world, tick }) =>
+          () =>
+            this.advance(world, tick),
+      ),
+      () => this.scope.cancel(),
+    );
+    for (const world of this.worlds) {
+      const { id: worldId, hold } = world;
       for (const user of this.users) await user.page.goto(`/w/${worldId}`);
       const board = await this.board(world);
       expect(board.resources.gold).toBeGreaterThanOrEqual(500);
@@ -568,14 +627,19 @@ export class OfferFixture {
     const page = this.users[0]!.page;
     const button = this.panel().getByRole('button', { name: `${targetName}에게 제안`, exact: true });
     await this.panel().getByLabel('제안할 관계').selectOption('LIEUTENANT');
-    await button.evaluate((element) =>
-      element.addEventListener(
-        'click',
-        () => {
-          document.documentElement.dataset.offerClick = String(Date.now());
-        },
-        { once: true, capture: true },
-      ),
+    const clickBinding = 'offerClick' + randomUUID().replaceAll('-', '');
+    await page.exposeFunction(clickBinding, () => this.requestOrder.arm());
+    await button.evaluate(
+      (element, binding) =>
+        element.addEventListener(
+          'click',
+          () => {
+            // capture에서 보낸 binding 메시지는 React의 새 요청보다 먼저 도착한다.
+            void (window as unknown as Record<string, () => Promise<void>>)[binding]!();
+          },
+          { once: true, capture: true },
+        ),
+      clickBinding,
     );
     const seen = deferred<Board>(),
       gate = deferred<void>();
@@ -590,8 +654,7 @@ export class OfferFixture {
           if (this.scope.signal.aborted) return route.abort('aborted');
           const call = calls(route.request()).find((c) => c.path === 'campaign.get');
           if (!armed || !call || route.request().method() !== 'GET') return route.fallback();
-          const clickedAt = Number(await page.evaluate(() => document.documentElement.dataset.offerClick ?? 0));
-          if (!clickedAt || route.request().timing().startTime < clickedAt) return route.fallback();
+          if (!this.requestOrder.claim(route.request())) return route.fallback();
           armed = false;
           const response = await this.scope.work('route fetch', () => route.fetch());
           const json = await response.json();
@@ -613,7 +676,6 @@ export class OfferFixture {
     await page.route('**/trpc/**', handler);
     return {
       click: () => {
-        this.offerClickStartedAt = Date.now();
         return this.scope.work('offer click', () => button.click());
       },
       seen: seen.promise,
@@ -645,8 +707,7 @@ export class OfferFixture {
             // 명시적 재조회가 취소한 자기 이전 poll만 허용한다.
             const ownFreshReadCancelledOldPoll =
               !this.scope.signal.aborted &&
-              this.offerClickStartedAt > 0 &&
-              route.request().timing().startTime < this.offerClickStartedAt &&
+              this.requestOrder.beforeClick(route.request()) &&
               route.request().failure()?.errorText === 'net::ERR_ABORTED';
             if (!ownFreshReadCancelledOldPoll) throw error;
           }
