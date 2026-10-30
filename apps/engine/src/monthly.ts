@@ -13,6 +13,7 @@ import {
   settleTreaties,
   type ReplayState,
   type WorldState,
+  unitSetSchema,
 } from '@opensamguk/rules';
 import { rngFor } from '@opensamguk/shared';
 import { hashState } from '@opensamguk/shared/node';
@@ -68,7 +69,9 @@ export async function loadReplayState(tx: Prisma.TransactionClient, worldId: str
     revisions: Object.fromEntries(generals.map(({ id, turnRevision }) => [id, turnRevision])),
     monthlyTick: world.monthlyTick,
     ...(policy ? { policy } : {}),
-    ...(world.ruleFeatures.includes('campaign-v1') ? { campaignArmyTypes: readCampaignArmyTypes(world) } : {}),
+    ...(world.ruleFeatures.includes('campaign-v1')
+      ? { campaignArmyTypes: readCampaignArmyTypes(world), campaignUnitSet: unitSetSchema.parse(world.unitSet) }
+      : {}),
   };
   for (const feature of engineFeatures
     .filter((feature) => state.ruleFeatures?.includes(feature.key))

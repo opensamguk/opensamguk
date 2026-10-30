@@ -186,6 +186,8 @@ export * from './campaign/state';
 export * from './campaign/relationships';
 export * from './campaign/record';
 export * from './campaign/unitInputs';
+export * from './campaign/orderTypes';
+export * from './campaign/orders';
 export { campaignArmyTypes, validateCampaignRecord } from './campaign/feature';
 export { commandStatPreview, type CommandStatPreview } from './commands/statPreview';
 export * from './clock/createRequest';

@@ -282,7 +282,10 @@ export class TurnLoop {
               ...(modern ? { explicit: command!.explicit } : {}),
             },
             world.seed,
-            modern ? { policy: actor.defaultPolicy as import('@opensamguk/rules').PolicyKey } : {},
+            {
+              ...(modern ? { policy: actor.defaultPolicy as import('@opensamguk/rules').PolicyKey } : {}),
+              turnRevision: actor.turnRevision,
+            },
             engineResolver(world).resolver,
             ...(personnelBefore ? ([{ offices: personnelBefore.offices! }] as const) : []),
           );

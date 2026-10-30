@@ -14,6 +14,7 @@ import { MapLegend, WorldMap } from '../main/WorldMap';
 import { PolicyBar } from '../policy/PolicyBar';
 import { OfferBox } from '../personnel/OfferBox';
 import { CampaignPanel } from '../personnel/CampaignPanel';
+import { RetinueOrdersPanel } from '../personnel/RetinueOrdersPanel';
 import { TurnEditor } from '../turns/TurnEditor';
 import { EmptyState, LoadingState } from '../ui/States';
 import { useTRPC } from '../trpc';
@@ -207,6 +208,7 @@ export function MainPage() {
         </div>
       </div>
       {mine.data?.general && mine.data.creationRules.campaignEnabled ? <CampaignPanel worldId={worldId} /> : null}
+      {mine.data?.general && mine.data.creationRules.campaignEnabled ? <RetinueOrdersPanel worldId={worldId} /> : null}
     </section>
   );
 }
