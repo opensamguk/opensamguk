@@ -3,6 +3,7 @@ import type { NationTrustState, TreatyState } from '../diplomacy/treatyTypes';
 import { cloneExtStateWithRegistry, extSlices, extCommandBindings, type ExtStateRegistry } from '../commands/ext/state';
 import type { InitialCity, InitialGeneral, InitialNation, InitialDiplomacy, WorldInit } from '../world/bootstrap';
 import type { CampaignState } from '../campaign/state';
+import type { CityResourcesState } from '../cityResources/state';
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 export type WorldExt = Record<string, JsonValue>;
 export interface AssignmentOffer {
@@ -16,6 +17,7 @@ export interface AssignmentOffer {
 export type OfficeTurns = Record<number, Record<number, { commandKey: string; args: unknown }[]>>;
 export type OfficeRevisions = Record<number, Record<number, { revision: number; tenure: number }>>;
 export interface WorldState {
+  cityResources?: CityResourcesState;
   campaign?: CampaignState;
   presetRules?: PresetRules;
   ruleFeatures?: string[];

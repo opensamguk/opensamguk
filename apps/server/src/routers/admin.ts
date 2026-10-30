@@ -5,8 +5,10 @@ import { notifySessionClosed } from '@opensamguk/db';
 import { createAdminSanction, createSanctionInput, liftAdminSanction, liftSanctionInput } from '../admin/sanctionStore';
 import { auditListInput, getUser, getUserInput, listAudit, searchUsers, searchUsersInput } from '../admin/read';
 import { listAdminWorlds } from '../admin/worlds';
+import { investigateShared, investigateSharedInput } from '../admin/investigation';
 import { requestWorldCreateInput, worldCreateStatusInput } from '@opensamguk/rules';
 import { requestWorldCreate, getWorldCreateRequest } from '../admin/worldCreate';
+import { creationOptionsInput, getWorldCreationOptions } from '../admin/worldCreateOptions';
 import { requestWorldReset, getWorldResetRequest } from '../admin/worldReset';
 import { requestWorldResetInput, worldResetRequestInput } from '@opensamguk/rules';
 
@@ -28,7 +30,13 @@ import {
 
 export const adminRouter = router({
   whoami: adminProcedure.input(z.void()).query(() => ({ admin: true as const })),
+  investigate: router({
+    shared: adminProcedure.input(investigateSharedInput).query(({ ctx, input }) => investigateShared(ctx, input)),
+  }),
   world: router({
+    creationOptions: adminProcedure
+      .input(creationOptionsInput)
+      .query(({ ctx, input }) => getWorldCreationOptions(ctx, input)),
     create: adminProcedure.input(requestWorldCreateInput).mutation(({ ctx, input }) => requestWorldCreate(ctx, input)),
     createStatus: adminProcedure
       .input(worldCreateStatusInput)
@@ -62,7 +70,7 @@ export const adminRouter = router({
       .mutation(({ ctx, input }) => changeAdminNotice(ctx, { kind: 'hide', input })),
   }),
   user: router({
-    get: adminProcedure.input(getUserInput).query(({ ctx, input }) => getUser(ctx.db, ctx.user.id, input, ctx.now)),
+    get: adminProcedure.input(getUserInput).query(({ ctx, input }) => getUser(ctx, input)),
     search: adminProcedure
       .input(searchUsersInput)
       .query(({ ctx, input }) => searchUsers(ctx.db, ctx.user.id, input, ctx.now)),

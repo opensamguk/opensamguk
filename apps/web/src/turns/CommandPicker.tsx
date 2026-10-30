@@ -3,6 +3,7 @@ import { DisabledReason } from '../ui/DisabledReason';
 import { argFields, buildArgs, requiredKeys, type ArgField } from './args';
 import type { Turn } from './draft';
 import styles from './TurnEditor.module.css';
+import { cityPreparationNote, cityPreparationSchema, type PreparationTarget } from './cityResourceArgs';
 
 export interface CommandInfo {
   key: string;
@@ -34,6 +35,7 @@ interface Props {
   generals?: Array<{ id: number; name: string }> | undefined;
   selectedCityKey: number | null;
   defaultCrewType: number | undefined;
+  cityResources?: boolean;
   // 넣을 수 없을 때의 이유. null이면 넣을 수 있다.
   blockedReason: string | null;
   targetLabel: string;
@@ -52,6 +54,7 @@ export function CommandPicker({
   generals,
   selectedCityKey,
   defaultCrewType,
+  cityResources = false,
   blockedReason,
   targetLabel,
   searchRef,
@@ -62,6 +65,7 @@ export function CommandPicker({
   const [category, setCategory] = useState<string>('all');
   const [chosen, setChosen] = useState<string | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
+  const [preparationTarget, setPreparationTarget] = useState<PreparationTarget>('unit');
   const firstArgRef = useRef<HTMLElement | null>(null);
   const listId = useId();
   const formId = useId();
@@ -73,8 +77,14 @@ export function CommandPicker({
     );
   }, [commands, query, category]);
   const command = commands.find((c) => c.key === chosen) ?? null;
-  const fields = useMemo(() => (command ? argFields(command.argsSchema) : []), [command]);
-  const required = useMemo(() => (command ? requiredKeys(command.argsSchema) : []), [command]);
+  const schema = useMemo(
+    () => (command ? cityPreparationSchema(command.argsSchema, cityResources, command.key, preparationTarget) : null),
+    [command, cityResources, preparationTarget],
+  );
+  const fields = useMemo(() => (schema ? argFields(schema) : []), [schema]);
+  const required = useMemo(() => (schema ? requiredKeys(schema) : []), [schema]);
+  const cityDrill = cityResources && command && ['train', 'morale'].includes(command.key);
+  const costNote = command ? cityPreparationNote(cityResources, command.key, preparationTarget) : null;
   const built = buildArgs(fields, required, values);
   const sortedCities = useMemo(() => [...cities].sort((a, b) => a.name.localeCompare(b.name, 'ko')), [cities]);
   const choices = command && cityChoicesFor ? cityChoicesFor(command.key) : null;
@@ -92,7 +102,8 @@ export function CommandPicker({
     const next = commands.find((c) => c.key === key);
     const initial: Record<string, string> = {};
     const mapCity = mapCityFor(next?.key);
-    for (const field of next ? argFields(next.argsSchema) : []) {
+    const nextSchema = next ? cityPreparationSchema(next.argsSchema, cityResources, next.key, preparationTarget) : null;
+    for (const field of nextSchema ? argFields(nextSchema) : []) {
       if (field.kind === 'city' && mapCity !== null) initial[field.key] = String(mapCity);
       if (field.kind === 'integer' && field.key === 'crewType' && defaultCrewType !== undefined)
         initial[field.key] = String(defaultCrewType);
@@ -105,8 +116,12 @@ export function CommandPicker({
   };
 
   const put = () => {
-    if (!command || blockedReason || built.missing.length > 0) return;
-    onPut({ commandKey: command.key, args: built.args, explicit: true });
+    if (!command || !schema || blockedReason || built.missing.length > 0) return;
+    onPut({
+      commandKey: command.key,
+      args: cityDrill && preparationTarget === 'city' ? { ...built.args, target: 'city' } : built.args,
+      explicit: true,
+    });
   };
 
   const onSearchKey = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -115,7 +130,7 @@ export function CommandPicker({
     const first = filtered[0];
     if (!first) return;
     const next = choose(first.key);
-    if (next && argFields(next.argsSchema).length === 0) {
+    if (next && !(cityResources && ['train', 'morale'].includes(next.key)) && argFields(next.argsSchema).length === 0) {
       if (!blockedReason) onPut({ commandKey: next.key, args: {}, explicit: true });
     } else {
       // 인자 칸이 그려진 뒤 옮긴다.
@@ -137,7 +152,13 @@ export function CommandPicker({
 
   const putReason =
     blockedReason ??
-    (!command ? '명령을 고르세요.' : built.missing.length > 0 ? `${built.missing.join(', ')} 칸을 채우세요.` : null);
+    (!command
+      ? '명령을 고르세요.'
+      : !schema
+        ? '명령 입력 형식을 확인하지 못했습니다.'
+        : built.missing.length > 0
+          ? `${built.missing.join(', ')} 칸을 채우세요.`
+          : null);
 
   return (
     <section className={styles.picker} aria-label="명령 고르기">
@@ -200,6 +221,26 @@ export function CommandPicker({
             put();
           }}
         >
+          {cityDrill ? (
+            <label className={styles.argLabel}>
+              <span>훈련·사기 대상</span>
+              <select
+                value={preparationTarget}
+                onChange={(event) => {
+                  setPreparationTarget(event.target.value === 'city' ? 'city' : 'unit');
+                  setValues({});
+                }}
+              >
+                <option value="unit">기존 부곡</option>
+                <option value="city">현재 도시 수비병</option>
+              </select>
+            </label>
+          ) : null}
+          {costNote ? (
+            <p className={styles.muted} role="note">
+              {costNote}
+            </p>
+          ) : null}
           {fields.length === 0 ? <p className={styles.muted}>인자 없이 넣는 명령입니다.</p> : null}
           {fields.map((field, i) => (
             <ArgInput

@@ -2,6 +2,9 @@ import { TRPCError } from '@trpc/server';
 import type { Prisma, PrismaClient } from '@opensamguk/db';
 import { z } from 'zod';
 import { activeSanctionWhere } from '../auth/sanction';
+import type { Context } from '../context';
+import { requireCurrentAdmin } from './access';
+import { databaseTime } from '../messaging';
 
 const text = (min: number, max: number) =>
   z
@@ -121,8 +124,12 @@ export async function searchUsers(
   });
 }
 
-export async function getUser(db: PrismaClient, actorId: string, input: z.infer<typeof getUserInput>, now: number) {
-  const result = await readAsAdmin(db, actorId, async (tx) => {
+export async function getUser(ctx: Context, input: z.infer<typeof getUserInput>) {
+  if (!ctx.user) throw new TRPCError({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' });
+  const actorId = ctx.user.id;
+  const result = await readAsAdmin(ctx.db, actorId, async (tx) => {
+    await requireCurrentAdmin(tx, ctx, false);
+    const auditNow = (await databaseTime(tx)).getTime();
     const user = await tx.user.findUnique({
       where: { id: input.userId },
       select: {
@@ -159,6 +166,13 @@ export async function getUser(db: PrismaClient, actorId: string, input: z.infer<
         },
       },
     });
+    const recentLogins = user
+      ? await tx.$queryRaw<Array<{ at: Date; success: boolean; ipLabel: string; deviceLabel: string | null }>>`
+      SELECT at,success,left("ipHash",8) AS "ipLabel",left("deviceHash",8) AS "deviceLabel"
+      FROM "LoginRecord" WHERE "userId"=${input.userId}
+        AND at>=${new Date(auditNow - 90 * 86_400_000)} AND at<=${new Date(auditNow)}
+      ORDER BY at DESC,id DESC LIMIT 50`
+      : [];
     await tx.auditLog.create({
       data: {
         actorKind: 'ADMIN',
@@ -184,6 +198,12 @@ export async function getUser(db: PrismaClient, actorId: string, input: z.infer<
       emailVerified: user.emailVerifiedAt !== null,
       generalCount: user._count.generals,
       sanctionCount: user._count.sanctions,
+      recentLogins: recentLogins.map((record) => ({
+        at: record.at.toISOString(),
+        success: record.success,
+        ipLabel: record.ipLabel,
+        deviceLabel: record.deviceLabel,
+      })),
       generals: user.generals.map((general) => ({
         generalId: general.id,
         name: general.name,
@@ -200,7 +220,7 @@ export async function getUser(db: PrismaClient, actorId: string, input: z.infer<
         createdAt: sanction.createdAt.toISOString(),
         expiresAt: sanction.expiresAt?.toISOString() ?? null,
         liftedAt: sanction.liftedAt?.toISOString() ?? null,
-        active: sanction.liftedAt === null && (sanction.expiresAt === null || sanction.expiresAt.getTime() > now),
+        active: sanction.liftedAt === null && (sanction.expiresAt === null || sanction.expiresAt.getTime() > ctx.now),
       })),
     };
   });

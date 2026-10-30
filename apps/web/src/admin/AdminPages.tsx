@@ -9,6 +9,7 @@ import { auditFilter, searchFilter, type AuditFilter } from './filters';
 import { usePrivateRead } from './usePrivateRead';
 import { AdminUserDetail } from './AdminUserDetail';
 import { AdminSanctionActions } from './AdminSanctionActions';
+import { AdminInvestigation, AdminReadIdentityError, readCurrentAdminData } from './AdminInvestigation';
 import styles from './AdminPages.module.css';
 
 type Outputs = inferRouterOutputs<AppRouter>['admin'];
@@ -135,8 +136,8 @@ export function AdminHome() {
       <h2>운영 조회</h2>
       <p>월드·사용자·감사 기록을 조회하고 로비·월드 공지를 관리합니다.</p>
       <p>
-        사용자 상세에서 참가 장수·제재 이력을 확인하고 제재를 등록·해제합니다. 월드 조작과 로그인 자료 화면은 준비
-        중입니다.
+        사용자 상세에서 참가 장수·제재 이력을 확인하고 제재를 등록·해제합니다. 월드 목록에서
+        생성·시작·일시정지·재개·종료를 요청합니다. 초기화와 로그인 자료 화면은 준비 중입니다.
       </p>
     </section>
   );
@@ -144,7 +145,8 @@ export function AdminHome() {
 
 export function AdminUsers() {
   const viewerId = useViewer(),
-    client = useTRPCClient();
+    client = useTRPCClient(),
+    router = useRouter();
   const searchForm = useRef<HTMLFormElement>(null);
   const query = usePrivateRead<Outputs['user']['search']>(viewerId);
   const detail = usePrivateRead<Outputs['user']['get']>(viewerId);
@@ -161,7 +163,22 @@ export function AdminUsers() {
       setDetailError('사용자 UUID를 확인하세요.');
       return;
     }
-    void detail.read((signal) => client.admin.user.get.query({ userId }, { signal }));
+    void detail.read(async (signal) => {
+      try {
+        return await readCurrentAdminData(
+          viewerId,
+          {
+            me: (next) => client.auth.me.query(undefined, { signal: next }),
+            whoami: (next) => client.admin.whoami.query(undefined, { signal: next }),
+          },
+          signal,
+          (next) => client.admin.user.get.query({ userId }, { signal: next }),
+        );
+      } catch (failure) {
+        if (failure instanceof AdminReadIdentityError) void router.invalidate();
+        throw failure;
+      }
+    });
   }
   const [kind, setKind] = useState('account'),
     [error, setError] = useState<string | null>(null);
@@ -295,6 +312,20 @@ export function AdminUsers() {
           setError(null);
         }}
         onLockChange={setActionLocked}
+      />
+      <AdminInvestigation
+        key={`investigation:${viewerId}`}
+        viewerId={viewerId}
+        disabled={actionLocked}
+        source={{
+          me: (signal) => client.auth.me.query(undefined, { signal }),
+          whoami: (signal) => client.admin.whoami.query(undefined, { signal }),
+          worlds: (signal) => client.admin.world.list.query(undefined, { signal }),
+          shared: (input, signal) => client.admin.investigate.shared.query(input, { signal }),
+        }}
+        onAccessDenied={() => {
+          void router.invalidate();
+        }}
       />
     </section>
   );

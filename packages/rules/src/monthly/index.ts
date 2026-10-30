@@ -4,6 +4,7 @@ import { TICKS_PER_MONTH } from '../clock/constants';
 import type { WorldState, WorldView } from '../model/world';
 import { refreshSupply } from '../supply';
 import { readCampaignState } from '../campaign/state';
+import { applyCityResourceIncome } from '../cityResourceIncome';
 
 export const MONTHLY_STAGES = ['income', 'population', 'supply', 'diplomacy', 'yearbook'] as const;
 export interface NationSummary {
@@ -163,6 +164,7 @@ export function runMonthly(state: WorldView, tick: number, rng: Rng) {
   // 현 단계는 난수를 소비하지 않는다. 재해·사건을 붙일 때 이 스트림만 쓴다.
   void rng;
   let next = settleIncome(state, date);
+  if (state.ruleFeatures?.includes('city-resources-v1')) next = applyCityResourceIncome(state, next, date);
   next = settlePopulation(next);
   next = settleSupply(next);
   next = settleDiplomacy(next, tick);

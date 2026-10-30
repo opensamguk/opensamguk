@@ -74,13 +74,14 @@ describe('INT-01 / AC-INT-01 PostgreSQL CI 분할', () => {
     expect(api).toContain('tools/int06-campaign.integration.test.ts');
   });
 
-  it('기존 다섯 파일과 승인한 여섯 파일만 엔진 묶음에 넣는다', () => {
+  it('기존 다섯 파일과 승인한 일곱 파일만 엔진 묶음에 넣는다', () => {
     expect(ENGINE_INTEGRATION_FILES).toEqual([
       'tools/scenarios.integration.test.ts',
       'apps/engine/src/supervisor.integration.test.ts',
       'apps/engine/src/accelerated.integration.test.ts',
       'apps/engine/src/season.integration.test.ts',
       'apps/engine/src/lease.integration.test.ts',
+      'tools/int18-city-resources.integration.test.ts',
       'tools/integration-scenario.integration.test.ts',
       'tools/resource-catalog.integration.test.ts',
       'tools/t4-17-ext-n2.integration.test.ts',

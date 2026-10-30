@@ -1,4 +1,4 @@
-import { createHash, randomInt, randomUUID } from 'node:crypto';
+import { randomBytes, createHash, randomInt, randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -305,7 +305,9 @@ async function serverFor(options: { policy: LegalPolicy | null; production?: boo
     publicOrigin: requestOrigin,
     emailVerificationRequired: true,
     legalPolicy: options.policy,
-    ...(options.production ? { production: true } : {}),
+    ...(options.production
+      ? { production: true, loginAudit: { key: randomBytes(32).toString('hex'), version: 1 } }
+      : {}),
   });
   servers.push(server);
   return { address: await listen(server), origin: requestOrigin };
@@ -553,10 +555,10 @@ it('두 정식 월드의 미동의 변경은 전부403·무변경이며 실제 �
   const paths = Object.entries(procedures)
     .filter(([, procedure]) => procedure._def.type === 'mutation' && procedure._def.meta?.accountAccess === 'verified')
     .map(([path]) => path);
-  expect(paths).toHaveLength(29);
+  expect(paths).toHaveLength(30);
   expect(paths).toContain('admin.world.requestClock');
   expect(paths).toContain('admin.world.create');
-
+  expect(paths).toContain('cityResources.allocate');
   expect(paths).toContain('admin.world.requestEnd');
   expect(paths).toContain('admin.world.requestReset');
   const before = await gameSnapshot(true);

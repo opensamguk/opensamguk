@@ -9,6 +9,7 @@ import { assertPersonnelStorage } from './personnelState';
 import { assertNoResidenceAnchorsInRows } from './residenceState';
 import { storedGeneralStats } from './generalStats';
 import { readCampaignArmyTypes, readStoredCampaign } from './campaignState';
+import { readStoredCityResources } from './cityResourcesState';
 
 export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): Promise<WorldState> {
   const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
@@ -80,6 +81,12 @@ export async function loadWorldAfterCapabilityCheck(
   };
   const campaign = readStoredCampaign(world.campaignState, state, world.seed);
   if (campaign) state.campaign = campaign;
+  const cityResources = readStoredCityResources(
+    world.cityResourcesState,
+    state,
+    world.ruleFeatures.includes('city-resources-v1') ? readCampaignArmyTypes(world) : [],
+  );
+  if (cityResources) state.cityResources = cityResources;
   for (const feature of engineFeatures
     .filter((feature) => world.ruleFeatures?.includes(feature.key))
     .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)))
