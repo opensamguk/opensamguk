@@ -1,4 +1,13 @@
-import { test, expect, mutate, randomUUID, hashState, calls, type Offer } from './campaign-offer-fixture';
+import {
+  test,
+  expect,
+  mutate,
+  randomUUID,
+  hashState,
+  calls,
+  settleIndependentJoins,
+  type Offer,
+} from './campaign-offer-fixture';
 
 // INT-11 AC-INT-11. 전용 공개 dist 구성에서만 열거하고 실행한다.
 test.describe.configure({ timeout: 120_000, retries: 0 });
@@ -93,24 +102,29 @@ test('AC-INT-11 C 선행 정상 입력 뒤 engine STALE은 비용·시도·후�
     const gate = await offer.gateRead(npc.name);
     await gate.click();
     const fresh = await gate.seen;
-    const formRequests: string[] = [];
-    for (const world of [main!, control!]) {
-      const b = await offer.board(world, 1);
-      const requestId = randomUUID();
-      formRequests.push(requestId);
-      await mutate(offer.users[1]!.page, 'campaign.unit', {
-        worldId: world.id,
-        requestId,
-        payload: { type: 'form', commanderId: 493, crewType: b.armyTypes[0]!.id, revision: b.revision },
-      });
-    }
+    const formRequests = await settleIndependentJoins(
+      [main!, control!].map((world) => async () => {
+        const b = await offer.board(world, 1);
+        const requestId = randomUUID();
+        await mutate(offer.users[1]!.page, 'campaign.unit', {
+          worldId: world.id,
+          requestId,
+          payload: { type: 'form', commanderId: 493, crewType: b.armyTypes[0]!.id, revision: b.revision },
+        });
+        return requestId;
+      }),
+      () => offer.scope.cancel(),
+    );
     expect((await offer.board()).revision).toBe(fresh.revision);
     gate.release();
     await expect.poll(() => posts.length).toBe(1);
     expect(posts[0]!.status).toBe(200);
     const requestId = posts[0]!.input.requestId;
     expect((await offer.input(requestId)).status).toBe('PENDING');
-    for (const world of [main!, control!]) await offer.advance(world, world.tick);
+    await settleIndependentJoins(
+      [main!, control!].map((world) => () => offer.advance(world, world.tick)),
+      () => offer.scope.cancel(),
+    );
     expect(await offer.input(requestId)).toMatchObject({ status: 'REJECTED', result: { code: 'STALE_REVISION' } });
     for (const [index, world] of [main!, control!].entries())
       expect(
@@ -126,23 +140,25 @@ test('AC-INT-11 C 선행 정상 입력 뒤 engine STALE은 비용·시도·후�
       expect(left.state.generals[id]!.rice).toBe(right.state.generals[id]!.rice);
     }
     // 같은 후속 NPC 제안을 두 월드에서 실제 처리해 거부 입력의 난수·비용 영향을 검사한다.
-    const results: unknown[] = [];
-    for (const world of [main!, control!]) {
-      const b = await offer.board(world);
-      const id = randomUUID();
-      await mutate(offer.users[0]!.page, 'campaign.relationship', {
-        worldId: world.id,
-        requestId: id,
-        expectedUserId: offer.users[0]!.id,
-        payload: { type: 'offer', targetId: npc.id, relation: 'LIEUTENANT', revision: b.revision },
-      });
-      await offer.advance(world, world.tick);
-      const event = await world.hold.db.inputEvent.findFirstOrThrow({
-        where: { worldId: world.id, idempotencyKey: `campaign:${id}` },
-      });
-      expect(event.status).toBe('APPLIED');
-      results.push(event.result);
-    }
+    const results = await settleIndependentJoins(
+      [main!, control!].map((world) => async () => {
+        const b = await offer.board(world);
+        const id = randomUUID();
+        await mutate(offer.users[0]!.page, 'campaign.relationship', {
+          worldId: world.id,
+          requestId: id,
+          expectedUserId: offer.users[0]!.id,
+          payload: { type: 'offer', targetId: npc.id, relation: 'LIEUTENANT', revision: b.revision },
+        });
+        await offer.advance(world, world.tick);
+        const event = await world.hold.db.inputEvent.findFirstOrThrow({
+          where: { worldId: world.id, idempotencyKey: `campaign:${id}` },
+        });
+        expect(event.status).toBe('APPLIED');
+        return event.result;
+      }),
+      () => offer.scope.cancel(),
+    );
     expect(results[0]).toEqual(results[1]);
     expect((await offer.snapshot(main!)).state.campaign).toEqual((await offer.snapshot(control!)).state.campaign);
     for (const world of [main!, control!]) {

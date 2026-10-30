@@ -444,54 +444,11 @@ export class OfferFixture {
       ),
       () => this.scope.cancel(),
     );
-    for (const world of this.worlds) {
-      const { id: worldId, hold } = world;
-      for (const user of this.users) await user.page.goto(`/w/${worldId}`);
-      const board = await this.board(world);
-      expect(board.resources.gold).toBeGreaterThanOrEqual(500);
-      expect(board.cityKey).toBe((await this.board(world, 1)).cityKey);
-      expect(await hold.db.generalTurn.count({ where: { worldId, generalId: 493 } })).toBe(30);
-      // 사람 휘하는 본인의 실제 응답 후에만 성립한다. 이후 해제해 NPC 시험의 초기 상태를 맞춘다.
-      this.progress('world-snapshot');
-      const humanBefore = await this.snapshot(world);
-      this.progress('consent-offer');
-      const offerId = randomUUID();
-      await mutate(this.users[0]!.page, 'campaign.relationship', {
-        worldId,
-        requestId: offerId,
-        expectedUserId: this.users[0]!.id,
-        payload: { type: 'offer', targetId: 493, relation: 'STAFF', revision: board.revision },
-      });
-      await this.advance(world, world.tick);
-      const offered = await this.board(world, 1);
-      expect(offered.links).toHaveLength(0);
-      const humanOffer = offered.offers.find((o) => o.personId === 493 && o.status === 'PENDING');
-      expect(humanOffer).toBeDefined();
-      this.progress('consent-accept');
-      await mutate(this.users[1]!.page, 'campaign.relationship', {
-        worldId,
-        requestId: randomUUID(),
-        payload: { type: 'respond', offerId: humanOffer!.id, accept: true, revision: offered.revision },
-      });
-      await this.advance(world, world.tick);
-      const accepted = await this.board(world, 1);
-      expect(accepted.links).toContainEqual({ masterId: 492, personId: 493, relation: 'STAFF' });
-      this.progress('consent-release');
-      await mutate(this.users[1]!.page, 'campaign.relationship', {
-        worldId,
-        requestId: randomUUID(),
-        payload: { type: 'release', personId: 493, revision: accepted.revision },
-      });
-      await this.advance(world, world.tick);
-      expect((await this.board(world)).links).toHaveLength(0);
-      this.progress('world-snapshot');
-      const humanAfter = await this.snapshot(world);
-      for (const id of [492, 493])
-        expect(humanAfter.state.generals[id]!.gold).toBe(humanBefore.state.generals[id]!.gold);
-      expect(humanAfter.turns).toEqual(humanBefore.turns);
-      expect(humanAfter.revisions).toEqual(humanBefore.revisions);
-      this.journal.push({ humanConsent: worldId, requestId: offerId, cost: 0 });
-    }
+    for (const world of this.worlds) for (const user of this.users) await user.page.goto(`/w/${world.id}`);
+    await settleIndependentJoins(
+      this.worlds.map((world) => () => this.prepareConsent(world)),
+      () => this.scope.cancel(),
+    );
     this.progress('world-snapshot');
     expect(hashState(await this.snapshot(this.worlds[0]!))).toBe(hashState(await this.snapshot(this.worlds[1]!)));
     const page = this.users[0]!.page;
@@ -513,6 +470,52 @@ export class OfferFixture {
     this.progress('final-panel');
     await expect(this.panel()).toBeVisible();
   }
+  private async prepareConsent(world: World) {
+    const { id: worldId, hold } = world;
+    const board = await this.board(world);
+    expect(board.resources.gold).toBeGreaterThanOrEqual(500);
+    expect(board.cityKey).toBe((await this.board(world, 1)).cityKey);
+    expect(await hold.db.generalTurn.count({ where: { worldId, generalId: 493 } })).toBe(30);
+    // 사람 휘하는 본인의 실제 응답 후에만 성립한다. 이후 해제해 NPC 시험의 초기 상태를 맞춘다.
+    this.progress('world-snapshot');
+    const humanBefore = await this.snapshot(world);
+    this.progress('consent-offer');
+    const offerId = randomUUID();
+    await mutate(this.users[0]!.page, 'campaign.relationship', {
+      worldId,
+      requestId: offerId,
+      expectedUserId: this.users[0]!.id,
+      payload: { type: 'offer', targetId: 493, relation: 'STAFF', revision: board.revision },
+    });
+    await this.advance(world, world.tick);
+    const offered = await this.board(world, 1);
+    expect(offered.links).toHaveLength(0);
+    const humanOffer = offered.offers.find((o) => o.personId === 493 && o.status === 'PENDING');
+    expect(humanOffer).toBeDefined();
+    this.progress('consent-accept');
+    await mutate(this.users[1]!.page, 'campaign.relationship', {
+      worldId,
+      requestId: randomUUID(),
+      payload: { type: 'respond', offerId: humanOffer!.id, accept: true, revision: offered.revision },
+    });
+    await this.advance(world, world.tick);
+    const accepted = await this.board(world, 1);
+    expect(accepted.links).toContainEqual({ masterId: 492, personId: 493, relation: 'STAFF' });
+    this.progress('consent-release');
+    await mutate(this.users[1]!.page, 'campaign.relationship', {
+      worldId,
+      requestId: randomUUID(),
+      payload: { type: 'release', personId: 493, revision: accepted.revision },
+    });
+    await this.advance(world, world.tick);
+    expect((await this.board(world)).links).toHaveLength(0);
+    this.progress('world-snapshot');
+    const humanAfter = await this.snapshot(world);
+    for (const id of [492, 493]) expect(humanAfter.state.generals[id]!.gold).toBe(humanBefore.state.generals[id]!.gold);
+    expect(humanAfter.turns).toEqual(humanBefore.turns);
+    expect(humanAfter.revisions).toEqual(humanBefore.revisions);
+    this.journal.push({ humanConsent: worldId, requestId: offerId, cost: 0 });
+  }
   panel() {
     return this.users[0]!.page.getByRole('region', { name: '개인 휘하·부곡' });
   }
@@ -528,10 +531,14 @@ export class OfferFixture {
     if (this.closing) throw new Error('정리가 시작되어 새 엔진 진행을 막습니다.');
     expect(world.hold.lost).toBeUndefined();
     this.scope.check();
-    await this.scope.work('engine advance', () =>
+    const startedAt = Date.now();
+    const executions = await this.scope.work('engine advance', () =>
       new TurnLoop(world.hold.db, world.hold.lease).advanceTo(tick, this.scope.signal),
     );
     world.tick = tick;
+    const observation = { tick, executions: executions.length, elapsedMs: Date.now() - startedAt };
+    this.journal.push({ engineAdvance: { worldId: world.id, ...observation } });
+    console.log('[campaign-offer-advance]', JSON.stringify(observation));
   }
   async npcCommit() {
     const [main, control] = this.worlds as [World, World];
@@ -551,8 +558,10 @@ export class OfferFixture {
       expect(Math.floor(due.nextTurnTick / 10000)).toBe(Math.floor(control.tick / 10000));
       const before = (await this.snapshot(control)).state.campaign!.revision;
       const tick = due.nextTurnTick;
-      await this.advance(control, tick);
-      await this.advance(main, tick);
+      await settleIndependentJoins(
+        [control, main].map((world) => () => this.advance(world, tick)),
+        () => this.scope.cancel(),
+      );
       const logs = await control.hold.db.generalLog.findMany({
         where: { worldId: control.id, tick, kind: 'success', commandKey: { in: ['recruit', 'train', 'morale'] } },
       });
