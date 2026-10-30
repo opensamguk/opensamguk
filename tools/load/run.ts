@@ -229,7 +229,7 @@ const fs=require('node:fs'),crypto=require('node:crypto');
 const password=crypto.randomBytes(48).toString('base64url');
 const database=process.env.LOAD_DATABASE;
 if(!/^opensamguk_load_[a-f0-9]{32}_test$/.test(database||''))process.exit(1);
-for(const name of ['app','pg','data','evidence'])fs.chmodSync('/owned/'+name,0o700);
+for(const name of ['app','pg','data','evidence']){fs.chownSync('/owned/'+name,0,0);fs.chmodSync('/owned/'+name,0o700);}
 for(const [dir,name,value,uid] of [['app','database_url','postgresql://load:'+password+'@postgres/'+database,10001],['pg','pg_password',password,70]]){
  const path='/owned/'+dir+'/'+name;fs.writeFileSync(path,value,{flag:'wx',mode:0o600});fs.chownSync(path,uid,uid);
 }
