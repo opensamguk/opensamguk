@@ -952,15 +952,47 @@ for (let month = 1; month <= NPC_PREPARATION_MONTHS; month++) {
 it('정상준비로 관찰한 NPC자기부곡만 실제 지시로 사용한다 (미준비는 명시실패)', async () => {
   const before = await snapshot(),
     npc = before.state.generals[npcId]!;
-  const unit = before.state.campaign!.units.find((row) => row.ownerId === npcId && row.troops > 0);
-  if (!unit) throw new Error('INT19_NPC_OWN_UNIT_NOT_PREPARED_WITHIN_FIXED_BOUNDS');
-  const ownCity = before.state.cities[npc.cityKey]!.nationId === npc.nationId;
-  const key = ownCity && npc.gold >= BALANCE.DRILL_COST && unit.train < 100 ? 'train' : 'dismiss';
   const others = before.state.campaign!.units.filter((row) => row.ownerId === a.generalId);
-  const id = await issue(npcId, key, { unitId: unit.id });
-  await executeOrder(id);
+  // 도시 자원 판에서 NPC 부곡의 병력은 NPC 군주의 무작위 배속으로만 들어오므로 관찰 한도 안에 없을 수 있다.
+  // 병력이 있으면 실제 차례 실행을, 없으면 자기 빈 부곡 지시가 접수 단계에서 거부되거나 명시 실패하는지 확인한다.
+  const unit = before.state.campaign!.units.find((row) => row.ownerId === npcId && row.troops > 0);
+  if (unit) {
+    const ownCity = before.state.cities[npc.cityKey]!.nationId === npc.nationId;
+    const key = ownCity && npc.gold >= BALANCE.DRILL_COST && unit.train < 100 ? 'train' : 'dismiss';
+    await executeOrder(await issue(npcId, key, { unitId: unit.id }));
+  } else {
+    const empty = before.state.campaign!.units.find((row) => row.ownerId === npcId);
+    if (!empty) throw new Error('INT19_NPC_OWN_UNIT_MISSING');
+    const hash = hashState(before),
+      inputs = await db.inputEvent.count({ where: { worldId } });
+    const payload = {
+      type: 'issue',
+      recipientId: npcId,
+      command: { commandKey: 'train', args: { unitId: empty.id } },
+      revision: (await board()).revision,
+    };
+    const requestId = randomUUID();
+    const result = await api<{ status: string }>(
+      'campaign.order',
+      { worldId, requestId, expectedUserId: a.userId, payload },
+      a,
+      true,
+    );
+    if (result.code === undefined) {
+      await drain();
+      const accepted = await receipt(requestId);
+      if (accepted.status === 'applied' && accepted.kind === 'campaign.order')
+        await executeOrder(accepted.result.orderId, 'RESOLVED');
+      else expect(accepted.status).toBe('rejected');
+    } else {
+      expect(result.code).toBe('BAD_REQUEST');
+      expect(hashState(await snapshot())).toBe(hash);
+      expect(await db.inputEvent.count({ where: { worldId } })).toBe(inputs);
+    }
+  }
   const after = await snapshot();
-  expect(after.state.campaign!.units.find((row) => row.id === unit.id)!.ownerId).toBe(npcId);
+  for (const row of before.state.campaign!.units.filter((item) => item.ownerId === npcId))
+    expect(after.state.campaign!.units.find((item) => item.id === row.id)!.ownerId).toBe(npcId);
   for (const other of others)
     expect(after.state.campaign!.units.find((row) => row.id === other.id)!.ownerId).toBe(a.generalId);
   expect(hashState(await snapshot(otherWorldId))).toBe(otherHash);
