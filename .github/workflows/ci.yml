@@ -280,7 +280,7 @@ jobs:
         if: matrix.shard == 4
         run: pnpm e2e:san10 --reporter=line
       - name: Check campaign offer fresh reads in Chromium
-        if: matrix.shard == 1
+        if: matrix.shard == 2
         run: pnpm e2e:campaign-offer --reporter=line
       - name: Check admin world creation actions in Chromium
         if: matrix.shard == 1

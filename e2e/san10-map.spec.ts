@@ -198,8 +198,11 @@ async function verifyMode(stack: LegalStack, page: Page, info: TestInfo, run: Ru
   for (const ledger of Object.values(before.state.cityResources!.cities))
     expect(ledger).toEqual({ gold: 0, rice: 0, garrison: [] });
   expect((await step(run, () => readWorldState(db, worldId))).operationalMap).toEqual(initial.operationalMap);
-  const hold = await step(run, () => holdLease(worldId));
-  run.holds.push(hold);
+  const hold = await step(run, async () => {
+    const acquired = await holdLease(worldId);
+    run.holds.push(acquired);
+    return acquired;
+  });
   await step(run, () => controlClock(hold.db, worldId, 'start'));
   const creating = api<{ status: string }>(
     run,
