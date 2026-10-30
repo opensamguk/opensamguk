@@ -51,6 +51,20 @@ type Container = {
   };
 };
 const auxiliaryRoles = ['initialize', 'migrations', 'resources', 'witness'] as const;
+export function loadHelperExecArgs(
+  role: (typeof auxiliaryRoles)[number],
+  id: string,
+  command: readonly string[],
+  workdir?: string,
+): string[] {
+  return [
+    'exec',
+    ...(workdir ? ['--workdir', workdir] : []),
+    id,
+    // exec는 PID1이 파일에서 읽은 동적 환경을 상속하지 않는다. 같은 파일 검사를 새 프로세스에도 적용한다.
+    ...(role === 'initialize' ? command : ['/app/deploy/entrypoint.sh', ...command]),
+  ];
+}
 export function partitionOwnedContainers(rows: readonly Container[], project: string, runId: string) {
   const primary: Container[] = [],
     auxiliary: Container[] = [];
@@ -502,7 +516,7 @@ async function main(): Promise<number> {
     } else assertContainerLimits([row], mode, image, postgresImage);
     await verifyActiveParent(row, signal);
     signal.throwIfAborted();
-    await invoke(['exec', ...(workdir ? ['--workdir', workdir] : []), id, ...command], 'execute');
+    await invoke(loadHelperExecArgs(role, id, command, workdir), 'execute');
     signal.throwIfAborted();
     await invoke(['stop', '--time', '1', id], 'stop');
     const stopped: unknown = JSON.parse(await invoke(['inspect', id], 'exit-proof'));

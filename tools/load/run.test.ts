@@ -13,7 +13,49 @@ import {
   requireImageSource,
   verifyDatabaseIdentity,
   loadFailureDiagnostic,
+  loadHelperExecArgs,
 } from './run';
+
+describe('load helper secret admission for each exec process', () => {
+  it('runs migrations through the reviewed secret entrypoint in the existing DB workdir', () => {
+    const command = [
+      'node',
+      '/app/packages/db/node_modules/prisma/build/index.js',
+      'migrate',
+      'deploy',
+      '--schema',
+      '/app/packages/db/prisma/schema.prisma',
+    ];
+    expect(loadHelperExecArgs('migrations', 'owned-container', command, '/app/packages/db')).toEqual([
+      'exec',
+      '--workdir',
+      '/app/packages/db',
+      'owned-container',
+      '/app/deploy/entrypoint.sh',
+      ...command,
+    ]);
+  });
+  it.each(['resources', 'witness'] as const)(
+    '%s reads the secret file for its own process without Docker env or shell interpolation',
+    (role) => {
+      const command = ['node', '--import', 'tsx', 'tools/load/worker.ts', role];
+      const args = loadHelperExecArgs(role, 'owned-container', command);
+      expect(args).toEqual(['exec', 'owned-container', '/app/deploy/entrypoint.sh', ...command]);
+      expect(args).not.toContain('-e');
+      expect(args).not.toContain('--env');
+      expect(args).not.toContain('sh');
+      expect(args.join(' ')).not.toContain('postgresql:');
+    },
+  );
+  it('keeps initialization before secret creation on its existing direct node path', () => {
+    const command = ['node', '-e', 'fixed-initializer'];
+    expect(loadHelperExecArgs('initialize', 'owned-container', command)).toEqual([
+      'exec',
+      'owned-container',
+      ...command,
+    ]);
+  });
+});
 
 // This checks the actual embedded script against a CAP_CHOWN-only permission model.
 // It is not a Linux filesystem or Docker execution receipt.
