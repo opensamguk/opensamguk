@@ -244,6 +244,45 @@ it('AC-M2-08 중복 volume·다른 driver와 scope를 채택하지 않는다', a
   ])
     expect(() => verifyTargetVolumes(value, f.input.target)).toThrow();
 });
+it('실제 Compose config의 null 명령·빈 IPAM·생략된 false bind만 같은 모델로 대조한다', async () => {
+  const f = await fixture(),
+    model = structuredClone(f.model) as {
+      services: Record<string, Record<string, unknown>>;
+      networks: Record<string, Record<string, unknown>>;
+    };
+  for (const service of Object.values(model.services)) {
+    service.command = null;
+    service.entrypoint = null;
+  }
+  for (const network of Object.values(model.networks)) network.ipam = {};
+  expect(() => verifyTargetCompose(model, f.template, f.environment, f.input.target)).not.toThrow();
+  const volumes = model.services.caddy!.volumes as Array<{ type: string; bind?: Record<string, unknown> }>;
+  for (const volume of volumes) if (volume.type === 'bind') volume.bind = {};
+  expect(() => verifyTargetCompose(model, f.template, f.environment, f.input.target)).not.toThrow();
+});
+for (const change of [
+  'empty-command',
+  'empty-entrypoint',
+  'ipam-driver',
+  'ipam-config',
+  'create-path',
+  'bind-extra',
+] as const)
+  it(`Compose ${change}의 실제 동작 변경은 기본값 정규화 뒤에도 거부한다`, async () => {
+    const f = await fixture(),
+      model = structuredClone(f.model) as {
+        services: Record<string, Record<string, unknown>>;
+        networks: Record<string, Record<string, unknown>>;
+      };
+    if (change === 'empty-command') model.services.server!.command = [];
+    if (change === 'empty-entrypoint') model.services.server!.entrypoint = [];
+    if (change === 'ipam-driver') model.networks.backend!.ipam = { driver: 'untrusted' };
+    if (change === 'ipam-config') model.networks.backend!.ipam = { config: [] };
+    const volumes = model.services.caddy!.volumes as Array<{ type: string; bind?: Record<string, unknown> }>;
+    if (change === 'create-path') volumes[0]!.bind = { create_host_path: true };
+    if (change === 'bind-extra') volumes[0]!.bind = { create_host_path: false, propagation: 'shared' };
+    expect(() => verifyTargetCompose(model, f.template, f.environment, f.input.target)).toThrow();
+  });
 for (const change of ['root', 'port', 'network', 'mount', 'image', 'extra-service', 'command', 'extra-field'] as const)
   it(`AC-M2-08 Compose ${change} override를 거부한다`, async () => {
     const f = await fixture(),

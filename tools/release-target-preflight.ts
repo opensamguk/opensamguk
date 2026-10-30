@@ -409,6 +409,8 @@ export function normalizedCompose(value: unknown, project: string, deployDirecto
   const services = record(model.services);
   for (const raw of Object.values(services)) {
     const service = record(raw);
+    // Compose emits image defaults as null; an empty command/entrypoint still overrides the image.
+    for (const key of ['command', 'entrypoint']) if (service[key] === null) delete service[key];
     if (service.networks)
       service.networks = Array.isArray(service.networks)
         ? Object.fromEntries(service.networks.map((name) => [String(name), {}]))
@@ -436,6 +438,9 @@ export function normalizedCompose(value: unknown, project: string, deployDirecto
         const mount = record(v);
         if (mount.read_only === false) delete mount.read_only;
         if (mount.volume && Object.keys(record(mount.volume)).length === 0) delete mount.volume;
+        // compose-go omits the false zero value in resolved long-syntax bind JSON.
+        if (mount.type === 'bind' && mount.bind && record(mount.bind).create_host_path === false)
+          delete record(mount.bind).create_host_path;
         if (mount.type === 'bind' && typeof mount.source === 'string')
           mount.source = resolve(deployDirectory, mount.source);
         return mount;
@@ -444,6 +449,7 @@ export function normalizedCompose(value: unknown, project: string, deployDirecto
   for (const [name, raw] of Object.entries(record(model.networks))) {
     const network = record(raw ?? {});
     network.name ??= project + '_' + name;
+    if (network.ipam && Object.keys(record(network.ipam)).length === 0) delete network.ipam;
     model.networks = { ...record(model.networks), [name]: network };
   }
   // Compose may retain root extension definitions; they cannot affect the resolved services.
