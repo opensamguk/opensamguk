@@ -125,8 +125,10 @@ const builderSchema = z.looseObject({
   Image: z.string(),
   State: z.looseObject({ Running: z.literal(true), Pid: z.number().int().positive(), OOMKilled: z.literal(false) }),
   HostConfig: z.looseObject({
-    CPUQuota: z.literal(100000),
-    CPUPeriod: z.literal(100000),
+    // Docker JSON uses Cpu*, unlike the Go field names and systemd CPUQuota.
+    // https://docs.docker.com/reference/api/engine/version/v1.56/
+    CpuQuota: z.literal(100000),
+    CpuPeriod: z.literal(100000),
     Memory: z.literal(2147483648),
     MemorySwap: z.literal(2147483648),
     CgroupParent: z.string(),
