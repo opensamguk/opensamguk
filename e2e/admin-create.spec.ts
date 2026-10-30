@@ -135,7 +135,7 @@ test('AC-M3-04 CH-01 실제 생성은 PREOPEN·191·21국491NPC61거점·감사1
   expect(await legalStack.db.auditLog.count({ where: { action: 'world.create.applied', worldId: id } })).toBe(1);
   expect(await endFootprint(legalStack, source.id, true)).toBe(source.fingerprint);
   expect(await legalStack.db.inputEvent.count({ where: { worldId: source.id } })).toBe(0);
-  await createdResult(page);
+  await createdResult(page, request);
   await responsiveCreation(page, 'done');
 });
 test('AC-M3-04 CH-02 직접 시드·프리셋·수동 턴·종료연도 없음이 저장값과 같다', async ({ page, legalStack }) => {
@@ -154,7 +154,7 @@ test('AC-M3-04 CH-02 직접 시드·프리셋·수동 턴·종료연도 없음�
     endYear: null,
     seed: '지정 seed 그대로',
   });
-  await createdResult(page);
+  await createdResult(page, request);
 });
 test('AC-M3-04 CH-03 실제 읽기 응답의 표식 변경 주입은 POST0으로 확인을 해제한다', async ({ page, legalStack }) => {
   const actor = await createActor(page, legalStack);
@@ -214,12 +214,31 @@ test('AC-M3-04 CH-04 실제 커밋 뒤 응답 유실과 수동 같은 요청은 
   const before = await createRequest(legalStack, actor.id);
   await page.getByRole('button', { name: '요청 상태 확인', exact: true }).click();
   await expect(page.getByText('접수됨 · 생성 대기', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '같은 요청 접수 확인', exact: true }).click();
+  const [resendResponse] = await Promise.all([
+    page.waitForResponse((item) => sanctionCalls(item.request(), 'admin.world.create'), { timeout: 10_000 }),
+    page.getByRole('button', { name: '같은 요청 접수 확인', exact: true }).click(),
+  ]);
+  expect(resendResponse.status()).toBe(200);
+  expect(await resendResponse.json()).toEqual([
+    {
+      result: {
+        data: {
+          userId: actor.id,
+          requestId: before.id,
+          idempotencyKey: before.idempotencyKey,
+          status: 'PENDING',
+          worldId: null,
+          error: null,
+        },
+      },
+    },
+  ]);
+  await expect(page.getByRole('button', { name: '같은 요청 접수 확인', exact: true })).toBeEnabled();
   await expect(page.getByText('접수됨 · 생성 대기', { exact: true })).toBeVisible();
   expect(await legalStack.db.worldCreateRequest.count({ where: { requestedBy: actor.id } })).toBe(1);
   expect((await createRequest(legalStack, actor.id)).effectiveSeed).toBe(before.effectiveSeed);
-  await applyCreation(legalStack, actor.id);
-  await createdResult(page);
+  const result = await applyCreation(legalStack, actor.id);
+  await createdResult(page, result);
 });
 test('AC-M3-04 CH-05 중복 확정·대기 중 운영 조치와 focus의 자동 POST를 막는다', async ({ page, legalStack }) => {
   const actor = await createActor(page, legalStack);
@@ -243,8 +262,8 @@ test('AC-M3-04 CH-05 중복 확정·대기 중 운영 조치와 focus의 자동 
   });
   await page.getByRole('button', { name: '계정과 생성 설정 다시 확인', exact: true }).click();
   expect(posts).toBe(1);
-  await applyCreation(legalStack, actor.id);
-  await createdResult(page);
+  const result = await applyCreation(legalStack, actor.id);
+  await createdResult(page, result);
 });
 test('AC-M3-04 CH-06 POST 직전 다른 ADMIN 쿠키로 바뀌면 두 계정 모두 미접수다', async ({ page, legalStack }) => {
   const a = await createActor(page, legalStack);
@@ -367,10 +386,30 @@ test('AC-M3-04 CH-09 실제429의 기한 뒤에도 자동 POST 없이 같은 요
   rateServer.advance(61_000);
   await page.clock.fastForward(61_000);
   expect(await legalStack.db.worldCreateRequest.count({ where: { requestedBy: actor.id } })).toBe(1);
-  await page.getByRole('button', { name: '같은 요청 접수 확인', exact: true }).click();
+  const [resendResponse] = await Promise.all([
+    page.waitForResponse((item) => sanctionCalls(item.request(), 'admin.world.create'), { timeout: 10_000 }),
+    page.getByRole('button', { name: '같은 요청 접수 확인', exact: true }).click(),
+  ]);
+  expect(resendResponse.status()).toBe(200);
+  const resendRequest = await createRequest(legalStack, actor.id);
+  expect(await resendResponse.json()).toEqual([
+    {
+      result: {
+        data: {
+          userId: actor.id,
+          requestId: resendRequest.id,
+          idempotencyKey: resendRequest.idempotencyKey,
+          status: 'PENDING',
+          worldId: null,
+          error: null,
+        },
+      },
+    },
+  ]);
+  await expect(page.getByRole('button', { name: '같은 요청 접수 확인', exact: true })).toBeEnabled();
   await expect(page.getByText('접수됨 · 생성 대기', { exact: true })).toBeVisible();
-  await applyCreation(legalStack, actor.id);
-  await createdResult(page);
+  const result = await applyCreation(legalStack, actor.id);
+  await createdResult(page, result);
 });
 test('AC-M3-04 CH-10 reload는 본인 추적 번호로 수동 조회만 복구한다', async ({ page, legalStack }) => {
   const actor = await createActor(page, legalStack);
@@ -382,8 +421,8 @@ test('AC-M3-04 CH-10 reload는 본인 추적 번호로 수동 조회만 복구�
   await expect(page.getByRole('button', { name: '요청 상태 확인', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '같은 요청 접수 확인', exact: true })).toHaveCount(0);
   expect((await createRequest(legalStack, actor.id)).id).toBe(request.id);
-  await applyCreation(legalStack, actor.id);
-  await createdResult(page);
+  const result = await applyCreation(legalStack, actor.id);
+  await createdResult(page, result);
 });
 test('AC-M3-04 CH-11 보관 정보 손상은 생성 폼을 막고 원문을 노출하지 않는다', async ({ page, legalStack }) => {
   const actor = await createActor(page, legalStack);

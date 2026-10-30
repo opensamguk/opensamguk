@@ -83,9 +83,34 @@ export async function applyCreation(stack: LegalStack, userId: string) {
   await processWorldCreateRequest(stack.db, AbortSignal.timeout(20_000));
   return stack.db.worldCreateRequest.findUniqueOrThrow({ where: { id: request.id } });
 }
-export async function createdResult(page: Page) {
-  await page.getByRole('button', { name: '요청 상태 확인', exact: true }).click();
+export async function createdResult(page: Page, result: { status: string; worldId: string | null }) {
+  expect(result.status).toBe('DONE');
+  expect(result.worldId).not.toBeNull();
+  if (!(await page.getByText('생성 완료 · 개장 전', { exact: true }).isVisible())) {
+    try {
+      await page.getByRole('button', { name: '요청 상태 확인', exact: true }).click();
+    } catch (clickError) {
+      const terminalVisible = await Promise.all([
+        page.getByText('생성 완료 · 개장 전', { exact: true }).isVisible(),
+        page
+          .getByRole('status')
+          .filter({ has: page.getByText('생성 완료 · 개장 전', { exact: true }) })
+          .getByText(result.worldId!, { exact: true })
+          .isVisible(),
+      ]).then(
+        (visibility) => visibility.every(Boolean),
+        () => false,
+      );
+      if (!terminalVisible) throw clickError;
+    }
+  }
   await expect(page.getByText('생성 완료 · 개장 전', { exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByRole('status')
+      .filter({ has: page.getByText('생성 완료 · 개장 전', { exact: true }) })
+      .getByText(result.worldId!, { exact: true }),
+  ).toBeVisible();
 }
 export async function creationSource(stack: LegalStack) {
   const initial = await loadInitialWorld({
