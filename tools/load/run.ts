@@ -8,7 +8,7 @@ import { parse, stringify } from 'yaml';
 import { admissionSite, composeBudget, evaluateAdmission, LOAD_LIMITS, type Admission } from './admission';
 import { loadDatabaseName } from './contract';
 import { assertDockerParent, assertRunningDockerParent, bindLocalDocker, LOAD_DOCKER } from './docker';
-import { OwnedCommands, mayDeleteOwnedData, sourceSnapshot, writeEvidence } from './lifecycle';
+import { OwnedCommands, mayDeleteOwnedData, sourceSnapshot, writeEvidence, driverFailureDiagnostic } from './lifecycle';
 import {
   observationFromCounters,
   parseCpuCounter,
@@ -23,6 +23,17 @@ import { loadRunSchema, type LoadRun } from './report';
 const PG_IMAGE = 'postgres:18.6-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873';
 const services = ['postgres', 'server', 'engine', 'generator'] as const;
 const volumes = ['pg-data', 'pg-secrets', 'app-secrets', 'evidence'] as const;
+let driverStage = 'options';
+export function loadFailureDiagnostic(stage: string, error: unknown) {
+  return driverFailureDiagnostic(stage, error);
+}
+function reportLoadFailure(error: unknown, stage = driverStage) {
+  try {
+    process.stderr.write(JSON.stringify(loadFailureDiagnostic(stage, error)) + '\n');
+  } catch {
+    /* Original failure remains authoritative. */
+  }
+}
 type Container = {
   Id: string;
   Name: string;
@@ -242,9 +253,11 @@ async function main(): Promise<number> {
   if (mode !== 'formal' && mode !== 'smoke') throw new Error('LOAD_OPTIONS_INVALID');
   const databaseName = loadDatabaseName(runId),
     project = `opensamguk-load-${runId}`;
+  driverStage = 'runner-provenance';
   const site = admissionSite(values.site, await readRunnerProvenance());
   // Windows·공용 풀 미설정 경로는 Docker/DB에 접속하기 전에 거부한다.
   if (!site.accepted) {
+    reportLoadFailure(new Error('ADMISSION_REFUSED'));
     process.stdout.write(`${site.reason}\n`);
     return 75;
   }
@@ -280,6 +293,7 @@ async function main(): Promise<number> {
     timeoutMs = 10_000,
     env?: NodeJS.ProcessEnv,
   ) => commands.run('docker', args, { label, signal: ownSignal, timeoutMs, ...(env ? { env } : {}) });
+  driverStage = 'local-daemon';
   const docker = await bindLocalDocker(rawDocker, signal);
   const native = (
     args: readonly string[],
@@ -288,13 +302,16 @@ async function main(): Promise<number> {
     timeoutMs = 10_000,
     env?: NodeJS.ProcessEnv,
   ) => docker.run(args, label, ownSignal, timeoutMs, env);
+  driverStage = 'source-binding';
   const before = await sourceSnapshot(commands, signal);
   if (before.head !== expectedHead || before.sha256 !== expectedSource) throw new Error('LOAD_SOURCE_PIN_MISMATCH');
   await writeEvidence(resolve(output, 'source-before.json'), before);
+  driverStage = 'compose-contract';
   const composeText = renderLoadCompose(await readFile(resolve(root, 'deploy/load/compose.yml'), 'utf8'), mode);
   const budget = composeBudget(composeText, mode),
     composePath = resolve(output, 'compose.yml');
   await writeFile(composePath, composeText, { flag: 'wx', mode: 0o600 });
+  driverStage = 'docker-information';
   const info = dictionary(
     JSON.parse(
       await native(
@@ -316,6 +333,7 @@ async function main(): Promise<number> {
     info.security.some((item) => typeof item !== 'string' || item.includes('rootless'))
   )
     throw new Error('LOAD_DOCKER_ISOLATION_UNVERIFIED');
+  driverStage = 'admission';
   const startedAdmission = Date.now();
   let admission: Admission;
   do {
@@ -337,9 +355,11 @@ async function main(): Promise<number> {
   const admissionText = JSON.stringify({ admission, budget, project, source: before, docker: docker.binding });
   await writeFile(resolve(output, 'admission.json'), admissionText + '\n', { flag: 'wx', mode: 0o600 });
   if (!admission.accepted) {
+    reportLoadFailure(new Error('ADMISSION_REFUSED'));
     process.stdout.write(`${admission.reason}\n`);
     return 75;
   }
+  driverStage = 'runtime-images';
   requireImageSource(
     JSON.parse(await native(['image', 'inspect', image], 'image-source')),
     expectedHead,
@@ -550,6 +570,7 @@ async function main(): Promise<number> {
   };
   const failures: Error[] = [];
   try {
+    driverStage = 'ownership-baseline';
     const collisions = await native(
       ['ps', '-aq', '--filter', `label=com.docker.compose.project=${project}`],
       'project-baseline',
@@ -572,10 +593,12 @@ async function main(): Promise<number> {
       throw new Error('LOAD_OWNERSHIP_BASELINE_NOT_EMPTY');
     signal.throwIfAborted();
     created = true;
+    driverStage = 'project-create';
     await setupCompose(['create'], 'create-project', 30_000);
     ownedRows = await inspectOwned(signal);
     signal.throwIfAborted();
     if (Date.now() >= setupDeadline) throw new Error('LOAD_SETUP_DEADLINE_EXCEEDED');
+    driverStage = 'private-volume-init';
     await runOwnedHelper(
       'initialize',
       [
@@ -624,9 +647,12 @@ async function main(): Promise<number> {
       true,
     );
     if (Date.now() >= setupDeadline) throw new Error('LOAD_SETUP_DEADLINE_EXCEEDED');
+    driverStage = 'postgres-start';
     await setupCompose(['up', '-d', '--wait', 'postgres'], 'postgres-start', 40_000);
     await inspectOwned(signal);
+    driverStage = 'database-identity';
     knownOid = (await databaseIdentity(signal)).oid;
+    driverStage = 'migrations';
     await runOwnedHelper(
       'migrations',
       helperArgs('migrations'),
@@ -643,6 +669,7 @@ async function main(): Promise<number> {
       true,
       '/app/packages/db',
     );
+    driverStage = 'resources';
     await runOwnedHelper(
       'resources',
       helperArgs('resources'),
@@ -651,10 +678,13 @@ async function main(): Promise<number> {
       30_000,
       true,
     );
+    driverStage = 'server-start';
     await setupCompose(['up', '-d', '--wait', 'server'], 'server-start', 30_000);
     await inspectOwned(signal);
+    driverStage = 'engine-start';
     await setupCompose(['up', '-d', 'engine'], 'engine-supervisor-start', 10_000);
     await inspectOwned(signal);
+    driverStage = 'generator-start';
     await setupCompose(['up', '-d', 'generator'], 'generator-start', 10_000);
     await inspectOwned(signal);
     observationTask = (async () => {
@@ -715,10 +745,12 @@ async function main(): Promise<number> {
       }
     })().catch((error: unknown) => {
       if (!(observer.signal.aborted && error instanceof Error && error.name === 'AbortError')) {
+        reportLoadFailure(error, 'observation');
         observeFailure = true;
         stop();
       }
     });
+    driverStage = 'generator-progress';
     const generator = ownedRows.find((row) => row.Config.Labels['com.docker.compose.service'] === 'generator')!;
     while (true) {
       signal.throwIfAborted();
@@ -762,6 +794,7 @@ async function main(): Promise<number> {
     const exit = (await native(['wait', generator.Id], 'generator-actual-exit', signal, 15_000)).trim();
     if (exit !== '0') throw new Error('LOAD_GENERATOR_FAILED');
     await compose(['stop', 'engine', 'server'], 'stop-application', signal, 50_000);
+    driverStage = 'final-witness';
     await runOwnedHelper(
       'witness',
       helperArgs('witness'),
@@ -773,6 +806,7 @@ async function main(): Promise<number> {
     const identity = await databaseIdentity(signal);
     if (identity.connections !== 0) throw new Error('LOAD_DATABASE_CONNECTIONS_REMAIN');
     await writeEvidence(resolve(output, 'database-before-stop.json'), identity);
+    driverStage = 'evidence-copy';
     const artifactPath = resolve(output, 'artifacts');
     await mkdir(artifactPath, { mode: 0o700 });
     await native(['cp', `${generator.Id}:/evidence/.`, artifactPath], 'copy-owned-evidence', signal, 10_000);
@@ -815,14 +849,17 @@ async function main(): Promise<number> {
         observations: selected,
       },
     });
+    driverStage = 'report';
     const report = await saveLoadReport(output, raw);
     finalVerdict = report.verdict;
     succeeded = finalVerdict === 'PASS' || finalVerdict === 'SMOKE_ONLY';
     complete = true;
-  } catch {
+  } catch (error) {
+    reportLoadFailure(error);
     failures.push(new Error('LOAD_BODY_FAILED'));
   }
   {
+    driverStage = 'cleanup';
     clearTimeout(bodyTimer);
     observer.abort();
     const cleanup = new AbortController(),
@@ -1013,7 +1050,8 @@ async function main(): Promise<number> {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     process.exitCode = await main();
-  } catch {
+  } catch (error) {
+    reportLoadFailure(error);
     process.stderr.write('LOAD_EXECUTION_FAILED\n');
     process.exitCode = 1;
   }

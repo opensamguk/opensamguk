@@ -12,7 +12,14 @@ import {
   readBuilderKernelProof,
   type BuilderKernelProof,
 } from './builderKernel';
-import { commandSettled, OwnedCommands, sourceSnapshot, writeEvidence } from './lifecycle';
+import {
+  commandSettled,
+  OwnedCommands,
+  sourceSnapshot,
+  writeEvidence,
+  parseDriverDiagnostic,
+  type CommandReceipt,
+} from './lifecycle';
 import { readRunnerProvenance, sampleAdmission, selfCgroupPath } from './observe';
 import { evaluateLoadRun, loadRunSchema } from './report';
 import { requireImageSource } from './run';
@@ -499,6 +506,12 @@ function reportFailure(error: unknown) {
   process.stderr.write(
     JSON.stringify({ event: 'LOAD_CI_DIAGNOSTIC', ...ciFailureDiagnostic(diagnosticPhase, error) }) + '\n',
   );
+}
+export function driverFailureDiagnostics(receipts: readonly CommandReceipt[]) {
+  return receipts
+    .filter((row) => row.label === 'actual-load-driver')
+    .flatMap((row) => (row.driverDiagnostics ?? []).map(parseDriverDiagnostic).filter((value) => value !== undefined))
+    .slice(0, 8);
 }
 const hash = z.string().regex(/^[a-f0-9]{64}$/),
   head = z.string().regex(/^[a-f0-9]{40}$/);
@@ -1180,6 +1193,12 @@ async function main() {
       throw new Error('LOAD_CI_FINAL_UNVERIFIED');
   } catch (error) {
     reportFailure(error);
+    try {
+      for (const diagnostic of driverFailureDiagnostics(commands.receipts))
+        process.stderr.write(JSON.stringify(diagnostic) + '\n');
+    } catch {
+      /* Diagnostic output cannot replace the original failure. */
+    }
     driverFailures.push(new Error('LOAD_DRIVER_OR_FINAL_EVIDENCE_FAILED'));
   }
   try {

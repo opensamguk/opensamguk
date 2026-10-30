@@ -10,7 +10,44 @@ import {
   renderLoadCompose,
   requireImageSource,
   verifyDatabaseIdentity,
+  loadFailureDiagnostic,
 } from './run';
+
+describe('driver primary failure classification', () => {
+  it('freezes the original stage before cleanup and never reads raw nested errors or getters', () => {
+    const error = Object.assign(new Error('LOAD_CONTAINER_CGROUP_UNVERIFIED', { cause: new Error('private-canary') }), {
+      stderr: 'private-canary',
+      path: '/private-canary',
+    });
+    Object.defineProperty(error, 'name', {
+      get() {
+        throw new Error('name-canary');
+      },
+    });
+    const primary = loadFailureDiagnostic('private-volume-init', error);
+    const cleanup = loadFailureDiagnostic('cleanup', new Error('LOAD_CLEANUP_UNCONFIRMED'));
+    expect(primary).toMatchObject({ stage: 'private-volume-init', code: 'LOAD_CONTAINER_CGROUP_UNVERIFIED' });
+    expect(cleanup).toMatchObject({ stage: 'cleanup', code: 'LOAD_CLEANUP_UNCONFIRMED' });
+    expect(primary.stage).toBe('private-volume-init');
+    expect(JSON.stringify(primary)).not.toContain('canary');
+    expect(loadFailureDiagnostic('/private-canary', new Error('/private-canary'))).toMatchObject({
+      stage: 'unknown',
+      code: 'UNCLASSIFIED',
+    });
+  });
+  it('distinguishes fixed schema/resource/admission categories without copying input', () => {
+    expect(loadFailureDiagnostic('admission', new Error('ADMISSION_REFUSED')).code).toBe('ADMISSION_REFUSED');
+    expect(
+      loadFailureDiagnostic('resources', Object.assign(new Error('private-canary'), { code: 'ENOENT' })).code,
+    ).toBe('RESOURCE_MISSING');
+    expect(
+      loadFailureDiagnostic('resources', Object.assign(new Error('private-canary'), { code: 'EACCES' })).code,
+    ).toBe('RESOURCE_DENIED');
+    expect(loadFailureDiagnostic('report', Object.assign(new Error('private-canary'), { name: 'ZodError' })).code).toBe(
+      'SCHEMA_INVALID',
+    );
+  });
+});
 
 describe('L4 실제 실행 전 소유권/source/compose 계약', () => {
   const host = {

@@ -17,11 +17,47 @@ import {
   verifyBuilderBeforeStop,
   builderStopEventArguments,
   verifyBuilderStopped,
+  driverFailureDiagnostics,
 } from './ci';
+import { driverFailureDiagnostic, type CommandReceipt } from './lifecycle';
 import { userWorkload } from './workload';
 import type { LoadRun } from './report';
 
 const id = (n: number) => `00000000-0000-4000-8000-${n.toString(16).padStart(12, '0')}`;
+
+describe('forward only fixed actual driver diagnostics', () => {
+  it('forwards strict sanitized records only from the exact driver and preserves outer failures', () => {
+    const diagnostic = driverFailureDiagnostic('migrations', new Error('LOAD_NATIVE_COMMAND_FAILED'));
+    const receipt: CommandReceipt = {
+      label: 'actual-load-driver',
+      pid: 123,
+      startedAt: 1,
+      closedAt: 2,
+      stdoutEnded: true,
+      stderrEnded: true,
+      actualClose: true,
+      exitCode: 1,
+      signal: null,
+      failed: false,
+      driverDiagnostics: [diagnostic],
+    };
+    expect(driverFailureDiagnostics([receipt])).toEqual([diagnostic]);
+    expect(driverFailureDiagnostics([{ ...receipt, label: 'other-driver' }])).toEqual([]);
+    const invalid = { ...diagnostic, raw: 'private-canary' };
+    expect(driverFailureDiagnostics([{ ...receipt, driverDiagnostics: [invalid] }])).toEqual([]);
+    expect(driverFailureDiagnostics([{ ...receipt, driverDiagnostics: [] }])).toEqual([]);
+    expect(driverFailureDiagnostics([{ ...receipt, driverDiagnostics: Array(12).fill(diagnostic) }])).toHaveLength(8);
+    expect(JSON.stringify(driverFailureDiagnostics([receipt]))).not.toContain('123');
+    expect(ciFailureDiagnostic('load-driver', new Error('LOAD_NATIVE_COMMAND_FAILED'))).toEqual({
+      phase: 'load-driver',
+      code: 'LOAD_NATIVE_COMMAND_FAILED',
+    });
+    expect(ciFailureDiagnostic('driver-lifecycle', new Error('LOAD_CI_FINAL_FAILED'))).toEqual({
+      phase: 'driver-lifecycle',
+      code: 'LOAD_CI_FINAL_FAILED',
+    });
+  });
+});
 describe('fixed CI failure diagnostics', () => {
   it.each(['LOAD_NATIVE_COMMAND_FAILED', 'LOAD_NATIVE_CHILD_UNSETTLED', 'LOAD_BUILDER_UNVERIFIED'])(
     'native failure remains a fixed code without copying private properties: %s',
