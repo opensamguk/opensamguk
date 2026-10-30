@@ -156,6 +156,17 @@ describe('AC-INT-19A 명시 동의·현재 상관·변경 없는30칸', () => {
       code: 'PENDING',
     });
   });
+  it('NPC에게는 소속 변경 명령을 지시하지 못하고 내정은 지시할 수 있다', () => {
+    const f = fixture();
+    for (const key of ['resign', 'join_random'])
+      expect(applyCampaignOrder(f.world, issue(4, key), 1, f.context)).toMatchObject({
+        ok: false,
+        code: 'NOT_ALLOWED',
+      });
+    expect(
+      ok(applyCampaignOrder(f.world, issue(4, 'farm'), 1, f.context)).state.campaign!.orders!.items[0],
+    ).toMatchObject({ recipientId: 4, status: 'READY', command: { commandKey: 'farm' } });
+  });
   it('과거 상태는 orders키를 만들지 않고 손상된 원장은 빈 목록으로 대체하지 않는다', () => {
     const f = fixture(),
       original = snapshot(f.world.campaign);

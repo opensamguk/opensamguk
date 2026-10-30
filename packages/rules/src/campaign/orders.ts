@@ -9,6 +9,8 @@ import { chooseGeneralTurn } from '../npc';
 import { readCampaignState } from './state';
 import { campaignOrderInputSchema, campaignOrderSlotSchema, sameOrderValue, type CampaignOrder } from './orderTypes';
 
+const NPC_ORDER_CATEGORIES: ReadonlySet<string> = new Set(['domestic', 'military', 'personal']);
+
 export function canIssueCampaignOrder(world: WorldView, issuerId: number, recipientId: number): boolean {
   const issuer = world.generals[issuerId],
     recipient = world.generals[recipientId];
@@ -131,6 +133,10 @@ export function applyCampaignOrder(
     const definition = context.resolver.get(chosen.commandKey);
     if (!definition || definition.target !== 'general' || !definition.args.safeParse(chosen.args).success)
       return deny('BAD_ARGS', '이 월드의 장수 명령과 인자를 선택하세요.');
+    // 본인 동의 없이 바로 실행되는 NPC 지시는 내정·이동·귀환·자기 부곡과 개인 명령으로 한정한다.
+    // 소속 변경·등용·계략(strategy)은 지시로 시키지 않는다.
+    if (recipient.userId === null && !NPC_ORDER_CATEGORIES.has(definition.category))
+      return deny('NOT_ALLOWED', 'NPC에게는 내정·이동·귀환·부곡 명령만 지시할 수 있습니다.');
     order = {
       id: orders.nextId++,
       issuerId,
