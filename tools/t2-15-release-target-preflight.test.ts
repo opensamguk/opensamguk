@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { basename, join, relative, resolve } from 'node:path';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { parse as yaml } from 'yaml';
-import { createTargetFixture } from './t2-15-release-target-linux.mts';
+import { createTargetFixture, metadataLinuxFailureCode } from './t2-15-release-target-linux.mts';
 import { hashFile, fileInventory } from './release-artifact';
 import {
   nonsecretKeys,
@@ -22,6 +22,17 @@ import {
 } from './release-target-preflight';
 
 let owned: string;
+it('Linux fixture 오류 분류는 원문과 임의 오류 코드를 노출하지 않는다', () => {
+  expect(metadataLinuxFailureCode(new TargetPreflightError('NATIVE'))).toBe('NATIVE');
+  expect(metadataLinuxFailureCode(new TargetPreflightError('NATIVE_UNSETTLED'))).toBe('NATIVE_UNSETTLED');
+  for (const error of [
+    new Error('canary-secret'),
+    new TargetPreflightError('canary-secret'),
+    { code: 'NATIVE', message: 'canary-secret' },
+    null,
+  ])
+    expect(metadataLinuxFailureCode(error)).toBe('FIXTURE_STEP_FAILED');
+});
 beforeAll(async () => {
   owned = await mkdtemp(join(tmpdir(), 'opensamguk-target-pure-'));
 });

@@ -298,6 +298,11 @@ export async function verifyTargetNativeDescendants(root: string, signal: AbortS
   return { cases: 2, sameGroupClosed: true, escapedStickyFailure: true, localHandlesReleased: true };
 }
 
+export function metadataLinuxFailureCode(error: unknown) {
+  if (error instanceof TargetPreflightError && ['NATIVE', 'NATIVE_UNSETTLED'].includes(error.code)) return error.code;
+  return 'FIXTURE_STEP_FAILED';
+}
+
 async function realLinuxMetadata() {
   if (process.platform !== 'linux' || !process.env.GITHUB_ACTIONS || process.env.GITHUB_ACTIONS !== 'true')
     throw new Error('LINUX_CI_REQUIRED');
@@ -316,6 +321,8 @@ async function realLinuxMetadata() {
   let failed = false,
     assertions = 0,
     nativeProbeVerified = false;
+  let stage = 'native-probes';
+  let failureCode: string | undefined;
   const failures: unknown[] = [];
   const assert = (v: unknown) => {
     if (!v) throw new Error('METADATA_ASSERTION');
@@ -330,16 +337,21 @@ async function realLinuxMetadata() {
         nativeProof.localHandlesReleased,
     );
     nativeProbeVerified = true;
+    stage = 'baseline-images';
     for (const id of (await command(['image', 'ls', '--no-trunc', '--quiet'])).trim().split('\n').filter(Boolean))
       baselineImages.add(id);
+    stage = 'baseline-volumes';
     for (const name of (await command(['volume', 'ls', '--quiet'])).trim().split('\n').filter(Boolean))
       baselineVolumes.add(name);
     for (const reference of Object.values(officialImages)) {
       // Fixture setup may acquire these two fixed official metadata references; checker never pulls.
+      stage = reference === officialImages.postgres ? 'official-postgres-pull' : 'official-caddy-pull';
       await command(['pull', reference]);
+      stage = 'official-image-inspect';
       const id = (await command(['image', 'inspect', reference, '--format', '{{.Id}}'])).trim();
       if (!baselineImages.has(id) && !ownImages.includes(id)) ownImages.push(id);
     }
+    stage = 'fixture-artifact';
     const f = await createTargetFixture(join(root, 'fixture'), async (tree, archive) => {
       const tar = join(root, 'empty.tar');
       await writeFile(tar, Buffer.alloc(10240));
@@ -369,6 +381,7 @@ async function realLinuxMetadata() {
       await command(['image', 'save', '--output', archive, ...ids]);
       return ids;
     });
+    stage = 'fixture-volumes';
     f.input.target.dockerExecutable = docker;
     f.input.target.expectedDaemonId = (await command(['info', '--format', '{{.ID}}'])).trim();
     const addVolume = async (name: string, purpose: string, wrong = false) => {
@@ -392,6 +405,7 @@ async function realLinuxMetadata() {
     };
     for (const [key, purpose] of Object.entries(volumePurposes))
       await addVolume(f.input.target.volumes[key as keyof typeof volumePurposes], purpose);
+    stage = 'metadata-checks';
     const result = await preflightTarget(f.input, controller.signal);
     controller.signal.throwIfAborted();
     const receipt = JSON.parse(await readFile(result.receiptPath, 'utf8')) as Record<string, unknown>;
@@ -511,6 +525,7 @@ async function realLinuxMetadata() {
     assert((await hashFile(f.input.artifact.manifestPath)).sha256 === f.input.artifact.manifestSha256);
   } catch (error) {
     failed = true;
+    failureCode = metadataLinuxFailureCode(error);
     failures.push(error);
   } finally {
     // Failures preserve fixture resources. Success deletes only re-inspected exact owned identities.
@@ -562,6 +577,8 @@ async function realLinuxMetadata() {
       assertions,
       nativeProbeCases: nativeProbeVerified ? 2 : 0,
       nativeProbeVerified,
+      failureStage: failed ? stage : undefined,
+      failureCode,
       failures: failures.length,
       dbQueried: false,
       secretsRead: false,
