@@ -1,4 +1,4 @@
-import { createHash, randomInt, randomUUID } from 'node:crypto';
+import { randomBytes, createHash, randomInt, randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -305,7 +305,9 @@ async function serverFor(options: { policy: LegalPolicy | null; production?: boo
     publicOrigin: requestOrigin,
     emailVerificationRequired: true,
     legalPolicy: options.policy,
-    ...(options.production ? { production: true } : {}),
+    ...(options.production
+      ? { production: true, loginAudit: { key: randomBytes(32).toString('hex'), version: 1 } }
+      : {}),
   });
   servers.push(server);
   return { address: await listen(server), origin: requestOrigin };
