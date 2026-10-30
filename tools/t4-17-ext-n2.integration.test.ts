@@ -117,6 +117,7 @@ beforeAll(async () => {
     '20261105000000_admin_notices',
     '20261106000000_legal_document_versions',
     '20261107000000_admin_sanction_requests',
+    '20261109000000_login_audit_records',
     '20261110000000_world_create_requests',
   ]);
   expect(migrations.slice(0, 18).at(-1)).toBe('20261023073000_treaties');
