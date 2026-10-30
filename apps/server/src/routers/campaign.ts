@@ -8,7 +8,7 @@ const request = worldInput.extend({ requestId: z.uuid() });
 export const campaignRouter = router({
   get: protectedProcedure.input(worldInput).query(({ ctx, input }) => readCampaignBoard(ctx, input.worldId)),
   relationship: worldVerifiedProcedure
-    .input(request.extend({ payload: campaignRelationshipInputSchema }))
+    .input(request.extend({ payload: campaignRelationshipInputSchema, expectedUserId: z.uuid().optional() }))
     .mutation(({ ctx, input }) => submitCampaignRequest(ctx, { ...input, kind: 'campaign.relationship' })),
   unit: worldVerifiedProcedure
     .input(request.extend({ payload: campaignUnitInputSchema }))

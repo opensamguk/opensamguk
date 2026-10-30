@@ -348,6 +348,58 @@ describe('네 휘하 API의 실제 HTTP 권한 대조', () => {
       );
 });
 
+it('fresh GET 뒤 다른 계정의 세션으로 바뀌면 expectedUserId가 접수와 활동을 막는다', async () => {
+  const fresh = await board();
+  const before = hashState(await snapshot());
+  const events = await db.inputEvent.count({ where: { worldId } });
+  const turns = await db.generalTurn.findMany({ where: { worldId }, orderBy: [{ generalId: 'asc' }, { slot: 'asc' }] });
+  const input = {
+    worldId,
+    requestId: randomUUID(),
+    expectedUserId: users[0],
+    payload: { type: 'offer', targetId, relation: 'STAFF', revision: fresh.revision },
+  };
+  expect((await http('campaign.relationship', input, cookies[1], true)).code).toBe('FORBIDDEN');
+  // 기존 pending JSON을 다시 읽어 같은 UUID·payload로 수동 재전송해도 UI 계정 기대값을 최상위에 붙인다.
+  const pending = JSON.parse(
+    JSON.stringify({ kind: 'campaign.relationship', requestId: input.requestId, payload: input.payload }),
+  ) as {
+    kind: string;
+    requestId: string;
+    payload: typeof input.payload;
+  };
+  const manual = { worldId, requestId: pending.requestId, payload: pending.payload, expectedUserId: users[0] };
+  expect(manual).toEqual(input);
+  expect((await http('campaign.relationship', manual, cookies[1], true)).code).toBe('FORBIDDEN');
+  expect(pending).toEqual({ kind: 'campaign.relationship', requestId: input.requestId, payload: input.payload });
+  expect((await http('campaign.relationship', { ...input, expectedUserId: users[1] }, cookies[0], true)).code).toBe(
+    'FORBIDDEN',
+  );
+  expect((await http('campaign.relationship', { ...input, expectedUserId: 'invalid' }, cookies[0], true)).code).toBe(
+    'BAD_REQUEST',
+  );
+  const original = await db.inputEvent.findUniqueOrThrow({
+    where: {
+      worldId_userId_idempotencyKey: { worldId, userId: users[0]!, idempotencyKey: `campaign:${offerRequest}` },
+    },
+  });
+  expect(
+    (
+      await http(
+        'campaign.relationship',
+        { ...input, requestId: offerRequest, payload: original.payload },
+        cookies[0],
+        true,
+      )
+    ).data,
+  ).toMatchObject({ status: 'applied' });
+  expect(hashState(await snapshot())).toBe(before);
+  expect(await db.inputEvent.count({ where: { worldId } })).toBe(events);
+  expect(
+    await db.generalTurn.findMany({ where: { worldId }, orderBy: [{ generalId: 'asc' }, { slot: 'asc' }] }),
+  ).toEqual(turns);
+});
+
 it('같은 요청은 한 번만 적용하고 사람 본인의 동의·거절·해제를 보호한다', async () => {
   const offer = await db.inputEvent.findUniqueOrThrow({
     where: {

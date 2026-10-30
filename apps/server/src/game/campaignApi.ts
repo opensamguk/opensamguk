@@ -97,11 +97,17 @@ export async function readCampaignRequest(ctx: ActorContext, worldId: string, re
 // 접수와 활동 입력만 저장한다. 소유권·명망·비용·RNG·실제 지휘 상한은 엔진이 다시 검사한다.
 export async function submitCampaignRequest(
   ctx: ActorContext,
-  input: { worldId: string; requestId: string; kind: Kind; payload: unknown },
+  input: { worldId: string; requestId: string; kind: Kind; payload: unknown; expectedUserId?: string | undefined },
 ) {
   const started = performance.now();
   await ctx.db.$transaction(async (tx) => {
     await requirePersonnelSession(tx, identity(ctx, started));
+    if (
+      input.kind === 'campaign.relationship' &&
+      input.expectedUserId !== undefined &&
+      input.expectedUserId !== ctx.user.id
+    )
+      throw new TRPCError({ code: 'FORBIDDEN', message: '로그인한 계정이 바뀌었습니다. 화면을 다시 확인하세요.' });
     const world = await requireWorld(tx, input.worldId, true);
     ready(world);
     const schema = input.kind === 'campaign.relationship' ? campaignRelationshipInputSchema : campaignUnitInputSchema;

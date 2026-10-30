@@ -285,3 +285,6 @@ jobs:
       - name: Check admin world reset actions in Chromium
         if: matrix.shard == 1
         run: pnpm e2e:admin-reset --reporter=line
+      - name: Check campaign offer fresh reads in Chromium
+        if: matrix.shard == 2
+        run: pnpm e2e:campaign-offer --reporter=line
