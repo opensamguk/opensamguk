@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { basename, join, relative, resolve } from 'node:path';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { parse as yaml } from 'yaml';
+import ts from 'typescript';
 import { createTargetFixture, metadataLinuxFailureCode } from './t2-15-release-target-linux.mts';
 import { hashFile, fileInventory } from './release-artifact';
 import {
@@ -22,16 +23,83 @@ import {
 } from './release-target-preflight';
 
 let owned: string;
+const targetFailureCodes = [
+  'ARCHITECTURE',
+  'COMPOSE',
+  'COMPOSE_PATH',
+  'COMPOSE_TEMPLATE',
+  'CONFIG',
+  'DAEMON',
+  'ENV',
+  'ENV_IMAGE',
+  'ENV_VOLUME',
+  'ENV_WEB',
+  'EXECUTABLE',
+  'FILE',
+  'HASH',
+  'IMAGE',
+  'INPUT_OR_IO',
+  'MODE',
+  'MODEL',
+  'NATIVE',
+  'NATIVE_UNSETTLED',
+  'OUTPUT',
+  'PATH',
+  'PLATFORM',
+  'RECEIPT',
+  'REPLACED',
+  'SOCKET',
+  'VOLUME',
+];
+it.each(targetFailureCodes)('Linux fixture exposes only this known consumer code: %s', (code) => {
+  const error = Object.assign(new TargetPreflightError(code), {
+    path: '/private/canary-secret',
+    stderr: 'canary-secret',
+    environment: { TOKEN: 'canary-secret' },
+    cause: new Error('canary-secret'),
+  });
+  expect(metadataLinuxFailureCode(error)).toBe(code);
+  expect(JSON.stringify({ failureCode: metadataLinuxFailureCode(error) })).not.toContain('canary');
+  expect(metadataLinuxFailureCode(Object.assign(new Error('canary-secret'), { code }))).toBe('FIXTURE_STEP_FAILED');
+  expect(metadataLinuxFailureCode({ code, message: 'canary-secret' })).toBe('FIXTURE_STEP_FAILED');
+});
 it('Linux fixture 오류 분류는 원문과 임의 오류 코드를 노출하지 않는다', () => {
   expect(metadataLinuxFailureCode(new TargetPreflightError('NATIVE'))).toBe('NATIVE');
   expect(metadataLinuxFailureCode(new TargetPreflightError('NATIVE_UNSETTLED'))).toBe('NATIVE_UNSETTLED');
   for (const error of [
     new Error('canary-secret'),
     new TargetPreflightError('canary-secret'),
+    new TargetPreflightError('IMAGE\ncanary-secret'),
+    new TargetPreflightError('IMAGE-canary-secret'),
+    new TargetPreflightError('canary-secret'.repeat(4096)),
     { code: 'NATIVE', message: 'canary-secret' },
     null,
   ])
     expect(metadataLinuxFailureCode(error)).toBe('FIXTURE_STEP_FAILED');
+});
+it('the fixed diagnostic inventory covers every literal target-consumer failure without evaluating it', async () => {
+  const text = await readFile(new URL('./release-target-preflight.ts', import.meta.url), 'utf8');
+  const source = ts.createSourceFile('target.ts', text, ts.ScriptTarget.Latest, true);
+  const codes = new Set<string>();
+  const visit = (node: ts.Node) => {
+    const isNeed = ts.isCallExpression(node) && node.expression.getText(source) === 'need';
+    const isTargetError = ts.isNewExpression(node) && node.expression.getText(source) === 'TargetPreflightError';
+    if (isNeed || isTargetError) {
+      const args = (node as ts.CallExpression | ts.NewExpression).arguments;
+      const code = isTargetError ? args?.[0] : args?.at(-1);
+      if (code && ts.isStringLiteral(code)) codes.add(code.text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  expect([...codes].sort()).toEqual([...targetFailureCodes].sort());
+});
+it('a changing code accessor cannot replace the already-whitelisted value with private text', () => {
+  const error = new TargetPreflightError('IMAGE');
+  let reads = 0;
+  Object.defineProperty(error, 'code', { get: () => (++reads === 1 ? 'IMAGE' : 'canary-secret') });
+  expect(metadataLinuxFailureCode(error)).toBe('IMAGE');
+  expect(reads).toBe(1);
 });
 beforeAll(async () => {
   owned = await mkdtemp(join(tmpdir(), 'opensamguk-target-pure-'));

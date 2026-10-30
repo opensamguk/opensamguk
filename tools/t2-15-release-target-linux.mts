@@ -298,8 +298,40 @@ export async function verifyTargetNativeDescendants(root: string, signal: AbortS
   return { cases: 2, sameGroupClosed: true, escapedStickyFailure: true, localHandlesReleased: true };
 }
 
+// Only literal codes used by the target consumer are public; no message/cause/native output is copied.
+const metadataTargetFailureCodes = new Set([
+  'ARCHITECTURE',
+  'COMPOSE',
+  'COMPOSE_PATH',
+  'COMPOSE_TEMPLATE',
+  'CONFIG',
+  'DAEMON',
+  'ENV',
+  'ENV_IMAGE',
+  'ENV_VOLUME',
+  'ENV_WEB',
+  'EXECUTABLE',
+  'FILE',
+  'HASH',
+  'IMAGE',
+  'INPUT_OR_IO',
+  'MODE',
+  'MODEL',
+  'NATIVE',
+  'NATIVE_UNSETTLED',
+  'OUTPUT',
+  'PATH',
+  'PLATFORM',
+  'RECEIPT',
+  'REPLACED',
+  'SOCKET',
+  'VOLUME',
+]);
 export function metadataLinuxFailureCode(error: unknown) {
-  if (error instanceof TargetPreflightError && ['NATIVE', 'NATIVE_UNSETTLED'].includes(error.code)) return error.code;
+  if (error instanceof TargetPreflightError) {
+    const code = error.code;
+    if (metadataTargetFailureCodes.has(code)) return code;
+  }
   return 'FIXTURE_STEP_FAILED';
 }
 
