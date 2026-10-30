@@ -4,7 +4,7 @@ import { expect, it } from 'vitest';
 import { buildSan10Map, buildSan10Scenarios } from './san10';
 import { buildInitialWorld } from '../../packages/rules/src/world/bootstrap';
 import { validateWorldResources } from '../../packages/rules/src/world/validate';
-import { operationalMapSchema } from '../../packages/rules/src/world/map/operational';
+import { compileOperationalGraph, operationalMapSchema } from '../../packages/rules/src/world/map/operational';
 import { publicGeographySchema } from '../../packages/shared/src/publicGeography';
 import { hashState } from '../../packages/shared/src/node/hashState';
 import { loadInitialWorld, loadPreset, resolveWorldResourceSelection } from '../../apps/engine/src/world/resources';
@@ -12,6 +12,7 @@ import { san10ResourceRows } from '../san10-resources';
 import { prepareInitialWorld } from '../../apps/engine/src/world/persistence';
 import { toWorldState } from '../../packages/rules/src/model/world';
 import { emptyCityResourcesState, readCityResourcesState } from '../../packages/rules/src/cityResources/state';
+import { commandRegistry } from '../../packages/rules/src/commands/registry';
 
 const root = new URL('../../', import.meta.url);
 const read = (path: string) => JSON.parse(readFileSync(new URL(path, root), 'utf8'));
@@ -50,6 +51,91 @@ it('D-045: 159표식·152전략 거점에 제안 45개를 포함한 200도로가
   expect(map.routes.some((route) => route.from === byName.get('구야국') && route.to === byName.get('대마국'))).toBe(
     true,
   );
+});
+
+it('AC-INT-03: 두 정식 원생성의152거점 전체 경로와400방향 이동 사전검사가 연결된다', async () => {
+  const resource = operationalMapSchema.parse(read('resources/map/san10.json'));
+  const graph = compileOperationalGraph(resource);
+  const byKey = new Map(graph.map((node) => [node.cityKey, node]));
+  const ports = resource.sites.filter((site) => site.kind === 'PORT');
+  const fields = resource.sites.filter((site) => site.kind === 'FIELD');
+  expect(graph).toHaveLength(152);
+  expect(byKey.size).toBe(152);
+  expect(ports).toHaveLength(6);
+  expect(fields).toHaveLength(1);
+  for (const marker of [...ports, ...fields]) {
+    expect(marker).not.toHaveProperty('anchorKey');
+    expect(graph.some((node) => node.siteId === marker.id)).toBe(false);
+  }
+  const portParents = ports.map((port) => {
+    const parent = resource.sites.find((site) => site.id === port.parentCityId);
+    expect(parent?.kind).toBe('CITY');
+    if (!parent || !('anchorKey' in parent)) throw new Error(`항구의 전략 도시가 없습니다: ${port.id}`);
+    expect(byKey.has(parent.anchorKey)).toBe(true);
+    return parent.anchorKey;
+  });
+  expect(graph.reduce((sum, node) => sum + node.connections.length, 0)).toBe(400);
+  for (const node of graph) {
+    expect(node.connections.length, `고립 거점 ${node.siteId}`).toBeGreaterThan(0);
+    expect(new Set(node.connections).size).toBe(node.connections.length);
+    for (const next of node.connections) {
+      expect(byKey.has(next), `없는 도착지 ${node.siteId}→${next}`).toBe(true);
+      expect(byKey.get(next)!.connections, `역방향 누락 ${node.cityKey}→${next}`).toContain(node.cityKey);
+    }
+  }
+
+  const move = commandRegistry.get('move')!;
+  for (const scenario of ['san10-191', 'san10-empty']) {
+    const initial = await loadInitialWorld({ map: 'san10', scenario, seed: 'san10-all-movement' });
+    expect(initial.generals).toHaveLength(491);
+    const originHash = hashState(initial);
+    expect(
+      initial.cities
+        .map(({ cityKey, kind, connections }) => ({ cityKey, kind, connections }))
+        .sort((a, b) => a.cityKey - b.cityKey),
+    ).toEqual(graph.map(({ cityKey, kind, connections }) => ({ cityKey, kind, connections })));
+    const state = toWorldState(initial);
+    // 정본 재야 장수의 위치만 메모리에서 바꿔 지리를 검사한다. 소속 장수의 적국 진입 권한은 별도 규칙이다.
+    const probe = Object.values(state.generals).find((general) => general.nationId === null);
+    expect(probe).toBeDefined();
+    if (!probe) throw new Error(`${scenario} 정본에 재야 장수가 없습니다.`);
+    const oldCityKey = probe.cityKey;
+    const stateHash = hashState(state);
+    let pairs = 0;
+    let directedMoves = 0;
+    try {
+      for (const source of graph) {
+        const seen = new Set([source.cityKey]);
+        const queue = [source.cityKey];
+        for (let index = 0; index < queue.length; index++)
+          for (const next of byKey.get(queue[index]!)!.connections)
+            if (!seen.has(next)) {
+              seen.add(next);
+              queue.push(next);
+            }
+        expect(
+          [...seen].sort((a, b) => a - b),
+          `${scenario} ${source.siteId}에서 전체 거점`,
+        ).toEqual([...byKey.keys()].sort((a, b) => a - b));
+        for (const parentKey of portParents) expect(seen.has(parentKey)).toBe(true);
+        pairs += seen.size - 1;
+        probe.cityKey = source.cityKey;
+        for (const next of source.connections) {
+          expect(
+            move.precheck(state, { generalId: probe.id }, { cityKey: next }),
+            `${scenario} 실제 이동 ${source.cityKey}→${next}`,
+          ).toBeNull();
+          directedMoves++;
+        }
+      }
+    } finally {
+      probe.cityKey = oldCityKey;
+    }
+    expect(pairs).toBe(152 * 151);
+    expect(directedMoves).toBe(400);
+    expect(hashState(state)).toBe(stateHash);
+    expect(hashState(initial)).toBe(originHash);
+  }
 });
 
 it('두 시나리오는 동일한 지리·도로를 쓰고 역사는21국491명, 공백지는180년 전원 재야다', async () => {
