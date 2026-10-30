@@ -17,6 +17,7 @@ export default defineConfig({
     '**/admin-clock.spec.ts',
     '**/admin-end.spec.ts',
     '**/admin-create.spec.ts',
+    '**/admin-create-profile.spec.ts',
     '**/admin-reset.spec.ts',
   ],
   forbidOnly: isCI,

@@ -20,6 +20,7 @@
     "e2e:admin-end": "playwright test --config playwright.end.config.ts",
     "e2e:campaign-offer": "playwright test --config playwright.campaign-offer.config.ts",
     "e2e:admin-create": "playwright test --config playwright.create.config.ts",
+    "e2e:admin-create-profile": "playwright test --config playwright.create-profile.config.ts",
     "notice:publish": "tsx --env-file-if-exists=.env tools/notice-publish.ts",
     "dev": "pnpm --parallel --filter \"./apps/*\" dev",
     "generate": "pnpm --filter @opensamguk/db generate",

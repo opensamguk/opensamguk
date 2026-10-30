@@ -285,6 +285,9 @@ jobs:
       - name: Check admin world creation actions in Chromium
         if: matrix.shard == 1
         run: pnpm e2e:admin-create --reporter=line
+      - name: Check SAN10 administrator creation profiles in public Chromium
+        if: matrix.shard == 1
+        run: pnpm e2e:admin-create-profile --reporter=line
       - name: Check admin world reset actions in Chromium
         if: matrix.shard == 1
         run: pnpm e2e:admin-reset --reporter=line
