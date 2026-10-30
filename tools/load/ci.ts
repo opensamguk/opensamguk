@@ -73,6 +73,10 @@ const diagnosticCodes = new Set([
   'LOAD_BUILDER_UNVERIFIED',
   'LOAD_IMAGE_SOURCE_INVALID',
   'LOAD_CI_BUILD_FAILED',
+  'LOAD_BUILDER_IDENTITY_UNCONFIRMED',
+  'LOAD_BUILDER_EXIT_UNCONFIRMED',
+  'LOAD_BUILDER_CHILD_UNSETTLED',
+  'LOAD_BUILDER_REMAINS',
   'LOAD_CI_FINAL_UNVERIFIED',
   'LOAD_CI_FINAL_FAILED',
   'LOAD_PUBLIC_SUMMARY_UNVERIFIED',
@@ -224,6 +228,69 @@ export function ciFailureDiagnostic(phase: unknown, error: unknown) {
       : {}),
     ...(builderKernelFailure(error) ? { builderKernelCheck: builderKernelFailure(error) } : {}),
   };
+}
+const cleanupStages = [
+  'proof',
+  'identity-inspect',
+  'identity-check',
+  'stop',
+  'exit-inspect',
+  'exit-check',
+  'child-settlement',
+  'remove',
+  'post-container',
+  'post-volume',
+  'post-check',
+  'lifecycle-write',
+] as const;
+type CleanupStage = (typeof cleanupStages)[number];
+const cleanupFields = [
+  'shape',
+  'id',
+  'name',
+  'state',
+  'running',
+  'pid',
+  'exit-code',
+  'oom-killed',
+  'pending-command',
+  'sticky-unsettled',
+  'command-close',
+  'remaining-container',
+  'remaining-volume',
+] as const;
+type CleanupField = (typeof cleanupFields)[number];
+const cleanupSchemaPaths: Readonly<Record<string, CleanupField>> = {
+  Id: 'id',
+  Name: 'name',
+  State: 'state',
+  'State.Running': 'running',
+  'State.Pid': 'pid',
+  'State.ExitCode': 'exit-code',
+  'State.OOMKilled': 'oom-killed',
+};
+export function builderCleanupCheckFields(error: z.ZodError): CleanupField[] {
+  return error.issues.map(({ path }) => {
+    const key = path.slice(1).join('.');
+    return Object.hasOwn(cleanupSchemaPaths, key) ? cleanupSchemaPaths[key]! : 'shape';
+  });
+}
+// Only fixed table values enter this diagnostic, never schema inputs or arbitrary error properties.
+export function builderCleanupDiagnostic(stage: unknown, error: unknown, fields: readonly unknown[] = []) {
+  return {
+    ...ciFailureDiagnostic('builder-cleanup', error),
+    cleanupStage: cleanupStages.find((known) => known === stage) ?? 'unknown',
+    cleanupFields: cleanupFields.filter((known) => fields.includes(known)),
+  };
+}
+function reportBuilderCleanupFailure(stage: CleanupStage, error: unknown, fields: readonly CleanupField[]) {
+  try {
+    process.stderr.write(
+      JSON.stringify({ event: 'LOAD_CI_DIAGNOSTIC', ...builderCleanupDiagnostic(stage, error, fields) }) + '\n',
+    );
+  } catch {
+    // The existing sticky cleanup failure still vetoes success; reporting must not interrupt cleanup.
+  }
 }
 function reportFailure(error: unknown) {
   process.stderr.write(
@@ -711,19 +778,32 @@ async function main() {
         process.stderr.write('LOAD_BUILDER_CLEANUP_UNSETTLED\n');
         process.exit(1);
       }, cleanupMs);
+      let cleanupStage: CleanupStage = 'proof';
+      let failedFields: CleanupField[] = [];
       try {
         if (createAttempted) {
           // 생성 결과/ID가 불명이면 삭제하지 않는다. 원자료를 보존하고 수동 확인으로 넘긴다.
           if (!builderProof) throw new Error('LOAD_BUILDER_IDENTITY_UNCONFIRMED');
+          cleanupStage = 'identity-inspect';
           const fresh: unknown = JSON.parse(
             await native(['inspect', builderProof.id], 'builder-cleanup-identity', clean.signal),
           );
+          cleanupStage = 'identity-check';
           const current = z
             .array(z.looseObject({ Id: z.literal(builderProof.id), Name: z.literal(`/${containerName}`) }))
             .length(1)
             .safeParse(fresh);
-          if (!current.success) throw new Error('LOAD_BUILDER_IDENTITY_UNCONFIRMED');
+          if (!current.success) {
+            failedFields = builderCleanupCheckFields(current.error);
+            throw new Error('LOAD_BUILDER_IDENTITY_UNCONFIRMED');
+          }
+          cleanupStage = 'stop';
           await native(['stop', '--time', '20', builderProof.id], 'stop-owned-builder', clean.signal, 30000);
+          cleanupStage = 'exit-inspect';
+          const stoppedRaw: unknown = JSON.parse(
+            await native(['inspect', builderProof.id], 'builder-actual-exit', clean.signal),
+          );
+          cleanupStage = 'exit-check';
           const stopped = z
             .array(
               z.looseObject({
@@ -737,38 +817,61 @@ async function main() {
               }),
             )
             .length(1)
-            .safeParse(JSON.parse(await native(['inspect', builderProof.id], 'builder-actual-exit', clean.signal)));
-          if (!stopped.success) throw new Error('LOAD_BUILDER_EXIT_UNCONFIRMED');
+            .safeParse(stoppedRaw);
+          if (!stopped.success) {
+            failedFields = builderCleanupCheckFields(stopped.error);
+            throw new Error('LOAD_BUILDER_EXIT_UNCONFIRMED');
+          }
+          cleanupStage = 'child-settlement';
           if (
             commands.pending.size ||
             commands.stickyUnsettled ||
             commands.receipts.some((row) => !commandSettled(row))
-          )
+          ) {
+            failedFields = [
+              ...(commands.pending.size ? ['pending-command' as const] : []),
+              ...(commands.stickyUnsettled ? ['sticky-unsettled' as const] : []),
+              ...(commands.receipts.some((row) => !commandSettled(row)) ? ['command-close' as const] : []),
+            ];
             throw new Error('LOAD_BUILDER_CHILD_UNSETTLED');
+          }
           builderClosed = true;
           // 실패한 빌드의 자기 state volume은 정상 정지 뒤에도 보존한다.
           if (!failure) {
+            cleanupStage = 'remove';
             await native(['buildx', 'rm', builder], 'remove-owned-builder', clean.signal, 30000);
-            if (
-              (
-                await native(
-                  ['ps', '-aq', '--no-trunc', '--filter', `name=^/${containerName}$`],
-                  'builder-post-container',
-                  clean.signal,
-                )
-              ).trim() ||
-              (await native(['volume', 'ls', '-q'], 'builder-post-volume', clean.signal))
+            cleanupStage = 'post-container';
+            const remainingContainer = (
+              await native(
+                ['ps', '-aq', '--no-trunc', '--filter', `name=^/${containerName}$`],
+                'builder-post-container',
+                clean.signal,
+              )
+            ).trim();
+            let remainingVolume = false;
+            // Preserve the original short circuit: no volume query if a container remains.
+            if (!remainingContainer) {
+              cleanupStage = 'post-volume';
+              remainingVolume = (await native(['volume', 'ls', '-q'], 'builder-post-volume', clean.signal))
                 .trim()
                 .split(/\s+/)
-                .includes(volumeName)
-            )
+                .includes(volumeName);
+            }
+            cleanupStage = 'post-check';
+            if (remainingContainer || remainingVolume) {
+              failedFields = [
+                ...(remainingContainer ? ['remaining-container' as const] : []),
+                ...(remainingVolume ? ['remaining-volume' as const] : []),
+              ];
               throw new Error('LOAD_BUILDER_REMAINS');
+            }
             builderDeleted = true;
           }
         }
         builderClosed = true;
-      } catch {
+      } catch (error) {
         cleanupFailures.push('BUILDER_CLEANUP_UNCONFIRMED');
+        reportBuilderCleanupFailure(cleanupStage, error, failedFields);
       } finally {
         try {
           await writeEvidence(resolve(output, 'lifecycle.json'), {
@@ -782,8 +885,9 @@ async function main() {
             stickyUnsettled: commands.stickyUnsettled,
             cleanupFailures,
           });
-        } catch {
+        } catch (error) {
           cleanupFailures.push('BUILD_LIFECYCLE_WRITE_FAILED');
+          reportBuilderCleanupFailure('lifecycle-write', error, []);
         }
         clearTimeout(timer);
         clearTimeout(guard);

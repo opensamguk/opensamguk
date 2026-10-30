@@ -6,6 +6,8 @@ import {
   BUILDKIT_IMAGE,
   CI_LIMITS,
   ciFailureDiagnostic,
+  builderCleanupCheckFields,
+  builderCleanupDiagnostic,
   builderCgroupDiagnostic,
   fixedImageId,
   publicLoadSummary,
@@ -49,6 +51,133 @@ describe('fixed CI failure diagnostics', () => {
   ])('filesystem errors preserve only a fixed category: %s', (code, expected) => {
     const error = Object.assign(new Error('/private/canary'), { code, path: '/private/canary' });
     expect(ciFailureDiagnostic('builder-evidence', error)).toEqual({ phase: 'builder-evidence', code: expected });
+  });
+});
+describe('fixed builder cleanup diagnostics', () => {
+  it.each([
+    'proof',
+    'identity-inspect',
+    'identity-check',
+    'stop',
+    'exit-inspect',
+    'exit-check',
+    'child-settlement',
+    'remove',
+    'post-container',
+    'post-volume',
+    'post-check',
+    'lifecycle-write',
+  ])('identifies the existing cleanup stage without exposing command data: %s', (stage) => {
+    const error = Object.assign(new Error('LOAD_NATIVE_COMMAND_FAILED'), {
+      stderr: 'private-canary',
+      command: '/private/canary',
+      id: 'private-canary',
+    });
+    expect(builderCleanupDiagnostic(stage, error)).toEqual({
+      phase: 'builder-cleanup',
+      code: 'LOAD_NATIVE_COMMAND_FAILED',
+      cleanupStage: stage,
+      cleanupFields: [],
+    });
+  });
+  it.each([
+    ['LOAD_BUILDER_IDENTITY_UNCONFIRMED', 'identity-check'],
+    ['LOAD_BUILDER_EXIT_UNCONFIRMED', 'exit-check'],
+    ['LOAD_BUILDER_CHILD_UNSETTLED', 'child-settlement'],
+    ['LOAD_BUILDER_REMAINS', 'post-check'],
+  ])('retains only the fixed original rejection code: %s', (code, stage) => {
+    expect(builderCleanupDiagnostic(stage, new Error(code)).code).toBe(code);
+  });
+  it('distinguishes all stopped-state predicates while dropping invalid values and issue messages', () => {
+    const parsed = z
+      .array(
+        z.looseObject({
+          Id: z.literal('expected'),
+          State: z.looseObject({
+            Running: z.literal(false),
+            Pid: z.literal(0),
+            ExitCode: z.literal(0),
+            OOMKilled: z.literal(false),
+          }),
+        }),
+      )
+      .length(1)
+      .safeParse([
+        {
+          Id: 'private-canary',
+          State: {
+            Running: true,
+            Pid: 123456,
+            ExitCode: 137,
+            OOMKilled: true,
+            privatePath: '/private/canary',
+          },
+        },
+      ]);
+    expect(parsed.success).toBe(false);
+    if (parsed.success) throw new Error('EXPECTED_SCHEMA_REJECTION');
+    const diagnostic = builderCleanupDiagnostic(
+      'exit-check',
+      new Error('LOAD_BUILDER_EXIT_UNCONFIRMED'),
+      builderCleanupCheckFields(parsed.error),
+    );
+    expect(diagnostic.cleanupFields).toEqual(['id', 'running', 'pid', 'exit-code', 'oom-killed']);
+    expect(JSON.stringify(diagnostic)).not.toMatch(/canary|123456|137|privatePath/);
+  });
+  it('does not confuse unknown schema keys, array shape, or private fields with known checks', () => {
+    const parsed = z
+      .array(z.object({ privateCanaryKey: z.literal('expected') }))
+      .length(1)
+      .safeParse([{ privateCanaryKey: '/private/canary' }, {}]);
+    if (parsed.success) throw new Error('EXPECTED_SCHEMA_REJECTION');
+    expect(
+      builderCleanupDiagnostic('private-canary', new Error('raw-private-canary'), [
+        ...builderCleanupCheckFields(parsed.error),
+        '/private/canary',
+        'pending-command',
+        'pending-command',
+      ]),
+    ).toEqual({
+      phase: 'builder-cleanup',
+      code: 'UNCLASSIFIED',
+      cleanupStage: 'unknown',
+      cleanupFields: ['shape', 'pending-command'],
+    });
+  });
+  it('separates settlement and postcondition checks using only fixed fields', () => {
+    expect(
+      builderCleanupDiagnostic('child-settlement', new Error('LOAD_BUILDER_CHILD_UNSETTLED'), [
+        'sticky-unsettled',
+        'command-close',
+        'pending-command',
+      ]).cleanupFields,
+    ).toEqual(['pending-command', 'sticky-unsettled', 'command-close']);
+    expect(
+      builderCleanupDiagnostic('post-check', new Error('LOAD_BUILDER_REMAINS'), [
+        'remaining-volume',
+        'remaining-container',
+      ]).cleanupFields,
+    ).toEqual(['remaining-container', 'remaining-volume']);
+  });
+  it('ignores forged diagnostic getters, nested errors and raw filesystem paths', () => {
+    const error = Object.assign(new Error('raw-private-canary', { cause: new Error('nested-canary') }), {
+      code: 'EACCES',
+      path: '/private/canary',
+      stack: 'private-canary',
+    });
+    Object.defineProperty(error, 'cleanupFields', {
+      get() {
+        throw new Error('getter-canary');
+      },
+    });
+    const diagnostic = builderCleanupDiagnostic('lifecycle-write', error, [{ value: 'private-canary' }]);
+    expect(diagnostic).toEqual({
+      phase: 'builder-cleanup',
+      code: 'RESOURCE_DENIED',
+      cleanupStage: 'lifecycle-write',
+      cleanupFields: [],
+    });
+    expect(JSON.stringify(diagnostic)).not.toContain('canary');
   });
 });
 // 공개 요약 경계의 수학 고정물이다. 실제 부하·계정·월드 인수로 세지 않는다.
