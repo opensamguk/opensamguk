@@ -8,6 +8,7 @@ import {
   ciFailureDiagnostic,
   builderCleanupCheckFields,
   builderCleanupDiagnostic,
+  builderCleanupExitDiagnostic,
   builderCgroupDiagnostic,
   fixedImageId,
   publicLoadSummary,
@@ -54,6 +55,61 @@ describe('fixed CI failure diagnostics', () => {
   });
 });
 describe('fixed builder cleanup diagnostics', () => {
+  it.each([
+    [0, 'zero'],
+    [1, 'one'],
+    [143, 'term143'],
+    [137, 'kill137'],
+    [2, 'other'],
+    [-1, 'other'],
+  ])('classifies stopped exit %s without returning the raw number', (code, expected) => {
+    const raw = [{ State: { ExitCode: code, privateCanary: '/private/canary' }, Id: 'private-canary' }];
+    const diagnostic = builderCleanupDiagnostic(
+      'exit-check',
+      new Error('LOAD_BUILDER_EXIT_UNCONFIRMED'),
+      ['exit-code'],
+      raw,
+    );
+    expect(diagnostic.builderExit).toEqual({ exitCodeClass: expected, exitCodeValid: true });
+    expect(diagnostic.code).toBe('LOAD_BUILDER_EXIT_UNCONFIRMED');
+    expect(JSON.stringify(diagnostic)).not.toMatch(/private|canary|"ExitCode"/);
+    // A diagnostic class never changes the original stopped-state success predicate.
+    expect(
+      z
+        .array(z.object({ State: z.object({ ExitCode: z.literal(0) }) }))
+        .length(1)
+        .safeParse(raw).success,
+    ).toBe(code === 0);
+  });
+  it.each(
+    [
+      undefined,
+      null,
+      [],
+      [{ State: {} }],
+      [{ State: null }],
+      [{ State: { ExitCode: 'private-canary' } }],
+      [{ State: { ExitCode: NaN } }],
+      [{ State: { ExitCode: Infinity } }],
+      [{ State: { ExitCode: 1.5 } }],
+      [{ State: { ExitCode: 0 } }, { State: { ExitCode: 1 } }],
+    ].map((raw) => ({ raw })),
+  )('marks a malformed exit input as other without exposing it: %#', ({ raw }) => {
+    expect(builderCleanupExitDiagnostic(raw)).toEqual({ exitCodeClass: 'other', exitCodeValid: false });
+  });
+  it('does not copy raw exit data or accept spoofed diagnostic properties from errors', () => {
+    const error = Object.assign(new Error('LOAD_BUILDER_EXIT_UNCONFIRMED'), {
+      builderExit: { exitCodeClass: 'private-canary' },
+      State: { ExitCode: 'private-canary' },
+    });
+    const raw = [{ State: { ExitCode: 1 }, Env: ['private-canary'], Path: '/private/canary' }];
+    expect(builderCleanupDiagnostic('exit-check', error, ['exit-code'], raw).builderExit).toEqual({
+      exitCodeClass: 'one',
+      exitCodeValid: true,
+    });
+    expect(builderCleanupDiagnostic('stop', error, [], raw)).not.toHaveProperty('builderExit');
+    expect(JSON.stringify(builderCleanupDiagnostic('exit-check', error, ['exit-code'], raw))).not.toContain('canary');
+  });
   it.each([
     'proof',
     'identity-inspect',

@@ -275,18 +275,47 @@ export function builderCleanupCheckFields(error: z.ZodError): CleanupField[] {
     return Object.hasOwn(cleanupSchemaPaths, key) ? cleanupSchemaPaths[key]! : 'shape';
   });
 }
+export function builderCleanupExitDiagnostic(raw: unknown) {
+  // Numeric buckets only: 143/137 do not prove a signal, and no bucket authorizes cleanup success.
+  const result = z
+    .array(z.object({ State: z.object({ ExitCode: z.number().int() }) }))
+    .length(1)
+    .safeParse(raw);
+  const code = result.success ? result.data[0]!.State.ExitCode : undefined;
+  return {
+    exitCodeClass:
+      code === 0 ? 'zero' : code === 1 ? 'one' : code === 143 ? 'term143' : code === 137 ? 'kill137' : 'other',
+    exitCodeValid: result.success,
+  };
+}
 // Only fixed table values enter this diagnostic, never schema inputs or arbitrary error properties.
-export function builderCleanupDiagnostic(stage: unknown, error: unknown, fields: readonly unknown[] = []) {
+export function builderCleanupDiagnostic(
+  stage: unknown,
+  error: unknown,
+  fields: readonly unknown[] = [],
+  stoppedRaw?: unknown,
+) {
   return {
     ...ciFailureDiagnostic('builder-cleanup', error),
     cleanupStage: cleanupStages.find((known) => known === stage) ?? 'unknown',
     cleanupFields: cleanupFields.filter((known) => fields.includes(known)),
+    ...(stage === 'exit-check' && stoppedRaw !== undefined
+      ? { builderExit: builderCleanupExitDiagnostic(stoppedRaw) }
+      : {}),
   };
 }
-function reportBuilderCleanupFailure(stage: CleanupStage, error: unknown, fields: readonly CleanupField[]) {
+function reportBuilderCleanupFailure(
+  stage: CleanupStage,
+  error: unknown,
+  fields: readonly CleanupField[],
+  stoppedRaw?: unknown,
+) {
   try {
     process.stderr.write(
-      JSON.stringify({ event: 'LOAD_CI_DIAGNOSTIC', ...builderCleanupDiagnostic(stage, error, fields) }) + '\n',
+      JSON.stringify({
+        event: 'LOAD_CI_DIAGNOSTIC',
+        ...builderCleanupDiagnostic(stage, error, fields, stoppedRaw),
+      }) + '\n',
     );
   } catch {
     // The existing sticky cleanup failure still vetoes success; reporting must not interrupt cleanup.
@@ -780,6 +809,7 @@ async function main() {
       }, cleanupMs);
       let cleanupStage: CleanupStage = 'proof';
       let failedFields: CleanupField[] = [];
+      let failedExitRaw: unknown;
       try {
         if (createAttempted) {
           // 생성 결과/ID가 불명이면 삭제하지 않는다. 원자료를 보존하고 수동 확인으로 넘긴다.
@@ -820,6 +850,7 @@ async function main() {
             .safeParse(stoppedRaw);
           if (!stopped.success) {
             failedFields = builderCleanupCheckFields(stopped.error);
+            failedExitRaw = stoppedRaw;
             throw new Error('LOAD_BUILDER_EXIT_UNCONFIRMED');
           }
           cleanupStage = 'child-settlement';
@@ -871,7 +902,7 @@ async function main() {
         builderClosed = true;
       } catch (error) {
         cleanupFailures.push('BUILDER_CLEANUP_UNCONFIRMED');
-        reportBuilderCleanupFailure(cleanupStage, error, failedFields);
+        reportBuilderCleanupFailure(cleanupStage, error, failedFields, failedExitRaw);
       } finally {
         try {
           await writeEvidence(resolve(output, 'lifecycle.json'), {
