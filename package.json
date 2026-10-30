@@ -54,7 +54,10 @@
     "build:public": "pnpm --filter @opensamguk/web exec vite build --mode public && pnpm assets:check",
     "assets:check": "tsx tools/public-assets/check.ts",
     "officers:check": "tsx tools/officer-stats/check.ts",
-    "portraits:fetch-supplement": "tsx tools/portrait-map/fetch-supplement.ts"
+    "portraits:fetch-supplement": "tsx tools/portrait-map/fetch-supplement.ts",
+    "db:init-san10": "tsx --env-file-if-exists=.env tools/init-san10-resources.ts",
+    "test:san10": "tsx tools/run-san10-check.ts",
+    "e2e:san10": "playwright test --config playwright.san10.config.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -86,7 +86,7 @@ it('N2 고정물은 source179·정렬 목록·승인 상수와 제품 preset의 
   });
   const directory = new URL('../resources/preset/', import.meta.url);
   const files = readdirSync(directory).filter((file) => file.endsWith('.json'));
-  expect(files).toHaveLength(4);
+  expect(files.sort()).toEqual(['beginner.json', 'empty.json', 'hardcore.json', 'regular.json', 'speed.json']);
   for (const file of files) expect(JSON.parse(readFileSync(new URL(file, directory), 'utf8')).commands).toBeNull();
 });
 

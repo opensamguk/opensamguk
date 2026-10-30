@@ -1,0 +1,783 @@
+{
+  "format": "opensamguk-coordinate-placement-draft",
+  "version": 1,
+  "status": "DRAFT_NOT_RUNTIME_RESOURCE",
+  "date": "2026-10-29",
+  "relatedAcceptanceCriteria": ["AC-INT-03", "AC-INT-10"],
+  "scope": "선정한 한반도·왜 26곳과 기존 추가 집단 7곳을 현재 통합판 좌표계에 겹쳐 보는 배치다. SAN10 전체 119곳의 GIS 변환은 포함하지 않는다.",
+  "coordinateSystem": {
+    "projection": "WGS84 plate carree",
+    "baseMap": "resources/map/integration.json",
+    "baseMapSha256": "d108fcf1db9e83dfcf7528dd620f445d4c32012a2510359b3625b16c8927144f",
+    "baseCanvas": {
+      "width": 1000,
+      "height": 700
+    },
+    "baseBounds": [94, 17, 132.57142857142856, 44],
+    "formula": {
+      "x": "round((longitude - 94) / (132.57142857142856 - 94) * 1000)",
+      "y": "round((44 - latitude) / 27 * 700)"
+    },
+    "unitsPerDegree": 25.925925925925927,
+    "previewBounds": [94, 17, 138, 46],
+    "previewViewBox": [0, -51.851852, 1140.740741, 751.851852],
+    "preservesExistingCoordinates": true
+  },
+  "basemap": {
+    "file": "coordinate-basemap.geojson",
+    "sha256": "5e936876f11e413f3aebd9070251fa7aa169b56ffe7017b08ee9f8a37afbaab1",
+    "source": "Natural Earth v5.1.2",
+    "license": "Public domain",
+    "sourceUrl": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_10m_land.geojson",
+    "sourceSha256": "1ac90796408bc6ad6911d69448485d3c4dbf2190370080368a09976e1c9f7416",
+    "simplifyToleranceDegrees": 0.012,
+    "ringOrientation": "clockwise exterior for d3-geo"
+  },
+  "coordinateSources": [
+    {
+      "url": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_10m_populated_places.geojson",
+      "sha256": "9b8e3de09048ef00dfc70357dbb9fa324493f214b5e0ae4daf1aa79a8d10116b"
+    },
+    {
+      "file": "east-asia-selection.json",
+      "use": "선정한 권역 안에서 제안한 대표점, 고대 성터 좌표가 아님"
+    }
+  ],
+  "counts": {
+    "placedSites": 33,
+    "selectedEastAsiaSites": 26,
+    "regionalSites": 7,
+    "baseMapSites": 80,
+    "outsideCurrentCanvas": 6
+  },
+  "sitesOutsideCurrentCanvas": ["야마타이국", "이즈모", "기비", "이요", "사누키", "읍루"],
+  "sites": [
+    {
+      "id": "S127",
+      "selectionId": "JP01",
+      "name": "대마국",
+      "region": "왜",
+      "role": "DOCUMENTED_POLITY",
+      "level": null,
+      "position": {
+        "x": 916,
+        "y": 250
+      },
+      "geographicReference": {
+        "longitude": 129.33,
+        "latitude": 34.35,
+        "basis": "PROPOSED_REGIONAL_REPRESENTATIVE",
+        "placeName": null
+      },
+      "insideCurrentCanvas": true,
+      "locationStatus": "REGION_WELL_SUPPORTED",
+      "modernArea": "쓰시마섬",
+      "sources": ["kyushu"]
+    },
+    {
+      "id": "S128",
+      "selectionId": "JP02",
+      "name": "일지국",
+      "region": "왜",
+      "role": "DOCUMENTED_POLITY",
+      "level": null,
+      "position": {
+        "x": 926,
+        "y": 265
+      },
+      "geographicReference": {
+        "longitude": 129.72,
+        "latitude": 33.78,
+        "basis": "PROPOSED_REGIONAL_REPRESENTATIVE",
+        "placeName": null
+      },
+      "insideCurrentCanvas": true,
+      "locationStatus": "REGION_WELL_SUPPORTED",
+      "modernArea": "이키섬",
+      "sources": ["kyushu", "yoshinogari"]
+    },
+    {
+      "id": "S129",
+      "selectionId": "JP03",
+      "name": "말로국",
+      "region": "왜",
+      "role": "DOCUMENTED_POLITY",
+      "level": null,
+      "position": {
+        "x": 933,
+        "y": 274
+      },
+      "geographicReference": {
+        "longitude": 129.97,
+        "latitude": 33.45,
+        "basis": "PROPOSED_REGIONAL_REPRESENTATIVE",
+        "placeName": null
+      },
+      "insideCurrentCanvas": true,
+      "locationStatus": "REGION_WELL_SUPPORTED",
+      "modernArea": "가라쓰평야 일대",
+      "sources": ["kyushu", "yoshinogari"]
+    },
+    {
+      "id": "S130",
+      "selectionId": "JP04",
+      "name": "이도국",
+      "region": "왜",
+      "role": "DOCUMENTED_POLITY",
+      "level": null,
+      "position": {
+        "x": 939,
+        "y": 271
+      },
+      "geographicReference": {
+        "longitude": 130.2,
+        "latitude": 33.55,
+        "basis": "PROPOSED_REGIONAL_REPRESENTATIVE",
+        "placeName": null
+      },
+      "insideCurrentCanvas": true,
+      "locationStatus": "REGION_WELL_SUPPORTED",
+      "modernArea": "이토시마평야 일대",
+      "sources": ["kyushu", "fukuoka"]
+    },
+    {
+      "id": "S131",
+      "selectionId": "JP05",
+      "name": "노국",
+      "region": "왜",
+      "role": "DOCUMENTED_POLITY",
+      "level": null,
+      "position": {
+        "x": 944,
+        "y": 270
+      },
+      "geographicReference": {
+        "longitude": 130.408068,
+        "latitude": 33.596961,
+        "basis": "NATURAL_EARTH_MODERN_AREA_CENTER",
+        "placeName": "Fukuoka"
+      },
+      "insideCurrentCanvas": true,
+      "locationStatus": "REGION_WELL_SUPPORTED",
+      "modernArea": "후쿠오카평야 일대",
+      "sources": ["kyushu", "fukuoka"]
+    },
+    {
+      "id": "S132",
+      "selectionId": "JP06",
+      "name": "불미국",
+      "region": "왜",
+      "role": "DOCUMENTED_POLITY",
+      "level": null,
+      "position": {
+        "x": 947,
+        "y": 270
+      },
+      "geographicReference": {
+        "longitude": 130.51,
+        "latitude": 33.57,
+        "basis": "PROPOSED_REGIONAL_REPRESENTATIVE",
+        "placeName": null
+      },
+      "insideCurrentCanvas": true,
+      "locationStatus": "CONTESTED_WORKING_CHOICE",
+      "modernArea": "우미·가스야권",
+      "sources": ["fumi-choice"]
+    },
+    {
+      "id": "S133",
+      "selectionId": "JP07",
+      "name": "야마타이국",
+      "region": "왜",
+      "role": "DOCUMENTED_POLITY",
+      "level": null,
+      "position": {
+        "x": 1085,
+        "y": 245
+      },
+      "geographicReference": {
+        "longitude": 135.84,
+        "latitude": 34.54,
+        "basis": "PROPOSED_REGIONAL_REPRESENTATIVE",
+        "placeName": null
+      },
+      "insideCurrentCanvas": false,
+      "locationStatus": "KINAI_WORKING_CHOICE_NOT_SETTLED",
+      "modernArea": "기나이 나라분지, 마키무쿠 일대",
+      "sources": ["yamatai-theories", "yamatai-choice"]
+    },
+    {
+      "id": "S134",
+      "selectionId": "JP08",
+      "name": "이즈모",
+      "region": "왜",
+      "role": "REGIONAL_REPRESENTATIVE",
+      "level": null,
+      "position": {
+        "x": 1005,
+        "y": 224
+      },
+      "geographicReference": {
+        "longitude": 132.76,
+        "latitude": 35.37,
+        "basis": "PROPOSED_REGIONAL_REPRESENTATIVE",
+        "placeName": null
+      },
+      "insideCurrentCanvas": false,
+      "locationStatus": "GAME_REGION_LABEL",
+      "modernArea": "혼슈 서부 산인, 시마네권",
+      "sources": ["izumo"]
+    },
+    {
+      "id": "S135",
+      "selectionId": "JP09",
+      "name": "기비",
+      "region": "왜",
+      "role": "REGIONAL_REPRESENTATIVE",
+      "level": null,
+      "position": {
+        "x": 1035,
+        "y": 242
+      },
+      "geographicReference": {
+        "longitude": 133.917087,
+        "latitude": 34.67203,
+        "basis": "NATURAL_EARTH_MODERN_AREA_CENTER",
+        "placeName": "Okayama"
+      },
+      "insideCurrentCanvas": false,
+      "locationStatus": "GAME_REGION_LABEL",
+      "modernArea": "혼슈 서부, 오카야마권",
+      "sources": ["kibi"]
+    },
+    {
+      "id": "S136",
+      "selectionId": "JP10",
+      "name": "이요",
+      "region": "왜",
+      "role": "REGIONAL_REPRESENTATIVE",
+      "level": null,
+      "position": {
+        "x": 1005,
+        "y": 263
+      },
+      "geographicReference": {
+        "longitude": 132.765839,
+        "latitude": 33.845543,
+        "basis": "NATURAL_EARTH_MODERN_AREA_CENTER",
+        "placeName": "Matsuyama"
+      },
+      "insideCurrentCanvas": false,
+      "locationStatus": "GAME_REGION_LABEL",
+      "modernArea": "시코쿠 북서부, 에히메현 마쓰야마평야권",
+      "sources": ["iyo"]
+    },
+    {
+      "id": "S137",
+      "selectionId": "JP11",
+      "name": "사누키",
+      "region": "왜",
+      "role": "REGIONAL_REPRESENTATIVE",
+      "level": null,
+      "position": {
+        "x": 1038,
+        "y": 250
+      },
+      "geographicReference": {
+        "longitude": 134.044779,
+        "latitude": 34.344737,
+        "basis": "NATURAL_EARTH_MODERN_AREA_CENTER",
+        "placeName": "Takamatsu"
+      },
+      "insideCurrentCanvas": false,
+      "locationStatus": "GAME_REGION_LABEL",
+      "modernArea": "시코쿠 북동부, 가가와현 다카마쓰·사누키평야권",
+      "sources": ["sanuki"]
+    },
+    {
+      "id": "S138",
+      "selectionId": "KR01",
+      "name": "서안평",
+      "region": "한반도·만주",
+      "role": "SITE",
+      "level": null,
+      "position": {
+        "x": 788,
+        "y": 100
+      },
+      "geographicReference": {
+        "longitude": 124.391639,
+        "latitude": 40.145554,
+        "basis": "NATURAL_EARTH_MODERN_AREA_CENTER",
+        "placeName": "Dandong"
+      },
+      "insideCurrentCanvas": true,
+      "locationStatus": "WORKING_AREA",
+      "modernArea": "압록강 하류, 단둥권",
+      "sources": []
+    },
+    {
+      "id": "S139",
+      "selectionId": "KR02",
+      "name": "졸본",
+      "region": "한반도·만주",
+      "role": "SITE",
+      "level": null,
+      "position": {
+        "x": 813,
+        "y": 71
+      },
+      "geographicReference": {
+        "longitude": 125.345982,
+        "latitude": 41.256331,
+        "basis": "NATURAL_EARTH_MODERN_AREA_CENTER",
+        "placeName": "Huanren"
+      },
+      "insideCurrentCanvas": true,
+      "locationStatus": "WORKING_AREA",
+      "modernArea": "환런권",
+      "sources": []
+    },
+    {
+      "id": "S140",
+      "selectionId": "KR03",
+      "name": "국내성",
+      "region": "한반도·만주",
+      "role": "SITE",
+      "level": null,
+      "position": {
+        "x": 834,
+        "y": 74
+      },
+      "geographicReference": {
+        "longitude": 126.18,
+        "latitude": 41.13,
+        "basis": "PROPOSED_REGIONAL_REPRESENTATIVE",
+        "placeName": null
+      },
+      "insideCurrentCanvas": true,
+      "locationStatus": "REGION_WELL_SUPPORTED",
+      "modernArea": "지안권",
+      "sources": []
+    },
+    {
+      "id": "S082",
+      "selectionId": "KR04",
+      "name": "낙랑",
+      "region": "한반도·만주",
+      "role": "SITE",
+      "level": 2,
+      "position": {
+        "x": 823,
+        "y": 129
+      },
+      "geographicReference": {
+        "longitude": 125.752745,
+        "latitude": 39.021385,
+        "basis": "NATURAL_EARTH_MODERN_AREA_CENTER",
+        "placeName": "Pyongyang"
+      },
+      "insideCurrentCanvas": true,
+      "locationStatus": "REUSE_EXISTING_SITE",
+      "modernArea": "평양권",
+      "sources": [],
+      "reusesSourceSite": "S082"
+    },
+    {
+      "id": "S141",
+      "selectionId": "KR05",
+      "name": "부조",
+      "region": "한반도·만주",
+      "role": "SITE",
+      "level": null,
+      "position": {
+        "x": 870,
+        "y": 106
+      },
+      "geographicReference": {
+        "longitude": 127.543488,
+        "latitude": 39.912002,
+        "basis": "NATURAL_EARTH_MODERN_AREA_CENTER",
+        "placeName": "Hamhung"
+      },
+      "insideCurrentCanvas": true,
+      "locationStatus": "WORKING_AREA",
+      "modernArea": "함흥권",
+      "sources": ["okjeo"]
+    },
+    {
+      "id": "S142",
+      "selectionId": "KR06",
+      "name": "화려",
+      "region": "한반도·만주",
+      "role": "SITE",
+      "level": null,
+      "position": {
+        "x": 862,
+        "y": 115
+      },
+      "geographicReference": {
+        "longitude": 127.23,
+        "latitude": 39.55,
+        "basis": "PROPOSED_REGIONAL_REPRESENTATIVE",
+        "placeName": null
+      },
+      "insideCurrentCanvas": true,
+      "locationStatus": "WORKING_AREA",
+      "modernArea": "영흥권",
+      "sources": []
+    },
+    {
+      "id": "S143",
+      "selectionId": "KR07",
+      "name": "불이",
+      "region": "한반도·만주",
+      "role": "SITE",
+      "level": null,
+      "position": {
+        "x": 869,
+        "y": 129
+      },
+      "geographicReference": {
+        "longitude": 127.518562,
+        "latitude": 39.028172,
+        "basis": "NATURAL_EARTH_MODERN_AREA_CENTER",
+        "placeName": "Anbyon"
+      },
+      "insideCurrentCanvas": true,
+      "locationStatus": "CONTESTED_WORKING_CHOICE",
+      "modernArea": "안변권",
+      "sources": ["okjeo"]
+    },
+    {
+      "id": "S144",
+      "selectionId": "KR08",
+      "name": "백제국",
+      "region": "한반도·만주",
+      "role": "DOCUMENTED_POLITY",
+      "level": null,
+      "position": {
+        "x": 855,
+        "y": 167
+      },
+      "geographicReference": {
+        "longitude": 126.997785,
+        "latitude": 37.568295,
+        "basis": "NATURAL_EARTH_MODERN_AREA_CENTER",
+        "placeName": "Seoul"
+      },
+      "insideCurrentCanvas": true,
+      "locationStatus": "WORKING_AREA",
+      "modernArea": "한강 하류 서울권",
+      "sources": []
+    },
+    {
+      "id": "S145",
+      "selectionId": "KR09",
+      "name": "목지국",
+      "region": "한반도·만주",
+      "role": "DOCUMENTED_POLITY",
+      "level": null,
+      "position": {
+        "x": 859,
+        "y": 184
+      },
+      "geographicReference": {
+        "longitude": 127.15,
+        "latitude": 36.92,
+        "basis": "PROPOSED_REGIONAL_REPRESENTATIVE",
+        "placeName": null
+      },
+      "insideCurrentCanvas": true,
+      "locationStatus": "CONTESTED_WORKING_CHOICE",
+      "modernArea": "천안 직산·성환, 아산만권",
+      "sources": ["mokji"]
+    },
+    {
+      "id": "S146",
+      "selectionId": "KR10",
+      "name": "건마국",
+      "region": "한반도·만주",
+      "role": "DOCUMENTED_POLITY",
+      "level": null,
+      "position": {
+        "x": 854,
+        "y": 209
+      },
+      "geographicReference": {
+        "longitude": 126.945419,
+        "latitude": 35.94097,
+        "basis": "NATURAL_EARTH_MODERN_AREA_CENTER",
+        "placeName": "Iksan"
+      },
+      "insideCurrentCanvas": true,
+      "locationStatus": "WORKING_AREA",
+      "modernArea": "익산권",
+      "sources": []
+    },
+    {
+      "id": "S147",
+      "selectionId": "KR11",
+      "name": "사로국",
+      "region": "한반도·만주",
+      "role": "DOCUMENTED_POLITY",
+      "level": null,
+      "position": {
+        "x": 913,
+        "y": 211
+      },
+      "geographicReference": {
+        "longitude": 129.211689,
+        "latitude": 35.842759,
+        "basis": "NATURAL_EARTH_MODERN_AREA_CENTER",
+        "placeName": "Gyeongju"
+      },
+      "insideCurrentCanvas": true,
+      "locationStatus": "REGION_WELL_SUPPORTED",
+      "modernArea": "경주권",
+      "sources": []
+    },
+    {
+      "id": "S148",
+      "selectionId": "KR12",
+      "name": "구야국",
+      "region": "한반도·만주",
+      "role": "DOCUMENTED_POLITY",
+      "level": null,
+      "position": {
+        "x": 904,
+        "y": 227
+      },
+      "geographicReference": {
+        "longitude": 128.88,
+        "latitude": 35.23,
+        "basis": "PROPOSED_REGIONAL_REPRESENTATIVE",
+        "placeName": null
+      },
+      "insideCurrentCanvas": true,
+      "locationStatus": "REGION_WELL_SUPPORTED",
+      "modernArea": "김해권",
+      "sources": []
+    },
+    {
+      "id": "S149",
+      "selectionId": "KR13",
+      "name": "부여",
+      "region": "한반도·만주",
+      "role": "REGIONAL_REPRESENTATIVE",
+      "level": null,
+      "position": {
+        "x": 844,
+        "y": 4
+      },
+      "geographicReference": {
+        "longitude": 126.548097,
+        "latitude": 43.851917,
+        "basis": "NATURAL_EARTH_MODERN_AREA_CENTER",
+        "placeName": "Jilin"
+      },
+      "insideCurrentCanvas": true,
+      "locationStatus": "WORKING_AREA",
+      "modernArea": "지린·송화강 유역",
+      "sources": ["buyeo"]
+    },
+    {
+      "id": "S150",
+      "selectionId": "KR14",
+      "name": "읍루",
+      "region": "한반도·만주",
+      "role": "REGIONAL_REPRESENTATIVE",
+      "level": null,
+      "position": {
+        "x": 910,
+        "y": -21
+      },
+      "geographicReference": {
+        "longitude": 129.1,
+        "latitude": 44.8,
+        "basis": "PROPOSED_REGIONAL_REPRESENTATIVE",
+        "placeName": null
+      },
+      "insideCurrentCanvas": false,
+      "locationStatus": "BROAD_REGION",
+      "modernArea": "만주 동부 권역",
+      "sources": []
+    },
+    {
+      "id": "S151",
+      "selectionId": "KR15",
+      "name": "북옥저",
+      "region": "한반도·만주",
+      "role": "REGIONAL_REPRESENTATIVE",
+      "level": null,
+      "position": {
+        "x": 944,
+        "y": 41
+      },
+      "geographicReference": {
+        "longitude": 130.43,
+        "latitude": 42.4,
+        "basis": "PROPOSED_REGIONAL_REPRESENTATIVE",
+        "placeName": null
+      },
+      "insideCurrentCanvas": true,
+      "locationStatus": "BROAD_REGION",
+      "modernArea": "두만강 하류 권역",
+      "sources": ["okjeo"]
+    },
+    {
+      "id": "S120",
+      "name": "강",
+      "region": "주변 집단",
+      "role": "TRIBAL",
+      "level": 4,
+      "position": {
+        "x": 191,
+        "y": 166
+      },
+      "geographicReference": {
+        "longitude": 101.35,
+        "latitude": 37.6,
+        "basis": "PROPOSED_REGIONAL_REPRESENTATIVE",
+        "placeName": null
+      },
+      "insideCurrentCanvas": true,
+      "locationStatus": "GAME_REGION_LABEL",
+      "modernArea": "기존 지역 대표 거점의 GIS 좌표 배치 제안",
+      "sources": []
+    },
+    {
+      "id": "S121",
+      "name": "오환",
+      "region": "주변 집단",
+      "role": "TRIBAL",
+      "level": 4,
+      "position": {
+        "x": 674,
+        "y": 39
+      },
+      "geographicReference": {
+        "longitude": 120.0,
+        "latitude": 42.5,
+        "basis": "PROPOSED_REGIONAL_REPRESENTATIVE",
+        "placeName": null
+      },
+      "insideCurrentCanvas": true,
+      "locationStatus": "GAME_REGION_LABEL",
+      "modernArea": "기존 지역 대표 거점의 GIS 좌표 배치 제안",
+      "sources": []
+    },
+    {
+      "id": "S122",
+      "name": "남만",
+      "region": "주변 집단",
+      "role": "TRIBAL",
+      "level": 4,
+      "position": {
+        "x": 171,
+        "y": 531
+      },
+      "geographicReference": {
+        "longitude": 100.6,
+        "latitude": 23.5,
+        "basis": "PROPOSED_REGIONAL_REPRESENTATIVE",
+        "placeName": null
+      },
+      "insideCurrentCanvas": true,
+      "locationStatus": "GAME_REGION_LABEL",
+      "modernArea": "기존 지역 대표 거점의 GIS 좌표 배치 제안",
+      "sources": []
+    },
+    {
+      "id": "S123",
+      "name": "산월",
+      "region": "주변 집단",
+      "role": "TRIBAL",
+      "level": 4,
+      "position": {
+        "x": 638,
+        "y": 394
+      },
+      "geographicReference": {
+        "longitude": 118.6,
+        "latitude": 28.8,
+        "basis": "PROPOSED_REGIONAL_REPRESENTATIVE",
+        "placeName": null
+      },
+      "insideCurrentCanvas": true,
+      "locationStatus": "GAME_REGION_LABEL",
+      "modernArea": "기존 지역 대표 거점의 GIS 좌표 배치 제안",
+      "sources": []
+    },
+    {
+      "id": "S124",
+      "name": "선비",
+      "region": "주변 집단",
+      "role": "TRIBAL",
+      "level": 4,
+      "position": {
+        "x": 583,
+        "y": 21
+      },
+      "geographicReference": {
+        "longitude": 116.5,
+        "latitude": 43.2,
+        "basis": "PROPOSED_REGIONAL_REPRESENTATIVE",
+        "placeName": null
+      },
+      "insideCurrentCanvas": true,
+      "locationStatus": "GAME_REGION_LABEL",
+      "modernArea": "기존 지역 대표 거점의 GIS 좌표 배치 제안",
+      "sources": []
+    },
+    {
+      "id": "S125",
+      "name": "흉노",
+      "region": "주변 집단",
+      "role": "TRIBAL",
+      "level": 4,
+      "position": {
+        "x": 423,
+        "y": 47
+      },
+      "geographicReference": {
+        "longitude": 110.3,
+        "latitude": 42.2,
+        "basis": "PROPOSED_REGIONAL_REPRESENTATIVE",
+        "placeName": null
+      },
+      "insideCurrentCanvas": true,
+      "locationStatus": "GAME_REGION_LABEL",
+      "modernArea": "기존 지역 대표 거점의 GIS 좌표 배치 제안",
+      "sources": []
+    },
+    {
+      "id": "S126",
+      "name": "저",
+      "region": "주변 집단",
+      "role": "TRIBAL",
+      "level": 4,
+      "position": {
+        "x": 283,
+        "y": 257
+      },
+      "geographicReference": {
+        "longitude": 104.9,
+        "latitude": 34.1,
+        "basis": "PROPOSED_REGIONAL_REPRESENTATIVE",
+        "placeName": null
+      },
+      "insideCurrentCanvas": true,
+      "locationStatus": "GAME_REGION_LABEL",
+      "modernArea": "기존 지역 대표 거점의 GIS 좌표 배치 제안",
+      "sources": []
+    }
+  ],
+  "connections": [],
+  "limits": [
+    "기존 80표식·경로·좌표와 운영 자원은 바꾸지 않았다.",
+    "새 점 사이의 이동 연결과 신규 거점의 레벨·경제·소유권은 정하지 않았다. 낙랑은 기존 SAN10 S082의 레벨 2, 집단 7곳은 초안 레벨 4를 보존했다.",
+    "현재 화면 밖의 점도 원래 좌표를 유지한다. 미리보기만 동쪽·북쪽으로 넓힌다.",
+    "지리 기준점은 대표 권역을 배치하기 위한 제안이며 고대 성터의 측량값이 아니다."
+  ]
+}

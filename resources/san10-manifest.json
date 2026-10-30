@@ -1,0 +1,26 @@
+[
+  {
+    "kind": "MAP",
+    "name": "san10",
+    "path": "resources/map/san10.json",
+    "version": 1,
+    "contentHash": "f00a77bf8ee3875644a210e161a73e262a692bb4854833b3abd956585595bef5",
+    "source": "D-045; SAN10 user survey / core2026 df6c926 MIT / Natural Earth v5.1.2 public domain; resources/map-drafts/san10/NOTICE.md"
+  },
+  {
+    "kind": "SCENARIO",
+    "name": "san10-191",
+    "path": "resources/scenario/san10-191.json",
+    "version": 1,
+    "contentHash": "63f0e0317ab84d3fe8b1eaeaea3117a613d6914e5aa1a1bdb292c08e0f18a3b4",
+    "source": "D-045; SAN10 user survey / core2026 df6c926 MIT / Natural Earth v5.1.2 public domain; resources/map-drafts/san10/NOTICE.md"
+  },
+  {
+    "kind": "SCENARIO",
+    "name": "san10-empty",
+    "path": "resources/scenario/san10-empty.json",
+    "version": 1,
+    "contentHash": "836601df411c48860395a95efe84ead401f71c117bc9b845174a0cf589bb9d9e",
+    "source": "D-045; SAN10 user survey / core2026 df6c926 MIT / Natural Earth v5.1.2 public domain; resources/map-drafts/san10/NOTICE.md"
+  }
+]

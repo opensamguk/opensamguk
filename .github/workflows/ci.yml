@@ -276,6 +276,9 @@ jobs:
       - name: Check admin world end actions in Chromium
         if: matrix.shard == 4
         run: pnpm e2e:admin-end --reporter=line
+      - name: Check SAN10 historic and empty maps in public Chromium
+        if: matrix.shard == 4
+        run: pnpm e2e:san10 --reporter=line
       - name: Check campaign offer fresh reads in Chromium
         if: matrix.shard == 1
         run: pnpm e2e:campaign-offer --reporter=line

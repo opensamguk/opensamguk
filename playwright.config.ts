@@ -13,6 +13,7 @@ export default defineConfig({
     '**/account-withdrawal.spec.ts',
     '**/admin-sanction.spec.ts',
     '**/int18-city-resources.spec.ts',
+    '**/san10-map.spec.ts',
     '**/admin-clock.spec.ts',
     '**/admin-end.spec.ts',
     '**/admin-reset.spec.ts',

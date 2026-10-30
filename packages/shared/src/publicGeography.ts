@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 // Public, fixed geography only. No economy, troops, ownership, or people are accepted here.
 const id = z.string().regex(/^[a-z][a-z0-9:_-]{0,63}$/);
-const point = z.object({ x: z.number().finite().min(0).max(1000), y: z.number().finite().min(0).max(700) });
+const point = z.object({ x: z.number().finite().min(0).max(4096), y: z.number().finite().min(0).max(4096) });
 const site = z
   .object({
     id,
@@ -23,7 +23,7 @@ export const publicGeographySchema = z
   .object({
     id,
     version: z.literal(3),
-    canvas: z.object({ width: z.literal(1000), height: z.literal(700) }),
+    canvas: z.object({ width: z.number().int().min(1).max(4096), height: z.number().int().min(1).max(4096) }),
     basemap: z.object({
       source: z.literal('natural-earth-5.1.2'),
       projection: z.literal('WGS84 plate carree'),
@@ -47,6 +47,11 @@ export const publicGeographySchema = z
       .max(2000),
   })
   .superRefine((value, ctx) => {
+    if (
+      value.canvas.width * value.canvas.height > 4194304 ||
+      value.sites.some((site) => site.position.x > value.canvas.width || site.position.y > value.canvas.height)
+    )
+      ctx.addIssue({ code: 'custom', message: '지도 범위와 거점 좌표를 확인하세요.' });
     const anchors = value.sites.filter((site) => site.kind === 'CITY' || site.kind === 'PASS');
     if (
       new Set(value.sites.map((site) => site.id)).size !== value.sites.length ||
