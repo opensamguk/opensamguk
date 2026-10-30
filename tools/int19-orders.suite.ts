@@ -12,6 +12,7 @@ import {
   type CampaignOrderInput,
   type WorldInit,
 } from '../packages/rules/src/index';
+import { cityNpcPreparation } from '../packages/rules/src/cityResources/npc';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { loadInitialWorld } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
@@ -952,53 +953,47 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
       expect(hashState(initial)).toBe(originHash);
     }, 240_000);
 
-    it('NPC자기부곡 지시는 병력이 있으면 실제 실행하고 없으면 명시 거부·실패하며 소유권을 지킨다', async () => {
-      const before = await snapshot(),
-        npc = before.state.generals[npcId]!;
-      const others = before.state.campaign!.units.filter((row) => row.ownerId === a.generalId);
-      // 도시 자원 판에서 NPC 부곡의 병력은 NPC 군주의 무작위 배속으로만 들어오므로 관찰 한도 안에 없을 수 있다.
-      // 병력이 있으면 실제 차례 실행을, 없으면 자기 빈 부곡 지시가 접수 단계에서 거부되거나 명시 실패하는지 확인한다.
-      const unit = before.state.campaign!.units.find((row) => row.ownerId === npcId && row.troops > 0);
-      if (unit) {
-        const ownCity = before.state.cities[npc.cityKey]!.nationId === npc.nationId;
-        const key = ownCity && npc.gold >= BALANCE.DRILL_COST && unit.train < 100 ? 'train' : 'dismiss';
-        await executeOrder(await issue(npcId, key, { unitId: unit.id }));
-      } else {
-        const empty = before.state.campaign!.units.find((row) => row.ownerId === npcId);
-        if (!empty) throw new Error('INT19_NPC_OWN_UNIT_MISSING');
-        const hash = hashState(before),
-          inputs = await db.inputEvent.count({ where: { worldId } });
-        const payload = {
-          type: 'issue',
-          recipientId: npcId,
-          command: { commandKey: 'train', args: { unitId: empty.id } },
-          revision: (await board()).revision,
-        };
-        const requestId = randomUUID();
-        const result = await api<{ status: string }>(
-          'campaign.order',
-          { worldId, requestId, expectedUserId: a.userId, payload },
-          a,
-          true,
+    it('NPC자기부곡 지시는 정상 도시 준비와 NPC군주 배속으로 병력을 받은 뒤 실제 훈련을 실행하고 소유권을 지킨다', async () => {
+      const start = await snapshot(),
+        unitId = start.state.campaign!.units.find((row) => row.ownerId === npcId)!.id;
+      const others = start.state.campaign!.units.filter((row) => row.ownerId === a.generalId);
+      const ruler = Object.values(start.state.generals).find(
+        (general) => general.nationId === nationId && general.officerLevel === BALANCE.RULER_LEVEL,
+      )!;
+      expect(ruler.userId).toBeNull();
+      // 사람 장수는 관직이 없어 배속할 수 없다. NPC에게 NPC 준비 규칙이 고르는 도시 수비병 모병·사기·훈련을 지시해
+      // 배속 조건(훈련60·사기70)을 만들고, NPC군주의 실제 국가 차례가 자기 부곡에 배속할 때까지 진행한다.
+      for (let round = 0; ; round++) {
+        if (round >= 24) throw new Error('INT19 NPC 부곡 배속 관찰 한도를 넘었습니다.');
+        const state = await snapshot(),
+          unit = state.state.campaign!.units.find((row) => row.id === unitId)!;
+        expect(unit).toMatchObject({ ownerId: npcId, commanderId: npcId });
+        if (unit.troops > 0) break;
+        const prepare = cityNpcPreparation(state.state, npcId, { unitSet: initial.unitSet }).find(
+          (row) => row.key !== 'form_unit' && !('unitId' in row.args),
         );
-        if (result.code === undefined) {
-          await drain();
-          const accepted = await receipt(requestId);
-          if (accepted.status === 'applied' && accepted.kind === 'campaign.order')
-            await executeOrder(accepted.result.orderId, 'RESOLVED');
-          else expect(accepted.status).toBe('rejected');
-        } else {
-          expect(result.code).toBe('BAD_REQUEST');
-          expect(hashState(await snapshot())).toBe(hash);
-          expect(await db.inputEvent.count({ where: { worldId } })).toBe(inputs);
-        }
+        if (prepare) await executeOrder(await issue(npcId, prepare.key, prepare.args));
+        else await executeOrder(await issue(npcId, 'farm'), 'RESOLVED');
       }
-      const after = await snapshot();
-      for (const row of before.state.campaign!.units.filter((item) => item.ownerId === npcId))
-        expect(after.state.campaign!.units.find((item) => item.id === row.id)!.ownerId).toBe(npcId);
+      const before = await snapshot(),
+        npc = before.state.generals[npcId]!,
+        unit = before.state.campaign!.units.find((row) => row.id === unitId)!;
+      expect(before.state.cities[npc.cityKey]!.nationId).toBe(npc.nationId);
+      expect(npc.gold).toBeGreaterThanOrEqual(BALANCE.DRILL_COST);
+      expect(unit.train).toBeLessThan(100);
+      const after = await executeOrder(await issue(npcId, 'train', { unitId }));
+      const trained = after.state.campaign!.units.find((row) => row.id === unitId)!;
+      expect(trained).toMatchObject({
+        ownerId: npcId,
+        commanderId: npcId,
+        troops: unit.troops,
+        crewType: unit.crewType,
+      });
+      expect(trained.train).toBeGreaterThan(unit.train);
+      expect(after.state.generals[npcId]!.gold).toBe(npc.gold - BALANCE.DRILL_COST);
       for (const other of others)
         expect(after.state.campaign!.units.find((row) => row.id === other.id)!.ownerId).toBe(a.generalId);
       expect(hashState(await snapshot(otherWorldId))).toBe(otherHash);
-    }, 240_000);
+    }, 600_000);
   }
 }
