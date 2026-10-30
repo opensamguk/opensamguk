@@ -12,6 +12,7 @@ import { test as base } from '@playwright/test';
 import { createDb } from '../packages/db/src/index';
 import { buildServer } from '../apps/server/src/server';
 import type { LegalPolicy } from '../apps/server/src/legal/policy';
+import type { LoginAuditOptions } from '../apps/server/src/auth/loginAudit';
 import type { WithdrawalPolicy } from '../apps/server/src/auth/withdrawalPolicy';
 import type { MailMessage } from '../apps/server/src/mail/transport';
 import { initializeResources } from '../tools/init-resources';
@@ -43,6 +44,7 @@ export interface LegalStack {
     policy: LegalPolicy | null,
     emailRequired?: boolean,
     withdrawalPolicy?: WithdrawalPolicy | null,
+    options?: { loginAudit?: LoginAuditOptions | null },
   ): Promise<void>;
   productionPending(): Promise<{ origin: string; close(): Promise<void> }>;
   peer(): Promise<{ origin: string; close(): Promise<void> }>;
@@ -238,6 +240,7 @@ export const test = base.extend<Record<never, never>, { legalStack: LegalStack }
           policy: LegalPolicy | null,
           emailRequired = false,
           withdrawalPolicy: WithdrawalPolicy | null = null,
+          options: { loginAudit?: LoginAuditOptions | null } = {},
         ) => {
           await api?.close();
           api = await buildServer({
@@ -246,6 +249,7 @@ export const test = base.extend<Record<never, never>, { legalStack: LegalStack }
             logging: false,
             publicOrigin: origin,
             emailVerificationRequired: emailRequired,
+            loginAudit: options.loginAudit ?? null,
             legalPolicy: policy,
             withdrawalPolicy,
             mailTransport: transport,
@@ -294,6 +298,7 @@ export const test = base.extend<Record<never, never>, { legalStack: LegalStack }
             const server = await buildServer({
               db: db!,
               production: true,
+              loginAudit: { key: randomBytes(32).toString('hex'), version: 1 },
               logging: false,
               publicOrigin: 'https://legal-pending.example.test',
               mailTransport: transport,

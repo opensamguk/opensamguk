@@ -6,6 +6,7 @@ import type { createRateLimiter } from './security/rateLimit';
 import type { MailTransport } from './mail/transport';
 import type { LegalPolicy } from './legal/policy';
 import type { WithdrawalPolicy } from './auth/withdrawalPolicy';
+import type { LoginAuditRequest } from './auth/loginAudit';
 
 export interface Context {
   db: PrismaClient;
@@ -24,4 +25,5 @@ export interface Context {
   legalPolicyRequired?: boolean | undefined;
   withdrawalPolicy?: WithdrawalPolicy | null | undefined;
   closeSession?: ((sessionId: string) => void) | undefined;
+  loginAudit?: LoginAuditRequest | undefined;
 }

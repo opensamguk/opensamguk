@@ -16,6 +16,7 @@ import { emailVerificationRequired } from './auth/verificationPolicy';
 import { resolveLegalPolicy, type LegalPolicy } from './legal/policy';
 import { bindLegalPolicy } from './legal/publish';
 import { resolveWithdrawalPolicy, type WithdrawalPolicy } from './auth/withdrawalPolicy';
+import { deviceCookieOptions, prepareLoginAudit, resolveLoginAudit, type LoginAuditOptions } from './auth/loginAudit';
 
 export async function buildServer(options: {
   db: PrismaClient;
@@ -31,6 +32,7 @@ export async function buildServer(options: {
   emailVerificationRequired?: boolean;
   legalPolicy?: LegalPolicy | null;
   withdrawalPolicy?: WithdrawalPolicy | null;
+  loginAudit?: LoginAuditOptions | null;
 }) {
   const requireVerifiedEmail = emailVerificationRequired(process.env, options);
   const mapConfig = publicMapConfig(process.env);
@@ -53,6 +55,7 @@ export async function buildServer(options: {
   const trustProxyValue = process.env.TRUST_PROXY;
   if (trustProxyValue !== undefined && trustProxyValue !== '0' && trustProxyValue !== '1')
     throw new Error('TRUST_PROXY는 0 또는 1이어야 합니다.');
+  const loginAuditConfig = resolveLoginAudit(process.env, production, options.loginAudit);
   const clock = options.now ?? Date.now;
   const legalPolicy = resolveLegalPolicy(options.legalPolicy, clock());
   const withdrawalPolicy = resolveWithdrawalPolicy(options.withdrawalPolicy, legalPolicy);
@@ -130,6 +133,10 @@ export async function buildServer(options: {
         const now = clock();
         requestTimes.set(req, now);
         const identity = await authenticate(options.db, req.cookies.sid, now, false);
+        const audit =
+          loginAuditConfig && (!production || legalPolicy)
+            ? prepareLoginAudit(loginAuditConfig, req.ip, req.cookies.did)
+            : null;
         return {
           db: options.db,
           publicMapConfig: mapConfig,
@@ -147,6 +154,14 @@ export async function buildServer(options: {
           legalPolicyRequired: production,
           withdrawalPolicy,
           closeSession: realtime.closeSession,
+          loginAudit: audit
+            ? {
+                ipHash: audit.ipHash,
+                deviceHash: audit.deviceHash,
+                hashKeyVersion: audit.hashKeyVersion,
+                setDeviceCookie: () => res.setCookie('did', audit.token, deviceCookieOptions(secureCookies)),
+              }
+            : undefined,
         };
       },
       onError({ error }) {

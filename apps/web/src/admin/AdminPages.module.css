@@ -160,6 +160,44 @@
 .userHistory li {
   margin-block: var(--space-3);
 }
+.investigation {
+  margin-block-start: var(--space-4);
+  padding-block-start: var(--space-4);
+  border-top: 1px solid var(--color-border);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.investigation .investigationConfirm {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.investigationConfirm input[type='checkbox'] {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+}
+.investigation select {
+  min-width: 0;
+  max-width: 100%;
+}
+.investigationGroups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: var(--space-3);
+  margin-block: var(--space-3);
+}
+.investigationGroups article {
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  padding: var(--space-3);
+}
+.investigationGroups ul {
+  padding-inline-start: var(--space-4);
+}
+.investigationGroups li {
+  margin-block: var(--space-3);
+}
 .endDialog {
   box-sizing: border-box;
   width: min(720px, calc(100vw - 24px));
