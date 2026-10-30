@@ -21,6 +21,18 @@ const presets = ['regular', 'speed', 'beginner', 'hardcore'].map((key) => ({
   key,
   value: json(`resources/preset/${key}.json`),
 }));
+const san10Rows = (
+  [
+    { kind: 'MAP', name: 'san10', path: 'map/san10' },
+    { kind: 'SCENARIO', name: 'san10-191', path: 'scenario/san10-191' },
+    { kind: 'SCENARIO', name: 'san10-empty', path: 'scenario/san10-empty' },
+  ] as const
+).map(({ kind, name, path }) => {
+  const content = json(`resources/${path}.json`);
+  return { kind, name, version: 1, content, contentHash: hashState(content) };
+});
+const allRows = [...rows, ...san10Rows],
+  allPresets = [...presets, { key: 'empty', value: json('resources/preset/empty.json') }];
 // 도시 기능의 실제 구현을 대신하지 않는다. 순수 목록 검증의 등록된 분기만 확인한다.
 const registered: RuleRegistry = {
   ...ruleRegistry,
@@ -103,5 +115,112 @@ describe('AC-M3-04 원생성 설정 조회', () => {
     expect(hashState(creationProfile(rows, changed, registered))).not.toBe(
       hashState(creationProfile(rows, presets, registered)),
     );
+  });
+});
+
+describe('AC-INT-04 SAN10 명시 생성 프로필', () => {
+  it.each(['san10-191', 'san10-empty'] as const)(
+    '%s는 152전략·159표식·200도로와491명·9기능을 엄격히 고정한다',
+    (id) => {
+      const before = JSON.stringify([allRows, allPresets]),
+        profile = creationProfile(allRows, allPresets, registered, id);
+      expect(profile).toMatchObject({
+        id,
+        available: true,
+        selection: {
+          scenarioKey: id,
+          mapKey: 'san10',
+          unitSetKey: 'basic',
+          statRulesKey: 'five-stats',
+          portraitMapKey: '191-map',
+        },
+        startYear: id === 'san10-empty' ? 180 : 191,
+        counts: {
+          nations: id === 'san10-empty' ? 0 : 21,
+          generals: 491,
+          cities: 144,
+          gates: 8,
+          ports: 6,
+          fields: 1,
+          anchors: 152,
+          markers: 159,
+          roads: 200,
+        },
+        ruleFeatures: creationFeatures,
+      });
+      if (!profile.available) throw new Error('SAN10 프로필을 확인하세요.');
+      expect(profile.presets.map((preset) => preset.key)).toEqual(
+        id === 'san10-empty' ? ['empty'] : ['regular', 'speed', 'beginner', 'hardcore'],
+      );
+      expect(profile.resources).toHaveLength(5);
+      expect(profile.resources.find((resource) => resource.kind === 'SCENARIO')?.key).toBe(id);
+      expect(JSON.stringify([allRows, allPresets])).toBe(before);
+    },
+  );
+
+  it('SAN10 게시 자원이 없어도 구판을 새 지도라고 바꾸지 않고 각 프로필을 구분한다', () => {
+    expect(creationProfile(rows, allPresets, registered)).toMatchObject({
+      id: 'integration-v01',
+      available: true,
+      selection: creationSelection,
+    });
+    for (const id of ['san10-191', 'san10-empty'] as const)
+      expect(creationProfile(rows, allPresets, registered, id)).toMatchObject({
+        id,
+        available: false,
+        code: 'RESOURCES_UNAVAILABLE',
+      });
+  });
+
+  it.each(['disabled', 'direction', 'count', 'canvas'] as const)(
+    'SAN10의 %s 도로·화면 계약은 재해시해도 완화하지 않는다',
+    (change) => {
+      const altered = structuredClone(allRows),
+        row = altered.find((row) => row.kind === 'MAP' && row.name === 'san10')!;
+      const map = row.content as { routes: { enabled: boolean; direction: string }[]; canvas: { width: number } };
+      if (change === 'disabled') map.routes[0]!.enabled = false;
+      if (change === 'direction') map.routes[0]!.direction = 'FORWARD';
+      if (change === 'count') map.routes.pop();
+      if (change === 'canvas') map.canvas.width = 1401;
+      row.contentHash = hashState(map);
+      expect(creationProfile(altered, allPresets, registered, 'san10-191')).toMatchObject({
+        available: false,
+        code: 'RESOURCES_UNAVAILABLE',
+      });
+    },
+  );
+
+  it.each(['year', 'stats', 'nation', 'diplomacy', 'office'] as const)(
+    '공백지 %s 계약은 재해시해도 역사판으로 대신하지 않는다',
+    (change) => {
+      const altered = structuredClone(allRows),
+        row = altered.find((row) => row.kind === 'SCENARIO' && row.name === 'san10-empty')!;
+      const scenario = row.content as {
+        startYear: number;
+        generalStats: { generalId: number }[];
+        general: unknown[][];
+        diplomacy: number[][];
+      };
+      if (change === 'year') scenario.startYear = 191;
+      if (change === 'stats') scenario.generalStats[0]!.generalId = 2;
+      if (change === 'nation') scenario.general[0]![3] = 1;
+      if (change === 'diplomacy') scenario.diplomacy.push([1, 2, 0, 0]);
+      if (change === 'office') scenario.general[0]![8] = 5;
+      row.contentHash = hashState(scenario);
+      expect(creationProfile(altered, allPresets, registered, 'san10-empty')).toMatchObject({
+        id: 'san10-empty',
+        available: false,
+        code: 'RESOURCES_UNAVAILABLE',
+      });
+    },
+  );
+
+  it('공백지 프리셋 누락은 역사·구판 프리셋을 손상시키지 않는다', () => {
+    expect(creationProfile(allRows, presets, registered, 'san10-empty')).toMatchObject({
+      available: false,
+      code: 'PRESETS_UNAVAILABLE',
+    });
+    expect(creationProfile(allRows, presets, registered, 'san10-191')).toMatchObject({ available: true });
+    expect(creationProfile(allRows, presets, registered)).toMatchObject({ available: true });
   });
 });
