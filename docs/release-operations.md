@@ -22,6 +22,18 @@
 
 통과하면 새 디렉터리에 `receipt.json`을 쓰며 결과는 `artifact-preflight-passed`입니다. 완료한 임시 파일을 최종 이름에 연결할 때 기존 파일을 덮지 않습니다. 실패 도중 남은 자기 디렉터리·partial은 보존합니다. receipt는 런타임 산출물이므로 Git에 넣지 않습니다. 이 명령은 배포 시작·이미지 load·DB 조회·서비스 변경·`current` 교체를 수행하지 않습니다. `dataContract`는 `unknown`이고 복귀를 허용하지 않습니다. 운영 대상 확인과 T2-15 단계2~6, 실제 배포·복귀 리허설, AC-M2-08·AC-M3-10 전체 인수는 후속입니다.
 
+### 운영 대상 metadata 사전 확인 (T2-15 B2b3b)
+
+`bash tools/deploy.sh --target-preflight /absolute/target.json`은 Linux의 로컬 Docker에서 이미지·volume·Compose 메타데이터만 읽습니다. 입력에는 버전1과 `artifact`, `target`, `receiptDirectory`를 명시합니다. `artifact`에는 기존 네 입력 중 산출물 경로·해시·revision과 이전 `preflightReceiptPath`·`preflightReceiptSha256`을 넣습니다. 이전 receipt의 해시를 대조한 뒤 같은 산출물을 새 `artifact-recheck` receipt로 다시 확인합니다. 과거 receipt만으로 현재 파일을 채택하지 않습니다.
+
+`target`에는 root 소유·다른 사용자가 쓸 수 없는 Docker 실행 파일, `dockerHost: unix:///var/run/docker.sock`, 자기 소유0700의 빈 `dockerConfigDirectory`, 소유자가 따로 기록한 `expectedDaemonId`, `ownerId`, `targetId`, `projectName`을 넣습니다. Docker context나 환경의 원격 daemon을 탐색하지 않습니다. `composeFile`·`composeSha256`은 해당 산출물 context의 이번 검토된 `deploy/compose.yml` 바이트와 같아야 합니다. `environmentFile`·`environmentSha256`은 별도 일반 파일이며 기존 예제의16개 비밀 아닌 키만 받습니다. 원문 비밀·알 수 없는 키·중복·환경 확장은 거부합니다.
+
+`volumes`의 `appSecrets`, `pgSecrets`, `pgData`, `caddyData`에는 미리 만든 서로 다른 정확한 이름을 넣습니다. driver와 scope는 모두 `local`이어야 합니다. 네 volume은 `org.opensamguk.owner=<ownerId>`, `org.opensamguk.target=<targetId>`, `org.opensamguk.purpose=<용도>` 세 label이 필요하며 용도는 각각 `app-secrets`, `pg-secrets`, `pg-data`, `caddy-data`입니다. 이름만 일치하거나 표지가 없으면 거부하고 기존 volume에 표지를 추가하지 않습니다. 생성 시각·표지·mountpoint 메타데이터를 검사 전후 대조하지만 volume 안의 파일은 열지 않습니다.
+
+명령은 manifest의 세 이미지 ID·소스 표지·UID10001 설정과 고정한 공식 PG/Caddy 이미지의 로컬 metadata를 대조합니다. 이미지를 pull하거나 load하지 않습니다. 명시한16개 설정으로 렌더한 Compose의 이미지·사용자·읽기 전용 mount·권한·두 공개 포트·내부 network·수동 migrate 구성을 확인합니다. 각 native 명령은10초, 검사 전체는120초이며 취소 뒤 native 종료·양쪽 출력 종료를 최대60초 기다립니다. 원문 Docker 출력과 환경 설정을 로그로 내보내지 않습니다.
+
+새 출력은 `target-metadata-preflight-passed`를 기록합니다. `operationalReady`, `secretUidModeVerified`, `dbQueried`, `secretsRead`, `deploymentStarted`, `currentChanged`, `rollbackAuthorized`는 모두 `false`입니다. 비밀 파일 내용·UID·권한, DB 대상·migration, 배포·복귀·서비스 기동은 후속입니다. 서버·도메인·메일·실제 owner inventory 값은 여전히 미정이며 `.invalid` 시험 값은 운영 확정값이 아닙니다. 새 전용 Linux CI는 자기 이미지·volume으로 이 metadata 경계만 검사하고 앱·DB를 기동하지 않습니다. 실제 CI·독립 리뷰·보호 병합과 전체 AC 인수는 아직 남아 있습니다.
+
 ### 공개 실행 이미지 (T2-15 B2a)
 
 `deploy/Dockerfile`은 Node24 공식 이미지의 digest와 pnpm10.33.0을 고정하고 lockfile 설치·Prisma 생성을 실행합니다. `server`·`engine`·`migrate` 대상은 같은 소스를 쓰며 `web` 대상은 `build:public`·자산 검사를 거친 정적 파일만 `/web`으로 내보냅니다. API와 엔진은 UID/GID10001로 실행하고 진입점이 실제 Node 프로세스를 `exec`합니다. API의 기존 loopback 바인딩을 유지합니다.
