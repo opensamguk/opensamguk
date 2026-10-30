@@ -14,6 +14,14 @@
 
 <!-- TODO(M2): 명령 하나로 배포 (AC-M2-08). migration 적용 → server·engine 재시작 → 상태 확인. -->
 
+### 로컬 산출물 사전 확인 (T2-15 B2b3a)
+
+기존 `release-artifact.ts`의 산출물을 `bash tools/deploy.sh --preflight /absolute/preflight.json`으로 확인합니다. Node와 프로젝트의 tsx 설치가 필요합니다. 입력 JSON에는 `manifestPath`, `manifestSha256`, `sourceRevision`, `receiptDirectory` 네 값만 넣습니다. 경로는 절대 경로이고 마지막 값은 아직 없는 새 디렉터리여야 합니다. manifest 해시는 빌드 때 보관한 값, revision은 같은40자 소스 SHA를 사용합니다. DB URL이나 비밀값은 넣지 않습니다.
+
+명령은 final manifest와 체크섬, 이미지·web archive, 공개 파일 전체, 원본 source archive/context, migration·resources·공개 자산 정책의 해시를 대조합니다. 현재 producer가 보존한 `.partial-<UUID>/source.tar`와 `context`가 필요합니다. 링크·경로 탈출·미지원 형식·누락·변조·다른 SHA·이미 있는 출력은 거부합니다. 원본 산출물을 다시 빌드하거나 덮지 않습니다.
+
+통과하면 새 디렉터리에 `receipt.json`을 쓰며 결과는 `artifact-preflight-passed`입니다. 완료한 임시 파일을 최종 이름에 연결할 때 기존 파일을 덮지 않습니다. 실패 도중 남은 자기 디렉터리·partial은 보존합니다. receipt는 런타임 산출물이므로 Git에 넣지 않습니다. 이 명령은 배포 시작·이미지 load·DB 조회·서비스 변경·`current` 교체를 수행하지 않습니다. `dataContract`는 `unknown`이고 복귀를 허용하지 않습니다. 운영 대상 확인과 T2-15 단계2~6, 실제 배포·복귀 리허설, AC-M2-08·AC-M3-10 전체 인수는 후속입니다.
+
 ### 공개 실행 이미지 (T2-15 B2a)
 
 `deploy/Dockerfile`은 Node24 공식 이미지의 digest와 pnpm10.33.0을 고정하고 lockfile 설치·Prisma 생성을 실행합니다. `server`·`engine`·`migrate` 대상은 같은 소스를 쓰며 `web` 대상은 `build:public`·자산 검사를 거친 정적 파일만 `/web`으로 내보냅니다. API와 엔진은 UID/GID10001로 실행하고 진입점이 실제 Node 프로세스를 `exec`합니다. API의 기존 loopback 바인딩을 유지합니다.
