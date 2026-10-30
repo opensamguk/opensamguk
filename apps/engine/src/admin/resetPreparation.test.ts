@@ -178,6 +178,117 @@ function fixture(useRequest = true) {
 async function reject(f: ReturnType<typeof fixture>, code: ResetPreparationError['code']) {
   await expect(prepareWorldReset(f.db, worldId, 'new-seed', controller().signal)).rejects.toMatchObject({ code });
 }
+
+async function san10RequestFixture(scenario: 'san10-191' | 'san10-empty') {
+  const presetKey = scenario === 'san10-empty' ? 'empty' : 'regular',
+    preset = parsePreset(json(`resources/preset/${presetKey}.json`)),
+    selected: InitialResources = {
+      ...resources,
+      map: resource('MAP', 'san10', 'resources/map/san10.json'),
+      scenario: resource('SCENARIO', scenario, `resources/scenario/${scenario}.json`),
+    },
+    san10Features = [
+      'campaign-assignment-v2',
+      'campaign-v1',
+      'city-resources-v1',
+      'five-stats',
+      'operational-map',
+      'personnel',
+      'policy',
+      'stratagem-basic',
+      'treaty',
+    ].sort();
+  const initial = composeInitialWorld(selected, oldSeed);
+  initial.ruleFeatures = san10Features;
+  const f = fixture();
+  Object.assign(
+    f.world,
+    (
+      await capture(
+        prepareInitialWorld(initial, {
+          ...options,
+          ruleFeatures: san10Features,
+          turnTermMinutes: preset.turnTermMinutes,
+          preset: { key: presetKey, value: preset },
+        }),
+      )
+    ).world,
+  );
+  const intent = worldCreateIntent({
+    expectedUserId: userId,
+    idempotencyKey: requestId,
+    name: f.world.name,
+    presetKey,
+    seed: oldSeed,
+    endYear: f.world.endYear,
+    ruleFeatures: san10Features,
+  });
+  f.rows.splice(0, f.rows.length, ...structuredClone(Object.values(selected)));
+  f.requests[0] = {
+    ...request(f.world),
+    intent,
+    intentHash: hashState(intent),
+    resolution: {
+      version: 1,
+      selection: { scenario, map: 'san10', unitSet: 'basic', statRules: 'five-stats', portraitMap: '191-map' },
+      resources: Object.values(selected).map(({ kind, name, version, contentHash }) => ({
+        kind,
+        name,
+        version,
+        contentHash,
+      })),
+      presetKey,
+      presetHash: hashState(preset),
+      turnTermMinutes: preset.turnTermMinutes,
+      endYear: f.world.endYear,
+      initialStateHash: f.world.initialStateHash,
+    },
+  } as unknown as Request;
+  return { f, san10Features };
+}
+
+it.each(['san10-191', 'san10-empty'] as const)(
+  'AC-INT-18D %s의 생략된 기본 자원도 DONE 출처와152빈원장을 보존해 초기화한다',
+  async (scenario) => {
+    const { f, san10Features } = await san10RequestFixture(scenario),
+      before = structuredClone({ world: f.world, requests: f.requests, rows: f.rows });
+    const result = await prepareWorldReset(f.db, worldId, 'new-seed', controller().signal),
+      saved = await capture(result.prepared),
+      origin = saved.world.replayOrigin as unknown as ReplayOriginV3;
+    expect(result.evidence.provenance).toEqual({ kind: 'request', requestId });
+    expect(origin.initial.mapKey).toBe('san10');
+    expect(origin.initial.scenarioKey).toBe(scenario);
+    expect(origin.initial.startYear).toBe(scenario === 'san10-empty' ? 180 : 191);
+    expect(origin.initial.nations).toHaveLength(scenario === 'san10-empty' ? 0 : 21);
+    expect(origin.initial.generals).toHaveLength(491);
+    expect(origin.initial.generals.every((general) => general.userId === null)).toBe(true);
+    expect(origin.initial.cities).toHaveLength(152);
+    expect(saved.world.ruleFeatures).toEqual(san10Features);
+    const ledger = saved.world.cityResourcesState as {
+      cities: Record<string, { gold: number; rice: number; garrison: unknown[] }>;
+    };
+    expect(Object.keys(ledger.cities)).toHaveLength(152);
+    expect(
+      Object.values(ledger.cities).every((city) => city.gold === 0 && city.rice === 0 && city.garrison.length === 0),
+    ).toBe(true);
+    expect({ world: f.world, requests: f.requests, rows: f.rows }).toEqual(before);
+  },
+);
+
+it.each(['san10-191', 'san10-empty'] as const)(
+  'AC-M3-04 %s의 생략된 기본 자원을 옛 stat·portrait로 바꾼 DONE 출처는 거부한다',
+  async (scenario) => {
+    const { f } = await san10RequestFixture(scenario);
+    const resolution = f.requests[0]!.resolution as unknown as {
+      selection: { statRules: string; portraitMap: string };
+    };
+    resolution.selection.statRules = 'default';
+    resolution.selection.portraitMap = 'rtk14-map';
+    await reject(f, 'PROVENANCE_INVALID');
+    expect(f.tx.gameResource.findMany).not.toHaveBeenCalled();
+  },
+);
+
 it('정식21국491명 원본 시드를 완전히 복원하고 새 시드만 결정적으로 준비한다', async () => {
   const f = fixture(),
     before = structuredClone({ world: f.world, requests: f.requests, rows: f.rows });
