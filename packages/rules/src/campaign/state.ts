@@ -74,7 +74,6 @@ export function readCampaignState(value: unknown, world: WorldView, expectedSeed
           order.issuerId === order.recipientId ||
           !world.generals[order.issuerId] ||
           !world.generals[order.recipientId] ||
-          (order.resolvedTick !== null && order.resolvedTick < order.createdTick) ||
           ((order.status === 'PENDING' || order.status === 'REJECTED') &&
             (order.firstSlot !== null || order.turnRevision !== null)) ||
           ((order.status === 'READY' || order.status === 'EXECUTED' || order.status === 'FAILED') &&

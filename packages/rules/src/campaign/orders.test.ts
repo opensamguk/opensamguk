@@ -252,6 +252,35 @@ describe('AC-INT-19B 실제차례 한 번 실행·현재권한·예약 펜스', 
     );
     expect(second.commandKey).toBe('farm');
   });
+  it('실시간 진행에서 입력보다 이른 tick으로 밀린 차례도 지시를 실행·취소해 저장할 수 있다', () => {
+    // 엔진은 대기 입력을 현재 시계 tick에 먼저 처리하고, 밀린 장수 차례는 그보다 이른 nextTurnTick으로 실행한다.
+    const f = fixture(),
+      issued = ok(applyCampaignOrder(f.world, issue(4), 1, { ...f.context, tick: 1003 }));
+    const executed = runGeneralTurn(
+      issued.state,
+      { generalId: 4, tick: 1000, unitSet: testUnits },
+      slot,
+      'order-seed',
+      { turnRevision: 0 },
+      resolver,
+    );
+    expect(executed.state.campaign!.orders!.items[0]).toMatchObject({
+      status: 'EXECUTED',
+      createdTick: 1003,
+      resolvedTick: 1000,
+    });
+    expect(() => readCampaignState(executed.state.campaign, executed.state)).not.toThrow();
+    const cancelled = runGeneralTurn(
+      issued.state,
+      { generalId: 4, tick: 1000, unitSet: testUnits },
+      slot,
+      'order-seed',
+      { turnRevision: 1 },
+      resolver,
+    );
+    expect(cancelled.state.campaign!.orders!.items[0]).toMatchObject({ status: 'CANCELLED', resolvedTick: 1000 });
+    expect(() => readCampaignState(cancelled.state.campaign, cancelled.state)).not.toThrow();
+  });
   it('NPC가 받은 휴식은 rest→AI 선택으로 대체하지 않는다', () => {
     const f = fixture(),
       issued = ok(applyCampaignOrder(f.world, issue(4), 1, f.context));
