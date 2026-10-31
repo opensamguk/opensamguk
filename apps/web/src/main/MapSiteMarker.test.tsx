@@ -47,6 +47,13 @@ it('AC-INT-20 멀리서는 국가색 네모, 가까이서는 원래 성 그림�
   expect(draw(4, '#3366aa', 2).querySelector('[data-marker-art="field"]')).not.toBeNull();
 });
 
+it('AC-INT-20 화면 크기를 읽기 전(배율 0)에도 표식 좌표·크기가 유한하다', () => {
+  const square = draw(0).querySelector('[data-marker-detail="square"]')!;
+  for (const name of ['x', 'y', 'width', 'height'])
+    expect(Number.isFinite(Number(square.getAttribute(name)))).toBe(true);
+  expect(Number(square.getAttribute('width'))).toBe(11);
+});
+
 it('AC-INT-20 아주 작은 네모도 화면에서 6px 아래로 줄지 않고 공백지는 군기를 달지 않는다', () => {
   const tiny = draw(0.25, null, 0).querySelector('[data-marker-detail="square"]')!;
   expect(Number(tiny.getAttribute('width')) * 0.25).toBe(6);

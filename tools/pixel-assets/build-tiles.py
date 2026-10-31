@@ -190,12 +190,17 @@ def main():
     src = Path(sys.argv[1])
     sources = json.loads((OUT / 'sources.json').read_text(encoding='utf-8'))
     names = sorted(set(TERRAIN_SOURCES.values()))
+    # 이미 기록한 원본은 해시가 같아야 한다. 처음 보는 원본만 새로 기록한다.
+    recorded = {o['file']: o for o in sources['originals']}
     originals = [o for o in sources['originals'] if not o['file'].startswith('tiles/')]
     for name in names:
+        digest = build.sha(src / name)
+        known = recorded.get(f'tiles/{name}')
+        if known and known['sha256'] != digest:
+            raise SystemExit(f'tiles/{name}: 원본 해시가 sources.json과 다릅니다')
         with Image.open(src / name) as image:
             size = list(image.size)
-        originals.append({'file': f'tiles/{name}', 'sha256': build.sha(src / name), 'size': size,
-                          'prompt': PROMPTS[name]})
+        originals.append({'file': f'tiles/{name}', 'sha256': digest, 'size': size, 'prompt': PROMPTS[name]})
     outputs = [o for o in sources['outputs'] if not o['from'].startswith(('tiles/', 'tools/pixel-assets/build-tiles'))]
     for terrain, name in TERRAIN_SOURCES.items():
         cells = BIG_TILES.get(terrain, 1)

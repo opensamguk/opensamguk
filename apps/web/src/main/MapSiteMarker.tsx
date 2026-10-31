@@ -41,7 +41,8 @@ export function MapSiteMarker({
   const units = markerUnits(kind, level);
   const detail = markerDetail(units, pixelsPerUnit);
   if (detail === 'square') {
-    const side = Math.max(units, SQUARE_MIN_PX / pixelsPerUnit);
+    // 화면 크기를 읽기 전(배율 0)에는 지도 단위 크기 그대로 둔다.
+    const side = pixelsPerUnit > 0 ? Math.max(units, SQUARE_MIN_PX / pixelsPerUnit) : units;
     return (
       <rect
         data-marker-detail="square"

@@ -435,6 +435,8 @@ def main():
     if 'land' in PROFILE:
         data['land'] = json.loads(PROFILE['land'].read_bytes())['land']
         inputs.append(PROFILE['land'])
+    if 'sites' in PROFILE:
+        inputs.append(PROFILE['sites'])  # 거점 자리를 땅으로 되돌리고 강을 돌리는 데 쓴다
     if PROFILE.get('exaggerate'):
         data['rivers'] = data['rivers'] + river_mouths(data)
     f = features(data, Image.open(PROFILE['relief']).convert('RGB'))

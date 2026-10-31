@@ -163,10 +163,14 @@ def main():
     art = Image.open(src / 'keyart.png').convert('RGB').resize(KEYART, Image.Resampling.BOX)
     art = art.quantize(KEYART_COLORS, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
     outputs.append({'from': 'keyart.png', **save(art, OUT / 'keyart.png')})
+    # 지형·길 타일 원본과 출력은 build-tiles.py가 관리한다. 여기서는 확인하지 않고 기록을 보존한다.
     for original in sources['originals']:
+        if original['file'].startswith('tiles/'):
+            continue
         if sha(src / original['file']) != original['sha256']:
             raise SystemExit(f"{original['file']}: 원본 해시가 sources.json과 다릅니다")
-    sources['outputs'] = outputs
+    tiles = [o for o in sources['outputs'] if o['from'].startswith(('tiles/', 'tools/pixel-assets/build-tiles'))]
+    sources['outputs'] = outputs + tiles
     (OUT / 'sources.json').write_text(json.dumps(sources, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
 

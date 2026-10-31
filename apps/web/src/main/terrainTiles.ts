@@ -230,6 +230,9 @@ export function waterPath(from: Point, to: Point, grid: Grid): Point[] | null {
     x < columns &&
     y < rows &&
     (waterIndex.has(cells[y * columns + x]!) || near(x, y, from) || near(x, y, to));
+  // 지도 끝 좌표(예: 1000,700)는 격자 밖 칸이 된다. 시작·목표가 격자 안이 아니면 물길이 없다.
+  const inGrid = (point: Point) => point.x >= 0 && point.y >= 0 && point.x < columns && point.y < rows;
+  if (!inGrid(from) || !inGrid(to)) return null;
   const previous = new Int32Array(columns * rows).fill(-1);
   const start = from.y * columns + from.x;
   const goal = to.y * columns + to.x;

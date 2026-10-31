@@ -13,6 +13,10 @@
     {
       "file": "apps/web/src/main/san10-basemap.json",
       "sha256": "6b7bcefb67c43011d671b75f9306dfac25efd7adba3ae8ff86f9440157091a84"
+    },
+    {
+      "file": "resources/map/san10.json",
+      "sha256": "03550bc0e9b601af371dc1a925853e1c455ec76431500a749141766bb74f4667"
     }
   ],
   "grid": {

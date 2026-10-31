@@ -113,6 +113,9 @@ it('AC-INT-20 물 위를 지나는 땅길은 물 칸을 따라 그리고 길이 
   const land = grid([Array.from({ length: 10 }, () => 'plains' as const)]);
   expect(waterPath({ x: 0, y: 0 }, { x: 9, y: 0 }, land)).toBeNull();
   expect(waterPath({ x: 0, y: 0 }, { x: 6, y: 0 }, land)).toHaveLength(7);
+  // 지도 끝 좌표는 격자 밖 칸이라 물길을 찾지 않는다(무한 역추적 방지).
+  expect(waterPath({ x: 0, y: 0 }, { x: 10, y: 0 }, land)).toBeNull();
+  expect(waterPath({ x: -1, y: 0 }, { x: 3, y: 0 }, land)).toBeNull();
   const sites = [
     { id: 'a', name: 'a', kind: 'CITY' as const, position: { x: 1, y: 1 } },
     { id: 'b', name: 'b', kind: 'CITY' as const, position: { x: 15, y: 1 } },
