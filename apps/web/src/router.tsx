@@ -345,7 +345,7 @@ const diplomacyRoute = createRoute({
     return <DiplomacyPage tab={tab} />;
   },
 });
-// 받은 제안함 (INT-20). 발령·막부·외교 제안을 모아 보고 답하는 화면으로 잇는다.
+// 받은 제안함 (INT-20). 발령·휘하·외교 제안을 모아 보고 답하는 화면으로 잇는다.
 const inboxRoute = createRoute({ getParentRoute: () => worldRoute, path: 'inbox', component: InboxPage });
 // 메시지 전체 화면 (T2-10). 메인 오른쪽 메시지 패널과 같은 부품이다.
 const messagesRoute = createRoute({ getParentRoute: () => worldRoute, path: 'messages', component: MessagesPage });

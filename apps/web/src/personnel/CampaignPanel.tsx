@@ -212,7 +212,7 @@ function CampaignBoard({
   return (
     <section className={styles.panel} aria-labelledby="campaign-title">
       <h2 id="campaign-title" tabIndex={-1}>
-        막부·부곡
+        개인 휘하·부곡
       </h2>
       {accountChanged || notice ? (
         <p role="status">{accountChanged ? '로그인한 계정이 바뀌었습니다. 화면을 다시 확인하세요.' : notice}</p>

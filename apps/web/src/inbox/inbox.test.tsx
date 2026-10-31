@@ -124,14 +124,14 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('받은 제안함', () => {
-  it('받은 제안이 없으면 빈 상태를 보이고 외교·막부는 묻지 않는다', async () => {
+  it('받은 제안이 없으면 빈 상태를 보이고 외교·휘하는 묻지 않는다', async () => {
     renderPage();
     expect(await screen.findByRole('heading', { level: 1, name: '받은 제안함' })).toBeTruthy();
     expect(await screen.findByText('받은 제안이 없습니다')).toBeTruthy();
     expect(wire.calls.some((call) => call.path === 'treaty.list' || call.path === 'campaign.get')).toBe(false);
   });
 
-  it('발령·막부·외교 제안을 모아 보이고 답하는 화면으로 잇는다', async () => {
+  it('발령·휘하·외교 제안을 모아 보이고 답하는 화면으로 잇는다', async () => {
     on('home.get', () => ({ nation: { id: 1 } }));
     on('general.mine', () => ({ general: { id: 1 }, creationRules: { campaignEnabled: true } }));
     on('offers.mine', () => [offer]);
@@ -145,9 +145,9 @@ describe('받은 제안함', () => {
     expect(within(assignment).getByText('공손찬이 북평으로 발령했습니다 · 남은 기한 1개월, 넘기면 수락')).toBeTruthy();
     expect(within(assignment).getByRole('button', { name: '수락' })).toBeTruthy();
 
-    const retinue = await screen.findByRole('region', { name: '막부 제안 1' });
+    const retinue = await screen.findByRole('region', { name: '휘하 제안 1' });
     expect(within(retinue).getByText('하후돈의 가신 제안')).toBeTruthy();
-    expect(within(retinue).getByText('막부에서 답하기').getAttribute('data-hash')).toBe('campaign-title');
+    expect(within(retinue).getByText('휘하·부곡에서 답하기').getAttribute('data-hash')).toBe('campaign-title');
 
     const treaties = await screen.findByRole('region', { name: '외교 제안 1' });
     expect(within(treaties).getByText('원소의 조약 제안 · 응답 기한 191년 9월')).toBeTruthy();

@@ -136,7 +136,7 @@ export function GameNavigation({
         pathname.replace(/\/$/, '') === `/w/${worldId}` ? (
           <a className={styles.link} href="#campaign-title" onClick={() => close()}>
             <Icon src={personnelIcon} />
-            막부
+            휘하·부곡
           </a>
         ) : (
           <Link
@@ -147,7 +147,7 @@ export function GameNavigation({
             onClick={() => close()}
           >
             <Icon src={personnelIcon} />
-            막부
+            휘하·부곡
           </Link>
         )
       ) : null}

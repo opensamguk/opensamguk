@@ -18,8 +18,8 @@ import { EmptyState, LoadingState } from '../ui/States';
 import { incomingTreaties, retinueOffers } from './count';
 import styles from './Inbox.module.css';
 
-// 받은 제안함 (INT-20, 시안 X-Inbox). 발령·막부·외교 제안을 한곳에 모은다. 화면만 바꾸며 기존 조회만 쓴다.
-// 발령은 메인의 제안 상자를 그대로 쓰고 막부·외교는 수와 요약을 보인 뒤 답하는 화면으로 잇는다.
+// 받은 제안함 (INT-20, 시안 X-Inbox). 발령·휘하·외교 제안을 한곳에 모은다. 화면만 바꾸며 기존 조회만 쓴다.
+// 발령은 메인의 제안 상자를 그대로 쓰고 휘하·외교는 수와 요약을 보인 뒤 답하는 화면으로 잇는다.
 export function InboxPage() {
   const worldId = useWorldId();
   const home = useHome(worldId);
@@ -46,7 +46,7 @@ export function InboxPage() {
         <img className="pixel-art" src={messagesIcon} alt="" width={48} height={48} />
         <h1>받은 제안함</h1>
       </div>
-      <p className={styles.lead}>발령·막부·외교 제안을 한곳에서 봅니다.</p>
+      <p className={styles.lead}>발령·휘하·외교 제안을 한곳에서 봅니다.</p>
       {body}
     </section>
   );
@@ -88,7 +88,7 @@ export function Inbox({ worldId, hasNation, campaign }: { worldId: string; hasNa
           <img className="pixel-art" src={personnelIcon} alt="" width={48} height={48} />
           <div className={styles.cardBody}>
             <h2 id="inbox-retinue" className={styles.cardTitle}>
-              막부 제안 <span className="num">{retinue.length}</span>
+              휘하 제안 <span className="num">{retinue.length}</span>
             </h2>
             <ul className={styles.rows}>
               {retinue.map((offer) => (
@@ -99,11 +99,11 @@ export function Inbox({ worldId, hasNation, campaign }: { worldId: string; hasNa
             </ul>
           </div>
           <Link to="/w/$worldId" params={{ worldId }} hash="campaign-title" className={styles.button}>
-            막부에서 답하기
+            휘하·부곡에서 답하기
           </Link>
         </section>
       ) : null}
-      {campaign && board.isError ? <p className={styles.muted}>막부 제안을 불러오지 못했습니다.</p> : null}
+      {campaign && board.isError ? <p className={styles.muted}>휘하 제안을 불러오지 못했습니다.</p> : null}
 
       {incoming.length > 0 ? (
         <section className={styles.card} aria-labelledby="inbox-treaties">
@@ -132,7 +132,7 @@ export function Inbox({ worldId, hasNation, campaign }: { worldId: string; hasNa
       ) : null}
 
       {loading ? <LoadingState /> : null}
-      {empty ? <EmptyState title="받은 제안이 없습니다">발령·막부·외교 제안이 오면 여기에 모입니다.</EmptyState> : null}
+      {empty ? <EmptyState title="받은 제안이 없습니다">발령·휘하·외교 제안이 오면 여기에 모입니다.</EmptyState> : null}
     </div>
   );
 }

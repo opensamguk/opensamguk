@@ -433,7 +433,7 @@ test.describe('장수가 있는 계정', () => {
         await summary.click();
       }
       // 구형 월드에는 없는 휘하 앵커를 표시하지 않는다.
-      await expect(nav.getByRole('link', { name: '막부', exact: true })).toHaveCount(0);
+      await expect(nav.getByRole('link', { name: '휘하·부곡', exact: true })).toHaveCount(0);
       const targets = await nav.locator('a:visible,summary:visible,button:visible').evaluateAll((nodes) =>
         nodes.map((node) => {
           const { width, height } = node.getBoundingClientRect();

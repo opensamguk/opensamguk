@@ -60,7 +60,7 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
     endYear: 201,
   });
   const hold = await holdLease(worldId);
-  const panel = (user: typeof owner) => user.page.getByRole('region', { name: '막부·부곡' });
+  const panel = (user: typeof owner) => user.page.getByRole('region', { name: '개인 휘하·부곡' });
   let tick = 0;
   const advance = () => new TurnLoop(hold.db, hold.lease).advanceTo(tick);
   const pending = (kind: string) =>
@@ -193,10 +193,10 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
     await editor.getByRole('button', { name: /에 넣기$/ }).click();
     await expect(editor.locator('tr[data-slot="1"]')).toContainText('농지 개간');
     const selectedBeforeAnchor = new URL(owner.page.url()).search;
-    await owner.page.getByRole('link', { name: '막부', exact: true }).click();
+    await owner.page.getByRole('link', { name: '휘하·부곡', exact: true }).click();
     expect(new URL(owner.page.url()).search).toBe(selectedBeforeAnchor);
     expect(new URL(owner.page.url()).hash).toBe('#campaign-title');
-    await expect(owner.page.getByRole('heading', { name: '막부·부곡', exact: true })).toBeFocused();
+    await expect(owner.page.getByRole('heading', { name: '개인 휘하·부곡', exact: true })).toBeFocused();
     await expect(editor.locator('tr[data-slot="1"]')).toContainText('농지 개간');
     await panel(owner).getByRole('button', { name: '화면장수1에게 제안', exact: true }).click();
     await pending('campaign.relationship');
