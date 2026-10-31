@@ -67,7 +67,7 @@ test('로그인 → 로비 → 장수 만들기 → 메인 → 로비로 돌아�
   // 생성 폼은 T1-11 시험이 본다. 여기서는 같은 API로 만들고 로비로 돌아오는 길만 본다.
   const general = await createGeneralByApi(page, world);
   await page.goto(`/w/${world}`);
-  await expect(page.getByRole('heading', { level: 1, name: '메인' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: '군략도' })).toBeVisible();
   await page.getByRole('link', { name: '로비', exact: true }).click();
   await expect(page).toHaveURL('/lobby');
   await expect(target.getByText(`내 장수: ${general.name} (재야)`)).toBeVisible();

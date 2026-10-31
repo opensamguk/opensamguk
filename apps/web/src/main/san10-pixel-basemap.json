@@ -1,0 +1,45 @@
+{
+  "note": "Derived only from Natural Earth (public domain): the shipped v5.1.2 vectors and Natural Earth II relief.",
+  "script": "tools/map-data/build-pixel-basemap.py",
+  "sources": [
+    {
+      "file": "resources/map-drafts/san10/pixel-sources.json",
+      "sha256": "ba55fdb6a1e7facd857d941ae08f9430ddb1759784bfe91b3b04bd3c6a8a63af"
+    },
+    {
+      "file": "resources/map-drafts/san10/natural-earth-relief.webp",
+      "sha256": "4f7df0e27c701fbfbf8e020200afdde0c7d3538024007f6d1ceda0596f43612e"
+    },
+    {
+      "file": "apps/web/src/main/san10-basemap.json",
+      "sha256": "6b7bcefb67c43011d671b75f9306dfac25efd7adba3ae8ff86f9440157091a84"
+    }
+  ],
+  "grid": {
+    "width": 700,
+    "height": 500,
+    "viewBoxUnitsPerPixel": 2
+  },
+  "palette": {
+    "deepSea": "#1e3a7a",
+    "sea": "#28509e",
+    "shallow": "#3d6fb8",
+    "lake": "#2c5faf",
+    "river": "#2b5eae",
+    "plains": "#9ccb5c",
+    "farmland": "#b4d36c",
+    "grassland": "#83bf4f",
+    "forest": "#3f8f3c",
+    "loess": "#d6c07a",
+    "desert": "#e4d4a0",
+    "hills": "#5fa045",
+    "mountains": "#2e6a34",
+    "highMountains": "#6b5d49",
+    "snow": "#f0ede4",
+    "coastSand": "#e6d9a6"
+  },
+  "output": {
+    "file": "apps/web/src/main/san10-pixel-basemap.png",
+    "sha256": "8242e71afbb1f6273c3b0034c88d86257766997fa2182ba95485366745bf5378"
+  }
+}

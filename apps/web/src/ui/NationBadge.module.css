@@ -1,14 +1,49 @@
+/* 국가 이름표: 국가색 군기 + 국가색 이름패 (INT-20). */
 .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  vertical-align: middle;
+}
+/* 깃대·테두리 그림 위에 국가색으로 칠한 깃천을 깐다. 깃천 모양은 마스크 그림에서 온다. */
+.flag {
+  position: relative;
+  flex: none;
   display: inline-block;
+  width: 16px;
+  height: 16px;
+}
+.flag::before,
+.flag::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  image-rendering: pixelated;
+}
+.flag::before {
+  background: currentColor;
+  -webkit-mask: url('../art/flag/square-cloth.png') 0 0 / 100% 100% no-repeat;
+  mask: url('../art/flag/square-cloth.png') 0 0 / 100% 100% no-repeat;
+}
+.flag::after {
+  background: url('../art/flag/square.png') 0 0 / 100% 100% no-repeat;
+}
+.name {
+  display: inline-block;
+  min-width: 0;
   padding: 0 var(--space-2);
+  border: 1px solid var(--color-ink);
   border-radius: var(--radius);
   font-size: var(--text-xs);
   font-weight: 600;
-  line-height: 20px;
+  line-height: 18px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .none {
-  background: var(--color-surface-muted);
+  background: var(--color-surface-raised);
   color: var(--color-text-muted);
-  border: 1px solid var(--color-border);
+  border-style: dashed;
 }

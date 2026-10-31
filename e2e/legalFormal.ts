@@ -74,7 +74,7 @@ export async function formalConsent(
         .poll(() => hold.db.inputEvent.count({ where: { worldId, kind: 'general.create', status: 'PENDING' } }))
         .toBe(1);
       await new TurnLoop(hold.db, hold.lease).advanceTo(0);
-      await expect(page.getByRole('heading', { name: '메인', exact: true })).toBeVisible();
+      await expect(page.getByRole('heading', { name: '군략도', exact: true })).toBeVisible();
       const human = await stack.db.general.findUniqueOrThrow({
         where: { worldId_userId: { worldId, userId: user.id } },
         select: { id: true },

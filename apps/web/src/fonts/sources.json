@@ -1,0 +1,31 @@
+{
+  "license": "MIT, Copyright (c) 2016-2022 Damheo Lee (이담허)",
+  "note": "원본 글꼴 이름은 LICENSE의 예약 이름이라 서브셋은 다른 이름을 쓴다.",
+  "build": "python3 tools/fonts/build-title-fonts.py <원본 폴더>",
+  "fonts": [
+    {
+      "family": "OpenSamguk Myungjo",
+      "file": "apps/web/src/fonts/title-myungjo.woff",
+      "sha256": "8af38fb4fd11d91ef28019ee7bc5a1d67925a8ac2fb72786dfe5ba75cf34c6ce",
+      "bytes": 94052,
+      "source": {
+        "repository": "https://github.com/hurss/fonts",
+        "commit": "3fc1181c6b4af095206068188c3ea966d6738add",
+        "path": "ttf/DOSMyungjo.ttf",
+        "sha256": "aa3861287e6375488d60fe666bbeafe5b8dc5bd76d8e05b60067501cda275a6b"
+      }
+    },
+    {
+      "family": "OpenSamguk Iyagi",
+      "file": "apps/web/src/fonts/title-iyagi.woff",
+      "sha256": "8193140431fc0c99e5acc2dae384721fb5d86e466a4c86324c3fea20a9009135",
+      "bytes": 82396,
+      "source": {
+        "repository": "https://github.com/hurss/fonts",
+        "commit": "3fc1181c6b4af095206068188c3ea966d6738add",
+        "path": "ttf/DOSIyagiBoldface.ttf",
+        "sha256": "5548a69b50b9396b0d9c8141667ea8b8208ed61071aa9756e02a4e0f0d5c26f4"
+      }
+    }
+  ]
+}

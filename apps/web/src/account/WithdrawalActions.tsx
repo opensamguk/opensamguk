@@ -44,7 +44,7 @@ export function WithdrawalActions({
         <span>현재 계정의 탈퇴와 복구 불가를 확인했습니다.</span>
       </label>
       <button
-        className={styles.touch}
+        className={`${styles.touch} ${styles.danger}`}
         type="submit"
         disabled={!confirmed || password.length < 1 || password.length > 128}
       >

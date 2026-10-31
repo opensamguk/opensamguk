@@ -15,6 +15,8 @@ type Pending = { requestId: string } & (
   | { kind: 'campaign.unit'; payload: Inputs['unit']['payload'] }
 );
 const relations = { STAFF: '가신', LIEUTENANT: '부장', GUEST: '식객' } as const;
+// 받은 제안함(INT-20)도 같은 이름을 쓴다.
+export const CAMPAIGN_RELATIONS = relations;
 function remember(key: string, pending: Pending | null) {
   try {
     if (pending) sessionStorage.setItem(key, JSON.stringify(pending));
@@ -210,7 +212,7 @@ function CampaignBoard({
   return (
     <section className={styles.panel} aria-labelledby="campaign-title">
       <h2 id="campaign-title" tabIndex={-1}>
-        개인 휘하·부곡
+        막부·부곡
       </h2>
       {accountChanged || notice ? (
         <p role="status">{accountChanged ? '로그인한 계정이 바뀌었습니다. 화면을 다시 확인하세요.' : notice}</p>

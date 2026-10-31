@@ -113,6 +113,9 @@ function Detail({ worldId, op }: { worldId: string; op: OperationDetail }) {
       </header>
 
       <section aria-label="작전 타임라인" className={styles.timelineWrap}>
+        <p className={styles.plaque} aria-hidden="true">
+          작전 타임라인
+        </p>
         <p className={styles.legend}>
           {Object.values(VERDICT_VIEW).map((v) => (
             <Tag key={v.text} tone={v.tone}>

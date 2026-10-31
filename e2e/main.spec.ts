@@ -50,7 +50,7 @@ test.beforeAll(async ({ browser }) => {
 
 async function openMain(page: Page, search = '') {
   await page.goto(`/w/${ctx.worldId}${search}`);
-  await expect(page.getByRole('heading', { level: 1, name: '메인' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: '군략도' })).toBeVisible();
   await expect(page.getByTestId('world-map').locator('[data-city-key]')).toHaveCount(94);
 }
 
@@ -422,7 +422,7 @@ test.describe('장수가 있는 계정', () => {
       await expect(nav).toHaveCount(1);
       await page.getByRole('button', { name: '로그아웃', exact: true }).focus();
       await page.keyboard.press('Tab');
-      await expect(nav.getByRole('link', { name: '메인', exact: true })).toBeFocused();
+      await expect(nav.getByRole('link', { name: '군략도', exact: true })).toBeFocused();
       if (width < 768) {
         const summary = nav.locator('summary');
         await summary.click();
@@ -433,7 +433,7 @@ test.describe('장수가 있는 계정', () => {
         await summary.click();
       }
       // 구형 월드에는 없는 휘하 앵커를 표시하지 않는다.
-      await expect(nav.getByRole('link', { name: '휘하·부곡', exact: true })).toHaveCount(0);
+      await expect(nav.getByRole('link', { name: '막부', exact: true })).toHaveCount(0);
       const targets = await nav.locator('a:visible,summary:visible,button:visible').evaluateAll((nodes) =>
         nodes.map((node) => {
           const { width, height } = node.getBoundingClientRect();

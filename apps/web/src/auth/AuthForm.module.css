@@ -1,3 +1,4 @@
+/* 계정 양식 공용 부품 (INT-20): 먹 테두리 칸, 주칠 버튼, 못 쓰면 점선. */
 .form {
   display: flex;
   flex-direction: column;
@@ -8,15 +9,19 @@
   flex-direction: column;
   gap: var(--space-1);
 }
+.field > label {
+  font-weight: 500;
+}
 .input {
   flex: 1;
-  min-height: 44px;
+  min-height: 48px;
   min-width: 0;
   font: inherit;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border-strong);
+  font-size: var(--text-lg);
+  padding: 0 var(--space-3);
+  border: var(--frame);
   border-radius: var(--radius);
-  background: var(--color-surface);
+  background: var(--color-surface-raised);
   color: var(--color-text);
 }
 .input[aria-invalid='true'] {
@@ -31,10 +36,12 @@
   min-height: 44px;
   font: inherit;
   font-size: var(--text-sm);
+  font-weight: 500;
   padding: 0 var(--space-3);
-  border: 1px solid var(--color-border-strong);
+  border: var(--frame);
   border-radius: var(--radius);
-  background: var(--color-surface-muted);
+  box-shadow: var(--shadow-button);
+  background: var(--color-surface);
   color: var(--color-text);
   cursor: pointer;
 }
@@ -43,24 +50,36 @@
   font-size: var(--text-xs);
   color: var(--color-text-muted);
 }
-.fieldError,
-.formError {
+.fieldError {
   margin: 0;
   font-size: var(--text-sm);
   color: var(--color-danger);
 }
+.formError {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 2px solid var(--color-danger);
+  background: var(--color-surface-raised);
+  font-size: var(--text-sm);
+  color: var(--color-danger);
+}
 .submit {
-  min-height: 44px;
+  min-height: 52px;
   font: inherit;
+  font-size: var(--text-lg);
   font-weight: 600;
   padding: var(--space-2) var(--space-4);
-  border: 0;
+  border: var(--frame);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-button);
   background: var(--color-accent);
   color: var(--color-accent-text);
   cursor: pointer;
 }
 .submit:disabled {
-  opacity: 0.6;
+  border: 2px dashed var(--color-text-muted);
+  box-shadow: none;
+  background: transparent;
+  color: var(--color-text-muted);
   cursor: progress;
 }

@@ -62,7 +62,7 @@ test('좁은 메인 명령 칸에서 긴 인자와 긴 대상 도시 이름에�
   await waitTurnWindow(page, world, 45_000);
   await setTurns(page, world, []);
   await page.goto(`/w/${world}`);
-  await expect(page.getByRole('heading', { level: 1, name: '메인' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: '군략도' })).toBeVisible();
   await expect(row(page, 30)).toBeVisible();
 
   await row(page, 1).click();

@@ -625,7 +625,7 @@ test('T3-03 AC-M3-02 정식191 두 월드·사람30칸을 UI로 만든 뒤 실�
           .poll(() => stack.db.inputEvent.count({ where: { worldId, kind: 'general.create', status: 'PENDING' } }))
           .toBe(1);
         await new TurnLoop(hold.db, hold.lease).advanceTo(0);
-        await expect(page.getByRole('heading', { name: '메인', exact: true })).toBeVisible();
+        await expect(page.getByRole('heading', { name: '군략도', exact: true })).toBeVisible();
         const creation = page.request.post(stack.origin + '/trpc/general.create', {
           headers: { Origin: stack.origin, Cookie: 'sid=' + other.token },
           data: {

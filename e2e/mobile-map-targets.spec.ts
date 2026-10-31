@@ -133,7 +133,7 @@ test('T3-10 정식 GIS61거점 실제 터치·밀집 후보·끌기·취소와 �
       .toBe(1);
     expect(hold.lost).toBeUndefined();
     await new TurnLoop(hold.db, hold.lease).advanceTo(0);
-    await expect(page.getByRole('heading', { name: '메인', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '군략도', exact: true })).toBeVisible();
     await page.goto(`/w/${ownWorld}?city=40`);
     const editor = page.getByTestId('turn-editor');
     await expect(editor.locator('tr[data-slot]')).toHaveCount(30);

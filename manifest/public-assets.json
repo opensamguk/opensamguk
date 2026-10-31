@@ -12,24 +12,388 @@
   ],
   "mapImages": [
     {
-      "sha256": "72300c4014e0ede4b33fe9c22104865a08bede0699c6b3aab6f14e874e44fbe1",
-      "source": "apps/web/src/mapEditor/icons/city.png"
+      "sha256": "36e138c386791644b84f847030b346a1d8797631be4cdea380c33d58cbd53eb3",
+      "source": "apps/web/src/main/pixel-basemap.png"
     },
     {
-      "sha256": "57e0500ff148b2b2f5c0a24d08f92410bcb39b545cc8f926f11ec0e9c7d6f106",
-      "source": "apps/web/src/mapEditor/icons/pass.png"
+      "sha256": "8242e71afbb1f6273c3b0034c88d86257766997fa2182ba95485366745bf5378",
+      "source": "apps/web/src/main/san10-pixel-basemap.png"
     },
     {
-      "sha256": "d721d2052afa118fb3bab1f76cafb413db30c989441ba61683dbf648c938bc1e",
-      "source": "apps/web/src/mapEditor/icons/port.png"
+      "sha256": "2b845afea434aa1cd75afe0fa54b19857ea1e577aa80dba9fea0fb8d23c93fb9",
+      "source": "apps/web/src/art/flag/square-cloth.png"
     },
     {
-      "sha256": "8a631f70bd5798b1b774d6d96ef8729b7eff48572dce446bea453407186be90e",
-      "source": "apps/web/src/mapEditor/icons/field.png"
+      "sha256": "3f334bcf7547ba6ce0dc0d4fe8c4346466ad3e58f563f9f8d27796e8b726d493",
+      "source": "apps/web/src/art/flag/square.png"
     },
     {
-      "sha256": "0ea160d2cb9d64fb5bed696a93c4cdf118607d4e0df5653d66fd0051bfc5a794",
-      "source": "apps/web/src/mapEditor/geodata/natural-earth-relief.webp"
+      "sha256": "17724a538a39628fe3a60921da999cd61f17a1caba46d8bd4fbe50711b71c0f1",
+      "source": "apps/web/src/art/flag/tall-cloth.png"
+    },
+    {
+      "sha256": "a67eb9f047e20ca8fca03657c03387fdfef6210607cc657f4cb3cc7eff8b009c",
+      "source": "apps/web/src/art/flag/tall.png"
+    },
+    {
+      "sha256": "0fe1eb6f30fd960d9189aa7aefbef1d6442b8b36394febe5ace7470775a5ebed",
+      "source": "apps/web/src/art/icons/battle.png"
+    },
+    {
+      "sha256": "642b3bdf7b59991bdb8773fe8009b13aa3417d1ca6d8a785a42838a0e49ef59a",
+      "source": "apps/web/src/art/icons/diplomacy.png"
+    },
+    {
+      "sha256": "eb727ba646f3f2edcbd3dc5cfdf523b00bbfb6da52b84497bfd6dc223b88d2c7",
+      "source": "apps/web/src/art/icons/domestic.png"
+    },
+    {
+      "sha256": "2c80a8e77000178afdd14d120a590b17bb8617747baa9942ce2078941d801034",
+      "source": "apps/web/src/art/icons/help.png"
+    },
+    {
+      "sha256": "1ae9d293e7c9df51250d4ef459a7aa7d59792c3346b23e86c9bc1a18c189dbcd",
+      "source": "apps/web/src/art/icons/main.png"
+    },
+    {
+      "sha256": "d138921f9e5984390b2d825072c008bbe409113acf8b5dbb584140a25cbb2417",
+      "source": "apps/web/src/art/icons/map.png"
+    },
+    {
+      "sha256": "bac0e26ac9095cd52d6b352acc414a082afe6ab5a485c92c51e96f458d3e34c8",
+      "source": "apps/web/src/art/icons/messages.png"
+    },
+    {
+      "sha256": "d4d6ecf9c03d7f24590628c11cda26ce72874fde3cdf0efd1c40ab8b09f354e8",
+      "source": "apps/web/src/art/icons/military.png"
+    },
+    {
+      "sha256": "4152c66674929c8cff362e95d6092d45949bd4633bc42081e8b40d971d4c75f4",
+      "source": "apps/web/src/art/icons/nation.png"
+    },
+    {
+      "sha256": "79b17bd6089ab9da0d76560b55f21a26bb12ecaca3d8d59069ae45c00cfab24f",
+      "source": "apps/web/src/art/icons/operations.png"
+    },
+    {
+      "sha256": "7180611b2bb7e6d2779b319f833f101621def8865c81743faae6f0ca34cbfafa",
+      "source": "apps/web/src/art/icons/personnel.png"
+    },
+    {
+      "sha256": "f60cdb55666b1ed205a15a294d3f3f43111959d5e06c1809e4223ff70cd92ce3",
+      "source": "apps/web/src/art/icons/ranking.png"
+    },
+    {
+      "sha256": "78ac5f8ab05e45c9fde1b3be5c6833a7e9f288d374f8d92800ef26a4b13a2630",
+      "source": "apps/web/src/art/icons/records.png"
+    },
+    {
+      "sha256": "7bff81cb06060a4c2a404434fbac976a7c6f16dd30d6436f978da10a9f6885f6",
+      "source": "apps/web/src/art/icons/strategy.png"
+    },
+    {
+      "sha256": "83e13514de69cc5742eb8bd80366f9d68571f8943e6d29ff7566114f85af0518",
+      "source": "apps/web/src/art/icons/turns.png"
+    },
+    {
+      "sha256": "6c40a5f0faa0877c1ab72cc588229ef87a62a82c3d1009144fc015a4b56f2c5f",
+      "source": "apps/web/src/art/keyart.png"
+    },
+    {
+      "sha256": "34ad7fa6ece68ca83f15065f40b9d8a32cec90f5917d9b6f8ae3b90ce0e72e67",
+      "source": "apps/web/src/art/map/field.png"
+    },
+    {
+      "sha256": "95ab2f36acc448f1cb4bb48fd36a814ebb8a13d3efdf7ee82e689d4b15feb420",
+      "source": "apps/web/src/art/map/field@128.png"
+    },
+    {
+      "sha256": "ca06e3799b12bbebf023473d8bb2bb777dc2138c0e7f256147581bdfff360040",
+      "source": "apps/web/src/art/map/ford.png"
+    },
+    {
+      "sha256": "b0c34428225037b9c96a7f82c18e2d149058d7855dd21e0047167f39fcb02cd3",
+      "source": "apps/web/src/art/map/ford@128.png"
+    },
+    {
+      "sha256": "8b24014d1346e04bc62e775b3a7618196f01158865947cfb8f25608f98119147",
+      "source": "apps/web/src/art/map/level-0.png"
+    },
+    {
+      "sha256": "1771dfa901a52acab601bef1c9e94cbe9810e2fbc747f2a847e776ece77b1231",
+      "source": "apps/web/src/art/map/level-0@128.png"
+    },
+    {
+      "sha256": "dbd5380cc43de9c34e1e82d8f0c44fccc96915f84a52bb6573633f9eb59a7b3a",
+      "source": "apps/web/src/art/map/level-4.png"
+    },
+    {
+      "sha256": "9a17ed11e2a83aa28b08be155d6ea9a16d6a73b339d5ba30bda338197260ffd0",
+      "source": "apps/web/src/art/map/level-4@128.png"
+    },
+    {
+      "sha256": "6028f63f7bcf040e03c2293dd31c5187850743cff5e8684af2e30b0341b7d5aa",
+      "source": "apps/web/src/art/map/level-5.png"
+    },
+    {
+      "sha256": "53ccfb8e828ad94dec95b5babececff7b9d2b1ecb223175553d4756bd6559de5",
+      "source": "apps/web/src/art/map/level-5@128.png"
+    },
+    {
+      "sha256": "cb3dea00d9c6ea21aebdd090254d4f80780919f1a758be8368c78744034ec8ad",
+      "source": "apps/web/src/art/map/level-6.png"
+    },
+    {
+      "sha256": "acbd463e4513230c7256c3a48c0079a4c2bedf0c775390d5e8b773eed741ca6d",
+      "source": "apps/web/src/art/map/level-6@128.png"
+    },
+    {
+      "sha256": "d9db128042772ca0decc48d5d3d5d95c8feade3fa7668af764bc1b4127da8eb6",
+      "source": "apps/web/src/art/map/level-7.png"
+    },
+    {
+      "sha256": "35923c2b850211ef23d3d93dde0506b39ae13bd3ecef7e46d5d7c63f418ab8dd",
+      "source": "apps/web/src/art/map/level-7@128.png"
+    },
+    {
+      "sha256": "3e808fd1efa825f830e221384820b602a78cab1ea760dc067a1d6ca2eb1d5137",
+      "source": "apps/web/src/art/map/level-8.png"
+    },
+    {
+      "sha256": "3819e8cdb4f46de1bd9b076f9dc796fd1b41c7c2810c12137cf822b8920baaf2",
+      "source": "apps/web/src/art/map/level-8@128.png"
+    },
+    {
+      "sha256": "171a29c642955b9ea8ab6ae9b0d154e5ffa3d47507c453c9771a8221218cc726",
+      "source": "apps/web/src/art/map/level-9.png"
+    },
+    {
+      "sha256": "9fab68dcb41882682fd693ef552347e4f01352e087ef853840963375ca152998",
+      "source": "apps/web/src/art/map/level-9@128.png"
+    },
+    {
+      "sha256": "61b1441b68f63cb7220218402acc33f7d74c097fa33ac556c0c6ef471baaf28f",
+      "source": "apps/web/src/art/map/pass-ew.png"
+    },
+    {
+      "sha256": "8ad2a2e448d1154c5e6c8122e2fca826f81ab8348b1ddd2e6159aad5076e80b4",
+      "source": "apps/web/src/art/map/pass-ew@128.png"
+    },
+    {
+      "sha256": "684ed7217c03fa51db0b24f592907ba601147c851b52ba790ce42f5f5f3d252a",
+      "source": "apps/web/src/art/map/pass.png"
+    },
+    {
+      "sha256": "0b58cfa87f63f93a9288289e916dd9c364ca50fc47a91ef2aa1012d3b5a3a9ec",
+      "source": "apps/web/src/art/map/pass@128.png"
+    },
+    {
+      "sha256": "01c8899f17b0989acebb4d40dabacd32413043ef9399f31546df137fdcb3ea57",
+      "source": "apps/web/src/art/map/port.png"
+    },
+    {
+      "sha256": "782e789163814277a0f373fd00c7c35aa652318eba8de47b9d9ae88b0397cccf",
+      "source": "apps/web/src/art/map/port@128.png"
+    },
+    {
+      "sha256": "b20a85f91ca313f848e3b536b405d7b356b57096ce30a7fb71bbc5a1c8aced05",
+      "source": "apps/web/src/art/map/ruin.png"
+    },
+    {
+      "sha256": "02546e3b6fad3ea715069838360da84df763720b1f2448ec54bffca546c27b31",
+      "source": "apps/web/src/art/map/ruin@128.png"
+    },
+    {
+      "sha256": "62c90936703fb9386effb207025ed5af6bc098b66feb506177a7b11a733b5975",
+      "source": "apps/web/src/art/road/bridge-10.png"
+    },
+    {
+      "sha256": "c9be49858fb0e3a54bd333dc95906f1fdb68a73e83169d15da99aed0b17a5698",
+      "source": "apps/web/src/art/road/bridge-5.png"
+    },
+    {
+      "sha256": "3a674ad02ba7f632e9899b636c94a9f1e05b1a5fe7032e68f422421ec903caf2",
+      "source": "apps/web/src/art/road/road-0.png"
+    },
+    {
+      "sha256": "bc9539562ea8eb41bd8adda1c92505bb8ca6eab92db0982158636d81b181dce2",
+      "source": "apps/web/src/art/road/road-1.png"
+    },
+    {
+      "sha256": "400eb8871b660e4ead3da7dea60da3cc2e442d0f8a37b2b91ef9fe40d7886d05",
+      "source": "apps/web/src/art/road/road-10.png"
+    },
+    {
+      "sha256": "eb96d0fb191064cddbef0ecd93d20e21f3a6a28b2becdc621966e310e6b766ea",
+      "source": "apps/web/src/art/road/road-11.png"
+    },
+    {
+      "sha256": "d7f9715cf91a58e33fabd9e3baa410db74ca734c597db7befe1e9ee88c1a8384",
+      "source": "apps/web/src/art/road/road-12.png"
+    },
+    {
+      "sha256": "88a75706d986db39a60ba91abed89b43c2184fe30d8f8eece2fc3e5825a00e5f",
+      "source": "apps/web/src/art/road/road-13.png"
+    },
+    {
+      "sha256": "c0b399c3fda5c26238f2dc99d081b69da1c579e12b6e3ba1b4f57b7c70225b1c",
+      "source": "apps/web/src/art/road/road-14.png"
+    },
+    {
+      "sha256": "8b880d624d773f4e7b57843fb56a74e59e748f57a14c56a1b5bf5d53714a84d2",
+      "source": "apps/web/src/art/road/road-15.png"
+    },
+    {
+      "sha256": "f2eadc32650a84251cf455218c14e9b16977df7f70061d52611e532bcc732090",
+      "source": "apps/web/src/art/road/road-2.png"
+    },
+    {
+      "sha256": "8366314925a4bd9e82f647245a0709574e75a7d7394c4ec15ddb698ba9c3a824",
+      "source": "apps/web/src/art/road/road-3.png"
+    },
+    {
+      "sha256": "d5116fb9a99631cba1b5078f7ed1a1065ae7b406ff8755f4965f7c49adeca139",
+      "source": "apps/web/src/art/road/road-4.png"
+    },
+    {
+      "sha256": "378b51a27990ba060da9f0b01e138567ee268c2d8cf0a172a5b199b559ec0272",
+      "source": "apps/web/src/art/road/road-5.png"
+    },
+    {
+      "sha256": "8302dbc8fa537c9ea5220b4e43ceeade013624a3ce684579952fc72b0ad0bd67",
+      "source": "apps/web/src/art/road/road-6.png"
+    },
+    {
+      "sha256": "9e5c9df64455ad578623c327478dd830076020d008eaca6a219944c177dca1a2",
+      "source": "apps/web/src/art/road/road-7.png"
+    },
+    {
+      "sha256": "005ef2fb5d6234e7f8bf354f6c35ddae446e78b23842048c281267264ce3a406",
+      "source": "apps/web/src/art/road/road-8.png"
+    },
+    {
+      "sha256": "0611de8f1de6ef458d8e5268418d80007dca6d767993024a29046ebbb863075b",
+      "source": "apps/web/src/art/road/road-9.png"
+    },
+    {
+      "sha256": "9927fa867f40caaa9e9bea8aae95a2e6882a15fb4740d6be8eabcb7ad7513e96",
+      "source": "apps/web/src/art/terrain/coastSand.png"
+    },
+    {
+      "sha256": "84a88b3d61fd9ea9b3a981d7e1947eb3d1dad6269d8fcda677cd808e5b83e598",
+      "source": "apps/web/src/art/terrain/deepSea.png"
+    },
+    {
+      "sha256": "ed94c651b51fcc614dc14a7d4a84b73ff842a3066fd9cbceef346be946bbea1b",
+      "source": "apps/web/src/art/terrain/desert.png"
+    },
+    {
+      "sha256": "87da54d7ac4fc55c5eafc1123b3c6a94229a9c16b0b31e84d31fe72a8becab72",
+      "source": "apps/web/src/art/terrain/farmland.png"
+    },
+    {
+      "sha256": "f1e71a5468f112c9a751faa5249a50615ecf086dab16f242acc5bbcf1b5d903b",
+      "source": "apps/web/src/art/terrain/forest.png"
+    },
+    {
+      "sha256": "e08a2ae2d2114cd21c88e68861ed6ee0e9e7bc90d85f393338c16f2f6df0d33c",
+      "source": "apps/web/src/art/terrain/grassland.png"
+    },
+    {
+      "sha256": "72257ad6e1dabbb486fe0ea97281481564ad3d902ff0f88428c86fd88293e543",
+      "source": "apps/web/src/art/terrain/highMountains.png"
+    },
+    {
+      "sha256": "8ac10e0240d4d2b92c291b4303c67c25fea8b3a6b9c0045e4cf4b2f33322d704",
+      "source": "apps/web/src/art/terrain/hills.png"
+    },
+    {
+      "sha256": "acc0867065a4d4a36c5ee7a65a6b98ba66f9aba9772d63f3adb6ee04a87371b5",
+      "source": "apps/web/src/art/terrain/loess.png"
+    },
+    {
+      "sha256": "d79c367d24b62663825e6b224bd94a7e8c1de6c0275fc603f6348817e614d8b3",
+      "source": "apps/web/src/art/terrain/mountains.png"
+    },
+    {
+      "sha256": "5837eb3ad019b05cf5ad5f654d70dbae6d4066954418579de48cbc337a27abc2",
+      "source": "apps/web/src/art/terrain/plains.png"
+    },
+    {
+      "sha256": "c2352350c33f087a07b0979da603e256aee772914c868c358d62883170499fcc",
+      "source": "apps/web/src/art/terrain/river.png"
+    },
+    {
+      "sha256": "a4d6c2b74fd21555308210df3428f233bb49bc558749deb6b502deb1fa95c95c",
+      "source": "apps/web/src/art/terrain/sea.png"
+    },
+    {
+      "sha256": "528d0390a08855c453b002b2e227407cc28a8faaa17cb6d2a5dc33d3a2715cb4",
+      "source": "apps/web/src/art/terrain/shallow.png"
+    },
+    {
+      "sha256": "e151bc14660ccc72b96a870c0dbf7b935dc75595100ab5eb8e71a10009c3dfc6",
+      "source": "apps/web/src/art/terrain/snow.png"
+    },
+    {
+      "sha256": "d35b0d2b5f5b76d3f3b584dc3b48bd358e0e39983aa6b58f45640175d76a9dbd",
+      "source": "apps/web/src/art/water/bank-1.png"
+    },
+    {
+      "sha256": "7b81bacf7f732ebea7d3ea91e444460334ffc2b8ffc0fc033d7467ec5cf15376",
+      "source": "apps/web/src/art/water/bank-10.png"
+    },
+    {
+      "sha256": "f6e99230bf2595b02a167cb01fc3a0e99b7b1679a6107ce20dd53d03f3bde71a",
+      "source": "apps/web/src/art/water/bank-11.png"
+    },
+    {
+      "sha256": "d601180f8f889ed9bb464eb68fc8c75a0de92de4af0736f7be80518a8a8308d3",
+      "source": "apps/web/src/art/water/bank-12.png"
+    },
+    {
+      "sha256": "8bfe0ee9f441fea72b5fc4adfcb5d65ec173ba646b96fc68139430f4d141d801",
+      "source": "apps/web/src/art/water/bank-13.png"
+    },
+    {
+      "sha256": "62b3c7b254306aaa19e4aa31f6c5958a057b85fad4898aebf488738ea303a8a5",
+      "source": "apps/web/src/art/water/bank-14.png"
+    },
+    {
+      "sha256": "90d83cb74a89d724d05be24c3f0c4ca80d7fd88c325d4793ffe9f3bfad9c5e7d",
+      "source": "apps/web/src/art/water/bank-15.png"
+    },
+    {
+      "sha256": "70d7e0134475bcb3f94adf1f55a6e79f1886213ff2cc993a343dcdfc07f012d2",
+      "source": "apps/web/src/art/water/bank-2.png"
+    },
+    {
+      "sha256": "5974461ade167c30cfa726b442a708e3ccfba30b433449f2926c7c8a370747d4",
+      "source": "apps/web/src/art/water/bank-3.png"
+    },
+    {
+      "sha256": "17fcfc175e92587339e8c1208223678da9ab1608b0218260abd3bfb2460363b6",
+      "source": "apps/web/src/art/water/bank-4.png"
+    },
+    {
+      "sha256": "f206a4a4f2c99526bd3ead244c0a813eed543bb79b7f87d5c2ee9927d411ffbc",
+      "source": "apps/web/src/art/water/bank-5.png"
+    },
+    {
+      "sha256": "e688145ca5a22f7883a5b15e26fb83619727a665dbab1b0722f7ae96c584239a",
+      "source": "apps/web/src/art/water/bank-6.png"
+    },
+    {
+      "sha256": "20905796460a353243079f5d0b2cbe3de05c1e7d8d27771869b495686940665f",
+      "source": "apps/web/src/art/water/bank-7.png"
+    },
+    {
+      "sha256": "fe2269b16d2a71f12a93ef8ea76b919dd2d28377a6d5080ff3aded609188d3aa",
+      "source": "apps/web/src/art/water/bank-8.png"
+    },
+    {
+      "sha256": "af511db23c0d30c6717a216a0eaf670a48377ee604ecbe49b498f3fcb5381b2d",
+      "source": "apps/web/src/art/water/bank-9.png"
     }
   ]
 }

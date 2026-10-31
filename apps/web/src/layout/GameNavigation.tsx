@@ -1,22 +1,39 @@
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, type MouseEvent } from 'react';
 import { OFFICER_MIN_LEVEL } from '../operations/contract';
+import mainIcon from '../art/icons/main.png';
+import turnsIcon from '../art/icons/turns.png';
+import mapIcon from '../art/icons/map.png';
+import nationIcon from '../art/icons/nation.png';
+import diplomacyIcon from '../art/icons/diplomacy.png';
+import operationsIcon from '../art/icons/operations.png';
+import recordsIcon from '../art/icons/records.png';
+import rankingIcon from '../art/icons/ranking.png';
+import battleIcon from '../art/icons/battle.png';
+import personnelIcon from '../art/icons/personnel.png';
+import helpIcon from '../art/icons/help.png';
+import messagesIcon from '../art/icons/messages.png';
+import { useInboxCount } from '../inbox/useInboxCount';
 import styles from './GameNavigation.module.css';
 
 // 구조 참고: opensamguk-v1 bc053629의 GameFrame.tsx·nav31.ts (MIT).
 // Copyright (c) 2026 빼뽀네 (peppone-choi) and OpenSamguk contributors.
 // 현재 React 주소와 메인 지도·30칸 예약을 유지하고 연결된 화면만 안내한다.
+// 아이콘은 Codex 생성 도트 그림이다 (apps/web/src/art/sources.json, D-041).
 const NAV = [
-  { to: '/w/$worldId', label: '메인', exact: true },
-  { to: '/w/$worldId', label: '예턴', area: 'main-commands' },
-  { to: '/w/$worldId/map', label: '지도' },
-  { to: '/w/$worldId/nation/personnel', label: '국가' },
-  { to: '/w/$worldId/diplomacy', label: '외교' },
-  { to: '/w/$worldId/operations', label: '작전' },
-  { to: '/w/$worldId/records', label: '기록' },
-  { to: '/w/$worldId/ranking', label: '순위' },
-  { to: '/w/$worldId/simulator', label: '전투 시뮬레이터' },
+  { to: '/w/$worldId', label: '군략도', icon: mainIcon, exact: true },
+  { to: '/w/$worldId', label: '예턴', icon: turnsIcon, area: 'main-commands' },
+  { to: '/w/$worldId/map', label: '지도', icon: mapIcon },
+  { to: '/w/$worldId/nation/personnel', label: '국가', icon: nationIcon },
+  { to: '/w/$worldId/diplomacy', label: '외교', icon: diplomacyIcon },
+  { to: '/w/$worldId/inbox', label: '제안함', icon: messagesIcon },
+  { to: '/w/$worldId/operations', label: '작전', icon: operationsIcon },
+  { to: '/w/$worldId/records', label: '기록', icon: recordsIcon },
+  { to: '/w/$worldId/ranking', label: '순위', icon: rankingIcon },
+  { to: '/w/$worldId/simulator', label: '전투 시뮬레이터', icon: battleIcon },
 ] as const;
+
+const Icon = ({ src }: { src: string }) => <img src={src} alt="" width={32} height={32} className={styles.icon} />;
 
 export function GameNavigation({
   worldId,
@@ -29,6 +46,7 @@ export function GameNavigation({
 }) {
   const { pathname, search } = useLocation();
   const navigate = useNavigate();
+  const inbox = useInboxCount(worldId);
   const city = Number(search.city);
   const citySearch = Number.isInteger(city) && city > 0 && city <= 2_147_483_647 ? { city } : {};
   const navSearch = (to: string) => (to === '/w/$worldId' || to === '/w/$worldId/records' ? citySearch : {});
@@ -87,6 +105,7 @@ export function GameNavigation({
         className={styles.link}
         onClick={openTurns}
       >
+        <Icon src={item.icon} />
         {item.label}
       </a>
     ) : (
@@ -100,7 +119,14 @@ export function GameNavigation({
         activeProps={{ className: `${styles.link} ${styles.active}`, 'aria-current': 'page' }}
         onClick={() => close()}
       >
+        <Icon src={item.icon} />
         {item.label}
+        {item.label === '제안함' && inbox > 0 ? (
+          <span className={styles.badge}>
+            <span className="num">{inbox}</span>
+            <span className={styles.hidden}>건 대기</span>
+          </span>
+        ) : null}
       </Link>
     );
   const links = (
@@ -109,7 +135,8 @@ export function GameNavigation({
       {campaignEnabled ? (
         pathname.replace(/\/$/, '') === `/w/${worldId}` ? (
           <a className={styles.link} href="#campaign-title" onClick={() => close()}>
-            휘하·부곡
+            <Icon src={personnelIcon} />
+            막부
           </a>
         ) : (
           <Link
@@ -119,16 +146,19 @@ export function GameNavigation({
             className={styles.link}
             onClick={() => close()}
           >
-            휘하·부곡
+            <Icon src={personnelIcon} />
+            막부
           </Link>
         )
       ) : null}
       {officerLevel >= OFFICER_MIN_LEVEL ? (
         <Link to="/w/$worldId/nation/inspection" params={{ worldId }} className={styles.link} onClick={() => close()}>
+          <Icon src={nationIcon} />
           감찰
         </Link>
       ) : null}
       <Link to="/help/$doc" params={{ doc: 'index' }} className={styles.link} onClick={() => close()}>
+        <Icon src={helpIcon} />
         도움말
       </Link>
     </>
@@ -139,7 +169,7 @@ export function GameNavigation({
         {links}
       </nav>
       <nav className={styles.mobile} aria-label="게임 메뉴">
-        {NAV.filter((item) => ['메인', '예턴', '기록'].includes(item.label)).map(navigationLink)}
+        {NAV.filter((item) => ['군략도', '예턴', '기록'].includes(item.label)).map(navigationLink)}
         <details ref={more} className={styles.more}>
           <summary ref={summary} className={styles.link}>
             전체

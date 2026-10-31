@@ -84,7 +84,7 @@ const TOPBAR_QUERIES = ['auth.me', 'home.get', 'world.summary', 'message.unread'
 
 async function openSimulatorFromMenu(page: Page) {
   await page.goto(`/w/${ctx.worldId}`);
-  await expect(page.getByRole('heading', { level: 1, name: '메인' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: '군략도' })).toBeVisible();
   await page.getByRole('navigation', { name: '게임 메뉴' }).getByRole('link', { name: '전투 시뮬레이터' }).click();
   await expect(page).toHaveURL(`/w/${ctx.worldId}/simulator`);
   await expect(page.getByRole('heading', { level: 1, name: '전투 시뮬레이터' })).toBeVisible();
@@ -281,8 +281,8 @@ test('Worker 파일을 못 받으면 오류와 다시 실행이 보이고 풀면
   await expect.poll(() => shown(page)).toEqual(summary(GENERAL_CASE));
 
   const closed = new Promise<void>((resolve) => worker.once('close', () => resolve()));
-  await page.getByRole('navigation', { name: '게임 메뉴' }).getByRole('link', { name: '메인' }).click();
-  await expect(page.getByRole('heading', { level: 1, name: '메인' })).toBeVisible();
+  await page.getByRole('navigation', { name: '게임 메뉴' }).getByRole('link', { name: '군략도' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: '군략도' })).toBeVisible();
   await closed;
 });
 
@@ -313,7 +313,7 @@ test('메인의 저장하지 않은 편집은 시뮬레이터를 다녀와도 �
   await waitTurnWindow(page, ctx.worldId, 45_000);
   await setTurns(page, ctx.worldId, []);
   await page.goto(`/w/${ctx.worldId}`);
-  await expect(page.getByRole('heading', { level: 1, name: '메인' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: '군략도' })).toBeVisible();
   const editor = page.getByRole('region', { name: '명령 목록', exact: true }).getByTestId('turn-editor');
   await expect(editor.locator('tr[data-slot="30"]')).toBeVisible();
   await editor.locator('tr[data-slot="1"]').click();
@@ -330,7 +330,7 @@ test('메인의 저장하지 않은 편집은 시뮬레이터를 다녀와도 �
   await expect(result(page)).toHaveAttribute('data-state', 'done');
   expect(await storage()).toBe(before);
 
-  await page.getByRole('navigation', { name: '게임 메뉴' }).getByRole('link', { name: '메인' }).click();
+  await page.getByRole('navigation', { name: '게임 메뉴' }).getByRole('link', { name: '군략도' }).click();
   await expect(editor.getByTestId('draft-state')).toHaveText('저장하지 않은 편집 1건');
   await expect(editor.locator('tr[data-slot="1"]')).toContainText('농지 개간');
   expect(await storage()).toBe(before);

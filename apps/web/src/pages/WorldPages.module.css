@@ -22,22 +22,27 @@
 .nationHead {
   padding-bottom: var(--space-2);
 }
+/* 책갈피 탭 (INT-20): 먹 밑줄 위에 고른 탭만 한지 첩으로 올라선다. */
 .tabs {
   display: flex;
-  gap: var(--space-1);
+  border-bottom: 2px solid var(--color-ink);
 }
 .tab {
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--color-border);
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  margin-bottom: -2px;
+  border: 2px solid transparent;
+  border-bottom: 0;
   border-radius: var(--radius);
   color: var(--color-text);
   text-decoration: none;
-  background: var(--color-surface);
 }
 .tab[aria-current='page'] {
-  background: var(--color-accent);
-  color: var(--color-accent-text);
-  border-color: var(--color-accent);
+  background: var(--color-surface);
+  border-color: var(--color-ink);
+  font-weight: 600;
 }
 
 @media (max-width: 767px) {

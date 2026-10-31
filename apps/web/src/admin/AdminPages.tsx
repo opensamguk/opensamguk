@@ -93,11 +93,11 @@ export function AdminLayout() {
   }, [router, client, viewerId]);
   return (
     <main className={styles.shell}>
-      <header>
+      <header className={styles.top}>
         <h1>관리자 콘솔</h1>
         <Link to="/lobby">로비</Link>
       </header>
-      <nav aria-label="관리자 메뉴">
+      <nav aria-label="관리자 메뉴" className={styles.side}>
         <Link to="/admin" preload={false}>
           안내
         </Link>
@@ -114,7 +114,7 @@ export function AdminLayout() {
           공지 관리
         </Link>
       </nav>
-      <p>조회 결과에는 개인정보가 포함됩니다. 필요한 범위만 확인하세요.</p>
+      <p className={styles.privacy}>조회 결과에는 개인정보가 포함됩니다. 필요한 범위만 확인하세요.</p>
       {checkError ? (
         <ErrorState
           title="접근 권한을 확인하지 못했습니다. 작성 내용은 이 탭에 보존했습니다."

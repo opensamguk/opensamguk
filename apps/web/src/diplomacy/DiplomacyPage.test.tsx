@@ -415,3 +415,25 @@ describe('외교실 첫 세 조항 화면', () => {
     expect(screen.queryByRole('button', { name: /제안 보내기/ })).toBeNull();
   });
 });
+
+describe('외교실 국가 탭 (INT-20)', () => {
+  it('이미 받은 상대 목록으로 관계와 이어 볼 곳을 한 줄씩 보이고 새 조회를 하지 않는다', async () => {
+    on('treaty.list', () => listPage({ items: [treaty({})] }));
+    renderPage('nations');
+    const table = await screen.findByTestId('nation-relations');
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((cell) => cell.textContent),
+    ).toEqual(['국가', '우리와의 관계', '이어 보기']);
+    // 시험의 Link 대역은 aria-label을 넘기지 않으므로 줄 글자로 본다.
+    expect(
+      within(table)
+        .getAllByRole('row')
+        .slice(1)
+        .map((row) => row.textContent),
+    ).toEqual(['원소관계 없음받은 제안 보기', '유표교전조약서 쓰기']);
+    expect(within(table).getByText('교전').dataset.tone).toBe('danger');
+    expect(callsTo('treaty.trust')).toHaveLength(0);
+  });
+});

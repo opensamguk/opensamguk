@@ -6,21 +6,23 @@
   align-items: center;
   justify-content: center;
   padding: var(--space-4);
-  background: rgb(0 0 0 / 40%);
+  background: color-mix(in srgb, var(--color-ink) 45%, transparent);
 }
+/* 국가 방침 알림은 첩 한 장 (INT-20). */
 .dialog {
   width: min(480px, 100%);
   max-height: 80vh;
   overflow-y: auto;
   padding: var(--space-4);
-  border: 1px solid var(--color-border-strong);
+  border: var(--frame);
   border-radius: var(--radius);
   background: var(--color-surface);
   color: var(--color-text);
+  box-shadow: var(--frame-inset), var(--shadow-step);
 }
 .title {
   margin: 0 0 var(--space-2);
-  font-size: var(--text-lg);
+  font-size: var(--title-sm);
 }
 .meta {
   display: flex;
@@ -47,18 +49,20 @@
 .primary,
 .secondary {
   font: inherit;
-  padding: var(--space-1) var(--space-4);
+  font-weight: 500;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: var(--frame);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-button);
   cursor: pointer;
 }
 .primary {
-  border: 1px solid var(--color-accent);
   background: var(--color-accent);
   color: var(--color-accent-text);
 }
 .secondary {
-  border: 1px solid var(--color-border-strong);
-  background: transparent;
+  background: var(--color-surface);
   color: var(--color-text);
 }
 .box {
@@ -74,7 +78,7 @@
 }
 .boxTitle {
   margin: 0;
-  font-size: var(--text-md);
+  font-size: var(--title-sm);
 }
 .form {
   display: flex;
@@ -92,9 +96,9 @@
   width: 100%;
   resize: vertical;
   padding: var(--space-2);
-  border: 1px solid var(--color-border-strong);
+  border: 2px solid var(--color-ink);
   border-radius: var(--radius);
-  background: var(--color-surface);
+  background: var(--color-surface-raised);
   color: var(--color-text);
 }
 .error {

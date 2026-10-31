@@ -11,6 +11,7 @@ import {
 } from '@tanstack/react-router';
 import { BattleSimPage } from './battleSim/BattleSimPage';
 import { DiplomacyPage, parseDiplomacySearch } from './diplomacy/DiplomacyPage';
+import { InboxPage } from './inbox/InboxPage';
 import { CreateGeneralPage } from './general/CreateGeneralPage';
 import { HelpPage } from './help/HelpPage';
 import { GameLayout } from './layout/GameLayout';
@@ -334,7 +335,7 @@ const rankingRoute = createRoute({
 // 전투 시뮬레이터 (T4-34). 사용자가 넣은 가정으로 교전 한 번을 Web Worker에서 계산하는 보조 화면이다.
 const simulatorRoute = createRoute({ getParentRoute: () => worldRoute, path: 'simulator', component: BattleSimPage });
 
-// 외교실 (T2-08). 주소: /w/:worldId/diplomacy?tab=incoming|outgoing|active|ended|write
+// 외교실 (T2-08, INT-20 국가 탭). 주소: /w/:worldId/diplomacy?tab=nations|incoming|outgoing|active|ended|write|trust
 const diplomacyRoute = createRoute({
   getParentRoute: () => worldRoute,
   path: 'diplomacy',
@@ -344,6 +345,8 @@ const diplomacyRoute = createRoute({
     return <DiplomacyPage tab={tab} />;
   },
 });
+// 받은 제안함 (INT-20). 발령·막부·외교 제안을 모아 보고 답하는 화면으로 잇는다.
+const inboxRoute = createRoute({ getParentRoute: () => worldRoute, path: 'inbox', component: InboxPage });
 // 메시지 전체 화면 (T2-10). 메인 오른쪽 메시지 패널과 같은 부품이다.
 const messagesRoute = createRoute({ getParentRoute: () => worldRoute, path: 'messages', component: MessagesPage });
 
@@ -479,6 +482,7 @@ const routeTree = rootRoute.addChildren([
     rankingRoute,
     simulatorRoute,
     diplomacyRoute,
+    inboxRoute,
     messagesRoute,
     operationsRoute,
     operationRoute,
