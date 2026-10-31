@@ -48,7 +48,7 @@ it.each(['kind', 'anchor', 'port', 'coordinate', 'canvas'] as const)(
             ? { ...value, sites: [{ ...value.sites[0], kind: 'PORT', anchorKey: undefined }] }
             : field === 'coordinate'
               ? { ...value, sites: [{ ...value.sites[0], position: { x: Infinity, y: 0 } }] }
-              : { ...value, canvas: { width: 700, height: 500 } };
+              : { ...value, canvas: { width: 0, height: 500 } };
     expect(publicGeographySchema.safeParse(changed).success).toBe(false);
   },
 );

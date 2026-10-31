@@ -4,6 +4,13 @@ import { afterEach, expect, it, vi } from 'vitest';
 import type { MapCity, WorldMap as WorldMapResponse } from '../game/types';
 import { WorldMap } from './WorldMap';
 import { OPERATIONAL_GIS_SHA256 } from './operationalGeography';
+import { publicGeographySchema } from '@opensamguk/shared';
+import { readFileSync } from 'node:fs';
+import { URL as NodeURL } from 'node:url';
+const san10Resource: unknown = JSON.parse(
+  readFileSync(new NodeURL('../../../../resources/map/san10.json', import.meta.url), 'utf8'),
+);
+import { matchesOperationalGeography, operationalOverview } from './OperationalWorldMap';
 
 afterEach(cleanup);
 const makeCity = (key: number, name: string, kind: 'CITY' | 'PASS', x: number): MapCity => ({
@@ -149,3 +156,50 @@ it.each(['sha', 'position', 'missing', 'duplicate-id', 'duplicate-anchor'] as co
     expect(screen.queryByTestId('world-map')).toBeNull();
   },
 );
+
+it('AC-INT-03·10 SAN10의 159표식·200도로와 동북 끝점 전체 범위를 유지한다', () => {
+  const geography = publicGeographySchema.parse(san10Resource);
+  const strategic = geography.sites.filter((site) => site.kind === 'CITY' || site.kind === 'PASS');
+  const mapped: MapCity[] = strategic.map((site) => ({
+    ...makeCity(site.anchorKey!, site.name, site.kind as 'CITY' | 'PASS', site.position.x),
+    y: site.position.y,
+    links: [],
+  }));
+  expect(matchesOperationalGeography(geography, mapped)).toBe(true);
+  const overview = operationalOverview(geography);
+  for (const site of geography.sites) {
+    expect(site.position.x).toBeGreaterThanOrEqual(overview.x);
+    expect(site.position.x).toBeLessThanOrEqual(overview.x + overview.width);
+    expect(site.position.y).toBeGreaterThanOrEqual(overview.y);
+    expect(site.position.y).toBeLessThanOrEqual(overview.y + overview.height);
+  }
+  render(<WorldMap cities={mapped} nations={nations} operationalMap={geography} onSelect={vi.fn()} />);
+  const svg = screen.getByTestId('world-map'),
+    before = svg.getAttribute('viewBox');
+  expect(svg.querySelectorAll('[data-site-kind]')).toHaveLength(159);
+  expect(svg.querySelectorAll('[data-route-mode="LAND"]')).toHaveLength(200);
+  expect(screen.queryByTestId('geographic-relief')).toBeNull();
+  const yamatai = mapped.find((city) => city.name === '야마타이국')!;
+  fireEvent.change(screen.getByRole('combobox', { name: '지도 거점' }), { target: { value: String(yamatai.key) } });
+  expect(svg.getAttribute('viewBox')).toBe(before);
+});
+
+it('AC-INT-03 SAN10 GIS 해시·범위·도시 좌표가 다르면 다른 지도 묶음으로 대신 그리지 않는다', () => {
+  const geography = publicGeographySchema.parse(san10Resource);
+  const mapped: MapCity[] = geography.sites
+    .filter((site) => site.kind === 'CITY' || site.kind === 'PASS')
+    .map((site) => ({
+      ...makeCity(site.anchorKey!, site.name, site.kind as 'CITY' | 'PASS', site.position.x),
+      y: site.position.y,
+      links: [],
+    }));
+  const changedHash = structuredClone(geography);
+  changedHash.basemap.sha256 = '0'.repeat(64);
+  expect(matchesOperationalGeography(changedHash, mapped)).toBe(false);
+  const changedBounds = structuredClone(geography);
+  changedBounds.basemap.bounds[0] += 1;
+  expect(matchesOperationalGeography(changedBounds, mapped)).toBe(false);
+  const changedCities = structuredClone(mapped);
+  changedCities[0]!.x += 1;
+  expect(matchesOperationalGeography(geography, changedCities)).toBe(false);
+});

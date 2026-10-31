@@ -48,6 +48,7 @@ export const options: CreateOptions = {
   ],
 };
 export const draft: CreateDraft = {
+  profileId: 'integration-v01',
   name: ' 새 월드 ',
   presetKey: 'regular',
   turnTerm: '60',

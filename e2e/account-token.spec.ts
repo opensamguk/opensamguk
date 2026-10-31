@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
 import { createAccount, TEST_PASSWORD, withE2eDb } from './account';
 import { accountMailLink } from './mailbox';
 
@@ -184,12 +185,24 @@ test('로그인 실패 한도의 실제 남은 시간을 안내한다', async ({
     await page.getByRole('button', { name: '로그인', exact: true }).click();
     return response;
   }
+  // 실패 누적과 차단 요청이 같은 15분 고정 창에 들어가도록 경계 직전에는 한 번 기다린다.
+  const windowMs = 900_000;
+  const startedAt = Date.now();
+  const startingWindow = Math.floor(startedAt / windowMs);
+  const remaining = (startingWindow + 1) * windowMs - startedAt;
+  if (remaining <= 15_000) {
+    await delay(remaining + 50);
+    expect(Math.floor(Date.now() / windowMs), '대기 뒤 다음 로그인 제한 창이어야 합니다.').toBe(startingWindow + 1);
+  }
+  const loginWindow = Math.floor(Date.now() / windowMs);
   for (let attempt = 0; attempt < 5; attempt++) {
     expect((await submit()).status()).toBe(401);
     await expect(page.getByRole('alert')).toHaveText('이메일 또는 비밀번호가 맞지 않습니다');
   }
   await page.getByLabel('비밀번호', { exact: true }).fill(TEST_PASSWORD);
+  expect(Math.floor(Date.now() / windowMs), '차단 요청 전에 로그인 제한 창이 바뀌었습니다.').toBe(loginWindow);
   const limited = await submit();
+  expect(Math.floor(Date.now() / windowMs), '차단 응답 전에 로그인 제한 창이 바뀌었습니다.').toBe(loginWindow);
   expect(limited.status()).toBe(429);
   const retryAfter = Number(await limited.headerValue('retry-after'));
   expect(Number.isInteger(retryAfter) && retryAfter > 0).toBe(true);

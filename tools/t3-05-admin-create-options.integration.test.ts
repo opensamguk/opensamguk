@@ -370,6 +370,8 @@ it('AC-M3-04 도시 규칙 통합 뒤 실제 게시 정식9기능을 검증한�
   expect(result.body.result?.data).toMatchObject({
     profiles: [
       { available: true, ruleFeatures: [...creationFeatures], counts: { nations: 21, generals: 491, anchors: 61 } },
+      { id: 'san10-191', available: false, code: 'RESOURCES_UNAVAILABLE' },
+      { id: 'san10-empty', available: false, code: 'RESOURCES_UNAVAILABLE' },
     ],
   });
 });

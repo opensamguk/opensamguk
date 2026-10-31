@@ -190,7 +190,7 @@ export * from './campaign/orderTypes';
 export * from './campaign/orders';
 export { campaignArmyTypes, validateCampaignRecord } from './campaign/feature';
 export { commandStatPreview, type CommandStatPreview } from './commands/statPreview';
-export * from './clock/createRequest';
 export * from './cityResources/state';
 export * from './cityResources/input';
 export { canExecuteCityNationCommand } from './cityResources/commands';
+export * from './clock/createRequest';

@@ -19,7 +19,7 @@ import { hashState } from '@opensamguk/shared/node';
 import { z } from 'zod';
 import { checkWorldReplay } from '../features';
 import { resourceHashV3 } from '../replay';
-import { composeInitialWorld, type InitialResources } from '../world/resources';
+import { composeInitialWorld, resolveWorldResourceSelection, type InitialResources } from '../world/resources';
 import { prepareInitialWorld, type PreparedInitialWorld, type InitialWorldOptions } from '../world/persistence';
 
 const messages = {
@@ -328,13 +328,16 @@ function requestRefs(world: SourceWorld, request: Request, preset: WorldPreset |
   return fixed('PROVENANCE_INVALID', () => {
     const intent = worldCreateIntentSchema.parse(request.intent),
       resolution = resolutionSchema.parse(request.resolution);
-    const expected = {
-      scenario: intent.scenarioKey ?? preset?.scenario,
-      map: intent.mapKey ?? preset?.map,
+    const scenario = intent.scenarioKey ?? preset?.scenario,
+      map = intent.mapKey ?? preset?.map;
+    if (!scenario || !map) fail('PROVENANCE_INVALID');
+    const expected = resolveWorldResourceSelection({
+      scenario,
+      map,
       unitSet: intent.unitSetKey ?? preset?.unitSet ?? 'basic',
-      statRules: intent.statRulesKey ?? 'default',
-      portraitMap: intent.portraitMapKey ?? 'rtk14-map',
-    };
+      ...(intent.statRulesKey === null ? {} : { statRules: intent.statRulesKey }),
+      ...(intent.portraitMapKey === null ? {} : { portraitMap: intent.portraitMapKey }),
+    });
     if (
       request.status !== 'DONE' ||
       request.version !== 1 ||

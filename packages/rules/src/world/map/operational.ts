@@ -4,7 +4,7 @@ const id = z.string().regex(/^[a-z][a-z0-9:_-]{0,63}$/);
 const name = z.string().trim().min(1).max(60);
 const natural = z.number().int().min(0).max(2147483647);
 const anchor = natural.min(1);
-const position = z.strictObject({ x: z.number().finite().min(0).max(1000), y: z.number().finite().min(0).max(700) });
+const position = z.strictObject({ x: z.number().finite().min(0).max(4096), y: z.number().finite().min(0).max(4096) });
 const common = { id, name, position };
 const values = z.strictObject({
   population: natural,
@@ -55,7 +55,7 @@ export const operationalMapSchema = z
     version: z.literal(3),
     id,
     name: name.max(100),
-    canvas: z.strictObject({ width: z.literal(1000), height: z.literal(700) }),
+    canvas: z.strictObject({ width: z.number().int().min(1).max(4096), height: z.number().int().min(1).max(4096) }),
     basemap: z.strictObject({
       source: z.literal('natural-earth-5.1.2'),
       projection: z.literal('WGS84 plate carree'),
@@ -75,6 +75,7 @@ export const operationalMapSchema = z
     const fail = (path: PropertyKey[], message: string) => context.addIssue({ code: 'custom', path, message });
     const [west, south, east, north] = map.basemap.bounds;
     if (west >= east || south >= north) fail(['basemap', 'bounds'], '지도 범위의 순서를 확인하세요.');
+    if (map.canvas.width * map.canvas.height > 4194304) fail(['canvas'], '지도 면적이 너무 큽니다.');
     const ids = new Set<string>(),
       anchors = new Set<number>(),
       names = new Set<string>(),
@@ -82,6 +83,8 @@ export const operationalMapSchema = z
     const sites = new Map(map.sites.map((row) => [row.id, row]));
     map.sites.forEach((row, index) => {
       const path = ['sites', index];
+      if (row.position.x > map.canvas.width || row.position.y > map.canvas.height)
+        fail([...path, 'position'], '거점이 지도 범위를 벗어났습니다.');
       if (ids.has(row.id)) fail([...path, 'id'], '거점 ID가 중복됩니다.');
       ids.add(row.id);
       if (!row.id.startsWith(`${row.kind.toLowerCase()}:`)) fail([...path, 'id'], '거점 종류와 ID가 다릅니다.');

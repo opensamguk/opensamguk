@@ -7,7 +7,7 @@ import cityIcon from '../mapEditor/icons/city.png';
 import passIcon from '../mapEditor/icons/pass.png';
 import portIcon from '../mapEditor/icons/port.png';
 import fieldIcon from '../mapEditor/icons/field.png';
-import { OPERATIONAL_GIS_SHA256, operationalBasemap as basemap } from './operationalGeography';
+import { basemapForOperationalMap } from './operationalGeography';
 import { mapTapTargets, tapCandidates, type MapView } from './mapTapTargets';
 import styles from './OperationalWorldMap.module.css';
 
@@ -17,24 +17,36 @@ type DrawnCity = Pick<MapCity, 'key' | 'name' | 'kind' | 'x' | 'y' | 'nationId'>
   recorded?: boolean;
 };
 type View = MapView;
-const whole: View = { x: 0, y: 0, width: 1000, height: 700 };
 const icons = { CITY: cityIcon, PASS: passIcon, PORT: portIcon, FIELD: fieldIcon };
 const labels = { CITY: '도시', PASS: '관문', PORT: '항구 시설', FIELD: '전장 표시' };
 const neutral = '#d6d0c4';
-const clamp = (view: View): View => ({
+const clamp = (view: View, canvas: MapData['canvas']): View => ({
   ...view,
-  x: Math.max(0, Math.min(1000 - view.width, view.x)),
-  y: Math.max(0, Math.min(700 - view.height, view.y)),
+  x: Math.max(0, Math.min(canvas.width - view.width, view.x)),
+  y: Math.max(0, Math.min(canvas.height - view.height, view.y)),
 });
 
+export function operationalOverview(map: MapData): View {
+  if (map.id !== 'san10') return { x: 0, y: 0, width: map.canvas.width, height: map.canvas.height };
+  const xs = map.sites.map((site) => site.position.x),
+    ys = map.sites.map((site) => site.position.y);
+  const x = Math.max(0, Math.min(...xs) - 55),
+    y = Math.max(0, Math.min(...ys) - 55);
+  return {
+    x,
+    y,
+    width: Math.min(map.canvas.width, Math.max(...xs) + 55) - x,
+    height: Math.min(map.canvas.height, Math.max(...ys) + 55) - y,
+  };
+}
+
 export function matchesOperationalGeography(map: MapData, cities: readonly DrawnCity[]) {
+  const basemap = basemapForOperationalMap(map);
   if (
     map.version !== 3 ||
-    map.canvas.width !== 1000 ||
-    map.canvas.height !== 700 ||
+    !basemap ||
     map.basemap.source !== 'natural-earth-5.1.2' ||
     map.basemap.projection !== 'WGS84 plate carree' ||
-    map.basemap.sha256 !== OPERATIONAL_GIS_SHA256 ||
     JSON.stringify(map.basemap.bounds) !== JSON.stringify(basemap.bounds)
   )
     return false;
@@ -73,6 +85,11 @@ export function OperationalWorldMap({
   selectedKey: number | null;
   onSelect?: (key: number) => void;
 }) {
+  const basemap = basemapForOperationalMap(map);
+  const canvas = map.canvas;
+  const whole = operationalOverview(map);
+  const ratio = whole.height / whole.width;
+  const clampView = (value: View) => clamp(value, canvas);
   const [view, setView] = useState(whole);
   const drag = useRef<{ pointerId: number; x: number; y: number; view: View; mobile: boolean; moved: boolean } | null>(
     null,
@@ -125,11 +142,11 @@ export function OperationalWorldMap({
     if (selectedX === undefined || selectedY === undefined) return;
     setView((old) =>
       selectedX < old.x || selectedX > old.x + old.width || selectedY < old.y || selectedY > old.y + old.height
-        ? clamp({ ...old, x: selectedX - old.width / 2, y: selectedY - old.height / 2 })
+        ? clampView({ ...old, x: selectedX - old.width / 2, y: selectedY - old.height / 2 })
         : old,
     );
   }, [selectedX, selectedY]);
-  if (!validGeography) return <p role="alert">지도 판이 맞지 않습니다. 지도를 다시 불러오세요.</p>;
+  if (!validGeography || !basemap) return <p role="alert">지도 판이 맞지 않습니다. 지도를 다시 불러오세요.</p>;
   const cityByKey = new Map(cities.map((city) => [city.key, city]));
   const nationById = new Map(nations.map((nation) => [nation.id, nation]));
   const siteById = new Map(map.sites.map((site) => [site.id, site]));
@@ -146,9 +163,9 @@ export function OperationalWorldMap({
   };
   const zoom = (factor: number) =>
     setView((old) => {
-      const width = Math.min(1000, Math.max(200, old.width / factor));
-      const height = width * 0.7;
-      return clamp({ x: old.x + (old.width - width) / 2, y: old.y + (old.height - height) / 2, width, height });
+      const width = Math.min(whole.width, Math.max(200, old.width / factor));
+      const height = width * ratio;
+      return clampView({ x: old.x + (old.width - width) / 2, y: old.y + (old.height - height) / 2, width, height });
     });
   const choose = (key: number, focus = false) => {
     const city = cityByKey.get(key);
@@ -157,7 +174,7 @@ export function OperationalWorldMap({
     if (focus)
       setView((old) => {
         const width = Math.min(old.width, 500);
-        return clamp({ x: city.x - width / 2, y: city.y - width * 0.35, width, height: width * 0.7 });
+        return clampView({ x: city.x - width / 2, y: city.y - (width * ratio) / 2, width, height: width * ratio });
       });
   };
   const selectAt = (element: SVGSVGElement, clientX: number, clientY: number) => {
@@ -181,7 +198,7 @@ export function OperationalWorldMap({
     const box = event.currentTarget.getBoundingClientRect();
     if (!box.width || !box.height) return;
     setView(
-      clamp({
+      clampView({
         ...active.view,
         x: active.view.x - ((event.clientX - active.x) * active.view.width) / box.width,
         y: active.view.y - ((event.clientY - active.y) * active.view.height) / box.height,
@@ -213,18 +230,26 @@ export function OperationalWorldMap({
           <button type="button" aria-label="지도 확대" disabled={view.width <= 200} onClick={() => zoom(1.5)}>
             확대
           </button>
-          <button type="button" aria-label="지도 축소" disabled={view.width >= 1000} onClick={() => zoom(1 / 1.5)}>
+          <button
+            type="button"
+            aria-label="지도 축소"
+            disabled={view.width >= whole.width}
+            onClick={() => zoom(1 / 1.5)}
+          >
             축소
           </button>
           <button type="button" aria-label="지도 전체" onClick={() => setView(whole)}>
             전체
           </button>
-          <output aria-label="현재 지도 배율">{(1000 / view.width).toFixed(1)}배</output>
+          <output aria-label="현재 지도 배율">{(whole.width / view.width).toFixed(1)}배</output>
         </div>
         {onSelect && (
           <label className={styles.selector}>
             지도 거점
-            <select value={selectedKey ?? ''} onChange={(event) => choose(Number(event.target.value), true)}>
+            <select
+              value={selectedKey ?? ''}
+              onChange={(event) => choose(Number(event.target.value), map.id !== 'san10')}
+            >
               <option value="" disabled>
                 도시·관문 선택
               </option>
@@ -241,6 +266,7 @@ export function OperationalWorldMap({
         ref={svg}
         viewBox={`${view.x} ${view.y} ${view.width} ${view.height}`}
         className={styles.map}
+        style={{ aspectRatio: `${whole.width}/${whole.height}` }}
         role="group"
         aria-label={`중원 지도, 도시 ${anchors.filter((site) => site.kind === 'CITY').length}개, 관문 ${anchors.filter((site) => site.kind === 'PASS').length}개`}
         data-testid="world-map"
@@ -252,7 +278,7 @@ export function OperationalWorldMap({
           if (direction) {
             event.preventDefault();
             setView((old) =>
-              clamp({
+              clampView({
                 ...old,
                 x: old.x + (direction[0]! * old.width) / 5,
                 y: old.y + (direction[1]! * old.height) / 5,
@@ -320,17 +346,26 @@ export function OperationalWorldMap({
             <path d="M0 0L10 5L0 10" fill="context-stroke" />
           </marker>
         </defs>
-        <rect width="1000" height="700" fill="#d5e5e7" />
+        <rect width={canvas.width} height={canvas.height} fill="#d5e5e7" />
         <g aria-hidden="true" pointerEvents="none" data-testid="geographic-basemap">
-          <image
-            href={reliefUrl}
-            width="1000"
-            height="700"
-            preserveAspectRatio="none"
-            data-testid="geographic-relief"
-          />
+          {basemap.relief && (
+            <image
+              href={reliefUrl}
+              width="1000"
+              height="700"
+              preserveAspectRatio="none"
+              data-testid="geographic-relief"
+            />
+          )}
           {basemap.land.map((d, i) => (
-            <path key={`land-${i}`} d={d} fill="none" stroke="#8e9c8d" strokeWidth=".4" fillRule="evenodd" />
+            <path
+              key={`land-${i}`}
+              d={d}
+              fill={basemap.relief ? 'none' : '#c8d0b5'}
+              stroke="#8e9c8d"
+              strokeWidth=".4"
+              fillRule="evenodd"
+            />
           ))}
           {basemap.lakes.map((d, i) => (
             <path key={`lake-${i}`} d={d} fill="#a9c9d2" stroke="#8ab0bc" strokeWidth=".3" fillRule="evenodd" />

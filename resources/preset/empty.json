@@ -1,0 +1,24 @@
+{
+  "name": "공백지",
+  "turnTermMinutes": 60,
+  "scenario": "san10-empty",
+  "map": "san10",
+  "unitSet": "basic",
+  "commands": null,
+  "npc": {
+    "fillRatio": 1,
+    "aggression": 1
+  },
+  "protection": {
+    "foundUntilMonths": 0,
+    "peaceMonths": 0,
+    "maxGeneralsPerNation": null
+  },
+  "boost": {
+    "smallWorld": null,
+    "lateJoin": null
+  },
+  "features": {
+    "advisor": false
+  }
+}

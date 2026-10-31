@@ -6,6 +6,7 @@ export type CreateProfile = Extract<CreateOptions['profiles'][number], { availab
 export type CreateInput = inferRouterInputs<AppRouter>['admin']['world']['create'];
 export type CreateReply = inferRouterOutputs<AppRouter>['admin']['world']['createStatus'];
 export type CreateDraft = {
+  profileId: string;
   name: string;
   presetKey: string;
   turnTerm: string;
@@ -16,14 +17,19 @@ export type CreateDraft = {
 };
 export type CreateReview = Readonly<{
   revision: string;
+  profileId: string;
   presetLabel: string;
+  presetDescriptions: readonly string[];
   scenarioTitle: string;
+  startYear: number;
+  counts: Readonly<CreateProfile['counts']>;
   seedMode: 'auto' | 'custom';
   input: Readonly<Omit<CreateInput, 'idempotencyKey'>>;
 }>;
 export type CreateCommand = Readonly<{ review: CreateReview; input: Readonly<CreateInput> }>;
 export type CreatePointer = { version: 1; viewerId: string; idempotencyKey: string; requestId?: string };
 export const createDraft = (): CreateDraft => ({
+  profileId: '',
   name: '',
   presetKey: '',
   turnTerm: '',
@@ -32,6 +38,9 @@ export const createDraft = (): CreateDraft => ({
   seedMode: 'auto',
   seed: '',
 });
+export function initialCreateProfile(options: CreateOptions, preferredId = 'san10-191') {
+  return options.profiles.find((profile) => profile.id === preferredId)?.id ?? '';
+}
 export const uuid = (value: unknown): value is string =>
   typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 export function storedText(value: string) {
@@ -46,7 +55,7 @@ export function storedText(value: string) {
 }
 export class CreateDraftError extends Error {
   constructor(
-    readonly field: 'name' | 'presetKey' | 'turnTerm' | 'endYear' | 'seed',
+    readonly field: 'profileId' | 'name' | 'presetKey' | 'turnTerm' | 'endYear' | 'seed',
     message: string,
   ) {
     super(message);
@@ -65,12 +74,14 @@ export function reviewCreation(
   viewerId: string,
   autoSeed: string,
 ): CreateReview {
-  const profile = options.profiles.find((entry): entry is CreateProfile => entry.available);
+  const profile = options.profiles.find(
+    (entry): entry is CreateProfile => entry.available && entry.id === draft.profileId,
+  );
   const preset = profile?.presets.find((entry) => entry.key === draft.presetKey);
   const name = draft.name.trim(),
     seed = draft.seedMode === 'auto' ? autoSeed : draft.seed;
-  if (!uuid(viewerId) || options.userId !== viewerId || !profile)
-    throw new Error('현재 계정과 생성 설정을 확인하세요.');
+  if (!uuid(viewerId) || options.userId !== viewerId) throw new Error('현재 계정과 생성 설정을 확인하세요.');
+  if (!profile) throw new CreateDraftError('profileId', '현재 시나리오를 선택하세요.');
   if (!storedText(name)) throw new CreateDraftError('name', '월드 이름을 확인하세요.');
   if (!preset) throw new CreateDraftError('presetKey', '현재 프리셋을 선택하세요.');
   if (!storedText(seed)) throw new CreateDraftError('seed', '시드의 빈칸과 저장할 수 없는 문자를 확인하세요.');
@@ -87,8 +98,12 @@ export function reviewCreation(
   Object.freeze(input.ruleFeatures);
   return Object.freeze({
     revision: options.revision,
+    profileId: profile.id,
     presetLabel: preset.label,
+    presetDescriptions: Object.freeze([...preset.descriptions]),
     scenarioTitle: profile.scenarioTitle,
+    startYear: profile.startYear,
+    counts: Object.freeze({ ...profile.counts }),
     seedMode: draft.seedMode,
     input: Object.freeze(input),
   });

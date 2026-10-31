@@ -44,12 +44,58 @@ export const creationRefs = [
 const presetKeys = ['regular', 'speed', 'beginner', 'hardcore'] as const;
 const presetRoot = new URL('../../../../resources/preset/', import.meta.url);
 const identity = { id: 'integration-v01', label: '통합판 v0.1 · 191년 군웅할거' } as const;
+const profileIds = ['integration-v01', 'san10-191', 'san10-empty'] as const;
+type ProfileId = (typeof profileIds)[number];
+type Selection = Record<keyof typeof creationSelection, string>;
+type Identity = { id: ProfileId; label: string };
+const san10Selection = { ...creationSelection, mapKey: 'san10' } as const;
+const contracts = {
+  'integration-v01': {
+    ...identity,
+    selection: creationSelection,
+    startYear: 191,
+    nations: 21,
+    counts: { cities: 53, gates: 8, ports: 6, fields: 13, anchors: 61 },
+    presets: presetKeys,
+    suggestedEndYear: 201,
+  },
+  'san10-191': {
+    id: 'san10-191',
+    label: 'SAN10 · 191년 군웅할거',
+    selection: { ...san10Selection, scenarioKey: 'san10-191' },
+    startYear: 191,
+    nations: 21,
+    counts: { cities: 144, gates: 8, ports: 6, fields: 1, anchors: 152 },
+    presets: presetKeys,
+    suggestedEndYear: 201,
+  },
+  'san10-empty': {
+    id: 'san10-empty',
+    label: 'SAN10 · 180년 공백지',
+    selection: { ...san10Selection, scenarioKey: 'san10-empty' },
+    startYear: 180,
+    nations: 0,
+    counts: { cities: 144, gates: 8, ports: 6, fields: 1, anchors: 152 },
+    presets: ['empty'],
+    suggestedEndYear: 190,
+  },
+} as const;
+function profileRefs(id: ProfileId) {
+  const selection = contracts[id].selection;
+  return [
+    { kind: 'MAP', name: selection.mapKey, version: 1 },
+    { kind: 'SCENARIO', name: selection.scenarioKey, version: 1 },
+    { kind: 'UNIT_SET', name: selection.unitSetKey, version: 1 },
+    { kind: 'STAT_RULES', name: selection.statRulesKey, version: 1 },
+    { kind: 'PORTRAIT_MAP', name: selection.portraitMapKey, version: 1 },
+  ] as const;
+}
 const reasons = {
   RULES_UNAVAILABLE: '통합판의 도시 자원 규칙을 준비하고 있습니다.',
   RESOURCES_UNAVAILABLE: '게시된 통합판 생성 자원을 확인하지 못했습니다.',
   PRESETS_UNAVAILABLE: '생성 프리셋을 확인하지 못했습니다.',
 } as const;
-type Unavailable = typeof identity & { available: false; code: keyof typeof reasons; reason: string };
+type Unavailable = Identity & { available: false; code: keyof typeof reasons; reason: string };
 export type CreationPreset = {
   key: string;
   label: string;
@@ -57,9 +103,9 @@ export type CreationPreset = {
   turnTermMinutes: number;
   descriptions: string[];
 };
-export type AvailableCreationProfile = typeof identity & {
+export type AvailableCreationProfile = Identity & {
   available: true;
-  selection: typeof creationSelection;
+  selection: Selection;
   scenarioTitle: string;
   mapName: string;
   startYear: number;
@@ -71,6 +117,8 @@ export type AvailableCreationProfile = typeof identity & {
     ports: number;
     fields: number;
     anchors: number;
+    markers?: number;
+    roads?: number;
   };
   resources: Array<{ kind: string; key: string; version: number; contentHash: string }>;
   ruleFeatures: string[];
@@ -80,8 +128,9 @@ export type AvailableCreationProfile = typeof identity & {
 export type CreationProfile = AvailableCreationProfile | Unavailable;
 type Resource = Pick<PublishedResource, 'kind' | 'name' | 'version' | 'content' | 'contentHash'>;
 export type PresetSource = { key: string; value: unknown };
-function unavailable(code: keyof typeof reasons): Unavailable {
-  return { ...identity, available: false, code, reason: reasons[code] };
+function unavailable(id: ProfileId, code: keyof typeof reasons): Unavailable {
+  const profile = contracts[id];
+  return { id: profile.id, label: profile.label, available: false, code, reason: reasons[code] };
 }
 
 // 조회용 검증과 요약만 한다. 월드 준비·RNG·DB 쓰기는 엔진 소관이다.
@@ -89,15 +138,18 @@ export function creationProfile(
   rows: readonly Resource[],
   presets: readonly PresetSource[],
   registry: RuleRegistry = ruleRegistry,
+  profileId: ProfileId = 'integration-v01',
 ): CreationProfile {
+  const profile = contracts[profileId],
+    refs = profileRefs(profileId);
   try {
     checkRuleFeatures([...creationFeatures], registry);
   } catch {
-    return unavailable('RULES_UNAVAILABLE');
+    return unavailable(profileId, 'RULES_UNAVAILABLE');
   }
   let map: z.infer<typeof operationalMapSchema>, scenario: z.infer<typeof scenarioSchema>;
   try {
-    const selected = creationRefs.map((ref) => {
+    const selected = refs.map((ref) => {
       const matches = rows.filter(
         (row) => row.kind === ref.kind && row.name === ref.name && row.version === ref.version,
       );
@@ -110,12 +162,12 @@ export function creationProfile(
     const stat = statRulesSchema.parse(statRow!.content);
     const unit = unitRow!.content as { id?: unknown } | null;
     if (
-      map.id !== creationSelection.mapKey ||
-      scenario.id !== creationSelection.scenarioKey ||
-      unit?.id !== creationSelection.unitSetKey ||
+      map.id !== profile.selection.mapKey ||
+      scenario.id !== profile.selection.scenarioKey ||
+      unit?.id !== profile.selection.unitSetKey ||
       stat.stat.count !== 5 ||
-      scenario.startYear !== 191 ||
-      scenario.nation.length !== 21 ||
+      scenario.startYear !== profile.startYear ||
+      scenario.nation.length !== profile.nations ||
       scenario.general.length !== 491 ||
       scenario.generalStats?.length !== 491 ||
       new Set(scenario.generalStats.map((entry) => entry.generalId)).size !== 491 ||
@@ -123,7 +175,27 @@ export function creationProfile(
     )
       throw new Error();
     const counts = (kind: string) => map.sites.filter((site) => site.kind === kind).length;
-    if (counts('CITY') !== 53 || counts('PASS') !== 8 || counts('PORT') !== 6 || counts('FIELD') !== 13)
+    if (
+      counts('CITY') !== profile.counts.cities ||
+      counts('PASS') !== profile.counts.gates ||
+      counts('PORT') !== profile.counts.ports ||
+      counts('FIELD') !== profile.counts.fields ||
+      counts('CITY') + counts('PASS') !== profile.counts.anchors
+    )
+      throw new Error();
+    if (
+      profile.selection.mapKey === 'san10' &&
+      (map.sites.length !== 159 ||
+        map.routes.length !== 200 ||
+        map.routes.some((route) => !route.enabled || route.direction !== 'BOTH') ||
+        map.canvas.width !== 1400 ||
+        map.canvas.height !== 1000)
+    )
+      throw new Error();
+    if (
+      profileId === 'san10-empty' &&
+      (scenario.diplomacy.length !== 0 || scenario.general.some((general) => general[3] !== 0 || general[8] !== 0))
+    )
       throw new Error();
     if (
       validateWorldResources({
@@ -138,11 +210,11 @@ export function creationProfile(
     const portraits = (portraitRow!.content as { portraits?: Record<string, unknown> }).portraits;
     if (!portraits || scenario.general.some((general) => !Object.hasOwn(portraits, general[1]))) throw new Error();
   } catch {
-    return unavailable('RESOURCES_UNAVAILABLE');
+    return unavailable(profileId, 'RESOURCES_UNAVAILABLE');
   }
   const options: CreationPreset[] = [];
   try {
-    for (const key of presetKeys) {
+    for (const key of profile.presets) {
       const entries = presets.filter((entry) => entry.key === key);
       if (entries.length !== 1) throw new Error();
       const preset = parsePreset(entries[0]!.value);
@@ -161,25 +233,23 @@ export function creationProfile(
       });
     }
   } catch {
-    return unavailable('PRESETS_UNAVAILABLE');
+    return unavailable(profileId, 'PRESETS_UNAVAILABLE');
   }
   return {
-    ...identity,
+    id: profile.id,
+    label: profile.label,
     available: true,
-    selection: { ...creationSelection },
+    selection: { ...profile.selection },
     scenarioTitle: scenario.title,
     mapName: map.name,
     startYear: scenario.startYear,
     counts: {
       nations: scenario.nation.length,
       generals: scenario.general.length,
-      cities: 53,
-      gates: 8,
-      ports: 6,
-      fields: 13,
-      anchors: 61,
+      ...profile.counts,
+      ...(profile.selection.mapKey === 'san10' ? { markers: 159, roads: 200 } : {}),
     },
-    resources: creationRefs.map((ref) => ({
+    resources: refs.map((ref) => ({
       kind: ref.kind,
       key: ref.name,
       version: ref.version,
@@ -188,7 +258,7 @@ export function creationProfile(
     })),
     ruleFeatures: [...creationFeatures],
     presets: options,
-    suggestedEndYear: 201,
+    suggestedEndYear: profile.suggestedEndYear,
   };
 }
 
@@ -200,12 +270,15 @@ export async function getWorldCreationOptions(ctx: Context, input: z.infer<typeo
     return await ctx.db.$transaction(
       async (tx) => {
         const userId = await requireCurrentAdmin(tx, ctx, false);
+        const refs = [
+          ...new Map(profileIds.flatMap(profileRefs).map((ref) => [ref.kind + '/' + ref.name, ref])).values(),
+        ];
         const rows = await tx.gameResource.findMany({
-          where: { status: 'PUBLISHED', OR: creationRefs.map((ref) => ({ ...ref })) },
+          where: { status: 'PUBLISHED', OR: refs.map((ref) => ({ ...ref })) },
           select: { kind: true, name: true, version: true, content: true, contentHash: true },
         });
         const presets = await Promise.all(
-          presetKeys.map(async (key) => {
+          [...presetKeys, 'empty'].map(async (key) => {
             try {
               return { key, value: JSON.parse(await readFile(new URL(`${key}.json`, presetRoot), 'utf8')) as unknown };
             } catch {
@@ -213,8 +286,8 @@ export async function getWorldCreationOptions(ctx: Context, input: z.infer<typeo
             }
           }),
         );
-        const profile = creationProfile(rows, presets);
-        return { userId, revision: hashState(profile), profiles: [profile] };
+        const profiles = profileIds.map((id) => creationProfile(rows, presets, ruleRegistry, id));
+        return { userId, revision: hashState(profiles), profiles };
       },
       { isolationLevel: 'RepeatableRead' },
     );

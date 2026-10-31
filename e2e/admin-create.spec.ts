@@ -177,7 +177,11 @@ test('AC-M3-04 CH-03 실제 읽기 응답의 표식 변경 주입은 POST0으로
     const packet = Array.isArray(body) ? body[index] : body;
     expect(packet.result.data).toMatchObject({
       userId: actor.id,
-      profiles: [{ available: true, ruleFeatures: [...creationFeatures] }],
+      profiles: [
+        { id: 'integration-v01', available: true, ruleFeatures: [...creationFeatures] },
+        { id: 'san10-191', available: false, code: 'RESOURCES_UNAVAILABLE' },
+        { id: 'san10-empty', available: false, code: 'RESOURCES_UNAVAILABLE' },
+      ],
     });
     packet.result.data.revision = 'explicit-test-stamp-' + packet.result.data.revision;
     injected++;

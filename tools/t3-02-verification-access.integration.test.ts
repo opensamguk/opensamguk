@@ -185,8 +185,9 @@ describe('T3-02 AC-M3-01 실제 PostgreSQL·HTTP 이메일 인증 차단', () =>
     expect(paths).toHaveLength(31);
     expect(paths).toContain('campaign.order');
     expect(paths).toContain('admin.world.requestClock');
-    expect(paths).toContain('admin.world.create');
     expect(paths).toContain('cityResources.allocate');
+    expect(paths).toContain('admin.world.create');
+
     expect(paths).toContain('admin.world.requestEnd');
     expect(paths).toContain('admin.world.requestReset');
     const before = await snapshot();

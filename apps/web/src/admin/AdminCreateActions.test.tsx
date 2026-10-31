@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { TRPCClientError } from '@trpc/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AdminCreateActions } from './AdminCreateActions';
 import { options, requestId, requestKey, viewerId, worldId } from './test/createFixture';
-import type { CreateInput } from './adminCreateModel';
+import type { CreateInput, CreateOptions, CreateProfile } from './adminCreateModel';
 
 const state = vi.hoisted(() => ({
   me: vi.fn(),
@@ -49,8 +49,39 @@ function setup() {
     />,
   );
 }
+function profileOptions() {
+  const legacy = structuredClone(options.profiles[0]!);
+  if (!legacy.available) throw new Error('Available fixture required');
+  const profile = (id: 'san10-191' | 'san10-empty', year: number, nations: number, minutes: number): CreateProfile => ({
+    ...structuredClone(legacy),
+    id,
+    label: id,
+    scenarioTitle: `${year}년 시나리오`,
+    startYear: year,
+    counts: { ...legacy.counts, nations },
+    selection: {
+      scenarioKey: `${id}-scenario`,
+      mapKey: `${id}-map`,
+      unitSetKey: `${id}-units`,
+      statRulesKey: `${id}-stats`,
+      portraitMapKey: `${id}-portraits`,
+    },
+    presets: [{ ...legacy.presets[0]!, key: `${id}-preset`, label: `${id} 전용`, turnTermMinutes: minutes }],
+    suggestedEndYear: year + 10,
+  });
+  return {
+    ...structuredClone(options),
+    profiles: [legacy, profile('san10-empty', 180, 0, 30), profile('san10-191', 191, 21, 120)],
+  } satisfies CreateOptions;
+}
+async function chooseLegacy() {
+  const scenario = await screen.findByRole('combobox', { name: '시나리오' });
+  await waitFor(() => expect((scenario as HTMLSelectElement).disabled).toBe(false));
+  fireEvent.change(scenario, { target: { value: 'integration-v01' } });
+}
 async function review() {
   fireEvent.click(screen.getByRole('button', { name: '새 월드 생성 준비' }));
+  await chooseLegacy();
   await screen.findByLabelText('월드 이름');
   fireEvent.change(screen.getByLabelText('월드 이름'), { target: { value: '화면 생성' } });
   fireEvent.change(screen.getByLabelText('프리셋'), { target: { value: 'regular' } });
@@ -80,9 +111,138 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
+  it('SAN10 자원이 없으면 기본 선택을 유지해 안내하고 통합판은 직접 골라야 입력한다', async () => {
+    const value = profileOptions();
+    state.settings.mockResolvedValue({
+      ...value,
+      profiles: value.profiles.map((profile) =>
+        profile.id === 'integration-v01'
+          ? profile
+          : {
+              id: profile.id,
+              label: profile.label,
+              available: false,
+              code: 'RESOURCES_UNAVAILABLE',
+              reason: `${profile.id} 게시 자원이 없습니다.`,
+            },
+      ),
+    });
+    setup();
+    fireEvent.click(screen.getByRole('button', { name: '새 월드 생성 준비' }));
+    const scenario = await screen.findByRole('combobox', { name: '시나리오' });
+    expect((scenario as HTMLSelectElement).value).toBe('san10-191');
+    const unavailable = within(screen.getByRole('note', { name: '사용할 수 없는 시나리오' }));
+    for (const id of ['san10-191', 'san10-empty']) {
+      const option = within(scenario).getByRole('option', { name: id }) as HTMLOptionElement;
+      expect(option.disabled).toBe(true);
+      expect(unavailable.getByText(`${id} 게시 자원이 없습니다.`)).toBeTruthy();
+    }
+    expect(screen.queryByLabelText('월드 이름')).toBeNull();
+    expect(state.create).not.toHaveBeenCalled();
+    await chooseLegacy();
+    await screen.findByLabelText('월드 이름');
+    expect((scenario as HTMLSelectElement).value).toBe('integration-v01');
+    expect(state.create).not.toHaveBeenCalled();
+  });
+  it('프로필 순서와 관계없이 SAN10 191년을 기본 선택하고 해당 5자원·9기능만 전송한다', async () => {
+    const value = profileOptions();
+    state.settings.mockResolvedValue(value);
+    setup();
+    fireEvent.click(screen.getByRole('button', { name: '새 월드 생성 준비' }));
+    const scenario = await screen.findByRole('combobox', { name: '시나리오' });
+    expect((scenario as HTMLSelectElement).value).toBe('san10-191');
+    expect(
+      within(scenario)
+        .getAllByRole('option')
+        .map((option) => (option as HTMLOptionElement).value),
+    ).toEqual(['', 'integration-v01', 'san10-empty', 'san10-191']);
+    fireEvent.change(screen.getByLabelText('월드 이름'), { target: { value: '기본 SAN10' } });
+    fireEvent.change(screen.getByRole('combobox', { name: '프리셋' }), {
+      target: { value: 'san10-191-preset' },
+    });
+    expect((screen.getByLabelText('턴 간격 (분)') as HTMLInputElement).value).toBe('120');
+    fireEvent.click(screen.getByRole('button', { name: '현재 설정 검토' }));
+    const confirmation = within(await screen.findByRole('dialog'));
+    expect(confirmation.getByText(/191년 · 21국 · NPC 491명/)).toBeTruthy();
+    for (const ref of Object.values(value.profiles[2]!.selection)) expect(confirmation.getByText(ref)).toBeTruthy();
+    await submit();
+    expect(state.create.mock.calls[0]![0]).toMatchObject({
+      ...value.profiles[2]!.selection,
+      presetKey: 'san10-191-preset',
+      turnTermMinutes: 120,
+      endYear: 201,
+      ruleFeatures: value.profiles[2]!.ruleFeatures,
+    });
+    expect(state.create.mock.calls[0]![0]).not.toHaveProperty('profileId');
+  });
+
+  it('공백 프로필로 바꾸면 이전 프리셋과 연도를 버리고 180년·0국과 선택 자원으로 같은 요청을 재접수한다', async () => {
+    const value = profileOptions();
+    state.settings.mockResolvedValue(value);
+    setup();
+    fireEvent.click(screen.getByRole('button', { name: '새 월드 생성 준비' }));
+    await screen.findByLabelText('월드 이름');
+    fireEvent.change(screen.getByLabelText('월드 이름'), { target: { value: '공백 SAN10' } });
+    const preset = screen.getByRole('combobox', { name: '프리셋' }) as HTMLSelectElement;
+    fireEvent.change(preset, { target: { value: 'san10-191-preset' } });
+    fireEvent.change(screen.getByLabelText('종료 연도'), { target: { value: '209' } });
+    fireEvent.change(screen.getByRole('combobox', { name: '시나리오' }), { target: { value: 'san10-empty' } });
+    expect(preset.value).toBe('');
+    expect((screen.getByLabelText('턴 간격 (분)') as HTMLInputElement).value).toBe('');
+    expect((screen.getByLabelText('종료 연도') as HTMLInputElement).value).toBe('190');
+    expect((screen.getByLabelText('종료 연도') as HTMLInputElement).min).toBe('180');
+    expect(within(preset).queryByText(/san10-191/)).toBeNull();
+    expect(screen.getByText(/180년 · 0국 · NPC 491명/)).toBeTruthy();
+    fireEvent.change(preset, { target: { value: 'san10-empty-preset' } });
+    fireEvent.click(screen.getByRole('button', { name: '현재 설정 검토' }));
+    const confirmation = within(await screen.findByRole('dialog'));
+    expect(confirmation.getByText(/180년 · 0국 · NPC 491명/)).toBeTruthy();
+    expect(confirmation.queryByText(/191년 · 21국/)).toBeNull();
+    for (const ref of Object.values(value.profiles[1]!.selection)) expect(confirmation.getByText(ref)).toBeTruthy();
+    await submit();
+    const input = state.create.mock.calls[0]![0] as CreateInput;
+    expect(input).toMatchObject({
+      ...value.profiles[1]!.selection,
+      presetKey: 'san10-empty-preset',
+      turnTermMinutes: 30,
+      endYear: 190,
+      ruleFeatures: value.profiles[1]!.ruleFeatures,
+    });
+    expect(input.ruleFeatures).toHaveLength(9);
+    expect(input).not.toHaveProperty('profileId');
+    state.settings.mockResolvedValue(options);
+    fireEvent.click(screen.getByRole('button', { name: '같은 요청 접수 확인' }));
+    await waitFor(() => expect(state.create).toHaveBeenCalledTimes(2));
+    expect(state.create.mock.calls[1]![0]).toBe(input);
+  });
+
+  it('선택한 공백 프로필이 재조회에서 사라지면 다른 프로필로 대체하거나 생성하지 않는다', async () => {
+    const value = profileOptions();
+    state.settings.mockResolvedValue(value);
+    setup();
+    fireEvent.click(screen.getByRole('button', { name: '새 월드 생성 준비' }));
+    await screen.findByLabelText('월드 이름');
+    fireEvent.change(screen.getByLabelText('월드 이름'), { target: { value: '사라진 프로필' } });
+    fireEvent.change(screen.getByRole('combobox', { name: '시나리오' }), { target: { value: 'san10-empty' } });
+    fireEvent.change(screen.getByRole('combobox', { name: '프리셋' }), {
+      target: { value: 'san10-empty-preset' },
+    });
+    state.settings.mockResolvedValue({
+      ...value,
+      revision: 'removed-empty',
+      profiles: value.profiles.filter((profile) => profile.id !== 'san10-empty'),
+    });
+    fireEvent.click(screen.getByRole('button', { name: '현재 설정 검토' }));
+    await screen.findByText('현재 시나리오를 선택하세요.');
+    expect((screen.getByRole('combobox', { name: '시나리오' }) as HTMLSelectElement).value).toBe('');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(state.create).not.toHaveBeenCalled();
+  });
+
   it('폼의 조건부 입력·선택과 확인 체크 상자의 접근 이름은 화면 라벨과 같다', async () => {
     setup();
     fireEvent.click(screen.getByRole('button', { name: '새 월드 생성 준비' }));
+    await chooseLegacy();
     await screen.findByLabelText('월드 이름');
     const labels = ['시나리오', '프리셋', '자동 종료', '시드 선택'];
     const exactLabels = () => {
