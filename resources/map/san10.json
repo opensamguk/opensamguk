@@ -10,7 +10,12 @@
     "source": "natural-earth-5.1.2",
     "projection": "WGS84 plate carree",
     "sha256": "6b7bcefb67c43011d671b75f9306dfac25efd7adba3ae8ff86f9440157091a84",
-    "bounds": [94, 15.457142857142856, 148, 54.028571428571425]
+    "bounds": [
+      94,
+      15.457142857142856,
+      148,
+      54.028571428571425
+    ]
   },
   "defaults": {
     "trust": 50,
@@ -569,8 +574,8 @@
       "id": "city:37",
       "name": "북해",
       "position": {
-        "x": 635,
-        "y": 449
+        "x": 637,
+        "y": 450
       },
       "kind": "CITY",
       "anchorKey": 37,
@@ -1033,7 +1038,7 @@
       "name": "시상",
       "position": {
         "x": 570,
-        "y": 630
+        "y": 634
       },
       "kind": "CITY",
       "anchorKey": 15,
@@ -1120,7 +1125,7 @@
       "name": "양양",
       "position": {
         "x": 470,
-        "y": 571
+        "y": 576
       },
       "kind": "CITY",
       "anchorKey": 6,
@@ -1149,7 +1154,7 @@
       "name": "강릉",
       "position": {
         "x": 473,
-        "y": 615
+        "y": 613
       },
       "kind": "CITY",
       "anchorKey": 13,
@@ -1525,8 +1530,8 @@
       "id": "pass:100",
       "name": "동관",
       "position": {
-        "x": 419,
-        "y": 507
+        "x": 422,
+        "y": 508
       },
       "kind": "PASS",
       "anchorKey": 100,
@@ -1544,8 +1549,8 @@
       "id": "pass:73",
       "name": "함곡관",
       "position": {
-        "x": 427,
-        "y": 501
+        "x": 428,
+        "y": 500
       },
       "kind": "PASS",
       "anchorKey": 73,
@@ -1763,7 +1768,7 @@
       "id": "city:1064",
       "name": "진창",
       "position": {
-        "x": 347,
+        "x": 346,
         "y": 510
       },
       "kind": "CITY",
@@ -1791,7 +1796,7 @@
       "id": "city:1065",
       "name": "오장원",
       "position": {
-        "x": 353,
+        "x": 354,
         "y": 512
       },
       "kind": "CITY",
@@ -1819,7 +1824,7 @@
       "id": "city:1066",
       "name": "화산",
       "position": {
-        "x": 417,
+        "x": 413,
         "y": 507
       },
       "kind": "CITY",
@@ -2379,8 +2384,8 @@
       "id": "city:1086",
       "name": "임치",
       "position": {
-        "x": 630,
-        "y": 446
+        "x": 628,
+        "y": 445
       },
       "kind": "CITY",
       "anchorKey": 1086,
@@ -2745,7 +2750,7 @@
       "name": "번성",
       "position": {
         "x": 470,
-        "y": 569
+        "y": 564
       },
       "kind": "CITY",
       "anchorKey": 1099,
@@ -2997,7 +3002,7 @@
       "name": "공안",
       "position": {
         "x": 473,
-        "y": 621
+        "y": 623
       },
       "kind": "CITY",
       "anchorKey": 1108,
@@ -3025,7 +3030,7 @@
       "name": "심양",
       "position": {
         "x": 570,
-        "y": 627
+        "y": 623
       },
       "kind": "CITY",
       "anchorKey": 1109,
@@ -3109,7 +3114,7 @@
       "name": "광릉",
       "position": {
         "x": 659,
-        "y": 561
+        "y": 560
       },
       "kind": "CITY",
       "anchorKey": 83,
@@ -3138,7 +3143,7 @@
       "name": "경구",
       "position": {
         "x": 659,
-        "y": 566
+        "y": 568
       },
       "kind": "CITY",
       "anchorKey": 1113,
@@ -3585,8 +3590,8 @@
       "id": "city:1129",
       "name": "말로국",
       "position": {
-        "x": 933,
-        "y": 534
+        "x": 930,
+        "y": 536
       },
       "kind": "CITY",
       "anchorKey": 1129,
@@ -3613,8 +3618,8 @@
       "id": "city:1130",
       "name": "이도국",
       "position": {
-        "x": 939,
-        "y": 531
+        "x": 937,
+        "y": 530
       },
       "kind": "CITY",
       "anchorKey": 1130,
@@ -3642,7 +3647,7 @@
       "name": "노국",
       "position": {
         "x": 944,
-        "y": 530
+        "y": 528
       },
       "kind": "CITY",
       "anchorKey": 1131,
@@ -3669,8 +3674,8 @@
       "id": "city:1132",
       "name": "불미국",
       "position": {
-        "x": 947,
-        "y": 530
+        "x": 952,
+        "y": 531
       },
       "kind": "CITY",
       "anchorKey": 1132,
@@ -3723,7 +3728,7 @@
     },
     {
       "id": "city:1134",
-      "name": "이즈모",
+      "name": "투마국",
       "position": {
         "x": 1005,
         "y": 484
@@ -3751,7 +3756,7 @@
     },
     {
       "id": "city:1135",
-      "name": "기비",
+      "name": "지유국",
       "position": {
         "x": 1035,
         "y": 502
@@ -3779,7 +3784,7 @@
     },
     {
       "id": "city:1136",
-      "name": "이요",
+      "name": "이사국",
       "position": {
         "x": 1005,
         "y": 523
@@ -3807,7 +3812,7 @@
     },
     {
       "id": "city:1137",
-      "name": "사누키",
+      "name": "파리국",
       "position": {
         "x": 1038,
         "y": 510
@@ -4262,66 +4267,6 @@
         "y": 649
       },
       "kind": "FIELD"
-    },
-    {
-      "id": "port:13",
-      "name": "강릉항",
-      "position": {
-        "x": 483,
-        "y": 624
-      },
-      "kind": "PORT",
-      "parentCityId": "city:13"
-    },
-    {
-      "id": "port:52",
-      "name": "강하항",
-      "position": {
-        "x": 535,
-        "y": 617
-      },
-      "kind": "PORT",
-      "parentCityId": "city:52"
-    },
-    {
-      "id": "port:15",
-      "name": "시상항",
-      "position": {
-        "x": 580,
-        "y": 639
-      },
-      "kind": "PORT",
-      "parentCityId": "city:15"
-    },
-    {
-      "id": "port:56",
-      "name": "여강항",
-      "position": {
-        "x": 595,
-        "y": 616
-      },
-      "kind": "PORT",
-      "parentCityId": "city:56"
-    },
-    {
-      "id": "port:7",
-      "name": "건업항",
-      "position": {
-        "x": 652,
-        "y": 579
-      },
-      "kind": "PORT",
-      "parentCityId": "city:7"
-    },
-    {
-      "id": "port:31",
-      "name": "오항",
-      "position": {
-        "x": 700,
-        "y": 598
-      },
-      "kind": "PORT",
-      "parentCityId": "city:31"
     }
   ],
   "routes": [
