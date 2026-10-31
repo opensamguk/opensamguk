@@ -8,6 +8,7 @@ import hashlib
 import json
 import shutil
 import zipfile
+import zlib
 from pathlib import Path
 from urllib.request import Request, urlopen
 
@@ -44,6 +45,14 @@ def fetch(url, path, sha256):
         raise ValueError(f'Source hash mismatch: {path.name}')
 
 
+def crc32(path):
+    value = 0
+    with path.open('rb') as source:
+        while block := source.read(4 * 1024 * 1024):
+            value = zlib.crc32(block, value)
+    return value
+
+
 def project(lon, lat):
     return round((lon - BOUNDS[0]) * UNITS, 2), round((BOUNDS[3] - lat) * UNITS, 2)
 
@@ -77,9 +86,13 @@ def main():
     tif = CACHE / 'NE2_LR_LC_SR_W_DR.tif'
     with zipfile.ZipFile(archive) as z:
         world = [float(v) for v in z.read('NE2_LR_LC_SR_W_DR.tfw').decode().split()]
-        if not tif.exists():
-            with z.open('NE2_LR_LC_SR_W_DR.tif') as src, tif.open('wb') as dst:
+        # 캐시 TIFF는 해시를 검증한 zip 안의 파일과 크기·CRC가 같을 때만 쓰고, 아니면 다시 푼다.
+        member = z.getinfo('NE2_LR_LC_SR_W_DR.tif')
+        if not tif.exists() or tif.stat().st_size != member.file_size or crc32(tif) != member.CRC:
+            with z.open(member) as src, tif.open('wb') as dst:
                 shutil.copyfileobj(src, dst)
+        if crc32(tif) != member.CRC:
+            raise ValueError('Extracted relief does not match the verified archive')
     Image.MAX_IMAGE_PIXELS = 300_000_000
     pixel, _, _, vertical, center_x, center_y = world
     left, top = center_x - pixel / 2, center_y - vertical / 2
