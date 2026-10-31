@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useContext, useEffect } from 'react';
 import {
   Outlet,
   createRootRouteWithContext,
@@ -59,9 +59,11 @@ interface RouterContext {
 
 function NotFound() {
   // 관리자 경로의 권한 없음은 beforeLoad의 notFound()라 이 화면까지 올라올 수 있다. 관리자 화면은 그림을 불러오지 않는다.
-  const admin = useRouterState({ select: (state) => /^\/admin(\/|$)/.test(state.location.pathname) });
+  // 라우터처럼 대소문자를 가리지 않는다. 바깥에서 이미 끈 아이콘은 다시 켜지 않는다.
+  const admin = useRouterState({ select: (state) => /^\/admin(\/|$)/i.test(state.location.pathname) });
+  const icons = useContext(StateIconsContext) && !admin;
   return (
-    <StateIconsContext.Provider value={!admin}>
+    <StateIconsContext.Provider value={icons}>
       <main style={{ maxWidth: 480, margin: '64px auto' }}>
         <EmptyState title="없는 주소입니다" />
       </main>
