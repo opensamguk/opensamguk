@@ -33,7 +33,7 @@ import { InspectionPage } from './operations/InspectionPage';
 import { OperationDetailPage } from './operations/OperationDetailPage';
 import { OperationsPage } from './operations/OperationsPage';
 import { TurnsPage } from './turns/TurnsPage';
-import { EmptyState, ErrorState } from './ui/States';
+import { EmptyState, ErrorState, StateIconsContext } from './ui/States';
 import { ForgotPasswordPage } from './account/ForgotPasswordPage';
 import { ResetPasswordPage } from './account/ResetPasswordPage';
 import { VerifyEmailPage } from './account/VerifyEmailPage';
@@ -118,6 +118,15 @@ function GuardError() {
     <main style={{ maxWidth: 480, margin: '64px auto' }}>
       <ErrorState title="서버에 연결할 수 없습니다" onRetry={() => void router.invalidate()} />
     </main>
+  );
+}
+
+// 관리자 진입의 권한 확인 실패 화면. 관리자 화면은 그림을 불러오지 않는다(AC-M3-08 CH-12).
+function AdminGuardError() {
+  return (
+    <StateIconsContext.Provider value={false}>
+      <GuardError />
+    </StateIconsContext.Provider>
   );
 }
 
@@ -425,7 +434,7 @@ const adminRoute = createRoute({
   path: 'admin',
   beforeLoad: async ({ location }) => (await import('./admin/access')).requireAdmin(location.href),
   component: lazyRouteComponent(() => import('./admin/AdminPages'), 'AdminLayout'),
-  errorComponent: GuardError,
+  errorComponent: AdminGuardError,
 });
 const adminIndexRoute = createRoute({
   getParentRoute: () => adminRoute,
