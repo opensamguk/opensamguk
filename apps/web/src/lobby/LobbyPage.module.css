@@ -93,6 +93,11 @@
   border: var(--frame);
   box-shadow: var(--frame-inset);
 }
+.single {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+}
 .layout {
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);

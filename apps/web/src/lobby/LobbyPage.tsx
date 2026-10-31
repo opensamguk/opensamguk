@@ -36,6 +36,11 @@ export function LobbyPage() {
   else if (worlds.data.length === 0) body = <EmptyState title="열린 월드가 없습니다" />;
   else body = <WorldList worlds={worlds.data} loggedIn={loggedIn} />;
 
+  const noticeBoard = notices.isError ? (
+    <ErrorState title="공지를 불러오지 못했습니다" onRetry={() => void notices.refetch()} />
+  ) : notices.data && notices.data.length > 0 ? (
+    <NoticeBoard notices={notices.data} />
+  ) : null;
   return (
     <div className={styles.page}>
       <header className={styles.top}>
@@ -66,22 +71,17 @@ export function LobbyPage() {
           </p>
         </div>
       </div>
-      <div className={styles.layout}>
+      {/* 지연 공개 지도 (T2-25, D-026). 월드 목록 위에 두고 지도 탭은 월드 카드와 따로 움직인다. */}
+      <PublicMapTabs />
+      {/* 공지가 있을 때만 월드 목록 옆 칸에 둔다. 없으면 월드 목록이 너비를 다 쓴다. */}
+      <div className={noticeBoard ? styles.layout : styles.single}>
         <section aria-labelledby="lobby-worlds" className={styles.worlds}>
           <h2 id="lobby-worlds" className={styles.heading}>
             월드
           </h2>
           {body}
         </section>
-        <aside className={styles.side}>
-          {notices.isError ? (
-            <ErrorState title="공지를 불러오지 못했습니다" onRetry={() => void notices.refetch()} />
-          ) : notices.data && notices.data.length > 0 ? (
-            <NoticeBoard notices={notices.data} />
-          ) : null}
-          {/* 지연 공개 지도 (T2-25, D-026). 지도 탭은 월드 카드와 따로 움직인다. */}
-          <PublicMapTabs />
-        </aside>
+        {noticeBoard ? <aside className={styles.side}>{noticeBoard}</aside> : null}
       </div>
     </div>
   );
