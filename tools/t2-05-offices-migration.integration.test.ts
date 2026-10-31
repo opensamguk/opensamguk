@@ -372,6 +372,7 @@ it.each(['empty', 'legacy'] as const)(
         '20261106000000_legal_document_versions',
         '20261107000000_admin_sanction_requests',
         '20261108000000_city_resources_state',
+        '20261109000000_login_audit_records',
         '20261110000000_world_create_requests',
       ]);
       for (const directory of previous) {

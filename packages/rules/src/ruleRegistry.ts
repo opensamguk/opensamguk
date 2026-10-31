@@ -1,6 +1,7 @@
 import type { JsonValue, WorldView } from './model/world';
 import type { WorldInit } from './world/bootstrap';
 import type { CommandDef } from './commands/types';
+import type { CommandResolver } from './commands/resolve';
 import { applyCreationInput, applyPolicyInput, applyTurnsInput } from './replayInputs';
 import {
   personnelFeature,
@@ -61,7 +62,7 @@ export interface InputKindDefinition {
   feature: string | null;
   route: 'direct' | 'queued';
   directTick?: boolean;
-  apply(replay: ReplayState, input: RecordedInput): ReplayState;
+  apply(replay: ReplayState, input: RecordedInput, context?: { resolver?: CommandResolver | undefined }): ReplayState;
 }
 export interface RuleRegistry {
   features: readonly RuleFeatureDefinition[];

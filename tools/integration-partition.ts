@@ -13,6 +13,8 @@ export const ENGINE_INTEGRATION_FILES = [
   'tools/preset.integration.test.ts',
   'tools/t1-11.integration.test.ts',
   'tools/t4-03-cap6-central.integration.test.ts',
+  // INT-19/AC-INT-19B: 여러 실제 차례를 진행하는 긴 장수 지시 시나리오. 권한 사례는 API 묶음의 별도 파일에 남긴다.
+  'tools/int19-orders.integration.test.ts',
 ] as const;
 
 export function integrationPartition(value: string | undefined): string[] {

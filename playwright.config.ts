@@ -14,6 +14,7 @@ export default defineConfig({
     '**/admin-sanction.spec.ts',
     '**/int18-city-resources.spec.ts',
     '**/san10-map.spec.ts',
+    '**/admin-investigation.spec.ts',
     '**/admin-clock.spec.ts',
     '**/admin-end.spec.ts',
     '**/admin-create.spec.ts',

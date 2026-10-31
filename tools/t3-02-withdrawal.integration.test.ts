@@ -1,4 +1,4 @@
-import { createHash, randomInt, randomUUID } from 'node:crypto';
+import { randomBytes, createHash, randomInt, randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { afterAll, beforeAll, beforeEach, expect, it as test } from 'vitest';
@@ -101,6 +101,7 @@ async function start(
     db,
     publicOrigin,
     production,
+    ...(production ? { loginAudit: { key: randomBytes(32).toString('hex'), version: 1 } } : {}),
     secureCookies: production,
     emailVerificationRequired: true,
     legalPolicy: policy,

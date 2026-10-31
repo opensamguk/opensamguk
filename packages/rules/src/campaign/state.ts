@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { WorldView } from '../model/world';
 import { readGeneralFiveStats } from '../general/fiveStats';
 import { buildRetinueHierarchy, INITIAL_RENOWN_CAPACITY, type RetinuePerson } from './retinue';
+import { campaignOrdersSchema } from './orderTypes';
 
 const integer = z.number().int().min(0).max(2_147_483_647);
 const id = integer.min(1);
@@ -34,6 +35,7 @@ export const campaignStateSchema = z.strictObject({
   offers: z.array(campaignOfferSchema),
   units: z.array(campaignUnitSchema),
   attempts: z.array(z.strictObject({ masterId: id, personId: id, month: integer })),
+  orders: campaignOrdersSchema.optional(),
 });
 export type CampaignState = z.infer<typeof campaignStateSchema>;
 export type CampaignUnitState = z.infer<typeof campaignUnitSchema>;
@@ -62,6 +64,30 @@ export function readCampaignState(value: unknown, world: WorldView, expectedSeed
   )
     throw new Error('휘하 인물의 생성 출처 대응이 다릅니다.');
   const tree = buildRetinueHierarchy(people, state.links);
+  if (state.orders) {
+    const orders = state.orders.items;
+    if (
+      new Set(orders.map((order) => order.id)).size !== orders.length ||
+      orders.some(
+        (order) =>
+          order.id >= state.orders!.nextId ||
+          order.issuerId === order.recipientId ||
+          !world.generals[order.issuerId] ||
+          !world.generals[order.recipientId] ||
+          ((order.status === 'PENDING' || order.status === 'REJECTED') &&
+            (order.firstSlot !== null || order.turnRevision !== null)) ||
+          ((order.status === 'READY' || order.status === 'EXECUTED' || order.status === 'FAILED') &&
+            (order.firstSlot === null || order.turnRevision === null)) ||
+          (['PENDING', 'READY'].includes(order.status)
+            ? order.resolvedTick !== null || order.result !== null
+            : order.resolvedTick === null || order.result === null),
+      )
+    )
+      throw new Error('휘하 지시의 번호·참조·처리 상태가 다릅니다.');
+    const active = orders.filter((order) => order.status === 'READY' || order.status === 'PENDING');
+    if (new Set(active.map((order) => order.recipientId)).size !== active.length)
+      throw new Error('같은 장수의 미처리 지시가 중복됐습니다.');
+  }
   for (const person of people)
     if (!tree.withinCapacity(person.id, INITIAL_RENOWN_CAPACITY)) throw new Error('휘하 명망 수용량을 넘었습니다.');
   if (

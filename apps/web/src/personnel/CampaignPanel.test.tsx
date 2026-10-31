@@ -64,13 +64,21 @@ const conflict = () =>
   TRPCClientError.from({
     error: { message: '휘하 현황을 다시 불러오세요.', code: -32000, data: { code: 'CONFLICT' } },
   });
+const accountChanged = '로그인한 계정이 바뀌었습니다. 화면을 다시 확인하세요.';
+const forbidden = () =>
+  TRPCClientError.from({ error: { message: accountChanged, code: -32000, data: { code: 'FORBIDDEN' } } });
 
 // 실제 API 증거가 아닌 컴포넌트 단위 검사다. 실제 세션 전환 거부는 int06 HTTP 검사에 둔다.
 function mount(
   answer: (read: number) => Board | Promise<Board>,
-  options: { rejectMutation?: boolean; lostRequest?: boolean } = {},
+  options: {
+    rejectMutation?: boolean;
+    lostRequest?: boolean;
+    mutation?: (input: Record<string, unknown>) => Promise<void>;
+  } = {},
 ) {
   let reads = 0;
+  let currentUserId = userId;
   const mutations: Array<{ path: string; input: Record<string, unknown> }> = [];
   const link: TRPCLink<AppRouter> =
     () =>
@@ -83,7 +91,7 @@ function mount(
         const fail = (error: unknown) =>
           observer.error(error instanceof TRPCClientError ? error : TRPCClientError.from(error as Error));
         const input = op.input as Record<string, unknown>;
-        if (op.path === 'auth.me') reply({ user: { id: userId, email: 'unit@example.test', role: 'USER' } });
+        if (op.path === 'auth.me') reply({ user: { id: currentUserId, email: 'unit@example.test', role: 'USER' } });
         else if (op.path === 'campaign.get') {
           try {
             Promise.resolve(answer(++reads)).then(reply, fail);
@@ -93,6 +101,10 @@ function mount(
         } else if (op.path === 'campaign.relationship' || op.path === 'campaign.unit') {
           mutations.push({ path: op.path, input });
           if (options.rejectMutation) fail(conflict());
+          else if (options.mutation)
+            void options
+              .mutation(input)
+              .then(() => reply({ requestId: input.requestId, kind: op.path, status: 'pending' }), fail);
           else reply({ requestId: input.requestId, kind: op.path, status: 'pending' });
         } else if (op.path === 'campaign.request') {
           if (options.lostRequest) fail(new Error('request unavailable'));
@@ -119,6 +131,7 @@ function mount(
     reads: () => reads,
     changeWorld: (id: string) => view.rerender(tree(id)),
     changeAccount: (id: string) => {
+      currentUserId = id;
       const key = optionsProxy.auth.me.queryKey();
       const current = client.getQueryData(key)!;
       if (!current.user) throw new Error('Expected authenticated fixture');
@@ -126,6 +139,84 @@ function mount(
     },
   };
 }
+
+describe('계정 교체 안내의 수명', () => {
+  const nextUserId = '2bf38c50-cc52-4b07-9878-f746f4fbd9e0';
+  it.each(['403 먼저', '계정 갱신 먼저'] as const)(
+    '%s여도 새 계정 패널에 안내가 남고 자동 재전송하지 않는다',
+    async (order) => {
+      const result = deferred<void>();
+      const view = mount(() => base, {
+        mutation: async (input) => {
+          if (input.expectedUserId === userId) await result.promise;
+          else throw conflict();
+        },
+      });
+      try {
+        fireEvent.click(await screen.findByRole('button', { name: '대상에게 제안' }));
+        await waitFor(() => expect(view.mutations).toHaveLength(1));
+        const original = structuredClone(view.mutations[0]!.input);
+        expect(original).toMatchObject({ worldId, expectedUserId: userId });
+        expect(JSON.parse(sessionStorage.getItem(`campaign.pending:${userId}:${worldId}`)!).requestId).toBe(
+          original.requestId,
+        );
+        if (order === '403 먼저') {
+          await act(async () => result.reject(forbidden()));
+          await screen.findByText(accountChanged);
+          act(() => view.changeAccount(nextUserId));
+        } else {
+          act(() => view.changeAccount(nextUserId));
+          await screen.findByText(accountChanged);
+          expect(screen.queryByText('엔진이 요청을 처리하는 중입니다.')).toBeNull();
+          await act(async () => result.reject(forbidden()));
+        }
+        await screen.findByText(accountChanged);
+        view.changeWorld(worldId);
+        expect(screen.getByText(accountChanged)).toBeTruthy();
+        expect(view.mutations).toHaveLength(1);
+        expect(view.mutations[0]!.input).toEqual(original);
+        expect(sessionStorage.getItem(`campaign.pending:${userId}:${worldId}`)).toBeNull();
+        expect(sessionStorage.getItem(`campaign.pending:${nextUserId}:${worldId}`)).toBeNull();
+        expect(screen.queryByText('엔진이 요청을 처리하는 중입니다.')).toBeNull();
+
+        // 현재 계정이 새로 누른 조작만 새 UUID로 보낸다. 과거 오류 안내가 새 결과를 덮지 않는다.
+        fireEvent.click(screen.getByRole('button', { name: '대상에게 제안' }));
+        await screen.findByText('휘하 현황을 다시 불러오세요.');
+        expect(screen.queryByText(accountChanged)).toBeNull();
+        expect(view.mutations).toHaveLength(2);
+        expect(view.mutations[1]!.input.expectedUserId).toBe(nextUserId);
+        expect(view.mutations[1]!.input.requestId).not.toBe(original.requestId);
+      } finally {
+        await act(async () => result.reject(forbidden()));
+      }
+    },
+  );
+
+  it('다른 월드로 옮기면 안내를 지우고 이전 계정의 늦은403도 새 월드나 복귀 화면에 남기지 않는다', async () => {
+    const result = deferred<void>();
+    const view = mount(() => base, { mutation: () => result.promise });
+    const nextWorldId = 'f752b2c2-9a87-41f9-9730-c948b6bf5dc2';
+    try {
+      fireEvent.click(await screen.findByRole('button', { name: '대상에게 제안' }));
+      await waitFor(() => expect(view.mutations).toHaveLength(1));
+      act(() => view.changeAccount(nextUserId));
+      await screen.findByText(accountChanged);
+      view.changeWorld(nextWorldId);
+      await screen.findByRole('button', { name: '대상에게 제안' });
+      expect(screen.queryByText(accountChanged)).toBeNull();
+      await act(async () => result.reject(forbidden()));
+      expect(screen.queryByText(accountChanged)).toBeNull();
+      expect(sessionStorage.getItem(`campaign.pending:${nextUserId}:${nextWorldId}`)).toBeNull();
+      expect(sessionStorage.getItem(`campaign.pending:${userId}:${worldId}`)).toBeNull();
+      view.changeWorld(worldId);
+      await screen.findByRole('button', { name: '대상에게 제안' });
+      expect(screen.queryByText(accountChanged)).toBeNull();
+      expect(view.mutations).toHaveLength(1);
+    } finally {
+      await act(async () => result.reject(forbidden()));
+    }
+  });
+});
 
 describe('명시적인 새 휘하 제안 준비', () => {
   it('캐시가 신선해도 클릭 뒤 조회하고 선택을 보존해 기대 UUID·최신 revision으로 한 번만 보낸다', async () => {

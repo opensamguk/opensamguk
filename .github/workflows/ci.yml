@@ -124,7 +124,8 @@ jobs:
   database-engine:
     name: opensamguk-database-engine
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    # INT-19 장수 지시 시나리오를 더해 약 20분이 걸린다.
+    timeout-minutes: 30
     env:
       CI: 'true'
       INTEGRATION_SUITE: engine
@@ -270,6 +271,9 @@ jobs:
       - name: Check city resources in public Chromium
         if: matrix.shard == 2
         run: pnpm e2e:city-resources --reporter=line
+      - name: Check admin investigation in Chromium
+        if: matrix.shard == 1
+        run: pnpm e2e:investigation --reporter=line
       - name: Check admin world clock actions in Chromium
         if: matrix.shard == 3
         run: pnpm e2e:admin-clock --reporter=line

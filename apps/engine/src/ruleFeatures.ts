@@ -103,7 +103,11 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   { key: 'campaign-assignment-v2' },
   {
     key: 'campaign-v1',
-    queuedInputs: { 'campaign.relationship': processCampaignQueuedInput, 'campaign.unit': processCampaignQueuedInput },
+    queuedInputs: {
+      'campaign.relationship': processCampaignQueuedInput,
+      'campaign.unit': processCampaignQueuedInput,
+      'campaign.order': processCampaignQueuedInput,
+    },
     afterQueuedInput: (tx, world, before, input) =>
       input.kind === 'city.resources' ? Promise.resolve() : persistForeignCampaignInput(tx, world, before, input),
   },
