@@ -1,13 +1,14 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import {
+  Outlet,
   createRootRouteWithContext,
   createRoute,
   createRouter,
   lazyRouteComponent,
-  Outlet,
   redirect,
   useRouter,
+  useRouterState,
 } from '@tanstack/react-router';
 import { BattleSimPage } from './battleSim/BattleSimPage';
 import { DiplomacyPage, parseDiplomacySearch } from './diplomacy/DiplomacyPage';
@@ -56,13 +57,21 @@ interface RouterContext {
   trpc: Trpc;
 }
 
+function NotFound() {
+  // 관리자 경로의 권한 없음은 beforeLoad의 notFound()라 이 화면까지 올라올 수 있다. 관리자 화면은 그림을 불러오지 않는다.
+  const admin = useRouterState({ select: (state) => /^\/admin(\/|$)/.test(state.location.pathname) });
+  return (
+    <StateIconsContext.Provider value={!admin}>
+      <main style={{ maxWidth: 480, margin: '64px auto' }}>
+        <EmptyState title="없는 주소입니다" />
+      </main>
+    </StateIconsContext.Provider>
+  );
+}
+
 const rootRoute = createRootRouteWithContext<RouterContext>()({
   component: RootFrame,
-  notFoundComponent: () => (
-    <main style={{ maxWidth: 480, margin: '64px auto' }}>
-      <EmptyState title="없는 주소입니다" />
-    </main>
-  ),
+  notFoundComponent: NotFound,
 });
 
 function RootFrame() {
@@ -121,11 +130,18 @@ function GuardError() {
   );
 }
 
-// 관리자 진입의 권한 확인 실패 화면. 관리자 화면은 그림을 불러오지 않는다(AC-M3-08 CH-12).
+// 관리자 진입의 권한 확인 실패·권한 없음 화면. 관리자 화면은 그림을 불러오지 않는다(AC-M3-08 CH-12).
 function AdminGuardError() {
   return (
     <StateIconsContext.Provider value={false}>
       <GuardError />
+    </StateIconsContext.Provider>
+  );
+}
+function AdminNotFound() {
+  return (
+    <StateIconsContext.Provider value={false}>
+      <NotFound />
     </StateIconsContext.Provider>
   );
 }
@@ -435,6 +451,7 @@ const adminRoute = createRoute({
   beforeLoad: async ({ location }) => (await import('./admin/access')).requireAdmin(location.href),
   component: lazyRouteComponent(() => import('./admin/AdminPages'), 'AdminLayout'),
   errorComponent: AdminGuardError,
+  notFoundComponent: AdminNotFound,
 });
 const adminIndexRoute = createRoute({
   getParentRoute: () => adminRoute,
