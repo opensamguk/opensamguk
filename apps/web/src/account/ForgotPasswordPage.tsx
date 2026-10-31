@@ -20,7 +20,7 @@ export function ForgotPasswordPage() {
     if (!error) mutation.mutate({ email });
   }
   return (
-    <AccountFrame title="비밀번호 재설정">
+    <AccountFrame title="비밀번호 재설정" plaque="비밀번호 찾기">
       <p>가입한 이메일을 입력하세요. 재설정 링크는30분 동안 한 번 쓸 수 있습니다.</p>
       {mutation.isSuccess ? (
         <p role="status">등록된 주소라면 재설정 메일을 보냈습니다. 메일함을 확인하세요.</p>

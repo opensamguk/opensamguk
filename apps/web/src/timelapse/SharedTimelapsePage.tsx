@@ -50,26 +50,37 @@ export function SharedTimelapsePage({ worldId }: { worldId: string }) {
     error: null,
     refetch: () => undefined,
   };
+  // 위쪽 띠는 로그인 화면 밖이라 게임 띠를 쓰지 않고 이름표·안내·로그인 링크만 둔다 (INT-20).
   return (
-    <main style={{ maxWidth: 960, margin: '0 auto', padding: 'var(--space-4)' }}>
-      <h1 style={{ fontSize: 'var(--text-xl)', margin: '0 0 var(--space-2)' }}>
-        {head ? `${head.world.name} · 영토 재생` : '영토 재생'}
-      </h1>
-      <p className={styles.note}>
-        <span>로그인 없이 보는 종료 월드 기록입니다.</span>
-        {head ? <span className="num">{`${head.world.endedYear}년 ${head.world.endedMonth}월 종료`}</span> : null}
-        <Link to="/lobby">로비</Link>
-      </p>
-      <section aria-label="공유 영토 재생" style={{ marginTop: 'var(--space-3)' }}>
-        <TimelapseScreen
-          worldId={worldId}
-          fetchPage={fetchPage}
-          queryKey={queryKey}
-          map={map}
-          firstPageError={sharedErrorView}
-          {...(head ? { worldName: head.world.name } : {})}
-        />
-      </section>
-    </main>
+    <>
+      <header className={styles.sharedBanner}>
+        <span className={styles.brand}>오픈삼국</span>
+        <span className={styles.bannerNote}>로그인 없이 보는 종료 월드 기록입니다.</span>
+        <a className={styles.bannerLink} href="/login">
+          로그인
+        </a>
+      </header>
+      <main className={styles.shared}>
+        <div className={styles.sharedHead}>
+          <h1 className={styles.sharedTitle}>{head ? `${head.world.name} · 영토 재생` : '영토 재생'}</h1>
+          {head ? (
+            <span className={styles.endedAt}>{`${head.world.endedYear}년 ${head.world.endedMonth}월 종료`}</span>
+          ) : null}
+        </div>
+        <p className={styles.note}>
+          <Link to="/lobby">로비</Link>
+        </p>
+        <section aria-label="공유 영토 재생" className={styles.sharedBody}>
+          <TimelapseScreen
+            worldId={worldId}
+            fetchPage={fetchPage}
+            queryKey={queryKey}
+            map={map}
+            firstPageError={sharedErrorView}
+            {...(head ? { worldName: head.world.name } : {})}
+          />
+        </section>
+      </main>
+    </>
   );
 }

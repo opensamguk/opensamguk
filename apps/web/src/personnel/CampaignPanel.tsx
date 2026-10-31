@@ -15,6 +15,8 @@ type Pending = { requestId: string } & (
   | { kind: 'campaign.unit'; payload: Inputs['unit']['payload'] }
 );
 const relations = { STAFF: '가신', LIEUTENANT: '부장', GUEST: '식객' } as const;
+// 받은 제안함(INT-20)도 같은 이름을 쓴다.
+export const CAMPAIGN_RELATIONS = relations;
 function remember(key: string, pending: Pending | null) {
   try {
     if (pending) sessionStorage.setItem(key, JSON.stringify(pending));

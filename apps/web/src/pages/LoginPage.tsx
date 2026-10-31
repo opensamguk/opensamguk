@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link } from '@tanstack/react-router';
+import keyartUrl from '../art/keyart.png';
 import { AuthForm } from '../auth/AuthForm';
 import styles from '../auth/AuthPage.module.css';
 import { PublicMapTabs } from '../publicMap/PublicMapTabs';
@@ -12,10 +13,11 @@ export function LoginPage() {
   const trpc = useTRPC();
   const health = useQuery(trpc.health.queryOptions());
 
-  // 양식이 먼저다. 넓은 화면에서는 오른쪽, 640px 이하에서는 양식 아래에 공개 지도를 둔다 (T2-25).
+  // 양식이 먼저다. 넓은 화면에서는 대표 그림과 공개 지도를 왼쪽에, 640px 이하에서는 양식 아래에 둔다 (T2-25, INT-20).
   return (
     <main className={styles.withMap}>
       <div className={styles.formColumn}>
+        <span className={styles.plaque}>입성</span>
         <h1>로그인</h1>
         <AuthForm mode="login" next={next} />
         <p className={styles.switch}>
@@ -31,7 +33,12 @@ export function LoginPage() {
           {statusText(health)}
         </p>
       </div>
-      <PublicMapTabs />
+      <div className={styles.art}>
+        <img className={styles.artImage} src={keyartUrl} alt="" width={480} height={270} />
+      </div>
+      <div className={styles.map}>
+        <PublicMapTabs />
+      </div>
     </main>
   );
 }

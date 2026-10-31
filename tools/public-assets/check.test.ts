@@ -102,13 +102,18 @@ describe('공개 배포 파일 검사', () => {
     }
     await seal();
   }
-  it('AC-INT-10 원본 해시가 맞는 기존 도트4개와 GIS 지형만 추가로 통과시킨다', async () => {
+  it('AC-INT-20 원본 해시가 맞는 도트 바탕과 출처를 남긴 생성 그림만 추가로 통과시킨다', async () => {
     await addMapImages();
-    await expect(checkPublicAssets({ root })).resolves.toEqual({ files: 9, images: 6, decision: 'D-031' });
+    await expect(checkPublicAssets({ root })).resolves.toEqual({
+      files: 4 + APPROVED_MAP_IMAGES.length,
+      images: 1 + APPROVED_MAP_IMAGES.length,
+      decision: 'D-031',
+    });
   });
   it('AC-INT-10 지도 이미지의 원본·배출 바이트가 달라지면 거부한다', async () => {
     await addMapImages();
-    await put('apps/web/dist/assets/city-abcdefgh.png', 'changed-image');
+    const name = basename(APPROVED_MAP_IMAGES[0]);
+    await put(`apps/web/dist/assets/${name.replace(/\.png$/, '')}-abcdefgh.png`, 'changed-image');
     await seal();
     await expect(checkPublicAssets({ root })).rejects.toThrow('image-hash');
   });

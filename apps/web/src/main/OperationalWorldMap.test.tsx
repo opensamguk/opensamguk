@@ -59,6 +59,25 @@ const draw = (override: Partial<typeof map> = {}) =>
     />,
   );
 
+it('AC-INT-20 도로를 도트 층으로 깔고 거점을 규모 표식과 국가 군기로 그린다', () => {
+  const { container } = draw({
+    routes: [
+      ...map.routes,
+      { id: 'land:3', from: 'pass:2', to: 'city:1', mode: 'LAND', direction: 'FORWARD', enabled: true },
+    ],
+  });
+  const svg = container.querySelector('svg')!;
+  expect(screen.getByTestId('road-pixels').querySelector('[data-road-mode="LAND"]')?.getAttribute('d')).toMatch(/^M/);
+  // 경로 선은 경로마다 하나 남고 일방통행만 화살표를 단다.
+  expect(svg.querySelectorAll('polyline[data-route-mode="LAND"]')).toHaveLength(2);
+  expect(svg.querySelectorAll('polyline[marker-end]')).toHaveLength(1);
+  expect(svg.querySelector('mask[id^="operational-flag-"]')).toBeTruthy();
+  // jsdom은 크기를 0으로 읽으므로 표식은 국가색 네모로 줄어든다.
+  const city = screen.getByTestId('site-icon-city').querySelector('[data-marker-detail="square"]');
+  expect(city?.getAttribute('fill')).toBe('#202020');
+  expect(screen.getByTestId('site-icon-field').querySelector('rect')?.getAttribute('fill')).toBe('#d6d0c4');
+});
+
 it('AC-INT-10 GIS 지형과 기존 도트·국가색을 그리고 항구·전장에는 이동 단추를 만들지 않는다', () => {
   const onSelect = vi.fn();
   render(
@@ -72,9 +91,10 @@ it('AC-INT-10 GIS 지형과 기존 도트·국가색을 그리고 항구·전장
     />,
   );
   expect(screen.getByTestId('geographic-basemap')).toBeTruthy();
-  expect(screen.getByTestId('geographic-relief').getAttribute('href')).toContain('natural-earth-relief.webp');
-  for (const kind of ['city', 'pass', 'port', 'field']) expect(screen.getByTestId(`site-icon-${kind}`)).toBeTruthy();
-  expect(screen.getByRole('img', { name: '항구, 항구 시설, 허창 소속' }).getAttribute('tabindex')).toBeNull();
+  expect(screen.getByTestId('geographic-relief').getAttribute('href')).toContain('pixel-basemap.png');
+  for (const kind of ['city', 'pass', 'field']) expect(screen.getByTestId(`site-icon-${kind}`)).toBeTruthy();
+  // INT-20: 켜진 물길이 쓰지 않는 항구 시설은 그리지 않는다.
+  expect(screen.queryByTestId('site-icon-port')).toBeNull();
   expect(screen.getByRole('img', { name: '전장, 전장 표시' })).toBeTruthy();
   const pass = screen.getByRole('button', { name: '관문, 관문, 위' });
   expect(pass.getAttribute('aria-pressed')).toBe('true');
@@ -134,6 +154,9 @@ it('AC-INT-10 수로는 출발 도시·항구·경유지·도착 항구·도시 
   expect(screen.getByTestId('world-map').querySelector('polyline')!.getAttribute('points')).toBe(
     '300,200 320,220 450,200 580,220 600,200',
   );
+  // 물길이 쓰는 항구는 그리고 이동 단추는 만들지 않는다.
+  expect(screen.getAllByTestId('site-icon-port')).toHaveLength(2);
+  expect(screen.getByRole('img', { name: '항구, 항구 시설, 허창 소속' }).getAttribute('tabindex')).toBeNull();
 });
 
 it.each(['sha', 'position', 'missing', 'duplicate-id', 'duplicate-anchor'] as const)(
@@ -157,7 +180,7 @@ it.each(['sha', 'position', 'missing', 'duplicate-id', 'duplicate-anchor'] as co
   },
 );
 
-it('AC-INT-03·10 SAN10의 159표식·200도로와 동북 끝점 전체 범위를 유지한다', () => {
+it('AC-INT-03·10 SAN10의 153표식·200도로와 동북 끝점 전체 범위를 유지한다', () => {
   const geography = publicGeographySchema.parse(san10Resource);
   const strategic = geography.sites.filter((site) => site.kind === 'CITY' || site.kind === 'PASS');
   const mapped: MapCity[] = strategic.map((site) => ({
@@ -176,9 +199,11 @@ it('AC-INT-03·10 SAN10의 159표식·200도로와 동북 끝점 전체 범위�
   render(<WorldMap cities={mapped} nations={nations} operationalMap={geography} onSelect={vi.fn()} />);
   const svg = screen.getByTestId('world-map'),
     before = svg.getAttribute('viewBox');
-  expect(svg.querySelectorAll('[data-site-kind]')).toHaveLength(159);
+  // D-049: SAN10 지도 자료에는 항구 시설이 없다.
+  expect(svg.querySelectorAll('[data-site-kind]')).toHaveLength(153);
+  expect(svg.querySelectorAll('[data-site-kind="PORT"]')).toHaveLength(0);
   expect(svg.querySelectorAll('[data-route-mode="LAND"]')).toHaveLength(200);
-  expect(screen.queryByTestId('geographic-relief')).toBeNull();
+  expect(screen.getByTestId('geographic-relief').getAttribute('href')).toContain('san10-pixel-basemap.png');
   const yamatai = mapped.find((city) => city.name === '야마타이국')!;
   fireEvent.change(screen.getByRole('combobox', { name: '지도 거점' }), { target: { value: String(yamatai.key) } });
   expect(svg.getAttribute('viewBox')).toBe(before);

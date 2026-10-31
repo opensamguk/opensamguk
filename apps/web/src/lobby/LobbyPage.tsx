@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useId, useState } from 'react';
+import keyartUrl from '../art/keyart.png';
 import { LogoutButton } from '../auth/LogoutButton';
 import { PublicMapTabs } from '../publicMap/PublicMapTabs';
 import { useTRPC } from '../trpc';
@@ -35,9 +36,15 @@ export function LobbyPage() {
   else if (worlds.data.length === 0) body = <EmptyState title="열린 월드가 없습니다" />;
   else body = <WorldList worlds={worlds.data} loggedIn={loggedIn} />;
 
+  const noticeBoard = notices.isError ? (
+    <ErrorState title="공지를 불러오지 못했습니다" onRetry={() => void notices.refetch()} />
+  ) : notices.data && notices.data.length > 0 ? (
+    <NoticeBoard notices={notices.data} />
+  ) : null;
   return (
     <div className={styles.page}>
       <header className={styles.top}>
+        <span className={styles.brand}>오픈삼국</span>
         <h1 className={styles.title}>로비</h1>
         {me.data ? (
           loggedIn ? (
@@ -54,19 +61,28 @@ export function LobbyPage() {
           )
         ) : null}
       </header>
-      {notices.isError ? (
-        <ErrorState title="공지를 불러오지 못했습니다" onRetry={() => void notices.refetch()} />
-      ) : notices.data && notices.data.length > 0 ? (
-        <NoticeBoard notices={notices.data} />
-      ) : null}
-      {/* 지연 공개 지도 (T2-25, D-026). 지도 탭은 월드 카드와 따로 움직인다. */}
+      {/* 대표 그림과 한 줄 소개 (INT-20). 그림은 꾸밈이라 대체 글을 비운다. */}
+      <div className={styles.hero}>
+        <img className={styles.heroArt} src={keyartUrl} alt="" width={480} height={270} />
+        <div className={styles.heroText}>
+          <p className={styles.tagline}>천하를 한 장씩</p>
+          <p className={styles.caption}>
+            한 턴은 게임의 한 달입니다. 예턴 30칸을 미리 채워 두면 자리를 비워도 장수가 움직입니다.
+          </p>
+        </div>
+      </div>
+      {/* 지연 공개 지도 (T2-25, D-026). 월드 목록 위에 두고 지도 탭은 월드 카드와 따로 움직인다. */}
       <PublicMapTabs />
-      <section aria-labelledby="lobby-worlds" className={styles.worlds}>
-        <h2 id="lobby-worlds" className={styles.heading}>
-          월드
-        </h2>
-        {body}
-      </section>
+      {/* 공지가 있을 때만 월드 목록 옆 칸에 둔다. 없으면 월드 목록이 너비를 다 쓴다. */}
+      <div className={noticeBoard ? styles.layout : styles.single}>
+        <section aria-labelledby="lobby-worlds" className={styles.worlds}>
+          <h2 id="lobby-worlds" className={styles.heading}>
+            월드
+          </h2>
+          {body}
+        </section>
+        {noticeBoard ? <aside className={styles.side}>{noticeBoard}</aside> : null}
+      </div>
     </div>
   );
 }
@@ -146,7 +162,7 @@ function WorldAction({ world, loggedIn }: { world: LobbyWorld; loggedIn: boolean
   const action = lobbyAction(loggedIn, world);
   if (action.kind === 'enter')
     return (
-      <Link to="/w/$worldId" params={{ worldId: world.id }} className={styles.action}>
+      <Link to="/w/$worldId" params={{ worldId: world.id }} className={`${styles.action} ${styles.primary}`}>
         들어가기
       </Link>
     );

@@ -1,12 +1,37 @@
+/* 로그인·가입 (INT-20 한지 군략도). 양식은 한지 첩, 로그인에는 대표 그림을 단다. */
 .page {
-  max-width: 360px;
+  max-width: 520px;
   margin: 64px auto;
-  padding: 0 var(--space-4);
+  padding: var(--space-6);
+  background: var(--color-surface);
+  border: var(--frame);
+  box-shadow: var(--frame-inset), var(--shadow-step);
+}
+/* 꾸밈 현판. 제목이 아니라 글자 띠다. */
+.plaque {
+  display: inline-flex;
+  margin-bottom: var(--space-3);
+  padding: 6px 12px 5px;
+  font-family: var(--font-title);
+  font-size: var(--title-sm);
+  line-height: 1;
+  color: var(--color-accent-text);
+  background: var(--color-accent);
+  border: var(--frame);
+}
+.page h1,
+.formColumn h1 {
+  margin-bottom: var(--space-4);
+  font-size: var(--title-md);
+  line-height: 1.1;
 }
 .switch {
-  margin: var(--space-6) 0 0;
+  margin: var(--space-4) 0 0;
   font-size: var(--text-sm);
   color: var(--color-text-muted);
+}
+.switch + .switch {
+  margin-top: 0;
 }
 .switch a {
   display: inline-flex;
@@ -21,19 +46,65 @@
 }
 .withMap {
   display: grid;
-  grid-template-columns: 360px minmax(0, 640px);
+  grid-template-columns: minmax(0, 640px) minmax(320px, 420px);
+  grid-template-areas:
+    'art form'
+    'map form';
+  grid-template-rows: auto 1fr;
   justify-content: center;
   align-items: start;
-  gap: var(--space-8) 48px;
-  margin: 64px auto;
+  gap: var(--space-6);
+  margin: 48px auto;
   padding: 0 var(--space-4);
 }
 .formColumn {
+  grid-area: form;
+  min-width: 0;
+  padding: var(--space-6);
+  background: var(--color-surface);
+  border: var(--frame);
+  box-shadow: var(--frame-inset), var(--shadow-step);
+}
+.art {
+  grid-area: art;
+  min-width: 0;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: var(--frame);
+  box-shadow: var(--shadow-step);
+  background: var(--color-surface-muted);
+}
+.artImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+.map {
+  grid-area: map;
   min-width: 0;
 }
 @media (max-width: 640px) {
   .withMap {
     grid-template-columns: minmax(0, 1fr);
-    margin-top: var(--space-8);
+    grid-template-areas:
+      'art'
+      'form'
+      'map';
+    grid-template-rows: none;
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+  }
+  .art {
+    aspect-ratio: auto;
+    height: 120px;
+  }
+  .page {
+    margin: var(--space-6) var(--space-4);
+    padding: var(--space-4);
+  }
+  .formColumn {
+    padding: var(--space-4);
   }
 }

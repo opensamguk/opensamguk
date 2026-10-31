@@ -1,39 +1,83 @@
+/* 공통 상태 (INT-20): 빈 목록은 점선 한지, 오류는 주칠 테두리, 불러오는 중은 먹 점 세 개. */
 .empty,
 .error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
   padding: var(--space-6) var(--space-4);
   border-radius: var(--radius);
   text-align: center;
 }
 .empty {
-  border: 1px dashed var(--color-border-strong);
+  border: 2px dashed var(--color-text-muted);
+  background: var(--color-surface);
   color: var(--color-text-muted);
 }
 .error {
-  border: 1px solid var(--color-danger);
+  border: 2px solid var(--color-danger);
   color: var(--color-danger);
-  background: color-mix(in srgb, var(--color-danger) 6%, transparent);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-step);
+}
+.icon {
+  width: 32px;
+  height: 32px;
+  flex: none;
 }
 .title {
   margin: 0;
   font-weight: 600;
 }
 .body {
-  margin-top: var(--space-2);
   font-size: var(--text-sm);
 }
 .loading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   margin: 0;
   padding: var(--space-3) 0;
   color: var(--color-text-muted);
   font-size: var(--text-sm);
 }
+.dots {
+  display: inline-flex;
+  gap: 4px;
+}
+.dots > i {
+  width: 6px;
+  height: 6px;
+  background: var(--color-ink);
+  animation: blink 1.2s steps(1, end) infinite;
+}
+.dots > i:nth-child(2) {
+  opacity: 0.6;
+  animation-delay: 0.4s;
+}
+.dots > i:nth-child(3) {
+  opacity: 0.3;
+  animation-delay: 0.8s;
+}
+@keyframes blink {
+  50% {
+    background: var(--color-border);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dots > i {
+    animation: none;
+  }
+}
 .retry {
-  margin-top: var(--space-3);
   font: inherit;
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid currentColor;
+  font-weight: 500;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: var(--frame);
   border-radius: var(--radius);
-  background: transparent;
-  color: inherit;
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-button);
   cursor: pointer;
 }

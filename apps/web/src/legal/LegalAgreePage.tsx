@@ -188,7 +188,7 @@ export function LegalAgreePage() {
   }
 
   return (
-    <AccountFrame title="현재 문서 동의">
+    <AccountFrame title="현재 문서 동의" plaque="새 판에 동의">
       {pending ? <p role="status">계정과 현재 문서를 확인하고 있습니다…</p> : null}
       {error ? <p role="alert">{error}</p> : null}
       {!pending && !view ? (

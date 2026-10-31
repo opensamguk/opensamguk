@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useId, useRef, useState, type KeyboardEvent } from 'react';
+import mapIconUrl from '../art/icons/map.png';
 import { MapLegend, WorldMap } from '../main/WorldMap';
 import { useTRPC } from '../trpc';
 import { Tag } from '../ui/Tag';
@@ -74,30 +75,33 @@ export function PublicMapView({
 
   return (
     <section className={styles.area} data-testid="public-map" aria-label="공개 지도">
-      <div className={styles.tabs} role="tablist" aria-label="진행 중인 월드" onKeyDown={move}>
-        {worlds.map((world, i) => {
-          const selected = i === index;
-          return (
-            <button
-              key={world.id}
-              ref={(node) => {
-                if (node) tabRefs.current.set(world.id, node);
-                else tabRefs.current.delete(world.id);
-              }}
-              type="button"
-              role="tab"
-              id={tabId(i)}
-              className={styles.tab}
-              aria-selected={selected}
-              aria-controls={panelId}
-              tabIndex={selected ? 0 : -1}
-              onClick={() => setChosenId(world.id)}
-            >
-              {world.name}
-              {world.status === 'PAUSED' ? <Tag tone="muted">멈춤</Tag> : null}
-            </button>
-          );
-        })}
+      <div className={styles.tabRow}>
+        <img className={styles.icon} src={mapIconUrl} alt="" width={32} height={32} />
+        <div className={styles.tabs} role="tablist" aria-label="진행 중인 월드" onKeyDown={move}>
+          {worlds.map((world, i) => {
+            const selected = i === index;
+            return (
+              <button
+                key={world.id}
+                ref={(node) => {
+                  if (node) tabRefs.current.set(world.id, node);
+                  else tabRefs.current.delete(world.id);
+                }}
+                type="button"
+                role="tab"
+                id={tabId(i)}
+                className={styles.tab}
+                aria-selected={selected}
+                aria-controls={panelId}
+                tabIndex={selected ? 0 : -1}
+                onClick={() => setChosenId(world.id)}
+              >
+                {world.name}
+                {world.status === 'PAUSED' ? <Tag tone="muted">멈춤</Tag> : null}
+              </button>
+            );
+          })}
+        </div>
       </div>
       <div
         className={styles.panel}

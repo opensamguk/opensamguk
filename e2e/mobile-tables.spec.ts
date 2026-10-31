@@ -187,7 +187,7 @@ test('T3-10 정식191년 도시·국가·월간 순위 표의 모든 값·정렬
       )
       .toBe(1);
     await new TurnLoop(hold.db, hold.lease).advanceTo(0);
-    await expect(page.getByRole('heading', { name: '메인', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '군략도', exact: true })).toBeVisible();
     const first = await hold.db.general.findFirstOrThrow({ where: { worldId: ownWorld, user: { email: ownEmail } } });
     const reservation = await page.request.post('/trpc/turns.set', {
       headers: { Origin: new URL(page.url()).origin },

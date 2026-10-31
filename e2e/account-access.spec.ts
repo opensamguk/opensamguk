@@ -256,7 +256,7 @@ scenario(
         .toBe(1);
       expect(hold.lost).toBeUndefined();
       await new TurnLoop(hold.db, hold.lease).advanceTo(0);
-      await expect(page.getByRole('heading', { name: '메인', exact: true })).toBeVisible();
+      await expect(page.getByRole('heading', { name: '군략도', exact: true })).toBeVisible();
       const main = `/w/${worldId}?city=40`;
       await page.goto(main);
       await expect(page.getByRole('link', { name: '내 계정', exact: true })).toBeVisible();

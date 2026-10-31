@@ -77,7 +77,7 @@ export function MainPage() {
   return (
     <section className={styles.page} ref={page}>
       <header className={styles.header}>
-        <h1 className={styles.h1}>메인</h1>
+        <h1 className={styles.h1}>군략도</h1>
         {summary.data ? (
           <p className={styles.progress} aria-label="게임 진행 정보">
             <span>

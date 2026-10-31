@@ -1,35 +1,129 @@
+/* 로비: 먹 띠, 대표 그림, 월드 첩과 방(榜) (INT-20 한지 군략도). */
 .page {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: var(--space-6) var(--space-4) var(--space-8);
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  min-height: 100vh;
 }
 .top {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  min-height: var(--topbar-height);
+  padding: var(--space-1) var(--space-4);
+  background: var(--color-banner);
+  color: var(--color-banner-text);
+  border-bottom: 4px solid var(--color-accent);
+}
+/* 이름표는 금빛 제목 글꼴, 화면 제목은 그 옆에 작게 둔다. */
+.brand {
+  font-family: var(--font-title);
+  font-size: var(--title-md);
+  line-height: 1;
+  color: var(--color-banner-gold);
 }
 .title {
-  margin: 0;
-  font-size: var(--text-2xl);
+  margin: 0 auto 0 0;
+  font-size: var(--title-sm);
+  line-height: 1;
+  color: var(--color-banner-text);
 }
 .account {
-  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 var(--space-3);
   font: inherit;
   font-size: var(--text-sm);
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--color-border-strong);
+  border: 2px solid var(--color-banner-text);
   border-radius: var(--radius);
   background: transparent;
-  color: var(--color-text-muted);
+  color: var(--color-banner-text);
   text-decoration: none;
   cursor: pointer;
 }
+.account:disabled {
+  border-style: dashed;
+  cursor: progress;
+}
+.hero {
+  position: relative;
+  height: 300px;
+  overflow: hidden;
+  border-bottom: 4px solid var(--color-ink);
+  background: var(--color-surface-muted);
+}
+.heroArt {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 60%;
+  image-rendering: pixelated;
+}
+.heroText {
+  position: absolute;
+  left: 48px;
+  right: var(--space-4);
+  bottom: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+.tagline {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--title-lg);
+  line-height: 1;
+  color: var(--color-text);
+  text-shadow:
+    0 0 1px var(--color-bg),
+    2px 2px 0 var(--color-bg);
+}
+.caption {
+  max-width: 640px;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-md);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: var(--frame);
+  box-shadow: var(--frame-inset);
+}
+.single {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  align-items: start;
+  gap: var(--space-6);
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-6) var(--space-8);
+}
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+/* 절 제목은 주칠 현판으로 단다. */
 .heading {
-  margin: 0 0 var(--space-2);
-  font-size: var(--text-lg);
+  align-self: flex-start;
+  margin: 0 0 var(--space-3);
+  padding: 6px 12px 5px;
+  font-size: var(--title-sm);
+  line-height: 1;
+  color: var(--color-accent-text);
+  background: var(--color-accent);
+  border: var(--frame);
 }
 .muted {
   color: var(--color-text-muted);
@@ -38,6 +132,7 @@
 .worlds {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 .noticeList,
 .cards {
@@ -48,9 +143,10 @@
   flex-direction: column;
 }
 .noticeList {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  padding: var(--space-1);
   background: var(--color-surface);
+  border: var(--frame);
+  box-shadow: var(--frame-inset), var(--shadow-step);
 }
 .notice + .notice {
   border-top: 1px solid var(--color-border);
@@ -72,23 +168,30 @@
 .noticeHead[aria-expanded='true'] {
   font-weight: 600;
 }
+.noticeHead time {
+  flex: none;
+  font-family: var(--font-pixel);
+  font-size: var(--text-xs);
+}
 .noticeBody {
   margin: 0;
   padding: 0 var(--space-3) var(--space-3);
   font-size: var(--text-sm);
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .cards {
-  gap: var(--space-3);
+  gap: var(--space-4);
 }
 .card {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  padding: var(--space-4);
   background: var(--color-surface);
+  border: var(--frame);
+  box-shadow: var(--frame-inset), var(--shadow-step);
+  min-width: 0;
 }
 .cardHead {
   display: flex;
@@ -101,11 +204,17 @@
   color: var(--color-text-muted);
 }
 .name {
+  order: -1;
+  flex-basis: 100%;
   margin: 0;
-  font-size: var(--text-lg);
+  font-size: var(--title-md);
+  line-height: 1.1;
+  overflow-wrap: anywhere;
 }
 .meta {
   margin: 0;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
   font-size: var(--text-sm);
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
@@ -120,11 +229,46 @@
 .action {
   display: inline-flex;
   align-items: center;
-  min-height: 36px;
-  padding: var(--space-1) var(--space-4);
+  justify-content: center;
+  min-width: 140px;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: var(--frame);
   border-radius: var(--radius);
-  background: var(--color-accent);
-  color: var(--color-accent-text);
+  box-shadow: var(--shadow-button);
+  background: var(--color-surface);
+  color: var(--color-text);
   font-weight: 600;
   text-decoration: none;
+}
+.primary {
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+}
+
+@media (max-width: 767px) {
+  .hero {
+    height: 200px;
+  }
+  .heroText {
+    left: var(--space-4);
+    bottom: var(--space-3);
+  }
+  .tagline {
+    font-size: var(--title-md);
+  }
+  .caption {
+    font-size: var(--text-sm);
+  }
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-6);
+    padding: var(--space-4) var(--space-4) var(--space-8);
+  }
+  .name {
+    font-size: var(--title-sm);
+  }
+  .action {
+    min-width: 44px;
+  }
 }

@@ -1,12 +1,13 @@
 import type { PublicGeography } from '@opensamguk/shared';
-import { useEffect, useId, useRef, useState, type PointerEvent } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type PointerEvent } from 'react';
 import type { MapCity, MapNation } from '../game/types';
 import { readableTextColor } from '../ui/color';
-import reliefUrl from '../mapEditor/geodata/natural-earth-relief.webp';
-import cityIcon from '../mapEditor/icons/city.png';
-import passIcon from '../mapEditor/icons/pass.png';
-import portIcon from '../mapEditor/icons/port.png';
-import fieldIcon from '../mapEditor/icons/field.png';
+import { FlagMaskDef, MapSiteMarker } from './MapSiteMarker';
+import { RoadPixelLayer, WaterLaneLayer } from './RoadPixelLayer';
+import { TerrainTileLayer, useTerrainGrid } from './TerrainTileLayer';
+import { showTiles, waterLanes } from './terrainTiles';
+import { ROAD_CELL, passNeighbours } from './roadPixels';
+import { markerUnits, passAxis } from './siteMarkers';
 import { basemapForOperationalMap } from './operationalGeography';
 import { mapTapTargets, tapCandidates, type MapView } from './mapTapTargets';
 import styles from './OperationalWorldMap.module.css';
@@ -15,11 +16,12 @@ type MapData = PublicGeography;
 type DrawnCity = Pick<MapCity, 'key' | 'name' | 'kind' | 'x' | 'y' | 'nationId'> & {
   supplied?: boolean;
   recorded?: boolean;
+  level?: number;
 };
 type View = MapView;
-const icons = { CITY: cityIcon, PASS: passIcon, PORT: portIcon, FIELD: fieldIcon };
 const labels = { CITY: '도시', PASS: '관문', PORT: '항구 시설', FIELD: '전장 표시' };
-const neutral = '#d6d0c4';
+// 가장 깊이 확대한 보기 너비(지도 단위). 이때 지형 칸은 화면 너비의 1/30쯤이라 타일 그림이 보인다.
+const MIN_VIEW_WIDTH = 60;
 const clamp = (view: View, canvas: MapData['canvas']): View => ({
   ...view,
   x: Math.max(0, Math.min(canvas.width - view.width, view.x)),
@@ -101,6 +103,20 @@ export function OperationalWorldMap({
   const firstChoice = useRef<HTMLButtonElement>(null);
   const choiceOrigin = useRef<SVGElement | null>(null);
   const validGeography = matchesOperationalGeography(map, cities);
+  const grid = useTerrainGrid(basemap?.pixels, basemap?.palette);
+  const lanes = useMemo(() => (grid ? waterLanes(map, grid) : []), [grid, map]);
+  const laneIds = useMemo(() => new Set(lanes.map((lane) => lane.id)), [lanes]);
+  // 길은 표식 가장자리의 문으로 드나든다. 문 칸은 표식 반지름만큼 떨어진다.
+  const gateCells = useMemo(() => {
+    const levels = new Map(cities.map((city) => [city.key, city.level]));
+    const cells = new Map(
+      map.sites.map((site) => {
+        const level = site.kind === 'CITY' && site.anchorKey !== undefined ? levels.get(site.anchorKey) : undefined;
+        return [site.id, Math.ceil(markerUnits(site.kind, level) / 2 / ROAD_CELL)];
+      }),
+    );
+    return (siteId: string) => cells.get(siteId) ?? 0;
+  }, [cities, map]);
   const canSelect = Boolean(onSelect);
   useEffect(() => {
     const element = svg.current;
@@ -134,7 +150,9 @@ export function OperationalWorldMap({
     if (active && svg.current?.hasPointerCapture?.(active.pointerId))
       svg.current.releasePointerCapture(active.pointerId);
   }, [layout.mobile]);
-  const arrowId = `operational-arrow-${useId().replaceAll(':', '')}`;
+  const uid = useId().replaceAll(':', '');
+  const arrowId = `operational-arrow-${uid}`;
+  const flagMaskId = `operational-flag-${uid}`;
   const selectedCity = cities.find((city) => city.key === selectedKey);
   const selectedX = selectedCity?.x;
   const selectedY = selectedCity?.y;
@@ -150,9 +168,28 @@ export function OperationalWorldMap({
   const cityByKey = new Map(cities.map((city) => [city.key, city]));
   const nationById = new Map(nations.map((nation) => [nation.id, nation]));
   const siteById = new Map(map.sites.map((site) => [site.id, site]));
+  // 항구는 켜진 물길이 타고 내리는 자리일 때만 그린다. 물길이 없는 판(SAN10)의 항구 시설은 숨긴다.
+  const usedPorts = new Set(
+    map.routes.flatMap((route) => (route.enabled && route.mode === 'RIVER' ? (route.portIds ?? []) : [])),
+  );
+  const drawnSites = map.sites.filter((site) => site.kind !== 'PORT' || usedPorts.has(site.id));
   const anchors = map.sites.filter((site) => site.kind === 'CITY' || site.kind === 'PASS');
   const tapTargets = layout.mobile && onSelect ? mapTapTargets(cities, view, layout) : [];
   const targetByKey = new Map(tapTargets.map((target) => [target.key, target]));
+  // 화면 px / 지도 단위. 크기를 아직 못 읽었으면 0이고 표식은 네모로 줄인다.
+  const pixelsPerUnit =
+    layout.width > 0 && layout.height > 0 ? Math.min(layout.width / view.width, layout.height / view.height) : 0;
+  // 지도 요소의 화면 비율이 보기와 다르면 viewBox 바깥도 가운데 맞춤으로 보인다. 타일은 실제로 보이는 범위에 깐다.
+  const shown = pixelsPerUnit
+    ? {
+        x: view.x - (layout.width / pixelsPerUnit - view.width) / 2,
+        y: view.y - (layout.height / pixelsPerUnit - view.height) / 2,
+        width: layout.width / pixelsPerUnit,
+        height: layout.height / pixelsPerUnit,
+      }
+    : view;
+  // 이름표 글자는 7단위다. 화면에서 14px보다 커지지 않게 줄인다.
+  const labelScale = pixelsPerUnit > 2 ? 2 / pixelsPerUnit : 1;
   const closeChoices = (restoreFocus: boolean) => {
     setChoices([]);
     if (restoreFocus) {
@@ -163,7 +200,7 @@ export function OperationalWorldMap({
   };
   const zoom = (factor: number) =>
     setView((old) => {
-      const width = Math.min(whole.width, Math.max(200, old.width / factor));
+      const width = Math.min(whole.width, Math.max(MIN_VIEW_WIDTH, old.width / factor));
       const height = width * ratio;
       return clampView({ x: old.x + (old.width - width) / 2, y: old.y + (old.height - height) / 2, width, height });
     });
@@ -227,7 +264,12 @@ export function OperationalWorldMap({
     >
       <div className={styles.controls}>
         <div className={styles.zoom} role="group" aria-label="지도 배율">
-          <button type="button" aria-label="지도 확대" disabled={view.width <= 200} onClick={() => zoom(1.5)}>
+          <button
+            type="button"
+            aria-label="지도 확대"
+            disabled={view.width <= MIN_VIEW_WIDTH}
+            onClick={() => zoom(1.5)}
+          >
             확대
           </button>
           <button
@@ -345,41 +387,35 @@ export function OperationalWorldMap({
           >
             <path d="M0 0L10 5L0 10" fill="context-stroke" />
           </marker>
+          <FlagMaskDef id={flagMaskId} />
         </defs>
-        <rect width={canvas.width} height={canvas.height} fill="#d5e5e7" />
+        <rect width={canvas.width} height={canvas.height} fill="#2b4a6b" />
         <g aria-hidden="true" pointerEvents="none" data-testid="geographic-basemap">
-          {basemap.relief && (
-            <image
-              href={reliefUrl}
-              width="1000"
-              height="700"
-              preserveAspectRatio="none"
-              data-testid="geographic-relief"
-            />
-          )}
-          {basemap.land.map((d, i) => (
-            <path
-              key={`land-${i}`}
-              d={d}
-              fill={basemap.relief ? 'none' : '#c8d0b5'}
-              stroke="#8e9c8d"
-              strokeWidth=".4"
-              fillRule="evenodd"
-            />
-          ))}
-          {basemap.lakes.map((d, i) => (
-            <path key={`lake-${i}`} d={d} fill="#a9c9d2" stroke="#8ab0bc" strokeWidth=".3" fillRule="evenodd" />
-          ))}
-          {basemap.rivers.map((river, i) => (
-            <path
-              key={`river-${i}`}
-              d={river.path}
-              fill="none"
-              stroke="#6d9dad"
-              strokeWidth={river.rank <= 3 ? 1.15 : 0.55}
-            />
-          ))}
+          <image
+            href={basemap.pixels}
+            width={canvas.width}
+            height={canvas.height}
+            preserveAspectRatio="none"
+            style={{ imageRendering: 'pixelated' }}
+            data-testid="geographic-relief"
+          />
         </g>
+        {grid && showTiles(pixelsPerUnit) && (
+          <TerrainTileLayer
+            grid={grid}
+            map={map}
+            skip={laneIds}
+            gateCells={gateCells}
+            view={shown}
+            idPrefix={`operational-terrain-${uid}`}
+          />
+        )}
+        <RoadPixelLayer
+          map={map}
+          skip={laneIds}
+          modes={grid && showTiles(pixelsPerUnit) ? ['FORD', 'RIVER'] : undefined}
+        />
+        <WaterLaneLayer lanes={lanes} />
         <g aria-hidden="true" pointerEvents="none">
           {map.routes
             .filter((route) => route.enabled)
@@ -397,14 +433,14 @@ export function OperationalWorldMap({
                 <polyline
                   key={route.id}
                   data-route-mode={route.mode}
-                  className={`${styles.route} ${styles[route.mode.toLowerCase()] ?? ''}`}
+                  className={`${styles.route} ${route.direction === 'FORWARD' ? styles.oneWay : ''}`}
                   points={points.map((point) => `${point!.x},${point!.y}`).join(' ')}
                   markerEnd={route.direction === 'FORWARD' ? `url(#${arrowId})` : undefined}
                 />
               );
             })}
         </g>
-        {map.sites.map((site) => {
+        {drawnSites.map((site) => {
           const city = site.anchorKey === undefined ? undefined : cityByKey.get(site.anchorKey);
           const nation = city?.nationId == null ? undefined : nationById.get(city.nationId);
           const mine = city?.key === myCityKey;
@@ -422,6 +458,7 @@ export function OperationalWorldMap({
             .join(', ');
           const action = city && onSelect ? () => choose(city.key) : undefined;
           const target = city ? targetByKey.get(city.key) : undefined;
+          const radius = markerUnits(site.kind, site.kind === 'CITY' ? city?.level : undefined) / 2;
           return (
             <g
               key={site.id}
@@ -468,45 +505,41 @@ export function OperationalWorldMap({
                   pointerEvents="all"
                 />
               ) : null}
-              {city && (
-                <circle
-                  className={styles.nation}
-                  cx={site.position.x}
-                  cy={site.position.y}
-                  r={13}
-                  style={{
-                    fill: city.recorded === false ? 'none' : (nation?.color ?? neutral),
-                    strokeDasharray: city.recorded === false ? '3 2' : undefined,
-                  }}
-                />
+              {city?.recorded === false && (
+                <circle className={styles.unrecorded} cx={site.position.x} cy={site.position.y} r={radius + 2} />
               )}
-              {mine && <circle cx={site.position.x} cy={site.position.y} r={18} className={styles.mine} />}
-              {selected && <circle cx={site.position.x} cy={site.position.y} r={16} className={styles.selected} />}
-              <image
-                data-testid={`site-icon-${site.kind.toLowerCase()}`}
-                href={icons[site.kind]}
-                x={site.position.x - 8}
-                y={site.position.y - 8}
-                width="16"
-                height="16"
-                className={styles.icon}
-              />
-              <rect
-                x={site.position.x - (Array.from(site.name).length * 6 + 5) / 2}
-                y={site.position.y + 14}
-                width={Array.from(site.name).length * 6 + 5}
-                height="11"
-                rx="1"
-                fill={nation?.color ?? '#eee8d7'}
-              />
-              <text
-                x={site.position.x}
-                y={site.position.y + 22}
-                className={styles.label}
-                fill={nation ? readableTextColor(nation.color) : '#282d29'}
-              >
-                {site.name}
-              </text>
+              {action && (
+                <circle className={styles.focusRing} cx={site.position.x} cy={site.position.y} r={radius + 3} />
+              )}
+              {mine && <circle cx={site.position.x} cy={site.position.y} r={radius + 6} className={styles.mine} />}
+              {selected && (
+                <circle cx={site.position.x} cy={site.position.y} r={radius + 4} className={styles.selected} />
+              )}
+              <g data-testid={`site-icon-${site.kind.toLowerCase()}`}>
+                <MapSiteMarker
+                  x={site.position.x}
+                  y={site.position.y}
+                  kind={site.kind}
+                  level={site.kind === 'CITY' ? city?.level : undefined}
+                  axis={site.kind === 'PASS' ? passAxis(site.position, passNeighbours(site.id, map)) : undefined}
+                  color={city && city.recorded !== false ? (nation?.color ?? null) : null}
+                  pixelsPerUnit={pixelsPerUnit}
+                  flagMaskId={flagMaskId}
+                />
+              </g>
+              <g transform={`translate(${site.position.x} ${site.position.y + radius + 2}) scale(${labelScale})`}>
+                <rect
+                  x={-(Array.from(site.name).length * 6 + 5) / 2}
+                  y={0}
+                  width={Array.from(site.name).length * 6 + 5}
+                  height="11"
+                  rx="1"
+                  fill={nation?.color ?? '#eee8d7'}
+                />
+                <text x={0} y={8} className={styles.label} fill={nation ? readableTextColor(nation.color) : '#282d29'}>
+                  {site.name}
+                </text>
+              </g>
             </g>
           );
         })}

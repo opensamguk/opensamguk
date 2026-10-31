@@ -19,6 +19,7 @@ import {
   type StatValues,
 } from './createForm';
 import styles from './CreateGeneralPage.module.css';
+import { stepStat, summarizeStats } from './statSummary';
 
 const EVEN: StatValues = { leadership: '55', strength: '55', intel: '55', politics: '55', charm: '55' };
 
@@ -135,7 +136,13 @@ function CreateGeneral({ worldId }: { worldId: string }) {
 
   return (
     <section className={styles.page}>
-      <h1>장수 생성</h1>
+      <div className={styles.intro}>
+        <span className={styles.plaque}>출사표</span>
+        <h1>장수 생성</h1>
+        <p className={styles.lead}>
+          이름과 초상, 능력치를 정해 이 월드의 내 장수를 만듭니다. 한 월드에 장수는 하나입니다.
+        </p>
+      </div>
       {body}
     </section>
   );
@@ -187,6 +194,8 @@ function CreateForm({
   const check = checkCreation(name, stats, rules);
   const problemsId = useId();
   const nameId = useId();
+  const statId = useId();
+  const summary = summarizeStats(stats, rules);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -239,21 +248,52 @@ function CreateForm({
         <legend>
           능력치 (합계 {rules.total}, 각각 {rules.min}~{rules.max})
         </legend>
-        {(rules.count === 5 ? FIVE_STATS : STATS).map((stat) => (
-          <label key={stat.key} className={styles.stat}>
-            <span>{stat.label}</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              className={`${styles.input} num`}
-              min={rules.min}
-              max={rules.max}
-              step={1}
-              value={stats[stat.key] ?? ''}
-              onChange={(e) => setStats((prev) => ({ ...prev, [stat.key as StatKey]: e.target.value }))}
-            />
-          </label>
-        ))}
+        {(rules.count === 5 ? FIVE_STATS : STATS).map((stat) => {
+          // 숫자 칸이 기준이다. −/+는 칸 값을 한 칸씩 옮기기만 한다.
+          const down = stepStat(stats[stat.key], -1, rules, check.remaining);
+          const up = stepStat(stats[stat.key], 1, rules, check.remaining);
+          const set = (value: string) => setStats((prev) => ({ ...prev, [stat.key as StatKey]: value }));
+          return (
+            <div key={stat.key} className={styles.stat}>
+              <label htmlFor={`${statId}-${stat.key}`}>{stat.label}</label>
+              <div className={styles.stepper}>
+                <button
+                  type="button"
+                  className={styles.step}
+                  aria-label={`${stat.label} 줄이기`}
+                  disabled={down === null}
+                  onClick={() => {
+                    if (down !== null) set(down);
+                  }}
+                >
+                  −
+                </button>
+                <input
+                  id={`${statId}-${stat.key}`}
+                  type="number"
+                  inputMode="numeric"
+                  className={`${styles.input} num`}
+                  min={rules.min}
+                  max={rules.max}
+                  step={1}
+                  value={stats[stat.key] ?? ''}
+                  onChange={(e) => set(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className={styles.step}
+                  aria-label={`${stat.label} 늘리기`}
+                  disabled={up === null}
+                  onClick={() => {
+                    if (up !== null) set(up);
+                  }}
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          );
+        })}
         <p className={styles.remaining} aria-live="polite" data-testid="remaining">
           남은 점수 <strong className="num">{check.remaining}</strong>
         </p>
@@ -327,6 +367,20 @@ function CreateForm({
           )}
         </div>
       ) : null}
+
+      <aside className={styles.summary} aria-labelledby={`${statId}-summary`}>
+        <span id={`${statId}-summary`} className={styles.plaque}>
+          이 장수는
+        </span>
+        {summary ? (
+          <>
+            <p>{summary.strong}</p>
+            {summary.caution ? <p className={styles.muted}>{summary.caution}</p> : null}
+          </>
+        ) : (
+          <p className={styles.muted}>능력치를 모두 정수로 넣으면 이 장수의 강점을 보입니다.</p>
+        )}
+      </aside>
 
       <div className={styles.actions}>
         {create.isPending ? (

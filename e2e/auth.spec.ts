@@ -19,7 +19,7 @@ test('가입 → 메인 → 로그아웃 → 로그인 → 메인', async ({ pag
   await fill(page, email, TEST_PASSWORD);
   await page.getByRole('button', { name: '가입하기' }).click();
   await expect(page).toHaveURL('/w/1');
-  await expect(page.getByRole('heading', { level: 1, name: '메인' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: '군략도' })).toBeVisible();
 
   await page.getByRole('button', { name: '로그아웃' }).click();
   await expect(page).toHaveURL('/login');
@@ -29,7 +29,7 @@ test('가입 → 메인 → 로그아웃 → 로그인 → 메인', async ({ pag
   await fill(page, email, TEST_PASSWORD);
   await page.getByRole('button', { name: '로그인' }).click();
   await expect(page).toHaveURL('/w/1');
-  await expect(page.getByRole('heading', { level: 1, name: '메인' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: '군략도' })).toBeVisible();
 });
 
 test('틀린 비밀번호는 안내한다', async ({ page }) => {
@@ -113,7 +113,7 @@ test('비밀번호 보이기 토글', async ({ page }) => {
 test('다른 탭에서 로그아웃하면 이 탭의 다음 이동도 로그인으로 간다', async ({ page, context }) => {
   await createAccount(page);
   await page.goto('/w/1');
-  await expect(page.getByRole('heading', { level: 1, name: '메인' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: '군략도' })).toBeVisible();
 
   const other = await context.newPage();
   await other.goto('/w/1');
@@ -140,7 +140,7 @@ test('세션이 서버에서 없어지면 다음 이동은 로그인으로 간�
   const [, recent] = await Promise.all([page.goto('/w/1'), recentReady]);
   const finishedError = await recent.finished();
   if (finishedError) throw finishedError;
-  await expect(page.getByRole('heading', { level: 1, name: '메인' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: '군략도' })).toBeVisible();
   await page.context().clearCookies();
   // 예턴은 같은 메인의 영역 이동이므로 실제 페이지 이동인 기록으로 가드를 확인한다.
   await page.getByRole('link', { name: '기록', exact: true }).click();

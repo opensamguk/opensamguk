@@ -65,7 +65,7 @@ const contracts = {
     selection: { ...san10Selection, scenarioKey: 'san10-191' },
     startYear: 191,
     nations: 21,
-    counts: { cities: 144, gates: 8, ports: 6, fields: 1, anchors: 152 },
+    counts: { cities: 144, gates: 8, ports: 0, fields: 1, anchors: 152 },
     presets: presetKeys,
     suggestedEndYear: 201,
   },
@@ -75,7 +75,7 @@ const contracts = {
     selection: { ...san10Selection, scenarioKey: 'san10-empty' },
     startYear: 180,
     nations: 0,
-    counts: { cities: 144, gates: 8, ports: 6, fields: 1, anchors: 152 },
+    counts: { cities: 144, gates: 8, ports: 0, fields: 1, anchors: 152 },
     presets: ['empty'],
     suggestedEndYear: 190,
   },
@@ -185,7 +185,7 @@ export function creationProfile(
       throw new Error();
     if (
       profile.selection.mapKey === 'san10' &&
-      (map.sites.length !== 159 ||
+      (map.sites.length !== 153 ||
         map.routes.length !== 200 ||
         map.routes.some((route) => !route.enabled || route.direction !== 'BOTH') ||
         map.canvas.width !== 1400 ||
@@ -247,7 +247,7 @@ export function creationProfile(
       nations: scenario.nation.length,
       generals: scenario.general.length,
       ...profile.counts,
-      ...(profile.selection.mapKey === 'san10' ? { markers: 159, roads: 200 } : {}),
+      ...(profile.selection.mapKey === 'san10' ? { markers: 153, roads: 200 } : {}),
     },
     resources: refs.map((ref) => ({
       kind: ref.kind,

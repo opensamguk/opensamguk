@@ -205,10 +205,10 @@ scenario('T3-06 AC-M3-04 정식 두 월드 제재·403·30칸 초안·해제·6�
     await page.keyboard.press('Enter');
     await expect(notice).toBeVisible();
     await peer.page.goto(`/w/${worldId}`);
-    await expect(peer.page.getByRole('heading', { name: '메인', exact: true })).toBeVisible();
+    await expect(peer.page.getByRole('heading', { name: '군략도', exact: true })).toBeVisible();
     await expect(peer.page.getByRole('status', { name: '이 월드의 이용 제한' })).toHaveCount(0);
     await page.goto(`/w/${otherId}`);
-    await expect(page.getByRole('heading', { name: '메인', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '군략도', exact: true })).toBeVisible();
     await expect(notice).toHaveCount(0);
     await page.goto(`/w/${worldId}`);
     await expect(notice).toBeVisible();
@@ -298,7 +298,7 @@ scenario(
         if (event.eventName === 'ready') readyEvents++;
       });
       await page.goto(`/w/${worldId}`);
-      await expect(page.getByRole('heading', { name: '메인', exact: true })).toBeVisible();
+      await expect(page.getByRole('heading', { name: '군략도', exact: true })).toBeVisible();
       const guardFetching = () =>
         page.evaluate(async (moduleUrl) => {
           const { queryClient, trpc } = await import(moduleUrl);
@@ -541,7 +541,7 @@ for (const boundary of ['focus', 'route'] as const) {
           ),
         ).toBe(false);
         await expect(
-          page.getByRole('heading', { name: boundary === 'focus' ? '메인' : '전투 시뮬레이터', exact: true }),
+          page.getByRole('heading', { name: boundary === 'focus' ? '군략도' : '전투 시뮬레이터', exact: true }),
         ).toBeVisible();
       }, [
         async () => {

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getRouteApi, Link } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
+import messagesIconUrl from '../art/icons/messages.png';
 import { describeFailure, retryAfterSeconds } from '../auth/credentials';
 import form from '../auth/AuthForm.module.css';
 import { useTRPC } from '../trpc';
@@ -103,7 +104,7 @@ export function VerifyEmailPage() {
       <VerificationRequest email={account.data.email} />
     );
   return (
-    <AccountFrame title="이메일 인증" privateLink>
+    <AccountFrame title="이메일 인증" privateLink plaque="메일 인증" icon={messagesIconUrl}>
       {body}
       {(accountToken.kind === 'token' && mutation.isSuccess) ||
       (accountToken.kind === 'missing' && account.data?.emailVerified) ? (

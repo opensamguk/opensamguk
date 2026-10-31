@@ -1,0 +1,756 @@
+{
+  "decision": "D-047",
+  "task": "INT-20",
+  "generator": "Codex built-in image_gen (imagegen skill, codex exec), 2026-10-30",
+  "input": "텍스트 프롬프트만. 참조·입력 이미지 없음. 게임 제목·회사·작가 이름을 넣지 않았다.",
+  "license": "생성 서비스 약관 확인 결과는 docs/product/decisions.md D-047에 적는다.",
+  "build": "python3 tools/pixel-assets/build.py <원본 폴더>",
+  "originals": [
+    {
+      "file": "icons-a.png",
+      "sha256": "44654b37a3c4045a925d517621cc866aa9f8caf9134374af560e3f2a8480b7f3",
+      "size": [1254, 1254],
+      "prompt": "A sprite sheet of 8 pixel-art game icons arranged in a 4 by 2 grid, every icon centered in its own equal cell with wide empty margins between icons. Style: 1990s PC strategy game pixel art, each icon drawn on a 32 by 32 pixel grid and scaled up with hard square pixels, no anti-aliasing, 1-pixel dark ink outline (#231f1a), limited palette of hanji ivory #f6efdd, ink black #231f1a, vermilion lacquer red #9e2b1e, celadon green #3f7f6e, antique gold #b8913a, indigo #2b3a55, warm brown #7d6c4f, pale stone gray #b9b2a5. Flat solid pure magenta #FF00FF background everywhere outside the icons, no shadows on the background, no gradients. Top row left to right: a bundle of golden rice sheaves with a farming hoe; two crossed halberds; an unrolled bamboo strategy scroll with a calligraphy brush and a small flame; a traveler's straw sandal with a cloth bundle. Bottom row left to right: a square red official seal stamp on a cord; a castle gate tower with a curved tiled roof; a fanned stack of bamboo slips tied with cord; a rolled paper map with a red ribbon. Square canvas, 1024x1024 pixels or the closest square size. No text, letters, numbers, signatures or watermarks. No human faces. Any scrolls, maps and seal surfaces must be blank."
+    },
+    {
+      "file": "icons-b.png",
+      "sha256": "6ab09f512c0ee4b3240c363eb5c4252485e573c8921463fb52fd73a8cf8b201c",
+      "size": [1254, 1254],
+      "prompt": "A sprite sheet of 8 pixel-art game icons arranged in a 4 by 2 grid, every icon centered in its own equal cell with wide empty margins between icons. Style: 1990s PC strategy game pixel art, each icon drawn on a 32 by 32 pixel grid and scaled up with hard square pixels, no anti-aliasing, 1-pixel dark ink outline (#231f1a), limited palette of hanji ivory #f6efdd, ink black #231f1a, vermilion lacquer red #9e2b1e, celadon green #3f7f6e, antique gold #b8913a, indigo #2b3a55, warm brown #7d6c4f, pale stone gray #b9b2a5. Flat solid pure magenta #FF00FF background everywhere outside the icons, no shadows on the background, no gradients. Top row left to right: an envoy's split jade tally with a tassel; a tall military war banner on a pole; a thread-bound old book; a golden medallion plaque with a red ribbon. Bottom row left to right: two crossed swords over a small sand table; a soldier's helmet with a red plume; a hanging paper lantern; a folded letter sealed with red wax. Square canvas, 1024x1024 pixels or the closest square size. No text, letters, numbers, signatures or watermarks. No human faces. Any tally, banner, book, plaque, lantern and letter surfaces must be blank."
+    },
+    {
+      "file": "keyart.png",
+      "sha256": "226cfeeee38b099f9d94ad2ad6c4fe6a2fe4cbe36093fa5c1db4a9574cdbad2e",
+      "size": [1672, 941],
+      "prompt": "Wide pixel-art landscape for a strategy game title screen. Style: 1990s PC game pixel art with hard square pixels and a limited palette inspired by traditional blue-green landscape painting: layered jade and celadon mountains, drifting mist bands, a winding river valley, a distant walled city on a plateau with a vermilion gate tower and several small banners in different solid colors, pine trees on cliffs in the foreground, warm hanji-ivory dusk sky with soft ink clouds. Calm, wide composition with empty sky in the upper third. No people, no faces, no text. Wide 16:9 canvas, 1536x864 pixels or the closest wide size. No letters, numbers, signatures or watermarks. Banners must be plain solid colors with no markings."
+    },
+    {
+      "file": "flags.png",
+      "sha256": "b4a4dd9a6cff8b54f6811f4e9849df49517c136f8f70f1efe7c89607e86b0e43",
+      "size": [1774, 887],
+      "prompt": "A sprite sheet of 2 pixel-art military banners in the style of ancient Chinese warring-states army standards, arranged in a 2 by 1 row, each centered in its own equal square cell with wide empty margins. Left: a tall vertical rectangular war banner hanging from a dark wooden pole with a gilded spear-tip finial and a red tassel, the cloth has a serrated flame-tooth border trim in dark ink and antique gold. Right: a smaller square pennant banner on a short pole with the same serrated trim. IMPORTANT: the main cloth area inside the trim of each banner must be one completely flat, pure white color (#FFFFFF) with no shading, no texture, no folds, no symbols, so it can be recolored later. Style: 1990s PC strategy game pixel art, each banner on a 32 by 32 pixel grid scaled up with hard square pixels, no anti-aliasing, 1-pixel dark ink outline (#231f1a), limited palette: ink #231f1a, antique gold #b8913a, warm brown wood #7d6c4f, vermilion tassel #9e2b1e, pure white cloth #FFFFFF. Flat solid pure magenta #FF00FF background everywhere outside the banners, no shadows.\nConstraints: No text, letters, characters, symbols or emblems on the cloth. No human faces."
+    },
+    {
+      "file": "markers/level-0.png",
+      "sha256": "65d9b2570bf8a2e6a085a601cd1fc21cb8d2a57f647d1dc783d2c3a51dc031e2",
+      "size": [1254, 1254],
+      "prompt": "A single large map marker for a strategy game world map, which players can zoom into until it fills the whole screen, so it needs rich detail. Strict 90-degree top-down plan view, camera pointing straight down like a satellite photo or an architectural site plan. Absolutely no perspective, no isometric, no three-quarter view, no oblique angle: no building facades, no doors, no front faces or side faces of walls are visible, only the tops of things. Roofs appear as hipped roof shapes seen from above with ridge lines and tile rows, walls appear as thick flat bands with crenellation dots seen from above, towers appear as small square roofs. Detailed pixel art on a 128 by 128 pixel grid scaled up with hard square pixels, no anti-aliasing, no blur, 1-pixel dark ink outlines (#231f1a), muted limited palette of about 24 colors based on hanji ivory #f6efdd, ink #231f1a, vermilion #9e2b1e, celadon green #3f7f6e, antique gold #b8913a, indigo roof tiles #2b3a55, warm brown earth #7d6c4f, stone gray #b9b2a5, grass green #8fa865, water blue #4f86a3. The marker is centered and fills about 80 percent of the canvas. Flat solid pure magenta #FF00FF background everywhere outside the marker, no shadows on the background, no frame. Subject: an empty open clearing, a roughly round patch of bare earth with a few stones, grass tufts and a faint footpath."
+    },
+    {
+      "file": "markers/level-4.png",
+      "sha256": "9ab1284c2d703bed4e038117edc041f537803046c176c16fb944517c47176c60",
+      "size": [1254, 1254],
+      "prompt": "A single large map marker for a strategy game world map, which players can zoom into until it fills the whole screen, so it needs rich detail. Strict 90-degree top-down plan view, camera pointing straight down like a satellite photo or an architectural site plan. Absolutely no perspective, no isometric, no three-quarter view, no oblique angle: no building facades, no doors, no front faces or side faces of walls are visible, only the tops of things. Roofs appear as hipped roof shapes seen from above with ridge lines and tile rows, walls appear as thick flat bands with crenellation dots seen from above, towers appear as small square roofs. Detailed pixel art on a 128 by 128 pixel grid scaled up with hard square pixels, no anti-aliasing, no blur, 1-pixel dark ink outlines (#231f1a), muted limited palette of about 24 colors based on hanji ivory #f6efdd, ink #231f1a, vermilion #9e2b1e, celadon green #3f7f6e, antique gold #b8913a, indigo roof tiles #2b3a55, warm brown earth #7d6c4f, stone gray #b9b2a5, grass green #8fa865, water blue #4f86a3. The marker is centered and fills about 80 percent of the canvas. Flat solid pure magenta #FF00FF background everywhere outside the marker, no shadows on the background, no frame. Subject: a frontier tribal camp, clusters of round felt tent tops with central smoke holes, a wooden horse corral ring, a fire pit, no walls."
+    },
+    {
+      "file": "markers/level-5.png",
+      "sha256": "c3e2bc67f4b5a7c216cca6b55b722c15f9068c133953e345decff064f01f3418",
+      "size": [1254, 1254],
+      "prompt": "A single large map marker for a strategy game world map, which players can zoom into until it fills the whole screen, so it needs rich detail. Strict 90-degree top-down plan view, camera pointing straight down like a satellite photo or an architectural site plan. Absolutely no perspective, no isometric, no three-quarter view, no oblique angle: no building facades, no doors, no front faces or side faces of walls are visible, only the tops of things. Roofs appear as hipped roof shapes seen from above with ridge lines and tile rows, walls appear as thick flat bands with crenellation dots seen from above, towers appear as small square roofs. Detailed pixel art on a 128 by 128 pixel grid scaled up with hard square pixels, no anti-aliasing, no blur, 1-pixel dark ink outlines (#231f1a), muted limited palette of about 24 colors based on hanji ivory #f6efdd, ink #231f1a, vermilion #9e2b1e, celadon green #3f7f6e, antique gold #b8913a, indigo roof tiles #2b3a55, warm brown earth #7d6c4f, stone gray #b9b2a5, grass green #8fa865, water blue #4f86a3. The marker is centered and fills about 80 percent of the canvas. Flat solid pure magenta #FF00FF background everywhere outside the marker, no shadows on the background, no frame. Subject: a small walled town, a thin square rammed-earth wall band with one gate, a few houses with indigo hipped roofs, small fields and trees inside."
+    },
+    {
+      "file": "markers/level-6.png",
+      "sha256": "e62cf22ea17b34c0e3af3f591e0e37e7c890fe085237d68f2c627ecc586d170a",
+      "size": [1254, 1254],
+      "prompt": "A single large map marker for a strategy game world map, which players can zoom into until it fills the whole screen, so it needs rich detail. Strict 90-degree top-down plan view, camera pointing straight down like a satellite photo or an architectural site plan. Absolutely no perspective, no isometric, no three-quarter view, no oblique angle: no building facades, no doors, no front faces or side faces of walls are visible, only the tops of things. Roofs appear as hipped roof shapes seen from above with ridge lines and tile rows, walls appear as thick flat bands with crenellation dots seen from above, towers appear as small square roofs. Detailed pixel art on a 128 by 128 pixel grid scaled up with hard square pixels, no anti-aliasing, no blur, 1-pixel dark ink outlines (#231f1a), muted limited palette of about 24 colors based on hanji ivory #f6efdd, ink #231f1a, vermilion #9e2b1e, celadon green #3f7f6e, antique gold #b8913a, indigo roof tiles #2b3a55, warm brown earth #7d6c4f, stone gray #b9b2a5, grass green #8fa865, water blue #4f86a3. The marker is centered and fills about 80 percent of the canvas. Flat solid pure magenta #FF00FF background everywhere outside the marker, no shadows on the background, no frame. Subject: a medium walled city, a square stone wall band with two gate towers, a grid of streets and many indigo hipped roofs, a small market square."
+    },
+    {
+      "file": "markers/level-7.png",
+      "sha256": "7c7487e06f0ce65fccbc3d1c0ecd8176c5869136c2a41aefb09dbfd230ebc5ce",
+      "size": [1254, 1254],
+      "prompt": "A single large map marker for a strategy game world map, which players can zoom into until it fills the whole screen, so it needs rich detail. Strict 90-degree top-down plan view, camera pointing straight down like a satellite photo or an architectural site plan. Absolutely no perspective, no isometric, no three-quarter view, no oblique angle: no building facades, no doors, no front faces or side faces of walls are visible, only the tops of things. Roofs appear as hipped roof shapes seen from above with ridge lines and tile rows, walls appear as thick flat bands with crenellation dots seen from above, towers appear as small square roofs. Detailed pixel art on a 128 by 128 pixel grid scaled up with hard square pixels, no anti-aliasing, no blur, 1-pixel dark ink outlines (#231f1a), muted limited palette of about 24 colors based on hanji ivory #f6efdd, ink #231f1a, vermilion #9e2b1e, celadon green #3f7f6e, antique gold #b8913a, indigo roof tiles #2b3a55, warm brown earth #7d6c4f, stone gray #b9b2a5, grass green #8fa865, water blue #4f86a3. The marker is centered and fills about 80 percent of the canvas. Flat solid pure magenta #FF00FF background everywhere outside the marker, no shadows on the background, no frame. Subject: a large walled city, a thick square stone wall band with corner towers and four gate towers at the middle of each side, a cross of main avenues, dense indigo roofs, one vermilion government hall roof in the center."
+    },
+    {
+      "file": "markers/level-8.png",
+      "sha256": "cf55a9bd6d7b4dd52273fcbf71cef934c60c44f95a1b91484ed2848da342f631",
+      "size": [1254, 1254],
+      "prompt": "A single large map marker for a strategy game world map, which players can zoom into until it fills the whole screen, so it needs rich detail. Strict 90-degree top-down plan view, camera pointing straight down like a satellite photo or an architectural site plan. Absolutely no perspective, no isometric, no three-quarter view, no oblique angle: no building facades, no doors, no front faces or side faces of walls are visible, only the tops of things. Roofs appear as hipped roof shapes seen from above with ridge lines and tile rows, walls appear as thick flat bands with crenellation dots seen from above, towers appear as small square roofs. Detailed pixel art on a 128 by 128 pixel grid scaled up with hard square pixels, no anti-aliasing, no blur, 1-pixel dark ink outlines (#231f1a), muted limited palette of about 24 colors based on hanji ivory #f6efdd, ink #231f1a, vermilion #9e2b1e, celadon green #3f7f6e, antique gold #b8913a, indigo roof tiles #2b3a55, warm brown earth #7d6c4f, stone gray #b9b2a5, grass green #8fa865, water blue #4f86a3. The marker is centered and fills about 80 percent of the canvas. Flat solid pure magenta #FF00FF background everywhere outside the marker, no shadows on the background, no frame. Subject: a great city, two nested square stone wall bands with many towers, very dense indigo roofs in city blocks, a large vermilion palace complex with courtyards in the center."
+    },
+    {
+      "file": "markers/level-9.png",
+      "sha256": "15db7382178efcd7230e347d1967f24be6f84912b061e8da28eeb10f8d514593",
+      "size": [1254, 1254],
+      "prompt": "A single large map marker for a strategy game world map, which players can zoom into until it fills the whole screen, so it needs rich detail. Strict 90-degree top-down plan view, camera pointing straight down like a satellite photo or an architectural site plan. Absolutely no perspective, no isometric, no three-quarter view, no oblique angle: no building facades, no doors, no front faces or side faces of walls are visible, only the tops of things. Roofs appear as hipped roof shapes seen from above with ridge lines and tile rows, walls appear as thick flat bands with crenellation dots seen from above, towers appear as small square roofs. Detailed pixel art on a 128 by 128 pixel grid scaled up with hard square pixels, no anti-aliasing, no blur, 1-pixel dark ink outlines (#231f1a), muted limited palette of about 24 colors based on hanji ivory #f6efdd, ink #231f1a, vermilion #9e2b1e, celadon green #3f7f6e, antique gold #b8913a, indigo roof tiles #2b3a55, warm brown earth #7d6c4f, stone gray #b9b2a5, grass green #8fa865, water blue #4f86a3. The marker is centered and fills about 80 percent of the canvas. Flat solid pure magenta #FF00FF background everywhere outside the marker, no shadows on the background, no frame. Subject: an imperial capital, two nested square stone wall bands surrounded by a blue moat ring with bridges, a golden-roofed imperial palace complex with many courtyards in the center, a grid of wide straight avenues, dense roofs."
+    },
+    {
+      "file": "markers/ruin.png",
+      "sha256": "3245c164e7d4dae05475a81c473cc4805ea5728e115462b52dbe7e0e0e3e9eea",
+      "size": [1254, 1254],
+      "prompt": "A single large map marker for a strategy game world map, which players can zoom into until it fills the whole screen, so it needs rich detail. Strict 90-degree top-down plan view, camera pointing straight down like a satellite photo or an architectural site plan. Absolutely no perspective, no isometric, no three-quarter view, no oblique angle: no building facades, no doors, no front faces or side faces of walls are visible, only the tops of things. Roofs appear as hipped roof shapes seen from above with ridge lines and tile rows, walls appear as thick flat bands with crenellation dots seen from above, towers appear as small square roofs. Detailed pixel art on a 128 by 128 pixel grid scaled up with hard square pixels, no anti-aliasing, no blur, 1-pixel dark ink outlines (#231f1a), muted limited palette of about 24 colors based on hanji ivory #f6efdd, ink #231f1a, vermilion #9e2b1e, celadon green #3f7f6e, antique gold #b8913a, indigo roof tiles #2b3a55, warm brown earth #7d6c4f, stone gray #b9b2a5, grass green #8fa865, water blue #4f86a3. The marker is centered and fills about 80 percent of the canvas. Flat solid pure magenta #FF00FF background everywhere outside the marker, no shadows on the background, no frame. Subject: ruins of a walled town, broken wall band fragments, collapsed roofs, rubble and weeds."
+    },
+    {
+      "file": "markers/port.png",
+      "sha256": "d6888e2e8082a9dcb42f38a2747d6d8b741b6485853dfa1c6d72adab6bca0edc",
+      "size": [1254, 1254],
+      "prompt": "A single large map marker for a strategy game world map, which players can zoom into until it fills the whole screen, so it needs rich detail. Strict 90-degree top-down plan view, camera pointing straight down like a satellite photo or an architectural site plan. Absolutely no perspective, no isometric, no three-quarter view, no oblique angle: no building facades, no doors, no front faces or side faces of walls are visible, only the tops of things. Roofs appear as hipped roof shapes seen from above with ridge lines and tile rows, walls appear as thick flat bands with crenellation dots seen from above, towers appear as small square roofs. Detailed pixel art on a 128 by 128 pixel grid scaled up with hard square pixels, no anti-aliasing, no blur, 1-pixel dark ink outlines (#231f1a), muted limited palette of about 24 colors based on hanji ivory #f6efdd, ink #231f1a, vermilion #9e2b1e, celadon green #3f7f6e, antique gold #b8913a, indigo roof tiles #2b3a55, warm brown earth #7d6c4f, stone gray #b9b2a5, grass green #8fa865, water blue #4f86a3. The marker is centered and fills about 80 percent of the canvas. Flat solid pure magenta #FF00FF background everywhere outside the marker, no shadows on the background, no frame. Subject: a river harbor, a small square walled dock town on the left on land, wooden piers reaching into blue water on the right, three moored boats seen from above."
+    },
+    {
+      "file": "markers/pass.png",
+      "sha256": "af56a88419a1c82c98c7b99bb4a470b9810f9ea0d2f640944d1d60d489b9e745",
+      "size": [1254, 1254],
+      "prompt": "A single large map marker for a strategy game world map, which players can zoom into until it fills the whole screen, so it needs rich detail. Strict 90-degree top-down plan view, camera pointing straight down like a satellite photo or an architectural site plan. Absolutely no perspective, no isometric, no three-quarter view, no oblique angle: no building facades, no doors, no front faces or side faces of walls are visible, only the tops of things. Roofs appear as hipped roof shapes seen from above with ridge lines and tile rows, walls appear as thick flat bands with crenellation dots seen from above, towers appear as small square roofs. Detailed pixel art on a 128 by 128 pixel grid scaled up with hard square pixels, no anti-aliasing, no blur, 1-pixel dark ink outlines (#231f1a), muted limited palette of about 24 colors based on hanji ivory #f6efdd, ink #231f1a, vermilion #9e2b1e, celadon green #3f7f6e, antique gold #b8913a, indigo roof tiles #2b3a55, warm brown earth #7d6c4f, stone gray #b9b2a5, grass green #8fa865, water blue #4f86a3. The marker is centered and fills about 80 percent of the canvas. Flat solid pure magenta #FF00FF background everywhere outside the marker, no shadows on the background, no frame. Subject: a mountain pass fortress, a thick stone wall band with a gate tower running left to right across a north-south dirt road, steep brown rocky ridges filling the left and right sides."
+    },
+    {
+      "file": "markers/field.png",
+      "sha256": "529e25c6f3eb812ef887c10298896940a31b012c8c2419012a9f8f180503c5f3",
+      "size": [1254, 1254],
+      "prompt": "A single large map marker for a strategy game world map, which players can zoom into until it fills the whole screen, so it needs rich detail. Strict 90-degree top-down plan view, camera pointing straight down like a satellite photo or an architectural site plan. Absolutely no perspective, no isometric, no three-quarter view, no oblique angle: no building facades, no doors, no front faces or side faces of walls are visible, only the tops of things. Roofs appear as hipped roof shapes seen from above with ridge lines and tile rows, walls appear as thick flat bands with crenellation dots seen from above, towers appear as small square roofs. Detailed pixel art on a 128 by 128 pixel grid scaled up with hard square pixels, no anti-aliasing, no blur, 1-pixel dark ink outlines (#231f1a), muted limited palette of about 24 colors based on hanji ivory #f6efdd, ink #231f1a, vermilion #9e2b1e, celadon green #3f7f6e, antique gold #b8913a, indigo roof tiles #2b3a55, warm brown earth #7d6c4f, stone gray #b9b2a5, grass green #8fa865, water blue #4f86a3. The marker is centered and fills about 80 percent of the canvas. Flat solid pure magenta #FF00FF background everywhere outside the marker, no shadows on the background, no frame. Subject: a military field camp, a ring of wooden palisade around rows of square tent tops, a command tent in the center with a small banner pole, a gate opening in the palisade."
+    },
+    {
+      "file": "markers/ford.png",
+      "sha256": "393dc0e1b1449468adce096c604bca1715a0e6cf41c799d71b3e884036a0ea8f",
+      "size": [1254, 1254],
+      "prompt": "A single large map marker for a strategy game world map, which players can zoom into until it fills the whole screen, so it needs rich detail. Strict 90-degree top-down plan view, camera pointing straight down like a satellite photo or an architectural site plan. Absolutely no perspective, no isometric, no three-quarter view, no oblique angle: no building facades, no doors, no front faces or side faces of walls are visible, only the tops of things. Roofs appear as hipped roof shapes seen from above with ridge lines and tile rows, walls appear as thick flat bands with crenellation dots seen from above, towers appear as small square roofs. Detailed pixel art on a 128 by 128 pixel grid scaled up with hard square pixels, no anti-aliasing, no blur, 1-pixel dark ink outlines (#231f1a), muted limited palette of about 24 colors based on hanji ivory #f6efdd, ink #231f1a, vermilion #9e2b1e, celadon green #3f7f6e, antique gold #b8913a, indigo roof tiles #2b3a55, warm brown earth #7d6c4f, stone gray #b9b2a5, grass green #8fa865, water blue #4f86a3. The marker is centered and fills about 80 percent of the canvas. Flat solid pure magenta #FF00FF background everywhere outside the marker, no shadows on the background, no frame. Subject: a river ford, a dirt road coming from the north and south crossing a shallow blue river on stepping stones, reeds on the banks."
+    },
+    {
+      "file": "tiles/coast-sand.png",
+      "sha256": "fe7e936ea2c527f78f87f77c180bb859daef7922f486ae3776984fe8c3bf34d1",
+      "size": [1254, 1254],
+      "prompt": "One square terrain tile for a classic 1990s PC strategy game world map that is drawn as a grid of tiles. Strict 90-degree top-down view looking straight down, no perspective, no horizon, no isometric angle. Pixel art drawn on a 32 by 32 pixel grid and scaled up with hard square pixels, no anti-aliasing, no blur, muted limited palette of about 12 colors, soft painterly game-map colors. The tile is a seamless repeating texture: the pattern fills the entire square edge to edge with no border, no frame, no vignette, and the left edge continues into the right edge and the top edge into the bottom edge so identical tiles can be laid side by side without visible seams. Even lighting, no cast shadow toward any side. Subject: sandy beach, light sand (#d9c79a) with a few shells and wet darker sand streaks."
+    },
+    {
+      "file": "tiles/desert.png",
+      "sha256": "c3263e165a6d158b9aec4fee2884422a4c86cd78dc00f93aa0da9802e8982d94",
+      "size": [1254, 1254],
+      "prompt": "One square terrain tile for a classic 1990s PC strategy game world map that is drawn as a grid of tiles. Strict 90-degree top-down view looking straight down, no perspective, no horizon, no isometric angle. Pixel art drawn on a 32 by 32 pixel grid and scaled up with hard square pixels, no anti-aliasing, no blur, muted limited palette of about 12 colors, soft painterly game-map colors. The tile is a seamless repeating texture: the pattern fills the entire square edge to edge with no border, no frame, no vignette, and the left edge continues into the right edge and the top edge into the bottom edge so identical tiles can be laid side by side without visible seams. Even lighting, no cast shadow toward any side. Subject: sandy desert, pale sand (#dccb9c) with gentle wind ripples and a few small dunes."
+    },
+    {
+      "file": "tiles/farmland.png",
+      "sha256": "60e9d2cc903e68838274218e9074d83f06d8c0d18b5590071c3251ed651646d0",
+      "size": [1254, 1254],
+      "prompt": "One square terrain tile for a classic 1990s PC strategy game world map that is drawn as a grid of tiles. Strict 90-degree top-down view looking straight down, no perspective, no horizon, no isometric angle. Pixel art drawn on a 32 by 32 pixel grid and scaled up with hard square pixels, no anti-aliasing, no blur, muted limited palette of about 12 colors, soft painterly game-map colors. The tile is a seamless repeating texture: the pattern fills the entire square edge to edge with no border, no frame, no vignette, and the left edge continues into the right edge and the top edge into the bottom edge so identical tiles can be laid side by side without visible seams. Even lighting, no cast shadow toward any side. Subject: cultivated farmland, neat rows of green crops (#a8b673) in small rectangular field plots separated by thin earth ridges."
+    },
+    {
+      "file": "tiles/forest.png",
+      "sha256": "b8f8ea0d4633edacd5f639dd36dd9f524e448a7cddd240dad3a42f6345bfe700",
+      "size": [1254, 1254],
+      "prompt": "One square terrain tile for a classic 1990s PC strategy game world map that is drawn as a grid of tiles. Strict 90-degree top-down view looking straight down, no perspective, no horizon, no isometric angle. Pixel art drawn on a 32 by 32 pixel grid and scaled up with hard square pixels, no anti-aliasing, no blur, muted limited palette of about 12 colors, soft painterly game-map colors. The tile is a seamless repeating texture: the pattern fills the entire square edge to edge with no border, no frame, no vignette, and the left edge continues into the right edge and the top edge into the bottom edge so identical tiles can be laid side by side without visible seams. Even lighting, no cast shadow toward any side. Subject: dense forest canopy seen from above, round tree crowns of dark green (#5f8a52) packed together with small gaps of shade."
+    },
+    {
+      "file": "tiles/grassland.png",
+      "sha256": "7336bac37a3f1fd75f4a1e46c847733d1724ff279063b2d0c4e4af38452762ec",
+      "size": [1254, 1254],
+      "prompt": "One square terrain tile for a classic 1990s PC strategy game world map that is drawn as a grid of tiles. Strict 90-degree top-down view looking straight down, no perspective, no horizon, no isometric angle. Pixel art drawn on a 32 by 32 pixel grid and scaled up with hard square pixels, no anti-aliasing, no blur, muted limited palette of about 12 colors, soft painterly game-map colors. The tile is a seamless repeating texture: the pattern fills the entire square edge to edge with no border, no frame, no vignette, and the left edge continues into the right edge and the top edge into the bottom edge so identical tiles can be laid side by side without visible seams. Even lighting, no cast shadow toward any side. Subject: lush grassland meadow, medium green grass (#8fa865) with small darker clumps."
+    },
+    {
+      "file": "tiles/high-mountains.png",
+      "sha256": "e65a5aa83ab85eb727e013ee0988fd3b21f129eb3405164ba5e39db44d04ac50",
+      "size": [1254, 1254],
+      "prompt": "One square terrain tile for a classic 1990s PC strategy game world map that is drawn as a grid of tiles. Strict 90-degree top-down view looking straight down, no perspective, no horizon, no isometric angle. Pixel art drawn on a 32 by 32 pixel grid and scaled up with hard square pixels, no anti-aliasing, no blur, muted limited palette of about 12 colors, soft painterly game-map colors. The tile is a seamless repeating texture: the pattern fills the entire square edge to edge with no border, no frame, no vignette, and the left edge continues into the right edge and the top edge into the bottom edge so identical tiles can be laid side by side without visible seams. Even lighting, no cast shadow toward any side. Subject: high alpine mountains, one big dark gray-brown (#5f5140) massif seen from directly above with sharp ridges and small white snow patches on the summits."
+    },
+    {
+      "file": "tiles/hills.png",
+      "sha256": "a85068a9c69afa7fe88e99a0486fd77b07707b144485db5229091397f197758a",
+      "size": [1254, 1254],
+      "prompt": "One square terrain tile for a classic 1990s PC strategy game world map that is drawn as a grid of tiles. Strict 90-degree top-down view looking straight down, no perspective, no horizon, no isometric angle. Pixel art drawn on a 32 by 32 pixel grid and scaled up with hard square pixels, no anti-aliasing, no blur, muted limited palette of about 12 colors, soft painterly game-map colors. The tile is a seamless repeating texture: the pattern fills the entire square edge to edge with no border, no frame, no vignette, and the left edge continues into the right edge and the top edge into the bottom edge so identical tiles can be laid side by side without visible seams. Even lighting, no cast shadow toward any side. Subject: rolling hills, a few low rounded brown-olive (#9c8d60) hill mounds with light tops and darker lower slopes, patches of grass."
+    },
+    {
+      "file": "tiles/loess.png",
+      "sha256": "6f389811d6ddb8c9180bf05faca1d26ff424d30cb76d69cbf380495b77a0e807",
+      "size": [1254, 1254],
+      "prompt": "One square terrain tile for a classic 1990s PC strategy game world map that is drawn as a grid of tiles. Strict 90-degree top-down view looking straight down, no perspective, no horizon, no isometric angle. Pixel art drawn on a 32 by 32 pixel grid and scaled up with hard square pixels, no anti-aliasing, no blur, muted limited palette of about 12 colors, soft painterly game-map colors. The tile is a seamless repeating texture: the pattern fills the entire square edge to edge with no border, no frame, no vignette, and the left edge continues into the right edge and the top edge into the bottom edge so identical tiles can be laid side by side without visible seams. Even lighting, no cast shadow toward any side. Subject: yellow loess plateau, ochre earth (#cdb27a) cut by a few small dry gullies and terraced ridges."
+    },
+    {
+      "file": "tiles/mountains.png",
+      "sha256": "3fc8d936e4ec01489514c92bd7634a627183b06376801a8e1d97a8fa467646b6",
+      "size": [1254, 1254],
+      "prompt": "One square terrain tile for a classic 1990s PC strategy game world map that is drawn as a grid of tiles. Strict 90-degree top-down view looking straight down, no perspective, no horizon, no isometric angle. Pixel art drawn on a 32 by 32 pixel grid and scaled up with hard square pixels, no anti-aliasing, no blur, muted limited palette of about 12 colors, soft painterly game-map colors. The tile is a seamless repeating texture: the pattern fills the entire square edge to edge with no border, no frame, no vignette, and the left edge continues into the right edge and the top edge into the bottom edge so identical tiles can be laid side by side without visible seams. Even lighting, no cast shadow toward any side. Subject: rocky mountain range, two or three brown (#7d6a4c) mountain peaks seen from directly above as ridges radiating from summits, lighter ridge crests, darker valleys."
+    },
+    {
+      "file": "tiles/plains.png",
+      "sha256": "fd19ad5eac364015d5165ef1e398ac7f95ffab520678d769827dd8873435c2a4",
+      "size": [1254, 1254],
+      "prompt": "One square terrain tile for a classic 1990s PC strategy game world map that is drawn as a grid of tiles. Strict 90-degree top-down view looking straight down, no perspective, no horizon, no isometric angle. Pixel art drawn on a 32 by 32 pixel grid and scaled up with hard square pixels, no anti-aliasing, no blur, muted limited palette of about 12 colors, soft painterly game-map colors. The tile is a seamless repeating texture: the pattern fills the entire square edge to edge with no border, no frame, no vignette, and the left edge continues into the right edge and the top edge into the bottom edge so identical tiles can be laid side by side without visible seams. Even lighting, no cast shadow toward any side. Subject: open grassy plain, short pale olive-green grass (#b9bf86) with a few scattered tiny tufts and pebbles."
+    },
+    {
+      "file": "tiles/shallow.png",
+      "sha256": "ae17ff439b280d7b007c26e43479ed746583ad63b5b3cc016a966c0c8eea6c2b",
+      "size": [1254, 1254],
+      "prompt": "One square terrain tile for a classic 1990s PC strategy game world map that is drawn as a grid of tiles. Strict 90-degree top-down view looking straight down, no perspective, no horizon, no isometric angle. Pixel art drawn on a 32 by 32 pixel grid and scaled up with hard square pixels, no anti-aliasing, no blur, muted limited palette of about 12 colors, soft painterly game-map colors. The tile is a seamless repeating texture: the pattern fills the entire square edge to edge with no border, no frame, no vignette, and the left edge continues into the right edge and the top edge into the bottom edge so identical tiles can be laid side by side without visible seams. Even lighting, no cast shadow toward any side. Subject: shallow coastal water, light blue-green (#5d8ea6) water with faint ripples and a few visible stones on the bottom."
+    },
+    {
+      "file": "tiles/snow.png",
+      "sha256": "7e394add723f6ed620c4574893624781b1eb6eec2fa6354b1993eedf04cac8cd",
+      "size": [1254, 1254],
+      "prompt": "One square terrain tile for a classic 1990s PC strategy game world map that is drawn as a grid of tiles. Strict 90-degree top-down view looking straight down, no perspective, no horizon, no isometric angle. Pixel art drawn on a 32 by 32 pixel grid and scaled up with hard square pixels, no anti-aliasing, no blur, muted limited palette of about 12 colors, soft painterly game-map colors. The tile is a seamless repeating texture: the pattern fills the entire square edge to edge with no border, no frame, no vignette, and the left edge continues into the right edge and the top edge into the bottom edge so identical tiles can be laid side by side without visible seams. Even lighting, no cast shadow toward any side. Subject: snowfield, off-white snow (#ebe6d6) with faint blue-gray drifts."
+    },
+    {
+      "file": "tiles/water.png",
+      "sha256": "ccd1c2295f50bda5f69b66c58e953d6a05cf3fb2af48dd1c5cde2732341f79ae",
+      "size": [1254, 1254],
+      "prompt": "One square terrain tile for a classic 1990s PC strategy game world map that is drawn as a grid of tiles. Strict 90-degree top-down view looking straight down, no perspective, no horizon, no isometric angle. Pixel art drawn on a 32 by 32 pixel grid and scaled up with hard square pixels, no anti-aliasing, no blur, muted limited palette of about 12 colors, soft painterly game-map colors. The tile is a seamless repeating texture: the pattern fills the entire square edge to edge with no border, no frame, no vignette, and the left edge continues into the right edge and the top edge into the bottom edge so identical tiles can be laid side by side without visible seams. Even lighting, no cast shadow toward any side. Subject: open water, blue (#3a6584) water surface with small light wave crest marks scattered evenly."
+    }
+  ],
+  "outputs": [
+    {
+      "from": "icons-a.png",
+      "file": "apps/web/src/art/icons/domestic.png",
+      "sha256": "eb727ba646f3f2edcbd3dc5cfdf523b00bbfb6da52b84497bfd6dc223b88d2c7",
+      "bytes": 1909
+    },
+    {
+      "from": "icons-a.png",
+      "file": "apps/web/src/art/icons/military.png",
+      "sha256": "d4d6ecf9c03d7f24590628c11cda26ce72874fde3cdf0efd1c40ab8b09f354e8",
+      "bytes": 1305
+    },
+    {
+      "from": "icons-a.png",
+      "file": "apps/web/src/art/icons/strategy.png",
+      "sha256": "7bff81cb06060a4c2a404434fbac976a7c6f16dd30d6436f978da10a9f6885f6",
+      "bytes": 1486
+    },
+    {
+      "from": "icons-a.png",
+      "file": "apps/web/src/art/icons/personal.png",
+      "sha256": "26a55da4bbed821fb6f89e03fb08af7260cb3d420a8bc338173f62f9b73c2f5b",
+      "bytes": 1875
+    },
+    {
+      "from": "icons-a.png",
+      "file": "apps/web/src/art/icons/nation.png",
+      "sha256": "4152c66674929c8cff362e95d6092d45949bd4633bc42081e8b40d971d4c75f4",
+      "bytes": 1245
+    },
+    {
+      "from": "icons-a.png",
+      "file": "apps/web/src/art/icons/main.png",
+      "sha256": "1ae9d293e7c9df51250d4ef459a7aa7d59792c3346b23e86c9bc1a18c189dbcd",
+      "bytes": 1318
+    },
+    {
+      "from": "icons-a.png",
+      "file": "apps/web/src/art/icons/turns.png",
+      "sha256": "83e13514de69cc5742eb8bd80366f9d68571f8943e6d29ff7566114f85af0518",
+      "bytes": 1695
+    },
+    {
+      "from": "icons-a.png",
+      "file": "apps/web/src/art/icons/map.png",
+      "sha256": "d138921f9e5984390b2d825072c008bbe409113acf8b5dbb584140a25cbb2417",
+      "bytes": 1419
+    },
+    {
+      "from": "icons-b.png",
+      "file": "apps/web/src/art/icons/diplomacy.png",
+      "sha256": "642b3bdf7b59991bdb8773fe8009b13aa3417d1ca6d8a785a42838a0e49ef59a",
+      "bytes": 796
+    },
+    {
+      "from": "icons-b.png",
+      "file": "apps/web/src/art/icons/operations.png",
+      "sha256": "79b17bd6089ab9da0d76560b55f21a26bb12ecaca3d8d59069ae45c00cfab24f",
+      "bytes": 748
+    },
+    {
+      "from": "icons-b.png",
+      "file": "apps/web/src/art/icons/records.png",
+      "sha256": "78ac5f8ab05e45c9fde1b3be5c6833a7e9f288d374f8d92800ef26a4b13a2630",
+      "bytes": 1077
+    },
+    {
+      "from": "icons-b.png",
+      "file": "apps/web/src/art/icons/ranking.png",
+      "sha256": "f60cdb55666b1ed205a15a294d3f3f43111959d5e06c1809e4223ff70cd92ce3",
+      "bytes": 1261
+    },
+    {
+      "from": "icons-b.png",
+      "file": "apps/web/src/art/icons/battle.png",
+      "sha256": "0fe1eb6f30fd960d9189aa7aefbef1d6442b8b36394febe5ace7470775a5ebed",
+      "bytes": 1279
+    },
+    {
+      "from": "icons-b.png",
+      "file": "apps/web/src/art/icons/personnel.png",
+      "sha256": "7180611b2bb7e6d2779b319f833f101621def8865c81743faae6f0ca34cbfafa",
+      "bytes": 1192
+    },
+    {
+      "from": "icons-b.png",
+      "file": "apps/web/src/art/icons/help.png",
+      "sha256": "2c80a8e77000178afdd14d120a590b17bb8617747baa9942ce2078941d801034",
+      "bytes": 553
+    },
+    {
+      "from": "icons-b.png",
+      "file": "apps/web/src/art/icons/messages.png",
+      "sha256": "bac0e26ac9095cd52d6b352acc414a082afe6ab5a485c92c51e96f458d3e34c8",
+      "bytes": 1425
+    },
+    {
+      "from": "flags.png",
+      "file": "apps/web/src/art/flag/tall.png",
+      "sha256": "a67eb9f047e20ca8fca03657c03387fdfef6210607cc657f4cb3cc7eff8b009c",
+      "bytes": 569
+    },
+    {
+      "from": "flags.png",
+      "file": "apps/web/src/art/flag/tall-cloth.png",
+      "sha256": "17724a538a39628fe3a60921da999cd61f17a1caba46d8bd4fbe50711b71c0f1",
+      "bytes": 113
+    },
+    {
+      "from": "flags.png",
+      "file": "apps/web/src/art/flag/square.png",
+      "sha256": "3f334bcf7547ba6ce0dc0d4fe8c4346466ad3e58f563f9f8d27796e8b726d493",
+      "bytes": 849
+    },
+    {
+      "from": "flags.png",
+      "file": "apps/web/src/art/flag/square-cloth.png",
+      "sha256": "2b845afea434aa1cd75afe0fa54b19857ea1e577aa80dba9fea0fb8d23c93fb9",
+      "bytes": 115
+    },
+    {
+      "from": "markers/level-0.png",
+      "file": "apps/web/src/art/map/level-0.png",
+      "sha256": "8b24014d1346e04bc62e775b3a7618196f01158865947cfb8f25608f98119147",
+      "bytes": 1850
+    },
+    {
+      "from": "markers/level-0.png",
+      "file": "apps/web/src/art/map/level-0@128.png",
+      "sha256": "1771dfa901a52acab601bef1c9e94cbe9810e2fbc747f2a847e776ece77b1231",
+      "bytes": 25326
+    },
+    {
+      "from": "markers/level-4.png",
+      "file": "apps/web/src/art/map/level-4.png",
+      "sha256": "dbd5380cc43de9c34e1e82d8f0c44fccc96915f84a52bb6573633f9eb59a7b3a",
+      "bytes": 2134
+    },
+    {
+      "from": "markers/level-4.png",
+      "file": "apps/web/src/art/map/level-4@128.png",
+      "sha256": "9a17ed11e2a83aa28b08be155d6ea9a16d6a73b339d5ba30bda338197260ffd0",
+      "bytes": 27125
+    },
+    {
+      "from": "markers/level-5.png",
+      "file": "apps/web/src/art/map/level-5.png",
+      "sha256": "6028f63f7bcf040e03c2293dd31c5187850743cff5e8684af2e30b0341b7d5aa",
+      "bytes": 1812
+    },
+    {
+      "from": "markers/level-5.png",
+      "file": "apps/web/src/art/map/level-5@128.png",
+      "sha256": "53ccfb8e828ad94dec95b5babececff7b9d2b1ecb223175553d4756bd6559de5",
+      "bytes": 21622
+    },
+    {
+      "from": "markers/level-6.png",
+      "file": "apps/web/src/art/map/level-6.png",
+      "sha256": "cb3dea00d9c6ea21aebdd090254d4f80780919f1a758be8368c78744034ec8ad",
+      "bytes": 2114
+    },
+    {
+      "from": "markers/level-6.png",
+      "file": "apps/web/src/art/map/level-6@128.png",
+      "sha256": "acbd463e4513230c7256c3a48c0079a4c2bedf0c775390d5e8b773eed741ca6d",
+      "bytes": 26956
+    },
+    {
+      "from": "markers/level-7.png",
+      "file": "apps/web/src/art/map/level-7.png",
+      "sha256": "d9db128042772ca0decc48d5d3d5d95c8feade3fa7668af764bc1b4127da8eb6",
+      "bytes": 2042
+    },
+    {
+      "from": "markers/level-7.png",
+      "file": "apps/web/src/art/map/level-7@128.png",
+      "sha256": "35923c2b850211ef23d3d93dde0506b39ae13bd3ecef7e46d5d7c63f418ab8dd",
+      "bytes": 26934
+    },
+    {
+      "from": "markers/level-8.png",
+      "file": "apps/web/src/art/map/level-8.png",
+      "sha256": "3e808fd1efa825f830e221384820b602a78cab1ea760dc067a1d6ca2eb1d5137",
+      "bytes": 2000
+    },
+    {
+      "from": "markers/level-8.png",
+      "file": "apps/web/src/art/map/level-8@128.png",
+      "sha256": "3819e8cdb4f46de1bd9b076f9dc796fd1b41c7c2810c12137cf822b8920baaf2",
+      "bytes": 27587
+    },
+    {
+      "from": "markers/level-9.png",
+      "file": "apps/web/src/art/map/level-9.png",
+      "sha256": "171a29c642955b9ea8ab6ae9b0d154e5ffa3d47507c453c9771a8221218cc726",
+      "bytes": 1998
+    },
+    {
+      "from": "markers/level-9.png",
+      "file": "apps/web/src/art/map/level-9@128.png",
+      "sha256": "9fab68dcb41882682fd693ef552347e4f01352e087ef853840963375ca152998",
+      "bytes": 24190
+    },
+    {
+      "from": "markers/ruin.png",
+      "file": "apps/web/src/art/map/ruin.png",
+      "sha256": "b20a85f91ca313f848e3b536b405d7b356b57096ce30a7fb71bbc5a1c8aced05",
+      "bytes": 2063
+    },
+    {
+      "from": "markers/ruin.png",
+      "file": "apps/web/src/art/map/ruin@128.png",
+      "sha256": "02546e3b6fad3ea715069838360da84df763720b1f2448ec54bffca546c27b31",
+      "bytes": 29172
+    },
+    {
+      "from": "markers/port.png",
+      "file": "apps/web/src/art/map/port.png",
+      "sha256": "01c8899f17b0989acebb4d40dabacd32413043ef9399f31546df137fdcb3ea57",
+      "bytes": 1707
+    },
+    {
+      "from": "markers/port.png",
+      "file": "apps/web/src/art/map/port@128.png",
+      "sha256": "782e789163814277a0f373fd00c7c35aa652318eba8de47b9d9ae88b0397cccf",
+      "bytes": 19144
+    },
+    {
+      "from": "markers/pass.png",
+      "file": "apps/web/src/art/map/pass.png",
+      "sha256": "684ed7217c03fa51db0b24f592907ba601147c851b52ba790ce42f5f5f3d252a",
+      "bytes": 1959
+    },
+    {
+      "from": "markers/pass.png",
+      "file": "apps/web/src/art/map/pass@128.png",
+      "sha256": "0b58cfa87f63f93a9288289e916dd9c364ca50fc47a91ef2aa1012d3b5a3a9ec",
+      "bytes": 28044
+    },
+    {
+      "from": "markers/field.png",
+      "file": "apps/web/src/art/map/field.png",
+      "sha256": "34ad7fa6ece68ca83f15065f40b9d8a32cec90f5917d9b6f8ae3b90ce0e72e67",
+      "bytes": 1972
+    },
+    {
+      "from": "markers/field.png",
+      "file": "apps/web/src/art/map/field@128.png",
+      "sha256": "95ab2f36acc448f1cb4bb48fd36a814ebb8a13d3efdf7ee82e689d4b15feb420",
+      "bytes": 22814
+    },
+    {
+      "from": "markers/ford.png",
+      "file": "apps/web/src/art/map/ford.png",
+      "sha256": "ca06e3799b12bbebf023473d8bb2bb777dc2138c0e7f256147581bdfff360040",
+      "bytes": 1783
+    },
+    {
+      "from": "markers/ford.png",
+      "file": "apps/web/src/art/map/ford@128.png",
+      "sha256": "b0c34428225037b9c96a7f82c18e2d149058d7855dd21e0047167f39fcb02cd3",
+      "bytes": 25860
+    },
+    {
+      "from": "markers/pass.png",
+      "file": "apps/web/src/art/map/pass-ew.png",
+      "sha256": "61b1441b68f63cb7220218402acc33f7d74c097fa33ac556c0c6ef471baaf28f",
+      "bytes": 1903
+    },
+    {
+      "from": "markers/pass.png",
+      "file": "apps/web/src/art/map/pass-ew@128.png",
+      "sha256": "8ad2a2e448d1154c5e6c8122e2fca826f81ab8348b1ddd2e6159aad5076e80b4",
+      "bytes": 27944
+    },
+    {
+      "from": "keyart.png",
+      "file": "apps/web/src/art/keyart.png",
+      "sha256": "6c40a5f0faa0877c1ab72cc588229ef87a62a82c3d1009144fc015a4b56f2c5f",
+      "bytes": 52534
+    },
+    {
+      "from": "tiles/water.png",
+      "file": "apps/web/src/art/terrain/deepSea.png",
+      "sha256": "84a88b3d61fd9ea9b3a981d7e1947eb3d1dad6269d8fcda677cd808e5b83e598",
+      "bytes": 660
+    },
+    {
+      "from": "tiles/water.png",
+      "file": "apps/web/src/art/terrain/sea.png",
+      "sha256": "a4d6c2b74fd21555308210df3428f233bb49bc558749deb6b502deb1fa95c95c",
+      "bytes": 660
+    },
+    {
+      "from": "tiles/shallow.png",
+      "file": "apps/web/src/art/terrain/shallow.png",
+      "sha256": "528d0390a08855c453b002b2e227407cc28a8faaa17cb6d2a5dc33d3a2715cb4",
+      "bytes": 660
+    },
+    {
+      "from": "tiles/water.png",
+      "file": "apps/web/src/art/terrain/river.png",
+      "sha256": "c2352350c33f087a07b0979da603e256aee772914c868c358d62883170499fcc",
+      "bytes": 660
+    },
+    {
+      "from": "tiles/plains.png",
+      "file": "apps/web/src/art/terrain/plains.png",
+      "sha256": "5837eb3ad019b05cf5ad5f654d70dbae6d4066954418579de48cbc337a27abc2",
+      "bytes": 660
+    },
+    {
+      "from": "tiles/farmland.png",
+      "file": "apps/web/src/art/terrain/farmland.png",
+      "sha256": "87da54d7ac4fc55c5eafc1123b3c6a94229a9c16b0b31e84d31fe72a8becab72",
+      "bytes": 642
+    },
+    {
+      "from": "tiles/grassland.png",
+      "file": "apps/web/src/art/terrain/grassland.png",
+      "sha256": "e08a2ae2d2114cd21c88e68861ed6ee0e9e7bc90d85f393338c16f2f6df0d33c",
+      "bytes": 660
+    },
+    {
+      "from": "tiles/forest.png",
+      "file": "apps/web/src/art/terrain/forest.png",
+      "sha256": "f1e71a5468f112c9a751faa5249a50615ecf086dab16f242acc5bbcf1b5d903b",
+      "bytes": 660
+    },
+    {
+      "from": "tiles/loess.png",
+      "file": "apps/web/src/art/terrain/loess.png",
+      "sha256": "acc0867065a4d4a36c5ee7a65a6b98ba66f9aba9772d63f3adb6ee04a87371b5",
+      "bytes": 660
+    },
+    {
+      "from": "tiles/desert.png",
+      "file": "apps/web/src/art/terrain/desert.png",
+      "sha256": "ed94c651b51fcc614dc14a7d4a84b73ff842a3066fd9cbceef346be946bbea1b",
+      "bytes": 660
+    },
+    {
+      "from": "tiles/hills.png",
+      "file": "apps/web/src/art/terrain/hills.png",
+      "sha256": "8ac10e0240d4d2b92c291b4303c67c25fea8b3a6b9c0045e4cf4b2f33322d704",
+      "bytes": 1963
+    },
+    {
+      "from": "tiles/mountains.png",
+      "file": "apps/web/src/art/terrain/mountains.png",
+      "sha256": "d79c367d24b62663825e6b224bd94a7e8c1de6c0275fc603f6348817e614d8b3",
+      "bytes": 1959
+    },
+    {
+      "from": "tiles/high-mountains.png",
+      "file": "apps/web/src/art/terrain/highMountains.png",
+      "sha256": "72257ad6e1dabbb486fe0ea97281481564ad3d902ff0f88428c86fd88293e543",
+      "bytes": 1845
+    },
+    {
+      "from": "tiles/snow.png",
+      "file": "apps/web/src/art/terrain/snow.png",
+      "sha256": "e151bc14660ccc72b96a870c0dbf7b935dc75595100ab5eb8e71a10009c3dfc6",
+      "bytes": 660
+    },
+    {
+      "from": "tiles/coast-sand.png",
+      "file": "apps/web/src/art/terrain/coastSand.png",
+      "sha256": "9927fa867f40caaa9e9bea8aae95a2e6882a15fb4740d6be8eabcb7ad7513e96",
+      "bytes": 660
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/road/road-0.png",
+      "sha256": "3a674ad02ba7f632e9899b636c94a9f1e05b1a5fe7032e68f422421ec903caf2",
+      "bytes": 251
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/road/road-1.png",
+      "sha256": "bc9539562ea8eb41bd8adda1c92505bb8ca6eab92db0982158636d81b181dce2",
+      "bytes": 215
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/road/road-2.png",
+      "sha256": "f2eadc32650a84251cf455218c14e9b16977df7f70061d52611e532bcc732090",
+      "bytes": 190
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/road/road-3.png",
+      "sha256": "8366314925a4bd9e82f647245a0709574e75a7d7394c4ec15ddb698ba9c3a824",
+      "bytes": 342
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/road/road-4.png",
+      "sha256": "d5116fb9a99631cba1b5078f7ed1a1065ae7b406ff8755f4965f7c49adeca139",
+      "bytes": 200
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/road/road-5.png",
+      "sha256": "378b51a27990ba060da9f0b01e138567ee268c2d8cf0a172a5b199b559ec0272",
+      "bytes": 137
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/road/road-6.png",
+      "sha256": "8302dbc8fa537c9ea5220b4e43ceeade013624a3ce684579952fc72b0ad0bd67",
+      "bytes": 330
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/road/road-7.png",
+      "sha256": "9e5c9df64455ad578623c327478dd830076020d008eaca6a219944c177dca1a2",
+      "bytes": 183
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/road/road-8.png",
+      "sha256": "005ef2fb5d6234e7f8bf354f6c35ddae446e78b23842048c281267264ce3a406",
+      "bytes": 212
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/road/road-9.png",
+      "sha256": "0611de8f1de6ef458d8e5268418d80007dca6d767993024a29046ebbb863075b",
+      "bytes": 354
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/road/road-10.png",
+      "sha256": "400eb8871b660e4ead3da7dea60da3cc2e442d0f8a37b2b91ef9fe40d7886d05",
+      "bytes": 124
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/road/road-11.png",
+      "sha256": "eb96d0fb191064cddbef0ecd93d20e21f3a6a28b2becdc621966e310e6b766ea",
+      "bytes": 177
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/road/road-12.png",
+      "sha256": "d7f9715cf91a58e33fabd9e3baa410db74ca734c597db7befe1e9ee88c1a8384",
+      "bytes": 347
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/road/road-13.png",
+      "sha256": "88a75706d986db39a60ba91abed89b43c2184fe30d8f8eece2fc3e5825a00e5f",
+      "bytes": 186
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/road/road-14.png",
+      "sha256": "c0b399c3fda5c26238f2dc99d081b69da1c579e12b6e3ba1b4f57b7c70225b1c",
+      "bytes": 173
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/road/road-15.png",
+      "sha256": "8b880d624d773f4e7b57843fb56a74e59e748f57a14c56a1b5bf5d53714a84d2",
+      "bytes": 218
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/water/bank-1.png",
+      "sha256": "d35b0d2b5f5b76d3f3b584dc3b48bd358e0e39983aa6b58f45640175d76a9dbd",
+      "bytes": 104
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/water/bank-2.png",
+      "sha256": "70d7e0134475bcb3f94adf1f55a6e79f1886213ff2cc993a343dcdfc07f012d2",
+      "bytes": 115
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/water/bank-3.png",
+      "sha256": "5974461ade167c30cfa726b442a708e3ccfba30b433449f2926c7c8a370747d4",
+      "bytes": 141
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/water/bank-4.png",
+      "sha256": "17fcfc175e92587339e8c1208223678da9ab1608b0218260abd3bfb2460363b6",
+      "bytes": 107
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/water/bank-5.png",
+      "sha256": "f206a4a4f2c99526bd3ead244c0a813eed543bb79b7f87d5c2ee9927d411ffbc",
+      "bytes": 118
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/water/bank-6.png",
+      "sha256": "e688145ca5a22f7883a5b15e26fb83619727a665dbab1b0722f7ae96c584239a",
+      "bytes": 139
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/water/bank-7.png",
+      "sha256": "20905796460a353243079f5d0b2cbe3de05c1e7d8d27771869b495686940665f",
+      "bytes": 146
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/water/bank-8.png",
+      "sha256": "fe2269b16d2a71f12a93ef8ea76b919dd2d28377a6d5080ff3aded609188d3aa",
+      "bytes": 121
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/water/bank-9.png",
+      "sha256": "af511db23c0d30c6717a216a0eaf670a48377ee604ecbe49b498f3fcb5381b2d",
+      "bytes": 146
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/water/bank-10.png",
+      "sha256": "7b81bacf7f732ebea7d3ea91e444460334ffc2b8ffc0fc033d7467ec5cf15376",
+      "bytes": 133
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/water/bank-11.png",
+      "sha256": "f6e99230bf2595b02a167cb01fc3a0e99b7b1679a6107ce20dd53d03f3bde71a",
+      "bytes": 155
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/water/bank-12.png",
+      "sha256": "d601180f8f889ed9bb464eb68fc8c75a0de92de4af0736f7be80518a8a8308d3",
+      "bytes": 144
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/water/bank-13.png",
+      "sha256": "8bfe0ee9f441fea72b5fc4adfcb5d65ec173ba646b96fc68139430f4d141d801",
+      "bytes": 152
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/water/bank-14.png",
+      "sha256": "62b3c7b254306aaa19e4aa31f6c5958a057b85fad4898aebf488738ea303a8a5",
+      "bytes": 158
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/water/bank-15.png",
+      "sha256": "90d83cb74a89d724d05be24c3f0c4ca80d7fd88c325d4793ffe9f3bfad9c5e7d",
+      "bytes": 163
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/road/bridge-5.png",
+      "sha256": "c9be49858fb0e3a54bd333dc95906f1fdb68a73e83169d15da99aed0b17a5698",
+      "bytes": 169
+    },
+    {
+      "from": "tools/pixel-assets/build-tiles.py",
+      "file": "apps/web/src/art/road/bridge-10.png",
+      "sha256": "62c90936703fb9386effb207025ed5af6bc098b66feb506177a7b11a733b5975",
+      "bytes": 144
+    }
+  ]
+}

@@ -28,9 +28,9 @@ const materials = {
   portraitMap: read('resources/portraits/191-map.json'),
 };
 
-it('D-045: 159표식·152전략 거점에 제안 45개를 포함한 200도로가 양방향 활성화된다', () => {
+it('D-045·D-049: 153표식·152전략 거점에 제안 45개를 포함한 200도로가 양방향 활성화된다', () => {
   expect(map).toEqual(read('resources/map/san10.json'));
-  expect(map.sites).toHaveLength(159);
+  expect(map.sites).toHaveLength(153);
   expect(map.sites.filter((site) => 'anchorKey' in site)).toHaveLength(152);
   expect(map.routes).toHaveLength(200);
   expect(map.routes.every((route) => route.enabled && route.mode === 'LAND' && route.direction === 'BOTH')).toBe(true);
@@ -61,7 +61,8 @@ it('AC-INT-03: 두 정식 원생성의152거점 전체 경로와400방향 이동
   const fields = resource.sites.filter((site) => site.kind === 'FIELD');
   expect(graph).toHaveLength(152);
   expect(byKey.size).toBe(152);
-  expect(ports).toHaveLength(6);
+  // D-049: 물길이 없는 SAN10에는 항구 시설을 두지 않는다.
+  expect(ports).toHaveLength(0);
   expect(fields).toHaveLength(1);
   for (const marker of [...ports, ...fields]) {
     expect(marker).not.toHaveProperty('anchorKey');

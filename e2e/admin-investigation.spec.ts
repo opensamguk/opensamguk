@@ -197,7 +197,7 @@ const test = base.extend<{ investigation: Journey }>({
               )
               .toBe(1);
             await new TurnLoop(hold.db, hold.lease).advanceTo(0);
-            await expect(person.page.getByRole('heading', { name: '메인', exact: true })).toBeVisible();
+            await expect(person.page.getByRole('heading', { name: '군략도', exact: true })).toBeVisible();
             const general = await stack.db.general.findUniqueOrThrow({
               where: { worldId_userId: { worldId, userId: person.id } },
             });

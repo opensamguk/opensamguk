@@ -100,7 +100,7 @@ test('T3-10 정식191년 모바일 명령·방침·탭의 크기와 30번 칸 �
       .toBe(1);
     expect(hold.lost).toBeUndefined();
     await new TurnLoop(hold.db, hold.lease).advanceTo(0);
-    await expect(page.getByRole('heading', { name: '메인', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '군략도', exact: true })).toBeVisible();
     const main = `/w/${ownWorld}?city=40`;
     await page.goto(main);
     const editor = page.getByTestId('turn-editor');

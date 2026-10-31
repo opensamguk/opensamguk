@@ -88,3 +88,51 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+
+OpenSamguk title fonts (subset of DOSMyungjo and DOSIyagiBoldface)
+
+Source: https://github.com/hurss/fonts
+Revision: 3fc1181c6b4af095206068188c3ea966d6738add
+Files: apps/web/src/fonts/title-myungjo.woff, apps/web/src/fonts/title-iyagi.woff
+Subset to ASCII, KS X 1001 Hangul and a few Hanja by tools/fonts/build-title-fonts.py and renamed
+"OpenSamguk Myungjo" and "OpenSamguk Iyagi", because the license reserves the original font names
+for unmodified fonts. Provenance and hashes: apps/web/src/fonts/sources.json.
+
+MIT License
+
+Copyright (c) 2016-2022 Damheo Lee (이담허) (leedheo@gmail.com)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+DotGothic16 font
+
+Package: @fontsource/dotgothic16 5.3.1
+Font: DotGothic16 by Fontworks Inc.
+License: SIL Open Font License 1.1, https://openfontlicense.org
+
+
+INT-20 generated pixel art and pixel basemap
+
+Files: apps/web/src/art/** and apps/web/src/main/pixel-basemap.png
+The art was generated for this project with Codex built-in image generation from text prompts only
+(no reference or input images) and reduced by tools/pixel-assets/build.py. Prompts and source hashes:
+apps/web/src/art/sources.json. The basemap is rendered from Natural Earth (public domain) by
+tools/map-data/build-pixel-basemap.py; inputs and hashes: apps/web/src/main/pixel-basemap.json.
