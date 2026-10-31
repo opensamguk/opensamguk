@@ -3,10 +3,20 @@ import { operationalInput } from '../../test/operationalMapFixture';
 import { commandInitial } from '../../test/commandFixture';
 import { buildInitialWorld } from '../world/bootstrap';
 import { buildCreatedGeneral } from '../general/create';
-import { checkReplayOrigin, ruleRegistry } from '../ruleRegistry';
-import { applyRecordedInput, initialReplayState, initialReplayStateWithRegistry, type RecordedInput } from '../replay';
+import { checkReplayOrigin, ruleRegistry, type RuleRegistry } from '../ruleRegistry';
+import {
+  applyRecordedInput,
+  initialReplayState,
+  initialReplayStateWithRegistry,
+  runReplayAction,
+  type RecordedInput,
+} from '../replay';
 import { applyCampaignUnitInput } from './unitInputs';
 import { applyCampaignRelationship } from './relationships';
+import { applyCampaignOrder } from './orders';
+import { resolverForRuleFeatures } from '../ruleCommands';
+import { runGeneralTurn } from '../commands/turn';
+import { TICKS_PER_MONTH } from '../clock/constants';
 
 const registry = ruleRegistry;
 const data = { policy: { version: 1, turnTermMinutes: 60 } };
@@ -133,5 +143,105 @@ describe('AC-INT-06 휘하 프로필 생성·입력 재생 계약', () => {
     expect(() => checkReplayOrigin(duplicate, registry)).toThrow();
     expect(Object.hasOwn(initialReplayState(commandInitial()), 'campaignArmyTypes')).toBe(false);
     expect(Object.hasOwn(initialReplayState(commandInitial()).state, 'campaign')).toBe(false);
+  });
+});
+
+describe('AC-INT-19B 휘하 지시 입력과 실제 순수 턴의 재생', () => {
+  function ordersFixture() {
+    const f = fixture(),
+      replay = f.created;
+    Object.assign(replay.state.generals[1]!, { nationId: 1, officerLevel: 1, cityKey: 1 });
+    Object.assign(replay.state.generals[3]!, { nationId: 1, officerLevel: 1, cityKey: 1 });
+    replay.state.campaign!.links = [{ masterId: 3, personId: 1, relation: 'LIEUTENANT' }];
+    const payload = {
+      type: 'issue',
+      recipientId: 1,
+      command: { commandKey: 'rest', args: {} },
+      revision: replay.state.campaign!.revision,
+    };
+    const outcome = applyCampaignOrder(replay.state, payload, 3, {
+      tick: 1,
+      userId: 'owner',
+      userActive: true,
+      turns: replay.turns,
+      revisions: replay.revisions,
+      resolver: resolverForRuleFeatures(replay.state)!,
+      unitSet: f.initial.unitSet,
+    });
+    if (!outcome.ok) throw new Error(outcome.message);
+    const record: RecordedInput = {
+      sequence: 2,
+      tick: 1,
+      generalId: 3,
+      kind: 'campaign.order',
+      status: 'APPLIED',
+      payload,
+      result: { ...outcome.result, tick: 1 },
+    };
+    return { ...f, replay, outcome, record };
+  }
+  it('접수 재생은30칸·revision을 변경하지 않고 실제차례는 같은 명령·한shift·한revision을 재현한다', () => {
+    const f = ordersFixture(),
+      next = applyRecordedInput(f.replay, f.record);
+    expect(next.state.campaign).toEqual(f.outcome.state.campaign);
+    expect(next.turns).toEqual(f.replay.turns);
+    expect(next.revisions).toEqual(f.replay.revisions);
+    for (const general of Object.values(next.state.generals)) general.nextTurnTick = 10001;
+    next.state.generals[1]!.nextTurnTick = 1;
+    const direct = runGeneralTurn(
+      next.state,
+      { generalId: 1, tick: 1, unitSet: f.initial.unitSet },
+      next.turns[1]![0]!,
+      f.initial.seed,
+      { policy: next.policy!.policies[1]!, turnRevision: next.revisions[1]! },
+      resolverForRuleFeatures(next.state),
+      { offices: next.offices! },
+    );
+    const replayed = runReplayAction(next, f.initial.seed, f.initial.unitSet);
+    expect(direct.commandKey).toBe('rest');
+    expect(replayed.state.campaign).toEqual(direct.state.campaign);
+    expect(replayed.state.campaign!.orders!.items[0]!.status).toBe('EXECUTED');
+    expect(replayed.state.generals[1]!.nextTurnTick).toBe(1 + TICKS_PER_MONTH);
+    expect(replayed.revisions[1]).toBe(next.revisions[1]! + 1);
+    expect(replayed.turns[1]).toHaveLength(30);
+    expect(replayed.turns[3]).toEqual(next.turns[3]);
+    expect(runReplayAction(next, f.initial.seed, f.initial.unitSet)).toEqual(replayed);
+  });
+  it('지시 재생은 호출한 등록표의 명령 해석기를 전달하고 직접 무문맥 적용은 거부한다', () => {
+    const f = ordersFixture(),
+      kind = registry.inputKinds.find((item) => item.kind === 'campaign.order')!,
+      probe = { ...resolverForRuleFeatures(f.replay.state)!.get('rest')!, key: 'order_probe' };
+    const custom: RuleRegistry = {
+      ...registry,
+      features: registry.features.map((feature) =>
+        feature.key === 'five-stats'
+          ? { ...feature, commandBindings: [...(feature.commandBindings ?? []), { definition: probe, sliceKeys: [] }] }
+          : feature,
+      ),
+      inputKinds: registry.inputKinds.map((item) =>
+        item !== kind
+          ? item
+          : {
+              ...item,
+              apply(replay, input, context) {
+                expect(context?.resolver?.get('order_probe')).toMatchObject({ key: 'order_probe', name: probe.name });
+                return kind.apply(replay, input, context);
+              },
+            },
+      ),
+    };
+    expect(() => kind.apply(f.replay, f.record)).toThrow('명령 해석기');
+    expect(applyRecordedInput(f.replay, f.record, custom).state.campaign).toEqual(f.outcome.state.campaign);
+    expect(resolverForRuleFeatures(f.replay.state)!.get('order_probe')).toBeUndefined();
+  });
+  it.each(['result', 'tick', 'actor', 'args', 'issuer'])('기록의 %s 위조를 엄격하게 거부한다', (kind) => {
+    const f = ordersFixture(),
+      forged = structuredClone(f.record);
+    if (kind === 'result') (forged.result as { orderId: number }).orderId++;
+    if (kind === 'tick') forged.tick = 2;
+    if (kind === 'actor') forged.generalId = 1;
+    if (kind === 'args') (forged.payload as { command: { args: unknown } }).command.args = { forbidden: 1 };
+    if (kind === 'issuer') (forged.payload as Record<string, unknown>).issuerId = 1;
+    expect(() => applyRecordedInput(f.replay, forged)).toThrow();
   });
 });

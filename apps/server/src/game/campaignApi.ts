@@ -5,6 +5,7 @@ import {
   campaignUnitInputSchema,
   campaignRelationshipResultSchema,
   campaignUnitResultSchema,
+  campaignOrderResultSchema,
   validateCampaignRecord,
   FIVE_STAT_KEYS,
   fiveStatsSchema,
@@ -20,11 +21,15 @@ import { z } from 'zod';
 import type { Context } from '../context';
 import { requirePersonnelSession } from './personnelAdmission';
 import { readView, requireGeneral, requireRuleFeature, requireWorld } from './queries';
+import { requireCampaignOrderAccess } from './campaignOrders';
 
-type ActorContext = Pick<Context, 'db' | 'sessionId' | 'now'> & { user: { id: string } };
+type ActorContext = Pick<
+  Context,
+  'db' | 'sessionId' | 'now' | 'emailVerificationRequired' | 'legalPolicy' | 'legalPolicyRequired'
+> & { user: { id: string } };
 type Kind = 'campaign.relationship' | 'campaign.unit';
 type Event = Prisma.InputEventGetPayload<Record<string, never>>;
-const kinds: Kind[] = ['campaign.relationship', 'campaign.unit'];
+const kinds = ['campaign.relationship', 'campaign.unit', 'campaign.order'];
 function identity(ctx: ActorContext, started: number) {
   return { userId: ctx.user.id, sessionId: ctx.sessionId ?? '', at: new Date(ctx.now + performance.now() - started) };
 }
@@ -51,19 +56,26 @@ function requestDto(event: Event) {
     result: event.result,
   });
   return event.status === 'APPLIED'
-    ? event.kind === 'campaign.relationship'
+    ? event.kind === 'campaign.order'
       ? {
           requestId,
-          kind: 'campaign.relationship' as const,
+          kind: 'campaign.order' as const,
           status: 'applied' as const,
-          result: campaignRelationshipResultSchema.parse(event.result),
+          result: campaignOrderResultSchema.parse(event.result),
         }
-      : {
-          requestId,
-          kind: 'campaign.unit' as const,
-          status: 'applied' as const,
-          result: campaignUnitResultSchema.parse(event.result),
-        }
+      : event.kind === 'campaign.relationship'
+        ? {
+            requestId,
+            kind: 'campaign.relationship' as const,
+            status: 'applied' as const,
+            result: campaignRelationshipResultSchema.parse(event.result),
+          }
+        : {
+            requestId,
+            kind: 'campaign.unit' as const,
+            status: 'applied' as const,
+            result: campaignUnitResultSchema.parse(event.result),
+          }
     : {
         requestId,
         kind: event.kind,
@@ -88,6 +100,10 @@ export async function readCampaignRequest(ctx: ActorContext, worldId: string, re
       });
       if (!event || !kinds.includes(event.kind as Kind))
         throw new TRPCError({ code: 'NOT_FOUND', message: '휘하 요청이 없습니다.' });
+      if (event.kind === 'campaign.order') {
+        await requireCampaignOrderAccess(tx, ctx, worldId);
+        return { ...requestDto(event), userId: ctx.user.id };
+      }
       return requestDto(event);
     },
     { isolationLevel: 'RepeatableRead' },

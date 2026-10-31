@@ -327,3 +327,6 @@ D-034로 INT-07·08을 취소했다. 위 순수 행군 이식 착수 기록은 �
 | INT-18B | 도시 자원 DB/API·권한·NPC·재생 | INT-18B | Codex | INT-18A | 진행중 |
 | INT-18C | 도시 자원·수비·배속 화면 | INT-18C | Codex | INT-18B | 진행중 |
 | INT-18D | 새 도시 자원 판 정식 전체 인수 | INT-18D | Codex | INT-18A, INT-18B, INT-18C | 계획 |
+| INT-19A | 장수 지시 원장·단일 상관·개인 사병 권한 | INT-19A | Codex | INT-05, INT-06 | 진행중 |
+| INT-19B | 장수 지시 API·실제 턴·저장·재생 | INT-19B | Codex | INT-19A | 진행중 |
+| INT-19C | 장수 지시 발송·수신·동의·실제 UI 인수 | INT-19C | Codex | INT-19B | 진행중 |

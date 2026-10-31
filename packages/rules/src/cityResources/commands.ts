@@ -26,7 +26,7 @@ export function canExecuteCityNationCommand(
 }
 
 function formUnit(view: WorldView, actor: Actor, value: unknown) {
-  const denied = ownCity(view, actor) ?? checkCampaignActor(view, actor, 'recruit');
+  const denied = ownCity(view, actor) ?? checkCampaignActor(view, actor, 'form_unit', value);
   if (denied) return { ok: false as const, ...denied };
   const args = formArgs.safeParse(value);
   if (!args.success) return { ok: false as const, ...fail('BAD_ARGS', '빈 부곡의 병종을 확인하세요.') };
@@ -82,7 +82,7 @@ export function createCityResourceCommandResolver(base: CommandResolver): Comman
         key === 'conscript' ||
         ((key === 'train' || key === 'morale') && value && typeof value === 'object' && 'target' in value)
       ) {
-        const denial = checkCampaignActor(view, actor, key);
+        const denial = checkCampaignActor(view, actor, key, value);
         return denial
           ? { ok: false as const, ...denial }
           : applyCityPreparation(view, actor, key as 'recruit' | 'conscript' | 'train' | 'morale', value);

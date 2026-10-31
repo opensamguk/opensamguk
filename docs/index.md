@@ -82,6 +82,8 @@
 
 통합 상세 작업은 [INT-02](./plans/INT-02.md), [INT-03](./plans/INT-03.md), [INT-04](./plans/INT-04.md), [INT-06](./plans/INT-06.md), [INT-09](./plans/INT-09.md), [INT-10](./plans/INT-10.md), [INT-11](./plans/INT-11.md), [INT-12](./plans/INT-12.md), [INT-14](./plans/INT-14.md), [INT-15](./plans/INT-15.md), [INT-16](./plans/INT-16.md), [INT-17](./plans/INT-17.md)에 둔다. 2026-10-29 추가 요청의 [INT-18 도시 자원·수비병·부곡 배속](./plans/INT-18.md)은 기존 완료 증거와 분리한 후속 계획이다. 도시 세수 적립과 모병·수비 비용의 도시 부담은 사용자 확정이며 규칙 검토·구현·실제 인수는 남아 있다.
 
+2026-10-30 추가 범위인 [INT-19 장수 지시·수신·실행](./plans/INT-19.md)은 AC-INT-19A~C의 계획·검증 경계를 기록한다. 기존 통합판의 완료 기록과 별도로 인수한다.
+
 ## architecture/ 무엇이 어디서 실행되나
 
 | 문서                                                    | 상태 | 필요 시점 |
