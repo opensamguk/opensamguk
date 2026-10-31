@@ -62,7 +62,8 @@ test('AC-INT-10 정식191년 실제 API·80표식·375px·키보드·지연 공�
         }),
       );
     });
-    expect(decoded).toHaveLength(5);
+    // INT-20: 그림 수는 배율에 따라 바뀐다(멀리서는 바탕 그림과 깃발, 가까이서는 표식 그림). 모두 해독되어야 한다.
+    expect(decoded.length).toBeGreaterThanOrEqual(2);
     expect(decoded.every(Boolean)).toBe(true);
     for (const [kind, count] of [
       ['CITY', 53],

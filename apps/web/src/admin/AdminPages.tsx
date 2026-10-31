@@ -4,7 +4,7 @@ import { Link, Outlet, useRouteContext, useRouter } from '@tanstack/react-router
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useTRPCClient } from '../trpc';
 import { publicFailure } from '../auth/credentials';
-import { ErrorState, LoadingState } from '../ui/States';
+import { ErrorState, LoadingState, StateIconsContext } from '../ui/States';
 import { auditFilter, searchFilter, type AuditFilter } from './filters';
 import { usePrivateRead } from './usePrivateRead';
 import { AdminUserDetail } from './AdminUserDetail';
@@ -92,41 +92,43 @@ export function AdminLayout() {
     };
   }, [router, client, viewerId]);
   return (
-    <main className={styles.shell}>
-      <header className={styles.top}>
-        <h1>관리자 콘솔</h1>
-        <Link to="/lobby">로비</Link>
-      </header>
-      <nav aria-label="관리자 메뉴" className={styles.side}>
-        <Link to="/admin" preload={false}>
-          안내
-        </Link>
-        <Link to="/admin/worlds" preload={false}>
-          월드 목록
-        </Link>
-        <Link to="/admin/users" preload={false}>
-          사용자 찾기
-        </Link>
-        <Link to="/admin/audit" preload={false}>
-          감사 기록
-        </Link>
-        <Link to="/admin/notices" preload={false}>
-          공지 관리
-        </Link>
-      </nav>
-      <p className={styles.privacy}>조회 결과에는 개인정보가 포함됩니다. 필요한 범위만 확인하세요.</p>
-      {checkError ? (
-        <ErrorState
-          title="접근 권한을 확인하지 못했습니다. 작성 내용은 이 탭에 보존했습니다."
-          onRetry={() => retryCheck.current()}
-        />
-      ) : checking ? (
-        <LoadingState>접근 권한 확인 중</LoadingState>
-      ) : null}
-      <section key={viewerId} hidden={checking} inert={checking}>
-        <Outlet />
-      </section>
-    </main>
+    <StateIconsContext.Provider value={false}>
+      <main className={styles.shell}>
+        <header className={styles.top}>
+          <h1>관리자 콘솔</h1>
+          <Link to="/lobby">로비</Link>
+        </header>
+        <nav aria-label="관리자 메뉴" className={styles.side}>
+          <Link to="/admin" preload={false}>
+            안내
+          </Link>
+          <Link to="/admin/worlds" preload={false}>
+            월드 목록
+          </Link>
+          <Link to="/admin/users" preload={false}>
+            사용자 찾기
+          </Link>
+          <Link to="/admin/audit" preload={false}>
+            감사 기록
+          </Link>
+          <Link to="/admin/notices" preload={false}>
+            공지 관리
+          </Link>
+        </nav>
+        <p className={styles.privacy}>조회 결과에는 개인정보가 포함됩니다. 필요한 범위만 확인하세요.</p>
+        {checkError ? (
+          <ErrorState
+            title="접근 권한을 확인하지 못했습니다. 작성 내용은 이 탭에 보존했습니다."
+            onRetry={() => retryCheck.current()}
+          />
+        ) : checking ? (
+          <LoadingState>접근 권한 확인 중</LoadingState>
+        ) : null}
+        <section key={viewerId} hidden={checking} inert={checking}>
+          <Outlet />
+        </section>
+      </main>
+    </StateIconsContext.Provider>
   );
 }
 
