@@ -1,7 +1,7 @@
 # INT-22 병종 확장: 창극병 계열, 원작·사료 병종, 전투 특수 효과
 
 > AC-INT-22 · 구현 Codex · 리뷰 Claude · 결정 [D-054](../product/decisions.md) · 사용자 직접 요청 2026-11-01
-> 상태: 상세 계획 제안 2판. 1판(`5d6e3e05`)은 Codex G-03에서 보류(P1 4건, P2 6건)였고 이 판이 그 지적을 반영했다. 재검토 전이다.
+> 상태: 상세 계획 제안 3판. 1판(`5d6e3e05`)은 Codex G-03 보류(P1 4건, P2 6건), 2판(`30a3567e`)은 재검토 보류(P1 2건, P2 4건)였고 이 판이 두 번의 지적을 반영했다. 3차 검토 전이다.
 > 기준: main `d2202e13`, core2026 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`(MIT, devsam). 원작 줄은 이 커밋의 `resources/unitset/unitset_event_more_crewtype.json`, `packages/logic/src/war/`다.
 > 함께 보는 계획: [T4-09](./T4-09.md)(연구 6종), [T4-10](./T4-10.md)(화륜차 연구), [T4-07](./T4-07.md)(준비 턴), [T4-53](./T4-53.md)(연구 등록), [T4-72](./T4-72.md)(초토화), [T4-73](./mvp-command-gaps.md)(증축), [T1-03](./T1-03.md)(가정 A7)
 
@@ -155,9 +155,9 @@ SAN10 지도에서는 `region`을 191년 州 코드로 쓴다.
 
 남중은 『華陽國志』 南中志의 범위(건녕·운남·영창·월수·장가 쪽)다. 옹주는 興平 원년(194)에 생겨 191년 기준에서 쓰지 않는다. 거점별 값은 SAN10 지도 사료 검토 세션의 표(`191년 州·郡國` 열)로 채운다. 그 세션이 제안한 원작 8지역 값으로의 region 수정은 이 코드와 겹쳐 적용하지 않는다.
 
-바뀌는 곳은 region 범위 하나다. 운영 지도 스키마(`world/map/operational.ts:25`, `:34`)의 1~8을 1~16으로 넓힌다. 검증 경고(`world/validate/map.ts:42`)와 편집기 검증(`world/resourceEditor/validate/map.ts:46`), 개발 편집기(`apps/web/src/mapEditor/contract.ts:111`, `MapEditorPage.tsx`)도 같은 범위로 고친다. 기존 지도의 값은 모두 1~8이라 결과가 같다.
+region 범위는 1~8에서 1~16으로 넓힌다. 고칠 곳은 운영 지도 스키마(`world/map/operational.ts:25`, `:34`), 검증 경고(`world/validate/map.ts:42`), 자원 편집기 검증(`world/resourceEditor/validate/map.ts:46`, 문구 `issues.ts:28`), 개발 편집기의 범위 상수(`apps/web/src/mapEditor/validate.ts:30` `REGION_RANGE`)와 진단 문구다. 기존 지도의 값은 모두 1~8이라 결과가 같다. 개발 편집기는 지금 v3 운영 지도를 받지 않으며 이 작업에서도 그대로 둔다. SAN10 편집 왕복은 지원 범위 밖이다. 범위 상수만 바꾸고 v3 거부와 기존 v2 왕복 시험이 그대로인지 확인한다.
 
-`expanded` 판은 선택 칸 `maps: ['san10']`으로 쓸 수 있는 지도를 적는다. 월드 생성 검증(`validateWorldResources`)은 판에 `maps`가 있고 지도 id가 목록에 없으면 거부한다. 그래서 che·통합 지도의 옛 region 뜻과 섞이지 않는다.
+region 숫자의 뜻은 지도 내용에 적는다. 운영 지도 최상위에 선택 칸 `regionScheme`을 더하고 SAN10 지도에는 `"province-191"`을 넣는다. 병종 판에도 같은 이름의 선택 칸을 두고 `expanded`는 `"province-191"`이다. 공통 생성 경계인 `buildInitialWorld`(`world/bootstrap.ts:119-127`)는 병종 판에 `regionScheme`이 있으면 지도의 값과 같은지 보고 다르면 생성을 멈춘다. 엔진 생성·재초기화·CLI·시험 모두 이 함수를 지나므로 검증기를 건너뛰는 경로가 없다. che·통합 지도와 이 변경 전의 SAN10 내용에는 이 칸이 없어 `expanded`로 만들 수 없다. 시험은 이 셋의 거부와 새 SAN10의 허용을 하나씩 본다.
 
 ### 병종 조건 검사
 
@@ -209,11 +209,11 @@ SAN10 지도에서는 `region`을 191년 州 코드로 쓴다.
 
 배수는 모두 `damage()` 안의 위력에 곱하고 지금처럼 `Math.round` 뒤 `max(1, …)`, `min(상대 병력, …)`을 한다. 배수끼리는 위 표 순서(`guard5` → `cavalryClash`)로 곱한다. 기존 `attackerModifiers`·`defenderModifiers` 적용은 그 뒤다.
 
-선제 단계. 어느 쪽이든 `firstVolley`가 있으면 정규 페이즈 전에 한 번 한다. 한쪽만 가지면 그쪽만 평소 위력의 2/3로 쏘고 상대는 쏘지 않는다. 양쪽 다 가지면 서로 2/3로 쏜다. 난수는 쏘는 쪽만, 공격측 → 수비측 순서로 지금 `damage()`의 한 번씩을 쓴다. 피해는 동시에 반영한다. 이 단계는 `BATTLE_PHASES`에 세지 않고 사기도 줄이지 않는다. 끝난 뒤 한쪽 병력이 0이면 정규 페이즈를 하지 않는다.
+선제 단계. 어느 쪽이든 `firstVolley`가 있고 두 쪽 모두 병력과 사기가 0보다 크면 정규 페이즈 전에 한 번 한다. 한쪽이라도 병력이나 사기가 0이면 선제 단계를 건너뛰고 난수도 쓰지 않는다(지금 반복 조건과 같다). 부곡전의 성벽 0 상대(`campaign/skirmish.ts:102`)와 보급으로 사기가 0이 된 부대도 여기에 걸린다. 한쪽만 가지면 그쪽만 평소 위력의 2/3로 쏘고 상대는 쏘지 않는다. 양쪽 다 가지면 서로 2/3로 쏜다. 난수는 쏘는 쪽만, 공격측 → 수비측 순서로 지금 `damage()`의 한 번씩을 쓴다. 피해는 동시에 반영한다. 이 단계는 `BATTLE_PHASES`에 세지 않고 사기도 줄이지 않는다. 끝난 뒤 한쪽 병력이 0이면 정규 페이즈를 하지 않는다.
 
 정규 페이즈. 지금 반복 조건(`BATTLE_PHASES`, 병력·사기 0)은 그대로다. 한 페이즈 안에서는 이 순서로 처리한다.
 
-1. `hold`: 수비측이 가지고 이번 전투에서 아직 쓰지 않았으면 난수 하나로 `(훈련+사기)/400` 판정을 한다. 성공하면 이 페이즈는 양쪽 피해 계산과 피해 난수를 건너뛰고 사기도 줄이지 않으며 페이즈 수에는 센다. 전투당 한 번이다.
+1. `hold`: 수비측이 가지고 이번 전투에서 아직 성공하지 않았으면 페이즈마다 난수 하나로 `(훈련+사기)/400` 판정을 한다. 실패하면 다음 페이즈에 다시 판정한다. 성공하면 이 페이즈는 양쪽 피해 계산과 피해 난수를 건너뛰고 사기도 줄이지 않으며 페이즈 수에는 센다. 한 번 성공한 뒤로는 판정하지 않는다. 원작 che_저지시도가 매 페이즈 시도하고 발동은 한 번인 것과 같다.
 2. `avoid`: 공격측, 수비측 순서로 가진 쪽만 난수 하나씩 판정한다. 성공한 쪽이 이 페이즈에 받는 피해는 × 1/6이다.
 3. 지금과 같이 수비측이 받는 피해, 공격측이 받는 피해 순서로 `damage()`를 부르고 동시에 반영한 뒤 사기를 줄인다.
 
@@ -240,15 +240,19 @@ SAN10 지도에서는 `region`을 191년 州 코드로 쓴다.
 
 `expanded.json`은 생성기 `tools/unitset/build-expanded.ts`가 만든다. 원작 값은 core2026 `df6c926` 판에서 옮기고 `resources/NOTICE.md`에 출처를 적는다.
 
-SAN10 게시(`tools/san10-resources.ts`)는 manifest 목록을 `MAP/san10/1,SCENARIO/san10-191/1,SCENARIO/san10-empty/1`로 고정하고 검증 재료로 `basic.json`을 읽는다. 바꿀 곳은 셋이다.
+엔진은 초기 월드 자원으로 1판만 읽는다. 조회가 판 1로 고정이고(`apps/engine/src/world/resources.ts:62`), 합성이 1판이 아니면 거부하며(`:85`), 재초기화 출처 검사도 판을 1로 묶는다(`apps/engine/src/admin/resetPreparation.ts:56`). 생성 요청에도 판 칸이 없다. 그래서 州 코드와 `regionScheme`은 새 2판이 아니라 D-052의 선례대로 `MAP/san10` 1판의 내용을 바꿔 싣는다. 이 변경 전에 SAN10을 게시한 DB는 게시 검사(`tools/san10-resources.ts`의 「기존 SAN10 게시 자원과 다릅니다」)에서 멈추므로 다시 만든다. 운영 월드를 다시 만드는 일이라 자원 PR 전에 사용자 확인을 받는다(질문 절). 엔진에 자원 판 선택을 넣는 일은 이 작업 범위 밖이다.
 
-- `resources/san10-manifest.json`에 `UNIT_SET/expanded/1`과 州 코드를 채운 `MAP/san10/2`를 더한다. `MAP/san10/1`은 게시된 내용 그대로 둔다. 기존 게시 행과 다르면 멈추는 지금 검사도 그대로다.
-- 목록 검사를 새 목록으로, 시나리오 검증 재료를 `MAP/san10/2`와 `expanded`로 바꾼다.
-- 서버 SAN10 프로필(`apps/server/src/admin/worldCreateOptions.ts`의 `san10Selection`·참조 행 `:88`)이 `unitSetKey: 'expanded'`와 지도 2판을 가리키게 한다. 지금 참조 행은 판을 1로 고정하므로 프로필마다 판을 적게 고친다. 개수 계약(`counts`)은 지도 검토 결과에 맞춘다.
+바꿀 곳은 다섯이다.
 
-엔진의 `resolveWorldResourceSelection`(`apps/engine/src/world/resources.ts:28`)의 `unitSet ?? 'basic'`은 바꾸지 않는다. 재생 원본 추론이 같은 함수를 써서 기본값을 바꾸면 판을 적지 않고 만든 기존 SAN10 월드의 재생이 깨진다. 생성 요청(`apps/engine/src/admin/createRequests.ts:54`, `resetPreparation.ts:337`)은 프로필이 준 키를 그대로 쓰므로 고치지 않는다.
+- 지도 생성기: `tools/map-data/san10.ts`가 거점마다 州 코드를 region에 넣고 최상위 `regionScheme: "province-191"`을 쓴다. 값의 원천은 지도 사료 검토 표의 州 열이며 표에 없는 거점이 있으면 생성을 멈춘다. `tools/map-data/build-san10-resources.ts:25-37`은 지금처럼 `resources/map/san10.json`과 manifest를 함께 다시 쓴다.
+- manifest 생성: 같은 도구가 manifest 목록에 `UNIT_SET/expanded/1`(경로 `resources/unitset/expanded.json`)을 더해 쓴다. 손으로 고친 manifest가 재생성 때 사라지지 않게 한다.
+- 게시 도구: `tools/san10-resources.ts`의 고정 목록 검사를 `MAP/san10/1,SCENARIO/san10-191/1,SCENARIO/san10-empty/1,UNIT_SET/expanded/1`로, 시나리오 검증 재료의 병종 판을 `expanded`로 바꾼다.
+- 서버 SAN10 프로필: `apps/server/src/admin/worldCreateOptions.ts`의 `san10Selection`에 `unitSetKey: 'expanded'`를 넣는다. 참조 행(`:88`)은 선택의 이름을 그대로 쓰므로 판 1이 맞다. 개수 계약(`counts`)은 지도 검토 결과에 맞춘다.
+- 프리셋: SAN10 프리셋 다섯 개(`resources/preset/regular·speed·beginner·hardcore·empty.json`)의 `"unitSet": "basic"`을 `"expanded"`로 바꾼다. 생성 요청은 `intent.unitSetKey ?? preset?.unitSet ?? 'basic'`(`apps/engine/src/admin/createRequests.ts:54`) 순서라 프로필 없이 프리셋만 주는 생성도 새 판을 고른다. 기존 월드는 생성 때 고른 `world.unitSetKey`와 저장한 프리셋 내용으로 재초기화하므로(`resetPreparation.ts:177`, `:194`) 파일 변경의 영향을 받지 않는다. 이것은 기존 월드의 재초기화 시험으로 확인한다.
 
-`MAP/san10`이 2판이 되면 D-052처럼 이 변경 전에 SAN10을 게시한 DB는 다시 만든다. 규모·연결·파양 정리(지도 검토 세션)와 같은 2판에 묶을지는 그 세션의 사용자 결정에 따른다.
+엔진의 `resolveWorldResourceSelection`(`apps/engine/src/world/resources.ts:28`)의 `unitSet ?? 'basic'`은 바꾸지 않는다. 재생 원본 추론이 같은 함수를 써서 기본값을 바꾸면 판을 적지 않고 만든 기존 월드의 재생이 깨진다.
+
+규모·연결·파양 정리(지도 검토 세션)도 같은 1판 내용을 바꾼다. 두 변경을 한 번의 DB 재생성으로 묶을지는 그 세션의 사용자 결정에 따른다.
 
 ### 해시 보존
 
@@ -256,18 +260,18 @@ SAN10 게시(`tools/san10-resources.ts`)는 manifest 목록을 `MAP/san10/1,SCEN
 
 - `requirements`가 빈 배열이거나 없으면 출력에서 뺀다.
 - `effects`가 빈 배열이거나 없으면 출력에서 뺀다.
-- `coefMode`·`maps`가 없으면 출력에 넣지 않는다.
+- 병종 판의 `coefMode`·`regionScheme`, 운영 지도의 `regionScheme`이 없으면 출력에 넣지 않는다.
 - 그 밖의 칸은 지금처럼 버린다.
 
-그래서 `basic.json`을 읽은 결과는 지금과 같다. 시험은 `unitSetSchema.parse(basic.json)`의 지금 스냅샷, `buildInitialWorld`로 만든 che·통합·SAN10 1판 월드의 초기 상태 해시, 기존 재생 골든 해시를 바꾸지 않고 비교한다. 운영 지도 스키마는 region 범위만 넓히므로 기존 지도 읽기 결과도 같다.
+그래서 `basic.json`을 읽은 결과는 지금과 같다. 시험은 `unitSetSchema.parse(basic.json)`의 지금 스냅샷, `buildInitialWorld`로 만든 che·통합 월드와 이 변경 전 SAN10 내용 월드의 초기 상태 해시, 기존 재생 골든 해시를 바꾸지 않고 비교한다. 운영 지도 스키마는 region 범위를 넓히고 선택 칸 하나를 더할 뿐이라 기존 지도 읽기 결과도 같다.
 
 ### 범위
 
 | PR | 파일 | 시작 조건 |
 | --- | --- | --- |
-| 1 규칙 | `world/resources.ts`(병종 행 `requirements`·`effects`, 판 `coefMode`·`maps`, 해시 보존), `world/crewRequirements.ts`와 시험, 위 모병 경로 표의 여섯 파일, 계수 키 검증 두 곳, region 범위(스키마·검증·편집기), 생성 검증의 `maps` 검사, 명령 대응표 두 행과 AC-M1-14·README 집계 | G-03 통과 |
+| 1 규칙 | `world/resources.ts`(병종 행 `requirements`·`effects`, 판 `coefMode`·`regionScheme`, 해시 보존), 운영 지도의 `regionScheme`과 region 범위(스키마·검증·자원 편집기·개발 편집기 상수), `buildInitialWorld`의 `regionScheme` 검사, `world/crewRequirements.ts`와 시험, 위 모병 경로 표의 여섯 파일, 계수 키 검증 두 곳, 명령 대응표 두 행과 AC-M1-14·README 집계 | G-03 통과 |
 | 2 전투 | `battle/simulate.ts`(`coefMode`, 계수 조회, 효과, 선제 단계), `basic` 회귀 시험(난수 호출 수·상태 포함). 호출부 `commands/attack.ts:80`·`:116`, `campaign/skirmish.ts:71`·`:105`·`:161`, `apps/web/src/battleSim/compute.ts:27`은 입력이 그대로라 고치지 않고 시험만 더한다 | PR 1 |
-| 3 자원 | `resources/unitset/expanded.json`, 생성기, 균형 도구와 표, `resources/NOTICE.md`, `MAP/san10/2`(州 코드), manifest·게시 도구, 서버 SAN10 프로필 | PR 2, 지도 검토 세션의 州 열 |
+| 3 자원 | `resources/unitset/expanded.json`과 생성기, 균형 도구와 표, `resources/NOTICE.md`, 지도 생성기(州 코드·`regionScheme`)와 `resources/map/san10.json`, manifest 생성·게시 도구, 서버 SAN10 프로필, 프리셋 다섯 개, 두 번 생성해 같은 해시인지 보는 재현 시험 | PR 2, 지도 검토 세션의 州 열, 운영 DB 재생성 사용자 확인 |
 | 4 화면 | 병종 목록 응답에 고를 수 있는지와 이유(`campaignApi.ts:253`, `cityResourcesApi.ts:201`, 모병·징병 명령의 병종 목록), 고르기 화면의 이유 표시, 전투 시뮬레이터의 판 선택(`apps/web/src/battleSim/publicUnitSet.ts`), 도움말 병종 표와 창작 표시 | PR 3 |
 
 ### 하지 않는 것
@@ -292,9 +296,10 @@ SAN10 게시(`tools/san10-resources.ts`)는 manifest 목록을 `MAP/san10/1,SCEN
 
 조건 검사는 모병·징병·부곡 모병·빈 부곡 편성·수비병·미리보기·NPC 경로마다 기술·州·도시·규모·연도·연구·초토화·수뇌·모집 불가 조건을 하나씩 실패시키고 이유 문구를 본다. PR 1~4에서 연구·초토화 조건은 막히는 것만 인수한다. 연구를 마친 뒤 열리는 것은 T4-09·T4-10과 T4-53 등록 뒤에 인수한다.
 
-재생은 `expanded` SAN10 월드를 실제 DB로 만들어 12개월 돌린다. 그리고 생성 직후 상태, DB 재적재 상태, 엔진 재시작 뒤 상태, 순수 재생 결과의 해시가 서로 같은지 엔진 통합 시험으로 본다. `basic` 쪽은 기존 전투 시험(규칙 164건, 엔진 전투 통합 18건)과 재생 골든 해시가 그대로인지 본다. 화면은 실제 Chromium으로 조건 이유 표시와 375px 배치를 본다. 균형 표를 PR에 붙이고 독립 리뷰를 받는다.
+재생은 `expanded` SAN10 월드를 실제 DB로 만들어 두 가지를 엔진 통합 시험으로 본다. 첫째, 생성 직후 상태의 해시와 그 상태를 바로 DB에서 다시 읽은 해시가 같다. 둘째, 12개월을 돌린 뒤 같은 tick·같은 입력 순번에서 DB 재적재 상태, 엔진 재시작 뒤 상태, 생성 기록과 입력만으로 다시 돌린 순수 재생 상태의 해시가 셋 다 같다. `basic` 쪽은 기존 전투 시험(규칙 164건, 엔진 전투 통합 18건)과 재생 골든 해시가 그대로인지 본다. 화면은 실제 Chromium으로 조건 이유 표시와 375px 배치를 본다. 균형 표를 PR에 붙이고 독립 리뷰를 받는다.
 
 ### 질문
 
+- 사용자 확인(자원 PR 전): `MAP/san10` 1판 내용을 바꾸므로 SAN10을 게시한 DB와 그 월드를 다시 만들어야 한다. D-052와 같은 처리다.
 - 사용자 결정: 지금 `basic` 판도 원작식 계산으로 고칠지. 고치면 상성이 실제로 작동하지만 기존 월드의 전투 결과와 재생이 바뀐다. 이 작업은 `basic`을 그대로 두고 `expanded`만 원작식으로 한다.
 - G-03 1차 지적 가운데 원작 기술 단위·성장 속도가 같은지는 Codex도 확인 불가였다. 원작 값을 그대로 쓰고 SAN10 191 시작 기술 1000에서 첫 단계가 바로 열리는 것을 받아들인다. 균형 검사와 실제 플레이에서 문제가 보이면 다시 묻는다.
