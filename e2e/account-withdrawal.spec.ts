@@ -526,6 +526,10 @@ test('T3-03 AC-M3-02 실제 성공 응답 유실과 늦은 응답은 재접수·
 
 test('T3-03 AC-M3-02 실제429는 Retry-After까지 재조회·입력·자동 재접수0', ({ page, legalStack: stack }) =>
   track(async () => {
+    // 요청 제한은 벽시계 15분 고정 창이다. 다섯 번 실패와 여섯 번째 요청 사이에 창이 바뀌면 계수가 0이 되어
+    // 429 대신 200이 온다. 경계까지 60초가 안 남았으면 경계를 넘긴 뒤 시작한다.
+    const left = 900_000 - (Date.now() % 900_000);
+    if (left < 60_000) await page.waitForTimeout(left + 1_000);
     await approved(stack, 'limit');
     const user = await account(stack, page);
     for (let index = 0; index < 5; index++) {
