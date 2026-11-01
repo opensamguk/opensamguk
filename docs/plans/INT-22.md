@@ -25,9 +25,9 @@
 | 기병→궁병 | 1988 | 3641 |
 | 보병→궁병 | 1547 | 2611 |
 
-보병과 기병은 상성이 있어도 비긴다. 궁병은 상성상 이겨야 할 기병에게 진다. 남는 차이는 공격·방어 능력치뿐이다. 원작은 자기 위력에 `attackCoef[상대]`를, 상대 위력에 자기 `defenceCoef[상대]`를 곱한다(`war/units/base.ts:286-287`). 그래서 유리한 쪽은 1.2×1.2=1.44배, 불리한 쪽은 0.8×0.8=0.64배가 된다.
+보병과 기병은 상성이 있어도 비긴다. 궁병은 상성상 이겨야 할 기병에게 진다. 남는 차이는 공격·방어 능력치뿐이다. 원작은 전투 단위마다 자기 위력에 자기 `attackCoef[상대]`를 곱하고 상대 위력에 자기 `defenceCoef[상대]`를 곱한다(`war/units/base.ts:286-287`). 그래서 a가 b에게 주는 피해의 배수는 `a.attackCoef[b] × b.defenceCoef[a]`다. 보병이 궁병을 칠 때는 보병 `attackCoef[궁]` 1.2 × 궁병 `defenceCoef[보]` 1.2 = 1.44, 궁병이 보병을 칠 때는 궁병 `attackCoef[보]` 0.8 × 보병 `defenceCoef[궁]` 0.8 = 0.64다.
 
-사용자가 2026-11-01 `basic`도 원작식으로 고치도록 승인했다. 다만 이미 만든 월드의 재생은 지켜야 하므로 계산식은 월드 단위 규칙 기능으로 고른다. 새 규칙 기능 `battle-affinity-v2`를 `ruleFeatures.ts`에 등록하고 서버 생성 프로필의 `creationFeatures`(`apps/server/src/admin/worldCreateOptions.ts:19`)에 더한다. 이 기능이 켜진 월드는 판과 상관없이 원작식으로 계산한다. 켜지지 않은 기존 월드는 지금 나누기 식을 그대로 쓴다. `expanded` 판에는 선택 칸 `coefMode: "multiply"`를 두고 `buildInitialWorld`가 이 판을 쓰는 월드에 `battle-affinity-v2`가 없으면 생성을 멈춘다. 전투 호출부(`commands/attack.ts`, `campaign/skirmish.ts`)는 `state.ruleFeatures`에서 계산식을 읽어 `simulateBattle` 입력에 넘긴다. 웹 전투 시뮬레이터는 새 월드와 같은 원작식을 기본으로 하고 옛 식을 고르는 선택지를 둔다.
+사용자가 2026-11-01 `basic`도 원작식으로 고치도록 승인했다. 다만 이미 만든 월드의 재생은 지켜야 하므로 계산식은 월드 단위 규칙 기능으로 고른다. 새 규칙 기능 `battle-affinity-v2`를 `ruleFeatures.ts`에 등록하고 서버 생성 프로필의 `creationFeatures`(`apps/server/src/admin/worldCreateOptions.ts:19`)에 더한다. 이 기능이 켜진 월드는 판과 상관없이 원작식으로 계산한다. 켜지지 않은 기존 월드는 지금 나누기 식을 그대로 쓴다. `expanded` 판에는 선택 칸 `coefMode: "multiply"`를 둔다. `buildInitialWorld`는 규칙 기능을 입력받지 않으므로 이 검사를 넣지 않는다. 기능을 합친 뒤의 공통 경계인 `prepareInitialWorld`(`apps/engine/src/world/persistence.ts:56`)가 `state.unitSet.coefMode`가 `multiply`인데 `options.ruleFeatures`에 `battle-affinity-v2`가 없으면 거부한다. 관리자 생성(`apps/engine/src/admin/createRequests.ts:72-75`, 기능 합성 뒤), CLI 생성(`admin/creation.ts:6`), 재초기화(`admin/resetPreparation.ts:425`), 저장 경로(`world/persistence.ts:321`)가 모두 이 함수를 지난다. 시험은 네 경로마다 기능이 있으면 허용, 없으면 거부를 본다. 전투 호출부(`commands/attack.ts`, `campaign/skirmish.ts`)는 `state.ruleFeatures`에서 계산식을 읽어 `simulateBattle` 입력에 넘긴다. 웹 전투 시뮬레이터는 새 월드와 같은 원작식을 기본으로 하고 옛 식을 고르는 선택지를 둔다.
 
 ### 계열과 상성
 
@@ -55,7 +55,7 @@
 
 차병의 `defenceCoef`는 원작대로 보·궁·기·창극에 1.2, 목우만 1.0이다. 성벽(1000)은 원작대로 `attackCoef` 없음(1), `defenceCoef` 보병 1.2다. 원작 정란·벽력거·화륜차는 백이병(1106)·양마기병(91300)에 공격 1.112, 방어 1.067(정란·벽력거의 양마기병 방어는 1.112)을 병종 id로 따로 적었다. 충차도 같은 두 id에 공격 1.112, 방어 1.067이다. 이 예외를 그대로 옮긴다.
 
-계수 조회는 원작 `getAttackCoef`·`getDefenceCoef`(`war/crewType.ts:99-120`)처럼 병종 id 키, 계열 키, 1 순서로 찾고 먼저 찾은 값 하나만 쓴다(곱하지 않는다). 계수 0은 허용한다. 빈 배열 `[]`은 지금처럼 모두 1이다. 두 검증기(`world/validate/unitSet.ts`, `world/resourceEditor/validate/unitSet.ts`)는 계열 키와 같은 판의 병종 id 키를 받고 둘 다 아닌 키는 오류로 낸다. 계열 키 0(성벽)도 받는다. 같은 숫자가 계열 번호이면서 병종 id인 판은 거부한다. 시험은 id 우선, 계열 대체, 알 수 없는 키, 계수 0, `basic`의 빈 배열과 계열 키 불변을 본다.
+계수 조회는 원작 `getAttackCoef`·`getDefenceCoef`(`war/crewType.ts:99-120`)처럼 병종 id 키, 계열 키, 1 순서로 찾고 먼저 찾은 값 하나만 쓴다(곱하지 않는다). 계수 0은 허용한다. 빈 배열 `[]`은 지금처럼 모두 1이다. 두 검증기(`world/validate/unitSet.ts`, `world/resourceEditor/validate/unitSet.ts`)는 계열 키와 같은 판의 병종 id 키를 받고 둘 다 아닌 키는 오류로 낸다. 계열 키 0(성벽)도 받는다. 같은 숫자가 계열 번호이면서 병종 id인 판은 거부한다. 시험은 id 우선, 계열 대체, 알 수 없는 키, 계수 0, `basic`의 빈 배열과 계열 키 불변을 본다. 원작식 `damage()`는 `a.crew × (a.attack / max(1, b.defence + 성벽 수비)) × A × D × 훈련 × 사기 × 기술 × DAMAGE_FACTOR × 난수`이고 A는 공격 병종 a의 `attackCoef`에서 수비 병종 b의 id·계열로, D는 수비 병종 b의 `defenceCoef`에서 a의 id·계열로 찾는다. 비대칭 계수 시험(a의 `attackCoef[b]` 1.3, b의 `defenceCoef[a]` 0.9 → 배수 1.17, 반대 방향은 각자의 값)으로 소유자와 조회 대상을 고정한다.
 
 이 표대로면 궁병이 두 계열을 이기고 기병이 두 계열에 진다. 수치는 아래 균형 검사로 맞추며 검사가 실패하면 기본 병종의 공격·방어·비용을 고친다.
 
@@ -217,7 +217,7 @@ region 숫자의 뜻은 지도 내용에 적는다. 운영 지도 최상위에 �
 2. `avoid`: 공격측, 수비측 순서로 가진 쪽만 난수 하나씩 판정한다. 성공한 쪽이 이 페이즈에 받는 피해는 × 1/6이다.
 3. 지금과 같이 수비측이 받는 피해, 공격측이 받는 피해 순서로 `damage()`를 부르고 동시에 반영한 뒤 사기를 줄인다.
 
-효과가 하나도 없는 두 병종의 전투는 지금과 같은 순서로 같은 수의 난수를 쓴다. 회귀 시험은 `basic` 전체 쌍과 성벽전에서 최종 병력·사기, 난수 호출 수, 전투 뒤 난수 상태(다음 값)를 지금 구현과 비교한다.
+효과가 하나도 없는 두 병종의 전투는 지금과 같은 순서로 같은 수의 난수를 쓴다. 결과까지 같다는 보장은 `battle-affinity-v2`가 없는 월드에만 해당한다. 회귀 시험은 그 기능이 없는 월드의 `basic` 전체 쌍과 성벽전에서 최종 병력·사기, 난수 호출 수, 전투 뒤 난수 상태(다음 값)를 지금 구현과 비교한다.
 
 ### 연구 병종
 
