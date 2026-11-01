@@ -180,24 +180,55 @@ function alongCorners(corners: readonly Point[]): Point[] {
   return out;
 }
 
-function clearRun(start: Point, end: Point, blocked: (point: Point) => boolean, options: readonly Point[][]): Point[] {
+export function clearRun(start: Point, end: Point, blocked: (point: Point) => boolean, options: readonly Point[][]): Point[] {
   for (const corners of options) {
     const run = alongCorners(corners);
     if (!run.some(blocked)) return run;
   }
-  // 상자 칸을 가장 적게 밟고(0-1 너비 우선), 그다음 가장 짧은 가로세로 길. 두 점을 둘러싼 범위 밖으로 8칸까지만 찾는다.
-  // 표식이 서로 붙어 피할 길이 없어도 상자를 덜 지나는 길을 고르고, 막힌 기본 꺾임으로 되돌아가지 않는다.
+  // 상자 칸을 가장 적게 밟고, 그다음 가장 짧은 가로세로 길(밟은 칸 수·길이 순 비용의 다익스트라).
+  // 두 점을 둘러싼 범위 밖으로 8칸까지만 찾는다. 표식이 붙어 피할 길이 없어도 상자를 덜 지나는 길을 고르고,
+  // 막힌 기본 꺾임으로 되돌아가지 않는다.
   const x0 = Math.min(start.x, end.x) - 8;
   const x1 = Math.max(start.x, end.x) + 8;
   const y0 = Math.min(start.y, end.y) - 8;
   const y1 = Math.max(start.y, end.y) + 8;
+  const area = (x1 - x0 + 1) * (y1 - y0 + 1);
   const key = (point: Point) => `${point.x},${point.y}`;
+  // 밟은 칸 하나가 어떤 우회 길이보다 비싸도록 범위 칸 수를 곱한다.
   const cost = new Map<string, number>([[key(start), 0]]);
   const previous = new Map<string, Point | null>([[key(start), null]]);
-  const deque: Point[] = [start];
-  while (deque.length) {
-    const at = deque.shift()!;
-    const here = cost.get(key(at))!;
+  const heap: Array<[number, Point]> = [[0, start]];
+  const push = (item: [number, Point]) => {
+    heap.push(item);
+    for (let at = heap.length - 1; at > 0;) {
+      const up = (at - 1) >> 1;
+      if (heap[up]![0] <= heap[at]![0]) break;
+      [heap[up], heap[at]] = [heap[at]!, heap[up]!];
+      at = up;
+    }
+  };
+  const pop = () => {
+    const top = heap[0]!;
+    const last = heap.pop()!;
+    if (heap.length) {
+      heap[0] = last;
+      for (let at = 0; ;) {
+        const left = at * 2 + 1;
+        const right = left + 1;
+        let low = at;
+        if (left < heap.length && heap[left]![0] < heap[low]![0]) low = left;
+        if (right < heap.length && heap[right]![0] < heap[low]![0]) low = right;
+        if (low === at) break;
+        [heap[low], heap[at]] = [heap[at]!, heap[low]!];
+        at = low;
+      }
+    }
+    return top;
+  };
+  while (heap.length) {
+    const [here, at] = pop();
+    if (here > cost.get(key(at))!) continue;
+    if (at.x === end.x && at.y === end.y) break;
     for (const [dx, dy] of [
       [1, 0],
       [-1, 0],
@@ -206,14 +237,13 @@ function clearRun(start: Point, end: Point, blocked: (point: Point) => boolean, 
     ] as const) {
       const next = { x: at.x + dx, y: at.y + dy };
       if (next.x < x0 || next.x > x1 || next.y < y0 || next.y > y1) continue;
-      const step = blocked(next) && (next.x !== end.x || next.y !== end.y) ? 1 : 0;
+      const step = 1 + (blocked(next) && (next.x !== end.x || next.y !== end.y) ? area : 0);
       const total = here + step;
       const known = cost.get(key(next));
       if (known !== undefined && known <= total) continue;
       cost.set(key(next), total);
       previous.set(key(next), at);
-      if (step) deque.push(next);
-      else deque.unshift(next);
+      push([total, next]);
     }
   }
   const path: Point[] = [];

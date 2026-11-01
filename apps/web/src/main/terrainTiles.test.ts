@@ -6,6 +6,7 @@ import {
   SOUTH,
   TERRAINS,
   WEST,
+  clearRun,
   gatedWalk,
   isWaterRoute,
   roadTiles,
@@ -208,4 +209,31 @@ it('D-052 강릉(네 문)·공안(남문)처럼 붙은 표식은 상대 상자�
   expect(path.at(-1)).toEqual({ x: 236, y: 311 });
   // 공안에는 남문으로 들어온다.
   expect(path.at(-2)).toEqual({ x: 236, y: 312 });
+});
+
+it('D-052 상자를 같은 칸 수만큼 밟아야 하면 그중 가장 짧은 길을 고른다', () => {
+  // 시작 문 밖 칸이 상대 상자에 붙어 꺾임 길이 모두 막힐 때도, 우회는 상자를 덜 밟고 가장 짧아야 한다.
+  const path = gatedWalk(
+    [
+      { x: 101, y: 101 },
+      { x: 101, y: 121 },
+    ],
+    [
+      { cells: 2, allowed: ['S'] },
+      { cells: 2, allowed: ['N'], half: { x: 6, y: 2 } },
+    ],
+  );
+  // 문 밖으로 곧게 나가 바로 상대 북문으로 들어가는 길이 가장 짧다(가로로 돌지 않는다).
+  expect(path.every((point) => point.x === 50)).toBe(true);
+});
+
+it('D-052 피할 수 없는 상자는 가장 적게 밟고, 같은 칸 수면 가장 짧은 길을 고른다', () => {
+  // x=5 세로 벽이 찾는 범위 전체를 막아 한 칸은 밟아야 한다. 막힌 기본 꺾임은 쓰지 않는다.
+  const wall = (point: { x: number; y: number }) => point.x === 5;
+  const start = { x: 0, y: 0 };
+  const end = { x: 10, y: 0 };
+  const path = clearRun(start, end, wall, [[start, end]]);
+  expect(path.filter(wall)).toHaveLength(1);
+  expect(path).toHaveLength(10);
+  expect(path.at(-1)).toEqual(end);
 });
