@@ -44,62 +44,14 @@
   font-size: var(--text-xs);
   color: var(--color-text-muted);
 }
-.withMap {
-  display: grid;
-  grid-template-columns: minmax(0, 640px) minmax(320px, 420px);
-  grid-template-areas:
-    'art form'
-    'map form';
-  grid-template-rows: auto 1fr;
-  justify-content: center;
-  align-items: start;
-  gap: var(--space-6);
-  margin: 48px auto;
-  padding: 0 var(--space-4);
-}
 .formColumn {
-  grid-area: form;
   min-width: 0;
   padding: var(--space-6);
   background: var(--color-surface);
   border: var(--frame);
   box-shadow: var(--frame-inset), var(--shadow-step);
 }
-.art {
-  grid-area: art;
-  min-width: 0;
-  aspect-ratio: 16 / 9;
-  overflow: hidden;
-  border: var(--frame);
-  box-shadow: var(--shadow-step);
-  background: var(--color-surface-muted);
-}
-.artImage {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  image-rendering: pixelated;
-}
-.map {
-  grid-area: map;
-  min-width: 0;
-}
 @media (max-width: 640px) {
-  .withMap {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      'art'
-      'form'
-      'map';
-    grid-template-rows: none;
-    gap: var(--space-4);
-    margin-top: var(--space-4);
-  }
-  .art {
-    aspect-ratio: auto;
-    height: 120px;
-  }
   .page {
     margin: var(--space-6) var(--space-4);
     padding: var(--space-4);
