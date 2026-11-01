@@ -180,7 +180,12 @@ function alongCorners(corners: readonly Point[]): Point[] {
   return out;
 }
 
-export function clearRun(start: Point, end: Point, blocked: (point: Point) => boolean, options: readonly Point[][]): Point[] {
+export function clearRun(
+  start: Point,
+  end: Point,
+  blocked: (point: Point) => boolean,
+  options: readonly Point[][],
+): Point[] {
   for (const corners of options) {
     const run = alongCorners(corners);
     if (!run.some(blocked)) return run;
