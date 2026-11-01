@@ -172,14 +172,6 @@
       "source": "apps/web/src/art/map/level-9@128.png"
     },
     {
-      "sha256": "61b1441b68f63cb7220218402acc33f7d74c097fa33ac556c0c6ef471baaf28f",
-      "source": "apps/web/src/art/map/pass-ew.png"
-    },
-    {
-      "sha256": "8ad2a2e448d1154c5e6c8122e2fca826f81ab8348b1ddd2e6159aad5076e80b4",
-      "source": "apps/web/src/art/map/pass-ew@128.png"
-    },
-    {
       "sha256": "7d8a4d17a226ff11ffdaa0d0902b3958c7176faed514e4f2b1e3ffcba1b0a18d",
       "source": "apps/web/src/art/map/pass-wall-ew.png"
     },
@@ -194,14 +186,6 @@
     {
       "sha256": "fb01a7b2a67613ed99ffbe356501da8310ba59476b0151be99133c8bc35a2148",
       "source": "apps/web/src/art/map/pass-wall@128.png"
-    },
-    {
-      "sha256": "684ed7217c03fa51db0b24f592907ba601147c851b52ba790ce42f5f5f3d252a",
-      "source": "apps/web/src/art/map/pass.png"
-    },
-    {
-      "sha256": "0b58cfa87f63f93a9288289e916dd9c364ca50fc47a91ef2aa1012d3b5a3a9ec",
-      "source": "apps/web/src/art/map/pass@128.png"
     },
     {
       "sha256": "01c8899f17b0989acebb4d40dabacd32413043ef9399f31546df137fdcb3ea57",
