@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useId, useRef, useState, type KeyboardEvent } from 'react';
 import mapIconUrl from '../art/icons/map.png';
+import basemapUrl from '../main/san10-pixel-basemap.png';
 import { MapLegend, WorldMap } from '../main/WorldMap';
 import { useTRPC } from '../trpc';
 import { Tag } from '../ui/Tag';
@@ -11,7 +12,7 @@ import styles from './PublicMapTabs.module.css';
 const REFRESH_MS = 60_000;
 
 // 로그인 화면과 로비의 지연 공개 지도 (T2-25, D-026). 진행 중인 월드를 탭으로 고르고 지도는 하나만 그린다.
-export function PublicMapTabs() {
+export function PublicMapTabs({ backdrop = false }: { backdrop?: boolean } = {}) {
   const trpc = useTRPC();
   const maps = useQuery(
     trpc.world.publicMaps.queryOptions(undefined, {
@@ -20,7 +21,7 @@ export function PublicMapTabs() {
       refetchInterval: REFRESH_MS,
     }),
   );
-  return <PublicMapView data={maps.data} failed={maps.isError && !maps.data} />;
+  return <PublicMapView data={maps.data} failed={maps.isError && !maps.data} backdrop={backdrop} />;
 }
 
 // 공개할 월드가 없거나 아직 받는 중이면 문구 없이 자리만 둔다 (2026-10-23 소유자 지시).
@@ -28,15 +29,25 @@ export function PublicMapView({
   data,
   failed = false,
   now = new Date(),
+  backdrop = false,
 }: {
   data: PublicMaps | undefined;
   failed?: boolean;
   now?: Date;
+  /** 로그인 화면 배경. 지도가 상자를 가득 채우고, 월드가 없으면 바탕 그림만 깐다. */
+  backdrop?: boolean;
 }) {
   const baseId = useId();
   const [chosenId, setChosenId] = useState<string | null>(null);
   const tabRefs = useRef(new Map<string, HTMLButtonElement>());
 
+  const worlds = data?.worlds ?? [];
+  if (backdrop && (failed || !data || worlds.length === 0))
+    return (
+      <div className={styles.backdrop} data-testid="public-map" data-empty="true">
+        <img className={styles.backdropImage} src={basemapUrl} alt="" />
+      </div>
+    );
   if (failed) {
     return (
       <section className={styles.area} data-testid="public-map" aria-label="공개 지도">
@@ -44,7 +55,6 @@ export function PublicMapView({
       </section>
     );
   }
-  const worlds = data?.worlds ?? [];
   if (!data || worlds.length === 0) return <div className={styles.area} data-testid="public-map" data-empty="true" />;
 
   // 고른 월드가 다시 받은 목록에서 빠지면 첫 탭으로 돌아간다.
@@ -74,8 +84,8 @@ export function PublicMapView({
   };
 
   return (
-    <section className={styles.area} data-testid="public-map" aria-label="공개 지도">
-      <div className={styles.tabRow}>
+    <section className={backdrop ? styles.backdrop : styles.area} data-testid="public-map" aria-label="공개 지도">
+      <div className={backdrop ? `${styles.tabRow} ${styles.backdropBar}` : styles.tabRow}>
         <img className={styles.icon} src={mapIconUrl} alt="" width={32} height={32} />
         <div className={styles.tabs} role="tablist" aria-label="진행 중인 월드" onKeyDown={move}>
           {worlds.map((world, i) => {
@@ -104,17 +114,20 @@ export function PublicMapView({
         </div>
       </div>
       <div
-        className={styles.panel}
+        className={backdrop ? styles.backdropPanel : styles.panel}
         role="tabpanel"
         id={panelId}
         aria-labelledby={tabId(index)}
         data-world-id={current.id}
       >
         {current.map === null ? (
-          <p className={styles.note}>아직 공개 지도가 없습니다</p>
+          <p className={backdrop ? `${styles.note} ${styles.backdropNote}` : styles.note}>아직 공개 지도가 없습니다</p>
         ) : (
           <>
-            <p className={styles.when} data-testid="public-map-when">
+            <p
+              className={backdrop ? `${styles.when} ${styles.backdropWhen}` : styles.when}
+              data-testid="public-map-when"
+            >
               <time dateTime={current.map.takenAt}>{snapshotTimeText(current.map, now)}</time>
               {data.delayMinutes > 0 ? <span>{delayText(data.delayMinutes)}</span> : null}
             </p>
@@ -123,8 +136,16 @@ export function PublicMapView({
               cities={current.map.cities}
               nations={current.map.nations}
               operationalMap={current.map.operationalMap}
+              fill={backdrop}
             />
-            <MapLegend cities={current.map.cities} nations={current.map.nations} readOnly />
+            {backdrop ? (
+              <details className={styles.backdropLegend}>
+                <summary>범례</summary>
+                <MapLegend cities={current.map.cities} nations={current.map.nations} readOnly />
+              </details>
+            ) : (
+              <MapLegend cities={current.map.cities} nations={current.map.nations} readOnly />
+            )}
           </>
         )}
       </div>

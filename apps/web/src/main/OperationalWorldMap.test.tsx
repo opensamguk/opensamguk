@@ -10,7 +10,13 @@ import { URL as NodeURL } from 'node:url';
 const san10Resource: unknown = JSON.parse(
   readFileSync(new NodeURL('../../../../resources/map/san10.json', import.meta.url), 'utf8'),
 );
-import { matchesOperationalGeography, operationalOverview } from './OperationalWorldMap';
+import {
+  MIN_VIEW_WIDTH,
+  matchesOperationalGeography,
+  operationalOverview,
+  wheelFactor,
+  zoomAround,
+} from './OperationalWorldMap';
 
 afterEach(cleanup);
 const makeCity = (key: number, name: string, kind: 'CITY' | 'PASS', x: number): MapCity => ({
@@ -227,4 +233,24 @@ it('AC-INT-03 SAN10 GIS 해시·범위·도시 좌표가 다르면 다른 지도
   const changedCities = structuredClone(mapped);
   changedCities[0]!.x += 1;
   expect(matchesOperationalGeography(geography, changedCities)).toBe(false);
+});
+
+it('휠 확대는 커서 아래 지도 점을 그 자리에 두고 가장 큰 표식이 화면을 채울 만큼 들어간다', () => {
+  const view = { x: 100, y: 50, width: 400, height: 280 };
+  const zoomed = zoomAround(view, 2, 300, 120, 1000, 0.7);
+  expect(zoomed).toEqual({ x: 200, y: 85, width: 200, height: 140 });
+  // 커서 점의 화면 비율((cx-x)/width)이 확대 전후 같다.
+  expect((300 - zoomed.x) / zoomed.width).toBe((300 - view.x) / view.width);
+  expect(zoomAround(view, 1000, 300, 120, 1000, 0.7).width).toBe(MIN_VIEW_WIDTH);
+  expect(zoomAround(view, 0.001, 300, 120, 1000, 0.7).width).toBe(1000);
+  expect(MIN_VIEW_WIDTH).toBeLessThanOrEqual(13);
+});
+
+it('휠 방향과 줄·쪽 단위를 같은 비율로 바꾸고 한 번에 2배를 넘지 않는다', () => {
+  expect(wheelFactor(-100, 0)).toBeGreaterThan(1);
+  expect(wheelFactor(100, 0)).toBeLessThan(1);
+  expect(wheelFactor(-100, 0) * wheelFactor(100, 0)).toBeCloseTo(1, 10);
+  expect(wheelFactor(-3, 1)).toBeCloseTo(wheelFactor(-48, 0), 10);
+  expect(wheelFactor(-10, 2)).toBe(2);
+  expect(wheelFactor(10, 2)).toBe(0.5);
 });

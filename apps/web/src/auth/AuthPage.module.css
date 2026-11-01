@@ -108,3 +108,55 @@
     padding: var(--space-4);
   }
 }
+
+/* 로그인: 공개 지도를 화면 전체에 깔고 양식 첩을 오른쪽에 띄운다. */
+.mapStage {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  min-height: 100dvh;
+  padding: 48px var(--space-6);
+  overflow: hidden;
+}
+.mapStage .formColumn {
+  position: relative;
+  z-index: 3;
+  width: min(420px, 100%);
+}
+.stageMap {
+  position: absolute;
+  inset: 0;
+}
+.banner {
+  display: block;
+  width: calc(100% + 2 * var(--space-6));
+  height: auto;
+  aspect-ratio: 16 / 9;
+  margin: calc(-1 * var(--space-6)) calc(-1 * var(--space-6)) var(--space-4);
+  object-fit: cover;
+  image-rendering: pixelated;
+  border-bottom: var(--frame);
+}
+@media (max-width: 640px) {
+  .mapStage {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-4);
+    padding: var(--space-4);
+  }
+  .mapStage .formColumn {
+    width: auto;
+  }
+  .banner {
+    width: calc(100% + 2 * var(--space-4));
+    height: 120px;
+    aspect-ratio: auto;
+    margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) var(--space-3);
+  }
+  .stageMap {
+    position: relative;
+    inset: auto;
+    height: 70dvh;
+  }
+}
