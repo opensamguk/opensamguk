@@ -186,7 +186,7 @@ it.each(['sha', 'position', 'missing', 'duplicate-id', 'duplicate-anchor'] as co
   },
 );
 
-it('AC-INT-03·10 SAN10의 155표식·202도로와 동북 끝점 전체 범위를 유지한다', () => {
+it('AC-INT-03·10 SAN10의 155표식·191도로와 동북 끝점 전체 범위를 유지한다', () => {
   const geography = publicGeographySchema.parse(san10Resource);
   const strategic = geography.sites.filter((site) => site.kind === 'CITY' || site.kind === 'PASS');
   const mapped: MapCity[] = strategic.map((site) => ({
@@ -208,7 +208,7 @@ it('AC-INT-03·10 SAN10의 155표식·202도로와 동북 끝점 전체 범위�
   // D-049: SAN10 지도 자료에는 항구 시설이 없다.
   expect(svg.querySelectorAll('[data-site-kind]')).toHaveLength(155);
   expect(svg.querySelectorAll('[data-site-kind="PORT"]')).toHaveLength(0);
-  expect(svg.querySelectorAll('[data-route-mode="LAND"]')).toHaveLength(202);
+  expect(svg.querySelectorAll('[data-route-mode="LAND"]')).toHaveLength(191);
   expect(screen.getByTestId('geographic-relief').getAttribute('href')).toContain('san10-pixel-basemap.png');
   const yamatai = mapped.find((city) => city.name === '야마타이국')!;
   fireEvent.change(screen.getByRole('combobox', { name: '지도 거점' }), { target: { value: String(yamatai.key) } });

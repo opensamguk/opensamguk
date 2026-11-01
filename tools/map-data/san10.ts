@@ -70,6 +70,50 @@ const EAST_ASIA_LEVELS: Record<string, number> = {
   S152: 5, // 주호 「乘船往來，巿買韓中」
   S153: 1, // 이주
 };
+// D-054: SAN10 원작의 OUTPOST라 진(2)으로 들어온 중원 치소 세 곳을 『後漢書』 郡國志와 사서로 올린다
+// (사용자 결정 2026-11-01). 초는 che·통합 지도의 소(5)와 상속 수치로 되돌린다.
+const CENTRAL_PLAINS_LEVELS: Record<string, number> = {
+  S095: 6, // 진 陳國 「口百五十四萬七千五百七十二」, 「陳獨富強…有眾十餘萬」(資治通鑑 卷062)
+  S093: 5, // 팽성 彭城國 「口四十九萬三千二十七」, 「屠彭城，獲其相侯諧。進至下邳」(三國志 武帝紀)
+  S096: 5, // 초 沛國 「譙，刺史治」, 魏 五都 「改長安、譙、許昌、鄴、洛陽爲五都」(三國志 文帝紀 注 魏略)
+  // D-055: 진(2)으로 들어온 191년 郡國 치소를 소(5)로 올린다. 口 수는 『後漢書』 郡國志다.
+  S017: 5, // 양평 遼東郡 치소 襄平. 191 공손도의 수도
+  S086: 5, // 임치 齊國 「臨菑，本齊，刺史治」 口四十九萬一千七百六十五
+  S089: 5, // 하동 河東郡 치소 安邑 口五十七萬八百三
+  S091: 5, // 정도 濟陰郡 치소 定陶 口六十五萬七千五百五十四
+  S088: 5, // 낭야 琅邪國 口五十七萬九百六十七
+  S084: 5, // 거록 鉅鹿郡 口六十萬二千九十六
+  S112: 5, // 광릉 廣陵郡 치소 廣陵 口四十一萬百九十
+  S110: 5, // 남창 豫章郡 치소 南昌 口百六十六萬八千九百六
+  S087: 5, // 태산 泰山郡 口四十三萬七千三百一十七
+  S014: 5, // 상당 上黨郡 口十二萬七千四百三
+  S119: 5, // 창오 蒼梧郡 치소 廣信 口四十六萬六千九百七十五
+  S049: 5, // 영창 永昌郡
+  S072: 5, // 월수 越巂郡 치소 邛都
+  S060: 5, // 적도 隴西郡 치소 狄道 口二萬九千六百三十七
+};
+const LEVEL_OVERRIDES: Record<string, number> = { ...EAST_ASIA_LEVELS, ...CENTRAL_PLAINS_LEVELS };
+// D-055: 새 거점의 지역(che 번호: 1 하북, 2 중원, 3 서북, 4 서촉, 5 남중, 6 초, 7 오월, 8 동이)을 191년 州로 정한다.
+// 상속 도시는 기존 지역을 쓴다. 여기 없는 새 거점은 하북(1)이다.
+const REGIONS: Record<string, number> = Object.fromEntries(
+  (
+    [
+      [2, 'S087 S088 S090 S091 S092 S093 S094 S095 S111'], // 태산 낭야 백마 정도 관도 팽성 숭산 진 회음
+      [3, 'S059 S060 S061 S062 S063 S064 S065 S066 S089 S120 S126'], // 주천 적도 남안 기산 가정 진창 오장원 화산 하동 강 저
+      [4, 'S067 S068 S069 S070 S071'], // 서성 방릉 한가 강양 임강
+      [5, 'S072 S073 S074 S075 S076 S077 S078 S119 S122'], // 월수 주제 노수 애뢰 사룡 흥고 합포 창오 남만
+      [6, 'S097 S098 S099 S103 S104 S105 S107 S108 S116 S117 S118'], // 노양 의양 번성 장판 이릉 화용 적벽 공안 형산 임하 곡강
+      [7, 'S100 S101 S102 S106 S109 S110 S113 S114 S115 S123 S153 field:92'], // 합비 석정 유수구 서새산 심양 남창 경구 부춘 임해 산월 이주 파양
+      // 한반도·왜·부여·읍루·주호
+      [
+        8,
+        'S127 S128 S129 S130 S131 S132 S133 S134 S135 S136 S137 S139 S140 S141 S142 S143 S144 S145 S146 S147 S148 S149 S150 S151 S152',
+      ],
+    ] as const
+  ).flatMap(([region, ids]) => ids.split(' ').map((id) => [id, region])),
+);
+// D-055: 길 없는 전장 표식이던 파양(豫章郡 鄱陽縣)을 진(2) 도시로 바꾸고 시상·남창과 잇는다.
+const PROMOTED_FIELDS: Record<string, { key: number; level: number }> = { 'field:92': { key: 1154, level: 2 } };
 // D-052: 사료의 섬 두 곳을 더한다. 좌표는 위경도를 지도 공식((경도-94)·700/27, (54.0286-위도)·700/27)으로 옮겼다.
 // 주호는 『三國志』 卷30 「州胡在馬韓之西海中大島上」(제주도로 비정), 이주는 卷47 吳主傳 「浮海求夷洲」
 // (대만 비정은 학설이다). 연결은 권역을 잇는 게임 연결이며 고대 항로 판독이 아니다.
@@ -85,7 +129,32 @@ const POSITION_OVERRIDES: Record<string, { x: number; y: number }> = {
 const EXTRA_CONNECTIONS: Edge[] = [
   { id: 'EA46', from: 'S146', to: 'S152', mode: 'WATER' }, // 건마국-주호
   { id: 'EA47', from: 'S035', to: 'S153', mode: 'WATER' }, // 건안-이주
+  // D-055: 주변 거점은 가까운 거점부터 이어 전체가 한 덩어리가 되는 만큼만 둔다.
+  { id: 'P15.1', from: 'S120', to: 'S002', mode: 'LAND' }, // 강-서평
+  { id: 'P16.1', from: 'S126', to: 'S062', mode: 'LAND' }, // 저-기산
+  { id: 'EA48', from: 'S143', to: 'S144', mode: 'LAND' }, // 불이-백제국
+  { id: 'F92.1', from: 'field:92', to: 'S036', mode: 'LAND' }, // 파양-시상
+  { id: 'F92.2', from: 'field:92', to: 'S110', mode: 'LAND' }, // 파양-남창
 ];
+// D-055: 가까운 거점을 건너뛰거나 같은 덩어리를 한 번 더 잇는 주변 제안 연결을 뺀다(45 → 32).
+const DROPPED_CONNECTIONS = new Set([
+  'P01.1', // 강-무위
+  'P02.1', // 강-적도
+  'P04.1', // 남만-영창
+  'P07.1', // 산월-회계
+  'P08.1', // 선비-구원
+  'P11.1', // 흉노-진양
+  'P12.1', // 저-무위
+  'P13.1', // 저-천수
+  'P14.1', // 저-가정
+  'EA02', // 서안평-낙랑
+  'EA06', // 국내성-부조
+  'EA09', // 북옥저-부조
+  'EA13', // 낙랑-백제국
+  'EA16', // 목지국-사로국
+  'EA19', // 불이-사로국
+  'EA27', // 불미국-지유국
+]);
 
 const LEVEL_UNITS = [5, 6, 4, 6, 6, 7, 8, 9, 11, 13];
 // D-052: 관은 12단위 긴 성벽 띠라 띄울 때는 긴 변으로 잰다.
@@ -139,6 +208,32 @@ export function buildSan10Map(gisHash: string): OperationalMapResource {
   const ids = new Map<string, string>();
   const inheritedOf = (site: Draft['sites'][number]) =>
     old.sites.find((row) => draft.operationalSiteAliases[row.id] === site.id);
+  // D-055: 새 도시의 최대치는 같은 규모 기존 도시의 항목별 중앙값이다. 기존 도시가 없는 규모(1·4)는 규모 비례식을 쓴다.
+  const oldCities = old.sites.flatMap((row) => (row.kind === 'CITY' ? [row] : []));
+  const maxFor = (level: number) => {
+    const same = oldCities.filter((row) => row.level === level).map((row) => row.max);
+    const median = (key: keyof (typeof same)[number]) => {
+      const values = same.map((max) => max[key]).sort((a, b) => a - b);
+      return values[Math.floor((values.length - 1) / 2)]!;
+    };
+    return same.length
+      ? {
+          population: median('population'),
+          agriculture: median('agriculture'),
+          commerce: median('commerce'),
+          security: median('security'),
+          defence: median('defence'),
+          wall: median('wall'),
+        }
+      : {
+          population: level * 50000,
+          agriculture: level * 1000,
+          commerce: level * 1000,
+          security: 2000,
+          defence: level * 2000,
+          wall: level * 2000,
+        };
+  };
   // D-049: SAN10에는 물길이 없어 항구 시설은 지도 자료에서 뺀다. 전장 표식은 남긴다.
   const kept = [...draft.sites.filter((site) => site.strategic || inheritedOf(site)?.kind !== 'PORT'), ...EXTRA_SITES];
   const sites: OperationalMapResource['sites'] = kept.map((site) => {
@@ -147,13 +242,15 @@ export function buildSan10Map(gisHash: string): OperationalMapResource {
       name: SINO_KOREAN_NAMES[site.name] ?? site.name,
       position: { ...(POSITION_OVERRIDES[site.id] ?? site.position) },
     };
-    if (!site.strategic) {
+    const promoted = PROMOTED_FIELDS[site.id];
+    if (!site.strategic && !promoted) {
       if (!inherited || (inherited.kind !== 'PORT' && inherited.kind !== 'FIELD'))
         throw Error(`시설 대응 없음: ${site.id}`);
       ids.set(site.id, inherited.id);
       return { ...inherited, ...common };
     }
-    const key = inherited && 'anchorKey' in inherited ? inherited.anchorKey : 1000 + Number(site.id.slice(1));
+    const key =
+      promoted?.key ?? (inherited && 'anchorKey' in inherited ? inherited.anchorKey : 1000 + Number(site.id.slice(1)));
     const kind = site.role === 'PASS' ? 'PASS' : 'CITY';
     const id = `${kind.toLowerCase()}:${key}`;
     ids.set(site.id, id);
@@ -161,16 +258,19 @@ export function buildSan10Map(gisHash: string): OperationalMapResource {
       if (inherited?.kind !== 'PASS') throw Error(`관문 대응 없음: ${site.name}`);
       return { ...inherited, ...common, id };
     }
-    if (inherited?.kind === 'CITY')
-      return { ...inherited, ...common, id, level: EAST_ASIA_LEVELS[site.id] ?? site.level ?? inherited.level };
-    const level = EAST_ASIA_LEVELS[site.id] ?? site.level ?? 2;
+    if (inherited?.kind === 'CITY') {
+      const level = LEVEL_OVERRIDES[site.id] ?? site.level ?? inherited.level;
+      // D-055: 규모를 바꾼 상속 도시는 새 규모의 최대치를 쓴다. 같으면 상속 수치 그대로다.
+      return { ...inherited, ...common, id, level, ...(level === inherited.level ? {} : { max: maxFor(level) }) };
+    }
+    const level = promoted?.level ?? LEVEL_OVERRIDES[site.id] ?? site.level ?? 2;
     return {
       ...common,
       id,
       kind: 'CITY',
       anchorKey: key,
       level,
-      region: 1,
+      region: REGIONS[site.id] ?? 1,
       initial: {
         population: level * 2500,
         agriculture: level * 50,
@@ -179,25 +279,20 @@ export function buildSan10Map(gisHash: string): OperationalMapResource {
         defence: level * 250,
         wall: level * 250,
       },
-      max: {
-        population: level * 50000,
-        agriculture: level * 1000,
-        commerce: level * 1000,
-        security: 2000,
-        defence: level * 2000,
-        wall: level * 2000,
-      },
+      max: maxFor(level),
     };
   });
   spreadSites(sites);
-  const routes = [...draft.connections, ...draft.proposedConnections, ...EXTRA_CONNECTIONS].map((edge) => ({
-    id: edge.id.startsWith('route:') ? edge.id : `route:san10-${edge.id.toLowerCase().replaceAll('.', '-')}`,
-    from: ids.get(edge.from)!,
-    to: ids.get(edge.to)!,
-    mode: 'LAND' as const,
-    direction: 'BOTH' as const,
-    enabled: true,
-  }));
+  const routes = [...draft.connections, ...draft.proposedConnections, ...EXTRA_CONNECTIONS]
+    .filter((edge) => !DROPPED_CONNECTIONS.has(edge.id))
+    .map((edge) => ({
+      id: edge.id.startsWith('route:') ? edge.id : `route:san10-${edge.id.toLowerCase().replaceAll('.', '-')}`,
+      from: ids.get(edge.from)!,
+      to: ids.get(edge.to)!,
+      mode: 'LAND' as const,
+      direction: 'BOTH' as const,
+      enabled: true,
+    }));
   return operationalMapSchema.parse({
     version: 3,
     id: 'san10',
@@ -222,7 +317,8 @@ export const SAN10_191_GAP_FILL: Readonly<Record<string, readonly string[]>> = {
   유표: ['번성', '신야', '의양'],
   유언: ['강양'],
   이각: ['화산', '동관'],
-  마등: ['저'],
+  // D-055: 저-무위·저-천수를 빼면서 무위와 천수·저가 끊겨 무위-서평-적도-남안-천수, 천수-기산-저를 잇는다.
+  마등: ['서평', '적도', '남안', '기산', '저'],
   유요: ['유수구', '석정'],
 };
 // 공백지로 이을 길이 없는 영토는 공백지로 돌린다 (원술의 여남은 공주의 수도 초를 지나야만 닿는다).

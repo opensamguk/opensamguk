@@ -398,11 +398,11 @@
       "name": "상당",
       "position": {
         "x": 495,
-        "y": 463
+        "y": 462
       },
       "kind": "CITY",
       "anchorKey": 95,
-      "level": 2,
+      "level": 5,
       "region": 1,
       "initial": {
         "population": 5000,
@@ -413,12 +413,12 @@
         "wall": 500
       },
       "max": {
-        "population": 100000,
-        "agriculture": 2000,
-        "commerce": 2000,
-        "security": 2000,
-        "defence": 4000,
-        "wall": 4000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -488,7 +488,7 @@
       },
       "kind": "CITY",
       "anchorKey": 99,
-      "level": 2,
+      "level": 5,
       "region": 1,
       "initial": {
         "population": 5000,
@@ -499,12 +499,12 @@
         "wall": 500
       },
       "max": {
-        "population": 100000,
-        "agriculture": 2000,
-        "commerce": 2000,
-        "security": 2000,
-        "defence": 4000,
-        "wall": 4000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -1414,7 +1414,7 @@
       },
       "kind": "CITY",
       "anchorKey": 97,
-      "level": 2,
+      "level": 5,
       "region": 5,
       "initial": {
         "population": 5000,
@@ -1425,12 +1425,12 @@
         "wall": 500
       },
       "max": {
-        "population": 100000,
-        "agriculture": 2000,
-        "commerce": 2000,
-        "security": 2000,
-        "defence": 4000,
-        "wall": 4000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -1604,7 +1604,7 @@
       "name": "호관",
       "position": {
         "x": 503,
-        "y": 472
+        "y": 473
       },
       "kind": "PASS",
       "anchorKey": 70,
@@ -1629,7 +1629,7 @@
       "kind": "CITY",
       "anchorKey": 1059,
       "level": 2,
-      "region": 1,
+      "region": 3,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -1656,23 +1656,23 @@
       },
       "kind": "CITY",
       "anchorKey": 1060,
-      "level": 2,
-      "region": 1,
+      "level": 5,
+      "region": 3,
       "initial": {
-        "population": 5000,
-        "agriculture": 100,
-        "commerce": 100,
+        "population": 12500,
+        "agriculture": 250,
+        "commerce": 250,
         "security": 100,
-        "defence": 500,
-        "wall": 500
+        "defence": 1250,
+        "wall": 1250
       },
       "max": {
-        "population": 100000,
-        "agriculture": 2000,
-        "commerce": 2000,
-        "security": 2000,
-        "defence": 4000,
-        "wall": 4000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -1685,7 +1685,7 @@
       "kind": "CITY",
       "anchorKey": 1061,
       "level": 2,
-      "region": 1,
+      "region": 3,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -1713,7 +1713,7 @@
       "kind": "CITY",
       "anchorKey": 1062,
       "level": 2,
-      "region": 1,
+      "region": 3,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -1741,7 +1741,7 @@
       "kind": "CITY",
       "anchorKey": 1063,
       "level": 2,
-      "region": 1,
+      "region": 3,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -1769,7 +1769,7 @@
       "kind": "CITY",
       "anchorKey": 1064,
       "level": 2,
-      "region": 1,
+      "region": 3,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -1797,7 +1797,7 @@
       "kind": "CITY",
       "anchorKey": 1065,
       "level": 2,
-      "region": 1,
+      "region": 3,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -1825,7 +1825,7 @@
       "kind": "CITY",
       "anchorKey": 1066,
       "level": 2,
-      "region": 1,
+      "region": 3,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -1853,7 +1853,7 @@
       "kind": "CITY",
       "anchorKey": 1067,
       "level": 2,
-      "region": 1,
+      "region": 4,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -1881,7 +1881,7 @@
       "kind": "CITY",
       "anchorKey": 1068,
       "level": 2,
-      "region": 1,
+      "region": 4,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -1909,7 +1909,7 @@
       "kind": "CITY",
       "anchorKey": 1069,
       "level": 2,
-      "region": 1,
+      "region": 4,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -1937,7 +1937,7 @@
       "kind": "CITY",
       "anchorKey": 1070,
       "level": 2,
-      "region": 1,
+      "region": 4,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -1965,7 +1965,7 @@
       "kind": "CITY",
       "anchorKey": 1071,
       "level": 2,
-      "region": 1,
+      "region": 4,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -1992,23 +1992,23 @@
       },
       "kind": "CITY",
       "anchorKey": 1072,
-      "level": 2,
-      "region": 1,
+      "level": 5,
+      "region": 5,
       "initial": {
-        "population": 5000,
-        "agriculture": 100,
-        "commerce": 100,
+        "population": 12500,
+        "agriculture": 250,
+        "commerce": 250,
         "security": 100,
-        "defence": 500,
-        "wall": 500
+        "defence": 1250,
+        "wall": 1250
       },
       "max": {
-        "population": 100000,
-        "agriculture": 2000,
-        "commerce": 2000,
-        "security": 2000,
-        "defence": 4000,
-        "wall": 4000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -2021,7 +2021,7 @@
       "kind": "CITY",
       "anchorKey": 1073,
       "level": 2,
-      "region": 1,
+      "region": 5,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -2049,7 +2049,7 @@
       "kind": "CITY",
       "anchorKey": 1074,
       "level": 2,
-      "region": 1,
+      "region": 5,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -2077,7 +2077,7 @@
       "kind": "CITY",
       "anchorKey": 1075,
       "level": 2,
-      "region": 1,
+      "region": 5,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -2105,7 +2105,7 @@
       "kind": "CITY",
       "anchorKey": 1076,
       "level": 2,
-      "region": 1,
+      "region": 5,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -2133,7 +2133,7 @@
       "kind": "CITY",
       "anchorKey": 1077,
       "level": 2,
-      "region": 1,
+      "region": 5,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -2161,7 +2161,7 @@
       "kind": "CITY",
       "anchorKey": 1078,
       "level": 2,
-      "region": 1,
+      "region": 5,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -2283,12 +2283,12 @@
         "wall": 1500
       },
       "max": {
-        "population": 300000,
-        "agriculture": 6000,
-        "commerce": 6000,
-        "security": 2000,
-        "defence": 12000,
-        "wall": 12000
+        "population": 388500,
+        "agriculture": 7800,
+        "commerce": 8000,
+        "security": 6000,
+        "defence": 8100,
+        "wall": 8000
       }
     },
     {
@@ -2328,23 +2328,23 @@
       },
       "kind": "CITY",
       "anchorKey": 1084,
-      "level": 2,
+      "level": 5,
       "region": 1,
       "initial": {
-        "population": 5000,
-        "agriculture": 100,
-        "commerce": 100,
+        "population": 12500,
+        "agriculture": 250,
+        "commerce": 250,
         "security": 100,
-        "defence": 500,
-        "wall": 500
+        "defence": 1250,
+        "wall": 1250
       },
       "max": {
-        "population": 100000,
-        "agriculture": 2000,
-        "commerce": 2000,
-        "security": 2000,
-        "defence": 4000,
-        "wall": 4000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -2384,23 +2384,23 @@
       },
       "kind": "CITY",
       "anchorKey": 1086,
-      "level": 2,
+      "level": 5,
       "region": 1,
       "initial": {
-        "population": 5000,
-        "agriculture": 100,
-        "commerce": 100,
+        "population": 12500,
+        "agriculture": 250,
+        "commerce": 250,
         "security": 100,
-        "defence": 500,
-        "wall": 500
+        "defence": 1250,
+        "wall": 1250
       },
       "max": {
-        "population": 100000,
-        "agriculture": 2000,
-        "commerce": 2000,
-        "security": 2000,
-        "defence": 4000,
-        "wall": 4000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -2412,23 +2412,23 @@
       },
       "kind": "CITY",
       "anchorKey": 1087,
-      "level": 2,
-      "region": 1,
+      "level": 5,
+      "region": 2,
       "initial": {
-        "population": 5000,
-        "agriculture": 100,
-        "commerce": 100,
+        "population": 12500,
+        "agriculture": 250,
+        "commerce": 250,
         "security": 100,
-        "defence": 500,
-        "wall": 500
+        "defence": 1250,
+        "wall": 1250
       },
       "max": {
-        "population": 100000,
-        "agriculture": 2000,
-        "commerce": 2000,
-        "security": 2000,
-        "defence": 4000,
-        "wall": 4000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -2440,23 +2440,23 @@
       },
       "kind": "CITY",
       "anchorKey": 1088,
-      "level": 2,
-      "region": 1,
+      "level": 5,
+      "region": 2,
       "initial": {
-        "population": 5000,
-        "agriculture": 100,
-        "commerce": 100,
+        "population": 12500,
+        "agriculture": 250,
+        "commerce": 250,
         "security": 100,
-        "defence": 500,
-        "wall": 500
+        "defence": 1250,
+        "wall": 1250
       },
       "max": {
-        "population": 100000,
-        "agriculture": 2000,
-        "commerce": 2000,
-        "security": 2000,
-        "defence": 4000,
-        "wall": 4000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -2468,23 +2468,23 @@
       },
       "kind": "CITY",
       "anchorKey": 1089,
-      "level": 2,
-      "region": 1,
+      "level": 5,
+      "region": 3,
       "initial": {
-        "population": 5000,
-        "agriculture": 100,
-        "commerce": 100,
+        "population": 12500,
+        "agriculture": 250,
+        "commerce": 250,
         "security": 100,
-        "defence": 500,
-        "wall": 500
+        "defence": 1250,
+        "wall": 1250
       },
       "max": {
-        "population": 100000,
-        "agriculture": 2000,
-        "commerce": 2000,
-        "security": 2000,
-        "defence": 4000,
-        "wall": 4000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -2497,7 +2497,7 @@
       "kind": "CITY",
       "anchorKey": 1090,
       "level": 2,
-      "region": 1,
+      "region": 2,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -2524,23 +2524,23 @@
       },
       "kind": "CITY",
       "anchorKey": 1091,
-      "level": 2,
-      "region": 1,
+      "level": 5,
+      "region": 2,
       "initial": {
-        "population": 5000,
-        "agriculture": 100,
-        "commerce": 100,
+        "population": 12500,
+        "agriculture": 250,
+        "commerce": 250,
         "security": 100,
-        "defence": 500,
-        "wall": 500
+        "defence": 1250,
+        "wall": 1250
       },
       "max": {
-        "population": 100000,
-        "agriculture": 2000,
-        "commerce": 2000,
-        "security": 2000,
-        "defence": 4000,
-        "wall": 4000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -2553,7 +2553,7 @@
       "kind": "CITY",
       "anchorKey": 1092,
       "level": 2,
-      "region": 1,
+      "region": 2,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -2580,23 +2580,23 @@
       },
       "kind": "CITY",
       "anchorKey": 1093,
-      "level": 2,
-      "region": 1,
+      "level": 5,
+      "region": 2,
       "initial": {
-        "population": 5000,
-        "agriculture": 100,
-        "commerce": 100,
+        "population": 12500,
+        "agriculture": 250,
+        "commerce": 250,
         "security": 100,
-        "defence": 500,
-        "wall": 500
+        "defence": 1250,
+        "wall": 1250
       },
       "max": {
-        "population": 100000,
-        "agriculture": 2000,
-        "commerce": 2000,
-        "security": 2000,
-        "defence": 4000,
-        "wall": 4000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -2609,7 +2609,7 @@
       "kind": "CITY",
       "anchorKey": 1094,
       "level": 2,
-      "region": 1,
+      "region": 2,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -2636,23 +2636,23 @@
       },
       "kind": "CITY",
       "anchorKey": 1095,
-      "level": 2,
-      "region": 1,
+      "level": 6,
+      "region": 2,
       "initial": {
-        "population": 5000,
-        "agriculture": 100,
-        "commerce": 100,
+        "population": 15000,
+        "agriculture": 300,
+        "commerce": 300,
         "security": 100,
-        "defence": 500,
-        "wall": 500
+        "defence": 1500,
+        "wall": 1500
       },
       "max": {
-        "population": 100000,
-        "agriculture": 2000,
-        "commerce": 2000,
-        "security": 2000,
-        "defence": 4000,
-        "wall": 4000
+        "population": 388500,
+        "agriculture": 7800,
+        "commerce": 8000,
+        "security": 6000,
+        "defence": 8100,
+        "wall": 8000
       }
     },
     {
@@ -2665,7 +2665,7 @@
       "kind": "CITY",
       "anchorKey": 38,
       "legacyCityId": 38,
-      "level": 2,
+      "level": 5,
       "region": 2,
       "initial": {
         "population": 100000,
@@ -2694,7 +2694,7 @@
       "kind": "CITY",
       "anchorKey": 1097,
       "level": 2,
-      "region": 1,
+      "region": 6,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -2722,7 +2722,7 @@
       "kind": "CITY",
       "anchorKey": 1098,
       "level": 2,
-      "region": 1,
+      "region": 6,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -2750,7 +2750,7 @@
       "kind": "CITY",
       "anchorKey": 1099,
       "level": 2,
-      "region": 1,
+      "region": 6,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -2778,7 +2778,7 @@
       "kind": "CITY",
       "anchorKey": 1100,
       "level": 2,
-      "region": 1,
+      "region": 7,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -2806,7 +2806,7 @@
       "kind": "CITY",
       "anchorKey": 1101,
       "level": 2,
-      "region": 1,
+      "region": 7,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -2834,7 +2834,7 @@
       "kind": "CITY",
       "anchorKey": 1102,
       "level": 2,
-      "region": 1,
+      "region": 7,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -2862,7 +2862,7 @@
       "kind": "CITY",
       "anchorKey": 1103,
       "level": 2,
-      "region": 1,
+      "region": 6,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -2890,7 +2890,7 @@
       "kind": "CITY",
       "anchorKey": 1104,
       "level": 2,
-      "region": 1,
+      "region": 6,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -2918,7 +2918,7 @@
       "kind": "CITY",
       "anchorKey": 1105,
       "level": 2,
-      "region": 1,
+      "region": 6,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -2946,7 +2946,7 @@
       "kind": "CITY",
       "anchorKey": 1106,
       "level": 2,
-      "region": 1,
+      "region": 7,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -2974,7 +2974,7 @@
       "kind": "CITY",
       "anchorKey": 1107,
       "level": 1,
-      "region": 1,
+      "region": 6,
       "initial": {
         "population": 2500,
         "agriculture": 50,
@@ -3002,7 +3002,7 @@
       "kind": "CITY",
       "anchorKey": 1108,
       "level": 2,
-      "region": 1,
+      "region": 6,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -3030,7 +3030,7 @@
       "kind": "CITY",
       "anchorKey": 1109,
       "level": 2,
-      "region": 1,
+      "region": 7,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -3057,23 +3057,23 @@
       },
       "kind": "CITY",
       "anchorKey": 1110,
-      "level": 2,
-      "region": 1,
+      "level": 5,
+      "region": 7,
       "initial": {
-        "population": 5000,
-        "agriculture": 100,
-        "commerce": 100,
+        "population": 12500,
+        "agriculture": 250,
+        "commerce": 250,
         "security": 100,
-        "defence": 500,
-        "wall": 500
+        "defence": 1250,
+        "wall": 1250
       },
       "max": {
-        "population": 100000,
-        "agriculture": 2000,
-        "commerce": 2000,
-        "security": 2000,
-        "defence": 4000,
-        "wall": 4000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -3086,7 +3086,7 @@
       "kind": "CITY",
       "anchorKey": 1111,
       "level": 2,
-      "region": 1,
+      "region": 2,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -3109,12 +3109,12 @@
       "name": "광릉",
       "position": {
         "x": 659,
-        "y": 560
+        "y": 559
       },
       "kind": "CITY",
       "anchorKey": 83,
       "legacyCityId": 83,
-      "level": 2,
+      "level": 5,
       "region": 2,
       "initial": {
         "population": 5000,
@@ -3125,12 +3125,12 @@
         "wall": 500
       },
       "max": {
-        "population": 100100,
-        "agriculture": 2000,
-        "commerce": 2100,
-        "security": 2000,
-        "defence": 4100,
-        "wall": 4000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -3143,7 +3143,7 @@
       "kind": "CITY",
       "anchorKey": 1113,
       "level": 2,
-      "region": 1,
+      "region": 7,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -3171,7 +3171,7 @@
       "kind": "CITY",
       "anchorKey": 1114,
       "level": 2,
-      "region": 1,
+      "region": 7,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -3199,7 +3199,7 @@
       "kind": "CITY",
       "anchorKey": 1115,
       "level": 2,
-      "region": 1,
+      "region": 7,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -3227,7 +3227,7 @@
       "kind": "CITY",
       "anchorKey": 1116,
       "level": 2,
-      "region": 1,
+      "region": 6,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -3255,7 +3255,7 @@
       "kind": "CITY",
       "anchorKey": 1117,
       "level": 2,
-      "region": 1,
+      "region": 6,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -3283,7 +3283,7 @@
       "kind": "CITY",
       "anchorKey": 1118,
       "level": 2,
-      "region": 1,
+      "region": 6,
       "initial": {
         "population": 5000,
         "agriculture": 100,
@@ -3310,23 +3310,23 @@
       },
       "kind": "CITY",
       "anchorKey": 1119,
-      "level": 2,
-      "region": 1,
+      "level": 5,
+      "region": 5,
       "initial": {
-        "population": 5000,
-        "agriculture": 100,
-        "commerce": 100,
+        "population": 12500,
+        "agriculture": 250,
+        "commerce": 250,
         "security": 100,
-        "defence": 500,
-        "wall": 500
+        "defence": 1250,
+        "wall": 1250
       },
       "max": {
-        "population": 100000,
-        "agriculture": 2000,
-        "commerce": 2000,
-        "security": 2000,
-        "defence": 4000,
-        "wall": 4000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -3339,7 +3339,7 @@
       "kind": "CITY",
       "anchorKey": 1120,
       "level": 4,
-      "region": 1,
+      "region": 3,
       "initial": {
         "population": 10000,
         "agriculture": 200,
@@ -3395,7 +3395,7 @@
       "kind": "CITY",
       "anchorKey": 1122,
       "level": 4,
-      "region": 1,
+      "region": 5,
       "initial": {
         "population": 10000,
         "agriculture": 200,
@@ -3423,7 +3423,7 @@
       "kind": "CITY",
       "anchorKey": 1123,
       "level": 4,
-      "region": 1,
+      "region": 7,
       "initial": {
         "population": 10000,
         "agriculture": 200,
@@ -3507,7 +3507,7 @@
       "kind": "CITY",
       "anchorKey": 1126,
       "level": 4,
-      "region": 1,
+      "region": 3,
       "initial": {
         "population": 10000,
         "agriculture": 200,
@@ -3535,7 +3535,7 @@
       "kind": "CITY",
       "anchorKey": 1127,
       "level": 5,
-      "region": 1,
+      "region": 8,
       "initial": {
         "population": 12500,
         "agriculture": 250,
@@ -3545,12 +3545,12 @@
         "wall": 1250
       },
       "max": {
-        "population": 250000,
-        "agriculture": 5000,
-        "commerce": 5000,
-        "security": 2000,
-        "defence": 10000,
-        "wall": 10000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -3563,7 +3563,7 @@
       "kind": "CITY",
       "anchorKey": 1128,
       "level": 5,
-      "region": 1,
+      "region": 8,
       "initial": {
         "population": 12500,
         "agriculture": 250,
@@ -3573,12 +3573,12 @@
         "wall": 1250
       },
       "max": {
-        "population": 250000,
-        "agriculture": 5000,
-        "commerce": 5000,
-        "security": 2000,
-        "defence": 10000,
-        "wall": 10000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -3591,7 +3591,7 @@
       "kind": "CITY",
       "anchorKey": 1129,
       "level": 5,
-      "region": 1,
+      "region": 8,
       "initial": {
         "population": 12500,
         "agriculture": 250,
@@ -3601,12 +3601,12 @@
         "wall": 1250
       },
       "max": {
-        "population": 250000,
-        "agriculture": 5000,
-        "commerce": 5000,
-        "security": 2000,
-        "defence": 10000,
-        "wall": 10000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -3619,7 +3619,7 @@
       "kind": "CITY",
       "anchorKey": 1130,
       "level": 5,
-      "region": 1,
+      "region": 8,
       "initial": {
         "population": 12500,
         "agriculture": 250,
@@ -3629,12 +3629,12 @@
         "wall": 1250
       },
       "max": {
-        "population": 250000,
-        "agriculture": 5000,
-        "commerce": 5000,
-        "security": 2000,
-        "defence": 10000,
-        "wall": 10000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -3647,7 +3647,7 @@
       "kind": "CITY",
       "anchorKey": 1131,
       "level": 5,
-      "region": 1,
+      "region": 8,
       "initial": {
         "population": 12500,
         "agriculture": 250,
@@ -3657,12 +3657,12 @@
         "wall": 1250
       },
       "max": {
-        "population": 250000,
-        "agriculture": 5000,
-        "commerce": 5000,
-        "security": 2000,
-        "defence": 10000,
-        "wall": 10000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -3675,7 +3675,7 @@
       "kind": "CITY",
       "anchorKey": 1132,
       "level": 5,
-      "region": 1,
+      "region": 8,
       "initial": {
         "population": 12500,
         "agriculture": 250,
@@ -3685,12 +3685,12 @@
         "wall": 1250
       },
       "max": {
-        "population": 250000,
-        "agriculture": 5000,
-        "commerce": 5000,
-        "security": 2000,
-        "defence": 10000,
-        "wall": 10000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -3703,7 +3703,7 @@
       "kind": "CITY",
       "anchorKey": 1133,
       "level": 7,
-      "region": 1,
+      "region": 8,
       "initial": {
         "population": 17500,
         "agriculture": 350,
@@ -3713,12 +3713,12 @@
         "wall": 1750
       },
       "max": {
-        "population": 350000,
-        "agriculture": 7000,
-        "commerce": 7000,
-        "security": 2000,
-        "defence": 14000,
-        "wall": 14000
+        "population": 486200,
+        "agriculture": 9900,
+        "commerce": 9900,
+        "security": 8000,
+        "defence": 10000,
+        "wall": 9900
       }
     },
     {
@@ -3731,7 +3731,7 @@
       "kind": "CITY",
       "anchorKey": 1134,
       "level": 6,
-      "region": 1,
+      "region": 8,
       "initial": {
         "population": 15000,
         "agriculture": 300,
@@ -3741,12 +3741,12 @@
         "wall": 1500
       },
       "max": {
-        "population": 300000,
-        "agriculture": 6000,
-        "commerce": 6000,
-        "security": 2000,
-        "defence": 12000,
-        "wall": 12000
+        "population": 388500,
+        "agriculture": 7800,
+        "commerce": 8000,
+        "security": 6000,
+        "defence": 8100,
+        "wall": 8000
       }
     },
     {
@@ -3759,7 +3759,7 @@
       "kind": "CITY",
       "anchorKey": 1135,
       "level": 5,
-      "region": 1,
+      "region": 8,
       "initial": {
         "population": 12500,
         "agriculture": 250,
@@ -3769,12 +3769,12 @@
         "wall": 1250
       },
       "max": {
-        "population": 250000,
-        "agriculture": 5000,
-        "commerce": 5000,
-        "security": 2000,
-        "defence": 10000,
-        "wall": 10000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -3787,7 +3787,7 @@
       "kind": "CITY",
       "anchorKey": 1136,
       "level": 5,
-      "region": 1,
+      "region": 8,
       "initial": {
         "population": 12500,
         "agriculture": 250,
@@ -3797,12 +3797,12 @@
         "wall": 1250
       },
       "max": {
-        "population": 250000,
-        "agriculture": 5000,
-        "commerce": 5000,
-        "security": 2000,
-        "defence": 10000,
-        "wall": 10000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -3815,7 +3815,7 @@
       "kind": "CITY",
       "anchorKey": 1137,
       "level": 5,
-      "region": 1,
+      "region": 8,
       "initial": {
         "population": 12500,
         "agriculture": 250,
@@ -3825,12 +3825,12 @@
         "wall": 1250
       },
       "max": {
-        "population": 250000,
-        "agriculture": 5000,
-        "commerce": 5000,
-        "security": 2000,
-        "defence": 10000,
-        "wall": 10000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -3871,7 +3871,7 @@
       "kind": "CITY",
       "anchorKey": 1139,
       "level": 5,
-      "region": 1,
+      "region": 8,
       "initial": {
         "population": 12500,
         "agriculture": 250,
@@ -3881,12 +3881,12 @@
         "wall": 1250
       },
       "max": {
-        "population": 250000,
-        "agriculture": 5000,
-        "commerce": 5000,
-        "security": 2000,
-        "defence": 10000,
-        "wall": 10000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -3899,7 +3899,7 @@
       "kind": "CITY",
       "anchorKey": 1140,
       "level": 6,
-      "region": 1,
+      "region": 8,
       "initial": {
         "population": 15000,
         "agriculture": 300,
@@ -3909,12 +3909,12 @@
         "wall": 1500
       },
       "max": {
-        "population": 300000,
-        "agriculture": 6000,
-        "commerce": 6000,
-        "security": 2000,
-        "defence": 12000,
-        "wall": 12000
+        "population": 388500,
+        "agriculture": 7800,
+        "commerce": 8000,
+        "security": 6000,
+        "defence": 8100,
+        "wall": 8000
       }
     },
     {
@@ -3927,7 +3927,7 @@
       "kind": "CITY",
       "anchorKey": 1141,
       "level": 5,
-      "region": 1,
+      "region": 8,
       "initial": {
         "population": 12500,
         "agriculture": 250,
@@ -3937,12 +3937,12 @@
         "wall": 1250
       },
       "max": {
-        "population": 250000,
-        "agriculture": 5000,
-        "commerce": 5000,
-        "security": 2000,
-        "defence": 10000,
-        "wall": 10000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -3955,7 +3955,7 @@
       "kind": "CITY",
       "anchorKey": 1142,
       "level": 5,
-      "region": 1,
+      "region": 8,
       "initial": {
         "population": 12500,
         "agriculture": 250,
@@ -3965,12 +3965,12 @@
         "wall": 1250
       },
       "max": {
-        "population": 250000,
-        "agriculture": 5000,
-        "commerce": 5000,
-        "security": 2000,
-        "defence": 10000,
-        "wall": 10000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -3983,7 +3983,7 @@
       "kind": "CITY",
       "anchorKey": 1143,
       "level": 5,
-      "region": 1,
+      "region": 8,
       "initial": {
         "population": 12500,
         "agriculture": 250,
@@ -3993,12 +3993,12 @@
         "wall": 1250
       },
       "max": {
-        "population": 250000,
-        "agriculture": 5000,
-        "commerce": 5000,
-        "security": 2000,
-        "defence": 10000,
-        "wall": 10000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -4011,7 +4011,7 @@
       "kind": "CITY",
       "anchorKey": 1144,
       "level": 5,
-      "region": 1,
+      "region": 8,
       "initial": {
         "population": 12500,
         "agriculture": 250,
@@ -4021,12 +4021,12 @@
         "wall": 1250
       },
       "max": {
-        "population": 250000,
-        "agriculture": 5000,
-        "commerce": 5000,
-        "security": 2000,
-        "defence": 10000,
-        "wall": 10000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -4039,7 +4039,7 @@
       "kind": "CITY",
       "anchorKey": 1145,
       "level": 6,
-      "region": 1,
+      "region": 8,
       "initial": {
         "population": 15000,
         "agriculture": 300,
@@ -4049,12 +4049,12 @@
         "wall": 1500
       },
       "max": {
-        "population": 300000,
-        "agriculture": 6000,
-        "commerce": 6000,
-        "security": 2000,
-        "defence": 12000,
-        "wall": 12000
+        "population": 388500,
+        "agriculture": 7800,
+        "commerce": 8000,
+        "security": 6000,
+        "defence": 8100,
+        "wall": 8000
       }
     },
     {
@@ -4067,7 +4067,7 @@
       "kind": "CITY",
       "anchorKey": 1146,
       "level": 5,
-      "region": 1,
+      "region": 8,
       "initial": {
         "population": 12500,
         "agriculture": 250,
@@ -4077,12 +4077,12 @@
         "wall": 1250
       },
       "max": {
-        "population": 250000,
-        "agriculture": 5000,
-        "commerce": 5000,
-        "security": 2000,
-        "defence": 10000,
-        "wall": 10000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -4095,7 +4095,7 @@
       "kind": "CITY",
       "anchorKey": 1147,
       "level": 5,
-      "region": 1,
+      "region": 8,
       "initial": {
         "population": 12500,
         "agriculture": 250,
@@ -4105,12 +4105,12 @@
         "wall": 1250
       },
       "max": {
-        "population": 250000,
-        "agriculture": 5000,
-        "commerce": 5000,
-        "security": 2000,
-        "defence": 10000,
-        "wall": 10000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -4123,7 +4123,7 @@
       "kind": "CITY",
       "anchorKey": 1148,
       "level": 5,
-      "region": 1,
+      "region": 8,
       "initial": {
         "population": 12500,
         "agriculture": 250,
@@ -4133,12 +4133,12 @@
         "wall": 1250
       },
       "max": {
-        "population": 250000,
-        "agriculture": 5000,
-        "commerce": 5000,
-        "security": 2000,
-        "defence": 10000,
-        "wall": 10000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -4151,7 +4151,7 @@
       "kind": "CITY",
       "anchorKey": 1149,
       "level": 7,
-      "region": 1,
+      "region": 8,
       "initial": {
         "population": 17500,
         "agriculture": 350,
@@ -4161,12 +4161,12 @@
         "wall": 1750
       },
       "max": {
-        "population": 350000,
-        "agriculture": 7000,
-        "commerce": 7000,
-        "security": 2000,
-        "defence": 14000,
-        "wall": 14000
+        "population": 486200,
+        "agriculture": 9900,
+        "commerce": 9900,
+        "security": 8000,
+        "defence": 10000,
+        "wall": 9900
       }
     },
     {
@@ -4179,7 +4179,7 @@
       "kind": "CITY",
       "anchorKey": 1150,
       "level": 5,
-      "region": 1,
+      "region": 8,
       "initial": {
         "population": 12500,
         "agriculture": 250,
@@ -4189,12 +4189,12 @@
         "wall": 1250
       },
       "max": {
-        "population": 250000,
-        "agriculture": 5000,
-        "commerce": 5000,
-        "security": 2000,
-        "defence": 10000,
-        "wall": 10000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -4207,7 +4207,7 @@
       "kind": "CITY",
       "anchorKey": 1151,
       "level": 5,
-      "region": 1,
+      "region": 8,
       "initial": {
         "population": 12500,
         "agriculture": 250,
@@ -4217,12 +4217,12 @@
         "wall": 1250
       },
       "max": {
-        "population": 250000,
-        "agriculture": 5000,
-        "commerce": 5000,
-        "security": 2000,
-        "defence": 10000,
-        "wall": 10000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -4255,13 +4255,32 @@
       }
     },
     {
-      "id": "field:92",
+      "id": "city:1154",
       "name": "파양",
       "position": {
         "x": 588,
         "y": 649
       },
-      "kind": "FIELD"
+      "kind": "CITY",
+      "anchorKey": 1154,
+      "level": 2,
+      "region": 7,
+      "initial": {
+        "population": 5000,
+        "agriculture": 100,
+        "commerce": 100,
+        "security": 100,
+        "defence": 500,
+        "wall": 500
+      },
+      "max": {
+        "population": 100000,
+        "agriculture": 2000,
+        "commerce": 2000,
+        "security": 2000,
+        "defence": 4000,
+        "wall": 4000
+      }
     },
     {
       "id": "city:1152",
@@ -4273,7 +4292,7 @@
       "kind": "CITY",
       "anchorKey": 1152,
       "level": 5,
-      "region": 1,
+      "region": 8,
       "initial": {
         "population": 12500,
         "agriculture": 250,
@@ -4283,12 +4302,12 @@
         "wall": 1250
       },
       "max": {
-        "population": 250000,
-        "agriculture": 5000,
-        "commerce": 5000,
-        "security": 2000,
-        "defence": 10000,
-        "wall": 10000
+        "population": 300500,
+        "agriculture": 5800,
+        "commerce": 5900,
+        "security": 4000,
+        "defence": 6000,
+        "wall": 5900
       }
     },
     {
@@ -4301,7 +4320,7 @@
       "kind": "CITY",
       "anchorKey": 1153,
       "level": 1,
-      "region": 1,
+      "region": 7,
       "initial": {
         "population": 2500,
         "agriculture": 50,
@@ -5562,33 +5581,9 @@
       "enabled": true
     },
     {
-      "id": "route:san10-p01-1",
-      "from": "city:1120",
-      "to": "city:22",
-      "mode": "LAND",
-      "direction": "BOTH",
-      "enabled": true
-    },
-    {
-      "id": "route:san10-p02-1",
-      "from": "city:1120",
-      "to": "city:1060",
-      "mode": "LAND",
-      "direction": "BOTH",
-      "enabled": true
-    },
-    {
       "id": "route:san10-p03-1",
       "from": "city:1121",
       "to": "city:1081",
-      "mode": "LAND",
-      "direction": "BOTH",
-      "enabled": true
-    },
-    {
-      "id": "route:san10-p04-1",
-      "from": "city:1122",
-      "to": "city:97",
       "mode": "LAND",
       "direction": "BOTH",
       "enabled": true
@@ -5610,22 +5605,6 @@
       "enabled": true
     },
     {
-      "id": "route:san10-p07-1",
-      "from": "city:1123",
-      "to": "city:57",
-      "mode": "LAND",
-      "direction": "BOTH",
-      "enabled": true
-    },
-    {
-      "id": "route:san10-p08-1",
-      "from": "city:1124",
-      "to": "city:1079",
-      "mode": "LAND",
-      "direction": "BOTH",
-      "enabled": true
-    },
-    {
       "id": "route:san10-p09-1",
       "from": "city:1124",
       "to": "city:1121",
@@ -5642,49 +5621,9 @@
       "enabled": true
     },
     {
-      "id": "route:san10-p11-1",
-      "from": "city:1125",
-      "to": "city:35",
-      "mode": "LAND",
-      "direction": "BOTH",
-      "enabled": true
-    },
-    {
-      "id": "route:san10-p12-1",
-      "from": "city:1126",
-      "to": "city:22",
-      "mode": "LAND",
-      "direction": "BOTH",
-      "enabled": true
-    },
-    {
-      "id": "route:san10-p13-1",
-      "from": "city:1126",
-      "to": "city:40",
-      "mode": "LAND",
-      "direction": "BOTH",
-      "enabled": true
-    },
-    {
-      "id": "route:san10-p14-1",
-      "from": "city:1126",
-      "to": "city:1063",
-      "mode": "LAND",
-      "direction": "BOTH",
-      "enabled": true
-    },
-    {
       "id": "route:san10-ea01",
       "from": "city:99",
       "to": "city:1138",
-      "mode": "LAND",
-      "direction": "BOTH",
-      "enabled": true
-    },
-    {
-      "id": "route:san10-ea02",
-      "from": "city:1138",
-      "to": "city:1082",
       "mode": "LAND",
       "direction": "BOTH",
       "enabled": true
@@ -5714,14 +5653,6 @@
       "enabled": true
     },
     {
-      "id": "route:san10-ea06",
-      "from": "city:1140",
-      "to": "city:1141",
-      "mode": "LAND",
-      "direction": "BOTH",
-      "enabled": true
-    },
-    {
       "id": "route:san10-ea07",
       "from": "city:1149",
       "to": "city:1150",
@@ -5733,14 +5664,6 @@
       "id": "route:san10-ea08",
       "from": "city:1150",
       "to": "city:1151",
-      "mode": "LAND",
-      "direction": "BOTH",
-      "enabled": true
-    },
-    {
-      "id": "route:san10-ea09",
-      "from": "city:1151",
-      "to": "city:1141",
       "mode": "LAND",
       "direction": "BOTH",
       "enabled": true
@@ -5770,14 +5693,6 @@
       "enabled": true
     },
     {
-      "id": "route:san10-ea13",
-      "from": "city:1082",
-      "to": "city:1144",
-      "mode": "LAND",
-      "direction": "BOTH",
-      "enabled": true
-    },
-    {
       "id": "route:san10-ea14",
       "from": "city:1144",
       "to": "city:1145",
@@ -5794,14 +5709,6 @@
       "enabled": true
     },
     {
-      "id": "route:san10-ea16",
-      "from": "city:1145",
-      "to": "city:1147",
-      "mode": "LAND",
-      "direction": "BOTH",
-      "enabled": true
-    },
-    {
       "id": "route:san10-ea17",
       "from": "city:1146",
       "to": "city:1148",
@@ -5813,14 +5720,6 @@
       "id": "route:san10-ea18",
       "from": "city:1147",
       "to": "city:1148",
-      "mode": "LAND",
-      "direction": "BOTH",
-      "enabled": true
-    },
-    {
-      "id": "route:san10-ea19",
-      "from": "city:1143",
-      "to": "city:1147",
       "mode": "LAND",
       "direction": "BOTH",
       "enabled": true
@@ -5882,14 +5781,6 @@
       "enabled": true
     },
     {
-      "id": "route:san10-ea27",
-      "from": "city:1132",
-      "to": "city:1135",
-      "mode": "LAND",
-      "direction": "BOTH",
-      "enabled": true
-    },
-    {
       "id": "route:san10-ea28",
       "from": "city:1134",
       "to": "city:1135",
@@ -5933,6 +5824,46 @@
       "id": "route:san10-ea47",
       "from": "city:98",
       "to": "city:1153",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:san10-p15-1",
+      "from": "city:1120",
+      "to": "city:96",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:san10-p16-1",
+      "from": "city:1126",
+      "to": "city:1062",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:san10-ea48",
+      "from": "city:1143",
+      "to": "city:1144",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:san10-f92-1",
+      "from": "city:1154",
+      "to": "city:15",
+      "mode": "LAND",
+      "direction": "BOTH",
+      "enabled": true
+    },
+    {
+      "id": "route:san10-f92-2",
+      "from": "city:1154",
+      "to": "city:1110",
       "mode": "LAND",
       "direction": "BOTH",
       "enabled": true
