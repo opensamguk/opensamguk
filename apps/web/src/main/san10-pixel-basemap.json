@@ -16,7 +16,7 @@
     },
     {
       "file": "resources/map/san10.json",
-      "sha256": "68c5b5b9e4368c65172d51ec33d39eca605dc7dedcce600e069210889299bae1"
+      "sha256": "d9f7399783fca6b06f61865b356eb3c41560cd3d116fd7eb0b440d975471c65a"
     }
   ],
   "grid": {
@@ -44,6 +44,6 @@
   },
   "output": {
     "file": "apps/web/src/main/san10-pixel-basemap.png",
-    "sha256": "0a7c1768d7dc303c582cff8e876f5232c292d46135c3ef6c9f33f27d424d67db"
+    "sha256": "6f6cbcf89fcb219aa64e061ccb1715ad0aab1ea1d8dc78ceed3e04581f796619"
   }
 }
