@@ -57,7 +57,11 @@ export async function buildServer(options: {
     throw new Error('TRUST_PROXY는 0 또는 1이어야 합니다.');
   const loginAuditConfig = resolveLoginAudit(process.env, production, options.loginAudit);
   const clock = options.now ?? Date.now;
-  const legalPolicy = resolveLegalPolicy(options.legalPolicy, clock());
+  // 승인된 판은 운영 서버에만 기본으로 건다. 개발·시험은 명시한 판만 쓴다 (D-051).
+  const legalPolicy = resolveLegalPolicy(
+    options.legalPolicy === undefined && !production ? null : options.legalPolicy,
+    clock(),
+  );
   const withdrawalPolicy = resolveWithdrawalPolicy(options.withdrawalPolicy, legalPolicy);
   await bindLegalPolicy(options.db, legalPolicy);
   const rateLimiter = createRateLimiter({ now: clock });

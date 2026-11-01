@@ -298,6 +298,8 @@ export const test = base.extend<Record<never, never>, { legalStack: LegalStack }
             const server = await buildServer({
               db: db!,
               production: true,
+              // 승인 판이 생긴 뒤에도 미승인 운영 상태를 재현한다 (D-051).
+              legalPolicy: null,
               loginAudit: { key: randomBytes(32).toString('hex'), version: 1 },
               logging: false,
               publicOrigin: 'https://legal-pending.example.test',

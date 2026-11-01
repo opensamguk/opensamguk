@@ -8,7 +8,11 @@ const schema = z.strictObject({
 export type WithdrawalPolicy = Readonly<z.infer<typeof schema>>;
 
 // 보존 자료·기간·근거를 사용자가 승인한 검토 커밋에서만 활성화한다.
-const approvedWithdrawalPolicy: WithdrawalPolicy | null = null;
+// 2026-11-01 사용자 승인 (D-051). 보존 자료·기간은 privacy-2026-11-01 본문 6항을 따른다.
+const approvedWithdrawalPolicy: WithdrawalPolicy | null = {
+  scheme: 'tombstone-v1',
+  privacyVersion: 'privacy-2026-11-01',
+};
 
 export function resolveWithdrawalPolicy(
   value: WithdrawalPolicy | null | undefined,

@@ -20,10 +20,17 @@ describe('T3-02 AC-M3-02 승인 전 판과 실제 동의 대조', () => {
     const boundary = { ...complete, terms: { ...complete.terms, bodyText: '가'.repeat(21845) + 'a' } };
     expect(resolveLegalPolicy(boundary, now)?.terms.bodyText === boundary.terms.bodyText).toBe(true);
   });
-  it('승인된 현재 판이 없으면 임의 판과 과거 동의를 만들지 않는다', () => {
-    expect(resolveLegalPolicy(undefined, now)).toBeNull();
+  it('판을 끄면 임의 판과 과거 동의를 만들지 않는다', () => {
     expect(resolveLegalPolicy(null, now)).toBeNull();
     expect(missingConsents(null, [])).toEqual([]);
+  });
+  it('D-051 승인 판은 두 본문을 갖고 한국 시각 2026-11-01 0시부터 쓴다', () => {
+    const effective = Date.parse('2026-10-31T15:00:00Z');
+    expect(() => resolveLegalPolicy(undefined, effective - 1)).toThrow('약관 시행 시각');
+    const approved = resolveLegalPolicy(undefined, effective)!;
+    expect([approved.terms.version, approved.privacy.version]).toEqual(['terms-2026-11-01', 'privacy-2026-11-01']);
+    expect(hasLegalBodies(approved)).toBe(true);
+    expect(approved.privacy.bodyText).toContain('peppone.choi@gmail.com');
   });
   it('생성자가 가진 원본을 복사하고 중첩 필드까지 변경을 막는다', () => {
     const input = structuredClone(policy);
