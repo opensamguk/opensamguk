@@ -1,3 +1,4 @@
+import type { MapNation } from '../game/types';
 import level0 from '../art/map/level-0.png';
 import level0Large from '../art/map/level-0@128.png';
 import level4 from '../art/map/level-4.png';
@@ -133,3 +134,11 @@ export function passAxis(at: { x: number; y: number }, neighbours: readonly { x:
   }
   return dx > dy ? 'ew' : 'ns';
 }
+
+// 공개 지도 사본은 수도를 저장하지 않는다(T4-56). 수도가 없으면 별표를 달지 않는다.
+export type DrawnNation = Pick<MapNation, 'id' | 'name' | 'color'> & { capitalCityKey?: number | null };
+
+// 수도는 도시 이름 앞 별표로 누구에게나 보인다 (D-053).
+export const CAPITAL_MARK = '★';
+export const isCapital = (city: { key: number }, nation: DrawnNation | undefined) =>
+  nation?.capitalCityKey === city.key;

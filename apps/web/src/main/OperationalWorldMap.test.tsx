@@ -261,3 +261,22 @@ it('도시 표식의 접근성 이름에 툴팁과 같은 규모를 넣고 관�
   expect(screen.getByRole('button', { name: /^허창, 진 도시, / })).toBeTruthy();
   expect(screen.getByRole('button', { name: '관문, 관문, 위' })).toBeTruthy();
 });
+
+it('D-053 수도는 이름표 앞 별표와 접근성 이름 「수도」로 누구에게나 보이고 다른 거점에는 붙지 않는다', () => {
+  const { container, unmount } = render(
+    <WorldMap
+      cities={cities}
+      nations={[{ ...nations[0]!, capitalCityKey: 1 }]}
+      operationalMap={map}
+      onSelect={vi.fn()}
+    />,
+  );
+  const plates = [...container.querySelectorAll('svg text')].map((text) => text.textContent);
+  expect(plates).toEqual(expect.arrayContaining(['★허창', '관문']));
+  expect(screen.getByRole('button', { name: /^허창, 진 도시, 위, 수도$/ })).toBeTruthy();
+  expect(screen.getByRole('button', { name: '관문, 관문, 위' })).toBeTruthy();
+  unmount();
+  // 공개 지도 사본처럼 수도를 모르는 국가는 별표를 달지 않는다.
+  const plain = draw();
+  expect([...plain.container.querySelectorAll('svg text')].some((text) => text.textContent?.includes('★'))).toBe(false);
+});

@@ -161,6 +161,19 @@ export function buildSan10Map(gisHash: string): OperationalMapResource {
   });
 }
 
+// 수도에서 같은 나라 땅으로 이어지지 않던 영토를 잇는 공백지 (사용자 결정 2026-11-01, D-053).
+// 끊긴 도시 쪽에서 수도 덩어리까지 공백지만 지나는 최단 경로이며 경로는 모두 하나뿐이다.
+export const SAN10_191_GAP_FILL: Readonly<Record<string, readonly string[]>> = {
+  원소: ['계교'],
+  유표: ['번성', '신야', '의양'],
+  유언: ['강양'],
+  이각: ['화산', '동관'],
+  마등: ['저'],
+  유요: ['유수구', '석정'],
+};
+// 공백지로 이을 길이 없는 영토는 공백지로 돌린다 (원술의 여남은 공주의 수도 초를 지나야만 닿는다).
+export const SAN10_191_RELEASE: Readonly<Record<string, readonly string[]>> = { 원술: ['여남'] };
+
 export function buildSan10Scenarios(map: OperationalMapResource) {
   const draft: Draft = read('resources/map-drafts/san10/adopted-placement.json');
   const old = operationalMapSchema.parse(read('resources/map/integration.json'));
@@ -199,6 +212,23 @@ export function buildSan10Scenarios(map: OperationalMapResource) {
       }
     }
   });
+  // D-053: 수도와 끊긴 영토 사이의 공백지를 그 나라에 넣어 잇는다. 수도(첫 도시)는 그대로다.
+  for (const [nationName, cities] of Object.entries(SAN10_191_GAP_FILL)) {
+    const row = historical.nation.find((nation) => nation[0] === nationName)!;
+    for (const city of cities) {
+      if (existingOwners.has(city)) throw new Error(`${nationName}: ${city}는 이미 소유국이 있다`);
+      row[8].push(city);
+      existingOwners.add(city);
+    }
+  }
+  for (const [nationName, cities] of Object.entries(SAN10_191_RELEASE)) {
+    const row = historical.nation.find((nation) => nation[0] === nationName)!;
+    for (const city of cities) {
+      if (!row[8].includes(city) || row[8][0] === city)
+        throw new Error(`${nationName}: ${city}는 수도가 아닌 영토여야 한다`);
+      row[8] = row[8].filter((name) => name !== city);
+    }
+  }
   const empty: ScenarioResource = {
     ...historical,
     id: 'san10-empty',

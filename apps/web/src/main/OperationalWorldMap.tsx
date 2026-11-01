@@ -1,13 +1,13 @@
 import type { PublicGeography } from '@opensamguk/shared';
 import { useEffect, useId, useMemo, useRef, useState, type PointerEvent } from 'react';
-import type { MapCity, MapNation } from '../game/types';
+import type { MapCity } from '../game/types';
 import { readableTextColor } from '../ui/color';
 import { FlagMaskDef, MapSiteMarker } from './MapSiteMarker';
 import { RoadPixelLayer, WaterLaneLayer } from './RoadPixelLayer';
 import { TerrainTileLayer, useTerrainGrid } from './TerrainTileLayer';
 import { showTiles, waterLanes } from './terrainTiles';
 import { ROAD_CELL, passNeighbours } from './roadPixels';
-import { levelName, markerUnits, passAxis } from './siteMarkers';
+import { CAPITAL_MARK, isCapital, levelName, markerUnits, passAxis, type DrawnNation } from './siteMarkers';
 import { basemapForOperationalMap } from './operationalGeography';
 import { mapTapTargets, tapCandidates, type MapView } from './mapTapTargets';
 import styles from './OperationalWorldMap.module.css';
@@ -97,7 +97,7 @@ export function OperationalWorldMap({
   fill = false,
 }: {
   cities: readonly DrawnCity[];
-  nations: readonly MapNation[];
+  nations: readonly DrawnNation[];
   map: MapData;
   myCityKey: number | null;
   selectedKey: number | null;
@@ -518,10 +518,13 @@ export function OperationalWorldMap({
           const selected = city?.key === selectedKey;
           const parent = site.kind === 'PORT' ? siteById.get(site.parentCityId!) : undefined;
           const grade = site.kind === 'CITY' ? levelName(city?.level) : undefined;
+          const capital = city !== undefined && isCapital(city, nation);
+          const plate = capital ? `${CAPITAL_MARK}${site.name}` : site.name;
           const label = [
             site.name,
             grade ? `${grade} ${labels[site.kind]}` : labels[site.kind],
             city?.recorded === false ? '기록 없음' : (nation?.name ?? (city ? '공백지' : null)),
+            capital ? '수도' : null,
             parent ? `${parent.name} 소속` : null,
             mine ? '내 위치' : null,
             city?.supplied === false && city.nationId !== null ? '보급 끊김' : null,
@@ -606,15 +609,15 @@ export function OperationalWorldMap({
               </g>
               <g transform={`translate(${site.position.x} ${site.position.y + radius + 2}) scale(${labelScale})`}>
                 <rect
-                  x={-(Array.from(site.name).length * 6 + 5) / 2}
+                  x={-(Array.from(plate).length * 6 + 5) / 2}
                   y={0}
-                  width={Array.from(site.name).length * 6 + 5}
+                  width={Array.from(plate).length * 6 + 5}
                   height="11"
                   rx="1"
                   fill={nation?.color ?? '#eee8d7'}
                 />
                 <text x={0} y={8} className={styles.label} fill={nation ? readableTextColor(nation.color) : '#282d29'}>
-                  {site.name}
+                  {plate}
                 </text>
               </g>
             </g>
@@ -631,6 +634,7 @@ export function OperationalWorldMap({
             const grade = site.kind === 'CITY' ? levelName(city?.level) : undefined;
             const owner = city?.recorded === false ? '기록 없음' : (nation?.name ?? (city ? '공백지' : null));
             const notes = [
+              city && isCapital(city, nation) ? '수도' : null,
               parent ? `${parent.name} 소속` : null,
               city?.key === myCityKey ? '내 위치' : null,
               city?.supplied === false && city.nationId !== null ? '보급 끊김' : null,

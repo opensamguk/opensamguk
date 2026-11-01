@@ -278,3 +278,24 @@ it.each(['san10-191', 'san10-empty'])('%s의 9기능 원생성은152거점 빈 �
   ).toThrow();
   expect(hashState(initial)).toBe(before);
 });
+
+it('D-053: 역사 시나리오의 모든 영토는 같은 나라 땅만 지나 수도와 이어진다', () => {
+  const graph = new Map(compileOperationalGraph(map).map((row) => [row.cityKey, row.connections]));
+  const keyByName = new Map(
+    map.sites.flatMap((site) => ('anchorKey' in site ? [[site.name, site.anchorKey] as const] : [])),
+  );
+  const cut: string[] = [];
+  for (const [nationName, , , , , , , , cities] of historical.nation) {
+    const own = new Set(cities.map((city) => keyByName.get(city)!));
+    const reached = new Set([keyByName.get(cities[0]!)!]);
+    const queue = [...reached];
+    for (let i = 0; i < queue.length; i++)
+      for (const next of graph.get(queue[i]!)!) {
+        if (!own.has(next) || reached.has(next)) continue;
+        reached.add(next);
+        queue.push(next);
+      }
+    cut.push(...cities.filter((city) => !reached.has(keyByName.get(city)!)).map((city) => `${nationName}: ${city}`));
+  }
+  expect(cut).toEqual([]);
+});
