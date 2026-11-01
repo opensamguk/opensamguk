@@ -6,6 +6,8 @@ import {
   SOUTH,
   TERRAINS,
   WEST,
+  clearRun,
+  gatedWalk,
   isWaterRoute,
   roadTiles,
   shadowPaths,
@@ -135,4 +137,103 @@ it('AC-INT-20 높은 산의 남쪽·동쪽 칸에 높이 차이만큼 그림자�
   ]);
   const view = { x: 0, y: 0, width: 4, height: 4 };
   expect(shadowPaths(g, view)).toEqual([{ step: 3, d: 'M2 0h2v2h-2zM0 2h2v2h-2z' }]);
+});
+
+it('D-052 남문만 있는 표식에서 북쪽 상대로 갈 때 남문으로 나가 옆으로 비켜 돌고 표식을 가로지르지 않는다', () => {
+  // 거점 중심 칸 (50,50), 표식 반지름 2칸, 남문만. 상대는 북쪽 (50,20).
+  const path = gatedWalk(
+    [
+      { x: 101, y: 101 },
+      { x: 101, y: 41 },
+    ],
+    [{ cells: 2, allowed: ['S'] }, 0],
+  );
+  expect(path.slice(1, 4)).toEqual([
+    { x: 50, y: 51 },
+    { x: 50, y: 52 },
+    { x: 50, y: 53 },
+  ]);
+  const inside = (point: { x: number; y: number }) => Math.abs(point.x - 50) <= 2 && Math.abs(point.y - 50) <= 2;
+  expect(path.slice(4).some(inside)).toBe(false);
+  expect(path.at(-1)).toEqual({ x: 50, y: 20 });
+});
+
+it('D-052 남북 관은 길 방향 문으로만 드나든다', () => {
+  const path = gatedWalk(
+    [
+      { x: 101, y: 101 },
+      { x: 141, y: 161 },
+    ],
+    [{ cells: 1, allowed: ['N', 'S'] }, 0],
+  );
+  expect(path[1]).toEqual({ x: 50, y: 51 });
+});
+
+it('D-052 남문만 있는 두 표식이 위아래로 붙어 있어도 가운데 길이 어느 표식 상자도 지나지 않는다', () => {
+  // 애뢰(아래)·영창(위)처럼 같은 열, 반지름 1칸, 남문만.
+  const north = { x: 134, y: 749 };
+  const south = { x: 134, y: 762 };
+  const path = gatedWalk(
+    [north, south],
+    [
+      { cells: 1, allowed: ['S'] },
+      { cells: 1, allowed: ['S'] },
+    ],
+  );
+  const box = (center: { x: number; y: number }) => ({ x: Math.floor(center.x / 2), y: Math.floor(center.y / 2) });
+  const inside = (point: { x: number; y: number }, center: { x: number; y: number }) =>
+    Math.abs(point.x - center.x) <= 1 && Math.abs(point.y - center.y) <= 1;
+  const [a, b] = [box(north), box(south)];
+  // 처음 문 길(중심→문 밖)과 마지막 문 길을 뺀 구간은 두 상자 밖이다.
+  const middle = path.slice(3, -3);
+  expect(middle.some((point) => inside(point, a) || inside(point, b))).toBe(false);
+});
+
+it('D-052 강릉(네 문)·공안(남문)처럼 붙은 표식은 상대 상자로 들어가지 않는 문을 골라 상자를 밟지 않고 잇는다', () => {
+  const big = { x: 472, y: 612 }; // 칸 (236,306), 반지름 3칸, 네 문
+  const small = { x: 472, y: 622 }; // 칸 (236,311), 반지름 1칸, 남문만
+  const path = gatedWalk(
+    [big, small],
+    [
+      { cells: 3, allowed: ['N', 'E', 'S', 'W'] },
+      { cells: 1, allowed: ['S'] },
+    ],
+  );
+  const inside = (point: { x: number; y: number }, x: number, y: number, r: number) =>
+    Math.abs(point.x - x) <= r && Math.abs(point.y - y) <= r;
+  // 첫 문 길(강릉 중심→문)과 마지막 문 길(공안 남문→중심)을 빼면 두 상자 밖이다.
+  const firstOut = path.findIndex((point) => !inside(point, 236, 306, 3));
+  const lastOut = path.length - 1 - [...path].reverse().findIndex((point) => !inside(point, 236, 311, 1));
+  const middle = path.slice(firstOut, lastOut + 1);
+  expect(middle.some((point) => inside(point, 236, 306, 3) || inside(point, 236, 311, 1))).toBe(false);
+  expect(path.at(-1)).toEqual({ x: 236, y: 311 });
+  // 공안에는 남문으로 들어온다.
+  expect(path.at(-2)).toEqual({ x: 236, y: 312 });
+});
+
+it('D-052 상자를 같은 칸 수만큼 밟아야 하면 그중 가장 짧은 길을 고른다', () => {
+  // 시작 문 밖 칸이 상대 상자에 붙어 꺾임 길이 모두 막힐 때도, 우회는 상자를 덜 밟고 가장 짧아야 한다.
+  const path = gatedWalk(
+    [
+      { x: 101, y: 101 },
+      { x: 101, y: 121 },
+    ],
+    [
+      { cells: 2, allowed: ['S'] },
+      { cells: 2, allowed: ['N'], half: { x: 6, y: 2 } },
+    ],
+  );
+  // 문 밖으로 곧게 나가 바로 상대 북문으로 들어가는 길이 가장 짧다(가로로 돌지 않는다).
+  expect(path.every((point) => point.x === 50)).toBe(true);
+});
+
+it('D-052 피할 수 없는 상자는 가장 적게 밟고, 같은 칸 수면 가장 짧은 길을 고른다', () => {
+  // x=5 세로 벽이 찾는 범위 전체를 막아 한 칸은 밟아야 한다. 막힌 기본 꺾임은 쓰지 않는다.
+  const wall = (point: { x: number; y: number }) => point.x === 5;
+  const start = { x: 0, y: 0 };
+  const end = { x: 10, y: 0 };
+  const path = clearRun(start, end, wall, [[start, end]]);
+  expect(path.filter(wall)).toHaveLength(1);
+  expect(path).toHaveLength(10);
+  expect(path.at(-1)).toEqual(end);
 });

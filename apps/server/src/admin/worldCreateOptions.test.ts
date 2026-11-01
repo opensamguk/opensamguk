@@ -120,7 +120,7 @@ describe('AC-M3-04 원생성 설정 조회', () => {
 
 describe('AC-INT-04 SAN10 명시 생성 프로필', () => {
   it.each(['san10-191', 'san10-empty'] as const)(
-    '%s는 152전략·153표식·200도로와491명·9기능을 엄격히 고정한다',
+    '%s는 154전략·155표식·202도로와491명·9기능을 엄격히 고정한다',
     (id) => {
       const before = JSON.stringify([allRows, allPresets]),
         profile = creationProfile(allRows, allPresets, registered, id);
@@ -138,13 +138,13 @@ describe('AC-INT-04 SAN10 명시 생성 프로필', () => {
         counts: {
           nations: id === 'san10-empty' ? 0 : 21,
           generals: 491,
-          cities: 144,
+          cities: 146,
           gates: 8,
           ports: 0,
           fields: 1,
-          anchors: 152,
-          markers: 153,
-          roads: 200,
+          anchors: 154,
+          markers: 155,
+          roads: 202,
         },
         ruleFeatures: creationFeatures,
       });

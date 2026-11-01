@@ -1,6 +1,7 @@
 import type { PublicGeography } from '@opensamguk/shared';
 import { palette } from './pixel-basemap.json';
 import { ROAD_CELL, routePoints, routeSiteIds } from './roadPixels';
+import type { GateDir } from './siteMarkers';
 
 // 확대 지형 타일 (INT-20, D-047). 도트 바탕의 한 픽셀(2단위 칸)이 화면에서 충분히 커지면
 // 그 칸의 지형 종류에 맞는 타일 그림으로 바꿔 그린다. 길은 칸끼리 상하좌우로 이은 연결 모양 타일이다.
@@ -109,19 +110,52 @@ export function walk(points: readonly Point[], cell = ROAD_CELL): Point[] {
   return out;
 }
 
-// 거점 문 (INT-20). 길은 거점 표식의 동서남북 문으로만 드나든다. 상대 점 쪽으로 더 많이 벌어진 축의 문을 쓰고,
-// 문 칸에서 바깥으로 한 칸 곧게 나간 뒤 다음 점으로 잇는다. 거점 안쪽 칸은 표식에 가려진다.
+// 거점 문 (INT-20, D-052). 길은 거점 표식의 문으로만 드나든다. 문이 정해진 표식은 그 가운데 상대 점 쪽을 가장
+// 많이 향한 문을, 담이 없는 표식은 상대 점 쪽으로 더 벌어진 축의 문을 쓴다. 문 칸에서 바깥으로 한 칸 곧게 나간다.
+// 거점 안쪽 칸은 표식에 가려진다.
 type Gate = { dx: number; dy: number };
+// half: 표식 상자 반지름(칸). 없으면 문 칸 수와 같은 정사각형으로 본다. 길 가운데 구간이 이 상자를 지나지 않게 한다.
+export type SiteGate =
+  number | { cells: number; allowed?: readonly GateDir[] | undefined; half?: { x: number; y: number } | undefined };
+const DIRECTIONS: Record<GateDir, Gate> = {
+  N: { dx: 0, dy: -1 },
+  E: { dx: 1, dy: 0 },
+  S: { dx: 0, dy: 1 },
+  W: { dx: -1, dy: 0 },
+};
 const gateToward = (from: Point, to: Point): Gate =>
   Math.abs(to.x - from.x) >= Math.abs(to.y - from.y)
     ? { dx: Math.sign(to.x - from.x) || 1, dy: 0 }
     : { dx: 0, dy: Math.sign(to.y - from.y) };
+// 쓸 수 있는 문을 상대 쪽을 많이 향한 순서로 낸다. 담이 없는 표식은 상대 쪽 축의 문 하나다.
+function gateOrder(from: Point, to: Point, allowed: readonly GateDir[] | undefined): Gate[] {
+  if (!allowed?.length) return [gateToward(from, to)];
+  const score = (gate: Gate) => gate.dx * (to.x - from.x) + gate.dy * (to.y - from.y);
+  return allowed.map((name) => DIRECTIONS[name]).sort((left, right) => score(right) - score(left));
+}
+const facing = (gate: Gate, from: Point, to: Point) => gate.dx * (to.x - from.x) + gate.dy * (to.y - from.y) > 0;
+const gateOf = (value: SiteGate) =>
+  typeof value === 'number' ? { cells: value, allowed: undefined, half: undefined } : value;
+// 상대 쪽을 향하지 않는 문으로 나가면 문 밖에서 표식 옆으로 비켜선 뒤 상대 쪽으로 꺾는다. 그래야 길이 표식을 가로지르지 않는다.
+function leaveBy(center: Point, gate: Gate, cells: number, target: Point): { path: Point[]; heading: Gate } {
+  const path = spur(center, gate, cells + 1);
+  if (facing(gate, center, target)) return { path, heading: gate };
+  const end = path.at(-1)!;
+  const side = gate.dy
+    ? { dx: Math.sign(target.x - center.x) || 1, dy: 0 }
+    : { dx: 0, dy: Math.sign(target.y - center.y) || 1 };
+  for (let step = 1; step <= cells + 2; step += 1) path.push({ x: end.x + side.dx * step, y: end.y + side.dy * step });
+  const back = gate.dy
+    ? { dx: 0, dy: Math.sign(target.y - path.at(-1)!.y) || -gate.dy }
+    : { dx: Math.sign(target.x - path.at(-1)!.x) || -gate.dx, dy: 0 };
+  return { path, heading: back };
+}
 const spur = (center: Point, gate: Gate, length: number) =>
   Array.from({ length: length + 1 }, (_, step) => ({ x: center.x + gate.dx * step, y: center.y + gate.dy * step }));
 
 // 두 문 밖 칸 사이를 가로세로 곧은 줄로 잇는다. 문 방향이 같은 축이면 가운데에서 한 번 비켜 가고(ㄹ자),
 // 다른 축이면 한 번만 꺾는다(ㄱ자). 계단식 대각선을 만들지 않는다.
-function straightRuns(from: Point, leave: Gate, to: Point, enter: Gate): Point[] {
+function cornersFor(from: Point, leave: Gate, to: Point, enter: Gate): Point[] {
   const corners: Point[] = [from];
   if (leave.dx && enter.dx) {
     const mid = Math.round((from.x + to.x) / 2);
@@ -132,6 +166,9 @@ function straightRuns(from: Point, leave: Gate, to: Point, enter: Gate): Point[]
   } else if (leave.dx) corners.push({ x: to.x, y: from.y });
   else corners.push({ x: from.x, y: to.y });
   corners.push(to);
+  return corners;
+}
+function alongCorners(corners: readonly Point[]): Point[] {
   const out: Point[] = [];
   for (let index = 1; index < corners.length; index += 1) {
     const a = corners[index - 1]!;
@@ -143,18 +180,117 @@ function straightRuns(from: Point, leave: Gate, to: Point, enter: Gate): Point[]
   return out;
 }
 
-// gateCells: 거점 중심에서 문 칸까지의 칸 수(표식 반지름). 0이면 문 없이 중심끼리 잇는다.
-export function gatedWalk(points: readonly Point[], gateCells: readonly number[], cell = ROAD_CELL): Point[] {
+export function clearRun(
+  start: Point,
+  end: Point,
+  blocked: (point: Point) => boolean,
+  options: readonly Point[][],
+): Point[] {
+  for (const corners of options) {
+    const run = alongCorners(corners);
+    if (!run.some(blocked)) return run;
+  }
+  // 상자 칸을 가장 적게 밟고, 그다음 가장 짧은 가로세로 길(밟은 칸 수·길이 순 비용의 다익스트라).
+  // 두 점을 둘러싼 범위 밖으로 8칸까지만 찾는다. 표식이 붙어 피할 길이 없어도 상자를 덜 지나는 길을 고르고,
+  // 막힌 기본 꺾임으로 되돌아가지 않는다.
+  const x0 = Math.min(start.x, end.x) - 8;
+  const x1 = Math.max(start.x, end.x) + 8;
+  const y0 = Math.min(start.y, end.y) - 8;
+  const y1 = Math.max(start.y, end.y) + 8;
+  const area = (x1 - x0 + 1) * (y1 - y0 + 1);
+  const key = (point: Point) => `${point.x},${point.y}`;
+  // 밟은 칸 하나가 어떤 우회 길이보다 비싸도록 범위 칸 수를 곱한다.
+  const cost = new Map<string, number>([[key(start), 0]]);
+  const previous = new Map<string, Point | null>([[key(start), null]]);
+  const heap: Array<[number, Point]> = [[0, start]];
+  const push = (item: [number, Point]) => {
+    heap.push(item);
+    for (let at = heap.length - 1; at > 0;) {
+      const up = (at - 1) >> 1;
+      if (heap[up]![0] <= heap[at]![0]) break;
+      [heap[up], heap[at]] = [heap[at]!, heap[up]!];
+      at = up;
+    }
+  };
+  const pop = () => {
+    const top = heap[0]!;
+    const last = heap.pop()!;
+    if (heap.length) {
+      heap[0] = last;
+      for (let at = 0; ;) {
+        const left = at * 2 + 1;
+        const right = left + 1;
+        let low = at;
+        if (left < heap.length && heap[left]![0] < heap[low]![0]) low = left;
+        if (right < heap.length && heap[right]![0] < heap[low]![0]) low = right;
+        if (low === at) break;
+        [heap[low], heap[at]] = [heap[at]!, heap[low]!];
+        at = low;
+      }
+    }
+    return top;
+  };
+  while (heap.length) {
+    const [here, at] = pop();
+    if (here > cost.get(key(at))!) continue;
+    if (at.x === end.x && at.y === end.y) break;
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ] as const) {
+      const next = { x: at.x + dx, y: at.y + dy };
+      if (next.x < x0 || next.x > x1 || next.y < y0 || next.y > y1) continue;
+      const step = 1 + (blocked(next) && (next.x !== end.x || next.y !== end.y) ? area : 0);
+      const total = here + step;
+      const known = cost.get(key(next));
+      if (known !== undefined && known <= total) continue;
+      cost.set(key(next), total);
+      previous.set(key(next), at);
+      push([total, next]);
+    }
+  }
+  const path: Point[] = [];
+  for (let step: Point | null = end; step && key(step) !== key(start); step = previous.get(key(step)) ?? null)
+    path.unshift(step);
+  return path;
+}
+
+// gates: 거점마다 중심에서 문 칸까지의 칸 수(표식 반지름)와 쓸 수 있는 문. 0이면 문 없이 중심끼리 잇는다.
+export function gatedWalk(points: readonly Point[], gates: readonly SiteGate[], cell = ROAD_CELL): Point[] {
   const centers = points.map((point) => ({ x: Math.floor(point.x / cell), y: Math.floor(point.y / cell) }));
   const out: Point[] = [];
   for (let index = 1; index < centers.length; index += 1) {
     const from = centers[index - 1]!;
     const to = centers[index]!;
-    const leave = gateToward(from, to);
-    const enter = gateToward(to, from);
-    const outbound = spur(from, leave, gateCells[index - 1]! + 1);
-    const inbound = spur(to, enter, gateCells[index]! + 1).reverse();
-    const middle = straightRuns(outbound.at(-1)!, leave, inbound[0]!, enter);
+    const a = gateOf(gates[index - 1]!);
+    const b = gateOf(gates[index]!);
+    const boxOf = (site: Point, gate: ReturnType<typeof gateOf>) => (point: Point) =>
+      Math.abs(point.x - site.x) <= (gate.half?.x ?? gate.cells) &&
+      Math.abs(point.y - site.y) <= (gate.half?.y ?? gate.cells);
+    const inFrom = boxOf(from, a);
+    const inTo = boxOf(to, b);
+    const inBox = (point: Point) => inFrom(point) || inTo(point);
+    // 문 밖 길이 상대 표식 상자로 들어가지 않는 문을 먼저 고른다. 모두 들어가면 가장 상대 쪽 문을 쓴다.
+    const exit = (center: Point, gate: ReturnType<typeof gateOf>, target: Point, other: (point: Point) => boolean) => {
+      const tries = gateOrder(center, target, gate.allowed).map((choice) =>
+        leaveBy(center, choice, gate.cells, target),
+      );
+      return tries.find((option) => !option.path.some(other)) ?? tries[0]!;
+    };
+    const leaving = exit(from, a, to, inTo);
+    const entering = exit(to, b, from, inFrom);
+    const outbound = leaving.path;
+    const inbound = [...entering.path].reverse();
+    // 가운데 구간이 두 표식 상자를 지나면 다른 꺾임(ㄱ·ㄹ)을 고르고, 그래도 지나면 상자를 가장 적게 밟는 길로 잇는다.
+    const start = outbound.at(-1)!;
+    const end = inbound[0]!;
+    const middle = clearRun(start, end, inBox, [
+      cornersFor(start, leaving.heading, end, entering.heading),
+      [start, { x: end.x, y: start.y }, end],
+      [start, { x: start.x, y: end.y }, end],
+    ]);
     for (const part of [outbound, middle, inbound])
       for (const point of part)
         if (!out.length || out.at(-1)!.x !== point.x || out.at(-1)!.y !== point.y) out.push(point);
@@ -166,7 +302,7 @@ export function gatedWalk(points: readonly Point[], gateCells: readonly number[]
 export function roadTiles(
   map: Pick<PublicGeography, 'sites' | 'routes'>,
   skip: ReadonlySet<string> = new Set(),
-  gateCells: (siteId: string) => number = () => 0,
+  gateCells: (siteId: string) => SiteGate = () => 0,
   cell = ROAD_CELL,
 ) {
   const siteById = new Map(map.sites.map((site) => [site.id, site]));

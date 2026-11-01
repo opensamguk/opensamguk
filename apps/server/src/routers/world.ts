@@ -56,7 +56,7 @@ export const worldRouter = router({
       const nations = await tx.nation.findMany({
         where: { worldId: input.worldId },
         orderBy: { id: 'asc' },
-        select: { id: true, name: true, color: true },
+        select: { id: true, name: true, color: true, capitalCityKey: true },
       });
       const world = await tx.world.findUniqueOrThrow({
         where: { id: input.worldId },

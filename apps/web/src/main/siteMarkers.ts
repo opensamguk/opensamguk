@@ -1,3 +1,4 @@
+import type { MapNation } from '../game/types';
 import level0 from '../art/map/level-0.png';
 import level0Large from '../art/map/level-0@128.png';
 import level4 from '../art/map/level-4.png';
@@ -16,10 +17,10 @@ import ruin from '../art/map/ruin.png';
 import ruinLarge from '../art/map/ruin@128.png';
 import port from '../art/map/port.png';
 import portLarge from '../art/map/port@128.png';
-import pass from '../art/map/pass.png';
-import passLarge from '../art/map/pass@128.png';
-import passEw from '../art/map/pass-ew.png';
-import passEwLarge from '../art/map/pass-ew@128.png';
+import passWall from '../art/map/pass-wall.png';
+import passWallLarge from '../art/map/pass-wall@128.png';
+import passWallEw from '../art/map/pass-wall-ew.png';
+import passWallEwLarge from '../art/map/pass-wall-ew@128.png';
 import field from '../art/map/field.png';
 import fieldLarge from '../art/map/field@128.png';
 import ford from '../art/map/ford.png';
@@ -31,6 +32,7 @@ import fordLarge from '../art/map/ford@128.png';
 
 export type SiteKind = 'CITY' | 'PASS' | 'PORT' | 'FIELD';
 export type PassAxis = 'ns' | 'ew';
+export type GateDir = 'N' | 'E' | 'S' | 'W';
 export interface MarkerArt {
   name: string;
   small: string;
@@ -48,8 +50,8 @@ const ART = {
   level9: art('level-9', level9, level9Large),
   ruin: art('ruin', ruin, ruinLarge),
   port: art('port', port, portLarge),
-  pass: art('pass', pass, passLarge),
-  passEw: art('pass-ew', passEw, passEwLarge),
+  pass: art('pass-wall', passWall, passWallLarge),
+  passEw: art('pass-wall-ew', passWallEw, passWallEwLarge),
   field: art('field', field, fieldLarge),
   ford: art('ford', ford, fordLarge),
 };
@@ -60,6 +62,8 @@ export const LEVEL_NAMES = ['무', '수', '진', '관', '이', '소', '중', '�
 // INT-20 사용자 요청으로 줄였다. 진(2)과 진영은 확실히 작게 둔다.
 const LEVEL_UNITS = [5, 6, 4, 6, 6, 7, 8, 9, 11, 13] as const;
 const FACILITY_UNITS: Record<Exclude<SiteKind, 'CITY'>, number> = { PASS: 6, PORT: 6, FIELD: 3.5 };
+// D-052: 관은 길을 가로막는 긴 성벽 띠다. 남북 길이면 가로 12×세로 3, 동서 길이면 가로 3×세로 12 지도 단위다.
+export const PASS_WALL = { long: 12, short: 3 } as const;
 export const SQUARE_BELOW_PX = 16;
 export const SMALL_UP_TO_PX = 48;
 
@@ -75,6 +79,39 @@ export function levelName(level: number | undefined): string | undefined {
 export function markerUnits(kind: SiteKind, level?: number): number {
   if (kind !== 'CITY') return FACILITY_UNITS[kind];
   return LEVEL_UNITS[knownLevel(level) ?? 5] ?? LEVEL_UNITS[5];
+}
+
+const isPass = (kind: SiteKind, level?: number) => kind === 'PASS' || (kind === 'CITY' && knownLevel(level) === 3);
+
+/** 그림 상자 크기(지도 단위). 관만 길쭉하고 나머지는 정사각형이다. */
+export function markerBox(kind: SiteKind, level?: number, axis?: PassAxis): { width: number; height: number } {
+  if (isPass(kind, level))
+    return axis === 'ew'
+      ? { width: PASS_WALL.short, height: PASS_WALL.long }
+      : { width: PASS_WALL.long, height: PASS_WALL.short };
+  const units = markerUnits(kind, level);
+  return { width: units, height: units };
+}
+
+// D-052 사용자 요청: 길은 그림에 실제로 있는 문으로만 드나든다. undefined는 담이 없어 어느 쪽이든 된다.
+// 진·소·수는 남문 하나, 중은 남북 문, 대·특·경은 네 문이다. 관은 길 방향 양쪽 문이다.
+export function markerGates(kind: SiteKind, level?: number, axis?: PassAxis): readonly GateDir[] | undefined {
+  if (isPass(kind, level)) return axis === 'ew' ? ['E', 'W'] : ['N', 'S'];
+  if (kind !== 'CITY') return undefined;
+  switch (knownLevel(level) ?? 5) {
+    case 1:
+    case 2:
+    case 5:
+      return ['S'];
+    case 6:
+      return ['N', 'S'];
+    case 7:
+    case 8:
+    case 9:
+      return ['N', 'E', 'S', 'W'];
+    default:
+      return undefined;
+  }
 }
 
 export function markerArt(
@@ -133,3 +170,11 @@ export function passAxis(at: { x: number; y: number }, neighbours: readonly { x:
   }
   return dx > dy ? 'ew' : 'ns';
 }
+
+// 공개 지도 사본은 수도를 저장하지 않는다(T4-56). 수도가 없으면 별표를 달지 않는다.
+export type DrawnNation = Pick<MapNation, 'id' | 'name' | 'color'> & { capitalCityKey?: number | null };
+
+// 수도는 도시 이름 앞 별표로 누구에게나 보인다 (D-053).
+export const CAPITAL_MARK = '★';
+export const isCapital = (city: { key: number }, nation: DrawnNation | undefined) =>
+  nation?.capitalCityKey === city.key;

@@ -1,13 +1,23 @@
 import type { PublicGeography } from '@opensamguk/shared';
 import { useEffect, useId, useMemo, useRef, useState, type PointerEvent } from 'react';
-import type { MapCity, MapNation } from '../game/types';
+import type { MapCity } from '../game/types';
 import { readableTextColor } from '../ui/color';
 import { FlagMaskDef, MapSiteMarker } from './MapSiteMarker';
 import { RoadPixelLayer, WaterLaneLayer } from './RoadPixelLayer';
 import { TerrainTileLayer, useTerrainGrid } from './TerrainTileLayer';
 import { showTiles, waterLanes } from './terrainTiles';
 import { ROAD_CELL, passNeighbours } from './roadPixels';
-import { levelName, markerUnits, passAxis } from './siteMarkers';
+import {
+  CAPITAL_MARK,
+  isCapital,
+  levelName,
+  markerBox,
+  markerGates,
+  markerUnits,
+  passAxis,
+  type DrawnNation,
+} from './siteMarkers';
+import type { SiteGate } from './terrainTiles';
 import { basemapForOperationalMap } from './operationalGeography';
 import { mapTapTargets, tapCandidates, type MapView } from './mapTapTargets';
 import styles from './OperationalWorldMap.module.css';
@@ -97,7 +107,7 @@ export function OperationalWorldMap({
   fill = false,
 }: {
   cities: readonly DrawnCity[];
-  nations: readonly MapNation[];
+  nations: readonly DrawnNation[];
   map: MapData;
   myCityKey: number | null;
   selectedKey: number | null;
@@ -135,16 +145,22 @@ export function OperationalWorldMap({
   const grid = useTerrainGrid(basemap?.pixels, basemap?.palette);
   const lanes = useMemo(() => (grid ? waterLanes(map, grid) : []), [grid, map]);
   const laneIds = useMemo(() => new Set(lanes.map((lane) => lane.id)), [lanes]);
-  // 길은 표식 가장자리의 문으로 드나든다. 문 칸은 표식 반지름만큼 떨어진다.
+  // 길은 표식에 실제로 있는 문으로만 드나든다(D-052). 문 칸은 문이 난 변까지의 반지름만큼 떨어진다.
   const gateCells = useMemo(() => {
     const levels = new Map(cities.map((city) => [city.key, city.level]));
-    const cells = new Map(
+    const gates = new Map<string, SiteGate>(
       map.sites.map((site) => {
         const level = site.kind === 'CITY' && site.anchorKey !== undefined ? levels.get(site.anchorKey) : undefined;
-        return [site.id, Math.ceil(markerUnits(site.kind, level) / 2 / ROAD_CELL)];
+        const axis = site.kind === 'PASS' ? passAxis(site.position, passNeighbours(site.id, map)) : undefined;
+        const box = markerBox(site.kind, level, axis);
+        const allowed = markerGates(site.kind, level, axis);
+        // 관은 길 방향 변(짧은 쪽)에 문이 있다. 나머지는 정사각형이라 어느 변이든 같다.
+        const toGate = allowed && allowed.every((gate) => gate === 'N' || gate === 'S') ? box.height : box.width;
+        const half = { x: Math.ceil(box.width / 2 / ROAD_CELL), y: Math.ceil(box.height / 2 / ROAD_CELL) };
+        return [site.id, { cells: Math.ceil(toGate / 2 / ROAD_CELL), allowed, half }];
       }),
     );
-    return (siteId: string) => cells.get(siteId) ?? 0;
+    return (siteId: string) => gates.get(siteId) ?? 0;
   }, [cities, map]);
   const canSelect = Boolean(onSelect);
   useEffect(() => {
@@ -518,10 +534,13 @@ export function OperationalWorldMap({
           const selected = city?.key === selectedKey;
           const parent = site.kind === 'PORT' ? siteById.get(site.parentCityId!) : undefined;
           const grade = site.kind === 'CITY' ? levelName(city?.level) : undefined;
+          const capital = city !== undefined && isCapital(city, nation);
+          const plate = capital ? `${CAPITAL_MARK}${site.name}` : site.name;
           const label = [
             site.name,
             grade ? `${grade} ${labels[site.kind]}` : labels[site.kind],
             city?.recorded === false ? '기록 없음' : (nation?.name ?? (city ? '공백지' : null)),
+            capital ? '수도' : null,
             parent ? `${parent.name} 소속` : null,
             mine ? '내 위치' : null,
             city?.supplied === false && city.nationId !== null ? '보급 끊김' : null,
@@ -530,7 +549,11 @@ export function OperationalWorldMap({
             .join(', ');
           const action = city && onSelect ? () => choose(city.key) : undefined;
           const target = city ? targetByKey.get(city.key) : undefined;
-          const radius = markerUnits(site.kind, site.kind === 'CITY' ? city?.level : undefined) / 2;
+          const level = site.kind === 'CITY' ? city?.level : undefined;
+          const axis = site.kind === 'PASS' ? passAxis(site.position, passNeighbours(site.id, map)) : undefined;
+          const radius = markerUnits(site.kind, level) / 2;
+          // 이름표는 그림 아래 변 바로 밑에 단다. 가로 성벽 관은 그림이 낮아 더 붙는다.
+          const below = markerBox(site.kind, level, axis).height / 2;
           return (
             <g
               key={site.id}
@@ -598,23 +621,23 @@ export function OperationalWorldMap({
                   y={site.position.y}
                   kind={site.kind}
                   level={site.kind === 'CITY' ? city?.level : undefined}
-                  axis={site.kind === 'PASS' ? passAxis(site.position, passNeighbours(site.id, map)) : undefined}
+                  axis={axis}
                   color={city && city.recorded !== false ? (nation?.color ?? null) : null}
                   pixelsPerUnit={pixelsPerUnit}
                   flagMaskId={flagMaskId}
                 />
               </g>
-              <g transform={`translate(${site.position.x} ${site.position.y + radius + 2}) scale(${labelScale})`}>
+              <g transform={`translate(${site.position.x} ${site.position.y + below + 2}) scale(${labelScale})`}>
                 <rect
-                  x={-(Array.from(site.name).length * 6 + 5) / 2}
+                  x={-(Array.from(plate).length * 6 + 5) / 2}
                   y={0}
-                  width={Array.from(site.name).length * 6 + 5}
+                  width={Array.from(plate).length * 6 + 5}
                   height="11"
                   rx="1"
                   fill={nation?.color ?? '#eee8d7'}
                 />
                 <text x={0} y={8} className={styles.label} fill={nation ? readableTextColor(nation.color) : '#282d29'}>
-                  {site.name}
+                  {plate}
                 </text>
               </g>
             </g>
@@ -631,6 +654,7 @@ export function OperationalWorldMap({
             const grade = site.kind === 'CITY' ? levelName(city?.level) : undefined;
             const owner = city?.recorded === false ? '기록 없음' : (nation?.name ?? (city ? '공백지' : null));
             const notes = [
+              city && isCapital(city, nation) ? '수도' : null,
               parent ? `${parent.name} 소속` : null,
               city?.key === myCityKey ? '내 위치' : null,
               city?.supplied === false && city.nationId !== null ? '보급 끊김' : null,

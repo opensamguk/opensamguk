@@ -186,7 +186,7 @@ it.each(['sha', 'position', 'missing', 'duplicate-id', 'duplicate-anchor'] as co
   },
 );
 
-it('AC-INT-03·10 SAN10의 153표식·200도로와 동북 끝점 전체 범위를 유지한다', () => {
+it('AC-INT-03·10 SAN10의 155표식·202도로와 동북 끝점 전체 범위를 유지한다', () => {
   const geography = publicGeographySchema.parse(san10Resource);
   const strategic = geography.sites.filter((site) => site.kind === 'CITY' || site.kind === 'PASS');
   const mapped: MapCity[] = strategic.map((site) => ({
@@ -206,9 +206,9 @@ it('AC-INT-03·10 SAN10의 153표식·200도로와 동북 끝점 전체 범위�
   const svg = screen.getByTestId('world-map'),
     before = svg.getAttribute('viewBox');
   // D-049: SAN10 지도 자료에는 항구 시설이 없다.
-  expect(svg.querySelectorAll('[data-site-kind]')).toHaveLength(153);
+  expect(svg.querySelectorAll('[data-site-kind]')).toHaveLength(155);
   expect(svg.querySelectorAll('[data-site-kind="PORT"]')).toHaveLength(0);
-  expect(svg.querySelectorAll('[data-route-mode="LAND"]')).toHaveLength(200);
+  expect(svg.querySelectorAll('[data-route-mode="LAND"]')).toHaveLength(202);
   expect(screen.getByTestId('geographic-relief').getAttribute('href')).toContain('san10-pixel-basemap.png');
   const yamatai = mapped.find((city) => city.name === '야마타이국')!;
   fireEvent.change(screen.getByRole('combobox', { name: '지도 거점' }), { target: { value: String(yamatai.key) } });
@@ -260,4 +260,23 @@ it('도시 표식의 접근성 이름에 툴팁과 같은 규모를 넣고 관�
   // 허창은 규모 2(진). 툴팁(aria-hidden)에만 있는 정보가 없도록 이름에도 같은 규모를 둔다.
   expect(screen.getByRole('button', { name: /^허창, 진 도시, / })).toBeTruthy();
   expect(screen.getByRole('button', { name: '관문, 관문, 위' })).toBeTruthy();
+});
+
+it('D-053 수도는 이름표 앞 별표와 접근성 이름 「수도」로 누구에게나 보이고 다른 거점에는 붙지 않는다', () => {
+  const { container, unmount } = render(
+    <WorldMap
+      cities={cities}
+      nations={[{ ...nations[0]!, capitalCityKey: 1 }]}
+      operationalMap={map}
+      onSelect={vi.fn()}
+    />,
+  );
+  const plates = [...container.querySelectorAll('svg text')].map((text) => text.textContent);
+  expect(plates).toEqual(expect.arrayContaining(['★허창', '관문']));
+  expect(screen.getByRole('button', { name: /^허창, 진 도시, 위, 수도$/ })).toBeTruthy();
+  expect(screen.getByRole('button', { name: '관문, 관문, 위' })).toBeTruthy();
+  unmount();
+  // 공개 지도 사본처럼 수도를 모르는 국가는 별표를 달지 않는다.
+  const plain = draw();
+  expect([...plain.container.querySelectorAll('svg text')].some((text) => text.textContent?.includes('★'))).toBe(false);
 });

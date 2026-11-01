@@ -4,7 +4,7 @@
     "name": "san10",
     "path": "resources/map/san10.json",
     "version": 1,
-    "contentHash": "cf109be97f9c3304ddab6f270c506f285db7a6c25121467eb3a4147e8e206a8a",
+    "contentHash": "292905fd357d6d1c3c9b4db0b5d3dc976da94f333b77a320e15291c5619a3d06",
     "source": "D-045; SAN10 user survey / core2026 df6c926 MIT / Natural Earth v5.1.2 public domain; resources/map-drafts/san10/NOTICE.md"
   },
   {
@@ -12,7 +12,7 @@
     "name": "san10-191",
     "path": "resources/scenario/san10-191.json",
     "version": 1,
-    "contentHash": "63f0e0317ab84d3fe8b1eaeaea3117a613d6914e5aa1a1bdb292c08e0f18a3b4",
+    "contentHash": "369394ce7e5722bce915de90231b8e919d50e23cb4448d7a3c6e927f27ed96a6",
     "source": "D-045; SAN10 user survey / core2026 df6c926 MIT / Natural Earth v5.1.2 public domain; resources/map-drafts/san10/NOTICE.md"
   },
   {
