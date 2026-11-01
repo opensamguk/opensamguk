@@ -66,3 +66,13 @@ it('AC-INT-20 관문 이웃 점은 켜진 길의 바로 다음 점이다', () =>
   expect(passNeighbours('pass:3', map)).toEqual([{ x: 20, y: 30 }]);
   expect(passNeighbours('city:1', map)).toEqual([{ x: 30, y: 10 }]);
 });
+
+it('D-055 칸 길이 있는 경로는 확대 타일과 같은 그 칸으로 그린다', () => {
+  const cells = [
+    { x: 5, y: 5 },
+    { x: 6, y: 5 },
+  ];
+  expect(roadLayer(map, new Set(), 2, new Map([['r1', cells]])).find((layer) => layer.mode === 'LAND')?.d).toBe(
+    cellsPath(cells),
+  );
+});

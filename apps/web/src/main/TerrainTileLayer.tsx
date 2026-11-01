@@ -1,18 +1,16 @@
-import type { PublicGeography } from '@opensamguk/shared';
 import { useEffect, useMemo, useState } from 'react';
 import { BANK_TILES, BRIDGE_TILES, ROAD_TILES, TERRAIN_TILE_CELLS, TERRAIN_TILES } from '../art/tiles';
 import { ROAD_CELL } from './roadPixels';
 import {
   WATER_TERRAINS,
   bankTiles,
-  roadTiles,
+  roadMasks,
   shadowPaths,
   terrainGrid,
   type TerrainPalette,
   terrainPaths,
   visibleCells,
   type View,
-  type SiteGate,
 } from './terrainTiles';
 
 export type TerrainGrid = { cells: Int8Array; columns: number; rows: number };
@@ -70,21 +68,17 @@ export function useTerrainGrid(pixels: string | undefined, colors: TerrainPalett
 
 export function TerrainTileLayer({
   grid,
-  map,
-  skip,
-  gateCells,
+  walks,
   view,
   idPrefix,
 }: {
   grid: Grid;
-  map: Pick<PublicGeography, 'sites' | 'routes'>;
-  skip: ReadonlySet<string>;
-  // 거점 중심에서 문 칸까지의 칸 수.
-  gateCells: (siteId: string) => SiteGate;
+  // 경로별 칸 길(roadWalks).
+  walks: ReadonlyMap<string, readonly { x: number; y: number }[]>;
   view: View;
   idPrefix: string;
 }) {
-  const roads = useMemo(() => roadTiles(map, skip, gateCells), [map, skip, gateCells]);
+  const roads = useMemo(() => roadMasks(walks.values()), [walks]);
   const ground = grid;
   const terrains = terrainPaths(ground.cells, ground.columns, ground.rows, view);
   const shadows = shadowPaths(ground, view);

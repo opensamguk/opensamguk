@@ -5,7 +5,7 @@ import { readableTextColor } from '../ui/color';
 import { FlagMaskDef, MapSiteMarker } from './MapSiteMarker';
 import { RoadPixelLayer, WaterLaneLayer } from './RoadPixelLayer';
 import { TerrainTileLayer, useTerrainGrid } from './TerrainTileLayer';
-import { showTiles, waterLanes } from './terrainTiles';
+import { roadWalks, showTiles, waterLanes } from './terrainTiles';
 import { ROAD_CELL, passNeighbours } from './roadPixels';
 import {
   CAPITAL_MARK,
@@ -146,8 +146,12 @@ export function OperationalWorldMap({
   const lanes = useMemo(() => (grid ? waterLanes(map, grid) : []), [grid, map]);
   const laneIds = useMemo(() => new Set(lanes.map((lane) => lane.id)), [lanes]);
   // 길은 표식에 실제로 있는 문으로만 드나든다(D-052). 문 칸은 문이 난 변까지의 반지름만큼 떨어진다.
+  // 문은 도시 규모로만 정해지므로 규모가 바뀔 때만 다시 계산한다. 지도 전체 길 계산이 여기에 걸려 있다.
+  const levelKey = cities.map((city) => `${city.key}:${city.level}`).join(',');
   const gateCells = useMemo(() => {
-    const levels = new Map(cities.map((city) => [city.key, city.level]));
+    const levels = new Map(
+      levelKey ? levelKey.split(',').map((entry) => entry.split(':').map(Number) as [number, number]) : [],
+    );
     const gates = new Map<string, SiteGate>(
       map.sites.map((site) => {
         const level = site.kind === 'CITY' && site.anchorKey !== undefined ? levels.get(site.anchorKey) : undefined;
@@ -161,7 +165,9 @@ export function OperationalWorldMap({
       }),
     );
     return (siteId: string) => gates.get(siteId) ?? 0;
-  }, [cities, map]);
+  }, [levelKey, map]);
+  // 땅길은 확대 전후 모두 같은 가로세로 칸 길로 그린다(D-055).
+  const walks = useMemo(() => roadWalks(map, laneIds, gateCells), [map, laneIds, gateCells]);
   const canSelect = Boolean(onSelect);
   useEffect(() => {
     const element = svg.current;
@@ -488,18 +494,12 @@ export function OperationalWorldMap({
           />
         </g>
         {grid && showTiles(pixelsPerUnit) && (
-          <TerrainTileLayer
-            grid={grid}
-            map={map}
-            skip={laneIds}
-            gateCells={gateCells}
-            view={shown}
-            idPrefix={`operational-terrain-${uid}`}
-          />
+          <TerrainTileLayer grid={grid} walks={walks} view={shown} idPrefix={`operational-terrain-${uid}`} />
         )}
         <RoadPixelLayer
           map={map}
           skip={laneIds}
+          walks={walks}
           modes={grid && showTiles(pixelsPerUnit) ? ['FORD', 'RIVER'] : undefined}
         />
         <WaterLaneLayer lanes={lanes} />
