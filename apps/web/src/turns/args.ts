@@ -1,10 +1,12 @@
 // 명령 인자 입력 칸. commands.list가 준 JSON Schema(argsSchema)에서 칸을 만든다.
 // 화면은 형식만 돕고, 인자가 맞는지는 서버가 저장·사전 검사 때 다시 본다.
+import { UNIT_CHOICES, unitName } from '../battleSim/publicUnitSet';
 
 export type ArgField =
   | { key: string; kind: 'city'; label: string }
   | { key: string; kind: 'nation'; label: string }
   | { key: string; kind: 'integer'; label: string; min: number; max: number }
+  | { key: string; kind: 'unit'; label: string; options: Array<{ value: string; label: string }> }
   | { key: string; kind: 'boolean'; label: string; options: [string, string] }
   | { key: string; kind: 'enum'; label: string; options: Array<{ value: string; label: string }> }
   | { key: string; kind: 'color'; label: string }
@@ -15,13 +17,18 @@ const LABELS: Record<string, string> = {
   nationId: '대상 국가',
   generalId: '대상 장수 번호',
   amount: '수량',
-  crewType: '병종 번호',
+  crewType: '병종',
   unitId: '부곡 번호',
   buy: '사고팔기',
   resource: '자원',
   name: '나라 이름',
   color: '나라 색',
 };
+
+const RECRUITABLE = UNIT_CHOICES.filter((unit) => unit.armType > 0).map((unit) => ({
+  value: String(unit.id),
+  label: unit.name,
+}));
 
 const ENUM_LABELS: Record<string, string> = { gold: '금', rice: '쌀' };
 
@@ -51,6 +58,8 @@ export function argFields(schema: unknown): ArgField[] {
     if (prop.type === 'integer') {
       if (key === 'cityKey') fields.push({ key, kind: 'city', label });
       else if (key === 'nationId') fields.push({ key, kind: 'nation', label });
+      // 병종은 번호를 치지 않고 이름으로 고른다. 모집할 수 있는 병종(armType > 0)만 둔다.
+      else if (key === 'crewType') fields.push({ key, kind: 'unit', label, options: RECRUITABLE });
       else
         fields.push({
           key,
@@ -99,9 +108,13 @@ export function buildArgs(
       if (required.includes(field.key)) missing.push(field.label);
       continue;
     }
-    if (field.kind === 'city' || field.kind === 'nation' || field.kind === 'integer') {
+    if (field.kind === 'city' || field.kind === 'nation' || field.kind === 'integer' || field.kind === 'unit') {
       const n = Number(raw);
-      if (!Number.isInteger(n) || (field.kind === 'integer' && (n < field.min || n > field.max))) {
+      if (
+        !Number.isInteger(n) ||
+        (field.kind === 'integer' && (n < field.min || n > field.max)) ||
+        (field.kind === 'unit' && !field.options.some((option) => option.value === raw))
+      ) {
         missing.push(field.label);
         continue;
       }
@@ -130,6 +143,7 @@ export function describeArgs(args: Record<string, unknown>, names: ArgNames): st
     else if (key === 'nationId' && typeof value === 'number') parts.push(names.nation(value) ?? `국가 ${value}`);
     else if (key === 'generalId' && typeof value === 'number' && names.general)
       parts.push(names.general(value) ?? `장수 ${value}`);
+    else if (key === 'crewType' && typeof value === 'number') parts.push(unitName(value));
     else if (key === 'buy' && typeof value === 'boolean') parts.push(value ? '쌀 사기' : '쌀 팔기');
     else if (key === 'resource' && typeof value === 'string') parts.push(ENUM_LABELS[value] ?? value);
     else if (key === 'target' && value === 'city') parts.push('도시 수비병');
