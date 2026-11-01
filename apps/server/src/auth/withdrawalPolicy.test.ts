@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isWithdrawalTombstoneEmail, resolveWithdrawalPolicy } from './withdrawalPolicy';
-import type { LegalPolicy } from '../legal/policy';
+import { resolveLegalPolicy, type LegalPolicy } from '../legal/policy';
 
 const legal: LegalPolicy = {
   terms: { version: 'terms-test', effectiveAt: '2026-01-01T00:00:00Z', bodyText: '시험 약관' },
@@ -13,6 +13,13 @@ describe('T3-02 AC-M3-02 탈퇴 정책의 명시적 활성화 경계', () => {
     expect(resolveWithdrawalPolicy(undefined, legal)).toBeNull();
     expect(resolveWithdrawalPolicy(null, legal)).toBeNull();
     expect(resolveWithdrawalPolicy(policy, null)).toBeNull();
+  });
+  it('D-051 승인 탈퇴 기준은 승인 개인정보 판에서만 켜진다', () => {
+    const approved = resolveLegalPolicy(undefined, Date.parse('2026-10-31T15:00:00Z'));
+    expect(resolveWithdrawalPolicy(undefined, approved)).toEqual({
+      scheme: 'tombstone-v1',
+      privacyVersion: 'privacy-2026-11-01',
+    });
   });
   it('시험 정책도 현재 개인정보 본문과 판이 맞아야 한다', () => {
     expect(resolveWithdrawalPolicy({ ...policy, privacyVersion: 'old' }, legal)).toBeNull();
