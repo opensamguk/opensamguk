@@ -254,3 +254,10 @@ it('휠 방향과 줄·쪽 단위를 같은 비율로 바꾸고 한 번에 2배�
   expect(wheelFactor(-10, 2)).toBe(2);
   expect(wheelFactor(10, 2)).toBe(0.5);
 });
+
+it('도시 표식의 접근성 이름에 툴팁과 같은 규모를 넣고 관문은 그대로 둔다', () => {
+  draw();
+  // 허창은 규모 2(진). 툴팁(aria-hidden)에만 있는 정보가 없도록 이름에도 같은 규모를 둔다.
+  expect(screen.getByRole('button', { name: /^허창, 진 도시, / })).toBeTruthy();
+  expect(screen.getByRole('button', { name: '관문, 관문, 위' })).toBeTruthy();
+});

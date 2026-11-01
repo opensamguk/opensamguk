@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useId, useRef, useState, type KeyboardEvent } from 'react';
+import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import mapIconUrl from '../art/icons/map.png';
 import basemapUrl from '../main/san10-pixel-basemap.png';
 import { MapLegend, WorldMap } from '../main/WorldMap';
@@ -83,72 +83,96 @@ export function PublicMapView({
     tabRefs.current.get(next.id)?.focus();
   };
 
-  return (
-    <section className={backdrop ? styles.backdrop : styles.area} data-testid="public-map" aria-label="공개 지도">
-      <div className={backdrop ? `${styles.tabRow} ${styles.backdropBar}` : styles.tabRow}>
-        <img className={styles.icon} src={mapIconUrl} alt="" width={32} height={32} />
-        <div className={styles.tabs} role="tablist" aria-label="진행 중인 월드" onKeyDown={move}>
-          {worlds.map((world, i) => {
-            const selected = i === index;
-            return (
-              <button
-                key={world.id}
-                ref={(node) => {
-                  if (node) tabRefs.current.set(world.id, node);
-                  else tabRefs.current.delete(world.id);
-                }}
-                type="button"
-                role="tab"
-                id={tabId(i)}
-                className={styles.tab}
-                aria-selected={selected}
-                aria-controls={panelId}
-                tabIndex={selected ? 0 : -1}
-                onClick={() => setChosenId(world.id)}
-              >
-                {world.name}
-                {world.status === 'PAUSED' ? <Tag tone="muted">멈춤</Tag> : null}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      <div
-        className={backdrop ? styles.backdropPanel : styles.panel}
-        role="tabpanel"
-        id={panelId}
-        aria-labelledby={tabId(index)}
-        data-world-id={current.id}
-      >
-        {current.map === null ? (
-          <p className={backdrop ? `${styles.note} ${styles.backdropNote}` : styles.note}>아직 공개 지도가 없습니다</p>
-        ) : (
-          <>
-            <p
-              className={backdrop ? `${styles.when} ${styles.backdropWhen}` : styles.when}
-              data-testid="public-map-when"
+  const tabRow = (
+    <div className={backdrop ? `${styles.tabRow} ${styles.backdropBox}` : styles.tabRow}>
+      <img className={styles.icon} src={mapIconUrl} alt="" width={32} height={32} />
+      <div className={styles.tabs} role="tablist" aria-label="진행 중인 월드" onKeyDown={move}>
+        {worlds.map((world, i) => {
+          const selected = i === index;
+          return (
+            <button
+              key={world.id}
+              ref={(node) => {
+                if (node) tabRefs.current.set(world.id, node);
+                else tabRefs.current.delete(world.id);
+              }}
+              type="button"
+              role="tab"
+              id={tabId(i)}
+              className={styles.tab}
+              aria-selected={selected}
+              aria-controls={panelId}
+              tabIndex={selected ? 0 : -1}
+              onClick={() => setChosenId(world.id)}
             >
-              <time dateTime={current.map.takenAt}>{snapshotTimeText(current.map, now)}</time>
-              {data.delayMinutes > 0 ? <span>{delayText(data.delayMinutes)}</span> : null}
-            </p>
-            <WorldMap
-              key={current.id}
-              cities={current.map.cities}
-              nations={current.map.nations}
-              operationalMap={current.map.operationalMap}
-              fill={backdrop}
-            />
-            {backdrop ? (
-              <details className={styles.backdropLegend}>
-                <summary>범례</summary>
-                <MapLegend cities={current.map.cities} nations={current.map.nations} readOnly />
-              </details>
-            ) : (
-              <MapLegend cities={current.map.cities} nations={current.map.nations} readOnly />
-            )}
-          </>
-        )}
+              {world.name}
+              {world.status === 'PAUSED' ? <Tag tone="muted">멈춤</Tag> : null}
+            </button>
+          );
+        })}
       </div>
+    </div>
+  );
+  const snapshot = current.map;
+  const when = snapshot ? (
+    <p className={backdrop ? `${styles.when} ${styles.backdropBox}` : styles.when} data-testid="public-map-when">
+      <time dateTime={snapshot.takenAt}>{snapshotTimeText(snapshot, now)}</time>
+      {data.delayMinutes > 0 ? <span>{delayText(data.delayMinutes)}</span> : null}
+    </p>
+  ) : null;
+  const legend = snapshot ? <MapLegend cities={snapshot.cities} nations={snapshot.nations} readOnly /> : null;
+  const map = snapshot ? (
+    <WorldMap
+      key={current.id}
+      cities={snapshot.cities}
+      nations={snapshot.nations}
+      operationalMap={snapshot.operationalMap}
+      fill={backdrop}
+    />
+  ) : null;
+  const panel = (children: ReactNode) => (
+    <div
+      className={backdrop ? styles.backdropPanel : styles.panel}
+      role="tabpanel"
+      id={panelId}
+      aria-labelledby={tabId(index)}
+      data-world-id={current.id}
+    >
+      {snapshot === null ? (
+        <p className={backdrop ? `${styles.note} ${styles.backdropNote}` : styles.note}>아직 공개 지도가 없습니다</p>
+      ) : (
+        children
+      )}
+    </div>
+  );
+
+  // 로그인 배경: 탭·기준 시각·범례를 한 기둥에 위에서부터 쌓아 탭이 여러 줄이어도 아래 요소가 덮지 않는다.
+  if (backdrop)
+    return (
+      <section className={styles.backdrop} data-testid="public-map" aria-label="공개 지도">
+        <div className={styles.backdropStack}>
+          {tabRow}
+          {when}
+          {legend ? (
+            <details className={`${styles.backdropBox} ${styles.backdropLegend}`}>
+              <summary>범례</summary>
+              {legend}
+            </details>
+          ) : null}
+        </div>
+        {panel(map)}
+      </section>
+    );
+  return (
+    <section className={styles.area} data-testid="public-map" aria-label="공개 지도">
+      {tabRow}
+      {panel(
+        <>
+          {when}
+          {map}
+          {legend}
+        </>,
+      )}
     </section>
   );
 }

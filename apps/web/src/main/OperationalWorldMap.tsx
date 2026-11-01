@@ -111,9 +111,17 @@ export function OperationalWorldMap({
   const ratio = whole.height / whole.width;
   const clampView = (value: View) => clamp(value, canvas);
   const [view, setView] = useState(whole);
-  const drag = useRef<{ pointerId: number; x: number; y: number; view: View; mobile: boolean; moved: boolean } | null>(
-    null,
-  );
+  // anchor: 표식 위에서 시작한 데스크톱 누르기. 4px 넘게 움직여야 끌기로 보고 그때 포인터를 잡는다(그 전엔 클릭 선택).
+  const drag = useRef<{
+    pointerId: number;
+    x: number;
+    y: number;
+    view: View;
+    mobile: boolean;
+    moved: boolean;
+    anchor: boolean;
+  } | null>(null);
+  const suppressClick = useRef(false);
   const completedTap = useRef<number | null>(null);
   const svg = useRef<SVGSVGElement>(null);
   const [layout, setLayout] = useState({ mobile: false, width: 0, height: 0 });
@@ -165,6 +173,11 @@ export function OperationalWorldMap({
     if (!validGeography || !element) return;
     const onWheel = (event: WheelEvent) => {
       if (!event.deltaY) return;
+      // 끌기는 시작할 때의 보기를 기준으로 옮긴다. 그 사이 확대하면 다음 이동이 되돌리므로 끌기 중엔 막는다.
+      if (drag.current) {
+        event.preventDefault();
+        return;
+      }
       const matrix = element.getScreenCTM?.();
       if (!matrix) return;
       event.preventDefault();
@@ -266,7 +279,13 @@ export function OperationalWorldMap({
   const move = (event: PointerEvent<SVGSVGElement>) => {
     const active = drag.current;
     if (!active || active.pointerId !== event.pointerId) return;
-    if (active.mobile && !active.moved && Math.hypot(event.clientX - active.x, event.clientY - active.y) < 4) return;
+    if (
+      (active.mobile || active.anchor) &&
+      !active.moved &&
+      Math.hypot(event.clientX - active.x, event.clientY - active.y) < 4
+    )
+      return;
+    if (active.anchor && !active.moved) event.currentTarget.setPointerCapture(event.pointerId);
     active.moved = true;
     const box = event.currentTarget.getBoundingClientRect();
     if (!box.width || !box.height) return;
@@ -287,8 +306,15 @@ export function OperationalWorldMap({
       data-testid="operational-world-map"
       onPointerDownCapture={() => {
         completedTap.current = null;
+        suppressClick.current = false;
       }}
       onClickCapture={(event) => {
+        if (suppressClick.current) {
+          suppressClick.current = false;
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
         if (
           layout.mobile &&
           completedTap.current !== null &&
@@ -374,13 +400,10 @@ export function OperationalWorldMap({
           }
         }}
         onPointerDown={(event) => {
-          if (
-            event.button !== 0 ||
-            event.isPrimary === false ||
-            drag.current ||
-            (!layout.mobile && event.target instanceof Element && event.target.closest('[data-anchor-key]'))
-          )
-            return;
+          if (event.button !== 0 || event.isPrimary === false || drag.current) return;
+          // 크게 확대하면 표식이 화면을 덮는다. 표식 위에서도 끌 수 있게 하되 움직이기 전까지는 클릭으로 둔다.
+          const anchor =
+            !layout.mobile && event.target instanceof Element && event.target.closest('[data-anchor-key]') !== null;
           setHover(null);
           drag.current = {
             pointerId: event.pointerId,
@@ -389,14 +412,17 @@ export function OperationalWorldMap({
             view,
             mobile: layout.mobile,
             moved: false,
+            anchor,
           };
-          event.currentTarget.setPointerCapture(event.pointerId);
+          if (!anchor) event.currentTarget.setPointerCapture(event.pointerId);
         }}
         onPointerMove={move}
         onPointerUp={(event) => {
           const active = drag.current;
           if (!active || active.pointerId !== event.pointerId) return;
           drag.current = null;
+          // 표식 위에서 끌고 놓으면 뒤따르는 클릭이 선택으로 번지지 않게 한 번 막는다.
+          if (active.anchor && active.moved) suppressClick.current = true;
           if (active.mobile) {
             completedTap.current = event.pointerId;
             if (!active.moved) selectAt(event.currentTarget, event.clientX, event.clientY);
@@ -486,9 +512,10 @@ export function OperationalWorldMap({
           const mine = city?.key === myCityKey;
           const selected = city?.key === selectedKey;
           const parent = site.kind === 'PORT' ? siteById.get(site.parentCityId!) : undefined;
+          const grade = site.kind === 'CITY' ? levelName(city?.level) : undefined;
           const label = [
             site.name,
-            labels[site.kind],
+            grade ? `${grade} ${labels[site.kind]}` : labels[site.kind],
             city?.recorded === false ? '기록 없음' : (nation?.name ?? (city ? '공백지' : null)),
             parent ? `${parent.name} 소속` : null,
             mine ? '내 위치' : null,
