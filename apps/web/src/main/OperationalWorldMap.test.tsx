@@ -77,6 +77,19 @@ it('AC-INT-20 도로를 도트 층으로 깔고 거점을 규모 표식과 국�
   // 경로 선은 경로마다 하나 남고 일방통행만 화살표를 단다.
   expect(svg.querySelectorAll('polyline[data-route-mode="LAND"]')).toHaveLength(2);
   expect(svg.querySelectorAll('polyline[marker-end]')).toHaveLength(1);
+  // D-055: 일방통행 선은 도트 길 칸 위로만 지나 길 밖에 따로 선을 긋지 않는다.
+  const road = screen.getByTestId('road-pixels').querySelector('[data-road-mode="LAND"]')!.getAttribute('d')!;
+  const rects = [...road.matchAll(/M(-?[\d.]+) (-?[\d.]+)h([\d.]+)v([\d.]+)/g)].map((m) => m.slice(1).map(Number));
+  const vertices = svg
+    .querySelector('polyline[marker-end]')!
+    .getAttribute('points')!
+    .split(' ')
+    .map((pair) => pair.split(',').map(Number) as [number, number]);
+  expect(vertices.length).toBeGreaterThan(2);
+  for (const [x, y] of vertices)
+    expect(
+      rects.some(([left, top, width, height]) => x > left! && x < left! + width! && y > top! && y < top! + height!),
+    ).toBe(true);
   expect(svg.querySelector('mask[id^="operational-flag-"]')).toBeTruthy();
   // jsdom은 크기를 0으로 읽으므로 표식은 국가색 네모로 줄어든다.
   const city = screen.getByTestId('site-icon-city').querySelector('[data-marker-detail="square"]');
@@ -107,9 +120,17 @@ it('AC-INT-10 GIS 지형과 기존 도트·국가색을 그리고 항구·전장
   fireEvent.keyDown(pass, { key: 'Enter' });
   expect(onSelect.mock.calls).toEqual([[2]]);
   expect(screen.getByTestId('world-map').querySelectorAll('polyline')).toHaveLength(1);
-  expect(screen.getByTestId('world-map').querySelector('polyline')!.getAttribute('points')).toBe(
-    '300,200 450,200 600,200',
-  );
+  // D-055: 경로 선은 칸 길 가운데를 따라 허창 칸에서 관문 칸까지 가로세로로만 간다.
+  const line = screen
+    .getByTestId('world-map')
+    .querySelector('polyline')!
+    .getAttribute('points')!
+    .split(' ')
+    .map((pair) => pair.split(',').map(Number) as [number, number]);
+  expect(line[0]).toEqual([301, 201]);
+  expect(line.at(-1)).toEqual([601, 201]);
+  for (let i = 1; i < line.length; i += 1)
+    expect(Math.abs(line[i]![0] - line[i - 1]![0]) + Math.abs(line[i]![1] - line[i - 1]![1])).toBe(2);
 });
 
 it('AC-INT-10 거점 목록은 도시·관문만 선택하고 확대·방향키·전체 복귀가 동작한다', () => {
@@ -186,7 +207,7 @@ it.each(['sha', 'position', 'missing', 'duplicate-id', 'duplicate-anchor'] as co
   },
 );
 
-it('AC-INT-03·10 SAN10의 155표식·202도로와 동북 끝점 전체 범위를 유지한다', () => {
+it('AC-INT-03·10 SAN10의 155표식·191도로와 동북 끝점 전체 범위를 유지한다', () => {
   const geography = publicGeographySchema.parse(san10Resource);
   const strategic = geography.sites.filter((site) => site.kind === 'CITY' || site.kind === 'PASS');
   const mapped: MapCity[] = strategic.map((site) => ({
@@ -208,7 +229,7 @@ it('AC-INT-03·10 SAN10의 155표식·202도로와 동북 끝점 전체 범위�
   // D-049: SAN10 지도 자료에는 항구 시설이 없다.
   expect(svg.querySelectorAll('[data-site-kind]')).toHaveLength(155);
   expect(svg.querySelectorAll('[data-site-kind="PORT"]')).toHaveLength(0);
-  expect(svg.querySelectorAll('[data-route-mode="LAND"]')).toHaveLength(202);
+  expect(svg.querySelectorAll('[data-route-mode="LAND"]')).toHaveLength(191);
   expect(screen.getByTestId('geographic-relief').getAttribute('href')).toContain('san10-pixel-basemap.png');
   const yamatai = mapped.find((city) => city.name === '야마타이국')!;
   fireEvent.change(screen.getByRole('combobox', { name: '지도 거점' }), { target: { value: String(yamatai.key) } });

@@ -202,8 +202,41 @@ export function clearRun(
   // 밟은 칸 하나가 어떤 우회 길이보다 비싸도록 범위 칸 수를 곱한다.
   const cost = new Map<string, number>([[key(start), 0]]);
   const previous = new Map<string, Point | null>([[key(start), null]]);
-  const heap: Array<[number, Point]> = [[0, start]];
-  const push = (item: [number, Point]) => {
+  const { heap, push, pop } = minHeap<Point>();
+  push([0, start]);
+  while (heap.length) {
+    const [here, at] = pop();
+    if (here > cost.get(key(at))!) continue;
+    if (at.x === end.x && at.y === end.y) break;
+    for (const [dx, dy] of STEPS) {
+      const next = { x: at.x + dx, y: at.y + dy };
+      if (next.x < x0 || next.x > x1 || next.y < y0 || next.y > y1) continue;
+      const step = 1 + (blocked(next) && (next.x !== end.x || next.y !== end.y) ? area : 0);
+      const total = here + step;
+      const known = cost.get(key(next));
+      if (known !== undefined && known <= total) continue;
+      cost.set(key(next), total);
+      previous.set(key(next), at);
+      push([total, next]);
+    }
+  }
+  const path: Point[] = [];
+  for (let step: Point | null = end; step && key(step) !== key(start); step = previous.get(key(step)) ?? null)
+    path.unshift(step);
+  return path;
+}
+
+const STEPS = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+] as const;
+
+// 비용이 가장 낮은 항목부터 꺼내는 이진 힙.
+function minHeap<T>() {
+  const heap: Array<[number, T]> = [];
+  const push = (item: [number, T]) => {
     heap.push(item);
     for (let at = heap.length - 1; at > 0;) {
       const up = (at - 1) >> 1;
@@ -230,35 +263,94 @@ export function clearRun(
     }
     return top;
   };
+  return { heap, push, pop };
+}
+
+// 지도 전체 길을 그릴 때 앞서 그린 길과 다른 표식 (D-055).
+// 칸 번호. 지도 칸은 가로세로 65536칸보다 작다.
+const cellNo = (x: number, y: number) => y * 65536 + x;
+export type RoadContext = { used: ReadonlySet<number>; blocked: (point: Point) => boolean };
+// 앞서 그린 길 칸은 새 칸의 3할 값이고, 꺾임 한 번은 새 칸 두 개 값이다.
+const ON_ROAD = 0.3;
+const TURN = 2;
+
+// D-055: 두 문 밖 칸 사이를 기존 길에 겹쳐 타며 적게 꺾는 가로세로 길로 잇는다. 막힌 칸(두 표식 상자와 다른 표식 상자)은
+// 기존 길 칸이 아니면 어떤 우회보다 비싸게 친다. 두 점을 둘러싼 범위 밖으로 8칸까지만 찾고 되돌아 걷지 않는다.
+export function bundledRun(
+  start: Point,
+  end: Point,
+  heading: { dx: number; dy: number },
+  blocked: (point: Point) => boolean,
+  used: ReadonlySet<number>,
+): Point[] {
+  const x0 = Math.min(start.x, end.x) - 8;
+  const y0 = Math.min(start.y, end.y) - 8;
+  const width = Math.max(start.x, end.x) + 8 - x0 + 1;
+  const height = Math.max(start.y, end.y) + 8 - y0 + 1;
+  const wall = width * height * (1 + TURN);
+  // 범위 칸마다 한 번만 읽는다: 1 기존 길, 2 막힌 칸.
+  const kind = new Uint8Array(width * height);
+  for (let y = 0; y < height; y += 1)
+    for (let x = 0; x < width; x += 1) {
+      const point = { x: x0 + x, y: y0 + y };
+      kind[y * width + x] = used.has(cellNo(point.x, point.y)) ? 1 : blocked(point) ? 2 : 0;
+    }
+  const index = (point: Point) => (point.y - y0) * width + (point.x - x0);
+  const goal = index(end);
+  // 상태 = 칸 번호 × 4 + 들어온 방향. 처음 방향은 문을 나선 방향이다.
+  const first = Math.max(
+    0,
+    STEPS.findIndex(([dx, dy]) => dx === heading.dx && dy === heading.dy),
+  );
+  const cost = new Float64Array(width * height * 4).fill(Infinity);
+  const previous = new Int32Array(width * height * 4).fill(-1);
+  const origin = index(start) * 4 + first;
+  cost[origin] = 0;
+  const { heap, push, pop } = minHeap<number>();
+  push([0, origin]);
+  let last = -1;
   while (heap.length) {
-    const [here, at] = pop();
-    if (here > cost.get(key(at))!) continue;
-    if (at.x === end.x && at.y === end.y) break;
-    for (const [dx, dy] of [
-      [1, 0],
-      [-1, 0],
-      [0, 1],
-      [0, -1],
-    ] as const) {
-      const next = { x: at.x + dx, y: at.y + dy };
-      if (next.x < x0 || next.x > x1 || next.y < y0 || next.y > y1) continue;
-      const step = 1 + (blocked(next) && (next.x !== end.x || next.y !== end.y) ? area : 0);
+    const [here, state] = pop();
+    if (here > cost[state]!) continue;
+    const at = state >> 2;
+    const dir = state & 3;
+    if (at === goal) {
+      last = state;
+      break;
+    }
+    const x = at % width;
+    const y = (at - x) / width;
+    for (let next = 0; next < 4; next += 1) {
+      const [dx, dy] = STEPS[next]!;
+      if (STEPS[dir]![0] === -dx && STEPS[dir]![1] === -dy) continue;
+      if (x + dx < 0 || x + dx >= width || y + dy < 0 || y + dy >= height) continue;
+      const cell = at + dy * width + dx;
+      const road = kind[cell] === 1;
+      const step = (road ? ON_ROAD : 1) + (next !== dir ? TURN : 0) + (kind[cell] === 2 && cell !== goal ? wall : 0);
       const total = here + step;
-      const known = cost.get(key(next));
-      if (known !== undefined && known <= total) continue;
-      cost.set(key(next), total);
-      previous.set(key(next), at);
-      push([total, next]);
+      const to = cell * 4 + next;
+      if (cost[to]! <= total) continue;
+      cost[to] = total;
+      previous[to] = state;
+      push([total, to]);
     }
   }
   const path: Point[] = [];
-  for (let step: Point | null = end; step && key(step) !== key(start); step = previous.get(key(step)) ?? null)
-    path.unshift(step);
+  for (let state = last; state >= 0 && state >> 2 !== origin >> 2; state = previous[state]!) {
+    const at = state >> 2;
+    path.unshift({ x: x0 + (at % width), y: y0 + Math.floor(at / width) });
+  }
   return path;
 }
 
 // gates: 거점마다 중심에서 문 칸까지의 칸 수(표식 반지름)와 쓸 수 있는 문. 0이면 문 없이 중심끼리 잇는다.
-export function gatedWalk(points: readonly Point[], gates: readonly SiteGate[], cell = ROAD_CELL): Point[] {
+// context가 있으면 가운데 구간을 기존 길에 겹쳐 타고 다른 표식을 비켜 가는 길로 낸다(D-055).
+export function gatedWalk(
+  points: readonly Point[],
+  gates: readonly SiteGate[],
+  cell = ROAD_CELL,
+  context?: RoadContext,
+): Point[] {
   const centers = points.map((point) => ({ x: Math.floor(point.x / cell), y: Math.floor(point.y / cell) }));
   const out: Point[] = [];
   for (let index = 1; index < centers.length; index += 1) {
@@ -286,11 +378,13 @@ export function gatedWalk(points: readonly Point[], gates: readonly SiteGate[], 
     // 가운데 구간이 두 표식 상자를 지나면 다른 꺾임(ㄱ·ㄹ)을 고르고, 그래도 지나면 상자를 가장 적게 밟는 길로 잇는다.
     const start = outbound.at(-1)!;
     const end = inbound[0]!;
-    const middle = clearRun(start, end, inBox, [
-      cornersFor(start, leaving.heading, end, entering.heading),
-      [start, { x: end.x, y: start.y }, end],
-      [start, { x: start.x, y: end.y }, end],
-    ]);
+    const middle = context
+      ? bundledRun(start, end, leaving.heading, (point) => inBox(point) || context.blocked(point), context.used)
+      : clearRun(start, end, inBox, [
+          cornersFor(start, leaving.heading, end, entering.heading),
+          [start, { x: end.x, y: start.y }, end],
+          [start, { x: start.x, y: end.y }, end],
+        ]);
     for (const part of [outbound, middle, inbound])
       for (const point of part)
         if (!out.length || out.at(-1)!.x !== point.x || out.at(-1)!.y !== point.y) out.push(point);
@@ -298,14 +392,54 @@ export function gatedWalk(points: readonly Point[], gates: readonly SiteGate[], 
   return out.length ? out : centers.slice(0, 1);
 }
 
-// 땅길·다리의 칸별 연결 모양. 여울·물길과 물길로 따로 그리는 경로(skip)는 뺀다.
-export function roadTiles(
+// 땅길·다리의 칸 길 (D-055). 여울·물길과 물길로 따로 그리는 경로(skip)는 뺀다. 곧은 거리가 짧은 길부터 내고
+// 뒤 길은 앞 길 칸에 겹쳐 타서 같은 쪽으로 가는 길이 한 줄로 합쳐진다. 지나가는 길은 다른 표식 상자를 비켜 간다.
+export function roadWalks(
   map: Pick<PublicGeography, 'sites' | 'routes'>,
   skip: ReadonlySet<string> = new Set(),
   gateCells: (siteId: string) => SiteGate = () => 0,
   cell = ROAD_CELL,
-) {
+): Map<string, Point[]> {
   const siteById = new Map(map.sites.map((site) => [site.id, site]));
+  const boxes = new Map<number, string[]>();
+  for (const site of map.sites) {
+    const gate = gateOf(gateCells(site.id));
+    const half = gate.half ?? { x: gate.cells, y: gate.cells };
+    if (!half.x && !half.y) continue;
+    const x = Math.floor(site.position.x / cell);
+    const y = Math.floor(site.position.y / cell);
+    for (let dx = -half.x; dx <= half.x; dx += 1)
+      for (let dy = -half.y; dy <= half.y; dy += 1) {
+        const no = cellNo(x + dx, y + dy);
+        boxes.set(no, [...(boxes.get(no) ?? []), site.id]);
+      }
+  }
+  const length = (points: readonly Point[]) =>
+    points.reduce(
+      (sum, point, index) =>
+        index ? sum + Math.hypot(point.x - points[index - 1]!.x, point.y - points[index - 1]!.y) : 0,
+      0,
+    );
+  const drawn = map.routes.flatMap((route) => {
+    if (!route.enabled || skip.has(route.id) || (route.mode !== 'LAND' && route.mode !== 'BRIDGE')) return [];
+    const points = routePoints(route, siteById);
+    return points ? [{ route, points, length: length(points) }] : [];
+  });
+  drawn.sort((left, right) => left.length - right.length || (left.route.id < right.route.id ? -1 : 1));
+  const used = new Set<number>();
+  const walks = new Map<string, Point[]>();
+  for (const { route, points } of drawn) {
+    const own = new Set(routeSiteIds(route));
+    const blocked = (point: Point) => (boxes.get(cellNo(point.x, point.y)) ?? []).some((id) => !own.has(id));
+    const cells = gatedWalk(points, routeSiteIds(route).map(gateCells), cell, { used, blocked });
+    for (const point of cells) used.add(cellNo(point.x, point.y));
+    walks.set(route.id, cells);
+  }
+  return walks;
+}
+
+// 칸 길을 칸별 연결 모양으로 묶는다.
+export function roadMasks(walks: Iterable<readonly Point[]>) {
   const masks = new Map<string, { x: number; y: number; mask: number }>();
   const at = (point: Point) => {
     const key = `${point.x},${point.y}`;
@@ -313,11 +447,7 @@ export function roadTiles(
     if (!tile) masks.set(key, (tile = { ...point, mask: 0 }));
     return tile;
   };
-  for (const route of map.routes) {
-    if (!route.enabled || skip.has(route.id) || (route.mode !== 'LAND' && route.mode !== 'BRIDGE')) continue;
-    const points = routePoints(route, siteById);
-    if (!points) continue;
-    const cells = gatedWalk(points, routeSiteIds(route).map(gateCells), cell);
+  for (const cells of walks) {
     at(cells[0]!);
     for (let index = 1; index < cells.length; index += 1) {
       const from = at(cells[index - 1]!);
@@ -329,6 +459,16 @@ export function roadTiles(
     }
   }
   return [...masks.values()];
+}
+
+// 땅길·다리의 칸별 연결 모양. 여울·물길과 물길로 따로 그리는 경로(skip)는 뺀다.
+export function roadTiles(
+  map: Pick<PublicGeography, 'sites' | 'routes'>,
+  skip: ReadonlySet<string> = new Set(),
+  gateCells: (siteId: string) => SiteGate = () => 0,
+  cell = ROAD_CELL,
+) {
+  return roadMasks(roadWalks(map, skip, gateCells, cell).values());
 }
 
 // 물길 표시 (INT-20, 화면만). 지도 자료의 땅길 가운데 물 위를 지나는 경로를 바다·강 칸을 따라 그린다.

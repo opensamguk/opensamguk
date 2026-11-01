@@ -93,10 +93,12 @@ export function cellsPath(cells: readonly Point[], cell = ROAD_CELL): string {
 }
 
 // 지도 전체 도로를 길 종류별 path로 묶는다. 꺼진 경로와 점을 모르는 경로는 뺀다.
+// walks에 칸 길이 있는 경로는 그 칸을 쓴다(D-055: 확대 전후 같은 가로세로 길).
 export function roadLayer(
   map: Pick<PublicGeography, 'sites' | 'routes'>,
   skip: ReadonlySet<string> = new Set(),
   cell = ROAD_CELL,
+  walks?: ReadonlyMap<string, readonly Point[]>,
 ) {
   const siteById = new Map(map.sites.map((site) => [site.id, site]));
   const byMode = new Map<RoadMode, Point[]>();
@@ -104,7 +106,10 @@ export function roadLayer(
     if (!route.enabled || skip.has(route.id)) continue;
     const points = routePoints(route, siteById);
     if (!points) continue;
-    byMode.set(route.mode, [...(byMode.get(route.mode) ?? []), ...roadCells(route.mode, points, cell)]);
+    byMode.set(route.mode, [
+      ...(byMode.get(route.mode) ?? []),
+      ...(walks?.get(route.id) ?? roadCells(route.mode, points, cell)),
+    ]);
   }
   return [...byMode].map(([mode, cells]) => ({ mode, d: cellsPath(cells, cell) }));
 }

@@ -10,6 +10,7 @@ import {
   gatedWalk,
   isWaterRoute,
   roadTiles,
+  roadWalks,
   shadowPaths,
   showTiles,
   terrainGrid,
@@ -236,4 +237,64 @@ it('D-052 피할 수 없는 상자는 가장 적게 밟고, 같은 칸 수면 �
   expect(path.filter(wall)).toHaveLength(1);
   expect(path).toHaveLength(10);
   expect(path.at(-1)).toEqual(end);
+});
+
+const city = (id: string, x: number, y: number) => ({ id, name: id, kind: 'CITY' as const, position: { x, y } });
+const land = (id: string, from: string, to: string) => ({
+  id,
+  from,
+  to,
+  mode: 'LAND' as const,
+  direction: 'BOTH' as const,
+  enabled: true,
+});
+const cellKey = (point: { x: number; y: number }) => `${point.x},${point.y}`;
+
+it('D-055 같은 쪽으로 가는 두 길은 앞 길 칸에 겹쳐 타서 나란한 두 줄이 생기지 않는다', () => {
+  // a에서 동쪽의 b와 동남쪽의 c로 간다. 짧은 a-b를 먼저 내고 a-c는 a-b를 타다 갈라진다.
+  const walks = roadWalks(
+    {
+      sites: [city('a', 21, 21), city('b', 81, 25), city('c', 81, 61)],
+      routes: [land('ac', 'a', 'c'), land('ab', 'a', 'b')],
+    },
+    new Set(),
+    () => ({ cells: 1, half: { x: 1, y: 1 } }),
+  );
+  expect([...walks.keys()]).toEqual(['ab', 'ac']);
+  const ab = new Set(walks.get('ab')!.map(cellKey));
+  const ac = walks.get('ac')!;
+  expect(ac.filter((point) => ab.has(cellKey(point))).length).toBeGreaterThan(10);
+  // a-c만의 칸 가운데 a-b 칸과 옆으로 붙은 칸은 갈라지는 한 칸뿐이다.
+  const beside = ac.filter(
+    (point) =>
+      !ab.has(cellKey(point)) &&
+      [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ].some(([dx, dy]) => ab.has(cellKey({ x: point.x + dx!, y: point.y + dy! }))),
+  );
+  expect(beside.length).toBeLessThanOrEqual(1);
+});
+
+it('D-055 지나가는 길은 다른 표식 상자를 비켜 가고 반듯하게 한 번만 돌아간다', () => {
+  // a(5,5)-b(45,5) 곧은 길 가운데에 m(25,5) 표식(반지름 2칸)이 있다.
+  const walk = roadWalks(
+    { sites: [city('a', 11, 11), city('b', 91, 11), city('m', 51, 11)], routes: [land('ab', 'a', 'b')] },
+    new Set(),
+    (id) => (id === 'm' ? { cells: 2, half: { x: 2, y: 2 } } : 0),
+  ).get('ab')!;
+  expect(walk.some((point) => Math.abs(point.x - 25) <= 2 && Math.abs(point.y - 5) <= 2)).toBe(false);
+  expect(walk.at(-1)).toEqual({ x: 45, y: 5 });
+  let turns = 0;
+  for (let i = 2; i < walk.length; i += 1)
+    if (
+      walk[i]!.x - walk[i - 1]!.x !== walk[i - 1]!.x - walk[i - 2]!.x ||
+      walk[i]!.y - walk[i - 1]!.y !== walk[i - 1]!.y - walk[i - 2]!.y
+    )
+      turns += 1;
+  expect(turns).toBe(4);
+  for (let i = 1; i < walk.length; i += 1)
+    expect(Math.abs(walk[i]!.x - walk[i - 1]!.x) + Math.abs(walk[i]!.y - walk[i - 1]!.y)).toBe(1);
 });
