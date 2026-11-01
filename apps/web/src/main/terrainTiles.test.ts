@@ -167,3 +167,23 @@ it('D-052 남북 관은 길 방향 문으로만 드나든다', () => {
   );
   expect(path[1]).toEqual({ x: 50, y: 51 });
 });
+
+it('D-052 남문만 있는 두 표식이 위아래로 붙어 있어도 가운데 길이 어느 표식 상자도 지나지 않는다', () => {
+  // 애뢰(아래)·영창(위)처럼 같은 열, 반지름 1칸, 남문만.
+  const north = { x: 134, y: 749 };
+  const south = { x: 134, y: 762 };
+  const path = gatedWalk(
+    [north, south],
+    [
+      { cells: 1, allowed: ['S'] },
+      { cells: 1, allowed: ['S'] },
+    ],
+  );
+  const box = (center: { x: number; y: number }) => ({ x: Math.floor(center.x / 2), y: Math.floor(center.y / 2) });
+  const inside = (point: { x: number; y: number }, center: { x: number; y: number }) =>
+    Math.abs(point.x - center.x) <= 1 && Math.abs(point.y - center.y) <= 1;
+  const [a, b] = [box(north), box(south)];
+  // 처음 문 길(중심→문 밖)과 마지막 문 길을 뺀 구간은 두 상자 밖이다.
+  const middle = path.slice(3, -3);
+  expect(middle.some((point) => inside(point, a) || inside(point, b))).toBe(false);
+});

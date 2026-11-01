@@ -269,8 +269,9 @@ RIDGE_CELLS = 8
 
 
 # 실제 섬 거점. 그 밖의 거점이 작은 땅에 갇히면(강이 빙 둘러 섬이 되면) 생성을 멈춘다.
-REAL_ISLANDS = {'대마국', '일지국', '이사국', '파리국', '주호', '이주'}
-ISLAND_CELLS = 600  # 이보다 작은 땅 덩어리 위의 거점은 섬으로 본다(가짜 섬은 9~54칸이었다)
+# 가짜 섬: 강·호수 때문에만 작아진 땅. 강·호수를 땅으로 칠 때보다 땅만 셀 때 덩어리가 작고 그 크기가 이보다 작으면
+# 강에 갇힌 것으로 본다(가짜 섬은 9~170칸이었다). 바다로만 둘러싸인 실제 섬(대마국·주호 등)은 두 셈이 같아 통과한다.
+ISLAND_CELLS = 1000
 # D-052 역사 기슭표. 강에서 본 191년 전후 치소의 쪽이다. 동서로 흐르는 강에는 북안·남안을, 남북으로 흐르는 강에는
 # 동안·서안을 쓰므로 합류점은 강마다 맞는 쪽이 골라진다. 본류(장강·황하)와 지류의 기슭이 다르면 {'major', 'other'}로
 # 나눈다(하내는 黃河 북안이면서 沁水 남안이다). 주된 근거는 水經注 經·注의
@@ -404,7 +405,7 @@ def bank_shields(pixels, index, rivers, crossings=None):
                 continue
             else:
                 nx, ny = (mx - px) / d, (my - py) / d
-            # 반지름+2칸은 강을 걷어 내는 곳, 반지름+4칸은 다시 이을 때 강이 지나지 못하는 곳이다.
+            # 반지름+2칸은 강을 걷어 내는 곳, 반지름+4칸은 다시 이을 때 새 강이 지나지 못하는 곳이다(이미 물인 칸은 지난다).
             reach = radius + 4
             for y in range(cy - reach, cy + reach + 1):
                 for x in range(cx - reach, cx + reach + 1):
@@ -545,24 +546,57 @@ def pass_ridges(pixels, index, blocked):
     return out
 
 
+def check_banks(pixels, index, original, crossings):
+    """새로 낸 강 칸(원래 강이 아니던 칸)이 거점 바로 뒤(기슭 쪽 반지름+4칸, 재연결이 막히는 범위)에 있으면 멈춘다.
+    재연결이 기슭 쪽으로 돌아 강을 거점 뒤로 내는 회귀를 막는다. 그보다 먼 곳의 강은 汾水(하동 북쪽)·漢水(양양 동쪽)처럼
+    다른 줄기나 굽이일 수 있어 보지 않는다."""
+    w, h = GRID
+    river = index['river']
+    behind = {}
+    # 두 강 사이에 놓인 거점(하내처럼 강마다 기슭이 다른 곳)은 한쪽 강이 다른 강의 기슭 쪽에 있는 게 맞아 뺀다.
+    sides = {}
+    for cx, cy, _radius, nx, ny, *_rest in crossings:
+        sides.setdefault((cx, cy), set()).add((nx, ny))
+    for cx, cy, radius, nx, ny, _tx, _ty, _width in crossings:
+        if len(sides[(cx, cy)]) > 1:
+            continue
+        reach = radius + 4
+        for y in range(cy - reach, cy + reach + 1):
+            for x in range(cx - reach, cx + reach + 1):
+                if not (0 <= x < w and 0 <= y < h) or pixels[y * w + x] != river or original[y * w + x] == river:
+                    continue
+                ox, oy = x - cx, y - cy
+                # 거점 바로 뒤(기슭 방향 37도 안)만 본다. 기슭은 동서남북 네 방향이라 대각선으로 흐르는 강의 옆 줄기는 뺀다.
+                distance = math.hypot(ox, oy)
+                if distance <= reach and ox * nx + oy * ny > 0.8 * distance:
+                    behind[(cx * 2, cy * 2)] = behind.get((cx * 2, cy * 2), 0) + 1
+    wrong = sorted(at for at, count in behind.items() if count >= 3)
+    if wrong:
+        raise SystemExit(f'기슭 쪽에 새 강이 난 거점 좌표: {wrong}')
+
+
 def check_islands(pixels, index):
     """실제 섬이 아닌 거점이 작은 땅 덩어리(강이나 바다에 둘러싸인 곳)에 있으면 멈춘다."""
     w, h = GRID
     water = {index[name] for name in ('deepSea', 'sea', 'shallow', 'lake', 'river')}
-    trapped = []
-    for site, cx, cy, _rx, _ry, _axis in site_boxes():
-        if site['name'] in REAL_ISLANDS:
-            continue
+    sea = {index[name] for name in ('deepSea', 'sea', 'shallow')}
+
+    def area(cx, cy, blocks, cap):
         seen, queue = {(cx, cy)}, [(cx, cy)]
         for ax, ay in queue:
-            if len(seen) >= ISLAND_CELLS:
+            if len(seen) >= cap:
                 break
             for nx, ny in ((ax + 1, ay), (ax - 1, ay), (ax, ay + 1), (ax, ay - 1)):
-                if 0 <= nx < w and 0 <= ny < h and (nx, ny) not in seen and pixels[ny * w + nx] not in water:
+                if 0 <= nx < w and 0 <= ny < h and (nx, ny) not in seen and pixels[ny * w + nx] not in blocks:
                     seen.add((nx, ny))
                     queue.append((nx, ny))
-        if len(seen) < ISLAND_CELLS:
-            trapped.append(f"{site['name']}({len(seen)}칸)")
+        return len(seen)
+
+    trapped = []
+    for site, cx, cy, _rx, _ry, _axis in site_boxes():
+        land = area(cx, cy, water, ISLAND_CELLS)
+        if land < ISLAND_CELLS and area(cx, cy, sea, land + 1) > land:
+            trapped.append(f"{site['name']}({land}칸)")
     if trapped:
         raise SystemExit(f'섬처럼 갇힌 거점: {trapped}')
 
@@ -618,7 +652,7 @@ def reconnect_rivers(pixels, index, rivers, blocked):
                     break
                 goal = cells[j]
                 # 남은 강폭으로 이미 물이 이어져 있으면(방패가 강 한쪽만 걷어 낸 경우) 새 물길을 내지 않는다.
-                margin = 12
+                margin = 40
                 x0, x1 = min(start[0], goal[0]) - margin, max(start[0], goal[0]) + margin
                 y0, y1 = min(start[1], goal[1]) - margin, max(start[1], goal[1]) + margin
                 seen, queue = {start}, [start]
@@ -737,13 +771,18 @@ def restore_bank_channels(pixels, index, crossings, original, blocked):
         if river_side or not along:
             continue
         offset = radius + 2
-        for step in range(math.floor(min(along)), math.ceil(max(along)) + 1):
-            for extra in range(max(1, min(width, 2))):
+        for extra in range(2):
+            previous = None
+            for step in range(math.floor(min(along)), math.ceil(max(along)) + 1):
                 x = math.floor(mx + tx * step - nx * (offset + extra))
                 y = math.floor(my + ty * step - ny * (offset + extra))
-                k = y * w + x
-                if 0 <= x < w and 0 <= y < h and k not in blocked and out[k] not in water:
-                    out[k] = index['river']
+                # 대각선으로 한 번에 두 축이 바뀌면 사이 칸을 채워 상하좌우로 이어지게 한다.
+                cells = [(x, y)] if previous is None or previous[0] == x or previous[1] == y else [(previous[0], y), (x, y)]
+                for cx2, cy2 in cells:
+                    k = cy2 * w + cx2
+                    if 0 <= cx2 < w and 0 <= cy2 < h and k not in blocked and out[k] not in water:
+                        out[k] = index['river']
+                previous = (x, y)
     return out
 
 
@@ -803,6 +842,7 @@ def main():
         pixels = restore_bank_channels(pixels, index, crossings, before_shields, blocked | shields)
         check_water(pixels, index, data['rivers'])
         check_islands(pixels, index)
+        check_banks(pixels, index, before_shields, crossings)
         report = SAN10 / 'river-banks.json'
         report.write_text(json.dumps({'note': '강가 거점이 놓인 기슭(거점 좌표와 실제 강 중심선 기준). 생성 결과다.',
                                       'banks': banks}, ensure_ascii=False, indent=1) + '\n', newline='\n')

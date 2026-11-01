@@ -117,8 +117,9 @@ export function OperationalWorldMap({
         const box = markerBox(site.kind, level, axis);
         const allowed = markerGates(site.kind, level, axis);
         // 관은 길 방향 변(짧은 쪽)에 문이 있다. 나머지는 정사각형이라 어느 변이든 같다.
-        const half = allowed && allowed.every((gate) => gate === 'N' || gate === 'S') ? box.height / 2 : box.width / 2;
-        return [site.id, { cells: Math.ceil(half / ROAD_CELL), allowed }];
+        const toGate = allowed && allowed.every((gate) => gate === 'N' || gate === 'S') ? box.height : box.width;
+        const half = { x: Math.ceil(box.width / 2 / ROAD_CELL), y: Math.ceil(box.height / 2 / ROAD_CELL) };
+        return [site.id, { cells: Math.ceil(toGate / 2 / ROAD_CELL), allowed, half }];
       }),
     );
     return (siteId: string) => gates.get(siteId) ?? 0;
