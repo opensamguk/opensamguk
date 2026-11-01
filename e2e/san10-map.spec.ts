@@ -276,7 +276,7 @@ async function verifyMode(stack: LegalStack, page: Page, info: TestInfo, run: Ru
   }
   await step(run, () => page.setViewportSize({ width: 375, height: 812 }));
   const selector = page.getByRole('combobox', { name: '지도 거점' });
-  await step(run, () => expect(selector.locator('option')).toHaveCount(155));
+  await step(run, () => expect(selector.locator('option')).toHaveCount(156));
   const yamatai = data.cities.find((city) => city.name === '야마타이국')!;
   await step(run, () => selector.selectOption(String(yamatai.key)));
   await step(run, () => expect(map).toHaveAttribute('viewBox', overview!));
