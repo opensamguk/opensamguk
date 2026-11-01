@@ -1,7 +1,7 @@
 # INT-22 병종 확장: 창극병 계열, 원작·사료 병종, 전투 특수 효과
 
 > AC-INT-22 · 구현 Codex · 리뷰 Claude · 결정 [D-056](../product/decisions.md) · 사용자 직접 요청 2026-11-01
-> 상태: 상세 계획 3판. Codex G-03은 1판(`5d6e3e05`) 보류(P1 4건, P2 6건), 2판(`30a3567e`) 보류(P1 2건, P2 4건), 3판(`ccf81bc5`) 조건부 통과(P3 1건)였고 P3 문구를 고쳤다. 조건은 자원 PR 전 운영 DB 재생성 사용자 확인을 지키는 것이다.
+> 상태: 상세 계획 3판. Codex G-03은 1판(`5d6e3e05`) 보류(P1 4건, P2 6건), 2판(`30a3567e`) 보류(P1 2건, P2 4건), 3판(`ccf81bc5`) 조건부 통과(P3 1건)였고 P3 문구를 고쳤다. 조건이던 운영 DB 재생성은 2026-11-01 사용자가 승인했다. 같은 날 `basic` 계산식 수정도 승인해 규칙 기능 `battle-affinity-v2`를 더했다(결정 절).
 > 기준: main `d2202e13`, core2026 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`(MIT, devsam). 원작 줄은 이 커밋의 `resources/unitset/unitset_event_more_crewtype.json`, `packages/logic/src/war/`다.
 > 함께 보는 계획: [T4-09](./T4-09.md)(연구 6종), [T4-10](./T4-10.md)(화륜차 연구), [T4-07](./T4-07.md)(준비 턴), [T4-53](./T4-53.md)(연구 등록), [T4-72](./T4-72.md)(초토화), [T4-73](./mvp-command-gaps.md)(증축), [T1-03](./T1-03.md)(가정 A7)
 
@@ -27,7 +27,7 @@
 
 보병과 기병은 상성이 있어도 비긴다. 궁병은 상성상 이겨야 할 기병에게 진다. 남는 차이는 공격·방어 능력치뿐이다. 원작은 자기 위력에 `attackCoef[상대]`를, 상대 위력에 자기 `defenceCoef[상대]`를 곱한다(`war/units/base.ts:286-287`). 그래서 유리한 쪽은 1.2×1.2=1.44배, 불리한 쪽은 0.8×0.8=0.64배가 된다.
 
-`expanded` 판은 원작식으로 계산한다. 병종 판에 선택 칸 `coefMode`를 두고 값이 `multiply`일 때만 원작식을 쓴다. 칸이 없으면 지금 나누기 식이다. 따라서 `basic` 결과는 그대로다. `basic`도 원작식으로 고칠지는 기존 월드의 전투 결과와 재생이 바뀌는 일이라 사용자 결정으로 남긴다(질문 절).
+사용자가 2026-11-01 `basic`도 원작식으로 고치도록 승인했다. 다만 이미 만든 월드의 재생은 지켜야 하므로 계산식은 월드 단위 규칙 기능으로 고른다. 새 규칙 기능 `battle-affinity-v2`를 `ruleFeatures.ts`에 등록하고 서버 생성 프로필의 `creationFeatures`(`apps/server/src/admin/worldCreateOptions.ts:19`)에 더한다. 이 기능이 켜진 월드는 판과 상관없이 원작식으로 계산한다. 켜지지 않은 기존 월드는 지금 나누기 식을 그대로 쓴다. `expanded` 판에는 선택 칸 `coefMode: "multiply"`를 두고 `buildInitialWorld`가 이 판을 쓰는 월드에 `battle-affinity-v2`가 없으면 생성을 멈춘다. 전투 호출부(`commands/attack.ts`, `campaign/skirmish.ts`)는 `state.ruleFeatures`에서 계산식을 읽어 `simulateBattle` 입력에 넘긴다. 웹 전투 시뮬레이터는 새 월드와 같은 원작식을 기본으로 하고 옛 식을 고르는 선택지를 둔다.
 
 ### 계열과 상성
 
@@ -240,7 +240,7 @@ region 숫자의 뜻은 지도 내용에 적는다. 운영 지도 최상위에 �
 
 `expanded.json`은 생성기 `tools/unitset/build-expanded.ts`가 만든다. 원작 값은 core2026 `df6c926` 판에서 옮기고 `resources/NOTICE.md`에 출처를 적는다.
 
-엔진은 초기 월드 자원으로 1판만 읽는다. 조회가 판 1로 고정이고(`apps/engine/src/world/resources.ts:62`), 합성이 1판이 아니면 거부하며(`:85`), 재초기화 출처 검사도 판을 1로 묶는다(`apps/engine/src/admin/resetPreparation.ts:56`). 생성 요청에도 판 칸이 없다. 그래서 州 코드와 `regionScheme`은 새 2판이 아니라 D-052의 선례대로 `MAP/san10` 1판의 내용을 바꿔 싣는다. 이 변경 전에 SAN10을 게시한 DB는 게시 검사(`tools/san10-resources.ts`의 「기존 SAN10 게시 자원과 다릅니다」)에서 멈추므로 다시 만든다. 운영 월드를 다시 만드는 일이라 자원 PR 전에 사용자 확인을 받는다(질문 절). 엔진에 자원 판 선택을 넣는 일은 이 작업 범위 밖이다.
+엔진은 초기 월드 자원으로 1판만 읽는다. 조회가 판 1로 고정이고(`apps/engine/src/world/resources.ts:62`), 합성이 1판이 아니면 거부하며(`:85`), 재초기화 출처 검사도 판을 1로 묶는다(`apps/engine/src/admin/resetPreparation.ts:56`). 생성 요청에도 판 칸이 없다. 그래서 州 코드와 `regionScheme`은 새 2판이 아니라 D-052의 선례대로 `MAP/san10` 1판의 내용을 바꿔 싣는다. 이 변경 전에 SAN10을 게시한 DB는 게시 검사(`tools/san10-resources.ts`의 「기존 SAN10 게시 자원과 다릅니다」)에서 멈추므로 다시 만든다. 운영 월드를 다시 만드는 일은 2026-11-01 사용자가 승인했다(결정 절). 엔진에 자원 판 선택을 넣는 일은 이 작업 범위 밖이다.
 
 바꿀 곳은 다섯이다.
 
@@ -270,13 +270,13 @@ region 숫자의 뜻은 지도 내용에 적는다. 운영 지도 최상위에 �
 | PR | 파일 | 시작 조건 |
 | --- | --- | --- |
 | 1 규칙 | `world/resources.ts`(병종 행 `requirements`·`effects`, 판 `coefMode`·`regionScheme`, 해시 보존), 운영 지도의 `regionScheme`과 region 범위(스키마·검증·자원 편집기·개발 편집기 상수), `buildInitialWorld`의 `regionScheme` 검사, `world/crewRequirements.ts`와 시험, 위 모병 경로 표의 여섯 파일, 계수 키 검증 두 곳, 명령 대응표 두 행과 AC-M1-14·README 집계 | G-03 통과 |
-| 2 전투 | `battle/simulate.ts`(`coefMode`, 계수 조회, 효과, 선제 단계), `basic` 회귀 시험(난수 호출 수·상태 포함). 호출부 `commands/attack.ts:80`·`:116`, `campaign/skirmish.ts:71`·`:105`·`:161`, `apps/web/src/battleSim/compute.ts:27`은 입력이 그대로라 고치지 않고 시험만 더한다 | PR 1 |
-| 3 자원 | `resources/unitset/expanded.json`과 생성기, 균형 도구와 표, `resources/NOTICE.md`, 지도 생성기(州 코드·`regionScheme`)와 `resources/map/san10.json`, manifest 생성·게시 도구, 서버 SAN10 프로필, 프리셋 다섯 개, 두 번 생성해 같은 해시인지 보는 재현 시험 | PR 2, #330 병합, `provinces.json` 검수, 운영 DB 재생성 사용자 확인 |
+| 2 전투 | `battle/simulate.ts`(계산식 입력, 계수 조회, 효과, 선제 단계), 규칙 기능 `battle-affinity-v2` 등록과 생성 프로필 `creationFeatures`, 호출부 `commands/attack.ts:80`·`:116`, `campaign/skirmish.ts:71`·`:105`·`:161`가 `ruleFeatures`에서 계산식을 넘기는 한 줄, `apps/web/src/battleSim/compute.ts:27`의 계산식 선택, 기능 없는 월드의 `basic` 회귀 시험(난수 호출 수·상태 포함) | PR 1 |
+| 3 자원 | `resources/unitset/expanded.json`과 생성기, 균형 도구와 표, `resources/NOTICE.md`, 지도 생성기(州 코드·`regionScheme`)와 `resources/map/san10.json`, manifest 생성·게시 도구, 서버 SAN10 프로필, 프리셋 다섯 개, 두 번 생성해 같은 해시인지 보는 재현 시험 | PR 2, #330 병합, `provinces.json` 검수, 운영 DB 재생성(승인됨) |
 | 4 화면 | 병종 목록 응답에 고를 수 있는지와 이유(`campaignApi.ts:253`, `cityResourcesApi.ts:201`, 모병·징병 명령의 병종 목록), 고르기 화면의 이유 표시, 전투 시뮬레이터의 판 선택(`apps/web/src/battleSim/publicUnitSet.ts`), 도움말 병종 표와 창작 표시 | PR 3 |
 
 ### 하지 않는 것
 
-- 기존 월드의 병종 판 교체, `basic` 판의 내용·계산식 변경(질문 절).
+- 기존 월드의 병종 판 교체와 계산식 변경. `basic.json` 내용 변경.
 - 수군 병종과 물길 규칙.
 - 장수 부상 규칙과 차병의 성벽 부상 무효.
 - 병종 숙련(원작 dex)과 장수 특기의 전투 트리거. 원작 `che_필살`·`che_격노` 같은 특기 효과는 병종 효과가 아니다.
@@ -298,8 +298,8 @@ region 숫자의 뜻은 지도 내용에 적는다. 운영 지도 최상위에 �
 
 재생은 `expanded` SAN10 월드를 실제 DB로 만들어 두 가지를 엔진 통합 시험으로 본다. 첫째, 생성 직후 상태의 해시와 그 상태를 바로 DB에서 다시 읽은 해시가 같다. 둘째, 12개월을 돌린 뒤 같은 tick·같은 입력 순번에서 DB 재적재 상태, 엔진 재시작 뒤 상태, 생성 기록과 입력만으로 다시 돌린 순수 재생 상태의 해시가 셋 다 같다. `basic` 쪽은 기존 전투 시험(규칙 164건, 엔진 전투 통합 18건)과 재생 골든 해시가 그대로인지 본다. 화면은 실제 Chromium으로 조건 이유 표시와 375px 배치를 본다. 균형 표를 PR에 붙이고 독립 리뷰를 받는다.
 
-### 질문
+### 결정
 
-- 사용자 확인(자원 PR 전): `MAP/san10` 1판 내용을 바꾸므로 SAN10을 게시한 DB와 그 월드를 다시 만들어야 한다. D-052와 같은 처리다.
-- 사용자 결정: 지금 `basic` 판도 원작식 계산으로 고칠지. 고치면 상성이 실제로 작동하지만 기존 월드의 전투 결과와 재생이 바뀐다. 이 작업은 `basic`을 그대로 두고 `expanded`만 원작식으로 한다.
+- 2026-11-01 사용자 승인: `MAP/san10` 1판 내용을 바꾸고 SAN10을 게시한 DB와 그 월드를 다시 만든다. D-052와 같은 처리이며 #330과 한 번으로 묶는다.
+- 2026-11-01 사용자 승인: `basic`도 원작식 계산으로 고친다. 기존 월드의 재생을 지키려고 새 월드부터 규칙 기능 `battle-affinity-v2`로 켠다.
 - G-03 1차 지적 가운데 원작 기술 단위·성장 속도가 같은지는 Codex도 확인 불가였다. 원작 값을 그대로 쓰고 SAN10 191 시작 기술 1000에서 첫 단계가 바로 열리는 것을 받아들인다. 균형 검사와 실제 플레이에서 문제가 보이면 다시 묻는다.
