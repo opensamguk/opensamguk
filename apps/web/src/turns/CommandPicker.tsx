@@ -1,4 +1,5 @@
 import { useId, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
+import { DEFAULT_CREW_TYPE_ID } from '../battleSim/publicUnitSet';
 import { DisabledReason } from '../ui/DisabledReason';
 import { argFields, buildArgs, requiredKeys, type ArgField } from './args';
 import type { Turn } from './draft';
@@ -105,8 +106,13 @@ export function CommandPicker({
     const nextSchema = next ? cityPreparationSchema(next.argsSchema, cityResources, next.key, preparationTarget) : null;
     for (const field of nextSchema ? argFields(nextSchema) : []) {
       if (field.kind === 'city' && mapCity !== null) initial[field.key] = String(mapCity);
-      if (field.kind === 'integer' && field.key === 'crewType' && defaultCrewType !== undefined)
-        initial[field.key] = String(defaultCrewType);
+      // 지금 거느린 병종을 먼저 고른다(병력이 있으면 소집해제 전엔 바꿀 수 없다). 없으면 기본 병종이다.
+      if (field.kind === 'unit') {
+        const own = defaultCrewType == null ? undefined : String(defaultCrewType);
+        const fallback = String(DEFAULT_CREW_TYPE_ID);
+        initial[field.key] =
+          [own, fallback].find((v) => field.options.some((o) => o.value === v)) ?? field.options[0]?.value ?? '';
+      }
       if (field.kind === 'boolean') initial[field.key] = 'true';
       if (field.kind === 'enum') initial[field.key] = field.options[0]?.value ?? '';
       if (field.kind === 'color') initial[field.key] = '#8a5a2b';
@@ -319,7 +325,13 @@ function ArgInput({
         ))}
       </select>
     );
-  } else if (field.kind === 'city' || field.kind === 'nation' || field.kind === 'boolean' || field.kind === 'enum') {
+  } else if (
+    field.kind === 'city' ||
+    field.kind === 'nation' ||
+    field.kind === 'boolean' ||
+    field.kind === 'enum' ||
+    field.kind === 'unit'
+  ) {
     const options =
       field.kind === 'city'
         ? cities.map((c) => ({ value: String(c.key), label: c.name }))

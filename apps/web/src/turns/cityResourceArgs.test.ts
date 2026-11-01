@@ -21,7 +21,7 @@ it('INT-18C AC-INT-18C 도시/부곡 대상은 실제 union 갈래의 인자와 
     args: { crewType: 1100 },
     missing: [],
   });
-  expect(buildArgs(fields, requiredKeys(selected), { crewType: '0' }).missing).toEqual(['병종 번호']);
+  expect(buildArgs(fields, requiredKeys(selected), { crewType: '0' }).missing).toEqual(['병종']);
   expect(cityPreparationSchema(schema, true, 'morale', 'unit')).toBe(unit);
   expect(buildArgs(argFields(unit), requiredKeys(unit), { unitId: '7', crewType: '1100' }).args).toEqual({ unitId: 7 });
 });
