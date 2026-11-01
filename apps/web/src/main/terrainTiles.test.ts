@@ -187,3 +187,25 @@ it('D-052 남문만 있는 두 표식이 위아래로 붙어 있어도 가운데
   const middle = path.slice(3, -3);
   expect(middle.some((point) => inside(point, a) || inside(point, b))).toBe(false);
 });
+
+it('D-052 강릉(네 문)·공안(남문)처럼 붙은 표식은 상대 상자로 들어가지 않는 문을 골라 상자를 밟지 않고 잇는다', () => {
+  const big = { x: 472, y: 612 }; // 칸 (236,306), 반지름 3칸, 네 문
+  const small = { x: 472, y: 622 }; // 칸 (236,311), 반지름 1칸, 남문만
+  const path = gatedWalk(
+    [big, small],
+    [
+      { cells: 3, allowed: ['N', 'E', 'S', 'W'] },
+      { cells: 1, allowed: ['S'] },
+    ],
+  );
+  const inside = (point: { x: number; y: number }, x: number, y: number, r: number) =>
+    Math.abs(point.x - x) <= r && Math.abs(point.y - y) <= r;
+  // 첫 문 길(강릉 중심→문)과 마지막 문 길(공안 남문→중심)을 빼면 두 상자 밖이다.
+  const firstOut = path.findIndex((point) => !inside(point, 236, 306, 3));
+  const lastOut = path.length - 1 - [...path].reverse().findIndex((point) => !inside(point, 236, 311, 1));
+  const middle = path.slice(firstOut, lastOut + 1);
+  expect(middle.some((point) => inside(point, 236, 306, 3) || inside(point, 236, 311, 1))).toBe(false);
+  expect(path.at(-1)).toEqual({ x: 236, y: 311 });
+  // 공안에는 남문으로 들어온다.
+  expect(path.at(-2)).toEqual({ x: 236, y: 312 });
+});

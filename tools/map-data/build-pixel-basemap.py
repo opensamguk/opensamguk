@@ -269,9 +269,9 @@ RIDGE_CELLS = 8
 
 
 # 실제 섬 거점. 그 밖의 거점이 작은 땅에 갇히면(강이 빙 둘러 섬이 되면) 생성을 멈춘다.
-# 가짜 섬: 강·호수 때문에만 작아진 땅. 강·호수를 땅으로 칠 때보다 땅만 셀 때 덩어리가 작고 그 크기가 이보다 작으면
-# 강에 갇힌 것으로 본다(가짜 섬은 9~170칸이었다). 바다로만 둘러싸인 실제 섬(대마국·주호 등)은 두 셈이 같아 통과한다.
-ISLAND_CELLS = 1000
+# 가짜 섬: 강·호수 건너편에 다른 땅이 있는데 이보다 작은 땅에 갇힌 거점(가짜 섬은 9~170칸이었다).
+# 바다로만 둘러싸인 실제 섬(대마국·주호 등)과 섬 안 호수는 건너편 땅이 없어 통과한다.
+ISLAND_CELLS = 3000
 # D-052 역사 기슭표. 강에서 본 191년 전후 치소의 쪽이다. 동서로 흐르는 강에는 북안·남안을, 남북으로 흐르는 강에는
 # 동안·서안을 쓰므로 합류점은 강마다 맞는 쪽이 골라진다. 본류(장강·황하)와 지류의 기슭이 다르면 {'major', 'other'}로
 # 나눈다(하내는 黃河 북안이면서 沁水 남안이다). 주된 근거는 水經注 經·注의
@@ -546,57 +546,59 @@ def pass_ridges(pixels, index, blocked):
     return out
 
 
-def check_banks(pixels, index, original, crossings):
-    """새로 낸 강 칸(원래 강이 아니던 칸)이 거점 바로 뒤(기슭 쪽 반지름+4칸, 재연결이 막히는 범위)에 있으면 멈춘다.
-    재연결이 기슭 쪽으로 돌아 강을 거점 뒤로 내는 회귀를 막는다. 그보다 먼 곳의 강은 汾水(하동 북쪽)·漢水(양양 동쪽)처럼
-    다른 줄기나 굽이일 수 있어 보지 않는다."""
-    w, h = GRID
+def check_banks(pixels, index, original, shields):
+    """새로 낸 강 칸(원래 강이 아니던 칸)이 기슭 방패(거점 쪽 반원, 재연결이 강을 못 내는 곳) 안에 있으면 멈춘다.
+    방패는 강마다 그 강의 기슭 방향으로 만들고 이미 물인 칸은 빼므로, 두 강 사이 거점도 강마다 정확히 본다.
+    재연결·복원이 기슭 쪽으로 강을 내는 회귀를 막는다."""
     river = index['river']
-    behind = {}
-    # 두 강 사이에 놓인 거점(하내처럼 강마다 기슭이 다른 곳)은 한쪽 강이 다른 강의 기슭 쪽에 있는 게 맞아 뺀다.
-    sides = {}
-    for cx, cy, _radius, nx, ny, *_rest in crossings:
-        sides.setdefault((cx, cy), set()).add((nx, ny))
-    for cx, cy, radius, nx, ny, _tx, _ty, _width in crossings:
-        if len(sides[(cx, cy)]) > 1:
-            continue
-        reach = radius + 4
-        for y in range(cy - reach, cy + reach + 1):
-            for x in range(cx - reach, cx + reach + 1):
-                if not (0 <= x < w and 0 <= y < h) or pixels[y * w + x] != river or original[y * w + x] == river:
-                    continue
-                ox, oy = x - cx, y - cy
-                # 거점 바로 뒤(기슭 방향 37도 안)만 본다. 기슭은 동서남북 네 방향이라 대각선으로 흐르는 강의 옆 줄기는 뺀다.
-                distance = math.hypot(ox, oy)
-                if distance <= reach and ox * nx + oy * ny > 0.8 * distance:
-                    behind[(cx * 2, cy * 2)] = behind.get((cx * 2, cy * 2), 0) + 1
-    wrong = sorted(at for at, count in behind.items() if count >= 3)
+    wrong = sorted({(k % GRID[0] * 2, k // GRID[0] * 2) for k in shields
+                    if pixels[k] == river and original[k] != river})
     if wrong:
-        raise SystemExit(f'기슭 쪽에 새 강이 난 거점 좌표: {wrong}')
+        raise SystemExit(f'기슭 방패 안에 새 강이 난 곳(지도 좌표): {wrong[:20]}')
 
 
 def check_islands(pixels, index):
-    """실제 섬이 아닌 거점이 작은 땅 덩어리(강이나 바다에 둘러싸인 곳)에 있으면 멈춘다."""
+    """강·호수 건너편에 다른 땅이 있는데 거점이 작은 땅(ISLAND_CELLS 미만)에 갇혀 있으면 멈춘다. 바다로만 둘러싸인
+    실제 섬은 건너편 땅이 없고, 섬 안 호수는 건너도 같은 땅이라 통과한다."""
     w, h = GRID
-    water = {index[name] for name in ('deepSea', 'sea', 'shallow', 'lake', 'river')}
+    land_water = {index[name] for name in ('lake', 'river')}
     sea = {index[name] for name in ('deepSea', 'sea', 'shallow')}
-
-    def area(cx, cy, blocks, cap):
-        seen, queue = {(cx, cy)}, [(cx, cy)]
-        for ax, ay in queue:
-            if len(seen) >= cap:
-                break
-            for nx, ny in ((ax + 1, ay), (ax - 1, ay), (ax, ay + 1), (ax, ay - 1)):
-                if 0 <= nx < w and 0 <= ny < h and (nx, ny) not in seen and pixels[ny * w + nx] not in blocks:
-                    seen.add((nx, ny))
-                    queue.append((nx, ny))
-        return len(seen)
-
+    near = lambda x, y: ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1))
+    inside = lambda x, y: 0 <= x < w and 0 <= y < h
     trapped = []
     for site, cx, cy, _rx, _ry, _axis in site_boxes():
-        land = area(cx, cy, water, ISLAND_CELLS)
-        if land < ISLAND_CELLS and area(cx, cy, sea, land + 1) > land:
-            trapped.append(f"{site['name']}({land}칸)")
+        land, queue, shore = {(cx, cy)}, [(cx, cy)], set()
+        for ax, ay in queue:
+            if len(land) >= ISLAND_CELLS:
+                break
+            for nx, ny in near(ax, ay):
+                if not inside(nx, ny) or (nx, ny) in land:
+                    continue
+                kind = pixels[ny * w + nx]
+                if kind in land_water:
+                    shore.add((nx, ny))
+                elif kind not in sea:
+                    land.add((nx, ny))
+                    queue.append((nx, ny))
+        if len(land) >= ISLAND_CELLS or not shore:
+            continue
+        # 강·호수 칸을 따라가 이 땅이 아닌 땅에 닿으면 강에 갇힌 것이다.
+        seen, queue, across = set(shore), list(shore), False
+        for ax, ay in queue:
+            for nx, ny in near(ax, ay):
+                if not inside(nx, ny) or (nx, ny) in seen:
+                    continue
+                kind = pixels[ny * w + nx]
+                if kind in land_water:
+                    seen.add((nx, ny))
+                    queue.append((nx, ny))
+                elif kind not in sea and (nx, ny) not in land:
+                    across = True
+                    break
+            if across:
+                break
+        if across:
+            trapped.append(f"{site['name']}({len(land)}칸)")
     if trapped:
         raise SystemExit(f'섬처럼 갇힌 거점: {trapped}')
 
@@ -842,7 +844,7 @@ def main():
         pixels = restore_bank_channels(pixels, index, crossings, before_shields, blocked | shields)
         check_water(pixels, index, data['rivers'])
         check_islands(pixels, index)
-        check_banks(pixels, index, before_shields, crossings)
+        check_banks(pixels, index, before_shields, shields)
         report = SAN10 / 'river-banks.json'
         report.write_text(json.dumps({'note': '강가 거점이 놓인 기슭(거점 좌표와 실제 강 중심선 기준). 생성 결과다.',
                                       'banks': banks}, ensure_ascii=False, indent=1) + '\n', newline='\n')
