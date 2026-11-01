@@ -1,7 +1,7 @@
 # INT-23 운영자 게임 안 개입과 기록 조회
 
 > AC-INT-23 · 구현 Codex · 리뷰 Claude · 결정 [D-057](../product/decisions.md) · 사용자 직접 요청 2026-11-01
-> 상태: 상세 계획 제안. 2026-11-01 Codex G-03 1차 보류(PR #331 댓글) 지적을 반영한 2판이다.
+> 상태: 상세 계획 제안. 2026-11-01 Codex G-03 1·2차 보류(PR #331 댓글) 지적을 반영한 3판이다.
 > 기준: main `d2202e13`. 짝 계획은 [INT-24 서버 속성·NPC 플레이·야간 휴전 토글](./INT-24.md)이다. 기존 운영 콘솔은 [T3-05](./T3-05.md)·[T3-06](./T3-06.md), 문서는 [관리자 콘솔](../admin-console.md)이다.
 
 ## 계획 (Claude)
@@ -19,7 +19,7 @@
 | 장수 | `admin.general.rename` | 장수 이름을 바꾼다. 월드 안 이름 중복 검사는 장수 생성과 같다 | 1 |
 | 장수 | `admin.general.release` | 사람 장수를 NPC로 돌린다. `userId`를 null로 하고 `policy.lastActiveTicks`에서 뺀다. 군주였다면 `Nation.isNpc`를 켠다(T3-07 맡기의 반대). 소속·관직·병력은 그대로다 | 1 |
 | 장수 | `admin.general.clearTurns` | 예턴 30칸을 휴식으로 채우고 `revisions`를 1 올린다 | 1 |
-| 장수 | `admin.general.remove` | 장수를 월드에서 내보낸다. 아래 「장수 내보내기」 절 | 2 |
+| 장수 | `admin.general.remove` | 장수를 월드에서 내보낸다. 사람 연결도 끊는다. 아래 「장수 내보내기」 절 | 2 |
 | 수치 | `admin.general.adjust` | 금·쌀·위치 도시. 부곡 프로필이 아닌 월드에서만 병력·병종·훈련·사기 | 1 |
 | 수치 | `admin.city.adjust` | 주민·농업·상업·치안·수비·성벽·민심 | 1 |
 | 수치 | `admin.nation.adjust` | 국고 금·쌀·기술 | 1 |
@@ -78,6 +78,9 @@ APPLIED·REJECTED 모두 `sequence`(`nextActionSequence`)와 `tick`을 받는다
 | 장수 턴 선택 `apps/engine/src/turnLoop.ts:205`·`:237`, 순수 재생 `packages/rules/src/replay.ts:73` | `removedAt`이 있으면 고르지 않는다 |
 | NPC 명령 선택 `packages/rules/src/npc/` | 후보에서 뺀다 |
 | 월 정산·보급 `packages/rules/src/monthly/`, `supply.ts` | 봉급·인구 계산과 보급 판정에서 뺀다 |
+| 사람 연결 | 내보낼 때 `userId`를 null로 하고 `policy.lastActiveTicks`에서 뺀다. 그 계정은 이 월드에서 장수가 없는 상태가 되어 새 장수를 만들 수 있다(생성이 열려 있을 때) |
+| 사용자 장수 조회 `apps/server/src/game/queries.ts:33` `requireGeneral` 등 | `userId`로 찾으므로 내보낸 장수는 자연히 빠진다. 예턴·방침·휘하 지시·쪽지 같은 변경 접수는 이 조회를 거쳐 거절된다 |
+| 이미 PENDING인 일반 입력 | 엔진이 처리할 때 대상 장수에 `removedAt`이 있으면 `GENERAL_REMOVED`로 REJECTED 기록을 남긴다(입력 종류마다 같은 검사) |
 | 장수 생성·맡기 | 맡을 수 없다. 이름 중복 검사에는 남긴다 |
 | 지도·장수 목록 조회 `apps/server/src/game/`, `visibility.ts` | 목록과 지도에서 뺀다. 상세 조회는 「내보낸 장수」로 보인다 |
 | 순위 `packages/rules/src/ranking.ts` | 새 집계에서 뺀다. 이미 저장한 RankingSnapshot은 고치지 않는다 |
@@ -96,7 +99,9 @@ APPLIED·REJECTED 모두 `sequence`(`nextActionSequence`)와 `tick`을 받는다
 
 지금 쪽지 발신자 파서(`apps/server/src/messaging.ts:71`)는 `{ generalId, name, nation }`만 받는다. 운영 쪽지를 위해 발신자 모양에 `{ kind: 'admin', name: '운영' }`을 더하고 파서, `routers/message.ts`, 웹 쪽지 타입과 표시를 함께 고친다(PR 3). 기존 행은 그대로 읽힌다.
 
-장수 조치는 그 장수의 GeneralLog에 한 줄 남긴다. `commandKey`는 입력 종류, `kind: 'admin'`이며 운영 입력의 `sequence`와 `ordinal`을 채운다. 그러면 `GeneralLog_worldId_generalId_sequence_ordinal_key`에 걸리고 sequence 없는 로그의 장수·tick 고유 제약에는 걸리지 않는다. 같은 tick의 장수 턴 로그와 여러 운영 조치가 모두 남는지 시험한다. 국가·도시 조치는 월드 기록에 남긴다. 문구는 「운영 조치: 이름을 ○○로 바꿈」처럼 바뀐 것만 쓰고 사유는 넣지 않는다.
+장수 조치는 그 장수의 GeneralLog에 한 줄 남긴다. `commandKey`는 입력 종류, `kind: 'admin'`이며 운영 입력의 `sequence`와 `ordinal`을 채운다. 그러면 `GeneralLog_worldId_generalId_sequence_ordinal_key`에 걸리고 sequence 없는 로그의 장수·tick 고유 제약에는 걸리지 않는다. 같은 tick에 로그가 여러 줄 생기므로 장수 기록 조회(`apps/server/src/routers/records.ts`의 `records.general`, 30행 단위·`tick < cursor`)를 `(tick, id)` 복합 커서로 바꾼다. 같은 tick 로그가 페이지 경계에서 빠지지 않는지 시험한다.
+
+국가·도시 조치의 공개 기록은 새 표를 만들지 않고 월드 쪽지(Message, scope WORLD, 발신자 「운영」)로 남긴다. 지금 `records.world`는 연감(YearbookSnapshot)만 읽으므로 거기에 섞지 않는다. 쪽지는 APPLIED 처리와 같은 트랜잭션에서 한 번만 만든다. InputEvent는 한 번만 APPLIED가 되므로 중복이 생기지 않는다. 쪽지는 재생 상태가 아니며 재생 해시에 들어가지 않는다. 문구는 「운영 조치: 위나라 국명을 ○○로 바꿈」처럼 바뀐 것만 쓰고 사유는 넣지 않는다.
 
 ### 감사
 
@@ -123,8 +128,8 @@ APPLIED·REJECTED 모두 `sequence`(`nextActionSequence`)와 `tick`을 받는다
 | PR | 내용 | 시작 조건 |
 | --- | --- | --- |
 | 1 규칙·엔진·서버 | 입력 스키마, 등록부, 적용 함수(장수 이름·NPC 돌리기·예턴 비우기·수치·국명·수뇌 임명 취소), `processAdminInputs`, 서버 접수·조회 결과, 감사, 재생 검사, 시험 | G-03 통과 |
-| 2 내보내기 | migration(`General.removedAt`), 상태 표현, 위 경로 표 전부, 시험 | PR 1 |
-| 3 쪽지·기록 | 발신자 모양 확장, GeneralLog·월드 기록, 기록 조회 프로시저 | PR 1 |
+| 2 내보내기 | migration(`General.removedAt`), 상태 표현, 위 경로 표 전부(사람 연결·사용자 조회·대기 입력의 `GENERAL_REMOVED` 포함), 시험 | PR 1 |
+| 3 쪽지·기록 | 발신자 모양 확장, GeneralLog와 `records.general` 복합 커서, 국가·도시 조치의 월드 쪽지, 기록 조회 프로시저 | PR 1 |
 | 4 화면 | 운영 콘솔 탭, `docs/admin-console.md`, 도움말 | PR 1~3 |
 | 5 국가 전이 | `setRuler`, `disband` | PR 1, T4-15 규칙 PR |
 
