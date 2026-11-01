@@ -430,6 +430,11 @@ export function OperationalWorldMap({
           if (event.currentTarget.hasPointerCapture(event.pointerId))
             event.currentTarget.releasePointerCapture(event.pointerId);
         }}
+        onPointerLeave={(event) => {
+          // 표식 위 누르기는 움직이기 전엔 포인터를 잡지 않는다. 그 사이 지도 밖에서 놓으면 pointerup이 오지 않으니 여기서 푼다.
+          const active = drag.current;
+          if (active?.pointerId === event.pointerId && active.anchor && !active.moved) drag.current = null;
+        }}
         onPointerCancel={(event) => {
           if (drag.current?.pointerId !== event.pointerId) return;
           drag.current = null;
