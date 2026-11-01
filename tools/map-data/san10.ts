@@ -93,25 +93,6 @@ const CENTRAL_PLAINS_LEVELS: Record<string, number> = {
   S060: 5, // 적도 隴西郡 치소 狄道 口二萬九千六百三十七
 };
 const LEVEL_OVERRIDES: Record<string, number> = { ...EAST_ASIA_LEVELS, ...CENTRAL_PLAINS_LEVELS };
-// D-055: 새 거점의 지역(che 번호: 1 하북, 2 중원, 3 서북, 4 서촉, 5 남중, 6 초, 7 오월, 8 동이)을 191년 州로 정한다.
-// 상속 도시는 기존 지역을 쓴다. 여기 없는 새 거점은 하북(1)이다.
-const REGIONS: Record<string, number> = Object.fromEntries(
-  (
-    [
-      [2, 'S087 S088 S090 S091 S092 S093 S094 S095 S111'], // 태산 낭야 백마 정도 관도 팽성 숭산 진 회음
-      [3, 'S059 S060 S061 S062 S063 S064 S065 S066 S089 S120 S126'], // 주천 적도 남안 기산 가정 진창 오장원 화산 하동 강 저
-      [4, 'S067 S068 S069 S070 S071'], // 서성 방릉 한가 강양 임강
-      [5, 'S072 S073 S074 S075 S076 S077 S078 S119 S122'], // 월수 주제 노수 애뢰 사룡 흥고 합포 창오 남만
-      [6, 'S097 S098 S099 S103 S104 S105 S107 S108 S116 S117 S118'], // 노양 의양 번성 장판 이릉 화용 적벽 공안 형산 임하 곡강
-      [7, 'S100 S101 S102 S106 S109 S110 S113 S114 S115 S123 S153 field:92'], // 합비 석정 유수구 서새산 심양 남창 경구 부춘 임해 산월 이주 파양
-      // 한반도·왜·부여·읍루·주호
-      [
-        8,
-        'S127 S128 S129 S130 S131 S132 S133 S134 S135 S136 S137 S139 S140 S141 S142 S143 S144 S145 S146 S147 S148 S149 S150 S151 S152',
-      ],
-    ] as const
-  ).flatMap(([region, ids]) => ids.split(' ').map((id) => [id, region])),
-);
 // D-055: 길 없는 전장 표식이던 파양(豫章郡 鄱陽縣)을 진(2) 도시로 바꾸고 시상·남창과 잇는다.
 const PROMOTED_FIELDS: Record<string, { key: number; level: number }> = { 'field:92': { key: 1154, level: 2 } };
 // D-052: 사료의 섬 두 곳을 더한다. 좌표는 위경도를 지도 공식((경도-94)·700/27, (54.0286-위도)·700/27)으로 옮겼다.
@@ -270,7 +251,8 @@ export function buildSan10Map(gisHash: string): OperationalMapResource {
       kind: 'CITY',
       anchorKey: key,
       level,
-      region: REGIONS[site.id] ?? 1,
+      // 새 거점의 지역은 INT-22에서 191년 州 코드로 채운다.
+      region: 1,
       initial: {
         population: level * 2500,
         agriculture: level * 50,
