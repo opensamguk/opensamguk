@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, Outlet, useLocation, useParams } from '@tanstack/react-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AdminEntry } from '../auth/AdminEntry';
 import { LogoutButton } from '../auth/LogoutButton';
 import { formatRemaining, useTurnCountdown } from '../game/countdown';
 import { errorCode, isNotFound } from '../game/errors';
@@ -101,6 +102,7 @@ export function GameLayout() {
           open={messagesOpen}
           onToggle={() => (messagesOpen ? closeMessages() : setMessagesOpen(true))}
         />
+        <AdminEntry className={styles.account} />
         <Link to="/account" className={styles.account}>
           내 계정
         </Link>

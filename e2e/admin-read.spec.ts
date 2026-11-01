@@ -602,3 +602,21 @@ test('T3-06 AC-M3-04 익명·일반 계정 가드와 실제 계정 전환·권�
       () => other.close(),
     ]);
   }));
+
+test('INT-20 AC-INT-20 일반 화면의 운영 입구는 관리자에게만 보이고 375px에서 한 번 눌러 콘솔에 들어간다', ({ world }) =>
+  track(async () => {
+    const { admin, actor } = await fixture(world);
+    const denied = observe(actor.page.waitForResponse((value) => calls(value.request(), 'admin.whoami')));
+    await actor.page.goto('/lobby');
+    await expect(actor.page.getByRole('link', { name: '내 계정', exact: true })).toBeVisible();
+    await denied;
+    await frames(actor.page);
+    await expect(actor.page.getByRole('link', { name: '운영 화면', exact: true })).toHaveCount(0);
+    await admin.page.setViewportSize({ width: 375, height: 900 });
+    await admin.page.goto('/lobby');
+    const entry = admin.page.getByRole('link', { name: '운영 화면', exact: true });
+    await expect(entry).toBeInViewport();
+    await entry.click();
+    await expect(admin.page.getByRole('heading', { name: '관리자 콘솔', exact: true })).toBeVisible();
+    expect(new URL(admin.page.url()).pathname).toBe('/admin');
+  }));
