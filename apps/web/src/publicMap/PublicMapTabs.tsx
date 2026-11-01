@@ -139,7 +139,13 @@ export function PublicMapView({
       data-world-id={current.id}
     >
       {snapshot === null ? (
-        <p className={backdrop ? `${styles.note} ${styles.backdropNote}` : styles.note}>아직 공개 지도가 없습니다</p>
+        <>
+          {/* 새 월드는 첫 턴이 지나고 공개 지연이 끝날 때까지 사본이 없다. 그동안 로그인 배경이 빈 바다로 남지 않게 바탕 그림을 깐다. */}
+          {backdrop ? (
+            <img className={styles.backdropImage} src={basemapUrl} alt="" data-testid="public-map-basemap" />
+          ) : null}
+          <p className={backdrop ? `${styles.note} ${styles.backdropNote}` : styles.note}>아직 공개 지도가 없습니다</p>
+        </>
       ) : (
         children
       )}
