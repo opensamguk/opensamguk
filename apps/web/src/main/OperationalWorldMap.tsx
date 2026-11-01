@@ -7,7 +7,7 @@ import { RoadPixelLayer, WaterLaneLayer } from './RoadPixelLayer';
 import { TerrainTileLayer, useTerrainGrid } from './TerrainTileLayer';
 import { showTiles, waterLanes } from './terrainTiles';
 import { ROAD_CELL, passNeighbours } from './roadPixels';
-import { markerBox, markerGates, markerUnits, passAxis } from './siteMarkers';
+import { levelName, markerBox, markerGates, markerUnits, passAxis } from './siteMarkers';
 import type { SiteGate } from './terrainTiles';
 import { basemapForOperationalMap } from './operationalGeography';
 import { mapTapTargets, tapCandidates, type MapView } from './mapTapTargets';
@@ -21,13 +21,28 @@ type DrawnCity = Pick<MapCity, 'key' | 'name' | 'kind' | 'x' | 'y' | 'nationId'>
 };
 type View = MapView;
 const labels = { CITY: '도시', PASS: '관문', PORT: '항구 시설', FIELD: '전장 표시' };
-// 가장 깊이 확대한 보기 너비(지도 단위). 이때 지형 칸은 화면 너비의 1/30쯤이라 타일 그림이 보인다.
-const MIN_VIEW_WIDTH = 60;
+// 툴팁 오른쪽 위의 한 글자 표기. 도시는 규모(특·대·중·소 …)를 쓴다.
+const shortLabels = { CITY: '도시', PASS: '관', PORT: '항', FIELD: '전장' };
+// 가장 깊이 확대한 보기 너비(지도 단위). 가장 큰 표식(경 13단위)도 화면 하나에 거의 차게 보인다.
+export const MIN_VIEW_WIDTH = 8;
 const clamp = (view: View, canvas: MapData['canvas']): View => ({
   ...view,
   x: Math.max(0, Math.min(canvas.width - view.width, view.x)),
   y: Math.max(0, Math.min(canvas.height - view.height, view.y)),
 });
+
+/** 지도 점 (cx, cy)를 화면의 같은 자리에 둔 채 factor배 확대한다. 너비는 [MIN_VIEW_WIDTH, maxWidth]로 묶는다. */
+export function zoomAround(view: View, factor: number, cx: number, cy: number, maxWidth: number, ratio: number): View {
+  const width = Math.min(maxWidth, Math.max(MIN_VIEW_WIDTH, view.width / factor));
+  const scale = width / view.width;
+  return { x: cx - (cx - view.x) * scale, y: cy - (cy - view.y) * scale, width, height: width * ratio };
+}
+
+// 휠 한 번(100px)에 약 1.35배. 터치패드의 작은 이동도 같은 비율로 부드럽게 따라간다.
+export function wheelFactor(deltaY: number, deltaMode: number): number {
+  const pixels = deltaMode === 1 ? deltaY * 16 : deltaMode === 2 ? deltaY * 400 : deltaY;
+  return Math.min(2, Math.max(0.5, Math.exp(-pixels * 0.003)));
+}
 
 export function operationalOverview(map: MapData): View {
   if (map.id !== 'san10') return { x: 0, y: 0, width: map.canvas.width, height: map.canvas.height };
@@ -80,6 +95,7 @@ export function OperationalWorldMap({
   myCityKey,
   selectedKey,
   onSelect,
+  fill = false,
 }: {
   cities: readonly DrawnCity[];
   nations: readonly MapNation[];
@@ -87,6 +103,8 @@ export function OperationalWorldMap({
   myCityKey: number | null;
   selectedKey: number | null;
   onSelect?: (key: number) => void;
+  /** 부모 상자를 가득 채운다(로그인 배경). 남는 가장자리는 바다색이다. */
+  fill?: boolean;
 }) {
   const basemap = basemapForOperationalMap(map);
   const canvas = map.canvas;
@@ -94,13 +112,24 @@ export function OperationalWorldMap({
   const ratio = whole.height / whole.width;
   const clampView = (value: View) => clamp(value, canvas);
   const [view, setView] = useState(whole);
-  const drag = useRef<{ pointerId: number; x: number; y: number; view: View; mobile: boolean; moved: boolean } | null>(
-    null,
-  );
+  // anchor: 표식 위에서 시작한 데스크톱 누르기. 4px 넘게 움직여야 끌기로 보고 그때 포인터를 잡는다(그 전엔 클릭 선택).
+  const drag = useRef<{
+    pointerId: number;
+    x: number;
+    y: number;
+    view: View;
+    mobile: boolean;
+    moved: boolean;
+    anchor: boolean;
+  } | null>(null);
+  const suppressClick = useRef(false);
   const completedTap = useRef<number | null>(null);
   const svg = useRef<SVGSVGElement>(null);
   const [layout, setLayout] = useState({ mobile: false, width: 0, height: 0 });
   const [choices, setChoices] = useState<number[]>([]);
+  // 마우스로 표식 위에 올렸을 때만 보이는 툴팁. 내용은 aria-label·선택 정보와 같다(호버 전용 정보 없음).
+  const [hover, setHover] = useState<{ siteId: string; x: number; y: number } | null>(null);
+  const frame = useRef<HTMLDivElement>(null);
   const firstChoice = useRef<HTMLButtonElement>(null);
   const choiceOrigin = useRef<SVGElement | null>(null);
   const validGeography = matchesOperationalGeography(map, cities);
@@ -144,6 +173,28 @@ export function OperationalWorldMap({
       window.removeEventListener('resize', read);
     };
   }, [validGeography]);
+  // 휠 확대는 페이지 스크롤을 막아야 해서 passive가 아닌 수신기로 단다. 커서 아래 지점이 그 자리에 남는다.
+  const maxWidth = whole.width;
+  useEffect(() => {
+    const element = svg.current;
+    if (!validGeography || !element) return;
+    const onWheel = (event: WheelEvent) => {
+      if (!event.deltaY) return;
+      // 끌기는 시작할 때의 보기를 기준으로 옮긴다. 그 사이 확대하면 다음 이동이 되돌리므로 끌기 중엔 막는다.
+      if (drag.current) {
+        event.preventDefault();
+        return;
+      }
+      const matrix = element.getScreenCTM?.();
+      if (!matrix) return;
+      event.preventDefault();
+      const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+      const factor = wheelFactor(event.deltaY, event.deltaMode);
+      setView((old) => clamp(zoomAround(old, factor, point.x, point.y, maxWidth, ratio), canvas));
+    };
+    element.addEventListener('wheel', onWheel, { passive: false });
+    return () => element.removeEventListener('wheel', onWheel);
+  }, [validGeography, maxWidth, ratio, canvas]);
   useEffect(() => {
     setChoices((old) => (old.length ? [] : old));
   }, [view.x, view.y, view.width, view.height, layout.mobile, map.id, selectedKey, canSelect]);
@@ -206,11 +257,9 @@ export function OperationalWorldMap({
     }
   };
   const zoom = (factor: number) =>
-    setView((old) => {
-      const width = Math.min(whole.width, Math.max(MIN_VIEW_WIDTH, old.width / factor));
-      const height = width * ratio;
-      return clampView({ x: old.x + (old.width - width) / 2, y: old.y + (old.height - height) / 2, width, height });
-    });
+    setView((old) =>
+      clampView(zoomAround(old, factor, old.x + old.width / 2, old.y + old.height / 2, whole.width, ratio)),
+    );
   const choose = (key: number, focus = false) => {
     const city = cityByKey.get(key);
     if (!city || !onSelect) return;
@@ -237,26 +286,42 @@ export function OperationalWorldMap({
   const move = (event: PointerEvent<SVGSVGElement>) => {
     const active = drag.current;
     if (!active || active.pointerId !== event.pointerId) return;
-    if (active.mobile && !active.moved && Math.hypot(event.clientX - active.x, event.clientY - active.y) < 4) return;
+    if (
+      (active.mobile || active.anchor) &&
+      !active.moved &&
+      Math.hypot(event.clientX - active.x, event.clientY - active.y) < 4
+    )
+      return;
+    if (active.anchor && !active.moved) event.currentTarget.setPointerCapture(event.pointerId);
     active.moved = true;
     const box = event.currentTarget.getBoundingClientRect();
     if (!box.width || !box.height) return;
+    // 화면 비율이 보기와 달라도(가득 채우기) 손가락 아래 지점이 따라오도록 실제 px/단위로 옮긴다.
+    const perUnit = Math.min(box.width / active.view.width, box.height / active.view.height);
     setView(
       clampView({
         ...active.view,
-        x: active.view.x - ((event.clientX - active.x) * active.view.width) / box.width,
-        y: active.view.y - ((event.clientY - active.y) * active.view.height) / box.height,
+        x: active.view.x - (event.clientX - active.x) / perUnit,
+        y: active.view.y - (event.clientY - active.y) / perUnit,
       }),
     );
   };
   return (
     <div
-      className={styles.frame}
+      ref={frame}
+      className={fill ? `${styles.frame} ${styles.fill}` : styles.frame}
       data-testid="operational-world-map"
       onPointerDownCapture={() => {
         completedTap.current = null;
+        suppressClick.current = false;
       }}
       onClickCapture={(event) => {
+        if (suppressClick.current) {
+          suppressClick.current = false;
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
         if (
           layout.mobile &&
           completedTap.current !== null &&
@@ -314,8 +379,8 @@ export function OperationalWorldMap({
       <svg
         ref={svg}
         viewBox={`${view.x} ${view.y} ${view.width} ${view.height}`}
-        className={styles.map}
-        style={{ aspectRatio: `${whole.width}/${whole.height}` }}
+        className={fill ? `${styles.map} ${styles.mapFill}` : styles.map}
+        style={fill ? undefined : { aspectRatio: `${whole.width}/${whole.height}` }}
         role="group"
         aria-label={`중원 지도, 도시 ${anchors.filter((site) => site.kind === 'CITY').length}개, 관문 ${anchors.filter((site) => site.kind === 'PASS').length}개`}
         data-testid="world-map"
@@ -342,13 +407,11 @@ export function OperationalWorldMap({
           }
         }}
         onPointerDown={(event) => {
-          if (
-            event.button !== 0 ||
-            event.isPrimary === false ||
-            drag.current ||
-            (!layout.mobile && event.target instanceof Element && event.target.closest('[data-anchor-key]'))
-          )
-            return;
+          if (event.button !== 0 || event.isPrimary === false || drag.current) return;
+          // 크게 확대하면 표식이 화면을 덮는다. 표식 위에서도 끌 수 있게 하되 움직이기 전까지는 클릭으로 둔다.
+          const anchor =
+            !layout.mobile && event.target instanceof Element && event.target.closest('[data-anchor-key]') !== null;
+          setHover(null);
           drag.current = {
             pointerId: event.pointerId,
             x: event.clientX,
@@ -356,20 +419,28 @@ export function OperationalWorldMap({
             view,
             mobile: layout.mobile,
             moved: false,
+            anchor,
           };
-          event.currentTarget.setPointerCapture(event.pointerId);
+          if (!anchor) event.currentTarget.setPointerCapture(event.pointerId);
         }}
         onPointerMove={move}
         onPointerUp={(event) => {
           const active = drag.current;
           if (!active || active.pointerId !== event.pointerId) return;
           drag.current = null;
+          // 표식 위에서 끌고 놓으면 뒤따르는 클릭이 선택으로 번지지 않게 한 번 막는다.
+          if (active.anchor && active.moved) suppressClick.current = true;
           if (active.mobile) {
             completedTap.current = event.pointerId;
             if (!active.moved) selectAt(event.currentTarget, event.clientX, event.clientY);
           }
           if (event.currentTarget.hasPointerCapture(event.pointerId))
             event.currentTarget.releasePointerCapture(event.pointerId);
+        }}
+        onPointerLeave={(event) => {
+          // 표식 위 누르기는 움직이기 전엔 포인터를 잡지 않는다. 그 사이 지도 밖에서 놓으면 pointerup이 오지 않으니 여기서 푼다.
+          const active = drag.current;
+          if (active?.pointerId === event.pointerId && active.anchor && !active.moved) drag.current = null;
         }}
         onPointerCancel={(event) => {
           if (drag.current?.pointerId !== event.pointerId) return;
@@ -453,9 +524,10 @@ export function OperationalWorldMap({
           const mine = city?.key === myCityKey;
           const selected = city?.key === selectedKey;
           const parent = site.kind === 'PORT' ? siteById.get(site.parentCityId!) : undefined;
+          const grade = site.kind === 'CITY' ? levelName(city?.level) : undefined;
           const label = [
             site.name,
-            labels[site.kind],
+            grade ? `${grade} ${labels[site.kind]}` : labels[site.kind],
             city?.recorded === false ? '기록 없음' : (nation?.name ?? (city ? '공백지' : null)),
             parent ? `${parent.name} 소속` : null,
             mine ? '내 위치' : null,
@@ -484,6 +556,12 @@ export function OperationalWorldMap({
               data-mine={mine || undefined}
               data-selected={selected || undefined}
               className={action ? styles.anchor : styles.display}
+              onPointerMove={(event) => {
+                if (event.pointerType !== 'mouse' || drag.current) return;
+                const box = frame.current?.getBoundingClientRect();
+                if (box) setHover({ siteId: site.id, x: event.clientX - box.left, y: event.clientY - box.top });
+              }}
+              onPointerLeave={() => setHover((old) => (old?.siteId === site.id ? null : old))}
               onClick={
                 action
                   ? (event) => {
@@ -503,7 +581,6 @@ export function OperationalWorldMap({
                   : undefined
               }
             >
-              <title>{label}</title>
               {target ? (
                 <rect
                   data-testid="map-tap-target"
@@ -555,6 +632,54 @@ export function OperationalWorldMap({
           );
         })}
       </svg>
+      {hover
+        ? (() => {
+            const site = siteById.get(hover.siteId);
+            if (!site) return null;
+            const city = site.anchorKey === undefined ? undefined : cityByKey.get(site.anchorKey);
+            const nation = city?.nationId == null ? undefined : nationById.get(city.nationId);
+            const parent = site.kind === 'PORT' ? siteById.get(site.parentCityId!) : undefined;
+            const grade = site.kind === 'CITY' ? levelName(city?.level) : undefined;
+            const owner = city?.recorded === false ? '기록 없음' : (nation?.name ?? (city ? '공백지' : null));
+            const notes = [
+              parent ? `${parent.name} 소속` : null,
+              city?.key === myCityKey ? '내 위치' : null,
+              city?.supplied === false && city.nationId !== null ? '보급 끊김' : null,
+            ].filter((note): note is string => note !== null);
+            // 커서 오른쪽 아래에 띄우되 지도 밖으로 나가면 왼쪽·위로 넘긴다.
+            const right = hover.x > layout.width - 200;
+            const below = hover.y < 120;
+            return (
+              <div
+                className={styles.tooltip}
+                data-testid="map-tooltip"
+                aria-hidden="true"
+                style={{
+                  left: right ? undefined : hover.x + 14,
+                  right: right ? Math.max(0, layout.width - hover.x + 14) : undefined,
+                  top: below ? hover.y + 18 : undefined,
+                  bottom: below ? undefined : Math.max(0, (frame.current?.clientHeight ?? 0) - hover.y + 10),
+                }}
+              >
+                <p className={styles.tooltipTitle}>
+                  <span>{site.name}</span>
+                  <span className={styles.tooltipGrade}>{grade ?? shortLabels[site.kind]}</span>
+                </p>
+                {owner ? (
+                  <p className={styles.tooltipOwner}>
+                    <span className={styles.tooltipSwatch} style={{ background: nation?.color ?? '#d6d0c4' }} />
+                    {owner}
+                  </p>
+                ) : null}
+                {notes.map((note) => (
+                  <p key={note} className={styles.tooltipNote}>
+                    {note}
+                  </p>
+                ))}
+              </div>
+            );
+          })()
+        : null}
       {onSelect && layout.mobile && choices.length > 1 ? (
         <div
           className={styles.choices}
