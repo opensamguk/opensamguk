@@ -53,6 +53,7 @@ export function WorldMap({
   selectedKey = null,
   onSelect,
   operationalMap,
+  fill = false,
 }: {
   cities: readonly DrawnCity[];
   nations: readonly MapNation[];
@@ -60,6 +61,7 @@ export function WorldMap({
   selectedKey?: number | null;
   onSelect?: (key: number) => void;
   operationalMap?: PublicGeography | undefined;
+  fill?: boolean;
 }) {
   if (operationalMap)
     return (
@@ -70,6 +72,7 @@ export function WorldMap({
         selectedKey={selectedKey}
         {...(onSelect ? { onSelect } : {})}
         map={operationalMap}
+        fill={fill}
       />
     );
   if (cities.some((city) => city.kind !== undefined)) return <p role="alert">운영 지도 자료를 다시 불러오세요.</p>;

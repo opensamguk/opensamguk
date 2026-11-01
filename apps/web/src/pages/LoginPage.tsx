@@ -13,10 +13,12 @@ export function LoginPage() {
   const trpc = useTRPC();
   const health = useQuery(trpc.health.queryOptions());
 
-  // 양식이 먼저다. 넓은 화면에서는 대표 그림과 공개 지도를 왼쪽에, 640px 이하에서는 양식 아래에 둔다 (T2-25, INT-20).
+  // 양식이 먼저다. 넓은 화면은 공개 지도를 화면 전체 배경으로 깔고 양식을 오른쪽에 띄운다.
+  // 640px 이하에서는 양식 아래에 지도를 둔다 (T2-25, INT-20).
   return (
-    <main className={styles.withMap}>
+    <main className={styles.mapStage}>
       <div className={styles.formColumn}>
+        <img className={styles.banner} src={keyartUrl} alt="" width={480} height={270} />
         <span className={styles.plaque}>입성</span>
         <h1>로그인</h1>
         <AuthForm mode="login" next={next} />
@@ -33,11 +35,8 @@ export function LoginPage() {
           {statusText(health)}
         </p>
       </div>
-      <div className={styles.art}>
-        <img className={styles.artImage} src={keyartUrl} alt="" width={480} height={270} />
-      </div>
-      <div className={styles.map}>
-        <PublicMapTabs />
+      <div className={styles.stageMap}>
+        <PublicMapTabs backdrop />
       </div>
     </main>
   );
