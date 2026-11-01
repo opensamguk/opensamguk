@@ -1,7 +1,7 @@
 # INT-23 운영자 게임 안 개입과 기록 조회
 
 > AC-INT-23 · 구현 Codex · 리뷰 Claude · 결정 [D-057](../product/decisions.md) · 사용자 직접 요청 2026-11-01
-> 상태: 상세 계획 제안. 2026-11-01 Codex G-03 1·2차 보류(PR #331 댓글) 지적을 반영한 3판이다.
+> 상태: 상세 계획 제안. 2026-11-01 Codex G-03 1~3차 보류(PR #331 댓글) 지적을 반영한 4판이다.
 > 기준: main `d2202e13`. 짝 계획은 [INT-24 서버 속성·NPC 플레이·야간 휴전 토글](./INT-24.md)이다. 기존 운영 콘솔은 [T3-05](./T3-05.md)·[T3-06](./T3-06.md), 문서는 [관리자 콘솔](../admin-console.md)이다.
 
 ## 계획 (Claude)
@@ -88,6 +88,9 @@ APPLIED·REJECTED 모두 `sequence`(`nextActionSequence`)와 `tick`을 받는다
 | 부곡 `packages/rules/src/campaign/` | 지휘하던 부곡과 소유한 부곡을 해산한다. 병력은 소속 도시 주민으로 돌린다 |
 | 휘하·발령 `packages/rules/src/personnel/`, AssignmentOffer | 휘하 연결과 대기 중 제안·지시·발령을 취소한다 |
 | 관직 | 수뇌 자리를 비운다(`offices` revision을 올린다) |
+| 소속·병력 | 소속 국가를 비우고(재야와 같은 `nationId` null) 비부곡 월드의 장수 병력은 0으로 해 소속 도시 주민으로 돌린다. 그래서 수비 장수 선택(`packages/rules/src/commands/attack.ts:61`, 소속·병력·도시로 고름)과 같은 나라 대상 명령에서 자연히 빠진다 |
+| 장수를 대상으로 하는 명령 `packages/rules/src/commands/`(포상·몰수 `nation.ts:18`, 등용·임명 등 `args.generalId`를 받는 모든 명령) | 대상 장수를 고르는 공통 함수(`targetGeneral`)를 두고 `removedAt`이면 `BAD_TARGET`으로 거절한다. PR 2는 `generalId` 인자를 받는 명령을 grep해 모두 이 함수로 바꾼다 |
+| 서버 작전 `apps/server/src/game/operation.ts:52`, 같은 파일의 `createOperation` | 참여자 검사와 기존 참여자 조회에서 뺀다. 이미 들어간 작전의 집계에서도 뺀다 |
 
 로그·쪽지·전투 기록은 남는다.
 
@@ -128,7 +131,7 @@ APPLIED·REJECTED 모두 `sequence`(`nextActionSequence`)와 `tick`을 받는다
 | PR | 내용 | 시작 조건 |
 | --- | --- | --- |
 | 1 규칙·엔진·서버 | 입력 스키마, 등록부, 적용 함수(장수 이름·NPC 돌리기·예턴 비우기·수치·국명·수뇌 임명 취소), `processAdminInputs`, 서버 접수·조회 결과, 감사, 재생 검사, 시험 | G-03 통과 |
-| 2 내보내기 | migration(`General.removedAt`), 상태 표현, 위 경로 표 전부(사람 연결·사용자 조회·대기 입력의 `GENERAL_REMOVED` 포함), 시험 | PR 1 |
+| 2 내보내기 | migration(`General.removedAt`), 상태 표현, 위 경로 표 전부(사람 연결·사용자 조회·대기 입력의 `GENERAL_REMOVED`, 소속·병력, 대상 명령 공통 함수, 서버 작전 포함), 시험 | PR 1 |
 | 3 쪽지·기록 | 발신자 모양 확장, GeneralLog와 `records.general` 복합 커서, 국가·도시 조치의 월드 쪽지, 기록 조회 프로시저 | PR 1 |
 | 4 화면 | 운영 콘솔 탭, `docs/admin-console.md`, 도움말 | PR 1~3 |
 | 5 국가 전이 | `setRuler`, `disband` | PR 1, T4-15 규칙 PR |
@@ -142,4 +145,4 @@ APPLIED·REJECTED 모두 `sequence`(`nextActionSequence`)와 `tick`을 받는다
 
 ### 검증
 
-규칙 단위 시험은 조치마다 성공 하나와 거절 코드마다 하나를 둔다. 형식3 월드에서 조치를 섞은 기록을 내보내고 읽어 순수 재생한 결과가 DB 상태·해시와 같아야 한다. caps 월드의 기록에 운영 입력이 있으면 거절해야 한다. 기존 형식1~3·caps 재생 골든 해시는 그대로여야 한다. 엔진 통합 시험(실제 PostgreSQL)은 접수 → 처리 → 감사 두 행 → 게임 기록 → 재시작 뒤 같은 상태를 본다. 권한 시험은 비관리자·제재 관리자, 같은 키 같은 내용(기존 결과)과 다른 내용(충돌)을 본다. 내보내기는 경로 표의 각 줄을 시험한다. 화면은 실제 Chromium으로 장수 이름 바꾸기, 수치 고치기, 운영 쪽지를 한 번씩 확인한다. `pnpm check`와 독립 리뷰를 거친다.
+규칙 단위 시험은 조치마다 성공 하나와 거절 코드마다 하나를 둔다. 형식3 월드에서 조치를 섞은 기록을 내보내고 읽어 순수 재생한 결과가 DB 상태·해시와 같아야 한다. caps 월드의 기록에 운영 입력이 있으면 거절해야 한다. 기존 형식1~3·caps 재생 골든 해시는 그대로여야 한다. 엔진 통합 시험(실제 PostgreSQL)은 접수 → 처리 → 감사 두 행 → 게임 기록 → 재시작 뒤 같은 상태를 본다. 권한 시험은 비관리자·제재 관리자, 같은 키 같은 내용(기존 결과)과 다른 내용(충돌)을 본다. 내보내기는 경로 표의 각 줄을 시험한다. 특히 내보낸 뒤 수비전 불참, 대상 명령 거절, 기존 작전 집계 제외를 본다. 화면은 실제 Chromium으로 장수 이름 바꾸기, 수치 고치기, 운영 쪽지를 한 번씩 확인한다. `pnpm check`와 독립 리뷰를 거친다.

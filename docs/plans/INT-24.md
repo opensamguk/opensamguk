@@ -1,7 +1,7 @@
 # INT-24 진행 중 월드의 서버 속성 변경, NPC 플레이, 야간 휴전 토글
 
 > AC-INT-24 · 구현 Codex · 리뷰 Claude · 결정 [D-057](../product/decisions.md) · 사용자 직접 요청 2026-11-01
-> 상태: 상세 계획 제안. 2026-11-01 Codex G-03 1·2차 보류(PR #331 댓글) 지적을 반영한 3판이다.
+> 상태: 상세 계획 제안. 2026-11-01 Codex G-03 1~3차 보류(PR #331 댓글) 지적을 반영한 4판이다.
 > 기준: main `d2202e13`. 짝 계획은 [INT-23 게임 안 개입과 기록 조회](./INT-23.md)다. 입력 등록·접수·엔진 처리 자리·감사는 INT-23과 같다. NPC 장수 맡기는 [T3-07](./T3-07.md)의 `entry.possess` 설계를 쓴다.
 
 ## 계획 (Claude)
@@ -73,7 +73,7 @@
 
 초기화로 만드는 새 월드는 진행 중에 바꾼 설정을 이어받지 않는다. 원본 월드를 만들 때의 이름·간격·종료 연도·프리셋으로 다시 시작하고 `runtimeOptions`는 null이다. 2차 검토에서 승계를 택하면 새 월드의 재생 시작 상태, 정책 featureData, 자원 해시(`clock/reset.ts:118`의 원본·새 자원 해시 같음 조건)와 초기화 증거가 모두 갈라진다는 점이 드러났다. 바꾼 설정이 다음 판에도 필요하면 운영자가 새 월드에서 다시 바꾼다. 그 변경도 감사와 재생 기록에 남는다.
 
-이렇게 하려면 초기화가 읽는 설정을 하나의 함수 `creationSettings(world, appliedSettingInputs)`로 모은다. 이 함수는 그 월드의 APPLIED `rename`·`setEndYear`·`setTurnTerm` 입력 가운데 칸마다 가장 앞선 것의 `result.before`를 생성 당시 값으로 돌려준다. 그런 입력이 없으면 지금 World 값이다. `runtimeOptions`는 읽지 않는다. 아래 네 곳이 지금 World 값 대신 이 함수를 쓴다.
+이렇게 하려면 초기화가 읽는 설정을 하나의 함수 `creationSettings(world, appliedSettingInputs)`로 모은다. 이 함수는 그 월드의 APPLIED `rename`·`setEndYear`·`setTurnTerm` 입력 가운데 칸마다 가장 앞선 것의 `result.before`를 생성 당시 값으로 돌려준다. 그런 입력이 없으면 지금 World 값이다. `runtimeOptions`는 읽지 않는다. 아래 다섯 곳이 지금 World 값 대신 이 함수를 쓴다.
 
 | 곳 | 하는 일 |
 | --- | --- |
@@ -81,6 +81,9 @@
 | `resetSourceSettingsHash`(`:171`), `resetSettingsReference`(`:186`) | 초기화 증거의 원본 설정 해시와 새 월드 설정 |
 | `resetPreparation.ts:231` `resetRefs` | 초기화로 생긴 월드를 다시 초기화할 때 과거 증거 대조 |
 | `admin/reset.ts:179` `checkedResetTarget` | 원본 월드 재생 내보내기에서 새 월드 연결 검사 |
+| `resetPreparation.ts:158` `sourceOrigin`의 `InitialWorldOptions` | 원본 시드 재구성과 새 월드 준비 양쪽에 넘기는 이름·간격·종료 연도. 정책 featureData의 간격과 같아야 `world/persistence.ts:107` 검사를 통과한다 |
+
+재생 내보내기의 종료 연도는 두 값을 나눈다. 아카이브 `config.endYear`(`apps/engine/src/replay.ts:219`)는 종료 판정에 쓰는 지금 값 그대로다. 초기화 결과 검사(`replay.ts:424`)의 `reset.settings.endYear !== archive.config.endYear`는 `reset.settings.endYear !== creationEndYear(archive)`로 바꾼다. `creationEndYear`는 아카이브 안의 APPLIED `setEndYear` 입력 가운데 가장 앞선 것의 `result.before`이고 없으면 `config.endYear`다. 변경 입력이 없는 기존 아카이브는 지금과 같은 비교가 된다.
 
 설정을 바꾼 적 없는 월드는 함수 값이 지금 값과 같으므로 이미 저장한 초기화 기록의 해시가 그대로 검증된다. 생성 당시 값은 바뀌지 않으므로 A를 초기화해 B를 만든 뒤 B의 설정을 바꿔도 A 내보내기와 B 재초기화의 대조가 그대로 통과한다. featureData와 자원 해시는 생성 당시 간격으로 만들므로 지금처럼 원본과 새 월드가 같다.
 
@@ -112,7 +115,7 @@ T3-07 계획의 `entry.possess`(InputEvent `general.possess`)로 사람이 NPC �
 
 | PR | 내용 | 시작 조건 |
 | --- | --- | --- |
-| 1 속성 | `packages/rules/src/admin/settings.ts`, `world/options.ts`, 등록부·재생 검사, migration(`World.runtimeOptions`), 위 표의 유효 옵션 경로(로더·저장·서버 조회·늦은 참가), 이름·종료 연도·턴 간격·규칙 옵션, 초기화 설정 함수 `creationSettings`와 네 사용처, 서버 프로시저·감사, 「속성」 탭 | G-03 통과, INT-23 PR 1 |
+| 1 속성 | `packages/rules/src/admin/settings.ts`, `world/options.ts`, 등록부·재생 검사, migration(`World.runtimeOptions`), 위 표의 유효 옵션 경로(로더·저장·서버 조회·늦은 참가), 이름·종료 연도·턴 간격·규칙 옵션, 초기화 설정 함수 `creationSettings`와 다섯 사용처, `creationEndYear`, 서버 프로시저·감사, 「속성」 탭 | G-03 통과, INT-23 PR 1 |
 | 2 생성 닫기 | 장수 생성 접수·엔진 재검사, 로비·생성 화면 문구 | PR 1 |
 | 3 NPC 플레이 | `general.possess` 접수·처리 조건, 로비 진입 | PR 1, T3-07 맡기 구현 |
 | 4 휴전 토글 | `admin.world.setTruce`, 휴전 읽기 지점을 유효 옵션으로, 「속성」 탭의 휴전 칸 | PR 1, T4-40 시계 구현 |
@@ -127,4 +130,4 @@ PR 1·2는 T3-07·T4-40을 기다리지 않는다.
 
 ### 검증
 
-규칙 단위 시험은 속성마다 성공과 거절을 본다. 형식3 월드에서 속성 변경을 섞은 기록을 내보내고 읽어 순수 재생한 상태와 DB에서 불러온 상태의 해시가 같아야 한다. 턴 간격은 변경 전후 월간 해시, 미접속 경계, 재시작 뒤 값을 본다. 엔진 통합 시험은 실행 중 간격 변경 뒤 다음 틱 시각, 정지 중 변경 뒤 재개, `clockRevision` 경쟁, 재시작 뒤 `runtimeOptions` 유지를 본다. 초기화는 이름·간격·규칙 옵션을 바꾼 월드 A의 초기화 성공과 새 월드 B가 생성 당시 설정으로 시작하는지, B의 첫 정산·재시작·재생 해시 일치, 이전 초기화 기록의 해시 검증, B 설정 변경 뒤 A 내보내기와 B 재초기화를 본다. 장수 생성 닫기와 NPC 플레이는 접수 거절과 엔진 거절을 둘 다 본다. 휴전은 실행 중 켜기·끄기, 휴전 시간대 안에서 켜기, 정지 중 바꾼 뒤 재개, 재시작 뒤 설정 유지와 30칸 예정 시각을 본다. 화면은 실제 Chromium으로 속성 탭과 로비 문구를 본다. `pnpm check`와 독립 리뷰를 거친다.
+규칙 단위 시험은 속성마다 성공과 거절을 본다. 형식3 월드에서 속성 변경을 섞은 기록을 내보내고 읽어 순수 재생한 상태와 DB에서 불러온 상태의 해시가 같아야 한다. 턴 간격은 변경 전후 월간 해시, 미접속 경계, 재시작 뒤 값을 본다. 엔진 통합 시험은 실행 중 간격 변경 뒤 다음 틱 시각, 정지 중 변경 뒤 재개, `clockRevision` 경쟁, 재시작 뒤 `runtimeOptions` 유지를 본다. 초기화는 이름·간격·종료 연도·규칙 옵션을 바꾼 월드 A의 초기화 성공, 종료 연도를 바꾼 A의 원본 내보내기·읽기·끝까지 재생, 새 월드 B가 생성 당시 설정으로 시작하는지, B의 첫 정산·재시작·재생 해시 일치, 이전 초기화 기록의 해시 검증, B 설정 변경 뒤 A 내보내기와 B 재초기화를 본다. 장수 생성 닫기와 NPC 플레이는 접수 거절과 엔진 거절을 둘 다 본다. 휴전은 실행 중 켜기·끄기, 휴전 시간대 안에서 켜기, 정지 중 바꾼 뒤 재개, 재시작 뒤 설정 유지와 30칸 예정 시각을 본다. 화면은 실제 Chromium으로 속성 탭과 로비 문구를 본다. `pnpm check`와 독립 리뷰를 거친다.
