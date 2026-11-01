@@ -251,7 +251,7 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
   const cities = await step(run, () =>
     db.city.findMany({ where: { worldId }, select: { cityKey: true }, orderBy: { cityKey: 'asc' } }),
   );
-  expect(cities).toHaveLength(154);
+  expect(cities).toHaveLength(155);
   const keys = cities.map((city) => String(city.cityKey)).sort();
   const replay = await step(run, () => db.$transaction((tx) => loadReplayState(tx, worldId)));
   expect(Object.keys(replay.state.cityResources!.cities).sort()).toEqual(keys);
@@ -268,7 +268,7 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
   expect(mapData.cities.map((city) => String(city.key)).sort()).toEqual(keys);
   const map = page.getByTestId('world-map');
   await step(run, () => expect(map).toBeVisible());
-  await step(run, () => expect(map.locator('g[data-city-key][data-anchor-key]')).toHaveCount(154));
+  await step(run, () => expect(map.locator('g[data-city-key][data-anchor-key]')).toHaveCount(155));
   expect(
     await step(run, () =>
       map
@@ -284,7 +284,7 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
     ),
   ).toEqual(keys);
   const anchors = page.getByRole('combobox', { name: '지도 거점', exact: true });
-  await step(run, () => expect(anchors.locator('option')).toHaveCount(155));
+  await step(run, () => expect(anchors.locator('option')).toHaveCount(156));
   expect(
     await step(run, () =>
       anchors.locator('option').evaluateAll((rows) =>
@@ -321,7 +321,7 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
 }
 
 for (const mode of modes) {
-  test(`AC-M3-04 AC-INT-04 ${mode.id}: 관리자 선택·실제 원생성·154개 빈 원장과 지도 연결`, async ({
+  test(`AC-M3-04 AC-INT-04 ${mode.id}: 관리자 선택·실제 원생성·155개 빈 원장과 지도 연결`, async ({
     page,
     legalStack,
   }) => {

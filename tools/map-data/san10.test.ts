@@ -28,13 +28,13 @@ const materials = {
   portraitMap: read('resources/portraits/191-map.json'),
 };
 
-it('D-045·D-049·D-052: 155표식·154전략 거점에 제안 45개와 섬 연결 2개를 포함한 202도로가 양방향 활성화된다', () => {
+it('D-045·D-049·D-052·D-055: 155표식이 모두 전략 거점이고 주변 제안 32개와 섬·파양 연결 4개를 포함한 191도로가 양방향 활성화된다', () => {
   expect(map).toEqual(read('resources/map/san10.json'));
   expect(map.sites).toHaveLength(155);
-  expect(map.sites.filter((site) => 'anchorKey' in site)).toHaveLength(154);
-  expect(map.routes).toHaveLength(202);
+  expect(map.sites.filter((site) => 'anchorKey' in site)).toHaveLength(155);
+  expect(map.routes).toHaveLength(191);
   expect(map.routes.every((route) => route.enabled && route.mode === 'LAND' && route.direction === 'BOTH')).toBe(true);
-  expect(new Set(map.routes.map((route) => [route.from, route.to].sort().join('/'))).size).toBe(202);
+  expect(new Set(map.routes.map((route) => [route.from, route.to].sort().join('/'))).size).toBe(191);
   for (const scenario of [historical, empty])
     expect(validateWorldResources({ ...materials, scenario }).status).toBe('pass');
   const byName = new Map(map.sites.map((site) => [site.name, site.id]));
@@ -53,17 +53,17 @@ it('D-045·D-049·D-052: 155표식·154전략 거점에 제안 45개와 섬 연�
   );
 });
 
-it('AC-INT-03: 두 정식 원생성의154거점 전체 경로와404방향 이동 사전검사가 연결된다', async () => {
+it('AC-INT-03: 두 정식 원생성의155거점 전체 경로와382방향 이동 사전검사가 연결된다', async () => {
   const resource = operationalMapSchema.parse(read('resources/map/san10.json'));
   const graph = compileOperationalGraph(resource);
   const byKey = new Map(graph.map((node) => [node.cityKey, node]));
   const ports = resource.sites.filter((site) => site.kind === 'PORT');
   const fields = resource.sites.filter((site) => site.kind === 'FIELD');
-  expect(graph).toHaveLength(154);
-  expect(byKey.size).toBe(154);
+  expect(graph).toHaveLength(155);
+  expect(byKey.size).toBe(155);
   // D-049: 물길이 없는 SAN10에는 항구 시설을 두지 않는다.
   expect(ports).toHaveLength(0);
-  expect(fields).toHaveLength(1);
+  expect(fields).toHaveLength(0);
   for (const marker of [...ports, ...fields]) {
     expect(marker).not.toHaveProperty('anchorKey');
     expect(graph.some((node) => node.siteId === marker.id)).toBe(false);
@@ -75,7 +75,7 @@ it('AC-INT-03: 두 정식 원생성의154거점 전체 경로와404방향 이동
     expect(byKey.has(parent.anchorKey)).toBe(true);
     return parent.anchorKey;
   });
-  expect(graph.reduce((sum, node) => sum + node.connections.length, 0)).toBe(404);
+  expect(graph.reduce((sum, node) => sum + node.connections.length, 0)).toBe(382);
   for (const node of graph) {
     expect(node.connections.length, `고립 거점 ${node.siteId}`).toBeGreaterThan(0);
     expect(new Set(node.connections).size).toBe(node.connections.length);
@@ -132,8 +132,8 @@ it('AC-INT-03: 두 정식 원생성의154거점 전체 경로와404방향 이동
     } finally {
       probe.cityKey = oldCityKey;
     }
-    expect(pairs).toBe(154 * 153);
-    expect(directedMoves).toBe(404);
+    expect(pairs).toBe(155 * 154);
+    expect(directedMoves).toBe(382);
     expect(hashState(state)).toBe(stateHash);
     expect(hashState(initial)).toBe(originHash);
   }
@@ -142,8 +142,8 @@ it('AC-INT-03: 두 정식 원생성의154거점 전체 경로와404방향 이동
 it('두 시나리오는 동일한 지리·도로를 쓰고 역사는21국491명, 공백지는180년 전원 재야다', async () => {
   const a = await loadInitialWorld({ map: 'san10', scenario: 'san10-191', seed: 'san10-deterministic' });
   const b = await loadInitialWorld({ map: 'san10', scenario: 'san10-empty', seed: 'san10-deterministic' });
-  expect([a.startYear, a.nations.length, a.generals.length, a.cities.length]).toEqual([191, 21, 491, 154]);
-  expect([b.startYear, b.nations.length, b.generals.length, b.cities.length]).toEqual([180, 0, 491, 154]);
+  expect([a.startYear, a.nations.length, a.generals.length, a.cities.length]).toEqual([191, 21, 491, 155]);
+  expect([b.startYear, b.nations.length, b.generals.length, b.cities.length]).toEqual([180, 0, 491, 155]);
   expect(b.diplomacies).toEqual([]);
   expect(b.cities.every((city) => city.nationId === null)).toBe(true);
   expect(b.generals.every((general) => general.nationId === null)).toBe(true);
@@ -242,7 +242,7 @@ it('역사491명의 ID·소속·5능력치·초상은 기존191정본과 같고 
   );
 });
 
-it.each(['san10-191', 'san10-empty'])('%s의 9기능 원생성은154거점 빈 원장 하나만 허용한다', async (scenario) => {
+it.each(['san10-191', 'san10-empty'])('%s의 9기능 원생성은155거점 빈 원장 하나만 허용한다', async (scenario) => {
   const initial = await loadInitialWorld({ map: 'san10', scenario, seed: 'san10-ledger' });
   const features = [
     'campaign-assignment-v2',
@@ -260,7 +260,7 @@ it.each(['san10-191', 'san10-empty'])('%s의 9기능 원생성은154거점 빈 �
     state = toWorldState(initial),
     ledger = emptyCityResourcesState(state);
   expect(Object.keys(ledger.cities).sort()).toEqual(initial.cities.map((city) => String(city.cityKey)).sort());
-  expect(Object.values(ledger.cities)).toHaveLength(154);
+  expect(Object.values(ledger.cities)).toHaveLength(155);
   expect(
     Object.values(ledger.cities).every((city) => city.gold === 0 && city.rice === 0 && city.garrison.length === 0),
   ).toBe(true);

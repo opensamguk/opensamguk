@@ -248,7 +248,7 @@ async function san10RequestFixture(scenario: 'san10-191' | 'san10-empty') {
 }
 
 it.each(['san10-191', 'san10-empty'] as const)(
-  'AC-INT-18D %s의 생략된 기본 자원도 DONE 출처와154빈원장을 보존해 초기화한다',
+  'AC-INT-18D %s의 생략된 기본 자원도 DONE 출처와155빈원장을 보존해 초기화한다',
   async (scenario) => {
     const { f, san10Features } = await san10RequestFixture(scenario),
       before = structuredClone({ world: f.world, requests: f.requests, rows: f.rows });
@@ -262,12 +262,12 @@ it.each(['san10-191', 'san10-empty'] as const)(
     expect(origin.initial.nations).toHaveLength(scenario === 'san10-empty' ? 0 : 21);
     expect(origin.initial.generals).toHaveLength(491);
     expect(origin.initial.generals.every((general) => general.userId === null)).toBe(true);
-    expect(origin.initial.cities).toHaveLength(154);
+    expect(origin.initial.cities).toHaveLength(155);
     expect(saved.world.ruleFeatures).toEqual(san10Features);
     const ledger = saved.world.cityResourcesState as {
       cities: Record<string, { gold: number; rice: number; garrison: unknown[] }>;
     };
-    expect(Object.keys(ledger.cities)).toHaveLength(154);
+    expect(Object.keys(ledger.cities)).toHaveLength(155);
     expect(
       Object.values(ledger.cities).every((city) => city.gold === 0 && city.rice === 0 && city.garrison.length === 0),
     ).toBe(true);

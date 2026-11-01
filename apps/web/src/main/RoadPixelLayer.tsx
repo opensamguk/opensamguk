@@ -15,13 +15,16 @@ export function RoadPixelLayer({
   map,
   modes,
   skip,
+  walks,
 }: {
   map: Pick<PublicGeography, 'sites' | 'routes'>;
   modes?: readonly RoadMode[] | undefined;
   // 물길로 따로 그리는 경로 id.
   skip?: ReadonlySet<string> | undefined;
+  // 경로별 칸 길(roadWalks). 있으면 확대 타일과 같은 길로 그린다.
+  walks?: ReadonlyMap<string, readonly { x: number; y: number }[]> | undefined;
 }) {
-  const all = useMemo(() => roadLayer(map, skip), [map, skip]);
+  const all = useMemo(() => roadLayer(map, skip, ROAD_CELL, walks), [map, skip, walks]);
   const layers = modes ? all.filter((layer) => modes.includes(layer.mode)) : all;
   return (
     <g aria-hidden="true" pointerEvents="none" shapeRendering="crispEdges" data-testid="road-pixels">
