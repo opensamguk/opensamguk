@@ -133,6 +133,8 @@ INT-20 generated pixel art and pixel basemap
 
 Files: apps/web/src/art/** and apps/web/src/main/pixel-basemap.png
 The art was generated for this project with Codex built-in image generation from text prompts only
-(no reference or input images) and reduced by tools/pixel-assets/build.py. Prompts and source hashes:
+(no reference or input images) and reduced by tools/pixel-assets/build.py. The pass wall markers
+(apps/web/src/art/map/pass-wall*.png) are crops of the generated pass marker made by
+tools/pixel-assets/build-pass-walls.py. Prompts and source hashes:
 apps/web/src/art/sources.json. The basemap is rendered from Natural Earth (public domain) by
 tools/map-data/build-pixel-basemap.py; inputs and hashes: apps/web/src/main/pixel-basemap.json.

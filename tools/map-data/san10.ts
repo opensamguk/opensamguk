@@ -38,8 +38,58 @@ const SINO_KOREAN_NAMES: Record<string, string> = {
   사누키: '파리국', // 巴利國
 };
 
+// D-052: 한반도·왜는 이(4)를 쓰지 않고 대·중·소로 나눈다. 호수는 『三國志』 卷30 東夷傳,
+// 낙랑은 『後漢書』 郡國志다. 사용자 결정(2026-11-01)으로 한반도·왜의 나라는 가장 작아도 소(5)이고,
+// 호수가 없거나 작은 나라·바다 교역 섬도 소다. 한 縣인 서안평과 한반도·왜 밖의 이주는 이 바닥에서 뺀다.
+const EAST_ASIA_LEVELS: Record<string, number> = {
+  S149: 7, // 부여 「戶八萬」
+  S133: 7, // 야마타이국 「可七萬餘戶」, 여왕 도읍
+  S082: 6, // 낙랑 「十八城，户六万一千四百…」
+  S140: 6, // 국내성 고구려 「戶三萬」, 도읍(丸都)
+  S134: 6, // 투마국 「可五萬餘户」
+  S145: 6, // 목지국 「辰王治月支國」, 마한 「總十餘萬戶」
+  S131: 5, // 노국 「有二萬餘户」
+  S142: 5, // 화려 예 「戶二萬」의 대표 거점
+  S127: 5, // 대마국 「有千餘戶…乘船南北市糴」
+  S128: 5, // 일지국 「有三千許家…亦南北市糴」
+  S129: 5, // 말로국 「有四千餘戶」
+  S130: 5, // 이도국
+  S132: 5, // 불미국
+  S135: 5, // 지유국
+  S136: 5, // 이사국
+  S137: 5, // 파리국
+  S139: 5, // 졸본
+  S141: 5, // 부조
+  S143: 5, // 불이
+  S144: 5, // 백제국
+  S146: 5, // 건마국
+  S147: 5, // 사로국
+  S148: 5, // 구야국
+  S150: 5, // 읍루
+  S151: 5, // 북옥저
+  S152: 5, // 주호 「乘船往來，巿買韓中」
+  S153: 1, // 이주
+};
+// D-052: 사료의 섬 두 곳을 더한다. 좌표는 위경도를 지도 공식((경도-94)·700/27, (54.0286-위도)·700/27)으로 옮겼다.
+// 주호는 『三國志』 卷30 「州胡在馬韓之西海中大島上」(제주도로 비정), 이주는 卷47 吳主傳 「浮海求夷洲」
+// (대만 비정은 학설이다). 연결은 권역을 잇는 게임 연결이며 고대 항로 판독이 아니다.
+const EXTRA_SITES: DraftSite[] = [
+  { id: 'S152', name: '주호', role: 'DOCUMENTED_POLITY', strategic: true, position: { x: 844, y: 535 } },
+  { id: 'S153', name: '이주', role: 'DOCUMENTED_POLITY', strategic: true, position: { x: 690, y: 781 } },
+];
+// D-052: 초안의 게임 배치가 치소와 멀어 강 기슭이 뒤집히던 거점을 치소 위경도로 옮긴다.
+// 하동은 河東郡 치소 安邑(지금 夏縣 서북 禹王城, 약 북위 35.13·동경 111.20)이고 黃河 북안이다.
+const POSITION_OVERRIDES: Record<string, { x: number; y: number }> = {
+  S089: { x: 446, y: 490 },
+};
+const EXTRA_CONNECTIONS: Edge[] = [
+  { id: 'EA46', from: 'S146', to: 'S152', mode: 'WATER' }, // 건마국-주호
+  { id: 'EA47', from: 'S035', to: 'S153', mode: 'WATER' }, // 건안-이주
+];
+
 const LEVEL_UNITS = [5, 6, 4, 6, 6, 7, 8, 9, 11, 13];
-const FACILITY_UNITS = { PASS: 6, PORT: 6, FIELD: 3.5 } as const;
+// D-052: 관은 12단위 긴 성벽 띠라 띄울 때는 긴 변으로 잰다.
+const FACILITY_UNITS = { PASS: 12, PORT: 6, FIELD: 3.5 } as const;
 const SPREAD_GAP = 4;
 const SPREAD_LIMIT = 12;
 
@@ -90,10 +140,13 @@ export function buildSan10Map(gisHash: string): OperationalMapResource {
   const inheritedOf = (site: Draft['sites'][number]) =>
     old.sites.find((row) => draft.operationalSiteAliases[row.id] === site.id);
   // D-049: SAN10에는 물길이 없어 항구 시설은 지도 자료에서 뺀다. 전장 표식은 남긴다.
-  const kept = draft.sites.filter((site) => site.strategic || inheritedOf(site)?.kind !== 'PORT');
+  const kept = [...draft.sites.filter((site) => site.strategic || inheritedOf(site)?.kind !== 'PORT'), ...EXTRA_SITES];
   const sites: OperationalMapResource['sites'] = kept.map((site) => {
     const inherited = inheritedOf(site);
-    const common = { name: SINO_KOREAN_NAMES[site.name] ?? site.name, position: { ...site.position } };
+    const common = {
+      name: SINO_KOREAN_NAMES[site.name] ?? site.name,
+      position: { ...(POSITION_OVERRIDES[site.id] ?? site.position) },
+    };
     if (!site.strategic) {
       if (!inherited || (inherited.kind !== 'PORT' && inherited.kind !== 'FIELD'))
         throw Error(`시설 대응 없음: ${site.id}`);
@@ -108,8 +161,9 @@ export function buildSan10Map(gisHash: string): OperationalMapResource {
       if (inherited?.kind !== 'PASS') throw Error(`관문 대응 없음: ${site.name}`);
       return { ...inherited, ...common, id };
     }
-    if (inherited?.kind === 'CITY') return { ...inherited, ...common, id, level: site.level ?? inherited.level };
-    const level = site.level ?? 2;
+    if (inherited?.kind === 'CITY')
+      return { ...inherited, ...common, id, level: EAST_ASIA_LEVELS[site.id] ?? site.level ?? inherited.level };
+    const level = EAST_ASIA_LEVELS[site.id] ?? site.level ?? 2;
     return {
       ...common,
       id,
@@ -136,7 +190,7 @@ export function buildSan10Map(gisHash: string): OperationalMapResource {
     };
   });
   spreadSites(sites);
-  const routes = [...draft.connections, ...draft.proposedConnections].map((edge) => ({
+  const routes = [...draft.connections, ...draft.proposedConnections, ...EXTRA_CONNECTIONS].map((edge) => ({
     id: edge.id.startsWith('route:') ? edge.id : `route:san10-${edge.id.toLowerCase().replaceAll('.', '-')}`,
     from: ids.get(edge.from)!,
     to: ids.get(edge.to)!,

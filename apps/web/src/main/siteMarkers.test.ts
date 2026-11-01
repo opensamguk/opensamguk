@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { levelName, markerArt, markerDetail, markerUnits, passAxis } from './siteMarkers';
+import { levelName, markerArt, markerBox, markerDetail, markerGates, markerUnits, passAxis } from './siteMarkers';
 
 it('AC-INT-20 규모마다 지도 위 크기가 다르고 경이 가장 크다', () => {
   const units = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((level) => markerUnits('CITY', level));
@@ -26,13 +26,13 @@ it('AC-INT-20 규모·시설·폐허·관문 방향에 맞는 그림을 고른�
   expect(markerArt('CITY', 0).name).toBe('level-0');
   expect(markerArt('CITY', 1).name).toBe('port');
   expect(markerArt('CITY', 2).name).toBe('field');
-  expect(markerArt('CITY', 3, { axis: 'ew' }).name).toBe('pass-ew');
+  expect(markerArt('CITY', 3, { axis: 'ew' }).name).toBe('pass-wall-ew');
   expect(markerArt('CITY', 4).name).toBe('level-4');
   expect(markerArt('CITY', 9).name).toBe('level-9');
   expect(markerArt('CITY', undefined).name).toBe('level-5');
   expect(markerArt('CITY', 8, { ruined: true }).name).toBe('ruin');
-  expect(markerArt('PASS', undefined).name).toBe('pass');
-  expect(markerArt('PASS', undefined, { axis: 'ew' }).name).toBe('pass-ew');
+  expect(markerArt('PASS', undefined).name).toBe('pass-wall');
+  expect(markerArt('PASS', undefined, { axis: 'ew' }).name).toBe('pass-wall-ew');
   expect(markerArt('PORT').name).toBe('port');
   for (const level of [0, 4, 5, 6, 7, 8, 9]) {
     const chosen = markerArt('CITY', level);
@@ -56,4 +56,20 @@ it('AC-INT-20 관문은 도로가 남북으로 지나면 남북판, 동서로 �
   ).toBe('ew');
   expect(passAxis(at, [])).toBe('ns');
   expect(passAxis(at, [at])).toBe('ns');
+});
+
+it('D-052 관은 길 방향에 따라 가로·세로 긴 성벽이고 길 방향 두 문만 쓴다', () => {
+  expect(markerBox('PASS', undefined, 'ns')).toEqual({ width: 12, height: 3 });
+  expect(markerBox('PASS', undefined, 'ew')).toEqual({ width: 3, height: 12 });
+  expect(markerBox('CITY', 7)).toEqual({ width: 9, height: 9 });
+  expect(markerGates('PASS', undefined, 'ns')).toEqual(['N', 'S']);
+  expect(markerGates('PASS', undefined, 'ew')).toEqual(['E', 'W']);
+});
+
+it('D-052 도시 그림에 실제로 있는 문만 길에 쓴다', () => {
+  expect([1, 2, 5].map((level) => markerGates('CITY', level))).toEqual([['S'], ['S'], ['S']]);
+  expect(markerGates('CITY', 6)).toEqual(['N', 'S']);
+  expect([7, 8, 9].map((level) => markerGates('CITY', level))).toEqual(Array(3).fill(['N', 'E', 'S', 'W']));
+  // 담이 없는 무·이는 어느 쪽이든 된다.
+  expect([0, 4].map((level) => markerGates('CITY', level))).toEqual([undefined, undefined]);
 });

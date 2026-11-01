@@ -12,6 +12,7 @@ import {
   terrainPaths,
   visibleCells,
   type View,
+  type SiteGate,
 } from './terrainTiles';
 
 export type TerrainGrid = { cells: Int8Array; columns: number; rows: number };
@@ -79,7 +80,7 @@ export function TerrainTileLayer({
   map: Pick<PublicGeography, 'sites' | 'routes'>;
   skip: ReadonlySet<string>;
   // 거점 중심에서 문 칸까지의 칸 수.
-  gateCells: (siteId: string) => number;
+  gateCells: (siteId: string) => SiteGate;
   view: View;
   idPrefix: string;
 }) {

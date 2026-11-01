@@ -1,0 +1,725 @@
+{
+ "note": "강가 거점이 놓인 기슭(거점 좌표와 실제 강 중심선 기준). 생성 결과다.",
+ "banks": [
+  {
+   "site": "서평",
+   "bank": "북안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "천수",
+   "bank": "남안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "안정",
+   "bank": "북안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "무도",
+   "bank": "서안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "한중",
+   "bank": "북안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "장안",
+   "bank": "남안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "장안",
+   "bank": "남안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "강주",
+   "bank": "북안",
+   "major": true,
+   "source": "사료"
+  },
+  {
+   "site": "강주",
+   "bank": "북안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "영안",
+   "bank": "북안",
+   "major": true,
+   "source": "사료"
+  },
+  {
+   "site": "계",
+   "bank": "동안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "북평",
+   "bank": "동안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "평원",
+   "bank": "북안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "업",
+   "bank": "남안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "복양",
+   "bank": "북안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "하내",
+   "bank": "남안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "하내",
+   "bank": "북안",
+   "major": true,
+   "source": "사료"
+  },
+  {
+   "site": "낙양",
+   "bank": "남안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "진류",
+   "bank": "서안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "진류",
+   "bank": "남안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "수춘",
+   "bank": "남안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "수춘",
+   "bank": "동안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "여강",
+   "bank": "서안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "건업",
+   "bank": "동안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "오",
+   "bank": "북안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "시상",
+   "bank": "남안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "시상",
+   "bank": "남안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "시상",
+   "bank": "서안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "시상",
+   "bank": "북안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "양양",
+   "bank": "남안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "강릉",
+   "bank": "북안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "강릉",
+   "bank": "서안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "강하",
+   "bank": "서안",
+   "major": true,
+   "source": "사료"
+  },
+  {
+   "site": "강하",
+   "bank": "서안",
+   "major": true,
+   "source": "사료"
+  },
+  {
+   "site": "강하",
+   "bank": "북안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "무릉",
+   "bank": "북안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "무릉",
+   "bank": "북안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "장사",
+   "bank": "동안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "영릉",
+   "bank": "동안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "남해",
+   "bank": "북안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "남해",
+   "bank": "동안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "남해",
+   "bank": "동안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "남해",
+   "bank": "북안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "남해",
+   "bank": "북안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "남해",
+   "bank": "북안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "건녕",
+   "bank": "동안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "운남",
+   "bank": "동안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "영창",
+   "bank": "동안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "영창",
+   "bank": "서안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "교지",
+   "bank": "동안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "검각",
+   "bank": "서안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "양평관",
+   "bank": "북안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "동관",
+   "bank": "남안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "동관",
+   "bank": "남안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "동관",
+   "bank": "남안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "함곡관",
+   "bank": "동안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "함곡관",
+   "bank": "동안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "함곡관",
+   "bank": "북안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "호로관",
+   "bank": "남안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "호로관",
+   "bank": "남안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "남안",
+   "bank": "북안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "진창",
+   "bank": "북안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "오장원",
+   "bank": "남안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "화산",
+   "bank": "서안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "화산",
+   "bank": "남안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "화산",
+   "bank": "서안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "서성",
+   "bank": "북안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "강양",
+   "bank": "북안",
+   "major": true,
+   "source": "사료"
+  },
+  {
+   "site": "임강",
+   "bank": "북안",
+   "major": true,
+   "source": "사료"
+  },
+  {
+   "site": "노수",
+   "bank": "동안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "애뢰",
+   "bank": "동안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "사룡",
+   "bank": "서안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "구원",
+   "bank": "북안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "백랑산",
+   "bank": "북안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "계교",
+   "bank": "북안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "임치",
+   "bank": "남안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "태산",
+   "bank": "남안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "하동",
+   "bank": "북안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "백마",
+   "bank": "북안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "정도",
+   "bank": "남안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "관도",
+   "bank": "남안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "숭산",
+   "bank": "남안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "의양",
+   "bank": "남안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "번성",
+   "bank": "북안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "석정",
+   "bank": "서안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "유수구",
+   "bank": "북안",
+   "major": true,
+   "source": "사료"
+  },
+  {
+   "site": "유수구",
+   "bank": "북안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "장판",
+   "bank": "북안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "이릉",
+   "bank": "북안",
+   "major": true,
+   "source": "사료"
+  },
+  {
+   "site": "화용",
+   "bank": "북안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "화용",
+   "bank": "동안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "화용",
+   "bank": "남안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "서새산",
+   "bank": "남안",
+   "major": true,
+   "source": "사료"
+  },
+  {
+   "site": "적벽",
+   "bank": "남안",
+   "major": true,
+   "source": "사료"
+  },
+  {
+   "site": "공안",
+   "bank": "남안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "심양",
+   "bank": "북안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "심양",
+   "bank": "북안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "심양",
+   "bank": "북안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "남창",
+   "bank": "동안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "광릉",
+   "bank": "북안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "광릉",
+   "bank": "서안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "광릉",
+   "bank": "북안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "경구",
+   "bank": "남안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "경구",
+   "bank": "남안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "경구",
+   "bank": "서안",
+   "major": true,
+   "source": "좌표"
+  },
+  {
+   "site": "부춘",
+   "bank": "북안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "형산",
+   "bank": "서안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "곡강",
+   "bank": "동안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "창오",
+   "bank": "북안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "창오",
+   "bank": "북안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "남만",
+   "bank": "동안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "서안평",
+   "bank": "북안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "국내성",
+   "bank": "북안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "백제국",
+   "bank": "남안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "백제국",
+   "bank": "남안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "구야국",
+   "bank": "서안",
+   "major": false,
+   "source": "좌표"
+  },
+  {
+   "site": "부여",
+   "bank": "동안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "부여",
+   "bank": "동안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "부여",
+   "bank": "동안",
+   "major": false,
+   "source": "사료"
+  },
+  {
+   "site": "홍농",
+   "bank": "남안",
+   "major": true,
+   "source": "좌표"
+  }
+ ]
+}
