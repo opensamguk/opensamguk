@@ -26,11 +26,13 @@ type Whoami = 'admin' | 'forbidden' | 'offline';
 // 일반 화면 운영 입구 (INT-20, AC-INT-20). 실제 서버 권한 검사는 e2e/admin-read.spec.ts에서 본다.
 async function mount(user: string | null, whoami: Whoami) {
   const calls: string[] = [];
+  const unbatched: string[] = [];
   const link: TRPCLink<AppRouter> =
     () =>
     ({ op }) =>
       observable((observer) => {
         calls.push(op.path);
+        if (op.context.skipBatch === true) unbatched.push(op.path);
         const reply = (data: unknown) => {
           observer.next({ result: { type: 'data', data } });
           observer.complete();
@@ -71,16 +73,18 @@ async function mount(user: string | null, whoami: Whoami) {
     </QueryClientProvider>,
   );
   await screen.findByText('내 계정');
-  return { calls, client };
+  return { calls, unbatched, client };
 }
 
 describe('운영 입구', () => {
   it('관리자에게는 /admin으로 가는 운영 링크를 접근성 이름과 함께 보인다', async () => {
-    await mount('10000000-0000-4000-8000-000000000001', 'admin');
+    const { unbatched } = await mount('10000000-0000-4000-8000-000000000001', 'admin');
     const entry = await screen.findByRole('link', { name: '운영 화면' });
     expect(entry.getAttribute('href')).toBe('/admin');
     expect(entry.textContent).toBe('운영');
     expect(entry.className).toBe('account');
+    // 화면 요청의 취소를 막지 않게 관리자 확인만 묶지 않고 보낸다.
+    expect(unbatched).toEqual(['admin.whoami']);
   });
 
   it('관리자가 아니면 링크도 빈 자리도 그리지 않고 다시 묻지 않는다', async () => {
