@@ -16,7 +16,7 @@ import { hashState } from '../packages/shared/src/node/hashState';
 import type { WorldMap } from '../apps/web/src/game/types';
 
 // AC-INT-02/03/04/10: 새 지도 두 모드의 공개 dist·실제 PG·입력·월 정산·재생이다.
-// 기존 61거점/132개월 인수는 이 152거점 판의 기수 완료로 세지 않는다.
+// 기존 61거점/132개월 인수는 이 154거점 판의 기수 완료로 세지 않는다.
 const features = [
   'campaign-assignment-v2',
   'campaign-v1',
@@ -169,9 +169,9 @@ async function verifyMode(stack: LegalStack, page: Page, info: TestInfo, run: Ru
     expect(await step(run, () => db.gameResource.findUniqueOrThrow({ where: { id: row.id } }))).toEqual(row);
   const selection = { map: 'san10', scenario, seed: `san10-e2e-${scenario}` };
   const initial = await step(run, () => loadInitialWorldFromDb(db, selection));
-  expect(initial.cities).toHaveLength(152);
-  expect(initial.operationalMap!.sites).toHaveLength(153);
-  expect(initial.operationalMap!.routes).toHaveLength(200);
+  expect(initial.cities).toHaveLength(154);
+  expect(initial.operationalMap!.sites).toHaveLength(155);
+  expect(initial.operationalMap!.routes).toHaveLength(202);
   expect([initial.startYear, initial.nations.length, initial.generals.length]).toEqual(
     scenario === 'san10-empty' ? [180, 0, 491] : [191, 21, 491],
   );
@@ -194,7 +194,7 @@ async function verifyMode(stack: LegalStack, page: Page, info: TestInfo, run: Ru
   expect(Object.keys(before.state.cityResources!.cities).sort()).toEqual(
     initial.cities.map((row) => String(row.cityKey)).sort(),
   );
-  expect(Object.values(before.state.cityResources!.cities)).toHaveLength(152);
+  expect(Object.values(before.state.cityResources!.cities)).toHaveLength(154);
   for (const ledger of Object.values(before.state.cityResources!.cities))
     expect(ledger).toEqual({ gold: 0, rice: 0, garrison: [] });
   expect((await step(run, () => readWorldState(db, worldId))).operationalMap).toEqual(initial.operationalMap);
@@ -254,18 +254,18 @@ async function verifyMode(stack: LegalStack, page: Page, info: TestInfo, run: Ru
   );
   expect(months).toEqual([{ tick: 10_000, stateHash: snapshot.stateHash }]);
   const data = await step(run, () => api<WorldMap>(run, page, stack, 'world.map', { worldId }));
-  expect(data.cities).toHaveLength(152);
-  expect(data.operationalMap!.sites).toHaveLength(153);
-  expect(data.operationalMap!.routes).toHaveLength(200);
+  expect(data.cities).toHaveLength(154);
+  expect(data.operationalMap!.sites).toHaveLength(155);
+  expect(data.operationalMap!.routes).toHaveLength(202);
   expect(data.operationalMap!.routes.every((route) => route.enabled && route.mode === 'LAND')).toBe(true);
   expect(JSON.stringify(data.operationalMap)).not.toMatch(/"(?:population|initial|max|crew|gold|rice|generals)"/);
   await step(run, () => page.goto(`${stack.origin}/w/${worldId}/map`));
   const map = page.getByTestId('world-map');
   await step(run, () => expect(map).toBeVisible());
   await step(run, () => expect(page.getByRole('alert')).toHaveCount(0));
-  // D-049: 항구 시설을 뺀 153표식을 모두 그린다.
-  await step(run, () => expect(map.locator('[data-site-kind]')).toHaveCount(153));
-  await step(run, () => expect(map.locator('[data-route-mode="LAND"]')).toHaveCount(200));
+  // D-049: 항구 시설을 뺀 155표식(D-052 섬 2곳 포함)을 모두 그린다.
+  await step(run, () => expect(map.locator('[data-site-kind]')).toHaveCount(155));
+  await step(run, () => expect(map.locator('[data-route-mode="LAND"]')).toHaveCount(202));
   const overview = await step(run, () => map.getAttribute('viewBox'));
   const [x, y, w, h] = overview!.split(' ').map(Number);
   for (const site of data.operationalMap!.sites) {
@@ -276,7 +276,7 @@ async function verifyMode(stack: LegalStack, page: Page, info: TestInfo, run: Ru
   }
   await step(run, () => page.setViewportSize({ width: 375, height: 812 }));
   const selector = page.getByRole('combobox', { name: '지도 거점' });
-  await step(run, () => expect(selector.locator('option')).toHaveCount(153));
+  await step(run, () => expect(selector.locator('option')).toHaveCount(155));
   const yamatai = data.cities.find((city) => city.name === '야마타이국')!;
   await step(run, () => selector.selectOption(String(yamatai.key)));
   await step(run, () => expect(map).toHaveAttribute('viewBox', overview!));
@@ -293,7 +293,7 @@ async function verifyMode(stack: LegalStack, page: Page, info: TestInfo, run: Ru
 }
 
 for (const scenario of ['san10-191', 'san10-empty']) {
-  test(`D-045 ${scenario}: 실제 PG·공개 dist·152도시 원장·월 정산·재생·153표식과 200도로`, async ({
+  test(`D-045 ${scenario}: 실제 PG·공개 dist·154도시 원장·월 정산·재생·155표식과 202도로`, async ({
     legalStack,
     page,
   }, info) => {

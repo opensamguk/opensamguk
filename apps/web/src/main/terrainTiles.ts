@@ -1,6 +1,7 @@
 import type { PublicGeography } from '@opensamguk/shared';
 import { palette } from './pixel-basemap.json';
 import { ROAD_CELL, routePoints, routeSiteIds } from './roadPixels';
+import type { GateDir } from './siteMarkers';
 
 // 확대 지형 타일 (INT-20, D-047). 도트 바탕의 한 픽셀(2단위 칸)이 화면에서 충분히 커지면
 // 그 칸의 지형 종류에 맞는 타일 그림으로 바꿔 그린다. 길은 칸끼리 상하좌우로 이은 연결 모양 타일이다.
@@ -109,13 +110,48 @@ export function walk(points: readonly Point[], cell = ROAD_CELL): Point[] {
   return out;
 }
 
-// 거점 문 (INT-20). 길은 거점 표식의 동서남북 문으로만 드나든다. 상대 점 쪽으로 더 많이 벌어진 축의 문을 쓰고,
-// 문 칸에서 바깥으로 한 칸 곧게 나간 뒤 다음 점으로 잇는다. 거점 안쪽 칸은 표식에 가려진다.
+// 거점 문 (INT-20, D-052). 길은 거점 표식의 문으로만 드나든다. 문이 정해진 표식은 그 가운데 상대 점 쪽을 가장
+// 많이 향한 문을, 담이 없는 표식은 상대 점 쪽으로 더 벌어진 축의 문을 쓴다. 문 칸에서 바깥으로 한 칸 곧게 나간다.
+// 거점 안쪽 칸은 표식에 가려진다.
 type Gate = { dx: number; dy: number };
+export type SiteGate = number | { cells: number; allowed?: readonly GateDir[] | undefined };
+const DIRECTIONS: Record<GateDir, Gate> = {
+  N: { dx: 0, dy: -1 },
+  E: { dx: 1, dy: 0 },
+  S: { dx: 0, dy: 1 },
+  W: { dx: -1, dy: 0 },
+};
 const gateToward = (from: Point, to: Point): Gate =>
   Math.abs(to.x - from.x) >= Math.abs(to.y - from.y)
     ? { dx: Math.sign(to.x - from.x) || 1, dy: 0 }
     : { dx: 0, dy: Math.sign(to.y - from.y) };
+function chooseGate(from: Point, to: Point, allowed: readonly GateDir[] | undefined): Gate {
+  if (!allowed?.length) return gateToward(from, to);
+  let best = DIRECTIONS[allowed[0]!];
+  let score = -Infinity;
+  for (const name of allowed) {
+    const gate = DIRECTIONS[name];
+    const value = gate.dx * (to.x - from.x) + gate.dy * (to.y - from.y);
+    if (value > score) [best, score] = [gate, value];
+  }
+  return best;
+}
+const facing = (gate: Gate, from: Point, to: Point) => gate.dx * (to.x - from.x) + gate.dy * (to.y - from.y) > 0;
+const gateOf = (value: SiteGate) => (typeof value === 'number' ? { cells: value, allowed: undefined } : value);
+// 상대 쪽을 향하지 않는 문으로 나가면 문 밖에서 표식 옆으로 비켜선 뒤 상대 쪽으로 꺾는다. 그래야 길이 표식을 가로지르지 않는다.
+function leaveBy(center: Point, gate: Gate, cells: number, target: Point): { path: Point[]; heading: Gate } {
+  const path = spur(center, gate, cells + 1);
+  if (facing(gate, center, target)) return { path, heading: gate };
+  const end = path.at(-1)!;
+  const side = gate.dy
+    ? { dx: Math.sign(target.x - center.x) || 1, dy: 0 }
+    : { dx: 0, dy: Math.sign(target.y - center.y) || 1 };
+  for (let step = 1; step <= cells + 2; step += 1) path.push({ x: end.x + side.dx * step, y: end.y + side.dy * step });
+  const back = gate.dy
+    ? { dx: 0, dy: Math.sign(target.y - path.at(-1)!.y) || -gate.dy }
+    : { dx: Math.sign(target.x - path.at(-1)!.x) || -gate.dx, dy: 0 };
+  return { path, heading: back };
+}
 const spur = (center: Point, gate: Gate, length: number) =>
   Array.from({ length: length + 1 }, (_, step) => ({ x: center.x + gate.dx * step, y: center.y + gate.dy * step }));
 
@@ -143,18 +179,20 @@ function straightRuns(from: Point, leave: Gate, to: Point, enter: Gate): Point[]
   return out;
 }
 
-// gateCells: 거점 중심에서 문 칸까지의 칸 수(표식 반지름). 0이면 문 없이 중심끼리 잇는다.
-export function gatedWalk(points: readonly Point[], gateCells: readonly number[], cell = ROAD_CELL): Point[] {
+// gates: 거점마다 중심에서 문 칸까지의 칸 수(표식 반지름)와 쓸 수 있는 문. 0이면 문 없이 중심끼리 잇는다.
+export function gatedWalk(points: readonly Point[], gates: readonly SiteGate[], cell = ROAD_CELL): Point[] {
   const centers = points.map((point) => ({ x: Math.floor(point.x / cell), y: Math.floor(point.y / cell) }));
   const out: Point[] = [];
   for (let index = 1; index < centers.length; index += 1) {
     const from = centers[index - 1]!;
     const to = centers[index]!;
-    const leave = gateToward(from, to);
-    const enter = gateToward(to, from);
-    const outbound = spur(from, leave, gateCells[index - 1]! + 1);
-    const inbound = spur(to, enter, gateCells[index]! + 1).reverse();
-    const middle = straightRuns(outbound.at(-1)!, leave, inbound[0]!, enter);
+    const a = gateOf(gates[index - 1]!);
+    const b = gateOf(gates[index]!);
+    const leaving = leaveBy(from, chooseGate(from, to, a.allowed), a.cells, to);
+    const entering = leaveBy(to, chooseGate(to, from, b.allowed), b.cells, from);
+    const outbound = leaving.path;
+    const inbound = [...entering.path].reverse();
+    const middle = straightRuns(outbound.at(-1)!, leaving.heading, inbound[0]!, entering.heading);
     for (const part of [outbound, middle, inbound])
       for (const point of part)
         if (!out.length || out.at(-1)!.x !== point.x || out.at(-1)!.y !== point.y) out.push(point);
@@ -166,7 +204,7 @@ export function gatedWalk(points: readonly Point[], gateCells: readonly number[]
 export function roadTiles(
   map: Pick<PublicGeography, 'sites' | 'routes'>,
   skip: ReadonlySet<string> = new Set(),
-  gateCells: (siteId: string) => number = () => 0,
+  gateCells: (siteId: string) => SiteGate = () => 0,
   cell = ROAD_CELL,
 ) {
   const siteById = new Map(map.sites.map((site) => [site.id, site]));

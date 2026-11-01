@@ -751,6 +751,30 @@
       "file": "apps/web/src/art/road/bridge-10.png",
       "sha256": "62c90936703fb9386effb207025ed5af6bc098b66feb506177a7b11a733b5975",
       "bytes": 144
+    },
+    {
+      "from": "markers/pass.png",
+      "file": "apps/web/src/art/map/pass-wall.png",
+      "sha256": "ac341e536c7f88f762ce64967b779c52b8a152ad8cb83e5187d059de55175cef",
+      "bytes": 660
+    },
+    {
+      "from": "markers/pass.png",
+      "file": "apps/web/src/art/map/pass-wall-ew.png",
+      "sha256": "7d8a4d17a226ff11ffdaa0d0902b3958c7176faed514e4f2b1e3ffcba1b0a18d",
+      "bytes": 671
+    },
+    {
+      "from": "markers/pass.png",
+      "file": "apps/web/src/art/map/pass-wall@128.png",
+      "sha256": "fb01a7b2a67613ed99ffbe356501da8310ba59476b0151be99133c8bc35a2148",
+      "bytes": 8422
+    },
+    {
+      "from": "markers/pass.png",
+      "file": "apps/web/src/art/map/pass-wall-ew@128.png",
+      "sha256": "9f8f3d3bd5f7fcc7c73f057139088e8b788a00167215d63adb23becd323f26c8",
+      "bytes": 8357
     }
   ]
 }

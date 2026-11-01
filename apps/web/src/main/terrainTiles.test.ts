@@ -6,6 +6,7 @@ import {
   SOUTH,
   TERRAINS,
   WEST,
+  gatedWalk,
   isWaterRoute,
   roadTiles,
   shadowPaths,
@@ -135,4 +136,34 @@ it('AC-INT-20 높은 산의 남쪽·동쪽 칸에 높이 차이만큼 그림자�
   ]);
   const view = { x: 0, y: 0, width: 4, height: 4 };
   expect(shadowPaths(g, view)).toEqual([{ step: 3, d: 'M2 0h2v2h-2zM0 2h2v2h-2z' }]);
+});
+
+it('D-052 남문만 있는 표식에서 북쪽 상대로 갈 때 남문으로 나가 옆으로 비켜 돌고 표식을 가로지르지 않는다', () => {
+  // 거점 중심 칸 (50,50), 표식 반지름 2칸, 남문만. 상대는 북쪽 (50,20).
+  const path = gatedWalk(
+    [
+      { x: 101, y: 101 },
+      { x: 101, y: 41 },
+    ],
+    [{ cells: 2, allowed: ['S'] }, 0],
+  );
+  expect(path.slice(1, 4)).toEqual([
+    { x: 50, y: 51 },
+    { x: 50, y: 52 },
+    { x: 50, y: 53 },
+  ]);
+  const inside = (point: { x: number; y: number }) => Math.abs(point.x - 50) <= 2 && Math.abs(point.y - 50) <= 2;
+  expect(path.slice(4).some(inside)).toBe(false);
+  expect(path.at(-1)).toEqual({ x: 50, y: 20 });
+});
+
+it('D-052 남북 관은 길 방향 문으로만 드나든다', () => {
+  const path = gatedWalk(
+    [
+      { x: 101, y: 101 },
+      { x: 141, y: 161 },
+    ],
+    [{ cells: 1, allowed: ['N', 'S'] }, 0],
+  );
+  expect(path[1]).toEqual({ x: 50, y: 51 });
 });
