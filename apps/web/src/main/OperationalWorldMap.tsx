@@ -514,7 +514,11 @@ export function OperationalWorldMap({
                 ...(route.mode === 'RIVER' && route.portIds ? [route.portIds[1]] : []),
                 route.to,
               ];
-              const points = ids.map((id) => siteById.get(id)?.position);
+              // 칸 길이 있는 경로는 일방통행 선·화살표도 그 길 칸 가운데를 따른다(D-055).
+              const walk = walks.get(route.id);
+              const points = walk
+                ? walk.map((cell) => ({ x: (cell.x + 0.5) * ROAD_CELL, y: (cell.y + 0.5) * ROAD_CELL }))
+                : ids.map((id) => siteById.get(id)?.position);
               if (points.some((point) => point === undefined)) return null;
               return (
                 <polyline
