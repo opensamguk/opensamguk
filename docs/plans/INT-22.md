@@ -153,7 +153,7 @@ SAN10 지도에서는 `region`을 191년 州 코드로 쓴다.
 | 7 | 荊州 | 15 | 東夷(한반도·왜) |
 | 8 | 揚州 | 16 | 이민족 거점 |
 
-남중은 『華陽國志』 南中志의 범위(건녕·운남·영창·월수·장가 쪽)다. 옹주는 興平 원년(194)에 생겨 191년 기준에서 쓰지 않는다. 거점별 값은 SAN10 지도 사료 검토 세션의 표(`191년 州·郡國` 열)로 채운다. 지도 정리 결정 D-054·D-055는 새 거점에 원작 8지역 번호를 먼저 준다. 이 작업의 자원 PR이 그 값을 위 州 코드로 바꾼다.
+남중은 『華陽國志』 南中志의 범위(건녕·운남·영창·월수·장가 쪽)다. 옹주는 興平 원년(194)에 생겨 191년 기준에서 쓰지 않는다. 거점별 값은 손으로 확인한 대응표 `resources/map-drafts/san10/provinces.json`(거점 id, 州 코드, 근거 인용)으로 정하고 자원 PR에서 만든다. SAN10 지도 사료 검토 표의 `191년 州·郡國` 열은 같은 이름을 기계적으로 처음 찾은 결과라 출발점으로만 쓴다. 지도 세션이 확인한 오매칭은 이렇다. 서평(실제 涼州 西平郡), 남안(涼州 南安郡), 북평(幽州 右北平郡), 영안(益州 巴郡 魚復), 안정·무도(涼州의 郡)는 다른 州의 같은 이름 縣이 잡혔다. 항산은 恒山 산지라 州를 따로 정한다. 낙양(司隸 河南尹)·천수(涼州 漢陽郡)·월수(남중)와 건안·건녕·흥고·의양·형산·임해·임하·공안·경구·석정·유수구·서새산·적벽·역경·계교·관도·숭산·화산·오장원·기산·가정·백랑산·노수는 郡國志에서 검출되지 않아 손으로 정한다. 파양은 揚州 豫章郡 鄱陽縣이다. 이주는 揚州 밖이라 동이(15)와 이민족(16) 가운데 고른다. 지도 정리 PR [#330](https://github.com/opensamguk/opensamguk/pull/330)은 region을 바꾸지 않고 이 작업에 넘겼다.
 
 region 범위는 1~8에서 1~16으로 넓힌다. 고칠 곳은 운영 지도 스키마(`world/map/operational.ts:25`, `:34`), 검증 경고(`world/validate/map.ts:42`), 자원 편집기 검증(`world/resourceEditor/validate/map.ts:46`, 문구 `issues.ts:28`), 개발 편집기의 범위 상수(`apps/web/src/mapEditor/validate.ts:30` `REGION_RANGE`)와 진단 문구다. 기존 지도의 값은 모두 1~8이라 결과가 같다. 개발 편집기는 지금 v3 운영 지도를 받지 않으며 이 작업에서도 그대로 둔다. SAN10 편집 왕복은 지원 범위 밖이다. 범위 상수만 바꾸고 v3 거부와 기존 v2 왕복 시험이 그대로인지 확인한다.
 
@@ -244,7 +244,7 @@ region 숫자의 뜻은 지도 내용에 적는다. 운영 지도 최상위에 �
 
 바꿀 곳은 다섯이다.
 
-- 지도 생성기: `tools/map-data/san10.ts`가 거점마다 州 코드를 region에 넣고 최상위 `regionScheme: "province-191"`을 쓴다. 값의 원천은 지도 사료 검토 표의 州 열이며 표에 없는 거점이 있으면 생성을 멈춘다. `tools/map-data/build-san10-resources.ts:25-37`은 지금처럼 `resources/map/san10.json`과 manifest를 함께 다시 쓴다.
+- 지도 생성기: `tools/map-data/san10.ts`가 거점마다 州 코드를 region에 넣고 최상위 `regionScheme: "province-191"`을 쓴다. 값은 `provinces.json`만 읽으며 지도의 CITY·PASS 가운데 표에 없는 거점이 있으면 생성을 멈춘다. `tools/map-data/build-san10-resources.ts:25-37`은 지금처럼 `resources/map/san10.json`과 manifest를 함께 다시 쓴다.
 - manifest 생성: 같은 도구가 manifest 목록에 `UNIT_SET/expanded/1`(경로 `resources/unitset/expanded.json`)을 더해 쓴다. 손으로 고친 manifest가 재생성 때 사라지지 않게 한다.
 - 게시 도구: `tools/san10-resources.ts`의 고정 목록 검사를 `MAP/san10/1,SCENARIO/san10-191/1,SCENARIO/san10-empty/1,UNIT_SET/expanded/1`로, 시나리오 검증 재료의 병종 판을 `expanded`로 바꾼다.
 - 서버 SAN10 프로필: `apps/server/src/admin/worldCreateOptions.ts`의 `san10Selection`에 `unitSetKey: 'expanded'`를 넣는다. 참조 행(`:88`)은 선택의 이름을 그대로 쓰므로 판 1이 맞다. 개수 계약(`counts`)은 지도 검토 결과에 맞춘다.
@@ -252,7 +252,7 @@ region 숫자의 뜻은 지도 내용에 적는다. 운영 지도 최상위에 �
 
 엔진의 `resolveWorldResourceSelection`(`apps/engine/src/world/resources.ts:28`)의 `unitSet ?? 'basic'`은 바꾸지 않는다. 재생 원본 추론이 같은 함수를 써서 기본값을 바꾸면 판을 적지 않고 만든 기존 월드의 재생이 깨진다.
 
-규모·연결·파양 정리(지도 검토 세션)도 같은 1판 내용을 바꾼다. 두 변경을 한 번의 DB 재생성으로 묶을지는 그 세션의 사용자 결정에 따른다.
+규모·연결·파양 정리 PR #330도 같은 1판 내용을 바꾼다. 자원 PR은 #330 병합 뒤 그 위에서 만들고 두 변경을 한 번의 DB 재생성으로 묶는다.
 
 ### 해시 보존
 
@@ -271,7 +271,7 @@ region 숫자의 뜻은 지도 내용에 적는다. 운영 지도 최상위에 �
 | --- | --- | --- |
 | 1 규칙 | `world/resources.ts`(병종 행 `requirements`·`effects`, 판 `coefMode`·`regionScheme`, 해시 보존), 운영 지도의 `regionScheme`과 region 범위(스키마·검증·자원 편집기·개발 편집기 상수), `buildInitialWorld`의 `regionScheme` 검사, `world/crewRequirements.ts`와 시험, 위 모병 경로 표의 여섯 파일, 계수 키 검증 두 곳, 명령 대응표 두 행과 AC-M1-14·README 집계 | G-03 통과 |
 | 2 전투 | `battle/simulate.ts`(`coefMode`, 계수 조회, 효과, 선제 단계), `basic` 회귀 시험(난수 호출 수·상태 포함). 호출부 `commands/attack.ts:80`·`:116`, `campaign/skirmish.ts:71`·`:105`·`:161`, `apps/web/src/battleSim/compute.ts:27`은 입력이 그대로라 고치지 않고 시험만 더한다 | PR 1 |
-| 3 자원 | `resources/unitset/expanded.json`과 생성기, 균형 도구와 표, `resources/NOTICE.md`, 지도 생성기(州 코드·`regionScheme`)와 `resources/map/san10.json`, manifest 생성·게시 도구, 서버 SAN10 프로필, 프리셋 다섯 개, 두 번 생성해 같은 해시인지 보는 재현 시험 | PR 2, 지도 검토 세션의 州 열, 운영 DB 재생성 사용자 확인 |
+| 3 자원 | `resources/unitset/expanded.json`과 생성기, 균형 도구와 표, `resources/NOTICE.md`, 지도 생성기(州 코드·`regionScheme`)와 `resources/map/san10.json`, manifest 생성·게시 도구, 서버 SAN10 프로필, 프리셋 다섯 개, 두 번 생성해 같은 해시인지 보는 재현 시험 | PR 2, #330 병합, `provinces.json` 검수, 운영 DB 재생성 사용자 확인 |
 | 4 화면 | 병종 목록 응답에 고를 수 있는지와 이유(`campaignApi.ts:253`, `cityResourcesApi.ts:201`, 모병·징병 명령의 병종 목록), 고르기 화면의 이유 표시, 전투 시뮬레이터의 판 선택(`apps/web/src/battleSim/publicUnitSet.ts`), 도움말 병종 표와 창작 표시 | PR 3 |
 
 ### 하지 않는 것
