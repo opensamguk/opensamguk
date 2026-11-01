@@ -1,7 +1,7 @@
 # INT-22 병종 확장: 창극병 계열, 원작·사료 병종, 전투 특수 효과
 
 > AC-INT-22 · 구현 Codex · 리뷰 Claude · 결정 [D-054](../product/decisions.md) · 사용자 직접 요청 2026-11-01
-> 상태: 상세 계획 제안 3판. 1판(`5d6e3e05`)은 Codex G-03 보류(P1 4건, P2 6건), 2판(`30a3567e`)은 재검토 보류(P1 2건, P2 4건)였고 이 판이 두 번의 지적을 반영했다. 3차 검토 전이다.
+> 상태: 상세 계획 3판. Codex G-03은 1판(`5d6e3e05`) 보류(P1 4건, P2 6건), 2판(`30a3567e`) 보류(P1 2건, P2 4건), 3판(`ccf81bc5`) 조건부 통과(P3 1건)였고 P3 문구를 고쳤다. 조건은 자원 PR 전 운영 DB 재생성 사용자 확인을 지키는 것이다.
 > 기준: main `d2202e13`, core2026 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`(MIT, devsam). 원작 줄은 이 커밋의 `resources/unitset/unitset_event_more_crewtype.json`, `packages/logic/src/war/`다.
 > 함께 보는 계획: [T4-09](./T4-09.md)(연구 6종), [T4-10](./T4-10.md)(화륜차 연구), [T4-07](./T4-07.md)(준비 턴), [T4-53](./T4-53.md)(연구 등록), [T4-72](./T4-72.md)(초토화), [T4-73](./mvp-command-gaps.md)(증축), [T1-03](./T1-03.md)(가정 A7)
 
@@ -138,7 +138,7 @@
 
 ### 州 조건
 
-지도 스키마에 새 칸을 넣지 않는다. 운영 지도의 CITY·PASS 행에는 이미 `region`이 있고 `operationalAnchors`(`world/map/anchors.ts:17`)를 거쳐 월드 생성(`world/bootstrap.ts:204`), 저장(`apps/engine/src/world/persistence.ts`), 재생 검사(`apps/engine/src/replayCaps.ts:146`), 공개 응답(`apps/server/src/visibility.ts:106`)까지 흐른다. 지금 규칙은 이 값을 읽지 않는다. che 지도에서 region 1~8은 원작 8지역(하북·중원·서북·서촉·남중·초·오월·동이)이고 SAN10은 상속 거점만 그 값을 가졌으며 새 거점은 대부분 1이다.
+州 값을 담을 칸은 따로 만들지 않고 기존 `region`을 다시 쓴다. 숫자의 뜻을 가리키는 최상위 칸 `regionScheme` 하나만 더한다(아래). 운영 지도의 CITY·PASS 행에는 이미 `region`이 있고 `operationalAnchors`(`world/map/anchors.ts:17`)를 거쳐 월드 생성(`world/bootstrap.ts:204`), 저장(`apps/engine/src/world/persistence.ts`), 재생 검사(`apps/engine/src/replayCaps.ts:146`), 공개 응답(`apps/server/src/visibility.ts:106`)까지 흐른다. 지금 규칙은 이 값을 읽지 않는다. che 지도에서 region 1~8은 원작 8지역(하북·중원·서북·서촉·남중·초·오월·동이)이고 SAN10은 상속 거점만 그 값을 가졌으며 새 거점은 대부분 1이다.
 
 SAN10 지도에서는 `region`을 191년 州 코드로 쓴다.
 
