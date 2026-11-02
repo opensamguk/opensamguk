@@ -4,6 +4,7 @@ import type { inferRouterOutputs } from '@trpc/server';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import { buildCreatedGeneral, type LogisticsConfig, type WorldInit } from '../packages/rules/src/index';
+import { BALANCE } from '../packages/rules/src/balance';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { buildServer } from '../apps/server/src/server';
 import type { AppRouter } from '../apps/server/src/router';
@@ -272,7 +273,7 @@ afterAll(async () => {
 
 describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
   it('일반 차례 저장 뒤 실패는 소비·금·도시·예턴·로그·순번을 함께 롤백하고 새 엔진이 한 번 처리한다', async () => {
-    const world = await fixture();
+    const world = await fixture({ fundedRecruitment: true });
     const ruler = await db.general.findUniqueOrThrow({
       where: { worldId_id: { worldId: world.id, id: world.generalId } },
     });
@@ -291,6 +292,8 @@ describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
     ).toBe(200);
     await advance(world.id, 10_000);
     const before = await snapshot(world.id);
+    expect(before.state.generals[world.generalId]!.gold).toBeGreaterThanOrEqual(BALANCE.DEVEL_COST);
+    expect(before.state.cities[world.cityKey]!.wall).toBeLessThan(before.state.cities[world.cityKey]!.wallMax);
     const count = await db.logisticsMovement.count({ where: { worldId: world.id } });
     const sequence = (await db.world.findUniqueOrThrow({ where: { id: world.id } })).actionSequence;
     const logs = await db.generalLog.count({ where: { worldId: world.id } });
@@ -301,6 +304,7 @@ describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
     expect((await db.world.findUniqueOrThrow({ where: { id: world.id } })).actionSequence).toBe(sequence);
     await advance(world.id, ruler.nextTurnTick);
     const after = await snapshot(world.id);
+    expect(after.state.cities[world.cityKey]!.wall).toBeGreaterThan(before.state.cities[world.cityKey]!.wall);
     expect(after.state.logistics!.cities[String(world.cityKey)]!.wood).toBe(
       before.state.logistics!.cities[String(world.cityKey)]!.wood - 1,
     );
