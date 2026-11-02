@@ -197,13 +197,22 @@ it('가속 턴 commit과 겹친 API edit는 STALE이며 재시도한 편집은 �
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
-  let first = true;
+  let first = true,
+    commerceTick: number | undefined,
+    commerceSequence: number | undefined;
   const loop = new TurnLoop(db, lease, {
-    beforeCommit: async () => {
+    beforeCommit: async (tx) => {
       if (first) {
         first = false;
         reached();
         await gate;
+      }
+      if (commerceTick !== undefined && commerceSequence === undefined) {
+        const general = await tx.general.findUniqueOrThrow({
+          where: { worldId_id: { worldId, id: 1 } },
+          select: { nextTurnTick: true, world: { select: { actionSequence: true } } },
+        });
+        if (general.nextTurnTick === commerceTick + 10000) commerceSequence = general.world.actionSequence;
       }
     },
   });
@@ -233,10 +242,12 @@ it('가속 턴 commit과 겹친 API edit는 STALE이며 재시도한 편집은 �
     );
     expect(saved.data.ok).toBe(true);
     const general = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
+    commerceTick = general.nextTurnTick;
     await loop.advanceTo(general.nextTurnTick);
+    expect(commerceSequence).toBeTypeOf('number');
     expect(
       await db.generalLog.findFirstOrThrow({
-        where: { worldId, generalId: 1, tick: general.nextTurnTick, sequence: null },
+        where: { worldId, generalId: 1, tick: general.nextTurnTick, sequence: commerceSequence! },
       }),
     ).toMatchObject({ commandKey: 'commerce' });
     expect((await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } })).turnRevision).toBe(

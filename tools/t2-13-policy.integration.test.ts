@@ -294,8 +294,9 @@ it('방침 실패는 같은 턴에서 비용 없이 휴식하고 실제 장수 �
   const after = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId: f.worldId, id: 1 } } });
   expect(after.gold).toBe(before.gold);
   expect(after.injury).toBeLessThan(before.injury);
+  const sequence = (await db.world.findUniqueOrThrow({ where: { id: f.worldId } })).actionSequence;
   const log = await db.generalLog.findFirstOrThrow({
-    where: { worldId: f.worldId, generalId: 1, tick: 100, sequence: null },
+    where: { worldId: f.worldId, generalId: 1, tick: 100, sequence },
   });
   expect(log.commandKey).toBe('rest');
   expect(log.text).toBe('기본 방침 실패: 이미 최대치입니다. → 휴식');
@@ -358,8 +359,9 @@ it('방침 월드 NPC는 빈칸에서도 AI를 실행하고 12개월 실제 엔�
   const f = await fixture({ npc: true });
   expect(await db.generalTurn.count({ where: { worldId: f.worldId, generalId: 2, explicit: false } })).toBe(30);
   await f.loop.advanceTo(5000);
+  const sequence = (await db.world.findUniqueOrThrow({ where: { id: f.worldId } })).actionSequence;
   const log = await db.generalLog.findFirstOrThrow({
-    where: { worldId: f.worldId, generalId: 2, tick: 5000, sequence: null },
+    where: { worldId: f.worldId, generalId: 2, tick: 5000, sequence },
   });
   expect(log.commandKey).not.toBe('rest');
   expect(log.text).not.toContain('기본 방침');
@@ -468,7 +470,18 @@ it('표지가 없는 옛 월드는 쓰기를 거부하되 기존 생성·직접 
   await expect
     .poll(() => db.inputEvent.count({ where: { worldId: f.worldId, kind: 'general.create', status: 'PENDING' } }))
     .toBe(1);
-  await f.loop.advanceTo(100);
+  let sequence: number | undefined;
+  await new TurnLoop(db, f.lease, {
+    beforeCommit: async (tx) => {
+      if (sequence !== undefined) return;
+      const general = await tx.general.findUniqueOrThrow({
+        where: { worldId_id: { worldId: f.worldId, id: 1 } },
+        select: { nextTurnTick: true, world: { select: { actionSequence: true } } },
+      });
+      if (general.nextTurnTick === 10100) sequence = general.world.actionSequence;
+    },
+  }).advanceTo(100);
+  expect(sequence).toBeTypeOf('number');
   expect((await request).data).toMatchObject({ status: 'created' });
   const general = await db.general.findUniqueOrThrow({
     where: { worldId_userId: { worldId: f.worldId, userId: newcomer.id } },
@@ -477,7 +490,7 @@ it('표지가 없는 옛 월드는 쓰기를 거부하되 기존 생성·직접 
   expect(await db.generalTurn.count({ where: { worldId: f.worldId, generalId: general.id, explicit: true } })).toBe(30);
   expect(
     await db.generalLog.findFirstOrThrow({
-      where: { worldId: f.worldId, generalId: 1, tick: 100, sequence: null },
+      where: { worldId: f.worldId, generalId: 1, tick: 100, sequence: sequence! },
     }),
   ).toMatchObject({ commandKey: 'rest' });
   const replay = await db.$transaction((tx) => loadReplayState(tx, f.worldId));

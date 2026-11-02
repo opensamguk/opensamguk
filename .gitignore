@@ -15,6 +15,7 @@ playwright-report/
 test-results/
 apps/server/.authz/
 .mail-outbox/
+.load-reports/
 
 # Prisma 생성물
 packages/db/src/generated/

@@ -609,9 +609,13 @@ describe('T1-11 군사 명령 API·엔진 결합', () => {
         (await request('turns.set', { worldId, revision: 0, slots: [turn, ...empty().slice(1)] }, a.cookie)).data,
       ).toMatchObject({ ok: true, revision: 1 });
       expect((await request('turns.get', { worldId }, a.cookie)).data.slots[0]).toMatchObject(turn);
+      const beforeTurn = await db.world.findUniqueOrThrow({
+        where: { id: worldId },
+        select: { actionSequence: true },
+      });
       await loop.advanceTo(100);
       const log = await db.generalLog.findFirstOrThrow({
-        where: { worldId, generalId: 1, tick: 100, sequence: null },
+        where: { worldId, generalId: 1, tick: 100, sequence: beforeTurn.actionSequence + 1 },
       });
       expect(log).toMatchObject({ commandKey, kind: accepted ? 'success' : 'failure' });
       if (!accepted) expect(log.text).toContain(preview.data.code);
@@ -854,6 +858,10 @@ describe('T1-11 30칸·revision·경합·재검사', () => {
     ).toBe(true);
     await db.general.update({ where: { worldId_id: { worldId, id: 1 } }, data: { gold: 0 } });
     expect((await request('turns.precheck', { worldId, commandKey: 'farm' }, a.cookie)).data.code).toBe('NO_GOLD');
+    const beforeTurn = await db.world.findUniqueOrThrow({
+      where: { id: worldId },
+      select: { actionSequence: true },
+    });
     const entered = Promise.withResolvers<void>();
     const release = Promise.withResolvers<void>();
     let once = false;
@@ -884,7 +892,7 @@ describe('T1-11 30칸·revision·경합·재검사', () => {
     await running;
     expect((await saving).data).toMatchObject({ ok: false, reason: 'STALE', revision: 2 });
     const log = await db.generalLog.findFirstOrThrow({
-      where: { worldId, generalId: 1, tick: 100, sequence: null },
+      where: { worldId, generalId: 1, tick: 100, sequence: beforeTurn.actionSequence + 1 },
     });
     expect(log).toMatchObject({ kind: 'failure', commandKey: 'farm' });
     expect(log.text).toContain('NO_GOLD');
