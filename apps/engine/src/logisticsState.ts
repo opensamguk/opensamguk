@@ -1,6 +1,6 @@
 import type { Prisma } from '@opensamguk/db';
 import {
-  readLogisticsConfig,
+  readLogisticsOriginConfig,
   readLogisticsState,
   logisticsMovementSchema,
   LOGISTICS_GOODS,
@@ -14,24 +14,7 @@ import { z } from 'zod';
 
 type World = Prisma.WorldGetPayload<Record<string, never>>;
 
-export function readLogisticsOriginConfig(
-  world: Pick<World, 'replayFormat' | 'ruleFeatures' | 'replayOrigin'>,
-  state: Pick<WorldView, 'cities'>,
-): LogisticsConfig | undefined {
-  if (!world.ruleFeatures.includes('logistics-v1')) return undefined;
-  const origin = world.replayOrigin;
-  if (
-    world.replayFormat !== 3 ||
-    !origin ||
-    typeof origin !== 'object' ||
-    Array.isArray(origin) ||
-    !origin.featureData ||
-    typeof origin.featureData !== 'object' ||
-    Array.isArray(origin.featureData)
-  )
-    throw new Error('물류의 원생성 설정이 없습니다.');
-  return readLogisticsConfig(origin.featureData['logistics-v1'], state);
-}
+export { readLogisticsOriginConfig } from '@opensamguk/rules';
 
 export function readStoredLogistics(
   value: unknown,

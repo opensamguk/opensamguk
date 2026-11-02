@@ -16,6 +16,8 @@ import {
   readCityResourcesState,
   checkReplayOrigin,
   campaignArmyTypes,
+  readLogisticsOriginConfig,
+  readLogisticsState,
 } from '@opensamguk/rules';
 import { z } from 'zod';
 import { worldResolver } from './resolver';
@@ -118,5 +120,11 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
       throw new Error('도시 자원의 생성 기록과 운영 병종이 다릅니다.');
     state.cityResources = readCityResourcesState(world.cityResourcesState, state, campaignArmyTypes(origin.initial));
   } else if (world.cityResourcesState != null) throw new Error('도시 자원 기능을 끈 월드에 저장 상태가 있습니다.');
+  if (world.ruleFeatures.includes('logistics-v1')) {
+    const config = readLogisticsOriginConfig(world, state);
+    state.logistics = readLogisticsState(world.logisticsState, state);
+    if (!isDeepStrictEqual(state.logistics.config, config) || state.logistics.monthlyTick !== world.monthlyTick)
+      throw new Error('물류 설정·월 정산 tick이 원생성·저장 월드와 다릅니다.');
+  } else if (world.logisticsState != null) throw new Error('물류 기능을 끈 월드에 저장 상태가 있습니다.');
   return { ...state, ...(treaties ? { treaties } : {}) };
 }

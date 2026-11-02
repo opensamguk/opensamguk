@@ -75,7 +75,7 @@ export type LogisticsState = z.infer<typeof logisticsStateSchema>;
 export type LogisticsConvoy = z.infer<typeof convoySchema>;
 type CityWorld = Pick<WorldView, 'cities'>;
 
-export function logisticsCapacity(config: LogisticsConfig, level: number): number {
+export function logisticsCapacity(config: Pick<LogisticsConfig, 'capacity'>, level: number): number {
   logisticsQuantity.max(config.capacity.maxLevel).parse(level);
   return config.capacity.base + config.capacity.perLevel * level;
 }
