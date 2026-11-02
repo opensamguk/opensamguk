@@ -194,3 +194,7 @@ export * from './cityResources/state';
 export * from './cityResources/input';
 export { canExecuteCityNationCommand } from './cityResources/commands';
 export * from './clock/createRequest';
+export * from './logistics/state';
+export * from './logistics/ledger';
+export * from './logistics/operations';
+export { logisticsResultSchema, validateLogisticsRecord } from './logistics/feature';

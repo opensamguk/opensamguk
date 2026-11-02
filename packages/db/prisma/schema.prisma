@@ -10,6 +10,8 @@ datasource db {
 }
 
 model World {
+  logisticsState Json?
+  logisticsMovements LogisticsMovement[]
   id              String      @id @default(uuid())
   name            String
   presetKey       String?
@@ -68,6 +70,22 @@ model World {
   assignmentOffers AssignmentOffer[]
   sanctions       Sanction[]
   createRequest   WorldCreateRequest?
+}
+
+model LogisticsMovement {
+  worldId  String
+  sequence Int
+  ordinal  Int
+  tick     Int
+  holder   String
+  holderId Int
+  good     String
+  delta    Int
+  reason   String
+  world    World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@id([worldId, sequence, ordinal])
+  @@index([worldId, tick])
 }
 
 enum WorldCreateStatus {

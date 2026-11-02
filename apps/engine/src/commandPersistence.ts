@@ -5,6 +5,7 @@ import { loadWorld } from './worldLoader';
 import { archiveRemovedNation, type ActionAt } from './nationArchive';
 import { persistCampaignState, readCampaignArmyTypes } from './campaignState';
 import { persistCityResourcesState } from './cityResourcesState';
+import { persistLogisticsState } from './logisticsState';
 
 export async function loadCommandState(
   tx: Prisma.TransactionClient,
@@ -40,6 +41,7 @@ export async function persistCommandState(
     ? readCampaignArmyTypes(await tx.world.findUniqueOrThrow({ where: { id: worldId } }))
     : [];
   await persistCityResourcesState(tx, worldId, before, state, cityArmyTypes);
+  await persistLogisticsState(tx, worldId, before, state);
   for (const nation of Object.values(state.nations)) {
     if (!before.nations[nation.id]) {
       await tx.nation.create({ data: { ...nation, worldId, capitalCityKey: null } });
