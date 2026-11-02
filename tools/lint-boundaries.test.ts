@@ -98,6 +98,28 @@ describe('패키지 경계', () => {
 });
 
 // T4-34 예외 E1·E2 (docs/architecture/package-boundaries.md). 정확한 파일만 열리고 이웃 파일은 계속 막힌다.
+describe('T4-93 비용 미리보기 예외 E4', () => {
+  const allowed = "export { recruitGoods } from '@opensamguk/rules/logistics-costs';\n";
+  it('정확한 두 파일에서 모집 비용 하나만 허용한다', async () => {
+    for (const file of ['apps/web/src/city/costPreview.ts', 'apps/web/src/city/costPreview.test.ts']) {
+      expect(await ruleIds(allowed, file)).toEqual([]);
+      for (const code of [
+        "export { recruitGoods } from '@opensamguk/rules';\n",
+        "export { consumeCityGoods } from '@opensamguk/rules/logistics-costs';\n",
+        "export * from '@opensamguk/rules/resources';\n",
+        "export * from '@opensamguk/shared/node';\n",
+        "export * from '@opensamguk/db';\n",
+        "export * from '@opensamguk/engine';\n",
+        "export * from '@opensamguk/server/router';\n",
+        "export * from 'node:fs';\n",
+      ])
+        expect(await ruleIds(code, file), code).toContain('no-restricted-imports');
+    }
+    expect(await ruleIds(allowed, 'apps/web/src/city/LogisticsCosts.tsx')).toContain('no-restricted-imports');
+    expect(await ruleIds(allowed, 'apps/web/src/x.ts')).toContain('no-restricted-imports');
+  });
+});
+
 describe('전투 시뮬레이터 예외', () => {
   const rulesValue = "import { simulateBattle } from '@opensamguk/rules';\nexport { simulateBattle };\n";
   const unitSetJson = "import basic from '../../../../resources/unitset/basic.json';\nexport { basic };\n";

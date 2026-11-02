@@ -29,6 +29,8 @@ tools/* ───────────▶ 무엇이든 (배포물에 포함�
 
 지도 편집기 예외 E3 ([T4-76](../plans/T4-76.md)): `apps/web/src/mapEditor/**`에서 `@opensamguk/rules/resource-validation`의 값과 타입만 읽습니다. rules 본 경로와 다른 하위 경로, `shared/node`, engine·db, server 값, Node 내장 모듈과 다른 패키지의 상대 경로 import는 막습니다. 공개 하위 경로는 순수 schema·검증 함수·타입·상수만 내보냅니다. 화면의 기존 임시 검증 코드를 바꾸는 작업은 후속 담당이 맡습니다.
 
+- E4 (T4-93, AC-P2-30): `apps/web/src/city/costPreview.ts`와 그 시험만 `@opensamguk/rules/logistics-costs`의 `recruitGoods`를 읽습니다. 이 공개 파일은 zod와 타입만 import하며 모집 비용 계산 하나만 내보냅니다. 화면은 비용을 복제하지 않고 참고용 예상 소비를 보여 줍니다. 최종 인원·재고·권한 판정과 소비는 엔진이 맡습니다. rules 본 경로, 다른 하위 경로, Node 내장 모듈, shared/node, engine·db·server 값은 계속 막습니다.
+
 ## 패키지별 책임
 
 | 패키지             | 넣는 것                                           | 넣지 않는 것 |

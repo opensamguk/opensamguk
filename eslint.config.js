@@ -182,6 +182,38 @@ export default defineConfig([
       ],
     },
   },
+  // 예외 E4 (T4-93): 비용 미리보기 두 파일만 순수 모집 비용 함수를 읽는다.
+  {
+    files: ['apps/web/src/city/costPreview.ts', 'apps/web/src/city/costPreview.test.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@opensamguk/db', '@opensamguk/db/*', '@opensamguk/engine', '@opensamguk/engine/*'],
+              message: BOUNDARY_MESSAGE,
+            },
+            {
+              group: ['@opensamguk/server', '@opensamguk/server/*'],
+              allowTypeImports: true,
+              message: BOUNDARY_MESSAGE,
+            },
+            { regex: '^@opensamguk/rules(?:$|/(?!logistics-costs$))', message: BOUNDARY_MESSAGE },
+            {
+              group: ['@opensamguk/rules/logistics-costs'],
+              allowImportNames: ['recruitGoods'],
+              message: '비용 미리보기는 recruitGoods만 읽습니다 (E4).',
+            },
+            {
+              group: ['/@opensamguk/shared/node', '/@opensamguk/shared/resource-root', ...NODE_BUILTINS],
+              message: BOUNDARY_MESSAGE,
+            },
+          ],
+        },
+      ],
+    },
+  },
   // 예외 E2 (T4-34): 공개 병종표 resources/unitset/basic.json 하나만 상대 경로로 읽는다.
   {
     files: ['apps/web/src/battleSim/publicUnitSet.ts'],

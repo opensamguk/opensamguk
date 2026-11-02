@@ -11,6 +11,7 @@ import { StatTable, type StatRow } from '../ui/StatTable';
 import { Tag } from '../ui/Tag';
 import styles from './CityInfo.module.css';
 import { CityResourcesPanel } from './CityResourcesPanel';
+import { LogisticsPanel } from '../city/LogisticsPanel';
 
 const HIDDEN_CITY = '다른 국가의 도시입니다';
 const HIDDEN_GENERAL = '다른 국가 장수입니다';
@@ -32,12 +33,15 @@ export function CityInfo({
   nations,
   onSelectCity,
   showGenerals = true,
+  logisticsEnabled = false,
 }: {
   worldId: string;
   cityKey: number;
   nations: readonly MapNation[];
   onSelectCity?: (key: number) => void;
   showGenerals?: boolean;
+  // world.summary.logisticsEnabled가 true인 월드에서만 물류 칸을 그리고 조회한다 (T4-93).
+  logisticsEnabled?: boolean;
 }) {
   const city = useCity(worldId, cityKey);
   if (city.isPending) return <LoadingState />;
@@ -87,6 +91,7 @@ export function CityInfo({
       )}
       <StatTable rows={rows} />
       <CityResourcesPanel worldId={worldId} cityKey={cityKey} />
+      {logisticsEnabled ? <LogisticsPanel worldId={worldId} cityKey={cityKey} /> : null}
       {data.links.length > 0 ? (
         <p className={styles.links}>
           <span className={styles.meta}>연결</span>

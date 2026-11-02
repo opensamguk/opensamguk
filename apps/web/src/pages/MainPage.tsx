@@ -229,7 +229,13 @@ export function MainPage() {
           }
         >
           {cityKey !== null ? (
-            <CityInfo worldId={worldId} cityKey={cityKey} nations={nations} onSelectCity={selectCity} />
+            <CityInfo
+              worldId={worldId}
+              cityKey={cityKey}
+              nations={nations}
+              onSelectCity={selectCity}
+              logisticsEnabled={summary.data?.logisticsEnabled === true}
+            />
           ) : home.isPending ? (
             <LoadingState />
           ) : (
