@@ -124,4 +124,13 @@
     grid-column: 1 / -1;
     justify-content: center;
   }
+  /* 위 띠에서 옮긴 계정 링크. 게임 메뉴와 구분하도록 한 줄을 띄우고 위에 선을 긋는다 (T4-97 U1). */
+  .accountLinks {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-1);
+    padding-top: var(--space-1);
+    border-top: 1px solid var(--color-rail-text);
+  }
 }

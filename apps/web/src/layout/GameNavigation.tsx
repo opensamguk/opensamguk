@@ -1,6 +1,6 @@
 import { publicImageUrl } from '@opensamguk/shared/public-images';
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
-import { useEffect, useRef, type MouseEvent } from 'react';
+import { useEffect, useRef, type MouseEvent, type ReactNode } from 'react';
 import { OFFICER_MIN_LEVEL } from '../operations/contract';
 const mainIcon = publicImageUrl('apps/web/src/art/icons/main.png');
 const turnsIcon = publicImageUrl('apps/web/src/art/icons/turns.png');
@@ -40,12 +40,15 @@ export function GameNavigation({
   worldId,
   campaignEnabled,
   officerLevel,
+  accountLinks,
 }: {
   worldId: string;
   campaignEnabled: boolean;
   officerLevel: number;
+  // 좁은 화면에서만 넘긴다. 위 띠에서 빠진 관리자·내 계정·알림 설정을 `전체` 메뉴 끝에 둔다.
+  accountLinks?: ((className: string | undefined) => ReactNode) | undefined;
 }) {
-  const { pathname, search } = useLocation();
+  const { pathname, search, hash } = useLocation();
   const navigate = useNavigate();
   const inbox = useInboxCount(worldId);
   const city = Number(search.city);
@@ -104,6 +107,7 @@ export function GameNavigation({
         key={item.label}
         href={`/w/${encodeURIComponent(worldId)}${'city' in citySearch ? `?city=${citySearch.city}` : ''}#${item.area}`}
         className={styles.link}
+        aria-current={pathname.replace(/\/$/, '') === `/w/${worldId}` && hash === item.area ? 'location' : undefined}
         onClick={openTurns}
       >
         <Icon src={item.icon} />
@@ -180,6 +184,12 @@ export function GameNavigation({
               메뉴 닫기
             </button>
             {links}
+            {accountLinks ? (
+              // 링크로 주소가 바뀌면 위 pathname 효과가 메뉴를 닫는다.
+              <div className={styles.accountLinks} role="group" aria-label="계정">
+                {accountLinks(styles.link)}
+              </div>
+            ) : null}
           </div>
         </details>
       </nav>
