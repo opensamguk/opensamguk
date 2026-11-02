@@ -59,8 +59,8 @@ Modern city points are review anchors; they do not establish historical city-sit
 Reused OpenSamguk pixel site icons
 Repository: https://github.com/peppone-choi/opensamguk-images
 Revision: 46faca52ac6bf0db67b3350400e3b92847036af2
-Assets: apps/web/src/mapEditor/icons/*.png (unchanged 32px exports).
-Original paths and SHA-256: apps/web/src/mapEditor/icons/sources.json
+Assets: opensamguk-images/public/mapEditor/icons/*.png (unchanged 32px exports).
+Original paths and SHA-256: opensamguk-images/public/mapEditor/icons/sources.json
 
 License evidence at the pinned revision:
 - README.md, License section, includes the repository's own assets/ and web/ work.
@@ -140,10 +140,10 @@ License: SIL Open Font License 1.1, https://openfontlicense.org
 
 INT-20 generated pixel art and pixel basemap
 
-Files: apps/web/src/art/** and apps/web/src/main/pixel-basemap.png
+Files: opensamguk-images/public/art/** and apps/web/src/main/pixel-basemap.png
 The art was generated for this project with Codex built-in image generation from text prompts only
 (no reference or input images) and reduced by tools/pixel-assets/build.py. The pass wall markers
-(apps/web/src/art/map/pass-wall*.png) are crops of the generated pass marker made by
+(opensamguk-images/public/art/map/pass-wall*.png) are crops of the generated pass marker made by
 tools/pixel-assets/build-pass-walls.py. Prompts and source hashes:
-apps/web/src/art/sources.json. The basemap is rendered from Natural Earth (public domain) by
+opensamguk-images/public/art/sources.json. The basemap is rendered from Natural Earth (public domain) by
 tools/map-data/build-pixel-basemap.py; inputs and hashes: apps/web/src/main/pixel-basemap.json.

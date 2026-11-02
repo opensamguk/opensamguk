@@ -1,8 +1,6 @@
 import { createMailTransport } from './mail/transport';
 import { resourceRoot } from '@opensamguk/shared/resource-root';
 
-resourceRoot();
-
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
   console.error('DATABASE_URL이 없습니다. .env.example을 .env로 복사하세요.');
@@ -13,6 +11,7 @@ const mailTransport = createMailTransport({
   ...process.env,
   MAIL_TRANSPORT: process.env.MAIL_TRANSPORT ?? (process.env.NODE_ENV === 'production' ? undefined : 'capture'),
 });
+resourceRoot();
 const [{ createDb }, { buildServer }] = await Promise.all([import('@opensamguk/db'), import('./server')]);
 const db = createDb(databaseUrl);
 const port = Number(process.env.SERVER_PORT ?? 3001);

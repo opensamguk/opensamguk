@@ -36,7 +36,7 @@
 
 ### 공개 실행 이미지 (T2-15 B2a)
 
-`deploy/Dockerfile`은 Node24 공식 이미지의 digest와 pnpm10.33.0을 고정하고 lockfile 설치·Prisma 생성을 실행합니다. `server`·`engine`·`migrate` 대상은 같은 소스를 쓰며 `web` 대상은 `build:public`·자산 검사를 거친 정적 파일만 `/web`으로 내보냅니다. API와 엔진은 UID/GID10001로 실행하고 진입점이 실제 Node 프로세스를 `exec`합니다. API의 기존 loopback 바인딩을 유지합니다.
+`deploy/Dockerfile`은 Node24 공식 이미지의 digest와 pnpm10.33.0을 고정하고 lockfile 설치·Prisma 생성을 실행합니다. `server`·`engine`은 `.mjs` 번들과 필요한 운영 파일만 받습니다. `migrate`는 Prisma CLI와 migration 전용 의존성을 받습니다. `web` 대상은 `build:public`·자산 검사를 거친 정적 파일만 `/web`으로 내보냅니다. API와 엔진은 UID/GID10001로 실행하고 진입점이 실제 Node 프로세스를 `exec`합니다. API의 기존 loopback 바인딩을 유지합니다.
 
 빌드 입력은 검토한 Git archive의 별도 디렉터리입니다. Dockerfile 옆의 `Dockerfile.dockerignore`가 package·lock·앱·패키지·도구·문서·필수 manifest·resources만 받고 `.git`·`.env*`·private·호스트 의존성·백업·로그·시험 산출물을 제외합니다. stdin tar는 이 필터의 검증으로 세지 않습니다. `SOURCE_REVISION`은 실제 기준 커밋40자이고 `SOURCE_TREE_SHA256`은 후보 소스 경로·파일 바이트의 SHA-256입니다. 두 값은 이미지 label에 남으며 후보 해시를 확정 릴리스로 선언하지 않습니다. 깨끗한 소스의 선택·해시 생성·manifest·배포 receipt·current 교체 명령은 B2 후속에 남아 있습니다.
 
@@ -124,7 +124,7 @@ Caddy는 loopback 프록시에서 온 `CF-Connecting-IP`만 client IP로 해석�
 
 Compose 대상은 항상 절대 경로의 `--env-file`, `-f`와 `--project-name`을 명시합니다. 예를 들어 `docker compose --project-name <확인한 대상> --env-file <실제 설정 절대 경로> -f <checkout 절대 경로>/deploy/compose.yml config --quiet`로 필수 설정을 먼저 검사합니다. 이 검사는 secret 파일이나 DB의 migration 상태를 인수하지 않습니다. migration은 수동 tools profile이며 일반 기동에 숨기지 않습니다. 운영 실행은 T2-15의 writer 정지·백업·migration·확인·receipt 계약을 구현한 뒤 수행합니다.
 
-`deploy/Caddyfile`은 `deploy/security.caddy`의 `game_security` snippet을 import합니다. CSP는 `default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self'; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'`입니다. D-031 공개 빌드에 맞춰 외부 초상과 data 이미지를 허용하지 않습니다. 국가 색 등 동적 style 속성만 `style-src-attr`로 허용하며 인라인 script와 style 요소는 허용하지 않습니다. HSTS는 `max-age=31536000`이며 `includeSubDomains`와 preload는 넣지 않습니다. access log와 debug는 켜지 않고 upstream 장애는 고정 오류 응답으로 처리해 query·쿠키가 기본 오류 로그에 남는 경로를 막습니다. [Caddy 프록시](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy), [포트 설정](https://caddyserver.com/docs/caddyfile/options), [Compose 서비스](https://docs.docker.com/reference/compose-file/services/)
+`deploy/Caddyfile`은 `deploy/security.caddy`의 `game_security` snippet을 import합니다. CSP는 `default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' https://raw.githubusercontent.com https://rawcdn.githack.com; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'`입니다. D-060에 따라 승인한 고정 이미지 주소만 빌드 검사로 허용하며 원작 초상과 data 이미지는 거부합니다. 국가 색 등 동적 style 속성만 `style-src-attr`로 허용하며 인라인 script와 style 요소는 허용하지 않습니다. HSTS는 `max-age=31536000`이며 `includeSubDomains`와 preload는 넣지 않습니다. access log와 debug는 켜지 않고 upstream 장애는 고정 오류 응답으로 처리해 query·쿠키가 기본 오류 로그에 남는 경로를 막습니다. [Caddy 프록시](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy), [포트 설정](https://caddyserver.com/docs/caddyfile/options), [Compose 서비스](https://docs.docker.com/reference/compose-file/services/)
 
 운영 API는 `NODE_ENV=production`, 정확한 HTTPS `PUBLIC_ORIGIN`, `TRUST_PROXY=1`로 Caddy 바로 뒤의 loopback에 둡니다. 직접 외부 API 포트를 열지 않습니다. Secure를 끄거나 잘못된 공개 출처를 지정하면 시작하지 않습니다. CORS를 열어 화면·API 출처를 분리하지 않습니다. 요청 제한은 단일 서버 메모리 계수이며 재시작 시 초기화됩니다. 서버를 늘리거나 재시작을 반복하는 운영 방식은 현재 계수기 보장을 벗어납니다.
 

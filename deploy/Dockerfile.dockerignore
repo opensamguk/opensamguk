@@ -36,6 +36,8 @@
 **/.wrangler
 **/.dev.vars*
 **/.cf-build
+**/__pycache__
+**/*.pyc
 **/*.log
 **/*.dump
 **/*.backup
