@@ -103,4 +103,4 @@ Node 전용 config 어댑터를 bootstrap에서 DB/API 동적 import 전에 읽�
 
 ## 독립 리뷰
 
-읽기 전용 Claude 세션이 소스·계획·실제 원문과 이미지의 소스 복사본을 대조해 승인했다. P0·P1·필수 P2는0건이다. fd 크기 제한, 기존 환경 우선순위, DB·메일·audit 시작 순서, 고정 오류, 실제 Linux 분기와 제한된 공개 증거를 확인했다. 다른 UID 비교의 보완 시험은 `adapter-uid-probe.mjs`·`adapter-uid-result.json`에 따로 남겼다. 이 시험만 root와 DAC override를 써 파일이 실제로 읽히는 상태에서도 UID 비교로 거부함을 확인했으며, 제품의 UID10001·cap_drop ALL 검증과 섞지 않았다. 상태 줄을 갱신했고 원문은 `claude-final-review.log`다. 정확한 PR head의 필수 CI·Linux metadata fixture·merge queue는 병합 전 gate로 남는다.
+읽기 전용 Claude 세션이 소스·계획·실제 원문과 이미지의 소스 복사본을 대조해 승인했다. P0·P1·필수 P2는0건이다. fd 크기 제한, 기존 환경 우선순위, DB·메일·audit 시작 순서, 고정 오류, 실제 Linux 분기와 제한된 공개 증거를 확인했다. 다른 UID 비교의 보완 시험은 `adapter-uid-probe.mjs`·`adapter-uid-result.json`에 따로 남겼다. 이 시험만 root와 DAC override를 써 파일이 실제로 읽히는 상태에서도 UID 비교로 거부함을 확인했다. 제품의 UID10001·cap_drop ALL 검증과 섞지 않았다. 상태 줄을 갱신했고 원문은 `claude-final-review.log`다. 정확한 PR head의 필수 CI·Linux metadata fixture·merge queue는 병합 전 gate로 남는다.
