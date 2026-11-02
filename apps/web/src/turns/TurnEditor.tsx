@@ -17,7 +17,7 @@ import { TRADE_COMMAND_KEY } from '../diplomacy/contract';
 import { useTradeCityChoices } from '../diplomacy/tradeTargets';
 import { useTRPC } from '../trpc';
 import { DisabledReason } from '../ui/DisabledReason';
-import { EmptyState, ErrorState } from '../ui/States';
+import { EmptyState, ErrorState, LoadingState } from '../ui/States';
 import { errorCode, retryUnlessClientError } from './apiError';
 import { describeArgs, type ArgNames } from './args';
 import { CommandPicker, type CommandInfo } from './CommandPicker';
@@ -56,6 +56,31 @@ export interface TurnEditorProps<S extends DisplaySlot = DisplaySlot> {
   source?: TurnSourceFactory<S>;
   // 편집기 위에 같은 초안 훅 상태를 쓰는 부품을 둔다(작전 맞추기, T2-12). 훅을 하나만 두어야 초안이 갈라지지 않는다.
   renderTop?: ((draft: TurnDraftState) => ReactNode) | undefined;
+  // 바깥 띠(메인 바로가기)에 저장 상태를 알린다 (T4-97 U2). 상태 값이 바뀔 때만 부르고, 편집기가 사라지면 null을 넘긴다.
+  // 정본은 이 편집기의 초안·revision이며 바깥은 표시만 한다. 같은 함수를 넘겨야 불필요한 재통지가 없다.
+  onStatus?: ((status: TurnEditorStatus | null) => void) | undefined;
+}
+
+// 최초 조회·조회 실패·로그인 풀림·읽기 전용·끝난 판은 '저장된 목록'과 따로 둔다. selection은 고른 칸 수다.
+export type TurnEditorStatus =
+  | { kind: 'loading' }
+  | { kind: 'error' }
+  | { kind: 'authLost' }
+  | { kind: 'readOnly' }
+  | { kind: 'ended' }
+  | { kind: 'conflict'; edits: number }
+  | { kind: 'saving'; edits: number }
+  | { kind: 'unsaved'; edits: number; behind: boolean; selection: number }
+  | { kind: 'saved'; behind: boolean; selection: number };
+
+function useStatusReport(onStatus: TurnEditorProps['onStatus'], status: TurnEditorStatus | undefined) {
+  // 객체를 매번 새로 만들어도 값이 같으면 다시 알리지 않도록 문자열로 비교한다.
+  const key = status ? JSON.stringify(status) : undefined;
+  useEffect(() => {
+    if (!onStatus || key === undefined) return;
+    onStatus(JSON.parse(key) as TurnEditorStatus);
+    return () => onStatus(null);
+  }, [onStatus, key]);
 }
 
 // 예턴 편집기. 메인 명령 칸(T1-16)과 /w/:worldId/turns가 개인 30칸으로, 국가 예턴(T2-06)이 직책 12칸으로 같은 부품을 쓴다.
@@ -70,15 +95,30 @@ function SourceEditor<S extends DisplaySlot>({
   selectedCityKey,
   source,
   renderTop,
+  onStatus,
 }: Omit<TurnEditorProps<S>, 'source'> & { source: TurnSourceFactory<S> }) {
   const trpc = useTRPC();
   const me = useQuery({ ...trpc.auth.me.queryOptions(), retry: retryUnlessClientError });
   const userId = me.data?.user?.id;
   const made = useMemo(() => (userId ? source({ trpc, userId, worldId }) : null), [source, trpc, userId, worldId]);
+  const authLost = Boolean(me.data && !me.data.user);
+  // 바깥 통지는 이 한 곳에서만 한다. Editor는 자기 상태를 여기로 올린다. 계정 확인 중과 Editor의 첫 조회는
+  // 둘 다 '불러오는 중'이라 Editor로 넘어가도 같은 값을 다시 알리지 않는다 (T4-97 U2).
+  const [inner, setInner] = useState<TurnEditorStatus | undefined>(undefined);
+  useStatusReport(
+    onStatus,
+    made
+      ? (inner ?? { kind: 'loading' })
+      : authLost
+        ? { kind: 'authLost' }
+        : me.isError
+          ? { kind: 'error' }
+          : { kind: 'loading' },
+  );
   if (!made) {
-    if (me.data && !me.data.user) return <AuthLost />;
+    if (authLost) return <AuthLost />;
     if (me.isError) return <ErrorState title="불러오지 못했습니다" onRetry={() => void me.refetch()} />;
-    return <p className={styles.muted}>예턴을 불러오는 중…</p>;
+    return <LoadingState>예턴을 불러오는 중</LoadingState>;
   }
   return (
     <Editor
@@ -87,6 +127,7 @@ function SourceEditor<S extends DisplaySlot>({
       selectedCityKey={selectedCityKey}
       source={made}
       renderTop={renderTop}
+      report={onStatus ? setInner : undefined}
     />
   );
 }
@@ -110,11 +151,14 @@ function Editor<S extends DisplaySlot>({
   selectedCityKey,
   source,
   renderTop,
+  report,
 }: {
   worldId: string;
   selectedCityKey: number | null;
   source: TurnSource<S>;
   renderTop?: TurnEditorProps['renderTop'];
+  // SourceEditor의 상태 칸(setState)이다. 바깥 통지와 중복 판정은 SourceEditor가 한다.
+  report?: ((status: TurnEditorStatus | undefined) => void) | undefined;
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -296,6 +340,34 @@ function Editor<S extends DisplaySlot>({
   };
   const onClear = () => onPut(EMPTY);
 
+  const edits = draft?.ops.length ?? 0;
+  const status: TurnEditorStatus = !turns
+    ? state.authLost
+      ? { kind: 'authLost' }
+      : server.isError
+        ? { kind: 'error' }
+        : { kind: 'loading' }
+    : readOnly !== null
+      ? { kind: 'readOnly' }
+      : ended
+        ? { kind: 'ended' }
+        : state.authLost
+          ? { kind: 'authLost' }
+          : pending
+            ? { kind: 'conflict', edits: pending.ops.length }
+            : state.saving
+              ? { kind: 'saving', edits }
+              : edits > 0
+                ? { kind: 'unsaved', edits, behind: state.behind, selection: selected.size }
+                : { kind: 'saved', behind: state.behind, selection: selected.size };
+  // 값이 같으면 다시 올리지 않는다. 사라지면 비워서 바깥이 오래된 상태를 쓰지 않게 한다.
+  const statusKey = JSON.stringify(status);
+  useEffect(() => {
+    if (!report) return;
+    report(JSON.parse(statusKey) as TurnEditorStatus);
+    return () => report(undefined);
+  }, [report, statusKey]);
+
   if (!turns) {
     if (state.authLost) return <AuthLost />;
     if (server.isError) {
@@ -311,10 +383,10 @@ function Editor<S extends DisplaySlot>({
       if (code === 'BAD_REQUEST') return <EmptyState title="월드를 찾을 수 없습니다" />;
       return <ErrorState title="예턴을 불러오지 못했습니다" onRetry={() => void server.refetch()} />;
     }
-    return <p className={styles.muted}>예턴을 불러오는 중…</p>;
+    return <LoadingState>예턴을 불러오는 중</LoadingState>;
   }
 
-  const editCount = draft?.ops.length ?? 0;
+  const editCount = edits;
   const selectionText = selected.size === 0 ? '없음' : `${describeSelection(selected)}번 칸`;
   const targetLabel = selected.size === 0 ? '고른 칸' : `${describeSelection(selected)}번 칸`;
 
