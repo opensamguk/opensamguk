@@ -50,6 +50,7 @@ COPY resources/NOTICE.md /app/resources/NOTICE.md
 ENV OPENSAMGUK_RESOURCES_ROOT=/app/resources
 
 FROM app-runtime AS server
+ENV AUDIT_HASH_CONFIG_FILE=/run/secrets/audit_hash_config
 COPY --from=bundle /app/dist/runtime/server/server.mjs /app/server/server.mjs
 COPY --from=bundle /app/dist/runtime/server/THIRD_PARTY_NOTICES.txt /app/server/THIRD_PARTY_NOTICES.txt
 COPY --from=bundle /app/dist/runtime/server/node_modules /app/server/node_modules

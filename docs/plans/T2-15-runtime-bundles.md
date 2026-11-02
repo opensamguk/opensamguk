@@ -271,3 +271,5 @@ Docker Desktop Linux에서 같은 DB·실행 중 월드1개·활성 장수2명·
 ### 인수 상태
 
 이 기록은 실행 이미지와 공통 자산 분리의 검증이다. 공개 named Tunnel·두 공인 IP, 기존 audit 키 전달 간극, 실제 운영 배포·복귀 리허설은 남아 있다. AC-M2-08 전체를 완료로 바꾸지 않는다. 이미지 PR은 [opensamguk-images#48](https://github.com/opensamguk/opensamguk-images/pull/48)로 머지했다. 코드 PR과 최종 CI·병합 결과는 후속 기록한다.
+
+조사 키 전달 간극은 [후속 파일 설정](./T2-15-audit-secret-file.md)에서 기본 Compose·entrypoint를 보존해 해결·검증한다. 위 초기 리허설의 override 사용 기록은 당시 증거로 남긴다.

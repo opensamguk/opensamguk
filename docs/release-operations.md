@@ -40,7 +40,7 @@
 
 빌드 입력은 검토한 Git archive의 별도 디렉터리입니다. Dockerfile 옆의 `Dockerfile.dockerignore`가 package·lock·앱·패키지·도구·문서·필수 manifest·resources만 받고 `.git`·`.env*`·private·호스트 의존성·백업·로그·시험 산출물을 제외합니다. stdin tar는 이 필터의 검증으로 세지 않습니다. `SOURCE_REVISION`은 실제 기준 커밋40자이고 `SOURCE_TREE_SHA256`은 후보 소스 경로·파일 바이트의 SHA-256입니다. 두 값은 이미지 label에 남으며 후보 해시를 확정 릴리스로 선언하지 않습니다. 깨끗한 소스의 선택·해시 생성·manifest·배포 receipt·current 교체 명령은 B2 후속에 남아 있습니다.
 
-실행 비밀 디렉터리 `/run/secrets`는 UID10001 소유·0700이어야 하고 `database_url`·`mail_api_key`는 같은 소유자·0600의 일반 파일이어야 합니다. 디렉터리를 read-only로 마운트하며 기본0444 Compose secret은 그대로 사용할 수 없습니다. 파일은1~4096바이트의 UTF-8로 줄바꿈·NUL 없이 저장하고 심볼릭 링크를 쓰지 않습니다. DB 파일에는 인증 정보와 DB 경로를 갖춘 PostgreSQL URL을 넣습니다. URL은 진입점의 exec 환경에만 전달하며 `DATABASE_URL`·`MAIL_API_KEY`·`RESEND_API_KEY`를 호스트 환경에서 전달하면 빈 값도 거부합니다. Git·명령 인자·build ARG·이미지 환경·로그·`VITE_*`에는 비밀값을 넣지 않습니다.
+실행 비밀 디렉터리 `/run/secrets`는 UID10001 소유·0700이어야 하고 `database_url`·`mail_api_key`·`audit_hash_config`는 같은 소유자·0600의 일반 파일이어야 합니다. 디렉터리를 read-only로 마운트하며 기본0444 Compose secret은 그대로 사용할 수 없습니다. 파일은1~4096바이트의 UTF-8로 줄바꿈·NUL 없이 저장하고 심볼릭 링크를 쓰지 않습니다. DB 파일에는 인증 정보와 DB 경로를 갖춘 PostgreSQL URL을 넣습니다. URL은 진입점의 exec 환경에만 전달하며 `DATABASE_URL`·`MAIL_API_KEY`·`RESEND_API_KEY`를 호스트 환경에서 전달하면 빈 값도 거부합니다. Git·명령 인자·build ARG·이미지 환경·로그·`VITE_*`에는 비밀값을 넣지 않습니다.
 
 메일 후보를 선택한 뒤 `MAIL_TRANSPORT=resend`·인증한 `MAIL_FROM`을 설정합니다. 키는 `/run/secrets/mail_api_key`의 경로만 기존 `MAIL_API_KEY_FILE` 계약으로 전달합니다. 운영 모드의 미설정 메일·capture는 시작 실패가 정상이며 개발 capture 기동을 운영 메일 인수로 세지 않습니다. 서버·도메인·메일 선택과 실제 수신 확인은 아직 남아 있습니다.
 
@@ -110,7 +110,9 @@ docker compose --env-file /secure/production.env -f deploy/compose.tunnel.yml up
 
 Caddy는 loopback 프록시에서 온 `CF-Connecting-IP`만 client IP로 해석하고 XFF를 그 IP 하나로 덮어쓴다. 따라서 로그인·가입 제한은 API의 `TRUST_PROXY=1` 계약을 유지한다. Tunnel·Caddy·server namespace에 임의 프로세스를 추가하면 이 신뢰 경계가 넓어진다. 기존 target 사전 확인 도구는 기본 Compose만 심사하므로 Tunnel 구성을 그 receipt로 승인하지 않는다. 실제 정식 Tunnel의 SSE·화면 새로고침과 두 공인 IP 검증을 별도로 남긴다. 도메인·token·두 접속 경로가 없는 이번 환경에서는 이 종단 인수는 미완료다. Quick Tunnel은 SSE를 지원하지 않는다.
 
-기준 main Compose에는 필수 로그인 조사 키의 전달 설정이 빠져 있다. 이번 실제 리허설은 별도의 시험용 비밀 파일을 읽어 `AUDIT_HASH_KEY`와 버전을 프로세스 환경에 넣는 명령 override를 사용했다. 기본 Compose를 그대로 실행하면 키 설정 오류로 시작하지 않는다. 이 기존 운영 설정 누락을 숨기거나 원문 키를 예시 환경 파일에 넣지 않는다. `entrypoint.sh`의 비밀 계약은 바꾸지 않았다.
+server 이미지는 `AUDIT_HASH_CONFIG_FILE=/run/secrets/audit_hash_config`를 기본으로 둔다. 이 파일에 UTF-8 한 줄 JSON의 `key`와 `version`을 함께 저장한다. 키는 UTF-8 32바이트 이상, 버전은 1~2147483647의 정수다. BOM·NUL·줄바꿈·추가 필드는 거부하며 디렉터리0700·파일0600·같은 UID·일반 파일·심볼릭 링크 금지 계약을 확인한다. 실제 키는 Git·명령 인자·로그에 쓰지 않는다. 기존 `AUDIT_HASH_KEY` 또는 `AUDIT_HASH_KEY_VERSION`이 정의돼 있으면 파일을 열지 않고 기존 환경 검증을 먼저 하므로 운영에서는 두 설정 방식을 섞지 않는다. 개발 미설정은 기존처럼 비수집이며 engine·migrate에는 이 파일이 필요 없다. 기본 Compose와 `entrypoint.sh`의 바이트는 바꾸지 않았다.
+
+키를 교체할 때 같은 디렉터리의 임시 파일을10001 소유·0600으로 준비하고 키와 버전을 함께 원자적으로 rename한다. server는 재시작 때 파일을 읽는다. namespace를 공유하는 Caddy·cloudflared도 함께 재시작하고 healthz·SSE와 새 로그인 기록의 버전을 확인한다. 준비와 실제 검증은 [조사 키 파일 설정](./plans/T2-15-audit-secret-file.md)에 기록한다.
 
 ### 운영 번들과 이미지
 
@@ -122,7 +124,7 @@ Caddy는 loopback 프록시에서 온 `CF-Connecting-IP`만 client IP로 해석�
 
 `PUBLIC_HOST`는 인증서 hostname이고 `PUBLIC_ORIGIN`은 실제 외부 HTTPS 주소입니다. 운영 ACME에는 외부80/443에서 내부8080/8443으로의 전달이 필요합니다. HTTP 리디렉션은 내부8443을 주소에 넣지 않고 `PUBLIC_ORIGIN`과 요청 URI를 잇습니다. 로컬 고포트 리허설은 별도의 internal issuer 설정과 요청에만 전달하는 private CA를 사용합니다. 호스트 truststore나 운영 TLS 검증을 끄지 않습니다.
 
-기동 전에 manifest 이미지 ID·web 해시·migration과 external volume의 정확한 이름·용도·owner label·UID·권한을 확인해야 합니다. app secret 디렉터리는10001 소유0700이며 `database_url`·`mail_api_key` 파일은0600입니다. PG 비밀 디렉터리/`pg_password`와 자료 volume은70 소유, Caddy 자료는10001 소유로 준비합니다. 기존 volume을 이름만 보고 채택하지 않습니다. 실제 비밀은 보안 입력으로 미리 준비하며 `deploy/.env.production.example`에는 비밀이 아닌 입력 이름만 있습니다. 비밀 입력·소유 대조·배포 receipt/current를 수행하는 운영 명령은 후속입니다.
+기동 전에 manifest 이미지 ID·web 해시·migration과 external volume의 정확한 이름·용도·owner label·UID·권한을 확인해야 합니다. app secret 디렉터리는10001 소유0700이며 `database_url`·`mail_api_key`·`audit_hash_config` 파일은0600입니다. PG 비밀 디렉터리/`pg_password`와 자료 volume은70 소유, Caddy 자료는10001 소유로 준비합니다. 기존 volume을 이름만 보고 채택하지 않습니다. 실제 비밀은 보안 입력으로 미리 준비하며 `deploy/.env.production.example`에는 비밀이 아닌 입력 이름만 있습니다. 비밀 입력·소유 대조·배포 receipt/current를 수행하는 운영 명령은 후속입니다.
 
 Compose 대상은 항상 절대 경로의 `--env-file`, `-f`와 `--project-name`을 명시합니다. 예를 들어 `docker compose --project-name <확인한 대상> --env-file <실제 설정 절대 경로> -f <checkout 절대 경로>/deploy/compose.yml config --quiet`로 필수 설정을 먼저 검사합니다. 이 검사는 secret 파일이나 DB의 migration 상태를 인수하지 않습니다. migration은 수동 tools profile이며 일반 기동에 숨기지 않습니다. 운영 실행은 T2-15의 writer 정지·백업·migration·확인·receipt 계약을 구현한 뒤 수행합니다.
 
