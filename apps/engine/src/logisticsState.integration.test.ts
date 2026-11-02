@@ -82,7 +82,11 @@ beforeAll(async () => {
     capacity: { base: 10_000, perLevel: 10_000, maxLevel: 5 },
     upgrade: { gold: 1000, wood: 500 },
     transport: { maxHops: 8, hopsPerMonth: 2, lossBpPerHop: 100, maxPerOrder: 10_000, maxActivePerNation: 20 },
-    recruitPer100: { '1': { iron: 2, wood: 0, horses: 0 } },
+    recruitPer100: Object.fromEntries(
+      [...new Set(initial.unitSet.crewTypes.filter((type) => type.armType > 0).map((type) => type.armType))].map(
+        (armType) => [String(armType), { iron: 2, wood: 0, horses: 0 }],
+      ),
+    ),
     build: { wall: { iron: 0, wood: 50, horses: 0 }, defence: { iron: 20, wood: 20, horses: 0 } },
     trade: { iron: { buy: 3, sell: 1 }, wood: { buy: 3, sell: 1 }, horses: { buy: 3, sell: 1 } },
   };

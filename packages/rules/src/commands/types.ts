@@ -19,6 +19,7 @@ export interface Failure {
     | 'NOT_OWN_CITY'
     | 'NO_SUPPLY'
     | 'NO_GOLD'
+    | 'NO_GOODS'
     | 'AT_MAX'
     | 'BAD_ARGS'
     | 'UNKNOWN_COMMAND'

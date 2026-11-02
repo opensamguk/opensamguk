@@ -65,7 +65,7 @@ case $status in
   *) stop "ubuntu-files-read status=$status" ;;
 esac
 
-# deb822 ubuntu.sources: 모든 stanza가 미러 목록과 Ubuntu keyring을 쓴다
+# deb822 ubuntu.sources: 미러 목록 또는 공식 보안 URI와 Ubuntu keyring을 쓴다
 sources=$(awk -v uri="mirror+file:/etc/apt/apt-mirrors.txt" -v keyring="$keyring" '
   function fail(r) { print "STOP " r; failed = 1; exit }
   function within(value, set,   n, a, i) {
@@ -98,7 +98,11 @@ sources=$(awk -v uri="mirror+file:/etc/apt/apt-mirrors.txt" -v keyring="$keyring
     if (count == 0) next
     stanzas++
     if (("Enabled" in v) && v["Enabled"] != "yes") fail("enabled " v["Enabled"])
-    if (v["URIs"] != uri) fail("uris " v["URIs"])
+    if (v["URIs"] == uri) form = "mirror"
+    else if (v["URIs"] ~ /^https?:\/\/security\.ubuntu\.com\/ubuntu\/?$/) {
+      if (v["Suites"] != "noble-security") fail("security-suites " v["Suites"])
+      form = "security"
+    } else fail("uris " v["URIs"])
     if (v["Signed-By"] != keyring) fail("signed-by " v["Signed-By"])
     if (!within(v["Types"], T)) fail("types " v["Types"])
     if (!within(v["Suites"], S)) fail("suites " v["Suites"])
@@ -108,7 +112,7 @@ sources=$(awk -v uri="mirror+file:/etc/apt/apt-mirrors.txt" -v keyring="$keyring
       n = split(v["Suites"], a, /[[:space:]]+/); for (i = 1; i <= n; i++) seenS[a[i]]
       n = split(v["Components"], a, /[[:space:]]+/); for (i = 1; i <= n; i++) seenC[a[i]]
     }
-    print "STANZA Types=" v["Types"] " Suites=" v["Suites"] " Components=" v["Components"] \
+    print "STANZA Form=" form " URIs=" v["URIs"] " Types=" v["Types"] " Suites=" v["Suites"] " Components=" v["Components"] \
       " Architectures=" (("Architectures" in v) ? v["Architectures"] : "-") " Signed-By=" v["Signed-By"]
   }
   END {

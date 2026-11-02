@@ -84,11 +84,21 @@ async function user(id = randomUUID()) {
   await db.session.create({ data: { id: session.id, userId: id, expiresAt: session.expiresAt } });
   return { id, sessionId: session.id, cookie: `sid=${session.token}` };
 }
-async function advance(id: string, tick: number) {
+async function advance(id: string, tick: number, fail = false) {
   const lease = await acquireLease(db, id);
   if (!lease) throw new Error('물류 API 시험 실행권이 없습니다.');
   try {
-    await new TurnLoop(db, lease).advanceTo(tick);
+    await new TurnLoop(
+      db,
+      lease,
+      fail
+        ? {
+            beforeCommit: async () => {
+              throw new Error('after-consumption-save');
+            },
+          }
+        : {},
+    ).advanceTo(tick);
   } finally {
     await releaseLease(db, lease);
   }
@@ -150,7 +160,7 @@ async function fixture() {
       cityKeys: initial.cities.filter((city) => city.kind !== 'PASS').map((city) => city.cityKey),
       unitSet: initial.unitSet,
     });
-    if (neutral.some((city) => city.cityKey === preview.cityKey)) {
+    if (preview.nextTurnTick < 10_000 && neutral.some((city) => city.cityKey === preview.cityKey)) {
       playerId = candidate;
       cityKey = preview.cityKey;
       break;
@@ -163,7 +173,11 @@ async function fixture() {
     capacity: { base: 10_000, perLevel: 1000, maxLevel: 2 },
     upgrade: { gold: 1, wood: 1 },
     transport: { maxHops: 8, hopsPerMonth: 2, lossBpPerHop: 100, maxPerOrder: 100, maxActivePerNation: 20 },
-    recruitPer100: { '1': { iron: 2, wood: 0, horses: 0 } },
+    recruitPer100: Object.fromEntries(
+      [...new Set(initial.unitSet.crewTypes.filter((type) => type.armType > 0).map((type) => type.armType))].map(
+        (armType) => [String(armType), { iron: 2, wood: 0, horses: armType === 3 ? 1 : 0 }],
+      ),
+    ),
     build: { wall: { iron: 0, wood: 1, horses: 0 }, defence: { iron: 1, wood: 1, horses: 0 } },
     trade: { iron: { buy: 3, sell: 1 }, wood: { buy: 3, sell: 1 }, horses: { buy: 3, sell: 1 } },
   };
@@ -243,6 +257,140 @@ afterAll(async () => {
 });
 
 describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
+  it('일반 차례 저장 뒤 실패는 소비·금·도시·예턴·로그·순번을 함께 롤백하고 새 엔진이 한 번 처리한다', async () => {
+    const world = await fixture();
+    const ruler = await db.general.findUniqueOrThrow({
+      where: { worldId_id: { worldId: world.id, id: world.generalId } },
+    });
+    expect(
+      (
+        await rpc(
+          'turns.set',
+          {
+            worldId: world.id,
+            revision: ruler.turnRevision,
+            slots: Array.from({ length: 30 }, (_, slot) => (slot === 0 ? { commandKey: 'wall', args: {} } : null)),
+          },
+          world.player,
+        )
+      ).status,
+    ).toBe(200);
+    await advance(world.id, 10_000);
+    const before = await snapshot(world.id);
+    const count = await db.logisticsMovement.count({ where: { worldId: world.id } });
+    const sequence = (await db.world.findUniqueOrThrow({ where: { id: world.id } })).actionSequence;
+    const logs = await db.generalLog.count({ where: { worldId: world.id } });
+    await expect(advance(world.id, ruler.nextTurnTick, true)).rejects.toThrow('after-consumption-save');
+    expect(hashState(await snapshot(world.id))).toBe(hashState(before));
+    expect(await db.logisticsMovement.count({ where: { worldId: world.id } })).toBe(count);
+    expect(await db.generalLog.count({ where: { worldId: world.id } })).toBe(logs);
+    expect((await db.world.findUniqueOrThrow({ where: { id: world.id } })).actionSequence).toBe(sequence);
+    await advance(world.id, ruler.nextTurnTick);
+    const after = await snapshot(world.id);
+    expect(after.state.logistics!.cities[String(world.cityKey)]!.wood).toBe(
+      before.state.logistics!.cities[String(world.cityKey)]!.wood - 1,
+    );
+    expect(await db.logisticsMovement.count({ where: { worldId: world.id, reason: 'CONSUME' } })).toBe(1);
+    await advance(world.id, ruler.nextTurnTick);
+    expect(hashState(await snapshot(world.id))).toBe(hashState(after));
+  });
+
+  it('사람의 실제 예턴 모집·징병·건설 소비를 저장하고 원생성 다섯 월을 재생한다', async () => {
+    const world = await fixture();
+    for (const [good, amount] of [
+      ['iron', 7],
+      ['horses', 3],
+    ] as const) {
+      expect(
+        (
+          await rpc(
+            'logistics.submit',
+            {
+              worldId: world.id,
+              expectedUserId: world.player.id,
+              requestId: randomUUID(),
+              payload: { type: 'trade', cityKey: world.cityKey, good, side: 'buy', amount },
+            },
+            world.player,
+          )
+        ).status,
+      ).toBe(200);
+    }
+    await advance(world.id, 10_000);
+    const cavalry = initial.unitSet.crewTypes.find((type) => type.armType === 3);
+    if (!cavalry) throw new Error('생성 자원에 기병이 없습니다.');
+    const commands = [
+      { commandKey: 'recruit', args: { amount: 101, crewType: cavalry.id } },
+      { commandKey: 'wall', args: {} },
+      { commandKey: 'conscript', args: { amount: 1, crewType: cavalry.id } },
+      { commandKey: 'defence', args: {} },
+    ];
+    const ruler = await db.general.findUniqueOrThrow({
+      where: { worldId_id: { worldId: world.id, id: world.generalId } },
+    });
+    expect(
+      (
+        await rpc(
+          'turns.set',
+          {
+            worldId: world.id,
+            revision: ruler.turnRevision,
+            slots: Array.from({ length: 30 }, (_, slot) => commands[slot] ?? null),
+          },
+          world.player,
+        )
+      ).status,
+    ).toBe(200);
+    await advance(world.id, 10_000);
+    for (const command of commands) {
+      const before = await snapshot(world.id);
+      const due = await db.general.findUniqueOrThrow({
+        where: { worldId_id: { worldId: world.id, id: world.generalId } },
+      });
+      expect(due.nextTurnTick % 10_000).not.toBe(0);
+      await advance(world.id, due.nextTurnTick);
+      const after = await snapshot(world.id);
+      const rows = await db.logisticsMovement.findMany({
+        where: { worldId: world.id, tick: due.nextTurnTick, reason: 'CONSUME' },
+        orderBy: { ordinal: 'asc' },
+      });
+      const expected =
+        command.commandKey === 'recruit'
+          ? { iron: 4, wood: 0, horses: 2 }
+          : command.commandKey === 'conscript'
+            ? { iron: 2, wood: 0, horses: 1 }
+            : world.config.build[command.commandKey as 'wall' | 'defence'];
+      expect(rows.map(({ good, delta }) => ({ good, delta }))).toEqual(
+        Object.entries(expected)
+          .filter(([, amount]) => amount > 0)
+          .map(([good, amount]) => ({ good, delta: -amount })),
+      );
+      expect(after.state.logistics!.revision).toBe(before.state.logistics!.revision + 1);
+      const oldResource = before.state.cityResources!.cities[String(world.cityKey)]!;
+      const resource = after.state.cityResources!.cities[String(world.cityKey)]!;
+      if (command.commandKey === 'recruit' || command.commandKey === 'conscript') {
+        const amount = command.commandKey === 'recruit' ? 101 : 1;
+        expect(after.state.cities[world.cityKey]!.population).toBe(
+          before.state.cities[world.cityKey]!.population - amount,
+        );
+        expect(resource.gold).toBeLessThan(oldResource.gold);
+        expect(resource.garrison.find((row) => row.crewType === cavalry.id)!.troops).toBe(
+          (oldResource.garrison.find((row) => row.crewType === cavalry.id)?.troops ?? 0) + amount,
+        );
+      } else {
+        expect(after.state.generals[world.generalId]!.gold).toBeLessThan(before.state.generals[world.generalId]!.gold);
+        expect(resource.gold).toBe(oldResource.gold);
+      }
+      await advance(world.id, Math.ceil(due.nextTurnTick / 10_000) * 10_000);
+    }
+    const state = await snapshot(world.id);
+    expect(state.state.logistics!.cities[String(world.cityKey)]).toMatchObject({ iron: 0, horses: 0 });
+    const archive = await exportReplay(db, world.id),
+      replayed = replayArchive(archive, 5);
+    expect(replayed.map((row) => row.stateHash)).toEqual(archive.months.map((row) => row.stateHash));
+    expect(replayed.at(-1)!.stateHash).toBe(hashState(state));
+  });
+
   it('월 정산 대기 중에는 409와 읽기 전용을 주고 정산 뒤 같은 번호로 접수한다', async () => {
     const world = await fixture();
     const input = {
