@@ -25,6 +25,7 @@ import { ADMIN_CLOCK_KINDS, applyAdminClockRecord } from './clock/admin';
 import { cityResourcesFeature, cityResourceInputKind } from './cityResourcesFeature';
 import { ADMIN_END_KIND, applyAdminEndRecord } from './clock/end';
 import { ADMIN_RESET_KIND, applyAdminResetRecord } from './clock/reset';
+import { logisticsFeature, logisticsInputKind } from './logistics/feature';
 
 export interface ReplayOriginV1 {
   version: 1;
@@ -82,8 +83,9 @@ export const ruleRegistry: RuleRegistry = {
     campaignFeature,
     campaignAssignmentFeature,
     cityResourcesFeature,
+    logisticsFeature,
   ],
-  monthlyOrder: ['treaty', 'personnel', 'campaign-assignment-v2'],
+  monthlyOrder: ['treaty', 'personnel', 'campaign-assignment-v2', 'logistics-v1'],
   inputKinds: [
     ...ADMIN_CLOCK_KINDS.map((kind) => ({
       kind,
@@ -103,6 +105,7 @@ export const ruleRegistry: RuleRegistry = {
     treatyBreakInputKind,
     ...campaignInputKinds,
     cityResourceInputKind,
+    logisticsInputKind,
   ],
 };
 

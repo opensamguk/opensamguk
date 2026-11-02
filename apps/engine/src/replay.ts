@@ -40,6 +40,7 @@ import { hashState } from '@opensamguk/shared/node';
 import { exportCapsArchive, replayCapsArchive, replayCapsToEnd, type CapsArchive } from './replayCaps';
 import { checkStoredReplayFormat } from './features';
 import { assertStoredCityResources } from './cityResourcesState';
+import { assertStoredLogistics } from './logisticsState';
 import { checkedAdminEndResult } from './admin/end';
 import { checkedAdminResetResult, checkedResetTarget } from './admin/reset';
 
@@ -128,6 +129,7 @@ export async function exportReplay(
       if (world.replayOrigin === null) throw new Error('생성 기록이 없는 월드는 재생할 수 없습니다.');
       checkStoredReplayFormat(world);
       await assertStoredCityResources(tx, world);
+      await assertStoredLogistics(tx, world);
       const v3 = world.replayFormat === 3;
       if (!v3) {
         const capabilities = selectWorldCapabilities(world);

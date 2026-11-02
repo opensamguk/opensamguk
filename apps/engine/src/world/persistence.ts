@@ -25,6 +25,7 @@ import {
   attachOperationalKinds,
   emptyCampaignState,
   emptyCityResourcesState,
+  initialLogisticsState,
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { loadCommandState } from '../commandPersistence';
@@ -254,6 +255,14 @@ export function prepareInitialWorld(state: WorldInit, suppliedOptions: InitialWo
           : {}),
         ...(features.includes('city-resources-v1')
           ? { cityResourcesState: emptyCityResourcesState(toWorldState(creationState)) as Prisma.InputJsonValue }
+          : {}),
+        ...(features.includes('logistics-v1')
+          ? {
+              logisticsState: initialLogisticsState(
+                featureData?.['logistics-v1'],
+                toWorldState(creationState),
+              ) as Prisma.InputJsonValue,
+            }
           : {}),
         ...(creationState.operationalMap
           ? { operationalMap: creationState.operationalMap as Prisma.InputJsonValue }

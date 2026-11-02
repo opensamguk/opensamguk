@@ -21,6 +21,10 @@ import { processTreatyQueuedInput } from './treatyInput';
 import { loadResidenceAnchors, persistResidenceAnchors } from './residenceState';
 import { persistForeignCampaignInput, processCampaignQueuedInput } from './campaignInput';
 import { processCityResourceInput } from './cityResourceInput';
+import { processLogisticsInput } from './logistics/input';
+import { appendLogisticsMovements } from './logisticsState';
+import { logisticsMovementSchema } from '@opensamguk/rules';
+import { z } from 'zod';
 
 export async function persistPersonnelPacket(
   tx: Prisma.TransactionClient,
@@ -100,6 +104,14 @@ const processPersonnelInput: QueuedInputHandler = async (tx, world, event, { tic
 };
 
 export const builtInEngineFeatures: readonly EngineFeature[] = [
+  {
+    key: 'logistics-v1',
+    queuedInputs: { 'logistics.order': processLogisticsInput },
+    async persistMonthly(tx, worldId, _before, _next, effects, context) {
+      const rows = z.strictObject({ movements: z.array(logisticsMovementSchema) }).parse(effects).movements;
+      await appendLogisticsMovements(tx, worldId, rows, context);
+    },
+  },
   { key: 'campaign-assignment-v2' },
   {
     key: 'campaign-v1',
@@ -109,7 +121,9 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
       'campaign.order': processCampaignQueuedInput,
     },
     afterQueuedInput: (tx, world, before, input) =>
-      input.kind === 'city.resources' ? Promise.resolve() : persistForeignCampaignInput(tx, world, before, input),
+      ['city.resources', 'logistics.order'].includes(input.kind)
+        ? Promise.resolve()
+        : persistForeignCampaignInput(tx, world, before, input),
   },
   { key: 'city-resources-v1', queuedInputs: { 'city.resources': processCityResourceInput } },
   { key: 'five-stats' },

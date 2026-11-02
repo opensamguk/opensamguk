@@ -25,6 +25,7 @@ import { persistExt } from './extState';
 import { persistTreatyClosures } from './treatyState';
 import { persistCampaignState, readCampaignArmyTypes } from './campaignState';
 import { persistCityResourcesState } from './cityResourcesState';
+import { persistLogisticsState } from './logisticsState';
 
 export async function loadReplayState(tx: Prisma.TransactionClient, worldId: string): Promise<ReplayState> {
   const state = await loadWorld(tx, worldId);
@@ -124,6 +125,7 @@ export async function persistMonthly(
   await tx.diplomacy.deleteMany({ where: { worldId } });
   await tx.diplomacy.createMany({ data: next.diplomacies.map((entry) => ({ ...entry, worldId })) });
   await persistExt(tx, worldId, before.ext, next.ext);
+  await persistLogisticsState(tx, worldId, before, next);
   await persistCampaignState(tx, worldId, before, next);
   await persistCityResourcesState(
     tx,

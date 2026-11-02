@@ -10,6 +10,7 @@ import { assertNoResidenceAnchorsInRows } from './residenceState';
 import { storedGeneralStats } from './generalStats';
 import { readCampaignArmyTypes, readStoredCampaign } from './campaignState';
 import { readStoredCityResources } from './cityResourcesState';
+import { readStoredLogistics, readLogisticsOriginConfig } from './logisticsState';
 
 export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): Promise<WorldState> {
   const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
@@ -87,6 +88,10 @@ export async function loadWorldAfterCapabilityCheck(
     world.ruleFeatures.includes('city-resources-v1') ? readCampaignArmyTypes(world) : [],
   );
   if (cityResources) state.cityResources = cityResources;
+  const logistics = readStoredLogistics(world.logisticsState, state, readLogisticsOriginConfig(world, state));
+  if (logistics && logistics.monthlyTick !== world.monthlyTick)
+    throw new Error('저장된 물류와 월 정산 tick이 다릅니다.');
+  if (logistics) state.logistics = logistics;
   for (const feature of engineFeatures
     .filter((feature) => world.ruleFeatures?.includes(feature.key))
     .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)))

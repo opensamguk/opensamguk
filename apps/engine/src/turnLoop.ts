@@ -15,6 +15,7 @@ import {
   isPolicyMode,
   completePersonnelStep,
   updateResidenceAnchors,
+  logisticsCommandMovements,
   type WorldState,
 } from '@opensamguk/rules';
 import { appendNationHistory, persistCommandReports, commandRealtimeSignals } from './commandPersistence';
@@ -26,6 +27,7 @@ import { hashState } from '@opensamguk/shared/node';
 import { processInputs, processPendingInput } from './inputs';
 import { checkWorldReplay } from './features';
 import { persistPersonnelPacket } from './ruleFeatures';
+import { appendLogisticsMovements } from './logisticsState';
 import { engineResolver, persistExt, verifyWorldExt } from './extState';
 import { assertWorldCapabilities } from './capsGate';
 import { processAdminClock } from './admin/executor';
@@ -322,6 +324,7 @@ export class TurnLoop {
               : null;
           if (personnelPacket) next = personnelPacket.state;
           signals.push(...commandRealtimeSignals(state, next));
+          const consumption = logisticsCommandMovements(state, next);
           await persistEffects(
             tx,
             worldId,
@@ -334,6 +337,7 @@ export class TurnLoop {
               : undefined,
           );
           await persistExt(tx, worldId, state.ext, next.ext);
+          await appendLogisticsMovements(tx, worldId, consumption, { sequence, tick: due.nextTurnTick });
           if (!failed) await persistCommandReports(tx, worldId, due.nextTurnTick, due.id, result);
           if (turn.nation) {
             const national = turn.nation.result;
