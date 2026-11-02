@@ -18,6 +18,7 @@ const webDir = join(repoRoot, 'apps', 'web');
 const distDir = resolve(process.env.PUBLIC_ASSETS_DIST || join(webDir, 'dist'));
 const META_FILE = 'public-build.json';
 const FALLBACK_SOURCE = 'apps/web/src/portrait/fallback.svg';
+const KEYART_SOURCE = 'apps/web/src/art/keyart.png';
 // M1 dev 서버·API와 초상 시험(portrait.spec.ts)이 쓰는 port. 겹치면 시작하지 않는다.
 const RESERVED_PORTS = new Set([5173, 3001, 5181, 5182]);
 const ASSET_TYPES = new Set(['document', 'script', 'stylesheet', 'font', 'image']);
@@ -259,6 +260,30 @@ for (const path of ['/', '/login']) {
     for (const src of srcs) expect(src).not.toMatch(/\/portraits\/|^data:image/);
   });
 }
+
+// 새로고침해도 같은 dist와 승인한 CDN 그림만 다시 받고 로그인 그림이 다시 그려지는지 본다.
+// /trpc·/sse는 여기서도 503으로 막으므로 실제 API 재연결의 증거로 쓰지 않는다.
+test('/login 화면을 새로고침해도 승인한 CDN 그림과 dist만 다시 받는다', async ({ page }) => {
+  const keyart = meta.remoteImages.find((image) => image.source === KEYART_SOURCE)!.url;
+  const banner = page.locator(`img[src="${keyart}"]`);
+  const drawn = () => banner.evaluate((img: HTMLImageElement) => (img.complete ? img.naturalWidth : 0));
+  const seen = await watch(page);
+  await page.goto(`${origin}/login`, { waitUntil: 'networkidle' });
+  await expect(banner).toHaveCount(1);
+  await expect.poll(drawn).toBeGreaterThan(0);
+  await Promise.all(seen.pending);
+  const documentsBefore = seen.assets.filter((asset) => asset.type === 'document').length;
+
+  const reloaded = await page.reload({ waitUntil: 'networkidle' });
+  expect(reloaded?.status()).toBe(200);
+  await expect(page.locator('#root > *').first()).toBeAttached();
+  await expect(banner).toHaveCount(1);
+  await expect.poll(drawn).toBeGreaterThan(0);
+  await Promise.all(seen.pending);
+
+  expect(seen.assets.filter((asset) => asset.type === 'document').length).toBe(documentsBefore + 1);
+  expectOnlyDistAssets(seen);
+});
 
 test('고정 커밋의 SVG를 실제 브라우저가 CDN에서 읽는다', async ({ page }) => {
   const seen = await watch(page);

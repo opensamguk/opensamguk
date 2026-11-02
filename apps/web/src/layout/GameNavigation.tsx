@@ -20,7 +20,7 @@ import styles from './GameNavigation.module.css';
 // 구조 참고: opensamguk-v1 bc053629의 GameFrame.tsx·nav31.ts (MIT).
 // Copyright (c) 2026 빼뽀네 (peppone-choi) and OpenSamguk contributors.
 // 현재 React 주소와 메인 지도·30칸 예약을 유지하고 연결된 화면만 안내한다.
-// 아이콘은 Codex 생성 도트 그림이다 (apps/web/src/art/sources.json, D-041).
+// 아이콘은 Codex 생성 도트 그림이다 (opensamguk-images의 public/art/sources.json, D-041).
 const NAV = [
   { to: '/w/$worldId', label: '군략도', icon: mainIcon, exact: true },
   { to: '/w/$worldId', label: '예턴', icon: turnsIcon, area: 'main-commands' },
