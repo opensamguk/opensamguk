@@ -41,8 +41,11 @@ export const logisticsFeature: RuleFeatureDefinition = {
       cities: Object.fromEntries(initial.cities.map((city) => [city.cityKey, city])),
     });
     const armTypes = new Set(initial.unitSet.crewTypes.filter((row) => row.armType > 0).map((row) => row.armType));
-    if (Object.keys(config.recruitPer100).some((key) => !armTypes.has(Number(key))))
-      throw new Error('물류 모병 비용의 군사 병과가 없습니다.');
+    if (
+      Object.keys(config.recruitPer100).length !== armTypes.size ||
+      Object.keys(config.recruitPer100).some((key) => !armTypes.has(Number(key)))
+    )
+      throw new Error('물류 모병 비용은 원생성의 모든 군사 병과에 명시해야 합니다.');
   },
   initReplayState(replay, { data }) {
     if (Object.hasOwn(replay.state, 'logistics')) throw new Error('물류 초기화가 중복됐습니다.');

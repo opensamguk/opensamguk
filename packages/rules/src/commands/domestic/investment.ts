@@ -5,6 +5,8 @@ import type { Actor, CommandDef, Failure } from '../types';
 import type { CityField, Effect } from '../effects';
 import { applyModifiers, collectModifiers, collectModifiersWith, type ModifierProvider } from '../../modifiers';
 import { domesticStatScore } from '../statScores';
+import { checkCityGoods, consumeCityGoods } from '../../logistics/consumption';
+import { cloneWorld } from '../../model/clone';
 
 type Spec = {
   key: string;
@@ -65,6 +67,7 @@ export function makeInvestmentWithProviders(spec: Spec, providers: readonly Modi
 
 function makeInvestmentWithCollector(spec: Spec, collect: typeof collectModifiers): CommandDef {
   const cost = BALANCE.DEVEL_COST * (spec.costFactor ?? 1);
+  const construction = spec.field === 'wall' || spec.field === 'defence' ? spec.field : null;
   function check(view: WorldView, actor: Actor): Failure | null {
     const general = view.generals[actor.generalId];
     if (!general) return { code: 'NO_ACTOR', message: '장수가 없습니다.' };
@@ -80,7 +83,12 @@ function makeInvestmentWithCollector(spec: Spec, collect: typeof collectModifier
     const value = spec.field === 'tech' ? nation.tech : city[spec.field];
     const max =
       spec.field === 'tech' ? BALANCE.MAX_TECH : spec.field === 'trust' ? BALANCE.MAX_TRUST : city[`${spec.field}Max`];
-    return value >= max ? { code: 'AT_MAX', message: '이미 최대치입니다.' } : null;
+    if (value >= max) return { code: 'AT_MAX', message: '이미 최대치입니다.' };
+    if (construction && view.ruleFeatures?.includes('logistics-v1')) {
+      if (!view.logistics) throw new Error('물류 판의 재고가 없습니다.');
+      return checkCityGoods(view, city.cityKey, view.logistics.config.build[construction]);
+    }
+    return null;
   }
   return {
     key: spec.key,
@@ -95,6 +103,15 @@ function makeInvestmentWithCollector(spec: Spec, collect: typeof collectModifier
       if (failure) throw new Error(failure.message);
       const general = view.generals[actor.generalId]!;
       const city = view.cities[general.cityKey]!;
+      let material: Effect[] = [];
+      if (construction && view.ruleFeatures?.includes('logistics-v1')) {
+        if (!view.logistics) throw new Error('물류 판의 재고가 없습니다.');
+        const spent = consumeCityGoods(view, city.cityKey, view.logistics.config.build[construction]);
+        if (!spent.ok) throw new Error(spent.message);
+        const state = cloneWorld(view);
+        state.logistics = spent.logistics;
+        material = [{ kind: 'world', state }];
+      }
       // Replay order: base score, critical roll, then a multiplier only for a critical.
       let score =
         ((domesticStatScore(view, general, spec.key, spec.stat) * city.trust) / 100) * (0.8 + rng.next() * 0.4);
@@ -118,6 +135,7 @@ function makeInvestmentWithCollector(spec: Spec, collect: typeof collectModifier
           : { kind: 'city', id: city.cityKey, field: spec.field, op: 'add', value: change };
       return {
         effects: [
+          ...material,
           effect,
           { kind: 'general', id: general.id, field: 'gold', op: 'add', value: -cost },
           { kind: 'general', id: general.id, field: 'experience', op: 'add', value: Math.round(score * 0.7) },

@@ -4,6 +4,7 @@ import type { WorldView } from '../model/world';
 import type { NpcCandidate, NpcContext } from '../npc';
 import { readCampaignState } from '../campaign/state';
 import { readCityResourcesState } from './state';
+import { affordableByGoods } from '../logistics/consumption';
 
 const candidate = (key: string, args: Record<string, unknown>, score: number, reason: string): NpcCandidate => ({
   key,
@@ -38,7 +39,14 @@ export function cityNpcPreparation(view: WorldView, generalId: number, context: 
   }
   if ((row?.troops ?? 0) < 2000) {
     const limit = Math.min(2000 - (row?.troops ?? 0), city.population);
-    const amount = affordableRecruits(view, { ...general, gold: resources.gold }, type.cost, limit);
+    let amount = affordableRecruits(view, { ...general, gold: resources.gold }, type.cost, limit);
+    if (view.ruleFeatures?.includes('logistics-v1')) {
+      const logistics = view.logistics,
+        cost = logistics?.config.recruitPer100[String(type.armType)],
+        stock = logistics?.cities[String(city.cityKey)];
+      if (!cost || !stock) throw new Error('NPC의 물류 모집 비용 또는 거점 재고가 없습니다.');
+      amount = affordableByGoods(stock, cost, amount);
+    }
     if (amount > 0)
       choices.push(
         candidate('recruit', { amount, crewType: type.id }, 120, '도시 금으로 부족한 도시 수비병을 모집한다.'),

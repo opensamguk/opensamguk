@@ -54,6 +54,7 @@ export function assertLogisticsConserved(
         : before.convoys.some((convoy) => convoy.id === row.id) || after.convoys.some((convoy) => convoy.id === row.id);
     if (!exists) throw new Error('물류 변동의 보유처가 없습니다.');
     const delta = BigInt(row.delta);
+    if (row.reason === 'CONSUME' && row.holder !== 'city') throw new Error('물류 소비는 도시에서만 기록합니다.');
     if (
       (row.reason === 'DEPART' && (row.holder === 'city' ? row.delta > 0 : row.delta < 0)) ||
       (['ARRIVE', 'RETURN', 'CAPTURE'].includes(row.reason) && (row.holder === 'city' ? row.delta < 0 : row.delta > 0))

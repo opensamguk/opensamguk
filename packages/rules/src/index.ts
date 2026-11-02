@@ -197,5 +197,6 @@ export * from './clock/createRequest';
 export * from './logistics/state';
 export * from './logistics/origin';
 export * from './logistics/ledger';
+export * from './logistics/consumption';
 export * from './logistics/operations';
 export { logisticsResultSchema, validateLogisticsRecord } from './logistics/feature';

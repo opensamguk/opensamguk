@@ -8,6 +8,7 @@ import type { WorldView } from '../model/world';
 import { readCampaignState } from '../campaign/state';
 import { recruitCityGarrison } from './ledger';
 import { readCityResourcesState } from './state';
+import { consumeCityGoods, recruitGoods } from '../logistics/consumption';
 
 const positive = z.number().int().min(1).max(1_000_000);
 export const cityRecruitArgs = z.strictObject({ amount: positive, crewType: positive });
@@ -41,6 +42,12 @@ export function applyCityPreparation(view: WorldView, actor: Actor, key: CityPre
     if (city.population < amount) return fail('NO_POPULATION', '도시 인구가 부족합니다.');
     const cost = recruitCost(view, general, amount, crewType.cost, key === 'conscript');
     if (resource.gold < cost) return fail('NO_GOLD', '도시 금이 부족합니다.');
+    if (view.ruleFeatures?.includes('logistics-v1')) {
+      if (!view.logistics) throw new Error('물류 판의 재고가 없습니다.');
+      const spent = consumeCityGoods(view, city.cityKey, recruitGoods(view.logistics.config, crewType.armType, amount));
+      if (!spent.ok) return spent;
+      state.logistics = spent.logistics;
+    }
     const recruited = recruitCityGarrison(resource, crewType.id, amount);
     recruited.gold -= cost;
     ledger.cities[String(general.cityKey)] = recruited;
