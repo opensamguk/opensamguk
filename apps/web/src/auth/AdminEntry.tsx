@@ -18,9 +18,10 @@ export function AdminEntry({ className }: { className?: string | undefined }) {
   const me = useQuery(trpc.auth.me.queryOptions());
   const userId = me.data?.user?.id;
   if (!userId) return null;
+  // 계정이 바뀌면 새로 그린다. 같은 관찰자의 키만 바꾸면 거절된 확인도 다시 묻는다 (retryOnMount가 적용되지 않는다).
   return (
     <Suspense fallback={null}>
-      <AdminLink userId={userId} className={className} />
+      <AdminLink key={userId} userId={userId} className={className} />
     </Suspense>
   );
 }

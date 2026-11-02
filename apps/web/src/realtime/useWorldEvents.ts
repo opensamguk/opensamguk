@@ -59,7 +59,10 @@ export function applyWorldEvent(queryClient: QueryClient, trpc: Trpc, worldId: s
     const authHash = hashKey(authKey);
     const authWasFetching = queryClient.getQueryState(authKey)?.fetchStatus === 'fetching';
     // 화면 데이터는 기존처럼 새로 읽되 공유 인증의 진행 중 가드는 취소하지 않는다.
-    void queryClient.invalidateQueries({ predicate: (query) => query.queryHash !== authHash });
+    // meta.readyRefetch가 false인 query는 연결마다 다시 묻지 않는다 (일반 화면의 운영 입구 확인, INT-20).
+    void queryClient.invalidateQueries({
+      predicate: (query) => query.queryHash !== authHash && query.meta?.readyRefetch !== false,
+    });
     const refreshed = queryClient.invalidateQueries({ queryKey: authKey, exact: true }, { cancelRefetch: false });
     // ready 전 응답에 합류했다면 정착 뒤에도 쓰는 인증 조회를 한 번 더 갱신한다.
     if (authWasFetching)

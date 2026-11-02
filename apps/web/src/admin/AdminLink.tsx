@@ -13,12 +13,16 @@ export function AdminLink({ userId, className }: { userId: string; className?: s
   const admin = useQuery({
     queryKey: ['adminEntry', userId],
     queryFn: async ({ signal }) => {
-      const [, permission] = await Promise.all([
+      const [identity, permission] = await Promise.all([
         entryClient.auth.me.query(undefined, { signal }),
         entryClient.admin.whoami.query(undefined, { signal }),
       ]);
+      // 다른 탭에서 계정을 바꿨거나 응답이 늦게 오면 서버가 본 계정이 이 키의 계정과 다를 수 있다. 그 결과는 저장하지 않는다.
+      if (identity.user?.id !== userId) throw new Error('운영 입구 확인 응답의 계정이 다릅니다.');
       return permission;
     },
+    // SSE ready마다 화면 전체를 다시 받을 때도 이 확인은 다시 묻지 않는다 (useWorldEvents.ts).
+    meta: { readyRefetch: false },
     retry: false,
     retryOnMount: false,
     staleTime: 5 * 60_000,
