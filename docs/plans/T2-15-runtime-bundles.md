@@ -36,7 +36,7 @@ AC-M2-08은 서버 1대에 명령 하나로 배포하고 이전 버전으로 되
 
 ### 하지 않는 것
 
-`deploy/compose.yml`, `deploy/Caddyfile`, `deploy/security.caddy`, `deploy/entrypoint.sh`의 바이트를 바꾸지 않는다. target 사전 확인의 Compose 고정값이 그대로 맞아야 한다. 규칙·엔진 턴 로직·DB schema·migration은 손대지 않으며 자체 migration 실행기를 만들지 않고 Prisma CLI `migrate deploy`를 그대로 쓴다. web target과 `build:public`도 그대로다. 복귀 리허설, 실제 운영 배포, 백업·복구 변경, target 사전 확인의 Tunnel 모드 확장은 후속이다. 개발 명령(`pnpm dev`, `engine:run`, `world:*`, `test:int`)은 계속 tsx로 실행한다.
+`deploy/compose.yml`, `deploy/Caddyfile`, `deploy/entrypoint.sh`의 바이트를 바꾸지 않는다. CSP는 이후 승인된 D-060에 따라 바꾼다. target 사전 확인의 Compose 고정값이 그대로 맞아야 한다. 규칙·엔진 턴 로직·DB schema·migration은 손대지 않으며 자체 migration 실행기를 만들지 않고 Prisma CLI `migrate deploy`를 그대로 쓴다. web target 이름은 유지하며 D-060 외부 이미지 계약을 빌드에 반영한다. 복귀 리허설, 실제 운영 배포, 백업·복구 변경, target 사전 확인의 Tunnel 모드 확장은 후속이다. 개발 명령(`pnpm dev`, `engine:run`, `world:*`, `test:int`)은 계속 tsx로 실행한다.
 
 ### 결정이 필요한 것
 
@@ -164,7 +164,7 @@ A13 Tunnel은 선택 항목으로 두고 Docker 밖의 리팩터링도 이번 �
 #### 2. 게임 이미지 분리
 
 - 이미지는 모두 `opensamguk/opensamguk-images`로 옮긴다. 공개 초상은 지금처럼 fallback만 쓴다. `portraits/` 경로는 계속 금지한다.
-- 주소는 전체 40자리 커밋 SHA로 고정한다. 권장 형식은 `https://cdn.jsdelivr.net/gh/opensamguk/opensamguk-images@<SHA>/<path>`이다. raw.githubusercontent는 SVG를 `text/plain`으로 보내 그림이 표시되지 않으므로 쓰지 않는다. jsDelivr는 CORS(`*`)를 주므로 CSS `mask-image`도 동작한다.
+- 주소는 전체 40자리 커밋 SHA로 고정한다. PNG·WebP는 `https://raw.githubusercontent.com/opensamguk/opensamguk-images/<SHA>/<path>`, SVG는 `https://rawcdn.githack.com/opensamguk/opensamguk-images/<SHA>/<path>`를 쓴다. 실제 MIME·CORS·해시와 브라우저 표시를 확인한다.
 - 승인 목록은 shared에 `{ path, url, sha256, provenance }` 형태로 둔다. 지금의 `publicMapImages.ts`를 넓혀 쓴다.
   - web은 SVG·PNG 바이너리 import를 이 상수의 URL로 바꾼다.
   - eslint `no-restricted-imports`로 이미지 확장자 import를 막는다.
@@ -196,51 +196,73 @@ A13 Tunnel은 선택 항목으로 두고 Docker 밖의 리팩터링도 이번 �
 - CDN이 멈추면 fallback 초상도 보이지 않는다. CSS 배경색을 마지막 대비책으로 둔다.
 - 이미지 저장소 SHA를 바꿀 때 manifest·shared·CSP를 함께 고쳐야 한다. shared 상수 하나를 원본으로 삼아 셋을 맞춘다.
 
-## 구현 기록 (담당)
+## 구현 기록
 
-- 바꾼 것:
-- 계획과 달라진 점과 이유:
-- 검증 결과: 아래 표에 채운다.
+운영 server·engine은 esbuild0.28.2로 만든 `.mjs`를 실행한다. 감독은 같은 번들을 `--world`로 실행하며 소스 실행의 tsx 경로는 유지한다. 자료 루트는 `OPENSAMGUK_RESOURCES_ROOT`로 받는다. argon2의 Linux native prebuild는 external로 복사하고 Prisma WASM query compiler는 번들에 포함한다. migrate는 전용 workspace의 Prisma 운영 의존성·schema·migration·config만 받는다.
 
-## 리뷰 (독립 Claude)
+사용자가 추가로 요청한 공통 이미지 분리와 범위 밖 리팩터링은 Workers 담당과 협의했다. IO 없는 Origin·JSON 요청 검사와 요청 제한 창 계산을 shared로 옮겼다. 게임 규칙·턴 처리·저장소 구현은 바꾸지 않았다. 공개 그림97개와 개발·편집 입력11개는 `opensamguk-images`의 `b7efb438b70058aefdfa2fbc4693ca7db259bbc6`으로 고정했다. PNG·WebP는 GitHub raw, SVG는 rawcdn.githack.com을 쓴다. jsDelivr의 SVG는 실제 요청에서403이어서 채택하지 않았다. 생성기 출력과 출처 기록도 이미지 저장소로 옮겼다.
 
-- 결과:
-- 확인한 것:
-- 고칠 것:
+프론트 구현은 사용자 인계에 따라 Claude Code가 맡았다. 외부 바탕 그림의 canvas 읽기에 `crossOrigin='anonymous'`를 넣고 처리 오류가 promise를 거부하도록 고쳤다. 실제 Chromium 비교에서 수정 전 `SecurityError`, 수정 후 픽셀700000바이트 읽기를 확인했다. 디자인 변경은 하지 않았으며 이후 디자인은 사용자 지정 Claude 도구가 맡고 이미지 생성은 Codex가 맡는다.
+
+기본 Compose·HTTPS Caddyfile·비밀 진입점의 바이트는 유지했다. 선택 Tunnel 파일은 기본 서비스를 상속하고 HTTP Caddy와 cloudflared를 같은 namespace에서 실행한다. 실제 Compose 해석 결과 여섯 서비스의 공개 포트는0개다. Caddy는 loopback cloudflared의 CF-Connecting-IP만 신뢰하고 XFF를 클라이언트 IP 하나로 덮어쓴다. `TRUST_PROXY=1` 계약을 유지한다.
+
+### 계획에서 바뀐 점
+
+- D-060 승인으로 이미지 바이트를 외부 저장소로 옮기면서 web 빌드·자산 검사·CSP도 바꿨다. target 이름과 기존 공개 승인 목록은 유지했다.
+- Tunnel 정적 파일 대조 시험 대신 실제 `docker compose config --format json` 결과의 포트·권한·비밀 환경 계약을 검사하고 실제 Caddy 요청으로 IP 전달을 확인했다.
+- 권한 판정 분기는 직접 바꾸지 않아 전체 authz 묶음은 실행하지 않았다. 영향받는 감독·security·session-renewal·preset 통합85개와 release 관련193개를 실행했다.
+- 기존 기본 Compose에는 필수 `AUDIT_HASH_KEY` 전달이 없다. 기준판도 그대로는 시작하지 못한다. 이 작업은 기본 파일을 보존하므로 격리 리허설의 별도 command override에서 비밀 파일을 읽어 전달했다. 운영 적용 전 이 기존 간극을 해결해야 한다.
+- 승인된 Tunnel 도메인·토큰과 서로 다른 두 공인 클라이언트가 없다. Quick Tunnel은 SSE를 지원하지 않으므로 공개 Tunnel 종단 시험을 완료로 세지 않았다. 아래 T행의 실제 Caddy 리허설과 구별한다.
+
+## 독립 리뷰
+
+Claude의 최초 독립 리뷰는 P2 두 건을 지적했다. 관 성벽 생성기의 삭제된 입력 경로와 운영 문서의 오래된 CSP 설명이었다. 생성기를 외부 저장소로 옮기고 중복 출처 사본을 지웠으며 CSP·출처 설명을 고쳤다. Claude 재리뷰는 두 건 해결과 새 P1/P2 없음으로 판정했다. 구현 담당 Codex가 리뷰 결과를 고쳤다.
+
+프론트 인계 후 Claude Code가 구현한 CORS 처리와 새로고침 시험은 Codex가 독립 확인했다. CORS 설정이 `src` 대입보다 앞에 있고 오류가 정착하며 기존 요청·그림 목록 제한을 유지하는 것을 확인했다. 실행 증거는 별도 artifact에 보관한다.
 
 ## 검증 증거
 
-결과 칸에는 통과·실패·미실행 중 하나만 쓴다. 증거 위치는 커밋하지 않는 로그 경로나 CI 실행 URL이다.
+로그 기준 위치는 `E:\codex-artifacts\opensamguk\t2-15-runtime-bundles`다. 로그·비밀·리허설 DB는 Git에 넣지 않는다. skip 또는 mock 결과를 실제 API·엔진 증거로 세지 않는다.
 
-| #   | 항목                                       | 명령·방법                                       | 통과 기준                                                     | 대상 SHA | 결과   | 증거 위치 |
-| --- | ------------------------------------------ | ----------------------------------------------- | ------------------------------------------------------------- | -------- | ------ | --------- |
-| S1  | 전체 검사                                  | `pnpm check`                                    | 종료 코드 0                                                   |          | 미실행 |           |
-| S2  | 번들 metafile                              | `tools/t2-15-runtime-bundle.test.ts`            | 금지 입력 0, external 2                                      |          | 미실행 |           |
-| S3  | Tunnel Compose 정적 검사                   | `tools/t2-15-compose-tunnel.test.ts`            | ports 0, 공통 서비스 동일, 비밀 환경 0                        |          | 미실행 |           |
-| I1  | 감독 통합                                  | `pnpm test:int`                                 | FAIL·skip 0                                                   |          | 미실행 |           |
-| I2  | 권한 통합                                  | `pnpm test:authz`                               | FAIL·skip 0                                                   |          | 미실행 |           |
-| I3  | release 묶음                               | 검증 2의 vitest 네 파일과 Linux fixture         | FAIL·skip 0                                                   |          | 미실행 |           |
-| I4  | 정확 SHA CI                                | `ci.yml`, `release-target-preflight.yml`        | 모두 녹색                                                     |          | 미실행 |           |
-| D1  | Docker 네 빌드                             | 검증 3                                          | 네 target 성공, User·label·ENTRYPOINT 유지                    |          | 미실행 |           |
-| D2  | 이미지 내용                                | 검증 3                                          | `tsx`·`pnpm`·소스 없음                                        |          | 미실행 |           |
-| R1  | migrate                                    | 검증 5                                          | 종료 0, 완료 행 수 = migration 수                             |          | 미실행 |           |
-| R2  | healthz·argon2                             | 검증 5                                          | `ok:true`, 가입·로그인 성공                                   |          | 미실행 |           |
-| R3  | 감독 자식                                  | 검증 5                                          | `engine.mjs --world <ID>` 자식 확인                           |          | 미실행 |           |
-| R4  | 턴 진행                                    | 검증 5                                          | heartbeat·턴 2회 이상 증가                                    |          | 미실행 |           |
-| R5  | 종료·리스 해제                             | 검증 5                                          | 20초 안 종료 0, 자식 없음, `expiresAt <= now()`               |          | 미실행 |           |
-| T1  | 공인 포트 없음                             | 검증 6                                          | `docker compose port` 비어 있음, 새 listen 없음               |          | 미실행 |           |
-| T2  | 정적·새로고침                              | 검증 6                                          | 첫 화면, 깊은 경로, `/assets/*` 200                           |          | 미실행 |           |
-| T3  | SSE                                        | 검증 6                                          | 2분 넘게 유지, 이벤트 수신, 재연결                            |          | 미실행 |           |
-| T4  | 실제 IP rate limit                         | 검증 6                                          | 위조 헤더 무시, 망별 버킷, `ipHash` 상이                      |          | 미실행 |           |
-| V1  | 독립 Claude 리뷰                           | 검증 7                                          | 필수 지적 0                                                   |          | 미실행 |           |
-| V2  | PR 병합                                    | 보호 규칙                                       | 병합 SHA 기록                                                 |          | 미실행 |           |
+| 항목 | 결과 | 실제 증거와 범위 |
+| --- | --- | --- |
+| `pnpm check` | 통과 | `check-release.log`, 전체6484개 통과·종료0. 최초 시작 검사9건의 순서 회귀는 수정 후11개 통과. 다음 전체 검사는 기존 uptimeDrill의 PID 종료 관측1건 실패. 해당 파일5개는 단독 재실행 통과. |
+| 번들·자료 루트·감독 인자 | 통과 | `focused.log`, 4파일21개. WASM metafile·금지 입력·native argon2 확인. |
+| shared·공개 정책 | 통과 | `shared-focused.log`, 6파일99개. |
+| 감독·security·session·preset 실제 DB | 통과 | `integration-final.log`, 4파일85개, skip0. |
+| release·공개 산출물 검사 | 통과 | `release-focused.log`, 7파일193개. |
+| Docker 네 target | 통과 | `reviewed-{server,engine,migrate,web}-build.log`. 프론트 최종 수정의 web은 `frontend-full-web-build.log`. |
+| 런타임 내용·label·UID | 통과 | 실제 image inspect와 파일 목록. server·engine의 TypeScript·tsx·Vitest·esbuild·pnpm store0. migrate의 `.pnpm`은 운영 의존성 링크 구조이며 다운로드 store가 아니다. |
+| 비밀 파일 권한 | 통과 | 실제 Linux 컨테이너 `/run/secrets`700, database_url·mail_api_key600, 소유10001:10001. 기존 진입점 바이트 동일. |
+| migrate·API·Prisma·argon2 | 통과 | `final-migrate.log`, `reviewed-migrate.log`. 기준판39개 migration 적용, 이후 재실행0. 실제 native 해시 생성과 로그인200, healthz200. |
+| 감독·턴·정상 종료·리스 | 통과 | `reviewed-tunnel-rehearsal-result.json`. 번들 자식 확인, monthlyTick40000·actionSequence12, 271ms 안 exit0, 리스 해제. |
+| 선택 Compose 보안 | 통과 | `tunnel-config-check.log`. 실제 렌더링의 여섯 서비스 ports0·read_only·cap_drop·사용자·원문 DB 환경 거부 계약. |
+| Caddy 정적 경로·SSE·IP | 통과 | `reviewed-tunnel-rehearsal-result.json`. SPA 깊은 경로200, 없는 asset404, SSE125초·heartbeat4회·턴 이벤트·재연결. 가짜 trusted-edge IP A429/B200, XFF 위조429, 로그인 ipHash가 CF IP의 HMAC과 일치. 공개 Cloudflare 시험은 아님. |
+| 원격 이미지 | 통과 | `remote-images.log`, 실제108개 GET의 해시·MIME·CORS. |
+| Chromium 공개 자산·새로고침 | 통과 | `frontend-claude-handoff.txt`, 실제 Chromium5개. API·SSE503 mock은 자산 격리에만 사용. |
+| 생성기 | 통과 | Python compile과 외부 저장소 fixture의 성벽 출력4개·출처 경로 확인. 게임 저장소에 PNG를 다시 만들지 않음. |
+| cloudflared 옵션 | 통과 | 고정2026.10.7 digest의 `cloudflared-help.log`, `--token-file` 지원 확인. |
+| named Tunnel 공개 SSE·두 공인 IP | 미실행 | 승인된 도메인·토큰·클라이언트 없음. |
+| 전체 authz 묶음 | 미실행 | 영향 통합85개와 구분. |
+| 정확 PR SHA CI | PR Checks 참조 | PR head와 merge queue의 필수 검사 결과는 PR에 기록한다. |
 
-크기·RSS·기동 비교는 3회 중앙값이다. migrate는 healthz 칸에 시작부터 종료까지 걸린 초를 적는다.
+### 크기·RSS·기동 시간
 
-| 대상               | 크기 이전 | 크기 이후 | healthz까지 초 이전 | 이후 | RSS MiB 이전 | 이후 |
-| ------------------ | --------- | --------- | ------------------- | ---- | ------------ | ---- |
-| server             |           |           |                     |      |              |      |
-| engine 감독        |           |           | 해당 없음           |      |              |      |
-| engine 자식 (1월드) | 해당 없음 | 해당 없음 | 해당 없음           |      |              |      |
-| migrate            |           |           |                     |      | 해당 없음    |      |
-| web                |           |           | 해당 없음           |      | 해당 없음    |      |
+기준 소스는 `f00ec07e04744f607b9c4bb94dc20b87b3e737f3`, 수정 실행 이미지는 `6dcc81ae796dfbd323dd49b153d0639bce76bdad`, 최종 프론트 web은 `5906dad992ef258e3ff93b0c139d52f1094c669d`다. git archive의 파일 바이트·blob을 대조한 깨끗한 context로 빌드했다. source-tree SHA-256은 각각 `ca9061a33f0d7874d870dd2522e68a94264912469a2c1cb7717f18ba69efd248`, `71444e8a8755c496587d47ba6d95356e798538434c2cb47970e14bbb5aebd261`, `37893aa8c37459aae6723a5150fe8ba7e5917eb3b2188e11fa752cb39b2b4a47`이다. 보호된 main 전용 정식 release producer를 우회하지 않은 후보 리허설이다.
+
+Docker Desktop Linux에서 같은 DB·실행 중 월드1개·활성 장수2명·고정 clock 조건으로 세 번 재시작했다. 기동은 Docker StartedAt부터 server listen 로그 또는 engine 첫 heartbeat까지다. healthz 성공을 따로 확인했다. 매번60초 뒤 `/proc`의 RSS를 측정하며 측정용 Node는 제외했다. 아래는 세 번의 중앙값이다. `docker image inspect .Size`의 비압축 크기이며 web은 scratch export의 정적 파일 합계다.
+
+| 대상 | 크기 이전 MiB | 이후 MiB | 감소 | RSS 이전 MiB | 이후 MiB | 기동 이전 ms | 이후 ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| server | 905.27 | 230.40 | 74.5% | 246.44 | 187.10 | 1937 | 664 |
+| engine 전체 | 905.27 | 228.45 | 74.8% | 489.38 | 461.01 | 1958 | 759 |
+| engine 감독 | 해당 없음 | 해당 없음 | 해당 없음 | 195.19 | 175.11 | 해당 없음 | 해당 없음 |
+| engine 자식1개 | 해당 없음 | 해당 없음 | 해당 없음 | 274.75 | 285.89 | 해당 없음 | 해당 없음 |
+| migrate | 905.27 | 457.96 | 49.4% | 해당 없음 | 해당 없음 | 해당 없음 | 해당 없음 |
+| web export | 6.65 | 6.22 | 6.4% | 해당 없음 | 해당 없음 | 해당 없음 | 해당 없음 |
+
+전체 RSS는 기준판의 tsx/esbuild 보조 프로세스도 포함한다. 각 프로세스의 중앙값 합과 전체 중앙값은 다를 수 있다. server RSS는24.1%, engine 전체는5.8% 줄었다. engine 자식만 보면4.1% 늘었으므로 모든 프로세스의 메모리가 줄었다고 판단하지 않는다. 작은 fixture와3회 측정이며 운영 부하의 메모리 상한이나 처리량 증거가 아니다. 원시 값은 `baseline-final-metrics.json`, `reviewed-final-metrics.json`, `comparison.json`에 있다.
+
+### 인수 상태
+
+이 기록은 실행 이미지와 공통 자산 분리의 검증이다. 공개 named Tunnel·두 공인 IP, 기존 audit 키 전달 간극, 실제 운영 배포·복귀 리허설은 남아 있다. AC-M2-08 전체를 완료로 바꾸지 않는다. 이미지 PR은 [opensamguk-images#48](https://github.com/opensamguk/opensamguk-images/pull/48)로 머지했다. 코드 PR과 최종 CI·병합 결과는 후속 기록한다.

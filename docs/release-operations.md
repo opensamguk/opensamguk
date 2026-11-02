@@ -97,6 +97,8 @@ backup의 필수 `--release-sha`는40자리16진 문자열을 그대로 manifest
 
 T2-15·AC-M2-08의 선택 파일 `deploy/compose.tunnel.yml`은 기본 Compose에서 postgres·server·engine·migrate·Caddy 설정을 상속한다. server의 publish를 지우고 HTTP 전용 `Caddyfile.tunnel`을 쓴다. 기본 `deploy/compose.yml`과 기존 HTTPS Caddyfile의 바이트는 유지한다. Compose의 `!reset`·`!override`를 지원하는 Docker Compose 2.24.4 이상이 필요하다.
 
+리허설에서 server만 `docker restart`한 뒤 Caddy가 이전 network namespace에 남는 것을 확인했다. server를 직접 재시작했다면 Caddy와 cloudflared도 재시작하고 healthz·SSE를 다시 확인한다. Compose로 server를 재생성할 때도 namespace를 공유하는 서비스가 함께 재생성되는지 확인한다.
+
 ```sh
 docker compose --env-file /secure/production.env -f deploy/compose.tunnel.yml config --quiet
 docker compose --env-file /secure/production.env -f deploy/compose.tunnel.yml up -d --wait postgres
