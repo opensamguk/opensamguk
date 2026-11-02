@@ -17,8 +17,11 @@ from pathlib import Path
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'tools'))
+from image_repository import image_repository
+IMAGE_ROOT = image_repository()
 GEO = ROOT / 'apps/web/src/mapEditor/geodata'
-OUT = ROOT / 'apps/web/src/main'
+OUT = IMAGE_ROOT / 'public/main'
 SAN10 = ROOT / 'resources/map-drafts/san10'
 # SAN10 판의 표시 색 (INT-20). 고전 전략 지도처럼 밝은 초록 평지, 짙은 초록 산등성이, 선명한 파란 물이다.
 # 지형 순서는 PALETTE와 같아서 화면은 색으로 같은 지형을 읽는다.
@@ -30,9 +33,9 @@ SAN10_PALETTE = {
 }
 PROFILES = {
     'integration': {'canvas': (1000, 700), 'vectors': GEO / 'natural-earth.json',
-                    'relief': GEO / 'natural-earth-relief.webp', 'output': 'pixel-basemap'},
-    'san10': {'canvas': (1400, 1000), 'vectors': SAN10 / 'pixel-sources.json', 'land': OUT / 'san10-basemap.json',
-              'relief': SAN10 / 'natural-earth-relief.webp', 'output': 'san10-pixel-basemap',
+                    'relief': IMAGE_ROOT / 'public/mapEditor/geodata/natural-earth-relief.webp', 'output': 'pixel-basemap'},
+    'san10': {'canvas': (1400, 1000), 'vectors': SAN10 / 'pixel-sources.json', 'land': ROOT / 'apps/web/src/main/san10-basemap.json',
+              'relief': IMAGE_ROOT / 'public/map-drafts/san10/natural-earth-relief.webp', 'output': 'san10-pixel-basemap',
               # INT-20 사용자 요청: 강과 산을 실제보다 크게 그린다.
               'exaggerate': True, 'sites': ROOT / 'resources/map/san10.json', 'palette': SAN10_PALETTE},
 }
@@ -857,14 +860,15 @@ def main():
     meta = {
         'note': 'Derived only from Natural Earth (public domain): the shipped v5.1.2 vectors and Natural Earth II relief.',
         'script': 'tools/map-data/build-pixel-basemap.py',
-        'sources': [{'file': path.relative_to(ROOT).as_posix(), 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+        'sources': [{'file': path.relative_to(ROOT if path.is_relative_to(ROOT) else IMAGE_ROOT).as_posix(), 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
                     for path in inputs],
         'grid': {'width': GRID[0], 'height': GRID[1], 'viewBoxUnitsPerPixel': 2},
         'palette': PROFILE.get('palette', PALETTE),
-        'output': {'file': target.relative_to(ROOT).as_posix(), 'sha256': hashlib.sha256(target.read_bytes()).hexdigest()},
+        'output': {'file': target.relative_to(IMAGE_ROOT).as_posix(), 'sha256': hashlib.sha256(target.read_bytes()).hexdigest()},
     }
     (OUT / f"{PROFILE['output']}.json").write_text(json.dumps(meta, indent=2) + '\n', newline='\n')
-    print('Built', target.relative_to(ROOT), target.stat().st_size, 'bytes', meta['output']['sha256'])
+    (ROOT / 'apps/web/src/main' / f"{PROFILE['output']}.json").write_text(json.dumps(meta, indent=2) + '\n', newline='\n')
+    print('Built', target.relative_to(IMAGE_ROOT), target.stat().st_size, 'bytes', meta['output']['sha256'])
     print({name: pixels.count(i) for name, i in index.items()})
 
 

@@ -5,6 +5,10 @@
   "exports": {
     ".": "./src/index.ts",
     "./node": "./src/node/hashState.ts",
+    "./resource-root": "./src/node/resourceRoot.ts",
+    "./request-policy": "./src/http/requestPolicy.ts",
+    "./public-images": "./src/publicImages.ts",
+    "./tool-images": "./src/toolImageCatalog.json",
     "./public-map-images": "./src/publicMapImages.ts"
   },
   "scripts": {

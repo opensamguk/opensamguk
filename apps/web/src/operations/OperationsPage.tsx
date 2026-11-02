@@ -1,7 +1,8 @@
+import { publicImageUrl } from '@opensamguk/shared/public-images';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
-import operationsIcon from '../art/icons/operations.png';
+const operationsIcon = publicImageUrl('apps/web/src/art/icons/operations.png');
 import { errorCode, retryUnlessClientError } from '../game/errors';
 import { formatYearMonth } from '../game/gameDate';
 import { NoGeneral, QueryError } from '../game/QueryState';

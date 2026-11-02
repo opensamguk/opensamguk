@@ -36,7 +36,7 @@
 
 ### 공개 실행 이미지 (T2-15 B2a)
 
-`deploy/Dockerfile`은 Node24 공식 이미지의 digest와 pnpm10.33.0을 고정하고 lockfile 설치·Prisma 생성을 실행합니다. `server`·`engine`·`migrate` 대상은 같은 소스를 쓰며 `web` 대상은 `build:public`·자산 검사를 거친 정적 파일만 `/web`으로 내보냅니다. API와 엔진은 UID/GID10001로 실행하고 진입점이 실제 Node 프로세스를 `exec`합니다. API의 기존 loopback 바인딩을 유지합니다.
+`deploy/Dockerfile`은 Node24 공식 이미지의 digest와 pnpm10.33.0을 고정하고 lockfile 설치·Prisma 생성을 실행합니다. `server`·`engine`은 `.mjs` 번들과 필요한 운영 파일만 받습니다. `migrate`는 Prisma CLI와 migration 전용 의존성을 받습니다. `web` 대상은 `build:public`·자산 검사를 거친 정적 파일만 `/web`으로 내보냅니다. API와 엔진은 UID/GID10001로 실행하고 진입점이 실제 Node 프로세스를 `exec`합니다. API의 기존 loopback 바인딩을 유지합니다.
 
 빌드 입력은 검토한 Git archive의 별도 디렉터리입니다. Dockerfile 옆의 `Dockerfile.dockerignore`가 package·lock·앱·패키지·도구·문서·필수 manifest·resources만 받고 `.git`·`.env*`·private·호스트 의존성·백업·로그·시험 산출물을 제외합니다. stdin tar는 이 필터의 검증으로 세지 않습니다. `SOURCE_REVISION`은 실제 기준 커밋40자이고 `SOURCE_TREE_SHA256`은 후보 소스 경로·파일 바이트의 SHA-256입니다. 두 값은 이미지 label에 남으며 후보 해시를 확정 릴리스로 선언하지 않습니다. 깨끗한 소스의 선택·해시 생성·manifest·배포 receipt·current 교체 명령은 B2 후속에 남아 있습니다.
 
@@ -93,6 +93,31 @@ backup의 필수 `--release-sha`는40자리16진 문자열을 그대로 manifest
 
 ## 5. 프록시 경로
 
+### Tunnel 선택 구성
+
+T2-15·AC-M2-08의 선택 파일 `deploy/compose.tunnel.yml`은 기본 Compose에서 postgres·server·engine·migrate·Caddy 설정을 상속한다. server의 publish를 지우고 HTTP 전용 `Caddyfile.tunnel`을 쓴다. 기본 `deploy/compose.yml`과 기존 HTTPS Caddyfile의 바이트는 유지한다. Compose의 `!reset`·`!override`를 지원하는 Docker Compose 2.24.4 이상이 필요하다.
+
+리허설에서 server만 `docker restart`한 뒤 Caddy가 이전 network namespace에 남는 것을 확인했다. server를 직접 재시작했다면 Caddy와 cloudflared도 재시작하고 healthz·SSE를 다시 확인한다. Compose로 server를 재생성할 때도 namespace를 공유하는 서비스가 함께 재생성되는지 확인한다.
+
+```sh
+docker compose --env-file /secure/production.env -f deploy/compose.tunnel.yml config --quiet
+docker compose --env-file /secure/production.env -f deploy/compose.tunnel.yml up -d --wait postgres
+docker compose --env-file /secure/production.env -f deploy/compose.tunnel.yml run --rm migrate
+docker compose --env-file /secure/production.env -f deploy/compose.tunnel.yml up -d server engine caddy cloudflared
+```
+
+기존 이미지·자료·메일·비밀 볼륨 설정에 `TUNNEL_SECRETS_VOLUME`을 더한다. 해당 external volume의 `/run/secrets`를 UID/GID10001 소유·0700으로, `tunnel_token`을 0600으로 준비하고 읽기 전용으로 연결한다. token 값은 환경·명령 인자·Git·로그에 두지 않는다. 고정 cloudflared 2026.10.7은 `--token-file`을 지원한다. Cloudflare의 공개 hostname 서비스는 `http://127.0.0.1:8080`을 가리켜야 하며 API3001로 직접 연결하지 않는다. 공인 포트는 열지 않는다.
+
+Caddy는 loopback 프록시에서 온 `CF-Connecting-IP`만 client IP로 해석하고 XFF를 그 IP 하나로 덮어쓴다. 따라서 로그인·가입 제한은 API의 `TRUST_PROXY=1` 계약을 유지한다. Tunnel·Caddy·server namespace에 임의 프로세스를 추가하면 이 신뢰 경계가 넓어진다. 기존 target 사전 확인 도구는 기본 Compose만 심사하므로 Tunnel 구성을 그 receipt로 승인하지 않는다. 실제 정식 Tunnel의 SSE·화면 새로고침과 두 공인 IP 검증을 별도로 남긴다. 도메인·token·두 접속 경로가 없는 이번 환경에서는 이 종단 인수는 미완료다. Quick Tunnel은 SSE를 지원하지 않는다.
+
+기준 main Compose에는 필수 로그인 조사 키의 전달 설정이 빠져 있다. 이번 실제 리허설은 별도의 시험용 비밀 파일을 읽어 `AUDIT_HASH_KEY`와 버전을 프로세스 환경에 넣는 명령 override를 사용했다. 기본 Compose를 그대로 실행하면 키 설정 오류로 시작하지 않는다. 이 기존 운영 설정 누락을 숨기거나 원문 키를 예시 환경 파일에 넣지 않는다. `entrypoint.sh`의 비밀 계약은 바꾸지 않았다.
+
+### 운영 번들과 이미지
+
+`pnpm build:runtime`은 esbuild 0.28.2로 server·engine `.mjs`와 검토용 metafile을 만든다. 앱 이미지는 Node slim·실행 번들·필수 resources·LICENSE/NOTICE만 담고 server에만 argon2 실행 파일과 해당 플랫폼의 native prebuild를 더한다. TypeScript 소스·tsx·빌드 도구·pnpm 다운로드 캐시는 없다. migrate는 lockfile의 별도 `@opensamguk/migrate-runtime` 설치본에서 Prisma CLI·schema·migrations·config만 가져온다. Prisma CLI의 전이 실행 의존성은 보존한다.
+
+네 Docker target 이름과 SOURCE_REVISION·SOURCE_TREE_SHA256 검사·label, UID/GID10001, 읽기 전용·cap_drop 설정은 유지한다. web target은 실제 공개 빌드·검사를 거친 정적 파일만 내보낸다. D-060으로 이미지 바이트는 web에 넣지 않고 shared의 고정 커밋 URL·승인 해시 목록으로 읽는다. `pnpm assets:verify-remote`는 이미지 저장소의 실제 바이트·MIME·CORS를 검사한다. 배포 전에 이미지 저장소 PR과 게임 PR을 함께 검토해야 한다.
+
 `deploy/compose.yml`은 검증한 release 이미지와 external volume을 연결하는 T2-15 B2b2 구성입니다. PostgreSQL은 내부 network에만 두며 server의 loopback3001은 Caddy와 같은 namespace에서만 접근합니다. server의8080/8443을 명시한 호스트 주소와 HTTP/HTTPS 포트로 연결합니다. Caddy는 공개 web을 읽기 전용으로 제공합니다. `/trpc`·`/trpc/*`·`/sse`·`/healthz`·`/healthz/engine`만 API로 넘깁니다. 그 밖의 화면 주소는 SPA의 index로 돌아오며 없는 `/assets/*`와 확장자 파일은404로 남습니다.
 
 `PUBLIC_HOST`는 인증서 hostname이고 `PUBLIC_ORIGIN`은 실제 외부 HTTPS 주소입니다. 운영 ACME에는 외부80/443에서 내부8080/8443으로의 전달이 필요합니다. HTTP 리디렉션은 내부8443을 주소에 넣지 않고 `PUBLIC_ORIGIN`과 요청 URI를 잇습니다. 로컬 고포트 리허설은 별도의 internal issuer 설정과 요청에만 전달하는 private CA를 사용합니다. 호스트 truststore나 운영 TLS 검증을 끄지 않습니다.
@@ -101,7 +126,7 @@ backup의 필수 `--release-sha`는40자리16진 문자열을 그대로 manifest
 
 Compose 대상은 항상 절대 경로의 `--env-file`, `-f`와 `--project-name`을 명시합니다. 예를 들어 `docker compose --project-name <확인한 대상> --env-file <실제 설정 절대 경로> -f <checkout 절대 경로>/deploy/compose.yml config --quiet`로 필수 설정을 먼저 검사합니다. 이 검사는 secret 파일이나 DB의 migration 상태를 인수하지 않습니다. migration은 수동 tools profile이며 일반 기동에 숨기지 않습니다. 운영 실행은 T2-15의 writer 정지·백업·migration·확인·receipt 계약을 구현한 뒤 수행합니다.
 
-`deploy/Caddyfile`은 `deploy/security.caddy`의 `game_security` snippet을 import합니다. CSP는 `default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self'; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'`입니다. D-031 공개 빌드에 맞춰 외부 초상과 data 이미지를 허용하지 않습니다. 국가 색 등 동적 style 속성만 `style-src-attr`로 허용하며 인라인 script와 style 요소는 허용하지 않습니다. HSTS는 `max-age=31536000`이며 `includeSubDomains`와 preload는 넣지 않습니다. access log와 debug는 켜지 않고 upstream 장애는 고정 오류 응답으로 처리해 query·쿠키가 기본 오류 로그에 남는 경로를 막습니다. [Caddy 프록시](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy), [포트 설정](https://caddyserver.com/docs/caddyfile/options), [Compose 서비스](https://docs.docker.com/reference/compose-file/services/)
+`deploy/Caddyfile`은 `deploy/security.caddy`의 `game_security` snippet을 import합니다. CSP는 `default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' https://raw.githubusercontent.com https://rawcdn.githack.com; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'`입니다. D-060에 따라 승인한 고정 이미지 주소만 빌드 검사로 허용하며 원작 초상과 data 이미지는 거부합니다. 국가 색 등 동적 style 속성만 `style-src-attr`로 허용하며 인라인 script와 style 요소는 허용하지 않습니다. HSTS는 `max-age=31536000`이며 `includeSubDomains`와 preload는 넣지 않습니다. access log와 debug는 켜지 않고 upstream 장애는 고정 오류 응답으로 처리해 query·쿠키가 기본 오류 로그에 남는 경로를 막습니다. [Caddy 프록시](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy), [포트 설정](https://caddyserver.com/docs/caddyfile/options), [Compose 서비스](https://docs.docker.com/reference/compose-file/services/)
 
 운영 API는 `NODE_ENV=production`, 정확한 HTTPS `PUBLIC_ORIGIN`, `TRUST_PROXY=1`로 Caddy 바로 뒤의 loopback에 둡니다. 직접 외부 API 포트를 열지 않습니다. Secure를 끄거나 잘못된 공개 출처를 지정하면 시작하지 않습니다. CORS를 열어 화면·API 출처를 분리하지 않습니다. 요청 제한은 단일 서버 메모리 계수이며 재시작 시 초기화됩니다. 서버를 늘리거나 재시작을 반복하는 운영 방식은 현재 계수기 보장을 벗어납니다.
 

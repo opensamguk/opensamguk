@@ -1,3 +1,4 @@
+import { publicImageUrl } from '@opensamguk/shared/public-images';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Link, useRouterState } from '@tanstack/react-router';
 import { useMemo } from 'react';
@@ -10,7 +11,7 @@ import { serverMessage } from '../turns/apiError';
 import { NationBadge } from '../ui/NationBadge';
 import { EmptyState, ErrorState, LoadingState } from '../ui/States';
 import { Tag } from '../ui/Tag';
-import diplomacyIcon from '../art/icons/diplomacy.png';
+const diplomacyIcon = publicImageUrl('apps/web/src/art/icons/diplomacy.png');
 import {
   fetchTreatyPage,
   type FinishedTreaty,

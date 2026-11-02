@@ -5,6 +5,7 @@ import type { PrismaClient } from '../packages/db/src/index';
 import type { WorldInit } from '../packages/rules/src/index';
 import { appOrigin, e2eDatabaseUrl } from './account';
 import { createGeneralByApi, mutate, query } from './game';
+import { externalOrigin } from './imageRequestPolicy';
 
 // T2-07 첫 세 조항 브라우저 시험의 월드 fixture (AC-M2-06).
 // 실제 1030·che 초기 상태에서 국가 20개의 국고·NPC 여부·관계만 정한 뒤 실제 saveInitialWorld로 조약 월드 T(treatyFormat 1)와
@@ -18,7 +19,6 @@ export const FIRST_DUE_TICK = 10_000;
 // 선포 관계의 기한. 시험 시간보다 충분히 뒤다.
 const DECLARED_UNTIL_TICK = 120_000;
 const RICH = 100_000;
-const WEB_PROTOCOLS = ['http:', 'https:', 'ws:', 'wss:'];
 const EVENT_FIELDS = {
   id: true,
   kind: true,
@@ -99,7 +99,7 @@ export interface Actor {
   worldId: string;
   context: BrowserContext;
   page: Page;
-  // 앱 출처가 아닌 곳으로 나간 요청의 출처. 외부 서비스를 쓰지 않았음을 확인한다.
+  // 앱 출처가 아닌 곳으로 나간 요청의 출처. 승인 이미지(imageRequestPolicy) 말고는 외부 서비스를 쓰지 않았음을 확인한다.
   external: string[];
 }
 
@@ -298,8 +298,8 @@ export class TreatyFixture {
       const external: string[] = [];
       const appHost = new URL(appOrigin()).host;
       page.on('request', (request) => {
-        const url = new URL(request.url());
-        if (WEB_PROTOCOLS.includes(url.protocol) && url.host !== appHost) external.push(url.origin);
+        const origin = externalOrigin({ url: request.url(), resourceType: request.resourceType() }, appHost);
+        if (origin !== null) external.push(origin);
       });
       const general = await createGeneralByApi(page, worldId);
       await this.assignGeneral(key, worldId, general.id);

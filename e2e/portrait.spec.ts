@@ -1,13 +1,20 @@
 import { spawn, type ChildProcess } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test, type Page, type Route } from '@playwright/test';
+import { expect, test, type Locator, type Page, type Response, type Route } from '@playwright/test';
+import { PUBLIC_IMAGES, publicImageUrl } from '../packages/shared/src/publicImages';
 
 // T1-17 · AC-M1-20: base URL 환경변수만 바꿔 띄운 두 화면의 초상 주소가 다르고, 못 불러온 초상은 기본 이미지로 바뀐다.
 // 화면 하나에 base URL 하나가 박히므로 값을 달리한 Vite 서버 두 개를 직접 띄운다. 부품 모음(/dev/ui)은 로그인이 필요 없다.
-// 이미지 요청은 page.route로 가로채 시험용 그림을 돌려준다. 실제 초상 파일과 외부 네트워크에 기대지 않는다.
+// 초상 요청은 page.route로 가로채 시험용 그림을 돌려준다. 실제 초상 파일과 외부 네트워크에 기대지 않는다.
+// 기본 이미지는 공통 승인 목록의 고정 커밋 주소(T2-15)라 가로채지 않는다. 브라우저가 실제로 읽어 그린 바이트가 목록의 sha256과 같아야 한다.
+
+const FALLBACK_SOURCE = 'apps/web/src/portrait/fallback.svg';
+const FALLBACK_URL = publicImageUrl(FALLBACK_SOURCE);
+const FALLBACK_SHA256 = PUBLIC_IMAGES.find((image) => image.source === FALLBACK_SOURCE)!.sha256;
 
 const DEFAULT_BASE =
   'https://raw.githubusercontent.com/opensamguk/opensamguk-images/48163bd1ce8d54c54c94fb5484b05f9db9e50c62';
@@ -110,8 +117,42 @@ async function expectLoaded(page: Page, name: string, variant: string) {
   await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
 }
 
+// 화면을 열기 전에 건다. 브라우저가 받은 기본 이미지 응답의 상태와 바이트 해시를 모은다.
+function watchFallback(page: Page): Promise<{ status: number; sha256: string }>[] {
+  const seen: Promise<{ status: number; sha256: string }>[] = [];
+  page.on('response', (response: Response) => {
+    if (response.url() !== FALLBACK_URL) return;
+    seen.push(
+      response.body().then((body) => ({
+        status: response.status(),
+        sha256: createHash('sha256').update(body).digest('hex'),
+      })),
+    );
+  });
+  return seen;
+}
+
+// 기본 이미지 칸은 승인 목록의 그 주소를 쓰고, 그 그림을 실제로 다 불러와 그렸다.
+async function expectFallbackShown(frame: Locator) {
+  await expect(frame).toHaveAttribute('data-state', 'fallback');
+  const img = frame.getByRole('img');
+  await expect(img).toHaveAttribute('src', FALLBACK_URL);
+  await expect(img).toBeVisible();
+  await expect
+    .poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0 && el.currentSrc), {
+      timeout: 15_000,
+    })
+    .toBe(FALLBACK_URL);
+}
+
+async function expectFallbackBytes(seen: Promise<{ status: number; sha256: string }>[]) {
+  expect(seen.length).toBeGreaterThan(0);
+  for (const response of await Promise.all(seen)) expect(response).toEqual({ status: 200, sha256: FALLBACK_SHA256 });
+}
+
 test('base URL을 바꿔 띄운 두 화면은 초상 주소가 다르다', async ({ page }, testInfo) => {
   const seen: Record<string, string | null> = {};
+  const fallbackResponses = watchFallback(page);
   for (const server of SERVERS) {
     await serveFixture(page, server);
     await page.goto(`http://127.0.0.1:${server.port}/dev/ui`);
@@ -125,9 +166,7 @@ test('base URL을 바꿔 띄운 두 화면은 초상 주소가 다르다', async
     }
     // 초상 ID가 없거나 범위 밖이면 base와 상관없이 기본 이미지
     for (const name of ['유비', '관우', '장비']) {
-      const frame = page.locator('[data-state]').filter({ has: page.getByRole('img', { name }) });
-      await expect(frame).toHaveAttribute('data-state', 'fallback');
-      expect(await frame.getByRole('img').getAttribute('src')).toMatch(/^data:image\/svg\+xml/);
+      await expectFallbackShown(page.locator('[data-state]').filter({ has: page.getByRole('img', { name }) }));
     }
 
     seen[server.name] = await srcOf(page, '정원', 'portrait');
@@ -135,19 +174,21 @@ test('base URL을 바꿔 띄운 두 화면은 초상 주소가 다르다', async
     await page.unrouteAll();
   }
   expect(seen.A).not.toBe(seen.B);
+  await expectFallbackBytes(fallbackResponses);
 });
 
 test('못 불러온 초상은 기본 이미지로 바뀐다', async ({ page }, testInfo) => {
   const [server] = SERVERS;
   await serveFixture(page, server!, ['/icon/11000.webp']);
+  const fallbackResponses = watchFallback(page);
   await page.goto(`http://127.0.0.1:${server!.port}/dev/ui`);
   await portraitSection(page).scrollIntoViewIfNeeded();
 
   const frame = page.locator('[data-variant="icon"]').filter({ has: page.getByRole('img', { name: '공도' }) });
-  await expect(frame).toHaveAttribute('data-state', 'fallback');
+  await expectFallbackShown(frame);
   await expect(frame).toHaveText('공');
-  expect(await frame.getByRole('img').getAttribute('src')).toMatch(/^data:image\/svg\+xml/);
   // 같은 화면의 다른 초상은 그대로 나온다
   await expectLoaded(page, '정원', 'icon');
+  await expectFallbackBytes(fallbackResponses);
   await portraitSection(page).screenshot({ path: testInfo.outputPath('portrait-missing-fallback.png') });
 });

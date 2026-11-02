@@ -1,0 +1,90 @@
+[
+  {
+    "source": "apps/web/src/art/icons/personal.png",
+    "path": "public/art/icons/personal.png",
+    "sha256": "26a55da4bbed821fb6f89e03fb08af7260cb3d420a8bc338173f62f9b73c2f5b",
+    "bytes": 1875,
+    "public": false,
+    "url": "https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/art/icons/personal.png"
+  },
+  {
+    "source": "apps/web/src/art/map/pass-ew.png",
+    "path": "public/art/map/pass-ew.png",
+    "sha256": "61b1441b68f63cb7220218402acc33f7d74c097fa33ac556c0c6ef471baaf28f",
+    "bytes": 1903,
+    "public": false,
+    "url": "https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/art/map/pass-ew.png"
+  },
+  {
+    "source": "apps/web/src/art/map/pass-ew@128.png",
+    "path": "public/art/map/pass-ew@128.png",
+    "sha256": "8ad2a2e448d1154c5e6c8122e2fca826f81ab8348b1ddd2e6159aad5076e80b4",
+    "bytes": 27944,
+    "public": false,
+    "url": "https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/art/map/pass-ew@128.png"
+  },
+  {
+    "source": "apps/web/src/art/map/pass.png",
+    "path": "public/art/map/pass.png",
+    "sha256": "684ed7217c03fa51db0b24f592907ba601147c851b52ba790ce42f5f5f3d252a",
+    "bytes": 1959,
+    "public": false,
+    "url": "https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/art/map/pass.png"
+  },
+  {
+    "source": "apps/web/src/art/map/pass@128.png",
+    "path": "public/art/map/pass@128.png",
+    "sha256": "0b58cfa87f63f93a9288289e916dd9c364ca50fc47a91ef2aa1012d3b5a3a9ec",
+    "bytes": 28044,
+    "public": false,
+    "url": "https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/art/map/pass@128.png"
+  },
+  {
+    "source": "apps/web/src/mapEditor/geodata/natural-earth-relief.webp",
+    "path": "public/mapEditor/geodata/natural-earth-relief.webp",
+    "sha256": "0ea160d2cb9d64fb5bed696a93c4cdf118607d4e0df5653d66fd0051bfc5a794",
+    "bytes": 533418,
+    "public": false,
+    "url": "https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/mapEditor/geodata/natural-earth-relief.webp"
+  },
+  {
+    "source": "apps/web/src/mapEditor/icons/city.png",
+    "path": "public/mapEditor/icons/city.png",
+    "sha256": "72300c4014e0ede4b33fe9c22104865a08bede0699c6b3aab6f14e874e44fbe1",
+    "bytes": 1239,
+    "public": false,
+    "url": "https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/mapEditor/icons/city.png"
+  },
+  {
+    "source": "apps/web/src/mapEditor/icons/field.png",
+    "path": "public/mapEditor/icons/field.png",
+    "sha256": "8a631f70bd5798b1b774d6d96ef8729b7eff48572dce446bea453407186be90e",
+    "bytes": 1057,
+    "public": false,
+    "url": "https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/mapEditor/icons/field.png"
+  },
+  {
+    "source": "apps/web/src/mapEditor/icons/pass.png",
+    "path": "public/mapEditor/icons/pass.png",
+    "sha256": "57e0500ff148b2b2f5c0a24d08f92410bcb39b545cc8f926f11ec0e9c7d6f106",
+    "bytes": 1200,
+    "public": false,
+    "url": "https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/mapEditor/icons/pass.png"
+  },
+  {
+    "source": "apps/web/src/mapEditor/icons/port.png",
+    "path": "public/mapEditor/icons/port.png",
+    "sha256": "d721d2052afa118fb3bab1f76cafb413db30c989441ba61683dbf648c938bc1e",
+    "bytes": 1006,
+    "public": false,
+    "url": "https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/mapEditor/icons/port.png"
+  },
+  {
+    "source": "resources/map-drafts/san10/natural-earth-relief.webp",
+    "path": "public/map-drafts/san10/natural-earth-relief.webp",
+    "sha256": "4f7df0e27c701fbfbf8e020200afdde0c7d3538024007f6d1ceda0596f43612e",
+    "bytes": 968124,
+    "public": false,
+    "url": "https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/map-drafts/san10/natural-earth-relief.webp"
+  }
+]

@@ -1,7 +1,8 @@
+import { publicImageUrl } from '@opensamguk/shared/public-images';
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import fallbackUrl from './fallback.svg';
+const fallbackUrl = publicImageUrl('apps/web/src/portrait/fallback.svg');
 import { Portrait } from './Portrait';
 import { PORTRAIT_ID_MAX, PORTRAIT_ID_MIN, PORTRAIT_VARIANTS, portraitUrl, type PortraitVariant } from './portraitUrl';
 

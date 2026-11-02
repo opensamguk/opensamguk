@@ -2,9 +2,9 @@ import { readFile } from 'node:fs/promises';
 import { TRPCError } from '@trpc/server';
 import { creationBlock, nowTick, scenarioSchema, toGameDate } from '@opensamguk/rules';
 import { z } from 'zod';
+import { resourceRoot } from '@opensamguk/shared/resource-root';
 import { publicProcedure, router } from '../trpc';
 
-const scenarioRoot = new URL('../../../../resources/scenario/', import.meta.url);
 const titleSchema = scenarioSchema.pick({ id: true, title: true });
 const titles = new Map<string, string>();
 
@@ -13,7 +13,9 @@ export async function scenarioTitle(key: string): Promise<string> {
   const cached = titles.get(key);
   if (cached !== undefined) return cached;
   try {
-    const value = titleSchema.parse(JSON.parse(await readFile(new URL(`${key}.json`, scenarioRoot), 'utf8')));
+    const value = titleSchema.parse(
+      JSON.parse(await readFile(new URL(`scenario/${key}.json`, resourceRoot()), 'utf8')),
+    );
     if (value.id !== key) throw new Error();
     titles.set(key, value.title);
     return value.title;
