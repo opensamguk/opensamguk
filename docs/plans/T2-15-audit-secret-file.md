@@ -52,6 +52,7 @@ PR #334의 실제 리허설은 기본 `deploy/compose.yml`이 로그인 조사 �
 | `pnpm check` | 통과 | Windows 390파일·6520시험, pnpm-check-final.log |
 | 단위·시작 순서 (Windows) | 통과 | 4파일·58시험. 파일 설정은 미지원 거부를 확인 |
 | 단위 POSIX (Linux 비root) | 통과 | UID10001 실제 FS 29시험·skip0, linux-file-tests-final.log |
+| 어댑터의 다른 UID 직접 거부 | 통과 | 별도 root 시험의 DAC override로 읽을 수 있는 다른 UID 디렉터리·파일도 거부. 양성 대조 포함3사례, 제품 권한과 구분 |
 | 기존 mail startup | 통과 | 위 58시험에 기존 11시험 포함 |
 | loginAudit·조사·security 통합 (실제 DB) | 통과 | Linux PostgreSQL18.6, 앞 두 파일19시험과 security42시험. 최종 각 파일 skip0 |
 | release 계약 | 로컬 통과·CI gate | 4파일111시험. 실제 Linux metadata fixture는 필수 GitHub Actions에서 확인 |
@@ -102,4 +103,4 @@ Node 전용 config 어댑터를 bootstrap에서 DB/API 동적 import 전에 읽�
 
 ## 독립 리뷰
 
-(Claude 기록)
+읽기 전용 Claude 세션이 소스·계획·실제 원문과 이미지의 소스 복사본을 대조해 승인했다. P0·P1·필수 P2는0건이다. fd 크기 제한, 기존 환경 우선순위, DB·메일·audit 시작 순서, 고정 오류, 실제 Linux 분기와 제한된 공개 증거를 확인했다. 다른 UID 비교의 보완 시험은 `adapter-uid-probe.mjs`·`adapter-uid-result.json`에 따로 남겼다. 이 시험만 root와 DAC override를 써 파일이 실제로 읽히는 상태에서도 UID 비교로 거부함을 확인했으며, 제품의 UID10001·cap_drop ALL 검증과 섞지 않았다. 상태 줄을 갱신했고 원문은 `claude-final-review.log`다. 정확한 PR head의 필수 CI·Linux metadata fixture·merge queue는 병합 전 gate로 남는다.
