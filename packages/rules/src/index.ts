@@ -198,5 +198,11 @@ export * from './logistics/state';
 export * from './logistics/origin';
 export * from './logistics/ledger';
 export * from './logistics/consumption';
-export * from './logistics/operations';
+export {
+  applyLogisticsInput,
+  findLogisticsPath,
+  logisticsInputSchema,
+  settleLogisticsMonthly,
+  type LogisticsInput,
+} from './logistics/operations';
 export { logisticsResultSchema, validateLogisticsRecord } from './logistics/feature';
