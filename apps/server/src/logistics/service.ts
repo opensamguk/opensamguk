@@ -9,6 +9,7 @@ import {
   logisticsTotal,
   TICKS_PER_MONTH,
   validateLogisticsRecord,
+  unitSetSchema,
 } from '@opensamguk/rules';
 import type { LogisticsIdentity, LogisticsRequest, LogisticsSnapshot, LogisticsStore } from './ports';
 import { logisticsBoardInput, logisticsRequestInput, logisticsSubmitInput } from './schemas';
@@ -172,6 +173,10 @@ export async function readLogisticsBoard(store: LogisticsStore, identity: Logist
     capacity: logisticsCapacity(config, stock.level),
     used: logisticsTotal(stock),
     gold: state.cityResources!.cities[String(city.cityKey)]!.gold,
+    recruitUnits: unitSetSchema
+      .parse(world.unitSet)
+      .crewTypes.filter((unit) => unit.armType > 0)
+      .map(({ id, armType, name }) => ({ id, armType, name })),
     costs: structuredClone({
       upgrade: config.upgrade,
       capacity: config.capacity,

@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./logistics-costs": "./src/logistics/costs.ts",
     "./resource-validation": "./src/world/validate/index.ts",
     "./resources": "./src/world/resourceEditor/index.ts",
     "./world/resourceEditor": "./src/world/resourceEditor/index.ts"

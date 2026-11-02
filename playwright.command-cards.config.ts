@@ -10,6 +10,7 @@ export default defineConfig({
     'mobile-controls.spec.ts',
     'int19-retinue-orders.spec.ts',
     't4-97-game-ui.spec.ts',
+    't4-93-logistics.spec.ts',
   ],
   testIgnore: [],
   forbidOnly: true,
