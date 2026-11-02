@@ -34,7 +34,7 @@ ADMIN-CREATE-B 후보의 기본 감독은 월드 발견 주기마다 `WorldCreat
 | `SESSION_SECRET`         | 사용하지 않음. 무작위 토큰의 SHA-256을 DB에서 조회    | —                                                                                      | —               | 불필요 (T1-10)                                        |
 | `AUDIT_HASH_KEY`         | 로그인 조사의 HMAC-SHA256 키. UTF-8 32바이트 이상     | 없음                                                                                   | 예              | 운영 시작에 필수, 공개 정책 미확정 중에는 수집 비활성 |
 | `AUDIT_HASH_KEY_VERSION` | 새 키와 함께 올리는 양의 정수 버전                    | 없음                                                                                   | 아니오          | 키와 함께 필수                                        |
-| AUDIT_HASH_CONFIG_FILE | Node server의 키·버전 JSON 비밀 파일 경로 | 로컬 없음. server 이미지는 /run/secrets/audit_hash_config | 경로만 공개 | 기존 환경 키·버전이 없을 때 사용. POSIX 0700·0600·UID 검증 |
+| `AUDIT_HASH_CONFIG_FILE` | Node server의 키·버전 JSON 비밀 파일 경로 | 로컬 없음. server 이미지는 `/run/secrets/audit_hash_config` | 경로만 공개 | 기존 환경 키·버전이 없을 때 사용. POSIX 0700·0600·UID 검증 |
 | `VITE_IMAGE_BASE_URL`    | 초상 이미지 base URL                                  | 비우면 jsDelivr 고정 커밋 주소 ([이미지 자산 §2](../image-assets.md#2-초상-id와-경로)) | 아니오 (공개값) | 사용 중                                               |
 
 세션 쿠키 `sid`는 HttpOnly·SameSite=Lax·Path=/이며 `NODE_ENV=production`에서 Secure를 붙입니다.

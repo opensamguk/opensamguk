@@ -13,7 +13,7 @@ PR #334의 실제 리허설은 기본 `deploy/compose.yml`이 로그인 조사 �
 
 설정 우선순위는 셋이다. `AUDIT_HASH_KEY`나 `AUDIT_HASH_KEY_VERSION`이 하나라도 정의돼 있으면 파일을 열지 않고 지금의 환경 검증 경로를 탄다(개발·기존 주입 유지). 둘 다 없고 `AUDIT_HASH_CONFIG_FILE`이 정의돼 있으면 파일을 읽는다. 셋 다 없으면 지금처럼 운영은 실패하고 개발은 수집하지 않는다.
 
-파일 검사는 entrypoint의 비밀 파일 기준과 맞춘다. 경로는 절대 경로여야 하고 상위 디렉터리는 `lstat`으로 심볼릭 링크가 아닌 디렉터리, 0700, 현재 UID 소유여야 한다. 파일은 `O_RDONLY|O_NOFOLLOW|O_NONBLOCK`로 열고 같은 fd의 `fstat`으로 일반 파일, 0600, 현재 UID, 1~4096바이트를 확인한다. `TextDecoder('utf-8',{fatal:true,ignoreBOM:true})`로 디코드하고 NUL·CR·LF가 있으면 거부한다. JSON 최상위는 `key`·`version` 두 키만 가진 객체여야 하며 값 검사는 `resolveLoginAudit({}, true, 파싱값)`을 그대로 부른다. `process.getuid`나 `O_NOFOLLOW`가 없는 플랫폼(Windows)은 검사를 건너뛰지 않고 파일 설정을 거부한다. 모든 오류는 기존 문구 `로그인 조사 키 설정을 확인하세요.` 하나로 던지며 키·파일 내용·경로·원래 오류(`cause` 포함)를 붙이지 않는다.
+파일 검사는 entrypoint의 비밀 파일 기준과 맞춘다. 경로는 절대 경로여야 하고 상위 디렉터리는 `lstat`으로 심볼릭 링크가 아닌 디렉터리, 0700, 현재 UID 소유여야 한다. 파일은 `O_RDONLY|O_NOFOLLOW|O_NONBLOCK`로 열고 같은 fd의 `fstat`으로 일반 파일, 0600, 현재 UID, 1~4096바이트를 확인한다. 읽기는 검사한 크기보다 한 바이트까지만 제한하고 실제 길이가 달라지면 거부한다. `TextDecoder('utf-8',{fatal:true,ignoreBOM:true})`로 디코드하고 NUL·CR·LF가 있으면 거부한다. JSON 최상위는 `key`·`version` 두 키만 가진 객체여야 하며 값 검사는 `resolveLoginAudit({}, true, 파싱값)`을 그대로 부른다. `process.getuid`나 `O_NOFOLLOW`가 없는 플랫폼(Windows)은 검사를 건너뛰지 않고 파일 설정을 거부한다. 모든 오류는 기존 문구 `로그인 조사 키 설정을 확인하세요.` 하나로 던지며 키·파일 내용·경로·원래 오류(`cause` 포함)를 붙이지 않는다.
 
 ### 파일별 범위
 
@@ -23,7 +23,7 @@ PR #334의 실제 리허설은 기본 `deploy/compose.yml`이 로그인 조사 �
 | `apps/server/src/index.ts` | `resourceRoot()` 다음, API·Prisma 동적 import 전에 호출하고 결과를 `buildServer`의 선택 `loginAudit` 인자에 넘긴다 |
 | `deploy/Dockerfile` | `server` target에만 `ENV AUDIT_HASH_CONFIG_FILE=/run/secrets/audit_hash_config`. `runtime`·`engine`·`migrate`는 그대로 |
 | `apps/server/src/config/loginAudit.test.ts` (새 파일) | 정상·우선순위·거부 단위 시험. POSIX 시험은 Linux에서, Windows 거부 시험은 Windows에서 실제로 실행한다 |
-| `tools/t2-15-audit-startup.test.ts` (새 파일) | 기존 `mail-startup-dependency-guard.mjs`로 시작 순서와 적재 전 거부를 본다. Dockerfile의 ENV가 server stage에만 있는지도 본다 |
+| `tools/t2-15-audit-startup.test.ts` (새 파일) | 기존 `mail-startup-dependency-guard.mjs`로 시작 순서와 적재 전 거부를 본다. server 전용 ENV는 별도 Docker image inspect 증거로 확인한다 |
 | `docs/release-operations.md`, `docs/architecture/runtime.md` | 113행의 간극 문구를 실제 설정 설명으로 고친다. 43행 비밀 파일 목록과 125행 준비 절차에 `audit_hash_config`를, runtime 환경 표에 `AUDIT_HASH_CONFIG_FILE`을 더한다 |
 | `docs/plans/T2-15-runtime-bundles.md`, `docs/index.md` | 기존 기록 문장은 두고 인수 상태 끝에 이 계획 링크와 상태 한 줄을 덧붙인다. 지도에 이 계획을 등록한다 |
 

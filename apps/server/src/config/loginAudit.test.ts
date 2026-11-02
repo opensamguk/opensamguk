@@ -57,6 +57,9 @@ it('T2-15 AC-M2-08 POSIX의 실제 0700·0600 파일만 읽고 미지원 플랫�
   const multibyte = 'é'.repeat(16);
   writeFileSync(file, JSON.stringify({ key: multibyte, version: 2_147_483_647 }));
   expect(digest(loadLoginAuditOptions(env())!.key)).toBe(digest(multibyte));
+  const maximumKey = 'x'.repeat(4096 - Buffer.byteLength(JSON.stringify({ key: '', version: 7 })));
+  writeFileSync(file, JSON.stringify({ key: maximumKey, version: 7 }));
+  expect(digest(loadLoginAuditOptions(env())!.key)).toBe(digest(maximumKey));
 });
 
 it.each(['', 'relative-canary', join(tmpdir(), 'missing-audit-canary', 'file')])(

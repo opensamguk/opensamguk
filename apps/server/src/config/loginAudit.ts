@@ -1,4 +1,4 @@
-import { closeSync, constants, fstatSync, lstatSync, openSync, readFileSync } from 'node:fs';
+import { closeSync, constants, fstatSync, lstatSync, openSync, readSync } from 'node:fs';
 import { dirname, isAbsolute } from 'node:path';
 import { resolveLoginAudit, type LoginAuditOptions } from '../auth/loginAudit';
 
@@ -28,7 +28,16 @@ export function loadLoginAuditOptions(env: NodeJS.ProcessEnv): LoginAuditOptions
     const stat = fstatSync(descriptor);
     if (!stat.isFile() || (stat.mode & 0o777) !== 0o600 || stat.uid !== uid || stat.size < 1 || stat.size > 4096)
       throw new Error();
-    const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(readFileSync(descriptor));
+    // 검사 뒤 파일이 커져도 검사한 크기보다 한 바이트까지만 읽는다.
+    const bytes = Buffer.alloc(stat.size + 1);
+    let size = 0;
+    while (size < bytes.length) {
+      const count = readSync(descriptor, bytes, size, bytes.length - size, null);
+      if (count === 0) break;
+      size += count;
+    }
+    if (size !== stat.size) throw new Error();
+    const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes.subarray(0, size));
     if (['\0', '\r', '\n'].some((character) => text.includes(character))) throw new Error();
     const value: unknown = JSON.parse(text);
     if (

@@ -6,12 +6,12 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
 
-it('T2-15 AC-M2-08 audit 파일 오류는 API·Prisma 적재 전에 고정 문구로 거부한다', async () => {
+it('T2-15 AC-M2-08 DB·메일·audit 검증 순서와 기존 환경 우선순위를 지킨다', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'opensamguk-audit-startup-'));
   const mail = join(directory, 'mail');
   try {
     await writeFile(mail, 're_' + randomBytes(16).toString('hex'), { mode: 0o600 });
-    for (const supplied of [false, true]) {
+    for (const mode of ['file', 'legacy', 'database', 'mail']) {
       const env: NodeJS.ProcessEnv = {
         ...process.env,
         NODE_ENV: 'production',
@@ -24,7 +24,9 @@ it('T2-15 AC-M2-08 audit 파일 오류는 API·Prisma 적재 전에 고정 문�
       };
       delete env.AUDIT_HASH_KEY;
       delete env.AUDIT_HASH_KEY_VERSION;
-      if (supplied) {
+      if (mode === 'database') delete env.DATABASE_URL;
+      if (mode === 'mail') delete env.MAIL_TRANSPORT;
+      if (mode === 'legacy') {
         env.AUDIT_HASH_KEY = randomBytes(32).toString('hex');
         env.AUDIT_HASH_KEY_VERSION = '7';
       }
@@ -59,10 +61,16 @@ it('T2-15 AC-M2-08 audit 파일 오류는 API·Prisma 적재 전에 고정 문�
       });
       expect(spawnError).toBe(false);
       expect({ ...result, timedOut }).toEqual({ code: 1, signal: null, timedOut: false });
-      if (supplied) {
+      if (mode === 'legacy') {
         expect(output.includes('MAIL_STARTUP_DEPENDENCY_LOADED')).toBe(true);
-      } else {
+      } else if (mode === 'file') {
         expect(output.trim()).toBe('로그인 조사 키 설정을 확인하세요.');
+      } else {
+        if (mode === 'database')
+          expect(output.trim()).toBe('DATABASE_URL이 없습니다. .env.example을 .env로 복사하세요.');
+        else expect(output.includes('메일 전송 설정을 확인하세요.')).toBe(true);
+        expect(output.includes('로그인 조사 키 설정을 확인하세요.')).toBe(false);
+        expect(output.includes('MAIL_STARTUP_DEPENDENCY_LOADED')).toBe(false);
       }
       expect(output.includes('private-path-canary')).toBe(false);
       expect(output.includes('Server listening')).toBe(false);
@@ -72,4 +80,4 @@ it('T2-15 AC-M2-08 audit 파일 오류는 API·Prisma 적재 전에 고정 문�
     expect(basename(directory).startsWith('opensamguk-audit-startup-')).toBe(true);
     await rm(directory, { recursive: true, force: true });
   }
-}, 15_000);
+}, 30_000);
