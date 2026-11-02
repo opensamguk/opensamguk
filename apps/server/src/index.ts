@@ -1,5 +1,6 @@
 import { createMailTransport } from './mail/transport';
 import { resourceRoot } from '@opensamguk/shared/resource-root';
+import { loadLoginAuditOptions } from './config/loginAudit';
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -12,10 +13,17 @@ const mailTransport = createMailTransport({
   MAIL_TRANSPORT: process.env.MAIL_TRANSPORT ?? (process.env.NODE_ENV === 'production' ? undefined : 'capture'),
 });
 resourceRoot();
+let loginAudit: ReturnType<typeof loadLoginAuditOptions>;
+try {
+  loginAudit = loadLoginAuditOptions(process.env);
+} catch {
+  console.error('로그인 조사 키 설정을 확인하세요.');
+  process.exit(1);
+}
 const [{ createDb }, { buildServer }] = await Promise.all([import('@opensamguk/db'), import('./server')]);
 const db = createDb(databaseUrl);
 const port = Number(process.env.SERVER_PORT ?? 3001);
-const server = await buildServer({ db, mailTransport });
+const server = await buildServer({ db, mailTransport, ...(loginAudit === undefined ? {} : { loginAudit }) });
 
 const shutdown = async () => {
   await server.close();
