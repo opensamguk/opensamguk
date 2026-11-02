@@ -1,5 +1,6 @@
-import flagCloth from '../art/flag/tall-cloth.png';
-import flagPole from '../art/flag/tall.png';
+import { publicImageUrl } from '@opensamguk/shared/public-images';
+const flagCloth = publicImageUrl('apps/web/src/art/flag/tall-cloth.png');
+const flagPole = publicImageUrl('apps/web/src/art/flag/tall.png');
 import { markerArt, markerBox, markerDetail, type PassAxis, type SiteKind } from './siteMarkers';
 
 // 지도 표식 한 개 (INT-20). 지도 SVG 안에서 쓰며 좌표·크기는 1000×700 지도 단위다.

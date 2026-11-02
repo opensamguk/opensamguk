@@ -1,5 +1,11 @@
 # 이미지 자산
 
+2026-11-02 D-060으로 Docker·Workers 화면의 공통 이미지 107개와 지도 생성 입력 1개를 [opensamguk-images](https://github.com/opensamguk/opensamguk-images)의 `public/`로 옮겼다. 공개 승인 97개는 `packages/shared/src/publicImageCatalog.json`, 편집·생성 입력 11개는 `toolImageCatalog.json`에 원래 경로와 SHA-256을 둔다. 게임 배포의 이미지 파일은 0개다. 공개 원작 초상 제한과 개발 초상의 기존 설정은 유지한다.
+
+PNG·WebP는 GitHub raw의 전체 커밋 주소, SVG는 같은 커밋의 githack CDN 주소를 쓴다. raw SVG는 MIME이 맞지 않고 jsDelivr의 실제 SVG 요청은 403이었다. `pnpm assets:verify-remote`는 전체 원격 바이트·이미지 MIME·CORS를 대조하고 공개 Chromium 시험은 실제 화면·SVG 로딩과 응답 해시를 확인한다. CDN 장애 때 그림이 빠질 수 있으나 장수 이름·기본 배경색은 남는다.
+
+생성기 `tools/pixel-assets/`와 `tools/map-data/`는 `OPENSAMGUK_IMAGES_DIRECTORY`에 이미지 저장소 checkout의 절대 경로를 받아 그 `public/`에 쓴다. 지도 편집의 JSON·좌표·규칙 데이터는 게임 저장소에 유지한다. 새 그림을 게시할 때는 이미지 저장소 manifest·출처를 갱신하고 shared의 전체 커밋 URL·승인 해시·공개 자산 검사를 함께 바꾼다. 아래 초상·지도 기록은 각 결정 당시의 경로를 설명한다.
+
 > 상태: 초안 v0.2 (2026-10-20 정리 반영) · 필요 시점: M1 (ID 규칙), M2 (이미지 서버), M3 (라이선스 관문) · 관련 결정: D-004, D-016
 > 관련 요구사항: FR-IMG-01~04 · 관련 AC: M1-20, M3-06
 

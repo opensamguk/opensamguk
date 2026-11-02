@@ -395,5 +395,9 @@
       "sha256": "af511db23c0d30c6717a216a0eaf670a48377ee604ecbe49b498f3fcb5381b2d",
       "source": "apps/web/src/art/water/bank-9.png"
     }
-  ]
+  ],
+  "delivery": "external",
+  "imageRevision": "b7efb438b70058aefdfa2fbc4693ca7db259bbc6",
+  "imageBaseUrl": "https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6",
+  "svgImageBaseUrl": "https://rawcdn.githack.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6"
 }

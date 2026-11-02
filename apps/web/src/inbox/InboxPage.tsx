@@ -1,8 +1,9 @@
+import { publicImageUrl } from '@opensamguk/shared/public-images';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import diplomacyIcon from '../art/icons/diplomacy.png';
-import messagesIcon from '../art/icons/messages.png';
-import personnelIcon from '../art/icons/personnel.png';
+const diplomacyIcon = publicImageUrl('apps/web/src/art/icons/diplomacy.png');
+const messagesIcon = publicImageUrl('apps/web/src/art/icons/messages.png');
+const personnelIcon = publicImageUrl('apps/web/src/art/icons/personnel.png');
 import { fetchTreatyPage } from '../diplomacy/contract';
 import { treatyListBlocked } from '../diplomacy/DiplomacyPage';
 import { nationName } from '../diplomacy/TreatyCard';

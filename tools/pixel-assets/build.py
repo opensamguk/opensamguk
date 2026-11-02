@@ -14,7 +14,10 @@ from pathlib import Path
 from PIL import Image, ImageFilter
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / 'apps/web/src/art'
+sys.path.insert(0, str(ROOT / 'tools'))
+from image_repository import image_repository
+IMAGE_ROOT = image_repository()
+OUT = IMAGE_ROOT / 'public/art'
 # 시트 이름: (열, 행, 저장 폴더, 이름들)
 SHEETS = {
     'icons-a.png': (4, 2, 'icons', ['domestic', 'military', 'strategy', 'personal', 'nation', 'main', 'turns', 'map']),
@@ -122,7 +125,7 @@ def split_cloth(flag):
 def save(image, path):
     path.parent.mkdir(parents=True, exist_ok=True)
     image.save(path, optimize=True)
-    return {'file': str(path.relative_to(ROOT)).replace('\\', '/'), 'sha256': sha(path), 'bytes': path.stat().st_size}
+    return {'file': path.relative_to(IMAGE_ROOT).as_posix(), 'sha256': sha(path), 'bytes': path.stat().st_size}
 
 
 def main():

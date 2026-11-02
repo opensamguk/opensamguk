@@ -1,6 +1,7 @@
+import { publicImageUrl } from '@opensamguk/shared/public-images';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link } from '@tanstack/react-router';
-import keyartUrl from '../art/keyart.png';
+const keyartUrl = publicImageUrl('apps/web/src/art/keyart.png');
 import { AuthForm } from '../auth/AuthForm';
 import styles from '../auth/AuthPage.module.css';
 import { PublicMapTabs } from '../publicMap/PublicMapTabs';

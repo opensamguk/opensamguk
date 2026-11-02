@@ -1,13 +1,10 @@
-export interface LimitRule {
-  namespace: string;
-  key: string;
-  limit: number;
-  windowMs: number;
-}
-export interface RateLimitDecision {
-  allowed: boolean;
-  retryAfterSeconds: number;
-}
+import {
+  rateLimitDecision,
+  rateLimitWindows,
+  type LimitRule,
+  type RateLimitDecision,
+} from '@opensamguk/shared/request-policy';
+export type { LimitRule, RateLimitDecision } from '@opensamguk/shared/request-policy';
 
 export function createRateLimiter(options: { now: () => number }): {
   check(rules: readonly LimitRule[]): RateLimitDecision;
@@ -16,24 +13,11 @@ export function createRateLimiter(options: { now: () => number }): {
   const buckets = new Map<string, { count: number; end: number }>();
   function decide(rules: readonly LimitRule[], consume: boolean): RateLimitDecision {
     const now = options.now();
-    for (const rule of rules) {
-      if (
-        !Number.isSafeInteger(rule.limit) ||
-        rule.limit <= 0 ||
-        !Number.isSafeInteger(rule.windowMs) ||
-        rule.windowMs <= 0
-      )
-        throw new Error('요청 제한 규칙이 올바르지 않습니다.');
-    }
+    const windows = rateLimitWindows(rules, now);
     for (const [key, bucket] of buckets) if (bucket.end <= now) buckets.delete(key);
-    const entries = rules.map((rule) => {
-      const key = JSON.stringify([rule.namespace, rule.key, rule.windowMs]);
-      const end = (Math.floor(now / rule.windowMs) + 1) * rule.windowMs;
-      return { rule, key, end, count: buckets.get(key)?.count ?? 0 };
-    });
-    const blocked = entries.filter(({ rule, count }) => count >= rule.limit);
-    if (blocked.length)
-      return { allowed: false, retryAfterSeconds: Math.ceil(Math.max(...blocked.map(({ end }) => end - now)) / 1000) };
+    const entries = windows.map((entry) => ({ ...entry, count: buckets.get(entry.key)?.count ?? 0 }));
+    const decision = rateLimitDecision(entries, now);
+    if (!decision.allowed) return decision;
     if (consume) {
       // 같은 버킷의 규칙이 중복돼도 한 요청은 한 번만 센다.
       for (const { key, count, end } of entries) buckets.set(key, { count: count + 1, end });

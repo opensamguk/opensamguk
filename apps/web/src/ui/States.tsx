@@ -1,6 +1,7 @@
+import { publicImageUrl } from '@opensamguk/shared/public-images';
 import { createContext, useContext, type ReactNode } from 'react';
-import emptyIcon from '../art/icons/records.png';
-import errorIcon from '../art/icons/messages.png';
+const emptyIcon = publicImageUrl('apps/web/src/art/icons/records.png');
+const errorIcon = publicImageUrl('apps/web/src/art/icons/messages.png');
 import styles from './States.module.css';
 
 // 상태 아이콘 (INT-20). 관리자 화면은 그림을 불러오지 않는 계약(AC-M3-08 CH-12)이라 AdminLayout이 끈다.

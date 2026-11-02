@@ -4,6 +4,7 @@ coverage/
 .turbo/
 *.log
 .DS_Store
+__pycache__/
 
 # 환경변수와 비밀값
 .env

@@ -12,11 +12,16 @@ import {
 } from '@opensamguk/rules/resources';
 import { createCampaignDraft } from './campaignSeed';
 import { basemap, unprojectGeographicPoint } from './geography';
-import reliefUrl from './geodata/natural-earth-relief.webp';
-import cityMarker from './icons/city.png';
-import passMarker from './icons/pass.png';
-import portMarker from './icons/port.png';
-import fieldMarker from './icons/field.png';
+const reliefUrl =
+  'https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/mapEditor/geodata/natural-earth-relief.webp';
+const cityMarker =
+  'https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/mapEditor/icons/city.png';
+const passMarker =
+  'https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/mapEditor/icons/pass.png';
+const portMarker =
+  'https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/mapEditor/icons/port.png';
+const fieldMarker =
+  'https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/mapEditor/icons/field.png';
 import styles from './CampaignMapEditor.module.css';
 
 type History = { map: CampaignDraft; past: CampaignDraft[]; future: CampaignDraft[] };

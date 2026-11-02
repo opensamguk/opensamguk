@@ -554,6 +554,24 @@ SAN10 초안은 원작의 OUTPOST 거점을 모두 진(2)으로 들였다. 사�
 - 설문조사와 유니크 아이템 획득은 원작을 그대로 옮기지 않는다. 설문 방식이나 아이템 드롭 확률을 고친 설계로 넣는다 (사용자 요청).
 - 국가 베팅을 넣는다. 베팅·토너먼트·경매는 원작을 그대로 옮기지 않고 발전시킨 설계로 넣는다 (사용자 요청). 실제 돈은 쓰지 않는다.
 
+## D-059 A13에 공인 포트 없는 Tunnel 선택 구성을 더한다 (2026-11-02)
+
+사용자가 T2-15·AC-M2-08 작업에서 Cloudflare Tunnel 선택 구성을 요청했다. 서버 한 대·Compose·Caddy는 유지한다. 기존 `deploy/compose.yml`은 기본 구성이고 `deploy/compose.tunnel.yml`은 그 서비스를 상속하는 선택 구성이다. Tunnel의 Caddy는 loopback HTTP에서 정적 화면과 API·SSE를 처리하고 TLS는 Cloudflare가 맡는다. 공인 포트는 열지 않는다.
+
+cloudflared와 Caddy는 server의 네트워크 namespace를 공유한다. Caddy는 loopback 프록시에서 온 `CF-Connecting-IP`만 신뢰하고 `X-Forwarded-For`를 그 IP 하나로 덮어쓴다. API의 `TRUST_PROXY=1` 한 단계 계약은 그대로다. Tunnel token은 별도 읽기 전용 비밀 볼륨의 파일로만 받는다. 기존 release target 사전 확인은 기본 Compose만 다루며 Tunnel 배포 승인을 대신하지 않는다.
+
+정식 Tunnel·도메인과 서로 다른 두 공인 IP의 시험 경로가 없어 공개 SSE와 IP별 제한의 종단 검증은 남는다. Quick Tunnel은 SSE를 지원하지 않으므로 이 증거를 대신하지 않는다. 자세한 범위와 검증은 [T2-15 경량화 계획](../plans/T2-15-runtime-bundles.md)에 둔다.
+
+## D-060 두 게임 버전의 화면 이미지를 공통 저장소에서 읽는다 (2026-11-02)
+
+사용자가 Docker·Cloudflare Workers 버전의 이미지를 [opensamguk-images](https://github.com/opensamguk/opensamguk-images)로 옮기고 두 채팅이 협의하도록 지시했다. upstream이 web·shared의 공통 계약과 이미지 저장소 변경을 맡고 Workers 버전은 이를 upstream에서 받는다. 게임 빌드에는 이미지 바이트를 넣지 않는다. 원래 경로·SHA-256·생성 출처와 NOTICE를 이미지 저장소 `public/`에 보존하고 전체 커밋 SHA로 고정한 URL을 쓴다.
+
+공개 초상은 D-031의 기본 실루엣 정책을 유지한다. 기존 `portraits/`의 원작 초상을 공개 허용한 결정은 아니다. 승인 목록의 생성 그림·지도·실루엣만 공개 번들에서 참조할 수 있다. 개발 초상의 `VITE_IMAGE_BASE_URL` 계약은 유지하며 공개 빌드에서는 계속 거부한다.
+
+새 이미지 커밋에서 jsDelivr의 실루엣 SVG 요청이 403을 반환했다. PNG·WebP는 GitHub raw, SVG는 MIME과 CORS가 맞는 rawcdn.githack.com을 쓴다. 두 주소 모두 같은 전체 커밋 SHA로 고정하고 CSP에는 두 이미지 출처만 추가한다. 공개 자산 검사는 정확한 승인 URL·불변 SHA·해시 목록과 이미지 없는 배포 파일을 대조한다. CDN이 끊기면 그림이 빠질 수 있으므로 기본 배경색·장수 이름 표시는 유지하고 원격 바이트와 실제 브라우저를 검증한다.
+
+사용자가 이번 범위 밖 리팩토링도 승인해 Workers 채팅과 협의했다. 공유 패키지에는 순수 Origin·JSON·요청 제한 계산만 옮기고 계수 저장소·HTTP 전송·DB·게임 규칙은 각 담당에 남긴다. 턴 루프 재작성은 이 변경에 섞지 않는다.
+
 ## D-061 명령 카드와 자원·통치·계승·유산을 구현 범위에 넣는다 (2026-11-02)
 
 사용자가 남은 작업과 후보 대부분을 구현하고 기존 제외 항목 중 전체 명령 카드화, 철·목재·말·창고·수송망, 황실·봉신·조정, 혼인·다세대 계승, 기수 간 능력치 유산을 넣도록 지시했다. D-038의 해당 제외와 D-031의 유산 능력 혜택 금지는 이 새 범위에서 대체한다. 기존 v0.1 인수 기록과 완료 분모는 보존한다.

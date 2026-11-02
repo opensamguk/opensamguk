@@ -1,5 +1,6 @@
+import { publicImageUrl } from '@opensamguk/shared/public-images';
 import { useState } from 'react';
-import fallbackUrl from './fallback.svg';
+const fallbackUrl = publicImageUrl('apps/web/src/portrait/fallback.svg');
 import styles from './Portrait.module.css';
 import { portraitUrl, PORTRAIT_VARIANTS, type PortraitVariant } from './portraitUrl';
 

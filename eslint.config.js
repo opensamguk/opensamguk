@@ -35,7 +35,7 @@ function importRule(allowed, { banBuiltins = false, typeOnly = [] } = {}) {
   }
   if (banBuiltins) {
     patterns.push({
-      group: [...NODE_BUILTINS, '/@opensamguk/shared/node'],
+      group: [...NODE_BUILTINS, '/@opensamguk/shared/node', '/@opensamguk/shared/resource-root'],
       message: 'rules는 파일·네트워크·프로세스를 쓰지 않습니다.',
     });
   }
@@ -54,6 +54,7 @@ const E3_PATTERNS = [
   },
   { regex: '^@opensamguk/rules(?:$|/(?!(?:resource-validation|resources)$))', message: BOUNDARY_MESSAGE },
   { regex: '^@opensamguk/shared/node(?:$|/)', message: BOUNDARY_MESSAGE },
+  { group: ['/@opensamguk/shared/resource-root'], message: BOUNDARY_MESSAGE },
 ];
 
 const RESOURCE_EDITOR_PATTERNS = E3_PATTERNS.map((pattern) =>
@@ -172,7 +173,10 @@ export default defineConfig([
               message:
                 'battleSim은 rules에서 simulateBattle·unitSetSchema·BALANCE·commanderBattleModifiers와 타입만 import합니다 (E1).',
             },
-            { group: ['/@opensamguk/shared/node', ...NODE_BUILTINS], message: BOUNDARY_MESSAGE },
+            {
+              group: ['/@opensamguk/shared/node', '/@opensamguk/shared/resource-root', ...NODE_BUILTINS],
+              message: BOUNDARY_MESSAGE,
+            },
           ],
         },
       ],

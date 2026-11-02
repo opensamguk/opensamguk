@@ -206,16 +206,26 @@ function resourceProperty(node: ts.Node): boolean {
   return ts.isNewExpression(parent) && /^(?:Worker|SharedWorker|EventSource)$/.test(parent.expression.getText());
 }
 
-export function inspectAssetText(text: string, file: string, files: ReadonlySet<string>): string[] {
+export function inspectAssetText(
+  text: string,
+  file: string,
+  files: ReadonlySet<string>,
+  approvedUrls: ReadonlySet<string> = new Set(),
+): string[] {
   const failures = new Set<string>();
   const fail = (rule: string, detail: string) => failures.add(`${file}: ${rule}: ${detail.slice(0, 180)}`);
   const inspect = (value: string, resource = false) => {
+    if (approvedUrls.has(value)) return;
     if (/data\s*:\s*image\//i.test(value)) fail('inline-image', value);
-    if (/opensamguk-images|\/?portraits\//i.test(value)) fail('portrait-path', value);
+    if (/opensamguk-images|\/?portraits\//i.test(value)) {
+      const remainder = [...approvedUrls].reduce((text, url) => text.replaceAll(url, ''), value);
+      if (/opensamguk-images|\/?portraits\//i.test(remainder)) fail('portrait-path', value);
+    }
     if (resource && /^(?:data|blob|javascript|file|ftp):/i.test(value.trim())) fail('resource-scheme', value);
     const urls = [...value.matchAll(/https?:\/\/[^\s"'`<>)[\]{}\\]+/gi)].map((match) => match[0]);
     if (/^\/\/[a-z0-9[]/i.test(value.trim())) urls.push(value.trim().split(/[\s"'<>]/)[0]!);
     for (const url of urls) {
+      if (approvedUrls.has(url)) continue;
       const documentation = url.startsWith('https://react.dev/errors/');
       if (
         !resource &&
@@ -257,7 +267,7 @@ export function inspectAssetText(text: string, file: string, files: ReadonlySet<
       inspect(decode(match[2] ?? match[4] ?? ''), true);
     const decoded = decode(clean);
     inspect(decoded, true);
-    for (const match of decoded.matchAll(/\/\/[a-z0-9[][^\s"'<>)]*/gi)) inspect(match[0], true);
+    for (const match of decoded.matchAll(/(?<!:)\/\/[a-z0-9[][^\s"'<>)]*/gi)) inspect(match[0], true);
     if (/data\s*:\s*image\//i.test(clean)) fail('inline-image', 'data:image/');
   } else if (/\.html$/i.test(file)) {
     const clean = text.replace(/<!--[\s\S]*?-->/g, '');
@@ -272,9 +282,10 @@ export function inspectAssetText(text: string, file: string, files: ReadonlySet<
         },
       );
     for (const style of clean.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi))
-      for (const item of inspectAssetText(style[1]!, file + '.inline.css', files)) failures.add(item);
+      for (const item of inspectAssetText(style[1]!, file + '.inline.css', files, approvedUrls)) failures.add(item);
     for (const style of clean.matchAll(/\bstyle\s*=\s*(['"])(.*?)\1/gi))
-      for (const item of inspectAssetText(decode(style[2]!), file + '.inline.css', files)) failures.add(item);
+      for (const item of inspectAssetText(decode(style[2]!), file + '.inline.css', files, approvedUrls))
+        failures.add(item);
     for (const tag of clean.matchAll(/<([a-z][a-z0-9:-]*)\b[^>]*>/gi)) {
       if (tag[1]!.toLowerCase() === 'base') fail('html-base', tag[0]);
       const attributes = [...tag[0].matchAll(/([^\s<>/="']+)\s*=\s*(?:(['"])(.*?)\2|([^\s>]+))/gi)];
@@ -300,18 +311,77 @@ export function inspectAssetText(text: string, file: string, files: ReadonlySet<
       }
     }
     for (const script of clean.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) {
-      for (const item of inspectAssetText(script[1]!, `${file}.inline.js`, files)) failures.add(item);
+      for (const item of inspectAssetText(script[1]!, `${file}.inline.js`, files, approvedUrls)) failures.add(item);
     }
     if (/data\s*:\s*image\//i.test(clean)) fail('inline-image', 'data:image/');
   }
   return [...failures];
 }
 
+async function checkExternalAssets(root: string, dist: string, raw: Record<string, unknown>) {
+  const manifest = manifestFrom(raw);
+  const failures: string[] = [];
+  const revision = raw.imageRevision;
+  const base = `https://raw.githubusercontent.com/opensamguk/opensamguk-images/${String(revision)}`;
+  const svgBase = `https://rawcdn.githack.com/opensamguk/opensamguk-images/${String(revision)}`;
+  if (
+    typeof revision !== 'string' ||
+    !/^[a-f0-9]{40}$/.test(revision) ||
+    raw.imageBaseUrl !== base ||
+    raw.svgImageBaseUrl !== svgBase
+  )
+    failures.push('manifest/public-assets.json: image-revision: 전체 커밋 SHA로 고정한 이미지 주소가 필요합니다.');
+  const catalog: unknown = JSON.parse(
+    await readFile(resolve(root, 'packages/shared/src/publicImageCatalog.json'), 'utf8'),
+  );
+  const expected = [...manifest.bundledImages, ...(manifest.mapImages ?? [])]
+    .sort((a, b) => (a.source < b.source ? -1 : 1))
+    .map((image) => ({
+      source: image.source,
+      url: `${image.source.endsWith('.svg') ? svgBase : base}/public/${image.source.replace(/^apps\/web\/src\//, '')}`,
+      sha256: image.sha256,
+    }));
+  if (JSON.stringify(catalog) !== JSON.stringify(expected))
+    failures.push('publicImageCatalog.json: image-catalog: 승인 목록·해시·주소가 다릅니다.');
+  const metadata: unknown = JSON.parse(await readFile(resolve(dist, metadataName), 'utf8'));
+  if (!record(metadata) || metadata.schema !== 2 || JSON.stringify(metadata.remoteImages) !== JSON.stringify(expected))
+    failures.push('public-build.json: remote-images: 빌드의 원격 이미지 목록이 다릅니다.');
+  if (!record(metadata)) throw new PublicAssetsError(failures);
+  const meta = metadataFrom({ ...metadata, schema: 1 });
+  if (meta.images.length) failures.push('public-build.json: image-set: 이미지 바이트는 게임 배포에 넣지 않습니다.');
+  const decisions = await readFile(resolve(root, 'docs/product/decisions.md'), 'utf8');
+  if (!/^## D-060[. ]/m.test(decisions)) failures.push('docs/product/decisions.md: missing-decision: D-060');
+  const csp = await readFile(resolve(root, 'deploy/security.caddy'), 'utf8');
+  const imageSources = [...csp.matchAll(/img-src\s+([^;"\r\n]+)/g)];
+  if (
+    imageSources.length !== 1 ||
+    imageSources[0]![1]!.trim() !== "'self' https://raw.githubusercontent.com https://rawcdn.githack.com"
+  )
+    failures.push('deploy/security.caddy: image-csp: 승인한 이미지 출처 하나만 허용합니다.');
+  const actual = (await fileNames(dist)).filter((name) => name !== metadataName);
+  if (JSON.stringify(Object.keys(meta.files).sort()) !== JSON.stringify(actual))
+    failures.push('public-build.json: file-set: 배포 파일 목록이 다릅니다.');
+  if (!actual.includes('index.html')) failures.push('index.html: missing-entry: 공개 화면이 없습니다.');
+  const urls = new Set(expected.map((image) => image.url));
+  for (const file of actual) {
+    const bytes = await readFile(resolve(dist, file));
+    if (imageExtension.test(file)) failures.push(`${file}: image-set: 로컬 이미지를 배포할 수 없습니다.`);
+    else if (!/\.(?:html|[cm]?js|css|woff2?|ttf|otf)$/i.test(file)) failures.push(`${file}: unsupported-asset`);
+    if (digest(bytes) !== meta.files[file]) failures.push(`${file}: file-hash: 빌드 뒤 바이트가 바뀌었습니다.`);
+    if (/\.(?:html|[cm]?js|css)$/i.test(file))
+      failures.push(...inspectAssetText(bytes.toString('utf8'), file, new Set(actual), urls));
+  }
+  if (failures.length) throw new PublicAssetsError([...new Set(failures)]);
+  return { files: actual.length, images: 0, remoteImages: expected.length, decision: manifest.decision };
+}
+
 export async function checkPublicAssets(options: { root?: string; dist?: string } = {}) {
   const root = options.root ?? projectRoot;
   const dist = options.dist ?? resolve(root, 'apps/web/dist');
   const readJson = async (file: string): Promise<unknown> => JSON.parse(await readFile(file, 'utf8'));
-  const manifest = manifestFrom(await readJson(resolve(root, 'manifest/public-assets.json')));
+  const rawManifest = await readJson(resolve(root, 'manifest/public-assets.json'));
+  if (record(rawManifest) && rawManifest.delivery === 'external') return checkExternalAssets(root, dist, rawManifest);
+  const manifest = manifestFrom(rawManifest);
   const metadata = metadataFrom(await readJson(resolve(dist, metadataName)));
   const failures: string[] = [];
   const decisions = await readFile(resolve(root, 'docs/product/decisions.md'), 'utf8');

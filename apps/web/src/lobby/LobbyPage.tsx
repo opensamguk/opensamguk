@@ -1,7 +1,8 @@
+import { publicImageUrl } from '@opensamguk/shared/public-images';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useId, useState } from 'react';
-import keyartUrl from '../art/keyart.png';
+const keyartUrl = publicImageUrl('apps/web/src/art/keyart.png');
 import { AdminEntry } from '../auth/AdminEntry';
 import { LogoutButton } from '../auth/LogoutButton';
 import { PublicMapTabs } from '../publicMap/PublicMapTabs';

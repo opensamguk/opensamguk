@@ -1,5 +1,6 @@
+import { publicImageUrl } from '@opensamguk/shared/public-images';
 import { getRouteApi, Link } from '@tanstack/react-router';
-import rankingIcon from '../art/icons/ranking.png';
+const rankingIcon = publicImageUrl('apps/web/src/art/icons/ranking.png');
 import { EmptyState, ErrorState } from '../ui/States';
 import styles from './Ranking.module.css';
 import { GeneralRankingTable, NationRankingTable } from './RankingTables';

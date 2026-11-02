@@ -1,0 +1,64 @@
+# T2-15 · AC-M2-08. 공인 포트 없는 선택 구성. 기본 Compose의 서비스 계약을 재사용한다.
+services:
+  postgres:
+    extends: { file: compose.yml, service: postgres }
+  server:
+    extends: { file: compose.yml, service: server }
+    ports: !reset []
+  engine:
+    extends: { file: compose.yml, service: engine }
+  migrate:
+    extends: { file: compose.yml, service: migrate }
+  caddy:
+    extends: { file: compose.yml, service: caddy }
+    volumes: !override
+      - type: bind
+        source: ./Caddyfile.tunnel
+        target: /etc/caddy/Caddyfile
+        read_only: true
+        bind: { create_host_path: false }
+      - type: bind
+        source: ./security.caddy
+        target: /etc/caddy/security.caddy
+        read_only: true
+        bind: { create_host_path: false }
+      - type: bind
+        source: ${PUBLIC_WEB_DIRECTORY:?}
+        target: /srv/web
+        read_only: true
+        bind: { create_host_path: false }
+    tmpfs: !override
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+      - /data:rw,noexec,nosuid,size=16m,uid=10001,gid=10001,mode=0700
+  cloudflared:
+    image: cloudflare/cloudflared:2026.10.7@sha256:4955524aeaa379e154023d5a027c250f7b35041a2e7e950cf13f144bc9b9c5ba
+    pull_policy: never
+    init: true
+    user: '10001:10001'
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    network_mode: service:server
+    command: [tunnel, --no-autoupdate, --metrics, '127.0.0.1:20241', run, --token-file, /run/secrets/tunnel_token]
+    depends_on:
+      caddy: { condition: service_started }
+    volumes:
+      - type: volume
+        source: tunnel-secrets
+        target: /run/secrets
+        read_only: true
+    stop_grace_period: 20s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: 10m, max-file: '3' }
+
+networks:
+  backend: { internal: true }
+  front: {}
+
+volumes:
+  app-secrets: { external: true, name: '${APP_SECRETS_VOLUME:?}' }
+  pg-secrets: { external: true, name: '${PG_SECRETS_VOLUME:?}' }
+  pg-data: { external: true, name: '${PG_DATA_VOLUME:?}' }
+  tunnel-secrets: { external: true, name: '${TUNNEL_SECRETS_VOLUME:?}' }

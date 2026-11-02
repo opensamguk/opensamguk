@@ -11,6 +11,9 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'tools'))
+from image_repository import image_repository
+RELIEF = image_repository() / 'public/mapEditor/geodata/natural-earth-relief.webp'
 CACHE = Path.home() / '.cache/opensamguk/natural-earth-v5.1.2'
 OUT = ROOT / 'apps/web/src/mapEditor/geodata'
 BOUNDS = [94, 17, 94 + 1000 * 27 / 700, 44]
@@ -88,7 +91,7 @@ def line_path(points):
 
 
 def main():
-    if (OUT / 'natural-earth-relief.webp').exists() and '--with-relief' not in sys.argv:
+    if RELIEF.exists() and '--with-relief' not in sys.argv:
         raise SystemExit('Existing relief requires --with-relief; refusing to remove its provenance.')
     CACHE.mkdir(parents=True, exist_ok=True)
     OUT.mkdir(parents=True, exist_ok=True)
@@ -146,7 +149,8 @@ def main():
         box = ((BOUNDS[0]-left)/pixel,(BOUNDS[3]-top)/vertical,(BOUNDS[2]-left)/pixel,(BOUNDS[1]-top)/vertical)
         image = Image.open(tif)
         region = image.transform((2000,1400),Image.Transform.EXTENT,box,Image.Resampling.BICUBIC)
-        region.save(OUT/'natural-earth-relief.webp',quality=88,method=6)
+        RELIEF.parent.mkdir(parents=True, exist_ok=True)
+        region.save(RELIEF,quality=88,method=6)
         output['relief']={'url':raster_url,'sha256':raster_hash,'archiveVersion':version,'worldFile':world,'output':'natural-earth-relief.webp'}
     target = OUT / 'natural-earth.json'
     target.write_text(json.dumps(output, ensure_ascii=False, separators=(',', ':')) + '\n')

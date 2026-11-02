@@ -1,5 +1,5 @@
 // 공개 빌드에 묶는 그림. INT-10·D-038의 자작 도트·Natural Earth 지형은 INT-20에서 운영 지도가 도트 바탕과
-// 생성 표식으로 바뀌어 빠졌다. INT-20·D-047: Natural Earth 도트 바탕과 apps/web/src/art/sources.json의 생성 그림이다.
+// 생성 표식으로 바뀌어 빠졌다. INT-20·D-047: Natural Earth 도트 바탕과 opensamguk-images의 public/art/sources.json의 생성 그림이다.
 export const APPROVED_MAP_IMAGES = [
   'apps/web/src/main/pixel-basemap.png',
   'apps/web/src/main/san10-pixel-basemap.png',
