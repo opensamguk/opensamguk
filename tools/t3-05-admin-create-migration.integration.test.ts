@@ -225,7 +225,8 @@ beforeAll(
         await checked(async () => gate.connect());
         const directory = new URL('../packages/db/prisma/migrations/', import.meta.url),
           all = (await checked(async () => readdir(directory))).filter((value) => /^\d{14}_/.test(value)).sort();
-        expect(all.at(-1)).toBe(migration);
+        expect(all).toContain(migration);
+        expect(all.at(-1)).toBe('20261111000000_logistics_state');
         for (const item of all.filter((value) => value !== migration)) {
           signal.throwIfAborted();
           await checked(async () =>

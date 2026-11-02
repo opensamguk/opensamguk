@@ -138,11 +138,16 @@ async function createHuman(worldId: string, player: User, name: string) {
     await creating;
   }
 }
-async function fixture() {
+async function fixture({ fundedRecruitment = false }: { fundedRecruitment?: boolean } = {}) {
   const seed = randomUUID(),
     payload = creation('물류군주');
   const neutral = initial.cities.filter(
-    (city) => city.kind !== 'PASS' && city.nationId === null && city.population > 0 && city.commerce > 0,
+    (city) =>
+      city.kind !== 'PASS' &&
+      city.nationId === null &&
+      city.population > 0 &&
+      city.commerce > 0 &&
+      (!fundedRecruitment || (city.population >= 100_000 && city.commerce >= 1000)),
   );
   if (!neutral.length) throw new Error('건국할 빈 도시가 없습니다.');
   let playerId = '',
@@ -204,12 +209,21 @@ async function fixture() {
   );
   const edited = await rpc('turns.set', { worldId: id, revision: general.turnRevision, slots }, player);
   expect(edited.status, JSON.stringify(edited.error)).toBe(200);
+  let beforeTaxGold: number | undefined;
+  if (fundedRecruitment) {
+    await advance(id, general.nextTurnTick);
+    const founded = await snapshot(id);
+    expect(founded.state.generals[general.id]!.officerLevel).toBe(12);
+    beforeTaxGold = founded.state.cityResources!.cities[String(cityKey)]!.gold;
+  }
   await advance(id, 10_000);
   const ruler = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId: id, id: general.id } } });
   expect(ruler.officerLevel).toBe(12);
   const state = await snapshot(id);
   expect(state.state.logistics!.cities[String(cityKey)]!.wood).toBeGreaterThan(0);
   expect(state.state.cityResources!.cities[String(cityKey)]!.gold).toBeGreaterThan(7);
+  if (beforeTaxGold !== undefined)
+    expect(state.state.cityResources!.cities[String(cityKey)]!.gold).toBeGreaterThan(beforeTaxGold);
   return { id, player, generalId: general.id, cityKey, seed, config, state };
 }
 async function visitorAtCity(world: Awaited<ReturnType<typeof fixture>>) {
@@ -296,7 +310,7 @@ describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
   });
 
   it('사람의 실제 예턴 모집·징병·건설 소비를 저장하고 원생성 다섯 월을 재생한다', async () => {
-    const world = await fixture();
+    const world = await fixture({ fundedRecruitment: true });
     for (const [good, amount] of [
       ['iron', 7],
       ['horses', 3],
@@ -317,6 +331,15 @@ describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
       ).toBe(200);
     }
     await advance(world.id, 10_000);
+    expect(
+      await db.inputEvent.count({ where: { worldId: world.id, kind: 'logistics.order', status: 'APPLIED' } }),
+    ).toBe(2);
+    const supplied = await snapshot(world.id);
+    expect(supplied.state.cityResources!.cities[String(world.cityKey)]!.gold).toBe(
+      world.state.state.cityResources!.cities[String(world.cityKey)]!.gold - 30,
+    );
+    expect(supplied.state.cityResources!.cities[String(world.cityKey)]!.gold).toBeGreaterThanOrEqual(1500);
+    expect(supplied.state.logistics!.cities[String(world.cityKey)]).toMatchObject({ iron: 7, horses: 3 });
     const cavalry = initial.unitSet.crewTypes.find((type) => type.armType === 3);
     if (!cavalry) throw new Error('생성 자원에 기병이 없습니다.');
     const commands = [
@@ -360,7 +383,24 @@ describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
           : command.commandKey === 'conscript'
             ? { iron: 2, wood: 0, horses: 1 }
             : world.config.build[command.commandKey as 'wall' | 'defence'];
-      expect(rows.map(({ good, delta }) => ({ good, delta }))).toEqual(
+      const logs = await db.generalLog.findMany({
+        where: { worldId: world.id, generalId: world.generalId, tick: due.nextTurnTick },
+        select: { commandKey: true, kind: true, text: true },
+      });
+      const context = JSON.stringify({
+        command: command.commandKey,
+        cityKey: world.cityKey,
+        gold: before.state.cityResources!.cities[String(world.cityKey)]!.gold,
+        population: before.state.cities[world.cityKey]!.population,
+        stock: before.state.logistics!.cities[String(world.cityKey)],
+        afterGold: after.state.cityResources!.cities[String(world.cityKey)]!.gold,
+        afterStock: after.state.logistics!.cities[String(world.cityKey)],
+        logs,
+      });
+      expect(
+        rows.map(({ good, delta }) => ({ good, delta })),
+        context,
+      ).toEqual(
         Object.entries(expected)
           .filter(([, amount]) => amount > 0)
           .map(([good, amount]) => ({ good, delta: -amount })),
