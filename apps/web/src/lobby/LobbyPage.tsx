@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useId, useState } from 'react';
 import keyartUrl from '../art/keyart.png';
+import { AdminEntry } from '../auth/AdminEntry';
 import { LogoutButton } from '../auth/LogoutButton';
 import { PublicMapTabs } from '../publicMap/PublicMapTabs';
 import { useTRPC } from '../trpc';
@@ -49,6 +50,7 @@ export function LobbyPage() {
         {me.data ? (
           loggedIn ? (
             <>
+              <AdminEntry className={styles.account} />
               <Link to="/account" className={styles.account}>
                 내 계정
               </Link>
