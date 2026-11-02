@@ -1051,8 +1051,10 @@ it('정식 두191년 월드에서21개 변경 차단·본인 조회·같은 월�
   const guarded = Object.entries(procedures)
     .filter(([, procedure]) => procedure._def.meta?.worldSanction)
     .map(([path]) => path);
-  expect(guarded).toHaveLength(21);
+  expect(guarded).toHaveLength(22);
   expect(guarded).toContain('cityResources.allocate');
+  // AC-INT-19B: 장수 지시 접수도 월드 제재 대상이다.
+  expect(guarded).toContain('campaign.order');
   expect(
     (await db.world.findUniqueOrThrow({ where: { id: worldId }, select: { ruleFeatures: true } })).ruleFeatures,
   ).not.toContain('city-resources-v1');
@@ -1062,9 +1064,16 @@ it('정식 두191년 월드에서21개 변경 차단·본인 조회·같은 월�
     expectedUserId: victim.id,
     payload: { cityKey: human.cityKey, unitId: 1, crewType: 1100, amount: 1 },
   };
+  const orderInput = {
+    worldId,
+    requestId: randomUUID(),
+    expectedUserId: victim.id,
+    payload: { type: 'request', revision: 0 },
+  };
+  const inputs: Record<string, unknown> = { 'cityResources.allocate': cityInput, 'campaign.order': orderInput };
   const before = await snapshot();
   for (const path of guarded)
-    expect(await call(path, path === 'cityResources.allocate' ? cityInput : { worldId }, sid)).toMatchObject({
+    expect(await call(path, inputs[path] ?? { worldId }, sid)).toMatchObject({
       status: 403,
       code: 'FORBIDDEN',
       reason: null,

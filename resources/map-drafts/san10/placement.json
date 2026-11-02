@@ -1,0 +1,5202 @@
+{
+  "format": "opensamguk-san10-placement-draft",
+  "version": 1,
+  "id": "san10-placement",
+  "status": "DRAFT_NOT_RUNTIME_RESOURCE",
+  "metadata": {
+    "date": "2026-10-29",
+    "relatedAcceptanceCriteria": ["AC-INT-03", "AC-INT-10"],
+    "decision": "D-041",
+    "sourceImage": {
+      "filename": "SAN10MAP.png",
+      "sha256": "742991a74a40db25f7ca4638900c4ec4e260e4189c13abc0219b439246a5fb03",
+      "width": 4800,
+      "height": 3232,
+      "credit": "艾克氏電玩特攻, xgodgame.blogspot.com, image date 2015/11/1; supplied by user",
+      "included": false
+    },
+    "canvas": {
+      "width": 1000,
+      "height": 700,
+      "coordinateSystem": "source image axes scaled independently; not longitude/latitude"
+    },
+    "levelSources": {
+      "resources/map/integration.json": "d108fcf1db9e83dfcf7528dd620f445d4c32012a2510359b3625b16c8927144f",
+      "resources/map/che.json": "a021bdaee12f93ff4efc0dfaf9434085e63f7841d21e10b9e44fd7f9dc1fca0b"
+    },
+    "sourcePositionErrorPx": 30,
+    "userDecisions": {
+      "strategicOpenPlots": 61,
+      "includedPairs": [
+        ["S065", "S006"],
+        ["S089", "S055"]
+      ],
+      "excludedDirectPairs": [
+        ["S012", "S011"],
+        ["S113", "S114"]
+      ]
+    },
+    "counts": {
+      "sites": 126,
+      "roles": {
+        "CITY": 50,
+        "PASS": 8,
+        "OUTPOST": 61,
+        "TRIBAL": 7
+      },
+      "levels": {
+        "0": 8,
+        "1": 1,
+        "2": 65,
+        "4": 7,
+        "5": 17,
+        "6": 14,
+        "7": 7,
+        "8": 7
+      },
+      "connections": 153,
+      "proposedConnections": 14,
+      "excludedDirectConnections": 2,
+      "sourceReviewConnections": 0,
+      "pendingConnections": 14
+    },
+    "levelBasisDefinitions": {
+      "INHERITED_CITY_LEVEL": "현재 통합 지도의 같은 도시 레벨 유지",
+      "CURRENT_PASS_INTERNAL_ZERO": "현재 관문의 내부 레벨 0 유지",
+      "INHERITED_CHE_LOW_LEVEL": "기존 che의 같은 지명 1~2레벨을 첫 제안으로 사용",
+      "PROPOSED_LOW_LEVEL_DEFAULT": "새 공터 또는 기존 상위 도시를 공터로 바꾸는 첫 제안 2레벨",
+      "INHERITED_CHE_REGIONAL_LEVEL": "기존 che 지역 거점의 4레벨을 초안에 사용",
+      "PROPOSED_REGIONAL_LEVEL": "새 선비 거점을 같은 등급의 4레벨로 제안"
+    },
+    "limits": [
+      "배치·레벨 검토용 초안이며 운영 지도 형식 v3가 아니다.",
+      "OUTPOST는 초안 역할이며 현재 엔진 종류가 아니다.",
+      "공터 경제·방어·시나리오 귀속은 확정하지 않았다.",
+      "무방향 연결 관계이며 이동 턴·수로 시설·일방통행을 새로 추론하지 않는다.",
+      "기존 월드·운영 자원·AC 상태는 바꾸지 않았다.",
+      "TRIBAL은 지역 대표 거점의 초안 역할이며 통일된 역사 국가·도시를 뜻하지 않는다.",
+      "추가 7곳의 sourcePosition은 null이며 position은 게임 배치 제안이다.",
+      "proposedConnections 14개는 기존 판독·확정 연결 153개와 구분되며 실행 연결로 확정하지 않았다."
+    ],
+    "currentMapSitesNotMatched": [
+      {
+        "id": "city:42",
+        "name": "홍농",
+        "kind": "CITY"
+      },
+      {
+        "id": "field:92",
+        "name": "파양",
+        "kind": "FIELD"
+      },
+      {
+        "id": "port:13",
+        "name": "강릉항",
+        "kind": "PORT"
+      },
+      {
+        "id": "port:52",
+        "name": "강하항",
+        "kind": "PORT"
+      },
+      {
+        "id": "port:15",
+        "name": "시상항",
+        "kind": "PORT"
+      },
+      {
+        "id": "port:56",
+        "name": "여강항",
+        "kind": "PORT"
+      },
+      {
+        "id": "port:7",
+        "name": "건업항",
+        "kind": "PORT"
+      },
+      {
+        "id": "port:31",
+        "name": "오항",
+        "kind": "PORT"
+      }
+    ],
+    "decisions": ["D-041", "D-042"],
+    "baseSurveySiteCount": 119,
+    "addedRegionalSiteCount": 7
+  },
+  "nameAliases": {
+    "호로관": "호로",
+    "함곡관": "함곡",
+    "면죽관": "면죽",
+    "백랑산": "백랑"
+  },
+  "sites": [
+    {
+      "id": "S001",
+      "name": "무위",
+      "nameZh": "武威",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 6,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 980,
+        "y": 965
+      },
+      "position": {
+        "x": 204.167,
+        "y": 209.004
+      },
+      "currentMapMatch": {
+        "id": "city:22",
+        "kind": "CITY",
+        "level": 6,
+        "anchorKey": 22
+      },
+      "cheMatch": null
+    },
+    {
+      "id": "S002",
+      "name": "서평",
+      "nameZh": "西平",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 2,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 785,
+        "y": 1153
+      },
+      "position": {
+        "x": 163.542,
+        "y": 249.722
+      },
+      "currentMapMatch": {
+        "id": "city:96",
+        "kind": "CITY",
+        "level": 2,
+        "anchorKey": 96
+      },
+      "cheMatch": null
+    },
+    {
+      "id": "S003",
+      "name": "천수",
+      "nameZh": "天水",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 5,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 1194,
+        "y": 1385
+      },
+      "position": {
+        "x": 248.75,
+        "y": 299.969
+      },
+      "currentMapMatch": {
+        "id": "city:40",
+        "kind": "CITY",
+        "level": 5,
+        "anchorKey": 40
+      },
+      "cheMatch": {
+        "id": 40,
+        "level": 5
+      }
+    },
+    {
+      "id": "S004",
+      "name": "안정",
+      "nameZh": "安定",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 5,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 1675,
+        "y": 1237
+      },
+      "position": {
+        "x": 348.958,
+        "y": 267.915
+      },
+      "currentMapMatch": {
+        "id": "city:41",
+        "kind": "CITY",
+        "level": 5,
+        "anchorKey": 41
+      },
+      "cheMatch": {
+        "id": 41,
+        "level": 5
+      }
+    },
+    {
+      "id": "S005",
+      "name": "무도",
+      "nameZh": "武都",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 5,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 1410,
+        "y": 1462
+      },
+      "position": {
+        "x": 293.75,
+        "y": 316.646
+      },
+      "currentMapMatch": {
+        "id": "city:43",
+        "kind": "CITY",
+        "level": 5,
+        "anchorKey": 43
+      },
+      "cheMatch": null
+    },
+    {
+      "id": "S006",
+      "name": "한중",
+      "nameZh": "漢中",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 6,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 1677,
+        "y": 1532
+      },
+      "position": {
+        "x": 349.375,
+        "y": 331.807
+      },
+      "currentMapMatch": {
+        "id": "city:24",
+        "kind": "CITY",
+        "level": 6,
+        "anchorKey": 24
+      },
+      "cheMatch": {
+        "id": 24,
+        "level": 6
+      }
+    },
+    {
+      "id": "S007",
+      "name": "장안",
+      "nameZh": "長安",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 8,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 1905,
+        "y": 1438
+      },
+      "position": {
+        "x": 396.875,
+        "y": 311.448
+      },
+      "currentMapMatch": {
+        "id": "city:4",
+        "kind": "CITY",
+        "level": 8,
+        "anchorKey": 4
+      },
+      "cheMatch": {
+        "id": 4,
+        "level": 8
+      }
+    },
+    {
+      "id": "S008",
+      "name": "자동",
+      "nameZh": "梓潼",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 5,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 1390,
+        "y": 1765
+      },
+      "position": {
+        "x": 289.583,
+        "y": 382.271
+      },
+      "currentMapMatch": {
+        "id": "city:44",
+        "kind": "CITY",
+        "level": 5,
+        "anchorKey": 44
+      },
+      "cheMatch": {
+        "id": 44,
+        "level": 5
+      }
+    },
+    {
+      "id": "S009",
+      "name": "성도",
+      "nameZh": "成都",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 8,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 1172,
+        "y": 1850
+      },
+      "position": {
+        "x": 244.167,
+        "y": 400.681
+      },
+      "currentMapMatch": {
+        "id": "city:5",
+        "kind": "CITY",
+        "level": 8,
+        "anchorKey": 5
+      },
+      "cheMatch": {
+        "id": 5,
+        "level": 8
+      }
+    },
+    {
+      "id": "S010",
+      "name": "강주",
+      "nameZh": "江州",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 6,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 1565,
+        "y": 1990
+      },
+      "position": {
+        "x": 326.042,
+        "y": 431.002
+      },
+      "currentMapMatch": {
+        "id": "city:27",
+        "kind": "CITY",
+        "level": 6,
+        "anchorKey": 27
+      },
+      "cheMatch": {
+        "id": 27,
+        "level": 6
+      }
+    },
+    {
+      "id": "S011",
+      "name": "영안",
+      "nameZh": "永安",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 5,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2120,
+        "y": 1800
+      },
+      "position": {
+        "x": 441.667,
+        "y": 389.851
+      },
+      "currentMapMatch": {
+        "id": "city:45",
+        "kind": "CITY",
+        "level": 5,
+        "anchorKey": 45
+      },
+      "cheMatch": {
+        "id": 45,
+        "level": 5
+      }
+    },
+    {
+      "id": "S012",
+      "name": "상용",
+      "nameZh": "上庸",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 6,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2047,
+        "y": 1645
+      },
+      "position": {
+        "x": 426.458,
+        "y": 356.281
+      },
+      "currentMapMatch": {
+        "id": "city:25",
+        "kind": "CITY",
+        "level": 6,
+        "anchorKey": 25
+      },
+      "cheMatch": {
+        "id": 25,
+        "level": 6
+      }
+    },
+    {
+      "id": "S013",
+      "name": "진양",
+      "nameZh": "晉陽",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 5,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2495,
+        "y": 924
+      },
+      "position": {
+        "x": 519.792,
+        "y": 200.124
+      },
+      "currentMapMatch": {
+        "id": "city:35",
+        "kind": "CITY",
+        "level": 5,
+        "anchorKey": 35
+      },
+      "cheMatch": {
+        "id": 35,
+        "level": 5
+      }
+    },
+    {
+      "id": "S014",
+      "name": "상당",
+      "nameZh": "上黨",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 2,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2495,
+        "y": 1088
+      },
+      "position": {
+        "x": 519.792,
+        "y": 235.644
+      },
+      "currentMapMatch": {
+        "id": "city:95",
+        "kind": "CITY",
+        "level": 2,
+        "anchorKey": 95
+      },
+      "cheMatch": null
+    },
+    {
+      "id": "S015",
+      "name": "계",
+      "nameZh": "薊",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 6,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3040,
+        "y": 647
+      },
+      "position": {
+        "x": 633.333,
+        "y": 140.13
+      },
+      "currentMapMatch": {
+        "id": "city:17",
+        "kind": "CITY",
+        "level": 6,
+        "anchorKey": 17
+      },
+      "cheMatch": {
+        "id": 17,
+        "level": 6
+      }
+    },
+    {
+      "id": "S016",
+      "name": "북평",
+      "nameZh": "北平",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 7,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3380,
+        "y": 628
+      },
+      "position": {
+        "x": 704.167,
+        "y": 136.015
+      },
+      "currentMapMatch": {
+        "id": "city:8",
+        "kind": "CITY",
+        "level": 7,
+        "anchorKey": 8
+      },
+      "cheMatch": {
+        "id": 8,
+        "level": 7
+      }
+    },
+    {
+      "id": "S017",
+      "name": "양평",
+      "nameZh": "襄平",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 2,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3977,
+        "y": 385
+      },
+      "position": {
+        "x": 828.542,
+        "y": 83.385
+      },
+      "currentMapMatch": {
+        "id": "city:99",
+        "kind": "CITY",
+        "level": 2,
+        "anchorKey": 99
+      },
+      "cheMatch": {
+        "id": 75,
+        "level": 3
+      }
+    },
+    {
+      "id": "S018",
+      "name": "남피",
+      "nameZh": "南皮",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 7,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3163,
+        "y": 880
+      },
+      "position": {
+        "x": 658.958,
+        "y": 190.594
+      },
+      "currentMapMatch": {
+        "id": "city:9",
+        "kind": "CITY",
+        "level": 7,
+        "anchorKey": 9
+      },
+      "cheMatch": {
+        "id": 9,
+        "level": 7
+      }
+    },
+    {
+      "id": "S019",
+      "name": "평원",
+      "nameZh": "平原",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 5,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3230,
+        "y": 967
+      },
+      "position": {
+        "x": 672.917,
+        "y": 209.437
+      },
+      "currentMapMatch": {
+        "id": "city:36",
+        "kind": "CITY",
+        "level": 5,
+        "anchorKey": 36
+      },
+      "cheMatch": {
+        "id": 36,
+        "level": 5
+      }
+    },
+    {
+      "id": "S020",
+      "name": "북해",
+      "nameZh": "北海",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 5,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3613,
+        "y": 1020
+      },
+      "position": {
+        "x": 752.708,
+        "y": 220.916
+      },
+      "currentMapMatch": {
+        "id": "city:37",
+        "kind": "CITY",
+        "level": 5,
+        "anchorKey": 37
+      },
+      "cheMatch": {
+        "id": 37,
+        "level": 5
+      }
+    },
+    {
+      "id": "S021",
+      "name": "업",
+      "nameZh": "鄴",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 8,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2874,
+        "y": 1073
+      },
+      "position": {
+        "x": 598.75,
+        "y": 232.395
+      },
+      "currentMapMatch": {
+        "id": "city:1",
+        "kind": "CITY",
+        "level": 8,
+        "anchorKey": 1
+      },
+      "cheMatch": {
+        "id": 1,
+        "level": 8
+      }
+    },
+    {
+      "id": "S022",
+      "name": "복양",
+      "nameZh": "濮陽",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 6,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3065,
+        "y": 1194
+      },
+      "position": {
+        "x": 638.542,
+        "y": 258.601
+      },
+      "currentMapMatch": {
+        "id": "city:18",
+        "kind": "CITY",
+        "level": 6,
+        "anchorKey": 18
+      },
+      "cheMatch": {
+        "id": 18,
+        "level": 6
+      }
+    },
+    {
+      "id": "S023",
+      "name": "하내",
+      "nameZh": "河內",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 6,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2620,
+        "y": 1280
+      },
+      "position": {
+        "x": 545.833,
+        "y": 277.228
+      },
+      "currentMapMatch": {
+        "id": "city:23",
+        "kind": "CITY",
+        "level": 6,
+        "anchorKey": 23
+      },
+      "cheMatch": {
+        "id": 23,
+        "level": 6
+      }
+    },
+    {
+      "id": "S024",
+      "name": "낙양",
+      "nameZh": "洛陽",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 8,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2535,
+        "y": 1355
+      },
+      "position": {
+        "x": 528.125,
+        "y": 293.472
+      },
+      "currentMapMatch": {
+        "id": "city:3",
+        "kind": "CITY",
+        "level": 8,
+        "anchorKey": 3
+      },
+      "cheMatch": {
+        "id": 3,
+        "level": 8
+      }
+    },
+    {
+      "id": "S025",
+      "name": "진류",
+      "nameZh": "陳留",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 6,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2990,
+        "y": 1350
+      },
+      "position": {
+        "x": 622.917,
+        "y": 292.389
+      },
+      "currentMapMatch": {
+        "id": "city:19",
+        "kind": "CITY",
+        "level": 6,
+        "anchorKey": 19
+      },
+      "cheMatch": {
+        "id": 19,
+        "level": 6
+      }
+    },
+    {
+      "id": "S026",
+      "name": "허창",
+      "nameZh": "許昌",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 8,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2867,
+        "y": 1435
+      },
+      "position": {
+        "x": 597.292,
+        "y": 310.798
+      },
+      "currentMapMatch": {
+        "id": "city:2",
+        "kind": "CITY",
+        "level": 8,
+        "anchorKey": 2
+      },
+      "cheMatch": {
+        "id": 2,
+        "level": 8
+      }
+    },
+    {
+      "id": "S027",
+      "name": "여남",
+      "nameZh": "汝南",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 6,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2963,
+        "y": 1555
+      },
+      "position": {
+        "x": 617.292,
+        "y": 336.788
+      },
+      "currentMapMatch": {
+        "id": "city:20",
+        "kind": "CITY",
+        "level": 6,
+        "anchorKey": 20
+      },
+      "cheMatch": {
+        "id": 20,
+        "level": 6
+      }
+    },
+    {
+      "id": "S028",
+      "name": "소패",
+      "nameZh": "小沛",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 5,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3370,
+        "y": 1350
+      },
+      "position": {
+        "x": 702.083,
+        "y": 292.389
+      },
+      "currentMapMatch": {
+        "id": "city:39",
+        "kind": "CITY",
+        "level": 5,
+        "anchorKey": 39
+      },
+      "cheMatch": null
+    },
+    {
+      "id": "S029",
+      "name": "하비",
+      "nameZh": "下邳",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 6,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3740,
+        "y": 1265
+      },
+      "position": {
+        "x": 779.167,
+        "y": 273.979
+      },
+      "currentMapMatch": {
+        "id": "city:21",
+        "kind": "CITY",
+        "level": 6,
+        "anchorKey": 21
+      },
+      "cheMatch": {
+        "id": 21,
+        "level": 6
+      }
+    },
+    {
+      "id": "S030",
+      "name": "수춘",
+      "nameZh": "壽春",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 7,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3430,
+        "y": 1516
+      },
+      "position": {
+        "x": 714.583,
+        "y": 328.342
+      },
+      "currentMapMatch": {
+        "id": "city:11",
+        "kind": "CITY",
+        "level": 7,
+        "anchorKey": 11
+      },
+      "cheMatch": {
+        "id": 11,
+        "level": 7
+      }
+    },
+    {
+      "id": "S031",
+      "name": "여강",
+      "nameZh": "廬江",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 5,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3375,
+        "y": 1780
+      },
+      "position": {
+        "x": 703.125,
+        "y": 385.52
+      },
+      "currentMapMatch": {
+        "id": "city:56",
+        "kind": "CITY",
+        "level": 5,
+        "anchorKey": 56
+      },
+      "cheMatch": {
+        "id": 56,
+        "level": 5
+      }
+    },
+    {
+      "id": "S032",
+      "name": "건업",
+      "nameZh": "建業",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 8,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3857,
+        "y": 1586
+      },
+      "position": {
+        "x": 803.542,
+        "y": 343.502
+      },
+      "currentMapMatch": {
+        "id": "city:7",
+        "kind": "CITY",
+        "level": 8,
+        "anchorKey": 7
+      },
+      "cheMatch": {
+        "id": 7,
+        "level": 8
+      }
+    },
+    {
+      "id": "S033",
+      "name": "오",
+      "nameZh": "吳",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 6,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 4202,
+        "y": 1590
+      },
+      "position": {
+        "x": 875.417,
+        "y": 344.369
+      },
+      "currentMapMatch": {
+        "id": "city:31",
+        "kind": "CITY",
+        "level": 6,
+        "anchorKey": 31
+      },
+      "cheMatch": {
+        "id": 31,
+        "level": 6
+      }
+    },
+    {
+      "id": "S034",
+      "name": "회계",
+      "nameZh": "會稽",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 5,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 4248,
+        "y": 1776
+      },
+      "position": {
+        "x": 885.0,
+        "y": 384.653
+      },
+      "currentMapMatch": {
+        "id": "city:57",
+        "kind": "CITY",
+        "level": 5,
+        "anchorKey": 57
+      },
+      "cheMatch": {
+        "id": 57,
+        "level": 5
+      }
+    },
+    {
+      "id": "S035",
+      "name": "건안",
+      "nameZh": "建安",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 2,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3857,
+        "y": 2138
+      },
+      "position": {
+        "x": 803.542,
+        "y": 463.057
+      },
+      "currentMapMatch": {
+        "id": "city:98",
+        "kind": "CITY",
+        "level": 2,
+        "anchorKey": 98
+      },
+      "cheMatch": null
+    },
+    {
+      "id": "S036",
+      "name": "시상",
+      "nameZh": "柴桑",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 7,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3230,
+        "y": 1950
+      },
+      "position": {
+        "x": 672.917,
+        "y": 422.339
+      },
+      "currentMapMatch": {
+        "id": "city:15",
+        "kind": "CITY",
+        "level": 7,
+        "anchorKey": 15
+      },
+      "cheMatch": {
+        "id": 15,
+        "level": 7
+      }
+    },
+    {
+      "id": "S037",
+      "name": "완",
+      "nameZh": "宛",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 7,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2560,
+        "y": 1536
+      },
+      "position": {
+        "x": 533.333,
+        "y": 332.673
+      },
+      "currentMapMatch": {
+        "id": "city:10",
+        "kind": "CITY",
+        "level": 7,
+        "anchorKey": 10
+      },
+      "cheMatch": {
+        "id": 10,
+        "level": 7
+      }
+    },
+    {
+      "id": "S038",
+      "name": "신야",
+      "nameZh": "新野",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 5,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2680,
+        "y": 1606
+      },
+      "position": {
+        "x": 558.333,
+        "y": 347.834
+      },
+      "currentMapMatch": {
+        "id": "city:51",
+        "kind": "CITY",
+        "level": 5,
+        "anchorKey": 51
+      },
+      "cheMatch": {
+        "id": 51,
+        "level": 5
+      }
+    },
+    {
+      "id": "S039",
+      "name": "양양",
+      "nameZh": "襄陽",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 8,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2580,
+        "y": 1724
+      },
+      "position": {
+        "x": 537.5,
+        "y": 373.391
+      },
+      "currentMapMatch": {
+        "id": "city:6",
+        "kind": "CITY",
+        "level": 8,
+        "anchorKey": 6
+      },
+      "cheMatch": {
+        "id": 6,
+        "level": 8
+      }
+    },
+    {
+      "id": "S040",
+      "name": "강릉",
+      "nameZh": "江陵",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 7,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2662,
+        "y": 1855
+      },
+      "position": {
+        "x": 554.583,
+        "y": 401.764
+      },
+      "currentMapMatch": {
+        "id": "city:13",
+        "kind": "CITY",
+        "level": 7,
+        "anchorKey": 13
+      },
+      "cheMatch": {
+        "id": 13,
+        "level": 7
+      }
+    },
+    {
+      "id": "S041",
+      "name": "강하",
+      "nameZh": "江夏",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 5,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2915,
+        "y": 1777
+      },
+      "position": {
+        "x": 607.292,
+        "y": 384.87
+      },
+      "currentMapMatch": {
+        "id": "city:52",
+        "kind": "CITY",
+        "level": 5,
+        "anchorKey": 52
+      },
+      "cheMatch": {
+        "id": 52,
+        "level": 5
+      }
+    },
+    {
+      "id": "S042",
+      "name": "무릉",
+      "nameZh": "武陵",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 5,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2545,
+        "y": 2040
+      },
+      "position": {
+        "x": 530.208,
+        "y": 441.832
+      },
+      "currentMapMatch": {
+        "id": "city:53",
+        "kind": "CITY",
+        "level": 5,
+        "anchorKey": 53
+      },
+      "cheMatch": {
+        "id": 53,
+        "level": 5
+      }
+    },
+    {
+      "id": "S043",
+      "name": "장사",
+      "nameZh": "長沙",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 7,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2832,
+        "y": 2115
+      },
+      "position": {
+        "x": 590.0,
+        "y": 458.075
+      },
+      "currentMapMatch": {
+        "id": "city:14",
+        "kind": "CITY",
+        "level": 7,
+        "anchorKey": 14
+      },
+      "cheMatch": {
+        "id": 14,
+        "level": 7
+      }
+    },
+    {
+      "id": "S044",
+      "name": "영릉",
+      "nameZh": "零陵",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 5,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2662,
+        "y": 2357
+      },
+      "position": {
+        "x": 554.583,
+        "y": 510.489
+      },
+      "currentMapMatch": {
+        "id": "city:54",
+        "kind": "CITY",
+        "level": 5,
+        "anchorKey": 54
+      },
+      "cheMatch": {
+        "id": 54,
+        "level": 5
+      }
+    },
+    {
+      "id": "S045",
+      "name": "계양",
+      "nameZh": "桂陽",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 6,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2885,
+        "y": 2440
+      },
+      "position": {
+        "x": 601.042,
+        "y": 528.465
+      },
+      "currentMapMatch": {
+        "id": "city:30",
+        "kind": "CITY",
+        "level": 6,
+        "anchorKey": 30
+      },
+      "cheMatch": {
+        "id": 30,
+        "level": 6
+      }
+    },
+    {
+      "id": "S046",
+      "name": "남해",
+      "nameZh": "南海",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 6,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2945,
+        "y": 2718
+      },
+      "position": {
+        "x": 613.542,
+        "y": 588.676
+      },
+      "currentMapMatch": {
+        "id": "city:29",
+        "kind": "CITY",
+        "level": 6,
+        "anchorKey": 29
+      },
+      "cheMatch": {
+        "id": 29,
+        "level": 6
+      }
+    },
+    {
+      "id": "S047",
+      "name": "건녕",
+      "nameZh": "建寧",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 6,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 1128,
+        "y": 2494
+      },
+      "position": {
+        "x": 235.0,
+        "y": 540.161
+      },
+      "currentMapMatch": {
+        "id": "city:28",
+        "kind": "CITY",
+        "level": 6,
+        "anchorKey": 28
+      },
+      "cheMatch": {
+        "id": 28,
+        "level": 6
+      }
+    },
+    {
+      "id": "S048",
+      "name": "운남",
+      "nameZh": "雲南",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 5,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 857,
+        "y": 2625
+      },
+      "position": {
+        "x": 178.542,
+        "y": 568.533
+      },
+      "currentMapMatch": {
+        "id": "city:48",
+        "kind": "CITY",
+        "level": 5,
+        "anchorKey": 48
+      },
+      "cheMatch": {
+        "id": 48,
+        "level": 5
+      }
+    },
+    {
+      "id": "S049",
+      "name": "영창",
+      "nameZh": "永昌",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 2,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 470,
+        "y": 2612
+      },
+      "position": {
+        "x": 97.917,
+        "y": 565.718
+      },
+      "currentMapMatch": {
+        "id": "city:97",
+        "kind": "CITY",
+        "level": 2,
+        "anchorKey": 97
+      },
+      "cheMatch": null
+    },
+    {
+      "id": "S050",
+      "name": "교지",
+      "nameZh": "交趾",
+      "sourceKind": "CITY",
+      "role": "CITY",
+      "level": 5,
+      "levelBasis": "INHERITED_CITY_LEVEL",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 1600,
+        "y": 3008
+      },
+      "position": {
+        "x": 333.333,
+        "y": 651.485
+      },
+      "currentMapMatch": {
+        "id": "city:50",
+        "kind": "CITY",
+        "level": 5,
+        "anchorKey": 50
+      },
+      "cheMatch": {
+        "id": 50,
+        "level": 5
+      }
+    },
+    {
+      "id": "S051",
+      "name": "면죽관",
+      "nameZh": "綿竹關",
+      "sourceKind": "PASS",
+      "role": "PASS",
+      "level": 0,
+      "levelBasis": "CURRENT_PASS_INTERNAL_ZERO",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 1240,
+        "y": 1721
+      },
+      "position": {
+        "x": 258.333,
+        "y": 372.741
+      },
+      "currentMapMatch": {
+        "id": "pass:87",
+        "kind": "PASS",
+        "level": null,
+        "anchorKey": 87
+      },
+      "cheMatch": {
+        "id": 87,
+        "level": 3
+      }
+    },
+    {
+      "id": "S052",
+      "name": "검각",
+      "nameZh": "劍閣",
+      "sourceKind": "PASS",
+      "role": "PASS",
+      "level": 0,
+      "levelBasis": "CURRENT_PASS_INTERNAL_ZERO",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 1405,
+        "y": 1618
+      },
+      "position": {
+        "x": 292.708,
+        "y": 350.433
+      },
+      "currentMapMatch": {
+        "id": "pass:102",
+        "kind": "PASS",
+        "level": null,
+        "anchorKey": 102
+      },
+      "cheMatch": null
+    },
+    {
+      "id": "S053",
+      "name": "양평관",
+      "nameZh": "陽平關",
+      "sourceKind": "PASS",
+      "role": "PASS",
+      "level": 0,
+      "levelBasis": "CURRENT_PASS_INTERNAL_ZERO",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 1540,
+        "y": 1549
+      },
+      "position": {
+        "x": 320.833,
+        "y": 335.489
+      },
+      "currentMapMatch": {
+        "id": "pass:75",
+        "kind": "PASS",
+        "level": null,
+        "anchorKey": 75
+      },
+      "cheMatch": null
+    },
+    {
+      "id": "S054",
+      "name": "동관",
+      "nameZh": "潼關",
+      "sourceKind": "PASS",
+      "role": "PASS",
+      "level": 0,
+      "levelBasis": "CURRENT_PASS_INTERNAL_ZERO",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2240,
+        "y": 1374
+      },
+      "position": {
+        "x": 466.667,
+        "y": 297.587
+      },
+      "currentMapMatch": {
+        "id": "pass:100",
+        "kind": "PASS",
+        "level": null,
+        "anchorKey": 100
+      },
+      "cheMatch": null
+    },
+    {
+      "id": "S055",
+      "name": "함곡관",
+      "nameZh": "函谷關",
+      "sourceKind": "PASS",
+      "role": "PASS",
+      "level": 0,
+      "levelBasis": "CURRENT_PASS_INTERNAL_ZERO",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2435,
+        "y": 1340
+      },
+      "position": {
+        "x": 507.292,
+        "y": 290.223
+      },
+      "currentMapMatch": {
+        "id": "pass:73",
+        "kind": "PASS",
+        "level": null,
+        "anchorKey": 73
+      },
+      "cheMatch": {
+        "id": 73,
+        "level": 3
+      }
+    },
+    {
+      "id": "S056",
+      "name": "무관",
+      "nameZh": "武關",
+      "sourceKind": "PASS",
+      "role": "PASS",
+      "level": 0,
+      "levelBasis": "CURRENT_PASS_INTERNAL_ZERO",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2276,
+        "y": 1499
+      },
+      "position": {
+        "x": 474.167,
+        "y": 324.66
+      },
+      "currentMapMatch": {
+        "id": "pass:101",
+        "kind": "PASS",
+        "level": null,
+        "anchorKey": 101
+      },
+      "cheMatch": null
+    },
+    {
+      "id": "S057",
+      "name": "호로관",
+      "nameZh": "虎牢關",
+      "sourceKind": "PASS",
+      "role": "PASS",
+      "level": 0,
+      "levelBasis": "CURRENT_PASS_INTERNAL_ZERO",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2685,
+        "y": 1335
+      },
+      "position": {
+        "x": 559.375,
+        "y": 289.14
+      },
+      "currentMapMatch": {
+        "id": "pass:71",
+        "kind": "PASS",
+        "level": null,
+        "anchorKey": 71
+      },
+      "cheMatch": {
+        "id": 71,
+        "level": 3
+      }
+    },
+    {
+      "id": "S058",
+      "name": "호관",
+      "nameZh": "壺關",
+      "sourceKind": "PASS",
+      "role": "PASS",
+      "level": 0,
+      "levelBasis": "CURRENT_PASS_INTERNAL_ZERO",
+      "levelStatus": "INHERITED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2552,
+        "y": 1168
+      },
+      "position": {
+        "x": 531.667,
+        "y": 252.97
+      },
+      "currentMapMatch": {
+        "id": "pass:70",
+        "kind": "PASS",
+        "level": null,
+        "anchorKey": 70
+      },
+      "cheMatch": {
+        "id": 70,
+        "level": 3
+      }
+    },
+    {
+      "id": "S059",
+      "name": "주천",
+      "nameZh": "酒泉",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 480,
+        "y": 732
+      },
+      "position": {
+        "x": 100.0,
+        "y": 158.54
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S060",
+      "name": "적도",
+      "nameZh": "狄道",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "INHERITED_CHE_LOW_LEVEL",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 1005,
+        "y": 1161
+      },
+      "position": {
+        "x": 209.375,
+        "y": 251.454
+      },
+      "currentMapMatch": {
+        "id": "field:84",
+        "kind": "FIELD",
+        "level": null,
+        "anchorKey": null
+      },
+      "cheMatch": {
+        "id": 84,
+        "level": 2
+      }
+    },
+    {
+      "id": "S061",
+      "name": "남안",
+      "nameZh": "南安",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 1060,
+        "y": 1284
+      },
+      "position": {
+        "x": 220.833,
+        "y": 278.094
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S062",
+      "name": "기산",
+      "nameZh": "祁山",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "INHERITED_CHE_LOW_LEVEL",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 1230,
+        "y": 1489
+      },
+      "position": {
+        "x": 256.25,
+        "y": 322.494
+      },
+      "currentMapMatch": {
+        "id": "field:86",
+        "kind": "FIELD",
+        "level": null,
+        "anchorKey": null
+      },
+      "cheMatch": {
+        "id": 86,
+        "level": 2
+      }
+    },
+    {
+      "id": "S063",
+      "name": "가정",
+      "nameZh": "街亭",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "INHERITED_CHE_LOW_LEVEL",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 1468,
+        "y": 1264
+      },
+      "position": {
+        "x": 305.833,
+        "y": 273.762
+      },
+      "currentMapMatch": {
+        "id": "field:85",
+        "kind": "FIELD",
+        "level": null,
+        "anchorKey": null
+      },
+      "cheMatch": {
+        "id": 85,
+        "level": 2
+      }
+    },
+    {
+      "id": "S064",
+      "name": "진창",
+      "nameZh": "陳倉",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 1578,
+        "y": 1404
+      },
+      "position": {
+        "x": 328.75,
+        "y": 304.084
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S065",
+      "name": "오장원",
+      "nameZh": "五丈原",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 1728,
+        "y": 1427
+      },
+      "position": {
+        "x": 360.0,
+        "y": 309.066
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S066",
+      "name": "화산",
+      "nameZh": "華山",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2140,
+        "y": 1462
+      },
+      "position": {
+        "x": 445.833,
+        "y": 316.646
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S067",
+      "name": "서성",
+      "nameZh": "西城",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 1949,
+        "y": 1636
+      },
+      "position": {
+        "x": 406.042,
+        "y": 354.332
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S068",
+      "name": "방릉",
+      "nameZh": "房陵",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2278,
+        "y": 1633
+      },
+      "position": {
+        "x": 474.583,
+        "y": 353.682
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S069",
+      "name": "한가",
+      "nameZh": "漢嘉",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 967,
+        "y": 1956
+      },
+      "position": {
+        "x": 201.458,
+        "y": 423.639
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S070",
+      "name": "강양",
+      "nameZh": "江陽",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 1253,
+        "y": 2077
+      },
+      "position": {
+        "x": 261.042,
+        "y": 449.845
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S071",
+      "name": "임강",
+      "nameZh": "臨江",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 1827,
+        "y": 1913
+      },
+      "position": {
+        "x": 380.625,
+        "y": 414.325
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S072",
+      "name": "월수",
+      "nameZh": "越嶲",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 937,
+        "y": 2206
+      },
+      "position": {
+        "x": 195.208,
+        "y": 477.785
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S073",
+      "name": "주제",
+      "nameZh": "朱提",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 1252,
+        "y": 2270
+      },
+      "position": {
+        "x": 260.833,
+        "y": 491.646
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S074",
+      "name": "노수",
+      "nameZh": "瀘水",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 773,
+        "y": 2416
+      },
+      "position": {
+        "x": 161.042,
+        "y": 523.267
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S075",
+      "name": "애뢰",
+      "nameZh": "哀牢",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 246,
+        "y": 2628
+      },
+      "position": {
+        "x": 51.25,
+        "y": 569.183
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S076",
+      "name": "사룡",
+      "nameZh": "邪龍",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 651,
+        "y": 2621
+      },
+      "position": {
+        "x": 135.625,
+        "y": 567.667
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S077",
+      "name": "흥고",
+      "nameZh": "興古",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 1084,
+        "y": 2756
+      },
+      "position": {
+        "x": 225.833,
+        "y": 596.906
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S078",
+      "name": "합포",
+      "nameZh": "合浦",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2230,
+        "y": 2874
+      },
+      "position": {
+        "x": 464.583,
+        "y": 622.463
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S079",
+      "name": "구원",
+      "nameZh": "九原",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2538,
+        "y": 783
+      },
+      "position": {
+        "x": 528.75,
+        "y": 169.585
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S080",
+      "name": "항산",
+      "nameZh": "恒山",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2710,
+        "y": 698
+      },
+      "position": {
+        "x": 564.583,
+        "y": 151.176
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S081",
+      "name": "백랑산",
+      "nameZh": "白狼山",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "INHERITED_CHE_LOW_LEVEL",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3552,
+        "y": 531
+      },
+      "position": {
+        "x": 740.0,
+        "y": 115.006
+      },
+      "currentMapMatch": {
+        "id": "field:90",
+        "kind": "FIELD",
+        "level": null,
+        "anchorKey": null
+      },
+      "cheMatch": {
+        "id": 90,
+        "level": 2
+      }
+    },
+    {
+      "id": "S082",
+      "name": "낙랑",
+      "nameZh": "樂浪",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 4564,
+        "y": 583
+      },
+      "position": {
+        "x": 950.833,
+        "y": 126.269
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S083",
+      "name": "역경",
+      "nameZh": "易京",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "INHERITED_CHE_LOW_LEVEL",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3122,
+        "y": 761
+      },
+      "position": {
+        "x": 650.417,
+        "y": 164.821
+      },
+      "currentMapMatch": {
+        "id": "field:77",
+        "kind": "FIELD",
+        "level": null,
+        "anchorKey": null
+      },
+      "cheMatch": {
+        "id": 77,
+        "level": 2
+      }
+    },
+    {
+      "id": "S084",
+      "name": "거록",
+      "nameZh": "鉅鹿",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2828,
+        "y": 904
+      },
+      "position": {
+        "x": 589.167,
+        "y": 195.792
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S085",
+      "name": "계교",
+      "nameZh": "界橋",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "INHERITED_CHE_LOW_LEVEL",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3096,
+        "y": 1009
+      },
+      "position": {
+        "x": 645.0,
+        "y": 218.533
+      },
+      "currentMapMatch": {
+        "id": "field:78",
+        "kind": "FIELD",
+        "level": null,
+        "anchorKey": null
+      },
+      "cheMatch": {
+        "id": 78,
+        "level": 2
+      }
+    },
+    {
+      "id": "S086",
+      "name": "임치",
+      "nameZh": "臨淄",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3488,
+        "y": 1011
+      },
+      "position": {
+        "x": 726.667,
+        "y": 218.967
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S087",
+      "name": "태산",
+      "nameZh": "泰山",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3319,
+        "y": 1071
+      },
+      "position": {
+        "x": 691.458,
+        "y": 231.962
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S088",
+      "name": "낭야",
+      "nameZh": "琅邪",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3779,
+        "y": 1151
+      },
+      "position": {
+        "x": 787.292,
+        "y": 249.288
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S089",
+      "name": "하동",
+      "nameZh": "河東",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2381,
+        "y": 1209
+      },
+      "position": {
+        "x": 496.042,
+        "y": 261.85
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S090",
+      "name": "백마",
+      "nameZh": "白馬",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2903,
+        "y": 1228
+      },
+      "position": {
+        "x": 604.792,
+        "y": 265.965
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S091",
+      "name": "정도",
+      "nameZh": "定陶",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "INHERITED_CHE_LOW_LEVEL",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3097,
+        "y": 1274
+      },
+      "position": {
+        "x": 645.208,
+        "y": 275.928
+      },
+      "currentMapMatch": {
+        "id": "field:81",
+        "kind": "FIELD",
+        "level": null,
+        "anchorKey": null
+      },
+      "cheMatch": {
+        "id": 81,
+        "level": 2
+      }
+    },
+    {
+      "id": "S092",
+      "name": "관도",
+      "nameZh": "官渡",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "INHERITED_CHE_LOW_LEVEL",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2847,
+        "y": 1321
+      },
+      "position": {
+        "x": 593.125,
+        "y": 286.108
+      },
+      "currentMapMatch": {
+        "id": "field:80",
+        "kind": "FIELD",
+        "level": null,
+        "anchorKey": null
+      },
+      "cheMatch": {
+        "id": 80,
+        "level": 2
+      }
+    },
+    {
+      "id": "S093",
+      "name": "팽성",
+      "nameZh": "彭城",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3562,
+        "y": 1325
+      },
+      "position": {
+        "x": 742.083,
+        "y": 286.974
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S094",
+      "name": "숭산",
+      "nameZh": "嵩山",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2666,
+        "y": 1423
+      },
+      "position": {
+        "x": 555.417,
+        "y": 308.199
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S095",
+      "name": "진",
+      "nameZh": "陳",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3045,
+        "y": 1437
+      },
+      "position": {
+        "x": 634.375,
+        "y": 311.231
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S096",
+      "name": "초",
+      "nameZh": "譙",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3176,
+        "y": 1424
+      },
+      "position": {
+        "x": 661.667,
+        "y": 308.416
+      },
+      "currentMapMatch": {
+        "id": "city:38",
+        "kind": "CITY",
+        "level": 5,
+        "anchorKey": 38
+      },
+      "cheMatch": {
+        "id": 38,
+        "level": 5
+      },
+      "roleChangeNote": "현재 도시를 원본 공터에 대응. 초안에서는 점령·이동 가능한 낮은 레벨 거점으로 배치."
+    },
+    {
+      "id": "S097",
+      "name": "노양",
+      "nameZh": "魯陽",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2763,
+        "y": 1515
+      },
+      "position": {
+        "x": 575.625,
+        "y": 328.125
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S098",
+      "name": "의양",
+      "nameZh": "義陽",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2857,
+        "y": 1589
+      },
+      "position": {
+        "x": 595.208,
+        "y": 344.152
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S099",
+      "name": "번성",
+      "nameZh": "樊城",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2525,
+        "y": 1609
+      },
+      "position": {
+        "x": 526.042,
+        "y": 348.484
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S100",
+      "name": "합비",
+      "nameZh": "合肥",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "INHERITED_CHE_LOW_LEVEL",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3451,
+        "y": 1613
+      },
+      "position": {
+        "x": 718.958,
+        "y": 349.35
+      },
+      "currentMapMatch": {
+        "id": "field:82",
+        "kind": "FIELD",
+        "level": null,
+        "anchorKey": null
+      },
+      "cheMatch": {
+        "id": 82,
+        "level": 2
+      }
+    },
+    {
+      "id": "S101",
+      "name": "석정",
+      "nameZh": "石亭",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3320,
+        "y": 1667
+      },
+      "position": {
+        "x": 691.667,
+        "y": 361.046
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S102",
+      "name": "유수구",
+      "nameZh": "濡須口",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3580,
+        "y": 1680
+      },
+      "position": {
+        "x": 745.833,
+        "y": 363.861
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S103",
+      "name": "장판",
+      "nameZh": "長坂",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "INHERITED_CHE_LOW_LEVEL",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2572,
+        "y": 1778
+      },
+      "position": {
+        "x": 535.833,
+        "y": 385.087
+      },
+      "currentMapMatch": {
+        "id": "field:89",
+        "kind": "FIELD",
+        "level": null,
+        "anchorKey": null
+      },
+      "cheMatch": {
+        "id": 89,
+        "level": 2
+      }
+    },
+    {
+      "id": "S104",
+      "name": "이릉",
+      "nameZh": "夷陵",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "INHERITED_CHE_LOW_LEVEL",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2434,
+        "y": 1829
+      },
+      "position": {
+        "x": 507.083,
+        "y": 396.132
+      },
+      "currentMapMatch": {
+        "id": "field:88",
+        "kind": "FIELD",
+        "level": null,
+        "anchorKey": null
+      },
+      "cheMatch": {
+        "id": 88,
+        "level": 2
+      }
+    },
+    {
+      "id": "S105",
+      "name": "화용",
+      "nameZh": "華容",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2814,
+        "y": 1844
+      },
+      "position": {
+        "x": 586.25,
+        "y": 399.381
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S106",
+      "name": "서새산",
+      "nameZh": "西塞山",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3146,
+        "y": 1876
+      },
+      "position": {
+        "x": 655.417,
+        "y": 406.312
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S107",
+      "name": "적벽",
+      "nameZh": "赤壁",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 1,
+      "levelBasis": "INHERITED_CHE_LOW_LEVEL",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2919,
+        "y": 1916
+      },
+      "position": {
+        "x": 608.125,
+        "y": 414.975
+      },
+      "currentMapMatch": {
+        "id": "field:91",
+        "kind": "FIELD",
+        "level": null,
+        "anchorKey": null
+      },
+      "cheMatch": {
+        "id": 91,
+        "level": 1
+      }
+    },
+    {
+      "id": "S108",
+      "name": "공안",
+      "nameZh": "公安",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2592,
+        "y": 1940
+      },
+      "position": {
+        "x": 540.0,
+        "y": 420.173
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S109",
+      "name": "심양",
+      "nameZh": "尋陽",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3289,
+        "y": 1849
+      },
+      "position": {
+        "x": 685.208,
+        "y": 400.464
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S110",
+      "name": "남창",
+      "nameZh": "南昌",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3275,
+        "y": 2072
+      },
+      "position": {
+        "x": 682.292,
+        "y": 448.762
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S111",
+      "name": "회음",
+      "nameZh": "淮陰",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3698,
+        "y": 1404
+      },
+      "position": {
+        "x": 770.417,
+        "y": 304.084
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S112",
+      "name": "광릉",
+      "nameZh": "廣陵",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "INHERITED_CHE_LOW_LEVEL",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 4034,
+        "y": 1447
+      },
+      "position": {
+        "x": 840.417,
+        "y": 313.397
+      },
+      "currentMapMatch": {
+        "id": "city:83",
+        "kind": "CITY",
+        "level": 2,
+        "anchorKey": 83
+      },
+      "cheMatch": {
+        "id": 83,
+        "level": 2
+      },
+      "roleChangeNote": "현재 도시를 원본 공터에 대응. 초안에서는 점령·이동 가능한 낮은 레벨 거점으로 배치."
+    },
+    {
+      "id": "S113",
+      "name": "경구",
+      "nameZh": "京口",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 4034,
+        "y": 1600
+      },
+      "position": {
+        "x": 840.417,
+        "y": 346.535
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S114",
+      "name": "부춘",
+      "nameZh": "富春",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 3985,
+        "y": 1785
+      },
+      "position": {
+        "x": 830.208,
+        "y": 386.603
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S115",
+      "name": "임해",
+      "nameZh": "臨海",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 4277,
+        "y": 1979
+      },
+      "position": {
+        "x": 891.042,
+        "y": 428.62
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S116",
+      "name": "형산",
+      "nameZh": "衡山",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2786,
+        "y": 2270
+      },
+      "position": {
+        "x": 580.417,
+        "y": 491.646
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S117",
+      "name": "임하",
+      "nameZh": "臨賀",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2764,
+        "y": 2523
+      },
+      "position": {
+        "x": 575.833,
+        "y": 546.442
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S118",
+      "name": "곡강",
+      "nameZh": "曲江",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2978,
+        "y": 2583
+      },
+      "position": {
+        "x": 620.417,
+        "y": 559.437
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S119",
+      "name": "창오",
+      "nameZh": "蒼梧",
+      "sourceKind": "OPEN",
+      "role": "OUTPOST",
+      "level": 2,
+      "levelBasis": "PROPOSED_LOW_LEVEL_DEFAULT",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": {
+        "x": 2738,
+        "y": 2742
+      },
+      "position": {
+        "x": 570.417,
+        "y": 593.874
+      },
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S120",
+      "name": "강",
+      "nameZh": "羌",
+      "sourceKind": "ADDED_REGION",
+      "role": "TRIBAL",
+      "level": 4,
+      "levelBasis": "INHERITED_CHE_REGIONAL_LEVEL",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": null,
+      "position": {
+        "x": 145,
+        "y": 210
+      },
+      "positionBasis": "PROPOSED_GAME_POSITION",
+      "placementNote": "사용자 요청에 따른 지역 대표 거점의 게임 배치. 역사 도시 좌표나 원본 표식의 판독값이 아니다.",
+      "currentMapMatch": null,
+      "cheMatch": {
+        "id": 63,
+        "level": 4
+      }
+    },
+    {
+      "id": "S121",
+      "name": "오환",
+      "nameZh": "烏桓",
+      "sourceKind": "ADDED_REGION",
+      "role": "TRIBAL",
+      "level": 4,
+      "levelBasis": "INHERITED_CHE_REGIONAL_LEVEL",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": null,
+      "position": {
+        "x": 740,
+        "y": 65
+      },
+      "positionBasis": "PROPOSED_GAME_POSITION",
+      "placementNote": "사용자 요청에 따른 지역 대표 거점의 게임 배치. 역사 도시 좌표나 원본 표식의 판독값이 아니다.",
+      "currentMapMatch": null,
+      "cheMatch": {
+        "id": 68,
+        "level": 4
+      }
+    },
+    {
+      "id": "S122",
+      "name": "남만",
+      "nameZh": "南蠻",
+      "sourceKind": "ADDED_REGION",
+      "role": "TRIBAL",
+      "level": 4,
+      "levelBasis": "INHERITED_CHE_REGIONAL_LEVEL",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": null,
+      "position": {
+        "x": 105,
+        "y": 600
+      },
+      "positionBasis": "PROPOSED_GAME_POSITION",
+      "placementNote": "사용자 요청에 따른 지역 대표 거점의 게임 배치. 역사 도시 좌표나 원본 표식의 판독값이 아니다.",
+      "currentMapMatch": null,
+      "cheMatch": {
+        "id": 66,
+        "level": 4
+      }
+    },
+    {
+      "id": "S123",
+      "name": "산월",
+      "nameZh": "山越",
+      "sourceKind": "ADDED_REGION",
+      "role": "TRIBAL",
+      "level": 4,
+      "levelBasis": "INHERITED_CHE_REGIONAL_LEVEL",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": null,
+      "position": {
+        "x": 750,
+        "y": 490
+      },
+      "positionBasis": "PROPOSED_GAME_POSITION",
+      "placementNote": "사용자 요청에 따른 지역 대표 거점의 게임 배치. 역사 도시 좌표나 원본 표식의 판독값이 아니다.",
+      "currentMapMatch": null,
+      "cheMatch": {
+        "id": 67,
+        "level": 4
+      }
+    },
+    {
+      "id": "S124",
+      "name": "선비",
+      "nameZh": "鮮卑",
+      "sourceKind": "ADDED_REGION",
+      "role": "TRIBAL",
+      "level": 4,
+      "levelBasis": "PROPOSED_REGIONAL_LEVEL",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": null,
+      "position": {
+        "x": 630,
+        "y": 75
+      },
+      "positionBasis": "PROPOSED_GAME_POSITION",
+      "placementNote": "사용자 요청에 따른 지역 대표 거점의 게임 배치. 역사 도시 좌표나 원본 표식의 판독값이 아니다.",
+      "currentMapMatch": null,
+      "cheMatch": null
+    },
+    {
+      "id": "S125",
+      "name": "흉노",
+      "nameZh": "匈奴",
+      "sourceKind": "ADDED_REGION",
+      "role": "TRIBAL",
+      "level": 4,
+      "levelBasis": "INHERITED_CHE_REGIONAL_LEVEL",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": null,
+      "position": {
+        "x": 500,
+        "y": 105
+      },
+      "positionBasis": "PROPOSED_GAME_POSITION",
+      "placementNote": "사용자 요청에 따른 지역 대표 거점의 게임 배치. 역사 도시 좌표나 원본 표식의 판독값이 아니다.",
+      "currentMapMatch": null,
+      "cheMatch": {
+        "id": 65,
+        "level": 4
+      }
+    },
+    {
+      "id": "S126",
+      "name": "저",
+      "nameZh": "氐",
+      "sourceKind": "ADDED_REGION",
+      "role": "TRIBAL",
+      "level": 4,
+      "levelBasis": "INHERITED_CHE_REGIONAL_LEVEL",
+      "levelStatus": "PROPOSED",
+      "strategic": true,
+      "sourcePosition": null,
+      "position": {
+        "x": 240,
+        "y": 250
+      },
+      "positionBasis": "PROPOSED_GAME_POSITION",
+      "placementNote": "사용자 요청에 따른 지역 대표 거점의 게임 배치. 역사 도시 좌표나 원본 표식의 판독값이 아니다.",
+      "currentMapMatch": null,
+      "cheMatch": {
+        "id": 64,
+        "level": 4
+      }
+    }
+  ],
+  "connections": [
+    {
+      "id": "R01.1",
+      "from": "S059",
+      "to": "S001",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["NW"],
+      "note": "서북부 도로와 황하 북쪽 접근로"
+    },
+    {
+      "id": "R01.2",
+      "from": "S001",
+      "to": "S002",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["NW"],
+      "note": "서북부 도로와 황하 북쪽 접근로"
+    },
+    {
+      "id": "R01.3",
+      "from": "S002",
+      "to": "S060",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["NW"],
+      "note": "서북부 도로와 황하 북쪽 접근로"
+    },
+    {
+      "id": "R02.1",
+      "from": "S061",
+      "to": "S003",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["NW", "X-NW"],
+      "note": "황하 남쪽 산길과 가정·안정 계곡"
+    },
+    {
+      "id": "R02.2",
+      "from": "S003",
+      "to": "S063",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["NW", "X-NW"],
+      "note": "황하 남쪽 산길과 가정·안정 계곡"
+    },
+    {
+      "id": "R02.3",
+      "from": "S063",
+      "to": "S004",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["NW", "X-NW"],
+      "note": "황하 남쪽 산길과 가정·안정 계곡"
+    },
+    {
+      "id": "R03.1",
+      "from": "S003",
+      "to": "S062",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["NW", "X-NW"],
+      "note": "산기슭 남쪽 도로와 양평관"
+    },
+    {
+      "id": "R03.2",
+      "from": "S062",
+      "to": "S005",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["NW", "X-NW"],
+      "note": "산기슭 남쪽 도로와 양평관"
+    },
+    {
+      "id": "R03.3",
+      "from": "S005",
+      "to": "S053",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["NW", "X-NW"],
+      "note": "산기슭 남쪽 도로와 양평관"
+    },
+    {
+      "id": "R03.4",
+      "from": "S053",
+      "to": "S006",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["NW", "X-NW"],
+      "note": "산기슭 남쪽 도로와 양평관"
+    },
+    {
+      "id": "R04.1",
+      "from": "S003",
+      "to": "S064",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["NW", "X-NW", "C"],
+      "note": "천수 동쪽 계곡·관중 동쪽 강변·낙양 동쪽 도로"
+    },
+    {
+      "id": "R04.2",
+      "from": "S064",
+      "to": "S065",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["NW", "X-NW", "C"],
+      "note": "천수 동쪽 계곡·관중 동쪽 강변·낙양 동쪽 도로"
+    },
+    {
+      "id": "R04.3",
+      "from": "S065",
+      "to": "S007",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["NW", "X-NW", "C"],
+      "note": "천수 동쪽 계곡·관중 동쪽 강변·낙양 동쪽 도로"
+    },
+    {
+      "id": "R04.4",
+      "from": "S007",
+      "to": "S066",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["NW", "X-NW", "C"],
+      "note": "천수 동쪽 계곡·관중 동쪽 강변·낙양 동쪽 도로"
+    },
+    {
+      "id": "R04.5",
+      "from": "S066",
+      "to": "S054",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["NW", "X-NW", "C"],
+      "note": "천수 동쪽 계곡·관중 동쪽 강변·낙양 동쪽 도로"
+    },
+    {
+      "id": "R04.6",
+      "from": "S054",
+      "to": "S055",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["NW", "X-NW", "C"],
+      "note": "천수 동쪽 계곡·관중 동쪽 강변·낙양 동쪽 도로"
+    },
+    {
+      "id": "R04.7",
+      "from": "S055",
+      "to": "S024",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["NW", "X-NW", "C"],
+      "note": "천수 동쪽 계곡·관중 동쪽 강변·낙양 동쪽 도로"
+    },
+    {
+      "id": "R04.8",
+      "from": "S024",
+      "to": "S057",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["NW", "X-NW", "C"],
+      "note": "천수 동쪽 계곡·관중 동쪽 강변·낙양 동쪽 도로"
+    },
+    {
+      "id": "R04.9",
+      "from": "S057",
+      "to": "S092",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["NW", "X-NW", "C"],
+      "note": "천수 동쪽 계곡·관중 동쪽 강변·낙양 동쪽 도로"
+    },
+    {
+      "id": "R05.1",
+      "from": "S005",
+      "to": "S064",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["X-NW"],
+      "note": "무도 북동쪽 계곡"
+    },
+    {
+      "id": "R06.1",
+      "from": "S065",
+      "to": "S006",
+      "mode": "LAND",
+      "status": "CONFIRMED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["U1"],
+      "note": "2026-10-29 사용자 확대 검토: 1번 오장원–한중 연결 확정"
+    },
+    {
+      "id": "R07.1",
+      "from": "S053",
+      "to": "S052",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["SW", "X-SHU"],
+      "note": "서쪽 관문 회랑"
+    },
+    {
+      "id": "R07.2",
+      "from": "S052",
+      "to": "S051",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["SW", "X-SHU"],
+      "note": "서쪽 관문 회랑"
+    },
+    {
+      "id": "R07.3",
+      "from": "S051",
+      "to": "S009",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["SW", "X-SHU"],
+      "note": "서쪽 관문 회랑"
+    },
+    {
+      "id": "R08.1",
+      "from": "S052",
+      "to": "S008",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["X-SHU", "SW"],
+      "note": "검각 남동쪽의 자동 경유 갈래. 면죽관을 잇는 서쪽 갈래와 구분"
+    },
+    {
+      "id": "R08.2",
+      "from": "S008",
+      "to": "S009",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["X-SHU", "SW"],
+      "note": "검각 남동쪽의 자동 경유 갈래. 면죽관을 잇는 서쪽 갈래와 구분"
+    },
+    {
+      "id": "R09.1",
+      "from": "S051",
+      "to": "S008",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["X-SHU"],
+      "note": "면죽관 남동쪽 평지 갈래"
+    },
+    {
+      "id": "R10.1",
+      "from": "S006",
+      "to": "S067",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["SW", "C", "X-HAN"],
+      "note": "한중 동쪽 산길과 한수 남쪽 길"
+    },
+    {
+      "id": "R10.2",
+      "from": "S067",
+      "to": "S012",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["SW", "C", "X-HAN"],
+      "note": "한중 동쪽 산길과 한수 남쪽 길"
+    },
+    {
+      "id": "R10.3",
+      "from": "S012",
+      "to": "S068",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["SW", "C", "X-HAN"],
+      "note": "한중 동쪽 산길과 한수 남쪽 길"
+    },
+    {
+      "id": "R10.4",
+      "from": "S068",
+      "to": "S039",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["SW", "C", "X-HAN"],
+      "note": "한중 동쪽 산길과 한수 남쪽 길"
+    },
+    {
+      "id": "R12.1",
+      "from": "S009",
+      "to": "S069",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["SW", "C"],
+      "note": "촉 서남쪽 산길과 장강 북쪽 접근로"
+    },
+    {
+      "id": "R12.2",
+      "from": "S069",
+      "to": "S072",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["SW", "C"],
+      "note": "촉 서남쪽 산길과 장강 북쪽 접근로"
+    },
+    {
+      "id": "R12.3",
+      "from": "S072",
+      "to": "S070",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["SW", "C"],
+      "note": "촉 서남쪽 산길과 장강 북쪽 접근로"
+    },
+    {
+      "id": "R12.4",
+      "from": "S070",
+      "to": "S010",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["SW", "C"],
+      "note": "촉 서남쪽 산길과 장강 북쪽 접근로"
+    },
+    {
+      "id": "R12.5",
+      "from": "S010",
+      "to": "S071",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["SW", "C"],
+      "note": "촉 서남쪽 산길과 장강 북쪽 접근로"
+    },
+    {
+      "id": "R12.6",
+      "from": "S071",
+      "to": "S011",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["SW", "C"],
+      "note": "촉 서남쪽 산길과 장강 북쪽 접근로"
+    },
+    {
+      "id": "R12.7",
+      "from": "S011",
+      "to": "S104",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["SW", "C"],
+      "note": "촉 서남쪽 산길과 장강 북쪽 접근로"
+    },
+    {
+      "id": "R13.1",
+      "from": "S009",
+      "to": "S070",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["SW"],
+      "note": "성도 남쪽 굽은 도로"
+    },
+    {
+      "id": "R14.1",
+      "from": "S073",
+      "to": "S047",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["SW", "X-SOUTHWEST"],
+      "note": "주제 남쪽 계곡과 남중 동서 도로"
+    },
+    {
+      "id": "R14.2",
+      "from": "S047",
+      "to": "S048",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["SW", "X-SOUTHWEST"],
+      "note": "주제 남쪽 계곡과 남중 동서 도로"
+    },
+    {
+      "id": "R14.3",
+      "from": "S048",
+      "to": "S076",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["SW", "X-SOUTHWEST"],
+      "note": "주제 남쪽 계곡과 남중 동서 도로"
+    },
+    {
+      "id": "R14.4",
+      "from": "S076",
+      "to": "S049",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["SW", "X-SOUTHWEST"],
+      "note": "주제 남쪽 계곡과 남중 동서 도로"
+    },
+    {
+      "id": "R14.5",
+      "from": "S049",
+      "to": "S075",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["SW", "X-SOUTHWEST"],
+      "note": "주제 남쪽 계곡과 남중 동서 도로"
+    },
+    {
+      "id": "R15.1",
+      "from": "S072",
+      "to": "S074",
+      "mode": "BRIDGE",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": ["W20"],
+      "evidenceCropIds": ["SW", "X-SOUTHWEST"],
+      "note": "월수 남서쪽 좁은 물길 위 목제 연결"
+    },
+    {
+      "id": "R16.1",
+      "from": "S074",
+      "to": "S048",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["X-SOUTHWEST"],
+      "note": "노수 동남쪽 도로"
+    },
+    {
+      "id": "R17.1",
+      "from": "S074",
+      "to": "S049",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["SW", "X-SOUTHWEST"],
+      "note": "노수 서남쪽으로 돌아 영창 북쪽에 닿는 길"
+    },
+    {
+      "id": "R18.1",
+      "from": "S047",
+      "to": "S077",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["SW", "FAR-S"],
+      "note": "남중 남쪽에서 교지·합포로 이어지는 긴 계곡 도로"
+    },
+    {
+      "id": "R18.2",
+      "from": "S077",
+      "to": "S050",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["SW", "FAR-S"],
+      "note": "남중 남쪽에서 교지·합포로 이어지는 긴 계곡 도로"
+    },
+    {
+      "id": "R18.3",
+      "from": "S050",
+      "to": "S078",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["SW", "FAR-S"],
+      "note": "남중 남쪽에서 교지·합포로 이어지는 긴 계곡 도로"
+    },
+    {
+      "id": "R19.1",
+      "from": "S048",
+      "to": "S077",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["SW", "X-SOUTHWEST"],
+      "note": "운남 남동쪽 갈래"
+    },
+    {
+      "id": "R20.1",
+      "from": "S119",
+      "to": "S046",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["S", "FAR-S"],
+      "note": "남해 북쪽과 계양·임하의 산길"
+    },
+    {
+      "id": "R20.2",
+      "from": "S046",
+      "to": "S118",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["S", "FAR-S"],
+      "note": "남해 북쪽과 계양·임하의 산길"
+    },
+    {
+      "id": "R20.3",
+      "from": "S118",
+      "to": "S045",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["S", "FAR-S"],
+      "note": "남해 북쪽과 계양·임하의 산길"
+    },
+    {
+      "id": "R20.4",
+      "from": "S045",
+      "to": "S117",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["S", "FAR-S"],
+      "note": "남해 북쪽과 계양·임하의 산길"
+    },
+    {
+      "id": "R20.5",
+      "from": "S117",
+      "to": "S044",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["S", "FAR-S"],
+      "note": "남해 북쪽과 계양·임하의 산길"
+    },
+    {
+      "id": "R21.1",
+      "from": "S045",
+      "to": "S116",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["S"],
+      "note": "형산 북쪽 길과 무릉·영릉 사이 계곡"
+    },
+    {
+      "id": "R21.2",
+      "from": "S116",
+      "to": "S043",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["S"],
+      "note": "형산 북쪽 길과 무릉·영릉 사이 계곡"
+    },
+    {
+      "id": "R21.3",
+      "from": "S043",
+      "to": "S042",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["S"],
+      "note": "형산 북쪽 길과 무릉·영릉 사이 계곡"
+    },
+    {
+      "id": "R21.4",
+      "from": "S042",
+      "to": "S044",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["S"],
+      "note": "형산 북쪽 길과 무릉·영릉 사이 계곡"
+    },
+    {
+      "id": "R22.1",
+      "from": "S117",
+      "to": "S119",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["S"],
+      "note": "임하 남쪽 계곡"
+    },
+    {
+      "id": "R23.1",
+      "from": "S116",
+      "to": "S044",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["S"],
+      "note": "형산 서남쪽 갈래"
+    },
+    {
+      "id": "R24.1",
+      "from": "S043",
+      "to": "S110",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["S", "E", "X-YANGTZE"],
+      "note": "장사 동쪽 산남 도로와 시상·서새산 접근로"
+    },
+    {
+      "id": "R24.2",
+      "from": "S110",
+      "to": "S036",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["S", "E", "X-YANGTZE"],
+      "note": "장사 동쪽 산남 도로와 시상·서새산 접근로"
+    },
+    {
+      "id": "R24.3",
+      "from": "S036",
+      "to": "S106",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["S", "E", "X-YANGTZE"],
+      "note": "장사 동쪽 산남 도로와 시상·서새산 접근로"
+    },
+    {
+      "id": "R25.1",
+      "from": "S110",
+      "to": "S035",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["E", "X-COAST"],
+      "note": "강남 동쪽 산길과 동남 해안. 산길은 굽어 있으며 직선이 아니다"
+    },
+    {
+      "id": "R25.2",
+      "from": "S035",
+      "to": "S115",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["E", "X-COAST"],
+      "note": "강남 동쪽 산길과 동남 해안. 산길은 굽어 있으며 직선이 아니다"
+    },
+    {
+      "id": "R25.3",
+      "from": "S115",
+      "to": "S034",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["E", "X-COAST"],
+      "note": "강남 동쪽 산길과 동남 해안. 산길은 굽어 있으며 직선이 아니다"
+    },
+    {
+      "id": "R26.1",
+      "from": "S043",
+      "to": "S107",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["S", "C", "X-YANGTZE"],
+      "note": "장사 북서쪽 산을 돌아 적벽 남쪽으로 이어지는 길"
+    },
+    {
+      "id": "R27.1",
+      "from": "S042",
+      "to": "S108",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["S", "X-HAN"],
+      "note": "무릉 북쪽 강안 접근로"
+    },
+    {
+      "id": "R28.1",
+      "from": "S040",
+      "to": "S103",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["X-HAN"],
+      "note": "강릉에서 장판을 지나 양양으로 이어지는 길"
+    },
+    {
+      "id": "R28.2",
+      "from": "S103",
+      "to": "S039",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["X-HAN"],
+      "note": "강릉에서 장판을 지나 양양으로 이어지는 길"
+    },
+    {
+      "id": "R29.1",
+      "from": "S037",
+      "to": "S038",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["C", "X-CENTRAL"],
+      "note": "완 동남쪽과 신야 동쪽 평지 도로"
+    },
+    {
+      "id": "R29.2",
+      "from": "S038",
+      "to": "S098",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["C", "X-CENTRAL"],
+      "note": "완 동남쪽과 신야 동쪽 평지 도로"
+    },
+    {
+      "id": "R29.3",
+      "from": "S098",
+      "to": "S027",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["C", "X-CENTRAL"],
+      "note": "완 동남쪽과 신야 동쪽 평지 도로"
+    },
+    {
+      "id": "R30.1",
+      "from": "S037",
+      "to": "S099",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["X-HAN"],
+      "note": "한수 북쪽의 번성 접근 갈래"
+    },
+    {
+      "id": "R30.2",
+      "from": "S099",
+      "to": "S038",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["X-HAN"],
+      "note": "한수 북쪽의 번성 접근 갈래"
+    },
+    {
+      "id": "R31.1",
+      "from": "S037",
+      "to": "S097",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["C", "X-CENTRAL"],
+      "note": "완 동쪽에서 노양을 거쳐 허창으로 오르는 길"
+    },
+    {
+      "id": "R31.2",
+      "from": "S097",
+      "to": "S026",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["C", "X-CENTRAL"],
+      "note": "완 동쪽에서 노양을 거쳐 허창으로 오르는 길"
+    },
+    {
+      "id": "R32.1",
+      "from": "S056",
+      "to": "S037",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["C"],
+      "note": "무관 동쪽 협곡"
+    },
+    {
+      "id": "R33.1",
+      "from": "S066",
+      "to": "S056",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["C"],
+      "note": "관중 동남쪽 남행 갈래"
+    },
+    {
+      "id": "R34.1",
+      "from": "S024",
+      "to": "S094",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["C", "N", "E"],
+      "note": "중원·황하 남쪽·산동 해안의 도로"
+    },
+    {
+      "id": "R34.2",
+      "from": "S094",
+      "to": "S026",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["C", "N", "E"],
+      "note": "중원·황하 남쪽·산동 해안의 도로"
+    },
+    {
+      "id": "R34.3",
+      "from": "S026",
+      "to": "S092",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["C", "N", "E"],
+      "note": "중원·황하 남쪽·산동 해안의 도로"
+    },
+    {
+      "id": "R34.4",
+      "from": "S092",
+      "to": "S090",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["C", "N", "E"],
+      "note": "중원·황하 남쪽·산동 해안의 도로"
+    },
+    {
+      "id": "R34.5",
+      "from": "S090",
+      "to": "S091",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["C", "N", "E"],
+      "note": "중원·황하 남쪽·산동 해안의 도로"
+    },
+    {
+      "id": "R34.6",
+      "from": "S091",
+      "to": "S022",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["C", "N", "E"],
+      "note": "중원·황하 남쪽·산동 해안의 도로"
+    },
+    {
+      "id": "R34.7",
+      "from": "S022",
+      "to": "S087",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["C", "N", "E"],
+      "note": "중원·황하 남쪽·산동 해안의 도로"
+    },
+    {
+      "id": "R34.8",
+      "from": "S087",
+      "to": "S086",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["C", "N", "E"],
+      "note": "중원·황하 남쪽·산동 해안의 도로"
+    },
+    {
+      "id": "R34.9",
+      "from": "S086",
+      "to": "S020",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["C", "N", "E"],
+      "note": "중원·황하 남쪽·산동 해안의 도로"
+    },
+    {
+      "id": "R34.10",
+      "from": "S020",
+      "to": "S088",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["C", "N", "E"],
+      "note": "중원·황하 남쪽·산동 해안의 도로"
+    },
+    {
+      "id": "R34.11",
+      "from": "S088",
+      "to": "S029",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["C", "N", "E"],
+      "note": "중원·황하 남쪽·산동 해안의 도로"
+    },
+    {
+      "id": "R35.1",
+      "from": "S026",
+      "to": "S025",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["C", "X-CENTRAL", "E"],
+      "note": "허창·진류와 서주 북쪽 도로"
+    },
+    {
+      "id": "R35.2",
+      "from": "S025",
+      "to": "S091",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["C", "X-CENTRAL", "E"],
+      "note": "허창·진류와 서주 북쪽 도로"
+    },
+    {
+      "id": "R35.3",
+      "from": "S091",
+      "to": "S028",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["C", "X-CENTRAL", "E"],
+      "note": "허창·진류와 서주 북쪽 도로"
+    },
+    {
+      "id": "R35.4",
+      "from": "S028",
+      "to": "S093",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["C", "X-CENTRAL", "E"],
+      "note": "허창·진류와 서주 북쪽 도로"
+    },
+    {
+      "id": "R35.5",
+      "from": "S093",
+      "to": "S029",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["C", "X-CENTRAL", "E"],
+      "note": "허창·진류와 서주 북쪽 도로"
+    },
+    {
+      "id": "R36.1",
+      "from": "S026",
+      "to": "S095",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["X-CENTRAL", "C", "E", "X-YANGTZE"],
+      "note": "진·초를 지나는 평지와 장강 북서쪽 길"
+    },
+    {
+      "id": "R36.2",
+      "from": "S095",
+      "to": "S096",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["X-CENTRAL", "C", "E", "X-YANGTZE"],
+      "note": "진·초를 지나는 평지와 장강 북서쪽 길"
+    },
+    {
+      "id": "R36.3",
+      "from": "S096",
+      "to": "S030",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["X-CENTRAL", "C", "E", "X-YANGTZE"],
+      "note": "진·초를 지나는 평지와 장강 북서쪽 길"
+    },
+    {
+      "id": "R36.4",
+      "from": "S030",
+      "to": "S100",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["X-CENTRAL", "C", "E", "X-YANGTZE"],
+      "note": "진·초를 지나는 평지와 장강 북서쪽 길"
+    },
+    {
+      "id": "R36.5",
+      "from": "S100",
+      "to": "S101",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["X-CENTRAL", "C", "E", "X-YANGTZE"],
+      "note": "진·초를 지나는 평지와 장강 북서쪽 길"
+    },
+    {
+      "id": "R36.6",
+      "from": "S101",
+      "to": "S031",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["X-CENTRAL", "C", "E", "X-YANGTZE"],
+      "note": "진·초를 지나는 평지와 장강 북서쪽 길"
+    },
+    {
+      "id": "R36.7",
+      "from": "S031",
+      "to": "S109",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["X-CENTRAL", "C", "E", "X-YANGTZE"],
+      "note": "진·초를 지나는 평지와 장강 북서쪽 길"
+    },
+    {
+      "id": "R37.1",
+      "from": "S096",
+      "to": "S028",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["X-CENTRAL", "C"],
+      "note": "초 북동쪽에서 소패 서쪽으로 이어지는 갈래"
+    },
+    {
+      "id": "R38.1",
+      "from": "S095",
+      "to": "S027",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["X-CENTRAL"],
+      "note": "진 남동쪽으로 굽은 뒤 여남으로 이어지는 길"
+    },
+    {
+      "id": "R39.1",
+      "from": "S028",
+      "to": "S030",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["C", "E"],
+      "note": "소패 남쪽 회남 갈래"
+    },
+    {
+      "id": "R40.1",
+      "from": "S098",
+      "to": "S041",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["U3"],
+      "note": "의양–여남 길의 남쪽 갈래에서 굽어 내려가는 강하 접근로를 추가 확대 확인"
+    },
+    {
+      "id": "R41.1",
+      "from": "S041",
+      "to": "S105",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["X-HAN", "X-YANGTZE"],
+      "note": "강하 서남쪽 강안 도로"
+    },
+    {
+      "id": "R42.1",
+      "from": "S079",
+      "to": "S080",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["N", "X-NORTHEAST"],
+      "note": "북방 산지와 요동·낙랑 해안 회랑"
+    },
+    {
+      "id": "R42.2",
+      "from": "S080",
+      "to": "S015",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["N", "X-NORTHEAST"],
+      "note": "북방 산지와 요동·낙랑 해안 회랑"
+    },
+    {
+      "id": "R42.3",
+      "from": "S015",
+      "to": "S016",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["N", "X-NORTHEAST"],
+      "note": "북방 산지와 요동·낙랑 해안 회랑"
+    },
+    {
+      "id": "R42.4",
+      "from": "S016",
+      "to": "S081",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["N", "X-NORTHEAST"],
+      "note": "북방 산지와 요동·낙랑 해안 회랑"
+    },
+    {
+      "id": "R42.5",
+      "from": "S081",
+      "to": "S017",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["N", "X-NORTHEAST"],
+      "note": "북방 산지와 요동·낙랑 해안 회랑"
+    },
+    {
+      "id": "R42.6",
+      "from": "S017",
+      "to": "S082",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["N", "X-NORTHEAST"],
+      "note": "북방 산지와 요동·낙랑 해안 회랑"
+    },
+    {
+      "id": "R43.1",
+      "from": "S079",
+      "to": "S013",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["N", "X-N"],
+      "note": "진양 서북쪽 계곡과 상당·하동 길"
+    },
+    {
+      "id": "R43.2",
+      "from": "S013",
+      "to": "S014",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["N", "X-N"],
+      "note": "진양 서북쪽 계곡과 상당·하동 길"
+    },
+    {
+      "id": "R43.3",
+      "from": "S014",
+      "to": "S089",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["N", "X-N"],
+      "note": "진양 서북쪽 계곡과 상당·하동 길"
+    },
+    {
+      "id": "R44.1",
+      "from": "S013",
+      "to": "S084",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["N", "X-N", "X-NE-PASS"],
+      "note": "거록 남쪽 산길과 하북 평지. 거록에서 역경으로 산을 직선 횡단하지 않는다"
+    },
+    {
+      "id": "R44.2",
+      "from": "S084",
+      "to": "S021",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["N", "X-N", "X-NE-PASS"],
+      "note": "거록 남쪽 산길과 하북 평지. 거록에서 역경으로 산을 직선 횡단하지 않는다"
+    },
+    {
+      "id": "R44.3",
+      "from": "S021",
+      "to": "S085",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["N", "X-N", "X-NE-PASS"],
+      "note": "거록 남쪽 산길과 하북 평지. 거록에서 역경으로 산을 직선 횡단하지 않는다"
+    },
+    {
+      "id": "R44.4",
+      "from": "S085",
+      "to": "S019",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["N", "X-N", "X-NE-PASS"],
+      "note": "거록 남쪽 산길과 하북 평지. 거록에서 역경으로 산을 직선 횡단하지 않는다"
+    },
+    {
+      "id": "R44.5",
+      "from": "S019",
+      "to": "S018",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["N", "X-N", "X-NE-PASS"],
+      "note": "거록 남쪽 산길과 하북 평지. 거록에서 역경으로 산을 직선 횡단하지 않는다"
+    },
+    {
+      "id": "R44.6",
+      "from": "S018",
+      "to": "S083",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["N", "X-N", "X-NE-PASS"],
+      "note": "거록 남쪽 산길과 하북 평지. 거록에서 역경으로 산을 직선 횡단하지 않는다"
+    },
+    {
+      "id": "R44.7",
+      "from": "S083",
+      "to": "S015",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["N", "X-N", "X-NE-PASS"],
+      "note": "거록 남쪽 산길과 하북 평지. 거록에서 역경으로 산을 직선 횡단하지 않는다"
+    },
+    {
+      "id": "R45.1",
+      "from": "S014",
+      "to": "S021",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["X-N", "N"],
+      "note": "상당 동쪽 갈래"
+    },
+    {
+      "id": "R46.1",
+      "from": "S014",
+      "to": "S058",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["N", "C"],
+      "note": "상당 남쪽·호관을 통과하는 길"
+    },
+    {
+      "id": "R46.2",
+      "from": "S058",
+      "to": "S023",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["N", "C"],
+      "note": "상당 남쪽·호관을 통과하는 길"
+    },
+    {
+      "id": "R47.1",
+      "from": "S058",
+      "to": "S021",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["N", "C"],
+      "note": "호관 북동쪽 길과 하북 평지 갈래"
+    },
+    {
+      "id": "R48.1",
+      "from": "S023",
+      "to": "S021",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["U4"],
+      "note": "하내 북동쪽에서 북안 나루 접근로와 업 서쪽 길로 이어지는 갈래를 추가 확대 확인"
+    },
+    {
+      "id": "R49.1",
+      "from": "S111",
+      "to": "S112",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["E", "X-E"],
+      "note": "회음 동쪽·광릉 서쪽 육지 길"
+    },
+    {
+      "id": "R50.1",
+      "from": "S032",
+      "to": "S113",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["E", "X-E"],
+      "note": "장강 남쪽 도시 사이 도로"
+    },
+    {
+      "id": "R50.2",
+      "from": "S113",
+      "to": "S033",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["E", "X-E"],
+      "note": "장강 남쪽 도시 사이 도로"
+    },
+    {
+      "id": "R51.1",
+      "from": "S032",
+      "to": "S114",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["E", "X-E"],
+      "note": "건업 동남쪽의 굽은 길"
+    },
+    {
+      "id": "R53.1",
+      "from": "S006",
+      "to": "S007",
+      "mode": "LAND",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["U1"],
+      "note": "한중 동쪽에서 절벽 동편을 돌아 장안 남쪽으로 오르는 굽은 길. 오장원을 직선으로 잇지 않는다"
+    },
+    {
+      "id": "F01.1",
+      "from": "S060",
+      "to": "S061",
+      "mode": "FERRY",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": ["W01"],
+      "evidenceCropIds": ["NW", "X-NW"],
+      "note": "같은 나루 묶음의 양안 잔교를 따른다"
+    },
+    {
+      "id": "F02.1",
+      "from": "S019",
+      "to": "S087",
+      "mode": "FERRY",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": ["W02"],
+      "evidenceCropIds": ["N", "E"],
+      "note": "평원 쪽 강안과 태산 서쪽 잔교의 건넘"
+    },
+    {
+      "id": "F03.1",
+      "from": "S089",
+      "to": "S055",
+      "mode": "WATER",
+      "status": "CONFIRMED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": ["W03"],
+      "evidenceCropIds": ["C"],
+      "note": "2026-10-29 사용자 확대 검토: 4번 하동–함곡관 연결 확정. 기존 수로 분류 유지"
+    },
+    {
+      "id": "F04.1",
+      "from": "S021",
+      "to": "S090",
+      "mode": "FERRY",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": ["W04"],
+      "evidenceCropIds": ["N", "C"],
+      "note": "업 쪽 북안 접근로와 백마 쪽 남안 잔교"
+    },
+    {
+      "id": "F05.1",
+      "from": "S029",
+      "to": "S111",
+      "mode": "FERRY",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": ["W05", "W06"],
+      "evidenceCropIds": ["E", "X-E"],
+      "note": "하비 남쪽 잔교와 회음 쪽 잔교"
+    },
+    {
+      "id": "F06.1",
+      "from": "S030",
+      "to": "S111",
+      "mode": "WATER",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": ["W06"],
+      "evidenceCropIds": ["U7"],
+      "note": "수춘 성 수변과 회음 쪽 잔교가 이어진 물길. 육로로 분류하지 않는다"
+    },
+    {
+      "id": "F07.1",
+      "from": "S112",
+      "to": "S113",
+      "mode": "FERRY",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": ["W07", "W09"],
+      "evidenceCropIds": ["X-E"],
+      "note": "양안 잔교와 그 사이 물길"
+    },
+    {
+      "id": "F08.1",
+      "from": "S101",
+      "to": "S102",
+      "mode": "FERRY",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": ["W08"],
+      "evidenceCropIds": ["C", "E", "X-E"],
+      "note": "석정 쪽 육지에서 유수구 쪽으로 건너는 갈래"
+    },
+    {
+      "id": "F09.1",
+      "from": "S102",
+      "to": "S032",
+      "mode": "WATER",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": ["W08"],
+      "evidenceCropIds": ["U8"],
+      "note": "유수구 동쪽 잔교에서 건업 수변으로 이어진 물길. 육로로 분류하지 않는다"
+    },
+    {
+      "id": "F10.1",
+      "from": "S114",
+      "to": "S034",
+      "mode": "FERRY",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": ["W10"],
+      "evidenceCropIds": ["X-E", "X-COAST"],
+      "note": "부춘 잔교와 회계 쪽 강안 사이 물길"
+    },
+    {
+      "id": "F11.1",
+      "from": "S099",
+      "to": "S039",
+      "mode": "FERRY",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": ["W11"],
+      "evidenceCropIds": ["X-HAN"],
+      "note": "번성 쪽 잔교와 양양 북쪽 강안"
+    },
+    {
+      "id": "F12.1",
+      "from": "S104",
+      "to": "S040",
+      "mode": "FERRY",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": ["W12", "W13"],
+      "evidenceCropIds": ["X-HAN"],
+      "note": "양쪽 잔교 사이의 건넘"
+    },
+    {
+      "id": "F13.1",
+      "from": "S105",
+      "to": "S107",
+      "mode": "FERRY",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": ["W14", "W15"],
+      "evidenceCropIds": ["X-HAN", "X-YANGTZE"],
+      "note": "화용 쪽과 적벽 쪽 잔교 사이"
+    },
+    {
+      "id": "F14.1",
+      "from": "S106",
+      "to": "S109",
+      "mode": "FERRY",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": ["W16", "W17"],
+      "evidenceCropIds": ["X-YANGTZE"],
+      "note": "서새산 쪽과 심양 쪽의 양안 연결"
+    },
+    {
+      "id": "F15.1",
+      "from": "S040",
+      "to": "S108",
+      "mode": "FERRY",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": ["W18"],
+      "evidenceCropIds": ["X-HAN"],
+      "note": "강릉 쪽 수변에서 공안 쪽 잔교로 건넘"
+    },
+    {
+      "id": "F16.1",
+      "from": "S070",
+      "to": "S073",
+      "mode": "FERRY",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": ["W19"],
+      "evidenceCropIds": ["SW", "X-SOUTHWEST"],
+      "note": "강양 남쪽 양안 잔교"
+    },
+    {
+      "id": "F17.1",
+      "from": "S078",
+      "to": "S119",
+      "mode": "FERRY",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": ["W21"],
+      "evidenceCropIds": ["FAR-S", "S"],
+      "note": "합포 동쪽 길에서 양안 잔교를 지나 창오로 이어짐"
+    },
+    {
+      "id": "F18.1",
+      "from": "S031",
+      "to": "S102",
+      "mode": "WATER",
+      "status": "OBSERVED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": ["W08"],
+      "evidenceCropIds": ["U8"],
+      "note": "여강 성 수변과 유수구 쪽 잔교가 이어진 물길. 육로로 분류하지 않는다"
+    }
+  ],
+  "excludedDirectConnections": [
+    {
+      "id": "R11.1",
+      "from": "S012",
+      "to": "S011",
+      "mode": "LAND",
+      "status": "REJECTED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["U2"],
+      "note": "2026-10-29 사용자 확대 검토: 2번 상용–영안 직접 연결 아님"
+    },
+    {
+      "id": "R52.1",
+      "from": "S113",
+      "to": "S114",
+      "mode": "LAND",
+      "status": "REJECTED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": ["X-E"],
+      "note": "2026-10-29 사용자 확대 검토: 3번 경구–부춘 직접 연결 아님"
+    }
+  ],
+  "proposedConnections": [
+    {
+      "id": "P01.1",
+      "from": "S120",
+      "to": "S001",
+      "mode": "LAND",
+      "status": "PROPOSED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": [],
+      "note": "지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다."
+    },
+    {
+      "id": "P02.1",
+      "from": "S120",
+      "to": "S060",
+      "mode": "LAND",
+      "status": "PROPOSED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": [],
+      "note": "지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다."
+    },
+    {
+      "id": "P03.1",
+      "from": "S121",
+      "to": "S081",
+      "mode": "LAND",
+      "status": "PROPOSED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": [],
+      "note": "지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다."
+    },
+    {
+      "id": "P04.1",
+      "from": "S122",
+      "to": "S049",
+      "mode": "LAND",
+      "status": "PROPOSED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": [],
+      "note": "지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다."
+    },
+    {
+      "id": "P05.1",
+      "from": "S122",
+      "to": "S048",
+      "mode": "LAND",
+      "status": "PROPOSED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": [],
+      "note": "지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다."
+    },
+    {
+      "id": "P06.1",
+      "from": "S123",
+      "to": "S035",
+      "mode": "LAND",
+      "status": "PROPOSED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": [],
+      "note": "지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다."
+    },
+    {
+      "id": "P07.1",
+      "from": "S123",
+      "to": "S034",
+      "mode": "LAND",
+      "status": "PROPOSED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": [],
+      "note": "지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다."
+    },
+    {
+      "id": "P08.1",
+      "from": "S124",
+      "to": "S079",
+      "mode": "LAND",
+      "status": "PROPOSED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": [],
+      "note": "지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다."
+    },
+    {
+      "id": "P09.1",
+      "from": "S124",
+      "to": "S121",
+      "mode": "LAND",
+      "status": "PROPOSED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": [],
+      "note": "지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다."
+    },
+    {
+      "id": "P10.1",
+      "from": "S125",
+      "to": "S079",
+      "mode": "LAND",
+      "status": "PROPOSED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": [],
+      "note": "지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다."
+    },
+    {
+      "id": "P11.1",
+      "from": "S125",
+      "to": "S013",
+      "mode": "LAND",
+      "status": "PROPOSED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": [],
+      "note": "지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다."
+    },
+    {
+      "id": "P12.1",
+      "from": "S126",
+      "to": "S001",
+      "mode": "LAND",
+      "status": "PROPOSED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": [],
+      "note": "지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다."
+    },
+    {
+      "id": "P13.1",
+      "from": "S126",
+      "to": "S003",
+      "mode": "LAND",
+      "status": "PROPOSED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": [],
+      "note": "지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다."
+    },
+    {
+      "id": "P14.1",
+      "from": "S126",
+      "to": "S063",
+      "mode": "LAND",
+      "status": "PROPOSED",
+      "direction": "UNDIRECTED",
+      "waterfrontReferences": [],
+      "evidenceCropIds": [],
+      "note": "지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다."
+    }
+  ]
+}

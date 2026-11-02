@@ -96,6 +96,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@fontsource/dotgothic16':
+        specifier: 5.3.1
+        version: 5.3.1
       '@opensamguk/rules':
         specifier: workspace:*
         version: link:../../packages/rules
@@ -495,6 +498,9 @@ packages:
 
   '@fastify/proxy-addr@5.1.2':
     resolution: {integrity: sha512-uqB4QsgVoro0XDC+DIftIMGXHdBPn+lK6Ek3xXAIxPMCJfqxnbtyEoMCm2KPUVOuIosd7Cyw9HawEqMFM/UA+g==}
+
+  '@fontsource/dotgothic16@5.3.1':
+    resolution: {integrity: sha512-alvxJchrFDFohce0s8YfHsFiRm2zUM+FrwEeWtLyc14WIl3heSG1/8BPD7Sm001YuVPL1bU14UmM5P2KO5/gnQ==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -2447,6 +2453,8 @@ snapshots:
     dependencies:
       '@fastify/forwarded': 3.1.1
       ipaddr.js: 2.5.0
+
+  '@fontsource/dotgothic16@5.3.1': {}
 
   '@humanfs/core@0.19.2':
     dependencies:

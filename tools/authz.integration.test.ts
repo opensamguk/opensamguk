@@ -74,7 +74,23 @@ async function session(user = 0) {
   return `sid=${value.token}`;
 }
 async function request(path: Path, data: unknown, cookie?: string) {
-  const mutation = appRouter._def.procedures[path]._def.type === 'mutation';
+  const procedure: unknown = Object.getOwnPropertyDescriptor(appRouter._def.procedures, path)?.value;
+  if (
+    (typeof procedure !== 'object' && typeof procedure !== 'function') ||
+    procedure === null ||
+    !('_def' in procedure)
+  )
+    throw new Error('권한 검사 절차 경로를 확인하세요.');
+  const definition = procedure._def;
+  if (
+    typeof definition !== 'object' ||
+    definition === null ||
+    !('type' in definition) ||
+    typeof definition.type !== 'string' ||
+    !['query', 'mutation', 'subscription'].includes(definition.type)
+  )
+    throw new Error('권한 검사 절차 종류를 확인하세요.');
+  const mutation = definition.type === 'mutation';
   const encoded = JSON.stringify({ 0: data });
   const res = await fetch(`${base}/trpc/${path}?batch=1${mutation ? '' : `&input=${encodeURIComponent(encoded)}`}`, {
     method: mutation ? 'POST' : 'GET',
@@ -97,6 +113,7 @@ async function snapshot() {
     db.notice.findMany({ orderBy: { id: 'asc' } }),
     db.adminNoticeRequest.findMany({ orderBy: [{ actorUserId: 'asc' }, { idempotencyKey: 'asc' }] }),
     db.sanction.findMany({ orderBy: { id: 'asc' } }),
+    db.$queryRaw<Array<Record<string, unknown>>>`SELECT * FROM "LoginRecord" ORDER BY id`,
     db.publicMapSnapshot.findMany({ orderBy: [{ worldId: 'asc' }, { takenAt: 'asc' }] }),
     db.city.findMany({ orderBy: [{ worldId: 'asc' }, { cityKey: 'asc' }] }),
     db.nation.findMany({ orderBy: [{ worldId: 'asc' }, { id: 'asc' }] }),

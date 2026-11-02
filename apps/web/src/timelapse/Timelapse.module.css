@@ -11,10 +11,14 @@
   font-size: var(--text-xs);
   color: var(--color-text-muted);
 }
+/* 연월은 도트 숫자로 크게, 주칠로 (INT-20). */
 .date {
   margin: 0;
-  font-size: var(--text-sm);
-  font-weight: 600;
+  font-family: var(--font-pixel);
+  font-size: var(--text-2xl);
+  font-weight: 400;
+  line-height: 1.2;
+  color: var(--color-accent);
   text-align: left;
 }
 .map {
@@ -56,8 +60,9 @@
   gap: var(--space-1);
   aspect-ratio: 7 / 5;
   max-height: 560px;
-  border: 1px dashed var(--color-border-strong);
+  border: 2px dashed var(--color-text-muted);
   border-radius: var(--radius);
+  background: var(--color-surface);
   font-size: var(--text-sm);
   color: var(--color-text-muted);
   text-align: center;
@@ -86,35 +91,116 @@
   display: inline-block;
   width: 10px;
   height: 10px;
-  border-radius: 2px;
-  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-ink);
 }
+/* 조작 줄: 한지 첩 한 줄. 재생만 주칠 버튼이다. */
 .controls {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: var(--frame);
+  background: var(--color-surface);
+  box-shadow: var(--frame-inset), var(--shadow-step);
 }
 .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
   font: inherit;
   font-size: var(--text-sm);
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--color-border-strong);
+  font-weight: 500;
+  padding: 0 var(--space-3);
+  border: var(--frame);
   border-radius: var(--radius);
-  background: transparent;
+  background: var(--color-surface);
   color: var(--color-text);
+  box-shadow: var(--shadow-button);
   cursor: pointer;
 }
-.button:disabled {
+.button:disabled,
+.button[aria-disabled='true'] {
   color: var(--color-text-muted);
+  border-style: dashed;
+  box-shadow: none;
   cursor: default;
 }
 .play {
   min-width: 4.5em;
+  background: var(--color-accent);
+  color: var(--color-accent-text);
 }
 .range {
   flex: 1 1 160px;
   min-width: 120px;
+  min-height: 44px;
+  accent-color: var(--color-accent);
+}
+
+/* 로그인 없이 보는 공유 화면 (SharedTimelapsePage). 위쪽은 먹 띠에 주칠 밑줄. */
+.sharedBanner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-4);
+  min-height: var(--topbar-height);
+  padding: var(--space-1) var(--space-4);
+  background: var(--color-banner);
+  color: var(--color-banner-text);
+  border-bottom: 4px solid var(--color-accent);
+}
+.brand {
+  font-family: var(--font-title);
+  font-size: var(--title-sm);
+  line-height: 1;
+  color: var(--color-banner-gold);
+}
+.bannerNote {
+  min-width: 0;
+  font-size: var(--text-sm);
+  opacity: 0.8;
+}
+.bannerLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-left: auto;
+  padding: 0 var(--space-3);
+  border: 2px solid var(--color-banner-text);
+  color: var(--color-banner-text);
+  text-decoration: none;
+}
+.sharedHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-4);
+}
+.endedAt {
+  font-family: var(--font-pixel);
+  font-size: var(--text-2xl);
+  color: var(--color-accent);
+}
+.shared {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--space-4);
+  min-width: 0;
+}
+.sharedTitle {
+  margin: 0;
+  font-size: var(--title-md);
+  overflow-wrap: anywhere;
+}
+.sharedBody {
+  margin-top: var(--space-3);
+  padding: var(--space-2);
+  border: var(--frame);
+  background: var(--color-surface);
+  box-shadow: var(--frame-inset), var(--shadow-step);
 }
 .error {
   margin: 0;

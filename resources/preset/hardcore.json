@@ -1,8 +1,8 @@
 {
   "name": "하드코어",
   "turnTermMinutes": 60,
-  "scenario": "1030",
-  "map": "che",
+  "scenario": "san10-191",
+  "map": "san10",
   "unitSet": "basic",
   "commands": null,
   "npc": {

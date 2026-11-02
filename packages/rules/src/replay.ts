@@ -31,6 +31,7 @@ export interface ReplayState {
   residenceAnchors?: Record<number, number>;
   // 새 부곡 프로필의 불변 병종 허용 목록. 생성 기록의 unitSet에서만 읽는다.
   campaignArmyTypes?: number[];
+  campaignUnitSet?: UnitSetResource;
 }
 export interface RecordedInput {
   sequence: number;
@@ -104,7 +105,10 @@ export function runReplayAction(
     { generalId: action.generalId, tick: action.tick, unitSet },
     command,
     seed,
-    next.policy ? { policy: next.policy.policies[action.generalId]! } : {},
+    {
+      ...(next.policy ? { policy: next.policy.policies[action.generalId]! } : {}),
+      turnRevision: next.revisions[action.generalId] ?? 0,
+    },
     resolver ?? resolverForRuleFeatures(next.state, registry),
     personnel ? { offices: next.offices! } : undefined,
   );
@@ -167,7 +171,10 @@ export function applyRecordedInput(
   const legacyPolicy = kind.feature === 'policy' && replay.policy && !replay.state.ruleFeatures;
   if (kind.feature !== null && !hasRuleFeature(replay.state, kind.feature) && !legacyPolicy)
     throw new Error('이 월드에서 켜지 않은 기능입니다.');
-  let next = kind.apply(replay, input);
+  let next =
+    input.kind === 'campaign.order'
+      ? kind.apply(replay, input, { resolver: resolverForRuleFeatures(replay.state, registry) })
+      : kind.apply(replay, input);
   for (const key of replay.state.ruleFeatures ?? []) {
     if (key === kind.feature) continue;
     const feature = registry.features.find((feature) => feature.key === key);

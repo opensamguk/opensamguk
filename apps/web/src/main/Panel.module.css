@@ -1,7 +1,8 @@
+/* 첩(패널): 먹 테두리 안쪽에 금니 실선, 그림자는 흐리지 않고 계단으로 떨어뜨린다 (INT-19). */
 .panel {
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  border: var(--frame);
+  box-shadow: var(--frame-inset), var(--shadow-step);
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -10,15 +11,22 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 32px;
-  padding: 0 var(--space-3);
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface-muted);
+  min-height: 40px;
+  padding: var(--space-2) var(--space-3) 0;
 }
+/* 제목패: 주칠 바탕의 작은 현판 */
 .title {
   margin: 0;
-  font-size: var(--text-md);
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px 5px;
+  font-family: var(--font-title);
+  font-size: var(--title-sm);
+  font-weight: 400;
+  line-height: 1;
+  color: var(--color-accent-text);
+  background: var(--color-accent);
+  border: var(--frame);
   scroll-margin-block-start: 80px;
 }
 .title:focus-visible {
@@ -33,11 +41,11 @@
   font-size: var(--text-sm);
 }
 .body {
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-3) var(--space-3);
   min-width: 0;
 }
 .flush {
-  padding: 0;
+  padding: var(--space-2);
 }
 .grid {
   display: grid;

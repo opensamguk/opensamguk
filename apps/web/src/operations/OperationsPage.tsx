@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
+import operationsIcon from '../art/icons/operations.png';
 import { errorCode, retryUnlessClientError } from '../game/errors';
 import { formatYearMonth } from '../game/gameDate';
 import { NoGeneral, QueryError } from '../game/QueryState';
@@ -38,6 +39,7 @@ export function OperationsPage() {
   else
     body = (
       <>
+        {home.data?.nation ? <p className={styles.plaque}>{`${home.data.nation.name}의 작전`}</p> : null}
         <OperationTable worldId={worldId} items={list.data.items} />
         {list.data.canCreate.ok && home.data?.nation ? (
           <CreateForm worldId={worldId} nationId={home.data.nation.id} />
@@ -49,7 +51,10 @@ export function OperationsPage() {
 
   return (
     <section className={styles.page}>
-      <h1>작전</h1>
+      <div className={styles.heading}>
+        <img className="pixel-art" src={operationsIcon} alt="" width={48} height={48} />
+        <h1>작전</h1>
+      </div>
       {body}
     </section>
   );

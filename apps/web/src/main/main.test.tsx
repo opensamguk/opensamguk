@@ -40,6 +40,17 @@ describe('지도 계산', () => {
     expect(cityLabel(city(2, []), undefined, false)).toBe('도시2, 공백지');
   });
 
+  it('D-053 수도는 이름 앞 별표와 접근성 이름 「수도」로 표시한다', () => {
+    const capital = city(1, [2], { nationId: 1 });
+    const nations = [{ id: 1, name: '위', color: '#000080', capitalCityKey: 1 }];
+    expect(cityLabel(capital, nations[0], false)).toBe(`${capital.name}, 위, 수도`);
+    const { container } = render(<WorldMap cities={[capital, city(2, [1], { nationId: 1 })]} nations={nations} />);
+    expect([...container.querySelectorAll('text')].map((text) => text.textContent)).toEqual([
+      `★${capital.name}`,
+      city(2, [1]).name,
+    ]);
+  });
+
   it('도시를 누르거나 Enter를 치면 onSelect로 알리고 내 도시를 표시한다', () => {
     const onSelect = vi.fn();
     const nations = [{ id: 1, name: '위', color: '#000080' }];

@@ -1,7 +1,8 @@
 import type { PublicGeography } from '@opensamguk/shared';
 import { OperationalWorldMap } from './OperationalWorldMap';
+import { CAPITAL_MARK, isCapital, type DrawnNation } from './siteMarkers';
 import { readableTextColor } from '../ui/color';
-import type { MapCity, MapNation } from '../game/types';
+import type { MapCity } from '../game/types';
 import styles from './WorldMap.module.css';
 
 // 지도 좌표계. che 지도의 도시 좌표(25~680, 20~480)를 그대로 쓴다.
@@ -38,8 +39,14 @@ export const isCut = (city: Pick<DrawnCity, 'supplied' | 'nationId'>) =>
 // 도시 규모(1~8)에 따라 점 크기를 키운다.
 export const cityRadius = (level: number) => 4 + Math.max(1, Math.min(8, level)) * 0.6;
 
-export function cityLabel(city: DrawnCity, nation: MapNation | undefined, mine: boolean): string {
-  return [city.name, nation ? nation.name : '공백지', isCut(city) ? '보급 끊김' : null, mine ? '내 위치' : null]
+export function cityLabel(city: DrawnCity, nation: DrawnNation | undefined, mine: boolean): string {
+  return [
+    city.name,
+    nation ? nation.name : '공백지',
+    isCapital(city, nation) ? '수도' : null,
+    isCut(city) ? '보급 끊김' : null,
+    mine ? '내 위치' : null,
+  ]
     .filter(Boolean)
     .join(', ');
 }
@@ -53,13 +60,15 @@ export function WorldMap({
   selectedKey = null,
   onSelect,
   operationalMap,
+  fill = false,
 }: {
   cities: readonly DrawnCity[];
-  nations: readonly MapNation[];
+  nations: readonly DrawnNation[];
   myCityKey?: number | null;
   selectedKey?: number | null;
   onSelect?: (key: number) => void;
   operationalMap?: PublicGeography | undefined;
+  fill?: boolean;
 }) {
   if (operationalMap)
     return (
@@ -70,6 +79,7 @@ export function WorldMap({
         selectedKey={selectedKey}
         {...(onSelect ? { onSelect } : {})}
         map={operationalMap}
+        fill={fill}
       />
     );
   if (cities.some((city) => city.kind !== undefined)) return <p role="alert">운영 지도 자료를 다시 불러오세요.</p>;
@@ -94,7 +104,8 @@ export function WorldMap({
         const mine = city.key === myCityKey;
         const selected = city.key === selectedKey;
         const r = cityRadius(city.level);
-        const labelWidth = Array.from(city.name).length * 10 + 6;
+        const name = isCapital(city, nation) ? `${CAPITAL_MARK}${city.name}` : city.name;
+        const labelWidth = Array.from(name).length * 10 + 6;
         const select = onSelect ? () => onSelect(city.key) : undefined;
         return (
           <g
@@ -151,7 +162,7 @@ export function WorldMap({
               y={city.y + r + 11}
               style={{ fill: nation ? readableTextColor(nation.color) : 'var(--color-text)' }}
             >
-              {city.name}
+              {name}
             </text>
             {mine ? (
               <text className={styles.mineText} x={city.x} y={city.y - r - 7}>
@@ -173,7 +184,7 @@ export function MapLegend({
   readOnly = false,
 }: {
   cities: readonly DrawnCity[];
-  nations: readonly MapNation[];
+  nations: readonly DrawnNation[];
   readOnly?: boolean;
 }) {
   const counts = new Map<number, number>();

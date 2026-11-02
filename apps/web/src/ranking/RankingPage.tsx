@@ -1,4 +1,5 @@
 import { getRouteApi, Link } from '@tanstack/react-router';
+import rankingIcon from '../art/icons/ranking.png';
 import { EmptyState, ErrorState } from '../ui/States';
 import styles from './Ranking.module.css';
 import { GeneralRankingTable, NationRankingTable } from './RankingTables';
@@ -53,6 +54,7 @@ export function RankingView({
   return (
     <section className={styles.page}>
       <div className={styles.head}>
+        <img className="pixel-art" src={rankingIcon} alt="" width={48} height={48} />
         <h1>순위</h1>
         {data.state === 'ready' && data.ranking.at ? (
           <span className={styles.at}>{formatAt(data.ranking.at)}</span>

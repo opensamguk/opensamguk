@@ -126,7 +126,14 @@ describe('명령 인자 칸', () => {
   it('JSON Schema에서 칸을 만들고 넣으면 안 되는 인자는 뺀다', () => {
     expect(argFields(recruit).map((f) => [f.key, f.kind])).toEqual([
       ['amount', 'integer'],
-      ['crewType', 'integer'],
+      ['crewType', 'unit'],
+    ]);
+    // 병종은 번호 대신 모집할 수 있는 병종 이름으로 고른다.
+    const crew = argFields(recruit)[1]!;
+    expect(crew.kind === 'unit' && crew.options).toEqual([
+      { value: '1100', label: '보병' },
+      { value: '1200', label: '궁병' },
+      { value: '1300', label: '기병' },
     ]);
     expect(argFields({ properties: { cityKey: { type: 'integer' } } })[0]!.kind).toBe('city');
     expect(argFields({ properties: { nationId: { not: {} } } })).toEqual([]);
@@ -144,14 +151,13 @@ describe('명령 인자 칸', () => {
 
   it('필수 값이 비었거나 범위 밖이면 넣지 않는다', () => {
     const fields = argFields(recruit);
-    expect(buildArgs(fields, requiredKeys(recruit), { amount: '100', crewType: '1' })).toEqual({
-      args: { amount: 100, crewType: 1 },
+    expect(buildArgs(fields, requiredKeys(recruit), { amount: '100', crewType: '1200' })).toEqual({
+      args: { amount: 100, crewType: 1200 },
       missing: [],
     });
-    expect(buildArgs(fields, requiredKeys(recruit), { amount: '0', crewType: '' }).missing).toEqual([
-      '수량',
-      '병종 번호',
-    ]);
+    // 모집할 수 없는 병종(armType 0)이나 없는 번호는 넣지 않는다.
+    expect(buildArgs(fields, requiredKeys(recruit), { amount: '100', crewType: '1000' }).missing).toEqual(['병종']);
+    expect(buildArgs(fields, requiredKeys(recruit), { amount: '0', crewType: '' }).missing).toEqual(['수량', '병종']);
     const buy = argFields({ properties: { buy: { type: 'boolean' } } });
     expect(buildArgs(buy, ['buy'], { buy: 'false' }).args).toEqual({ buy: false });
   });

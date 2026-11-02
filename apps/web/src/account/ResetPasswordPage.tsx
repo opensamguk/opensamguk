@@ -39,7 +39,7 @@ export function ResetPasswordPage() {
     mutation.mutate({ token: accountToken.token, password });
   }
   return (
-    <AccountFrame title="새 비밀번호" privateLink>
+    <AccountFrame title="새 비밀번호" privateLink plaque="비밀번호 재설정">
       {mutation.isSuccess ? (
         <p role="status">비밀번호를 바꿨습니다. 새 비밀번호로 로그인하세요.</p>
       ) : accountToken.kind !== 'token' ? (

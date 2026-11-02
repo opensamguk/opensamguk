@@ -173,9 +173,9 @@ function queue(base: number, move: City, target: City): Prepared[] {
     switch (i % 6) {
       case 0:
         return {
-          input: { commandKey: 'recruit', args: { amount: base + i, crewType: 1 } },
+          input: { commandKey: 'recruit', args: { amount: base + i, crewType: 1100 } },
           kind: 'command',
-          text: `모병 수량 ${base + i} · 병종 번호 1`,
+          text: `모병 수량 ${base + i} · 보병`,
         };
       case 1:
         return { input: { commandKey: 'train' }, kind: 'command', text: '훈련' };
@@ -210,6 +210,7 @@ const NO_ARG_NAMES: Record<string, string> = {
 };
 const CITY_ARG_NAMES: Record<string, string> = { attack: '출병', move: '이동' };
 const RECRUIT_NAMES: Record<string, string> = { recruit: '모병', conscript: '징병' };
+const UNIT_NAMES: Record<string, string> = { '1100': '보병', '1200': '궁병', '1300': '기병' };
 function knownLabel(turn: StoredTurn, cities: City[]): Label {
   if (!turn.explicit) return { kind: 'empty', text: '빈 칸' };
   const args = (turn.args ?? {}) as Record<string, unknown>;
@@ -222,7 +223,10 @@ function knownLabel(turn: StoredTurn, cities: City[]): Label {
   if (cityArg && keys === 'cityKey' && typeof args.cityKey === 'number')
     return { kind: 'command', text: `${cityArg} ${cityName(cities, args.cityKey)}` };
   if (recruit && keys === 'amount,crewType')
-    return { kind: 'command', text: `${recruit} 수량 ${String(args.amount)} · 병종 번호 ${String(args.crewType)}` };
+    return {
+      kind: 'command',
+      text: `${recruit} 수량 ${String(args.amount)} · ${UNIT_NAMES[String(args.crewType)] ?? String(args.crewType)}`,
+    };
   throw new Error(`감찰 대조표에 없는 예턴입니다: ${turn.commandKey}`);
 }
 

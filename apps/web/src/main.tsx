@@ -1,4 +1,6 @@
 import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
+import '@fontsource/dotgothic16/400.css';
+import './styles/fonts.css';
 import './styles/tokens.css';
 import './styles/global.css';
 import { QueryClientProvider } from '@tanstack/react-query';

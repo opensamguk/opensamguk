@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import messagesIconUrl from '../art/icons/messages.png';
 import { retryUnlessClientError } from '../game/errors';
 import { errorCode, serverMessage } from '../turns/apiError';
 import { DisabledReason } from '../ui/DisabledReason';
@@ -29,7 +30,9 @@ function useNotification() {
 export function NotificationSettingsPage() {
   return (
     <main className={styles.page}>
+      {/* 먹 띠 제목 (INT-20) */}
       <header className={styles.header}>
+        <span className={styles.brand}>오픈삼국</span>
         <h1>알림 설정</h1>
         <Link to="/" className={styles.back}>
           로비로
@@ -72,8 +75,11 @@ function Settings({ data, refetch }: { data: NotificationResponse; refetch: () =
 
   return (
     <div className={styles.sections}>
-      <section className={styles.section} aria-labelledby="discord-title">
-        <h2 id="discord-title">디스코드 웹훅</h2>
+      <section className={`${styles.section} ${styles.discord}`} aria-labelledby="discord-title">
+        <div className={styles.sectionHead}>
+          <img className={styles.icon} src={messagesIconUrl} alt="" width={32} height={32} />
+          <h2 id="discord-title">디스코드 웹훅</h2>
+        </div>
         {registered ? (
           <Registered
             data={data}
@@ -106,7 +112,7 @@ function Settings({ data, refetch }: { data: NotificationResponse; refetch: () =
         ) : null}
       </section>
 
-      <section className={styles.section} aria-labelledby="events-title">
+      <section className={`${styles.section} ${styles.eventsSection}`} aria-labelledby="events-title">
         <h2 id="events-title">받을 알림</h2>
         {registered ? null : <p className={styles.muted}>고른 종류는 웹훅을 등록할 때 함께 저장합니다.</p>}
         <fieldset className={styles.events}>
@@ -139,7 +145,7 @@ function Settings({ data, refetch }: { data: NotificationResponse; refetch: () =
         </fieldset>
       </section>
 
-      <section className={styles.section} aria-labelledby="howto-title">
+      <section className={`${styles.section} ${styles.howto}`} aria-labelledby="howto-title">
         <h2 id="howto-title">웹훅 만드는 법</h2>
         <ol className={styles.steps}>
           <li>디스코드에서 알림을 받을 채널의 설정(톱니바퀴)을 엽니다.</li>

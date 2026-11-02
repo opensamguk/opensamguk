@@ -14,6 +14,7 @@ import { liveRefresh, topbarStatus } from '../game/worldWatch';
 import { useTRPC } from '../trpc';
 import styles from './GameLayout.module.css';
 import { SanctionNotice } from '../sanction/SanctionNotice';
+import { FirstTurnGuide } from '../onboarding/FirstTurnGuide';
 
 // 핵심 조작은 메인 한 화면에서 한다 (소유자 UI 정정 2026-10-21). 메뉴의 다른 주소는 넓게 보는 보조 화면이다.
 // 위쪽 띠에는 월드 이름·현재 연월·다음 턴까지 남은 시간·메뉴·로그아웃. 본문은 화면 폭을 다 쓴다.
@@ -81,7 +82,7 @@ export function GameLayout() {
           로비
         </Link>
         <span className={styles.world}>{worldName}</span>
-        <span className={styles.meta} data-testid="game-date">
+        <span className={`${styles.meta} ${styles.date}`} data-testid="game-date">
           {date}
         </span>
         <span
@@ -121,6 +122,11 @@ export function GameLayout() {
       </main>
       {messagesOpen ? <MessageDrawer worldId={worldId} onClose={closeMessages} /> : null}
       <NationNoticePopup worldId={worldId} />
+      <FirstTurnGuide
+        key={worldId}
+        worldId={worldId}
+        show={Boolean(home.data) && pathname.replace(/\/$/, '') === `/w/${worldId}`}
+      />
     </div>
   );
 }

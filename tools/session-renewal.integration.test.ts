@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { Writable } from 'node:stream';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
@@ -54,7 +54,12 @@ async function send(base: string, path = 'turns.set', body: unknown = mutation()
     headers: { origin, 'content-type': 'application/json', cookie: `sid=${cookie}` },
     body: JSON.stringify(body),
   });
-  return { status: response.status, cookie: response.headers.get('set-cookie'), body: await response.json() };
+  return {
+    status: response.status,
+    cookie: response.headers.get('set-cookie'),
+    cookies: response.headers.getSetCookie(),
+    body: await response.json(),
+  };
 }
 const mutation = (revision = 0) => ({ 0: { worldId, revision, slots } });
 const success = (revision = 1) => [{ result: { data: { ok: true, revision, slots: displaySlots(slots) } } }];
@@ -69,7 +74,15 @@ async function sessionExpiry() {
   return (await db.session.findUniqueOrThrow({ where: { id: sessionId } })).expiresAt;
 }
 async function withServer(fn: (base: string) => Promise<void>) {
-  const app = await buildServer({ db, publicOrigin: origin, production: true, now: () => now, logStream, legalPolicy });
+  const app = await buildServer({
+    db,
+    publicOrigin: origin,
+    production: true,
+    now: () => now,
+    logStream,
+    legalPolicy,
+    loginAudit: { key: randomBytes(32).toString('hex'), version: 1 },
+  });
   try {
     await fn(await app.listen({ host: '127.0.0.1', port: 0 }));
   } finally {
@@ -358,9 +371,12 @@ describe('T3-04 세션 갱신 장애와 실제 HTTP·PostgreSQL 커밋', () => {
       const login = await send(base, 'auth.login', { 0: { email: user.email, password } });
       expect(login.status).toBe(200);
       expect(await db.session.findUnique({ where: { id: sessionId } })).toBeNull();
-      const newToken = login.cookie?.match(/^sid=([^;]+);/)?.[1];
+      const sessionCookies = login.cookies.filter((cookie) => cookie.startsWith('sid='));
+      expect(sessionCookies).toHaveLength(1);
+      const sessionCookie = sessionCookies[0]!;
+      const newToken = sessionCookie.match(/^sid=([^;]+);/)?.[1];
       expect(newToken !== undefined && newToken !== token).toBe(true);
-      expect(login.cookie?.includes('Secure')).toBe(true);
+      expect(sessionCookie.includes('Secure')).toBe(true);
       const loggedIn = await db.session.findUniqueOrThrow({ where: { id: hashToken(newToken!) } });
       expect(loggedIn.expiresAt).toEqual(new Date(now + SESSION_SECONDS * 1000));
       const logout = await send(base, 'auth.logout', {}, newToken!);

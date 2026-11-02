@@ -251,64 +251,81 @@ export function AccountPage({ viewerId }: { viewerId: string }) {
   }
   const remaining = retryAt === null ? 0 : Math.max(0, Math.ceil((retryAt - now) / 1000));
   return (
-    <AccountFrame title={phase === 'done' ? '탈퇴 완료' : '내 계정'}>
-      {message ? <p role="alert">{message}</p> : null}
-      {phase === 'loading' ? <p role="status">계정과 현재 문서를 확인하고 있습니다…</p> : null}
-      {phase === 'sending' ? <p role="status">탈퇴 요청의 응답을 기다리고 있습니다…</p> : null}
-      {phase === 'done' ? <p role="status">탈퇴 처리와 로그인 종료를 확인했습니다.</p> : null}
-      {phase === 'ambiguous' ? (
-        <p>
-          <Link to="/forgot-password">비밀번호 재설정</Link>
-        </p>
-      ) : null}
-      {phase === 'refresh' ? (
-        <button className={styles.touch} type="button" disabled={sending || remaining > 0} onClick={() => void load()}>
-          {remaining > 0 ? `${remaining}초 뒤 현재 정보 다시 확인` : '현재 정보 다시 확인'}
-        </button>
+    <AccountFrame title={phase === 'done' ? '탈퇴 완료' : '내 계정'} panels>
+      {/* 첩 세 장 (INT-20 A-Account): 내 정보 · 동의 기록 · 계정 탈퇴. 상태 문장은 맨 위 첩에 모은다. */}
+      {message || phase !== 'ready' ? (
+        <section className={`${styles.panel} ${styles.wide}`}>
+          {message ? <p role="alert">{message}</p> : null}
+          {phase === 'loading' ? <p role="status">계정과 현재 문서를 확인하고 있습니다…</p> : null}
+          {phase === 'sending' ? <p role="status">탈퇴 요청의 응답을 기다리고 있습니다…</p> : null}
+          {phase === 'done' ? <p role="status">탈퇴 처리와 로그인 종료를 확인했습니다.</p> : null}
+          {phase === 'ambiguous' ? (
+            <p>
+              <Link to="/forgot-password">비밀번호 재설정</Link>
+            </p>
+          ) : null}
+          {phase === 'refresh' ? (
+            <button
+              className={`${styles.touch} ${styles.button}`}
+              type="button"
+              disabled={sending || remaining > 0}
+              onClick={() => void load()}
+            >
+              {remaining > 0 ? `${remaining}초 뒤 현재 정보 다시 확인` : '현재 정보 다시 확인'}
+            </button>
+          ) : null}
+        </section>
       ) : null}
       {phase === 'ready' && view ? (
         <>
-          <dl className={styles.facts}>
-            <dt>이메일</dt>
-            <dd>{view.account.email}</dd>
-            <dt>인증</dt>
-            <dd>{view.account.emailVerified ? '확인됨' : '확인 필요'}</dd>
-          </dl>
-          {!view.account.emailVerified ? <VerificationRequest email={view.account.email} /> : null}
-          <h2>동의 기록</h2>
-          {view.account.consentRequired.length > 0 ? (
-            <p>
-              <Link to="/legal/agree" search={{ next: '/account' }}>
-                현재 문서를 확인하고 동의하기
-              </Link>
-            </p>
-          ) : null}
-          {view.account.consents.length === 0 ? (
-            <p>기록된 동의가 없습니다.</p>
-          ) : (
-            <ul>
-              {view.account.consents.map((consent) => (
-                <li key={consent.docType + ':' + consent.version}>
-                  {consent.docType === 'TERMS' ? '이용약관' : '개인정보처리방침'} {consent.version} ·{' '}
-                  <time dateTime={consent.agreedAt}>{new Date(consent.agreedAt).toLocaleDateString('ko-KR')}</time>
-                </li>
-              ))}
-            </ul>
-          )}
-          <nav aria-label="계정 설정" className={styles.links}>
-            <Link to="/legal/terms">이용약관</Link>
-            <Link to="/legal/privacy">개인정보처리방침</Link>
-            <Link to="/forgot-password">비밀번호 재설정</Link>
-            <Link to="/settings/notifications">알림 설정</Link>
-          </nav>
-          <h2>계정 탈퇴</h2>
-          {view.account.withdrawalAvailable && privacyStamp(view.policy) !== null ? (
-            <WithdrawalActions stamp={privacyStamp(view.policy)!} onWithdraw={withdraw} />
-          ) : (
-            <p role="status">
-              탈퇴 처리 기준을 준비하고 있습니다. <Link to="/legal/privacy">개인정보처리방침 확인</Link>
-            </p>
-          )}
+          <section className={styles.panel}>
+            <span className={styles.plaque}>내 정보</span>
+            <dl className={styles.facts}>
+              <dt>이메일</dt>
+              <dd>{view.account.email}</dd>
+              <dt>인증</dt>
+              <dd>{view.account.emailVerified ? '확인됨' : '확인 필요'}</dd>
+            </dl>
+            {!view.account.emailVerified ? <VerificationRequest email={view.account.email} /> : null}
+            <nav aria-label="계정 설정" className={styles.links}>
+              <Link to="/legal/terms">이용약관</Link>
+              <Link to="/legal/privacy">개인정보처리방침</Link>
+              <Link to="/forgot-password">비밀번호 재설정</Link>
+              <Link to="/settings/notifications">알림 설정</Link>
+            </nav>
+          </section>
+          <section className={styles.panel}>
+            <h2>동의 기록</h2>
+            {view.account.consentRequired.length > 0 ? (
+              <p>
+                <Link to="/legal/agree" search={{ next: '/account' }}>
+                  현재 문서를 확인하고 동의하기
+                </Link>
+              </p>
+            ) : null}
+            {view.account.consents.length === 0 ? (
+              <p>기록된 동의가 없습니다.</p>
+            ) : (
+              <ul className={styles.consents}>
+                {view.account.consents.map((consent) => (
+                  <li key={consent.docType + ':' + consent.version}>
+                    {consent.docType === 'TERMS' ? '이용약관' : '개인정보처리방침'} {consent.version} ·{' '}
+                    <time dateTime={consent.agreedAt}>{new Date(consent.agreedAt).toLocaleDateString('ko-KR')}</time>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          <section className={`${styles.panel} ${styles.dangerPanel}`}>
+            <h2>계정 탈퇴</h2>
+            {view.account.withdrawalAvailable && privacyStamp(view.policy) !== null ? (
+              <WithdrawalActions stamp={privacyStamp(view.policy)!} onWithdraw={withdraw} />
+            ) : (
+              <p role="status">
+                탈퇴 처리 기준을 준비하고 있습니다. <Link to="/legal/privacy">개인정보처리방침 확인</Link>
+              </p>
+            )}
+          </section>
         </>
       ) : null}
     </AccountFrame>

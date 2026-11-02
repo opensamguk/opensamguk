@@ -6,13 +6,20 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
+import { dismissGuide, isGuideDismissed, sessionMemory } from '../onboarding/guideStorage';
 import { CATALOG_DOC, GUIDE_ORDER, GUIDES } from './guides';
 import { HelpPage } from './HelpPage';
 import { guideTarget, headingIds, links, parseInline, parseMarkdown, slug } from './markdown';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+  sessionStorage.clear();
+  sessionMemory.dismissed.clear();
+  sessionMemory.lastWorld = null;
+});
 
 describe('가이드 마크다운', () => {
   it('제목 앵커는 GitHub 방식이다', () => {
@@ -111,8 +118,9 @@ async function renderHelp(path: string) {
     },
   });
   const home = createRoute({ getParentRoute: () => root, path: '/' });
+  const world = createRoute({ getParentRoute: () => root, path: 'w/$worldId' });
   const router = createRouter({
-    routeTree: root.addChildren([doc, home]),
+    routeTree: root.addChildren([doc, home, world]),
     history: createMemoryHistory({ initialEntries: [path] }),
   });
   await act(async () => {
@@ -146,5 +154,23 @@ describe('도움말 화면', () => {
   it('없는 문서는 없다고 보인다', async () => {
     await renderHelp('/help/nope');
     expect(await screen.findByText('없는 도움말입니다')).toBeTruthy();
+  });
+
+  it('이 탭에서 연 월드가 없으면 첫 턴 안내 다시 보기를 숨긴다', async () => {
+    await renderHelp('/help/index');
+    await screen.findByRole('heading', { level: 1, name: '시작하기' });
+    expect(screen.queryByRole('link', { name: '첫 턴 안내 다시 보기' })).toBeNull();
+  });
+
+  it('마지막으로 연 월드의 첫 턴 안내 기록을 지우고 그 월드로 간다', async () => {
+    sessionStorage.setItem('opensamguk:last-world', 'w9');
+    dismissGuide('w9');
+    await renderHelp('/help/index');
+    const link = await screen.findByRole('link', { name: '첫 턴 안내 다시 보기' });
+    expect(link.getAttribute('href')).toBe('/w/w9');
+    await act(async () => {
+      fireEvent.click(link);
+    });
+    expect(isGuideDismissed('w9')).toBe(false);
   });
 });

@@ -1,0 +1,40 @@
+name: Release target metadata
+
+on:
+  pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-target-metadata-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  target-metadata:
+    name: opensamguk-release-target-metadata
+    runs-on: ubuntu-24.04
+    # Install plus finite8min fixture and at most60s native settlement; no app/DB starts.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact source
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.22.0'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Pure and filesystem target boundaries
+        run: pnpm exec vitest run tools/t2-15-release-preflight.test.ts tools/t2-15-release-target-preflight.test.ts
+      - name: Actual Linux Docker metadata fixture
+        run: node --import tsx tools/t2-15-release-target-linux.mts

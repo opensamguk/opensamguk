@@ -1,16 +1,18 @@
 import type { QueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useContext, useEffect } from 'react';
 import {
+  Outlet,
   createRootRouteWithContext,
   createRoute,
   createRouter,
   lazyRouteComponent,
-  Outlet,
   redirect,
   useRouter,
+  useRouterState,
 } from '@tanstack/react-router';
 import { BattleSimPage } from './battleSim/BattleSimPage';
 import { DiplomacyPage, parseDiplomacySearch } from './diplomacy/DiplomacyPage';
+import { InboxPage } from './inbox/InboxPage';
 import { CreateGeneralPage } from './general/CreateGeneralPage';
 import { HelpPage } from './help/HelpPage';
 import { GameLayout } from './layout/GameLayout';
@@ -32,7 +34,7 @@ import { InspectionPage } from './operations/InspectionPage';
 import { OperationDetailPage } from './operations/OperationDetailPage';
 import { OperationsPage } from './operations/OperationsPage';
 import { TurnsPage } from './turns/TurnsPage';
-import { EmptyState, ErrorState } from './ui/States';
+import { EmptyState, ErrorState, StateIconsContext } from './ui/States';
 import { ForgotPasswordPage } from './account/ForgotPasswordPage';
 import { ResetPasswordPage } from './account/ResetPasswordPage';
 import { VerifyEmailPage } from './account/VerifyEmailPage';
@@ -55,13 +57,23 @@ interface RouterContext {
   trpc: Trpc;
 }
 
+function NotFound() {
+  // 관리자 경로의 권한 없음은 beforeLoad의 notFound()라 이 화면까지 올라올 수 있다. 관리자 화면은 그림을 불러오지 않는다.
+  // 라우터처럼 대소문자를 가리지 않는다. 바깥에서 이미 끈 아이콘은 다시 켜지 않는다.
+  const admin = useRouterState({ select: (state) => /^\/admin(\/|$)/i.test(state.location.pathname) });
+  const icons = useContext(StateIconsContext) && !admin;
+  return (
+    <StateIconsContext.Provider value={icons}>
+      <main style={{ maxWidth: 480, margin: '64px auto' }}>
+        <EmptyState title="없는 주소입니다" />
+      </main>
+    </StateIconsContext.Provider>
+  );
+}
+
 const rootRoute = createRootRouteWithContext<RouterContext>()({
   component: RootFrame,
-  notFoundComponent: () => (
-    <main style={{ maxWidth: 480, margin: '64px auto' }}>
-      <EmptyState title="없는 주소입니다" />
-    </main>
-  ),
+  notFoundComponent: NotFound,
 });
 
 function RootFrame() {
@@ -117,6 +129,22 @@ function GuardError() {
     <main style={{ maxWidth: 480, margin: '64px auto' }}>
       <ErrorState title="서버에 연결할 수 없습니다" onRetry={() => void router.invalidate()} />
     </main>
+  );
+}
+
+// 관리자 진입의 권한 확인 실패·권한 없음 화면. 관리자 화면은 그림을 불러오지 않는다(AC-M3-08 CH-12).
+function AdminGuardError() {
+  return (
+    <StateIconsContext.Provider value={false}>
+      <GuardError />
+    </StateIconsContext.Provider>
+  );
+}
+function AdminNotFound() {
+  return (
+    <StateIconsContext.Provider value={false}>
+      <NotFound />
+    </StateIconsContext.Provider>
   );
 }
 
@@ -334,7 +362,7 @@ const rankingRoute = createRoute({
 // 전투 시뮬레이터 (T4-34). 사용자가 넣은 가정으로 교전 한 번을 Web Worker에서 계산하는 보조 화면이다.
 const simulatorRoute = createRoute({ getParentRoute: () => worldRoute, path: 'simulator', component: BattleSimPage });
 
-// 외교실 (T2-08). 주소: /w/:worldId/diplomacy?tab=incoming|outgoing|active|ended|write
+// 외교실 (T2-08, INT-20 국가 탭). 주소: /w/:worldId/diplomacy?tab=nations|incoming|outgoing|active|ended|write|trust
 const diplomacyRoute = createRoute({
   getParentRoute: () => worldRoute,
   path: 'diplomacy',
@@ -344,6 +372,8 @@ const diplomacyRoute = createRoute({
     return <DiplomacyPage tab={tab} />;
   },
 });
+// 받은 제안함 (INT-20). 발령·휘하·외교 제안을 모아 보고 답하는 화면으로 잇는다.
+const inboxRoute = createRoute({ getParentRoute: () => worldRoute, path: 'inbox', component: InboxPage });
 // 메시지 전체 화면 (T2-10). 메인 오른쪽 메시지 패널과 같은 부품이다.
 const messagesRoute = createRoute({ getParentRoute: () => worldRoute, path: 'messages', component: MessagesPage });
 
@@ -422,7 +452,8 @@ const adminRoute = createRoute({
   path: 'admin',
   beforeLoad: async ({ location }) => (await import('./admin/access')).requireAdmin(location.href),
   component: lazyRouteComponent(() => import('./admin/AdminPages'), 'AdminLayout'),
-  errorComponent: GuardError,
+  errorComponent: AdminGuardError,
+  notFoundComponent: AdminNotFound,
 });
 const adminIndexRoute = createRoute({
   getParentRoute: () => adminRoute,
@@ -479,6 +510,7 @@ const routeTree = rootRoute.addChildren([
     rankingRoute,
     simulatorRoute,
     diplomacyRoute,
+    inboxRoute,
     messagesRoute,
     operationsRoute,
     operationRoute,

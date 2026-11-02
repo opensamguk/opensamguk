@@ -1,19 +1,34 @@
+/* 약관 본문과 동의 칸 (INT-20): 본문은 한지 위 먹 테두리 상자, 동의 칸은 주칠 체크. */
 .body {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   line-height: 1.7;
+  padding: var(--space-3) var(--space-4);
+  border: var(--frame);
+  background: var(--color-surface-raised);
 }
 .consents {
   margin: 0;
   padding: var(--space-3);
-  border: 1px solid var(--color-border-strong);
+  border: 0;
+  border-top: var(--frame);
   min-width: 0;
+}
+.consents legend {
+  padding: 0 var(--space-2) 0 0;
+  font-weight: 600;
+}
+.consents > div + div {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
 }
 .check {
   display: flex;
   gap: var(--space-2);
   align-items: center;
   min-height: 44px;
+  font-weight: 500;
   cursor: pointer;
 }
 .check input {
@@ -21,6 +36,7 @@
   height: 44px;
   margin: 0;
   flex: 0 0 44px;
+  accent-color: var(--color-accent);
 }
 .link {
   display: inline-flex;

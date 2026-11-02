@@ -4,7 +4,7 @@ import { createAccount } from './account';
 import { createGeneralByApi, e2eWorld, query, setTurns, waitTurnWindow } from './game';
 
 // GitHub #112 · T1-15 · AC-M1-19: 메인 오른쪽 좁은 명령 칸에서 바뀜 태그가 바/뀜 두 줄로 갈라지던 결함.
-// main.spec.ts의 초안 시험은 이동 한 칸을 본다. 여기서는 긴 실제 인자(모병 수량·병종 번호)와 이름이 가장 긴 대상 도시로
+// main.spec.ts의 초안 시험은 이동 한 칸을 본다. 여기서는 긴 실제 인자(모병 수량·병종)와 이름이 가장 긴 대상 도시로
 // 태그를 실제 줄 상자로 재고, 명령·인자와 겹치거나 칸 밖으로 잘리지 않는지, 표 안 세로 스크롤과 메인 가로 넘침을 본다.
 // 실제 서버·PostgreSQL·엔진(pnpm dev)과 Chromium을 쓴다. 저장은 하지 않는다 (저장은 main.spec.ts가 본다).
 
@@ -62,13 +62,13 @@ test('좁은 메인 명령 칸에서 긴 인자와 긴 대상 도시 이름에�
   await waitTurnWindow(page, world, 45_000);
   await setTurns(page, world, []);
   await page.goto(`/w/${world}`);
-  await expect(page.getByRole('heading', { level: 1, name: '메인' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: '군략도' })).toBeVisible();
   await expect(row(page, 30)).toBeVisible();
 
   await row(page, 1).click();
   await pick(page, '모병');
   await editor(page).getByRole('spinbutton', { name: '수량' }).fill('1000000');
-  await editor(page).getByRole('spinbutton', { name: '병종 번호' }).fill('1100');
+  await editor(page).getByRole('combobox', { name: '병종' }).selectOption('1100');
   await editor(page).getByRole('button', { name: '1번 칸에 넣기', exact: true }).click();
   await editor(page).getByRole('button', { name: '선택 해제' }).click();
   await row(page, 2).click();

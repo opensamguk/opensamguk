@@ -1,0 +1,228 @@
+{
+  "date": "2026-10-29",
+  "relatedAcceptanceCriteria": ["AC-INT-03", "AC-INT-10"],
+  "status": "REFERENCE_WITH_COORDINATE_DRAFT",
+  "scope": "한반도·왜 이름과 권역의 참고 자료다. 현재 좌표 배치는 coordinate-placement.json에 별도 저장한다.",
+  "sources": [
+    {
+      "id": "kyushu",
+      "title": "규슈대학교 종합연구박물관: 倭人伝の道",
+      "url": "https://www.museum.kyushu-u.ac.jp/publications/annual_exhibitions/WAJINDEN2004/02-1.html",
+      "accessedAt": "2026-10-29"
+    },
+    {
+      "id": "fukuoka",
+      "title": "후쿠오카시박물관: 海と遺跡 — 弥生時代",
+      "url": "https://museum.city.fukuoka.jp/sp/exhibition/523/",
+      "accessedAt": "2026-10-29"
+    },
+    {
+      "id": "yoshinogari",
+      "title": "요시노가리 역사공원: 邪馬台国 논쟁의 배경",
+      "url": "https://www.yoshinogari.jp/ym/topics/yama02.html",
+      "accessedAt": "2026-10-29"
+    },
+    {
+      "id": "daebang",
+      "title": "국사편찬위원회 우리역사넷: 대방군",
+      "url": "https://contents.history.go.kr/front/tg/view.do?ganada=&levelId=tg_001_0660&pageUnit=10&treeId=0209",
+      "accessedAt": "2026-10-29"
+    },
+    {
+      "id": "izumo",
+      "title": "시마네현립 고대 이즈모 역사박물관: 弥生王墓誕生",
+      "url": "https://www.izm.ed.jp/cms/cms.php?id=114&mode=v",
+      "accessedAt": "2026-10-29"
+    },
+    {
+      "id": "kibi",
+      "title": "오카야마현 고대 기비 문화재센터: 弥生住居と集落",
+      "url": "https://www.pref.okayama.jp/site/kodai/632623.html",
+      "accessedAt": "2026-10-29"
+    },
+    {
+      "id": "yamatai-theories",
+      "title": "요시노가리 역사공원: 기나이설과 규슈설",
+      "url": "https://www.yoshinogari.jp/ym/topics/yama01.html",
+      "accessedAt": "2026-10-29"
+    },
+    {
+      "id": "yamatai-choice",
+      "title": "무나카타시 해양박물관: 邪馬台国とムナカタ国",
+      "url": "https://www.city.munakata.lg.jp/searoad/kiji0034337/index.html",
+      "accessedAt": "2026-10-29"
+    },
+    {
+      "id": "fumi-choice",
+      "title": "우미정: 光正寺古墳, 불미국 위치의 두 유력설",
+      "url": "https://www.town.umi.lg.jp/site/spot/kanko131.html",
+      "accessedAt": "2026-10-29"
+    },
+    {
+      "id": "iyo",
+      "title": "에히메현: 愛媛の歴史と文化",
+      "url": "https://www.pref.ehime.jp/site/ehimenotakara/138689.html",
+      "accessedAt": "2026-10-29"
+    },
+    {
+      "id": "sanuki",
+      "title": "가가와현립박물관: かがわ今昔",
+      "url": "https://www.kmuseum.pref.kagawa.lg.jp/exhibition-list/post-1613/",
+      "accessedAt": "2026-10-29"
+    },
+    {
+      "id": "mokji",
+      "title": "한국민족문화대백과사전: 목지국",
+      "url": "https://encykorea.aks.ac.kr/Article/E0018698",
+      "accessedAt": "2026-10-29"
+    },
+    {
+      "id": "okjeo",
+      "title": "우리역사넷: 옥저의 위치와 변천",
+      "url": "https://contents.history.go.kr/mobile/hm/view.do?levelId=hm_003_0040",
+      "accessedAt": "2026-10-29"
+    },
+    {
+      "id": "buyeo",
+      "title": "한국민족문화대백과사전: 부여",
+      "url": "https://encykorea.aks.ac.kr/Article/E0024368",
+      "accessedAt": "2026-10-29"
+    }
+  ],
+  "japanUmbrellaLabel": "왜(倭)",
+  "modernRegionsVisible": ["규슈(九州)", "시코쿠(四國)", "혼슈(本州) 서부"],
+  "japanCandidates": [
+    {
+      "name": "대마국",
+      "nameZh": "對馬國",
+      "modernArea": "쓰시마섬",
+      "locationStatus": "REGION_WELL_SUPPORTED",
+      "sources": ["kyushu"],
+      "selected": true
+    },
+    {
+      "name": "일지국",
+      "nameZh": "一支國",
+      "aliases": ["일대국(一大國)"],
+      "modernArea": "이키섬",
+      "locationStatus": "REGION_WELL_SUPPORTED",
+      "sources": ["kyushu", "yoshinogari"],
+      "selected": true
+    },
+    {
+      "name": "말로국",
+      "nameZh": "末盧國",
+      "aliases": ["末廬國"],
+      "modernArea": "가라쓰평야 일대",
+      "locationStatus": "REGION_WELL_SUPPORTED",
+      "sources": ["kyushu", "yoshinogari"],
+      "selected": true
+    },
+    {
+      "name": "이도국",
+      "nameZh": "伊都國",
+      "modernArea": "이토시마평야 일대",
+      "locationStatus": "REGION_WELL_SUPPORTED",
+      "sources": ["kyushu", "fukuoka"],
+      "selected": true
+    },
+    {
+      "name": "노국",
+      "nameZh": "奴國",
+      "modernArea": "후쿠오카평야 일대",
+      "locationStatus": "REGION_WELL_SUPPORTED",
+      "sources": ["kyushu", "fukuoka"],
+      "selected": true
+    },
+    {
+      "name": "불미국",
+      "nameZh": "不彌國",
+      "modernArea": "우미·가스야권",
+      "locationStatus": "CONTESTED_WORKING_CHOICE",
+      "sources": ["fumi-choice"],
+      "selected": true
+    },
+    {
+      "name": "투마국",
+      "nameZh": "投馬國",
+      "modernArea": null,
+      "locationStatus": "LOCATION_DISPUTED",
+      "sources": ["yoshinogari"],
+      "selected": false
+    },
+    {
+      "name": "야마타이국",
+      "nameZh": "邪馬臺國",
+      "aliases": ["사마대국", "邪馬壹國"],
+      "modernArea": "기나이 나라분지, 마키무쿠 일대",
+      "locationStatus": "KINAI_WORKING_CHOICE_NOT_SETTLED",
+      "sources": ["yamatai-theories", "yamatai-choice"],
+      "selected": true
+    }
+  ],
+  "proposedJapanEntryCorridor": ["구야국(한반도)", "대마국", "일지국", "말로국", "이도국", "노국"],
+  "limits": [
+    "왜인전의 주된 기록은 3세기 상황이며 191년의 소국 경계·소유권을 그대로 확정하지 않는다.",
+    "첨부 일본 그림의 이름 없는 점에는 좌표별 지명이 없어 위 소국 이름과 일대일 대응할 수 없다.",
+    "현대 지역 이름과 당시 소국 이름을 구분한다.",
+    "야마타이를 혼슈 전체나 규슈의 확정 지명으로 쓰지 않는다.",
+    "군현·집단 분포 지도만으로 도로의 직접 연결을 확정하지 않는다.",
+    "유력설을 택한 게임 기준과 학계의 합의를 구분한다. 야마타이·불미·목지·불이의 위치를 확정 사실로 올리지 않는다.",
+    "이요·사누키는 사용자가 선택한 두 지역 거점이며 후대 행정국 경계를 191년에 적용하지 않는다."
+  ],
+  "korea": {
+    "reuseExistingSite": "S082",
+    "siteCandidates": [
+      "서안평",
+      "졸본",
+      "국내성",
+      "부조",
+      "화려",
+      "불이",
+      "백제국",
+      "목지국",
+      "건마국",
+      "사로국",
+      "구야국"
+    ],
+    "regionalCandidates": ["부여", "읍루", "북옥저"],
+    "connectionRevision": "서안평에서 낙랑 방면과 졸본·국내성 방면을 분기하는 대안을 검토. 기존 양평–낙랑을 언제나 고구려 중심지 경유로 강제하지 않는다.",
+    "daebangNote": "대방군 설치는 건안 연간이다. 191년 시나리오와 후대 군 체제를 구분한다."
+  },
+  "japanRegionalLabelCandidates": [
+    {
+      "name": "이즈모",
+      "nameZh": "出雲",
+      "modernArea": "혼슈 서부 산인, 시마네권",
+      "use": "지역 대표 거점명. 191년의 공식 국명이나 그림 점과의 대응을 확정하지 않는다.",
+      "sources": ["izumo"],
+      "selected": true
+    },
+    {
+      "name": "기비",
+      "nameZh": "吉備",
+      "modernArea": "혼슈 서부, 오카야마권",
+      "use": "지역 대표 거점명. 개별 성읍과 구분한다.",
+      "sources": ["kibi"],
+      "selected": true
+    },
+    {
+      "name": "이요",
+      "nameZh": "伊予",
+      "modernArea": "시코쿠 북서부, 에히메현 마쓰야마평야권",
+      "selected": true,
+      "use": "지역 대표 거점명. 191년의 율령국이나 국부가 존재했다는 뜻은 아니다.",
+      "sources": ["iyo"]
+    },
+    {
+      "name": "사누키",
+      "nameZh": "讃岐",
+      "modernArea": "시코쿠 북동부, 가가와현 다카마쓰·사누키평야권",
+      "selected": true,
+      "use": "지역 대표 거점명. 191년의 율령국이나 국부가 존재했다는 뜻은 아니다.",
+      "sources": ["sanuki"]
+    }
+  ],
+  "selectionFile": "east-asia-selection.json",
+  "coordinatePlacementFile": "coordinate-placement.json"
+}

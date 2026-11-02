@@ -104,7 +104,7 @@ test('정식191년 메인·예턴 메뉴 이동·초점·375~1440px·30초 재�
       .toBe(1);
     expect(hold.lost).toBeUndefined();
     await new TurnLoop(hold.db, hold.lease).advanceTo(0);
-    await expect(page.getByRole('heading', { level: 1, name: '메인', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: '군략도', exact: true })).toBeVisible();
     const editor = page.getByTestId('turn-editor');
     await expect(editor.locator('tr[data-slot]')).toHaveCount(30);
     const map = await query<WorldMap>(page, 'world.map', { worldId: ownWorld });
@@ -190,10 +190,9 @@ test('정식191년 메인·예턴 메뉴 이동·초점·375~1440px·30초 재�
       ).toBe(true);
       await expect(editor.getByTestId('draft-state')).toHaveText('저장하지 않은 편집 1건');
       await expect(editor.locator('tr[data-slot="30"]')).toHaveAttribute('aria-selected', 'true');
-      await expect(gameNav.getByRole('link', { name: '메인', exact: true }).filter({ visible: true })).toHaveAttribute(
-        'aria-current',
-        'page',
-      );
+      await expect(
+        gameNav.getByRole('link', { name: '군략도', exact: true }).filter({ visible: true }),
+      ).toHaveAttribute('aria-current', 'page');
       await expect(turnsLink).not.toHaveAttribute('aria-current');
       if (width === 375) {
         await gameNav.locator('summary').click();

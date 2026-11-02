@@ -1,27 +1,35 @@
+/* 꼬리표: 네모, 먹 테두리, 한지 바탕. 위험은 주칠, 안내는 남색으로 채운다 (INT-20). */
 .tag {
-  display: inline-block;
-  padding: 0 var(--space-1);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 6px;
   border-radius: var(--radius);
-  border: 1px solid currentColor;
+  border: 1px solid var(--color-ink);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
   font-size: var(--text-xs);
   font-weight: 600;
   line-height: 18px;
   white-space: nowrap;
 }
 .danger {
-  color: var(--color-danger);
-  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  background: var(--color-danger);
+  color: var(--color-accent-text);
 }
 .warning {
   color: var(--color-warning);
-  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  background: color-mix(in srgb, var(--color-warning) 12%, var(--color-surface-raised));
 }
 .info {
-  color: var(--color-info);
+  background: var(--color-info);
+  color: var(--color-accent-text);
 }
 .muted {
   color: var(--color-text-muted);
+  border-style: dashed;
 }
 .accent {
   color: var(--color-accent);
+  border-color: var(--color-accent);
 }

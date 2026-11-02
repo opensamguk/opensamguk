@@ -1,8 +1,8 @@
 {
   "name": "초보",
   "turnTermMinutes": 30,
-  "scenario": "1030",
-  "map": "che",
+  "scenario": "san10-191",
+  "map": "san10",
   "unitSet": "basic",
   "commands": null,
   "npc": {

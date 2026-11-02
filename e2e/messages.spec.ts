@@ -60,7 +60,7 @@ async function openMessages(user: T210User, world: T210World) {
 
 async function openMain(user: T210User, world: T210World) {
   await user.page.goto(`/w/${world.id}`);
-  await expect(user.page.getByRole('heading', { level: 1, name: '메인' })).toBeVisible();
+  await expect(user.page.getByRole('heading', { level: 1, name: '군략도' })).toBeVisible();
   await expectOpen(user.page);
 }
 
@@ -485,7 +485,7 @@ test.describe('메시지와 실시간 갱신', () => {
 
     const fetched = b.page.waitForResponse(isCall('notice.nation.get'));
     await b.page.reload();
-    await expect(b.page.getByRole('heading', { level: 1, name: '메인' })).toBeVisible();
+    await expect(b.page.getByRole('heading', { level: 1, name: '군략도' })).toBeVisible();
     expect(await trpcResult(await fetched, 'notice.nation.get')).toMatchObject({ unseen: false });
     await expect(popup).toHaveCount(0);
   });

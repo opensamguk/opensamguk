@@ -22,9 +22,9 @@
 .select {
   min-height: 28px;
   padding: 0 var(--space-2);
-  border: 1px solid var(--color-border-strong);
+  border: 2px solid var(--color-ink);
   border-radius: var(--radius);
-  background: var(--color-surface);
+  background: var(--color-surface-raised);
   color: var(--color-text);
   font: inherit;
 }

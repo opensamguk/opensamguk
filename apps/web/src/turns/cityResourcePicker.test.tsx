@@ -60,15 +60,16 @@ it('INT-18C AC-INT-18C 도시 훈련 선택은 target city를 보내며 부곡 �
   );
   fireEvent.click(screen.getByRole('radio', { name: '훈련' }));
   fireEvent.change(screen.getByRole('combobox', { name: '훈련·사기 대상' }), { target: { value: 'city' } });
-  fireEvent.change(screen.getByRole('spinbutton', { name: '병종 번호' }), { target: { value: '1100' } });
+  expect((screen.getByRole('combobox', { name: '병종' }) as HTMLSelectElement).value).toBe('1100');
+  fireEvent.change(screen.getByRole('combobox', { name: '병종' }), { target: { value: '1200' } });
   fireEvent.click(screen.getByRole('button', { name: '선택에 넣기' }));
   expect(onPut).toHaveBeenLastCalledWith({
     commandKey: 'train',
-    args: { crewType: 1100, target: 'city' },
+    args: { crewType: 1200, target: 'city' },
     explicit: true,
   });
   fireEvent.change(screen.getByRole('combobox', { name: '훈련·사기 대상' }), { target: { value: 'unit' } });
-  expect(screen.queryByRole('spinbutton', { name: '병종 번호' })).toBeNull();
+  expect(screen.queryByRole('combobox', { name: '병종' })).toBeNull();
   fireEvent.change(screen.getByRole('spinbutton', { name: '부곡 번호' }), { target: { value: '7' } });
   fireEvent.click(screen.getByRole('button', { name: '선택에 넣기' }));
   expect(onPut).toHaveBeenLastCalledWith({ commandKey: 'train', args: { unitId: 7 }, explicit: true });

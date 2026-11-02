@@ -13,6 +13,7 @@ import { canExecuteNationCommand } from '../personnel/permissions';
 import type { OfficeRevisions } from '../personnel/offices';
 import { assertTick, PersonnelInvariantError, type ClosedOffer, type PersonnelLog } from '../personnel/types';
 import { canExecuteCityNationCommand } from '../cityResources/commands';
+import { takeCampaignOrder, finishCampaignOrder } from '../campaign/orders';
 
 export type PersonnelTurnInput = Readonly<{ offices: DeepReadonly<OfficeRevisions> }>;
 export type PersonnelTurnChange = Readonly<{
@@ -26,7 +27,7 @@ export function runGeneralTurn(
   actor: Actor,
   command: { commandKey: string; args: unknown; explicit?: boolean },
   seed: string,
-  options: Pick<NpcContext, 'convergence'> & { policy?: PolicyKey } = {},
+  options: Pick<NpcContext, 'convergence'> & { policy?: PolicyKey; turnRevision?: number } = {},
   resolver?: CommandResolver,
   personnel?: PersonnelTurnInput,
 ): {
@@ -133,8 +134,10 @@ export function runGeneralTurn(
     }
     nation = { commandKey: slot.commandKey, result, nationId };
   }
-  let selected = command;
-  if (general.userId !== null && command.explicit === false && options.policy !== undefined) {
+  const instructed = takeCampaignOrder(next, actor.generalId, options.turnRevision, command, actor.tick ?? 0);
+  next = instructed.state as WorldState;
+  let selected = instructed.order ? { ...instructed.order.command, explicit: true } : command;
+  if (!instructed.order && general.userId !== null && command.explicit === false && options.policy !== undefined) {
     const policy = runPolicyCommand(next, { ...actor, target: 'general' }, options.policy, seed, resolver);
     next = applyEffects(next, policy.result.effects);
     return {
@@ -146,6 +149,7 @@ export function runGeneralTurn(
     };
   }
   if (
+    !instructed.order &&
     general.userId === null &&
     command.commandKey === 'rest' &&
     commandRegistry.get('rest')!.args.safeParse(command.args).success
@@ -160,12 +164,22 @@ export function runGeneralTurn(
   }
   const result = run(
     next,
-    { ...actor, target: 'general' },
+    { ...actor, target: 'general', ...(instructed.order ? { campaignOrderId: instructed.order.id } : {}) },
     selected.commandKey,
     selected.args,
     rngFor(seed, 'turn', actor.tick ?? 0, actor.generalId),
   );
   next = applyEffects(next, 'code' in result ? [] : result.effects);
+  if (instructed.order)
+    next = finishCampaignOrder(
+      next,
+      instructed.order.id,
+      actor.tick ?? 0,
+      'code' in result,
+      'code' in result
+        ? `${result.code}: ${result.message}`
+        : result.logs.map((log) => log.text).join('\n') || '명령을 실행했습니다.',
+    );
   return {
     state: next,
     result,

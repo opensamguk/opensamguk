@@ -1,0 +1,170 @@
+﻿id,from,to,fromName,toName,mode,status,enabled,waterfrontReferences,note
+R01.1,S059,S001,주천,무위,LAND,OBSERVED,True,,서북부 도로와 황하 북쪽 접근로
+R01.2,S001,S002,무위,서평,LAND,OBSERVED,True,,서북부 도로와 황하 북쪽 접근로
+R01.3,S002,S060,서평,적도,LAND,OBSERVED,True,,서북부 도로와 황하 북쪽 접근로
+R02.1,S061,S003,남안,천수,LAND,OBSERVED,True,,황하 남쪽 산길과 가정·안정 계곡
+R02.2,S003,S063,천수,가정,LAND,OBSERVED,True,,황하 남쪽 산길과 가정·안정 계곡
+R02.3,S063,S004,가정,안정,LAND,OBSERVED,True,,황하 남쪽 산길과 가정·안정 계곡
+R03.1,S003,S062,천수,기산,LAND,OBSERVED,True,,산기슭 남쪽 도로와 양평관
+R03.2,S062,S005,기산,무도,LAND,OBSERVED,True,,산기슭 남쪽 도로와 양평관
+R03.3,S005,S053,무도,양평관,LAND,OBSERVED,True,,산기슭 남쪽 도로와 양평관
+R03.4,S053,S006,양평관,한중,LAND,OBSERVED,True,,산기슭 남쪽 도로와 양평관
+R04.1,S003,S064,천수,진창,LAND,OBSERVED,True,,천수 동쪽 계곡·관중 동쪽 강변·낙양 동쪽 도로
+R04.2,S064,S065,진창,오장원,LAND,OBSERVED,True,,천수 동쪽 계곡·관중 동쪽 강변·낙양 동쪽 도로
+R04.3,S065,S007,오장원,장안,LAND,OBSERVED,True,,천수 동쪽 계곡·관중 동쪽 강변·낙양 동쪽 도로
+R04.4,S007,S066,장안,화산,LAND,OBSERVED,True,,천수 동쪽 계곡·관중 동쪽 강변·낙양 동쪽 도로
+R04.5,S066,S054,화산,동관,LAND,OBSERVED,True,,천수 동쪽 계곡·관중 동쪽 강변·낙양 동쪽 도로
+R04.6,S054,S055,동관,함곡관,LAND,OBSERVED,True,,천수 동쪽 계곡·관중 동쪽 강변·낙양 동쪽 도로
+R04.7,S055,S024,함곡관,낙양,LAND,OBSERVED,True,,천수 동쪽 계곡·관중 동쪽 강변·낙양 동쪽 도로
+R04.8,S024,S057,낙양,호로관,LAND,OBSERVED,True,,천수 동쪽 계곡·관중 동쪽 강변·낙양 동쪽 도로
+R04.9,S057,S092,호로관,관도,LAND,OBSERVED,True,,천수 동쪽 계곡·관중 동쪽 강변·낙양 동쪽 도로
+R05.1,S005,S064,무도,진창,LAND,OBSERVED,True,,무도 북동쪽 계곡
+R06.1,S065,S006,오장원,한중,LAND,CONFIRMED,True,,2026-10-29 사용자 확대 검토: 1번 오장원–한중 연결 확정
+R07.1,S053,S052,양평관,검각,LAND,OBSERVED,True,,서쪽 관문 회랑
+R07.2,S052,S051,검각,면죽관,LAND,OBSERVED,True,,서쪽 관문 회랑
+R07.3,S051,S009,면죽관,성도,LAND,OBSERVED,True,,서쪽 관문 회랑
+R08.1,S052,S008,검각,자동,LAND,OBSERVED,True,,검각 남동쪽의 자동 경유 갈래. 면죽관을 잇는 서쪽 갈래와 구분
+R08.2,S008,S009,자동,성도,LAND,OBSERVED,True,,검각 남동쪽의 자동 경유 갈래. 면죽관을 잇는 서쪽 갈래와 구분
+R09.1,S051,S008,면죽관,자동,LAND,OBSERVED,True,,면죽관 남동쪽 평지 갈래
+R10.1,S006,S067,한중,서성,LAND,OBSERVED,True,,한중 동쪽 산길과 한수 남쪽 길
+R10.2,S067,S012,서성,상용,LAND,OBSERVED,True,,한중 동쪽 산길과 한수 남쪽 길
+R10.3,S012,S068,상용,방릉,LAND,OBSERVED,True,,한중 동쪽 산길과 한수 남쪽 길
+R10.4,S068,S039,방릉,양양,LAND,OBSERVED,True,,한중 동쪽 산길과 한수 남쪽 길
+R12.1,S009,S069,성도,한가,LAND,OBSERVED,True,,촉 서남쪽 산길과 장강 북쪽 접근로
+R12.2,S069,S072,한가,월수,LAND,OBSERVED,True,,촉 서남쪽 산길과 장강 북쪽 접근로
+R12.3,S072,S070,월수,강양,LAND,OBSERVED,True,,촉 서남쪽 산길과 장강 북쪽 접근로
+R12.4,S070,S010,강양,강주,LAND,OBSERVED,True,,촉 서남쪽 산길과 장강 북쪽 접근로
+R12.5,S010,S071,강주,임강,LAND,OBSERVED,True,,촉 서남쪽 산길과 장강 북쪽 접근로
+R12.6,S071,S011,임강,영안,LAND,OBSERVED,True,,촉 서남쪽 산길과 장강 북쪽 접근로
+R12.7,S011,S104,영안,이릉,LAND,OBSERVED,True,,촉 서남쪽 산길과 장강 북쪽 접근로
+R13.1,S009,S070,성도,강양,LAND,OBSERVED,True,,성도 남쪽 굽은 도로
+R14.1,S073,S047,주제,건녕,LAND,OBSERVED,True,,주제 남쪽 계곡과 남중 동서 도로
+R14.2,S047,S048,건녕,운남,LAND,OBSERVED,True,,주제 남쪽 계곡과 남중 동서 도로
+R14.3,S048,S076,운남,사룡,LAND,OBSERVED,True,,주제 남쪽 계곡과 남중 동서 도로
+R14.4,S076,S049,사룡,영창,LAND,OBSERVED,True,,주제 남쪽 계곡과 남중 동서 도로
+R14.5,S049,S075,영창,애뢰,LAND,OBSERVED,True,,주제 남쪽 계곡과 남중 동서 도로
+R15.1,S072,S074,월수,노수,BRIDGE,OBSERVED,True,W20,월수 남서쪽 좁은 물길 위 목제 연결
+R16.1,S074,S048,노수,운남,LAND,OBSERVED,True,,노수 동남쪽 도로
+R17.1,S074,S049,노수,영창,LAND,OBSERVED,True,,노수 서남쪽으로 돌아 영창 북쪽에 닿는 길
+R18.1,S047,S077,건녕,흥고,LAND,OBSERVED,True,,남중 남쪽에서 교지·합포로 이어지는 긴 계곡 도로
+R18.2,S077,S050,흥고,교지,LAND,OBSERVED,True,,남중 남쪽에서 교지·합포로 이어지는 긴 계곡 도로
+R18.3,S050,S078,교지,합포,LAND,OBSERVED,True,,남중 남쪽에서 교지·합포로 이어지는 긴 계곡 도로
+R19.1,S048,S077,운남,흥고,LAND,OBSERVED,True,,운남 남동쪽 갈래
+R20.1,S119,S046,창오,남해,LAND,OBSERVED,True,,남해 북쪽과 계양·임하의 산길
+R20.2,S046,S118,남해,곡강,LAND,OBSERVED,True,,남해 북쪽과 계양·임하의 산길
+R20.3,S118,S045,곡강,계양,LAND,OBSERVED,True,,남해 북쪽과 계양·임하의 산길
+R20.4,S045,S117,계양,임하,LAND,OBSERVED,True,,남해 북쪽과 계양·임하의 산길
+R20.5,S117,S044,임하,영릉,LAND,OBSERVED,True,,남해 북쪽과 계양·임하의 산길
+R21.1,S045,S116,계양,형산,LAND,OBSERVED,True,,형산 북쪽 길과 무릉·영릉 사이 계곡
+R21.2,S116,S043,형산,장사,LAND,OBSERVED,True,,형산 북쪽 길과 무릉·영릉 사이 계곡
+R21.3,S043,S042,장사,무릉,LAND,OBSERVED,True,,형산 북쪽 길과 무릉·영릉 사이 계곡
+R21.4,S042,S044,무릉,영릉,LAND,OBSERVED,True,,형산 북쪽 길과 무릉·영릉 사이 계곡
+R22.1,S117,S119,임하,창오,LAND,OBSERVED,True,,임하 남쪽 계곡
+R23.1,S116,S044,형산,영릉,LAND,OBSERVED,True,,형산 서남쪽 갈래
+R24.1,S043,S110,장사,남창,LAND,OBSERVED,True,,장사 동쪽 산남 도로와 시상·서새산 접근로
+R24.2,S110,S036,남창,시상,LAND,OBSERVED,True,,장사 동쪽 산남 도로와 시상·서새산 접근로
+R24.3,S036,S106,시상,서새산,LAND,OBSERVED,True,,장사 동쪽 산남 도로와 시상·서새산 접근로
+R25.1,S110,S035,남창,건안,LAND,OBSERVED,True,,강남 동쪽 산길과 동남 해안. 산길은 굽어 있으며 직선이 아니다
+R25.2,S035,S115,건안,임해,LAND,OBSERVED,True,,강남 동쪽 산길과 동남 해안. 산길은 굽어 있으며 직선이 아니다
+R25.3,S115,S034,임해,회계,LAND,OBSERVED,True,,강남 동쪽 산길과 동남 해안. 산길은 굽어 있으며 직선이 아니다
+R26.1,S043,S107,장사,적벽,LAND,OBSERVED,True,,장사 북서쪽 산을 돌아 적벽 남쪽으로 이어지는 길
+R27.1,S042,S108,무릉,공안,LAND,OBSERVED,True,,무릉 북쪽 강안 접근로
+R28.1,S040,S103,강릉,장판,LAND,OBSERVED,True,,강릉에서 장판을 지나 양양으로 이어지는 길
+R28.2,S103,S039,장판,양양,LAND,OBSERVED,True,,강릉에서 장판을 지나 양양으로 이어지는 길
+R29.1,S037,S038,완,신야,LAND,OBSERVED,True,,완 동남쪽과 신야 동쪽 평지 도로
+R29.2,S038,S098,신야,의양,LAND,OBSERVED,True,,완 동남쪽과 신야 동쪽 평지 도로
+R29.3,S098,S027,의양,여남,LAND,OBSERVED,True,,완 동남쪽과 신야 동쪽 평지 도로
+R30.1,S037,S099,완,번성,LAND,OBSERVED,True,,한수 북쪽의 번성 접근 갈래
+R30.2,S099,S038,번성,신야,LAND,OBSERVED,True,,한수 북쪽의 번성 접근 갈래
+R31.1,S037,S097,완,노양,LAND,OBSERVED,True,,완 동쪽에서 노양을 거쳐 허창으로 오르는 길
+R31.2,S097,S026,노양,허창,LAND,OBSERVED,True,,완 동쪽에서 노양을 거쳐 허창으로 오르는 길
+R32.1,S056,S037,무관,완,LAND,OBSERVED,True,,무관 동쪽 협곡
+R33.1,S066,S056,화산,무관,LAND,OBSERVED,True,,관중 동남쪽 남행 갈래
+R34.1,S024,S094,낙양,숭산,LAND,OBSERVED,True,,중원·황하 남쪽·산동 해안의 도로
+R34.2,S094,S026,숭산,허창,LAND,OBSERVED,True,,중원·황하 남쪽·산동 해안의 도로
+R34.3,S026,S092,허창,관도,LAND,OBSERVED,True,,중원·황하 남쪽·산동 해안의 도로
+R34.4,S092,S090,관도,백마,LAND,OBSERVED,True,,중원·황하 남쪽·산동 해안의 도로
+R34.5,S090,S091,백마,정도,LAND,OBSERVED,True,,중원·황하 남쪽·산동 해안의 도로
+R34.6,S091,S022,정도,복양,LAND,OBSERVED,True,,중원·황하 남쪽·산동 해안의 도로
+R34.7,S022,S087,복양,태산,LAND,OBSERVED,True,,중원·황하 남쪽·산동 해안의 도로
+R34.8,S087,S086,태산,임치,LAND,OBSERVED,True,,중원·황하 남쪽·산동 해안의 도로
+R34.9,S086,S020,임치,북해,LAND,OBSERVED,True,,중원·황하 남쪽·산동 해안의 도로
+R34.10,S020,S088,북해,낭야,LAND,OBSERVED,True,,중원·황하 남쪽·산동 해안의 도로
+R34.11,S088,S029,낭야,하비,LAND,OBSERVED,True,,중원·황하 남쪽·산동 해안의 도로
+R35.1,S026,S025,허창,진류,LAND,OBSERVED,True,,허창·진류와 서주 북쪽 도로
+R35.2,S025,S091,진류,정도,LAND,OBSERVED,True,,허창·진류와 서주 북쪽 도로
+R35.3,S091,S028,정도,소패,LAND,OBSERVED,True,,허창·진류와 서주 북쪽 도로
+R35.4,S028,S093,소패,팽성,LAND,OBSERVED,True,,허창·진류와 서주 북쪽 도로
+R35.5,S093,S029,팽성,하비,LAND,OBSERVED,True,,허창·진류와 서주 북쪽 도로
+R36.1,S026,S095,허창,진,LAND,OBSERVED,True,,진·초를 지나는 평지와 장강 북서쪽 길
+R36.2,S095,S096,진,초,LAND,OBSERVED,True,,진·초를 지나는 평지와 장강 북서쪽 길
+R36.3,S096,S030,초,수춘,LAND,OBSERVED,True,,진·초를 지나는 평지와 장강 북서쪽 길
+R36.4,S030,S100,수춘,합비,LAND,OBSERVED,True,,진·초를 지나는 평지와 장강 북서쪽 길
+R36.5,S100,S101,합비,석정,LAND,OBSERVED,True,,진·초를 지나는 평지와 장강 북서쪽 길
+R36.6,S101,S031,석정,여강,LAND,OBSERVED,True,,진·초를 지나는 평지와 장강 북서쪽 길
+R36.7,S031,S109,여강,심양,LAND,OBSERVED,True,,진·초를 지나는 평지와 장강 북서쪽 길
+R37.1,S096,S028,초,소패,LAND,OBSERVED,True,,초 북동쪽에서 소패 서쪽으로 이어지는 갈래
+R38.1,S095,S027,진,여남,LAND,OBSERVED,True,,진 남동쪽으로 굽은 뒤 여남으로 이어지는 길
+R39.1,S028,S030,소패,수춘,LAND,OBSERVED,True,,소패 남쪽 회남 갈래
+R40.1,S098,S041,의양,강하,LAND,OBSERVED,True,,의양–여남 길의 남쪽 갈래에서 굽어 내려가는 강하 접근로를 추가 확대 확인
+R41.1,S041,S105,강하,화용,LAND,OBSERVED,True,,강하 서남쪽 강안 도로
+R42.1,S079,S080,구원,항산,LAND,OBSERVED,True,,북방 산지와 요동·낙랑 해안 회랑
+R42.2,S080,S015,항산,계,LAND,OBSERVED,True,,북방 산지와 요동·낙랑 해안 회랑
+R42.3,S015,S016,계,북평,LAND,OBSERVED,True,,북방 산지와 요동·낙랑 해안 회랑
+R42.4,S016,S081,북평,백랑산,LAND,OBSERVED,True,,북방 산지와 요동·낙랑 해안 회랑
+R42.5,S081,S017,백랑산,양평,LAND,OBSERVED,True,,북방 산지와 요동·낙랑 해안 회랑
+R42.6,S017,S082,양평,낙랑,LAND,OBSERVED,True,,북방 산지와 요동·낙랑 해안 회랑
+R43.1,S079,S013,구원,진양,LAND,OBSERVED,True,,진양 서북쪽 계곡과 상당·하동 길
+R43.2,S013,S014,진양,상당,LAND,OBSERVED,True,,진양 서북쪽 계곡과 상당·하동 길
+R43.3,S014,S089,상당,하동,LAND,OBSERVED,True,,진양 서북쪽 계곡과 상당·하동 길
+R44.1,S013,S084,진양,거록,LAND,OBSERVED,True,,거록 남쪽 산길과 하북 평지. 거록에서 역경으로 산을 직선 횡단하지 않는다
+R44.2,S084,S021,거록,업,LAND,OBSERVED,True,,거록 남쪽 산길과 하북 평지. 거록에서 역경으로 산을 직선 횡단하지 않는다
+R44.3,S021,S085,업,계교,LAND,OBSERVED,True,,거록 남쪽 산길과 하북 평지. 거록에서 역경으로 산을 직선 횡단하지 않는다
+R44.4,S085,S019,계교,평원,LAND,OBSERVED,True,,거록 남쪽 산길과 하북 평지. 거록에서 역경으로 산을 직선 횡단하지 않는다
+R44.5,S019,S018,평원,남피,LAND,OBSERVED,True,,거록 남쪽 산길과 하북 평지. 거록에서 역경으로 산을 직선 횡단하지 않는다
+R44.6,S018,S083,남피,역경,LAND,OBSERVED,True,,거록 남쪽 산길과 하북 평지. 거록에서 역경으로 산을 직선 횡단하지 않는다
+R44.7,S083,S015,역경,계,LAND,OBSERVED,True,,거록 남쪽 산길과 하북 평지. 거록에서 역경으로 산을 직선 횡단하지 않는다
+R45.1,S014,S021,상당,업,LAND,OBSERVED,True,,상당 동쪽 갈래
+R46.1,S014,S058,상당,호관,LAND,OBSERVED,True,,상당 남쪽·호관을 통과하는 길
+R46.2,S058,S023,호관,하내,LAND,OBSERVED,True,,상당 남쪽·호관을 통과하는 길
+R47.1,S058,S021,호관,업,LAND,OBSERVED,True,,호관 북동쪽 길과 하북 평지 갈래
+R48.1,S023,S021,하내,업,LAND,OBSERVED,True,,하내 북동쪽에서 북안 나루 접근로와 업 서쪽 길로 이어지는 갈래를 추가 확대 확인
+R49.1,S111,S112,회음,광릉,LAND,OBSERVED,True,,회음 동쪽·광릉 서쪽 육지 길
+R50.1,S032,S113,건업,경구,LAND,OBSERVED,True,,장강 남쪽 도시 사이 도로
+R50.2,S113,S033,경구,오,LAND,OBSERVED,True,,장강 남쪽 도시 사이 도로
+R51.1,S032,S114,건업,부춘,LAND,OBSERVED,True,,건업 동남쪽의 굽은 길
+R53.1,S006,S007,한중,장안,LAND,OBSERVED,True,,한중 동쪽에서 절벽 동편을 돌아 장안 남쪽으로 오르는 굽은 길. 오장원을 직선으로 잇지 않는다
+F01.1,S060,S061,적도,남안,FERRY,OBSERVED,True,W01,같은 나루 묶음의 양안 잔교를 따른다
+F02.1,S019,S087,평원,태산,FERRY,OBSERVED,True,W02,평원 쪽 강안과 태산 서쪽 잔교의 건넘
+F03.1,S089,S055,하동,함곡관,WATER,CONFIRMED,True,W03,2026-10-29 사용자 확대 검토: 4번 하동–함곡관 연결 확정. 기존 수로 분류 유지
+F04.1,S021,S090,업,백마,FERRY,OBSERVED,True,W04,업 쪽 북안 접근로와 백마 쪽 남안 잔교
+F05.1,S029,S111,하비,회음,FERRY,OBSERVED,True,"W05,W06",하비 남쪽 잔교와 회음 쪽 잔교
+F06.1,S030,S111,수춘,회음,WATER,OBSERVED,True,W06,수춘 성 수변과 회음 쪽 잔교가 이어진 물길. 육로로 분류하지 않는다
+F07.1,S112,S113,광릉,경구,FERRY,OBSERVED,True,"W07,W09",양안 잔교와 그 사이 물길
+F08.1,S101,S102,석정,유수구,FERRY,OBSERVED,True,W08,석정 쪽 육지에서 유수구 쪽으로 건너는 갈래
+F09.1,S102,S032,유수구,건업,WATER,OBSERVED,True,W08,유수구 동쪽 잔교에서 건업 수변으로 이어진 물길. 육로로 분류하지 않는다
+F10.1,S114,S034,부춘,회계,FERRY,OBSERVED,True,W10,부춘 잔교와 회계 쪽 강안 사이 물길
+F11.1,S099,S039,번성,양양,FERRY,OBSERVED,True,W11,번성 쪽 잔교와 양양 북쪽 강안
+F12.1,S104,S040,이릉,강릉,FERRY,OBSERVED,True,"W12,W13",양쪽 잔교 사이의 건넘
+F13.1,S105,S107,화용,적벽,FERRY,OBSERVED,True,"W14,W15",화용 쪽과 적벽 쪽 잔교 사이
+F14.1,S106,S109,서새산,심양,FERRY,OBSERVED,True,"W16,W17",서새산 쪽과 심양 쪽의 양안 연결
+F15.1,S040,S108,강릉,공안,FERRY,OBSERVED,True,W18,강릉 쪽 수변에서 공안 쪽 잔교로 건넘
+F16.1,S070,S073,강양,주제,FERRY,OBSERVED,True,W19,강양 남쪽 양안 잔교
+F17.1,S078,S119,합포,창오,FERRY,OBSERVED,True,W21,합포 동쪽 길에서 양안 잔교를 지나 창오로 이어짐
+F18.1,S031,S102,여강,유수구,WATER,OBSERVED,True,W08,여강 성 수변과 유수구 쪽 잔교가 이어진 물길. 육로로 분류하지 않는다
+P01.1,S120,S001,강,무위,LAND,PROPOSED,False,,지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다.
+P02.1,S120,S060,강,적도,LAND,PROPOSED,False,,지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다.
+P03.1,S121,S081,오환,백랑산,LAND,PROPOSED,False,,지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다.
+P04.1,S122,S049,남만,영창,LAND,PROPOSED,False,,지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다.
+P05.1,S122,S048,남만,운남,LAND,PROPOSED,False,,지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다.
+P06.1,S123,S035,산월,건안,LAND,PROPOSED,False,,지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다.
+P07.1,S123,S034,산월,회계,LAND,PROPOSED,False,,지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다.
+P08.1,S124,S079,선비,구원,LAND,PROPOSED,False,,지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다.
+P09.1,S124,S121,선비,오환,LAND,PROPOSED,False,,지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다.
+P10.1,S125,S079,흉노,구원,LAND,PROPOSED,False,,지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다.
+P11.1,S125,S013,흉노,진양,LAND,PROPOSED,False,,지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다.
+P12.1,S126,S001,저,무위,LAND,PROPOSED,False,,지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다.
+P13.1,S126,S003,저,천수,LAND,PROPOSED,False,,지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다.
+P14.1,S126,S063,저,가정,LAND,PROPOSED,False,,지역 대표 거점의 게임 연결 제안. 원본의 연속 도로를 판독한 연결이 아니며 검토 전이다.
+R11.1,S012,S011,상용,영안,LAND,REJECTED,False,,2026-10-29 사용자 확대 검토: 2번 상용–영안 직접 연결 아님
+R52.1,S113,S114,경구,부춘,LAND,REJECTED,False,,2026-10-29 사용자 확대 검토: 3번 경구–부춘 직접 연결 아님

@@ -104,7 +104,7 @@ export async function formalSanctionWorlds(stack: LegalStack, page: Page, userId
         .poll(() => stack.db.inputEvent.count({ where: { worldId, kind: 'general.create', status: 'PENDING' } }))
         .toBe(1);
       await new TurnLoop(hold.db, hold.lease).advanceTo(0);
-      await expect(page.getByRole('heading', { name: '메인', exact: true })).toBeVisible();
+      await expect(page.getByRole('heading', { name: '군략도', exact: true })).toBeVisible();
       const human = await stack.db.general.findUniqueOrThrow({ where: { worldId_userId: { worldId, userId } } });
       expect(await stack.db.generalTurn.count({ where: { worldId, generalId: human.id } })).toBe(30);
       expect(await stack.db.general.count({ where: { worldId, userId: null } })).toBe(491);

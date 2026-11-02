@@ -1,0 +1,41 @@
+{
+  "note": "Derived only from Natural Earth (public domain): the shipped v5.1.2 vectors and Natural Earth II relief.",
+  "script": "tools/map-data/build-pixel-basemap.py",
+  "sources": [
+    {
+      "file": "apps/web/src/mapEditor/geodata/natural-earth.json",
+      "sha256": "7aebb196cd19b2edf936cc5d6ef401d5582e0cb5662f5521b9016930d84da11e"
+    },
+    {
+      "file": "apps/web/src/mapEditor/geodata/natural-earth-relief.webp",
+      "sha256": "0ea160d2cb9d64fb5bed696a93c4cdf118607d4e0df5653d66fd0051bfc5a794"
+    }
+  ],
+  "grid": {
+    "width": 500,
+    "height": 350,
+    "viewBoxUnitsPerPixel": 2
+  },
+  "palette": {
+    "deepSea": "#2b4a6b",
+    "sea": "#3a6584",
+    "shallow": "#5d8ea6",
+    "lake": "#6fa3b5",
+    "river": "#4f86a3",
+    "plains": "#b9bf86",
+    "farmland": "#a8b673",
+    "grassland": "#8fa865",
+    "forest": "#5f8a52",
+    "loess": "#cdb27a",
+    "desert": "#dccb9c",
+    "hills": "#9c8d60",
+    "mountains": "#7d6a4c",
+    "highMountains": "#5f5140",
+    "snow": "#ebe6d6",
+    "coastSand": "#d9c79a"
+  },
+  "output": {
+    "file": "apps/web/src/main/pixel-basemap.png",
+    "sha256": "36e138c386791644b84f847030b346a1d8797631be4cdea380c33d58cbd53eb3"
+  }
+}

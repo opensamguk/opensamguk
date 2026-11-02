@@ -18,6 +18,7 @@ import { authzCase } from '../apps/server/src/authz/case';
 import { categories } from '../apps/server/src/authz/coverage';
 import { initializeResources } from './init-resources';
 import { initializeIntegrationResources } from './integration-resources';
+import { initializeSan10Resources } from './san10-resources';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
@@ -458,6 +459,7 @@ beforeAll(
           ),
         );
         await checked(async () => initializeIntegrationResources(db));
+        await checked(async () => initializeSan10Resources(db));
         passwordHash = await checked(async () => hashPassword(randomUUID()));
         secrets.add(passwordHash);
         address = await checked(async () => start());
@@ -1233,8 +1235,8 @@ it('AC-M3-04 프리셋만 지정한 요청도 검증된 기존 기본 자원을 
     world = await db.world.findUniqueOrThrow({ where: { id: current.worldId! } });
   expect([world.status, world.scenarioKey, world.mapKey, world.presetKey, world.turnTermMinutes]).toEqual([
     'PREOPEN',
-    '1030',
-    'che',
+    'san10-191',
+    'san10',
     'regular',
     60,
   ]);

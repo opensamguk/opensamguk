@@ -5,6 +5,7 @@ import {
   campaignUnitInputSchema,
   campaignRelationshipResultSchema,
   campaignUnitResultSchema,
+  campaignOrderResultSchema,
   validateCampaignRecord,
   FIVE_STAT_KEYS,
   fiveStatsSchema,
@@ -20,11 +21,15 @@ import { z } from 'zod';
 import type { Context } from '../context';
 import { requirePersonnelSession } from './personnelAdmission';
 import { readView, requireGeneral, requireRuleFeature, requireWorld } from './queries';
+import { requireCampaignOrderAccess } from './campaignOrders';
 
-type ActorContext = Pick<Context, 'db' | 'sessionId' | 'now'> & { user: { id: string } };
+type ActorContext = Pick<
+  Context,
+  'db' | 'sessionId' | 'now' | 'emailVerificationRequired' | 'legalPolicy' | 'legalPolicyRequired'
+> & { user: { id: string } };
 type Kind = 'campaign.relationship' | 'campaign.unit';
 type Event = Prisma.InputEventGetPayload<Record<string, never>>;
-const kinds: Kind[] = ['campaign.relationship', 'campaign.unit'];
+const kinds = ['campaign.relationship', 'campaign.unit', 'campaign.order'];
 function identity(ctx: ActorContext, started: number) {
   return { userId: ctx.user.id, sessionId: ctx.sessionId ?? '', at: new Date(ctx.now + performance.now() - started) };
 }
@@ -51,19 +56,26 @@ function requestDto(event: Event) {
     result: event.result,
   });
   return event.status === 'APPLIED'
-    ? event.kind === 'campaign.relationship'
+    ? event.kind === 'campaign.order'
       ? {
           requestId,
-          kind: 'campaign.relationship' as const,
+          kind: 'campaign.order' as const,
           status: 'applied' as const,
-          result: campaignRelationshipResultSchema.parse(event.result),
+          result: campaignOrderResultSchema.parse(event.result),
         }
-      : {
-          requestId,
-          kind: 'campaign.unit' as const,
-          status: 'applied' as const,
-          result: campaignUnitResultSchema.parse(event.result),
-        }
+      : event.kind === 'campaign.relationship'
+        ? {
+            requestId,
+            kind: 'campaign.relationship' as const,
+            status: 'applied' as const,
+            result: campaignRelationshipResultSchema.parse(event.result),
+          }
+        : {
+            requestId,
+            kind: 'campaign.unit' as const,
+            status: 'applied' as const,
+            result: campaignUnitResultSchema.parse(event.result),
+          }
     : {
         requestId,
         kind: event.kind,
@@ -88,6 +100,10 @@ export async function readCampaignRequest(ctx: ActorContext, worldId: string, re
       });
       if (!event || !kinds.includes(event.kind as Kind))
         throw new TRPCError({ code: 'NOT_FOUND', message: '휘하 요청이 없습니다.' });
+      if (event.kind === 'campaign.order') {
+        await requireCampaignOrderAccess(tx, ctx, worldId);
+        return { ...requestDto(event), userId: ctx.user.id };
+      }
       return requestDto(event);
     },
     { isolationLevel: 'RepeatableRead' },
@@ -97,11 +113,17 @@ export async function readCampaignRequest(ctx: ActorContext, worldId: string, re
 // 접수와 활동 입력만 저장한다. 소유권·명망·비용·RNG·실제 지휘 상한은 엔진이 다시 검사한다.
 export async function submitCampaignRequest(
   ctx: ActorContext,
-  input: { worldId: string; requestId: string; kind: Kind; payload: unknown },
+  input: { worldId: string; requestId: string; kind: Kind; payload: unknown; expectedUserId?: string | undefined },
 ) {
   const started = performance.now();
   await ctx.db.$transaction(async (tx) => {
     await requirePersonnelSession(tx, identity(ctx, started));
+    if (
+      input.kind === 'campaign.relationship' &&
+      input.expectedUserId !== undefined &&
+      input.expectedUserId !== ctx.user.id
+    )
+      throw new TRPCError({ code: 'FORBIDDEN', message: '로그인한 계정이 바뀌었습니다. 화면을 다시 확인하세요.' });
     const world = await requireWorld(tx, input.worldId, true);
     ready(world);
     const schema = input.kind === 'campaign.relationship' ? campaignRelationshipInputSchema : campaignUnitInputSchema;

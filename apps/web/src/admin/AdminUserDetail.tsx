@@ -138,6 +138,38 @@ export function AdminUserDetail({
               ))}
             </ul>
           )}
+          <h4>최근 로그인 기록</h4>
+          <p>
+            최근90일 중 최대50건을 최근 시각순으로 표시합니다. 가입·로그인 시도 기록이며 보존 정책의 승인을 뜻하지
+            않습니다.
+          </p>
+          {Array.isArray(data.recentLogins) &&
+          data.recentLogins.every(
+            (record) =>
+              record !== null &&
+              typeof record.success === 'boolean' &&
+              Number.isFinite(Date.parse(record.at)) &&
+              /^[0-9a-f]{8}$/.test(record.ipLabel) &&
+              (record.deviceLabel === null || /^[0-9a-f]{8}$/.test(record.deviceLabel)),
+          ) ? (
+            data.recentLogins.length === 0 ? (
+              <p>조회 범위의 로그인 기록이 없습니다.</p>
+            ) : (
+              <ul className={styles.userHistory} aria-label="최근 로그인 기록 목록">
+                {data.recentLogins.map((record, index) => (
+                  <li key={index}>
+                    <Time value={record.at} /> · {record.success ? '성공' : '실패'}
+                    <p>
+                      IP 가림 이름 <code>{record.ipLabel}</code>
+                    </p>
+                    <p>기기 가림 이름 {record.deviceLabel ? <code>{record.deviceLabel}</code> : '기록 없음'}</p>
+                  </li>
+                ))}
+              </ul>
+            )
+          ) : (
+            <ErrorState title="로그인 기록 형식을 확인하지 못했습니다. 다시 조회하세요." />
+          )}
         </>
       ) : null}
     </section>

@@ -2,7 +2,12 @@ import type { Prisma, PrismaClient } from '@opensamguk/db';
 import { checkRuleFeatures, worldCreateIntentSchema, type WorldCreateRejectCode } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { databaseNow } from '../lease';
-import { composeInitialWorld, readInitialResources, loadPreset } from '../world/resources';
+import {
+  composeInitialWorld,
+  readInitialResources,
+  loadPreset,
+  resolveWorldResourceSelection,
+} from '../world/resources';
 import { prepareInitialWorld, savePreparedInitialWorld } from '../world/persistence';
 
 type Request = Prisma.WorldCreateRequestGetPayload<Record<string, never>>;
@@ -43,13 +48,13 @@ async function resolveCreation(db: PrismaClient, request: Request) {
     map = intent.mapKey ?? preset?.map;
   const turnTermMinutes = intent.turnTermMinutes ?? preset?.turnTermMinutes;
   if (!scenario || !map || turnTermMinutes === undefined) throw new CreationRejected('INPUT_INVALID');
-  const selection = {
+  const selection = resolveWorldResourceSelection({
     scenario,
     map,
     unitSet: intent.unitSetKey ?? preset?.unitSet ?? 'basic',
-    statRules: intent.statRulesKey ?? 'default',
-    portraitMap: intent.portraitMapKey ?? 'rtk14-map',
-  };
+    ...(intent.statRulesKey === null ? {} : { statRules: intent.statRulesKey }),
+    ...(intent.portraitMapKey === null ? {} : { portraitMap: intent.portraitMapKey }),
+  });
   let resources;
   try {
     resources = await readInitialResources(db, selection);

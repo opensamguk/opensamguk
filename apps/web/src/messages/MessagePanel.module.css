@@ -4,32 +4,37 @@
   gap: var(--space-2);
   min-height: 0;
 }
+/* 책갈피 탭 (INT-20): 먹 밑줄 위에 고른 탭만 한지 첩으로 올라선다. */
 .tabs {
   display: flex;
-  gap: var(--space-1);
-  border-bottom: 1px solid var(--color-border);
+  flex-wrap: wrap;
+  border-bottom: 2px solid var(--color-ink);
 }
 .tab {
   font: inherit;
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  padding: var(--space-1) var(--space-3);
-  border: 0;
-  border-bottom: 2px solid transparent;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  margin-bottom: -2px;
+  border: 2px solid transparent;
+  border-bottom: 0;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
 }
 .activeTab {
   color: var(--color-text);
-  border-bottom-color: var(--color-accent);
+  background: var(--color-surface);
+  border-color: var(--color-ink);
   font-weight: 600;
 }
 .count {
   min-width: 18px;
   padding: 0 var(--space-1);
-  border-radius: 9px;
+  border-radius: var(--radius);
   background: var(--color-accent);
   color: var(--color-accent-text);
   font-size: var(--text-xs);
@@ -58,6 +63,12 @@
   font: inherit;
   flex: 1;
   min-width: 0;
+  min-height: 36px;
+  padding: 0 var(--space-2);
+  border: 2px solid var(--color-ink);
+  border-radius: var(--radius);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
 }
 .counter {
   margin-left: auto;
@@ -68,9 +79,9 @@
   width: 100%;
   resize: vertical;
   padding: var(--space-2);
-  border: 1px solid var(--color-border-strong);
+  border: 2px solid var(--color-ink);
   border-radius: var(--radius);
-  background: var(--color-surface);
+  background: var(--color-surface-raised);
   color: var(--color-text);
 }
 .actions {
@@ -79,12 +90,21 @@
 }
 .primary {
   font: inherit;
-  padding: var(--space-1) var(--space-4);
-  border: 1px solid var(--color-accent);
+  font-weight: 500;
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  border: var(--frame);
   border-radius: var(--radius);
   background: var(--color-accent);
   color: var(--color-accent-text);
+  box-shadow: var(--shadow-button);
   cursor: pointer;
+}
+.primary:disabled {
+  border-style: dashed;
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 .note {
   margin: 0;
@@ -103,9 +123,10 @@
 }
 .notice {
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--color-ink);
+  border-left: 4px solid var(--color-accent);
   border-radius: var(--radius);
-  background: var(--color-surface-muted);
+  background: var(--color-surface-raised);
 }
 .listWrap {
   display: flex;
@@ -153,11 +174,13 @@
 .more {
   font: inherit;
   align-self: center;
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--color-border-strong);
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: var(--frame);
   border-radius: var(--radius);
-  background: transparent;
+  background: var(--color-surface);
   color: var(--color-text);
+  box-shadow: var(--shadow-button);
   cursor: pointer;
 }
 .end {
@@ -165,4 +188,20 @@
   text-align: center;
   font-size: var(--text-sm);
   color: var(--color-text-muted);
+}
+
+/* 좁은 화면에서는 누르는 대상을 44px로 키운다. */
+@media (max-width: 767px) {
+  .tab,
+  .primary,
+  .more,
+  .field select {
+    min-height: 44px;
+  }
+  .tab {
+    min-width: 44px;
+  }
+  .field select {
+    font-size: 16px;
+  }
 }

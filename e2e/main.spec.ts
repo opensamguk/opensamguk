@@ -50,7 +50,7 @@ test.beforeAll(async ({ browser }) => {
 
 async function openMain(page: Page, search = '') {
   await page.goto(`/w/${ctx.worldId}${search}`);
-  await expect(page.getByRole('heading', { level: 1, name: '메인' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: '군략도' })).toBeVisible();
   await expect(page.getByTestId('world-map').locator('[data-city-key]')).toHaveCount(94);
 }
 
@@ -422,7 +422,7 @@ test.describe('장수가 있는 계정', () => {
       await expect(nav).toHaveCount(1);
       await page.getByRole('button', { name: '로그아웃', exact: true }).focus();
       await page.keyboard.press('Tab');
-      await expect(nav.getByRole('link', { name: '메인', exact: true })).toBeFocused();
+      await expect(nav.getByRole('link', { name: '군략도', exact: true })).toBeFocused();
       if (width < 768) {
         const summary = nav.locator('summary');
         await summary.click();

@@ -133,7 +133,8 @@ jobs:
     name: opensamguk-database-engine
     if: github.event_name != 'workflow_dispatch' || inputs.load_expected_sha == ''
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    # INT-19 장수 지시 시나리오를 더해 약 20분이 걸린다.
+    timeout-minutes: 30
     env:
       CI: 'true'
       INTEGRATION_SUITE: engine
@@ -280,12 +281,30 @@ jobs:
       - name: Check city resources in public Chromium
         if: matrix.shard == 2
         run: pnpm e2e:city-resources --reporter=line
+      - name: Check admin investigation in Chromium
+        if: matrix.shard == 1
+        run: pnpm e2e:investigation --reporter=line
       - name: Check admin world clock actions in Chromium
         if: matrix.shard == 3
         run: pnpm e2e:admin-clock --reporter=line
       - name: Check admin world end actions in Chromium
         if: matrix.shard == 4
         run: pnpm e2e:admin-end --reporter=line
+      - name: Check SAN10 historic and empty maps in public Chromium
+        if: matrix.shard == 4
+        run: pnpm e2e:san10 --reporter=line
+      - name: Check campaign offer fresh reads in Chromium
+        if: matrix.shard == 2
+        run: pnpm e2e:campaign-offer --reporter=line
+      - name: Check admin world creation actions in Chromium
+        if: matrix.shard == 1
+        run: pnpm e2e:admin-create --reporter=line
+      - name: Check SAN10 administrator creation profiles in public Chromium
+        if: matrix.shard == 1
+        run: pnpm e2e:admin-create-profile --reporter=line
+      - name: Check admin world reset actions in Chromium
+        if: matrix.shard == 1
+        run: pnpm e2e:admin-reset --reporter=line
 
   formal-load:
     name: opensamguk-formal-load

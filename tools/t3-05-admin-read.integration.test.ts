@@ -532,6 +532,7 @@ it('상세 조회는 정식 두 월드의 사람 장수만 읽고 최신 제재5
     emailVerified: true,
     generalCount: 2,
     sanctionCount: 51,
+    recentLogins: [],
     generals: generals.map((general) => ({
       generalId: general.id,
       name: general.name,

@@ -14,6 +14,7 @@ import { MapLegend, WorldMap } from '../main/WorldMap';
 import { PolicyBar } from '../policy/PolicyBar';
 import { OfferBox } from '../personnel/OfferBox';
 import { CampaignPanel } from '../personnel/CampaignPanel';
+import { RetinueOrdersPanel } from '../personnel/RetinueOrdersPanel';
 import { TurnEditor } from '../turns/TurnEditor';
 import { EmptyState, LoadingState } from '../ui/States';
 import { useTRPC } from '../trpc';
@@ -76,7 +77,7 @@ export function MainPage() {
   return (
     <section className={styles.page} ref={page}>
       <header className={styles.header}>
-        <h1 className={styles.h1}>메인</h1>
+        <h1 className={styles.h1}>군략도</h1>
         {summary.data ? (
           <p className={styles.progress} aria-label="게임 진행 정보">
             <span>
@@ -207,6 +208,7 @@ export function MainPage() {
         </div>
       </div>
       {mine.data?.general && mine.data.creationRules.campaignEnabled ? <CampaignPanel worldId={worldId} /> : null}
+      {mine.data?.general && mine.data.creationRules.campaignEnabled ? <RetinueOrdersPanel worldId={worldId} /> : null}
     </section>
   );
 }

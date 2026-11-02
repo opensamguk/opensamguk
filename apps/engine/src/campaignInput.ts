@@ -2,6 +2,9 @@ import type { Prisma } from '@opensamguk/db';
 import {
   applyCampaignRelationship,
   applyCampaignUnitInput,
+  applyCampaignOrder,
+  resolverForRuleFeatures,
+  unitSetSchema,
   applyRecordedInput,
   type RecordedInput,
   type ReplayState,
@@ -9,6 +12,7 @@ import {
 import type { EngineWorld, QueuedInputHandler } from './features';
 import { loadReplayState } from './monthly';
 import { persistEffects } from './persist';
+import { databaseNow } from './lease';
 
 export async function processCampaignQueuedInput(
   tx: Parameters<QueuedInputHandler>[0],
@@ -21,6 +25,24 @@ export async function processCampaignQueuedInput(
   await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${event.userId} FOR SHARE`;
   const user = await tx.user.findUnique({ where: { id: event.userId } });
   if (!user || user.status !== 'ACTIVE') return reject('ACTOR_INACTIVE', '활성 계정이 아닙니다.');
+  if (event.kind === 'campaign.order') {
+    if (world.status !== 'RUNNING') return reject('WORLD_CLOSED', '실행 중인 월드가 아닙니다.');
+    const now = await databaseNow(tx);
+    if (
+      await tx.sanction.findFirst({
+        where: {
+          userId: event.userId,
+          liftedAt: null,
+          AND: [
+            { OR: [{ worldId: null }, { worldId: world.id }] },
+            { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+          ],
+        },
+        select: { id: true },
+      })
+    )
+      return reject('ACTOR_SANCTIONED', '이 월드의 이용이 제한됐습니다.');
+  }
   if (event.generalId === null) return reject('NO_GENERAL', '장수가 없습니다.');
   await tx.$queryRaw`SELECT id FROM "General" WHERE "worldId" = ${world.id} AND id = ${event.generalId} FOR UPDATE`;
   const before = await loadReplayState(tx, world.id);
@@ -33,7 +55,15 @@ export async function processCampaignQueuedInput(
             ...context,
             armyTypes: before.campaignArmyTypes!,
           })
-        : null;
+        : event.kind === 'campaign.order'
+          ? applyCampaignOrder(before.state, event.payload, event.generalId, {
+              ...context,
+              turns: before.turns,
+              revisions: before.revisions,
+              resolver: resolverForRuleFeatures(before.state)!,
+              unitSet: unitSetSchema.parse(world.unitSet),
+            })
+          : null;
   if (!outcome) throw new Error('휘하·부곡 입력 종류를 확인하세요.');
   if (!outcome.ok) return reject(outcome.code, outcome.message);
   await persistEffects(

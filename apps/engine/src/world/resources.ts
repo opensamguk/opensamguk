@@ -20,14 +20,26 @@ export async function loadPreset(key: string, root: URL = resourceRoot) {
   return parsePreset(JSON.parse(await readFile(new URL(`preset/${resourceKey(key)}.json`, root), 'utf8')));
 }
 
+// 새 지도 기본값을 생성·CLI·재생 원본 추론이 함께 쓴다. 명시한 판 선택은 그대로 유지한다.
+export function resolveWorldResourceSelection(options: WorldResourceSelection): Required<WorldResourceSelection> {
+  return {
+    scenario: resourceKey(options.scenario),
+    map: resourceKey(options.map),
+    unitSet: resourceKey(options.unitSet ?? 'basic'),
+    statRules: resourceKey(options.statRules ?? (options.map === 'san10' ? 'five-stats' : 'default')),
+    portraitMap: resourceKey(options.portraitMap ?? (options.map === 'san10' ? '191-map' : 'rtk14-map')),
+  };
+}
+
 export async function loadInitialWorld(options: WorldResourceSelection & { seed: string }, root: URL = resourceRoot) {
+  const selected = resolveWorldResourceSelection(options);
   const readJson = async (path: string): Promise<unknown> => JSON.parse(await readFile(new URL(path, root), 'utf8'));
   const [map, scenario, unitSet, statRules, portraitMap] = await Promise.all([
-    readJson(`map/${resourceKey(options.map)}.json`),
-    readJson(`scenario/${resourceKey(options.scenario)}.json`),
-    readJson(`unitset/${resourceKey(options.unitSet ?? 'basic')}.json`),
-    readJson(`scenario/${resourceKey(options.statRules ?? 'default')}.json`),
-    readJson(`portraits/${resourceKey(options.portraitMap ?? 'rtk14-map')}.json`),
+    readJson(`map/${selected.map}.json`),
+    readJson(`scenario/${selected.scenario}.json`),
+    readJson(`unitset/${selected.unitSet}.json`),
+    readJson(`scenario/${selected.statRules}.json`),
+    readJson(`portraits/${selected.portraitMap}.json`),
   ]);
   return buildInitialWorld({ map, scenario, unitSet, statRules, portraitMap, seed: options.seed });
 }
@@ -44,18 +56,14 @@ export async function readInitialResources(
   db: Parameters<typeof readPublishedResources>[0],
   options: WorldResourceSelection,
 ): Promise<InitialResources> {
-  resourceKey(options.scenario);
-  resourceKey(options.map);
-  resourceKey(options.unitSet ?? 'basic');
-  resourceKey(options.statRules ?? 'default');
-  resourceKey(options.portraitMap ?? 'rtk14-map');
+  const selected = resolveWorldResourceSelection(options);
   const { readPublishedResources } = await import('@opensamguk/db');
   const [map, scenario, unitSet, statRules, portraitMap] = await readPublishedResources(db, [
-    { kind: 'MAP', name: options.map, version: 1 },
-    { kind: 'SCENARIO', name: options.scenario, version: 1 },
-    { kind: 'UNIT_SET', name: options.unitSet ?? 'basic', version: 1 },
-    { kind: 'STAT_RULES', name: options.statRules ?? 'default', version: 1 },
-    { kind: 'PORTRAIT_MAP', name: options.portraitMap ?? 'rtk14-map', version: 1 },
+    { kind: 'MAP', name: selected.map, version: 1 },
+    { kind: 'SCENARIO', name: selected.scenario, version: 1 },
+    { kind: 'UNIT_SET', name: selected.unitSet, version: 1 },
+    { kind: 'STAT_RULES', name: selected.statRules, version: 1 },
+    { kind: 'PORTRAIT_MAP', name: selected.portraitMap, version: 1 },
   ]);
   return { map: map!, scenario: scenario!, unitSet: unitSet!, statRules: statRules!, portraitMap: portraitMap! };
 }

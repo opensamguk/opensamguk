@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomBytes, createHash, randomUUID } from 'node:crypto';
 import { request as httpRequest } from 'node:http';
 import { Writable } from 'node:stream';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -87,10 +87,21 @@ async function send(
 }
 async function withServer(
   fn: (base: string) => Promise<void>,
-  options: Partial<Parameters<typeof buildServer>[0]> = {},
+  options: Omit<Partial<Parameters<typeof buildServer>[0]>, 'publicOrigin'> & {
+    publicOrigin?: string | undefined;
+  } = {},
 ) {
   now = 1_800_000_000_001;
-  const app = await buildServer({ db, publicOrigin: origin, now: () => now, logStream, ...options });
+  const { publicOrigin, ...remaining } = options;
+  const serverOrigin = Object.hasOwn(options, 'publicOrigin') ? publicOrigin : origin;
+  const app = await buildServer({
+    db,
+    ...(serverOrigin === undefined ? {} : { publicOrigin: serverOrigin }),
+    now: () => now,
+    logStream,
+    ...(options.production ? { loginAudit: { key: randomBytes(32).toString('hex'), version: 1 } } : {}),
+    ...remaining,
+  });
   try {
     await fn(await app.listen({ host: '127.0.0.1', port: 0 }));
   } finally {

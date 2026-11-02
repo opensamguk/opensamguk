@@ -1,5 +1,40 @@
+/* 장수 생성 (INT-20 한지 군략도): 왼쪽 초상 첩, 오른쪽 이름·능력치 첩. */
 .page {
-  max-width: 640px;
+  max-width: 1040px;
+}
+
+.page h1 {
+  margin: 0;
+  font-size: var(--title-md);
+  line-height: 1.1;
+}
+
+/* 머리: 출사표 현판, 제목, 한 줄 안내 */
+.intro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.lead {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+/* 꾸밈 현판. 제목이 아니라 글자 띠다. */
+.plaque {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 6px 12px 5px;
+  font-family: var(--font-title);
+  font-size: var(--title-sm);
+  line-height: 1;
+  color: var(--color-accent-text);
+  background: var(--color-accent);
+  border: var(--frame);
 }
 
 .muted {
@@ -18,13 +53,23 @@
   gap: var(--space-1);
 }
 
+.field > label {
+  font-weight: 500;
+}
+
 .input {
+  min-width: 0;
+  min-height: 44px;
   font: inherit;
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--color-border-strong);
+  padding: 0 var(--space-3);
+  border: var(--frame);
   border-radius: var(--radius);
-  background: var(--color-surface);
+  background: var(--color-surface-raised);
   color: var(--color-text);
+}
+
+.field .input {
+  font-size: var(--text-xl);
 }
 
 .input[aria-invalid='true'] {
@@ -37,33 +82,78 @@
   color: var(--color-text-muted);
 }
 
+/* 첩: 먹 테두리, 금니 실선, 계단 그림자. 제목은 주칠 현판. */
 .stats,
 .portraits {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
   gap: var(--space-3);
+  min-width: 0;
   margin: 0;
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
+  padding: var(--space-4);
+  border: var(--frame);
   border-radius: var(--radius);
   background: var(--color-surface);
+  box-shadow: var(--frame-inset), var(--shadow-step);
 }
 
 .stats legend,
 .portraits legend {
-  padding: 0 var(--space-1);
-  font-weight: 600;
+  padding: 6px 12px 5px;
+  font-family: var(--font-title);
+  font-size: var(--title-sm);
+  line-height: 1;
+  color: var(--color-accent-text);
+  background: var(--color-accent);
+  border: var(--frame);
 }
 
 .stat {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  font-weight: 500;
+}
+
+.stat > label {
+  font-weight: 600;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.step {
+  width: 44px;
+  height: 44px;
+  font: inherit;
+  font-size: var(--text-xl);
+  line-height: 1;
+  border: var(--frame);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-button);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.step:disabled {
+  border-style: dashed;
+  border-color: var(--color-text-muted);
+  box-shadow: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: not-allowed;
 }
 
 .stat input {
-  width: 5em;
+  width: 4em;
+  font-family: var(--font-pixel);
+  font-size: var(--text-xl);
+  text-align: center;
 }
 
 .remaining {
@@ -71,13 +161,44 @@
   padding: var(--space-1) 0;
 }
 
+.remaining strong {
+  font-family: var(--font-pixel);
+  font-size: var(--text-2xl);
+  color: var(--color-success);
+}
+
 .portraitOption {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
+  min-width: 44px;
+  padding: var(--space-1);
   font-size: var(--text-xs);
   cursor: pointer;
+}
+
+.portraitOption input {
+  accent-color: var(--color-accent);
+}
+
+.portraitOption:has(input:checked) {
+  outline: 3px solid var(--color-accent);
+  outline-offset: -1px;
+}
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: var(--frame);
+  box-shadow: var(--frame-inset), var(--shadow-step);
+}
+
+.summary p {
+  margin: 0;
 }
 
 .problems ul {
@@ -89,13 +210,17 @@
 
 .errorText {
   margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 2px solid var(--color-danger);
+  background: var(--color-surface-raised);
   color: var(--color-danger);
 }
 
 .alert {
   padding: var(--space-3);
-  border: 1px solid var(--color-warning);
+  border: 2px solid var(--color-warning);
   border-radius: var(--radius);
+  background: var(--color-surface);
 }
 
 .alert p {
@@ -107,43 +232,81 @@
 }
 
 .submit {
+  min-width: 200px;
+  min-height: 56px;
   font: inherit;
+  font-size: var(--text-lg);
   font-weight: 600;
-  padding: var(--space-2) var(--space-4);
-  border: 0;
+  padding: 0 var(--space-6);
+  border: var(--frame);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-button);
   background: var(--color-accent);
   color: var(--color-accent-text);
   cursor: pointer;
 }
 
 .submit:disabled {
-  opacity: 0.6;
+  border-style: dashed;
+  border-color: var(--color-text-muted);
+  box-shadow: none;
+  background: transparent;
+  color: var(--color-text-muted);
   cursor: progress;
 }
 
 .secondary {
+  min-width: 44px;
+  min-height: 44px;
   font: inherit;
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--color-border-strong);
+  font-weight: 500;
+  padding: 0 var(--space-3);
+  border: var(--frame);
   border-radius: var(--radius);
-  background: var(--color-surface-muted);
+  box-shadow: var(--shadow-button);
+  background: var(--color-surface);
   color: var(--color-text);
   cursor: pointer;
 }
 
 .pending {
   padding: var(--space-4);
-  border: 1px dashed var(--color-border-strong);
+  border: 2px dashed var(--color-border-strong);
   border-radius: var(--radius);
+  background: var(--color-surface);
 }
 
 .done {
   display: flex;
   gap: var(--space-3);
   align-items: center;
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: var(--frame);
+  box-shadow: var(--frame-inset), var(--shadow-step);
 }
 
 .done p {
   margin: 0 0 var(--space-2);
+}
+
+/* 넓은 화면: 초상 첩을 왼쪽 세로로, 나머지는 오른쪽에 쌓는다. 빈 줄이 틈을 만들지 않게 행 간격은 여백으로 준다. */
+@media (min-width: 900px) {
+  .form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+    column-gap: var(--space-6);
+    row-gap: 0;
+    align-items: start;
+  }
+
+  .form > * {
+    grid-column: 2;
+    margin-bottom: var(--space-4);
+  }
+
+  .form > .portraits {
+    grid-column: 1;
+    grid-row: 1 / span 8;
+  }
 }

@@ -14,9 +14,10 @@ import {
   type CampaignPreparationKey,
 } from './preparation';
 import { readCampaignState } from './state';
+import { hasCampaignOrderAuthority } from './orders';
 
 const preparation = ['recruit', 'conscript', 'train', 'morale', 'dismiss'] as const;
-const military = new Set<string>([...preparation, 'attack', 'move', 'return']);
+const military = new Set<string>([...preparation, 'attack', 'move', 'return', 'form_unit']);
 const allegiance = new Set(['join', 'join_random', 'found', 'uprising', 'resign', 'accept_invite']);
 const stratagems = new Set(['fire_attack', 'sabotage', 'incite']);
 
@@ -27,14 +28,19 @@ function descendants(view: WorldView, id: number) {
     ids.push(...campaign.links.filter((link) => link.masterId === ids[index]).map((link) => link.personId));
   return ids;
 }
-function gate(view: WorldView, actor: Actor, key: string) {
+function gate(view: WorldView, actor: Actor, key: string, value: unknown) {
   const general = view.generals[actor.generalId];
   if (!general) return fail('NO_ACTOR', '장수가 없습니다.');
   // 군사·소속을 건드리지 않는 후보 검사에는 휘하 조건이 없다.
   // 실제 실행의 전후 상태 검사는 아래 execute 경로에서 계속 수행한다.
   if (!military.has(key) && !allegiance.has(key)) return null;
   const campaign = readCampaignState(view.campaign, view);
-  if (general.userId === null && military.has(key) && campaign.links.some((link) => link.personId === general.id))
+  if (
+    general.userId === null &&
+    military.has(key) &&
+    campaign.links.some((link) => link.personId === general.id) &&
+    !hasCampaignOrderAuthority(view, actor, key, value)
+  )
     return fail('COMMAND_DISABLED', '휘하 NPC의 군사 행동은 상관의 부곡 명령으로 실행합니다.');
   if (allegiance.has(key)) {
     if (campaign.links.some((link) => link.personId === general.id))
@@ -100,11 +106,11 @@ export function createCampaignCommandResolver(base: CommandResolver): CommandRes
     if (!original) return undefined;
     const def = overrides.get(key) ?? original;
     const check = (view: WorldView, actor: Actor, value: unknown) =>
-      gate(view, actor, key) ?? def.check(view, actor, value);
+      gate(view, actor, key, value) ?? def.check(view, actor, value);
     return {
       ...def,
       check,
-      precheck: (view, actor, value) => gate(view, actor, key) ?? def.precheck(view, actor, value),
+      precheck: (view, actor, value) => gate(view, actor, key, value) ?? def.precheck(view, actor, value),
       execute(view, actor, value, rng): CommandResult {
         const failure = check(view, actor, value);
         if (failure) throw new Error(failure.message);

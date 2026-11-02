@@ -960,8 +960,8 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
         for (const command of commands) {
           const fields: Record<string, string> =
             command.key === 'recruit' || command.key === 'conscript'
-              ? { 수량: String(command.args.amount), '병종 번호': '1100' }
-              : { '훈련·사기 대상': 'city', '병종 번호': '1100' };
+              ? { 수량: String(command.args.amount), 병종: '1100' }
+              : { '훈련·사기 대상': 'city', 병종: '1100' };
           await put(actor, 1, command.name, fields);
           await save(actor);
           const saved = await turns(main, actor);
@@ -1349,7 +1349,7 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
         await expect(resourcePanel(oldActor.page)).toHaveCount(0);
         await put(oldActor, 1, '모병', {
           수량: '1',
-          '병종 번호': '1100',
+          병종: '1100',
           '부곡 번호': '1',
         });
         await expect(oldActor.page.getByTestId('turn-editor').getByLabel('부곡 번호', { exact: true })).toBeVisible();

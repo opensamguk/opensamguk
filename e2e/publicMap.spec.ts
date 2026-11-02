@@ -438,7 +438,9 @@ test('장수·병력·보급·국고는 응답과 화면에 없고 지도는 읽
     await expect(area(page)).not.toContainText(/보급|내 위치|병력|장수|국고/);
     for (const name of generalNames) await expect(area(page)).not.toContainText(name);
   }
-  await worldMap(page).locator('[data-city-key="1"]').click();
+  // 로그인 화면은 지도를 배경으로 깔고 양식 첩을 위에 띄워 도시가 양식 밑에 있을 수 있다. 위치와 상관없이
+  // 도시 표식 자체에 클릭을 보내 읽기 전용(이동·선택 없음)을 확인한다.
+  await worldMap(page).locator('[data-city-key="1"]').dispatchEvent('click');
   await expect(page).toHaveURL('/login');
   await expect(page.getByRole('heading', { level: 1, name: '로그인' })).toBeVisible();
 });

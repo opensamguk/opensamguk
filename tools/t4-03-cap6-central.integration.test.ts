@@ -33,6 +33,7 @@ import { exportReplay, replayArchive, type ReplayArchive } from '../apps/engine/
 import { replayCapsArchive, replayCapsToEnd } from '../apps/engine/src/replayCaps';
 import { readView } from '../apps/server/src/game/queries';
 import { testDatabaseUrl } from './test-database';
+import { confirmDisconnectedDatabase } from './test-db-close';
 
 type PgClient = {
   connect(): Promise<void>;
@@ -185,6 +186,7 @@ afterAll(async () => {
         expect(beforeDrop).toEqual([{ oid: ownOid }]);
         evidence.databasesBeforeDrop = await databases();
         expect(evidence.databasesBeforeDrop).toEqual(oldDatabases);
+        evidence.disconnectObservation = await confirmDisconnectedDatabase(admin, ownName, ownOid!);
         const connections = (
           await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1', [ownName])
         ).rows;

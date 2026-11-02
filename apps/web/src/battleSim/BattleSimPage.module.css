@@ -1,11 +1,40 @@
 /* 위쪽 띠의 좁은 화면 처리는 T3-10 범위다. 띠가 본문 칸을 넓혀도 이 화면은 창 폭 안에 둔다. */
 .page {
-  max-width: min(880px, calc(100vw - 2 * var(--space-4)));
+  max-width: min(1280px, calc(100vw - 2 * var(--space-4)));
   min-width: 0;
 }
 
 .page h1 {
   margin-bottom: var(--space-2);
+}
+
+/* 넓은 화면은 시안대로 입력(공격·수비)과 결과를 나란히 둔다 (INT-20). */
+@media (min-width: 1280px) {
+  .page {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1.1fr);
+    column-gap: var(--space-4);
+    align-items: start;
+  }
+
+  .page > h1,
+  .page > p {
+    grid-column: 1 / -1;
+  }
+
+  .form,
+  .assumptions {
+    grid-column: 1;
+  }
+
+  .result {
+    grid-column: 2;
+    grid-row: 3 / span 2;
+  }
+
+  .result .forces {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .muted {
@@ -33,6 +62,7 @@
   }
 }
 
+/* 공격·수비는 첩 두 장. 제목패는 공격 주칠, 수비 남색. */
 .side {
   display: flex;
   flex-direction: column;
@@ -40,14 +70,25 @@
   min-width: 0;
   margin: 0;
   padding: var(--space-3);
-  border: 1px solid var(--color-border);
+  border: var(--frame);
   border-radius: var(--radius);
   background: var(--color-surface);
+  box-shadow: var(--frame-inset), var(--shadow-step);
 }
 
 .side legend {
-  padding: 0 var(--space-1);
-  font-weight: 600;
+  padding: 6px 12px 5px;
+  font-family: var(--font-title);
+  font-size: var(--title-sm);
+  font-weight: 400;
+  line-height: 1;
+  color: var(--color-accent-text);
+  background: var(--color-accent);
+  border: var(--frame);
+}
+
+.side + .side legend {
+  background: var(--color-info);
 }
 
 .kind {
@@ -90,14 +131,15 @@
   min-height: 44px;
   font: inherit;
   padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--color-border-strong);
+  border: 2px solid var(--color-ink);
   border-radius: var(--radius);
-  background: var(--color-surface);
+  background: var(--color-surface-raised);
   color: var(--color-text);
 }
 
 .input[aria-invalid='true'] {
   border-color: var(--color-danger);
+  border-style: dashed;
 }
 
 .hint,
@@ -126,19 +168,20 @@
 .primary,
 .secondary {
   font: inherit;
-  padding: var(--space-1) var(--space-4);
+  font-weight: 500;
+  padding: 0 var(--space-4);
+  border: var(--frame);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-button);
   cursor: pointer;
 }
 
 .primary {
-  border: 1px solid var(--color-accent);
   background: var(--color-accent);
   color: var(--color-accent-text);
 }
 
 .secondary {
-  border: 1px solid var(--color-border-strong);
   background: var(--color-surface);
   color: var(--color-text);
 }
@@ -146,7 +189,7 @@
 .assumptions {
   margin-top: var(--space-4);
   padding: var(--space-3);
-  border: 1px solid var(--color-border);
+  border: 1px dashed var(--color-text-muted);
   border-radius: var(--radius);
   background: var(--color-surface-muted);
   font-size: var(--text-sm);
@@ -159,15 +202,23 @@
 .result {
   margin-top: var(--space-4);
   padding: var(--space-3);
-  border: 1px solid var(--color-border);
+  border: var(--frame);
   border-radius: var(--radius);
   background: var(--color-surface);
+  box-shadow: var(--frame-inset), var(--shadow-step);
   min-width: 0;
 }
 
+/* 제목패: 주칠 현판 */
 .result h2 {
-  margin: 0 0 var(--space-2);
-  font-size: var(--text-lg);
+  display: inline-flex;
+  margin: 0 0 var(--space-3);
+  padding: 6px 12px 5px;
+  font-size: var(--title-sm);
+  line-height: 1;
+  color: var(--color-accent-text);
+  background: var(--color-accent);
+  border: var(--frame);
 }
 
 .row {
@@ -222,7 +273,7 @@
 
 .force h3 {
   margin: 0 0 var(--space-1);
-  font-size: var(--text-md);
+  font-size: var(--title-sm);
 }
 
 .table {
@@ -236,6 +287,13 @@
   padding: var(--space-1) var(--space-2);
   border-bottom: 1px solid var(--color-border);
   text-align: right;
+}
+
+.table thead th {
+  border-bottom: 2px solid var(--color-ink);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
 }
 
 .table th:first-child {

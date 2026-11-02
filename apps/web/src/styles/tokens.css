@@ -1,23 +1,37 @@
-/* 디자인 토큰. 원작 정보량 + 모던 정리 (D-007). 국가색은 토큰이 아니라 데이터에서 온다. */
+/* 디자인 토큰. 한지 군략도 (INT-19, D-041): 원작 정보량은 그대로 두고 한지·먹·주칠로 옷을 바꾼다.
+   국가색은 토큰이 아니라 데이터에서 온다. */
 :root {
   color-scheme: light dark;
 
-  --color-bg: #f4f2ee;
-  --color-surface: #ffffff;
-  --color-surface-muted: #f9f8f5;
-  --color-text: #1f1d1a;
-  --color-text-muted: #6b665e;
-  --color-border: #ddd8cf;
-  --color-border-strong: #b9b2a5;
-  --color-accent: #8a5a2b;
-  --color-accent-text: #ffffff;
+  --color-bg: #e5d9bd;
+  --color-surface: #f4ecd8;
+  --color-surface-muted: #efe5cc;
+  --color-surface-raised: #fbf4e4;
+  --color-text: #221d17;
+  --color-text-muted: #5a5044;
+  --color-border: #cdbf9e;
+  --color-border-strong: #221d17;
+  --color-accent: #9b2c1f;
+  --color-accent-text: #fbf4e4;
+  --color-gold: #a8822f;
+  --color-ink: #221d17;
+  --color-banner: #221d17;
+  --color-banner-text: #f4ecd8;
+  --color-banner-gold: #d9b45a;
+  --color-rail: #2c261f;
+  --color-rail-text: #e5d9bd;
+  --color-sea: #2b4a6b;
 
-  --color-success: #2e7d4f;
-  --color-danger: #b3261e;
-  --color-warning: #a86a00;
-  --color-info: #2f5f9e;
+  --color-success: #2f6e5e;
+  --color-danger: #9b2c1f;
+  --color-warning: #8a5a00;
+  --color-info: #263552;
 
   --font-sans: 'Pretendard Variable', Pretendard, system-ui, sans-serif;
+  /* 비트맵 글꼴이라 16px 배수(16·32·48)에서만 또렷하다. */
+  --font-title: 'OpenSamguk Myungjo', 'Pretendard Variable', serif;
+  --font-display: 'OpenSamguk Iyagi', 'OpenSamguk Myungjo', serif;
+  --font-pixel: 'DotGothic16', ui-monospace, monospace;
 
   --text-xs: 12px;
   --text-sm: 13px;
@@ -25,6 +39,10 @@
   --text-lg: 16px;
   --text-xl: 20px;
   --text-2xl: 24px;
+  --text-3xl: 32px;
+  --title-sm: 16px;
+  --title-md: 32px;
+  --title-lg: 48px;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -33,28 +51,38 @@
   --space-6: 24px;
   --space-8: 32px;
 
-  --radius: 4px;
+  /* 도트 화풍이라 모서리를 둥글리지 않는다. */
+  --radius: 0;
+  --frame: 2px solid var(--color-ink);
+  --frame-inset: inset 0 0 0 3px var(--color-surface), inset 0 0 0 4px var(--color-gold);
+  --shadow-step: 4px 4px 0 rgb(34 29 23 / 30%);
+  --shadow-button: 2px 2px 0 var(--color-ink);
   --row-height: 28px;
-  --topbar-height: 44px;
-  --sidebar-width: 240px;
+  --topbar-height: 56px;
+  --sidebar-width: 76px;
 }
 
-/* 다크 모드는 자리만 둔다. 다듬기는 M3 (T3-10). */
+/* 다크 모드는 밤 군막: 먹 바탕에 한지 글자. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-bg: #171614;
-    --color-surface: #211f1c;
-    --color-surface-muted: #1b1a18;
-    --color-text: #ece8e1;
-    --color-text-muted: #a39d93;
-    --color-border: #3a3631;
-    --color-border-strong: #57524a;
-    --color-accent: #c08a50;
-    --color-accent-text: #171614;
+    --color-bg: #15171c;
+    --color-surface: #1f2229;
+    --color-surface-muted: #1a1c22;
+    --color-surface-raised: #262a32;
+    --color-text: #ece3cf;
+    --color-text-muted: #b3a994;
+    --color-border: #3a3b40;
+    --color-border-strong: #8c7b5a;
+    --color-accent: #f07a6a;
+    --color-accent-text: #15171c;
+    --color-gold: #c9a24a;
+    --color-ink: #0c0d10;
+    --color-banner: #0c0d10;
+    --color-rail: #111317;
 
-    --color-success: #5cb984;
-    --color-danger: #ef6b62;
-    --color-warning: #e0a43a;
-    --color-info: #7aa7e6;
+    --color-success: #6cc59a;
+    --color-danger: #f07a6a;
+    --color-warning: #e6b04a;
+    --color-info: #8fb0e8;
   }
 }

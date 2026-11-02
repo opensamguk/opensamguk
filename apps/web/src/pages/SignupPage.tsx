@@ -9,6 +9,7 @@ export function SignupPage() {
   const { next } = route.useSearch();
   return (
     <main className={styles.page}>
+      <span className={styles.plaque}>명부에 이름 올리기</span>
       <h1>가입</h1>
       <AuthForm mode="signup" next={next} />
       <p className={styles.switch}>

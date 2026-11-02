@@ -506,7 +506,23 @@ model User {
   consents     ConsentRecord[]
   generals     General[]
   sanctions    Sanction[]
+  loginRecords LoginRecord[]
   worldCreateRequests WorldCreateRequest[]
+}
+
+model LoginRecord {
+  id             BigInt @id @default(autoincrement())
+  userId         String
+  at             DateTime @default(now()) @db.Timestamptz(3)
+  success        Boolean
+  ipHash         String @db.VarChar(64)
+  deviceHash     String? @db.VarChar(64)
+  hashKeyVersion Int
+  user           User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, at])
+  @@index([hashKeyVersion, ipHash, at])
+  @@index([hashKeyVersion, deviceHash, at])
 }
 
 model AdminSanctionRequest {

@@ -1,0 +1,126 @@
+/* 첫 턴 안내: 지도 위에 한지 첩 한 장을 얹는다 (INT-20, 시안 S2-Onboard). */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: color-mix(in srgb, var(--color-ink) 45%, transparent);
+}
+.dialog {
+  width: min(640px, 100%);
+  max-height: calc(100vh - 2 * var(--space-4));
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  border: var(--frame);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--frame-inset), var(--shadow-step);
+}
+.plaque {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px 12px 5px;
+  font-family: var(--font-title);
+  font-size: var(--title-sm);
+  line-height: 1;
+  color: var(--color-accent-text);
+  background: var(--color-accent);
+  border: var(--frame);
+}
+.title {
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: var(--title-md);
+  font-weight: 400;
+  line-height: 1.2;
+}
+.title:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 4px;
+}
+.text {
+  margin: 0;
+  font-size: var(--text-md);
+}
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: var(--frame);
+  background: var(--color-surface-raised);
+  text-align: center;
+}
+.current {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.primary,
+.secondary {
+  font: inherit;
+  font-weight: 500;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: var(--frame);
+  box-shadow: var(--shadow-button);
+  cursor: pointer;
+}
+.primary {
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+}
+.secondary {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.close {
+  margin-left: auto;
+}
+.note {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 767px) {
+  .dialog {
+    padding: var(--space-4);
+  }
+  .steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .step {
+    flex-direction: row;
+    text-align: left;
+  }
+  .step img {
+    width: 32px;
+    height: 32px;
+  }
+}

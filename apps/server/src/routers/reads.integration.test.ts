@@ -286,7 +286,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     }
   });
 
-  it('94도시 지도는 정렬한 공개 필드·연결·보급과 국가 색만 반환한다', async () => {
+  it('94도시 지도는 정렬한 공개 필드·연결·보급과 국가 색·수도만 반환한다', async () => {
     const result = await query('world.map', { worldId });
     expect(result.status).toBe(200);
     expect(result.data).toEqual({
@@ -300,7 +300,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         supplied: city.supplied,
         links: city.connections,
       })),
-      nations: state.nations.map(({ id, name, color }) => ({ id, name, color })),
+      nations: state.nations.map(({ id, name, color, capitalCityKey }) => ({ id, name, color, capitalCityKey })),
     });
     expect(result.data.cities).toHaveLength(94);
     for (const city of result.data.cities)

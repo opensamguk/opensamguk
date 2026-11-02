@@ -9,6 +9,8 @@ import { useTRPC } from '../trpc';
 import { serverMessage } from '../turns/apiError';
 import { NationBadge } from '../ui/NationBadge';
 import { EmptyState, ErrorState, LoadingState } from '../ui/States';
+import { Tag } from '../ui/Tag';
+import diplomacyIcon from '../art/icons/diplomacy.png';
 import {
   fetchTreatyPage,
   type FinishedTreaty,
@@ -36,10 +38,11 @@ import { useTreatyRequests } from './useTreatyRequests';
 // 제안·수락·거절은 엔진이 처리한 뒤에 결과가 정해진다. 화면은 applied·rejected를 받기 전에는 성공 문구를 띄우지 않는다.
 // 신의·파기는 월드가 켠 기능과 서버 권한을 따른다.
 
-export const DIPLOMACY_TABS = ['incoming', 'outgoing', 'active', 'ended', 'write', 'trust'] as const;
+export const DIPLOMACY_TABS = ['nations', 'incoming', 'outgoing', 'active', 'ended', 'write', 'trust'] as const;
 export type DiplomacyTab = (typeof DIPLOMACY_TABS)[number];
 
 const TAB_LABELS: Record<DiplomacyTab, string> = {
+  nations: '국가',
   incoming: '받은 제안',
   outgoing: '보낸 제안',
   active: '진행 중',
@@ -144,7 +147,10 @@ export function DiplomacyPage({ tab }: { tab: DiplomacyTab }) {
 
   return (
     <section className={styles.page}>
-      <h1>외교실</h1>
+      <div className={styles.heading}>
+        <img className="pixel-art" src={diplomacyIcon} alt="" width={48} height={48} />
+        <h1>외교실</h1>
+      </div>
       {body}
     </section>
   );
@@ -231,6 +237,8 @@ function Diplomacy({ worldId, tab, storageKey }: { worldId: string; tab: Diploma
         ) : (
           <LoadingState />
         )
+      ) : tab === 'nations' ? (
+        <NationTable worldId={worldId} targets={head.targets} items={items} canPropose={head.canPropose.ok} />
       ) : tab === 'trust' ? (
         head.breakEnabled ? (
           <TrustTable worldId={worldId} />
@@ -384,6 +392,81 @@ function TreatyList({
       ))}
     </div>
   );
+}
+
+// 국가 탭: 다른 국가마다 우리와의 관계와 이어 볼 곳을 한 줄에 둔다 (INT-20 외교실 시안).
+// 이미 받은 treaty.list의 상대 목록과 조약만 쓴다. 마지막 파기는 신의 탭이 따로 조회하므로 여기에는 없다.
+function NationTable({
+  worldId,
+  targets,
+  items,
+  canPropose,
+}: {
+  worldId: string;
+  targets: TreatyTarget[];
+  items: readonly TreatyItem[];
+  canPropose: boolean;
+}) {
+  if (targets.length === 0) return <EmptyState title="다른 국가가 없습니다" />;
+  const withNation = (id: number) => items.filter((t) => t.fromNationId === id || t.toNationId === id);
+  return (
+    <div className={styles.sheet}>
+      <table className={styles.table} data-testid="nation-relations">
+        <thead>
+          <tr>
+            <th scope="col">국가</th>
+            <th scope="col">우리와의 관계</th>
+            <th scope="col">이어 보기</th>
+          </tr>
+        </thead>
+        <tbody>
+          {targets.map((target) => {
+            const treaties = withNation(target.nation.id);
+            const incoming = treaties.some((t) => t.status === 'PROPOSED' && t.incoming);
+            const active = treaties.some((t) => t.status === 'ACTIVE');
+            const next: { tab: DiplomacyTab; text: string } | null = incoming
+              ? { tab: 'incoming', text: '받은 제안 보기' }
+              : active
+                ? { tab: 'active', text: '진행 중 조약 보기' }
+                : canPropose
+                  ? { tab: 'write', text: '조약서 쓰기' }
+                  : null;
+            return (
+              <tr key={target.nation.id}>
+                <td>
+                  <NationBadge name={target.nation.name} color={target.nation.color} />
+                </td>
+                <td>
+                  <RelationTag target={target} />
+                </td>
+                <td>
+                  {next ? (
+                    <Link
+                      to="/w/$worldId/diplomacy"
+                      params={{ worldId }}
+                      search={{ tab: next.tab }}
+                      className={styles.secondary}
+                      aria-label={`${target.nation.name}: ${next.text}`}
+                    >
+                      {next.text}
+                    </Link>
+                  ) : (
+                    <span className={styles.muted}>없음</span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// 관계 꼬리표. 교전은 주칠, 불가침은 남색으로 채우고 글자를 함께 쓴다.
+function RelationTag({ target }: { target: TreatyTarget }) {
+  const tone = target.relation === 'WAR' ? 'danger' : target.relation === 'NON_AGGRESSION' ? 'info' : 'muted';
+  return <Tag tone={tone}>{relationText(target)}</Tag>;
 }
 
 function TrustTable({ worldId }: { worldId: string }) {

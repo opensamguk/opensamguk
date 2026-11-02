@@ -1,0 +1,11 @@
+/* 제목 글꼴: hurss/fonts(MIT, 이담허)의 도스명조·도스이야기 굵은체 서브셋. 고친 글꼴이라 이름을 바꿨다 (apps/web/src/fonts/sources.json). */
+@font-face {
+  font-family: 'OpenSamguk Myungjo';
+  src: url('../fonts/title-myungjo.woff') format('woff');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'OpenSamguk Iyagi';
+  src: url('../fonts/title-iyagi.woff') format('woff');
+  font-display: swap;
+}

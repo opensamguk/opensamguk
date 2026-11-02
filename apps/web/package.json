@@ -8,6 +8,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@fontsource/dotgothic16": "5.3.1",
     "@opensamguk/rules": "workspace:*",
     "@opensamguk/shared": "workspace:*",
     "@tanstack/react-query": "^5.104.5",

@@ -1,0 +1,603 @@
+import type { PublicGeography } from '@opensamguk/shared';
+import { palette } from './pixel-basemap.json';
+import { ROAD_CELL, routePoints, routeSiteIds } from './roadPixels';
+import type { GateDir } from './siteMarkers';
+
+// 확대 지형 타일 (INT-20, D-047). 도트 바탕의 한 픽셀(2단위 칸)이 화면에서 충분히 커지면
+// 그 칸의 지형 종류에 맞는 타일 그림으로 바꿔 그린다. 길은 칸끼리 상하좌우로 이은 연결 모양 타일이다.
+
+type Point = { x: number; y: number };
+export type View = { x: number; y: number; width: number; height: number };
+export type Terrain = keyof typeof palette;
+
+export const TERRAINS = Object.keys(palette) as Terrain[];
+// 칸 한 변이 화면에서 이만큼(px) 이상이면 타일로 그린다.
+export const TILE_FROM_PX = 12;
+
+const hex = (r: number, g: number, b: number) =>
+  '#' + [r, g, b].map((value) => value.toString(16).padStart(2, '0')).join('');
+export type TerrainPalette = Record<Terrain, string>;
+const colorIndex = (colors: TerrainPalette) => new Map(TERRAINS.map((name, index) => [colors[name], index]));
+const byColor = colorIndex(palette);
+
+export function showTiles(pixelsPerUnit: number) {
+  return pixelsPerUnit * ROAD_CELL >= TILE_FROM_PX;
+}
+
+// RGBA 픽셀을 지형 번호로 읽는다. 지도 판마다 표시 색이 달라 그 판의 색 판으로 읽는다. 색 판 밖 색은 -1이다.
+export function terrainGrid(
+  rgba: ArrayLike<number>,
+  width: number,
+  height: number,
+  colors: TerrainPalette = palette,
+): Int8Array {
+  const lookup = colors === palette ? byColor : colorIndex(colors);
+  const grid = new Int8Array(width * height);
+  for (let index = 0; index < width * height; index += 1) {
+    const at = index * 4;
+    grid[index] = lookup.get(hex(rgba[at]!, rgba[at + 1]!, rgba[at + 2]!)) ?? -1;
+  }
+  return grid;
+}
+
+// 보이는 칸 범위. 가장자리 칸은 반쯤 보여도 넣는다.
+export function visibleCells(view: View, columns: number, rows: number) {
+  return {
+    left: Math.max(0, Math.floor(view.x / ROAD_CELL)),
+    top: Math.max(0, Math.floor(view.y / ROAD_CELL)),
+    right: Math.min(columns - 1, Math.ceil((view.x + view.width) / ROAD_CELL) - 1),
+    bottom: Math.min(rows - 1, Math.ceil((view.y + view.height) / ROAD_CELL) - 1),
+  };
+}
+
+// 보이는 칸을 지형별 path로 묶는다. 같은 줄에서 이어진 같은 지형은 한 사각형이다.
+export function terrainPaths(grid: Int8Array, columns: number, rows: number, view: View) {
+  const { left, top, right, bottom } = visibleCells(view, columns, rows);
+  const parts = TERRAINS.map(() => [] as string[]);
+  for (let y = top; y <= bottom; y += 1) {
+    let start = left;
+    for (let x = left + 1; x <= right + 1; x += 1) {
+      const kind = grid[y * columns + start]!;
+      if (x <= right && grid[y * columns + x] === kind) continue;
+      if (kind >= 0) {
+        const run = (x - start) * ROAD_CELL;
+        parts[kind]!.push(`M${start * ROAD_CELL} ${y * ROAD_CELL}h${run}v${ROAD_CELL}h${-run}z`);
+      }
+      start = x;
+    }
+  }
+  return TERRAINS.map((terrain, index) => ({ terrain, d: parts[index]!.join('') })).filter((part) => part.d);
+}
+
+// 길 연결 비트: 북 1, 동 2, 남 4, 서 8.
+export const NORTH = 1;
+export const EAST = 2;
+export const SOUTH = 4;
+export const WEST = 8;
+
+// 점과 점 사이를 상하좌우로만 움직이는 칸 길로 잇는다. 대각선 걸음은 가로 칸을 하나 끼운다.
+export function walk(points: readonly Point[], cell = ROAD_CELL): Point[] {
+  const out: Point[] = [];
+  const toCell = (point: Point) => ({ x: Math.floor(point.x / cell), y: Math.floor(point.y / cell) });
+  for (let index = 0; index < points.length; index += 1) {
+    const end = toCell(points[index]!);
+    if (index === 0) {
+      out.push(end);
+      continue;
+    }
+    let { x, y } = toCell(points[index - 1]!);
+    const dx = Math.abs(end.x - x);
+    const dy = -Math.abs(end.y - y);
+    const sx = x < end.x ? 1 : -1;
+    const sy = y < end.y ? 1 : -1;
+    let error = dx + dy;
+    while (x !== end.x || y !== end.y) {
+      const twice = 2 * error;
+      const stepX = twice >= dy;
+      const stepY = twice <= dx;
+      if (stepX) {
+        error += dy;
+        x += sx;
+        out.push({ x, y });
+      }
+      if (stepY) {
+        error += dx;
+        y += sy;
+        out.push({ x, y });
+      }
+    }
+  }
+  return out;
+}
+
+// 거점 문 (INT-20, D-052). 길은 거점 표식의 문으로만 드나든다. 문이 정해진 표식은 그 가운데 상대 점 쪽을 가장
+// 많이 향한 문을, 담이 없는 표식은 상대 점 쪽으로 더 벌어진 축의 문을 쓴다. 문 칸에서 바깥으로 한 칸 곧게 나간다.
+// 거점 안쪽 칸은 표식에 가려진다.
+type Gate = { dx: number; dy: number };
+// half: 표식 상자 반지름(칸). 없으면 문 칸 수와 같은 정사각형으로 본다. 길 가운데 구간이 이 상자를 지나지 않게 한다.
+export type SiteGate =
+  number | { cells: number; allowed?: readonly GateDir[] | undefined; half?: { x: number; y: number } | undefined };
+const DIRECTIONS: Record<GateDir, Gate> = {
+  N: { dx: 0, dy: -1 },
+  E: { dx: 1, dy: 0 },
+  S: { dx: 0, dy: 1 },
+  W: { dx: -1, dy: 0 },
+};
+const gateToward = (from: Point, to: Point): Gate =>
+  Math.abs(to.x - from.x) >= Math.abs(to.y - from.y)
+    ? { dx: Math.sign(to.x - from.x) || 1, dy: 0 }
+    : { dx: 0, dy: Math.sign(to.y - from.y) };
+// 쓸 수 있는 문을 상대 쪽을 많이 향한 순서로 낸다. 담이 없는 표식은 상대 쪽 축의 문 하나다.
+function gateOrder(from: Point, to: Point, allowed: readonly GateDir[] | undefined): Gate[] {
+  if (!allowed?.length) return [gateToward(from, to)];
+  const score = (gate: Gate) => gate.dx * (to.x - from.x) + gate.dy * (to.y - from.y);
+  return allowed.map((name) => DIRECTIONS[name]).sort((left, right) => score(right) - score(left));
+}
+const facing = (gate: Gate, from: Point, to: Point) => gate.dx * (to.x - from.x) + gate.dy * (to.y - from.y) > 0;
+const gateOf = (value: SiteGate) =>
+  typeof value === 'number' ? { cells: value, allowed: undefined, half: undefined } : value;
+// 상대 쪽을 향하지 않는 문으로 나가면 문 밖에서 표식 옆으로 비켜선 뒤 상대 쪽으로 꺾는다. 그래야 길이 표식을 가로지르지 않는다.
+function leaveBy(center: Point, gate: Gate, cells: number, target: Point): { path: Point[]; heading: Gate } {
+  const path = spur(center, gate, cells + 1);
+  if (facing(gate, center, target)) return { path, heading: gate };
+  const end = path.at(-1)!;
+  const side = gate.dy
+    ? { dx: Math.sign(target.x - center.x) || 1, dy: 0 }
+    : { dx: 0, dy: Math.sign(target.y - center.y) || 1 };
+  for (let step = 1; step <= cells + 2; step += 1) path.push({ x: end.x + side.dx * step, y: end.y + side.dy * step });
+  const back = gate.dy
+    ? { dx: 0, dy: Math.sign(target.y - path.at(-1)!.y) || -gate.dy }
+    : { dx: Math.sign(target.x - path.at(-1)!.x) || -gate.dx, dy: 0 };
+  return { path, heading: back };
+}
+const spur = (center: Point, gate: Gate, length: number) =>
+  Array.from({ length: length + 1 }, (_, step) => ({ x: center.x + gate.dx * step, y: center.y + gate.dy * step }));
+
+// 두 문 밖 칸 사이를 가로세로 곧은 줄로 잇는다. 문 방향이 같은 축이면 가운데에서 한 번 비켜 가고(ㄹ자),
+// 다른 축이면 한 번만 꺾는다(ㄱ자). 계단식 대각선을 만들지 않는다.
+function cornersFor(from: Point, leave: Gate, to: Point, enter: Gate): Point[] {
+  const corners: Point[] = [from];
+  if (leave.dx && enter.dx) {
+    const mid = Math.round((from.x + to.x) / 2);
+    corners.push({ x: mid, y: from.y }, { x: mid, y: to.y });
+  } else if (leave.dy && enter.dy) {
+    const mid = Math.round((from.y + to.y) / 2);
+    corners.push({ x: from.x, y: mid }, { x: to.x, y: mid });
+  } else if (leave.dx) corners.push({ x: to.x, y: from.y });
+  else corners.push({ x: from.x, y: to.y });
+  corners.push(to);
+  return corners;
+}
+function alongCorners(corners: readonly Point[]): Point[] {
+  const out: Point[] = [];
+  for (let index = 1; index < corners.length; index += 1) {
+    const a = corners[index - 1]!;
+    const b = corners[index]!;
+    const steps = Math.abs(b.x - a.x) + Math.abs(b.y - a.y);
+    for (let step = 1; step <= steps; step += 1)
+      out.push({ x: a.x + Math.sign(b.x - a.x) * step, y: a.y + Math.sign(b.y - a.y) * step });
+  }
+  return out;
+}
+
+export function clearRun(
+  start: Point,
+  end: Point,
+  blocked: (point: Point) => boolean,
+  options: readonly Point[][],
+): Point[] {
+  for (const corners of options) {
+    const run = alongCorners(corners);
+    if (!run.some(blocked)) return run;
+  }
+  // 상자 칸을 가장 적게 밟고, 그다음 가장 짧은 가로세로 길(밟은 칸 수·길이 순 비용의 다익스트라).
+  // 두 점을 둘러싼 범위 밖으로 8칸까지만 찾는다. 표식이 붙어 피할 길이 없어도 상자를 덜 지나는 길을 고르고,
+  // 막힌 기본 꺾임으로 되돌아가지 않는다.
+  const x0 = Math.min(start.x, end.x) - 8;
+  const x1 = Math.max(start.x, end.x) + 8;
+  const y0 = Math.min(start.y, end.y) - 8;
+  const y1 = Math.max(start.y, end.y) + 8;
+  const area = (x1 - x0 + 1) * (y1 - y0 + 1);
+  const key = (point: Point) => `${point.x},${point.y}`;
+  // 밟은 칸 하나가 어떤 우회 길이보다 비싸도록 범위 칸 수를 곱한다.
+  const cost = new Map<string, number>([[key(start), 0]]);
+  const previous = new Map<string, Point | null>([[key(start), null]]);
+  const { heap, push, pop } = minHeap<Point>();
+  push([0, start]);
+  while (heap.length) {
+    const [here, at] = pop();
+    if (here > cost.get(key(at))!) continue;
+    if (at.x === end.x && at.y === end.y) break;
+    for (const [dx, dy] of STEPS) {
+      const next = { x: at.x + dx, y: at.y + dy };
+      if (next.x < x0 || next.x > x1 || next.y < y0 || next.y > y1) continue;
+      const step = 1 + (blocked(next) && (next.x !== end.x || next.y !== end.y) ? area : 0);
+      const total = here + step;
+      const known = cost.get(key(next));
+      if (known !== undefined && known <= total) continue;
+      cost.set(key(next), total);
+      previous.set(key(next), at);
+      push([total, next]);
+    }
+  }
+  const path: Point[] = [];
+  for (let step: Point | null = end; step && key(step) !== key(start); step = previous.get(key(step)) ?? null)
+    path.unshift(step);
+  return path;
+}
+
+const STEPS = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+] as const;
+
+// 비용이 가장 낮은 항목부터 꺼내는 이진 힙.
+function minHeap<T>() {
+  const heap: Array<[number, T]> = [];
+  const push = (item: [number, T]) => {
+    heap.push(item);
+    for (let at = heap.length - 1; at > 0;) {
+      const up = (at - 1) >> 1;
+      if (heap[up]![0] <= heap[at]![0]) break;
+      [heap[up], heap[at]] = [heap[at]!, heap[up]!];
+      at = up;
+    }
+  };
+  const pop = () => {
+    const top = heap[0]!;
+    const last = heap.pop()!;
+    if (heap.length) {
+      heap[0] = last;
+      for (let at = 0; ;) {
+        const left = at * 2 + 1;
+        const right = left + 1;
+        let low = at;
+        if (left < heap.length && heap[left]![0] < heap[low]![0]) low = left;
+        if (right < heap.length && heap[right]![0] < heap[low]![0]) low = right;
+        if (low === at) break;
+        [heap[low], heap[at]] = [heap[at]!, heap[low]!];
+        at = low;
+      }
+    }
+    return top;
+  };
+  return { heap, push, pop };
+}
+
+// 지도 전체 길을 그릴 때 앞서 그린 길과 다른 표식 (D-055).
+// 칸 번호. 지도 칸은 가로세로 65536칸보다 작다.
+const cellNo = (x: number, y: number) => y * 65536 + x;
+export type RoadContext = { used: ReadonlySet<number>; blocked: (point: Point) => boolean };
+// 앞서 그린 길 칸은 새 칸의 3할 값이고, 꺾임 한 번은 새 칸 두 개 값이다.
+const ON_ROAD = 0.3;
+const TURN = 2;
+
+// D-055: 두 문 밖 칸 사이를 기존 길에 겹쳐 타며 적게 꺾는 가로세로 길로 잇는다. 막힌 칸(두 표식 상자와 다른 표식 상자)은
+// 기존 길 칸이 아니면 어떤 우회보다 비싸게 친다. 두 점을 둘러싼 범위 밖으로 8칸까지만 찾고 되돌아 걷지 않는다.
+export function bundledRun(
+  start: Point,
+  end: Point,
+  heading: { dx: number; dy: number },
+  blocked: (point: Point) => boolean,
+  used: ReadonlySet<number>,
+): Point[] {
+  const x0 = Math.min(start.x, end.x) - 8;
+  const y0 = Math.min(start.y, end.y) - 8;
+  const width = Math.max(start.x, end.x) + 8 - x0 + 1;
+  const height = Math.max(start.y, end.y) + 8 - y0 + 1;
+  const wall = width * height * (1 + TURN);
+  // 범위 칸마다 한 번만 읽는다: 1 기존 길, 2 막힌 칸.
+  const kind = new Uint8Array(width * height);
+  for (let y = 0; y < height; y += 1)
+    for (let x = 0; x < width; x += 1) {
+      const point = { x: x0 + x, y: y0 + y };
+      kind[y * width + x] = used.has(cellNo(point.x, point.y)) ? 1 : blocked(point) ? 2 : 0;
+    }
+  const index = (point: Point) => (point.y - y0) * width + (point.x - x0);
+  const goal = index(end);
+  // 상태 = 칸 번호 × 4 + 들어온 방향. 처음 방향은 문을 나선 방향이다.
+  const first = Math.max(
+    0,
+    STEPS.findIndex(([dx, dy]) => dx === heading.dx && dy === heading.dy),
+  );
+  const cost = new Float64Array(width * height * 4).fill(Infinity);
+  const previous = new Int32Array(width * height * 4).fill(-1);
+  const origin = index(start) * 4 + first;
+  cost[origin] = 0;
+  const { heap, push, pop } = minHeap<number>();
+  push([0, origin]);
+  let last = -1;
+  while (heap.length) {
+    const [here, state] = pop();
+    if (here > cost[state]!) continue;
+    const at = state >> 2;
+    const dir = state & 3;
+    if (at === goal) {
+      last = state;
+      break;
+    }
+    const x = at % width;
+    const y = (at - x) / width;
+    for (let next = 0; next < 4; next += 1) {
+      const [dx, dy] = STEPS[next]!;
+      if (STEPS[dir]![0] === -dx && STEPS[dir]![1] === -dy) continue;
+      if (x + dx < 0 || x + dx >= width || y + dy < 0 || y + dy >= height) continue;
+      const cell = at + dy * width + dx;
+      const road = kind[cell] === 1;
+      const step = (road ? ON_ROAD : 1) + (next !== dir ? TURN : 0) + (kind[cell] === 2 && cell !== goal ? wall : 0);
+      const total = here + step;
+      const to = cell * 4 + next;
+      if (cost[to]! <= total) continue;
+      cost[to] = total;
+      previous[to] = state;
+      push([total, to]);
+    }
+  }
+  const path: Point[] = [];
+  for (let state = last; state >= 0 && state >> 2 !== origin >> 2; state = previous[state]!) {
+    const at = state >> 2;
+    path.unshift({ x: x0 + (at % width), y: y0 + Math.floor(at / width) });
+  }
+  return path;
+}
+
+// gates: 거점마다 중심에서 문 칸까지의 칸 수(표식 반지름)와 쓸 수 있는 문. 0이면 문 없이 중심끼리 잇는다.
+// context가 있으면 가운데 구간을 기존 길에 겹쳐 타고 다른 표식을 비켜 가는 길로 낸다(D-055).
+export function gatedWalk(
+  points: readonly Point[],
+  gates: readonly SiteGate[],
+  cell = ROAD_CELL,
+  context?: RoadContext,
+): Point[] {
+  const centers = points.map((point) => ({ x: Math.floor(point.x / cell), y: Math.floor(point.y / cell) }));
+  const out: Point[] = [];
+  for (let index = 1; index < centers.length; index += 1) {
+    const from = centers[index - 1]!;
+    const to = centers[index]!;
+    const a = gateOf(gates[index - 1]!);
+    const b = gateOf(gates[index]!);
+    const boxOf = (site: Point, gate: ReturnType<typeof gateOf>) => (point: Point) =>
+      Math.abs(point.x - site.x) <= (gate.half?.x ?? gate.cells) &&
+      Math.abs(point.y - site.y) <= (gate.half?.y ?? gate.cells);
+    const inFrom = boxOf(from, a);
+    const inTo = boxOf(to, b);
+    const inBox = (point: Point) => inFrom(point) || inTo(point);
+    // 문 밖 길이 상대 표식 상자로 들어가지 않는 문을 먼저 고른다. 모두 들어가면 가장 상대 쪽 문을 쓴다.
+    const exit = (center: Point, gate: ReturnType<typeof gateOf>, target: Point, other: (point: Point) => boolean) => {
+      const tries = gateOrder(center, target, gate.allowed).map((choice) =>
+        leaveBy(center, choice, gate.cells, target),
+      );
+      return tries.find((option) => !option.path.some(other)) ?? tries[0]!;
+    };
+    const leaving = exit(from, a, to, inTo);
+    const entering = exit(to, b, from, inFrom);
+    const outbound = leaving.path;
+    const inbound = [...entering.path].reverse();
+    // 가운데 구간이 두 표식 상자를 지나면 다른 꺾임(ㄱ·ㄹ)을 고르고, 그래도 지나면 상자를 가장 적게 밟는 길로 잇는다.
+    const start = outbound.at(-1)!;
+    const end = inbound[0]!;
+    const middle = context
+      ? bundledRun(start, end, leaving.heading, (point) => inBox(point) || context.blocked(point), context.used)
+      : clearRun(start, end, inBox, [
+          cornersFor(start, leaving.heading, end, entering.heading),
+          [start, { x: end.x, y: start.y }, end],
+          [start, { x: start.x, y: end.y }, end],
+        ]);
+    for (const part of [outbound, middle, inbound])
+      for (const point of part)
+        if (!out.length || out.at(-1)!.x !== point.x || out.at(-1)!.y !== point.y) out.push(point);
+  }
+  return out.length ? out : centers.slice(0, 1);
+}
+
+// 땅길·다리의 칸 길 (D-055). 여울·물길과 물길로 따로 그리는 경로(skip)는 뺀다. 곧은 거리가 짧은 길부터 내고
+// 뒤 길은 앞 길 칸에 겹쳐 타서 같은 쪽으로 가는 길이 한 줄로 합쳐진다. 지나가는 길은 다른 표식 상자를 비켜 간다.
+export function roadWalks(
+  map: Pick<PublicGeography, 'sites' | 'routes'>,
+  skip: ReadonlySet<string> = new Set(),
+  gateCells: (siteId: string) => SiteGate = () => 0,
+  cell = ROAD_CELL,
+): Map<string, Point[]> {
+  const siteById = new Map(map.sites.map((site) => [site.id, site]));
+  const boxes = new Map<number, string[]>();
+  for (const site of map.sites) {
+    const gate = gateOf(gateCells(site.id));
+    const half = gate.half ?? { x: gate.cells, y: gate.cells };
+    if (!half.x && !half.y) continue;
+    const x = Math.floor(site.position.x / cell);
+    const y = Math.floor(site.position.y / cell);
+    for (let dx = -half.x; dx <= half.x; dx += 1)
+      for (let dy = -half.y; dy <= half.y; dy += 1) {
+        const no = cellNo(x + dx, y + dy);
+        boxes.set(no, [...(boxes.get(no) ?? []), site.id]);
+      }
+  }
+  const length = (points: readonly Point[]) =>
+    points.reduce(
+      (sum, point, index) =>
+        index ? sum + Math.hypot(point.x - points[index - 1]!.x, point.y - points[index - 1]!.y) : 0,
+      0,
+    );
+  const drawn = map.routes.flatMap((route) => {
+    if (!route.enabled || skip.has(route.id) || (route.mode !== 'LAND' && route.mode !== 'BRIDGE')) return [];
+    const points = routePoints(route, siteById);
+    return points ? [{ route, points, length: length(points) }] : [];
+  });
+  drawn.sort((left, right) => left.length - right.length || (left.route.id < right.route.id ? -1 : 1));
+  const used = new Set<number>();
+  const walks = new Map<string, Point[]>();
+  for (const { route, points } of drawn) {
+    const own = new Set(routeSiteIds(route));
+    const blocked = (point: Point) => (boxes.get(cellNo(point.x, point.y)) ?? []).some((id) => !own.has(id));
+    const cells = gatedWalk(points, routeSiteIds(route).map(gateCells), cell, { used, blocked });
+    for (const point of cells) used.add(cellNo(point.x, point.y));
+    walks.set(route.id, cells);
+  }
+  return walks;
+}
+
+// 칸 길을 칸별 연결 모양으로 묶는다.
+export function roadMasks(walks: Iterable<readonly Point[]>) {
+  const masks = new Map<string, { x: number; y: number; mask: number }>();
+  const at = (point: Point) => {
+    const key = `${point.x},${point.y}`;
+    let tile = masks.get(key);
+    if (!tile) masks.set(key, (tile = { ...point, mask: 0 }));
+    return tile;
+  };
+  for (const cells of walks) {
+    at(cells[0]!);
+    for (let index = 1; index < cells.length; index += 1) {
+      const from = at(cells[index - 1]!);
+      const to = at(cells[index]!);
+      if (to.x > from.x) [from.mask, to.mask] = [from.mask | EAST, to.mask | WEST];
+      else if (to.x < from.x) [from.mask, to.mask] = [from.mask | WEST, to.mask | EAST];
+      else if (to.y > from.y) [from.mask, to.mask] = [from.mask | SOUTH, to.mask | NORTH];
+      else if (to.y < from.y) [from.mask, to.mask] = [from.mask | NORTH, to.mask | SOUTH];
+    }
+  }
+  return [...masks.values()];
+}
+
+// 땅길·다리의 칸별 연결 모양. 여울·물길과 물길로 따로 그리는 경로(skip)는 뺀다.
+export function roadTiles(
+  map: Pick<PublicGeography, 'sites' | 'routes'>,
+  skip: ReadonlySet<string> = new Set(),
+  gateCells: (siteId: string) => SiteGate = () => 0,
+  cell = ROAD_CELL,
+) {
+  return roadMasks(roadWalks(map, skip, gateCells, cell).values());
+}
+
+// 물길 표시 (INT-20, 화면만). 지도 자료의 땅길 가운데 물 위를 지나는 경로를 바다·강 칸을 따라 그린다.
+// 이동 규칙과 경로 종류는 바꾸지 않는다.
+const WATER = new Set<Terrain>(['deepSea', 'sea', 'shallow', 'lake', 'river']);
+const SEA = new Set<Terrain>(['deepSea', 'sea', 'shallow']);
+const waterIndex = new Set(TERRAINS.flatMap((name, index) => (WATER.has(name) ? [index] : [])));
+// 지형 번호 가운데 물. 길이 지나면 다리를 놓는다.
+export const WATER_TERRAINS: ReadonlySet<number> = waterIndex;
+const seaIndex = new Set(TERRAINS.flatMap((name, index) => (SEA.has(name) ? [index] : [])));
+// 끝점 둘레 이 칸 수 안의 땅은 물길이 지나갈 수 있다(항구에서 배에 오르는 자리).
+const LANDING = 3;
+
+type Grid = { cells: Int8Array; columns: number; rows: number };
+
+export function isWaterRoute(cells: readonly Point[], grid: Grid) {
+  let water = 0;
+  let sea = 0;
+  for (const { x, y } of cells) {
+    const kind = grid.cells[y * grid.columns + x] ?? -1;
+    if (waterIndex.has(kind)) water += 1;
+    if (seaIndex.has(kind)) sea += 1;
+  }
+  return sea / cells.length >= 0.15 || water / cells.length >= 0.5;
+}
+
+// 물 칸과 끝점 둘레를 지나는 상하좌우 최단 칸 길(너비 우선). 길이 없으면 null이다.
+export function waterPath(from: Point, to: Point, grid: Grid): Point[] | null {
+  const { columns, rows, cells } = grid;
+  const near = (x: number, y: number, point: Point) =>
+    Math.abs(x - point.x) <= LANDING && Math.abs(y - point.y) <= LANDING;
+  const open = (x: number, y: number) =>
+    x >= 0 &&
+    y >= 0 &&
+    x < columns &&
+    y < rows &&
+    (waterIndex.has(cells[y * columns + x]!) || near(x, y, from) || near(x, y, to));
+  // 지도 끝 좌표(예: 1000,700)는 격자 밖 칸이 된다. 시작·목표가 격자 안이 아니면 물길이 없다.
+  const inGrid = (point: Point) => point.x >= 0 && point.y >= 0 && point.x < columns && point.y < rows;
+  if (!inGrid(from) || !inGrid(to)) return null;
+  const previous = new Int32Array(columns * rows).fill(-1);
+  const start = from.y * columns + from.x;
+  const goal = to.y * columns + to.x;
+  previous[start] = start;
+  const queue = [start];
+  for (let head = 0; head < queue.length; head += 1) {
+    const at = queue[head]!;
+    if (at === goal) break;
+    const x = at % columns;
+    const y = (at - x) / columns;
+    for (const [nx, ny] of [
+      [x, y - 1],
+      [x + 1, y],
+      [x, y + 1],
+      [x - 1, y],
+    ] as const) {
+      const next = ny * columns + nx;
+      if (!open(nx, ny) || previous[next] !== -1) continue;
+      previous[next] = at;
+      queue.push(next);
+    }
+  }
+  if (previous[goal] === -1) return null;
+  const path: Point[] = [];
+  for (let at = goal; ; at = previous[at]!) {
+    path.push({ x: at % columns, y: Math.floor(at / columns) });
+    if (at === start) break;
+  }
+  return path.reverse();
+}
+
+// 물길로 그릴 경로와 그 칸. 물길을 못 찾으면 원래 직선 칸을 쓴다.
+export function waterLanes(map: Pick<PublicGeography, 'sites' | 'routes'>, grid: Grid, cell = ROAD_CELL) {
+  const siteById = new Map(map.sites.map((site) => [site.id, site]));
+  const lanes: { id: string; cells: Point[] }[] = [];
+  for (const route of map.routes) {
+    if (!route.enabled || (route.mode !== 'LAND' && route.mode !== 'BRIDGE')) continue;
+    const points = routePoints(route, siteById);
+    if (!points) continue;
+    const straight = walk(points, cell);
+    if (!isWaterRoute(straight, grid)) continue;
+    const ends = points.map((point) => ({ x: Math.floor(point.x / cell), y: Math.floor(point.y / cell) }));
+    const legs = ends.slice(1).map((end, index) => waterPath(ends[index]!, end, grid));
+    lanes.push({ id: route.id, cells: legs.every(Boolean) ? legs.flatMap((leg) => leg!) : straight });
+  }
+  return lanes;
+}
+
+// 강둑 (INT-20). 보이는 강·호수 칸 가운데 땅과 맞닿은 칸과 그 땅 쪽 비트.
+export function bankTiles(grid: Grid, view: View) {
+  const { left, top, right, bottom } = visibleCells(view, grid.columns, grid.rows);
+  const inland = new Set([TERRAINS.indexOf('river'), TERRAINS.indexOf('lake')]);
+  const land = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= grid.columns || y >= grid.rows) return false;
+    const kind = grid.cells[y * grid.columns + x]!;
+    return kind >= 0 && !waterIndex.has(kind);
+  };
+  const out: { x: number; y: number; mask: number }[] = [];
+  for (let y = top; y <= bottom; y += 1)
+    for (let x = left; x <= right; x += 1) {
+      if (!inland.has(grid.cells[y * grid.columns + x]!)) continue;
+      const mask =
+        (land(x, y - 1) ? NORTH : 0) |
+        (land(x + 1, y) ? EAST : 0) |
+        (land(x, y + 1) ? SOUTH : 0) |
+        (land(x - 1, y) ? WEST : 0);
+      if (mask) out.push({ x, y, mask });
+    }
+  return out;
+}
+
+// 산 높이 (INT-20). 구릉 1, 산 2, 고산 3단이다. 북쪽·서쪽 이웃이 더 높으면 그 차이만큼 그림자를 드리운다.
+const HEIGHT: Partial<Record<Terrain, number>> = { hills: 1, mountains: 2, highMountains: 3 };
+const heightOf = TERRAINS.map((name) => HEIGHT[name] ?? 0);
+
+export function shadowPaths(grid: Grid, view: View, cell = ROAD_CELL) {
+  const { left, top, right, bottom } = visibleCells(view, grid.columns, grid.rows);
+  const at = (x: number, y: number) =>
+    x < 0 || y < 0 || x >= grid.columns || y >= grid.rows ? 0 : (heightOf[grid.cells[y * grid.columns + x]!] ?? 0);
+  const levels = [[], [], []] as string[][];
+  for (let y = top; y <= bottom; y += 1)
+    for (let x = left; x <= right; x += 1) {
+      const here = at(x, y);
+      const north = at(x, y - 1) - here;
+      const west = at(x - 1, y) - here;
+      // 높이 차이 1단마다 칸의 1/3씩 그림자가 길어진다(3단이면 한 칸 전체).
+      if (north > 0) levels[north - 1]!.push(`M${x * cell} ${y * cell}h${cell}v${(cell * north) / 3}h${-cell}z`);
+      if (west > 0)
+        levels[west - 1]!.push(`M${x * cell} ${y * cell}h${(cell * west) / 3}v${cell}h${-(cell * west) / 3}z`);
+    }
+  return levels.map((parts, index) => ({ step: index + 1, d: parts.join('') })).filter((level) => level.d);
+}

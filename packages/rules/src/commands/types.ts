@@ -10,6 +10,7 @@ export interface Actor {
   tick?: number;
   unitSet?: DeepReadonly<UnitSetResource> | undefined;
   authority?: 'office';
+  campaignOrderId?: number;
 }
 export interface Failure {
   code:

@@ -130,6 +130,13 @@ describe('공개 지도 빈 상태', () => {
     expect(screen.queryByRole('tablist')).toBeNull();
   });
 
+  it('로그인 배경에서 사본이 없는 월드는 바탕 그림 위에 안내를 띄운다', () => {
+    render(<PublicMapView data={{ delayMinutes: 10, worlds: [data.worlds[2]!] }} now={now} backdrop />);
+    expect(screen.getByTestId('public-map-basemap').getAttribute('src')).toContain('san10-pixel-basemap');
+    expect(screen.getByRole('tabpanel').textContent).toBe('아직 공개 지도가 없습니다');
+    expect(screen.queryByTestId('world-map')).toBeNull();
+  });
+
   it('응답을 받기 전에도 문구 없이 자리만 둔다', () => {
     render(<PublicMapView data={undefined} now={now} />);
     expect(screen.getByTestId('public-map').textContent).toBe('');

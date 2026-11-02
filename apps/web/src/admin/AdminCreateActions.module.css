@@ -1,0 +1,60 @@
+.create {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  margin-block: var(--space-4);
+}
+.form {
+  display: grid;
+  gap: var(--space-3);
+  max-width: 720px;
+}
+.form label {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.form input,
+.form select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+}
+.dialog {
+  box-sizing: border-box;
+  width: min(100% - 32px, 720px);
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+}
+.dialog dd {
+  margin-inline-start: 0;
+  margin-block-end: var(--space-2);
+  overflow-wrap: anywhere;
+}
+.dialog button,
+.create button,
+.create select,
+.create input {
+  min-height: 44px;
+  min-width: 44px;
+  font: inherit;
+  padding: var(--space-2);
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-block: var(--space-3);
+}
+.check input {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+}
+.result code,
+.dialog code {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}

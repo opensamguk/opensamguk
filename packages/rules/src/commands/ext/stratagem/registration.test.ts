@@ -134,7 +134,7 @@ it('keeps each definition paired with its unchanged spec and shared functions', 
 it('accepts general preset registration and rejects nation registration without activating product presets', () => {
   const folder = new URL('../../../../../../resources/preset/', import.meta.url);
   const files = readdirSync(folder).filter((file) => file.endsWith('.json'));
-  expect(files.sort()).toStrictEqual(['beginner.json', 'hardcore.json', 'regular.json', 'speed.json']);
+  expect(files.sort()).toStrictEqual(['beginner.json', 'empty.json', 'hardcore.json', 'regular.json', 'speed.json']);
   for (const file of files) {
     const preset = JSON.parse(readFileSync(new URL(file, folder), 'utf8')) as Record<string, unknown>;
     expect(preset.commands).toBeNull();

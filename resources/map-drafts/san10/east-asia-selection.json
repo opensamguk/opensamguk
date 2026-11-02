@@ -1,0 +1,557 @@
+{
+  "format": "opensamguk-east-asia-name-selection",
+  "version": 1,
+  "date": "2026-10-29",
+  "status": "WORKING_COORDINATE_PLACEMENT_DRAFT",
+  "relatedAcceptanceCriteria": ["AC-INT-03", "AC-INT-10"],
+  "decision": "D-043",
+  "criteria": "위치 대응이 안정된 이름을 우선한다. 논쟁 지역은 유력한 안 하나를 게임 기준으로 고르고 근거의 확실성을 별도 기록한다. 학계 다수의 비율을 확인한 자료는 아니다.",
+  "sources": [
+    {
+      "id": "kyushu",
+      "title": "규슈대학교 종합연구박물관: 倭人伝の道",
+      "url": "https://www.museum.kyushu-u.ac.jp/publications/annual_exhibitions/WAJINDEN2004/02-1.html",
+      "accessedAt": "2026-10-29"
+    },
+    {
+      "id": "fukuoka",
+      "title": "후쿠오카시박물관: 海と遺跡 — 弥生時代",
+      "url": "https://museum.city.fukuoka.jp/sp/exhibition/523/",
+      "accessedAt": "2026-10-29"
+    },
+    {
+      "id": "yoshinogari",
+      "title": "요시노가리 역사공원: 邪馬台国 논쟁의 배경",
+      "url": "https://www.yoshinogari.jp/ym/topics/yama02.html",
+      "accessedAt": "2026-10-29"
+    },
+    {
+      "id": "daebang",
+      "title": "국사편찬위원회 우리역사넷: 대방군",
+      "url": "https://contents.history.go.kr/front/tg/view.do?ganada=&levelId=tg_001_0660&pageUnit=10&treeId=0209",
+      "accessedAt": "2026-10-29"
+    },
+    {
+      "id": "izumo",
+      "title": "시마네현립 고대 이즈모 역사박물관: 弥生王墓誕生",
+      "url": "https://www.izm.ed.jp/cms/cms.php?id=114&mode=v",
+      "accessedAt": "2026-10-29"
+    },
+    {
+      "id": "kibi",
+      "title": "오카야마현 고대 기비 문화재센터: 弥生住居と集落",
+      "url": "https://www.pref.okayama.jp/site/kodai/632623.html",
+      "accessedAt": "2026-10-29"
+    },
+    {
+      "id": "yamatai-theories",
+      "title": "요시노가리 역사공원: 기나이설과 규슈설",
+      "url": "https://www.yoshinogari.jp/ym/topics/yama01.html",
+      "accessedAt": "2026-10-29"
+    },
+    {
+      "id": "yamatai-choice",
+      "title": "무나카타시 해양박물관: 邪馬台国とムナカタ国",
+      "url": "https://www.city.munakata.lg.jp/searoad/kiji0034337/index.html",
+      "accessedAt": "2026-10-29"
+    },
+    {
+      "id": "fumi-choice",
+      "title": "우미정: 光正寺古墳, 불미국 위치의 두 유력설",
+      "url": "https://www.town.umi.lg.jp/site/spot/kanko131.html",
+      "accessedAt": "2026-10-29"
+    },
+    {
+      "id": "iyo",
+      "title": "에히메현: 愛媛の歴史と文化",
+      "url": "https://www.pref.ehime.jp/site/ehimenotakara/138689.html",
+      "accessedAt": "2026-10-29"
+    },
+    {
+      "id": "sanuki",
+      "title": "가가와현립박물관: かがわ今昔",
+      "url": "https://www.kmuseum.pref.kagawa.lg.jp/exhibition-list/post-1613/",
+      "accessedAt": "2026-10-29"
+    },
+    {
+      "id": "mokji",
+      "title": "한국민족문화대백과사전: 목지국",
+      "url": "https://encykorea.aks.ac.kr/Article/E0018698",
+      "accessedAt": "2026-10-29"
+    },
+    {
+      "id": "okjeo",
+      "title": "우리역사넷: 옥저의 위치와 변천",
+      "url": "https://contents.history.go.kr/mobile/hm/view.do?levelId=hm_003_0040",
+      "accessedAt": "2026-10-29"
+    },
+    {
+      "id": "buyeo",
+      "title": "한국민족문화대백과사전: 부여",
+      "url": "https://encykorea.aks.ac.kr/Article/E0024368",
+      "accessedAt": "2026-10-29"
+    }
+  ],
+  "japanUmbrellaLabel": "왜(倭)",
+  "japanSites": [
+    {
+      "name": "대마국",
+      "nameZh": "對馬國",
+      "modernArea": "쓰시마섬",
+      "locationStatus": "REGION_WELL_SUPPORTED",
+      "sources": ["kyushu"],
+      "id": "JP01",
+      "kind": "DOCUMENTED_POLITY",
+      "position": {
+        "x": 916,
+        "y": 250
+      },
+      "level": null,
+      "placementId": "S127",
+      "coordinatePlacementFile": "coordinate-placement.json"
+    },
+    {
+      "name": "일지국",
+      "nameZh": "一支國",
+      "modernArea": "이키섬",
+      "locationStatus": "REGION_WELL_SUPPORTED",
+      "sources": ["kyushu", "yoshinogari"],
+      "id": "JP02",
+      "kind": "DOCUMENTED_POLITY",
+      "position": {
+        "x": 926,
+        "y": 265
+      },
+      "level": null,
+      "aliases": ["일대국(一大國)"],
+      "placementId": "S128",
+      "coordinatePlacementFile": "coordinate-placement.json"
+    },
+    {
+      "name": "말로국",
+      "nameZh": "末盧國",
+      "modernArea": "가라쓰평야 일대",
+      "locationStatus": "REGION_WELL_SUPPORTED",
+      "sources": ["kyushu", "yoshinogari"],
+      "id": "JP03",
+      "kind": "DOCUMENTED_POLITY",
+      "position": {
+        "x": 933,
+        "y": 274
+      },
+      "level": null,
+      "aliases": ["末廬國"],
+      "placementId": "S129",
+      "coordinatePlacementFile": "coordinate-placement.json"
+    },
+    {
+      "name": "이도국",
+      "nameZh": "伊都國",
+      "modernArea": "이토시마평야 일대",
+      "locationStatus": "REGION_WELL_SUPPORTED",
+      "sources": ["kyushu", "fukuoka"],
+      "id": "JP04",
+      "kind": "DOCUMENTED_POLITY",
+      "position": {
+        "x": 939,
+        "y": 271
+      },
+      "level": null,
+      "placementId": "S130",
+      "coordinatePlacementFile": "coordinate-placement.json"
+    },
+    {
+      "name": "노국",
+      "nameZh": "奴國",
+      "modernArea": "후쿠오카평야 일대",
+      "locationStatus": "REGION_WELL_SUPPORTED",
+      "sources": ["kyushu", "fukuoka"],
+      "id": "JP05",
+      "kind": "DOCUMENTED_POLITY",
+      "position": {
+        "x": 944,
+        "y": 270
+      },
+      "level": null,
+      "placementId": "S131",
+      "coordinatePlacementFile": "coordinate-placement.json"
+    },
+    {
+      "name": "불미국",
+      "nameZh": "不彌國",
+      "modernArea": "우미·가스야권",
+      "locationStatus": "CONTESTED_WORKING_CHOICE",
+      "sources": ["fumi-choice"],
+      "id": "JP06",
+      "kind": "DOCUMENTED_POLITY",
+      "position": {
+        "x": 947,
+        "y": 270
+      },
+      "level": null,
+      "note": "우미·가스야설을 채택한다. 가호권설도 유력하므로 합의된 비정으로 다루지 않는다.",
+      "placementId": "S132",
+      "coordinatePlacementFile": "coordinate-placement.json"
+    },
+    {
+      "name": "야마타이국",
+      "nameZh": "邪馬臺國",
+      "modernArea": "기나이 나라분지, 마키무쿠 일대",
+      "locationStatus": "KINAI_WORKING_CHOICE_NOT_SETTLED",
+      "sources": ["yamatai-theories", "yamatai-choice"],
+      "id": "JP07",
+      "kind": "DOCUMENTED_POLITY",
+      "position": {
+        "x": 1085,
+        "y": 245
+      },
+      "level": null,
+      "aliases": ["사마대국", "邪馬壹國"],
+      "note": "기나이설을 작업 기준으로 채택한다. 규슈설도 유력하며 학설이 종결됐다는 뜻은 아니다.",
+      "placementId": "S133",
+      "coordinatePlacementFile": "coordinate-placement.json"
+    },
+    {
+      "id": "JP08",
+      "name": "이즈모",
+      "nameZh": "出雲",
+      "modernArea": "혼슈 서부 산인, 시마네권",
+      "kind": "REGIONAL_REPRESENTATIVE",
+      "locationStatus": "GAME_REGION_LABEL",
+      "position": {
+        "x": 1005,
+        "y": 224
+      },
+      "level": null,
+      "note": "지역 대표 거점명. 191년의 공식 국명이나 그림 점과의 대응을 확정하지 않는다.",
+      "sources": ["izumo"],
+      "placementId": "S134",
+      "coordinatePlacementFile": "coordinate-placement.json"
+    },
+    {
+      "id": "JP09",
+      "name": "기비",
+      "nameZh": "吉備",
+      "modernArea": "혼슈 서부, 오카야마권",
+      "kind": "REGIONAL_REPRESENTATIVE",
+      "locationStatus": "GAME_REGION_LABEL",
+      "position": {
+        "x": 1035,
+        "y": 242
+      },
+      "level": null,
+      "note": "지역 대표 거점명. 개별 성읍과 구분한다.",
+      "sources": ["kibi"],
+      "placementId": "S135",
+      "coordinatePlacementFile": "coordinate-placement.json"
+    },
+    {
+      "id": "JP10",
+      "name": "이요",
+      "nameZh": "伊予",
+      "modernArea": "시코쿠 북서부, 에히메현 마쓰야마평야권",
+      "kind": "REGIONAL_REPRESENTATIVE",
+      "locationStatus": "GAME_REGION_LABEL",
+      "position": {
+        "x": 1005,
+        "y": 263
+      },
+      "level": null,
+      "note": "지역 대표 거점명. 191년의 율령국이나 국부가 존재했다는 뜻은 아니다.",
+      "sources": ["iyo"],
+      "placementId": "S136",
+      "coordinatePlacementFile": "coordinate-placement.json"
+    },
+    {
+      "id": "JP11",
+      "name": "사누키",
+      "nameZh": "讃岐",
+      "modernArea": "시코쿠 북동부, 가가와현 다카마쓰·사누키평야권",
+      "kind": "REGIONAL_REPRESENTATIVE",
+      "locationStatus": "GAME_REGION_LABEL",
+      "position": {
+        "x": 1038,
+        "y": 250
+      },
+      "level": null,
+      "note": "지역 대표 거점명. 191년의 율령국이나 국부가 존재했다는 뜻은 아니다.",
+      "sources": ["sanuki"],
+      "placementId": "S137",
+      "coordinatePlacementFile": "coordinate-placement.json"
+    }
+  ],
+  "koreaSites": [
+    {
+      "id": "KR01",
+      "name": "서안평",
+      "modernArea": "압록강 하류, 단둥권",
+      "kind": "SITE",
+      "locationStatus": "WORKING_AREA",
+      "position": {
+        "x": 788,
+        "y": 100
+      },
+      "level": null,
+      "sources": [],
+      "userReference": "철기문화와 여러 나라의 성장 및 집단 분포 첨부 지도",
+      "placementId": "S138",
+      "coordinatePlacementFile": "coordinate-placement.json"
+    },
+    {
+      "id": "KR02",
+      "name": "졸본",
+      "modernArea": "환런권",
+      "kind": "SITE",
+      "locationStatus": "WORKING_AREA",
+      "position": {
+        "x": 813,
+        "y": 71
+      },
+      "level": null,
+      "sources": [],
+      "userReference": "철기문화와 여러 나라의 성장 및 집단 분포 첨부 지도",
+      "placementId": "S139",
+      "coordinatePlacementFile": "coordinate-placement.json"
+    },
+    {
+      "id": "KR03",
+      "name": "국내성",
+      "modernArea": "지안권",
+      "kind": "SITE",
+      "locationStatus": "REGION_WELL_SUPPORTED",
+      "position": {
+        "x": 834,
+        "y": 74
+      },
+      "level": null,
+      "sources": [],
+      "userReference": "철기문화와 여러 나라의 성장 및 집단 분포 첨부 지도",
+      "placementId": "S140",
+      "coordinatePlacementFile": "coordinate-placement.json"
+    },
+    {
+      "id": "KR04",
+      "name": "낙랑",
+      "modernArea": "평양권",
+      "kind": "SITE",
+      "locationStatus": "REUSE_EXISTING_SITE",
+      "position": {
+        "x": 823,
+        "y": 129
+      },
+      "level": null,
+      "sources": [],
+      "userReference": "철기문화와 여러 나라의 성장 및 집단 분포 첨부 지도",
+      "reuseExistingSite": "S082",
+      "placementId": "S082",
+      "coordinatePlacementFile": "coordinate-placement.json"
+    },
+    {
+      "id": "KR05",
+      "name": "부조",
+      "modernArea": "함흥권",
+      "kind": "SITE",
+      "locationStatus": "WORKING_AREA",
+      "position": {
+        "x": 870,
+        "y": 106
+      },
+      "level": null,
+      "sources": ["okjeo"],
+      "userReference": "철기문화와 여러 나라의 성장 및 집단 분포 첨부 지도",
+      "placementId": "S141",
+      "coordinatePlacementFile": "coordinate-placement.json"
+    },
+    {
+      "id": "KR06",
+      "name": "화려",
+      "modernArea": "영흥권",
+      "kind": "SITE",
+      "locationStatus": "WORKING_AREA",
+      "position": {
+        "x": 862,
+        "y": 115
+      },
+      "level": null,
+      "sources": [],
+      "userReference": "철기문화와 여러 나라의 성장 및 집단 분포 첨부 지도",
+      "placementId": "S142",
+      "coordinatePlacementFile": "coordinate-placement.json"
+    },
+    {
+      "id": "KR07",
+      "name": "불이",
+      "modernArea": "안변권",
+      "kind": "SITE",
+      "locationStatus": "CONTESTED_WORKING_CHOICE",
+      "position": {
+        "x": 869,
+        "y": 129
+      },
+      "level": null,
+      "sources": ["okjeo"],
+      "userReference": "철기문화와 여러 나라의 성장 및 집단 분포 첨부 지도",
+      "note": "안변권을 작업 기준으로 채택한다. 금야권 등 다른 위치설이 있다.",
+      "placementId": "S143",
+      "coordinatePlacementFile": "coordinate-placement.json"
+    },
+    {
+      "id": "KR08",
+      "name": "백제국",
+      "modernArea": "한강 하류 서울권",
+      "kind": "DOCUMENTED_POLITY",
+      "locationStatus": "WORKING_AREA",
+      "position": {
+        "x": 855,
+        "y": 167
+      },
+      "level": null,
+      "sources": [],
+      "userReference": "철기문화와 여러 나라의 성장 및 집단 분포 첨부 지도",
+      "placementId": "S144",
+      "coordinatePlacementFile": "coordinate-placement.json"
+    },
+    {
+      "id": "KR09",
+      "name": "목지국",
+      "modernArea": "천안 직산·성환, 아산만권",
+      "kind": "DOCUMENTED_POLITY",
+      "locationStatus": "CONTESTED_WORKING_CHOICE",
+      "position": {
+        "x": 859,
+        "y": 184
+      },
+      "level": null,
+      "sources": ["mokji"],
+      "userReference": "철기문화와 여러 나라의 성장 및 집단 분포 첨부 지도",
+      "note": "직산·아산만권을 작업 기준으로 채택한다. 여러 위치설 중 하나이며 정확한 도성을 정하지 않는다.",
+      "placementId": "S145",
+      "coordinatePlacementFile": "coordinate-placement.json"
+    },
+    {
+      "id": "KR10",
+      "name": "건마국",
+      "modernArea": "익산권",
+      "kind": "DOCUMENTED_POLITY",
+      "locationStatus": "WORKING_AREA",
+      "position": {
+        "x": 854,
+        "y": 209
+      },
+      "level": null,
+      "sources": [],
+      "userReference": "철기문화와 여러 나라의 성장 및 집단 분포 첨부 지도",
+      "placementId": "S146",
+      "coordinatePlacementFile": "coordinate-placement.json"
+    },
+    {
+      "id": "KR11",
+      "name": "사로국",
+      "modernArea": "경주권",
+      "kind": "DOCUMENTED_POLITY",
+      "locationStatus": "REGION_WELL_SUPPORTED",
+      "position": {
+        "x": 913,
+        "y": 211
+      },
+      "level": null,
+      "sources": [],
+      "userReference": "철기문화와 여러 나라의 성장 및 집단 분포 첨부 지도",
+      "placementId": "S147",
+      "coordinatePlacementFile": "coordinate-placement.json"
+    },
+    {
+      "id": "KR12",
+      "name": "구야국",
+      "modernArea": "김해권",
+      "kind": "DOCUMENTED_POLITY",
+      "locationStatus": "REGION_WELL_SUPPORTED",
+      "position": {
+        "x": 904,
+        "y": 227
+      },
+      "level": null,
+      "sources": [],
+      "userReference": "철기문화와 여러 나라의 성장 및 집단 분포 첨부 지도",
+      "placementId": "S148",
+      "coordinatePlacementFile": "coordinate-placement.json"
+    },
+    {
+      "id": "KR13",
+      "name": "부여",
+      "modernArea": "지린·송화강 유역",
+      "kind": "REGIONAL_REPRESENTATIVE",
+      "locationStatus": "WORKING_AREA",
+      "position": {
+        "x": 844,
+        "y": 4
+      },
+      "level": null,
+      "sources": ["buyeo"],
+      "userReference": "철기문화와 여러 나라의 성장 및 집단 분포 첨부 지도",
+      "placementId": "S149",
+      "coordinatePlacementFile": "coordinate-placement.json"
+    },
+    {
+      "id": "KR14",
+      "name": "읍루",
+      "modernArea": "만주 동부 권역",
+      "kind": "REGIONAL_REPRESENTATIVE",
+      "locationStatus": "BROAD_REGION",
+      "position": {
+        "x": 910,
+        "y": -21
+      },
+      "level": null,
+      "sources": [],
+      "userReference": "철기문화와 여러 나라의 성장 및 집단 분포 첨부 지도",
+      "placementId": "S150",
+      "coordinatePlacementFile": "coordinate-placement.json"
+    },
+    {
+      "id": "KR15",
+      "name": "북옥저",
+      "modernArea": "두만강 하류 권역",
+      "kind": "REGIONAL_REPRESENTATIVE",
+      "locationStatus": "BROAD_REGION",
+      "position": {
+        "x": 944,
+        "y": 41
+      },
+      "level": null,
+      "sources": ["okjeo"],
+      "userReference": "철기문화와 여러 나라의 성장 및 집단 분포 첨부 지도",
+      "placementId": "S151",
+      "coordinatePlacementFile": "coordinate-placement.json"
+    }
+  ],
+  "excludedCandidates": [
+    {
+      "name": "투마국",
+      "reason": "위치설의 차이가 커서 첫 선정에서 제외"
+    },
+    {
+      "name": "구노국",
+      "reason": "첫 선정에서 제외, 특정 위치설을 채택하지 않음"
+    },
+    {
+      "name": "대방군",
+      "reason": "건안 연간 설치를 191년의 군 체제로 소급하지 않음",
+      "sources": ["daebang"]
+    }
+  ],
+  "limits": [
+    "현대 권역은 대표 배치 영역이며 정확한 유적 좌표나 고대 국경이 아니다.",
+    "왜인전의 3세기 기록을 참고하되 191년의 동일한 소유권·국가 조직을 확정하지 않는다.",
+    "원본 지도 126거점·153연결·14연결 제안은 이 선정으로 변경하지 않는다.",
+    "선정 ID는 참고 자료용이며 운영 거점 ID가 아니다.",
+    "연결은 별도 조사·게임 검토가 필요한 제안이다."
+  ],
+  "proposedConnectionPolicy": {
+    "status": "PROPOSED_NOT_ACTIVE",
+    "koreaEntry": "서안평에서 낙랑 방면과 졸본·국내성 방면으로 분기",
+    "japanEntry": ["구야국", "대마국", "일지국", "말로국"],
+    "note": "섬 사이는 해로, 말로 이후 내륙과 세토내해 연결은 별도 검토. 역사 지도만으로 직통 도로를 확정하지 않는다."
+  },
+  "coordinatePlacementFile": "coordinate-placement.json"
+}
