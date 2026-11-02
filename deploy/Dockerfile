@@ -51,11 +51,13 @@ ENV OPENSAMGUK_RESOURCES_ROOT=/app/resources
 
 FROM app-runtime AS server
 COPY --from=bundle /app/dist/runtime/server/server.mjs /app/server/server.mjs
+COPY --from=bundle /app/dist/runtime/server/THIRD_PARTY_NOTICES.txt /app/server/THIRD_PARTY_NOTICES.txt
 COPY --from=bundle /app/dist/runtime/server/node_modules /app/server/node_modules
 CMD ["node", "/app/server/server.mjs"]
 
 FROM app-runtime AS engine
 COPY --from=bundle /app/dist/runtime/engine/engine.mjs /app/engine/engine.mjs
+COPY --from=bundle /app/dist/runtime/engine/THIRD_PARTY_NOTICES.txt /app/engine/THIRD_PARTY_NOTICES.txt
 CMD ["node", "/app/engine/engine.mjs"]
 
 FROM runtime AS migrate

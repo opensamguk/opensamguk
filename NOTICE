@@ -1,3 +1,13 @@
+Bundled npm runtime dependencies
+Referenced by: tools/runtime-bundle/build.mjs
+The esbuild input graph identifies each bundled npm package. Its published package
+metadata and LICENSE, NOTICE or COPYING files are retained verbatim in
+/app/server/THIRD_PARTY_NOTICES.txt and /app/engine/THIRD_PARTY_NOTICES.txt.
+For upstream packages without separate license files, their published README is
+retained with the package metadata. Native dependencies retain their own licenses
+under /app/server/node_modules. The migrate image retains package license files.
+
+
 BuildKit external build-only image
 Referenced by: tools/load/ci.ts (manual isolated load workflows)
 Image: moby/buildkit:v0.34.1@sha256:99368f3e46177c6405b9740e4461d91cee004128daeecca78d4ceac50ec1da5c
