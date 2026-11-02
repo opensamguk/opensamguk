@@ -1,7 +1,8 @@
+import { publicImageUrl } from '@opensamguk/shared/public-images';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import messagesIconUrl from '../art/icons/messages.png';
+const messagesIconUrl = publicImageUrl('apps/web/src/art/icons/messages.png');
 import { retryUnlessClientError } from '../game/errors';
 import { errorCode, serverMessage } from '../turns/apiError';
 import { DisabledReason } from '../ui/DisabledReason';

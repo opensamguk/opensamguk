@@ -1,4 +1,5 @@
 import { publicMapConfig } from '@opensamguk/shared';
+import { resourceRoot } from '@opensamguk/shared/resource-root';
 import { parseArgs } from 'node:util';
 import { createDb } from '@opensamguk/db';
 import { engineFailureMessage, runEngine } from './main';
@@ -6,6 +7,7 @@ import { runSupervisor } from './supervisor';
 import { onShutdownRequest } from './process-lifecycle';
 
 async function main() {
+  resourceRoot();
   publicMapConfig(process.env);
   const { values } = parseArgs({ options: { world: { type: 'string' } } });
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL이 필요합니다.');

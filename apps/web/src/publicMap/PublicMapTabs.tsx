@@ -1,7 +1,8 @@
+import { publicImageUrl } from '@opensamguk/shared/public-images';
 import { useQuery } from '@tanstack/react-query';
 import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import mapIconUrl from '../art/icons/map.png';
-import basemapUrl from '../main/san10-pixel-basemap.png';
+const mapIconUrl = publicImageUrl('apps/web/src/art/icons/map.png');
+const basemapUrl = publicImageUrl('apps/web/src/main/san10-pixel-basemap.png');
 import { MapLegend, WorldMap } from '../main/WorldMap';
 import { useTRPC } from '../trpc';
 import { Tag } from '../ui/Tag';

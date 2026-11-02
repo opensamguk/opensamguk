@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { checkPublicAssets, inspectAssetText } from './check';
 import { APPROVED_MAP_IMAGES } from '../../packages/shared/src/publicMapImages';
 
-const original = new URL('../../apps/web/src/portrait/fallback.svg', import.meta.url);
+const original = new URL('./fixtures/fallback.svg', import.meta.url);
 const fallback = 'apps/web/src/portrait/fallback.svg';
 const emitted = 'assets/fallback-abcdefgh.svg';
 const sha = (value: Uint8Array | string) => createHash('sha256').update(value).digest('hex');
@@ -93,7 +93,7 @@ describe('공개 배포 파일 검사', () => {
   async function addMapImages() {
     manifest.mapImages = [];
     for (const source of APPROVED_MAP_IMAGES) {
-      const bytes = await readFile(new URL(`../../${source}`, import.meta.url));
+      const bytes = Buffer.from(`unit fixture: ${source}`);
       const name = basename(source);
       const dot = name.lastIndexOf('.');
       await put(source, bytes);
@@ -188,6 +188,76 @@ describe('공개 배포 파일 검사', () => {
   it('이미지 CSP의 외부 주소와 data를 거부한다', async () => {
     await put('deploy/security.caddy', `Content-Security-Policy "img-src 'self' https://cdn.jsdelivr.net data:;"`);
     await expect(checkPublicAssets({ root })).rejects.toThrow('image-csp');
+  });
+});
+
+describe('T2-15 AC-INT-20 외부 이미지 배포', () => {
+  const revision = 'a'.repeat(40);
+  const base = `https://raw.githubusercontent.com/opensamguk/opensamguk-images/${revision}`;
+  const svgBase = `https://rawcdn.githack.com/opensamguk/opensamguk-images/${revision}`;
+  let catalog: { source: string; url: string; sha256: string }[];
+  beforeEach(async () => {
+    catalog = [{ source: fallback, url: `${svgBase}/public/portrait/fallback.svg`, sha256: sha(svg) }];
+    await rm(resolve(dist, emitted));
+    await put('apps/web/dist/assets/main.js', `const fallback=${JSON.stringify(catalog[0]!.url)};`);
+    await seal();
+    const metadata = JSON.parse(await readFile(join(dist, 'public-build.json'), 'utf8')) as object;
+    await put('apps/web/dist/public-build.json', JSON.stringify({ ...metadata, schema: 2, remoteImages: catalog }));
+    await put('packages/shared/src/publicImageCatalog.json', JSON.stringify(catalog));
+    await put(
+      'manifest/public-assets.json',
+      JSON.stringify({
+        ...manifest,
+        delivery: 'external',
+        imageRevision: revision,
+        imageBaseUrl: base,
+        svgImageBaseUrl: svgBase,
+      }),
+    );
+    await put('docs/product/decisions.md', '## D-031. 기본 SVG\n## D-060 이미지 분리\n');
+    await put(
+      'deploy/security.caddy',
+      `Content-Security-Policy "img-src 'self' https://raw.githubusercontent.com https://rawcdn.githack.com;"`,
+    );
+  });
+  it('이미지 없는 dist와 정확한 고정 커밋의 목록을 통과시킨다', async () => {
+    await expect(checkPublicAssets({ root })).resolves.toMatchObject({ images: 0, remoteImages: 1 });
+    const urls = new Set(catalog.map((image) => image.url));
+    for (const [text, file] of [
+      [`<img src="${catalog[0]!.url}">`, 'index.html'],
+      [`x{mask:url('${catalog[0]!.url}')}`, 'main.css'],
+    ])
+      expect(inspectAssetText(text!, file!, new Set(), urls)).toEqual([]);
+  });
+  it.each(['main', 'a'.repeat(39)])('움직이는 참조나 짧은 SHA를 거부한다: %s', async (imageRevision) => {
+    await put(
+      'manifest/public-assets.json',
+      JSON.stringify({
+        ...manifest,
+        delivery: 'external',
+        imageRevision,
+        imageBaseUrl: base,
+        svgImageBaseUrl: svgBase,
+      }),
+    );
+    await expect(checkPublicAssets({ root })).rejects.toThrow('image-revision');
+  });
+  it('목록 밖의 경로·원작 초상·다른 호스트와 승인 URL 뒤 경로를 거부한다', () => {
+    const urls = new Set(catalog.map((image) => image.url));
+    for (const url of [
+      catalog[0]!.url + '/other.png',
+      catalog[0]!.url.replace('/public/portrait/fallback.svg', '/portraits/icon/10001.webp'),
+      catalog[0]!.url.replace('rawcdn.githack.com', 'other.example'),
+    ])
+      expect(inspectAssetText(`const x=${JSON.stringify(url)}`, 'main.js', new Set(), urls).length).toBeGreaterThan(0);
+  });
+  it('승인 해시를 바꾼 목록과 추가 로컬 이미지를 거부한다', async () => {
+    await put(
+      'packages/shared/src/publicImageCatalog.json',
+      JSON.stringify([{ ...catalog[0], sha256: 'b'.repeat(64) }]),
+    );
+    await put('apps/web/dist/assets/smuggled.png', 'image');
+    await expect(checkPublicAssets({ root })).rejects.toThrow('image-catalog');
   });
 });
 

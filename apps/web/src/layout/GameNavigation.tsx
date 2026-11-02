@@ -1,25 +1,26 @@
+import { publicImageUrl } from '@opensamguk/shared/public-images';
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, type MouseEvent } from 'react';
 import { OFFICER_MIN_LEVEL } from '../operations/contract';
-import mainIcon from '../art/icons/main.png';
-import turnsIcon from '../art/icons/turns.png';
-import mapIcon from '../art/icons/map.png';
-import nationIcon from '../art/icons/nation.png';
-import diplomacyIcon from '../art/icons/diplomacy.png';
-import operationsIcon from '../art/icons/operations.png';
-import recordsIcon from '../art/icons/records.png';
-import rankingIcon from '../art/icons/ranking.png';
-import battleIcon from '../art/icons/battle.png';
-import personnelIcon from '../art/icons/personnel.png';
-import helpIcon from '../art/icons/help.png';
-import messagesIcon from '../art/icons/messages.png';
+const mainIcon = publicImageUrl('apps/web/src/art/icons/main.png');
+const turnsIcon = publicImageUrl('apps/web/src/art/icons/turns.png');
+const mapIcon = publicImageUrl('apps/web/src/art/icons/map.png');
+const nationIcon = publicImageUrl('apps/web/src/art/icons/nation.png');
+const diplomacyIcon = publicImageUrl('apps/web/src/art/icons/diplomacy.png');
+const operationsIcon = publicImageUrl('apps/web/src/art/icons/operations.png');
+const recordsIcon = publicImageUrl('apps/web/src/art/icons/records.png');
+const rankingIcon = publicImageUrl('apps/web/src/art/icons/ranking.png');
+const battleIcon = publicImageUrl('apps/web/src/art/icons/battle.png');
+const personnelIcon = publicImageUrl('apps/web/src/art/icons/personnel.png');
+const helpIcon = publicImageUrl('apps/web/src/art/icons/help.png');
+const messagesIcon = publicImageUrl('apps/web/src/art/icons/messages.png');
 import { useInboxCount } from '../inbox/useInboxCount';
 import styles from './GameNavigation.module.css';
 
 // 구조 참고: opensamguk-v1 bc053629의 GameFrame.tsx·nav31.ts (MIT).
 // Copyright (c) 2026 빼뽀네 (peppone-choi) and OpenSamguk contributors.
 // 현재 React 주소와 메인 지도·30칸 예약을 유지하고 연결된 화면만 안내한다.
-// 아이콘은 Codex 생성 도트 그림이다 (apps/web/src/art/sources.json, D-041).
+// 아이콘은 Codex 생성 도트 그림이다 (opensamguk-images의 public/art/sources.json, D-041).
 const NAV = [
   { to: '/w/$worldId', label: '군략도', icon: mainIcon, exact: true },
   { to: '/w/$worldId', label: '예턴', icon: turnsIcon, area: 'main-commands' },

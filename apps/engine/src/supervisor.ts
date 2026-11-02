@@ -36,11 +36,22 @@ type ManagedWorld = {
   halted: boolean;
 };
 
+declare const __OPENSAMGUK_RUNTIME_BUNDLE__: boolean | undefined;
+
+export function engineChildArgs(bundle: boolean, selfUrl: string, worldId: string): string[] {
+  const entry = fileURLToPath(bundle ? selfUrl : new URL('./index.ts', selfUrl));
+  return [...(bundle ? [] : ['--import', 'tsx']), entry, '--world', worldId];
+}
+
 function spawnEngine(worldId: string): ChildProcess {
   // tsx의 watch 래퍼를 거치지 않아 감독이 실제 엔진 PID를 소유한다.
   return spawn(
     process.execPath,
-    ['--import', 'tsx', fileURLToPath(new URL('./index.ts', import.meta.url)), '--world', worldId],
+    engineChildArgs(
+      typeof __OPENSAMGUK_RUNTIME_BUNDLE__ !== 'undefined' && __OPENSAMGUK_RUNTIME_BUNDLE__,
+      import.meta.url,
+      worldId,
+    ),
     {
       env: process.env,
       stdio: process.platform === 'win32' ? ['ignore', 'ignore', 'ignore', 'ipc'] : 'ignore',

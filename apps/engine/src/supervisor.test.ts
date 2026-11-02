@@ -1,6 +1,27 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@opensamguk/db';
-import { CRASH_LIMIT, CRASH_WINDOW_MS, recentCrashes, restartDelay, runSupervisor } from './supervisor';
+import {
+  CRASH_LIMIT,
+  CRASH_WINDOW_MS,
+  engineChildArgs,
+  recentCrashes,
+  restartDelay,
+  runSupervisor,
+} from './supervisor';
+import { fileURLToPath } from 'node:url';
+
+it('T2-15 AC-M2-08 번들은 자기 파일을, 소스는 tsx index.ts를 다시 실행한다', () => {
+  const bundle = new URL('./directory with spaces/engine.mjs', import.meta.url);
+  expect(engineChildArgs(true, bundle.href, 'world-a')).toEqual([fileURLToPath(bundle), '--world', 'world-a']);
+  const source = new URL('./supervisor.ts', import.meta.url);
+  expect(engineChildArgs(false, source.href, 'world-b')).toEqual([
+    '--import',
+    'tsx',
+    fileURLToPath(new URL('./index.ts', source)),
+    '--world',
+    'world-b',
+  ]);
+});
 
 describe('감독 재시작 정책', () => {
   it('백오프는 1·2·4초로 늘고 60초에서 멈춘다', () => {

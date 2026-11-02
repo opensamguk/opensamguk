@@ -1,12 +1,13 @@
+import { publicImageUrl } from '@opensamguk/shared/public-images';
 // SHA-256 of the shipped Natural Earth vector bundle, verified by INT-03 data tests.
 import { bounds } from '../mapEditor/geodata/natural-earth.json';
 import { bounds as san10Bounds } from './san10-basemap.json';
 import { SAN10_GIS_SHA256 } from './san10-gis-hash';
 import type { PublicGeography } from '@opensamguk/shared';
-import pixelBasemap from './pixel-basemap.png';
+const pixelBasemap = publicImageUrl('apps/web/src/main/pixel-basemap.png');
 import { palette } from './pixel-basemap.json';
 import { palette as san10Palette } from './san10-pixel-basemap.json';
-import san10PixelBasemap from './san10-pixel-basemap.png';
+const san10PixelBasemap = publicImageUrl('apps/web/src/main/san10-pixel-basemap.png');
 
 export const OPERATIONAL_GIS_SHA256 = '7aebb196cd19b2edf936cc5d6ef401d5582e0cb5662f5521b9016930d84da11e';
 

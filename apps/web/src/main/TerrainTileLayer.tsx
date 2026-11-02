@@ -16,7 +16,7 @@ import {
 export type TerrainGrid = { cells: Int8Array; columns: number; rows: number };
 
 // 확대 지형·길 타일 층 (INT-20). 칸 하나에 타일 하나를 깔고, 타일 그림은 지형마다 SVG 무늬로 한 번만 둔다.
-// 그림은 apps/web/src/art/sources.json의 생성 원본을 tools/pixel-assets/build-tiles.py로 줄인 것이다.
+// 그림은 opensamguk-images의 public/art/sources.json 생성 원본을 tools/pixel-assets/build-tiles.py로 줄인 것이다.
 
 type Grid = TerrainGrid;
 const grids = new Map<string, Promise<Grid>>();
@@ -27,19 +27,25 @@ function loadGrid(url: string, colors: TerrainPalette): Promise<Grid> {
   if (!grid) {
     grid = new Promise<Grid>((resolve, reject) => {
       const image = new Image();
+      // 바탕 PNG는 이미지 저장소 CDN에 있다. CORS로 받아야 canvas가 오염되지 않고 픽셀을 읽을 수 있다.
+      image.crossOrigin = 'anonymous';
       image.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = image.naturalWidth;
-        canvas.height = image.naturalHeight;
-        const context = canvas.getContext('2d', { willReadFrequently: true });
-        if (!context) return reject(new Error('canvas'));
-        context.drawImage(image, 0, 0);
-        const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
-        resolve({
-          cells: terrainGrid(data, canvas.width, canvas.height, colors),
-          columns: canvas.width,
-          rows: canvas.height,
-        });
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = image.naturalWidth;
+          canvas.height = image.naturalHeight;
+          const context = canvas.getContext('2d', { willReadFrequently: true });
+          if (!context) return reject(new Error('canvas'));
+          context.drawImage(image, 0, 0);
+          const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+          resolve({
+            cells: terrainGrid(data, canvas.width, canvas.height, colors),
+            columns: canvas.width,
+            rows: canvas.height,
+          });
+        } catch (error) {
+          reject(error);
+        }
       };
       image.onerror = () => reject(new Error('image'));
       image.src = url;

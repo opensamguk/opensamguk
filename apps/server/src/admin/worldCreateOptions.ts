@@ -12,6 +12,7 @@ import {
 } from '@opensamguk/rules';
 import { operationalMapSchema, validateWorldResources } from '@opensamguk/rules/resource-validation';
 import { hashState } from '@opensamguk/shared/node';
+import { resourceRoot } from '@opensamguk/shared/resource-root';
 import type { Context } from '../context';
 import { requireCurrentAdmin } from './access';
 
@@ -42,7 +43,6 @@ export const creationRefs = [
   { kind: 'PORTRAIT_MAP', name: '191-map', version: 1 },
 ] as const;
 const presetKeys = ['regular', 'speed', 'beginner', 'hardcore'] as const;
-const presetRoot = new URL('../../../../resources/preset/', import.meta.url);
 const identity = { id: 'integration-v01', label: '통합판 v0.1 · 191년 군웅할거' } as const;
 const profileIds = ['integration-v01', 'san10-191', 'san10-empty'] as const;
 type ProfileId = (typeof profileIds)[number];
@@ -280,7 +280,10 @@ export async function getWorldCreationOptions(ctx: Context, input: z.infer<typeo
         const presets = await Promise.all(
           [...presetKeys, 'empty'].map(async (key) => {
             try {
-              return { key, value: JSON.parse(await readFile(new URL(`${key}.json`, presetRoot), 'utf8')) as unknown };
+              return {
+                key,
+                value: JSON.parse(await readFile(new URL(`preset/${key}.json`, resourceRoot()), 'utf8')) as unknown,
+              };
             } catch {
               return { key, value: null };
             }

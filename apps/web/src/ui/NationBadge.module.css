@@ -23,11 +23,14 @@
 }
 .flag::before {
   background: currentColor;
-  -webkit-mask: url('../art/flag/square-cloth.png') 0 0 / 100% 100% no-repeat;
-  mask: url('../art/flag/square-cloth.png') 0 0 / 100% 100% no-repeat;
+  -webkit-mask: url('https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/art/flag/square-cloth.png')
+    0 0 / 100% 100% no-repeat;
+  mask: url('https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/art/flag/square-cloth.png')
+    0 0 / 100% 100% no-repeat;
 }
 .flag::after {
-  background: url('../art/flag/square.png') 0 0 / 100% 100% no-repeat;
+  background: url('https://raw.githubusercontent.com/opensamguk/opensamguk-images/b7efb438b70058aefdfa2fbc4693ca7db259bbc6/public/art/flag/square.png')
+    0 0 / 100% 100% no-repeat;
 }
 .name {
   display: inline-block;

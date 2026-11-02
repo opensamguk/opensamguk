@@ -1,0 +1,9 @@
+{
+  "name": "@opensamguk/migrate-runtime",
+  "private": true,
+  "type": "module",
+  "files": [],
+  "dependencies": {
+    "prisma": "7.10.1"
+  }
+}

@@ -1,4 +1,5 @@
 import { publicMapConfig } from '@opensamguk/shared';
+import { requestGuard } from '@opensamguk/shared/request-policy';
 import { randomBytes } from 'node:crypto';
 import cookie from '@fastify/cookie';
 import type { PrismaClient } from '@opensamguk/db';
@@ -93,18 +94,17 @@ export async function buildServer(options: {
     reply.header('X-Frame-Options', 'DENY');
     const path = req.routeOptions.url ?? req.url.split('?')[0]!;
     if (path !== '/trpc' && !path.startsWith('/trpc/')) return;
-    const sse = req.headers.accept
-      ?.split(',')
-      .some((value) => value.split(';')[0]?.trim().toLowerCase() === 'text/event-stream');
-    if (req.method !== 'POST' && !sse) return;
-    const origin = req.headers.origin;
-    if (origin !== undefined ? origin !== publicOrigin : req.headers['sec-fetch-site'] !== 'same-origin')
-      return reply.code(403).send({ error: '같은 출처에서 요청하세요.' });
-    if (
-      req.method === 'POST' &&
-      req.headers['content-type']?.split(';')[0]?.trim().toLowerCase() !== 'application/json'
-    )
-      return reply.code(415).send({ error: 'JSON 본문이 필요합니다.' });
+    const denial = requestGuard(
+      {
+        method: req.method,
+        accept: req.headers.accept,
+        origin: req.headers.origin,
+        secFetchSite: req.headers['sec-fetch-site'] as string | undefined,
+        contentType: req.headers['content-type'],
+      },
+      publicOrigin,
+    );
+    if (denial) return reply.code(denial.status).send({ error: denial.error });
   });
   await server.register(cookie);
   const realtime = registerRealtime(server, options.db, publicOrigin, options.realtime, clock);
