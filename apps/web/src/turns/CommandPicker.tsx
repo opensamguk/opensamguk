@@ -4,7 +4,7 @@ import { DisabledReason } from '../ui/DisabledReason';
 import { argFields, buildArgs, requiredKeys, type ArgField } from './args';
 import type { Turn } from './draft';
 import styles from './TurnEditor.module.css';
-import { cityPreparationNote, cityPreparationSchema, type PreparationTarget } from './cityResourceArgs';
+import { cityPreparationNote, cityPreparationSchema, hasCityBranch, type PreparationTarget } from './cityResourceArgs';
 
 export interface CommandInfo {
   key: string;
@@ -46,8 +46,8 @@ interface Props {
   cityChoicesFor?: ((commandKey: string) => CityChoices | null) | undefined;
 }
 
-// 명령 고르기: 분류별 목록 + 이름 검색, 인자가 있으면 대상 칸을 띄운다.
-// 키보드: 검색 칸에서 Enter를 누르면 첫 결과를 고른다. 인자가 없으면 바로 넣고, 있으면 첫 인자 칸으로 간다.
+// 서버가 준 명령을 카드로 고른다. 카드 선택과 실제 명령/패 소비는 별개다.
+// 키보드: 검색 칸에서 Enter를 누르면 화면의 첫 카드를 고른다. 인자가 없으면 바로 넣고, 있으면 첫 인자 칸으로 간다.
 export function CommandPicker({
   commands,
   cities,
@@ -71,20 +71,56 @@ export function CommandPicker({
   const listId = useId();
   const formId = useId();
 
+  // 서버 목록에서 고른 명령이 빠지면 고른 상태와 입력값을 비운다. 같은 키가 다시 와도 옛 입력을 되살리지 않는다.
+  if (chosen !== null && !commands.some((c) => c.key === chosen)) {
+    setChosen(null);
+    setValues({});
+    setPreparationTarget('unit');
+  }
+
+  // 고른 카드만 고른 갈래를 쓰고, 나머지 카드는 기본 갈래(기존 부곡)로 설명한다.
+  const targetOf = (key: string): PreparationTarget => (key === chosen ? preparationTarget : 'unit');
+  const schemaFor = (item: CommandInfo, target: PreparationTarget) =>
+    cityPreparationSchema(item.argsSchema, cityResources, target);
+  // 국가 칸은 대상 장수를 이름으로 고르므로 카드 설명·입력 칸·누락 안내가 같은 이름을 쓴다.
+  const fieldsFor = (target: unknown): ArgField[] =>
+    target
+      ? argFields(target).map((field) =>
+          field.key === 'generalId' && generals ? { ...field, label: '대상 장수' } : field,
+        )
+      : [];
+
+  const categories = useMemo(
+    () =>
+      [...new Set([...CATEGORY_ORDER, ...commands.map((command) => command.category)])].filter((key) =>
+        commands.some((command) => command.category === key),
+      ),
+    [commands],
+  );
+  const activeCategory = categories.includes(category) ? category : 'all';
+
   const filtered = useMemo(() => {
     const q = query.trim();
     return commands.filter(
-      (command) => (category === 'all' || command.category === category) && (q === '' || command.name.includes(q)),
+      (command) =>
+        (activeCategory === 'all' || command.category === activeCategory) && (q === '' || command.name.includes(q)),
     );
-  }, [commands, query, category]);
-  const command = commands.find((c) => c.key === chosen) ?? null;
-  const schema = useMemo(
-    () => (command ? cityPreparationSchema(command.argsSchema, cityResources, command.key, preparationTarget) : null),
-    [command, cityResources, preparationTarget],
+  }, [commands, query, activeCategory]);
+  // 화면은 분류 순서로 묶어 그린다. 검색 Enter도 이 순서의 첫 카드를 고른다.
+  const groups = useMemo(
+    () =>
+      categories
+        .map((key) => ({ key, items: filtered.filter((c) => c.category === key) }))
+        .filter((g) => g.items.length > 0),
+    [categories, filtered],
   );
-  const fields = useMemo(() => (schema ? argFields(schema) : []), [schema]);
-  const required = useMemo(() => (schema ? requiredKeys(schema) : []), [schema]);
-  const cityDrill = cityResources && command && ['train', 'morale'].includes(command.key);
+  const command = commands.find((c) => c.key === chosen) ?? null;
+  const schema = command ? schemaFor(command, preparationTarget) : null;
+  const fields = fieldsFor(schema);
+  const required = schema ? requiredKeys(schema) : [];
+  // 도시 자원 판에서 서버 schema에 도시 수비병 갈래가 있는 명령(INT-18의 훈련·사기)만 갈래를 고른다.
+  // 고른 뒤 서버 목록에서 갈래가 사라져도 부곡으로 되돌릴 수 있도록 고른 상태면 선택 칸을 남긴다.
+  const cityDrill = cityResources && command && (hasCityBranch(command.argsSchema) || preparationTarget === 'city');
   const costNote = command ? cityPreparationNote(cityResources, command.key, preparationTarget) : null;
   const built = buildArgs(fields, required, values);
   const sortedCities = useMemo(() => [...cities].sort((a, b) => a.name.localeCompare(b.name, 'ko')), [cities]);
@@ -98,13 +134,15 @@ export function CommandPicker({
   };
 
   // 고를 때 기본값을 채운다. 대상 도시는 지도에서 고른 도시를 먼저 둔다 (힌트일 뿐 바로 넣지는 않는다).
-  const choose = (key: string) => {
+  // 다른 카드로 옮기면 훈련·사기 갈래는 기존 부곡으로 돌아간다. 고른 schema를 돌려준다.
+  const choose = (key: string, target: PreparationTarget = targetOf(key)) => {
     setChosen(key);
+    setPreparationTarget(target);
     const next = commands.find((c) => c.key === key);
     const initial: Record<string, string> = {};
     const mapCity = mapCityFor(next?.key);
-    const nextSchema = next ? cityPreparationSchema(next.argsSchema, cityResources, next.key, preparationTarget) : null;
-    for (const field of nextSchema ? argFields(nextSchema) : []) {
+    const nextSchema = next ? schemaFor(next, target) : null;
+    for (const field of fieldsFor(nextSchema)) {
       if (field.kind === 'city' && mapCity !== null) initial[field.key] = String(mapCity);
       // 지금 거느린 병종을 먼저 고른다(병력이 있으면 소집해제 전엔 바꿀 수 없다). 없으면 기본 병종이다.
       if (field.kind === 'unit') {
@@ -118,7 +156,7 @@ export function CommandPicker({
       if (field.kind === 'color') initial[field.key] = '#8a5a2b';
     }
     setValues(initial);
-    return next;
+    return nextSchema;
   };
 
   const put = () => {
@@ -133,11 +171,11 @@ export function CommandPicker({
   const onSearchKey = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== 'Enter') return;
     event.preventDefault();
-    const first = filtered[0];
+    const first = groups[0]?.items[0];
     if (!first) return;
-    const next = choose(first.key);
-    if (next && !(cityResources && ['train', 'morale'].includes(next.key)) && argFields(next.argsSchema).length === 0) {
-      if (!blockedReason) onPut({ commandKey: next.key, args: {}, explicit: true });
+    const nextSchema = choose(first.key);
+    if (nextSchema && !(cityResources && hasCityBranch(first.argsSchema)) && fieldsFor(nextSchema).length === 0) {
+      if (!blockedReason) onPut({ commandKey: first.key, args: {}, explicit: true });
     } else {
       // 인자 칸이 그려진 뒤 옮긴다.
       requestAnimationFrame(() => firstArgRef.current?.focus());
@@ -150,11 +188,6 @@ export function CommandPicker({
       put();
     }
   };
-
-  const groups = CATEGORY_ORDER.map((key) => ({
-    key,
-    items: filtered.filter((c) => c.category === key),
-  })).filter((g) => g.items.length > 0);
 
   const putReason =
     blockedReason ??
@@ -182,37 +215,60 @@ export function CommandPicker({
           />
         </label>
         <div className={styles.categories} role="group" aria-label="명령 분류">
-          {['all', ...CATEGORY_ORDER.filter((key) => commands.some((c) => c.category === key))].map((key) => (
+          {['all', ...categories].map((key) => (
             <button
               key={key}
               type="button"
               className={styles.chip}
-              aria-pressed={category === key}
+              aria-pressed={activeCategory === key}
               onClick={() => setCategory(key)}
             >
-              {key === 'all' ? '전체' : CATEGORY_LABELS[key]}
+              {key === 'all' ? '전체' : (CATEGORY_LABELS[key] ?? key)}
             </button>
           ))}
         </div>
       </div>
 
       <div id={listId} className={styles.commandList}>
-        {groups.length === 0 ? <p className={styles.muted}>맞는 명령이 없습니다.</p> : null}
+        {groups.length === 0 ? (
+          <p className={styles.muted}>맞는 명령이 없습니다. 검색어를 지우거나 전체 분류를 고르세요.</p>
+        ) : null}
         {groups.map((group) => (
           <fieldset key={group.key} className={styles.group}>
             <legend>{CATEGORY_LABELS[group.key] ?? group.key}</legend>
-            {group.items.map((item) => (
-              <label key={item.key} className={styles.commandOption}>
-                <input
-                  type="radio"
-                  name={`${listId}-command`}
-                  value={item.key}
-                  checked={chosen === item.key}
-                  onChange={() => choose(item.key)}
-                />
-                {item.name}
-              </label>
-            ))}
+            <div className={styles.commandCards}>
+              {group.items.map((item) => {
+                const cardSchema = schemaFor(item, targetOf(item.key));
+                const cardFields = fieldsFor(cardSchema);
+                const cardRequired = requiredKeys(cardSchema);
+                const cardId = `${listId}-${item.key}`;
+                return (
+                  <label key={item.key} className={styles.commandOption} data-checked={chosen === item.key}>
+                    <input
+                      type="radio"
+                      name={`${listId}-command`}
+                      value={item.key}
+                      checked={chosen === item.key}
+                      aria-labelledby={`${cardId}-name`}
+                      aria-describedby={`${cardId}-hint`}
+                      onChange={() => choose(item.key)}
+                    />
+                    <span className={styles.commandBody}>
+                      <strong id={`${cardId}-name`}>{item.name}</strong>
+                      <span id={`${cardId}-hint`} className={styles.commandHint}>
+                        {CATEGORY_LABELS[item.category] ?? item.category}
+                        {' · '}
+                        {!cardSchema
+                          ? '입력 형식 확인 필요'
+                          : cardFields
+                              .map((field) => `${field.label}${cardRequired.includes(field.key) ? ' (필수)' : ''}`)
+                              .join(' · ') || '인자 없음'}
+                      </span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
           </fieldset>
         ))}
       </div>
@@ -233,8 +289,7 @@ export function CommandPicker({
               <select
                 value={preparationTarget}
                 onChange={(event) => {
-                  setPreparationTarget(event.target.value === 'city' ? 'city' : 'unit');
-                  setValues({});
+                  choose(command.key, event.target.value === 'city' ? 'city' : 'unit');
                 }}
               >
                 <option value="unit">기존 부곡</option>
@@ -247,7 +302,7 @@ export function CommandPicker({
               {costNote}
             </p>
           ) : null}
-          {fields.length === 0 ? <p className={styles.muted}>인자 없이 넣는 명령입니다.</p> : null}
+          {schema && fields.length === 0 ? <p className={styles.muted}>인자 없이 넣는 명령입니다.</p> : null}
           {fields.map((field, i) => (
             <ArgInput
               key={field.key}
@@ -387,7 +442,7 @@ function ArgInput({
   return (
     <div className={styles.argRow}>
       <label className={styles.argLabel}>
-        <span>{field.key === 'generalId' && generals ? '대상 장수' : field.label}</span>
+        <span>{field.label}</span>
         {control}
       </label>
       {mapHint ? (

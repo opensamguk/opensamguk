@@ -16,6 +16,7 @@ import { useTRPC } from '../trpc';
 import styles from './GameLayout.module.css';
 import { SanctionNotice } from '../sanction/SanctionNotice';
 import { FirstTurnGuide } from '../onboarding/FirstTurnGuide';
+import { useNarrowTable } from '../ui/useNarrowTable';
 
 // 핵심 조작은 메인 한 화면에서 한다 (소유자 UI 정정 2026-10-21). 메뉴의 다른 주소는 넓게 보는 보조 화면이다.
 // 위쪽 띠에는 월드 이름·현재 연월·다음 턴까지 남은 시간·메뉴·로그아웃. 본문은 화면 폭을 다 쓴다.
@@ -75,6 +76,22 @@ export function GameLayout() {
   const shown = data?.result ?? data?.gameDate;
   const date = shown ? `${shown.year}년 ${shown.month}월` : '연월 —';
   const nextText = topbarStatus(data, noGeneral, countdown, formatRemaining);
+  // 좁은 화면의 위 띠는 월드·연월·다음 턴·실시간·메시지·로그아웃만 둔다. 계정 링크는 아래 `전체` 메뉴로 옮긴다 (T4-97 U1).
+  // 한 곳에만 그려 운영 입구 확인(AC-INT-20)을 두 번 만들지 않는다. 장수 생성 화면은 메뉴가 없으므로 위 띠에 둔다.
+  const narrow = useNarrowTable();
+  const accountInMenu = narrow && !entry;
+  // CSS module의 클래스 값은 string | undefined다. 받은 그대로 각 링크에 넘긴다.
+  const accountLinks = (className: string | undefined) => (
+    <>
+      <AdminEntry className={className} />
+      <Link to="/account" className={className}>
+        내 계정
+      </Link>
+      <Link to="/settings/notifications" className={className}>
+        알림 설정
+      </Link>
+    </>
+  );
 
   return (
     <div className={styles.shell} data-has-navigation={!entry}>
@@ -102,13 +119,7 @@ export function GameLayout() {
           open={messagesOpen}
           onToggle={() => (messagesOpen ? closeMessages() : setMessagesOpen(true))}
         />
-        <AdminEntry className={styles.account} />
-        <Link to="/account" className={styles.account}>
-          내 계정
-        </Link>
-        <Link to="/settings/notifications" className={styles.account}>
-          알림 설정
-        </Link>
+        {accountInMenu ? null : accountLinks(styles.account)}
         <LogoutButton className={styles.logout} />
       </header>
       {!entry ? (
@@ -116,6 +127,7 @@ export function GameLayout() {
           worldId={worldId}
           campaignEnabled={mine.data?.creationRules.campaignEnabled ?? false}
           officerLevel={home.data?.general.officerLevel ?? 0}
+          accountLinks={accountInMenu ? accountLinks : undefined}
         />
       ) : null}
       <main className={styles.content}>

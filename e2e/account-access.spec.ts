@@ -259,7 +259,20 @@ scenario(
       await expect(page.getByRole('heading', { name: '군략도', exact: true })).toBeVisible();
       const main = `/w/${worldId}?city=40`;
       await page.goto(main);
-      await expect(page.getByRole('link', { name: '내 계정', exact: true })).toBeVisible();
+      // 375px에서 내 계정은 위 띠가 아니라 게임 메뉴 `전체`의 계정 줄에 하나만 있다 (T4-97 U1, AC-P2-34).
+      await expect(page.getByRole('banner').getByRole('link', { name: '내 계정', exact: true })).toHaveCount(0);
+      const gameMenu = page.getByRole('navigation', { name: '게임 메뉴', exact: true }).filter({ visible: true });
+      const fullMenu = gameMenu.locator('details');
+      await gameMenu.locator('summary').click();
+      await expect(fullMenu).toHaveAttribute('open');
+      const accountLink = page.getByRole('link', { name: '내 계정', exact: true });
+      await expect(accountLink).toHaveCount(1);
+      await expect(
+        fullMenu.getByRole('group', { name: '계정', exact: true }).getByRole('link', { name: '내 계정', exact: true }),
+      ).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(fullMenu).not.toHaveAttribute('open');
+      await expect(gameMenu.locator('summary')).toBeFocused();
       const editor = page.getByTestId('turn-editor');
       await expect(editor.locator('tr[data-slot]')).toHaveCount(30);
       async function draft(slot: number) {

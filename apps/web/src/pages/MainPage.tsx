@@ -1,6 +1,6 @@
 import { useLocation, useNavigate, useSearch } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useRef, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { errorCode } from '../game/errors';
 import { NoGeneral, QueryError } from '../game/QueryState';
 import { useHome, useWorldId, useWorldMap, useWorldSummary } from '../game/queries';
@@ -15,7 +15,7 @@ import { PolicyBar } from '../policy/PolicyBar';
 import { OfferBox } from '../personnel/OfferBox';
 import { CampaignPanel } from '../personnel/CampaignPanel';
 import { RetinueOrdersPanel } from '../personnel/RetinueOrdersPanel';
-import { TurnEditor } from '../turns/TurnEditor';
+import { TurnEditor, type TurnEditorStatus } from '../turns/TurnEditor';
 import { EmptyState, LoadingState } from '../ui/States';
 import { useTRPC } from '../trpc';
 import styles from './MainPage.module.css';
@@ -28,6 +28,39 @@ const SECTIONS = [
   { area: 'general', label: '장수', name: '장수로 이동' },
   { area: 'general-records', label: '기록', name: '기록으로 이동' },
 ] as const;
+
+// 바로가기 띠의 예턴 상태 (T4-97 U2). 편집기가 알린 값만 옮기며 저장은 편집기에서만 한다.
+function turnStatusText(status: TurnEditorStatus): string {
+  const behind = 'behind' in status && status.behind ? ' · 다른 곳에서 바뀜' : '';
+  switch (status.kind) {
+    case 'loading':
+      return '예턴을 불러오는 중';
+    case 'error':
+      return '예턴을 불러오지 못했습니다';
+    case 'authLost':
+      return '다시 로그인해야 저장할 수 있습니다';
+    case 'readOnly':
+      return '읽기 전용 예턴';
+    case 'ended':
+      return '끝난 판이라 예턴을 바꿀 수 없습니다';
+    case 'conflict':
+      return `충돌 확인 필요 · 보관한 편집 ${status.edits}건`;
+    case 'saving':
+      return '저장하는 중';
+    case 'unsaved':
+      return `저장하지 않은 편집 ${status.edits}건${behind}`;
+    case 'saved':
+      return `저장된 목록${behind}`;
+  }
+}
+
+// 좁은 단추에 얹는 짧은 표. 손볼 일이 있을 때만 보인다.
+function turnStatusBadge(status: TurnEditorStatus): string | null {
+  if (status.kind === 'unsaved') return String(status.edits);
+  if (status.kind === 'saving') return '…';
+  if (status.kind === 'conflict' || status.kind === 'error' || status.kind === 'authLost') return '!';
+  return null;
+}
 
 // 메인 작업 화면이다. 원작 core2026 MainView(R1, df6c926)의 데스크톱 배치를 따른다.
 // 지도(왼쪽)와 명령 목록(오른쪽)을 한 화면에 두고, 지도 아래 도시 정보, 그 아래 국가·장수 정보, 맨 아래 기록을 둔다.
@@ -51,11 +84,24 @@ export function MainPage() {
   const trpc = useTRPC();
   const mine = useQuery(trpc.general.mine.queryOptions({ worldId }));
   const map = useWorldMap(worldId);
+  const [turnStatus, setTurnStatus] = useState<TurnEditorStatus | null>(null);
+  const turnStatusId = useId();
 
   const selectCity = useCallback(
     (key: number) => void navigate({ search: (prev) => ({ ...prev, city: key }), replace: true, resetScroll: false }),
     [navigate],
   );
+
+  // 지도에서 고른 도시는 이미 명령의 대상 도시 기본값이다. 여기서는 명령 칸으로 옮기기만 하고 바로 넣지 않는다.
+  // 고른 칸이 있으면 명령 찾기로, 없으면 칸 목록으로 간다 (칸에서 Enter를 누르면 명령 찾기로 간다).
+  const editable = turnStatus?.kind === 'saved' || turnStatus?.kind === 'unsaved';
+  const chooseForCity = () => {
+    const area = page.current?.querySelector('[data-main-area="commands"]');
+    const hasSelection = turnStatus && 'selection' in turnStatus && turnStatus.selection > 0;
+    const target = area?.querySelector<HTMLElement>(hasSelection ? 'input[type="search"]' : 'tr[tabindex="0"]');
+    target?.focus({ preventScroll: true });
+    target?.scrollIntoView({ block: 'center', behavior: 'instant' });
+  };
 
   const noGeneral = home.isError && errorCode(home.error) === 'NOT_FOUND';
   const homeData = home.data;
@@ -93,18 +139,36 @@ export function MainPage() {
       </header>
 
       <nav className={styles.sections} aria-label="메인 영역 바로가기">
-        {SECTIONS.map(({ area, label, name }) => (
-          <button
-            key={area}
-            type="button"
-            className={styles.sectionLink}
-            aria-label={name}
-            aria-controls={`main-${area}`}
-            onClick={() => focusSection(area)}
-          >
-            {label}
-          </button>
-        ))}
+        {SECTIONS.map(({ area, label, name }) => {
+          // 장수가 없는 계정은 예턴 상태 대신 장수 만들기 안내를 본다.
+          const status = area === 'commands' && turnStatus && !noGeneral ? turnStatus : null;
+          const badge = status ? turnStatusBadge(status) : null;
+          return (
+            <button
+              key={area}
+              type="button"
+              className={styles.sectionLink}
+              aria-label={name}
+              aria-controls={`main-${area}`}
+              aria-describedby={status ? turnStatusId : undefined}
+              data-turn-status={status?.kind}
+              title={status ? turnStatusText(status) : undefined}
+              onClick={() => focusSection(area)}
+            >
+              {label}
+              {badge ? (
+                <span className={styles.turnBadge} aria-hidden="true">
+                  {badge}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+        {turnStatus && !noGeneral ? (
+          <span id={turnStatusId} className={styles.srOnly} data-testid="main-turn-status">
+            {turnStatusText(turnStatus)}
+          </span>
+        ) : null}
       </nav>
 
       {/* 끝난 판이면 결과를 맨 위에 둔다. 나머지 칸은 그대로 읽는다 (T1-27). */}
@@ -152,7 +216,18 @@ export function MainPage() {
           )}
         </Panel>
 
-        <Panel title="도시 정보" area="city" headingId="main-city">
+        <Panel
+          title="도시 정보"
+          area="city"
+          headingId="main-city"
+          actions={
+            cityKey !== null && editable ? (
+              <button type="button" className={styles.action} onClick={chooseForCity}>
+                이 도시로 명령 고르기
+              </button>
+            ) : null
+          }
+        >
           {cityKey !== null ? (
             <CityInfo worldId={worldId} cityKey={cityKey} nations={nations} onSelectCity={selectCity} />
           ) : home.isPending ? (
@@ -166,7 +241,7 @@ export function MainPage() {
             도시 선택·재조회 때 다시 만들지 않는다. 그래서 저장하지 않은 편집과 고른 칸이 유지된다. */}
         <Panel title="명령 목록" area="commands" headingId="main-commands">
           <PolicyBar worldId={worldId} />
-          <TurnEditor worldId={worldId} selectedCityKey={cityKey} />
+          <TurnEditor worldId={worldId} selectedCityKey={cityKey} onStatus={setTurnStatus} />
         </Panel>
 
         <Panel title="국가 정보" area="nation" headingId="main-nation">
