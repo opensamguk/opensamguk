@@ -6,6 +6,7 @@ lakes and rivers under resources/map-drafts/san10/ so build-pixel-basemap.py --m
 """
 import hashlib
 import json
+import sys
 import shutil
 import zipfile
 import zlib
@@ -15,6 +16,9 @@ from urllib.request import Request, urlopen
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'tools'))
+from image_repository import image_repository
+RELIEF = image_repository() / 'public/map-drafts/san10/natural-earth-relief.webp'
 CACHE = Path.home() / '.cache/opensamguk/natural-earth-v5.1.2'
 OUT = ROOT / 'resources/map-drafts/san10'
 LAYOUT = json.loads((OUT / 'adopted-placement.json').read_text(encoding='utf-8'))
@@ -100,7 +104,8 @@ def main():
            (BOUNDS[2] - left) / pixel, (BOUNDS[1] - top) / vertical)
     size = (CANVAS[0] * 2, CANVAS[1] * 2)  # 2 relief pixels per map unit, as for the 1000x700 relief
     relief = Image.open(tif).convert('RGB').transform(size, Image.Transform.EXTENT, box, Image.Resampling.BICUBIC)
-    relief.save(OUT / 'natural-earth-relief.webp', quality=88, method=6)
+    RELIEF.parent.mkdir(parents=True, exist_ok=True)
+    relief.save(RELIEF, quality=88, method=6)
 
     sources = [{'url': url, 'sha256': raster_hash}]
     lakes, rivers = [], []
@@ -132,7 +137,7 @@ def main():
         'bounds': BOUNDS, 'unitsPerDegree': UNITS, 'canvas': CANVAS,
         'sources': sources, 'worldFile': world,
         'relief': {'file': 'natural-earth-relief.webp',
-                   'sha256': hashlib.sha256((OUT / 'natural-earth-relief.webp').read_bytes()).hexdigest()},
+                   'sha256': hashlib.sha256(RELIEF.read_bytes()).hexdigest()},
         'lakes': lakes, 'rivers': rivers,
     }
     (OUT / 'pixel-sources.json').write_text(json.dumps(meta, ensure_ascii=False) + '\n', encoding='utf-8', newline='\n')

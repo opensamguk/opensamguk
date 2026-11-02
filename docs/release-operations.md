@@ -93,6 +93,29 @@ backup의 필수 `--release-sha`는40자리16진 문자열을 그대로 manifest
 
 ## 5. 프록시 경로
 
+### Tunnel 선택 구성
+
+T2-15·AC-M2-08의 선택 파일 `deploy/compose.tunnel.yml`은 기본 Compose에서 postgres·server·engine·migrate·Caddy 설정을 상속한다. server의 publish를 지우고 HTTP 전용 `Caddyfile.tunnel`을 쓴다. 기본 `deploy/compose.yml`과 기존 HTTPS Caddyfile의 바이트는 유지한다. Compose의 `!reset`·`!override`를 지원하는 Docker Compose 2.24.4 이상이 필요하다.
+
+```sh
+docker compose --env-file /secure/production.env -f deploy/compose.tunnel.yml config --quiet
+docker compose --env-file /secure/production.env -f deploy/compose.tunnel.yml up -d --wait postgres
+docker compose --env-file /secure/production.env -f deploy/compose.tunnel.yml run --rm migrate
+docker compose --env-file /secure/production.env -f deploy/compose.tunnel.yml up -d server engine caddy cloudflared
+```
+
+기존 이미지·자료·메일·비밀 볼륨 설정에 `TUNNEL_SECRETS_VOLUME`을 더한다. 해당 external volume의 `/run/secrets`를 UID/GID10001 소유·0700으로, `tunnel_token`을 0600으로 준비하고 읽기 전용으로 연결한다. token 값은 환경·명령 인자·Git·로그에 두지 않는다. 고정 cloudflared 2026.10.7은 `--token-file`을 지원한다. Cloudflare의 공개 hostname 서비스는 `http://127.0.0.1:8080`을 가리켜야 하며 API3001로 직접 연결하지 않는다. 공인 포트는 열지 않는다.
+
+Caddy는 loopback 프록시에서 온 `CF-Connecting-IP`만 client IP로 해석하고 XFF를 그 IP 하나로 덮어쓴다. 따라서 로그인·가입 제한은 API의 `TRUST_PROXY=1` 계약을 유지한다. Tunnel·Caddy·server namespace에 임의 프로세스를 추가하면 이 신뢰 경계가 넓어진다. 기존 target 사전 확인 도구는 기본 Compose만 심사하므로 Tunnel 구성을 그 receipt로 승인하지 않는다. 실제 정식 Tunnel의 SSE·화면 새로고침과 두 공인 IP 검증을 별도로 남긴다. 도메인·token·두 접속 경로가 없는 이번 환경에서는 이 종단 인수는 미완료다. Quick Tunnel은 SSE를 지원하지 않는다.
+
+기준 main Compose에는 필수 로그인 조사 키의 전달 설정이 빠져 있다. 이번 실제 리허설은 별도의 시험용 비밀 파일을 읽어 `AUDIT_HASH_KEY`와 버전을 프로세스 환경에 넣는 명령 override를 사용했다. 기본 Compose를 그대로 실행하면 키 설정 오류로 시작하지 않는다. 이 기존 운영 설정 누락을 숨기거나 원문 키를 예시 환경 파일에 넣지 않는다. `entrypoint.sh`의 비밀 계약은 바꾸지 않았다.
+
+### 운영 번들과 이미지
+
+`pnpm build:runtime`은 esbuild 0.28.2로 server·engine `.mjs`와 검토용 metafile을 만든다. 앱 이미지는 Node slim·실행 번들·필수 resources·LICENSE/NOTICE만 담고 server에만 argon2 실행 파일과 해당 플랫폼의 native prebuild를 더한다. TypeScript 소스·tsx·빌드 도구·pnpm 다운로드 캐시는 없다. migrate는 lockfile의 별도 `@opensamguk/migrate-runtime` 설치본에서 Prisma CLI·schema·migrations·config만 가져온다. Prisma CLI의 전이 실행 의존성은 보존한다.
+
+네 Docker target 이름과 SOURCE_REVISION·SOURCE_TREE_SHA256 검사·label, UID/GID10001, 읽기 전용·cap_drop 설정은 유지한다. web target은 실제 공개 빌드·검사를 거친 정적 파일만 내보낸다. D-060으로 이미지 바이트는 web에 넣지 않고 shared의 고정 커밋 URL·승인 해시 목록으로 읽는다. `pnpm assets:verify-remote`는 이미지 저장소의 실제 바이트·MIME·CORS를 검사한다. 배포 전에 이미지 저장소 PR과 게임 PR을 함께 검토해야 한다.
+
 `deploy/compose.yml`은 검증한 release 이미지와 external volume을 연결하는 T2-15 B2b2 구성입니다. PostgreSQL은 내부 network에만 두며 server의 loopback3001은 Caddy와 같은 namespace에서만 접근합니다. server의8080/8443을 명시한 호스트 주소와 HTTP/HTTPS 포트로 연결합니다. Caddy는 공개 web을 읽기 전용으로 제공합니다. `/trpc`·`/trpc/*`·`/sse`·`/healthz`·`/healthz/engine`만 API로 넘깁니다. 그 밖의 화면 주소는 SPA의 index로 돌아오며 없는 `/assets/*`와 확장자 파일은404로 남습니다.
 
 `PUBLIC_HOST`는 인증서 hostname이고 `PUBLIC_ORIGIN`은 실제 외부 HTTPS 주소입니다. 운영 ACME에는 외부80/443에서 내부8080/8443으로의 전달이 필요합니다. HTTP 리디렉션은 내부8443을 주소에 넣지 않고 `PUBLIC_ORIGIN`과 요청 URI를 잇습니다. 로컬 고포트 리허설은 별도의 internal issuer 설정과 요청에만 전달하는 private CA를 사용합니다. 호스트 truststore나 운영 TLS 검증을 끄지 않습니다.

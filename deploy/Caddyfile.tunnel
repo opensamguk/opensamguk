@@ -1,0 +1,46 @@
+{
+	admin off
+	persist_config off
+	auto_https off
+	servers {
+		protocols h1
+		trusted_proxies static 127.0.0.1/32 ::1/128
+		trusted_proxies_strict
+		client_ip_headers CF-Connecting-IP
+	}
+}
+
+import /etc/caddy/security.caddy
+
+http://:8080 {
+	bind 127.0.0.1
+	import game_security
+	root * /srv/web
+	handle_errors {
+		import game_security
+		respond "요청을 처리하지 못했습니다." {err.status_code}
+	}
+
+	@api path /trpc /trpc/* /sse /healthz /healthz/engine
+	handle @api {
+		reverse_proxy 127.0.0.1:3001 {
+			# Fastify는 Caddy 한 단계만 신뢰하므로 검증한 IP 하나로 덮어쓴다.
+			header_up X-Forwarded-For {client_ip}
+			header_up X-Forwarded-Proto https
+		}
+	}
+
+	@file path /assets /assets/*
+	@extension path_regexp \.[^/]+$
+	handle @file {
+		file_server
+	}
+	handle @extension {
+		file_server
+	}
+	handle {
+		header Cache-Control no-store
+		try_files {path} /index.html
+		file_server
+	}
+}

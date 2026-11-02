@@ -1,4 +1,7 @@
 import { createMailTransport } from './mail/transport';
+import { resourceRoot } from '@opensamguk/shared/resource-root';
+
+resourceRoot();
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {

@@ -21,6 +21,8 @@ ADMIN-CREATE-B 후보의 기본 감독은 월드 발견 주기마다 `WorldCreat
 
 ## 2. 환경변수
 
+운영 server는 `node /app/server/server.mjs`, 감독은 `node /app/engine/engine.mjs`로 실행한다. 감독은 같은 번들을 `--world <ID>`로 다시 실행한다. 개발 명령과 시험의 tsx 실행은 유지한다. Prisma의 PostgreSQL WASM은 번들에 포함하고 server의 argon2만 native prebuild를 외부 모듈로 둔다. migrate는 별도 Prisma CLI 이미지다 (T2-15·AC-M2-08).
+
 루트 `.env`에 둡니다 (`.env.example`을 복사). 비밀값은 운영에서 파일(`/run/secrets`)로만 넣습니다.
 
 | 이름                     | 의미                                                  | 기본값 (로컬)                                                                          | 비밀            | 상태                                                  |
@@ -61,6 +63,10 @@ DB에는 토큰 원문 대신 SHA-256만 저장하고 성공한 활동의 응답
 `turns.set`·`turns.edit`는 같은 revision과 본문을 다시 보내면 기존 `STALE` 응답과 최신 snapshot을 돌려줍니다. 클라이언트가 지정하는 requestId 계약은 없습니다. `tools/session-renewal.integration.test.ts`는 파일 전용 DB를 생성해 실제 loopback HTTP로 검증합니다. PostgreSQL trigger의 세션 UPDATE 예외와 InputEvent 커밋에 맞춘 세션 테이블 rename으로 갱신 SELECT 오류를 각각 넣고 `finally`에서 복구합니다. 업무 예턴·InputEvent·revision의 1회 반영, 원래 200 응답, 쿠키·만료 불변과 같은 revision 재전송을 확인합니다. 인증 단계 SELECT 오류, 정상·동시 갱신, 만료·제재·429·잘못된 입력·207, 로그인·로그아웃 쿠키도 같은 시험에서 확인합니다. 소켓·운영 DB 장애를 주입하는 시험은 아닙니다.
 
 ## 3. 로컬 실행
+
+운영 번들은 `OPENSAMGUK_RESOURCES_ROOT=/app/resources`에서 자료를 읽는다. 값은 기존 디렉터리의 절대 경로여야 하며 없거나 잘못되면 기동을 거부한다. 소스 개발·시험에서 생략하면 저장소 `resources/`를 쓴다. 서버의 생성 프로필·로비 제목과 엔진의 프리셋·초기화가 같은 Node 전용 helper를 쓴다. Workers는 파일 helper 대신 자료 내용을 주입하고 기존 순수 합성 함수를 재사용한다.
+
+`deploy/compose.tunnel.yml`은 공인 포트 없이 cloudflared를 Caddy 앞에 두는 선택 구성이다 (D-059). Caddy HTTP는 server namespace의 loopback8080에만 열린다. Caddy가 loopback에서 받은 `CF-Connecting-IP`를 해석한 뒤 XFF를 그 IP 하나로 덮어쓰므로 API는 계속 직접 연결한 Caddy 한 단계만 신뢰한다. 클라이언트의 XFF를 이어 붙이거나 `TRUST_PROXY`의 홉 수를 늘리지 않는다. 공개 TLS는 Cloudflare가 맡는다. 자세한 비밀 파일 준비와 미검증 범위는 [릴리스 운영](../release-operations.md#tunnel-선택-구성)에 있다.
 
 ```sh
 cp .env.example .env   # 처음 한 번

@@ -7,6 +7,7 @@
     "node": ">=24"
   },
   "scripts": {
+    "build:runtime": "node tools/runtime-bundle/build.mjs",
     "admin:grant": "tsx --env-file-if-exists=.env tools/admin-role.ts grant",
     "admin:revoke": "tsx --env-file-if-exists=.env tools/admin-role.ts revoke",
     "e2e:public": "playwright test --config playwright.public.config.ts",
@@ -60,6 +61,7 @@
     "sim": "tsx tools/sim/cli.ts",
     "build:public": "pnpm --filter @opensamguk/web exec vite build --mode public && pnpm assets:check",
     "assets:check": "tsx tools/public-assets/check.ts",
+    "assets:verify-remote": "tsx tools/public-assets/verify-remote.ts",
     "officers:check": "tsx tools/officer-stats/check.ts",
     "portraits:fetch-supplement": "tsx tools/portrait-map/fetch-supplement.ts",
     "db:init-san10": "tsx --env-file-if-exists=.env tools/init-san10-resources.ts",
@@ -70,6 +72,7 @@
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.64.1",
     "@types/node": "^26.6.5",
+    "esbuild": "0.28.2",
     "eslint": "^10.13.0",
     "globals": "^17.13.0",
     "prettier": "3.9.9",

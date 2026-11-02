@@ -1,7 +1,8 @@
+import { publicImageUrl } from '@opensamguk/shared/public-images';
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
-import mapIcon from '../art/icons/map.png';
-import nationIcon from '../art/icons/nation.png';
-import turnsIcon from '../art/icons/turns.png';
+const mapIcon = publicImageUrl('apps/web/src/art/icons/map.png');
+const nationIcon = publicImageUrl('apps/web/src/art/icons/nation.png');
+const turnsIcon = publicImageUrl('apps/web/src/art/icons/turns.png');
 import { automated, dismissGuide, isGuideDismissed, rememberWorld } from './guideStorage';
 import styles from './FirstTurnGuide.module.css';
 

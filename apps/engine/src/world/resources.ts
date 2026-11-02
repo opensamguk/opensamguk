@@ -1,8 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import type { readPublishedResources, GameResourceKind, PublishedResource } from '@opensamguk/db';
 import { buildInitialWorld, parsePreset, type WorldInit } from '@opensamguk/rules';
+import { resourceRoot as resolveResourceRoot } from '@opensamguk/shared/resource-root';
 
-export const resourceRoot = new URL('../../../../resources/', import.meta.url);
+export const resourceRoot = resolveResourceRoot();
+
 export interface WorldResourceSelection {
   scenario: string;
   map: string;
@@ -16,7 +18,7 @@ function resourceKey(value: string): string {
   return value;
 }
 
-export async function loadPreset(key: string, root: URL = resourceRoot) {
+export async function loadPreset(key: string, root: URL = resolveResourceRoot()) {
   return parsePreset(JSON.parse(await readFile(new URL(`preset/${resourceKey(key)}.json`, root), 'utf8')));
 }
 
@@ -31,7 +33,10 @@ export function resolveWorldResourceSelection(options: WorldResourceSelection): 
   };
 }
 
-export async function loadInitialWorld(options: WorldResourceSelection & { seed: string }, root: URL = resourceRoot) {
+export async function loadInitialWorld(
+  options: WorldResourceSelection & { seed: string },
+  root: URL = resolveResourceRoot(),
+) {
   const selected = resolveWorldResourceSelection(options);
   const readJson = async (path: string): Promise<unknown> => JSON.parse(await readFile(new URL(path, root), 'utf8'));
   const [map, scenario, unitSet, statRules, portraitMap] = await Promise.all([

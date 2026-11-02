@@ -14,9 +14,21 @@ RUN pnpm build:public
 FROM scratch AS web
 COPY --from=public-build /app/apps/web/dist/ /web/
 
-FROM dependencies AS runtime
+FROM dependencies AS bundle
+RUN pnpm build:runtime
+
+FROM dependencies AS migrate-pack
+RUN pnpm --filter @opensamguk/migrate-runtime deploy --prod --legacy /opt/migrate \
+    && test -f /opt/migrate/node_modules/prisma/build/index.js \
+    && test -n "$(find /opt/migrate/node_modules -name schema-engine-debian-openssl-3.0.x -print -quit)"
+
+# 빌드 도구·소스·pnpm store가 없는 공통 실행 기반이다.
+FROM node:24-bookworm-slim@sha256:be8204d4bd327363357f532187b752ff62759c31bedf98e9e18fc08c9cbd605c AS runtime
+WORKDIR /app
 ARG SOURCE_REVISION
 ARG SOURCE_TREE_SHA256
+COPY deploy/entrypoint.sh /app/deploy/entrypoint.sh
+COPY LICENSE NOTICE /app/
 RUN node -e 'if(!/^[a-f0-9]{40}$/.test(process.argv[1])||!/^[a-f0-9]{64}$/.test(process.argv[2]))process.exit(1)' "$SOURCE_REVISION" "$SOURCE_TREE_SHA256" \
     && groupadd --gid 10001 opensamguk \
     && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin opensamguk \
@@ -28,12 +40,31 @@ ENV NODE_ENV=production
 USER 10001:10001
 ENTRYPOINT ["/app/deploy/entrypoint.sh"]
 
-FROM runtime AS server
-CMD ["node", "--import", "tsx", "apps/server/src/index.ts"]
+FROM runtime AS app-runtime
+COPY resources/map /app/resources/map
+COPY resources/scenario /app/resources/scenario
+COPY resources/unitset /app/resources/unitset
+COPY resources/portraits /app/resources/portraits
+COPY resources/preset /app/resources/preset
+COPY resources/NOTICE.md /app/resources/NOTICE.md
+ENV OPENSAMGUK_RESOURCES_ROOT=/app/resources
 
-FROM runtime AS engine
-CMD ["node", "--import", "tsx", "apps/engine/src/index.ts"]
+FROM app-runtime AS server
+COPY --from=bundle /app/dist/runtime/server/server.mjs /app/server/server.mjs
+COPY --from=bundle /app/dist/runtime/server/node_modules /app/server/node_modules
+CMD ["node", "/app/server/server.mjs"]
+
+FROM app-runtime AS engine
+COPY --from=bundle /app/dist/runtime/engine/engine.mjs /app/engine/engine.mjs
+CMD ["node", "/app/engine/engine.mjs"]
 
 FROM runtime AS migrate
-WORKDIR /app/packages/db
-CMD ["node", "/app/packages/db/node_modules/prisma/build/index.js", "migrate", "deploy"]
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=migrate-pack /opt/migrate/node_modules /app/migrate/node_modules
+COPY packages/db/prisma /app/migrate/prisma
+COPY packages/db/prisma.config.ts /app/migrate/prisma.config.ts
+WORKDIR /app/migrate
+USER 10001:10001
+CMD ["node", "node_modules/prisma/build/index.js", "migrate", "deploy"]

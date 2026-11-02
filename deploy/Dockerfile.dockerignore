@@ -21,6 +21,8 @@
 !deploy/Dockerfile
 !deploy/Dockerfile.dockerignore
 !deploy/entrypoint.sh
+!deploy/migrate/
+!deploy/migrate/package.json
 !deploy/security.caddy
 **/node_modules
 **/dist
@@ -31,6 +33,9 @@
 **/playwright-report
 **/.mail-outbox
 **/.authz
+**/.wrangler
+**/.dev.vars*
+**/.cf-build
 **/*.log
 **/*.dump
 **/*.backup

@@ -6,14 +6,13 @@ import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import { resolveApiTarget } from './apiTarget';
 import { devPortraits } from './devPortraits';
-import { APPROVED_MAP_IMAGES } from '@opensamguk/shared/public-map-images';
+import { PUBLIC_IMAGES } from '@opensamguk/shared/public-images';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 
 // 공개 빌드 (D-031, T3-13). `vite build --mode public`일 때만 아래가 적용된다. 일반 dev/build는 그대로다.
 const PUBLIC_MODE = 'public';
 const PUBLIC_BUILD_META = 'public-build.json';
-const FALLBACK_SOURCE = 'apps/web/src/portrait/fallback.svg';
 const IMAGE_FILE = /\.(png|jpe?g|webp|gif|svg|avif|ico|bmp)$/i;
 
 // 공개 빌드는 초상 base URL을 쓰지 않는다. 셸 환경과 .env 파일에서 읽힌 값을 모두 보고, 공백만 있는 값도 거부한다.
@@ -55,9 +54,6 @@ function publicBuildMeta(): Plugin {
     writeBundle: {
       order: 'post',
       async handler() {
-        const imageSources = new Map<string, string>();
-        for (const source of [FALLBACK_SOURCE, ...APPROVED_MAP_IMAGES])
-          imageSources.set(sha256(await readFile(join(repoRoot, source))), source);
         const files: Record<string, string> = {};
         const images: { file: string; source: string | null; sha256: string }[] = [];
         for (const path of (await listFiles(outDir)).sort()) {
@@ -67,10 +63,10 @@ function publicBuildMeta(): Plugin {
           files[file] = digest;
           // 바이트가 기본 SVG와 같을 때만 출처를 적는다. 모르는 그림은 null로 남겨 검사가 걸러 내게 한다.
           if (IMAGE_FILE.test(file)) {
-            images.push({ file, source: imageSources.get(digest) ?? null, sha256: digest });
+            images.push({ file, source: null, sha256: digest });
           }
         }
-        const meta = { schema: 1, mode: PUBLIC_MODE, imageBaseUrl: '', images, files };
+        const meta = { schema: 2, mode: PUBLIC_MODE, imageBaseUrl: '', images, remoteImages: PUBLIC_IMAGES, files };
         await writeFile(join(outDir, PUBLIC_BUILD_META), `${JSON.stringify(meta, null, 2)}\n`);
       },
     },

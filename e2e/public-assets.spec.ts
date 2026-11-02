@@ -27,6 +27,7 @@ interface PublicBuildMeta {
   mode: string;
   imageBaseUrl: string;
   images: { file: string; source: string | null; sha256: string }[];
+  remoteImages: { source: string; url: string; sha256: string }[];
   files: Record<string, string>;
 }
 
@@ -52,7 +53,7 @@ function listFiles(dir: string): string[] {
 // dist가 메타데이터를 만든 바로 그 빌드인지 바이트로 확인한다.
 function readVerifiedMeta(): PublicBuildMeta {
   const meta = JSON.parse(readFileSync(join(distDir, META_FILE), 'utf8')) as PublicBuildMeta;
-  expect(meta.schema).toBe(1);
+  expect(meta.schema).toBe(2);
   expect(meta.mode).toBe('public');
   expect(meta.imageBaseUrl).toBe('');
   const onDisk = listFiles(distDir)
@@ -163,7 +164,7 @@ async function watch(page: Page): Promise<Seen> {
   const seen: Seen = { external: [], api: [], assets: [], pending: [] };
   await page.route('**/*', (route) => {
     const url = new URL(route.request().url());
-    if (url.origin !== origin) {
+    if (url.origin !== origin && !meta.remoteImages.some((image) => image.url === url.href)) {
       seen.external.push(url.href);
       return route.abort('blockedbyclient');
     }
@@ -178,12 +179,12 @@ async function watch(page: Page): Promise<Seen> {
   page.on('response', (response: Response) => {
     const request = response.request();
     const url = new URL(request.url());
-    if (url.origin !== origin || !ASSET_TYPES.has(request.resourceType())) return;
+    if (!ASSET_TYPES.has(request.resourceType())) return;
     if (url.pathname.startsWith('/trpc') || url.pathname.startsWith('/sse')) return;
     seen.pending.push(
       response.body().then((body) => {
         seen.assets.push({
-          path: url.pathname,
+          path: url.origin === origin ? url.pathname : url.href,
           type: request.resourceType(),
           status: response.status(),
           sha256: sha256(body),
@@ -198,37 +199,38 @@ async function watch(page: Page): Promise<Seen> {
 const distKey = (path: string, type: string) => (type === 'document' ? 'index.html' : decodeURI(path.slice(1)));
 
 function expectOnlyDistAssets(seen: Seen) {
-  expect(seen.external, '같은 origin 밖으로 나간 요청').toEqual([]);
+  expect(seen.external, '승인 목록 밖 요청').toEqual([]);
   for (const asset of seen.assets) {
-    const key = distKey(asset.path, asset.type);
     expect(asset.path, '원작 초상 경로').not.toContain('/portraits/');
     expect(asset.status, asset.path).toBe(200);
-    expect(meta.files[key], `${asset.path}가 dist 목록에 없음`).toBeDefined();
-    expect(asset.sha256, `${asset.path} 바이트`).toBe(meta.files[key]);
-    if (asset.type === 'image') expect(meta.images.map((image) => image.file)).toContain(key);
+    if (asset.path.startsWith('https://')) {
+      const approved = meta.remoteImages.find((image) => image.url === asset.path);
+      expect(approved, asset.path).toBeDefined();
+      expect(asset.sha256, asset.path).toBe(approved!.sha256);
+    } else {
+      const key = distKey(asset.path, asset.type);
+      expect(meta.files[key], asset.path).toBeDefined();
+      expect(asset.sha256, asset.path).toBe(meta.files[key]);
+      expect(asset.type).not.toBe('image');
+    }
   }
 }
 
-test('dist는 기본 SVG·승인 지도 자산과 같은 origin 폰트만 묶는다', () => {
+test('dist에는 이미지 바이트가 없고 승인한 고정 주소와 해시만 남는다', () => {
   const approved = JSON.parse(readFileSync(join(repoRoot, 'manifest/public-assets.json'), 'utf8')) as {
+    bundledImages: { source: string; sha256: string }[];
     mapImages: { source: string; sha256: string }[];
   };
-  expect(meta.images).toHaveLength(1 + approved.mapImages.length);
-  const fallback = meta.images.find((image) => image.source === FALLBACK_SOURCE);
-  expect(fallback!.source).toBe(FALLBACK_SOURCE);
-  expect(fallback!.sha256).toBe(sha256(readFileSync(join(repoRoot, FALLBACK_SOURCE))));
-  expect(meta.files[fallback!.file]).toBe(fallback!.sha256);
-  for (const image of approved.mapImages) {
-    const emitted = meta.images.find((entry) => entry.source === image.source);
-    expect(emitted?.sha256).toBe(image.sha256);
-    expect(meta.files[emitted!.file]).toBe(sha256(readFileSync(join(repoRoot, image.source))));
-  }
-  // main.tsx가 읽는 Pretendard 글꼴은 빌드 파일로 함께 나간다.
+  expect(meta.images).toEqual([]);
+  expect(Object.keys(meta.files).filter((file) => /\.(png|svg|webp|jpe?g)$/.test(file))).toEqual([]);
+  expect(meta.remoteImages).toHaveLength(approved.bundledImages.length + approved.mapImages.length);
+  for (const image of [...approved.bundledImages, ...approved.mapImages])
+    expect(meta.remoteImages.find((entry) => entry.source === image.source)?.sha256).toBe(image.sha256);
   expect(Object.keys(meta.files).some((file) => file.endsWith('.woff2'))).toBe(true);
 });
 
 for (const path of ['/', '/login']) {
-  test(`${path} 화면은 dist 안의 자산만 받고 원작 초상을 요청하지 않는다`, async ({ page }) => {
+  test(`${path} 화면은 승인한 CDN 이미지와 dist만 받고 원작 초상을 요청하지 않는다`, async ({ page }) => {
     const seen = await watch(page);
     await page.goto(`${origin}${path}`, { waitUntil: 'networkidle' });
     await expect(page.locator('#root > *').first()).toBeAttached();
@@ -254,11 +256,11 @@ for (const path of ['/', '/login']) {
     ).toBe(true);
     expect(types.has('script') && types.has('stylesheet')).toBe(true);
     const srcs = await page.locator('img').evaluateAll((imgs) => imgs.map((img) => img.getAttribute('src') ?? ''));
-    for (const src of srcs) expect(src).not.toMatch(/portraits|jsdelivr|^data:image/);
+    for (const src of srcs) expect(src).not.toMatch(/\/portraits\/|^data:image/);
   });
 }
 
-test('배출된 기본 SVG를 브라우저가 같은 origin에서 읽는다', async ({ page }) => {
+test('고정 커밋의 SVG를 실제 브라우저가 CDN에서 읽는다', async ({ page }) => {
   const seen = await watch(page);
   await page.goto(`${origin}/login`, { waitUntil: 'networkidle' });
   // 제품 화면을 더하지 않고 시험 안에서만 그림 하나를 읽는다. Portrait 렌더링의 증거로 쓰지 않는다.
@@ -269,7 +271,7 @@ test('배출된 기본 SVG를 브라우저가 같은 origin에서 읽는다', as
       await img.decode();
       return img.naturalWidth;
     },
-    `/${meta.images.find((image) => image.source === FALLBACK_SOURCE)!.file}`,
+    meta.remoteImages.find((image) => image.source === FALLBACK_SOURCE)!.url,
   );
   expect(width).toBeGreaterThan(0);
   await Promise.all(seen.pending);
@@ -279,7 +281,7 @@ test('배출된 기본 SVG를 브라우저가 같은 origin에서 읽는다', as
     seen.assets.some(
       (asset) =>
         asset.type === 'image' &&
-        asset.path === `/${meta.images.find((image) => image.source === FALLBACK_SOURCE)!.file}`,
+        asset.path === meta.remoteImages.find((image) => image.source === FALLBACK_SOURCE)!.url,
     ),
   ).toBe(true);
 });

@@ -16,7 +16,9 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / 'apps/web/src/art'
+sys.path.insert(0, str(ROOT / 'tools'))
+from image_repository import image_repository
+OUT = image_repository() / 'public/art'
 # 확대 타일은 SAN10 표시 색 판으로 물들인다(고전 전략 지도풍의 밝은 초록·짙은 초록·선명한 파랑).
 PALETTE = json.loads((ROOT / 'apps/web/src/main/san10-pixel-basemap.json').read_text(encoding='utf-8'))['palette']
 PROMPTS = json.loads((Path(__file__).with_name('tiles-prompts.json')).read_text(encoding='utf-8'))['prompts']
