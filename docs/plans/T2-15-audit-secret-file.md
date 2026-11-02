@@ -49,31 +49,56 @@ PR #334의 실제 리허설은 기본 `deploy/compose.yml`이 로그인 조사 �
 
 | 항목 | 결과 | 증거 |
 | --- | --- | --- |
-| `pnpm check` | (기록) | (로그 경로·개수) |
-| 단위·시작 순서 (Windows) | (기록) | (Windows 거부 시험 포함) |
-| 단위 POSIX (Linux 비root) | (기록) | (skip 0건) |
-| 기존 mail startup | (기록) | |
-| loginAudit·조사·security 통합 (실제 DB) | (기록) | (skip 0건) |
-| release 계약 | (기록) | |
-| server ENV·engine/migrate 미설정 | (기록) | (image inspect) |
-| compose.yml·entrypoint.sh 바이트 | (기록) | (main과 SHA-256 동일) |
-| 기본 Compose 기동, override 없음 | (기록) | (`docker compose config` 결과·healthz) |
-| 로그인 200과 ipHash·버전 대조 | (기록) | (파일 키 HMAC 일치) |
-| SSE 이벤트·재연결 | (기록) | |
-| 엔진 턴 2회 이상·정상 종료·리스 해제 | (기록) | |
-| 원자적 교체와 재시작 | (기록) | (새 버전 기록) |
-| Docker 거부 사례 | (기록) | (사례별 종료 코드·로그 비노출) |
+| `pnpm check` | 통과 | Windows 390파일·6520시험, pnpm-check-final.log |
+| 단위·시작 순서 (Windows) | 통과 | 4파일·58시험. 파일 설정은 미지원 거부를 확인 |
+| 단위 POSIX (Linux 비root) | 통과 | UID10001 실제 FS 29시험·skip0, linux-file-tests-final.log |
+| 기존 mail startup | 통과 | 위 58시험에 기존 11시험 포함 |
+| loginAudit·조사·security 통합 (실제 DB) | 통과 | Linux PostgreSQL18.6, 앞 두 파일19시험과 security42시험. 최종 각 파일 skip0 |
+| release 계약 | 로컬 통과·CI gate | 4파일111시험. 실제 Linux metadata fixture는 필수 GitHub Actions에서 확인 |
+| server ENV·engine/migrate 미설정 | 통과 | image inspect와 파일을 숨긴 채 migrate·engine 자식 기동 모두 성공 |
+| compose.yml·entrypoint.sh 바이트 | 통과 | main9ab와 동일, Tunnel 파일도 동일. default-contract-proof.json |
+| 기본 Compose 기동, override 없음 | 통과 | primary -f 한 개로 migrate→server health200→engine. CMD·ENTRYPOINT 원본 일치, raw audit ENV 없음 |
+| 로그인 200과 ipHash·버전 대조 | 통과 | native argon2·Prisma WASM 실쿼리, 파일 HMAC·버전7 일치 |
+| SSE 이벤트·재연결 | 통과 | 실제 Caddy+API 125067ms, heartbeat4·ready·턴 이벤트·재연결 |
+| 엔진 턴 2회 이상·정상 종료·리스 해제 | 통과 | .mjs 자식, 월 경계2회·actionSequence0→6, 종료281ms·exit0·리스 만료 |
+| 원자적 교체와 재시작 | 통과 | 파일 rename 뒤 기존 프로세스7 유지, server·Caddy 재기동 뒤 새 키 HMAC·버전8·SSE ready |
+| Docker 거부 사례 | 통과 | UID10001 18사례 모두 exit1·고정 오류, 원문·경로·리스닝 로그 없음. 상위 디렉터리 오류는 기존 entrypoint 문구 |
 | 공개 named Tunnel·두 공인 IP | 미실행 | 도메인·토큰 없음. 이 작업에서 완료로 세지 않는다 |
 
 로그·비밀·리허설 DB는 `E:\codex-artifacts\opensamguk\t2-15-audit-secret-file`에 두고 Git에 넣지 않는다. skip·mock만의 행이나 미병합 상태를 완료로 보고하지 않는다.
 
 ### 독립 리뷰 gate
 
-구현하지 않은 Claude 세션이 이 계획 대비 범위, 우선순위와 시작 순서, 파일 검사의 fd 재사용과 fail-closed, 오류 비노출, 고정 파일 바이트, 문구를 리뷰한다. 필수 지적이 0건이고 PR head 정확 SHA의 필수 CI가 녹색이며 증거 표의 미실행 행이 위 Tunnel 한 줄뿐일 때 병합 후보로 올린다. 병합 뒤 이 문서와 `T2-15-runtime-bundles.md`의 상태 줄, 지도 상태를 갱신한다.
+구현하지 않은 Claude 세션이 이 계획 대비 범위, 우선순위와 시작 순서, 파일 검사의 fd 재사용과 fail-closed, 오류 비노출, 고정 파일 바이트, 문구를 리뷰한다. 필수 지적이 0건이고 PR head 정확 SHA의 필수 CI가 녹색이며 증거 표의 미실행 행이 위 Tunnel 한 줄뿐일 때 병합 후보로 올린다. 필수 CI와 병합 결과는 PR 검사·증거 댓글로 기록하며 공개 Tunnel의 미완료 상태는 유지한다.
 
 ## 구현 기록
 
-(Codex 기록)
+Node 전용 config 어댑터를 bootstrap에서 DB/API 동적 import 전에 읽고 기존 `LoginAuditOptions`로 전달했다. 파일은 같은 fd로 최대 검사 크기+1바이트까지만 읽는다. 기존 환경 주입·게임 규칙·공개 API·Workers·프론트는 바꾸지 않았다. JSON 중복 필드는 표준 `JSON.parse`의 마지막 값 선택을 따르며 별도 문자열 파서는 추가하지 않았다.
+
+### 후속 이미지와 성능 재측정
+
+측정 후보는 `9daa33e1`, 원본은 `f00ec07e`다. 같은 전용 DB·월드1개·활성 장수2명에서 각각3회 재시작하고60초 뒤 `/proc` RSS를 읽었다. server와 engine 모두 node·tsx의 esbuild 프로세스를 합산한 중앙값이며 engine의 자식도 포함한다. 원본 server만 기존 조사 키 전달 누락 때문에 역사적 명령 override를 썼다. 후보는 기본 Compose 그대로다. 원문은 `baseline-metrics.json`·`audit-file-metrics.json`·`comparison.json`이다.
+
+| 항목 | 원본 | 파일 설정 포함 번들 |
+| --- | ---: | ---: |
+| server 이미지 (MiB) | 905.27 | 230.65 |
+| engine 이미지 (MiB) | 905.27 | 228.55 |
+| migrate 이미지 (MiB) | 905.27 | 457.96 |
+| web 이미지 (MiB) | 6.65 | 6.22 |
+| server RSS 합계 (MiB) | 244.91 | 185.82 |
+| engine RSS 합계 (MiB) | 491.46 | 443.91 |
+| engine 부모 RSS (MiB) | 205.11 | 158.39 |
+| engine 자식 RSS (MiB) | 267.93 | 285.51 |
+| server listen (ms) | 1547 | 569 |
+| engine 새 heartbeat (ms) | 1788 | 631 |
+
+자식 RSS는6.6% 늘었으며 engine 전체는9.7% 줄었다. 작은 표본의 중앙값이므로 장기 부하 결과로 세지 않는다. 네 타깃은 실제 Docker로 빌드했고 후보의 server는241853116 B, engine239653818 B, migrate480201944 B, web6525611 B다. SOURCE_REVISION·정규화한 소스 지문 label과 UID10001·read_only·cap_drop을 대조했다.
+
+### 임시 공개 Tunnel의 제한된 증거
+
+계정·도메인 없이 Quick Tunnel을 잠깐 열어 공개 HTTPS의 정적 경로 새로고침, Chromium 폼 표시·재로딩과 오류0을 확인했다. 실제 접속 공인 IP를 메모리에서만 읽고 파일 키의 HMAC과 `LoginRecord` 버전8을 대조했다. 같은 실제 IP의 요청 제한429와 위조 X-Forwarded-For의429도 확인했다. 원문 IP·비밀번호·세션·키는 결과 로그에 넣지 않았다. 서비스·cloudflared의 publish 포트는0개였고 시험 후 임시 Tunnel을 제거했다. 결과는 `quick-result.json`·`quick-login-refresh.png`다.
+
+이 공개 검증은 실제 클라이언트1개뿐이다. [Cloudflare 공식 제한](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/)상 Quick Tunnel은 SSE를 지원하지 않으므로 로컬 Caddy의125초 SSE를 공개 Tunnel 성공으로 세지 않는다. named Tunnel·서로 다른 두 공인 IP 조건은 계속 남는다.
 
 ## 독립 리뷰
 
