@@ -218,7 +218,7 @@ A13 Tunnel은 선택 항목으로 두고 Docker 밖의 리팩터링도 이번 �
 
 Claude의 최초 독립 리뷰는 P2 두 건을 지적했다. 관 성벽 생성기의 삭제된 입력 경로와 운영 문서의 오래된 CSP 설명이었다. 생성기를 외부 저장소로 옮기고 중복 출처 사본을 지웠으며 CSP·출처 설명을 고쳤다. Claude 재리뷰는 두 건 해결과 새 P1/P2 없음으로 판정했다. 구현 담당 Codex가 리뷰 결과를 고쳤다.
 
-프론트 인계 후 Claude Code가 구현한 CORS 처리와 새로고침 시험은 Codex가 독립 확인했다. CORS 설정이 `src` 대입보다 앞에 있고 오류가 정착하며 기존 요청·그림 목록 제한을 유지하는 것을 확인했다. 실행 증거는 별도 artifact에 보관한다.
+프론트 인계 후 Claude Code가 구현한 CORS 처리와 새로고침 시험은 Codex가 독립 확인했다. CORS 설정이 `src` 대입보다 앞에 있고 오류가 정착하며 기존 요청·그림 목록 제한을 유지하는 것을 확인했다. 실행 증거는 별도 artifact에 보관한다. 초기 PR CI에서 드러난 인라인 fallback 가정과 외부 요청0개 가정도 Claude Code가 D-060 계약에 맞춰 고쳤다. 승인 fallback URL·바이트 해시·실제 표시를 확인하는 Chromium2개와 승인 이미지 외 script·fetch·다른SHA·원작·개발 그림을 거부하는 정책6개를 통과했다. 이 수정도 Codex가 독립 확인했다.
 
 ## 검증 증거
 
@@ -254,8 +254,8 @@ Docker Desktop Linux에서 같은 DB·실행 중 월드1개·활성 장수2명·
 
 | 대상 | 크기 이전 MiB | 이후 MiB | 감소 | RSS 이전 MiB | 이후 MiB | 기동 이전 ms | 이후 ms |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| server | 905.27 | 230.40 | 74.5% | 246.44 | 187.10 | 1937 | 664 |
-| engine 전체 | 905.27 | 228.45 | 74.8% | 489.38 | 461.01 | 1958 | 759 |
+| server | 905.27 | 230.65 | 74.5% | 246.44 | 187.10 | 1937 | 664 |
+| engine 전체 | 905.27 | 228.55 | 74.8% | 489.38 | 461.01 | 1958 | 759 |
 | engine 감독 | 해당 없음 | 해당 없음 | 해당 없음 | 195.19 | 175.11 | 해당 없음 | 해당 없음 |
 | engine 자식1개 | 해당 없음 | 해당 없음 | 해당 없음 | 274.75 | 285.89 | 해당 없음 | 해당 없음 |
 | migrate | 905.27 | 457.96 | 49.4% | 해당 없음 | 해당 없음 | 해당 없음 | 해당 없음 |
@@ -263,6 +263,11 @@ Docker Desktop Linux에서 같은 DB·실행 중 월드1개·활성 장수2명·
 
 전체 RSS는 기준판의 tsx/esbuild 보조 프로세스도 포함한다. 각 프로세스의 중앙값 합과 전체 중앙값은 다를 수 있다. server RSS는24.1%, engine 전체는5.8% 줄었다. engine 자식만 보면4.1% 늘었으므로 모든 프로세스의 메모리가 줄었다고 판단하지 않는다. 작은 fixture와3회 측정이며 운영 부하의 메모리 상한이나 처리량 증거가 아니다. 원시 값은 `baseline-final-metrics.json`, `reviewed-final-metrics.json`, `comparison.json`에 있다.
 
+### 의존성 고지 보존
+
+최종 이미지에는 번들 입력에 포함된 npm 패키지의 metadata·LICENSE·NOTICE·COPYING을 `THIRD_PARTY_NOTICES.txt`로 함께 넣었다. upstream에 별도 파일이 없으면 배포된 README를 보존한다. 서버 고지는255416바이트, 엔진 고지는110747바이트다. 실제 pg LICENSE 원문 포함 시험과 독립 Claude 리뷰를 통과했다.
+
+이 최종 네 target은 `b3c0f3f92820658641b3ecca458ff649a4c4a9f2`, source-tree SHA-256 `6d47f5b7bc0db4e6548edaa2eb5490e22da513be7497716e9084e981b01b9315`로 다시 빌드했다. 위 크기 표는 고지 파일을 포함한 최종 크기다. `licensed-payload-proof.json`에서 최종 이미지의 server·engine `.mjs` SHA-256이 RSS 측정판과 각각 같은 것을 확인했다. 실행 코드가 같아 측정 결과를 유지했다. 최종 이미지의 migrate·healthz·engine healthz·감독 자식도 다시 확인하고 리허설 컨테이너를 종료했다.
 ### 인수 상태
 
 이 기록은 실행 이미지와 공통 자산 분리의 검증이다. 공개 named Tunnel·두 공인 IP, 기존 audit 키 전달 간극, 실제 운영 배포·복귀 리허설은 남아 있다. AC-M2-08 전체를 완료로 바꾸지 않는다. 이미지 PR은 [opensamguk-images#48](https://github.com/opensamguk/opensamguk-images/pull/48)로 머지했다. 코드 PR과 최종 CI·병합 결과는 후속 기록한다.
