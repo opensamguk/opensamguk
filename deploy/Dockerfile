@@ -18,7 +18,15 @@ FROM dependencies AS bundle
 RUN pnpm build:runtime
 
 FROM dependencies AS migrate-pack
+# deploy --prod가 복사한 선택 peer compiler는 migrate deploy에 넣지 않는다.
 RUN pnpm --filter @opensamguk/migrate-runtime deploy --prod --legacy /opt/migrate \
+    && node -e 'const p=JSON.parse(require("fs").readFileSync("/opt/migrate/node_modules/prisma/package.json","utf8"));if(p.version!=="7.10.1"||!p.peerDependencies?.typescript||p.peerDependenciesMeta?.typescript?.optional!==true||p.dependencies?.typescript||p.optionalDependencies?.typescript)process.exit(1)' \
+    && test -n "$(find /opt/migrate/node_modules/.pnpm -mindepth 1 -maxdepth 1 -type d -name 'typescript@*' -print -quit)" \
+    && find /opt/migrate/node_modules -type l -name typescript -delete \
+    && find /opt/migrate/node_modules -type f \( -path '*/.bin/tsc' -o -path '*/.bin/tsserver' \) -delete \
+    && find /opt/migrate/node_modules/.pnpm -mindepth 1 -maxdepth 1 -type d -name 'typescript@*' -exec rm -rf -- {} + \
+    && test -z "$(find /opt/migrate/node_modules \( -name typescript -o -name 'typescript@*' -o -name tsc -o -name tsserver \) -print -quit)" \
+    && test -z "$(find /opt/migrate/node_modules -xtype l -print -quit)" \
     && test -f /opt/migrate/node_modules/prisma/build/index.js \
     && test -n "$(find /opt/migrate/node_modules -name schema-engine-debian-openssl-3.0.x -print -quit)"
 
