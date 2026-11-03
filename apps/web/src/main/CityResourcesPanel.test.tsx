@@ -324,11 +324,18 @@ it('INT-18C AC-INT-18C mutation401은 commit 뒤 세션 만료일 수 있어 UUI
   expect(sessionStorage.getItem(allocationStorageKey(mocks.user, 'world-one'))).not.toBeNull();
 });
 it('INT-18C AC-INT-18C 미접수 429는 UUID를 지우고 Retry-After 뒤 수동 조회만 허용한다', async () => {
-  let tick: (() => void) | undefined;
-  const original = globalThis.setInterval;
+  // 카운트다운 interval은 commit 뒤 passive effect에서 등록돼 findByText보다 늦을 수 있다. 살아 있는 1초 interval만 추적한다.
+  const live = new Map<unknown, () => void>();
+  const original = globalThis.setInterval,
+    originalClear = globalThis.clearInterval;
   const timer = vi.spyOn(globalThis, 'setInterval').mockImplementation((handler, delay, ...args) => {
-    if (delay === 1000 && typeof handler === 'function') tick = () => handler();
-    return original(handler, delay, ...args);
+    const id = original(handler, delay, ...args);
+    if (delay === 1000 && typeof handler === 'function') live.set(id, () => handler());
+    return id;
+  });
+  const clear = vi.spyOn(globalThis, 'clearInterval').mockImplementation((id) => {
+    live.delete(id);
+    return originalClear(id);
   });
   const clock = vi.spyOn(Date, 'now');
   try {
@@ -341,13 +348,19 @@ it('INT-18C AC-INT-18C 미접수 429는 UUID를 지우고 Retry-After 뒤 수동
     expect((screen.getByRole('button', { name: '다시 확인' }) as HTMLButtonElement).disabled).toBe(true);
     expect(mocks.request).not.toHaveBeenCalled();
     expect(mocks.allocate).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(live.size).toBe(1));
     clock.mockReturnValue(Date.now() + 46_000);
-    act(() => tick?.());
+    act(() => {
+      for (const tick of [...live.values()]) tick();
+    });
+    expect((screen.getByRole('button', { name: '다시 확인' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(live.size).toBe(0);
     fireEvent.click(screen.getByRole('button', { name: '다시 확인' }));
     await screen.findByRole('combobox', { name: '배속할 부곡' });
     expect(mocks.allocate).toHaveBeenCalledTimes(1);
   } finally {
     clock.mockRestore();
+    clear.mockRestore();
     timer.mockRestore();
   }
 });
