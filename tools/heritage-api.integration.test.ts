@@ -9,7 +9,7 @@ import type { inferRouterOutputs } from '@trpc/server';
 import { createDb, type Prisma } from '../packages/db/src/index';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 import { lineageTestConfig } from '../packages/rules/src/lineage/testFixture';
-import { TICKS_PER_MONTH } from '../packages/rules/src/index';
+import { TICKS_PER_MONTH, type LineageInput } from '../packages/rules/src/index';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { initializeIntegrationResources } from './integration-resources';
 import { hashState } from '../packages/shared/src/node/hashState';
@@ -65,6 +65,9 @@ type Replies = {
   'general.create': Out['general']['create'];
   'general.mine': Out['general']['mine'];
   'heritage.mine': Out['heritage']['mine'];
+  'lineage.get': Out['lineage']['get'];
+  'lineage.submit': Out['lineage']['submit'];
+  'lineage.request': Out['lineage']['request'];
   'turns.set': Out['turns']['set'];
   'nationTurns.set': Out['nationTurns']['set'];
   'admin.world.requestReset': Out['admin']['world']['requestReset'];
@@ -76,6 +79,7 @@ async function rpc<R extends keyof Replies>(route: R, input: unknown, user?: Use
       route === 'general.create' ||
       route === 'turns.set' ||
       route === 'nationTurns.set' ||
+      route === 'lineage.submit' ||
       route === 'admin.world.requestReset',
     encoded = JSON.stringify({ 0: input });
   const response = await fetch(
@@ -116,6 +120,7 @@ async function world(
     endYear?: number | null;
     personnel?: boolean;
     maxGenerals?: number;
+    lineage?: boolean;
   } = {},
 ) {
   const initial = commandInitial();
@@ -133,14 +138,22 @@ async function world(
   } else if (options.actor) {
     initial.generals[0]!.userId = options.actor.id;
   }
-  const enabled = options.enabled !== false;
+  const enabled = options.enabled !== false,
+    withLineage = Boolean(options.maxGenerals || options.lineage);
   const featureData = {
     ...(enabled ? { 'heritage-v1': { version: 1 } } : {}),
-    ...(options.maxGenerals
+    ...(withLineage
       ? {
           'lineage-v1': {
             ...lineageTestConfig,
-            limits: { ...lineageTestConfig.limits, maxGenerals: options.maxGenerals },
+            birth: {
+              ...lineageTestConfig.birth,
+              ...(options.lineage ? { comingOfAgeYears: 1 } : {}),
+            },
+            limits: {
+              ...lineageTestConfig.limits,
+              maxGenerals: options.maxGenerals ?? lineageTestConfig.limits.maxGenerals,
+            },
           },
         }
       : {}),
@@ -153,8 +166,8 @@ async function world(
     ruleFeatures: [
       ...(enabled ? ['heritage-v1'] : []),
       'policy',
-      ...(options.personnel || options.maxGenerals ? ['personnel'] : []),
-      ...(options.maxGenerals ? ['lineage-v1'] : []),
+      ...(options.personnel || withLineage ? ['personnel'] : []),
+      ...(withLineage ? ['lineage-v1'] : []),
     ].sort(),
     featureData,
   });
@@ -345,6 +358,83 @@ it.each(['spend', 'refund'] as const)(
   },
   120000,
 );
+
+it('AC-P2-33 동의 계승 전후의 실제 36개월 활동을 한 계정에 합산하고 종료 재생을 보존한다', async () => {
+  const father = await user(),
+    mother = await user(),
+    id = await world({ lineage: true, endYear: 193 });
+  // 성인 등장 1년·확률 100%인 인공 고정물이다. 공개 기본값·491명 전체 기수의 증거가 아니다.
+  const create = async (player: User, name: string, sex: 'MALE' | 'FEMALE') => {
+    const request = await admit(id, player, {
+      worldId: id,
+      name,
+      sex,
+      leadership: 70,
+      strength: 70,
+      intel: 60,
+      portraitId: null,
+    });
+    await advance(id);
+    const result = await request.result;
+    expect(result.status, JSON.stringify(result.error)).toBe(200);
+    if (result.data?.status !== 'created') throw Error('계승 활동 고정물의 장수 생성이 끝나지 않았습니다.');
+    return result.data.general.id;
+  };
+  const send = async (player: User, generalId: number, payload: LineageInput) => {
+    const requestId = randomUUID();
+    const submitted = await rpc(
+      'lineage.submit',
+      {
+        worldId: id,
+        expectedUserId: player.id,
+        expectedGeneralId: generalId,
+        requestId,
+        payload,
+      },
+      player,
+    );
+    expect(submitted.status, JSON.stringify(submitted.error)).toBe(200);
+    await advance(id, (await db.world.findUniqueOrThrow({ where: { id } })).clockTick);
+    const receipt = await rpc('lineage.request', { worldId: id, requestId }, player);
+    expect(receipt.data?.status, JSON.stringify(receipt.error ?? receipt.data)).toBe('applied');
+    if (receipt.data?.status !== 'applied') throw Error('실제 가문 입력이 적용되지 않았습니다.');
+    return receipt.data.result;
+  };
+  const from = await create(father, '유산부', 'MALE'),
+    mom = await create(mother, '유산모', 'FEMALE'),
+    offered = await send(father, from, { type: 'marriage.propose', targetGeneralId: mom });
+  expect(offered.offerId).toBeDefined();
+  await send(mother, mom, { type: 'marriage.respond', offerId: offered.offerId!, accept: true });
+  await advance(id, TICKS_PER_MONTH);
+  const birth = await db.$transaction((tx) => loadReplayState(tx, id)),
+    heir = Number(Object.entries(birth.state.lineage!.persons).find(([, person]) => person.parents.includes(from))![0]);
+  for (let month = 1; month < 12; month++) {
+    await send(father, from, { type: 'heir.designate', heirGeneralId: null });
+    await advance(id, (month + 1) * TICKS_PER_MONTH);
+  }
+  await send(father, from, { type: 'heir.designate', heirGeneralId: heir });
+  const board = await rpc('lineage.get', { worldId: id }, father),
+    preview = board.data?.view.mine?.preview;
+  if (!preview) throw Error('실제 후계자의 계승 미리보기가 없습니다.');
+  await send(father, from, { type: 'succession.confirm', heirGeneralId: heir, expected: preview });
+  for (let month = 12; month < 36; month++) {
+    await send(father, heir, { type: 'heir.designate', heirGeneralId: null });
+    await advance(id, (month + 1) * TICKS_PER_MONTH);
+  }
+  expect(await db.general.count({ where: { worldId: id, userId: father.id } })).toBe(1);
+  expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId: id, id: heir } } })).toMatchObject({
+    userId: father.id,
+  });
+  const result = await db.worldResult.findUniqueOrThrow({ where: { worldId: id } }),
+    credit = await db.heritageEntry.findMany({ where: { worldId: id, userId: father.id, kind: 'SEASON_CREDIT' } });
+  expect(result.reason).toBe('END_YEAR');
+  expect(credit).toHaveLength(1);
+  expect(credit[0]).toMatchObject({ delta: 3, detail: { activityMonths: 36, activityPoints: 3, winPoints: 0 } });
+  expect((await invariant(father)).balance).toBe(3);
+  const archive = await exportReplay(db, id);
+  expect(replayToEnd(archive)).toEqual(archive.end);
+  expect(archive.end?.finalStateHash).toBe(result.finalStateHash);
+}, 120000);
 
 it('AC-P2-33 국가 예턴만 직접 편집한 12개월도 활동분을 지급한다', async () => {
   const player = await user(),
