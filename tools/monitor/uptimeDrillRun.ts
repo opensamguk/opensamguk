@@ -98,7 +98,9 @@ async function listen(status: 200 | 500): Promise<Server> {
       });
       return server;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw new UptimeDrillError('listener');
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== 'EADDRINUSE' && !(process.platform === 'win32' && code === 'EACCES'))
+        throw new UptimeDrillError('listener');
     }
   }
   throw new UptimeDrillError('listener');
