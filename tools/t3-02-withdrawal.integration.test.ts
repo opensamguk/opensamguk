@@ -1,4 +1,4 @@
-import { randomBytes, createHash, randomInt, randomUUID } from 'node:crypto';
+import { randomBytes, createHash, randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { afterAll, beforeAll, beforeEach, expect, it as test } from 'vitest';
@@ -117,7 +117,7 @@ async function start(
   });
   const result = { app, address: '', origin: publicOrigin };
   apps.push(result);
-  result.address = await app.listen({ host: '127.0.0.1', port: randomInt(20_000, 50_000) });
+  result.address = await app.listen({ host: '127.0.0.1', port: 0 });
   return result;
 }
 async function user(
