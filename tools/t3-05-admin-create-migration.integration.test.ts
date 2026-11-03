@@ -226,7 +226,7 @@ beforeAll(
         const directory = new URL('../packages/db/prisma/migrations/', import.meta.url),
           all = (await checked(async () => readdir(directory))).filter((value) => /^\d{14}_/.test(value)).sort();
         expect(all).toContain(migration);
-        expect(all.at(-1)).toBe('20261113000000_lineage_state');
+        expect(all.at(-1)).toBe('20261114000000_heritage_ledger');
         for (const item of all.filter((value) => value !== migration)) {
           signal.throwIfAborted();
           await checked(async () =>
