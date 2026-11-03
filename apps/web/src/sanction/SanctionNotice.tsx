@@ -24,10 +24,23 @@ export function SanctionNotice({ worldId }: { worldId: string }) {
   // 가드 쿼리를 active로 만들면 SSE 재조회가 진행 중인 라우트 검사를 취소한다.
   // 캐시만 구독해 같은 월드 안의 이동에서도 가드가 확인한 계정 변경을 즉시 숨긴다.
   const guarded = useSyncExternalStore(
-    (notify) =>
-      queryClient.getQueryCache().subscribe((event) => {
-        if (event.query.queryHash === hashKey(trpc.auth.me.queryKey())) notify();
-      }),
+    (notify) => {
+      let live = true;
+      const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+        if (event.query.queryHash !== hashKey(trpc.auth.me.queryKey())) return;
+        // 상태를 바꾸는 갱신·제거는 곧바로 알려 이전 계정의 사유를 같은 틱에 숨긴다. 관찰자 이벤트는 상태를 바꾸지 않는다.
+        if (event.type === 'updated' || event.type === 'removed') notify();
+        // added는 다른 화면의 useQuery가 렌더 중에 쿼리를 만들 때 그 렌더 안에서 온다. 렌더가 끝난 뒤 알린다.
+        else if (event.type === 'added')
+          queueMicrotask(() => {
+            if (live) notify();
+          });
+      });
+      return () => {
+        live = false;
+        unsubscribe();
+      };
+    },
     () => queryClient.getQueryState<Awaited<ReturnType<typeof client.auth.me.query>>>(trpc.auth.me.queryKey()),
   );
   const viewerId = identity.data?.user?.id;
