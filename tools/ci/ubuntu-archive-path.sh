@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# T3-04 CI 설치 경로 후속. Ubuntu 공식 저장소 미러 목록에서 azure 미러 한 줄만 뺀다.
+# T3-04 CI 설치 경로 후속. azure가 없으면 쓰지 않고 한 줄이면 그 줄만 뺀다.
 # 예상한 구성이 아니면 아무것도 쓰지 않고 종료 코드 1로 멈춘다. 첫 인수는 검사할 루트다(CI는 /).
 set -euo pipefail
 
@@ -127,7 +127,7 @@ sources=$(awk -v uri="mirror+file:/etc/apt/apt-mirrors.txt" -v keyring="$keyring
 printf '%s\n' "$sources" | sed 's/^/APT_PATH_/'
 [ "$(printf '%s\n' "$sources" | tail -n 1)" = SOURCES_OK ] || stop ubuntu.sources
 
-# 미러 목록: azure http 한 줄과 Ubuntu 공식 호스트(us-east-2 EC2 포함) 한 줄 이상, 태그는 priority만
+# 미러 목록: azure http 0~1줄과 Ubuntu 공식 호스트 한 줄 이상, 태그는 priority만
 mirrors=$(awk '
   BEGIN { FS = "\t" }
   /^[[:space:]]*(#|$)/ { next }
@@ -139,12 +139,17 @@ mirrors=$(awk '
   }
   END {
     if (failed) exit
-    if (found != 1) { print "STOP azure-lines " found + 0; exit }
+    if (found > 1) { print "STOP azure-lines " found + 0; exit }
     if (official < 1) { print "STOP no-official-mirror"; exit }
-    print "OK"
+    print "OK azure=" (found + 0)
   }
 ' "$list")
-[ "$mirrors" = OK ] || stop "apt-mirrors.txt $mirrors"
+case "$mirrors" in
+  'OK azure=0') azure_lines=0 ;;
+  'OK azure=1') azure_lines=1 ;;
+  *) stop "apt-mirrors.txt $mirrors" ;;
+esac
+echo "APT_PATH_AZURE_LINES $azure_lines"
 
 # 아키텍처는 실제 실행기에서만 본다
 if [ -z "$root" ]; then
@@ -176,18 +181,27 @@ case $status in
   *) stop "apt-config-acquire status=$status" ;;
 esac
 
-# 쓰기: azure 줄 하나만 뺀 목록을 같은 파일(소유자·권한 유지)에 쓴다
+# azure가 없으면 파일을 쓰지 않는다. 있으면 그 한 줄만 같은 파일에서 뺀다.
+list_stat=$(stat -c '%u %g %a %i %Y' "$list")
 cp "$list" "$work/before"
 awk 'BEGIN { FS = "\t" } !($1 ~ /^http:\/\/azure\.archive\.ubuntu\.com\/ubuntu\/?$/)' "$list" > "$work/after"
 status=0
 diff -U 0 "$work/before" "$work/after" > "$work/mirrors.diff" || status=$?
-[ "$status" -eq 1 ] || stop "diff status=$status"
+[ "$status" -eq "$azure_lines" ] || stop "diff status=$status"
 removed=$(awk '/^-/ && !/^---/ { n++ } END { print n + 0 }' "$work/mirrors.diff")
 added=$(awk '/^[+]/ && !/^[+][+][+]/ { n++ } END { print n + 0 }' "$work/mirrors.diff")
-[ "$removed" = 1 ] && [ "$added" = 0 ] || stop "diff removed=$removed added=$added"
+[ "$removed" -eq "$azure_lines" ] && [ "$added" = 0 ] || stop "diff removed=$removed added=$added"
 snapshot > "$work/snapshot.before"
-tee "$list" < "$work/after" > /dev/null
+if [ "$azure_lines" -eq 1 ]; then
+  tee "$list" < "$work/after" > /dev/null
+else
+  cmp -s "$work/before" "$work/after" || stop no-op-diff
+fi
 cmp -s "$list" "$work/after" || stop write
+list_stat_after=$(stat -c '%u %g %a %i %Y' "$list")
+if [ "$azure_lines" -eq 0 ]; then
+  [ "$list_stat_after" = "$list_stat" ] || stop no-op-metadata-changed
+fi
 snapshot > "$work/snapshot.after"
 cmp -s "$work/snapshot.before" "$work/snapshot.after" || stop other-apt-files-changed
 
