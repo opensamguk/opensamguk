@@ -4,6 +4,7 @@ import { TICKS_PER_MONTH } from '../clock/constants';
 import type { WorldView } from '../model/world';
 
 export const LOGISTICS_GOODS = ['iron', 'wood', 'horses'] as const;
+export const LOGISTICS_MAX_CONVOYS = 100_000;
 export const logisticsQuantity = z.number().int().min(0).max(CITY_RESOURCE_MAX);
 const identifier = logisticsQuantity.min(1);
 export const logisticsGoodsSchema = z.strictObject({
@@ -20,37 +21,51 @@ const priceSchema = z
   .strictObject({ buy: identifier, sell: identifier })
   .refine((row) => row.sell <= row.buy, '매도가가 매입가보다 높습니다.');
 
-export const logisticsConfigSchema = z.strictObject({
-  version: z.literal(1),
-  specialties: z
-    .array(
-      z.strictObject({
-        cityKey: identifier,
-        good: z.enum(LOGISTICS_GOODS),
-        perMonth: logisticsQuantity.min(1),
-      }),
-    )
-    .max(10_000)
-    .refine((rows) => new Set(rows.map((row) => row.cityKey)).size === rows.length, '특산 거점이 중복됐습니다.')
-    .transform((rows) => rows.sort((a, b) => a.cityKey - b.cityKey)),
-  capacity: z
-    .strictObject({ base: identifier, perLevel: identifier, maxLevel: logisticsQuantity.max(100) })
-    .refine(
-      (value) => BigInt(value.base) + BigInt(value.perLevel) * BigInt(value.maxLevel) <= BigInt(CITY_RESOURCE_MAX),
-      '창고 용량 한도를 넘었습니다.',
-    ),
-  upgrade: z.strictObject({ gold: identifier, wood: identifier }),
-  transport: z.strictObject({
-    maxHops: identifier.max(128),
-    hopsPerMonth: identifier.max(128),
-    lossBpPerHop: logisticsQuantity.max(10_000),
-    maxPerOrder: identifier,
-    maxActivePerNation: identifier.max(100),
-  }),
-  recruitPer100: z.record(z.string().regex(/^[1-9]\d*$/), logisticsGoodsSchema),
-  build: z.strictObject({ wall: logisticsGoodsSchema, defence: logisticsGoodsSchema }),
-  trade: z.strictObject({ iron: priceSchema, wood: priceSchema, horses: priceSchema }),
-});
+export const logisticsConfigSchema = z
+  .strictObject({
+    version: z.literal(1),
+    specialties: z
+      .array(
+        z.strictObject({
+          cityKey: identifier,
+          good: z.enum(LOGISTICS_GOODS),
+          perMonth: logisticsQuantity.min(1),
+        }),
+      )
+      .max(10_000)
+      .refine((rows) => new Set(rows.map((row) => row.cityKey)).size === rows.length, '특산 거점이 중복됐습니다.')
+      .transform((rows) => rows.sort((a, b) => a.cityKey - b.cityKey)),
+    capacity: z
+      .strictObject({ base: identifier, perLevel: identifier, maxLevel: logisticsQuantity.max(100) })
+      .refine(
+        (value) => BigInt(value.base) + BigInt(value.perLevel) * BigInt(value.maxLevel) <= BigInt(CITY_RESOURCE_MAX),
+        '창고 용량 한도를 넘었습니다.',
+      ),
+    upgrade: z.strictObject({ gold: identifier, wood: identifier }),
+    transport: z.strictObject({
+      maxHops: identifier.max(128),
+      hopsPerMonth: identifier.max(128),
+      lossBpPerHop: logisticsQuantity.max(10_000),
+      maxPerOrder: identifier,
+      maxActivePerNation: identifier.max(100),
+    }),
+    recruitPer100: z.record(z.string().regex(/^[1-9]\d*$/), logisticsGoodsSchema),
+    build: z.strictObject({ wall: logisticsGoodsSchema, defence: logisticsGoodsSchema }),
+    trade: z.strictObject({ iron: priceSchema, wood: priceSchema, horses: priceSchema }),
+    npc: z
+      .strictObject({
+        recruitTarget: identifier
+          .min(100)
+          .max(2000)
+          .refine((amount) => amount % 100 === 0),
+        budgetBp: identifier.max(10_000),
+        maxActions: identifier.max(3),
+        stockCapBp: identifier.max(10_000),
+        upgradeAtBp: identifier.max(10_000),
+      })
+      .optional(),
+  })
+  .transform(({ npc, ...config }) => (npc === undefined ? config : { ...config, npc }));
 export type LogisticsConfig = z.infer<typeof logisticsConfigSchema>;
 const convoySchema = z.strictObject({
   id: identifier,
@@ -69,7 +84,7 @@ export const logisticsStateSchema = z.strictObject({
   monthlyTick: logisticsQuantity,
   nextConvoyId: identifier,
   cities: z.record(z.string().regex(/^[1-9]\d*$/), logisticsGoodsSchema.extend({ level: logisticsQuantity })),
-  convoys: z.array(convoySchema).max(100_000),
+  convoys: z.array(convoySchema).max(LOGISTICS_MAX_CONVOYS),
 });
 export type LogisticsState = z.infer<typeof logisticsStateSchema>;
 export type LogisticsConvoy = z.infer<typeof convoySchema>;

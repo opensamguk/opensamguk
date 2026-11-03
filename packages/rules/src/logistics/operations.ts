@@ -6,6 +6,7 @@ import type { WorldState, WorldView } from '../model/world';
 import { assertLogisticsConserved, type LogisticsMovement } from './ledger';
 import {
   LOGISTICS_GOODS,
+  LOGISTICS_MAX_CONVOYS,
   logisticsGoodsSchema,
   logisticsQuantity,
   logisticsTotal,
@@ -150,36 +151,49 @@ export function applyLogisticsInput(
   const state = cloneWorld(world),
     rows: LogisticsMovement[] = [];
   state.logistics = original;
-  const args = parsed.data,
+  const outcome = runLogisticsAction(state, actor.nationId, parsed.data, context.tick, rows);
+  if (!outcome.ok) return outcome;
+  return complete(world, state, rows, context.tick, parsed.data.type, outcome.extra);
+}
+
+// 사람 입력은 위에서 세션·직책을 검사한다. NPC는 월 정산에서 군주와 예산을 검사한 뒤에만 이 전이를 쓴다.
+export function runLogisticsAction(
+  state: WorldState,
+  nationId: number,
+  args: LogisticsInput,
+  tick: number,
+  rows: LogisticsMovement[],
+) {
+  const original = state.logistics!,
     config = original.config;
-  const owned = (key: number) => world.cities[key]?.nationId === actor.nationId && world.cities[key]!.supplied;
+  const owned = (key: number) => state.cities[key]?.nationId === nationId && state.cities[key]!.supplied;
   if (args.type === 'dispatch') {
     const total = logisticsTotal(args.goods),
       stock = original.cities[String(args.fromCityKey)];
     if (total < 1 || total > config.transport.maxPerOrder) return deny('BAD_INPUT', '한 번에 보낼 수량을 확인하세요.');
-    const path = findLogisticsPath(world, args.fromCityKey, args.toCityKey, actor.nationId, config.transport.maxHops);
+    const path = findLogisticsPath(state, args.fromCityKey, args.toCityKey, nationId, config.transport.maxHops);
     if (!path) return deny('NO_ROUTE', '보급이 이어진 자기 국가 거점 사이에서만 수송할 수 있습니다.');
     if (!stock || LOGISTICS_GOODS.some((good) => stock[good] < args.goods[good]))
       return deny('NO_GOODS', '보낼 재고가 부족합니다.');
     if (
-      original.convoys.filter((convoy) => convoy.nationId === actor.nationId).length >=
-        config.transport.maxActivePerNation ||
+      original.convoys.length >= LOGISTICS_MAX_CONVOYS ||
+      original.convoys.filter((convoy) => convoy.nationId === nationId).length >= config.transport.maxActivePerNation ||
       original.nextConvoyId === CITY_RESOURCE_MAX
     )
       return deny('LIMIT', '수송대 한도를 넘었습니다.');
     const arriveTick =
-      (Math.floor(context.tick / TICKS_PER_MONTH) + Math.ceil((path.length - 1) / config.transport.hopsPerMonth)) *
+      (Math.floor(tick / TICKS_PER_MONTH) + Math.ceil((path.length - 1) / config.transport.hopsPerMonth)) *
       TICKS_PER_MONTH;
     if (arriveTick > CITY_RESOURCE_MAX) return deny('LIMIT', '수송 도착 tick 한도를 넘었습니다.');
     const convoyId = original.nextConvoyId++;
     original.convoys.push({
       id: convoyId,
-      nationId: actor.nationId,
+      nationId,
       fromCityKey: args.fromCityKey,
       toCityKey: args.toCityKey,
       path,
       goods: args.goods,
-      departTick: context.tick,
+      departTick: tick,
       arriveTick,
     });
     for (const good of LOGISTICS_GOODS) {
@@ -187,18 +201,18 @@ export function applyLogisticsInput(
       change(rows, 'city', args.fromCityKey, good, -args.goods[good], 'DEPART');
       change(rows, 'convoy', convoyId, good, args.goods[good], 'DEPART');
     }
-    return complete(world, state, rows, context.tick, args.type, { convoyId, arriveTick, path });
+    return { ok: true as const, extra: { convoyId, arriveTick, path } };
   }
   if (args.type === 'cancel') {
     const convoy = original.convoys.find((row) => row.id === args.convoyId);
-    if (!convoy || convoy.nationId !== actor.nationId || !owned(convoy.fromCityKey))
+    if (!convoy || convoy.nationId !== nationId || !owned(convoy.fromCityKey))
       return deny('BAD_TARGET', '자기 국가 출발지로 돌릴 수 있는 수송대가 없습니다.');
     receive(state, convoy, convoy.fromCityKey, 'RETURN', 0, rows);
     original.convoys = original.convoys.filter((row) => row.id !== convoy.id);
-    return complete(world, state, rows, context.tick, args.type, { convoyId: convoy.id });
+    return { ok: true as const, extra: { convoyId: convoy.id } };
   }
   if (!owned(args.cityKey)) return deny('NOT_OWN_CITY', '보급이 이어진 자기 국가 거점만 관리할 수 있습니다.');
-  state.cityResources = readCityResourcesState(world.cityResources, world);
+  state.cityResources = readCityResourcesState(state.cityResources, state);
   const city = original.cities[String(args.cityKey)]!,
     funds = state.cityResources.cities[String(args.cityKey)]!;
   if (args.type === 'upgrade') {
@@ -226,7 +240,7 @@ export function applyLogisticsInput(
       change(rows, 'city', args.cityKey, args.good, -args.amount, 'TRADE');
     }
   }
-  return complete(world, state, rows, context.tick, args.type);
+  return { ok: true as const, extra: {} };
 }
 
 export function settleLogisticsMonthly(world: WorldView, tick: number) {
