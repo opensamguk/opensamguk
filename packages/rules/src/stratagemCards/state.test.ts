@@ -182,6 +182,14 @@ describe('AC-P2-23 계략 패 상태와 월간 보충', () => {
     expect(() => settleStratagemCards(world, next, 2 * TICKS_PER_MONTH)).toThrow('한도');
   });
 
+  it('저장된 월을 벗어난 함정 설치 시각을 거부한다', () => {
+    const { world, state, nationId, city } = setup();
+    state.nations[nationId]!.traps = [{ cityKey: city.cityKey, setTick: TICKS_PER_MONTH }];
+    expect(() => readStratagemCardsState(state, world)).toThrow('저장된 월');
+    state.nations[nationId]!.traps[0]!.setTick = TICKS_PER_MONTH - 1;
+    expect(readStratagemCardsState(state, world)).toEqual(state);
+  });
+
   it('덱 밖 패·중복 함정·보유 상한 초과를 거부한다', () => {
     const { world, state, nationId, city } = setup();
     state.nations[nationId]!.hand = ['nation_raid'];

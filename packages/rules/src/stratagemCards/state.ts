@@ -53,8 +53,11 @@ export function readStratagemCardsState(value: unknown, world: CardWorld) {
       throw Error('계략 패 보유 상한을 넘었습니다.');
     if (new Set(cards.traps.map((trap) => trap.cityKey)).size !== cards.traps.length)
       throw Error('같은 도시에 함정이 겹칩니다.');
-    for (const trap of cards.traps)
+    for (const trap of cards.traps) {
       if (world.cities[trap.cityKey]?.nationId !== id) throw Error('현재 소유 도시의 함정이 아닙니다.');
+      if (trap.setTick >= state.monthlyTick + TICKS_PER_MONTH)
+        throw Error('함정 설치 시각이 저장된 월을 벗어났습니다.');
+    }
   }
   return state;
 }

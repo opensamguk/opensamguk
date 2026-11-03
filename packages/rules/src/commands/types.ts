@@ -20,6 +20,7 @@ export interface Failure {
     | 'NO_SUPPLY'
     | 'NO_GOLD'
     | 'NO_GOODS'
+    | 'NO_SCHEME_CARD'
     | 'AT_MAX'
     | 'BAD_ARGS'
     | 'UNKNOWN_COMMAND'
