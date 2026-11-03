@@ -266,9 +266,9 @@ jobs:
       - name: Check public assets in Chromium
         if: matrix.shard == 1
         run: pnpm e2e:public --reporter=line
-      - name: Check logistics in Chromium
+      - name: Check command cards and expansion flows in Chromium
         if: matrix.shard == 4
-        run: pnpm e2e:logistics --reporter=line
+        run: pnpm exec playwright test --config playwright.command-cards.config.ts --reporter=line
       - name: Check required email verification in Chromium
         if: matrix.shard == 1
         run: pnpm e2e:account --reporter=line

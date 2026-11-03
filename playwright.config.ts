@@ -22,6 +22,7 @@ export default defineConfig({
     '**/admin-reset.spec.ts',
     '**/t4-93-logistics.spec.ts',
     '**/t4-94-governance.spec.ts',
+    '**/t4-95-lineage.spec.ts',
   ],
   forbidOnly: isCI,
   use: { baseURL: 'http://127.0.0.1:5173' },
