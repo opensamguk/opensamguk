@@ -53,6 +53,11 @@ export const exemptions: AuthzExemption[] = [
   { path: 'world.list', category: 'otherUser', reason: '인증 사용자 공통 월드 목록이며 타인 소유 자원이 없다.' },
   { path: 'world.summary', category: 'otherUser', reason: '인증 사용자 공통 월드 시계이며 타인 소유 자원이 없다.' },
   {
+    path: 'resources.worldRules',
+    category: 'otherUser',
+    reason: '인증 사용자 공통 월드 규칙이며 타인 소유 자원이 없다. 행위자 ID 주입은 거부한다.',
+  },
+  {
     path: 'world.map',
     category: 'otherUser',
     reason: '인증 사용자 공통 공개 지도다. 비공개 장수 자원은 반환하지 않는다.',

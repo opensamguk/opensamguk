@@ -6,6 +6,7 @@ import { legalRouter } from './routers/legal';
 import { adminRouter } from './routers/admin';
 import { sanctionRouter } from './routers/sanction';
 import { worldRouter } from './routers/world';
+import { resourcesRouter } from './routers/resources';
 import { generalRouter } from './routers/general';
 import { turnsRouter } from './routers/turns';
 import { commandsRouter } from './routers/commands';
@@ -39,6 +40,7 @@ export const appRouter = router({
   admin: adminRouter,
   sanction: sanctionRouter,
   world: worldRouter,
+  resources: resourcesRouter,
   general: generalRouter,
   turns: turnsRouter,
   commands: commandsRouter,
