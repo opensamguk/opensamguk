@@ -11,6 +11,7 @@ import type { InitialGeneral } from '../world/bootstrap';
 import type { CommandResolver } from '../commands/resolve';
 import { readCampaignState } from '../campaign/state';
 import { cityNpcAllocations, cityNpcPreparation } from '../cityResources/npc';
+import { frontier } from './frontier';
 
 export interface NpcCandidate {
   key: string;
@@ -56,10 +57,6 @@ function chooser(view: WorldView, general: General, rng: Rng, context: NpcContex
       };
     },
   };
-}
-
-function frontier(view: WorldView, nationId: number, cityKey: number) {
-  return view.cities[cityKey]!.connections.some((key) => view.cities[key]?.nationId !== nationId);
 }
 
 // 자기 영토의 BFS로 전선까지 한 칸을 고른다. ID 순서로 동률을 고정한다.
