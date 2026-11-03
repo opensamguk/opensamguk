@@ -1,7 +1,6 @@
-import { randomInt } from 'node:crypto';
-import { once } from 'node:events';
-import { createServer, type RequestListener } from 'node:http';
+import type { RequestListener } from 'node:http';
 import { expect, it } from 'vitest';
+import { withLoopbackHttp } from '../test-support/loopbackHttp';
 import { sendUptimeNotice } from './uptimeWebhook';
 
 const notice = {
@@ -13,34 +12,7 @@ const notice = {
   lastAttemptAt: null,
 };
 async function withServer<T>(handler: RequestListener, use: (endpoint: URL) => Promise<T>) {
-  const server = createServer(handler);
-  for (let index = 0; index < 16; index++) {
-    try {
-      server.listen(randomInt(10081, 65536), '127.0.0.1');
-      await once(server, 'listening');
-      break;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw error;
-    }
-  }
-  const address = server.address();
-  if (!address || typeof address === 'string') throw new Error('Own receiver bind failed');
-  const failures: unknown[] = [];
-  let result: T | undefined;
-  try {
-    result = await use(new URL(`http://127.0.0.1:${address.port}/receiver`));
-  } catch (error) {
-    failures.push(error);
-  }
-  try {
-    const close = new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
-    server.closeAllConnections();
-    await close;
-  } catch (error) {
-    failures.push(error);
-  }
-  if (failures.length) throw new AggregateError(failures, 'Receiver body or cleanup failed');
-  return result!;
+  return withLoopbackHttp(handler, (base) => use(new URL('/receiver', base)));
 }
 
 it.each([200, 204, 302, 429, 500])(

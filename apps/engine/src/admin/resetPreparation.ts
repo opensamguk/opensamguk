@@ -14,12 +14,18 @@ import {
   type ReplayOriginV3,
   type WorldInit,
   type WorldPreset,
+  type SexLedger,
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { z } from 'zod';
 import { checkWorldReplay } from '../features';
 import { resourceHashV3 } from '../replay';
-import { composeInitialWorld, resolveWorldResourceSelection, type InitialResources } from '../world/resources';
+import {
+  composeInitialWorld,
+  resolveWorldResourceSelection,
+  loadSexLedgers,
+  type InitialResources,
+} from '../world/resources';
 import { prepareInitialWorld, type PreparedInitialWorld, type InitialWorldOptions } from '../world/persistence';
 
 const messages = {
@@ -409,6 +415,7 @@ function prepared(
   options: InitialWorldOptions,
   effectiveSeed: string,
   request?: Request,
+  sexLedger?: SexLedger,
 ) {
   return fixed('RESOURCE_INVALID', () => {
     const state: WorldInit = composeInitialWorld(resources, effectiveSeed),
@@ -422,8 +429,28 @@ function prepared(
       fail('RESOURCE_INVALID');
     if (state.ruleFeatures || features.length) state.ruleFeatures = [...features];
     if (resourceHashV3({ ...original, initial: state }) !== original.resourceHash) fail('RESOURCE_INVALID');
-    return prepareInitialWorld(state, options);
+    return prepareInitialWorld(state, options, sexLedger);
   });
+}
+function originalPrepared(
+  resources: InitialResources,
+  origin: ReplayOriginV3,
+  options: InitialWorldOptions,
+  effectiveSeed: string,
+  request?: Request,
+) {
+  const ledgers = options.ruleFeatures?.includes('lineage-v1')
+    ? fixed('RESOURCE_INVALID', loadSexLedgers)
+    : [undefined];
+  for (const ledger of ledgers) {
+    try {
+      const value = prepared(resources, origin, options, effectiveSeed, request, ledger);
+      if (value.stateHash === origin.initialStateHash) return { value, ledger };
+    } catch (error) {
+      if (!(error instanceof ResetPreparationError) || error.code !== 'RESOURCE_INVALID') throw error;
+    }
+  }
+  return undefined;
 }
 function references(resources: InitialResources): Reference[] {
   return Object.values(resources)
@@ -477,7 +504,7 @@ async function legacyResources(
       signal.throwIfAborted();
       const bundle = { ...base, statRules, portraitMap };
       try {
-        if (prepared(bundle, origin, options, world.seed).stateHash === origin.initialStateHash) {
+        if (originalPrepared(bundle, origin, options, world.seed)) {
           const signature = hashState(references(bundle).map((r) => ({ kind: r.kind, contentHash: r.contentHash })));
           if (!matches.has(signature)) matches.set(signature, bundle);
         }
@@ -517,10 +544,10 @@ export async function prepareWorldReset(
           : await legacyResources(tx, world, origin, options, signal);
       signal.throwIfAborted();
       // Full original-seed preparation is mandatory before the new seed can be prepared.
-      if (prepared(resources, origin, options, world.seed, request).stateHash !== origin.initialStateHash)
-        fail('RESOURCE_INVALID');
+      const source = originalPrepared(resources, origin, options, world.seed, request);
+      if (!source) fail('RESOURCE_INVALID');
       signal.throwIfAborted();
-      const next = prepared(resources, origin, options, frozenSeed, request);
+      const next = prepared(resources, origin, options, frozenSeed, request, source.ledger);
       signal.throwIfAborted();
       const evidence = freeze<ResetPreparationEvidence>({
         version: 1,

@@ -31,6 +31,7 @@ import {
   storedGeneralSex,
   applySexLedger,
   assertGeneralSex,
+  type SexLedger,
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { loadCommandState } from '../commandPersistence';
@@ -60,7 +61,11 @@ type StorePreparedWorld = (
 ) => Promise<{ worldId: string; stateHash: string }>;
 const preparedWorlds = new WeakMap<PreparedInitialWorld, StorePreparedWorld>();
 
-export function prepareInitialWorld(state: WorldInit, suppliedOptions: InitialWorldOptions): PreparedInitialWorld {
+export function prepareInitialWorld(
+  state: WorldInit,
+  suppliedOptions: InitialWorldOptions,
+  sexLedger?: SexLedger,
+): PreparedInitialWorld {
   const options = structuredClone(suppliedOptions);
   if (
     !options.name.trim() ||
@@ -141,7 +146,7 @@ export function prepareInitialWorld(state: WorldInit, suppliedOptions: InitialWo
     ...(preset ? { presetRules: presetRules(preset) } : {}),
     ...(features.length ? { ruleFeatures: features } : {}),
   };
-  if (features.includes('lineage-v1')) initial.generals = applySexLedger(initial, loadSexLedger());
+  if (features.includes('lineage-v1')) initial.generals = applySexLedger(initial, sexLedger ?? loadSexLedger());
   else for (const general of initial.generals) assertGeneralSex(general, false);
   const stateHash = hashState(initial);
   checkStatProfile(initial);
