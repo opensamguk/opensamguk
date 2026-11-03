@@ -613,6 +613,7 @@ describe('AC-INT-18B 정식 자료 기반 권한·잔량 통제 고정물', () =
     const enemy = initial.cities.find((city) => city.nationId !== null && city.nationId !== f.nationId)!.cityKey;
     expect((await api('cityResources.get', { worldId: f.worldId, cityKey: enemy }, actor.cookie)).data).toEqual({
       userId: actor.userId,
+      actorId: actor.generalId,
       cityKey: enemy,
       visible: false,
     });
