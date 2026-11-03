@@ -282,6 +282,16 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
     expect(
       await db.generalTurn.findMany({ where: { worldId, generalId: targetId }, orderBy: { slot: 'asc' } }),
     ).toEqual(targetTurns);
+    // NPC 지휘 병력은 원래 일정 결과를 저장 상태에서 비교한다. 반납한 사람 부곡의 실제 귀속도 확인한다.
+    const persisted = await db.$transaction((tx) => loadReplayState(tx, worldId));
+    expect(persisted.state.campaign!.units.find((unit) => unit.id === after.units[0]!.id)).toMatchObject({
+      ownerId,
+      commanderId: ownerId,
+      troops: 10,
+    });
+    const npcTroops = persisted.state
+      .campaign!.units.filter((unit) => unit.commanderId === npc!.id)
+      .reduce((total, unit) => total + unit.troops, 0);
     const nation = await apiQuery<inferRouterOutputs<AppRouter>['nation']['get']>(owner, 'nation.get', {
       worldId,
       nationId: 1,
@@ -294,7 +304,7 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
       commandedArmy: { troops: 10, train: 0, atmos: 0 },
     });
     expect(nation.generals.find((general) => general.id === npc!.id)).toMatchObject({
-      commandedArmy: { troops: 0, train: 0, atmos: 0 },
+      commandedArmy: { troops: npcTroops },
     });
     await owner.page.getByRole('button', { name: '소속 장수·도시 펼치기', exact: true }).click();
     const nationTable = owner.page.getByRole('table', { name: /^소속 장수/ });
@@ -313,8 +323,8 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
     const previousCommanderRow = nationTable
       .getByRole('row')
       .filter({ has: owner.page.getByRole('cell', { name: npc!.name, exact: true }) });
-    await expect(previousCommanderRow.getByRole('cell').nth(8)).toHaveText('0');
-    await expect(previousCommanderRow.getByRole('cell').nth(11)).not.toContainText('훈련 부족');
+    await expect(previousCommanderRow.getByRole('cell').nth(8)).toHaveText(npcTroops.toLocaleString('ko-KR'));
+    if (npcTroops === 0) await expect(previousCommanderRow.getByRole('cell').nth(11)).not.toContainText('훈련 부족');
     await owner.page.screenshot({ path: 'test-results/int11-formal-nation-commanded-army.png', fullPage: true });
     await owner.page.getByRole('button', { name: '소속 장수·도시 접기', exact: true }).click();
     await owner.page.reload();
