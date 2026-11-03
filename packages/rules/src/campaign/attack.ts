@@ -15,7 +15,7 @@ import { disbandCityGarrison } from '../cityResources/ownership';
 
 const argsSchema = z.strictObject({ cityKey: positive });
 const year = (view: WorldView, tick: number) => view.startYear + Math.floor(tick / (12 * TICKS_PER_MONTH));
-function attackers(view: WorldView, actor: Actor) {
+export function campaignAttackingUnits(view: WorldView, actor: Actor) {
   const owner = view.generals[actor.generalId]!;
   return readCampaignState(view.campaign, view)
     .units.filter((unit) => {
@@ -67,7 +67,7 @@ function check(view: WorldView, actor: Actor, raw: unknown) {
     return fail('NOT_WAR', '교전 중인 국가가 아닙니다.');
   if (Object.values(view.generals).some((general) => general.crew !== 0))
     throw new Error('부곡 월드에 장수 병력을 중복 저장할 수 없습니다.');
-  const force = attackers(view, actor);
+  const force = campaignAttackingUnits(view, actor);
   if (!force.length) return fail('NO_CREW', '같은 거점에 집결한 부곡 병력이나 사기가 부족합니다.');
   const all = [...force, ...defenders(view, actor, target.cityKey)];
   if (view.ruleFeatures?.includes('city-resources-v1'))
@@ -91,7 +91,7 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
   let state = cloneWorld(view);
   const nationId = state.generals[ownerId]!.nationId!,
     defendingNation = state.cities[cityKey]!.nationId;
-  const attackingIds = attackers(state, actor).map((unit) => unit.id);
+  const attackingIds = campaignAttackingUnits(state, actor).map((unit) => unit.id);
   // 출병 시작 때의 수비 순서를 고정한다. 사람의 예약이나 다른 소유자의 부곡을 공격 편성에 넣지 않는다.
   const defendingIds = defenders(state, actor, cityKey).map((unit) => unit.id);
   const cityResources = state.ruleFeatures?.includes('city-resources-v1') ?? false;
