@@ -6,29 +6,19 @@ import type { WorldState } from '../model/world';
 import { deepFreeze } from '../personnel/testFixture';
 import { LINEAGE_EXITED_YEAR } from '../lineage/config';
 import { logisticsCommandMovements } from '../logistics/consumption';
-import { initialLogisticsState, type LogisticsConfig } from '../logistics/state';
+import { initialLogisticsState } from '../logistics/state';
 import { EQUIPMENT_MAX, type EquipmentSlot } from './config';
 import { initialEquipment } from './state';
-import { TEST_EQUIPMENT_CONFIG } from './testFixture';
+import { TEST_EQUIPMENT_CONFIG, TEST_EQUIPMENT_LOGISTICS_CONFIG } from './testFixture';
 import { equipmentTrade } from './trade';
 
 const actor = { generalId: 1 };
 const horse = { slot: 'horse' as const, itemKey: 'horse_01' };
-const config: LogisticsConfig = {
-  version: 1,
-  specialties: [],
-  capacity: { base: 1000, perLevel: 1000, maxLevel: 2 },
-  upgrade: { gold: 1, wood: 1 },
-  transport: { maxHops: 8, hopsPerMonth: 2, lossBpPerHop: 100, maxPerOrder: 100, maxActivePerNation: 2 },
-  recruitPer100: { '1': { iron: 2, wood: 0, horses: 0 } },
-  build: { wall: { iron: 0, wood: 4, horses: 0 }, defence: { iron: 2, wood: 3, horses: 0 } },
-  trade: { iron: { buy: 3, sell: 1 }, wood: { buy: 3, sell: 1 }, horses: { buy: 3, sell: 1 } },
-};
 function fixture() {
   const world = commandWorld();
   world.ruleFeatures = ['equipment-v1', 'logistics-v1'];
   world.equipment = initialEquipment(TEST_EQUIPMENT_CONFIG);
-  world.logistics = initialLogisticsState(config, world);
+  world.logistics = initialLogisticsState(TEST_EQUIPMENT_LOGISTICS_CONFIG, world);
   Object.assign(world.logistics.cities['1']!, { iron: 20, wood: 20, horses: 20 });
   return world;
 }

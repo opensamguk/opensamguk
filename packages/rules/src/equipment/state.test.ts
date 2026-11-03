@@ -125,3 +125,24 @@ it('AC-P2-12 복사한 장착과 카탈로그를 바꿔도 앞선 상태는 보�
   copy.equipment!.config.items[0]!.cost = 99;
   expect(world).toEqual(before);
 });
+it('AC-P2-12 보너스 조회는 다른 장수 행을 순회하지 않으며 전체 검증은 경계에서 한다', () => {
+  const world = fixture();
+  world.equipment!.generals['1'] = { horse: 'horse_01' };
+  world.equipment!.generals['99'] = { horse: 'horse_06' };
+  expect(() => readEquipmentState(world.equipment, world)).toThrow();
+  expect(equipmentBonus(world, 1)).toEqual({ leadership: 1, strength: 0, intel: 0 });
+  Object.defineProperty(world.equipment!.generals, '99', {
+    get() {
+      throw new Error('다른 장수 행을 읽었습니다.');
+    },
+  });
+  expect(equipmentBonus(world, 1).leadership).toBe(1);
+});
+
+it('AC-P2-12 선택 장수의 없는 장비와 칸 불일치는 보너스로 계산하지 않는다', () => {
+  const world = fixture();
+  world.equipment!.generals['1'] = { horse: 'horse_06' };
+  expect(() => equipmentBonus(world, 1)).toThrow();
+  world.equipment!.generals['1'] = { horse: 'weapon_01' };
+  expect(() => equipmentBonus(world, 1)).toThrow();
+});
