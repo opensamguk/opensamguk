@@ -127,14 +127,14 @@ sources=$(awk -v uri="mirror+file:/etc/apt/apt-mirrors.txt" -v keyring="$keyring
 printf '%s\n' "$sources" | sed 's/^/APT_PATH_/'
 [ "$(printf '%s\n' "$sources" | tail -n 1)" = SOURCES_OK ] || stop ubuntu.sources
 
-# 미러 목록: azure http 한 줄과 Ubuntu 공식 호스트 한 줄 이상, 태그는 priority만
+# 미러 목록: azure http 한 줄과 Ubuntu 공식 호스트(us-east-2 EC2 포함) 한 줄 이상, 태그는 priority만
 mirrors=$(awk '
   BEGIN { FS = "\t" }
   /^[[:space:]]*(#|$)/ { next }
   {
     for (i = 2; i <= NF; i++) if ($i !~ /^priority:[0-9]+$/) { print "STOP tag " $i; failed = 1; exit }
     if ($1 ~ /^http:\/\/azure\.archive\.ubuntu\.com\/ubuntu\/?$/) { found++; next }
-    if ($1 !~ /^https?:\/\/(archive|security)\.ubuntu\.com\/ubuntu\/?$/) { print "STOP host " $1; failed = 1; exit }
+    if ($1 !~ /^https?:\/\/(archive|security|us-east-2\.ec2\.archive)\.ubuntu\.com\/ubuntu\/?$/) { print "STOP host " $1; failed = 1; exit }
     official++
   }
   END {
