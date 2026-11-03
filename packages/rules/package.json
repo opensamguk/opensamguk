@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./testing/lineage": "./src/lineage/testFixture.ts",
     "./logistics-costs": "./src/logistics/costs.ts",
     "./resource-validation": "./src/world/validate/index.ts",
     "./resources": "./src/world/resourceEditor/index.ts",
