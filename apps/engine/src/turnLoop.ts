@@ -33,6 +33,8 @@ import { assertWorldCapabilities } from './capsGate';
 import { processAdminClock } from './admin/executor';
 import { observeCommittedStep, type CommitMetricCandidate, type CommitMetricSink } from './metrics';
 import { preparePendingReset, type PendingResetPreparation } from './admin/reset';
+import { PgHeritageRepository } from './heritage/repository';
+import { creditHeritageSeason } from './heritage/service';
 
 export const CLOCK_CHECKPOINT_MS = 5_000;
 export const ENGINE_BATCH_STEPS = 64;
@@ -386,6 +388,7 @@ export class TurnLoop {
         const endedAt = outcome ? await databaseNow(tx) : null;
         if (outcome) {
           const winner = outcome.winnerNationId === null ? null : next!.nations[outcome.winnerNationId]!;
+          const finalStateHash = hashState(await loadReplayState(tx, worldId));
           await tx.worldResult.create({
             data: {
               worldId,
@@ -397,10 +400,18 @@ export class TurnLoop {
               endedTick: endedTick!,
               endedSequence: sequence,
               remainingNations: Object.keys(next!.nations).length,
-              finalStateHash: hashState(await loadReplayState(tx, worldId)),
+              finalStateHash,
               endedAt: endedAt!,
             },
           });
+          if (world.ruleFeatures.includes('heritage-v1'))
+            await creditHeritageSeason(new PgHeritageRepository(tx), {
+              worldId,
+              ...outcome,
+              generals: Object.values(next!.generals),
+              endedSequence: sequence,
+              finalStateHash,
+            });
         }
         const saved = await tx.world.updateMany({
           where: { id: worldId, status: 'RUNNING', clockRevision: world.clockRevision },

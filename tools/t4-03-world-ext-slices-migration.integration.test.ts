@@ -432,6 +432,7 @@ it.each(['empty', 'legacy'] as const)(
         '20261111000000_logistics_state',
         '20261112000000_governance_state',
         '20261113000000_lineage_state',
+        '20261114000000_heritage_ledger',
       ]);
       for (const directory of previous)
         await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
@@ -482,6 +483,8 @@ it.each(['empty', 'legacy'] as const)(
         WorldCreateRequest: [],
         LogisticsMovement: [],
         GovernanceMovement: [],
+        HeritageAccount: [],
+        HeritageEntry: [],
       });
       expect(await readSlices()).toEqual(slices);
       expect(

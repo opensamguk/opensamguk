@@ -78,8 +78,9 @@ jobs:
     name: opensamguk-database-authz
     if: github.event_name != 'workflow_dispatch' || inputs.load_expected_sha == ''
     runs-on: ubuntu-24.04
-    # PR #314의 30분 작업 취소를 반영한다. 개별 시험의 제한·worker·검사 항목은 유지한다.
-    timeout-minutes: 45
+    # PR #342의 API 작업은 43분 34초였다. 유산 실제 PG 135건 추가분의 전체 실행 예산이다.
+    # 개별 시험의 제한·worker·검사 항목과 필수 그룹은 유지한다.
+    timeout-minutes: 75
     env:
       CI: 'true'
       INTEGRATION_SUITE: api

@@ -1,6 +1,7 @@
 import { nextActionSequence, type Prisma } from '@opensamguk/db';
 import {
   buildCreatedGeneral,
+  creationHeritageRecord,
   lateJoinBonus,
   parsePreset,
   monthlyDate,
@@ -22,6 +23,7 @@ import {
 } from '@opensamguk/rules';
 import { processTreatyInput } from './treatyInput';
 import { loadReplayState } from './monthly';
+import { PgHeritageRepository } from './heritage/repository';
 
 import { engineRegistry, type EngineRegistry, type QueuedInputHandler } from './features';
 
@@ -260,7 +262,7 @@ export async function processInputs(
   return true;
 }
 
-const processGeneralCreation: QueuedInputHandler = async (tx, world, event, { tick }) => {
+const processGeneralCreation: QueuedInputHandler = async (tx, world, event, { tick, sequence }) => {
   const reject = (code: CreationCode) => ({ status: 'REJECTED' as const, result: creationFailure(code) });
   const modern =
     world.replayFormat === 3
@@ -279,7 +281,12 @@ const processGeneralCreation: QueuedInputHandler = async (tx, world, event, { ti
   if (block && block.code !== 'PENDING') return reject(block.code);
   const actor = await tx.user.findUnique({ where: { id: event.userId } });
   if (!actor || actor.status !== 'ACTIVE') return reject('ACTOR_INACTIVE');
-  const parsed = validateGeneralCreation(event.payload, world.statRules, world.ruleFeatures.includes('lineage-v1'));
+  const parsed = validateGeneralCreation(
+    event.payload,
+    world.statRules,
+    world.ruleFeatures.includes('lineage-v1'),
+    world.ruleFeatures.includes('heritage-v1'),
+  );
   if (!parsed.ok) return reject(parsed.code);
   if (
     world.ruleFeatures.includes('lineage-v1') &&
@@ -315,6 +322,17 @@ const processGeneralCreation: QueuedInputHandler = async (tx, world, event, { ti
     cityKeys: cities.map((c) => c.cityKey),
     unitSet: world.unitSet,
   });
+  const heritage = creationHeritageRecord(parsed.value.heritage);
+  if (
+    heritage &&
+    !(await new PgHeritageRepository(tx).spend({
+      worldId: world.id,
+      userId: event.userId,
+      sequence,
+      allocation: heritage,
+    }))
+  )
+    return reject('HERITAGE_INSUFFICIENT');
   await tx.general.create({
     data: {
       ...general,
@@ -335,6 +353,10 @@ const processGeneralCreation: QueuedInputHandler = async (tx, world, event, { ti
   return {
     status: 'APPLIED',
     generalId: general.id,
-    result: { general, ...(modern ? { activeTick: tick } : {}) } as unknown as Prisma.InputJsonValue,
+    result: {
+      general,
+      ...(modern ? { activeTick: tick } : {}),
+      ...(heritage ? { heritage } : {}),
+    } as unknown as Prisma.InputJsonValue,
   };
 };

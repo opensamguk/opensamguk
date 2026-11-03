@@ -121,7 +121,7 @@ async function setup() {
       await once(server, 'listening');
       break;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw error;
+      if (!['EADDRINUSE', 'EACCES'].includes((error as NodeJS.ErrnoException).code ?? '')) throw error;
     }
   }
   const address = server.address();

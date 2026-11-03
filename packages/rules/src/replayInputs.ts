@@ -5,11 +5,12 @@ import { validatePolicyRecordedInput } from './policy/replay';
 import { assertGeneralStatProfile, FIVE_STAT_KEYS, FIVE_STAT_RULES } from './general/fiveStats';
 import { validateGeneralCreation } from './general/create';
 import { assertGeneralSex, knownGeneralSexSchema } from './general/sex';
+import { assertHeritageCreationResult, createdHeritageStat } from './heritage/creation';
 
-export function validatePolicyInput(input: RecordedInput, five = false, lineage = false): void {
+export function validatePolicyInput(input: RecordedInput, five = false, lineage = false, heritage = false): void {
   const { tick, ...legacy } = input;
   void tick;
-  validatePolicyRecordedInput(legacy, true, five, lineage);
+  validatePolicyRecordedInput(legacy, true, five, lineage, heritage);
   if (input.status === 'APPLIED' && input.kind !== 'turns.set' && input.tick !== undefined && input.tick !== null) {
     if ((input.result as { activeTick?: number }).activeTick !== input.tick)
       throw new Error('활동 tick이 처리 tick과 다릅니다.');
@@ -24,6 +25,7 @@ export function applyTurnsInput(replay: ReplayState, input: RecordedInput): Repl
       input,
       replay.state.ruleFeatures?.includes('five-stats'),
       replay.state.ruleFeatures?.includes('lineage-v1'),
+      replay.state.ruleFeatures?.includes('heritage-v1'),
     );
   const next = structuredClone(replay);
   const payload = input.payload as { turns?: QueuedTurn[]; revision?: number };
@@ -56,6 +58,7 @@ export function applyCreationInput(replay: ReplayState, input: RecordedInput): R
       input,
       replay.state.ruleFeatures?.includes('five-stats'),
       replay.state.ruleFeatures?.includes('lineage-v1'),
+      replay.state.ruleFeatures?.includes('heritage-v1'),
     );
   const next = structuredClone(replay);
   const general = (input.result as { general?: InitialGeneral }).general;
@@ -74,6 +77,8 @@ export function applyCreationInput(replay: ReplayState, input: RecordedInput): R
   const five = next.state.ruleFeatures?.includes('five-stats') ?? false;
   assertGeneralStatProfile(general, five);
   const lineage = next.state.ruleFeatures?.includes('lineage-v1') ?? false;
+  const heritage = next.state.ruleFeatures?.includes('heritage-v1') ?? false;
+  assertHeritageCreationResult(input.payload, input.result, heritage, five);
   assertGeneralSex(general, lineage);
   const payload = input.payload as Record<string, unknown>;
   if (lineage) {
@@ -82,8 +87,8 @@ export function applyCreationInput(replay: ReplayState, input: RecordedInput): R
       throw Error('가문 판의 장수 정원을 넘었습니다.');
   } else if (payload && Object.hasOwn(payload, 'sex')) throw Error('끈 가문 판의 생성 입력에 성별이 있습니다.');
   if (five) {
-    const creation = validateGeneralCreation(input.payload, FIVE_STAT_RULES, lineage);
-    if (!creation.ok || FIVE_STAT_KEYS.some((key) => creation.value[key] !== general[key]))
+    const creation = validateGeneralCreation(input.payload, FIVE_STAT_RULES, lineage, heritage);
+    if (!creation.ok || FIVE_STAT_KEYS.some((key) => createdHeritageStat(creation.value, key) !== general[key]))
       throw new Error('5능력치 생성 입력과 결과가 다릅니다.');
   }
   next.state.generals[general.id] = structuredClone(general);
@@ -102,6 +107,7 @@ export function applyPolicyInput(replay: ReplayState, input: RecordedInput): Rep
     input,
     replay.state.ruleFeatures?.includes('five-stats'),
     replay.state.ruleFeatures?.includes('lineage-v1'),
+    replay.state.ruleFeatures?.includes('heritage-v1'),
   );
   const next = structuredClone(replay);
   const id = input.generalId;

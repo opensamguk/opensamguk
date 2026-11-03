@@ -6,13 +6,18 @@ import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useTRPCClient } from '../trpc';
 import { publicFailure, retryAfterSeconds } from '../auth/credentials';
 import { AccountFrame } from './AccountParts';
+import { HeritagePanel } from './HeritagePanel';
 import { VerificationRequest } from './VerifyEmailPage';
 import { WithdrawalActions } from './WithdrawalActions';
 import { privacyStamp } from './withdrawalPolicy';
 import styles from './Account.module.css';
 
 type Outputs = inferRouterOutputs<AppRouter>;
-type Snapshot = { account: Outputs['account']['get']; policy: Outputs['legal']['current'] };
+type Snapshot = {
+  account: Outputs['account']['get'];
+  heritage: Outputs['heritage']['mine'];
+  policy: Outputs['legal']['current'];
+};
 type Phase = 'loading' | 'ready' | 'refresh' | 'sending' | 'ambiguous' | 'done';
 class IdentityChanged extends Error {}
 
@@ -54,10 +59,13 @@ export function AccountPage({ viewerId }: { viewerId: string }) {
       if (first.user?.id !== viewerId) throw new IdentityChanged();
       const account = await client.account.get.query(undefined, { signal });
       if (account.userId !== viewerId) throw new IdentityChanged();
+      // 유산 잔액·기록도 같은 앞뒤 계정 대조 안에서 읽는다. 계정이 바뀌면 이전 계정 값을 한순간도 보이지 않는다.
+      const heritage = await client.heritage.mine.query(undefined, { signal });
+      if (heritage.userId !== viewerId) throw new IdentityChanged();
       const policy = await client.legal.current.query(undefined, { signal });
       const last = await client.auth.me.query(undefined, { signal });
       if (last.user?.id !== viewerId) throw new IdentityChanged();
-      return { account, policy };
+      return { account, heritage, policy };
     },
     [client, viewerId],
   );
@@ -252,7 +260,7 @@ export function AccountPage({ viewerId }: { viewerId: string }) {
   const remaining = retryAt === null ? 0 : Math.max(0, Math.ceil((retryAt - now) / 1000));
   return (
     <AccountFrame title={phase === 'done' ? '탈퇴 완료' : '내 계정'} panels>
-      {/* 첩 세 장 (INT-20 A-Account): 내 정보 · 동의 기록 · 계정 탈퇴. 상태 문장은 맨 위 첩에 모은다. */}
+      {/* 첩 네 장 (INT-20 A-Account): 내 정보 · 동의 기록 · 유산 포인트(T4-96) · 계정 탈퇴. 상태 문장은 맨 위 첩에 모은다. */}
       {message || phase !== 'ready' ? (
         <section className={`${styles.panel} ${styles.wide}`}>
           {message ? <p role="alert">{message}</p> : null}
@@ -316,8 +324,12 @@ export function AccountPage({ viewerId }: { viewerId: string }) {
               </ul>
             )}
           </section>
+          <HeritagePanel heritage={view.heritage} />
           <section className={`${styles.panel} ${styles.dangerPanel}`}>
             <h2>계정 탈퇴</h2>
+            {view.heritage.balance > 0 ? (
+              <p>보유한 유산 포인트 {view.heritage.balance}점도 탈퇴하면 몰수되어 되살리지 않습니다.</p>
+            ) : null}
             {view.account.withdrawalAvailable && privacyStamp(view.policy) !== null ? (
               <WithdrawalActions stamp={privacyStamp(view.policy)!} onWithdraw={withdraw} />
             ) : (

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { createdHeritageStat } from './heritage/creation';
 import { FIVE_STAT_KEYS, FIVE_STAT_RULES, checkStatProfile } from './general/fiveStats';
 import { validateGeneralCreation } from './general/create';
 import type { InputKindDefinition, RuleFeatureDefinition } from './ruleRegistry';
@@ -51,9 +52,14 @@ export const fiveStatsFeature: RuleFeatureDefinition = {
         input.payload,
         FIVE_STAT_RULES,
         origin.initial.ruleFeatures?.includes('lineage-v1'),
+        origin.initial.ruleFeatures?.includes('heritage-v1'),
       );
       const general = (input.result as { general?: Record<string, unknown> } | null)?.general;
-      if (!parsed.ok || !general || FIVE_STAT_KEYS.some((key) => general[key] !== parsed.value[key]))
+      if (
+        !parsed.ok ||
+        !general ||
+        FIVE_STAT_KEYS.some((key) => general[key] !== createdHeritageStat(parsed.value, key))
+      )
         throw new Error('5능력치 생성 입력과 결과가 다릅니다.');
     }
   },
@@ -76,6 +82,7 @@ export const policyFeature: RuleFeatureDefinition = {
           input,
           origin.initial.ruleFeatures?.includes('five-stats'),
           origin.initial.ruleFeatures?.includes('lineage-v1'),
+          origin.initial.ruleFeatures?.includes('heritage-v1'),
         );
   },
   initReplayState(replay, { data }) {

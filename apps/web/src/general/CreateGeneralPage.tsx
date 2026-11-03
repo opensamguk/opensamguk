@@ -2,7 +2,7 @@ import type { AppRouter } from '@opensamguk/server/router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { inferRouterOutputs } from '@trpc/server';
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
-import { useEffect, useId, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { Portrait } from '../portrait/Portrait';
 import { useTRPC } from '../trpc';
 import { errorCode, retryUnlessClientError, serverMessage } from '../turns/apiError';
@@ -19,6 +19,14 @@ import {
   type StatValues,
 } from './createForm';
 import styles from './CreateGeneralPage.module.css';
+import {
+  checkHeritage,
+  HERITAGE_INSUFFICIENT_MESSAGE,
+  withBonus,
+  type HeritageBonus,
+  type HeritageRules,
+} from './heritage';
+import { HeritageAllocation } from './HeritageAllocation';
 import { stepStat, summarizeStats } from './statSummary';
 
 const EVEN: StatValues = { leadership: '55', strength: '55', intel: '55', politics: '55', charm: '55' };
@@ -29,10 +37,21 @@ interface Draft {
   portraitId: number | null;
   // 가문 월드에서만 보내는 성별. 기본 선택이 없어 고르기 전에는 ''이다.
   sex: '' | 'MALE' | 'FEMALE';
+  // 유산 월드에서만 쓰는 능력치별 유산 배분. 0인 능력치는 키가 없다.
+  bonus: HeritageBonus;
+  // 유산 월드에서 이 입력을 시작한 계정(creationRules.heritage.userId). 보낼 때 expectedUserId로 쓴다. 다른 월드는 null이다.
+  owner: string | null;
 }
 
-const EMPTY_DRAFT: Draft = { name: '', stats: EVEN, portraitId: null, sex: '' };
+type HeritageState = 'ok' | 'stale' | 'refreshed';
+type Mine = inferRouterOutputs<AppRouter>['general']['mine'];
+
+const EMPTY_DRAFT: Draft = { name: '', stats: EVEN, portraitId: null, sex: '', bonus: {}, owner: null };
 const SEX_REQUIRED = '성별을 선택하세요.';
+
+// 유산 월드에서 서버가 알려 준 현재 세션 계정. 다른 월드는 null이다.
+const heritageOwner = (data: Mine | undefined) =>
+  data && 'heritage' in data.creationRules ? data.creationRules.heritage.userId : null;
 
 // /w/:worldId/create. 이름·통솔·무력·지력·초상으로 이 월드의 내 장수를 만든다 (AC-M1-06).
 // 월드가 바뀌면 입력과 대기 상태를 처음부터 다시 잡는다.
@@ -60,10 +79,36 @@ function CreateGeneral({ worldId }: { worldId: string }) {
   });
   const general = mine.data?.general ?? null;
   const pending = mine.data?.creation?.status === 'pending';
+  // 잔액 부족으로 거절되면 사용자가 「잔액 다시 확인」을 누를 때까지 제출을 막는다. 배분과 입력은 그대로 두고 다시 보내지 않는다.
+  const [heritageState, setHeritageState] = useState<HeritageState>('ok');
+  const rejectedCode = mine.data?.creation?.status === 'rejected' ? mine.data.creation.code : null;
+  const lastRejected = useRef(rejectedCode);
+  const owner = heritageOwner(mine.data);
+  // 유산 월드의 입력은 처음 받은 계정에 묶는다. 다시 읽은 계정이 다르면 그 입력을 다음 계정에 옮기지 않고 그리기 전에 버린다.
+  // 버린 뒤에는 새 계정의 빈 입력으로 다시 시작하며 아무것도 보내지 않는다.
+  const [accountChanged, setAccountChanged] = useState(false);
+  if (owner !== null && draft.owner !== owner) {
+    if (draft.owner !== null) setAccountChanged(true);
+    setDraft({ ...EMPTY_DRAFT, owner });
+    setHeritageState('ok');
+    setCreationStarted(false);
+  }
+  const accountNotice = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    if (accountChanged) accountNotice.current?.focus();
+  }, [accountChanged, draft.owner]);
 
   useEffect(() => {
     if (pending) setCreationStarted(true);
   }, [pending]);
+
+  // 이 화면에서 보낸 요청이 대기 뒤 잔액 부족으로 거절된 순간만 본다. 들어올 때 이미 있던 거절은 새 잔액을 받았으므로 막지 않는다.
+  useEffect(() => {
+    if (creationStarted && rejectedCode !== lastRejected.current && rejectedCode === 'HERITAGE_INSUFFICIENT')
+      setHeritageState('stale');
+    lastRejected.current = rejectedCode;
+  }, [creationStarted, rejectedCode]);
 
   // 만들어지면 메인으로 간다. 메인과 위쪽 띠가 새 장수를 보도록 조회를 새로 받는다.
   useEffect(() => {
@@ -107,34 +152,58 @@ function CreateGeneral({ worldId }: { worldId: string }) {
     );
   } else {
     body = (
-      <CreateForm
-        worldId={worldId}
-        rules={mine.data.creationRules}
-        lineage={'lineageEnabled' in mine.data.creationRules && mine.data.creationRules.lineageEnabled === true}
-        draft={draft}
-        onDraft={setDraft}
-        rejected={mine.data.creation?.status === 'rejected' ? mine.data.creation.message : null}
-        onSubmitting={() => setCreationStarted(true)}
-        onPending={async () => {
-          // 보내기 전에 시작한 조회가 늦게 와서 pending을 덮지 않게 멈춘다. 결과는 다시 묻기로 받는다.
-          await queryClient.cancelQueries({ queryKey: mineKey });
-          queryClient.setQueryData(mineKey, {
-            general: null,
-            creation: { status: 'pending' as const },
-            creationRules: mine.data!.creationRules,
-          });
-        }}
-        onFailed={() => void queryClient.invalidateQueries({ queryKey: mineKey })}
-        onCreated={(created) => {
-          queryClient.setQueryData(mineKey, {
-            general: created,
-            creation: null,
-            creationRules: mine.data!.creationRules,
-          });
-          void queryClient.invalidateQueries({ queryKey: trpc.home.get.queryKey({ worldId }) });
-          void navigate({ to: '/w/$worldId', params: { worldId } });
-        }}
-      />
+      <>
+        {accountChanged ? (
+          <p ref={accountNotice} className={styles.alert} role="alert" tabIndex={-1}>
+            계정이 바뀌어 이전 계정에서 넣은 입력과 유산 배분을 지웠습니다. 현재 계정으로 다시 입력하세요.
+          </p>
+        ) : null}
+        {/* 계정이 바뀌면 폼을 새로 그려 이전 계정의 요청 상태·오류·알림이 남지 않게 한다. */}
+        <CreateForm
+          key={draft.owner ?? ''}
+          worldId={worldId}
+          rules={mine.data.creationRules}
+          lineage={'lineageEnabled' in mine.data.creationRules && mine.data.creationRules.lineageEnabled === true}
+          heritage={'heritage' in mine.data.creationRules ? mine.data.creationRules.heritage : undefined}
+          currentOwner={owner}
+          heritageState={heritageState}
+          onHeritageShort={() => setHeritageState('stale')}
+          onHeritageRefresh={() => {
+            const pinned = draft.owner;
+            void mine.refetch().then((result) => {
+              // 다시 읽은 계정이 다르면 입력은 이미 버렸다. 새 입력에 「다시 확인했습니다」를 붙이지 않는다.
+              if (!result.isError && heritageOwner(result.data) === pinned) setHeritageState('refreshed');
+            });
+          }}
+          draft={draft}
+          onDraft={setDraft}
+          rejected={mine.data.creation?.status === 'rejected' ? mine.data.creation.message : null}
+          onSubmitting={() => {
+            setCreationStarted(true);
+            setHeritageState((prev) => (prev === 'refreshed' ? 'ok' : prev));
+          }}
+          onPending={async () => {
+            // 보내기 전에 시작한 조회가 늦게 와서 pending을 덮지 않게 멈춘다. 결과는 다시 묻기로 받는다.
+            await queryClient.cancelQueries({ queryKey: mineKey });
+            queryClient.setQueryData(mineKey, {
+              general: null,
+              creation: { status: 'pending' as const },
+              creationRules: mine.data!.creationRules,
+            });
+          }}
+          // 계정이 바뀌었다는 CONFLICT도 여기서 다시 읽는다. 새 계정이 오면 위에서 입력을 버리고 다시 보내지 않는다.
+          onFailed={() => void queryClient.invalidateQueries({ queryKey: mineKey })}
+          onCreated={(created) => {
+            queryClient.setQueryData(mineKey, {
+              general: created,
+              creation: null,
+              creationRules: mine.data!.creationRules,
+            });
+            void queryClient.invalidateQueries({ queryKey: trpc.home.get.queryKey({ worldId }) });
+            void navigate({ to: '/w/$worldId', params: { worldId } });
+          }}
+        />
+      </>
     );
   }
 
@@ -169,6 +238,11 @@ function CreateForm({
   worldId,
   rules,
   lineage,
+  heritage,
+  currentOwner,
+  heritageState,
+  onHeritageShort,
+  onHeritageRefresh,
   draft,
   onDraft,
   rejected,
@@ -181,6 +255,13 @@ function CreateForm({
   rules: CreationRules;
   // lineage-v1 월드면 성별을 꼭 고른다. 다른 월드에는 성별 칸이 없고 보내지도 않는다.
   lineage: boolean;
+  // heritage-v1 월드에만 있다. 없으면 유산 첩도 heritage 키도 없다.
+  heritage: HeritageRules | undefined;
+  // 마지막으로 읽은 세션 계정. 입력을 묶은 draft.owner와 다르면 보내지 않는다.
+  currentOwner: string | null;
+  heritageState: HeritageState;
+  onHeritageShort: () => void;
+  onHeritageRefresh: () => void;
   draft: Draft;
   onDraft: (update: (prev: Draft) => Draft) => void;
   rejected: string | null;
@@ -192,36 +273,72 @@ function CreateForm({
   const trpc = useTRPC();
   const create = useMutation(trpc.general.create.mutationOptions());
   // 입력은 화면(CreateGeneral)이 갖는다. 기다리는 동안 폼이 사라졌다가 거절로 돌아와도 보낸 값이 남는다.
-  const { name, stats, portraitId, sex } = draft;
+  const { name, stats, portraitId, sex, bonus } = draft;
   const setName = (value: string) => onDraft((prev) => ({ ...prev, name: value }));
   const setStats = (update: (prev: StatValues) => StatValues) =>
     onDraft((prev) => ({ ...prev, stats: update(prev.stats) }));
   const setPortraitId = (value: number | null) => onDraft((prev) => ({ ...prev, portraitId: value }));
   const setSex = (value: 'MALE' | 'FEMALE') => onDraft((prev) => ({ ...prev, sex: value }));
+  const setBonus = (key: StatKey, value: number) =>
+    onDraft((prev) => {
+      const next: HeritageBonus = { ...prev.bonus, [key]: value };
+      if (value <= 0) delete next[key];
+      return { ...prev, bonus: next };
+    });
   const [touched, setTouched] = useState(false);
   const check = checkCreation(name, stats, rules);
-  const problems = lineage && sex === '' ? [...check.problems, SEX_REQUIRED] : check.problems;
+  const heritageCheck = heritage ? checkHeritage(bonus, stats, rules, heritage, heritageState === 'stale') : null;
+  const problems = [
+    ...check.problems,
+    ...(lineage && sex === '' ? [SEX_REQUIRED] : []),
+    ...(heritageCheck?.problems ?? []),
+  ];
   const problemsId = useId();
   const nameId = useId();
   const statId = useId();
   const sexHelpId = useId();
-  const summary = summarizeStats(stats, rules);
+  // 유산 월드에서는 유산을 더한 최종 능력치로 요약한다. 보낼 능력치는 기본값 그대로다.
+  const summary = summarizeStats(heritage ? withBonus(stats, bonus) : stats, rules);
+  const spent = heritageCheck?.spent ?? 0;
+  const submitLabel = spent > 0 ? `장수 만들기 (유산 ${spent}점 사용)` : '장수 만들기';
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
     setTouched(true);
-    if (!check.stats || problems.length > 0 || create.isPending) return;
+    if (!check.stats || problems.length > 0 || create.isPending || draft.owner !== currentOwner) return;
+    // 0인 능력치는 빼고 합이 0이면 heritage 키를 보내지 않는다. 보너스는 서버가 기본값에 더한다.
+    const heritagePayload =
+      heritageCheck && spent > 0
+        ? {
+            heritage: Object.fromEntries(
+              heritageCheck.rows.filter((row) => row.bonus > 0).map((row) => [row.key, row.bonus]),
+            ) as HeritageBonus,
+          }
+        : {};
     // 재조회가 생성 응답보다 빨라도 폼의 언마운트로 완료 전환을 잃지 않는다.
     onSubmitting();
     create.mutate(
-      { worldId, name: check.name, ...check.stats, portraitId, ...(lineage && sex !== '' ? { sex } : {}) },
+      {
+        worldId,
+        name: check.name,
+        ...check.stats,
+        portraitId,
+        ...(lineage && sex !== '' ? { sex } : {}),
+        ...heritagePayload,
+        // 유산 월드에서는 입력을 시작한 계정을 함께 보낸다. 세션이 바뀌었으면 서버가 입력·잔액을 건드리기 전에 거절한다.
+        ...(heritage && draft.owner !== null ? { expectedUserId: draft.owner } : {}),
+      },
       {
         onSuccess: (result) => {
           if (result.status === 'created') onCreated(result.general);
           else void onPending();
         },
         // 연결이 끊겨 응답만 못 받았거나 다른 요청이 진행 중이면 서버에 pending이 남아 있을 수 있다. 상태를 다시 묻는다.
-        onError: onFailed,
+        onError: (failure) => {
+          if (errorCode(failure) === 'CONFLICT' && serverMessage(failure) === HERITAGE_INSUFFICIENT_MESSAGE)
+            onHeritageShort();
+          onFailed();
+        },
       },
     );
   };
@@ -337,6 +454,17 @@ function CreateForm({
         </p>
       ) : null}
 
+      {heritage && heritageCheck ? (
+        <HeritageAllocation
+          heritage={heritage}
+          rules={rules}
+          result={heritageCheck}
+          check={heritageState}
+          onStep={setBonus}
+          onRefresh={onHeritageRefresh}
+        />
+      ) : null}
+
       {lineage ? (
         <>
           {/* 초상 첩(.portraits)은 넓은 화면에서 왼쪽 칸 전체를 차지한다. 성별 첩은 같은 틀만 쓰고 오른쪽 칸에 둔다. */}
@@ -417,6 +545,7 @@ function CreateForm({
           <>
             <p>{summary.strong}</p>
             {summary.caution ? <p className={styles.muted}>{summary.caution}</p> : null}
+            {spent > 0 ? <p className={styles.muted}>유산을 더한 최종 능력치로 봅니다.</p> : null}
           </>
         ) : (
           <p className={styles.muted}>능력치를 모두 정수로 넣으면 이 장수의 강점을 보입니다.</p>
@@ -429,10 +558,10 @@ function CreateForm({
             만드는 중…
           </button>
         ) : reason ? (
-          <DisabledReason reason={reason}>장수 만들기</DisabledReason>
+          <DisabledReason reason={reason}>{submitLabel}</DisabledReason>
         ) : (
           <button type="submit" className={styles.submit}>
-            장수 만들기
+            {submitLabel}
           </button>
         )}
       </div>

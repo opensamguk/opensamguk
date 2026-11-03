@@ -17,6 +17,9 @@ import { router, protectedProcedure, worldVerifiedProcedure } from '../trpc';
 import { requireGeneral, requireWorld, worldInput } from '../game/queries';
 import { ownGeneral } from '../game/projection';
 import { readPolicy, requirePolicyReady } from '../game/policy';
+import { hashState } from '@opensamguk/shared/node';
+import { PgHeritageBalanceStore } from '../heritage/pgStore';
+import { readCreationHeritage } from '../heritage/service';
 
 const codes = {
   ALREADY_EXISTS: 'CONFLICT',
@@ -25,6 +28,8 @@ const codes = {
   BAD_STATS: 'BAD_REQUEST',
   BAD_PORTRAIT: 'BAD_REQUEST',
   BAD_SEX: 'BAD_REQUEST',
+  BAD_HERITAGE: 'BAD_REQUEST',
+  HERITAGE_INSUFFICIENT: 'CONFLICT',
   WORLD_FULL: 'BAD_REQUEST',
   WORLD_CLOSED: 'PRECONDITION_FAILED',
   ACTOR_INACTIVE: 'UNAUTHORIZED',
@@ -36,7 +41,7 @@ function rejection(result: unknown) {
   const known = code as CreationCode;
   return { code: known, message: CREATION_ERRORS[known] };
 }
-const createInput = generalCreationSchema.extend(worldInput.shape);
+const createInput = generalCreationSchema.extend({ ...worldInput.shape, expectedUserId: z.uuid().optional() });
 const creationEnvelope = worldInput.extend({
   name: z.unknown(),
   leadership: z.unknown(),
@@ -45,6 +50,8 @@ const creationEnvelope = worldInput.extend({
   politics: z.unknown().optional(),
   charm: z.unknown().optional(),
   sex: z.unknown().optional(),
+  heritage: z.unknown().optional(),
+  expectedUserId: z.uuid().optional(),
   portraitId: z.unknown(),
 });
 const creationInputParser = {
@@ -123,7 +130,9 @@ export const generalRouter = router({
     }),
   create: worldVerifiedProcedure.input(creationInputParser).mutation(async ({ ctx, input }) => {
     const started = performance.now();
-    const { worldId, ...payload } = input;
+    const { worldId, expectedUserId, ...payload } = input;
+    if (expectedUserId !== undefined && expectedUserId !== ctx.user.id)
+      throw new TRPCError({ code: 'CONFLICT', message: '계정이 바뀌었습니다. 현재 계정으로 다시 확인하세요.' });
     const id = await ctx.db.$transaction(async (tx) => {
       const world = await requireWorld(tx, worldId, true);
       const existing = await tx.general.findUnique({ where: { worldId_userId: { worldId, userId: ctx.user.id } } });
@@ -144,17 +153,21 @@ export const generalRouter = router({
           code: 'BAD_REQUEST',
           message: parsed.error.issues.some((issue) => issue.path[0] === 'sex')
             ? CREATION_ERRORS.BAD_SEX
-            : parsed.error.message,
+            : parsed.error.issues.some((issue) => issue.path[0] === 'heritage')
+              ? CREATION_ERRORS.BAD_HERITAGE
+              : parsed.error.message,
           cause: parsed.error,
         });
-      const checked = validateGeneralCreation(payload, world.statRules, world.ruleFeatures.includes('lineage-v1'));
+      const checked = validateGeneralCreation(
+        payload,
+        world.statRules,
+        world.ruleFeatures.includes('lineage-v1'),
+        world.ruleFeatures.includes('heritage-v1'),
+      );
       if (!checked.ok) throw new TRPCError({ code: 'BAD_REQUEST', message: checked.message });
       if (pending) {
         // PostgreSQL jsonb의 키 순서는 입력 객체 순서와 다르다.
-        const equal =
-          Object.entries(checked.value).every(
-            ([key, value]) => (pending.payload as Record<string, unknown>)[key] === value,
-          ) && Object.keys(pending.payload as object).length === Object.keys(checked.value).length;
+        const equal = hashState(checked.value) === hashState(pending.payload);
         if (!equal) throw new TRPCError({ code: 'CONFLICT', message: '생성 요청이 진행 중입니다.' });
         return pending.id;
       }
@@ -208,6 +221,11 @@ export const generalRouter = router({
           count: world.ruleFeatures.includes('five-stats') ? (5 as const) : (3 as const),
           campaignEnabled: world.ruleFeatures.includes('campaign-v1'),
           ...(world.ruleFeatures.includes('lineage-v1') ? { lineageEnabled: true as const } : {}),
+          ...(world.ruleFeatures.includes('heritage-v1')
+            ? {
+                heritage: await readCreationHeritage(new PgHeritageBalanceStore(tx), ctx.user.id),
+              }
+            : {}),
         };
         const general = await tx.general.findUnique({
           where: { worldId_userId: { worldId: input.worldId, userId: ctx.user.id } },

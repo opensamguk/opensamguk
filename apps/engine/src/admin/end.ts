@@ -14,6 +14,8 @@ import { hashState } from '@opensamguk/shared/node';
 import { databaseNow } from '../lease';
 import { loadReplayState } from '../monthly';
 import { checkedAdminResetResult } from './reset';
+import { PgHeritageRepository } from '../heritage/repository';
+import { refundHeritageCreations } from '../heritage/service';
 
 export function checkedAdminEndResult(
   world: Prisma.WorldGetPayload<Record<string, never>>,
@@ -128,6 +130,10 @@ export async function processAdminEnd(
       data: { status: 'ENDED', endedAt: now, clockRevision: { increment: 1 } },
     });
     if (saved.count !== 1) throw new Error('월드 상태가 바뀌어 종료를 취소했습니다.');
+    if (world.ruleFeatures.includes('heritage-v1'))
+      await refundHeritageCreations(new PgHeritageRepository(tx), world.id, 'ADMIN_END', {
+        requestId: String(event.id),
+      });
   }
   const saved = await tx.inputEvent.updateMany({
     where: { id: event.id, status: 'PENDING' },

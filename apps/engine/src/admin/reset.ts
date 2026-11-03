@@ -1,5 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { nextActionSequence, type Prisma, type PrismaClient } from '@opensamguk/db';
+import { PgHeritageRepository } from '../heritage/repository';
+import { refundHeritageCreations } from '../heritage/service';
 import {
   ADMIN_RESET_KIND,
   adminResetPayloadSchema,
@@ -301,6 +303,11 @@ export async function processAdminReset(
       data: { status: 'ENDED', endedAt: now, clockRevision: { increment: 1 } },
     });
     if (source.count !== 1) throw new Error('원본 월드 상태가 바뀌어 초기화를 취소했습니다.');
+    if (world.ruleFeatures.includes('heritage-v1'))
+      await refundHeritageCreations(new PgHeritageRepository(tx), world.id, 'ADMIN_RESET', {
+        requestId: String(event.id),
+        newWorldId: payload.plannedNewWorldId,
+      });
   }
   const sequence = await nextActionSequence(tx, world.id),
     status = code ? ('REJECTED' as const) : ('APPLIED' as const);
