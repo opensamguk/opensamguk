@@ -67,7 +67,8 @@ export const stratagemCardsFeature: RuleFeatureDefinition = {
   checkArchive({ inputs }) {
     for (const input of inputs) if (input.kind === 'stratagem-cards.act') validateStratagemCardsRecord(input);
   },
-  afterAppliedInput(_before, after) {
+  afterAppliedInput(_before, after, _input, context) {
+    if (context?.route !== 'queued') return after;
     return {
       ...after,
       state: {
