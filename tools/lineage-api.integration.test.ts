@@ -370,6 +370,10 @@ it.each([false, true])(
         data: { nationId: 1, officerLevel: 1 },
       });
       const predecessor = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId: id, id: from } } });
+      const destination = await db.city.findFirstOrThrow({
+        where: { worldId: id, nationId: 1, cityKey: { not: predecessor.cityKey } },
+        orderBy: { cityKey: 'asc' },
+      });
       await db.assignmentOffer.create({
         data: {
           id: assignmentId,
@@ -377,7 +381,7 @@ it.each([false, true])(
           nationId: 1,
           issuerGeneralId: 1,
           targetGeneralId: from,
-          cityKey: predecessor.cityKey === 1 ? 3 : 1,
+          cityKey: destination.cityKey,
           createdTick: 120000,
           expiresTick: 180000,
           status: 'PENDING',
