@@ -598,7 +598,7 @@ for (const path of paths)
               const before = await snapshot(),
                 response = await call(path, value, peer.cookie);
               expect(response.status).toBe(200);
-              expect(response.data).toEqual({ userId: peer.userId, cityKey, visible: false });
+              expect(response.data).toEqual({ userId: peer.userId, actorId: peer.generalId, cityKey, visible: false });
               expect(await snapshot()).toBe(before);
             }
           } else if (category === 'sanctioned') {
@@ -663,6 +663,7 @@ for (const path of paths)
                 resources: { gold: 10000, rice: 10000 },
               });
               expect(Object.keys(response.data!).sort()).toEqual([
+                'actorId',
                 'armyTypes',
                 'canAllocate',
                 'cityKey',

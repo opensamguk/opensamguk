@@ -291,7 +291,7 @@ async function listen(server: Awaited<ReturnType<typeof buildServer>>) {
     try {
       return await server.listen({ host: '127.0.0.1', port: randomInt(10081, 65536) });
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw error;
+      if (!['EADDRINUSE', 'EACCES'].includes((error as NodeJS.ErrnoException).code ?? '')) throw error;
     }
   throw new Error('시험 서버의 빈 HTTP 포트를 찾지 못했습니다.');
 }
@@ -555,7 +555,8 @@ it('두 정식 월드의 미동의 변경은 전부403·무변경이며 실제 �
   const paths = Object.entries(procedures)
     .filter(([, procedure]) => procedure._def.type === 'mutation' && procedure._def.meta?.accountAccess === 'verified')
     .map(([path]) => path);
-  expect(paths).toHaveLength(33);
+  expect(paths).toHaveLength(34);
+  expect(paths).toContain('lineage.submit');
   expect(paths).toContain('logistics.submit');
   expect(paths).toContain('governance.submit');
   expect(paths).toContain('campaign.order');

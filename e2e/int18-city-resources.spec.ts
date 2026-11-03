@@ -1270,7 +1270,7 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
             worldId: main.id,
             cityKey: enemy.cityKey,
           }),
-        ).toEqual({ userId: actor.userId, cityKey: enemy.cityKey, visible: false });
+        ).toEqual({ userId: actor.userId, actorId: actor.generalId, cityKey: enemy.cityKey, visible: false });
         await actor.page.setViewportSize({ width: 375, height: 812 });
         await actor.page.getByRole('button', { name: '내 도시로', exact: true }).click();
         await showResources(main, actor, cityKey);

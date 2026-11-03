@@ -303,18 +303,23 @@ it('거주 tick은 null·0·양수를 저장하고 음수를 거부하며 멸망
     ).toEqual([]);
     const where = { worldId_id: { worldId: 'residence-world', id: 1 } };
     for (const residenceTick of [0, 1, 2147483647, null]) {
-      expect((await db.general.update({ where, data: { residenceTick } })).residenceTick).toBe(residenceTick);
+      expect(
+        (await db.general.update({ where, data: { residenceTick }, select: { residenceTick: true } })).residenceTick,
+      ).toBe(residenceTick);
       expect(
         (await client.query('SELECT "residenceTick" FROM "General" WHERE "worldId"=$1 AND id=1', ['residence-world']))
           .rows,
       ).toEqual([{ residenceTick }]);
     }
-    await db.general.update({ where, data: { residenceTick: 105 } });
-    const before = await db.general.findUniqueOrThrow({ where });
+    await db.general.update({ where, data: { residenceTick: 105 }, select: { residenceTick: true } });
+    const before = (await client.query('SELECT * FROM "General" WHERE "worldId"=$1 AND id=1', ['residence-world']))
+      .rows;
     await expect(
       client.query('UPDATE "General" SET "residenceTick"=-1 WHERE "worldId"=$1 AND id=1', ['residence-world']),
     ).rejects.toMatchObject({ code: '23514', constraint: 'General_residenceTick_check' });
-    expect(await db.general.findUniqueOrThrow({ where })).toEqual(before);
+    expect(
+      (await client.query('SELECT * FROM "General" WHERE "worldId"=$1 AND id=1', ['residence-world'])).rows,
+    ).toEqual(before);
     const offer = await db.assignmentOffer.create({
       data: {
         worldId: 'residence-world',
