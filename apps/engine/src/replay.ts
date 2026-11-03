@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util';
 import type { PrismaClient } from '@opensamguk/db';
 import {
   applyRecordedInput,
@@ -9,6 +10,8 @@ import {
   type ReplayOriginV3,
   nextGameAction,
   runReplayAction,
+  settleReplayMonth,
+  governanceMovementSchema,
   TICKS_PER_MONTH,
   type RecordedInput,
   type WorldInit,
@@ -37,10 +40,12 @@ import {
   adminResetAppliedSchema,
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
+import { z } from 'zod';
 import { exportCapsArchive, replayCapsArchive, replayCapsToEnd, type CapsArchive } from './replayCaps';
 import { checkStoredReplayFormat } from './features';
 import { assertStoredCityResources } from './cityResourcesState';
 import { assertStoredLogistics } from './logisticsState';
+import { readGovernanceLedger, type GovernanceLedgerEntry } from './governance/repository';
 import { checkedAdminEndResult } from './admin/end';
 import { checkedAdminResetResult, checkedResetTarget } from './admin/reset';
 
@@ -123,7 +128,8 @@ export async function exportReplay(
   db: PrismaClient,
   worldId: string,
 ): Promise<ReplayArchiveV2 | ReplayArchiveV3 | ReplayArchiveV5 | CapsArchive> {
-  return db.$transaction(
+  let ledger: Awaited<ReturnType<typeof readGovernanceLedger>> | undefined;
+  const archive = await db.$transaction(
     async (tx) => {
       const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
       if (world.replayOrigin === null) throw new Error('생성 기록이 없는 월드는 재생할 수 없습니다.');
@@ -222,6 +228,9 @@ export async function exportReplay(
       if (v3) {
         const archive = { ...common, end: common.end ?? adminEnd, version: 3, config };
         readArchive(archive);
+        if (world.ruleFeatures.includes('governance-v1')) {
+          ledger = await readGovernanceLedger(tx, worldId);
+        }
         return archive as unknown as ReplayArchiveV3;
       }
       if (world.policyFromSequence != null) {
@@ -252,6 +261,13 @@ export async function exportReplay(
     },
     { isolationLevel: 'RepeatableRead' },
   );
+  // 원장과 아카이브는 같은 스냅샷에서 읽는다. 긴 순수 재생 동안 DB 트랜잭션을 붙들지 않는다.
+  if (ledger !== undefined && archive.version === 3) {
+    const expected: GovernanceLedgerEntry[] = [];
+    if (archive.months.length) replayArchiveWithLedger(archive, archive.months.length, ruleRegistry, expected);
+    if (!isDeepStrictEqual(ledger, expected)) throw new Error('저장된 황실 원장이 원생성 재생의 월 효과와 다릅니다.');
+  }
+  return archive;
 }
 
 export function readArchive(value: unknown, registry: RuleRegistry = ruleRegistry): Archive {
@@ -592,6 +608,15 @@ export function replayArchive(
   months = 12,
   registry: RuleRegistry = ruleRegistry,
 ): { tick: number; stateHash: string }[] {
+  return replayArchiveWithLedger(value, months, registry);
+}
+
+function replayArchiveWithLedger(
+  value: unknown,
+  months: number,
+  registry: RuleRegistry,
+  governanceRows?: GovernanceLedgerEntry[],
+): { tick: number; stateHash: string }[] {
   if (value !== null && typeof value === 'object' && 'version' in value && value.version === 6)
     return replayCapsArchive(value, months);
   if (!Number.isSafeInteger(months) || months < 1 || months > 12000) {
@@ -623,7 +648,14 @@ export function replayArchive(
         if (action.tick > tick || (action.kind === 'monthly' && sequence !== expected.sequence)) {
           throw new Error(`정산 순서가 다릅니다: ${tick}`);
         }
-        replay = runReplayAction(replay, origin.initial.seed, origin.initial.unitSet, undefined, registry);
+        if (governanceRows && action.kind === 'monthly' && replay.state.ruleFeatures?.includes('governance-v1')) {
+          const settled = settleReplayMonth(replay, origin.initial.seed, action.tick, registry);
+          const { movements } = z
+            .object({ movements: z.array(governanceMovementSchema) })
+            .parse(settled.effects['governance-v1']);
+          governanceRows.push(...movements.map((row, ordinal) => ({ ...row, ordinal, tick: action.tick, sequence })));
+          replay = settled.replay;
+        } else replay = runReplayAction(replay, origin.initial.seed, origin.initial.unitSet, undefined, registry);
         lastActionTick = action.tick;
         if (action.kind === 'turn') untouched.delete(action.generalId);
         if (archive.version !== 1) checkOutcome(archive, replay, sequence, action);

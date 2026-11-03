@@ -39,9 +39,14 @@ async function withDatabase(mode: 'empty' | 'upgrade', run: (client: PgClient) =
     try {
       await client.end();
       if (created) {
-        expect(
-          (await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1', [name])).rows,
-        ).toEqual([{ count: 0 }]);
+        // 소켓 종료 뒤 서버가 연결을 거두는 시간만 기다린다. 실제 누수는 계속 실패한다.
+        await expect
+          .poll(
+            async () =>
+              (await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1', [name])).rows,
+            { interval: 20, timeout: 5_000 },
+          )
+          .toEqual([{ count: 0 }]);
         // 이 시험이 만든 UUID DB만 지운다. 다른 연결을 종료하거나 DROP FORCE를 쓰지 않는다.
         await admin.query(`DROP DATABASE "${name}"`);
         expect((await admin.query('SELECT datname FROM pg_database WHERE datname=$1', [name])).rows).toEqual([]);

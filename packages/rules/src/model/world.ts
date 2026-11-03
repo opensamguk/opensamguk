@@ -5,6 +5,7 @@ import type { InitialCity, InitialGeneral, InitialNation, InitialDiplomacy, Worl
 import type { CampaignState } from '../campaign/state';
 import type { CityResourcesState } from '../cityResources/state';
 import type { LogisticsState } from '../logistics/state';
+import type { GovernanceState } from '../governance/state';
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 export type WorldExt = Record<string, JsonValue>;
 export interface AssignmentOffer {
@@ -18,6 +19,7 @@ export interface AssignmentOffer {
 export type OfficeTurns = Record<number, Record<number, { commandKey: string; args: unknown }[]>>;
 export type OfficeRevisions = Record<number, Record<number, { revision: number; tenure: number }>>;
 export interface WorldState {
+  governance?: GovernanceState;
   logistics?: LogisticsState;
   cityResources?: CityResourcesState;
   campaign?: CampaignState;

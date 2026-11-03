@@ -5,6 +5,7 @@ import { retryUnlessClientError } from '../game/errors';
 import { officerName } from '../game/names';
 import { QueryError } from '../game/QueryState';
 import { isDetailedGeneral, isMemberNation, type Home, type MapCity, type NationView } from '../game/types';
+import { GovernancePanel } from '../governance/GovernancePanel';
 import { NationNoticeBox } from '../messages/NationNotice';
 import { useTRPC } from '../trpc';
 import { DataTable, type Column } from '../ui/DataTable';
@@ -63,8 +64,14 @@ export function NationInfo({
   onSelectCity: (key: number) => void;
 }) {
   const [open, setOpen] = useState(false);
+  // 황실 칸은 공개 정보라 재야 장수에게도 보인다. 기능을 켜지 않은 월드면 칸이 아무것도 그리지 않는다.
   if (nation === null)
-    return <EmptyState title="재야입니다">국가에 임관하면 국고·군량과 소속 장수를 여기서 봅니다.</EmptyState>;
+    return (
+      <>
+        <EmptyState title="재야입니다">국가에 임관하면 국고·군량과 소속 장수를 여기서 봅니다.</EmptyState>
+        <GovernancePanel worldId={worldId} />
+      </>
+    );
   const capital = isMemberNation(nation) ? cities.find((city) => city.key === nation.capitalCityKey) : undefined;
   return (
     <div className={styles.nation} data-nation-id={nation.id}>
@@ -84,6 +91,7 @@ export function NationInfo({
       </button>
       {open ? <NationTables worldId={worldId} nationId={nation.id} onSelectCity={onSelectCity} /> : null}
       <NationNoticeBox worldId={worldId} />
+      <GovernancePanel worldId={worldId} />
     </div>
   );
 }

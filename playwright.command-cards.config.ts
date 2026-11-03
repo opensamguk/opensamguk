@@ -11,6 +11,7 @@ export default defineConfig({
     'int19-retinue-orders.spec.ts',
     't4-97-game-ui.spec.ts',
     't4-93-logistics.spec.ts',
+    't4-94-governance.spec.ts',
   ],
   testIgnore: [],
   forbidOnly: true,

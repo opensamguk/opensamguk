@@ -26,6 +26,7 @@ import {
   emptyCampaignState,
   emptyCityResourcesState,
   initialLogisticsState,
+  initialGovernanceState,
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { loadCommandState } from '../commandPersistence';
@@ -260,6 +261,14 @@ export function prepareInitialWorld(state: WorldInit, suppliedOptions: InitialWo
           ? {
               logisticsState: initialLogisticsState(
                 featureData?.['logistics-v1'],
+                toWorldState(creationState),
+              ) as Prisma.InputJsonValue,
+            }
+          : {}),
+        ...(features.includes('governance-v1')
+          ? {
+              governanceState: initialGovernanceState(
+                featureData?.['governance-v1'],
                 toWorldState(creationState),
               ) as Prisma.InputJsonValue,
             }

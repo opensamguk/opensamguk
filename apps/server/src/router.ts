@@ -28,6 +28,7 @@ import { nationCommandsRouter } from './routers/nationCommands';
 import { campaignRouter } from './routers/campaign';
 import { cityResourcesRouter } from './routers/cityResources';
 import { logisticsRouter } from './routers/logistics';
+import { governanceRouter } from './routers/governance';
 
 export const appRouter = router({
   auth: authRouter,
@@ -58,6 +59,7 @@ export const appRouter = router({
   campaign: campaignRouter,
   cityResources: cityResourcesRouter,
   logistics: logisticsRouter,
+  governance: governanceRouter,
   // 화면이 서버와 DB 연결을 확인하는 데 쓴다 (AC-M1-02).
   health: publicProcedure.query(async ({ ctx }) => {
     let db: 'ok' | 'down' = 'ok';

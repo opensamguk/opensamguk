@@ -22,8 +22,11 @@ import { loadResidenceAnchors, persistResidenceAnchors } from './residenceState'
 import { persistForeignCampaignInput, processCampaignQueuedInput } from './campaignInput';
 import { processCityResourceInput } from './cityResourceInput';
 import { processLogisticsInput } from './logistics/input';
+import { processGovernanceInput } from './governance/input';
+import { PgGovernanceRepository, appendGovernanceMovements } from './governance/repository';
+import { reconcileGovernanceOrder } from './governance/service';
 import { appendLogisticsMovements } from './logisticsState';
-import { logisticsMovementSchema } from '@opensamguk/rules';
+import { logisticsMovementSchema, governanceMovementSchema } from '@opensamguk/rules';
 import { z } from 'zod';
 
 export async function persistPersonnelPacket(
@@ -121,9 +124,22 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
       'campaign.order': processCampaignQueuedInput,
     },
     afterQueuedInput: (tx, world, before, input) =>
-      ['city.resources', 'logistics.order'].includes(input.kind)
+      ['city.resources', 'logistics.order', 'governance.act'].includes(input.kind)
         ? Promise.resolve()
         : persistForeignCampaignInput(tx, world, before, input),
+  },
+  {
+    key: 'governance-v1',
+    queuedInputs: { 'governance.act': processGovernanceInput },
+    afterQueuedInput: (tx, world, _before, input) =>
+      reconcileGovernanceOrder(new PgGovernanceRepository(tx), world.id, {
+        tick: input.tick!,
+        sequence: input.sequence,
+      }),
+    async persistMonthly(tx, worldId, _before, _next, effects, context) {
+      const rows = z.object({ movements: z.array(governanceMovementSchema) }).parse(effects).movements;
+      await appendGovernanceMovements(tx, worldId, rows, context);
+    },
   },
   { key: 'city-resources-v1', queuedInputs: { 'city.resources': processCityResourceInput } },
   { key: 'five-stats' },

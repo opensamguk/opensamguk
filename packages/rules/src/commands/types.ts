@@ -34,6 +34,7 @@ export interface Failure {
     | 'NO_OFFER'
     | 'NO_UNIT_SET'
     | 'COMMAND_DISABLED'
+    | 'VASSAL_BOUND'
     | 'PROTECTED';
   message: string;
 }

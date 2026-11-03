@@ -1,5 +1,11 @@
 import type { Prisma } from '@opensamguk/db';
-import { presetRules, readOperationalMap, attachOperationalKinds, type WorldState } from '@opensamguk/rules';
+import {
+  presetRules,
+  readOperationalMap,
+  attachOperationalKinds,
+  readStoredGovernance,
+  type WorldState,
+} from '@opensamguk/rules';
 import { engineFeatures } from './features';
 import { loadCommandState } from './commandPersistence';
 import { engineResolver, loadExt } from './extState';
@@ -92,6 +98,8 @@ export async function loadWorldAfterCapabilityCheck(
   if (logistics && logistics.monthlyTick !== world.monthlyTick)
     throw new Error('저장된 물류와 월 정산 tick이 다릅니다.');
   if (logistics) state.logistics = logistics;
+  const governance = readStoredGovernance(world, state);
+  if (governance) state.governance = governance;
   for (const feature of engineFeatures
     .filter((feature) => world.ruleFeatures?.includes(feature.key))
     .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)))

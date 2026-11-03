@@ -18,6 +18,7 @@ import {
   campaignArmyTypes,
   readLogisticsOriginConfig,
   readLogisticsState,
+  readStoredGovernance,
 } from '@opensamguk/rules';
 import { z } from 'zod';
 import { worldResolver } from './resolver';
@@ -126,5 +127,7 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
     if (!isDeepStrictEqual(state.logistics.config, config) || state.logistics.monthlyTick !== world.monthlyTick)
       throw new Error('물류 설정·월 정산 tick이 원생성·저장 월드와 다릅니다.');
   } else if (world.logisticsState != null) throw new Error('물류 기능을 끈 월드에 저장 상태가 있습니다.');
+  const governance = readStoredGovernance(world, state);
+  if (governance) state.governance = governance;
   return { ...state, ...(treaties ? { treaties } : {}) };
 }

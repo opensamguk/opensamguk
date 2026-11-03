@@ -78,6 +78,17 @@ export function nextGameAction(replay: ReplayState) {
     : { kind: 'monthly' as const, tick: boundary };
 }
 
+export function settleReplayMonth(
+  replay: ReplayState,
+  seed: string,
+  tick: number,
+  registry: RuleRegistry = ruleRegistry,
+) {
+  const date = monthlyDate(replay.state.startYear, tick);
+  const result = runMonthly(replay.state, tick, rngFor(seed, 'monthly', date.year, date.month));
+  return settleMonthlyFeatures(replay, { ...replay, state: result.state, monthlyTick: tick }, tick, registry);
+}
+
 export function runReplayAction(
   replay: ReplayState,
   seed: string,
@@ -87,14 +98,7 @@ export function runReplayAction(
 ): ReplayState {
   const action = nextGameAction(replay);
   if (action.kind === 'monthly') {
-    const date = monthlyDate(replay.state.startYear, action.tick);
-    const result = runMonthly(replay.state, action.tick, rngFor(seed, 'monthly', date.year, date.month));
-    return settleMonthlyFeatures(
-      replay,
-      { ...replay, state: result.state, monthlyTick: action.tick },
-      action.tick,
-      registry,
-    ).replay;
+    return settleReplayMonth(replay, seed, action.tick, registry).replay;
   }
   const next = structuredClone(replay);
   const personnel = Object.hasOwn(replay, 'offices');
@@ -178,7 +182,7 @@ export function applyRecordedInput(
   for (const key of replay.state.ruleFeatures ?? []) {
     if (key === kind.feature) continue;
     const feature = registry.features.find((feature) => feature.key === key);
-    next = feature?.afterAppliedInput?.(replay, next, input) ?? next;
+    next = feature?.afterAppliedInput?.(replay, next, input, { route: kind.route }) ?? next;
   }
   return next;
 }
