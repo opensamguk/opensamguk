@@ -1,4 +1,5 @@
 import type { EquipmentConfig } from './config';
+import type { LogisticsConfig } from '../logistics/state';
 
 // 인공 시험값이다. 원작 수치·공개 프로필에서 읽지 않는다.
 export const TEST_EQUIPMENT_CONFIG: EquipmentConfig = {
@@ -40,4 +41,18 @@ export const TEST_EQUIPMENT_CONFIG: EquipmentConfig = {
   ],
   sellRateBp: 4000,
   tradeExperience: 2,
+};
+export const TEST_EQUIPMENT_LOGISTICS_CONFIG: LogisticsConfig = {
+  version: 1,
+  specialties: [],
+  capacity: { base: 1000, perLevel: 1000, maxLevel: 2 },
+  upgrade: { gold: 1, wood: 1 },
+  transport: { maxHops: 8, hopsPerMonth: 2, lossBpPerHop: 100, maxPerOrder: 100, maxActivePerNation: 2 },
+  recruitPer100: {
+    '1': { iron: 2, wood: 0, horses: 0 },
+    '2': { iron: 0, wood: 3, horses: 0 },
+    '3': { iron: 1, wood: 0, horses: 1 },
+  },
+  build: { wall: { iron: 0, wood: 4, horses: 0 }, defence: { iron: 2, wood: 3, horses: 0 } },
+  trade: { iron: { buy: 3, sell: 1 }, wood: { buy: 3, sell: 1 }, horses: { buy: 3, sell: 1 } },
 };

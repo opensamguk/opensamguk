@@ -129,7 +129,7 @@ it('AC-P2-23 direct 입력 뒤에는 시계만 앞섰다는 이유로 만료·re
       result: {},
     },
     result = stratagemCardsFeature.afterAppliedInput!(before, before, input, { route: 'direct' });
-  expect(result).toEqual(before);
+  expect(result).toBe(before);
   expect(result.state.stratagemCards!.revision).toBe(0);
 });
 

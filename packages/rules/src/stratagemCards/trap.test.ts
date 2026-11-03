@@ -160,21 +160,64 @@ it('AC-P2-23 만료·미래 설치 시각과 변경 번호 한도는 피해 적�
   expect(world.stratagemCards!.nations[2]!.traps).toHaveLength(1);
 });
 
-it.each([false, true])('AC-P2-23 설치보다 이른 차례의 지연 출병은 함정 없이 같은 전투를 한다 (부곡=%s)', (campaign) => {
-  const world = fixture(campaign);
-  world.stratagemCards!.nations[2]!.traps[0]!.setTick = actor.tick + 1;
-  const original = selected(campaign),
-    left = createRng('delayed-turn'),
-    right = createRng('delayed-turn'),
-    ordinary = original.run(world, actor, 'attack', target, left),
-    actual = createStratagemCardResolver(original).run(world, actor, 'attack', target, right);
-  if ('code' in ordinary || 'code' in actual) throw Error('출병 고정물이 실행 조건을 만족하지 못했습니다.');
-  const expectedState = applyEffects(cloneWorld(world), ordinary.effects),
-    actualState = applyEffects(cloneWorld(world), actual.effects);
-  delete expectedState.stratagemCards;
-  delete actualState.stratagemCards;
-  expect(actualState).toEqual(expectedState);
-  expect(actual.logs).toEqual(ordinary.logs);
-  expect(left.next()).toBe(right.next());
-  expect(world.stratagemCards!.nations[2]!.traps).toHaveLength(1);
-});
+it.each(
+  [false, true].flatMap((campaign) =>
+    [
+      { capture: false, survives: true },
+      { capture: true, survives: false },
+      { capture: true, survives: true },
+    ].map((outcome) => ({ campaign, ...outcome })),
+  ),
+)(
+  'AC-P2-23 지연 출병의 전투·카드 상태를 보존한다: 부곡=$campaign 점령=$capture 상대국 생존=$survives',
+  ({ campaign, capture, survives }) => {
+    const world = fixture(campaign);
+    if (capture && survives) {
+      world.cities[3]!.nationId = 2;
+      world.nations[2]!.capitalCityKey = 3;
+    }
+    world.stratagemCards!.monthlyTick = 10_000;
+    world.stratagemCards!.nations[2]!.traps[0]!.setTick = actor.tick + 1;
+    if (capture) {
+      world.cities[2]!.wall = 0;
+      if (campaign) world.campaign!.units = world.campaign!.units.filter((unit) => unit.ownerId === 1);
+      else for (const general of Object.values(world.generals)) if (general.nationId === 2) general.crew = 0;
+    } else {
+      world.cities[2]!.wall = 1000;
+      if (campaign) for (const unit of world.campaign!.units) unit.troops = unit.ownerId === 1 ? 100 : 10_000;
+      else {
+        world.generals[1]!.crew = 100;
+        for (const general of Object.values(world.generals)) if (general.nationId === 2) general.crew = 10_000;
+      }
+    }
+    const before = structuredClone(world),
+      original = selected(campaign),
+      left = createRng('delayed-turn'),
+      right = createRng('delayed-turn'),
+      ordinary = original.run(world, actor, 'attack', target, left),
+      actual = createStratagemCardResolver(original).run(world, actor, 'attack', target, right);
+    if ('code' in ordinary || 'code' in actual) throw Error('출병 고정물이 실행 조건을 만족하지 못했습니다.');
+    const expectedState = applyEffects(cloneWorld(world), ordinary.effects),
+      actualState = applyEffects(cloneWorld(world), actual.effects);
+    expect(actualState.cities[2]!.nationId).toBe(capture ? 1 : 2);
+    expect(actualState.nations[2] !== undefined).toBe(survives);
+    expect(actualState.stratagemCards!.nations[2] !== undefined).toBe(survives);
+    const expectedCards = structuredClone(world.stratagemCards!);
+    if (capture) {
+      if (survives) expectedCards.nations[2]!.traps = [];
+      else delete expectedCards.nations[2];
+      expectedCards.revision++;
+    }
+    expect(actualState.stratagemCards).toEqual(expectedCards);
+    const { effects: ordinaryEffects, ...ordinaryDetails } = ordinary,
+      { effects: actualEffects, ...actualDetails } = actual;
+    expect(ordinaryEffects.length).toBeGreaterThan(0);
+    expect(actualEffects.length).toBeGreaterThan(0);
+    expect(actualDetails).toEqual(ordinaryDetails);
+    delete expectedState.stratagemCards;
+    delete actualState.stratagemCards;
+    expect(actualState).toEqual(expectedState);
+    expect(left.next()).toBe(right.next());
+    expect(world).toEqual(before);
+  },
+);
