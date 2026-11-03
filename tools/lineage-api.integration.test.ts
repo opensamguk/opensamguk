@@ -18,6 +18,8 @@ import { newSession } from '../apps/server/src/auth/session';
 import type { AppRouter } from '../apps/server/src/router';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { initializeIntegrationResources } from './integration-resources';
+import { authzCase } from '../apps/server/src/authz/case';
+import { categories } from '../apps/server/src/authz/coverage';
 
 // AC-P2-32·35: 인공 4명·성인 등장 1년 설정의 실제 PG/HTTP/엔진이다.
 // 정식 시나리오 성별 자료나 491명 전체 스케줄·공개 설정·CF 증거가 아니다.
@@ -190,6 +192,78 @@ async function create(worldId: string, player: User, name: string, sex: 'MALE' |
   if (result.data?.status !== 'created') throw Error('실제 장수 생성이 끝나지 않았습니다.');
   return result.data.general.id;
 }
+for (const route of ['lineage.get', 'lineage.submit', 'lineage.request'] as const)
+  for (const category of categories)
+    it(
+      `${route} ${category}`,
+      authzCase(route, category, async () => {
+        const id = await world(),
+          owner = await user(),
+          stranger = await user(),
+          actorId = await create(id, owner, '권한가문', 'MALE'),
+          requestId = randomUUID(),
+          input = {
+            worldId: id,
+            expectedUserId: owner.id,
+            expectedGeneralId: actorId,
+            requestId,
+            payload: { type: 'heir.designate' as const, heirGeneralId: null },
+          };
+        expect((await rpc('lineage.submit', input, owner)).status).toBe(200);
+        const before = hashState(await snapshot(id)),
+          count = await db.inputEvent.count({ where: { worldId: id } }),
+          caller = category === 'unauthenticated' ? undefined : category === 'otherUser' ? stranger : owner;
+        const sanction =
+          category === 'sanctioned'
+            ? await db.sanction.create({
+                data: {
+                  userId: owner.id,
+                  worldId: id,
+                  createdBy: owner.id,
+                  reason: '가문 권한 범주 검증',
+                },
+              })
+            : null;
+        try {
+          const value =
+            category === 'invalidInput'
+              ? { worldId: id, unknown: true }
+              : route === 'lineage.get'
+                ? { worldId: id, generalId: actorId }
+                : route === 'lineage.request'
+                  ? { worldId: id, requestId }
+                  : { ...input, expectedUserId: caller?.id ?? owner.id };
+          const result = await rpc(route, value, caller);
+          const expected =
+            category === 'unauthenticated'
+              ? 401
+              : category === 'invalidInput'
+                ? 400
+                : category === 'otherUser' && route !== 'lineage.get'
+                  ? 404
+                  : category === 'sanctioned' && route === 'lineage.submit'
+                    ? 403
+                    : 200;
+          expect(result.status, `${route} ${category}: ${JSON.stringify(result.error)}`).toBe(expected);
+          if (route === 'lineage.get' && result.status === 200) {
+            const board = result.data as Out['lineage']['get'];
+            expect(board.userId).toBe(caller!.id);
+            if (category === 'otherUser') expect(board.view.mine).toBeNull();
+            else expect(board.view.mine?.generalId).toBe(actorId);
+            if (category === 'sanctioned') expect(board.canSubmit).toBe(false);
+          }
+          if (route === 'lineage.request' && result.status === 200)
+            expect(result.data).toMatchObject({ userId: owner.id, requestId, status: 'pending' });
+          expect(hashState(await snapshot(id))).toBe(before);
+          expect(await db.inputEvent.count({ where: { worldId: id } })).toBe(count);
+          expect(await db.inputEvent.count({ where: { worldId: id, kind: 'lineage.act' } })).toBe(1);
+        } finally {
+          if (sanction) await db.sanction.delete({ where: { id: sanction.id } });
+        }
+      }),
+      60000,
+    );
+
 async function send(worldId: string, player: User, generalId: number, payload: LineageInput, requestId = randomUUID()) {
   const input = { worldId, expectedUserId: player.id, expectedGeneralId: generalId, requestId, payload };
   const submitted = await rpc('lineage.submit', input, player);
