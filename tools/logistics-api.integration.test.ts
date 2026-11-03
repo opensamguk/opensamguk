@@ -243,8 +243,8 @@ async function visitorAtCity(world: Awaited<ReturnType<typeof fixture>>) {
     });
     if (preview.cityKey !== world.cityKey) continue;
     const visitor = await user(candidate);
-    await createHuman(world.id, visitor, '방문자');
-    return visitor;
+    const general = await createHuman(world.id, visitor, '방문자');
+    return { ...visitor, generalId: general.id };
   }
   throw new Error('방문 장수의 도시를 찾지 못했습니다.');
 }
@@ -651,6 +651,7 @@ describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
     expect(board.status).toBe(200);
     expect(board.data).toEqual({
       userId: visitor.id,
+      actorId: visitor.generalId,
       cityKey: world.cityKey,
       visible: true,
       own: false,
@@ -659,6 +660,7 @@ describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
     const remote = initial.cities.find((city) => city.cityKey !== world.cityKey)!;
     expect((await rpc('logistics.get', { worldId: world.id, cityKey: remote.cityKey }, visitor)).data).toEqual({
       userId: visitor.id,
+      actorId: visitor.generalId,
       cityKey: remote.cityKey,
       visible: false,
     });
@@ -716,6 +718,7 @@ describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
             if (route === 'logistics.get' && category === 'otherUser')
               expect(reply.data).toEqual({
                 userId: visitor.id,
+                actorId: visitor.generalId,
                 cityKey: world.cityKey,
                 visible: true,
                 own: false,

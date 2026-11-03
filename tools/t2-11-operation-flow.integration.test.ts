@@ -90,7 +90,13 @@ async function fixture(keepEnemyCity = false) {
   });
   worlds.push(worldId);
   await controlClock(db, worldId, 'start');
-  return { initial, worldId, commander: actors[0]!, enemy: actors[1]! };
+  return {
+    initial,
+    worldId,
+    commander: actors[0]!,
+    commanderGeneralId: initial.generals.find((general) => general.userId === actors[0]!.id)!.id,
+    enemy: actors[1]!,
+  };
 }
 
 async function createOperation(f: Awaited<ReturnType<typeof fixture>>, enemy = false) {
@@ -202,6 +208,7 @@ describe('T2-11 / AC-M2-15 실제 HTTP 저장과 엔진 반영', () => {
     expect(saved.revision).toBe(suggestion.revision + 1);
     expect(saved.slots.map(toTurn)).toEqual(draft);
     expect(await rpc('turns.get', { worldId: f.worldId }, f.commander.cookie)).toEqual({
+      actorId: f.commanderGeneralId,
       revision: saved.revision,
       slots: saved.slots,
     });
@@ -264,6 +271,7 @@ describe('T2-11 / AC-M2-15 실제 HTTP 저장과 엔진 반영', () => {
     expect(stale).toEqual({ ok: false, reason: 'STALE', revision: edited.revision, slots: edited.slots });
     expect(await snapshot(f.worldId)).toEqual(beforeSave);
     expect(await rpc('turns.get', { worldId: f.worldId }, f.commander.cookie)).toEqual({
+      actorId: f.commanderGeneralId,
       revision: edited.revision,
       slots: edited.slots,
     });
@@ -279,7 +287,7 @@ describe('T2-11 / AC-M2-15 실제 HTTP 저장과 엔진 반영', () => {
     expect(retry.revision).toBe(stale.revision + 1);
     expect(retry.slots.map(toTurn)).toEqual(reapplied);
     const reread = await rpc('turns.get', { worldId: f.worldId }, f.commander.cookie);
-    expect(reread).toEqual({ revision: retry.revision, slots: retry.slots });
+    expect(reread).toEqual({ actorId: f.commanderGeneralId, revision: retry.revision, slots: retry.slots });
     expect(reread.slots[0]).toMatchObject({ commandKey: 'attack', args: { cityKey: 2 }, explicit: true });
     expect(reread.slots[8]).toMatchObject({ commandKey: 'rest', explicit: true });
     expect(reread.slots[9]).toMatchObject({ commandKey: 'rest', explicit: false });

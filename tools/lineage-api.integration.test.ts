@@ -17,6 +17,7 @@ import { buildServer } from '../apps/server/src/server';
 import { newSession } from '../apps/server/src/auth/session';
 import type { AppRouter } from '../apps/server/src/router';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { initializeIntegrationResources } from './integration-resources';
 
 // AC-P2-32·35: 인공 4명·성인 등장 1년 설정의 실제 PG/HTTP/엔진이다.
 // 정식 시나리오 성별 자료나 491명 전체 스케줄·공개 설정·CF 증거가 아니다.
@@ -199,6 +200,7 @@ async function send(worldId: string, player: User, generalId: number, payload: L
   return { input, result };
 }
 beforeAll(async () => {
+  await initializeIntegrationResources(db);
   base = await app.listen({ host: '127.0.0.1', port: 0 });
 });
 afterAll(async () => {
