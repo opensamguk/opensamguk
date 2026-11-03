@@ -14,6 +14,7 @@ type PersonnelMember = {
   dedication: number;
 };
 export type PersonnelBoard = {
+  actorId: number;
   appoint: Allowed;
   levels: { officerLevel: number; title: string; holderId: number | null }[];
   members: PersonnelMember[];
@@ -54,6 +55,7 @@ export async function readPersonnelBoard(
     dedication: row.dedication,
   }));
   return {
+    actorId: actor.id,
     appoint: canManagePersonnel(actor.officerLevel)
       ? { ok: true }
       : { ok: false, reason: '군주만 임명·해임할 수 있습니다.' },

@@ -2,7 +2,9 @@ import { LOGISTICS_MAX, type LogisticsPayload } from '../queries/logistics';
 
 // 접수를 확인하지 못한 물류 요청 하나를 이 탭에 둔다. 계정·월드마다 다른 키라 다른 계정에 넘어가지 않는다.
 // 월드당 하나만 두어 결과를 보기 전에는 다른 거점에서도 새 요청을 만들지 않는다. 자동으로 다시 보내지 않는다.
-export type LogisticsPending = { requestId: string; payload: LogisticsPayload };
+// generalId(T4-95): 처음 기록을 만들 때 보낸 장수. 재접수도 이 값을 expectedGeneralId로 그대로 보내고 바꾸지 않는다.
+// 가문 이전에 저장한 기록에는 없을 수 있어 없는 모양도 읽는다.
+export type LogisticsPending = { requestId: string; generalId?: number; payload: LogisticsPayload };
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const GOODS = ['iron', 'wood', 'horses'] as const;
@@ -60,10 +62,16 @@ export function readLogisticsPending(storage: Pick<Storage, 'getItem'>, key: str
     return null;
   }
   const value = record(raw);
-  if (!value || !exactKeys(value, ['requestId', 'payload'])) return null;
+  if (!value) return null;
+  const legacy = exactKeys(value, ['requestId', 'payload']);
+  if (!legacy && !exactKeys(value, ['requestId', 'generalId', 'payload'])) return null;
   if (typeof value.requestId !== 'string' || !uuid.test(value.requestId)) return null;
+  if (!legacy && !positive(value.generalId)) return null;
   const payload = readLogisticsPayload(value.payload);
-  return payload ? { requestId: value.requestId, payload } : null;
+  if (!payload) return null;
+  return legacy
+    ? { requestId: value.requestId, payload }
+    : { requestId: value.requestId, generalId: value.generalId as number, payload };
 }
 
 // 칸 순서와 상관없이 같은 내용인지 본다. 둘 다 위 검사를 거친 모양으로 바꿔 비교한다.
@@ -73,8 +81,31 @@ export function samePayload(a: unknown, b: unknown): boolean {
   return left !== null && right !== null && JSON.stringify(left) === JSON.stringify(right);
 }
 
+// 번호·보낸 장수·내용이 모두 같은 요청인가. 장수 id가 없는 예전 기록은 둘 다 없을 때만 같다.
+export function sameLogisticsRequest(a: LogisticsPending | null, b: LogisticsPending | null): boolean {
+  return (
+    a !== null &&
+    b !== null &&
+    a.requestId === b.requestId &&
+    a.generalId === b.generalId &&
+    samePayload(a.payload, b.payload)
+  );
+}
+
 export function writeLogisticsPending(storage: Pick<Storage, 'setItem'>, key: string, request: LogisticsPending) {
-  storage.setItem(key, JSON.stringify({ requestId: request.requestId, payload: request.payload }));
+  storage.setItem(
+    key,
+    JSON.stringify(
+      request.generalId === undefined
+        ? { requestId: request.requestId, payload: request.payload }
+        : { requestId: request.requestId, generalId: request.generalId, payload: request.payload },
+    ),
+  );
+}
+
+// 기록을 보낸 장수가 지금 장수와 다르다고 확인된 경우(계승). 장수 id가 없는 예전 기록은 바뀐 것으로 보지 않는다.
+export function logisticsActorChanged(request: LogisticsPending, current: number | null): boolean {
+  return request.generalId !== undefined && current !== null && current !== request.generalId;
 }
 
 // 요청 단추 세 가지. 새 제출만 새 번호를 만든다. 상태 확인과 같은 요청 재접수는 저장된 번호·내용을 그대로 쓴다.
@@ -92,11 +123,9 @@ export function requestModeAllowed(
 ): boolean {
   const { request, pending, saved, canManage, stale } = context;
   if (mode === 'submit') return pending === null && saved === null && canManage && !stale;
-  const same = (value: LogisticsPending | null) =>
-    value !== null && value.requestId === request.requestId && samePayload(value.payload, request.payload);
-  if (!same(pending)) return false;
+  if (!sameLogisticsRequest(pending, request)) return false;
   // 같은 요청 재접수는 탭 기록이 그대로 있고 지금 관리 권한이 있을 때만 한다. 권한이 없으면 상태 확인만 한다.
-  return mode === 'check' || (same(saved) && canManage);
+  return mode === 'check' || (sameLogisticsRequest(saved, request) && canManage);
 }
 
 // 다시 조회하다 실패했을 때 보이는 값을 지워야 하는가. 계정·권한·월드 상태가 바뀐 응답이면 지운다.
@@ -117,7 +146,7 @@ export function forgetLogisticsPending(
     storage.removeItem(key);
     return true;
   }
-  if (saved.requestId !== request.requestId || !samePayload(saved.payload, request.payload)) return false;
+  if (!sameLogisticsRequest(saved, request)) return false;
   storage.removeItem(key);
   return true;
 }

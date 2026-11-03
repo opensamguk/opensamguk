@@ -96,7 +96,7 @@ export async function readNationOfficeTabs(tx: Prisma.TransactionClient, worldId
       slots: displayOfficeTurns(world, await readOfficeTurns(tx, world, nationId, officerLevel)),
     });
   }
-  return { tabs };
+  return { actorId: actor.id, tabs };
 }
 
 // caller의 동일 tx에서 World·장수·직책을 잠근 뒤 칸·기록·활동을 함께 저장한다.

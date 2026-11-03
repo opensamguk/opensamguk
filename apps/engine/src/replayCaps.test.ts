@@ -160,6 +160,7 @@ function exportFixture(source: CapsArchive, ended = true) {
     cityResourcesState: null,
     logisticsState: null,
     governanceState: null,
+    lineageState: null,
     presetKey: null,
     preset: null,
     scenarioKey: initial.scenarioKey,

@@ -10,6 +10,8 @@ export type CityRef = { cityKey: number; name: string };
 export type DisplaySlot = { commandKey: string; args?: unknown; name: string };
 
 export interface PersonnelBoard {
+  // 이 조회를 받은 계정의 지금 장수. 계승으로 바뀌면 화면이 예전 장수의 입력으로 보내지 않는다 (T4-95).
+  actorId: number;
   appoint: Allowed;
   levels: Array<{ officerLevel: number; title: string; holderId: number | null }>;
   members: PersonnelMember[];
@@ -85,7 +87,7 @@ export interface PersonnelApi {
   request(input: W & { requestId: string }): Promise<PersonnelRecord>;
   recent(input: W): Promise<PersonnelRecord[]>;
   offers(input: W): Promise<AssignmentOfferView[]>;
-  nationTurns(input: W): Promise<{ tabs: NationTurnTab[] }>;
+  nationTurns(input: W): Promise<{ actorId: number; tabs: NationTurnTab[] }>;
   setNationTurns(
     input: W & {
       office: Office;

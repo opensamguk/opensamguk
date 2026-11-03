@@ -121,6 +121,8 @@ export async function submitGovernanceRequest(store: GovernanceStore, identity: 
       fail('CONFLICT', '월 정산이 진행 중입니다. 완료 뒤 다시 보내세요.');
     const actorId = viewer(snapshot, identity.userId);
     if (actorId === null) fail('NOT_FOUND', '장수가 없습니다.');
+    if (input.expectedGeneralId !== undefined && actorId !== input.expectedGeneralId)
+      fail('CONFLICT', '조작 장수가 바뀌었습니다. 화면을 다시 불러오세요.');
     const outcome = decideGovernanceAction(snapshot.state!, actorId, input.payload, world.clockTick);
     if (!outcome.ok)
       fail(

@@ -19,6 +19,7 @@ const VERIFIED_MUTATIONS = [
   'general.create',
   'general.setPolicy',
   'governance.submit',
+  'lineage.submit',
   'logistics.submit',
   'message.markRead',
   'message.send',
@@ -56,7 +57,7 @@ describe('T3-02 AC-M3-01 이메일 인증 경계', () => {
       { _def: { type: string; meta?: ProcedureMeta } }
     >;
     const mutations = Object.entries(procedures).filter(([, procedure]) => procedure._def.type === 'mutation');
-    expect(mutations).toHaveLength(42);
+    expect(mutations).toHaveLength(43);
     expect(
       mutations
         .filter(([, procedure]) => procedure._def.meta?.accountAccess === 'verified')

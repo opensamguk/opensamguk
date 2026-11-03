@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import type { Prisma } from '@opensamguk/db';
 import type { ClosedOffer, WorldState, WorldView } from '@opensamguk/rules';
+import { pendingAssignmentsFromRows } from '@opensamguk/rules';
 
 type PendingOffer = NonNullable<WorldState['assignmentOffers']>[number];
 type Descriptor = { targetGeneralId: number; offer: PendingOffer };
@@ -102,32 +103,7 @@ export async function loadAssignmentState(
     where: { worldId, status: 'PENDING' },
     orderBy: [{ targetGeneralId: 'asc' }, { id: 'asc' }],
   });
-  const assignmentOffers: NonNullable<WorldState['assignmentOffers']> = {};
-  const ids = new Set<string>();
-  for (const row of rows) {
-    if (
-      row.worldId !== worldId ||
-      row.status !== 'PENDING' ||
-      row.resolvedBy !== null ||
-      row.cancelReason !== null ||
-      row.resolvedTick !== null
-    )
-      throw new Error('저장된 발령 제안이 PENDING 상태와 다릅니다.');
-    integer(row.targetGeneralId, 1);
-    const offer = readOffer({
-      id: row.id,
-      nationId: row.nationId,
-      issuerGeneralId: row.issuerGeneralId,
-      cityKey: row.cityKey,
-      createdTick: row.createdTick,
-      expiresTick: row.expiresTick,
-    });
-    if (Object.hasOwn(assignmentOffers, row.targetGeneralId) || ids.has(offer.id))
-      throw new Error('저장된 발령 대상 또는 제안 id가 중복됐습니다.');
-    assignmentOffers[row.targetGeneralId] = offer;
-    ids.add(offer.id);
-  }
-  return rows.length ? { assignmentOffers } : {};
+  return pendingAssignmentsFromRows(rows, worldId);
 }
 
 // 호출자가 World 잠금과 리스 펜싱을 잡고 before를 적재한다. 오류는 전체 트랜잭션을 되돌려야 한다.

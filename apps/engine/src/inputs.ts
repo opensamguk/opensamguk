@@ -6,6 +6,7 @@ import {
   monthlyDate,
   TICKS_PER_MONTH,
   creationFailure,
+  readLineageState,
   creationBlock,
   emptyTurns,
   emptyQueue,
@@ -278,8 +279,13 @@ const processGeneralCreation: QueuedInputHandler = async (tx, world, event, { ti
   if (block && block.code !== 'PENDING') return reject(block.code);
   const actor = await tx.user.findUnique({ where: { id: event.userId } });
   if (!actor || actor.status !== 'ACTIVE') return reject('ACTOR_INACTIVE');
-  const parsed = validateGeneralCreation(event.payload, world.statRules);
+  const parsed = validateGeneralCreation(event.payload, world.statRules, world.ruleFeatures.includes('lineage-v1'));
   if (!parsed.ok) return reject(parsed.code);
+  if (
+    world.ruleFeatures.includes('lineage-v1') &&
+    existing.length >= readLineageState(world.lineageState).config.limits.maxGenerals
+  )
+    return reject('WORLD_FULL');
   if (existing.some((g) => g.name.normalize('NFC').trim() === parsed.value.name)) return reject('NAME_TAKEN');
   const cities = await tx.city.findMany({
     where: { worldId: world.id, OR: [{ kind: null }, { kind: 'CITY' }] },

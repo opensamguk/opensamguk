@@ -32,6 +32,7 @@ export interface ReplayState {
   // 새 부곡 프로필의 불변 병종 허용 목록. 생성 기록의 unitSet에서만 읽는다.
   campaignArmyTypes?: number[];
   campaignUnitSet?: UnitSetResource;
+  lineageResources?: import('./lineage/birth').LineageResources;
 }
 export interface RecordedInput {
   sequence: number;
@@ -152,7 +153,11 @@ export function applyRecordedInput(
     (!replay.state.ruleFeatures ||
       ['turns.set', 'general.create', 'general.setPolicy', 'general.active'].includes(input.kind))
   )
-    validatePolicyInput(input, replay.state.ruleFeatures?.includes('five-stats'));
+    validatePolicyInput(
+      input,
+      replay.state.ruleFeatures?.includes('five-stats'),
+      replay.state.ruleFeatures?.includes('lineage-v1'),
+    );
   const kind = registry.inputKinds.find((kind) => kind.kind === input.kind);
   if (input.status === 'REJECTED') {
     if (

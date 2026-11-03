@@ -209,6 +209,16 @@ it('INT-18C AC-INT-18C 원장 재조회는 편집 중인 배속 입력을 보존
     timer.mockRestore();
   }
 });
+it('T4-95 AC-P2-32 보내기 직전 다시 읽은 장수가 바뀌었으면(계승) 배속을 보내지 않고 기록도 만들지 않는다', async () => {
+  mocks.get.mockResolvedValue({ ...board(), actorId: 3 });
+  mount();
+  await screen.findByText('금 123');
+  mocks.get.mockResolvedValue({ ...board(), actorId: 4 });
+  enterAllocation();
+  await screen.findByText('장수가 바뀌었습니다. 배속을 보내지 않았습니다. 화면을 다시 확인하세요.');
+  expect(mocks.allocate).not.toHaveBeenCalled();
+  expect(sessionStorage.getItem(allocationStorageKey(mocks.user, 'world-one'))).toBeNull();
+});
 it('INT-18C AC-INT-18C 연속 클릭과 네트워크 실패는 새 배속을 자동 재접수하지 않는다', async () => {
   mocks.allocate.mockRejectedValue(new Error('network'));
   mount();

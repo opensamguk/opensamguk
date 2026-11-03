@@ -137,6 +137,7 @@ export const turnsRouter = router({
         const world = await requireWorld(tx, input.worldId);
         const actor = await requireGeneral(tx, input.worldId, ctx.user.id);
         return {
+          actorId: actor.id,
           revision: actor.turnRevision,
           slots: displaySlots(await readSlots(tx, input.worldId, actor.id), worldResolver(world).resolver),
         };

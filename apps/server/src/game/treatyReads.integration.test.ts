@@ -43,6 +43,7 @@ function world(patch: Partial<World> = {}): World {
     cityResourcesState: null,
     logisticsState: null,
     governanceState: null,
+    lineageState: null,
     presetKey: null,
     preset: null,
     scenarioKey: '1030',
@@ -85,6 +86,7 @@ function world(patch: Partial<World> = {}): World {
 function general(patch: Partial<General> = {}): General {
   return {
     ...initial.generals[0]!,
+    sex: null,
     politics: null,
     charm: null,
     worldId: 'world',

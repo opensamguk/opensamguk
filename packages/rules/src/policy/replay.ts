@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { ReplayState, RecordedInput } from '../replay';
 import { emptyQueue, POLICY_KEYS, type PolicyKey } from './index';
 import { fiveStatsSchema } from '../general/fiveStats';
+import { knownGeneralSexSchema } from '../general/sex';
 
 export const policyKeySchema = z.enum(POLICY_KEYS);
 export const setPolicyPayloadSchema = z.strictObject({ policy: policyKeySchema });
@@ -93,6 +94,7 @@ export function validatePolicyRecordedInput(
   value: unknown,
   modern: boolean,
   five = false,
+  lineage = false,
 ): asserts value is RecordedInput {
   const input = envelopeSchema.parse(value);
   if (!modern && input.kind !== 'turns.set' && input.kind !== 'general.create')
@@ -117,7 +119,8 @@ export function validatePolicyRecordedInput(
       : z.strictObject({ revision: positive })
     ).parse(input.result);
   } else if (input.kind === 'general.create') {
-    const general = five ? recordedGeneralSchema.extend(fiveStatsSchema.shape) : recordedGeneralSchema;
+    let general = five ? recordedGeneralSchema.extend(fiveStatsSchema.shape) : recordedGeneralSchema;
+    if (lineage) general = general.extend({ sex: knownGeneralSexSchema });
     (modern ? z.strictObject({ general, activeTick: policyTickSchema }) : z.strictObject({ general })).parse(
       input.result,
     );

@@ -51,6 +51,7 @@ export interface InitialNation {
 export interface InitialGeneral {
   id: number;
   userId: string | null;
+  sex?: import('../general/sex').GeneralSex;
   affinity: number;
   name: string;
   portraitId: number | null;

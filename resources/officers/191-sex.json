@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "scenarios": [
+    "1030",
+    "integration191"
+  ],
+  "review": {
+    "status": "approved",
+    "reviewer": "Claude 독립 자료 검토",
+    "evidence": "2026-11-03 원문 스냅숏 판2568053·두 시나리오 인물 대응·생성 경계 독립 검토 OKAY. 실행 검증은 별도로 기록한다.",
+    "contentSha256": "56185bc5c826551be6717b4021db62b6ef42355c6e1e6742005d122888fbb519"
+  },
+  "rows": [
+    {
+      "generalId": 108,
+      "name": "맹획",
+      "identity": "孟獲",
+      "sex": "MALE",
+      "sourceId": "wikisource-zh:三國演義/第090回",
+      "sourceRevision": "sha256:eabf3fa1e7e522b39cb55bf31f85f4a691a281a18fdf6a0384bdb38b8215c388",
+      "evidence": {
+        "kind": "primary-text",
+        "quotes": [
+          "既為男子"
+        ],
+        "urls": [
+          "https://zh.wikisource.org/wiki/三國演義/第090回"
+        ]
+      }
+    },
+    {
+      "generalId": 439,
+      "name": "축융",
+      "identity": "祝融",
+      "sex": "FEMALE",
+      "sourceId": "wikisource-zh:三國演義/第090回",
+      "sourceRevision": "sha256:25e660e04c2c638c922cd7e744ad787d1277ff1b7a838d7434d792e2aef42e19",
+      "evidence": {
+        "kind": "primary-text",
+        "quotes": [
+          "我雖是一婦人",
+          "妻祝融夫人"
+        ],
+        "urls": [
+          "https://zh.wikisource.org/wiki/三國演義/第090回"
+        ]
+      }
+    }
+  ]
+}

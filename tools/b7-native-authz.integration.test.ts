@@ -242,6 +242,7 @@ function expectRead(path: Path, data: unknown, f: Fixture, rows: Rows, foreign =
       .filter((general) => general.nationId === actor.nationId)
       .sort((a, b) => b.officerLevel - a.officerLevel || a.id - b.id);
     expect(data).toEqual({
+      actorId: actor.id,
       appoint: { ok: true },
       levels: levels.slice(1).map((officerLevel) => ({
         officerLevel,
@@ -289,6 +290,7 @@ function expectRead(path: Path, data: unknown, f: Fixture, rows: Rows, foreign =
     );
   } else if (path === 'nationTurns.get') {
     expect(data).toEqual({
+      actorId: actor.id,
       tabs: levels.map((officerLevel) => {
         const office = rows.offices.find((row) => row.nationId === actor.nationId && row.officerLevel === officerLevel);
         const holder = rows.generals.find(

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useWorldId } from '../game/queries';
@@ -13,6 +13,7 @@ import styles from './Personnel.module.css';
 import { usePersonnelAction } from './usePersonnelAction';
 
 const KINDS = ['personnel.appoint', 'personnel.dismiss'] as const;
+const ACTOR_CHANGED = '장수가 바뀌었습니다. 요청을 보내지 않았습니다. 화면을 다시 확인하세요.';
 
 // 국가 메뉴의 두 화면을 잇는 띠.
 export function NationNav({ worldId, current }: { worldId: string; current: 'personnel' | 'turns' }) {
@@ -54,6 +55,15 @@ export function PersonnelPage() {
     kinds: KINDS,
     nameOf: (id) => members?.find((m) => m.generalId === id)?.name,
   });
+  // 누른 화면의 장수가 지금도 이 계정의 장수일 때만 보낸다. 계승 뒤 예전 화면의 임명·해임은 보내지 않는다.
+  // 표는 장수 id로 key해 장수가 바뀌면 고르던 임명 후보를 버린다.
+  const queryClient = useQueryClient();
+  const actorId = board.data?.actorId;
+  const sameActor = async () => {
+    const fresh = await api.officers({ worldId });
+    queryClient.setQueryData(personnelKeys.officers(worldId), fresh);
+    return fresh.actorId === actorId ? null : ACTOR_CHANGED;
+  };
 
   return (
     <section className={styles.page}>
@@ -64,14 +74,19 @@ export function PersonnelPage() {
       <Notices notices={action.notices} />
       {board.data ? (
         <PersonnelBoardView
+          key={board.data.actorId}
           board={board.data}
           busyTarget={action.busy ? (action.busyTarget ?? '') : null}
           busyLabel={action.busyLabel}
           onAppoint={(generalId, officerLevel) =>
-            void action.submit({ kind: 'personnel.appoint', generalId, officerLevel }, `level-${officerLevel}`)
+            void action.submit(
+              { kind: 'personnel.appoint', generalId, officerLevel },
+              `level-${officerLevel}`,
+              sameActor,
+            )
           }
           onDismiss={(generalId, officerLevel) =>
-            void action.submit({ kind: 'personnel.dismiss', generalId }, `level-${officerLevel}`)
+            void action.submit({ kind: 'personnel.dismiss', generalId }, `level-${officerLevel}`, sameActor)
           }
         />
       ) : board.isError ? (

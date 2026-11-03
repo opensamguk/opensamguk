@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import {
   forgetGovernancePending,
+  governanceActorChanged,
   governanceModeAllowed,
   governanceStorageKey,
   readGovernancePending,
@@ -104,4 +105,34 @@ it('T4-94 AC-P2-31 다른 탭이 바꾼 기록은 지우지 않는다', () => {
   writeGovernancePending(storage, 'key', mine);
   expect(forgetGovernancePending(storage, 'key', mine)).toBe(true);
   expect(readGovernancePending(storage, 'key')).toBeNull();
+});
+
+it('T4-95 AC-P2-32 새 기록은 처음 보낸 장수 id를 함께 두고, 장수 id 없는 예전 기록도 그대로 읽는다', () => {
+  const storage = memory();
+  const mine: GovernancePending = { requestId, generalId: 10, payload: { type: 'throne.ascend' } };
+  writeGovernancePending(storage, 'key', mine);
+  expect(JSON.parse(storage.getItem('key')!)).toEqual({ requestId, generalId: 10, payload: { type: 'throne.ascend' } });
+  expect(readGovernancePending(storage, 'key')).toEqual(mine);
+  // 예전 기록(장수 id 없음)은 읽되 generalId 칸을 만들지 않는다.
+  const legacy = read({ requestId, payload: { type: 'throne.ascend' } });
+  expect(legacy).toEqual({ requestId, payload: { type: 'throne.ascend' } });
+  expect(legacy && Object.hasOwn(legacy, 'generalId')).toBe(false);
+  for (const generalId of [0, -1, 1.5, '10', null, 2_147_483_648])
+    expect(read({ requestId, generalId, payload: { type: 'throne.ascend' } }), String(generalId)).toBeNull();
+
+  // 같은 번호·내용이라도 보낸 장수가 다르면 같은 요청이 아니다. 재접수·지우기 모두 하지 않는다.
+  const moved: GovernancePending = { ...mine, generalId: 11 };
+  const base = { request: mine, pending: mine, saved: mine, canSubmit: true, stale: false };
+  expect(governanceModeAllowed('resubmit', base)).toBe(true);
+  expect(governanceModeAllowed('resubmit', { ...base, request: moved })).toBe(false);
+  expect(governanceModeAllowed('resubmit', { ...base, saved: moved })).toBe(false);
+  expect(governanceModeAllowed('check', { ...base, request: moved })).toBe(false);
+  expect(forgetGovernancePending(storage, 'key', moved)).toBe(false);
+  expect(readGovernancePending(storage, 'key')).toEqual(mine);
+
+  // 장수가 바뀌었다고 보는 경우는 기록에 장수 id가 있고 지금 장수를 알며 둘이 다를 때뿐이다.
+  expect(governanceActorChanged(mine, 11)).toBe(true);
+  expect(governanceActorChanged(mine, 10)).toBe(false);
+  expect(governanceActorChanged(mine, null)).toBe(false);
+  expect(governanceActorChanged(legacy!, 11)).toBe(false);
 });

@@ -116,7 +116,7 @@ describe('SSE 재조회와 초안', () => {
     client.setQueryData(listKey('PRIVATE'), { pages: [], pageParams: [] });
     client.setQueryData(listKey('NATION'), { pages: [], pageParams: [] });
     client.setQueryData(unreadKey, { PRIVATE: 1, NATION: 0, DIPLOMACY: null, WORLD: 0 });
-    client.setQueryData(trpc.turns.get.queryKey({ worldId: WORLD }), { revision: 1, slots: [] });
+    client.setQueryData(trpc.turns.get.queryKey({ worldId: WORLD }), { actorId: 1, revision: 1, slots: [] });
   };
   const invalidated = (client: QueryClient, key: readonly unknown[]) => client.getQueryState(key)?.isInvalidated;
 

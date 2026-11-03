@@ -10,84 +10,85 @@ datasource db {
 }
 
 model World {
-  governanceState Json?
+  lineageState        Json?
+  governanceState     Json?
   governanceMovements GovernanceMovement[]
-  logisticsState Json?
-  logisticsMovements LogisticsMovement[]
-  id              String      @id @default(uuid())
-  name            String
-  presetKey       String?
-  preset          Json?
-  scenarioKey     String
-  mapKey          String
-  unitSetKey      String
-  seed            String
-  startYear       Int
-  endYear         Int?
-  clockMode       WorldClockMode @default(REALTIME)
-  outcomeFromSequence Int @default(0)
-  result          WorldResult?
-  turnTermMinutes Int
-  status          WorldStatus @default(PREOPEN)
-  clockTick       Int         @default(0)
-  clockAnchorAt   DateTime?
-  clockRevision   Int         @default(0)
-  startedAt       DateTime?
-  endedAt         DateTime?
-  initialStateHash String
-  statRules       Json
-  unitSet         Json
-  operationalMap  Json?
-  createdAt       DateTime    @default(now())
-  nations         Nation[]
-  cities          City[]
-  generals        General[]
-  diplomacies     Diplomacy[]
-  engineLease     EngineLease?
-  engineHeartbeat EngineHeartbeat?
-  monthlyTick     Int         @default(0)
-  actionSequence  Int         @default(0)
-  policyFromSequence Int?
-  treatyFormat    Int?
-  personnelFormat Int?
-  replayFormat    Int @default(1)
-  ruleFeatures    String[] @default([])
-  replayOrigin    Json?
-  inputEvents     InputEvent[]
-  nationHistory   NationHistory[]
-  yearbooks       YearbookSnapshot[]
-  removedNations  RemovedNation[]
-  commandMeta     Json?
-  campaignState   Json?
-  cityResourcesState Json?
-  battleLogs      BattleLog[]
-  ranking         RankingSnapshot?
-  publicMaps      PublicMapSnapshot[]
-  messages        Message[]
-  notices         Notice[]
-  operations      Operation[]
-  extSlices       WorldExtSlice[]
-  treaties        Treaty[]
-  nationTrust     NationTrust[]
-  assignmentOffers AssignmentOffer[]
-  sanctions       Sanction[]
-  createRequest   WorldCreateRequest?
+  logisticsState      Json?
+  logisticsMovements  LogisticsMovement[]
+  id                  String               @id @default(uuid())
+  name                String
+  presetKey           String?
+  preset              Json?
+  scenarioKey         String
+  mapKey              String
+  unitSetKey          String
+  seed                String
+  startYear           Int
+  endYear             Int?
+  clockMode           WorldClockMode       @default(REALTIME)
+  outcomeFromSequence Int                  @default(0)
+  result              WorldResult?
+  turnTermMinutes     Int
+  status              WorldStatus          @default(PREOPEN)
+  clockTick           Int                  @default(0)
+  clockAnchorAt       DateTime?
+  clockRevision       Int                  @default(0)
+  startedAt           DateTime?
+  endedAt             DateTime?
+  initialStateHash    String
+  statRules           Json
+  unitSet             Json
+  operationalMap      Json?
+  createdAt           DateTime             @default(now())
+  nations             Nation[]
+  cities              City[]
+  generals            General[]
+  diplomacies         Diplomacy[]
+  engineLease         EngineLease?
+  engineHeartbeat     EngineHeartbeat?
+  monthlyTick         Int                  @default(0)
+  actionSequence      Int                  @default(0)
+  policyFromSequence  Int?
+  treatyFormat        Int?
+  personnelFormat     Int?
+  replayFormat        Int                  @default(1)
+  ruleFeatures        String[]             @default([])
+  replayOrigin        Json?
+  inputEvents         InputEvent[]
+  nationHistory       NationHistory[]
+  yearbooks           YearbookSnapshot[]
+  removedNations      RemovedNation[]
+  commandMeta         Json?
+  campaignState       Json?
+  cityResourcesState  Json?
+  battleLogs          BattleLog[]
+  ranking             RankingSnapshot?
+  publicMaps          PublicMapSnapshot[]
+  messages            Message[]
+  notices             Notice[]
+  operations          Operation[]
+  extSlices           WorldExtSlice[]
+  treaties            Treaty[]
+  nationTrust         NationTrust[]
+  assignmentOffers    AssignmentOffer[]
+  sanctions           Sanction[]
+  createRequest       WorldCreateRequest?
 }
 
 model GovernanceMovement {
-  worldId String
-  sequence Int
-  ordinal Int
-  tick Int
-  kind String
-  refId Int
-  holder String
-  holderId Int
-  resource String
-  delta Int
+  worldId      String
+  sequence     Int
+  ordinal      Int
+  tick         Int
+  kind         String
+  refId        Int
+  holder       String
+  holderId     Int
+  resource     String
+  delta        Int
   fromNationId Int
-  toNationId Int
-  world World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  toNationId   Int
+  world        World  @relation(fields: [worldId], references: [id], onDelete: Cascade)
 
   @@id([worldId, sequence, ordinal])
   @@index([worldId, tick])
@@ -106,7 +107,7 @@ model LogisticsMovement {
   good     String
   delta    Int
   reason   String
-  world    World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  world    World  @relation(fields: [worldId], references: [id], onDelete: Cascade)
 
   @@id([worldId, sequence, ordinal])
   @@index([worldId, tick])
@@ -119,22 +120,22 @@ enum WorldCreateStatus {
 }
 
 model WorldCreateRequest {
-  id              String @id @default(uuid())
-  requestedBy     String
-  idempotencyKey  String
-  version         Int @default(1)
-  intentHash      String
-  intent          Json
-  effectiveSeed   String
-  plannedWorldId  String @unique
-  resolution      Json?
-  status          WorldCreateStatus @default(PENDING)
-  worldId         String? @unique
-  errorCode       String?
-  createdAt       DateTime @default(now())
-  processedAt     DateTime?
-  actor           User @relation(fields: [requestedBy], references: [id], onDelete: NoAction)
-  world           World? @relation(fields: [worldId], references: [id], onDelete: NoAction)
+  id             String            @id @default(uuid())
+  requestedBy    String
+  idempotencyKey String
+  version        Int               @default(1)
+  intentHash     String
+  intent         Json
+  effectiveSeed  String
+  plannedWorldId String            @unique
+  resolution     Json?
+  status         WorldCreateStatus @default(PENDING)
+  worldId        String?           @unique
+  errorCode      String?
+  createdAt      DateTime          @default(now())
+  processedAt    DateTime?
+  actor          User              @relation(fields: [requestedBy], references: [id], onDelete: NoAction)
+  world          World?            @relation(fields: [worldId], references: [id], onDelete: NoAction)
 
   @@unique([requestedBy, idempotencyKey])
   @@index([status, createdAt, id])
@@ -173,7 +174,7 @@ model AssignmentOffer {
   createdTick     Int
   expiresTick     Int
   resolvedTick    Int?
-  world           World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  world           World                        @relation(fields: [worldId], references: [id], onDelete: Cascade)
 
   @@id([worldId, id])
 }
@@ -201,7 +202,7 @@ model Treaty {
   closedSequence Int?
   costFrom       Int?
   costTo         Int?
-  world          World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  world          World        @relation(fields: [worldId], references: [id], onDelete: Cascade)
 
   @@id([worldId, id])
   @@index([worldId, status, id])
@@ -214,7 +215,7 @@ model NationTrust {
   nationId       Int
   brokenTreaties Int
   lastBrokenTick Int
-  world          World @relation(fields: [worldId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  world          World  @relation(fields: [worldId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@id([worldId, nationId])
 }
@@ -223,7 +224,7 @@ model WorldExtSlice {
   worldId String
   key     String
   value   Json
-  world   World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  world   World  @relation(fields: [worldId], references: [id], onDelete: Cascade)
 
   @@id([worldId, key])
 }
@@ -246,8 +247,8 @@ enum WorldEndReason {
 }
 
 model WorldResult {
-  worldId          String @id
-  world            World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  worldId          String         @id
+  world            World          @relation(fields: [worldId], references: [id], onDelete: Cascade)
   reason           WorldEndReason
   winnerNationId   Int?
   winnerName       String?
@@ -268,65 +269,65 @@ enum DiplomacyState {
 }
 
 model Nation {
-  worldId        String
-  id             Int
-  name           String
-  color          String
-  gold           Int
-  rice           Int
-  description    String
-  tech           Float
-  philosophy     String
-  level          Int
-  capitalCityKey Int?
-  isNpc          Boolean @default(true)
-  world          World   @relation(fields: [worldId], references: [id], onDelete: Cascade)
-  capital        City?   @relation("Capital", fields: [worldId, capitalCityKey], references: [worldId, cityKey], onDelete: NoAction)
-  cities         City[]  @relation("OwnedCities")
-  generals       General[]
-  diplomacyAsA   Diplomacy[] @relation("NationA")
-  diplomacyAsB   Diplomacy[] @relation("NationB")
-  turns          NationTurn[]
-  offices        NationOffice[]
-  officeTurns    NationOfficeTurn[]
-  notice         String @default("")
-  noticeRevision Int @default(0)
+  worldId         String
+  id              Int
+  name            String
+  color           String
+  gold            Int
+  rice            Int
+  description     String
+  tech            Float
+  philosophy      String
+  level           Int
+  capitalCityKey  Int?
+  isNpc           Boolean            @default(true)
+  world           World              @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  capital         City?              @relation("Capital", fields: [worldId, capitalCityKey], references: [worldId, cityKey], onDelete: NoAction)
+  cities          City[]             @relation("OwnedCities")
+  generals        General[]
+  diplomacyAsA    Diplomacy[]        @relation("NationA")
+  diplomacyAsB    Diplomacy[]        @relation("NationB")
+  turns           NationTurn[]
+  offices         NationOffice[]
+  officeTurns     NationOfficeTurn[]
+  notice          String             @default("")
+  noticeRevision  Int                @default(0)
   noticeUpdatedAt DateTime?
   noticeUpdatedBy String?
-  operations     Operation[]
+  operations      Operation[]
 
   @@id([worldId, id])
 }
 
 model City {
-  worldId       String
-  cityKey       Int
-  kind          String?
-  name          String
-  level         Int
-  region        Int
-  x             Float
-  y             Float
-  connections   Int[]
-  nationId      Int?
-  population    Int
-  populationMax Int
-  agriculture   Int
-  agricultureMax Int
-  commerce      Int
-  commerceMax   Int
-  security      Int
-  securityMax   Int
-  defence       Int
-  defenceMax    Int
-  wall          Int
-  wallMax       Int
-  trust         Float
-  supplied      Boolean
-  world         World   @relation(fields: [worldId], references: [id], onDelete: Cascade)
-  nation        Nation? @relation("OwnedCities", fields: [worldId, nationId], references: [worldId, id], onDelete: NoAction)
-  capitalOf     Nation[] @relation("Capital")
-  generals      General[]
+  worldId          String
+  cityKey          Int
+  kind             String?
+  name             String
+  level            Int
+  region           Int
+  x                Float
+  y                Float
+  connections      Int[]
+  nationId         Int?
+  population       Int
+  populationMax    Int
+  agriculture      Int
+  agricultureMax   Int
+  commerce         Int
+  commerceMax      Int
+  security         Int
+  securityMax      Int
+  defence          Int
+  defenceMax       Int
+  wall             Int
+  wallMax          Int
+  trust            Float
+  supplied         Boolean
+  world            World       @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  nation           Nation?     @relation("OwnedCities", fields: [worldId, nationId], references: [worldId, id], onDelete: NoAction)
+  capitalOf        Nation[]    @relation("Capital")
+  generals         General[]
   operationTargets Operation[]
 
   @@id([worldId, cityKey])
@@ -335,54 +336,55 @@ model City {
 }
 
 model General {
-  worldId        String
-  id             Int
-  userId         String?
-  user           User? @relation(fields: [userId], references: [id], onDelete: NoAction)
-  affinity       Int
-  name           String
-  portraitId     Int?
-  nationId       Int?
-  cityKey        Int
-  leadership     Int
-  strength       Int
-  intel          Int
-  politics       Int?
-  charm          Int?
-  officerLevel   Int
-  birthYear      Int
-  deathYear      Int
-  activeFromYear Int
-  personality    String?
-  special        String?
-  gold           Int
-  rice           Int
-  crew           Int
-  crewType       Int
-  train          Int
-  atmos          Int
-  experience     Int
-  dedication     Int
-  battleWins     Int @default(0)
-  captures       Int @default(0)
-  age            Int
-  injury         Int
-  nextTurnTick   Int
-  turnRevision   Int @default(0)
-  defaultPolicy  String?
-  lastActiveTick Int?
-  lastActiveAt   DateTime?
-  residenceTick  Int?
-  noticeSeen     Json?
-  messageReads   MessageRead[]
-  turns          GeneralTurn[]
-  logs           GeneralLog[]
-  battleLogs     BattleLog[]
+  sex               String?
+  worldId           String
+  id                Int
+  userId            String?
+  user              User?             @relation(fields: [userId], references: [id], onDelete: NoAction)
+  affinity          Int
+  name              String
+  portraitId        Int?
+  nationId          Int?
+  cityKey           Int
+  leadership        Int
+  strength          Int
+  intel             Int
+  politics          Int?
+  charm             Int?
+  officerLevel      Int
+  birthYear         Int
+  deathYear         Int
+  activeFromYear    Int
+  personality       String?
+  special           String?
+  gold              Int
+  rice              Int
+  crew              Int
+  crewType          Int
+  train             Int
+  atmos             Int
+  experience        Int
+  dedication        Int
+  battleWins        Int               @default(0)
+  captures          Int               @default(0)
+  age               Int
+  injury            Int
+  nextTurnTick      Int
+  turnRevision      Int               @default(0)
+  defaultPolicy     String?
+  lastActiveTick    Int?
+  lastActiveAt      DateTime?
+  residenceTick     Int?
+  noticeSeen        Json?
+  messageReads      MessageRead[]
+  turns             GeneralTurn[]
+  logs              GeneralLog[]
+  battleLogs        BattleLog[]
   operationsCreated Operation[]
-  operationMembers OperationMember[]
-  world          World   @relation(fields: [worldId], references: [id], onDelete: Cascade)
-  nation         Nation? @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: NoAction)
-  city           City    @relation(fields: [worldId, cityKey], references: [worldId, cityKey], onDelete: NoAction)
+  operationMembers  OperationMember[]
+  world             World             @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  nation            Nation?           @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: NoAction)
+  city              City              @relation(fields: [worldId, cityKey], references: [worldId, cityKey], onDelete: NoAction)
 
   @@id([worldId, id])
   @@unique([worldId, userId])
@@ -397,7 +399,7 @@ enum OperationStatus {
 }
 
 model Operation {
-  id            String          @id @default(uuid())
+  id            String            @id @default(uuid())
   worldId       String
   nationId      Int
   targetCityKey Int
@@ -405,12 +407,12 @@ model Operation {
   minCrew       Int
   minTrain      Int
   minAtmos      Int
-  status        OperationStatus @default(OPEN)
+  status        OperationStatus   @default(OPEN)
   createdById   Int
-  world         World           @relation(fields: [worldId], references: [id], onDelete: Cascade)
-  nation        Nation          @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: Cascade)
-  target        City            @relation(fields: [worldId, targetCityKey], references: [worldId, cityKey], onDelete: NoAction)
-  createdBy     General         @relation(fields: [worldId, createdById], references: [worldId, id], onDelete: Cascade)
+  world         World             @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  nation        Nation            @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: Cascade)
+  target        City              @relation(fields: [worldId, targetCityKey], references: [worldId, cityKey], onDelete: NoAction)
+  createdBy     General           @relation(fields: [worldId, createdById], references: [worldId, id], onDelete: Cascade)
   members       OperationMember[]
 
   @@unique([worldId, id])
@@ -429,11 +431,11 @@ model OperationMember {
 }
 
 model EngineLease {
-  worldId      String @id
+  worldId      String   @id
   ownerId      String
   fencingToken Int
   expiresAt    DateTime
-  world        World @relation(fields: [worldId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  world        World    @relation(fields: [worldId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model EngineHeartbeat {
@@ -449,8 +451,8 @@ model GeneralTurn {
   worldId    String
   generalId  Int
   slot       Int
-  commandKey String @default("rest")
-  args       Json @default("{}")
+  commandKey String  @default("rest")
+  args       Json    @default("{}")
   explicit   Boolean
   general    General @relation(fields: [worldId, generalId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
 
@@ -458,7 +460,7 @@ model GeneralTurn {
 }
 
 model GeneralLog {
-  id         BigInt @id @default(autoincrement())
+  id         BigInt   @id @default(autoincrement())
   worldId    String
   generalId  Int
   tick       Int
@@ -466,10 +468,9 @@ model GeneralLog {
   kind       String
   text       String
   sequence   Int?
-  ordinal    Int @default(0)
+  ordinal    Int      @default(0)
   createdAt  DateTime @default(now())
-  general    General @relation(fields: [worldId, generalId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
-
+  general    General  @relation(fields: [worldId, generalId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model NationTurn {
@@ -477,7 +478,7 @@ model NationTurn {
   nationId   Int
   slot       Int
   commandKey String @default("nation_rest")
-  args       Json @default("{}")
+  args       Json   @default("{}")
   nation     Nation @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([worldId, nationId, slot])
@@ -487,8 +488,8 @@ model NationOffice {
   worldId      String
   nationId     Int
   officerLevel Int
-  turnRevision Int @default(0)
-  tenure       Int @default(0)
+  turnRevision Int    @default(0)
+  tenure       Int    @default(0)
   nation       Nation @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([worldId, nationId, officerLevel])
@@ -500,20 +501,20 @@ model NationOfficeTurn {
   officerLevel Int
   slot         Int
   commandKey   String @default("nation_rest")
-  args         Json @default("{}")
+  args         Json   @default("{}")
   nation       Nation @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([worldId, nationId, officerLevel, slot])
 }
 
 model BattleLog {
-  worldId   String
-  tick      Int
+  worldId    String
+  tick       Int
   attackerId Int
-  generalId Int
-  text      String
-  world     World @relation(fields: [worldId], references: [id], onDelete: Cascade)
-  general   General @relation(fields: [worldId, generalId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
+  generalId  Int
+  text       String
+  world      World   @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  general    General @relation(fields: [worldId, generalId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([worldId, tick, attackerId, generalId])
 }
@@ -536,31 +537,31 @@ enum AuditActorKind {
 }
 
 model User {
-  id           String @id @default(uuid())
-  email        String @unique
-  passwordHash String
-  status       UserStatus @default(ACTIVE)
-  role         UserRole @default(USER)
-  createdAt    DateTime @default(now())
-  emailVerifiedAt DateTime?
-  sessions     Session[]
-  accountTokens AccountToken[]
-  consents     ConsentRecord[]
-  generals     General[]
-  sanctions    Sanction[]
-  loginRecords LoginRecord[]
+  id                  String               @id @default(uuid())
+  email               String               @unique
+  passwordHash        String
+  status              UserStatus           @default(ACTIVE)
+  role                UserRole             @default(USER)
+  createdAt           DateTime             @default(now())
+  emailVerifiedAt     DateTime?
+  sessions            Session[]
+  accountTokens       AccountToken[]
+  consents            ConsentRecord[]
+  generals            General[]
+  sanctions           Sanction[]
+  loginRecords        LoginRecord[]
   worldCreateRequests WorldCreateRequest[]
 }
 
 model LoginRecord {
-  id             BigInt @id @default(autoincrement())
+  id             BigInt   @id @default(autoincrement())
   userId         String
   at             DateTime @default(now()) @db.Timestamptz(3)
   success        Boolean
-  ipHash         String @db.VarChar(64)
-  deviceHash     String? @db.VarChar(64)
+  ipHash         String   @db.VarChar(64)
+  deviceHash     String?  @db.VarChar(64)
   hashKeyVersion Int
-  user           User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, at])
   @@index([hashKeyVersion, ipHash, at])
@@ -568,36 +569,36 @@ model LoginRecord {
 }
 
 model AdminSanctionRequest {
-  actorUserId   String
+  actorUserId    String
   idempotencyKey String
-  requestHash   String
-  sanctionId    String
-  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  requestHash    String
+  sanctionId     String
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
 
   @@id([actorUserId, idempotencyKey])
 }
 
 model Sanction {
-  id          String @id @default(uuid())
-  userId      String
-  worldId     String?
-  reason      String
-  expiresAt   DateTime?
-  createdBy   String
-  createdAt   DateTime @default(now())
-  liftedAt    DateTime?
-  liftedBy    String?
-  liftReason  String?
-  user        User @relation(fields: [userId], references: [id], onDelete: NoAction)
-  world       World? @relation(fields: [worldId], references: [id], onDelete: NoAction)
+  id         String    @id @default(uuid())
+  userId     String
+  worldId    String?
+  reason     String
+  expiresAt  DateTime?
+  createdBy  String
+  createdAt  DateTime  @default(now())
+  liftedAt   DateTime?
+  liftedBy   String?
+  liftReason String?
+  user       User      @relation(fields: [userId], references: [id], onDelete: NoAction)
+  world      World?    @relation(fields: [worldId], references: [id], onDelete: NoAction)
 
   @@index([userId, liftedAt])
   @@index([worldId])
 }
 
 model AuditLog {
-  id           BigInt @id @default(autoincrement())
-  at           DateTime @default(now())
+  id           BigInt         @id @default(autoincrement())
+  at           DateTime       @default(now())
   actorKind    AuditActorKind
   actorUserId  String?
   action       String
@@ -619,13 +620,13 @@ enum AccountTokenPurpose {
 }
 
 model AccountToken {
-  id        String @id
+  id        String              @id
   userId    String
   purpose   AccountTokenPurpose
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
-  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime            @default(now())
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, purpose])
   @@index([expiresAt])
@@ -647,22 +648,22 @@ model LegalDocumentVersion {
 }
 
 model ConsentRecord {
-  id        String @id @default(uuid())
-  userId    String
-  docType   ConsentDocType
-  version   String
-  agreedAt  DateTime @default(now())
-  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id       String         @id @default(uuid())
+  userId   String
+  docType  ConsentDocType
+  version  String
+  agreedAt DateTime       @default(now())
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, docType, version])
 }
 
 model Session {
-  id        String @id
+  id        String   @id
   userId    String
   expiresAt DateTime
   createdAt DateTime @default(now())
-  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([expiresAt])
@@ -674,9 +675,9 @@ model Diplomacy {
   nationB   Int
   state     DiplomacyState
   untilTick Int
-  world     World  @relation(fields: [worldId], references: [id], onDelete: Cascade)
-  a         Nation @relation("NationA", fields: [worldId, nationA], references: [worldId, id], onDelete: NoAction)
-  b         Nation @relation("NationB", fields: [worldId, nationB], references: [worldId, id], onDelete: NoAction)
+  world     World          @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  a         Nation         @relation("NationA", fields: [worldId, nationA], references: [worldId, id], onDelete: NoAction)
+  b         Nation         @relation("NationB", fields: [worldId, nationB], references: [worldId, id], onDelete: NoAction)
 
   @@id([worldId, nationA, nationB])
 }
@@ -688,7 +689,7 @@ enum InputEventStatus {
 }
 
 model InputEvent {
-  id             BigInt @id @default(autoincrement())
+  id             BigInt           @id @default(autoincrement())
   worldId        String
   userId         String
   generalId      Int?
@@ -700,8 +701,8 @@ model InputEvent {
   stepTick       Int?
   tick           Int?
   result         Json?
-  createdAt      DateTime @default(now())
-  world          World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  createdAt      DateTime         @default(now())
+  world          World            @relation(fields: [worldId], references: [id], onDelete: Cascade)
 
   @@unique([worldId, userId, idempotencyKey])
   @@unique([worldId, sequence])
@@ -713,7 +714,7 @@ model NationHistory {
   tick     Int
   nationId Int
   data     Json
-  world    World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  world    World  @relation(fields: [worldId], references: [id], onDelete: Cascade)
 
   @@id([worldId, tick, nationId])
 }
@@ -726,7 +727,7 @@ model YearbookSnapshot {
   sequence  Int
   data      Json
   stateHash String
-  world     World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  world     World            @relation(fields: [worldId], references: [id], onDelete: Cascade)
   nations   YearbookNation[]
 
   @@id([worldId, tick])
@@ -739,7 +740,7 @@ model RemovedNation {
   color           String
   removedSequence Int
   removedTick     Int
-  world           World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  world           World  @relation(fields: [worldId], references: [id], onDelete: Cascade)
 
   @@id([worldId, nationId])
 }
@@ -762,7 +763,7 @@ model RankingSnapshot {
   month    Int
   generals Json
   nations  Json
-  world    World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  world    World  @relation(fields: [worldId], references: [id], onDelete: Cascade)
 }
 
 model PublicMapSnapshot {
@@ -772,7 +773,7 @@ model PublicMapSnapshot {
   year    Int
   month   Int
   data    Json
-  world   World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  world   World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
 
   @@id([worldId, takenAt])
 }
@@ -830,7 +831,7 @@ model Notice {
   pinned      Boolean     @default(false)
   publishedAt DateTime    @default(now()) @db.Timestamptz(3)
   hiddenAt    DateTime?   @db.Timestamptz(3)
-  revision    Int        @default(0)
+  revision    Int         @default(0)
   world       World?      @relation(fields: [worldId], references: [id], onDelete: Cascade)
 
   @@index([scope, worldId, publishedAt, id])
@@ -838,13 +839,13 @@ model Notice {
 
 // 감사 기록처럼 원래 월드 삭제 뒤에도 재시도 결과를 보존한다.
 model AdminNoticeRequest {
-  actorUserId   String
+  actorUserId    String
   idempotencyKey String
-  requestHash   String
-  noticeId      String
-  revision      Int
-  hidden        Boolean
-  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  requestHash    String
+  noticeId       String
+  revision       Int
+  hidden         Boolean
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
 
   @@id([actorUserId, idempotencyKey])
 }
@@ -868,10 +869,10 @@ model GameResource {
   name        String
   version     Int
   status      GameResourceStatus
-  content     Json               // jsonb. 원본 JSON 전체
-  contentHash String             // hashState(content), 소문자 16진수 64자리
-  source      String             // 출처와 라이선스 한 줄
-  createdBy   String?            // 내장 판은 null. 사용자 관계는 T3-05·T4-78
+  content     Json // jsonb. 원본 JSON 전체
+  contentHash String // hashState(content), 소문자 16진수 64자리
+  source      String // 출처와 라이선스 한 줄
+  createdBy   String? // 내장 판은 null. 사용자 관계는 T3-05·T4-78
   createdAt   DateTime           @default(now())
   publishedAt DateTime?
 

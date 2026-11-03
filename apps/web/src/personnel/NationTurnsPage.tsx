@@ -23,7 +23,7 @@ const NATION_DRAFT_PREFIX = 'opensamguk.nationTurnDraft.v1';
 export const nationDraftKey = (userId: string, worldId: string, office: Office) =>
   `${NATION_DRAFT_PREFIX}:${userId}:${worldId}:${office.nationId}:${office.officerLevel}:${office.tenure}`;
 
-type TabsData = { tabs: NationTurnTab[] };
+type TabsData = { actorId: number; tabs: NationTurnTab[] };
 // 국가 칸은 임시 계약(PersonnelApi)의 칸 모양 그대로 캐시와 저장 결과에 쓴다. 개인 칸 모양과 섞지 않는다.
 type NationSlot = NationTurnTab['slots'][number];
 
@@ -49,13 +49,14 @@ export function nationSource(
         queryFn: () => api.nationTurns({ worldId }),
         select: (data) => {
           const found = (data as TabsData).tabs.find((t) => t.officerLevel === level);
-          return { revision: found?.revision ?? 0, slots: found?.slots ?? [] };
+          return { actorId: (data as TabsData).actorId, revision: found?.revision ?? 0, slots: found?.slots ?? [] };
         },
       },
       writeList: (queryClient: QueryClient, list: TurnList<NationSlot>) =>
         queryClient.setQueryData<TabsData>(listKey, (old) =>
           old
             ? {
+                ...old,
                 tabs: old.tabs.map((t) =>
                   t.officerLevel === level ? { ...t, revision: list.revision, slots: list.slots } : t,
                 ),

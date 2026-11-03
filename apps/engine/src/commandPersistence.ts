@@ -7,6 +7,7 @@ import { persistCampaignState, readCampaignArmyTypes } from './campaignState';
 import { persistCityResourcesState } from './cityResourcesState';
 import { persistLogisticsState } from './logisticsState';
 import { persistGovernanceState } from './governance/repository';
+import { persistLineageState } from './lineage/repository';
 
 export async function loadCommandState(
   tx: Prisma.TransactionClient,
@@ -44,6 +45,7 @@ export async function persistCommandState(
   await persistCityResourcesState(tx, worldId, before, state, cityArmyTypes);
   await persistLogisticsState(tx, worldId, before, state);
   await persistGovernanceState(tx, worldId, before, state);
+  await persistLineageState(tx, worldId, before, state);
   for (const nation of Object.values(state.nations)) {
     if (!before.nations[nation.id]) {
       await tx.nation.create({ data: { ...nation, worldId, capitalCityKey: null } });

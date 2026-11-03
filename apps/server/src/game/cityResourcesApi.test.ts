@@ -313,11 +313,17 @@ describe('AC-INT-18B 도시 원장 가시성과 배속 대상', () => {
       userId: otherUserId,
       cityKey: 2,
       visible: false,
+      actorId: 2,
     });
   });
   it('다른 국가의 먼 도시 금·쌀·병력을 반환하지 않는다', async () => {
     const f = fixture();
-    expect(await readCityResourceBoard(f.ctx, 'own-world', 2)).toEqual({ userId, cityKey: 2, visible: false });
+    expect(await readCityResourceBoard(f.ctx, 'own-world', 2)).toEqual({
+      userId,
+      actorId: 2,
+      cityKey: 2,
+      visible: false,
+    });
   });
   it('자국 도시는 원장을 읽고 권한자는 같은 도시에 집결한 자국 부곡만 본다', async () => {
     const f = fixture();

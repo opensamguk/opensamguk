@@ -6,6 +6,7 @@ import { statRulesSchema, unitSetSchema } from '../world/resources';
 import type { InitialGeneral } from '../world/bootstrap';
 import type { PresetRules } from '../world/preset';
 import { FIVE_STAT_KEYS } from './fiveStats';
+import { knownGeneralSexSchema } from './sex';
 
 export interface CreationBonus {
   gold: number;
@@ -47,6 +48,7 @@ export const generalCreationSchema = z.strictObject({
   intel: dbInt,
   politics: dbInt.optional(),
   charm: dbInt.optional(),
+  sex: knownGeneralSexSchema.optional(),
   portraitId: z.number().int().min(10001).max(11008).nullable(),
 });
 export type GeneralCreation = z.infer<typeof generalCreationSchema>;
@@ -54,6 +56,8 @@ export const CREATION_ERRORS = {
   BAD_NAME: '이름을 확인하세요.',
   BAD_STATS: '능력치 합계와 범위를 확인하세요.',
   BAD_PORTRAIT: '초상 번호를 확인하세요.',
+  BAD_SEX: '이 판의 성별 선택을 확인하세요.',
+  WORLD_FULL: '이 판의 장수 정원에 닿았습니다.',
   ALREADY_EXISTS: '이미 장수가 있습니다.',
   NAME_TAKEN: '이미 사용 중인 장수 이름입니다.',
   WORLD_CLOSED: '지금은 장수를 생성할 수 없습니다.',
@@ -66,15 +70,26 @@ export function creationFailure(code: CreationCode) {
 export function validateGeneralCreation(
   payload: unknown,
   statRules: unknown,
+  lineage = false,
 ): { ok: true; value: GeneralCreation } | { ok: false; code: CreationCode; message: string } {
   const parsed = generalCreationSchema.safeParse(payload);
   if (!parsed.success) {
     const path = parsed.error.issues[0]?.path[0];
     return {
       ok: false,
-      ...creationFailure(path === 'name' ? 'BAD_NAME' : path === 'portraitId' ? 'BAD_PORTRAIT' : 'BAD_STATS'),
+      ...creationFailure(
+        path === 'name'
+          ? 'BAD_NAME'
+          : path === 'portraitId'
+            ? 'BAD_PORTRAIT'
+            : path === 'sex'
+              ? 'BAD_SEX'
+              : 'BAD_STATS',
+      ),
     };
   }
+  if (lineage ? parsed.data.sex === undefined : Object.hasOwn(parsed.data, 'sex'))
+    return { ok: false, ...creationFailure('BAD_SEX') };
   const rules = statRulesSchema.parse({ stat: statRules }).stat;
   const five = rules.count === 5;
   if (
@@ -113,10 +128,11 @@ export function buildCreatedGeneral(input: {
     throw new Error('장수 저장 범위를 넘었습니다.');
   // monthlyDate는 정산할 달의 끝 경계를 받는다. monthlyTick=0도 첫 달이다.
   const birthYear = monthlyDate(input.startYear, input.monthlyTick + TICKS_PER_MONTH).year - 20;
-  const { politics, charm, ...payload } = input.payload;
+  const { politics, charm, sex, ...payload } = input.payload;
   if ((politics === undefined) !== (charm === undefined)) throw new Error('5능력치 생성 값을 확인하세요.');
   return {
     ...payload,
+    ...(sex === undefined ? {} : { sex }),
     ...(politics !== undefined && charm !== undefined ? { politics, charm } : {}),
     id: input.id,
     userId: input.userId,

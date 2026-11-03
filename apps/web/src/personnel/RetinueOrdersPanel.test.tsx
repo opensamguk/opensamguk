@@ -238,6 +238,15 @@ describe('AC-INT-19C 장수 지시 화면', () => {
     expect(view.mutations).toHaveLength(0);
     expect(screen.queryByText(/NPC 군주 → 나/)).toBeNull();
   });
+  it('T4-95 AC-P2-32 계승으로 같은 계정의 장수가 바뀌면 이전 장수 화면에서 누른 지시 요청을 보내지 않는다', async () => {
+    const view = mount();
+    const button = await screen.findByRole('button', { name: 'NPC 군주에게 지시 요청' });
+    view.setBoard({ ...base, actorId: 4 });
+    fireEvent.click(button);
+    await screen.findByText('장수가 바뀌었습니다. 화면을 다시 확인하세요.');
+    expect(view.mutations).toHaveLength(0);
+    expect(sessionStorage.getItem(`campaign.order.pending:${userId}:${worldId}`)).toBeNull();
+  });
   it('연결이 끊겨도 자동 재전송하지 않고 수동 재접수에서 같은 UUID·payload를 보존한다', async () => {
     const view = mount();
     view.loseTransport();

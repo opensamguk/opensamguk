@@ -158,3 +158,40 @@ it('탭 저장 공간의 쓰기가 막혀도 선택과 화면 편집은 이어 �
     blocked.mockRestore();
   }
 });
+it('T4-95 AC-P2-32 칸 주인 장수가 바뀌면(계승) 예전 장수의 초안을 버리고 같은 장수면 남긴다', async () => {
+  const probe = draftProbe(30, 'actor-draft');
+  const listKey = ['draft', 'actor-draft'];
+  const list = (actorId: number, revision: number) => ({
+    ...probe.source.list.select(probe.client.getQueryData(listKey)),
+    actorId,
+    revision,
+  });
+  // React Query v5는 캐시 변경을 notifyManager의 setTimeout(0)으로 React에 알린다. 동기 act()가 끝나도
+  // 훅은 아직 예전 목록을 보므로, 화면이 새 목록을 그린 뒤에 편집해야 사용자가 본 칸 주인에 묶인다.
+  act(() => void probe.client.setQueryData(listKey, list(1, 3)));
+  await waitFor(() => expect(probe.result.current.server.data?.actorId).toBe(1));
+  act(() =>
+    probe.result.current.edit({ put: { indices: [0], turn: { commandKey: 'farm', args: {}, explicit: true } } }),
+  );
+  expect(readStored(window.sessionStorage, 'actor-draft').actorId).toBe(1);
+  // 같은 장수의 목록이 바뀌어도(턴 실행) 초안은 그대로다. 새 목록을 실제로 그린 뒤에 확인한다.
+  act(() => void probe.client.setQueryData(listKey, list(1, 4)));
+  await waitFor(() => expect(probe.result.current.server.data?.revision).toBe(4));
+  expect(probe.result.current.draft?.turns[0]?.commandKey).toBe('farm');
+  expect(probe.result.current.behind).toBe(true);
+  expect(readStored(window.sessionStorage, 'actor-draft').actorId).toBe(1);
+  act(() => void probe.client.setQueryData(listKey, list(2, 5)));
+  await waitFor(() => expect(probe.result.current.notice?.kind).toBe('actor'));
+  expect(probe.result.current.draft).toBeNull();
+  expect(probe.result.current.pending).toBeNull();
+  expect(window.sessionStorage.getItem('actor-draft')).toBeNull();
+  // 새 장수 칸에서 다시 편집하면 초안은 새 장수에 묶여 보관된다.
+  act(() =>
+    probe.result.current.edit({ put: { indices: [1], turn: { commandKey: 'farm', args: {}, explicit: true } } }),
+  );
+  const rebound = readStored(window.sessionStorage, 'actor-draft');
+  expect(rebound.actorId).toBe(2);
+  expect(rebound.draft?.baseRevision).toBe(5);
+  expect(rebound.draft?.turns[0]?.commandKey).toBe('rest');
+  expect(probe.result.current.notice).toBeNull();
+});

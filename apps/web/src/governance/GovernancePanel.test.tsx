@@ -7,6 +7,7 @@ import { NationInfo } from '../main/NationInfo';
 import { GovernancePanel } from './GovernancePanel';
 import { governanceStorageKey, readGovernancePending, writeGovernancePending } from './governanceRequestState';
 import { testBoard, testView } from './testView';
+import { OLD_REQUEST_CLEARED, OLD_REQUEST_KEPT } from './useGovernanceBoard';
 
 // 화면의 요청 수명·기능 꺼짐 경계만 본다. 실제 API/PG·브라우저 인수는 별도다.
 const ACCOUNT = '11111111-1111-4111-8111-111111111111';
@@ -174,10 +175,13 @@ it('T4-94 AC-P2-31 응답을 잃은 요청은 다시 보내지 않고, 기록을
   await screen.findByText(/응답을 받지 못했습니다/);
   const saved = readGovernancePending(sessionStorage, key());
   expect(saved?.payload).toEqual({ type: 'throne.ascend' });
+  // 처음 기록을 만들 때의 장수(10)를 함께 두고, 같은 값을 expectedGeneralId로 보낸다.
+  expect(saved?.generalId).toBe(10);
   expect(mocks.submit).toHaveBeenCalledTimes(1);
   expect(mocks.submit.mock.calls[0]![0]).toEqual({
     worldId: WORLD,
     expectedUserId: mocks.user,
+    expectedGeneralId: 10,
     requestId: saved!.requestId,
     payload: { type: 'throne.ascend' },
   });
@@ -325,6 +329,158 @@ it('T4-94 AC-P2-31 재야 장수도 재야 안내 아래에서 공개 황실 칸
   await waitFor(() => expect(off.getQueryData(['summary'])).toBeDefined());
   expect(mocks.get).not.toHaveBeenCalled();
   expect(screen.queryByRole('region', { name: '황실' })).toBeNull();
+});
+
+// 가문 계승(T4-95)은 같은 계정의 장수만 바꾼다. 계정 확인만으로는 막지 못하는 경계다.
+const successor = () =>
+  testBoard(
+    mocks.user,
+    WORLD,
+    testView({
+      roles,
+      viewerGeneralId: 11,
+      ownNationId: 1,
+      throne: { emperorGeneralId: null, emperorNationId: null, sinceTick: 0 },
+      ascend: { allowed: true },
+    }),
+  );
+
+it('T4-95 AC-P2-32 다시 읽은 장수가 바뀌면 같은 계정이어도 열린 확인 대화상자를 버리고 보내지 않는다', async () => {
+  mount();
+  const [opener] = await screen.findAllByRole('button', { name: '즉위 요청' });
+  fireEvent.click(opener!);
+  expect(screen.getByRole('dialog', { name: '즉위 요청' })).toBeTruthy();
+  const reads = mocks.get.mock.calls.length;
+  mocks.get.mockImplementation(async () => successor());
+  act(() => void window.dispatchEvent(new Event('focus')));
+  await waitFor(() => expect(mocks.get).toHaveBeenCalledTimes(reads + 1));
+  await screen.findByText('장수가 바뀌었습니다. 화면을 다시 확인하세요.');
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(mocks.submit).not.toHaveBeenCalled();
+});
+
+it('T4-95 AC-P2-32 보내기 직전 다시 읽은 장수가 대화상자를 연 장수와 다르면 요청·탭 기록을 만들지 않는다', async () => {
+  mount();
+  const [opener] = await screen.findAllByRole('button', { name: '즉위 요청' });
+  fireEvent.click(opener!);
+  mocks.get.mockImplementation(async () => successor());
+  fireEvent.click(screen.getByRole('button', { name: '즉위 요청 보내기' }));
+  await screen.findByText('장수가 바뀌었습니다. 화면을 다시 확인하세요. 요청을 보내지 않았습니다.');
+  expect(mocks.submit).not.toHaveBeenCalled();
+  expect(readGovernancePending(sessionStorage, key())).toBeNull();
+});
+
+// 이전 장수(10) 명의로 저장한 미확인 요청. 지금 board의 장수는 successor()의 11이다.
+const oldRequest = { requestId, generalId: 10, payload: { type: 'court.resign' as const } };
+
+it('T4-95 AC-P2-32 같은 장수의 미확인(404) 요청은 지우기 없이 같은 번호·장수로만 다시 접수한다', async () => {
+  writeGovernancePending(sessionStorage, key(), oldRequest);
+  mocks.request.mockRejectedValue(refused('NOT_FOUND'));
+  mount();
+  const resubmit = await screen.findByRole('button', { name: '같은 요청 다시 접수' });
+  expect(screen.queryByRole('button', { name: '이전 장수 요청 기록 지우기' })).toBeNull();
+  expect(readGovernancePending(sessionStorage, key())).toEqual(oldRequest);
+
+  mocks.submit.mockResolvedValueOnce({ userId: mocks.user, requestId, status: 'pending' });
+  fireEvent.click(resubmit);
+  await waitFor(() => expect(mocks.submit).toHaveBeenCalledTimes(1));
+  expect(mocks.submit.mock.calls[0]![0]).toEqual({
+    worldId: WORLD,
+    expectedUserId: mocks.user,
+    expectedGeneralId: 10,
+    requestId,
+    payload: { type: 'court.resign' },
+  });
+  // 재접수 뒤에도 기록의 장수·번호는 바뀌지 않는다.
+  await waitFor(() => expect(mocks.request).toHaveBeenCalledTimes(2));
+  expect(readGovernancePending(sessionStorage, key())).toEqual(oldRequest);
+});
+
+it('T4-95 AC-P2-32 장수가 바뀐 뒤 404인 이전 장수 요청은 다시 접수하지 않고, 새 보기·새 접수 조회를 거쳐 손으로만 지운다', async () => {
+  writeGovernancePending(sessionStorage, key(), oldRequest);
+  mocks.get.mockImplementation(async () => successor());
+  mocks.request.mockRejectedValue(refused('NOT_FOUND'));
+  mount();
+  const clear = await screen.findByRole('button', { name: '이전 장수 요청 기록 지우기' });
+  expect(screen.queryByRole('button', { name: '같은 요청 다시 접수' })).toBeNull();
+  expect(screen.getByText(/이전 장수\(황제\) 명의로 보냈습니다/)).toBeTruthy();
+  expect(readGovernancePending(sessionStorage, key())).toEqual(oldRequest);
+
+  const reads = mocks.get.mock.calls.length,
+    receipts = mocks.request.mock.calls.length;
+  fireEvent.click(clear);
+  await screen.findByText(OLD_REQUEST_CLEARED);
+  expect(mocks.get).toHaveBeenCalledTimes(reads + 1);
+  expect(mocks.request).toHaveBeenCalledTimes(receipts + 1);
+  expect(mocks.request.mock.calls.at(-1)![0]).toEqual({ worldId: WORLD, requestId });
+  expect(readGovernancePending(sessionStorage, key())).toBeNull();
+  expect(mocks.submit).not.toHaveBeenCalled();
+});
+
+it('T4-95 AC-P2-32 지우기를 누른 뒤 새 보기의 장수가 요청 장수와 같으면 지우지 않고 접수 조회도 하지 않는다', async () => {
+  writeGovernancePending(sessionStorage, key(), oldRequest);
+  mocks.get.mockImplementation(async () => successor());
+  mocks.request.mockRejectedValue(refused('NOT_FOUND'));
+  mount();
+  const clear = await screen.findByRole('button', { name: '이전 장수 요청 기록 지우기' });
+  const receipts = mocks.request.mock.calls.length;
+  mocks.get.mockImplementation(async () => ascendable());
+  fireEvent.click(clear);
+  await screen.findByText(/달라졌음을 확인하지 못해 기록을 지우지 않았습니다/);
+  expect(mocks.request).toHaveBeenCalledTimes(receipts);
+  expect(readGovernancePending(sessionStorage, key())).toEqual(oldRequest);
+  expect(mocks.submit).not.toHaveBeenCalled();
+});
+
+it('T4-95 AC-P2-32 지우기 확인 중 연결·인증 오류면 기록을 그대로 둔다', async () => {
+  writeGovernancePending(sessionStorage, key(), oldRequest);
+  mocks.get.mockImplementation(async () => successor());
+  mocks.request.mockRejectedValueOnce(refused('NOT_FOUND'));
+  mount();
+  const clear = await screen.findByRole('button', { name: '이전 장수 요청 기록 지우기' });
+  mocks.request.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+  fireEvent.click(clear);
+  await screen.findByText(OLD_REQUEST_KEPT);
+  expect(readGovernancePending(sessionStorage, key())).toEqual(oldRequest);
+
+  mocks.request.mockRejectedValueOnce(refused('UNAUTHORIZED'));
+  fireEvent.click(await screen.findByRole('button', { name: '이전 장수 요청 기록 지우기' }));
+  await screen.findByText('거부 UNAUTHORIZED');
+  expect(readGovernancePending(sessionStorage, key())).toEqual(oldRequest);
+  expect(mocks.submit).not.toHaveBeenCalled();
+});
+
+it('T4-95 AC-P2-32 지우기 확인에서 접수 기록이 보이면 지우지 않고 그 결과를 끝까지 확인한다', async () => {
+  writeGovernancePending(sessionStorage, key(), oldRequest);
+  mocks.get.mockImplementation(async () => successor());
+  mocks.request.mockRejectedValueOnce(refused('NOT_FOUND'));
+  mount();
+  const clear = await screen.findByRole('button', { name: '이전 장수 요청 기록 지우기' });
+  mocks.request.mockResolvedValue({ userId: mocks.user, requestId, status: 'pending' });
+  fireEvent.click(clear);
+  await waitFor(() => expect(screen.queryByRole('button', { name: '이전 장수 요청 기록 지우기' })).toBeNull());
+  expect(screen.queryByText(OLD_REQUEST_CLEARED)).toBeNull();
+  expect(readGovernancePending(sessionStorage, key())).toEqual(oldRequest);
+  expect(mocks.submit).not.toHaveBeenCalled();
+});
+
+it('T4-95 AC-P2-32 장수 id가 없는 예전 기록은 장수 비교 없이 예전처럼 같은 번호로만 다시 접수한다', async () => {
+  writeGovernancePending(sessionStorage, key(), { requestId, payload: { type: 'court.resign' } });
+  mocks.get.mockImplementation(async () => successor());
+  mocks.request.mockRejectedValue(refused('NOT_FOUND'));
+  mount();
+  const resubmit = await screen.findByRole('button', { name: '같은 요청 다시 접수' });
+  expect(screen.queryByRole('button', { name: '이전 장수 요청 기록 지우기' })).toBeNull();
+  mocks.submit.mockResolvedValueOnce({ userId: mocks.user, requestId, status: 'pending' });
+  fireEvent.click(resubmit);
+  await waitFor(() => expect(mocks.submit).toHaveBeenCalledTimes(1));
+  expect(mocks.submit.mock.calls[0]![0]).toEqual({
+    worldId: WORLD,
+    expectedUserId: mocks.user,
+    requestId,
+    payload: { type: 'court.resign' },
+  });
+  expect(Object.hasOwn(mocks.submit.mock.calls[0]![0] as object, 'expectedGeneralId')).toBe(false);
 });
 
 it('T4-94 AC-P2-31 다른 계정의 저장 요청은 읽지 않는다', async () => {

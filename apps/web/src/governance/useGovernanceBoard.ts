@@ -7,9 +7,11 @@ import { errorCode, serverMessage } from '../turns/apiError';
 import { APPLIED_MESSAGE, type GovernanceBoard, type GovernanceRequestResult } from './governanceModel';
 import {
   forgetGovernancePending,
+  governanceActorChanged,
   governanceModeAllowed,
   governanceStorageKey,
   readGovernancePending,
+  sameGovernanceRequest,
   writeGovernancePending,
   type GovernancePending,
   type GovernanceRequestMode,
@@ -24,6 +26,14 @@ class IdentityChanged extends Error {}
 
 const ACCOUNT_MESSAGE = '계정이 바뀌었습니다. 다시 확인하세요.';
 const RECORD_MESSAGE = '요청 기록이 바뀌었습니다. 다시 확인하세요.';
+// 가문 계승(T4-95)은 같은 계정의 장수만 바꾼다. 계정 확인만으로는 전임자 기준 대화상자를 막지 못한다.
+const GENERAL_CHANGED_MESSAGE = '장수가 바뀌었습니다. 화면을 다시 확인하세요.';
+export const OLD_REQUEST_CLEARED =
+  '이전 장수 명의 요청은 접수되지 않았고 앞으로도 처리되지 않음을 확인해 이 탭의 기록을 지웠습니다. 필요하면 새로 요청하세요.';
+export const OLD_REQUEST_KEPT = '이전 장수 명의 요청을 확인하지 못해 기록을 그대로 두었습니다. 다시 확인하세요.';
+const OLD_REQUEST_NO_RESEND =
+  '장수가 바뀌어 이전 장수 명의 요청은 다시 접수하지 않았습니다. 같은 요청의 상태를 확인하거나 이전 장수 요청 기록 지우기를 누르세요.';
+const viewerOf = (board: GovernanceBoard) => (board.view.enabled ? board.view.viewerGeneralId : null);
 const deniedView = (error: unknown) => refreshFailureClearsView(errorCode(error), error instanceof IdentityChanged);
 const unreachable = (error: unknown) => errorCode(error) === undefined && !(error instanceof IdentityChanged);
 // 황실 기능을 켜지 않은 월드. 오류로 보이지 않고 조회를 다시 하지 않는다.
@@ -92,6 +102,18 @@ export function useGovernanceBoard(worldId: string) {
     drop();
     setNotice(null);
   }, [drop]);
+  // 같은 계정으로 다시 읽었는데 보는 장수가 바뀌었으면(계승) 열린 확인 대화상자와 입력 폼을 버린다.
+  const lastViewer = useRef<{ userId: string; generalId: number | null } | null>(null);
+  useEffect(() => {
+    if (!view) return;
+    const before = lastViewer.current,
+      generalId = viewerOf(view.board);
+    lastViewer.current = { userId: view.userId, generalId };
+    if (!before || before.userId !== view.userId || before.generalId === generalId) return;
+    setSessionId(++session.current);
+    setFormEpoch((value) => value + 1);
+    setNotice((previous) => previous ?? { text: GENERAL_CHANGED_MESSAGE, tone: 'info' });
+  }, [view]);
 
   const snapshot = useCallback(
     async (signal: AbortSignal, expected?: string) => {
@@ -271,6 +293,8 @@ export function useGovernanceBoard(worldId: string) {
 
   // submit: 새 번호로 새 요청을 보낸다. check: 저장된 요청의 상태만 본다.
   // resubmit: 접수 기록을 찾지 못한 저장 요청을 같은 번호·내용 그대로 다시 보낸다. 기록은 최종 결과에서만 지운다.
+  // request.generalId: 처음 기록을 만든 대화상자가 본 장수. 새 요청은 다시 읽은 장수가 다르면 보내지 않고,
+  // 재접수도 바뀐 장수 명의로는 보내지 않는다. 보낼 때는 이 값을 expectedGeneralId로 그대로 보낸다.
   async function act(request: GovernancePending, mode: GovernanceRequestMode) {
     if (!view || sending.current) return;
     const key = governanceStorageKey(view.userId, worldId);
@@ -297,6 +321,14 @@ export function useGovernanceBoard(worldId: string) {
       latest = { ...fresh, pending: current.pending };
       setView(latest);
       setStale(false);
+      if (mode === 'submit' && viewerOf(fresh.board) !== request.generalId) {
+        setNotice({ text: `${GENERAL_CHANGED_MESSAGE} 요청을 보내지 않았습니다.`, tone: 'error' });
+        return;
+      }
+      if (mode === 'resubmit' && governanceActorChanged(request, viewerOf(fresh.board))) {
+        setNotice({ text: OLD_REQUEST_NO_RESEND, tone: 'error' });
+        return;
+      }
       if (sends) {
         if (!canSubmit(fresh.board)) {
           setNotice({
@@ -330,8 +362,16 @@ export function useGovernanceBoard(worldId: string) {
           throw new IdentityChanged(RECORD_MESSAGE);
         setUnconfirmed(false);
         mutationStarted = true;
+        // 다시 읽기와 접수 사이(수 ms)의 계승은 서버가 expectedGeneralId로 막는다(CONFLICT).
+        // 장수 id가 없는 예전 기록은 예전처럼 보낸다.
         const accepted = await api.governance.submit.mutate(
-          { worldId, expectedUserId: current.userId, requestId: request.requestId, payload: request.payload },
+          {
+            worldId,
+            expectedUserId: current.userId,
+            ...(request.generalId === undefined ? {} : { expectedGeneralId: request.generalId }),
+            requestId: request.requestId,
+            payload: request.payload,
+          },
           timed(run.signal),
         );
         mutationReturned = true;
@@ -383,6 +423,65 @@ export function useGovernanceBoard(worldId: string) {
     }
   }
 
+  // 이전 장수 명의 요청의 탭 기록을 사용자가 명시적으로 지운다(가문 칸 useLineageBoard.forgetOld와 같은 순서).
+  // 1) 같은 계정으로 새로 읽은 보기의 장수가 기록의 장수와 다르다(계승이 이미 끝났다).
+  // 2) 그 뒤 같은 번호의 접수 기록을 새로 물어 NOT_FOUND다.
+  // 계승 전에 접수됐다면 2)에서 기록이 보이고, 계승 뒤 잠금에 닿은 원래 전송은 서버가 expectedGeneralId로 거부하므로
+  // 이 요청은 앞으로도 적용될 수 없다. 장수 id가 없는 예전 기록, 같은 장수의 미확인 요청, 접수 기록이 있는 요청,
+  // 확인 실패(연결·인증)는 지우지 않는다. 다시 보내거나 새 번호를 만들지 않는다.
+  async function forgetOld(request: GovernancePending) {
+    const current = viewRef.current;
+    if (!current || sending.current || request.generalId === undefined) return;
+    if (!sameGovernanceRequest(current.pending, request)) return;
+    const key = governanceStorageKey(current.userId, worldId);
+    if (!sameGovernanceRequest(readGovernancePending(sessionStorage, key), request)) return;
+    sending.current = true;
+    const run = begin();
+    setBusy(true);
+    setNotice(null);
+    try {
+      const fresh = await snapshot(run.signal, current.userId);
+      if (!run.current()) return;
+      setView({ ...fresh, pending: request });
+      setStale(false);
+      if (!governanceActorChanged(request, viewerOf(fresh.board))) {
+        setNotice({
+          text: '지금 장수가 이 요청을 보낸 장수와 달라졌음을 확인하지 못해 기록을 지우지 않았습니다. 같은 요청의 상태를 확인하세요.',
+          tone: 'error',
+        });
+        return;
+      }
+      let receipt = true;
+      try {
+        await api.governance.request.query({ worldId, requestId: request.requestId }, timed(run.signal));
+      } catch (error) {
+        if (errorCode(error) !== 'NOT_FOUND') throw error;
+        receipt = false;
+      }
+      if (!run.current()) return;
+      // 접수 기록이 있으면 지우지 않고 그 결과를 끝까지 확인한다.
+      if (receipt) return await observe(current.userId, request, run.signal, run.current);
+      const me = await api.auth.me.query(undefined, timed(run.signal));
+      if (me.user?.id !== current.userId) throw new IdentityChanged(ACCOUNT_MESSAGE);
+      if (!run.current()) return;
+      if (!forgetGovernancePending(sessionStorage, key, request)) throw new IdentityChanged(RECORD_MESSAGE);
+      setView({ ...fresh, pending: null });
+      setUnconfirmed(false);
+      setNotice({ text: OLD_REQUEST_CLEARED, tone: 'info' });
+    } catch (error) {
+      if (!run.current()) return;
+      if (deniedView(error)) drop();
+      else if (unreachable(error)) setStale(true);
+      setNotice({
+        text: error instanceof IdentityChanged ? error.message : (serverMessage(error) ?? OLD_REQUEST_KEPT),
+        tone: 'error',
+      });
+    } finally {
+      sending.current = false;
+      if (run.current()) setBusy(false);
+    }
+  }
+
   return {
     view,
     notice,
@@ -394,13 +493,21 @@ export function useGovernanceBoard(worldId: string) {
     retryWait: retryUntil > now ? Math.ceil((retryUntil - now) / 1000) : 0,
     load,
     session: sessionId,
-    // owner: 대화상자를 열 때의 계정·세션. 그사이 보기가 지워졌거나 계정이 바뀌었으면 보내지 않는다.
-    submit: (payload: GovernancePending['payload'], owner: { userId: string; session: number }) => {
-      if (owner.session !== session.current || owner.userId !== view?.userId) return;
-      void act({ requestId: crypto.randomUUID(), payload }, 'submit');
+    // owner: 대화상자를 열 때의 계정·세션·장수. 그사이 보기가 지워졌거나 계정·장수가 바뀌었으면 보내지 않는다.
+    submit: (
+      payload: GovernancePending['payload'],
+      owner: { userId: string; session: number; generalId: number | null },
+    ) => {
+      if (!view || owner.session !== session.current || owner.userId !== view.userId) return;
+      if (owner.generalId === null || owner.generalId !== viewerOf(view.board)) return;
+      // 보낸 장수는 처음 기록을 만들 때 한 번만 정한다. 재접수·상태 확인은 저장된 값을 그대로 쓴다.
+      void act({ requestId: crypto.randomUUID(), generalId: owner.generalId, payload }, 'submit');
     },
     recheck: () => view?.pending && void act(view.pending, 'check'),
     resubmit: () => view?.pending && void act(view.pending, 'resubmit'),
+    forgetOld: () => view?.pending && void forgetOld(view.pending),
+    // 미확인 대기 기록을 보낸 장수가 지금 보는 장수와 다른가. 이때는 재접수 대신 기록 지우기만 연다.
+    oldActor: view?.pending ? governanceActorChanged(view.pending, viewerOf(view.board)) : false,
     canSubmit: view ? canSubmit(view.board) : false,
   };
 }

@@ -157,7 +157,9 @@ function CampaignBoard({
       sending.current = false;
     }
   }
-  async function prepareOffer(payload: Extract<Inputs['relationship']['payload'], { type: 'offer' }>) {
+  // 모든 요청은 보내기 전에 현황을 다시 읽는다. 단추를 그린 화면의 장수와 지금 장수가 다르면(가문 계승, T4-95)
+  // 같은 계정이어도 보내지 않는다. 제안은 대상·비용도 다시 확인한다.
+  async function prepare(action: Action) {
     if (preparation.current || pending || sending.current) return;
     const actorId = board.data?.actorId;
     if (actorId === undefined) return;
@@ -172,6 +174,11 @@ function CampaignBoard({
         setNotice('장수나 로그인한 계정이 바뀌었습니다. 화면을 다시 확인하세요.');
         return;
       }
+      if (action.kind !== 'campaign.relationship' || action.payload.type !== 'offer') {
+        await send({ ...action, requestId: crypto.randomUUID() });
+        return;
+      }
+      const payload = action.payload;
       const target = fresh.people.find((person) => person.id === payload.targetId);
       if (
         fresh.status !== 'RUNNING' ||
@@ -200,14 +207,9 @@ function CampaignBoard({
       if (alive.current) setPreparing(false);
     }
   }
-  const act = (
-    action:
-      | Omit<Extract<Pending, { kind: 'campaign.relationship' }>, 'requestId'>
-      | Omit<Extract<Pending, { kind: 'campaign.unit' }>, 'requestId'>,
-  ) => {
+  const act = (action: Action) => {
     if (pending || sending.current || preparation.current) return;
-    if (action.kind === 'campaign.relationship' && action.payload.type === 'offer') void prepareOffer(action.payload);
-    else void send({ ...action, requestId: crypto.randomUUID() });
+    void prepare(action);
   };
   return (
     <section className={styles.panel} aria-labelledby="campaign-title">
@@ -229,7 +231,14 @@ function CampaignBoard({
         </div>
       ) : null}
       {board.data ? (
-        <CampaignControls board={board.data} busy={pending !== null || preparing} preparing={preparing} act={act} />
+        // 장수가 바뀌면(계승) 고르던 지휘관·관계 입력을 버린다.
+        <CampaignControls
+          key={board.data.actorId}
+          board={board.data}
+          busy={pending !== null || preparing}
+          preparing={preparing}
+          act={act}
+        />
       ) : board.isError ? (
         <ErrorState
           title={serverMessage(board.error) ?? '휘하 현황을 불러오지 못했습니다'}

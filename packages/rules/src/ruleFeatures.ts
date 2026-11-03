@@ -8,6 +8,7 @@ import { applyPersonnelRecordStep } from './personnel/inputStep';
 import { validatePersonnelRecord } from './personnel/inputs';
 import { runPersonnelMonth } from './personnel/monthStep';
 import { updateResidenceAnchors } from './personnel/residence';
+import { recordedLineageSuccession } from './lineage/control';
 import { completePersonnelStep, type PersonnelStepPacket } from './personnel/step';
 import { applyTreatyInput, settleTreaties, validateTreatyRecord } from './diplomacy/treaty';
 import { validatePolicyInput } from './replayInputs';
@@ -43,10 +44,14 @@ export const fiveStatsFeature: RuleFeatureDefinition = {
     if (data !== undefined) throw new Error('5능력치 기능의 별도 초기 자료는 없습니다.');
     checkStatProfile(initial);
   },
-  checkArchive({ inputs }) {
+  checkArchive({ origin, inputs }) {
     for (const input of inputs) {
       if (input.kind !== 'general.create' || input.status !== 'APPLIED') continue;
-      const parsed = validateGeneralCreation(input.payload, FIVE_STAT_RULES);
+      const parsed = validateGeneralCreation(
+        input.payload,
+        FIVE_STAT_RULES,
+        origin.initial.ruleFeatures?.includes('lineage-v1'),
+      );
       const general = (input.result as { general?: Record<string, unknown> } | null)?.general;
       if (!parsed.ok || !general || FIVE_STAT_KEYS.some((key) => general[key] !== parsed.value[key]))
         throw new Error('5능력치 생성 입력과 결과가 다릅니다.');
@@ -67,7 +72,11 @@ export const policyFeature: RuleFeatureDefinition = {
   checkArchive({ origin, inputs }) {
     for (const input of inputs)
       if (['turns.set', 'general.create', 'general.setPolicy', 'general.active'].includes(input.kind))
-        validatePolicyInput(input, origin.initial.ruleFeatures?.includes('five-stats'));
+        validatePolicyInput(
+          input,
+          origin.initial.ruleFeatures?.includes('five-stats'),
+          origin.initial.ruleFeatures?.includes('lineage-v1'),
+        );
   },
   initReplayState(replay, { data }) {
     const config = policyDataSchema.parse(data);
@@ -94,6 +103,7 @@ function personnelResult(before: ReplayState, after: ReplayState, packet: Person
       anchors: current.anchors,
       tick,
       createdHumanId: input.kind === 'general.create' ? input.generalId : null,
+      succession: recordedLineageSuccession(input),
     }),
   };
 }

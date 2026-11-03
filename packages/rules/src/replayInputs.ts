@@ -4,11 +4,12 @@ import { emptyQueue } from './policy';
 import { validatePolicyRecordedInput } from './policy/replay';
 import { assertGeneralStatProfile, FIVE_STAT_KEYS, FIVE_STAT_RULES } from './general/fiveStats';
 import { validateGeneralCreation } from './general/create';
+import { assertGeneralSex, knownGeneralSexSchema } from './general/sex';
 
-export function validatePolicyInput(input: RecordedInput, five = false): void {
+export function validatePolicyInput(input: RecordedInput, five = false, lineage = false): void {
   const { tick, ...legacy } = input;
   void tick;
-  validatePolicyRecordedInput(legacy, true, five);
+  validatePolicyRecordedInput(legacy, true, five, lineage);
   if (input.status === 'APPLIED' && input.kind !== 'turns.set' && input.tick !== undefined && input.tick !== null) {
     if ((input.result as { activeTick?: number }).activeTick !== input.tick)
       throw new Error('활동 tick이 처리 tick과 다릅니다.');
@@ -18,7 +19,12 @@ export function validatePolicyInput(input: RecordedInput, five = false): void {
 export const emptyTurns = (): QueuedTurn[] => Array.from({ length: 30 }, () => ({ commandKey: 'rest', args: {} }));
 
 export function applyTurnsInput(replay: ReplayState, input: RecordedInput): ReplayState {
-  if (replay.policy) validatePolicyInput(input, replay.state.ruleFeatures?.includes('five-stats'));
+  if (replay.policy)
+    validatePolicyInput(
+      input,
+      replay.state.ruleFeatures?.includes('five-stats'),
+      replay.state.ruleFeatures?.includes('lineage-v1'),
+    );
   const next = structuredClone(replay);
   const payload = input.payload as { turns?: QueuedTurn[]; revision?: number };
   const result = input.result as { revision?: number };
@@ -45,7 +51,12 @@ export function applyTurnsInput(replay: ReplayState, input: RecordedInput): Repl
 }
 
 export function applyCreationInput(replay: ReplayState, input: RecordedInput): ReplayState {
-  if (replay.policy) validatePolicyInput(input, replay.state.ruleFeatures?.includes('five-stats'));
+  if (replay.policy)
+    validatePolicyInput(
+      input,
+      replay.state.ruleFeatures?.includes('five-stats'),
+      replay.state.ruleFeatures?.includes('lineage-v1'),
+    );
   const next = structuredClone(replay);
   const general = (input.result as { general?: InitialGeneral }).general;
   if (
@@ -62,8 +73,16 @@ export function applyCreationInput(replay: ReplayState, input: RecordedInput): R
   }
   const five = next.state.ruleFeatures?.includes('five-stats') ?? false;
   assertGeneralStatProfile(general, five);
+  const lineage = next.state.ruleFeatures?.includes('lineage-v1') ?? false;
+  assertGeneralSex(general, lineage);
+  const payload = input.payload as Record<string, unknown>;
+  if (lineage) {
+    if (knownGeneralSexSchema.parse(payload?.sex) !== general.sex) throw Error('성별 생성 입력과 결과가 다릅니다.');
+    if (!next.state.lineage || Object.keys(next.state.generals).length >= next.state.lineage.config.limits.maxGenerals)
+      throw Error('가문 판의 장수 정원을 넘었습니다.');
+  } else if (payload && Object.hasOwn(payload, 'sex')) throw Error('끈 가문 판의 생성 입력에 성별이 있습니다.');
   if (five) {
-    const creation = validateGeneralCreation(input.payload, FIVE_STAT_RULES);
+    const creation = validateGeneralCreation(input.payload, FIVE_STAT_RULES, lineage);
     if (!creation.ok || FIVE_STAT_KEYS.some((key) => creation.value[key] !== general[key]))
       throw new Error('5능력치 생성 입력과 결과가 다릅니다.');
   }
@@ -79,7 +98,11 @@ export function applyCreationInput(replay: ReplayState, input: RecordedInput): R
 }
 
 export function applyPolicyInput(replay: ReplayState, input: RecordedInput): ReplayState {
-  validatePolicyInput(input, replay.state.ruleFeatures?.includes('five-stats'));
+  validatePolicyInput(
+    input,
+    replay.state.ruleFeatures?.includes('five-stats'),
+    replay.state.ruleFeatures?.includes('lineage-v1'),
+  );
   const next = structuredClone(replay);
   const id = input.generalId;
   if (!next.policy || id === null || !next.state.generals[id] || next.state.generals[id]!.userId === null)
