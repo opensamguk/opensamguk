@@ -146,10 +146,10 @@ async function world() {
   expect(initial.generals).toHaveLength(491);
   return (await saveInitialWorld(db, initial, { name: '정리 시험 월드', turnTermMinutes: 60, endYear: 201 })).worldId;
 }
-async function hold(worldId: string) {
+async function hold(worldId: string, ttlMs?: number) {
   const own = createDb(target.href);
   pools.add(own);
-  const lease = await acquireLease(own, worldId);
+  const lease = await acquireLease(own, worldId, randomUUID(), ttlMs);
   expect(lease).not.toBeNull();
   return { db: own, lease: lease!, done: new AbortController(), renewal: Promise.resolve() };
 }
@@ -217,7 +217,7 @@ it('실제 Lease 보유자가 World를 잠글 수 있으며 정리는 같은 순
 for (const invalid of ['owner', 'expired', 'world-wait'] as const)
   it(`${invalid} 실행권이면 실제 월드·장수·예약을 보존한다`, async () => {
     const mine = await world(),
-      owned = await hold(mine),
+      owned = await hold(mine, invalid === 'world-wait' ? 5000 : undefined),
       before = await snapshot(mine);
     let pending: Promise<unknown> | undefined;
     try {
@@ -226,7 +226,6 @@ for (const invalid of ['owner', 'expired', 'world-wait'] as const)
       else if (invalid === 'expired')
         await db.engineLease.update({ where: { worldId: mine }, data: { expiresAt: new Date(0) } });
       else {
-        await db.$executeRaw`UPDATE "EngineLease" SET "expiresAt"=(clock_timestamp() AT TIME ZONE 'UTC')+interval '1 second' WHERE "worldId"=${mine}`;
         await blocker.query('BEGIN');
         await blocker.query('SELECT id FROM "World" WHERE id=$1 FOR UPDATE', [mine]);
         // 이 거부는 예상 결과로 정착시킨 뒤 추적한다.
@@ -236,16 +235,18 @@ for (const invalid of ['owner', 'expired', 'world-wait'] as const)
           });
         });
         await expect.poll(async () => (await blocked()).length).toBe(1);
-        await expect
-          .poll(
-            async () =>
-              (
-                await db.$queryRaw<
-                  Array<{ expired: boolean }>
-                >`SELECT "expiresAt"<=(clock_timestamp() AT TIME ZONE 'UTC') AS expired FROM "EngineLease" WHERE "worldId"=${mine}`
-              )[0]!.expired,
-          )
-          .toBe(true);
+        // World를 기다리는 것을 확인한 뒤 DB 시계의 실제 만료까지 잠금을 유지한다.
+        await blocker.query(
+          `SELECT pg_sleep(GREATEST(0, EXTRACT(EPOCH FROM ("expiresAt" - (clock_timestamp() AT TIME ZONE 'UTC')))) + 0.01) FROM "EngineLease" WHERE "worldId"=$1`,
+          [mine],
+        );
+        expect(
+          (
+            await db.$queryRaw<
+              Array<{ expired: boolean }>
+            >`SELECT "expiresAt"<=(clock_timestamp() AT TIME ZONE 'UTC') AS expired FROM "EngineLease" WHERE "worldId"=${mine}`
+          )[0]!.expired,
+        ).toBe(true);
         await blocker.query('COMMIT');
         await pending;
       }
