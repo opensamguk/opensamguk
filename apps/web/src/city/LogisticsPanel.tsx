@@ -5,10 +5,12 @@ import { formatYearMonth, personalLogDate } from '../game/gameDate';
 import { useWorldMap, useWorldSummary } from '../game/queries';
 import {
   forgetLogisticsPending,
+  logisticsActorChanged,
   logisticsStorageKey,
   readLogisticsPending,
   refreshFailureClearsView,
   requestModeAllowed,
+  sameLogisticsRequest,
   writeLogisticsPending,
   type LogisticsPending,
   type LogisticsRequestMode,
@@ -51,6 +53,11 @@ class IdentityChanged extends Error {}
 
 const ACCOUNT_MESSAGE = '계정이 바뀌었습니다. 다시 확인하세요.';
 const RECORD_MESSAGE = '요청 기록이 바뀌었습니다. 다시 확인하세요.';
+const OLD_REQUEST_CLEARED =
+  '이전 장수 명의 요청은 접수되지 않았고 앞으로도 처리되지 않음을 확인해 이 탭의 기록을 지웠습니다. 필요하면 새로 요청하세요.';
+const OLD_REQUEST_KEPT = '이전 장수 명의 요청을 확인하지 못해 기록을 그대로 두었습니다. 다시 확인하세요.';
+const OLD_REQUEST_NO_RESEND =
+  '장수가 바뀌어 이전 장수 명의 요청은 다시 접수하지 않았습니다. 같은 요청의 상태를 확인하거나 이전 장수 요청 기록 지우기를 누르세요.';
 const deniedView = (error: unknown) => refreshFailureClearsView(errorCode(error), error instanceof IdentityChanged);
 // 응답을 받지 못한 실패. 같은 계정의 화면·입력은 남기고 값이 오래됐다고 표시한다.
 const unreachable = (error: unknown) => errorCode(error) === undefined && !(error instanceof IdentityChanged);
@@ -286,6 +293,8 @@ function LogisticsBoardView({ worldId, cityKey }: { worldId: string; cityKey: nu
 
   // submit: 새 번호로 새 요청을 보낸다. check: 저장된 요청의 상태만 본다.
   // resubmit: 접수 기록을 찾지 못한 저장 요청을 같은 번호·내용 그대로 다시 보낸다. 기록은 최종 결과에서만 지운다.
+  // request.generalId: 처음 기록을 만든 화면(양식)의 장수. 새 요청은 다시 읽은 장수가 다르면(계승) 보내지 않고,
+  // 재접수도 바뀐 장수 명의로는 보내지 않는다. 보낼 때는 이 값을 expectedGeneralId로 그대로 보낸다.
   async function act(request: LogisticsPending, mode: LogisticsRequestMode) {
     if (!view || sending.current) return;
     const key = logisticsStorageKey(view.userId, worldId);
@@ -313,6 +322,14 @@ function LogisticsBoardView({ worldId, cityKey }: { worldId: string; cityKey: nu
       latest = { ...fresh, pending: current.pending };
       setView(latest);
       setStale(false);
+      if (mode === 'submit' && fresh.board.actorId !== request.generalId) {
+        setNotice({ text: '장수가 바뀌었습니다. 요청을 보내지 않았습니다. 화면을 다시 확인하세요.', tone: 'error' });
+        return;
+      }
+      if (mode === 'resubmit' && logisticsActorChanged(request, fresh.board.actorId)) {
+        setNotice({ text: OLD_REQUEST_NO_RESEND, tone: 'error' });
+        return;
+      }
       if (sends) {
         if (!fresh.board.visible || !fresh.board.own || !fresh.board.canManage) {
           setNotice({
@@ -340,8 +357,16 @@ function LogisticsBoardView({ worldId, cityKey }: { worldId: string; cityKey: nu
           throw new IdentityChanged(RECORD_MESSAGE);
         setUnconfirmed(false);
         mutationStarted = true;
+        // 다시 읽기와 접수 사이(수 ms)의 계승은 서버가 expectedGeneralId로 막는다(CONFLICT).
+        // 장수 id가 없는 예전 기록은 예전처럼 보낸다.
         const accepted = await api.logistics.submit.mutate(
-          { worldId, expectedUserId: current.userId, requestId: request.requestId, payload: request.payload },
+          {
+            worldId,
+            expectedUserId: current.userId,
+            ...(request.generalId === undefined ? {} : { expectedGeneralId: request.generalId }),
+            requestId: request.requestId,
+            payload: request.payload,
+          },
           timed(run.signal),
         );
         mutationReturned = true;
@@ -387,6 +412,65 @@ function LogisticsBoardView({ worldId, cityKey }: { worldId: string; cityKey: nu
                     : '상태를 확인하지 못했습니다. 자동으로 다시 보내지 않습니다.')),
         });
       }
+    } finally {
+      sending.current = false;
+      if (run.current()) setBusy(false);
+    }
+  }
+
+  // 이전 장수 명의 요청의 탭 기록을 사용자가 명시적으로 지운다(가문 칸 useLineageBoard.forgetOld와 같은 순서).
+  // 1) 같은 계정으로 새로 읽은 board의 장수가 기록의 장수와 다르다(계승이 이미 끝났다).
+  // 2) 그 뒤 같은 번호의 접수 기록을 새로 물어 NOT_FOUND다.
+  // 계승 전에 접수됐다면 2)에서 기록이 보이고, 계승 뒤 잠금에 닿은 원래 전송은 서버가 expectedGeneralId로 거부하므로
+  // 이 요청은 앞으로도 적용될 수 없다. 장수 id가 없는 예전 기록, 같은 장수의 미확인 요청, 접수 기록이 있는 요청,
+  // 확인 실패(연결·인증)는 지우지 않는다. 다시 보내거나 새 번호를 만들지 않는다.
+  async function forgetOld(request: LogisticsPending) {
+    const current = view;
+    if (!current || sending.current || request.generalId === undefined) return;
+    if (!sameLogisticsRequest(current.pending, request)) return;
+    const key = logisticsStorageKey(current.userId, worldId);
+    if (!sameLogisticsRequest(readLogisticsPending(sessionStorage, key), request)) return;
+    sending.current = true;
+    const run = begin();
+    setBusy(true);
+    setNotice(null);
+    try {
+      const fresh = await snapshot(run.signal, current.userId);
+      if (!run.current()) return;
+      setView({ ...fresh, pending: request });
+      setStale(false);
+      if (!logisticsActorChanged(request, fresh.board.actorId)) {
+        setNotice({
+          text: '지금 장수가 이 요청을 보낸 장수와 달라졌음을 확인하지 못해 기록을 지우지 않았습니다. 같은 요청의 상태를 확인하세요.',
+          tone: 'error',
+        });
+        return;
+      }
+      let receipt = true;
+      try {
+        await api.logistics.request.query({ worldId, requestId: request.requestId }, timed(run.signal));
+      } catch (error) {
+        if (errorCode(error) !== 'NOT_FOUND') throw error;
+        receipt = false;
+      }
+      if (!run.current()) return;
+      // 접수 기록이 있으면 지우지 않고 그 결과를 끝까지 확인한다.
+      if (receipt) return await observe(current.userId, request, run.signal, run.current);
+      const me = await api.auth.me.query(undefined, timed(run.signal));
+      if (me.user?.id !== current.userId) throw new IdentityChanged(ACCOUNT_MESSAGE);
+      if (!run.current()) return;
+      if (!forgetLogisticsPending(sessionStorage, key, request)) throw new IdentityChanged(RECORD_MESSAGE);
+      setView({ ...fresh, pending: null });
+      setUnconfirmed(false);
+      setNotice({ text: OLD_REQUEST_CLEARED, tone: 'info' });
+    } catch (error) {
+      if (!run.current()) return;
+      if (deniedView(error)) setView(null);
+      else if (unreachable(error)) setStale(true);
+      setNotice({
+        text: error instanceof IdentityChanged ? error.message : (serverMessage(error) ?? OLD_REQUEST_KEPT),
+        tone: 'error',
+      });
     } finally {
       sending.current = false;
       if (run.current()) setBusy(false);
@@ -445,9 +529,11 @@ function LogisticsBoardView({ worldId, cityKey }: { worldId: string; cityKey: nu
               names={names}
               busy={busy}
               unconfirmed={unconfirmed}
+              oldActor={logisticsActorChanged(view.pending, view.board.actorId)}
               canResubmit={view.board.visible && view.board.own && view.board.canManage}
               recheck={() => void act(view.pending!, 'check')}
               resubmit={() => void act(view.pending!, 'resubmit')}
+              forgetOld={() => void forgetOld(view.pending!)}
             />
           ) : null}
           {!view.board.visible ? (
@@ -461,12 +547,14 @@ function LogisticsBoardView({ worldId, cityKey }: { worldId: string; cityKey: nu
             </>
           ) : (
             <OwnBoard
-              key={`${view.userId}:${cityKey}:${formEpoch}`}
+              key={`${view.userId}:${view.board.actorId}:${cityKey}:${formEpoch}`}
               board={view.board}
               locked={busy || stale || view.pending !== null || !view.board.canManage}
               names={names}
               when={when}
-              submit={(payload) => void act({ requestId: crypto.randomUUID(), payload }, 'submit')}
+              submit={(payload) =>
+                void act({ requestId: crypto.randomUUID(), generalId: view.board.actorId, payload }, 'submit')
+              }
             />
           )}
         </>
@@ -506,17 +594,21 @@ function PendingStatus({
   names,
   busy,
   unconfirmed,
+  oldActor,
   canResubmit,
   recheck,
   resubmit,
+  forgetOld,
 }: {
   pending: LogisticsPending;
   names: Names;
   busy: boolean;
   unconfirmed: boolean;
+  oldActor: boolean;
   canResubmit: boolean;
   recheck: () => void;
   resubmit: () => void;
+  forgetOld: () => void;
 }) {
   return (
     <div className={styles.status} role="status" aria-live="polite">
@@ -524,20 +616,30 @@ function PendingStatus({
         <strong>요청 처리 대기</strong> · {describe(pending.payload, names)}
       </p>
       <p className={styles.note}>
-        {unconfirmed
-          ? '이 요청의 접수 기록을 아직 찾지 못했습니다. 보내던 요청이 늦게 접수될 수도 있습니다. 같은 요청을 그대로 다시 접수하면 서버가 같은 번호로 한 번만 받습니다. 결과를 받기 전에는 새 요청을 만들지 않습니다.'
-          : '접수한 요청을 처리하고 있습니다. 결과가 나올 때까지 새 물류 요청은 기다려 주세요.'}
+        {!unconfirmed
+          ? '접수한 요청을 처리하고 있습니다. 결과가 나올 때까지 새 물류 요청은 기다려 주세요.'
+          : oldActor
+            ? '이 요청의 접수 기록을 찾지 못했습니다. 장수가 이미 바뀌어, 이전 장수 명의 요청은 서버가 거부하므로 앞으로도 처리되지 않습니다. 기록 지우기를 누르면 지금 장수와 접수 기록을 한 번 더 확인한 뒤 이 탭의 기록만 지웁니다. 다시 보내지 않습니다.'
+            : '이 요청의 접수 기록을 아직 찾지 못했습니다. 보내던 요청이 늦게 접수될 수도 있습니다. 같은 요청을 그대로 다시 접수하면 서버가 같은 번호로 한 번만 받습니다. 결과를 받기 전에는 새 요청을 만들지 않습니다.'}
       </p>
-      {unconfirmed && !canResubmit ? (
+      {oldActor ? (
+        <p className={styles.note}>이 요청은 이전 장수 명의로 보냈습니다. 같은 번호로 결과만 확인합니다.</p>
+      ) : null}
+      {unconfirmed && !oldActor && !canResubmit ? (
         <p className={styles.note}>지금 이 거점에서는 다시 접수할 수 없어 같은 요청의 상태만 확인할 수 있습니다.</p>
       ) : null}
       <div className={styles.row}>
         <button type="button" className={styles.secondary} disabled={busy} onClick={recheck}>
           같은 요청 상태 확인
         </button>
-        {unconfirmed && canResubmit ? (
+        {unconfirmed && !oldActor && canResubmit ? (
           <button type="button" className={styles.secondary} disabled={busy} onClick={resubmit}>
             같은 요청 다시 접수
+          </button>
+        ) : null}
+        {unconfirmed && oldActor ? (
+          <button type="button" className={styles.secondary} disabled={busy} onClick={forgetOld}>
+            이전 장수 요청 기록 지우기
           </button>
         ) : null}
       </div>

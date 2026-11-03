@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { DisabledReason } from '../ui/DisabledReason';
 import { personnelKeys, usePersonnelApi, type AssignmentOfferView } from './contract';
 import styles from './Personnel.module.css';
@@ -11,6 +11,7 @@ const KINDS = ['offer.respond'] as const;
 // 제안이 없거나 인사 기능이 없는 월드면 아무것도 그리지 않는다. 결과 안내는 상자가 사라져도 남는다.
 export function OfferBox({ worldId }: { worldId: string }) {
   const api = usePersonnelApi();
+  const queryClient = useQueryClient();
   const action = usePersonnelAction({ worldId, kinds: KINDS });
   const offers = useQuery({
     queryKey: personnelKeys.offers(worldId),
@@ -20,6 +21,15 @@ export function OfferBox({ worldId }: { worldId: string }) {
     refetchInterval: (query) => (query.state.status === 'error' ? false : 15_000),
   });
   const offer = offers.data?.[0];
+  // 보내기 직전 제안 목록을 다시 받아 이 제안이 지금 장수에게 아직 열려 있을 때만 보낸다.
+  // 계승하면 이전 장수의 발령 제안은 닫히고 새 장수의 목록에 없으므로 예전 화면의 응답은 보내지 않는다.
+  const stillOpen = (id: string) => async () => {
+    const fresh = await api.offers({ worldId });
+    queryClient.setQueryData(personnelKeys.offers(worldId), fresh);
+    return fresh.some((row) => row.id === id && row.respond.ok)
+      ? null
+      : '발령 제안이 바뀌었습니다. 응답을 보내지 않았습니다. 다시 확인하세요.';
+  };
   if (!offer && action.notices.length === 0 && !action.busy) return null;
   return (
     <div className={styles.offerStack} data-testid="offer-box">
@@ -30,7 +40,11 @@ export function OfferBox({ worldId }: { worldId: string }) {
           busy={action.busy}
           busyLabel={action.busyLabel}
           onRespond={(accept) =>
-            void action.submit({ kind: 'offer.respond', offerId: offer.id, accept }, accept ? 'accept' : 'reject')
+            void action.submit(
+              { kind: 'offer.respond', offerId: offer.id, accept },
+              accept ? 'accept' : 'reject',
+              stillOpen(offer.id),
+            )
           }
         />
       ) : action.busy ? (

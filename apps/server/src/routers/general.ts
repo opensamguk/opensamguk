@@ -10,6 +10,7 @@ import {
   type InitialGeneral,
   policyKeySchema,
   statRulesSchema,
+  storedGeneralSex,
 } from '@opensamguk/rules';
 import { z } from 'zod';
 import { router, protectedProcedure, worldVerifiedProcedure } from '../trpc';
@@ -23,6 +24,8 @@ const codes = {
   BAD_NAME: 'BAD_REQUEST',
   BAD_STATS: 'BAD_REQUEST',
   BAD_PORTRAIT: 'BAD_REQUEST',
+  BAD_SEX: 'BAD_REQUEST',
+  WORLD_FULL: 'BAD_REQUEST',
   WORLD_CLOSED: 'PRECONDITION_FAILED',
   ACTOR_INACTIVE: 'UNAUTHORIZED',
 } as const;
@@ -41,6 +44,7 @@ const creationEnvelope = worldInput.extend({
   intel: z.unknown(),
   politics: z.unknown().optional(),
   charm: z.unknown().optional(),
+  sex: z.unknown().optional(),
   portraitId: z.unknown(),
 });
 const creationInputParser = {
@@ -136,8 +140,14 @@ export const generalRouter = router({
         throw new TRPCError({ code: codes[block.code], message: CREATION_ERRORS[block.code] });
       const parsed = createInput.safeParse(input);
       if (!parsed.success)
-        throw new TRPCError({ code: 'BAD_REQUEST', message: parsed.error.message, cause: parsed.error });
-      const checked = validateGeneralCreation(payload, world.statRules);
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: parsed.error.issues.some((issue) => issue.path[0] === 'sex')
+            ? CREATION_ERRORS.BAD_SEX
+            : parsed.error.message,
+          cause: parsed.error,
+        });
+      const checked = validateGeneralCreation(payload, world.statRules, world.ruleFeatures.includes('lineage-v1'));
       if (!checked.ok) throw new TRPCError({ code: 'BAD_REQUEST', message: checked.message });
       if (pending) {
         // PostgreSQL jsonb의 키 순서는 입력 객체 순서와 다르다.
@@ -197,11 +207,17 @@ export const generalRouter = router({
           ...statRulesSchema.parse({ stat: world.statRules }).stat,
           count: world.ruleFeatures.includes('five-stats') ? (5 as const) : (3 as const),
           campaignEnabled: world.ruleFeatures.includes('campaign-v1'),
+          ...(world.ruleFeatures.includes('lineage-v1') ? { lineageEnabled: true as const } : {}),
         };
         const general = await tx.general.findUnique({
           where: { worldId_userId: { worldId: input.worldId, userId: ctx.user.id } },
         });
-        if (general) return { general: ownGeneral(general), creation: null, creationRules };
+        if (general)
+          return {
+            general: ownGeneral(storedGeneralSex(general, world.ruleFeatures.includes('lineage-v1'))),
+            creation: null,
+            creationRules,
+          };
         const event = await tx.inputEvent.findFirst({
           where: { worldId: input.worldId, userId: ctx.user.id, kind: 'general.create' },
           orderBy: { id: 'desc' },

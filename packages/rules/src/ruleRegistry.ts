@@ -27,6 +27,7 @@ import { ADMIN_END_KIND, applyAdminEndRecord } from './clock/end';
 import { ADMIN_RESET_KIND, applyAdminResetRecord } from './clock/reset';
 import { logisticsFeature, logisticsInputKind } from './logistics/feature';
 import { governanceFeature, governanceInputKind } from './governance/feature';
+import { lineageFeature, lineageInputKind } from './lineage/feature';
 
 export interface ReplayOriginV1 {
   version: 1;
@@ -91,8 +92,9 @@ export const ruleRegistry: RuleRegistry = {
     cityResourcesFeature,
     logisticsFeature,
     governanceFeature,
+    lineageFeature,
   ],
-  monthlyOrder: ['treaty', 'personnel', 'campaign-assignment-v2', 'logistics-v1', 'governance-v1'],
+  monthlyOrder: ['treaty', 'lineage-v1', 'personnel', 'campaign-assignment-v2', 'logistics-v1', 'governance-v1'],
   inputKinds: [
     ...ADMIN_CLOCK_KINDS.map((kind) => ({
       kind,
@@ -114,6 +116,7 @@ export const ruleRegistry: RuleRegistry = {
     cityResourceInputKind,
     logisticsInputKind,
     governanceInputKind,
+    lineageInputKind,
   ],
 };
 

@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import {
   forgetLogisticsPending,
+  logisticsActorChanged,
   logisticsStorageKey,
   readLogisticsPending,
   refreshFailureClearsView,
@@ -114,4 +115,41 @@ it('같은 내용 비교는 칸 순서와 상관없고 다른 요청 기록은 �
   expect(readLogisticsPending(storage, 'key')).toEqual(request);
   expect(forgetLogisticsPending(storage, 'key', request)).toBe(true);
   expect(removed).toBe(1);
+});
+
+it('T4-95 AC-P2-32 새 기록은 처음 보낸 장수 id를 함께 두고, 장수 id 없는 예전 기록도 그대로 읽는다', () => {
+  let raw = 'null';
+  const storage = {
+    getItem: () => raw,
+    setItem: (_key: string, value: string) => {
+      raw = value;
+    },
+    removeItem: () => {
+      raw = 'null';
+    },
+  };
+  const mine: LogisticsPending = { requestId, generalId: 10, payload: { type: 'upgrade', cityKey: 30 } };
+  writeLogisticsPending(storage, 'key', mine);
+  expect(JSON.parse(raw)).toEqual({ requestId, generalId: 10, payload: { type: 'upgrade', cityKey: 30 } });
+  expect(readLogisticsPending(storage, 'key')).toEqual(mine);
+  // 예전 기록(장수 id 없음)은 읽되 generalId 칸을 만들지 않는다.
+  const legacy = read({ requestId, payload: { type: 'upgrade', cityKey: 30 } });
+  expect(legacy).toEqual({ requestId, payload: { type: 'upgrade', cityKey: 30 } });
+  expect(legacy && Object.hasOwn(legacy, 'generalId')).toBe(false);
+  for (const generalId of [0, -1, 1.5, '10', null, 2_147_483_648])
+    expect(read({ requestId, generalId, payload: { type: 'upgrade', cityKey: 30 } }), String(generalId)).toBeNull();
+
+  // 같은 번호·내용이라도 보낸 장수가 다르면 같은 요청이 아니다. 재접수·지우기 모두 하지 않는다.
+  const moved: LogisticsPending = { ...mine, generalId: 11 };
+  const base = { request: mine, pending: mine, saved: mine, canManage: true, stale: false };
+  expect(requestModeAllowed('resubmit', base)).toBe(true);
+  expect(requestModeAllowed('resubmit', { ...base, request: moved })).toBe(false);
+  expect(requestModeAllowed('resubmit', { ...base, saved: moved })).toBe(false);
+  expect(requestModeAllowed('check', { ...base, request: moved })).toBe(false);
+  expect(forgetLogisticsPending(storage, 'key', moved)).toBe(false);
+  expect(readLogisticsPending(storage, 'key')).toEqual(mine);
+
+  expect(logisticsActorChanged(mine, 11)).toBe(true);
+  expect(logisticsActorChanged(mine, 10)).toBe(false);
+  expect(logisticsActorChanged(legacy!, 11)).toBe(false);
 });

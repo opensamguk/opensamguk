@@ -24,6 +24,8 @@ export interface Pending {
 interface Stored {
   draft: Draft | null;
   pending: Pending | null;
+  // 편집을 시작한 칸 주인 장수(목록의 actorId). 없으면 예전 초안이거나 주인을 모르는 연결이다.
+  actorId?: number | undefined;
 }
 
 export type SaveNotice =
@@ -32,6 +34,7 @@ export type SaveNotice =
   | { kind: 'auth' }
   | { kind: 'error'; message: string }
   | { kind: 'reapplied' }
+  | { kind: 'actor' }
   | null;
 
 // 저장하지 않은 편집은 이 탭의 sessionStorage에 둔다. 새로고침이나 다시 로그인한 뒤에도 이어서 저장할 수 있다.
@@ -95,6 +98,7 @@ export function readStored(storage: Storage | undefined, key: string, slotCount 
         turns: goodDraft.turns.map(toTurn),
       },
       pending: goodPending && { ops: goodPending.ops.map(normalizeOp) },
+      ...(Number.isInteger(parsed.actorId) ? { actorId: parsed.actorId as number } : {}),
     };
   } catch {
     return empty;
@@ -162,6 +166,16 @@ export function useTurnDraft<S extends DisplaySlot>(worldId: string, source: Tur
 
   useLayoutEffect(() => writeStored(sessionStore(), storageKey, stored), [storageKey, stored]);
 
+  // 계승으로 같은 계정의 칸 주인 장수가 바뀌면 예전 장수의 초안·충돌 편집을 새 장수 칸에 남기지 않는다 (T4-95).
+  const actorId = server.data?.actorId;
+  const draftActor = stored.actorId;
+  const actorChanged = actorId !== undefined && draftActor !== undefined && draftActor !== actorId;
+  useLayoutEffect(() => {
+    if (!actorChanged) return;
+    setStored({ draft: null, pending: null });
+    setNotice({ kind: 'actor' });
+  }, [actorChanged]);
+
   const serverTurns = useMemo(() => server.data?.slots.map((slot) => toTurn(slot)) ?? null, [server.data]);
   const turns = pending ? serverTurns : (draft?.turns ?? serverTurns);
 
@@ -173,7 +187,11 @@ export function useTurnDraft<S extends DisplaySlot>(worldId: string, source: Tur
       setStored((prev) => {
         if (prev.pending) return prev;
         const base = prev.draft ?? { baseRevision: data.revision, ops: [], turns: serverTurns };
-        return { draft: { ...base, ops: [...base.ops, op], turns: applyOp(base.turns, op) }, pending: null };
+        return {
+          draft: { ...base, ops: [...base.ops, op], turns: applyOp(base.turns, op) },
+          pending: null,
+          actorId: prev.draft ? prev.actorId : data.actorId,
+        };
       });
     },
     [server.data, serverTurns, source.readOnly],
@@ -191,7 +209,11 @@ export function useTurnDraft<S extends DisplaySlot>(worldId: string, source: Tur
     setStored((prev) => {
       if (!prev.pending) return prev;
       const ops = prev.pending.ops;
-      return { draft: { baseRevision: data.revision, ops, turns: applyOps(serverTurns, ops) }, pending: null };
+      return {
+        draft: { baseRevision: data.revision, ops, turns: applyOps(serverTurns, ops) },
+        pending: null,
+        actorId: prev.actorId,
+      };
     });
     setNotice({ kind: 'reapplied' });
   }, [server.data, serverTurns]);
@@ -205,7 +227,7 @@ export function useTurnDraft<S extends DisplaySlot>(worldId: string, source: Tur
         setStored({ draft: null, pending: null });
         setNotice({ kind: 'saved' });
       } else {
-        setStored((prev) => ({ draft: null, pending: { ops: prev.draft?.ops ?? [] } }));
+        setStored((prev) => ({ draft: null, pending: { ops: prev.draft?.ops ?? [] }, actorId: prev.actorId }));
         setNotice({ kind: 'stale' });
       }
       void queryClient.invalidateQueries({ queryKey: trpc.home.get.queryKey({ worldId }) });

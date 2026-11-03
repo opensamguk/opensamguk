@@ -27,9 +27,12 @@ interface Draft {
   name: string;
   stats: StatValues;
   portraitId: number | null;
+  // 가문 월드에서만 보내는 성별. 기본 선택이 없어 고르기 전에는 ''이다.
+  sex: '' | 'MALE' | 'FEMALE';
 }
 
-const EMPTY_DRAFT: Draft = { name: '', stats: EVEN, portraitId: null };
+const EMPTY_DRAFT: Draft = { name: '', stats: EVEN, portraitId: null, sex: '' };
+const SEX_REQUIRED = '성별을 선택하세요.';
 
 // /w/:worldId/create. 이름·통솔·무력·지력·초상으로 이 월드의 내 장수를 만든다 (AC-M1-06).
 // 월드가 바뀌면 입력과 대기 상태를 처음부터 다시 잡는다.
@@ -107,6 +110,7 @@ function CreateGeneral({ worldId }: { worldId: string }) {
       <CreateForm
         worldId={worldId}
         rules={mine.data.creationRules}
+        lineage={'lineageEnabled' in mine.data.creationRules && mine.data.creationRules.lineageEnabled === true}
         draft={draft}
         onDraft={setDraft}
         rejected={mine.data.creation?.status === 'rejected' ? mine.data.creation.message : null}
@@ -164,6 +168,7 @@ type Created = NonNullable<inferRouterOutputs<AppRouter>['general']['mine']['gen
 function CreateForm({
   worldId,
   rules,
+  lineage,
   draft,
   onDraft,
   rejected,
@@ -174,6 +179,8 @@ function CreateForm({
 }: {
   worldId: string;
   rules: CreationRules;
+  // lineage-v1 월드면 성별을 꼭 고른다. 다른 월드에는 성별 칸이 없고 보내지도 않는다.
+  lineage: boolean;
   draft: Draft;
   onDraft: (update: (prev: Draft) => Draft) => void;
   rejected: string | null;
@@ -185,26 +192,29 @@ function CreateForm({
   const trpc = useTRPC();
   const create = useMutation(trpc.general.create.mutationOptions());
   // 입력은 화면(CreateGeneral)이 갖는다. 기다리는 동안 폼이 사라졌다가 거절로 돌아와도 보낸 값이 남는다.
-  const { name, stats, portraitId } = draft;
+  const { name, stats, portraitId, sex } = draft;
   const setName = (value: string) => onDraft((prev) => ({ ...prev, name: value }));
   const setStats = (update: (prev: StatValues) => StatValues) =>
     onDraft((prev) => ({ ...prev, stats: update(prev.stats) }));
   const setPortraitId = (value: number | null) => onDraft((prev) => ({ ...prev, portraitId: value }));
+  const setSex = (value: 'MALE' | 'FEMALE') => onDraft((prev) => ({ ...prev, sex: value }));
   const [touched, setTouched] = useState(false);
   const check = checkCreation(name, stats, rules);
+  const problems = lineage && sex === '' ? [...check.problems, SEX_REQUIRED] : check.problems;
   const problemsId = useId();
   const nameId = useId();
   const statId = useId();
+  const sexHelpId = useId();
   const summary = summarizeStats(stats, rules);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
     setTouched(true);
-    if (!check.stats || check.problems.length > 0 || create.isPending) return;
+    if (!check.stats || problems.length > 0 || create.isPending) return;
     // 재조회가 생성 응답보다 빨라도 폼의 언마운트로 완료 전환을 잃지 않는다.
     onSubmitting();
     create.mutate(
-      { worldId, name: check.name, ...check.stats, portraitId },
+      { worldId, name: check.name, ...check.stats, portraitId, ...(lineage && sex !== '' ? { sex } : {}) },
       {
         onSuccess: (result) => {
           if (result.status === 'created') onCreated(result.general);
@@ -218,7 +228,7 @@ function CreateForm({
 
   const error = create.error;
   const code = errorCode(error);
-  const reason = check.problems[0] ?? null;
+  const reason = problems[0] ?? null;
 
   return (
     <form className={styles.form} onSubmit={submit} noValidate>
@@ -327,6 +337,37 @@ function CreateForm({
         </p>
       ) : null}
 
+      {lineage ? (
+        <>
+          {/* 초상 첩(.portraits)은 넓은 화면에서 왼쪽 칸 전체를 차지한다. 성별 첩은 같은 틀만 쓰고 오른쪽 칸에 둔다. */}
+          <fieldset className={styles.sexGroup} aria-describedby={sexHelpId}>
+            <legend>성별 (필수)</legend>
+            {(
+              [
+                ['MALE', '남'],
+                ['FEMALE', '여'],
+              ] as const
+            ).map(([value, label]) => (
+              <label key={value} className={styles.sexOption}>
+                <input
+                  type="radio"
+                  name="sex"
+                  value={value}
+                  required
+                  checked={sex === value}
+                  onChange={() => setSex(value)}
+                />
+                <span>{label}</span>
+              </label>
+            ))}
+          </fieldset>
+          <p id={sexHelpId} className={styles.hint}>
+            기본 선택이 없습니다. 이 월드는 가문 규칙을 써서 혼인과 출생이 남·여 짝만 됩니다. 성별은 만든 뒤 바꿀 수
+            없습니다. 「미상」은 출처가 성별을 밝히지 않은 시나리오 인물에게만 붙으며 고를 수 없습니다.
+          </p>
+        </>
+      ) : null}
+
       <fieldset className={styles.portraits}>
         <legend>초상</legend>
         <label className={styles.portraitOption}>
@@ -344,9 +385,9 @@ function CreateForm({
       </fieldset>
 
       <div id={problemsId} className={styles.problems} aria-live="polite">
-        {check.problems.length > 0 ? (
+        {problems.length > 0 ? (
           <ul>
-            {check.problems.map((problem) => (
+            {problems.map((problem) => (
               <li key={problem}>{problem}</li>
             ))}
           </ul>

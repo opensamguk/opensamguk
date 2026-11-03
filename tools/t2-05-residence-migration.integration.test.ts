@@ -116,6 +116,7 @@ async function ownDatabase(
       '20261110000000_world_create_requests',
       '20261111000000_logistics_state',
       '20261112000000_governance_state',
+      '20261113000000_lineage_state',
     ]);
     await run(client, db);
     completed = true;

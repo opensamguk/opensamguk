@@ -8,15 +8,16 @@ export type ResidenceStepInput = Readonly<{
   anchors: ResidenceAnchors;
   tick: number;
   createdHumanId: number | null;
+  succession?: Readonly<{ fromId: number; toId: number }> | undefined;
 }>;
 
 function storedTick(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 && value <= 2_147_483_647;
 }
 
-// 생성과 실제 도시 이동만 기록한다. 입력의 tick 순서로 기존 앵커를 보정하지 않는다.
+// 생성·실제 도시 이동·검증한 사람 계승만 기록한다. tick 순서로 기존 앵커를 보정하지 않는다.
 export function updateResidenceAnchors(input: ResidenceStepInput): Record<number, number> {
-  const { before, after, anchors, tick, createdHumanId } = input;
+  const { before, after, anchors, tick, createdHumanId, succession } = input;
   if (!storedTick(tick)) throw new PersonnelInvariantError('물리 거주 앵커의 처리 tick이 잘못됐습니다.');
   const peopleBefore = Object.values(before.generals).filter((general) => general.userId !== null);
   if (Object.keys(anchors).length !== peopleBefore.length)
@@ -41,6 +42,28 @@ export function updateResidenceAnchors(input: ResidenceStepInput): Record<number
     throw new PersonnelInvariantError('실제 생성한 사람 장수의 출처가 잘못됐습니다.');
 
   const next: Record<number, number> = {};
+  if (succession) {
+    const { fromId, toId } = succession;
+    const source = before.generals[fromId],
+      target = before.generals[toId];
+    const record = after.lineage?.persons[String(fromId)];
+    if (
+      !after.ruleFeatures?.includes('lineage-v1') ||
+      createdHumanId !== null ||
+      !Number.isSafeInteger(fromId) ||
+      !Number.isSafeInteger(toId) ||
+      fromId < 1 ||
+      toId < 1 ||
+      fromId === toId ||
+      !source?.userId ||
+      target?.userId !== null ||
+      after.generals[fromId]?.userId !== null ||
+      after.generals[toId]?.userId !== source.userId ||
+      record?.exit?.cause !== 'SUCCEEDED' ||
+      record.successorId !== toId
+    )
+      throw new PersonnelInvariantError('사람 계승의 거주 앵커 출처가 잘못됐습니다.');
+  }
   const people = Object.values(after.generals)
     .filter((general) => general.userId !== null)
     .sort((a, b) => a.id - b.id);
@@ -49,6 +72,10 @@ export function updateResidenceAnchors(input: ResidenceStepInput): Record<number
     if (!previous) {
       if (general.id !== createdHumanId)
         throw new PersonnelInvariantError('생성 출처가 없는 사람 장수의 앵커를 만들 수 없습니다.');
+      next[general.id] = tick;
+      continue;
+    }
+    if (previous.userId === null && general.id === succession?.toId) {
       next[general.id] = tick;
       continue;
     }

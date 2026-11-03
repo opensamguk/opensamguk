@@ -432,6 +432,9 @@ function Editor<S extends DisplaySlot>({
         {state.saving ? '저장하는 중…' : null}
         {notice?.kind === 'saved' ? '저장했습니다.' : null}
         {notice?.kind === 'reapplied' ? '최신 목록에 내 편집을 다시 적용했습니다. 확인한 뒤 저장하세요.' : null}
+        {notice?.kind === 'actor'
+          ? '장수가 바뀌어 이전 장수의 저장하지 않은 편집을 버렸습니다. 지금 장수의 예턴을 확인하세요.'
+          : null}
         {state.behind && !pending
           ? '다른 곳에서 예턴이 바뀌었습니다(다른 탭 저장이나 턴 실행). 저장하면 최신 목록에 다시 적용할지 묻습니다.'
           : null}

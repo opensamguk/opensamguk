@@ -63,9 +63,10 @@ type Confirm = {
   ok: string;
   danger: boolean;
   lines: string[];
-  // 연 계정·세션. 보기가 지워지거나 계정이 바뀌면 이 대화상자는 다시 보이지도, 보내지지도 않는다.
+  // 연 계정·세션·장수. 보기가 지워지거나 계정·장수가 바뀌면 이 대화상자는 다시 보이지도, 보내지지도 않는다.
   userId: string;
   session: number;
+  generalId: number | null;
 };
 
 const TABS = [
@@ -96,7 +97,11 @@ function GovernanceBoardView({ worldId }: { worldId: string }) {
   const [tab, setTab] = useState<Tab>('crown');
   const opener = useRef<HTMLElement | null>(null);
   const { view: state, notice } = board;
-  const live = confirm && confirm.userId === state?.userId && confirm.session === board.session ? confirm : null;
+  const viewer = state?.board.view.enabled ? state.board.view.viewerGeneralId : null;
+  const live =
+    confirm && confirm.userId === state?.userId && confirm.session === board.session && confirm.generalId === viewer
+      ? confirm
+      : null;
   useEffect(() => {
     if (!confirm || live) return;
     // 무효가 된 대화상자는 버린다. 초점이 사라진 대화상자에 남지 않게 제목으로 옮긴다.
@@ -126,6 +131,7 @@ function GovernanceBoardView({ worldId }: { worldId: string }) {
       ...confirmText(view, payload, cityName),
       userId: state.userId,
       session: board.session,
+      generalId: view.viewerGeneralId,
     });
   };
   const close = (send: boolean) => {
@@ -189,20 +195,33 @@ function GovernanceBoardView({ worldId }: { worldId: string }) {
                 <strong>요청 처리 대기</strong> · {describeAction(view, state.pending.payload)}
               </p>
               <p className={styles.note}>
-                {board.unconfirmed
-                  ? '이 요청의 접수 기록을 아직 찾지 못했습니다. 보내던 요청이 늦게 접수될 수도 있습니다. 같은 요청을 그대로 다시 접수하면 서버가 같은 번호로 한 번만 받습니다. 결과를 받기 전에는 새 요청을 만들지 않습니다.'
-                  : '접수한 요청을 처리하고 있습니다. 결과가 나올 때까지 다른 황실 요청은 기다려 주세요.'}
+                {!board.unconfirmed
+                  ? '접수한 요청을 처리하고 있습니다. 결과가 나올 때까지 다른 황실 요청은 기다려 주세요.'
+                  : board.oldActor
+                    ? '이 요청의 접수 기록을 찾지 못했습니다. 장수가 이미 바뀌어, 이전 장수 명의 요청은 서버가 거부하므로 앞으로도 처리되지 않습니다. 기록 지우기를 누르면 지금 장수와 접수 기록을 한 번 더 확인한 뒤 이 탭의 기록만 지웁니다. 다시 보내지 않습니다.'
+                    : '이 요청의 접수 기록을 아직 찾지 못했습니다. 보내던 요청이 늦게 접수될 수도 있습니다. 같은 요청을 그대로 다시 접수하면 서버가 같은 번호로 한 번만 받습니다. 결과를 받기 전에는 새 요청을 만들지 않습니다.'}
               </p>
-              {board.unconfirmed && !board.canSubmit ? (
+              {board.oldActor && state.pending.generalId !== undefined ? (
+                <p className={styles.note}>
+                  이 요청은 이전 장수({generalName(view, state.pending.generalId)}) 명의로 보냈습니다. 같은 번호로
+                  결과만 확인합니다.
+                </p>
+              ) : null}
+              {board.unconfirmed && !board.oldActor && !board.canSubmit ? (
                 <p className={styles.note}>지금은 다시 접수할 수 없어 같은 요청의 상태만 확인할 수 있습니다.</p>
               ) : null}
               <div className={styles.row}>
                 <button type="button" className={styles.secondary} disabled={board.busy} onClick={board.recheck}>
                   같은 요청 상태 확인
                 </button>
-                {board.unconfirmed && board.canSubmit ? (
+                {board.unconfirmed && !board.oldActor && board.canSubmit ? (
                   <button type="button" className={styles.secondary} disabled={board.busy} onClick={board.resubmit}>
                     같은 요청 다시 접수
+                  </button>
+                ) : null}
+                {board.unconfirmed && board.oldActor ? (
+                  <button type="button" className={styles.secondary} disabled={board.busy} onClick={board.forgetOld}>
+                    이전 장수 요청 기록 지우기
                   </button>
                 ) : null}
               </div>
@@ -1189,7 +1208,7 @@ function confirmText(
   view: GovernanceView,
   payload: GovernanceInput,
   cityName: (key: number) => string,
-): Omit<Confirm, 'payload' | 'userId' | 'session'> {
+): Omit<Confirm, 'payload' | 'userId' | 'session' | 'generalId'> {
   const seat = cityName(view.seat.cityKey);
   const vassal = (id: number) => view.vassals.find((row) => row.id === id);
   const pair = (upper: number, lower: number) => `상위 ${nationName(view, upper)} · 하위 ${nationName(view, lower)}`;

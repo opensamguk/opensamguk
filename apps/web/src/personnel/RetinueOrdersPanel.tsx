@@ -15,6 +15,8 @@ type Payload = inferRouterInputs<AppRouter>['campaign']['order']['payload'];
 type Json = Extract<Payload, { type: 'issue' }>['command']['args'];
 type Pending = { requestId: string; payload: Payload };
 const accountChanged = '로그인한 계정이 바뀌었습니다. 화면을 다시 확인하세요.';
+// 가문 계승(T4-95)은 같은 계정의 장수만 바꾼다. 단추를 그린 화면의 장수와 다시 읽은 장수가 다르면 보내지 않는다.
+const generalChanged = '장수가 바뀌었습니다. 화면을 다시 확인하세요.';
 const labels = {
   PENDING: '응답 대기',
   READY: '다음 차례 실행 대기',
@@ -110,6 +112,12 @@ function OrdersBoard({ worldId, userId, accountNotice }: { worldId: string; user
   useEffect(() => {
     setConsent({});
   }, [board.data?.next.turnRevision]);
+  // 장수가 바뀌면 고르던 받을 장수·지시·동의를 버린다.
+  useEffect(() => {
+    setConsent({});
+    setRecipientId(0);
+    setCommand(null);
+  }, [board.data?.actorId]);
   const commands = useQuery(trpc.commands.list.queryOptions({ worldId }));
   const map = useQuery(trpc.world.map.queryOptions({ worldId }));
   const summary = useQuery(trpc.world.summary.queryOptions({ worldId }));
@@ -140,6 +148,7 @@ function OrdersBoard({ worldId, userId, accountNotice }: { worldId: string; user
 
   async function submit(make: (latest: Board) => Payload, retry?: Pending) {
     if (busy.current || (!retry && pending)) return;
+    const opened = board.data?.actorId;
     busy.current = true;
     setPreparing(true);
     setNotice('');
@@ -152,6 +161,8 @@ function OrdersBoard({ worldId, userId, accountNotice }: { worldId: string; user
       if (!alive.current) return;
       if (latest.userId !== userId) throw new Error(accountChanged);
       if (client.getQueryData(trpc.auth.me.queryKey())?.user?.id !== userId) throw new Error(accountChanged);
+      // 같은 요청 재접수는 처음 장수 명의 그대로 서버가 판정하므로 새 요청에만 건다.
+      if (!retry && latest.actorId !== opened) throw new Error(generalChanged);
       if (latest.status !== 'RUNNING') throw new Error('실행 중인 월드에서만 지시할 수 있습니다.');
       action = retry ?? { requestId: crypto.randomUUID(), payload: make(latest) };
       remember(storageKey, action);

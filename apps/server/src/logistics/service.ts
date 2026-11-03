@@ -97,6 +97,8 @@ export async function submitLogisticsRequest(store: LogisticsStore, identity: Lo
     if (!snapshot.state?.logistics) throw new Error('물류 판정 상태가 없습니다.');
     const actor = Object.values(snapshot.state.generals).find((general) => general.userId === identity.userId);
     if (!actor) fail('NOT_FOUND', '장수가 없습니다.');
+    if (input.expectedGeneralId !== undefined && actor.id !== input.expectedGeneralId)
+      fail('CONFLICT', '조작 장수가 바뀌었습니다. 화면을 다시 불러오세요.');
     const outcome = applyLogisticsInput(snapshot.state, input.payload, actor.id, {
       tick: world.clockTick,
       userId: identity.userId,
@@ -123,7 +125,7 @@ export async function readLogisticsBoard(store: LogisticsStore, identity: Logist
   const city = state.cities[input.cityKey];
   if (!city) fail('NOT_FOUND', '거점이 없습니다.');
   const own = actor.nationId !== null && actor.nationId === city.nationId;
-  const base = { userId: identity.userId, cityKey: input.cityKey };
+  const base = { userId: identity.userId, actorId: actor.id, cityKey: input.cityKey };
   if (!own && actor.cityKey !== city.cityKey) return { ...base, visible: false as const };
   const specialty = state.logistics.config.specialties.find((row) => row.cityKey === city.cityKey) ?? null;
   if (!own) return { ...base, visible: true as const, own: false as const, specialty };

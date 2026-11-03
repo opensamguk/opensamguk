@@ -27,11 +27,16 @@ import {
   emptyCityResourcesState,
   initialLogisticsState,
   initialGovernanceState,
+  initialLineageState,
+  storedGeneralSex,
+  applySexLedger,
+  assertGeneralSex,
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { loadCommandState } from '../commandPersistence';
 import { engineResolver, loadExt } from '../extState';
 import { storedGeneralStats } from '../generalStats';
+import { loadSexLedger } from './resources';
 
 export type InitialWorldOptions = {
   name: string;
@@ -136,6 +141,8 @@ export function prepareInitialWorld(state: WorldInit, suppliedOptions: InitialWo
     ...(preset ? { presetRules: presetRules(preset) } : {}),
     ...(features.length ? { ruleFeatures: features } : {}),
   };
+  if (features.includes('lineage-v1')) initial.generals = applySexLedger(initial, loadSexLedger());
+  else for (const general of initial.generals) assertGeneralSex(general, false);
   const stateHash = hashState(initial);
   checkStatProfile(initial);
   checkOperationalProfile(initial);
@@ -273,6 +280,15 @@ export function prepareInitialWorld(state: WorldInit, suppliedOptions: InitialWo
               ) as Prisma.InputJsonValue,
             }
           : {}),
+        ...(features.includes('lineage-v1')
+          ? {
+              lineageState: initialLineageState(
+                featureData?.['lineage-v1'],
+                toWorldState(creationState),
+                creationState.seed,
+              ) as Prisma.InputJsonValue,
+            }
+          : {}),
         ...(creationState.operationalMap
           ? { operationalMap: creationState.operationalMap as Prisma.InputJsonValue }
           : {}),
@@ -388,7 +404,10 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
           void turnRevision;
           void battleWins;
           void captures;
-          return storedGeneralStats(stripWorldId(general), world.ruleFeatures?.includes('five-stats') ?? false);
+          return storedGeneralStats(
+            storedGeneralSex(stripWorldId(general), world.ruleFeatures.includes('lineage-v1')),
+            world.ruleFeatures?.includes('five-stats') ?? false,
+          );
         }),
         diplomacies: diplomacies.map(stripWorldId),
         ...(await loadCommandState(tx, worldId)),

@@ -32,7 +32,7 @@ function increment(value: number): number {
 
 // before는 step 시작 상태다. 다음 step의 재검사는 직전 결과를 before와 after에 넣는다.
 export function syncOffices(
-  before: Pick<WorldView, 'nations' | 'generals'>,
+  before: Pick<WorldView, 'nations' | 'generals' | 'ruleFeatures'>,
   after: OfficeView,
   offices: DeepReadonly<OfficeRevisions>,
 ): { state: OfficeState; offices: OfficeRevisions } {
@@ -54,7 +54,12 @@ export function syncOffices(
       ...Object.keys(current[nationId] ?? {}).map(Number),
     ]);
     for (const level of levels) {
-      if (previous[nationId]?.[level] === current[nationId]?.[level]) continue;
+      const id = current[nationId]?.[level];
+      const controllerChanged =
+        after.ruleFeatures?.includes('lineage-v1') &&
+        id !== undefined &&
+        before.generals[id]?.userId !== after.generals[id]?.userId;
+      if (previous[nationId]?.[level] === id && !controllerChanged) continue;
       const old = revisions[nationId]?.[level] ?? { revision: 0, tenure: 0 };
       const updated = { revision: increment(old.revision), tenure: increment(old.tenure) };
       (revisions[nationId] ??= {})[level] = updated;

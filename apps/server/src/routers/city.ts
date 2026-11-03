@@ -3,6 +3,7 @@ import { protectedProcedure, router } from '../trpc';
 import { entityKey, readWorld, viewerGeneral, worldInput } from '../queries';
 import { cityInfo, garrisonGeneralInfo } from '../visibility';
 import { readView } from '../game/queries';
+import { LINEAGE_EXITED_YEAR } from '@opensamguk/rules';
 
 export const cityRouter = router({
   get: protectedProcedure.input(worldInput.extend({ cityKey: entityKey }).strict()).query(({ ctx, input }) =>
@@ -11,7 +12,7 @@ export const cityRouter = router({
       const city = await tx.city.findUnique({ where: { worldId_cityKey: input } });
       if (!city) throw new TRPCError({ code: 'NOT_FOUND', message: '도시를 찾을 수 없습니다.' });
       const generals = await tx.general.findMany({
-        where: { worldId: input.worldId, cityKey: input.cityKey },
+        where: { worldId: input.worldId, cityKey: input.cityKey, activeFromYear: { not: LINEAGE_EXITED_YEAR } },
         orderBy: { id: 'asc' },
       });
       const units = world.ruleFeatures.includes('campaign-v1')

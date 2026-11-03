@@ -19,6 +19,8 @@ import {
   readLogisticsOriginConfig,
   readLogisticsState,
   readStoredGovernance,
+  storedGeneralSex,
+  readStoredLineage,
 } from '@opensamguk/rules';
 import { z } from 'zod';
 import { worldResolver } from './resolver';
@@ -95,7 +97,7 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
       readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin),
     ),
     nations,
-    generals,
+    generals: generals.map((general) => storedGeneralSex(general, world.ruleFeatures.includes('lineage-v1'))),
     diplomacies,
     ...(world.commandMeta ? { commandMeta: world.commandMeta } : {}),
   } as unknown as WorldInit);
@@ -129,5 +131,7 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
   } else if (world.logisticsState != null) throw new Error('물류 기능을 끈 월드에 저장 상태가 있습니다.');
   const governance = readStoredGovernance(world, state);
   if (governance) state.governance = governance;
+  const lineage = readStoredLineage(world, state);
+  if (lineage) state.lineage = lineage;
   return { ...state, ...(treaties ? { treaties } : {}) };
 }

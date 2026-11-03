@@ -4,6 +4,8 @@ import {
   readOperationalMap,
   attachOperationalKinds,
   readStoredGovernance,
+  storedGeneralSex,
+  readStoredLineage,
   type WorldState,
 } from '@opensamguk/rules';
 import { engineFeatures } from './features';
@@ -78,7 +80,10 @@ export async function loadWorldAfterCapabilityCheck(
         void captures;
         return [
           general.id,
-          storedGeneralStats(stripWorldId(general), world.ruleFeatures?.includes('five-stats') ?? false),
+          storedGeneralStats(
+            storedGeneralSex(stripWorldId(general), world.ruleFeatures.includes('lineage-v1')),
+            world.ruleFeatures?.includes('five-stats') ?? false,
+          ),
         ];
       }),
     ),
@@ -100,6 +105,8 @@ export async function loadWorldAfterCapabilityCheck(
   if (logistics) state.logistics = logistics;
   const governance = readStoredGovernance(world, state);
   if (governance) state.governance = governance;
+  const lineage = readStoredLineage(world, state);
+  if (lineage) state.lineage = lineage;
   for (const feature of engineFeatures
     .filter((feature) => world.ruleFeatures?.includes(feature.key))
     .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)))

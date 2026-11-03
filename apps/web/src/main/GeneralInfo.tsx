@@ -1,6 +1,8 @@
 import { Link } from '@tanstack/react-router';
 import { officerName } from '../game/names';
-import type { Home, MapNation } from '../game/types';
+import { useWorldSummary } from '../game/queries';
+import type { Home, MapNation, WorldSummary } from '../game/types';
+import { LineagePanel } from '../lineage/LineagePanel';
 import { Portrait } from '../portrait/Portrait';
 import { NationBadge } from '../ui/NationBadge';
 import { Tag } from '../ui/Tag';
@@ -14,6 +16,17 @@ export function formatClock(iso: string | null): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '—';
   return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+}
+
+// 보이는 나이. lineage-v1 월드는 가문 칸과 같게 월드 요약의 현재 게임 연도에서 출생 연도를 뺀다.
+// 저장 나이(age)는 1월 월말 정산에서야 오르므로 해가 바뀐 1월에 가문 칸보다 한 살 적게 보인다. 저장값·규칙은 바꾸지 않는다.
+// 기능이 꺼진 월드나 요약을 아직 받지 못했으면 저장 나이를 그대로 쓴다.
+export function displayedAge(
+  general: Pick<Home['general'], 'age' | 'birthYear'>,
+  summary: WorldSummary | undefined,
+): number {
+  if (summary === undefined || !('lineageEnabled' in summary) || summary.lineageEnabled !== true) return general.age;
+  return Math.max(0, summary.gameDate.year - general.birthYear);
 }
 
 // 장수 정보. 원작 GeneralBasicCard의 초상·이름·소속·능력치·자원 칸을 한 카드에 둔다.
@@ -33,6 +46,7 @@ export function GeneralInfo({
   campaignEnabled?: boolean;
 }) {
   const g = home.general;
+  const summary = useWorldSummary(worldId).data;
   return (
     <div className={styles.general} data-general-id={g.id}>
       <div className={styles.head}>
@@ -66,7 +80,7 @@ export function GeneralInfo({
                 { label: '매력', value: n(g.charm) },
               ]
             : []),
-          { label: '나이', value: `${g.age}세` },
+          { label: '나이', value: `${displayedAge(g, summary)}세` },
           { label: '금', value: n(g.gold) },
           { label: '쌀', value: n(g.rice) },
           ...(campaignEnabled
@@ -82,6 +96,8 @@ export function GeneralInfo({
           { label: '기본 방침', value: g.policy.name },
         ]}
       />
+      {/* 가문 칸(T4-95)은 lineage-v1 월드에서만 그린다. 계승으로 장수가 바뀌어도 대기 요청을 이어 보도록 장수 id로 다시 만들지 않는다. */}
+      <LineagePanel worldId={worldId} />
     </div>
   );
 }

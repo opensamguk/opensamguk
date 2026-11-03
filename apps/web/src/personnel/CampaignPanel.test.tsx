@@ -266,6 +266,22 @@ describe('명시적인 새 휘하 제안 준비', () => {
     },
   );
 
+  it('T4-95 AC-P2-32 편성 같은 즉시 요청도 보내기 전에 다시 읽고, 같은 계정의 장수가 바뀌었으면 보내지 않는다', async () => {
+    const view = mount((read) => (read === 1 ? base : { ...base, actorId: 99 }));
+    fireEvent.click(await screen.findByRole('button', { name: '빈 부곡 편성' }));
+    await screen.findByText(/바뀌었습니다/);
+    expect(view.reads()).toBeGreaterThanOrEqual(2);
+    expect(view.mutations).toHaveLength(0);
+    expect(sessionStorage.getItem(`campaign.pending:${userId}:${worldId}`)).toBeNull();
+  });
+
+  it('T4-95 AC-P2-32 다시 읽은 장수가 같으면 즉시 요청을 한 번만 보낸다', async () => {
+    const view = mount(() => base);
+    fireEvent.click(await screen.findByRole('button', { name: '빈 부곡 편성' }));
+    await waitFor(() => expect(view.mutations).toHaveLength(1));
+    expect(view.mutations[0]).toMatchObject({ path: 'campaign.unit', input: { payload: { type: 'form' } } });
+  });
+
   it('최신 조회가 실패하면 남아 있는 과거 data로 보내지 않는다', async () => {
     const view = mount((read) => {
       if (read === 1) return base;

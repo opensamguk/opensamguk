@@ -12,6 +12,7 @@ export default defineConfig({
     't4-97-game-ui.spec.ts',
     't4-93-logistics.spec.ts',
     't4-94-governance.spec.ts',
+    't4-95-lineage.spec.ts',
   ],
   testIgnore: [],
   forbidOnly: true,

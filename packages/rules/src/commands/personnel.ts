@@ -1,6 +1,7 @@
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { z } from 'zod';
 import { BALANCE } from '../balance';
+import { LINEAGE_EXITED_YEAR } from '../lineage/config';
 import { refreshSupply } from '../supply';
 import { commandMeta, defineCommand, fail, noArgs, positive, ruler, success } from './support';
 
@@ -109,7 +110,9 @@ export const personnelCommands = [
       const failure = ruler(view, actor);
       if (failure) return failure;
       const target = view.generals[args.generalId];
-      return target?.nationId === null ? null : fail('BAD_TARGET', '재야 장수만 등용할 수 있습니다.');
+      return target?.nationId === null && target.activeFromYear !== LINEAGE_EXITED_YEAR
+        ? null
+        : fail('BAD_TARGET', '재야 장수만 등용할 수 있습니다.');
     },
     change(state, actor, args) {
       const nationId = state.generals[actor.generalId]!.nationId!;

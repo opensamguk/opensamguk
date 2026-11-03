@@ -6,6 +6,7 @@ export const logisticsRequestInput = logisticsWorldInput.extend({ requestId: z.u
 export const logisticsBoardInput = logisticsWorldInput.extend({ cityKey: z.number().int().min(1).max(2_147_483_647) });
 export const logisticsSubmitInput = logisticsRequestInput.extend({
   expectedUserId: z.uuid(),
+  expectedGeneralId: z.number().int().min(1).max(2_147_483_647).optional(),
   payload: logisticsInputSchema,
 });
 export type LogisticsSubmitInput = z.infer<typeof logisticsSubmitInput>;

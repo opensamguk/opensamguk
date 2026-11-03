@@ -21,6 +21,8 @@ export type PersonalSlot = inferRouterOutputs<AppRouter>['turns']['get']['slots'
 export interface TurnList<S extends DisplaySlot = DisplaySlot> {
   revision: number;
   slots: S[];
+  // 칸 주인 장수(서버 actorId). 계승으로 바뀌면 편집기가 예전 장수의 초안을 버린다 (T4-95).
+  actorId?: number | undefined;
 }
 
 export type SaveSlots = Array<{ commandKey: string; args: Record<string, unknown> } | null>;
@@ -87,7 +89,9 @@ export const personalSource: TurnSourceFactory<PersonalSlot> = ({ trpc, userId, 
       queryFn: get.queryFn as QueryFunction<unknown>,
       select: (data) => data as TurnList<PersonalSlot>,
     },
-    writeList: (queryClient, list) => queryClient.setQueryData(get.queryKey, list),
+    // 조회 값의 actorId는 그대로 두고 저장 결과의 revision·칸만 바꾼다.
+    writeList: (queryClient, list) =>
+      queryClient.setQueryData(get.queryKey, (old) => old && { ...old, revision: list.revision, slots: list.slots }),
     save: ({ revision, slots }) => trpcClient.turns.set.mutate({ worldId, revision, slots }),
     commands: {
       queryKey: commands.queryKey,

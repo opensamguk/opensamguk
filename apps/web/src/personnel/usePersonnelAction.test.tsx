@@ -219,6 +219,48 @@ describe('인사 전송과 서버 접수', () => {
   });
 });
 
+describe('보내기 직전 장수 확인 (T4-95)', () => {
+  const sendWith = async (hook: ReturnType<typeof setup>, guard: () => Promise<string | null>) => {
+    await act(async () => {
+      void hook.result.current.submit(accept, 'accept', guard);
+    });
+    await tick();
+  };
+
+  it('다시 읽은 장수·제안이 바뀌었으면 보내지 않고 잠금을 풀며 그 이유를 보인다', async () => {
+    const actRequest = vi.fn<PersonnelApi['act']>();
+    const hook = setup({ act: actRequest });
+    await tick();
+    await sendWith(hook, async () => '장수가 바뀌었습니다.');
+    expect(actRequest).not.toHaveBeenCalled();
+    expect(hook.result.current.busy).toBe(false);
+    expect(hook.result.current.notices).toEqual([{ tone: 'error', text: '장수가 바뀌었습니다.' }]);
+  });
+
+  it('다시 읽기에 실패해도 보내지 않는다', async () => {
+    const actRequest = vi.fn<PersonnelApi['act']>();
+    const hook = setup({ act: actRequest });
+    await tick();
+    await sendWith(hook, async () => {
+      throw network();
+    });
+    expect(actRequest).not.toHaveBeenCalled();
+    expect(hook.result.current.busy).toBe(false);
+    expect(hook.result.current.notices).toEqual([
+      { tone: 'error', text: '지금 장수를 확인하지 못했습니다. 요청을 보내지 않았습니다.' },
+    ]);
+  });
+
+  it('같은 장수면 그대로 한 번 보낸다', async () => {
+    const actRequest = vi.fn<PersonnelApi['act']>().mockImplementation(async ({ requestId }) => pending(requestId));
+    const hook = setup({ act: actRequest });
+    await tick();
+    await sendWith(hook, async () => null);
+    expect(actRequest).toHaveBeenCalledTimes(1);
+    expect(actRequest.mock.calls[0]![0].action).toEqual(accept);
+  });
+});
+
 describe('인사 재마운트와 권한 격리', () => {
   it('접수 확인 뒤 빠르게 재마운트해도 fresh recent로 대기를 잇고 완료는 다시 안내하지 않는다', async () => {
     const mutation = deferred<RequestState<PersonnelResult>>();

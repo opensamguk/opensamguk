@@ -5,7 +5,15 @@ import { z } from 'zod';
 
 type General = Omit<
   Prisma.GeneralGetPayload<true>,
-  'battleWins' | 'captures' | 'noticeSeen' | 'defaultPolicy' | 'lastActiveTick' | 'lastActiveAt' | 'politics' | 'charm'
+  | 'battleWins'
+  | 'captures'
+  | 'noticeSeen'
+  | 'defaultPolicy'
+  | 'lastActiveTick'
+  | 'lastActiveAt'
+  | 'politics'
+  | 'charm'
+  | 'sex'
 > & { politics?: number | null; charm?: number | null };
 type City = Omit<Prisma.CityGetPayload<true>, 'kind'> & { kind?: string | null };
 type Nation = Omit<Prisma.NationGetPayload<true>, 'notice' | 'noticeRevision' | 'noticeUpdatedAt' | 'noticeUpdatedBy'>;

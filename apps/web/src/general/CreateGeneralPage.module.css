@@ -84,7 +84,8 @@
 
 /* 첩: 먹 테두리, 금니 실선, 계단 그림자. 제목은 주칠 현판. */
 .stats,
-.portraits {
+.portraits,
+.sexGroup {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
@@ -99,7 +100,8 @@
 }
 
 .stats legend,
-.portraits legend {
+.portraits legend,
+.sexGroup legend {
   padding: 6px 12px 5px;
   font-family: var(--font-title);
   font-size: var(--title-sm);
@@ -185,6 +187,38 @@
 .portraitOption:has(input:checked) {
   outline: 3px solid var(--color-accent);
   outline-offset: -1px;
+}
+
+/* 성별 고르기(가문 월드). 초상 칸과 같은 첩 틀에 44px 이상의 선택 칸을 둔다.
+   .portraits를 같이 쓰면 넓은 화면에서 초상 첩과 같은 왼쪽 칸에 겹쳐 선택 칸이 가려지므로 따로 이름을 둔다. */
+.sexGroup {
+  align-items: center;
+}
+
+.sexOption {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 88px;
+  min-height: 44px;
+  padding: var(--space-1) var(--space-3);
+  border: var(--frame);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.sexOption input {
+  min-width: 20px;
+  min-height: 20px;
+  margin: 0;
+  accent-color: var(--color-accent);
+}
+
+.sexOption:has(input:checked) {
+  outline: 3px solid var(--color-accent);
+  outline-offset: -1px;
+  font-weight: 600;
 }
 
 .summary {

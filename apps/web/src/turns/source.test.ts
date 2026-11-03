@@ -28,6 +28,7 @@ const fill = (count: number) => Array.from({ length: count }, emptySlot);
 
 // 0번 직접 이동, 1번 빈칸, 2번 직접 휴식, 나머지 빈칸.
 const read = getOutput({
+  actorId: 7,
   revision: 4,
   slots: [
     { commandKey: 'move', args: { cityKey: 3 }, name: '이동', explicit: true },
@@ -53,7 +54,9 @@ function setup() {
   const trpc = createTRPCOptionsProxy<AppRouter>({ client, queryClient });
   const source = personalSource({ trpc, userId: 'u1', worldId: 'w1' });
   const cached = () => source.list.select(queryClient.getQueryData(source.list.queryKey));
-  return { queryClient, source, cached };
+  // 편집기는 조회를 받은 뒤에만 저장하므로 저장 결과를 쓰기 전에 캐시를 채운다.
+  const prime = () => queryClient.fetchQuery({ queryKey: source.list.queryKey, queryFn: source.list.queryFn });
+  return { queryClient, source, cached, prime };
 }
 
 beforeEach(() => setMutate.mockReset());
@@ -92,8 +95,9 @@ describe('개인 예턴 연결', () => {
     expect(JSON.stringify(sent.slots)).not.toMatch(/name|explicit/);
   });
 
-  it('저장 성공 결과를 캐시에 넣어도 칸 정보가 그대로다', async () => {
-    const { queryClient, source, cached } = setup();
+  it('저장 성공 결과를 캐시에 넣어도 칸 정보와 칸 주인 장수가 그대로다', async () => {
+    const { queryClient, source, cached, prime } = setup();
+    await prime();
     const saved = setOutput({
       ok: true,
       revision: 5,
@@ -109,7 +113,7 @@ describe('개인 예턴 연결', () => {
     const result = await source.save({ revision: 4, slots: toSaveSlots(read.slots.map(toTurn)) });
     // useTurnDraft의 저장 onSuccess와 같은 쓰기다.
     source.writeList(queryClient, { revision: result.revision, slots: result.slots });
-    expect(cached()).toEqual({ revision: 5, slots: saved.slots });
+    expect(cached()).toEqual({ actorId: 7, revision: 5, slots: saved.slots });
     expect(cached().slots.slice(0, 4).map(toTurn)).toEqual([
       { commandKey: 'rest', args: {}, explicit: false },
       { commandKey: 'move', args: { cityKey: 3 }, explicit: true },
@@ -119,7 +123,8 @@ describe('개인 예턴 연결', () => {
   });
 
   it('STALE로 받은 최신 칸을 캐시에 넣어도 빈칸과 직접 휴식이 그대로다', async () => {
-    const { queryClient, source, cached } = setup();
+    const { queryClient, source, cached, prime } = setup();
+    await prime();
     const stale = setOutput({
       ok: false,
       reason: 'STALE',
@@ -135,7 +140,7 @@ describe('개인 예턴 연결', () => {
     const result = await source.save({ revision: 4, slots: toSaveSlots(read.slots.map(toTurn)) });
     expect(result.ok).toBe(false);
     source.writeList(queryClient, { revision: result.revision, slots: result.slots });
-    expect(cached()).toEqual({ revision: 7, slots: stale.slots });
+    expect(cached()).toEqual({ actorId: 7, revision: 7, slots: stale.slots });
     expect(toSaveSlots(cached().slots.map(toTurn)).slice(0, 4)).toEqual([
       { commandKey: 'rest', args: {} },
       null,

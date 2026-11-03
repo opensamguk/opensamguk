@@ -202,7 +202,8 @@ function ResourceBoard({ worldId, cityKey }: { worldId: string; cityKey: number 
     return () => clearInterval(timer);
   }, [view, busy, snapshot]);
 
-  async function act(request: AllocationRequest, submit: boolean) {
+  // actorId: 새 배속이면 양식을 그린 화면의 장수. 다시 읽은 장수가 다르면(계승) 보내지 않는다.
+  async function act(request: AllocationRequest, submit: boolean, actorId?: number) {
     if (!view || sending.current || (submit && Date.now() < retryDeadline.current)) return;
     sending.current = true;
     const run = begin();
@@ -216,6 +217,8 @@ function ResourceBoard({ worldId, cityKey }: { worldId: string; cityKey: number 
       if (!run.current()) return;
       setView({ ...fresh, pending: current.pending });
       if (submit) {
+        if (fresh.board.actorId !== actorId)
+          throw new IdentityChanged('장수가 바뀌었습니다. 배속을 보내지 않았습니다. 화면을 다시 확인하세요.');
         if (
           !fresh.board.visible ||
           !fresh.board.canAllocate ||
@@ -305,10 +308,10 @@ function ResourceBoard({ worldId, cityKey }: { worldId: string; cityKey: number 
             </>
           ) : view.board.canAllocate ? (
             <AllocationForm
-              key={`${view.userId}:${cityKey}`}
+              key={`${view.userId}:${view.board.actorId}:${cityKey}`}
               board={view.board}
               busy={busy}
-              allocate={(payload) => void act({ requestId: crypto.randomUUID(), payload }, true)}
+              allocate={(payload) => void act({ requestId: crypto.randomUUID(), payload }, true, view.board.actorId)}
             />
           ) : (
             <p className={styles.note}>자국 도시의 병력 배속은 군주·참모·수뇌가 맡습니다.</p>

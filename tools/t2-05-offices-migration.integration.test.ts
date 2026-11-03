@@ -213,11 +213,11 @@ async function existingRows(client: PgClient) {
   ]) {
     const data =
       table === 'World'
-        ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures' - 'operationalMap' - 'campaignState' - 'cityResourcesState' - 'logisticsState' - 'governanceState'"
+        ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures' - 'operationalMap' - 'campaignState' - 'cityResourcesState' - 'logisticsState' - 'governanceState' - 'lineageState'"
         : table === 'City'
           ? "to_jsonb(t) - 'kind'"
           : table === 'General'
-            ? "to_jsonb(t) - 'residenceTick' - 'politics' - 'charm'"
+            ? "to_jsonb(t) - 'residenceTick' - 'politics' - 'charm' - 'sex'"
             : "to_jsonb(t) - 'treatyFormat'";
     rows[table] = (await client.query(`SELECT ${data} AS data FROM "${table}" t ORDER BY to_jsonb(t)::text`)).rows;
   }
@@ -376,6 +376,7 @@ it.each(['empty', 'legacy'] as const)(
         '20261110000000_world_create_requests',
         '20261111000000_logistics_state',
         '20261112000000_governance_state',
+        '20261113000000_lineage_state',
       ]);
       for (const directory of previous) {
         await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));

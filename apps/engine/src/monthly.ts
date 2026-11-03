@@ -14,6 +14,7 @@ import {
   type ReplayState,
   type WorldState,
   unitSetSchema,
+  readLineageResources,
 } from '@opensamguk/rules';
 import { rngFor } from '@opensamguk/shared';
 import { hashState } from '@opensamguk/shared/node';
@@ -27,6 +28,7 @@ import { persistCampaignState, readCampaignArmyTypes } from './campaignState';
 import { persistCityResourcesState } from './cityResourcesState';
 import { persistLogisticsState } from './logisticsState';
 import { persistGovernanceState } from './governance/repository';
+import { persistLineageState } from './lineage/repository';
 
 export async function loadReplayState(tx: Prisma.TransactionClient, worldId: string): Promise<ReplayState> {
   const state = await loadWorld(tx, worldId);
@@ -71,6 +73,7 @@ export async function loadReplayState(tx: Prisma.TransactionClient, worldId: str
     revisions: Object.fromEntries(generals.map(({ id, turnRevision }) => [id, turnRevision])),
     monthlyTick: world.monthlyTick,
     ...(policy ? { policy } : {}),
+    ...(world.ruleFeatures.includes('lineage-v1') ? { lineageResources: readLineageResources(world) } : {}),
     ...(world.ruleFeatures.includes('campaign-v1')
       ? { campaignArmyTypes: readCampaignArmyTypes(world), campaignUnitSet: unitSetSchema.parse(world.unitSet) }
       : {}),
@@ -119,6 +122,11 @@ export async function persistMonthly(
     }
   }
   for (const general of Object.values(next.generals)) {
+    if (!before.generals[general.id]) {
+      if (!world.ruleFeatures.includes('lineage-v1') || next.lineage?.persons[String(general.id)]?.bornTick !== tick)
+        throw Error('월 정산에 출처 없는 장수가 추가됐습니다.');
+      continue;
+    }
     if (JSON.stringify(general) !== JSON.stringify(before.generals[general.id])) {
       await tx.general.update({ where: { worldId_id: { worldId, id: general.id } }, data: general });
     }
@@ -128,6 +136,7 @@ export async function persistMonthly(
   await persistExt(tx, worldId, before.ext, next.ext);
   await persistLogisticsState(tx, worldId, before, next);
   await persistGovernanceState(tx, worldId, before, next);
+  await persistLineageState(tx, worldId, before, next);
   await persistCampaignState(tx, worldId, before, next);
   await persistCityResourcesState(
     tx,

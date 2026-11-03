@@ -60,6 +60,7 @@ function world(patch: Partial<World> = {}): World {
     cityResourcesState: null,
     logisticsState: null,
     governanceState: null,
+    lineageState: null,
     presetKey: null,
     preset: null,
     scenarioKey: 'command-test',

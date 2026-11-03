@@ -5,6 +5,7 @@ import {
   completePersonnelStep,
   setPolicyPayloadSchema,
   updateResidenceAnchors,
+  recordedLineageSuccession,
   type PersonnelMonthResult,
   type PersonnelStepPacket,
   type ReplayState,
@@ -28,6 +29,10 @@ import { reconcileGovernanceOrder } from './governance/service';
 import { appendLogisticsMovements } from './logisticsState';
 import { logisticsMovementSchema, governanceMovementSchema } from '@opensamguk/rules';
 import { z } from 'zod';
+import { processLineageInput } from './lineage/input';
+import { PgLineageRepository, persistLineageMonth } from './lineage/repository';
+import { reconcileLineageOrder } from './lineage/service';
+import type { LineageMonthEffects } from '@opensamguk/rules';
 
 export async function persistPersonnelPacket(
   tx: Prisma.TransactionClient,
@@ -124,7 +129,7 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
       'campaign.order': processCampaignQueuedInput,
     },
     afterQueuedInput: (tx, world, before, input) =>
-      ['city.resources', 'logistics.order', 'governance.act'].includes(input.kind)
+      ['city.resources', 'logistics.order', 'governance.act', 'lineage.act'].includes(input.kind)
         ? Promise.resolve()
         : persistForeignCampaignInput(tx, world, before, input),
   },
@@ -146,6 +151,14 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   { key: 'operational-map' },
   { key: 'stratagem-basic' },
   { key: 'policy', queuedInputs: { 'general.setPolicy': processPolicyInput, 'general.active': processPolicyInput } },
+  {
+    key: 'lineage-v1',
+    queuedInputs: { 'lineage.act': processLineageInput },
+    afterQueuedInput: (tx, world, _before, input) =>
+      reconcileLineageOrder(new PgLineageRepository(tx), world.id, { tick: input.tick!, sequence: input.sequence }),
+    persistMonthly: (tx, worldId, before, next, effects, context) =>
+      persistLineageMonth(tx, worldId, before, next, effects as LineageMonthEffects, context),
+  },
   {
     key: 'personnel',
     async loadWorld(tx, worldId, state) {
@@ -180,6 +193,7 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
         anchors: before.residenceAnchors!,
         tick: input.tick!,
         createdHumanId: input.kind === 'general.create' ? input.generalId : null,
+        succession: recordedLineageSuccession(input),
       });
       await persistEffects(tx, world.id, packet.state, [{ kind: 'world', state: packet.state }], {
         tick: input.tick!,

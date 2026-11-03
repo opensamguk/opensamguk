@@ -316,6 +316,7 @@ describe('발령 제안 상자', () => {
 
 describe('인사부', () => {
   const board: PersonnelBoard = {
+    actorId: 1,
     appoint: { ok: true },
     levels: [
       { officerLevel: 11, title: '참모', holderId: 2 },

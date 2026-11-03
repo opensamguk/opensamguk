@@ -17,6 +17,7 @@ type General = Prisma.GeneralGetPayload<Record<string, never>>;
 function general(changes: Partial<General> = {}): General {
   return {
     worldId: 'world',
+    sex: null,
     id: 1,
     userId: 'own',
     nationId: 1,

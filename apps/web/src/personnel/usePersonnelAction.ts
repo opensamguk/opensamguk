@@ -140,8 +140,10 @@ export function usePersonnelAction({ worldId, kinds, nameOf }: Options) {
     },
     [isActive, scope, finish, toLogin],
   );
+  // guard: 보내기 직전에 서버 값을 다시 읽어 지금도 보낼 수 있는지 본다(계승으로 장수가 바뀐 화면 등, T4-95).
+  // 거절 문구를 돌려주거나 확인하지 못하면 보내지 않는다. 이때 만든 번호는 서버에 가지 않았으므로 버린다.
   const submit = useCallback(
-    async (action: ActionInput, target: string) => {
+    async (action: ActionInput, target: string, guard?: () => Promise<string | null>) => {
       if (!scope || active.current?.scope === scope || !kindsKey.split(',').includes(action.kind)) return;
       const requestId = newRequestId();
       active.current = { scope, requestId };
@@ -149,6 +151,24 @@ export function usePersonnelAction({ worldId, kinds, nameOf }: Options) {
       const current = () => generation.current === started && isActive(requestId);
       setNotices({ scope, value: [] });
       setState({ scope, value: { phase: 'sending', requestId, kind: action.kind, target, refusal: null } });
+      if (guard) {
+        let refusal: string | null,
+          login = false;
+        try {
+          refusal = await guard();
+        } catch (error) {
+          login = errorCode(error) === 'UNAUTHORIZED';
+          refusal = '지금 장수를 확인하지 못했습니다. 요청을 보내지 않았습니다.';
+        }
+        if (!current()) return;
+        if (refusal !== null) {
+          active.current = null;
+          setState({ scope, value: { phase: 'idle' } });
+          if (login) toLogin();
+          else setNotices({ scope, value: [{ tone: 'error', text: refusal }] });
+          return;
+        }
+      }
       const outcome = await sendAction(api, worldId, requestId, action, current);
       if (!current()) return;
       if (outcome.type === 'error' && outcome.code !== 'UNAUTHORIZED') {
@@ -161,7 +181,7 @@ export function usePersonnelAction({ worldId, kinds, nameOf }: Options) {
         });
       } else receive(requestId, action.kind, outcome);
     },
-    [scope, kindsKey, isActive, api, worldId, receive],
+    [scope, kindsKey, isActive, api, worldId, receive, toLogin],
   );
 
   // mutation은 접수 뒤에도 최대 5초 기다린다. 병행 조회로 접수를 확인하고 초기 NOT_FOUND는 기다린다.
