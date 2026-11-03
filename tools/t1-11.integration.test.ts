@@ -787,6 +787,7 @@ describe('T1-11 30칸·revision·경합·재검사', () => {
     expect(result.revision).toBe(1);
     expect(result.slots[29]).toEqual({ commandKey: 'rest', args: {}, name: '휴식', explicit: false });
     expect((await request('turns.get', { worldId }, a.cookie)).data).toEqual({
+      actorId: 1,
       revision: result.revision,
       slots: result.slots,
     });
