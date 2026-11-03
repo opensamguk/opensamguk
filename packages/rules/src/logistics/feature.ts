@@ -3,6 +3,7 @@ import type { InputKindDefinition, RuleFeatureDefinition } from '../ruleRegistry
 import type { RecordedInput } from '../replay';
 import { logisticsMovementSchema } from './ledger';
 import { applyLogisticsInput, logisticsInputSchema, settleLogisticsMonthly } from './operations';
+import { settleNpcLogistics } from './npc';
 import { initialLogisticsState, logisticsQuantity, readLogisticsConfig } from './state';
 
 export const logisticsResultSchema = z.strictObject({
@@ -41,6 +42,7 @@ export const logisticsFeature: RuleFeatureDefinition = {
       cities: Object.fromEntries(initial.cities.map((city) => [city.cityKey, city])),
     });
     const armTypes = new Set(initial.unitSet.crewTypes.filter((row) => row.armType > 0).map((row) => row.armType));
+    if ('npc' in config && armTypes.size === 0) throw new Error('NPC 물류에는 군사 병종이 필요합니다.');
     if (
       Object.keys(config.recruitPer100).length !== armTypes.size ||
       Object.keys(config.recruitPer100).some((key) => !armTypes.has(Number(key)))
@@ -56,7 +58,11 @@ export const logisticsFeature: RuleFeatureDefinition = {
   },
   settleMonthly({ settled, tick }) {
     const result = settleLogisticsMonthly(settled.state, tick);
-    return { replay: { ...settled, state: result.state }, effects: { movements: result.movements } };
+    const npc = settleNpcLogistics(result.state, tick, settled.campaignUnitSet);
+    return {
+      replay: { ...settled, state: npc.state },
+      effects: { movements: [...result.movements, ...npc.movements] },
+    };
   },
 };
 

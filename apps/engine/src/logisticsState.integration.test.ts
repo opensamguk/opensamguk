@@ -2,10 +2,16 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb, type Prisma } from '@opensamguk/db';
 import { hashState } from '@opensamguk/shared/node';
+import { rngFor } from '@opensamguk/shared';
+import { z } from 'zod';
 import {
   applyRecordedInput,
   runReplayAction,
   logisticsResultSchema,
+  logisticsMovementSchema,
+  monthlyDate,
+  runMonthly,
+  settleMonthlyFeatures,
   settleLogisticsMonthly,
   type LogisticsConfig,
   type RecordedInput,
@@ -99,17 +105,17 @@ afterAll(async () => {
     await db.$disconnect();
   }
 });
-async function fixture() {
+async function fixture(source = initial, rules = config, seed: string = randomUUID()) {
   const saved = await saveInitialWorld(
     db,
-    { ...structuredClone(initial), seed: randomUUID() },
+    { ...structuredClone(source), seed },
     {
       name: 'AC-P2-30 물류 저장·재생',
       turnTermMinutes: 60,
       endYear: 201,
       replayFormat: 3,
       ruleFeatures: features,
-      featureData: { 'logistics-v1': config },
+      featureData: { 'logistics-v1': rules },
     },
   );
   ids.push(saved.worldId);
@@ -173,6 +179,59 @@ async function queuedFixture() {
   });
   const before = await db.$transaction((tx) => loadReplayState(tx, world.id));
   return { ...world, userId, generalId: ruler.id, source: source.cityKey, destination: destination.cityKey, before };
+}
+
+// 정식 491명 검증이 아니다. 해당 국가의 군주와 한 NPC만 남겨 모집 경쟁을 원생성에서 고정한다.
+async function npcFixture(mode: 'buy' | 'transport') {
+  const source = structuredClone(initial),
+    byCity = new Map(source.cities.map((city) => [city.cityKey, city]));
+  const rulers = source.generals.filter(
+    (general) => general.userId === null && general.officerLevel === 12 && general.activeFromYear <= source.startYear,
+  );
+  const eligible = (general: WorldInit['generals'][number], cityKey: number, nationId: number | null) =>
+    general.userId === null &&
+    general.nationId === nationId &&
+    general.cityKey === cityKey &&
+    general.officerLevel < 5 &&
+    general.activeFromYear <= source.startYear;
+  const city = source.cities.find(
+    (row) =>
+      row.kind !== 'PASS' &&
+      row.nationId !== null &&
+      row.supplied &&
+      row.population >= 100_000 &&
+      row.commerce >= 1000 &&
+      rulers.some((general) => general.nationId === row.nationId) &&
+      source.generals.some((general) => eligible(general, row.cityKey, row.nationId)) &&
+      row.connections.some((key) => byCity.get(key)?.nationId !== row.nationId) &&
+      row.connections.some(
+        (key) =>
+          byCity.get(key)?.nationId === row.nationId && byCity.get(key)!.supplied && byCity.get(key)!.kind !== 'PASS',
+      ),
+  );
+  if (!city || city.nationId === null)
+    throw new Error('NPC 물류 시험의 부유한 전선·보급 후방·군주·일반 장수가 없습니다.');
+  const ruler = rulers.find((general) => general.nationId === city.nationId)!;
+  const general = source.generals
+    .filter((row) => eligible(row, city.cityKey, city.nationId))
+    .sort((a, b) => a.id - b.id)[0]!;
+  const rear = city.connections
+    .map((key) => byCity.get(key)!)
+    .find((row) => row.nationId === city.nationId && row.supplied && row.kind !== 'PASS')!;
+  source.generals = source.generals.filter(
+    (row) => row.nationId !== city.nationId || row.id === ruler.id || row.id === general.id,
+  );
+  for (const nation of source.nations) nation.isNpc = nation.id === city.nationId;
+  general.nextTurnTick = mode === 'buy' ? 10_010 : 30_010;
+  const rules: LogisticsConfig = {
+    ...structuredClone(config),
+    specialties: mode === 'transport' ? [{ cityKey: rear.cityKey, good: 'iron', perMonth: 1000 }] : [],
+    transport: { ...config.transport, lossBpPerHop: 5000 },
+    npc: { recruitTarget: 100, budgetBp: 2000, maxActions: 3, stockCapBp: 8000, upgradeAtBp: 9000 },
+  };
+  const seed = `npc-logistics-storage-${mode}`,
+    saved = await fixture(source, rules, seed);
+  return { ...saved, cityKey: city.cityKey, rearKey: rear.cityKey, generalId: general.id, seed };
 }
 async function queue(world: Awaited<ReturnType<typeof queuedFixture>>, payload: Prisma.InputJsonValue) {
   return db.inputEvent.create({
@@ -367,5 +426,168 @@ describe('AC-P2-30 실제 PostgreSQL 물류', () => {
     expect(replayed).toHaveLength(1);
     expect(replayed[0]!.stateHash).toBe(hashState(snapshot));
     expect(replayArchive(archive, 1)).toEqual(replayed);
+  });
+
+  it('NPC 월 매입의 저장 뒤 실패를 롤백하고 재접속한 실제 NPC가 모집·소비한 결과를 재생한다', async () => {
+    const world = await npcFixture('buy'),
+      other = await fixture();
+    await controlClock(db, world.id, 'start');
+    const before = await db.$transaction((tx) => loadReplayState(tx, world.id));
+    const date = monthlyDate(before.state.startYear, 10_000);
+    const base = runMonthly(before.state, 10_000, rngFor(world.seed, 'monthly', date.year, date.month));
+    const expected = settleMonthlyFeatures(before, { ...before, state: base.state, monthlyTick: 10_000 }, 10_000);
+    const expectedRows = z
+      .strictObject({ movements: z.array(logisticsMovementSchema) })
+      .parse(expected.effects['logistics-v1']).movements;
+    const lease = await acquireLease(db, world.id);
+    if (!lease) throw new Error('NPC 롤백 시험 실행권이 없습니다.');
+    let observed = 0;
+    try {
+      await expect(
+        new TurnLoop(db, lease, {
+          beforeCommit: async (tx) => {
+            const count = await tx.logisticsMovement.count({
+              where: { worldId: world.id, tick: 10_000, reason: 'TRADE', holder: 'city', holderId: world.cityKey },
+            });
+            if (!count) return;
+            observed = count;
+            throw new Error('after-npc-month-save');
+          },
+        }).advanceTo(10_000),
+      ).rejects.toThrow('after-npc-month-save');
+    } finally {
+      await releaseLease(db, lease);
+    }
+    expect(observed).toBeGreaterThan(0);
+    const rolledBack = await db.$transaction((tx) => loadReplayState(tx, world.id));
+    expect(rolledBack.state).toEqual(before.state);
+    expect(rolledBack.monthlyTick).toBe(0);
+    expect(await db.logisticsMovement.count({ where: { worldId: world.id } })).toBe(0);
+    expect(await db.yearbookSnapshot.count({ where: { worldId: world.id } })).toBe(0);
+    expect((await db.$transaction((tx) => loadReplayState(tx, other.id))).state).toEqual(other.before);
+    const reopened = createDb(url);
+    try {
+      await advance(world.id, 10_000, reopened);
+    } finally {
+      await reopened.$disconnect();
+    }
+    const purchased = await db.$transaction((tx) => loadReplayState(tx, world.id));
+    expect(hashState(purchased)).toBe(hashState(expected.replay));
+    const rows = await db.logisticsMovement.findMany({
+      where: { worldId: world.id, tick: 10_000 },
+      orderBy: [{ sequence: 'asc' }, { ordinal: 'asc' }],
+    });
+    expect(
+      rows.map(({ holder, holderId, good, delta, reason }) => ({ holder, id: holderId, good, delta, reason })),
+    ).toEqual(expectedRows);
+    expect(rows.map((row) => row.ordinal)).toEqual(expectedRows.map((_, ordinal) => ordinal));
+    expect(purchased.state.logistics!.cities[String(world.cityKey)]!.iron).toBe(2);
+    await advance(world.id, 10_010);
+    const recruited = await db.$transaction((tx) => loadReplayState(tx, world.id));
+    expect(
+      await db.generalLog.findMany({
+        where: { worldId: world.id, generalId: world.generalId, tick: 10_010 },
+        select: { commandKey: true, kind: true, text: true },
+      }),
+    ).toContainEqual(expect.objectContaining({ commandKey: 'recruit' }));
+    const troops = recruited.state.cityResources!.cities[String(world.cityKey)]!.garrison.reduce(
+      (total, row) => total + row.troops,
+      0,
+    );
+    expect(troops).toBeGreaterThan(0);
+    expect(troops).toBeLessThanOrEqual(100);
+    expect(recruited.state.cities[world.cityKey]!.population).toBe(
+      purchased.state.cities[world.cityKey]!.population - troops,
+    );
+    expect(recruited.state.generals[world.generalId]!.gold).toBe(purchased.state.generals[world.generalId]!.gold);
+    expect(recruited.state.logistics!.cities[String(world.cityKey)]!.iron).toBe(0);
+    expect(
+      await db.logisticsMovement.findFirst({
+        where: {
+          worldId: world.id,
+          tick: 10_010,
+          holder: 'city',
+          holderId: world.cityKey,
+          good: 'iron',
+          reason: 'CONSUME',
+          delta: -2,
+        },
+      }),
+    ).not.toBeNull();
+    await advance(world.id, 20_000);
+    const final = await db.$transaction((tx) => loadReplayState(tx, world.id)),
+      archive = await exportReplay(db, world.id);
+    const replayed = replayArchive(archive, 2);
+    expect(replayed).toHaveLength(2);
+    expect(replayed.at(-1)!.stateHash).toBe(hashState(final));
+    expect(replayArchive(archive, 2)).toEqual(replayed);
+  });
+
+  it('NPC 특산 후방의 실제 수송·도착 손실·보충·모집 원장을 네 달 재생과 대조한다', async () => {
+    const world = await npcFixture('transport');
+    await controlClock(db, world.id, 'start');
+    await advance(world.id, 10_000);
+    const sent = await db.$transaction((tx) => loadReplayState(tx, world.id));
+    expect(sent.state.logistics!.convoys).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          fromCityKey: world.rearKey,
+          toCityKey: world.cityKey,
+          goods: { iron: 2, wood: 0, horses: 0 },
+        }),
+      ]),
+    );
+    await advance(world.id, 20_000);
+    expect(
+      await db.logisticsMovement.findFirst({
+        where: { worldId: world.id, reason: 'LOSS_TRANSIT', good: 'iron', delta: -1 },
+      }),
+    ).not.toBeNull();
+    expect(
+      await db.logisticsMovement.findFirst({
+        where: {
+          worldId: world.id,
+          tick: 20_000,
+          reason: 'ARRIVE',
+          holder: 'city',
+          holderId: world.cityKey,
+          good: 'iron',
+          delta: 1,
+        },
+      }),
+    ).not.toBeNull();
+    await advance(world.id, 30_010);
+    const recruited = await db.$transaction((tx) => loadReplayState(tx, world.id));
+    expect(
+      await db.generalLog.findMany({
+        where: { worldId: world.id, generalId: world.generalId, tick: 30_010 },
+        select: { commandKey: true, kind: true, text: true },
+      }),
+    ).toContainEqual(expect.objectContaining({ commandKey: 'recruit' }));
+    expect(
+      recruited.state.cityResources!.cities[String(world.cityKey)]!.garrison.reduce(
+        (total, row) => total + row.troops,
+        0,
+      ),
+    ).toBeGreaterThan(0);
+    expect(
+      await db.logisticsMovement.findFirst({
+        where: {
+          worldId: world.id,
+          tick: 30_010,
+          reason: 'CONSUME',
+          holder: 'city',
+          holderId: world.cityKey,
+          delta: -2,
+        },
+      }),
+    ).not.toBeNull();
+    await advance(world.id, 40_000);
+    const final = await db.$transaction((tx) => loadReplayState(tx, world.id)),
+      archive = await exportReplay(db, world.id);
+    const replayed = replayArchive(archive, 4);
+    expect(replayed).toHaveLength(4);
+    expect(replayed.at(-1)!.stateHash).toBe(hashState(final));
+    expect(replayArchive(archive, 4)).toEqual(replayed);
   });
 });
