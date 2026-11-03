@@ -11,6 +11,8 @@
 
 `deploy/migrate/package.json`의 의존성은 `prisma` 7.10.1 하나다. Prisma 7.10.1은 `typescript`를 `optional: true` peer로 선언한다. lock에서 이 peer가 workspace의 `typescript@6.0.3`으로 풀렸고 `pnpm deploy --prod --legacy`가 그대로 복사했다.
 
+함께 배포되는 `valibot` 1.4.2도 TypeScript 선택 peer를 가진다. compiler와 이 패키지의 peer 링크도 제거하며 실제 DB 회귀에서 함께 검증한다.
+
 운영 migrate 이미지에는 Prisma CLI, schema engine과 asset, `schema.prisma`, migrations, `prisma.config.ts`만 있으면 된다. compiler가 필요 없다는 판정은 TypeScript를 지운 이미지로 실제 `migrate deploy`를 돌려 내린다. CLI `version` 통과는 근거로 쓰지 않는다.
 
 ## 방법
@@ -62,14 +64,14 @@ server·engine·web 단계, compose, entrypoint, UID 10001, secrets, `read_only`
 
 기존 검증 절차를 따른다. 원본 PG 39 데이터 디렉터리를 읽기 전용으로 물리 복사해 이 검증이 소유하는 새 volume을 만든다. migration 작업과 같은 PostgreSQL 18.6으로 기동하며 공유 개발 DB와 공유 포트는 쓰지 않는다.
 
-새 migrate 이미지를 compose의 기존 migrate 설정(UID, `read_only`, `cap_drop`, secret 파일) 그대로 실행해 migration 40을 적용한다. DB 접속 정보는 저장소 밖 임시 secret 파일로만 넘기고 명령 인자와 로그에 넣지 않는다.
+새 migrate 이미지를 compose의 기존 migrate 설정(UID, `read_only`, `cap_drop`, secret 파일) 그대로 실행해 migration 40을 적용한다. DB 접속 정보는 저장소 밖 리허설 secret volume의 파일을 읽기 전용으로 넘기고 명령 인자와 로그에 넣지 않는다.
 
 적용 뒤 확인할 항목:
 
 - `_prisma_migrations`에 40행이 모두 완료 상태다.
 - migration 40의 스키마 변경이 실제 DB에 있다.
 - 같은 이미지를 다시 실행하면 적용할 migration 없이 끝난다.
-- 같은 이미지 안에서 `typescript`를 해석하면 찾지 못한다.
+- Prisma·valibot의 실제 파일 경로에서 `typescript`를 해석한다. 기준 이미지에서 성공하고 후보 이미지에서 찾지 못해야 한다. symlink를 풀지 않은 경로만 검사하지 않는다.
 
 끝나면 이 검증이 만든 컨테이너와 volume만 지운다.
 
