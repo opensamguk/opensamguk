@@ -1,0 +1,71 @@
+import { z } from 'zod';
+import { defineCommand, fail, ownCity, success } from '../commands/support';
+import { checkCityGoods, consumeCityGoods } from '../logistics/consumption';
+import { LINEAGE_EXITED_YEAR } from '../lineage/config';
+import { EQUIPMENT_MAX, equipmentKeySchema, equipmentSlotSchema } from './config';
+import { readEquipmentState } from './state';
+
+const argsSchema = z.strictObject({
+  slot: equipmentSlotSchema,
+  itemKey: z.union([z.literal('none'), equipmentKeySchema]),
+});
+const proceeds = (cost: number, rate: number) => Math.floor((cost * rate) / 10_000);
+
+// 미등록 명령이다. 운영 정책·카탈로그 확정 전에는 명시한 인공 시험 설정만 쓴다.
+export const equipmentTrade = defineCommand({
+  key: 'equipment_trade',
+  name: '장비매매',
+  category: 'personal',
+  args: argsSchema,
+  check(view, actor, args) {
+    if (!view.ruleFeatures?.includes('equipment-v1')) return fail('COMMAND_DISABLED', '장비 판이 아닙니다.');
+    if (!view.ruleFeatures.includes('logistics-v1'))
+      return fail('COMMAND_DISABLED', '장비매매에 물류 판이 필요합니다.');
+    const location = ownCity(view, actor);
+    if (location) return location;
+    const general = view.generals[actor.generalId]!,
+      key = String(actor.generalId);
+    if (general.activeFromYear === LINEAGE_EXITED_YEAR || view.lineage?.persons[key]?.exit)
+      return fail('BAD_STATE', '퇴장한 장수는 장비를 거래할 수 없습니다.');
+    const equipment = readEquipmentState(view.equipment, view),
+      held = equipment.generals[key]?.[args.slot];
+    if (general.experience > EQUIPMENT_MAX - equipment.config.tradeExperience)
+      return fail('BAD_STATE', '경험의 한도에 도달했습니다.');
+    if (args.itemKey === 'none') {
+      if (!held) return fail('BAD_STATE', '판매할 장비가 없습니다.');
+      const item = equipment.config.items.find((entry) => entry.key === held)!;
+      return general.gold > EQUIPMENT_MAX - proceeds(item.cost, equipment.config.sellRateBp)
+        ? fail('BAD_STATE', '금의 한도에 도달했습니다.')
+        : null;
+    }
+    const item = equipment.config.items.find((entry) => entry.key === args.itemKey);
+    if (!item || item.slot !== args.slot) return fail('BAD_ARGS', '장비 번호와 칸이 맞지 않습니다.');
+    if (view.cities[general.cityKey]!.security < item.requiredSecurity)
+      return fail('BAD_STATE', '도시의 치안이 부족합니다.');
+    if (general.gold < item.cost) return fail('NO_GOLD', '금이 부족합니다.');
+    if (held === item.key) return fail('BAD_STATE', '같은 장비를 이미 장착했습니다.');
+    return checkCityGoods(view, general.cityKey, item.goods);
+  },
+  change(state, actor, args) {
+    const general = state.generals[actor.generalId]!,
+      key = String(actor.generalId),
+      equipment = readEquipmentState(state.equipment, state);
+    if (args.itemKey === 'none') {
+      const slots = equipment.generals[key]!,
+        item = equipment.config.items.find((entry) => entry.key === slots[args.slot])!;
+      general.gold += proceeds(item.cost, equipment.config.sellRateBp);
+      delete slots[args.slot];
+      if (Object.keys(slots).length === 0) delete equipment.generals[key];
+    } else {
+      const item = equipment.config.items.find((entry) => entry.key === args.itemKey)!;
+      const spent = consumeCityGoods(state, general.cityKey, item.goods);
+      if (!spent.ok) throw new Error(spent.message);
+      state.logistics = spent.logistics;
+      general.gold -= item.cost;
+      equipment.generals[key] = { ...equipment.generals[key], [args.slot]: item.key };
+    }
+    general.experience += equipment.config.tradeExperience;
+    state.equipment = equipment;
+    return success(args.itemKey === 'none' ? '장비를 판매했습니다.' : '장비를 구매해 장착했습니다.');
+  },
+});
