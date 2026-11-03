@@ -80,10 +80,14 @@ async function user(): Promise<User> {
   await db.session.create({ data: { id: session.id, userId: id, expiresAt: session.expiresAt } });
   return { id, cookie: `sid=${session.token}` };
 }
-async function world(lineage = true) {
+async function world(lineage = true, peaceUntilTick = 300000) {
   const initial = commandInitial();
   initial.seed = `lineage-pg-${randomUUID()}`;
-  initial.diplomacies = initial.diplomacies.map((row) => ({ ...row, state: 'NON_AGGRESSION', untilTick: 300000 }));
+  initial.diplomacies = initial.diplomacies.map((row) => ({
+    ...row,
+    state: 'NON_AGGRESSION',
+    untilTick: peaceUntilTick,
+  }));
   if (lineage) for (const g of initial.generals) g.sex = g.id === 2 ? 'MALE' : g.id === 3 ? 'FEMALE' : 'UNKNOWN';
   initial.generals[1]!.deathYear = initial.startYear + 1;
   const config = structuredClone(lineageTestConfig);
@@ -273,7 +277,7 @@ async function create(worldId: string, player: User, name: string, sex: 'MALE' |
       throw Error(`가문 장수 생성 대기 기록이 없습니다: ${JSON.stringify(await creating)}`);
     await delay(10);
   }
-  await advance(worldId, 0);
+  await advance(worldId, (await db.world.findUniqueOrThrow({ where: { id: worldId } })).clockTick);
   const result = await creating;
   expect(result.status, JSON.stringify(result.error)).toBe(200);
   if (result.data?.status !== 'created') throw Error('실제 장수 생성이 끝나지 않았습니다.');
@@ -444,6 +448,112 @@ it('AC-P2-32 출생 트랜잭션 실패는 새 행·예약을 모두 되돌리�
   expect(replayed.at(-1)!.stateHash).toBe(hashState(state));
 }, 120000);
 
+it('AC-P2-32 실제 218개월 두 번의 동의 계승은 단일 조작권·이전 영수증·다세대 재생을 보존한다', async () => {
+  // 혼인·출생 최소 연령16은 유지한다. 기존 인공 설정의 성인 등장1년과 이 사례의 장기 불가침만 쓴다.
+  const id = await world(true, 2_400_000),
+    player = await user(),
+    mother = await user(),
+    from = await create(id, player, '계승시조', 'MALE'),
+    mom = await create(id, mother, '계승초모', 'FEMALE');
+  const offered = await send(id, player, from, { type: 'marriage.propose', targetGeneralId: mom });
+  if (offered.result.data?.status !== 'applied') throw Error('첫 혼인 제안 결과가 없습니다.');
+  await send(id, mother, mom, { type: 'marriage.respond', offerId: offered.result.data.result.offerId!, accept: true });
+  await advance(id, 10000);
+  const born = await snapshot(id),
+    heir = Number(Object.entries(born.state.lineage!.persons).find(([, p]) => p.parents.some((id) => id === from))![0]);
+  async function succeed(predecessor: number, successor: number) {
+    await send(id, player, predecessor, { type: 'heir.designate', heirGeneralId: successor });
+    const board = await rpc('lineage.get', { worldId: id }, player),
+      preview = board.data?.view.mine?.preview;
+    if (!preview) throw Error('후계자의 계승 미리보기가 없습니다.');
+    return send(id, player, predecessor, { type: 'succession.confirm', heirGeneralId: successor, expected: preview });
+  }
+  await advance(id, 120000);
+  const first = await succeed(from, heir);
+  await advance(id, 1_000_000);
+  const reconnected = createDb(url!);
+  try {
+    await advance(id, 2_000_000, false, reconnected);
+  } finally {
+    await reconnected.$disconnect();
+  }
+  const adult = (await snapshot(id)).state.generals[heir]!;
+  expect(adult.age).toBeGreaterThanOrEqual(16);
+  expect(['MALE', 'FEMALE']).toContain(adult.sex);
+  const partner = await user(),
+    spouse = await create(id, partner, '계승배우', adult.sex === 'MALE' ? 'FEMALE' : 'MALE');
+  const secondOffer = await send(id, player, heir, { type: 'marriage.propose', targetGeneralId: spouse });
+  if (secondOffer.result.data?.status !== 'applied') throw Error('다음 세대 혼인 제안 결과가 없습니다.');
+  await send(id, partner, spouse, {
+    type: 'marriage.respond',
+    offerId: secondOffer.result.data.result.offerId!,
+    accept: true,
+  });
+  let grandchild = 0;
+  for (let month = 201; month <= 205; month++) {
+    await advance(id, month * 10000);
+    const born = await snapshot(id),
+      child = Object.entries(born.state.lineage!.persons).find(([, person]) =>
+        person.parents.some((id) => id === heir),
+      );
+    if (child) {
+      grandchild = Number(child[0]);
+      break;
+    }
+  }
+  expect(grandchild).toBeGreaterThan(0);
+  const nextBirth = await snapshot(id);
+  expect(nextBirth.state.lineage!.persons[String(grandchild)]!.parents).toEqual(expect.arrayContaining([heir, spouse]));
+  // 등장 직후 동의한다. NPC가 이후 스스로 다른 나라에 임관하면 같은 국가 조건으로 계승할 수 없다.
+  const activationTick = (nextBirth.state.generals[grandchild]!.activeFromYear - nextBirth.state.startYear) * 120000;
+  expect(activationTick).toBeGreaterThanOrEqual(nextBirth.monthlyTick);
+  await advance(id, activationTick);
+  const eligible = await snapshot(id);
+  expect(eligible.state.generals[grandchild]!.nationId).toBe(eligible.state.generals[heir]!.nationId);
+  const second = await succeed(heir, grandchild),
+    after = await snapshot(id);
+  expect(after.state.lineage!.persons[String(from)]!.successorId).toBe(heir);
+  expect(after.state.lineage!.persons[String(heir)]!.successorId).toBe(grandchild);
+  expect(after.state.generals[grandchild]!.userId).toBe(player.id);
+  expect(
+    Object.values(after.state.generals)
+      .filter((general) => general.userId === player.id)
+      .map((general) => general.id),
+  ).toEqual([grandchild]);
+  expect(await db.general.count({ where: { worldId: id, userId: player.id } })).toBe(1);
+  for (const predecessor of [from, heir]) {
+    expect(after.state.generals[predecessor]).toMatchObject({ userId: null, gold: 0, rice: 0 });
+    const stale = await rpc(
+      'lineage.submit',
+      {
+        worldId: id,
+        expectedUserId: player.id,
+        expectedGeneralId: predecessor,
+        requestId: randomUUID(),
+        payload: { type: 'heir.designate', heirGeneralId: null },
+      },
+      player,
+    );
+    expect(stale.error?.data.code).toBe('CONFLICT');
+  }
+  const beforeReceipts = hashState(await snapshot(id));
+  for (const confirmed of [first, second]) {
+    expect((await rpc('lineage.submit', confirmed.input, player)).data?.status).toBe('applied');
+    expect(
+      await db.inputEvent.count({ where: { worldId: id, idempotencyKey: `lineage:${confirmed.input.requestId}` } }),
+    ).toBe(1);
+  }
+  expect(hashState(await snapshot(id))).toBe(beforeReceipts);
+  await advance(id, 2_180_000);
+  const final = await snapshot(id),
+    archive = await exportReplay(db, id),
+    replayed = replayArchive(archive, 218);
+  expect(final.monthlyTick).toBe(2_180_000);
+  expect(replayed).toHaveLength(218);
+  expect(replayed.map((month) => month.stateHash)).toEqual(archive.months.map((month) => month.stateHash));
+  expect(replayed.at(-1)!.stateHash).toBe(hashState(final));
+}, 180000);
+
 it('AC-P2-32 조회 대상은 행위자가 아니며 접수 뒤 제재도 엔진에서 다시 검사한다', async () => {
   const owner = await user(),
     stranger = await user(),
@@ -516,7 +626,7 @@ it.each([false, true])(
     await send(id, mother, mom, { type: 'marriage.respond', offerId, accept: true });
     await advance(id, 10000);
     const birth = await snapshot(id),
-      heir = Object.entries(birth.state.lineage!.persons).find(([, p]) => p.parents.includes(from))![0];
+      heir = Object.entries(birth.state.lineage!.persons).find(([, p]) => p.parents.some((id) => id === from))![0];
     for (let month = 2; month <= 12; month++) {
       await send(id, father, from, { type: 'heir.designate', heirGeneralId: null });
       await send(id, mother, mom, { type: 'heir.designate', heirGeneralId: null });
