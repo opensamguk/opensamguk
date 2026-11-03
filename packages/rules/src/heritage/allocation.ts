@@ -22,7 +22,7 @@ export type HeritageBonus = z.infer<typeof heritageBonusSchema>;
 export function readHeritageAllocation(
   value: unknown,
   rules: Pick<StatRules, 'count' | 'max'>,
-  base: Partial<Record<HeritageStat, number>>,
+  base: Partial<Record<HeritageStat, number | undefined>>,
 ): { ok: true; bonus: HeritageBonus; cost: number } | { ok: false; code: 'BAD_HERITAGE'; message: string } {
   if (value === undefined) return { ok: true, bonus: {}, cost: 0 };
   const invalid = { ok: false as const, code: 'BAD_HERITAGE' as const, message: HERITAGE_ERRORS.BAD_HERITAGE };

@@ -7,6 +7,8 @@ import type { InitialGeneral } from '../world/bootstrap';
 import type { PresetRules } from '../world/preset';
 import { FIVE_STAT_KEYS } from './fiveStats';
 import { knownGeneralSexSchema } from './sex';
+import { heritageBonusSchema, readHeritageAllocation } from '../heritage/allocation';
+import { HERITAGE_ERRORS } from '../heritage/constants';
 
 export interface CreationBonus {
   gold: number;
@@ -49,10 +51,12 @@ export const generalCreationSchema = z.strictObject({
   politics: dbInt.optional(),
   charm: dbInt.optional(),
   sex: knownGeneralSexSchema.optional(),
+  heritage: heritageBonusSchema.optional(),
   portraitId: z.number().int().min(10001).max(11008).nullable(),
 });
 export type GeneralCreation = z.infer<typeof generalCreationSchema>;
 export const CREATION_ERRORS = {
+  ...HERITAGE_ERRORS,
   BAD_NAME: '이름을 확인하세요.',
   BAD_STATS: '능력치 합계와 범위를 확인하세요.',
   BAD_PORTRAIT: '초상 번호를 확인하세요.',
@@ -71,6 +75,7 @@ export function validateGeneralCreation(
   payload: unknown,
   statRules: unknown,
   lineage = false,
+  heritage = false,
 ): { ok: true; value: GeneralCreation } | { ok: false; code: CreationCode; message: string } {
   const parsed = generalCreationSchema.safeParse(payload);
   if (!parsed.success) {
@@ -84,12 +89,15 @@ export function validateGeneralCreation(
             ? 'BAD_PORTRAIT'
             : path === 'sex'
               ? 'BAD_SEX'
-              : 'BAD_STATS',
+              : path === 'heritage'
+                ? 'BAD_HERITAGE'
+                : 'BAD_STATS',
       ),
     };
   }
   if (lineage ? parsed.data.sex === undefined : Object.hasOwn(parsed.data, 'sex'))
     return { ok: false, ...creationFailure('BAD_SEX') };
+  if (!heritage && Object.hasOwn(parsed.data, 'heritage')) return { ok: false, ...creationFailure('BAD_HERITAGE') };
   const rules = statRulesSchema.parse({ stat: statRules }).stat;
   const five = rules.count === 5;
   if (
@@ -103,6 +111,8 @@ export function validateGeneralCreation(
   );
   if (stats.some((n) => n < rules.min || n > rules.max) || stats.reduce((a, b) => a + b, 0) !== rules.total)
     return { ok: false, ...creationFailure('BAD_STATS') };
+  if (heritage && !readHeritageAllocation(parsed.data.heritage, rules, parsed.data).ok)
+    return { ok: false, ...creationFailure('BAD_HERITAGE') };
   return { ok: true, value: parsed.data };
 }
 export function buildCreatedGeneral(input: {
@@ -128,12 +138,20 @@ export function buildCreatedGeneral(input: {
     throw new Error('장수 저장 범위를 넘었습니다.');
   // monthlyDate는 정산할 달의 끝 경계를 받는다. monthlyTick=0도 첫 달이다.
   const birthYear = monthlyDate(input.startYear, input.monthlyTick + TICKS_PER_MONTH).year - 20;
-  const { politics, charm, sex, ...payload } = input.payload;
+  const { politics, charm, sex, heritage, ...payload } = input.payload;
   if ((politics === undefined) !== (charm === undefined)) throw new Error('5능력치 생성 값을 확인하세요.');
+  const stats = { ...payload, ...(politics !== undefined && charm !== undefined ? { politics, charm } : {}) };
+  if (heritage !== undefined)
+    for (const key of FIVE_STAT_KEYS) {
+      const amount = heritage[key];
+      if (amount === undefined) continue;
+      const value = stats[key];
+      if (value === undefined) throw new Error('유산 능력치 종류를 확인하세요.');
+      stats[key] = value + amount;
+    }
   return {
-    ...payload,
+    ...stats,
     ...(sex === undefined ? {} : { sex }),
-    ...(politics !== undefined && charm !== undefined ? { politics, charm } : {}),
     id: input.id,
     userId: input.userId,
     affinity,

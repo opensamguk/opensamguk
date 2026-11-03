@@ -157,6 +157,7 @@ export function applyRecordedInput(
       input,
       replay.state.ruleFeatures?.includes('five-stats'),
       replay.state.ruleFeatures?.includes('lineage-v1'),
+      replay.state.ruleFeatures?.includes('heritage-v1'),
     );
   const kind = registry.inputKinds.find((kind) => kind.kind === input.kind);
   if (input.status === 'REJECTED') {

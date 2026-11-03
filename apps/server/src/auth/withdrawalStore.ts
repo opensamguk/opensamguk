@@ -3,6 +3,7 @@ import { TRPCError } from '@trpc/server';
 import type { PrismaClient } from '@opensamguk/db';
 import { hashPassword, verifyPassword } from './password';
 import { hasGlobalSanction } from './sanction';
+import { forfeitHeritageBalance } from '../heritage/pgStore';
 
 const denied = () => new TRPCError({ code: 'UNAUTHORIZED', message: '현재 계정과 비밀번호를 다시 확인하세요.' });
 const collision = () => new TRPCError({ code: 'CONFLICT', message: '계정 상태를 확인한 뒤 다시 요청하세요.' });
@@ -51,6 +52,7 @@ export async function withdrawAccount(
         data: { status: 'WITHDRAWN', email, passwordHash, emailVerifiedAt: null },
       });
       await tx.session.deleteMany({ where: { userId: identity.userId } });
+      await forfeitHeritageBalance(tx, identity.userId);
       await tx.accountToken.deleteMany({ where: { userId: identity.userId } });
       await tx.$executeRaw`DELETE FROM "LoginRecord" WHERE "userId"=${identity.userId}`;
       // 현재 schema에는 알림 대상·발송 대기열이 없다.

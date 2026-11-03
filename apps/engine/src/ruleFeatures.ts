@@ -152,6 +152,9 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   { key: 'stratagem-basic' },
   { key: 'policy', queuedInputs: { 'general.setPolicy': processPolicyInput, 'general.active': processPolicyInput } },
   {
+    key: 'heritage-v1',
+  },
+  {
     key: 'lineage-v1',
     queuedInputs: { 'lineage.act': processLineageInput },
     afterQueuedInput: (tx, world, _before, input) =>

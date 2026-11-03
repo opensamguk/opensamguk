@@ -85,7 +85,8 @@
 /* 첩: 먹 테두리, 금니 실선, 계단 그림자. 제목은 주칠 현판. */
 .stats,
 .portraits,
-.sexGroup {
+.sexGroup,
+.heritage {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
@@ -101,7 +102,8 @@
 
 .stats legend,
 .portraits legend,
-.sexGroup legend {
+.sexGroup legend,
+.heritage legend {
   padding: 6px 12px 5px;
   font-family: var(--font-title);
   font-size: var(--title-sm);
@@ -219,6 +221,153 @@
   outline: 3px solid var(--color-accent);
   outline-offset: -1px;
   font-weight: 600;
+}
+
+/* 유산 능력치 첩 (T4-96). 같은 첩 틀에 4칸 수치와 기본·유산·최종 표를 세로로 쌓는다. */
+.heritage {
+  display: grid;
+  align-items: stretch;
+}
+
+.heritage legend {
+  justify-self: start;
+}
+
+.heritageFacts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  background: var(--color-border);
+  border: 1px solid var(--color-border-strong);
+}
+
+.heritageFacts > div {
+  display: grid;
+  gap: 2px;
+  align-content: start;
+  min-width: 0;
+  padding: var(--space-2);
+  background: var(--color-surface-raised);
+}
+
+.heritageFacts dt {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.heritageFacts dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.pixelNum {
+  font-family: var(--font-pixel);
+  font-size: var(--text-xl);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.short,
+.over {
+  color: var(--color-danger);
+}
+
+.staleMark {
+  font-size: var(--text-xs);
+  color: var(--color-warning);
+}
+
+.heritageStale {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 2px solid var(--color-warning);
+  background: var(--color-surface-raised);
+}
+
+.heritageStale p {
+  margin: 0;
+}
+
+.heritageOk {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  border-left: 4px solid var(--color-success);
+  font-size: var(--text-sm);
+}
+
+.heritageTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.heritageTable th,
+.heritageTable td {
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.heritageTable thead th {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: var(--color-surface-muted);
+}
+
+.heritageTable tbody th {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.heritageTable .n {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.heritageTable .hasWhy th,
+.heritageTable .hasWhy td {
+  border-bottom: 0;
+}
+
+.heritageWhy td {
+  padding-top: 0;
+  font-size: var(--text-xs);
+  color: var(--color-warning);
+}
+
+.heritageValue {
+  min-width: 2.2em;
+  text-align: center;
+  font-family: var(--font-pixel);
+  font-size: var(--text-xl);
+  color: var(--color-success);
+}
+
+.heritageValue.muted {
+  color: var(--color-text-muted);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+  .heritageFacts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .heritageTable th,
+  .heritageTable td {
+    padding: var(--space-1);
+  }
 }
 
 .summary {

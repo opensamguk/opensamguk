@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { assertHeritageCreationResult, heritageCreationRecordSchema } from '../heritage/creation';
 import type { ReplayState, RecordedInput } from '../replay';
 import { emptyQueue, POLICY_KEYS, type PolicyKey } from './index';
 import { fiveStatsSchema } from '../general/fiveStats';
@@ -95,6 +96,7 @@ export function validatePolicyRecordedInput(
   modern: boolean,
   five = false,
   lineage = false,
+  heritage = false,
 ): asserts value is RecordedInput {
   const input = envelopeSchema.parse(value);
   if (!modern && input.kind !== 'turns.set' && input.kind !== 'general.create')
@@ -121,9 +123,14 @@ export function validatePolicyRecordedInput(
   } else if (input.kind === 'general.create') {
     let general = five ? recordedGeneralSchema.extend(fiveStatsSchema.shape) : recordedGeneralSchema;
     if (lineage) general = general.extend({ sex: knownGeneralSexSchema });
-    (modern ? z.strictObject({ general, activeTick: policyTickSchema }) : z.strictObject({ general })).parse(
-      input.result,
-    );
+    if (heritage && !modern) throw new Error('유산 생성은 정책 기능이 있는 새 판에서만 허용합니다.');
+    (heritage
+      ? z.strictObject({ general, activeTick: policyTickSchema, heritage: heritageCreationRecordSchema.optional() })
+      : modern
+        ? z.strictObject({ general, activeTick: policyTickSchema })
+        : z.strictObject({ general })
+    ).parse(input.result);
+    assertHeritageCreationResult(input.payload, input.result, heritage, five);
   } else {
     if (!modern) throw new Error('전환 전 방침 입력입니다.');
     if (input.kind === 'general.setPolicy') {

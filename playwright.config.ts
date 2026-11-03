@@ -23,6 +23,7 @@ export default defineConfig({
     '**/t4-93-logistics.spec.ts',
     '**/t4-94-governance.spec.ts',
     '**/t4-95-lineage.spec.ts',
+    '**/t4-96-heritage.spec.ts',
   ],
   forbidOnly: isCI,
   use: { baseURL: 'http://127.0.0.1:5173' },

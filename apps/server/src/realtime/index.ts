@@ -257,6 +257,8 @@ export function registerRealtime<L extends FastifyBaseLogger>(
       warn();
       return reply.code(503).send({ error: '실시간 연결을 다시 시도하세요.' });
     }
+    // 연결 준비를 기다리는 동안 종료되거나 요청이 끊겼으면 새 스트림을 등록하지 않는다.
+    if (closing || reply.raw.destroyed) return reply.code(503).send({ error: '실시간 연결을 다시 시도하세요.' });
     reply.hijack();
     reply.raw.writeHead(200, {
       'content-type': 'text/event-stream; charset=utf-8',

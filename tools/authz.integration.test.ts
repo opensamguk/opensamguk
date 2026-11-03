@@ -35,6 +35,7 @@ const paths = [
   'world.map',
   'general.create',
   'general.mine',
+  'heritage.mine',
   'turns.get',
   'turns.set',
   'turns.edit',
@@ -53,7 +54,8 @@ const paths = [
 ] as const;
 type Path = (typeof paths)[number];
 function input(path: Path): unknown {
-  if (['health', 'auth.me', 'auth.logout', 'world.list', 'world.publicMaps'].includes(path)) return undefined;
+  if (['health', 'auth.me', 'auth.logout', 'world.list', 'world.publicMaps', 'heritage.mine'].includes(path))
+    return undefined;
   if (path === 'auth.signup') return { email: `${randomUUID()}@example.test`, password };
   if (path === 'auth.login') return { email: users[0]!.email, password };
   if (path === 'timelapse.publicFrames') return { worldId: endedWorldId };
@@ -234,6 +236,9 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
                   expect.objectContaining({ key: 'farm' }),
                 ]),
               );
+            } else if (path === 'heritage.mine') {
+              expect(result.status).toBe(200);
+              expect(result.data).toMatchObject({ userId: users[3]!.id, balance: 0, entries: [] });
             } else {
               // 이 월드에 자기 장수가 없는 사용자는 남의 장수·예턴·기록을 대신 고를 수 없다.
               expect(result.code).toBe('NOT_FOUND');

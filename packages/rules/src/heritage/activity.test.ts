@@ -24,6 +24,13 @@ it('AC-P2-33 등록된 입력을 수동 활동과 제외 항목 중 정확히 �
   for (const row of ruleRegistry.inputKinds)
     expect(Number(direct.has(row.kind)) + Number(ignored.has(row.kind)), row.kind).toBe(1);
 });
+it('AC-P2-33 수동 활동은 두 예턴 편집 경로 외에는 시각을 저장하는 공통 대기열을 거친다', () => {
+  expect(
+    HERITAGE_DIRECT_INPUT_KINDS.filter(
+      (kind) => ruleRegistry.inputKinds.find((definition) => definition.kind === kind)?.route !== 'queued',
+    ),
+  ).toEqual(['turns.set', 'nationTurns.set']);
+});
 it('AC-P2-33 같은 계정의 전임자·후계자 입력은 한 달에 한 번만 센다', () => {
   const rows = [
     { ...input(), generalId: 5 },
