@@ -54,7 +54,8 @@ async function server(handler: (request: IncomingMessage, response: ServerRespon
       bound = true;
       break;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw error;
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== 'EADDRINUSE' && !(process.platform === 'win32' && code === 'EACCES')) throw error;
     }
   }
   if (!bound) throw new Error('loopback HTTP fixture port unavailable after 16 atomic binds');
