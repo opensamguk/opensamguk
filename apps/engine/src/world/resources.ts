@@ -8,13 +8,13 @@ import { resourceRoot as resolveResourceRoot } from '@opensamguk/shared/resource
 
 export const resourceRoot = resolveResourceRoot();
 
-let sexLedger: SexLedger | undefined;
+const SEX_LEDGER_FILES = ['officers/191-sex.json', 'officers/191-sex-2.json'] as const;
+const sexLedgers = new Map<string, SexLedger>();
 // 생성 때만 읽고 적용 값을 재생 원본에 고정한다. 사실 추가는 기존 원장을 덮지 않고 새 판으로 다룬다.
-export function loadSexLedger(): SexLedger {
-  if (sexLedger) return sexLedger;
-  const parsed = sexLedgerSchema.parse(
-    JSON.parse(readFileSync(new URL('officers/191-sex.json', resolveResourceRoot()), 'utf8')),
-  );
+function readSexLedger(path: (typeof SEX_LEDGER_FILES)[number]): SexLedger {
+  const cached = sexLedgers.get(path);
+  if (cached) return cached;
+  const parsed = sexLedgerSchema.parse(JSON.parse(readFileSync(new URL(path, resolveResourceRoot()), 'utf8')));
   const { review, ...content } = parsed;
   if (hashState(content) !== review.contentSha256) throw Error('성별 원장의 검토 해시가 다릅니다.');
   for (const row of parsed.rows)
@@ -23,8 +23,14 @@ export function loadSexLedger(): SexLedger {
       `sha256:${hashState({ identity: row.identity, sex: row.sex, urls: row.evidence.urls, quotes: row.evidence.quotes })}`
     )
       throw Error('성별 원장의 선택 사실 해시가 다릅니다.');
-  sexLedger = parsed;
-  return sexLedger;
+  sexLedgers.set(path, parsed);
+  return parsed;
+}
+export function loadSexLedgers(): SexLedger[] {
+  return SEX_LEDGER_FILES.map(readSexLedger);
+}
+export function loadSexLedger(): SexLedger {
+  return readSexLedger(SEX_LEDGER_FILES.at(-1)!);
 }
 
 export interface WorldResourceSelection {

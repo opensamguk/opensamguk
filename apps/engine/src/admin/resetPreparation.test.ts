@@ -2,8 +2,10 @@ import { readFileSync } from 'node:fs';
 import type { Prisma, PrismaClient, PublishedResource } from '@opensamguk/db';
 import { parsePreset, worldCreateIntent, ADMIN_RESET_KIND, type ReplayOriginV3 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
-import { beforeAll, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, expect, it, vi } from 'vitest';
 import { composeInitialWorld, type InitialResources } from '../world/resources';
+import * as resourceLoaders from '../world/resources';
+import { lineageTestConfig } from '@opensamguk/rules/testing/lineage';
 import {
   prepareInitialWorld,
   savePreparedInitialWorld,
@@ -45,6 +47,7 @@ const options: InitialWorldOptions = {
   replayFormat: 3,
   ruleFeatures: features,
 };
+afterEach(() => vi.restoreAllMocks());
 type World = Prisma.WorldGetPayload<Record<string, never>>;
 type Request = Prisma.WorldCreateRequestGetPayload<Record<string, never>>;
 type Event = Prisma.InputEventGetPayload<Record<string, never>>;
@@ -178,6 +181,71 @@ function fixture(useRequest = true) {
 async function reject(f: ReturnType<typeof fixture>, code: ResetPreparationError['code']) {
   await expect(prepareWorldReset(f.db, worldId, 'new-seed', controller().signal)).rejects.toMatchObject({ code });
 }
+
+async function sexEditionFixture(useRequest: boolean, useLatest = false) {
+  const f = fixture(useRequest),
+    ruleFeatures = [...features, 'lineage-v1'].sort(),
+    lineageOptions = { ...options, ruleFeatures, featureData: { 'lineage-v1': lineageTestConfig } },
+    initial = composeInitialWorld(resources, oldSeed);
+  initial.ruleFeatures = ruleFeatures;
+  const old = prepareInitialWorld(initial, lineageOptions, resourceLoaders.loadSexLedgers()[0]),
+    latest = prepareInitialWorld(initial, lineageOptions);
+  expect(old.stateHash).not.toBe(latest.stateHash);
+  Object.assign(f.world, (await capture(useLatest ? latest : old)).world);
+  if (useRequest) {
+    const row = request(f.world),
+      intent = { ...(row.intent as Record<string, unknown>), ruleFeatures };
+    f.requests[0] = { ...row, intent, intentHash: hashState(intent) } as Request;
+  }
+  return f;
+}
+
+it.each([true, false])('AC-P2-32 초기화는 기존 성별 판을 유지한다: 생성 요청 %s', async (useRequest) => {
+  const f = await sexEditionFixture(useRequest),
+    before = structuredClone(f.world),
+    result = await prepareWorldReset(f.db, worldId, 'new-sex-edition-seed', controller().signal),
+    saved = await capture(result.prepared),
+    origin = saved.world.replayOrigin as unknown as ReplayOriginV3;
+  expect(origin.initial.generals.find((general) => general.id === 47)?.sex).toBe('UNKNOWN');
+  expect(origin.initial.generals.find((general) => general.id === 439)?.sex).toBe('FEMALE');
+  expect(origin.initial.seed).toBe('new-sex-edition-seed');
+  expect(result.evidence.provenance.kind).toBe(useRequest ? 'request' : 'cli');
+  expect(f.world).toEqual(before);
+});
+
+it.each([true, false])('AC-P2-32 생성 당시 성별 판이 없으면 초기화를 거부한다: 생성 요청 %s', async (useRequest) => {
+  const f = await sexEditionFixture(useRequest),
+    latest = resourceLoaders.loadSexLedger();
+  vi.spyOn(resourceLoaders, 'loadSexLedgers').mockReturnValue([latest]);
+  await reject(f, 'RESOURCE_INVALID');
+});
+
+it.each([true, false])('AC-P2-32 최신 성별 판의 초기화는 두 번째 후보와 맞는다: 생성 요청 %s', async (useRequest) => {
+  const f = await sexEditionFixture(useRequest, true),
+    result = await prepareWorldReset(f.db, worldId, 'latest-sex-edition-seed', controller().signal),
+    saved = await capture(result.prepared),
+    origin = saved.world.replayOrigin as unknown as ReplayOriginV3;
+  expect(origin.initial.generals.find((general) => general.id === 47)?.sex).toBe('MALE');
+  expect(origin.initial.generals.find((general) => general.id === 439)?.sex).toBe('FEMALE');
+  expect(result.evidence.provenance.kind).toBe(useRequest ? 'request' : 'cli');
+});
+
+it('AC-P2-32 최신 판과 맞는 월드도 원장 검토 오류를 감추지 않는다', async () => {
+  const f = await sexEditionFixture(true, true);
+  vi.spyOn(resourceLoaders, 'loadSexLedgers').mockImplementation(() => {
+    throw Error('잘못된 검토 해시');
+  });
+  await reject(f, 'RESOURCE_INVALID');
+});
+
+it('AC-P2-32 가문을 끈 초기화는 성별 원장을 읽지 않는다', async () => {
+  const f = fixture(),
+    all = vi.spyOn(resourceLoaders, 'loadSexLedgers'),
+    latest = vi.spyOn(resourceLoaders, 'loadSexLedger');
+  await prepareWorldReset(f.db, worldId, 'off-sex-edition-seed', controller().signal);
+  expect(all).not.toHaveBeenCalled();
+  expect(latest).not.toHaveBeenCalled();
+});
 
 async function san10RequestFixture(scenario: 'san10-191' | 'san10-empty') {
   const presetKey = scenario === 'san10-empty' ? 'empty' : 'regular',

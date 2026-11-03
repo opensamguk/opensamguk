@@ -7,8 +7,9 @@ import {
   readInitialResources,
   loadPreset,
   resolveWorldResourceSelection,
+  loadSexLedgers,
 } from '../world/resources';
-import { prepareInitialWorld, savePreparedInitialWorld } from '../world/persistence';
+import { prepareInitialWorld, savePreparedInitialWorld, type PreparedInitialWorld } from '../world/persistence';
 
 type Request = Prisma.WorldCreateRequestGetPayload<Record<string, never>>;
 class CreationRejected extends Error {
@@ -67,21 +68,34 @@ async function resolveCreation(db: PrismaClient, request: Request) {
   } catch (error) {
     resourceFailure(error);
   }
-  let prepared;
+  let prepared: PreparedInitialWorld | undefined;
   try {
     const combined = [...new Set([...(state.ruleFeatures ?? []), ...(intent.ruleFeatures ?? [])])].sort();
     const ruleFeatures = combined.length ? checkRuleFeatures(combined) : [];
     if (state.ruleFeatures) state.ruleFeatures = ruleFeatures;
-    prepared = prepareInitialWorld(state, {
+    const options = {
       name: intent.name,
       turnTermMinutes,
       endYear: intent.endYear,
       ruleFeatures,
       ...(preset ? { preset: { key: intent.presetKey!, value: preset } } : {}),
-    });
+    };
+    const frozenHash =
+      request.resolution && typeof request.resolution === 'object' && !Array.isArray(request.resolution)
+        ? request.resolution.initialStateHash
+        : undefined;
+    const ledgers = request.resolution !== null && ruleFeatures.includes('lineage-v1') ? loadSexLedgers() : [undefined];
+    for (const ledger of ledgers) {
+      const candidate = prepareInitialWorld(structuredClone(state), options, ledger);
+      if (request.resolution === null || !ruleFeatures.includes('lineage-v1') || candidate.stateHash === frozenHash) {
+        prepared = candidate;
+        break;
+      }
+    }
   } catch {
     throw new CreationRejected('INPUT_INVALID');
   }
+  if (!prepared) throw new CreationRejected('RESOURCE_INVALID');
   const resolution = {
     version: 1,
     selection,

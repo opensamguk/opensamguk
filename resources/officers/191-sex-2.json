@@ -1,0 +1,254 @@
+{
+  "version": 1,
+  "scenarios": [
+    "1030",
+    "integration191"
+  ],
+  "review": {
+    "status": "approved",
+    "reviewer": "Claude 독립 원문·자료 검토",
+    "evidence": "2026-11-04 고정 원문 판2583915·5314829·8729938·2567991·2568043의 직접 친족 표현으로 새12행 승인, 간접 추론 조조392 제외. 기존2행 보존, Codex가 두 시나리오 인물 대응·선택 사실 및 전체 내용 해시를 검증했다. 실행 검증은 별도다.",
+    "contentSha256": "4b63c4842f0b41d81fe4b8ba6df25dbaec4cc083b8c30f1a2f3c126c2b23e847"
+  },
+  "rows": [
+    {
+      "generalId": 108,
+      "name": "맹획",
+      "identity": "孟獲",
+      "sex": "MALE",
+      "sourceId": "wikisource-zh:三國演義/第090回",
+      "sourceRevision": "sha256:eabf3fa1e7e522b39cb55bf31f85f4a691a281a18fdf6a0384bdb38b8215c388",
+      "evidence": {
+        "kind": "primary-text",
+        "quotes": [
+          "既為男子"
+        ],
+        "urls": [
+          "https://zh.wikisource.org/wiki/三國演義/第090回"
+        ]
+      }
+    },
+    {
+      "generalId": 439,
+      "name": "축융",
+      "identity": "祝融",
+      "sex": "FEMALE",
+      "sourceId": "wikisource-zh:三國演義/第090回",
+      "sourceRevision": "sha256:25e660e04c2c638c922cd7e744ad787d1277ff1b7a838d7434d792e2aef42e19",
+      "evidence": {
+        "kind": "primary-text",
+        "quotes": [
+          "我雖是一婦人",
+          "妻祝融夫人"
+        ],
+        "urls": [
+          "https://zh.wikisource.org/wiki/三國演義/第090回"
+        ]
+      }
+    },
+    {
+      "generalId": 47,
+      "name": "관우",
+      "identity": "関羽",
+      "sex": "MALE",
+      "sourceId": "wikisource-zh:三國演義/第001回",
+      "sourceRevision": "sha256:61600c45f164082391bfeca13e944d7503321737fc60c1c212e755a20c9150f4",
+      "evidence": {
+        "kind": "primary-text",
+        "quotes": [
+          "念劉備、關羽、張飛，雖然異姓，既結為兄弟"
+        ],
+        "urls": [
+          "https://zh.wikisource.org/w/index.php?title=%E4%B8%89%E5%9C%8B%E6%BC%94%E7%BE%A9%2F%E7%AC%AC001%E5%9B%9E&oldid=2583915"
+        ]
+      }
+    },
+    {
+      "generalId": 281,
+      "name": "유비",
+      "identity": "劉備",
+      "sex": "MALE",
+      "sourceId": "wikisource-zh:三國演義/第001回",
+      "sourceRevision": "sha256:b79f76fa429bac8120165fbaa4f18e7b4fbfcbf9c2b66d2b22b89e3d0e15bdee",
+      "evidence": {
+        "kind": "primary-text",
+        "quotes": [
+          "念劉備、關羽、張飛，雖然異姓，既結為兄弟"
+        ],
+        "urls": [
+          "https://zh.wikisource.org/w/index.php?title=%E4%B8%89%E5%9C%8B%E6%BC%94%E7%BE%A9%2F%E7%AC%AC001%E5%9B%9E&oldid=2583915"
+        ]
+      }
+    },
+    {
+      "generalId": 322,
+      "name": "장비",
+      "identity": "張飛",
+      "sex": "MALE",
+      "sourceId": "wikisource-zh:三國演義/第001回",
+      "sourceRevision": "sha256:a2bdff93e80f41db0f692fb6fab95b3863046db85b1652bc18f6d90368bc6fc0",
+      "evidence": {
+        "kind": "primary-text",
+        "quotes": [
+          "念劉備、關羽、張飛，雖然異姓，既結為兄弟"
+        ],
+        "urls": [
+          "https://zh.wikisource.org/w/index.php?title=%E4%B8%89%E5%9C%8B%E6%BC%94%E7%BE%A9%2F%E7%AC%AC001%E5%9B%9E&oldid=2583915"
+        ]
+      }
+    },
+    {
+      "generalId": 314,
+      "name": "장각",
+      "identity": "張角",
+      "sex": "MALE",
+      "sourceId": "wikisource-zh:三國演義/第001回",
+      "sourceRevision": "sha256:4d387fca0597727d8fdf75482f0bf3fd4f04a1da9fc3b1fc17d6a26237e42bef",
+      "evidence": {
+        "kind": "primary-text",
+        "quotes": [
+          "時鉅鹿郡有兄弟三人：一名張角，一名張寶，一名張梁"
+        ],
+        "urls": [
+          "https://zh.wikisource.org/w/index.php?title=%E4%B8%89%E5%9C%8B%E6%BC%94%E7%BE%A9%2F%E7%AC%AC001%E5%9B%9E&oldid=2583915"
+        ]
+      }
+    },
+    {
+      "generalId": 318,
+      "name": "장량",
+      "identity": "張梁",
+      "sex": "MALE",
+      "sourceId": "wikisource-zh:三國演義/第001回",
+      "sourceRevision": "sha256:b1d200acd20087a3a794d775d59c10d28519f3662248efafcd2e3fb4fe4cbb14",
+      "evidence": {
+        "kind": "primary-text",
+        "quotes": [
+          "時鉅鹿郡有兄弟三人：一名張角，一名張寶，一名張梁"
+        ],
+        "urls": [
+          "https://zh.wikisource.org/w/index.php?title=%E4%B8%89%E5%9C%8B%E6%BC%94%E7%BE%A9%2F%E7%AC%AC001%E5%9B%9E&oldid=2583915"
+        ]
+      }
+    },
+    {
+      "generalId": 321,
+      "name": "장보",
+      "identity": "張宝",
+      "sex": "MALE",
+      "sourceId": "wikisource-zh:三國演義/第001回",
+      "sourceRevision": "sha256:8107579ae6f27246dba09aa1b67eb21233fa0959cfaad65a61ec4614d7de0058",
+      "evidence": {
+        "kind": "primary-text",
+        "quotes": [
+          "時鉅鹿郡有兄弟三人：一名張角，一名張寶，一名張梁"
+        ],
+        "urls": [
+          "https://zh.wikisource.org/w/index.php?title=%E4%B8%89%E5%9C%8B%E6%BC%94%E7%BE%A9%2F%E7%AC%AC001%E5%9B%9E&oldid=2583915"
+        ]
+      }
+    },
+    {
+      "generalId": 229,
+      "name": "여포",
+      "identity": "呂布",
+      "sex": "MALE",
+      "sourceId": "wikisource-zh:三國演義/第008回",
+      "sourceRevision": "sha256:ed2e0e521a49ed466365d897be1baa7e10a48fe7f2350fad9f4156d28d6a995a",
+      "evidence": {
+        "kind": "primary-text",
+        "quotes": [
+          "董卓有一義兒，姓呂，名布，驍勇異常"
+        ],
+        "urls": [
+          "https://zh.wikisource.org/w/index.php?title=%E4%B8%89%E5%9C%8B%E6%BC%94%E7%BE%A9%2F%E7%AC%AC008%E5%9B%9E&oldid=5314829"
+        ]
+      }
+    },
+    {
+      "generalId": 167,
+      "name": "손견",
+      "identity": "孫堅",
+      "sex": "MALE",
+      "sourceId": "wikisource-zh:三國演義/第015回",
+      "sourceRevision": "sha256:6590ec672433980142caa9cc48a3be9c2fd120aebc0e8328993cb179dd8c9abb",
+      "evidence": {
+        "kind": "primary-text",
+        "quotes": [
+          "因思父孫堅如此英雄"
+        ],
+        "urls": [
+          "https://zh.wikisource.org/w/index.php?title=%E4%B8%89%E5%9C%8B%E6%BC%94%E7%BE%A9%2F%E7%AC%AC015%E5%9B%9E&oldid=8729938"
+        ]
+      }
+    },
+    {
+      "generalId": 169,
+      "name": "손권",
+      "identity": "孫権",
+      "sex": "MALE",
+      "sourceId": "wikisource-zh:三國演義/第029回",
+      "sourceRevision": "sha256:f0861a9d7fc9e54a176ab2baa7677d2d161d448f88538d7cfb0370c3434bf108",
+      "evidence": {
+        "kind": "primary-text",
+        "quotes": [
+          "隨召張昭等諸人，及弟孫權"
+        ],
+        "urls": [
+          "https://zh.wikisource.org/w/index.php?title=%E4%B8%89%E5%9C%8B%E6%BC%94%E7%BE%A9%2F%E7%AC%AC029%E5%9B%9E&oldid=2567991"
+        ]
+      }
+    },
+    {
+      "generalId": 381,
+      "name": "조비",
+      "identity": "曹丕",
+      "sex": "MALE",
+      "sourceId": "wikisource-zh:三國演義/第079回",
+      "sourceRevision": "sha256:9dbf212aadd8119dba2ebbb3013b374b468d14292217aa74e7d598f50c12a90f",
+      "evidence": {
+        "kind": "primary-text",
+        "quotes": [
+          "彰即時叱退左右將士，隻身入內，拜見曹丕。兄弟二人，相抱大哭。曹彰將本部軍馬盡交與曹丕"
+        ],
+        "urls": [
+          "https://zh.wikisource.org/w/index.php?title=%E4%B8%89%E5%9C%8B%E6%BC%94%E7%BE%A9%2F%E7%AC%AC079%E5%9B%9E&oldid=2568043"
+        ]
+      }
+    },
+    {
+      "generalId": 394,
+      "name": "조창",
+      "identity": "曹彰",
+      "sex": "MALE",
+      "sourceId": "wikisource-zh:三國演義/第079回",
+      "sourceRevision": "sha256:bad137cdfd9b00d8fcfe3190a97a0cba8073f432239572a13eefde81454623e0",
+      "evidence": {
+        "kind": "primary-text",
+        "quotes": [
+          "彰即時叱退左右將士，隻身入內，拜見曹丕。兄弟二人，相抱大哭。曹彰將本部軍馬盡交與曹丕"
+        ],
+        "urls": [
+          "https://zh.wikisource.org/w/index.php?title=%E4%B8%89%E5%9C%8B%E6%BC%94%E7%BE%A9%2F%E7%AC%AC079%E5%9B%9E&oldid=2568043"
+        ]
+      }
+    },
+    {
+      "generalId": 385,
+      "name": "조식",
+      "identity": "曹植",
+      "sex": "MALE",
+      "sourceId": "wikisource-zh:三國演義/第079回",
+      "sourceRevision": "sha256:9a77c9838c968bf534a5213939b0d5f9ee9e026859f9d9af7a2ea5dd4589f882",
+      "evidence": {
+        "kind": "primary-text",
+        "quotes": [
+          "須臾，曹植入見，惶恐伏拜請罪。丕曰：「吾與汝情雖兄弟，義屬君臣"
+        ],
+        "urls": [
+          "https://zh.wikisource.org/w/index.php?title=%E4%B8%89%E5%9C%8B%E6%BC%94%E7%BE%A9%2F%E7%AC%AC079%E5%9B%9E&oldid=2568043"
+        ]
+      }
+    }
+  ]
+}
