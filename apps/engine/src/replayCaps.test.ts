@@ -159,6 +159,7 @@ function exportFixture(source: CapsArchive, ended = true) {
     campaignState: null,
     cityResourcesState: null,
     logisticsState: null,
+    governanceState: null,
     presetKey: null,
     preset: null,
     scenarioKey: initial.scenarioKey,

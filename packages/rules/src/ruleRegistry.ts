@@ -26,6 +26,7 @@ import { cityResourcesFeature, cityResourceInputKind } from './cityResourcesFeat
 import { ADMIN_END_KIND, applyAdminEndRecord } from './clock/end';
 import { ADMIN_RESET_KIND, applyAdminResetRecord } from './clock/reset';
 import { logisticsFeature, logisticsInputKind } from './logistics/feature';
+import { governanceFeature, governanceInputKind } from './governance/feature';
 
 export interface ReplayOriginV1 {
   version: 1;
@@ -52,7 +53,12 @@ export interface RuleFeatureDefinition {
     end?: { sequence: number; tick: number } | null;
   }): void;
   initReplayState?(replay: ReplayState, context: { initial: WorldInit; data: JsonValue | undefined }): ReplayState;
-  afterAppliedInput?(before: ReplayState, after: ReplayState, input: RecordedInput): ReplayState;
+  afterAppliedInput?(
+    before: ReplayState,
+    after: ReplayState,
+    input: RecordedInput,
+    context?: { route: InputKindDefinition['route'] },
+  ): ReplayState;
   settleMonthly?(context: { before: ReplayState; settled: ReplayState; tick: number }): {
     replay: ReplayState;
     effects: unknown;
@@ -84,8 +90,9 @@ export const ruleRegistry: RuleRegistry = {
     campaignAssignmentFeature,
     cityResourcesFeature,
     logisticsFeature,
+    governanceFeature,
   ],
-  monthlyOrder: ['treaty', 'personnel', 'campaign-assignment-v2', 'logistics-v1'],
+  monthlyOrder: ['treaty', 'personnel', 'campaign-assignment-v2', 'logistics-v1', 'governance-v1'],
   inputKinds: [
     ...ADMIN_CLOCK_KINDS.map((kind) => ({
       kind,
@@ -106,6 +113,7 @@ export const ruleRegistry: RuleRegistry = {
     ...campaignInputKinds,
     cityResourceInputKind,
     logisticsInputKind,
+    governanceInputKind,
   ],
 };
 

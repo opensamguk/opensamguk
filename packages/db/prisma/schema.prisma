@@ -10,6 +10,8 @@ datasource db {
 }
 
 model World {
+  governanceState Json?
+  governanceMovements GovernanceMovement[]
   logisticsState Json?
   logisticsMovements LogisticsMovement[]
   id              String      @id @default(uuid())
@@ -70,6 +72,28 @@ model World {
   assignmentOffers AssignmentOffer[]
   sanctions       Sanction[]
   createRequest   WorldCreateRequest?
+}
+
+model GovernanceMovement {
+  worldId String
+  sequence Int
+  ordinal Int
+  tick Int
+  kind String
+  refId Int
+  holder String
+  holderId Int
+  resource String
+  delta Int
+  fromNationId Int
+  toNationId Int
+  world World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@id([worldId, sequence, ordinal])
+  @@index([worldId, tick])
+  @@index([worldId, fromNationId, tick])
+  @@index([worldId, toNationId, tick])
+  @@index([worldId, holder, holderId, tick])
 }
 
 model LogisticsMovement {

@@ -1051,8 +1051,9 @@ it('정식 두191년 월드에서21개 변경 차단·본인 조회·같은 월�
   const guarded = Object.entries(procedures)
     .filter(([, procedure]) => procedure._def.meta?.worldSanction)
     .map(([path]) => path);
-  expect(guarded).toHaveLength(23);
+  expect(guarded).toHaveLength(24);
   expect(guarded).toContain('logistics.submit');
+  expect(guarded).toContain('governance.submit');
   expect(guarded).toContain('cityResources.allocate');
   // AC-INT-19B: 장수 지시 접수도 월드 제재 대상이다.
   expect(guarded).toContain('campaign.order');
@@ -1081,6 +1082,12 @@ it('정식 두191년 월드에서21개 변경 차단·본인 조회·같은 월�
     'cityResources.allocate': cityInput,
     'campaign.order': orderInput,
     'logistics.submit': logisticsInput,
+    'governance.submit': {
+      worldId,
+      requestId: randomUUID(),
+      expectedUserId: victim.id,
+      payload: { type: 'throne.ascend' },
+    },
   };
   const before = await snapshot();
   for (const path of guarded)

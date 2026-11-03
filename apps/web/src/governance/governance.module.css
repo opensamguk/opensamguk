@@ -1,0 +1,378 @@
+/* 황실 칸 (T4-94). 물류 칸(logistics.module.css)·국가 공지 대화상자와 같은 틀과 토큰만 쓴다. */
+.panel {
+  display: grid;
+  gap: var(--space-2);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-2);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.panel h3,
+.panel h4,
+.panel p {
+  margin: 0;
+}
+.title:focus {
+  outline: none;
+}
+.title:focus-visible {
+  outline: 2px solid var(--color-accent);
+}
+.body,
+.tabPanel {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.panel select,
+.panel input,
+.panel button,
+.panel summary {
+  font: inherit;
+  min-height: 44px;
+  min-width: 44px;
+  box-sizing: border-box;
+  max-width: 100%;
+}
+.panel select,
+.panel input:not([type='radio']) {
+  width: 100%;
+  min-width: 0;
+}
+.panel button {
+  padding: var(--space-1) var(--space-2);
+}
+.panel button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.primary,
+.danger {
+  border: 0;
+  border-radius: var(--radius);
+  font-weight: 600;
+  cursor: pointer;
+}
+.primary {
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+}
+.danger {
+  background: var(--color-danger);
+  color: var(--color-accent-text);
+}
+.secondary {
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+.note {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+.error {
+  color: var(--color-danger);
+}
+.ok {
+  color: var(--color-success);
+}
+.info {
+  color: var(--color-info);
+}
+.status {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--color-info);
+}
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* 요약 네 칸: 넓으면 2×2, 좁으면 한 줄씩. 칸이 최소 절반 폭이라 3+1로 빈 칸이 남지 않는다. */
+.hud {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(max(min(200px, 100%), calc((100% - 1px) / 2)), 1fr));
+  gap: 1px;
+  margin: 0;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-border);
+}
+.hud > div {
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  background: var(--color-surface-raised);
+  min-width: 0;
+}
+.hud dt {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+.hud dd {
+  margin: 0;
+}
+
+/* 정통성 막대. 붉은 눈금이 즉위 기준이다. 값은 옆 글자로도 보인다. */
+.meter {
+  position: relative;
+  height: 12px;
+  min-width: 80px;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+}
+.meter i {
+  display: block;
+  height: 100%;
+  background: var(--color-gold);
+}
+.meter b {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--color-danger);
+}
+.legit {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.legit li {
+  display: grid;
+  grid-template-columns: auto minmax(80px, 1fr) auto;
+  gap: var(--space-1) var(--space-2);
+  align-items: center;
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.legit li > .note {
+  grid-column: 1 / -1;
+}
+.value {
+  font-variant-numeric: tabular-nums;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  border-bottom: 2px solid var(--color-border-strong);
+}
+.tab {
+  border: 1px solid var(--color-border);
+  border-bottom: 0;
+  border-radius: var(--radius);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  cursor: pointer;
+}
+.tab[aria-selected='true'] {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  font-weight: 600;
+}
+.count {
+  display: inline-block;
+  min-width: 1.5em;
+  padding: 0 var(--space-1);
+  border: 1px solid currentColor;
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+  gap: var(--space-2);
+}
+.card {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-left-width: 4px;
+  background: var(--color-surface-raised);
+  min-width: 0;
+}
+.card h4 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: center;
+}
+.mine {
+  border-left-color: var(--color-accent);
+}
+.form {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.form label {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+  gap: var(--space-2);
+}
+.choice {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.choice legend {
+  padding: 0;
+  margin-bottom: var(--space-1);
+}
+.choice label {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-height: 44px;
+}
+.choice label > span {
+  display: grid;
+}
+.choice input {
+  min-width: 24px;
+  min-height: 24px;
+  margin: 10px 0 0;
+}
+.preview {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px var(--space-3);
+  margin: 0;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: var(--text-sm);
+}
+.preview dt {
+  color: var(--color-text-muted);
+}
+.preview dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.reasons {
+  margin: 0;
+  padding-left: var(--space-4);
+  color: var(--color-warning);
+  font-size: var(--text-sm);
+}
+.disc {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+  min-width: 0;
+}
+.disc > summary {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-2);
+  font-weight: 600;
+  cursor: pointer;
+}
+.disc > ul {
+  margin: 0;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border-top: 1px solid var(--color-border);
+  font-size: var(--text-sm);
+}
+.discBody {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2);
+  border-top: 1px solid var(--color-border);
+}
+
+/* 계열도: 들여쓰기와 왼쪽 선으로 상하위를 보인다. */
+.tree,
+.tree ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tree ul {
+  margin-left: var(--space-3);
+  padding-left: var(--space-2);
+  border-left: 2px solid var(--color-border-strong);
+}
+.node {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: center;
+  padding: var(--space-1) 0;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3);
+  background: color-mix(in srgb, var(--color-ink) 45%, transparent);
+}
+.dialog {
+  display: grid;
+  gap: var(--space-2);
+  width: min(440px, 100%);
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: var(--space-4);
+  border: var(--frame);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--frame-inset), var(--shadow-step);
+  overflow-wrap: anywhere;
+}
+.dangerDialog {
+  border-color: var(--color-danger);
+}
+.dialogTitle {
+  margin: 0;
+  font-size: var(--title-sm);
+}
+.dialogBody {
+  display: grid;
+  gap: var(--space-1);
+}
+.dialogBody p {
+  margin: 0;
+}
+.dialog button {
+  font: inherit;
+  min-height: 44px;
+  padding: var(--space-1) var(--space-3);
+}

@@ -82,6 +82,7 @@ export function worldSummary(world: ReadWorld, now: number) {
     turnTermMinutes: world.turnTermMinutes,
     ...(world.ruleFeatures.includes('city-resources-v1') ? { cityResourcesEnabled: true as const } : {}),
     ...(world.ruleFeatures.includes('logistics-v1') ? { logisticsEnabled: true as const } : {}),
+    ...(world.ruleFeatures.includes('governance-v1') ? { governanceEnabled: true as const } : {}),
   };
 }
 

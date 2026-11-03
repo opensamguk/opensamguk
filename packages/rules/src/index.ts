@@ -206,3 +206,11 @@ export {
   type LogisticsInput,
 } from './logistics/operations';
 export { logisticsResultSchema, validateLogisticsRecord } from './logistics/feature';
+export * from './governance/config';
+export * from './governance/state';
+export * from './governance/actions';
+export * from './governance/ledger';
+export * from './governance/origin';
+export * from './governance/visibility';
+export { reconcileGovernance, assertGovernanceFinal } from './governance/reconcile';
+export { governanceResultSchema, validateGovernanceRecord } from './governance/feature';

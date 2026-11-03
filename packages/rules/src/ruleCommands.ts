@@ -3,6 +3,7 @@ import type { WorldView } from './model/world';
 import { checkRuleFeatures, ruleRegistry, type RuleRegistry } from './ruleRegistry';
 import { createCampaignCommandResolver } from './campaign/commands';
 import { createCityResourceCommandResolver } from './cityResources/commands';
+import { createGovernanceCommandResolver } from './governance/commands';
 
 // 형식 3의 같은 기능 등록표에서 무상태 명령을 고른다. 기존 preset 선택은 따로 보존한다.
 export function resolverForRuleFeatures(
@@ -15,7 +16,8 @@ export function resolverForRuleFeatures(
     .filter((feature) => features.includes(feature.key))
     .flatMap((feature) => feature.commandBindings ?? []);
   const campaign = features.includes('campaign-v1');
-  if (!bindings.length && !campaign) return undefined;
+  const governance = features.includes('governance-v1');
+  if (!bindings.length && !campaign && !governance) return undefined;
   if (bindings.some((binding) => binding.sliceKeys.length))
     throw new Error('이 규칙 명령은 저장 조각을 지원하지 않습니다.');
   const definitions = bindings.map((binding) => binding.definition);
@@ -28,5 +30,6 @@ export function resolverForRuleFeatures(
     ...definitions,
   ]);
   const selected = campaign ? createCampaignCommandResolver(resolver) : resolver;
-  return features.includes('city-resources-v1') ? createCityResourceCommandResolver(selected) : selected;
+  const resources = features.includes('city-resources-v1') ? createCityResourceCommandResolver(selected) : selected;
+  return governance ? createGovernanceCommandResolver(resources) : resources;
 }
