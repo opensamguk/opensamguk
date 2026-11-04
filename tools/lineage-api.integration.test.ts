@@ -80,7 +80,7 @@ async function user(): Promise<User> {
   await db.session.create({ data: { id: session.id, userId: id, expiresAt: session.expiresAt } });
   return { id, cookie: `sid=${session.token}` };
 }
-async function world(lineage = true, peaceUntilTick = 300000) {
+async function world(lineage = true, peaceUntilTick = 300000, npcGenerations = false) {
   const initial = commandInitial();
   initial.seed = `lineage-pg-${randomUUID()}`;
   initial.diplomacies = initial.diplomacies.map((row) => ({
@@ -93,6 +93,21 @@ async function world(lineage = true, peaceUntilTick = 300000) {
   const config = structuredClone(lineageTestConfig);
   config.birth.comingOfAgeYears = 1;
   config.marriage.npc.perMonth = 1;
+  if (npcGenerations) {
+    initial.seed = 'lineage-pg-npc-generations';
+    for (const g of initial.generals)
+      Object.assign(g, {
+        sex: g.id <= 2 ? 'MALE' : 'FEMALE',
+        nationId: 2,
+        cityKey: 2,
+        officerLevel: g.id === 2 ? 12 : 1,
+        deathYear: initial.startYear + (g.id === 2 ? 1 : 2),
+        nextTurnTick: 1_000_000_000,
+      });
+    config.marriage.npc.perMonth = 2;
+    config.birth.lifespan = { min: 18, max: 18 };
+    config.birth.givenNames = Array.from({ length: 128 }, (_, i) => String.fromCodePoint(0xac00 + i));
+  }
   const saved = await saveInitialWorld(db, initial, {
     name: 'AC-P2-32 인공 4명',
     turnTermMinutes: 60,
@@ -446,6 +461,64 @@ it('AC-P2-32 출생 트랜잭션 실패는 새 행·예약을 모두 되돌리�
   expect(replayed).toHaveLength(24);
   expect(replayed.map((month) => month.stateHash)).toEqual(archive.months.map((month) => month.stateHash));
   expect(replayed.at(-1)!.stateHash).toBe(hashState(state));
+}, 120000);
+
+it('AC-P2-32 NPC 부모·자녀·손자녀 자동 계승은 연결 재개 뒤에도 같은 사슬과 월간 재생을 보존한다', async () => {
+  // 인공4명·출생자 수명18년·성인 등장1년이다. 혼인·부모 최소16과 실제 자손의 명령은 유지한다.
+  const id = await world(true, 2_400_000, true);
+  let connection = createDb(url!),
+    heir = 0,
+    grandchild = 0,
+    months = 12;
+  try {
+    for (; months <= 240; months += 12) {
+      await advance(id, months * 10000, false, connection);
+      const state = (await snapshot(id)).state,
+        successor = state.lineage!.persons['2']?.successorId;
+      if (!heir && successor) {
+        heir = successor;
+        expect(state.lineage!.persons[String(heir)]!.parents).toContain(2);
+        expect(state.generals[heir]).toMatchObject({ userId: null, nationId: 2, officerLevel: 12 });
+        await connection.$disconnect();
+        connection = createDb(url!);
+      }
+      if (heir) grandchild = state.lineage!.persons[String(heir)]!.successorId ?? 0;
+      if (grandchild) break;
+    }
+  } finally {
+    await connection.$disconnect();
+  }
+  const saved = await snapshot(id),
+    state = saved.state,
+    people = state.lineage!.persons;
+  expect(heir, JSON.stringify(people)).toBeGreaterThan(0);
+  expect(grandchild, JSON.stringify(people)).toBeGreaterThan(0);
+  expect(people['2']).toMatchObject({ successorId: heir, exit: { cause: 'DIED' } });
+  expect(people[String(heir)]).toMatchObject({ successorId: grandchild, exit: { cause: 'DIED' } });
+  expect(people[String(heir)]!.parents).toContain(2);
+  expect(people[String(grandchild)]!.parents).toContain(heir);
+  for (const predecessor of [2, heir])
+    expect(state.generals[predecessor]).toMatchObject({
+      userId: null,
+      nationId: null,
+      officerLevel: 0,
+      crew: 0,
+      gold: 0,
+      rice: 0,
+    });
+  expect(
+    Object.values(state.generals)
+      .filter((g) => g.nationId === 2 && g.officerLevel === 12)
+      .map((g) => g.id),
+  ).toEqual([grandchild]);
+  expect(await db.general.count({ where: { worldId: id, userId: { not: null } } })).toBe(0);
+  expect(await db.inputEvent.count({ where: { worldId: id } })).toBe(0);
+  const archive = await exportReplay(db, id),
+    replayed = replayArchive(archive, months);
+  expect(replayed).toHaveLength(months);
+  expect(replayed.map((month) => month.stateHash)).toEqual(archive.months.map((month) => month.stateHash));
+  expect(replayed.at(-1)!.stateHash).toBe(hashState(saved));
+  console.info('NPC_GENERATIONS', { months, chain: [2, heir, grandchild], stateHash: replayed.at(-1)!.stateHash });
 }, 120000);
 
 it('AC-P2-32 실제 218개월 두 번의 동의 계승은 단일 조작권·이전 영수증·다세대 재생을 보존한다', async () => {
