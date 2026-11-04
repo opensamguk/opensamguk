@@ -1051,7 +1051,8 @@ it('정식 두191년 월드에서21개 변경 차단·본인 조회·같은 월�
   const guarded = Object.entries(procedures)
     .filter(([, procedure]) => procedure._def.meta?.worldSanction)
     .map(([path]) => path);
-  expect(guarded).toHaveLength(25);
+  expect(guarded).toHaveLength(26);
+  expect(guarded).toContain('stratagemCards.setTrap');
   expect(guarded).toContain('lineage.submit');
   expect(guarded).toContain('logistics.submit');
   expect(guarded).toContain('governance.submit');
@@ -1080,6 +1081,13 @@ it('정식 두191년 월드에서21개 변경 차단·본인 조회·같은 월�
     payload: { type: 'trade', cityKey: human.cityKey, good: 'iron', side: 'buy', amount: 1 },
   };
   const inputs: Record<string, unknown> = {
+    'stratagemCards.setTrap': {
+      worldId,
+      requestId: randomUUID(),
+      expectedUserId: victim.id,
+      expectedGeneralId: human.id,
+      payload: { type: 'trap.set', nationId: human.nationId, cityKey: human.cityKey },
+    },
     'lineage.submit': {
       worldId,
       requestId: randomUUID(),

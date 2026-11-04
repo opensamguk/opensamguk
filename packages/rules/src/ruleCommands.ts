@@ -4,6 +4,7 @@ import { checkRuleFeatures, ruleRegistry, type RuleRegistry } from './ruleRegist
 import { createCampaignCommandResolver } from './campaign/commands';
 import { createCityResourceCommandResolver } from './cityResources/commands';
 import { createGovernanceCommandResolver } from './governance/commands';
+import { createStratagemCardResolver } from './stratagemCards/resolver';
 
 // 형식 3의 같은 기능 등록표에서 무상태 명령을 고른다. 기존 preset 선택은 따로 보존한다.
 export function resolverForRuleFeatures(
@@ -31,5 +32,6 @@ export function resolverForRuleFeatures(
   ]);
   const selected = campaign ? createCampaignCommandResolver(resolver) : resolver;
   const resources = features.includes('city-resources-v1') ? createCityResourceCommandResolver(selected) : selected;
-  return governance ? createGovernanceCommandResolver(resources) : resources;
+  const cards = features.includes('stratagem-cards-v1') ? createStratagemCardResolver(resources) : resources;
+  return governance ? createGovernanceCommandResolver(cards) : cards;
 }

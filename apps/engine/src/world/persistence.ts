@@ -28,6 +28,8 @@ import {
   initialLogisticsState,
   initialGovernanceState,
   initialLineageState,
+  initialStratagemCards,
+  readStratagemCardsConfig,
   storedGeneralSex,
   applySexLedger,
   assertGeneralSex,
@@ -289,6 +291,15 @@ export function prepareInitialWorld(
           ? {
               lineageState: initialLineageState(
                 featureData?.['lineage-v1'],
+                toWorldState(creationState),
+                creationState.seed,
+              ) as Prisma.InputJsonValue,
+            }
+          : {}),
+        ...(features.includes('stratagem-cards-v1')
+          ? {
+              stratagemCardsState: initialStratagemCards(
+                readStratagemCardsConfig(featureData?.['stratagem-cards-v1']),
                 toWorldState(creationState),
                 creationState.seed,
               ) as Prisma.InputJsonValue,

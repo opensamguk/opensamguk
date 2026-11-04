@@ -228,6 +228,18 @@ describe('선택된 인사 입력', () => {
 });
 
 describe('인사 기록과 직책 칸', () => {
+  it('직접 마무리는 직책 무결성 오류를 tick 오류보다 먼저 거부한다', () => {
+    const before = world();
+    const after = structuredClone(before);
+    after.generals[3]!.officerLevel = after.generals[4]!.officerLevel;
+    expect(() =>
+      finishPersonnelStep(deepFreeze(before), deepFreeze({ state: after, closedOffers: [], logs: [] }), {}, -1),
+    ).toThrow('한 직책에 장수가 둘 이상 있습니다.');
+    expect(() => finishPersonnelStep(before, { state: before, closedOffers: [], logs: [] }, {}, -1)).toThrow(
+      '인사 처리 tick이 잘못됐습니다.',
+    );
+  });
+
   it('형식이 정상이어도 현재 직책 revision이 다르면 거부한다', () => {
     const record = turnRecord();
     expect(() => applyNationTurnsRecord(world(), { 1: { 5: { revision: 7, tenure: 0 } } }, record)).toThrow();

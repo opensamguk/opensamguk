@@ -1,6 +1,7 @@
 import type { Prisma } from '@opensamguk/db';
 import {
   assertSlotSet,
+  emptyQueue,
   isPolicyKey,
   activityPayloadSchema,
   applyPersonnelInputStep,
@@ -36,27 +37,37 @@ import { processLineageInput } from './lineage/input';
 import { PgLineageRepository, persistLineageMonth } from './lineage/repository';
 import { reconcileLineageOrder } from './lineage/service';
 import type { LineageMonthEffects } from '@opensamguk/rules';
+import { processStratagemCardsInput } from './stratagemCards/input';
+import { reconcileQueuedStratagemCards } from './stratagemCards/state';
 
 export async function loadPersonnelTurnContext(tx: Prisma.TransactionClient, worldId: string, state: WorldState) {
   if (state.ruleFeatures?.includes('policy')) {
+    const expectedSlots = emptyQueue().map((_, slot) => slot);
+    // 조인 계획이 바뀌어도 이 조회의 예턴 집계는 한 번만 계산한다.
     const rows = await tx.$queryRaw<
       {
         id: number;
         defaultPolicy: string | null;
         userId: string | null;
         lastActiveTick: number | null;
-        slots: number[];
+        slots: number[] | null;
       }[]
     >`
+      WITH turn_slots AS MATERIALIZED (
+        SELECT "generalId", array_agg(slot ORDER BY slot) AS slots
+        FROM "GeneralTurn" WHERE "worldId" = ${worldId}
+        GROUP BY "generalId"
+      )
       SELECT g.id, g."defaultPolicy", g."userId", g."lastActiveTick",
-        COALESCE(array_agg(t.slot) FILTER (WHERE t.slot IS NOT NULL), ARRAY[]::integer[]) AS slots
+        CASE WHEN t.slots = ${expectedSlots}::integer[] THEN NULL
+          ELSE COALESCE(t.slots, ARRAY[]::integer[]) END AS slots
       FROM "General" g
-      LEFT JOIN "GeneralTurn" t ON t."worldId" = g."worldId" AND t."generalId" = g.id
+      LEFT JOIN turn_slots t ON t."generalId" = g.id
       WHERE g."worldId" = ${worldId}
-      GROUP BY g."worldId", g.id
       ORDER BY g.id
     `;
-    for (const row of rows) assertSlotSet(row.slots.map((slot) => ({ slot })));
+    // NULL은 정본 칸 배열과의 동등 검사를 마친 행이다.
+    for (const row of rows) if (row.slots !== null) assertSlotSet(row.slots.map((slot) => ({ slot })));
     for (const row of rows) {
       if (!isPolicyKey(row.defaultPolicy)) throw new Error('저장된 기본 방침이 올바르지 않습니다.');
       if (row.userId !== null && row.lastActiveTick === null) throw new Error('사람 장수의 활동 tick이 없습니다.');
@@ -146,6 +157,12 @@ const processPersonnelInput: QueuedInputHandler = async (tx, world, event, { tic
 
 export const builtInEngineFeatures: readonly EngineFeature[] = [
   {
+    key: 'stratagem-cards-v1',
+    queuedInputs: { 'stratagem-cards.act': processStratagemCardsInput },
+    // 다른 후처리의 엄격한 적재 전에 소유를 맞춘다. 원생성 월 시각으로 멱등 정리한다.
+    afterQueuedInput: (tx, world) => reconcileQueuedStratagemCards(tx, world.id),
+  },
+  {
     key: 'logistics-v1',
     queuedInputs: { 'logistics.order': processLogisticsInput },
     async persistMonthly(tx, worldId, _before, _next, effects, context) {
@@ -162,7 +179,7 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
       'campaign.order': processCampaignQueuedInput,
     },
     afterQueuedInput: (tx, world, before, input) =>
-      ['city.resources', 'logistics.order', 'governance.act', 'lineage.act'].includes(input.kind)
+      ['city.resources', 'logistics.order', 'governance.act', 'lineage.act', 'stratagem-cards.act'].includes(input.kind)
         ? Promise.resolve()
         : persistForeignCampaignInput(tx, world, before, input),
   },

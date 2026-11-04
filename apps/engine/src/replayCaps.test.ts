@@ -161,6 +161,7 @@ function exportFixture(source: CapsArchive, ended = true) {
     logisticsState: null,
     governanceState: null,
     lineageState: null,
+    stratagemCardsState: null,
     presetKey: null,
     preset: null,
     scenarioKey: initial.scenarioKey,

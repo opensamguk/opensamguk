@@ -13,7 +13,7 @@ import {
   campaignRecruitArgs,
   type CampaignPreparationKey,
 } from './preparation';
-import { readCampaignState } from './state';
+import { readCampaignState, type CampaignState } from './state';
 import { hasCampaignOrderAuthority } from './orders';
 
 const preparation = ['recruit', 'conscript', 'train', 'morale', 'dismiss'] as const;
@@ -21,9 +21,8 @@ const military = new Set<string>([...preparation, 'attack', 'move', 'return', 'f
 const allegiance = new Set(['join', 'join_random', 'found', 'uprising', 'resign', 'accept_invite']);
 const stratagems = new Set(['fire_attack', 'sabotage', 'incite']);
 
-function descendants(view: WorldView, id: number) {
-  const campaign = readCampaignState(view.campaign, view),
-    ids = [id];
+function descendants(campaign: CampaignState, id: number) {
+  const ids = [id];
   for (let index = 0; index < ids.length; index++)
     ids.push(...campaign.links.filter((link) => link.masterId === ids[index]).map((link) => link.personId));
   return ids;
@@ -46,7 +45,7 @@ function gate(view: WorldView, actor: Actor, key: string, value: unknown) {
     if (campaign.links.some((link) => link.personId === general.id))
       return fail('BAD_STATE', '휘하 관계를 해제한 뒤 소속을 바꿀 수 있습니다.');
     if (
-      descendants(view, general.id)
+      descendants(campaign, general.id)
         .slice(1)
         .some((id) => view.generals[id]!.userId !== null)
     )
@@ -149,7 +148,7 @@ export function createCampaignCommandResolver(base: CommandResolver): CommandRes
         }
         if (allegiance.has(key)) {
           const owner = state.generals[actor.generalId]!;
-          for (const id of descendants(view, actor.generalId).slice(1)) {
+          for (const id of descendants(readCampaignState(view.campaign, view), actor.generalId).slice(1)) {
             const child = state.generals[id]!;
             if (child.nationId !== owner.nationId) {
               if (child.userId !== null) throw new Error('다른 사람의 소속을 강제로 바꿀 수 없습니다.');
@@ -159,7 +158,6 @@ export function createCampaignCommandResolver(base: CommandResolver): CommandRes
           }
         }
         state = followCampaignCommanders(view, state);
-        readCampaignState(state.campaign, state);
         return { ...result, effects: [{ kind: 'world', state }] };
       },
     };

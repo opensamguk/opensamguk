@@ -18,6 +18,7 @@ function fixture(personnelFormat: 1 | null, policyFromSequence: number | null = 
     logisticsState: null,
     governanceState: null,
     lineageState: null,
+    stratagemCardsState: null,
     presetKey: null,
     scenarioKey: legacy.origin.initial.scenarioKey,
     mapKey: legacy.origin.initial.mapKey,

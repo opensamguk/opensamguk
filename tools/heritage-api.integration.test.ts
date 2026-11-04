@@ -29,6 +29,7 @@ import { withdrawAccount } from '../apps/server/src/auth/withdrawalStore';
 import type { AppRouter } from '../apps/server/src/router';
 import { initializeResources } from './init-resources';
 import { testDatabaseUrl } from './test-database';
+import { confirmDisconnectedDatabase } from './test-db-close';
 
 // 불변 원장은 지우지 않는다. 이 파일이 새로 만든 UUID DB에서만 실제 PG/HTTP/엔진을 검증한다.
 if (!process.env.TEST_DATABASE_URL) throw Error('전용 유산 테스트 DB가 필요합니다.');
@@ -58,6 +59,7 @@ const admin = new Client({ connectionString: adminUrl.href }),
   db = createDb(target.href),
   now = Date.now();
 let created = false,
+  oid: string | undefined,
   base: string,
   app: Awaited<ReturnType<typeof buildServer>> | undefined;
 type Out = inferRouterOutputs<AppRouter>;
@@ -803,6 +805,9 @@ beforeAll(async () => {
   await admin.connect();
   await admin.query(`CREATE DATABASE "${name}"`);
   created = true;
+  oid = (await admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname=$1', [name])).rows[0]?.oid as
+    string | undefined;
+  if (!oid) throw Error('생성한 유산 시험 DB OID가 없습니다.');
   await sql.connect();
   const migrations = new URL('../packages/db/prisma/migrations/', import.meta.url);
   for (const directory of (await readdir(migrations, { withFileTypes: true }))
@@ -824,11 +829,12 @@ afterAll(async () => {
   await sql.end();
   try {
     if (created) {
-      expect(
-        (await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1', [name])).rows,
-      ).toEqual([{ count: 0 }]);
+      if (!oid) throw Error('소유 유산 시험 DB OID를 확인하지 못해 보존합니다.');
+      const observation = await confirmDisconnectedDatabase(admin, name, oid);
+      expect(observation.connections).toBe(0);
       await admin.query(`DROP DATABASE "${name}"`);
       expect((await admin.query('SELECT datname FROM pg_database WHERE datname=$1', [name])).rows).toEqual([]);
+      console.info(JSON.stringify({ event: 'heritage-db-dropped', name, oid, ...observation, absent: true }));
     }
   } finally {
     await admin.end();

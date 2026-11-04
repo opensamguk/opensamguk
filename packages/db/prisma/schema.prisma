@@ -12,6 +12,7 @@ datasource db {
 model World {
   notificationOutbox  NotificationOutbox[]
   lineageState        Json?
+  stratagemCardsState Json?
   governanceState     Json?
   governanceMovements GovernanceMovement[]
   logisticsState      Json?

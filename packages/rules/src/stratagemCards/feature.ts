@@ -22,7 +22,7 @@ const rejectionSchema = z.strictObject({
   reason: z.string().min(1).optional(),
 });
 
-function supportedConfig(data: unknown) {
+export function readStratagemCardsConfig(data: unknown) {
   const { config } = stratagemCardsFeatureDataSchema.parse(data);
   if (!config.consumeOnRollFailure || config.campaignLoss !== 'eligibleAll' || config.setter !== 'ruler')
     throw Error('아직 구현하지 않은 계략 패 규칙입니다.');
@@ -45,14 +45,14 @@ export function validateStratagemCardsRecord(input: RecordedInput) {
   if (result.tick !== input.tick) throw Error('계략 패 입력과 결과 시각이 다릅니다.');
 }
 
-// 엔진·DB·HTTP 연결 전에는 운영 등록표에 넣지 않는다. 순수 재생 시험은 전용 등록표를 쓴다.
+// 설정은 원생성에 명시한다. 공개 생성 목록과 운영 기본값은 별도로 정한다.
 export const stratagemCardsFeature: RuleFeatureDefinition = {
   key: 'stratagem-cards-v1',
   requires: ['personnel', 'stratagem-basic'],
   conflicts: [],
   checkOrigin({ initial, data }) {
     if (Object.hasOwn(initial, 'stratagemCards')) throw Error('계략 패는 원생성의 빈 상태에서 시작합니다.');
-    initialStratagemCards(supportedConfig(data), toWorldState(initial), initial.seed);
+    initialStratagemCards(readStratagemCardsConfig(data), toWorldState(initial), initial.seed);
   },
   initReplayState(replay, { initial, data }) {
     if (Object.hasOwn(replay.state, 'stratagemCards')) throw Error('계략 패 초기화가 중복됐습니다.');
@@ -60,7 +60,7 @@ export const stratagemCardsFeature: RuleFeatureDefinition = {
       ...replay,
       state: {
         ...replay.state,
-        stratagemCards: initialStratagemCards(supportedConfig(data), replay.state, initial.seed),
+        stratagemCards: initialStratagemCards(readStratagemCardsConfig(data), replay.state, initial.seed),
       },
     };
   },
