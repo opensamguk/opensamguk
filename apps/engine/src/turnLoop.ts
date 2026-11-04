@@ -26,7 +26,7 @@ import { persistMonthly, loadReplayState } from './monthly';
 import { hashState } from '@opensamguk/shared/node';
 import { processInputs, processPendingInput } from './inputs';
 import { checkWorldReplay } from './features';
-import { persistPersonnelPacket } from './ruleFeatures';
+import { loadPersonnelTurnContext, persistPersonnelPacket } from './ruleFeatures';
 import { appendLogisticsMovements } from './logisticsState';
 import { engineResolver, persistExt, verifyWorldExt } from './extState';
 import { assertWorldCapabilities } from './capsGate';
@@ -259,11 +259,11 @@ export class TurnLoop {
           sequence = await nextActionSequence(tx, worldId);
           await tx.$queryRaw`SELECT id FROM "General" WHERE "worldId" = ${worldId} AND id = ${due.id} FOR UPDATE`;
           // 예턴 편집은 actor 행 잠금 또는 turnRevision 조건을 함께 사용해야 한다.
+          const state = await loadWorldAfterCapabilityCheck(tx, world, capabilities);
           const personnelBefore =
             world.replayFormat === 3 && world.ruleFeatures.includes('personnel')
-              ? await loadReplayState(tx, worldId)
+              ? await loadPersonnelTurnContext(tx, worldId, state)
               : null;
-          const state = personnelBefore?.state ?? (await loadWorldAfterCapabilityCheck(tx, world, capabilities));
           const actor = await tx.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: due.id } } });
           const slots = await tx.generalTurn.findMany({
             where: { worldId, generalId: due.id },
