@@ -11,6 +11,8 @@ import {
 
 // INT-11 AC-INT-11. 전용 공개 dist 구성에서만 열거하고 실행한다.
 test.describe.configure({ timeout: 120_000, retries: 0 });
+// C는 두 사람의 가입 차례가 월 마지막 tick인 경계를 매번 실제로 거친다.
+const lateOnboardingTest = test.extend({ offerLateOnboarding: true });
 
 test('AC-INT-11 A 이전 표시→실제 NPC commit→명시적 최신 조회→POST 한 번', async ({ offer }) =>
   offer.run(async () => {
@@ -90,7 +92,7 @@ test('AC-INT-11 B 최신 실제 조회 후 NPC commit은409·접수0·비용0', 
     offer.journal.push({ case: 'B', snapshotRevision: fresh.revision, submitted: posts[0]!.input, status: 409 });
   }));
 
-test('AC-INT-11 C 선행 정상 입력 뒤 engine STALE은 비용·시도·후속 RNG에 영향0', async ({ offer }) =>
+lateOnboardingTest('AC-INT-11 C 선행 정상 입력 뒤 engine STALE은 비용·시도·후속 RNG에 영향0', async ({ offer }) =>
   offer.run(async () => {
     const [main, control] = offer.worlds;
     // 같은 실제 NPC commit을 두 월드에서 먼저 확정한다. 접수 뒤 NPC가 먼저 실행된다고 가정하지 않는다.
@@ -168,7 +170,8 @@ test('AC-INT-11 C 선행 정상 입력 뒤 engine STALE은 비용·시도·후�
     }
     expect(posts).toHaveLength(1);
     offer.journal.push({ case: 'C', requestId, stale: 'STALE_REVISION', nextActualResults: results });
-  }));
+  }),
+);
 
 test('AC-INT-11 D A 최신 조회 후 B 쿠키로 바뀌면403·접수0', async ({ offer }) =>
   offer.run(async () => {
