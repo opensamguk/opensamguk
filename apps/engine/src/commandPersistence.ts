@@ -36,12 +36,17 @@ export async function persistCommandState(
   at: ActionAt,
   previous?: WorldState,
   beforeNationRemoval?: () => Promise<void>,
+  // 같은 트랜잭션에서 잠근 World 행의 원생성을 검증해 얻은 목록만 전달한다.
+  knownCityArmyTypes?: readonly number[],
 ) {
   // 같은 잠긴 트랜잭션에서 읽은 사본은 다시 조회하지 않는다.
   const before = previous ?? (await loadWorld(tx, worldId));
   await persistCampaignState(tx, worldId, before, state);
   const cityArmyTypes = before.ruleFeatures?.includes('city-resources-v1')
-    ? readCampaignArmyTypes(await tx.world.findUniqueOrThrow({ where: { id: worldId } }))
+    ? (knownCityArmyTypes ??
+      readCampaignArmyTypes(
+        await tx.world.findUniqueOrThrow({ where: { id: worldId }, select: { unitSet: true, replayOrigin: true } }),
+      ))
     : [];
   await persistCityResourcesState(tx, worldId, before, state, cityArmyTypes);
   await persistLogisticsState(tx, worldId, before, state);

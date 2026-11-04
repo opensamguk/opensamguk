@@ -12,6 +12,37 @@ describe('attack', () => {
   it('실패', () => verifyFailure('attack'));
 });
 
+describe('AC-M2-18 실제 출병 대상', () => {
+  it.each([10000, 0])('수비 장수 없이 성벽 %i를 공격해도 점령 전 국가를 반환한다', (wall) => {
+    const state = commandWorld();
+    state.generals[2]!.crew = 0;
+    state.generals[3]!.crew = 0;
+    state.cities[2]!.wall = wall;
+    const result = runCommand(
+      state,
+      { generalId: 1, tick: 100, unitSet: testUnits },
+      'attack',
+      { cityKey: 2 },
+      rngFor('notification-wall', wall),
+    );
+    expect(result).not.toHaveProperty('code');
+    if ('code' in result) throw Error('실제 공격이 필요합니다.');
+    expect(result.reports).toEqual([]);
+    expect(result.attackTarget).toEqual({ cityKey: 2, defendingNationId: 2 });
+  });
+  it('거부한 자기 도시 공격에는 실제 출병 사실이 없다', () => {
+    const result = runCommand(
+      commandWorld(),
+      { generalId: 1, tick: 100, unitSet: testUnits },
+      'attack',
+      { cityKey: 1 },
+      rngFor('notification-rejected', 1),
+    );
+    expect(result).toHaveProperty('code');
+    expect(result).not.toHaveProperty('attackTarget');
+  });
+});
+
 describe('T4-33 출병 추출 전 골든', () => {
   // main 5432ee83의 원 출병 구현에서 결과 전체와 RNG 다음값을 실측했다.
   const cases: [string, (state: WorldState) => void][] = [
@@ -141,10 +172,17 @@ describe('T4-33 출병 추출 전 골든', () => {
           rng,
         );
         expect(state).toEqual(before);
+        const legacyResult = structuredClone(result);
+        if (!('code' in legacyResult)) {
+          expect(legacyResult.attackTarget).toEqual({ cityKey: 2, defendingNationId: before.cities[2]!.nationId });
+          delete legacyResult.attackTarget;
+        } else expect(legacyResult).not.toHaveProperty('attackTarget');
         return {
           name,
           sha256: Array.from(
-            new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(result)))),
+            new Uint8Array(
+              await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(legacyResult))),
+            ),
             (byte) => byte.toString(16).padStart(2, '0'),
           ).join(''),
           calls,

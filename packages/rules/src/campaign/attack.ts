@@ -192,6 +192,7 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
     reports,
     history,
     battleAwards,
+    attackTarget: { cityKey, defendingNationId: defendingNation },
   };
 }
 
