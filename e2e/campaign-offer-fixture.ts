@@ -112,6 +112,7 @@ type ProgressPhase =
   | 'consent-offer'
   | 'consent-accept'
   | 'consent-release'
+  | 'npc-observation-month'
   | 'world-snapshot'
   | 'final-board-navigation'
   | 'final-board-response'
@@ -306,7 +307,7 @@ export class OfferFixture {
       },
     });
   }
-  async prepare(browser: Browser) {
+  async prepare(browser: Browser, lateOnboarding = false) {
     if (!this.runtime && process.env.CAMPAIGN_OFFER_PUBLIC_DIST !== '1')
       throw new Error('공개 dist 전용 실행기가 필요합니다.');
     this.progress('public-metadata');
@@ -338,6 +339,9 @@ export class OfferFixture {
           this.withDb((db) =>
             db.user.create({
               data: {
+                ...(lateOnboarding
+                  ? { id: ['00000000-0011-4000-8000-000000003972', '00000000-0011-4000-8000-00000000493e'][i]! }
+                  : {}),
                 email: user.email,
                 passwordHash: hash,
                 sessions: { create: { id: session.id, expiresAt: session.expiresAt } },
@@ -425,6 +429,7 @@ export class OfferFixture {
         orderBy: { id: 'asc' },
       });
       expect(humans.map((g) => g.id)).toEqual([492, 493]);
+      if (lateOnboarding) expect(humans.map((g) => g.nextTurnTick)).toEqual([9999, 9999]);
       this.progress('join-inputs');
       for (const user of this.users)
         await mutate(user.page, 'turns.set', {
@@ -449,6 +454,7 @@ export class OfferFixture {
       this.worlds.map((world) => () => this.prepareConsent(world)),
       () => this.scope.cancel(),
     );
+    await this.prepareNpcObservationMonth();
     this.progress('world-snapshot');
     expect(hashState(await this.snapshot(this.worlds[0]!))).toBe(hashState(await this.snapshot(this.worlds[1]!)));
     const page = this.users[0]!.page;
@@ -469,6 +475,37 @@ export class OfferFixture {
     this.deliveredBoard = (Array.isArray(body) ? body[call.index] : body).result.data as Board;
     this.progress('final-panel');
     await expect(this.panel()).toBeVisible();
+  }
+  private async prepareNpcObservationMonth() {
+    const [main, control] = this.worlds as [World, World];
+    expect(main.tick).toBe(control.tick);
+    const due = await control.hold.db.general.findFirstOrThrow({
+      where: { worldId: control.id, activeFromYear: { lte: 191 } },
+      orderBy: [{ nextTurnTick: 'asc' }, { id: 'asc' }],
+    });
+    const currentMonth = Math.floor(control.tick / 10000),
+      dueMonth = Math.floor(due.nextTurnTick / 10000);
+    expect(dueMonth).toBeGreaterThanOrEqual(currentMonth);
+    if (dueMonth === currentMonth) return;
+    expect(dueMonth).toBe(currentMonth + 1);
+    const human = await control.hold.db.general.aggregate({
+      where: { worldId: control.id, userId: { not: null } },
+      _min: { nextTurnTick: true },
+    });
+    expect(due.nextTurnTick).toBeLessThan(human._min.nextTurnTick!);
+    for (const world of [main, control])
+      expect(await world.hold.db.inputEvent.count({ where: { worldId: world.id, status: 'PENDING' } })).toBe(0);
+    // 가입 처리 중 그달의 NPC 차례를 모두 진행했다면, 최종 판을 읽기 전에 다음 정상 월을 준비한다.
+    const fromTick = control.tick,
+      tick = dueMonth * 10000;
+    this.progress('npc-observation-month');
+    await settleIndependentJoins(
+      [main, control].map((world) => () => this.advance(world, tick)),
+      () => this.scope.cancel(),
+    );
+    const prepared = { fromTick, tick, firstDueTick: due.nextTurnTick };
+    this.journal.push({ npcObservationMonth: prepared });
+    console.log('[campaign-offer-month]', JSON.stringify(prepared));
   }
   private async prepareConsent(world: World) {
     const { id: worldId, hold } = world;
@@ -933,8 +970,9 @@ export function assertCleanupPassed(cleanup: Awaited<ReturnType<OfferFixture['cl
     throw new Error('시험 실패 또는 불확실한 정리: controlled-cleanup-v3.json을 확인하세요.');
 }
 
-export const test = base.extend<{ offer: OfferFixture }>({
-  offer: async ({ browser, offerRuntime }, use, info) => {
+export const test = base.extend<{ offer: OfferFixture; offerLateOnboarding: boolean }>({
+  offerLateOnboarding: [false, { option: true }],
+  offer: async ({ browser, offerRuntime, offerLateOnboarding }, use, info) => {
     const offer = new OfferFixture(undefined, offerRuntime);
     const timer = setTimeout(() => {
       offer.progressPending('timeout');
@@ -942,7 +980,7 @@ export const test = base.extend<{ offer: OfferFixture }>({
     }, info.timeout);
     let fixtureFailed = false;
     try {
-      await offer.scope.cancellable(offer.scope.work('prepare', () => offer.prepare(browser)));
+      await offer.scope.cancellable(offer.scope.work('prepare', () => offer.prepare(browser, offerLateOnboarding)));
       await use(offer);
     } catch {
       fixtureFailed = true;

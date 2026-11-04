@@ -45,9 +45,7 @@ export interface EngineRegistry {
 export const engineRegistry: EngineRegistry = { rules: ruleRegistry, features: engineFeatures };
 
 // 기존 capability 형식은 DB의 기본 형식 1·빈 기능 사본을 유지한다.
-export function checkStoredReplayFormat(
-  world: Pick<EngineWorld, 'replayFormat' | 'ruleFeatures' | 'replayOrigin'>,
-): void {
+export function checkStoredReplayFormat(world: Pick<EngineWorld, 'replayFormat' | 'ruleFeatures' | 'replayOrigin'>) {
   if (world.replayFormat === 3) return checkWorldReplay(world);
   if (world.replayFormat !== 1 || !Array.isArray(world.ruleFeatures) || world.ruleFeatures.length)
     throw new Error('기존 월드의 재생 형식·기능 사본이 다릅니다.');
@@ -65,7 +63,7 @@ export function checkStoredReplayFormat(
 export function checkWorldReplay(
   world: Pick<EngineWorld, 'replayFormat' | 'ruleFeatures' | 'replayOrigin'>,
   registry: RuleRegistry = ruleRegistry,
-): void {
+) {
   if (world.replayOrigin === null) {
     if (world.replayFormat !== 1 || world.ruleFeatures.length)
       throw new Error('생성 기록 없는 월드의 재생 사본이 다릅니다.');
@@ -80,4 +78,5 @@ export function checkWorldReplay(
   )
     throw new Error('월드 재생 형식·기능 사본이 생성 기록과 다릅니다.');
   if (world.ruleFeatures.length) checkRuleFeatures(world.ruleFeatures, registry);
+  return origin;
 }

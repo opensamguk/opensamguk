@@ -126,6 +126,7 @@ beforeAll(async () => {
     '20261114000000_heritage_ledger',
     '20261115000000_notification_settings',
     '20261116000000_notification_outbox',
+    '20261117000000_stratagem_cards_state',
   ]);
   expect(migrations.slice(0, 18).at(-1)).toBe('20261023073000_treaties');
   for (const name of migrations)

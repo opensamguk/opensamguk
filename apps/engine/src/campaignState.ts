@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 import type { Prisma } from '@opensamguk/db';
+import type { checkWorldReplay } from './features';
 import {
   campaignArmyTypes,
   checkReplayOrigin,
@@ -10,9 +11,17 @@ import {
 
 export function readCampaignArmyTypes(
   world: Pick<Prisma.WorldGetPayload<Record<string, never>>, 'unitSet' | 'replayOrigin'>,
+  checkedOrigin?: ReturnType<typeof checkWorldReplay>,
 ): number[] {
-  const origin: unknown = world.replayOrigin;
-  checkReplayOrigin(origin);
+  // 같은 잠긴 World 행에서 방금 검증한 객체만 재사용한다. 다음 트랜잭션에서는 다시 검증한다.
+  let origin = checkedOrigin;
+  if (origin === undefined) {
+    const stored: unknown = world.replayOrigin;
+    checkReplayOrigin(stored);
+    origin = stored;
+  } else if (origin !== (world.replayOrigin as unknown)) {
+    throw new Error('검증한 생성 기록이 잠근 월드와 다릅니다.');
+  }
   if (origin.version !== 3 || !origin.initial.ruleFeatures?.includes('campaign-v1'))
     throw new Error('휘하 프로필의 생성 기록이 없습니다.');
   if (!isDeepStrictEqual(world.unitSet, origin.initial.unitSet)) throw new Error('운영 병종이 생성 기록과 다릅니다.');

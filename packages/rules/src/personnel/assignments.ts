@@ -14,6 +14,7 @@ import type {
   CancelReason,
   PersonnelChange,
   PersonnelResult,
+  PersonnelState,
   PersonnelView,
   RespondResult,
 } from './types';
@@ -170,10 +171,15 @@ const cancelText: Record<CancelReason, string> = {
 // 모든 상태 변경 step 끝에서 syncOffices 뒤에 호출한다. tick은 그 step의 게임 시각이다.
 export function closeInvalidOffers(view: PersonnelView, tick: number): PersonnelChange {
   assertTick(tick);
-  const state = clonePersonnel(view);
+  return closeInvalidOffersInPlace(clonePersonnel(view), tick);
+}
+
+// syncOffices가 복제한 인사 단계의 소유 사본에만 쓴다. 패키지 진입점에서는 공개하지 않는다.
+export function closeInvalidOffersInPlace(state: PersonnelState, tick: number): PersonnelChange {
+  assertTick(tick);
   const result: PersonnelChange = { state, closedOffers: [], logs: [] };
-  for (const [generalId, offer] of pendingOffers(view)) {
-    const reason = assignmentCancelReason(view, generalId, offer);
+  for (const [generalId, offer] of pendingOffers(state)) {
+    const reason = assignmentCancelReason(state, generalId, offer);
     if (!reason) continue;
     removeOffer(state, generalId);
     result.closedOffers.push({

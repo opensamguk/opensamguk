@@ -213,7 +213,7 @@ async function existingRows(client: PgClient) {
   ]) {
     const data =
       table === 'World'
-        ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures' - 'operationalMap' - 'campaignState' - 'cityResourcesState' - 'logisticsState' - 'governanceState' - 'lineageState'"
+        ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures' - 'operationalMap' - 'campaignState' - 'cityResourcesState' - 'logisticsState' - 'governanceState' - 'lineageState' - 'stratagemCardsState'"
         : table === 'City'
           ? "to_jsonb(t) - 'kind'"
           : table === 'General'
@@ -380,6 +380,7 @@ it.each(['empty', 'legacy'] as const)(
         '20261114000000_heritage_ledger',
         '20261115000000_notification_settings',
         '20261116000000_notification_outbox',
+        '20261117000000_stratagem_cards_state',
       ]);
       for (const directory of previous) {
         await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
@@ -420,6 +421,7 @@ it.each(['empty', 'legacy'] as const)(
       expect((await client.query('SELECT id FROM "World" WHERE "cityResourcesState" IS NOT NULL')).rows).toEqual([]);
       expect((await client.query('SELECT id FROM "World" WHERE "logisticsState" IS NOT NULL')).rows).toEqual([]);
       expect((await client.query('SELECT id FROM "World" WHERE "governanceState" IS NOT NULL')).rows).toEqual([]);
+      expect((await client.query('SELECT id FROM "World" WHERE "stratagemCardsState" IS NOT NULL')).rows).toEqual([]);
       expect((await client.query('SELECT count(*)::int AS count FROM "GovernanceMovement"')).rows).toEqual([
         { count: 0 },
       ]);
