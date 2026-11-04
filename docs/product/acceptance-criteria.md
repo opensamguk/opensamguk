@@ -188,6 +188,8 @@ Phase 2 AC는 M1~M3 관문이 아니다. 위 요약표, README 관문 집계, MV
 2026-10-24 공유·보존의 후속 부분 증거: T4-56 최종 소스 `d5da8c54c528f1061b264d87645a0f5eee650aa8`는 실제 Claude 독립 재리뷰 `ccca60e5`에서 `PASS_IMPLEMENTATION_SCOPE`였다. T4-91 `9a134174b4e9fb8d98f18693ada4e8b53950f685`는 단위 8건과 실제 PostgreSQL·HTTP 167건, 실제 Claude 소스 리뷰 필수 수정 0건을 기록했다. T4-37 `65fd569a575399ff577b703592dbbeadc455f88c`는 단위 66건과 실제 Chromium 21건(skip·flaky·retry 0), PNG 1400×1352의 국가 16개·중립·꼬리말 경계 검증을 기록했고 부모 Codex의 최종 소스 체인 검토도 필수 수정 0건이었다. 각 [계획](../plans/T4-91.md#구현-기록-codex)·[화면 기록](../plans/T4-37.md#구현-기록-claude)·[보존 리뷰](../plans/T4-56.md#리뷰-claude)에서 로컬 검증과 남은 통합 관문을 구분한다. 소스의 main·CI 게이트는 이번 main `9740379`과 [정상 CI 40096369435](https://github.com/opensamguk/opensamguk/actions/runs/40096369435)·[queue CI 40097240762](https://github.com/opensamguk/opensamguk/actions/runs/40097240762)로 확인했다. 이는 원 로컬 실행을 새 실행으로 바꾸거나 AC-P2-17 전체 인수를 선언한 것이 아니다. 공유의 채택 문구는 기존 G-03 원검토와 정본 반영을 별도로 대조해야 한다. 사건 자막·열전 문구와 A-11 나머지 범위는 승인되지 않았다.
 
 
+2026-11-04 한정 인수: [T4-36](../plans/T4-36.md#통합-인수-대조-codex-2026-11-04)과 [T4-56](../plans/T4-56.md#통합-인수-대조-codex-2026-11-04)은 기존 독립 리뷰·실제 실행·main 반영을 현재 [queue CI](https://github.com/opensamguk/opensamguk/actions/runs/41743125428)와 대조해 각각 (나) 화면과 (다) 보존·조회 몫을 완료로 정리했다. check 449파일·7029건, PostgreSQL 116파일·2017건(skip 0), 권한 누락 0과 해당 Chromium E1~E13 통과를 확인했다. 전체 E2E의 알림 2 skip, 공유의 정본 인수 대조와 나머지 제품 범위는 별도다. AC-P2-17 전체 상태는 그대로 둔다.
+
 ## 통합 지도·휘하 (D-033·034)
 
 통합 계획 §8의 조건을 정식 등록한다. 아래 완료는 동결한 통합판의 검증·독립 인수 범위이며 기존 관문의 완료를 바꾸지 않는다. D-034로 취소한07·08은 완료 분모에서 제외한다.
