@@ -1,5 +1,7 @@
 import type { Prisma } from '@opensamguk/db';
 import {
+  assertSlotSet,
+  isPolicyKey,
   activityPayloadSchema,
   applyPersonnelInputStep,
   completePersonnelStep,
@@ -9,6 +11,7 @@ import {
   type PersonnelMonthResult,
   type PersonnelStepPacket,
   type ReplayState,
+  type WorldState,
 } from '@opensamguk/rules';
 import type { EngineFeature, QueuedInputHandler } from './features';
 import { loadReplayState } from './monthly';
@@ -34,10 +37,40 @@ import { PgLineageRepository, persistLineageMonth } from './lineage/repository';
 import { reconcileLineageOrder } from './lineage/service';
 import type { LineageMonthEffects } from '@opensamguk/rules';
 
+export async function loadPersonnelTurnContext(tx: Prisma.TransactionClient, worldId: string, state: WorldState) {
+  if (state.ruleFeatures?.includes('policy')) {
+    const rows = await tx.$queryRaw<
+      {
+        id: number;
+        defaultPolicy: string | null;
+        userId: string | null;
+        lastActiveTick: number | null;
+        slots: number[];
+      }[]
+    >`
+      SELECT g.id, g."defaultPolicy", g."userId", g."lastActiveTick",
+        COALESCE(array_agg(t.slot) FILTER (WHERE t.slot IS NOT NULL), ARRAY[]::integer[]) AS slots
+      FROM "General" g
+      LEFT JOIN "GeneralTurn" t ON t."worldId" = g."worldId" AND t."generalId" = g.id
+      WHERE g."worldId" = ${worldId}
+      GROUP BY g."worldId", g.id
+      ORDER BY g.id
+    `;
+    for (const row of rows) assertSlotSet(row.slots.map((slot) => ({ slot })));
+    for (const row of rows) {
+      if (!isPolicyKey(row.defaultPolicy)) throw new Error('저장된 기본 방침이 올바르지 않습니다.');
+      if (row.userId !== null && row.lastActiveTick === null) throw new Error('사람 장수의 활동 tick이 없습니다.');
+    }
+  }
+  const { offices } = await loadOfficeState(tx, worldId);
+  const residenceAnchors = await loadResidenceAnchors(tx, worldId);
+  return { state, offices, residenceAnchors };
+}
+
 export async function persistPersonnelPacket(
   tx: Prisma.TransactionClient,
   worldId: string,
-  before: ReplayState,
+  before: Pick<ReplayState, 'residenceAnchors'>,
   packet: PersonnelStepPacket,
   anchors: Record<number, number>,
   tick: number,

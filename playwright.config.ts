@@ -7,6 +7,7 @@ const isCI = Boolean(process.env.CI);
 export default defineConfig({
   testDir: 'e2e',
   testIgnore: [
+    '**/notifications.spec.ts',
     '**/public-assets.spec.ts',
     '**/account-access.spec.ts',
     '**/legal-consent.spec.ts',

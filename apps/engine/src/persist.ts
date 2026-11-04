@@ -11,10 +11,11 @@ export async function persistEffects(
   at: ActionAt,
   previous?: WorldState,
   beforeNationRemoval?: () => Promise<void>,
+  cityArmyTypes?: readonly number[],
 ) {
   // 규칙에서 보정한 최종값만 저장한다. 같은 필드의 효과가 여럿이어도 한 번 쓴다.
   if (effects.some((effect) => effect.kind === 'world')) {
-    await persistCommandState(tx, worldId, state, at, previous, beforeNationRemoval);
+    await persistCommandState(tx, worldId, state, at, previous, beforeNationRemoval, cityArmyTypes);
     return;
   }
   const changes = new Map<string, Exclude<Effect, { kind: 'world' }>>();

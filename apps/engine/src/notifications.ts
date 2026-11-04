@@ -39,8 +39,7 @@ function entry(
 }
 
 // 점령·멸망 후 소속을 잃기 전에 수신자를 고른다. 저장은 호출한 턴의 CAS 뒤 같은 tx에서 한다.
-export async function commandNotifications(
-  tx: Tx,
+export function commandNotifications(
   world: World,
   context: {
     actor: Actor;
@@ -51,7 +50,7 @@ export async function commandNotifications(
     modern: boolean;
     slots: readonly { slot: number; explicit: boolean }[];
   },
-): Promise<NotificationEntry[]> {
+): NotificationEntry[] {
   const { actor, tick, result, national, before, slots, modern } = context;
   const entries: NotificationEntry[] = [];
   if (actor.userId) {
@@ -85,11 +84,9 @@ export async function commandNotifications(
     const city = before.cities[target.cityKey];
     if (!city || city.nationId !== target.defendingNationId) throw Error('공격 전 대상 도시와 국가를 확인하세요.');
     if (target.defendingNationId !== null) {
-      const members = await tx.general.findMany({
-        where: { worldId: world.id, nationId: target.defendingNationId, userId: { not: null } },
-        select: { userId: true },
-        orderBy: { id: 'asc' },
-      });
+      const members = Object.values(before.generals)
+        .filter((member) => member.nationId === target.defendingNationId && member.userId !== null)
+        .sort((a, b) => a.id - b.id);
       for (const member of members)
         if (member.userId)
           entries.push(

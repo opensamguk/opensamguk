@@ -27,7 +27,7 @@ import { persistMonthly, loadReplayState } from './monthly';
 import { hashState } from '@opensamguk/shared/node';
 import { processInputs, processPendingInput } from './inputs';
 import { checkWorldReplay } from './features';
-import { persistPersonnelPacket } from './ruleFeatures';
+import { loadPersonnelTurnContext, persistPersonnelPacket } from './ruleFeatures';
 import { appendLogisticsMovements } from './logisticsState';
 import { engineResolver, persistExt, verifyWorldExt } from './extState';
 import { assertWorldCapabilities } from './capsGate';
@@ -260,11 +260,11 @@ export class TurnLoop {
           sequence = await nextActionSequence(tx, worldId);
           await tx.$queryRaw`SELECT id FROM "General" WHERE "worldId" = ${worldId} AND id = ${due.id} FOR UPDATE`;
           // 예턴 편집은 actor 행 잠금 또는 turnRevision 조건을 함께 사용해야 한다.
+          const state = await loadWorldAfterCapabilityCheck(tx, world, capabilities);
           const personnelBefore =
             world.replayFormat === 3 && world.ruleFeatures.includes('personnel')
-              ? await loadReplayState(tx, worldId)
+              ? await loadPersonnelTurnContext(tx, worldId, state)
               : null;
-          const state = personnelBefore?.state ?? (await loadWorldAfterCapabilityCheck(tx, world, capabilities));
           const actor = await tx.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: due.id } } });
           const slots = await tx.generalTurn.findMany({
             where: { worldId, generalId: due.id },
@@ -328,7 +328,7 @@ export class TurnLoop {
           if (personnelPacket) next = personnelPacket.state;
           signals.push(...commandRealtimeSignals(state, next));
           const consumption = logisticsCommandMovements(state, next);
-          const notifications = await commandNotifications(tx, world, {
+          const notifications = commandNotifications(world, {
             actor,
             tick: due.nextTurnTick,
             before: state,
@@ -347,6 +347,7 @@ export class TurnLoop {
             personnelBefore && personnelPacket && anchors
               ? () => persistPersonnelPacket(tx, worldId, personnelBefore, personnelPacket, anchors, due.nextTurnTick)
               : undefined,
+            capabilities.kind === 'registry' ? capabilities.armyTypes : undefined,
           );
           await persistExt(tx, worldId, state.ext, next.ext);
           await appendLogisticsMovements(tx, worldId, consumption, { sequence, tick: due.nextTurnTick });

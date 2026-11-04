@@ -33,6 +33,7 @@ const paths = [
   'world.publicMaps',
   'world.summary',
   'world.map',
+  'resources.worldRules',
   'general.create',
   'general.mine',
   'heritage.mine',
