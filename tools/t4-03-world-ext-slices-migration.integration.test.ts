@@ -433,6 +433,7 @@ it.each(['empty', 'legacy'] as const)(
         '20261112000000_governance_state',
         '20261113000000_lineage_state',
         '20261114000000_heritage_ledger',
+        '20261115000000_notification_settings',
       ]);
       for (const directory of previous)
         await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
@@ -473,6 +474,7 @@ it.each(['empty', 'legacy'] as const)(
       expect(await existingRows(client)).toEqual({
         ...settled,
         AccountToken: [],
+        NotificationTarget: [],
         ConsentRecord: [],
         AuditLog: [],
         Sanction: [],

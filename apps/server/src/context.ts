@@ -7,6 +7,7 @@ import type { MailTransport } from './mail/transport';
 import type { LegalPolicy } from './legal/policy';
 import type { WithdrawalPolicy } from './auth/withdrawalPolicy';
 import type { LoginAuditRequest } from './auth/loginAudit';
+import type { DiscordWebhookTransport } from './notifications/discordWebhook';
 
 export interface Context {
   db: PrismaClient;
@@ -26,4 +27,5 @@ export interface Context {
   withdrawalPolicy?: WithdrawalPolicy | null | undefined;
   closeSession?: ((sessionId: string) => void) | undefined;
   loginAudit?: LoginAuditRequest | undefined;
+  notificationTransport?: DiscordWebhookTransport | undefined;
 }

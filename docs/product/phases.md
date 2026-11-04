@@ -188,7 +188,7 @@ T3-01 메일 발송 서비스와 T3-12 공개 이미지 라이선스는 아직 �
 - 요청 제한 계수기 `apps/server/src/security/rateLimit.ts`는 T3-04가 main `450c384`에 넣었고 T3-04만 고친다. T3-02의 선행 칸에 T3-04를 적었다 (T3-01도 유지). T3-04는 T3-02에 의존하지 않는다. 계약은 [T3-04](../plans/T3-04.md#공유-요청-제한-계수기-결정)와 [T3-02](../plans/T3-02.md#공유-요청-제한-계수기-결정)에 같은 글로 있다. T3-02는 이 파일을 import만 하고 착수 커밋을 구현 기록 첫 줄에 적는다.
 - 권한 대조 `pnpm test:authz`는 T3-04 인수 때 절차 23개를 봤고 main `3e5b52a`의 `appRouter`에는 34개가 있다. T3-02는 새 절차 8개의 사례를 `tools/authz.integration.test.ts`에 더해 다시 통과시킨다. AC-M3-03 최종 인수는 이 통과를 기다린다.
 - 화면이 읽는 오류 값은 `data.code`와 `data.reason`이다. 지금 `trpc.ts` formatter는 `reason`을 늘 `null`로 둔다. 값을 싣는 일은 T3-02가 한다 ([T3-02 오류 계약](../plans/T3-02.md#오류-계약)).
-- 탈퇴 때 지울 다른 작업의 모델은 T2-20의 `NotificationTarget`·`NotificationOutbox`(발송 직전 확인 포함)와 T3-05의 `LoginRecord`다. 지금 main에는 둘 다 없다. T3-02보다 늦게 들어오는 작업이 `account.withdraw` 트랜잭션에 삭제를 더하고 T3-02 탈퇴 시험의 빈 행을 채운다 ([T3-02 탈퇴 절](../plans/T3-02.md#탈퇴-때-지우는-자료)).
+- 탈퇴 때 지울 다른 작업의 모델은 T2-20의 `NotificationTarget`·`NotificationOutbox`(발송 직전 확인 포함)와 T3-05의 `LoginRecord`다. `LoginRecord`와 NC1의 `NotificationTarget`은 `account.withdraw` 트랜잭션의 삭제에 연결했다. `NotificationOutbox`는 후속 모델 구현 때 같은 삭제와 경합 시험을 더한다 ([T3-02 탈퇴 절](../plans/T3-02.md#탈퇴-때-지우는-자료)).
 
 2026-10-23 T3-02·T3-03 계획을 main `3e5b52a`에 맞춰 다시 확인하고 단계를 `구현`으로 바꿨다. 미인증 차단 대상에 메시지·국가 공지 변경 절차 4개를 더했다. 선행 T3-01(메일 발송 서비스)과 약관 본문은 여전히 사용자 결정 전이라 T3-02는 그 뒤에 착수한다. 결정할 것은 [T3-02 사용자가 정할 것](../plans/T3-02.md#사용자가-정할-것)에 있다.
 

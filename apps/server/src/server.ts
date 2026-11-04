@@ -20,6 +20,7 @@ import { resolveLegalPolicy, type LegalPolicy } from './legal/policy';
 import { bindLegalPolicy } from './legal/publish';
 import { resolveWithdrawalPolicy, type WithdrawalPolicy } from './auth/withdrawalPolicy';
 import { deviceCookieOptions, prepareLoginAudit, resolveLoginAudit, type LoginAuditOptions } from './auth/loginAudit';
+import type { DiscordWebhookTransport } from './notifications/discordWebhook';
 
 export async function buildServer(options: {
   db: PrismaClient;
@@ -37,6 +38,7 @@ export async function buildServer(options: {
   withdrawalPolicy?: WithdrawalPolicy | null;
   capacityMonitor?: CapacityMonitorConfig | null;
   loginAudit?: LoginAuditOptions | null;
+  notificationTransport?: DiscordWebhookTransport;
 }) {
   const requireVerifiedEmail = emailVerificationRequired(process.env, options);
   const mapConfig = publicMapConfig(process.env);
@@ -158,6 +160,7 @@ export async function buildServer(options: {
           ip: req.ip,
           rateLimiter,
           accountMail: options.mailTransport ? { transport: options.mailTransport, origin: publicOrigin } : undefined,
+          notificationTransport: options.notificationTransport,
           emailVerificationRequired: requireVerifiedEmail,
           legalPolicy,
           legalPolicyRequired: production,
