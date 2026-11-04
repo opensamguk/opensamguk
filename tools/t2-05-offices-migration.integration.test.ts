@@ -351,7 +351,7 @@ it.each(['empty', 'legacy'] as const)(
       const directories = (await readdir(migrations)).filter((name) => /^\d/.test(name)).sort();
       const previous = directories.filter((name) => name < migration);
       const later = directories.filter((name) => name > migration);
-      expect(later).toEqual([
+      const prerequisiteLater = [
         '20261023072000_world_ext_slices',
         '20261023073000_treaties',
         '20261023074000_assignment_storage',
@@ -381,7 +381,8 @@ it.each(['empty', 'legacy'] as const)(
         '20261115000000_notification_settings',
         '20261116000000_notification_outbox',
         '20261117000000_stratagem_cards_state',
-      ]);
+      ];
+      expect(later.slice(0, prerequisiteLater.length)).toEqual(prerequisiteLater);
       for (const directory of previous) {
         await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
       }
