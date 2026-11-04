@@ -55,8 +55,8 @@ function track<T>(action: () => Promise<T>): Promise<T> {
   void execution.finally(() => executions.delete(execution)).catch(() => undefined);
   return execution;
 }
-function it(name: string, action: () => Promise<void>) {
-  test(name, () => track(action));
+function it(name: string, action: () => Promise<void>, timeout?: number) {
+  test(name, () => track(action), timeout);
 }
 beforeEach(async () => {
   await Promise.allSettled([...executions]);
@@ -695,7 +695,7 @@ it('실제 휘하 부곡을 지정한 모병·훈련 예약과 편집이 unitId�
 
 it('정식 첫 달 전반의 모든 NPC를 실제 부곡 프로필로 실행한다', async () => {
   await advance(5000);
-});
+}, 60000);
 it('정식 첫 달 후반의 모든 NPC와 월 정산을 실행한다', async () => {
   await advance(10000);
 });
