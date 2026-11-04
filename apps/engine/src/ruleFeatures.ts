@@ -43,6 +43,7 @@ import { reconcileQueuedStratagemCards } from './stratagemCards/state';
 export async function loadPersonnelTurnContext(tx: Prisma.TransactionClient, worldId: string, state: WorldState) {
   if (state.ruleFeatures?.includes('policy')) {
     const expectedSlots = emptyQueue().map((_, slot) => slot);
+    // 조인 계획이 바뀌어도 이 조회의 예턴 집계는 한 번만 계산한다.
     const rows = await tx.$queryRaw<
       {
         id: number;
@@ -52,15 +53,16 @@ export async function loadPersonnelTurnContext(tx: Prisma.TransactionClient, wor
         slots: number[] | null;
       }[]
     >`
+      WITH turn_slots AS MATERIALIZED (
+        SELECT "generalId", array_agg(slot ORDER BY slot) AS slots
+        FROM "GeneralTurn" WHERE "worldId" = ${worldId}
+        GROUP BY "generalId"
+      )
       SELECT g.id, g."defaultPolicy", g."userId", g."lastActiveTick",
         CASE WHEN t.slots = ${expectedSlots}::integer[] THEN NULL
           ELSE COALESCE(t.slots, ARRAY[]::integer[]) END AS slots
       FROM "General" g
-      LEFT JOIN (
-        SELECT "generalId", array_agg(slot ORDER BY slot) AS slots
-        FROM "GeneralTurn" WHERE "worldId" = ${worldId}
-        GROUP BY "generalId"
-      ) t ON t."generalId" = g.id
+      LEFT JOIN turn_slots t ON t."generalId" = g.id
       WHERE g."worldId" = ${worldId}
       ORDER BY g.id
     `;
