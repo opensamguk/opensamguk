@@ -10,6 +10,7 @@ datasource db {
 }
 
 model World {
+  notificationOutbox  NotificationOutbox[]
   lineageState        Json?
   governanceState     Json?
   governanceMovements GovernanceMovement[]
@@ -537,6 +538,7 @@ enum AuditActorKind {
 }
 
 model User {
+  notificationOutbox     NotificationOutbox[]
   notificationGeneration Int                  @default(0)
   notificationTarget     NotificationTarget?
   id                     String               @id @default(uuid())
@@ -573,6 +575,43 @@ model NotificationTarget {
   disabledReason String?
   verifiedAt     DateTime
   user           User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum NotificationOutboxStatus {
+  PENDING
+  SENDING
+  RETRY
+  SENT
+  UNKNOWN
+  GAVE_UP
+}
+
+model NotificationOutbox {
+  id            String                   @id @default(uuid())
+  worldId       String
+  userId        String
+  event         String
+  payload       Json
+  dedupeKey     String                   @unique
+  status        NotificationOutboxStatus @default(PENDING)
+  attempts      Int                      @default(0)
+  nextAttemptAt DateTime                 @default(now()) @db.Timestamptz(3)
+  claimId       String?
+  claimedAt     DateTime?                @db.Timestamptz(3)
+  targetId      String?
+  generation    Int?
+  resultCode    String?
+  createdAt     DateTime                 @default(now()) @db.Timestamptz(3)
+  user          User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  world         World                    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt, createdAt, id])
+  @@index([userId])
+}
+
+model NotificationDispatchGate {
+  id           String    @id
+  blockedUntil DateTime? @db.Timestamptz(3)
 }
 
 model HeritageAccount {
