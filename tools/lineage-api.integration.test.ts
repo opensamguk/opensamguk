@@ -217,7 +217,7 @@ it.each([
   { edition: 1, unknownCount: 489, guanSex: 'UNKNOWN' },
   { edition: 2, unknownCount: 477, guanSex: 'MALE' },
 ] as const)(
-  'AC-P2-32 $edition판은 실제 491명 저장·월간 재생·HTTP 관리자 초기화 뒤에도 유지된다',
+  'AC-P2-32 $edition 판은 실제 491명 저장·월간 재생·HTTP 관리자 초기화 뒤에도 유지된다',
   async ({ edition, unknownCount, guanSex }) => {
     const initial = await loadInitialWorldFromDb(db, {
         scenario: '1030',
