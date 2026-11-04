@@ -34,7 +34,9 @@ export async function loadWorldAfterCapabilityCheck(
   capabilities: Awaited<ReturnType<typeof assertWorldCapabilities>>,
 ): Promise<WorldState> {
   const worldId = world.id;
-  if (world.ruleFeatures.includes('campaign-v1')) readCampaignArmyTypes(world);
+  const armyTypes = world.ruleFeatures.includes('campaign-v1')
+    ? ((capabilities.kind === 'registry' ? capabilities.armyTypes : undefined) ?? readCampaignArmyTypes(world))
+    : [];
   const { preset, commands } = engineResolver(world);
   if (world.replayFormat === 3) await assertPersonnelStorage(tx, worldId, world.ruleFeatures.includes('personnel'));
   const ext = await loadExt(tx, worldId, commands);
@@ -93,11 +95,7 @@ export async function loadWorldAfterCapabilityCheck(
   };
   const campaign = readStoredCampaign(world.campaignState, state, world.seed);
   if (campaign) state.campaign = campaign;
-  const cityResources = readStoredCityResources(
-    world.cityResourcesState,
-    state,
-    world.ruleFeatures.includes('city-resources-v1') ? readCampaignArmyTypes(world) : [],
-  );
+  const cityResources = readStoredCityResources(world.cityResourcesState, state, armyTypes);
   if (cityResources) state.cityResources = cityResources;
   const logistics = readStoredLogistics(world.logisticsState, state, readLogisticsOriginConfig(world, state));
   if (logistics && logistics.monthlyTick !== world.monthlyTick)

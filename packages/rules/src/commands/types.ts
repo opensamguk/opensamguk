@@ -47,6 +47,8 @@ export interface CommandResult {
   effects: Effect[];
   logs: LogEntry[];
   reports?: { generalId: number; text: string }[];
+  // 실제로 해결한 공격의 점령 전 대상이다. 알림·보고용이며 상태에는 넣지 않는다.
+  attackTarget?: { cityKey: number; defendingNationId: number | null };
   history?: { nationId: number; text: string }[];
   // 순위용 집계 이벤트이며 재생 상태에는 넣지 않는다.
   battleAwards?: { generalId: number; wins: number; captures: number }[];

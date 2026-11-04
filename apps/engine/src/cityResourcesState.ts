@@ -27,6 +27,7 @@ export async function assertStoredCityResources(
     Prisma.WorldGetPayload<Record<string, never>>,
     'id' | 'replayFormat' | 'ruleFeatures' | 'replayOrigin' | 'unitSet' | 'cityResourcesState'
   >,
+  armyTypes?: readonly number[],
 ): Promise<void> {
   if (!world.ruleFeatures.includes('city-resources-v1')) {
     readStoredCityResources(world.cityResourcesState, { cities: {}, ruleFeatures: world.ruleFeatures }, []);
@@ -40,7 +41,7 @@ export async function assertStoredCityResources(
       cities: Object.fromEntries(cities.map((city) => [city.cityKey, city])),
       ruleFeatures: world.ruleFeatures,
     },
-    readCampaignArmyTypes(world),
+    armyTypes ?? readCampaignArmyTypes(world),
   );
 }
 

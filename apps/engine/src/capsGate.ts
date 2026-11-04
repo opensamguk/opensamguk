@@ -9,17 +9,19 @@ import {
 import { checkStoredReplayFormat } from './features';
 import { assertStoredCityResources } from './cityResourcesState';
 import { assertStoredLogistics } from './logisticsState';
+import { readCampaignArmyTypes } from './campaignState';
 
 // 호출자가 확보한 트랜잭션과 World 행을 쓴다. 잠금·쓰기·sequence는 소유하지 않는다.
 export async function assertWorldCapabilities(
   tx: Prisma.TransactionClient,
   world: Prisma.WorldGetPayload<Record<string, never>>,
-): Promise<WorldCapabilities | { kind: 'registry' }> {
+): Promise<WorldCapabilities | { kind: 'registry'; armyTypes?: readonly number[] }> {
   const modern = world.replayFormat === 3;
   checkStoredReplayFormat(world);
-  await assertStoredCityResources(tx, world);
+  const armyTypes = world.ruleFeatures.includes('campaign-v1') ? readCampaignArmyTypes(world) : [];
+  await assertStoredCityResources(tx, world, armyTypes);
   await assertStoredLogistics(tx, world);
-  const capabilities = modern ? { kind: 'registry' as const } : selectWorldCapabilities(world);
+  const capabilities = modern ? { kind: 'registry' as const, armyTypes } : selectWorldCapabilities(world);
   const rows = await tx.treaty.findMany({
     where: { worldId: world.id },
     orderBy: { id: 'asc' },
