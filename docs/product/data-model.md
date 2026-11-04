@@ -37,7 +37,7 @@
 
 ## 계정 영역
 
-탈퇴 API·DB 후보는 승인된 현재 개인정보 보존 정책이 있을 때만 User를 WITHDRAWN으로 바꾸고 이메일을 `withdrawn+<UUID>@invalid`로 치환하며 무작위 비밀번호 해시·인증 일시 제거·모든 Session/AccountToken/LoginRecord 삭제를 한 트랜잭션에서 처리한다. 기본 정책 상수는 null로 운영 연결을 막는다. ConsentRecord·Sanction·AuditLog와 General·예약·게임 원장 보존안의 사용자 승인은 남아 있다. 현재 schema에는 알림 대상·발송 대기열이 없다. 해당 모델을 추가할 때 탈퇴 삭제와 동시성 검사를 함께 확장한다. UUID 묘비를 영구 익명 처리로 부르지 않는다. 검증 범위와 남은 관문은 [T3-02](../plans/T3-02.md)에 기록한다.
+탈퇴 API·DB 후보는 승인된 현재 개인정보 보존 정책이 있을 때만 User를 WITHDRAWN으로 바꾸고 이메일을 `withdrawn+<UUID>@invalid`로 치환하며 무작위 비밀번호 해시·인증 일시 제거·모든 Session/AccountToken/LoginRecord 삭제를 한 트랜잭션에서 처리한다. 기본 정책 상수는 null로 운영 연결을 막는다. ConsentRecord·Sanction·AuditLog와 General·예약·게임 원장 보존안의 사용자 승인은 남아 있다. 알림 대상과 발송 대기열도 같은 User 잠금 트랜잭션에서 삭제한다. UUID 묘비를 영구 익명 처리로 부르지 않는다. 검증 범위와 남은 관문은 [T3-02](../plans/T3-02.md)에 기록한다.
 
 | 테이블                 | 주요 필드                                                                                                                                           | 관문                 |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
@@ -109,6 +109,8 @@ AC-INT-06의 `World.campaignState`는 관계·제안·NPC 서약 시도와 부�
 | `AssignmentOffer`            | D11 발령 응답                 | id, worldId, generalId, fromNationId, targetCityKey, status, expiresTick            | M2   |
 | `General.defaultPolicy`      | D12 기본 방침                 | 필드 하나: 방침 key                                                                 | M2   |
 | `NotificationTarget`         | D6 턴 알림                    | 사용자당 디스코드 대상 하나. id, userId, kind(DISCORD), endpoint, last4, events, status, disabledReason, verifiedAt. 주소는 서버 안에서만 쓰며 API는 끝 4자리만 낸다. `User.notificationGeneration`은 해제 뒤에도 유지한다 | M2   |
+| `NotificationOutbox`         | D6 턴 알림                    | worldId, userId, event, 공개 payload, 고유 dedupeKey, status, attempts, nextAttemptAt, claimId, claimedAt, targetId, generation, resultCode. 주소를 복제하지 않는다. User·World 삭제에 함께 지워지며 상태 해시·RNG에 넣지 않는다 | M2   |
+| `NotificationDispatchGate`   | D6 턴 알림                    | 고정 id(discord), blockedUntil. 관측한 429의 공통 발송 기한을 재시작 뒤에도 지킨다. 비밀·사용자 식별자는 저장하지 않는다 | M2   |
 | `OfficeEffect` (리소스 파일) | D17 관직 주재 효과            | 관직별 도시 보정 표. DB가 아닌 `resources/`                                         | M3   |
 | `ReputationEvent`            | D10 월단평                    | worldId, generalId, tick, kind, score                                               | M3   |
 | (없음)                       | D3 군사 조언, D15 역할별 입장 | 기존 데이터와 NPC AI만 사용                                                         | M3   |

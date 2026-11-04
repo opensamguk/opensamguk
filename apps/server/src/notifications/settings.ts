@@ -1,10 +1,10 @@
 import type { Prisma, PrismaClient } from '@opensamguk/db';
 import { TRPCError } from '@trpc/server';
+import { notificationEvents, type NotificationEvent } from '@opensamguk/shared/notifications';
 import { hasGlobalSanction } from '../auth/sanction';
 import { normalizeDiscordWebhookUrl, sendDiscordWebhook, type DiscordWebhookTransport } from './discordWebhook';
 
-export const notificationEvents = ['turn.failed', 'attacked', 'diplomacy.offer', 'turns.low'] as const;
-export type NotificationEvent = (typeof notificationEvents)[number];
+export { notificationEvents, type NotificationEvent };
 const names = ['예턴 실패', '공격받음', '외교 제안', '예턴 3칸 이하'] as const;
 type Identity = { userId: string; sessionId: string | null };
 export type NotificationResponse = {
@@ -143,7 +143,12 @@ export function changeNotificationSettings(
       });
       if (updated.count !== 1)
         throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '먼저 디스코드 웹훅을 등록해 주세요.' });
-    } else await tx.notificationTarget.deleteMany({ where: { userId: identity.userId } });
+    } else {
+      await tx.notificationOutbox.deleteMany({
+        where: { userId: identity.userId, status: { in: ['PENDING', 'RETRY'] } },
+      });
+      await tx.notificationTarget.deleteMany({ where: { userId: identity.userId } });
+    }
     await tx.user.update({ where: { id: identity.userId }, data: { notificationGeneration: { increment: 1 } } });
     return response(tx, identity.userId, current.generation + 1);
   });

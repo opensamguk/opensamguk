@@ -10,6 +10,7 @@ export {
   type PublishedResource,
 } from './gameResources';
 export { nextActionSequence } from './inputEvents';
+export { enqueueNotifications, type NotificationEntry } from './notificationOutbox';
 export { readWorldExtRows, writeWorldExtChanges } from './worldExt';
 export { assertStorableJson, type StorableJson } from './storableJson';
 export { notifyWorld, notifySessionClosed, worldChannel, type RealtimeSignal, type RealtimeTarget } from './realtime';

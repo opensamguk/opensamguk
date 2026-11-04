@@ -379,6 +379,7 @@ it.each(['empty', 'legacy'] as const)(
         '20261113000000_lineage_state',
         '20261114000000_heritage_ledger',
         '20261115000000_notification_settings',
+        '20261116000000_notification_outbox',
       ]);
       for (const directory of previous) {
         await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));

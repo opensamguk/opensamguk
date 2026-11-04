@@ -1,6 +1,7 @@
 import { createMailTransport } from './mail/transport';
 import { resourceRoot } from '@opensamguk/shared/resource-root';
 import { loadLoginAuditOptions } from './config/loginAudit';
+import { startNotificationDispatcher } from './notifications/dispatcher';
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -24,8 +25,17 @@ const [{ createDb }, { buildServer }] = await Promise.all([import('@opensamguk/d
 const db = createDb(databaseUrl);
 const port = Number(process.env.SERVER_PORT ?? 3001);
 const server = await buildServer({ db, mailTransport, ...(loginAudit === undefined ? {} : { loginAudit }) });
+const dispatcher = startNotificationDispatcher(
+  db,
+  {
+    publicOrigin: process.env.PUBLIC_ORIGIN ?? 'http://127.0.0.1:5173',
+    onSummary: ({ unknown }) => server.log.warn({ category: 'UNKNOWN', count: unknown }, '알림 전송 결과 불명'),
+  },
+  () => server.log.warn('알림 대기열 처리 실패'),
+);
 
 const shutdown = async () => {
+  await dispatcher.stop();
   await server.close();
   await db.$disconnect();
   process.exit(0);
