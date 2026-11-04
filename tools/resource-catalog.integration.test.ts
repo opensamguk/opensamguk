@@ -64,7 +64,11 @@ interface Fixture {
   dispose(): Promise<void>;
 }
 
-async function createFixture(config: { beforeCatalog?: boolean; initialize?: boolean } = {}): Promise<Fixture> {
+const draftMigration = '20261118000000_game_resource_draft_cas';
+
+async function createFixture(
+  config: { beforeCatalog?: boolean; beforeDrafts?: boolean; initialize?: boolean } = {},
+): Promise<Fixture> {
   if (!process.env.TEST_DATABASE_URL) throw new Error('전용 TEST_DATABASE_URL이 필요합니다.');
   const reference = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
   const name = `resource_catalog_${randomUUID().replaceAll('-', '')}_test`;
@@ -160,7 +164,8 @@ async function createFixture(config: { beforeCatalog?: boolean; initialize?: boo
     );
     const targets = migrations.filter((entry) => /CREATE TABLE "GameResource"/.test(entry.sql));
     expect(targets).toHaveLength(1);
-    for (const migration of migrations.filter((entry) => !config.beforeCatalog || entry.name < targets[0]!.name)) {
+    const before = config.beforeCatalog ? targets[0]!.name : config.beforeDrafts ? draftMigration : undefined;
+    for (const migration of migrations.filter((entry) => before === undefined || entry.name < before)) {
       await native.query(migration.sql);
     }
     const sql = (await readFile(new URL('packages/db/sql/resources-init.sql', root), 'utf8')).replaceAll('\r\n', '\n');
@@ -182,7 +187,7 @@ async function createFixture(config: { beforeCatalog?: boolean; initialize?: boo
 
 async function withDatabase(
   action: (fixture: Fixture) => Promise<void>,
-  config: { beforeCatalog?: boolean; initialize?: boolean } = {},
+  config: { beforeCatalog?: boolean; beforeDrafts?: boolean; initialize?: boolean } = {},
 ) {
   const fixture = await createFixture(config);
   let failure: unknown;
@@ -538,4 +543,204 @@ it('C5 한 번 조회해 refs 순서로 돌려주고 transaction client도 받�
   expect(counter.count()).toBe(1);
   expect(rows.map(({ kind, name, version }) => ({ kind, name, version }))).toEqual(shuffled);
   expect(await sharedDb().$transaction((tx) => readPublishedResources(tx, shuffled))).toEqual(rows);
+});
+
+async function createDraft(db: PrismaClient) {
+  const name = `a2_${randomUUID().replaceAll('-', '')}`;
+  const content = { id: name, value: 0 };
+  return db.gameResource.create({
+    data: {
+      kind: 'MAP',
+      name,
+      version: 2,
+      status: 'DRAFT',
+      content,
+      contentHash: hashState(content),
+      source: 'A2 시험',
+    },
+  });
+}
+
+it('A2 초안 저장은 revision과 편집자를 남기고 게시는 저장한 내용·revision을 유지한다', async () => {
+  await withDatabase(async ({ db }) => {
+    const draft = await createDraft(db);
+    expect([draft.revision, draft.updatedBy, draft.updatedAt, draft.publishedBy]).toEqual([0, null, null, null]);
+    const actor = randomUUID();
+    const content = { id: draft.name, value: 1 };
+    const saved = await db.gameResource.update({
+      where: { id: draft.id },
+      data: {
+        content,
+        contentHash: hashState(content),
+        revision: { increment: 1 },
+        updatedBy: actor,
+        updatedAt: new Date(),
+      },
+    });
+    expect(saved.revision).toBe(1);
+    expect(saved.updatedBy).toBe(actor);
+    expect(saved.updatedAt).not.toBeNull();
+    const published = await db.gameResource.update({
+      where: { id: draft.id },
+      data: { status: 'PUBLISHED', publishedAt: new Date(), publishedBy: actor },
+    });
+    expect(published).toEqual({ ...saved, status: 'PUBLISHED', publishedAt: expect.any(Date), publishedBy: actor });
+    expect(published.contentHash).toBe(hashState(published.content));
+  });
+});
+
+it.each([
+  ['id', { id: 'changed-id' }],
+  ['kind', { kind: 'SCENARIO' }],
+  ['name', { name: 'changed-name' }],
+  ['version', { version: 3 }],
+  ['createdBy', { createdBy: 'changed-creator' }],
+  ['createdAt', { createdAt: new Date(0) }],
+  ['source', { source: 'changed-source' }],
+] as const)('A2 초안의 %s 식별 정보 변경은 거부하고 원래 행을 보존한다', async (_field, change) => {
+  await withDatabase(async ({ db }) => {
+    const draft = await createDraft(db);
+    await expect(
+      db.gameResource.update({ where: { id: draft.id }, data: { ...change, revision: { increment: 1 } } }),
+    ).rejects.toThrow('Draft game resource identity');
+    expect(await db.gameResource.findUniqueOrThrow({ where: { id: draft.id } })).toEqual(draft);
+  });
+});
+
+it.each([-1, 0, 2])('A2 저장 revision을 %i로 건너뛰거나 재사용하지 못한다', async (revision) => {
+  await withDatabase(async ({ db }) => {
+    const draft = await createDraft(db);
+    await expect(db.gameResource.update({ where: { id: draft.id }, data: { revision } })).rejects.toThrow(
+      'revision must increase by one',
+    );
+    expect(await db.gameResource.findUniqueOrThrow({ where: { id: draft.id } })).toEqual(draft);
+  });
+});
+
+it.each([
+  ['revision', { revision: 1 }],
+  ['content', { content: { id: 'unsaved' } }],
+  ['contentHash', { contentHash: '0'.repeat(64) }],
+] as const)('A2 게시하면서 저장된 %s를 바꾸지 못한다', async (_field, change) => {
+  await withDatabase(async ({ db }) => {
+    const draft = await createDraft(db);
+    await expect(
+      db.gameResource.update({
+        where: { id: draft.id },
+        data: { ...change, status: 'PUBLISHED', publishedAt: new Date() },
+      }),
+    ).rejects.toThrow('Publishing must preserve');
+    expect(await db.gameResource.findUniqueOrThrow({ where: { id: draft.id } })).toEqual(draft);
+  });
+});
+
+it('A2 폐기 정책 전에는 초안을 삭제하지 못한다', async () => {
+  await withDatabase(async ({ db }) => {
+    const draft = await createDraft(db);
+    await expect(db.gameResource.delete({ where: { id: draft.id } })).rejects.toThrow(
+      'Draft game resources cannot be deleted',
+    );
+    expect(await db.gameResource.findUniqueOrThrow({ where: { id: draft.id } })).toEqual(draft);
+  });
+});
+
+it('A2 게시 뒤에는 새 편집 메타데이터 갱신과 삭제도 거부한다', async () => {
+  await withDatabase(async ({ db }) => {
+    const draft = await createDraft(db);
+    const published = await db.gameResource.update({
+      where: { id: draft.id },
+      data: { status: 'PUBLISHED', publishedAt: new Date() },
+    });
+    await expect(
+      db.gameResource.update({
+        where: { id: draft.id },
+        data: { revision: 1, updatedBy: randomUUID(), updatedAt: new Date() },
+      }),
+    ).rejects.toThrow('Published game resources cannot be updated or deleted');
+    await expect(db.gameResource.delete({ where: { id: draft.id } })).rejects.toThrow(
+      'Published game resources cannot be updated or deleted',
+    );
+    expect(await db.gameResource.findUniqueOrThrow({ where: { id: draft.id } })).toEqual(published);
+  });
+});
+
+it('A2 같은 revision의 실제 동시 저장은 하나만 성공하고 내용·해시가 그 결과와 일치한다', async () => {
+  await withDatabase(async ({ db }) => {
+    const draft = await createDraft(db);
+    const results = await Promise.all(
+      [1, 2].map((value) => {
+        const content = { id: draft.name, value };
+        return db.gameResource.updateMany({
+          where: { id: draft.id, status: 'DRAFT', revision: 0 },
+          data: { content, contentHash: hashState(content), revision: { increment: 1 } },
+        });
+      }),
+    );
+    expect(results.map(({ count }) => count).sort()).toEqual([0, 1]);
+    const row = await db.gameResource.findUniqueOrThrow({ where: { id: draft.id } });
+    expect(row.revision).toBe(1);
+    expect(row.content).toEqual({ id: draft.name, value: results[0]!.count ? 1 : 2 });
+    expect(row.contentHash).toBe(hashState(row.content));
+  });
+});
+
+it('A2 저장과 게시가 겹치면 저장한 판 하나만 남고 이전 revision의 게시는 성공하지 않는다', async () => {
+  await withDatabase(async ({ db }) => {
+    const draft = await createDraft(db);
+    const content = { id: draft.name, value: 1 };
+    const [save, publish] = await Promise.all([
+      db.gameResource.updateMany({
+        where: { id: draft.id, status: 'DRAFT', revision: 0 },
+        data: { content, contentHash: hashState(content), revision: { increment: 1 } },
+      }),
+      db.gameResource.updateMany({
+        where: { id: draft.id, status: 'DRAFT', revision: 0 },
+        data: { status: 'PUBLISHED', publishedAt: new Date() },
+      }),
+    ]);
+    expect(save.count + publish.count).toBe(1);
+    const row = await db.gameResource.findUniqueOrThrow({ where: { id: draft.id } });
+    expect(row.status).toBe(save.count ? 'DRAFT' : 'PUBLISHED');
+    expect(row.revision).toBe(save.count ? 1 : 0);
+    expect(row.content).toEqual(save.count ? content : draft.content);
+    expect(row.contentHash).toBe(hashState(row.content));
+  });
+});
+
+it('A2 한 트랜잭션의 후속 식별 정보 오류는 앞선 정상 저장도 롤백한다', async () => {
+  await withDatabase(async ({ db }) => {
+    const draft = await createDraft(db);
+    const content = { id: draft.name, value: 1 };
+    await expect(
+      db.$transaction(async (tx) => {
+        await tx.gameResource.update({
+          where: { id: draft.id },
+          data: { content, contentHash: hashState(content), revision: 1 },
+        });
+        await tx.gameResource.update({ where: { id: draft.id }, data: { source: 'changed-source', revision: 2 } });
+      }),
+    ).rejects.toThrow('Draft game resource identity');
+    expect(await db.gameResource.findUniqueOrThrow({ where: { id: draft.id } })).toEqual(draft);
+  });
+});
+
+it('A2 기존45개 migration의 게시·초안 행은 업그레이드 뒤 내용·해시·식별 정보를 보존한다', async () => {
+  await withDatabase(
+    async (fixture) => {
+      for (const draft of [false, true]) {
+        const name = draft ? 'a2_legacy_draft' : 'a2_legacy_published';
+        await insertResource(fixture, { kind: 'MAP', name, version: 1 }, { id: name }, { draft });
+      }
+      const before = (await fixture.native.query('SELECT * FROM "GameResource" ORDER BY id')).rows;
+      await fixture.native.query(await readFile(new URL(`${draftMigration}/migration.sql`, migrationRoot), 'utf8'));
+      const after = (await fixture.native.query('SELECT * FROM "GameResource" ORDER BY id')).rows;
+      expect(
+        after.map(({ revision, updatedBy, updatedAt, publishedBy, ...row }) => {
+          expect([revision, updatedBy, updatedAt, publishedBy]).toEqual([0, null, null, null]);
+          return row;
+        }),
+      ).toEqual(before);
+    },
+    { beforeDrafts: true },
+  );
 });
