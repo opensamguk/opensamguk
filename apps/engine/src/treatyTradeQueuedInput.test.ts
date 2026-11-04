@@ -45,7 +45,7 @@ async function fixture(respond = false) {
     world: { update: vi.fn() },
     inputEvent: { updateMany: vi.fn() },
     user: { findUnique: vi.fn(async () => ({ status: 'ACTIVE' })) },
-    general: { findUnique: vi.fn(async () => ({ userId: 'actor' })) },
+    general: { findUnique: vi.fn(async () => ({ userId: 'actor' })), findMany: vi.fn(async () => []) },
     treaty: { create: vi.fn(async () => ({})), updateMany: vi.fn(async () => ({ count: 1 })) },
     nation: { updateMany: vi.fn(async () => ({ count: 1 })) },
     diplomacy: { deleteMany: vi.fn(), create: vi.fn() },

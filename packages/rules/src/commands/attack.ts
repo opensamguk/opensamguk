@@ -164,7 +164,13 @@ function makeAttack(collect: typeof collectModifiers) {
       for (const report of reports) report.text += `, ${captured ? '점령' : '수비 유지'}`;
       history.push({ nationId: attackingNation, text: `${rounds.join('; ')}; ${summary}` });
       if (defendingNation !== null) history.push({ nationId: defendingNation, text: summary });
-      return { ...success(`${rounds.join('\n')}\n${summary}`), reports, history, battleAwards };
+      return {
+        ...success(`${rounds.join('\n')}\n${summary}`),
+        reports,
+        history,
+        battleAwards,
+        attackTarget: { cityKey: args.cityKey, defendingNationId: defendingNation },
+      };
     },
   });
 }

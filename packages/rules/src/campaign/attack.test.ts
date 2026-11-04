@@ -26,6 +26,22 @@ function run(world = fixture()) {
   const result = campaignAttack.execute(deepFreeze(world), actor, { cityKey: 2 }, rngFor('campaign-attack', 1));
   return { result, state: applyEffects(world, result.effects) };
 }
+describe('AC-M2-18 부곡의 실제 출병 대상', () => {
+  it.each([10000, 0])('수비 부곡 없이 성벽 %i를 공격해도 점령 전 국가를 반환한다', (wall) => {
+    const world = fixture();
+    world.campaign!.units = world.campaign!.units.filter((unit) => unit.ownerId === 1);
+    world.cities[2]!.wall = wall;
+    const { result } = run(world);
+    expect(result.reports).toEqual([]);
+    expect(result.attackTarget).toEqual({ cityKey: 2, defendingNationId: 2 });
+  });
+  it('거부한 자기 도시 공격에는 실제 출병 사실이 없다', () => {
+    const failure = campaignAttack.check(fixture(), actor, { cityKey: 1 });
+    expect(failure).not.toBeNull();
+    expect(failure).not.toHaveProperty('attackTarget');
+  });
+});
+
 describe('AC-INT-09 부곡 출병·점령', () => {
   it('수비 둘과 성벽을 순서대로 교전하고 마지막 도시 멸망·전공·보고를 기록한다', () => {
     const world = fixture(),

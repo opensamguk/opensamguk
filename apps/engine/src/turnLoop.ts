@@ -1,7 +1,8 @@
 import { publicMapConfig } from '@opensamguk/shared';
 import { persistPublicMap } from './publicMap';
 import type { Prisma, PrismaClient } from '@opensamguk/db';
-import { nextActionSequence, notifyWorld, type RealtimeSignal } from '@opensamguk/db';
+import { nextActionSequence, notifyWorld, enqueueNotifications, type RealtimeSignal } from '@opensamguk/db';
+import { commandNotifications } from './notifications';
 import {
   checkpointClock,
   monthlyDate,
@@ -327,6 +328,15 @@ export class TurnLoop {
           if (personnelPacket) next = personnelPacket.state;
           signals.push(...commandRealtimeSignals(state, next));
           const consumption = logisticsCommandMovements(state, next);
+          const notifications = await commandNotifications(tx, world, {
+            actor,
+            tick: due.nextTurnTick,
+            before: state,
+            result,
+            ...(turn.nation ? { national: turn.nation.result } : {}),
+            modern,
+            slots,
+          });
           await persistEffects(
             tx,
             worldId,
@@ -373,6 +383,7 @@ export class TurnLoop {
             data: { nextTurnTick: due.nextTurnTick + TICKS_PER_MONTH, turnRevision: { increment: 1 } },
           });
           if (updated.count !== 1) throw new Error('예턴이 변경되어 턴 저장을 취소했습니다.');
+          await enqueueNotifications(tx, notifications);
           execution = { generalId: due.id, tick: due.nextTurnTick, commandKey };
         }
         const endedTick = monthly ? boundary : due?.nextTurnTick;

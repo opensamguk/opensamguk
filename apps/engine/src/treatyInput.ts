@@ -22,6 +22,7 @@ import { loadWorld } from './worldLoader';
 import { loadReplayState } from './monthly';
 import { databaseNow } from './lease';
 import { readAdminEndTick } from './admin/end';
+import { enqueueTreatyOffer } from './notifications';
 
 type StoredWorld = Prisma.WorldGetPayload<Record<string, never>>;
 type StoredInput = Prisma.InputEventGetPayload<Record<string, never>>;
@@ -300,6 +301,7 @@ async function persistApplied(
         },
       });
     }
+    await enqueueTreatyOffer(tx, world, input.payload.toNationId, id, result.tick);
     return;
   }
   if (result.outcome === 'PROPOSED') throw new Error('조약 응답 결과가 제안으로 기록됐습니다.');
