@@ -959,6 +959,10 @@ model GameResource {
   createdBy   String? // 내장 판은 null. 사용자 관계는 T3-05·T4-78
   createdAt   DateTime           @default(now())
   publishedAt DateTime?
+  revision    Int                @default(0)
+  updatedBy   String?
+  updatedAt   DateTime?
+  publishedBy String?
 
   @@unique([kind, name, version])
 }
