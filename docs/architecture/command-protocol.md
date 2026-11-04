@@ -116,6 +116,7 @@ ID와 amount는 1~1,000,000 정수입니다. resource는 gold 또는 rice이며 
 | NO_SUPPLY | 출발·모집·내정 도시 보급 단절 |
 | NO_GOLD, NO_RICE | 비용·이전 자원 부족 |
 | NO_GOODS | 물류 판에서 도시의 철·목재·말 부족 |
+| NO_SCHEME_CARD | 계략 패 판에서 이 명령의 패가 없음 |
 | AT_MAX | 능력·도시·병력 상한 |
 | BAD_ARGS | 인자 파싱 실패 또는 target 불일치 |
 | UNKNOWN_COMMAND | 기본·확장 레지스트리에 없는 key |

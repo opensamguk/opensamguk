@@ -8,6 +8,7 @@ import { hashState } from '../packages/shared/src/node/hashState';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { exportReplay, replayArchive, type ReplayArchive } from '../apps/engine/src/replay';
 import { testDatabaseUrl } from './test-database';
+import { confirmDisconnectedDatabase } from './test-db-close';
 
 type PgClient = {
   connect(): Promise<void>;
@@ -45,23 +46,27 @@ async function withDatabase(mode: string, run: (client: PgClient, db: Db) => Pro
   const admin = new Client({ connectionString: adminUrl.href });
   const client = new Client({ connectionString: target.href });
   const db = createDb(target.href);
-  let created = false;
+  let created = false,
+    oid: string | undefined;
   await admin.connect();
   try {
     await admin.query(`CREATE DATABASE "${name}"`);
     created = true;
+    oid = (await admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname=$1', [name])).rows[0]?.oid as
+      string | undefined;
+    if (!oid) throw new Error('생성한 확장 저장 시험 DB OID가 없습니다.');
     await client.connect();
     await run(client, db);
   } finally {
     try {
       await Promise.all([client.end(), db.$disconnect()]);
-      if (created) {
-        expect(
-          (await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1', [name])).rows,
-        ).toEqual([{ count: 0 }]);
+      if (created && oid) {
+        const observation = await confirmDisconnectedDatabase(admin, name, oid);
+        expect(observation.connections).toBe(0);
         // 위에서 생성한 UUID DB만 지운다. 다른 연결을 종료하거나 DROP FORCE를 쓰지 않는다.
         await admin.query(`DROP DATABASE "${name}"`);
         expect((await admin.query('SELECT datname FROM pg_database WHERE datname=$1', [name])).rows).toEqual([]);
+        console.info(JSON.stringify({ event: 't403-slices-db-dropped', name, oid, ...observation, absent: true }));
       }
     } finally {
       await admin.end();
@@ -173,7 +178,7 @@ async function existingRows(client: PgClient) {
       throw new Error('잘못된 시험 표 이름입니다.');
     const data =
       table === 'World'
-        ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures' - 'operationalMap' - 'campaignState' - 'cityResourcesState' - 'logisticsState' - 'governanceState' - 'lineageState'"
+        ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures' - 'operationalMap' - 'campaignState' - 'cityResourcesState' - 'logisticsState' - 'governanceState' - 'lineageState' - 'stratagemCardsState'"
         : table === 'City'
           ? "to_jsonb(t) - 'kind'"
           : table === 'General'
@@ -407,7 +412,7 @@ it.each(['empty', 'legacy'] as const)(
       const previous = directories.filter((name) => name < migration);
       const later = directories.filter((name) => name > migration);
       expect(previous.at(-1)).toBe('20261023071000_nation_offices');
-      expect(later).toEqual([
+      const prerequisiteLater = [
         '20261023073000_treaties',
         '20261023074000_assignment_storage',
         '20261024000000_replay_features',
@@ -435,7 +440,9 @@ it.each(['empty', 'legacy'] as const)(
         '20261114000000_heritage_ledger',
         '20261115000000_notification_settings',
         '20261116000000_notification_outbox',
-      ]);
+        '20261117000000_stratagem_cards_state',
+      ];
+      expect(later.slice(0, prerequisiteLater.length)).toEqual(prerequisiteLater);
       for (const directory of previous)
         await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
       if (mode === 'legacy') await seedLegacy(client);
@@ -464,6 +471,7 @@ it.each(['empty', 'legacy'] as const)(
       expect((await client.query('SELECT id FROM "World" WHERE "logisticsState" IS NOT NULL')).rows).toEqual([]);
       expect((await client.query('SELECT id FROM "World" WHERE "governanceState" IS NOT NULL')).rows).toEqual([]);
       expect((await client.query('SELECT id FROM "World" WHERE "lineageState" IS NOT NULL')).rows).toEqual([]);
+      expect((await client.query('SELECT id FROM "World" WHERE "stratagemCardsState" IS NOT NULL')).rows).toEqual([]);
       expect((await client.query('SELECT "cityKey" FROM "City" WHERE "kind" IS NOT NULL')).rows).toEqual([]);
       expect(
         (

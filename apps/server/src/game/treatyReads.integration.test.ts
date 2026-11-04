@@ -44,6 +44,7 @@ function world(patch: Partial<World> = {}): World {
     logisticsState: null,
     governanceState: null,
     lineageState: null,
+    stratagemCardsState: null,
     presetKey: null,
     preset: null,
     scenarioKey: '1030',

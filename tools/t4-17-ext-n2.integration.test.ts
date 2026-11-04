@@ -80,8 +80,8 @@ beforeAll(async () => {
   await client.connect();
   const directory = new URL('../packages/db/prisma/migrations/', import.meta.url);
   const migrations = (await readdir(directory)).filter((name) => /^\d/.test(name)).sort();
-  // 18개 조약 migration까지의 접두부를 보존하고 현재 소스의 후속 SQL도 모두 적용한다.
-  expect(migrations).toEqual([
+  // 기존 45개 migration의 접두부를 보존하고 현재 소스의 후속 SQL도 모두 적용한다.
+  const prerequisiteMigrations = [
     '20261020000000_initial_world',
     '20261020010000_world_clock',
     '20261020020000_accounts',
@@ -126,7 +126,9 @@ beforeAll(async () => {
     '20261114000000_heritage_ledger',
     '20261115000000_notification_settings',
     '20261116000000_notification_outbox',
-  ]);
+    '20261117000000_stratagem_cards_state',
+  ];
+  expect(migrations.slice(0, prerequisiteMigrations.length)).toEqual(prerequisiteMigrations);
   expect(migrations.slice(0, 18).at(-1)).toBe('20261023073000_treaties');
   for (const name of migrations)
     await client.query(await readFile(new URL(`${name}/migration.sql`, directory), 'utf8'));

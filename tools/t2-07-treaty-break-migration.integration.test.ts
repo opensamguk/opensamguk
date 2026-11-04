@@ -114,7 +114,7 @@ async function ownDatabase(mode: 'empty' | 'upgrade' | 'constraints', run: (clie
 
 async function previous(client: PgClient) {
   const names = (await readdir(directory)).filter((name) => /^\d{14}_/.test(name)).sort();
-  expect(names).toEqual([
+  const prerequisiteMigrations = [
     ...previous23,
     marker,
     '20261028000000_assignment_nation_destroyed',
@@ -137,7 +137,9 @@ async function previous(client: PgClient) {
     '20261114000000_heritage_ledger',
     '20261115000000_notification_settings',
     '20261116000000_notification_outbox',
-  ]);
+    '20261117000000_stratagem_cards_state',
+  ];
+  expect(names.slice(0, prerequisiteMigrations.length)).toEqual(prerequisiteMigrations);
   for (const name of previous23)
     await client.query(await readFile(new URL(`${name}/migration.sql`, directory), 'utf8'));
 }

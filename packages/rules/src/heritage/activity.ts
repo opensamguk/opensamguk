@@ -20,6 +20,7 @@ export const HERITAGE_DIRECT_INPUT_KINDS = [
   'logistics.order',
   'governance.act',
   'lineage.act',
+  'stratagem-cards.act',
 ] as const;
 export const HERITAGE_IGNORED_INPUT_KINDS = [
   'general.active',

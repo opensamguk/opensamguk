@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { rngFor, type Rng } from '@opensamguk/shared';
 import { TICKS_PER_MONTH } from '../clock/constants';
-import type { WorldView } from '../model/world';
 import { cardId, cardKindSchema, cardQuantity, stratagemCardsConfigSchema, type StratagemCardsConfig } from './config';
 
 export const stratagemCardsStateSchema = z.strictObject({
@@ -21,7 +20,10 @@ export const stratagemCardsStateSchema = z.strictObject({
     .refine((nations) => Object.keys(nations).length <= 10_000),
 });
 export type StratagemCardsState = z.infer<typeof stratagemCardsStateSchema>;
-export type CardWorld = Pick<WorldView, 'nations' | 'cities'>;
+export interface CardWorld {
+  readonly nations: Readonly<Record<number, { readonly id: number }>>;
+  readonly cities: Readonly<Record<number, { readonly nationId: number | null }>>;
+}
 
 export function drawStratagemCard(config: StratagemCardsConfig, rng: Rng) {
   let index = rng.int(0, config.deck.reduce((total, card) => total + card.weight, 0) - 1);

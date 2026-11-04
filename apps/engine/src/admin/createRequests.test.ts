@@ -10,7 +10,7 @@ import { processWorldCreateRequest } from './createRequests';
 
 afterEach(() => vi.restoreAllMocks());
 
-function sexEditionRequest(frozen: 'old' | 'latest' | 'missing' | null, lineage = true) {
+function sexEditionRequest(frozen: 'old' | 'second' | 'latest' | 'missing' | null, lineage = true) {
   const read = (kind: PublishedResource['kind'], name: string, path: string): PublishedResource => {
     const content = JSON.parse(readFileSync(new URL(`../../../../resources/${path}`, import.meta.url), 'utf8'));
     return { kind, name, version: 1, content, contentHash: hashState(content), source: 'repository fixture' };
@@ -49,6 +49,7 @@ function sexEditionRequest(frozen: 'old' | 'latest' | 'missing' | null, lineage 
     },
     ledgers = resources.loadSexLedgers(),
     oldHash = realPrepare(initial, options, ledgers[0]).stateHash,
+    secondHash = realPrepare(initial, options, ledgers[1]).stateHash,
     latestHash = realPrepare(initial, options).stateHash;
   const resolution = {
     version: 1,
@@ -63,7 +64,14 @@ function sexEditionRequest(frozen: 'old' | 'latest' | 'missing' | null, lineage 
     presetHash: null,
     turnTermMinutes: 60,
     endYear: null,
-    initialStateHash: frozen === 'old' ? oldHash : frozen === 'missing' ? '0'.repeat(64) : latestHash,
+    initialStateHash:
+      frozen === 'old'
+        ? oldHash
+        : frozen === 'second'
+          ? secondHash
+          : frozen === 'missing'
+            ? '0'.repeat(64)
+            : latestHash,
   };
   const request = {
     id: '00000000-0000-4000-8000-000000000003',
@@ -119,10 +127,10 @@ function sexEditionRequest(frozen: 'old' | 'latest' | 'missing' | null, lineage 
     },
     $transaction: vi.fn(async (run: (tx: unknown) => Promise<unknown>) => run(tx)),
   } as unknown as PrismaClient;
-  return { db, request, tx, prepare, oldHash, latestHash, stored: () => stored };
+  return { db, request, tx, prepare, oldHash, secondHash, latestHash, stored: () => stored };
 }
 
-it.each(['old', 'latest', null] as const)(
+it.each(['old', 'second', 'latest', null] as const)(
   'AC-P2-32 고정된 생성은 %s 성별 판을 유지하고 미고정 생성은 최신 판을 쓴다',
   async (frozen) => {
     const f = sexEditionRequest(frozen),
@@ -131,12 +139,18 @@ it.each(['old', 'latest', null] as const)(
     await expect(processWorldCreateRequest(f.db, new AbortController().signal)).resolves.toBe(true);
     expect(f.request.status).toBe('DONE');
     expect(f.oldHash).not.toBe(f.latestHash);
+    expect(f.secondHash).not.toBe(f.latestHash);
     const origin = f.stored()!.replayOrigin as {
       initial: { generals: Array<{ id: number; sex: string }> };
       initialStateHash: string;
     };
     expect(origin.initial.generals.find((g) => g.id === 47)?.sex).toBe(frozen === 'old' ? 'UNKNOWN' : 'MALE');
-    expect(origin.initialStateHash).toBe(frozen === 'old' ? f.oldHash : f.latestHash);
+    expect(origin.initial.generals.find((g) => g.id === 266)?.sex).toBe(
+      frozen === 'old' || frozen === 'second' ? 'UNKNOWN' : 'MALE',
+    );
+    expect(origin.initialStateHash).toBe(
+      frozen === 'old' ? f.oldHash : frozen === 'second' ? f.secondHash : f.latestHash,
+    );
     if (before) expect(f.request.resolution).toEqual(before);
     if (frozen === null) expect(all).not.toHaveBeenCalled();
   },

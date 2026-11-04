@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { commandRegistry } from '../commands/registry';
 import type { DeepReadonly } from '../model/world';
 import { appointOfficer, dismissOfficer } from './appointments';
-import { closeInvalidOffers, respondAssignment } from './assignments';
+import { closeInvalidOffersInPlace, respondAssignment } from './assignments';
 import { syncOffices, type OfficeRevisions, type OfficeState, type OfficeView } from './offices';
 import { canExecuteNationCommand, canUseNationTurns } from './permissions';
 import { canExecuteCityNationCommand } from '../cityResources/commands';
@@ -255,7 +255,7 @@ export function finishPersonnelStep(
   tick: number,
 ): PersonnelStepResult {
   const synced = syncOffices(before, change.state, offices);
-  const cancelled = closeInvalidOffers(synced.state, tick);
+  const cancelled = closeInvalidOffersInPlace(synced.state, tick);
   const closedOffers = [...change.closedOffers, ...cancelled.closedOffers];
   const remaining = new Set(Object.values(cancelled.state.assignmentOffers ?? {}).map((offer) => offer.id));
   // 국가 발령 뒤 개인 탈국이 실행되면 같은 턴에 새 제안이 생겼다가 취소될 수 있다.
