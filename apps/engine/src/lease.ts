@@ -38,7 +38,7 @@ export async function acquireLease(
   return rows[0] ? { worldId, ownerId, fencingToken: rows[0].fencingToken, ttlMs } : null;
 }
 
-export async function renewLease(db: PrismaClient, lease: Lease): Promise<void> {
+export async function renewLease(db: Pick<PrismaClient, '$executeRaw'>, lease: Lease): Promise<void> {
   const count = await db.$executeRaw`
     UPDATE "EngineLease" SET "expiresAt" = (clock_timestamp() AT TIME ZONE 'UTC') + ${lease.ttlMs} * interval '1 millisecond'
     WHERE "worldId" = ${lease.worldId} AND "ownerId" = ${lease.ownerId} AND "fencingToken" = ${lease.fencingToken}

@@ -163,7 +163,8 @@ describe('AC-P2-30·31·32·33 정식 491명 확장 결합', () => {
       const lease = await acquireLease(db, worldId);
       if (!lease) throw new Error('확장 결합 시험 실행권이 없습니다.');
       try {
-        const loop = new TurnLoop(db, lease);
+        // 일괄 진행 중에도 각 commit의 유효한 실행권을 갱신한다.
+        const loop = new TurnLoop(db, lease, { beforeCommit: (tx) => renewLease(tx, lease) });
         for (let tick = 1000; tick <= TICKS_PER_MONTH; tick += 1000) {
           await renewLease(db, lease);
           await loop.advanceTo(tick);
