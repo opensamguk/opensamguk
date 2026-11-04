@@ -537,22 +537,42 @@ enum AuditActorKind {
 }
 
 model User {
-  id                  String               @id @default(uuid())
-  email               String               @unique
-  passwordHash        String
-  status              UserStatus           @default(ACTIVE)
-  role                UserRole             @default(USER)
-  createdAt           DateTime             @default(now())
-  emailVerifiedAt     DateTime?
-  sessions            Session[]
-  accountTokens       AccountToken[]
-  consents            ConsentRecord[]
-  generals            General[]
-  sanctions           Sanction[]
-  loginRecords        LoginRecord[]
-  worldCreateRequests WorldCreateRequest[]
-  heritageAccount     HeritageAccount?
-  heritageEntries     HeritageEntry[]
+  notificationGeneration Int                  @default(0)
+  notificationTarget     NotificationTarget?
+  id                     String               @id @default(uuid())
+  email                  String               @unique
+  passwordHash           String
+  status                 UserStatus           @default(ACTIVE)
+  role                   UserRole             @default(USER)
+  createdAt              DateTime             @default(now())
+  emailVerifiedAt        DateTime?
+  sessions               Session[]
+  accountTokens          AccountToken[]
+  consents               ConsentRecord[]
+  generals               General[]
+  sanctions              Sanction[]
+  loginRecords           LoginRecord[]
+  worldCreateRequests    WorldCreateRequest[]
+  heritageAccount        HeritageAccount?
+  heritageEntries        HeritageEntry[]
+}
+
+enum NotificationTargetStatus {
+  ACTIVE
+  DISABLED
+}
+
+model NotificationTarget {
+  id             String                   @id @default(uuid())
+  userId         String                   @unique
+  kind           String                   @default("DISCORD")
+  endpoint       String
+  last4          String
+  events         String[]
+  status         NotificationTargetStatus @default(ACTIVE)
+  disabledReason String?
+  verifiedAt     DateTime
+  user           User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model HeritageAccount {

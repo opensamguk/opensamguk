@@ -55,8 +55,8 @@ export async function withdrawAccount(
       await forfeitHeritageBalance(tx, identity.userId);
       await tx.accountToken.deleteMany({ where: { userId: identity.userId } });
       await tx.$executeRaw`DELETE FROM "LoginRecord" WHERE "userId"=${identity.userId}`;
-      // 현재 schema에는 알림 대상·발송 대기열이 없다.
-      // 모델을 추가하는 작업은 이 트랜잭션의 삭제와 경합 검증도 함께 확장한다.
+      await tx.notificationTarget.deleteMany({ where: { userId: identity.userId } });
+      // 발송 대기열을 추가하는 작업은 이 트랜잭션의 삭제와 경합 검증도 함께 확장한다.
       return { sessionIds };
     });
   } catch (error) {

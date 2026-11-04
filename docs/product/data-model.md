@@ -108,7 +108,7 @@ AC-INT-06의 `World.campaignState`는 관계·제안·NPC 서약 시도와 부�
 | `Operation`                  | D2 국가 작전판                | id, worldId, nationId, targetCityKey, targetTick, members, status                   | M2   |
 | `AssignmentOffer`            | D11 발령 응답                 | id, worldId, generalId, fromNationId, targetCityKey, status, expiresTick            | M2   |
 | `General.defaultPolicy`      | D12 기본 방침                 | 필드 하나: 방침 key                                                                 | M2   |
-| `NotificationTarget`         | D6 턴 알림                    | userId, kind(디스코드·웹 푸시), endpoint, events                                    | M2   |
+| `NotificationTarget`         | D6 턴 알림                    | 사용자당 디스코드 대상 하나. id, userId, kind(DISCORD), endpoint, last4, events, status, disabledReason, verifiedAt. 주소는 서버 안에서만 쓰며 API는 끝 4자리만 낸다. `User.notificationGeneration`은 해제 뒤에도 유지한다 | M2   |
 | `OfficeEffect` (리소스 파일) | D17 관직 주재 효과            | 관직별 도시 보정 표. DB가 아닌 `resources/`                                         | M3   |
 | `ReputationEvent`            | D10 월단평                    | worldId, generalId, tick, kind, score                                               | M3   |
 | (없음)                       | D3 군사 조언, D15 역할별 입장 | 기존 데이터와 NPC AI만 사용                                                         | M3   |
