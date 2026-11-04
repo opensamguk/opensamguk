@@ -10,6 +10,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { monthlyFixture } from '../test/monthlyFixture';
 import { loadInitialWorld } from './world/resources';
 import { persistCampaignState, readCampaignArmyTypes, readStoredCampaign } from './campaignState';
+import { checkStoredReplayFormat } from './features';
 
 let initial: Awaited<ReturnType<typeof monthlyFixture>>;
 beforeAll(async () => {
@@ -46,8 +47,15 @@ describe('AC-INT-06 휘하 저장 경계', () => {
     const types = readCampaignArmyTypes(row);
     expect(types).toContain(1100);
     expect(types).not.toContain(1000);
+    const checked = checkStoredReplayFormat({ ...row, replayFormat: 3, ruleFeatures: initial.ruleFeatures });
+    expect(checked).toBe(row.replayOrigin);
+    expect(readCampaignArmyTypes(row, checked)).toEqual(types);
+    expect(() => readCampaignArmyTypes({ ...row, replayOrigin: structuredClone(row.replayOrigin) }, checked)).toThrow(
+      '잠근 월드와 다릅니다',
+    );
     row.unitSet.crewTypes[1].id = 9999;
     expect(() => readCampaignArmyTypes(row)).toThrow('생성 기록과 다릅니다');
+    expect(() => readCampaignArmyTypes(row, checked)).toThrow('생성 기록과 다릅니다');
     expect(
       readCampaignArmyTypes(JSON.parse(JSON.stringify({ unitSet: initial.unitSet, replayOrigin: origin }))),
     ).toEqual(types);

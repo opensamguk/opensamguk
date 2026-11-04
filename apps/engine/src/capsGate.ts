@@ -17,8 +17,8 @@ export async function assertWorldCapabilities(
   world: Prisma.WorldGetPayload<Record<string, never>>,
 ): Promise<WorldCapabilities | { kind: 'registry'; armyTypes?: readonly number[] }> {
   const modern = world.replayFormat === 3;
-  checkStoredReplayFormat(world);
-  const armyTypes = world.ruleFeatures.includes('campaign-v1') ? readCampaignArmyTypes(world) : [];
+  const origin = checkStoredReplayFormat(world);
+  const armyTypes = world.ruleFeatures.includes('campaign-v1') ? readCampaignArmyTypes(world, origin) : [];
   await assertStoredCityResources(tx, world, armyTypes);
   await assertStoredLogistics(tx, world);
   const capabilities = modern ? { kind: 'registry' as const, armyTypes } : selectWorldCapabilities(world);
