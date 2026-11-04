@@ -555,7 +555,10 @@ it('두 정식 월드의 미동의 변경은 전부403·무변경이며 실제 �
   const paths = Object.entries(procedures)
     .filter(([, procedure]) => procedure._def.type === 'mutation' && procedure._def.meta?.accountAccess === 'verified')
     .map(([path]) => path);
-  expect(paths).toHaveLength(34);
+  expect(paths).toHaveLength(37);
+  expect(paths).toEqual(
+    expect.arrayContaining(['notification.setDiscord', 'notification.setEvents', 'notification.removeDiscord']),
+  );
   expect(paths).toContain('lineage.submit');
   expect(paths).toContain('logistics.submit');
   expect(paths).toContain('governance.submit');
