@@ -6,6 +6,7 @@ import {
   readStoredGovernance,
   storedGeneralSex,
   readStoredLineage,
+  readStoredStratagemCards,
   type WorldState,
 } from '@opensamguk/rules';
 import { engineFeatures } from './features';
@@ -107,6 +108,8 @@ export async function loadWorldAfterCapabilityCheck(
   if (governance) state.governance = governance;
   const lineage = readStoredLineage(world, state);
   if (lineage) state.lineage = lineage;
+  const cards = readStoredStratagemCards(world, state);
+  if (cards) state.stratagemCards = cards;
   for (const feature of engineFeatures
     .filter((feature) => world.ruleFeatures?.includes(feature.key))
     .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)))

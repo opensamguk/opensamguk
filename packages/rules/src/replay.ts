@@ -185,7 +185,12 @@ export function applyRecordedInput(
     input.kind === 'campaign.order'
       ? kind.apply(replay, input, { resolver: resolverForRuleFeatures(replay.state, registry) })
       : kind.apply(replay, input);
-  for (const key of replay.state.ruleFeatures ?? []) {
+  const features = replay.state.ruleFeatures ?? [];
+  // 엄격한 후속 적재 전에 멸망·거점 소유 변경에 따른 계략 패를 정리한다.
+  const ordered = features.includes('stratagem-cards-v1')
+    ? ['stratagem-cards-v1', ...features.filter((key) => key !== 'stratagem-cards-v1')]
+    : features;
+  for (const key of ordered) {
     if (key === kind.feature) continue;
     const feature = registry.features.find((feature) => feature.key === key);
     next = feature?.afterAppliedInput?.(replay, next, input, { route: kind.route }) ?? next;

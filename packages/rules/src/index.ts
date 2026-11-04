@@ -236,3 +236,14 @@ export * from './heritage/awards';
 export * from './heritage/refund';
 export * from './heritage/creation';
 export { heritageFeatureDataSchema } from './heritage/feature';
+export * from './stratagemCards/config';
+export * from './stratagemCards/state';
+export * from './stratagemCards/origin';
+export * from './stratagemCards/view';
+export * from './stratagemCards/actions';
+export * from './stratagemCards/resolver';
+export {
+  readStratagemCardsConfig,
+  stratagemCardsResultSchema,
+  validateStratagemCardsRecord,
+} from './stratagemCards/feature';

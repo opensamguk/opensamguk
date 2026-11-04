@@ -21,7 +21,7 @@ function cardFailure(world: WorldView, actor: Actor, key: string, reserve: boole
     : fail('NO_SCHEME_CARD', '이 계략 패가 없습니다.');
 }
 
-// 실제 등록은 엔진·입력 경로를 함께 갖춘 뒤 한다. 현재는 명시 시험 config로만 검증한다.
+// 같은 resolver를 엔진·예턴 사전 검사·재생에서 쓴다. 기능을 켠 월드만 패를 소비한다.
 export function createStratagemCardResolver(base: CommandResolver): CommandResolver {
   const definition = (key: string): CommandDef | undefined => {
     const original = base.get(key);

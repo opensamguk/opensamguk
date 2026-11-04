@@ -31,6 +31,7 @@ import { cityResourcesRouter } from './routers/cityResources';
 import { logisticsRouter } from './routers/logistics';
 import { governanceRouter } from './routers/governance';
 import { lineageRouter } from './routers/lineage';
+import { stratagemCardsRouter } from './routers/stratagemCards';
 import { heritageRouter } from './routers/heritage';
 import { notificationRouter } from './routers/notification';
 
@@ -66,6 +67,7 @@ export const appRouter = router({
   logistics: logisticsRouter,
   governance: governanceRouter,
   lineage: lineageRouter,
+  stratagemCards: stratagemCardsRouter,
   heritage: heritageRouter,
   notification: notificationRouter,
   // 화면이 서버와 DB 연결을 확인하는 데 쓴다 (AC-M1-02).

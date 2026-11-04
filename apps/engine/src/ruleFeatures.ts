@@ -36,6 +36,8 @@ import { processLineageInput } from './lineage/input';
 import { PgLineageRepository, persistLineageMonth } from './lineage/repository';
 import { reconcileLineageOrder } from './lineage/service';
 import type { LineageMonthEffects } from '@opensamguk/rules';
+import { processStratagemCardsInput } from './stratagemCards/input';
+import { reconcileQueuedStratagemCards } from './stratagemCards/state';
 
 export async function loadPersonnelTurnContext(tx: Prisma.TransactionClient, worldId: string, state: WorldState) {
   if (state.ruleFeatures?.includes('policy')) {
@@ -146,6 +148,12 @@ const processPersonnelInput: QueuedInputHandler = async (tx, world, event, { tic
 
 export const builtInEngineFeatures: readonly EngineFeature[] = [
   {
+    key: 'stratagem-cards-v1',
+    queuedInputs: { 'stratagem-cards.act': processStratagemCardsInput },
+    // 다른 후처리의 엄격한 적재 전에 소유를 맞춘다. 원생성 월 시각으로 멱등 정리한다.
+    afterQueuedInput: (tx, world) => reconcileQueuedStratagemCards(tx, world.id),
+  },
+  {
     key: 'logistics-v1',
     queuedInputs: { 'logistics.order': processLogisticsInput },
     async persistMonthly(tx, worldId, _before, _next, effects, context) {
@@ -162,7 +170,7 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
       'campaign.order': processCampaignQueuedInput,
     },
     afterQueuedInput: (tx, world, before, input) =>
-      ['city.resources', 'logistics.order', 'governance.act', 'lineage.act'].includes(input.kind)
+      ['city.resources', 'logistics.order', 'governance.act', 'lineage.act', 'stratagem-cards.act'].includes(input.kind)
         ? Promise.resolve()
         : persistForeignCampaignInput(tx, world, before, input),
   },

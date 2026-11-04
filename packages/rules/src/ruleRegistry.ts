@@ -28,6 +28,7 @@ import { ADMIN_RESET_KIND, applyAdminResetRecord } from './clock/reset';
 import { logisticsFeature, logisticsInputKind } from './logistics/feature';
 import { governanceFeature, governanceInputKind } from './governance/feature';
 import { lineageFeature, lineageInputKind } from './lineage/feature';
+import { stratagemCardsFeature, stratagemCardsInputKind } from './stratagemCards/feature';
 import { heritageFeature } from './heritage/feature';
 
 export interface ReplayOriginV1 {
@@ -95,8 +96,17 @@ export const ruleRegistry: RuleRegistry = {
     governanceFeature,
     lineageFeature,
     heritageFeature,
+    stratagemCardsFeature,
   ],
-  monthlyOrder: ['treaty', 'lineage-v1', 'personnel', 'campaign-assignment-v2', 'logistics-v1', 'governance-v1'],
+  monthlyOrder: [
+    'treaty',
+    'lineage-v1',
+    'personnel',
+    'campaign-assignment-v2',
+    'logistics-v1',
+    'governance-v1',
+    'stratagem-cards-v1',
+  ],
   inputKinds: [
     ...ADMIN_CLOCK_KINDS.map((kind) => ({
       kind,
@@ -119,6 +129,7 @@ export const ruleRegistry: RuleRegistry = {
     logisticsInputKind,
     governanceInputKind,
     lineageInputKind,
+    stratagemCardsInputKind,
   ],
 };
 

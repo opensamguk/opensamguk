@@ -1,4 +1,5 @@
 import { isDeepStrictEqual } from 'node:util';
+import { loadWorld } from './worldLoader';
 import type { PrismaClient } from '@opensamguk/db';
 import {
   applyRecordedInput,
@@ -136,6 +137,8 @@ export async function exportReplay(
       checkStoredReplayFormat(world);
       await assertStoredCityResources(tx, world);
       await assertStoredLogistics(tx, world);
+      if (world.ruleFeatures.includes('stratagem-cards-v1') || world.stratagemCardsState != null)
+        await loadWorld(tx, worldId);
       const v3 = world.replayFormat === 3;
       if (!v3) {
         const capabilities = selectWorldCapabilities(world);
