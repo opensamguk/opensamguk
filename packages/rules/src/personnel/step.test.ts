@@ -200,6 +200,8 @@ describe('인사 step의 저장 묶음', () => {
 
   it('B와 W의 제안 및 office 스냅샷은 이후 결과 변경과 분리된다', () => {
     const before = applied(assignGeneral(personnelWorld(), 4, 3, 4, 100)).state;
+    before.officeTurns = { 1: { 5: Array.from({ length: 12 }, () => ({ commandKey: 'nation_rest', args: {} })) } };
+    const saved = structuredClone(before);
     const start = { 1: { 5: { revision: 4, tenure: 2 } } };
     const packet = completePersonnelStep(
       deepFreeze(before),
@@ -207,12 +209,17 @@ describe('인사 step의 저장 묶음', () => {
       deepFreeze(unchanged(before, start)),
       200,
     );
+    packet.state.generals[3]!.gold++;
     packet.state.assignmentOffers![3]!.cityKey = 1;
+    packet.state.officeTurns![1]![5]![0]!.commandKey = 'nation_reward';
     packet.offices[1]![5]!.revision = 99;
     expect(packet.assignment.before.assignmentOffers![3]!.cityKey).toBe(4);
     expect(packet.assignment.beforeFinish.assignmentOffers![3]!.cityKey).toBe(4);
     expect(packet.assignment.final.assignmentOffers![3]!.cityKey).toBe(4);
     expect(packet.office.next.offices[1]![5]!.revision).toBe(4);
+    expect(packet.office.before.officeTurns![1]![5]![0]!.commandKey).toBe('nation_rest');
+    expect(packet.office.next.officeTurns![1]![5]![0]!.commandKey).toBe('nation_rest');
+    expect(before).toEqual(saved);
     expect(start[1]![5]!.revision).toBe(4);
   });
 });
