@@ -181,8 +181,11 @@ describe('T3-02 AC-M3-01 실제 PostgreSQL·HTTP 이메일 인증 차단', () =>
     });
   });
 
-  it('34개 변경 API가 미인증·위조·무인증·제재를 거부하며 모든 DB 행은 그대로다', async () => {
-    expect(paths).toHaveLength(34);
+  it('37개 변경 API가 미인증·위조·무인증·제재를 거부하며 모든 DB 행은 그대로다', async () => {
+    expect(paths).toHaveLength(37);
+    expect(paths).toEqual(
+      expect.arrayContaining(['notification.setDiscord', 'notification.setEvents', 'notification.removeDiscord']),
+    );
     expect(paths).toContain('lineage.submit');
     expect(paths).toContain('logistics.submit');
     expect(paths).toContain('governance.submit');
