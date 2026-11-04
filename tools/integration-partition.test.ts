@@ -4,19 +4,31 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { ENGINE_INTEGRATION_FILES, integrationPartition } from './integration-partition';
 
 async function integrationFiles() {
-  return (
-    await Promise.all(
-      ['apps', 'tools'].map(async (directory) =>
-        (await readdir(new URL(`../${directory}/`, import.meta.url), { recursive: true })).map(
-          (file) => `${directory}/${file}`,
-        ),
-      ),
-    )
-  )
-    .flat()
-    .map((file) => file.replaceAll('\\', '/'))
-    .filter((file) => /^(apps\/.*|tools\/[^/]+)\.integration\.test\.ts$/.test(file))
-    .sort();
+  async function appFiles(directory: string): Promise<string[]> {
+    const entries = await readdir(new URL(`../${directory}/`, import.meta.url), { withFileTypes: true });
+    return (
+      await Promise.all(
+        entries
+          .filter((entry) => entry.name !== 'node_modules')
+          .map(async (entry) => {
+            const file = `${directory}/${entry.name}`;
+            if (entry.isDirectory()) return appFiles(file);
+            return entry.isFile() && file.endsWith('.integration.test.ts') ? [file] : [];
+          }),
+      )
+    ).flat();
+  }
+  // 통합 설정과 같이 의존성은 제외하고 tools의 직접 파일과 apps의 소스만 찾는다.
+  const [apps, tools] = await Promise.all([
+    appFiles('apps'),
+    readdir(new URL('../tools/', import.meta.url), { withFileTypes: true }),
+  ]);
+  return [
+    ...apps,
+    ...tools
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.integration.test.ts'))
+      .map((entry) => `tools/${entry.name}`),
+  ].sort();
 }
 
 function partition(files: string[]) {
@@ -61,6 +73,8 @@ describe('INT-01 / AC-INT-01 PostgreSQL CI 분할', () => {
   });
 
   it('실제 통합 파일은 두 CI 묶음에 빠짐없이 한 번씩 속한다', () => {
+    expect(files).toContain('apps/server/src/routers/reads.integration.test.ts');
+    expect(files.some((file) => file.includes('/node_modules/'))).toBe(false);
     const { engine, api } = partition(files);
     const apiArgs = integrationPartition('api');
     expect(apiArgs).toHaveLength(engine.length * 2);
