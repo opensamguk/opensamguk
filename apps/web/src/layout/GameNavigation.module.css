@@ -58,6 +58,11 @@
 .link:hover {
   background: rgb(255 255 255 / 8%);
 }
+.link:is(button) {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
 .active,
 .active:hover {
   background: var(--color-accent);

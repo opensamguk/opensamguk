@@ -43,12 +43,15 @@ test('T4-97 메인 HUD 계정 메뉴·예턴 상태·도시에서 명령 고르�
     const banner = page.getByRole('banner');
     for (const colorScheme of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme });
-      for (const width of [375, 1440]) {
+      for (const width of [375, 767, 768, 1440]) {
         await page.setViewportSize({ width, height: 900 });
-        await expect(banner.getByRole('button', { name: '로그아웃', exact: true })).toBeVisible();
+        const gameNav = page.getByRole('navigation', { name: '게임 메뉴', exact: true }).filter({ visible: true });
+        await banner.locator('a,button').filter({ visible: true }).last().focus();
+        await page.keyboard.press('Tab');
+        await expect(gameNav.getByRole('link', { name: '군략도', exact: true })).toBeFocused();
         if (width < 768) {
+          await expect(banner.getByRole('button', { name: '로그아웃', exact: true })).toHaveCount(0);
           await expect(banner.getByRole('link', { name: '내 계정', exact: true })).toHaveCount(0);
-          const gameNav = page.getByRole('navigation', { name: '게임 메뉴', exact: true }).filter({ visible: true });
           const summary = gameNav.locator('summary');
           await summary.click();
           const account = gameNav.getByRole('group', { name: '계정', exact: true });
@@ -57,11 +60,17 @@ test('T4-97 메인 HUD 계정 메뉴·예턴 상태·도시에서 명령 고르�
             expect(box.width).toBeGreaterThanOrEqual(44);
             expect(box.height).toBeGreaterThanOrEqual(44);
           }
+          const logout = account.getByRole('button', { name: '로그아웃', exact: true });
+          await expect(logout).toBeVisible();
+          const logoutBox = (await logout.boundingBox())!;
+          expect(logoutBox.width).toBeGreaterThanOrEqual(44);
+          expect(logoutBox.height).toBeGreaterThanOrEqual(44);
           await page.screenshot({ path: info.outputPath(`t4-97-menu-${colorScheme}-${width}.png`) });
           await page.keyboard.press('Escape');
           await expect(summary).toBeFocused();
           await expect(gameNav.locator('details')).not.toHaveAttribute('open');
         } else {
+          await expect(banner.getByRole('button', { name: '로그아웃', exact: true })).toBeVisible();
           await expect(banner.getByRole('link', { name: '내 계정', exact: true })).toBeVisible();
           await expect(banner.getByRole('link', { name: '알림 설정', exact: true })).toBeVisible();
         }
@@ -151,6 +160,14 @@ test('T4-97 메인 HUD 계정 메뉴·예턴 상태·도시에서 명령 고르�
     } finally {
       await other.close();
     }
+    await page.setViewportSize({ width: 375, height: 900 });
+    const gameNav = page.getByRole('navigation', { name: '게임 메뉴', exact: true }).filter({ visible: true });
+    await gameNav.locator('summary').click();
+    await gameNav
+      .getByRole('group', { name: '계정', exact: true })
+      .getByRole('button', { name: '로그아웃', exact: true })
+      .click();
+    await expect(page).toHaveURL(/\/login$/);
   } finally {
     await page.close();
     await releaseHold(hold);
