@@ -40,6 +40,7 @@ const summary = (status: WorldSummary['status']): WorldSummary => ({
   nowTick: 0,
   msPerTick: 1_000,
   turnTermMinutes: 60,
+  truce: null,
 });
 
 function fakeClient(status: WorldSummary['status']) {
