@@ -555,7 +555,7 @@ it('두 정식 월드의 미동의 변경은 전부403·무변경이며 실제 �
   const paths = Object.entries(procedures)
     .filter(([, procedure]) => procedure._def.type === 'mutation' && procedure._def.meta?.accountAccess === 'verified')
     .map(([path]) => path);
-  expect(paths).toHaveLength(38);
+  expect(paths).toHaveLength(41);
   expect(paths).toEqual(
     expect.arrayContaining(['notification.setDiscord', 'notification.setEvents', 'notification.removeDiscord']),
   );
@@ -567,6 +567,7 @@ it('두 정식 월드의 미동의 변경은 전부403·무변경이며 실제 �
   expect(paths).toContain('admin.world.requestClock');
   expect(paths).toContain('cityResources.allocate');
   expect(paths).toContain('admin.world.create');
+  expect(paths).toEqual(expect.arrayContaining(['resourceAdmin.clone', 'resourceAdmin.save', 'resourceAdmin.publish']));
 
   expect(paths).toContain('admin.world.requestEnd');
   expect(paths).toContain('admin.world.requestReset');
