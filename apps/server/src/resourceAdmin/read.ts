@@ -6,7 +6,7 @@ import { checkContent, makeLimits, measureJson, type Content, type Limits } from
 
 const kinds = ['MAP', 'SCENARIO', 'UNIT_SET', 'STAT_RULES', 'PORTRAIT_MAP'] as const;
 const statuses = ['DRAFT', 'PUBLISHED'] as const;
-const listInput = z.strictObject({
+export const listInput = z.strictObject({
   kind: z.enum(kinds).optional(),
   name: z
     .string()

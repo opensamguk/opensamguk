@@ -35,11 +35,11 @@ export function makeLimits(input: Limits): Limits {
   });
 }
 
-// 내장 다섯 판의 compact 최대 54,879바이트를 수용한다. 보고 예산은 wire 한도가 아니다.
+// 운영 시나리오 compact 171,087바이트를 수용한다. 보고 예산은 wire 한도가 아니다.
 // 진단 1,000개가 내용 길이의 문자열을 반복해도 들어가는 보수적 예산이며 실제 호출자는 값을 주입한다.
 export const RESOURCE_PAYLOAD_LIMITS = makeLimits({
   depthMax: MAX_CONTENT_DEPTH,
-  contentMax: 128 * 1024,
+  contentMax: 900_000,
   metaMax: 8 * 1024,
   responseMax: 128 * 1024 * 1024,
 });

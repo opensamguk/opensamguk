@@ -12,7 +12,7 @@
 
 ## 1. 권한
 
-T3-05 첫 묶음은 관리자 역할과 명령줄의 권한 부여·회수만 다룹니다. 기존 계정과 새 계정의 기본 역할은 USER이며 자동으로 관리자를 지정하지 않습니다. `admin.whoami`는 로그인·필수 이메일 인증 뒤 DB의 ACTIVE·ADMIN을 매번 확인하고 `{ admin: true }`만 돌려줍니다. 역할을 회수하면 기존 세션에서도 다음 요청부터 거부합니다. 요청의 사용자 ID나 역할 값은 권한 근거가 아닙니다.
+T3-05 첫 묶음은 관리자 역할과 명령줄의 권한 부여·회수만 다룹니다. 기존 계정과 새 계정의 기본 역할은 USER이며 자동으로 관리자를 지정하지 않습니다. `admin.whoami`는 로그인·필수 이메일 인증 뒤 DB의 ACTIVE·ADMIN을 매번 확인하고 `{ admin: true, resourceEditor: boolean }`을 돌려줍니다. 역할을 회수하면 기존 세션에서도 다음 요청부터 거부합니다. 요청의 사용자 ID나 역할 값은 권한 근거가 아닙니다.
 
 관리자 지정·회수 API는 없습니다. 대상과 사유를 확정한 서버 운영자가 올바른 DB 환경을 확인한 뒤 `pnpm admin:grant` 또는 `pnpm admin:revoke`를 실행합니다. 이메일과 사유는 명령 인자에 넣지 않고 표준 입력 JSON으로 전달합니다. 입력 파일은 저장소 밖에 둡니다.
 
@@ -30,6 +30,28 @@ pnpm admin:revoke < /secure/admin-role-request.json
 유효한 계정 전체 또는 월드 제재가 남은 사용자는 ADMIN으로 올리지 못합니다. 먼저 관리자가 제재를 해제해야 합니다. 역할 부여와 제재가 경쟁해도 같은 사용자 행 잠금 아래에서 자격을 다시 확인합니다.
 
 감사 기록은 DB 시각·CLI 행위·대상 UUID·사유·전후 역할을 남기고 UPDATE·DELETE·TRUNCATE를 DB trigger로 거부합니다. 사용자 UUID와 자유 입력 사유의 보존 정책 검토는 남아 있습니다. 이번 검증은 전용 시험 DB만 사용했으며 기존 개발 계정·실제 운영자의 권한은 변경하지 않았습니다. 전체 관리자 화면·월드 조작과 AC-M3-04 인수는 후속 묶음입니다.
+
+### 자원 편집 권한
+
+D-068에 따라 관리자 역할만으로 자원 편집 권한을 얻지 않습니다. 기본값은 없음이며 운영자가 `pnpm resource-editor:grant` 또는 `pnpm resource-editor:revoke`에 위와 같은 이메일·사유 JSON을 표준 입력으로 전달합니다. 활성 관리자이고 유효한 제재가 없는 계정에만 부여합니다. 회수는 비활성 계정에도 할 수 있습니다.
+
+권한과 `resource-editor.grant`·`resource-editor.revoke` 감사는 같은 트랜잭션에서 확정합니다. 응답에는 사용자 UUID·`resourceEditor`·변경 여부·감사 ID만 담습니다. `admin:revoke`는 별도 편집 권한도 회수하고 감사하므로 나중에 다시 관리자가 되어도 편집 권한을 새로 받아야 합니다. `admin.whoami`의 값은 화면 표시용이며 자원 API는 현재 세션과 권한을 다시 확인합니다. 초안 편집·게시 API와 화면의 전체 인수는 [T4-78](./plans/T4-78.md)·T4-81·T4-87 후속입니다.
+
+### 자원 판 API 구현 후보
+
+다음 계약은 `@opensamguk/server/router`의 `AppRouter` 타입으로 읽습니다. 모두 자원 편집 권한을 요구하며 행위자 UUID는 입력으로 받지 않습니다. 목록은 최대 50건이고 `next`를 다음 요청의 `cursor`로 보냅니다. 메타데이터의 사람 칸은 이메일 대신 UUID입니다.
+
+| 절차 | 입력 | 성공과 상태 결과 |
+| ---- | ---- | ---------------- |
+| `resourceAdmin.list` | 선택 `kind`·`name`·`status`·`cursor` | `{ items, next }`, 내용은 없음 |
+| `resourceAdmin.get` | `id` | `{ meta, content }` |
+| `resourceAdmin.clone` | `sourceId` | 게시 판의 같은 이름 다음 판. `{ ok: true, meta }` 또는 `DRAFT_EXISTS`와 `draftId` |
+| `resourceAdmin.save` | `id`·`revision`·`content` | `{ ok: true, meta, report }` 또는 `STALE`·`PUBLISHED`와 현재 `meta` |
+| `resourceAdmin.publish` | `id`·`revision`·필수 `reason` | 성공 시 `meta`·`report`, 거부는 `STALE`·`PUBLISHED`·`NOT_PASS`·`ID_MISMATCH` |
+
+초안은 검증 오류가 있어도 저장할 수 있습니다. 게시는 저장된 revision을 잠그고 다시 검증하며 변경과 감사를 함께 확정합니다. 응답 크기가 한도를 넘으면 둘 다 되돌리고 `RESPONSE_TOO_LARGE`를 돌려줍니다. `report`는 검증기의 `kind`·`status`·`issues`·`ran`·`skipped`·`truncated`를 담습니다. 오류는 `BAD_REQUEST`·`NOT_FOUND`와 기존 인증·권한·제재 응답을 따릅니다. 내용은 JSON 객체이며 정규 JSON 기준 최대 900,000바이트입니다.
+
+현재 병종·능력치 규칙·초상 대응표만 게시합니다. 지도·시나리오는 게시 문맥 계약이 정해질 때까지 `incomplete`로 거부합니다. 다른 이름 복제와 초안 폐기는 사용자 답을 기다립니다. 게시한 판과 진행 중인 월드는 이 API로 수정하지 않습니다. 관리자 화면과 AC-P2-27 전체 인수는 아직 남아 있습니다.
 
 ## 2. 월드 관리
 

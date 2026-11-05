@@ -187,7 +187,7 @@ describe('T3-05 AC-M3-04 실제 관리자 권한과 추가 전용 감사', () =>
     expect((await request(sid, { role: 'ADMIN' })).code).toBe('FORBIDDEN');
     expect(await snapshot()).toBe(before);
     await changeAdminRole(db, { email: actor.email, reason: '전용 시험 부여', role: 'ADMIN' });
-    expect((await request(sid)).data).toEqual({ admin: true });
+    expect((await request(sid)).data).toEqual({ admin: true, resourceEditor: false });
     await changeAdminRole(db, { email: actor.email, reason: '전용 시험 회수', role: 'USER' });
     expect((await request(sid)).code).toBe('FORBIDDEN');
     const unverified = await user('ADMIN', 'ACTIVE', false);
