@@ -21,7 +21,8 @@ import { initializeIntegrationResources } from './integration-resources';
 import { initializeSan10Resources } from './san10-resources';
 import { loadInitialWorldFromDb, loadFeatureProfile } from '../apps/engine/src/world/resources';
 import type { CreationProfile } from '../apps/server/src/admin/worldCreateOptions';
-import { exportReplay, replayToEnd } from '../apps/engine/src/replay';
+import { exportReplay, readArchive, replayToEnd } from '../apps/engine/src/replay';
+import { initialReplayStateWithRegistry, ruleRegistry } from '../packages/rules/src/index';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
@@ -755,7 +756,11 @@ it('AC-P2-30·31·32·33 관리자 HTTP 확장 선택·엔진 생성·재생·�
     orderBy: { id: 'asc' },
   });
   expect(await db.generalTurn.count({ where: { worldId: world.id } })).toBe(491 * 30);
-  expect(replayToEnd(await exportReplay(db, world.id)).ruleFeatures).toEqual(profile.value.ruleFeatures);
+  const archive = readArchive(await exportReplay(db, world.id));
+  if (archive.version !== 3) throw new Error('확장 생성의 실제 V3 보관 파일이 필요합니다.');
+  expect(
+    initialReplayStateWithRegistry(archive.origin.initial, ruleRegistry, archive.origin.featureData).state.ruleFeatures,
+  ).toEqual(profile.value.ruleFeatures);
   expect((await create(actor, pair.payload, signal)).data?.worldId).toBe(world.id);
   expect(await auditCount('world.create.applied', stored.id)).toBe(1);
   await controlClock(db, world.id, 'start');
@@ -801,7 +806,12 @@ it('AC-P2-30·31·32·33 관리자 HTTP 확장 선택·엔진 생성·재생·�
       orderBy: { id: 'asc' },
     }),
   ).toEqual(sexes);
-  expect(replayToEnd(await exportReplay(db, target.id)).ruleFeatures).toEqual(profile.value.ruleFeatures);
+  const targetArchive = readArchive(await exportReplay(db, target.id));
+  if (targetArchive.version !== 3) throw new Error('초기화의 실제 V3 보관 파일이 필요합니다.');
+  expect(
+    initialReplayStateWithRegistry(targetArchive.origin.initial, ruleRegistry, targetArchive.origin.featureData).state
+      .ruleFeatures,
+  ).toEqual(profile.value.ruleFeatures);
   expect(replayToEnd(await exportReplay(db, world.id))).toMatchObject({ reason: 'ADMIN_RESET' });
 });
 
