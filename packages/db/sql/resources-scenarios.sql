@@ -119,6 +119,10 @@
 --
 -- 페이지 구조는 비공개 참고 저장소 `peppone-choi/opensamguk-v1`의 `bc053629710711d4c5dfa50683bae78f4baeca95`에서 `web/game/components/shell/GameFrame.tsx`, `web/game/lib/nav31.ts`, `web/game/components/campaign/WarRoomPage.tsx`, `web/gateway/components/lobby/LobbyScreen.tsx`를 대조했다. 현재 `apps/web/src/layout/GameNavigation.tsx`는 공통 머리줄·왼쪽 메뉴·모바일 하단 탐색을 참고하며 기존 React 주소와30칸 예약을 유지한다. v1의 게임 규칙·이미지·전체 페이지를 복사하지 않았다. v1은 MIT이며 원 고지는 `Copyright (c) 2026 빼뽀네 (peppone-choi) and OpenSamguk contributors`다. 위 MIT 허가·조건·보증 부인 전문은 이 출처에도 적용된다.
 --
+-- ## 일반 장비 18종
+--
+-- `packages/rules/src/equipment/catalog.ts`의 일반 명마·무기·서적 이름과 금·치안·능력치 보너스는 core2026 커밋 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`의 `packages/logic/src/items/che_명마_01_노기.ts`~`che_서적_06_사민월령.ts` 18종에서 가져왔다. 원저작자 devsam의 위 MIT 고지를 유지한다. 말·철의 등급×5 소비는 사용자 승인 D-070의 추가 규칙이며 원작 산출량이 아니다. 서적의 추가 전투 계략 시도 효과는 첫 카탈로그에 옮기지 않았다.
+--
 
 DO $t4_46_init$
 DECLARE
