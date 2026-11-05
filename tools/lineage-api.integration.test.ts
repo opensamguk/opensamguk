@@ -178,11 +178,20 @@ it.each([
     expect(generals.filter((general) => general.sex !== 'UNKNOWN').map((general) => [general.id, general.sex])).toEqual(
       [
         [47, 'MALE'],
+        [93, 'MALE'],
+        [99, 'MALE'],
+        [100, 'MALE'],
+        [103, 'MALE'],
         [108, 'MALE'],
         [167, 'MALE'],
         [169, 'MALE'],
         [229, 'MALE'],
+        [266, 'MALE'],
+        [267, 'MALE'],
+        [271, 'MALE'],
+        [276, 'MALE'],
         [281, 'MALE'],
+        [291, 'MALE'],
         [314, 'MALE'],
         [318, 'MALE'],
         [321, 'MALE'],
@@ -197,85 +206,95 @@ it.each([
     const stored = await db.world.findUniqueOrThrow({ where: { id: saved.worldId } }),
       origin = stored.replayOrigin as unknown as { initial: { generals: Array<{ id: number; sex: string }> } };
     expect(origin.initial.generals.find((general) => general.id === 439)?.sex).toBe('FEMALE');
-    expect(await db.general.count({ where: { worldId: saved.worldId, sex: 'UNKNOWN' } })).toBe(477);
+    expect(await db.general.count({ where: { worldId: saved.worldId, sex: 'UNKNOWN' } })).toBe(468);
     await exportReplay(db, saved.worldId);
     expect(initial.generals.every((general) => !Object.hasOwn(general, 'sex'))).toBe(true);
   },
   120000,
 );
 
-it('AC-P2-32 기존 성별 판은 실제 491명 저장·월간 재생·HTTP 관리자 초기화 뒤에도 유지된다', async () => {
-  const initial = await loadInitialWorldFromDb(db, {
-      scenario: '1030',
-      map: 'che',
-      statRules: 'default',
-      portraitMap: 'rtk14-map',
-      seed: 'old-sex-edition-pg',
-    }),
-    ruleFeatures = ['lineage-v1', 'personnel', 'policy'];
-  initial.ruleFeatures = ruleFeatures;
-  const saved = await db.$transaction((tx) =>
-    savePreparedInitialWorld(
-      tx,
-      prepareInitialWorld(
-        initial,
-        {
-          name: '성별 원장 1판 보존',
-          turnTermMinutes: 60,
-          endYear: null,
-          replayFormat: 3,
-          ruleFeatures,
-          featureData: { 'lineage-v1': lineageTestConfig },
-        },
-        loadSexLedgers()[0],
+it.each([
+  { edition: 1, unknownCount: 489, guanSex: 'UNKNOWN' },
+  { edition: 2, unknownCount: 477, guanSex: 'MALE' },
+] as const)(
+  'AC-P2-32 $edition 판은 실제 491명 저장·월간 재생·HTTP 관리자 초기화 뒤에도 유지된다',
+  async ({ edition, unknownCount, guanSex }) => {
+    const initial = await loadInitialWorldFromDb(db, {
+        scenario: '1030',
+        map: 'che',
+        statRules: 'default',
+        portraitMap: 'rtk14-map',
+        seed: 'old-sex-edition-pg',
+      }),
+      ruleFeatures = ['lineage-v1', 'personnel', 'policy'];
+    initial.ruleFeatures = ruleFeatures;
+    const saved = await db.$transaction((tx) =>
+      savePreparedInitialWorld(
+        tx,
+        prepareInitialWorld(
+          initial,
+          {
+            name: `성별 원장 ${edition}판 보존`,
+            turnTermMinutes: 60,
+            endYear: null,
+            replayFormat: 3,
+            ruleFeatures,
+            featureData: { 'lineage-v1': lineageTestConfig },
+          },
+          loadSexLedgers()[edition - 1],
+        ),
       ),
-    ),
-  );
-  const id = saved.worldId;
-  worldIds.push(id);
-  expect(await db.general.count({ where: { worldId: id } })).toBe(491);
-  expect((await snapshot(id)).state.generals[47]?.sex).toBe('UNKNOWN');
-  expect(await db.general.count({ where: { worldId: id, sex: 'UNKNOWN' } })).toBe(489);
-  const before = await exportReplay(db, id);
-  await expect(db.$executeRaw`UPDATE "General" SET sex='MALE' WHERE "worldId"=${id} AND id=47`).rejects.toThrow(
-    /General_sex_immutable|23514/,
-  );
-  expect(await exportReplay(db, id)).toEqual(before);
-  await controlClock(db, id, 'start');
-  await advance(id, 10000);
-  expect((await snapshot(id)).state.generals[47]?.sex).toBe('UNKNOWN');
-  const archive = await exportReplay(db, id),
-    replayed = replayArchive(archive, 1);
-  expect(replayed).toHaveLength(1);
-  expect(replayed[0]!.stateHash).toBe(hashState(await snapshot(id)));
-  await controlClock(db, id, 'pause');
-  const administrator = await user();
-  await db.user.update({ where: { id: administrator.id }, data: { role: 'ADMIN' } });
-  const current = await db.world.findUniqueOrThrow({ where: { id } }),
-    binding = { worldId: id, expectedUserId: administrator.id, idempotencyKey: randomUUID() },
-    admitted = await rpc(
-      'admin.world.requestReset',
-      {
-        ...binding,
-        confirmName: current.name,
-        expectedRevision: current.clockRevision,
-        reason: '기존 성별 판 보존 검증',
-      },
-      administrator,
     );
-  expect(admitted.status).toBe(200);
-  expect(admitted.data?.status).toBe('PENDING');
-  await advance(id, 10000);
-  const receipt = await rpc('admin.world.resetRequest', binding, administrator);
-  expect(receipt.data?.status).toBe('APPLIED');
-  const newId = receipt.data!.plannedNewWorldId;
-  worldIds.push(newId);
-  expect(newId).not.toBe(id);
-  expect(await db.general.count({ where: { worldId: newId } })).toBe(491);
-  expect((await snapshot(newId)).state.generals[47]?.sex).toBe('UNKNOWN');
-  expect(await db.general.count({ where: { worldId: newId, sex: 'UNKNOWN' } })).toBe(489);
-  expect((await snapshot(id)).state.generals[47]?.sex).toBe('UNKNOWN');
-}, 120000);
+    const id = saved.worldId;
+    worldIds.push(id);
+    expect(await db.general.count({ where: { worldId: id } })).toBe(491);
+    expect((await snapshot(id)).state.generals[47]?.sex).toBe(guanSex);
+    expect((await snapshot(id)).state.generals[266]?.sex).toBe('UNKNOWN');
+    expect(await db.general.count({ where: { worldId: id, sex: 'UNKNOWN' } })).toBe(unknownCount);
+    const before = await exportReplay(db, id);
+    await expect(db.$executeRaw`UPDATE "General" SET sex='MALE' WHERE "worldId"=${id} AND id=266`).rejects.toThrow(
+      /General_sex_immutable|23514/,
+    );
+    expect(await exportReplay(db, id)).toEqual(before);
+    await controlClock(db, id, 'start');
+    await advance(id, 10000);
+    expect((await snapshot(id)).state.generals[47]?.sex).toBe(guanSex);
+    expect((await snapshot(id)).state.generals[266]?.sex).toBe('UNKNOWN');
+    const archive = await exportReplay(db, id),
+      replayed = replayArchive(archive, 1);
+    expect(replayed).toHaveLength(1);
+    expect(replayed[0]!.stateHash).toBe(hashState(await snapshot(id)));
+    await controlClock(db, id, 'pause');
+    const administrator = await user();
+    await db.user.update({ where: { id: administrator.id }, data: { role: 'ADMIN' } });
+    const current = await db.world.findUniqueOrThrow({ where: { id } }),
+      binding = { worldId: id, expectedUserId: administrator.id, idempotencyKey: randomUUID() },
+      admitted = await rpc(
+        'admin.world.requestReset',
+        {
+          ...binding,
+          confirmName: current.name,
+          expectedRevision: current.clockRevision,
+          reason: '기존 성별 판 보존 검증',
+        },
+        administrator,
+      );
+    expect(admitted.status).toBe(200);
+    expect(admitted.data?.status).toBe('PENDING');
+    await advance(id, 10000);
+    const receipt = await rpc('admin.world.resetRequest', binding, administrator);
+    expect(receipt.data?.status).toBe('APPLIED');
+    const newId = receipt.data!.plannedNewWorldId;
+    worldIds.push(newId);
+    expect(newId).not.toBe(id);
+    expect(await db.general.count({ where: { worldId: newId } })).toBe(491);
+    expect((await snapshot(newId)).state.generals[47]?.sex).toBe(guanSex);
+    expect((await snapshot(newId)).state.generals[266]?.sex).toBe('UNKNOWN');
+    expect(await db.general.count({ where: { worldId: newId, sex: 'UNKNOWN' } })).toBe(unknownCount);
+    expect((await snapshot(id)).state.generals[47]?.sex).toBe(guanSex);
+  },
+  120000,
+);
 async function create(worldId: string, player: User, name: string, sex: 'MALE' | 'FEMALE') {
   const creating = rpc(
     'general.create',

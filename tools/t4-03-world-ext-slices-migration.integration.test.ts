@@ -412,7 +412,7 @@ it.each(['empty', 'legacy'] as const)(
       const previous = directories.filter((name) => name < migration);
       const later = directories.filter((name) => name > migration);
       expect(previous.at(-1)).toBe('20261023071000_nation_offices');
-      expect(later).toEqual([
+      const prerequisiteLater = [
         '20261023073000_treaties',
         '20261023074000_assignment_storage',
         '20261024000000_replay_features',
@@ -441,7 +441,8 @@ it.each(['empty', 'legacy'] as const)(
         '20261115000000_notification_settings',
         '20261116000000_notification_outbox',
         '20261117000000_stratagem_cards_state',
-      ]);
+      ];
+      expect(later.slice(0, prerequisiteLater.length)).toEqual(prerequisiteLater);
       for (const directory of previous)
         await client.query(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
       if (mode === 'legacy') await seedLegacy(client);

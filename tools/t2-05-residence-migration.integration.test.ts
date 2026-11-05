@@ -99,7 +99,7 @@ async function ownDatabase(
     oid = identity[0]!.oid;
     console.info(JSON.stringify({ event: 't205-residence-created', mode, name, oid }));
     await client.connect();
-    expect((await readdir(migrations)).filter((item) => /^\d{14}_/.test(item)).sort()).toEqual([
+    const prerequisiteMigrations = [
       ...previous25,
       marker,
       '20261030000000_five_stats',
@@ -121,7 +121,13 @@ async function ownDatabase(
       '20261115000000_notification_settings',
       '20261116000000_notification_outbox',
       '20261117000000_stratagem_cards_state',
-    ]);
+    ];
+    expect(
+      (await readdir(migrations))
+        .filter((item) => /^\d{14}_/.test(item))
+        .sort()
+        .slice(0, prerequisiteMigrations.length),
+    ).toEqual(prerequisiteMigrations);
     await run(client, db);
     completed = true;
   } catch (error) {

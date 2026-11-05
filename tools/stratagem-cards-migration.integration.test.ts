@@ -95,9 +95,9 @@ it.each(['empty', 'upgrade'] as const)(
   async (mode) => {
     await ownDatabase(async (client) => {
       const names = (await readdir(directory)).filter((name) => /^\d{14}_/.test(name)).sort();
-      expect(names).toHaveLength(45);
-      expect(names.at(-1)).toBe(marker);
-      for (const name of names.slice(0, -1))
+      const markerIndex = names.indexOf(marker);
+      expect(markerIndex).toBe(44);
+      for (const name of names.slice(0, markerIndex))
         await client.query(await readFile(new URL(`${name}/migration.sql`, directory), 'utf8'));
       if (mode === 'upgrade') {
         const initial = commandInitial();
@@ -133,6 +133,9 @@ it.each(['empty', 'upgrade'] as const)(
           )
         ).rows,
       ).toEqual([{ data_type: 'jsonb', is_nullable: 'YES', column_default: null }]);
+      for (const name of names.slice(markerIndex + 1))
+        await client.query(await readFile(new URL(`${name}/migration.sql`, directory), 'utf8'));
+      expect((await client.query('SELECT * FROM "World" ORDER BY id')).rows).toEqual(after);
     });
   },
 );

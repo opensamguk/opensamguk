@@ -35,6 +35,15 @@ it('AC-P2-32 검토된 성별 사실 해시와 191년 시나리오의 인물 대
     [381, 'MALE'],
     [394, 'MALE'],
     [385, 'MALE'],
+    [266, 'MALE'],
+    [271, 'MALE'],
+    [267, 'MALE'],
+    [276, 'MALE'],
+    [291, 'MALE'],
+    [100, 'MALE'],
+    [103, 'MALE'],
+    [99, 'MALE'],
+    [93, 'MALE'],
   ]);
 });
 
@@ -44,11 +53,17 @@ it('AC-P2-32 기존 판의 바이트와 뒤 판의 기존 사실을 보존한다
       .update(readFileSync(new URL('../../resources/officers/191-sex.json', import.meta.url)))
       .digest('hex'),
   ).toBe('d5179cf98ffe03a7f3a910642d9e15ef5d52825a6e8dddb2415052f251d2ddb4');
+  expect(
+    createHash('sha256')
+      .update(readFileSync(new URL('../../resources/officers/191-sex-2.json', import.meta.url)))
+      .digest('hex'),
+  ).toBe('8c468b4cf34e5c2f8b90bced624a88bf7c8751ef4754aed528b8edcc64b40ab8');
   const ledgers = loadSexLedgers();
-  expect(ledgers).toHaveLength(2);
+  expect(ledgers).toHaveLength(3);
   expect(ledgers.map((ledger) => ledger.review.contentSha256)).toEqual([
     '56185bc5c826551be6717b4021db62b6ef42355c6e1e6742005d122888fbb519',
     '4b63c4842f0b41d81fe4b8ba6df25dbaec4cc083b8c30f1a2f3c126c2b23e847',
+    '1545771f0b042645b9cb4f3f1496672deb16efaa76c02b3b252afd705a215761',
   ]);
   for (let index = 1; index < ledgers.length; index++) {
     const previous = ledgers[index - 1]!,

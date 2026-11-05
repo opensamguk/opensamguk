@@ -182,7 +182,7 @@ async function reject(f: ReturnType<typeof fixture>, code: ResetPreparationError
   await expect(prepareWorldReset(f.db, worldId, 'new-seed', controller().signal)).rejects.toMatchObject({ code });
 }
 
-async function sexEditionFixture(useRequest: boolean, useLatest = false) {
+async function sexEditionFixture(useRequest: boolean, edition: 'first' | 'second' | 'latest' = 'first') {
   const f = fixture(useRequest),
     ruleFeatures = [...features, 'lineage-v1'].sort(),
     lineageOptions = { ...options, ruleFeatures, featureData: { 'lineage-v1': lineageTestConfig } },
@@ -191,7 +191,13 @@ async function sexEditionFixture(useRequest: boolean, useLatest = false) {
   const old = prepareInitialWorld(initial, lineageOptions, resourceLoaders.loadSexLedgers()[0]),
     latest = prepareInitialWorld(initial, lineageOptions);
   expect(old.stateHash).not.toBe(latest.stateHash);
-  Object.assign(f.world, (await capture(useLatest ? latest : old)).world);
+  const prepared =
+    edition === 'latest'
+      ? latest
+      : edition === 'second'
+        ? prepareInitialWorld(initial, lineageOptions, resourceLoaders.loadSexLedgers()[1])
+        : old;
+  Object.assign(f.world, (await capture(prepared)).world);
   if (useRequest) {
     const row = request(f.world),
       intent = { ...(row.intent as Record<string, unknown>), ruleFeatures };
@@ -200,13 +206,21 @@ async function sexEditionFixture(useRequest: boolean, useLatest = false) {
   return f;
 }
 
-it.each([true, false])('AC-P2-32 초기화는 기존 성별 판을 유지한다: 생성 요청 %s', async (useRequest) => {
-  const f = await sexEditionFixture(useRequest),
+it.each([
+  { useRequest: true, edition: 'first' },
+  { useRequest: false, edition: 'first' },
+  { useRequest: true, edition: 'second' },
+  { useRequest: false, edition: 'second' },
+] as const)('AC-P2-32 초기화는 $edition 성별 판을 유지한다: 생성 요청 $useRequest', async ({ useRequest, edition }) => {
+  const f = await sexEditionFixture(useRequest, edition),
     before = structuredClone(f.world),
     result = await prepareWorldReset(f.db, worldId, 'new-sex-edition-seed', controller().signal),
     saved = await capture(result.prepared),
     origin = saved.world.replayOrigin as unknown as ReplayOriginV3;
-  expect(origin.initial.generals.find((general) => general.id === 47)?.sex).toBe('UNKNOWN');
+  expect(origin.initial.generals.find((general) => general.id === 47)?.sex).toBe(
+    edition === 'first' ? 'UNKNOWN' : 'MALE',
+  );
+  expect(origin.initial.generals.find((general) => general.id === 266)?.sex).toBe('UNKNOWN');
   expect(origin.initial.generals.find((general) => general.id === 439)?.sex).toBe('FEMALE');
   expect(origin.initial.seed).toBe('new-sex-edition-seed');
   expect(result.evidence.provenance.kind).toBe(useRequest ? 'request' : 'cli');
@@ -220,18 +234,19 @@ it.each([true, false])('AC-P2-32 생성 당시 성별 판이 없으면 초기화
   await reject(f, 'RESOURCE_INVALID');
 });
 
-it.each([true, false])('AC-P2-32 최신 성별 판의 초기화는 두 번째 후보와 맞는다: 생성 요청 %s', async (useRequest) => {
-  const f = await sexEditionFixture(useRequest, true),
+it.each([true, false])('AC-P2-32 초기화는 등록된 최신 성별 판을 선택한다: 생성 요청 %s', async (useRequest) => {
+  const f = await sexEditionFixture(useRequest, 'latest'),
     result = await prepareWorldReset(f.db, worldId, 'latest-sex-edition-seed', controller().signal),
     saved = await capture(result.prepared),
     origin = saved.world.replayOrigin as unknown as ReplayOriginV3;
   expect(origin.initial.generals.find((general) => general.id === 47)?.sex).toBe('MALE');
+  expect(origin.initial.generals.find((general) => general.id === 266)?.sex).toBe('MALE');
   expect(origin.initial.generals.find((general) => general.id === 439)?.sex).toBe('FEMALE');
   expect(result.evidence.provenance.kind).toBe(useRequest ? 'request' : 'cli');
 });
 
 it('AC-P2-32 최신 판과 맞는 월드도 원장 검토 오류를 감추지 않는다', async () => {
-  const f = await sexEditionFixture(true, true);
+  const f = await sexEditionFixture(true, 'latest');
   vi.spyOn(resourceLoaders, 'loadSexLedgers').mockImplementation(() => {
     throw Error('잘못된 검토 해시');
   });

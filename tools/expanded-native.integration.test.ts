@@ -134,7 +134,7 @@ describe('AC-P2-30·31·32·33 정식 491명 확장 결합', () => {
       expect(stored.ruleFeatures).toEqual(features);
       before = await db.$transaction((tx) => loadReplayState(tx, worldId));
       expect(Object.keys(before.state.generals)).toHaveLength(491);
-      expect(Object.values(before.state.generals).filter((general) => general.sex === 'UNKNOWN')).toHaveLength(477);
+      expect(Object.values(before.state.generals).filter((general) => general.sex === 'UNKNOWN')).toHaveLength(468);
       expect(before.state.lineage?.persons).toEqual({});
       expect(before.state.lineage?.config).toEqual(lineageTestConfig);
       expect(before.state.logistics?.config).toEqual(logistics);
