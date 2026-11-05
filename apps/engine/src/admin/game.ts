@@ -85,7 +85,10 @@ export async function processAdminGame(tx: Prisma.TransactionClient, world: Engi
           { state: outcome.replay.state, offices: before.offices, closedOffers: [], logs: [] },
           world.clockTick,
         );
-        await persistPersonnelPacket(tx, world.id, before, packet, next.residenceAnchors!, world.clockTick);
+        await persistPersonnelPacket(tx, world.id, before, packet, next.residenceAnchors!, {
+          tick: world.clockTick,
+          sequence,
+        });
       }
       const action = payload.action;
       if (action.kind === 'admin.general.clearTurns') {

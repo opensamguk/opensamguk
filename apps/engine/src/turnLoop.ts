@@ -345,7 +345,11 @@ export class TurnLoop {
             { sequence, tick: due.nextTurnTick },
             state,
             personnelBefore && personnelPacket && anchors
-              ? () => persistPersonnelPacket(tx, worldId, personnelBefore, personnelPacket, anchors, due.nextTurnTick)
+              ? () =>
+                  persistPersonnelPacket(tx, worldId, personnelBefore, personnelPacket, anchors, {
+                    tick: due.nextTurnTick,
+                    sequence,
+                  })
               : undefined,
             capabilities.kind === 'registry' ? capabilities.armyTypes : undefined,
           );

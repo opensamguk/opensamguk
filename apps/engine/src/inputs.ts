@@ -8,6 +8,7 @@ import {
   TICKS_PER_MONTH,
   creationFailure,
   readLineageState,
+  removedGeneralResult,
   creationBlock,
   emptyTurns,
   emptyQueue,
@@ -249,7 +250,7 @@ export async function processInputs(
     : actor?.removedAt != null
       ? {
           status: 'REJECTED' as const,
-          result: { code: 'GENERAL_REMOVED', message: '내보낸 장수의 요청은 처리할 수 없습니다.' },
+          result: removedGeneralResult(event.kind, tick),
         }
       : await handlers[event.kind]!(tx, world, event, { tick, sequence, ...(emit ? { emit } : {}) });
   if (before && outcome.status === 'APPLIED') {
