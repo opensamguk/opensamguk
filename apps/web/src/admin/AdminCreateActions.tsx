@@ -555,14 +555,17 @@ export function AdminCreateActions({
                         <br />
                         5능력치 · 휘하·부곡 · 도시 자원 규칙을 포함합니다.
                       </p>
-                      <dl>
-                        {(Object.keys(resourceLabels) as Array<keyof typeof resourceLabels>).map((key) => (
-                          <Fragment key={key}>
-                            <dt>{resourceLabels[key]}</dt>
-                            <dd>{available.selection[key]}</dd>
-                          </Fragment>
-                        ))}
-                      </dl>
+                      <details className={styles.resources}>
+                        <summary>사용 자원 확인</summary>
+                        <dl>
+                          {(Object.keys(resourceLabels) as Array<keyof typeof resourceLabels>).map((key) => (
+                            <Fragment key={key}>
+                              <dt>{resourceLabels[key]}</dt>
+                              <dd>{available.selection[key]}</dd>
+                            </Fragment>
+                          ))}
+                        </dl>
+                      </details>
                       <label>
                         프리셋
                         <select

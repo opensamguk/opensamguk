@@ -162,6 +162,14 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
   if (mode.id !== 'san10-191') await step(run, () => selector.selectOption(mode.id));
   await step(run, () => expect(selector).toHaveValue(mode.id));
   if (expanded) {
+    const resource = controls.getByText(profile.selection.scenarioKey, { exact: true });
+    const resourceSummary = controls.getByText('사용 자원 확인', { exact: true });
+    await step(run, () => expect(resource).toBeAttached());
+    await step(run, () => expect(resource).not.toBeVisible());
+    await step(run, () => resourceSummary.click());
+    await step(run, () => expect(resource).toBeVisible());
+    await step(run, () => resourceSummary.press('Enter'));
+    await step(run, () => expect(resource).not.toBeVisible());
     const originalViewport = page.viewportSize();
     for (const width of [375, 1440]) {
       await step(run, () => page.setViewportSize({ width, height: 900 }));
