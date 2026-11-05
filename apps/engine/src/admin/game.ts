@@ -61,6 +61,7 @@ export async function processAdminGame(tx: Prisma.TransactionClient, world: Engi
       sanctioned: false,
       replayFormat: 3,
       worldStatus: world.status,
+      tick: world.clockTick,
       unitSet: origin.initial.unitSet,
     });
     status = outcome.status;
@@ -105,7 +106,7 @@ export async function processAdminGame(tx: Prisma.TransactionClient, world: Engi
         });
         if (saved.count !== 1) throw Error('장수의 예턴 revision이 바뀌었습니다.');
       }
-      if (action.kind === 'admin.general.release')
+      if (action.kind === 'admin.general.release' || action.kind === 'admin.general.remove')
         await tx.general.update({
           where: { worldId_id: { worldId: world.id, id: action.generalId } },
           data: { lastActiveTick: null, lastActiveAt: null },

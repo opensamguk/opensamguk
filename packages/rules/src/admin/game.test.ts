@@ -13,7 +13,7 @@ it('AC-INT-23 조치와 각 변경 칸은 서버 행위자·불명 필드와 빈
     payload({ ...action, changes: { gold: { expected: 10, value: 20, delta: 10 } } }),
     payload({ ...action, changes: { gold: { value: 20 } } }),
     { ...payload(action), reason: '\n' },
-    payload({ kind: 'admin.general.remove', generalId: 1 }),
+    payload({ kind: 'admin.nation.setRuler', nationId: 1, generalId: 1 }),
   ])
     expect(adminGamePayloadSchema.safeParse(value).success).toBe(false);
 });

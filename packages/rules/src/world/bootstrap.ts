@@ -66,6 +66,7 @@ export interface InitialGeneral {
   birthYear: number;
   deathYear: number;
   activeFromYear: number;
+  removedAt?: number;
   personality: string | null;
   special: string | null;
   gold: number;

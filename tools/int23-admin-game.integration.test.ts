@@ -72,7 +72,13 @@ async function user(role: 'ADMIN' | 'USER', status: 'ACTIVE' | 'SANCTIONED' = 'A
   return { id: row.id, cookie: 'sid=' + session.token };
 }
 async function call(path: string, input: unknown, cookie?: string) {
-  const mutation = path === 'admin.game.request' || path === 'general.create';
+  const mutation = [
+    'admin.game.request',
+    'general.create',
+    'general.setPolicy',
+    'operation.create',
+    'turns.set',
+  ].includes(path);
   const encoded = JSON.stringify({ 0: input });
   const response = await fetch(
     address + '/trpc/' + path + '?batch=1' + (mutation ? '' : '&input=' + encodeURIComponent(encoded)),
@@ -86,10 +92,11 @@ async function call(path: string, input: unknown, cookie?: string) {
   const [body] = (await response.json()) as [{ result?: { data: unknown }; error?: { data: { code: string } } }];
   return { status: response.status, data: body.result?.data, code: body.error?.data.code };
 }
-async function world() {
+async function world(quietNpcs = false) {
   const initial = commandInitial();
   initial.ruleFeatures = ['personnel', 'policy'];
   initial.generals[2]!.officerLevel = 11;
+  if (quietNpcs) for (const general of initial.generals) general.activeFromYear = 192;
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '운영 조치 검증',
     turnTermMinutes: 60,
@@ -388,7 +395,169 @@ it('AC-INT-23 접수는 게임 상태를 바꾸지 않고 8종 입력·감사·�
   expect(() => readArchive({ ...archive, version: 1 })).toThrow();
 }, 30000);
 
-it('AC-INT-23 정식491명 부곡 월드는 장수 병력 변경을 거절하고 금 조정·재생을 보존한다', async () => {
+it('AC-INT-23 장수 내보내기는 직책·병력을 정리하고 실제 조회·턴·월 정산·재생에서 제외한다', async () => {
+  const worldId = await world();
+  const before = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 3 } } });
+  const city = await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId, cityKey: before.cityKey } } });
+  const input = command(worldId, { kind: 'admin.general.remove', generalId: 3 });
+  expect((await call('admin.game.request', input, actor.cookie)).status).toBe(200);
+  expect((await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 3 } } })).removedAt).toBeNull();
+  await advance(worldId);
+  expect((await call('admin.game.requestStatus', statusInput(input), actor.cookie)).data).toMatchObject({
+    status: 'APPLIED',
+    result: { after: { removedAt: 0, nationId: null, officerLevel: 0, crew: 0 } },
+  });
+  const removed = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 3 } } });
+  expect(removed).toMatchObject({
+    removedAt: 0,
+    userId: null,
+    lastActiveTick: null,
+    lastActiveAt: null,
+    residenceTick: null,
+    nextTurnTick: before.nextTurnTick,
+  });
+  expect(
+    (await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId, cityKey: city.cityKey } } })).population,
+  ).toBe(Math.min(city.populationMax, city.population + before.crew));
+  const response = await call('city.get', { worldId, cityKey: city.cityKey }, actor.cookie);
+  expect(response.status).toBe(200);
+  expect((response.data as { generals: { id: number }[] }).generals.some((g) => g.id === 3)).toBe(false);
+  await expectReplayedState(worldId);
+  await controlClock(db, worldId, 'resume');
+  await advance(worldId, 10_000);
+  expect((await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 3 } } })).nextTurnTick).toBe(
+    before.nextTurnTick,
+  );
+  expect(await db.generalLog.count({ where: { worldId, generalId: 3 } })).toBe(0);
+  expect(replayArchive(await exportReplay(db, worldId), 1)).toHaveLength(1);
+}, 30000);
+
+it('AC-INT-23 사람 내보내기는 먼저 접수된 요청을 거절하고 같은 계정의 새 장수 생성을 허용한다', async () => {
+  const worldId = await world();
+  await controlClock(db, worldId, 'resume');
+  const creating = call(
+    'general.create',
+    { worldId, name: '퇴장전장수', leadership: 70, strength: 70, intel: 60, portraitId: null },
+    ordinary.cookie,
+  );
+  await expect
+    .poll(() => db.inputEvent.count({ where: { worldId, kind: 'general.create', status: 'PENDING' } }))
+    .toBe(1);
+  await advance(worldId);
+  expect((await creating).status).toBe(200);
+  const human = await db.general.findUniqueOrThrow({ where: { worldId_userId: { worldId, userId: ordinary.id } } });
+  const pending = call('general.setPolicy', { worldId, policy: 'none' }, ordinary.cookie);
+  await expect
+    .poll(() => db.inputEvent.count({ where: { worldId, kind: 'general.setPolicy', status: 'PENDING' } }))
+    .toBe(1);
+  const input = command(worldId, { kind: 'admin.general.remove', generalId: human.id });
+  expect((await call('admin.game.request', input, actor.cookie)).status).toBe(200);
+  await advance(worldId);
+  expect((await pending).status).toBe(400);
+  expect(await db.inputEvent.findFirstOrThrow({ where: { worldId, kind: 'general.setPolicy' } })).toMatchObject({
+    status: 'REJECTED',
+    result: { code: 'GENERAL_REMOVED' },
+  });
+  expect((await call('general.mine', { worldId }, ordinary.cookie)).data).toMatchObject({ general: null });
+  const next = call(
+    'general.create',
+    { worldId, name: '퇴장후장수', leadership: 70, strength: 70, intel: 60, portraitId: null },
+    ordinary.cookie,
+  );
+  await expect
+    .poll(() => db.inputEvent.count({ where: { worldId, kind: 'general.create', status: 'PENDING' } }))
+    .toBe(1);
+  await advance(worldId);
+  expect((await next).status).toBe(200);
+  expect(
+    (await db.general.findUniqueOrThrow({ where: { worldId_userId: { worldId, userId: ordinary.id } } })).id,
+  ).not.toBe(human.id);
+  await expectReplayedState(worldId);
+}, 30000);
+
+it('AC-INT-23 내보낸 장수는 기존 작전 집계와 새 참여 후보에서 빠지고 과거 참여 행은 남는다', async () => {
+  const worldId = await world(true);
+  await controlClock(db, worldId, 'resume');
+  for (const [identity, name] of [
+    [actor, '작전군주'],
+    [ordinary, '작전부하'],
+  ] as const) {
+    const creating = call(
+      'general.create',
+      { worldId, name, leadership: 70, strength: 70, intel: 60, portraitId: null },
+      identity.cookie,
+    );
+    await expect
+      .poll(() => db.inputEvent.count({ where: { worldId, kind: 'general.create', status: 'PENDING' } }))
+      .toBe(1);
+    await advance(worldId);
+    expect((await creating).status).toBe(200);
+  }
+  const commander = await db.general.findUniqueOrThrow({ where: { worldId_userId: { worldId, userId: actor.id } } });
+  const member = await db.general.findUniqueOrThrow({ where: { worldId_userId: { worldId, userId: ordinary.id } } });
+  const adjustment = command(worldId, {
+    kind: 'admin.general.adjust',
+    generalId: commander.id,
+    changes: {
+      cityKey: { expected: commander.cityKey, value: 3 },
+      gold: { expected: commander.gold, value: 100000 },
+    },
+  });
+  expect((await call('admin.game.request', adjustment, actor.cookie)).status).toBe(200);
+  await advance(worldId);
+  const founderSlots: ({ commandKey: string; args: unknown } | null)[] = Array.from({ length: 30 }, () => null);
+  founderSlots[0] = { commandKey: 'found', args: { name: '작전국가', color: '#123456' } };
+  const memberSlots: ({ commandKey: string; args: unknown } | null)[] = Array.from({ length: 30 }, () => null);
+  memberSlots[1] = { commandKey: 'join', args: { nationId: 3 } };
+  expect(
+    (await call('turns.set', { worldId, revision: commander.turnRevision, slots: founderSlots }, actor.cookie)).data,
+  ).toMatchObject({ ok: true });
+  expect(
+    (await call('turns.set', { worldId, revision: member.turnRevision, slots: memberSlots }, ordinary.cookie)).data,
+  ).toMatchObject({ ok: true });
+  const tick = member.nextTurnTick + 10000;
+  await advance(worldId, tick);
+  expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: commander.id } } })).toMatchObject({
+    nationId: 3,
+    officerLevel: 12,
+  });
+  expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: member.id } } })).toMatchObject({
+    nationId: 3,
+    officerLevel: 1,
+  });
+  const input = {
+    worldId,
+    targetCityKey: 1,
+    targetYear: 191,
+    targetMonth: 4,
+    min: { crew: 0, train: 0, atmos: 0 },
+    memberIds: [commander.id, member.id],
+  };
+  const created = await call('operation.create', input, actor.cookie);
+  expect(created.status).toBe(200);
+  const id = (created.data as { id: string }).id;
+  expect((await call('operation.get', { worldId, id }, actor.cookie)).data).toMatchObject({ members: 2 });
+  expect(
+    (
+      await call(
+        'admin.game.request',
+        command(worldId, { kind: 'admin.general.remove', generalId: member.id }),
+        actor.cookie,
+      )
+    ).status,
+  ).toBe(200);
+  await advance(worldId, tick);
+  expect((await call('operation.get', { worldId, id }, actor.cookie)).data).toMatchObject({
+    members: 1,
+    timeline: [{ generalId: commander.id }],
+  });
+  expect((await call('operation.create', { ...input, memberIds: [member.id] }, actor.cookie)).status).toBe(400);
+  expect(await db.operationMember.count({ where: { operationId: id } })).toBe(2);
+  await advance(worldId, 20000);
+  expect(replayArchive(await exportReplay(db, worldId), 2)).toHaveLength(2);
+}, 30000);
+
+it('AC-INT-23 정식491명 부곡 월드는 병력 조정을 거절하고 금 조정·장수 내보내기·재생을 보존한다', async () => {
   const initial = await loadInitialWorld({
     scenario: 'integration191',
     map: 'integration',
@@ -428,5 +597,21 @@ it('AC-INT-23 정식491명 부곡 월드는 장수 병력 변경을 거절하고
     crew: 0,
     gold: general.gold + 1,
   });
+  await expectReplayedState(worldId);
+  const target = await db.general.findFirstOrThrow({
+    where: { worldId, officerLevel: { not: 12 } },
+    orderBy: { id: 'asc' },
+  });
+  expect(
+    (
+      await call(
+        'admin.game.request',
+        command(worldId, { kind: 'admin.general.remove', generalId: target.id }),
+        actor.cookie,
+      )
+    ).status,
+  ).toBe(200);
+  await advance(worldId);
+  expect((await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: target.id } } })).removedAt).toBe(0);
   await expectReplayedState(worldId);
 });

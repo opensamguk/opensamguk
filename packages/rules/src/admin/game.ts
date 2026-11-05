@@ -37,11 +37,12 @@ export const adminNationChangesSchema = z
   })
   .refine((values) => Object.values(values).some((value) => value !== undefined), '바꿀 칸을 고르세요.');
 
-// INT-23 PR1. 내보내기·군주 교체·해산·쪽지는 뒤 단계의 별도 입력이다.
+// 군주 교체·해산·쪽지는 뒤 단계의 별도 입력이다.
 export const ADMIN_GAME_KINDS = [
   'admin.general.rename',
   'admin.general.release',
   'admin.general.clearTurns',
+  'admin.general.remove',
   'admin.general.adjust',
   'admin.city.adjust',
   'admin.nation.adjust',
@@ -52,6 +53,7 @@ export const adminGameActionSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('admin.general.rename'), generalId: id, name: generalCreationSchema.shape.name }),
   z.strictObject({ kind: z.literal('admin.general.release'), generalId: id }),
   z.strictObject({ kind: z.literal('admin.general.clearTurns'), generalId: id }),
+  z.strictObject({ kind: z.literal('admin.general.remove'), generalId: id }),
   z.strictObject({ kind: z.literal('admin.general.adjust'), generalId: id, changes: adminGeneralChangesSchema }),
   z.strictObject({ kind: z.literal('admin.city.adjust'), cityKey: id, changes: adminCityChangesSchema }),
   z.strictObject({ kind: z.literal('admin.nation.adjust'), nationId: id, changes: adminNationChangesSchema }),

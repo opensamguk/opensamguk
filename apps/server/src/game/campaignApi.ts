@@ -146,6 +146,8 @@ export async function submitCampaignRequest(
       campaign = view.campaign!;
     if (payload.revision !== campaign.revision)
       throw new TRPCError({ code: 'CONFLICT', message: '휘하 현황을 다시 불러오세요.' });
+    if (payload.type === 'offer' && view.generals[payload.targetId]?.removedAt !== undefined)
+      throw new TRPCError({ code: 'BAD_REQUEST', message: '내보낸 장수에게 휘하 제안을 보낼 수 없습니다.' });
     if ('unitId' in payload && campaign.units.find((unit) => unit.id === payload.unitId)?.ownerId !== actor.id)
       throw new TRPCError({ code: 'FORBIDDEN', message: '자기 부곡만 조작할 수 있습니다.' });
     if (
@@ -220,6 +222,7 @@ export async function readCampaignBoard(ctx: ActorContext, worldId: string) {
           ? []
           : Object.values(view.generals).filter(
               (general) =>
+                general.removedAt === undefined &&
                 general.id !== actor.id &&
                 general.cityKey === actor.cityKey &&
                 general.officerLevel !== 12 &&

@@ -34,6 +34,7 @@ function general(changes: Partial<General> = {}): General {
     birthYear: 160,
     deathYear: 220,
     activeFromYear: 180,
+    removedAt: null,
     personality: null,
     special: null,
     gold: 0,

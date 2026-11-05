@@ -74,7 +74,7 @@ export function nextGameAction(replay: ReplayState) {
   const boundary = replay.monthlyTick + TICKS_PER_MONTH;
   const year = monthlyDate(replay.state.startYear, boundary).year;
   const due = Object.values(replay.state.generals)
-    .filter((general) => general.activeFromYear <= year)
+    .filter((general) => general.removedAt === undefined && general.activeFromYear <= year)
     .sort((a, b) => a.nextTurnTick - b.nextTurnTick || a.id - b.id)[0];
   return due && due.nextTurnTick < boundary
     ? { kind: 'turn' as const, tick: due.nextTurnTick, generalId: due.id }

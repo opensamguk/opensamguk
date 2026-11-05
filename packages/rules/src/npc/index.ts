@@ -88,7 +88,7 @@ function frontlineSteps(view: WorldView, general: General): number[] {
 }
 
 export function chooseGeneralTurn(view: WorldView, general: General, rng: Rng, context: NpcContext = {}): NpcDecision {
-  if (general.userId !== null) return { chosen: null, candidates: [] };
+  if (general.removedAt !== undefined || general.userId !== null) return { chosen: null, candidates: [] };
   const stats = commandFiveStats(view, general);
   const militaryScore = stats ? Math.max(stats.leadership, stats.strength) : 0;
   const choice = chooser(view, general, rng, context, 'general');
@@ -194,7 +194,12 @@ export function chooseGeneralTurn(view: WorldView, general: General, rng: Rng, c
 
 export function chooseNationTurn(view: WorldView, ruler: General, rng: Rng, context: NpcContext = {}): NpcDecision {
   const nation = ruler.nationId === null ? undefined : view.nations[ruler.nationId];
-  if (ruler.userId !== null || !nation?.isNpc || ruler.officerLevel !== BALANCE.RULER_LEVEL)
+  if (
+    ruler.removedAt !== undefined ||
+    ruler.userId !== null ||
+    !nation?.isNpc ||
+    ruler.officerLevel !== BALANCE.RULER_LEVEL
+  )
     return { chosen: null, candidates: [] };
   const choice = chooser(view, ruler, rng, context, 'nation');
   choice.add('nation_rest', {}, 0, '국가 명령이 없으면 쉰다.');
@@ -231,6 +236,7 @@ export function chooseNationTurn(view: WorldView, ruler: General, rng: Rng, cont
   if (nation.gold >= 10000) {
     const members = Object.values(view.generals).filter(
       (g) =>
+        g.removedAt === undefined &&
         g.nationId === nation.id &&
         g.activeFromYear <= view.startYear + Math.floor((context.tick ?? 0) / (12 * TICKS_PER_MONTH)),
     );

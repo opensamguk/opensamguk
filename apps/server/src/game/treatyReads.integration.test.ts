@@ -88,6 +88,7 @@ function world(patch: Partial<World> = {}): World {
 function general(patch: Partial<General> = {}): General {
   return {
     ...initial.generals[0]!,
+    removedAt: null,
     sex: null,
     politics: null,
     charm: null,

@@ -210,7 +210,7 @@ export class TurnLoop {
         const accelerated = target === undefined && world.clockMode === 'ACCELERATED';
         const earliest = accelerated
           ? await tx.general.findFirst({
-              where: { worldId, activeFromYear: { lte: year } },
+              where: { worldId, removedAt: null, activeFromYear: { lte: year } },
               orderBy: [{ nextTurnTick: 'asc' }, { id: 'asc' }],
             })
           : null;
@@ -242,7 +242,7 @@ export class TurnLoop {
           };
         }
         const due = await tx.general.findFirst({
-          where: { worldId, nextTurnTick: { lte: tick }, activeFromYear: { lte: year } },
+          where: { worldId, removedAt: null, nextTurnTick: { lte: tick }, activeFromYear: { lte: year } },
           orderBy: [{ nextTurnTick: 'asc' }, { id: 'asc' }],
         });
         const monthly = boundary <= tick && (!due || due.nextTurnTick >= boundary);
