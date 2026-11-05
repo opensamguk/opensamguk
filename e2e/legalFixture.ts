@@ -189,6 +189,21 @@ export const test = base.extend<Record<never, never>, { legalStack: LegalStack }
       const saved = { DATABASE_URL: process.env.DATABASE_URL, TEST_DATABASE_URL: process.env.TEST_DATABASE_URL };
       const errors: unknown[] = [],
         messages: MailMessage[] = [];
+      const mark = (label: string, stage: string) => {
+        try {
+          console.info('[legal-fixture]', label, stage);
+        } catch (error) {
+          errors.push(error);
+        }
+      };
+      let apiSequence = 0,
+        cleanupSequence = 0;
+      const observe = (server: Awaited<ReturnType<typeof buildServer>>) => {
+        const label = `api${++apiSequence}`;
+        server.addHook('preClose', async () => mark(label, 'preClose'));
+        server.server.on('close', () => mark(label, 'httpClose'));
+        server.addHook('onClose', async () => mark(label, 'onClose'));
+      };
       const transport = {
         async send(message: MailMessage) {
           messages.push(message);
@@ -255,6 +270,7 @@ export const test = base.extend<Record<never, never>, { legalStack: LegalStack }
             mailTransport: transport,
             realtime: { connectionString: url.href, applicationName: `legal-${suffix}` },
           });
+          observe(api);
           await api.ready();
           await listenLegalLoopback(
             (port) => api!.listen({ host: '127.0.0.1', port }),
@@ -281,6 +297,7 @@ export const test = base.extend<Record<never, never>, { legalStack: LegalStack }
               realtime: { connectionString: url.href, applicationName: `legal-peer-${suffix}` },
             });
             extraServers.add(server);
+            observe(server);
             await server.ready();
             await listenLegalLoopback(
               (port) => server.listen({ host: '127.0.0.1', port }),
@@ -307,6 +324,7 @@ export const test = base.extend<Record<never, never>, { legalStack: LegalStack }
               realtime: { connectionString: url.href, applicationName: `legal-production-${suffix}` },
             });
             extraServers.add(server);
+            observe(server);
             await server.ready();
             await listenLegalLoopback(
               (port) => server.listen({ host: '127.0.0.1', port }),
@@ -331,12 +349,16 @@ export const test = base.extend<Record<never, never>, { legalStack: LegalStack }
         failure = error;
       }
       const cleanup = async (label: string, action: () => Promise<unknown>) => {
+        const step = `${++cleanupSequence}:${label}`;
+        mark(step, 'start');
         try {
           await action();
           receipt[label] = true;
+          mark(step, 'done');
         } catch (error) {
           errors.push(error);
           receipt[label] = false;
+          mark(step, 'failed');
         }
       };
       await cleanup('webClosed', async () => closeWeb?.());
