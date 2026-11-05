@@ -14,7 +14,7 @@ import { prepareWorldReset } from '../apps/engine/src/admin/resetPreparation';
 import { initializeResources } from './init-resources';
 import { initializeIntegrationResources } from './integration-resources';
 import { controlClock } from '../apps/engine/src/world/clock';
-import { acquireLease, releaseLease } from '../apps/engine/src/lease';
+import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
 import { processAdminSetting } from '../apps/engine/src/admin/settings';
 import { lockLease, assertLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -135,7 +135,8 @@ async function advance(worldId: string, tick = 0) {
   const lease = await acquireLease(db, worldId);
   if (!lease) throw Error('자기 시험 월드의 리스를 얻지 못했습니다.');
   try {
-    await new TurnLoop(db, lease).advanceTo(tick);
+    // 정식491명의 여러 차례를 한 번에 진행해도 운영 엔진처럼 매 commit에서 실행권을 갱신한다.
+    await new TurnLoop(db, lease, { beforeCommit: (tx) => renewLease(tx, lease) }).advanceTo(tick);
   } finally {
     await releaseLease(db, lease);
   }
