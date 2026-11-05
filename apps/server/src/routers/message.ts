@@ -92,7 +92,8 @@ export const messageRouter = router({
               })
             : ownNation;
         if (
-          (input.scope === 'PRIVATE' && (!recipient || recipient.activeFromYear === LINEAGE_EXITED_YEAR)) ||
+          (input.scope === 'PRIVATE' &&
+            (!recipient || recipient.removedAt != null || recipient.activeFromYear === LINEAGE_EXITED_YEAR)) ||
           (input.scope !== 'PRIVATE' && !nation) ||
           (input.scope === 'DIPLOMACY' && (!isLeader(g) || nation!.id === g.nationId))
         )
@@ -184,7 +185,12 @@ export const messageRouter = router({
       async (tx) => {
         const g = await messagingActor(tx, ctx, input.worldId);
         const generals = await tx.general.findMany({
-          where: { worldId: input.worldId, id: { not: g.id }, activeFromYear: { not: LINEAGE_EXITED_YEAR } },
+          where: {
+            worldId: input.worldId,
+            id: { not: g.id },
+            removedAt: null,
+            activeFromYear: { not: LINEAGE_EXITED_YEAR },
+          },
           select: { id: true, name: true, nation: { select: nationTagSelect } },
           orderBy: [{ name: 'asc' }, { id: 'asc' }],
         });

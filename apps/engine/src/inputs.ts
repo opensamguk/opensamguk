@@ -9,6 +9,7 @@ import {
   TICKS_PER_MONTH,
   creationFailure,
   readLineageState,
+  removedGeneralResult,
   creationBlock,
   emptyTurns,
   emptyQueue,
@@ -234,11 +235,23 @@ export async function processInputs(
   const handlers = queuedInputHandlers(registry);
   const sequence = await nextActionSequence(tx, world.id);
   const before = world.ruleFeatures.includes('personnel') ? await loadReplayState(tx, world.id) : null;
-  const outcome =
-    kind.feature !== null && !world.ruleFeatures.includes(kind.feature)
+  const enabled = kind.feature === null || world.ruleFeatures.includes(kind.feature);
+  const actor =
+    !enabled || event.generalId === null
+      ? null
+      : await tx.general.findUnique({
+          where: { worldId_id: { worldId: world.id, id: event.generalId } },
+          select: { removedAt: true },
+        });
+  const outcome = !enabled
+    ? {
+        status: 'REJECTED' as const,
+        result: { code: 'FEATURE_DISABLED', message: '이 월드에서 켜지 않은 기능입니다.' },
+      }
+    : actor?.removedAt != null
       ? {
           status: 'REJECTED' as const,
-          result: { code: 'FEATURE_DISABLED', message: '이 월드에서 켜지 않은 기능입니다.' },
+          result: removedGeneralResult(event.kind, tick),
         }
       : await handlers[event.kind]!(tx, world, event, { tick, sequence, ...(emit ? { emit } : {}) });
   if (before && outcome.status === 'APPLIED') {

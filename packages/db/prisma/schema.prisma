@@ -359,6 +359,7 @@ model General {
   birthYear         Int
   deathYear         Int
   activeFromYear    Int
+  removedAt         Int?
   personality       String?
   special           String?
   gold              Int

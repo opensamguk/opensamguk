@@ -5,6 +5,7 @@ import {
   attachOperationalKinds,
   readStoredGovernance,
   storedGeneralSex,
+  storedGeneralRemoval,
   readStoredLineage,
   readStoredStratagemCards,
   readStoredEquipment,
@@ -86,7 +87,10 @@ export async function loadWorldAfterCapabilityCheck(
         return [
           general.id,
           storedGeneralStats(
-            storedGeneralSex(stripWorldId(general), world.ruleFeatures.includes('lineage-v1')),
+            storedGeneralRemoval(
+              storedGeneralSex(stripWorldId(general), world.ruleFeatures.includes('lineage-v1')),
+              world.replayFormat,
+            ),
             world.ruleFeatures?.includes('five-stats') ?? false,
           ),
         ];

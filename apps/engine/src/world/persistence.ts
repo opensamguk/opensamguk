@@ -34,6 +34,7 @@ import {
   initialStratagemCards,
   readStratagemCardsConfig,
   storedGeneralSex,
+  storedGeneralRemoval,
   applySexLedger,
   assertGeneralSex,
   type SexLedger,
@@ -432,7 +433,10 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
           void battleWins;
           void captures;
           return storedGeneralStats(
-            storedGeneralSex(stripWorldId(general), world.ruleFeatures.includes('lineage-v1')),
+            storedGeneralRemoval(
+              storedGeneralSex(stripWorldId(general), world.ruleFeatures.includes('lineage-v1')),
+              world.replayFormat,
+            ),
             world.ruleFeatures?.includes('five-stats') ?? false,
           );
         }),
