@@ -75,7 +75,9 @@ const stats = [
 ] as const;
 function expectedDetails(general: General, kind: 'city' | 'nation', cities: Map<number, string>) {
   const detailed = isDetailedGeneral(general);
-  const hidden = kind === 'city' ? '다른 국가 장수입니다' : '다른 국가 정보';
+  const hidden = kind === 'city' ? '능력치는 같은 국가 장수만 보입니다' : '다른 국가 정보';
+  // 도시 표의 숨긴 장수는 접은 칸이 모두 같은 이유라 칸마다 되풀이하지 않고 이유를 한 줄로 적는다.
+  if (kind === 'city' && !detailed) return { name: general.name, fields: [], reason: hidden, troops: '—' };
   const numeric = (value: number | undefined) =>
     detailed ? (value === undefined ? '—' : number(value)) : `— (${hidden})`;
   const army = detailed
@@ -99,7 +101,7 @@ function expectedDetails(general: General, kind: 'city' | 'nation', cities: Map<
     if (army && army.troops > 0 && army.atmos < 50) care.push('사기 부족');
     fields.push(['관리', care.join('')]);
   }
-  return { name: general.name, fields, troops: detailed ? numeric(army?.troops) : '—' };
+  return { name: general.name, fields, reason: null, troops: detailed ? numeric(army?.troops) : '—' };
 }
 async function assertMobileDetails(
   table: Locator,
@@ -118,6 +120,7 @@ async function assertMobileDetails(
             item.querySelector('dt')!.textContent,
             item.querySelector('dd')!.textContent,
           ]),
+          reason: el.querySelector('td > p')?.textContent ?? null,
           troops: el.querySelector('td:last-child')!.textContent,
         })),
       ),

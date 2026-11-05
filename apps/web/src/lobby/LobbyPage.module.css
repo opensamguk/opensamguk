@@ -73,15 +73,16 @@
   align-items: flex-start;
   gap: var(--space-2);
 }
+/* 대표 그림의 어두운 숲 위에서도 읽히도록 위 띠와 같은 먹색 판에 금색 글자를 얹는다. 그림자만으로는 대비가 모자랐다. */
 .tagline {
   margin: 0;
+  padding: var(--space-2) var(--space-3);
   font-family: var(--font-display);
   font-size: var(--title-lg);
   line-height: 1;
-  color: var(--color-text);
-  text-shadow:
-    0 0 1px var(--color-bg),
-    2px 2px 0 var(--color-bg);
+  color: var(--color-banner-gold);
+  background: var(--color-banner);
+  border: 2px solid var(--color-banner-gold);
 }
 .caption {
   max-width: 640px;

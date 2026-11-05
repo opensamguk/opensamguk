@@ -111,7 +111,9 @@ export function DataTable<T>({
               {visible.map((c, i) => (
                 <td key={c.key} className={c.numeric ? 'num' : undefined} title={c.title?.(row)}>
                   {c.render(row)}
-                  {i === 0 && details.length ? (
+                  {i === 0 && details.length && sharedReason(details, row) ? (
+                    <p className={styles.sharedReason}>{sharedReason(details, row)}</p>
+                  ) : i === 0 && details.length ? (
                     <dl className={styles.details}>
                       {details.map((detail) => (
                         <div key={detail.key}>
@@ -132,6 +134,13 @@ export function DataTable<T>({
       </table>
     </div>
   );
+}
+
+// 좁은 화면에서 접은 칸이 모두 같은 이유로 가려졌으면 칸마다 되풀이하지 않고 그 이유를 한 번만 적는다.
+function sharedReason<T>(details: readonly Column<T>[], row: T): string | undefined {
+  const reasons = details.map((detail) => detail.title?.(row));
+  const first = reasons[0];
+  return first !== undefined && reasons.every((reason) => reason === first) ? first : undefined;
 }
 
 export function sortRows<T>(rows: readonly T[], value: (row: T) => number | string | null, dir: 'asc' | 'desc'): T[] {
