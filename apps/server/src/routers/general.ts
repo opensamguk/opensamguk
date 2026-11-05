@@ -230,6 +230,11 @@ export const generalRouter = router({
             effectiveWorldOptions(world.preset === null ? null : parsePreset(world.preset), world.runtimeOptions).entry
               .generalCreation === 'open',
           personnelEnabled: world.replayFormat === 3 && world.ruleFeatures.includes('personnel'),
+          ...(world.replayFormat === 3 &&
+          effectiveWorldOptions(world.preset === null ? null : parsePreset(world.preset), world.runtimeOptions).entry
+            .npcPlay === 'on'
+            ? { npcPlayEnabled: true as const }
+            : {}),
           ...(world.ruleFeatures.includes('lineage-v1') ? { lineageEnabled: true as const } : {}),
           ...(world.ruleFeatures.includes('heritage-v1')
             ? {

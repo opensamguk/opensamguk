@@ -8,6 +8,7 @@ import {
   adminSettingRejectedSchema,
   isAdminSettingKind,
   effectiveWorldOptions,
+  canChangeAdminSetting,
   parsePreset,
 } from '@opensamguk/rules';
 import type { Context } from '../context';
@@ -109,7 +110,7 @@ export async function requestWorldSetting(ctx: Context, input: z.infer<typeof re
       if (!world) throw new TRPCError({ code: 'NOT_FOUND', message: '월드를 찾을 수 없습니다.' });
       if (world.replayFormat !== 3)
         throw new TRPCError({ code: 'BAD_REQUEST', message: '이 월드의 재생 형식에서는 사용할 수 없습니다.' });
-      if (!['RUNNING', 'PAUSED'].includes(world.status))
+      if (!canChangeAdminSetting(world.status, payload.setting))
         throw new TRPCError({ code: 'CONFLICT', message: '월드 상태가 바뀌었습니다. 다시 조회하세요.' });
       const event = await tx.inputEvent.create({ data: { ...key, kind: payload.setting.kind, payload } });
       await tx.auditLog.create({
@@ -180,6 +181,9 @@ export async function getWorldSettings(ctx: Context, input: z.infer<typeof world
         clockRevision: world.clockRevision,
         presetKey: world.presetKey,
         canChangeRules: world.preset !== null,
+        canChangeNpcPlay:
+          world.replayFormat === 3 &&
+          canChangeAdminSetting(world.status, { kind: 'admin.world.setOption', key: 'entry.npcPlay', value: 'on' }),
         rules: effective.presetRules ?? null,
         entry: effective.entry,
         truce: effective.truce,

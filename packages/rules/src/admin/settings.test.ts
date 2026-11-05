@@ -296,5 +296,57 @@ it('AC-INT-24 생성 열기·닫기는 프리셋 없이도 가능하고 규칙 �
     };
     expect(applyAdminSettingRecord(original, record)).toEqual(original);
   }
-  expect(runtimeOptionsSchema.safeParse({ entry: { npcPlay: 'on' } }).success).toBe(false);
+  expect(runtimeOptionsSchema.safeParse({ entry: { npcPlay: 'on' } }).success).toBe(true);
+  expect(runtimeOptionsSchema.safeParse({ entry: {} }).success).toBe(false);
 });
+
+it.each([false, true])(
+  'AC-INT-24 NPC 맡기는 개장 전에도 켜고 생성·휴전·규칙 설정을 양방향 보존한다: preset=%s',
+  (withPreset) => {
+    const { replay, world } = fixture(withPreset);
+    world.runtimeOptions = { entry: { generalCreation: 'closed' }, truce: null };
+    const setting = { kind: 'admin.world.setOption', key: 'entry.npcPlay', value: 'on' } as const;
+    const enabled = decideAdminSetting(replay, world, payload(setting), { ...context, worldStatus: 'PREOPEN' });
+    expect(enabled.status).toBe('APPLIED');
+    expect(enabled.settings.runtimeOptions).toEqual({
+      entry: { generalCreation: 'closed', npcPlay: 'on' },
+      truce: null,
+    });
+    expect(effectiveWorldOptions(enabled.settings.preset, enabled.settings.runtimeOptions).entry).toEqual({
+      generalCreation: 'closed',
+      npcPlay: 'on',
+    });
+    expect(enabled.replay).toEqual(replay);
+    const opened = decideAdminSetting(
+      replay,
+      enabled.settings,
+      payload({ kind: 'admin.world.setOption', key: 'entry.generalCreation', value: 'open' }),
+      context,
+    );
+    expect(opened.settings.runtimeOptions!.entry).toEqual({ generalCreation: 'open', npcPlay: 'on' });
+    expect(opened.settings.runtimeOptions!.truce).toBeNull();
+    const record: RecordedInput = {
+      sequence: 1,
+      tick: 0,
+      generalId: null,
+      kind: setting.kind,
+      status: enabled.status,
+      payload: payload(setting),
+      result: enabled.result,
+    };
+    expect(applyAdminSettingRecord(replay, record)).toEqual(replay);
+    for (const other of [
+      { kind: 'admin.world.rename', name: '다른 이름' },
+      { kind: 'admin.world.setOption', key: 'entry.generalCreation', value: 'open' },
+      { kind: 'admin.world.setTruce', truce: null },
+    ] satisfies AdminSetting[])
+      expect(decideAdminSetting(replay, world, payload(other), { ...context, worldStatus: 'PREOPEN' })).toMatchObject({
+        status: 'REJECTED',
+        result: { code: 'WORLD_STATE_CHANGED' },
+      });
+    expect(decideAdminSetting(replay, world, payload(setting), { ...context, worldStatus: 'ENDED' })).toMatchObject({
+      status: 'REJECTED',
+      result: { code: 'WORLD_STATE_CHANGED' },
+    });
+  },
+);

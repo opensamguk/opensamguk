@@ -133,7 +133,7 @@ API와 엔진 모두 월드 행을 장수 행보다 먼저 잠급니다. API는 
 
 ## 진행 중 월드 속성 (INT-24 · AC-INT-24)
 
-`admin.world.settings({worldId})`는 현재 관리자 권한을 다시 검사하고 조회 감사를 남긴다. 응답은 `name`, `status`, `startYear`, `endYear`, `turnTermMinutes`, `clockRevision`, `presetKey`, `canChangeRules`, `rules`, `entry`, `truce`다. `rules`는 원본 프리셋에 진행 중 변경을 합친 값이며 프리셋이 없으면 null이다. `truce`는 유효 휴전 설정 또는 null이다.
+`admin.world.settings({worldId})`는 현재 관리자 권한을 다시 검사하고 조회 감사를 남긴다. 응답은 `name`, `status`, `startYear`, `endYear`, `turnTermMinutes`, `clockRevision`, `presetKey`, `canChangeRules`, `canChangeNpcPlay`, `rules`, `entry`, `truce`다. `rules`는 원본 프리셋에 진행 중 변경을 합친 값이며 프리셋이 없으면 null이다. `truce`는 유효 휴전 설정 또는 null이다.
 
 `admin.world.requestSetting`은 `{expectedUserId,worldId,idempotencyKey,reason,setting}`을 받는다. `setting`은 다음 중 하나다.
 
@@ -156,11 +156,25 @@ API와 엔진 모두 월드 행을 장수 행보다 먼저 잠급니다. API는 
 
 ### 장수 생성 허용 (INT-24 PR2)
 
-`admin.world.requestSetting`의 옵션 키 `entry.generalCreation`은 `open`·`closed`를 받는다. 프리셋 없는 월드에서도 사용할 수 있으며 규칙 옵션과 서로 지우지 않는다. `admin.world.settings`는 `entry.generalCreation`을 함께 반환한다. NPC 맡기 입력은 아직 받지 않는다.
+`admin.world.requestSetting`의 옵션 키 `entry.generalCreation`은 `open`·`closed`를 받는다. 프리셋 없는 월드에서도 사용할 수 있으며 규칙 옵션과 서로 지우지 않는다. `admin.world.settings`는 `entry.generalCreation`을 함께 반환한다.
 
 `general.mine.creationRules.generalCreationEnabled`는 항상 boolean이고 기본값은 true다. 기존 장수 유무와 별도로 이 판의 생성 허용을 나타낸다. 로비의 기존 `createBlockedReason`은 닫힌 RUNNING 판에서 「지금은 새 장수를 받지 않습니다」를 반환한다. 기존 장수가 있으면 접속할 수 있고 차단 사유는 null이다. PAUSED·PREOPEN·ENDED는 기존 월드 상태 사유를 유지한다.
 
 닫힌 판의 새 생성 접수는 HTTP412(PRECONDITION_FAILED)와 「지금은 새 장수를 받지 않습니다.」 메시지를 반환하며 입력을 만들지 않는다. 이미 PENDING인 생성도 처리할 때 현재 값을 다시 읽고 REJECTED `ENTRY_CLOSED`로 확정한다. `general.mine.creation`에서 해당 코드와 문구를 복구할 수 있다. 다시 연 뒤에는 새 요청을 접수하며 이전 거절 기록을 바꾸지 않는다. 초기화는 생성 허용을 원래 기본값 open으로 돌린다.
+
+### NPC 장수 맡기 (T3-07 · AC-M3-14 · INT-24 PR3)
+
+`entry.npcPlay`는 기본 off이며 형식3에서 운영자가 on으로 바꾼 PREOPEN·RUNNING 판만 맡기를 받는다. PREOPEN 설정 허용은 이 키에만 한정하고 다른 설정은 RUNNING·PAUSED를 유지한다. 감독은 PREOPEN의 대기 설정·맡기를 발견해 실제 자식을 띄운다. 맡기는 시계·장수의 다음 턴 시각을 바꾸지 않는다. 다른 entry 키·규칙·명시한 휴전 null을 보존하며 초기화는 기본 off로 돌아간다.
+
+`entry.roles({worldId})`는 `gameDate`, 사람 수와 상한 null인 `quota`, `mine`, `roles`, `canPossess`, `blockedReason`을 반환한다. 군주·중견·부하·재야 목록에는 활성·생존·미제거·미소유 NPC의 ID·이름·초상·소속·위치·능력·관직만 담는다. 정치·매력은5능력치 판에서만 있으며 재야는 국가 추천도 받는다. 금·쌀·병력·예턴·계정 신원은 공개하지 않는다. 내 장수나 대기 입장 요청이 있거나 설정·월드 상태가 맞지 않으면 후보 목록은 비운다. `general.mine.creationRules`와 로비는 허용된 판에만 선택 키 `npcPlayEnabled:true`를 반환한다. 키가 없으면 꺼짐이다.
+
+`entry.possess({worldId,generalId,expectedUserId,idempotencyKey})`는 세션의 사용자로 대상 NPC를 요청한다. 완료 응답은 `{status:'possessed',generalId}`, 대기는 `{status:'pending'}`, 엔진 거절은 `{status:'rejected',rejectCode,message}`다. 최대5초 대기 뒤 `entry.possessStatus({worldId,expectedUserId,idempotencyKey})`로 회수한다. 거절 코드는 `TAKEN`, `ALREADY_HAS_GENERAL`, `NOT_ELIGIBLE`, `ENTRY_CLOSED`, `ACTOR_INACTIVE`, `ACTOR_SANCTIONED`다. 새 접수의 꺼진 설정은412, 같은 키의 다른 대상은409, 계정 전환은401, 남의 키·없는 대상은404, 입력 형식 오류는400이다.
+
+같은 키의 기존 기록은 새 자격 검사보다 먼저 회수한다. 성공 영수증은 현재 장수의 상세나 소유권을 뜻하지 않는다. 화면은 성공 뒤 `general.mine`을 다시 읽는다. 운영 해제·다른 계정의 재맡기 뒤 옛 키도 ID 영수증만 반환하며 새 사용자의 금·병력·예턴·계정은 읽지 않는다. 완료·거절·pending 응답 전 현재 세션·만료·ACTIVE·전역/월드 제재를 경과 시간을 포함해 다시 검사한다.
+
+대기 입력의 `generalId`는 null이고 payload는 `{generalId,userId}`다. 행위자는 서버가 정하며 엔진은 payload와 입력의 사용자도 대조한다. 실제 적용 때만 결과의 `generalId`에 대상을 채운다. 엔진은 현재 자격을 재검사하고 userId null·기존 revision 조건으로 소유권과 revision을 한 번 바꾼다. 군주의 국가 isNpc와 정책 활동 tick도 같은 트랜잭션에 저장한다. 기존30칸·명시 여부·장비·능력·자원·병력·위치·다음 턴 시각은 유지한다. 거주 앵커는 생성·계승과 분리한 엄격한 possession 출처로 새로 만들며 검증 없는 NPC→사람 전환은 계속 거부한다.
+
+맡기 로그는 기존 `GeneralLog`에 `kind:'possess'`, `commandKey:'general.possess'`로 남긴다. 인사 후처리 뒤 대상·sequence의 마지막 ordinal 다음을 쓰며 실제 턴 로그와 같은 tick에도 공존한다. `records.general`의30행 복합 커서와 home10행을 그대로 쓴다. rollback은 소유권·앵커·로그·완료 기록을 함께 되돌리고 재전송은 행을 늘리지 않는다. 순수 재생은 적용·거절 모두 엄격히 검증하며 형식1·5에는 새 kind를 받지 않는다. 맡기 자체는 장수 생성처럼 유산 직접 명령 활동에서 제외한다. 배포는 새 엔진을 먼저 올린다.
 
 ### 휴전 설정과 예정 시각 (INT-24 PR4 · T4-40)
 

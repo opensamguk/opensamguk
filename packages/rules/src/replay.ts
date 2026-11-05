@@ -18,6 +18,7 @@ import { isAdminClockKind, applyAdminClockRecord } from './clock/admin';
 import { isAdminGameKind } from './admin/game';
 import { isAdminSettingKind, validateAdminSettingRecord } from './admin/settings';
 import { validateAdminGameRecord } from './admin/apply';
+import { POSSESSION_KIND, validatePossessionRecord } from './entry/possess';
 
 export interface QueuedTurn {
   commandKey: string;
@@ -154,6 +155,7 @@ export function applyRecordedInput(
   if (isAdminClockKind(input.kind)) return applyAdminClockRecord(replay, input);
   if (isAdminGameKind(input.kind)) validateAdminGameRecord(input);
   if (isAdminSettingKind(input.kind)) validateAdminSettingRecord(input);
+  if (input.kind === POSSESSION_KIND) validatePossessionRecord(input);
   if (
     replay.policy &&
     (!replay.state.ruleFeatures ||

@@ -3,6 +3,7 @@ import {
   adminSettingPayloadSchema,
   adminSettingRejectMessages,
   decideAdminSetting,
+  canChangeAdminSetting,
   applyRecordedInput,
   parsePreset,
   runtimeOptionsSchema,
@@ -54,7 +55,7 @@ export async function processAdminSetting(
   )
     code = 'ACTOR_SANCTIONED';
   else if (world.replayFormat !== 3) code = 'UNSUPPORTED_FORMAT';
-  else if (!['RUNNING', 'PAUSED'].includes(world.status)) code = 'WORLD_STATE_CHANGED';
+  else if (!canChangeAdminSetting(world.status, payload.setting)) code = 'WORLD_STATE_CHANGED';
   else if (
     ['admin.world.setTurnTerm', 'admin.world.setTruce'].includes(payload.setting.kind) &&
     world.clockRevision >= 2_147_483_647
@@ -169,6 +170,8 @@ function settingText(setting: AdminSetting): string {
       switch (setting.key) {
         case 'entry.generalCreation':
           return setting.value === 'open' ? '새 장수 생성을 다시 받습니다.' : '새 장수 생성을 닫았습니다.';
+        case 'entry.npcPlay':
+          return setting.value === 'on' ? 'NPC 장수 맡기를 허용합니다.' : 'NPC 장수 맡기를 닫았습니다.';
         case 'protection.foundUntilMonths':
           return `건국 보호 기간을 ${setting.value}개월로 변경했습니다.`;
         case 'protection.peaceMonths':

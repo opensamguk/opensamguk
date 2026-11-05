@@ -49,6 +49,7 @@ export const lobbyRouter = router({
               status: true,
               preset: true,
               runtimeOptions: true,
+              replayFormat: true,
               scenarioKey: true,
               startYear: true,
               clockMode: true,
@@ -108,6 +109,11 @@ export const lobbyRouter = router({
               turnTermMinutes: world.turnTermMinutes,
               startedAt: world.startedAt?.toISOString() ?? null,
               humanGenerals: world._count.generals,
+              ...(world.replayFormat === 3 &&
+              effectiveWorldOptions(world.preset === null ? null : parsePreset(world.preset), world.runtimeOptions)
+                .entry.npcPlay === 'on'
+                ? { npcPlayEnabled: true as const }
+                : {}),
               myGeneral: general
                 ? { id: general.id, name: general.name, nationName: general.nation?.name ?? null }
                 : null,

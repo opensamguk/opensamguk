@@ -8,6 +8,7 @@ import { sanctionRouter } from './routers/sanction';
 import { worldRouter } from './routers/world';
 import { resourcesRouter } from './routers/resources';
 import { generalRouter } from './routers/general';
+import { entryRouter } from './routers/entry';
 import { turnsRouter } from './routers/turns';
 import { commandsRouter } from './routers/commands';
 import { homeRouter } from './routers/home';
@@ -45,6 +46,7 @@ export const appRouter = router({
   world: worldRouter,
   resources: resourcesRouter,
   general: generalRouter,
+  entry: entryRouter,
   turns: turnsRouter,
   commands: commandsRouter,
   home: homeRouter,

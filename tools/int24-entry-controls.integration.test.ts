@@ -328,7 +328,7 @@ it('AC-INT-24 다시 연 뒤 생성은 정상 적용하고 기존 장수의 접�
   await expectReplayedState(worldId);
 });
 
-it('AC-INT-24 규칙 옵션 변경과 생성 닫기를 서로 지우지 않고 미래 단계의 키는 접수하지 않는다', async () => {
+it('AC-INT-24 규칙 옵션 변경과 생성 닫기를 서로 지우지 않고 잘못된 옵션은 접수하지 않는다', async () => {
   const worldId = await world();
   await setEntry(worldId, 'closed');
   expect(
@@ -351,7 +351,7 @@ it('AC-INT-24 규칙 옵션 변경과 생성 닫기를 서로 지우지 않고 �
     rules: { npc: { aggression: 0.5 } },
   });
   for (const [key, value] of [
-    ['entry.npcPlay', 'on'],
+    ['entry.npcPlay', 'yes'],
     ['entry.generalCreation', 'yes'],
   ] as const)
     expect(

@@ -15,10 +15,14 @@ export const runtimeRuleOptionsSchema = z
   })
   .refine(nonempty);
 export const generalCreationEntrySchema = z.enum(['open', 'closed']);
+export const npcPlayEntrySchema = z.enum(['off', 'on']);
 export const runtimeOptionsSchema = z
   .strictObject({
     rules: runtimeRuleOptionsSchema.optional(),
-    entry: z.strictObject({ generalCreation: generalCreationEntrySchema }).optional(),
+    entry: z
+      .strictObject({ generalCreation: generalCreationEntrySchema.optional(), npcPlay: npcPlayEntrySchema.optional() })
+      .refine(nonempty)
+      .optional(),
     truce: truceSchema.nullable().optional(),
   })
   .refine(nonempty);
@@ -44,7 +48,7 @@ export function applyRuleOptions(before: PresetRules, patch: RuntimeRuleOptions)
   };
   return structuredClone(next);
 }
-// 생성 원본은 바꾸지 않는다. NPC 맡기는 해당 단계가 구현되기 전의 기본값이다.
+// 생성 원본은 바꾸지 않는다. 생략한 입장 설정은 기본값을 쓴다.
 export function effectiveWorldOptions(preset: WorldPreset | null, stored: unknown = null) {
   const runtime = stored == null ? null : runtimeOptionsSchema.parse(stored);
   if (runtime?.rules && preset === null) throw Error('프리셋 없는 월드에 규칙 옵션이 저장됐습니다.');
@@ -52,7 +56,7 @@ export function effectiveWorldOptions(preset: WorldPreset | null, stored: unknow
   return {
     presetRules:
       rules === undefined ? undefined : runtime?.rules === undefined ? rules : applyRuleOptions(rules, runtime.rules),
-    entry: { generalCreation: runtime?.entry?.generalCreation ?? 'open', npcPlay: 'off' as const },
+    entry: { generalCreation: runtime?.entry?.generalCreation ?? 'open', npcPlay: runtime?.entry?.npcPlay ?? 'off' },
     truce: runtime?.truce === undefined ? (preset?.truce ?? null) : runtime.truce,
   };
 }
