@@ -78,6 +78,12 @@ export async function prepareSource(cwd: string, revision: string, destination: 
   requireCondition(/^[a-f0-9]{40}$/.test(revision));
   requireCondition((await git(cwd, ['rev-parse', revision + '^{commit}'])).trim() === revision);
   await git(cwd, ['merge-base', '--is-ancestor', revision, 'origin/main']);
+  return prepareCandidateSource(cwd, revision, destination);
+}
+// 후보 검증은 같은 정규화·Git blob 검사를 쓰며 정식 릴리스의 main 제한을 바꾸지 않는다.
+export async function prepareCandidateSource(cwd: string, revision: string, destination: string) {
+  requireCondition(/^[a-f0-9]{40}$/.test(revision));
+  requireCondition((await git(cwd, ['rev-parse', revision + '^{commit}'])).trim() === revision);
   const tree = (await git(cwd, ['ls-tree', '-r', '-z', '--full-tree', revision])).split('\0').filter(Boolean);
   const entries = new Map<string, { mode: string; object: string }>();
   for (const entry of tree) {

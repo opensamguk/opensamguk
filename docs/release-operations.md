@@ -36,6 +36,10 @@
 
 ### 공개 실행 이미지 (T2-15 B2a)
 
+후보의 확장 설정·성별 자원 적재만 확인할 때는 기존 CI를 수동 실행합니다. `gh workflow run ci.yml --ref <후보 브랜치> -f runtime_resources_expected_sha=<같은 후보의 40자 SHA>`를 사용합니다. 선택한 ref·dispatch SHA·checkout HEAD가 모두 같아야 하며 formal load 입력과 함께 사용할 수 없습니다. 일반 PR·병합 대기열과 무입력 수동 CI의 검사는 그대로 실행됩니다.
+
+이 경로는 Git blob과 알려진 내부 링크를 검증한 후보 스냅샷으로 `app-runtime`을 실제 빌드합니다. 같은 스냅샷의 실제 자원 loader를 읽기 전용·네트워크 없는 UID10001 컨테이너에서 실행해 확장 설정과 성별3파일의 원문·내용 해시를 대조합니다. 자기 owner 표지가 있는 종료된 컨테이너와 이미지 ID만 정리합니다. 불명확하거나 실행 중인 대상은 보존하고 실패합니다. CI artifact의 receipt는 `release:false`이며 소스 지문·이미지 ID·실제 관찰·정리 결과를 기록합니다. server·engine·migrate·web 최종 이미지, 운영 배포·복귀 또는 전체 AC 인수의 증거로 쓰지 않습니다.
+
 `deploy/Dockerfile`은 Node24 공식 이미지의 digest와 pnpm10.33.0을 고정하고 lockfile 설치·Prisma 생성을 실행합니다. `server`·`engine`은 `.mjs` 번들과 필요한 운영 파일만 받습니다. `migrate`는 Prisma CLI와 migration 전용 의존성을 받습니다. `web` 대상은 `build:public`·자산 검사를 거친 정적 파일만 `/web`으로 내보냅니다. API와 엔진은 UID/GID10001로 실행하고 진입점이 실제 Node 프로세스를 `exec`합니다. API의 기존 loopback 바인딩을 유지합니다.
 
 빌드 입력은 검토한 Git archive의 별도 디렉터리입니다. Dockerfile 옆의 `Dockerfile.dockerignore`가 package·lock·앱·패키지·도구·문서·필수 manifest·resources만 받고 `.git`·`.env*`·private·호스트 의존성·백업·로그·시험 산출물을 제외합니다. stdin tar는 이 필터의 검증으로 세지 않습니다. `SOURCE_REVISION`은 실제 기준 커밋40자이고 `SOURCE_TREE_SHA256`은 후보 소스 경로·파일 바이트의 SHA-256입니다. 두 값은 이미지 label에 남으며 후보 해시를 확정 릴리스로 선언하지 않습니다. 깨끗한 소스의 선택·해시 생성·manifest·배포 receipt·current 교체 명령은 B2 후속에 남아 있습니다.
