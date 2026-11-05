@@ -1,6 +1,7 @@
 import { BALANCE } from '../balance';
 import { FIVE_STAT_KEYS, fiveStatsSchema, type FiveStats } from '../general/fiveStats';
 import type { WorldView } from '../model/world';
+import { withEquipmentBonus } from '../equipment/stats';
 
 type General = WorldView['generals'][number];
 type LegacyStat = 'leadership' | 'strength' | 'intel';
@@ -10,8 +11,13 @@ export function commandFiveStats(view: WorldView, general: General): FiveStats |
   return fiveStatsSchema.parse(Object.fromEntries(FIVE_STAT_KEYS.map((key) => [key, general[key]])));
 }
 
-export function domesticStatScore(view: WorldView, general: General, key: string, legacy: LegacyStat): number {
+function commandScores(view: WorldView, general: General): FiveStats | null {
   const stats = commandFiveStats(view, general);
+  return stats ? withEquipmentBonus(view, general.id, stats) : null;
+}
+
+export function domesticStatScore(view: WorldView, general: General, key: string, legacy: LegacyStat): number {
+  const stats = commandScores(view, general);
   if (!stats) return general[legacy];
   switch (key) {
     case 'farm':
@@ -46,7 +52,7 @@ export function recruitCost(
 }
 
 export function drillGain(view: WorldView, general: General, morale: boolean): number {
-  const stats = commandFiveStats(view, general);
+  const stats = commandScores(view, general);
   if (!stats) return morale ? BALANCE.ATMOS_GAIN : BALANCE.TRAIN_GAIN;
   const score = morale ? Math.round((stats.charm * 60 + stats.leadership * 40) / 100) : stats.leadership;
   return 8 + Math.floor(score / 25);

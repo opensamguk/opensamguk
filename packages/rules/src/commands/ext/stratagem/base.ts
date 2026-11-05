@@ -9,10 +9,11 @@ import type { CityField, Effect } from '../../effects';
 import { fail, ownCity, positive, relation } from '../../support';
 import type { Actor, CommandResult, Failure } from '../../types';
 import { fiveStatsSchema } from '../../../general/fiveStats';
+import { equipmentBonus, withEquipmentBonus } from '../../../equipment/stats';
 
 // S1: 연도와 무관하게 금·쌀 각 100. S2: 부상으로 능력치를 줄이지 않는다.
 // S3: 부상 80 이상은 유지. S4: 불탐 표시·성공 횟수·별도 능력치 경험은 생략한다.
-// S5: 탈취는 보급과 무관하게 대상 재고에서 뺀다. S6: 장비·특기 보정은 없다.
+// S5: 탈취는 보급과 무관하게 대상 재고에서 뺀다. S6: 장비는 능력치에 합산하며 별도 특기 보정은 없다.
 // S7: 장수 로그·다친 장수 보고·대상 국가 기록. 판정은 확률 0·0.5에도 next 한 번이다.
 export const STRATAGEM = {
   COST_GOLD: 100,
@@ -43,9 +44,10 @@ export function effectiveStat(general: Pick<InitialGeneral, Stat>, stat: Stat): 
   return Math.trunc(Math.max(0, Math.min(STRATAGEM.MAX_STAT, general[stat] + Math.round(cross / 4))));
 }
 
-export function stratagemAttackScore(general: InitialGeneral, commandKey: string): number {
+export function stratagemAttackScore(general: InitialGeneral, commandKey: string, view?: WorldView): number {
   const { leadership, strength, intel, politics, charm } = general;
-  const stats = fiveStatsSchema.parse({ leadership, strength, intel, politics, charm });
+  const base = fiveStatsSchema.parse({ leadership, strength, intel, politics, charm });
+  const stats = view ? withEquipmentBonus(view, general.id, base) : base;
   if (commandKey === 'fire_attack' || commandKey === 'sabotage') return stats.intel;
   if (commandKey !== 'plunder' && commandKey !== 'incite') throw new Error('기본 계략의 명령 키를 확인하세요.');
   const primary = commandKey === 'plunder' ? stats.strength : stats.charm;
@@ -89,10 +91,14 @@ export function stratagemProbability(
   const defenders = stratagemDefenders(view, cityKey, year);
   const modern = view.ruleFeatures?.includes('stratagem-basic') ?? false;
   const attack =
-    (modern ? stratagemAttackScore(general, commandKey ?? '') : effectiveStat(general, stat)) /
+    (modern ? stratagemAttackScore(general, commandKey ?? '', view) : effectiveStat(general, stat)) /
     STRATAGEM.STAT_COEFFICIENT;
   const defence =
-    Math.max(0, ...defenders.map((g) => (modern ? g.intel : effectiveStat(g, stat)))) / STRATAGEM.STAT_COEFFICIENT +
+    Math.max(
+      0,
+      ...defenders.map((g) => (modern ? g.intel + equipmentBonus(view, g.id).intel : effectiveStat(g, stat))),
+    ) /
+      STRATAGEM.STAT_COEFFICIENT +
     (Math.log2(defenders.length + 1) - 1.25) * 0.04 +
     city.security / city.securityMax / 5 +
     (city.supplied ? 0.1 : 0);

@@ -4,12 +4,10 @@ import type { Socket } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
 import { proxyLegalRequest } from '../e2e/legalFixtureProxy';
+import { listenLegalHttp } from '../e2e/legalFixturePorts';
 
 async function listen(server: Server) {
-  await new Promise<void>((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
-  });
+  await listenLegalHttp(server);
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('자기 HTTP 포트가 필요합니다.');
   return 'http://127.0.0.1:' + address.port;
