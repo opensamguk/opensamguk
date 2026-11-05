@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { BALANCE } from '../balance';
 import { LINEAGE_EXITED_YEAR } from '../lineage/config';
 import { refreshSupply } from '../supply';
-import { commandMeta, defineCommand, fail, noArgs, positive, ruler, success } from './support';
+import { commandMeta, defineCommand, fail, noArgs, positive, ruler, success, targetGeneral } from './support';
 
 const establish = (uprising: boolean) =>
   defineCommand({
@@ -109,7 +109,7 @@ export const personnelCommands = [
     check(view, actor, args) {
       const failure = ruler(view, actor);
       if (failure) return failure;
-      const target = view.generals[args.generalId];
+      const target = targetGeneral(view, args.generalId);
       return target?.nationId === null && target.activeFromYear !== LINEAGE_EXITED_YEAR
         ? null
         : fail('BAD_TARGET', '재야 장수만 등용할 수 있습니다.');

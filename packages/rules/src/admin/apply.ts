@@ -6,6 +6,7 @@ import { lineageAlive } from '../lineage/eligibility';
 import { isAppointableOfficerLevel } from '../personnel/permissions';
 import { emptyQueue } from '../policy';
 import { emptyTurns } from '../replayInputs';
+import { removeAdminGeneral } from './remove';
 import {
   adminGamePayloadSchema,
   adminGameRejectMessages,
@@ -33,6 +34,14 @@ function snapshotSchema(action: AdminGameAction): z.ZodType<JsonValue> {
       return z.strictObject({ userId: z.string().min(1).nullable(), nationIsNpc: z.boolean().nullable() });
     case 'admin.general.clearTurns':
       return z.strictObject({ revision: counter, turns: z.array(turn).length(30) });
+    case 'admin.general.remove':
+      return z.strictObject({
+        userId: z.string().min(1).nullable(),
+        nationId: counter.nullable(),
+        officerLevel: counter,
+        crew: counter,
+        removedAt: counter.nullable(),
+      });
     case 'admin.nation.dismissOffice':
       return z.strictObject({ officerLevel: counter });
     default:
@@ -69,6 +78,7 @@ export interface AdminGameContext {
   replayFormat: number;
   worldStatus: string;
   unitSet?: UnitSetResource;
+  tick?: number;
 }
 
 // 같은 칸의 expected를 전부 확인한 뒤에만 사본을 바꾼다.
@@ -104,6 +114,22 @@ export function decideAdminGameAction(
   let after: JsonValue;
   const next = structuredClone(replay);
   switch (action.kind) {
+    case 'admin.general.remove': {
+      if (general!.officerLevel === 12) return reject('INVALID_VALUE');
+      if (!Number.isInteger(context.tick) || context.tick! < 0 || context.tick! > 2_147_483_647)
+        throw Error('장수 내보내기의 처리 tick이 없습니다.');
+      const snapshot = (g: typeof general) => ({
+        userId: g!.userId,
+        nationId: g!.nationId,
+        officerLevel: g!.officerLevel,
+        crew: g!.crew,
+        removedAt: g!.removedAt ?? null,
+      });
+      before = snapshot(general);
+      if (!removeAdminGeneral(next, action.generalId, context.tick!)) return reject('INVALID_VALUE');
+      after = snapshot(next.state.generals[action.generalId]);
+      break;
+    }
     case 'admin.general.rename': {
       if (
         Object.values(replay.state.generals).some(
@@ -249,6 +275,7 @@ export function applyAdminGameRecord(
     sanctioned: false,
     replayFormat: 3,
     worldStatus: 'RUNNING',
+    tick: input.tick!,
     ...context,
   });
   if (outcome.status !== 'APPLIED' || !sameJson(outcome.result, input.result as JsonValue))

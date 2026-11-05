@@ -23,14 +23,32 @@ function registry(handler: QueuedInputHandler): EngineRegistry {
 }
 function fixture(kind = 'test-a.queued', features = ['test-a']) {
   const world = { id: 'world', replayFormat: 3, ruleFeatures: features } as EngineWorld;
-  const event = { id: 1n, kind, status: 'PENDING', worldId: world.id };
+  const event = { id: 1n, generalId: null as number | null, kind, status: 'PENDING', worldId: world.id };
   const tx = {
+    general: { findUnique: vi.fn(async () => ({ removedAt: null as number | null })) },
     inputEvent: { findFirst: vi.fn(async () => event), updateMany: vi.fn(async () => ({ count: 1 })) },
     world: { update: vi.fn(async () => ({ actionSequence: 7 })) },
   };
-  return { world, tx, client: tx as unknown as Prisma.TransactionClient };
+  return { world, event, tx, client: tx as unknown as Prisma.TransactionClient };
 }
 describe('T2-26 통합 입력 처리기', () => {
+  it('AC-INT-23 퇴장 장수는 처리기를 부르지 않고 일반 거절 모양으로 한 번 기록한다', async () => {
+    const { world, event, tx, client } = fixture();
+    event.generalId = 2;
+    tx.general.findUnique.mockResolvedValue({ removedAt: 0 });
+    const handler = vi.fn<QueuedInputHandler>();
+    expect(await processInputs(client, world, 123, registry(handler))).toBe(true);
+    expect(handler).not.toHaveBeenCalled();
+    expect(tx.inputEvent.updateMany).toHaveBeenCalledExactlyOnceWith({
+      where: { id: 1n, status: 'PENDING' },
+      data: {
+        sequence: 7,
+        tick: 123,
+        status: 'REJECTED',
+        result: { code: 'GENERAL_REMOVED', message: '내보낸 장수의 요청은 처리할 수 없습니다.' },
+      },
+    });
+  });
   it('운영 대기 종류와 기능은 등록표의 처리기와 일치한다', () => {
     expect(engineRegistry.features.map((feature) => feature.key).sort()).toEqual(
       ruleRegistry.features.map((feature) => feature.key).sort(),

@@ -136,6 +136,7 @@ function clauseOrder(clause: TreatyClause): number {
 }
 
 const proposeRejectCodes = [
+  'GENERAL_REMOVED',
   'WORLD_CLOSED',
   'ACTOR_INACTIVE',
   'NO_GENERAL',
@@ -147,6 +148,7 @@ const proposeRejectCodes = [
   'INSUFFICIENT_GOLD',
 ] as const;
 const respondRejectCodes = [
+  'GENERAL_REMOVED',
   'WORLD_CLOSED',
   'ACTOR_INACTIVE',
   'NO_GENERAL',
@@ -160,6 +162,7 @@ const respondRejectCodes = [
   'COUNTERPART_UNAVAILABLE',
 ] as const;
 const breakRejectCodes = [
+  'GENERAL_REMOVED',
   'WORLD_CLOSED',
   'ACTOR_INACTIVE',
   'NO_GENERAL',
@@ -496,6 +499,7 @@ export function validateTreatyRecord(value: unknown, context: TreatyRecordContex
 }
 
 const rejectionMessages: Record<TreatyRejectCode, string> = {
+  GENERAL_REMOVED: '내보낸 장수의 요청은 처리할 수 없습니다.',
   WORLD_CLOSED: '실행 중인 월드가 아닙니다.',
   ACTOR_INACTIVE: '행동할 수 없는 계정입니다.',
   NO_GENERAL: '행위 장수가 없습니다.',

@@ -67,7 +67,10 @@ export function buildIntelRecord(view: WorldView, actor: Actor, cityKey: number)
   const tick = actor.tick ?? 0;
   const year = toGameDate(view.startYear, tick).year;
   const generals = Object.values(view.generals)
-    .filter((g) => g.cityKey === cityKey && g.nationId === city.nationId && g.activeFromYear <= year)
+    .filter(
+      (g) =>
+        g.removedAt === undefined && g.cityKey === cityKey && g.nationId === city.nationId && g.activeFromYear <= year,
+    )
     .sort((a, b) => a.id - b.id);
   const nation = city.nationId === null ? null : view.nations[city.nationId]!;
   const record: IntelRecord = {
