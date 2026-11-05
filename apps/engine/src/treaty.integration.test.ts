@@ -102,7 +102,10 @@ async function snapshot(worldId: string) {
 describe('T2-07 / AC-M2-06 실제 PostgreSQL 조약 저장 component', () => {
   it('사람 제안·수락 때 비용을 다시 계산하고 상태와 완료 입력을 함께 저장한다', async () => {
     const { worldId, userIds } = await fixture();
-    const nation = await db.nation.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
+    const nation = await db.nation.findUniqueOrThrow({
+      where: { worldId_id: { worldId, id: 1 } },
+      omit: { noticeDirective: true },
+    });
     const otherNation = await db.nation.create({ data: { ...nation, id: 3, name: '보존 국가' } });
     const otherPair = await db.diplomacy.create({
       data: { worldId, nationA: 1, nationB: 3, state: 'NON_AGGRESSION', untilTick: 90000 },

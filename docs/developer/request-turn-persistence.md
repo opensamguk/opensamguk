@@ -185,3 +185,19 @@ API와 엔진 모두 월드 행을 장수 행보다 먼저 잠급니다. API는 
 `world.summary.truce`와 시계 CLI의 `truce`는 설정 세 값에 `active`, `endsAt`, `nextStartsAt`, `nextEndsAt`을 더한 값 또는 null이다. 시각은 ISO 문자열이며 `endsAt`은 현재 휴전 중일 때만 있다. 정지·종료 여부와 별도로 벽시각의 구간을 나타낸다. 원본 프리셋과 비공개 운영 사유는 응답하지 않는다.
 
 `home.get.turnSchedule`은 개인 30칸의 `(string | null)[] | null`이다. 실행 중 실시간 시계와 기준 시각이 있을 때만 배열을 응답하며 칸 0은 `nextTurnAt`과 같다. Date 범위를 넘는 칸만 null이고 저장 설정 오류는 숨기지 않는다. 클라이언트는 휴전 경계를 다시 계산하지 않는다. 국가 직책 12칸의 무시각 계약은 바꾸지 않는다.
+
+## 군사 조언과 공지 지시 (T3-07 · AC-M3-13)
+
+`advice.get({worldId})`는 세션의 장수에게 `{basis:{tick,revision},items,skipped}`를 반환한다. `tick`은 현재 유효 시계, `revision`은 장수의 예턴 판이다. 명령 자격은 기존 `turns.precheck`처럼 다음 개인 턴 시각으로 검사한다. 현재 세션·ACTIVE·전역/월드 제재·소유 장수·작전·공지·상태를 같은 읽기 트랜잭션에서 확인한다. 장수가 없으면404이며 요청에 장수나 계정 ID를 넣을 수 없다.
+
+`items`는 최대3개다. 현재 같은 국가의 참여 중인 열린 작전, 자기 국가의 공지 지시, 공용 NPC 후보 순이다. 작전은 목표 시각·ID, NPC 후보는 점수 내림차순·명령 키·정규 JSON 인자로 정렬한다. 같은 명령과 인자는 먼저 나온 출처만 남긴다. 준비된 작전과 제안을 만들 수 없는 `noop`은 제외한다. 재야에게는 상성과 도시 수로 임관 국가를 추천한다. NPC 자동 행동의 사람 제외 조건과 난수 소비는 유지한다.
+
+각 항목은 `{source,commandKey,commandName,args,argsLabel,reason,score,nation}`이다. `source`는 `operation`·`notice`·`ai`, 점수는 NPC 후보에만 있고 나머지는 null이다. 재야의 `nation`은 `{id,name,color}`, 다른 항목은 null이다. 작전·공지 명령의 사전 검사 실패는 `skipped:[{source,commandKey,code,message}]`로 설명한다. 다른 국가의 공지나 작전, 참여자·계정 신원·비공개 수치는 반환하지 않는다.
+
+조회는 예턴·입력·로그·활동 기록을 바꾸지 않는다. 화면에서 추천을 고르면 기존 `turns.edit`의0번 칸 `put`과 revision 충돌 처리를 사용한다. 조언이 왔다는 이유로 기존 초안을 덮거나 자동 저장하지 않는다. 프론트 구현과 E2E는 T3-08의 별도 인수 대상이다.
+
+`notice.nation.set({worldId,body,directive?})`의 지시는 `{commandKey,args}` 또는 null이다. 생략하면 현재 지시를 보존하고 null이면 지운다. 현재 월드가 허용하는 일반 장수 명령과 실제 인자 스키마·저장 가능한 JSON만 받으며 국가 명령은 거절한다. 자원·위치 부족은 저장을 막지 않고 조언에서 사전 검사 실패로 설명한다. 기존 군주·참모 권한과 인증·동의·제재 검사는 유지한다.
+
+본문·지시·revision은 같은 트랜잭션에 저장하고 기존 `notice.updated`를 commit 뒤에 보낸다. 본문이 비어도 지시가 있으면 읽음 여부는 revision을 따른다. `notice.nation.get/set/markSeen`은 지시가 있을 때만 선택 키 `directive`를 반환하므로 이전 빈 공지 응답 모양은 유지된다. 손상된 저장 지시는500으로 드러내고 조회 중에 고쳐 쓰지 않는다.
+
+`Nation.noticeDirective`는 기존 공지와 같은 규칙 밖 metadata다. nullable JSONB 새 migration으로 추가하며 기존 행과 새 월드는 null이다. 엔진의 `loadWorld`·`readWorldState`, 서버의 `readView`에서 제외한다. 게임 해시·재생 원본·입력 종류·보상 활동에 추가하지 않는다. 실제 HTTP 권한과 공지·작전·롤백·불변성 검증은 `tools/t3-07-advice.integration.test.ts`에 있다. 백엔드 병합만으로 AC-M3-13 전체 완료를 뜻하지 않는다.

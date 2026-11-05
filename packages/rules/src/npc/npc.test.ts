@@ -4,7 +4,7 @@ import { commandWorld, testUnits } from '../../test/commandFixture';
 import { commandRegistry } from '../commands/registry';
 import { runGeneralTurn } from '../commands/turn';
 import { BALANCE } from '../balance';
-import { chooseGeneralTurn, chooseNationTurn } from './index';
+import { chooseGeneralTurn, chooseNationTurn, generalTurnCandidates } from './index';
 
 const context = { tick: 100, unitSet: testUnits };
 function rearWorld() {
@@ -15,6 +15,37 @@ function rearWorld() {
   return world;
 }
 describe('AC-M1-17 NPC 판단', () => {
+  it('AC-M3-13 사람 후보도 실제 소유권으로 검사하고 NPC 자동 선택은 계속 막는다', () => {
+    const world = commandWorld();
+    world.generals[1]!.userId = 'human';
+    const before = structuredClone(world),
+      general = world.generals[1]!;
+    const candidates = generalTurnCandidates(world, general, context);
+    expect(candidates.length).toBeGreaterThan(0);
+    for (const candidate of candidates)
+      expect(
+        commandRegistry.get(candidate.key)!.check(world, { ...context, generalId: general.id }, candidate.args),
+      ).toBeNull();
+    expect(chooseGeneralTurn(world, general, rngFor('human-advice'), context)).toEqual({
+      chosen: null,
+      candidates: [],
+    });
+    expect(world).toEqual(before);
+  });
+
+  it('AC-M3-13 후보 분리 뒤에도 NPC는 기존 동률 후보에서 RNG를 한 번만 소비한다', () => {
+    const world = commandWorld(),
+      general = world.generals[1]!;
+    const candidates = generalTurnCandidates(world, general, context);
+    const actual = rngFor('npc-candidate-reuse'),
+      expected = rngFor('npc-candidate-reuse');
+    expect(chooseGeneralTurn(world, general, actual, context)).toEqual({
+      candidates,
+      chosen: expected.pick(candidates.filter((candidate) => candidate.score === candidates[0]!.score)),
+    });
+    expect(actual.next()).toBe(expected.next());
+  });
+
   it('잘못된 휴식 인자는 빈 슬롯으로 바꾸지 않고 실패시킨다', () => {
     const world = commandWorld();
     world.nationTurns = { 1: [{ commandKey: 'nation_rest', args: { invalid: true } }] };

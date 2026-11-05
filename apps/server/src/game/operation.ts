@@ -12,6 +12,7 @@ import {
   unitSetSchema,
   type Readiness,
   type WorldView,
+  type AdviceOperation,
 } from '@opensamguk/rules';
 import { TRPCError } from '@trpc/server';
 import type { Context } from '../context';
@@ -39,6 +40,10 @@ const include = {
   members: { include: { general: { include: { city: { select: { name: true } } } } } },
 } as const satisfies Prisma.OperationInclude;
 type Operation = Prisma.OperationGetPayload<{ include: typeof include }>;
+type ForecastWorld = Pick<
+  OperationWorld,
+  'startYear' | 'replayFormat' | 'ruleFeatures' | 'policyFromSequence' | 'actionSequence'
+>;
 
 const denied = (code: string, reason: string) => ({ ok: false as const, code, reason });
 const allowed = { ok: true as const };
@@ -135,7 +140,7 @@ async function readRecord(tx: Tx, worldId: string, id: string, actor: Actor) {
   return row;
 }
 function forecastInput(
-  world: OperationWorld,
+  world: ForecastWorld,
   general: Actor,
   operation: Operation,
   turns: Awaited<ReturnType<typeof readSlots>>,
@@ -160,6 +165,51 @@ function forecastInput(
     policy,
     policyMode,
   };
+}
+export async function adviceOperationTurns(
+  tx: Tx,
+  world: ForecastWorld & { id: string; tick: number; unitSet: Prisma.JsonValue },
+  actor: Actor,
+  view: WorldView,
+): Promise<AdviceOperation[]> {
+  if (actor.nationId === null || actor.removedAt !== null) return [];
+  const operations = await tx.operation.findMany({
+    where: {
+      worldId: world.id,
+      nationId: actor.nationId,
+      status: 'OPEN',
+      targetTick: { gte: BigInt(world.tick) },
+      members: { some: { generalId: actor.id } },
+    },
+    include,
+    orderBy: [{ targetTick: 'asc' }, { id: 'asc' }],
+  });
+  if (operations.length === 0) return [];
+  const turns = await readSlots(tx, world.id, actor.id),
+    unitSet = unitSetSchema.parse(world.unitSet);
+  const candidates: AdviceOperation[] = [];
+  for (const operation of operations) {
+    if (!joined(operation, actor)) continue;
+    const input = forecastInput(world, actor, operation, turns, view);
+    if (calculateOperationForecast(input).verdict === 'READY') continue;
+    const suggestion = suggestOperationTurns({
+      ...input,
+      crewType: actor.crewType,
+      actor: { generalId: actor.id, tick: world.tick, unitSet },
+    });
+    if (suggestion.noop) continue;
+    const first = suggestion.slots[0];
+    if (!first) continue;
+    const date = toGameDate(world.startYear, input.deadlineTick);
+    candidates.push({
+      id: operation.id,
+      targetTick: input.deadlineTick,
+      commandKey: first.commandKey,
+      args: first.args,
+      reason: `${date.year}년 ${date.month}월 ${operation.target.name} 작전을 준비한다.`,
+    });
+  }
+  return candidates;
 }
 async function timelines(tx: Tx, world: OperationWorld, operation: Operation, actor: Actor, view: WorldView) {
   const members = currentMembers(operation).sort(

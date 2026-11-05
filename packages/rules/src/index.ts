@@ -54,6 +54,7 @@ export * from './supply';
 export * from './commands/turn';
 export * from './ranking';
 export * from './npc';
+export * from './advice/general';
 export * from './policy';
 export * from './policy/replay';
 export * from './operation/calendar';

@@ -9,6 +9,7 @@ import { worldRouter } from './routers/world';
 import { resourcesRouter } from './routers/resources';
 import { generalRouter } from './routers/general';
 import { entryRouter } from './routers/entry';
+import { adviceRouter } from './routers/advice';
 import { turnsRouter } from './routers/turns';
 import { commandsRouter } from './routers/commands';
 import { homeRouter } from './routers/home';
@@ -47,6 +48,7 @@ export const appRouter = router({
   resources: resourcesRouter,
   general: generalRouter,
   entry: entryRouter,
+  advice: adviceRouter,
   turns: turnsRouter,
   commands: commandsRouter,
   home: homeRouter,
