@@ -5,6 +5,7 @@ import { presetSchema } from '../world/preset';
 import { toGameDate } from '../clock/clock';
 import {
   applyRuleOptions,
+  generalCreationEntrySchema,
   effectiveWorldOptions,
   mergeRuntimeRules,
   type RuntimeOptions,
@@ -31,6 +32,7 @@ export const adminSettingSchema = z.union([
   option('npc.aggression', presetSchema.shape.npc.shape.aggression),
   option('boost.smallWorld', presetSchema.shape.boost.shape.smallWorld),
   option('boost.lateJoin', presetSchema.shape.boost.shape.lateJoin),
+  option('entry.generalCreation', generalCreationEntrySchema),
 ]);
 export const ADMIN_SETTING_KINDS = [
   'admin.world.rename',
@@ -68,6 +70,7 @@ function snapshot(setting: AdminSetting): z.ZodType<JsonValue> {
     case 'admin.world.setTurnTerm':
       return z.strictObject({ turnTermMinutes: term });
     case 'admin.world.setOption': {
+      if (setting.key === 'entry.generalCreation') return z.strictObject({ value: generalCreationEntrySchema });
       const value =
         setting.key === 'protection.foundUntilMonths'
           ? presetSchema.shape.protection.shape.foundUntilMonths
@@ -98,7 +101,8 @@ export interface WorldSettings {
   runtimeOptions: RuntimeOptions | null;
 }
 type OptionSetting = Extract<AdminSetting, { kind: 'admin.world.setOption' }>;
-export function ruleOptionPatch(setting: OptionSetting): RuntimeRuleOptions {
+type RuleOptionSetting = Exclude<OptionSetting, { key: 'entry.generalCreation' }>;
+export function ruleOptionPatch(setting: RuleOptionSetting): RuntimeRuleOptions {
   switch (setting.key) {
     case 'protection.foundUntilMonths':
       return { protection: { foundUntilMonths: setting.value } };
@@ -112,7 +116,7 @@ export function ruleOptionPatch(setting: OptionSetting): RuntimeRuleOptions {
       return { boost: { lateJoin: setting.value } };
   }
 }
-function optionValue(rules: PresetRules, setting: OptionSetting): JsonValue {
+function optionValue(rules: PresetRules, setting: RuleOptionSetting): JsonValue {
   switch (setting.key) {
     case 'protection.foundUntilMonths':
       return rules.protection.foundUntilMonths;
@@ -178,6 +182,12 @@ export function decideAdminSetting(
       if (next.policy) next.policy.turnTermMinutes = setting.turnTermMinutes;
       break;
     case 'admin.world.setOption': {
+      if (setting.key === 'entry.generalCreation') {
+        before = { value: current.runtimeOptions?.entry?.generalCreation ?? 'open' };
+        after = { value: setting.value };
+        settings.runtimeOptions = { ...current.runtimeOptions, entry: { generalCreation: setting.value } };
+        break;
+      }
       const effective = effectiveWorldOptions(current.preset, current.runtimeOptions);
       if (!effective.presetRules) return reject('NO_PRESET');
       if (
@@ -188,7 +198,10 @@ export function decideAdminSetting(
       before = { value: optionValue(effective.presetRules, setting) };
       after = { value: setting.value };
       const patch = ruleOptionPatch(setting);
-      settings.runtimeOptions = { rules: mergeRuntimeRules(current.runtimeOptions?.rules, patch) };
+      settings.runtimeOptions = {
+        ...current.runtimeOptions,
+        rules: mergeRuntimeRules(current.runtimeOptions?.rules, patch),
+      };
       next.state.presetRules = applyRuleOptions(effective.presetRules, patch);
       break;
     }
@@ -246,6 +259,7 @@ export function applyAdminSettingRecord(replay: ReplayState, input: RecordedInpu
       next.policy.turnTermMinutes = setting.turnTermMinutes;
     }
   } else {
+    if (setting.key === 'entry.generalCreation') return replay;
     if (!next.state.presetRules || !sameJson(optionValue(next.state.presetRules, setting), before.value!))
       throw Error('규칙 옵션의 변경 전 값이 재생과 다릅니다.');
     next.state.presetRules = applyRuleOptions(next.state.presetRules, ruleOptionPatch(setting));

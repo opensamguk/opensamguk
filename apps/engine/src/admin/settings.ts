@@ -161,6 +161,8 @@ function settingText(setting: AdminSetting): string {
       return `턴 간격을 ${setting.turnTermMinutes}분으로 변경했습니다.`;
     case 'admin.world.setOption': {
       switch (setting.key) {
+        case 'entry.generalCreation':
+          return setting.value === 'open' ? '새 장수 생성을 다시 받습니다.' : '새 장수 생성을 닫았습니다.';
         case 'protection.foundUntilMonths':
           return `건국 보호 기간을 ${setting.value}개월로 변경했습니다.`;
         case 'protection.peaceMonths':

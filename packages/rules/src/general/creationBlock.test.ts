@@ -29,3 +29,18 @@ describe('T2-03 / AC-M2-02 장수 생성 판정', () => {
     expect(creationBlock({ status: 'RUNNING', hasGeneral: false, hasPending: false })).toBeNull();
   });
 });
+
+it('AC-INT-24 생성 닫기는 새 접수·대기 생성을 막고 기존 장수와 월드 상태 판정을 보존한다', () => {
+  for (const hasPending of [false, true])
+    expect(creationBlock({ status: 'RUNNING', hasGeneral: false, hasPending, entryOpen: false })).toEqual({
+      code: 'ENTRY_CLOSED',
+      reason: '지금은 새 장수를 받지 않습니다',
+    });
+  expect(creationBlock({ status: 'RUNNING', hasGeneral: true, hasPending: false, entryOpen: false })).toEqual({
+    code: 'ALREADY_EXISTS',
+    reason: null,
+  });
+  expect(creationBlock({ status: 'PAUSED', hasGeneral: false, hasPending: false, entryOpen: false })!.code).toBe(
+    'WORLD_CLOSED',
+  );
+});

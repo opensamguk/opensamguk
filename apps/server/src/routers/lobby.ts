@@ -1,6 +1,13 @@
 import { readFile } from 'node:fs/promises';
 import { TRPCError } from '@trpc/server';
-import { creationBlock, nowTick, scenarioSchema, toGameDate } from '@opensamguk/rules';
+import {
+  creationBlock,
+  effectiveWorldOptions,
+  parsePreset,
+  nowTick,
+  scenarioSchema,
+  toGameDate,
+} from '@opensamguk/rules';
 import { z } from 'zod';
 import { resourceRoot } from '@opensamguk/shared/resource-root';
 import { publicProcedure, router } from '../trpc';
@@ -40,6 +47,7 @@ export const lobbyRouter = router({
               name: true,
               status: true,
               preset: true,
+              runtimeOptions: true,
               scenarioKey: true,
               startYear: true,
               clockMode: true,
@@ -110,6 +118,11 @@ export const lobbyRouter = router({
                   status: world.status,
                   hasGeneral: general !== undefined,
                   hasPending: pendingWorlds.has(world.id),
+                  entryOpen:
+                    effectiveWorldOptions(
+                      world.preset === null ? null : parsePreset(world.preset),
+                      world.runtimeOptions,
+                    ).entry.generalCreation === 'open',
                 })?.reason ?? null,
             };
           });

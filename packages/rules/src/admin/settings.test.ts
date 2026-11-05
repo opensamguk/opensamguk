@@ -207,3 +207,54 @@ it('AC-INT-24 권한·월드·연도·프리셋·불변 옵션의 거절 순서�
   ])
     expect(runtimeOptionsSchema.safeParse(invalid).success).toBe(false);
 });
+
+it('AC-INT-24 생성 열기·닫기는 프리셋 없이도 가능하고 규칙 옵션과 서로 보존된다', () => {
+  for (const hasPreset of [false, true]) {
+    let { world, replay } = fixture(hasPreset);
+    const original = structuredClone(replay);
+    const closed = decideAdminSetting(
+      replay,
+      world,
+      payload({ kind: 'admin.world.setOption', key: 'entry.generalCreation', value: 'closed' }),
+      context,
+    );
+    expect(closed.status).toBe('APPLIED');
+    world = closed.settings;
+    expect(effectiveWorldOptions(world.preset, world.runtimeOptions).entry.generalCreation).toBe('closed');
+    expect(closed.replay).toEqual(original);
+    if (hasPreset) {
+      const rules = decideAdminSetting(
+        replay,
+        world,
+        payload({ kind: 'admin.world.setOption', key: 'npc.aggression', value: 0.5 }),
+        context,
+      );
+      world = rules.settings;
+      replay = rules.replay;
+      expect(world.runtimeOptions!.entry!.generalCreation).toBe('closed');
+    }
+    const opened = decideAdminSetting(
+      replay,
+      world,
+      payload({ kind: 'admin.world.setOption', key: 'entry.generalCreation', value: 'open' }),
+      context,
+    );
+    expect(opened.status).toBe('APPLIED');
+    expect(opened.settings.runtimeOptions!.rules).toEqual(world.runtimeOptions!.rules);
+    expect(effectiveWorldOptions(opened.settings.preset, opened.settings.runtimeOptions).entry.generalCreation).toBe(
+      'open',
+    );
+    expect(opened.replay).toEqual(replay);
+    const record: RecordedInput = {
+      sequence: 1,
+      tick: 0,
+      generalId: null,
+      kind: 'admin.world.setOption',
+      status: closed.status,
+      payload: payload({ kind: 'admin.world.setOption', key: 'entry.generalCreation', value: 'closed' }),
+      result: closed.result,
+    };
+    expect(applyAdminSettingRecord(original, record)).toEqual(original);
+  }
+  expect(runtimeOptionsSchema.safeParse({ entry: { npcPlay: 'on' } }).success).toBe(false);
+});

@@ -278,6 +278,9 @@ const processGeneralCreation: QueuedInputHandler = async (tx, world, event, { ti
     status: world.status,
     hasGeneral: existing.some((g) => g.userId === event.userId),
     hasPending: false,
+    entryOpen:
+      effectiveWorldOptions(world.preset === null ? null : parsePreset(world.preset), world.runtimeOptions).entry
+        .generalCreation === 'open',
   });
   if (block && block.code !== 'PENDING') return reject(block.code);
   const actor = await tx.user.findUnique({ where: { id: event.userId } });

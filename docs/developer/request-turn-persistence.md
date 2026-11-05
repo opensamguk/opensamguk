@@ -143,3 +143,12 @@ API와 엔진 모두 월드 행을 장수 행보다 먼저 잠급니다. API는 
 엔진은 처리 때 계정·관리자·제재를 다시 검사한다. 간격 변경은 DB 시각과 옛 간격으로 체크포인트를 확정하고 `clockRevision` 조건부 갱신으로 새 간격을 저장한다. 실행 중에는 기준 시각을 다시 잡고 정지 중에는 기준 시각을 유지한다. 재생 정책의 간격도 같은 입력 sequence에서 바꾸며 장수의 활동 tick은 보존한다. 규칙 옵션은 깊게 합쳐 로더·서버 미리보기·늦은 참가 보정에서 같은 값을 쓴다.
 
 초기화는 변경 이력의 전후 연결을 검사해 생성 당시 설정으로 새 판을 만든다. 새 판의 `runtimeOptions`는 null이다. 이름 변경 뒤 초기화 결과의 `confirmedName`은 확인한 현재 이름이며 `settings.name`은 생성 이름이다. 기존 초기화 기록에는 키를 추가하지 않는다. 조회와 입력 오류에는 운영 계정·비공개 사유를 공개하지 않는다.
+
+
+### 장수 생성 허용 (INT-24 PR2)
+
+`admin.world.requestSetting`의 옵션 키 `entry.generalCreation`은 `open`·`closed`를 받는다. 프리셋 없는 월드에서도 사용할 수 있으며 규칙 옵션과 서로 지우지 않는다. `admin.world.settings`는 `entry.generalCreation`을 함께 반환한다. NPC 맡기·휴전 토글 입력은 아직 받지 않는다.
+
+`general.mine.creationRules.generalCreationEnabled`는 항상 boolean이고 기본값은 true다. 기존 장수 유무와 별도로 이 판의 생성 허용을 나타낸다. 로비의 기존 `createBlockedReason`은 닫힌 RUNNING 판에서 「지금은 새 장수를 받지 않습니다」를 반환한다. 기존 장수가 있으면 접속할 수 있고 차단 사유는 null이다. PAUSED·PREOPEN·ENDED는 기존 월드 상태 사유를 유지한다.
+
+닫힌 판의 새 생성 접수는 HTTP412(PRECONDITION_FAILED)와 「지금은 새 장수를 받지 않습니다.」 메시지를 반환하며 입력을 만들지 않는다. 이미 PENDING인 생성도 처리할 때 현재 값을 다시 읽고 REJECTED `ENTRY_CLOSED`로 확정한다. `general.mine.creation`에서 해당 코드와 문구를 복구할 수 있다. 다시 연 뒤에는 새 요청을 접수하며 이전 거절 기록을 바꾸지 않는다. 초기화는 생성 허용을 원래 기본값 open으로 돌린다.
