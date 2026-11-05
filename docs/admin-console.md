@@ -49,7 +49,7 @@ D-068에 따라 관리자 역할만으로 자원 편집 권한을 얻지 않습�
 | `resourceAdmin.save` | `id`·`revision`·`content` | `{ ok: true, meta, report }` 또는 `STALE`·`PUBLISHED`와 현재 `meta` |
 | `resourceAdmin.publish` | `id`·`revision`·필수 `reason` | 성공 시 `meta`·`report`, 거부는 `STALE`·`PUBLISHED`·`NOT_PASS`·`ID_MISMATCH` |
 
-초안은 검증 오류가 있어도 저장할 수 있습니다. 게시는 저장된 revision을 잠그고 다시 검증하며 변경과 감사를 함께 확정합니다. 응답 크기가 한도를 넘으면 둘 다 되돌리고 `RESPONSE_TOO_LARGE`를 돌려줍니다. `report`는 검증기의 `kind`·`status`·`issues`·`ran`·`skipped`·`truncated`를 담습니다. 오류는 `BAD_REQUEST`·`NOT_FOUND`와 기존 인증·권한·제재 응답을 따릅니다. 내용은 JSON 객체이며 정규 JSON 기준 최대 900,000바이트입니다.
+초안은 검증 오류가 있어도 저장할 수 있습니다. 게시는 저장된 revision을 잠그고 다시 검증하며 변경과 감사를 함께 확정합니다. 응답 크기가 한도를 넘으면 둘 다 되돌리고 `RESPONSE_TOO_LARGE`를 돌려줍니다. `report`는 검증기의 `kind`·`status`·`issues`·`ran`·`skipped`·`truncated`를 담습니다. 오류는 `BAD_REQUEST`·`NOT_FOUND`와 기존 인증·권한·제재 응답을 따릅니다. 내용은 JSON 객체이며 정규 JSON 기준 최대 900,000바이트입니다. 자원 API는 JSON으로 최대 네 절차씩 보내며 다른 API와 묶거나 JSONL 스트림으로 보내지 않습니다. 배치 링크는 자원 경로를 나누고 `maxItems`를 4 이하로 설정합니다.
 
 현재 병종·능력치 규칙·초상 대응표만 게시합니다. 지도·시나리오는 게시 문맥 계약이 정해질 때까지 `incomplete`로 거부합니다. 다른 이름 복제와 초안 폐기는 사용자 답을 기다립니다. 게시한 판과 진행 중인 월드는 이 API로 수정하지 않습니다. 관리자 화면과 AC-P2-27 전체 인수는 아직 남아 있습니다.
 

@@ -24,18 +24,21 @@ describe('자원 JSON 예산', () => {
   it('준비 상수와 get 필드 여유는 단일 결과 예산 안이고 wire 한도를 주장하지 않는다', () => {
     expect(RESOURCE_PAYLOAD_LIMITS).toEqual({
       depthMax: 16,
-      contentMax: 131_072,
+      contentMax: 900_000,
       metaMax: 8192,
       responseMax: 134_217_728,
     });
     expect(
-      RESOURCE_PAYLOAD_LIMITS.contentMax * 1000 +
-        1024 * 1000 +
-        RESOURCE_PAYLOAD_LIMITS.metaMax +
-        RESULT_FIELD_ALLOWANCE_BYTES,
+      RESOURCE_PAYLOAD_LIMITS.contentMax + RESOURCE_PAYLOAD_LIMITS.metaMax + RESULT_FIELD_ALLOWANCE_BYTES,
     ).toBeLessThanOrEqual(RESOURCE_PAYLOAD_LIMITS.responseMax);
     expect(bytes({ meta: null, content: null }) - bytes(null) * 2).toBeLessThanOrEqual(RESULT_FIELD_ALLOWANCE_BYTES);
     expect(bytes({ ok: false, reason: 'RESPONSE_TOO_LARGE' })).toBeLessThanOrEqual(RESULT_FIELD_ALLOWANCE_BYTES);
+  });
+
+  it('큰 입력에서 증폭된 진단도 단일 결과 상한을 넘으면 거부한다', () => {
+    const diagnostic = { params: { name: 'x'.repeat(RESOURCE_PAYLOAD_LIMITS.contentMax - 20) } };
+    const report = { issues: Array(1000).fill(diagnostic) };
+    expect(measureJson(report, RESOURCE_PAYLOAD_LIMITS.responseMax)).toEqual({ ok: false });
   });
 
   it('makeLimits는 get 결과 칸의 여유를 포함하고 입력을 바꾸지 않는다', () => {

@@ -6,6 +6,7 @@ import { newSession } from '../apps/server/src/auth/session';
 import { authzCase } from '../apps/server/src/authz/case';
 import { categories } from '../apps/server/src/authz/coverage';
 import { checkContent, RESOURCE_PAYLOAD_LIMITS } from '../apps/server/src/resourceAdmin/payload';
+import { RESOURCE_HTTP_LIMITS } from '../apps/server/src/resourceAdmin/httpLimits';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { testDatabaseUrl } from './test-database';
 
@@ -353,4 +354,103 @@ it('AC-P2-27 병종 내용 ID가 카탈로그 이름과 다르면 검증을 통�
     (await request('resourceAdmin.publish', { id, revision: 1, reason: 'ID 불일치 검증' }, user.cookie)).data,
   ).toEqual({ ok: false, reason: 'ID_MISMATCH' });
   expect(await snapshot()).toBe(before);
+});
+
+it('AC-P2-27 자원 배치 상한을 넘으면 인코딩된 경로도 어떤 절차·감사보다 먼저 거부한다', async () => {
+  const user = await actor(),
+    f = await fixture(),
+    before = await snapshot();
+  const count = 5;
+  for (const path of ['resourceAdmin.publish', '%72esourceAdmin.publish']) {
+    const response = await fetch(`${base}/trpc/${Array(count).fill(path).join(',')}?batch=1`, {
+      method: 'POST',
+      headers: { origin, cookie: user.cookie, 'content-type': 'application/json' },
+      body: JSON.stringify(
+        Object.fromEntries(
+          Array.from({ length: count }, (_, index) => [
+            index,
+            { id: f.draft.id, revision: 0, reason: '실행되면 안 되는 게시' },
+          ]),
+        ),
+      ),
+    });
+    expect(response.status).toBe(400);
+    expect(Buffer.byteLength(await response.text())).toBeLessThan(RESOURCE_HTTP_LIMITS.envelopeMax);
+    expect(await snapshot()).toBe(before);
+  }
+});
+
+it('AC-P2-27 자원과 로그아웃 혼합 배치는 세션·내용·감사를 전부 보존한다', async () => {
+  const user = await actor(),
+    f = await fixture(),
+    before = await snapshot();
+  const response = await fetch(`${base}/trpc/resourceAdmin.save,auth.logout?batch=1`, {
+    method: 'POST',
+    headers: { origin, cookie: user.cookie, 'content-type': 'application/json' },
+    body: JSON.stringify({ 0: { id: f.draft.id, revision: 0, content: { changed: true } } }),
+  });
+  expect(response.status).toBe(400);
+  expect(await snapshot()).toBe(before);
+});
+
+it('AC-P2-27 두 JSONL 협상 경로는 자원 저장 전에 거부한다', async () => {
+  const user = await actor(),
+    f = await fixture(),
+    before = await snapshot();
+  for (const headers of [{ 'trpc-accept': 'application/jsonl' }, { accept: 'application/json, application/jsonl' }]) {
+    const response = await fetch(`${base}/trpc/resourceAdmin.save?batch=1`, {
+      method: 'POST',
+      headers: { origin, cookie: user.cookie, 'content-type': 'application/json', ...headers },
+      body: JSON.stringify({ 0: { id: f.draft.id, revision: 0, content: { changed: true } } }),
+    });
+    expect(response.status).toBe(400);
+    expect(await snapshot()).toBe(before);
+  }
+});
+
+it('AC-P2-27 최대 자원 배치는 네 초안을 실제 저장하고 결과·봉투 예산 안에 든다', async () => {
+  const user = await actor(),
+    fixtures = await Promise.all(Array.from({ length: 4 }, () => fixture()));
+  const response = await fetch(`${base}/trpc/${fixtures.map(() => 'resourceAdmin.save').join(',')}?batch=1`, {
+    method: 'POST',
+    headers: { origin, cookie: user.cookie, 'content-type': 'application/json' },
+    body: JSON.stringify(
+      Object.fromEntries(fixtures.map((f, index) => [index, { id: f.draft.id, revision: 0, content: f.content }])),
+    ),
+  });
+  expect(response.status).toBe(200);
+  const raw = await response.text(),
+    body = JSON.parse(raw) as Array<{ result: { data: Reply } }>;
+  expect(body).toHaveLength(4);
+  for (const [index, entry] of body.entries()) {
+    expect(entry.result.data).toMatchObject({ ok: true, meta: { id: fixtures[index]!.draft.id, revision: 1 } });
+    const resultBytes = Buffer.byteLength(JSON.stringify(entry.result.data));
+    expect(Buffer.byteLength(JSON.stringify(entry)) - resultBytes).toBeLessThan(RESOURCE_HTTP_LIMITS.envelopeMax);
+    expect(await db.auditLog.count({ where: { targetId: fixtures[index]!.draft.id, action: 'resource.save' } })).toBe(
+      1,
+    );
+  }
+  expect(Buffer.byteLength(raw)).toBeLessThanOrEqual(RESOURCE_HTTP_LIMITS.wireMax);
+});
+
+it('AC-P2-27 긴 오류의 봉투를 제한하며 기존 관리자 다섯 조회 배치는 그대로 허용한다', async () => {
+  const user = await actor(),
+    f = await fixture(),
+    before = await snapshot();
+  const response = await fetch(`${base}/trpc/resourceAdmin.save?batch=1`, {
+    method: 'POST',
+    headers: { origin, cookie: user.cookie, 'content-type': 'application/json' },
+    body: JSON.stringify({ 0: { id: f.draft.id, revision: 0, content: {}, ['\u0000'.repeat(100_000)]: true } }),
+  });
+  expect(response.status).toBe(400);
+  const raw = await response.text();
+  expect(Buffer.byteLength(raw)).toBeLessThan(RESOURCE_HTTP_LIMITS.envelopeMax);
+  expect(raw).toContain('요청 값을 확인하세요.');
+  expect(await snapshot()).toBe(before);
+  const paths = Array(5).fill('admin.whoami').join(',');
+  const normal = await fetch(`${base}/trpc/${paths}?batch=1&input=${encodeURIComponent('{}')}`, {
+    headers: { origin, cookie: user.cookie },
+  });
+  expect(normal.status).toBe(200);
+  expect(await normal.json()).toHaveLength(5);
 });
