@@ -3,6 +3,15 @@ import { applyModifiers } from '../modifiers';
 import { commanderBattleModifiers, fiveStatsBattleModifiers } from './fiveStatsBattle';
 
 describe('AC-INT-09 실제 지휘관 전투 보정', () => {
+  it('AC-P2-12 장비는 100을 넘겨 계산해도 기본 능력치 검사와 분리한다', () => {
+    const base = { leadership: 100, strength: 100 };
+    const modifiers = commanderBattleModifiers(base, { leadership: 6, strength: 6 });
+    expect(applyModifiers(100, modifiers.dealt)).toBeCloseTo(111.2);
+    expect(applyModifiers(100, modifiers.taken)).toBeCloseTo(88.8);
+    expect(() => commanderBattleModifiers({ ...base, leadership: 101 }, { leadership: 6, strength: 6 })).toThrow();
+    for (const invalid of [-1, 7, 0.5, NaN, Infinity])
+      expect(() => commanderBattleModifiers(base, { leadership: invalid, strength: 0 })).toThrow();
+  });
   it.each([
     [0, 90, 110],
     [50, 100, 100],

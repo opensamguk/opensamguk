@@ -4,6 +4,8 @@ import { commandWorld, testUnits } from '../../test/commandFixture';
 import { deepFreeze } from '../personnel/testFixture';
 import { simulateBattle } from '../battle/simulate';
 import { fiveStatsBattleModifiers } from '../general/fiveStatsBattle';
+import { STANDARD_EQUIPMENT_CONFIG } from '../equipment/catalog';
+import { initialEquipment } from '../equipment/state';
 import { emptyCampaignState } from './state';
 import { fightCampaignUnits, fightCampaignWall } from './skirmish';
 
@@ -33,6 +35,39 @@ function fixture() {
 }
 const rng = () => rngFor('battle-test', 'skirmish', 1);
 describe('AC-INT-09 부곡별 실제 교전·군량', () => {
+  it('AC-P2-12 장비는 소유자가 아닌 실제 지휘관에게 적용하고 기본 능력치를 보존한다', () => {
+    const world = fixture();
+    world.ruleFeatures!.push('equipment-v1');
+    world.equipment = initialEquipment(STANDARD_EQUIPMENT_CONFIG);
+    Object.assign(world.generals[2]!, { leadership: 100, strength: 100 });
+    const plain = fightCampaignUnits(world, 1, 2, testUnits, rng());
+    world.equipment.generals['1'] = { horse: 'horse_06', weapon: 'weapon_06' };
+    const ownerOnly = fightCampaignUnits(world, 1, 2, testUnits, rng());
+    expect(ownerOnly.attacker).toEqual(plain.attacker);
+    expect(ownerOnly.defender).toEqual(plain.defender);
+    world.equipment.generals['2'] = { horse: 'horse_06', weapon: 'weapon_06' };
+    const before = structuredClone(world);
+    const equipped = fightCampaignUnits(deepFreeze(world), 1, 2, testUnits, rng());
+    expect([equipped.attacker, equipped.defender]).not.toEqual([plain.attacker, plain.defender]);
+    expect(equipped.state.generals[2]).toMatchObject({ leadership: 100, strength: 100 });
+    expect(world).toEqual(before);
+  });
+  it('AC-P2-12 미장착 부곡은 확장 전과 같은 전투 결과와 난수 위치를 유지한다', () => {
+    const plain = fixture(),
+      equipped = structuredClone(plain),
+      firstRng = rng(),
+      secondRng = rng();
+    equipped.ruleFeatures!.push('equipment-v1');
+    equipped.equipment = initialEquipment(STANDARD_EQUIPMENT_CONFIG);
+    const baseline = fightCampaignUnits(plain, 1, 2, testUnits, firstRng);
+    const result = fightCampaignUnits(equipped, 1, 2, testUnits, secondRng);
+    expect(result.attacker).toEqual(baseline.attacker);
+    expect(result.defender).toEqual(baseline.defender);
+    expect(secondRng.next()).toBe(firstRng.next());
+    delete result.state.equipment;
+    result.state.ruleFeatures = plain.ruleFeatures!;
+    expect(result.state).toEqual(baseline.state);
+  });
   it('동일 시드로 같은 피해를 재현하며 소유자 쌀만 한 번 차감하고 장수 병력을 만들지 않는다', () => {
     const world = fixture(),
       before = structuredClone(world);

@@ -9,6 +9,7 @@ import type { DeepReadonly, WorldState, WorldView } from '../model/world';
 import type { UnitSetResource } from '../world/resources';
 import { readCampaignState, type CampaignUnitState } from './state';
 import { readCityResourcesState } from '../cityResources/state';
+import { equipmentBonus } from '../equipment/stats';
 
 function start(view: WorldView) {
   const state = cloneWorld(view);
@@ -35,7 +36,11 @@ function feed(state: WorldState, row: CampaignUnitState) {
 function modifiers(state: WorldState, row: CampaignUnitState): BattleModifiers {
   const commander = state.generals[row.commanderId]!;
   const stats = fiveStatsSchema.parse(Object.fromEntries(FIVE_STAT_KEYS.map((key) => [key, commander[key]])));
-  const base = fiveStatsBattleModifiers(stats);
+  const equipment = state.ruleFeatures?.includes('equipment-v1') ? equipmentBonus(state, commander.id) : undefined;
+  const base = fiveStatsBattleModifiers(
+    stats,
+    equipment ? { leadership: equipment.leadership, strength: equipment.strength } : undefined,
+  );
   return {
     dealt: [...collectModifiers(state, commander.id, { stage: 'battle.dealt', commandKey: 'attack' }), ...base.dealt],
     taken: [...collectModifiers(state, commander.id, { stage: 'battle.taken', commandKey: 'attack' }), ...base.taken],
