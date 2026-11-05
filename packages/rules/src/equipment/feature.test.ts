@@ -39,7 +39,7 @@ function origin() {
   };
 }
 
-it('AC-P2-12 전용 등록표만 명시 장비 설정으로 독립된 빈 상태를 만든다', () => {
+it('AC-P2-12 운영 등록표가 명시 장비 설정으로 독립된 빈 상태를 만든다', () => {
   const value = origin(),
     before = structuredClone(value);
   expect(() => checkReplayOrigin(value, registry)).not.toThrow();
