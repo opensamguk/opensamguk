@@ -5,8 +5,16 @@ import type { WorldView } from '../model/world';
 import { assignmentCancelReason } from '../personnel/assignments';
 import { lineageId, lineageQuantity } from './config';
 import { applySuccession } from './succession';
+import { equipmentSlotsSchema } from '../equipment/state';
 
 export const successionPreviewSchema = z.strictObject({
+  equipment: z
+    .strictObject({
+      from: equipmentSlotsSchema.nullable(),
+      heir: equipmentSlotsSchema.nullable(),
+      inherited: equipmentSlotsSchema.nullable(),
+    })
+    .optional(),
   heirId: lineageId,
   officerLevel: lineageQuantity.max(12),
   gold: lineageQuantity,
@@ -75,6 +83,15 @@ export function successionPreview(world: WorldView, fromId: number, heirId: numb
       .sort((a, b) => a - b);
   }
   const value = successionPreviewSchema.parse({
+    ...(world.ruleFeatures?.includes('equipment-v1')
+      ? {
+          equipment: {
+            from: world.equipment!.generals[String(fromId)] ?? null,
+            heir: world.equipment!.generals[String(heirId)] ?? null,
+            inherited: next.equipment!.generals[String(heirId)] ?? null,
+          },
+        }
+      : {}),
     heirId,
     officerLevel: to.officerLevel,
     gold: to.gold,

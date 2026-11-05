@@ -26,6 +26,7 @@ import { cityResourcesFeature, cityResourceInputKind } from './cityResourcesFeat
 import { ADMIN_END_KIND, applyAdminEndRecord } from './clock/end';
 import { ADMIN_RESET_KIND, applyAdminResetRecord } from './clock/reset';
 import { logisticsFeature, logisticsInputKind } from './logistics/feature';
+import { equipmentFeature } from './equipment/feature';
 import { governanceFeature, governanceInputKind } from './governance/feature';
 import { lineageFeature, lineageInputKind } from './lineage/feature';
 import { stratagemCardsFeature, stratagemCardsInputKind } from './stratagemCards/feature';
@@ -93,6 +94,7 @@ export const ruleRegistry: RuleRegistry = {
     campaignAssignmentFeature,
     cityResourcesFeature,
     logisticsFeature,
+    equipmentFeature,
     governanceFeature,
     lineageFeature,
     heritageFeature,

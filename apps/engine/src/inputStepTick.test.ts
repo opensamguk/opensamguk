@@ -16,6 +16,7 @@ function fixture(personnelFormat: 1 | null, policyFromSequence: number | null = 
     campaignState: null,
     cityResourcesState: null,
     logisticsState: null,
+    equipmentState: null,
     governanceState: null,
     lineageState: null,
     stratagemCardsState: null,

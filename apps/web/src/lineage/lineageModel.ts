@@ -12,7 +12,7 @@ export type LineageMarriage = LineageView['marriages'][number];
 export type LineageMine = NonNullable<LineageView['mine']>;
 export type LineageOffer = LineageMine['offers'][number];
 export type LineageFailure = NonNullable<LineageMine['marriageCandidates'][number]['failure']>;
-export type SuccessionPreview = NonNullable<LineageMine['preview']>;
+export type SuccessionPreview = Extract<LineageInput, { type: 'succession.confirm' }>['expected'];
 export type LineageRequestResult = inferRouterOutputs<AppRouter>['lineage']['request'];
 export type LineageInput = inferRouterInputs<AppRouter>['lineage']['submit']['payload'];
 export type LineageSex = LineagePerson['sex'];
@@ -137,6 +137,29 @@ const list = (ids: readonly number[], label: (id: number) => string) => (ids.len
 // 계승 미리보기 표의 줄. 보내는 expected와 같은 값이며 화면은 이름만 붙인다.
 export function previewRows(view: LineageView, preview: SuccessionPreview): Array<[string, string[]]> {
   const name = (id: number) => personName(view, id);
+  const equipmentSlots = (slots: NonNullable<SuccessionPreview['equipment']>['from']) =>
+    (
+      [
+        ['horse', '명마'],
+        ['weapon', '무기'],
+        ['book', '서적'],
+      ] as const
+    )
+      .filter(([slot]) => slots?.[slot])
+      .map(([, label]) => label)
+      .join('·') || '없음';
+  const equipment: Array<[string, string[]]> = preview.equipment
+    ? [
+        [
+          '장비',
+          [
+            `부모: ${equipmentSlots(preview.equipment.from)}`,
+            `후계자: ${equipmentSlots(preview.equipment.heir)}`,
+            `계승 뒤: ${equipmentSlots(preview.equipment.inherited)}`,
+          ],
+        ],
+      ]
+    : [];
   const governance = [
     preview.governance.throne ? '황위: 폐위됩니다' : '황위: 해당 없음',
     preview.governance.courtOffice
@@ -148,6 +171,7 @@ export function previewRows(view: LineageView, preview: SuccessionPreview): Arra
     ['조작', [`이 계정이 ${name(preview.heirId)}을(를) 조작합니다. 지금 장수는 은퇴하고 되돌릴 수 없습니다.`]],
     ['직책', [`${name(preview.heirId)}: ${officerName(preview.officerLevel)}`]],
     ['금·쌀', [`금 ${formatCount(preview.gold)} · 쌀 ${formatCount(preview.rice)} (계승 뒤 후계자 보유량)`]],
+    ...equipment,
     ['병력', [`${formatCount(preview.crew)}명 (본대와 소유 부곡 합계)`]],
     ['부곡', list(preview.unitIds, (id) => `부곡 ${id}`)],
     ['휘하 유지', list(preview.keptRetinue, name)],

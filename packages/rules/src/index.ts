@@ -196,6 +196,11 @@ export { canExecuteCityNationCommand } from './cityResources/commands';
 export * from './clock/createRequest';
 export * from './logistics/state';
 export * from './logistics/origin';
+export * from './equipment/config';
+export * from './equipment/state';
+export * from './equipment/origin';
+export * from './equipment/stats';
+export { STANDARD_EQUIPMENT_CONFIG } from './equipment/catalog';
 export * from './logistics/ledger';
 export * from './logistics/consumption';
 export {

@@ -107,6 +107,10 @@ ADMIN-RESET-D 후보의 `packages/rules/src/clock/reset.ts`는 엄격 요청·pa
 
 ## 새 저장 필드를 추가할 때 빠뜨리기 쉬운 것
 
+T4-23의 장비 상태는 `World.equipmentState`에 저장한다. `packages/rules/src/equipment/origin.ts`가 원생성 기능·카탈로그·장착 주인을 검사하며 엔진 `equipmentState.ts`는 같은 턴 트랜잭션에서 CAS로 갱신한다. 원생성·적재·명령·월 정산·가문 계승의 저장 경로를 함께 확인한다. 기능을 끈 월드에는 상태를 추가하지 않는다.
+
+`equipment.mine`은 서버 세션의 자기 장수에게 카탈로그·장착·보너스·매매 조건을 반환한다. `apps/server/src/game/equipmentApi.ts`가 조회하고 실제 매매는 기존 예턴의 `equipment_trade`를 실행하는 엔진이 처리한다. `tools/equipment-api.integration.test.ts`는 실제 HTTP·PG·자원 소비·롤백·계승·재생을 대조한다. 장비 선택 화면과 공개 프로필 활성화는 T4-24의 범위다.
+
 관리자 공지의 엄격 입력·잠금·멱등·감사는 `apps/server/src/admin/notices.ts`에 있다. `routers/admin.ts`의 네 절차가 사용하며 `lobby.notices`·`notice.world.list`는 숨김 필터만 추가한다. `tools/t3-05-admin-notices.integration.test.ts`는 실제 HTTP·권한·경합·두 정식 월드 격리를 검사하고 `t3-05-notice-migration.integration.test.ts`는 기존 모든 행·sequence와 null 제목·고정 공지를 새 migration 전후로 대조한다. 두 운영 표는 게임 상태·재생 해시에 넣지 않는다.
 
 관리자 공지와 월드 조회의 잠금 뒤 현재 권한 확인은 `apps/server/src/admin/access.ts`가 맡는다. `admin/worlds.ts`의 `admin.world.list`는 명시한 월드·사람 수·heartbeat를 같은 스냅샷에서 읽고 오류 원문을 응답하지 않는다. `tools/t3-05-admin-worlds.integration.test.ts`는 실제 두 정식 월드·사람30칸과 HTTP 권한·잠금 대기 뒤 회수·게임 행 불변을 대조한다. 월드 제어 실행기나 화면의 완료 근거를 대신하지 않는다.

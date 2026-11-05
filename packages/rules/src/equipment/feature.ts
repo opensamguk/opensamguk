@@ -3,7 +3,7 @@ import { equipmentConfigSchema } from './config';
 import { initialEquipment } from './state';
 import { equipmentTrade } from './trade';
 
-// 운영 등록 전이다. 순수 재생 시험만 전용 등록표를 사용한다.
+// 원생성에 명시한 카탈로그와 빈 장착 상태로 시작한다.
 export const equipmentFeature: RuleFeatureDefinition = {
   key: 'equipment-v1',
   requires: ['five-stats', 'campaign-v1', 'logistics-v1'],

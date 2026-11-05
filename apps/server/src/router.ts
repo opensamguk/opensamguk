@@ -29,6 +29,7 @@ import { nationCommandsRouter } from './routers/nationCommands';
 import { campaignRouter } from './routers/campaign';
 import { cityResourcesRouter } from './routers/cityResources';
 import { logisticsRouter } from './routers/logistics';
+import { equipmentRouter } from './routers/equipment';
 import { governanceRouter } from './routers/governance';
 import { lineageRouter } from './routers/lineage';
 import { stratagemCardsRouter } from './routers/stratagemCards';
@@ -65,6 +66,7 @@ export const appRouter = router({
   campaign: campaignRouter,
   cityResources: cityResourcesRouter,
   logistics: logisticsRouter,
+  equipment: equipmentRouter,
   governance: governanceRouter,
   lineage: lineageRouter,
   stratagemCards: stratagemCardsRouter,

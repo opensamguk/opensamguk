@@ -9,6 +9,7 @@ import { persistLogisticsState } from './logisticsState';
 import { persistGovernanceState } from './governance/repository';
 import { persistLineageState } from './lineage/repository';
 import { persistStratagemCardsState } from './stratagemCards/state';
+import { persistEquipmentState } from './equipmentState';
 
 export async function loadCommandState(
   tx: Prisma.TransactionClient,
@@ -52,6 +53,7 @@ export async function persistCommandState(
   await persistLogisticsState(tx, worldId, before, state);
   await persistGovernanceState(tx, worldId, before, state);
   await persistLineageState(tx, worldId, before, state);
+  await persistEquipmentState(tx, worldId, before, state);
   await persistStratagemCardsState(tx, worldId, before, state);
   for (const nation of Object.values(state.nations)) {
     if (!before.nations[nation.id]) {

@@ -3,7 +3,7 @@ import type { WorldView } from '../model/world';
 import { LINEAGE_EXITED_YEAR } from '../lineage/config';
 import { EQUIPMENT_MAX, equipmentConfigSchema, equipmentKeySchema, type EquipmentConfig } from './config';
 
-const slotsSchema = z
+export const equipmentSlotsSchema = z
   .strictObject({
     horse: equipmentKeySchema.optional(),
     weapon: equipmentKeySchema.optional(),
@@ -20,7 +20,7 @@ const generalKey = z
 const stateSchema = z.strictObject({
   version: z.literal(1),
   config: equipmentConfigSchema,
-  generals: z.record(generalKey, slotsSchema),
+  generals: z.record(generalKey, equipmentSlotsSchema),
 });
 export type EquipmentState = z.infer<typeof stateSchema>;
 

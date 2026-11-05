@@ -7,6 +7,7 @@ import {
   storedGeneralSex,
   readStoredLineage,
   readStoredStratagemCards,
+  readStoredEquipment,
   type WorldState,
 } from '@opensamguk/rules';
 import { engineFeatures } from './features';
@@ -106,6 +107,8 @@ export async function loadWorldAfterCapabilityCheck(
   if (governance) state.governance = governance;
   const lineage = readStoredLineage(world, state);
   if (lineage) state.lineage = lineage;
+  const equipment = readStoredEquipment(world, state);
+  if (equipment) state.equipment = equipment;
   const cards = readStoredStratagemCards(world, state);
   if (cards) state.stratagemCards = cards;
   for (const feature of engineFeatures

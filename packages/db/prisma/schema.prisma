@@ -10,6 +10,7 @@ datasource db {
 }
 
 model World {
+  equipmentState      Json?
   notificationOutbox  NotificationOutbox[]
   lineageState        Json?
   stratagemCardsState Json?

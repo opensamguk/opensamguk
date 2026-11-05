@@ -9,7 +9,7 @@ import { readEquipmentState } from './state';
 import { equipmentFeature } from './feature';
 import { TEST_EQUIPMENT_CONFIG, TEST_EQUIPMENT_LOGISTICS_CONFIG } from './testFixture';
 
-const registry = { ...ruleRegistry, features: [...ruleRegistry.features, equipmentFeature] };
+const registry = ruleRegistry;
 const features = [
   'campaign-assignment-v2',
   'campaign-v1',
@@ -50,8 +50,8 @@ it('AC-P2-12 전용 등록표만 명시 장비 설정으로 독립된 빈 상태
   first.state.equipment!.config.items[0]!.cost++;
   expect(value).toEqual(before);
   expect(second.state.equipment!.config).toEqual(TEST_EQUIPMENT_CONFIG);
-  expect(ruleRegistry.features.some((feature) => feature.key === 'equipment-v1')).toBe(false);
-  expect(() => checkRuleFeatures(features)).toThrow('모르는');
+  expect(ruleRegistry.features.filter((feature) => feature.key === 'equipment-v1')).toHaveLength(1);
+  expect(() => checkRuleFeatures(features)).not.toThrow();
 });
 
 it.each(['five-stats', 'campaign-v1', 'logistics-v1'])('AC-P2-12 %s 의존을 빼면 장비 기능을 켤 수 없다', (missing) => {
