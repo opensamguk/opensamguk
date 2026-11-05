@@ -14,6 +14,7 @@ import { prepareWorldReset } from '../apps/engine/src/admin/resetPreparation';
 import { initializeResources } from './init-resources';
 import { initializeIntegrationResources } from './integration-resources';
 import { controlClock } from '../apps/engine/src/world/clock';
+import { worldClock } from '../apps/engine/src/world/truce';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { processAdminSetting } from '../apps/engine/src/admin/settings';
 import { lockLease, assertLease } from '../apps/engine/src/lease';
@@ -23,6 +24,7 @@ import { exportReplay, replayArchive, replayToEnd, readArchive } from '../apps/e
 import {
   initialReplayState,
   applyRecordedInput,
+  runReplayAction,
   ruleRegistry,
   parsePreset,
   presetRules,
@@ -31,6 +33,7 @@ import {
   isInactive,
   type AdminSetting,
   type RecordedInput,
+  type Truce,
 } from '../packages/rules/src/index';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 import { hashState } from '../packages/shared/src/node/hashState';
@@ -83,7 +86,7 @@ async function user(role: 'ADMIN' | 'USER', status: 'ACTIVE' | 'SANCTIONED' = 'A
   return { id: row.id, cookie: 'sid=' + session.token };
 }
 async function call<T = unknown>(path: string, input: unknown, cookie?: string) {
-  const mutation = ['admin.world.requestSetting', 'admin.world.requestReset'].includes(path);
+  const mutation = ['admin.world.requestSetting', 'admin.world.requestReset', 'general.create'].includes(path);
   const encoded = JSON.stringify({ 0: input });
   const response = await fetch(
     address + '/trpc/' + path + '?batch=1' + (mutation ? '' : '&input=' + encodeURIComponent(encoded)),
@@ -109,7 +112,7 @@ const preset = parsePreset({
   boost: { smallWorld: null, lateJoin: null },
   features: { advisor: false },
 });
-async function world(withPreset = true, published = false) {
+async function world(withPreset = true, published = false, truce?: Truce) {
   const initial = published
     ? await loadInitialWorldFromDb(db, {
         scenario: 'integration191',
@@ -119,13 +122,15 @@ async function world(withPreset = true, published = false) {
         seed: randomUUID(),
       })
     : commandInitial();
+  // 소형 fixture도 실제 로비에서 제목을 읽을 수 있는 시나리오 키를 쓴다.
+  if (!published) initial.scenarioKey = 'integration191';
   initial.ruleFeatures = [...new Set([...(initial.ruleFeatures ?? []), 'personnel', 'policy'])].sort();
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '생성 이름',
     turnTermMinutes: 60,
     endYear: 231,
     replayFormat: 3,
-    ...(withPreset ? { preset: { key: 'int24-test', value: preset } } : {}),
+    ...(withPreset ? { preset: { key: 'int24-test', value: truce ? { ...preset, truce } : preset } } : {}),
   });
   await controlClock(db, worldId, 'start');
   await controlClock(db, worldId, 'pause');
@@ -154,8 +159,14 @@ async function expectReplayedState(worldId: string) {
   };
   let replay = initialReplayState(origin.initial, origin.featureData);
   const rows = await db.inputEvent.findMany({ where: { worldId }, orderBy: { sequence: 'asc' } });
-  for (const row of rows) {
-    expect(row.status).not.toBe('PENDING');
+  for (const row of rows) expect(row.status).not.toBe('PENDING');
+  const inputs = new Map(rows.map((row) => [row.sequence!, row]));
+  for (let sequence = 1; sequence <= stored.actionSequence; sequence++) {
+    const row = inputs.get(sequence);
+    if (!row) {
+      replay = runReplayAction(replay, origin.initial.seed, origin.initial.unitSet, undefined, ruleRegistry);
+      continue;
+    }
     replay = applyRecordedInput(
       replay,
       {
@@ -531,6 +542,7 @@ it('AC-INT-24 원본 설정으로 A→B 초기화하고 B 변경 뒤 A 내보내
       { kind: 'admin.world.setEndYear', endYear: 232 },
       { kind: 'admin.world.setTurnTerm', turnTermMinutes: 30 },
       { kind: 'admin.world.setOption', key: 'npc.aggression', value: 0.5 },
+      { kind: 'admin.world.setTruce', truce: { utcOffsetMinutes: 540, startMinute: 60, endMinute: 420 } },
     ] as const)
       expect((await call('admin.world.requestSetting', command(id, setting), actor.cookie)).status).toBe(200);
     await advance(id);
@@ -646,18 +658,13 @@ it('AC-INT-24 간격 변경 전후 월간 해시와 재시작 뒤 정책이 엄�
   expect((await db.$transaction((tx) => loadReplayState(tx, worldId))).policy!.turnTermMinutes).toBe(30);
 });
 
-it('AC-INT-24 오래된 clockRevision의 적용은 결과·상태·메시지를 모두 되돌린다', async () => {
+it.each<AdminSetting>([
+  { kind: 'admin.world.setTurnTerm', turnTermMinutes: 30 },
+  { kind: 'admin.world.setTruce', truce: { utcOffsetMinutes: 540, startMinute: 60, endMinute: 420 } },
+])('AC-INT-24 오래된 clockRevision은 결과·상태·메시지를 모두 되돌린다: %j', async (setting) => {
   const worldId = await world(),
     stale = await db.world.findUniqueOrThrow({ where: { id: worldId } });
-  expect(
-    (
-      await call(
-        'admin.world.requestSetting',
-        command(worldId, { kind: 'admin.world.setTurnTerm', turnTermMinutes: 30 }),
-        actor.cookie,
-      )
-    ).status,
-  ).toBe(200);
+  expect((await call('admin.world.requestSetting', command(worldId, setting), actor.cookie)).status).toBe(200);
   const event = await db.inputEvent.findFirstOrThrow({ where: { worldId } });
   await controlClock(db, worldId, 'resume');
   await controlClock(db, worldId, 'pause');
@@ -684,5 +691,227 @@ it('AC-INT-24 오래된 clockRevision의 적용은 결과·상태·메시지를 
   });
   expect(await db.message.count({ where: { worldId } })).toBe(0);
   await advance(worldId);
-  expect((await db.world.findUniqueOrThrow({ where: { id: worldId } })).turnTermMinutes).toBe(30);
+  const applied = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+  if (setting.kind === 'admin.world.setTurnTerm') expect(applied.turnTermMinutes).toBe(30);
+  else if (setting.kind === 'admin.world.setTruce') expect(worldClock(applied).truce).toEqual(setting.truce);
+});
+
+it('AC-P2-19 프리셋 휴전은 CLI 정지·재개·재시작에 적용되고 명시적 null로 해제된다', async () => {
+  const truce: Truce = { utcOffsetMinutes: 0, startMinute: 1380, endMinute: 420 };
+  const worldId = await world(true, false, truce);
+  const original = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+  const at = (value: string) => Date.parse(`2026-11-${value}Z`);
+  await controlClock(db, worldId, 'resume', at('06T22:00:00'));
+  expect((await controlClock(db, worldId, 'status', at('07T03:00:00'))).tick).toBe(10_000);
+  expect((await controlClock(db, worldId, 'pause', at('07T03:00:00'))).truce).toMatchObject({
+    active: true,
+    endsAt: '2026-11-07T07:00:00.000Z',
+  });
+  await controlClock(db, worldId, 'resume', at('07T04:00:00'));
+  expect((await controlClock(db, worldId, 'status', at('07T06:00:00'))).tick).toBe(10_000);
+  expect((await controlClock(db, worldId, 'pause', at('07T07:30:00'))).tick).toBe(15_000);
+  const before = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+  const input = command(worldId, { kind: 'admin.world.setTruce', truce: null });
+  expect((await call('admin.world.requestSetting', input, actor.cookie)).status).toBe(200);
+  await advance(worldId, 15_000);
+  const cleared = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+  expect(cleared.preset).toEqual(original.preset);
+  expect(cleared.clockAnchorAt).toEqual(before.clockAnchorAt);
+  expect(cleared.clockRevision).toBe(before.clockRevision + 1);
+  expect(cleared.runtimeOptions).toEqual({ truce: null });
+  expect((await call('admin.world.settings', { worldId }, actor.cookie)).data).toMatchObject({ truce: null });
+  expect((await controlClock(db, worldId, 'status', at('07T08:00:00'))).truce).toBeNull();
+  await expectReplayedState(worldId);
+});
+
+it('AC-P2-19 실제 엔진 재시작은 휴전을 따라잡지 않고 토글·간격 변경을 원자 적용한다', async () => {
+  const worldId = await world(false);
+  const current = Date.now(),
+    start = Math.floor(current / 60_000) * 60_000 - 60_000;
+  const truce: Truce = {
+    utcOffsetMinutes: 0,
+    startMinute: ((Math.floor(start / 60_000) % 1440) + 1440) % 1440,
+    endMinute: (((Math.floor(start / 60_000) + 4) % 1440) + 1440) % 1440,
+  };
+  expect(
+    (await call('admin.world.requestSetting', command(worldId, { kind: 'admin.world.setTruce', truce }), actor.cookie))
+      .status,
+  ).toBe(200);
+  await advance(worldId);
+  await controlClock(db, worldId, 'resume', start - 36_000);
+  for (let restart = 0; restart < 2; restart++) {
+    const lease = await acquireLease(db, worldId);
+    if (!lease) throw Error('자기 재시작 리스가 필요합니다.');
+    try {
+      await new TurnLoop(db, lease).poll();
+    } finally {
+      await releaseLease(db, lease);
+    }
+    expect((await db.world.findUniqueOrThrow({ where: { id: worldId } })).clockTick).toBe(100);
+  }
+  await advance(worldId, 100);
+  const before = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+  expect(
+    (
+      await call(
+        'admin.world.requestSetting',
+        command(worldId, { kind: 'admin.world.setTurnTerm', turnTermMinutes: 30 }),
+        actor.cookie,
+      )
+    ).status,
+  ).toBe(200);
+  const settingRevisions: number[] = [];
+  const changingLease = await acquireLease(db, worldId);
+  if (!changingLease) throw Error('자기 간격 변경 리스가 필요합니다.');
+  try {
+    await new TurnLoop(db, changingLease, {
+      beforeCommit: async (tx) => {
+        const current = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
+        settingRevisions.push(current.clockRevision);
+        expect(current.turnTermMinutes).toBe(30);
+      },
+    }).advanceTo(100);
+  } finally {
+    await releaseLease(db, changingLease);
+  }
+  const changed = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+  expect(changed.clockTick).toBe(100);
+  expect(settingRevisions).toEqual([before.clockRevision + 1]);
+  // 설정 TX 뒤의 빈 턴 체크포인트도 별도 revision을 저장한다.
+  expect(changed.clockRevision).toBe(before.clockRevision + 2);
+  expect(nowTick(worldClock(changed), Date.now())).toBe(100);
+  const off = command(worldId, { kind: 'admin.world.setTruce', truce: null });
+  expect((await call('admin.world.requestSetting', off, actor.cookie)).status).toBe(200);
+  const lease = await acquireLease(db, worldId);
+  if (!lease) throw Error('자기 롤백 리스가 필요합니다.');
+  try {
+    await expect(
+      new TurnLoop(db, lease, {
+        beforeCommit: async () => {
+          throw Error('truce rollback');
+        },
+      }).advanceTo(100),
+    ).rejects.toThrow('truce rollback');
+  } finally {
+    await releaseLease(db, lease);
+  }
+  expect(await db.world.findUniqueOrThrow({ where: { id: worldId } })).toEqual(changed);
+  expect(
+    await db.inputEvent.findUniqueOrThrow({
+      where: { worldId_userId_idempotencyKey: { worldId, userId: actor.id, idempotencyKey: off.idempotencyKey } },
+    }),
+  ).toMatchObject({ status: 'PENDING', sequence: null, result: null });
+  await advance(worldId, 100);
+  const cleared = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+  expect(worldClock(cleared).truce).toBeNull();
+  expect(nowTick(worldClock(cleared), cleared.clockAnchorAt!.getTime() + 30_000)).toBe(266);
+  await controlClock(db, worldId, 'pause');
+  await expectReplayedState(worldId);
+});
+
+it('AC-P2-19 HTTP 상태·첫 칸·30칸은 같은 휴전 시계를 쓰고 기본 꺼짐은 기존 식이다', async () => {
+  const truce: Truce = { utcOffsetMinutes: 0, startMinute: 1380, endMinute: 420 };
+  const worldId = await world();
+  await controlClock(db, worldId, 'resume');
+  const creating = call(
+    'general.create',
+    { worldId, name: '휴전장', leadership: 70, strength: 70, intel: 60, portraitId: null },
+    ordinary.cookie,
+  );
+  await expect
+    .poll(() => db.inputEvent.count({ where: { worldId, kind: 'general.create', status: 'PENDING' } }))
+    .toBe(1);
+  await advance(worldId);
+  expect((await creating).status).toBe(200);
+  await controlClock(db, worldId, 'pause');
+  expect(
+    (
+      await call(
+        'admin.world.requestSetting',
+        command(worldId, { kind: 'admin.world.setTruce', truce }),
+        ordinary.cookie,
+      )
+    ).status,
+  ).toBe(403);
+  expect(
+    (
+      await call(
+        'admin.world.requestSetting',
+        command(worldId, { kind: 'admin.world.setTruce', truce: { ...truce, endMinute: 1380 } }),
+        actor.cookie,
+      )
+    ).status,
+  ).toBe(400);
+  expect(
+    (await call('admin.world.requestSetting', command(worldId, { kind: 'admin.world.setTruce', truce }), actor.cookie))
+      .status,
+  ).toBe(200);
+  await advance(worldId);
+  const anchor = Date.parse('2026-11-06T22:00:00Z');
+  await db.world.update({
+    where: { id: worldId },
+    data: { clockTick: 0, clockAnchorAt: new Date(anchor), status: 'RUNNING' },
+  });
+  const general = await db.general.findUniqueOrThrow({ where: { worldId_userId: { worldId, userId: ordinary.id } } });
+  await db.general.update({ where: { worldId_id: { worldId, id: general.id } }, data: { nextTurnTick: 0 } });
+  requestNow = Date.parse('2026-11-07T03:00:00Z');
+  const summary = await call<{ nowTick: number; truce: { active: boolean; endsAt: string } }>(
+    'world.summary',
+    { worldId },
+    ordinary.cookie,
+  );
+  expect(summary.data).toMatchObject({ nowTick: 10_000, truce: { active: true, endsAt: '2026-11-07T07:00:00.000Z' } });
+  const home = await call<{ nextTurnAt: string | null; turnSchedule: Array<string | null> | null }>(
+    'home.get',
+    { worldId },
+    ordinary.cookie,
+  );
+  expect(home.data!.turnSchedule).toHaveLength(30);
+  expect(home.data!.turnSchedule!.slice(0, 4)).toEqual([
+    '2026-11-06T22:00:00.000Z',
+    '2026-11-06T23:00:00.000Z',
+    '2026-11-07T08:00:00.000Z',
+    '2026-11-07T09:00:00.000Z',
+  ]);
+  expect(home.data!.nextTurnAt).toBe(home.data!.turnSchedule![0]);
+  const lobby = await call<Array<{ id: string; gameDate: { year: number; month: number } }>>(
+    'lobby.worlds',
+    {},
+    ordinary.cookie,
+  );
+  expect(lobby.data?.find((row) => row.id === worldId)?.gameDate).toEqual({ year: 191, month: 2 });
+  await db.world.update({ where: { id: worldId }, data: { runtimeOptions: { truce: null } } });
+  const plain = await call<{ nextTurnAt: string; turnSchedule: string[] }>('home.get', { worldId }, ordinary.cookie);
+  expect(plain.data!.turnSchedule).toEqual(
+    Array.from({ length: 30 }, (_, slot) => new Date(anchor + slot * 3_600_000).toISOString()),
+  );
+  expect((await call<{ truce: unknown }>('world.summary', { worldId }, ordinary.cookie)).data!.truce).toBeNull();
+  // 이 조회 시험은 DB 시각·턴을 고정한 fixture이며 재생 증거로 세지 않는다.
+  requestNow = now;
+});
+
+it('AC-P2-19 같은 tick의 두 월드는 휴전 유무와 무관하게 월간·재생·DB 해시가 같다', async () => {
+  const ids = [await world(true, false, { utcOffsetMinutes: 0, startMinute: 0, endMinute: 1439 }), await world()];
+  const hashes: string[] = [];
+  for (const worldId of ids) {
+    expect(
+      (
+        await call(
+          'admin.world.requestSetting',
+          command(worldId, { kind: 'admin.world.setOption', key: 'protection.peaceMonths', value: 12 }),
+          actor.cookie,
+        )
+      ).status,
+    ).toBe(200);
+    await advance(worldId);
+    await controlClock(db, worldId, 'resume');
+    await advance(worldId, 2 * TICKS_PER_MONTH);
+    await controlClock(db, worldId, 'pause');
+    expect(await db.nation.count({ where: { worldId } })).toBe(2);
+    const stateHash = hashState(await db.$transaction((tx) => loadReplayState(tx, worldId)));
+    const archive = await exportReplay(db, worldId);
+    expect(replayArchive(readArchive(JSON.parse(JSON.stringify(archive))), 2)[1]!.stateHash).toBe(stateHash);
+    hashes.push(stateHash);
+  }
+  expect(hashes[0]).toBe(hashes[1]);
 });

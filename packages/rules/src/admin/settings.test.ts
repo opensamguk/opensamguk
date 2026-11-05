@@ -43,6 +43,46 @@ function fixture(withPreset = true) {
 const context = { userActive: true, admin: true, sanctioned: false, replayFormat: 3, worldStatus: 'RUNNING', tick: 0 };
 const payload = (setting: AdminSetting) => ({ version: 1, reason: '설정 검증', setting });
 
+it.each([false, true])('AC-INT-24 휴전은 프리셋 유무=%s에서 명시적 null과 다른 옵션을 보존한다', (hasPreset) => {
+  const { world, replay } = fixture(hasPreset);
+  const truce = { utcOffsetMinutes: 540, startMinute: 60, endMinute: 420 };
+  if (world.preset) world.preset.truce = truce;
+  const original = structuredClone(world);
+  expect(effectiveWorldOptions(world.preset).truce).toEqual(hasPreset ? truce : null);
+  world.runtimeOptions = {
+    entry: { generalCreation: 'closed' },
+    ...(hasPreset ? { rules: { npc: { aggression: 2 } } } : {}),
+  };
+  if (hasPreset) replay.state.presetRules = effectiveWorldOptions(world.preset, world.runtimeOptions).presetRules!;
+  const setting: AdminSetting = { kind: 'admin.world.setTruce', truce: hasPreset ? null : truce };
+  const changed = decideAdminSetting(replay, world, payload(setting), context);
+  expect(changed.status).toBe('APPLIED');
+  expect(changed.replay).toEqual(replay);
+  expect(changed.settings.preset).toEqual(original.preset);
+  expect(changed.settings.runtimeOptions).toEqual({ ...world.runtimeOptions, truce: setting.truce });
+  expect(effectiveWorldOptions(changed.settings.preset, changed.settings.runtimeOptions).truce).toEqual(setting.truce);
+  const record: RecordedInput = {
+    sequence: 1,
+    tick: 0,
+    generalId: null,
+    kind: setting.kind,
+    status: changed.status,
+    payload: payload(setting),
+    result: changed.result,
+  };
+  expect(applyAdminSettingRecord(replay, record)).toEqual(replay);
+  expect(() =>
+    applyAdminSettingRecord(replay, {
+      ...record,
+      result: { version: 1, before: { truce: null }, after: { truce: { ...truce, startMinute: 61 } } },
+    }),
+  ).toThrow();
+  expect(decideAdminSetting(replay, changed.settings, payload(setting), context).result).toMatchObject({
+    code: 'UNCHANGED',
+  });
+  expect(runtimeOptionsSchema.safeParse({ truce: { ...truce, endMinute: 60 } }).success).toBe(false);
+});
+
 it('AC-INT-24 설정이 없으면 기존 프리셋 모양·생성 이름·간격·종료 연도를 보존한다', () => {
   const { world } = fixture();
   expect(effectiveWorldOptions(world.preset).presetRules).toEqual(presetRules(world.preset!));

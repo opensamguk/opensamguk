@@ -15,7 +15,7 @@ import {
 } from '@opensamguk/rules';
 import { TRPCError } from '@trpc/server';
 import type { Context } from '../context';
-import { nextTurnAt, readWorld, requireGeneral } from '../queries';
+import { nextTurnAt, readWorld, requireGeneral, worldClock } from '../queries';
 import { publicNationDisplaySelect } from '../visibility';
 import { readView } from './queries';
 import { displaySlots, readSlots } from './slots';
@@ -112,7 +112,7 @@ export function operationIdle(
 }
 
 function clock(world: ReadWorld, now: number) {
-  return nowTick({ ...world, clockAnchorAt: world.clockAnchorAt?.getTime() ?? null }, now);
+  return nowTick(worldClock(world), now);
 }
 async function readOperation<T>(
   ctx: OperationContext,

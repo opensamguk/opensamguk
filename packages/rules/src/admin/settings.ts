@@ -3,6 +3,7 @@ import { adminClockPayloadSchema, adminClockRejectMessages } from '../clock/admi
 import { requestWorldResetInput } from '../clock/reset';
 import { presetSchema } from '../world/preset';
 import { toGameDate } from '../clock/clock';
+import { truceSchema } from '../clock/truce';
 import {
   applyRuleOptions,
   generalCreationEntrySchema,
@@ -27,6 +28,7 @@ export const adminSettingSchema = z.union([
   z.strictObject({ kind: z.literal('admin.world.rename'), name }),
   z.strictObject({ kind: z.literal('admin.world.setEndYear'), endYear }),
   z.strictObject({ kind: z.literal('admin.world.setTurnTerm'), turnTermMinutes: term }),
+  z.strictObject({ kind: z.literal('admin.world.setTruce'), truce: truceSchema.nullable() }),
   option('protection.foundUntilMonths', presetSchema.shape.protection.shape.foundUntilMonths),
   option('protection.peaceMonths', presetSchema.shape.protection.shape.peaceMonths),
   option('npc.aggression', presetSchema.shape.npc.shape.aggression),
@@ -39,6 +41,7 @@ export const ADMIN_SETTING_KINDS = [
   'admin.world.setEndYear',
   'admin.world.setTurnTerm',
   'admin.world.setOption',
+  'admin.world.setTruce',
 ] as const;
 export const adminSettingPayloadSchema = z.strictObject({
   version: z.literal(1),
@@ -69,6 +72,8 @@ function snapshot(setting: AdminSetting): z.ZodType<JsonValue> {
       return z.strictObject({ endYear });
     case 'admin.world.setTurnTerm':
       return z.strictObject({ turnTermMinutes: term });
+    case 'admin.world.setTruce':
+      return z.strictObject({ truce: truceSchema.nullable() });
     case 'admin.world.setOption': {
       if (setting.key === 'entry.generalCreation') return z.strictObject({ value: generalCreationEntrySchema });
       const value =
@@ -181,6 +186,11 @@ export function decideAdminSetting(
       settings.turnTermMinutes = setting.turnTermMinutes;
       if (next.policy) next.policy.turnTermMinutes = setting.turnTermMinutes;
       break;
+    case 'admin.world.setTruce':
+      before = { truce: effectiveWorldOptions(current.preset, current.runtimeOptions).truce };
+      after = { truce: setting.truce };
+      settings.runtimeOptions = { ...current.runtimeOptions, truce: setting.truce };
+      break;
     case 'admin.world.setOption': {
       if (setting.key === 'entry.generalCreation') {
         before = { value: current.runtimeOptions?.entry?.generalCreation ?? 'open' };
@@ -238,7 +248,9 @@ export function validateAdminSettingRecord(input: RecordedInput): void {
           ? { endYear: setting.endYear }
           : setting.kind === 'admin.world.setTurnTerm'
             ? { turnTermMinutes: setting.turnTermMinutes }
-            : { value: setting.value };
+            : setting.kind === 'admin.world.setTruce'
+              ? { truce: setting.truce }
+              : { value: setting.value };
     if (!sameJson(result.after, expected)) throw Error('설정 입력과 적용한 값이 다릅니다.');
   } else if (input.status === 'REJECTED') adminSettingRejectedSchema.parse(input.result);
   else throw Error('완료된 관리자 설정 입력이 필요합니다.');
@@ -250,7 +262,12 @@ export function applyAdminSettingRecord(replay: ReplayState, input: RecordedInpu
   const { setting } = adminSettingPayloadSchema.parse(input.payload);
   const result = adminSettingAppliedSchema(setting).parse(input.result),
     before = result.before as Record<string, JsonValue>;
-  if (setting.kind === 'admin.world.rename' || setting.kind === 'admin.world.setEndYear') return replay;
+  if (
+    setting.kind === 'admin.world.rename' ||
+    setting.kind === 'admin.world.setEndYear' ||
+    setting.kind === 'admin.world.setTruce'
+  )
+    return replay;
   const next = structuredClone(replay);
   if (setting.kind === 'admin.world.setTurnTerm') {
     if (next.policy) {

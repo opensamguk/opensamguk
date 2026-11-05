@@ -1,5 +1,5 @@
 import { protectedProcedure, router } from '../trpc';
-import { nextTurnAt, readWorld, requireGeneral, worldInput } from '../queries';
+import { nextTurnAt, turnSchedule, readWorld, requireGeneral, worldInput } from '../queries';
 import { cityInfo, ownGeneralInfo, logInfo, logSelect, nationInfo } from '../visibility';
 import { policyOptions } from '@opensamguk/rules';
 import { displaySlots, readSlots } from '../game/slots';
@@ -48,6 +48,7 @@ export const homeRouter = router({
                 general,
               ),
         nextTurnAt: nextTurnAt(world, general.nextTurnTick),
+        turnSchedule: turnSchedule(world, general.nextTurnTick),
         turnsPreview: Array.from({ length: 5 }, (_, slot) => ({ slot, ...turns[slot]! })),
         recentLogs: logs.map(logInfo),
       };

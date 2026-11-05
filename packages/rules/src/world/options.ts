@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { presetSchema, presetRules, type WorldPreset, type PresetRules } from './preset';
+import { truceSchema } from '../clock/truce';
 
 const nonempty = (value: object) => Object.values(value).some((entry) => entry !== undefined);
 export const runtimeRuleOptionsSchema = z
@@ -18,6 +19,7 @@ export const runtimeOptionsSchema = z
   .strictObject({
     rules: runtimeRuleOptionsSchema.optional(),
     entry: z.strictObject({ generalCreation: generalCreationEntrySchema }).optional(),
+    truce: truceSchema.nullable().optional(),
   })
   .refine(nonempty);
 export type RuntimeRuleOptions = z.infer<typeof runtimeRuleOptionsSchema>;
@@ -42,7 +44,7 @@ export function applyRuleOptions(before: PresetRules, patch: RuntimeRuleOptions)
   };
   return structuredClone(next);
 }
-// 생성 원본은 바꾸지 않는다. NPC 맡기·휴전은 해당 단계가 구현되기 전의 기본값이다.
+// 생성 원본은 바꾸지 않는다. NPC 맡기는 해당 단계가 구현되기 전의 기본값이다.
 export function effectiveWorldOptions(preset: WorldPreset | null, stored: unknown = null) {
   const runtime = stored == null ? null : runtimeOptionsSchema.parse(stored);
   if (runtime?.rules && preset === null) throw Error('프리셋 없는 월드에 규칙 옵션이 저장됐습니다.');
@@ -51,6 +53,6 @@ export function effectiveWorldOptions(preset: WorldPreset | null, stored: unknow
     presetRules:
       rules === undefined ? undefined : runtime?.rules === undefined ? rules : applyRuleOptions(rules, runtime.rules),
     entry: { generalCreation: runtime?.entry?.generalCreation ?? 'open', npcPlay: 'off' as const },
-    truce: null,
+    truce: runtime?.truce === undefined ? (preset?.truce ?? null) : runtime.truce,
   };
 }

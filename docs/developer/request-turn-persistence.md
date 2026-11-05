@@ -127,7 +127,7 @@ API와 엔진 모두 월드 행을 장수 행보다 먼저 잠급니다. API는 
 
 ## 진행 중 월드 속성 (INT-24 · AC-INT-24)
 
-`admin.world.settings({worldId})`는 현재 관리자 권한을 다시 검사하고 조회 감사를 남긴다. 응답은 `name`, `status`, `startYear`, `endYear`, `turnTermMinutes`, `clockRevision`, `presetKey`, `canChangeRules`, `rules`다. `rules`는 원본 프리셋에 진행 중 변경을 합친 값이며 프리셋이 없으면 null이다.
+`admin.world.settings({worldId})`는 현재 관리자 권한을 다시 검사하고 조회 감사를 남긴다. 응답은 `name`, `status`, `startYear`, `endYear`, `turnTermMinutes`, `clockRevision`, `presetKey`, `canChangeRules`, `rules`, `entry`, `truce`다. `rules`는 원본 프리셋에 진행 중 변경을 합친 값이며 프리셋이 없으면 null이다. `truce`는 유효 휴전 설정 또는 null이다.
 
 `admin.world.requestSetting`은 `{expectedUserId,worldId,idempotencyKey,reason,setting}`을 받는다. `setting`은 다음 중 하나다.
 
@@ -137,6 +137,7 @@ API와 엔진 모두 월드 행을 장수 행보다 먼저 잠급니다. API는 
 | `admin.world.setEndYear` | `endYear` (1~10000 정수 또는 null) |
 | `admin.world.setTurnTerm` | `turnTermMinutes` (1~2147483647 정수) |
 | `admin.world.setOption` | `key`, `value` (프리셋과 같은 형식) |
+| `admin.world.setTruce` | `truce` (고정 UTC 오프셋·시작 분·종료 분 또는 null) |
 
 규칙 옵션 키는 `protection.foundUntilMonths`, `protection.peaceMonths`, `npc.aggression`, `boost.smallWorld`, `boost.lateJoin`이다. 명령 목록·NPC 충원 비율·장수 정원은 받지 않는다. 프리셋이 없는 월드의 규칙 변경은 엔진이 `NO_PRESET`으로 거절한다.
 
@@ -149,8 +150,18 @@ API와 엔진 모두 월드 행을 장수 행보다 먼저 잠급니다. API는 
 
 ### 장수 생성 허용 (INT-24 PR2)
 
-`admin.world.requestSetting`의 옵션 키 `entry.generalCreation`은 `open`·`closed`를 받는다. 프리셋 없는 월드에서도 사용할 수 있으며 규칙 옵션과 서로 지우지 않는다. `admin.world.settings`는 `entry.generalCreation`을 함께 반환한다. NPC 맡기·휴전 토글 입력은 아직 받지 않는다.
+`admin.world.requestSetting`의 옵션 키 `entry.generalCreation`은 `open`·`closed`를 받는다. 프리셋 없는 월드에서도 사용할 수 있으며 규칙 옵션과 서로 지우지 않는다. `admin.world.settings`는 `entry.generalCreation`을 함께 반환한다. NPC 맡기 입력은 아직 받지 않는다.
 
 `general.mine.creationRules.generalCreationEnabled`는 항상 boolean이고 기본값은 true다. 기존 장수 유무와 별도로 이 판의 생성 허용을 나타낸다. 로비의 기존 `createBlockedReason`은 닫힌 RUNNING 판에서 「지금은 새 장수를 받지 않습니다」를 반환한다. 기존 장수가 있으면 접속할 수 있고 차단 사유는 null이다. PAUSED·PREOPEN·ENDED는 기존 월드 상태 사유를 유지한다.
 
 닫힌 판의 새 생성 접수는 HTTP412(PRECONDITION_FAILED)와 「지금은 새 장수를 받지 않습니다.」 메시지를 반환하며 입력을 만들지 않는다. 이미 PENDING인 생성도 처리할 때 현재 값을 다시 읽고 REJECTED `ENTRY_CLOSED`로 확정한다. `general.mine.creation`에서 해당 코드와 문구를 복구할 수 있다. 다시 연 뒤에는 새 요청을 접수하며 이전 거절 기록을 바꾸지 않는다. 초기화는 생성 허용을 원래 기본값 open으로 돌린다.
+
+### 휴전 설정과 예정 시각 (INT-24 PR4 · T4-40)
+
+`admin.world.setTruce`의 `truce`는 `{utcOffsetMinutes,startMinute,endMinute}` 또는 null이다. UTC 오프셋은 −720~840 정수, 시작·종료는 0~1439의 서로 다른 분이다. 매일 시작 포함·종료 제외로 반복하며 자정을 넘을 수 있다. 결과의 전후 값은 `{truce}`이며 재생은 기록을 검증한 뒤 게임 상태와 정책을 그대로 둔다.
+
+엔진은 간격 변경과 휴전 변경 모두 옛 유효 시계·DB 시각으로 체크포인트를 확정한 뒤 `clockRevision` 조건부 갱신으로 저장한다. 실행 중에는 기준 시각을 다시 잡고 정지 중에는 유지한다. `runtimeOptions.truce` 키가 있으면 null도 원본 프리셋보다 앞선다. 다른 옵션과 원본 프리셋은 보존하며 초기화는 원본 휴전을 복원한다.
+
+`world.summary.truce`와 시계 CLI의 `truce`는 설정 세 값에 `active`, `endsAt`, `nextStartsAt`, `nextEndsAt`을 더한 값 또는 null이다. 시각은 ISO 문자열이며 `endsAt`은 현재 휴전 중일 때만 있다. 정지·종료 여부와 별도로 벽시각의 구간을 나타낸다. 원본 프리셋과 비공개 운영 사유는 응답하지 않는다.
+
+`home.get.turnSchedule`은 개인 30칸의 `(string | null)[] | null`이다. 실행 중 실시간 시계와 기준 시각이 있을 때만 배열을 응답하며 칸 0은 `nextTurnAt`과 같다. Date 범위를 넘는 칸만 null이고 저장 설정 오류는 숨기지 않는다. 클라이언트는 휴전 경계를 다시 계산하지 않는다. 국가 직책 12칸의 무시각 계약은 바꾸지 않는다.
