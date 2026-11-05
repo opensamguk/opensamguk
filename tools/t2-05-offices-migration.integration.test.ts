@@ -213,7 +213,7 @@ async function existingRows(client: PgClient) {
   ]) {
     const data =
       table === 'World'
-        ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures' - 'operationalMap' - 'campaignState' - 'cityResourcesState' - 'logisticsState' - 'governanceState' - 'lineageState' - 'stratagemCardsState' - 'equipmentState'"
+        ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures' - 'operationalMap' - 'campaignState' - 'cityResourcesState' - 'logisticsState' - 'governanceState' - 'lineageState' - 'stratagemCardsState' - 'equipmentState' - 'runtimeOptions'"
         : table === 'City'
           ? "to_jsonb(t) - 'kind'"
           : table === 'General'
@@ -434,6 +434,7 @@ it.each(['empty', 'legacy'] as const)(
       expect(
         (await client.query('SELECT id FROM "General" WHERE "politics" IS NOT NULL OR "charm" IS NOT NULL')).rows,
       ).toEqual([]);
+      expect((await client.query('SELECT id FROM "World" WHERE "runtimeOptions" IS NOT NULL')).rows).toEqual([]);
       expect((await client.query('SELECT id FROM "General" WHERE "removedAt" IS NOT NULL')).rows).toEqual([]);
       expect(await existingRows(client)).toEqual(settled);
       expect(await readOffices()).toEqual(offices);

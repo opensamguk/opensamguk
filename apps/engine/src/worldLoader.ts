@@ -1,6 +1,6 @@
 import type { Prisma } from '@opensamguk/db';
 import {
-  presetRules,
+  effectiveWorldOptions,
   readOperationalMap,
   attachOperationalKinds,
   readStoredGovernance,
@@ -41,6 +41,7 @@ export async function loadWorldAfterCapabilityCheck(
     ? ((capabilities.kind === 'registry' ? capabilities.armyTypes : undefined) ?? readCampaignArmyTypes(world))
     : [];
   const { preset, commands } = engineResolver(world);
+  const rules = effectiveWorldOptions(preset, world.runtimeOptions).presetRules;
   if (world.replayFormat === 3) await assertPersonnelStorage(tx, worldId, world.ruleFeatures.includes('personnel'));
   const ext = await loadExt(tx, worldId, commands);
   const cities = await tx.city.findMany({ where: { worldId } });
@@ -63,7 +64,7 @@ export async function loadWorldAfterCapabilityCheck(
     return value;
   };
   let state: WorldState = {
-    ...(preset ? { presetRules: presetRules(preset) } : {}),
+    ...(rules ? { presetRules: rules } : {}),
     ...(world.ruleFeatures?.length ? { ruleFeatures: [...world.ruleFeatures] } : {}),
     ...(ext ? { ext } : {}),
     startYear: world.startYear,

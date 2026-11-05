@@ -129,3 +129,25 @@ API와 엔진 모두 월드 행을 장수 행보다 먼저 잠급니다. API는 
 형식 3 월드가 다음 달 경계를 넘겨 밀렸으면 턴과 월간 정산을 게임 시간 순서로 먼저 따라잡고 입력을 처리합니다(C2). 경계 밖에서 PAUSED 상태가 되면 입력은 재개·정산까지 PENDING으로 남습니다. 따라잡다가 종료하면 남은 입력을 거절해 afterEnd에 남깁니다. 재생은 종료 전 대기 입력이 그 시점의 월 창 안인지 확인합니다. 형식 1은 입력을 먼저 처리합니다. 같은 달의 밀린 턴과 즉시 입력 `turns.set` 순서는 바꾸지 않습니다. 즉시 입력은 API가 바로 적용하고 sequence가 그 위치를 기록합니다.
 
 `DATABASE_URL`이 설정된 환경에서 `pnpm exec tsx tools/replay.ts --world <ID> --output <새 파일>`로 일관된 DB 스냅샷을 내보냅니다. 파일은 0600으로 새로 만들며 기존 파일은 덮어쓰지 않습니다. `pnpm exec tsx tools/replay.ts --from <파일> --months 12`는 DB 없이 매달 상태·예턴 해시와 연감을 비교해 일치한 tick과 해시를 출력합니다. 원본 변조, 입력 순서·revision 불일치, 누락된 월간 기록, 지원하지 않는 입력, 해시 불일치는 종료 코드 1입니다. 종료 기록이 없으면 마지막 연감 이후 입력과 미완료 요청은 내보내지 않습니다. 종료 기록이 있으면 끝 번호까지의 입력과 종료 뒤 거부 입력을 `afterEnd`로 구분해 내보냅니다. `--to-end`는 archive 2·3의 종료 사건까지 비교합니다.
+
+
+## 진행 중 월드 속성 (INT-24 · AC-INT-24)
+
+`admin.world.settings({worldId})`는 현재 관리자 권한을 다시 검사하고 조회 감사를 남긴다. 응답은 `name`, `status`, `startYear`, `endYear`, `turnTermMinutes`, `clockRevision`, `presetKey`, `canChangeRules`, `rules`다. `rules`는 원본 프리셋에 진행 중 변경을 합친 값이며 프리셋이 없으면 null이다.
+
+`admin.world.requestSetting`은 `{expectedUserId,worldId,idempotencyKey,reason,setting}`을 받는다. `setting`은 다음 중 하나다.
+
+| kind | 값 |
+| --- | --- |
+| `admin.world.rename` | `name` (trim 뒤 1~100자) |
+| `admin.world.setEndYear` | `endYear` (1~10000 정수 또는 null) |
+| `admin.world.setTurnTerm` | `turnTermMinutes` (1~2147483647 정수) |
+| `admin.world.setOption` | `key`, `value` (프리셋과 같은 형식) |
+
+옵션 키는 `protection.foundUntilMonths`, `protection.peaceMonths`, `npc.aggression`, `boost.smallWorld`, `boost.lateJoin`이다. 명령 목록·NPC 충원 비율·장수 정원은 받지 않는다. 프리셋이 없는 월드의 규칙 변경은 엔진이 `NO_PRESET`으로 거절한다.
+
+접수 응답과 `admin.world.settingRequest({expectedUserId,worldId,idempotencyKey})`는 `{requestId,kind,status,sequence,tick,result}`다. 접수 때는 PENDING이며 게임 설정을 바꾸지 않는다. 같은 사용자·월드·키·정규화한 내용은 같은 영수증을 반환하고 다른 내용은 409다. 완료 결과는 `{version:1,before,after}` 또는 `{code,message}`다. 이름·종료 연도·간격은 해당 필드의 사본, 옵션은 `{value}`를 전후 값으로 쓴다. `END_YEAR_PASSED`, `NO_PRESET`, `UNCHANGED`, `INVALID_VALUE`와 기존 운영 거절 코드를 받는다. 형식3의 RUNNING·PAUSED 월드만 접수한다.
+
+엔진은 처리 때 계정·관리자·제재를 다시 검사한다. 간격 변경은 DB 시각과 옛 간격으로 체크포인트를 확정하고 `clockRevision` 조건부 갱신으로 새 간격을 저장한다. 실행 중에는 기준 시각을 다시 잡고 정지 중에는 기준 시각을 유지한다. 재생 정책의 간격도 같은 입력 sequence에서 바꾸며 장수의 활동 tick은 보존한다. 규칙 옵션은 깊게 합쳐 로더·서버 미리보기·늦은 참가 보정에서 같은 값을 쓴다.
+
+초기화는 변경 이력의 전후 연결을 검사해 생성 당시 설정으로 새 판을 만든다. 새 판의 `runtimeOptions`는 null이다. 이름 변경 뒤 초기화 결과의 `confirmedName`은 확인한 현재 이름이며 `settings.name`은 생성 이름이다. 기존 초기화 기록에는 키를 추가하지 않는다. 조회와 입력 오류에는 운영 계정·비공개 사유를 공개하지 않는다.

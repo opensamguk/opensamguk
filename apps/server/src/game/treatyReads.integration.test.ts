@@ -36,6 +36,7 @@ const json = (value: unknown): Prisma.JsonValue => JSON.parse(JSON.stringify(val
 // selector와 조회 투영을 위한 저장 행 단위다. DB 생성·factory·HTTP의 증거가 아니다.
 function world(patch: Partial<World> = {}): World {
   return {
+    runtimeOptions: null,
     id: 'world',
     name: '조약 조회 단위',
     operationalMap: null,

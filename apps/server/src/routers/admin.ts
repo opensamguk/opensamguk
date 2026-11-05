@@ -14,6 +14,15 @@ import { requestWorldResetInput, worldResetRequestInput } from '@opensamguk/rule
 
 import { requestWorldEnd, requestWorldEndInput, getWorldEndRequest, worldEndRequestInput } from '../admin/worldEnd';
 import {
+  requestSettingInput,
+  settingRequestInput,
+  worldSettingsInput,
+  settingRequestProcedure,
+  requestWorldSetting,
+  getWorldSettingRequest,
+  getWorldSettings,
+} from '../admin/settings';
+import {
   adminGeneralInput,
   adminGeneralRecordsInput,
   adminNationRecordsInput,
@@ -71,6 +80,13 @@ export const adminRouter = router({
     shared: adminProcedure.input(investigateSharedInput).query(({ ctx, input }) => investigateShared(ctx, input)),
   }),
   world: router({
+    settings: adminProcedure.input(worldSettingsInput).query(({ ctx, input }) => getWorldSettings(ctx, input)),
+    requestSetting: settingRequestProcedure
+      .input(requestSettingInput)
+      .mutation(({ ctx, input }) => requestWorldSetting(ctx, input)),
+    settingRequest: adminProcedure
+      .input(settingRequestInput)
+      .query(({ ctx, input }) => getWorldSettingRequest(ctx, input)),
     creationOptions: adminProcedure
       .input(creationOptionsInput)
       .query(({ ctx, input }) => getWorldCreationOptions(ctx, input)),

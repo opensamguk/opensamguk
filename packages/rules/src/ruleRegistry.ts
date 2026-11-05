@@ -33,6 +33,7 @@ import { stratagemCardsFeature, stratagemCardsInputKind } from './stratagemCards
 import { heritageFeature } from './heritage/feature';
 import { ADMIN_GAME_KINDS } from './admin/game';
 import { applyAdminGameRecord } from './admin/apply';
+import { ADMIN_SETTING_KINDS, applyAdminSettingRecord } from './admin/settings';
 import type { UnitSetResource } from './world/resources';
 
 export interface ReplayOriginV1 {
@@ -117,6 +118,13 @@ export const ruleRegistry: RuleRegistry = {
     'stratagem-cards-v1',
   ],
   inputKinds: [
+    ...ADMIN_SETTING_KINDS.map((kind) => ({
+      kind,
+      feature: null,
+      route: 'direct' as const,
+      directTick: true,
+      apply: applyAdminSettingRecord,
+    })),
     ...ADMIN_GAME_KINDS.map((kind) => ({
       kind,
       feature: null,

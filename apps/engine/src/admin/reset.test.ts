@@ -148,6 +148,7 @@ async function fixture() {
       delete: forbidden,
     },
     inputEvent: {
+      findMany: vi.fn(async () => []),
       updateMany: vi.fn(async ({ data }: { data: Partial<Event> }) => {
         Object.assign(event, data);
         return { count: 1 };

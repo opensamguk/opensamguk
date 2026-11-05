@@ -4,6 +4,7 @@ import {
   emptyQueue,
   parsePreset,
   presetRules,
+  effectiveWorldOptions,
   statRulesSchema,
   unitSetSchema,
   ORIGIN_CAPS,
@@ -409,9 +410,10 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
         return value;
       };
       const operationalMap = readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin);
+      const rules = effectiveWorldOptions(preset, world.runtimeOptions).presetRules;
       return {
         ...(operationalMap ? { operationalMap } : {}),
-        ...(preset ? { presetRules: presetRules(preset) } : {}),
+        ...(rules ? { presetRules: rules } : {}),
         ...(world.ruleFeatures?.length ? { ruleFeatures: [...world.ruleFeatures] } : {}),
         ...(ext ? { ext } : {}),
         seed: world.seed,

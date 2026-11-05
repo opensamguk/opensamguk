@@ -259,7 +259,7 @@ export function validateAdminGameRecord(input: RecordedInput): void {
   else throw Error('완료된 관리자 게임 입력이 필요합니다.');
 }
 
-function sameJson(a: JsonValue, b: JsonValue): boolean {
+export function sameJson(a: JsonValue, b: JsonValue): boolean {
   if (a === b) return true;
   if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
   if (Array.isArray(a) || Array.isArray(b))

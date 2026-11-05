@@ -4,6 +4,7 @@ import {
   creationHeritageRecord,
   lateJoinBonus,
   parsePreset,
+  effectiveWorldOptions,
   monthlyDate,
   TICKS_PER_MONTH,
   creationFailure,
@@ -313,9 +314,10 @@ const processGeneralCreation: QueuedInputHandler = async (tx, world, event, { ti
     orderBy: { cityKey: 'asc' },
   });
   const preset = world.preset ? parsePreset(world.preset) : null;
-  const bonus = preset?.boost.lateJoin
+  const lateJoin = effectiveWorldOptions(preset, world.runtimeOptions).presetRules?.boost.lateJoin;
+  const bonus = lateJoin
     ? lateJoinBonus(
-        preset.boost.lateJoin,
+        lateJoin,
         monthlyDate(world.startYear, world.monthlyTick + TICKS_PER_MONTH).year - world.startYear,
         await tx.general.findMany({
           where: { worldId: world.id },

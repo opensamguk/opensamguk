@@ -3,7 +3,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { readWorldExtRows, type Prisma } from '@opensamguk/db';
 import {
   toWorldState,
-  presetRules,
+  effectiveWorldOptions,
   restoreExtState,
   selectWorldCapabilities,
   projectTreatyRows,
@@ -48,6 +48,7 @@ export async function requireGeneral(tx: Prisma.TransactionClient, worldId: stri
 export async function readView(tx: Prisma.TransactionClient, worldId: string) {
   const world = await requireWorld(tx, worldId);
   const { preset, commands } = worldResolver(world);
+  const rules = effectiveWorldOptions(preset, world.runtimeOptions).presetRules;
   const capabilities = world.replayFormat === 3 ? null : selectWorldCapabilities(world);
   const treatyRows = await tx.treaty.findMany({
     where: { worldId },
@@ -91,7 +92,7 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
   });
   const diplomacies = await tx.diplomacy.findMany({ where: { worldId } });
   const state = toWorldState({
-    ...(preset ? { presetRules: presetRules(preset) } : {}),
+    ...(rules ? { presetRules: rules } : {}),
     ...(world.ruleFeatures?.length ? { ruleFeatures: [...world.ruleFeatures] } : {}),
     ...(ext ? { ext } : {}),
     startYear: world.startYear,

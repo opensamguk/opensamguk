@@ -16,6 +16,7 @@ import { completePersonnelStep } from './personnel/step';
 import { updateResidenceAnchors } from './personnel/residence';
 import { isAdminClockKind, applyAdminClockRecord } from './clock/admin';
 import { isAdminGameKind } from './admin/game';
+import { isAdminSettingKind, validateAdminSettingRecord } from './admin/settings';
 import { validateAdminGameRecord } from './admin/apply';
 
 export interface QueuedTurn {
@@ -152,6 +153,7 @@ export function applyRecordedInput(
 ): ReplayState {
   if (isAdminClockKind(input.kind)) return applyAdminClockRecord(replay, input);
   if (isAdminGameKind(input.kind)) validateAdminGameRecord(input);
+  if (isAdminSettingKind(input.kind)) validateAdminSettingRecord(input);
   if (
     replay.policy &&
     (!replay.state.ruleFeatures ||
