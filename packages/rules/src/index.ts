@@ -236,6 +236,7 @@ export * from './heritage/awards';
 export * from './heritage/refund';
 export * from './heritage/creation';
 export { heritageFeatureDataSchema } from './heritage/feature';
+export * from './clock/featureProfile';
 export * from './stratagemCards/config';
 export * from './stratagemCards/state';
 export * from './stratagemCards/origin';

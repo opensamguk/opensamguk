@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import type { readPublishedResources, GameResourceKind, PublishedResource } from '@opensamguk/db';
 import { buildInitialWorld, parsePreset, type WorldInit } from '@opensamguk/rules';
-import { sexLedgerSchema, type SexLedger } from '@opensamguk/rules';
+import { sexLedgerSchema, featureProfileSchema, type SexLedger } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { resourceRoot as resolveResourceRoot } from '@opensamguk/shared/resource-root';
 
@@ -48,6 +48,14 @@ function resourceKey(value: string): string {
 
 export async function loadPreset(key: string, root: URL = resolveResourceRoot()) {
   return parsePreset(JSON.parse(await readFile(new URL(`preset/${resourceKey(key)}.json`, root), 'utf8')));
+}
+
+export async function loadFeatureProfile(key: string, root: URL = resolveResourceRoot()) {
+  const value = featureProfileSchema.parse(
+    JSON.parse(await readFile(new URL(`feature-profile/${resourceKey(key)}.json`, root), 'utf8')),
+  );
+  if (value.key !== key) throw new Error('확장 설정의 키가 파일 이름과 다릅니다.');
+  return { value, contentHash: hashState(value) };
 }
 
 // 새 지도 기본값을 생성·CLI·재생 원본 추론이 함께 쓴다. 명시한 판 선택은 그대로 유지한다.

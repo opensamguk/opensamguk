@@ -27,6 +27,7 @@ const createFields = {
   statRulesKey: key.optional(),
   unitSetKey: key.optional(),
   portraitMapKey: key.optional(),
+  featureProfileKey: key.optional(),
   ruleFeatures: features.optional(),
   seed: seed.optional(),
   turnTermMinutes: interval.optional(),
@@ -41,6 +42,8 @@ export const requestWorldCreateInput = z
   .superRefine((value, ctx) => {
     if (!value.presetKey && (!value.scenarioKey || !value.mapKey || value.turnTermMinutes === undefined))
       ctx.addIssue({ code: 'custom', message: '프리셋 또는 시나리오·지도·턴 간격이 필요합니다.' });
+    if (value.featureProfileKey !== undefined && value.ruleFeatures === undefined)
+      ctx.addIssue({ code: 'custom', path: ['ruleFeatures'], message: '확장 설정의 규칙 기능 목록이 필요합니다.' });
   });
 export const worldCreateIntentSchema = z.strictObject({
   version: z.literal(1),
@@ -51,6 +54,7 @@ export const worldCreateIntentSchema = z.strictObject({
   statRulesKey: key.nullable(),
   unitSetKey: key.nullable(),
   portraitMapKey: key.nullable(),
+  featureProfileKey: key.optional(),
   ruleFeatures: features.nullable(),
   seed: seed.nullable(),
   turnTermMinutes: interval.nullable(),
@@ -67,6 +71,7 @@ export function worldCreateIntent(input: z.infer<typeof requestWorldCreateInput>
     statRulesKey: input.statRulesKey ?? null,
     unitSetKey: input.unitSetKey ?? null,
     portraitMapKey: input.portraitMapKey ?? null,
+    ...(input.featureProfileKey === undefined ? {} : { featureProfileKey: input.featureProfileKey }),
     ruleFeatures: input.ruleFeatures === undefined ? null : [...input.ruleFeatures].sort(),
     seed: input.seed ?? null,
     turnTermMinutes: input.turnTermMinutes ?? null,

@@ -46,6 +46,18 @@ describe('ADMIN-CREATE-B AC-M3-04 생성 요청 계약', () => {
     expect(worldCreateIntent(requestWorldCreateInput.parse({ ...input, ruleFeatures: [] })).ruleFeatures).toEqual([]);
     expect(worldCreateIntent(requestWorldCreateInput.parse(input)).ruleFeatures).toBeNull();
   });
+  it('확장 키는 명시한 요청에만 남기고 기능 목록을 함께 요구한다', () => {
+    const expanded = { ...input, featureProfileKey: 'expanded-191-v1', ruleFeatures: ['policy', 'personnel'] };
+    const intent = worldCreateIntent(requestWorldCreateInput.parse(expanded));
+    expect(intent.featureProfileKey).toBe('expanded-191-v1');
+    expect(worldCreateIntentSchema.parse(intent)).toEqual(intent);
+    expect(Object.hasOwn(worldCreateIntent(requestWorldCreateInput.parse(input)), 'featureProfileKey')).toBe(false);
+    expect(requestWorldCreateInput.safeParse({ ...input, featureProfileKey: 'expanded-191-v1' }).success).toBe(false);
+    expect(requestWorldCreateInput.safeParse({ ...expanded, featureProfileKey: '../expanded-191-v1' }).success).toBe(
+      false,
+    );
+    expect(requestWorldCreateInput.safeParse({ ...expanded, featureProfileHash: 'client-pin' }).success).toBe(false);
+  });
   it('긴 이름은 보존하고 프리셋 기본값의 해결은 엔진에 맡긴다', () => {
     const name = '긴 이름'.repeat(100);
     const parsed = requestWorldCreateInput.parse({

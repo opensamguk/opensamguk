@@ -9,6 +9,8 @@ import {
   scenarioSchema,
   statRulesSchema,
   type RuleRegistry,
+  featureProfileSchema,
+  type FeatureProfile,
 } from '@opensamguk/rules';
 import { operationalMapSchema, validateWorldResources } from '@opensamguk/rules/resource-validation';
 import { hashState } from '@opensamguk/shared/node';
@@ -16,7 +18,10 @@ import { resourceRoot } from '@opensamguk/shared/resource-root';
 import type { Context } from '../context';
 import { requireCurrentAdmin } from './access';
 
-export const creationOptionsInput = z.strictObject({ expectedUserId: z.uuid() });
+export const creationOptionsInput = z.strictObject({
+  expectedUserId: z.uuid(),
+  expandedProfiles: z.boolean().optional(),
+});
 export const creationFeatures = [
   'campaign-assignment-v2',
   'campaign-v1',
@@ -47,7 +52,7 @@ const identity = { id: 'integration-v01', label: '통합판 v0.1 · 191년 군�
 const profileIds = ['integration-v01', 'san10-191', 'san10-empty'] as const;
 type ProfileId = (typeof profileIds)[number];
 type Selection = Record<keyof typeof creationSelection, string>;
-type Identity = { id: ProfileId; label: string };
+type Identity = { id: ProfileId | 'integration-v01-expanded'; label: string };
 const san10Selection = { ...creationSelection, mapKey: 'san10' } as const;
 const contracts = {
   'integration-v01': {
@@ -94,6 +99,7 @@ const reasons = {
   RULES_UNAVAILABLE: '통합판의 도시 자원 규칙을 준비하고 있습니다.',
   RESOURCES_UNAVAILABLE: '게시된 통합판 생성 자원을 확인하지 못했습니다.',
   PRESETS_UNAVAILABLE: '생성 프리셋을 확인하지 못했습니다.',
+  FEATURE_PROFILE_UNAVAILABLE: '확장 월드 설정을 확인하지 못했습니다.',
 } as const;
 type Unavailable = Identity & { available: false; code: keyof typeof reasons; reason: string };
 export type CreationPreset = {
@@ -124,6 +130,8 @@ export type AvailableCreationProfile = Identity & {
   ruleFeatures: string[];
   presets: CreationPreset[];
   suggestedEndYear: number;
+  featureProfileKey?: string;
+  featureProfileHash?: string;
 };
 export type CreationProfile = AvailableCreationProfile | Unavailable;
 type Resource = Pick<PublishedResource, 'kind' | 'name' | 'version' | 'content' | 'contentHash'>;
@@ -262,6 +270,43 @@ export function creationProfile(
   };
 }
 
+export function expandedCreationProfile(
+  rows: readonly Resource[],
+  presets: readonly PresetSource[],
+  data: unknown,
+  registry: RuleRegistry = ruleRegistry,
+): CreationProfile {
+  const identity = { id: 'integration-v01-expanded', label: '통합판 확장 · 191년 군웅할거' } as const;
+  let profile: FeatureProfile;
+  try {
+    profile = featureProfileSchema.parse(data);
+    if (
+      profile.key !== 'expanded-191-v1' ||
+      profile.scenarioKey !== creationSelection.scenarioKey ||
+      profile.mapKey !== creationSelection.mapKey
+    )
+      throw new Error();
+    checkRuleFeatures(profile.ruleFeatures, registry);
+  } catch {
+    return {
+      ...identity,
+      available: false,
+      code: 'FEATURE_PROFILE_UNAVAILABLE',
+      reason: reasons.FEATURE_PROFILE_UNAVAILABLE,
+    };
+  }
+  const base = creationProfile(rows, presets, registry);
+  if (!base.available) return { ...base, ...identity };
+  return {
+    ...base,
+    ...identity,
+    ruleFeatures: [...profile.ruleFeatures],
+    featureProfileKey: profile.key,
+    featureProfileHash: hashState(profile),
+    suggestedEndYear: 231,
+  };
+}
+
 export async function getWorldCreationOptions(ctx: Context, input: z.infer<typeof creationOptionsInput>) {
   if (!ctx.user || ctx.user.id !== input.expectedUserId)
     throw new TRPCError({ code: 'UNAUTHORIZED', message: '로그인한 계정이 바뀌었습니다. 다시 확인하세요.' });
@@ -290,6 +335,15 @@ export async function getWorldCreationOptions(ctx: Context, input: z.infer<typeo
           }),
         );
         const profiles = profileIds.map((id) => creationProfile(rows, presets, ruleRegistry, id));
+        if (input.expandedProfiles === true) {
+          let value: unknown;
+          try {
+            value = JSON.parse(await readFile(new URL('feature-profile/expanded-191-v1.json', resourceRoot()), 'utf8'));
+          } catch {
+            value = null;
+          }
+          profiles.push(expandedCreationProfile(rows, presets, value));
+        }
         return { userId, revision: hashState(profiles), profiles };
       },
       { isolationLevel: 'RepeatableRead' },
