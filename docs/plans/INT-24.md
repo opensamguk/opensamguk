@@ -18,7 +18,7 @@
 | 종료 연도 | `admin.world.setEndYear` | `World.endYear` | 처리한 순간. 지금 연도보다 이른 값은 거절 | 1 |
 | 턴 간격 | `admin.world.setTurnTerm` | `World.turnTermMinutes`, 재생 정책 | 처리 시각까지 도달한 틱은 옛 간격으로 확정하고 그다음 틱부터 새 간격 | 1 |
 | 보호 기간·NPC 공격성·추가 보정 | `admin.world.setOption` (`protection.foundUntilMonths`, `protection.peaceMonths`, `npc.aggression`, `boost.*`) | `World.runtimeOptions.rules`, 상태 `presetRules` | 처리 다음의 첫 틱부터 | 1 |
-| 장수 생성 열고 닫기 | `admin.world.setOption` (`entry.generalCreation`) | `World.runtimeOptions.entry` | 처리 뒤 접수되는 요청부터 | 2 |
+| 장수 생성 열고 닫기 | `admin.world.setOption` (`entry.generalCreation`) | `World.runtimeOptions.entry` | 처리 뒤 새 접수부터. 이미 대기인 생성도 처리 때 재검사 | 2 |
 | NPC 플레이 허용 | `admin.world.setOption` (`entry.npcPlay`) | `World.runtimeOptions.entry` | 처리 뒤 접수되는 요청부터 | 3 |
 | 야간 휴전 켜고 끄기·시간대 | `admin.world.setTruce` | `World.runtimeOptions.truce` | 처리한 순간. 시계 기준점을 다시 잡는다 | 4 |
 
@@ -139,7 +139,7 @@ PR 1·2는 T3-07·T4-40을 기다리지 않는다.
 
 설정 변경 이력에서 생성 당시 이름·간격·종료 연도를 역산해 초기화의 다섯 사용처에 적용했다. 이름을 바꾼 월드의 초기화 결과에는 `confirmedName`을 선택 키로 추가한다. 이 값은 접수 때 확인한 현재 이름이고 `settings.name`은 새 판에 복원하는 생성 이름이다. 기존 기록의 키·해시는 유지하며 이름이 달라질 때만 새 키를 쓴다. 재생 파일은 이름 변경 이력으로 두 이름의 연결을 대조한다.
 
-프론트 속성 탭은 Claude 담당이다. PR2 생성 닫기, PR3 NPC 맡기, PR4 휴전은 아직 구현하지 않았다. 실제 PostgreSQL·HTTP·엔진 검증과 전체 검사·독립 리뷰·보호 병합 전에는 PR1이나 전체 AC를 완료로 바꾸지 않는다.
+프론트 속성 탭은 Claude 담당이다. PR2 생성 닫기는 아래 후속 구현에 기록한다. PR3 NPC 맡기와 PR4 휴전은 아직 구현하지 않았다. 실제 PostgreSQL·HTTP·엔진 검증과 전체 검사·독립 리뷰·보호 병합 전에는 PR1이나 전체 AC를 완료로 바꾸지 않는다.
 
 실제 PostgreSQL18.6·소켓 HTTP·펜싱 엔진 검증 3파일29건이 통과했다(46.43초). 새 API 권한15경우, 입력 멱등성과 권한 재검사, DB 원자성, 간격 변경 전후 월간 해시·활동 기준, 오래된 시계 revision의 롤백, A→B 초기화·B 첫 정산·설정 변경 뒤 A 내보내기·B 재초기화를 확인했다. 기존 마이그레이션 empty/legacy4건은 nullable 열과 기존 행·golden을 함께 검증했다. 전체 검사와 독립 리뷰는 진행 중이다.
 
@@ -150,4 +150,4 @@ PR 1·2는 T3-07·T4-40을 기다리지 않는다.
 
 `general.mine.creationRules.generalCreationEnabled`와 로비 차단 사유를 화면에 제공한다. 프론트 파일은 수정하지 않았으며 생성 화면·속성 탭 문구는 Claude 담당이다. 초기화로 만든 새 판의 생성 허용은 기본값 open이다.
 
-실제 PostgreSQL18.6·HTTP·펜싱 엔진4파일103건이 통과했다(83.46초). 새 생성 제어5건, 기존 설정25건, 기존 생성·로비 회귀를 함께 확인했다. 전체 타입 검사·수정 파일 ESLint와 집중 규칙2파일16건도 통과했다. 검증 뒤 시험 제목 한 곳과 이 문서·API 문서만 정리했다. 전체 검사·독립 리뷰·보호 병합은 진행 중이며 PR2나 전체 AC를 완료로 바꾸지 않는다.
+실제 PostgreSQL18.6·HTTP·펜싱 엔진4파일103건이 통과했다(83.46초). 새 생성 제어5건, 기존 설정25건, 기존 생성·로비 회귀를 함께 확인했다. 전체 타입 검사·수정 파일 ESLint와 집중 규칙2파일16건도 통과했다. 검증 뒤 시험 제목 한 곳과 이 문서·API 문서만 정리했다. 전체 로컬 `pnpm check`는 460파일·7168시험이 통과했다(시험498.27초). 독립 Codex 리뷰는 필수 수정0건이며 보호 CI·병합은 진행 중이다. PR2나 전체 AC를 완료로 바꾸지 않는다.

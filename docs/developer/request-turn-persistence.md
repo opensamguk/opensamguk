@@ -136,7 +136,7 @@ API와 엔진 모두 월드 행을 장수 행보다 먼저 잠급니다. API는 
 | `admin.world.setTurnTerm` | `turnTermMinutes` (1~2147483647 정수) |
 | `admin.world.setOption` | `key`, `value` (프리셋과 같은 형식) |
 
-옵션 키는 `protection.foundUntilMonths`, `protection.peaceMonths`, `npc.aggression`, `boost.smallWorld`, `boost.lateJoin`이다. 명령 목록·NPC 충원 비율·장수 정원은 받지 않는다. 프리셋이 없는 월드의 규칙 변경은 엔진이 `NO_PRESET`으로 거절한다.
+규칙 옵션 키는 `protection.foundUntilMonths`, `protection.peaceMonths`, `npc.aggression`, `boost.smallWorld`, `boost.lateJoin`이다. 명령 목록·NPC 충원 비율·장수 정원은 받지 않는다. 프리셋이 없는 월드의 규칙 변경은 엔진이 `NO_PRESET`으로 거절한다.
 
 접수 응답과 `admin.world.settingRequest({expectedUserId,worldId,idempotencyKey})`는 `{requestId,kind,status,sequence,tick,result}`다. 접수 때는 PENDING이며 게임 설정을 바꾸지 않는다. 같은 사용자·월드·키·정규화한 내용은 같은 영수증을 반환하고 다른 내용은 409다. 완료 결과는 `{version:1,before,after}` 또는 `{code,message}`다. 이름·종료 연도·간격은 해당 필드의 사본, 옵션은 `{value}`를 전후 값으로 쓴다. `END_YEAR_PASSED`, `NO_PRESET`, `UNCHANGED`, `INVALID_VALUE`와 기존 운영 거절 코드를 받는다. 형식3의 RUNNING·PAUSED 월드만 접수한다.
 
