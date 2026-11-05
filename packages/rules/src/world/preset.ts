@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { createCommandResolver } from '../commands/resolve';
+import { truceSchema } from '../clock/truce';
 
 const integer = z.number().int().min(0).max(2_147_483_647);
 const resourceKey = z.string().regex(/^[a-zA-Z0-9_-]+$/);
@@ -52,6 +53,7 @@ export const presetSchema = z
     protection,
     boost,
     features: z.strictObject({ advisor: z.boolean() }),
+    truce: truceSchema.nullable().optional(),
   })
   .superRefine((value, context) => {
     try {
