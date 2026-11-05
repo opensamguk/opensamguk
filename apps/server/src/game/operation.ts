@@ -50,7 +50,9 @@ const sameNation = (actor: Actor) => {
 const canCreate = (actor: Actor) =>
   officer(actor) ? allowed : denied('NO_PERMISSION', '직책자만 작전을 만들 수 있습니다.');
 const currentMembers = (operation: Operation) =>
-  operation.members.filter((member) => member.general.nationId === operation.nationId);
+  operation.members.filter(
+    (member) => member.general.removedAt == null && member.general.nationId === operation.nationId,
+  );
 const joined = (operation: Operation, actor: Actor) =>
   currentMembers(operation).some((member) => member.generalId === actor.id);
 const canSuggest = (operation: Operation, actor: Actor) =>
@@ -301,7 +303,7 @@ export function createOperation(ctx: OperationContext, input: CreateOperationInp
     });
     if (!target) throw new TRPCError({ code: 'BAD_REQUEST', message: '목표 도시를 확인하세요.' });
     const members = await tx.general.findMany({
-      where: { worldId: input.worldId, nationId: actor.nationId, id: { in: input.memberIds } },
+      where: { worldId: input.worldId, nationId: actor.nationId, removedAt: null, id: { in: input.memberIds } },
       select: { id: true },
     });
     if (new Set(input.memberIds).size !== input.memberIds.length || members.length !== input.memberIds.length)
@@ -354,7 +356,7 @@ export function inspectMembers(ctx: OperationContext, worldId: string) {
   return readOperation(ctx, worldId, async (tx, world, actor) => {
     if (!officer(actor)) throw new TRPCError({ code: 'FORBIDDEN', message: '직책자만 감찰할 수 있습니다.' });
     const rows = await tx.general.findMany({
-      where: { worldId, nationId: actor.nationId },
+      where: { worldId, nationId: actor.nationId, removedAt: null },
       include: { city: { select: { name: true } } },
       orderBy: [{ officerLevel: 'desc' }, { id: 'asc' }],
     });

@@ -80,6 +80,7 @@ export type TreatyApplied =
   | TreatyBroken;
 
 export type TreatyRejectCode =
+  | 'GENERAL_REMOVED'
   | 'WORLD_CLOSED'
   | 'ACTOR_INACTIVE'
   | 'NO_GENERAL'

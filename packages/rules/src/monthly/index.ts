@@ -27,7 +27,10 @@ export const monthlyDate = (startYear: number, tick: number): GameDate => {
   return { year: startYear + Math.floor(index / 12), month: (index % 12) + 1 };
 };
 const citiesById = (state: WorldView) => Object.values(state.cities).sort((a, b) => a.cityKey - b.cityKey);
-const generalsById = (state: WorldView) => Object.values(state.generals).sort((a, b) => a.id - b.id);
+const generalsById = (state: WorldView) =>
+  Object.values(state.generals)
+    .filter((general) => general.removedAt === undefined)
+    .sort((a, b) => a.id - b.id);
 const nationsById = (state: WorldView) => Object.values(state.nations).sort((a, b) => a.id - b.id);
 
 export function settleIncome(state: WorldView, date: GameDate): WorldState {
