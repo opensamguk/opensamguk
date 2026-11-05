@@ -76,7 +76,7 @@ export function GameLayout() {
   const shown = data?.result ?? data?.gameDate;
   const date = shown ? `${shown.year}년 ${shown.month}월` : '연월 —';
   const nextText = topbarStatus(data, noGeneral, countdown, formatRemaining);
-  // 좁은 화면의 위 띠는 월드·연월·다음 턴·실시간·메시지·로그아웃만 둔다. 계정 링크는 아래 `전체` 메뉴로 옮긴다 (T4-97 U1).
+  // 좁은 화면의 위 띠는 월드·연월·다음 턴·실시간·메시지만 둔다. 계정 조작은 아래 `전체` 메뉴로 옮긴다 (T4-97 U1).
   // 한 곳에만 그려 운영 입구 확인(AC-INT-20)을 두 번 만들지 않는다. 장수 생성 화면은 메뉴가 없으므로 위 띠에 둔다.
   const narrow = useNarrowTable();
   const accountInMenu = narrow && !entry;
@@ -90,6 +90,7 @@ export function GameLayout() {
       <Link to="/settings/notifications" className={className}>
         알림 설정
       </Link>
+      {accountInMenu ? <LogoutButton className={className} /> : null}
     </>
   );
 
@@ -120,7 +121,7 @@ export function GameLayout() {
           onToggle={() => (messagesOpen ? closeMessages() : setMessagesOpen(true))}
         />
         {accountInMenu ? null : accountLinks(styles.account)}
-        <LogoutButton className={styles.logout} />
+        {accountInMenu ? null : <LogoutButton className={styles.logout} />}
       </header>
       {!entry ? (
         <GameNavigation

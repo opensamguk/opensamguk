@@ -420,7 +420,7 @@ test.describe('장수가 있는 계정', () => {
       await openMain(page);
       const nav = page.getByRole('navigation', { name: '게임 메뉴' }).filter({ visible: true });
       await expect(nav).toHaveCount(1);
-      await page.getByRole('button', { name: '로그아웃', exact: true }).focus();
+      await page.getByRole('banner').locator('a,button').filter({ visible: true }).last().focus();
       await page.keyboard.press('Tab');
       await expect(nav.getByRole('link', { name: '군략도', exact: true })).toBeFocused();
       if (width < 768) {
