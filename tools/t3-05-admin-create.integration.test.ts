@@ -23,6 +23,8 @@ import { loadInitialWorldFromDb, loadFeatureProfile } from '../apps/engine/src/w
 import type { CreationProfile } from '../apps/server/src/admin/worldCreateOptions';
 import { exportReplay, readArchive, replayToEnd } from '../apps/engine/src/replay';
 import { initialReplayStateWithRegistry, ruleRegistry } from '../packages/rules/src/index';
+import { hashState } from '../packages/shared/src/node';
+import { loadWorld } from '../apps/engine/src/worldLoader';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
@@ -758,6 +760,10 @@ it('AC-P2-30·31·32·33 관리자 HTTP 확장 선택·엔진 생성·재생·�
   expect(await db.generalTurn.count({ where: { worldId: world.id } })).toBe(491 * 30);
   const archive = readArchive(await exportReplay(db, world.id));
   if (archive.version !== 3) throw new Error('확장 생성의 실제 V3 보관 파일이 필요합니다.');
+  expect(hashState(archive.origin.initial)).toBe(world.initialStateHash);
+  expect(
+    hashState(initialReplayStateWithRegistry(archive.origin.initial, ruleRegistry, archive.origin.featureData).state),
+  ).toBe(hashState(await loadWorld(db, world.id)));
   expect(
     initialReplayStateWithRegistry(archive.origin.initial, ruleRegistry, archive.origin.featureData).state.ruleFeatures,
   ).toEqual(profile.value.ruleFeatures);
@@ -808,6 +814,13 @@ it('AC-P2-30·31·32·33 관리자 HTTP 확장 선택·엔진 생성·재생·�
   ).toEqual(sexes);
   const targetArchive = readArchive(await exportReplay(db, target.id));
   if (targetArchive.version !== 3) throw new Error('초기화의 실제 V3 보관 파일이 필요합니다.');
+  expect(hashState(targetArchive.origin.initial)).toBe(target.initialStateHash);
+  expect(
+    hashState(
+      initialReplayStateWithRegistry(targetArchive.origin.initial, ruleRegistry, targetArchive.origin.featureData)
+        .state,
+    ),
+  ).toBe(hashState(await loadWorld(db, target.id)));
   expect(
     initialReplayStateWithRegistry(targetArchive.origin.initial, ruleRegistry, targetArchive.origin.featureData).state
       .ruleFeatures,
