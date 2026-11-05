@@ -220,6 +220,7 @@ export const generalRouter = router({
           ...statRulesSchema.parse({ stat: world.statRules }).stat,
           count: world.ruleFeatures.includes('five-stats') ? (5 as const) : (3 as const),
           campaignEnabled: world.ruleFeatures.includes('campaign-v1'),
+          personnelEnabled: world.replayFormat === 3 && world.ruleFeatures.includes('personnel'),
           ...(world.ruleFeatures.includes('lineage-v1') ? { lineageEnabled: true as const } : {}),
           ...(world.ruleFeatures.includes('heritage-v1')
             ? {

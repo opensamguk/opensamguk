@@ -100,6 +100,17 @@ it('INT-14 실제 HTTP의 5값·세션 행위자·추가 필드·합계·누락�
   expect((await request('general.create', { worldId, ...missing }, cookie, true)).code).toBe('BAD_REQUEST');
   expect(await db.inputEvent.count({ where: { worldId } })).toBe(0);
 });
+it('T4-97 AC-P2-34·AC-INT-20 장수 생성 전에도 월드의 인사 조회 가능 여부를 알린다', async () => {
+  const enabled = await request('general.mine', { worldId }, outsiderCookie);
+  expect(enabled.data.general).toBeNull();
+  expect(enabled.data.creationRules.personnelEnabled).toBe(true);
+  expect((await request('personnel.recent', { worldId }, outsiderCookie)).code).toBeUndefined();
+  const disabled = await request('general.mine', { worldId: legacyWorld }, outsiderCookie);
+  expect(disabled.data.creationRules.personnelEnabled).toBe(false);
+  expect((await request('personnel.recent', { worldId: legacyWorld }, outsiderCookie)).code).toBe(
+    'PRECONDITION_FAILED',
+  );
+});
 it('INT-14 중복 접수는 한 입력이며 엔진 생성·조회·재접속·월 정산·재생의 5값이 같다', async () => {
   const responses = await Promise.all([
     request('general.create', { worldId, ...payload }, cookie, true),
@@ -114,6 +125,7 @@ it('INT-14 중복 접수는 한 입력이며 엔진 생성·조회·재접속·�
     await loop.advanceTo(0);
     const mine = await request('general.mine', { worldId }, cookie);
     expect(mine.data.general).toMatchObject(payload);
+    expect(mine.data.creationRules.personnelEnabled).toBe(true);
     expect(mine.data.general).not.toHaveProperty('userId');
     expect((await request('general.mine', { worldId }, outsiderCookie)).data.general).toBeNull();
     expect((await request('general.create', { worldId, ...payload }, cookie, true)).code).toBe('CONFLICT');
