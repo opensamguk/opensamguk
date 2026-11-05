@@ -28,7 +28,7 @@ const itemSchema = z
       context.addIssue({ code: 'custom', path: ['stat'], message: '장비 칸의 능력치가 아닙니다.' });
   });
 
-// 시험에서도 모든 값을 명시한다. 운영 카탈로그나 기본값을 두지 않는다 (AC-P2-12·30).
+// 시험과 원생성 모두 값을 명시한다. 카탈로그로 누락 값을 채우지 않는다 (AC-P2-12·30).
 export const equipmentConfigSchema = z
   .strictObject({
     version: z.literal(1),
