@@ -23,7 +23,7 @@ import { loadInitialWorldFromDb, loadFeatureProfile } from '../apps/engine/src/w
 import type { CreationProfile } from '../apps/server/src/admin/worldCreateOptions';
 import { exportReplay, readArchive, replayToEnd } from '../apps/engine/src/replay';
 import { initialReplayStateWithRegistry, ruleRegistry } from '../packages/rules/src/index';
-import { hashState } from '../packages/shared/src/node';
+import { hashState } from '../packages/shared/src/node/hashState';
 import { loadWorld } from '../apps/engine/src/worldLoader';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
