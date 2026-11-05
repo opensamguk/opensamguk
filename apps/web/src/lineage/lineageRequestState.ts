@@ -23,11 +23,51 @@ const OFFICES = ['chancellor', 'grandMarshal', 'minister'] as const;
 
 export const lineageStorageKey = (userId: string, worldId: string) => `lineage.pending:${userId}:${worldId}`;
 
+function readEquipmentSlots(value: unknown): NonNullable<SuccessionPreview['equipment']>['from'] | undefined {
+  if (value === null) return null;
+  const raw = record(value),
+    slots = ['horse', 'weapon', 'book'] as const;
+  if (
+    !raw ||
+    Object.keys(raw).length === 0 ||
+    Object.keys(raw).some((key) => !slots.includes(key as (typeof slots)[number]))
+  )
+    return undefined;
+  const result: NonNullable<NonNullable<SuccessionPreview['equipment']>['from']> = {};
+  for (const slot of slots) {
+    if (!Object.hasOwn(raw, slot)) continue;
+    const key = raw[slot];
+    if (typeof key !== 'string' || !new RegExp(`^${slot}_0[1-6]$`).test(key)) return undefined;
+    result[slot] = key;
+  }
+  return result;
+}
+
 // 서버는 미리보기를 JSON 문자열로 비교한다. 저장값을 서버 스키마의 칸 순서로 다시 만들어 그대로 보낸다.
 function readPreview(value: unknown): SuccessionPreview | null {
   const raw = record(value);
   const keys = ['heirId', 'officerLevel', 'gold', 'rice', 'crew', 'unitIds', 'keptRetinue', 'releasedRetinue'];
-  if (!raw || !exactKeys(raw, [...keys, 'cancelledOrders', 'cancelledOffers', 'governance'])) return null;
+  if (
+    !raw ||
+    !exactKeys(raw, [
+      ...keys,
+      'cancelledOrders',
+      'cancelledOffers',
+      'governance',
+      ...(Object.hasOwn(raw, 'equipment') ? ['equipment'] : []),
+    ])
+  )
+    return null;
+  let equipment: SuccessionPreview['equipment'];
+  if (Object.hasOwn(raw, 'equipment')) {
+    const source = record(raw.equipment);
+    if (!source || !exactKeys(source, ['from', 'heir', 'inherited'])) return null;
+    const from = readEquipmentSlots(source.from),
+      heir = readEquipmentSlots(source.heir),
+      inherited = readEquipmentSlots(source.inherited);
+    if (from === undefined || heir === undefined || inherited === undefined) return null;
+    equipment = { from, heir, inherited };
+  }
   const governance = record(raw.governance);
   if (!governance || !exactKeys(governance, ['throne', 'courtOffice', 'vassalIds'])) return null;
   if (!Array.isArray(raw.cancelledOffers)) return null;
@@ -51,6 +91,7 @@ function readPreview(value: unknown): SuccessionPreview | null {
   )
     return null;
   return {
+    ...(equipment ? { equipment } : {}),
     heirId: raw.heirId,
     officerLevel: raw.officerLevel,
     gold: raw.gold as number,

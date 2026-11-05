@@ -11,7 +11,7 @@ const argsSchema = z.strictObject({
 });
 const proceeds = (cost: number, rate: number) => Math.floor((cost * rate) / 10_000);
 
-// 미등록 명령이다. 운영 정책·카탈로그 확정 전에는 명시한 인공 시험 설정만 쓴다.
+// D-070: 기존 예턴 한 칸에서 개인 금·장착·도시 재료를 함께 바꾼다.
 export const equipmentTrade = defineCommand({
   key: 'equipment_trade',
   name: '장비매매',

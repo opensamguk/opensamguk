@@ -31,6 +31,56 @@ const confirm: LineagePending = {
   generalId: 10,
   payload: { type: 'succession.confirm', heirGeneralId: 21, expected: preview },
 };
+
+it('T4-23 AC-P2-32 장비 미리보기는 탭 복원 뒤에도 서버의 칸 순서와 원장을 보존한다', () => {
+  const storage = memory(),
+    key = lineageStorageKey(USER, WORLD);
+  const equipment = {
+    from: { weapon: 'weapon_06', book: 'book_03' },
+    heir: { horse: 'horse_01' },
+    inherited: { horse: 'horse_01', weapon: 'weapon_06', book: 'book_03' },
+  };
+  const expected = { equipment, ...preview };
+  storage.setItem(
+    key,
+    JSON.stringify({
+      ...confirm,
+      payload: {
+        type: 'succession.confirm',
+        heirGeneralId: 21,
+        expected: Object.fromEntries(Object.entries(expected).reverse()),
+      },
+    }),
+  );
+  const restored = readLineagePending(storage, key);
+  expect(restored?.payload.type).toBe('succession.confirm');
+  expect(JSON.stringify(restored?.payload.type === 'succession.confirm' && restored.payload.expected)).toBe(
+    JSON.stringify(expected),
+  );
+});
+
+it.each([
+  undefined,
+  null,
+  {},
+  { from: {}, heir: null, inherited: null },
+  { from: { weapon: 'horse_01' }, heir: null, inherited: null },
+  { from: { weapon: 'weapon_07' }, heir: null, inherited: null },
+  { from: { extra: 'weapon_01' }, heir: null, inherited: null },
+  { from: null, heir: null, inherited: null, extra: true },
+])('T4-23 AC-P2-32 잘못된 장비 미리보기 %j는 복원하지 않는다', (equipment) => {
+  const storage = memory(),
+    key = lineageStorageKey(USER, WORLD);
+  storage.setItem(
+    key,
+    JSON.stringify({
+      ...confirm,
+      payload: { type: 'succession.confirm', heirGeneralId: 21, expected: { equipment, ...preview } },
+    }),
+  );
+  // JSON에 없는 선택 필드는 기존 장비 비활성 월드의 미리보기다.
+  expect(readLineagePending(storage, key) === null).toBe(equipment !== undefined);
+});
 function memory() {
   const map = new Map<string, string>();
   return {

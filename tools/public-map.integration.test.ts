@@ -144,6 +144,7 @@ it('RUNNING·PAUSED만 createdAt/id 순서로 나열하고 사본 없는 월드�
     governanceState,
     lineageState,
     stratagemCardsState,
+    equipmentState,
     ...sourceScalars
   } = source;
   // These legacy list fixtures intentionally omit runtime map/campaign/city ledgers.
@@ -158,6 +159,8 @@ it('RUNNING·PAUSED만 createdAt/id 순서로 나열하고 사본 없는 월드�
   expect(lineageState).toBeNull();
   expect(source.ruleFeatures).not.toContain('stratagem-cards-v1');
   expect(stratagemCardsState).toBeNull();
+  expect(source.ruleFeatures).not.toContain('equipment-v1');
+  expect(equipmentState).toBeNull();
   if (source.statRules === null || source.unitSet === null) throw new Error('정식 능력치·병종 JSON이 필요합니다.');
   await db.world.update({ where: { id: worldId }, data: { createdAt: new Date(epoch + minute) } });
   for (const [id, status, createdAt] of [

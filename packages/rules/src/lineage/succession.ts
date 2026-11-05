@@ -5,6 +5,7 @@ import type { WorldState, WorldView } from '../model/world';
 import { LINEAGE_EXITED_YEAR, LINEAGE_MAX } from './config';
 import { heirEligibility, lineageActive, lineageFail } from './eligibility';
 import { emptyLineagePerson } from './state';
+import { inheritEquipment } from '../equipment/succession';
 
 export type SuccessionMode = 'HUMAN' | 'NPC_DEATH';
 
@@ -17,6 +18,8 @@ export function applySuccession(world: WorldView, fromId: number, toId: number, 
     to = next.generals[toId]!;
   if ((mode === 'HUMAN') !== (from.userId !== null))
     return lineageFail('NOT_OWNER', '사람의 계승에는 본인 동의가 필요합니다.');
+  if (!inheritEquipment(next, fromId, toId, mode))
+    return lineageFail('EQUIPMENT_CONFLICT', '부모와 후계자의 같은 칸 장비가 겹칩니다. 먼저 판매한 뒤 계승하세요.');
   const loss = { gold: 0, rice: 0, troops: 0 };
   const releasedPeople: number[] = [],
     inheritedPeople: number[] = [];
@@ -199,6 +202,7 @@ export function retireNpcWithoutHeir(world: WorldView, fromId: number, tick: num
     closeCampaignActivity(campaign, new Set([fromId]), tick);
     campaign.revision++;
   }
+  inheritEquipment(next, fromId, null, 'NPC_DEATH');
   recordExit(next, fromId, null, 'NPC_DEATH', tick);
   if (campaign) readCampaignState(campaign, next);
   return { ok: true as const, world: next, loss };

@@ -178,7 +178,7 @@ async function existingRows(client: PgClient) {
       throw new Error('잘못된 시험 표 이름입니다.');
     const data =
       table === 'World'
-        ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures' - 'operationalMap' - 'campaignState' - 'cityResourcesState' - 'logisticsState' - 'governanceState' - 'lineageState' - 'stratagemCardsState'"
+        ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures' - 'operationalMap' - 'campaignState' - 'cityResourcesState' - 'logisticsState' - 'governanceState' - 'lineageState' - 'stratagemCardsState' - 'equipmentState'"
         : table === 'City'
           ? "to_jsonb(t) - 'kind'"
           : table === 'General'
@@ -472,6 +472,7 @@ it.each(['empty', 'legacy'] as const)(
       expect((await client.query('SELECT id FROM "World" WHERE "governanceState" IS NOT NULL')).rows).toEqual([]);
       expect((await client.query('SELECT id FROM "World" WHERE "lineageState" IS NOT NULL')).rows).toEqual([]);
       expect((await client.query('SELECT id FROM "World" WHERE "stratagemCardsState" IS NOT NULL')).rows).toEqual([]);
+      expect((await client.query('SELECT id FROM "World" WHERE "equipmentState" IS NOT NULL')).rows).toEqual([]);
       expect((await client.query('SELECT "cityKey" FROM "City" WHERE "kind" IS NOT NULL')).rows).toEqual([]);
       expect(
         (

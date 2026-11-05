@@ -198,6 +198,7 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   },
   { key: 'city-resources-v1', queuedInputs: { 'city.resources': processCityResourceInput } },
   { key: 'five-stats' },
+  { key: 'equipment-v1' },
   { key: 'operational-map' },
   { key: 'stratagem-basic' },
   { key: 'policy', queuedInputs: { 'general.setPolicy': processPolicyInput, 'general.active': processPolicyInput } },

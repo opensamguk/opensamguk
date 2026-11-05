@@ -21,6 +21,7 @@ import {
   readStoredGovernance,
   storedGeneralSex,
   readStoredLineage,
+  readStoredEquipment,
   readStoredStratagemCards,
 } from '@opensamguk/rules';
 import { z } from 'zod';
@@ -134,6 +135,8 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
   if (governance) state.governance = governance;
   const lineage = readStoredLineage(world, state);
   if (lineage) state.lineage = lineage;
+  const equipment = readStoredEquipment(world, state);
+  if (equipment) state.equipment = equipment;
   const cards = readStoredStratagemCards(world, state);
   if (cards) state.stratagemCards = cards;
   return { ...state, ...(treaties ? { treaties } : {}) };

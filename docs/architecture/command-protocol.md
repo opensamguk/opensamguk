@@ -151,6 +151,14 @@ ID와 amount는 1~1,000,000 정수입니다. resource는 gold 또는 rice이며 
 
 ## T1-05 명령 정의와 결과
 
+### 선택형 장비 월드 (T4-22·23, AC-P2-12)
+
+`equipment-v1`은 `five-stats`·`campaign-v1`·`logistics-v1`을 요구하며 원생성에 명시한 카탈로그와 빈 장착 상태로 시작한다. `equipment_trade`는 기존 개인 예턴30칸에 저장하고 사전 검사·실행·기록·재생을 따른다. 자기 국가의 보급 도시에서 개인 명령 한 차례로 매매하며 금·재료·장착·경험을 같은 트랜잭션에 저장한다. API의 장비 조회는 상태를 바꾸지 않는다.
+
+장비 보너스는 계산할 때 기본 능력치에 더한다. D-070에 따라 합산값은100을 넘을 수 있으며 저장된 기본 능력치의0~100 검증은 유지한다. 사람 계승의 같은 칸 충돌은 판매 후 다시 진행하도록 거부한다. NPC 계승은 후계자의 겹치는 장비를 유지하고 부모의 장비를 정리한다. 기능이 꺼진 월드에는 장착 상태나 보너스를 추가하지 않는다.
+
+아래 T1-05 설명은 기존 월드의 기본 명령 계약이다.
+
 `commands/types.ts`의 CommandDef는 key·표시 이름·대상·zod 인자·precheck·check·execute를 가집니다. `runCommand()`가 입력과 실행 조건을 검사한 뒤 Effect와 로그를 반환하며 `applyEffects()`가 원본을 변경하지 않고 복사본에 적용합니다.
 
 실패 코드: NO_ACTOR, NOT_NATION, NOT_OWN_CITY, NO_SUPPLY, NO_GOLD, AT_MAX, BAD_ARGS, UNKNOWN_COMMAND. 실패에는 설명이 있고 Effect가 없습니다.

@@ -26,6 +26,8 @@ import {
   emptyCampaignState,
   emptyCityResourcesState,
   initialLogisticsState,
+  initialEquipment,
+  equipmentConfigSchema,
   initialGovernanceState,
   initialLineageState,
   initialStratagemCards,
@@ -276,6 +278,13 @@ export function prepareInitialWorld(
               logisticsState: initialLogisticsState(
                 featureData?.['logistics-v1'],
                 toWorldState(creationState),
+              ) as Prisma.InputJsonValue,
+            }
+          : {}),
+        ...(features.includes('equipment-v1')
+          ? {
+              equipmentState: initialEquipment(
+                equipmentConfigSchema.parse(featureData?.['equipment-v1']),
               ) as Prisma.InputJsonValue,
             }
           : {}),
