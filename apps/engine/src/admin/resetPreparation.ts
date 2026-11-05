@@ -30,6 +30,7 @@ import {
   type InitialResources,
 } from '../world/resources';
 import { prepareInitialWorld, type PreparedInitialWorld, type InitialWorldOptions } from '../world/persistence';
+import { readCreationWorld } from './settingsHistory';
 
 const messages = {
   UNSUPPORTED_FORMAT: '이 월드의 초기화 준비 형식은 아직 지원하지 않습니다.',
@@ -561,9 +562,10 @@ export async function prepareWorldReset(
       signal.throwIfAborted();
       await tx.$executeRaw`SET TRANSACTION READ ONLY`;
       signal.throwIfAborted();
-      const world = await tx.world.findUnique({ where: { id: worldId } });
+      const storedWorld = await tx.world.findUnique({ where: { id: worldId } });
       signal.throwIfAborted();
-      if (!world) fail('WORLD_NOT_FOUND');
+      if (!storedWorld) fail('WORLD_NOT_FOUND');
+      const world = await readCreationWorld(tx, storedWorld);
       const { origin, preset, options } = sourceOrigin(world);
       const pin = await provenance(tx, world, preset, origin, signal),
         request = pin.kind === 'request' ? pin.request : undefined;
@@ -601,7 +603,7 @@ export async function prepareWorldReset(
 /** No nested transaction/composition. Caller holds lease and source World lock in the existing apply TX. */
 export async function verifyResetPreparation(
   tx: Prisma.TransactionClient,
-  world: SourceWorld,
+  storedWorld: SourceWorld,
   candidate: ResetPreparation,
   requestEffectiveSeed: string,
   signal: AbortSignal,
@@ -618,6 +620,7 @@ export async function verifyResetPreparation(
   )
     fail('PROVENANCE_INVALID');
   const evidence = trusted.evidence;
+  const world = await readCreationWorld(tx, storedWorld);
   const { origin, preset } = sourceOrigin(world);
   const refs = fixed('PROVENANCE_INVALID', () => adminResetResourcesSchema.parse(evidence.resources));
   if (

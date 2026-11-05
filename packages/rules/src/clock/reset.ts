@@ -96,6 +96,8 @@ export const adminResetAppliedSchema = z
     version: z.literal(1),
     sourceWorldId: z.uuid(),
     newWorldId: z.uuid(),
+    // 이름 변경 뒤에는 확인한 현재 이름과 복원할 생성 이름이 다르다.
+    confirmedName: name.optional(),
     effectiveSeed: seed,
     before: z.strictObject({ status: z.literal('PAUSED'), tick: counter, revision: counter.max(2147483646) }),
     after: z.strictObject({ status: z.literal('ENDED'), tick: counter, revision: counter }),
@@ -173,7 +175,7 @@ export function validateAdminResetRecord(input: RecordedInput, sourceWorldId?: s
     result.effectiveSeed !== payload.effectiveSeed ||
     result.before.revision !== payload.intent.expectedRevision ||
     result.after.tick !== input.tick ||
-    result.settings.name !== payload.intent.confirmName
+    (result.confirmedName ?? result.settings.name) !== payload.intent.confirmName
   )
     throw new Error('초기화 요청과 적용 결과가 다릅니다.');
 }

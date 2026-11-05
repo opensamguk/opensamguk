@@ -10,6 +10,7 @@ type Event = Prisma.InputEventGetPayload<Record<string, never>>;
 // 실제 처리 함수의 쓰기 인자를 보는 단위 입력이다. public 인사 선택을 열거나 PG 원자성을 검증하지 않는다.
 function fixture(personnelFormat: 1 | null, policyFromSequence: number | null = null) {
   const world: World = {
+    runtimeOptions: null,
     id: 'world',
     name: '입력 시험',
     operationalMap: null,

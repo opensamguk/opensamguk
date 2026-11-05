@@ -10,6 +10,7 @@ datasource db {
 }
 
 model World {
+  runtimeOptions      Json?
   equipmentState      Json?
   notificationOutbox  NotificationOutbox[]
   lineageState        Json?

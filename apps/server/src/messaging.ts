@@ -74,13 +74,19 @@ const party = z.strictObject({
   nation: nationTag.nullable(),
 });
 export type Party = z.infer<typeof party>;
+const fromParty = z.union([
+  party,
+  z
+    .strictObject({ kind: z.literal('admin'), name: z.literal('운영') })
+    .transform((value) => ({ ...value, generalId: null, nation: null })),
+]);
 export function messageItem(row: Prisma.MessageGetPayload<{ include: { reads: true } }>, generalId: number) {
   const sent = row.senderId === generalId;
   return {
     id: row.id,
     scope: row.scope,
     direction: sent ? ('sent' as const) : ('received' as const),
-    from: party.parse(row.fromParty),
+    from: fromParty.parse(row.fromParty),
     to: row.toParty === null ? null : party.parse(row.toParty),
     body: row.body,
     sentAt: row.sentAt.toISOString(),

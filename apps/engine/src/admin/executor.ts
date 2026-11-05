@@ -1,9 +1,11 @@
-import { nextActionSequence, type Prisma } from '@opensamguk/db';
+import { nextActionSequence, type Prisma, type RealtimeSignal } from '@opensamguk/db';
 import {
   ADMIN_CLOCK_KINDS,
   ADMIN_END_KIND,
   ADMIN_RESET_KIND,
   ADMIN_GAME_KINDS,
+  ADMIN_SETTING_KINDS,
+  isAdminSettingKind,
   isAdminGameKind,
   adminClockPayloadSchema,
   adminClockExpectedStatus,
@@ -16,6 +18,7 @@ import { controlClockInTransaction } from '../world/clock';
 import { processAdminEnd } from './end';
 import { processAdminReset, type PendingResetPreparation } from './reset';
 import { processAdminGame } from './game';
+import { processAdminSetting } from './settings';
 
 // TurnLoop가 리스→World를 잠근 같은 트랜잭션에서만 호출한다.
 export async function processAdminInputs(
@@ -24,6 +27,7 @@ export async function processAdminInputs(
   minimumTick: number,
   resetPreparation?: PendingResetPreparation,
   signal?: AbortSignal,
+  emit?: (signal: RealtimeSignal) => void,
 ): Promise<{
   status: Prisma.WorldGetPayload<Record<string, never>>['status'];
   tick: number;
@@ -34,11 +38,14 @@ export async function processAdminInputs(
     where: {
       worldId: world.id,
       status: 'PENDING',
-      kind: { in: [...ADMIN_CLOCK_KINDS, ADMIN_END_KIND, ADMIN_RESET_KIND, ...ADMIN_GAME_KINDS] },
+      kind: {
+        in: [...ADMIN_CLOCK_KINDS, ADMIN_END_KIND, ADMIN_RESET_KIND, ...ADMIN_GAME_KINDS, ...ADMIN_SETTING_KINDS],
+      },
     },
     orderBy: { id: 'asc' },
   });
   if (!event) return null;
+  if (isAdminSettingKind(event.kind)) return processAdminSetting(tx, world, event, minimumTick, emit);
   if (isAdminGameKind(event.kind)) return processAdminGame(tx, world, event);
   if (event.kind === ADMIN_END_KIND) return processAdminEnd(tx, world, event);
   if (event.kind === ADMIN_RESET_KIND) return processAdminReset(tx, world, event, resetPreparation, signal);

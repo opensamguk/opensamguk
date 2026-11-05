@@ -53,6 +53,7 @@ beforeAll(async () => {
 // 저장 행 검사에만 쓰는 legacy row다. opt-in factory의 증거가 아니다.
 function world(patch: Partial<World> = {}): World {
   return {
+    runtimeOptions: null,
     id: 'world',
     name: '저장 행 단위',
     operationalMap: null,

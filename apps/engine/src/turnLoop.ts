@@ -162,7 +162,9 @@ export class TurnLoop {
         if (!this.extVerified) await verifyWorldExt(tx, world);
         const adminClock =
           world.replayFormat === 3
-            ? await processAdminInputs(tx, world, this.highWaterTick, resetPreparation, signal)
+            ? await processAdminInputs(tx, world, this.highWaterTick, resetPreparation, signal, (signal) =>
+                signals.push(signal),
+              )
             : null;
         if (adminClock) {
           const deferred = adminClock.deferred;
