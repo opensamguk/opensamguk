@@ -19,6 +19,7 @@ import { initializeResources } from '../tools/init-resources';
 import { e2eDatabaseUrl } from './account';
 import { confirmDisconnectedDatabase } from '../tools/test-db-close';
 import { listenLegalHttp, listenLegalLoopback } from './legalFixturePorts';
+import { proxyLegalRequest } from './legalFixtureProxy';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const run = promisify(execFile);
@@ -66,44 +67,7 @@ async function staticBridge(apiOrigin: () => string) {
       try {
         const url = new URL(request.url ?? '/', 'http://localhost');
         if (url.pathname.startsWith('/trpc/') || url.pathname.startsWith('/sse')) {
-          const headers: Record<string, string> = {};
-          for (const [key, value] of Object.entries(request.headers))
-            if (value !== undefined && !['host', 'connection', 'transfer-encoding'].includes(key))
-              headers[key] = Array.isArray(value) ? value.join(',') : value;
-          const chunks: Buffer[] = [];
-          let length = 0;
-          for await (const chunk of request) {
-            const bytes = Buffer.from(chunk as Uint8Array);
-            length += bytes.length;
-            if (length > 1_048_576) {
-              response.writeHead(413).end();
-              return;
-            }
-            chunks.push(bytes);
-          }
-          const method = request.method ?? 'GET';
-          const upstream = await fetch(apiOrigin() + url.pathname + url.search, {
-            method,
-            headers,
-            signal: controller.signal,
-            ...(method === 'GET' || method === 'HEAD' ? {} : { body: Buffer.concat(chunks) }),
-          });
-          response.statusCode = upstream.status;
-          for (const [key, value] of upstream.headers)
-            if (!['set-cookie', 'connection', 'transfer-encoding'].includes(key)) response.setHeader(key, value);
-          const cookies = upstream.headers.getSetCookie();
-          if (cookies.length) response.setHeader('set-cookie', cookies);
-          const reader = upstream.body?.getReader();
-          try {
-            while (reader) {
-              const item = await reader.read();
-              if (item.done) break;
-              response.write(item.value);
-            }
-          } finally {
-            await reader?.cancel().catch(() => undefined);
-          }
-          response.end();
+          await proxyLegalRequest(apiOrigin() + url.pathname + url.search, request, response, controller.signal);
           return;
         }
         if (request.method !== 'GET' && request.method !== 'HEAD') {
