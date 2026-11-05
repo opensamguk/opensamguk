@@ -26,6 +26,32 @@ function fixture(features: string[] = []) {
 function apply(action: AdminGameAction, replay = fixture(), overrides: Partial<AdminGameContext> = {}) {
   return decideAdminGameAction(replay, payload(action), { ...context, ...overrides });
 }
+it('AC-INT-23 운영 쪽지 입력은 게임 수치를 바꾸지 않고 엄격하게 재생한다', () => {
+  const before = fixture(['personnel', 'policy']);
+  const action: AdminGameAction = { kind: 'admin.message.send', scope: 'PRIVATE', generalId: 1, body: '운영 안내' };
+  const outcome = apply(action, before);
+  expect(outcome.status).toBe('APPLIED');
+  expect(outcome.replay).toEqual(before);
+  const input: RecordedInput = {
+    sequence: 1,
+    tick: 0,
+    generalId: null,
+    kind: action.kind,
+    status: 'APPLIED',
+    payload: payload(action),
+    result: outcome.result,
+  };
+  validateAdminGameRecord(input);
+  expect(applyRecordedInput(before, input, ruleRegistry)).toEqual(before);
+  expect(apply({ ...action, generalId: 999 }).result).toMatchObject({ code: 'TARGET_MISSING' });
+  expect(() =>
+    applyRecordedInput(
+      before,
+      { ...input, result: { version: 1, before: { sent: false }, after: { sent: false } } },
+      ruleRegistry,
+    ),
+  ).toThrow();
+});
 
 it('AC-INT-23 8종 조치를 기록으로 재생하고 원본·활동·기존 병력은 보존한다', () => {
   const replay = fixture(['personnel', 'policy']);

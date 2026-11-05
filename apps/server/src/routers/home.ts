@@ -23,7 +23,7 @@ export const homeRouter = router({
       const turns = displaySlots(await readSlots(tx, input.worldId, general.id));
       const logs = await tx.generalLog.findMany({
         where: { worldId: input.worldId, generalId: general.id },
-        orderBy: { tick: 'desc' },
+        orderBy: [{ tick: 'desc' }, { id: 'desc' }],
         take: 10,
         select: logSelect,
       });

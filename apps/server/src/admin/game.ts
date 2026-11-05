@@ -116,9 +116,22 @@ export async function requestAdminGame(ctx: Context, input: z.infer<typeof admin
           actorKind: 'ADMIN',
           actorUserId: userId,
           action: 'game.request',
-          targetType: 'cityKey' in action ? 'City' : 'generalId' in action ? 'General' : 'Nation',
+          targetType:
+            'cityKey' in action
+              ? 'City'
+              : 'generalId' in action && action.generalId !== undefined
+                ? 'General'
+                : 'nationId' in action
+                  ? 'Nation'
+                  : 'World',
           targetId: String(
-            'cityKey' in action ? action.cityKey : 'generalId' in action ? action.generalId : action.nationId,
+            'cityKey' in action
+              ? action.cityKey
+              : 'generalId' in action && action.generalId !== undefined
+                ? action.generalId
+                : 'nationId' in action
+                  ? action.nationId
+                  : input.worldId,
           ),
           worldId: input.worldId,
           reason: input.reason,

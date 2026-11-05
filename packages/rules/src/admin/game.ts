@@ -37,7 +37,7 @@ export const adminNationChangesSchema = z
   })
   .refine((values) => Object.values(values).some((value) => value !== undefined), '바꿀 칸을 고르세요.');
 
-// 군주 교체·해산·쪽지는 뒤 단계의 별도 입력이다.
+// 군주 교체·해산은 공통 상태 전이가 나온 뒤 붙인다.
 export const ADMIN_GAME_KINDS = [
   'admin.general.rename',
   'admin.general.release',
@@ -48,6 +48,7 @@ export const ADMIN_GAME_KINDS = [
   'admin.nation.adjust',
   'admin.nation.rename',
   'admin.nation.dismissOffice',
+  'admin.message.send',
 ] as const;
 export const adminGameActionSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('admin.general.rename'), generalId: id, name: generalCreationSchema.shape.name }),
@@ -59,6 +60,14 @@ export const adminGameActionSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('admin.nation.adjust'), nationId: id, changes: adminNationChangesSchema }),
   z.strictObject({ kind: z.literal('admin.nation.rename'), nationId: id, name: z.string().trim().min(1).max(30) }),
   z.strictObject({ kind: z.literal('admin.nation.dismissOffice'), nationId: id, generalId: id }),
+  z
+    .strictObject({
+      kind: z.literal('admin.message.send'),
+      scope: z.enum(['WORLD', 'PRIVATE']),
+      generalId: id.optional(),
+      body: z.string().refine((value) => value.trim().length > 0 && [...value].length <= 1000),
+    })
+    .refine((action) => (action.scope === 'PRIVATE') === (action.generalId !== undefined)),
 ]);
 export const adminGamePayloadSchema = z.strictObject({
   version: z.literal(1),
