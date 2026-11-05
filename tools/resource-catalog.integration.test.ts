@@ -67,9 +67,10 @@ interface Fixture {
 }
 
 const draftMigration = '20261118000000_game_resource_draft_cas';
+const singleDraftMigration = '20261119000000_game_resource_single_draft';
 
 async function createFixture(
-  config: { beforeCatalog?: boolean; beforeDrafts?: boolean; initialize?: boolean } = {},
+  config: { beforeCatalog?: boolean; beforeDrafts?: boolean; beforeSingleDraft?: boolean; initialize?: boolean } = {},
 ): Promise<Fixture> {
   if (!process.env.TEST_DATABASE_URL) throw new Error('전용 TEST_DATABASE_URL이 필요합니다.');
   const reference = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
@@ -166,7 +167,13 @@ async function createFixture(
     );
     const targets = migrations.filter((entry) => /CREATE TABLE "GameResource"/.test(entry.sql));
     expect(targets).toHaveLength(1);
-    const before = config.beforeCatalog ? targets[0]!.name : config.beforeDrafts ? draftMigration : undefined;
+    const before = config.beforeCatalog
+      ? targets[0]!.name
+      : config.beforeDrafts
+        ? draftMigration
+        : config.beforeSingleDraft
+          ? singleDraftMigration
+          : undefined;
     for (const migration of migrations.filter((entry) => before === undefined || entry.name < before)) {
       await native.query(migration.sql);
     }
@@ -189,7 +196,7 @@ async function createFixture(
 
 async function withDatabase(
   action: (fixture: Fixture) => Promise<void>,
-  config: { beforeCatalog?: boolean; beforeDrafts?: boolean; initialize?: boolean } = {},
+  config: { beforeCatalog?: boolean; beforeDrafts?: boolean; beforeSingleDraft?: boolean; initialize?: boolean } = {},
 ) {
   const fixture = await createFixture(config);
   let failure: unknown;
@@ -744,6 +751,110 @@ it('A2 기존45개 migration의 게시·초안 행은 업그레이드 뒤 내용
       ).toEqual(before);
     },
     { beforeDrafts: true },
+  );
+});
+
+it('Q78-4 같은 자원의 두 번째 초안은 거부하고 다른 종류·이름과 다음 게시 판은 허용한다', async () => {
+  await withDatabase(async (fixture) => {
+    const draft = await createDraft(fixture.db);
+    const next = { kind: draft.kind, name: draft.name, version: draft.version + 1 };
+    await expect(insertResource(fixture, next, draft.content, { draft: true })).rejects.toMatchObject({
+      code: '23505',
+      constraint: 'GameResource_one_draft_per_name_key',
+    });
+    expect(await fixture.db.gameResource.findUniqueOrThrow({ where: { id: draft.id } })).toEqual(draft);
+    await insertResource(fixture, { ...next, kind: 'SCENARIO' }, draft.content, { draft: true });
+    await insertResource(fixture, { ...next, name: `${draft.name}_other` }, draft.content, { draft: true });
+    await fixture.db.gameResource.update({
+      where: { id: draft.id },
+      data: { status: 'PUBLISHED', publishedAt: new Date() },
+    });
+    await insertResource(fixture, next, draft.content, { draft: true });
+    const rows = await fixture.db.gameResource.findMany({
+      where: { kind: draft.kind, name: draft.name },
+      orderBy: { version: 'asc' },
+    });
+    expect(rows.map(({ status, version }) => ({ status, version }))).toEqual([
+      { status: 'PUBLISHED', version: 2 },
+      { status: 'DRAFT', version: 3 },
+    ]);
+  });
+});
+
+it('Q78-4 다른 판 번호로 동시 생성해도 같은 자원의 초안은 하나만 생긴다', async () => {
+  await withDatabase(async ({ db }) => {
+    const name = `single_${randomUUID().replaceAll('-', '')}`;
+    const content = { id: name };
+    const results = await Promise.allSettled(
+      [2, 3].map((version) =>
+        db.gameResource.create({
+          data: {
+            kind: 'MAP',
+            name,
+            version,
+            status: 'DRAFT',
+            content,
+            contentHash: hashState(content),
+            source: 'Q78-4',
+          },
+        }),
+      ),
+    );
+    expect(results.filter(({ status }) => status === 'fulfilled')).toHaveLength(1);
+    expect(results.find(({ status }) => status === 'rejected')).toMatchObject({
+      status: 'rejected',
+      reason: { code: 'P2002' },
+    });
+    const saved = await db.gameResource.findMany({ where: { kind: 'MAP', name, status: 'DRAFT' } });
+    expect(saved).toHaveLength(1);
+    const winner = results.find((result) => result.status === 'fulfilled');
+    expect(winner?.status === 'fulfilled' && winner.value).toEqual(saved[0]);
+  });
+});
+
+it('Q78-4 색인 추가는 기존 게시 판들과 한 초안을 그대로 보존한다', async () => {
+  await withDatabase(
+    async (fixture) => {
+      const name = 'single_draft_upgrade';
+      for (const version of [1, 2, 3]) {
+        await insertResource(fixture, { kind: 'MAP', name, version }, { id: name, version }, { draft: version === 3 });
+      }
+      const before = (await fixture.native.query('SELECT * FROM "GameResource" ORDER BY id')).rows;
+      await fixture.native.query(
+        await readFile(new URL(`${singleDraftMigration}/migration.sql`, migrationRoot), 'utf8'),
+      );
+      expect((await fixture.native.query('SELECT * FROM "GameResource" ORDER BY id')).rows).toEqual(before);
+      const indexes = await fixture.native.query<{ indexdef: string }>(
+        `SELECT indexdef FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'GameResource_one_draft_per_name_key'`,
+      );
+      expect(indexes.rows).toHaveLength(1);
+      expect(indexes.rows[0]!.indexdef).toContain('CREATE UNIQUE INDEX');
+      expect(indexes.rows[0]!.indexdef).toContain('(kind, name)');
+      expect(indexes.rows[0]!.indexdef).toContain(`WHERE (status = 'DRAFT'::"GameResourceStatus")`);
+    },
+    { beforeSingleDraft: true },
+  );
+});
+
+it('Q78-4 기존 중복 초안이 있으면 삭제·선택 없이 색인 추가 전체를 거부한다', async () => {
+  await withDatabase(
+    async (fixture) => {
+      const name = 'single_draft_conflict';
+      for (const version of [2, 3]) {
+        await insertResource(fixture, { kind: 'MAP', name, version }, { id: name, version }, { draft: true });
+      }
+      const before = (await fixture.native.query('SELECT * FROM "GameResource" ORDER BY id')).rows;
+      await expect(
+        fixture.native.query(await readFile(new URL(`${singleDraftMigration}/migration.sql`, migrationRoot), 'utf8')),
+      ).rejects.toMatchObject({ code: '23505' });
+      await fixture.native.query('ROLLBACK');
+      expect((await fixture.native.query('SELECT * FROM "GameResource" ORDER BY id')).rows).toEqual(before);
+      expect(
+        (await fixture.native.query(`SELECT 1 FROM pg_indexes WHERE indexname = 'GameResource_one_draft_per_name_key'`))
+          .rows,
+      ).toEqual([]);
+    },
+    { beforeSingleDraft: true },
   );
 });
 
