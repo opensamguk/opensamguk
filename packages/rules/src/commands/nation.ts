@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { BALANCE } from '../balance';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { refreshSupply } from '../supply';
-import { defineCommand, fail, noArgs, positive, relation, success } from './support';
+import { defineCommand, fail, noArgs, positive, relation, success, targetGeneral } from './support';
 
 const resourceArgs = z.strictObject({ generalId: positive, resource: z.enum(['gold', 'rice']), amount: positive });
 const resourceTransfer = (seize: boolean) =>
@@ -14,7 +14,7 @@ const resourceTransfer = (seize: boolean) =>
     args: resourceArgs,
     check(view, actor, args) {
       const g = view.generals[actor.generalId]!;
-      const target = view.generals[args.generalId];
+      const target = targetGeneral(view, args.generalId);
       if (!target || target.nationId !== g.nationId) return fail('BAD_TARGET', '자기 국가 장수만 가능합니다.');
       const source = seize ? target : view.nations[g.nationId!]!;
       return source[args.resource] < args.amount
@@ -121,7 +121,8 @@ export const nationCommands = [
     args: z.strictObject({ generalId: positive, cityKey: positive }),
     check(view, actor, args) {
       const nationId = view.generals[actor.generalId]!.nationId;
-      return view.generals[args.generalId]?.nationId === nationId && view.cities[args.cityKey]?.nationId === nationId
+      return targetGeneral(view, args.generalId)?.nationId === nationId &&
+        view.cities[args.cityKey]?.nationId === nationId
         ? null
         : fail('BAD_TARGET', '소속 장수와 자기 국가 도시를 골라야 합니다.');
     },

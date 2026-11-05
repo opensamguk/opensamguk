@@ -12,7 +12,12 @@ export const cityRouter = router({
       const city = await tx.city.findUnique({ where: { worldId_cityKey: input } });
       if (!city) throw new TRPCError({ code: 'NOT_FOUND', message: '도시를 찾을 수 없습니다.' });
       const generals = await tx.general.findMany({
-        where: { worldId: input.worldId, cityKey: input.cityKey, activeFromYear: { not: LINEAGE_EXITED_YEAR } },
+        where: {
+          worldId: input.worldId,
+          cityKey: input.cityKey,
+          removedAt: null,
+          activeFromYear: { not: LINEAGE_EXITED_YEAR },
+        },
         orderBy: { id: 'asc' },
       });
       const units = world.ruleFeatures.includes('campaign-v1')

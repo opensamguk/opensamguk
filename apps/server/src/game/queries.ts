@@ -20,6 +20,7 @@ import {
   readLogisticsState,
   readStoredGovernance,
   storedGeneralSex,
+  storedGeneralRemoval,
   readStoredLineage,
   readStoredEquipment,
   readStoredStratagemCards,
@@ -99,7 +100,9 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
       readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin),
     ),
     nations,
-    generals: generals.map((general) => storedGeneralSex(general, world.ruleFeatures.includes('lineage-v1'))),
+    generals: generals.map((general) =>
+      storedGeneralRemoval(storedGeneralSex(general, world.ruleFeatures.includes('lineage-v1')), world.replayFormat),
+    ),
     diplomacies,
     ...(world.commandMeta ? { commandMeta: world.commandMeta } : {}),
   } as unknown as WorldInit);

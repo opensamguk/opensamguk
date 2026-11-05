@@ -45,6 +45,7 @@ export const lineageAge = (world: WorldView, id: number, tick: number) =>
   Math.max(0, lineageYear(world, tick) - world.generals[id]!.birthYear);
 export const lineageAlive = (world: WorldView, id: number) =>
   !!world.generals[id] &&
+  world.generals[id]!.removedAt === undefined &&
   world.generals[id]!.activeFromYear !== LINEAGE_EXITED_YEAR &&
   !world.lineage?.persons[String(id)]?.exit;
 export const lineageActive = (world: WorldView, id: number, tick: number) =>

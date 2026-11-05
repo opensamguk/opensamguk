@@ -182,7 +182,7 @@ async function existingRows(client: PgClient) {
         : table === 'City'
           ? "to_jsonb(t) - 'kind'"
           : table === 'General'
-            ? "to_jsonb(t) - 'residenceTick' - 'politics' - 'charm' - 'sex'"
+            ? "to_jsonb(t) - 'residenceTick' - 'politics' - 'charm' - 'sex' - 'removedAt'"
             : "to_jsonb(t) - 'treatyFormat'";
     rows[table] = (await client.query(`SELECT ${data} AS data FROM "${table}" t ORDER BY to_jsonb(t)::text`)).rows;
   }
@@ -471,6 +471,7 @@ it.each(['empty', 'legacy'] as const)(
       expect((await client.query('SELECT id FROM "World" WHERE "logisticsState" IS NOT NULL')).rows).toEqual([]);
       expect((await client.query('SELECT id FROM "World" WHERE "governanceState" IS NOT NULL')).rows).toEqual([]);
       expect((await client.query('SELECT id FROM "World" WHERE "lineageState" IS NOT NULL')).rows).toEqual([]);
+      expect((await client.query('SELECT id FROM "General" WHERE "removedAt" IS NOT NULL')).rows).toEqual([]);
       expect((await client.query('SELECT id FROM "World" WHERE "stratagemCardsState" IS NOT NULL')).rows).toEqual([]);
       expect((await client.query('SELECT id FROM "World" WHERE "equipmentState" IS NOT NULL')).rows).toEqual([]);
       expect((await client.query('SELECT "cityKey" FROM "City" WHERE "kind" IS NOT NULL')).rows).toEqual([]);

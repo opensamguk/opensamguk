@@ -28,6 +28,15 @@ function applied<T extends { ok: boolean }>(outcome: T): Extract<T, { ok: true }
 const offer = (targetId: number) => ({ type: 'offer', targetId, relation: 'LIEUTENANT', revision: 0 });
 
 describe('AC-INT-06 사람 동의와 NPC 서약의 순수 전이', () => {
+  it('AC-INT-23 내보낸 재야 NPC에게 서약 비용·시도·관계를 만들지 않는다', () => {
+    const f = fixture();
+    Object.assign(f.world.generals[4]!, { removedAt: 0, nationId: null, userId: null });
+    const before = structuredClone(f.world);
+    expect(f.apply(offer(4))).toMatchObject({ ok: false, code: 'BAD_TARGET' });
+    expect(f.world).toEqual(before);
+    expect(f.campaign.attempts).toEqual([]);
+    expect(f.campaign.links).toEqual([]);
+  });
   it('사람 제안은 금과 난수를 쓰지 않고 본인의 응답 전에는 관계를 만들지 않는다', () => {
     const f = fixture(),
       before = structuredClone(f.world);

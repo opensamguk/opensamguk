@@ -35,7 +35,10 @@ export function publicNationPower(
   const nation = state.nations[nationId];
   if (!nation) return 0;
   const generals = Object.values(state.generals)
-    .filter((general) => general.nationId === nationId && general.activeFromYear <= at.year)
+    .filter(
+      (general) =>
+        general.removedAt === undefined && general.nationId === nationId && general.activeFromYear <= at.year,
+    )
     .sort((a, b) => a.id - b.id);
   const cities = Object.values(state.cities)
     .filter((city) => city.nationId === nationId && city.supplied)
