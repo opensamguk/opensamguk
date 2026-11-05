@@ -55,7 +55,7 @@ COPY resources/unitset /app/resources/unitset
 COPY resources/portraits /app/resources/portraits
 COPY resources/preset /app/resources/preset
 COPY resources/NOTICE.md /app/resources/NOTICE.md
-COPY resources/officers/191-sex.json resources/officers/191-sex-2.json resources/officers/NOTICE.md /app/resources/officers/
+COPY resources/officers/191-sex*.json resources/officers/NOTICE.md /app/resources/officers/
 ENV OPENSAMGUK_RESOURCES_ROOT=/app/resources
 
 FROM app-runtime AS server
