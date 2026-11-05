@@ -361,8 +361,14 @@ it('AC-P2-27 자원 배치 상한을 넘으면 인코딩된 경로도 어떤 절
     f = await fixture(),
     before = await snapshot();
   const count = 5;
-  for (const path of ['resourceAdmin.publish', '%72esourceAdmin.publish']) {
-    const response = await fetch(`${base}/trpc/${Array(count).fill(path).join(',')}?batch=1`, {
+  const paths = [
+    Array(count).fill('resourceAdmin.publish').join(','),
+    Array(count).fill('%72esourceAdmin.publish').join(','),
+    Array(count).fill('%2572esourceAdmin.publish').join(','),
+    Array(count).fill('resourceAdmin.publish').join('%252c'),
+  ];
+  for (const path of paths) {
+    const response = await fetch(`${base}/trpc/${path}?batch=1`, {
       method: 'POST',
       headers: { origin, cookie: user.cookie, 'content-type': 'application/json' },
       body: JSON.stringify(
@@ -384,27 +390,35 @@ it('AC-P2-27 자원과 로그아웃 혼합 배치는 세션·내용·감사를 �
   const user = await actor(),
     f = await fixture(),
     before = await snapshot();
-  const response = await fetch(`${base}/trpc/resourceAdmin.save,auth.logout?batch=1`, {
-    method: 'POST',
-    headers: { origin, cookie: user.cookie, 'content-type': 'application/json' },
-    body: JSON.stringify({ 0: { id: f.draft.id, revision: 0, content: { changed: true } } }),
-  });
-  expect(response.status).toBe(400);
-  expect(await snapshot()).toBe(before);
+  for (const path of [
+    'resourceAdmin.save,auth.logout',
+    '%2572esourceAdmin.save,auth.logout',
+    'resourceAdmin.save%252cauth.logout',
+  ]) {
+    const response = await fetch(`${base}/trpc/${path}?batch=1`, {
+      method: 'POST',
+      headers: { origin, cookie: user.cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ 0: { id: f.draft.id, revision: 0, content: { changed: true } } }),
+    });
+    expect(response.status).toBe(400);
+    expect(await snapshot()).toBe(before);
+  }
 });
 
 it('AC-P2-27 두 JSONL 협상 경로는 자원 저장 전에 거부한다', async () => {
   const user = await actor(),
     f = await fixture(),
     before = await snapshot();
-  for (const headers of [{ 'trpc-accept': 'application/jsonl' }, { accept: 'application/json, application/jsonl' }]) {
-    const response = await fetch(`${base}/trpc/resourceAdmin.save?batch=1`, {
-      method: 'POST',
-      headers: { origin, cookie: user.cookie, 'content-type': 'application/json', ...headers },
-      body: JSON.stringify({ 0: { id: f.draft.id, revision: 0, content: { changed: true } } }),
-    });
-    expect(response.status).toBe(400);
-    expect(await snapshot()).toBe(before);
+  for (const path of ['resourceAdmin.save', '%2572esourceAdmin.save']) {
+    for (const headers of [{ 'trpc-accept': 'application/jsonl' }, { accept: 'application/json, application/jsonl' }]) {
+      const response = await fetch(`${base}/trpc/${path}?batch=1`, {
+        method: 'POST',
+        headers: { origin, cookie: user.cookie, 'content-type': 'application/json', ...headers },
+        body: JSON.stringify({ 0: { id: f.draft.id, revision: 0, content: { changed: true } } }),
+      });
+      expect(response.status).toBe(400);
+      expect(await snapshot()).toBe(before);
+    }
   }
 });
 

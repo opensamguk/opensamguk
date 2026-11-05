@@ -4,8 +4,15 @@ import { RESOURCE_HTTP_LIMITS } from './httpLimits';
 export function resourceAdminHttpGuard(request: FastifyRequest, reply: FastifyReply) {
   const params = request.params;
   if (typeof params !== 'object' || params === null || !('path' in params) || typeof params.path !== 'string') return;
-  // Fastify와 tRPC가 함께 쓰는 디코딩된 경로에서 실행 전에 제한한다.
-  const paths = params.path.split(',');
+  // Fastify의 디코딩 뒤 resolveResponse가 한 번 더 디코딩한 경로로 호출을 나눈다.
+  let path: string;
+  try {
+    path = decodeURIComponent(params.path);
+  } catch {
+    // tRPC도 이 경로는 실행하지 못하며 기존 잘못된 URI 응답으로 처리한다.
+    return;
+  }
+  const paths = path.split(',');
   const resources = paths.filter((path) => path.startsWith('resourceAdmin.'));
   if (!resources.length) return;
   const accept = request.headers['trpc-accept'] ?? request.headers.accept;
