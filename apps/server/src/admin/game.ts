@@ -1,4 +1,4 @@
-import { isDeepStrictEqual } from 'node:util';
+import { hashState } from '@opensamguk/shared/node';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import {
@@ -96,7 +96,7 @@ export async function requestAdminGame(ctx: Context, input: z.infer<typeof admin
       const prior = await tx.inputEvent.findUnique({ where: { worldId_userId_idempotencyKey: key } });
       const payload = adminGamePayloadSchema.parse({ version: 1, reason: input.reason, action: input.action });
       if (prior) {
-        if (prior.kind !== payload.action.kind || !isDeepStrictEqual(prior.payload, payload))
+        if (prior.kind !== payload.action.kind || hashState(prior.payload) !== hashState(payload))
           throw new TRPCError({ code: 'CONFLICT', message: '이 요청 번호는 다른 내용에 썼습니다.' });
         return response(prior);
       }

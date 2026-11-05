@@ -224,6 +224,28 @@ for (const path of ['admin.game.request', 'admin.game.requestStatus'])
       }),
     );
 
+it('AC-INT-23 숫자0과 -0의 같은 JSON 요청은 같은 추적 번호를 반환한다', async () => {
+  const worldId = await world();
+  const input = command(worldId, {
+    kind: 'admin.general.adjust',
+    generalId: 1,
+    changes: { gold: { expected: 100000, value: 0 } },
+  });
+  const before = await call('admin.game.request', input, actor.cookie);
+  expect(before.status).toBe(200);
+  const body = JSON.stringify({ 0: input }).replace('"value":0', '"value":-0');
+  const response = await fetch(address + '/trpc/admin.game.request?batch=1', {
+    method: 'POST',
+    headers: { origin, cookie: actor.cookie, 'content-type': 'application/json' },
+    body,
+    signal: AbortSignal.timeout(10000),
+  });
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual([{ result: { data: before.data } }]);
+  expect(await db.inputEvent.count({ where: { worldId } })).toBe(1);
+  expect(await db.auditLog.count({ where: { worldId, action: 'game.request' } })).toBe(1);
+});
+
 it('AC-INT-23 접수 뒤 권한·제재와 같은 칸의 expected를 엔진에서 다시 검사한다', async () => {
   for (const change of ['role', 'sanction'] as const) {
     const worldId = await world(),
