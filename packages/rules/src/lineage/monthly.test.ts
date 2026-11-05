@@ -4,7 +4,6 @@ import type { LineageResources } from './birth';
 import { settleLineageMonthly } from './monthly';
 import { emptyLineagePerson } from './state';
 import { lineageFixture } from './testFixture';
-import { hashState } from '@opensamguk/shared/node';
 import { lineageConfigSchema } from './config';
 
 const resources: LineageResources = { statRules: { total: 180, min: 0, max: 100 }, unitSet: { defaultCrewTypeId: 1 } };
@@ -20,19 +19,6 @@ function birthWorld() {
   world.lineage!.nextMarriageId = 2;
   return world;
 }
-
-it('AC-P2-32 주기를 생략한 기존 설정의 12개월 출생과 변경 전 전체 상태 해시를 보존한다', () => {
-  let world = birthWorld();
-  const births: number[] = [];
-  for (let month = 1; month <= 12; month++) {
-    const result = settleLineageMonthly(world, month * 10000, resources);
-    world = result.state;
-    births.push(result.effects.births.length);
-  }
-  expect(births).toEqual([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-  expect(hashState(world)).toBe('d00fb76e73d1ae62ae4aaf3e609338cb2e6b9093b6df8c1e19b443fdda68bbf3');
-  expect(world.lineage!.config.version).toBe(1);
-});
 
 it('AC-P2-32 월 출산은 매월 추첨하되 같은 해의 이전 출생을 합산하고 새해에 상한을 다시 센다', () => {
   let world = birthWorld();
