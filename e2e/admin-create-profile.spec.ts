@@ -166,13 +166,15 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
     for (const width of [375, 1440]) {
       await step(run, () => page.setViewportSize({ width, height: 900 }));
       await step(run, () => expect(controls.getByText(/철·목재·말과 수송망/)).toBeVisible());
-      expect(await step(run, () => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))).toBe(true);
-      await step(run, async () =>
-        run.info.attach(`확장 월드 선택 ${width}px`, {
-          body: await page.screenshot({ fullPage: true }),
+      await step(run, async () => {
+        const screenshot = run.info.outputPath(`expanded-world-selection-${width}.png`);
+        await page.screenshot({ path: screenshot, fullPage: true });
+        await run.info.attach(`확장 월드 선택 ${width}px`, {
+          path: screenshot,
           contentType: 'image/png',
-        }),
-      );
+        });
+      });
+      expect(await step(run, () => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))).toBe(true);
     }
     if (originalViewport) await step(run, () => page.setViewportSize(originalViewport));
   }
