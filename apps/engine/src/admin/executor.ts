@@ -46,7 +46,7 @@ export async function processAdminInputs(
   });
   if (!event) return null;
   if (isAdminSettingKind(event.kind)) return processAdminSetting(tx, world, event, minimumTick, emit);
-  if (isAdminGameKind(event.kind)) return processAdminGame(tx, world, event);
+  if (isAdminGameKind(event.kind)) return processAdminGame(tx, world, event, emit);
   if (event.kind === ADMIN_END_KIND) return processAdminEnd(tx, world, event);
   if (event.kind === ADMIN_RESET_KIND) return processAdminReset(tx, world, event, resetPreparation, signal);
   const payload = adminClockPayloadSchema.parse(event.payload),

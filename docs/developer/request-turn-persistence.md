@@ -12,7 +12,13 @@
 
 `{kind:'admin.general.remove',generalId}`는 군주를 제외한 장수의 활동을 끝낸다. 처리 tick을 `General.removedAt`에 저장하며 행·이름·기록 참조는 남긴다. 기존 장수의 null은 규칙 상태에서 키를 생략해 이전 해시를 지킨다. 조작권·소속·관직·활동 기록을 해제하고 병력은 실제 지휘관이 있는 도시 주민으로 최대치까지 돌려준다. 소유·지휘 부곡은 해산하고 휘하·발령·혼인·조정 직위와 제안을 정리한다. 턴·순위·현재 인원 조회·명령 대상에서 제외하며 이 장수가 앞서 접수한 대기 입력은 `GENERAL_REMOVED`로 거절한다. 계정은 생성이 열린 월드에서 새 장수를 만들 수 있다. 가문의 사망·계승으로 기록하지 않는다.
 
-전체 검사·독립 리뷰·보호 병합 전의 API 후보다. 운영 쪽지·공개 변경 기록·운영 기록 조회와 화면은 INT-23의 뒤 단계다.
+`admin.message.send`는 같은 요청 경로에서 `{scope:'WORLD',body}` 또는 `{scope:'PRIVATE',generalId,body}`를 받는다. 본문은 공백만으로 쓸 수 없고 최대 1,000자다. 게임 수치를 바꾸지 않는 엄격한 입력으로 재생하고 실제 쪽지는 엔진 트랜잭션에서 한 번 저장한다. 거절·롤백 때 쪽지는 생기지 않는다. 저장 발신자는 `{kind:'admin',name:'운영'}`이며 응답에는 기존 `generalId:null,nation:null`도 있어 기존 발신자 표시를 유지한다. 알림은 commit 뒤 기존 실시간 경로로 보낸다.
+
+적용한 장수 조치는 해당 `GeneralLog`의 `kind:'admin'`으로, 국가·도시 조치는 월드 쪽지로 남긴다. 운영 계정과 사유는 감사에만 남긴다. 개인 기록과 홈 최근 기록은 `(tick,id)` 내림차순이다. `records.general`은 새 복합 커서를 돌려주며 기존 숫자 커서도 받는다. 나머지 개인 기록 API의 커서는 그대로다.
+
+운영 조회는 모두 `adminProcedure`이며 같은 트랜잭션에서 현재 관리자·세션을 다시 검사하고 `admin.game.read` 감사를 저장한다. `admin.game.general`은 `{worldId,generalId}`를 받아 퇴장 여부와 연결 계정을 포함한 장수 상세를 돌려준다. 없는 대상 조회도 감사한 뒤 NOT_FOUND를 돌려준다. `generalLogs`·`generalInputs`는 같은 필수 입력에, `nationLogs`는 선택 `nationId`, `battles`는 선택 `generalId`에 `fromTick`·`toTick`·불투명 `cursor`를 받는다. 목록 응답은 `{items,nextCursor}`이고 한 페이지 최대 100행이다. 전투의 장수 필터는 공격자와 기록 대상 양쪽에 적용한다. 같은 tick의 경계에서도 중복·누락 없이 다음 행으로 이어진다.
+
+공개 기록·쪽지·운영 조회는 전체 검사·독립 리뷰·보호 병합 전의 후보다. 운영 화면은 Claude 담당이며 전체 AC-INT-23은 미완료다.
 
 ## 관리자 초기화 적용 후보 (ADMIN-RESET-D1~D3)
 

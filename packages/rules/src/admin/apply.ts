@@ -27,6 +27,8 @@ export const adminGameRejectedSchema = z
 
 function snapshotSchema(action: AdminGameAction): z.ZodType<JsonValue> {
   switch (action.kind) {
+    case 'admin.message.send':
+      return z.strictObject({ sent: z.boolean() });
     case 'admin.general.rename':
     case 'admin.nation.rename':
       return z.strictObject({ name: z.string().min(1) });
@@ -100,11 +102,14 @@ export function decideAdminGameAction(
   const parsed = adminGamePayloadSchema.safeParse(payload);
   if (!parsed.success) return reject('INVALID_VALUE');
   const action = parsed.data.action;
-  const general = 'generalId' in action ? replay.state.generals[action.generalId] : undefined;
+  const general =
+    'generalId' in action && action.generalId !== undefined ? replay.state.generals[action.generalId] : undefined;
   const nation = 'nationId' in action ? replay.state.nations[action.nationId] : undefined;
   const city = 'cityKey' in action ? replay.state.cities[action.cityKey] : undefined;
   if (
-    ('generalId' in action && (!general || !lineageAlive(replay.state, action.generalId))) ||
+    ('generalId' in action &&
+      action.generalId !== undefined &&
+      (!general || !lineageAlive(replay.state, action.generalId))) ||
     ('nationId' in action && !nation) ||
     ('cityKey' in action && !city)
   )
@@ -114,6 +119,11 @@ export function decideAdminGameAction(
   let after: JsonValue;
   const next = structuredClone(replay);
   switch (action.kind) {
+    case 'admin.message.send': {
+      before = { sent: false };
+      after = { sent: true };
+      break;
+    }
     case 'admin.general.remove': {
       if (general!.officerLevel === 12) return reject('INVALID_VALUE');
       if (!Number.isInteger(context.tick) || context.tick! < 0 || context.tick! > 2_147_483_647)
