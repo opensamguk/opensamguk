@@ -35,14 +35,14 @@ describe('AC-M3-04 생성 요청 확인·복구 경계', () => {
     expect(Object.isFrozen(command.input.ruleFeatures)).toBe(true);
     expect(JSON.stringify([options, draft])).toBe(original);
   });
-  it('AC-P2-30~34 확장판의 키·13기능을 고정하고 조회 전용 해시는 전송하지 않는다', () => {
+  it('AC-P2-30~34 확장판의 키·14기능을 고정하고 조회 전용 해시는 전송하지 않는다', () => {
     const value = { ...options, profiles: [expandedProfile] };
     const review = reviewCreation(value, { ...draft, profileId: expandedProfile.id, endYear: '231' }, viewerId, 'seed');
     const input = freezeCreation(review, requestKey).input;
     expect(review.profileLabel).toBe(expandedProfile.label);
-    expect(input.featureProfileKey).toBe('expanded-191-v1');
+    expect(input.featureProfileKey).toBe('expanded-191-v2');
     expect(input.ruleFeatures).toEqual(expandedProfile.ruleFeatures);
-    expect(input.ruleFeatures).toHaveLength(13);
+    expect(input.ruleFeatures).toHaveLength(14);
     expect(input.endYear).toBe(231);
     for (const key of ['featureProfileHash', 'expandedProfiles', 'profileId']) expect(input).not.toHaveProperty(key);
   });

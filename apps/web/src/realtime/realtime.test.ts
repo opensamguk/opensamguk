@@ -97,6 +97,7 @@ describe('SSE 알림 해석', () => {
       [['message', 'unread'], { input: { worldId: WORLD }, type: 'query' }],
     ]);
     expect(invalidationTargets({ kind: 'turn.result' }, WORLD, trpc)).toEqual([
+      trpc.equipment.mine.queryKey({ worldId: WORLD }),
       trpc.home.get.queryKey({ worldId: WORLD }),
       trpc.turns.get.queryKey({ worldId: WORLD }),
       trpc.records.general.pathKey(),

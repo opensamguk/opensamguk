@@ -134,7 +134,7 @@ describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
     for (const [input] of state.settings.mock.calls)
       expect(input).toEqual({ expectedUserId: viewerId, expandedProfiles: true });
     const input = state.create.mock.calls[0]![0] as CreateInput;
-    expect(input.featureProfileKey).toBe('expanded-191-v1');
+    expect(input.featureProfileKey).toBe('expanded-191-v2');
     expect(input.ruleFeatures).toEqual(expandedProfile.ruleFeatures);
     expect(input.endYear).toBe(235);
     for (const key of ['featureProfileHash', 'expandedProfiles', 'profileId']) expect(input).not.toHaveProperty(key);

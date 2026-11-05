@@ -388,13 +388,19 @@ function requestRefs(
     if ((intent.featureProfileKey === undefined) !== (resolution.featureProfile === undefined))
       fail('PROVENANCE_INVALID');
     if (resolution.featureProfile !== undefined) {
+      const equipment = origin.initial.ruleFeatures?.includes('equipment-v1') === true;
       const profile = featureProfileSchema.parse({
-        version: 1,
+        version: equipment ? 2 : 1,
         key: intent.featureProfileKey,
         scenarioKey: expected.scenario,
         mapKey: expected.map,
         ruleFeatures: intent.ruleFeatures,
-        featureData: Object.fromEntries(FEATURE_PROFILE_DATA_KEYS.map((key) => [key, origin.featureData?.[key]])),
+        featureData: Object.fromEntries(
+          [...FEATURE_PROFILE_DATA_KEYS, ...(equipment ? ['equipment-v1'] : [])].map((key) => [
+            key,
+            origin.featureData?.[key],
+          ]),
+        ),
       });
       if (
         profile.key !== resolution.featureProfile.key ||

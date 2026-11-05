@@ -21,6 +21,7 @@ import { EmptyState, ErrorState, LoadingState } from '../ui/States';
 import { errorCode, retryUnlessClientError } from './apiError';
 import { describeArgs, type ArgNames } from './args';
 import { CommandPicker, type CommandInfo } from './CommandPicker';
+import { useEquipment } from '../equipment/useEquipment';
 import {
   describeSelection,
   EMPTY,
@@ -208,6 +209,11 @@ function Editor<S extends DisplaySlot>({
   }, [revision, queryClient, precheckRoot]);
 
   const commandList: CommandInfo[] = useMemo(() => commands.data ?? [], [commands.data]);
+  const equipment = useEquipment(
+    worldId,
+    commandList.some((command) => command.key === 'equipment_trade'),
+    home.data?.general.id,
+  );
   // 교역 명령의 대상 도시는 교역 조약이 있는 이웃 도시만 후보로 둔다 (T2-08). 저장은 이 편집기의 같은 경로로 한다.
   const cityChoicesFor = useTradeCityChoices(
     worldId,
@@ -584,6 +590,7 @@ function Editor<S extends DisplaySlot>({
         <ErrorState title="명령 목록을 불러오지 못했습니다" onRetry={() => void commands.refetch()} />
       ) : (
         <CommandPicker
+          equipment={equipment}
           commands={commandList}
           cities={cities}
           nations={nations}
