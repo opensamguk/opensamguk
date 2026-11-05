@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import { afterAll, beforeAll, afterEach, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
@@ -136,12 +137,13 @@ async function world(withPreset = true, published = false, truce?: Truce) {
   await controlClock(db, worldId, 'pause');
   return worldId;
 }
-async function advance(worldId: string, tick = 0) {
+async function advance(worldId: string, tick = 0, signal?: AbortSignal) {
+  signal?.throwIfAborted();
   const lease = await acquireLease(db, worldId);
   if (!lease) throw Error('자기 시험 월드의 리스를 얻지 못했습니다.');
   try {
     // 정식491명의 여러 차례를 한 번에 진행해도 운영 엔진처럼 매 commit에서 실행권을 갱신한다.
-    await new TurnLoop(db, lease, { beforeCommit: (tx) => renewLease(tx, lease) }).advanceTo(tick);
+    await new TurnLoop(db, lease, { beforeCommit: (tx) => renewLease(tx, lease) }).advanceTo(tick, signal);
   } finally {
     await releaseLease(db, lease);
   }
@@ -535,8 +537,20 @@ it('AC-INT-24 옵션은 깊게 병합되고 로더·조회·재시작·엄격한
 });
 
 it('AC-INT-24 원본 설정으로 A→B 초기화하고 B 변경 뒤 A 내보내기·B 재초기화가 유지된다', async () => {
+  // 같은 CI의 정식 한 달만 33.7초다. 두 초기화·재생을 포함한 이 사례에만 120초를 둔다.
+  const signal = AbortSignal.timeout(110_000),
+    started = performance.now();
+  const timings: Array<{ stage: string; elapsedMs: number }> = [];
+  mkdirSync('test-results', { recursive: true });
+  const evidence = `test-results/int24-reset-timings-${randomUUID()}.json`;
+  function checkpoint(stage: string) {
+    timings.push({ stage, elapsedMs: performance.now() - started });
+    writeFileSync(evidence, JSON.stringify(timings));
+    signal.throwIfAborted();
+  }
   const worldId = await world(true, true),
     born = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+  checkpoint('A 생성');
   async function change(id: string) {
     for (const setting of [
       { kind: 'admin.world.rename', name: '바꾼 이름' },
@@ -546,12 +560,15 @@ it('AC-INT-24 원본 설정으로 A→B 초기화하고 B 변경 뒤 A 내보내
       { kind: 'admin.world.setTruce', truce: { utcOffsetMinutes: 540, startMinute: 60, endMinute: 420 } },
     ] as const)
       expect((await call('admin.world.requestSetting', command(id, setting), actor.cookie)).status).toBe(200);
-    await advance(id);
+    await advance(id, 0, signal);
   }
   await change(worldId);
+  checkpoint('A 설정 변경');
   expect(
-    (await prepareWorldReset(db, worldId, 'int24-reset-b', AbortSignal.timeout(20000))).prepared.stateHash,
+    (await prepareWorldReset(db, worldId, 'int24-reset-b', AbortSignal.any([signal, AbortSignal.timeout(20000)])))
+      .prepared.stateHash,
   ).not.toBe('');
+  checkpoint('A 초기화 준비');
   const changed = await db.world.findUniqueOrThrow({ where: { id: worldId } });
   const reset = {
     expectedUserId: actor.id,
@@ -562,7 +579,7 @@ it('AC-INT-24 원본 설정으로 A→B 초기화하고 B 변경 뒤 A 내보내
     expectedRevision: changed.clockRevision,
   };
   expect((await call('admin.world.requestReset', reset, actor.cookie)).status).toBe(200);
-  await advance(worldId);
+  await advance(worldId, 0, signal);
   const row = await db.inputEvent.findFirstOrThrow({ where: { worldId, kind: 'admin.world.reset' } });
   expect(row.status).toBe('APPLIED');
   const result = row.result as { newWorldId: string };
@@ -575,6 +592,7 @@ it('AC-INT-24 원본 설정으로 A→B 초기화하고 B 변경 뒤 A 내보내
     runtimeOptions: null,
     status: 'PREOPEN',
   });
+  checkpoint('A→B 적용');
   const sourceArchive = await exportReplay(db, worldId);
   expect(sourceArchive.config.endYear).toBe(232);
   const forged = JSON.parse(JSON.stringify(sourceArchive));
@@ -583,19 +601,30 @@ it('AC-INT-24 원본 설정으로 A→B 초기화하고 B 변경 뒤 A 내보내
   expect(() => readArchive(forged)).toThrow();
 
   expect(() => replayToEnd(readArchive(JSON.parse(JSON.stringify(sourceArchive))))).not.toThrow();
+  checkpoint('A 수출·엄격 재생');
   await controlClock(db, child.id, 'start');
-  await advance(child.id, TICKS_PER_MONTH);
+  await advance(child.id, TICKS_PER_MONTH, signal);
+  checkpoint('B 한 달 DB 진행');
   const firstMonth = await exportReplay(db, child.id);
   expect(replayArchive(readArchive(JSON.parse(JSON.stringify(firstMonth))), 1)[0]!.stateHash).toBe(
     hashState(await db.$transaction((tx) => loadReplayState(tx, child.id))),
   );
+  checkpoint('B 한 달 수출·재생 해시');
   await controlClock(db, child.id, 'pause');
   await change(child.id);
+  checkpoint('B 설정 변경');
   expect(() => readArchive(JSON.parse(JSON.stringify(sourceArchive)))).not.toThrow();
   const exportedAgain = await exportReplay(db, worldId);
   expect(() => replayToEnd(readArchive(JSON.parse(JSON.stringify(exportedAgain))))).not.toThrow();
-  const again = await prepareWorldReset(db, child.id, 'int24-reset-c', AbortSignal.timeout(20000));
+  checkpoint('B 변경 뒤 A 재수출·엄격 재생');
+  const again = await prepareWorldReset(
+    db,
+    child.id,
+    'int24-reset-c',
+    AbortSignal.any([signal, AbortSignal.timeout(20000)]),
+  );
   expect(again.evidence.sourceSettingsHash).not.toBe('');
+  checkpoint('B 초기화 준비');
   const current = await db.world.findUniqueOrThrow({ where: { id: child.id } });
   expect(
     (
@@ -612,11 +641,12 @@ it('AC-INT-24 원본 설정으로 A→B 초기화하고 B 변경 뒤 A 내보내
       )
     ).status,
   ).toBe(200);
-  await advance(child.id);
+  await advance(child.id, 0, signal);
   expect(
     (await db.inputEvent.findFirstOrThrow({ where: { worldId: child.id, kind: 'admin.world.reset' } })).status,
   ).toBe('APPLIED');
-});
+  checkpoint('B→C 적용');
+}, 120_000);
 
 it('AC-INT-24 간격 변경 전후 월간 해시와 재시작 뒤 정책이 엄격한 재생과 같다', async () => {
   const worldId = await world();
