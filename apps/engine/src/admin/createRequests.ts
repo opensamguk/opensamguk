@@ -1,5 +1,10 @@
 import type { Prisma, PrismaClient } from '@opensamguk/db';
-import { checkRuleFeatures, worldCreateIntentSchema, type WorldCreateRejectCode } from '@opensamguk/rules';
+import {
+  checkRuleFeatures,
+  worldCreateIntentSchema,
+  featureProfileReferenceSchema,
+  type WorldCreateRejectCode,
+} from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { databaseNow } from '../lease';
 import {
@@ -8,6 +13,7 @@ import {
   loadPreset,
   resolveWorldResourceSelection,
   loadSexLedgers,
+  loadFeatureProfile,
 } from '../world/resources';
 import { prepareInitialWorld, savePreparedInitialWorld, type PreparedInitialWorld } from '../world/persistence';
 
@@ -56,6 +62,33 @@ async function resolveCreation(db: PrismaClient, request: Request) {
     ...(intent.statRulesKey === null ? {} : { statRules: intent.statRulesKey }),
     ...(intent.portraitMapKey === null ? {} : { portraitMap: intent.portraitMapKey }),
   });
+  let featureProfile: Awaited<ReturnType<typeof loadFeatureProfile>> | undefined;
+  if (intent.featureProfileKey !== undefined) {
+    try {
+      featureProfile = await loadFeatureProfile(intent.featureProfileKey);
+    } catch {
+      throw new CreationRejected('RESOURCE_INVALID');
+    }
+    if (request.resolution !== null) {
+      const pinned = featureProfileReferenceSchema.safeParse(
+        typeof request.resolution === 'object' && !Array.isArray(request.resolution)
+          ? request.resolution.featureProfile
+          : undefined,
+      );
+      if (
+        !pinned.success ||
+        pinned.data.key !== intent.featureProfileKey ||
+        pinned.data.contentHash !== featureProfile.contentHash
+      )
+        throw new CreationRejected('RESOURCE_INVALID');
+    }
+    if (
+      featureProfile.value.scenarioKey !== selection.scenario ||
+      featureProfile.value.mapKey !== selection.map ||
+      hashState([...featureProfile.value.ruleFeatures].sort()) !== hashState(intent.ruleFeatures)
+    )
+      throw new CreationRejected('INPUT_INVALID');
+  }
   let resources;
   try {
     resources = await readInitialResources(db, selection);
@@ -78,6 +111,7 @@ async function resolveCreation(db: PrismaClient, request: Request) {
       turnTermMinutes,
       endYear: intent.endYear,
       ruleFeatures,
+      ...(featureProfile ? { featureData: featureProfile.value.featureData } : {}),
       ...(preset ? { preset: { key: intent.presetKey!, value: preset } } : {}),
     };
     const frozenHash =
@@ -110,6 +144,9 @@ async function resolveCreation(db: PrismaClient, request: Request) {
     turnTermMinutes,
     endYear: intent.endYear,
     initialStateHash: prepared.stateHash,
+    ...(featureProfile
+      ? { featureProfile: { key: featureProfile.value.key, contentHash: featureProfile.contentHash } }
+      : {}),
   };
   if (request.resolution !== null && hashState(request.resolution) !== hashState(resolution))
     throw new CreationRejected('RESOURCE_INVALID');

@@ -9,6 +9,7 @@ import {
   fileInventory,
   finalizeManifest,
   hashFile,
+  prepareCandidateSource,
   prepareSource,
   releaseInput,
   reserveRelease,
@@ -126,6 +127,27 @@ it('T2-15 AC-M2-08 origin/main에 없는 실제 commit은 추출 전에 거부�
   const destination = join(directory, 'context');
   await expect(prepareSource(repo, revision, destination)).rejects.toThrow();
   expect(await exists(destination)).toBe(false);
+});
+it('T2-15 AC-M2-08 후보 스냅샷은 미병합 commit을 읽어도 정식 릴리스의 main 제한을 유지한다', async () => {
+  const { directory, repo } = await fixture();
+  await writeFile(join(repo, 'candidate.txt'), 'candidate source\n');
+  await git(repo, ['add', '.']);
+  const revision = await commit(repo);
+  await writeFile(join(repo, 'candidate.txt'), 'dirty source\n');
+  const destination = join(directory, 'context');
+  await expect(prepareSource(repo, revision, destination)).rejects.toThrow();
+  expect(await exists(destination)).toBe(false);
+  const result = await prepareCandidateSource(repo, revision, destination);
+  expect(await readFile(join(destination, 'candidate.txt'), 'utf8')).toBe('candidate source\n');
+  expect(result.sourceTreeSha256).toBe(
+    createHash('sha256')
+      .update(
+        'AGENTS.md\0committed instructions\n\0candidate.txt\0candidate source\n\0ordinary.txt\0committed content\n\0',
+      )
+      .digest('hex'),
+  );
+  await expect(prepareSource(repo, revision, join(directory, 'release-context'))).rejects.toThrow();
+  expect(await exists(join(directory, 'release-context'))).toBe(false);
 });
 it('T2-15 AC-M2-08 Git의 알려진 내부 링크만 실제 파일로 바꾼다', async () => {
   const { directory, repo } = await fixture();

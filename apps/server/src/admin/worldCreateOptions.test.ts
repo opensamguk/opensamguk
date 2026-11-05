@@ -2,7 +2,14 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { hashState } from '@opensamguk/shared/node';
 import { ruleRegistry, type RuleRegistry } from '@opensamguk/rules';
-import { creationFeatures, creationProfile, creationRefs, creationSelection } from './worldCreateOptions';
+import {
+  creationFeatures,
+  creationProfile,
+  creationRefs,
+  creationSelection,
+  expandedCreationProfile,
+  creationOptionsInput,
+} from './worldCreateOptions';
 
 const root = new URL('../../../../', import.meta.url);
 const json = (path: string): unknown => JSON.parse(readFileSync(new URL(path, root), 'utf8'));
@@ -42,6 +49,35 @@ const registered: RuleRegistry = {
   ],
 };
 describe('AC-M3-04 원생성 설정 조회', () => {
+  it('확장 항목은 별도 키·설정 해시·13기능을 요약하고 기존 항목을 보존한다', () => {
+    const data = json('resources/feature-profile/expanded-191-v1.json');
+    const before = hashState(creationProfile(rows, presets));
+    const expanded = expandedCreationProfile(rows, presets, data);
+    expect(expanded).toMatchObject({
+      id: 'integration-v01-expanded',
+      available: true,
+      featureProfileKey: 'expanded-191-v1',
+      featureProfileHash: hashState(data),
+      suggestedEndYear: 231,
+    });
+    if (!expanded.available) throw new Error('확장 항목을 확인하세요.');
+    expect(expanded.ruleFeatures).toHaveLength(13);
+    expect(hashState(creationProfile(rows, presets))).toBe(before);
+    expect(Object.hasOwn(creationProfile(rows, presets), 'featureProfileKey')).toBe(false);
+    expect(expandedCreationProfile(rows, presets, null)).toMatchObject({
+      id: 'integration-v01-expanded',
+      available: false,
+      code: 'FEATURE_PROFILE_UNAVAILABLE',
+    });
+  });
+  it('확장 목록 요청은 선택 boolean만 받고 생략 시 새 속성을 만들지 않는다', () => {
+    const expectedUserId = '00000000-0000-4000-8000-000000000001';
+    expect(creationOptionsInput.parse({ expectedUserId })).toEqual({ expectedUserId });
+    for (const value of [true, false])
+      expect(creationOptionsInput.parse({ expectedUserId, expandedProfiles: value }).expandedProfiles).toBe(value);
+    for (const value of ['true', 1, null, {}])
+      expect(creationOptionsInput.safeParse({ expectedUserId, expandedProfiles: value }).success).toBe(false);
+  });
   it('정확한 도시 자원9기능만 쓰고 미등록이면 옛 프로필로 돌아가지 않는다', () => {
     expect(creationFeatures).toHaveLength(9);
     expect(creationFeatures).toContain('city-resources-v1');

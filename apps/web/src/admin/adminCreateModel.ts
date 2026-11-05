@@ -18,6 +18,7 @@ export type CreateDraft = {
 export type CreateReview = Readonly<{
   revision: string;
   profileId: string;
+  profileLabel: string;
   presetLabel: string;
   presetDescriptions: readonly string[];
   scenarioTitle: string;
@@ -89,6 +90,7 @@ export function reviewCreation(
     expectedUserId: viewerId,
     name,
     ...profile.selection,
+    ...(profile.featureProfileKey === undefined ? {} : { featureProfileKey: profile.featureProfileKey }),
     presetKey: preset.key,
     turnTermMinutes: integer(draft.turnTerm, 1, 2147483647, 'turnTerm'),
     endYear: draft.endMode === 'none' ? null : integer(draft.endYear, profile.startYear, 10000, 'endYear'),
@@ -99,6 +101,7 @@ export function reviewCreation(
   return Object.freeze({
     revision: options.revision,
     profileId: profile.id,
+    profileLabel: profile.label,
     presetLabel: preset.label,
     presetDescriptions: Object.freeze([...preset.descriptions]),
     scenarioTitle: profile.scenarioTitle,

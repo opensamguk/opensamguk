@@ -23,6 +23,7 @@ import {
 import styles from './AdminCreateActions.module.css';
 
 type Phase = 'idle' | 'unknown' | 'pending' | 'limited' | 'notAccepted' | 'done' | 'failed';
+const expandedProfileHelp = '철·목재·말과 수송망, 황실·봉신, 혼인·계승, 기수 유산을 사용하는 확장 월드입니다.';
 const resourceLabels = {
   scenarioKey: '시나리오 자원',
   mapKey: '지도 자원',
@@ -169,7 +170,7 @@ export function AdminCreateActions({
     const [identity, , value] = await Promise.all([
       client.auth.me.query(undefined, { signal }),
       client.admin.whoami.query(undefined, { signal }),
-      client.admin.world.creationOptions.query({ expectedUserId: viewerId }, { signal }),
+      client.admin.world.creationOptions.query({ expectedUserId: viewerId, expandedProfiles: true }, { signal }),
     ]);
     if (!current(own, signal)) return null;
     if (identity.user?.id !== viewerId || value.userId !== viewerId) {
@@ -495,7 +496,13 @@ export function AdminCreateActions({
                       name="profileId"
                       value={profile?.id ?? ''}
                       aria-invalid={invalidField === 'profileId' || undefined}
-                      aria-describedby={invalidField === 'profileId' ? 'create-form-error' : undefined}
+                      aria-describedby={
+                        invalidField === 'profileId'
+                          ? 'create-form-error'
+                          : available?.featureProfileKey
+                            ? 'create-profile-help'
+                            : undefined
+                      }
                       disabled={sending}
                       required
                       onChange={(event) => {
@@ -516,6 +523,11 @@ export function AdminCreateActions({
                       ))}
                     </select>
                   </label>
+                  {available?.featureProfileKey ? (
+                    <p id="create-profile-help">
+                      {expandedProfileHelp} 종료 연도는 {available.suggestedEndYear}년을 권장하며 바꿀 수 있습니다.
+                    </p>
+                  ) : null}
                   {options.profiles.some((entry) => !entry.available) ? (
                     <div role="note" aria-label="사용할 수 없는 시나리오">
                       <p>
@@ -543,14 +555,17 @@ export function AdminCreateActions({
                         <br />
                         5능력치 · 휘하·부곡 · 도시 자원 규칙을 포함합니다.
                       </p>
-                      <dl>
-                        {(Object.keys(resourceLabels) as Array<keyof typeof resourceLabels>).map((key) => (
-                          <Fragment key={key}>
-                            <dt>{resourceLabels[key]}</dt>
-                            <dd>{available.selection[key]}</dd>
-                          </Fragment>
-                        ))}
-                      </dl>
+                      <details className={styles.resources}>
+                        <summary>사용 자원 확인</summary>
+                        <dl>
+                          {(Object.keys(resourceLabels) as Array<keyof typeof resourceLabels>).map((key) => (
+                            <Fragment key={key}>
+                              <dt>{resourceLabels[key]}</dt>
+                              <dd>{available.selection[key]}</dd>
+                            </Fragment>
+                          ))}
+                        </dl>
+                      </details>
                       <label>
                         프리셋
                         <select
@@ -696,7 +711,7 @@ export function AdminCreateActions({
               <dt>이름</dt>
               <dd>{shownInput.name}</dd>
               <dt>시나리오</dt>
-              <dd>{review.scenarioTitle}</dd>
+              <dd>{review.profileLabel}</dd>
               {(Object.keys(resourceLabels) as Array<keyof typeof resourceLabels>).map((key) => (
                 <Fragment key={key}>
                   <dt>{resourceLabels[key]}</dt>
@@ -719,6 +734,7 @@ export function AdminCreateActions({
               {review.counts.cities} · 관문{review.counts.gates} · {shownInput.ruleFeatures?.length}개 기능. 현재 조회한
               프리셋과 게시 자원을 사용하며 최종 설정은 생성 처리 때 확정됩니다.
             </p>
+            {shownInput.featureProfileKey ? <p>{expandedProfileHelp}</p> : null}
             <ul>
               {review.presetDescriptions.map((text) => (
                 <li key={text}>{text}</li>

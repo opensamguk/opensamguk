@@ -1,4 +1,4 @@
-import type { CreateDraft, CreateOptions } from '../adminCreateModel';
+import type { CreateDraft, CreateOptions, CreateProfile } from '../adminCreateModel';
 export const viewerId = '11111111-1111-4111-8111-111111111111';
 export const requestKey = '22222222-2222-4222-8222-222222222222';
 export const requestId = '33333333-3333-4333-8333-333333333333';
@@ -56,4 +56,15 @@ export const draft: CreateDraft = {
   endYear: '201',
   seedMode: 'auto',
   seed: '',
+};
+
+const baseProfile = options.profiles.find((profile): profile is CreateProfile => profile.available)!;
+export const expandedProfile: CreateProfile = {
+  ...baseProfile,
+  id: 'integration-v01-expanded',
+  label: '통합판 확장 · 191년 군웅할거',
+  featureProfileKey: 'expanded-191-v1',
+  featureProfileHash: 'a'.repeat(64),
+  ruleFeatures: [...baseProfile.ruleFeatures, 'governance-v1', 'heritage-v1', 'lineage-v1', 'logistics-v1'].sort(),
+  suggestedEndYear: 231,
 };

@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { TRPCClientError } from '@trpc/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AdminCreateActions } from './AdminCreateActions';
-import { options, requestId, requestKey, viewerId, worldId } from './test/createFixture';
+import { options, expandedProfile, requestId, requestKey, viewerId, worldId } from './test/createFixture';
 import type { CreateInput, CreateOptions, CreateProfile } from './adminCreateModel';
 
 const state = vi.hoisted(() => ({
@@ -111,6 +111,55 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
+  it('AC-P2-30~34 기본 SAN10을 보존하고 확장판의 설명·권장 연도·키를 세 조회와 제출에 연결한다', async () => {
+    const value = profileOptions();
+    value.profiles.push(structuredClone(expandedProfile));
+    state.settings.mockResolvedValue(value);
+    setup();
+    fireEvent.click(screen.getByRole('button', { name: '새 월드 생성 준비' }));
+    const scenario = await screen.findByRole('combobox', { name: '시나리오' });
+    expect((scenario as HTMLSelectElement).value).toBe('san10-191');
+    fireEvent.change(scenario, { target: { value: expandedProfile.id } });
+    expect(screen.getByText(/철·목재·말과 수송망/)).toBeTruthy();
+    expect((screen.getByLabelText('종료 연도') as HTMLInputElement).value).toBe('231');
+    fireEvent.change(screen.getByLabelText('월드 이름'), { target: { value: '새 확장 월드' } });
+    fireEvent.change(screen.getByLabelText('프리셋'), { target: { value: 'regular' } });
+    fireEvent.change(screen.getByLabelText('종료 연도'), { target: { value: '235' } });
+    fireEvent.click(screen.getByRole('button', { name: '현재 설정 검토' }));
+    const confirmation = within(await screen.findByRole('dialog'));
+    expect(confirmation.getByText(expandedProfile.label)).toBeTruthy();
+    expect(confirmation.getByText(/철·목재·말과 수송망/)).toBeTruthy();
+    await submit();
+    expect(state.settings).toHaveBeenCalledTimes(3);
+    for (const [input] of state.settings.mock.calls)
+      expect(input).toEqual({ expectedUserId: viewerId, expandedProfiles: true });
+    const input = state.create.mock.calls[0]![0] as CreateInput;
+    expect(input.featureProfileKey).toBe('expanded-191-v1');
+    expect(input.ruleFeatures).toEqual(expandedProfile.ruleFeatures);
+    expect(input.endYear).toBe(235);
+    for (const key of ['featureProfileHash', 'expandedProfiles', 'profileId']) expect(input).not.toHaveProperty(key);
+  });
+  it('AC-P2-30~34 확장 설정을 읽지 못해도 기존 프로필을 직접 고를 수 있다', async () => {
+    const value = profileOptions();
+    state.settings.mockResolvedValue({
+      ...value,
+      profiles: [
+        ...value.profiles,
+        {
+          id: 'integration-v01-expanded',
+          label: expandedProfile.label,
+          available: false,
+          code: 'FEATURE_PROFILE_UNAVAILABLE',
+          reason: '확장 설정을 확인하지 못했습니다.',
+        },
+      ],
+    });
+    setup();
+    await review();
+    expect(screen.getByText('확장 설정을 확인하지 못했습니다.')).toBeTruthy();
+    await submit();
+    expect(state.create.mock.calls[0]![0]).not.toHaveProperty('featureProfileKey');
+  });
   it('SAN10 자원이 없으면 기본 선택을 유지해 안내하고 통합판은 직접 골라야 입력한다', async () => {
     const value = profileOptions();
     state.settings.mockResolvedValue({

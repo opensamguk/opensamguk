@@ -18,20 +18,25 @@ on:
         required: false
         default: ''
         type: string
+      runtime_resources_expected_sha:
+        description: Exact candidate SHA for app-runtime resource checks only
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.event_name == 'workflow_dispatch' && inputs.load_expected_sha != '' && 'formal-isolated-load' || format('ci-{0}-{1}', github.event_name, github.event.pull_request.number || github.ref) }}
-  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' || inputs.load_expected_sha == '' }}
+  group: ${{ github.event_name == 'workflow_dispatch' && inputs.runtime_resources_expected_sha != '' && format('runtime-resources-{0}', github.ref) || github.event_name == 'workflow_dispatch' && inputs.load_expected_sha != '' && 'formal-isolated-load' || format('ci-{0}-{1}', github.event_name, github.event.pull_request.number || github.ref) }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' || (inputs.load_expected_sha == '' && inputs.runtime_resources_expected_sha == '') }}
 
 jobs:
   # Runtime pins: recheck official Node releases and the Docker Official postgres index in a PR.
   # Update only after opposite-side review and exact-head CI; keep both Node patches identical.
   checks:
     name: opensamguk-check
-    if: github.event_name != 'workflow_dispatch' || inputs.load_expected_sha == ''
+    if: github.event_name != 'workflow_dispatch' || (inputs.load_expected_sha == '' && inputs.runtime_resources_expected_sha == '')
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -58,7 +63,7 @@ jobs:
   # Required check name. Every PG group and E2E shard must pass (cancelled or skipped fails).
   database-browser:
     name: opensamguk-database-browser
-    if: always() && (github.event_name != 'workflow_dispatch' || inputs.load_expected_sha == '')
+    if: always() && (github.event_name != 'workflow_dispatch' || (inputs.load_expected_sha == '' && inputs.runtime_resources_expected_sha == ''))
     needs: [database-authz, database-engine, database-e2e]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -76,7 +81,7 @@ jobs:
 
   database-authz:
     name: opensamguk-database-authz
-    if: github.event_name != 'workflow_dispatch' || inputs.load_expected_sha == ''
+    if: github.event_name != 'workflow_dispatch' || (inputs.load_expected_sha == '' && inputs.runtime_resources_expected_sha == '')
     runs-on: ubuntu-24.04
     # PR #342의 API 작업은 43분 34초였다. 유산 실제 PG 135건 추가분의 전체 실행 예산이다.
     # 개별 시험의 제한·worker·검사 항목과 필수 그룹은 유지한다.
@@ -132,7 +137,7 @@ jobs:
   # Slow engine scenarios use a separate PostgreSQL service. No tests or limits are removed.
   database-engine:
     name: opensamguk-database-engine
-    if: github.event_name != 'workflow_dispatch' || inputs.load_expected_sha == ''
+    if: github.event_name != 'workflow_dispatch' || (inputs.load_expected_sha == '' && inputs.runtime_resources_expected_sha == '')
     runs-on: ubuntu-24.04
     # INT-19 장수 지시 시나리오를 더해 약 20분이 걸린다.
     timeout-minutes: 30
@@ -178,7 +183,7 @@ jobs:
   # Every spec creates its own world and accounts when missing (e2e/game.ts e2eWorld), so file order across shards does not matter.
   database-e2e:
     name: opensamguk-database-e2e (${{ matrix.shard }}/4)
-    if: github.event_name != 'workflow_dispatch' || inputs.load_expected_sha == ''
+    if: github.event_name != 'workflow_dispatch' || (inputs.load_expected_sha == '' && inputs.runtime_resources_expected_sha == '')
     runs-on: ubuntu-24.04
     # Worst cold case seen in PR #219: apt download 13m28s + shard 1/4 E2E about 12 min (three 180 s test timeouts) + setup 1.5 min.
     timeout-minutes: 30
@@ -309,13 +314,65 @@ jobs:
       - name: Check SAN10 administrator creation profiles in public Chromium
         if: matrix.shard == 1
         run: pnpm e2e:admin-create-profile --reporter=line
+      - name: Preserve expanded world selection screenshots
+        if: always() && matrix.shard == 1
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: expanded-world-ui-${{ github.event.pull_request.head.sha || github.sha }}
+          path: test-results/**/attachments/*.png
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Check admin world reset actions in Chromium
         if: matrix.shard == 1
         run: pnpm e2e:admin-reset --reporter=line
 
+  runtime-resources:
+    name: opensamguk-runtime-resource-check
+    if: github.repository == 'opensamguk/opensamguk' && github.event_name == 'workflow_dispatch' && inputs.runtime_resources_expected_sha != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      RUNTIME_RESOURCES_EXPECTED_SHA: ${{ inputs.runtime_resources_expected_sha }}
+      LOAD_EXPECTED_SHA: ${{ inputs.load_expected_sha }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify resource check dispatch source
+        run: |
+          test -z "$LOAD_EXPECTED_SHA"
+          [[ "$RUNTIME_RESOURCES_EXPECTED_SHA" =~ ^[a-f0-9]{40}$ ]]
+          test "$RUNTIME_RESOURCES_EXPECTED_SHA" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$RUNTIME_RESOURCES_EXPECTED_SHA"
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.22.0'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Build candidate app-runtime and load actual resources
+        env:
+          RUNTIME_RESOURCES_OUTPUT: ${{ runner.temp }}/expanded-resources-${{ github.run_id }}-${{ github.run_attempt }}
+        run: node --import tsx tools/runtime-bundle/check-resources.mjs
+      - name: Preserve resource check evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: runtime-resources-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/expanded-resources-${{ github.run_id }}-${{ github.run_attempt }}/receipt.json
+            ${{ runner.temp }}/expanded-resources-${{ github.run_id }}-${{ github.run_attempt }}/source.json
+            ${{ runner.temp }}/expanded-resources-${{ github.run_id }}-${{ github.run_attempt }}/build.log
+            ${{ runner.temp }}/expanded-resources-${{ github.run_id }}-${{ github.run_attempt }}/probe.log
+          if-no-files-found: ignore
+          retention-days: 7
+
   formal-load:
     name: opensamguk-formal-load
-    if: github.repository == 'opensamguk/opensamguk' && github.event_name == 'workflow_dispatch' && inputs.load_expected_sha != ''
+    if: github.repository == 'opensamguk/opensamguk' && github.event_name == 'workflow_dispatch' && inputs.load_expected_sha != '' && inputs.runtime_resources_expected_sha == ''
     runs-on: ubuntu-24.04
     # Bootstrap5 + admission11 + pull/build15 + builder cleanup2 + driver36 + summary2 =71.
     # 원래 driver의 준비3분·실행20분·정리5분은 바꾸지 않는다. 나머지4분은 action 준비 여유다.

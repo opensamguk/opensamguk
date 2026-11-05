@@ -1,4 +1,4 @@
-import type { Page, Request, Response } from '@playwright/test';
+import type { Page, Request, Response, TestInfo } from '@playwright/test';
 import { test, expect, type LegalStack } from './legalFixture';
 import { sanctionCalls } from './adminSanctionSetup';
 import { createActor, creationSource, reviewCreationPage, applyCreation, createdResult } from './adminCreateSetup';
@@ -16,9 +16,11 @@ test.describe.configure({ mode: 'serial' });
 const modes = [
   { id: 'san10-191', year: 191, nations: 21, preset: 'regular', endYear: 201 },
   { id: 'san10-empty', year: 180, nations: 0, preset: 'empty', endYear: 190 },
+  { id: 'integration-v01-expanded', year: 191, nations: 21, preset: 'regular', endYear: 231 },
 ] as const;
 type Mode = (typeof modes)[number];
 type Run = {
+  info: TestInfo;
   controller: AbortController;
   pending: Set<Promise<unknown>>;
   errors: Set<unknown>;
@@ -81,7 +83,7 @@ test.afterEach(async ({ page, legalStack }, info) => {
     }
   }
   try {
-    await info.attach('SAN10 관리자 선택 인수', {
+    await info.attach('관리자 프로필 선택 인수', {
       body: Buffer.from(
         JSON.stringify({
           ...run.receipt,
@@ -103,11 +105,15 @@ test.afterEach(async ({ page, legalStack }, info) => {
   }
   current = undefined;
   // 행을 직접 지우지 않는다. 실패·불확실 정리의 자기 DB는 원 fixture가 보존한다.
-  if (run.errors.size) throw new AggregateError([...run.errors], 'SAN10 생성 선택 본문 또는 정착 실패');
+  if (run.errors.size) throw new AggregateError([...run.errors], '관리자 프로필 선택 본문 또는 정착 실패');
 });
 
 async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: Run) {
   const db = stack.db;
+  const expanded = mode.id === 'integration-v01-expanded';
+  const features = expanded
+    ? [...creationFeatures, 'governance-v1', 'heritage-v1', 'lineage-v1', 'logistics-v1'].sort()
+    : [...creationFeatures];
   const actor = await step(run, () => createActor(page, stack));
   const legacy = await step(run, () => creationSource(stack));
   await step(run, () => initializeSan10Resources(db));
@@ -127,13 +133,18 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
   expect(optionsResponse.status()).toBe(200);
   const options = await step(run, () => data<CreateOptions>(optionsResponse, 'admin.world.creationOptions'));
   expect(options.userId).toBe(actor.id);
-  expect(options.profiles.map((profile) => profile.id)).toEqual(['integration-v01', 'san10-191', 'san10-empty']);
+  expect(options.profiles.map((profile) => profile.id)).toEqual([
+    'integration-v01',
+    'san10-191',
+    'san10-empty',
+    'integration-v01-expanded',
+  ]);
   const profile = options.profiles.find((entry) => entry.id === mode.id);
   expect(profile?.available).toBe(true);
   if (!profile?.available) throw new Error('실제 게시 SAN10 프로필을 확인하세요.');
   expect([profile.startYear, profile.counts.nations, profile.counts.generals]).toEqual([mode.year, mode.nations, 491]);
-  expect(profile.ruleFeatures).toEqual([...creationFeatures]);
-  expect(profile.ruleFeatures).toHaveLength(9);
+  expect(profile.ruleFeatures).toEqual(features);
+  expect(profile.ruleFeatures).toHaveLength(expanded ? 13 : 9);
   expect(profile.resources).toHaveLength(5);
   const published = await step(run, () => db.gameResource.findMany({ where: { status: 'PUBLISHED' } }));
   const pinned = profile.resources.map((ref) => {
@@ -148,8 +159,33 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
   const selector = controls.getByLabel('시나리오', { exact: true });
   await step(run, () => expect(selector).toBeEnabled());
   await step(run, () => expect(selector).toHaveValue('san10-191'));
-  if (mode.id === 'san10-empty') await step(run, () => selector.selectOption(mode.id));
+  if (mode.id !== 'san10-191') await step(run, () => selector.selectOption(mode.id));
   await step(run, () => expect(selector).toHaveValue(mode.id));
+  if (expanded) {
+    const resource = controls.getByText(profile.selection.scenarioKey, { exact: true });
+    const resourceSummary = controls.getByText('사용 자원 확인', { exact: true });
+    await step(run, () => expect(resource).toBeAttached());
+    await step(run, () => expect(resource).not.toBeVisible());
+    await step(run, () => resourceSummary.click());
+    await step(run, () => expect(resource).toBeVisible());
+    await step(run, () => resourceSummary.press('Enter'));
+    await step(run, () => expect(resource).not.toBeVisible());
+    const originalViewport = page.viewportSize();
+    for (const width of [375, 1440]) {
+      await step(run, () => page.setViewportSize({ width, height: 900 }));
+      await step(run, () => expect(controls.getByText(/철·목재·말과 수송망/)).toBeVisible());
+      await step(run, async () => {
+        const screenshot = run.info.outputPath(`expanded-world-selection-${width}.png`);
+        await page.screenshot({ path: screenshot, fullPage: true });
+        await run.info.attach(`확장 월드 선택 ${width}px`, {
+          path: screenshot,
+          contentType: 'image/png',
+        });
+      });
+      expect(await step(run, () => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))).toBe(true);
+    }
+    if (originalViewport) await step(run, () => page.setViewportSize(originalViewport));
+  }
   const preset = controls.getByLabel('프리셋', { exact: true });
   expect(
     await step(run, () =>
@@ -166,6 +202,7 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
   const seed = 'admin-create-profile-' + mode.id;
   await step(run, () => controls.getByLabel('시드', { exact: true }).fill(seed));
   const dialog = await step(run, () => reviewCreationPage(page));
+  await step(run, () => expect(dialog.getByText(profile.label, { exact: true })).toBeVisible());
   await step(run, () =>
     expect(dialog.getByText(new RegExp(`${mode.year}년 · ${mode.nations}국 · NPC 491명`))).toBeVisible(),
   );
@@ -194,11 +231,12 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
     idempotencyKey: input.idempotencyKey,
     name: '관리자 선택 ' + mode.id,
     ...profile.selection,
+    ...(expanded ? { featureProfileKey: 'expanded-191-v1' } : {}),
     presetKey: mode.preset,
     turnTermMinutes: profile.presets.find((entry) => entry.key === mode.preset)!.turnTermMinutes,
     endYear: mode.endYear,
     seed,
-    ruleFeatures: [...creationFeatures],
+    ruleFeatures: features,
   });
   const requests = await step(run, () => db.worldCreateRequest.findMany({ where: { requestedBy: actor.id } }));
   expect(requests).toHaveLength(1);
@@ -230,19 +268,29 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
     monthlyTick: 0,
     startedAt: null,
     startYear: mode.year,
-    scenarioKey: mode.id,
-    mapKey: 'san10',
+    scenarioKey: profile.selection.scenarioKey,
+    mapKey: profile.selection.mapKey,
     unitSetKey: 'basic',
     seed,
     presetKey: mode.preset,
     endYear: mode.endYear,
-    ruleFeatures: [...creationFeatures],
+    ruleFeatures: features,
   });
   expect(result.resolution).toMatchObject({
-    selection: { map: 'san10', scenario: mode.id, unitSet: 'basic', statRules: 'five-stats', portraitMap: '191-map' },
+    selection: {
+      map: profile.selection.mapKey,
+      scenario: profile.selection.scenarioKey,
+      unitSet: 'basic',
+      statRules: 'five-stats',
+      portraitMap: '191-map',
+    },
     presetKey: mode.preset,
     initialStateHash: world.initialStateHash,
   });
+  if (expanded)
+    expect(result.resolution).toMatchObject({
+      featureProfile: { key: 'expanded-191-v1', contentHash: profile.featureProfileHash },
+    });
   expect((result.resolution as { resources: unknown[] }).resources).toEqual(expect.arrayContaining(pinned));
   expect((result.resolution as { resources: unknown[] }).resources).toHaveLength(5);
   expect(await step(run, () => db.nation.count({ where: { worldId } }))).toBe(mode.nations);
@@ -251,9 +299,14 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
   const cities = await step(run, () =>
     db.city.findMany({ where: { worldId }, select: { cityKey: true }, orderBy: { cityKey: 'asc' } }),
   );
-  expect(cities).toHaveLength(155);
+  expect(cities).toHaveLength(profile.counts.cities + profile.counts.gates);
   const keys = cities.map((city) => String(city.cityKey)).sort();
   const replay = await step(run, () => db.$transaction((tx) => loadReplayState(tx, worldId)));
+  if (expanded) {
+    expect(replay.state.logistics).toBeDefined();
+    expect(replay.state.governance).toBeDefined();
+    expect(replay.state.lineage).toBeDefined();
+  }
   expect(Object.keys(replay.state.cityResources!.cities).sort()).toEqual(keys);
   for (const row of Object.values(replay.state.cityResources!.cities))
     expect(row).toEqual({ gold: 0, rice: 0, garrison: [] });
@@ -268,7 +321,7 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
   expect(mapData.cities.map((city) => String(city.key)).sort()).toEqual(keys);
   const map = page.getByTestId('world-map');
   await step(run, () => expect(map).toBeVisible());
-  await step(run, () => expect(map.locator('g[data-city-key][data-anchor-key]')).toHaveCount(155));
+  await step(run, () => expect(map.locator('g[data-city-key][data-anchor-key]')).toHaveCount(keys.length));
   expect(
     await step(run, () =>
       map
@@ -284,7 +337,7 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
     ),
   ).toEqual(keys);
   const anchors = page.getByRole('combobox', { name: '지도 거점', exact: true });
-  await step(run, () => expect(anchors.locator('option')).toHaveCount(156));
+  await step(run, () => expect(anchors.locator('option')).toHaveCount(keys.length + 1));
   expect(
     await step(run, () =>
       anchors.locator('option').evaluateAll((rows) =>
@@ -321,12 +374,13 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
 }
 
 for (const mode of modes) {
-  test(`AC-M3-04 AC-INT-04 ${mode.id}: 관리자 선택·실제 원생성·155개 빈 원장과 지도 연결`, async ({
+  test(`AC-M3-04 AC-INT-04 ${mode.id}: 관리자 선택·실제 원생성·${mode.id === 'integration-v01-expanded' ? 61 : 155}개 빈 원장과 지도 연결`, async ({
     page,
     legalStack,
-  }) => {
+  }, info) => {
     const controller = new AbortController();
     const run: Run = {
+      info,
       controller,
       pending: new Set(),
       errors: new Set(),

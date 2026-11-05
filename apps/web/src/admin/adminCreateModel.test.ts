@@ -9,7 +9,7 @@ import {
   storedText,
   type CreateReply,
 } from './adminCreateModel';
-import { draft, options, requestId, requestKey, viewerId, worldId } from './test/createFixture';
+import { draft, options, expandedProfile, requestId, requestKey, viewerId, worldId } from './test/createFixture';
 describe('AC-M3-04 생성 요청 확인·복구 경계', () => {
   it('자동 시드와 명시5자원·현재9기능을 고정하고 입력·키를 변경하지 않는다', () => {
     const original = JSON.stringify([options, draft]);
@@ -30,9 +30,21 @@ describe('AC-M3-04 생성 요청 확인·복구 경계', () => {
     });
     expect(command.input.ruleFeatures).toContain('city-resources-v1');
     expect(command.input.ruleFeatures).not.toContain('treaty-trade');
+    expect(command.input).not.toHaveProperty('featureProfileKey');
     expect(Object.isFrozen(command.input)).toBe(true);
     expect(Object.isFrozen(command.input.ruleFeatures)).toBe(true);
     expect(JSON.stringify([options, draft])).toBe(original);
+  });
+  it('AC-P2-30~34 확장판의 키·13기능을 고정하고 조회 전용 해시는 전송하지 않는다', () => {
+    const value = { ...options, profiles: [expandedProfile] };
+    const review = reviewCreation(value, { ...draft, profileId: expandedProfile.id, endYear: '231' }, viewerId, 'seed');
+    const input = freezeCreation(review, requestKey).input;
+    expect(review.profileLabel).toBe(expandedProfile.label);
+    expect(input.featureProfileKey).toBe('expanded-191-v1');
+    expect(input.ruleFeatures).toEqual(expandedProfile.ruleFeatures);
+    expect(input.ruleFeatures).toHaveLength(13);
+    expect(input.endYear).toBe(231);
+    for (const key of ['featureProfileHash', 'expandedProfiles', 'profileId']) expect(input).not.toHaveProperty(key);
   });
   it('직접 시드의 공백·Unicode와 endYear null을 그대로 보존한다', () => {
     const review = reviewCreation(

@@ -15,6 +15,9 @@ import {
   type WorldInit,
   type WorldPreset,
   type SexLedger,
+  featureProfileSchema,
+  featureProfileReferenceSchema,
+  FEATURE_PROFILE_DATA_KEYS,
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { z } from 'zod';
@@ -71,6 +74,7 @@ const resolutionSchema = z.strictObject({
   turnTermMinutes: z.number().int().min(1).max(2_147_483_647),
   endYear: z.number().int().min(1).max(10000).nullable(),
   initialStateHash: hash,
+  featureProfile: featureProfileReferenceSchema.optional(),
 });
 const slots = {
   map: 'MAP',
@@ -249,6 +253,7 @@ async function provenance(
   tx: Prisma.TransactionClient,
   world: SourceWorld,
   preset: WorldPreset | null,
+  origin: ReplayOriginV3,
   signal: AbortSignal,
 ): Promise<Provenance> {
   signal.throwIfAborted();
@@ -271,7 +276,8 @@ async function provenance(
   });
   signal.throwIfAborted();
   if (requests.length + resets.length > 1) fail('PROVENANCE_INVALID');
-  if (requests[0]) return { kind: 'request', request: requests[0], refs: requestRefs(world, requests[0], preset) };
+  if (requests[0])
+    return { kind: 'request', request: requests[0], refs: requestRefs(world, requests[0], preset, origin) };
   if (resets[0]) return { kind: 'reset', event: resets[0], refs: resetRefs(world, resets[0]) };
   return { kind: 'cli' };
 }
@@ -330,7 +336,12 @@ function selectionRefs(selection: Selection, refs: readonly Reference[]) {
     if (!r || r.name !== wanted) fail('PROVENANCE_INVALID');
   }
 }
-function requestRefs(world: SourceWorld, request: Request, preset: WorldPreset | null): Reference[] {
+function requestRefs(
+  world: SourceWorld,
+  request: Request,
+  preset: WorldPreset | null,
+  origin: ReplayOriginV3,
+): Reference[] {
   return fixed('PROVENANCE_INVALID', () => {
     const intent = worldCreateIntentSchema.parse(request.intent),
       resolution = resolutionSchema.parse(request.resolution);
@@ -374,6 +385,24 @@ function requestRefs(world: SourceWorld, request: Request, preset: WorldPreset |
       resolution.initialStateHash !== world.initialStateHash
     )
       fail('PROVENANCE_INVALID');
+    if ((intent.featureProfileKey === undefined) !== (resolution.featureProfile === undefined))
+      fail('PROVENANCE_INVALID');
+    if (resolution.featureProfile !== undefined) {
+      const profile = featureProfileSchema.parse({
+        version: 1,
+        key: intent.featureProfileKey,
+        scenarioKey: expected.scenario,
+        mapKey: expected.map,
+        ruleFeatures: intent.ruleFeatures,
+        featureData: Object.fromEntries(FEATURE_PROFILE_DATA_KEYS.map((key) => [key, origin.featureData?.[key]])),
+      });
+      if (
+        profile.key !== resolution.featureProfile.key ||
+        hashState(profile) !== resolution.featureProfile.contentHash ||
+        !same([...profile.ruleFeatures].sort(), origin.initial.ruleFeatures)
+      )
+        fail('PROVENANCE_INVALID');
+    }
     selectionRefs(resolution.selection, resolution.resources);
     return resolution.resources;
   });
@@ -536,7 +565,7 @@ export async function prepareWorldReset(
       signal.throwIfAborted();
       if (!world) fail('WORLD_NOT_FOUND');
       const { origin, preset, options } = sourceOrigin(world);
-      const pin = await provenance(tx, world, preset, signal),
+      const pin = await provenance(tx, world, preset, origin, signal),
         request = pin.kind === 'request' ? pin.request : undefined;
       const resources =
         pin.kind !== 'cli'
@@ -608,7 +637,7 @@ export async function verifyResetPreparation(
     evidence.sourceSettingsHash !== resetSourceSettingsHash(world)
   )
     fail('PROVENANCE_INVALID');
-  const pin = await provenance(tx, world, preset, signal),
+  const pin = await provenance(tx, world, preset, origin, signal),
     current = provenanceEvidence(pin, refs);
   if (
     !same(current.provenance, evidence.provenance) ||
