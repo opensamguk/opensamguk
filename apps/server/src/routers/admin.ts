@@ -14,6 +14,17 @@ import { requestWorldResetInput, worldResetRequestInput } from '@opensamguk/rule
 
 import { requestWorldEnd, requestWorldEndInput, getWorldEndRequest, worldEndRequestInput } from '../admin/worldEnd';
 import {
+  adminGeneralInput,
+  adminGeneralRecordsInput,
+  adminNationRecordsInput,
+  adminBattlesInput,
+  readAdminGeneral,
+  readAdminGeneralLogs,
+  readAdminGeneralInputs,
+  readAdminNationLogs,
+  readAdminBattles,
+} from '../admin/gameRead';
+import {
   requestAdminGame,
   getAdminGameRequest,
   adminGameRequestInput,
@@ -37,6 +48,17 @@ import {
 
 export const adminRouter = router({
   game: router({
+    general: adminProcedure.input(adminGeneralInput).query(({ ctx, input }) => readAdminGeneral(ctx, input)),
+    generalLogs: adminProcedure
+      .input(adminGeneralRecordsInput)
+      .query(({ ctx, input }) => readAdminGeneralLogs(ctx, input)),
+    generalInputs: adminProcedure
+      .input(adminGeneralRecordsInput)
+      .query(({ ctx, input }) => readAdminGeneralInputs(ctx, input)),
+    nationLogs: adminProcedure
+      .input(adminNationRecordsInput)
+      .query(({ ctx, input }) => readAdminNationLogs(ctx, input)),
+    battles: adminProcedure.input(adminBattlesInput).query(({ ctx, input }) => readAdminBattles(ctx, input)),
     request: adminGameRequestProcedure
       .input(adminGameRequestInput)
       .mutation(({ ctx, input }) => requestAdminGame(ctx, input)),

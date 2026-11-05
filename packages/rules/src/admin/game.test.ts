@@ -2,6 +2,20 @@ import { expect, it } from 'vitest';
 import { adminGamePayloadSchema } from './game';
 
 const payload = (action: unknown) => ({ version: 1, reason: '운영 조치 검증', action });
+it('AC-INT-23 운영 쪽지는 월드·개인 수신 범위와 본문만 받는다', () => {
+  const action = { kind: 'admin.message.send', scope: 'WORLD', body: '운영 안내' };
+  expect(adminGamePayloadSchema.parse(payload(action)).action).toEqual(action);
+  expect(adminGamePayloadSchema.safeParse(payload({ ...action, scope: 'PRIVATE', generalId: 1 })).success).toBe(true);
+  for (const value of [
+    { ...action, generalId: 1 },
+    { ...action, scope: 'PRIVATE' },
+    { ...action, scope: 'NATION' },
+    { ...action, body: ' ' },
+    { ...action, body: '가'.repeat(1001) },
+    { ...action, senderId: 1 },
+  ])
+    expect(adminGamePayloadSchema.safeParse(payload(value)).success).toBe(false);
+});
 it('AC-INT-23 조치와 각 변경 칸은 서버 행위자·불명 필드와 빈 조정을 거부한다', () => {
   const action = { kind: 'admin.general.adjust', generalId: 1, changes: { gold: { expected: 10, value: 20 } } };
   expect(adminGamePayloadSchema.parse(payload(action))).toEqual(payload(action));

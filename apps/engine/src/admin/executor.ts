@@ -1,4 +1,4 @@
-import { nextActionSequence, type Prisma } from '@opensamguk/db';
+import { nextActionSequence, type Prisma, type RealtimeSignal } from '@opensamguk/db';
 import {
   ADMIN_CLOCK_KINDS,
   ADMIN_END_KIND,
@@ -24,6 +24,7 @@ export async function processAdminInputs(
   minimumTick: number,
   resetPreparation?: PendingResetPreparation,
   signal?: AbortSignal,
+  emit?: (signal: RealtimeSignal) => void,
 ): Promise<{
   status: Prisma.WorldGetPayload<Record<string, never>>['status'];
   tick: number;
@@ -39,7 +40,7 @@ export async function processAdminInputs(
     orderBy: { id: 'asc' },
   });
   if (!event) return null;
-  if (isAdminGameKind(event.kind)) return processAdminGame(tx, world, event);
+  if (isAdminGameKind(event.kind)) return processAdminGame(tx, world, event, emit);
   if (event.kind === ADMIN_END_KIND) return processAdminEnd(tx, world, event);
   if (event.kind === ADMIN_RESET_KIND) return processAdminReset(tx, world, event, resetPreparation, signal);
   const payload = adminClockPayloadSchema.parse(event.payload),

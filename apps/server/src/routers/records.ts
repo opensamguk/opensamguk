@@ -1,18 +1,37 @@
 import { protectedProcedure, router } from '../trpc';
 import { beforeCursor, page, readWorld, recordsInput, requireGeneral } from '../queries';
 import { logInfo, logSelect, nationRecordInfo, worldRecordInfo } from '../visibility';
+import { z } from 'zod';
+import { decodeRecordCursor, encodeRecordCursor, generalLogCursor } from '../recordCursor';
+import { worldInput } from '../queries';
+
+const generalInput = worldInput.extend({ cursor: z.string().min(1).max(256).optional() }).strict();
 
 export const recordsRouter = router({
-  general: protectedProcedure.input(recordsInput).query(({ ctx, input }) =>
+  general: protectedProcedure.input(generalInput).query(({ ctx, input }) =>
     readWorld(ctx.db, input.worldId, async (tx) => {
       const general = await requireGeneral(tx, input.worldId, ctx.user.id);
+      // 기존 숫자 커서도 받고 새 응답은 같은 tick의 행까지 이어 읽는다.
+      const legacy = recordsInput.shape.cursor.safeParse(input.cursor);
+      const cursor =
+        input.cursor === undefined || legacy.success ? null : decodeRecordCursor(input.cursor, generalLogCursor);
       const logs = await tx.generalLog.findMany({
-        where: { worldId: input.worldId, generalId: general.id, ...beforeCursor(input.cursor) },
-        orderBy: { tick: 'desc' },
+        where: {
+          worldId: input.worldId,
+          generalId: general.id,
+          ...(cursor
+            ? { OR: [{ tick: { lt: cursor[0] } }, { tick: cursor[0], id: { lt: BigInt(cursor[1]) } }] }
+            : beforeCursor(input.cursor)),
+        },
+        orderBy: [{ tick: 'desc' }, { id: 'desc' }],
         take: 31,
         select: logSelect,
       });
-      return page(logs.map(logInfo));
+      const items = logs.slice(0, 30).map(logInfo);
+      return {
+        items,
+        nextCursor: logs.length > 30 ? encodeRecordCursor([items.at(-1)!.tick, items.at(-1)!.id]) : null,
+      };
     }),
   ),
   nation: protectedProcedure.input(recordsInput).query(({ ctx, input }) =>
