@@ -10,6 +10,7 @@ import {
   officialImages,
   preflightTarget,
   runTargetNative,
+  nativeFailureSchema,
   TargetPreflightError,
   volumePurposes,
   type TargetInput,
@@ -250,11 +251,15 @@ export async function verifyTargetNativeDescendants(root: string, signal: AbortS
         !alive(grandchild.pid)
       )
         throw new Error('NATIVE_PROBE_IDENTITY');
-      local.abort();
+      if (escaped) local.abort();
       const result = await execution;
       if (!(result.error instanceof TargetPreflightError)) throw new Error('NATIVE_PROBE_FALSE_SUCCESS');
       if (!escaped) {
-        if (result.error.code !== 'NATIVE' || result.error.stickyUnsettled)
+        if (
+          result.error.code !== 'NATIVE' ||
+          result.error.stickyUnsettled ||
+          result.error.nativeFailure?.reason !== 'timeout'
+        )
           throw new Error('NATIVE_PROBE_GROUP_UNSETTLED');
         await until(async () => !alive(parent.pid) && !alive(grandchild!.pid), Date.now() + 5000);
       } else {
@@ -262,6 +267,7 @@ export async function verifyTargetNativeDescendants(root: string, signal: AbortS
         if (
           result.error.code !== 'NATIVE_UNSETTLED' ||
           !result.error.stickyUnsettled ||
+          result.error.nativeFailure?.reason !== 'aborted' ||
           !facts?.handlesReleased ||
           facts.actualClose ||
           facts.stdoutEnded ||
@@ -335,6 +341,24 @@ export function metadataLinuxFailureCode(error: unknown) {
   return 'FIXTURE_STEP_FAILED';
 }
 
+export function metadataLinuxFailureDiagnostics(error: unknown, operation?: unknown, purpose?: unknown) {
+  const failureCode = metadataLinuxFailureCode(error);
+  const failureOperation =
+    operation === 'daemon-info' || operation === 'volume-create' || operation === 'volume-inspect'
+      ? operation
+      : undefined;
+  const failurePurpose =
+    (failureOperation === 'volume-create' || failureOperation === 'volume-inspect') &&
+    (purpose === 'app-secrets' || purpose === 'pg-secrets' || purpose === 'pg-data' || purpose === 'caddy-data')
+      ? purpose
+      : undefined;
+  const native =
+    error instanceof TargetPreflightError && (failureCode === 'NATIVE' || failureCode === 'NATIVE_UNSETTLED')
+      ? nativeFailureSchema.safeParse(error.nativeFailure)
+      : undefined;
+  return { failureCode, failureOperation, failurePurpose, nativeFailure: native?.success ? native.data : undefined };
+}
+
 async function realLinuxMetadata() {
   if (process.platform !== 'linux' || !process.env.GITHUB_ACTIONS || process.env.GITHUB_ACTIONS !== 'true')
     throw new Error('LINUX_CI_REQUIRED');
@@ -354,7 +378,9 @@ async function realLinuxMetadata() {
     assertions = 0,
     nativeProbeVerified = false;
   let stage = 'native-probes';
-  let failureCode: string | undefined;
+  let failure: ReturnType<typeof metadataLinuxFailureDiagnostics> | undefined;
+  let operation: 'daemon-info' | 'volume-create' | 'volume-inspect' | undefined;
+  let operationPurpose: string | undefined;
   const failures: unknown[] = [];
   const assert = (v: unknown) => {
     if (!v) throw new Error('METADATA_ASSERTION');
@@ -415,7 +441,9 @@ async function realLinuxMetadata() {
     });
     stage = 'fixture-volumes';
     f.input.target.dockerExecutable = docker;
+    operation = 'daemon-info';
     f.input.target.expectedDaemonId = (await command(['info', '--format', '{{.ID}}'])).trim();
+    operation = undefined;
     const addVolume = async (name: string, purpose: string, wrong = false) => {
       if (baselineVolumes.has(name)) throw new Error('OWN_VOLUME_NAME');
       const labels = {
@@ -423,17 +451,22 @@ async function realLinuxMetadata() {
         'org.opensamguk.target': f.input.target.targetId,
         'org.opensamguk.purpose': purpose,
       };
+      operation = 'volume-create';
+      operationPurpose = purpose;
       await command([
         'volume',
         'create',
         ...Object.entries(labels).flatMap(([k, v]) => ['--label', k + '=' + v]),
         name,
       ]);
+      operation = 'volume-inspect';
       const v = JSON.parse(await command(['volume', 'inspect', name, '--format', '{{json .}}'])) as {
         CreatedAt: string;
         Labels: Record<string, string>;
       };
       ownVolumes.push({ name, createdAt: v.CreatedAt, labels });
+      operation = undefined;
+      operationPurpose = undefined;
     };
     for (const [key, purpose] of Object.entries(volumePurposes))
       await addVolume(f.input.target.volumes[key as keyof typeof volumePurposes], purpose);
@@ -557,7 +590,7 @@ async function realLinuxMetadata() {
     assert((await hashFile(f.input.artifact.manifestPath)).sha256 === f.input.artifact.manifestSha256);
   } catch (error) {
     failed = true;
-    failureCode = metadataLinuxFailureCode(error);
+    failure = metadataLinuxFailureDiagnostics(error, operation, operationPurpose);
     failures.push(error);
   } finally {
     // Failures preserve fixture resources. Success deletes only re-inspected exact owned identities.
@@ -610,7 +643,7 @@ async function realLinuxMetadata() {
       nativeProbeCases: nativeProbeVerified ? 2 : 0,
       nativeProbeVerified,
       failureStage: failed ? stage : undefined,
-      failureCode,
+      ...failure,
       failures: failures.length,
       dbQueried: false,
       secretsRead: false,
