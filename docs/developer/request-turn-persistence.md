@@ -46,6 +46,8 @@ General·휴식 30칸·완료 sequence·InitialGeneral 전체 결과를 같은 �
 
 증거는 `tools/t1-11.integration.test.ts`의 실제 HTTP·PostgreSQL 권한·경합·원자성·SIGKILL·12개월 재생 시험으로 확인한다. 화면 AC는 T1-15에서 별도로 검증한다.
 
+T4-97의 AC-P2-34·AC-INT-20 후속으로 `general.mine.creationRules.personnelEnabled`는 항상 boolean을 반환한다. 장수 생성 전후 모두 저장된 월드의 replayFormat이 3이고 ruleFeatures에 personnel이 있을 때만 true다. 화면은 이 값으로 인사 조회와 메뉴를 켠다. 실제 인사 API는 기존 세션·월드·장수 권한을 계속 검사한다.
+
 ## 3. 턴 실행 (engine)
 
 ```text
