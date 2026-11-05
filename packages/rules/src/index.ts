@@ -9,6 +9,8 @@ export type { OperationalMapResource } from './world/map/operational';
 export * from './clock/constants';
 export * from './clock/clock';
 export * from './clock/admin';
+export * from './admin/game';
+export * from './admin/apply';
 export * from './clock/end';
 export * from './clock/reset';
 export {

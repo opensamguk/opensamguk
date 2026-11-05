@@ -14,6 +14,13 @@ import { requestWorldResetInput, worldResetRequestInput } from '@opensamguk/rule
 
 import { requestWorldEnd, requestWorldEndInput, getWorldEndRequest, worldEndRequestInput } from '../admin/worldEnd';
 import {
+  requestAdminGame,
+  getAdminGameRequest,
+  adminGameRequestInput,
+  adminGameRequestStatusInput,
+  adminGameRequestProcedure,
+} from '../admin/game';
+import {
   requestWorldClock,
   requestWorldClockInput,
   getWorldClockRequest,
@@ -29,6 +36,14 @@ import {
 } from '../admin/notices';
 
 export const adminRouter = router({
+  game: router({
+    request: adminGameRequestProcedure
+      .input(adminGameRequestInput)
+      .mutation(({ ctx, input }) => requestAdminGame(ctx, input)),
+    requestStatus: adminProcedure
+      .input(adminGameRequestStatusInput)
+      .query(({ ctx, input }) => getAdminGameRequest(ctx, input)),
+  }),
   whoami: adminProcedure.input(z.void()).query(() => ({ admin: true as const })),
   investigate: router({
     shared: adminProcedure.input(investigateSharedInput).query(({ ctx, input }) => investigateShared(ctx, input)),

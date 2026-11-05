@@ -15,6 +15,8 @@ import { type ReplayPolicy } from './policy/replay';
 import { completePersonnelStep } from './personnel/step';
 import { updateResidenceAnchors } from './personnel/residence';
 import { isAdminClockKind, applyAdminClockRecord } from './clock/admin';
+import { isAdminGameKind } from './admin/game';
+import { validateAdminGameRecord } from './admin/apply';
 
 export interface QueuedTurn {
   commandKey: string;
@@ -146,8 +148,10 @@ export function applyRecordedInput(
   replay: ReplayState,
   input: RecordedInput,
   registry: RuleRegistry = ruleRegistry,
+  context?: { unitSet?: UnitSetResource },
 ): ReplayState {
   if (isAdminClockKind(input.kind)) return applyAdminClockRecord(replay, input);
+  if (isAdminGameKind(input.kind)) validateAdminGameRecord(input);
   if (
     replay.policy &&
     (!replay.state.ruleFeatures ||
@@ -183,8 +187,8 @@ export function applyRecordedInput(
     throw new Error('이 월드에서 켜지 않은 기능입니다.');
   let next =
     input.kind === 'campaign.order'
-      ? kind.apply(replay, input, { resolver: resolverForRuleFeatures(replay.state, registry) })
-      : kind.apply(replay, input);
+      ? kind.apply(replay, input, { ...context, resolver: resolverForRuleFeatures(replay.state, registry) })
+      : kind.apply(replay, input, context);
   const features = replay.state.ruleFeatures ?? [];
   // 엄격한 후속 적재 전에 멸망·거점 소유 변경에 따른 계략 패를 정리한다.
   const ordered = features.includes('stratagem-cards-v1')

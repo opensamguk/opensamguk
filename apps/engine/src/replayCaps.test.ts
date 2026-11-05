@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import type { Prisma, PrismaClient } from '@opensamguk/db';
 import {
   applyCapsRecordedInput,
+  ADMIN_GAME_KINDS,
   applyTreatyInput,
   buildYearbook,
   capsResourceHashInput,
@@ -25,6 +26,22 @@ import { exportCapsArchive, readCapsArchive, replayCapsArchive, replayCapsToEnd,
 const clone = <T>(value: T): T => structuredClone(value);
 type Mode = 'off' | 'default' | 'human' | 'npc';
 const clauses = [{ kind: 'peace' as const }, { kind: 'nonAggression' as const, months: 1 }];
+
+it('AC-INT-23 형식6에는 관리자 게임 조치를 넣을 수 없다', async () => {
+  const archive = await fixture();
+  for (const kind of ADMIN_GAME_KINDS) {
+    const value = clone(archive);
+    value.afterEnd.push({
+      sequence: archive.end!.sequence + 1,
+      generalId: null,
+      kind,
+      status: 'REJECTED',
+      payload: {},
+      result: { code: 'UNSUPPORTED_FORMAT', message: '이 월드의 재생 형식에서는 사용할 수 없습니다.' },
+    });
+    expect(() => readCapsArchive(value)).toThrow('관리자 운영 입력은 형식3');
+  }
+});
 
 // 기대 해시는 기존 공개 순수 함수를 걷고 만든다. DB·adapter·수출 함수를 쓰지 않는다.
 async function fixture(mode: Mode = 'off', fromSequence = 3): Promise<CapsArchive> {

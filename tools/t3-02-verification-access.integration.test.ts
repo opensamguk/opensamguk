@@ -102,7 +102,7 @@ async function request(path: string, input: unknown, cookie?: string, mutation =
   };
 }
 
-async function snapshot() {
+async function snapshot(excludeAudit = false) {
   return db.$transaction(
     async (tx) => {
       const tables = await tx.$queryRaw<
@@ -110,6 +110,7 @@ async function snapshot() {
       >`SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename`;
       const result: Record<string, unknown> = {};
       for (const { tablename } of tables) {
+        if (excludeAudit && tablename === 'AuditLog') continue;
         if (!/^[A-Za-z_][A-Za-z_0-9]*$/.test(tablename)) throw new Error('검사 테이블 이름을 확인하세요.');
         const rows = await tx.$queryRawUnsafe<Array<{ rows: unknown }>>(
           `SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text), '[]'::jsonb) AS rows FROM "${tablename}" t`,
@@ -181,8 +182,9 @@ describe('T3-02 AC-M3-01 실제 PostgreSQL·HTTP 이메일 인증 차단', () =>
     });
   });
 
-  it('38개 변경 API가 미인증·위조·무인증·제재를 거부하며 모든 DB 행은 그대로다', async () => {
-    expect(paths).toHaveLength(38);
+  it('39개 변경 API가 미인증·위조·무인증·제재를 거부하고 운영 권한 거절 감사 한 행만 남긴다', async () => {
+    expect(paths).toHaveLength(39);
+    expect(paths).toContain('admin.game.request');
     expect(paths).toEqual(
       expect.arrayContaining(['notification.setDiscord', 'notification.setEvents', 'notification.removeDiscord']),
     );
@@ -197,7 +199,8 @@ describe('T3-02 AC-M3-01 실제 PostgreSQL·HTTP 이메일 인증 차단', () =>
 
     expect(paths).toContain('admin.world.requestEnd');
     expect(paths).toContain('admin.world.requestReset');
-    const before = await snapshot();
+    const before = await snapshot(true);
+    const auditBefore = await db.auditLog.findMany({ orderBy: { id: 'asc' } });
     for (const path of paths) {
       for (const input of [
         {},
@@ -219,7 +222,20 @@ describe('T3-02 AC-M3-01 실제 PostgreSQL·HTTP 이메일 인증 차단', () =>
         reason: null,
       });
     }
-    expect(await snapshot()).toBe(before);
+    expect(await snapshot(true)).toBe(before);
+    const auditAfter = await db.auditLog.findMany({ orderBy: { id: 'asc' } });
+    expect(auditAfter.slice(0, -1)).toEqual(auditBefore);
+    expect(auditAfter.at(-1)).toMatchObject({
+      actorKind: 'ADMIN',
+      actorUserId: users[1],
+      action: 'game.request.rejected',
+      targetType: 'World',
+      targetId: null,
+      worldId: null,
+      reason: null,
+      payload: { code: 'FORBIDDEN' },
+      inputEventId: null,
+    });
   });
 
   it('미인증 상태에서도 가입·로그인·메일 재전송·인증·암호 복구·로그아웃은 이어진다', async () => {
