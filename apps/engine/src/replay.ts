@@ -33,6 +33,8 @@ import {
   selectWorldCapabilities,
   isAdminClockKind,
   validateAdminClockRecord,
+  isAdminGameKind,
+  validateAdminGameRecord,
   ADMIN_END_KIND,
   validateAdminEndRecord,
   adminEndAppliedSchema,
@@ -351,18 +353,21 @@ export function readArchive(value: unknown, registry: RuleRegistry = ruleRegistr
       throw new Error('입력 기록의 순서·상태가 올바르지 않습니다.');
     previous = input.sequence;
   }
-  if (archive.version === 5) validatePolicyArchive(archive);
   const allInputs = [...archive.inputs, ...(archive.version !== 1 ? archive.afterEnd : [])];
+  if (archive.version !== 3 && allInputs.some((input) => isAdminGameKind(input.kind)))
+    throw new Error('관리자 운영 입력은 형식3 기록에만 넣을 수 있습니다.');
+  if (archive.version === 5) validatePolicyArchive(archive);
   for (const input of allInputs) {
     if (archive.version !== 3) {
-      if (input.kind === ADMIN_END_KIND || input.kind === ADMIN_RESET_KIND)
-        throw new Error('관리자 종료는 형식3 기록에만 넣을 수 있습니다.');
+      if (input.kind === ADMIN_END_KIND || input.kind === ADMIN_RESET_KIND || isAdminGameKind(input.kind))
+        throw new Error('관리자 운영 입력은 형식3 기록에만 넣을 수 있습니다.');
       if (Object.hasOwn(input, 'tick')) throw new Error('기존 형식 입력에 tick을 넣을 수 없습니다.');
       continue;
     }
     const kind = registry.inputKinds.find((kind) => kind.kind === input.kind);
     if (!kind) throw new Error('등록되지 않은 입력 종류입니다.');
     if (isAdminClockKind(input.kind)) validateAdminClockRecord(input);
+    if (isAdminGameKind(input.kind)) validateAdminGameRecord(input);
     if (input.kind === ADMIN_END_KIND) validateAdminEndRecord(input);
     if (input.kind === ADMIN_RESET_KIND) validateAdminResetRecord(input);
     const numericTick = kind.route === 'queued' || kind.directTick === true;
@@ -529,7 +534,7 @@ function applyArchiveInput(
   }
   if (input.status === 'APPLIED' && input.kind === 'turns.set' && input.generalId !== null)
     untouched.delete(input.generalId);
-  return applyRecordedInput(replay, input, registry);
+  return applyRecordedInput(replay, input, registry, { unitSet: archive.origin.initial.unitSet });
 }
 
 function validSequence(sequence: number, maximum = 10_000_000): boolean {

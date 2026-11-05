@@ -31,7 +31,7 @@ import { loadPersonnelTurnContext, persistPersonnelPacket } from './ruleFeatures
 import { appendLogisticsMovements } from './logisticsState';
 import { engineResolver, persistExt, verifyWorldExt } from './extState';
 import { assertWorldCapabilities } from './capsGate';
-import { processAdminClock } from './admin/executor';
+import { processAdminInputs } from './admin/executor';
 import { observeCommittedStep, type CommitMetricCandidate, type CommitMetricSink } from './metrics';
 import { preparePendingReset, type PendingResetPreparation } from './admin/reset';
 import { PgHeritageRepository } from './heritage/repository';
@@ -162,7 +162,7 @@ export class TurnLoop {
         if (!this.extVerified) await verifyWorldExt(tx, world);
         const adminClock =
           world.replayFormat === 3
-            ? await processAdminClock(tx, world, this.highWaterTick, resetPreparation, signal)
+            ? await processAdminInputs(tx, world, this.highWaterTick, resetPreparation, signal)
             : null;
         if (adminClock) {
           const deferred = adminClock.deferred;

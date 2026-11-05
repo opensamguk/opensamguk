@@ -1,5 +1,6 @@
 import {
   ARCHIVE_CAPS,
+  isAdminGameKind,
   applyCapsRecordedInput,
   assertReplayPolicy,
   buildYearbook,
@@ -351,6 +352,15 @@ function assertArchiveStructure(value: unknown): asserts value is CapsArchive {
 
 export function readCapsArchive(value: unknown): CapsArchive {
   assertJson(value);
+  if (
+    object(value) &&
+    [value.inputs, value.afterEnd].some(
+      (inputs) =>
+        Array.isArray(inputs) &&
+        inputs.some((input: unknown) => object(input) && typeof input.kind === 'string' && isAdminGameKind(input.kind)),
+    )
+  )
+    throw new Error('관리자 운영 입력은 형식3 기록에만 넣을 수 있습니다.');
   // parse 출력은 사용하지 않는다. 해시가 걸린 원문을 고치지 않는 검사다.
   assertArchiveStructure(value);
   const archive = value;
