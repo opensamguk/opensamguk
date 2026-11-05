@@ -257,7 +257,7 @@ function Editor<S extends DisplaySlot>({
     else if (query.isError)
       precheckByKey.set(key, {
         ok: 'error',
-        message: errorCode(query.error) === 'BAD_REQUEST' ? '명령과 인자를 확인하세요.' : '검사하지 못했습니다.',
+        message: errorCode(query.error) === 'BAD_REQUEST' ? '명령과 고른 값을 확인하세요.' : '검사하지 못했습니다.',
       });
   });
 
@@ -580,6 +580,8 @@ function Editor<S extends DisplaySlot>({
         고르며 Enter로 명령 찾기에 갑니다. 경고가 있어도 저장되며 실행할 때 다시 검사합니다.
       </p>
 
+      {source.timed && home.data?.general.nationId === null ? <RoninNote commands={commandList} /> : null}
+
       {commands.isError ? (
         <ErrorState title="명령 목록을 불러오지 못했습니다" onRetry={() => void commands.refetch()} />
       ) : (
@@ -596,6 +598,7 @@ function Editor<S extends DisplaySlot>({
           searchRef={searchRef}
           onPut={onPut}
           cityChoicesFor={cityChoicesFor}
+          precheck={source.precheck}
         />
       )}
 
@@ -720,5 +723,26 @@ function ReadOnlySlots({
         </tbody>
       </table>
     </div>
+  );
+}
+
+// 갓 만든 재야 장수가 첫 명령을 고를 수 있게 국가에 들어가거나 세력을 일으키는 명령을 알려 준다.
+// 이름은 서버 명령 목록에 실제로 있는 것만 적는다. 다른 명령이 재야에게 막히는지는 사전 검사가 알려 준다.
+const RONIN_COMMANDS = [
+  ['join', 'join_random'],
+  ['uprising', 'found'],
+] as const;
+function RoninNote({ commands }: { commands: readonly CommandInfo[] }) {
+  const names = RONIN_COMMANDS.map((keys) =>
+    keys.flatMap((key) => commands.find((command) => command.key === key)?.name ?? []).map((name) => `'${name}'`),
+  );
+  const [join, rise] = names;
+  if (!join?.length && !rise?.length) return null;
+  return (
+    <p className={styles.help} role="note">
+      재야 장수입니다. 명령을 고르면 지금 실행할 수 있는지 먼저 알려 줍니다.
+      {join?.length ? ` 국가에 들어가기: ${join.join(', ')}.` : ''}
+      {rise?.length ? ` 세력 일으키기: ${rise.join(', ')}.` : ''}
+    </p>
   );
 }

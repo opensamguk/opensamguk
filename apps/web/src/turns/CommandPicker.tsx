@@ -1,8 +1,10 @@
 import { useId, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { DEFAULT_CREW_TYPE_ID } from '../battleSim/publicUnitSet';
 import { DisabledReason } from '../ui/DisabledReason';
 import { argFields, buildArgs, requiredKeys, type ArgField } from './args';
 import type { Turn } from './draft';
+import type { Check, SourceQuery } from './source';
 import styles from './TurnEditor.module.css';
 import { cityPreparationNote, cityPreparationSchema, hasCityBranch, type PreparationTarget } from './cityResourceArgs';
 
@@ -44,6 +46,8 @@ interface Props {
   onPut: (turn: Turn) => void;
   // 없거나 null을 돌려주면 지도의 모든 도시가 후보다.
   cityChoicesFor?: ((commandKey: string) => CityChoices | null) | undefined;
+  // 있으면 고른 명령을 넣기 전에 서버 사전 검사를 받아 경고를 미리 보인다. 30칸 표와 같은 조회 키라 캐시를 같이 쓴다.
+  precheck?: ((turn: Turn) => SourceQuery<Check>) | undefined;
 }
 
 // 서버가 준 명령을 카드로 고른다. 카드 선택과 실제 명령/패 소비는 별개다.
@@ -61,6 +65,7 @@ export function CommandPicker({
   searchRef,
   onPut,
   cityChoicesFor,
+  precheck,
 }: Props) {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<string>('all');
@@ -159,13 +164,18 @@ export function CommandPicker({
     return nextSchema;
   };
 
+  // 지금 넣으면 들어갈 명령. 칸이 덜 찼거나 형식을 모르면 없다.
+  const ready: Turn | null =
+    command && schema && built.missing.length === 0
+      ? {
+          commandKey: command.key,
+          args: cityDrill && preparationTarget === 'city' ? { ...built.args, target: 'city' } : built.args,
+          explicit: true,
+        }
+      : null;
   const put = () => {
-    if (!command || !schema || blockedReason || built.missing.length > 0) return;
-    onPut({
-      commandKey: command.key,
-      args: cityDrill && preparationTarget === 'city' ? { ...built.args, target: 'city' } : built.args,
-      explicit: true,
-    });
+    if (!ready || blockedReason) return;
+    onPut(ready);
   };
 
   const onSearchKey = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -262,7 +272,7 @@ export function CommandPicker({
                           ? '입력 형식 확인 필요'
                           : cardFields
                               .map((field) => `${field.label}${cardRequired.includes(field.key) ? ' (필수)' : ''}`)
-                              .join(' · ') || '인자 없음'}
+                              .join(' · ') || '고를 것 없음'}
                       </span>
                     </span>
                   </label>
@@ -302,7 +312,9 @@ export function CommandPicker({
               {costNote}
             </p>
           ) : null}
-          {schema && fields.length === 0 ? <p className={styles.muted}>인자 없이 넣는 명령입니다.</p> : null}
+          {schema && fields.length === 0 ? <p className={styles.muted}>더 고를 것 없이 바로 넣는 명령입니다.</p> : null}
+          {/* 휴식은 30칸 표처럼 검사하지 않는다. */}
+          {ready && precheck && ready.commandKey !== 'rest' ? <PrecheckWarning query={precheck(ready)} /> : null}
           {fields.map((field, i) => (
             <ArgInput
               key={field.key}
@@ -456,5 +468,16 @@ function ArgInput({
         </p>
       ) : null}
     </div>
+  );
+}
+
+// 넣기 전 사전 검사 경고. 판정은 서버가 하고 화면은 결과만 보인다. 통과하거나 아직 모르면 아무것도 그리지 않는다.
+function PrecheckWarning({ query }: { query: SourceQuery<Check> }) {
+  const check = useQuery({ queryKey: query.queryKey, queryFn: query.queryFn, select: query.select, retry: false });
+  if (!check.data || check.data.ok) return null;
+  return (
+    <p className={styles.warn} role="note">
+      사전 검사 경고: {check.data.message} 경고가 있어도 넣을 수 있습니다. 실행할 때 다시 검사합니다.
+    </p>
   );
 }
