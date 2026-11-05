@@ -135,7 +135,12 @@ it.each(['empty', 'upgrade'] as const)(
       ).toEqual([{ data_type: 'jsonb', is_nullable: 'YES', column_default: null }]);
       for (const name of names.slice(markerIndex + 1))
         await client.query(await readFile(new URL(`${name}/migration.sql`, directory), 'utf8'));
-      expect((await client.query('SELECT * FROM "World" ORDER BY id')).rows).toEqual(after);
+      expect(
+        (await client.query('SELECT * FROM "World" ORDER BY id')).rows.map(({ equipmentState, ...row }) => {
+          expect(equipmentState).toBeNull();
+          return row;
+        }),
+      ).toEqual(after);
     });
   },
 );
