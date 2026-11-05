@@ -472,11 +472,12 @@ function ArgInput({
 }
 
 // 넣기 전 사전 검사 경고. 판정은 서버가 하고 화면은 결과만 보인다. 통과하거나 아직 모르면 아무것도 그리지 않는다.
+// 고를 때 새로 나타나므로 status로 알린다. 편집기의 note는 넣기·저장 불가 사유 하나로 둔다.
 function PrecheckWarning({ query }: { query: SourceQuery<Check> }) {
   const check = useQuery({ queryKey: query.queryKey, queryFn: query.queryFn, select: query.select, retry: false });
   if (!check.data || check.data.ok) return null;
   return (
-    <p className={styles.warn} role="note">
+    <p className={styles.warn} role="status">
       사전 검사 경고: {check.data.message} 경고가 있어도 넣을 수 있습니다. 실행할 때 다시 검사합니다.
     </p>
   );

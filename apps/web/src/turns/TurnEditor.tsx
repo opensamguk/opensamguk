@@ -580,7 +580,10 @@ function Editor<S extends DisplaySlot>({
         고르며 Enter로 명령 찾기에 갑니다. 경고가 있어도 저장되며 실행할 때 다시 검사합니다.
       </p>
 
-      {source.timed && home.data?.general.nationId === null ? <RoninNote commands={commandList} /> : null}
+      {/* 바꿀 수 있는 개인 30칸에서만 보인다. 끝난 판·읽기 전용 칸의 사유 안내와 겹치지 않는다. */}
+      {source.timed && !ended && readOnly === null && home.data?.general.nationId === null ? (
+        <RoninNote commands={commandList} />
+      ) : null}
 
       {commands.isError ? (
         <ErrorState title="명령 목록을 불러오지 못했습니다" onRetry={() => void commands.refetch()} />
@@ -739,7 +742,7 @@ function RoninNote({ commands }: { commands: readonly CommandInfo[] }) {
   const [join, rise] = names;
   if (!join?.length && !rise?.length) return null;
   return (
-    <p className={styles.help} role="note">
+    <p className={styles.help}>
       재야 장수입니다. 명령을 고르면 지금 실행할 수 있는지 먼저 알려 줍니다.
       {join?.length ? ` 국가에 들어가기: ${join.join(', ')}.` : ''}
       {rise?.length ? ` 세력 일으키기: ${rise.join(', ')}.` : ''}

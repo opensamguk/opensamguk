@@ -263,9 +263,9 @@ it('넣기 전에 고른 명령의 서버 사전 검사 경고를 보이고 휴�
   );
   fireEvent.click(screen.getByRole('radio', { name: '이동' }));
   fireEvent.click(screen.getByRole('radio', { name: '휴식' }));
-  expect(screen.queryByRole('note')).toBeNull();
+  expect(screen.queryByRole('status')).toBeNull();
   fireEvent.click(screen.getByRole('radio', { name: '농지 개간' }));
-  expect((await screen.findByRole('note')).textContent).toBe(
+  expect((await screen.findByRole('status')).textContent).toBe(
     '사전 검사 경고: 국가에 소속되어야 합니다. 경고가 있어도 넣을 수 있습니다. 실행할 때 다시 검사합니다.',
   );
   expect(asked).toEqual(['farm']);
