@@ -134,7 +134,9 @@ it('T4-92 AC-P2-29 서버의 새 분류도 카드와 분류 단추에 보이며 
   expect(screen.getAllByRole('radio')).toHaveLength(commands.length);
   const card = screen.getByRole('radio', { name: '새 명령' });
   expect(card.getAttribute('aria-describedby')).toBeTruthy();
-  expect(document.getElementById(card.getAttribute('aria-describedby')!)?.textContent).toBe('new-category · 인자 없음');
+  expect(document.getElementById(card.getAttribute('aria-describedby')!)?.textContent).toBe(
+    'new-category · 고를 것 없음',
+  );
   fireEvent.click(screen.getByRole('button', { name: 'new-category' }));
   expect(screen.getAllByRole('radio')).toEqual([card]);
   fireEvent.change(screen.getByRole('searchbox'), { target: { value: '농지' } });
@@ -335,4 +337,33 @@ it('월드 규칙을 받기 전 union을 인자 없음으로 표시하거나 검
   expect(screen.getByText('군사 · 입력 형식 확인 필요')).toBeTruthy();
   fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Enter' });
   expect(input.onPut).not.toHaveBeenCalled();
+});
+
+it('넣기 전에 고른 명령의 서버 사전 검사 경고를 보이고 휴식과 덜 찬 명령은 검사하지 않는다', async () => {
+  const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
+  const asked: string[] = [];
+  const precheck = (turn: { commandKey: string; args: Record<string, unknown> }) => ({
+    queryKey: ['precheck', turn.commandKey, turn.args],
+    queryFn: () => {
+      asked.push(turn.commandKey);
+      return Promise.resolve({ ok: false, message: '국가에 소속되어야 합니다.' });
+    },
+    select: (data: unknown) => data as { ok: false; message: string },
+  });
+  const onPut = vi.fn();
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <CommandPicker {...props()} onPut={onPut} precheck={precheck} />
+    </QueryClientProvider>,
+  );
+  fireEvent.click(screen.getByRole('radio', { name: '이동' }));
+  fireEvent.click(screen.getByRole('radio', { name: '휴식' }));
+  expect(screen.queryByRole('status')).toBeNull();
+  fireEvent.click(screen.getByRole('radio', { name: '농지 개간' }));
+  expect((await screen.findByRole('status')).textContent).toBe(
+    '사전 검사 경고: 국가에 소속되어야 합니다. 경고가 있어도 넣을 수 있습니다. 실행할 때 다시 검사합니다.',
+  );
+  expect(asked).toEqual(['farm']);
+  fireEvent.click(screen.getByRole('button', { name: /1번 칸에 넣기/ }));
+  expect(onPut).toHaveBeenCalledWith({ commandKey: 'farm', args: {}, explicit: true });
 });

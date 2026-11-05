@@ -101,6 +101,12 @@
 .reason {
   color: var(--color-text-muted);
 }
+/* 접은 칸이 모두 같은 이유로 가려졌을 때의 한 줄. 세부 칸 목록과 같은 여백이다. */
+.sharedReason {
+  margin: var(--space-1) 0;
+  font-weight: normal;
+  color: var(--color-text-muted);
+}
 
 @media (min-width: 768px) {
   .responsive .table td,

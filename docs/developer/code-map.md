@@ -22,6 +22,7 @@ ADMIN-RESET-D 후보의 `packages/rules/src/clock/reset.ts`는 엄격 요청·pa
 
 | 경로 | 역할 |
 | ---- | ---- |
+| `packages/rules/src/clock/truce.ts` | T4-40 순수 휴전 겹침·유효 경과·구간·tick 역변환. 프리셋 선택 칸은 기본 꺼짐이며 실제 월드 시계 연결은 후속 |
 | `apps/server/src/index.ts` | DB 연결과 HTTP 서버 시작·종료 |
 | `apps/server/src/server.ts` | Fastify 생성, 쿠키·인증 context, 비밀값을 제외한 로그 |
 | `apps/server/src/auth/` | Argon2id, 세션·계정 토큰 해시·만료·원자 소비, 재설정의 비밀번호·세션 폐기와 실제 HTTP·DB 테스트 |

@@ -555,7 +555,8 @@ it('두 정식 월드의 미동의 변경은 전부403·무변경이며 실제 �
   const paths = Object.entries(procedures)
     .filter(([, procedure]) => procedure._def.type === 'mutation' && procedure._def.meta?.accountAccess === 'verified')
     .map(([path]) => path);
-  expect(paths).toHaveLength(38);
+  expect(paths).toHaveLength(39);
+  expect(paths).toContain('admin.game.request');
   expect(paths).toEqual(
     expect.arrayContaining(['notification.setDiscord', 'notification.setEvents', 'notification.removeDiscord']),
   );

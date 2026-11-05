@@ -89,6 +89,11 @@ export function readExtensionRegistryKeys(root) {
     'array',
   ]);
   const zodMethods = new Set(['int', 'positive', 'nonnegative', 'min', 'max', 'length', 'optional', 'nullable']);
+  const numericLiteral = (node) =>
+    ts.isNumericLiteral(node) ||
+    (ts.isPrefixUnaryExpression(node) &&
+      node.operator === ts.SyntaxKind.MinusToken &&
+      ts.isNumericLiteral(node.operand));
   const fail = (file, message) => {
     throw new Error(`확장 registry ${relative(root, file)}: ${message}`);
   };
@@ -233,9 +238,24 @@ export function readExtensionRegistryKeys(root) {
     if (!ts.isCallExpression(node) || !ts.isPropertyAccessExpression(node.expression)) return null;
     const receiver = zodValue(file, node.expression.expression);
     const methods = receiver?.zodRoot ? zodConstructors : receiver?.zodSchema ? zodMethods : null;
-    if (!methods?.has(node.expression.name.text) || node.questionDotToken || node.expression.questionDotToken)
+    const refinement = receiver?.zodSchema && node.expression.name.text === 'refine';
+    if (
+      (!refinement && !methods?.has(node.expression.name.text)) ||
+      node.questionDotToken ||
+      node.expression.questionDotToken
+    )
       return null;
-    for (const argument of node.arguments) zodArgument(file, argument);
+    if (refinement) {
+      const predicate = node.arguments[0];
+      if (
+        !predicate ||
+        node.arguments.length > 2 ||
+        (!ts.isArrowFunction(predicate) && !ts.isFunctionExpression(predicate))
+      )
+        fail(file, 'refine 검사기는 함수 리터럴이어야 한다');
+      // refine는 생성 때 검사기를 실행하지 않는다. 인자를 만드는 실행 식은 허용하지 않는다.
+      for (const argument of node.arguments.slice(1)) zodArgument(file, argument);
+    } else for (const argument of node.arguments) zodArgument(file, argument);
     return { zodSchema: true };
   };
   const argumentActive = new Set();
@@ -259,7 +279,7 @@ export function readExtensionRegistryKeys(root) {
     if (ts.isIdentifier(node)) return argumentBinding(file, node.text);
     if (
       ts.isStringLiteral(node) ||
-      ts.isNumericLiteral(node) ||
+      numericLiteral(node) ||
       ts.isBigIntLiteral(node) ||
       ts.isNoSubstitutionTemplateLiteral(node) ||
       [ts.SyntaxKind.TrueKeyword, ts.SyntaxKind.FalseKeyword, ts.SyntaxKind.NullKeyword].includes(node.kind)
@@ -474,7 +494,7 @@ export function readExtensionRegistryKeys(root) {
     if (
       ts.isIdentifier(node) ||
       ts.isStringLiteral(node) ||
-      ts.isNumericLiteral(node) ||
+      numericLiteral(node) ||
       ts.isBigIntLiteral(node) ||
       ts.isNoSubstitutionTemplateLiteral(node) ||
       ts.isArrowFunction(node) ||

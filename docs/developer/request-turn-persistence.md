@@ -1,5 +1,25 @@
 # 요청·턴·저장 흐름
 
+## 관리자 게임 조치 후보 (INT-23 PR1·2 · AC-INT-23)
+
+`admin.game.request`는 현재 세션의 관리자와 `expectedUserId`가 같은지 확인한다. World 잠금 뒤 현재 계정·세션·제재·인증·동의를 다시 검사한다. 입력은 `{expectedUserId,worldId,idempotencyKey,reason,action}`이다. 장수 이름·NPC 전환·30칸 비우기·내보내기·수치, 도시 수치, 국가 수치·이름·수뇌 임명 취소의9종을 받는다. 수치마다 `{expected,value}`를 받으며 장수 능력치나 도시 소유 국가는 바꾸지 않는다.
+
+접수는 형식3의 RUNNING·PAUSED 월드에 PENDING 입력과 `game.request` 감사만 쓴다. 같은 키·같은 정규형 입력은 기존 결과를 반환하고 다른 내용은409다. 인증·약관 경계를 지난 요청의 권한·형식·접수 거절은 `game.request.rejected` 감사에 오류 코드만 남긴다. 원래 요청 트랜잭션을 되돌린 뒤 남기는 감사이므로 거절된 InputEvent는 만들지 않는다. `admin.game.requestStatus`는 현재 관리자 자격을 다시 검사하고 본인 계정·월드·키의 결과만 읽는다.
+
+엔진은 기존 시계·종료·초기화와 같은 운영 대기열에서 id 순서로 하나씩 처리한다. 리스→World→행위자 잠금과 현재 관리자·전체 제재·월드 상태를 검사한다. 수치의 모든 `expected`와 대상·범위도 확인한다. 부곡 월드는 장수 행의 병력·병종·훈련·사기를 `CAMPAIGN_FIELD`로 거절한다. 일반 월드의 병종은 원생성 병종표에 있는 전투 병종만 받는다. 적용·거절 모두 순서와 tick, 처리 감사를 같은 트랜잭션에 쓴다.
+
+적용은 rules 등록부와 `applyRecordedInput`의 공통 후처리를 거친다. NPC 전환은 사람 연결·활동 기준을 지우고 군주였다면 국가의 NPC 표시를 켠다. 소속·관직·병력은 유지한다. 30칸 비우기는 방침 월드의 빈칸 형식을 유지하고 revision을1 올린다. 인사 후처리는 수뇌 자리와 발령 제안, 실제 이동의 거주 앵커도 함께 저장한다. 재생은 변경 전후를 다시 계산해 기록과 대조한다. 기존 형식과 caps에는 새 운영 입력을 넣을 수 없다.
+
+`{kind:'admin.general.remove',generalId}`는 군주를 제외한 장수의 활동을 끝낸다. 처리 tick을 `General.removedAt`에 저장하며 행·이름·기록 참조는 남긴다. 기존 장수의 null은 규칙 상태에서 키를 생략해 이전 해시를 지킨다. 조작권·소속·관직·활동 기록을 해제하고 병력은 실제 지휘관이 있는 도시 주민으로 최대치까지 돌려준다. 소유·지휘 부곡은 해산하고 휘하·발령·혼인·조정 직위와 제안을 정리한다. 턴·순위·현재 인원 조회·명령 대상에서 제외하며 이 장수가 앞서 접수한 대기 입력은 `GENERAL_REMOVED`로 거절한다. 계정은 생성이 열린 월드에서 새 장수를 만들 수 있다. 가문의 사망·계승으로 기록하지 않는다.
+
+`admin.message.send`는 같은 요청 경로에서 `{scope:'WORLD',body}` 또는 `{scope:'PRIVATE',generalId,body}`를 받는다. 본문은 공백만으로 쓸 수 없고 최대 1,000자다. 게임 수치를 바꾸지 않는 엄격한 입력으로 재생하고 실제 쪽지는 엔진 트랜잭션에서 한 번 저장한다. 거절·롤백 때 쪽지는 생기지 않는다. 저장 발신자는 `{kind:'admin',name:'운영'}`이며 응답에는 기존 `generalId:null,nation:null`도 있어 기존 발신자 표시를 유지한다. 알림은 commit 뒤 기존 실시간 경로로 보낸다.
+
+적용한 장수 조치는 해당 `GeneralLog`의 `kind:'admin'`으로, 국가·도시 조치는 월드 쪽지로 남긴다. 운영 계정과 사유는 감사에만 남긴다. 개인 기록과 홈 최근 기록은 `(tick,id)` 내림차순이다. `records.general`은 새 복합 커서를 돌려주며 기존 숫자 커서도 받는다. 나머지 개인 기록 API의 커서는 그대로다.
+
+운영 조회는 모두 `adminProcedure`이며 같은 트랜잭션에서 현재 관리자·세션을 다시 검사하고 `admin.game.read` 감사를 저장한다. `admin.game.general`은 `{worldId,generalId}`를 받아 퇴장 여부와 연결 계정을 포함한 장수 상세를 돌려준다. 없는 대상 조회도 감사한 뒤 NOT_FOUND를 돌려준다. `generalLogs`·`generalInputs`는 같은 필수 입력에, `nationLogs`는 선택 `nationId`, `battles`는 선택 `generalId`에 `fromTick`·`toTick`·불투명 `cursor`를 받는다. 목록 응답은 `{items,nextCursor}`이고 한 페이지 최대 100행이다. 전투의 장수 필터는 공격자와 기록 대상 양쪽에 적용한다. 같은 tick의 경계에서도 중복·누락 없이 다음 행으로 이어진다.
+
+공개 기록·쪽지·운영 조회는 전체 검사·독립 리뷰·보호 병합 전의 후보다. 운영 화면은 Claude 담당이며 전체 AC-INT-23은 미완료다.
+
 ## 관리자 초기화 적용 후보 (ADMIN-RESET-D1~D3)
 
 초기화는 기존 원본 월드의 `(worldId, userId, idempotencyKey)` InputEvent를 단일 요청 원장으로 쓴다. 새 표나 migration은 없다. `requestReset`은 World 쓰기 잠금 뒤 현재 User·Session과 관리자 자격·제재·인증·동의를 확인한다. 기존 키를 먼저 대조하고 새 접수만 원본 상태·이름·revision·원생성 형식3을 검사한다. 서버가 처음 만든 새 월드 UUID와 실제 시드를 엄격 payload에 고정하고 PENDING·요청 감사만 함께 확정한다. 같은 정규형 재접수는 원래 결과를 반환한다. `resetRequest`도 현재 자격을 확인하며 본인의 월드·키만 읽는다.
@@ -45,6 +65,8 @@ API와 엔진은 NFC·trim 뒤 코드포인트 1~6글자 이름(한글 음절·H
 General·휴식 30칸·완료 sequence·InitialGeneral 전체 결과를 같은 펜싱 트랜잭션으로 저장한다. API는 commit 뒤 최대 5초 조회하고 미완료면 pending을 반환한다. mine.creation으로 pending·rejected를 구분한다. 공개 장수는 명시적 projection이며 userId·affinity·내부 입력 키·sequence는 내보내지 않는다. 세션은 30일 수명을 유지하며 잔여 15일 이하일 때만 연장·Set-Cookie를 한다. 정상 동시 연장은 최신 상태를 다시 읽어 인증 실패와 구분한다.
 
 증거는 `tools/t1-11.integration.test.ts`의 실제 HTTP·PostgreSQL 권한·경합·원자성·SIGKILL·12개월 재생 시험으로 확인한다. 화면 AC는 T1-15에서 별도로 검증한다.
+
+T4-97의 AC-P2-34·AC-INT-20 후속으로 `general.mine.creationRules.personnelEnabled`는 항상 boolean을 반환한다. 장수 생성 전후 모두 저장된 월드의 replayFormat이 3이고 ruleFeatures에 personnel이 있을 때만 true다. 화면은 이 값으로 인사 조회와 메뉴를 켠다. 실제 인사 API는 기존 세션·월드·장수 권한을 계속 검사한다.
 
 ## 3. 턴 실행 (engine)
 

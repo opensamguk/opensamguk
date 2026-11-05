@@ -1,10 +1,14 @@
 import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join, relative, resolve } from 'node:path';
-import { afterAll, beforeAll, expect, it } from 'vitest';
+import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 import { parse as yaml } from 'yaml';
 import ts from 'typescript';
-import { createTargetFixture, metadataLinuxFailureCode } from './t2-15-release-target-linux.mts';
+import {
+  createTargetFixture,
+  metadataLinuxFailureCode,
+  metadataLinuxFailureDiagnostics,
+} from './t2-15-release-target-linux.mts';
 import { hashFile, fileInventory } from './release-artifact';
 import {
   nonsecretKeys,
@@ -100,6 +104,64 @@ it('a changing code accessor cannot replace the already-whitelisted value with p
   Object.defineProperty(error, 'code', { get: () => (++reads === 1 ? 'IMAGE' : 'canary-secret') });
   expect(metadataLinuxFailureCode(error)).toBe('IMAGE');
   expect(reads).toBe(1);
+});
+it('AC-M2-08 Linux 실패 진단은 고정 하위 작업·purpose·종료 사실만 출력한다', () => {
+  const error = Object.assign(
+    new TargetPreflightError('NATIVE', undefined, { reason: 'nonzero-exit', exitCode: 7, signal: null }),
+    { path: '/private/canary', stderr: 'canary', environment: { TOKEN: 'canary' }, cause: new Error('canary') },
+  );
+  const result = metadataLinuxFailureDiagnostics(error, 'volume-create', 'app-secrets');
+  expect(result).toEqual({
+    failureCode: 'NATIVE',
+    failureOperation: 'volume-create',
+    failurePurpose: 'app-secrets',
+    nativeFailure: { reason: 'nonzero-exit', exitCode: 7, signal: null },
+  });
+  expect(metadataLinuxFailureDiagnostics(error, 'daemon-info', 'app-secrets').failurePurpose).toBeUndefined();
+  expect(metadataLinuxFailureDiagnostics(error, 'volume-inspect', 'pg-data').failurePurpose).toBe('pg-data');
+  expect(JSON.stringify(result)).not.toContain('canary');
+  expect(
+    metadataLinuxFailureDiagnostics(
+      Object.assign(new Error('canary'), { code: 'NATIVE' }),
+      '/private/canary',
+      'canary',
+    ),
+  ).toEqual({
+    failureCode: 'FIXTURE_STEP_FAILED',
+    failureOperation: undefined,
+    failurePurpose: undefined,
+    nativeFailure: undefined,
+  });
+});
+it('AC-M2-08 임의 진단 값·추가 원문·범위 밖 종료 정보는 출력하지 않는다', () => {
+  const valid = { reason: 'nonzero-exit', exitCode: 7, signal: null };
+  for (const patch of [
+    { reason: 'canary' },
+    { exitCode: -1 },
+    { exitCode: 256 },
+    { signal: 'canary' },
+    { stdout: 'canary' },
+  ]) {
+    const error = Object.assign(new TargetPreflightError('NATIVE'), { nativeFailure: { ...valid, ...patch } });
+    const result = metadataLinuxFailureDiagnostics(error, 'volume-inspect', 'canary');
+    expect(result.nativeFailure).toBeUndefined();
+    expect(result.failurePurpose).toBeUndefined();
+    expect(JSON.stringify(result)).not.toContain('canary');
+  }
+});
+it('AC-M2-08 진단은 오류 접근자를 한 번 읽고 허용한 사본을 보존한다', () => {
+  const facts = { reason: 'nonzero-exit' as const, exitCode: 7, signal: null };
+  const error = new TargetPreflightError('NATIVE');
+  let codes = 0,
+    details = 0;
+  Object.defineProperty(error, 'code', { get: () => (++codes === 1 ? 'NATIVE' : 'canary') });
+  Object.defineProperty(error, 'nativeFailure', { get: () => (++details === 1 ? facts : { reason: 'canary' }) });
+  const result = metadataLinuxFailureDiagnostics(error, 'volume-create', 'pg-secrets');
+  facts.exitCode = 9;
+  expect(result.nativeFailure).toEqual({ reason: 'nonzero-exit', exitCode: 7, signal: null });
+  expect(codes).toBe(1);
+  expect(details).toBe(1);
+  expect(JSON.stringify(result)).not.toContain('canary');
 });
 beforeAll(async () => {
   owned = await mkdtemp(join(tmpdir(), 'opensamguk-target-pure-'));
@@ -413,17 +475,21 @@ it('AC-M2-08 실제 native 종료와 양쪽 EOF만 성공이며 stderr·오류 �
     new AbortController().signal,
   );
   expect(result).toBe('ok');
-  await expect(
-    runTargetNative(
-      process.execPath,
-      ['-e', 'process.stderr.write("canary-not-for-log");process.exitCode=1'],
-      new AbortController().signal,
-    ),
-  ).rejects.toThrow('운영 대상 metadata 사전 확인을 마치지 못했습니다.');
+  const error = await runTargetNative(
+    process.execPath,
+    ['-e', 'process.stderr.write("canary-not-for-log");process.exitCode=1'],
+    new AbortController().signal,
+  ).catch((error: unknown) => error);
+  expect(error).toMatchObject({
+    message: '운영 대상 metadata 사전 확인을 마치지 못했습니다.',
+    code: 'NATIVE',
+    nativeFailure: { reason: 'nonzero-exit', exitCode: 1, signal: null },
+  });
+  expect(JSON.stringify(metadataLinuxFailureDiagnostics(error))).not.toContain('canary');
 });
 it('AC-M2-08 실제 native 취소는 자기 자식 종료·EOF 뒤 고정 실패로 끝난다', async () => {
   const abort = new AbortController(),
-    timer = setTimeout(() => abort.abort(), 50);
+    timer = setTimeout(() => abort.abort(new Error('canary-not-for-log')), 50);
   try {
     const result = await runTargetNative(process.execPath, ['-e', 'setInterval(()=>{},1000)'], abort.signal).then(
       () => undefined,
@@ -433,7 +499,38 @@ it('AC-M2-08 실제 native 취소는 자기 자식 종료·EOF 뒤 고정 실패
     if (!(result instanceof TargetPreflightError)) throw new Error('EXPECTED_NATIVE_FAILURE');
     expect(result.code).toBe('NATIVE');
     expect(result.stickyUnsettled).toBe(false);
+    expect(result.nativeFailure?.reason).toBe('aborted');
+    expect(Object.isFrozen(result.nativeFailure)).toBe(true);
+    expect(JSON.stringify(metadataLinuxFailureDiagnostics(result))).not.toContain('canary');
   } finally {
     clearTimeout(timer);
   }
+});
+it('AC-M2-08 deadline 뒤 실제 자식의 종료가 timeout 원인을 덮지 않는다', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  try {
+    const execution = runTargetNative(
+      process.execPath,
+      ['-e', 'setInterval(()=>{},1000)'],
+      new AbortController().signal,
+    ).catch((error: unknown) => error);
+    // 실제 자식·EOF를 쓰고 deadline 타이머만 진행한다.
+    vi.advanceTimersByTime(10000);
+    const error = await execution;
+    expect(error).toMatchObject({ code: 'NATIVE', stickyUnsettled: false, nativeFailure: { reason: 'timeout' } });
+  } finally {
+    vi.useRealTimers();
+  }
+});
+it('AC-M2-08 실제 출력 한도 취소는 원문 없이 최초 원인을 보존한다', async () => {
+  const error = await runTargetNative(
+    process.execPath,
+    [
+      '-e',
+      'process.stdout.write("canary-not-for-log");process.stdout.write(Buffer.alloc(4*1024*1024+1,120));setInterval(()=>{},1000)',
+    ],
+    new AbortController().signal,
+  ).catch((error: unknown) => error);
+  expect(error).toMatchObject({ code: 'NATIVE', stickyUnsettled: false, nativeFailure: { reason: 'output-limit' } });
+  expect(JSON.stringify(metadataLinuxFailureDiagnostics(error))).not.toContain('canary');
 });

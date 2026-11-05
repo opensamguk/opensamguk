@@ -9,6 +9,8 @@ export type { OperationalMapResource } from './world/map/operational';
 export * from './clock/constants';
 export * from './clock/clock';
 export * from './clock/admin';
+export * from './admin/game';
+export * from './admin/apply';
 export * from './clock/end';
 export * from './clock/reset';
 export {
@@ -220,6 +222,7 @@ export * from './governance/visibility';
 export { reconcileGovernance, assertGovernanceFinal } from './governance/reconcile';
 export { governanceResultSchema, validateGovernanceRecord } from './governance/feature';
 export * from './general/sex';
+export * from './general/removal';
 export * from './lineage/config';
 export * from './lineage/state';
 export * from './lineage/origin';

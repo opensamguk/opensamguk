@@ -104,6 +104,12 @@ export const officialImages = {
   caddy: 'caddy:2.11.7-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f',
 } as const;
 const message = '운영 대상 metadata 사전 확인을 마치지 못했습니다.';
+export const nativeFailureSchema = z.strictObject({
+  reason: z.enum(['timeout', 'aborted', 'output-limit', 'spawn-error', 'stream-error', 'nonzero-exit', 'signal']),
+  exitCode: z.number().int().min(0).max(255).nullable(),
+  signal: z.enum(['SIGKILL', 'SIGTERM', 'SIGINT', 'SIGHUP', 'SIGPIPE', 'SIGABRT', 'SIGSEGV', 'other']).nullable(),
+});
+type NativeFailure = z.infer<typeof nativeFailureSchema>;
 export class TargetPreflightError extends Error {
   readonly stickyUnsettled: boolean;
   constructor(
@@ -115,6 +121,7 @@ export class TargetPreflightError extends Error {
       groupAbsent: boolean | null;
       handlesReleased: boolean;
     }>,
+    readonly nativeFailure?: Readonly<NativeFailure>,
   ) {
     super(message);
     this.stickyUnsettled = code === 'NATIVE_UNSETTLED';
@@ -211,6 +218,10 @@ export async function runTargetNative(executable: string, args: string[], signal
       done = false,
       uncertainGroup = false,
       observedGroupAbsent = false;
+    let failureReason: NativeFailure['reason'] | undefined,
+      exitCode: number | null = null,
+      exitSignal: NativeFailure['signal'] = null;
+    const failure = () => Object.freeze({ reason: failureReason ?? 'aborted', exitCode, signal: exitSignal });
     const linux = process.platform === 'linux';
     const child = spawn(executable, args, {
       env: { PATH: '/usr/bin:/bin', LANG: 'C', LC_ALL: 'C' },
@@ -244,7 +255,7 @@ export async function runTargetNative(executable: string, args: string[], signal
       clearTimeout(timer);
       if (settle) clearTimeout(settle);
       if (groupPoll) clearInterval(groupPoll);
-      signal.removeEventListener('abort', cancel);
+      signal.removeEventListener('abort', onAbort);
     };
     const finish = () => {
       if (done || !closed || !outEnd || !errEnd) return;
@@ -254,12 +265,14 @@ export async function runTargetNative(executable: string, args: string[], signal
       }
       done = true;
       clearOwned();
-      if (failed || signal.aborted) reject(new TargetPreflightError('NATIVE'));
+      if (failed || signal.aborted) reject(new TargetPreflightError('NATIVE', undefined, failure()));
       else resolveRun(output);
     };
-    const cancel = () => {
+    const cancel = (reason: NativeFailure['reason']) => {
       if (done) return;
       failed = true;
+      // A later deadline or SIGKILL must not replace the initiating failure.
+      failureReason ??= reason;
       if (linux && group !== undefined && !groupAbsent()) {
         try {
           process.kill(-group, 'SIGKILL');
@@ -286,14 +299,16 @@ export async function runTargetNative(executable: string, args: string[], signal
           new TargetPreflightError(
             'NATIVE_UNSETTLED',
             Object.freeze({ ...facts, handlesReleased: child.stdout.destroyed && child.stderr.destroyed }),
+            failure(),
           ),
         );
       }, 60000);
     };
-    const timer = setTimeout(cancel, 10000);
-    signal.addEventListener('abort', cancel, { once: true });
+    const onAbort = () => cancel('aborted');
+    const timer = setTimeout(() => cancel('timeout'), 10000);
+    signal.addEventListener('abort', onAbort, { once: true });
     child.stdout.on('data', (chunk: Buffer) => {
-      if (Buffer.byteLength(output) + chunk.length > 4 * 1024 * 1024) cancel();
+      if (Buffer.byteLength(output) + chunk.length > 4 * 1024 * 1024) cancel('output-limit');
       else output += chunk.toString('utf8');
     });
     // Always drain stderr, including after failure, without retaining native messages.
@@ -306,18 +321,22 @@ export async function runTargetNative(executable: string, args: string[], signal
       errEnd = true;
       finish();
     });
-    child.stdout.on('error', cancel);
-    child.stderr.on('error', cancel);
-    child.on('error', cancel);
+    child.stdout.on('error', () => cancel('stream-error'));
+    child.stderr.on('error', () => cancel('stream-error'));
+    child.on('error', () => cancel('spawn-error'));
     child.on('exit', () => {
       if (linux) groupAbsent();
     });
     child.on('close', (code, childSignal) => {
       closed = true;
+      exitCode = code !== null && Number.isInteger(code) && code >= 0 && code <= 255 ? code : null;
+      const parsedSignal = nativeFailureSchema.shape.signal.safeParse(childSignal);
+      exitSignal = parsedSignal.success ? parsedSignal.data : 'other';
       failed ||= code !== 0 || childSignal !== null;
+      if (code !== 0 || childSignal !== null) failureReason ??= childSignal === null ? 'nonzero-exit' : 'signal';
       finish();
     });
-    if (signal.aborted) cancel();
+    if (signal.aborted) onAbort();
   });
 }
 type Native = typeof runTargetNative;

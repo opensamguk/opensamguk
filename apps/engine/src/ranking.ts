@@ -13,7 +13,9 @@ export async function persistRanking(
     select: { id: true, battleWins: true, captures: true },
   });
   const byId = new Map(counters.map((general) => [general.id, general]));
-  const active = Object.values(state.generals).filter((general) => general.activeFromYear <= at.year);
+  const active = Object.values(state.generals).filter(
+    (general) => general.removedAt === undefined && general.activeFromYear <= at.year,
+  );
   const nationInfo = (id: number | null) => {
     const nation = id === null ? undefined : state.nations[id];
     return nation ? { id: nation.id, name: nation.name, color: nation.color } : null;

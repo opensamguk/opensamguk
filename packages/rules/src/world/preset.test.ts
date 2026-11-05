@@ -40,6 +40,14 @@ const presets = [regular, speed, beginner, hardcore];
 const rules = () => presetRules(parsePreset(beginner));
 
 describe('T2-02 프리셋 계약', () => {
+  it('선택 휴전은 원본 사본에서만 읽고 기본 프리셋과 게임 규칙 조각을 바꾸지 않는다', () => {
+    const truce = { utcOffsetMinutes: 540, startMinute: 60, endMinute: 420 };
+    expect(parsePreset(regular)).not.toHaveProperty('truce');
+    expect(parsePreset({ ...regular, truce: null }).truce).toBeNull();
+    expect(parsePreset({ ...regular, truce }).truce).toEqual(truce);
+    expect(presetRules(parsePreset({ ...regular, truce }))).toEqual(presetRules(parsePreset(regular)));
+    expect(() => parsePreset({ ...regular, truce: { ...truce, endMinute: 60 } })).toThrow();
+  });
   it('승인한 네 프리셋의 수치와 P3·P6 경계를 보존한다', () => {
     expect(presets.map((p) => parsePreset(p).turnTermMinutes)).toEqual([60, 10, 30, 60]);
     expect(presets.map((p) => parsePreset(p).npc.aggression)).toEqual([1, 1, 0.5, 1.5]);

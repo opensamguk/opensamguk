@@ -31,7 +31,7 @@ import { loadPersonnelTurnContext, persistPersonnelPacket } from './ruleFeatures
 import { appendLogisticsMovements } from './logisticsState';
 import { engineResolver, persistExt, verifyWorldExt } from './extState';
 import { assertWorldCapabilities } from './capsGate';
-import { processAdminClock } from './admin/executor';
+import { processAdminInputs } from './admin/executor';
 import { observeCommittedStep, type CommitMetricCandidate, type CommitMetricSink } from './metrics';
 import { preparePendingReset, type PendingResetPreparation } from './admin/reset';
 import { PgHeritageRepository } from './heritage/repository';
@@ -162,7 +162,9 @@ export class TurnLoop {
         if (!this.extVerified) await verifyWorldExt(tx, world);
         const adminClock =
           world.replayFormat === 3
-            ? await processAdminClock(tx, world, this.highWaterTick, resetPreparation, signal)
+            ? await processAdminInputs(tx, world, this.highWaterTick, resetPreparation, signal, (signal) =>
+                signals.push(signal),
+              )
             : null;
         if (adminClock) {
           const deferred = adminClock.deferred;
@@ -210,7 +212,7 @@ export class TurnLoop {
         const accelerated = target === undefined && world.clockMode === 'ACCELERATED';
         const earliest = accelerated
           ? await tx.general.findFirst({
-              where: { worldId, activeFromYear: { lte: year } },
+              where: { worldId, removedAt: null, activeFromYear: { lte: year } },
               orderBy: [{ nextTurnTick: 'asc' }, { id: 'asc' }],
             })
           : null;
@@ -242,7 +244,7 @@ export class TurnLoop {
           };
         }
         const due = await tx.general.findFirst({
-          where: { worldId, nextTurnTick: { lte: tick }, activeFromYear: { lte: year } },
+          where: { worldId, removedAt: null, nextTurnTick: { lte: tick }, activeFromYear: { lte: year } },
           orderBy: [{ nextTurnTick: 'asc' }, { id: 'asc' }],
         });
         const monthly = boundary <= tick && (!due || due.nextTurnTick >= boundary);
@@ -345,7 +347,11 @@ export class TurnLoop {
             { sequence, tick: due.nextTurnTick },
             state,
             personnelBefore && personnelPacket && anchors
-              ? () => persistPersonnelPacket(tx, worldId, personnelBefore, personnelPacket, anchors, due.nextTurnTick)
+              ? () =>
+                  persistPersonnelPacket(tx, worldId, personnelBefore, personnelPacket, anchors, {
+                    tick: due.nextTurnTick,
+                    sequence,
+                  })
               : undefined,
             capabilities.kind === 'registry' ? capabilities.armyTypes : undefined,
           );

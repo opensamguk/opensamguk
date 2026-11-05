@@ -316,6 +316,7 @@ afterAll(async ({}, suite) => {
       budgetsMs: { setup: 22000, cleanup: 12000, audit: 8000, finalClose: 3000, receipt: 2000, externalHook: 30000 },
       observationScope: 'All non-receipt work observed before starting this final file write',
     };
+    console.info(JSON.stringify({ event: 'admin-create-options-final-state', ...finalObservations }));
     await receipt.run(() =>
       writeFile(
         new URL('../test-results/admin-create-options-' + name + '.json', import.meta.url),

@@ -73,6 +73,23 @@ it('모바일은 모든 값·이유·정렬을 보존하고 폭을 바꿔도 같
   expect(media.listeners.size).toBe(0);
 });
 
+it('모바일에서 접은 칸이 모두 같은 이유로 가려졌으면 이유를 한 줄로만 적는다', () => {
+  viewport();
+  const hidden = '같은 국가만';
+  const both: Column<(typeof rows)[number]>[] = [
+    columns[0]!,
+    { ...columns[1]!, title: (r) => (r.intel === null ? hidden : undefined) },
+    { ...columns[2]!, title: (r) => (r.charm === null ? hidden : undefined) },
+  ];
+  render(
+    <DataTable caption="장수" rows={rows} columns={both} rowKey={(r) => r.id} mobileDetails={['intel', 'charm']} />,
+  );
+  const [, first, , third] = screen.getAllByRole('row');
+  expect(first?.querySelectorAll('dl > div')).toHaveLength(2);
+  expect(third?.querySelector('dl')).toBeNull();
+  expect(third?.textContent).toBe(`다${hidden}`);
+});
+
 it('명시 목록 없는 표는 모바일에서도 원래 열과 머리글 조작을 유지한다', () => {
   viewport();
   render(<DataTable rows={rows} columns={columns} rowKey={(r) => r.id} />);
