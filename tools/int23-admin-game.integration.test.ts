@@ -48,6 +48,7 @@ const admin = new Client({ connectionString: adminUrl.href }),
   db = createDb(target.href);
 const origin = 'http://127.0.0.1:5173',
   now = Date.now();
+let requestNow = now;
 let app: Awaited<ReturnType<typeof buildServer>> | undefined,
   address: string,
   oid: string | undefined,
@@ -168,7 +169,7 @@ beforeAll(async () => {
   sanctioned = await user('ADMIN', 'SANCTIONED');
   app = await buildServer({
     db,
-    now: () => now,
+    now: () => requestNow,
     publicOrigin: origin,
     emailVerificationRequired: true,
     logStream: { write() {} },
@@ -178,6 +179,8 @@ beforeAll(async () => {
 });
 afterEach(({ task }) => {
   if (task.result?.state === 'fail') failed = true;
+  // 각 시험은 새 분에서 시작하고 시험 안에서는 실제 120회 제한을 유지한다.
+  requestNow += 60_000;
 });
 afterAll(async () => {
   const errors: unknown[] = [];
@@ -234,6 +237,287 @@ for (const path of ['admin.game.request', 'admin.game.requestStatus'])
         );
       }),
     );
+
+for (const path of [
+  'admin.game.general',
+  'admin.game.generalLogs',
+  'admin.game.generalInputs',
+  'admin.game.nationLogs',
+  'admin.game.battles',
+])
+  for (const category of categories)
+    it(
+      path + ' ' + category,
+      authzCase(path, category, async () => {
+        const worldId = await world();
+        const cookie =
+          category === 'unauthenticated'
+            ? undefined
+            : category === 'otherUser'
+              ? ordinary.cookie
+              : category === 'sanctioned'
+                ? sanctioned.cookie
+                : actor.cookie;
+        const input =
+          category === 'invalidInput' ? {} : path === 'admin.game.nationLogs' ? { worldId } : { worldId, generalId: 1 };
+        const before = await db.auditLog.count({ where: { worldId, action: 'admin.game.read' } });
+        const response = await call(path, input, cookie);
+        expect(response.status).toBe(
+          category === 'success' ? 200 : category === 'invalidInput' ? 400 : category === 'otherUser' ? 403 : 401,
+        );
+        expect(await db.auditLog.count({ where: { worldId, action: 'admin.game.read' } })).toBe(
+          before + (category === 'success' ? 1 : 0),
+        );
+      }),
+    );
+
+it('AC-INT-23 같은 tick 운영 기록은 개인 30행·관리자100행에서 누락 없이 이어지고 읽기는 감사한다', async () => {
+  const worldId = await world(true);
+  await controlClock(db, worldId, 'resume');
+  const creating = call(
+    'general.create',
+    { worldId, name: '기록장수', leadership: 70, strength: 70, intel: 60, portraitId: null },
+    ordinary.cookie,
+  );
+  await expect
+    .poll(() => db.inputEvent.count({ where: { worldId, kind: 'general.create', status: 'PENDING' } }))
+    .toBe(1);
+  await advance(worldId);
+  expect((await creating).status).toBe(200);
+  const general = await db.general.findUniqueOrThrow({ where: { worldId_userId: { worldId, userId: ordinary.id } } });
+  for (let i = 0; i < 105; i++) {
+    expect(
+      (
+        await call(
+          'admin.game.request',
+          command(worldId, { kind: 'admin.general.rename', generalId: general.id, name: `기록${i}` }),
+          actor.cookie,
+        )
+      ).status,
+    ).toBe(200);
+  }
+  await advance(worldId);
+  let cursor: string | undefined;
+  const personal: string[] = [];
+  do {
+    const response = await call('records.general', { worldId, ...(cursor ? { cursor } : {}) }, ordinary.cookie);
+    expect(response.status).toBe(200);
+    const data = response.data as {
+      items: { id: string; tick: number; kind: string; text: string }[];
+      nextCursor: string | null;
+    };
+    expect(data.items.length).toBeLessThanOrEqual(30);
+    for (const row of data.items) {
+      expect(row).toMatchObject({ tick: 0, kind: 'admin' });
+      expect(row.text).not.toContain('공개하지 않는 운영 사유');
+      personal.push(row.id);
+    }
+    cursor = data.nextCursor ?? undefined;
+  } while (cursor);
+  expect(new Set(personal).size).toBe(105);
+  const home = await call('home.get', { worldId }, ordinary.cookie);
+  expect(home.status).toBe(200);
+  expect((home.data as { recentLogs: { id: string }[] }).recentLogs.map((row) => row.id)).toEqual(
+    personal.slice(0, 10),
+  );
+  const first = await call(
+    'admin.game.generalLogs',
+    { worldId, generalId: general.id, fromTick: 0, toTick: 0 },
+    actor.cookie,
+  );
+  expect(first.status).toBe(200);
+  const a = first.data as { items: { id: string }[]; nextCursor: string };
+  expect(a.items).toHaveLength(100);
+  const second = await call(
+    'admin.game.generalLogs',
+    { worldId, generalId: general.id, fromTick: 0, toTick: 0, cursor: a.nextCursor },
+    actor.cookie,
+  );
+  const b = second.data as { items: { id: string }[]; nextCursor: string | null };
+  expect(b.items).toHaveLength(5);
+  expect(b.nextCursor).toBeNull();
+  expect([...a.items, ...b.items].map((row) => row.id)).toEqual(personal);
+  expect((await call('admin.game.general', { worldId, generalId: general.id }, actor.cookie)).data).toMatchObject({
+    userId: ordinary.id,
+    name: '기록104',
+    removedAt: null,
+  });
+  const inputs = await call('admin.game.generalInputs', { worldId, generalId: general.id }, actor.cookie);
+  expect((inputs.data as { items: { kind: string }[] }).items).toHaveLength(100);
+  expect(await db.auditLog.count({ where: { worldId, action: 'admin.game.read' } })).toBe(4);
+  expect(await db.auditLog.findMany({ where: { worldId, action: 'admin.game.read' } })).toMatchObject([
+    { targetType: 'General', targetId: String(general.id) },
+    { targetType: 'General', targetId: String(general.id) },
+    { targetType: 'General', targetId: String(general.id) },
+    { targetType: 'General', targetId: String(general.id) },
+  ]);
+  const missing = await call('admin.game.general', { worldId, generalId: 9999 }, actor.cookie);
+  expect(missing.status).toBe(404);
+  expect(await db.auditLog.count({ where: { worldId, action: 'admin.game.read' } })).toBe(5);
+  expect(
+    (await call('admin.game.generalLogs', { worldId, generalId: general.id, cursor: '%%%25' }, actor.cookie)).status,
+  ).toBe(400);
+  await expectReplayedState(worldId);
+}, 30000);
+
+it('AC-INT-23 운영 쪽지는 실제 엔진에서 한 번 보내고 개인 수신 범위·게임 재생을 보존한다', async () => {
+  const worldId = await world(true);
+  await controlClock(db, worldId, 'resume');
+  const people: number[] = [];
+  for (const identity of [actor, ordinary]) {
+    const creating = call(
+      'general.create',
+      {
+        worldId,
+        name: identity === actor ? '운영장수' : '수신장수',
+        leadership: 70,
+        strength: 70,
+        intel: 60,
+        portraitId: null,
+      },
+      identity.cookie,
+    );
+    await expect
+      .poll(() => db.inputEvent.count({ where: { worldId, kind: 'general.create', status: 'PENDING' } }))
+      .toBe(1);
+    await advance(worldId);
+    expect((await creating).status).toBe(200);
+    people.push(
+      (await db.general.findUniqueOrThrow({ where: { worldId_userId: { worldId, userId: identity.id } } })).id,
+    );
+  }
+  const input = command(worldId, {
+    kind: 'admin.message.send',
+    scope: 'PRIVATE',
+    generalId: people[1]!,
+    body: '개인 운영 안내',
+  });
+  const response = await call('admin.game.request', input, actor.cookie);
+  expect(response.status).toBe(200);
+  expect((await call('admin.game.request', input, actor.cookie)).data).toEqual(response.data);
+  await advance(worldId);
+  expect(await db.message.count({ where: { worldId, body: '개인 운영 안내' } })).toBe(1);
+  const mine = await call('message.list', { worldId, scope: 'PRIVATE' }, ordinary.cookie);
+  expect(mine.status).toBe(200);
+  expect(mine.data).toMatchObject({
+    items: [{ body: '개인 운영 안내', from: { name: '운영', kind: 'admin', generalId: null, nation: null } }],
+  });
+  expect((await call('message.list', { worldId, scope: 'PRIVATE' }, actor.cookie)).data).toMatchObject({ items: [] });
+  const worldMessage = command(worldId, { kind: 'admin.message.send', scope: 'WORLD', body: '월드 운영 안내' });
+  expect((await call('admin.game.request', worldMessage, actor.cookie)).status).toBe(200);
+  expect(
+    (
+      await call(
+        'admin.game.request',
+        command(worldId, {
+          kind: 'admin.city.adjust',
+          cityKey: 1,
+          changes: { population: { expected: 20000, value: 21000 } },
+        }),
+        actor.cookie,
+      )
+    ).status,
+  ).toBe(200);
+  await advance(worldId);
+  for (const identity of [actor, ordinary]) {
+    const data = (await call('message.list', { worldId, scope: 'WORLD' }, identity.cookie)).data as {
+      items: { body: string }[];
+    };
+    expect(data.items).toHaveLength(2);
+    expect(data.items.map((row) => row.body).join('\n')).not.toContain('공개하지 않는 운영 사유');
+    expect(data.items.map((row) => row.body)).toContain('월드 운영 안내');
+  }
+  await expectReplayedState(worldId);
+}, 30000);
+
+it('AC-INT-23 보관 전투·국가 기록은 동률 커서와 틱·대상 범위를 유지한다', async () => {
+  const worldId = await world();
+  await db.battleLog.createMany({
+    data: Array.from({ length: 153 }, (_, i) => ({
+      worldId,
+      tick: Math.floor(i / 3),
+      attackerId: 1,
+      generalId: 2 + (i % 3),
+      text: `보관 전투 ${i}`,
+    })),
+  });
+  await db.nationHistory.createMany({
+    data: Array.from({ length: 102 }, (_, i) => ({
+      worldId,
+      tick: Math.floor(i / 3),
+      nationId: 1 + (i % 3),
+      data: { events: [`보관 국가 기록 ${i}`] },
+    })),
+  });
+  for (const [path, expected] of [
+    ['admin.game.battles', 153],
+    ['admin.game.nationLogs', 102],
+  ] as const) {
+    const rows: unknown[] = [];
+    let cursor: string | undefined;
+    do {
+      const response = await call(path, { worldId, ...(cursor ? { cursor } : {}) }, actor.cookie);
+      expect(response.status).toBe(200);
+      const data = response.data as { items: unknown[]; nextCursor: string | null };
+      expect(data.items.length).toBeLessThanOrEqual(100);
+      rows.push(...data.items);
+      cursor = data.nextCursor ?? undefined;
+    } while (cursor);
+    expect(rows).toHaveLength(expected);
+    expect(new Set(rows.map((row) => JSON.stringify(row))).size).toBe(expected);
+  }
+  expect(
+    (await call('admin.game.battles', { worldId, generalId: 2, fromTick: 2, toTick: 3 }, actor.cookie)).data,
+  ).toMatchObject({
+    items: [
+      { tick: 3, generalId: 2 },
+      { tick: 2, generalId: 2 },
+    ],
+    nextCursor: null,
+  });
+  expect(
+    (await call('admin.game.nationLogs', { worldId, nationId: 2, fromTick: 2, toTick: 3 }, actor.cookie)).data,
+  ).toMatchObject({
+    items: [
+      { tick: 3, nationId: 2 },
+      { tick: 2, nationId: 2 },
+    ],
+    nextCursor: null,
+  });
+  expect((await call('admin.game.battles', { worldId, fromTick: 3, toTick: 2 }, actor.cookie)).status).toBe(400);
+  expect((await call('admin.game.generalLogs', { worldId, generalId: 1 }, otherAdmin.cookie)).data).toEqual({
+    items: [],
+    nextCursor: null,
+  });
+});
+
+it('AC-INT-23 운영 쪽지도 commit 실패 시 함께 되돌고 새 리스에서 한 번 보낸다', async () => {
+  const worldId = await world();
+  const input = command(worldId, { kind: 'admin.message.send', scope: 'WORLD', body: '원자적 운영 쪽지' });
+  expect((await call('admin.game.request', input, actor.cookie)).status).toBe(200);
+  const lease = await acquireLease(db, worldId);
+  if (!lease) throw Error('자기 시험 리스를 얻지 못했습니다.');
+  try {
+    await expect(
+      new TurnLoop(db, lease, {
+        beforeCommit: async () => {
+          throw Error('의도한 쪽지 commit 실패');
+        },
+      }).advanceTo(0),
+    ).rejects.toThrow('의도한 쪽지 commit 실패');
+  } finally {
+    await releaseLease(db, lease);
+  }
+  expect(await db.message.count({ where: { worldId } })).toBe(0);
+  expect(await db.inputEvent.findFirstOrThrow({ where: { worldId } })).toMatchObject({
+    status: 'PENDING',
+    sequence: null,
+  });
+  expect(await db.auditLog.count({ where: { worldId, action: 'game.applied' } })).toBe(0);
+  await advance(worldId);
+  expect(await db.message.count({ where: { worldId, body: '원자적 운영 쪽지' } })).toBe(1);
+  await expectReplayedState(worldId);
+});
 
 it('AC-INT-23 숫자0과 -0의 같은 JSON 요청은 같은 추적 번호를 반환한다', async () => {
   const worldId = await world();
@@ -432,7 +716,9 @@ it('AC-INT-23 장수 내보내기는 직책·병력을 정리하고 실제 조�
   expect((await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 3 } } })).nextTurnTick).toBe(
     before.nextTurnTick,
   );
-  expect(await db.generalLog.count({ where: { worldId, generalId: 3 } })).toBe(0);
+  expect(await db.generalLog.findMany({ where: { worldId, generalId: 3 } })).toMatchObject([
+    { commandKey: 'admin.general.remove', kind: 'admin', text: '월드에서 내보냄' },
+  ]);
   expect(replayArchive(await exportReplay(db, worldId), 1)).toHaveLength(1);
 }, 30000);
 

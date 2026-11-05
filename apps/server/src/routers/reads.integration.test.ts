@@ -454,7 +454,9 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       expect(first.items.map((row) => row.tick)).toEqual(
         Array.from({ length: 30 }, (_, index) => (35 - index) * 10_000),
       );
-      expect(first.nextCursor).toBe('60000');
+      if (route === 'records.general')
+        expect(Buffer.from(first.nextCursor!, 'base64url').toString('utf8')).toMatch(/^\[60000,"[1-9]\d*"\]$/);
+      else expect(first.nextCursor).toBe('60000');
       const second = (await query(route, { worldId, cursor: first.nextCursor })).data;
       expect(second.items.map((row) => row.tick)).toEqual([50000, 40000, 30000, 20000, 10000]);
       expect(second.nextCursor).toBeNull();

@@ -1,4 +1,4 @@
-import { nextActionSequence, type Prisma } from '@opensamguk/db';
+import { nextActionSequence, type Prisma, type RealtimeSignal } from '@opensamguk/db';
 import {
   adminGamePayloadSchema,
   adminGameRejectMessages,
@@ -14,9 +14,15 @@ import { loadReplayState } from '../monthly';
 import { checkWorldReplay, type EngineInput, type EngineWorld } from '../features';
 import { persistEffects } from '../persist';
 import { persistPersonnelPacket } from '../ruleFeatures';
+import { persistAdminRecord } from './records';
 
 // 리스→World 잠금 아래에서 기존 운영 입력과 같은 줄을 처리한다.
-export async function processAdminGame(tx: Prisma.TransactionClient, world: EngineWorld, event: EngineInput) {
+export async function processAdminGame(
+  tx: Prisma.TransactionClient,
+  world: EngineWorld,
+  event: EngineInput,
+  emit?: (signal: RealtimeSignal) => void,
+) {
   const payload = adminGamePayloadSchema.parse(event.payload);
   if (
     event.kind !== payload.action.kind ||
@@ -114,6 +120,8 @@ export async function processAdminGame(tx: Prisma.TransactionClient, world: Engi
           where: { worldId_id: { worldId: world.id, id: action.generalId } },
           data: { lastActiveTick: null, lastActiveAt: null },
         });
+      const signal = await persistAdminRecord(tx, world, before.state, action, outcome.result, sequence, now);
+      if (signal) emit?.(signal);
     }
   }
   validateAdminGameRecord({
@@ -136,9 +144,22 @@ export async function processAdminGame(tx: Prisma.TransactionClient, world: Engi
       actorKind: 'ADMIN',
       actorUserId: event.userId,
       action: 'game.' + (status === 'APPLIED' ? 'applied' : 'rejected'),
-      targetType: 'cityKey' in action ? 'City' : 'generalId' in action ? 'General' : 'Nation',
+      targetType:
+        'cityKey' in action
+          ? 'City'
+          : 'generalId' in action && action.generalId !== undefined
+            ? 'General'
+            : 'nationId' in action
+              ? 'Nation'
+              : 'World',
       targetId: String(
-        'cityKey' in action ? action.cityKey : 'generalId' in action ? action.generalId : action.nationId,
+        'cityKey' in action
+          ? action.cityKey
+          : 'generalId' in action && action.generalId !== undefined
+            ? action.generalId
+            : 'nationId' in action
+              ? action.nationId
+              : world.id,
       ),
       worldId: world.id,
       reason: payload.reason,
