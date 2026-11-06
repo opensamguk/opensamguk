@@ -1,56 +1,80 @@
 import { readFile } from 'node:fs/promises';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { hashState } from '@opensamguk/shared/node';
+import { scenarioTitle } from './lobby';
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
   return { ...actual, readFile: vi.fn(actual.readFile) };
 });
 
-describe('T2-03 / AC-M2-02 로비 시나리오 이름', () => {
-  beforeEach(async () => {
-    vi.resetModules();
-    const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
-    vi.mocked(readFile).mockReset().mockImplementation(actual.readFile);
+const title = '【역사모드3】 군웅할거';
+const valid = { id: '1030', title };
+const findMany = vi.fn(async () => [] as Record<string, unknown>[]);
+const db = { gameResource: { findMany } } as unknown as Parameters<typeof scenarioTitle>[1];
+const row = (content: unknown, version = 1) => ({
+  kind: 'SCENARIO',
+  name: '1030',
+  version,
+  content,
+  contentHash: hashState(content),
+  source: 'unit fixture',
+});
+
+describe('T2-03·T4-77 / AC-M2-02·AC-P2-26 로비 시나리오 이름', () => {
+  beforeEach(() => {
+    findMany.mockReset();
+    vi.mocked(readFile).mockClear();
   });
 
-  it('실제 시나리오의 title만 읽고 같은 키의 성공은 한 번만 읽는다', async () => {
-    const { scenarioTitle } = await import('./lobby');
-    expect(await scenarioTitle('1030')).toBe('【역사모드3】 군웅할거');
-    expect(await scenarioTitle('1030')).toBe('【역사모드3】 군웅할거');
-    expect(readFile).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(readFile).mock.calls[0]![0]).toEqual(
-      new URL('../../../../resources/scenario/1030.json', import.meta.url),
+  it('게시된 정확한 판의 title을 읽고 DB 결과는 캐시하지 않는다', async () => {
+    findMany.mockResolvedValue([row(valid)]);
+    expect(await scenarioTitle('1030', db)).toBe(title);
+    expect(await scenarioTitle('1030', db)).toBe(title);
+    expect(findMany).toHaveBeenCalledTimes(2);
+    expect(findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ where: { status: 'PUBLISHED', OR: [{ kind: 'SCENARIO', name: '1030', version: 1 }] } }),
     );
-  });
-
-  it.each(['../1030', 'default', ''])('키 %j는 파일을 열기 전에 거부한다', async (key) => {
-    const { scenarioTitle } = await import('./lobby');
-    await expect(scenarioTitle(key)).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
     expect(readFile).not.toHaveBeenCalled();
   });
 
-  it('없는 파일의 실패는 캐시하지 않고 경로와 키를 오류에 넣지 않는다', async () => {
-    const { scenarioTitle } = await import('./lobby');
+  it.each(['../1030', ''])('잘못된 키 %j는 DB·파일 접근 전에 거부한다', async (key) => {
+    await expect(scenarioTitle(key, db)).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+    expect(findMany).not.toHaveBeenCalled();
+    expect(readFile).not.toHaveBeenCalled();
+  });
+
+  it.each(['default', 'missing_t2_03'])('미게시 키 %s는 캐시·파일 대체 없이 오류를 가린다', async (key) => {
+    findMany.mockResolvedValue([]);
     for (let i = 0; i < 2; i++) {
-      const error = await scenarioTitle('missing_t2_03').catch((failure: unknown) => failure);
+      const error = await scenarioTitle(key, db).catch((failure: unknown) => failure);
       expect(error).toMatchObject({ code: 'INTERNAL_SERVER_ERROR', message: 'INTERNAL_SERVER_ERROR' });
-      expect(String(error)).not.toContain('missing_t2_03');
+      expect(String(error)).not.toContain(key);
       expect(error).toHaveProperty('cause', undefined);
     }
-    expect(readFile).toHaveBeenCalledTimes(2);
+    expect(findMany).toHaveBeenCalledTimes(2);
+    expect(readFile).not.toHaveBeenCalled();
   });
 
   it.each([
     'not-json',
-    JSON.stringify({ id: '1031', title: '군웅할거' }),
-    JSON.stringify({ id: '1030', title: '' }),
-    JSON.stringify({ id: '1030', title: null }),
-    JSON.stringify({ id: '1030' }),
-  ])('JSON·id·title이 잘못된 파일은 실패하고 캐시하지 않는다: %s', async (contents) => {
-    vi.mocked(readFile).mockResolvedValueOnce(contents);
-    const { scenarioTitle } = await import('./lobby');
-    await expect(scenarioTitle('1030')).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
-    expect(await scenarioTitle('1030')).toBe('【역사모드3】 군웅할거');
-    expect(readFile).toHaveBeenCalledTimes(2);
+    { id: '1031', title: '군웅할거' },
+    { id: '1030', title: '' },
+    { id: '1030', title: null },
+    { id: '1030' },
+  ])('잘못된 게시 내용은 실패하고 음성 캐시를 남기지 않는다: %j', async (content) => {
+    findMany.mockResolvedValueOnce([row(content)]).mockResolvedValueOnce([row(valid)]);
+    await expect(scenarioTitle('1030', db)).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+    expect(await scenarioTitle('1030', db)).toBe(title);
+    expect(findMany).toHaveBeenCalledTimes(2);
+    expect(readFile).not.toHaveBeenCalled();
+  });
+
+  it('2판은 1판 제목으로 대체하지 않는다', async () => {
+    findMany.mockResolvedValue([row({ ...valid, title: '둘째 판' }, 2)]);
+    expect(await scenarioTitle('1030@2', db)).toBe('둘째 판');
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { status: 'PUBLISHED', OR: [{ kind: 'SCENARIO', name: '1030', version: 2 }] } }),
+    );
   });
 });

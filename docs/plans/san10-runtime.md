@@ -16,7 +16,7 @@
 
 `python tools/map-data/build-san10-basemap.py`와 해당 JSON의 Prettier 정리 후 `pnpm exec tsx tools/map-data/build-san10-resources.ts`로 지도·두 시나리오·게시 명세와 GIS 해시 상수를 재생성한다. 자료 출처는 [SAN10 고지](../../resources/map-drafts/san10/NOTICE.md)를 따른다.
 
-기본 초기화 뒤 `pnpm db:init-san10`으로 새 불변 판을 게시한다. 이미 같은 내용이 있으면 재사용하고 같은 키의 다른 내용은 거부한다. 게시 자원으로 역사판을 만들 때는 `pnpm world:create --published --preset regular --seed <시드> --end-year 300 --name <이름>`을 쓰고 공백지판은 `--preset empty`를 쓴다. 도시 금·쌀·수비병이 있는 정식 판을 CLI로 만들 때는 `--rule-features campaign-assignment-v2,campaign-v1,city-resources-v1,five-stats,operational-map,personnel,policy,stratagem-basic,treaty`를 함께 고정한다. 기존 판이나 명시한 다른 규칙 선택을 새 지도의 기본값으로 바꾸지 않는다. 파일 합성을 쓰려면 `--published`를 생략한다. SAN10의 기본 능력치 규칙과 초상 대응은 5능력치·191년 대응표로 선택되며 명시한 옵션은 그대로 우선한다.
+기본 초기화 뒤 `pnpm db:init-san10`으로 새 불변 판을 게시한다. 이미 같은 내용이 있으면 재사용하고 같은 키의 다른 내용은 거부한다. 게시 자원으로 역사판을 만들 때는 `pnpm world:create --published --preset regular --seed <시드> --end-year 300 --name <이름>`을 쓰고 공백지판은 `--preset empty`를 쓴다. 도시 금·쌀·수비병이 있는 정식 판을 CLI로 만들 때는 `--rule-features campaign-assignment-v2,campaign-v1,city-resources-v1,five-stats,operational-map,personnel,policy,stratagem-basic,treaty`를 함께 고정한다. 기존 판이나 명시한 다른 규칙 선택을 새 지도의 기본값으로 바꾸지 않는다. 생성 CLI는 기본으로 게시된 DB 자원을 읽는다. `--published`는 이전 호출과의 호환을 위해 허용하며 파일 합성으로 전환하지 않는다. SAN10의 기본 능력치 규칙과 초상 대응은 5능력치·191년 대응표로 선택되며 명시한 옵션은 그대로 우선한다.
 
 현재 게시 판의 월드 생성 로더는 1판을 고정하므로 새 이름의 1판을 사용한다. 기존 `integration/1`, 원작 `1030/1`과 이미 생성된 월드의 지도 사본은 바꾸지 않는다. 운영 DB 재초기화와 진행 중 월드 변환은 실행하지 않는다. 원 지도 작업의 미커밋 소스는 별도로 보존하고 통합 브랜치의 소스 보관 커밋과 실제 보호 병합을 구분한다.
 

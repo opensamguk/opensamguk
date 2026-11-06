@@ -61,7 +61,7 @@
     "world:status": "pnpm --filter @opensamguk/engine world:status",
     "world:accelerate": "pnpm --filter @opensamguk/engine world:accelerate",
     "world:realtime": "pnpm --filter @opensamguk/engine world:realtime",
-    "portraits:map": "tsx tools/portrait-map/generate.ts",
+    "portraits:map": "tsx --env-file-if-exists=.env tools/portrait-map/generate.ts",
     "sim": "tsx tools/sim/cli.ts",
     "build:public": "pnpm --filter @opensamguk/web exec vite build --mode public && pnpm assets:check",
     "assets:check": "tsx tools/public-assets/check.ts",
