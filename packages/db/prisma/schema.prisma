@@ -68,6 +68,7 @@ model World {
   campaignState       Json?
   cityResourcesState  Json?
   cityRuinsState      Json?
+  nationStrategyState Json?
   battleLogs          BattleLog[]
   ranking             RankingSnapshot?
   publicMaps          PublicMapSnapshot[]

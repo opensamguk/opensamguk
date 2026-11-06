@@ -127,3 +127,7 @@ v1에 없는 7명은 2026-10-27 웹에서 확인한 삼국지11 수치를 기록
 core2026 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`의 `resources/unitset/unitset_event_more_crewtype.json`을 포맷만 정리해 `tools/unitset/source/core2026-df6c926.json`에 보존했다. 원본 SHA-256은 `4b784547f5b131fac5630addb8b9d64f524f4c41792a570952dc665c310152bd`, 보존 파일은 `20d927b8ac7dbc57f07f3fcfb1c902a6d5ee346d31d45cd516b36745c3b66a92`다. 생성기 `tools/unitset/build-expanded.ts`는 귀병 12종을 제외하고 INT-22의 창극 계열·사료 이름·게임 모집 조건을 적용한다. 사료 이름은 계획의 권·인용을 `info`에 남기며 수치와 조건은 게임 편성이다. 원저작자 devsam의 위 MIT 고지를 유지한다.
 
 위의 병종4종 고지는 기존 `unitset/basic.json`을 뜻한다. 새 `unitset/expanded.json`은 45종이며 기존 기본 병종 파일은 바꾸지 않는다.
+
+## 준비 없는 국가 전략 3종
+
+`packages/rules/src/nationStrategy/commands.ts`는 core2026 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`의 `packages/logic/src/actions/turn/nation/che_백성동원.ts`, `che_이호경식.ts`, `che_급습.ts`의 효과·대기 공식을 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다. 직책 범위, 선포 1개월 기준의 외교 효과와 기록 범위는 사용자 승인 D-074를 적용했다. 국가 성향의 대기 보정은 이번에 옮기지 않았다.

@@ -1,11 +1,19 @@
 const noCommands = Object.freeze([] as const);
-const personnelCommands = Object.freeze(['nation_rest', 'nation_reward', 'nation_seize', 'nation_assign'] as const);
+const personnelCommands = Object.freeze([
+  'nation_rest',
+  'nation_reward',
+  'nation_seize',
+  'nation_assign',
+  'nation_mobilize',
+] as const);
 const diplomaticCommands = Object.freeze([
   ...personnelCommands,
   'nation_peace',
   'nation_pact',
   'nation_break_pact',
   'nation_aid',
+  'nation_rivalry',
+  'nation_raid',
 ] as const);
 const rulerCommands = Object.freeze([...diplomaticCommands, 'nation_declare', 'nation_capital'] as const);
 

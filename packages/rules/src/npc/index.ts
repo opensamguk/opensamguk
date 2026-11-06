@@ -13,6 +13,7 @@ import { readCampaignState } from '../campaign/state';
 import { cityNpcAllocations, cityNpcPreparation } from '../cityResources/npc';
 import { frontier } from './frontier';
 import { crewContext, crewTypeFailure } from '../world/crewRequirements';
+import { nationStrategyNpcCandidates } from '../nationStrategy/npc';
 
 export interface NpcCandidate {
   key: string;
@@ -222,6 +223,8 @@ export function chooseNationTurn(view: WorldView, ruler: General, rng: Rng, cont
     return { chosen: null, candidates: [] };
   const choice = chooser(view, ruler, context, 'nation');
   choice.add('nation_rest', {}, 0, '국가 명령이 없으면 쉰다.');
+  for (const candidate of nationStrategyNpcCandidates(view, nation.id, context.tick ?? 0))
+    choice.add(candidate.key, candidate.args, candidate.score, candidate.reason);
   if (view.ruleFeatures?.includes('city-resources-v1'))
     for (const candidate of cityNpcAllocations(view, nation.id))
       choice.add(candidate.key, candidate.args, candidate.score, candidate.reason);

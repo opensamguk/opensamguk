@@ -270,3 +270,10 @@ export {
   stratagemCardsResultSchema,
   validateStratagemCardsRecord,
 } from './stratagemCards/feature';
+export {
+  readNationStrategy,
+  initialNationStrategy,
+  NATION_STRATEGY_FEATURE,
+  type NationStrategyState,
+} from './nationStrategy/state';
+export { readStoredNationStrategy } from './nationStrategy/origin';

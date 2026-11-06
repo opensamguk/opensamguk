@@ -40,6 +40,7 @@ import type { UnitSetResource } from './world/resources';
 import { reputationFeature } from './review/feature';
 import { cityScaleFeature } from './cityScale/feature';
 import { checkCityScaleInitial } from './cityScale/state';
+import { nationStrategyFeature } from './nationStrategy/feature';
 
 export interface ReplayOriginV1 {
   version: 1;
@@ -115,6 +116,7 @@ export const ruleRegistry: RuleRegistry = {
     stratagemCardsFeature,
     reputationFeature,
     cityScaleFeature,
+    nationStrategyFeature,
   ],
   monthlyOrder: [
     'treaty',

@@ -10,6 +10,7 @@ import { reconcileGovernance } from './reconcile';
 
 export const GOVERNANCE_HOSTILE_COMMANDS = [
   'nation_declare',
+  'nation_raid',
   'attack',
   'fire_attack',
   'sabotage',
@@ -29,11 +30,12 @@ export function governanceHostilityFailure(
   const nationId = world.generals[actor.generalId]?.nationId;
   if (nationId === null || nationId === undefined || !world.nations[nationId] || !value || typeof value !== 'object')
     return null;
-  const targetKey = key === 'nation_declare' ? 'nationId' : 'cityKey';
+  const nationTarget = key === 'nation_declare' || key === 'nation_raid';
+  const targetKey = nationTarget ? 'nationId' : 'cityKey';
   if (!(targetKey in value)) return null;
   const target = (value as Record<string, unknown>)[targetKey];
   if (typeof target !== 'number' || !Number.isInteger(target) || target < 1) return null;
-  const targetNation = key === 'nation_declare' ? target : world.cities[target]?.nationId;
+  const targetNation = nationTarget ? target : world.cities[target]?.nationId;
   if (targetNation === null || targetNation === undefined || !world.nations[targetNation] || targetNation === nationId)
     return null;
   const index = governanceRealmIndex(world, world.governance, actor.tick ?? 0);

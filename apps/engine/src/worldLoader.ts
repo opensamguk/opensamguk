@@ -14,6 +14,7 @@ import {
 import { engineFeatures } from './features';
 import { loadCommandState } from './commandPersistence';
 import { engineResolver, loadExt } from './extState';
+import { readStoredNationStrategy } from '@opensamguk/rules';
 import { assertWorldCapabilities } from './capsGate';
 import { loadTreaties } from './treatyState';
 import { assertPersonnelStorage } from './personnelState';
@@ -107,6 +108,8 @@ export async function loadWorldAfterCapabilityCheck(
   if (cityResources) state.cityResources = cityResources;
   const cityRuins = readStoredCityRuins(world, state);
   if (cityRuins) state.cityRuins = cityRuins;
+  const nationStrategy = readStoredNationStrategy(world);
+  if (nationStrategy) state.nationStrategy = nationStrategy;
   const logistics = readStoredLogistics(world.logisticsState, state, readLogisticsOriginConfig(world, state));
   if (logistics && logistics.monthlyTick !== world.monthlyTick)
     throw new Error('저장된 물류와 월 정산 tick이 다릅니다.');

@@ -27,6 +27,7 @@ import {
   emptyCampaignState,
   emptyCityResourcesState,
   initialCityRuins,
+  initialNationStrategy,
   initialLogisticsState,
   initialEquipment,
   equipmentConfigSchema,
@@ -281,6 +282,9 @@ export function prepareInitialWorld(
         ...(features.includes('city-scale-v1')
           ? { cityRuinsState: initialCityRuins(creationState) as Prisma.InputJsonValue }
           : {}),
+        ...(features.includes('nation-strategy-v1')
+          ? { nationStrategyState: initialNationStrategy() as Prisma.InputJsonValue }
+          : {}),
         ...(features.includes('logistics-v1')
           ? {
               logisticsState: initialLogisticsState(
@@ -316,7 +320,7 @@ export function prepareInitialWorld(
         ...(features.includes('stratagem-cards-v1')
           ? {
               stratagemCardsState: initialStratagemCards(
-                readStratagemCardsConfig(featureData?.['stratagem-cards-v1']),
+                readStratagemCardsConfig(featureData?.['stratagem-cards-v1'], features),
                 toWorldState(creationState),
                 creationState.seed,
               ) as Prisma.InputJsonValue,

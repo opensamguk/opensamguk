@@ -25,6 +25,7 @@ import {
   readStoredLineage,
   readStoredEquipment,
   readStoredStratagemCards,
+  readStoredNationStrategy,
 } from '@opensamguk/rules';
 import { z } from 'zod';
 import { worldResolver } from './resolver';
@@ -130,6 +131,8 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
       throw new Error('도시 자원의 생성 기록과 운영 병종이 다릅니다.');
     state.cityResources = readCityResourcesState(world.cityResourcesState, state, campaignArmyTypes(origin.initial));
   } else if (world.cityResourcesState != null) throw new Error('도시 자원 기능을 끈 월드에 저장 상태가 있습니다.');
+  const nationStrategy = readStoredNationStrategy(world);
+  if (nationStrategy) state.nationStrategy = nationStrategy;
   if (world.ruleFeatures.includes('city-scale-v1')) {
     const origin: unknown = world.replayOrigin;
     checkReplayOrigin(origin);

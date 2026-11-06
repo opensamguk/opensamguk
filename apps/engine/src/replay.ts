@@ -6,6 +6,7 @@ import {
   initialReplayState,
   initialReplayStateWithRegistry,
   checkReplayOrigin,
+  readStoredNationStrategy,
   ruleRegistry,
   type RuleRegistry,
   type ReplayOriginV3,
@@ -145,6 +146,7 @@ export async function exportReplay(
       const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
       if (world.replayOrigin === null) throw new Error('생성 기록이 없는 월드는 재생할 수 없습니다.');
       checkStoredReplayFormat(world);
+      readStoredNationStrategy(world);
       await assertStoredCityResources(tx, world);
       await assertStoredCityRuins(tx, world);
       await assertStoredLogistics(tx, world);
