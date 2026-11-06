@@ -5,7 +5,7 @@ import { defineCommand, fail, noArgs, positive, ruler, success, targetGeneral } 
 import type { Actor, CommandDef } from '../commands/types';
 import type { WorldView } from '../model/world';
 import { refreshSupply } from '../supply';
-import { dissolveNation } from './operations';
+import { dissolveNation, transferRulership } from './operations';
 import { assertNationLifecycle, isWandering, NATION_LIFECYCLE_FEATURE } from './state';
 
 function canAct(world: WorldView, actor: Actor) {
@@ -37,13 +37,8 @@ export const nationLifecycleCommands: readonly CommandDef[] = [
     change(state, actor, args) {
       const general = state.generals[actor.generalId]!,
         target = state.generals[args.generalId]!;
-      const nation = state.nations[general.nationId!]!;
-      general.officerLevel = 1;
-      general.experience = Math.round(general.experience * 0.7);
-      target.officerLevel = 12;
-      nation.isNpc = target.userId === null;
-      const text = `${general.name} → ${target.name} 선양`;
-      return { ...success(text), history: [{ nationId: nation.id, text }], reports: [{ generalId: target.id, text }] };
+      const effects = transferRulership(state, general.nationId!, general.id, target.id);
+      return { ...success(effects.history[0]!.text), ...effects };
     },
   }),
   defineCommand({

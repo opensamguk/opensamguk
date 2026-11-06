@@ -530,35 +530,67 @@ async function cleanup() {
   cleanupPromise = (async () => {
     controller.abort();
     const errors = evidence.cleanupErrors as unknown[];
-    for (const [child, exited] of children) await stopOwnedChild(child, exited).catch(() => errors.push('child-stop'));
+    const report = (
+      phase: 'child-stop' | 'db-disconnect' | 'database-drop' | 'owned-database-retained' | 'final-preservation',
+      slot: 'source' | 'target' | 'none',
+      step:
+        | 'stop'
+        | 'disconnect'
+        | 'identity'
+        | 'catalog'
+        | 'ownership'
+        | 'connections'
+        | 'drop'
+        | 'retained'
+        | 'other-databases'
+        | 'container'
+        | 'ports'
+        | 'root-env',
+    ) => console.error(JSON.stringify({ event: 't215-cleanup-failure', phase, slot, step }));
+    for (const [child, exited] of children)
+      await stopOwnedChild(child, exited).catch(() => {
+        errors.push('child-stop');
+        report('child-stop', 'none', 'stop');
+      });
     await stages.settle();
     evidence.pendingStagesAfterCleanup = stages.activeCount;
-    for (const db of dbs) await disconnect(db).catch(() => errors.push('db-disconnect'));
+    for (const db of dbs)
+      await disconnect(db).catch(() => {
+        errors.push('db-disconnect');
+        report('db-disconnect', 'none', 'disconnect');
+      });
     if (input && databasesBefore) {
-      for (const [name, oid] of [
-        [targetName, targetOid],
-        [sourceName, sourceOid],
+      for (const [name, oid, slot] of [
+        [targetName, targetOid, 'target'],
+        [sourceName, sourceOid, 'source'],
       ] as const) {
         if (!oid) continue;
+        let step: 'identity' | 'catalog' | 'ownership' | 'connections' | 'drop' = 'identity';
         try {
           await identity(true);
+          step = 'catalog';
           const found = (await catalogList(true)).find((row) => row.name === name);
           if (!found) continue;
+          step = 'ownership';
           if (
             found.oid !== oid ||
             !/^t215_(?:src|dst)_[0-9a-f]{32}_test$/.test(name) ||
             databasesBefore.some((row) => row.name === name)
           )
             fail('cleanup-identity');
+          step = 'connections';
           if ((await catalog(`SELECT count(*) FROM pg_stat_activity WHERE datname='${name}';`, true)) !== '0')
             fail('cleanup-connected');
+          step = 'drop';
           await catalog(`DROP DATABASE "${name}";`, true);
           evidence.dropped ??= [] as unknown[];
           (evidence.dropped as unknown[]).push({ name, oid, connectionsBeforeDrop: 0 });
         } catch {
           errors.push({ phase: 'database-drop', name, oid });
+          report('database-drop', slot, step);
         }
       }
+      let step: 'catalog' | 'other-databases' | 'container' | 'ports' | 'root-env' = 'catalog';
       try {
         const after = await catalogList(true);
         const assignedNames = [sourceName, targetName].filter(
@@ -567,7 +599,12 @@ async function cleanup() {
         const remainingOwned = after.filter((row) => assignedNames.includes(row.name));
         const others = after.filter((row) => !assignedNames.includes(row.name));
         evidence.remainingOwnedDatabases = remainingOwned;
-        if (remainingOwned.length) errors.push({ phase: 'owned-database-retained', databases: remainingOwned });
+        if (remainingOwned.length) {
+          errors.push({ phase: 'owned-database-retained', databases: remainingOwned });
+          for (const row of remainingOwned)
+            report('owned-database-retained', row.name === sourceName ? 'source' : 'target', 'retained');
+        }
+        step = 'other-databases';
         assert.deepEqual(others, databasesBefore);
         evidence.otherDatabases = {
           count: others.length,
@@ -575,14 +612,18 @@ async function cleanup() {
           afterSha256: digest(JSON.stringify(others)),
           equal: true,
         };
+        step = 'container';
         assert.deepEqual(await identity(true), containerBefore);
         evidence.containerPreserved = true;
+        step = 'ports';
         assert.equal(await ports(true), portsBefore);
         evidence.portPidsAndListenersPreserved = true;
+        step = 'root-env';
         assert.deepEqual(await envFile(), envFileBefore);
         evidence.rootEnvPreserved = true;
       } catch {
         errors.push('final-preservation');
+        report('final-preservation', 'none', step);
       }
     }
     evidence.parentEnvironmentPreserved =
