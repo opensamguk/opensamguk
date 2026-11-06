@@ -11,6 +11,7 @@ import {
   readLineageState,
   removedGeneralResult,
   creationBlock,
+  POSSESSION_KIND,
   emptyTurns,
   emptyQueue,
   isPolicyMode,
@@ -24,6 +25,7 @@ import {
   type CreationCode,
 } from '@opensamguk/rules';
 import { processTreatyInput } from './treatyInput';
+import { processPossession, appendPossessionLog } from './entryInput';
 import { loadReplayState } from './monthly';
 import { PgHeritageRepository } from './heritage/repository';
 
@@ -191,7 +193,10 @@ export async function processPendingInput(
 }
 
 export function queuedInputHandlers(registry: EngineRegistry = engineRegistry): Record<string, QueuedInputHandler> {
-  const handlers: Record<string, QueuedInputHandler> = { 'general.create': processGeneralCreation };
+  const handlers: Record<string, QueuedInputHandler> = {
+    'general.create': processGeneralCreation,
+    [POSSESSION_KIND]: processPossession,
+  };
   const kinds = registry.rules.inputKinds;
   for (const feature of registry.features) {
     if (!registry.rules.features.some((definition) => definition.key === feature.key))
@@ -268,6 +273,10 @@ export async function processInputs(
       if (world.ruleFeatures.includes(feature.key) && feature.key !== kind.feature)
         await feature.afterQueuedInput?.(tx, world, before, input);
   }
+  if (event.kind === POSSESSION_KIND && outcome.status === 'APPLIED') {
+    if (outcome.generalId === undefined) throw Error('맡은 장수의 적용 ID가 없습니다.');
+    await appendPossessionLog(tx, world.id, outcome.generalId, tick, sequence);
+  }
   const updated = await tx.inputEvent.updateMany({
     where: { id: event.id, status: 'PENDING' },
     data: { ...outcome, sequence, tick: world.replayFormat === 3 ? tick : null },
@@ -291,6 +300,9 @@ const processGeneralCreation: QueuedInputHandler = async (tx, world, event, { ti
     status: world.status,
     hasGeneral: existing.some((g) => g.userId === event.userId),
     hasPending: false,
+    entryOpen:
+      effectiveWorldOptions(world.preset === null ? null : parsePreset(world.preset), world.runtimeOptions).entry
+        .generalCreation === 'open',
   });
   if (block && block.code !== 'PENDING') return reject(block.code);
   const actor = await tx.user.findUnique({ where: { id: event.userId } });

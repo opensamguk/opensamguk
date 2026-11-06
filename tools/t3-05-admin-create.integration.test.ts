@@ -505,6 +505,15 @@ afterAll(
         }
         return true;
       };
+      const dropDatabase = async (database: string) => {
+        // Windows의 DROP 강제 체크포인트가 실제로 21초 걸려 삭제 SQL에만 30초를 준다.
+        if (process.platform === 'win32') await checked(() => admin.query('SET statement_timeout=30000'), signal);
+        try {
+          await checked(() => admin.query('DROP DATABASE "' + database + '"'), signal);
+        } finally {
+          if (process.platform === 'win32') await checked(() => admin.query('SET statement_timeout=10000'), signal);
+        }
+      };
       let connections: number | undefined,
         dropped = false;
       try {
@@ -512,7 +521,7 @@ afterAll(
           signal.throwIfAborted();
           ({ connections } = await checked(() => confirmDisconnectedDatabase(admin, name, oid!), signal));
           if (mayDrop()) {
-            await checked(() => admin.query('DROP DATABASE "' + name + '"'), signal);
+            await dropDatabase(name);
             expect(
               (await checked(() => admin.query('SELECT oid FROM pg_database WHERE datname=$1', [name]), signal)).rows,
             ).toHaveLength(0);
@@ -544,7 +553,7 @@ afterAll(
               signal,
             ));
             if (mayDrop()) {
-              await checked(() => admin.query('DROP DATABASE "' + crash.name + '"'), signal);
+              await dropDatabase(crash.name);
               expect(
                 (await checked(() => admin.query('SELECT oid FROM pg_database WHERE datname=$1', [crash.name]), signal))
                   .rows,

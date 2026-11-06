@@ -36,6 +36,7 @@ const summary = (status: WorldSummary['status'], clockMode: WorldSummary['clockM
   nowTick: 0,
   msPerTick: 1_000,
   turnTermMinutes: 1,
+  truce: null,
 });
 
 // 화면이 읽는 필드만 채운 장수 있는 계정의 home.get.

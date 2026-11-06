@@ -53,6 +53,8 @@ describe('작전 응답 경계', () => {
       clockAnchorAt: new Date(0),
       clockTick: 0,
       turnTermMinutes: 30,
+      preset: null,
+      runtimeOptions: null,
     } as Parameters<typeof nextTurnAt>[0];
     expect(operationTargetAt(world, 10000)).toBe('1970-01-01T00:30:00.000Z');
     expect(operationTargetAt(world, Number.MAX_SAFE_INTEGER)).toBeNull();

@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createDb, notifyWorld, type PrismaClient } from '../packages/db/src/index';
 import { nowTick, toGameDate } from '../packages/rules/src/index';
+import { worldClock } from '../apps/server/src/queries';
 
 interface Publication {
   scope: 'lobby' | 'world' | 'world-message';
@@ -25,10 +26,7 @@ export async function publishNotice(db: PrismaClient, input: Publication) {
     const world = input.worldId ? await tx.world.findUnique({ where: { id: input.worldId } }) : null;
     if (input.worldId && !world) throw new Error('월드를 찾을 수 없습니다.');
     if (input.scope === 'world-message') {
-      const date = toGameDate(
-        world!.startYear,
-        nowTick({ ...world!, clockAnchorAt: world!.clockAnchorAt?.getTime() ?? null }, now.getTime()),
-      );
+      const date = toGameDate(world!.startYear, nowTick(worldClock(world!), now.getTime()));
       const row = await tx.message.create({
         data: {
           worldId: world!.id,

@@ -9,6 +9,7 @@ import {
   setPolicyPayloadSchema,
   updateResidenceAnchors,
   recordedLineageSuccession,
+  recordedPossession,
   type PersonnelMonthResult,
   type PersonnelStepPacket,
   type ReplayState,
@@ -259,6 +260,7 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
         tick: input.tick!,
         createdHumanId: input.kind === 'general.create' ? input.generalId : null,
         succession: recordedLineageSuccession(input),
+        possession: recordedPossession(input),
       });
       await persistEffects(tx, world.id, packet.state, [{ kind: 'world', state: packet.state }], {
         tick: input.tick!,

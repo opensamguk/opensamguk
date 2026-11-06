@@ -27,6 +27,7 @@ export const HERITAGE_DIRECT_INPUT_KINDS = [
 export const HERITAGE_IGNORED_INPUT_KINDS = [
   'general.active',
   'general.create',
+  'general.possess',
   'system.policy.enable',
   ...ADMIN_CLOCK_KINDS,
   ADMIN_END_KIND,
