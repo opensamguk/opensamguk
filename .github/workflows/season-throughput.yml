@@ -46,6 +46,8 @@ jobs:
       - run: pnpm generate
       - name: Migrate isolated measurement database
         run: DATABASE_URL="$TEST_DATABASE_URL" pnpm db:migrate
+      - name: Initialize published measurement resources
+        run: DATABASE_URL="$TEST_DATABASE_URL" pnpm db:init-resources
       - name: Runner hardware
         run: |
           uname -a

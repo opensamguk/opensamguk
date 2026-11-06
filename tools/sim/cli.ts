@@ -1,7 +1,12 @@
 import { appendFile } from 'node:fs/promises';
 import { cpus, totalmem } from 'node:os';
 import { parseArgs } from 'node:util';
-import { loadInitialWorld } from '../../apps/engine/src/world/resources';
+import { createDb } from '../../packages/db/src/index';
+import {
+  composeInitialWorld,
+  readInitialResources,
+  type InitialResources,
+} from '../../apps/engine/src/world/resources';
 import { DEFAULT_SIMULATION_MAX_YEAR, simulateGame } from '../../apps/engine/src/simulation';
 
 async function main() {
@@ -25,6 +30,14 @@ async function main() {
   )
     throw new Error('--seeds는 1~10000 정수이며 --seed와 함께 지정하지 않습니다.');
   if (!['on', 'off'].includes(values.convergence)) throw new Error('--convergence는 on 또는 off입니다.');
+  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL이 필요합니다.');
+  const db = createDb(process.env.DATABASE_URL);
+  let resources: InitialResources;
+  try {
+    resources = await readInitialResources(db, { scenario: values.scenario, map: 'che' });
+  } finally {
+    await db.$disconnect();
+  }
   console.error(
     JSON.stringify({
       node: process.version,
@@ -35,11 +48,17 @@ async function main() {
       map: 'che',
       maxYear: Number(values['max-year']),
       convergence: values.convergence,
+      resources: Object.values(resources).map(({ kind, name, version, contentHash }) => ({
+        kind,
+        name,
+        version,
+        contentHash,
+      })),
     }),
   );
   const seeds = values.seed === undefined ? Array.from({ length: count }, (_, i) => String(i + 1)) : [values.seed];
   for (const seed of seeds) {
-    const initial = await loadInitialWorld({ scenario: values.scenario, map: 'che', seed });
+    const initial = composeInitialWorld(resources, seed);
     const options = { maxYear: Number(values['max-year']), convergence: values.convergence === 'on' };
     const result = simulateGame(initial, options);
     const line = JSON.stringify(result);

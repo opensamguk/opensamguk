@@ -1,6 +1,6 @@
 // GitHub 표준 실행기에서 같은 DB TurnLoop 경로의 처리량을 잰다.
 import { createDb } from '../packages/db/src/index';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
@@ -11,7 +11,7 @@ if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 �
 const db = createDb(url);
 let worldId: string | undefined;
 try {
-  const initial = await loadInitialWorld({ scenario: '1030', map: 'che', seed: '1' });
+  const initial = await loadInitialWorldFromDb(db, { scenario: '1030', map: 'che', seed: '1' });
   if (initial.cities.length !== 94 || initial.generals.length !== 491) throw new Error('전체 1030 리소스가 아닙니다.');
   ({ worldId } = await saveInitialWorld(db, initial, { name: 'T1-26 처리량', turnTermMinutes: 1, endYear: 300 }));
   await controlClock(db, worldId, 'start');
