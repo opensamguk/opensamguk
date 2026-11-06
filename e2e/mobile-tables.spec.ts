@@ -9,7 +9,7 @@ import { isDetailedGeneral } from '../apps/web/src/game/types';
 import { officerName } from '../apps/web/src/game/names';
 import { createAccount, withE2eDb } from './account';
 import { holdLease, releaseHold, query } from './game';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -154,28 +154,28 @@ async function statValue(row: Locator, label: string, value: string, mobile: boo
 test('T3-10 정식191년 도시·국가·월간 순위 표의 모든 값·정렬·375px와 초안 보존', async ({ page }, info) => {
   test.setTimeout(120000);
   const execution = (async () => {
-    const initial = await loadInitialWorld({
-      scenario: 'integration191',
-      map: 'integration',
-      statRules: 'five-stats',
-      portraitMap: '191-map',
-      seed: 'mobile-tables-191',
-    });
-    initial.ruleFeatures = [
-      'campaign-v1',
-      'five-stats',
-      'operational-map',
-      'personnel',
-      'policy',
-      'stratagem-basic',
-      'treaty',
-    ];
-    expect(initial.generals).toHaveLength(491);
-    expect(initial.nations).toHaveLength(21);
     ownWorld = (
-      await withE2eDb((db) =>
-        saveInitialWorld(db, initial, { name: '모바일 표 정식191', turnTermMinutes: 60, endYear: 201 }),
-      )
+      await withE2eDb(async (db) => {
+        const initial = await loadInitialWorldFromDb(db, {
+          scenario: 'integration191',
+          map: 'integration',
+          statRules: 'five-stats',
+          portraitMap: '191-map',
+          seed: 'mobile-tables-191',
+        });
+        initial.ruleFeatures = [
+          'campaign-v1',
+          'five-stats',
+          'operational-map',
+          'personnel',
+          'policy',
+          'stratagem-basic',
+          'treaty',
+        ];
+        expect(initial.generals).toHaveLength(491);
+        expect(initial.nations).toHaveLength(21);
+        return saveInitialWorld(db, initial, { name: '모바일 표 정식191', turnTermMinutes: 60, endYear: 201 });
+      })
     ).worldId;
     hold = await holdLease(ownWorld);
     await controlClock(hold.db, ownWorld, 'start');

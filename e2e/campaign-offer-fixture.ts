@@ -12,7 +12,7 @@ import {
 } from '@playwright/test';
 import type { OfferRuntime } from './campaign-offer-ci-stack';
 import type { readCampaignBoard } from '../apps/server/src/game/campaignApi';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { loadReplayState } from '../apps/engine/src/monthly';
@@ -367,30 +367,30 @@ export class OfferFixture {
     for (let i = 0; i < 2; i++) {
       // 결과를 골라내지 않는 고정 시드. 두 월드는 사람 UUID·입력·일정을 공유한다.
       this.progress('world-resources');
-      const initial = await loadInitialWorld({
-        scenario: 'integration191',
-        map: 'integration',
-        statRules: 'five-stats',
-        portraitMap: '191-map',
-        seed: 'int11-offer-controlled-npc-v1',
-      });
-      initial.ruleFeatures = [
-        'campaign-v1',
-        'five-stats',
-        'operational-map',
-        'personnel',
-        'policy',
-        'stratagem-basic',
-        'treaty',
-      ];
-      expect(initial.generals).toHaveLength(491);
-      expect(initial.nations).toHaveLength(21);
-      this.scope.check();
-      this.progress('world-persist');
       const { worldId } = await this.scope.work(
         'create world',
         () =>
           this.withDb(async (db) => {
+            const initial = await loadInitialWorldFromDb(db, {
+              scenario: 'integration191',
+              map: 'integration',
+              statRules: 'five-stats',
+              portraitMap: '191-map',
+              seed: 'int11-offer-controlled-npc-v1',
+            });
+            initial.ruleFeatures = [
+              'campaign-v1',
+              'five-stats',
+              'operational-map',
+              'personnel',
+              'policy',
+              'stratagem-basic',
+              'treaty',
+            ];
+            expect(initial.generals).toHaveLength(491);
+            expect(initial.nations).toHaveLength(21);
+            this.scope.check();
+            this.progress('world-persist');
             const result = await saveInitialWorld(db, initial, {
               name: `휘하 실제 대조 ${i}`,
               turnTermMinutes: 60,

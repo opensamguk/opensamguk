@@ -5,7 +5,7 @@ import { TEST_PASSWORD } from './account';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { newSession } from '../apps/server/src/auth/session';
 import { changeAdminRole } from '../apps/server/src/admin/roleStore';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -70,7 +70,7 @@ export async function formalSanctionWorlds(stack: LegalStack, page: Page, userId
   };
   try {
     for (let index = 0; index < 2; index++) {
-      const initial = await loadInitialWorld({
+      const initial = await loadInitialWorldFromDb(stack.db, {
         scenario: 'integration191',
         map: 'integration',
         statRules: 'five-stats',

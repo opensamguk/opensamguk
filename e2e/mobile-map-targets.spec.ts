@@ -5,7 +5,7 @@ import { expect, test } from './t210-fixture';
 import { createAccount, withE2eDb } from './account';
 import { holdLease, query, releaseHold } from './game';
 import type { WorldMap } from '../apps/web/src/game/types';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -94,28 +94,28 @@ test('T3-10 정식 GIS61거점 실제 터치·밀집 후보·끌기·취소와 �
 }, info) => {
   test.setTimeout(120_000);
   const execution = (async () => {
-    const initial = await loadInitialWorld({
-      scenario: 'integration191',
-      map: 'integration',
-      statRules: 'five-stats',
-      portraitMap: '191-map',
-      seed: 'mobile-map-191',
-    });
-    initial.ruleFeatures = [
-      'campaign-v1',
-      'five-stats',
-      'operational-map',
-      'personnel',
-      'policy',
-      'stratagem-basic',
-      'treaty',
-    ];
-    expect(initial.generals).toHaveLength(491);
-    expect(initial.nations).toHaveLength(21);
     ownWorld = (
-      await withE2eDb((db) =>
-        saveInitialWorld(db, initial, { name: '지도 터치 정식191', turnTermMinutes: 60, endYear: 201 }),
-      )
+      await withE2eDb(async (db) => {
+        const initial = await loadInitialWorldFromDb(db, {
+          scenario: 'integration191',
+          map: 'integration',
+          statRules: 'five-stats',
+          portraitMap: '191-map',
+          seed: 'mobile-map-191',
+        });
+        initial.ruleFeatures = [
+          'campaign-v1',
+          'five-stats',
+          'operational-map',
+          'personnel',
+          'policy',
+          'stratagem-basic',
+          'treaty',
+        ];
+        expect(initial.generals).toHaveLength(491);
+        expect(initial.nations).toHaveLength(21);
+        return saveInitialWorld(db, initial, { name: '지도 터치 정식191', turnTermMinutes: 60, endYear: 201 });
+      })
     ).worldId;
     hold = await holdLease(ownWorld);
     await controlClock(hold.db, ownWorld, 'start');

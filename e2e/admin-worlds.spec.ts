@@ -5,7 +5,7 @@ import { adminRole } from './adminSetup';
 import { TEST_PASSWORD } from './account';
 import { holdLease, type LeaseHold } from './game';
 import { cleanupHeldWorld } from './heldWorldCleanup';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -82,7 +82,7 @@ test('T3-06 AC-M3-04 실제 정식 두 월드·수동 조회·게임 불변·엔
       try {
         const ids: string[] = [];
         for (const suffix of ['a', 'b']) {
-          const initial = await loadInitialWorld({
+          const initial = await loadInitialWorldFromDb(db, {
             scenario: 'integration191',
             map: 'integration',
             statRules: 'five-stats',

@@ -11,7 +11,7 @@ import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { removeWorlds } from './rankingCleanup';
 
 const url = process.env.DATABASE_URL;
@@ -20,7 +20,7 @@ const db = createDb(url);
 const [command, ...args] = process.argv.slice(2);
 
 async function fresh() {
-  const initial = await loadInitialWorld({ scenario: '1030', map: 'che', seed: 'e2e-ranking-fresh' });
+  const initial = await loadInitialWorldFromDb(db, { scenario: '1030', map: 'che', seed: 'e2e-ranking-fresh' });
   const { worldId } = await saveInitialWorld(db, initial, {
     name: 'E2E 순위 정산 전',
     turnTermMinutes: 60,
@@ -34,7 +34,7 @@ async function settled(emails: string[]) {
     emails.map((email) => db.user.findUniqueOrThrow({ where: { email }, select: { id: true } })),
   );
   if (!top || !outside || !newcomer) throw new Error('계정 세 개가 필요합니다.');
-  const initial = await loadInitialWorld({ scenario: '1030', map: 'che', seed: 'e2e-ranking' });
+  const initial = await loadInitialWorldFromDb(db, { scenario: '1030', map: 'che', seed: 'e2e-ranking' });
   // 130명만 등장시켜 상위 100명 밖이 생기게 한다. 정산은 바뀐 장수를 한 명씩 저장하므로 수를 줄여
   // 부하가 큰 기계에서도 정산 트랜잭션 제한(30초) 안에 들게 한다. 나머지는 50년 뒤 등장이라 순위에 없다.
   // 첫 정산 전에는 차례가 오지 않게 해 정산만 돌린다.

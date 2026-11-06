@@ -6,7 +6,7 @@ import { endFootprint } from './adminEndSetup';
 import { initializeIntegrationResources } from '../tools/integration-resources';
 import { ruleRegistry } from '../packages/rules/src/index';
 import { processWorldCreateRequest } from '../apps/engine/src/admin/createRequests';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { buildServer } from '../apps/server/src/server';
 import { listenLegalLoopback } from './legalFixturePorts';
@@ -114,7 +114,7 @@ export async function createdResult(page: Page, result: { status: string; worldI
   ).toBeVisible();
 }
 export async function creationSource(stack: LegalStack) {
-  const initial = await loadInitialWorld({
+  const initial = await loadInitialWorldFromDb(stack.db, {
     scenario: 'integration191',
     map: 'integration',
     statRules: 'five-stats',

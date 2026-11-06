@@ -4,7 +4,7 @@ import { test as base, expect, type LegalStack } from './legalFixture';
 import { TEST_PASSWORD } from './account';
 import { sanctionAccount } from './adminSanctionSetup';
 import { changeAdminRole } from '../apps/server/src/admin/roleStore';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -153,7 +153,7 @@ const test = base.extend<{ investigation: Journey }>({
         const people = [first, second, other];
         for (const index of [0, 1]) {
           controller.signal.throwIfAborted();
-          const initial = await loadInitialWorld({
+          const initial = await loadInitialWorldFromDb(stack.db, {
             scenario: 'integration191',
             map: 'integration',
             statRules: 'five-stats',
