@@ -21,6 +21,7 @@ const files = [
   'feature-profile/expanded-191-v1.json',
   'feature-profile/expanded-191-v3.json',
   'feature-profile/expanded-191-v4.json',
+  'feature-profile/expanded-191-v5.json',
   'scenario/san10-191-v2.json',
   ...['191-sex.json', '191-sex-2.json', '191-sex-3.json'].map((file) => `officers/${file}`),
 ];
@@ -132,6 +133,9 @@ try {
   const expanded = JSON.parse(
     fs.readFileSync(path.join(context, 'resources/feature-profile/expanded-191-v4.json'), 'utf8'),
   );
+  const lifecycle = JSON.parse(
+    fs.readFileSync(path.join(context, 'resources/feature-profile/expanded-191-v5.json'), 'utf8'),
+  );
 
   phase = 'build';
   cleanup.image = 'unverified';
@@ -170,7 +174,7 @@ try {
   phase = 'run';
   const code = `import fs from 'node:fs'; import {createHash} from 'node:crypto';
     import {loadSexLedger,loadSexLedgers,loadFeatureProfile} from '/probe.mjs';
-    const all=loadSexLedgers(), p=await loadFeatureProfile('expanded-191-v2'), legacy=await loadFeatureProfile('expanded-191-v1'), expanded=await loadFeatureProfile('expanded-191-v4');
+    const all=loadSexLedgers(), p=await loadFeatureProfile('expanded-191-v2'), legacy=await loadFeatureProfile('expanded-191-v1'), expanded=await loadFeatureProfile('expanded-191-v4'), lifecycle=await loadFeatureProfile('expanded-191-v5');
     console.log(JSON.stringify({node:process.version,uid:process.getuid(),gid:process.getgid(),root:process.env.OPENSAMGUK_RESOURCES_ROOT,
       files:Object.fromEntries(${JSON.stringify(files)}.map(f=>[f,createHash('sha256').update(fs.readFileSync('/app/resources/'+f)).digest('hex')])),
       rows:all.map(x=>x.rows.length),hashes:all.map(x=>x.review.contentSha256),latest:loadSexLedger().review.contentSha256,
@@ -178,6 +182,9 @@ try {
         birthBp:p.value.featureData['lineage-v1'].birth.chanceBp,maxGenerals:p.value.featureData['lineage-v1'].limits.maxGenerals,
         lineageVersion:p.value.featureData['lineage-v1'].version,equipmentItems:p.value.featureData['equipment-v1'].items.length},
       legacyProfile:{key:legacy.value.key,hash:legacy.contentHash},
+      lifecycleProfile:{key:lifecycle.value.key,hash:lifecycle.contentHash,features:lifecycle.value.ruleFeatures,
+        dataKeys:Object.keys(lifecycle.value.featureData).sort(),selection:Object.fromEntries(
+          ['mapKey','scenarioKey','unitSetKey','statRulesKey','portraitMapKey'].map(key=>[key,lifecycle.value[key]]))},
       expandedProfile:{key:expanded.value.key,hash:expanded.contentHash,features:expanded.value.ruleFeatures,
         dataKeys:Object.keys(expanded.value.featureData).sort(),selection:Object.fromEntries(
           ['mapKey','scenarioKey','unitSetKey','statRulesKey','portraitMapKey'].map(key=>[key,expanded.value[key]]))}}));`;
@@ -251,6 +258,16 @@ try {
     ),
   });
   assert.equal(observed.expandedProfile.features.length, 19);
+  assert.deepEqual(observed.lifecycleProfile, {
+    key: lifecycle.key,
+    hash: hashState(lifecycle),
+    features: lifecycle.ruleFeatures,
+    dataKeys: Object.keys(lifecycle.featureData).sort(),
+    selection: Object.fromEntries(
+      ['mapKey', 'scenarioKey', 'unitSetKey', 'statRulesKey', 'portraitMapKey'].map((key) => [key, lifecycle[key]]),
+    ),
+  });
+  assert.equal(observed.lifecycleProfile.features.length, 20);
   assert.equal(observed.legacyProfile.key, 'expanded-191-v1');
   assert.equal(
     observed.legacyProfile.hash,

@@ -1,4 +1,5 @@
 import { TRPCError } from '@trpc/server';
+import { TICKS_PER_MONTH, WANDERING_MONTH_LIMIT } from '@opensamguk/rules';
 import { protectedProcedure, router } from '../trpc';
 import { entityKey, readWorld, viewerGeneral, worldInput } from '../queries';
 import { garrisonGeneralInfo, mapCity, nationInfo } from '../visibility';
@@ -14,10 +15,24 @@ export const nationRouter = router({
       if (!nation) throw new TRPCError({ code: 'NOT_FOUND', message: '국가를 찾을 수 없습니다.' });
       const cities = await tx.city.findMany({ where: input, orderBy: { cityKey: 'asc' } });
       const generals = await tx.general.findMany({ where: input, orderBy: { id: 'asc' } });
-      const units = world.ruleFeatures.includes('campaign-v1')
-        ? (await readView(tx, input.worldId)).campaign!.units
+      const state = world.ruleFeatures.some((feature) => ['campaign-v1', 'nation-lifecycle-v1'].includes(feature))
+        ? await readView(tx, input.worldId)
         : undefined;
+      const units = state?.campaign?.units;
+      const lifecycle = state?.nationLifecycle;
+      const wandering = lifecycle?.nations[String(nation.id)];
       return {
+        ...(lifecycle
+          ? {
+              nationLifecycleEnabled: true as const,
+              wandering: wandering
+                ? {
+                    sinceTick: wandering.sinceTick,
+                    expiresTick: wandering.sinceTick + WANDERING_MONTH_LIMIT * TICKS_PER_MONTH,
+                  }
+                : null,
+            }
+          : {}),
         ...(units === undefined ? {} : { campaignEnabled: true as const }),
         ...(world.ruleFeatures.includes('five-stats') ? { fiveStats: true as const } : {}),
         ...nationInfo(

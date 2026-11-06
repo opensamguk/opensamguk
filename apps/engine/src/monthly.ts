@@ -21,13 +21,15 @@ import { hashState } from '@opensamguk/shared/node';
 import { engineFeatures } from './features';
 import { loadWorld } from './worldLoader';
 import { persistRanking } from './ranking';
-import { persistYearbookNations } from './nationArchive';
+import { persistYearbookNations, persistRemovedNations } from './nationArchive';
+import { persistCommandMeta } from './commandPersistence';
 import { persistExt } from './extState';
 import { persistTreatyClosures } from './treatyState';
 import { persistCampaignState, readCampaignArmyTypes } from './campaignState';
 import { persistCityResourcesState } from './cityResourcesState';
 import { persistCityRuins } from './cityScaleState';
 import { persistNationStrategy } from './nationStrategyState';
+import { persistNationLifecycle } from './nationLifecycleState';
 import { persistLogisticsState } from './logisticsState';
 import { persistGovernanceState } from './governance/repository';
 import { persistLineageState } from './lineage/repository';
@@ -140,6 +142,7 @@ export async function persistMonthly(
   await persistExt(tx, worldId, before.ext, next.ext);
   await persistCityRuins(tx, worldId, before, next);
   await persistNationStrategy(tx, worldId, before, next);
+  await persistNationLifecycle(tx, worldId, before, next);
   await persistLogisticsState(tx, worldId, before, next);
   await persistGovernanceState(tx, worldId, before, next);
   await persistLineageState(tx, worldId, before, next);
@@ -162,6 +165,8 @@ export async function persistMonthly(
         sequence,
       });
   }
+  await persistCommandMeta(tx, worldId, before, next);
+  await persistRemovedNations(tx, worldId, before, next, { tick, sequence });
   await tx.world.update({ where: { id: worldId }, data: { monthlyTick: tick } });
   const snapshot = await loadReplayState(tx, worldId);
   await tx.yearbookSnapshot.create({

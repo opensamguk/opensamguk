@@ -19,6 +19,9 @@ export function cloneWorldWithRegistry(view: WorldView, registry: ExtStateRegist
   for (const key in view.nations) nations[key] = { ...view.nations[key]! };
   for (const key in view.generals) generals[key] = { ...view.generals[key]! };
   return {
+    ...(view.nationLifecycle
+      ? { nationLifecycle: structuredClone(view.nationLifecycle) as NonNullable<WorldState['nationLifecycle']> }
+      : {}),
     ...(view.nationStrategy
       ? { nationStrategy: structuredClone(view.nationStrategy) as NonNullable<WorldState['nationStrategy']> }
       : {}),

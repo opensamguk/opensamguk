@@ -9,6 +9,8 @@ import {
   readStoredLineage,
   readStoredStratagemCards,
   readStoredEquipment,
+  readStoredNationLifecycle,
+  assertNationLifecycle,
   type WorldState,
 } from '@opensamguk/rules';
 import { engineFeatures } from './features';
@@ -110,6 +112,9 @@ export async function loadWorldAfterCapabilityCheck(
   if (cityRuins) state.cityRuins = cityRuins;
   const nationStrategy = readStoredNationStrategy(world);
   if (nationStrategy) state.nationStrategy = nationStrategy;
+  const nationLifecycle = readStoredNationLifecycle(world);
+  if (nationLifecycle) state.nationLifecycle = nationLifecycle;
+  assertNationLifecycle(state);
   const logistics = readStoredLogistics(world.logisticsState, state, readLogisticsOriginConfig(world, state));
   if (logistics && logistics.monthlyTick !== world.monthlyTick)
     throw new Error('저장된 물류와 월 정산 tick이 다릅니다.');

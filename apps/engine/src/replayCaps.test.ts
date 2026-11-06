@@ -178,6 +178,7 @@ function exportFixture(source: CapsArchive, ended = true) {
     cityResourcesState: null,
     cityRuinsState: null,
     nationStrategyState: null,
+    nationLifecycleState: null,
     logisticsState: null,
     equipmentState: null,
     governanceState: null,

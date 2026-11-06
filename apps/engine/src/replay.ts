@@ -7,6 +7,7 @@ import {
   initialReplayStateWithRegistry,
   checkReplayOrigin,
   readStoredNationStrategy,
+  readStoredNationLifecycle,
   ruleRegistry,
   type RuleRegistry,
   type ReplayOriginV3,
@@ -147,10 +148,16 @@ export async function exportReplay(
       if (world.replayOrigin === null) throw new Error('생성 기록이 없는 월드는 재생할 수 없습니다.');
       checkStoredReplayFormat(world);
       readStoredNationStrategy(world);
+      readStoredNationLifecycle(world);
       await assertStoredCityResources(tx, world);
       await assertStoredCityRuins(tx, world);
       await assertStoredLogistics(tx, world);
-      if (world.ruleFeatures.includes('stratagem-cards-v1') || world.stratagemCardsState != null)
+      if (
+        world.ruleFeatures.includes('stratagem-cards-v1') ||
+        world.stratagemCardsState != null ||
+        world.ruleFeatures.includes('nation-lifecycle-v1') ||
+        world.nationLifecycleState != null
+      )
         await loadWorld(tx, worldId);
       const v3 = world.replayFormat === 3;
       if (!v3) {
