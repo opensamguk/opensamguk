@@ -999,6 +999,7 @@ enum GameResourceStatus {
 }
 
 model GameResource {
+  background  MapBackground?
   id          String             @id @default(uuid())
   kind        GameResourceKind
   name        String
@@ -1016,4 +1017,16 @@ model GameResource {
   publishedBy String?
 
   @@unique([kind, name, version])
+}
+
+model MapBackground {
+  resourceId     String       @id
+  resource       GameResource @relation(fields: [resourceId], references: [id], onDelete: Restrict)
+  mapContentHash String
+  sha256         String
+  bytes          Int
+  width          Int
+  height         Int
+  imageCommit    String
+  createdAt      DateTime     @default(now())
 }
