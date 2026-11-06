@@ -133,7 +133,10 @@ describe('받은 제안함', () => {
 
   it('발령·휘하·외교 제안을 모아 보이고 답하는 화면으로 잇는다', async () => {
     on('home.get', () => ({ nation: { id: 1 } }));
-    on('general.mine', () => ({ general: { id: 1 }, creationRules: { campaignEnabled: true } }));
+    on('general.mine', () => ({
+      general: { id: 1 },
+      creationRules: { campaignEnabled: true, personnelEnabled: true },
+    }));
     on('offers.mine', () => [offer]);
     on('campaign.get', () => board);
     on('treaty.list', () =>
@@ -157,6 +160,20 @@ describe('받은 제안함', () => {
 
     expect(screen.queryByText('받은 제안이 없습니다')).toBeNull();
   });
+
+  // 서버 general.mine의 personnelEnabled가 정본이다. false이거나 키가 없으면(구형 서버) 인사 조회를 부르지 않는다 (PR377).
+  it.each([{ personnelEnabled: false }, {}])(
+    '인사 기능이 없는 월드는 발령·인사 조회 없이 빈 상태를 보인다 %o',
+    async (rules) => {
+      on('general.mine', () => ({ general: { id: 1 }, creationRules: { campaignEnabled: false, ...rules } }));
+      on('offers.mine', () => {
+        throw serverError('PRECONDITION_FAILED', '인사 기능이 없는 월드입니다.');
+      });
+      renderPage();
+      expect(await screen.findByText('받은 제안이 없습니다')).toBeTruthy();
+      expect(wire.calls.some((call) => call.path === 'offers.mine' || call.path === 'personnel.recent')).toBe(false);
+    },
+  );
 
   it('조약을 볼 수 없는 월드는 오류 없이 빈 상태로 둔다', async () => {
     on('home.get', () => ({ nation: { id: 1 } }));

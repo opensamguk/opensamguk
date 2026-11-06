@@ -4,6 +4,7 @@ import { personnelKeys, usePersonnelApi, type AssignmentOfferView } from './cont
 import styles from './Personnel.module.css';
 import { euro, iGa, type Notice } from './request';
 import { usePersonnelAction } from './usePersonnelAction';
+import { usePersonnelEnabled } from './usePersonnelEnabled';
 
 const KINDS = ['offer.respond'] as const;
 
@@ -13,11 +14,13 @@ export function OfferBox({ worldId }: { worldId: string }) {
   const api = usePersonnelApi();
   const queryClient = useQueryClient();
   const action = usePersonnelAction({ worldId, kinds: KINDS });
+  const personnel = usePersonnelEnabled(worldId);
   const offers = useQuery({
     queryKey: personnelKeys.offers(worldId),
     queryFn: () => api.offers({ worldId }),
+    enabled: personnel,
     retry: false,
-    // 발령은 엔진이 턴에 만든다. 서버가 거부하면(인사 기능 이전 월드 등) 다시 묻지 않는다.
+    // 발령은 엔진이 턴에 만든다. 인사 기능이 없는 월드는 묻지 않고, 서버가 거부해도 다시 묻지 않는다.
     refetchInterval: (query) => (query.state.status === 'error' ? false : 15_000),
   });
   const offer = offers.data?.[0];

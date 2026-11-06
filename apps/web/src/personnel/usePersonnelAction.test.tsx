@@ -28,6 +28,16 @@ vi.mock('../trpc', () => {
       },
     },
     home: { get: { queryKey: ({ worldId }: { worldId: string }) => ['home', worldId] } },
+    // 인사 기능이 있는 월드만 recent를 묻는다. 시험 월드는 모두 켜 둔다.
+    general: {
+      mine: {
+        queryOptions: ({ worldId }: { worldId: string }) => ({
+          queryKey: ['general', 'mine', worldId],
+          queryFn: () => ({ general: null, creationRules: { personnelEnabled: true } }),
+          staleTime: Infinity,
+        }),
+      },
+    },
   };
   return { useTRPC: () => trpc, trpcClient: {} };
 });

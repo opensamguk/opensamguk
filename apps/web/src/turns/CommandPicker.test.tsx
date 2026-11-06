@@ -67,7 +67,10 @@ it('T4-24 AC-P2-12 장비는 이름·가격·재료로 고르고 현재 조건�
   expect(select.tagName).toBe('SELECT');
   fireEvent.change(select, { target: { value: 'weapon_06' } });
   expect(screen.getByText(/치안 6,000 이상 · 철 30/)).toBeTruthy();
-  expect(screen.getByText('현재 조건: 금이 부족합니다.')).toBeTruthy();
+  // 지금 상태의 경고는 30칸 표의 사전 검사와 같은 말을 쓰고, 경고가 있어도 넣을 수 있다고 바로 아래에 적는다.
+  const warning = screen.getByText('사전 검사 경고: 금이 부족합니다.');
+  expect(warning.getAttribute('role')).toBe('note');
+  expect(warning.nextElementSibling?.textContent).toContain('경고가 있어도 넣을 수 있고');
   fireEvent.click(screen.getByRole('button', { name: '1번 칸에 넣기' }));
   expect(input.onPut).toHaveBeenCalledWith({
     commandKey: 'equipment_trade',
@@ -88,7 +91,7 @@ it('T4-24 AC-P2-12 장비 칸을 바꾸면 이전 선택을 비워 다른 종류
   expect(input.onPut).not.toHaveBeenCalled();
 });
 
-it('T4-24 AC-P2-12 장비 재조회가 실패하면 이미 고른 인자도 넣지 않고 다시 조회한다', () => {
+it('T4-24 AC-P2-12 AC-P2-34 장비 재조회가 실패하면 이미 고른 인자도 넣지 않고 공통 오류 칸에서 다시 시도한다', () => {
   const input = props({ commands: [equipmentCommand], equipment: { kind: 'ready', data: equipmentBoard() } });
   const view = render(<CommandPicker {...input} />);
   fireEvent.click(screen.getByRole('radio', { name: '장비매매' }));
@@ -97,7 +100,10 @@ it('T4-24 AC-P2-12 장비 재조회가 실패하면 이미 고른 인자도 넣�
   view.rerender(<CommandPicker {...input} equipment={{ kind: 'error', retry }} />);
   fireEvent.submit(screen.getByRole('form', { name: '장비매매 인자' }));
   expect(input.onPut).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole('button', { name: '다시 조회' }));
+  const alert = screen.getByRole('alert');
+  expect(alert.getAttribute('data-state')).toBe('error');
+  expect(alert.textContent).toContain('장비 정보를 불러오지 못했습니다.');
+  fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
   expect(retry).toHaveBeenCalledOnce();
 });
 
