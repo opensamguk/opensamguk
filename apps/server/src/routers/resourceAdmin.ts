@@ -5,6 +5,8 @@ import { listInput } from '../resourceAdmin/read';
 import {
   cloneResource,
   cloneResourceInput,
+  discardResource,
+  discardResourceInput,
   getResourceCatalog,
   getResourceInput,
   listResourceCatalog,
@@ -26,4 +28,5 @@ export const resourceAdminRouter = router({
   clone: resourceProcedure.input(cloneResourceInput).mutation(({ ctx, input }) => cloneResource(ctx, input)),
   save: resourceProcedure.input(saveResourceInput).mutation(({ ctx, input }) => saveResource(ctx, input)),
   publish: resourceProcedure.input(publishResourceInput).mutation(({ ctx, input }) => publishResource(ctx, input)),
+  discard: resourceProcedure.input(discardResourceInput).mutation(({ ctx, input }) => discardResource(ctx, input)),
 });

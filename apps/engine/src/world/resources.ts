@@ -5,8 +5,17 @@ import { buildInitialWorld, parsePreset, type WorldInit } from '@opensamguk/rule
 import { sexLedgerSchema, featureProfileSchema, type SexLedger } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { resourceRoot as resolveResourceRoot } from '@opensamguk/shared/resource-root';
+import { validateMap, validateScenario } from '@opensamguk/rules/resource-validation';
 
 export const resourceRoot = resolveResourceRoot();
+
+function validateInitialPair(map: unknown, scenario: unknown) {
+  if (
+    validateMap(map, { scenarios: [scenario] }).status !== 'pass' ||
+    validateScenario(scenario, { map }).status !== 'pass'
+  )
+    throw new Error('지도와 시나리오의 조합이 자원 검사를 통과하지 못했습니다.');
+}
 
 const SEX_LEDGER_FILES = ['officers/191-sex.json', 'officers/191-sex-2.json', 'officers/191-sex-3.json'] as const;
 const sexLedgers = new Map<string, SexLedger>();
@@ -82,6 +91,7 @@ export async function loadInitialWorld(
     readJson(`scenario/${selected.statRules}.json`),
     readJson(`portraits/${selected.portraitMap}.json`),
   ]);
+  validateInitialPair(map, scenario);
   return buildInitialWorld({ map, scenario, unitSet, statRules, portraitMap, seed: options.seed });
 }
 
@@ -133,6 +143,7 @@ export function composeInitialWorld(resources: InitialResources, seed: string): 
     }
   }
   try {
+    validateInitialPair(resources.map.content, resources.scenario.content);
     return buildInitialWorld({
       map: resources.map.content,
       scenario: resources.scenario.content,

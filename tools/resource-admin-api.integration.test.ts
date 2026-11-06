@@ -8,6 +8,7 @@ import { categories } from '../apps/server/src/authz/coverage';
 import { checkContent, RESOURCE_PAYLOAD_LIMITS } from '../apps/server/src/resourceAdmin/payload';
 import { RESOURCE_HTTP_LIMITS } from '../apps/server/src/resourceAdmin/httpLimits';
 import { hashState } from '../packages/shared/src/node/hashState';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { testDatabaseUrl } from './test-database';
 
 if (!process.env.TEST_DATABASE_URL) throw new Error('전용 시험 DB가 필요합니다.');
@@ -21,12 +22,14 @@ const paths = [
   'resourceAdmin.clone',
   'resourceAdmin.save',
   'resourceAdmin.publish',
+  'resourceAdmin.discard',
 ] as const;
 type Path = (typeof paths)[number];
 interface Reply {
   ok?: boolean;
   reason?: string;
   draftId?: string;
+  discarded?: { id: string; revision: number; contentHash: string };
   meta?: {
     id: string;
     name: string;
@@ -164,7 +167,20 @@ for (const path of paths)
           else if (path === 'resourceAdmin.get') expect(result.data).toMatchObject({ content: f.content });
           else if (path === 'resourceAdmin.clone')
             expect(result.data).toMatchObject({ ok: true, meta: { createdBy: user.id, status: 'DRAFT', revision: 0 } });
-          else expect(result.data).toMatchObject({ ok: true, meta: { id: f.draft.id }, report: { status: 'pass' } });
+          else if (path === 'resourceAdmin.discard') {
+            expect(result.data).toMatchObject({
+              ok: true,
+              discarded: { id: f.draft.id, revision: 0, contentHash: f.draft.contentHash },
+            });
+            expect(await db.gameResource.findUnique({ where: { id: f.draft.id } })).toBeNull();
+            expect(
+              await db.auditLog.findFirstOrThrow({ where: { targetId: f.draft.id, action: 'resource.discard' } }),
+            ).toMatchObject({
+              actorUserId: user.id,
+              reason: '실제 게시 시험',
+              payload: { beforeHash: f.draft.contentHash, afterHash: null, beforeRevision: 0, afterRevision: null },
+            });
+          } else expect(result.data).toMatchObject({ ok: true, meta: { id: f.draft.id }, report: { status: 'pass' } });
         } else {
           expect(result.code).toBe(
             category === 'otherUser' ? 'FORBIDDEN' : category === 'invalidInput' ? 'BAD_REQUEST' : 'UNAUTHORIZED',
@@ -240,7 +256,7 @@ it('AC-P2-27 공동 저장 CAS·잘못된 초안 게시 거부·게시 판 불�
   await expect(db.gameResource.delete({ where: { id: f.draft.id } })).rejects.toThrow();
 });
 
-it('AC-P2-27 감사 삽입 실패는 실제 HTTP의 초안 저장과 게시를 함께 되돌린다', async () => {
+it('AC-P2-27 감사 삽입 실패는 실제 HTTP의 초안 저장·게시·폐기를 함께 되돌린다', async () => {
   const user = await actor(),
     f = await fixture();
   await db.$executeRawUnsafe(
@@ -257,6 +273,9 @@ it('AC-P2-27 감사 삽입 실패는 실제 HTTP의 초안 저장과 게시를 �
     ).toBe('INTERNAL_SERVER_ERROR');
     expect(
       (await request('resourceAdmin.publish', { id: f.draft.id, revision: 0, reason: '감사 실패' }, user.cookie)).code,
+    ).toBe('INTERNAL_SERVER_ERROR');
+    expect(
+      (await request('resourceAdmin.discard', { id: f.draft.id, revision: 0, reason: '감사 실패' }, user.cookie)).code,
     ).toBe('INTERNAL_SERVER_ERROR');
     expect(await snapshot()).toBe(before);
   } finally {
@@ -467,4 +486,362 @@ it('AC-P2-27 긴 오류의 봉투를 제한하며 기존 관리자 다섯 조회
   });
   expect(normal.status).toBe(200);
   expect(await normal.json()).toHaveLength(5);
+});
+
+const resourceRef = (row: { id: string; revision: number; contentHash: string }) => ({
+  id: row.id,
+  revision: row.revision,
+  contentHash: row.contentHash,
+});
+const freshName = () => `d071_${randomUUID().replaceAll('-', '')}`;
+async function sourceResource(kind: 'MAP' | 'SCENARIO' | 'UNIT_SET' | 'STAT_RULES' | 'PORTRAIT_MAP', name: string) {
+  return db.gameResource.findUniqueOrThrow({ where: { kind_name_version: { kind, name, version: 1 } } });
+}
+async function copyResource(sourceId: string, cookie: string) {
+  const result = await request('resourceAdmin.clone', { sourceId, name: freshName() }, cookie);
+  expect(result).toMatchObject({ status: 200, data: { ok: true, meta: { revision: 0, status: 'DRAFT' } } });
+  return db.gameResource.findUniqueOrThrow({ where: { id: result.data!.meta!.id } });
+}
+
+it('AC-P2-27 다른 이름 복제는 종류별 1판을 만들고 원본·출처와 내용을 보존한다', async () => {
+  const user = await actor();
+  for (const [kind, name] of [
+    ['MAP', 'che'],
+    ['SCENARIO', '1030'],
+    ['UNIT_SET', 'basic'],
+    ['STAT_RULES', 'default'],
+    ['PORTRAIT_MAP', 'rtk14-map'],
+  ] as const) {
+    const source = await sourceResource(kind, name),
+      copied = await copyResource(source.id, user.cookie),
+      expected = ['MAP', 'SCENARIO', 'UNIT_SET'].includes(kind)
+        ? { ...(source.content as Record<string, unknown>), id: copied.name }
+        : source.content;
+    expect(copied).toMatchObject({
+      kind,
+      version: 1,
+      revision: 0,
+      source: source.source,
+      content: expected,
+      contentHash: hashState(expected),
+    });
+    expect(await sourceResource(kind, name)).toEqual(source);
+    expect(
+      await db.auditLog.findFirstOrThrow({ where: { targetId: copied.id, action: 'resource.clone' } }),
+    ).toMatchObject({
+      actorUserId: user.id,
+      payload: {
+        sourceId: source.id,
+        sourceName: name,
+        sourceVersion: 1,
+        sourceHash: source.contentHash,
+        afterHash: copied.contentHash,
+      },
+    });
+  }
+});
+
+it('AC-P2-27 같은 새 이름의 복제 경합과 이미 게시된 이름 충돌은 NAME_TAKEN이다', async () => {
+  const user = await actor(),
+    source = await sourceResource('STAT_RULES', 'default'),
+    name = freshName();
+  const results = await Promise.all(
+    [1, 2].map(() => request('resourceAdmin.clone', { sourceId: source.id, name }, user.cookie)),
+  );
+  expect(results.filter((result) => result.data?.ok)).toHaveLength(1);
+  expect(results.find((result) => !result.data?.ok)?.data).toEqual({ ok: false, reason: 'NAME_TAKEN' });
+  const id = results.find((result) => result.data?.ok)!.data!.meta!.id;
+  expect(await db.auditLog.count({ where: { targetId: id, action: 'resource.clone' } })).toBe(1);
+  await request('resourceAdmin.publish', { id, revision: 0, reason: '이름 예약' }, user.cookie);
+  const before = await snapshot();
+  expect((await request('resourceAdmin.clone', { sourceId: source.id, name }, user.cookie)).data).toEqual({
+    ok: false,
+    reason: 'NAME_TAKEN',
+  });
+  for (const invalidName of ['', '../map', 'a'.repeat(41)])
+    expect((await request('resourceAdmin.clone', { sourceId: source.id, name: invalidName }, user.cookie)).code).toBe(
+      'BAD_REQUEST',
+    );
+  expect(await snapshot()).toBe(before);
+});
+
+it('AC-P2-27 지도·시나리오 초안끼리 검사·게시하고 새 이름 조합을 생성 때 재검사한다', async () => {
+  const user = await actor(),
+    map = await copyResource((await sourceResource('MAP', 'che')).id, user.cookie),
+    scenario = await copyResource((await sourceResource('SCENARIO', '1030')).id, user.cookie);
+  const context = { scenarios: [resourceRef(scenario)] };
+  expect(
+    (await request('resourceAdmin.save', { id: map.id, revision: 0, content: map.content, context }, user.cookie)).data,
+  ).toMatchObject({ ok: true, meta: { revision: 1 }, report: { status: 'pass' } });
+  expect(
+    (
+      await request(
+        'resourceAdmin.publish',
+        { id: map.id, revision: 1, reason: '선택한 시나리오 검사', context },
+        user.cookie,
+      )
+    ).data,
+  ).toMatchObject({ ok: true, report: { status: 'pass' } });
+  const publishedMap = await db.gameResource.findUniqueOrThrow({ where: { id: map.id } });
+  expect(
+    (
+      await request(
+        'resourceAdmin.publish',
+        { id: scenario.id, revision: 0, reason: '선택한 지도 검사', context: { map: resourceRef(publishedMap) } },
+        user.cookie,
+      )
+    ).data,
+  ).toMatchObject({ ok: true, report: { status: 'pass' } });
+  for (const action of ['resource.save', 'resource.publish'])
+    expect(await db.auditLog.findFirstOrThrow({ where: { targetId: map.id, action } })).toMatchObject({
+      payload: { context: [{ ...resourceRef(scenario), kind: 'SCENARIO', name: scenario.name, version: 1 }] },
+    });
+  const world = await loadInitialWorldFromDb(db, { map: map.name, scenario: scenario.name, seed: 'd071' });
+  const original = await loadInitialWorldFromDb(db, { map: 'che', scenario: '1030', seed: 'd071' });
+  expect(world).toEqual({ ...original, mapKey: map.name, scenarioKey: scenario.name });
+});
+
+it('AC-P2-27 수정·삭제된 검사 대상은 저장·게시 모두 CONTEXT_STALE이고 종류 오류는 BAD_REQUEST다', async () => {
+  const user = await actor(),
+    map = await copyResource((await sourceResource('MAP', 'che')).id, user.cookie),
+    scenario = await copyResource((await sourceResource('SCENARIO', '1030')).id, user.cookie);
+  expect(
+    (await request('resourceAdmin.save', { id: scenario.id, revision: 0, content: scenario.content }, user.cookie))
+      .data,
+  ).toMatchObject({ ok: true });
+  const before = await snapshot();
+  for (const path of ['resourceAdmin.save', 'resourceAdmin.publish'] as const) {
+    const input = { id: map.id, revision: 0, content: map.content, reason: '문맥 검사' };
+    const operation =
+      path === 'resourceAdmin.save'
+        ? { id: input.id, revision: 0, content: input.content }
+        : { id: input.id, revision: 0, reason: input.reason };
+    for (const ref of [
+      resourceRef(scenario),
+      { ...resourceRef(scenario), id: randomUUID() },
+      { ...resourceRef(scenario), revision: 1, contentHash: '0'.repeat(64) },
+    ])
+      expect((await request(path, { ...operation, context: { scenarios: [ref] } }, user.cookie)).data).toMatchObject({
+        ok: false,
+        reason: 'CONTEXT_STALE',
+        meta: { id: map.id, revision: 0 },
+      });
+    for (const context of [
+      { map: resourceRef(map) },
+      { scenarios: [resourceRef(map)] },
+      { scenarios: [] },
+      { scenarios: [resourceRef(scenario), resourceRef(scenario)] },
+      { map: resourceRef(map), scenarios: [resourceRef(scenario)] },
+    ])
+      expect((await request(path, { ...operation, context }, user.cookie)).code).toBe('BAD_REQUEST');
+  }
+  expect(await snapshot()).toBe(before);
+  expect(
+    (await request('resourceAdmin.discard', { id: scenario.id, revision: 1, reason: '미게시 초안 폐기' }, user.cookie))
+      .data,
+  ).toMatchObject({ ok: true });
+  const discarded = await snapshot();
+  expect(
+    (
+      await request(
+        'resourceAdmin.publish',
+        {
+          id: map.id,
+          revision: 0,
+          reason: '사라진 참조',
+          context: { scenarios: [{ ...resourceRef(scenario), revision: 1 }] },
+        },
+        user.cookie,
+      )
+    ).data,
+  ).toMatchObject({ reason: 'CONTEXT_STALE' });
+  expect(await snapshot()).toBe(discarded);
+});
+
+it('AC-P2-27 게시 때 검사한 다른 조합은 새 월드의 잘못된 지도·시나리오 선택을 허용하지 않는다', async () => {
+  const user = await actor(),
+    map = await copyResource((await sourceResource('MAP', 'che')).id, user.cookie),
+    scenario = await copyResource((await sourceResource('SCENARIO', '1030')).id, user.cookie);
+  const original = checkContent(map.content, RESOURCE_PAYLOAD_LIMITS);
+  if (!original.ok || !Array.isArray(original.content.cities)) throw new Error('지도 고정물을 읽을 수 없습니다.');
+  const first = original.content.cities[0];
+  if (!first || typeof first !== 'object' || Array.isArray(first)) throw new Error('도시 고정물을 읽을 수 없습니다.');
+  const badMap = {
+    ...original.content,
+    cities: [{ ...first, name: '조합에없는도시' }, ...original.content.cities.slice(1)],
+  };
+  const emptyScenario = { id: scenario.name, title: '빈 판', startYear: 191, nation: [], general: [], diplomacy: [] };
+  expect(
+    (await request('resourceAdmin.save', { id: scenario.id, revision: 0, content: emptyScenario }, user.cookie)).data,
+  ).toMatchObject({ ok: true });
+  const empty = await db.gameResource.findUniqueOrThrow({ where: { id: scenario.id } });
+  expect(
+    (
+      await request(
+        'resourceAdmin.save',
+        { id: map.id, revision: 0, content: badMap, context: { scenarios: [resourceRef(empty)] } },
+        user.cookie,
+      )
+    ).data,
+  ).toMatchObject({ ok: true, report: { status: 'pass' } });
+  expect(
+    (
+      await request(
+        'resourceAdmin.publish',
+        { id: map.id, revision: 1, reason: '빈 시나리오용 지도', context: { scenarios: [resourceRef(empty)] } },
+        user.cookie,
+      )
+    ).data,
+  ).toMatchObject({ ok: true });
+  await expect(loadInitialWorldFromDb(db, { map: map.name, scenario: '1030', seed: 'invalid-pair' })).rejects.toThrow(
+    '지도와 시나리오의 조합',
+  );
+});
+
+it('AC-P2-27 서로를 검사하는 두 저장은 교착 없이 성공 또는 문맥 충돌로 끝난다', async () => {
+  const user = await actor(),
+    second = await actor(),
+    map = await copyResource((await sourceResource('MAP', 'che')).id, user.cookie),
+    scenario = await copyResource((await sourceResource('SCENARIO', '1030')).id, user.cookie);
+  const results = await Promise.all([
+    request(
+      'resourceAdmin.save',
+      { id: map.id, revision: 0, content: map.content, context: { scenarios: [resourceRef(scenario)] } },
+      user.cookie,
+    ),
+    request(
+      'resourceAdmin.save',
+      { id: scenario.id, revision: 0, content: scenario.content, context: { map: resourceRef(map) } },
+      second.cookie,
+    ),
+  ]);
+  expect(results.every((result) => result.status === 200)).toBe(true);
+  expect(results.filter((result) => result.data?.ok)).toHaveLength(1);
+  expect(results.find((result) => !result.data?.ok)?.data).toMatchObject({ reason: 'CONTEXT_STALE' });
+});
+
+it('AC-P2-27 폐기는 사유·CAS·게시 불변을 지키며 저장·게시와의 경합에서 한 요청만 확정된다', async () => {
+  const user = await actor(),
+    second = await actor();
+  for (const other of ['resourceAdmin.save', 'resourceAdmin.publish'] as const) {
+    const f = await fixture(),
+      discard = { id: f.draft.id, revision: 0, reason: '명시적 폐기' },
+      before = await snapshot();
+    for (const input of [
+      { id: f.draft.id, revision: 0 },
+      { ...discard, reason: ' ' },
+      { ...discard, revision: -1 },
+    ])
+      expect((await request('resourceAdmin.discard', input, user.cookie)).code).toBe('BAD_REQUEST');
+    expect((await request('resourceAdmin.discard', { ...discard, revision: 1 }, user.cookie)).data).toMatchObject({
+      reason: 'STALE',
+    });
+    expect((await request('resourceAdmin.discard', { ...discard, id: f.source.id }, user.cookie)).data).toMatchObject({
+      reason: 'PUBLISHED',
+    });
+    expect(await snapshot()).toBe(before);
+    const results = await Promise.all([
+      request('resourceAdmin.discard', discard, user.cookie),
+      request(
+        other,
+        other === 'resourceAdmin.save' ? { id: f.draft.id, revision: 0, content: f.content } : discard,
+        second.cookie,
+      ),
+    ]);
+    expect(results.filter((result) => result.data?.ok)).toHaveLength(1);
+    expect(
+      results.every(
+        (result) =>
+          result.data?.ok || result.code === 'NOT_FOUND' || ['PUBLISHED', 'STALE'].includes(result.data?.reason ?? ''),
+      ),
+    ).toBe(true);
+    expect(await db.auditLog.count({ where: { targetId: f.draft.id } })).toBe(1);
+  }
+});
+
+it('AC-P2-27 폐기 뒤 같은 이름의 초안을 다시 만들어도 이전 감사는 UUID로 남는다', async () => {
+  const user = await actor(),
+    f = await fixture();
+  expect(
+    (await request('resourceAdmin.discard', { id: f.draft.id, revision: 0, reason: '초안 다시 시작' }, user.cookie))
+      .data,
+  ).toMatchObject({ ok: true });
+  const next = (await request('resourceAdmin.clone', { sourceId: f.source.id }, user.cookie)).data!;
+  expect(next).toMatchObject({ ok: true });
+  expect(next.meta!.id).not.toBe(f.draft.id);
+  expect((await db.gameResource.findUniqueOrThrow({ where: { id: next.meta!.id } })).version).toBe(2);
+  expect(
+    await db.auditLog.findFirstOrThrow({ where: { targetId: f.draft.id, action: 'resource.discard' } }),
+  ).toMatchObject({ payload: { version: 2, beforeHash: f.draft.contentHash } });
+});
+
+it('AC-P2-27 최대 32개 대형 문맥은 실제 DB에서 검사하고 33개는 변경 전에 거부한다', async () => {
+  const user = await actor(),
+    map = await copyResource((await sourceResource('MAP', 'che')).id, user.cookie),
+    source = await sourceResource('SCENARIO', '1030');
+  const baseContent = {
+    ...(source.content as Record<string, unknown>),
+    nation: [],
+    general: [],
+    diplomacy: [],
+    padding: '',
+  };
+  const content = checkContent(
+    { ...baseContent, padding: 'x'.repeat(899_999 - Buffer.byteLength(JSON.stringify(baseContent))) },
+    RESOURCE_PAYLOAD_LIMITS,
+  );
+  if (!content.ok) throw new Error('최대 크기 고정물을 만들 수 없습니다.');
+  const rows = [];
+  for (let i = 0; i < 33; i++)
+    rows.push(
+      await db.gameResource.create({
+        data: {
+          kind: 'SCENARIO',
+          name: freshName(),
+          version: 1,
+          status: 'DRAFT',
+          source: '최대 문맥 시험',
+          content: content.content,
+          contentHash: hashState(content.content),
+        },
+      }),
+    );
+  const selected = rows.map(resourceRef);
+  const before = await snapshot();
+  expect(
+    (
+      await request(
+        'resourceAdmin.save',
+        { id: map.id, revision: 0, content: map.content, context: { scenarios: selected } },
+        user.cookie,
+      )
+    ).code,
+  ).toBe('BAD_REQUEST');
+  expect(await snapshot()).toBe(before);
+  const start = performance.now(),
+    heapBefore = process.memoryUsage().heapUsed;
+  const result = await request(
+    'resourceAdmin.save',
+    { id: map.id, revision: 0, content: map.content, context: { scenarios: selected.slice(0, 32) } },
+    user.cookie,
+  );
+  console.log(
+    'resource-context-benchmark',
+    JSON.stringify({
+      count: 32,
+      bytesEach: content.bytes,
+      elapsedMs: performance.now() - start,
+      heapBefore,
+      heapAfter: process.memoryUsage().heapUsed,
+    }),
+  );
+  expect(result).toMatchObject({ status: 200, data: { ok: true, report: { status: 'pass' }, meta: { revision: 1 } } });
+  const audit = await db.auditLog.findFirstOrThrow({ where: { targetId: map.id, action: 'resource.save' } });
+  expect((audit.payload as { context: unknown[] }).context).toHaveLength(32);
+  expect((audit.payload as { context: { id: string }[] }).context.map((row) => row.id)).toEqual(
+    selected
+      .slice(0, 32)
+      .map((row) => row.id)
+      .sort(),
+  );
 });

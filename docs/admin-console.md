@@ -45,13 +45,18 @@ D-068에 따라 관리자 역할만으로 자원 편집 권한을 얻지 않습�
 | ---- | ---- | ---------------- |
 | `resourceAdmin.list` | 선택 `kind`·`name`·`status`·`cursor` | `{ items, next }`, 내용은 없음 |
 | `resourceAdmin.get` | `id` | `{ meta, content }` |
-| `resourceAdmin.clone` | `sourceId` | 게시 판의 같은 이름 다음 판. `{ ok: true, meta }` 또는 `DRAFT_EXISTS`와 `draftId` |
-| `resourceAdmin.save` | `id`·`revision`·`content` | `{ ok: true, meta, report }` 또는 `STALE`·`PUBLISHED`와 현재 `meta` |
-| `resourceAdmin.publish` | `id`·`revision`·필수 `reason` | 성공 시 `meta`·`report`, 거부는 `STALE`·`PUBLISHED`·`NOT_PASS`·`ID_MISMATCH` |
+| `resourceAdmin.clone` | `sourceId`·선택 `name` | 같은 이름은 다음 판, 새 이름은 1판. `{ ok: true, meta }` 또는 `DRAFT_EXISTS`와 `draftId`·`NAME_TAKEN` |
+| `resourceAdmin.save` | `id`·`revision`·`content`·선택 `context` | `{ ok: true, meta, report }` 또는 `STALE`·`PUBLISHED`·`CONTEXT_STALE`와 현재 `meta` |
+| `resourceAdmin.publish` | `id`·`revision`·필수 `reason`·선택 `context` | 성공 시 `meta`·`report`, 거부는 `STALE`·`PUBLISHED`·`CONTEXT_STALE`·`NOT_PASS`·`ID_MISMATCH` |
+| `resourceAdmin.discard` | `id`·`revision`·필수 `reason` | `{ ok: true, discarded: { id, kind, name, version, revision, contentHash } }` 또는 `STALE`·`PUBLISHED`와 현재 `meta` |
 
 초안은 검증 오류가 있어도 저장할 수 있습니다. 게시는 저장된 revision을 잠그고 다시 검증하며 변경과 감사를 함께 확정합니다. 응답 크기가 한도를 넘으면 둘 다 되돌리고 `RESPONSE_TOO_LARGE`를 돌려줍니다. `report`는 검증기의 `kind`·`status`·`issues`·`ran`·`skipped`·`truncated`를 담습니다. 오류는 `BAD_REQUEST`·`NOT_FOUND`와 기존 인증·권한·제재 응답을 따릅니다. 내용은 JSON 객체이며 정규 JSON 기준 최대 900,000바이트입니다. 자원 API는 JSON으로 최대 네 절차씩 보내며 다른 API와 묶거나 JSONL 스트림으로 보내지 않습니다. 배치 링크는 자원 경로를 나누고 `maxItems`를 4 이하로 설정합니다.
 
-현재 병종·능력치 규칙·초상 대응표만 게시합니다. 지도·시나리오는 게시 문맥 계약이 정해질 때까지 `incomplete`로 거부합니다. 다른 이름 복제와 초안 폐기는 사용자 답을 기다립니다. 게시한 판과 진행 중인 월드는 이 API로 수정하지 않습니다. 관리자 화면과 AC-P2-27 전체 인수는 아직 남아 있습니다.
+지도·시나리오 검사는 운영자가 판을 고릅니다(D-071). 시나리오에는 `context: { map: ref }`, 지도에는 `context: { scenarios: ref[] }`를 보내며 `ref`는 `{ id, revision, contentHash }`입니다. 초안·게시 판을 모두 고를 수 있고 시나리오는 중복 없이 1~32개입니다. 다른 세 종류에는 문맥을 보내지 않습니다. 문맥을 생략하면 지도·시나리오의 검사는 `incomplete`이고 게시는 거부됩니다. 종류 오류는 `BAD_REQUEST`, 선택한 판이 없거나 revision·해시가 바뀌었으면 `CONTEXT_STALE`입니다. 충돌 때는 현재 내용과 검사 대상을 다시 불러와 운영자가 확인한 뒤 저장·게시합니다. 선택한 판의 UUID·종류·이름·판 번호·revision·해시가 감사에 남습니다.
+
+다른 이름 복제는 같은 종류에 이름이 이미 있으면 `NAME_TAKEN`입니다. 지도·시나리오·병종은 내용의 `id`만 새 이름으로 바꾸고 출처와 나머지 내용을 보존합니다. 초안 폐기는 사유를 남기는 수동 동작이며 저장과 같은 충돌 검사를 거칩니다. 삭제와 `resource.discard` 감사는 함께 확정됩니다. 버린 초안의 판 번호는 다시 쓸 수 있지만 UUID와 해시가 감사에 남습니다. 게시한 판은 삭제할 수 없습니다.
+
+새 월드 생성은 고른 지도·시나리오의 조합을 다시 검사합니다. 게시 때 검사했던 다른 조합이 통과했어도 생성 시 선택이 맞지 않으면 거부됩니다. 현재 생성기는 이름별 1판을 받으며 2판 이상 선택은 T4-79 후속입니다. 관리자 화면과 AC-P2-27 전체 인수는 아직 남아 있습니다.
 
 ## 2. 월드 관리
 
