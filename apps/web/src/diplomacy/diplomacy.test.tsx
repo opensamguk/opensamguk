@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { TEST_UNIT_SET } from '../battleSim/testUnitSet';
+import { worldUnits } from '../battleSim/unitChoices';
 import { CommandPicker } from '../turns/CommandPicker';
 import { readSelection, selectionStorageKey, writeSelection } from '../turns/useTurnDraft';
 import { buildClauses, describeClause, emptyCompose, noteLength, type ComposeState } from './clauses';
@@ -465,6 +467,7 @@ describe('예턴 편집의 교역 대상', () => {
         nations={[]}
         selectedCityKey={3}
         defaultCrewType={undefined}
+        units={worldUnits(TEST_UNIT_SET)}
         blockedReason={null}
         targetLabel="1번 칸"
         searchRef={{ current: null }}

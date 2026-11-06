@@ -1,14 +1,18 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { basename, dirname, join, resolve } from 'node:path';
 import { expect, test, type Download, type Page } from '@playwright/test';
+import { withE2eDb } from './account';
 
-// T4-80 · AC-P2-27 일부: 지도 편집 캔버스 한 흐름. 서버를 부르지 않는다 (개발 화면 /dev/map-editor).
+// T4-80·T4-88 · AC-P2-27 일부: 지도 편집 캔버스 한 흐름. 화면은 서버를 부르지 않는다 (개발 화면 /dev/map-editor).
 // che 불러오기 → 도시 추가·끌어서 이동·삭제 → 연결 → 강 그리기 → 검증 오류 → 고치기 → v2 내려받기 → 다시 불러와 같음.
-// T4-77이 resources/map/che.json을 지우면 이 입력을 DB에서 내보낸 che로 바꾼다 (docs/plans/T4-80.md).
-const CHE_PATH = fileURLToPath(new URL('../resources/map/che.json', import.meta.url));
+// 입력 che는 E2E DB에 게시된 MAP che@1 내용이다. 시험이 자기 임시 폴더에 파일로 써서 올리고 끝나면 그 폴더만 지운다.
 type Che = { cities: Array<{ id: number; name: string; position: { x: number; y: number }; connections: number[] }> };
-const che = JSON.parse(readFileSync(CHE_PATH, 'utf8')) as Che;
 type Exported = Che & { version: number; terrain: { rivers: Array<{ points: number[][] }> } };
+const CHE_PREFIX = 'map-editor-che-';
+let cheDir: string | undefined;
+let chePath = '';
+let che: Che = { cities: [] };
 
 // 도시와 겹치지 않는 빈자리. 도시에서 가장 먼 격자점부터 서로 40 이상 떨어진 것을 고른다.
 function emptySpots(count: number): Array<[number, number]> {
@@ -59,121 +63,145 @@ const tool = (page: Page, name: string) =>
   page.getByRole('group', { name: '도구' }).getByRole('button', { name, exact: true }).click();
 const issues = (page: Page) => page.getByTestId('issues');
 
-test('che를 불러와 고치고 v2로 내보낸 뒤 다시 불러오면 같다', async ({ page }) => {
-  test.setTimeout(120_000);
-  const [spotA, spotA2, spotB, ...riverSpots] = emptySpots(6) as [
-    [number, number],
-    [number, number],
-    [number, number],
-    ...Array<[number, number]>,
-  ];
-  const up = che.cities[0]!;
-  expect(up.name).toBe('업');
+test.describe('게시된 che@1', () => {
+  test.beforeAll(async () => {
+    const [resource] = await withE2eDb(async (db) => {
+      const { readPublishedResources } = await import('../packages/db/src/index');
+      return readPublishedResources(db, [{ kind: 'MAP', name: 'che', version: 1 }]);
+    });
+    che = resource!.content as Che;
+    cheDir = await mkdtemp(join(tmpdir(), CHE_PREFIX));
+    chePath = join(cheDir, 'che.json');
+    await writeFile(chePath, JSON.stringify(resource!.content, null, 2), 'utf8');
+  });
 
-  await page.goto('/dev/map-editor');
-  await expect(page.getByRole('heading', { level: 1, name: '지도 편집기' })).toBeVisible({ timeout: 30_000 });
-  await page.getByTestId('map-file').setInputFiles(CHE_PATH);
-  await expect(page.getByTestId('map-meta')).toContainText('도시 94개');
-  await expect(page.getByTestId('map-meta')).toContainText('불러온 형식 지금 형식');
-  await expect(issues(page).getByRole('heading')).toHaveText('검증 0건');
+  // 준비나 본문이 실패해도 mkdtemp가 만든 tmpdir 바로 아래 자기 폴더만 지운다. 아니면 지우지 않고 실패한다.
+  test.afterAll(async () => {
+    if (cheDir === undefined) return;
+    const target = resolve(cheDir);
+    const name = basename(target);
+    if (dirname(target) !== resolve(tmpdir()) || !name.startsWith(CHE_PREFIX) || name.length <= CHE_PREFIX.length)
+      throw new Error('지도 편집 E2E 입력 경로가 임시 폴더 아래 자기 폴더가 아니라 지우지 않았습니다.');
+    await rm(target, { recursive: true, force: true });
+    cheDir = undefined;
+  });
 
-  // 도시 추가: 연결이 없어 연결망 오류가 난다.
-  await tool(page, '도시 추가');
-  await clickMap(page, ...spotA);
-  await expect(page.getByTestId('map-meta')).toContainText('도시 95개');
-  const panel = page.getByTestId('city-panel');
-  await expect(panel.getByLabel('이름')).toHaveValue('새 도시 95');
-  await expect(panel).toContainText(`좌표 (${spotA[0]}, ${spotA[1]})`);
-  await expect(issues(page).locator('[data-code="network-split"]')).toHaveCount(1);
+  test('che를 불러와 고치고 v2로 내보낸 뒤 다시 불러오면 같다', async ({ page }) => {
+    test.setTimeout(120_000);
+    const [spotA, spotA2, spotB, ...riverSpots] = emptySpots(6) as [
+      [number, number],
+      [number, number],
+      [number, number],
+      ...Array<[number, number]>,
+    ];
+    const up = che.cities[0]!;
+    expect(up.name).toBe('업');
 
-  // 끌어서 이동
-  await tool(page, '선택');
-  await dragMap(page, spotA, spotA2);
-  await expect(panel).toContainText(`좌표 (${spotA2[0]}, ${spotA2[1]})`);
-  await expect(page.locator('[data-city-id="95"] circle').last()).toHaveAttribute('cx', String(spotA2[0]));
+    await page.goto('/dev/map-editor');
+    await expect(page.getByRole('heading', { level: 1, name: '지도 편집기' })).toBeVisible({ timeout: 30_000 });
+    await page.getByTestId('map-file').setInputFiles(chePath);
+    await expect(page.getByTestId('map-meta')).toContainText('도시 94개');
+    await expect(page.getByTestId('map-meta')).toContainText('불러온 형식 지금 형식');
+    await expect(issues(page).getByRole('heading')).toHaveText('검증 0건');
 
-  // 두 번째 도시를 만들어 업과 잇고 삭제한다. 업의 연결에서도 빠져야 한다.
-  await tool(page, '도시 추가');
-  await clickMap(page, ...spotB);
-  await expect(panel.getByLabel('이름')).toHaveValue('새 도시 96');
-  await tool(page, '연결');
-  await clickMap(page, ...spotB);
-  await clickMap(page, up.position.x, up.position.y);
-  await expect(panel.getByLabel('이름')).toHaveValue('업');
-  await expect(panel.getByRole('button', { name: '새 도시 96 연결 끊기' })).toBeVisible();
-  await page.getByLabel('도시 찾기').selectOption({ label: '새 도시 96 (ID 96)' });
-  await panel.getByRole('button', { name: '도시 삭제' }).click();
-  await expect(page.getByTestId('map-meta')).toContainText('도시 95개');
-  await expect(page.locator('[data-city-id="96"]')).toHaveCount(0);
+    // 도시 추가: 연결이 없어 연결망 오류가 난다.
+    await tool(page, '도시 추가');
+    await clickMap(page, ...spotA);
+    await expect(page.getByTestId('map-meta')).toContainText('도시 95개');
+    const panel = page.getByTestId('city-panel');
+    await expect(panel.getByLabel('이름')).toHaveValue('새 도시 95');
+    await expect(panel).toContainText(`좌표 (${spotA[0]}, ${spotA[1]})`);
+    await expect(issues(page).locator('[data-code="network-split"]')).toHaveCount(1);
 
-  // 연결: 새 도시를 업과 이으면 연결망 오류가 사라진다.
-  await clickMap(page, ...spotA2);
-  await clickMap(page, up.position.x, up.position.y);
-  await page.getByLabel('도시 찾기').selectOption({ label: '새 도시 95 (ID 95)' });
-  await expect(panel.getByRole('heading', { name: '연결 1개' })).toBeVisible();
-  await expect(panel.getByRole('button', { name: '업 연결 끊기' })).toBeVisible();
-  await expect(issues(page).getByRole('heading')).toHaveText('검증 0건');
+    // 끌어서 이동
+    await tool(page, '선택');
+    await dragMap(page, spotA, spotA2);
+    await expect(panel).toContainText(`좌표 (${spotA2[0]}, ${spotA2[1]})`);
+    await expect(page.locator('[data-city-id="95"] circle').last()).toHaveAttribute('cx', String(spotA2[0]));
 
-  // 강 하나 그리기
-  await tool(page, '강');
-  for (const spot of riverSpots) await clickMap(page, ...spot);
-  await expect(page.getByRole('group', { name: '그리기' })).toContainText('강 점 3개');
-  await page.getByRole('button', { name: '그리기 마치기' }).click();
-  await expect(page.getByTestId('terrain-panel')).toContainText('강 1 · 점 3개');
-  await expect(page.locator('[data-layer="rivers"] [data-shape-index="0"]')).toHaveCount(1);
+    // 두 번째 도시를 만들어 업과 잇고 삭제한다. 업의 연결에서도 빠져야 한다.
+    await tool(page, '도시 추가');
+    await clickMap(page, ...spotB);
+    await expect(panel.getByLabel('이름')).toHaveValue('새 도시 96');
+    await tool(page, '연결');
+    await clickMap(page, ...spotB);
+    await clickMap(page, up.position.x, up.position.y);
+    await expect(panel.getByLabel('이름')).toHaveValue('업');
+    await expect(panel.getByRole('button', { name: '새 도시 96 연결 끊기' })).toBeVisible();
+    await page.getByLabel('도시 찾기').selectOption({ label: '새 도시 96 (ID 96)' });
+    await panel.getByRole('button', { name: '도시 삭제' }).click();
+    await expect(page.getByTestId('map-meta')).toContainText('도시 95개');
+    await expect(page.locator('[data-city-id="96"]')).toHaveCount(0);
 
-  // 검증 오류: 새 도시 이름을 업으로 바꾸면 이름이 겹친다. 오류를 누르면 그 도시를 고른다.
-  await tool(page, '선택');
-  await page.getByLabel('도시 찾기').selectOption({ label: '새 도시 95 (ID 95)' });
-  await panel.getByLabel('이름').fill('업');
-  await panel.getByLabel('이름').press('Enter');
-  const duplicate = issues(page).locator('[data-code="city-name-duplicate"]');
-  await expect(duplicate).toHaveText('오류 도시 이름 업이 ID 1과 ID 95에 겹칩니다.');
-  await page.getByLabel('도시 찾기').selectOption('');
-  await expect(panel).toHaveCount(0);
-  await duplicate.click();
-  await expect(panel).toContainText('도시 ID 95');
+    // 연결: 새 도시를 업과 이으면 연결망 오류가 사라진다.
+    await clickMap(page, ...spotA2);
+    await clickMap(page, up.position.x, up.position.y);
+    await page.getByLabel('도시 찾기').selectOption({ label: '새 도시 95 (ID 95)' });
+    await expect(panel.getByRole('heading', { name: '연결 1개' })).toBeVisible();
+    await expect(panel.getByRole('button', { name: '업 연결 끊기' })).toBeVisible();
+    await expect(issues(page).getByRole('heading')).toHaveText('검증 0건');
 
-  // 되돌리기·다시 하기를 거쳐 고친다.
-  await page.getByRole('button', { name: '되돌리기', exact: true }).click();
-  await expect(panel.getByLabel('이름')).toHaveValue('새 도시 95');
-  await expect(issues(page).getByRole('heading')).toHaveText('검증 0건');
-  await page.getByRole('button', { name: '다시 하기', exact: true }).click();
-  await expect(duplicate).toHaveCount(1);
-  await panel.getByLabel('이름').fill('신도');
-  await panel.getByLabel('이름').press('Enter');
-  await expect(issues(page).getByRole('heading')).toHaveText('검증 0건');
+    // 강 하나 그리기
+    await tool(page, '강');
+    for (const spot of riverSpots) await clickMap(page, ...spot);
+    await expect(page.getByRole('group', { name: '그리기' })).toContainText('강 점 3개');
+    await page.getByRole('button', { name: '그리기 마치기' }).click();
+    await expect(page.getByTestId('terrain-panel')).toContainText('강 1 · 점 3개');
+    await expect(page.locator('[data-layer="rivers"] [data-shape-index="0"]')).toHaveCount(1);
 
-  // v2 내려받기
-  const first = await downloadOf(page, 'v2 JSON 내려받기');
-  expect(first.download.suggestedFilename()).toBe('che-v2.json');
-  const text = readFileSync(first.path, 'utf8');
-  const exported = JSON.parse(text) as Exported;
-  expect(exported.version).toBe(2);
-  expect(exported.cities).toHaveLength(95);
-  const added = exported.cities.find((c) => c.id === 95)!;
-  expect(added).toMatchObject({ name: '신도', position: { x: spotA2[0], y: spotA2[1] }, connections: [1] });
-  expect(exported.cities[0]!.connections).toEqual([...up.connections, 95]);
-  expect(exported.cities.some((c) => c.id === 96 || c.connections.includes(96))).toBe(false);
-  expect(exported.terrain.rivers).toEqual([{ points: riverSpots }]);
+    // 검증 오류: 새 도시 이름을 업으로 바꾸면 이름이 겹친다. 오류를 누르면 그 도시를 고른다.
+    await tool(page, '선택');
+    await page.getByLabel('도시 찾기').selectOption({ label: '새 도시 95 (ID 95)' });
+    await panel.getByLabel('이름').fill('업');
+    await panel.getByLabel('이름').press('Enter');
+    const duplicate = issues(page).locator('[data-code="city-name-duplicate"]');
+    await expect(duplicate).toHaveText('오류 도시 이름 업이 ID 1과 ID 95에 겹칩니다.');
+    await page.getByLabel('도시 찾기').selectOption('');
+    await expect(panel).toHaveCount(0);
+    await duplicate.click();
+    await expect(panel).toContainText('도시 ID 95');
 
-  // 다시 불러와 다시 내려받으면 글자열이 같다.
-  await page.getByTestId('map-file').setInputFiles(first.path);
-  await expect(page.getByTestId('map-meta')).toContainText('불러온 형식 v2');
-  await expect(page.getByTestId('map-meta')).toContainText('도시 95개');
-  await expect(issues(page).getByRole('heading')).toHaveText('검증 0건');
-  const second = await downloadOf(page, 'v2 JSON 내려받기');
-  expect(readFileSync(second.path, 'utf8')).toBe(text);
+    // 되돌리기·다시 하기를 거쳐 고친다.
+    await page.getByRole('button', { name: '되돌리기', exact: true }).click();
+    await expect(panel.getByLabel('이름')).toHaveValue('새 도시 95');
+    await expect(issues(page).getByRole('heading')).toHaveText('검증 0건');
+    await page.getByRole('button', { name: '다시 하기', exact: true }).click();
+    await expect(duplicate).toHaveCount(1);
+    await panel.getByLabel('이름').fill('신도');
+    await panel.getByLabel('이름').press('Enter');
+    await expect(issues(page).getByRole('heading')).toHaveText('검증 0건');
 
-  // 밑그림 PNG: 2100×1500 팔레트 PNG, 팔레트 5칸
-  const sketch = await downloadOf(page, '밑그림 PNG 내려받기');
-  expect(sketch.download.suggestedFilename()).toBe('che-sketch.png');
-  const png = readFileSync(sketch.path);
-  expect(png.subarray(1, 4).toString('latin1')).toBe('PNG');
-  expect(png.subarray(12, 16).toString('latin1')).toBe('IHDR');
-  expect([png.readUInt32BE(16), png.readUInt32BE(20), png[24], png[25]]).toEqual([2100, 1500, 8, 3]);
-  expect(png.subarray(37, 41).toString('latin1')).toBe('PLTE');
-  expect(png.readUInt32BE(33)).toBe(15);
+    // v2 내려받기
+    const first = await downloadOf(page, 'v2 JSON 내려받기');
+    expect(first.download.suggestedFilename()).toBe('che-v2.json');
+    const text = await readFile(first.path, 'utf8');
+    const exported = JSON.parse(text) as Exported;
+    expect(exported.version).toBe(2);
+    expect(exported.cities).toHaveLength(95);
+    const added = exported.cities.find((c) => c.id === 95)!;
+    expect(added).toMatchObject({ name: '신도', position: { x: spotA2[0], y: spotA2[1] }, connections: [1] });
+    expect(exported.cities[0]!.connections).toEqual([...up.connections, 95]);
+    expect(exported.cities.some((c) => c.id === 96 || c.connections.includes(96))).toBe(false);
+    expect(exported.terrain.rivers).toEqual([{ points: riverSpots }]);
+
+    // 다시 불러와 다시 내려받으면 글자열이 같다.
+    await page.getByTestId('map-file').setInputFiles(first.path);
+    await expect(page.getByTestId('map-meta')).toContainText('불러온 형식 v2');
+    await expect(page.getByTestId('map-meta')).toContainText('도시 95개');
+    await expect(issues(page).getByRole('heading')).toHaveText('검증 0건');
+    const second = await downloadOf(page, 'v2 JSON 내려받기');
+    expect(await readFile(second.path, 'utf8')).toBe(text);
+
+    // 밑그림 PNG: 2100×1500 팔레트 PNG, 팔레트 5칸
+    const sketch = await downloadOf(page, '밑그림 PNG 내려받기');
+    expect(sketch.download.suggestedFilename()).toBe('che-sketch.png');
+    const png = await readFile(sketch.path);
+    expect(png.subarray(1, 4).toString('latin1')).toBe('PNG');
+    expect(png.subarray(12, 16).toString('latin1')).toBe('IHDR');
+    expect([png.readUInt32BE(16), png.readUInt32BE(20), png[24], png[25]]).toEqual([2100, 1500, 8, 3]);
+    expect(png.subarray(37, 41).toString('latin1')).toBe('PLTE');
+    expect(png.readUInt32BE(33)).toBe(15);
+  });
 });
 
 test('모양이 틀린 파일은 이유와 함께 거부한다', async ({ page }) => {

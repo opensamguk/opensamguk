@@ -214,25 +214,6 @@ export default defineConfig([
       ],
     },
   },
-  // 예외 E2 (T4-34): 공개 병종표 resources/unitset/basic.json 하나만 상대 경로로 읽는다.
-  {
-    files: ['apps/web/src/battleSim/publicUnitSet.ts'],
-    rules: {
-      'opensamguk/no-cross-package-relative': 'off',
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            { group: ['@opensamguk/*', ...NODE_BUILTINS], message: BOUNDARY_MESSAGE },
-            {
-              regex: '^(?!\\.\\./\\.\\./\\.\\./\\.\\./resources/unitset/basic\\.json$)\\.',
-              message: 'publicUnitSet.ts는 resources/unitset/basic.json만 상대 경로로 읽습니다 (E2).',
-            },
-          ],
-        },
-      ],
-    },
-  },
   // 예외 E3 (T4-76): 지도 편집기는 순수 자원 검증 하위 경로 하나만 읽는다.
   {
     files: ['apps/web/src/mapEditor/**'],

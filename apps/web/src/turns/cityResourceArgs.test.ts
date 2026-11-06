@@ -1,5 +1,7 @@
 import { expect, it } from 'vitest';
-import { argFields, buildArgs, requiredKeys } from './args';
+import { TEST_UNIT_SET } from '../battleSim/testUnitSet';
+import { worldUnits } from '../battleSim/unitChoices';
+import { argFields as argFieldsOf, buildArgs, requiredKeys } from './args';
 import { cityPreparationNote, cityPreparationSchema, hasCityBranch } from './cityResourceArgs';
 
 const city = {
@@ -11,6 +13,7 @@ const city = {
   required: ['target', 'crewType'],
   additionalProperties: false,
 };
+const argFields = (schema: unknown) => argFieldsOf(schema, worldUnits(TEST_UNIT_SET).all);
 const unit = { type: 'object', properties: { unitId: { type: 'integer', minimum: 1, maximum: 2147483647 } } };
 const schema = { anyOf: [city, unit] };
 it('INT-18C AC-INT-18C 도시/부곡 대상은 실제 union 갈래의 인자와 한계를 구분한다', () => {

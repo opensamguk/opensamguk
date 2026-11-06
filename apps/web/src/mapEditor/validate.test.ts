@@ -1,19 +1,12 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { parseMapJson, type MapV2 } from './contract';
+import type { ResourceIssueCode } from '@opensamguk/rules/resources';
+import type { MapV2 } from './contract';
 import { testCity, testMap } from './fixtures';
-import { validateMap, type IssueCode } from './validate';
+import { editorIssues } from './validate';
 
-// T4-80: C-M3 지도 항목마다 통과 1건, 실패 1건. che는 통과한다.
-const codes = (map: MapV2) => validateMap(map).map((issue) => issue.code);
-
-describe('che', () => {
-  it('오류가 없다', () => {
-    const result = parseMapJson(readFileSync(new URL('../../../../resources/map/che.json', import.meta.url), 'utf8'));
-    if (!result.ok) throw new Error(result.error);
-    expect(validateMap(result.map)).toEqual([]);
-  });
-});
+// T4-80·T4-88: 공개 validateMap의 지도 코드마다 통과 1건, 실패 1건과 화면 대상. 범위 경계는 rules가 정한다.
+// 실제 che@1이 오류 0건인지는 e2e/mapEditor.spec.ts가 게시 DB에서 읽어 본다.
+const codes = (map: MapV2) => editorIssues(map).map((issue) => issue.code);
 
 const square: Array<[number, number]> = [
   [10, 10],
@@ -22,7 +15,7 @@ const square: Array<[number, number]> = [
   [10, 10],
 ];
 
-const cases: Array<{ code: IssueCode; pass: MapV2; fail: MapV2; target: unknown }> = [
+const cases: Array<{ code: ResourceIssueCode; pass: MapV2; fail: MapV2; target: unknown }> = [
   {
     code: 'city-id-duplicate',
     pass: testMap(),
@@ -36,6 +29,12 @@ const cases: Array<{ code: IssueCode; pass: MapV2; fail: MapV2; target: unknown 
     target: { kind: 'city', index: 1 },
   },
   {
+    code: 'city-name-empty',
+    pass: testMap(),
+    fail: testMap([testCity(1, [2]), testCity(2, [1], { name: '  ' })]),
+    target: { kind: 'city', index: 1 },
+  },
+  {
     code: 'city-out-of-canvas',
     pass: testMap([testCity(1, [2], { position: { x: 0, y: 0 } }), testCity(2, [1], { position: { x: 700, y: 500 } })]),
     fail: testMap([testCity(1, [2]), testCity(2, [1], { position: { x: 701, y: 10 } })]),
@@ -44,13 +43,13 @@ const cases: Array<{ code: IssueCode; pass: MapV2; fail: MapV2; target: unknown 
   {
     code: 'city-level-range',
     pass: testMap([testCity(1, [2], { level: 1 }), testCity(2, [1], { level: 8 })]),
-    fail: testMap([testCity(1, [2]), testCity(2, [1], { level: 9 })]),
+    fail: testMap([testCity(1, [2]), testCity(2, [1], { level: 10 })]),
     target: { kind: 'city', index: 1 },
   },
   {
     code: 'city-region-range',
-    pass: testMap([testCity(1, [2], { region: 8 }), testCity(2, [1])]),
-    fail: testMap([testCity(1, [2], { region: 0 }), testCity(2, [1])]),
+    pass: testMap([testCity(1, [2], { region: 16 }), testCity(2, [1])]),
+    fail: testMap([testCity(1, [2], { region: 17 }), testCity(2, [1])]),
     target: { kind: 'city', index: 0 },
   },
   {
@@ -129,15 +128,42 @@ describe.each(cases)('$code', ({ code, pass, fail, target }) => {
     expect(codes(pass)).toEqual([]);
   });
   it('실패하면 대상을 가리킨다', () => {
-    const issues = validateMap(fail).filter((issue) => issue.code === code);
+    const issues = editorIssues(fail).filter((issue) => issue.code === code);
     expect(issues).toHaveLength(1);
     expect(issues[0]!.target).toEqual(target);
+    expect(issues[0]!.severity).toBe('error');
+  });
+});
+
+describe('형식 오류와 경고', () => {
+  it('이름이 빈 글자면 shape-invalid를 그 도시로 가리키고 rules 문구를 그대로 쓴다', () => {
+    expect(editorIssues(testMap([testCity(1, [2]), testCity(2, [1], { name: '' })]))).toEqual([
+      {
+        code: 'shape-invalid',
+        severity: 'error',
+        message: '형식이 맞지 않습니다 (cities.1.name, 길이나 값이 1 이상이어야 함).',
+        target: { kind: 'city', index: 1 },
+      },
+    ]);
+  });
+
+  it('도시가 땅 밖이면 경고로 알린다', () => {
+    const map = { ...testMap(), terrain: { coast: [square], lakes: [], rivers: [], mountains: [] } };
+    map.cities = [testCity(1, [2]), testCity(2, [1], { position: { x: 200, y: 200 } })];
+    expect(editorIssues(map)).toEqual([
+      {
+        code: 'city-off-land',
+        severity: 'warning',
+        message: '도시가 땅 밖이나 호수 안에 있습니다 (도시2, 200, 200).',
+        target: { kind: 'city', index: 1 },
+      },
+    ]);
   });
 });
 
 describe('문구', () => {
   it('받침에 맞는 조사를 쓴다', () => {
-    const messages = validateMap(
+    const messages = editorIssues(
       testMap([
         testCity(1, [2], { name: '업' }),
         testCity(2, [1, 3], { name: '허창' }),
@@ -145,7 +171,12 @@ describe('문구', () => {
       ]),
     ).map((issue) => issue.message);
     expect(messages).toContain('허창에서 낙양으로 가는 연결만 있고 돌아오는 연결이 없습니다.');
-    expect(messages).toContain('낙양 등 도시 1개가 업의 연결망에 닿지 않습니다.');
+    expect(messages).toContain('낙양이 업의 연결망에 닿지 않습니다.');
+  });
+
+  it('겹치는 도시 이름은 두 ID를 함께 알린다', () => {
+    const issues = editorIssues(testMap([testCity(1, [2], { name: '업' }), testCity(2, [1], { name: '업' })]));
+    expect(issues.map((issue) => issue.message)).toEqual(['도시 이름 업이 ID 1과 ID 2에 겹칩니다.']);
   });
 
   it('강은 점이 2개 미만이면 열린 선으로 알린다', () => {
@@ -153,10 +184,17 @@ describe('문구', () => {
       ...testMap(),
       terrain: { coast: [], lakes: [], rivers: [{ points: [[1, 1]] as Array<[number, number]> }], mountains: [] },
     };
-    expect(validateMap(map)).toEqual([
+    expect(editorIssues(map)).toEqual([
       {
         code: 'terrain-open',
+        severity: 'error',
         message: '강 1의 점이 1개라서 선이 되지 않습니다.',
+        target: { kind: 'terrain', layer: 'rivers', index: 0 },
+      },
+      {
+        code: 'terrain-degenerate',
+        severity: 'error',
+        message: '지형의 서로 다른 점이 부족합니다 (1, 2).',
         target: { kind: 'terrain', layer: 'rivers', index: 0 },
       },
     ]);

@@ -1,163 +1,90 @@
-// 설계 C-M3의 지도 항목을 화면에서 미리 보는 임시 검사다 (docs/plans/T4-80.md 검증 표).
-// T4-76이 main에 들어오면 `@opensamguk/rules`의 검증기로 바꾼다. 게시를 막는 판단은 서버(T4-78)가 한다.
-// 시나리오가 참조하는 도시 검사는 편집기에 시나리오가 없어 여기서 하지 않는다.
+// 지도 편집기 검증 목록 (docs/plans/T4-80.md, docs/plans/T4-88.md). 판단은 공개 validateMap(@opensamguk/rules/resources)이
+// 정본이고, 여기서는 그 보고를 화면 문구·심각도·선택 대상으로만 바꾼다. 검사를 다시 하지 않는다.
+// 게시를 막는 판단은 서버가 한다. 시나리오가 참조하는 도시 검사는 편집기에 시나리오가 없어 넘기지 않는다.
+import {
+  validateMap,
+  type MapResource,
+  type ResourceIssue,
+  type ResourceIssueCode,
+  type Severity,
+  type ValidationReport,
+} from '@opensamguk/rules/resources';
 import { josa } from './josa';
-import { isClosedPolygon, layerLabel, TERRAIN_LAYERS, type MapV2, type Point, type TerrainLayer } from './contract';
+import { layerLabel, type MapV2, type TerrainLayer } from './contract';
 
-export type IssueCode =
-  | 'city-id-duplicate'
-  | 'city-name-duplicate'
-  | 'city-out-of-canvas'
-  | 'city-level-range'
-  | 'city-region-range'
-  | 'link-self'
-  | 'link-missing-city'
-  | 'link-one-way'
-  | 'network-split'
-  | 'terrain-open'
-  | 'terrain-out-of-canvas';
-
-// 도시는 목록 번호로 가리킨다. 불러온 파일에는 ID가 겹치는 도시가 있을 수 있어서다.
-export type IssueTarget = { kind: 'city'; index: number } | { kind: 'terrain'; layer: TerrainLayer; index: number };
+// 도시는 목록 번호로 가리킨다. 불러온 파일에는 ID가 겹치는 도시가 있을 수 있어서다. 가리킬 곳이 없으면 null이다.
+export type IssueTarget =
+  { kind: 'city'; index: number } | { kind: 'terrain'; layer: TerrainLayer; index: number } | null;
 export interface Issue {
-  code: IssueCode;
+  code: ResourceIssueCode;
+  severity: Severity;
   message: string;
   target: IssueTarget;
 }
 
-// che의 실제 범위이자 cityRadius가 쓰는 규모 범위다. 정식 범위는 T4-76이 정한다.
-export const LEVEL_RANGE = { min: 1, max: 8 };
-export const REGION_RANGE = { min: 1, max: 8 };
+const LAYERS: readonly string[] = ['coast', 'lakes', 'mountains', 'rivers'] satisfies TerrainLayer[];
 
-const inRange = (value: number, range: { min: number; max: number }) =>
-  Number.isInteger(value) && value >= range.min && value <= range.max;
-
-export function validateMap(map: MapV2): Issue[] {
-  const issues: Issue[] = [];
-  const { width, height } = map.canvas;
-  const inside = (x: number, y: number) => x >= 0 && x <= width && y >= 0 && y <= height;
-  const cityAt = (index: number) => ({ kind: 'city', index }) as const;
-  const label = (index: number) => map.cities[index]!.name || `ID ${map.cities[index]!.id}`;
-
-  const byId = new Map<number, number>();
-  const byName = new Map<string, number>();
-  map.cities.forEach((city, index) => {
-    const sameId = byId.get(city.id);
-    if (sameId === undefined) byId.set(city.id, index);
-    else
-      issues.push({
-        code: 'city-id-duplicate',
-        message: `도시 ID ${city.id}를 ${josa(label(sameId), '와/과')} ${josa(label(index), '이/가')} 같이 씁니다.`,
-        target: cityAt(index),
-      });
-    const name = city.name.trim();
-    const sameName = byName.get(name);
-    if (!name)
-      issues.push({
-        code: 'city-name-duplicate',
-        message: `ID ${city.id} 도시의 이름이 비었습니다.`,
-        target: cityAt(index),
-      });
-    else if (sameName === undefined) byName.set(name, index);
-    else
-      issues.push({
-        code: 'city-name-duplicate',
-        message: `도시 이름 ${josa(name, '이/가')} ID ${josa(String(map.cities[sameName]!.id), '와/과')} ID ${city.id}에 겹칩니다.`,
-        target: cityAt(index),
-      });
-    if (!inside(city.position.x, city.position.y))
-      issues.push({
-        code: 'city-out-of-canvas',
-        message: `${label(index)}의 좌표 (${city.position.x}, ${city.position.y})는 캔버스 ${width}×${height} 밖입니다.`,
-        target: cityAt(index),
-      });
-    if (!inRange(city.level, LEVEL_RANGE))
-      issues.push({
-        code: 'city-level-range',
-        message: `${label(index)}의 규모 ${josa(String(city.level), '은/는')} ${LEVEL_RANGE.min}~${LEVEL_RANGE.max} 밖입니다.`,
-        target: cityAt(index),
-      });
-    if (!inRange(city.region, REGION_RANGE))
-      issues.push({
-        code: 'city-region-range',
-        message: `${label(index)}의 지역 ${josa(String(city.region), '은/는')} ${REGION_RANGE.min}~${REGION_RANGE.max} 밖입니다.`,
-        target: cityAt(index),
-      });
-  });
-
-  map.cities.forEach((city, index) => {
-    for (const otherId of new Set(city.connections)) {
-      if (otherId === city.id) {
-        issues.push({
-          code: 'link-self',
-          message: `${josa(label(index), '이/가')} 자기 자신과 이어져 있습니다.`,
-          target: cityAt(index),
-        });
-        continue;
-      }
-      const other = byId.get(otherId);
-      if (other === undefined) {
-        issues.push({
-          code: 'link-missing-city',
-          message: `${josa(label(index), '이/가')} 없는 도시 ID ${josa(String(otherId), '와/과')} 이어져 있습니다.`,
-          target: cityAt(index),
-        });
-        continue;
-      }
-      if (!map.cities[other]!.connections.includes(city.id))
-        issues.push({
-          code: 'link-one-way',
-          message: `${label(index)}에서 ${josa(label(other), '으로/로')} 가는 연결만 있고 돌아오는 연결이 없습니다.`,
-          target: cityAt(index),
-        });
-    }
-  });
-
-  // 연결망은 양쪽 연결만 길로 센다. 한쪽 연결은 위에서 따로 알린다.
-  if (map.cities.length > 0) {
-    const reached = new Set<number>([0]);
-    const queue = [0];
-    while (queue.length > 0) {
-      const index = queue.shift()!;
-      const city = map.cities[index]!;
-      for (const otherId of city.connections) {
-        const other = byId.get(otherId);
-        if (other === undefined || reached.has(other) || !map.cities[other]!.connections.includes(city.id)) continue;
-        reached.add(other);
-        queue.push(other);
-      }
-    }
-    const cut = map.cities.map((_, index) => index).filter((index) => !reached.has(index));
-    const first = cut[0];
-    if (first !== undefined)
-      issues.push({
-        code: 'network-split',
-        message: `${label(first)} 등 도시 ${cut.length}개가 ${label(0)}의 연결망에 닿지 않습니다.`,
-        target: cityAt(first),
-      });
-  }
-
-  for (const { layer, closed } of TERRAIN_LAYERS) {
-    const lines: Point[][] = layer === 'rivers' ? map.terrain.rivers.map((river) => river.points) : map.terrain[layer];
-    lines.forEach((points, index) => {
-      const target = { kind: 'terrain', layer, index } as const;
-      const name = `${layerLabel(layer)} ${index + 1}`;
-      if (closed && !isClosedPolygon(points))
-        issues.push({ code: 'terrain-open', message: `${josa(name, '은/는')} 닫히지 않은 다각형입니다.`, target });
-      if (!closed && points.length < 2)
-        issues.push({
-          code: 'terrain-open',
-          message: `${name}의 점이 ${points.length}개라서 선이 되지 않습니다.`,
-          target,
-        });
-      const outside = points.filter(([x, y]) => !inside(x, y)).length;
-      if (outside > 0)
-        issues.push({
-          code: 'terrain-out-of-canvas',
-          message: `${name}의 점 ${outside}개가 캔버스 ${width}×${height} 밖입니다.`,
-          target,
-        });
-    });
-  }
-  return issues;
+function editorTarget(issue: ResourceIssue): IssueTarget {
+  const target = issue.target;
+  if (target.kind === 'city') return { kind: 'city', index: target.index };
+  if (target.kind === 'terrain') return { kind: 'terrain', layer: target.layer, index: target.index };
+  if (target.kind !== 'path') return null;
+  const [head, first, second] = target.path;
+  if (head === 'cities' && typeof first === 'number') return { kind: 'city', index: first };
+  if (head === 'terrain' && typeof first === 'string' && LAYERS.includes(first) && typeof second === 'number')
+    return { kind: 'terrain', layer: first as TerrainLayer, index: second };
+  return null;
 }
+
+// rules params와 지도만으로 기존 조사 문장을 만들 수 있는 코드만 바꾸고, 나머지는 rules 문구를 그대로 쓴다.
+function editorMessage(issue: ResourceIssue, target: IssueTarget, map: MapV2): string {
+  const { width, height } = map.canvas;
+  const { params } = issue;
+  if (target?.kind === 'terrain') {
+    const name = `${layerLabel(target.layer)} ${target.index + 1}`;
+    switch (issue.code) {
+      case 'terrain-open':
+        return target.layer === 'rivers'
+          ? `${name}의 점이 ${params.count}개라서 선이 되지 않습니다.`
+          : `${josa(name, '은/는')} 닫히지 않은 다각형입니다.`;
+      case 'terrain-out-of-canvas':
+        return `${name}의 점 ${params.outsideCount}개가 캔버스 ${width}×${height} 밖입니다.`;
+      default:
+        return issue.message;
+    }
+  }
+  if (target?.kind !== 'city' || issue.target.kind !== 'city') return issue.message;
+  const index = target.index;
+  const city = map.cities[index]!;
+  const label = (i: number) => map.cities[i]!.name || `ID ${map.cities[i]!.id}`;
+  const indexOfId = (id: number) => map.cities.findIndex((other) => other.id === id);
+  switch (issue.code) {
+    case 'city-id-duplicate':
+      return `도시 ID ${city.id}를 ${josa(label(Number(params.firstIndex)), '와/과')} ${josa(label(index), '이/가')} 같이 씁니다.`;
+    case 'city-name-empty':
+      return `ID ${city.id} 도시의 이름이 비었습니다.`;
+    case 'city-name-duplicate':
+      return `도시 이름 ${josa(String(params.name), '이/가')} ID ${josa(String(map.cities[Number(params.firstIndex)]!.id), '와/과')} ID ${city.id}에 겹칩니다.`;
+    case 'city-out-of-canvas':
+      return `${label(index)}의 좌표 (${city.position.x}, ${city.position.y})는 캔버스 ${width}×${height} 밖입니다.`;
+    case 'link-self':
+      return `${josa(label(index), '이/가')} 자기 자신과 이어져 있습니다.`;
+    case 'link-missing-city':
+      return `${josa(label(index), '이/가')} 없는 도시 ID ${josa(String(params.cityId), '와/과')} 이어져 있습니다.`;
+    case 'link-one-way':
+      return `${label(index)}에서 ${josa(label(indexOfId(Number(params.cityId))), '으로/로')} 가는 연결만 있고 돌아오는 연결이 없습니다.`;
+    case 'network-split':
+      return `${josa(label(index), '이/가')} ${label(0)}의 연결망에 닿지 않습니다.`;
+    default:
+      return issue.message;
+  }
+}
+
+export function toEditorIssues(report: ValidationReport<MapResource>, map: MapV2): Issue[] {
+  return report.issues.map((issue) => {
+    const target = editorTarget(issue);
+    return { code: issue.code, severity: issue.severity, message: editorMessage(issue, target, map), target };
+  });
+}
+
+export const editorIssues = (map: MapV2): Issue[] => toEditorIssues(validateMap(map), map);

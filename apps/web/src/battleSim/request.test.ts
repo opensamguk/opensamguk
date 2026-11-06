@@ -1,9 +1,11 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_CREW_TYPE_ID, UNIT_CHOICES } from './publicUnitSet';
+import { TEST_UNIT_SET } from './testUnitSet';
+import { worldUnits } from './unitChoices';
 import { checkForm, defaultForm, formBody, LIMITS, problemText, requestProblems, type BattleForm } from './request';
 
-// T4-34 화면 쪽 검사. 메인 스레드와 Worker가 같은 함수를 쓴다.
+// T4-34 화면 쪽 검사. 메인 스레드와 Worker가 같은 함수를 쓴다. 병종표는 시험 고정물이다 (T4-86).
+const { all: UNIT_CHOICES, defaultId } = worldUnits(TEST_UNIT_SET);
+const DEFAULT_CREW_TYPE_ID = defaultId!;
 const form = (patch: (f: BattleForm) => BattleForm = (f) => f) => patch(defaultForm(DEFAULT_CREW_TYPE_ID));
 const fields = (f: BattleForm) => checkForm(f, UNIT_CHOICES).problems.map((p) => p.field);
 
@@ -108,17 +110,8 @@ describe('폼 검사', () => {
   });
 });
 
+// 성벽 상한과 게시 지도 대조는 tools/battle-sim-resources.integration.test.ts가 실제 DB 행으로 한다 (T4-77).
 describe('상한 상수', () => {
-  it('성벽 상한 12,500이 resources/map/che.json 도시 max.wall·max.defence 최댓값과 같다', () => {
-    const map = JSON.parse(readFileSync(new URL('../../../../resources/map/che.json', import.meta.url), 'utf8')) as {
-      cities: Array<{ max: { wall: number; defence: number } }>;
-    };
-    const wall = Math.max(...map.cities.map((c) => c.max.wall));
-    const defence = Math.max(...map.cities.map((c) => c.max.defence));
-    expect(LIMITS.WALL_MAX).toBe(wall);
-    expect(LIMITS.WALL_MAX).toBe(defence);
-  });
-
   it('장수 병종 목록은 armType > 0인 병종이다', () => {
     expect(UNIT_CHOICES.filter((u) => u.armType > 0).map((u) => u.id)).toEqual([1100, 1200, 1300]);
     expect(UNIT_CHOICES.find((u) => u.id === 1000)?.armType).toBe(0);

@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { BattleRunBody, BattleRunErrorCode, BattleRunReply, BattleRunRequest, BattleRunResult } from './request';
+import type {
+  BattleRulesMessage,
+  BattleRunBody,
+  BattleRunErrorCode,
+  BattleRunReply,
+  BattleRunRequest,
+  BattleRunResult,
+} from './request';
 
 // Worker의 쓰는 부분만. 단위 시험은 이 모양의 가짜를 주입해 상태 전이만 본다. 진짜 Worker 실행은 Chromium E2E가 본다.
 export interface WorkerLike {
-  postMessage(message: BattleRunRequest): void;
+  postMessage(message: BattleRunRequest | BattleRulesMessage): void;
   terminate(): void;
   addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;
   addEventListener(type: 'error' | 'messageerror', listener: (event: Event) => void): void;
@@ -22,8 +29,10 @@ export type BattleWorkerState =
 
 // Worker 하나와 요청 번호를 맡는다 (docs/plans/T4-34.md 수명).
 // 실행마다 requestId를 늘리고 그 번호의 답만 받는다. 취소·오류·언마운트 때 Worker를 끝내고 다음 실행에 새로 만든다.
-export function useBattleWorker(create: () => WorkerLike = createBattleWorker) {
+// 새 Worker에는 실행 요청보다 먼저 월드 병종표(unitSet)를 보낸다 (T4-86). postMessage는 보낸 순서대로 닿는다.
+export function useBattleWorker(unitSet: unknown, create: () => WorkerLike = createBattleWorker) {
   const [state, setState] = useState<BattleWorkerState>({ status: 'idle' });
+  const unitSetRef = useRef(unitSet);
   const workerRef = useRef<WorkerLike | null>(null);
   const lastIdRef = useRef(0);
   const currentRef = useRef<number | null>(null);
@@ -66,6 +75,7 @@ export function useBattleWorker(create: () => WorkerLike = createBattleWorker) {
       fail(worker, 'WORKER');
     });
     worker.addEventListener('messageerror', () => fail(worker, 'WORKER'));
+    worker.postMessage({ type: 'rules', unitSet: unitSetRef.current });
     return worker;
   }, [create, fail]);
 
@@ -90,6 +100,13 @@ export function useBattleWorker(create: () => WorkerLike = createBattleWorker) {
   const retry = useCallback(() => {
     if (lastBodyRef.current) run(lastBodyRef.current);
   }, [run]);
+
+  // 병종표 참조가 바뀌면 앞 병종표의 Worker를 끝낸다. 조회 캐시는 내용이 같으면 참조를 유지하므로 다시 받기만으로는 끝내지 않는다.
+  useEffect(() => {
+    if (unitSetRef.current === unitSet) return;
+    unitSetRef.current = unitSet;
+    cancel();
+  }, [unitSet, cancel]);
 
   useEffect(() => {
     mountedRef.current = true;

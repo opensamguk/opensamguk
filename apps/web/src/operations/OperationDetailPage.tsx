@@ -4,7 +4,7 @@ import { useId, useMemo, useState } from 'react';
 import { errorCode, retryUnlessClientError } from '../game/errors';
 import { formatYearMonth } from '../game/gameDate';
 import { QueryError } from '../game/QueryState';
-import { useWorldId, useWorldMap } from '../game/queries';
+import { useWorldId, useWorldMap, useWorldUnits } from '../game/queries';
 import { useTRPC } from '../trpc';
 import { serverMessage } from '../turns/apiError';
 import type { ArgNames } from '../turns/args';
@@ -68,6 +68,7 @@ export function OperationDetailPage({ operationId }: { operationId: string }) {
 
 function Detail({ worldId, op }: { worldId: string; op: OperationDetail }) {
   const map = useWorldMap(worldId);
+  const { units } = useWorldUnits(worldId);
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState(false);
@@ -80,8 +81,9 @@ function Detail({ worldId, op }: { worldId: string; op: OperationDetail }) {
     return {
       city: (key) => cities.find((c) => c.key === key)?.name,
       nation: (id) => nations.find((n) => n.id === id)?.name,
+      unit: units.name,
     };
-  }, [map.data]);
+  }, [map.data, units]);
 
   // 닫기는 작전 메타데이터만 바꾼다. 작전 경로만 다시 받고 예턴 캐시는 건드리지 않는다.
   const close = useMutation(

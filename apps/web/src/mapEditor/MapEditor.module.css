@@ -384,3 +384,8 @@
   font-weight: 700;
   color: var(--color-danger);
 }
+
+.issueWarning {
+  font-weight: 700;
+  color: var(--color-warning);
+}

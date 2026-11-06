@@ -5,7 +5,7 @@ export type BattleForce = { crew: number; crewType: number; train: number; atmos
 export type CommanderStats = { leadership: number; strength: number };
 export type BattleCommanders = { attacker: CommanderStats; defender?: CommanderStats };
 
-// simulateBattle의 BattleInput에서 unitSet을 뺀 부분. 병종표는 Worker가 자기 묶음의 공개 표를 쓴다.
+// simulateBattle의 BattleInput에서 unitSet을 뺀 부분. 병종표는 화면이 Worker를 만들 때 rules 메시지로 한 번 보낸다 (T4-86).
 export type BattleRunInput = {
   attacker: BattleForce;
   defender: BattleForce;
@@ -16,6 +16,8 @@ export type BattleRunInput = {
 };
 export type BattleRunBody = BattleRunInput & { seed: string };
 export type BattleRunRequest = BattleRunBody & { type: 'run'; requestId: number };
+// 월드 병종표. Worker 하나에 병종표 하나이며 Worker가 처음 받은 것만 쓴다 (compute.ts createWorkerHandler).
+export type BattleRulesMessage = { type: 'rules'; unitSet: unknown };
 
 export type BattleRunResult = {
   type: 'result';
@@ -38,7 +40,7 @@ export const LIMITS = {
   // 통솔 상한 100 × BALANCE.CREW_PER_LEADERSHIP
   LEADERSHIP_MAX: 100,
   CREW_PER_LEADERSHIP: 100,
-  // resources/map/che.json 도시 max.wall·max.defence의 최댓값
+  // 게시 자원 MAP che@1 도시 max.wall·max.defence의 최댓값
   WALL_MAX: 12_500,
   SEED_MAX: 64,
 } as const;

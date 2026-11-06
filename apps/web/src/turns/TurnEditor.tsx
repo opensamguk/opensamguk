@@ -20,6 +20,7 @@ import { DisabledReason } from '../ui/DisabledReason';
 import { EmptyState, ErrorState, LoadingState } from '../ui/States';
 import { errorCode, retryUnlessClientError } from './apiError';
 import { describeArgs, type ArgNames } from './args';
+import { useWorldUnits } from '../game/queries';
 import { CommandPicker, type CommandInfo } from './CommandPicker';
 import { useEquipment } from '../equipment/useEquipment';
 import {
@@ -226,13 +227,16 @@ function Editor<S extends DisplaySlot>({
   const cities = useMemo(() => map.data?.cities ?? [], [map.data]);
   const nations = useMemo(() => map.data?.nations ?? [], [map.data]);
   const generals = source.generals;
-  const names = useMemo(
+  // 월드 병종표 (T4-86). 불러오는 중·오류여도 병종 없는 명령·표·저장은 그대로 쓰고 병종은 번호로 적는다.
+  const { units, note: unitNote } = useWorldUnits(worldId);
+  const names: ArgNames = useMemo(
     () => ({
       city: (key: number) => cities.find((c) => c.key === key)?.name,
       nation: (id: number) => nations.find((n) => n.id === id)?.name,
       general: generals ? (id: number) => generals.find((g) => g.id === id)?.name : undefined,
+      unit: units.name,
     }),
-    [cities, nations, generals],
+    [cities, nations, generals, units],
   );
 
   // 같은 명령·인자는 사전 검사를 한 번만 묻는다. 휴식은 묻지 않는다.
@@ -602,6 +606,8 @@ function Editor<S extends DisplaySlot>({
           selectedCityKey={selectedCityKey}
           generals={generals}
           defaultCrewType={home.data?.general.crewType}
+          units={units}
+          unitNote={unitNote}
           cityResources={summary.data?.cityResourcesEnabled === true}
           blockedReason={putBlocked}
           targetLabel={targetLabel}
