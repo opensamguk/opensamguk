@@ -109,10 +109,17 @@ export function settleLineageMonthly(world: WorldView, tick: number, resources: 
     lineage.marriages.push(marriage);
     effects.marriages.push({ marriageId: marriage.id, a: marriage.a, b: marriage.b, householdGeneralId: actor.id });
   }
-  if (date.month === 1)
+  // 설정1의 기존 원생성은 연간 출산과 같은 난수 순서를 유지한다.
+  const birthsThisYear =
+    config.version === 2
+      ? Object.values(lineage.persons).filter(
+          (person) => person.bornTick !== null && monthlyDate(world.startYear, person.bornTick).year === date.year,
+        ).length
+      : 0;
+  if (config.version === 2 || date.month === 1)
     for (const marriage of [...lineage.marriages].sort((a, b) => a.id - b.id)) {
       if (
-        effects.births.length >= config.limits.maxBirthsPerYear ||
+        birthsThisYear + effects.births.length >= config.limits.maxBirthsPerYear ||
         Object.keys(state.generals).length >= config.limits.maxGenerals
       ) {
         effects.skippedBirths.push({ marriageId: marriage.id, reason: 'LIMIT' });

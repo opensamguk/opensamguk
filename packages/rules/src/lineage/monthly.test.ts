@@ -4,8 +4,41 @@ import type { LineageResources } from './birth';
 import { settleLineageMonthly } from './monthly';
 import { emptyLineagePerson } from './state';
 import { lineageFixture } from './testFixture';
+import { lineageConfigSchema } from './config';
 
 const resources: LineageResources = { statRules: { total: 180, min: 0, max: 100 }, unitSet: { defaultCrewTypeId: 1 } };
+
+function birthWorld() {
+  const world = lineageFixture(),
+    [a, b] = Object.keys(world.generals).map(Number);
+  world.lineage!.config.marriage.npc.perMonth = 0;
+  world.lineage!.config.birth.chanceBp = 10000;
+  world.lineage!.config.birth.givenNames = ['가', '나', '다', '라', '마', '바'];
+  world.lineage!.config.limits.maxBirthsPerYear = 3;
+  world.lineage!.marriages = [{ id: 1, a: a!, b: b!, householdGeneralId: a!, sinceTick: 0 }];
+  world.lineage!.nextMarriageId = 2;
+  return world;
+}
+
+it('AC-P2-32 월 출산은 매월 추첨하되 같은 해의 이전 출생을 합산하고 새해에 상한을 다시 센다', () => {
+  let world = birthWorld();
+  world.lineage!.config.version = 2;
+  const source = structuredClone(world),
+    births: number[] = [];
+  for (let month = 1; month <= 13; month++) {
+    const result = settleLineageMonthly(world, month * 10000, resources);
+    if (month === 1) expect(world).toEqual(source);
+    world = result.state;
+    births.push(result.effects.births.length);
+    if (month === 4) expect(result.effects.skippedBirths).toEqual([{ marriageId: 1, reason: 'LIMIT' }]);
+  }
+  expect(births).toEqual([1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]);
+});
+
+it('AC-P2-32 가문 설정은 기존 연 출산1과 새 월 출산2만 허용한다', () => {
+  const config = birthWorld().lineage!.config;
+  expect(lineageConfigSchema.safeParse({ ...config, version: 3 }).success).toBe(false);
+});
 it('AC-P2-32 12월 정산은 다음 해 등장 NPC를 사망·혼인 후보로 앞당기지 않는다', () => {
   const world = lineageFixture(),
     id = Object.keys(world.generals).map(Number)[1]!;

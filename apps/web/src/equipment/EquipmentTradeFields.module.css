@@ -1,0 +1,26 @@
+.trade {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: var(--space-2);
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+.fields label {
+  min-width: 0;
+}
+
+.fields select {
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+}
+
+.trade p {
+  margin: 0;
+}

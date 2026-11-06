@@ -11,7 +11,7 @@ const name = generalCreationSchema.shape.name;
 // 자격과 수치는 원생성에서만 읽는다. 공개 프로필의 기본값은 만들지 않는다 (AC-P2-32).
 export const lineageConfigSchema = z
   .strictObject({
-    version: z.literal(1),
+    version: z.union([z.literal(1), z.literal(2)]),
     marriage: z.strictObject({
       minAge: age,
       maxAge: age,

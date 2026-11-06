@@ -6,6 +6,7 @@ import { NoGeneral, QueryError } from '../game/QueryState';
 import { useHome, useWorldId, useWorldMap, useWorldSummary } from '../game/queries';
 import { CityInfo } from '../main/CityInfo';
 import { GeneralInfo } from '../main/GeneralInfo';
+import { useEquipment } from '../equipment/useEquipment';
 import { NationInfo } from '../main/NationInfo';
 import { Panel } from '../main/Panel';
 import { RECORD_LABELS, RecordList } from '../main/Records';
@@ -83,6 +84,7 @@ export function MainPage() {
   const home = useHome(worldId);
   const trpc = useTRPC();
   const mine = useQuery(trpc.general.mine.queryOptions({ worldId }));
+  const equipment = useEquipment(worldId, summary.data?.equipmentEnabled === true, home.data?.general.id);
   const map = useWorldMap(worldId);
   const [turnStatus, setTurnStatus] = useState<TurnEditorStatus | null>(null);
   const turnStatusId = useId();
@@ -259,6 +261,7 @@ export function MainPage() {
         <Panel title="장수 정보" area="general" headingId="main-general">
           {withHome((data) => (
             <GeneralInfo
+              equipment={equipment}
               worldId={worldId}
               home={data}
               campaignEnabled={mine.data?.creationRules.campaignEnabled ?? false}
