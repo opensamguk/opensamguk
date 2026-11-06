@@ -24,6 +24,7 @@ export const options: CreateOptions = {
       counts: { nations: 21, generals: 491, cities: 53, gates: 8, ports: 6, fields: 13, anchors: 61 },
       resources: [],
       ruleFeatures: [
+        'battle-affinity-v2',
         'campaign-assignment-v2',
         'campaign-v1',
         'city-resources-v1',
@@ -63,7 +64,7 @@ export const expandedProfile: CreateProfile = {
   ...baseProfile,
   id: 'integration-v01-expanded',
   label: '통합판 확장 · 191년 군웅할거',
-  featureProfileKey: 'expanded-191-v2',
+  featureProfileKey: 'expanded-191-v3',
   featureProfileHash: 'a'.repeat(64),
   ruleFeatures: [
     ...baseProfile.ruleFeatures,

@@ -67,19 +67,34 @@ describe('AC-M3-04 원생성 설정 조회', () => {
       }).success,
     ).toBe(false);
   });
-  it('확장 항목은 별도 키·설정 해시·14기능을 요약하고 기존 항목을 보존한다', () => {
-    const data = json('resources/feature-profile/expanded-191-v2.json');
+  it('확장 항목은 새 키·설정 해시·15기능을 요약하고 기존 항목을 보존한다', () => {
+    const previous = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v2.json'));
+    const data = json('resources/feature-profile/expanded-191-v3.json');
+    expect(data).toEqual({
+      ...previous,
+      key: 'expanded-191-v3',
+      ruleFeatures: ['battle-affinity-v2', ...previous.ruleFeatures],
+    });
     const before = hashState(creationProfile(rows, presets));
     const expanded = expandedCreationProfile(rows, presets, data);
     expect(expanded).toMatchObject({
       id: 'integration-v01-expanded',
       available: true,
-      featureProfileKey: 'expanded-191-v2',
+      featureProfileKey: 'expanded-191-v3',
       featureProfileHash: hashState(data),
       suggestedEndYear: 231,
     });
     if (!expanded.available) throw new Error('확장 항목을 확인하세요.');
-    expect(expanded.ruleFeatures).toHaveLength(14);
+    expect(expanded.ruleFeatures).toHaveLength(15);
+    expect(expanded.ruleFeatures).toContain('battle-affinity-v2');
+    expect(expandedCreationProfile(rows, presets, previous)).toMatchObject({
+      available: false,
+      code: 'FEATURE_PROFILE_UNAVAILABLE',
+    });
+    expect(expandedCreationProfile(rows, presets, { ...previous, key: 'expanded-191-v3' })).toMatchObject({
+      available: false,
+      code: 'FEATURE_PROFILE_UNAVAILABLE',
+    });
     expect(hashState(creationProfile(rows, presets))).toBe(before);
     expect(Object.hasOwn(creationProfile(rows, presets), 'featureProfileKey')).toBe(false);
     expect(expandedCreationProfile(rows, presets, null)).toMatchObject({
@@ -96,8 +111,9 @@ describe('AC-M3-04 원생성 설정 조회', () => {
     for (const value of ['true', 1, null, {}])
       expect(creationOptionsInput.safeParse({ expectedUserId, expandedProfiles: value }).success).toBe(false);
   });
-  it('정확한 도시 자원9기능만 쓰고 미등록이면 옛 프로필로 돌아가지 않는다', () => {
-    expect(creationFeatures).toHaveLength(9);
+  it('도시 자원·전투 상성을 포함한 10기능을 쓰고 미등록이면 옛 프로필로 돌아가지 않는다', () => {
+    expect(creationFeatures).toHaveLength(10);
+    expect(creationFeatures).toContain('battle-affinity-v2');
     expect(creationFeatures).toContain('city-resources-v1');
     expect(creationFeatures).not.toContain('treaty-trade');
     const absent = {

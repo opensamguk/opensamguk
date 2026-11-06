@@ -38,6 +38,15 @@ export const basicStratagemFeature: RuleFeatureDefinition = {
   },
 };
 
+export const battleAffinityFeature: RuleFeatureDefinition = {
+  key: 'battle-affinity-v2',
+  requires: [],
+  conflicts: [],
+  checkOrigin({ data }) {
+    if (data !== undefined) throw new Error('전투 상성은 별도 초기 자료를 사용하지 않습니다.');
+  },
+};
+
 export const fiveStatsFeature: RuleFeatureDefinition = {
   key: 'five-stats',
   requires: [],
