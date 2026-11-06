@@ -714,7 +714,7 @@ async function resourceFixture(profile?: unknown) {
       await writeFile(new URL(directory + '/' + name, root), await readFile(new URL(name, original)), { flag: 'wx' });
   }
   if (profile !== undefined)
-    await writeFile(new URL('feature-profile/expanded-191-v2.json', root), JSON.stringify(profile), { flag: 'wx' });
+    await writeFile(new URL('feature-profile/expanded-191-v3.json', root), JSON.stringify(profile), { flag: 'wx' });
   return root;
 }
 async function withResourceRoot<T>(root: URL, body: () => Promise<T>) {
@@ -728,7 +728,7 @@ async function withResourceRoot<T>(root: URL, body: () => Promise<T>) {
   }
 }
 
-for (const profileKey of ['expanded-191-v1', 'expanded-191-v2'])
+for (const profileKey of ['expanded-191-v1', 'expanded-191-v2', 'expanded-191-v3'])
   it(`AC-P2-30·31·32·33 ${profileKey} 관리자 HTTP 확장 선택·엔진 생성·재생·저장 설정 초기화를 연결한다`, async (signal) => {
     const options = await creationOptions(actor, signal, true);
     expect(options.status).toBe(200);
@@ -852,7 +852,7 @@ it('AC-P2-30·31·32·33 설정 파일 누락·손상은 기존 HTTP 목록과 r
       const expanded = await creationOptions(actor, signal, true);
       expect(expanded.data?.profiles.slice(0, 3)).toEqual(before.data?.profiles);
       expect(expanded.data?.profiles[3]).toMatchObject({ available: false, code: 'FEATURE_PROFILE_UNAVAILABLE' });
-      const { value } = await loadFeatureProfile('expanded-191-v2', new URL('../resources/', import.meta.url));
+      const { value } = await loadFeatureProfile('expanded-191-v3', new URL('../resources/', import.meta.url));
       const pair = await accepted(actor, signal, { featureProfileKey: value.key, ruleFeatures: value.ruleFeatures });
       await processOne(signal);
       const stored = await row(pair.receipt.requestId);
@@ -862,7 +862,7 @@ it('AC-P2-30·31·32·33 설정 파일 누락·손상은 기존 HTTP 목록과 r
 });
 
 it('AC-P2-30·31·32·33 입력 목록 누락을 시나리오 기능으로 채우지 않고 미지 키를 확정 거부한다', async (signal) => {
-  const { value } = await loadFeatureProfile('expanded-191-v2');
+  const { value } = await loadFeatureProfile('expanded-191-v3');
   for (const [extra, expected] of [
     [{ featureProfileKey: 'missing-expanded-profile', ruleFeatures: value.ruleFeatures }, 'RESOURCE_INVALID'],
     [
@@ -880,7 +880,7 @@ it('AC-P2-30·31·32·33 입력 목록 누락을 시나리오 기능으로 채�
 });
 
 it('AC-P2-30·31·32·33 실제 DB 실패 뒤 고정한 설정의 파일 변경은 revision을 바꾸고 재처리를 거부한다', async (signal) => {
-  const { value } = await loadFeatureProfile('expanded-191-v2');
+  const { value } = await loadFeatureProfile('expanded-191-v3');
   const pair = await accepted(actor, signal, { featureProfileKey: value.key, ruleFeatures: value.ruleFeatures });
   const pending = await row(pair.receipt.requestId);
   await scopedFault('World', "NEW.id='" + pending.plannedWorldId + "'", async () => {

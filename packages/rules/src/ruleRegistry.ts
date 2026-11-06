@@ -13,6 +13,7 @@ import {
   fiveStatsFeature,
   operationalMapFeature,
   basicStratagemFeature,
+  battleAffinityFeature,
   personnelInputKinds,
   treatyInputKinds,
   treatyBreakInputKind,
@@ -100,6 +101,7 @@ export const ruleRegistry: RuleRegistry = {
     fiveStatsFeature,
     operationalMapFeature,
     basicStratagemFeature,
+    battleAffinityFeature,
     campaignFeature,
     campaignAssignmentFeature,
     cityResourcesFeature,
@@ -219,6 +221,8 @@ export function checkReplayOrigin(
     throw new Error('재생 생성 기록의 버전을 확인하세요.');
   checkStatProfile(origin.initial);
   checkOperationalProfile(origin.initial);
+  if (origin.initial.unitSet.coefMode === 'multiply' && !origin.initial.ruleFeatures?.includes('battle-affinity-v2'))
+    throw new Error('곱셈 병종 판에는 battle-affinity-v2 규칙 기능이 필요합니다.');
   if (origin.version === 1) {
     if (Object.hasOwn(origin.initial, 'ruleFeatures') || Object.hasOwn(origin, 'featureData'))
       throw new Error('형식 1 생성 기록에 규칙 기능을 넣을 수 없습니다.');

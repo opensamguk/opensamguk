@@ -29,6 +29,8 @@
 
 사용자가 2026-11-01 `basic`도 원작식으로 고치도록 승인했다. 다만 이미 만든 월드의 재생은 지켜야 하므로 계산식은 월드 단위 규칙 기능으로 고른다. 새 규칙 기능 `battle-affinity-v2`를 `ruleFeatures.ts`에 등록하고 서버 생성 프로필의 `creationFeatures`(`apps/server/src/admin/worldCreateOptions.ts:19`)에 더한다. 이 기능이 켜진 월드는 판과 상관없이 원작식으로 계산한다. 켜지지 않은 기존 월드는 지금 나누기 식을 그대로 쓴다. `expanded` 판에는 선택 칸 `coefMode: "multiply"`를 둔다. `buildInitialWorld`는 규칙 기능을 입력받지 않으므로 이 검사를 넣지 않는다. 기능을 합친 뒤의 공통 경계인 `prepareInitialWorld`(`apps/engine/src/world/persistence.ts:56`)가 검사한다. 이 함수는 `options.ruleFeatures ?? state.ruleFeatures ?? []`로 기능 목록을 고르고 일치성·기능 검증을 마친 `features`를 만든다(`persistence.ts:91-93`). 검사는 그 `features`를 대상으로 해서 `state.unitSet.coefMode`가 `multiply`인데 `battle-affinity-v2`가 없으면 거부한다. 관리자 생성(`apps/engine/src/admin/createRequests.ts:72-75`, 기능 합성 뒤), CLI 생성(`admin/creation.ts:6`), 재초기화(`admin/resetPreparation.ts:425`), 저장 경로(`world/persistence.ts:321`)가 모두 이 함수를 지난다. 시험은 네 경로마다 기능이 있으면 허용, 없으면 거부를 본다. 옵션에는 목록이 없고 `state.ruleFeatures`에만 기능이 있는 입력(`createWorldFromCli`, `saveInitialWorld`)이 허용되는지도 본다. 전투 호출부(`commands/attack.ts`, `campaign/skirmish.ts`)는 `state.ruleFeatures`에서 계산식을 읽어 `simulateBattle` 입력에 넘긴다. 웹 전투 시뮬레이터는 새 월드와 같은 원작식을 기본으로 하고 옛 식을 고르는 선택지를 둔다.
 
+확장 생성 목록은 고정 설정의 기능 목록을 쓰므로 별도 `expanded-191-v3`를 기본으로 읽는다. 저장 형식은 장비를 포함한 형식 2이며 v2의 설정과 기능을 복사하고 `battle-affinity-v2` 하나만 더한다. 기존 `expanded-191-v1`·`v2` 파일과 그 설정으로 만든 월드의 재초기화 원본은 보존한다. 새 생성 목록은 v3 설정에서 전투 기능이 빠지면 오류로 닫는다.
+
 ### 계열과 상성
 
 | 번호 | 계열 | 원작 |
