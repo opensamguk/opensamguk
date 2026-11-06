@@ -1,4 +1,5 @@
 import { publicMapConfig } from '@opensamguk/shared';
+import { worldClock } from './world/truce';
 import { persistPublicMap } from './publicMap';
 import type { Prisma, PrismaClient } from '@opensamguk/db';
 import { nextActionSequence, notifyWorld, enqueueNotifications, type RealtimeSignal } from '@opensamguk/db';
@@ -207,7 +208,7 @@ export class TurnLoop {
           };
         }
         const now = (await databaseNow(tx)).getTime();
-        const clock = { ...world, clockAnchorAt: world.clockAnchorAt?.getTime() ?? null };
+        const clock = worldClock(world);
         const checkpoint = checkpointClock(clock, now, this.highWaterTick);
         const boundary = world.monthlyTick + TICKS_PER_MONTH;
         const year = monthlyDate(world.startYear, boundary).year;
@@ -486,6 +487,7 @@ export class TurnLoop {
             clockAnchorAt: world.clockAnchorAt?.getTime() ?? null,
             turnTermMinutes: world.turnTermMinutes,
             explicitAdvance: target !== undefined,
+            truce: clock.truce ?? null,
           };
         return {
           tick: savedTick,

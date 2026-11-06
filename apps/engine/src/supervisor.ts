@@ -2,7 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import type { PrismaClient } from '@opensamguk/db';
-import { ADMIN_CLOCK_KINDS } from '@opensamguk/rules';
+import { ADMIN_CLOCK_KINDS, POSSESSION_KIND } from '@opensamguk/rules';
 import { stopOwnedChild } from './process-lifecycle';
 import { processWorldCreateRequest } from './admin/createRequests';
 
@@ -189,7 +189,12 @@ export async function runSupervisor(
                 { status: { in: ['RUNNING', 'PAUSED'] } },
                 {
                   status: 'PREOPEN',
-                  inputEvents: { some: { status: 'PENDING', kind: { in: [...ADMIN_CLOCK_KINDS] } } },
+                  inputEvents: {
+                    some: {
+                      status: 'PENDING',
+                      kind: { in: [...ADMIN_CLOCK_KINDS, 'admin.world.setOption', POSSESSION_KIND] },
+                    },
+                  },
                 },
                 {
                   status: 'ENDED',

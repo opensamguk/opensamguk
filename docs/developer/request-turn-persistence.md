@@ -133,7 +133,7 @@ API와 엔진 모두 월드 행을 장수 행보다 먼저 잠급니다. API는 
 
 ## 진행 중 월드 속성 (INT-24 · AC-INT-24)
 
-`admin.world.settings({worldId})`는 현재 관리자 권한을 다시 검사하고 조회 감사를 남긴다. 응답은 `name`, `status`, `startYear`, `endYear`, `turnTermMinutes`, `clockRevision`, `presetKey`, `canChangeRules`, `rules`다. `rules`는 원본 프리셋에 진행 중 변경을 합친 값이며 프리셋이 없으면 null이다.
+`admin.world.settings({worldId})`는 현재 관리자 권한을 다시 검사하고 조회 감사를 남긴다. 응답은 `name`, `status`, `startYear`, `endYear`, `turnTermMinutes`, `clockRevision`, `presetKey`, `canChangeRules`, `canChangeNpcPlay`, `rules`, `entry`, `truce`다. `rules`는 원본 프리셋에 진행 중 변경을 합친 값이며 프리셋이 없으면 null이다. `truce`는 유효 휴전 설정 또는 null이다.
 
 `admin.world.requestSetting`은 `{expectedUserId,worldId,idempotencyKey,reason,setting}`을 받는다. `setting`은 다음 중 하나다.
 
@@ -143,11 +143,61 @@ API와 엔진 모두 월드 행을 장수 행보다 먼저 잠급니다. API는 
 | `admin.world.setEndYear` | `endYear` (1~10000 정수 또는 null) |
 | `admin.world.setTurnTerm` | `turnTermMinutes` (1~2147483647 정수) |
 | `admin.world.setOption` | `key`, `value` (프리셋과 같은 형식) |
+| `admin.world.setTruce` | `truce` (고정 UTC 오프셋·시작 분·종료 분 또는 null) |
 
-옵션 키는 `protection.foundUntilMonths`, `protection.peaceMonths`, `npc.aggression`, `boost.smallWorld`, `boost.lateJoin`이다. 명령 목록·NPC 충원 비율·장수 정원은 받지 않는다. 프리셋이 없는 월드의 규칙 변경은 엔진이 `NO_PRESET`으로 거절한다.
+규칙 옵션 키는 `protection.foundUntilMonths`, `protection.peaceMonths`, `npc.aggression`, `boost.smallWorld`, `boost.lateJoin`이다. 명령 목록·NPC 충원 비율·장수 정원은 받지 않는다. 프리셋이 없는 월드의 규칙 변경은 엔진이 `NO_PRESET`으로 거절한다.
 
 접수 응답과 `admin.world.settingRequest({expectedUserId,worldId,idempotencyKey})`는 `{requestId,kind,status,sequence,tick,result}`다. 접수 때는 PENDING이며 게임 설정을 바꾸지 않는다. 같은 사용자·월드·키·정규화한 내용은 같은 영수증을 반환하고 다른 내용은 409다. 완료 결과는 `{version:1,before,after}` 또는 `{code,message}`다. 이름·종료 연도·간격은 해당 필드의 사본, 옵션은 `{value}`를 전후 값으로 쓴다. `END_YEAR_PASSED`, `NO_PRESET`, `UNCHANGED`, `INVALID_VALUE`와 기존 운영 거절 코드를 받는다. 형식3의 RUNNING·PAUSED 월드만 접수한다.
 
 엔진은 처리 때 계정·관리자·제재를 다시 검사한다. 간격 변경은 DB 시각과 옛 간격으로 체크포인트를 확정하고 `clockRevision` 조건부 갱신으로 새 간격을 저장한다. 실행 중에는 기준 시각을 다시 잡고 정지 중에는 기준 시각을 유지한다. 재생 정책의 간격도 같은 입력 sequence에서 바꾸며 장수의 활동 tick은 보존한다. 규칙 옵션은 깊게 합쳐 로더·서버 미리보기·늦은 참가 보정에서 같은 값을 쓴다.
 
 초기화는 변경 이력의 전후 연결을 검사해 생성 당시 설정으로 새 판을 만든다. 새 판의 `runtimeOptions`는 null이다. 이름 변경 뒤 초기화 결과의 `confirmedName`은 확인한 현재 이름이며 `settings.name`은 생성 이름이다. 기존 초기화 기록에는 키를 추가하지 않는다. 조회와 입력 오류에는 운영 계정·비공개 사유를 공개하지 않는다.
+
+
+### 장수 생성 허용 (INT-24 PR2)
+
+`admin.world.requestSetting`의 옵션 키 `entry.generalCreation`은 `open`·`closed`를 받는다. 프리셋 없는 월드에서도 사용할 수 있으며 규칙 옵션과 서로 지우지 않는다. `admin.world.settings`는 `entry.generalCreation`을 함께 반환한다.
+
+`general.mine.creationRules.generalCreationEnabled`는 항상 boolean이고 기본값은 true다. 기존 장수 유무와 별도로 이 판의 생성 허용을 나타낸다. 로비의 기존 `createBlockedReason`은 닫힌 RUNNING 판에서 「지금은 새 장수를 받지 않습니다」를 반환한다. 기존 장수가 있으면 접속할 수 있고 차단 사유는 null이다. PAUSED·PREOPEN·ENDED는 기존 월드 상태 사유를 유지한다.
+
+닫힌 판의 새 생성 접수는 HTTP412(PRECONDITION_FAILED)와 「지금은 새 장수를 받지 않습니다.」 메시지를 반환하며 입력을 만들지 않는다. 이미 PENDING인 생성도 처리할 때 현재 값을 다시 읽고 REJECTED `ENTRY_CLOSED`로 확정한다. `general.mine.creation`에서 해당 코드와 문구를 복구할 수 있다. 다시 연 뒤에는 새 요청을 접수하며 이전 거절 기록을 바꾸지 않는다. 초기화는 생성 허용을 원래 기본값 open으로 돌린다.
+
+### NPC 장수 맡기 (T3-07 · AC-M3-14 · INT-24 PR3)
+
+`entry.npcPlay`는 기본 off이며 형식3에서 운영자가 on으로 바꾼 PREOPEN·RUNNING 판만 맡기를 받는다. PREOPEN 설정 허용은 이 키에만 한정하고 다른 설정은 RUNNING·PAUSED를 유지한다. 감독은 PREOPEN의 대기 설정·맡기를 발견해 실제 자식을 띄운다. 맡기는 시계·장수의 다음 턴 시각을 바꾸지 않는다. 다른 entry 키·규칙·명시한 휴전 null을 보존하며 초기화는 기본 off로 돌아간다.
+
+`entry.roles({worldId})`는 `gameDate`, 사람 수와 상한 null인 `quota`, `mine`, `roles`, `canPossess`, `blockedReason`을 반환한다. 군주·중견·부하·재야 목록에는 활성·생존·미제거·미소유 NPC의 ID·이름·초상·소속·위치·능력·관직만 담는다. 정치·매력은5능력치 판에서만 있으며 재야는 국가 추천도 받는다. 금·쌀·병력·예턴·계정 신원은 공개하지 않는다. 내 장수나 대기 입장 요청이 있거나 설정·월드 상태가 맞지 않으면 후보 목록은 비운다. `general.mine.creationRules`와 로비는 허용된 판에만 선택 키 `npcPlayEnabled:true`를 반환한다. 키가 없으면 꺼짐이다.
+
+`entry.possess({worldId,generalId,expectedUserId,idempotencyKey})`는 세션의 사용자로 대상 NPC를 요청한다. 완료 응답은 `{status:'possessed',generalId}`, 대기는 `{status:'pending'}`, 엔진 거절은 `{status:'rejected',rejectCode,message}`다. 최대5초 대기 뒤 `entry.possessStatus({worldId,expectedUserId,idempotencyKey})`로 회수한다. 거절 코드는 `TAKEN`, `ALREADY_HAS_GENERAL`, `NOT_ELIGIBLE`, `ENTRY_CLOSED`, `ACTOR_INACTIVE`, `ACTOR_SANCTIONED`다. 새 접수의 꺼진 설정은412, 같은 키의 다른 대상은409, 계정 전환은401, 남의 키·없는 대상은404, 입력 형식 오류는400이다.
+
+같은 키의 기존 기록은 새 자격 검사보다 먼저 회수한다. 성공 영수증은 현재 장수의 상세나 소유권을 뜻하지 않는다. 화면은 성공 뒤 `general.mine`을 다시 읽는다. 운영 해제·다른 계정의 재맡기 뒤 옛 키도 ID 영수증만 반환하며 새 사용자의 금·병력·예턴·계정은 읽지 않는다. 완료·거절·pending 응답 전 현재 세션·만료·ACTIVE·전역/월드 제재를 경과 시간을 포함해 다시 검사한다.
+
+대기 입력의 `generalId`는 null이고 payload는 `{generalId,userId}`다. 행위자는 서버가 정하며 엔진은 payload와 입력의 사용자도 대조한다. 실제 적용 때만 결과의 `generalId`에 대상을 채운다. 엔진은 현재 자격을 재검사하고 userId null·기존 revision 조건으로 소유권과 revision을 한 번 바꾼다. 군주의 국가 isNpc와 정책 활동 tick도 같은 트랜잭션에 저장한다. 기존30칸·명시 여부·장비·능력·자원·병력·위치·다음 턴 시각은 유지한다. 거주 앵커는 생성·계승과 분리한 엄격한 possession 출처로 새로 만들며 검증 없는 NPC→사람 전환은 계속 거부한다.
+
+맡기 로그는 기존 `GeneralLog`에 `kind:'possess'`, `commandKey:'general.possess'`로 남긴다. 인사 후처리 뒤 대상·sequence의 마지막 ordinal 다음을 쓰며 실제 턴 로그와 같은 tick에도 공존한다. `records.general`의30행 복합 커서와 home10행을 그대로 쓴다. rollback은 소유권·앵커·로그·완료 기록을 함께 되돌리고 재전송은 행을 늘리지 않는다. 순수 재생은 적용·거절 모두 엄격히 검증하며 형식1·5에는 새 kind를 받지 않는다. 맡기 자체는 장수 생성처럼 유산 직접 명령 활동에서 제외한다. 배포는 새 엔진을 먼저 올린다.
+
+### 휴전 설정과 예정 시각 (INT-24 PR4 · T4-40)
+
+`admin.world.setTruce`의 `truce`는 `{utcOffsetMinutes,startMinute,endMinute}` 또는 null이다. UTC 오프셋은 −720~840 정수, 시작·종료는 0~1439의 서로 다른 분이다. 매일 시작 포함·종료 제외로 반복하며 자정을 넘을 수 있다. 결과의 전후 값은 `{truce}`이며 재생은 기록을 검증한 뒤 게임 상태와 정책을 그대로 둔다.
+
+엔진은 간격 변경과 휴전 변경 모두 옛 유효 시계·DB 시각으로 체크포인트를 확정한 뒤 `clockRevision` 조건부 갱신으로 저장한다. 실행 중에는 기준 시각을 다시 잡고 정지 중에는 유지한다. `runtimeOptions.truce` 키가 있으면 null도 원본 프리셋보다 앞선다. 다른 옵션과 원본 프리셋은 보존하며 초기화는 원본 휴전을 복원한다.
+
+`world.summary.truce`와 시계 CLI의 `truce`는 설정 세 값에 `active`, `endsAt`, `nextStartsAt`, `nextEndsAt`을 더한 값 또는 null이다. 시각은 ISO 문자열이며 `endsAt`은 현재 휴전 중일 때만 있다. 정지·종료 여부와 별도로 벽시각의 구간을 나타낸다. 원본 프리셋과 비공개 운영 사유는 응답하지 않는다.
+
+`home.get.turnSchedule`은 개인 30칸의 `(string | null)[] | null`이다. 실행 중 실시간 시계와 기준 시각이 있을 때만 배열을 응답하며 칸 0은 `nextTurnAt`과 같다. Date 범위를 넘는 칸만 null이고 저장 설정 오류는 숨기지 않는다. 클라이언트는 휴전 경계를 다시 계산하지 않는다. 국가 직책 12칸의 무시각 계약은 바꾸지 않는다.
+
+## 군사 조언과 공지 지시 (T3-07 · AC-M3-13)
+
+`advice.get({worldId})`는 세션의 장수에게 `{basis:{tick,revision},items,skipped}`를 반환한다. `tick`은 현재 유효 시계, `revision`은 장수의 예턴 판이다. 명령 자격은 기존 `turns.precheck`처럼 다음 개인 턴 시각으로 검사한다. 현재 세션·ACTIVE·전역/월드 제재·소유 장수·작전·공지·상태를 같은 읽기 트랜잭션에서 확인한다. 장수가 없으면404이며 요청에 장수나 계정 ID를 넣을 수 없다.
+
+`items`는 최대3개다. 현재 같은 국가의 참여 중인 열린 작전, 자기 국가의 공지 지시, 공용 NPC 후보 순이다. 작전은 목표 시각·ID, NPC 후보는 점수 내림차순·명령 키·정규 JSON 인자로 정렬한다. 같은 명령과 인자는 먼저 나온 출처만 남긴다. 준비된 작전과 제안을 만들 수 없는 `noop`은 제외한다. 재야에게는 상성과 도시 수로 임관 국가를 추천한다. NPC 자동 행동의 사람 제외 조건과 난수 소비는 유지한다.
+
+각 항목은 `{source,commandKey,commandName,args,argsLabel,reason,score,nation}`이다. `source`는 `operation`·`notice`·`ai`, 점수는 NPC 후보에만 있고 나머지는 null이다. 재야의 `nation`은 `{id,name,color}`, 다른 항목은 null이다. 작전·공지 명령의 사전 검사 실패는 `skipped:[{source,commandKey,code,message}]`로 설명한다. 다른 국가의 공지나 작전, 참여자·계정 신원·비공개 수치는 반환하지 않는다.
+
+조회는 예턴·입력·로그·활동 기록을 바꾸지 않는다. 화면에서 추천을 고르면 기존 `turns.edit`의0번 칸 `put`과 revision 충돌 처리를 사용한다. 조언이 왔다는 이유로 기존 초안을 덮거나 자동 저장하지 않는다. 프론트 구현과 E2E는 T3-08의 별도 인수 대상이다.
+
+`notice.nation.set({worldId,body,directive?})`의 지시는 `{commandKey,args}` 또는 null이다. 생략하면 현재 지시를 보존하고 null이면 지운다. 현재 월드가 허용하는 일반 장수 명령과 실제 인자 스키마·저장 가능한 JSON만 받으며 국가 명령은 거절한다. 자원·위치 부족은 저장을 막지 않고 조언에서 사전 검사 실패로 설명한다. 기존 군주·참모 권한과 인증·동의·제재 검사는 유지한다.
+
+본문·지시·revision은 같은 트랜잭션에 저장하고 기존 `notice.updated`를 commit 뒤에 보낸다. 본문이 비어도 지시가 있으면 읽음 여부는 revision을 따른다. `notice.nation.get/set/markSeen`은 지시가 있을 때만 선택 키 `directive`를 반환하므로 이전 빈 공지 응답 모양은 유지된다. 손상된 저장 지시는500으로 드러내고 조회 중에 고쳐 쓰지 않는다.
+
+`Nation.noticeDirective`는 기존 공지와 같은 규칙 밖 metadata다. nullable JSONB 새 migration으로 추가하며 기존 행과 새 월드는 null이다. 엔진의 `loadWorld`·`readWorldState`, 서버의 `readView`에서 제외한다. 게임 해시·재생 원본·입력 종류·보상 활동에 추가하지 않는다. 실제 HTTP 권한과 공지·작전·롤백·불변성 검증은 `tools/t3-07-advice.integration.test.ts`에 있다. 백엔드 병합만으로 AC-M3-13 전체 완료를 뜻하지 않는다.

@@ -14,11 +14,11 @@ export type Truce = z.infer<typeof truceSchema>;
 const DAY = 86_400_000;
 const DATE_LIMIT = 8_640_000_000_000_000;
 function safe(value: number): number {
-  if (!Number.isSafeInteger(value)) throw new Error('휴전 계산의 안전 정수 범위를 넘었습니다.');
+  if (!Number.isSafeInteger(value)) throw new RangeError('휴전 계산의 안전 정수 범위를 넘었습니다.');
   return value;
 }
 function timestamp(value: number): number {
-  if (Math.abs(safe(value)) > DATE_LIMIT) throw new Error('휴전 시각의 저장 범위를 넘었습니다.');
+  if (Math.abs(safe(value)) > DATE_LIMIT) throw new RangeError('휴전 시각의 저장 범위를 넘었습니다.');
   return value;
 }
 function period(truce: Truce) {
@@ -63,6 +63,7 @@ export function truceWindow(at: number, truce: Truce) {
     active,
     endsAt: active ? timestamp(shift + days * DAY + length) : null,
     nextStartsAt: timestamp(shift + (days + 1) * DAY),
+    nextEndsAt: timestamp(shift + (days + 1) * DAY + length),
   };
 }
 

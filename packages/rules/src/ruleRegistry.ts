@@ -3,6 +3,7 @@ import type { WorldInit } from './world/bootstrap';
 import type { CommandDef } from './commands/types';
 import type { CommandResolver } from './commands/resolve';
 import { applyCreationInput, applyPolicyInput, applyTurnsInput } from './replayInputs';
+import { POSSESSION_KIND, applyPossessionInput } from './entry/possess';
 import {
   personnelFeature,
   policyFeature,
@@ -146,6 +147,7 @@ export const ruleRegistry: RuleRegistry = {
     { kind: ADMIN_RESET_KIND, feature: null, route: 'direct', directTick: true, apply: applyAdminResetRecord },
     { kind: 'turns.set', feature: null, route: 'direct', apply: applyTurnsInput },
     { kind: 'general.create', feature: null, route: 'queued', apply: applyCreationInput },
+    { kind: POSSESSION_KIND, feature: null, route: 'queued', apply: applyPossessionInput },
     { kind: 'general.setPolicy', feature: 'policy', route: 'queued', apply: applyPolicyInput },
     { kind: 'general.active', feature: 'policy', route: 'queued', apply: applyPolicyInput },
     ...personnelInputKinds,
