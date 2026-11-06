@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { expect, test, type Page, type Worker } from '@playwright/test';
 import {
   simulateBattle,
@@ -6,6 +7,7 @@ import {
   type UnitSetResource,
 } from '../packages/rules/src/index';
 import { createRng } from '../packages/shared/src/index';
+import { initializeResources } from '../tools/init-resources';
 import { initializeSan10Resources } from '../tools/san10-resources';
 import { appOrigin, createAccount, withE2eDb } from './account';
 import { e2eFeatureWorld, e2eWorld, setTurns, turns, waitTurnWindow } from './game';
@@ -405,7 +407,14 @@ test('375px 폭에서 시뮬레이터 본문이 넘치지 않고 누르는 대�
 
 test('T4-86 AC-P2-26 확장 병종표 월드에서 시뮬레이터와 개인 예턴이 그 월드의 병종표를 쓴다', async ({ browser }) => {
   test.setTimeout(240_000);
-  await withE2eDb((db) => initializeSan10Resources(db));
+  await withE2eDb(async (db) => {
+    // SAN10 통합은 기존 core UNIT_SET/basic 행 해시를 먼저 확인하므로 공식 core 준비부터 멱등으로 실행한다.
+    await initializeResources(
+      db,
+      await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
+    );
+    await initializeSan10Resources(db);
+  });
   const worldId = await e2eFeatureWorld([], {
     resources: ['--scenario', 'san10-191', '--map', 'san10', '--unit-set', 'expanded'],
   });
