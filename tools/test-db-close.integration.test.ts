@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, beforeEach, expect, it as test } from 'vitest';
 import { testDatabaseUrl } from './test-database';
-import { confirmDisconnectedDatabase } from './test-db-close';
+import { confirmDisconnectedDatabase, observeDisconnectedDatabase } from './test-db-close';
 
 type Client = {
   connect(): Promise<void>;
@@ -130,7 +130,11 @@ for (const mode of ['delayed', 'lingering', 'lingering-two', 'wrong-oid'] as con
         expect(result.observations).toBeGreaterThan(0);
         expect(result.connections).toBe(0);
       } else if (mode === 'lingering' || mode === 'lingering-two') {
-        await expect(confirmDisconnectedDatabase(admin, name, oid)).rejects.toThrow('연결이 남아');
+        await expect(confirmDisconnectedDatabase(admin, name, oid)).rejects.toMatchObject({
+          reason: 'still-connected',
+          message: expect.stringContaining('연결이 남아'),
+          connections: ownedPids.length,
+        });
         expect((await admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname=$1', [name])).rows).toEqual([
           { oid },
         ]);
@@ -147,9 +151,10 @@ for (const mode of ['delayed', 'lingering', 'lingering-two', 'wrong-oid'] as con
       } else {
         await held.end();
         connected = false;
-        await expect(confirmDisconnectedDatabase(admin, name, String(BigInt(oid) + 1n))).rejects.toThrow(
-          '식별자가 달라',
-        );
+        await expect(confirmDisconnectedDatabase(admin, name, String(BigInt(oid) + 1n))).rejects.toMatchObject({
+          reason: 'identity-changed',
+          message: expect.stringContaining('식별자가 달라'),
+        });
         expect((await admin.query('SELECT oid::text AS oid FROM pg_database WHERE datname=$1', [name])).rows).toEqual([
           { oid },
         ]);
@@ -191,3 +196,42 @@ for (const mode of ['delayed', 'lingering', 'lingering-two', 'wrong-oid'] as con
     if (bodyError || errors.length)
       throw new AggregateError([...(bodyError ? [bodyError] : []), ...errors], 'DB 종료 관측 시험 실패');
   });
+
+it('연결 또는 식별자 조회 실패는 재시도 없이 고정 오류로 남긴다', async () => {
+  for (const phase of ['count', 'oid'] as const) {
+    let calls = 0;
+    const fail = async () => {
+      calls++;
+      throw new Error('private-sentinel');
+    };
+    const error = await observeDisconnectedDatabase(
+      'db_close_query_test',
+      '1',
+      phase === 'count' ? fail : async () => 0,
+      phase === 'oid' ? fail : async () => '1',
+    ).catch((error: unknown) => error);
+    expect(calls).toBe(1);
+    expect(error).toMatchObject({ reason: 'query-failed', message: '시험 DB 상태를 조회하지 못했습니다.' });
+    expect(String(error)).not.toContain('private-sentinel');
+  }
+});
+
+it('잘못된 연결 수와 행 개수는 0으로 취급하지 않는다', async () => {
+  for (const count of ['01', 'x', '', -1, null, undefined, Number.MAX_SAFE_INTEGER + 1]) {
+    await expect(
+      observeDisconnectedDatabase(
+        'db_close_invalid_test',
+        '1',
+        async () => count,
+        async () => '1',
+      ),
+    ).rejects.toMatchObject({ reason: 'invalid-count' });
+  }
+  await expect(
+    confirmDisconnectedDatabase(
+      { query: async () => ({ rows: [{ count: 0 }, { count: 0 }] }) },
+      'db_close_rows_test',
+      '1',
+    ),
+  ).rejects.toMatchObject({ reason: 'invalid-count' });
+});
