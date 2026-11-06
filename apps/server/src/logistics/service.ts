@@ -13,6 +13,7 @@ import {
 } from '@opensamguk/rules';
 import type { LogisticsIdentity, LogisticsRequest, LogisticsSnapshot, LogisticsStore } from './ports';
 import { logisticsBoardInput, logisticsRequestInput, logisticsSubmitInput } from './schemas';
+import { recruitmentAvailability } from '../game/recruitment';
 
 type FailureCode = 'UNAUTHORIZED' | 'NOT_FOUND' | 'FORBIDDEN' | 'BAD_REQUEST' | 'CONFLICT' | 'PRECONDITION_FAILED';
 export class LogisticsServiceError extends Error {
@@ -130,7 +131,8 @@ export async function readLogisticsBoard(store: LogisticsStore, identity: Logist
   const specialty = state.logistics.config.specialties.find((row) => row.cityKey === city.cityKey) ?? null;
   if (!own) return { ...base, visible: true as const, own: false as const, specialty };
   const config = state.logistics.config,
-    stock = state.logistics.cities[String(city.cityKey)]!;
+    stock = state.logistics.cities[String(city.cityKey)]!,
+    unitSet = unitSetSchema.parse(world.unitSet);
   const settling = world.clockTick >= world.monthlyTick + TICKS_PER_MONTH;
   const year = state.startYear + Math.floor(world.clockTick / (12 * TICKS_PER_MONTH));
   const canManage =
@@ -175,10 +177,10 @@ export async function readLogisticsBoard(store: LogisticsStore, identity: Logist
     capacity: logisticsCapacity(config, stock.level),
     used: logisticsTotal(stock),
     gold: state.cityResources!.cities[String(city.cityKey)]!.gold,
-    recruitUnits: unitSetSchema
-      .parse(world.unitSet)
-      .crewTypes.filter((unit) => unit.armType > 0)
+    recruitUnits: unitSet.crewTypes
+      .filter((unit) => unit.armType > 0)
       .map(({ id, armType, name }) => ({ id, armType, name })),
+    ...recruitmentAvailability(unitSet, state, { generalId: actor.id, tick: world.clockTick }),
     costs: structuredClone({
       upgrade: config.upgrade,
       capacity: config.capacity,
