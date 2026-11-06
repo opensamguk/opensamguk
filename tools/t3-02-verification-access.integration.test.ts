@@ -182,8 +182,8 @@ describe('T3-02 AC-M3-01 실제 PostgreSQL·HTTP 이메일 인증 차단', () =>
     });
   });
 
-  it('44개 변경 API가 미인증·위조·무인증·제재를 거부하고 운영 권한 거절 감사 두 행만 남긴다', async () => {
-    expect(paths).toHaveLength(44);
+  it('45개 변경 API가 미인증·위조·무인증·제재를 거부하고 운영 권한 거절 감사 두 행만 남긴다', async () => {
+    expect(paths).toHaveLength(45);
     expect(paths).toContain('entry.possess');
     expect(paths).toContain('admin.game.request');
     expect(paths).toContain('admin.world.requestSetting');
@@ -199,7 +199,12 @@ describe('T3-02 AC-M3-01 실제 PostgreSQL·HTTP 이메일 인증 차단', () =>
     expect(paths).toContain('cityResources.allocate');
     expect(paths).toContain('admin.world.create');
     expect(paths).toEqual(
-      expect.arrayContaining(['resourceAdmin.clone', 'resourceAdmin.save', 'resourceAdmin.publish']),
+      expect.arrayContaining([
+        'resourceAdmin.clone',
+        'resourceAdmin.save',
+        'resourceAdmin.publish',
+        'resourceAdmin.discard',
+      ]),
     );
 
     expect(paths).toContain('admin.world.requestEnd');

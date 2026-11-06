@@ -1338,9 +1338,8 @@ it('AC-M3-04 D2 실제 --world 엔진 INSERT 대기 중 SIGKILL은 PENDING과 �
     expect(child.child.kill('SIGKILL')).toBe(true);
     await checked(child.stop);
     expect(child.signal === 'SIGKILL' || (typeof child.code === 'number' && child.code !== 0)).toBe(true);
-    await checked(() =>
-      expect.poll(() => fullFootprint(['EngineLease', 'EngineHeartbeat']), { timeout: 5000 }).toBe(before),
-    );
+    const after = await fullFootprint(['EngineLease', 'EngineHeartbeat']);
+    expect(after).toBe(before);
     expect(await eventFor(payload)).toMatchObject({ status: 'PENDING', sequence: null, tick: null, result: null });
     expect(await checked(() => db.world.count({ where: { id: crashPlanned } }))).toBe(0);
   } catch (error) {

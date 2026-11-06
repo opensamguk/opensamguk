@@ -68,9 +68,16 @@ interface Fixture {
 
 const draftMigration = '20261118000000_game_resource_draft_cas';
 const singleDraftMigration = '20261119000000_game_resource_single_draft';
+const discardMigration = '20261126000000_game_resource_draft_discard';
 
 async function createFixture(
-  config: { beforeCatalog?: boolean; beforeDrafts?: boolean; beforeSingleDraft?: boolean; initialize?: boolean } = {},
+  config: {
+    beforeCatalog?: boolean;
+    beforeDrafts?: boolean;
+    beforeSingleDraft?: boolean;
+    beforeDiscard?: boolean;
+    initialize?: boolean;
+  } = {},
 ): Promise<Fixture> {
   if (!process.env.TEST_DATABASE_URL) throw new Error('전용 TEST_DATABASE_URL이 필요합니다.');
   const reference = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
@@ -173,7 +180,9 @@ async function createFixture(
         ? draftMigration
         : config.beforeSingleDraft
           ? singleDraftMigration
-          : undefined;
+          : config.beforeDiscard
+            ? discardMigration
+            : undefined;
     for (const migration of migrations.filter((entry) => before === undefined || entry.name < before)) {
       await native.query(migration.sql);
     }
@@ -196,7 +205,13 @@ async function createFixture(
 
 async function withDatabase(
   action: (fixture: Fixture) => Promise<void>,
-  config: { beforeCatalog?: boolean; beforeDrafts?: boolean; beforeSingleDraft?: boolean; initialize?: boolean } = {},
+  config: {
+    beforeCatalog?: boolean;
+    beforeDrafts?: boolean;
+    beforeSingleDraft?: boolean;
+    beforeDiscard?: boolean;
+    initialize?: boolean;
+  } = {},
 ) {
   const fixture = await createFixture(config);
   let failure: unknown;
@@ -644,12 +659,23 @@ it.each([
 });
 
 it('A2 폐기 정책 전에는 초안을 삭제하지 못한다', async () => {
+  await withDatabase(
+    async ({ db }) => {
+      const draft = await createDraft(db);
+      await expect(db.gameResource.delete({ where: { id: draft.id } })).rejects.toThrow(
+        'Draft game resources cannot be deleted',
+      );
+      expect(await db.gameResource.findUniqueOrThrow({ where: { id: draft.id } })).toEqual(draft);
+    },
+    { beforeDiscard: true },
+  );
+});
+
+it('AC-P2-27 D-071 migration 뒤에는 초안만 삭제할 수 있다', async () => {
   await withDatabase(async ({ db }) => {
     const draft = await createDraft(db);
-    await expect(db.gameResource.delete({ where: { id: draft.id } })).rejects.toThrow(
-      'Draft game resources cannot be deleted',
-    );
-    expect(await db.gameResource.findUniqueOrThrow({ where: { id: draft.id } })).toEqual(draft);
+    await db.gameResource.delete({ where: { id: draft.id } });
+    expect(await db.gameResource.findUnique({ where: { id: draft.id } })).toBeNull();
   });
 });
 

@@ -6,15 +6,16 @@ import type { Context } from '../context';
 import { databaseTime } from '../messaging';
 import { requireResourceEditor } from './access';
 import { checkContent, measureJson, RESOURCE_PAYLOAD_LIMITS, type Content } from './payload';
-import { getResource, listResources, type ResourceListInput, type ResourceMeta } from './read';
+import { getResource, listResources, resourceName, type ResourceListInput, type ResourceMeta } from './read';
+import { lockValidationResources, readValidationContext, resourceRevision, validationContext } from './context';
 import { publishVerdict } from './verdict';
 
-const revision = z.number().int().min(0).max(2_147_483_646);
 export const getResourceInput = z.strictObject({ id: z.uuid() });
-export const cloneResourceInput = z.strictObject({ sourceId: z.uuid() });
+export const cloneResourceInput = z.strictObject({ sourceId: z.uuid(), name: resourceName.optional() });
 export const saveResourceInput = z.strictObject({
   id: z.uuid(),
-  revision,
+  revision: resourceRevision,
+  context: validationContext.optional(),
   content: z.unknown().transform((input, ctx) => {
     const checked = checkContent(input, RESOURCE_PAYLOAD_LIMITS);
     if (checked.ok) return checked.content;
@@ -24,7 +25,13 @@ export const saveResourceInput = z.strictObject({
 });
 export const publishResourceInput = z.strictObject({
   id: z.uuid(),
-  revision,
+  revision: resourceRevision,
+  context: validationContext.optional(),
+  reason: z.string().trim().min(1).max(200),
+});
+export const discardResourceInput = z.strictObject({
+  id: z.uuid(),
+  revision: resourceRevision,
   reason: z.string().trim().min(1).max(200),
 });
 const cloneUniqueViolation = z.object({
@@ -54,35 +61,34 @@ async function resourceMutation<T>(ctx: Context, action: (tx: Prisma.Transaction
   }
 }
 
-async function lockResource(tx: Prisma.TransactionClient, id: string) {
-  await tx.$queryRaw`SELECT id FROM "GameResource" WHERE id=${id} FOR UPDATE`;
-  return getResource(tx, id, RESOURCE_PAYLOAD_LIMITS);
-}
-
 async function audit(
   tx: Prisma.TransactionClient,
   actorUserId: string,
   action: string,
   before: ResourceMeta | null,
-  after: ResourceMeta,
+  after: ResourceMeta | null,
   reason?: string,
+  details: Prisma.InputJsonObject = {},
 ) {
+  const target = after ?? before;
+  if (!target) throw new Error('감사 대상 자원이 없습니다.');
   await tx.auditLog.create({
     data: {
       actorKind: 'ADMIN',
       actorUserId,
       action,
       targetType: 'GameResource',
-      targetId: after.id,
+      targetId: target.id,
       reason: reason ?? null,
       payload: {
-        kind: after.kind,
-        name: after.name,
-        version: after.version,
+        kind: target.kind,
+        name: target.name,
+        version: target.version,
         beforeHash: before?.contentHash ?? null,
-        afterHash: after.contentHash,
+        afterHash: after?.contentHash ?? null,
         beforeRevision: before?.revision ?? null,
-        afterRevision: after.revision,
+        afterRevision: after?.revision ?? null,
+        ...details,
       },
     },
   });
@@ -109,29 +115,43 @@ export async function cloneResource(ctx: Context, input: z.infer<typeof cloneRes
       const source = await getResource(tx, input.sourceId, RESOURCE_PAYLOAD_LIMITS);
       if (source.meta.status !== 'PUBLISHED')
         throw new TRPCError({ code: 'BAD_REQUEST', message: '게시한 판만 복제할 수 있습니다.' });
-      const { kind, name } = source.meta;
+      const { kind } = source.meta;
+      const name = input.name ?? source.meta.name;
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`resource:${kind}:${name}`}, 0))`;
+      const renamed = name !== source.meta.name;
+      if (renamed && (await tx.gameResource.count({ where: { kind, name } })) > 0)
+        return { ok: false as const, reason: 'NAME_TAKEN' as const };
       const draft = await tx.gameResource.findFirst({ where: { kind, name, status: 'DRAFT' }, select: { id: true } });
       if (draft) return { ok: false as const, reason: 'DRAFT_EXISTS' as const, draftId: draft.id };
       const latest = await tx.gameResource.aggregate({ where: { kind, name }, _max: { version: true } });
-      const version = (latest._max.version ?? 0) + 1;
+      const version = renamed ? 1 : (latest._max.version ?? 0) + 1;
       if (version > 2_147_483_647)
         throw new TRPCError({ code: 'BAD_REQUEST', message: '자원 판 번호의 상한에 도달했습니다.' });
+      const copied =
+        renamed && ['MAP', 'SCENARIO', 'UNIT_SET'].includes(kind) ? { ...source.content, id: name } : source.content;
+      const checked = checkContent(copied, RESOURCE_PAYLOAD_LIMITS);
+      if (!checked.ok)
+        throw new TRPCError({ code: 'BAD_REQUEST', message: '새 이름을 적용한 자원의 크기를 확인하세요.' });
       const created = await tx.gameResource.create({
         data: {
           kind,
           name,
           version,
           status: 'DRAFT',
-          content: source.content,
-          contentHash: source.meta.contentHash,
+          content: checked.content,
+          contentHash: hashState(checked.content),
           source: source.meta.source,
           createdBy: actorUserId,
         },
         select: { id: true },
       });
       const { meta } = await getResource(tx, created.id, RESOURCE_PAYLOAD_LIMITS);
-      await audit(tx, actorUserId, 'resource.clone', null, meta);
+      await audit(tx, actorUserId, 'resource.clone', null, meta, undefined, {
+        sourceId: source.meta.id,
+        sourceName: source.meta.name,
+        sourceVersion: source.meta.version,
+        sourceHash: source.meta.contentHash,
+      });
       return { ok: true as const, meta };
     });
   } catch (error) {
@@ -140,8 +160,11 @@ export async function cloneResource(ctx: Context, input: z.infer<typeof cloneRes
     return ctx.db.$transaction(async (tx) => {
       await requireResourceEditor(tx, ctx, false);
       const source = await getResource(tx, input.sourceId, RESOURCE_PAYLOAD_LIMITS);
+      const name = input.name ?? source.meta.name;
+      if (name !== source.meta.name && (await tx.gameResource.count({ where: { kind: source.meta.kind, name } })) > 0)
+        return { ok: false as const, reason: 'NAME_TAKEN' as const };
       const draft = await tx.gameResource.findFirst({
-        where: { kind: source.meta.kind, name: source.meta.name, status: 'DRAFT' },
+        where: { kind: source.meta.kind, name, status: 'DRAFT' },
         select: { id: true },
       });
       if (draft) return { ok: false as const, reason: 'DRAFT_EXISTS' as const, draftId: draft.id };
@@ -153,11 +176,13 @@ export async function cloneResource(ctx: Context, input: z.infer<typeof cloneRes
 export async function saveResource(ctx: Context, input: z.infer<typeof saveResourceInput>) {
   return resourceMutation(ctx, async (tx) => {
     const actorUserId = await requireResourceEditor(tx, ctx, true);
-    const before = await lockResource(tx, input.id);
+    const before = await lockValidationResources(tx, input.id, input.context);
     if (before.meta.status === 'PUBLISHED')
       return { ok: false as const, reason: 'PUBLISHED' as const, meta: before.meta };
     if (before.meta.revision !== input.revision)
       return { ok: false as const, reason: 'STALE' as const, meta: before.meta };
+    const context = await readValidationContext(tx, before.meta, input.context);
+    if (!context.ok) return { ok: false as const, reason: 'CONTEXT_STALE' as const, meta: before.meta };
     if (input.revision === 2_147_483_646)
       throw new TRPCError({
         code: 'BAD_REQUEST',
@@ -168,7 +193,7 @@ export async function saveResource(ctx: Context, input: z.infer<typeof saveResou
     if (!checked.ok) throw new TRPCError({ code: 'BAD_REQUEST', message: '자원 내용의 형식과 크기를 확인하세요.' });
     const content: Content = checked.content;
     const contentHash = hashState(content),
-      report = publishVerdict(before.meta.kind, content).report;
+      report = publishVerdict(before.meta.kind, content, context.verdict).report;
     await tx.gameResource.update({
       where: { id: input.id, revision: input.revision, status: 'DRAFT' },
       data: {
@@ -180,7 +205,15 @@ export async function saveResource(ctx: Context, input: z.infer<typeof saveResou
       },
     });
     const { meta } = await getResource(tx, input.id, RESOURCE_PAYLOAD_LIMITS);
-    await audit(tx, actorUserId, 'resource.save', before.meta, meta);
+    await audit(
+      tx,
+      actorUserId,
+      'resource.save',
+      before.meta,
+      meta,
+      undefined,
+      input.context === undefined ? {} : { context: context.selected },
+    );
     return { ok: true as const, meta, report };
   });
 }
@@ -189,22 +222,44 @@ export async function publishResource(ctx: Context, input: z.infer<typeof publis
   return resourceMutation(ctx, async (tx) => {
     const actorUserId = await requireResourceEditor(tx, ctx, true);
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended('resource:publish', 0))`;
-    const before = await lockResource(tx, input.id);
+    const before = await lockValidationResources(tx, input.id, input.context);
     if (before.meta.status === 'PUBLISHED')
       return { ok: false as const, reason: 'PUBLISHED' as const, meta: before.meta };
     if (before.meta.revision !== input.revision)
       return { ok: false as const, reason: 'STALE' as const, meta: before.meta };
+    const context = await readValidationContext(tx, before.meta, input.context);
+    if (!context.ok) return { ok: false as const, reason: 'CONTEXT_STALE' as const, meta: before.meta };
     if (['MAP', 'SCENARIO', 'UNIT_SET'].includes(before.meta.kind) && before.content.id !== before.meta.name)
       return { ok: false as const, reason: 'ID_MISMATCH' as const };
-    // 지도·시나리오는 문맥 계약 확정 전까지 기존 검증기의 incomplete 결과로 게시를 막는다.
-    const verdict = publishVerdict(before.meta.kind, before.content);
+    const verdict = publishVerdict(before.meta.kind, before.content, context.verdict);
     if (!verdict.publishable) return { ok: false as const, reason: 'NOT_PASS' as const, report: verdict.report };
     await tx.gameResource.update({
       where: { id: input.id, revision: input.revision, status: 'DRAFT' },
       data: { status: 'PUBLISHED', publishedBy: actorUserId, publishedAt: await databaseTime(tx) },
     });
     const { meta } = await getResource(tx, input.id, RESOURCE_PAYLOAD_LIMITS);
-    await audit(tx, actorUserId, 'resource.publish', before.meta, meta, input.reason);
+    await audit(
+      tx,
+      actorUserId,
+      'resource.publish',
+      before.meta,
+      meta,
+      input.reason,
+      input.context === undefined ? {} : { context: context.selected },
+    );
     return { ok: true as const, meta, report: verdict.report };
+  });
+}
+
+export async function discardResource(ctx: Context, input: z.infer<typeof discardResourceInput>) {
+  return resourceMutation(ctx, async (tx) => {
+    const actorUserId = await requireResourceEditor(tx, ctx, true);
+    const { meta } = await lockValidationResources(tx, input.id);
+    if (meta.status === 'PUBLISHED') return { ok: false as const, reason: 'PUBLISHED' as const, meta };
+    if (meta.revision !== input.revision) return { ok: false as const, reason: 'STALE' as const, meta };
+    await tx.gameResource.delete({ where: { id: input.id, revision: input.revision, status: 'DRAFT' } });
+    await audit(tx, actorUserId, 'resource.discard', meta, null, input.reason);
+    const { id, kind, name, version, revision, contentHash } = meta;
+    return { ok: true as const, discarded: { id, kind, name, version, revision, contentHash } };
   });
 }
