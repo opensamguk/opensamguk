@@ -332,6 +332,7 @@ export function prepareInitialWorld(
       await tx.nation.update({
         where: { worldId_id: { worldId, id: nation.id } },
         data: { capitalCityKey: nation.capitalCityKey },
+        select: { id: true },
       });
     }
     await tx.general.createMany({
