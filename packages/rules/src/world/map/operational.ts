@@ -21,7 +21,7 @@ const site = z.discriminatedUnion('kind', [
     kind: z.literal('CITY'),
     anchorKey: anchor,
     legacyCityId: anchor.optional(),
-    level: z.number().int().min(1).max(8),
+    level: z.number().int().min(0).max(9),
     region: z.number().int().min(1).max(16),
     initial: values,
     max: values,

@@ -14,6 +14,7 @@ import {
   attachOperationalKinds,
   readCampaignState,
   readCityResourcesState,
+  readCityRuins,
   checkReplayOrigin,
   campaignArmyTypes,
   readLogisticsOriginConfig,
@@ -129,6 +130,15 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
       throw new Error('도시 자원의 생성 기록과 운영 병종이 다릅니다.');
     state.cityResources = readCityResourcesState(world.cityResourcesState, state, campaignArmyTypes(origin.initial));
   } else if (world.cityResourcesState != null) throw new Error('도시 자원 기능을 끈 월드에 저장 상태가 있습니다.');
+  if (world.ruleFeatures.includes('city-scale-v1')) {
+    const origin: unknown = world.replayOrigin;
+    checkReplayOrigin(origin);
+    if (world.replayFormat !== 3 || origin.version !== 3 || !origin.initial.ruleFeatures?.includes('city-scale-v1'))
+      throw new Error('폐허의 재생 형식이나 생성 원장이 다릅니다.');
+    const cityRuins = readCityRuins(world.cityRuinsState, state, origin.initial.cityScale);
+    if (!cityRuins) throw new Error('폐허 복구 상태가 없습니다.');
+    state.cityRuins = cityRuins;
+  } else if (world.cityRuinsState != null) throw new Error('도시 규모 기능을 끈 월드에 폐허 상태가 있습니다.');
   if (world.ruleFeatures.includes('logistics-v1')) {
     const config = readLogisticsOriginConfig(world, state);
     state.logistics = readLogisticsState(world.logisticsState, state);

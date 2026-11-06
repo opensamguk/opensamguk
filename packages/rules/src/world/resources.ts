@@ -7,7 +7,7 @@ const name = z.string().min(1);
 export const portraitMapSchema = z.object({
   portraits: z.record(name, z.number().int().min(10001).max(11008)),
 });
-const cityValues = z.object({
+export const cityValues = z.object({
   population: natural,
   agriculture: natural,
   commerce: natural,
@@ -40,6 +40,19 @@ export const scenarioSchema = z.object({
   id: name,
   title: name,
   startYear: natural,
+  cityScale: z
+    .strictObject({
+      cities: z
+        .array(
+          z
+            .strictObject({ city: name, level: natural.max(9).optional(), ruin: z.literal(true).optional() })
+            .refine((row) => row.level !== undefined || row.ruin === true, '도시 규모나 폐허 상태를 지정하세요.'),
+        )
+        .min(1)
+        .max(300)
+        .refine((rows) => new Set(rows.map((row) => row.city)).size === rows.length, '도시 규모 지정이 겹칩니다.'),
+    })
+    .optional(),
   generalStats: z
     .array(
       z.strictObject({

@@ -170,6 +170,7 @@ const processPersonnelInput: QueuedInputHandler = async (tx, world, event, { tic
 };
 
 export const builtInEngineFeatures: readonly EngineFeature[] = [
+  { key: 'city-scale-v1' },
   {
     key: 'stratagem-cards-v1',
     queuedInputs: { 'stratagem-cards.act': processStratagemCardsInput },

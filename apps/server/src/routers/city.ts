@@ -4,6 +4,7 @@ import { entityKey, readWorld, viewerGeneral, worldInput } from '../queries';
 import { cityInfo, garrisonGeneralInfo } from '../visibility';
 import { readView } from '../game/queries';
 import { LINEAGE_EXITED_YEAR } from '@opensamguk/rules';
+import { readCityScaleProjection } from '../game/cityScale';
 
 export const cityRouter = router({
   get: protectedProcedure.input(worldInput.extend({ cityKey: entityKey }).strict()).query(({ ctx, input }) =>
@@ -23,8 +24,10 @@ export const cityRouter = router({
       const units = world.ruleFeatures.includes('campaign-v1')
         ? (await readView(tx, input.worldId)).campaign!.units
         : undefined;
+      const ruins = await readCityScaleProjection(tx, input.worldId, world.ruleFeatures);
       return {
         ...cityInfo(city, viewer),
+        ...(ruins ? { ruin: ruins.get(city.cityKey) ?? null } : {}),
         ...(units === undefined ? {} : { campaignEnabled: true as const }),
         ...(world.ruleFeatures.includes('five-stats') ? { fiveStats: true as const } : {}),
         generals: generals.map((general) => garrisonGeneralInfo(general, viewer, units)),

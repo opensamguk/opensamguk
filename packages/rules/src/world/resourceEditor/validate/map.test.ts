@@ -75,7 +75,7 @@ const cases: Array<[ResourceIssueCode, (map: MapResourceV2) => void, IssueTarget
   [
     'city-level-range',
     (m) => {
-      m.cities[0]!.level = 9;
+      m.cities[0]!.level = 10;
     },
     city,
   ],
@@ -321,7 +321,7 @@ describe('AC-P2-27 지도 검증', () => {
   it('오류 순서는 전체·도시·연결망·지형·경고·다른 자원이며 입력을 바꾸지 않는다', () => {
     const map = mapFixture();
     map.canvas.width = 701;
-    map.cities[0]!.level = 9;
+    map.cities[0]!.level = 10;
     map.cities.forEach((c) => {
       c.connections = [];
     });

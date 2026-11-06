@@ -205,6 +205,10 @@ const publicMapData = z.object({
       name: z.string(),
       level: z.number().int(),
       kind: z.enum(['CITY', 'PASS']).optional(),
+      ruin: z
+        .object({ percent: z.union([z.literal(10), z.literal(40), z.literal(70)]) })
+        .nullable()
+        .optional(),
       x: z.number(),
       y: z.number(),
       nationId: z.number().int().nullable(),

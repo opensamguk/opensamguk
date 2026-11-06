@@ -1,6 +1,7 @@
 import { parseMapInput, type MapInput } from '../map/format';
 import { operationalAnchors } from '../map/anchors';
 import { scenarioSchema, type ScenarioResource } from '../resources';
+import { resolveCityScale } from '../map/cityScale';
 import { addShapeIssues, issue, ReportBuilder, type ResourceReport } from './issues';
 import { scanLimits } from './limits';
 
@@ -68,6 +69,12 @@ export function validateScenario(input: unknown, ctx?: { map?: unknown }): Resou
   }
   out.did('map-refs');
   const cities = 'version' in map && map.version === 3 ? operationalAnchors(map) : map.cities;
+  if (scenario.cityScale)
+    try {
+      resolveCityScale(cities, scenario.cityScale.cities);
+    } catch {
+      out.add(issue('city-scale-invalid', { kind: 'path', path: ['cityScale'] }));
+    }
   const names = new Set(cities.map((city) => city.name));
   scenario.nation.forEach((nation, index) => {
     if (

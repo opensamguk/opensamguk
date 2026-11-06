@@ -22,6 +22,7 @@ export interface AssignmentOffer {
 export type OfficeTurns = Record<number, Record<number, { commandKey: string; args: unknown }[]>>;
 export type OfficeRevisions = Record<number, Record<number, { revision: number; tenure: number }>>;
 export interface WorldState {
+  cityRuins?: import('../cityScale/state').CityRuinsState;
   equipment?: EquipmentState;
   stratagemCards?: StratagemCardsState;
   lineage?: LineageState;

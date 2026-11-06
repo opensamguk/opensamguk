@@ -3,6 +3,7 @@ import { nextTurnAt, turnSchedule, readWorld, requireGeneral, worldInput } from 
 import { cityInfo, ownGeneralInfo, logInfo, logSelect, nationInfo } from '../visibility';
 import { policyOptions } from '@opensamguk/rules';
 import { displaySlots, readSlots } from '../game/slots';
+import { readCityScaleProjection } from '../game/cityScale';
 
 export const homeRouter = router({
   get: protectedProcedure.input(worldInput).query(({ ctx, input }) =>
@@ -21,6 +22,7 @@ export const homeRouter = router({
               },
             });
       const turns = displaySlots(await readSlots(tx, input.worldId, general.id));
+      const ruins = await readCityScaleProjection(tx, input.worldId, world.ruleFeatures);
       const logs = await tx.generalLog.findMany({
         where: { worldId: input.worldId, generalId: general.id },
         orderBy: [{ tick: 'desc' }, { id: 'desc' }],
@@ -35,7 +37,7 @@ export const homeRouter = router({
             return { key: option.key, name: option.name };
           })(),
         },
-        city: cityInfo(city, general),
+        city: { ...cityInfo(city, general), ...(ruins ? { ruin: ruins.get(city.cityKey) ?? null } : {}) },
         nation:
           nation === null
             ? null

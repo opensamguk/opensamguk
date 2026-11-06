@@ -7,6 +7,7 @@ import type { WorldState, WorldExt } from '../model/world';
 import { operationalMapSchema, type OperationalMapResource } from './map/operational';
 import { operationalAnchors } from './map/anchors';
 import { validateMap } from './validate/map';
+import { CITY_SCALE_FEATURE, resolveCityScale, type CityScaleRecord } from './map/cityScale';
 
 export interface InitialCity {
   kind?: 'CITY' | 'PASS';
@@ -90,6 +91,7 @@ export interface InitialDiplomacy {
 }
 
 export interface WorldInit {
+  cityScale?: CityScaleRecord;
   operationalMap?: OperationalMapResource;
   presetRules?: PresetRules;
   ruleFeatures?: string[];
@@ -124,8 +126,12 @@ export function buildInitialWorld(input: {
       : undefined;
   if (operational && validateMap(operational, { scenarios: [] }).status !== 'pass')
     throw new Error('운영 지도의 연결망을 확인하세요.');
-  const map = operational ? { ...operational, cities: operationalAnchors(operational) } : mapSchema.parse(input.map);
   const scenario = scenarioSchema.parse(input.scenario);
+  const sourceMap = operational
+    ? { ...operational, cities: operationalAnchors(operational) }
+    : mapSchema.parse(input.map);
+  const scaled = resolveCityScale(sourceMap.cities, scenario.cityScale?.cities);
+  const map = { ...sourceMap, cities: scaled.cities };
   const unitSet = unitSetSchema.parse(input.unitSet);
   if (unitSet.regionScheme !== undefined && unitSet.regionScheme !== operational?.regionScheme)
     throw new Error('지도와 병종 판의 지역 기준이 다릅니다.');
@@ -298,9 +304,16 @@ export function buildInitialWorld(input: {
     });
   }
   return {
-    ...(five || operational
-      ? { ruleFeatures: [...(five ? ['five-stats'] : []), ...(operational ? ['operational-map'] : [])] }
+    ...(five || operational || scaled.record
+      ? {
+          ruleFeatures: [
+            ...(scaled.record ? [CITY_SCALE_FEATURE] : []),
+            ...(five ? ['five-stats'] : []),
+            ...(operational ? ['operational-map'] : []),
+          ],
+        }
       : {}),
+    ...(scaled.record ? { cityScale: scaled.record } : {}),
     ...(operational ? { operationalMap: operational } : {}),
     seed: input.seed,
     scenarioKey: scenario.id,

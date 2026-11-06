@@ -59,6 +59,7 @@ function world(patch: Partial<World> = {}): World {
     operationalMap: null,
     campaignState: null,
     cityResourcesState: null,
+    cityRuinsState: null,
     logisticsState: null,
     equipmentState: null,
     governanceState: null,

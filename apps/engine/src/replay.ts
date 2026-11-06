@@ -54,6 +54,7 @@ import { z } from 'zod';
 import { exportCapsArchive, replayCapsArchive, replayCapsToEnd, type CapsArchive } from './replayCaps';
 import { checkStoredReplayFormat } from './features';
 import { assertStoredCityResources } from './cityResourcesState';
+import { assertStoredCityRuins } from './cityScaleState';
 import { assertStoredLogistics } from './logisticsState';
 import { readGovernanceLedger, type GovernanceLedgerEntry } from './governance/repository';
 import { checkedAdminEndResult } from './admin/end';
@@ -145,6 +146,7 @@ export async function exportReplay(
       if (world.replayOrigin === null) throw new Error('생성 기록이 없는 월드는 재생할 수 없습니다.');
       checkStoredReplayFormat(world);
       await assertStoredCityResources(tx, world);
+      await assertStoredCityRuins(tx, world);
       await assertStoredLogistics(tx, world);
       if (world.ruleFeatures.includes('stratagem-cards-v1') || world.stratagemCardsState != null)
         await loadWorld(tx, worldId);

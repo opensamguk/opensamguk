@@ -67,6 +67,7 @@ model World {
   commandMeta         Json?
   campaignState       Json?
   cityResourcesState  Json?
+  cityRuinsState      Json?
   battleLogs          BattleLog[]
   ranking             RankingSnapshot?
   publicMaps          PublicMapSnapshot[]

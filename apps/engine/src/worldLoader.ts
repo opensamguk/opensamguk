@@ -21,6 +21,7 @@ import { assertNoResidenceAnchorsInRows } from './residenceState';
 import { storedGeneralStats } from './generalStats';
 import { readCampaignArmyTypes, readStoredCampaign } from './campaignState';
 import { readStoredCityResources } from './cityResourcesState';
+import { readStoredCityRuins } from './cityScaleState';
 import { readStoredLogistics, readLogisticsOriginConfig } from './logisticsState';
 
 export async function loadWorld(tx: Prisma.TransactionClient, worldId: string): Promise<WorldState> {
@@ -104,6 +105,8 @@ export async function loadWorldAfterCapabilityCheck(
   if (campaign) state.campaign = campaign;
   const cityResources = readStoredCityResources(world.cityResourcesState, state, armyTypes);
   if (cityResources) state.cityResources = cityResources;
+  const cityRuins = readStoredCityRuins(world, state);
+  if (cityRuins) state.cityRuins = cityRuins;
   const logistics = readStoredLogistics(world.logisticsState, state, readLogisticsOriginConfig(world, state));
   if (logistics && logistics.monthlyTick !== world.monthlyTick)
     throw new Error('저장된 물류와 월 정산 tick이 다릅니다.');
