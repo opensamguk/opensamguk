@@ -23,6 +23,7 @@ export const ENGINE_INTEGRATION_FILES = [
   'tools/int18-city-resources.integration.test.ts',
   'tools/integration-scenario.integration.test.ts',
   'tools/resource-catalog.integration.test.ts',
+  'tools/battle-sim-resources.integration.test.ts',
   'tools/t4-17-ext-n2.integration.test.ts',
   'tools/preset.integration.test.ts',
   'tools/t1-11.integration.test.ts',
