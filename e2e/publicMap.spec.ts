@@ -418,7 +418,10 @@ test('장수·병력·보급·국고는 응답과 화면에 없고 지도는 읽
   const raw = await open(page, '/login');
   const text = JSON.stringify(raw);
   expect(Object.keys(raw).sort()).toEqual(['delayMinutes', 'worlds']);
-  for (const world of raw.worlds) expect(Object.keys(world).sort()).toEqual(['id', 'map', 'name', 'status']);
+  for (const world of raw.worlds) {
+    expect(Object.keys(world).sort()).toEqual(['background', 'id', 'map', 'name', 'status']);
+    expect(world.background).toBeNull();
+  }
   for (const map of [raw.worlds[0]!.map!, raw.worlds[1]!.map!]) {
     expect(Object.keys(map).sort()).toEqual(['cities', 'month', 'nations', 'takenAt', 'year']);
     for (const city of map.cities)
