@@ -127,7 +127,7 @@ beforeAll(async () => {
       level: 1,
       region: 1,
       position: { x: id, y: 1 },
-      connections: [],
+      connections: [id === 1 ? 2 : 1],
       initial: values,
       max: {
         ...values,
