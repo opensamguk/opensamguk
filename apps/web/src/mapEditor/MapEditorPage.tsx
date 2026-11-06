@@ -17,7 +17,7 @@ import { clampPoint, editorReducer, initialEditor, isLinked, type EditorAction, 
 import { fullView, MapCanvas, MAX_ZOOM, zoomView, type Tool, type View } from './MapCanvas';
 import styles from './MapEditor.module.css';
 import { encodeSketchPng, rasterizeSketch, SKETCH_SCALE } from './sketch';
-import { LEVEL_RANGE, REGION_RANGE, validateMap, type Issue } from './validate';
+import { editorIssues, type Issue } from './validate';
 
 // 지도 편집기 (T4-80). 서버 없이 파일로 불러오고 내려받는다. 관리자 콘솔 연결은 T4-81이다.
 export function MapEditorPage() {
@@ -108,7 +108,8 @@ function Editor({ initial, fileName, legacy }: { initial: MapV2; fileName: strin
   const [linkFrom, setLinkFrom] = useState<number | null>(null);
   const [view, setView] = useState<View>(() => fullView(initial));
   const [busy, setBusy] = useState(false);
-  const issues = useMemo(() => validateMap(map), [map]);
+  const issues = useMemo(() => editorIssues(map), [map]);
+  const errorCount = issues.filter((issue) => issue.severity === 'error').length;
   // 도시가 지워지거나 되돌려지면 번호가 밀리므로 연결 시작점을 푼다.
   useEffect(() => setLinkFrom(null), [map.cities.length]);
 
@@ -212,8 +213,8 @@ function Editor({ initial, fileName, legacy }: { initial: MapV2; fileName: strin
             {busy ? '밑그림 만드는 중' : '밑그림 PNG 내려받기'}
           </button>
           <span className={styles.muted} data-testid="export-note">
-            {issues.length > 0
-              ? `검증 오류 ${issues.length}건이 있어도 내려받습니다. 게시는 서버 검증을 지나야 합니다.`
+            {errorCount > 0
+              ? `검증 오류 ${errorCount}건이 있어도 내려받습니다. 게시는 서버 검증을 지나야 합니다.`
               : '검증 오류 없음'}
           </span>
         </div>
@@ -392,11 +393,11 @@ function CityPanel({ map, index, dispatch }: { map: MapV2; index: number; dispat
         <input value={name} onChange={(event) => setName(event.target.value)} onBlur={save} />
       </label>
       <label className={styles.field}>
-        규모 ({LEVEL_RANGE.min}~{LEVEL_RANGE.max})
+        규모
         <input type="number" value={level} onChange={(event) => setLevel(event.target.value)} onBlur={save} />
       </label>
       <label className={styles.field}>
-        지역 ({REGION_RANGE.min}~{REGION_RANGE.max})
+        지역
         <input type="number" value={region} onChange={(event) => setRegion(event.target.value)} onBlur={save} />
       </label>
       <h3>연결 {linked.length}개</h3>
@@ -490,17 +491,24 @@ function IssueList({ issues, map, dispatch }: { issues: Issue[]; map: MapV2; dis
               <button
                 type="button"
                 data-code={issue.code}
-                onClick={() =>
+                onClick={() => {
+                  const target = issue.target;
+                  if (!target) return;
                   dispatch({
                     type: 'select',
                     selection:
-                      issue.target.kind === 'city'
-                        ? { kind: 'city', index: issue.target.index }
-                        : { kind: 'terrain', layer: issue.target.layer, index: issue.target.index, point: null },
-                  })
-                }
+                      target.kind === 'city'
+                        ? { kind: 'city', index: target.index }
+                        : { kind: 'terrain', layer: target.layer, index: target.index, point: null },
+                  });
+                }}
               >
-                <span className={styles.issueTag}>오류</span> {issue.message}
+                {issue.severity === 'error' ? (
+                  <span className={styles.issueTag}>오류</span>
+                ) : (
+                  <span className={styles.issueWarning}>경고</span>
+                )}{' '}
+                {issue.message}
               </button>
             </li>
           ))}
