@@ -23,25 +23,24 @@ export async function scenarioTitle(key: string, db?: Pick<Prisma.TransactionCli
   try {
     const ref = parseResourceKey(key),
       canonical = formatResourceKey(ref);
-    if (ref.name === 'default') throw new Error();
-    const cached = titles.get(canonical);
-    if (cached !== undefined) return cached;
-    const publishedContent = async () => {
-      if (!db) throw new Error();
-      const [resource] = await readPublishedResources(db, [{ kind: 'SCENARIO', ...ref }]);
-      return resource!.content;
-    };
     let content: unknown,
       fromFile = false;
-    if (ref.version === 1) {
-      try {
-        content = JSON.parse(await readFile(new URL(`scenario/${ref.name}.json`, resourceRoot()), 'utf8'));
-        fromFile = true;
-      } catch (error) {
-        if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') throw error;
-        content = await publishedContent();
-      }
-    } else content = await publishedContent();
+    const published =
+      db &&
+      (await db.gameResource.findFirst({
+        where: { kind: 'SCENARIO', ...ref, status: 'PUBLISHED' },
+        select: { id: true },
+      }));
+    if (published) {
+      const [resource] = await readPublishedResources(db!, [{ kind: 'SCENARIO', ...ref }]);
+      content = resource!.content;
+    } else {
+      if (ref.version !== 1 || ref.name === 'default') throw new Error();
+      const cached = titles.get(canonical);
+      if (cached !== undefined) return cached;
+      content = JSON.parse(await readFile(new URL(`scenario/${ref.name}.json`, resourceRoot()), 'utf8'));
+      fromFile = true;
+    }
     const value = titleSchema.parse(content);
     if (value.id !== ref.name) throw new Error();
     // 파일 제목만 캐시한다. 카탈로그 조회는 현재 DB 트랜잭션의 판을 쓴다.

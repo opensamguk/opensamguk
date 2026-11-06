@@ -498,8 +498,8 @@ const freshName = () => `d071_${randomUUID().replaceAll('-', '')}`;
 async function sourceResource(kind: 'MAP' | 'SCENARIO' | 'UNIT_SET' | 'STAT_RULES' | 'PORTRAIT_MAP', name: string) {
   return db.gameResource.findUniqueOrThrow({ where: { kind_name_version: { kind, name, version: 1 } } });
 }
-async function copyResource(sourceId: string, cookie: string) {
-  const result = await request('resourceAdmin.clone', { sourceId, name: freshName() }, cookie);
+async function copyResource(sourceId: string, cookie: string, name = freshName()) {
+  const result = await request('resourceAdmin.clone', { sourceId, name }, cookie);
   expect(result).toMatchObject({ status: 200, data: { ok: true, meta: { revision: 0, status: 'DRAFT' } } });
   return db.gameResource.findUniqueOrThrow({ where: { id: result.data!.meta!.id } });
 }
@@ -566,82 +566,86 @@ it('AC-P2-27 같은 새 이름의 복제 경합과 이미 게시된 이름 충�
   expect(await snapshot()).toBe(before);
 });
 
-it('AC-P2-27 지도·시나리오 초안끼리 검사·게시하고 새 이름 조합을 생성 때 재검사한다', async () => {
-  const user = await actor(),
-    map = await copyResource((await sourceResource('MAP', 'che')).id, user.cookie),
-    scenario = await copyResource((await sourceResource('SCENARIO', '1030')).id, user.cookie);
-  const context = { scenarios: [resourceRef(scenario)] };
-  expect(
-    (await request('resourceAdmin.save', { id: map.id, revision: 0, content: map.content, context }, user.cookie)).data,
-  ).toMatchObject({ ok: true, meta: { revision: 1 }, report: { status: 'pass' } });
-  expect(
-    (
-      await request(
-        'resourceAdmin.publish',
-        { id: map.id, revision: 1, reason: '선택한 시나리오 검사', context },
-        user.cookie,
-      )
-    ).data,
-  ).toMatchObject({ ok: true, report: { status: 'pass' } });
-  const publishedMap = await db.gameResource.findUniqueOrThrow({ where: { id: map.id } });
-  expect(
-    (
-      await request(
-        'resourceAdmin.publish',
-        { id: scenario.id, revision: 0, reason: '선택한 지도 검사', context: { map: resourceRef(publishedMap) } },
-        user.cookie,
-      )
-    ).data,
-  ).toMatchObject({ ok: true, report: { status: 'pass' } });
-  for (const action of ['resource.save', 'resource.publish'])
-    expect(await db.auditLog.findFirstOrThrow({ where: { targetId: map.id, action } })).toMatchObject({
-      payload: { context: [{ ...resourceRef(scenario), kind: 'SCENARIO', name: scenario.name, version: 1 }] },
+it.each([undefined, 'default', 'five-stats'])(
+  'AC-P2-27 새 이름 %s 지도·시나리오를 검사·게시·생성하고 로비에서 읽는다',
+  async (scenarioName) => {
+    const user = await actor(),
+      map = await copyResource((await sourceResource('MAP', 'che')).id, user.cookie),
+      scenario = await copyResource((await sourceResource('SCENARIO', '1030')).id, user.cookie, scenarioName);
+    const context = { scenarios: [resourceRef(scenario)] };
+    expect(
+      (await request('resourceAdmin.save', { id: map.id, revision: 0, content: map.content, context }, user.cookie))
+        .data,
+    ).toMatchObject({ ok: true, meta: { revision: 1 }, report: { status: 'pass' } });
+    expect(
+      (
+        await request(
+          'resourceAdmin.publish',
+          { id: map.id, revision: 1, reason: '선택한 시나리오 검사', context },
+          user.cookie,
+        )
+      ).data,
+    ).toMatchObject({ ok: true, report: { status: 'pass' } });
+    const publishedMap = await db.gameResource.findUniqueOrThrow({ where: { id: map.id } });
+    expect(
+      (
+        await request(
+          'resourceAdmin.publish',
+          { id: scenario.id, revision: 0, reason: '선택한 지도 검사', context: { map: resourceRef(publishedMap) } },
+          user.cookie,
+        )
+      ).data,
+    ).toMatchObject({ ok: true, report: { status: 'pass' } });
+    for (const action of ['resource.save', 'resource.publish'])
+      expect(await db.auditLog.findFirstOrThrow({ where: { targetId: map.id, action } })).toMatchObject({
+        payload: { context: [{ ...resourceRef(scenario), kind: 'SCENARIO', name: scenario.name, version: 1 }] },
+      });
+    const world = await loadInitialWorldFromDb(db, { map: map.name, scenario: scenario.name, seed: 'd071' });
+    const original = await loadInitialWorldFromDb(db, { map: 'che', scenario: '1030', seed: 'd071' });
+    expect(world).toEqual({ ...original, mapKey: map.name, scenarioKey: scenario.name });
+    const created = await createWorldFromCli(db, world, {
+      name: '새 이름 자원 월드',
+      turnTermMinutes: 60,
+      endYear: null,
     });
-  const world = await loadInitialWorldFromDb(db, { map: map.name, scenario: scenario.name, seed: 'd071' });
-  const original = await loadInitialWorldFromDb(db, { map: 'che', scenario: '1030', seed: 'd071' });
-  expect(world).toEqual({ ...original, mapKey: map.name, scenarioKey: scenario.name });
-  const created = await createWorldFromCli(db, world, {
-    name: '새 이름 자원 월드',
-    turnTermMinutes: 60,
-    endYear: null,
-  });
-  try {
-    const response = await fetch(
-      `${base}/trpc/lobby.worlds?batch=1&input=${encodeURIComponent(JSON.stringify({ 0: {} }))}`,
-    );
-    expect(response.status).toBe(200);
-    const body = (await response.json()) as Array<{ result: { data: Array<{ id: string; scenarioTitle: string }> } }>;
-    expect(body[0]!.result.data.find((row) => row.id === created.worldId)).toMatchObject({
-      scenarioTitle: '【역사모드3】 군웅할거',
-    });
-    const draft = await copyResource((await sourceResource('SCENARIO', '1030')).id, user.cookie);
-    const invalidName = freshName();
-    await db.gameResource.create({
-      data: {
-        kind: 'SCENARIO',
-        name: invalidName,
-        version: 1,
-        status: 'PUBLISHED',
-        publishedAt: new Date(),
-        content: { id: invalidName, title: '해시가 다른 제목' },
-        contentHash: '0'.repeat(64),
-        source: '해시 손상 고정물',
-      },
-    });
-    for (const key of [draft.name, invalidName]) {
-      await db.world.update({ where: { id: created.worldId }, data: { scenarioKey: key } });
-      const denied = await fetch(
+    try {
+      const response = await fetch(
         `${base}/trpc/lobby.worlds?batch=1&input=${encodeURIComponent(JSON.stringify({ 0: {} }))}`,
       );
-      expect(denied.status).toBe(500);
-      const raw = await denied.text();
-      expect(raw).toContain('INTERNAL_SERVER_ERROR');
-      expect(raw).not.toMatch(new RegExp(`${key}|해시가 다른 제목|ENOENT|resources`));
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as Array<{ result: { data: Array<{ id: string; scenarioTitle: string }> } }>;
+      expect(body[0]!.result.data.find((row) => row.id === created.worldId)).toMatchObject({
+        scenarioTitle: '【역사모드3】 군웅할거',
+      });
+      const draft = await copyResource((await sourceResource('SCENARIO', '1030')).id, user.cookie);
+      const invalidName = freshName();
+      await db.gameResource.create({
+        data: {
+          kind: 'SCENARIO',
+          name: invalidName,
+          version: 1,
+          status: 'PUBLISHED',
+          publishedAt: new Date(),
+          content: { id: invalidName, title: '해시가 다른 제목' },
+          contentHash: '0'.repeat(64),
+          source: '해시 손상 고정물',
+        },
+      });
+      for (const key of [draft.name, invalidName]) {
+        await db.world.update({ where: { id: created.worldId }, data: { scenarioKey: key } });
+        const denied = await fetch(
+          `${base}/trpc/lobby.worlds?batch=1&input=${encodeURIComponent(JSON.stringify({ 0: {} }))}`,
+        );
+        expect(denied.status).toBe(500);
+        const raw = await denied.text();
+        expect(raw).toContain('INTERNAL_SERVER_ERROR');
+        expect(raw).not.toMatch(new RegExp(`${key}|해시가 다른 제목|ENOENT|resources`));
+      }
+    } finally {
+      await db.world.delete({ where: { id: created.worldId } });
     }
-  } finally {
-    await db.world.delete({ where: { id: created.worldId } });
-  }
-});
+  },
+);
 
 it('AC-P2-27 수정·삭제된 검사 대상은 저장·게시 모두 CONTEXT_STALE이고 종류 오류는 BAD_REQUEST다', async () => {
   const user = await actor(),
