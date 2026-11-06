@@ -82,7 +82,11 @@ it.each([false, true])('확장 프리셋은 원작식 기능을 한 번만 합�
     unitSet: 'expanded',
     turnTermMinutes: 60,
   });
-  mocks.loadInitialWorld.mockResolvedValue({ seed: 'cli-unit', ruleFeatures: ['five-stats', 'operational-map'] });
+  mocks.loadInitialWorld.mockResolvedValue({
+    seed: 'cli-unit',
+    unitSetKey: 'expanded',
+    ruleFeatures: ['five-stats', 'operational-map'],
+  });
   process.argv = [
     process.execPath,
     'createWorld.ts',
@@ -107,7 +111,7 @@ it.each([false, true])('확장 프리셋은 원작식 기능을 한 번만 합�
   const features = ['battle-affinity-v2', 'five-stats', 'operational-map'];
   expect(mocks.createWorldFromCli).toHaveBeenCalledWith(
     expect.anything(),
-    { seed: 'cli-unit', ruleFeatures: features },
+    { seed: 'cli-unit', unitSetKey: 'expanded', ruleFeatures: features },
     expect.objectContaining({ ruleFeatures: features, preset: expect.objectContaining({ key: 'regular' }) }),
   );
   expect(console.error).not.toHaveBeenCalled();
