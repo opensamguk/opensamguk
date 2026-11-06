@@ -134,7 +134,7 @@ describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
     for (const [input] of state.settings.mock.calls)
       expect(input).toEqual({ expectedUserId: viewerId, expandedProfiles: true });
     const input = state.create.mock.calls[0]![0] as CreateInput;
-    expect(input.featureProfileKey).toBe('expanded-191-v2');
+    expect(input.featureProfileKey).toBe('expanded-191-v3');
     expect(input.ruleFeatures).toEqual(expandedProfile.ruleFeatures);
     expect(input.endYear).toBe(235);
     for (const key of ['featureProfileHash', 'expandedProfiles', 'profileId']) expect(input).not.toHaveProperty(key);
@@ -193,7 +193,7 @@ describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
     expect((scenario as HTMLSelectElement).value).toBe('integration-v01');
     expect(state.create).not.toHaveBeenCalled();
   });
-  it('프로필 순서와 관계없이 SAN10 191년을 기본 선택하고 해당 5자원·9기능만 전송한다', async () => {
+  it('프로필 순서와 관계없이 SAN10 191년을 기본 선택하고 해당 5자원·10기능만 전송한다', async () => {
     const value = profileOptions();
     state.settings.mockResolvedValue(value);
     setup();
@@ -257,7 +257,7 @@ describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
       endYear: 190,
       ruleFeatures: value.profiles[1]!.ruleFeatures,
     });
-    expect(input.ruleFeatures).toHaveLength(9);
+    expect(input.ruleFeatures).toHaveLength(10);
     expect(input).not.toHaveProperty('profileId');
     state.settings.mockResolvedValue(options);
     fireEvent.click(screen.getByRole('button', { name: '같은 요청 접수 확인' }));
