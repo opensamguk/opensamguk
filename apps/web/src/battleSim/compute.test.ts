@@ -1,8 +1,8 @@
 import { BALANCE, simulateBattle, unitSetSchema, commanderBattleModifiers } from '@opensamguk/rules';
 import { createRng } from '@opensamguk/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createCompute } from './compute';
-import { PUBLIC_UNIT_SET } from './publicUnitSet';
+import { createCompute, createWorkerHandler } from './compute';
+import { TEST_UNIT_SET } from './testUnitSet';
 import { GENERAL_CREW_MAX, LIMITS, type BattleRunRequest } from './request';
 
 // T4-34 E1. compute가 main의 simulateBattle(input, createRng(seed))를 그대로 한 번 부르는지 같은 함수와 대조한다.
@@ -12,8 +12,10 @@ vi.mock('@opensamguk/rules', async (importOriginal) => {
   return { ...original, simulateBattle: vi.fn(original.simulateBattle) };
 });
 
-const unitSet = unitSetSchema.parse(PUBLIC_UNIT_SET);
-const compute = createCompute(PUBLIC_UNIT_SET);
+// 병종표는 단위 시험 고정물이다 (T4-86). 실제 월드 병종표는 e2e/battleSim.spec.ts가 DB 값으로 본다.
+const RAW_UNIT_SET: unknown = TEST_UNIT_SET;
+const unitSet = unitSetSchema.parse(RAW_UNIT_SET);
+const compute = createCompute(RAW_UNIT_SET);
 
 describe('AC-INT-11 통합판의 단일 교전', () => {
   it.each([0, 50, 100])('지휘관 보정 %i는 엔진과 같은 함수로 한 번 적용하고 원래 두 값을 답한다', (value) => {
@@ -152,7 +154,7 @@ describe('compute와 simulateBattle의 차등', () => {
           requestId,
           seed: s,
           input,
-          unitSetId: 'basic',
+          unitSetId: 't486-fixture',
           attacker: expected.attacker,
           defender: expected.defender,
         });
@@ -234,7 +236,7 @@ describe('잘못된 입력', () => {
 });
 
 describe('병종표 오류', () => {
-  const base = JSON.parse(JSON.stringify(PUBLIC_UNIT_SET)) as {
+  const base = JSON.parse(JSON.stringify(RAW_UNIT_SET)) as {
     defaultCrewTypeId: number;
     crewTypes: Array<{ id: number; attack: unknown }>;
   };
@@ -252,4 +254,53 @@ describe('병종표 오류', () => {
       expect(simulateBattle).not.toHaveBeenCalled();
     });
   }
+});
+
+describe('T4-86 Worker 메시지 처리', () => {
+  it('rules 전 실행은 UNIT_SET_INVALID이고 simulateBattle을 부르지 않는다', () => {
+    const handle = createWorkerHandler();
+    expect(handle(general({ requestId: 3 }))).toEqual({ type: 'error', requestId: 3, code: 'UNIT_SET_INVALID' });
+    expect(simulateBattle).not.toHaveBeenCalled();
+  });
+
+  it('rules에는 답하지 않고 뒤의 실행은 같은 병종표·시드의 simulateBattle과 깊게 같다', () => {
+    const handle = createWorkerHandler();
+    expect(handle({ type: 'rules', unitSet: RAW_UNIT_SET })).toBeNull();
+    for (const request of [general({ seed: 'w-1' }), wall({ seed: 'w-2' })]) {
+      const { type, requestId, seed, ...input } = request;
+      expect(type).toBe('run');
+      const expected = simulateBattle({ ...input, unitSet }, createRng(seed));
+      expect(handle(request)).toEqual({
+        type: 'result',
+        requestId,
+        seed,
+        input,
+        unitSetId: 't486-fixture',
+        attacker: expected.attacker,
+        defender: expected.defender,
+      });
+    }
+  });
+
+  it('두 번째 rules(다른 병종표)는 버리고 첫 병종표로 계산한다', () => {
+    const handle = createWorkerHandler();
+    handle({ type: 'rules', unitSet: RAW_UNIT_SET });
+    const first = handle(general({ seed: 'keep' }));
+    const stronger = {
+      ...TEST_UNIT_SET,
+      id: 'other',
+      crewTypes: TEST_UNIT_SET.crewTypes.map((unit) => (unit.id === 1100 ? { ...unit, attack: 999 } : unit)),
+    };
+    expect(handle({ type: 'rules', unitSet: stronger })).toBeNull();
+    expect(handle(general({ seed: 'keep' }))).toEqual(first);
+  });
+
+  it('깨진 병종표 rules 뒤 실행은 UNIT_SET_INVALID다', () => {
+    const handle = createWorkerHandler();
+    expect(handle({ type: 'rules', unitSet: { ...TEST_UNIT_SET, defaultCrewTypeId: 4242 } })).toBeNull();
+    expect(handle(general({ requestId: 5 }))).toEqual({ type: 'error', requestId: 5, code: 'UNIT_SET_INVALID' });
+    expect(handle({ type: 'rules' })).toBeNull();
+    expect(handle(general({ requestId: 6 }))).toEqual({ type: 'error', requestId: 6, code: 'UNIT_SET_INVALID' });
+    expect(simulateBattle).not.toHaveBeenCalled();
+  });
 });

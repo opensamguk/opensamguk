@@ -2,6 +2,7 @@ import type { AppRouter } from '@opensamguk/server/router';
 import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
+import { useWorldUnits } from '../game/queries';
 import { useTRPC } from '../trpc';
 import { errorCode, serverMessage } from '../turns/apiError';
 import { CommandPicker } from '../turns/CommandPicker';
@@ -122,6 +123,7 @@ function OrdersBoard({ worldId, userId, accountNotice }: { worldId: string; user
   const map = useQuery(trpc.world.map.queryOptions({ worldId }));
   const summary = useQuery(trpc.world.summary.queryOptions({ worldId }));
   const home = useQuery(trpc.home.get.queryOptions({ worldId }));
+  const { units, note: unitNote } = useWorldUnits(worldId);
   const order = useMutation(trpc.campaign.order.mutationOptions());
   const request = useQuery({
     ...trpc.campaign.request.queryOptions({ worldId, requestId: pending?.requestId ?? '' }),
@@ -203,6 +205,7 @@ function OrdersBoard({ worldId, userId, accountNotice }: { worldId: string; user
     describeArgs(value, {
       city: (key) => map.data?.cities.find((city) => city.key === key)?.name,
       nation: (id) => map.data?.nations.find((nation) => nation.id === id)?.name,
+      unit: units.name,
     });
   return (
     <section className={styles.panel} aria-labelledby="retinue-orders-title">
@@ -251,6 +254,8 @@ function OrdersBoard({ worldId, userId, accountNotice }: { worldId: string; user
             nations={map.data.nations}
             selectedCityKey={null}
             defaultCrewType={home.data?.general.crewType}
+            units={units}
+            unitNote={unitNote}
             cityResources={summary.data?.cityResourcesEnabled === true}
             blockedReason={disabled ? '다른 요청의 처리를 기다리세요.' : !recipientId ? '받을 장수를 고르세요.' : null}
             targetLabel="보낼 지시"

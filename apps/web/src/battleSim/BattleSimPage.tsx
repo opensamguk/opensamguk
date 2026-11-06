@@ -1,13 +1,15 @@
 import { useId, useMemo, useState, type ReactNode } from 'react';
+import { useWorldId, useWorldRules } from '../game/queries';
 import { DisabledReason } from '../ui/DisabledReason';
+import { ErrorState, LoadingState } from '../ui/States';
 import { ValueDelta } from '../ui/ValueDelta';
-import { DEFAULT_CREW_TYPE_ID, UNIT_CHOICES, UNIT_SET_ID, unitName } from './publicUnitSet';
 import {
   checkForm,
   defaultForm,
   GENERAL_CREW_MAX,
   LIMITS,
   problemText,
+  WALL_CREW_TYPE,
   WALL_STAT,
   type BattleForce,
   type BattleForm,
@@ -17,12 +19,13 @@ import {
   type FieldProblem,
   type ForceForm,
 } from './request';
+import { worldUnits, type UnitInfo, type WorldUnitSet } from './unitChoices';
 import { useBattleWorker, type BattleWorkerState } from './useBattleWorker';
 import styles from './BattleSimPage.module.css';
 
 // /w/:worldId/simulator. 보조 화면이다 (T4-34). 사용자가 넣은 가정으로 교전 한 번을 Web Worker에서 계산한다.
-// tRPC를 부르지 않고 게임 상태에서 값을 채우지 않는다. 저장소(sessionStorage 등)를 읽거나 쓰지 않는다.
-const GENERAL_UNITS = UNIT_CHOICES.filter((unit) => unit.armType > 0);
+// 이 월드의 병종표 조회(resources.worldRules) 말고는 tRPC를 부르지 않고 게임 상태에서 값을 채우지 않는다 (T4-86).
+// 저장소(sessionStorage 등)를 읽거나 쓰지 않는다.
 
 const ERROR_TEXT: Record<Exclude<BattleWorkerState, { status: 'idle' | 'running' | 'done' }>['code'], string> = {
   INVALID_INPUT: 'Worker가 입력을 받지 않았습니다.',
@@ -32,9 +35,34 @@ const ERROR_TEXT: Record<Exclude<BattleWorkerState, { status: 'idle' | 'running'
 };
 
 export function BattleSimPage() {
-  const [form, setForm] = useState<BattleForm>(() => defaultForm(DEFAULT_CREW_TYPE_ID));
-  const { state, run, cancel, retry } = useBattleWorker();
-  const checked = useMemo(() => checkForm(form, UNIT_CHOICES), [form]);
+  const worldId = useWorldId();
+  const rules = useWorldRules(worldId);
+  return (
+    <section className={styles.page} aria-labelledby="battle-sim-title">
+      <h1 id="battle-sim-title">전투 시뮬레이터</h1>
+      {rules.data ? (
+        // 월드가 바뀌면 폼과 Worker를 새로 만든다. 앞 월드의 병종표가 남지 않는다.
+        <BattleSimForm key={worldId} unitSetKey={rules.data.unitSetKey} unitSet={rules.data.unitSet} />
+      ) : (
+        <>
+          {rules.isError ? (
+            <ErrorState title="이 월드의 병종표를 불러오지 못했습니다" onRetry={() => void rules.refetch()} />
+          ) : (
+            <LoadingState>병종표를 불러오는 중</LoadingState>
+          )}
+          <Assumptions />
+        </>
+      )}
+    </section>
+  );
+}
+
+function BattleSimForm({ unitSetKey, unitSet }: { unitSetKey: string; unitSet: WorldUnitSet }) {
+  const units = useMemo(() => worldUnits(unitSet), [unitSet]);
+  // shortcut: 장수 병종이 없는 병종표면 0으로 두어 병종 칸 오류로 보인다. 실제 출병도 그런 표로는 돌지 않는다.
+  const [form, setForm] = useState<BattleForm>(() => defaultForm(units.defaultId ?? 0));
+  const { state, run, cancel, retry } = useBattleWorker(unitSet);
+  const checked = useMemo(() => checkForm(form, units.all), [form, units]);
   const problems = useMemo(() => {
     const byField = new Map<string, FieldProblem>();
     for (const found of checked.problems) if (!byField.has(found.field)) byField.set(found.field, found);
@@ -48,11 +76,10 @@ export function BattleSimPage() {
   const wall = form.defenderKind === 'wall';
 
   return (
-    <section className={styles.page} aria-labelledby="battle-sim-title">
-      <h1 id="battle-sim-title">전투 시뮬레이터</h1>
+    <>
       <p className={styles.muted}>
-        양쪽 값과 시드를 직접 넣으면 교전 한 번을 계산합니다. 다른 국가의 값은 불러오지 않습니다. 병종표는 기본 병종표(
-        {UNIT_SET_ID}) 기준입니다.
+        양쪽 값과 시드를 직접 넣으면 교전 한 번을 계산합니다. 다른 국가의 값은 불러오지 않습니다. 병종표는 이 월드의
+        병종표({unitSetKey}) 기준입니다.
       </p>
 
       <form
@@ -82,7 +109,13 @@ export function BattleSimPage() {
         <div className={styles.sides}>
           <fieldset className={styles.side}>
             <legend>공격</legend>
-            <ForceFields side="attacker" form={form.attacker} problems={problems} onChange={setForce} />
+            <ForceFields
+              side="attacker"
+              form={form.attacker}
+              units={units.generals}
+              problems={problems}
+              onChange={setForce}
+            />
             {form.statProfile === 'five-stats' ? (
               <CommanderFields
                 side="attacker"
@@ -114,23 +147,30 @@ export function BattleSimPage() {
                   ['general', '장수'],
                   ['wall', '성벽'],
                 ] as Array<[DefenderKind, string]>
-              ).map(([kind, label]) => (
-                <label key={kind} className={styles.choice}>
-                  <input
-                    type="radio"
-                    name="defender-kind"
-                    value={kind}
-                    checked={form.defenderKind === kind}
-                    onChange={() => setForm((f) => ({ ...f, defenderKind: kind }))}
-                  />
-                  {label}
-                </label>
-              ))}
+              ).map(([kind, label]) =>
+                kind === 'wall' && !units.hasWall ? (
+                  // 병종표에 성벽이 없으면 실제 출병도 성벽 교전을 하지 않는다 (packages/rules/src/commands/attack.ts).
+                  <DisabledReason key={kind} reason={`이 병종표에는 성벽(${WALL_CREW_TYPE})이 없습니다.`}>
+                    {label}
+                  </DisabledReason>
+                ) : (
+                  <label key={kind} className={styles.choice}>
+                    <input
+                      type="radio"
+                      name="defender-kind"
+                      value={kind}
+                      checked={form.defenderKind === kind}
+                      onChange={() => setForm((f) => ({ ...f, defenderKind: kind }))}
+                    />
+                    {label}
+                  </label>
+                ),
+              )}
             </div>
             {wall ? (
               <>
                 <p className={styles.fixed}>
-                  병종 {unitName(1000)}, 훈련 {WALL_STAT}, 사기 {WALL_STAT} (고정)
+                  병종 {units.name(WALL_CREW_TYPE) ?? WALL_CREW_TYPE}, 훈련 {WALL_STAT}, 사기 {WALL_STAT} (고정)
                 </p>
                 <NumberField
                   label="성벽"
@@ -150,7 +190,13 @@ export function BattleSimPage() {
                 />
               </>
             ) : (
-              <ForceFields side="defender" form={form.defender} problems={problems} onChange={setForce} />
+              <ForceFields
+                side="defender"
+                form={form.defender}
+                units={units.generals}
+                problems={problems}
+                onChange={setForce}
+              />
             )}
             {form.statProfile === 'five-stats' && !wall ? (
               <CommanderFields
@@ -202,8 +248,8 @@ export function BattleSimPage() {
       </form>
 
       <Assumptions />
-      <ResultPanel state={state} current={checked.body} onCancel={cancel} onRetry={retry} />
-    </section>
+      <ResultPanel state={state} current={checked.body} unitName={units.name} onCancel={cancel} onRetry={retry} />
+    </>
   );
 }
 
@@ -240,11 +286,13 @@ function CommanderFields({
 function ForceFields({
   side,
   form,
+  units,
   problems,
   onChange,
 }: {
   side: 'attacker' | 'defender';
   form: ForceForm;
+  units: readonly UnitInfo[];
   problems: Problems;
   onChange: (side: 'attacker' | 'defender', key: keyof ForceForm, value: string) => void;
 }) {
@@ -258,7 +306,7 @@ function ForceFields({
             value={form.crewType}
             onChange={(e) => onChange(side, 'crewType', e.target.value)}
           >
-            {GENERAL_UNITS.map((unit) => (
+            {units.map((unit) => (
               <option key={unit.id} value={String(unit.id)}>
                 {unit.name}
               </option>
@@ -373,11 +421,13 @@ function sameBody(result: BattleRunResult, body: BattleRunBody | null): boolean 
 function ResultPanel({
   state,
   current,
+  unitName,
   onCancel,
   onRetry,
 }: {
   state: BattleWorkerState;
   current: BattleRunBody | null;
+  unitName: (id: number) => string | undefined;
   onCancel: () => void;
   onRetry: () => void;
 }) {
@@ -429,6 +479,7 @@ function ResultPanel({
           <div className={styles.forces}>
             <ForceResult
               title="공격"
+              unitName={unitName}
               side="attacker"
               start={state.result.input.attacker}
               end={state.result.attacker}
@@ -436,6 +487,7 @@ function ResultPanel({
             />
             <ForceResult
               title="수비"
+              unitName={unitName}
               side="defender"
               start={state.result.input.defender}
               end={state.result.defender}
@@ -456,6 +508,7 @@ function ResultPanel({
 
 function ForceResult({
   title,
+  unitName,
   side,
   start,
   end,
@@ -463,6 +516,7 @@ function ForceResult({
   defence,
 }: {
   title: string;
+  unitName: (id: number) => string | undefined;
   side: 'attacker' | 'defender';
   start: BattleForce;
   end: BattleForce;
@@ -473,7 +527,7 @@ function ForceResult({
   return (
     <div className={styles.force} data-testid={`result-${side}`}>
       <h3>
-        {title} · {unitName(start.crewType)}
+        {title} · {unitName(start.crewType) ?? `병종 ${start.crewType}`}
       </h3>
       <table className={styles.table}>
         <thead>

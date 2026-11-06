@@ -2,7 +2,14 @@
 // 이 파일과 compute.test.ts뿐이다. battle.worker.ts만 이 파일을 import하므로 simulateBattle은 Worker 묶음에만 들어간다.
 import { simulateBattle, unitSetSchema, commanderBattleModifiers, type UnitSetResource } from '@opensamguk/rules';
 import { createRng } from '@opensamguk/shared';
-import { checkRequest, readRequestId, requestBody, type BattleRunInput, type BattleRunReply } from './request';
+import {
+  checkRequest,
+  readRequestId,
+  requestBody,
+  type BattleRulesMessage,
+  type BattleRunInput,
+  type BattleRunReply,
+} from './request';
 
 // 병종표를 엔진의 buildInitialWorld와 같은 기준으로 검사한다: schema, id 중복, 기본 병종 존재.
 function parseUnitSet(raw: unknown): UnitSetResource | null {
@@ -47,5 +54,19 @@ export function createCompute(rawUnitSet: unknown): (message: unknown) => Battle
       attacker: result.attacker,
       defender: result.defender,
     };
+  };
+}
+
+// Worker 메시지 처리 (T4-86). 첫 rules 메시지의 병종표로 compute를 만들고 답하지 않는다(null). 뒤의 rules는 버린다.
+// rules보다 먼저 온 실행 요청에는 UNIT_SET_INVALID로 답한다.
+export function createWorkerHandler(): (message: unknown) => BattleRunReply | null {
+  let compute: ((message: unknown) => BattleRunReply) | null = null;
+  return (message) => {
+    if (typeof message === 'object' && message !== null && (message as { type?: unknown }).type === 'rules') {
+      compute ??= createCompute((message as BattleRulesMessage).unitSet);
+      return null;
+    }
+    if (!compute) return { type: 'error', requestId: readRequestId(message), code: 'UNIT_SET_INVALID' };
+    return compute(message);
   };
 }

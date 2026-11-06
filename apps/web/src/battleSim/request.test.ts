@@ -1,9 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_CREW_TYPE_ID, UNIT_CHOICES } from './publicUnitSet';
+import { TEST_UNIT_SET } from './testUnitSet';
+import { worldUnits } from './unitChoices';
 import { checkForm, defaultForm, formBody, LIMITS, problemText, requestProblems, type BattleForm } from './request';
 
-// T4-34 화면 쪽 검사. 메인 스레드와 Worker가 같은 함수를 쓴다.
+// T4-34 화면 쪽 검사. 메인 스레드와 Worker가 같은 함수를 쓴다. 병종표는 시험 고정물이다 (T4-86).
+const { all: UNIT_CHOICES, defaultId } = worldUnits(TEST_UNIT_SET);
+const DEFAULT_CREW_TYPE_ID = defaultId!;
 const form = (patch: (f: BattleForm) => BattleForm = (f) => f) => patch(defaultForm(DEFAULT_CREW_TYPE_ID));
 const fields = (f: BattleForm) => checkForm(f, UNIT_CHOICES).problems.map((p) => p.field);
 

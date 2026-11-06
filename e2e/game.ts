@@ -49,14 +49,14 @@ function databaseUrl(): string {
   return e2eDatabaseUrl();
 }
 
+const CHE_1030 = ['--scenario', '1030', '--map', 'che'];
+
 // PREOPEN 월드를 만든다. 감독은 world:start로 RUNNING이 된 뒤에야 이 월드를 찾는다.
-function createWorld(seed: string, name: string, ruleFeatures: string[] = []): string {
+// resources는 world:create의 자원 인자다. 기본은 1030 시나리오와 che 지도다.
+function createWorld(seed: string, name: string, ruleFeatures: string[] = [], resources = CHE_1030): string {
   const created = run([
     'world:create',
-    '--scenario',
-    '1030',
-    '--map',
-    'che',
+    ...resources,
     '--seed',
     seed,
     '--turn-term',
@@ -72,8 +72,11 @@ function createWorld(seed: string, name: string, ruleFeatures: string[] = []): s
 
 let worldId: string | undefined;
 // 기능 검사는 기존 월드의 설정을 바꾸지 않고 필요한 기능을 켠 전용 월드를 만든다.
-export async function e2eFeatureWorld(ruleFeatures: string[], options: { npcNations?: boolean } = {}): Promise<string> {
-  const id = createWorld(`e2e-features-${Date.now()}`, 'E2E 기능 월드', ruleFeatures);
+export async function e2eFeatureWorld(
+  ruleFeatures: string[],
+  options: { npcNations?: boolean; resources?: string[] } = {},
+): Promise<string> {
+  const id = createWorld(`e2e-features-${Date.now()}`, 'E2E 기능 월드', ruleFeatures, options.resources);
   const npcNations = options.npcNations;
   if (npcNations !== undefined)
     await withE2eDb((db) => db.nation.updateMany({ where: { worldId: id }, data: { isNpc: npcNations } }));

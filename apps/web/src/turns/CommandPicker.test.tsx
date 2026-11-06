@@ -2,6 +2,8 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { afterEach, expect, it, vi } from 'vitest';
+import { TEST_UNIT_SET } from '../battleSim/testUnitSet';
+import { worldUnits } from '../battleSim/unitChoices';
 import { CommandPicker, type CommandInfo } from './CommandPicker';
 import type { EquipmentBoard } from '../equipment/useEquipment';
 
@@ -127,6 +129,7 @@ function props(overrides: Partial<Omit<ComponentProps<typeof CommandPicker>, 'on
     nations: [],
     selectedCityKey: null,
     defaultCrewType: undefined,
+    units: worldUnits(TEST_UNIT_SET),
     blockedReason: null,
     targetLabel: '1번 칸',
     searchRef: { current: null },
@@ -372,4 +375,54 @@ it('넣기 전에 고른 명령의 서버 사전 검사 경고를 보이고 휴�
   expect(asked).toEqual(['farm']);
   fireEvent.click(screen.getByRole('button', { name: /1번 칸에 넣기/ }));
   expect(onPut).toHaveBeenCalledWith({ commandKey: 'farm', args: {}, explicit: true });
+});
+
+it('T4-86 AC-P2-26 병종 칸은 월드 병종표로 고르고 병종표를 불러오는 중에도 병종 없는 명령은 넣는다', () => {
+  const recruit: CommandInfo = {
+    key: 'recruit',
+    name: '징병',
+    category: 'military',
+    argsSchema: {
+      type: 'object',
+      properties: {
+        amount: { type: 'integer', exclusiveMinimum: 0, maximum: 1000000 },
+        crewType: { type: 'integer', exclusiveMinimum: 0, maximum: 1000000 },
+      },
+      required: ['amount', 'crewType'],
+    },
+  };
+  const input = props({ commands: [recruit, ...commands], units: worldUnits(undefined), unitNote: '불러오는 중' });
+  const view = render(<CommandPicker {...input} />);
+  fireEvent.click(screen.getByRole('radio', { name: '징병' }));
+  const crew = () => screen.getByRole('combobox', { name: '병종' }) as HTMLSelectElement;
+  expect([...crew().options].map((option) => option.textContent)).toEqual(['고르세요']);
+  expect(screen.getByRole('note').textContent).toBe('불러오는 중');
+  fireEvent.click(screen.getByRole('radio', { name: '농지 개간' }));
+  fireEvent.click(screen.getByRole('button', { name: '1번 칸에 넣기' }));
+  expect(input.onPut).toHaveBeenLastCalledWith({ commandKey: 'farm', args: {}, explicit: true });
+
+  // 병종표가 오면 지금 거느린 병종, 월드 기본 병종, 첫 장수 병종 순으로 유효한 값을 고른다.
+  const loaded = worldUnits(TEST_UNIT_SET);
+  view.rerender(<CommandPicker {...input} units={loaded} unitNote={null} defaultCrewType={1300} />);
+  fireEvent.click(screen.getByRole('radio', { name: '징병' }));
+  expect([...crew().options].map((option) => option.value)).toEqual(['1100', '1200', '1300']);
+  expect(crew().value).toBe('1300');
+  view.rerender(<CommandPicker {...input} units={loaded} unitNote={null} defaultCrewType={1000} />);
+  fireEvent.click(screen.getByRole('radio', { name: '농지 개간' }));
+  fireEvent.click(screen.getByRole('radio', { name: '징병' }));
+  expect(crew().value).toBe('1100');
+  const noDefault = worldUnits({ ...TEST_UNIT_SET, defaultCrewTypeId: 1000 });
+  view.rerender(<CommandPicker {...input} units={noDefault} unitNote={null} defaultCrewType={undefined} />);
+  fireEvent.click(screen.getByRole('radio', { name: '농지 개간' }));
+  fireEvent.click(screen.getByRole('radio', { name: '징병' }));
+  expect(crew().value).toBe('1100');
+  // 모집 조건이 있는 1300도 고르고 넣을 수 있다. 지금 조건 판정은 서버 사전 검사가 한다.
+  fireEvent.change(crew(), { target: { value: '1300' } });
+  fireEvent.change(screen.getByRole('spinbutton', { name: '수량' }), { target: { value: '100' } });
+  fireEvent.click(screen.getByRole('button', { name: '1번 칸에 넣기' }));
+  expect(input.onPut).toHaveBeenLastCalledWith({
+    commandKey: 'recruit',
+    args: { amount: 100, crewType: 1300 },
+    explicit: true,
+  });
 });

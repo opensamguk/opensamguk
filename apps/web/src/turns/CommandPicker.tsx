@@ -1,6 +1,6 @@
 import { useId, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { DEFAULT_CREW_TYPE_ID } from '../battleSim/publicUnitSet';
+import type { WorldUnits } from '../battleSim/unitChoices';
 import { DisabledReason } from '../ui/DisabledReason';
 import { argFields, buildArgs, requiredKeys, type ArgField } from './args';
 import type { Turn } from './draft';
@@ -39,7 +39,11 @@ interface Props {
   // 있으면 대상 장수(generalId)를 이름으로 고른다 (국가 칸, T2-06).
   generals?: Array<{ id: number; name: string }> | undefined;
   selectedCityKey: number | null;
+  // 지금 거느린 병종. 병종 칸 기본값의 첫 후보다.
   defaultCrewType: number | undefined;
+  // 월드 병종표 (T4-86). 불러오는 중·오류면 빈 목록이고 unitNote가 이유다. 병종 없는 명령은 그대로 넣을 수 있다.
+  units: WorldUnits;
+  unitNote?: string | null | undefined;
   cityResources?: boolean;
   equipment?: EquipmentRead | undefined;
   // 넣을 수 없을 때의 이유. null이면 넣을 수 있다.
@@ -62,6 +66,8 @@ export function CommandPicker({
   generals,
   selectedCityKey,
   defaultCrewType,
+  units,
+  unitNote = null,
   cityResources = false,
   equipment,
   blockedReason,
@@ -94,7 +100,7 @@ export function CommandPicker({
   // 국가 칸은 대상 장수를 이름으로 고르므로 카드 설명·입력 칸·누락 안내가 같은 이름을 쓴다.
   const fieldsFor = (target: unknown): ArgField[] =>
     target
-      ? argFields(target).map((field) =>
+      ? argFields(target, units.all).map((field) =>
           field.key === 'generalId' && generals ? { ...field, label: '대상 장수' } : field,
         )
       : [];
@@ -153,10 +159,10 @@ export function CommandPicker({
     const nextSchema = next ? schemaFor(next, target) : null;
     for (const field of fieldsFor(nextSchema)) {
       if (field.kind === 'city' && mapCity !== null) initial[field.key] = String(mapCity);
-      // 지금 거느린 병종을 먼저 고른다(병력이 있으면 소집해제 전엔 바꿀 수 없다). 없으면 기본 병종이다.
+      // 지금 거느린 병종을 먼저 고른다(병력이 있으면 소집해제 전엔 바꿀 수 없다). 없으면 월드 기본 병종, 첫 장수 병종 순이다.
       if (field.kind === 'unit') {
         const own = defaultCrewType == null ? undefined : String(defaultCrewType);
-        const fallback = String(DEFAULT_CREW_TYPE_ID);
+        const fallback = units.defaultId === undefined ? undefined : String(units.defaultId);
         initial[field.key] =
           [own, fallback].find((v) => field.options.some((o) => o.value === v)) ?? field.options[0]?.value ?? '';
       }
@@ -345,7 +351,13 @@ export function CommandPicker({
                 inputRef={i === 0 ? firstArgRef : undefined}
                 onKeyDown={onArgKey}
                 onChange={(value) => setValues((prev) => ({ ...prev, [field.key]: value }))}
-                note={field.kind === 'city' ? (choices?.note ?? null) : null}
+                note={
+                  field.kind === 'city'
+                    ? (choices?.note ?? null)
+                    : field.kind === 'unit' && field.options.length === 0
+                      ? unitNote
+                      : null
+                }
                 mapHint={
                   field.kind === 'city' &&
                   selectedCityKey !== null &&
@@ -432,7 +444,12 @@ function ArgInput({
             : field.options;
     control = (
       <select ref={ref} value={value} onChange={(e) => onChange(e.target.value)} onKeyDown={onKeyDown}>
-        {field.kind === 'city' || field.kind === 'nation' ? <option value="">고르세요</option> : null}
+        {/* 병종표를 늦게 받아 고른 값이 없으면 첫 병종이 고른 것처럼 보이지 않게 빈 선택을 둔다. */}
+        {field.kind === 'city' ||
+        field.kind === 'nation' ||
+        (field.kind === 'unit' && !field.options.some((option) => option.value === value)) ? (
+          <option value="">고르세요</option>
+        ) : null}
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
