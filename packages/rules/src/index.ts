@@ -2,6 +2,7 @@
 export const RULESET_ID = 'opensamguk-mvp';
 export * from './world/bootstrap';
 export * from './world/preset';
+export * from './world/options';
 export * from './world/resources';
 export { readOperationalMap, attachOperationalKinds, operationalMapDisplay } from './world/map/stored';
 export { checkOperationalProfile } from './world/map/profile';
@@ -11,6 +12,7 @@ export * from './clock/clock';
 export * from './clock/admin';
 export * from './admin/game';
 export * from './admin/apply';
+export * from './admin/settings';
 export * from './clock/end';
 export * from './clock/reset';
 export {

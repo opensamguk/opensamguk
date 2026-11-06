@@ -182,9 +182,10 @@ describe('T3-02 AC-M3-01 실제 PostgreSQL·HTTP 이메일 인증 차단', () =>
     });
   });
 
-  it('39개 변경 API가 미인증·위조·무인증·제재를 거부하고 운영 권한 거절 감사 한 행만 남긴다', async () => {
-    expect(paths).toHaveLength(39);
+  it('40개 변경 API가 미인증·위조·무인증·제재를 거부하고 운영 권한 거절 감사 두 행만 남긴다', async () => {
+    expect(paths).toHaveLength(40);
     expect(paths).toContain('admin.game.request');
+    expect(paths).toContain('admin.world.requestSetting');
     expect(paths).toEqual(
       expect.arrayContaining(['notification.setDiscord', 'notification.setEvents', 'notification.removeDiscord']),
     );
@@ -224,18 +225,21 @@ describe('T3-02 AC-M3-01 실제 PostgreSQL·HTTP 이메일 인증 차단', () =>
     }
     expect(await snapshot(true)).toBe(before);
     const auditAfter = await db.auditLog.findMany({ orderBy: { id: 'asc' } });
-    expect(auditAfter.slice(0, -1)).toEqual(auditBefore);
-    expect(auditAfter.at(-1)).toMatchObject({
-      actorKind: 'ADMIN',
-      actorUserId: users[1],
-      action: 'game.request.rejected',
-      targetType: 'World',
-      targetId: null,
-      worldId: null,
-      reason: null,
-      payload: { code: 'FORBIDDEN' },
-      inputEventId: null,
-    });
+    expect(auditAfter).toHaveLength(auditBefore.length + 2);
+    expect(auditAfter.slice(0, -2)).toEqual(auditBefore);
+    expect(auditAfter.slice(-2)).toMatchObject(
+      ['game.request.rejected', 'world.setting.request.rejected'].map((action) => ({
+        actorKind: 'ADMIN',
+        actorUserId: users[1],
+        action,
+        targetType: 'World',
+        targetId: null,
+        worldId: null,
+        reason: null,
+        payload: { code: 'FORBIDDEN' },
+        inputEventId: null,
+      })),
+    );
   });
 
   it('미인증 상태에서도 가입·로그인·메일 재전송·인증·암호 복구·로그아웃은 이어진다', async () => {

@@ -4,6 +4,7 @@ import type { ProcedureMeta } from '../trpc';
 
 const VERIFIED_MUTATIONS = [
   'admin.game.request',
+  'admin.world.requestSetting',
   'admin.notice.create',
   'admin.notice.hide',
   'admin.notice.update',
@@ -60,7 +61,7 @@ describe('T3-02 AC-M3-01 이메일 인증 경계', () => {
       { _def: { type: string; meta?: ProcedureMeta } }
     >;
     const mutations = Object.entries(procedures).filter(([, procedure]) => procedure._def.type === 'mutation');
-    expect(mutations).toHaveLength(48);
+    expect(mutations).toHaveLength(49);
     expect(
       mutations
         .filter(([, procedure]) => procedure._def.meta?.accountAccess === 'verified')

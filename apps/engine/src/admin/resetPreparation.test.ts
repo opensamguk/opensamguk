@@ -151,6 +151,14 @@ function fixture(useRequest = true) {
     gameResource: { findMany: vi.fn(async () => rows) },
     inputEvent: {
       findMany: vi.fn(async (args: Prisma.InputEventFindManyArgs) => {
+        if (
+          typeof args.where?.kind === 'object' &&
+          Array.isArray(args.where.kind.in) &&
+          args.where.kind.in.includes('admin.world.rename')
+        ) {
+          expect(args.where).toMatchObject({ worldId, status: 'APPLIED' });
+          return [];
+        }
         expect(args.take).toBe(2);
         return resets;
       }),
@@ -690,7 +698,9 @@ it('D1 APPLIED reset 원장을 출처로 새 월드를 다시 준비한다', asy
   expect(prepared.evidence.provenance).toEqual({ kind: 'reset', requestId: '11' });
   expect(prepared.evidence.initialHash).toBe(f.world.initialStateHash);
   await verifyResetPreparation(transactionClient(f), f.world, prepared, oldSeed, controller().signal);
-  expect(f.tx.inputEvent.findMany.mock.calls[0]![0]).toMatchObject({ take: 2, where: { kind: ADMIN_RESET_KIND } });
+  expect(f.tx.inputEvent.findMany).toHaveBeenCalledWith(
+    expect.objectContaining({ take: 2, where: expect.objectContaining({ kind: ADMIN_RESET_KIND }) }),
+  );
 });
 it.each(['PENDING', 'REJECTED'] as const)('D1 존재하는 reset %s는 CLI fallback하지 않는다', async (status) => {
   const f = fixture(false),

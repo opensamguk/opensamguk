@@ -3,6 +3,7 @@ import { ADMIN_CLOCK_KINDS } from '../clock/admin';
 import { ADMIN_END_KIND } from '../clock/end';
 import { ADMIN_RESET_KIND } from '../clock/reset';
 import { ADMIN_GAME_KINDS } from '../admin/game';
+import { ADMIN_SETTING_KINDS } from '../admin/settings';
 
 export const HERITAGE_DIRECT_INPUT_KINDS = [
   'turns.set',
@@ -31,6 +32,7 @@ export const HERITAGE_IGNORED_INPUT_KINDS = [
   ADMIN_END_KIND,
   ADMIN_RESET_KIND,
   ...ADMIN_GAME_KINDS,
+  ...ADMIN_SETTING_KINDS,
 ] as const;
 const directKinds = new Set<string>(HERITAGE_DIRECT_INPUT_KINDS);
 

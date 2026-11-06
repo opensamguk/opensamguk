@@ -19,6 +19,7 @@ import { isAdminGameKind } from './admin/game';
 import type { ReputationLedger } from './review/schema';
 import { reputationTurnEvents } from './review/events';
 import { appendReputationEvents } from './review/ledger';
+import { isAdminSettingKind, validateAdminSettingRecord } from './admin/settings';
 import { validateAdminGameRecord } from './admin/apply';
 
 export interface QueuedTurn {
@@ -170,6 +171,7 @@ export function applyRecordedInput(
 ): ReplayState {
   if (isAdminClockKind(input.kind)) return applyAdminClockRecord(replay, input);
   if (isAdminGameKind(input.kind)) validateAdminGameRecord(input);
+  if (isAdminSettingKind(input.kind)) validateAdminSettingRecord(input);
   if (
     replay.policy &&
     (!replay.state.ruleFeatures ||
