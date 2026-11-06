@@ -137,11 +137,12 @@ it.each(['empty', 'upgrade'] as const)(
         await client.query(await readFile(new URL(`${name}/migration.sql`, directory), 'utf8'));
       expect(
         (await client.query('SELECT * FROM "World" ORDER BY id')).rows.map(
-          ({ equipmentState, runtimeOptions, cityRuinsState, nationStrategyState, ...row }) => {
+          ({ equipmentState, runtimeOptions, cityRuinsState, nationStrategyState, nationLifecycleState, ...row }) => {
             expect(equipmentState).toBeNull();
             expect(runtimeOptions).toBeNull();
             expect(cityRuinsState).toBeNull();
             expect(nationStrategyState).toBeNull();
+            expect(nationLifecycleState).toBeNull();
             return row;
           },
         ),

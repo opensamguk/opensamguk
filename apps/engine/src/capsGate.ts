@@ -3,6 +3,7 @@ import {
   projectTreatyRows,
   selectWorldCapabilities,
   readStoredNationStrategy,
+  readStoredNationLifecycle,
   validateBrokenTreatyRow,
   validateClosedTreatyRow,
   type WorldCapabilities,
@@ -21,6 +22,7 @@ export async function assertWorldCapabilities(
   const modern = world.replayFormat === 3;
   const origin = checkStoredReplayFormat(world);
   readStoredNationStrategy(world);
+  readStoredNationLifecycle(world);
   const armyTypes = world.ruleFeatures.includes('campaign-v1') ? readCampaignArmyTypes(world, origin) : [];
   await assertStoredCityResources(tx, world, armyTypes);
   await assertStoredCityRuins(tx, world);

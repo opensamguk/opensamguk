@@ -41,6 +41,7 @@ import { reputationFeature } from './review/feature';
 import { cityScaleFeature } from './cityScale/feature';
 import { checkCityScaleInitial } from './cityScale/state';
 import { nationStrategyFeature } from './nationStrategy/feature';
+import { nationLifecycleFeature } from './nationLifecycle/feature';
 
 export interface ReplayOriginV1 {
   version: 1;
@@ -117,10 +118,12 @@ export const ruleRegistry: RuleRegistry = {
     reputationFeature,
     cityScaleFeature,
     nationStrategyFeature,
+    nationLifecycleFeature,
   ],
   monthlyOrder: [
     'treaty',
     'lineage-v1',
+    'nation-lifecycle-v1',
     'personnel',
     'campaign-assignment-v2',
     'logistics-v1',

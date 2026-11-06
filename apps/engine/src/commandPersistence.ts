@@ -2,7 +2,7 @@ import type { Prisma } from '@opensamguk/db';
 import type { RealtimeSignal } from '@opensamguk/db';
 import type { CommandResult, WorldState } from '@opensamguk/rules';
 import { loadWorld } from './worldLoader';
-import { archiveRemovedNation, type ActionAt } from './nationArchive';
+import { persistRemovedNations, type ActionAt } from './nationArchive';
 import { persistCampaignState, readCampaignArmyTypes } from './campaignState';
 import { persistCityResourcesState } from './cityResourcesState';
 import { persistLogisticsState } from './logisticsState';
@@ -11,6 +11,7 @@ import { persistLineageState } from './lineage/repository';
 import { persistStratagemCardsState } from './stratagemCards/state';
 import { persistEquipmentState } from './equipmentState';
 import { persistNationStrategy } from './nationStrategyState';
+import { persistNationLifecycle } from './nationLifecycleState';
 
 export async function loadCommandState(
   tx: Prisma.TransactionClient,
@@ -43,6 +44,7 @@ export async function persistCommandState(
 ) {
   // 같은 잠긴 트랜잭션에서 읽은 사본은 다시 조회하지 않는다.
   const before = previous ?? (await loadWorld(tx, worldId));
+  await persistNationLifecycle(tx, worldId, before, state);
   await persistNationStrategy(tx, worldId, before, state);
   await persistCampaignState(tx, worldId, before, state);
   const cityArmyTypes = before.ruleFeatures?.includes('city-resources-v1')
@@ -96,22 +98,25 @@ export async function persistCommandState(
       ),
     });
   }
-  if (JSON.stringify(state.commandMeta) !== JSON.stringify(before.commandMeta)) {
-    if (state.commandMeta)
-      await tx.world.update({
-        where: { id: worldId },
-        data: { commandMeta: state.commandMeta as Prisma.InputJsonValue },
-      });
-    else await tx.$executeRaw`UPDATE "World" SET "commandMeta" = NULL WHERE id = ${worldId}`;
-  }
+  await persistCommandMeta(tx, worldId, before, state);
   // 새 국가의 FK 대상은 생긴 뒤, 멸망 국가의 직책이 연쇄 삭제되기 전에 후속 상태를 저장한다.
   await beforeNationRemoval?.();
-  for (const nation of Object.values(before.nations)) {
-    if (!state.nations[nation.id]) {
-      await archiveRemovedNation(tx, worldId, nation, at);
-      await tx.nation.update({ where: { worldId_id: { worldId, id: nation.id } }, data: { capitalCityKey: null } });
-      await tx.nation.delete({ where: { worldId_id: { worldId, id: nation.id } } });
-    }
+  await persistRemovedNations(tx, worldId, before, state, at);
+}
+
+export async function persistCommandMeta(
+  tx: Prisma.TransactionClient,
+  worldId: string,
+  before: WorldState,
+  next: WorldState,
+) {
+  if (JSON.stringify(next.commandMeta) !== JSON.stringify(before.commandMeta)) {
+    if (next.commandMeta)
+      await tx.world.update({
+        where: { id: worldId },
+        data: { commandMeta: next.commandMeta as Prisma.InputJsonValue },
+      });
+    else await tx.$executeRaw`UPDATE "World" SET "commandMeta" = NULL WHERE id = ${worldId}`;
   }
 }
 

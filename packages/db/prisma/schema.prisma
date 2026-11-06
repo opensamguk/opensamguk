@@ -10,77 +10,78 @@ datasource db {
 }
 
 model World {
-  reputationEvents    ReputationEvent[]
-  monthlyReviews      MonthlyReview[]
-  runtimeOptions      Json?
-  equipmentState      Json?
-  notificationOutbox  NotificationOutbox[]
-  lineageState        Json?
-  stratagemCardsState Json?
-  governanceState     Json?
-  governanceMovements GovernanceMovement[]
-  logisticsState      Json?
-  logisticsMovements  LogisticsMovement[]
-  id                  String               @id @default(uuid())
-  name                String
-  presetKey           String?
-  preset              Json?
-  scenarioKey         String
-  mapKey              String
-  unitSetKey          String
-  seed                String
-  startYear           Int
-  endYear             Int?
-  clockMode           WorldClockMode       @default(REALTIME)
-  outcomeFromSequence Int                  @default(0)
-  result              WorldResult?
-  turnTermMinutes     Int
-  status              WorldStatus          @default(PREOPEN)
-  clockTick           Int                  @default(0)
-  clockAnchorAt       DateTime?
-  clockRevision       Int                  @default(0)
-  startedAt           DateTime?
-  endedAt             DateTime?
-  initialStateHash    String
-  statRules           Json
-  unitSet             Json
-  operationalMap      Json?
-  createdAt           DateTime             @default(now())
-  nations             Nation[]
-  cities              City[]
-  generals            General[]
-  diplomacies         Diplomacy[]
-  engineLease         EngineLease?
-  engineHeartbeat     EngineHeartbeat?
-  monthlyTick         Int                  @default(0)
-  actionSequence      Int                  @default(0)
-  policyFromSequence  Int?
-  treatyFormat        Int?
-  personnelFormat     Int?
-  replayFormat        Int                  @default(1)
-  ruleFeatures        String[]             @default([])
-  replayOrigin        Json?
-  inputEvents         InputEvent[]
-  nationHistory       NationHistory[]
-  yearbooks           YearbookSnapshot[]
-  removedNations      RemovedNation[]
-  commandMeta         Json?
-  campaignState       Json?
-  cityResourcesState  Json?
-  cityRuinsState      Json?
-  nationStrategyState Json?
-  battleLogs          BattleLog[]
-  ranking             RankingSnapshot?
-  publicMaps          PublicMapSnapshot[]
-  messages            Message[]
-  notices             Notice[]
-  operations          Operation[]
-  extSlices           WorldExtSlice[]
-  treaties            Treaty[]
-  nationTrust         NationTrust[]
-  assignmentOffers    AssignmentOffer[]
-  sanctions           Sanction[]
-  createRequest       WorldCreateRequest?
+  reputationEvents     ReputationEvent[]
+  monthlyReviews       MonthlyReview[]
+  runtimeOptions       Json?
+  equipmentState       Json?
+  notificationOutbox   NotificationOutbox[]
+  lineageState         Json?
+  stratagemCardsState  Json?
+  governanceState      Json?
+  governanceMovements  GovernanceMovement[]
+  logisticsState       Json?
+  logisticsMovements   LogisticsMovement[]
+  id                   String               @id @default(uuid())
+  name                 String
+  presetKey            String?
+  preset               Json?
+  scenarioKey          String
+  mapKey               String
+  unitSetKey           String
+  seed                 String
+  startYear            Int
+  endYear              Int?
+  clockMode            WorldClockMode       @default(REALTIME)
+  outcomeFromSequence  Int                  @default(0)
+  result               WorldResult?
+  turnTermMinutes      Int
+  status               WorldStatus          @default(PREOPEN)
+  clockTick            Int                  @default(0)
+  clockAnchorAt        DateTime?
+  clockRevision        Int                  @default(0)
+  startedAt            DateTime?
+  endedAt              DateTime?
+  initialStateHash     String
+  statRules            Json
+  unitSet              Json
+  operationalMap       Json?
+  createdAt            DateTime             @default(now())
+  nations              Nation[]
+  cities               City[]
+  generals             General[]
+  diplomacies          Diplomacy[]
+  engineLease          EngineLease?
+  engineHeartbeat      EngineHeartbeat?
+  monthlyTick          Int                  @default(0)
+  actionSequence       Int                  @default(0)
+  policyFromSequence   Int?
+  treatyFormat         Int?
+  personnelFormat      Int?
+  replayFormat         Int                  @default(1)
+  ruleFeatures         String[]             @default([])
+  replayOrigin         Json?
+  inputEvents          InputEvent[]
+  nationHistory        NationHistory[]
+  yearbooks            YearbookSnapshot[]
+  removedNations       RemovedNation[]
+  commandMeta          Json?
+  campaignState        Json?
+  cityResourcesState   Json?
+  cityRuinsState       Json?
+  nationStrategyState  Json?
+  nationLifecycleState Json?
+  battleLogs           BattleLog[]
+  ranking              RankingSnapshot?
+  publicMaps           PublicMapSnapshot[]
+  messages             Message[]
+  notices              Notice[]
+  operations           Operation[]
+  extSlices            WorldExtSlice[]
+  treaties             Treaty[]
+  nationTrust          NationTrust[]
+  assignmentOffers     AssignmentOffer[]
+  sanctions            Sanction[]
+  createRequest        WorldCreateRequest?
 }
 
 model ReputationEvent {

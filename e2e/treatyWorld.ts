@@ -75,6 +75,12 @@ export const ACTORS = {
 } as const satisfies Record<string, { world: 'treaty' | 'legacy'; nationId: number; officerLevel: number }>;
 export type ActorKey = keyof typeof ACTORS;
 
+// 역할마다 장수 이름을 고정한다. 무작위 이름(newGeneralName, 'E'+5자리)은 같은 월드의 다른 역할과 드물게 겹쳐
+// 엔진이 NAME_TAKEN(409)으로 거절하면 준비가 실패한다. 'T'+역할 순번 base36 5자리(6글자)는 역할끼리 다르고
+// 시나리오 장수 이름(한글)·newGeneralName('E' 접두)과 겹치지 않는다.
+const ACTOR_KEYS = Object.keys(ACTORS) as ActorKey[];
+const actorGeneralName = (key: ActorKey) => `T${ACTOR_KEYS.indexOf(key).toString(36).padStart(5, '0')}`;
+
 // 세션 토큰은 실행마다 새로 정한 시드에서 역할 키로 유도한다. 시드는 실행 드라이버가 자식 프로세스 env로만 넘긴다.
 // 드라이버는 같은 시드로 모든 토큰과 비밀번호를 메모리에서 알 수 있어 산출물에 새지 않았는지 검사한다. 디스크에 storageState를 쓰지 않는다.
 // env가 없으면(일반 pnpm e2e) 이 프로세스 안에서만 시드를 만든다.
@@ -301,7 +307,7 @@ export class TreatyFixture {
         const origin = externalOrigin({ url: request.url(), resourceType: request.resourceType() }, appHost);
         if (origin !== null) external.push(origin);
       });
-      const general = await createGeneralByApi(page, worldId);
+      const general = await createGeneralByApi(page, worldId, actorGeneralName(key));
       await this.assignGeneral(key, worldId, general.id);
       const home = await query<{ nation: { id: number } | null }>(page, 'home.get', { worldId });
       expect(home.nation?.id).toBe(plan.nationId);
