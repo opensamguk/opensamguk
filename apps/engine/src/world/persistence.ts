@@ -129,6 +129,8 @@ export function prepareInitialWorld(
         featureData = { ...featureData, policy: { version: 1, turnTermMinutes: options.turnTermMinutes } };
     }
   }
+  if (frozen.unitSet.coefMode === 'multiply' && !features.includes('battle-affinity-v2'))
+    throw new Error('곱셈 병종 판에는 battle-affinity-v2 규칙 기능이 필요합니다.');
   const parsedPreset = options.preset ? parsePreset(options.preset.value) : null;
   if (options.extFormat !== undefined && options.extFormat !== 1) throw new Error('확장 생성 형식을 확인하세요.');
   if (

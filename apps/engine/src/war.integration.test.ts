@@ -10,6 +10,7 @@ import { controlClock } from './world/clock';
 import { acquireLease, LeaseLostError, releaseLease, renewLease } from './lease';
 import { TurnLoop } from './turnLoop';
 import { exportReplay, replayArchive } from './replay';
+import { loadReplayState } from './monthly';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -18,8 +19,9 @@ afterAll(async () => {
   await db.world.deleteMany();
   await db.$disconnect();
 });
-async function create(initial?: WorldInit) {
+async function create(initial?: WorldInit, ruleFeatures?: string[]) {
   initial ??= await warFixture();
+  if (ruleFeatures) initial.ruleFeatures = ruleFeatures;
   // 12개월 전투·재생 회귀가 조기 통일로 끝나지 않도록 접근할 수 없는 중립 도시를 남긴다.
   initial.cities.push({
     ...initial.cities[0]!,
@@ -30,7 +32,8 @@ async function create(initial?: WorldInit) {
     supplied: false,
   });
   const { worldId } = await saveInitialWorld(db, initial, {
-    replayFormat: 'legacy',
+    replayFormat: ruleFeatures ? 3 : 'legacy',
+    ...(ruleFeatures ? { ruleFeatures } : {}),
     name: '전투 통합',
     turnTermMinutes: 60,
     endYear: null,
@@ -88,6 +91,61 @@ async function snapshot(worldId: string) {
 }
 
 describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
+  it.each(['basic', 'effects'] as const)(
+    'AC-INT-22 %s의 새 계산식은 실제 전투·rollback·12개월 재생·재적재가 같다',
+    async (mode) => {
+      const initial = await warFixture();
+      initial.generals[0]!.crew = initial.generals[1]!.crew = 1000;
+      initial.generals[1]!.crewType = 1200;
+      initial.generals[2]!.crew = 0;
+      if (mode === 'effects') {
+        initial.unitSet.coefMode = 'multiply';
+        for (const row of initial.unitSet.crewTypes)
+          row.effects = row.armType === 1 ? ['guard5'] : ['firstVolley', 'avoid'];
+      }
+      const { worldId, loop, lease } = await create(initial, ['battle-affinity-v2']);
+      try {
+        await queue(worldId, 1, 'attack', { cityKey: 2 });
+        const before = await snapshot(worldId);
+        await expect(
+          new TurnLoop(db, lease, {
+            beforeCommit: async () => {
+              throw Error('int22 battle rollback');
+            },
+          }).advanceTo(100),
+        ).rejects.toThrow('int22 battle rollback');
+        expect(await snapshot(worldId)).toEqual(before);
+        const expected = runGeneralTurn(
+          toWorldState(initial),
+          { generalId: 1, tick: 100, unitSet: initial.unitSet },
+          { commandKey: 'attack', args: { cityKey: 2 } },
+          initial.seed,
+        ).state;
+        expected.generals[1]!.nextTurnTick = 10100;
+        await loop.advanceTo(100);
+        await loop.advanceTo(100);
+        expect(hashState(toWorldState(await readWorldState(db, worldId)))).toBe(hashState(expected));
+        expect(await db.generalLog.count({ where: { worldId, generalId: 1, tick: 100 } })).toBe(1);
+        for (let month = 1; month <= 12; month++) {
+          await renewLease(db, lease);
+          await loop.advanceTo(month * 10000);
+        }
+        const archive = await exportReplay(db, worldId);
+        const result = replayArchive(archive, 12);
+        expect(result.map((row) => row.stateHash)).toEqual(archive.months.map((row) => row.stateHash));
+        const reopened = createDb(url!);
+        try {
+          expect(hashState(await reopened.$transaction((tx) => loadReplayState(tx, worldId)))).toBe(
+            result.at(-1)!.stateHash,
+          );
+        } finally {
+          await reopened.$disconnect();
+        }
+      } finally {
+        await releaseLease(db, lease);
+      }
+    },
+  );
   it('국가포상·수비2명·성벽·멸망·재야·국가예턴 삭제와 로그를 한 번 저장하고 12개월 재생한다', async () => {
     const { initial, worldId, loop, lease } = await create();
     await queue(worldId, 1, 'attack', { cityKey: 2 });

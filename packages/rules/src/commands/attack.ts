@@ -84,6 +84,7 @@ function makeAttack(collect: typeof collectModifiers) {
             attackerTech: aTech,
             defenderTech: bTech,
             unitSet: actor.unitSet!,
+            coefMode: state.ruleFeatures?.includes('battle-affinity-v2') ? 'multiply' : 'divide',
             attackerModifiers: {
               dealt: collect(state, g.id, { stage: 'battle.dealt', commandKey: 'attack' }),
               taken: collect(state, g.id, { stage: 'battle.taken', commandKey: 'attack' }),
@@ -121,6 +122,7 @@ function makeAttack(collect: typeof collectModifiers) {
             defenderTech: bTech,
             defence: city.defence,
             unitSet: actor.unitSet!,
+            coefMode: state.ruleFeatures?.includes('battle-affinity-v2') ? 'multiply' : 'divide',
             attackerModifiers: {
               dealt: collect(state, g.id, { stage: 'battle.dealt', commandKey: 'attack' }),
               taken: collect(state, g.id, { stage: 'battle.taken', commandKey: 'attack' }),

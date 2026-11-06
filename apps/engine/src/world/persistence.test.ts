@@ -2,8 +2,10 @@ import type { Prisma, PrismaClient } from '@opensamguk/db';
 import { readFileSync } from 'node:fs';
 import {
   capsResourceHashInput,
+  checkReplayOrigin,
   parseCapsOrigin,
   presetRules,
+  type ReplayOriginV3,
   type WorldInit,
   type WorldPreset,
 } from '@opensamguk/rules';
@@ -55,6 +57,51 @@ function database() {
   );
   return { tx, worldId, transaction, forbidden, db: { $transaction: transaction } as unknown as PrismaClient };
 }
+
+describe('AC-INT-22 전투 상성 생성 경계', () => {
+  it.each(['prepare', 'save', 'cli'] as const)('%s는 곱셈 판의 기능 누락을 TX 전에 거부한다', async (path) => {
+    const initial = await monthlyFixture();
+    initial.unitSet.coefMode = 'multiply';
+    const f = database();
+    if (path === 'prepare') expect(() => prepareInitialWorld(initial, options())).toThrow('battle-affinity-v2');
+    else
+      await expect((path === 'save' ? saveInitialWorld : createWorldFromCli)(f.db, initial, options())).rejects.toThrow(
+        'battle-affinity-v2',
+      );
+    expect(f.transaction).not.toHaveBeenCalled();
+    expect(f.tx.world.create).not.toHaveBeenCalled();
+  });
+  it.each(['state', 'options'] as const)(
+    '%s에만 있는 기능도 선택하여 같은 생성·재생 경계를 통과한다',
+    async (source) => {
+      const initial = await monthlyFixture();
+      initial.unitSet.coefMode = 'multiply';
+      const selected = options();
+      if (source === 'state') initial.ruleFeatures = ['battle-affinity-v2'];
+      else selected.ruleFeatures = ['battle-affinity-v2'];
+      const f = database();
+      await saveInitialWorld(f.db, initial, selected);
+      const data = f.tx.world.create.mock.calls[0]![0].data;
+      expect(data.ruleFeatures).toEqual(['battle-affinity-v2']);
+      const origin = data.replayOrigin as unknown as ReplayOriginV3;
+      expect(() => checkReplayOrigin(origin)).not.toThrow();
+      const forged = structuredClone(origin);
+      delete forged.initial.ruleFeatures;
+      expect(() => checkReplayOrigin(forged)).toThrow('battle-affinity-v2');
+    },
+  );
+  it('전투 상성의 별도 초기 자료는 받지 않는다', async () => {
+    const f = database();
+    await expect(
+      saveInitialWorld(f.db, await monthlyFixture(), {
+        ...options(),
+        ruleFeatures: ['battle-affinity-v2'],
+        featureData: { 'battle-affinity-v2': {} },
+      }),
+    ).rejects.toThrow('별도 초기 자료');
+    expect(f.transaction).not.toHaveBeenCalled();
+  });
+});
 
 it('준비한 자료는 입력과 옵션의 후속 변경을 보존된 해시에 섞지 않는다', async () => {
   const initial = await monthlyFixture(),
