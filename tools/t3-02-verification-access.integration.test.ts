@@ -182,8 +182,8 @@ describe('T3-02 AC-M3-01 실제 PostgreSQL·HTTP 이메일 인증 차단', () =>
     });
   });
 
-  it('41개 변경 API가 미인증·위조·무인증·제재를 거부하고 운영 권한 거절 감사 두 행만 남긴다', async () => {
-    expect(paths).toHaveLength(41);
+  it('44개 변경 API가 미인증·위조·무인증·제재를 거부하고 운영 권한 거절 감사 두 행만 남긴다', async () => {
+    expect(paths).toHaveLength(44);
     expect(paths).toContain('entry.possess');
     expect(paths).toContain('admin.game.request');
     expect(paths).toContain('admin.world.requestSetting');
@@ -198,6 +198,9 @@ describe('T3-02 AC-M3-01 실제 PostgreSQL·HTTP 이메일 인증 차단', () =>
     expect(paths).toContain('admin.world.requestClock');
     expect(paths).toContain('cityResources.allocate');
     expect(paths).toContain('admin.world.create');
+    expect(paths).toEqual(
+      expect.arrayContaining(['resourceAdmin.clone', 'resourceAdmin.save', 'resourceAdmin.publish']),
+    );
 
     expect(paths).toContain('admin.world.requestEnd');
     expect(paths).toContain('admin.world.requestReset');
@@ -218,9 +221,10 @@ describe('T3-02 AC-M3-01 실제 PostgreSQL·HTTP 이메일 인증 차단', () =>
         expect(response.error!.data, path).toMatchObject({ code: 'UNAUTHORIZED', reason: null });
       }
       const verified = await request(path, {}, cookies[1]);
-      expect(verified.status, path).toBe(path.startsWith('admin.') ? 403 : 400);
+      const adminOnly = path.startsWith('admin.') || path.startsWith('resourceAdmin.');
+      expect(verified.status, path).toBe(adminOnly ? 403 : 400);
       expect(verified.error!.data, path).toMatchObject({
-        code: path.startsWith('admin.') ? 'FORBIDDEN' : 'BAD_REQUEST',
+        code: adminOnly ? 'FORBIDDEN' : 'BAD_REQUEST',
         reason: null,
       });
     }

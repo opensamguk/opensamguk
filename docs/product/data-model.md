@@ -42,6 +42,7 @@
 | 테이블                 | 주요 필드                                                                                                                                           | 관문                 |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
 | `User`                 | id, email(고유), passwordHash, emailVerifiedAt, role(USER·ADMIN), status(ACTIVE·SANCTIONED·WITHDRAWN), createdAt                                    | M1                   |
+| `ResourceEditorGrant`  | userId(기본키·User 외래키), createdAt. 관리자 역할과 별도이며 관리자 역할 회수 시 함께 회수 | P2-27 권한 구현 중 |
 | `Session`              | id(토큰 해시), userId, expiresAt, createdAt                                                                                                         | M1                   |
 | `LoginRecord`          | id(BigInt), userId, at, success, ipHash, deviceHash(nullable), hashKeyVersion                                                                       | M3 조사 기록 구현 중 |
 | `ConsentRecord`        | userId, docType(약관·개인정보), version, agreedAt                                                                                                   | M3                   |

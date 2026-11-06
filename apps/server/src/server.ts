@@ -21,6 +21,7 @@ import { bindLegalPolicy } from './legal/publish';
 import { resolveWithdrawalPolicy, type WithdrawalPolicy } from './auth/withdrawalPolicy';
 import { deviceCookieOptions, prepareLoginAudit, resolveLoginAudit, type LoginAuditOptions } from './auth/loginAudit';
 import type { DiscordWebhookTransport } from './notifications/discordWebhook';
+import { resourceAdminHttpGuard } from './resourceAdmin/http';
 
 export async function buildServer(options: {
   db: PrismaClient;
@@ -107,6 +108,7 @@ export async function buildServer(options: {
       publicOrigin,
     );
     if (denial) return reply.code(denial.status).send({ error: denial.error });
+    return resourceAdminHttpGuard(req, reply);
   });
   await server.register(cookie);
   const realtime = registerRealtime(server, options.db, publicOrigin, options.realtime, clock);

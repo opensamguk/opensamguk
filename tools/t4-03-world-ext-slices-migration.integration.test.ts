@@ -493,6 +493,7 @@ it.each(['empty', 'legacy'] as const)(
         NotificationOutbox: [],
         NotificationDispatchGate: [{ data: { id: 'discord', blockedUntil: null } }],
         ConsentRecord: [],
+        ResourceEditorGrant: [],
         AuditLog: [],
         Sanction: [],
         AdminNoticeRequest: [],

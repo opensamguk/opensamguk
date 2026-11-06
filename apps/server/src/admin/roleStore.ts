@@ -26,6 +26,20 @@ export async function changeAdminRole(db: PrismaClient, input: z.input<typeof re
       throw new Error('대상 계정의 유효한 제재를 먼저 해제하세요.');
     const changed = user.role !== request.role;
     if (changed) await tx.user.update({ where: { id: user.id }, data: { role: request.role } });
+    if (request.role === 'USER') {
+      const removed = await tx.resourceEditorGrant.deleteMany({ where: { userId: user.id } });
+      if (removed.count)
+        await tx.auditLog.create({
+          data: {
+            actorKind: 'CLI',
+            action: 'resource-editor.revoke',
+            targetType: 'User',
+            targetId: user.id,
+            reason: request.reason,
+            payload: { before: true, after: false, changed: true },
+          },
+        });
+    }
     const audit = await tx.auditLog.create({
       data: {
         actorKind: 'CLI',

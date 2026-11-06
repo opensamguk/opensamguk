@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { adminProcedure } from '../admin/role';
+import { resourceEditorAccess } from '../resourceAdmin/access';
 import { router } from '../trpc';
 import { notifySessionClosed } from '@opensamguk/db';
 import { createAdminSanction, createSanctionInput, liftAdminSanction, liftSanctionInput } from '../admin/sanctionStore';
@@ -75,7 +76,12 @@ export const adminRouter = router({
       .input(adminGameRequestStatusInput)
       .query(({ ctx, input }) => getAdminGameRequest(ctx, input)),
   }),
-  whoami: adminProcedure.input(z.void()).query(() => ({ admin: true as const })),
+  whoami: adminProcedure.input(z.void()).query(({ ctx }) =>
+    ctx.db.$transaction(async (tx) => {
+      const { resourceEditor } = await resourceEditorAccess(tx, ctx, false);
+      return { admin: true as const, resourceEditor };
+    }),
+  ),
   investigate: router({
     shared: adminProcedure.input(investigateSharedInput).query(({ ctx, input }) => investigateShared(ctx, input)),
   }),
