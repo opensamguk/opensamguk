@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { validateWorldResources } from '../packages/rules/src/world/validate';
 import { hashState } from '../packages/shared/src/node/hashState';
 import type { GameResourceKind, Prisma, PrismaClient } from '../packages/db/src/index';
-import baseline from './fixtures/t4-77-baseline.json';
+import baseline from './fixtures/t4-77-baseline.json' with { type: 'json' };
 
 const root = new URL('../', import.meta.url);
 export const INTEGRATION_RESOURCE_FILES = [
