@@ -15,6 +15,7 @@ import { readWorldState, saveInitialWorld } from '../apps/engine/src/world/persi
 import { onShutdownRequest, stopOwnedChild } from '../apps/engine/src/process-lifecycle';
 import { initializeResources } from './init-resources';
 import { initializeIntegrationResources } from './integration-resources';
+import { DatabaseDisconnectError, observeDisconnectedDatabase } from './test-db-close';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { requestWorldReset, getWorldResetRequest } from '../apps/server/src/admin/worldReset';
 import { newSession } from '../apps/server/src/auth/session';
@@ -528,6 +529,7 @@ async function unpackTar(data: Buffer, lsTree: Buffer, head: string) {
 async function cleanup() {
   if (cleanupPromise) return cleanupPromise;
   cleanupPromise = (async () => {
+    const cleanupStarted = performance.now();
     controller.abort();
     const errors = evidence.cleanupErrors as unknown[];
     const report = (
@@ -546,7 +548,18 @@ async function cleanup() {
         | 'container'
         | 'ports'
         | 'root-env',
-    ) => console.error(JSON.stringify({ event: 't215-cleanup-failure', phase, slot, step }));
+      failure?: DatabaseDisconnectError,
+    ) =>
+      console.error(
+        JSON.stringify({
+          event: 't215-cleanup-failure',
+          phase,
+          slot,
+          step,
+          ...(failure ? { reason: failure.reason } : {}),
+          ...(failure?.reason === 'still-connected' ? { connections: failure.connections } : {}),
+        }),
+      );
     for (const [child, exited] of children)
       await stopOwnedChild(child, exited).catch(() => {
         errors.push('child-stop');
@@ -579,15 +592,28 @@ async function cleanup() {
           )
             fail('cleanup-identity');
           step = 'connections';
-          if ((await catalog(`SELECT count(*) FROM pg_stat_activity WHERE datname='${name}';`, true)) !== '0')
-            fail('cleanup-connected');
+          const observation = await observeDisconnectedDatabase(
+            name,
+            oid,
+            () => catalog(`SELECT count(*) FROM pg_stat_activity WHERE datname='${name}';`, true),
+            async () => {
+              try {
+                await identity(true);
+              } catch (error) {
+                if (['container-binding-identity', 'cluster-identity-or-local-auth'].includes(reasonOf(error)))
+                  return undefined;
+                throw error;
+              }
+              return (await catalogList(true)).find((row) => row.name === name)?.oid;
+            },
+          );
           step = 'drop';
           await catalog(`DROP DATABASE "${name}";`, true);
           evidence.dropped ??= [] as unknown[];
-          (evidence.dropped as unknown[]).push({ name, oid, connectionsBeforeDrop: 0 });
-        } catch {
+          (evidence.dropped as unknown[]).push({ name, oid, connectionsBeforeDrop: 0, ...observation });
+        } catch (error) {
           errors.push({ phase: 'database-drop', name, oid });
-          report('database-drop', slot, step);
+          report('database-drop', slot, step, error instanceof DatabaseDisconnectError ? error : undefined);
         }
       }
       let step: 'catalog' | 'other-databases' | 'container' | 'ports' | 'root-env' = 'catalog';
@@ -631,6 +657,7 @@ async function cleanup() {
     evidence.connectionEndpoint = input?.endpoint ?? null;
     evidence.m1DatabaseConnectionPolicy = { forbidden: true, directlyMeasured: false };
     evidence.finishedUtc = new Date().toISOString();
+    evidence.cleanupMs = performance.now() - cleanupStarted;
     if (runCreated) {
       // 실제 경로와 runId가 맞는 자기 디렉터리만 정리한다.
       const actual = await realpath(run);
