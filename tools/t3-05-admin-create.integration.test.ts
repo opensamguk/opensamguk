@@ -1234,6 +1234,11 @@ for (const mode of ['role', 'session', 'sanction'] as const)
     if (failures.length) throw new AggregateError(failures, '현재 권한 경합·정리 실패');
   });
 it('AC-M3-04 Context 뒤 만료·이메일·동의·정책 변경도 현재 생성과 조회를 다시 검사한다', async () => {
+  const cases: Array<{
+    owner: Actor;
+    caller: ReturnType<typeof appRouter.createCaller>;
+    expected: 'SERVICE_UNAVAILABLE' | 'UNAUTHORIZED' | 'FORBIDDEN';
+  }> = [];
   for (const mode of ['expired', 'unverified', 'consent', 'policy'] as const) {
     const owner = await user('ADMIN', 'ACTIVE', mode !== 'unverified'),
       identity: Context = {
@@ -1261,8 +1266,15 @@ it('AC-M3-04 Context 뒤 만료·이메일·동의·정책 변경도 현재 생�
     const caller = appRouter.createCaller(identity);
     if (mode === 'expired')
       await db.session.update({ where: { id: owner.sessionId }, data: { expiresAt: new Date(0) } });
-    const before = await footprint(),
-      expected = mode === 'policy' ? 'SERVICE_UNAVAILABLE' : mode === 'expired' ? 'UNAUTHORIZED' : 'FORBIDDEN';
+    cases.push({
+      owner,
+      caller,
+      expected: mode === 'policy' ? 'SERVICE_UNAVAILABLE' : mode === 'expired' ? 'UNAUTHORIZED' : 'FORBIDDEN',
+    });
+  }
+  // 준비 뒤 모든 거부가 무변경이어야 하므로 같은 전체 DB 기준을 대조한다.
+  const before = await footprint();
+  for (const { owner, caller, expected } of cases) {
     await expect(caller.admin.world.create(input(owner))).rejects.toMatchObject({ code: expected });
     await expect(
       caller.admin.world.createStatus({ expectedUserId: owner.id, idempotencyKey: firstRequest.idempotencyKey }),
