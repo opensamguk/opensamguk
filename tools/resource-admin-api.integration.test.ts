@@ -9,6 +9,7 @@ import { checkContent, RESOURCE_PAYLOAD_LIMITS } from '../apps/server/src/resour
 import { RESOURCE_HTTP_LIMITS } from '../apps/server/src/resourceAdmin/httpLimits';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { createWorldFromCli } from '../apps/engine/src/admin/creation';
 import { testDatabaseUrl } from './test-database';
 
 if (!process.env.TEST_DATABASE_URL) throw new Error('전용 시험 DB가 필요합니다.');
@@ -599,6 +600,47 @@ it('AC-P2-27 지도·시나리오 초안끼리 검사·게시하고 새 이름 �
   const world = await loadInitialWorldFromDb(db, { map: map.name, scenario: scenario.name, seed: 'd071' });
   const original = await loadInitialWorldFromDb(db, { map: 'che', scenario: '1030', seed: 'd071' });
   expect(world).toEqual({ ...original, mapKey: map.name, scenarioKey: scenario.name });
+  const created = await createWorldFromCli(db, world, {
+    name: '새 이름 자원 월드',
+    turnTermMinutes: 60,
+    endYear: null,
+  });
+  try {
+    const response = await fetch(
+      `${base}/trpc/lobby.worlds?batch=1&input=${encodeURIComponent(JSON.stringify({ 0: {} }))}`,
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as Array<{ result: { data: Array<{ id: string; scenarioTitle: string }> } }>;
+    expect(body[0]!.result.data.find((row) => row.id === created.worldId)).toMatchObject({
+      scenarioTitle: '【역사모드3】 군웅할거',
+    });
+    const draft = await copyResource((await sourceResource('SCENARIO', '1030')).id, user.cookie);
+    const invalidName = freshName();
+    await db.gameResource.create({
+      data: {
+        kind: 'SCENARIO',
+        name: invalidName,
+        version: 1,
+        status: 'PUBLISHED',
+        publishedAt: new Date(),
+        content: { id: invalidName, title: '해시가 다른 제목' },
+        contentHash: '0'.repeat(64),
+        source: '해시 손상 고정물',
+      },
+    });
+    for (const key of [draft.name, invalidName]) {
+      await db.world.update({ where: { id: created.worldId }, data: { scenarioKey: key } });
+      const denied = await fetch(
+        `${base}/trpc/lobby.worlds?batch=1&input=${encodeURIComponent(JSON.stringify({ 0: {} }))}`,
+      );
+      expect(denied.status).toBe(500);
+      const raw = await denied.text();
+      expect(raw).toContain('INTERNAL_SERVER_ERROR');
+      expect(raw).not.toMatch(new RegExp(`${key}|해시가 다른 제목|ENOENT|resources`));
+    }
+  } finally {
+    await db.world.delete({ where: { id: created.worldId } });
+  }
 });
 
 it('AC-P2-27 수정·삭제된 검사 대상은 저장·게시 모두 CONTEXT_STALE이고 종류 오류는 BAD_REQUEST다', async () => {

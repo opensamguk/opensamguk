@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { readPublishedResources, type Prisma } from '@opensamguk/db';
 import { TRPCError } from '@trpc/server';
 import {
   creationBlock,
@@ -16,16 +17,25 @@ import { worldClock } from '../queries';
 const titleSchema = scenarioSchema.pick({ id: true, title: true });
 const titles = new Map<string, string>();
 
-export async function scenarioTitle(key: string): Promise<string> {
+export async function scenarioTitle(key: string, db?: Pick<Prisma.TransactionClient, 'gameResource'>): Promise<string> {
   if (!/^[a-zA-Z0-9_-]+$/.test(key) || key === 'default') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
   const cached = titles.get(key);
   if (cached !== undefined) return cached;
   try {
-    const value = titleSchema.parse(
-      JSON.parse(await readFile(new URL(`scenario/${key}.json`, resourceRoot()), 'utf8')),
-    );
+    let content: unknown,
+      fromFile = false;
+    try {
+      content = JSON.parse(await readFile(new URL(`scenario/${key}.json`, resourceRoot()), 'utf8'));
+      fromFile = true;
+    } catch (error) {
+      if (!db || !(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') throw error;
+      const [resource] = await readPublishedResources(db, [{ kind: 'SCENARIO', name: key, version: 1 }]);
+      content = resource!.content;
+    }
+    const value = titleSchema.parse(content);
     if (value.id !== key) throw new Error();
-    titles.set(key, value.title);
+    // 파일 제목만 캐시한다. 카탈로그 조회는 현재 DB 트랜잭션의 판을 쓴다.
+    if (fromFile) titles.set(key, value.title);
     return value.title;
   } catch {
     throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
@@ -81,7 +91,7 @@ export const lobbyRouter = router({
           const scenarioTitles = new Map(
             await Promise.all(
               [...new Set(worlds.map((world) => world.scenarioKey))].map(
-                async (key) => [key, await scenarioTitle(key)] as const,
+                async (key) => [key, await scenarioTitle(key, tx)] as const,
               ),
             ),
           );
