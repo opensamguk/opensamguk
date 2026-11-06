@@ -76,6 +76,14 @@ export async function processAdminGame(
       const input = { sequence, tick: world.clockTick, generalId: null, kind: event.kind, status, payload, result };
       // 실제 엔진도 재생과 같은 등록부·공통 후처리를 지난 상태만 저장한다.
       const next = applyRecordedInput(before, input, ruleRegistry, { unitSet: origin.initial.unitSet });
+      const packet = before.offices
+        ? completePersonnelStep(
+            before.state,
+            before.offices,
+            { state: outcome.replay.state, offices: before.offices, closedOffers: [], logs: [] },
+            world.clockTick,
+          )
+        : undefined;
       await persistEffects(
         tx,
         world.id,
@@ -83,19 +91,14 @@ export async function processAdminGame(
         [{ kind: 'world', state: next.state }],
         { tick: world.clockTick, sequence },
         before.state,
+        async () => {
+          if (packet)
+            await persistPersonnelPacket(tx, world.id, before, packet, next.residenceAnchors!, {
+              tick: world.clockTick,
+              sequence,
+            });
+        },
       );
-      if (before.offices) {
-        const packet = completePersonnelStep(
-          before.state,
-          before.offices,
-          { state: outcome.replay.state, offices: before.offices, closedOffers: [], logs: [] },
-          world.clockTick,
-        );
-        await persistPersonnelPacket(tx, world.id, before, packet, next.residenceAnchors!, {
-          tick: world.clockTick,
-          sequence,
-        });
-      }
       const action = payload.action;
       if (action.kind === 'admin.general.clearTurns') {
         await tx.generalTurn.deleteMany({ where: { worldId: world.id, generalId: action.generalId } });
