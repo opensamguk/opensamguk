@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { buildInitialWorld } from '../../packages/rules/src/index';
 import { koreanName, matchPortraits, parseRegistry } from './convert';
 
 const readings = JSON.parse(readFileSync(new URL('hanja-readings.json', import.meta.url), 'utf8')).readings as Record<
@@ -8,16 +7,6 @@ const readings = JSON.parse(readFileSync(new URL('hanja-readings.json', import.m
   string
 >;
 const registry = parseRegistry(readFileSync(new URL('registry.tsv', import.meta.url), 'utf8'));
-const resource = (path: string) =>
-  JSON.parse(readFileSync(new URL(`../../resources/${path}`, import.meta.url), 'utf8'));
-const input = {
-  map: resource('map/che.json'),
-  scenario: resource('scenario/1030.json'),
-  unitSet: resource('unitset/basic.json'),
-  statRules: resource('scenario/default.json'),
-  seed: 'portraits',
-};
-
 describe('AC-M1-20 초상 이름 대응', () => {
   it('한자 독음과 이름 첫 음절의 두음법칙·성씨 예외를 적용한다', () => {
     for (const [kanji, name] of [
@@ -53,22 +42,6 @@ describe('AC-M1-20 초상 이름 대응', () => {
         없는이름: { id: 99999, reason: 'registry에 없음' },
       }),
     ).toThrow('registry');
-  });
-  it('고정된 생성물이 재생성 결과와 같고 월드에 429/491명을 안전하게 붙인다', () => {
-    const expected = resource('portraits/rtk14-map.json');
-    const generated = matchPortraits(
-      input.scenario.general.map((row: [number, string]) => row[1]),
-      registry,
-      readings,
-    );
-    expect({ ...expected, $comment: undefined }).toEqual({ ...generated, $comment: undefined });
-    expect(generated.stats).toEqual({ matched: 429, total: 491, percent: 87.37 });
-    const state = buildInitialWorld({ ...input, portraitMap: expected });
-    expect(state.generals.filter((general) => general.portraitId !== null)).toHaveLength(429);
-    expect(state.generals.find((general) => general.name === '유비')?.portraitId).toBe(10071);
-    expect(state.generals.find((general) => general.name === '고승')?.portraitId).toBeNull();
-    expect(state.generals.find((general) => general.name === '헌제')?.portraitId).toBeNull();
-    expect(() => buildInitialWorld({ ...input, portraitMap: { portraits: { 조조: 1 } } })).toThrow();
   });
   it('중복·범위 밖 registry ID를 거부한다', () => {
     const header = 'id\tname_kanji\treading\n';

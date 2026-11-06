@@ -1,6 +1,6 @@
-import { expect, it } from 'vitest';
+import { afterAll, beforeAll, expect, it } from 'vitest';
 import { hashState } from '../packages/shared/src/node/hashState';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import {
   applyCampaignOrder,
   applyRecordedInput,
@@ -11,9 +11,20 @@ import {
 } from '../packages/rules/src/index';
 import { creationFeatures } from '../apps/server/src/admin/worldCreateOptions';
 
-// 정식 자원의 순수 연결 검사다. 실제 PostgreSQL/HTTP/Chromium 인수와 구분한다.
+import { createDb } from '../packages/db/src/index';
+import { testDatabaseUrl } from './test-database';
+import { initializeIntegrationResources } from './integration-resources';
+const db = createDb(testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL }).href);
+beforeAll(async () => {
+  await initializeIntegrationResources(db);
+});
+afterAll(async () => {
+  await db.$disconnect();
+});
+
+// 정식 게시 자원의 연결 검사다. HTTP·Chromium 인수와 구분한다.
 it('AC-INT-19B 정식191년21국491명에서 사람 생성·정상출사·NPC지시를 재생하며 다른491명을 보존한다', async () => {
-  const initial = await loadInitialWorld({
+  const initial = await loadInitialWorldFromDb(db, {
     scenario: 'integration191',
     map: 'integration',
     statRules: 'five-stats',
