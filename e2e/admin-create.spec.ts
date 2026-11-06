@@ -194,6 +194,7 @@ test('AC-M3-04 CH-03 실제 읽기 응답의 표식 변경 주입은 POST0으로
             'logistics-v1',
           ].sort(),
         },
+        { id: 'san10-191-expanded', available: false, code: 'RESOURCES_UNAVAILABLE' },
       ],
     });
     packet.result.data.revision = 'explicit-test-stamp-' + packet.result.data.revision;
