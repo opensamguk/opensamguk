@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
-import { readFile, readdir, unlink, writeFile } from 'node:fs/promises';
+import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, expect, it } from 'vitest';
@@ -34,6 +34,7 @@ import { replayCapsArchive, replayCapsToEnd } from '../apps/engine/src/replayCap
 import { readView } from '../apps/server/src/game/queries';
 import { testDatabaseUrl } from './test-database';
 import { confirmDisconnectedDatabase } from './test-db-close';
+import { initializeResources } from './init-resources';
 
 type PgClient = {
   connect(): Promise<void>;
@@ -56,13 +57,9 @@ const client = new Client({ connectionString: ownUrl.href });
 const db = createDb(ownUrl.href);
 const root = fileURLToPath(new URL('../', import.meta.url));
 const resourceKey = `t403_caps_${randomUUID().replaceAll('-', '')}`;
-const resourceFiles = ['map', 'scenario'].map(
-  (kind) => new URL(`../resources/${kind}/${resourceKey}.json`, import.meta.url),
-);
 const leases: Lease[] = [];
 const loops = new Map<string, TurnLoop>();
 const children = new Map<ChildProcess, Promise<unknown>>();
-const createdResources: URL[] = [];
 let created = false;
 let ownOid: string | undefined;
 let oldDatabases: Record<string, unknown>[] = [];
@@ -115,6 +112,10 @@ beforeAll(async () => {
   for (const name of migrationNames)
     await client.query(await readFile(new URL(`${name}/migration.sql`, directory), 'utf8'));
   evidence.migrations = migrationNames;
+  await initializeResources(
+    db,
+    await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
+  );
   // 실제 CLI가 읽는 시험 소유 자원이다. 기존 자원은 바꾸지 않는다.
   const values = { population: 1000, agriculture: 100, commerce: 100, security: 100, defence: 50, wall: 50 };
   const map = {
@@ -158,10 +159,18 @@ beforeAll(async () => {
     general: [1, 2].map((id) => [0, `시험장수${id}`, '', id, `시험도시${id}`, 70, 70, 60, 12, 160, 230, null, null]),
     diplomacy: [],
   };
-  for (const [i, value] of [map, scenario].entries()) {
-    await writeFile(resourceFiles[i]!, JSON.stringify(value), { flag: 'wx' });
-    createdResources.push(resourceFiles[i]!);
-  }
+  await db.gameResource.createMany({
+    data: [map, scenario].map((content, index) => ({
+      kind: index === 0 ? 'MAP' : 'SCENARIO',
+      name: resourceKey,
+      version: 1,
+      status: 'PUBLISHED',
+      content,
+      contentHash: hashState(content),
+      source: 'T4-03 중앙 PG 시험',
+      publishedAt: new Date(),
+    })),
+  });
   evidence.executed = true;
 });
 
@@ -201,15 +210,10 @@ afterAll(async () => {
       }
     } finally {
       try {
-        for (const resource of createdResources) await unlink(resource);
-        evidence.resourcesRemoved = true;
+        await admin.end();
       } finally {
-        try {
-          await admin.end();
-        } finally {
-          if (process.env.T403_CENTRAL_EVIDENCE)
-            await writeFile(process.env.T403_CENTRAL_EVIDENCE, JSON.stringify(evidence, null, 2));
-        }
+        if (process.env.T403_CENTRAL_EVIDENCE)
+          await writeFile(process.env.T403_CENTRAL_EVIDENCE, JSON.stringify(evidence, null, 2));
       }
     }
   }
