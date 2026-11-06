@@ -72,4 +72,9 @@ describe('AC-M1-17 메모리 실행기', () => {
     initial.generals[0]!.userId = 'human';
     expect(() => simulateGame(initial)).toThrow('NPC 전용');
   });
+  it('월단평 기능을 기존 NPC 전용 시뮬레이터로 조용히 실행하지 않는다', async () => {
+    const initial = await smallWorld();
+    initial.ruleFeatures = ['reputation-v1'];
+    expect(() => simulateGame(initial)).toThrow('형식 3 재생');
+  });
 });

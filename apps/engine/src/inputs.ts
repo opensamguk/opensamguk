@@ -234,7 +234,9 @@ export async function processInputs(
   if (!kind || kind.route !== 'queued') throw new Error('등록되지 않은 대기 입력 종류입니다.');
   const handlers = queuedInputHandlers(registry);
   const sequence = await nextActionSequence(tx, world.id);
-  const before = world.ruleFeatures.includes('personnel') ? await loadReplayState(tx, world.id) : null;
+  const before = world.ruleFeatures.some((key) => key === 'personnel' || key === 'reputation-v1')
+    ? await loadReplayState(tx, world.id)
+    : null;
   const enabled = kind.feature === null || world.ruleFeatures.includes(kind.feature);
   const actor =
     !enabled || event.generalId === null
