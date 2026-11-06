@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { Page, TestInfo } from '@playwright/test';
 import { expect, type LegalStack } from './legalFixture';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -27,7 +27,7 @@ export async function formalConsent(
   const observations: Promise<unknown>[] = [];
   try {
     for (let index = 0; index < 2; index++) {
-      const initial = await loadInitialWorld({
+      const initial = await loadInitialWorldFromDb(stack.db, {
         scenario: 'integration191',
         map: 'integration',
         statRules: 'five-stats',

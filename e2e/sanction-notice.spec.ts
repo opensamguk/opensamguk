@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import type { CDPSession, Route, TestInfo } from '@playwright/test';
 import { test, expect, apiMutate, apiQuery, type T210World } from './t210-fixture';
 import { TEST_PASSWORD } from './account';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -88,7 +88,7 @@ async function prepare(world: T210World) {
   }
   try {
     for (let index = 0; index < 2; index++) {
-      const initial = await loadInitialWorld({
+      const initial = await loadInitialWorldFromDb(db, {
         scenario: 'integration191',
         map: 'integration',
         statRules: 'five-stats',

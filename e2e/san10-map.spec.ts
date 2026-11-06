@@ -6,7 +6,7 @@ import { sanctionAccount } from './adminSanctionSetup';
 import { holdLease, type LeaseHold } from './game';
 import { releaseLease } from '../apps/engine/src/lease';
 import { initializeSan10Resources } from '../tools/san10-resources';
-import { loadInitialWorld, loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld, readWorldState } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -146,7 +146,7 @@ async function verifyMode(stack: LegalStack, page: Page, info: TestInfo, run: Ru
   const user = await step(run, () => sanctionAccount(stack, page));
   const existing = await step(run, () => db.gameResource.findMany({ orderBy: { id: 'asc' } }));
   const legacy = await step(run, () =>
-    loadInitialWorld({
+    loadInitialWorldFromDb(db, {
       map: 'integration',
       scenario: 'integration191',
       statRules: 'five-stats',

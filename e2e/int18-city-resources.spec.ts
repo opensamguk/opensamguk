@@ -5,7 +5,7 @@ import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
 import type { AppRouter } from '../apps/server/src/router';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { newSession } from '../apps/server/src/auth/session';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { loadReplayState } from '../apps/engine/src/monthly';
@@ -538,7 +538,7 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
   }
   async function createWorld(enabled: boolean) {
     cityRun.controller.signal.throwIfAborted();
-    const initial = await loadInitialWorld({
+    const initial = await loadInitialWorldFromDb(db, {
       scenario: 'integration191',
       map: 'integration',
       statRules: 'five-stats',

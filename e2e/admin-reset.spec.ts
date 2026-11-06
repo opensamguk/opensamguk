@@ -17,7 +17,7 @@ import {
 } from './adminResetSetup';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { changeAdminRole } from '../apps/server/src/admin/roleStore';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { TEST_PASSWORD } from './account';
 
@@ -274,7 +274,7 @@ test('RESET02 AC-M3-04 정확 이름·사유·긴 이름과 지원 상태·구�
     const preopen = await clockWorld(stack, releases, false),
       running = await clockWorld(stack, releases, false);
     await resetClock(page, stack, running, admin.id, 'start');
-    const initial = await loadInitialWorld({ scenario: '1030', map: 'che', seed: 'reset-ui-legacy' });
+    const initial = await loadInitialWorldFromDb(stack.db, { scenario: '1030', map: 'che', seed: 'reset-ui-legacy' });
     const legacy = await saveInitialWorld(stack.db, initial, {
       name: '구형식 초기화 화면',
       turnTermMinutes: 60,

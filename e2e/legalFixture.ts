@@ -212,7 +212,7 @@ export const test = base.extend<Record<never, never>, { legalStack: LegalStack }
         process.env.TEST_DATABASE_URL = url.href;
         db = createDb(url.href);
         await initializeResources(db, await readFile(join(root, 'packages/db/sql/resources-init.sql'), 'utf8'));
-        // loadInitialWorld(integration191 등)를 쓰는 시험이 읽는 통합판 공식 게시 4행만 더 준비한다.
+        // loadInitialWorldFromDb(integration191 등)를 쓰는 시험이 DB에서 읽는 통합판 공식 게시 4행만 더 준비한다.
         const { initializeIntegrationResources } = await import('../tools/integration-resources');
         await initializeIntegrationResources(db);
         const bridge = await staticBridge(() => apiOrigin);

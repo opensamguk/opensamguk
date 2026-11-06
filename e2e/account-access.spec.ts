@@ -4,7 +4,7 @@ import { createAccount, TEST_PASSWORD, withE2eDb, e2eDatabaseUrl } from './accou
 import { accountMailLink } from './mailbox';
 import { holdLease } from './game';
 import { cleanupHeldWorld } from './heldWorldCleanup';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -212,27 +212,27 @@ scenario(
   async ({ page, context }, info) => {
     test.setTimeout(120_000);
     await page.setViewportSize({ width: 375, height: 900 });
-    const initial = await loadInitialWorld({
-      scenario: 'integration191',
-      map: 'integration',
-      statRules: 'five-stats',
-      portraitMap: '191-map',
-      seed: 'public-required-ui-191',
+    const { worldId } = await withE2eDb(async (db) => {
+      const initial = await loadInitialWorldFromDb(db, {
+        scenario: 'integration191',
+        map: 'integration',
+        statRules: 'five-stats',
+        portraitMap: '191-map',
+        seed: 'public-required-ui-191',
+      });
+      initial.ruleFeatures = [
+        'campaign-v1',
+        'five-stats',
+        'operational-map',
+        'personnel',
+        'policy',
+        'stratagem-basic',
+        'treaty',
+      ];
+      expect(initial.generals).toHaveLength(491);
+      expect(initial.nations).toHaveLength(21);
+      return saveInitialWorld(db, initial, { name: '공개 인증 화면 정식191', turnTermMinutes: 60, endYear: 201 });
     });
-    initial.ruleFeatures = [
-      'campaign-v1',
-      'five-stats',
-      'operational-map',
-      'personnel',
-      'policy',
-      'stratagem-basic',
-      'treaty',
-    ];
-    expect(initial.generals).toHaveLength(491);
-    expect(initial.nations).toHaveLength(21);
-    const { worldId } = await withE2eDb((db) =>
-      saveInitialWorld(db, initial, { name: '공개 인증 화면 정식191', turnTermMinutes: 60, endYear: 201 }),
-    );
     let hold: Awaited<ReturnType<typeof holdLease>> | undefined;
     let failure: unknown;
     try {

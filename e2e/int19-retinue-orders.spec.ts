@@ -2,7 +2,7 @@ import type { AppRouter } from '../apps/server/src/router';
 import type { inferRouterOutputs } from '@trpc/server';
 import { test, expect, apiMutate, apiQuery } from './t210-fixture';
 import { rngFor } from '../packages/shared/src/index';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -34,7 +34,7 @@ test('AC-INT-19C 정식491명 장수 지시 발송·수락 실행·거절·NPC �
     }
   }
   expect(seed).not.toBe('');
-  const initial = await loadInitialWorld({
+  const initial = await loadInitialWorldFromDb(db, {
     scenario: 'integration191',
     map: 'integration',
     statRules: 'five-stats',

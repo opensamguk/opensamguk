@@ -2,7 +2,7 @@ import { expect, test, type Browser, type Page } from '@playwright/test';
 import { setTimeout as delay } from 'node:timers/promises';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { createAccount, withE2eDb } from './account';
 import {
@@ -35,17 +35,21 @@ let nationId: number;
 let hold: LeaseHold | undefined;
 
 async function personnelWorld(): Promise<string> {
-  const initial = await loadInitialWorld({ scenario: '1030', map: 'che', seed: `e2e-personnel-${Date.now()}` });
-  const { worldId } = await withE2eDb((db) =>
-    saveInitialWorld(db, initial, {
+  const { worldId } = await withE2eDb(async (db) => {
+    const initial = await loadInitialWorldFromDb(db, {
+      scenario: '1030',
+      map: 'che',
+      seed: `e2e-personnel-${Date.now()}`,
+    });
+    return saveInitialWorld(db, initial, {
       name: 'E2E 인사 대기 월드',
       // 인사 접수 시험에 실시간 월간 캐치업이 끼지 않게 한다. 실행권만 쥐어도 시계는 흐른다.
       turnTermMinutes: 60,
       endYear: 300,
       replayFormat: 3,
       ruleFeatures: ['personnel', 'policy'],
-    }),
-  );
+    });
+  });
   hold = await holdLease(worldId);
   await withE2eDb((db) => controlClock(db, worldId, 'start'));
   return worldId;

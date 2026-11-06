@@ -4,7 +4,7 @@ import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './t210-fixture';
 import { createAccount, withE2eDb } from './account';
 import { holdLease, releaseHold } from './game';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -61,28 +61,28 @@ async function tapTargets(targets: Locator) {
 test('T3-10 정식191년 모바일 명령·방침·탭의 크기와 30번 칸 실제 저장·초안 복귀', async ({ page }, info) => {
   test.setTimeout(120_000);
   const execution = (async () => {
-    const initial = await loadInitialWorld({
-      scenario: 'integration191',
-      map: 'integration',
-      statRules: 'five-stats',
-      portraitMap: '191-map',
-      seed: 'mobile-controls-191',
-    });
-    initial.ruleFeatures = [
-      'campaign-v1',
-      'five-stats',
-      'operational-map',
-      'personnel',
-      'policy',
-      'stratagem-basic',
-      'treaty',
-    ];
-    expect(initial.generals).toHaveLength(491);
-    expect(initial.nations).toHaveLength(21);
     ownWorld = (
-      await withE2eDb((db) =>
-        saveInitialWorld(db, initial, { name: '모바일 조작 정식191', turnTermMinutes: 60, endYear: 201 }),
-      )
+      await withE2eDb(async (db) => {
+        const initial = await loadInitialWorldFromDb(db, {
+          scenario: 'integration191',
+          map: 'integration',
+          statRules: 'five-stats',
+          portraitMap: '191-map',
+          seed: 'mobile-controls-191',
+        });
+        initial.ruleFeatures = [
+          'campaign-v1',
+          'five-stats',
+          'operational-map',
+          'personnel',
+          'policy',
+          'stratagem-basic',
+          'treaty',
+        ];
+        expect(initial.generals).toHaveLength(491);
+        expect(initial.nations).toHaveLength(21);
+        return saveInitialWorld(db, initial, { name: '모바일 조작 정식191', turnTermMinutes: 60, endYear: 201 });
+      })
     ).worldId;
     hold = await holdLease(ownWorld);
     await controlClock(hold.db, ownWorld, 'start');

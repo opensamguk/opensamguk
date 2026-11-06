@@ -6,7 +6,7 @@ import { hashPassword } from '../apps/server/src/auth/password';
 import { newSession } from '../apps/server/src/auth/session';
 import { newAccountToken } from '../apps/server/src/auth/accountToken';
 import type { LegalPolicy } from '../apps/server/src/legal/policy';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -594,7 +594,7 @@ test('T3-03 AC-M3-02 정식191 두 월드·사람30칸을 UI로 만든 뒤 실�
     const evidence: Record<string, unknown> = { scenario: 'integration191', npcPerWorld: 491, nationPerWorld: 21 };
     try {
       for (let index = 0; index < 2; index++) {
-        const initial = await loadInitialWorld({
+        const initial = await loadInitialWorldFromDb(stack.db, {
           scenario: 'integration191',
           map: 'integration',
           statRules: 'five-stats',
