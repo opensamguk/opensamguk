@@ -19,7 +19,7 @@ const fields: Record<string, string> = {
   trust: '민심',
   tech: '기술',
 };
-function summary(action: AdminGameAction, result: AdminGameApplied): string {
+function summary(action: AdminGameAction, result: AdminGameApplied, before: WorldState): string {
   switch (action.kind) {
     case 'admin.general.rename':
     case 'admin.nation.rename':
@@ -32,6 +32,10 @@ function summary(action: AdminGameAction, result: AdminGameApplied): string {
       return '예약 명령 30칸을 휴식으로 변경';
     case 'admin.nation.dismissOffice':
       return `장수 #${action.generalId} 수뇌 임명 취소`;
+    case 'admin.nation.setRuler':
+      return `군주를 ${before.generals[action.expectedRulerId]!.name}에서 ${before.generals[action.generalId]!.name}(으)로 교체`;
+    case 'admin.nation.disband':
+      return '해산';
     case 'admin.message.send':
       return action.body;
     default: {
@@ -54,7 +58,7 @@ export async function persistAdminRecord(
   sequence: number,
   now: Date,
 ): Promise<RealtimeSignal | null> {
-  const text = summary(action, result);
+  const text = summary(action, result, before);
   if (action.kind.startsWith('admin.general.') && 'generalId' in action && action.generalId !== undefined) {
     const last = await tx.generalLog.findFirst({
       where: { worldId: world.id, generalId: action.generalId, sequence },

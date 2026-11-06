@@ -242,7 +242,8 @@ it('무인증·다른 계정·제재 세션은 같고 입력 ID 주입은 거부
   expect(anonymous.status).toBe(200);
   expect(Object.keys(anonymous.data!).sort()).toEqual(['delayMinutes', 'worlds']);
   const entry = anonymous.data!.worlds[0]!;
-  expect(Object.keys(entry).sort()).toEqual(['id', 'map', 'name', 'status']);
+  expect(Object.keys(entry).sort()).toEqual(['background', 'id', 'map', 'name', 'status']);
+  expect(entry).toHaveProperty('background', null);
   expect(Object.keys(entry.map!).sort()).toEqual(['cities', 'month', 'nations', 'takenAt', 'year']);
   expect(Object.keys(entry.map!.cities[0]!).sort()).toEqual(['key', 'level', 'links', 'name', 'nationId', 'x', 'y']);
   expect(Object.keys(entry.map!.nations[0]!).sort()).toEqual(['color', 'id', 'name']);

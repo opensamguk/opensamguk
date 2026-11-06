@@ -9,7 +9,9 @@ import { hashPassword } from '../apps/server/src/auth/password';
 import { authzCase } from '../apps/server/src/authz/case';
 import { categories } from '../apps/server/src/authz/coverage';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorld, loadInitialWorldFromDb, loadFeatureProfile } from '../apps/engine/src/world/resources';
+import { initializeResources } from './init-resources';
+import { initializeExpandedResources } from './expanded-resources';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -998,4 +1000,185 @@ it('AC-INT-23 정식491명 부곡 월드는 병력 조정을 거절하고 금 �
   await advance(worldId);
   expect((await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: target.id } } })).removedAt).toBe(0);
   await expectReplayedState(worldId);
+});
+
+it('AC-INT-23 확장20기능 정식491명 월드의 운영 군주 교체·해산은 저장과 순수 재생이 같다', async () => {
+  await initializeResources(
+    db,
+    await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
+  );
+  await initializeExpandedResources(db);
+  const { value: profile } = await loadFeatureProfile('expanded-191-v5');
+  if (profile.version !== 3) throw Error('형식3 확장 설정이 필요합니다.');
+  const initial = await loadInitialWorldFromDb(db, {
+    scenario: profile.scenarioKey,
+    map: profile.mapKey,
+    unitSet: profile.unitSetKey,
+    statRules: profile.statRulesKey,
+    portraitMap: profile.portraitMapKey,
+    seed: 'int23-expanded-nation',
+  });
+  initial.ruleFeatures = profile.ruleFeatures;
+  const { worldId } = await saveInitialWorld(db, initial, {
+    name: '확장 국가 운영 검증',
+    turnTermMinutes: 60,
+    endYear: 231,
+    replayFormat: 3,
+    ruleFeatures: profile.ruleFeatures,
+    featureData: profile.featureData,
+  });
+  await controlClock(db, worldId, 'start');
+  await controlClock(db, worldId, 'pause');
+  expect(await db.general.count({ where: { worldId } })).toBe(491);
+  const ruler = await db.general.findFirstOrThrow({ where: { worldId, officerLevel: 12 }, orderBy: { id: 'asc' } });
+  const successor = await db.general.findFirstOrThrow({
+    where: { worldId, nationId: ruler.nationId, officerLevel: { not: 12 }, activeFromYear: { lte: initial.startYear } },
+    orderBy: { id: 'asc' },
+  });
+  for (const action of [
+    { kind: 'admin.nation.setRuler', nationId: ruler.nationId!, generalId: successor.id, expectedRulerId: ruler.id },
+    { kind: 'admin.nation.disband', nationId: ruler.nationId! },
+  ] as const) {
+    const input = command(worldId, action);
+    expect((await call('admin.game.request', input, actor.cookie)).status).toBe(200);
+    await advance(worldId);
+    expect((await call('admin.game.requestStatus', statusInput(input), actor.cookie)).data).toMatchObject({
+      status: 'APPLIED',
+    });
+    await expectReplayedState(worldId);
+  }
+  expect(await db.nation.count({ where: { worldId, id: ruler.nationId! } })).toBe(0);
+  expect(await db.removedNation.count({ where: { worldId, nationId: ruler.nationId! } })).toBe(1);
+  const final = await db.$transaction((tx) => loadReplayState(tx, worldId));
+  expect(final.state.ruleFeatures).toHaveLength(20);
+  expect(final.state.nationLifecycle!.nations).toEqual({});
+  expect(await db.message.count({ where: { worldId } })).toBe(2);
+  expect(await db.nationHistory.count({ where: { worldId } })).toBe(0);
+  expect(await db.battleLog.count({ where: { worldId } })).toBe(0);
+});
+
+it('AC-INT-23 국가 운영 조치는 같은 API 권한·멱등과 군주 expected를 재검사한다', async () => {
+  const worldId = await world();
+  const input = command(worldId, { kind: 'admin.nation.setRuler', nationId: 2, generalId: 3, expectedRulerId: 2 });
+  for (const [cookie, status] of [
+    [undefined, 401],
+    [ordinary.cookie, 403],
+    [sanctioned.cookie, 401],
+  ] as const)
+    expect((await call('admin.game.request', input, cookie)).status).toBe(status);
+  const before = hashState(await db.$transaction((tx) => loadReplayState(tx, worldId)));
+  const requested = await call('admin.game.request', input, actor.cookie);
+  expect(requested.status).toBe(200);
+  expect((await call('admin.game.request', input, actor.cookie)).data).toEqual(requested.data);
+  expect(
+    (await call('admin.game.request', { ...input, action: { ...input.action, generalId: 2 } }, actor.cookie)).status,
+  ).toBe(409);
+  expect(hashState(await db.$transaction((tx) => loadReplayState(tx, worldId)))).toBe(before);
+  expect(
+    (
+      await call(
+        'admin.game.request',
+        command(worldId, {
+          ...input.action,
+          kind: 'admin.nation.setRuler',
+          nationId: 2,
+          generalId: 3,
+          expectedRulerId: 2,
+        }),
+        actor.cookie,
+      )
+    ).status,
+  ).toBe(200);
+  await advance(worldId);
+  const rows = await db.inputEvent.findMany({ where: { worldId }, orderBy: { id: 'asc' } });
+  expect(rows.map((row) => row.status)).toEqual(['APPLIED', 'REJECTED']);
+  expect(rows[1]!.result).toMatchObject({ code: 'TARGET_CHANGED' });
+  expect((await call('admin.game.requestStatus', statusInput(input), actor.cookie)).data).toMatchObject({
+    status: 'APPLIED',
+    result: { after: { rulerId: 3, nationIsNpc: true } },
+  });
+  expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 2 } } })).toMatchObject({
+    officerLevel: 1,
+  });
+  expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 3 } } })).toMatchObject({
+    officerLevel: 12,
+  });
+  const messages = await db.message.findMany({ where: { worldId } });
+  expect(messages).toHaveLength(1);
+  expect(messages[0]).toMatchObject({ scope: 'WORLD', fromParty: { kind: 'admin', name: '운영' } });
+  expect(messages[0]!.body).toContain('국가 국가2: 군주');
+  expect(messages[0]!.body).not.toContain(input.reason);
+  expect(await db.auditLog.count({ where: { worldId, action: 'game.request' } })).toBe(2);
+  expect(await db.auditLog.count({ where: { worldId, action: 'game.applied' } })).toBe(1);
+  expect(await db.auditLog.count({ where: { worldId, action: 'game.rejected' } })).toBe(1);
+  await expectReplayedState(worldId);
+});
+
+it('AC-INT-23 운영 강제 해산은 직책 삭제 전에 저장하고 원자적 rollback·새 리스·재적재를 보존한다', async () => {
+  const worldId = await world();
+  const input = command(worldId, { kind: 'admin.nation.disband', nationId: 2 });
+  expect((await call('admin.game.request', input, actor.cookie)).status).toBe(200);
+  const before = hashState(await db.$transaction((tx) => loadReplayState(tx, worldId)));
+  const lease = await acquireLease(db, worldId);
+  if (!lease) throw Error('자기 시험 리스를 얻지 못했습니다.');
+  try {
+    await expect(
+      new TurnLoop(db, lease, {
+        beforeCommit: async () => {
+          throw Error('의도한 국가 해산 commit 실패');
+        },
+      }).advanceTo(0),
+    ).rejects.toThrow('의도한 국가 해산 commit 실패');
+  } finally {
+    await releaseLease(db, lease);
+  }
+  expect(hashState(await db.$transaction((tx) => loadReplayState(tx, worldId)))).toBe(before);
+  expect(await db.removedNation.count({ where: { worldId } })).toBe(0);
+  expect(await db.message.count({ where: { worldId } })).toBe(0);
+  expect(await db.inputEvent.findFirstOrThrow({ where: { worldId } })).toMatchObject({
+    status: 'PENDING',
+    sequence: null,
+    tick: null,
+  });
+  expect(await db.auditLog.count({ where: { worldId, action: 'game.applied' } })).toBe(0);
+  await advance(worldId);
+  expect((await call('admin.game.requestStatus', statusInput(input), actor.cookie)).data).toMatchObject({
+    status: 'APPLIED',
+    result: { before: { exists: true, members: 2, cities: 1 }, after: { exists: false, members: 0, cities: 0 } },
+  });
+  expect(await db.nation.count({ where: { worldId, id: 2 } })).toBe(0);
+  expect(
+    await db.removedNation.findUniqueOrThrow({ where: { worldId_nationId: { worldId, nationId: 2 } } }),
+  ).toMatchObject({ name: '국가2', removedTick: 0 });
+  expect(await db.nationOffice.count({ where: { worldId, nationId: 2 } })).toBe(0);
+  expect(await db.diplomacy.count({ where: { worldId, OR: [{ nationA: 2 }, { nationB: 2 }] } })).toBe(0);
+  expect(await db.nationTurn.count({ where: { worldId, nationId: 2 } })).toBe(0);
+  expect(await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId, cityKey: 2 } } })).toMatchObject({
+    nationId: null,
+    supplied: false,
+  });
+  for (const id of [2, 3])
+    expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id } } })).toMatchObject({
+      nationId: null,
+      officerLevel: 0,
+      crew: 0,
+      train: 0,
+      atmos: 0,
+      gold: 1000,
+      rice: 1000,
+    });
+  expect(await db.message.count({ where: { worldId } })).toBe(1);
+  expect(await db.auditLog.count({ where: { worldId, action: { in: ['game.request', 'game.applied'] } } })).toBe(2);
+  await expectReplayedState(worldId);
+  const reopened = createDb(target.href);
+  try {
+    expect(hashState(await loadReplayState(reopened, worldId))).toBe(
+      hashState(await db.$transaction((tx) => loadReplayState(tx, worldId))),
+    );
+  } finally {
+    await reopened.$disconnect();
+  }
+  await advance(worldId);
+  expect(await db.removedNation.count({ where: { worldId } })).toBe(1);
+  expect(await db.message.count({ where: { worldId } })).toBe(1);
 });
