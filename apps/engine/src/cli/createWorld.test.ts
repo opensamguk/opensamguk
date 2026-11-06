@@ -4,16 +4,22 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   createDb: vi.fn(),
-  loadInitialWorld: vi.fn(),
+  readInitialResources: vi.fn(),
+  composeInitialWorld: vi.fn(),
   loadPreset: vi.fn(),
   createWorldFromCli: vi.fn(),
   disconnect: vi.fn(),
 }));
 vi.mock('@opensamguk/db', () => ({ createDb: mocks.createDb }));
-vi.mock('../world/resources', () => ({ loadInitialWorld: mocks.loadInitialWorld, loadPreset: mocks.loadPreset }));
+vi.mock('../world/resources', () => ({
+  readInitialResources: mocks.readInitialResources,
+  composeInitialWorld: mocks.composeInitialWorld,
+  loadPreset: mocks.loadPreset,
+}));
 vi.mock('../admin/creation', () => ({ createWorldFromCli: mocks.createWorldFromCli }));
 const originalArgv = process.argv;
 const originalExitCode = process.exitCode;
+const publishedResources = { fixture: 'published unit resources' };
 const args = [
   '--scenario',
   '1030',
@@ -34,7 +40,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv('DATABASE_URL', 'unit-only-not-a-connection');
   mocks.createDb.mockReturnValue({ $disconnect: mocks.disconnect });
-  mocks.loadInitialWorld.mockResolvedValue({ seed: 'cli-unit' });
+  mocks.readInitialResources.mockResolvedValue(publishedResources);
+  mocks.composeInitialWorld.mockReturnValue({ seed: 'cli-unit' });
   mocks.createWorldFromCli.mockResolvedValue({ worldId: 'created', stateHash: 'hash' });
   mocks.disconnect.mockResolvedValue(undefined);
   vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -61,7 +68,14 @@ it.each([false, true])('CLI는 --treaty 선택=%s를 실제 factory 인자로 �
       endYear: 300,
       ...(treaty ? { treatyFormat: 1 } : {}),
     },
+    publishedResources,
   );
+  expect(mocks.readInitialResources).toHaveBeenCalledExactlyOnceWith(mocks.createDb.mock.results[0]!.value, {
+    scenario: '1030',
+    map: 'che',
+    seed: 'cli-unit',
+  });
+  expect(mocks.composeInitialWorld).toHaveBeenCalledExactlyOnceWith(publishedResources, 'cli-unit');
   expect(console.error).not.toHaveBeenCalled();
   expect(console.log).toHaveBeenCalledExactlyOnceWith(JSON.stringify({ worldId: 'created', stateHash: 'hash' }));
 });
@@ -82,7 +96,7 @@ it.each([false, true])('확장 프리셋은 원작식 기능을 한 번만 합�
     unitSet: 'expanded',
     turnTermMinutes: 60,
   });
-  mocks.loadInitialWorld.mockResolvedValue({
+  mocks.composeInitialWorld.mockReturnValue({
     seed: 'cli-unit',
     unitSetKey: 'expanded',
     unitSet: { coefMode: 'multiply' },
@@ -103,7 +117,7 @@ it.each([false, true])('확장 프리셋은 원작식 기능을 한 번만 합�
   ];
   await import('./createWorld');
   await vi.waitFor(() => expect(mocks.disconnect).toHaveBeenCalledOnce());
-  expect(mocks.loadInitialWorld).toHaveBeenCalledWith({
+  expect(mocks.readInitialResources).toHaveBeenCalledWith(mocks.createDb.mock.results[0]!.value, {
     scenario: 'san10-191',
     map: 'san10',
     seed: 'cli-unit',
@@ -114,12 +128,13 @@ it.each([false, true])('확장 프리셋은 원작식 기능을 한 번만 합�
     expect.anything(),
     { seed: 'cli-unit', unitSetKey: 'expanded', unitSet: { coefMode: 'multiply' }, ruleFeatures: features },
     expect.objectContaining({ ruleFeatures: features, preset: expect.objectContaining({ key: 'regular' }) }),
+    publishedResources,
   );
   expect(console.error).not.toHaveBeenCalled();
 });
 
 it('자원 프로필과 요청 기능을 합칠 때 정렬한 뒤 의존 관계를 검사한다', async () => {
-  mocks.loadInitialWorld.mockResolvedValue({ seed: 'cli-unit', ruleFeatures: ['five-stats', 'operational-map'] });
+  mocks.composeInitialWorld.mockReturnValue({ seed: 'cli-unit', ruleFeatures: ['five-stats', 'operational-map'] });
   process.argv = [
     process.execPath,
     'createWorld.ts',
@@ -134,6 +149,7 @@ it('자원 프로필과 요청 기능을 합칠 때 정렬한 뒤 의존 관계�
     expect.anything(),
     { seed: 'cli-unit', ruleFeatures: features },
     expect.objectContaining({ ruleFeatures: features }),
+    publishedResources,
   );
   expect(console.error).not.toHaveBeenCalled();
 });
@@ -169,7 +185,7 @@ it('실제 CLI 자식 프로세스의 도움말은 --treaty를 안내한다 (DB 
   expect(output).toContain('pnpm world:create');
 });
 
-it('AC-P2-27 실제 파일 CLI의 2판 선택은 DB 설정 전에 거부한다', () => {
+it('AC-P2-27 실제 CLI의 2판 선택도 DB 설정이 없으면 생성하지 않는다', () => {
   const env = { ...process.env };
   delete env.DATABASE_URL;
   delete env.TEST_DATABASE_URL;
@@ -185,6 +201,7 @@ it('AC-P2-27 실제 파일 CLI의 2판 선택은 DB 설정 전에 거부한다',
     },
   );
   expect(result.status).toBe(1);
-  expect(result.stderr).toContain('게시된 판으로 생성하세요');
-  expect(result.stderr).not.toContain('DATABASE_URL');
+  expect(result.stderr).toContain('DATABASE_URL이 없습니다.');
+  expect(result.stderr).not.toMatch(/게시된 판으로 생성하세요|ENOENT|basic\.json/);
+  expect(result.stdout).toBe('');
 });

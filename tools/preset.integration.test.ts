@@ -28,6 +28,7 @@ import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { exportReplay, replayArchive, replayToEnd, type ReplayArchive } from '../apps/engine/src/replay';
+import { initializeSan10Resources } from './san10-resources';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !/\/[a-z][a-z0-9_]*_test$/.test(new URL(url).pathname))
@@ -41,6 +42,7 @@ const cookies = new Map<string, string>();
 let base: string;
 
 beforeAll(async () => {
+  await initializeSan10Resources(db);
   await db.world.deleteMany();
   for (const id of users) {
     await db.user.upsert({

@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { readFile, readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -373,7 +373,7 @@ it('P15 실제 게시 2판을 정확히 읽고 정규형 키로 월드를 합성
   );
 });
 
-it('AC-P2-27 게시 2판 CLI 생성·출처·초기화 준비·로비 제목을 같은 실DB에서 보존한다', async () => {
+it.each([false, true])('AC-P2-27 게시 2판 CLI 생성·출처·초기화·재생을 보존한다 (published=%s)', async (published) => {
   await withDatabase(
     async (fixture) => {
       const original = await readInitialResources(fixture.db, options);
@@ -385,7 +385,7 @@ it('AC-P2-27 게시 2판 CLI 생성·출처·초기화 준비·로비 제목을 
           '--import',
           'tsx',
           'apps/engine/src/cli/createWorld.ts',
-          '--published',
+          ...(published ? ['--published'] : []),
           '--map',
           'che@2',
           '--scenario',
@@ -581,6 +581,150 @@ it.each([0, -1, 1.5])('P20 판 번호 %s는 조회 전에 거부한다', async (
   const counter = countingDb(sharedDb());
   await expect(readPublishedResources(counter.db, [{ kind: 'MAP', name: 'che', version }])).rejects.toThrow();
   expect(counter.count()).toBe(0);
+});
+
+function resourceCli(fixture: Fixture, script: string, args: string[] = []) {
+  return spawnSync(process.execPath, ['--import', 'tsx', script, ...args], {
+    cwd: root,
+    env: { ...process.env, DATABASE_URL: fixture.url },
+    encoding: 'utf8',
+    windowsHide: true,
+  });
+}
+
+const s5CreateArgs = [
+  '--scenario',
+  '1030',
+  '--map',
+  'che',
+  '--seed',
+  'loader',
+  '--turn-term',
+  '30',
+  '--end-year',
+  '300',
+  '--name',
+  'DB 기본 생성',
+];
+
+it('T4-77 S5 기본 CLI는 S0 해시와 정확한 게시 판의 감사 출처를 보존한다', async () => {
+  await withDatabase(
+    async (fixture) => {
+      const resources = await readInitialResources(fixture.db, options);
+      const result = resourceCli(fixture, 'apps/engine/src/cli/createWorld.ts', s5CreateArgs);
+      expect(result.error).toBeUndefined();
+      expect(result.status, result.stderr).toBe(0);
+      const { worldId } = JSON.parse(result.stdout) as { worldId: string };
+      const world = await fixture.db.world.findUniqueOrThrow({ where: { id: worldId } });
+      expect(world).toMatchObject({
+        mapKey: 'che',
+        scenarioKey: '1030',
+        unitSetKey: 'basic',
+        initialStateHash: baseline.seeds.loader.initialStateHash,
+      });
+      const audit = await fixture.db.auditLog.findFirstOrThrow({
+        where: { worldId, actorKind: 'CLI', action: 'world.create.applied' },
+      });
+      expect(audit.payload).toMatchObject({
+        stateHash: world.initialStateHash,
+        resources: Object.values(resources)
+          .map(({ kind, name, version, contentHash }) => ({ kind, name, version, contentHash }))
+          .sort((a, b) => a.kind.localeCompare(b.kind)),
+      });
+    },
+    { initialize: true },
+  );
+});
+
+it('T4-77 S5 기본 CLI는 게시 자원이 없으면 파일 대체·쓰기 없이 실패한다', async () => {
+  await withDatabase(async (fixture) => {
+    const before = await Promise.all([
+      fixture.db.world.count(),
+      fixture.db.auditLog.count(),
+      fixture.db.gameResource.count(),
+    ]);
+    const result = resourceCli(fixture, 'apps/engine/src/cli/createWorld.ts', s5CreateArgs);
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('MAP/che/1');
+    expect(result.stdout).toBe('');
+    expect(
+      await Promise.all([fixture.db.world.count(), fixture.db.auditLog.count(), fixture.db.gameResource.count()]),
+    ).toEqual(before);
+  });
+});
+
+it('T4-77 S5 로비는 누락 실패를 캐시하지 않고 잘못된 게시 내용의 오류를 가린다', async () => {
+  await withDatabase(async (fixture) => {
+    await expect(scenarioTitle('s5_title', fixture.db)).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+    await insertResource(
+      fixture,
+      { kind: 'SCENARIO', name: 's5_title', version: 1 },
+      { id: 's5_title', title: '새 게시 제목' },
+    );
+    expect(await scenarioTitle('s5_title', fixture.db)).toBe('새 게시 제목');
+    const contents: unknown[] = ['not-json', { id: 'other', title: '잘못된 번호' }, { title: '' }, { title: null }, {}];
+    for (const [index, content] of contents.entries()) {
+      const name = `s5_badtitle_${index}`;
+      const value = typeof content === 'object' && content !== null ? { id: name, ...content } : content;
+      await insertResource(fixture, { kind: 'SCENARIO', name, version: 1 }, value);
+      const error = await scenarioTitle(name, fixture.db).catch((failure: unknown) => failure);
+      expect(error).toMatchObject({ code: 'INTERNAL_SERVER_ERROR', message: 'INTERNAL_SERVER_ERROR' });
+      expect(String(error)).not.toContain(name);
+      expect(error).toHaveProperty('cause', undefined);
+    }
+  });
+});
+
+it('T4-77 S5 초상 도구는 게시 대응표와 비교하고 원본·게시 행을 바꾸지 않는다', async () => {
+  await withDatabase(
+    async (fixture) => {
+      const original = await readFile(new URL('resources/portraits/rtk14-map.json', root));
+      const before = await fixture.db.gameResource.findMany({ orderBy: { id: 'asc' } });
+      const result = resourceCli(fixture, 'tools/portrait-map/generate.ts');
+      expect(result.error).toBeUndefined();
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain('초상 대응:');
+      expect(result.stdout).toContain('동명이인');
+      expect(result.stdout).toContain('미대응');
+      expect(result.stdout).toContain('게시 대응표 rtk14-map@1과 같습니다.');
+      expect(await readFile(new URL('resources/portraits/rtk14-map.json', root))).toEqual(original);
+      expect(await fixture.db.gameResource.findMany({ orderBy: { id: 'asc' } })).toEqual(before);
+    },
+    { initialize: true },
+  );
+});
+
+it('T4-77 S5 초상 도구는 다른 게시 대응표를 수정하지 않고 실패한다', async () => {
+  const resources = await readInitialResources(sharedDb(), options);
+  await withDatabase(async (fixture) => {
+    await insertResource(fixture, { kind: 'SCENARIO', name: '1030', version: 1 }, resources.scenario.content);
+    await insertResource(
+      fixture,
+      { kind: 'PORTRAIT_MAP', name: 'rtk14-map', version: 1 },
+      {
+        ...(resources.portraitMap.content as Record<string, unknown>),
+        $comment: '다른 게시 내용',
+      },
+    );
+    const before = await fixture.db.gameResource.findMany({ orderBy: { id: 'asc' } });
+    const result = resourceCli(fixture, 'tools/portrait-map/generate.ts');
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('게시 대응표 rtk14-map@1과 다릅니다.');
+    expect(await fixture.db.gameResource.findMany({ orderBy: { id: 'asc' } })).toEqual(before);
+  });
+});
+
+it('T4-77 S5 초상 도구는 게시 자원이 없으면 원본 파일로 대체하지 않는다', async () => {
+  await withDatabase(async (fixture) => {
+    const result = resourceCli(fixture, 'tools/portrait-map/generate.ts');
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('SCENARIO/1030/1');
+    expect(result.stderr).toContain('PORTRAIT_MAP/rtk14-map/1');
+    expect(await fixture.db.gameResource.count()).toBe(0);
+  });
 });
 
 for (const [seed, expected] of Object.entries(baseline.seeds)) {
