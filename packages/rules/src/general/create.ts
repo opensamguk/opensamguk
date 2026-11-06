@@ -65,6 +65,7 @@ export const CREATION_ERRORS = {
   ALREADY_EXISTS: '이미 장수가 있습니다.',
   NAME_TAKEN: '이미 사용 중인 장수 이름입니다.',
   WORLD_CLOSED: '지금은 장수를 생성할 수 없습니다.',
+  ENTRY_CLOSED: '지금은 새 장수를 받지 않습니다.',
   ACTOR_INACTIVE: '장수를 생성할 수 없는 계정입니다.',
 } as const;
 export type CreationCode = keyof typeof CREATION_ERRORS;

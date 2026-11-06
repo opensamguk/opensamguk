@@ -46,6 +46,7 @@ describe('실제 commit 뒤의 보수적 지연 측정', () => {
 
   it.each([
     { clockMode: 'ACCELERATED' as const },
+    { truce: { utcOffsetMinutes: 0, startMinute: 1380, endMinute: 420 } },
     { explicitAdvance: true },
     { clockAnchorAt: null },
     { turnTermMinutes: 0 },

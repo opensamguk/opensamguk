@@ -37,6 +37,8 @@ import {
   validateAdminGameRecord,
   isAdminSettingKind,
   validateAdminSettingRecord,
+  POSSESSION_KIND,
+  validatePossessionRecord,
   creationEndYear,
   creationName,
   ADMIN_END_KIND,
@@ -362,6 +364,8 @@ export function readArchive(value: unknown, registry: RuleRegistry = ruleRegistr
     previous = input.sequence;
   }
   const allInputs = [...archive.inputs, ...(archive.version !== 1 ? archive.afterEnd : [])];
+  if (archive.version !== 3 && allInputs.some((input) => input.kind === POSSESSION_KIND))
+    throw new Error('장수 맡기는 형식3 기록에만 넣을 수 있습니다.');
   if (archive.version !== 3 && allInputs.some((input) => isAdminGameKind(input.kind) || isAdminSettingKind(input.kind)))
     throw new Error('관리자 운영 입력은 형식3 기록에만 넣을 수 있습니다.');
   if (archive.version === 5) validatePolicyArchive(archive);
@@ -382,6 +386,7 @@ export function readArchive(value: unknown, registry: RuleRegistry = ruleRegistr
     if (isAdminClockKind(input.kind)) validateAdminClockRecord(input);
     if (isAdminGameKind(input.kind)) validateAdminGameRecord(input);
     if (isAdminSettingKind(input.kind)) validateAdminSettingRecord(input);
+    if (input.kind === POSSESSION_KIND) validatePossessionRecord(input);
     if (input.kind === ADMIN_END_KIND) validateAdminEndRecord(input);
     if (input.kind === ADMIN_RESET_KIND) validateAdminResetRecord(input);
     const numericTick = kind.route === 'queued' || kind.directTick === true;

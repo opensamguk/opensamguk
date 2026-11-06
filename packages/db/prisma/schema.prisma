@@ -10,6 +10,8 @@ datasource db {
 }
 
 model World {
+  reputationEvents    ReputationEvent[]
+  monthlyReviews      MonthlyReview[]
   runtimeOptions      Json?
   equipmentState      Json?
   notificationOutbox  NotificationOutbox[]
@@ -77,6 +79,42 @@ model World {
   assignmentOffers    AssignmentOffer[]
   sanctions           Sanction[]
   createRequest       WorldCreateRequest?
+}
+
+model ReputationEvent {
+  id          BigInt   @id @default(autoincrement())
+  worldId     String
+  generalId   Int
+  year        Int
+  month       Int
+  kind        String
+  score       Int
+  tick        Int
+  generalName String
+  nationId    Int?
+  nationName  String?
+  nationColor String?
+  cityKey     Int?
+  cityName    String?
+  createdAt   DateTime @default(now())
+  world       World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@unique([worldId, generalId, year, month, kind])
+  @@index([worldId, year, month])
+}
+
+model MonthlyReview {
+  worldId   String
+  year      Int
+  month     Int
+  tick      Int
+  entries   Json
+  headline  String?
+  createdAt DateTime @default(now())
+  world     World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@id([worldId, year, month])
+  @@unique([worldId, tick])
 }
 
 model GovernanceMovement {
@@ -295,6 +333,7 @@ model Nation {
   offices         NationOffice[]
   officeTurns     NationOfficeTurn[]
   notice          String             @default("")
+  noticeDirective Json?
   noticeRevision  Int                @default(0)
   noticeUpdatedAt DateTime?
   noticeUpdatedBy String?
@@ -561,6 +600,13 @@ model User {
   worldCreateRequests    WorldCreateRequest[]
   heritageAccount        HeritageAccount?
   heritageEntries        HeritageEntry[]
+  resourceEditorGrant    ResourceEditorGrant?
+}
+
+model ResourceEditorGrant {
+  userId    String   @id
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 enum NotificationTargetStatus {

@@ -18,6 +18,7 @@ const VERIFIED_MUTATIONS = [
   'campaign.relationship',
   'campaign.unit',
   'cityResources.allocate',
+  'entry.possess',
   'general.create',
   'general.setPolicy',
   'governance.submit',
@@ -34,6 +35,9 @@ const VERIFIED_MUTATIONS = [
   'operation.create',
   'personnel.appoint',
   'personnel.dismiss',
+  'resourceAdmin.clone',
+  'resourceAdmin.publish',
+  'resourceAdmin.save',
   'stratagemCards.setTrap',
   'treaty.break',
   'treaty.propose',
@@ -61,7 +65,7 @@ describe('T3-02 AC-M3-01 이메일 인증 경계', () => {
       { _def: { type: string; meta?: ProcedureMeta } }
     >;
     const mutations = Object.entries(procedures).filter(([, procedure]) => procedure._def.type === 'mutation');
-    expect(mutations).toHaveLength(49);
+    expect(mutations).toHaveLength(53);
     expect(
       mutations
         .filter(([, procedure]) => procedure._def.meta?.accountAccess === 'verified')
@@ -80,6 +84,6 @@ describe('T3-02 AC-M3-01 이메일 인증 경계', () => {
         .filter(([, procedure]) => procedure._def.meta?.worldSanction)
         .map(([path]) => path)
         .sort(),
-    ).toEqual(VERIFIED_MUTATIONS.filter((path) => !path.startsWith('admin.')));
+    ).toEqual(VERIFIED_MUTATIONS.filter((path) => !path.startsWith('admin.') && !path.startsWith('resourceAdmin.')));
   });
 });

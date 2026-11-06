@@ -3,6 +3,7 @@ import type { WorldInit } from './world/bootstrap';
 import type { CommandDef } from './commands/types';
 import type { CommandResolver } from './commands/resolve';
 import { applyCreationInput, applyPolicyInput, applyTurnsInput } from './replayInputs';
+import { POSSESSION_KIND, applyPossessionInput } from './entry/possess';
 import {
   personnelFeature,
   policyFeature,
@@ -36,6 +37,7 @@ import { ADMIN_GAME_KINDS } from './admin/game';
 import { applyAdminGameRecord } from './admin/apply';
 import { ADMIN_SETTING_KINDS, applyAdminSettingRecord } from './admin/settings';
 import type { UnitSetResource } from './world/resources';
+import { reputationFeature } from './review/feature';
 
 export interface ReplayOriginV1 {
   version: 1;
@@ -68,7 +70,7 @@ export interface RuleFeatureDefinition {
     input: RecordedInput,
     context?: { route: InputKindDefinition['route'] },
   ): ReplayState;
-  settleMonthly?(context: { before: ReplayState; settled: ReplayState; tick: number }): {
+  settleMonthly?(context: { before: ReplayState; settled: ReplayState; tick: number; seed?: string }): {
     replay: ReplayState;
     effects: unknown;
   };
@@ -109,6 +111,7 @@ export const ruleRegistry: RuleRegistry = {
     lineageFeature,
     heritageFeature,
     stratagemCardsFeature,
+    reputationFeature,
   ],
   monthlyOrder: [
     'treaty',
@@ -118,6 +121,7 @@ export const ruleRegistry: RuleRegistry = {
     'logistics-v1',
     'governance-v1',
     'stratagem-cards-v1',
+    'reputation-v1',
   ],
   inputKinds: [
     ...ADMIN_SETTING_KINDS.map((kind) => ({
@@ -145,6 +149,7 @@ export const ruleRegistry: RuleRegistry = {
     { kind: ADMIN_RESET_KIND, feature: null, route: 'direct', directTick: true, apply: applyAdminResetRecord },
     { kind: 'turns.set', feature: null, route: 'direct', apply: applyTurnsInput },
     { kind: 'general.create', feature: null, route: 'queued', apply: applyCreationInput },
+    { kind: POSSESSION_KIND, feature: null, route: 'queued', apply: applyPossessionInput },
     { kind: 'general.setPolicy', feature: 'policy', route: 'queued', apply: applyPolicyInput },
     { kind: 'general.active', feature: 'policy', route: 'queued', apply: applyPolicyInput },
     ...personnelInputKinds,
@@ -164,6 +169,7 @@ export function settleMonthlyFeatures(
   settled: ReplayState,
   tick: number,
   registry: RuleRegistry = ruleRegistry,
+  seed?: string,
 ): { replay: ReplayState; effects: Record<string, unknown> } {
   let replay = settled;
   const effects: Record<string, unknown> = {};
@@ -176,7 +182,7 @@ export function settleMonthlyFeatures(
   for (const key of order) {
     const feature = selected.find((feature) => feature.key === key);
     if (!feature) continue;
-    const result = feature.settleMonthly!({ before, settled: replay, tick });
+    const result = feature.settleMonthly!({ before, settled: replay, tick, ...(seed === undefined ? {} : { seed }) });
     replay = result.replay;
     effects[key] = result.effects;
   }

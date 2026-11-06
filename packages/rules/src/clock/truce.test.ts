@@ -73,11 +73,13 @@ describe('T4-40 AC-P2-19 순수 휴전 시계', () => {
       active: true,
       endsAt: at('10-25T07:00:00'),
       nextStartsAt: at('10-25T23:00:00'),
+      nextEndsAt: at('10-26T07:00:00'),
     });
     expect(truceWindow(at('10-25T07:00:00'), overnight)).toEqual({
       active: false,
       endsAt: null,
       nextStartsAt: at('10-25T23:00:00'),
+      nextEndsAt: at('10-26T07:00:00'),
     });
     expect(truceMsBetween(at('10-24T23:00:00'), at('10-25T07:00:00'), overnight)).toBe(8 * 3_600_000);
     expect(truceMsBetween(1, 0, overnight)).toBe(0);

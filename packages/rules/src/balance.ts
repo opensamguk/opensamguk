@@ -42,3 +42,5 @@ export const BALANCE = {
   DECLARE_MONTHS: 1,
   TREATY_MONTHS: 12,
 } as const;
+
+export const REPUTATION_POINTS = { conquest: 5, victory: 3, domestic: 2, defeat: -2, betrayal: -3 } as const;

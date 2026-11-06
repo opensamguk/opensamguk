@@ -4,6 +4,7 @@ import { logInfo, logSelect, nationRecordInfo, worldRecordInfo } from '../visibi
 import { z } from 'zod';
 import { decodeRecordCursor, encodeRecordCursor, generalLogCursor } from '../recordCursor';
 import { worldInput } from '../queries';
+import { monthlyReviewSelect, readMonthlyReview } from '../review';
 
 const generalInput = worldInput.extend({ cursor: z.string().min(1).max(256).optional() }).strict();
 
@@ -54,19 +55,33 @@ export const recordsRouter = router({
     }),
   ),
   world: protectedProcedure.input(recordsInput).query(({ ctx, input }) =>
-    readWorld(ctx.db, input.worldId, async (tx) => {
+    readWorld(ctx.db, input.worldId, async (tx, world) => {
       const history = await tx.yearbookSnapshot.findMany({
         where: { worldId: input.worldId, ...beforeCursor(input.cursor) },
         orderBy: { tick: 'desc' },
         take: 31,
         select: { tick: true, year: true, month: true, data: true },
       });
+      const reviews =
+        world.ruleFeatures.includes('reputation-v1') && history.length
+          ? await tx.monthlyReview.findMany({
+              where: { worldId: input.worldId, tick: { in: history.map((row) => row.tick) } },
+              select: monthlyReviewSelect,
+            })
+          : [];
+      const headlines = new Map(
+        reviews.map((row) => {
+          const review = readMonthlyReview(row, world.startYear);
+          return [review.tick, review.headline];
+        }),
+      );
       return page(
         history.map((row) => ({
           tick: row.tick,
           year: row.year,
           month: row.month,
           ...worldRecordInfo(row.data),
+          ...(headlines.get(row.tick) ? { review: { headline: headlines.get(row.tick)! } } : {}),
         })),
       );
     }),

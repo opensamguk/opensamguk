@@ -104,7 +104,7 @@ export async function persistMonthly(
   const settled = { ...beforeReplay, state: result.state, monthlyTick: tick };
   const features =
     world.replayFormat === 3
-      ? settleMonthlyFeatures(beforeReplay, settled, tick)
+      ? settleMonthlyFeatures(beforeReplay, settled, tick, ruleRegistry, seed)
       : {
           replay: { ...settled, state: treatyEnabled ? settleTreaties(result.state, tick) : result.state },
           effects: {} as Record<string, unknown>,

@@ -85,7 +85,7 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
     : undefined;
   const ext = restoreExtState(commands, await readWorldExtRows(tx, worldId));
   const cities = await tx.city.findMany({ where: { worldId } });
-  const nations = await tx.nation.findMany({ where: { worldId } });
+  const nations = await tx.nation.findMany({ where: { worldId }, omit: { noticeDirective: true } });
   const generals = await tx.general.findMany({
     where: { worldId },
     omit: { defaultPolicy: true, lastActiveTick: true, lastActiveAt: true, residenceTick: true },

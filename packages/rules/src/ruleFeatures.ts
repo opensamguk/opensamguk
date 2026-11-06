@@ -10,6 +10,7 @@ import { validatePersonnelRecord } from './personnel/inputs';
 import { runPersonnelMonth } from './personnel/monthStep';
 import { updateResidenceAnchors } from './personnel/residence';
 import { recordedLineageSuccession } from './lineage/control';
+import { recordedPossession } from './entry/possess';
 import { completePersonnelStep, type PersonnelStepPacket } from './personnel/step';
 import { applyTreatyInput, settleTreaties, validateTreatyRecord } from './diplomacy/treaty';
 import { validatePolicyInput } from './replayInputs';
@@ -120,6 +121,7 @@ function personnelResult(before: ReplayState, after: ReplayState, packet: Person
       tick,
       createdHumanId: input.kind === 'general.create' ? input.generalId : null,
       succession: recordedLineageSuccession(input),
+      possession: recordedPossession(input),
     }),
   };
 }

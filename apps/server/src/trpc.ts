@@ -2,6 +2,7 @@ import { initTRPC, TRPCError } from '@trpc/server';
 import type { Context } from './context';
 import { missingConsents } from './legal/policy';
 import { activeSanctionWhere } from './auth/sanction';
+import { RESOURCE_HTTP_LIMITS } from './resourceAdmin/httpLimits';
 export const PUBLIC_ERROR_REASONS = ['EMAIL_NOT_VERIFIED', 'CONSENT_REQUIRED', 'TOKEN_INVALID'] as const;
 export type PublicErrorReason = (typeof PUBLIC_ERROR_REASONS)[number];
 export class PublicReasonError extends Error {
@@ -24,10 +25,18 @@ const t = initTRPC
         error.cause instanceof PublicReasonError && PUBLIC_ERROR_REASONS.includes(error.cause.reason)
           ? error.cause.reason
           : null;
+      const resourceMessageTooLarge =
+        shape.data.path?.startsWith('resourceAdmin.') &&
+        Buffer.byteLength(shape.message) > RESOURCE_HTTP_LIMITS.errorMessageMax;
       return {
         ...shape,
         data: { ...data, reason },
-        message: error.code === 'INTERNAL_SERVER_ERROR' ? '요청을 처리하지 못했습니다.' : shape.message,
+        message:
+          error.code === 'INTERNAL_SERVER_ERROR'
+            ? '요청을 처리하지 못했습니다.'
+            : resourceMessageTooLarge
+              ? '요청 값을 확인하세요.'
+              : shape.message,
       };
     },
   });

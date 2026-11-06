@@ -153,6 +153,35 @@ describe('사람 장수의 물리 거주 앵커', () => {
     expect(() => updateResidenceAnchors({ ...step, after, createdHumanId: 1 })).toThrow(PersonnelInvariantError);
   });
 
+  it('검증한 맡기 출처만 새 사람의 앵커를 만들고 기존 앵커를 유지한다', () => {
+    const step = input();
+    const after = structuredClone(step.after) as OfficeState;
+    after.generals[1]!.userId = 'possessed';
+    const possession = { generalId: 1, userId: 'possessed' };
+    expect(updateResidenceAnchors({ ...step, after, possession })).toEqual({ 1: 100, 3: 5, 4: 10 });
+    expect(() => updateResidenceAnchors({ ...step, after, possession: { ...possession, userId: 'other' } })).toThrow(
+      PersonnelInvariantError,
+    );
+    expect(() => updateResidenceAnchors({ ...step, after, possession, createdHumanId: 1 })).toThrow(
+      PersonnelInvariantError,
+    );
+    expect(() => updateResidenceAnchors({ ...step, after, possession, succession: { fromId: 3, toId: 1 } })).toThrow(
+      PersonnelInvariantError,
+    );
+    after.generals[1]!.cityKey = 4;
+    expect(() => updateResidenceAnchors({ ...step, after, possession })).toThrow(PersonnelInvariantError);
+  });
+
+  it('맡기 출처로 기존 사람 계정의 장수를 하나 더 만들 수 없다', () => {
+    const step = input();
+    const after = structuredClone(step.after) as OfficeState;
+    const userId = step.before.generals[3]!.userId!;
+    after.generals[1]!.userId = userId;
+    expect(() => updateResidenceAnchors({ ...step, after, possession: { generalId: 1, userId } })).toThrow(
+      PersonnelInvariantError,
+    );
+  });
+
   it.each([-1, 0.5, NaN, Infinity, 2_147_483_648])('저장할 수 없는 처리 tick은 거부한다 (%s)', (tick) => {
     expect(() => updateResidenceAnchors({ ...input(), tick })).toThrow(PersonnelInvariantError);
   });
