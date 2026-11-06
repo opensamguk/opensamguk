@@ -3,6 +3,8 @@ import { appRouter } from '../router';
 import type { ProcedureMeta } from '../trpc';
 
 const VERIFIED_MUTATIONS = [
+  'admin.game.request',
+  'admin.world.requestSetting',
   'admin.notice.create',
   'admin.notice.hide',
   'admin.notice.update',
@@ -16,6 +18,7 @@ const VERIFIED_MUTATIONS = [
   'campaign.relationship',
   'campaign.unit',
   'cityResources.allocate',
+  'entry.possess',
   'general.create',
   'general.setPolicy',
   'governance.submit',

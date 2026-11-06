@@ -1,9 +1,17 @@
 import { readFile } from 'node:fs/promises';
 import { TRPCError } from '@trpc/server';
-import { creationBlock, nowTick, scenarioSchema, toGameDate } from '@opensamguk/rules';
+import {
+  creationBlock,
+  effectiveWorldOptions,
+  parsePreset,
+  nowTick,
+  scenarioSchema,
+  toGameDate,
+} from '@opensamguk/rules';
 import { z } from 'zod';
 import { resourceRoot } from '@opensamguk/shared/resource-root';
 import { publicProcedure, router } from '../trpc';
+import { worldClock } from '../queries';
 
 const titleSchema = scenarioSchema.pick({ id: true, title: true });
 const titles = new Map<string, string>();
@@ -40,6 +48,8 @@ export const lobbyRouter = router({
               name: true,
               status: true,
               preset: true,
+              runtimeOptions: true,
+              replayFormat: true,
               scenarioKey: true,
               startYear: true,
               clockMode: true,
@@ -95,13 +105,15 @@ export const lobbyRouter = router({
               gameDate:
                 world.status === 'ENDED' && world.result
                   ? { year: world.result.endedYear, month: world.result.endedMonth }
-                  : toGameDate(
-                      world.startYear,
-                      nowTick({ ...world, clockAnchorAt: world.clockAnchorAt?.getTime() ?? null }, ctx.now),
-                    ),
+                  : toGameDate(world.startYear, nowTick(worldClock(world), ctx.now)),
               turnTermMinutes: world.turnTermMinutes,
               startedAt: world.startedAt?.toISOString() ?? null,
               humanGenerals: world._count.generals,
+              ...(world.replayFormat === 3 &&
+              effectiveWorldOptions(world.preset === null ? null : parsePreset(world.preset), world.runtimeOptions)
+                .entry.npcPlay === 'on'
+                ? { npcPlayEnabled: true as const }
+                : {}),
               myGeneral: general
                 ? { id: general.id, name: general.name, nationName: general.nation?.name ?? null }
                 : null,
@@ -110,6 +122,11 @@ export const lobbyRouter = router({
                   status: world.status,
                   hasGeneral: general !== undefined,
                   hasPending: pendingWorlds.has(world.id),
+                  entryOpen:
+                    effectiveWorldOptions(
+                      world.preset === null ? null : parsePreset(world.preset),
+                      world.runtimeOptions,
+                    ).entry.generalCreation === 'open',
                 })?.reason ?? null,
             };
           });

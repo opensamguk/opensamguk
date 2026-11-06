@@ -137,6 +137,7 @@ describe('T4-02 등록된 확장 명령 대조', () => {
         'ext/stratagem/incite.ts',
         'ext/stratagem/plunder.ts',
         '../clock/clock.ts',
+        '../clock/truce.ts',
         '../clock/constants.ts',
         '../general/fiveStats.ts',
         '../equipment/stats.ts',
@@ -709,6 +710,8 @@ describe('T4-02 등록된 확장 명령 대조', () => {
     `z.literal({get toString() { return () => 'gold'; }} as any)`,
     `z.literal({set toString(input) {} } as any)`,
     `z.literal({convert() { return 1; }} as any)`,
+    `z.number().min(-({valueOf() { return 1; }} as any))`,
+    `z.number().refine((() => (value: number) => value > 0)())`,
   ])('zod 인자의 함수·중첩 함수·접근자를 거부한다: %s', (schema) => {
     fixture(
       { 'ext/registry.ts': `import {z} from 'zod'; const schema = ${schema}; export const extensionCommands = [];` },
@@ -720,13 +723,15 @@ describe('T4-02 등록된 확장 명령 대조', () => {
     fixture(
       {
         ...actualSupport(),
-        'ext/values.ts': `export const choices = ['gold', 'rice'] as const; export const limit = 1;`,
-        'ext/aliases.ts': `export {choices as kinds, limit as minimum} from './values.ts';`,
+        'ext/values.ts': `export const choices = ['gold', 'rice'] as const; export const limit = 1; export const offset = -720;`,
+        'ext/aliases.ts': `export {choices as kinds, limit as minimum, offset as minOffset} from './values.ts';`,
         'ext/registry.ts': `import {z as schema} from 'zod';
           import {defineCommand, positive} from '../support.ts';
-          import {kinds as options, minimum as lower} from './aliases.ts';
+          import {kinds as options, minimum as lower, minOffset} from './aliases.ts';
           const names = [...options]; const min = lower;
-          const fields = {cityKey: positive, kind: schema.enum(names), tags: schema.array(schema.string()).min(min)};
+          const fields = {cityKey: positive, kind: schema.enum(names), tags: schema.array(schema.string()).min(min),
+            utcOffset: schema.number().min(minOffset).max(840).refine((value) => value !== 7, '금지 값'),
+            localOffset: schema.number().min(-720)};
           const args = schema.strictObject(fields);
           export const extensionCommands = [defineCommand({key: 'fire_attack', name: '시험',
             category: 'strategy', args, check() { return null; }, change() { return {logs: []}; }})];`,
@@ -735,11 +740,17 @@ describe('T4-02 등록된 확장 명령 대조', () => {
         const runtime = importWithTsx(
           dir,
           `({registry: extensionCommands.map(({key,target})=>({key,target})),
-            valid: extensionCommands[0].args.safeParse({cityKey:1,kind:'gold',tags:['a']}).success,
-            invalid: extensionCommands[0].args.safeParse({cityKey:0,kind:'other',tags:[]}).success})`,
+            valid: extensionCommands[0].args.safeParse({cityKey:1,kind:'gold',tags:['a'],utcOffset:-720,localOffset:-720}).success,
+            invalid: extensionCommands[0].args.safeParse({cityKey:0,kind:'other',tags:[],utcOffset:0,localOffset:0}).success,
+            underflow: extensionCommands[0].args.safeParse({cityKey:1,kind:'gold',tags:['a'],utcOffset:-721,localOffset:0}).success,
+            overflow: extensionCommands[0].args.safeParse({cityKey:1,kind:'gold',tags:['a'],utcOffset:841,localOffset:0}).success,
+            refined: extensionCommands[0].args.safeParse({cityKey:1,kind:'gold',tags:['a'],utcOffset:7,localOffset:0}).success})`,
         );
         expect(runtime.valid).toBe(true);
         expect(runtime.invalid).toBe(false);
+        expect(runtime.underflow).toBe(false);
+        expect(runtime.overflow).toBe(false);
+        expect(runtime.refined).toBe(false);
         expect(readExtensionRegistryKeys(dir)).toEqual(runtime.registry);
       },
       join(root, 'packages/rules'),

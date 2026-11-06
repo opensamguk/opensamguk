@@ -281,7 +281,7 @@ export function expandedCreationProfile(
   try {
     profile = featureProfileSchema.parse(data);
     if (
-      profile.key !== 'expanded-191-v1' ||
+      profile.key !== 'expanded-191-v2' ||
       profile.scenarioKey !== creationSelection.scenarioKey ||
       profile.mapKey !== creationSelection.mapKey
     )
@@ -338,7 +338,7 @@ export async function getWorldCreationOptions(ctx: Context, input: z.infer<typeo
         if (input.expandedProfiles === true) {
           let value: unknown;
           try {
-            value = JSON.parse(await readFile(new URL('feature-profile/expanded-191-v1.json', resourceRoot()), 'utf8'));
+            value = JSON.parse(await readFile(new URL('feature-profile/expanded-191-v2.json', resourceRoot()), 'utf8'));
           } catch {
             value = null;
           }

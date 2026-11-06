@@ -22,6 +22,8 @@ ADMIN-RESET-D 후보의 `packages/rules/src/clock/reset.ts`는 엄격 요청·pa
 
 | 경로 | 역할 |
 | ---- | ---- |
+| `packages/rules/src/clock/truce.ts` | T4-40 순수 휴전 겹침·유효 경과·구간·tick 역변환. 프리셋 선택 칸은 기본 꺼짐 |
+| `apps/engine/src/world/truce.ts`, `apps/server/src/queries.ts` | 유효 휴전으로 월드 시계 구성, CLI·공개 요약 구간과 개인 30칸 예정 시각. 설정 적용은 `engine/src/admin/settings.ts` |
 | `apps/server/src/index.ts` | DB 연결과 HTTP 서버 시작·종료 |
 | `apps/server/src/server.ts` | Fastify 생성, 쿠키·인증 context, 비밀값을 제외한 로그 |
 | `apps/server/src/auth/` | Argon2id, 세션·계정 토큰 해시·만료·원자 소비, 재설정의 비밀번호·세션 폐기와 실제 HTTP·DB 테스트 |
@@ -109,7 +111,7 @@ ADMIN-RESET-D 후보의 `packages/rules/src/clock/reset.ts`는 엄격 요청·pa
 
 T4-23의 장비 상태는 `World.equipmentState`에 저장한다. `packages/rules/src/equipment/origin.ts`가 원생성 기능·카탈로그·장착 주인을 검사하며 엔진 `equipmentState.ts`는 같은 턴 트랜잭션에서 CAS로 갱신한다. 원생성·적재·명령·월 정산·가문 계승의 저장 경로를 함께 확인한다. 기능을 끈 월드에는 상태를 추가하지 않는다.
 
-`equipment.mine`은 서버 세션의 자기 장수에게 카탈로그·장착·보너스·매매 조건을 반환한다. `apps/server/src/game/equipmentApi.ts`가 조회하고 실제 매매는 기존 예턴의 `equipment_trade`를 실행하는 엔진이 처리한다. `tools/equipment-api.integration.test.ts`는 실제 HTTP·PG·자원 소비·롤백·계승·재생을 대조한다. 장비 선택 화면과 공개 프로필 활성화는 T4-24의 범위다.
+`equipment.mine`은 서버 세션의 자기 장수에게 카탈로그·장착·보너스·매매 조건을 반환한다. `apps/server/src/game/equipmentApi.ts`가 조회하고 실제 매매는 기존 예턴의 `equipment_trade`를 실행하는 엔진이 처리한다. `tools/equipment-api.integration.test.ts`는 실제 HTTP·PG·자원 소비·롤백·계승·재생을 대조한다. T4-24의 `apps/web/src/equipment/`는 메인 합산 능력치·세 장비 칸과 예턴 카드의 품목 선택을 맡는다. 새 확장 선택은 `expanded-191-v2`이며 기존 v1은 보존한다. 실제 화면 검증은 `e2e/t4-24-equipment.spec.ts`를 따른다.
 
 관리자 공지의 엄격 입력·잠금·멱등·감사는 `apps/server/src/admin/notices.ts`에 있다. `routers/admin.ts`의 네 절차가 사용하며 `lobby.notices`·`notice.world.list`는 숨김 필터만 추가한다. `tools/t3-05-admin-notices.integration.test.ts`는 실제 HTTP·권한·경합·두 정식 월드 격리를 검사하고 `t3-05-notice-migration.integration.test.ts`는 기존 모든 행·sequence와 null 제목·고정 공지를 새 migration 전후로 대조한다. 두 운영 표는 게임 상태·재생 해시에 넣지 않는다.
 
@@ -127,6 +129,8 @@ T4-56의 `RemovedNation`과 `YearbookNation`은 공개 표시값 보관이며 `W
 순위의 공개 국력은 D-019의 자원·기술·보급 도시 내정·장수 능력·경험·공헌 합성값이다. 월별 배율은 국가마다 별도 시드 RNG로 계산한다. 월간 정산의 같은 트랜잭션에서 최종 상태로 계산한 국력만 순위 캐시에 저장하며 계산에 쓴 사유 값은 공개하지 않는다.
 
 core2026 지침에서 가져온 체크리스트입니다.
+
+NPC 역할 입장(T3-07·AC-M3-14·INT-24 PR3)은 `packages/rules/src/entry/{possess,roles}.ts`가 순수 분류·자격·엄격 재생을 맡는다. `apps/server/src/routers/entry.ts`는 공개 후보 조회와 입력 접수·ID 영수증 회수를 맡는다. `apps/engine/src/entryInput.ts`는 리스 트랜잭션 안에서 소유권·정책 활동·맡기 로그를 저장한다. `personnel/residence.ts`는 생성·계승과 분리된 맡기 출처로 거주 앵커를 검증한다. `tools/t3-07-npc-entry.integration.test.ts`는 실제 HTTP·감독 자식·경합·세션 경계·rollback·월간 재생을 검사한다.
 
 - [ ] schema와 새 migration (기존 migration은 고치지 않음)
 - [ ] 도메인 타입

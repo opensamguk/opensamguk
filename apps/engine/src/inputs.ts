@@ -4,11 +4,14 @@ import {
   creationHeritageRecord,
   lateJoinBonus,
   parsePreset,
+  effectiveWorldOptions,
   monthlyDate,
   TICKS_PER_MONTH,
   creationFailure,
   readLineageState,
+  removedGeneralResult,
   creationBlock,
+  POSSESSION_KIND,
   emptyTurns,
   emptyQueue,
   isPolicyMode,
@@ -22,6 +25,7 @@ import {
   type CreationCode,
 } from '@opensamguk/rules';
 import { processTreatyInput } from './treatyInput';
+import { processPossession, appendPossessionLog } from './entryInput';
 import { loadReplayState } from './monthly';
 import { PgHeritageRepository } from './heritage/repository';
 
@@ -189,7 +193,10 @@ export async function processPendingInput(
 }
 
 export function queuedInputHandlers(registry: EngineRegistry = engineRegistry): Record<string, QueuedInputHandler> {
-  const handlers: Record<string, QueuedInputHandler> = { 'general.create': processGeneralCreation };
+  const handlers: Record<string, QueuedInputHandler> = {
+    'general.create': processGeneralCreation,
+    [POSSESSION_KIND]: processPossession,
+  };
   const kinds = registry.rules.inputKinds;
   for (const feature of registry.features) {
     if (!registry.rules.features.some((definition) => definition.key === feature.key))
@@ -233,11 +240,23 @@ export async function processInputs(
   const handlers = queuedInputHandlers(registry);
   const sequence = await nextActionSequence(tx, world.id);
   const before = world.ruleFeatures.includes('personnel') ? await loadReplayState(tx, world.id) : null;
-  const outcome =
-    kind.feature !== null && !world.ruleFeatures.includes(kind.feature)
+  const enabled = kind.feature === null || world.ruleFeatures.includes(kind.feature);
+  const actor =
+    !enabled || event.generalId === null
+      ? null
+      : await tx.general.findUnique({
+          where: { worldId_id: { worldId: world.id, id: event.generalId } },
+          select: { removedAt: true },
+        });
+  const outcome = !enabled
+    ? {
+        status: 'REJECTED' as const,
+        result: { code: 'FEATURE_DISABLED', message: '이 월드에서 켜지 않은 기능입니다.' },
+      }
+    : actor?.removedAt != null
       ? {
           status: 'REJECTED' as const,
-          result: { code: 'FEATURE_DISABLED', message: '이 월드에서 켜지 않은 기능입니다.' },
+          result: removedGeneralResult(event.kind, tick),
         }
       : await handlers[event.kind]!(tx, world, event, { tick, sequence, ...(emit ? { emit } : {}) });
   if (before && outcome.status === 'APPLIED') {
@@ -253,6 +272,10 @@ export async function processInputs(
     for (const feature of registry.features)
       if (world.ruleFeatures.includes(feature.key) && feature.key !== kind.feature)
         await feature.afterQueuedInput?.(tx, world, before, input);
+  }
+  if (event.kind === POSSESSION_KIND && outcome.status === 'APPLIED') {
+    if (outcome.generalId === undefined) throw Error('맡은 장수의 적용 ID가 없습니다.');
+    await appendPossessionLog(tx, world.id, outcome.generalId, tick, sequence);
   }
   const updated = await tx.inputEvent.updateMany({
     where: { id: event.id, status: 'PENDING' },
@@ -277,6 +300,9 @@ const processGeneralCreation: QueuedInputHandler = async (tx, world, event, { ti
     status: world.status,
     hasGeneral: existing.some((g) => g.userId === event.userId),
     hasPending: false,
+    entryOpen:
+      effectiveWorldOptions(world.preset === null ? null : parsePreset(world.preset), world.runtimeOptions).entry
+        .generalCreation === 'open',
   });
   if (block && block.code !== 'PENDING') return reject(block.code);
   const actor = await tx.user.findUnique({ where: { id: event.userId } });
@@ -300,9 +326,10 @@ const processGeneralCreation: QueuedInputHandler = async (tx, world, event, { ti
     orderBy: { cityKey: 'asc' },
   });
   const preset = world.preset ? parsePreset(world.preset) : null;
-  const bonus = preset?.boost.lateJoin
+  const lateJoin = effectiveWorldOptions(preset, world.runtimeOptions).presetRules?.boost.lateJoin;
+  const bonus = lateJoin
     ? lateJoinBonus(
-        preset.boost.lateJoin,
+        lateJoin,
         monthlyDate(world.startYear, world.monthlyTick + TICKS_PER_MONTH).year - world.startYear,
         await tx.general.findMany({
           where: { worldId: world.id },

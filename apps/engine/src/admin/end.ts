@@ -16,6 +16,7 @@ import { loadReplayState } from '../monthly';
 import { checkedAdminResetResult } from './reset';
 import { PgHeritageRepository } from '../heritage/repository';
 import { refundHeritageCreations } from '../heritage/service';
+import { readCreationWorld } from './settingsHistory';
 
 export function checkedAdminEndResult(
   world: Prisma.WorldGetPayload<Record<string, never>>,
@@ -55,7 +56,7 @@ export async function readAdminEndTick(
   if (records.length !== 1) throw new Error('종료된 월드의 종료 기록이 없습니다.');
   return (
     records[0]!.kind === ADMIN_RESET_KIND
-      ? checkedAdminResetResult(world, records[0]!)
+      ? checkedAdminResetResult(await readCreationWorld(tx, world), records[0]!)
       : checkedAdminEndResult(world, records[0]!)
   ).after.tick;
 }

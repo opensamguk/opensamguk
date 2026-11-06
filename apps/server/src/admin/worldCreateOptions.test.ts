@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { hashState } from '@opensamguk/shared/node';
-import { ruleRegistry, type RuleRegistry } from '@opensamguk/rules';
+import { featureProfileSchema, ruleRegistry, type RuleRegistry } from '@opensamguk/rules';
 import {
   creationFeatures,
   creationProfile,
@@ -49,19 +49,37 @@ const registered: RuleRegistry = {
   ],
 };
 describe('AC-M3-04 원생성 설정 조회', () => {
-  it('확장 항목은 별도 키·설정 해시·13기능을 요약하고 기존 항목을 보존한다', () => {
-    const data = json('resources/feature-profile/expanded-191-v1.json');
+  it('기존 프로필 바이트·규칙을 보존하고 새 형식은 장비 설정과 기능을 함께 요구한다', () => {
+    const legacy = json('resources/feature-profile/expanded-191-v1.json');
+    expect(hashState(legacy)).toBe('9afb4ff72357feace11d1340f425b336a6558603f0d84de8aa81e35ef1472e1f');
+    expect(featureProfileSchema.parse(legacy).featureData['lineage-v1'].version).toBe(1);
+    const current = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v2.json'));
+    if (current.version !== 2) throw Error('새 확장 설정 형식이 아닙니다.');
+    expect(current.featureData['lineage-v1'].version).toBe(2);
+    expect(current.featureData['equipment-v1'].items).toHaveLength(18);
+    const { 'equipment-v1': gear, ...withoutGear } = current.featureData;
+    expect(gear.items).toHaveLength(18);
+    expect(featureProfileSchema.safeParse({ ...current, featureData: withoutGear }).success).toBe(false);
+    expect(
+      featureProfileSchema.safeParse({
+        ...current,
+        ruleFeatures: current.ruleFeatures.filter((key) => key !== 'equipment-v1'),
+      }).success,
+    ).toBe(false);
+  });
+  it('확장 항목은 별도 키·설정 해시·14기능을 요약하고 기존 항목을 보존한다', () => {
+    const data = json('resources/feature-profile/expanded-191-v2.json');
     const before = hashState(creationProfile(rows, presets));
     const expanded = expandedCreationProfile(rows, presets, data);
     expect(expanded).toMatchObject({
       id: 'integration-v01-expanded',
       available: true,
-      featureProfileKey: 'expanded-191-v1',
+      featureProfileKey: 'expanded-191-v2',
       featureProfileHash: hashState(data),
       suggestedEndYear: 231,
     });
     if (!expanded.available) throw new Error('확장 항목을 확인하세요.');
-    expect(expanded.ruleFeatures).toHaveLength(13);
+    expect(expanded.ruleFeatures).toHaveLength(14);
     expect(hashState(creationProfile(rows, presets))).toBe(before);
     expect(Object.hasOwn(creationProfile(rows, presets), 'featureProfileKey')).toBe(false);
     expect(expandedCreationProfile(rows, presets, null)).toMatchObject({

@@ -10,6 +10,10 @@ import { PersonnelInvariantError } from '../personnel/types';
 export const noArgs = z.strictObject({});
 export const positive = z.number().int().positive().max(1_000_000);
 export const fail = (code: Failure['code'], message: string): Failure => ({ code, message });
+export function targetGeneral(view: WorldView, id: number) {
+  const general = view.generals[id];
+  return general?.removedAt === undefined ? general : undefined;
+}
 export function ownCity(view: WorldView, actor: Actor): Failure | null {
   const general = view.generals[actor.generalId];
   if (!general) return fail('NO_ACTOR', '장수가 없습니다.');
@@ -46,7 +50,7 @@ export function defineCommand<A>(spec: {
   change(state: WorldState, actor: Actor, args: A, rng: Rng): Omit<CommandResult, 'effects'>;
 }): CommandDef {
   const check = (view: WorldView, actor: Actor, raw: unknown) => {
-    if (!view.generals[actor.generalId]) return fail('NO_ACTOR', '장수가 없습니다.');
+    if (!targetGeneral(view, actor.generalId)) return fail('NO_ACTOR', '장수가 없습니다.');
     const parsed = spec.args.safeParse(raw);
     if (!parsed.success) return fail('BAD_ARGS', '명령 인자가 잘못되었습니다.');
     return (

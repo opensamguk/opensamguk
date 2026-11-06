@@ -1,7 +1,7 @@
 import { appendFile } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 import type { PrismaClient } from '@opensamguk/db';
-import { TICKS_PER_MONTH } from '@opensamguk/rules';
+import { TICKS_PER_MONTH, type Truce } from '@opensamguk/rules';
 
 export interface CommitMetricCandidate {
   worldId: string;
@@ -13,6 +13,7 @@ export interface CommitMetricCandidate {
   clockAnchorAt: number | null;
   turnTermMinutes: number;
   explicitAdvance: boolean;
+  truce?: Truce | null;
 }
 
 export interface CommitMetric {
@@ -46,6 +47,8 @@ export function commitMetric(candidate: CommitMetricCandidate, observedAt: numbe
   if (
     candidate.clockMode !== 'REALTIME' ||
     candidate.explicitAdvance ||
+    // 현행 부하 계측의 고정 epoch는 휴전 시계를 표현하지 못한다.
+    candidate.truce != null ||
     !Number.isSafeInteger(clockTick) ||
     clockTick < 0 ||
     !Number.isSafeInteger(tick) ||

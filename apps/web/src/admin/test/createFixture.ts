@@ -63,8 +63,15 @@ export const expandedProfile: CreateProfile = {
   ...baseProfile,
   id: 'integration-v01-expanded',
   label: '통합판 확장 · 191년 군웅할거',
-  featureProfileKey: 'expanded-191-v1',
+  featureProfileKey: 'expanded-191-v2',
   featureProfileHash: 'a'.repeat(64),
-  ruleFeatures: [...baseProfile.ruleFeatures, 'governance-v1', 'heritage-v1', 'lineage-v1', 'logistics-v1'].sort(),
+  ruleFeatures: [
+    ...baseProfile.ruleFeatures,
+    'equipment-v1',
+    'governance-v1',
+    'heritage-v1',
+    'lineage-v1',
+    'logistics-v1',
+  ].sort(),
   suggestedEndYear: 231,
 };

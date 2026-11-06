@@ -21,7 +21,7 @@ const exec = promisify(execFile),
 const pending = new Set<Promise<void>>(),
   folders: string[] = [],
   servers: Server[] = [];
-function it(name: string, body: () => Promise<void>) {
+function it(name: string, body: () => Promise<void>, timeoutMs = 30000) {
   registeredTest(
     name,
     () => {
@@ -33,7 +33,7 @@ function it(name: string, body: () => Promise<void>) {
       );
       return work;
     },
-    30000,
+    timeoutMs,
   );
 }
 async function git(args: string[]) {
@@ -329,44 +329,53 @@ it('T3-11 AC-M3-09 실제 ack push 응답 유실은 다시 읽어 중복 커밋�
   expect(f.controls.messages).toHaveLength(1);
 });
 
-it('T3-11 AC-M3-09 실제 수신 뒤 ack push3회 거절은 pending을 보존하고 뒤 항목을 보내지 않는다', async () => {
-  const f = await setup();
-  await f.run('1');
-  f.controls.receiver = 503;
-  await f.run('2');
-  f.controls.health = 200;
-  await f.run('3');
-  const before = await f.state();
-  expect(before.pending.map((item) => item.id)).toEqual(['prod:down:2.1', 'prod:recovery:3.1']);
-  f.controls.receiver = 204;
-  const hook = join(f.bare, 'hooks', 'pre-receive');
-  await writeFile(
-    hook,
-    '#!/bin/sh\nwhile read old new ref; do\n message=$(git log -1 --format=%s "$new") || exit 2\n case "$message" in *" ack") printf "rejected\\n" >> "$GIT_DIR/ack-rejected"; exit 1;; esac\ndone\n',
-  );
-  await chmod(hook, 0o700);
-  expect(await f.run('3')).toMatchObject({ ok: false, kind: 'git', sent: [{ id: 'prod:down:2.1', persisted: true }] });
-  expect(await f.state()).toEqual(before);
-  expect(f.controls.messages).toHaveLength(3);
-  expect(f.controls.messages.some((row) => row.id === 'prod:recovery:3.1')).toBe(false);
-  expect((await readFile(join(f.bare, 'ack-rejected'), 'utf8')).trim().split('\n')).toHaveLength(3);
-  await rm(hook);
-  expect(await f.run('3')).toMatchObject({
-    ok: true,
-    result: { delivered: 2, pending: 0 },
-    sent: [
-      { id: 'prod:down:2.1', persisted: true },
-      { id: 'prod:recovery:3.1', persisted: true },
-    ],
-  });
-  expect(f.controls.messages.map((row) => row.id)).toEqual([
-    'prod:down:2.1',
-    'prod:down:2.1',
-    'prod:down:2.1',
-    'prod:down:2.1',
-    'prod:recovery:3.1',
-  ]);
-});
+it(
+  'T3-11 AC-M3-09 실제 수신 뒤 ack push3회 거절은 pending을 보존하고 뒤 항목을 보내지 않는다',
+  async () => {
+    const f = await setup();
+    await f.run('1');
+    f.controls.receiver = 503;
+    await f.run('2');
+    f.controls.health = 200;
+    await f.run('3');
+    const before = await f.state();
+    expect(before.pending.map((item) => item.id)).toEqual(['prod:down:2.1', 'prod:recovery:3.1']);
+    f.controls.receiver = 204;
+    const hook = join(f.bare, 'hooks', 'pre-receive');
+    await writeFile(
+      hook,
+      '#!/bin/sh\nwhile read old new ref; do\n message=$(git log -1 --format=%s "$new") || exit 2\n case "$message" in *" ack") printf "rejected\\n" >> "$GIT_DIR/ack-rejected"; exit 1;; esac\ndone\n',
+    );
+    await chmod(hook, 0o700);
+    expect(await f.run('3')).toMatchObject({
+      ok: false,
+      kind: 'git',
+      sent: [{ id: 'prod:down:2.1', persisted: true }],
+    });
+    expect(await f.state()).toEqual(before);
+    expect(f.controls.messages).toHaveLength(3);
+    expect(f.controls.messages.some((row) => row.id === 'prod:recovery:3.1')).toBe(false);
+    expect((await readFile(join(f.bare, 'ack-rejected'), 'utf8')).trim().split('\n')).toHaveLength(3);
+    await rm(hook);
+    expect(await f.run('3')).toMatchObject({
+      ok: true,
+      result: { delivered: 2, pending: 0 },
+      sent: [
+        { id: 'prod:down:2.1', persisted: true },
+        { id: 'prod:recovery:3.1', persisted: true },
+      ],
+    });
+    expect(f.controls.messages.map((row) => row.id)).toEqual([
+      'prod:down:2.1',
+      'prod:down:2.1',
+      'prod:down:2.1',
+      'prod:down:2.1',
+      'prod:recovery:3.1',
+    ]);
+  },
+  // 실제 CLI 다섯 번과 Git hook 세 번의 누적 비용이 Windows에서 30초를 넘는다.
+  process.platform === 'win32' ? 90000 : 30000,
+);
 
 it('T3-11 AC-M3-09 상한으로 버린 항목은 실제 전달 실패 결과에도 안전한 경고를 남긴다', async () => {
   const f = await setup();

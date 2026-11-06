@@ -3,6 +3,12 @@ import type { WorldView } from '../model/world';
 import { LINEAGE_MAX } from './config';
 import { heirEligibility, lineageAlive } from './eligibility';
 
+export class LineageRevisionLimitError extends Error {
+  constructor() {
+    super('가문 변경 번호 한도에 닿았습니다.');
+  }
+}
+
 export function reconcileLineage(world: WorldView, tick: number) {
   const next = cloneWorld(world),
     state = next.lineage;
@@ -26,7 +32,7 @@ export function reconcileLineage(world: WorldView, tick: number) {
     }
   }
   if (changed) {
-    if (state.revision === LINEAGE_MAX) throw new Error('가문 변경 번호 한도에 닿았습니다.');
+    if (state.revision === LINEAGE_MAX) throw new LineageRevisionLimitError();
     state.revision++;
   }
   return next;

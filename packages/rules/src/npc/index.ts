@@ -32,7 +32,7 @@ export interface NpcContext {
 type General = DeepReadonly<InitialGeneral>;
 const compareText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
-function chooser(view: WorldView, general: General, rng: Rng, context: NpcContext, target: 'general' | 'nation') {
+function chooser(view: WorldView, general: General, context: NpcContext, target: 'general' | 'nation') {
   const candidates: NpcCandidate[] = [];
   const actor: Actor = { generalId: general.id, tick: context.tick ?? 0, unitSet: context.unitSet, target };
   return {
@@ -46,16 +46,20 @@ function chooser(view: WorldView, general: General, rng: Rng, context: NpcContex
         candidates.push({ key, args, score: weighted, reason });
       }
     },
-    finish(): NpcDecision {
+    finish(): NpcCandidate[] {
       candidates.sort(
         (a, b) =>
           b.score - a.score || compareText(a.key, b.key) || compareText(JSON.stringify(a.args), JSON.stringify(b.args)),
       );
-      return {
-        chosen: candidates.length ? rng.pick(candidates.filter((c) => c.score === candidates[0]!.score)) : null,
-        candidates,
-      };
+      return candidates;
     },
+  };
+}
+
+function decision(candidates: NpcCandidate[], rng: Rng): NpcDecision {
+  return {
+    chosen: candidates.length ? rng.pick(candidates.filter((c) => c.score === candidates[0]!.score)) : null,
+    candidates,
   };
 }
 
@@ -88,10 +92,16 @@ function frontlineSteps(view: WorldView, general: General): number[] {
 }
 
 export function chooseGeneralTurn(view: WorldView, general: General, rng: Rng, context: NpcContext = {}): NpcDecision {
-  if (general.userId !== null) return { chosen: null, candidates: [] };
+  if (general.removedAt !== undefined || general.userId !== null) return { chosen: null, candidates: [] };
+  return decision(generalTurnCandidates(view, general, context), rng);
+}
+
+// 사람 조언도 실제 소유권과 권한을 유지한 채 같은 후보 계산을 쓴다.
+export function generalTurnCandidates(view: WorldView, general: General, context: NpcContext = {}): NpcCandidate[] {
+  if (general.removedAt !== undefined) return [];
   const stats = commandFiveStats(view, general);
   const militaryScore = stats ? Math.max(stats.leadership, stats.strength) : 0;
-  const choice = chooser(view, general, rng, context, 'general');
+  const choice = chooser(view, general, context, 'general');
   choice.add('rest', {}, 0, '실행할 명령이 없으면 쉰다.');
   if (general.nationId === null) {
     for (const nation of Object.values(view.nations))
@@ -194,9 +204,14 @@ export function chooseGeneralTurn(view: WorldView, general: General, rng: Rng, c
 
 export function chooseNationTurn(view: WorldView, ruler: General, rng: Rng, context: NpcContext = {}): NpcDecision {
   const nation = ruler.nationId === null ? undefined : view.nations[ruler.nationId];
-  if (ruler.userId !== null || !nation?.isNpc || ruler.officerLevel !== BALANCE.RULER_LEVEL)
+  if (
+    ruler.removedAt !== undefined ||
+    ruler.userId !== null ||
+    !nation?.isNpc ||
+    ruler.officerLevel !== BALANCE.RULER_LEVEL
+  )
     return { chosen: null, candidates: [] };
-  const choice = chooser(view, ruler, rng, context, 'nation');
+  const choice = chooser(view, ruler, context, 'nation');
   choice.add('nation_rest', {}, 0, '국가 명령이 없으면 쉰다.');
   if (view.ruleFeatures?.includes('city-resources-v1'))
     for (const candidate of cityNpcAllocations(view, nation.id))
@@ -231,6 +246,7 @@ export function chooseNationTurn(view: WorldView, ruler: General, rng: Rng, cont
   if (nation.gold >= 10000) {
     const members = Object.values(view.generals).filter(
       (g) =>
+        g.removedAt === undefined &&
         g.nationId === nation.id &&
         g.activeFromYear <= view.startYear + Math.floor((context.tick ?? 0) / (12 * TICKS_PER_MONTH)),
     );
@@ -243,5 +259,5 @@ export function chooseNationTurn(view: WorldView, ruler: General, rng: Rng, cont
         '국고의 금을 자원이 부족한 장수에게 포상한다.',
       );
   }
-  return choice.finish();
+  return decision(choice.finish(), rng);
 }

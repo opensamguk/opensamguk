@@ -112,7 +112,7 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
   const db = stack.db;
   const expanded = mode.id === 'integration-v01-expanded';
   const features = expanded
-    ? [...creationFeatures, 'governance-v1', 'heritage-v1', 'lineage-v1', 'logistics-v1'].sort()
+    ? [...creationFeatures, 'equipment-v1', 'governance-v1', 'heritage-v1', 'lineage-v1', 'logistics-v1'].sort()
     : [...creationFeatures];
   const actor = await step(run, () => createActor(page, stack));
   const legacy = await step(run, () => creationSource(stack));
@@ -144,7 +144,7 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
   if (!profile?.available) throw new Error('실제 게시 SAN10 프로필을 확인하세요.');
   expect([profile.startYear, profile.counts.nations, profile.counts.generals]).toEqual([mode.year, mode.nations, 491]);
   expect(profile.ruleFeatures).toEqual(features);
-  expect(profile.ruleFeatures).toHaveLength(expanded ? 13 : 9);
+  expect(profile.ruleFeatures).toHaveLength(expanded ? 14 : 9);
   expect(profile.resources).toHaveLength(5);
   const published = await step(run, () => db.gameResource.findMany({ where: { status: 'PUBLISHED' } }));
   const pinned = profile.resources.map((ref) => {
@@ -231,7 +231,7 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
     idempotencyKey: input.idempotencyKey,
     name: '관리자 선택 ' + mode.id,
     ...profile.selection,
-    ...(expanded ? { featureProfileKey: 'expanded-191-v1' } : {}),
+    ...(expanded ? { featureProfileKey: 'expanded-191-v2' } : {}),
     presetKey: mode.preset,
     turnTermMinutes: profile.presets.find((entry) => entry.key === mode.preset)!.turnTermMinutes,
     endYear: mode.endYear,
@@ -289,7 +289,7 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
   });
   if (expanded)
     expect(result.resolution).toMatchObject({
-      featureProfile: { key: 'expanded-191-v1', contentHash: profile.featureProfileHash },
+      featureProfile: { key: 'expanded-191-v2', contentHash: profile.featureProfileHash },
     });
   expect((result.resolution as { resources: unknown[] }).resources).toEqual(expect.arrayContaining(pinned));
   expect((result.resolution as { resources: unknown[] }).resources).toHaveLength(5);

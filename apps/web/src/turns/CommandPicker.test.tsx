@@ -3,8 +3,103 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import type { ComponentProps } from 'react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CommandPicker, type CommandInfo } from './CommandPicker';
+import type { EquipmentBoard } from '../equipment/useEquipment';
 
 afterEach(cleanup);
+
+function equipmentBoard(): EquipmentBoard {
+  const stats = { leadership: 40, strength: 100, intel: 40, politics: 40, charm: 55 };
+  return {
+    generalId: 7,
+    slots: {},
+    baseStats: stats,
+    stats,
+    bonus: { leadership: 0, strength: 0, intel: 0 },
+    sellRateBp: 5000,
+    tradeExperience: 10,
+    items: [
+      {
+        key: 'horse_01',
+        name: '노기',
+        slot: 'horse',
+        grade: 1,
+        cost: 1000,
+        requiredSecurity: 1000,
+        stat: 'leadership',
+        bonus: 1,
+        goods: { iron: 0, wood: 0, horses: 5 },
+        failure: null,
+      },
+      {
+        key: 'weapon_06',
+        name: '소부',
+        slot: 'weapon',
+        grade: 6,
+        cost: 21000,
+        requiredSecurity: 6000,
+        stat: 'strength',
+        bonus: 6,
+        goods: { iron: 30, wood: 0, horses: 0 },
+        failure: { code: 'NO_GOLD', message: '금이 부족합니다.' },
+      },
+    ],
+    sales: ['horse', 'weapon', 'book'].map((slot) => ({
+      slot: slot as 'horse' | 'weapon' | 'book',
+      proceeds: 0,
+      failure: { code: 'BAD_TARGET', message: '장착한 장비가 없습니다.' },
+    })),
+  };
+}
+
+const equipmentCommand: CommandInfo = {
+  key: 'equipment_trade',
+  name: '장비매매',
+  category: 'personal',
+  argsSchema: { type: 'object' },
+};
+
+it('T4-24 AC-P2-12 장비는 이름·가격·재료로 고르고 현재 조건이 부족해도 다음 예턴에 예약할 수 있다', () => {
+  const input = props({ commands: [equipmentCommand], equipment: { kind: 'ready', data: equipmentBoard() } });
+  render(<CommandPicker {...input} />);
+  fireEvent.click(screen.getByRole('radio', { name: '장비매매' }));
+  fireEvent.change(screen.getByLabelText('장비 칸'), { target: { value: 'weapon' } });
+  const select = screen.getByLabelText('매매할 장비');
+  expect(select.tagName).toBe('SELECT');
+  fireEvent.change(select, { target: { value: 'weapon_06' } });
+  expect(screen.getByText(/치안 6,000 이상 · 철 30/)).toBeTruthy();
+  expect(screen.getByText('현재 조건: 금이 부족합니다.')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: '1번 칸에 넣기' }));
+  expect(input.onPut).toHaveBeenCalledWith({
+    commandKey: 'equipment_trade',
+    args: { slot: 'weapon', itemKey: 'weapon_06' },
+    explicit: true,
+  });
+});
+
+it('T4-24 AC-P2-12 장비 칸을 바꾸면 이전 선택을 비워 다른 종류의 장비를 넣지 않는다', () => {
+  const input = props({ commands: [equipmentCommand], equipment: { kind: 'ready', data: equipmentBoard() } });
+  render(<CommandPicker {...input} />);
+  fireEvent.click(screen.getByRole('radio', { name: '장비매매' }));
+  fireEvent.change(screen.getByLabelText('장비 칸'), { target: { value: 'weapon' } });
+  fireEvent.change(screen.getByLabelText('매매할 장비'), { target: { value: 'weapon_06' } });
+  fireEvent.change(screen.getByLabelText('장비 칸'), { target: { value: 'horse' } });
+  expect((screen.getByLabelText('매매할 장비') as HTMLSelectElement).value).toBe('');
+  fireEvent.submit(screen.getByRole('form', { name: '장비매매 인자' }));
+  expect(input.onPut).not.toHaveBeenCalled();
+});
+
+it('T4-24 AC-P2-12 장비 재조회가 실패하면 이미 고른 인자도 넣지 않고 다시 조회한다', () => {
+  const input = props({ commands: [equipmentCommand], equipment: { kind: 'ready', data: equipmentBoard() } });
+  const view = render(<CommandPicker {...input} />);
+  fireEvent.click(screen.getByRole('radio', { name: '장비매매' }));
+  fireEvent.change(screen.getByLabelText('매매할 장비'), { target: { value: 'horse_01' } });
+  const retry = vi.fn();
+  view.rerender(<CommandPicker {...input} equipment={{ kind: 'error', retry }} />);
+  fireEvent.submit(screen.getByRole('form', { name: '장비매매 인자' }));
+  expect(input.onPut).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: '다시 조회' }));
+  expect(retry).toHaveBeenCalledOnce();
+});
 
 const empty = { type: 'object', properties: {} };
 const commands: CommandInfo[] = [
@@ -39,7 +134,9 @@ it('T4-92 AC-P2-29 서버의 새 분류도 카드와 분류 단추에 보이며 
   expect(screen.getAllByRole('radio')).toHaveLength(commands.length);
   const card = screen.getByRole('radio', { name: '새 명령' });
   expect(card.getAttribute('aria-describedby')).toBeTruthy();
-  expect(document.getElementById(card.getAttribute('aria-describedby')!)?.textContent).toBe('new-category · 인자 없음');
+  expect(document.getElementById(card.getAttribute('aria-describedby')!)?.textContent).toBe(
+    'new-category · 고를 것 없음',
+  );
   fireEvent.click(screen.getByRole('button', { name: 'new-category' }));
   expect(screen.getAllByRole('radio')).toEqual([card]);
   fireEvent.change(screen.getByRole('searchbox'), { target: { value: '농지' } });
@@ -240,4 +337,33 @@ it('월드 규칙을 받기 전 union을 인자 없음으로 표시하거나 검
   expect(screen.getByText('군사 · 입력 형식 확인 필요')).toBeTruthy();
   fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Enter' });
   expect(input.onPut).not.toHaveBeenCalled();
+});
+
+it('넣기 전에 고른 명령의 서버 사전 검사 경고를 보이고 휴식과 덜 찬 명령은 검사하지 않는다', async () => {
+  const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
+  const asked: string[] = [];
+  const precheck = (turn: { commandKey: string; args: Record<string, unknown> }) => ({
+    queryKey: ['precheck', turn.commandKey, turn.args],
+    queryFn: () => {
+      asked.push(turn.commandKey);
+      return Promise.resolve({ ok: false, message: '국가에 소속되어야 합니다.' });
+    },
+    select: (data: unknown) => data as { ok: false; message: string },
+  });
+  const onPut = vi.fn();
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <CommandPicker {...props()} onPut={onPut} precheck={precheck} />
+    </QueryClientProvider>,
+  );
+  fireEvent.click(screen.getByRole('radio', { name: '이동' }));
+  fireEvent.click(screen.getByRole('radio', { name: '휴식' }));
+  expect(screen.queryByRole('status')).toBeNull();
+  fireEvent.click(screen.getByRole('radio', { name: '농지 개간' }));
+  expect((await screen.findByRole('status')).textContent).toBe(
+    '사전 검사 경고: 국가에 소속되어야 합니다. 경고가 있어도 넣을 수 있습니다. 실행할 때 다시 검사합니다.',
+  );
+  expect(asked).toEqual(['farm']);
+  fireEvent.click(screen.getByRole('button', { name: /1번 칸에 넣기/ }));
+  expect(onPut).toHaveBeenCalledWith({ commandKey: 'farm', args: {}, explicit: true });
 });

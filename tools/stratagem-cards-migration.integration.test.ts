@@ -136,10 +136,13 @@ it.each(['empty', 'upgrade'] as const)(
       for (const name of names.slice(markerIndex + 1))
         await client.query(await readFile(new URL(`${name}/migration.sql`, directory), 'utf8'));
       expect(
-        (await client.query('SELECT * FROM "World" ORDER BY id')).rows.map(({ equipmentState, ...row }) => {
-          expect(equipmentState).toBeNull();
-          return row;
-        }),
+        (await client.query('SELECT * FROM "World" ORDER BY id')).rows.map(
+          ({ equipmentState, runtimeOptions, ...row }) => {
+            expect(equipmentState).toBeNull();
+            expect(runtimeOptions).toBeNull();
+            return row;
+          },
+        ),
       ).toEqual(after);
     });
   },

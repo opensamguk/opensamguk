@@ -174,3 +174,23 @@ it('적용 결과의 양쪽UUID·시드·revision·tick·설정·manifest 변조
     expect(adminResetAppliedSchema.safeParse({ ...result, resources: values }).success).toBe(false);
   expect(() => validateAdminResetRecord(record(), target)).toThrow();
 });
+
+it('AC-INT-24 변경 뒤 확인 이름과 복원 이름은 분리하되 확인 이름 변조를 거부한다', () => {
+  const r = record(),
+    result = r.result as Record<string, unknown>;
+  const renamed = {
+    ...r,
+    result: {
+      ...result,
+      confirmedName: ' 원본 이름 ',
+      settings: { ...(result.settings as object), name: '생성 이름' },
+    },
+  };
+  expect(() => validateAdminResetRecord(renamed)).not.toThrow();
+  expect(() =>
+    validateAdminResetRecord({ ...renamed, result: { ...renamed.result, confirmedName: '틀린 확인' } }),
+  ).toThrow();
+  expect(() =>
+    validateAdminResetRecord({ ...renamed, result: { ...renamed.result, confirmedName: undefined } }),
+  ).toThrow();
+});

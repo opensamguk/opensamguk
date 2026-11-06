@@ -6,6 +6,12 @@ import { GOVERNANCE_OFFICES, readGovernanceConfig } from './config';
 import { governanceRealmIndex } from './realm';
 import { readGovernanceState, type GovernanceOffer, type GovernanceState } from './state';
 
+export class GovernanceRevisionLimitError extends Error {
+  constructor() {
+    super('황실 변경 번호 한도를 넘었습니다.');
+  }
+}
+
 function activeGeneral(world: WorldView, id: number, tick: number) {
   const general = world.generals[id];
   return general && general.activeFromYear <= world.startYear + Math.floor(tick / (12 * TICKS_PER_MONTH))
@@ -214,7 +220,7 @@ export function reconcileGovernance(world: WorldView, tick: number): WorldState 
     }),
   );
   if (JSON.stringify(state) !== original) {
-    if (state.revision === CITY_RESOURCE_MAX) throw new Error('황실 변경 번호 한도를 넘었습니다.');
+    if (state.revision === CITY_RESOURCE_MAX) throw new GovernanceRevisionLimitError();
     state.revision++;
   }
   assertGovernanceFinal(next, tick);

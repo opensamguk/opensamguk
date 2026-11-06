@@ -213,12 +213,14 @@ async function existingRows(client: PgClient) {
   ]) {
     const data =
       table === 'World'
-        ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures' - 'operationalMap' - 'campaignState' - 'cityResourcesState' - 'logisticsState' - 'governanceState' - 'lineageState' - 'stratagemCardsState' - 'equipmentState'"
-        : table === 'City'
-          ? "to_jsonb(t) - 'kind'"
-          : table === 'General'
-            ? "to_jsonb(t) - 'residenceTick' - 'politics' - 'charm' - 'sex'"
-            : "to_jsonb(t) - 'treatyFormat'";
+        ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures' - 'operationalMap' - 'campaignState' - 'cityResourcesState' - 'logisticsState' - 'governanceState' - 'lineageState' - 'stratagemCardsState' - 'equipmentState' - 'runtimeOptions'"
+        : table === 'Nation'
+          ? "to_jsonb(t) - 'noticeDirective'"
+          : table === 'City'
+            ? "to_jsonb(t) - 'kind'"
+            : table === 'General'
+              ? "to_jsonb(t) - 'residenceTick' - 'politics' - 'charm' - 'sex' - 'removedAt'"
+              : "to_jsonb(t) - 'treatyFormat'";
     rows[table] = (await client.query(`SELECT ${data} AS data FROM "${table}" t ORDER BY to_jsonb(t)::text`)).rows;
   }
   return rows;
@@ -434,6 +436,9 @@ it.each(['empty', 'legacy'] as const)(
       expect(
         (await client.query('SELECT id FROM "General" WHERE "politics" IS NOT NULL OR "charm" IS NOT NULL')).rows,
       ).toEqual([]);
+      expect((await client.query('SELECT id FROM "World" WHERE "runtimeOptions" IS NOT NULL')).rows).toEqual([]);
+      expect((await client.query('SELECT id FROM "Nation" WHERE "noticeDirective" IS NOT NULL')).rows).toEqual([]);
+      expect((await client.query('SELECT id FROM "General" WHERE "removedAt" IS NOT NULL')).rows).toEqual([]);
       expect(await existingRows(client)).toEqual(settled);
       expect(await readOffices()).toEqual(offices);
       expect(

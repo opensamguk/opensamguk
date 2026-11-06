@@ -3,6 +3,7 @@ import type { WorldInit } from './world/bootstrap';
 import type { CommandDef } from './commands/types';
 import type { CommandResolver } from './commands/resolve';
 import { applyCreationInput, applyPolicyInput, applyTurnsInput } from './replayInputs';
+import { POSSESSION_KIND, applyPossessionInput } from './entry/possess';
 import {
   personnelFeature,
   policyFeature,
@@ -31,6 +32,10 @@ import { governanceFeature, governanceInputKind } from './governance/feature';
 import { lineageFeature, lineageInputKind } from './lineage/feature';
 import { stratagemCardsFeature, stratagemCardsInputKind } from './stratagemCards/feature';
 import { heritageFeature } from './heritage/feature';
+import { ADMIN_GAME_KINDS } from './admin/game';
+import { applyAdminGameRecord } from './admin/apply';
+import { ADMIN_SETTING_KINDS, applyAdminSettingRecord } from './admin/settings';
+import type { UnitSetResource } from './world/resources';
 
 export interface ReplayOriginV1 {
   version: 1;
@@ -73,7 +78,11 @@ export interface InputKindDefinition {
   feature: string | null;
   route: 'direct' | 'queued';
   directTick?: boolean;
-  apply(replay: ReplayState, input: RecordedInput, context?: { resolver?: CommandResolver | undefined }): ReplayState;
+  apply(
+    replay: ReplayState,
+    input: RecordedInput,
+    context?: { resolver?: CommandResolver | undefined; unitSet?: UnitSetResource },
+  ): ReplayState;
 }
 export interface RuleRegistry {
   features: readonly RuleFeatureDefinition[];
@@ -110,6 +119,20 @@ export const ruleRegistry: RuleRegistry = {
     'stratagem-cards-v1',
   ],
   inputKinds: [
+    ...ADMIN_SETTING_KINDS.map((kind) => ({
+      kind,
+      feature: null,
+      route: 'direct' as const,
+      directTick: true,
+      apply: applyAdminSettingRecord,
+    })),
+    ...ADMIN_GAME_KINDS.map((kind) => ({
+      kind,
+      feature: null,
+      route: 'direct' as const,
+      directTick: true,
+      apply: applyAdminGameRecord,
+    })),
     ...ADMIN_CLOCK_KINDS.map((kind) => ({
       kind,
       feature: null,
@@ -121,6 +144,7 @@ export const ruleRegistry: RuleRegistry = {
     { kind: ADMIN_RESET_KIND, feature: null, route: 'direct', directTick: true, apply: applyAdminResetRecord },
     { kind: 'turns.set', feature: null, route: 'direct', apply: applyTurnsInput },
     { kind: 'general.create', feature: null, route: 'queued', apply: applyCreationInput },
+    { kind: POSSESSION_KIND, feature: null, route: 'queued', apply: applyPossessionInput },
     { kind: 'general.setPolicy', feature: 'policy', route: 'queued', apply: applyPolicyInput },
     { kind: 'general.active', feature: 'policy', route: 'queued', apply: applyPolicyInput },
     ...personnelInputKinds,

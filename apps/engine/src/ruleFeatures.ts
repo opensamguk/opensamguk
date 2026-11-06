@@ -9,6 +9,7 @@ import {
   setPolicyPayloadSchema,
   updateResidenceAnchors,
   recordedLineageSuccession,
+  recordedPossession,
   type PersonnelMonthResult,
   type PersonnelStepPacket,
   type ReplayState,
@@ -84,11 +85,22 @@ export async function persistPersonnelPacket(
   before: Pick<ReplayState, 'residenceAnchors'>,
   packet: PersonnelStepPacket,
   anchors: Record<number, number>,
-  tick: number,
+  at: { tick: number; sequence: number },
 ): Promise<void> {
+  const { tick, sequence } = at;
   await persistOfficeState(tx, worldId, packet.office.before, packet.office.next);
   await persistAssignmentState(tx, worldId, packet.assignment);
-  for (const log of packet.logs) await tx.generalLog.create({ data: { ...log, worldId, tick } });
+  if (packet.logs.length) {
+    const last = await tx.generalLog.findFirst({
+      where: { worldId, sequence },
+      orderBy: { ordinal: 'desc' },
+      select: { ordinal: true },
+    });
+    // 개인 턴 본문은 0번을 쓰고, 먼저 저장한 가계 기록 뒤에 인사 기록을 잇는다.
+    let ordinal = Math.max(1, (last?.ordinal ?? 0) + 1);
+    for (const log of packet.logs)
+      await tx.generalLog.create({ data: { ...log, worldId, tick, sequence, ordinal: ordinal++ } });
+  }
   await persistResidenceAnchors(tx, worldId, before.residenceAnchors!, anchors);
 }
 
@@ -151,7 +163,7 @@ const processPersonnelInput: QueuedInputHandler = async (tx, world, event, { tic
     tick,
     sequence,
   });
-  await persistPersonnelPacket(tx, world.id, before, outcome.packet, anchors, tick);
+  await persistPersonnelPacket(tx, world.id, before, outcome.packet, anchors, { tick, sequence });
   return { status: 'APPLIED', result: outcome.result as unknown as Prisma.InputJsonValue };
 };
 
@@ -248,16 +260,20 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
         tick: input.tick!,
         createdHumanId: input.kind === 'general.create' ? input.generalId : null,
         succession: recordedLineageSuccession(input),
+        possession: recordedPossession(input),
       });
       await persistEffects(tx, world.id, packet.state, [{ kind: 'world', state: packet.state }], {
         tick: input.tick!,
         sequence: input.sequence,
       });
-      await persistPersonnelPacket(tx, world.id, before, packet, anchors, input.tick!);
+      await persistPersonnelPacket(tx, world.id, before, packet, anchors, {
+        tick: input.tick!,
+        sequence: input.sequence,
+      });
     },
-    async persistMonthly(tx, worldId, before, next, effects, { tick }) {
+    async persistMonthly(tx, worldId, before, next, effects, { tick, sequence }) {
       const result = effects as PersonnelMonthResult;
-      await persistPersonnelPacket(tx, worldId, before, result.packet, next.residenceAnchors!, tick);
+      await persistPersonnelPacket(tx, worldId, before, result.packet, next.residenceAnchors!, { tick, sequence });
       for (const entry of result.history) await appendNationHistory(tx, worldId, tick, entry.nationId, entry.text);
     },
   },

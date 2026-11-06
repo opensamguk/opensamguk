@@ -23,7 +23,8 @@ import {
 import styles from './AdminCreateActions.module.css';
 
 type Phase = 'idle' | 'unknown' | 'pending' | 'limited' | 'notAccepted' | 'done' | 'failed';
-const expandedProfileHelp = '철·목재·말과 수송망, 황실·봉신, 혼인·계승, 기수 유산을 사용하는 확장 월드입니다.';
+const expandedProfileHelp =
+  '철·목재·말과 수송망, 장비, 황실·봉신, 혼인·월 출산·계승, 기수 유산을 사용하는 확장 월드입니다.';
 const resourceLabels = {
   scenarioKey: '시나리오 자원',
   mapKey: '지도 자원',

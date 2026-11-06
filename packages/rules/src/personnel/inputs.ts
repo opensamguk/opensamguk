@@ -47,7 +47,7 @@ const respondResult = z.strictObject({
   city: z.strictObject({ cityKey: positive, name: z.string() }),
   dedicationLost: natural,
 });
-const commonCodes = ['WORLD_CLOSED', 'ACTOR_INACTIVE', 'NO_GENERAL'] as const;
+const commonCodes = ['WORLD_CLOSED', 'ACTOR_INACTIVE', 'NO_GENERAL', 'GENERAL_REMOVED'] as const;
 const appointCodes = [...commonCodes, 'NOT_NATION', 'NOT_RULER', 'BAD_ARGS', 'BAD_TARGET', 'BAD_STATE'] as const;
 const dismissCodes = [...commonCodes, 'NOT_NATION', 'NOT_RULER', 'BAD_TARGET'] as const;
 const respondCodes = [...commonCodes, 'OFFER_CLOSED'] as const;

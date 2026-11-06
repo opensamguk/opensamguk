@@ -33,6 +33,14 @@ import {
   selectWorldCapabilities,
   isAdminClockKind,
   validateAdminClockRecord,
+  isAdminGameKind,
+  validateAdminGameRecord,
+  isAdminSettingKind,
+  validateAdminSettingRecord,
+  POSSESSION_KIND,
+  validatePossessionRecord,
+  creationEndYear,
+  creationName,
   ADMIN_END_KIND,
   validateAdminEndRecord,
   adminEndAppliedSchema,
@@ -41,6 +49,7 @@ import {
   adminResetAppliedSchema,
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
+import { readCreationWorld } from './admin/settingsHistory';
 import { z } from 'zod';
 import { exportCapsArchive, replayCapsArchive, replayCapsToEnd, type CapsArchive } from './replayCaps';
 import { checkStoredReplayFormat } from './features';
@@ -160,13 +169,16 @@ export async function exportReplay(
       let adminEnd: AdminReplayEnd | null = null;
       if (endings.length) {
         const event = endings[0]!;
+        const sourceSettings = event.kind === ADMIN_RESET_KIND ? await readCreationWorld(tx, world) : world;
         const applied =
-          event.kind === ADMIN_RESET_KIND ? checkedAdminResetResult(world, event) : checkedAdminEndResult(world, event);
+          event.kind === ADMIN_RESET_KIND
+            ? checkedAdminResetResult(sourceSettings, event)
+            : checkedAdminEndResult(world, event);
         if (event.kind === ADMIN_RESET_KIND) {
           const target = await tx.world.findUniqueOrThrow({
             where: { id: adminResetAppliedSchema.parse(event.result).newWorldId },
           });
-          checkedResetTarget(world, event, target);
+          checkedResetTarget(sourceSettings, event, await readCreationWorld(tx, target));
         }
         adminEnd = {
           sequence: event.sequence!,
@@ -351,18 +363,30 @@ export function readArchive(value: unknown, registry: RuleRegistry = ruleRegistr
       throw new Error('입력 기록의 순서·상태가 올바르지 않습니다.');
     previous = input.sequence;
   }
-  if (archive.version === 5) validatePolicyArchive(archive);
   const allInputs = [...archive.inputs, ...(archive.version !== 1 ? archive.afterEnd : [])];
+  if (archive.version !== 3 && allInputs.some((input) => input.kind === POSSESSION_KIND))
+    throw new Error('장수 맡기는 형식3 기록에만 넣을 수 있습니다.');
+  if (archive.version !== 3 && allInputs.some((input) => isAdminGameKind(input.kind) || isAdminSettingKind(input.kind)))
+    throw new Error('관리자 운영 입력은 형식3 기록에만 넣을 수 있습니다.');
+  if (archive.version === 5) validatePolicyArchive(archive);
   for (const input of allInputs) {
     if (archive.version !== 3) {
-      if (input.kind === ADMIN_END_KIND || input.kind === ADMIN_RESET_KIND)
-        throw new Error('관리자 종료는 형식3 기록에만 넣을 수 있습니다.');
+      if (
+        input.kind === ADMIN_END_KIND ||
+        input.kind === ADMIN_RESET_KIND ||
+        isAdminGameKind(input.kind) ||
+        isAdminSettingKind(input.kind)
+      )
+        throw new Error('관리자 운영 입력은 형식3 기록에만 넣을 수 있습니다.');
       if (Object.hasOwn(input, 'tick')) throw new Error('기존 형식 입력에 tick을 넣을 수 없습니다.');
       continue;
     }
     const kind = registry.inputKinds.find((kind) => kind.kind === input.kind);
     if (!kind) throw new Error('등록되지 않은 입력 종류입니다.');
     if (isAdminClockKind(input.kind)) validateAdminClockRecord(input);
+    if (isAdminGameKind(input.kind)) validateAdminGameRecord(input);
+    if (isAdminSettingKind(input.kind)) validateAdminSettingRecord(input);
+    if (input.kind === POSSESSION_KIND) validatePossessionRecord(input);
     if (input.kind === ADMIN_END_KIND) validateAdminEndRecord(input);
     if (input.kind === ADMIN_RESET_KIND) validateAdminResetRecord(input);
     const numericTick = kind.route === 'queued' || kind.directTick === true;
@@ -442,7 +466,8 @@ function validateAdminArchiveEnd(archive: ReplayArchiveV3): void {
       reset.settings.scenarioKey !== archive.origin.initial.scenarioKey ||
       reset.settings.mapKey !== archive.origin.initial.mapKey ||
       reset.settings.unitSetKey !== archive.origin.initial.unitSetKey ||
-      reset.settings.endYear !== archive.config.endYear ||
+      reset.settings.endYear !== creationEndYear(archive) ||
+      reset.settings.name !== creationName(reset.confirmedName ?? reset.settings.name, archive.inputs) ||
       reset.settings.featureDataHash !== hashState(archive.origin.featureData ?? null) ||
       hashState(reset.settings.ruleFeatures) !== hashState(archive.origin.initial.ruleFeatures ?? [])
     )
@@ -529,7 +554,7 @@ function applyArchiveInput(
   }
   if (input.status === 'APPLIED' && input.kind === 'turns.set' && input.generalId !== null)
     untouched.delete(input.generalId);
-  return applyRecordedInput(replay, input, registry);
+  return applyRecordedInput(replay, input, registry, { unitSet: archive.origin.initial.unitSet });
 }
 
 function validSequence(sequence: number, maximum = 10_000_000): boolean {

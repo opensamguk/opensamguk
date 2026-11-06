@@ -14,7 +14,8 @@ import { CityResourcesPanel } from './CityResourcesPanel';
 import { LogisticsPanel } from '../city/LogisticsPanel';
 
 const HIDDEN_CITY = '다른 국가의 도시입니다';
-const HIDDEN_GENERAL = '다른 국가 장수입니다';
+// 서버는 나 자신과 같은 국가 장수의 능력치만 준다(visibility.general). 재야끼리도 서로 보이지 않는다.
+const HIDDEN_GENERAL = '능력치는 같은 국가 장수만 보입니다';
 
 export function useCity(worldId: string, cityKey: number | null) {
   const trpc = useTRPC();

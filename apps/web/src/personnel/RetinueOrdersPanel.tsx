@@ -32,7 +32,7 @@ function json(value: unknown): Json {
   if (Array.isArray(value)) return value.map(json);
   if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype)
     return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, json(item)]));
-  throw new Error('명령 인자를 다시 확인하세요.');
+  throw new Error('명령에서 고른 값을 다시 확인하세요.');
 }
 
 function firstSlot(value: Board['next']['firstSlot']) {

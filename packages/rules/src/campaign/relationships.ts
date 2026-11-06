@@ -41,6 +41,8 @@ function eligible(
   if (
     !master ||
     !person ||
+    master.removedAt !== undefined ||
+    person.removedAt !== undefined ||
     master.id === person.id ||
     master.nationId === null ||
     !world.nations[master.nationId] ||

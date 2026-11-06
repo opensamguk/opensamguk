@@ -10,6 +10,7 @@ export default defineConfig({
     'mobile-controls.spec.ts',
     'int19-retinue-orders.spec.ts',
     't4-97-game-ui.spec.ts',
+    't4-24-equipment.spec.ts',
     't4-93-logistics.spec.ts',
     't4-94-governance.spec.ts',
     't4-95-lineage.spec.ts',

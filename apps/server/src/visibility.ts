@@ -14,9 +14,13 @@ type General = Omit<
   | 'politics'
   | 'charm'
   | 'sex'
+  | 'removedAt'
 > & { politics?: number | null; charm?: number | null };
 type City = Omit<Prisma.CityGetPayload<true>, 'kind'> & { kind?: string | null };
-type Nation = Omit<Prisma.NationGetPayload<true>, 'notice' | 'noticeRevision' | 'noticeUpdatedAt' | 'noticeUpdatedBy'>;
+type Nation = Omit<
+  Prisma.NationGetPayload<true>,
+  'notice' | 'noticeDirective' | 'noticeRevision' | 'noticeUpdatedAt' | 'noticeUpdatedBy'
+>;
 export type Viewer = Pick<General, 'id' | 'nationId' | 'cityKey'> | null;
 
 export function visibility(viewer: Viewer) {

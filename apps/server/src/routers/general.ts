@@ -4,6 +4,8 @@ import { TRPCError } from '@trpc/server';
 import {
   CREATION_ERRORS,
   creationBlock,
+  effectiveWorldOptions,
+  parsePreset,
   generalCreationSchema,
   validateGeneralCreation,
   type CreationCode,
@@ -32,6 +34,7 @@ const codes = {
   HERITAGE_INSUFFICIENT: 'CONFLICT',
   WORLD_FULL: 'BAD_REQUEST',
   WORLD_CLOSED: 'PRECONDITION_FAILED',
+  ENTRY_CLOSED: 'PRECONDITION_FAILED',
   ACTOR_INACTIVE: 'UNAUTHORIZED',
 } as const;
 function rejection(result: unknown) {
@@ -144,6 +147,9 @@ export const generalRouter = router({
         status: world.status,
         hasGeneral: existing !== null,
         hasPending: pending !== null,
+        entryOpen:
+          effectiveWorldOptions(world.preset === null ? null : parsePreset(world.preset), world.runtimeOptions).entry
+            .generalCreation === 'open',
       });
       if (block && block.code !== 'PENDING')
         throw new TRPCError({ code: codes[block.code], message: CREATION_ERRORS[block.code] });
@@ -220,6 +226,15 @@ export const generalRouter = router({
           ...statRulesSchema.parse({ stat: world.statRules }).stat,
           count: world.ruleFeatures.includes('five-stats') ? (5 as const) : (3 as const),
           campaignEnabled: world.ruleFeatures.includes('campaign-v1'),
+          generalCreationEnabled:
+            effectiveWorldOptions(world.preset === null ? null : parsePreset(world.preset), world.runtimeOptions).entry
+              .generalCreation === 'open',
+          personnelEnabled: world.replayFormat === 3 && world.ruleFeatures.includes('personnel'),
+          ...(world.replayFormat === 3 &&
+          effectiveWorldOptions(world.preset === null ? null : parsePreset(world.preset), world.runtimeOptions).entry
+            .npcPlay === 'on'
+            ? { npcPlayEnabled: true as const }
+            : {}),
           ...(world.ruleFeatures.includes('lineage-v1') ? { lineageEnabled: true as const } : {}),
           ...(world.ruleFeatures.includes('heritage-v1')
             ? {

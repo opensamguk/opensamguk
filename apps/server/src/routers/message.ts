@@ -2,7 +2,7 @@ import { TRPCError } from '@trpc/server';
 import { nowTick, toGameDate, LINEAGE_EXITED_YEAR } from '@opensamguk/rules';
 import { z } from 'zod';
 import { protectedProcedure, router, worldVerifiedProcedure } from '../trpc';
-import { entityKey, worldInput } from '../queries';
+import { entityKey, worldInput, worldClock } from '../queries';
 import {
   databaseTime,
   decodeMessageCursor,
@@ -92,7 +92,8 @@ export const messageRouter = router({
               })
             : ownNation;
         if (
-          (input.scope === 'PRIVATE' && (!recipient || recipient.activeFromYear === LINEAGE_EXITED_YEAR)) ||
+          (input.scope === 'PRIVATE' &&
+            (!recipient || recipient.removedAt != null || recipient.activeFromYear === LINEAGE_EXITED_YEAR)) ||
           (input.scope !== 'PRIVATE' && !nation) ||
           (input.scope === 'DIPLOMACY' && (!isLeader(g) || nation!.id === g.nationId))
         )
@@ -109,10 +110,7 @@ export const messageRouter = router({
           throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: `${seconds}초 뒤에 다시 보낼 수 있습니다.` });
         }
         const world = await tx.world.findUniqueOrThrow({ where: { id: input.worldId } });
-        const date = toGameDate(
-          world.startYear,
-          nowTick({ ...world, clockAnchorAt: world.clockAnchorAt?.getTime() ?? null }, now.getTime()),
-        );
+        const date = toGameDate(world.startYear, nowTick(worldClock(world), now.getTime()));
         const row = await tx.message.create({
           data: {
             worldId: input.worldId,
@@ -184,7 +182,12 @@ export const messageRouter = router({
       async (tx) => {
         const g = await messagingActor(tx, ctx, input.worldId);
         const generals = await tx.general.findMany({
-          where: { worldId: input.worldId, id: { not: g.id }, activeFromYear: { not: LINEAGE_EXITED_YEAR } },
+          where: {
+            worldId: input.worldId,
+            id: { not: g.id },
+            removedAt: null,
+            activeFromYear: { not: LINEAGE_EXITED_YEAR },
+          },
           select: { id: true, name: true, nation: { select: nationTagSelect } },
           orderBy: [{ name: 'asc' }, { id: 'asc' }],
         });

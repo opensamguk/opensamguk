@@ -3,7 +3,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { readWorldExtRows, type Prisma } from '@opensamguk/db';
 import {
   toWorldState,
-  presetRules,
+  effectiveWorldOptions,
   restoreExtState,
   selectWorldCapabilities,
   projectTreatyRows,
@@ -20,6 +20,7 @@ import {
   readLogisticsState,
   readStoredGovernance,
   storedGeneralSex,
+  storedGeneralRemoval,
   readStoredLineage,
   readStoredEquipment,
   readStoredStratagemCards,
@@ -47,6 +48,7 @@ export async function requireGeneral(tx: Prisma.TransactionClient, worldId: stri
 export async function readView(tx: Prisma.TransactionClient, worldId: string) {
   const world = await requireWorld(tx, worldId);
   const { preset, commands } = worldResolver(world);
+  const rules = effectiveWorldOptions(preset, world.runtimeOptions).presetRules;
   const capabilities = world.replayFormat === 3 ? null : selectWorldCapabilities(world);
   const treatyRows = await tx.treaty.findMany({
     where: { worldId },
@@ -83,14 +85,14 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
     : undefined;
   const ext = restoreExtState(commands, await readWorldExtRows(tx, worldId));
   const cities = await tx.city.findMany({ where: { worldId } });
-  const nations = await tx.nation.findMany({ where: { worldId } });
+  const nations = await tx.nation.findMany({ where: { worldId }, omit: { noticeDirective: true } });
   const generals = await tx.general.findMany({
     where: { worldId },
     omit: { defaultPolicy: true, lastActiveTick: true, lastActiveAt: true, residenceTick: true },
   });
   const diplomacies = await tx.diplomacy.findMany({ where: { worldId } });
   const state = toWorldState({
-    ...(preset ? { presetRules: presetRules(preset) } : {}),
+    ...(rules ? { presetRules: rules } : {}),
     ...(world.ruleFeatures?.length ? { ruleFeatures: [...world.ruleFeatures] } : {}),
     ...(ext ? { ext } : {}),
     startYear: world.startYear,
@@ -99,7 +101,9 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
       readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin),
     ),
     nations,
-    generals: generals.map((general) => storedGeneralSex(general, world.ruleFeatures.includes('lineage-v1'))),
+    generals: generals.map((general) =>
+      storedGeneralRemoval(storedGeneralSex(general, world.ruleFeatures.includes('lineage-v1')), world.replayFormat),
+    ),
     diplomacies,
     ...(world.commandMeta ? { commandMeta: world.commandMeta } : {}),
   } as unknown as WorldInit);

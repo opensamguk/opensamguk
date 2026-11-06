@@ -1,7 +1,7 @@
 # INT-24 진행 중 월드의 서버 속성 변경, NPC 플레이, 야간 휴전 토글
 
 > AC-INT-24 · 구현 Codex · 리뷰 Claude · 결정 [D-057](../product/decisions.md) · 사용자 직접 요청 2026-11-01
-> 상태: 상세 계획 제안. 2026-11-01 Codex G-03 1~3차 보류(PR #331 댓글) 지적을 반영한 4판이다.
+> 상태: 4판 G-03 통과([PR #331 검토](https://github.com/opensamguk/opensamguk/pull/331#issuecomment-6558996970)). PR1 백엔드 구현·검증 중이며 전체 AC는 미완료다.
 > 기준: main `d2202e13`. 짝 계획은 [INT-23 게임 안 개입과 기록 조회](./INT-23.md)다. 입력 등록·접수·엔진 처리 자리·감사는 INT-23과 같다. NPC 장수 맡기는 [T3-07](./T3-07.md)의 `entry.possess` 설계를 쓴다.
 
 ## 계획 (Claude)
@@ -18,7 +18,7 @@
 | 종료 연도 | `admin.world.setEndYear` | `World.endYear` | 처리한 순간. 지금 연도보다 이른 값은 거절 | 1 |
 | 턴 간격 | `admin.world.setTurnTerm` | `World.turnTermMinutes`, 재생 정책 | 처리 시각까지 도달한 틱은 옛 간격으로 확정하고 그다음 틱부터 새 간격 | 1 |
 | 보호 기간·NPC 공격성·추가 보정 | `admin.world.setOption` (`protection.foundUntilMonths`, `protection.peaceMonths`, `npc.aggression`, `boost.*`) | `World.runtimeOptions.rules`, 상태 `presetRules` | 처리 다음의 첫 틱부터 | 1 |
-| 장수 생성 열고 닫기 | `admin.world.setOption` (`entry.generalCreation`) | `World.runtimeOptions.entry` | 처리 뒤 접수되는 요청부터 | 2 |
+| 장수 생성 열고 닫기 | `admin.world.setOption` (`entry.generalCreation`) | `World.runtimeOptions.entry` | 처리 뒤 새 접수부터. 이미 대기인 생성도 처리 때 재검사 | 2 |
 | NPC 플레이 허용 | `admin.world.setOption` (`entry.npcPlay`) | `World.runtimeOptions.entry` | 처리 뒤 접수되는 요청부터 | 3 |
 | 야간 휴전 켜고 끄기·시간대 | `admin.world.setTruce` | `World.runtimeOptions.truce` | 처리한 순간. 시계 기준점을 다시 잡는다 | 4 |
 
@@ -131,3 +131,31 @@ PR 1·2는 T3-07·T4-40을 기다리지 않는다.
 ### 검증
 
 규칙 단위 시험은 속성마다 성공과 거절을 본다. 형식3 월드에서 속성 변경을 섞은 기록을 내보내고 읽어 순수 재생한 상태와 DB에서 불러온 상태의 해시가 같아야 한다. 턴 간격은 변경 전후 월간 해시, 미접속 경계, 재시작 뒤 값을 본다. 엔진 통합 시험은 실행 중 간격 변경 뒤 다음 틱 시각, 정지 중 변경 뒤 재개, `clockRevision` 경쟁, 재시작 뒤 `runtimeOptions` 유지를 본다. 초기화는 이름·간격·종료 연도·규칙 옵션을 바꾼 월드 A의 초기화 성공, 종료 연도를 바꾼 A의 원본 내보내기·읽기·끝까지 재생, 새 월드 B가 생성 당시 설정으로 시작하는지, B의 첫 정산·재시작·재생 해시 일치, 이전 초기화 기록의 해시 검증, B 설정 변경 뒤 A 내보내기와 B 재초기화를 본다. 장수 생성 닫기와 NPC 플레이는 접수 거절과 엔진 거절을 둘 다 본다. 휴전은 실행 중 켜기·끄기, 휴전 시간대 안에서 켜기, 정지 중 바꾼 뒤 재개, 재시작 뒤 설정 유지와 30칸 예정 시각을 본다. 화면은 실제 Chromium으로 속성 탭과 로비 문구를 본다. `pnpm check`와 독립 리뷰를 거친다.
+
+
+## PR1 백엔드 구현 (Codex)
+
+PR4 백엔드는 T4-40의 유효 시계 연결과 함께 구현 중이다. `admin.world.setTruce`를 기존 요청·조회·엄격 결과·재생 검증·초기화 복원에 연결한다. 턴 간격과 휴전 변경 모두 옛 유효 시계로 체크포인트한 뒤 새 설정을 저장한다. API는 게임 상태를 직접 바꾸지 않는다. 실제 재시작과 HTTP 요약·30칸 시각, 강제 롤백, 원본 휴전 복원은 설정 통합 시험에서 검사한다. 새 휴전 칸 UI는 Claude 담당이며 전체 AC는 미완료다.
+
+형식3 전용 설정 요청·조회, 리스와 월드 잠금 아래 적용, 유효 규칙 병합, 간격 변경과 정책 재생을 연결했다. `World.runtimeOptions`는 nullable JSONB이며 생성 원본 프리셋은 유지한다. API는 입력만 접수하고 설정·메시지·처리 결과·감사는 엔진 트랜잭션에서 확정한다. 운영 알림은 commit 뒤 보낸다.
+
+설정 변경 이력에서 생성 당시 이름·간격·종료 연도를 역산해 초기화의 다섯 사용처에 적용했다. 이름을 바꾼 월드의 초기화 결과에는 `confirmedName`을 선택 키로 추가한다. 이 값은 접수 때 확인한 현재 이름이고 `settings.name`은 새 판에 복원하는 생성 이름이다. 기존 기록의 키·해시는 유지하며 이름이 달라질 때만 새 키를 쓴다. 재생 파일은 이름 변경 이력으로 두 이름의 연결을 대조한다.
+
+프론트 속성 탭은 Claude 담당이다. PR2 생성 닫기와 PR3 NPC 맡기는 아래 후속 구현에 기록한다. PR4 휴전은 T4-40 시계 연결과 함께 구현 중이다. 실제 PostgreSQL·HTTP·엔진 검증과 전체 검사·독립 리뷰·보호 병합 전에는 PR1이나 전체 AC를 완료로 바꾸지 않는다.
+
+실제 PostgreSQL18.6·소켓 HTTP·펜싱 엔진 검증 3파일29건이 통과했다(46.43초). 새 API 권한15경우, 입력 멱등성과 권한 재검사, DB 원자성, 간격 변경 전후 월간 해시·활동 기준, 오래된 시계 revision의 롤백, A→B 초기화·B 첫 정산·설정 변경 뒤 A 내보내기·B 재초기화를 확인했다. 기존 마이그레이션 empty/legacy4건은 nullable 열과 기존 행·golden을 함께 검증했다. 전체 검사와 독립 리뷰는 진행 중이다.
+
+
+## PR2 장수 생성 열기·닫기 (Codex)
+
+`entry.generalCreation`은 프리셋과 관계없이 open·closed를 받는다. 기존 규칙 옵션을 보존하며 `runtimeOptions.entry`에 저장하고 규칙 재생 상태는 바꾸지 않는다. 접수·엔진·로비의 생성 차단은 같은 순수 `creationBlock`을 쓰며 기존 장수와 멈춘 판의 판정은 유지한다. 닫은 뒤 새 접수는 412로 막고 이미 접수된 생성은 엔진에서 `ENTRY_CLOSED`로 거절한다. 다시 열면 새 요청으로 생성할 수 있다.
+
+`general.mine.creationRules.generalCreationEnabled`와 로비 차단 사유를 화면에 제공한다. 프론트 파일은 수정하지 않았으며 생성 화면·속성 탭 문구는 Claude 담당이다. 초기화로 만든 새 판의 생성 허용은 기본값 open이다.
+
+실제 PostgreSQL18.6·HTTP·펜싱 엔진4파일103건이 통과했다(83.46초). 새 생성 제어5건, 기존 설정25건, 기존 생성·로비 회귀를 함께 확인했다. 전체 타입 검사·수정 파일 ESLint와 집중 규칙2파일16건도 통과했다. 검증 뒤 시험 제목 한 곳과 이 문서·API 문서만 정리했다. 전체 로컬 `pnpm check`는 460파일·7168시험이 통과했다(시험498.27초). 독립 Codex 리뷰는 필수 수정0건이며 보호 CI·병합은 진행 중이다. PR2나 전체 AC를 완료로 바꾸지 않는다.
+
+## PR3 NPC 맡기 (Codex)
+
+형식3의 기본off인 `entry.npcPlay`를 운영 요청·실제 감독·엔진·엄격 재생과 연결했다. PREOPEN에서는 이 옵션만 바꿀 수 있고 다른 설정의 상태 제한은 유지한다. sibling 생성 옵션·규칙·명시한 휴전 null을 보존한다. `settings.canChangeNpcPlay`와 선택 키 `general.mine.creationRules.npcPlayEnabled`·로비 표시로 프론트가 서버 판정을 받는다.
+
+맡기 본체는 [T3-07 구현 기록](./T3-07.md#구현-기록-codex)에 기록한다. 전체 검사7218시험 뒤 최종 실제 PostgreSQL18.6·HTTP4파일68건이 통과했다. PREOPEN 실제 감독·기존 직접 생성 제한과 정식491명·14기능의 소유권 전환·기능 상태 보존도 확인했다. 보호CI·병합·Claude UI 인수가 남아 있다.

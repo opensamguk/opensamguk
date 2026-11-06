@@ -2,6 +2,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { nextActionSequence, type Prisma, type PrismaClient } from '@opensamguk/db';
 import { PgHeritageRepository } from '../heritage/repository';
 import { refundHeritageCreations } from '../heritage/service';
+import { readCreationWorld } from './settingsHistory';
 import {
   ADMIN_RESET_KIND,
   adminResetPayloadSchema,
@@ -280,10 +281,12 @@ export async function processAdminReset(
       target.initialStateHash !== saved.stateHash
     )
       throw new Error('새 초기 월드와 준비 후보가 다릅니다.');
+    const original = await readCreationWorld(tx, world);
     result = adminResetAppliedSchema.parse({
       version: 1,
       sourceWorldId: world.id,
       newWorldId: target.id,
+      ...(world.name !== original.name ? { confirmedName: world.name } : {}),
       effectiveSeed: payload.effectiveSeed,
       before: { status: 'PAUSED', tick: world.clockTick, revision: world.clockRevision },
       after: { status: 'ENDED', tick: world.clockTick, revision: world.clockRevision + 1 },
@@ -296,7 +299,7 @@ export async function processAdminReset(
       newResourceHash: (target.replayOrigin as { resourceHash: unknown }).resourceHash,
       newSettingsHash: resetSourceSettingsHash(target),
       resources: candidate.evidence.resources,
-      settings: resetSettingsReference(world),
+      settings: resetSettingsReference(original),
     });
     const source = await tx.world.updateMany({
       where: { id: world.id, status: 'PAUSED', clockRevision: payload.intent.expectedRevision },

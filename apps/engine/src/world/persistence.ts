@@ -4,6 +4,7 @@ import {
   emptyQueue,
   parsePreset,
   presetRules,
+  effectiveWorldOptions,
   statRulesSchema,
   unitSetSchema,
   ORIGIN_CAPS,
@@ -33,6 +34,7 @@ import {
   initialStratagemCards,
   readStratagemCardsConfig,
   storedGeneralSex,
+  storedGeneralRemoval,
   applySexLedger,
   assertGeneralSex,
   type SexLedger,
@@ -330,6 +332,7 @@ export function prepareInitialWorld(
       await tx.nation.update({
         where: { worldId_id: { worldId, id: nation.id } },
         data: { capitalCityKey: nation.capitalCityKey },
+        select: { id: true },
       });
     }
     await tx.general.createMany({
@@ -392,7 +395,13 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
       const nations = await tx.nation.findMany({
         where: { worldId },
         orderBy: { id: 'asc' },
-        omit: { notice: true, noticeRevision: true, noticeUpdatedAt: true, noticeUpdatedBy: true },
+        omit: {
+          notice: true,
+          noticeDirective: true,
+          noticeRevision: true,
+          noticeUpdatedAt: true,
+          noticeUpdatedBy: true,
+        },
       });
       const generals = await tx.general.findMany({
         where: { worldId },
@@ -408,9 +417,10 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
         return value;
       };
       const operationalMap = readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin);
+      const rules = effectiveWorldOptions(preset, world.runtimeOptions).presetRules;
       return {
         ...(operationalMap ? { operationalMap } : {}),
-        ...(preset ? { presetRules: presetRules(preset) } : {}),
+        ...(rules ? { presetRules: rules } : {}),
         ...(world.ruleFeatures?.length ? { ruleFeatures: [...world.ruleFeatures] } : {}),
         ...(ext ? { ext } : {}),
         seed: world.seed,
@@ -430,7 +440,10 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
           void battleWins;
           void captures;
           return storedGeneralStats(
-            storedGeneralSex(stripWorldId(general), world.ruleFeatures.includes('lineage-v1')),
+            storedGeneralRemoval(
+              storedGeneralSex(stripWorldId(general), world.ruleFeatures.includes('lineage-v1')),
+              world.replayFormat,
+            ),
             world.ruleFeatures?.includes('five-stats') ?? false,
           );
         }),

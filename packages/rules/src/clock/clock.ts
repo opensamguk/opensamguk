@@ -1,4 +1,6 @@
 import { TICKS_PER_MONTH } from './constants';
+import { effectiveElapsed, timeAtTick, type Truce } from './truce';
+export * from './truce';
 
 export type ClockStatus = 'PREOPEN' | 'RUNNING' | 'PAUSED' | 'ENDED';
 export interface Clock {
@@ -7,6 +9,7 @@ export interface Clock {
   clockTick: number;
   clockAnchorAt: number | null;
   turnTermMinutes: number;
+  truce?: Truce | null;
 }
 
 function validate(clock: Clock, now: number) {
@@ -27,7 +30,10 @@ export function nowTick(clock: Clock, now: number): number {
   validate(clock, now);
   if (clock.status !== 'RUNNING' || clock.clockMode === 'ACCELERATED') return clock.clockTick;
   const msPerTick = (clock.turnTermMinutes * 60_000) / TICKS_PER_MONTH;
-  return clock.clockTick + Math.max(0, Math.floor((now - clock.clockAnchorAt!) / msPerTick));
+  const elapsed = clock.truce
+    ? effectiveElapsed(clock.clockAnchorAt!, now, clock.truce)
+    : Math.max(0, now - clock.clockAnchorAt!);
+  return clock.clockTick + Math.floor(elapsed / msPerTick);
 }
 
 // Preserve fractional ticks when saving a running clock checkpoint.
@@ -38,7 +44,9 @@ export function checkpointClock(clock: Clock, now: number, minimumTick = 0): Clo
   return {
     ...clock,
     clockTick: tick,
-    clockAnchorAt: clock.clockAnchorAt! + ((tick - clock.clockTick) * clock.turnTermMinutes * 60_000) / TICKS_PER_MONTH,
+    clockAnchorAt: clock.truce
+      ? timeAtTick(clock, tick)
+      : clock.clockAnchorAt! + ((tick - clock.clockTick) * clock.turnTermMinutes * 60_000) / TICKS_PER_MONTH,
   };
 }
 

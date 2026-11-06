@@ -14,10 +14,12 @@ function fixture() {
     clockAnchorAt: null,
     turnTermMinutes: 60,
     ruleFeatures: [] as string[],
+    preset: null,
+    runtimeOptions: null,
   };
 }
 describe('AC-INT-18B 월드 요약의 도시 자원 표시', () => {
-  it('구판 응답 모양과 값은 그대로다', () => {
+  it('구판의 기존 값을 유지하고 휴전이 없음을 표시한다', () => {
     expect(worldSummary(fixture(), 0)).toEqual({
       name: '도시 원장 판',
       status: 'PAUSED',
@@ -29,6 +31,7 @@ describe('AC-INT-18B 월드 요약의 도시 자원 표시', () => {
       nowTick: 0,
       msPerTick: 360,
       turnTermMinutes: 60,
+      truce: null,
     });
     const existing = fixture();
     existing.ruleFeatures = ['campaign-v1'];

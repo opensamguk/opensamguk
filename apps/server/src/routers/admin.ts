@@ -15,6 +15,33 @@ import { requestWorldResetInput, worldResetRequestInput } from '@opensamguk/rule
 
 import { requestWorldEnd, requestWorldEndInput, getWorldEndRequest, worldEndRequestInput } from '../admin/worldEnd';
 import {
+  requestSettingInput,
+  settingRequestInput,
+  worldSettingsInput,
+  settingRequestProcedure,
+  requestWorldSetting,
+  getWorldSettingRequest,
+  getWorldSettings,
+} from '../admin/settings';
+import {
+  adminGeneralInput,
+  adminGeneralRecordsInput,
+  adminNationRecordsInput,
+  adminBattlesInput,
+  readAdminGeneral,
+  readAdminGeneralLogs,
+  readAdminGeneralInputs,
+  readAdminNationLogs,
+  readAdminBattles,
+} from '../admin/gameRead';
+import {
+  requestAdminGame,
+  getAdminGameRequest,
+  adminGameRequestInput,
+  adminGameRequestStatusInput,
+  adminGameRequestProcedure,
+} from '../admin/game';
+import {
   requestWorldClock,
   requestWorldClockInput,
   getWorldClockRequest,
@@ -30,6 +57,25 @@ import {
 } from '../admin/notices';
 
 export const adminRouter = router({
+  game: router({
+    general: adminProcedure.input(adminGeneralInput).query(({ ctx, input }) => readAdminGeneral(ctx, input)),
+    generalLogs: adminProcedure
+      .input(adminGeneralRecordsInput)
+      .query(({ ctx, input }) => readAdminGeneralLogs(ctx, input)),
+    generalInputs: adminProcedure
+      .input(adminGeneralRecordsInput)
+      .query(({ ctx, input }) => readAdminGeneralInputs(ctx, input)),
+    nationLogs: adminProcedure
+      .input(adminNationRecordsInput)
+      .query(({ ctx, input }) => readAdminNationLogs(ctx, input)),
+    battles: adminProcedure.input(adminBattlesInput).query(({ ctx, input }) => readAdminBattles(ctx, input)),
+    request: adminGameRequestProcedure
+      .input(adminGameRequestInput)
+      .mutation(({ ctx, input }) => requestAdminGame(ctx, input)),
+    requestStatus: adminProcedure
+      .input(adminGameRequestStatusInput)
+      .query(({ ctx, input }) => getAdminGameRequest(ctx, input)),
+  }),
   whoami: adminProcedure.input(z.void()).query(({ ctx }) =>
     ctx.db.$transaction(async (tx) => {
       const { resourceEditor } = await resourceEditorAccess(tx, ctx, false);
@@ -40,6 +86,13 @@ export const adminRouter = router({
     shared: adminProcedure.input(investigateSharedInput).query(({ ctx, input }) => investigateShared(ctx, input)),
   }),
   world: router({
+    settings: adminProcedure.input(worldSettingsInput).query(({ ctx, input }) => getWorldSettings(ctx, input)),
+    requestSetting: settingRequestProcedure
+      .input(requestSettingInput)
+      .mutation(({ ctx, input }) => requestWorldSetting(ctx, input)),
+    settingRequest: adminProcedure
+      .input(settingRequestInput)
+      .query(({ ctx, input }) => getWorldSettingRequest(ctx, input)),
     creationOptions: adminProcedure
       .input(creationOptionsInput)
       .query(({ ctx, input }) => getWorldCreationOptions(ctx, input)),

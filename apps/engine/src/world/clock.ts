@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from '@opensamguk/db';
 import { checkpointClock, pauseClock, resumeClock, startClock, toGameDate, type Clock } from '@opensamguk/rules';
 import { databaseNow } from '../lease';
+import { worldClock, clockTruceStatus } from './truce';
 
 export type ClockAction = 'start' | 'pause' | 'resume' | 'status' | 'accelerate' | 'realtime';
 export async function controlClock(db: PrismaClient, worldId: string, action: ClockAction, injectedNow?: number) {
@@ -34,13 +35,7 @@ export async function controlClockInTransaction(
   // 기다리는 동안 엔진이 저장한 시계와 잠금 획득 뒤의 DB 시각을 사용한다.
   const now = injectedNow ?? (await databaseNow(tx)).getTime();
   const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
-  let clock: Clock = {
-    status: world.status,
-    clockMode: world.clockMode,
-    clockTick: world.clockTick,
-    clockAnchorAt: world.clockAnchorAt?.getTime() ?? null,
-    turnTermMinutes: world.turnTermMinutes,
-  };
+  let clock: Clock = worldClock(world);
   if (action === 'pause') clock = checkpointClock(clock, now, minimumTick);
   const mode = action === 'accelerate' ? 'ACCELERATED' : action === 'realtime' ? 'REALTIME' : world.clockMode;
   if (action === 'accelerate' || action === 'realtime') {
@@ -82,5 +77,6 @@ export async function controlClockInTransaction(
     ...(result ? { year: result.endedYear, month: result.endedMonth } : toGameDate(world.startYear, next.clockTick)),
     turnTermMinutes: world.turnTermMinutes,
     seed: world.seed,
+    truce: clockTruceStatus(next, now),
   };
 }

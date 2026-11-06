@@ -1,10 +1,11 @@
 import type { Prisma } from '@opensamguk/db';
 import {
-  presetRules,
+  effectiveWorldOptions,
   readOperationalMap,
   attachOperationalKinds,
   readStoredGovernance,
   storedGeneralSex,
+  storedGeneralRemoval,
   readStoredLineage,
   readStoredStratagemCards,
   readStoredEquipment,
@@ -40,13 +41,14 @@ export async function loadWorldAfterCapabilityCheck(
     ? ((capabilities.kind === 'registry' ? capabilities.armyTypes : undefined) ?? readCampaignArmyTypes(world))
     : [];
   const { preset, commands } = engineResolver(world);
+  const rules = effectiveWorldOptions(preset, world.runtimeOptions).presetRules;
   if (world.replayFormat === 3) await assertPersonnelStorage(tx, worldId, world.ruleFeatures.includes('personnel'));
   const ext = await loadExt(tx, worldId, commands);
   const cities = await tx.city.findMany({ where: { worldId } });
   const operationalMap = readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin);
   const nations = await tx.nation.findMany({
     where: { worldId },
-    omit: { notice: true, noticeRevision: true, noticeUpdatedAt: true, noticeUpdatedBy: true },
+    omit: { notice: true, noticeDirective: true, noticeRevision: true, noticeUpdatedAt: true, noticeUpdatedBy: true },
   });
   const generals = await tx.general.findMany({
     where: { worldId },
@@ -62,7 +64,7 @@ export async function loadWorldAfterCapabilityCheck(
     return value;
   };
   let state: WorldState = {
-    ...(preset ? { presetRules: presetRules(preset) } : {}),
+    ...(rules ? { presetRules: rules } : {}),
     ...(world.ruleFeatures?.length ? { ruleFeatures: [...world.ruleFeatures] } : {}),
     ...(ext ? { ext } : {}),
     startYear: world.startYear,
@@ -85,7 +87,10 @@ export async function loadWorldAfterCapabilityCheck(
         return [
           general.id,
           storedGeneralStats(
-            storedGeneralSex(stripWorldId(general), world.ruleFeatures.includes('lineage-v1')),
+            storedGeneralRemoval(
+              storedGeneralSex(stripWorldId(general), world.ruleFeatures.includes('lineage-v1')),
+              world.replayFormat,
+            ),
             world.ruleFeatures?.includes('five-stats') ?? false,
           ),
         ];

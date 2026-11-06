@@ -10,6 +10,7 @@ datasource db {
 }
 
 model World {
+  runtimeOptions      Json?
   equipmentState      Json?
   notificationOutbox  NotificationOutbox[]
   lineageState        Json?
@@ -294,6 +295,7 @@ model Nation {
   offices         NationOffice[]
   officeTurns     NationOfficeTurn[]
   notice          String             @default("")
+  noticeDirective Json?
   noticeRevision  Int                @default(0)
   noticeUpdatedAt DateTime?
   noticeUpdatedBy String?
@@ -358,6 +360,7 @@ model General {
   birthYear         Int
   deathYear         Int
   activeFromYear    Int
+  removedAt         Int?
   personality       String?
   special           String?
   gold              Int
