@@ -251,7 +251,9 @@ test('T4-24 장비 카드 예약·실제 매매·100 초과 표시와 세 화면
       }
     await slot.selectOption('weapon');
     await item.selectOption('weapon_06');
-    const condition = picker.getByRole('note').filter({ hasText: '현재 조건:' });
+    // 지금 상태의 경고는 30칸 표의 사전 검사와 같은 말이고, 경고가 있어도 넣을 수 있다고 바로 이어 적는다.
+    const condition = picker.getByRole('note').filter({ hasText: '사전 검사 경고:' });
+    await expect(picker.getByText(/경고가 있어도 넣을 수 있고 실행할 때/)).toBeVisible();
     const replacement = picker.getByRole('note').filter({ hasText: '교체하면 기존 장비 금액은 돌려받지 않습니다.' });
     await expect(condition).toBeVisible();
     await expect(replacement).toBeVisible();
@@ -285,6 +287,49 @@ test('T4-24 장비 카드 예약·실제 매매·100 초과 표시와 세 화면
     await expect(equipment.getByText('단도', { exact: true })).toHaveCount(0);
     await expect(generalPanel.getByText('기본 100 + 장비 1', { exact: true })).toHaveCount(0);
     expect((await general()).gold).toBe(saleGold + 500);
+
+    // AC-P2-34: 실제 연결 실패에서 장수 칸과 장비 카드가 공통 오류 칸을 보이고, 다시 시도가 375px에서도 44px이며 복구된다.
+    // 같은 HTTP 배치의 다른 조회도 함께 끊길 수 있어 복구 뒤 새 문서에서 다시 확인한다.
+    await page.setViewportSize({ width: 375, height: 900 });
+    await page.route('**/trpc/**', async (route) => {
+      if (route.request().url().includes('equipment.mine')) await route.abort('failed');
+      else await route.continue();
+    });
+    await page.reload();
+    const statusAlert = generalPanel.getByRole('alert').filter({ hasText: '장비 정보를 불러오지 못했습니다.' });
+    await expect(statusAlert).toBeVisible({ timeout: 20_000 });
+    await expect(generalPanel.getByText('무력', { exact: true }).locator('xpath=following-sibling::dd')).toHaveText(
+      '100',
+    );
+    await editor.getByRole('button', { name: '선택 해제', exact: true }).click();
+    await editor.locator('tr[data-slot="1"]').click();
+    await editor.getByRole('searchbox').fill('장비');
+    await editor.getByRole('radio', { name: '장비매매', exact: true }).check();
+    const pickerAlert = picker.getByRole('alert').filter({ hasText: '장비 정보를 불러오지 못했습니다.' });
+    await expect(pickerAlert).toBeVisible();
+    await expect(picker.getByRole('button', { name: '1번 칸에 넣기 (사용 불가)', exact: true })).toBeVisible();
+    for (const colorScheme of ['light', 'dark'] as const) {
+      await page.emulateMedia({ colorScheme });
+      for (const retry of [
+        statusAlert.getByRole('button', { name: '다시 시도', exact: true }),
+        pickerAlert.getByRole('button', { name: '다시 시도', exact: true }),
+      ]) {
+        const box = (await retry.boundingBox())!;
+        expect(box.height).toBeGreaterThanOrEqual(44);
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width).toBeLessThanOrEqual(376);
+      }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      await picker.screenshot({ path: info.outputPath(`t4-24-retry-trade-${colorScheme}-375.png`) });
+      await generalPanel.screenshot({ path: info.outputPath(`t4-24-retry-stats-${colorScheme}-375.png`) });
+    }
+    await page.unroute('**/trpc/**');
+    await pickerAlert.getByRole('button', { name: '다시 시도', exact: true }).click();
+    await expect(slot).toBeVisible();
+    await expect(equipment.getByText('미장착', { exact: true }).first()).toBeVisible();
+    await expect(statusAlert).toHaveCount(0);
+    await page.reload();
+    await expect(equipment).toBeVisible();
     expect(errors).toEqual([]);
   } finally {
     await player.context.close();

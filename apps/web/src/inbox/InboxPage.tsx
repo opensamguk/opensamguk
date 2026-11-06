@@ -13,6 +13,7 @@ import { NoGeneral, QueryError } from '../game/QueryState';
 import { useHome, useWorldId } from '../game/queries';
 import { CAMPAIGN_RELATIONS } from '../personnel/CampaignPanel';
 import { personnelKeys, usePersonnelApi } from '../personnel/contract';
+import { usePersonnelEnabled } from '../personnel/usePersonnelEnabled';
 import { OfferBox } from '../personnel/OfferBox';
 import { useTRPC } from '../trpc';
 import { EmptyState, LoadingState } from '../ui/States';
@@ -56,10 +57,12 @@ export function InboxPage() {
 export function Inbox({ worldId, hasNation, campaign }: { worldId: string; hasNation: boolean; campaign: boolean }) {
   const trpc = useTRPC();
   const api = usePersonnelApi();
-  // 메인의 발령 상자와 같은 키다. 주기 조회는 상자가 한다.
+  const personnel = usePersonnelEnabled(worldId);
+  // 메인의 발령 상자와 같은 키다. 주기 조회는 상자가 한다. 인사 기능이 없는 월드는 묻지 않는다.
   const offers = useQuery({
     queryKey: personnelKeys.offers(worldId),
     queryFn: () => api.offers({ worldId }),
+    enabled: personnel,
     retry: false,
   });
   const board = useQuery({ ...trpc.campaign.get.queryOptions({ worldId }), enabled: campaign, retry: false });
@@ -73,7 +76,7 @@ export function Inbox({ worldId, hasNation, campaign }: { worldId: string; hasNa
     retry: false,
   });
 
-  const loading = offers.isPending || (campaign && board.isPending) || (hasNation && treaties.isPending);
+  const loading = (personnel && offers.isPending) || (campaign && board.isPending) || (hasNation && treaties.isPending);
   const retinue = campaign ? retinueOffers(board.data) : [];
   const incoming = hasNation ? incomingTreaties(treaties.data) : [];
   const names = new Map(board.data?.people.map((person) => [person.id, person.name]) ?? []);

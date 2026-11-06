@@ -2,6 +2,7 @@ import type { RefObject } from 'react';
 import { EQUIPMENT_SLOTS, EQUIPMENT_STATS, type EquipmentRead } from './useEquipment';
 import styles from '../turns/TurnEditor.module.css';
 import tradeStyles from './EquipmentTradeFields.module.css';
+import { ErrorState, LoadingState } from '../ui/States';
 
 // 선택은 기존 편집기의 문자열 인자만 바꾼다. 실제 매매는 예턴 저장·실행 경로가 처리한다.
 export const equipmentUiSchema = {
@@ -25,16 +26,9 @@ export function EquipmentTradeFields({
   onChange: (next: Record<string, string>) => void;
   firstArgRef: RefObject<HTMLElement | null>;
 }) {
-  if (read?.kind === 'error')
-    return (
-      <div role="alert">
-        <p>장비 정보를 불러오지 못했습니다.</p>
-        <button type="button" onClick={read.retry}>
-          다시 조회
-        </button>
-      </div>
-    );
-  if (read?.kind !== 'ready') return <p role="status">장비 정보를 불러오는 중입니다.</p>;
+  // 실패·불러오는 중은 공통 상태 부품을 쓴다. 다시 시도 단추가 모든 폭에서 44px이다 (AC-P2-34).
+  if (read?.kind === 'error') return <ErrorState title="장비 정보를 불러오지 못했습니다." onRetry={read.retry} />;
+  if (read?.kind !== 'ready') return <LoadingState>장비 정보를 불러오는 중입니다.</LoadingState>;
   const board = read.data,
     slot = EQUIPMENT_SLOTS.find((row) => row.key === values.slot)?.key ?? 'horse';
   const items = board.items.filter((item) => item.slot === slot);
@@ -98,17 +92,20 @@ export function EquipmentTradeFields({
         </p>
       ) : null}
       {selling ? <p>현재 장착품 기준 판매 금액: 금 {n(sale.proceeds)}</p> : null}
-      {failure ? (
-        <p className={styles.warn} role="note">
-          현재 조건: {failure.message}
-        </p>
-      ) : null}
       {item && held && held.key !== item.key ? (
         <p className={styles.warn} role="note">
           교체하면 기존 장비 금액은 돌려받지 않습니다.
         </p>
       ) : null}
-      <p className={styles.muted}>매매는 고른 예턴에서 실행합니다. 실행할 때 금·재료·도시 조건을 다시 확인합니다.</p>
+      {/* 지금 상태의 판정과 예약 안내를 붙여 둔다. 30칸 표의 '사전 검사' 열과 같은 말을 쓴다. */}
+      {failure ? (
+        <p className={styles.warn} role="note">
+          사전 검사 경고: {failure.message}
+        </p>
+      ) : null}
+      <p className={styles.muted}>
+        매매는 고른 예턴에서 실행합니다. 경고가 있어도 넣을 수 있고 실행할 때 금·재료·도시 조건을 다시 검사합니다.
+      </p>
     </div>
   );
 }
