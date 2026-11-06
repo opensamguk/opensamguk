@@ -103,8 +103,7 @@ async function resolveCreation(db: PrismaClient, request: Request) {
   }
   let prepared: PreparedInitialWorld | undefined;
   try {
-    const presetFeatures =
-      preset?.unitSet === 'expanded' && selection.unitSet === 'expanded' ? ['battle-affinity-v2'] : [];
+    const presetFeatures = state.unitSet.coefMode === 'multiply' ? ['battle-affinity-v2'] : [];
     const combined = [
       ...new Set([...(state.ruleFeatures ?? []), ...presetFeatures, ...(intent.ruleFeatures ?? [])]),
     ].sort();

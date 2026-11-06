@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import type { readPublishedResources, GameResourceKind, PublishedResource } from '@opensamguk/db';
-import { buildInitialWorld, parsePreset, type WorldInit } from '@opensamguk/rules';
+import { buildInitialWorld, formatResourceKey, parsePreset, parseResourceKey, type WorldInit } from '@opensamguk/rules';
 import { sexLedgerSchema, featureProfileSchema, type SexLedger } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { resourceRoot as resolveResourceRoot } from '@opensamguk/shared/resource-root';
@@ -69,12 +69,17 @@ export async function loadFeatureProfile(key: string, root: URL = resolveResourc
 
 // 새 지도 기본값을 생성·CLI·재생 원본 추론이 함께 쓴다. 명시한 판 선택은 그대로 유지한다.
 export function resolveWorldResourceSelection(options: WorldResourceSelection): Required<WorldResourceSelection> {
+  const map = parseResourceKey(options.map);
   return {
-    scenario: resourceKey(options.scenario),
-    map: resourceKey(options.map),
-    unitSet: resourceKey(options.unitSet ?? 'basic'),
-    statRules: resourceKey(options.statRules ?? (options.map === 'san10' ? 'five-stats' : 'default')),
-    portraitMap: resourceKey(options.portraitMap ?? (options.map === 'san10' ? '191-map' : 'rtk14-map')),
+    scenario: formatResourceKey(parseResourceKey(options.scenario)),
+    map: formatResourceKey(map),
+    unitSet: formatResourceKey(parseResourceKey(options.unitSet ?? 'basic')),
+    statRules: formatResourceKey(
+      parseResourceKey(options.statRules ?? (map.name === 'san10' ? 'five-stats' : 'default')),
+    ),
+    portraitMap: formatResourceKey(
+      parseResourceKey(options.portraitMap ?? (map.name === 'san10' ? '191-map' : 'rtk14-map')),
+    ),
   };
 }
 
@@ -83,6 +88,8 @@ export async function loadInitialWorld(
   root: URL = resolveResourceRoot(),
 ) {
   const selected = resolveWorldResourceSelection(options);
+  if (Object.values(selected).some((key) => parseResourceKey(key).version !== 1))
+    throw new Error('자원 2판 이상은 게시된 판으로 생성하세요.');
   const readJson = async (path: string): Promise<unknown> => JSON.parse(await readFile(new URL(path, root), 'utf8'));
   const [map, scenario, unitSet, statRules, portraitMap] = await Promise.all([
     readJson(`map/${selected.map}.json`),
@@ -110,11 +117,11 @@ export async function readInitialResources(
   const selected = resolveWorldResourceSelection(options);
   const { readPublishedResources } = await import('@opensamguk/db');
   const [map, scenario, unitSet, statRules, portraitMap] = await readPublishedResources(db, [
-    { kind: 'MAP', name: selected.map, version: 1 },
-    { kind: 'SCENARIO', name: selected.scenario, version: 1 },
-    { kind: 'UNIT_SET', name: selected.unitSet, version: 1 },
-    { kind: 'STAT_RULES', name: selected.statRules, version: 1 },
-    { kind: 'PORTRAIT_MAP', name: selected.portraitMap, version: 1 },
+    { kind: 'MAP', ...parseResourceKey(selected.map) },
+    { kind: 'SCENARIO', ...parseResourceKey(selected.scenario) },
+    { kind: 'UNIT_SET', ...parseResourceKey(selected.unitSet) },
+    { kind: 'STAT_RULES', ...parseResourceKey(selected.statRules) },
+    { kind: 'PORTRAIT_MAP', ...parseResourceKey(selected.portraitMap) },
   ]);
   return { map: map!, scenario: scenario!, unitSet: unitSet!, statRules: statRules!, portraitMap: portraitMap! };
 }
@@ -133,8 +140,7 @@ export function composeInitialWorld(resources: InitialResources, seed: string): 
     const key = `${resource.kind}/${resource.name}/${resource.version}`;
     keys.push(key);
     if (resource.kind !== kinds[slot]) throw new Error(`자원 종류가 칸과 다릅니다: ${key}`);
-    if (resource.version !== 1) throw new Error(`초기 월드는 자원 1판만 씁니다: ${key}`);
-    if (!/^[a-zA-Z0-9_-]+$/.test(resource.name)) throw new Error(`자원 이름을 확인하세요: ${key}`);
+    formatResourceKey(resource);
     if (['map', 'scenario', 'unitSet'].includes(slot)) {
       const content = resource.content;
       if (content === null || typeof content !== 'object' || !('id' in content) || content.id !== resource.name) {
@@ -144,7 +150,7 @@ export function composeInitialWorld(resources: InitialResources, seed: string): 
   }
   try {
     validateInitialPair(resources.map.content, resources.scenario.content);
-    return buildInitialWorld({
+    const world = buildInitialWorld({
       map: resources.map.content,
       scenario: resources.scenario.content,
       unitSet: resources.unitSet.content,
@@ -152,6 +158,12 @@ export function composeInitialWorld(resources: InitialResources, seed: string): 
       portraitMap: resources.portraitMap.content,
       seed,
     });
+    return {
+      ...world,
+      mapKey: formatResourceKey(resources.map),
+      scenarioKey: formatResourceKey(resources.scenario),
+      unitSetKey: formatResourceKey(resources.unitSet),
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : '자원 내용을 확인하세요.';
     throw new Error(`자원 합성 실패 (${keys.join(', ')}): ${message}`, { cause: error });

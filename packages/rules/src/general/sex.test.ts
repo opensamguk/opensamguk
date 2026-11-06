@@ -46,6 +46,10 @@ it('AC-P2-32 원장은 ID·이름이 일치하는 확인 인물만 적용하고 
     },
     before = structuredClone(initial);
   expect(applySexLedger(initial, ledger).map((general) => general.sex)).toEqual(['FEMALE', 'UNKNOWN']);
+  for (const scenarioKey of ['known@1', 'known@2']) {
+    expect(applySexLedger({ ...initial, scenarioKey }, ledger)).toEqual(applySexLedger(initial, ledger));
+    expect(() => applySexLedger({ scenarioKey, generals: [{ id: 2, name: '다른인물' }] }, ledger)).toThrow('ID·이름');
+  }
   expect(initial).toEqual(before);
   expect(applySexLedger({ ...initial, scenarioKey: 'other' }, ledger).map((general) => general.sex)).toEqual([
     'UNKNOWN',

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { RecordedInput, ReplayState } from '../replay';
 import { adminClockPayloadSchema } from './admin';
+import { formatResourceKey, resourceKeySchema, resourceVersionSchema } from '../world/resourceKey';
 
 export const ADMIN_RESET_KIND = 'admin.world.reset' as const;
 const storedString = z
@@ -62,7 +63,7 @@ export const adminResetPayloadSchema = z
 export const adminResetResourceSchema = z.strictObject({
   kind: z.enum(['MAP', 'SCENARIO', 'UNIT_SET', 'STAT_RULES', 'PORTRAIT_MAP']),
   name: key,
-  version: z.literal(1),
+  version: resourceVersionSchema,
   contentHash: hash,
 });
 export const adminResetResourcesSchema = z
@@ -78,9 +79,9 @@ export const adminResetResourcesSchema = z
 export const adminResetSettingsSchema = z
   .strictObject({
     name,
-    scenarioKey: key,
-    mapKey: key,
-    unitSetKey: key,
+    scenarioKey: resourceKeySchema,
+    mapKey: resourceKeySchema,
+    unitSetKey: resourceKeySchema,
     presetKey: key.nullable(),
     presetHash: hash.nullable(),
     turnTermMinutes: z.number().int().min(1).max(2147483647),
@@ -124,9 +125,11 @@ export const adminResetAppliedSchema = z
       ['MAP', value.settings.mapKey],
       ['SCENARIO', value.settings.scenarioKey],
       ['UNIT_SET', value.settings.unitSetKey],
-    ] as const)
-      if (value.resources.find((row) => row.kind === kind)?.name !== selected)
+    ] as const) {
+      const resource = value.resources.find((row) => row.kind === kind);
+      if (!resource || formatResourceKey(resource) !== selected)
         ctx.addIssue({ code: 'custom', message: '초기화 자원과 설정이 다릅니다.' });
+    }
   });
 export const adminResetRejectMessages = {
   ACTOR_INACTIVE: '활성 관리자 계정이 아닙니다.',

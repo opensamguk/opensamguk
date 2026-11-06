@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
@@ -82,7 +82,12 @@ it.each([false, true])('확장 프리셋은 원작식 기능을 한 번만 합�
     unitSet: 'expanded',
     turnTermMinutes: 60,
   });
-  mocks.loadInitialWorld.mockResolvedValue({ seed: 'cli-unit', ruleFeatures: ['five-stats', 'operational-map'] });
+  mocks.loadInitialWorld.mockResolvedValue({
+    seed: 'cli-unit',
+    unitSetKey: 'expanded',
+    unitSet: { coefMode: 'multiply' },
+    ruleFeatures: ['five-stats', 'operational-map'],
+  });
   process.argv = [
     process.execPath,
     'createWorld.ts',
@@ -107,7 +112,7 @@ it.each([false, true])('확장 프리셋은 원작식 기능을 한 번만 합�
   const features = ['battle-affinity-v2', 'five-stats', 'operational-map'];
   expect(mocks.createWorldFromCli).toHaveBeenCalledWith(
     expect.anything(),
-    { seed: 'cli-unit', ruleFeatures: features },
+    { seed: 'cli-unit', unitSetKey: 'expanded', unitSet: { coefMode: 'multiply' }, ruleFeatures: features },
     expect.objectContaining({ ruleFeatures: features, preset: expect.objectContaining({ key: 'regular' }) }),
   );
   expect(console.error).not.toHaveBeenCalled();
@@ -162,4 +167,24 @@ it('실제 CLI 자식 프로세스의 도움말은 --treaty를 안내한다 (DB 
   );
   expect(output).toContain('[--treaty]');
   expect(output).toContain('pnpm world:create');
+});
+
+it('AC-P2-27 실제 파일 CLI의 2판 선택은 DB 설정 전에 거부한다', () => {
+  const env = { ...process.env };
+  delete env.DATABASE_URL;
+  delete env.TEST_DATABASE_URL;
+  const result = spawnSync(
+    process.execPath,
+    ['--import', 'tsx', fileURLToPath(new URL('./createWorld.ts', import.meta.url)), ...args, '--unit-set', 'basic@2'],
+    {
+      cwd: fileURLToPath(new URL('../../../../', import.meta.url)),
+      env,
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: 10000,
+    },
+  );
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain('게시된 판으로 생성하세요');
+  expect(result.stderr).not.toContain('DATABASE_URL');
 });

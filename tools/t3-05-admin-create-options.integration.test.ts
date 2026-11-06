@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import { ruleRegistry } from '../packages/rules/src/index';
+import { hashState } from '../packages/shared/src/node/hashState';
 import { buildServer } from '../apps/server/src/server';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { newSession } from '../apps/server/src/auth/session';
@@ -94,11 +95,11 @@ async function actor(role: 'ADMIN' | 'USER' = 'ADMIN', status: 'ACTIVE' | 'SANCT
   );
   return { id: user.id, cookie: 'sid=' + session.token };
 }
-async function call(input: unknown, cookie?: string) {
+async function call(input: unknown, cookie?: string, route = path) {
   if (!activeCase) throw new Error('실행 중인 생성 설정 시험이 없습니다.');
   const signal = activeCase.controller.signal;
   const response = await bounded(() =>
-    fetch(address + '/trpc/' + path + '?input=' + encodeURIComponent(JSON.stringify(input)), {
+    fetch(address + '/trpc/' + route + '?input=' + encodeURIComponent(JSON.stringify(input)), {
       headers: { Origin: origin, ...(cookie ? { Cookie: cookie } : {}) },
       signal,
     }),
@@ -358,6 +359,87 @@ for (const category of categories)
       expect(await bounded(() => db.world.count())).toBe(before);
     }),
   );
+const versionsPath = 'admin.world.creationVersions';
+for (const category of categories)
+  it(
+    'AC-P2-27 게시 판 목록 실제 HTTP ' + category,
+    authzCase(versionsPath, category, async () => {
+      const owner = await actor(),
+        other = await actor(),
+        requester = category === 'sanctioned' ? await actor('ADMIN', 'SANCTIONED') : owner;
+      const result = await call(
+        {
+          expectedUserId: category === 'otherUser' ? other.id : requester.id,
+          kind: 'MAP',
+          ...(category === 'invalidInput' ? { extra: true } : {}),
+        },
+        category === 'unauthenticated' ? undefined : requester.cookie,
+        versionsPath,
+      );
+      expect(result.status).toBe(category === 'success' ? 200 : category === 'invalidInput' ? 400 : 401);
+      if (category === 'success') {
+        const data = result.body.result!.data as { items: Array<Record<string, unknown>>; next: string | null };
+        expect(data.items.length).toBeGreaterThan(0);
+        expect(data.items.length).toBeLessThanOrEqual(50);
+        for (const item of data.items)
+          expect(Object.keys(item).sort()).toEqual(['contentHash', 'key', 'name', 'version']);
+      }
+    }),
+  );
+
+it('AC-P2-27 편집 권한 없는 관리자도 게시 판만 50건씩 중복 없이 조회한다', async () => {
+  const owner = await actor(),
+    base = 't479_' + randomUUID().replaceAll('-', '');
+  const content = { stat: { min: 10, max: 100, total: 180 } },
+    contentHash = hashState(content);
+  await bounded(() =>
+    db.gameResource.createMany({
+      data: Array.from({ length: 55 }, (_, index) => ({
+        kind: 'STAT_RULES' as const,
+        name: `${base}_${index}`,
+        version: index === 1 ? 2 : 1,
+        status: index === 54 ? ('DRAFT' as const) : ('PUBLISHED' as const),
+        content,
+        contentHash,
+        source: 'AC-P2-27 HTTP pagination fixture',
+        ...(index === 54 ? {} : { publishedAt: new Date() }),
+      })),
+    }),
+  );
+  const seen: Array<{ key: string; name: string; version: number; contentHash: string }> = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < 10; page++) {
+    const response = await call(
+      { expectedUserId: owner.id, kind: 'STAT_RULES', ...(cursor ? { cursor } : {}) },
+      owner.cookie,
+      versionsPath,
+    );
+    expect(response.status).toBe(200);
+    const data = response.body.result!.data as { items: typeof seen; next: string | null };
+    expect(data.items.length).toBeLessThanOrEqual(50);
+    if (page === 0) expect(data.items).toHaveLength(50);
+    seen.push(...data.items);
+    cursor = data.next;
+    if (cursor === null) break;
+  }
+  expect(cursor).toBeNull();
+  const expected = await bounded(() =>
+    db.gameResource.findMany({
+      where: { kind: 'STAT_RULES', status: 'PUBLISHED' },
+      select: { name: true, version: true, contentHash: true },
+    }),
+  );
+  expect(
+    seen
+      .map(({ name, version, contentHash }) => ({ name, version, contentHash }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  ).toEqual(expected.sort((a, b) => a.name.localeCompare(b.name)));
+  expect(seen.find((row) => row.name === `${base}_1`)?.key).toBe(`${base}_1@2`);
+  for (const input of [{ kind: 'MAP', cursor: 'invalid' }, { kind: 'UNKNOWN' }, { kind: 'MAP', status: 'DRAFT' }])
+    expect((await call({ expectedUserId: owner.id, ...input }, owner.cookie, versionsPath)).status).toBe(400);
+  await bounded(() => db.user.update({ where: { id: owner.id }, data: { role: 'USER' } }));
+  expect((await call({ expectedUserId: owner.id, kind: 'MAP' }, owner.cookie, versionsPath)).status).toBe(403);
+});
 it('AC-M3-04 역할 회수·일반회원은 같은 계정 UUID여도 생성 설정을 못 읽는다', async () => {
   const owner = await actor();
   expect((await call({ expectedUserId: owner.id }, owner.cookie)).status).toBe(200);

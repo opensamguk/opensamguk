@@ -252,6 +252,7 @@ export * from './clock/featureProfile';
 export * from './entry/possess';
 export * from './entry/roles';
 export * from './stratagemCards/config';
+export * from './world/resourceKey';
 export * from './stratagemCards/state';
 export * from './stratagemCards/origin';
 export * from './stratagemCards/view';

@@ -6,7 +6,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, beforeAll, beforeEach, expect, it as test } from 'vitest';
-import { createDb } from '../packages/db/src/index';
+import { createDb, type Prisma } from '../packages/db/src/index';
 import { buildServer } from '../apps/server/src/server';
 import { appRouter } from '../apps/server/src/router';
 import type { Context } from '../apps/server/src/context';
@@ -30,6 +30,7 @@ import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { processWorldCreateRequest } from '../apps/engine/src/admin/createRequests';
+import { prepareWorldReset } from '../apps/engine/src/admin/resetPreparation';
 import { stopOwnedChild } from '../apps/engine/src/process-lifecycle';
 import { testDatabaseUrl } from './test-database';
 import { confirmDisconnectedDatabase } from './test-db-close';
@@ -1261,6 +1262,65 @@ it('AC-M3-04 프리셋 위에 명시한 정식 자원·간격·긴 이름을 유
       })
     ).statRules,
   );
+});
+it('AC-P2-27 실제 HTTP의 1판 별칭은 멱등하고 게시 2판은 엔진·초기화 출처에 고정된다', async (signal) => {
+  const refs = [
+    { kind: 'MAP' as const, name: 'integration' },
+    { kind: 'SCENARIO' as const, name: 'integration191' },
+    { kind: 'UNIT_SET' as const, name: 'basic' },
+    { kind: 'STAT_RULES' as const, name: 'five-stats' },
+    { kind: 'PORTRAIT_MAP' as const, name: '191-map' },
+  ];
+  const rows = await db.gameResource.findMany({ where: { status: 'PUBLISHED', version: 1, OR: refs } });
+  expect(rows).toHaveLength(5);
+  await db.gameResource.createMany({
+    data: rows.map(({ kind, name, content, source }) => {
+      const selected =
+        kind === 'SCENARIO' ? { ...(content as Prisma.JsonObject), title: 'AC-P2-27 게시한 2판' } : content;
+      return {
+        kind,
+        name,
+        content: selected,
+        contentHash: hashState(selected),
+        source,
+        version: 2,
+        status: 'PUBLISHED' as const,
+        publishedAt: new Date(),
+      };
+    }),
+  });
+  const keys = {
+    mapKey: 'integration',
+    scenarioKey: 'integration191',
+    unitSetKey: 'basic',
+    statRulesKey: 'five-stats',
+    portraitMapKey: '191-map',
+  };
+  const alias = await accepted(actor, signal, {
+    ...Object.fromEntries(Object.entries(keys).map(([slot, key]) => [slot, `${key}@1`])),
+    seed: 't479-alias',
+  });
+  expect((await create(actor, { ...alias.payload, ...keys }, signal)).data).toEqual(alias.receipt);
+  expect((await create(actor, { ...alias.payload, mapKey: 'integration@2' }, signal)).code).toBe('CONFLICT');
+  await processOne(signal);
+  const next = await accepted(actor, signal, {
+    ...Object.fromEntries(Object.entries(keys).map(([slot, key]) => [slot, `${key}@2`])),
+    seed: 't479-next-version',
+  });
+  await processOne(signal);
+  const stored = await row(next.receipt.requestId);
+  expect(stored.status).toBe('DONE');
+  const world = await db.world.findUniqueOrThrow({ where: { id: stored.worldId! } });
+  expect(world).toMatchObject({ mapKey: 'integration@2', scenarioKey: 'integration191@2', unitSetKey: 'basic@2' });
+  const resolution = stored.resolution as { resources: Array<{ kind: string; version: number }> };
+  expect(resolution.resources).toHaveLength(5);
+  expect(resolution.resources.every((ref) => ref.version === 2)).toBe(true);
+  const lobby = await call<Array<{ id: string; scenarioTitle: string }>>('lobby.worlds', {}, signal);
+  expect(lobby.status).toBe(200);
+  expect(lobby.data?.find((entry) => entry.id === world.id)?.scenarioTitle).toBe('AC-P2-27 게시한 2판');
+  const candidate = await prepareWorldReset(db, world.id, 't479-reset-version', signal);
+  expect(candidate.evidence.resources).toEqual([...resolution.resources].sort((a, b) => a.kind.localeCompare(b.kind)));
+  expect(candidate.evidence.provenance).toEqual({ kind: 'request', requestId: stored.id });
 });
 it('AC-M3-04 해시가 손상된 새 게시 자원은 기존 게시물을 바꾸지 않고 거부한다', async (signal) => {
   const resource = await db.gameResource.findUniqueOrThrow({
