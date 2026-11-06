@@ -11,7 +11,8 @@ import { newSession } from '../apps/server/src/auth/session';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { testDatabaseUrl } from './test-database';
 import { initializeResources } from './init-resources';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { initializeIntegrationResources } from './integration-resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
@@ -187,6 +188,7 @@ beforeAll(() =>
       db,
       await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
     );
+    await initializeIntegrationResources(db);
     passwordHash = await hashPassword(randomUUID());
     sensitive.add(passwordHash);
     app = await buildServer({
@@ -542,7 +544,7 @@ for (const index of [0, 1])
         id = createHash('sha256').update(token).digest('hex');
       humanUserId = (await db.session.findUniqueOrThrow({ where: { id } })).userId;
     }
-    const initial = await loadInitialWorld({
+    const initial = await loadInitialWorldFromDb(db, {
       scenario: 'integration191',
       map: 'integration',
       statRules: 'five-stats',

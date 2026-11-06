@@ -11,7 +11,7 @@ import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { saveInitialWorld, readWorldState } from '../apps/engine/src/world/persistence';
-import { loadInitialWorld, loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { exportReplay, replayArchive } from '../apps/engine/src/replay';
 import { initializeResources } from './init-resources';
 import { initializeIntegrationResources, integrationResourceRows } from './integration-resources';
@@ -252,7 +252,7 @@ async function catalog(db: PrismaClient) {
 
 it('AC-INT-04 정식 게시를 재실행해도 원래 게시 자원과 구형191년 월드는 그대로다', async () => {
   await withDatabase(async ({ db }) => {
-    const old = await loadInitialWorld({ scenario: '1030', map: 'che', seed: 'old-191-preserved' });
+    const old = await loadInitialWorldFromDb(db, { scenario: '1030', map: 'che', seed: 'old-191-preserved' });
     const { worldId } = await saveInitialWorld(db, old, {
       name: '기존191년',
       turnTermMinutes: 60,

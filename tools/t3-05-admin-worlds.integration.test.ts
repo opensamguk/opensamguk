@@ -11,7 +11,9 @@ import { newSession } from '../apps/server/src/auth/session';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { authzCase } from '../apps/server/src/authz/case';
 import { categories } from '../apps/server/src/authz/coverage';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { initializeResources } from './init-resources';
+import { initializeIntegrationResources } from './integration-resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
@@ -182,6 +184,11 @@ beforeAll(() =>
     const migrations = new URL('../packages/db/prisma/migrations/', import.meta.url);
     for (const migration of (await readdir(migrations)).filter((value) => /^\d{14}_/.test(value)).sort())
       await gate.query(await readFile(new URL(migration + '/migration.sql', migrations), 'utf8'));
+    await initializeResources(
+      db,
+      await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
+    );
+    await initializeIntegrationResources(db);
     passwordHash = await hashPassword(randomUUID());
     sensitive.add(passwordHash);
     app = await buildServer({
@@ -260,7 +267,7 @@ for (const category of categories)
 
 for (const index of [0, 1])
   it('정식191 월드와 사람 장수30칸을 실제 API·엔진으로 준비한다 ' + index, async () => {
-    const initial = await loadInitialWorld({
+    const initial = await loadInitialWorldFromDb(db, {
       scenario: 'integration191',
       map: 'integration',
       statRules: 'five-stats',
@@ -782,7 +789,7 @@ it('감사 쓰기 실패는 실제 상태·입력·순번을 함께 롤백하고
 });
 
 it('PREOPEN 정식191년 월드를 실제 감독 자식이 발견해 시작하고 사람30칸을 만든다', async () => {
-  const initial = await loadInitialWorld({
+  const initial = await loadInitialWorldFromDb(db, {
     scenario: 'integration191',
     map: 'integration',
     statRules: 'five-stats',
@@ -1040,7 +1047,7 @@ it('엔진 적용 전에 비활성·전체 제재가 생기면 접수한 입력�
 });
 
 it('기존 형식 월드의 시계 API는 데이터·입력·감사를 바꾸지 않고 거부한다', async () => {
-  const initial = await loadInitialWorld({ scenario: '1030', map: 'che', seed: 'clock-legacy-refusal' });
+  const initial = await loadInitialWorldFromDb(db, { scenario: '1030', map: 'che', seed: 'clock-legacy-refusal' });
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '구형 보존',
     turnTermMinutes: 60,

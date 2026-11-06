@@ -1,7 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile, readdir, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
@@ -30,6 +32,7 @@ import { RESOURCE_INPUTS } from './resources-sql/convert';
 import { testDatabaseUrl } from './test-database';
 import { getResource, listResources } from '../apps/server/src/resourceAdmin/read';
 import { makeLimits, RESOURCE_PAYLOAD_LIMITS } from '../apps/server/src/resourceAdmin/payload';
+import { simulateGame } from '../apps/engine/src/simulation';
 
 vi.mock('../packages/rules/src/index', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../packages/rules/src/index')>();
@@ -725,6 +728,91 @@ it('T4-77 S5 초상 도구는 게시 자원이 없으면 원본 파일로 대체
     expect(result.stderr).toContain('PORTRAIT_MAP/rtk14-map/1');
     expect(await fixture.db.gameResource.count()).toBe(0);
   });
+});
+
+it('T4-77 S6 시뮬레이션 열 시드의 DB·파일 초기 상태가 같다', async () => {
+  const resources = await readInitialResources(sharedDb(), options);
+  for (let index = 1; index <= 10; index++) {
+    const seed = String(index);
+    const fromDb = composeInitialWorld(resources, seed);
+    const fromFile = await loadInitialWorld({ ...options, seed });
+    expect(fromDb).toEqual(fromFile);
+    expect(hashState(fromDb)).toBe(hashState(fromFile));
+  }
+});
+
+it('T4-77 S6 실제 sim CLI의 다중·반복 시드는 파일 공급자의 짧은 실행과 같다', async () => {
+  await withDatabase(
+    async (fixture) => {
+      const resources = await readInitialResources(fixture.db, options);
+      const before = await fixture.db.gameResource.findMany({ orderBy: { id: 'asc' } });
+      const initial = await loadInitialWorld({ ...options, seed: '1' });
+      for (const args of [
+        ['--seeds', '2'],
+        ['--seed', '1', '--repeat'],
+      ]) {
+        const result = resourceCli(fixture, 'tools/sim/cli.ts', [...args, '--max-year', String(initial.startYear)]);
+        expect(result.error).toBeUndefined();
+        expect(result.status, result.stderr).toBe(0);
+        const environment = JSON.parse(result.stderr.trim());
+        expect(environment).toMatchObject({
+          scenario: '1030',
+          map: 'che',
+          maxYear: initial.startYear,
+          convergence: 'on',
+        });
+        expect(environment.resources).toEqual(
+          Object.values(resources).map(({ kind, name, version, contentHash }) => ({
+            kind,
+            name,
+            version,
+            contentHash,
+          })),
+        );
+        const rows = result.stdout
+          .trim()
+          .split('\n')
+          .map((line) => JSON.parse(line) as ReturnType<typeof simulateGame> & { repeat?: boolean });
+        expect(rows).toHaveLength(2);
+        expect(rows.map((row) => row.seed)).toEqual(args.includes('--repeat') ? ['1', '1'] : ['1', '2']);
+        for (const [index, row] of rows.entries()) {
+          const { seconds, repeat, ...actual } = row;
+          const { seconds: expectedSeconds, ...expected } = simulateGame(
+            await loadInitialWorld({ ...options, seed: row.seed }),
+            { maxYear: initial.startYear },
+          );
+          expect(expectedSeconds).toBeGreaterThan(0);
+          expect(seconds).toBeGreaterThan(0);
+          expect(seconds).toBeLessThanOrEqual(900);
+          expect(repeat).toBe(args.includes('--repeat') && index === 1 ? true : undefined);
+          expect(actual).toEqual(expected);
+        }
+      }
+      expect(await fixture.db.gameResource.findMany({ orderBy: { id: 'asc' } })).toEqual(before);
+      expect(await fixture.db.world.count()).toBe(0);
+      expect(await fixture.db.auditLog.count()).toBe(0);
+    },
+    { initialize: true },
+  );
+});
+
+it('T4-77 S6 sim은 게시 자원이 없으면 출력 파일과 DB 행을 만들지 않는다', async () => {
+  const output = join(tmpdir(), `t477-s6-${randomUUID()}.jsonl`);
+  try {
+    await withDatabase(async (fixture) => {
+      const result = resourceCli(fixture, 'tools/sim/cli.ts', ['--seed', '1', '--output', output]);
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('SCENARIO/1030/1');
+      expect(result.stdout).toBe('');
+      await expect(readFile(output)).rejects.toMatchObject({ code: 'ENOENT' });
+      expect(await fixture.db.gameResource.count()).toBe(0);
+      expect(await fixture.db.world.count()).toBe(0);
+      expect(await fixture.db.auditLog.count()).toBe(0);
+    });
+  } finally {
+    await rm(output, { force: true });
+  }
 });
 
 for (const [seed, expected] of Object.entries(baseline.seeds)) {

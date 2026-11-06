@@ -19,7 +19,7 @@ import { hashState } from '../packages/shared/src/node/hashState';
 import { buildServer } from '../apps/server/src/server';
 import type { AppRouter } from '../apps/server/src/router';
 import { newSession } from '../apps/server/src/auth/session';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
@@ -266,7 +266,7 @@ async function send(world: Fixture, actor: User, payload: GovernanceInput) {
   return result;
 }
 beforeAll(async () => {
-  initial = await loadInitialWorld({
+  initial = await loadInitialWorldFromDb(db, {
     scenario: 'integration191',
     map: 'integration',
     statRules: 'five-stats',

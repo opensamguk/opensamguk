@@ -11,7 +11,9 @@ import { newSession } from '../apps/server/src/auth/session';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { authzCase } from '../apps/server/src/authz/case';
 import { categories } from '../apps/server/src/authz/coverage';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { initializeResources } from './init-resources';
+import { initializeIntegrationResources } from './integration-resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease, renewLease, type Lease } from '../apps/engine/src/lease';
@@ -210,6 +212,11 @@ beforeAll(() =>
     const migrations = new URL('../packages/db/prisma/migrations/', import.meta.url);
     for (const migration of (await readdir(migrations)).filter((value) => /^\d{14}_/.test(value)).sort())
       await gate.query(await readFile(new URL(migration + '/migration.sql', migrations), 'utf8'));
+    await initializeResources(
+      db,
+      await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
+    );
+    await initializeIntegrationResources(db);
     passwordHash = await hashPassword(randomUUID());
     sensitive.add(passwordHash);
     app = await buildServer({
@@ -259,7 +266,7 @@ afterAll(async () => {
 
 let initialPromise: Promise<WorldInit> | undefined;
 async function freshWorld(human = false, nameOverride?: string) {
-  initialPromise ??= loadInitialWorld({
+  initialPromise ??= loadInitialWorldFromDb(db, {
     scenario: 'integration191',
     map: 'integration',
     statRules: 'five-stats',
@@ -968,7 +975,7 @@ for (const status of ['PREOPEN', 'RUNNING', 'ENDED'] as const) {
 }
 it('실제 종료의 구형식 거부와 전체 DB 불변', async (signal) => {
   signal.throwIfAborted();
-  const initial = await loadInitialWorld({ scenario: '1030', map: 'che', seed: 'admin-end-legacy-refusal' });
+  const initial = await loadInitialWorldFromDb(db, { scenario: '1030', map: 'che', seed: 'admin-end-legacy-refusal' });
   signal.throwIfAborted();
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '구형 종료 보존',

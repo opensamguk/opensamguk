@@ -11,7 +11,8 @@ import { newSession } from '../apps/server/src/auth/session';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { testDatabaseUrl } from './test-database';
 import { initializeResources } from './init-resources';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { initializeIntegrationResources } from './integration-resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
@@ -170,6 +171,7 @@ beforeAll(() =>
       db,
       await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
     );
+    await initializeIntegrationResources(db);
     passwordHash = await hashPassword(password);
     sensitive.add(password);
     sensitive.add(passwordHash);
@@ -516,7 +518,7 @@ it('계정 비활성화가 먼저 잠그면 대기 중 실제 동의 요청은 �
 
 for (let index = 0; index < 2; index++)
   it(`정식191년 ${index + 1}번째 월드를 실제8개 규칙으로 준비한다`, async () => {
-    const initial = await loadInitialWorld({
+    const initial = await loadInitialWorldFromDb(db, {
       scenario: 'integration191',
       map: 'integration',
       statRules: 'five-stats',

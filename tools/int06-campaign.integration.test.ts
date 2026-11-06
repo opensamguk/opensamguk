@@ -5,7 +5,7 @@ import { createDb } from '../packages/db/src/index';
 import { rngFor } from '../packages/shared/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { applyCampaignRelationship, type WorldInit } from '../packages/rules/src/index';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { acquireLease, releaseLease, renewLease, LEASE_TTL_MS } from '../apps/engine/src/lease';
@@ -138,7 +138,7 @@ async function snapshot(id = worldId) {
 
 beforeAll(() =>
   track(async () => {
-    initial = await loadInitialWorld({
+    initial = await loadInitialWorldFromDb(db, {
       scenario: 'integration191',
       map: 'integration',
       statRules: 'five-stats',

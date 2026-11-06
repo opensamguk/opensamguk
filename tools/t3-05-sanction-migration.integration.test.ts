@@ -5,7 +5,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, beforeEach, expect, it as test } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import { testDatabaseUrl } from './test-database';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 
 type Pg = {
@@ -106,13 +106,19 @@ for (const marker of ['20261104000000_account_world_sanctions', '20261107000000_
       expect(index).toBeGreaterThan(0);
       for (const migration of migrations.slice(0, index))
         await client.query(await readFile(new URL(`${migration}/migration.sql`, root), 'utf8'));
-      const initial = await loadInitialWorld({
-        scenario: 'integration191',
-        map: 'integration',
-        statRules: 'five-stats',
-        portraitMap: '191-map',
-        seed: 't305-preservation',
-      });
+      const resourceDb = createDb(source.href);
+      let initial: Awaited<ReturnType<typeof loadInitialWorldFromDb>>;
+      try {
+        initial = await loadInitialWorldFromDb(resourceDb, {
+          scenario: 'integration191',
+          map: 'integration',
+          statRules: 'five-stats',
+          portraitMap: '191-map',
+          seed: 't305-preservation',
+        });
+      } finally {
+        await resourceDb.$disconnect();
+      }
       expect(initial.nations).toHaveLength(21);
       expect(initial.generals).toHaveLength(491);
       db = createDb(target.href);

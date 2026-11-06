@@ -157,6 +157,7 @@ scenario('T3-03 인증 조회 연결 실패 뒤 이미 성공한 가입을 다�
   await openMail(page, await accountMailLink(address, '오픈삼국 이메일 인증', after));
   await page.goto('/lobby');
   await page.getByRole('button', { name: '로그아웃', exact: true }).click();
+  await expect(page).toHaveURL('/login');
   await page.goto('/login?next=' + encodeURIComponent('/settings/notifications'));
   await page.route('**/trpc/account.get*', (route) => route.abort('failed'));
   await page.getByLabel('이메일', { exact: true }).fill(address);
@@ -197,6 +198,8 @@ scenario('T3-03 세션 조회 사이 만료와 다른 탭 로그아웃을 캐시
   try {
     await other.goto('/lobby');
     await other.getByRole('button', { name: '로그아웃', exact: true }).click();
+    // 로그아웃은 서버가 세션을 지운 응답 뒤에만 /login으로 옮긴다. 그 전에 이동하면 살아 있는 세션과 경합한다.
+    await expect(other).toHaveURL('/login');
     await page.goto('/settings/notifications');
     await expect(page).toHaveURL(/\/login\?next=%2Fsettings%2Fnotifications$/);
   } finally {

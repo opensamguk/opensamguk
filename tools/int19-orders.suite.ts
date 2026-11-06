@@ -12,7 +12,7 @@ import {
   type WorldInit,
 } from '../packages/rules/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { loadReplayState } from '../apps/engine/src/monthly';
@@ -420,7 +420,7 @@ export function defineInt19OrdersSuite(mode: 'authz' | 'scenario') {
     () =>
       scope.run(AbortSignal.any([lifetime.signal, AbortSignal.timeout(115_000)]), () =>
         track(async () => {
-          initial = await loadInitialWorld({
+          initial = await loadInitialWorldFromDb(db, {
             scenario: 'integration191',
             map: 'integration',
             statRules: 'five-stats',

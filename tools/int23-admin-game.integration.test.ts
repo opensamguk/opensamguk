@@ -9,8 +9,9 @@ import { hashPassword } from '../apps/server/src/auth/password';
 import { authzCase } from '../apps/server/src/authz/case';
 import { categories } from '../apps/server/src/authz/coverage';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
-import { loadInitialWorld, loadInitialWorldFromDb, loadFeatureProfile } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb, loadFeatureProfile } from '../apps/engine/src/world/resources';
 import { initializeResources } from './init-resources';
+import { initializeIntegrationResources } from './integration-resources';
 import { initializeExpandedResources } from './expanded-resources';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
@@ -165,6 +166,11 @@ beforeAll(async () => {
   const migrations = new URL('../packages/db/prisma/migrations/', import.meta.url);
   for (const entry of (await readdir(migrations)).filter((value) => /^\d{14}_/.test(value)).sort())
     await gate.query(await readFile(new URL(entry + '/migration.sql', migrations), 'utf8'));
+  await initializeResources(
+    db,
+    await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
+  );
+  await initializeIntegrationResources(db);
   actor = await user('ADMIN');
   otherAdmin = await user('ADMIN');
   ordinary = await user('USER');
@@ -944,7 +950,7 @@ it('AC-INT-23 퇴장 참모의 인사·조약 대기 입력도 조회·아카이
 }, 30000);
 
 it('AC-INT-23 정식491명 부곡 월드는 병력 조정을 거절하고 금 조정·장수 내보내기·재생을 보존한다', async () => {
-  const initial = await loadInitialWorld({
+  const initial = await loadInitialWorldFromDb(db, {
     scenario: 'integration191',
     map: 'integration',
     statRules: 'five-stats',

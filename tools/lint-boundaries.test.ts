@@ -122,7 +122,7 @@ describe('T4-93 비용 미리보기 예외 E4', () => {
 
 describe('전투 시뮬레이터 예외', () => {
   const rulesValue = "import { simulateBattle } from '@opensamguk/rules';\nexport { simulateBattle };\n";
-  const unitSetJson = "import basic from '../../../../resources/unitset/basic.json';\nexport { basic };\n";
+  const unitSetJson = "import expanded from '../../../../resources/unitset/expanded.json';\nexport { expanded };\n";
 
   it('E1: compute.ts·compute.test.ts만 rules의 정해진 값과 타입을 import한다', async () => {
     const allowed =
@@ -158,7 +158,7 @@ describe('전투 시뮬레이터 예외', () => {
 
   // E2는 T4-86에서 없앴다. 화면은 월드 병종표를 resources.worldRules로 받고 저장소 JSON을 묶지 않는다.
   it('E2 없음: battleSim 어느 파일도 resources JSON을 상대 경로로 읽지 못한다', async () => {
-    const otherJson = "import map from '../../../../resources/map/che.json';\nexport { map };\n";
+    const otherJson = "import map from '../../../../resources/map/san10.json';\nexport { map };\n";
     expect(await ruleIds(rulesValue, 'apps/web/src/battleSim/publicUnitSet.ts')).toContain('no-restricted-imports');
     for (const file of [
       'apps/web/src/battleSim/publicUnitSet.ts',
@@ -171,7 +171,7 @@ describe('전투 시뮬레이터 예외', () => {
     }
     expect(
       await ruleIds(
-        "import basic from '../../../resources/unitset/basic.json';\nexport { basic };\n",
+        "import expanded from '../../../resources/unitset/expanded.json';\nexport { expanded };\n",
         'apps/web/src/x.ts',
       ),
     ).toContain('opensamguk/no-cross-package-relative');
