@@ -424,17 +424,26 @@ function requestRefs(
       fail('PROVENANCE_INVALID');
     if (resolution.featureProfile !== undefined) {
       const equipment = origin.initial.ruleFeatures?.includes('equipment-v1') === true;
+      const cards = origin.initial.ruleFeatures?.includes('stratagem-cards-v1') === true;
       const profile = featureProfileSchema.parse({
-        version: equipment ? 2 : 1,
+        version: cards ? 3 : equipment ? 2 : 1,
         key: intent.featureProfileKey,
         scenarioKey: expected.scenario,
         mapKey: expected.map,
+        ...(cards
+          ? {
+              unitSetKey: expected.unitSet,
+              statRulesKey: expected.statRules,
+              portraitMapKey: expected.portraitMap,
+            }
+          : {}),
         ruleFeatures: intent.ruleFeatures,
         featureData: Object.fromEntries(
-          [...FEATURE_PROFILE_DATA_KEYS, ...(equipment ? ['equipment-v1'] : [])].map((key) => [
-            key,
-            origin.featureData?.[key],
-          ]),
+          [
+            ...FEATURE_PROFILE_DATA_KEYS,
+            ...(equipment ? ['equipment-v1'] : []),
+            ...(cards ? ['stratagem-cards-v1'] : []),
+          ].map((key) => [key, origin.featureData?.[key]]),
         ),
       });
       if (

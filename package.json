@@ -70,7 +70,8 @@
     "portraits:fetch-supplement": "tsx tools/portrait-map/fetch-supplement.ts",
     "db:init-san10": "tsx --env-file-if-exists=.env tools/init-san10-resources.ts",
     "test:san10": "tsx tools/run-san10-check.ts",
-    "e2e:san10": "playwright test --config playwright.san10.config.ts"
+    "e2e:san10": "playwright test --config playwright.san10.config.ts",
+    "db:init-expanded": "tsx --env-file-if-exists=.env tools/init-expanded-resources.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

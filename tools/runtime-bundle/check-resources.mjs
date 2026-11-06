@@ -17,6 +17,10 @@ const image = `opensamguk-resource-check:${owner}`;
 const container = `opensamguk-resource-check-${owner}`;
 const ownerLabel = 'org.opensamguk.test.owner';
 const files = [
+  'feature-profile/expanded-191-v4.json',
+  'feature-profile/expanded-191-v3.json',
+  'scenario/san10-191-v2.json',
+  'expanded-manifest.json',
   'feature-profile/expanded-191-v2.json',
   'feature-profile/expanded-191-v1.json',
   ...['191-sex.json', '191-sex-2.json', '191-sex-3.json'].map((file) => `officers/${file}`),

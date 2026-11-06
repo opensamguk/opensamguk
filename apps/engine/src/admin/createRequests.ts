@@ -85,6 +85,10 @@ async function resolveCreation(db: PrismaClient, request: Request) {
     if (
       featureProfile.value.scenarioKey !== selection.scenario ||
       featureProfile.value.mapKey !== selection.map ||
+      (featureProfile.value.version === 3 &&
+        (featureProfile.value.unitSetKey !== selection.unitSet ||
+          featureProfile.value.statRulesKey !== selection.statRules ||
+          featureProfile.value.portraitMapKey !== selection.portraitMap)) ||
       hashState([...featureProfile.value.ruleFeatures].sort()) !== hashState(intent.ruleFeatures)
     )
       throw new CreationRejected('INPUT_INVALID');

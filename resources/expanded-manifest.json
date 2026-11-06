@@ -1,0 +1,10 @@
+[
+  {
+    "kind": "SCENARIO",
+    "name": "san10-191",
+    "version": 2,
+    "path": "resources/scenario/san10-191-v2.json",
+    "contentHash": "70500ea3ccd250d09f2a501d28486487e1b1bd5514e9fd4ee290951a1a2a72ef",
+    "source": "D-048/D-072/D-073/D-074; SAN10 scenario v1 derived from core2026 df6c926 MIT; resources/NOTICE.md"
+  }
+]
