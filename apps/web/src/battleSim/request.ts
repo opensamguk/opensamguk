@@ -40,7 +40,7 @@ export const LIMITS = {
   // 통솔 상한 100 × BALANCE.CREW_PER_LEADERSHIP
   LEADERSHIP_MAX: 100,
   CREW_PER_LEADERSHIP: 100,
-  // resources/map/che.json 도시 max.wall·max.defence의 최댓값
+  // 게시 자원 MAP che@1 도시 max.wall·max.defence의 최댓값
   WALL_MAX: 12_500,
   SEED_MAX: 64,
 } as const;
