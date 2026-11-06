@@ -33,6 +33,7 @@ const san10Rows = (
     { kind: 'MAP', name: 'san10', path: 'map/san10' },
     { kind: 'SCENARIO', name: 'san10-191', path: 'scenario/san10-191' },
     { kind: 'SCENARIO', name: 'san10-empty', path: 'scenario/san10-empty' },
+    { kind: 'UNIT_SET', name: 'expanded', path: 'unitset/expanded' },
   ] as const
 ).map(({ kind, name, path }) => {
   const content = json(`resources/${path}.json`);
@@ -190,7 +191,7 @@ describe('AC-M3-04 원생성 설정 조회', () => {
 
 describe('AC-INT-04 SAN10 명시 생성 프로필', () => {
   it.each(['san10-191', 'san10-empty'] as const)(
-    '%s는 155전략·155표식·191도로와491명·9기능을 엄격히 고정한다',
+    '%s는 155전략·155표식·191도로·확장병종과491명·10기능을 엄격히 고정한다',
     (id) => {
       const before = JSON.stringify([allRows, allPresets]),
         profile = creationProfile(allRows, allPresets, registered, id);
@@ -200,7 +201,7 @@ describe('AC-INT-04 SAN10 명시 생성 프로필', () => {
         selection: {
           scenarioKey: id,
           mapKey: 'san10',
-          unitSetKey: 'basic',
+          unitSetKey: 'expanded',
           statRulesKey: 'five-stats',
           portraitMapKey: '191-map',
         },
@@ -224,9 +225,23 @@ describe('AC-INT-04 SAN10 명시 생성 프로필', () => {
       );
       expect(profile.resources).toHaveLength(5);
       expect(profile.resources.find((resource) => resource.kind === 'SCENARIO')?.key).toBe(id);
+      expect(profile.resources.find((resource) => resource.kind === 'UNIT_SET')?.key).toBe('expanded');
       expect(JSON.stringify([allRows, allPresets])).toBe(before);
     },
   );
+
+  it('확장 병종이 미게시이면 SAN10만 닫고 통합판 basic 선택은 보존한다', () => {
+    const missing = allRows.filter((row) => row.kind !== 'UNIT_SET' || row.name !== 'expanded');
+    for (const id of ['san10-191', 'san10-empty'] as const)
+      expect(creationProfile(missing, allPresets, registered, id)).toMatchObject({
+        available: false,
+        code: 'RESOURCES_UNAVAILABLE',
+      });
+    expect(creationProfile(missing, allPresets, registered)).toMatchObject({
+      available: true,
+      selection: { unitSetKey: 'basic' },
+    });
+  });
 
   it('SAN10 게시 자원이 없어도 구판을 새 지도라고 바꾸지 않고 각 프로필을 구분한다', () => {
     expect(creationProfile(rows, allPresets, registered)).toMatchObject({

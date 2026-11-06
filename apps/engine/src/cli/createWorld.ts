@@ -49,10 +49,13 @@ async function main() {
     };
     const state = values.published ? await loadInitialWorldFromDb(db, selection) : await loadInitialWorld(selection);
     let ruleFeatures: string[] | undefined;
-    if (values['rule-features'] !== undefined) {
-      const requested = values['rule-features'].split(',');
+    const presetFeatures = preset?.unitSet === 'expanded' ? ['battle-affinity-v2'] : [];
+    if (values['rule-features'] !== undefined || presetFeatures.length) {
+      const requested = values['rule-features']?.split(',') ?? [];
       if (new Set(requested).size !== requested.length) throw new Error('규칙 기능이 중복됩니다.');
-      ruleFeatures = checkRuleFeatures([...new Set([...(state.ruleFeatures ?? []), ...requested])].sort());
+      ruleFeatures = checkRuleFeatures(
+        [...new Set([...(state.ruleFeatures ?? []), ...presetFeatures, ...requested])].sort(),
+      );
       if (state.ruleFeatures) state.ruleFeatures = ruleFeatures;
     }
     console.log(

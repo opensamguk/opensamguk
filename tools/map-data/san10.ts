@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { operationalMapSchema, type OperationalMapResource } from '../../packages/rules/src/world/map/operational';
 import { scenarioSchema, type ScenarioResource } from '../../packages/rules/src/world/resources';
+import { applyProvinceRegions } from './provinces';
 
 const root = new URL('../../', import.meta.url);
 const read = (path: string) => JSON.parse(readFileSync(new URL(path, root), 'utf8'));
@@ -251,7 +252,7 @@ export function buildSan10Map(gisHash: string): OperationalMapResource {
       kind: 'CITY',
       anchorKey: key,
       level,
-      // 새 거점의 지역은 INT-22에서 191년 州 코드로 채운다.
+      // 모든 도시·관문의 최종 region은 아래의 검수 대응표로 채운다.
       region: 1,
       initial: {
         population: level * 2500,
@@ -264,7 +265,8 @@ export function buildSan10Map(gisHash: string): OperationalMapResource {
       max: maxFor(level),
     };
   });
-  spreadSites(sites);
+  const assignedSites = applyProvinceRegions(sites, read('resources/map-drafts/san10/provinces.json'));
+  spreadSites(assignedSites);
   const routes = [...draft.connections, ...draft.proposedConnections, ...EXTRA_CONNECTIONS]
     .filter((edge) => !DROPPED_CONNECTIONS.has(edge.id))
     .map((edge) => ({
@@ -279,6 +281,7 @@ export function buildSan10Map(gisHash: string): OperationalMapResource {
     version: 3,
     id: 'san10',
     name: 'SAN10 통합 지도',
+    regionScheme: 'province-191',
     canvas: draft.canvas,
     basemap: {
       source: 'natural-earth-5.1.2',
@@ -287,7 +290,7 @@ export function buildSan10Map(gisHash: string): OperationalMapResource {
       bounds: draft.coordinateSystem.bounds,
     },
     defaults: old.defaults,
-    sites,
+    sites: assignedSites,
     routes,
   });
 }
