@@ -1,21 +1,38 @@
 import { describe, expect, it } from 'vitest';
-// 실제 지도는 시험에서만 읽는다. 순수 계산과 검증기는 파일을 읽지 않는다.
-// eslint-disable-next-line no-restricted-imports
+// 실제 게시 지도는 이 통합 시험만 읽는다. 순수 계산과 검증기는 파일을 읽지 않는다.
 import { readFileSync } from 'node:fs';
-import { mapSchema, scenarioSchema } from '../resources';
-import { operationalMapSchema } from './operational';
-import { operationalAnchors } from './anchors';
-import { validateMap } from '../validate/map';
-import { validateScenario } from '../validate/scenario';
-import { validateMap as validateEditorMap } from '../resourceEditor/validate/map';
-import { validateScenario as validateEditorScenario } from '../resourceEditor/validate/scenario';
-import { CITY_SCALE_FIELDS, resolveCityScale, WASTELAND_INITIAL, WASTELAND_MAX } from './cityScale';
+import { mapSchema, scenarioSchema } from '../packages/rules/src/world/resources';
+import { operationalMapSchema } from '../packages/rules/src/world/map/operational';
+import { operationalAnchors } from '../packages/rules/src/world/map/anchors';
+import { validateMap } from '../packages/rules/src/world/validate/map';
+import { validateScenario } from '../packages/rules/src/world/validate/scenario';
+import { validateMap as validateEditorMap } from '../packages/rules/src/world/resourceEditor/validate/map';
+import { validateScenario as validateEditorScenario } from '../packages/rules/src/world/resourceEditor/validate/scenario';
+import {
+  CITY_SCALE_FIELDS,
+  resolveCityScale,
+  WASTELAND_INITIAL,
+  WASTELAND_MAX,
+} from '../packages/rules/src/world/map/cityScale';
 
-const readMap = (key: string): unknown =>
-  JSON.parse(readFileSync(new URL(`../../../../../resources/map/${key}.json`, import.meta.url), 'utf8'));
-const legacy = mapSchema.parse(readMap('che'));
-const integration = operationalMapSchema.parse(readMap('integration'));
-const san10 = operationalMapSchema.parse(readMap('san10'));
+import { createDb, readPublishedResources } from '../packages/db/src/index';
+import { testDatabaseUrl } from './test-database';
+const legacyResource = await (async () => {
+  const db = createDb(testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL }).href);
+  try {
+    const [resource] = await readPublishedResources(db, [{ kind: 'MAP', name: 'che', version: 1 }]);
+    return resource!;
+  } finally {
+    await db.$disconnect();
+  }
+})();
+const legacy = mapSchema.parse(legacyResource.content);
+const integration = operationalMapSchema.parse(
+  JSON.parse(readFileSync(new URL('../resources/map/integration.json', import.meta.url), 'utf8')),
+);
+const san10 = operationalMapSchema.parse(
+  JSON.parse(readFileSync(new URL('../resources/map/san10.json', import.meta.url), 'utf8')),
+);
 const maps = [
   { key: 'che', cities: legacy.cities, expected: [987314, 13627, 14444, 11778, 13979, 14570] },
   {
