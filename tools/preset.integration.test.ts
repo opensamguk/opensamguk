@@ -211,12 +211,18 @@ describe('T2-02 실제 DB 생성·고정', () => {
         '300',
         '--name',
         '프리셋 덮어쓰기',
+        '--unit-set',
+        'basic',
       ],
       { cwd: root, env: { ...process.env, DATABASE_URL: url }, encoding: 'utf8', timeout: 30_000 },
     );
     const result = JSON.parse(output.trim().split('\n').at(-1)!) as { worldId: string };
     const world = await db.world.findUniqueOrThrow({ where: { id: result.worldId } });
     expect(world.turnTermMinutes).toBe(7);
+    expect(world.mapKey).toBe('che');
+    expect(world.scenarioKey).toBe('1030');
+    expect(world.unitSetKey).toBe('basic');
+    expect(world.ruleFeatures).not.toContain('battle-affinity-v2');
     expect(world.preset).toEqual(await loadPreset('speed'));
   });
   it('없는 프리셋·경로 이탈·없는 시나리오·필수 인자가 빠진 CLI는 행을 만들지 않는다', async () => {
@@ -225,6 +231,7 @@ describe('T2-02 실제 DB 생성·고정', () => {
       ['--preset', 'missing'],
       ['--preset', '../beginner'],
       ['--preset', 'speed', '--scenario', 'missing'],
+      ['--preset', 'speed', '--unit-set', 'missing'],
       ['--preset', 'speed', '--turn-term', '0'],
       ['--preset', 'speed', '--end-year', ''],
     ]) {
