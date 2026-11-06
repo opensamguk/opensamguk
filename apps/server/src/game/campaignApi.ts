@@ -22,6 +22,7 @@ import type { Context } from '../context';
 import { requirePersonnelSession } from './personnelAdmission';
 import { readView, requireGeneral, requireRuleFeature, requireWorld } from './queries';
 import { requireCampaignOrderAccess } from './campaignOrders';
+import { recruitmentAvailability } from './recruitment';
 
 type ActorContext = Pick<
   Context,
@@ -256,6 +257,7 @@ export async function readCampaignBoard(ctx: ActorContext, worldId: string) {
         armyTypes: initial.unitSet.crewTypes
           .filter((type) => campaignArmyTypes(initial).includes(type.id))
           .map(({ id, name }) => ({ id, name })),
+        ...recruitmentAvailability(initial.unitSet, view, { generalId: actor.id, tick: world.clockTick }),
         renownUsed: links
           .filter((link) => link.masterId === actor.id)
           .reduce(

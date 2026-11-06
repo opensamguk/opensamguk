@@ -81,7 +81,7 @@ export function crewContext(view: WorldView, actor: Pick<Actor, 'generalId' | 't
 export function crewTypeFailure(
   unit: Pick<DeepReadonly<UnitSetResource['crewTypes'][number]>, 'requirements'>,
   context: CrewContext,
-): Failure | null {
+): (Failure & { code: 'BAD_STATE' }) | null {
   const cityNames = (keys: readonly number[]) => keys.map((key) => context.cityNames[key] ?? `도시 ${key}`).join('·');
   for (const requirement of unit.requirements ?? []) {
     let reason: string | null = null;
