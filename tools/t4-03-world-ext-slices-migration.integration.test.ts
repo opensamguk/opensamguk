@@ -179,11 +179,13 @@ async function existingRows(client: PgClient) {
     const data =
       table === 'World'
         ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures' - 'operationalMap' - 'campaignState' - 'cityResourcesState' - 'logisticsState' - 'governanceState' - 'lineageState' - 'stratagemCardsState' - 'equipmentState' - 'runtimeOptions'"
-        : table === 'City'
-          ? "to_jsonb(t) - 'kind'"
-          : table === 'General'
-            ? "to_jsonb(t) - 'residenceTick' - 'politics' - 'charm' - 'sex' - 'removedAt'"
-            : "to_jsonb(t) - 'treatyFormat'";
+        : table === 'Nation'
+          ? "to_jsonb(t) - 'noticeDirective'"
+          : table === 'City'
+            ? "to_jsonb(t) - 'kind'"
+            : table === 'General'
+              ? "to_jsonb(t) - 'residenceTick' - 'politics' - 'charm' - 'sex' - 'removedAt'"
+              : "to_jsonb(t) - 'treatyFormat'";
     rows[table] = (await client.query(`SELECT ${data} AS data FROM "${table}" t ORDER BY to_jsonb(t)::text`)).rows;
   }
   return rows;
@@ -470,6 +472,7 @@ it.each(['empty', 'legacy'] as const)(
       expect((await client.query('SELECT id FROM "World" WHERE "cityResourcesState" IS NOT NULL')).rows).toEqual([]);
       expect((await client.query('SELECT id FROM "World" WHERE "logisticsState" IS NOT NULL')).rows).toEqual([]);
       expect((await client.query('SELECT id FROM "World" WHERE "runtimeOptions" IS NOT NULL')).rows).toEqual([]);
+      expect((await client.query('SELECT id FROM "Nation" WHERE "noticeDirective" IS NOT NULL')).rows).toEqual([]);
       expect((await client.query('SELECT id FROM "World" WHERE "governanceState" IS NOT NULL')).rows).toEqual([]);
       expect((await client.query('SELECT id FROM "World" WHERE "lineageState" IS NOT NULL')).rows).toEqual([]);
       expect((await client.query('SELECT id FROM "General" WHERE "removedAt" IS NOT NULL')).rows).toEqual([]);
@@ -490,6 +493,7 @@ it.each(['empty', 'legacy'] as const)(
         NotificationOutbox: [],
         NotificationDispatchGate: [{ data: { id: 'discord', blockedUntil: null } }],
         ConsentRecord: [],
+        ResourceEditorGrant: [],
         AuditLog: [],
         Sanction: [],
         AdminNoticeRequest: [],
@@ -501,6 +505,8 @@ it.each(['empty', 'legacy'] as const)(
         GovernanceMovement: [],
         HeritageAccount: [],
         HeritageEntry: [],
+        ReputationEvent: [],
+        MonthlyReview: [],
       });
       expect(await readSlices()).toEqual(slices);
       expect(

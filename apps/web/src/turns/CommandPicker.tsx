@@ -172,7 +172,7 @@ export function CommandPicker({
   const equipmentWait =
     command?.key === 'equipment_trade' && equipment?.kind !== 'ready'
       ? equipment?.kind === 'error'
-        ? '장비 정보를 다시 조회하세요.'
+        ? '장비 정보를 불러오지 못했습니다. 다시 시도하세요.'
         : '장비 정보를 불러오는 중입니다.'
       : null;
   // 지금 넣으면 들어갈 명령. 칸이 덜 찼거나 형식을 모르면 없다.
@@ -327,7 +327,10 @@ export function CommandPicker({
           ) : null}
           {schema && fields.length === 0 ? <p className={styles.muted}>더 고를 것 없이 바로 넣는 명령입니다.</p> : null}
           {/* 휴식은 30칸 표처럼 검사하지 않는다. */}
-          {ready && precheck && ready.commandKey !== 'rest' ? <PrecheckWarning query={precheck(ready)} /> : null}
+          {/* 장비매매는 카드가 고른 장비의 서버 판정을 같은 사전 검사 경고로 이미 보인다. 한 번만 적는다. */}
+          {ready && precheck && ready.commandKey !== 'rest' && ready.commandKey !== 'equipment_trade' ? (
+            <PrecheckWarning query={precheck(ready)} />
+          ) : null}
           {command.key === 'equipment_trade' ? (
             <EquipmentTradeFields read={equipment} values={values} onChange={setValues} firstArgRef={firstArgRef} />
           ) : (

@@ -3,8 +3,11 @@ import { adminClockPayloadSchema, adminClockRejectMessages } from '../clock/admi
 import { requestWorldResetInput } from '../clock/reset';
 import { presetSchema } from '../world/preset';
 import { toGameDate } from '../clock/clock';
+import { truceSchema } from '../clock/truce';
 import {
   applyRuleOptions,
+  generalCreationEntrySchema,
+  npcPlayEntrySchema,
   effectiveWorldOptions,
   mergeRuntimeRules,
   type RuntimeOptions,
@@ -26,17 +29,21 @@ export const adminSettingSchema = z.union([
   z.strictObject({ kind: z.literal('admin.world.rename'), name }),
   z.strictObject({ kind: z.literal('admin.world.setEndYear'), endYear }),
   z.strictObject({ kind: z.literal('admin.world.setTurnTerm'), turnTermMinutes: term }),
+  z.strictObject({ kind: z.literal('admin.world.setTruce'), truce: truceSchema.nullable() }),
   option('protection.foundUntilMonths', presetSchema.shape.protection.shape.foundUntilMonths),
   option('protection.peaceMonths', presetSchema.shape.protection.shape.peaceMonths),
   option('npc.aggression', presetSchema.shape.npc.shape.aggression),
   option('boost.smallWorld', presetSchema.shape.boost.shape.smallWorld),
   option('boost.lateJoin', presetSchema.shape.boost.shape.lateJoin),
+  option('entry.generalCreation', generalCreationEntrySchema),
+  option('entry.npcPlay', npcPlayEntrySchema),
 ]);
 export const ADMIN_SETTING_KINDS = [
   'admin.world.rename',
   'admin.world.setEndYear',
   'admin.world.setTurnTerm',
   'admin.world.setOption',
+  'admin.world.setTruce',
 ] as const;
 export const adminSettingPayloadSchema = z.strictObject({
   version: z.literal(1),
@@ -44,6 +51,13 @@ export const adminSettingPayloadSchema = z.strictObject({
   setting: adminSettingSchema,
 });
 export type AdminSetting = z.infer<typeof adminSettingSchema>;
+export function canChangeAdminSetting(status: string, setting: AdminSetting | undefined): boolean {
+  return (
+    status === 'RUNNING' ||
+    status === 'PAUSED' ||
+    (status === 'PREOPEN' && setting?.kind === 'admin.world.setOption' && setting.key === 'entry.npcPlay')
+  );
+}
 export const adminSettingRejectMessages = {
   ...adminClockRejectMessages,
   END_YEAR_PASSED: '지금 연도보다 이른 종료 연도로 바꿀 수 없습니다.',
@@ -67,7 +81,11 @@ function snapshot(setting: AdminSetting): z.ZodType<JsonValue> {
       return z.strictObject({ endYear });
     case 'admin.world.setTurnTerm':
       return z.strictObject({ turnTermMinutes: term });
+    case 'admin.world.setTruce':
+      return z.strictObject({ truce: truceSchema.nullable() });
     case 'admin.world.setOption': {
+      if (setting.key === 'entry.generalCreation') return z.strictObject({ value: generalCreationEntrySchema });
+      if (setting.key === 'entry.npcPlay') return z.strictObject({ value: npcPlayEntrySchema });
       const value =
         setting.key === 'protection.foundUntilMonths'
           ? presetSchema.shape.protection.shape.foundUntilMonths
@@ -98,7 +116,8 @@ export interface WorldSettings {
   runtimeOptions: RuntimeOptions | null;
 }
 type OptionSetting = Extract<AdminSetting, { kind: 'admin.world.setOption' }>;
-export function ruleOptionPatch(setting: OptionSetting): RuntimeRuleOptions {
+type RuleOptionSetting = Exclude<OptionSetting, { key: 'entry.generalCreation' | 'entry.npcPlay' }>;
+export function ruleOptionPatch(setting: RuleOptionSetting): RuntimeRuleOptions {
   switch (setting.key) {
     case 'protection.foundUntilMonths':
       return { protection: { foundUntilMonths: setting.value } };
@@ -112,7 +131,7 @@ export function ruleOptionPatch(setting: OptionSetting): RuntimeRuleOptions {
       return { boost: { lateJoin: setting.value } };
   }
 }
-function optionValue(rules: PresetRules, setting: OptionSetting): JsonValue {
+function optionValue(rules: PresetRules, setting: RuleOptionSetting): JsonValue {
   switch (setting.key) {
     case 'protection.foundUntilMonths':
       return rules.protection.foundUntilMonths;
@@ -150,8 +169,9 @@ export function decideAdminSetting(
   if (!context.admin) return reject('ADMIN_REQUIRED');
   if (context.sanctioned) return reject('ACTOR_SANCTIONED');
   if (context.replayFormat !== 3) return reject('UNSUPPORTED_FORMAT');
-  if (!['RUNNING', 'PAUSED'].includes(context.worldStatus)) return reject('WORLD_STATE_CHANGED');
   const parsed = adminSettingPayloadSchema.safeParse(payload);
+  if (!canChangeAdminSetting(context.worldStatus, parsed.success ? parsed.data.setting : undefined))
+    return reject('WORLD_STATE_CHANGED');
   if (!parsed.success) return reject('INVALID_VALUE');
   integer.parse(context.tick);
   const setting = parsed.data.setting,
@@ -177,7 +197,29 @@ export function decideAdminSetting(
       settings.turnTermMinutes = setting.turnTermMinutes;
       if (next.policy) next.policy.turnTermMinutes = setting.turnTermMinutes;
       break;
+    case 'admin.world.setTruce':
+      before = { truce: effectiveWorldOptions(current.preset, current.runtimeOptions).truce };
+      after = { truce: setting.truce };
+      settings.runtimeOptions = { ...current.runtimeOptions, truce: setting.truce };
+      break;
     case 'admin.world.setOption': {
+      if (setting.key === 'entry.generalCreation' || setting.key === 'entry.npcPlay') {
+        const effective = effectiveWorldOptions(current.preset, current.runtimeOptions);
+        before = {
+          value: setting.key === 'entry.generalCreation' ? effective.entry.generalCreation : effective.entry.npcPlay,
+        };
+        after = { value: setting.value };
+        settings.runtimeOptions = {
+          ...current.runtimeOptions,
+          entry: {
+            ...current.runtimeOptions?.entry,
+            ...(setting.key === 'entry.generalCreation'
+              ? { generalCreation: setting.value }
+              : { npcPlay: setting.value }),
+          },
+        };
+        break;
+      }
       const effective = effectiveWorldOptions(current.preset, current.runtimeOptions);
       if (!effective.presetRules) return reject('NO_PRESET');
       if (
@@ -188,7 +230,10 @@ export function decideAdminSetting(
       before = { value: optionValue(effective.presetRules, setting) };
       after = { value: setting.value };
       const patch = ruleOptionPatch(setting);
-      settings.runtimeOptions = { rules: mergeRuntimeRules(current.runtimeOptions?.rules, patch) };
+      settings.runtimeOptions = {
+        ...current.runtimeOptions,
+        rules: mergeRuntimeRules(current.runtimeOptions?.rules, patch),
+      };
       next.state.presetRules = applyRuleOptions(effective.presetRules, patch);
       break;
     }
@@ -225,7 +270,9 @@ export function validateAdminSettingRecord(input: RecordedInput): void {
           ? { endYear: setting.endYear }
           : setting.kind === 'admin.world.setTurnTerm'
             ? { turnTermMinutes: setting.turnTermMinutes }
-            : { value: setting.value };
+            : setting.kind === 'admin.world.setTruce'
+              ? { truce: setting.truce }
+              : { value: setting.value };
     if (!sameJson(result.after, expected)) throw Error('설정 입력과 적용한 값이 다릅니다.');
   } else if (input.status === 'REJECTED') adminSettingRejectedSchema.parse(input.result);
   else throw Error('완료된 관리자 설정 입력이 필요합니다.');
@@ -237,7 +284,12 @@ export function applyAdminSettingRecord(replay: ReplayState, input: RecordedInpu
   const { setting } = adminSettingPayloadSchema.parse(input.payload);
   const result = adminSettingAppliedSchema(setting).parse(input.result),
     before = result.before as Record<string, JsonValue>;
-  if (setting.kind === 'admin.world.rename' || setting.kind === 'admin.world.setEndYear') return replay;
+  if (
+    setting.kind === 'admin.world.rename' ||
+    setting.kind === 'admin.world.setEndYear' ||
+    setting.kind === 'admin.world.setTruce'
+  )
+    return replay;
   const next = structuredClone(replay);
   if (setting.kind === 'admin.world.setTurnTerm') {
     if (next.policy) {
@@ -246,6 +298,7 @@ export function applyAdminSettingRecord(replay: ReplayState, input: RecordedInpu
       next.policy.turnTermMinutes = setting.turnTermMinutes;
     }
   } else {
+    if (setting.key === 'entry.generalCreation' || setting.key === 'entry.npcPlay') return replay;
     if (!next.state.presetRules || !sameJson(optionValue(next.state.presetRules, setting), before.value!))
       throw Error('규칙 옵션의 변경 전 값이 재생과 다릅니다.');
     next.state.presetRules = applyRuleOptions(next.state.presetRules, ruleOptionPatch(setting));

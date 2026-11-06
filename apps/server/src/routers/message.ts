@@ -2,7 +2,7 @@ import { TRPCError } from '@trpc/server';
 import { nowTick, toGameDate, LINEAGE_EXITED_YEAR } from '@opensamguk/rules';
 import { z } from 'zod';
 import { protectedProcedure, router, worldVerifiedProcedure } from '../trpc';
-import { entityKey, worldInput } from '../queries';
+import { entityKey, worldInput, worldClock } from '../queries';
 import {
   databaseTime,
   decodeMessageCursor,
@@ -110,10 +110,7 @@ export const messageRouter = router({
           throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: `${seconds}초 뒤에 다시 보낼 수 있습니다.` });
         }
         const world = await tx.world.findUniqueOrThrow({ where: { id: input.worldId } });
-        const date = toGameDate(
-          world.startYear,
-          nowTick({ ...world, clockAnchorAt: world.clockAnchorAt?.getTime() ?? null }, now.getTime()),
-        );
+        const date = toGameDate(world.startYear, nowTick(worldClock(world), now.getTime()));
         const row = await tx.message.create({
           data: {
             worldId: input.worldId,

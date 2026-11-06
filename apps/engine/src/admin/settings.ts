@@ -3,6 +3,7 @@ import {
   adminSettingPayloadSchema,
   adminSettingRejectMessages,
   decideAdminSetting,
+  canChangeAdminSetting,
   applyRecordedInput,
   parsePreset,
   runtimeOptionsSchema,
@@ -11,8 +12,8 @@ import {
   checkpointClock,
   toGameDate,
   type AdminSetting,
-  type Clock,
 } from '@opensamguk/rules';
+import { worldClock } from '../world/truce';
 import { databaseNow } from '../lease';
 import { loadReplayState } from '../monthly';
 import { persistEffects } from '../persist';
@@ -54,17 +55,21 @@ export async function processAdminSetting(
   )
     code = 'ACTOR_SANCTIONED';
   else if (world.replayFormat !== 3) code = 'UNSUPPORTED_FORMAT';
-  else if (!['RUNNING', 'PAUSED'].includes(world.status)) code = 'WORLD_STATE_CHANGED';
-  else if (payload.setting.kind === 'admin.world.setTurnTerm' && world.clockRevision >= 2_147_483_647)
+  else if (!canChangeAdminSetting(world.status, payload.setting)) code = 'WORLD_STATE_CHANGED';
+  else if (
+    ['admin.world.setTurnTerm', 'admin.world.setTruce'].includes(payload.setting.kind) &&
+    world.clockRevision >= 2_147_483_647
+  )
     code = 'INVALID_VALUE';
   let status: 'APPLIED' | 'REJECTED' = 'REJECTED',
     tick = world.clockTick;
   let result: Prisma.InputJsonValue;
   if (code) result = { code, message: adminSettingRejectMessages[code] };
   else {
-    const clock: Clock = { ...world, clockAnchorAt: world.clockAnchorAt?.getTime() ?? null };
-    const checkpoint =
-      payload.setting.kind === 'admin.world.setTurnTerm' ? checkpointClock(clock, now.getTime(), minimumTick) : clock;
+    const clock = worldClock(world);
+    const changesClock =
+      payload.setting.kind === 'admin.world.setTurnTerm' || payload.setting.kind === 'admin.world.setTruce';
+    const checkpoint = changesClock ? checkpointClock(clock, now.getTime(), minimumTick) : clock;
     tick = checkpoint.clockTick;
     const before = await loadReplayState(tx, world.id);
     const outcome = decideAdminSetting(
@@ -99,10 +104,10 @@ export async function processAdminSetting(
           name: outcome.settings.name,
           endYear: outcome.settings.endYear,
           turnTermMinutes: outcome.settings.turnTermMinutes,
-          ...(payload.setting.kind === 'admin.world.setOption'
+          ...(payload.setting.kind === 'admin.world.setOption' || payload.setting.kind === 'admin.world.setTruce'
             ? { runtimeOptions: outcome.settings.runtimeOptions! as Prisma.InputJsonValue }
             : {}),
-          ...(payload.setting.kind === 'admin.world.setTurnTerm'
+          ...(changesClock
             ? {
                 clockTick: tick,
                 clockRevision: { increment: 1 },
@@ -159,8 +164,14 @@ function settingText(setting: AdminSetting): string {
         : `월드 종료 연도를 ${setting.endYear}년으로 변경했습니다.`;
     case 'admin.world.setTurnTerm':
       return `턴 간격을 ${setting.turnTermMinutes}분으로 변경했습니다.`;
+    case 'admin.world.setTruce':
+      return setting.truce === null ? '야간 휴전을 해제했습니다.' : '야간 휴전 시간대를 변경했습니다.';
     case 'admin.world.setOption': {
       switch (setting.key) {
+        case 'entry.generalCreation':
+          return setting.value === 'open' ? '새 장수 생성을 다시 받습니다.' : '새 장수 생성을 닫았습니다.';
+        case 'entry.npcPlay':
+          return setting.value === 'on' ? 'NPC 장수 맡기를 허용합니다.' : 'NPC 장수 맡기를 닫았습니다.';
         case 'protection.foundUntilMonths':
           return `건국 보호 기간을 ${setting.value}개월로 변경했습니다.`;
         case 'protection.peaceMonths':

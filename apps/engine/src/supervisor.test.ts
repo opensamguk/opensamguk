@@ -52,7 +52,18 @@ it('ENDED 발견은 kind와 관계없이 모든 PENDING을 대상으로 한다 (
         {
           status: 'PREOPEN',
           inputEvents: {
-            some: { status: 'PENDING', kind: { in: ['admin.world.start', 'admin.world.pause', 'admin.world.resume'] } },
+            some: {
+              status: 'PENDING',
+              kind: {
+                in: [
+                  'admin.world.start',
+                  'admin.world.pause',
+                  'admin.world.resume',
+                  'admin.world.setOption',
+                  'general.possess',
+                ],
+              },
+            },
           },
         },
         { status: 'ENDED', inputEvents: { some: { status: 'PENDING' } } },

@@ -16,8 +16,12 @@ import { completePersonnelStep } from './personnel/step';
 import { updateResidenceAnchors } from './personnel/residence';
 import { isAdminClockKind, applyAdminClockRecord } from './clock/admin';
 import { isAdminGameKind } from './admin/game';
+import type { ReputationLedger } from './review/schema';
+import { reputationTurnEvents } from './review/events';
+import { appendReputationEvents } from './review/ledger';
 import { isAdminSettingKind, validateAdminSettingRecord } from './admin/settings';
 import { validateAdminGameRecord } from './admin/apply';
+import { POSSESSION_KIND, validatePossessionRecord } from './entry/possess';
 
 export interface QueuedTurn {
   commandKey: string;
@@ -25,6 +29,7 @@ export interface QueuedTurn {
   explicit?: boolean;
 }
 export interface ReplayState {
+  reputation?: ReputationLedger;
   state: WorldState;
   turns: Record<number, QueuedTurn[]>;
   revisions: Record<number, number>;
@@ -90,7 +95,7 @@ export function settleReplayMonth(
 ) {
   const date = monthlyDate(replay.state.startYear, tick);
   const result = runMonthly(replay.state, tick, rngFor(seed, 'monthly', date.year, date.month));
-  return settleMonthlyFeatures(replay, { ...replay, state: result.state, monthlyTick: tick }, tick, registry);
+  return settleMonthlyFeatures(replay, { ...replay, state: result.state, monthlyTick: tick }, tick, registry, seed);
 }
 
 export function runReplayAction(
@@ -140,6 +145,20 @@ export function runReplayAction(
         createdHumanId: null,
       });
   }
+  if (hasRuleFeature(replay.state, 'reputation-v1')) {
+    if (!next.reputation) throw Error('월단평 재생 원장이 없습니다.');
+    next.reputation = appendReputationEvents(
+      next.reputation,
+      reputationTurnEvents({
+        before: replay.state,
+        after: next.state,
+        generalId: action.generalId,
+        tick: action.tick,
+        commandKey: result.commandKey,
+        result: result.result,
+      }),
+    );
+  }
   next.turns[action.generalId] = [...turns.slice(1), next.policy ? emptyTurn() : { commandKey: 'rest', args: {} }];
   next.revisions[action.generalId] = (next.revisions[action.generalId] ?? 0) + 1;
   return next;
@@ -154,6 +173,7 @@ export function applyRecordedInput(
   if (isAdminClockKind(input.kind)) return applyAdminClockRecord(replay, input);
   if (isAdminGameKind(input.kind)) validateAdminGameRecord(input);
   if (isAdminSettingKind(input.kind)) validateAdminSettingRecord(input);
+  if (input.kind === POSSESSION_KIND) validatePossessionRecord(input);
   if (
     replay.policy &&
     (!replay.state.ruleFeatures ||

@@ -73,7 +73,7 @@ async function prepare(world: T210World) {
   cli.stdin.end(JSON.stringify({ email: account.email, reason: '제재 안내 실제 화면 검사' }));
   expect(await closed).toBe(0);
   expect(JSON.parse(output).role).toBe('ADMIN');
-  expect(await apiQuery(admin, 'admin.whoami')).toEqual({ admin: true });
+  expect(await apiQuery(admin, 'admin.whoami')).toEqual({ admin: true, resourceEditor: false });
   const holds: Awaited<ReturnType<typeof holdLease>>[] = [];
   const worldIds: string[] = [];
   async function close() {

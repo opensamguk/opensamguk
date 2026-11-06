@@ -144,7 +144,7 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
   if (!profile?.available) throw new Error('실제 게시 SAN10 프로필을 확인하세요.');
   expect([profile.startYear, profile.counts.nations, profile.counts.generals]).toEqual([mode.year, mode.nations, 491]);
   expect(profile.ruleFeatures).toEqual(features);
-  expect(profile.ruleFeatures).toHaveLength(expanded ? 14 : 9);
+  expect(profile.ruleFeatures).toHaveLength(expanded ? 15 : 10);
   expect(profile.resources).toHaveLength(5);
   const published = await step(run, () => db.gameResource.findMany({ where: { status: 'PUBLISHED' } }));
   const pinned = profile.resources.map((ref) => {
@@ -231,7 +231,7 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
     idempotencyKey: input.idempotencyKey,
     name: '관리자 선택 ' + mode.id,
     ...profile.selection,
-    ...(expanded ? { featureProfileKey: 'expanded-191-v2' } : {}),
+    ...(expanded ? { featureProfileKey: 'expanded-191-v3' } : {}),
     presetKey: mode.preset,
     turnTermMinutes: profile.presets.find((entry) => entry.key === mode.preset)!.turnTermMinutes,
     endYear: mode.endYear,
@@ -289,7 +289,7 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
   });
   if (expanded)
     expect(result.resolution).toMatchObject({
-      featureProfile: { key: 'expanded-191-v2', contentHash: profile.featureProfileHash },
+      featureProfile: { key: 'expanded-191-v3', contentHash: profile.featureProfileHash },
     });
   expect((result.resolution as { resources: unknown[] }).resources).toEqual(expect.arrayContaining(pinned));
   expect((result.resolution as { resources: unknown[] }).resources).toHaveLength(5);

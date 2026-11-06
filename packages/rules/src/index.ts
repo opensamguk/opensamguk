@@ -54,6 +54,7 @@ export * from './supply';
 export * from './commands/turn';
 export * from './ranking';
 export * from './npc';
+export * from './advice/general';
 export * from './policy';
 export * from './policy/replay';
 export * from './operation/calendar';
@@ -247,11 +248,19 @@ export * from './heritage/refund';
 export * from './heritage/creation';
 export { heritageFeatureDataSchema } from './heritage/feature';
 export * from './clock/featureProfile';
+export * from './entry/possess';
+export * from './entry/roles';
 export * from './stratagemCards/config';
 export * from './stratagemCards/state';
 export * from './stratagemCards/origin';
 export * from './stratagemCards/view';
 export * from './stratagemCards/actions';
+export * from './review/schema';
+export * from './review/ledger';
+export * from './review/lines';
+export * from './review/settle';
+export * from './review/events';
+export { reputationFeature } from './review/feature';
 export * from './stratagemCards/resolver';
 export {
   readStratagemCardsConfig,

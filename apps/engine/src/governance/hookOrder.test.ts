@@ -14,6 +14,7 @@ it('AC-P2-31 queued 후처리가 재생과 같은 순서이며 기존 캠페인�
   expect(engine.filter((key) => !['stratagem-cards-v1', 'governance-v1', 'lineage-v1'].includes(key))).toEqual([
     'campaign-v1',
     'personnel',
+    'reputation-v1',
   ]);
   expect(ruleRegistry.monthlyOrder!.indexOf('lineage-v1')).toBeLessThan(
     ruleRegistry.monthlyOrder!.indexOf('personnel'),

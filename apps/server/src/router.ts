@@ -4,16 +4,20 @@ import { authRouter } from './routers/auth';
 import { accountRouter } from './routers/account';
 import { legalRouter } from './routers/legal';
 import { adminRouter } from './routers/admin';
+import { resourceAdminRouter } from './routers/resourceAdmin';
 import { sanctionRouter } from './routers/sanction';
 import { worldRouter } from './routers/world';
 import { resourcesRouter } from './routers/resources';
 import { generalRouter } from './routers/general';
+import { entryRouter } from './routers/entry';
+import { adviceRouter } from './routers/advice';
 import { turnsRouter } from './routers/turns';
 import { commandsRouter } from './routers/commands';
 import { homeRouter } from './routers/home';
 import { cityRouter } from './routers/city';
 import { nationRouter } from './routers/nation';
 import { recordsRouter } from './routers/records';
+import { reviewRouter } from './routers/review';
 import { rankingRouter } from './routers/ranking';
 import { timelapseRouter } from './routers/timelapse';
 import { messageRouter } from './routers/message';
@@ -41,16 +45,20 @@ export const appRouter = router({
   account: accountRouter,
   legal: legalRouter,
   admin: adminRouter,
+  resourceAdmin: resourceAdminRouter,
   sanction: sanctionRouter,
   world: worldRouter,
   resources: resourcesRouter,
   general: generalRouter,
+  entry: entryRouter,
+  advice: adviceRouter,
   turns: turnsRouter,
   commands: commandsRouter,
   home: homeRouter,
   city: cityRouter,
   nation: nationRouter,
   records: recordsRouter,
+  review: reviewRouter,
   ranking: rankingRouter,
   timelapse: timelapseRouter,
   message: messageRouter,

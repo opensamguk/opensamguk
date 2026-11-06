@@ -1,4 +1,5 @@
 import { publicMapConfig } from '@opensamguk/shared';
+import { worldClock } from './world/truce';
 import { persistPublicMap } from './publicMap';
 import type { Prisma, PrismaClient } from '@opensamguk/db';
 import { nextActionSequence, notifyWorld, enqueueNotifications, type RealtimeSignal } from '@opensamguk/db';
@@ -17,6 +18,7 @@ import {
   completePersonnelStep,
   updateResidenceAnchors,
   logisticsCommandMovements,
+  reputationTurnEvents,
   type WorldState,
 } from '@opensamguk/rules';
 import { appendNationHistory, persistCommandReports, commandRealtimeSignals } from './commandPersistence';
@@ -36,6 +38,7 @@ import { observeCommittedStep, type CommitMetricCandidate, type CommitMetricSink
 import { preparePendingReset, type PendingResetPreparation } from './admin/reset';
 import { PgHeritageRepository } from './heritage/repository';
 import { creditHeritageSeason } from './heritage/service';
+import { appendReputationEvents } from './reputationState';
 
 export const CLOCK_CHECKPOINT_MS = 5_000;
 export const ENGINE_BATCH_STEPS = 64;
@@ -205,7 +208,7 @@ export class TurnLoop {
           };
         }
         const now = (await databaseNow(tx)).getTime();
-        const clock = { ...world, clockAnchorAt: world.clockAnchorAt?.getTime() ?? null };
+        const clock = worldClock(world);
         const checkpoint = checkpointClock(clock, now, this.highWaterTick);
         const boundary = world.monthlyTick + TICKS_PER_MONTH;
         const year = monthlyDate(world.startYear, boundary).year;
@@ -356,6 +359,19 @@ export class TurnLoop {
             capabilities.kind === 'registry' ? capabilities.armyTypes : undefined,
           );
           await persistExt(tx, worldId, state.ext, next.ext);
+          if (world.ruleFeatures.includes('reputation-v1'))
+            await appendReputationEvents(
+              tx,
+              worldId,
+              reputationTurnEvents({
+                before: state,
+                after: next,
+                generalId: due.id,
+                tick: due.nextTurnTick,
+                commandKey,
+                result,
+              }),
+            );
           await appendLogisticsMovements(tx, worldId, consumption, { sequence, tick: due.nextTurnTick });
           if (!failed) await persistCommandReports(tx, worldId, due.nextTurnTick, due.id, result);
           if (turn.nation) {
@@ -471,6 +487,7 @@ export class TurnLoop {
             clockAnchorAt: world.clockAnchorAt?.getTime() ?? null,
             turnTermMinutes: world.turnTermMinutes,
             explicitAdvance: target !== undefined,
+            truce: clock.truce ?? null,
           };
         return {
           tick: savedTick,

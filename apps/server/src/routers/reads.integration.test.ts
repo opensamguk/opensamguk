@@ -220,6 +220,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         nowTick: 200,
         msPerTick: 6,
         turnTermMinutes: 1,
+        truce: null,
       },
     });
   });
@@ -273,6 +274,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         nowTick: clockTick,
         msPerTick: 6,
         turnTermMinutes: 1,
+        truce: null,
       };
       for (const user of users) {
         const result = await query('world.summary', { worldId: endedWorldId }, user.cookie);
@@ -314,7 +316,15 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
   it('home은 본인 상세·도시·국가·예턴5개·개인 로그10개와 정확한 다음 시각을 반환한다', async () => {
     const { status, data } = await query('home.get', { worldId });
     expect(status).toBe(200);
-    expect(Object.keys(data).sort()).toEqual(['city', 'general', 'nation', 'nextTurnAt', 'recentLogs', 'turnsPreview']);
+    expect(Object.keys(data).sort()).toEqual([
+      'city',
+      'general',
+      'nation',
+      'nextTurnAt',
+      'recentLogs',
+      'turnSchedule',
+      'turnsPreview',
+    ]);
     expect(data.general).toMatchObject({ id: 1, gold: 11001, rice: 12001, crew: 13001, train: 41, atmos: 51 });
     expect(data.city).toMatchObject({ population: state.cities[0]!.population });
     expect(data.nation).toMatchObject({
@@ -325,6 +335,9 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       gold: state.nations[0]!.gold,
     });
     expect(data.nextTurnAt).toBe(new Date(anchor + 2400).toISOString());
+    expect(data.turnSchedule).toEqual(
+      Array.from({ length: 30 }, (_, slot) => new Date(anchor + 2400 + slot * 60_000).toISOString()),
+    );
     expect(data.turnsPreview).toEqual(
       Array.from({ length: 5 }, (_, slot) => ({
         slot,
