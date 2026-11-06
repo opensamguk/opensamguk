@@ -4,14 +4,14 @@ import { randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createDb, type PrismaClient } from '../packages/db/src/index';
-import { TICKS_PER_MONTH } from '../packages/rules/src/index';
+import { createDb, readPublishedResources, type PrismaClient } from '../packages/db/src/index';
+import { buildInitialWorld, TICKS_PER_MONTH } from '../packages/rules/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { saveInitialWorld, readWorldState } from '../apps/engine/src/world/persistence';
-import { loadInitialWorld, loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import fixture from './fixtures/t4-46-scenarios.json';
 import { initializeResources } from './init-resources';
 import { initializeScenarios, ScenarioInitializationError } from './init-scenarios';
@@ -21,7 +21,6 @@ import { testDatabaseUrl } from './test-database';
 
 const root = new URL('../', import.meta.url);
 const ready = fixture.scenarios.filter((row) => row.support === 'ready');
-const read = async (path: string) => JSON.parse(await readFile(new URL(path, root), 'utf8')) as unknown;
 const input = Object.fromEntries(
   await Promise.all(
     readyScenarioRows().map(async ({ key }) => [
@@ -30,12 +29,20 @@ const input = Object.fromEntries(
     ]),
   ),
 );
-const materials = {
-  map: await read('resources/map/che.json'),
-  unitSet: await read('resources/unitset/basic.json'),
-  statRules: await read('resources/scenario/default.json'),
-  portraitMap: await read('resources/portraits/rtk14-map.json'),
-};
+async function readMaterials(db: PrismaClient) {
+  const [map, unitSet, statRules, portraitMap] = await readPublishedResources(db, [
+    { kind: 'MAP', name: 'che', version: 1 },
+    { kind: 'UNIT_SET', name: 'basic', version: 1 },
+    { kind: 'STAT_RULES', name: 'default', version: 1 },
+    { kind: 'PORTRAIT_MAP', name: 'rtk14-map', version: 1 },
+  ]);
+  return {
+    map: map!.content,
+    unitSet: unitSet!.content,
+    statRules: statRules!.content,
+    portraitMap: portraitMap!.content,
+  };
+}
 const notice = await readFile(new URL('resources/NOTICE.md', root), 'utf8');
 const sql = await readFile(new URL('packages/db/sql/resources-scenarios.sql', root), 'utf8');
 interface PgClient {
@@ -262,7 +269,12 @@ it('S5 작은따옴표가 있는 source와 내용도 원문으로 되읽는다',
     const rows = scenarioRows.map((row) =>
       row.key === '1010' ? { ...row, contentHash: hashState(content), source } : row,
     );
-    const quoted = convertScenariosToSql({ ...input, '1010': JSON.stringify(content) }, notice, materials, rows);
+    const quoted = convertScenariosToSql(
+      { ...input, '1010': JSON.stringify(content) },
+      notice,
+      await readMaterials(db),
+      rows,
+    );
     expect(await initializeScenarios(db, quoted, rows)).toEqual({ inserted: 9, existing: 0 });
     const saved = await db.gameResource.findUniqueOrThrow({
       where: { kind_name_version: { kind: 'SCENARIO', name: '1010', version: 1 } },
@@ -277,7 +289,11 @@ it.each(ready)('S6 $key 두 DB 월드의 행 수와 재적재 해시는 파일 �
   await withDatabase(async ({ db }) => {
     await initializeScenarios(db, sql);
     const options = { scenario: row.key, map: 'che', seed: 't4-46-a' };
-    const fromFile = await loadInitialWorld(options);
+    const fromFile = buildInitialWorld({
+      ...(await readMaterials(db)),
+      scenario: JSON.parse(input[row.key]!),
+      seed: options.seed,
+    });
     for (let index = 0; index < 2; index++) {
       const initial = await loadInitialWorldFromDb(db, options);
       expect(hashState(initial)).toBe(hashState(fromFile));

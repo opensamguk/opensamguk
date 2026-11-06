@@ -10,7 +10,8 @@ import { newSession } from '../apps/server/src/auth/session';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { authzCase } from '../apps/server/src/authz/case';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
-import { loadFeatureProfile, loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadFeatureProfile, loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { initializeIntegrationResources } from './integration-resources';
 import { initializeResources } from './init-resources';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
@@ -216,6 +217,7 @@ beforeAll(async () => {
     db,
     await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
   );
+  await initializeIntegrationResources(db);
   operator = await user('ADMIN');
   ordinary = await user();
   other = await user();
@@ -269,7 +271,7 @@ afterAll(async () => {
 
 it('AC-M3-14 정식491명 확장 판에서5능력치 후보를 맡고 장비·자원·가계 상태를 보존한다', async () => {
   const { value: profile } = await loadFeatureProfile('expanded-191-v1');
-  const initial = await loadInitialWorld({
+  const initial = await loadInitialWorldFromDb(db, {
     scenario: 'integration191',
     map: 'integration',
     statRules: 'five-stats',

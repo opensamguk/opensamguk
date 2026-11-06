@@ -5,7 +5,8 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { initializeIntegrationResources } from './integration-resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, assertLease, lockLease, releaseLease } from '../apps/engine/src/lease';
@@ -321,6 +322,7 @@ beforeAll(() =>
       db,
       await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
     );
+    await initializeIntegrationResources(db);
     assertPreparing();
     preparationDone = true;
   }),
@@ -330,7 +332,7 @@ beforeAll(() =>
   setup(async () => {
     assertPreparing();
     if (!preparationDone) throw new Error('자기 DB 준비가 끝나지 않았습니다.');
-    const initial = await loadInitialWorld({
+    const initial = await loadInitialWorldFromDb(db, {
       scenario: 'integration191',
       map: 'integration',
       statRules: 'five-stats',

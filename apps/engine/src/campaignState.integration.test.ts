@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb, type Prisma } from '@opensamguk/db';
 import { emptyCampaignState, toWorldState, type WorldState } from '@opensamguk/rules';
 import { monthlyFixture } from '../test/monthlyFixture';
-import { loadInitialWorld } from './world/resources';
+import { loadInitialWorldFromDb } from './world/resources';
 import { persistCampaignState, readStoredCampaign } from './campaignState';
 
 // AC-INT-06 저장 계약만 검사한다. 정식 시나리오/API/엔진·리스 인수 증거와 구분한다.
@@ -24,7 +24,7 @@ const ids: string[] = [];
 let initial: Awaited<ReturnType<typeof monthlyFixture>>;
 let legacy: Awaited<ReturnType<typeof monthlyFixture>>;
 beforeAll(async () => {
-  initial = await loadInitialWorld({
+  initial = await loadInitialWorldFromDb(db, {
     scenario: 'integration191',
     map: 'integration',
     statRules: 'five-stats',

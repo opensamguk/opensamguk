@@ -4,7 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it as test } from 'v
 import { createDb } from '../packages/db/src/index';
 import { applyRecordedInput, checkReplayOrigin, initialReplayState, type WorldInit } from '../packages/rules/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { readWorldState, saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { loadReplayState } from '../apps/engine/src/monthly';
@@ -304,7 +304,7 @@ async function receipt(worldId: string, actor: Actor, requestId: string) {
 
 beforeAll(() =>
   track(async () => {
-    initial = await loadInitialWorld({
+    initial = await loadInitialWorldFromDb(db, {
       scenario: 'integration191',
       map: 'integration',
       statRules: 'five-stats',

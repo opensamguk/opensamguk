@@ -8,7 +8,9 @@ import { createDb } from '../packages/db/src/index';
 import { buildServer } from '../apps/server/src/server';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { newSession } from '../apps/server/src/auth/session';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { initializeResources } from './init-resources';
+import { initializeIntegrationResources } from './integration-resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
@@ -184,6 +186,12 @@ beforeAll(
           const sql = await checked(() => readFile(new URL(migration + '/migration.sql', migrations), 'utf8'), signal);
           await checked(() => gate.query(sql), signal);
         }
+        const resourceSql = await checked(
+          () => readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
+          signal,
+        );
+        await checked(() => initializeResources(db, resourceSql), signal);
+        await checked(() => initializeIntegrationResources(db), signal);
         passwordHash = await checked(() => hashPassword(password), signal);
         sensitive.add(passwordHash);
       },
@@ -390,7 +398,7 @@ it('AC-M3-05 정식 두 월드와 실제 같은 기기 가입·장수 생성으�
   await db.user.update({ where: { id: actor.id }, data: { role: 'ADMIN' } });
   for (const index of [0, 1]) {
     signal.throwIfAborted();
-    const initial = await loadInitialWorld({
+    const initial = await loadInitialWorldFromDb(db, {
       scenario: 'integration191',
       map: 'integration',
       statRules: 'five-stats',

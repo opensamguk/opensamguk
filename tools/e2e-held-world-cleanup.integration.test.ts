@@ -4,7 +4,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, beforeAll, beforeEach, expect, it as test } from 'vitest';
 import { createDb } from '../packages/db/src/index';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { acquireLease, LeaseLostError } from '../apps/engine/src/lease';
 import { cleanupHeldWorld } from '../e2e/heldWorldCleanup';
@@ -125,13 +125,19 @@ afterAll(async () => {
   if (errors.length) throw new AggregateError(errors, '실행권 월드 정리 검사 실패');
 });
 async function world() {
-  const initial = await loadInitialWorld({
-    scenario: 'integration191',
-    map: 'integration',
-    statRules: 'five-stats',
-    portraitMap: '191-map',
-    seed: 'cleanup-formal',
-  });
+  const resourceDb = createDb(source.href);
+  let initial: Awaited<ReturnType<typeof loadInitialWorldFromDb>>;
+  try {
+    initial = await loadInitialWorldFromDb(resourceDb, {
+      scenario: 'integration191',
+      map: 'integration',
+      statRules: 'five-stats',
+      portraitMap: '191-map',
+      seed: 'cleanup-formal',
+    });
+  } finally {
+    await resourceDb.$disconnect();
+  }
   initial.ruleFeatures = [
     'campaign-assignment-v2',
     'campaign-v1',

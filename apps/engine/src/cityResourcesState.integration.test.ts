@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb, type Prisma } from '@opensamguk/db';
 import { emptyCampaignState, emptyCityResourcesState, toWorldState, type WorldState } from '@opensamguk/rules';
 import { monthlyFixture } from '../test/monthlyFixture';
-import { loadInitialWorld } from './world/resources';
+import { loadInitialWorldFromDb } from './world/resources';
 import { persistCityResourcesState, readStoredCityResources } from './cityResourcesState';
 
 // 이 검사는 저장 어댑터와 실제 PG의 원자성만 맡는다. 정식 한 기수 인수를 대신하지 않는다.
@@ -23,7 +23,7 @@ const db = createDb(url);
 const ids: string[] = [];
 let source: Awaited<ReturnType<typeof monthlyFixture>>;
 beforeAll(async () => {
-  source = await loadInitialWorld({
+  source = await loadInitialWorldFromDb(db, {
     scenario: 'integration191',
     map: 'integration',
     statRules: 'five-stats',

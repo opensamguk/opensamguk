@@ -16,7 +16,7 @@ import { adviseGeneral, unitSetSchema, STANDARD_EQUIPMENT_CONFIG } from '../pack
 import { worldResolver } from '../apps/server/src/game/resolver';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
-import { loadInitialWorld, loadFeatureProfile } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb, loadFeatureProfile } from '../apps/engine/src/world/resources';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -458,7 +458,7 @@ describe('T3-07 AC-M3-13 실제 HTTP 군사 조언', () => {
 
   it('정식491명·확장14기능과 600명 추천에서 원본과 RNG 상태를 보존한다', async () => {
     const { value: profile } = await loadFeatureProfile('expanded-191-v1');
-    const initial = await loadInitialWorld({
+    const initial = await loadInitialWorldFromDb(db, {
       seed: 'advice-expanded',
       scenario: 'integration191',
       map: 'integration',

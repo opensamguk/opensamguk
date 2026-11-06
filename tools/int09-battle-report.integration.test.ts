@@ -4,7 +4,7 @@ import { createDb, type Prisma } from '../packages/db/src/index';
 import { rngFor } from '../packages/shared/src/index';
 import type { CommandResult } from '../packages/rules/src/index';
 import { campaignAttack } from '../packages/rules/src/campaign/attack';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { loadWorld } from '../apps/engine/src/worldLoader';
 import { acquireLease, assertLease, lockLease, releaseLease } from '../apps/engine/src/lease';
@@ -43,7 +43,7 @@ async function fenced(action: (tx: Prisma.TransactionClient) => Promise<void>) {
 beforeAll(
   () =>
     (preparation = (async () => {
-      const initial = await loadInitialWorld({
+      const initial = await loadInitialWorldFromDb(db, {
         scenario: 'integration191',
         map: 'integration',
         statRules: 'five-stats',

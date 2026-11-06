@@ -168,7 +168,8 @@ pnpm db:up
 pnpm test:int
 ```
 
-`tools/run-integration.ts`가 전용 DB를 만들고 migration을 적용한 뒤 테스트를 실행합니다.
+`tools/run-integration.ts`가 전용 DB를 만들고 migration·기본 자원·통합판 자원을 준비한 뒤 테스트를 실행합니다.
+Vitest를 직접 실행할 때는 같은 전용 DB에 `pnpm db:init-resources`와 `pnpm db:init-integration`을 먼저 적용합니다.
 기본 대상은 같은 PostgreSQL의 `opensamguk_test`입니다. 다른 대상은 `.env`의 `TEST_DATABASE_URL`로 지정합니다.
 DB 생성 권한이 없으면 해당 계정의 전용 테스트 DB를 먼저 준비해야 합니다.
 

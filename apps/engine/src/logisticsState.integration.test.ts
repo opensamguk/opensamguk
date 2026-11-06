@@ -18,7 +18,7 @@ import {
   type WorldInit,
   type WorldState,
 } from '@opensamguk/rules';
-import { loadInitialWorld } from './world/resources';
+import { loadInitialWorldFromDb } from './world/resources';
 import { saveInitialWorld } from './world/persistence';
 import { controlClock } from './world/clock';
 import { loadReplayState } from './monthly';
@@ -59,7 +59,7 @@ const features = [
   'policy',
 ];
 beforeAll(async () => {
-  initial = await loadInitialWorld({
+  initial = await loadInitialWorldFromDb(db, {
     scenario: 'integration191',
     map: 'integration',
     statRules: 'five-stats',

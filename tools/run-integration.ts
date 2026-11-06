@@ -33,4 +33,5 @@ function run(args: string[]) {
 }
 run(['--filter', '@opensamguk/db', 'migrate']);
 run(['db:init-resources']);
+run(['db:init-integration']);
 run(['exec', 'vitest', 'run', '--config', 'vitest.integration.config.ts', ...partition, ...shard]);

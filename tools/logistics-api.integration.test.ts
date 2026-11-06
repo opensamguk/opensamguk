@@ -11,7 +11,7 @@ import type { AppRouter } from '../apps/server/src/router';
 import { newSession } from '../apps/server/src/auth/session';
 import { authzCase } from '../apps/server/src/authz/case';
 import { categories } from '../apps/server/src/authz/coverage';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
@@ -249,7 +249,7 @@ async function visitorAtCity(world: Awaited<ReturnType<typeof fixture>>) {
   throw new Error('방문 장수의 도시를 찾지 못했습니다.');
 }
 beforeAll(async () => {
-  initial = await loadInitialWorld({
+  initial = await loadInitialWorldFromDb(db, {
     scenario: 'integration191',
     map: 'integration',
     statRules: 'five-stats',

@@ -14,7 +14,8 @@ import { createSanction, liftSanction } from '../apps/server/src/admin/sanctionS
 import { changeAdminRole } from '../apps/server/src/admin/roleStore';
 import { testDatabaseUrl } from './test-database';
 import { initializeResources } from './init-resources';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { initializeIntegrationResources } from './integration-resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
@@ -212,6 +213,7 @@ beforeAll(
         db,
         await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
       );
+      await initializeIntegrationResources(db);
       passwordHash = await hashPassword(password);
       app = await buildServer({
         db,
@@ -925,7 +927,7 @@ it('정식 두191년 월드에서21개 변경 차단·본인 조회·같은 월�
     other = await user();
   const sid = (await session(victim.id)).cookie,
     otherSid = (await session(other.id)).cookie;
-  const initial = await loadInitialWorld({
+  const initial = await loadInitialWorldFromDb(db, {
     scenario: 'integration191',
     map: 'integration',
     statRules: 'five-stats',

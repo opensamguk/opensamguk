@@ -9,7 +9,9 @@ import { hashPassword } from '../apps/server/src/auth/password';
 import { newAccountToken } from '../apps/server/src/auth/accountToken';
 import { authzCase } from '../apps/server/src/authz/case';
 import { categories } from '../apps/server/src/authz/coverage';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { initializeResources } from './init-resources';
+import { initializeIntegrationResources } from './integration-resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
@@ -312,6 +314,11 @@ beforeAll(() =>
     const migrations = new URL('../packages/db/prisma/migrations/', import.meta.url);
     for (const migration of (await readdir(migrations)).filter((v) => /^\d{14}_/.test(v)).sort())
       await gate.query(await readFile(new URL(migration + '/migration.sql', migrations), 'utf8'));
+    await initializeResources(
+      db,
+      await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
+    );
+    await initializeIntegrationResources(db);
     passwordHash = await hashPassword(password);
     sensitive.add(passwordHash);
     api = await start(true);
@@ -422,7 +429,7 @@ for (const index of [0, 1])
       otherHumanUser = (await user()).id;
       await tokens(otherHumanUser);
     }
-    const initial = await loadInitialWorld({
+    const initial = await loadInitialWorldFromDb(db, {
       scenario: 'integration191',
       map: 'integration',
       statRules: 'five-stats',
