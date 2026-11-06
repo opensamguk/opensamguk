@@ -26,6 +26,8 @@ import {
   readStoredEquipment,
   readStoredStratagemCards,
   readStoredNationStrategy,
+  readStoredNationLifecycle,
+  assertNationLifecycle,
 } from '@opensamguk/rules';
 import { z } from 'zod';
 import { worldResolver } from './resolver';
@@ -133,6 +135,9 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
   } else if (world.cityResourcesState != null) throw new Error('도시 자원 기능을 끈 월드에 저장 상태가 있습니다.');
   const nationStrategy = readStoredNationStrategy(world);
   if (nationStrategy) state.nationStrategy = nationStrategy;
+  const nationLifecycle = readStoredNationLifecycle(world);
+  if (nationLifecycle) state.nationLifecycle = nationLifecycle;
+  assertNationLifecycle(state);
   if (world.ruleFeatures.includes('city-scale-v1')) {
     const origin: unknown = world.replayOrigin;
     checkReplayOrigin(origin);

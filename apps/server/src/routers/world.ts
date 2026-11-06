@@ -4,6 +4,7 @@ import { readWorld, worldInput, worldSummary } from '../queries';
 import { mapCity, publicMapInfo } from '../visibility';
 import { readOperationalMap, operationalMapDisplay } from '@opensamguk/rules';
 import { readCityScaleProjection } from '../game/cityScale';
+import { readMapBackgrounds } from '../resourceAdmin/mapBackground';
 
 export const worldRouter = router({
   publicMaps: publicProcedure.input(z.void()).query(async ({ ctx }) => {
@@ -15,6 +16,7 @@ export const worldRouter = router({
         id: true,
         name: true,
         status: true,
+        mapKey: true,
         publicMaps: {
           where: { takenAt: { lte: new Date(ctx.now - delayMinutes * 60_000) } },
           orderBy: { takenAt: 'desc' },
@@ -23,15 +25,20 @@ export const worldRouter = router({
         },
       },
     });
+    const backgrounds = await readMapBackgrounds(
+      ctx.db,
+      worlds.map((world) => world.mapKey),
+    );
     return {
       delayMinutes,
-      worlds: worlds.map(({ id, name, status, publicMaps }) => {
+      worlds: worlds.map(({ id, name, status, mapKey, publicMaps }) => {
         const snapshot = publicMaps[0];
         const data = snapshot && publicMapInfo(snapshot.data);
         return {
           id,
           name,
           status: status as 'RUNNING' | 'PAUSED',
+          background: backgrounds.get(mapKey) ?? null,
           map:
             snapshot && data
               ? { takenAt: snapshot.takenAt.toISOString(), year: snapshot.year, month: snapshot.month, ...data }
@@ -61,11 +68,13 @@ export const worldRouter = router({
       });
       const world = await tx.world.findUniqueOrThrow({
         where: { id: input.worldId },
-        select: { operationalMap: true, ruleFeatures: true, replayOrigin: true },
+        select: { operationalMap: true, ruleFeatures: true, replayOrigin: true, mapKey: true },
       });
       const map = readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin);
       const ruins = await readCityScaleProjection(tx, input.worldId, world.ruleFeatures, cities);
+      const backgrounds = await readMapBackgrounds(tx, [world.mapKey]);
       return {
+        background: backgrounds.get(world.mapKey) ?? null,
         cities: cities.map((city) => ({
           ...mapCity(city),
           ...(ruins ? { ruin: ruins.get(city.cityKey) ?? null } : {}),

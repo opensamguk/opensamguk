@@ -1,7 +1,8 @@
 import type { WorldState } from './model/world';
+import { isWandering } from './nationLifecycle/state';
 
 export function unifiedNation(state: WorldState): number | null {
-  const nations = Object.values(state.nations);
+  const nations = Object.values(state.nations).filter((nation) => !isWandering(state, nation.id));
   const cities = Object.values(state.cities).filter((city) => city.kind !== 'PASS');
   return nations.length === 1 && cities.length > 0 && cities.every((city) => city.nationId === nations[0]!.id)
     ? nations[0]!.id

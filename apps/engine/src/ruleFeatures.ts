@@ -15,6 +15,7 @@ import {
   type PersonnelStepPacket,
   type ReplayState,
   type WorldState,
+  type NationLifecycleEffects,
 } from '@opensamguk/rules';
 import type { EngineFeature, QueuedInputHandler } from './features';
 import { loadReplayState } from './monthly';
@@ -42,6 +43,7 @@ import type { LineageMonthEffects } from '@opensamguk/rules';
 import { processStratagemCardsInput } from './stratagemCards/input';
 import { reconcileQueuedStratagemCards } from './stratagemCards/state';
 import { appendReputationEvents, loadReputationLedger, persistMonthlyReview } from './reputationState';
+import { persistNationLifecycleMonth } from './nationLifecycleState';
 
 export async function loadPersonnelTurnContext(tx: Prisma.TransactionClient, worldId: string, state: WorldState) {
   if (state.ruleFeatures?.includes('policy')) {
@@ -229,6 +231,14 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
       reconcileLineageOrder(new PgLineageRepository(tx), world.id, { tick: input.tick!, sequence: input.sequence }),
     persistMonthly: (tx, worldId, before, next, effects, context) =>
       persistLineageMonth(tx, worldId, before, next, effects as LineageMonthEffects, context),
+  },
+  {
+    key: 'nation-lifecycle-v1',
+    async afterQueuedInput(tx, world) {
+      await loadWorld(tx, world.id);
+    },
+    persistMonthly: (tx, worldId, _before, _next, effects, at) =>
+      persistNationLifecycleMonth(tx, worldId, effects as NationLifecycleEffects, at),
   },
   {
     key: 'personnel',

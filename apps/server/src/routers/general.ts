@@ -236,6 +236,7 @@ export const generalRouter = router({
             ? { npcPlayEnabled: true as const }
             : {}),
           ...(world.ruleFeatures.includes('lineage-v1') ? { lineageEnabled: true as const } : {}),
+          ...(world.ruleFeatures.includes('nation-lifecycle-v1') ? { nationLifecycleEnabled: true as const } : {}),
           ...(world.ruleFeatures.includes('heritage-v1')
             ? {
                 heritage: await readCreationHeritage(new PgHeritageBalanceStore(tx), ctx.user.id),

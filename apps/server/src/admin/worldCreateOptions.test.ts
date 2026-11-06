@@ -61,6 +61,39 @@ const registered: RuleRegistry = {
   ],
 };
 describe('AC-M3-04 원생성 설정 조회', () => {
+  it('AC-P2-08·09 국가 변천 선택은 기존 확장과 별도로20기능을 고정하며 기능 누락은 거부한다', () => {
+    const data = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v5.json'));
+    const lifecycle = expandedCreationProfile(expandedRows, allPresets, data, ruleRegistry, 'san10-191-lifecycle');
+    expect(lifecycle).toMatchObject({
+      id: 'san10-191-lifecycle',
+      available: true,
+      featureProfileKey: 'expanded-191-v5',
+      featureProfileHash: hashState(data),
+    });
+    if (!lifecycle.available) throw Error('국가 변천 선택이 필요합니다.');
+    expect(lifecycle.ruleFeatures).toHaveLength(20);
+    expect(lifecycle.ruleFeatures).toContain('nation-lifecycle-v1');
+    expect(
+      expandedCreationProfile(
+        expandedRows,
+        allPresets,
+        {
+          ...data,
+          ruleFeatures: data.ruleFeatures.filter((key) => key !== 'nation-lifecycle-v1'),
+        },
+        ruleRegistry,
+        'san10-191-lifecycle',
+      ),
+    ).toMatchObject({ available: false, code: 'FEATURE_PROFILE_UNAVAILABLE' });
+    expect(expandedCreationProfile(allRows, allPresets, data, ruleRegistry, 'san10-191-lifecycle')).toMatchObject({
+      available: false,
+      code: 'RESOURCES_UNAVAILABLE',
+    });
+    expect(expandedCreationProfile(expandedRows, allPresets, data, ruleRegistry, 'san10-191-expanded')).toMatchObject({
+      available: false,
+      code: 'FEATURE_PROFILE_UNAVAILABLE',
+    });
+  });
   it('AC-P2-04·AC-P2-03 새 SAN10 확장 선택은 시나리오 2판·다섯 자원·19기능을 고정한다', () => {
     const data = json('resources/feature-profile/expanded-191-v4.json');
     const expanded = expandedCreationProfile(expandedRows, allPresets, data, ruleRegistry, 'san10-191-expanded');

@@ -178,7 +178,7 @@ async function existingRows(client: PgClient) {
       throw new Error('잘못된 시험 표 이름입니다.');
     const data =
       table === 'World'
-        ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures' - 'operationalMap' - 'campaignState' - 'cityResourcesState' - 'logisticsState' - 'governanceState' - 'lineageState' - 'stratagemCardsState' - 'equipmentState' - 'runtimeOptions' - 'cityRuinsState' - 'nationStrategyState'"
+        ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures' - 'operationalMap' - 'campaignState' - 'cityResourcesState' - 'logisticsState' - 'governanceState' - 'lineageState' - 'stratagemCardsState' - 'equipmentState' - 'runtimeOptions' - 'cityRuinsState' - 'nationStrategyState' - 'nationLifecycleState'"
         : table === 'Nation'
           ? "to_jsonb(t) - 'noticeDirective'"
           : table === 'City'
@@ -507,6 +507,7 @@ it.each(['empty', 'legacy'] as const)(
         HeritageEntry: [],
         ReputationEvent: [],
         MonthlyReview: [],
+        MapBackground: [],
       });
       expect(await readSlices()).toEqual(slices);
       expect(

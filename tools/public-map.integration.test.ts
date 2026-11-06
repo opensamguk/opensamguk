@@ -147,6 +147,7 @@ it('RUNNING·PAUSED만 createdAt/id 순서로 나열하고 사본 없는 월드�
     equipmentState,
     cityRuinsState,
     nationStrategyState,
+    nationLifecycleState,
     runtimeOptions,
     ...sourceScalars
   } = source;
@@ -168,6 +169,8 @@ it('RUNNING·PAUSED만 createdAt/id 순서로 나열하고 사본 없는 월드�
   expect(cityRuinsState).toBeNull();
   expect(source.ruleFeatures).not.toContain('nation-strategy-v1');
   expect(nationStrategyState).toBeNull();
+  expect(source.ruleFeatures).not.toContain('nation-lifecycle-v1');
+  expect(nationLifecycleState).toBeNull();
   expect(runtimeOptions).toBeNull();
   if (source.statRules === null || source.unitSet === null) throw new Error('정식 능력치·병종 JSON이 필요합니다.');
   await db.world.update({ where: { id: worldId }, data: { createdAt: new Date(epoch + minute) } });
@@ -191,14 +194,22 @@ it('RUNNING·PAUSED만 createdAt/id 순서로 나열하고 사본 없는 월드�
       },
     });
   const ledgers = await db.$queryRaw<
-    Array<{ isNull: boolean; logisticsNull: boolean; optionsNull: boolean; ruinsNull: boolean; strategyNull: boolean }>
-  >`SELECT "cityResourcesState" IS NULL AS "isNull", "logisticsState" IS NULL AS "logisticsNull", "runtimeOptions" IS NULL AS "optionsNull", "cityRuinsState" IS NULL AS "ruinsNull", "nationStrategyState" IS NULL AS "strategyNull" FROM "World"`;
+    Array<{
+      isNull: boolean;
+      logisticsNull: boolean;
+      optionsNull: boolean;
+      ruinsNull: boolean;
+      strategyNull: boolean;
+      lifecycleNull: boolean;
+    }>
+  >`SELECT "cityResourcesState" IS NULL AS "isNull", "logisticsState" IS NULL AS "logisticsNull", "runtimeOptions" IS NULL AS "optionsNull", "cityRuinsState" IS NULL AS "ruinsNull", "nationStrategyState" IS NULL AS "strategyNull", "nationLifecycleState" IS NULL AS "lifecycleNull" FROM "World"`;
   expect(ledgers).toHaveLength(5);
   expect(ledgers.every((row) => row.isNull)).toBe(true);
   expect(ledgers.every((row) => row.logisticsNull)).toBe(true);
   expect(ledgers.every((row) => row.optionsNull)).toBe(true);
   expect(ledgers.every((row) => row.ruinsNull)).toBe(true);
   expect(ledgers.every((row) => row.strategyNull)).toBe(true);
+  expect(ledgers.every((row) => row.lifecycleNull)).toBe(true);
   const response = await maps();
   expect(response.data?.worlds.map((entry) => entry.id)).toEqual([
     '00000000-0000-4000-8000-000000000001',
@@ -231,7 +242,8 @@ it('무인증·다른 계정·제재 세션은 같고 입력 ID 주입은 거부
   expect(anonymous.status).toBe(200);
   expect(Object.keys(anonymous.data!).sort()).toEqual(['delayMinutes', 'worlds']);
   const entry = anonymous.data!.worlds[0]!;
-  expect(Object.keys(entry).sort()).toEqual(['id', 'map', 'name', 'status']);
+  expect(Object.keys(entry).sort()).toEqual(['background', 'id', 'map', 'name', 'status']);
+  expect(entry).toHaveProperty('background', null);
   expect(Object.keys(entry.map!).sort()).toEqual(['cities', 'month', 'nations', 'takenAt', 'year']);
   expect(Object.keys(entry.map!.cities[0]!).sort()).toEqual(['key', 'level', 'links', 'name', 'nationId', 'x', 'y']);
   expect(Object.keys(entry.map!.nations[0]!).sort()).toEqual(['color', 'id', 'name']);

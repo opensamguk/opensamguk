@@ -21,6 +21,7 @@ const serverResponse = {
       name: '첫 천하',
       status: 'RUNNING',
       map: { takenAt, year: 190, month: 3, cities: [luoyang, changan], nations: [wei, shu] },
+      background: null,
     },
   ],
 } satisfies PublicMapsOutput;

@@ -729,14 +729,25 @@ async function withResourceRoot<T>(root: URL, body: () => Promise<T>) {
   }
 }
 
-for (const profileKey of ['expanded-191-v1', 'expanded-191-v2', 'expanded-191-v3', 'expanded-191-v4'])
+for (const profileKey of [
+  'expanded-191-v1',
+  'expanded-191-v2',
+  'expanded-191-v3',
+  'expanded-191-v4',
+  'expanded-191-v5',
+])
   it(`AC-P2-30·31·32·33 ${profileKey} 관리자 HTTP 확장 선택·엔진 생성·재생·저장 설정 초기화를 연결한다`, async (signal) => {
     const options = await creationOptions(actor, signal, true);
     expect(options.status).toBe(200);
-    expect(options.data?.profiles).toHaveLength(5);
+    expect(options.data?.profiles).toHaveLength(6);
     const selected = options.data!.profiles.find(
       (profile) =>
-        profile.id === (profileKey === 'expanded-191-v4' ? 'san10-191-expanded' : 'integration-v01-expanded'),
+        profile.id ===
+        (profileKey === 'expanded-191-v5'
+          ? 'san10-191-lifecycle'
+          : profileKey === 'expanded-191-v4'
+            ? 'san10-191-expanded'
+            : 'integration-v01-expanded'),
     );
     if (!selected?.available) throw new Error('실제 확장 선택지가 필요합니다.');
     const profile = await loadFeatureProfile(profileKey);
@@ -766,7 +777,7 @@ for (const profileKey of ['expanded-191-v1', 'expanded-191-v2', 'expanded-191-v3
     expect(world.logisticsState).not.toBeNull();
     expect(world.governanceState).not.toBeNull();
     expect(world.lineageState).not.toBeNull();
-    if (profileKey === 'expanded-191-v4') {
+    if (profileKey === 'expanded-191-v4' || profileKey === 'expanded-191-v5') {
       expect(world).toMatchObject({
         mapKey: 'san10',
         scenarioKey: 'san10-191@2',
@@ -775,6 +786,8 @@ for (const profileKey of ['expanded-191-v1', 'expanded-191-v2', 'expanded-191-v3
       });
       expect(world.cityRuinsState).not.toBeNull();
       expect(world.stratagemCardsState).not.toBeNull();
+      if (profileKey === 'expanded-191-v5') expect(world.nationLifecycleState).toEqual({ version: 1, nations: {} });
+      else expect(world.nationLifecycleState).toBeNull();
       const resolution = stored.resolution as {
         resources: Array<{ kind: string; version: number; contentHash: string }>;
       };
@@ -924,6 +937,11 @@ it('AC-P2-30·31·32·33 설정 파일 누락·손상은 기존 HTTP 목록과 r
       expect(expanded.data?.profiles[3]).toMatchObject({ available: false, code: 'FEATURE_PROFILE_UNAVAILABLE' });
       expect(expanded.data?.profiles[4]).toMatchObject({
         id: 'san10-191-expanded',
+        available: false,
+        code: 'FEATURE_PROFILE_UNAVAILABLE',
+      });
+      expect(expanded.data?.profiles[5]).toMatchObject({
+        id: 'san10-191-lifecycle',
         available: false,
         code: 'FEATURE_PROFILE_UNAVAILABLE',
       });
@@ -1216,6 +1234,11 @@ for (const mode of ['role', 'session', 'sanction'] as const)
     if (failures.length) throw new AggregateError(failures, '현재 권한 경합·정리 실패');
   });
 it('AC-M3-04 Context 뒤 만료·이메일·동의·정책 변경도 현재 생성과 조회를 다시 검사한다', async () => {
+  const cases: Array<{
+    owner: Actor;
+    caller: ReturnType<typeof appRouter.createCaller>;
+    expected: 'SERVICE_UNAVAILABLE' | 'UNAUTHORIZED' | 'FORBIDDEN';
+  }> = [];
   for (const mode of ['expired', 'unverified', 'consent', 'policy'] as const) {
     const owner = await user('ADMIN', 'ACTIVE', mode !== 'unverified'),
       identity: Context = {
@@ -1243,8 +1266,15 @@ it('AC-M3-04 Context 뒤 만료·이메일·동의·정책 변경도 현재 생�
     const caller = appRouter.createCaller(identity);
     if (mode === 'expired')
       await db.session.update({ where: { id: owner.sessionId }, data: { expiresAt: new Date(0) } });
-    const before = await footprint(),
-      expected = mode === 'policy' ? 'SERVICE_UNAVAILABLE' : mode === 'expired' ? 'UNAUTHORIZED' : 'FORBIDDEN';
+    cases.push({
+      owner,
+      caller,
+      expected: mode === 'policy' ? 'SERVICE_UNAVAILABLE' : mode === 'expired' ? 'UNAUTHORIZED' : 'FORBIDDEN',
+    });
+  }
+  // 준비 뒤 모든 거부가 무변경이어야 하므로 같은 전체 DB 기준을 대조한다.
+  const before = await footprint();
+  for (const { owner, caller, expected } of cases) {
     await expect(caller.admin.world.create(input(owner))).rejects.toMatchObject({ code: expected });
     await expect(
       caller.admin.world.createStatus({ expectedUserId: owner.id, idempotencyKey: firstRequest.idempotencyKey }),

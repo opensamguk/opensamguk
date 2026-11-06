@@ -28,6 +28,7 @@ import {
   emptyCityResourcesState,
   initialCityRuins,
   initialNationStrategy,
+  initialNationLifecycle,
   initialLogisticsState,
   initialEquipment,
   equipmentConfigSchema,
@@ -284,6 +285,9 @@ export function prepareInitialWorld(
           : {}),
         ...(features.includes('nation-strategy-v1')
           ? { nationStrategyState: initialNationStrategy() as Prisma.InputJsonValue }
+          : {}),
+        ...(features.includes('nation-lifecycle-v1')
+          ? { nationLifecycleState: initialNationLifecycle() as Prisma.InputJsonValue }
           : {}),
         ...(features.includes('logistics-v1')
           ? {
