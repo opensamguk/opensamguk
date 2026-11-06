@@ -72,6 +72,8 @@ function makeAttack(collect: typeof collectModifiers) {
         .sort((a, b) => b.crew - a.crew || a.id - b.id);
       const reports: { generalId: number; text: string }[] = [];
       const battleAwards: NonNullable<CommandResult['battleAwards']> = [];
+      const battleOutcomes: NonNullable<CommandResult['battleOutcomes']> = [];
+      const reputation = state.ruleFeatures?.includes('reputation-v1');
       const rounds: string[] = [];
       let cleared = true;
       for (const defender of defenders) {
@@ -99,9 +101,13 @@ function makeAttack(collect: typeof collectModifiers) {
         Object.assign(defender, battle.defender);
         const attackerSurvives = g.crew > 0 && g.atmos > 0;
         const defenderSurvives = defender.crew > 0 && defender.atmos > 0;
-        if (attackerSurvives && !defenderSurvives) battleAwards.push({ generalId: g.id, wins: 1, captures: 0 });
-        else if (!attackerSurvives && defenderSurvives)
+        if (attackerSurvives && !defenderSurvives) {
+          battleAwards.push({ generalId: g.id, wins: 1, captures: 0 });
+          if (reputation) battleOutcomes.push({ winnerId: g.id, loserId: defender.id });
+        } else if (!attackerSurvives && defenderSurvives) {
           battleAwards.push({ generalId: defender.id, wins: 1, captures: 0 });
+          if (reputation) battleOutcomes.push({ winnerId: defender.id, loserId: g.id });
+        }
         const text = `${g.name} 대 ${defender.name}: 공격 ${g.crew}명, 수비 ${defender.crew}명`;
         rounds.push(text);
         reports.push({ generalId: defender.id, text });
@@ -169,6 +175,7 @@ function makeAttack(collect: typeof collectModifiers) {
         reports,
         history,
         battleAwards,
+        ...(reputation ? { battleOutcomes } : {}),
         attackTarget: { cityKey: args.cityKey, defendingNationId: defendingNation },
       };
     },

@@ -250,6 +250,12 @@ export * from './stratagemCards/state';
 export * from './stratagemCards/origin';
 export * from './stratagemCards/view';
 export * from './stratagemCards/actions';
+export * from './review/schema';
+export * from './review/ledger';
+export * from './review/lines';
+export * from './review/settle';
+export * from './review/events';
+export { reputationFeature } from './review/feature';
 export * from './stratagemCards/resolver';
 export {
   readStratagemCardsConfig,
