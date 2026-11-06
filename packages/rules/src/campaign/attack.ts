@@ -101,6 +101,8 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
   const rounds: string[] = [],
     reports: NonNullable<CommandResult['reports']> = [];
   const battleAwards: NonNullable<CommandResult['battleAwards']> = [];
+  const battleOutcomes: NonNullable<CommandResult['battleOutcomes']> = [];
+  const reputation = state.ruleFeatures?.includes('reputation-v1');
   for (const attackerId of attackingIds) {
     for (const defenderId of defendingIds) {
       if (!alive(get(attackerId))) break;
@@ -110,8 +112,13 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
       state = fightCampaignUnits(state, attackerId, defenderId, actor.unitSet!, rng).state;
       const a = get(attackerId),
         d = get(defenderId);
-      if (alive(a) && !alive(d)) battleAwards.push({ generalId: attackerCommander, wins: 1, captures: 0 });
-      else if (!alive(a) && alive(d)) battleAwards.push({ generalId: defenderCommander, wins: 1, captures: 0 });
+      if (alive(a) && !alive(d)) {
+        battleAwards.push({ generalId: attackerCommander, wins: 1, captures: 0 });
+        if (reputation) battleOutcomes.push({ winnerId: attackerCommander, loserId: defenderCommander });
+      } else if (!alive(a) && alive(d)) {
+        battleAwards.push({ generalId: defenderCommander, wins: 1, captures: 0 });
+        if (reputation) battleOutcomes.push({ winnerId: defenderCommander, loserId: attackerCommander });
+      }
       const text = `${state.generals[attackerCommander]!.name} 부곡${attackerId} 대 ${state.generals[defenderCommander]!.name} 부곡${defenderId}: 공격 ${a.troops}명, 수비 ${d.troops}명`;
       rounds.push(text);
       // BattleLog의 (worldId,tick,attackerId,generalId) 키당 한 행으로 저장한다.
@@ -193,6 +200,7 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
     history,
     battleAwards,
     attackTarget: { cityKey, defendingNationId: defendingNation },
+    ...(reputation ? { battleOutcomes } : {}),
   };
 }
 

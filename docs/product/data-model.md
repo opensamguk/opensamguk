@@ -112,9 +112,12 @@ AC-INT-06의 `World.campaignState`는 관계·제안·NPC 서약 시도와 부�
 | `NotificationOutbox`         | D6 턴 알림                    | worldId, userId, event, 공개 payload, 고유 dedupeKey, status, attempts, nextAttemptAt, claimId, claimedAt, targetId, generation, resultCode. 주소를 복제하지 않는다. User·World 삭제에 함께 지워지며 상태 해시·RNG에 넣지 않는다 | M2   |
 | `NotificationDispatchGate`   | D6 턴 알림                    | 고정 id(discord), blockedUntil. 관측한 429의 공통 발송 기한을 재시작 뒤에도 지킨다. 비밀·사용자 식별자는 저장하지 않는다 | M2   |
 | `OfficeEffect` (리소스 파일) | D17 관직 주재 효과            | 관직별 도시 보정 표. DB가 아닌 `resources/`                                         | M3   |
-| `ReputationEvent`            | D10 월단평                    | worldId, generalId, tick, kind, score                                               | M3   |
+| `ReputationEvent`            | D10 월단평                    | worldId, generalId, year, month, kind, score, tick, 당시 공개 이름·소속·전투 도시. 장수·연월·종류별 고유 키 | M3   |
+| `MonthlyReview`              | D10 월단평                    | (worldId, year, month) PK, (worldId, tick) 고유 키, entries, headline                | M3   |
 | (없음)                       | D3 군사 조언, D15 역할별 입장 | 기존 데이터와 NPC AI만 사용                                                         | M3   |
 | `GeneralRelation`            | D7 (Phase 2)                  | worldId, generalA, generalB, kind                                                   | —    |
+
+월단평 두 표는 형식 3에서 `reputation-v1`을 선택한 새 월드에만 기록한다. 장수·국가에는 외래 키를 걸지 않으며 당시 공개 스냅샷을 보존한다. 월드 삭제에는 함께 지워진다. 전체 과거 원장은 재생 해시에 들어가고 최신 24개월 제한은 조회에만 적용한다. 사건은 같은 턴 트랜잭션에서 처음 적용된 값을 남기며 월 정산의 중복 저장은 트랜잭션 오류다. [T3-07](../plans/T3-07.md)의 형식 3 계약을 따른다.
 
 ## 리소스 (DB 밖, `resources/`)
 

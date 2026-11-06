@@ -9,6 +9,7 @@ import {
   setPolicyPayloadSchema,
   updateResidenceAnchors,
   recordedLineageSuccession,
+  reputationInputEvents,
   recordedPossession,
   type PersonnelMonthResult,
   type PersonnelStepPacket,
@@ -40,6 +41,7 @@ import { reconcileLineageOrder } from './lineage/service';
 import type { LineageMonthEffects } from '@opensamguk/rules';
 import { processStratagemCardsInput } from './stratagemCards/input';
 import { reconcileQueuedStratagemCards } from './stratagemCards/state';
+import { appendReputationEvents, loadReputationLedger, persistMonthlyReview } from './reputationState';
 
 export async function loadPersonnelTurnContext(tx: Prisma.TransactionClient, worldId: string, state: WorldState) {
   if (state.ruleFeatures?.includes('policy')) {
@@ -312,4 +314,15 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
     },
   },
   { key: 'treaty-trade' },
+  {
+    key: 'reputation-v1',
+    async loadReplayState(tx, worldId, replay) {
+      return { ...replay, reputation: await loadReputationLedger(tx, worldId, replay.state.startYear) };
+    },
+    async afterQueuedInput(tx, world, before, input) {
+      await appendReputationEvents(tx, world.id, reputationInputEvents({ before: before.state, input }));
+    },
+    persistMonthly: (tx, worldId, _before, next, effects, { tick }) =>
+      persistMonthlyReview(tx, worldId, next, effects, tick),
+  },
 ];

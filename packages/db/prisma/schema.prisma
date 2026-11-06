@@ -10,6 +10,8 @@ datasource db {
 }
 
 model World {
+  reputationEvents    ReputationEvent[]
+  monthlyReviews      MonthlyReview[]
   runtimeOptions      Json?
   equipmentState      Json?
   notificationOutbox  NotificationOutbox[]
@@ -77,6 +79,42 @@ model World {
   assignmentOffers    AssignmentOffer[]
   sanctions           Sanction[]
   createRequest       WorldCreateRequest?
+}
+
+model ReputationEvent {
+  id          BigInt   @id @default(autoincrement())
+  worldId     String
+  generalId   Int
+  year        Int
+  month       Int
+  kind        String
+  score       Int
+  tick        Int
+  generalName String
+  nationId    Int?
+  nationName  String?
+  nationColor String?
+  cityKey     Int?
+  cityName    String?
+  createdAt   DateTime @default(now())
+  world       World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@unique([worldId, generalId, year, month, kind])
+  @@index([worldId, year, month])
+}
+
+model MonthlyReview {
+  worldId   String
+  year      Int
+  month     Int
+  tick      Int
+  entries   Json
+  headline  String?
+  createdAt DateTime @default(now())
+  world     World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@id([worldId, year, month])
+  @@unique([worldId, tick])
 }
 
 model GovernanceMovement {

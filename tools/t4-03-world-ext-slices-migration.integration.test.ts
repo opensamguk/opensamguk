@@ -504,6 +504,8 @@ it.each(['empty', 'legacy'] as const)(
         GovernanceMovement: [],
         HeritageAccount: [],
         HeritageEntry: [],
+        ReputationEvent: [],
+        MonthlyReview: [],
       });
       expect(await readSlices()).toEqual(slices);
       expect(

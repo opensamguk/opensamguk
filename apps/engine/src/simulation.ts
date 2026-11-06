@@ -19,6 +19,8 @@ export function simulateGame(
   initial: WorldInit,
   options: { maxYear?: number; convergence?: boolean; onYear?: (year: number, turns: number) => void } = {},
 ) {
+  if (initial.ruleFeatures?.includes('reputation-v1'))
+    throw new Error('월단평 월드는 턴 엔진과 형식 3 재생으로 실행하세요.');
   const maxYear = options.maxYear ?? DEFAULT_SIMULATION_MAX_YEAR;
   if (!Number.isSafeInteger(maxYear) || maxYear < initial.startYear || maxYear > 10000)
     throw new Error('종료 연도는 시작 연도 이상, 10000 이하여야 합니다.');
