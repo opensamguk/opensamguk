@@ -86,27 +86,58 @@ export const scenarioSchema = z.object({
 });
 
 const coefficients = z.union([z.record(z.string(), z.number().nonnegative()), z.array(z.never())]);
+export const crewResearchNames = z.enum([
+  'greatsword',
+  'halberd',
+  'fire_arrow',
+  'repeater',
+  'mountain',
+  'elephant',
+  'fire_wheel',
+]);
+export const crewRequirementSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('impossible') }),
+  z.strictObject({ kind: z.literal('tech'), min: natural }),
+  z.strictObject({ kind: z.literal('regions'), regions: z.array(positive.max(16)).min(1) }),
+  z.strictObject({ kind: z.literal('cities'), cityKeys: z.array(positive).min(1) }),
+  z.strictObject({ kind: z.literal('citiesWithLevel'), cityKeys: z.array(positive).min(1), level: positive }),
+  z.strictObject({ kind: z.literal('minRelYear'), min: natural }),
+  z.strictObject({ kind: z.literal('research'), name: crewResearchNames }),
+  z.strictObject({ kind: z.literal('scorched'), min: natural }),
+  z.strictObject({ kind: z.literal('chief') }),
+]);
+const crewEffects = z.enum(['firstVolley', 'guard5', 'cavalryClash', 'pikeWall', 'hold', 'avoid']);
 export const unitSetSchema = z.object({
   id: name,
   name,
   defaultCrewTypeId: positive,
   armTypes: z.record(z.string(), name),
+  coefMode: z.literal('multiply').optional(),
+  regionScheme: z.literal('province-191').optional(),
   crewTypes: z
     .array(
-      z.object({
-        id: positive,
-        armType: natural,
-        name,
-        attack: z.number().nonnegative(),
-        defence: z.number().nonnegative(),
-        speed: z.number().nonnegative(),
-        avoid: z.number().min(0).max(100),
-        magicCoef: z.number().nonnegative(),
-        cost: z.number().nonnegative(),
-        rice: z.number().nonnegative(),
-        attackCoef: coefficients,
-        defenceCoef: coefficients,
-      }),
+      z
+        .object({
+          id: positive,
+          armType: natural,
+          name,
+          attack: z.number().nonnegative(),
+          defence: z.number().nonnegative(),
+          speed: z.number().nonnegative(),
+          avoid: z.number().min(0).max(100),
+          magicCoef: z.number().nonnegative(),
+          cost: z.number().nonnegative(),
+          rice: z.number().nonnegative(),
+          attackCoef: coefficients,
+          defenceCoef: coefficients,
+          requirements: z.array(crewRequirementSchema).optional(),
+          effects: z.array(crewEffects).optional(),
+        })
+        .transform(({ requirements, effects, ...unit }) => ({
+          ...unit,
+          ...(requirements?.length ? { requirements } : {}),
+          ...(effects?.length ? { effects } : {}),
+        })),
     )
     .min(1),
 });

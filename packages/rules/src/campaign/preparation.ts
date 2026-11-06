@@ -6,6 +6,7 @@ import type { Actor, Failure } from '../commands/types';
 import { cloneWorld } from '../model/clone';
 import type { WorldView } from '../model/world';
 import { readCampaignState } from './state';
+import { crewContext, crewTypeFailure } from '../world/crewRequirements';
 
 const positive = z.number().int().min(1).max(1_000_000);
 const unitId = z.number().int().min(1).max(2_147_483_647).optional();
@@ -52,6 +53,8 @@ export function applyCampaignPreparation(view: WorldView, actor: Actor, key: Cam
     const args = campaignRecruitArgs.parse(value);
     const crewType = actor.unitSet?.crewTypes.find((row) => row.id === args.crewType && row.armType > 0);
     if (!crewType) return fail('NO_UNIT_SET', '모집할 병종을 확인하세요.');
+    const requirement = crewTypeFailure(crewType, crewContext(view, actor));
+    if (requirement) return { ok: false as const, ...requirement };
     if (unit && unit.troops > 0 && unit.crewType !== args.crewType)
       return fail('BAD_STATE', '소집해제 후 병종을 바꿀 수 있습니다.');
     const commanded = campaign.units

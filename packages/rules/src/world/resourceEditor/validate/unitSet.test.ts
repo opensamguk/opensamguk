@@ -6,6 +6,13 @@ import type { IssueTarget, ResourceIssueCode } from './issues';
 
 const cases: Array<[ResourceIssueCode, (s: UnitSetResource) => void, IssueTarget]> = [
   [
+    'unitset-id-arm-collision',
+    (s) => {
+      s.armTypes['1100'] = '겹치는 계열';
+    },
+    { kind: 'crewType', index: 1 },
+  ],
+  [
     'resource-id-mismatch',
     (s) => {
       s.id = 'other';
@@ -22,7 +29,7 @@ const cases: Array<[ResourceIssueCode, (s: UnitSetResource) => void, IssueTarget
   [
     'unitset-crew-id-duplicate',
     (s) => {
-      s.crewTypes[2]!.id = 1;
+      s.crewTypes[2]!.id = 1100;
     },
     { kind: 'crewType', index: 2 },
   ],

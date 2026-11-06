@@ -75,6 +75,7 @@ describe('AC-INT-06 휘하 프로필 생성·입력 재생 계약', () => {
       userId: 'owner',
       userActive: true,
       armyTypes: f.created.campaignArmyTypes!,
+      unitSet: f.created.campaignUnitSet!,
     });
     if (!applied.ok) throw new Error(applied.message);
     const record: RecordedInput = {

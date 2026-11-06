@@ -127,6 +127,8 @@ export function buildInitialWorld(input: {
   const map = operational ? { ...operational, cities: operationalAnchors(operational) } : mapSchema.parse(input.map);
   const scenario = scenarioSchema.parse(input.scenario);
   const unitSet = unitSetSchema.parse(input.unitSet);
+  if (unitSet.regionScheme !== undefined && unitSet.regionScheme !== operational?.regionScheme)
+    throw new Error('지도와 병종 판의 지역 기준이 다릅니다.');
   const statRules = statRulesSchema.parse(input.statRules).stat;
   const five = statRules.count === 5;
   if (operational && !five) throw new Error('운영 지도는 5능력치 프로필이 필요합니다.');

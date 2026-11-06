@@ -11,6 +11,7 @@ import { applyCityAllocation, cityAllocationArgs } from './allocation';
 import { applyCityPreparation, cityDrillArgs, cityRecruitArgs } from './preparation';
 import { disbandCityGarrison } from './ownership';
 import { readCityResourcesState } from './state';
+import { crewContext, crewTypeFailure } from '../world/crewRequirements';
 
 const formArgs = z.strictObject({ crewType: z.number().int().min(1).max(2_147_483_647) });
 export function canExecuteCityNationCommand(
@@ -30,8 +31,10 @@ function formUnit(view: WorldView, actor: Actor, value: unknown) {
   if (denied) return { ok: false as const, ...denied };
   const args = formArgs.safeParse(value);
   if (!args.success) return { ok: false as const, ...fail('BAD_ARGS', '빈 부곡의 병종을 확인하세요.') };
-  if (!actor.unitSet?.crewTypes.some((row) => row.id === args.data.crewType && row.armType > 0))
-    return { ok: false as const, ...fail('NO_UNIT_SET', '편성할 병종을 확인하세요.') };
+  const crewType = actor.unitSet?.crewTypes.find((row) => row.id === args.data.crewType && row.armType > 0);
+  if (!crewType) return { ok: false as const, ...fail('NO_UNIT_SET', '편성할 병종을 확인하세요.') };
+  const requirement = crewTypeFailure(crewType, crewContext(view, actor));
+  if (requirement) return { ok: false as const, ...requirement };
   const campaign = readCampaignState(view.campaign, view);
   if (
     campaign.units.some(

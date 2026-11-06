@@ -9,6 +9,7 @@ import { readCampaignState } from '../campaign/state';
 import { recruitCityGarrison } from './ledger';
 import { readCityResourcesState } from './state';
 import { consumeCityGoods, recruitGoods } from '../logistics/consumption';
+import { crewContext, crewTypeFailure } from '../world/crewRequirements';
 
 const positive = z.number().int().min(1).max(1_000_000);
 export const cityRecruitArgs = z.strictObject({ amount: positive, crewType: positive });
@@ -32,6 +33,10 @@ export function applyCityPreparation(view: WorldView, actor: Actor, key: CityPre
   const general = view.generals[actor.generalId]!;
   const crewType = actor.unitSet?.crewTypes.find((row) => row.id === parsed.data.crewType && row.armType > 0);
   if (!crewType) return fail('NO_UNIT_SET', '모집하거나 준비할 병종을 확인하세요.');
+  if (recruiting) {
+    const requirement = crewTypeFailure(crewType, crewContext(view, actor));
+    if (requirement) return { ok: false as const, ...requirement };
+  }
   const state = cloneWorld(view);
   state.cityResources = ledger;
   const city = state.cities[general.cityKey]!,

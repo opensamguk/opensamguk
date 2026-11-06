@@ -1108,11 +1108,11 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
       [
         {
           readme: context.readme.replace(
-            '원작 비교 분모 90개, 정본 분모 91개, 전 단계 완료 0개',
+            '원작 비교 분모 90개, 정본 분모 91개, 전 단계 완료 2개',
             '원작 비교 분모 37개, 정본 분모 37개, 전 단계 완료 37개',
           ),
         },
-        'README: 명령 대응표 출력(원작/정본/전 단계 완료) 불일치 (문서 37/37/37, 원장 90/91/0)',
+        'README: 명령 대응표 출력(원작/정본/전 단계 완료) 불일치 (문서 37/37/37, 원장 90/91/2)',
       ],
       [
         { readme: context.readme.replace(readmeM1Line, readmeM1Line.replace(readmeProgress, '통과')) },
@@ -1148,12 +1148,12 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
               line.startsWith('| AC-M1-14 ')
                 ? line
                     .replace('| 🟨 |', '| ✅ |')
-                    .replace('정본 분모 91(명령 88 + 미해결 원본 3), 전 단계 완료 0', '정본 분모 37, 전 단계 완료 37')
+                    .replace('정본 분모 91(명령 88 + 미해결 원본 3), 전 단계 완료 2', '정본 분모 37, 전 단계 완료 37')
                 : line,
             )
             .join('\n'),
         },
-        '인수조건 AC-M1-14: 남은 행이 있는데 ✅다 (전 단계 완료 0/91)',
+        '인수조건 AC-M1-14: 남은 행이 있는데 ✅다 (전 단계 완료 2/91)',
       ],
       [
         {
@@ -1202,8 +1202,21 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
     const noTrade = table();
     noTrade.commands = noTrade.commands.filter((command) => command.id !== 'trade');
     expect(errorsOf(noTrade)).toContain(
-      'README: 명령 대응표 출력(원작/정본/전 단계 완료) 불일치 (문서 90/91/0, 원장 90/90/0)',
+      'README: 명령 대응표 출력(원작/정본/전 단계 완료) 불일치 (문서 90/91/2, 원장 90/90/2)',
     );
+  });
+
+  it.each([
+    ['\n## D-997. 점이 있는 결정', true],
+    ['\n## D-997 점이 없는 결정', true],
+    ['\n본문 ## D-997 언급', false],
+    ['\n## D-9970 다른 번호', false],
+  ] as const)('결정 제목의 실제 두 형식만 승인 근거로 받는다: %s', (heading, exists) => {
+    const doc = table();
+    row(doc, 'farm').approvalRefs.push('D-997');
+    expect(
+      errorsOf(doc, withDocs({ decisions: context.decisions + heading })).includes('승인 근거 D-997가 문서에 없다'),
+    ).toBe(!exists);
   });
 
   it('반례: 이유 없는 해당 없음, 증거 없는 partial, 빠진 단계, 없는 증거 파일·승인·AC는 실패한다', () => {

@@ -39,7 +39,7 @@ export function validateMap(input: unknown, ctx?: { scenarios?: ReadonlyArray<un
       out.add(issue('city-out-of-canvas', target, { x: city.position.x, y: city.position.y }));
     if ((!operational && city.level < 1) || city.level > 8)
       out.add(issue('city-level-range', target, { level: city.level }, 'warning'));
-    if (city.region < 1 || city.region > 8)
+    if (city.region < 1 || city.region > 16)
       out.add(issue('city-region-range', target, { region: city.region }, 'warning'));
     for (const field of fields)
       if (city.initial[field] > city.max[field]) out.add(issue('city-initial-over-max', target, { field }));

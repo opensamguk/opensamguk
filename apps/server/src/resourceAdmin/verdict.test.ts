@@ -64,10 +64,10 @@ function unitFixture(): UnitSetResource {
   return {
     id: 'units',
     name: '병종표',
-    defaultCrewTypeId: 1,
+    defaultCrewTypeId: 1100,
     armTypes: { 1: '보병' },
     crewTypes: [
-      { ...base, id: 1, armType: 1 },
+      { ...base, id: 1100, armType: 1 },
       { ...base, id: 1000, armType: 0 },
     ],
   };
@@ -243,14 +243,14 @@ describe('자원 게시 판정', () => {
     raw.crewTypes[0]!.attackCoef = coefficients;
     raw.crewTypes[0]!.defenceCoef = { ...coefficients };
     const result = frozen(publishVerdict('UNIT_SET', frozen(raw)));
-    expect(result).toMatchObject({ publishable: true, report: { status: 'pass', truncated: true } });
+    expect(result).toMatchObject({ publishable: false, report: { status: 'fail', truncated: true } });
     expect(result.report.issues).toHaveLength(RESOURCE_LIMITS.diagnostics);
     const before = JSON.stringify(result);
     const size = Buffer.byteLength(before, 'utf8');
     expect(measureJson(result, size)).toEqual({ ok: true, bytes: size });
     expect(measureJson(result, size - 1)).toEqual({ ok: false });
     expect(JSON.stringify(result)).toBe(before);
-    expect(result.report.status).toBe('pass');
+    expect(result.report.status).toBe('fail');
     expect('value' in result.report).toBe(false);
   });
 

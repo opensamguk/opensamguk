@@ -54,7 +54,7 @@ describe('T4-76 지도 검증', () => {
     ['level', 0],
     ['level', 9],
     ['region', 0],
-    ['region', 9],
+    ['region', 17],
   ] as const)('%s %i는 권장 범위 경고만 내고 게시를 막지 않는다', (field, value) => {
     const map = mapFixture();
     map.cities[0]![field] = value;
@@ -71,7 +71,7 @@ describe('T4-76 지도 검증', () => {
   });
   it('도시 오류의 대상과 순서를 보존하고 원본을 바꾸지 않는다', () => {
     const map = mapFixture();
-    Object.assign(map.cities[1]!, { id: 1, name: '도시1', level: 0, region: 9, position: { x: -1, y: 10 } });
+    Object.assign(map.cities[1]!, { id: 1, name: '도시1', level: 0, region: 17, position: { x: -1, y: 10 } });
     map.cities[1]!.initial.wall = 101;
     const before = structuredClone(map);
     const report = complete(freezeDeep(map));

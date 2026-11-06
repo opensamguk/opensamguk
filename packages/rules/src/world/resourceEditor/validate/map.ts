@@ -43,7 +43,7 @@ export function validateMap(content: unknown, ctx: MapValidationContext = {}): V
     if (outside([x, y])) issues.push(resourceIssue('city-out-of-canvas', { name: city.name, x, y }, target));
     if (city.level < 1 || city.level > 8)
       issues.push(resourceIssue('city-level-range', { name: city.name, level: city.level }, target));
-    if (city.region < 1 || city.region > 8)
+    if (city.region < 1 || city.region > 16)
       issues.push(resourceIssue('city-region-range', { name: city.name, region: city.region }, target));
     for (const field of ['population', 'agriculture', 'commerce', 'security', 'defence', 'wall'] as const) {
       if (city.initial[field] > city.max[field])
