@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { MapV2 } from './contract';
 import { editorReducer, initialEditor, type EditorAction, type EditorState } from './editor';
 import { testCity, testMap } from './fixtures';
-import { validateMap } from './validate';
+import { editorIssues } from './validate';
 
 // T4-80 편집 reducer. 연결은 늘 양쪽에 함께 들어가고 빠진다.
 const run = (map: MapV2, ...actions: EditorAction[]): EditorState => actions.reduce(editorReducer, initialEditor(map));
@@ -89,7 +89,7 @@ describe('연결', () => {
       { type: 'toggleLink', a: 0, b: 2 },
     );
     expect(symmetric(state.map)).toBe(true);
-    expect(validateMap(state.map)).toEqual([]);
+    expect(editorIssues(state.map)).toEqual([]);
   });
 });
 
@@ -180,14 +180,15 @@ describe('지형', () => {
   });
 
   it('열린 다각형을 닫고 강 이름을 고치고 선을 지운다', () => {
+    // 해안은 시험 도시 (10,10)~(30,30)을 감싸 땅 밖 경고가 나지 않게 한다.
     const open = {
       ...testMap(),
       terrain: {
         coast: [
           [
             [0, 0],
-            [9, 0],
-            [9, 9],
+            [90, 0],
+            [90, 90],
           ],
         ],
         lakes: [],
@@ -207,7 +208,7 @@ describe('지형', () => {
       { type: 'closeTerrain', layer: 'coast', index: 0 },
       { type: 'renameRiver', index: 0, name: ' 장강 ' },
     );
-    expect(validateMap(state.map)).toEqual([]);
+    expect(editorIssues(state.map)).toEqual([]);
     expect(state.map.terrain.rivers[0]).toEqual({
       name: '장강',
       points: [

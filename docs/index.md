@@ -85,6 +85,7 @@
 | [T4-77 초기화 자원 DB 이전·초기화 SQL·JSON 삭제](./plans/T4-77.md) (AC-P2-26, 단계 S0~S8 실행 계획. Codex 기술 검토 PASS 필수 0. S0 코드와 순수 기준표는 Claude 재검토 PASS_SCOPE 필수 0, C7 입력 분류 한 곳 정정. 전체 unit·int·골든·시뮬레이션·처리량 UNRUN)                                                                                                                                                                                                                                                                                                                                                   | 구현                                                   | Phase 2             |
 
 | [T4-80 지도 편집 캔버스](./plans/T4-80.md) (AC-P2-27 일부, 서버 없는 편집·검증·v2와 밑그림 내보내기) | 구현 중 | Phase 2 |
+| [T4-88 지도 편집 캔버스를 rules 정본으로](./plans/T4-88.md) (AC-P2-27 일부, 공개 validateMap adapter·게시 che@1 E2E 입력. 실제 E2E·리뷰 전) | 구현 | Phase 2 |
 | [T4-34 전투 시뮬레이터 화면](./plans/T4-34.md) (AC-P2-16 (가), D-023. PR #132로 main `494272b` 병합. AC-P2-16 (나)는 남음) | 구현 병합 | Phase 2 |
 | [T4-30 토너먼트 대진 틀](./plans/T4-30.md), [T4-35 월간 영토 스냅샷 조회 API](./plans/T4-35.md) (AC-P2-15 (가), AC-P2-17 1차 API. Codex 계획 기술 검토 수용, 정본 한정 반영은 통합 커밋 전, 로컬 구현 WIP) | 계획 검토 수용 | Phase 2 |
 | [T4-05 계략 4종 규칙](./plans/T4-05.md) (AC-P2-03·AC-M1-14 후속, 규칙 구현 중, 운영 등록·엔진 연결은 별도) | 구현 중 | MVP·Phase 2 |
