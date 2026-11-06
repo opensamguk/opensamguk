@@ -8,6 +8,8 @@ import { NationBadge } from '../ui/NationBadge';
 import { Tag } from '../ui/Tag';
 import { InfoGrid } from './Panel';
 import styles from './GeneralInfo.module.css';
+import { EquipmentStatus } from '../equipment/EquipmentStatus';
+import type { EquipmentRead } from '../equipment/useEquipment';
 
 const n = (value: number) => value.toLocaleString('ko-KR');
 
@@ -37,6 +39,7 @@ export function GeneralInfo({
   nation,
   onSelectCity,
   campaignEnabled = false,
+  equipment,
 }: {
   worldId: string;
   home: Home;
@@ -44,9 +47,22 @@ export function GeneralInfo({
   nation: MapNation | undefined;
   onSelectCity: (key: number) => void;
   campaignEnabled?: boolean;
+  equipment?: EquipmentRead | undefined;
 }) {
   const g = home.general;
   const summary = useWorldSummary(worldId).data;
+  const board = equipment?.kind === 'ready' && equipment.data.generalId === g.id ? equipment.data : null;
+  const stat = (key: 'leadership' | 'strength' | 'intel') =>
+    board && board.bonus[key] > 0 ? (
+      <span>
+        <strong>{n(board.stats[key])}</strong>
+        <small className={styles.statNote}>
+          기본 {n(board.baseStats[key])} + 장비 {board.bonus[key]}
+        </small>
+      </span>
+    ) : (
+      n(board?.stats[key] ?? g[key])
+    );
   return (
     <div className={styles.general} data-general-id={g.id}>
       <div className={styles.head}>
@@ -71,9 +87,9 @@ export function GeneralInfo({
       </div>
       <InfoGrid
         items={[
-          { label: '통솔', value: n(g.leadership) },
-          { label: '무력', value: n(g.strength) },
-          { label: '지력', value: n(g.intel) },
+          { label: '통솔', value: stat('leadership') },
+          { label: '무력', value: stat('strength') },
+          { label: '지력', value: stat('intel') },
           ...('politics' in g && 'charm' in g && typeof g.politics === 'number' && typeof g.charm === 'number'
             ? [
                 { label: '정치', value: n(g.politics) },
@@ -97,6 +113,7 @@ export function GeneralInfo({
         ]}
       />
       {/* 가문 칸(T4-95)은 lineage-v1 월드에서만 그린다. 계승으로 장수가 바뀌어도 대기 요청을 이어 보도록 장수 id로 다시 만들지 않는다. */}
+      {equipment ? <EquipmentStatus read={equipment} /> : null}
       <LineagePanel worldId={worldId} />
     </div>
   );

@@ -23,6 +23,8 @@ const LABELS: Record<string, string> = {
   resource: '자원',
   name: '나라 이름',
   color: '나라 색',
+  slot: '장비 칸',
+  itemKey: '매매할 장비',
 };
 
 const RECRUITABLE = UNIT_CHOICES.filter((unit) => unit.armType > 0).map((unit) => ({
@@ -30,7 +32,7 @@ const RECRUITABLE = UNIT_CHOICES.filter((unit) => unit.armType > 0).map((unit) =
   label: unit.name,
 }));
 
-const ENUM_LABELS: Record<string, string> = { gold: '금', rice: '쌀' };
+const ENUM_LABELS: Record<string, string> = { gold: '금', rice: '쌀', horse: '명마', weapon: '무기', book: '서적' };
 
 interface JsonProperty {
   type?: string;

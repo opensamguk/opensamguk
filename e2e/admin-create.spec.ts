@@ -184,8 +184,15 @@ test('AC-M3-04 CH-03 실제 읽기 응답의 표식 변경 주입은 POST0으로
         {
           id: 'integration-v01-expanded',
           available: true,
-          featureProfileKey: 'expanded-191-v1',
-          ruleFeatures: [...creationFeatures, 'governance-v1', 'heritage-v1', 'lineage-v1', 'logistics-v1'].sort(),
+          featureProfileKey: 'expanded-191-v2',
+          ruleFeatures: [
+            ...creationFeatures,
+            'equipment-v1',
+            'governance-v1',
+            'heritage-v1',
+            'lineage-v1',
+            'logistics-v1',
+          ].sort(),
         },
       ],
     });

@@ -21,6 +21,7 @@ export default defineConfig({
     '**/admin-create.spec.ts',
     '**/admin-create-profile.spec.ts',
     '**/admin-reset.spec.ts',
+    '**/t4-24-equipment.spec.ts',
     '**/t4-93-logistics.spec.ts',
     '**/t4-94-governance.spec.ts',
     '**/t4-95-lineage.spec.ts',
