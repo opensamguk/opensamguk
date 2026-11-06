@@ -8,6 +8,8 @@ import {
   nowTick,
   scenarioSchema,
   toGameDate,
+  parseResourceKey,
+  formatResourceKey,
 } from '@opensamguk/rules';
 import { z } from 'zod';
 import { resourceRoot } from '@opensamguk/shared/resource-root';
@@ -18,30 +20,31 @@ const titleSchema = scenarioSchema.pick({ id: true, title: true });
 const titles = new Map<string, string>();
 
 export async function scenarioTitle(key: string, db?: Pick<Prisma.TransactionClient, 'gameResource'>): Promise<string> {
-  if (!/^[a-zA-Z0-9_-]+$/.test(key)) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
   try {
+    const ref = parseResourceKey(key),
+      canonical = formatResourceKey(ref);
     let content: unknown,
       fromFile = false;
     const published =
       db &&
       (await db.gameResource.findFirst({
-        where: { kind: 'SCENARIO', name: key, version: 1, status: 'PUBLISHED' },
+        where: { kind: 'SCENARIO', ...ref, status: 'PUBLISHED' },
         select: { id: true },
       }));
     if (published) {
-      const [resource] = await readPublishedResources(db!, [{ kind: 'SCENARIO', name: key, version: 1 }]);
+      const [resource] = await readPublishedResources(db!, [{ kind: 'SCENARIO', ...ref }]);
       content = resource!.content;
     } else {
-      if (key === 'default') throw new Error();
-      const cached = titles.get(key);
+      if (ref.version !== 1 || ref.name === 'default') throw new Error();
+      const cached = titles.get(canonical);
       if (cached !== undefined) return cached;
-      content = JSON.parse(await readFile(new URL(`scenario/${key}.json`, resourceRoot()), 'utf8'));
+      content = JSON.parse(await readFile(new URL(`scenario/${ref.name}.json`, resourceRoot()), 'utf8'));
       fromFile = true;
     }
     const value = titleSchema.parse(content);
-    if (value.id !== key) throw new Error();
+    if (value.id !== ref.name) throw new Error();
     // 파일 제목만 캐시한다. 카탈로그 조회는 현재 DB 트랜잭션의 판을 쓴다.
-    if (fromFile) titles.set(key, value.title);
+    if (fromFile) titles.set(canonical, value.title);
     return value.title;
   } catch {
     throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });

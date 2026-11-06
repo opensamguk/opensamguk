@@ -41,6 +41,17 @@ const san10Rows = (
 });
 const allRows = [...rows, ...san10Rows],
   allPresets = [...presets, { key: 'empty', value: json('resources/preset/empty.json') }];
+const expandedScenario = json('resources/scenario/san10-191-v2.json');
+const expandedRows = [
+  ...allRows,
+  {
+    kind: 'SCENARIO' as const,
+    name: 'san10-191',
+    version: 2,
+    content: expandedScenario,
+    contentHash: hashState(expandedScenario),
+  },
+];
 // 도시 기능의 실제 구현을 대신하지 않는다. 순수 목록 검증의 등록된 분기만 확인한다.
 const registered: RuleRegistry = {
   ...ruleRegistry,
@@ -50,6 +61,39 @@ const registered: RuleRegistry = {
   ],
 };
 describe('AC-M3-04 원생성 설정 조회', () => {
+  it('AC-P2-04·AC-P2-03 새 SAN10 확장 선택은 시나리오 2판·다섯 자원·19기능을 고정한다', () => {
+    const data = json('resources/feature-profile/expanded-191-v4.json');
+    const expanded = expandedCreationProfile(expandedRows, allPresets, data, ruleRegistry, 'san10-191-expanded');
+    expect(expanded).toMatchObject({
+      id: 'san10-191-expanded',
+      available: true,
+      featureProfileKey: 'expanded-191-v4',
+      featureProfileHash: hashState(data),
+      selection: {
+        mapKey: 'san10',
+        scenarioKey: 'san10-191@2',
+        unitSetKey: 'expanded',
+        statRulesKey: 'five-stats',
+        portraitMapKey: '191-map',
+      },
+      suggestedEndYear: 231,
+    });
+    if (!expanded.available) throw Error('실제 SAN10 확장 선택이 필요합니다.');
+    expect(expanded.ruleFeatures).toHaveLength(19);
+    expect(expanded.resources.find((row) => row.kind === 'SCENARIO')).toMatchObject({ key: 'san10-191', version: 2 });
+    expect(expandedCreationProfile(allRows, allPresets, data, ruleRegistry, 'san10-191-expanded')).toMatchObject({
+      available: false,
+      code: 'RESOURCES_UNAVAILABLE',
+    });
+    expect(expandedCreationProfile(expandedRows, allPresets, data, ruleRegistry)).toMatchObject({
+      available: false,
+      code: 'FEATURE_PROFILE_UNAVAILABLE',
+    });
+    for (const id of ['integration-v01', 'san10-191', 'san10-empty'] as const)
+      expect(creationProfile(expandedRows, allPresets, ruleRegistry, id)).toEqual(
+        creationProfile(allRows, allPresets, ruleRegistry, id),
+      );
+  });
   it('기존 프로필 바이트·규칙을 보존하고 새 형식은 장비 설정과 기능을 함께 요구한다', () => {
     const legacy = json('resources/feature-profile/expanded-191-v1.json');
     expect(hashState(legacy)).toBe('9afb4ff72357feace11d1340f425b336a6558603f0d84de8aa81e35ef1472e1f');

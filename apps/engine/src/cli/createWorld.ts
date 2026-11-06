@@ -1,7 +1,7 @@
 import { parseArgs } from 'node:util';
 import { createDb } from '@opensamguk/db';
 import { checkRuleFeatures } from '@opensamguk/rules';
-import { loadInitialWorld, loadInitialWorldFromDb, loadPreset } from '../world/resources';
+import { composeInitialWorld, loadInitialWorld, readInitialResources, loadPreset } from '../world/resources';
 import { createWorldFromCli } from '../admin/creation';
 
 async function main() {
@@ -36,25 +36,23 @@ async function main() {
   const { seed, name } = values;
   if (!scenario || !map || !seed || !name || turnTermMinutes === undefined || !values['end-year'])
     throw new Error('scenario, map, seed, turn-term, end-year, name이 필요합니다.');
+  const selection = {
+    scenario,
+    map,
+    seed,
+    ...(values['unit-set'] !== undefined ? { unitSet: values['unit-set'] } : preset ? { unitSet: preset.unitSet } : {}),
+    ...(values['stat-rules'] !== undefined ? { statRules: values['stat-rules'] } : {}),
+    ...(values['portrait-map'] !== undefined ? { portraitMap: values['portrait-map'] } : {}),
+  };
+  const fromFile = values.published ? undefined : await loadInitialWorld(selection);
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) throw new Error('DATABASE_URL이 없습니다. .env.example을 .env로 복사하세요.');
   const db = createDb(databaseUrl);
   try {
-    const selection = {
-      scenario,
-      map,
-      seed,
-      ...(values['unit-set'] !== undefined
-        ? { unitSet: values['unit-set'] }
-        : preset
-          ? { unitSet: preset.unitSet }
-          : {}),
-      ...(values['stat-rules'] !== undefined ? { statRules: values['stat-rules'] } : {}),
-      ...(values['portrait-map'] !== undefined ? { portraitMap: values['portrait-map'] } : {}),
-    };
-    const state = values.published ? await loadInitialWorldFromDb(db, selection) : await loadInitialWorld(selection);
+    const resources = values.published ? await readInitialResources(db, selection) : undefined;
+    const state = resources ? composeInitialWorld(resources, seed) : fromFile!;
     let ruleFeatures: string[] | undefined;
-    const selectedFeatures = state.unitSetKey === 'expanded' ? ['battle-affinity-v2'] : [];
+    const selectedFeatures = state.unitSet?.coefMode === 'multiply' ? ['battle-affinity-v2'] : [];
     if (values['rule-features'] !== undefined || selectedFeatures.length) {
       const requested = values['rule-features']?.split(',') ?? [];
       if (new Set(requested).size !== requested.length) throw new Error('규칙 기능이 중복됩니다.');
@@ -65,14 +63,19 @@ async function main() {
     }
     console.log(
       JSON.stringify(
-        await createWorldFromCli(db, state, {
-          ...(ruleFeatures !== undefined ? { ruleFeatures } : {}),
-          name,
-          turnTermMinutes,
-          ...(preset ? { preset: { key: values.preset!, value: preset } } : {}),
-          ...(values.treaty ? { treatyFormat: 1 } : {}),
-          endYear: Number(values['end-year']),
-        }),
+        await createWorldFromCli(
+          db,
+          state,
+          {
+            ...(ruleFeatures !== undefined ? { ruleFeatures } : {}),
+            name,
+            turnTermMinutes,
+            ...(preset ? { preset: { key: values.preset!, value: preset } } : {}),
+            ...(values.treaty ? { treatyFormat: 1 } : {}),
+            endYear: Number(values['end-year']),
+          },
+          ...(resources ? ([resources] as const) : []),
+        ),
       ),
     );
   } finally {

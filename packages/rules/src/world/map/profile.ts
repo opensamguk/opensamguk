@@ -2,9 +2,10 @@ import type { WorldInit } from '../bootstrap';
 import { operationalMapSchema } from './operational';
 import { operationalAnchors } from './anchors';
 import { validateMap } from '../validate/map';
+import { CITY_SCALE_FEATURE, cityScaleRecordSchema, resolveCityScale } from './cityScale';
 
 export function checkOperationalProfile(
-  initial: Pick<WorldInit, 'ruleFeatures' | 'operationalMap' | 'cities' | 'nations'>,
+  initial: Pick<WorldInit, 'ruleFeatures' | 'operationalMap' | 'cities' | 'nations' | 'cityScale'>,
 ) {
   const enabled = initial.ruleFeatures?.includes('operational-map') ?? false;
   if (!enabled) {
@@ -14,7 +15,21 @@ export function checkOperationalProfile(
   }
   const map = operationalMapSchema.parse(initial.operationalMap);
   if (validateMap(map, { scenarios: [] }).status !== 'pass') throw new Error('운영 지도의 연결망을 확인하세요.');
-  const anchors = operationalAnchors(map);
+  const source = operationalAnchors(map);
+  const record = initial.ruleFeatures?.includes(CITY_SCALE_FEATURE)
+    ? cityScaleRecordSchema.parse(initial.cityScale)
+    : undefined;
+  const scaled = resolveCityScale(
+    source,
+    record?.cities.map((row) => ({
+      city: source.find((city) => city.id === row.cityKey)?.name ?? '',
+      level: row.level,
+      ...(row.ruin ? { ruin: true as const } : {}),
+    })),
+  );
+  if (JSON.stringify(scaled.record) !== JSON.stringify(record))
+    throw new Error('도시 규모의 생성 원장과 지도 계산 결과가 다릅니다.');
+  const anchors = scaled.cities;
   if (initial.cities.length !== anchors.length) throw new Error('운영 지도의 앵커 수가 생성 상태와 다릅니다.');
   const cities = new Map(initial.cities.map((city) => [city.cityKey, city]));
   for (const anchor of anchors) {

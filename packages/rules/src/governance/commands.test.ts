@@ -1,7 +1,8 @@
 import { rngFor } from '@opensamguk/shared';
 import { describe, expect, it } from 'vitest';
 import { testUnits } from '../../test/commandFixture';
-import { createCommandResolver } from '../commands/resolve';
+import { createCommandResolver, createCommandResolverWithCommands, extensionCommands } from '../commands/resolve';
+import { nationStrategyCommands } from '../nationStrategy/commands';
 import type { Actor } from '../commands/types';
 import { createCampaignCommandResolver } from '../campaign/commands';
 import { deepFreeze } from '../personnel/testFixture';
@@ -17,15 +18,23 @@ function fixture() {
 }
 describe('AC-P2-31 봉신 계열의 모든 명령 소비 경계', () => {
   it.each(GOVERNANCE_HOSTILE_COMMANDS)('%s를 조회 정의·목록·사전 판정·실행에서 모두 차단한다', (key) => {
+    const selectedBase =
+      key === 'nation_raid'
+        ? createCommandResolverWithCommands({ general: [], nation: ['nation_raid'] }, [
+            ...extensionCommands,
+            ...nationStrategyCommands,
+          ])
+        : base;
     const world = deepFreeze(fixture()),
-      resolver = createGovernanceCommandResolver(base);
+      resolver = createGovernanceCommandResolver(selectedBase);
+    const nationTarget = key === 'nation_declare' || key === 'nation_raid';
     const actor: Actor = {
       generalId: 1,
-      target: key === 'nation_declare' ? 'nation' : 'general',
+      target: nationTarget ? 'nation' : 'general',
       tick: 0,
       unitSet: testUnits,
     };
-    const args = key === 'nation_declare' ? { nationId: 2 } : { cityKey: 2 };
+    const args = nationTarget ? { nationId: 2 } : { cityKey: 2 };
     const def = resolver.get(key)!;
     expect(def).toBeDefined();
     expect(def.check(world, actor, args)?.code).toBe('VASSAL_BOUND');

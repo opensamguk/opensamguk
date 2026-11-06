@@ -1,5 +1,6 @@
 import { MAP_DEFAULT_CANVAS, parseMapInput, type MapInput } from '../map/format';
 import { operationalAnchors } from '../map/anchors';
+import { checkMapCityScale, resolveCityScale } from '../map/cityScale';
 import { scenarioSchema } from '../resources';
 import { issue, ReportBuilder, type ResourceIssue, type ResourceReport } from './issues';
 import { RESOURCE_LIMITS, scanLimits, type ScenarioCounts } from './limits';
@@ -37,8 +38,14 @@ export function validateMap(input: unknown, ctx?: { scenarios?: ReadonlyArray<un
     if (city.name.trim() !== city.name || !city.name.trim()) out.add(issue('city-name-blank', target, {}, 'warning'));
     if (!inside(city.position.x, city.position.y))
       out.add(issue('city-out-of-canvas', target, { x: city.position.x, y: city.position.y }));
-    if ((!operational && city.level < 1) || city.level > 8)
-      out.add(issue('city-level-range', target, { level: city.level }, 'warning'));
+    if (city.level > 9) out.add(issue('city-level-range', target, { level: city.level }, 'warning'));
+    else {
+      try {
+        checkMapCityScale(city);
+      } catch {
+        out.add(issue('city-scale-invalid', target));
+      }
+    }
     if (city.region < 1 || city.region > 16)
       out.add(issue('city-region-range', target, { region: city.region }, 'warning'));
     for (const field of fields)
@@ -163,6 +170,12 @@ export function validateMap(input: unknown, ctx?: { scenarios?: ReadonlyArray<un
     }
     const source = { kind: 'SCENARIO', index } as const;
     const add = (item: ResourceIssue) => out.add({ ...item, source });
+    if (parsed.data.cityScale)
+      try {
+        resolveCityScale(cities, parsed.data.cityScale.cities);
+      } catch {
+        add(issue('city-scale-invalid', { kind: 'path', path: ['cityScale'] }));
+      }
     parsed.data.nation.forEach((nation, i) => {
       if (operational && !cities.some((city) => city.name === nation[8][0] && 'kind' in city && city.kind === 'CITY'))
         add(issue('shape-invalid', { kind: 'path', path: ['nation', i, 8, 0] }, { expected: 'CITY' }));

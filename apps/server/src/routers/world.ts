@@ -3,6 +3,7 @@ import { protectedProcedure, publicProcedure, router } from '../trpc';
 import { readWorld, worldInput, worldSummary } from '../queries';
 import { mapCity, publicMapInfo } from '../visibility';
 import { readOperationalMap, operationalMapDisplay } from '@opensamguk/rules';
+import { readCityScaleProjection } from '../game/cityScale';
 
 export const worldRouter = router({
   publicMaps: publicProcedure.input(z.void()).query(async ({ ctx }) => {
@@ -63,7 +64,15 @@ export const worldRouter = router({
         select: { operationalMap: true, ruleFeatures: true, replayOrigin: true },
       });
       const map = readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin);
-      return { cities: cities.map(mapCity), nations, ...(map ? { operationalMap: operationalMapDisplay(map) } : {}) };
+      const ruins = await readCityScaleProjection(tx, input.worldId, world.ruleFeatures, cities);
+      return {
+        cities: cities.map((city) => ({
+          ...mapCity(city),
+          ...(ruins ? { ruin: ruins.get(city.cityKey) ?? null } : {}),
+        })),
+        nations,
+        ...(map ? { operationalMap: operationalMapDisplay(map) } : {}),
+      };
     }),
   ),
 });

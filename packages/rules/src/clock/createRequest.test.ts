@@ -16,6 +16,26 @@ const input = {
   endYear: 201,
 };
 describe('ADMIN-CREATE-B AC-M3-04 생성 요청 계약', () => {
+  it('다섯 자원 판의 @1은 같은 intent이며 파일 설정 키는 판 번호를 받지 않는다', () => {
+    const plain = { ...input, unitSetKey: 'basic', statRulesKey: 'default', portraitMapKey: 'rtk14-map' };
+    const aliases = {
+      ...plain,
+      scenarioKey: 'integration191@1',
+      mapKey: 'integration@1',
+      unitSetKey: 'basic@1',
+      statRulesKey: 'default@1',
+      portraitMapKey: 'rtk14-map@1',
+    };
+    expect(worldCreateIntent(aliases)).toEqual(worldCreateIntent(plain));
+    expect(worldCreateIntent(requestWorldCreateInput.parse(aliases))).toEqual(worldCreateIntent(plain));
+    expect(requestWorldCreateInput.safeParse({ ...input, presetKey: 'regular@1' }).success).toBe(false);
+    expect(
+      requestWorldCreateInput.safeParse({ ...input, featureProfileKey: 'expanded-191-v3@1', ruleFeatures: [] }).success,
+    ).toBe(false);
+    expect(worldCreateIntent(requestWorldCreateInput.parse({ ...input, mapKey: 'integration@2' })).mapKey).toBe(
+      'integration@2',
+    );
+  });
   it('클라이언트 intent와 서버가 정할 시드·월드 UUID를 분리한다', () => {
     const parsed = requestWorldCreateInput.parse(input),
       intent = worldCreateIntent(parsed);

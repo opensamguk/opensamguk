@@ -2,15 +2,12 @@ import { TRPCError } from '@trpc/server';
 import type { Prisma } from '@opensamguk/db';
 import { hashState } from '@opensamguk/shared/node';
 import { z } from 'zod';
+import { resourceNameSchema } from '@opensamguk/rules';
 import { checkContent, makeLimits, measureJson, type Content, type Limits } from './payload';
 
 const kinds = ['MAP', 'SCENARIO', 'UNIT_SET', 'STAT_RULES', 'PORTRAIT_MAP'] as const;
 const statuses = ['DRAFT', 'PUBLISHED'] as const;
-export const resourceName = z
-  .string()
-  .min(1)
-  .max(40)
-  .regex(/^[a-zA-Z0-9_-]+$/);
+export const resourceName = resourceNameSchema;
 export const listInput = z.strictObject({
   kind: z.enum(kinds).optional(),
   name: resourceName.optional(),

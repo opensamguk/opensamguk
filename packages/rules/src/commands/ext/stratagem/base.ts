@@ -100,12 +100,17 @@ export function stratagemProbability(
     ) /
       STRATAGEM.STAT_COEFFICIENT +
     (Math.log2(defenders.length + 1) - 1.25) * 0.04 +
-    city.security / city.securityMax / 5 +
+    developmentRatio(view, city.security, city.securityMax) / 5 +
     (city.supplied ? 0.1 : 0);
   return Math.min(
     STRATAGEM.MAX_PROBABILITY,
     Math.max(0, (STRATAGEM.BASE_PROBABILITY + attack - defence) / stratagemDistance(view, general.cityKey, cityKey)),
   );
+}
+
+// 폐허의 내림으로 최대치가 0이 된 새 월드만 비율을 0으로 읽는다. 기존 공식은 보존한다.
+function developmentRatio(view: WorldView, value: number, max: number): number {
+  return max === 0 && view.ruleFeatures?.includes('city-scale-v1') ? 0 : value / max;
 }
 
 export function plunderYearCoefficient(startYear: number, year: number): number {
@@ -188,11 +193,11 @@ export function executeStratagem(
       const targetNation = view.nations[city.nationId!]!;
       const coefficient = city.level * plunderYearCoefficient(view.startYear, year);
       primary = Math.min(
-        primary * coefficient * (0.25 + city.commerce / city.commerceMax / 4),
+        primary * coefficient * (0.25 + developmentRatio(view, city.commerce, city.commerceMax) / 4),
         Math.max(0, targetNation.gold),
       );
       secondary = Math.min(
-        secondary * coefficient * (0.25 + city.agriculture / city.agricultureMax / 4),
+        secondary * coefficient * (0.25 + developmentRatio(view, city.agriculture, city.agricultureMax) / 4),
         Math.max(0, targetNation.rice),
       );
       // 정수 자원 효과의 .5 반올림으로 자원이 늘지 않도록 총량을 먼저 고정한다.

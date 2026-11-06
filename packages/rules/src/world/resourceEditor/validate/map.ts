@@ -1,6 +1,6 @@
 import { mapResourceSchema, MAP_DEFAULT_CANVAS, MAP_LIMITS, type MapResource, type Point } from '../map/format';
 import { isClosedRing, pointInRings } from '../map/geometry';
-import { scenarioSchema } from '../resources';
+import { scenarioSchema, checkMapCityScale } from '../resources';
 import { checkId, report, resourceIssue, shapeIssues, type ValidationReport } from './issues';
 import { scenarioCityIssues } from './scenario';
 
@@ -41,8 +41,14 @@ export function validateMap(content: unknown, ctx: MapValidationContext = {}): V
     }
     const { x, y } = city.position;
     if (outside([x, y])) issues.push(resourceIssue('city-out-of-canvas', { name: city.name, x, y }, target));
-    if (city.level < 1 || city.level > 8)
-      issues.push(resourceIssue('city-level-range', { name: city.name, level: city.level }, target));
+    if (city.level > 9) issues.push(resourceIssue('city-level-range', { name: city.name, level: city.level }, target));
+    else {
+      try {
+        checkMapCityScale(city);
+      } catch {
+        issues.push(resourceIssue('city-scale-invalid', {}, target));
+      }
+    }
     if (city.region < 1 || city.region > 16)
       issues.push(resourceIssue('city-region-range', { name: city.name, region: city.region }, target));
     for (const field of ['population', 'agriculture', 'commerce', 'security', 'defence', 'wall'] as const) {

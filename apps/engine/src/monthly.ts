@@ -26,6 +26,8 @@ import { persistExt } from './extState';
 import { persistTreatyClosures } from './treatyState';
 import { persistCampaignState, readCampaignArmyTypes } from './campaignState';
 import { persistCityResourcesState } from './cityResourcesState';
+import { persistCityRuins } from './cityScaleState';
+import { persistNationStrategy } from './nationStrategyState';
 import { persistLogisticsState } from './logisticsState';
 import { persistGovernanceState } from './governance/repository';
 import { persistLineageState } from './lineage/repository';
@@ -136,6 +138,8 @@ export async function persistMonthly(
   await tx.diplomacy.deleteMany({ where: { worldId } });
   await tx.diplomacy.createMany({ data: next.diplomacies.map((entry) => ({ ...entry, worldId })) });
   await persistExt(tx, worldId, before.ext, next.ext);
+  await persistCityRuins(tx, worldId, before, next);
+  await persistNationStrategy(tx, worldId, before, next);
   await persistLogisticsState(tx, worldId, before, next);
   await persistGovernanceState(tx, worldId, before, next);
   await persistLineageState(tx, worldId, before, next);

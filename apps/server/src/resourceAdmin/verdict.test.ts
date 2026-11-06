@@ -220,7 +220,7 @@ describe('자원 게시 판정', () => {
       ...structuredClone(city),
       id: index + 1,
       name: index === 0 ? '도시' : `도시${index}`,
-      level: 0,
+      level: 10,
       region: 0,
       connections: [((index + 999) % 1000) + 1, ((index + 1) % 1000) + 1],
     }));

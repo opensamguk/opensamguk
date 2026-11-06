@@ -31,7 +31,7 @@ export function readStratagemCardsStorage(world: CardsWorldRecord) {
     JSON.stringify(world.ruleFeatures) !== JSON.stringify(origin.initial.ruleFeatures)
   )
     throw Error('계략 패 기능이 원생성과 다릅니다.');
-  const config = readStratagemCardsConfig(origin.featureData['stratagem-cards-v1']),
+  const config = readStratagemCardsConfig(origin.featureData['stratagem-cards-v1'], world.ruleFeatures),
     stored = stratagemCardsStateSchema.parse(world.stratagemCardsState);
   if (JSON.stringify(stored.config) !== JSON.stringify(config) || stored.seed !== origin.initial.seed)
     throw Error('계략 패 설정·시드가 원생성과 다릅니다.');

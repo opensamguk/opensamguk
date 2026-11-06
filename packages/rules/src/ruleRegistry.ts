@@ -38,6 +38,9 @@ import { applyAdminGameRecord } from './admin/apply';
 import { ADMIN_SETTING_KINDS, applyAdminSettingRecord } from './admin/settings';
 import type { UnitSetResource } from './world/resources';
 import { reputationFeature } from './review/feature';
+import { cityScaleFeature } from './cityScale/feature';
+import { checkCityScaleInitial } from './cityScale/state';
+import { nationStrategyFeature } from './nationStrategy/feature';
 
 export interface ReplayOriginV1 {
   version: 1;
@@ -112,6 +115,8 @@ export const ruleRegistry: RuleRegistry = {
     heritageFeature,
     stratagemCardsFeature,
     reputationFeature,
+    cityScaleFeature,
+    nationStrategyFeature,
   ],
   monthlyOrder: [
     'treaty',
@@ -122,6 +127,7 @@ export const ruleRegistry: RuleRegistry = {
     'governance-v1',
     'stratagem-cards-v1',
     'reputation-v1',
+    'city-scale-v1',
   ],
   inputKinds: [
     ...ADMIN_SETTING_KINDS.map((kind) => ({
@@ -220,6 +226,7 @@ export function checkReplayOrigin(
   if (!origin || ![1, 3].includes(origin.version) || !origin.initial || typeof origin.initial !== 'object')
     throw new Error('재생 생성 기록의 버전을 확인하세요.');
   checkStatProfile(origin.initial);
+  checkCityScaleInitial(origin.initial);
   checkOperationalProfile(origin.initial);
   if (origin.initial.unitSet.coefMode === 'multiply' && !origin.initial.ruleFeatures?.includes('battle-affinity-v2'))
     throw new Error('곱셈 병종 판에는 battle-affinity-v2 규칙 기능이 필요합니다.');

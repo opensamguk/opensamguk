@@ -2,12 +2,14 @@ import type { Prisma } from '@opensamguk/db';
 import {
   projectTreatyRows,
   selectWorldCapabilities,
+  readStoredNationStrategy,
   validateBrokenTreatyRow,
   validateClosedTreatyRow,
   type WorldCapabilities,
 } from '@opensamguk/rules';
 import { checkStoredReplayFormat } from './features';
 import { assertStoredCityResources } from './cityResourcesState';
+import { assertStoredCityRuins } from './cityScaleState';
 import { assertStoredLogistics } from './logisticsState';
 import { readCampaignArmyTypes } from './campaignState';
 
@@ -18,8 +20,10 @@ export async function assertWorldCapabilities(
 ): Promise<WorldCapabilities | { kind: 'registry'; armyTypes?: readonly number[] }> {
   const modern = world.replayFormat === 3;
   const origin = checkStoredReplayFormat(world);
+  readStoredNationStrategy(world);
   const armyTypes = world.ruleFeatures.includes('campaign-v1') ? readCampaignArmyTypes(world, origin) : [];
   await assertStoredCityResources(tx, world, armyTypes);
+  await assertStoredCityRuins(tx, world);
   await assertStoredLogistics(tx, world);
   const capabilities = modern ? { kind: 'registry' as const, armyTypes } : selectWorldCapabilities(world);
   const rows = await tx.treaty.findMany({

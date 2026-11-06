@@ -26,6 +26,8 @@ import {
   attachOperationalKinds,
   emptyCampaignState,
   emptyCityResourcesState,
+  initialCityRuins,
+  initialNationStrategy,
   initialLogisticsState,
   initialEquipment,
   equipmentConfigSchema,
@@ -277,6 +279,12 @@ export function prepareInitialWorld(
         ...(features.includes('city-resources-v1')
           ? { cityResourcesState: emptyCityResourcesState(toWorldState(creationState)) as Prisma.InputJsonValue }
           : {}),
+        ...(features.includes('city-scale-v1')
+          ? { cityRuinsState: initialCityRuins(creationState) as Prisma.InputJsonValue }
+          : {}),
+        ...(features.includes('nation-strategy-v1')
+          ? { nationStrategyState: initialNationStrategy() as Prisma.InputJsonValue }
+          : {}),
         ...(features.includes('logistics-v1')
           ? {
               logisticsState: initialLogisticsState(
@@ -312,7 +320,7 @@ export function prepareInitialWorld(
         ...(features.includes('stratagem-cards-v1')
           ? {
               stratagemCardsState: initialStratagemCards(
-                readStratagemCardsConfig(featureData?.['stratagem-cards-v1']),
+                readStratagemCardsConfig(featureData?.['stratagem-cards-v1'], features),
                 toWorldState(creationState),
                 creationState.seed,
               ) as Prisma.InputJsonValue,
@@ -392,6 +400,12 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
     async (tx) => {
       const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
       const { preset, commands } = engineResolver(world);
+      let cityScale: WorldInit['cityScale'];
+      if (world.ruleFeatures.includes('city-scale-v1')) {
+        const origin: unknown = world.replayOrigin;
+        checkReplayOrigin(origin);
+        cityScale = origin.initial.cityScale;
+      }
       const ext = await loadExt(tx, worldId, commands);
       const cities = await tx.city.findMany({ where: { worldId }, orderBy: { cityKey: 'asc' } });
       const nations = await tx.nation.findMany({
@@ -422,6 +436,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
       const rules = effectiveWorldOptions(preset, world.runtimeOptions).presetRules;
       return {
         ...(operationalMap ? { operationalMap } : {}),
+        ...(cityScale ? { cityScale } : {}),
         ...(rules ? { presetRules: rules } : {}),
         ...(world.ruleFeatures?.length ? { ruleFeatures: [...world.ruleFeatures] } : {}),
         ...(ext ? { ext } : {}),

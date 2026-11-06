@@ -10,6 +10,7 @@ import { persistGovernanceState } from './governance/repository';
 import { persistLineageState } from './lineage/repository';
 import { persistStratagemCardsState } from './stratagemCards/state';
 import { persistEquipmentState } from './equipmentState';
+import { persistNationStrategy } from './nationStrategyState';
 
 export async function loadCommandState(
   tx: Prisma.TransactionClient,
@@ -42,6 +43,7 @@ export async function persistCommandState(
 ) {
   // 같은 잠긴 트랜잭션에서 읽은 사본은 다시 조회하지 않는다.
   const before = previous ?? (await loadWorld(tx, worldId));
+  await persistNationStrategy(tx, worldId, before, state);
   await persistCampaignState(tx, worldId, before, state);
   const cityArmyTypes = before.ruleFeatures?.includes('city-resources-v1')
     ? (knownCityArmyTypes ??

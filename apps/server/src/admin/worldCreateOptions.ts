@@ -11,6 +11,7 @@ import {
   type RuleRegistry,
   featureProfileSchema,
   type FeatureProfile,
+  parseResourceKey,
 } from '@opensamguk/rules';
 import { operationalMapSchema, validateWorldResources } from '@opensamguk/rules/resource-validation';
 import { hashState } from '@opensamguk/shared/node';
@@ -51,7 +52,7 @@ export const creationRefs = [
 const presetKeys = ['regular', 'speed', 'beginner', 'hardcore'] as const;
 const identity = { id: 'integration-v01', label: '통합판 v0.1 · 191년 군웅할거' } as const;
 const profileIds = ['integration-v01', 'san10-191', 'san10-empty'] as const;
-type ProfileId = (typeof profileIds)[number];
+type ProfileId = keyof typeof contracts;
 type Selection = Record<keyof typeof creationSelection, string>;
 type Identity = { id: ProfileId | 'integration-v01-expanded'; label: string };
 const san10Selection = { ...creationSelection, mapKey: 'san10', unitSetKey: 'expanded' } as const;
@@ -85,15 +86,25 @@ const contracts = {
     presets: ['empty'],
     suggestedEndYear: 190,
   },
+  'san10-191-expanded': {
+    id: 'san10-191-expanded',
+    label: 'SAN10 확장 · 191년 군웅할거',
+    selection: { ...san10Selection, scenarioKey: 'san10-191@2' },
+    startYear: 191,
+    nations: 21,
+    counts: { cities: 147, gates: 8, ports: 0, fields: 0, anchors: 155 },
+    presets: presetKeys,
+    suggestedEndYear: 231,
+  },
 } as const;
 function profileRefs(id: ProfileId) {
   const selection = contracts[id].selection;
   return [
-    { kind: 'MAP', name: selection.mapKey, version: 1 },
-    { kind: 'SCENARIO', name: selection.scenarioKey, version: 1 },
-    { kind: 'UNIT_SET', name: selection.unitSetKey, version: 1 },
-    { kind: 'STAT_RULES', name: selection.statRulesKey, version: 1 },
-    { kind: 'PORTRAIT_MAP', name: selection.portraitMapKey, version: 1 },
+    { kind: 'MAP', ...parseResourceKey(selection.mapKey) },
+    { kind: 'SCENARIO', ...parseResourceKey(selection.scenarioKey) },
+    { kind: 'UNIT_SET', ...parseResourceKey(selection.unitSetKey) },
+    { kind: 'STAT_RULES', ...parseResourceKey(selection.statRulesKey) },
+    { kind: 'PORTRAIT_MAP', ...parseResourceKey(selection.portraitMapKey) },
   ] as const;
 }
 const reasons = {
@@ -171,9 +182,9 @@ export function creationProfile(
     const stat = statRulesSchema.parse(statRow!.content);
     const unit = unitRow!.content as { id?: unknown } | null;
     if (
-      map.id !== profile.selection.mapKey ||
-      scenario.id !== profile.selection.scenarioKey ||
-      unit?.id !== profile.selection.unitSetKey ||
+      map.id !== parseResourceKey(profile.selection.mapKey).name ||
+      scenario.id !== parseResourceKey(profile.selection.scenarioKey).name ||
+      unit?.id !== parseResourceKey(profile.selection.unitSetKey).name ||
       stat.stat.count !== 5 ||
       scenario.startYear !== profile.startYear ||
       scenario.nation.length !== profile.nations ||
@@ -276,16 +287,25 @@ export function expandedCreationProfile(
   presets: readonly PresetSource[],
   data: unknown,
   registry: RuleRegistry = ruleRegistry,
+  profileId: 'integration-v01' | 'san10-191-expanded' = 'integration-v01',
 ): CreationProfile {
-  const identity = { id: 'integration-v01-expanded', label: '통합판 확장 · 191년 군웅할거' } as const;
+  const identity =
+    profileId === 'integration-v01'
+      ? ({ id: 'integration-v01-expanded', label: '통합판 확장 · 191년 군웅할거' } as const)
+      : { id: contracts[profileId].id, label: contracts[profileId].label };
   let profile: FeatureProfile;
   try {
     profile = featureProfileSchema.parse(data);
     if (
-      profile.key !== 'expanded-191-v3' ||
+      profile.key !== (profileId === 'integration-v01' ? 'expanded-191-v3' : 'expanded-191-v4') ||
       !profile.ruleFeatures.includes('battle-affinity-v2') ||
-      profile.scenarioKey !== creationSelection.scenarioKey ||
-      profile.mapKey !== creationSelection.mapKey
+      profile.scenarioKey !== contracts[profileId].selection.scenarioKey ||
+      profile.mapKey !== contracts[profileId].selection.mapKey ||
+      (profileId === 'san10-191-expanded' &&
+        (profile.version !== 3 ||
+          profile.unitSetKey !== contracts[profileId].selection.unitSetKey ||
+          profile.statRulesKey !== contracts[profileId].selection.statRulesKey ||
+          profile.portraitMapKey !== contracts[profileId].selection.portraitMapKey))
     )
       throw new Error();
     checkRuleFeatures(profile.ruleFeatures, registry);
@@ -297,7 +317,7 @@ export function expandedCreationProfile(
       reason: reasons.FEATURE_PROFILE_UNAVAILABLE,
     };
   }
-  const base = creationProfile(rows, presets, registry);
+  const base = creationProfile(rows, presets, registry, profileId);
   if (!base.available) return { ...base, ...identity };
   return {
     ...base,
@@ -317,8 +337,12 @@ export async function getWorldCreationOptions(ctx: Context, input: z.infer<typeo
     return await ctx.db.$transaction(
       async (tx) => {
         const userId = await requireCurrentAdmin(tx, ctx, false);
+        const selectedIds: ProfileId[] = [...profileIds];
+        if (input.expandedProfiles === true) selectedIds.push('san10-191-expanded');
         const refs = [
-          ...new Map(profileIds.flatMap(profileRefs).map((ref) => [ref.kind + '/' + ref.name, ref])).values(),
+          ...new Map(
+            selectedIds.flatMap(profileRefs).map((ref) => [`${ref.kind}/${ref.name}/${ref.version}`, ref]),
+          ).values(),
         ];
         const rows = await tx.gameResource.findMany({
           where: { status: 'PUBLISHED', OR: refs.map((ref) => ({ ...ref })) },
@@ -345,6 +369,15 @@ export async function getWorldCreationOptions(ctx: Context, input: z.infer<typeo
             value = null;
           }
           profiles.push(expandedCreationProfile(rows, presets, value));
+          let expanded: unknown;
+          try {
+            expanded = JSON.parse(
+              await readFile(new URL('feature-profile/expanded-191-v4.json', resourceRoot()), 'utf8'),
+            );
+          } catch {
+            expanded = null;
+          }
+          profiles.push(expandedCreationProfile(rows, presets, expanded, ruleRegistry, 'san10-191-expanded'));
         }
         return { userId, revision: hashState(profiles), profiles };
       },

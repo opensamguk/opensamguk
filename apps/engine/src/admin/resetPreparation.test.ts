@@ -144,10 +144,12 @@ function fixture(useRequest = true) {
   const world = structuredClone(sourceWorld),
     requests = useRequest ? [request(world)] : [],
     rows = structuredClone(Object.values(resources)),
-    resets: Event[] = [];
+    resets: Event[] = [],
+    audits: Array<{ targetType: string; targetId: string; payload: Prisma.JsonValue }> = [];
   const tx = {
     world: { findUnique: vi.fn(async () => world) },
     worldCreateRequest: { findMany: vi.fn(async () => requests) },
+    auditLog: { findMany: vi.fn(async () => audits) },
     gameResource: { findMany: vi.fn(async () => rows) },
     inputEvent: {
       findMany: vi.fn(async (args: Prisma.InputEventFindManyArgs) => {
@@ -181,6 +183,7 @@ function fixture(useRequest = true) {
     requests,
     rows,
     resets,
+    audits,
     tx,
     transaction,
     db: { $transaction: transaction } as unknown as PrismaClient,

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ruleRegistry } from '../ruleRegistry';
+import { resourceKeySchema } from '../world/resourceKey';
 
 // PostgreSQL TEXT/JSONB에 저장할 수 없는 NUL·짝 없는 surrogate를 접수 전에 거부한다.
 const storedString = z.string().refine(
@@ -21,12 +22,12 @@ const features = z.array(z.string()).superRefine((values, ctx) => {
 });
 const createFields = {
   name: storedString.refine((value) => value.trim().length > 0, '월드 이름이 필요합니다.'),
-  scenarioKey: key.optional(),
-  mapKey: key.optional(),
+  scenarioKey: resourceKeySchema.optional(),
+  mapKey: resourceKeySchema.optional(),
   presetKey: key.optional(),
-  statRulesKey: key.optional(),
-  unitSetKey: key.optional(),
-  portraitMapKey: key.optional(),
+  statRulesKey: resourceKeySchema.optional(),
+  unitSetKey: resourceKeySchema.optional(),
+  portraitMapKey: resourceKeySchema.optional(),
   featureProfileKey: key.optional(),
   ruleFeatures: features.optional(),
   seed: seed.optional(),
@@ -48,12 +49,12 @@ export const requestWorldCreateInput = z
 export const worldCreateIntentSchema = z.strictObject({
   version: z.literal(1),
   name: createFields.name,
-  scenarioKey: key.nullable(),
-  mapKey: key.nullable(),
+  scenarioKey: resourceKeySchema.nullable(),
+  mapKey: resourceKeySchema.nullable(),
   presetKey: key.nullable(),
-  statRulesKey: key.nullable(),
-  unitSetKey: key.nullable(),
-  portraitMapKey: key.nullable(),
+  statRulesKey: resourceKeySchema.nullable(),
+  unitSetKey: resourceKeySchema.nullable(),
+  portraitMapKey: resourceKeySchema.nullable(),
   featureProfileKey: key.optional(),
   ruleFeatures: features.nullable(),
   seed: seed.nullable(),
@@ -62,15 +63,16 @@ export const worldCreateIntentSchema = z.strictObject({
 });
 export type WorldCreateIntent = z.infer<typeof worldCreateIntentSchema>;
 export function worldCreateIntent(input: z.infer<typeof requestWorldCreateInput>): WorldCreateIntent {
+  const selected = (value: string | undefined) => (value === undefined ? null : resourceKeySchema.parse(value));
   return {
     version: 1,
     name: input.name.trim(),
-    scenarioKey: input.scenarioKey ?? null,
-    mapKey: input.mapKey ?? null,
+    scenarioKey: selected(input.scenarioKey),
+    mapKey: selected(input.mapKey),
     presetKey: input.presetKey ?? null,
-    statRulesKey: input.statRulesKey ?? null,
-    unitSetKey: input.unitSetKey ?? null,
-    portraitMapKey: input.portraitMapKey ?? null,
+    statRulesKey: selected(input.statRulesKey),
+    unitSetKey: selected(input.unitSetKey),
+    portraitMapKey: selected(input.portraitMapKey),
     ...(input.featureProfileKey === undefined ? {} : { featureProfileKey: input.featureProfileKey }),
     ruleFeatures: input.ruleFeatures === undefined ? null : [...input.ruleFeatures].sort(),
     seed: input.seed ?? null,

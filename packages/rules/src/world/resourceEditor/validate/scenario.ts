@@ -1,5 +1,5 @@
 import { mapResourceSchema, type MapResource } from '../map/format';
-import { scenarioSchema, type ScenarioResource } from '../resources';
+import { scenarioSchema, resolveCityScale, type ScenarioResource } from '../resources';
 import { checkId, report, resourceIssue, shapeIssues, type ResourceIssue, type ValidationReport } from './issues';
 
 export interface ScenarioValidationContext {
@@ -11,6 +11,12 @@ export interface ScenarioValidationContext {
 export function scenarioCityIssues(scenario: ScenarioResource, map: MapResource): ResourceIssue[] {
   const names = new Set(map.cities.map((city) => city.name));
   const issues: ResourceIssue[] = [];
+  if (scenario.cityScale)
+    try {
+      resolveCityScale(map.cities, scenario.cityScale.cities);
+    } catch {
+      issues.push(resourceIssue('city-scale-invalid', {}, { kind: 'path', path: ['cityScale'] }));
+    }
   scenario.nation.forEach((nation, index) => {
     for (const city of nation[8])
       if (!names.has(city))
@@ -85,5 +91,5 @@ export function validateScenario(content: unknown, ctx: ScenarioValidationContex
       warnings.push(resourceIssue('scenario-diplomacy-duplicate', { nationA, nationB, firstIndex }, target));
     else pairs.set(key, index);
   });
-  return report(value, [...issues, ...warnings]);
+  return report(value, [...issues, ...refs.filter((issue) => issue.target.kind === 'path'), ...warnings]);
 }

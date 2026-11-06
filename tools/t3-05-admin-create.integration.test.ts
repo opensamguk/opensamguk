@@ -2,11 +2,11 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { readdir, readFile, mkdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, beforeAll, beforeEach, expect, it as test } from 'vitest';
-import { createDb } from '../packages/db/src/index';
+import { createDb, type Prisma } from '../packages/db/src/index';
 import { buildServer } from '../apps/server/src/server';
 import { appRouter } from '../apps/server/src/router';
 import type { Context } from '../apps/server/src/context';
@@ -18,7 +18,7 @@ import { authzCase } from '../apps/server/src/authz/case';
 import { categories } from '../apps/server/src/authz/coverage';
 import { initializeResources } from './init-resources';
 import { initializeIntegrationResources } from './integration-resources';
-import { initializeSan10Resources } from './san10-resources';
+import { initializeExpandedResources } from './expanded-resources';
 import { loadInitialWorldFromDb, loadFeatureProfile } from '../apps/engine/src/world/resources';
 import type { CreationProfile } from '../apps/server/src/admin/worldCreateOptions';
 import { exportReplay, readArchive, replayToEnd } from '../apps/engine/src/replay';
@@ -27,9 +27,10 @@ import { hashState } from '../packages/shared/src/node/hashState';
 import { loadWorld } from '../apps/engine/src/worldLoader';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
-import { acquireLease, releaseLease } from '../apps/engine/src/lease';
+import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { processWorldCreateRequest } from '../apps/engine/src/admin/createRequests';
+import { prepareWorldReset } from '../apps/engine/src/admin/resetPreparation';
 import { stopOwnedChild } from '../apps/engine/src/process-lifecycle';
 import { testDatabaseUrl } from './test-database';
 import { confirmDisconnectedDatabase } from './test-db-close';
@@ -464,7 +465,7 @@ beforeAll(
           ),
         );
         await checked(async () => initializeIntegrationResources(db));
-        await checked(async () => initializeSan10Resources(db));
+        await checked(async () => initializeExpandedResources(db));
         passwordHash = await checked(async () => hashPassword(randomUUID()));
         secrets.add(passwordHash);
         address = await checked(async () => start());
@@ -728,12 +729,15 @@ async function withResourceRoot<T>(root: URL, body: () => Promise<T>) {
   }
 }
 
-for (const profileKey of ['expanded-191-v1', 'expanded-191-v2', 'expanded-191-v3'])
+for (const profileKey of ['expanded-191-v1', 'expanded-191-v2', 'expanded-191-v3', 'expanded-191-v4'])
   it(`AC-P2-30·31·32·33 ${profileKey} 관리자 HTTP 확장 선택·엔진 생성·재생·저장 설정 초기화를 연결한다`, async (signal) => {
     const options = await creationOptions(actor, signal, true);
     expect(options.status).toBe(200);
-    expect(options.data?.profiles).toHaveLength(4);
-    const selected = options.data!.profiles.find((profile) => profile.id === 'integration-v01-expanded');
+    expect(options.data?.profiles).toHaveLength(5);
+    const selected = options.data!.profiles.find(
+      (profile) =>
+        profile.id === (profileKey === 'expanded-191-v4' ? 'san10-191-expanded' : 'integration-v01-expanded'),
+    );
     if (!selected?.available) throw new Error('실제 확장 선택지가 필요합니다.');
     const profile = await loadFeatureProfile(profileKey);
     if (selected.featureProfileKey === profileKey) expect(selected.featureProfileHash).toBe(profile.contentHash);
@@ -762,6 +766,21 @@ for (const profileKey of ['expanded-191-v1', 'expanded-191-v2', 'expanded-191-v3
     expect(world.logisticsState).not.toBeNull();
     expect(world.governanceState).not.toBeNull();
     expect(world.lineageState).not.toBeNull();
+    if (profileKey === 'expanded-191-v4') {
+      expect(world).toMatchObject({
+        mapKey: 'san10',
+        scenarioKey: 'san10-191@2',
+        unitSetKey: 'expanded',
+        nationStrategyState: { version: 1, nations: {} },
+      });
+      expect(world.cityRuinsState).not.toBeNull();
+      expect(world.stratagemCardsState).not.toBeNull();
+      const resolution = stored.resolution as {
+        resources: Array<{ kind: string; version: number; contentHash: string }>;
+      };
+      expect(resolution.resources).toHaveLength(5);
+      expect(resolution.resources.find((ref) => ref.kind === 'SCENARIO')).toMatchObject({ version: 2 });
+    }
     expect(await db.general.count({ where: { worldId: world.id } })).toBe(491);
     expect(await db.general.count({ where: { worldId: world.id, sex: { not: null } } })).toBeGreaterThan(0);
     const sexes = await db.general.findMany({
@@ -839,7 +858,58 @@ for (const profileKey of ['expanded-191-v1', 'expanded-191-v2', 'expanded-191-v3
         .ruleFeatures,
     ).toEqual(profile.value.ruleFeatures);
     expect(replayToEnd(await exportReplay(db, world.id))).toMatchObject({ reason: 'ADMIN_RESET' });
+  }, 30000);
+
+it('AC-P2-23·04·30 expanded-191-v4 실제 한 달과 별도 DB 없는 재생이 일치한다', async (signal) => {
+  const options = await creationOptions(actor, signal, true);
+  const selected = options.data!.profiles.find((profile) => profile.id === 'san10-191-expanded');
+  if (!selected?.available) throw Error('실제 SAN10 확장 선택이 필요합니다.');
+  const pair = await accepted(actor, signal, {
+    ...selected.selection,
+    featureProfileKey: selected.featureProfileKey,
+    ruleFeatures: selected.ruleFeatures,
+    endYear: selected.suggestedEndYear,
+    seed: 'expanded-v4-http-month',
   });
+  await processOne(signal);
+  const created = await row(pair.receipt.requestId);
+  expect(created.status).toBe('DONE');
+  const world = await db.world.findUniqueOrThrow({ where: { id: created.worldId! } });
+  await controlClock(db, world.id, 'start');
+  const lease = await acquireLease(db, world.id, undefined, 120000);
+  if (!lease) throw Error('확장 판의 자기 실행권이 필요합니다.');
+  await cleanupBoth(async () => {
+    await checked(() =>
+      new TurnLoop(db, lease, {
+        beforeCommit: (tx) => renewLease(tx, lease),
+      }).advanceTo(10000, signal),
+    );
+  }, [() => releaseLease(db, lease)]);
+  await controlClock(db, world.id, 'pause');
+  const month = await exportReplay(db, world.id);
+  expect(month.months).toHaveLength(1);
+  const output = execFileSync(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      '--input-type=module',
+      '-e',
+      "import {readFileSync} from 'node:fs'; import {replayArchive} from './apps/engine/src/replay.ts'; console.log(JSON.stringify(replayArchive(JSON.parse(readFileSync(0,'utf8')),1)));",
+    ],
+    {
+      cwd: new URL('../', import.meta.url),
+      env: { ...process.env, DATABASE_URL: '', TEST_DATABASE_URL: '' },
+      input: JSON.stringify(month),
+      encoding: 'utf8',
+      timeout: 90000,
+    },
+  );
+  expect(JSON.parse(output)).toEqual(month.months.map((row) => ({ tick: row.tick, stateHash: row.stateHash })));
+  const state = await loadWorld(db, world.id);
+  expect(Object.values(state.stratagemCards!.nations).every((row) => row.hand.length === 1)).toBe(true);
+  expect(state.cityRuins!.cities).toHaveLength(1);
+}, 120000);
 
 it('AC-P2-30·31·32·33 설정 파일 누락·손상은 기존 HTTP 목록과 revision을 보존한다', async (signal) => {
   const before = await creationOptions(actor, signal);
@@ -852,6 +922,11 @@ it('AC-P2-30·31·32·33 설정 파일 누락·손상은 기존 HTTP 목록과 r
       const expanded = await creationOptions(actor, signal, true);
       expect(expanded.data?.profiles.slice(0, 3)).toEqual(before.data?.profiles);
       expect(expanded.data?.profiles[3]).toMatchObject({ available: false, code: 'FEATURE_PROFILE_UNAVAILABLE' });
+      expect(expanded.data?.profiles[4]).toMatchObject({
+        id: 'san10-191-expanded',
+        available: false,
+        code: 'FEATURE_PROFILE_UNAVAILABLE',
+      });
       const { value } = await loadFeatureProfile('expanded-191-v3', new URL('../resources/', import.meta.url));
       const pair = await accepted(actor, signal, { featureProfileKey: value.key, ruleFeatures: value.ruleFeatures });
       await processOne(signal);
@@ -877,6 +952,39 @@ it('AC-P2-30·31·32·33 입력 목록 누락을 시나리오 기능으로 채�
     expect(stored).toMatchObject({ status: 'FAILED', errorCode: expected });
     expect(await db.world.count({ where: { id: stored.plannedWorldId } })).toBe(0);
   }
+});
+
+it('AC-P2-23·27 확장 형식3은 자원 다섯 칸의 불일치를 모두 거부하고 기존 게시 판을 보존한다', async (signal) => {
+  const { value } = await loadFeatureProfile('expanded-191-v4');
+  if (value.version !== 3) throw Error('형식3 설정이 필요합니다.');
+  const selection = {
+    scenarioKey: value.scenarioKey,
+    mapKey: value.mapKey,
+    unitSetKey: value.unitSetKey,
+    statRulesKey: value.statRulesKey,
+    portraitMapKey: value.portraitMapKey,
+  };
+  const before = await db.gameResource.findMany({ where: { status: 'PUBLISHED' }, orderBy: { id: 'asc' } });
+  expect(await initializeExpandedResources(db)).toEqual({ inserted: 0, existing: 1 });
+  for (const [slot, key] of Object.entries({
+    scenarioKey: 'san10-191',
+    mapKey: 'integration',
+    unitSetKey: 'basic',
+    statRulesKey: 'default',
+    portraitMapKey: 'rtk14-map',
+  })) {
+    const pair = await accepted(actor, signal, {
+      ...selection,
+      [slot]: key,
+      featureProfileKey: value.key,
+      ruleFeatures: value.ruleFeatures,
+    });
+    await processOne(signal);
+    const current = await row(pair.receipt.requestId);
+    expect(current).toMatchObject({ status: 'FAILED', errorCode: 'INPUT_INVALID' });
+    expect(await db.world.count({ where: { id: current.plannedWorldId } })).toBe(0);
+  }
+  expect(await db.gameResource.findMany({ where: { status: 'PUBLISHED' }, orderBy: { id: 'asc' } })).toEqual(before);
 });
 
 it('AC-P2-30·31·32·33 실제 DB 실패 뒤 고정한 설정의 파일 변경은 revision을 바꾸고 재처리를 거부한다', async (signal) => {
@@ -1261,6 +1369,65 @@ it('AC-M3-04 프리셋 위에 명시한 정식 자원·간격·긴 이름을 유
       })
     ).statRules,
   );
+});
+it('AC-P2-27 실제 HTTP의 1판 별칭은 멱등하고 게시 2판은 엔진·초기화 출처에 고정된다', async (signal) => {
+  const refs = [
+    { kind: 'MAP' as const, name: 'integration' },
+    { kind: 'SCENARIO' as const, name: 'integration191' },
+    { kind: 'UNIT_SET' as const, name: 'basic' },
+    { kind: 'STAT_RULES' as const, name: 'five-stats' },
+    { kind: 'PORTRAIT_MAP' as const, name: '191-map' },
+  ];
+  const rows = await db.gameResource.findMany({ where: { status: 'PUBLISHED', version: 1, OR: refs } });
+  expect(rows).toHaveLength(5);
+  await db.gameResource.createMany({
+    data: rows.map(({ kind, name, content, source }) => {
+      const selected =
+        kind === 'SCENARIO' ? { ...(content as Prisma.JsonObject), title: 'AC-P2-27 게시한 2판' } : content;
+      return {
+        kind,
+        name,
+        content: selected,
+        contentHash: hashState(selected),
+        source,
+        version: 2,
+        status: 'PUBLISHED' as const,
+        publishedAt: new Date(),
+      };
+    }),
+  });
+  const keys = {
+    mapKey: 'integration',
+    scenarioKey: 'integration191',
+    unitSetKey: 'basic',
+    statRulesKey: 'five-stats',
+    portraitMapKey: '191-map',
+  };
+  const alias = await accepted(actor, signal, {
+    ...Object.fromEntries(Object.entries(keys).map(([slot, key]) => [slot, `${key}@1`])),
+    seed: 't479-alias',
+  });
+  expect((await create(actor, { ...alias.payload, ...keys }, signal)).data).toEqual(alias.receipt);
+  expect((await create(actor, { ...alias.payload, mapKey: 'integration@2' }, signal)).code).toBe('CONFLICT');
+  await processOne(signal);
+  const next = await accepted(actor, signal, {
+    ...Object.fromEntries(Object.entries(keys).map(([slot, key]) => [slot, `${key}@2`])),
+    seed: 't479-next-version',
+  });
+  await processOne(signal);
+  const stored = await row(next.receipt.requestId);
+  expect(stored.status).toBe('DONE');
+  const world = await db.world.findUniqueOrThrow({ where: { id: stored.worldId! } });
+  expect(world).toMatchObject({ mapKey: 'integration@2', scenarioKey: 'integration191@2', unitSetKey: 'basic@2' });
+  const resolution = stored.resolution as { resources: Array<{ kind: string; version: number }> };
+  expect(resolution.resources).toHaveLength(5);
+  expect(resolution.resources.every((ref) => ref.version === 2)).toBe(true);
+  const lobby = await call<Array<{ id: string; scenarioTitle: string }>>('lobby.worlds', {}, signal);
+  expect(lobby.status).toBe(200);
+  expect(lobby.data?.find((entry) => entry.id === world.id)?.scenarioTitle).toBe('AC-P2-27 게시한 2판');
+  const candidate = await prepareWorldReset(db, world.id, 't479-reset-version', signal);
+  expect(candidate.evidence.resources).toEqual([...resolution.resources].sort((a, b) => a.kind.localeCompare(b.kind)));
+  expect(candidate.evidence.provenance).toEqual({ kind: 'request', requestId: stored.id });
 });
 it('AC-M3-04 해시가 손상된 새 게시 자원은 기존 게시물을 바꾸지 않고 거부한다', async (signal) => {
   const resource = await db.gameResource.findUniqueOrThrow({

@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { readFile, readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -19,6 +20,9 @@ import { exportReplay, replayArchive, resourceHash } from '../apps/engine/src/re
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
+import { prepareWorldReset, verifyResetPreparation } from '../apps/engine/src/admin/resetPreparation';
+import { savePreparedInitialWorld } from '../apps/engine/src/world/persistence';
+import { scenarioTitle } from '../apps/server/src/routers/lobby';
 import { validateWorldResources } from '../packages/rules/src/world/validate/index';
 import baseline from './fixtures/t4-77-baseline.json';
 import { initializeResources } from './init-resources';
@@ -61,6 +65,7 @@ function nativeClient(connectionString: string): PgClient {
 
 interface Fixture {
   db: PrismaClient;
+  url: string;
   native: PgClient;
   sql: string;
   dispose(): Promise<void>;
@@ -192,7 +197,7 @@ async function createFixture(
     );
     db = createDb(url.href);
     if (config.initialize) await initializeResources(db, sql);
-    return { db, native, sql, dispose };
+    return { db, url: url.href, native, sql, dispose };
   } catch (error) {
     try {
       await dispose();
@@ -350,7 +355,7 @@ it('P15 없는 2판은 키를 적어 거부한다', async () => {
   );
 });
 
-it('P15 실제 게시 2판은 읽히지만 초기 월드 합성은 build 전에 거부한다', async () => {
+it('P15 실제 게시 2판을 정확히 읽고 정규형 키로 월드를 합성한다', async () => {
   await withDatabase(
     async (fixture) => {
       const resources = await readInitialResources(fixture.db, options);
@@ -358,7 +363,136 @@ it('P15 실제 게시 2판은 읽히지만 초기 월드 합성은 build 전에 
       const [map] = await readPublishedResources(fixture.db, [{ kind: 'MAP', name: 'che', version: 2 }]);
       expect(map!.version).toBe(2);
       await noFileFallback(async () => {
-        expect(() => composeInitialWorld({ ...resources, map: map! }, options.seed)).toThrow('MAP/che/2');
+        expect(composeInitialWorld({ ...resources, map: map! }, options.seed)).toEqual({
+          ...composeInitialWorld(resources, options.seed),
+          mapKey: 'che@2',
+        });
+      }, 2);
+    },
+    { initialize: true },
+  );
+});
+
+it('AC-P2-27 게시 2판 CLI 생성·출처·초기화 준비·로비 제목을 같은 실DB에서 보존한다', async () => {
+  await withDatabase(
+    async (fixture) => {
+      const original = await readInitialResources(fixture.db, options);
+      for (const row of Object.values(original))
+        await insertResource(fixture, { kind: row.kind, name: row.name, version: 2 }, row.content);
+      const output = execFileSync(
+        process.execPath,
+        [
+          '--import',
+          'tsx',
+          'apps/engine/src/cli/createWorld.ts',
+          '--published',
+          '--map',
+          'che@2',
+          '--scenario',
+          '1030@2',
+          '--unit-set',
+          'basic@2',
+          '--stat-rules',
+          'default@2',
+          '--portrait-map',
+          'rtk14-map@2',
+          '--seed',
+          't479-original',
+          '--turn-term',
+          '30',
+          '--end-year',
+          '300',
+          '--name',
+          'AC-P2-27 게시 2판',
+        ],
+        {
+          cwd: new URL('../', import.meta.url),
+          env: { ...process.env, DATABASE_URL: fixture.url },
+          encoding: 'utf8',
+          windowsHide: true,
+        },
+      );
+      const { worldId } = JSON.parse(output.trim()) as { worldId: string };
+      const world = await fixture.db.world.findUniqueOrThrow({ where: { id: worldId } });
+      expect(world).toMatchObject({ mapKey: 'che@2', scenarioKey: '1030@2', unitSetKey: 'basic@2' });
+      expect(await scenarioTitle('1030@2', fixture.db)).toBe((original.scenario.content as { title: string }).title);
+      const audit = await fixture.db.auditLog.findFirstOrThrow({
+        where: { worldId, actorKind: 'CLI', action: 'world.create.applied' },
+      });
+      const payload = audit.payload as {
+        stateHash: string;
+        resources: Array<{ kind: string; name: string; version: number; contentHash: string }>;
+      };
+      expect(payload.stateHash).toBe(world.initialStateHash);
+      expect(payload.resources).toHaveLength(5);
+      expect(payload.resources.every((row) => row.version === 2)).toBe(true);
+      await controlClock(fixture.db, worldId, 'start');
+      const lease = await acquireLease(fixture.db, worldId);
+      if (!lease) throw new Error('2판 월드의 실행권이 필요합니다.');
+      try {
+        const loop = new TurnLoop(fixture.db, lease);
+        for (let tick = 1_000; tick <= TICKS_PER_MONTH; tick += 1_000) {
+          await renewLease(fixture.db, lease);
+          await loop.advanceTo(tick);
+        }
+      } finally {
+        await releaseLease(fixture.db, lease);
+      }
+      await controlClock(fixture.db, worldId, 'pause');
+      const archive = await exportReplay(fixture.db, worldId);
+      expect(archive.origin.initial.mapKey).toBe('che@2');
+      expect(archive.months).toHaveLength(1);
+      const replayEnv = { ...process.env };
+      delete replayEnv.DATABASE_URL;
+      delete replayEnv.TEST_DATABASE_URL;
+      const replayed = execFileSync(
+        process.execPath,
+        [
+          '--import',
+          'tsx',
+          '--input-type=module',
+          '-e',
+          "import {readFileSync} from 'node:fs'; import {replayArchive} from './apps/engine/src/replay.ts'; process.stdout.write(JSON.stringify(replayArchive(JSON.parse(readFileSync(0,'utf8')),1)));",
+        ],
+        {
+          cwd: new URL('../', import.meta.url),
+          env: replayEnv,
+          input: JSON.stringify(archive),
+          encoding: 'utf8',
+          windowsHide: true,
+        },
+      );
+      expect(JSON.parse(replayed)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
+      const signal = new AbortController().signal;
+      const candidate = await prepareWorldReset(fixture.db, worldId, 't479-next', signal);
+      expect(candidate.evidence.resources).toEqual(payload.resources);
+      expect(candidate.evidence.provenance).toEqual({ kind: 'cli' });
+      const next = await fixture.db.$transaction(async (tx) => {
+        const current = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
+        await verifyResetPreparation(tx, current, candidate, 't479-next', signal);
+        return savePreparedInitialWorld(tx, candidate.prepared);
+      });
+      expect(await fixture.db.world.findUniqueOrThrow({ where: { id: next.worldId } })).toMatchObject({
+        seed: 't479-next',
+        mapKey: 'che@2',
+        scenarioKey: '1030@2',
+        unitSetKey: 'basic@2',
+      });
+      await expect(prepareWorldReset(fixture.db, next.worldId, 'missing', signal)).rejects.toMatchObject({
+        code: 'PROVENANCE_INVALID',
+      });
+      await fixture.db.auditLog.create({
+        data: {
+          actorKind: 'CLI',
+          action: 'world.create.applied',
+          targetType: 'World',
+          targetId: next.worldId,
+          worldId: next.worldId,
+          payload: { ...payload, stateHash: '0'.repeat(64) },
+        },
+      });
+      await expect(prepareWorldReset(fixture.db, next.worldId, 'tampered', signal)).rejects.toMatchObject({
+        code: 'PROVENANCE_INVALID',
       });
     },
     { initialize: true },

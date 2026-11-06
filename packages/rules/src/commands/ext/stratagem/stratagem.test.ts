@@ -96,6 +96,39 @@ const goldens = [
   },
 ] as const;
 
+it.each([['security'], ['commerce', 'agriculture'], ['security', 'commerce', 'agriculture']] as const)(
+  'AC-INT-21 폐허 최대치 0에서도 탈취 결과와 난수 순서를 보존한다: %j',
+  (...fields) => {
+    const state = world();
+    state.ruleFeatures = ['city-scale-v1', 'five-stats', 'stratagem-basic'];
+    for (const general of Object.values(state.generals)) Object.assign(general, { politics: 50, charm: 50 });
+    const control = structuredClone(state);
+    control.ruleFeatures = ['five-stats', 'stratagem-basic'];
+    for (const field of fields) {
+      state.cities[2]![field] = control.cities[2]![field] = 0;
+      state.cities[2]![`${field}Max`] = 0;
+    }
+    expect(stratagemProbability(state, actor, 2, 'strength', 'plunder')).toBe(
+      stratagemProbability(control, actor, 2, 'strength', 'plunder'),
+    );
+    const first = script([0, 100, 100, 201, 141]),
+      second = script([0, 100, 100, 201, 141]);
+    const before = structuredClone(state);
+    const result = run('plunder', state, first.rng);
+    expect(result).toEqual(run('plunder', control, second.rng));
+    expect(result.logs[0]!.text).toContain('탈취 성공');
+    expect(first.calls).toEqual(second.calls);
+    expect(first.remaining).toEqual([]);
+    expect(result.effects.every((effect) => effect.kind !== 'world' && Number.isFinite(effect.value))).toBe(true);
+    const after = applyEffects(state, result.effects);
+    for (const resource of ['gold', 'rice'] as const) {
+      const total = (s: WorldState) => s.nations[1]![resource] + s.nations[2]![resource] + s.generals[1]![resource];
+      expect(total(after)).toBe(total(state) - 100);
+    }
+    expect(state).toEqual(before);
+  },
+);
+
 describe('stratagem success seed goldens', () => {
   for (const golden of goldens)
     it(golden.key, () => {

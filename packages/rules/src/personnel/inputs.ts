@@ -7,6 +7,8 @@ import { syncOffices, type OfficeRevisions, type OfficeState, type OfficeView } 
 import { canExecuteNationCommand, canUseNationTurns } from './permissions';
 import { canExecuteCityNationCommand } from '../cityResources/commands';
 import { cityAllocationArgs } from '../cityResources/allocation';
+import { nationStrategyCommands } from '../nationStrategy/commands';
+import { NATION_STRATEGY_FEATURE } from '../nationStrategy/state';
 import {
   clonePersonnel,
   PersonnelInvariantError,
@@ -296,10 +298,14 @@ export function applyNationTurnsRecord(
       if (!cityAllocationArgs.safeParse(turn.args).success) invariant('직책 칸 명령과 인자가 올바르지 않습니다.');
       continue;
     }
-    const command = commandRegistry.get(turn.commandKey);
+    const command =
+      commandRegistry.get(turn.commandKey) ??
+      (view.ruleFeatures?.includes(NATION_STRATEGY_FEATURE)
+        ? nationStrategyCommands.find((definition) => definition.key === turn.commandKey)
+        : undefined);
     if (
       !command ||
-      command.category !== 'nation' ||
+      command.target !== 'nation' ||
       !canExecuteNationCommand(actor.officerLevel, turn.commandKey) ||
       !command.args.safeParse(turn.args).success
     )

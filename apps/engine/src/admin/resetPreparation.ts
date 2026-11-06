@@ -18,6 +18,10 @@ import {
   featureProfileSchema,
   featureProfileReferenceSchema,
   FEATURE_PROFILE_DATA_KEYS,
+  formatResourceKey,
+  parseResourceKey,
+  resourceKeySchema,
+  resourceVersionSchema,
 } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import { z } from 'zod';
@@ -59,11 +63,17 @@ const seed = z
       !value.includes('\u0000') &&
       Array.from(value).every((c) => c.length === 2 || c.charCodeAt(0) < 0xd800 || c.charCodeAt(0) > 0xdfff),
   );
-const selectionSchema = z.strictObject({ scenario: key, map: key, unitSet: key, statRules: key, portraitMap: key });
+const selectionSchema = z.strictObject({
+  scenario: resourceKeySchema,
+  map: resourceKeySchema,
+  unitSet: resourceKeySchema,
+  statRules: resourceKeySchema,
+  portraitMap: resourceKeySchema,
+});
 const referenceSchema = z.strictObject({
   kind: z.enum(['MAP', 'SCENARIO', 'UNIT_SET', 'STAT_RULES', 'PORTRAIT_MAP']),
   name: key,
-  version: z.literal(1),
+  version: resourceVersionSchema,
   contentHash: hash,
 });
 const resolutionSchema = z.strictObject({
@@ -249,7 +259,7 @@ function resetRefs(world: SourceWorld, event: ResetEvent): Reference[] {
 type Provenance =
   | { kind: 'request'; request: Request; refs: Reference[] }
   | { kind: 'reset'; event: ResetEvent; refs: Reference[] }
-  | { kind: 'cli' };
+  | { kind: 'cli'; refs?: Reference[] };
 async function provenance(
   tx: Prisma.TransactionClient,
   world: SourceWorld,
@@ -280,7 +290,31 @@ async function provenance(
   if (requests[0])
     return { kind: 'request', request: requests[0], refs: requestRefs(world, requests[0], preset, origin) };
   if (resets[0]) return { kind: 'reset', event: resets[0], refs: resetRefs(world, resets[0]) };
-  return { kind: 'cli' };
+  const audits = await tx.auditLog.findMany({
+    where: { worldId: world.id, actorKind: 'CLI', action: 'world.create.applied' },
+    orderBy: { at: 'asc' },
+    take: 2,
+  });
+  signal.throwIfAborted();
+  return fixed('PROVENANCE_INVALID', () => {
+    if (audits.length > 1) fail('PROVENANCE_INVALID');
+    const audit = audits[0];
+    if (!audit || z.strictObject({ stateHash: hash }).safeParse(audit.payload).success) {
+      if ([world.mapKey, world.scenarioKey, world.unitSetKey].some((key) => parseResourceKey(key).version !== 1))
+        fail('PROVENANCE_INVALID');
+      return { kind: 'cli' };
+    }
+    const payload = z.strictObject({ stateHash: hash, resources: adminResetResourcesSchema }).parse(audit.payload);
+    if (audit.targetType !== 'World' || audit.targetId !== world.id || payload.stateHash !== world.initialStateHash)
+      fail('PROVENANCE_INVALID');
+    for (const [kind, key] of [
+      ['MAP', world.mapKey],
+      ['SCENARIO', world.scenarioKey],
+      ['UNIT_SET', world.unitSetKey],
+    ] as const)
+      if (formatResourceKey(payload.resources.find((ref) => ref.kind === kind)!) !== key) fail('PROVENANCE_INVALID');
+    return { kind: 'cli', refs: payload.resources };
+  });
 }
 function provenanceEvidence(
   value: Provenance,
@@ -334,7 +368,7 @@ function selectionRefs(selection: Selection, refs: readonly Reference[]) {
   for (const [slot, kind] of Object.entries(slots)) {
     const wanted = selection[slot as keyof Selection],
       r = refs.find((x) => x.kind === kind);
-    if (!r || r.name !== wanted) fail('PROVENANCE_INVALID');
+    if (!r || formatResourceKey(r) !== wanted) fail('PROVENANCE_INVALID');
   }
 }
 function requestRefs(
@@ -390,17 +424,26 @@ function requestRefs(
       fail('PROVENANCE_INVALID');
     if (resolution.featureProfile !== undefined) {
       const equipment = origin.initial.ruleFeatures?.includes('equipment-v1') === true;
+      const cards = origin.initial.ruleFeatures?.includes('stratagem-cards-v1') === true;
       const profile = featureProfileSchema.parse({
-        version: equipment ? 2 : 1,
+        version: cards ? 3 : equipment ? 2 : 1,
         key: intent.featureProfileKey,
         scenarioKey: expected.scenario,
         mapKey: expected.map,
+        ...(cards
+          ? {
+              unitSetKey: expected.unitSet,
+              statRulesKey: expected.statRules,
+              portraitMapKey: expected.portraitMap,
+            }
+          : {}),
         ruleFeatures: intent.ruleFeatures,
         featureData: Object.fromEntries(
-          [...FEATURE_PROFILE_DATA_KEYS, ...(equipment ? ['equipment-v1'] : [])].map((key) => [
-            key,
-            origin.featureData?.[key],
-          ]),
+          [
+            ...FEATURE_PROFILE_DATA_KEYS,
+            ...(equipment ? ['equipment-v1'] : []),
+            ...(cards ? ['stratagem-cards-v1'] : []),
+          ].map((key) => [key, origin.featureData?.[key]]),
         ),
       });
       if (
@@ -458,14 +501,20 @@ function prepared(
       features = options.ruleFeatures ?? [];
     if (request) {
       const intent = worldCreateIntentSchema.parse(request.intent);
-      const presetFeatures =
-        options.preset?.value.unitSet === 'expanded' && resources.unitSet.name === 'expanded'
-          ? ['battle-affinity-v2']
-          : [];
+      const inferred = [state.unitSet.coefMode === 'multiply' ? ['battle-affinity-v2'] : []];
+      // 기존 1판 요청의 기능 합성도 원생성 해시와 함께 확인한다.
+      if (Object.values(resources).every((resource) => resource.version === 1))
+        inferred.push(
+          options.preset?.value.unitSet === 'expanded' && resources.unitSet.name === 'expanded'
+            ? ['battle-affinity-v2']
+            : [],
+        );
       if (
-        !same(
-          [...new Set([...(state.ruleFeatures ?? []), ...presetFeatures, ...(intent.ruleFeatures ?? [])])].sort(),
-          features,
+        !inferred.some((presetFeatures) =>
+          same(
+            [...new Set([...(state.ruleFeatures ?? []), ...presetFeatures, ...(intent.ruleFeatures ?? [])])].sort(),
+            features,
+          ),
         )
       )
         fail('PROVENANCE_INVALID');
@@ -584,10 +633,9 @@ export async function prepareWorldReset(
       const { origin, preset, options } = sourceOrigin(world);
       const pin = await provenance(tx, world, preset, origin, signal),
         request = pin.kind === 'request' ? pin.request : undefined;
-      const resources =
-        pin.kind !== 'cli'
-          ? await resourcesByRefs(tx, pin.refs, signal)
-          : await legacyResources(tx, world, origin, options, signal);
+      const resources = pin.refs
+        ? await resourcesByRefs(tx, pin.refs, signal)
+        : await legacyResources(tx, world, origin, options, signal);
       signal.throwIfAborted();
       // Full original-seed preparation is mandatory before the new seed can be prepared.
       const source = originalPrepared(resources, origin, options, world.seed, request);
@@ -639,9 +687,9 @@ export async function verifyResetPreparation(
   const { origin, preset } = sourceOrigin(world);
   const refs = fixed('PROVENANCE_INVALID', () => adminResetResourcesSchema.parse(evidence.resources));
   if (
-    refs.find((ref) => ref.kind === 'MAP')?.name !== world.mapKey ||
-    refs.find((ref) => ref.kind === 'SCENARIO')?.name !== world.scenarioKey ||
-    refs.find((ref) => ref.kind === 'UNIT_SET')?.name !== world.unitSetKey
+    formatResourceKey(refs.find((ref) => ref.kind === 'MAP')!) !== world.mapKey ||
+    formatResourceKey(refs.find((ref) => ref.kind === 'SCENARIO')!) !== world.scenarioKey ||
+    formatResourceKey(refs.find((ref) => ref.kind === 'UNIT_SET')!) !== world.unitSetKey
   )
     fail('PROVENANCE_INVALID');
   if (
@@ -660,7 +708,7 @@ export async function verifyResetPreparation(
   if (
     !same(current.provenance, evidence.provenance) ||
     current.provenanceFingerprint !== evidence.provenanceFingerprint ||
-    (pin.kind !== 'cli' &&
+    (pin.refs &&
       !same(
         [...pin.refs].sort((a, b) => a.kind.localeCompare(b.kind)),
         refs,

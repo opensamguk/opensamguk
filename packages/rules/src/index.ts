@@ -197,6 +197,7 @@ export * from './campaign/orders';
 export { campaignArmyTypes, validateCampaignRecord } from './campaign/feature';
 export { commandStatPreview, type CommandStatPreview } from './commands/statPreview';
 export * from './cityResources/state';
+export { initialCityRuins, readCityRuins, RUIN_PERCENT, type CityRuinsState } from './cityScale/state';
 export * from './cityResources/input';
 export { canExecuteCityNationCommand } from './cityResources/commands';
 export * from './clock/createRequest';
@@ -252,6 +253,7 @@ export * from './clock/featureProfile';
 export * from './entry/possess';
 export * from './entry/roles';
 export * from './stratagemCards/config';
+export * from './world/resourceKey';
 export * from './stratagemCards/state';
 export * from './stratagemCards/origin';
 export * from './stratagemCards/view';
@@ -268,3 +270,10 @@ export {
   stratagemCardsResultSchema,
   validateStratagemCardsRecord,
 } from './stratagemCards/feature';
+export {
+  readNationStrategy,
+  initialNationStrategy,
+  NATION_STRATEGY_FEATURE,
+  type NationStrategyState,
+} from './nationStrategy/state';
+export { readStoredNationStrategy } from './nationStrategy/origin';

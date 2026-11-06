@@ -1,5 +1,12 @@
 import type { Prisma } from '@opensamguk/db';
-import { toGameDate, readOperationalMap, operationalMapDisplay, type WorldState } from '@opensamguk/rules';
+import {
+  toGameDate,
+  readOperationalMap,
+  operationalMapDisplay,
+  readCityRuins,
+  RUIN_PERCENT,
+  type WorldState,
+} from '@opensamguk/rules';
 import type { PublicMapConfig } from '@opensamguk/shared';
 import { assertLease, lockLease, type Lease } from './lease';
 
@@ -43,6 +50,8 @@ export async function persistPublicMap(
     ? readOperationalMap(geography.operationalMap, geography.ruleFeatures, geography.replayOrigin)
     : undefined;
   const date = toGameDate(state.startYear, tick);
+  const ruins = readCityRuins(state.cityRuins, state);
+  const recovery = new Map(ruins?.cities.map((row) => [row.cityKey, { percent: RUIN_PERCENT[row.stage] }]));
   await tx.publicMapSnapshot.create({
     data: {
       worldId,
@@ -58,6 +67,7 @@ export async function persistPublicMap(
             name: city.name,
             level: city.level,
             ...(city.kind ? { kind: city.kind } : {}),
+            ...(ruins ? { ruin: recovery.get(city.cityKey) ?? null } : {}),
             x: city.x,
             y: city.y,
             nationId: city.nationId,

@@ -19,6 +19,7 @@ const messages = {
   'city-name-blank': '도시 이름에 불필요한 공백이 있습니다.',
   'city-out-of-canvas': '도시 좌표가 캔버스 밖입니다.',
   'city-level-range': '도시 규모가 권장 범위를 벗어납니다.',
+  'city-scale-invalid': '도시 규모나 폐허 지정이 지도와 맞지 않습니다.',
   'city-region-range': '도시 지역이 권장 범위를 벗어납니다.',
   'city-initial-over-max': '도시 초기값이 최대치를 넘습니다.',
   'link-duplicate': '도시 연결이 겹칩니다.',

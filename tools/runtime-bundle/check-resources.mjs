@@ -19,6 +19,9 @@ const ownerLabel = 'org.opensamguk.test.owner';
 const files = [
   'feature-profile/expanded-191-v2.json',
   'feature-profile/expanded-191-v1.json',
+  'feature-profile/expanded-191-v3.json',
+  'feature-profile/expanded-191-v4.json',
+  'scenario/san10-191-v2.json',
   ...['191-sex.json', '191-sex-2.json', '191-sex-3.json'].map((file) => `officers/${file}`),
 ];
 const output = process.env.RUNTIME_RESOURCES_OUTPUT;
@@ -126,6 +129,9 @@ try {
     .filter((file) => file.startsWith('officers/'))
     .map((file) => JSON.parse(fs.readFileSync(path.join(context, 'resources', file), 'utf8')));
   const profile = JSON.parse(fs.readFileSync(path.join(context, 'resources', files[0]), 'utf8'));
+  const expanded = JSON.parse(
+    fs.readFileSync(path.join(context, 'resources/feature-profile/expanded-191-v4.json'), 'utf8'),
+  );
 
   phase = 'build';
   cleanup.image = 'unverified';
@@ -164,14 +170,17 @@ try {
   phase = 'run';
   const code = `import fs from 'node:fs'; import {createHash} from 'node:crypto';
     import {loadSexLedger,loadSexLedgers,loadFeatureProfile} from '/probe.mjs';
-    const all=loadSexLedgers(), p=await loadFeatureProfile('expanded-191-v2'), legacy=await loadFeatureProfile('expanded-191-v1');
+    const all=loadSexLedgers(), p=await loadFeatureProfile('expanded-191-v2'), legacy=await loadFeatureProfile('expanded-191-v1'), expanded=await loadFeatureProfile('expanded-191-v4');
     console.log(JSON.stringify({node:process.version,uid:process.getuid(),gid:process.getgid(),root:process.env.OPENSAMGUK_RESOURCES_ROOT,
       files:Object.fromEntries(${JSON.stringify(files)}.map(f=>[f,createHash('sha256').update(fs.readFileSync('/app/resources/'+f)).digest('hex')])),
       rows:all.map(x=>x.rows.length),hashes:all.map(x=>x.review.contentSha256),latest:loadSexLedger().review.contentSha256,
       profile:{key:p.value.key,hash:p.contentHash,features:p.value.ruleFeatures,dataKeys:Object.keys(p.value.featureData).sort(),
         birthBp:p.value.featureData['lineage-v1'].birth.chanceBp,maxGenerals:p.value.featureData['lineage-v1'].limits.maxGenerals,
         lineageVersion:p.value.featureData['lineage-v1'].version,equipmentItems:p.value.featureData['equipment-v1'].items.length},
-      legacyProfile:{key:legacy.value.key,hash:legacy.contentHash}}));`;
+      legacyProfile:{key:legacy.value.key,hash:legacy.contentHash},
+      expandedProfile:{key:expanded.value.key,hash:expanded.contentHash,features:expanded.value.ruleFeatures,
+        dataKeys:Object.keys(expanded.value.featureData).sort(),selection:Object.fromEntries(
+          ['mapKey','scenarioKey','unitSetKey','statRulesKey','portraitMapKey'].map(key=>[key,expanded.value[key]]))}}));`;
   attemptedContainer = true;
   cleanup.container = 'unverified';
   containerId = command('docker', [
@@ -232,6 +241,16 @@ try {
   assert.equal(observed.profile.maxGenerals, 2500);
   assert.equal(observed.profile.lineageVersion, 2);
   assert.equal(observed.profile.equipmentItems, 18);
+  assert.deepEqual(observed.expandedProfile, {
+    key: expanded.key,
+    hash: hashState(expanded),
+    features: expanded.ruleFeatures,
+    dataKeys: Object.keys(expanded.featureData).sort(),
+    selection: Object.fromEntries(
+      ['mapKey', 'scenarioKey', 'unitSetKey', 'statRulesKey', 'portraitMapKey'].map((key) => [key, expanded[key]]),
+    ),
+  });
+  assert.equal(observed.expandedProfile.features.length, 19);
   assert.equal(observed.legacyProfile.key, 'expanded-191-v1');
   assert.equal(
     observed.legacyProfile.hash,
