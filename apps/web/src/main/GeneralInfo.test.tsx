@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { EquipmentRead } from '../equipment/useEquipment';
 import type { Home, WorldSummary } from '../game/types';
 import { displayedAge, GeneralInfo } from './GeneralInfo';
 
@@ -81,15 +82,45 @@ function ageCell() {
   return screen.getByText('나이').nextElementSibling?.textContent;
 }
 
-function renderCard() {
+function renderCard(equipment?: EquipmentRead) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <GeneralInfo worldId="world-one" home={home} cityName="낙양" nation={undefined} onSelectCity={() => {}} />
+      <GeneralInfo
+        worldId="world-one"
+        home={home}
+        cityName="낙양"
+        nation={undefined}
+        onSelectCity={() => {}}
+        equipment={equipment}
+      />
     </QueryClientProvider>,
   );
   return client;
 }
+
+// 장비 조회가 실패해도 기본 능력치는 그대로 보이고, 공통 오류 칸의 다시 시도로 같은 조회만 다시 받는다 (AC-P2-34).
+describe('장수 정보 칸 장비 상태', () => {
+  it('실패는 공통 오류 칸과 다시 시도 단추로 보인다', () => {
+    mocks.summary = summary(192, 1, false);
+    const retry = vi.fn();
+    renderCard({ kind: 'error', retry });
+    const alert = screen.getByRole('alert');
+    expect(alert.getAttribute('data-state')).toBe('error');
+    expect(alert.textContent).toContain('장비 정보를 불러오지 못했습니다.');
+    expect(screen.getByText('무력').nextElementSibling?.textContent).toBe('50');
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    expect(retry).toHaveBeenCalledOnce();
+  });
+
+  it('불러오는 중은 공통 불러오는 중 줄로 보인다', () => {
+    mocks.summary = summary(192, 1, false);
+    renderCard({ kind: 'loading' });
+    const status = screen.getByRole('status');
+    expect(status.getAttribute('data-state')).toBe('loading');
+    expect(status.textContent).toContain('장비 합산값을 불러오는 중입니다.');
+  });
+});
 
 describe('장수 정보 칸 나이', () => {
   it('lineage 월드 192년 1월에는 가문 칸과 같은 1세를 보인다', async () => {
