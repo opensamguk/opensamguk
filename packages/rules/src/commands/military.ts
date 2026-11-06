@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { BALANCE } from '../balance';
 import { defineCommand, fail, noArgs, ownCity, positive, success } from './support';
 import { drillGain, recruitCost } from './statScores';
+import { crewContext, crewTypeFailure } from '../world/crewRequirements';
 
 export const recruitArgs = z.strictObject({ amount: positive, crewType: positive });
 
@@ -18,6 +19,8 @@ const recruits = (forced: boolean) =>
       const city = view.cities[general.cityKey]!;
       const unit = actor.unitSet?.crewTypes.find((unit) => unit.id === args.crewType && unit.armType > 0);
       if (!unit) return fail('NO_UNIT_SET', '모집할 병종을 확인하세요.');
+      const requirement = crewTypeFailure(unit, crewContext(view, actor));
+      if (requirement) return requirement;
       if (general.crew > 0 && general.crewType !== args.crewType)
         return fail('BAD_STATE', '소집해제 후 병종을 바꿀 수 있습니다.');
       if (general.crew + args.amount > general.leadership * BALANCE.CREW_PER_LEADERSHIP)

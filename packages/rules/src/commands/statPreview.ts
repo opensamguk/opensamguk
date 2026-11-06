@@ -5,6 +5,7 @@ import { DOMESTIC_SPECS } from './domestic/investment';
 import { recruitArgs } from './military';
 import { domesticStatScore, drillGain, recruitCost } from './statScores';
 import type { Actor } from './types';
+import { crewContext, crewTypeFailure } from '../world/crewRequirements';
 
 export interface CommandStatPreview {
   goldCost: number;
@@ -58,6 +59,7 @@ export function commandStatPreview(
     if (!parsed.success) return null;
     const unit = actor.unitSet?.crewTypes.find((row) => row.id === parsed.data.crewType && row.armType > 0);
     if (!unit) return null;
+    if (crewTypeFailure(unit, crewContext(view, actor))) return null;
     return { goldCost: recruitCost(view, general, parsed.data.amount, unit.cost, key === 'conscript') };
   }
   return null;

@@ -26,17 +26,25 @@ export function validateUnitSet(input: unknown): ResourceReport<UnitSetResource>
   if (!standard) out.add(issue('unitset-default-missing', { kind: 'root' }));
   if (!ids.has(1000)) out.add(issue('unitset-wall-missing', { kind: 'root' }));
   if (standard?.armType === 0) out.add(issue('unitset-default-not-recruitable', { kind: 'root' }, {}, 'warning'));
+  for (const key of Object.keys(value.armTypes).sort(codeUnitCompare))
+    if (!/^(0|[1-9]\d*)$/.test(key)) out.add(issue('unitset-arm-key-invalid', { kind: 'root' }, { key }));
   const seen = new Set<number>();
   value.crewTypes.forEach((unit, index) => {
     const target = { kind: 'crewType', index } as const;
     if (seen.has(unit.id)) out.add(issue('unitset-crew-id-duplicate', target, { id: unit.id }));
     seen.add(unit.id);
+    if (Object.hasOwn(value.armTypes, String(unit.id)))
+      out.add(issue('unitset-id-arm-collision', target, { id: unit.id }));
     if (unit.armType !== 0 && !Object.hasOwn(value.armTypes, String(unit.armType)))
       out.add(issue('unitset-arm-unknown', target, { armType: unit.armType }, 'warning'));
     for (const field of ['attackCoef', 'defenceCoef'] as const) {
       for (const key of Object.keys(unit[field]).sort(codeUnitCompare)) {
-        if (!Object.hasOwn(value.armTypes, key))
-          out.add(issue('unitset-coef-arm-unknown', target, { field, key }, 'warning'));
+        if (
+          key !== '0' &&
+          !Object.hasOwn(value.armTypes, key) &&
+          !(String(Number(key)) === key && ids.has(Number(key)))
+        )
+          out.add(issue('unitset-coef-arm-unknown', target, { field, key }));
       }
     }
   });

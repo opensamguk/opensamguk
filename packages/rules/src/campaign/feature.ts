@@ -107,7 +107,7 @@ function applyCampaign(
   context?: Parameters<InputKindDefinition['apply']>[2],
 ): ReplayState {
   validateCampaignRecord(input);
-  if (!replay.campaignArmyTypes) throw new Error('부곡 생성 병종 목록이 없습니다.');
+  if (!replay.campaignArmyTypes || !replay.campaignUnitSet) throw new Error('부곡 생성 병종 목록이 없습니다.');
   if (input.kind === 'campaign.order') {
     const actor = replay.state.generals[input.generalId!];
     if (!actor?.userId || !replay.campaignUnitSet) throw new Error('휘하 지시의 장수·병종 출처가 없습니다.');
@@ -129,7 +129,10 @@ function applyCampaign(
     const result = replayCampaignRelationship(replay.state, replay.state.campaign, input);
     return { ...replay, state: { ...cloneWorld(result.state), campaign: result.campaign } };
   }
-  return { ...replay, state: cloneWorld(replayCampaignUnit(replay.state, input, replay.campaignArmyTypes)) };
+  return {
+    ...replay,
+    state: cloneWorld(replayCampaignUnit(replay.state, input, replay.campaignArmyTypes, replay.campaignUnitSet)),
+  };
 }
 export const campaignInputKinds: readonly InputKindDefinition[] = [
   'campaign.relationship',

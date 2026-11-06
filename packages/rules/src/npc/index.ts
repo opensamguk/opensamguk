@@ -12,6 +12,7 @@ import type { CommandResolver } from '../commands/resolve';
 import { readCampaignState } from '../campaign/state';
 import { cityNpcAllocations, cityNpcPreparation } from '../cityResources/npc';
 import { frontier } from './frontier';
+import { crewContext, crewTypeFailure } from '../world/crewRequirements';
 
 export interface NpcCandidate {
   key: string;
@@ -137,7 +138,15 @@ export function chooseGeneralTurn(view: WorldView, general: General, rng: Rng, c
       : general.crew;
     const capacity = commander.leadership * BALANCE.CREW_PER_LEADERSHIP;
     const minimum = Math.min(capacity, 2000);
-    const unit = context.unitSet?.crewTypes.find((u) => u.id === crewType && u.armType > 0);
+    const requirements = crewContext(view, { generalId: general.id, tick: context.tick ?? 0 });
+    const preferred = context.unitSet?.crewTypes.find((u) => u.id === crewType && u.armType > 0);
+    const unit =
+      (preferred && !crewTypeFailure(preferred, requirements) ? preferred : undefined) ??
+      (preferred && troops === 0
+        ? context.unitSet?.crewTypes
+            .filter((u) => u.armType > 0 && !crewTypeFailure(u, requirements))
+            .sort((a, b) => a.id - b.id)[0]
+        : undefined);
     const cityResources = view.ruleFeatures?.includes('city-resources-v1') ?? false;
     if (cityResources)
       for (const candidate of cityNpcPreparation(view, general.id, context))

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { RecordedInput } from '../replay';
-import type { WorldView } from '../model/world';
+import type { DeepReadonly, WorldView } from '../model/world';
+import type { UnitSetResource } from '../world/resources';
 import { applyCampaignRelationship, campaignRelationshipInputSchema } from './relationships';
 import { readCampaignState } from './state';
 import { applyCampaignUnitInput, campaignUnitInputSchema } from './unitInputs';
@@ -23,7 +24,12 @@ export const campaignUnitResultSchema = z.strictObject({
   tick: integer,
 });
 
-export function replayCampaignUnit(world: WorldView, input: RecordedInput, armyTypes: readonly number[]) {
+export function replayCampaignUnit(
+  world: WorldView,
+  input: RecordedInput,
+  armyTypes: readonly number[],
+  unitSet: DeepReadonly<UnitSetResource>,
+) {
   if (input.kind !== 'campaign.unit') throw new Error('부곡 입력 종류를 확인하세요.');
   integer.min(1).parse(input.sequence);
   integer.parse(input.tick);
@@ -41,6 +47,7 @@ export function replayCampaignUnit(world: WorldView, input: RecordedInput, armyT
     userId: actor.userId,
     userActive: true,
     armyTypes,
+    unitSet,
   });
   if (
     !applied.ok ||

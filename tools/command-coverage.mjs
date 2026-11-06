@@ -640,7 +640,7 @@ const isText = (value) => typeof value === 'string' && value.trim().length > 0;
 const isTextArray = (value) => Array.isArray(value) && value.every(isText);
 
 function referenceExists(id, context) {
-  if (/^D-\d{3}$/.test(id)) return context.decisions.includes(`## ${id}.`);
+  if (/^D-\d{3}$/.test(id)) return new RegExp(`^## ${id}(?:\\.|\\s)`, 'm').test(context.decisions);
   if (/^T\d-\d{2}$/.test(id))
     return (
       context.planFiles.has(`${id}.md`) || context.phases.includes(`| ${id} `) || context.phase2.includes(`| ${id} `)

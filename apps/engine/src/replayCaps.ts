@@ -210,7 +210,7 @@ const generalSchema: Check = (value) =>
   generalFields(value) && (value.birthYear as number) <= (value.deathYear as number);
 const statSchema = statRulesSchema.shape.stat.strict();
 const unitsSchema = unitSetSchema.strict();
-const crewSchema = unitSetSchema.shape.crewTypes.element.strict();
+const crewSchema = unitSetSchema.shape.crewTypes.element.in.strict();
 const initialSchema = shape(
   {
     seed: name,

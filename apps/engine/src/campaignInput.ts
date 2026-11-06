@@ -54,6 +54,7 @@ export async function processCampaignQueuedInput(
         ? applyCampaignUnitInput(before.state, event.payload, event.generalId, before.state.campaign, {
             ...context,
             armyTypes: before.campaignArmyTypes!,
+            unitSet: unitSetSchema.parse(world.unitSet),
           })
         : event.kind === 'campaign.order'
           ? applyCampaignOrder(before.state, event.payload, event.generalId, {

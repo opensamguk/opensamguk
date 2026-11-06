@@ -38,11 +38,13 @@ const messages = {
   'scenario-diplomacy-invalid': '외교 국가 쌍이 맞지 않습니다.',
   'scenario-diplomacy-duplicate': '외교 국가 쌍이 겹쳐 마지막 항목을 씁니다.',
   'unitset-crew-id-duplicate': '병종 ID가 겹칩니다.',
+  'unitset-id-arm-collision': '병종 ID와 계열 번호가 겹칩니다.',
+  'unitset-arm-key-invalid': '병종 계열 키는 0 이상 정수여야 합니다.',
   'unitset-default-missing': '기본 병종이 없습니다.',
   'unitset-wall-missing': '성벽 병종이 없습니다.',
   'unitset-default-not-recruitable': '기본 병종을 모병할 수 없습니다.',
   'unitset-arm-unknown': '병종의 계통 이름이 없습니다.',
-  'unitset-coef-arm-unknown': '병종 계수의 계통 이름이 없습니다.',
+  'unitset-coef-arm-unknown': '병종 계수의 병종·계열이 없습니다.',
   'stat-rules-inconsistent': '능력치 합계와 범위가 맞지 않습니다.',
 } as const;
 export type ResourceIssueCode = keyof typeof messages;

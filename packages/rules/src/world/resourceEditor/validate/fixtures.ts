@@ -44,9 +44,9 @@ export function unitSetFixture(): UnitSetResource {
   return {
     id: 'units',
     name: '병종',
-    defaultCrewTypeId: 1,
+    defaultCrewTypeId: 1100,
     armTypes: { '1': '보병' },
-    crewTypes: [1000, 1, 2].map((id) => ({
+    crewTypes: [1000, 1100, 1200].map((id) => ({
       id,
       name: `병종${id}`,
       armType: id === 1000 ? 0 : 1,

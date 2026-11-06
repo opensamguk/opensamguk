@@ -11241,140 +11241,140 @@
       "target": "nation",
       "sourceIds": ["nation:event_음귀병연구"],
       "replacementReason": null,
-      "approvalRefs": [],
+      "approvalRefs": ["D-056"],
       "acIds": ["AC-P2-06"],
       "queueIds": ["T4-10", "T4-53", "T4-50", "T4-51"],
       "ownerProfile": "opensamguk-implement",
       "reviewerProfile": "opensamguk-review",
-      "paths": ["docs/plans/phase2-expansion.md"],
+      "paths": ["docs/plans/phase2-expansion.md", "docs/plans/INT-22.md", "docs/product/decisions.md"],
       "stages": {
         "ui": {
-          "status": "missing",
+          "status": "not_applicable",
           "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "reason": "D-056: 음귀병·무희 병종을 제외하므로 이 연구 명령은 구현하지 않는다."
         },
         "api": {
-          "status": "missing",
+          "status": "not_applicable",
           "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "reason": "D-056: 음귀병·무희 병종을 제외하므로 이 연구 명령은 구현하지 않는다."
         },
         "authorization": {
-          "status": "missing",
+          "status": "not_applicable",
           "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "reason": "D-056: 음귀병·무희 병종을 제외하므로 이 연구 명령은 구현하지 않는다."
         },
         "engine": {
-          "status": "missing",
+          "status": "not_applicable",
           "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "reason": "D-056: 음귀병·무희 병종을 제외하므로 이 연구 명령은 구현하지 않는다."
         },
         "effectsCostsFailures": {
-          "status": "missing",
+          "status": "not_applicable",
           "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "reason": "D-056: 음귀병·무희 병종을 제외하므로 이 연구 명령은 구현하지 않는다."
         },
         "persistence": {
-          "status": "missing",
+          "status": "not_applicable",
           "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "reason": "D-056: 음귀병·무희 병종을 제외하므로 이 연구 명령은 구현하지 않는다."
         },
         "restart": {
-          "status": "missing",
+          "status": "not_applicable",
           "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "reason": "D-056: 음귀병·무희 병종을 제외하므로 이 연구 명령은 구현하지 않는다."
         },
         "replay": {
-          "status": "missing",
+          "status": "not_applicable",
           "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "reason": "D-056: 음귀병·무희 병종을 제외하므로 이 연구 명령은 구현하지 않는다."
         },
         "independentReview": {
-          "status": "missing",
+          "status": "not_applicable",
           "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "reason": "D-056: 음귀병·무희 병종을 제외하므로 이 연구 명령은 구현하지 않는다."
         },
         "exactShaValidation": {
-          "status": "missing",
+          "status": "not_applicable",
           "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "reason": "D-056: 음귀병·무희 병종을 제외하므로 이 연구 명령은 구현하지 않는다."
         },
         "merge": {
-          "status": "missing",
+          "status": "not_applicable",
           "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "reason": "D-056: 음귀병·무희 병종을 제외하므로 이 연구 명령은 구현하지 않는다."
         }
       },
-      "blockers": ["G-03", "U-01", "U-02", "U-03"]
+      "blockers": []
     },
     {
       "id": "nation_research_dancer",
       "target": "nation",
       "sourceIds": ["nation:event_무희연구"],
       "replacementReason": null,
-      "approvalRefs": [],
+      "approvalRefs": ["D-056"],
       "acIds": ["AC-P2-06"],
       "queueIds": ["T4-10", "T4-53", "T4-50", "T4-51"],
       "ownerProfile": "opensamguk-implement",
       "reviewerProfile": "opensamguk-review",
-      "paths": ["docs/plans/phase2-expansion.md"],
+      "paths": ["docs/plans/phase2-expansion.md", "docs/plans/INT-22.md", "docs/product/decisions.md"],
       "stages": {
         "ui": {
-          "status": "missing",
+          "status": "not_applicable",
           "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "reason": "D-056: 음귀병·무희 병종을 제외하므로 이 연구 명령은 구현하지 않는다."
         },
         "api": {
-          "status": "missing",
+          "status": "not_applicable",
           "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "reason": "D-056: 음귀병·무희 병종을 제외하므로 이 연구 명령은 구현하지 않는다."
         },
         "authorization": {
-          "status": "missing",
+          "status": "not_applicable",
           "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "reason": "D-056: 음귀병·무희 병종을 제외하므로 이 연구 명령은 구현하지 않는다."
         },
         "engine": {
-          "status": "missing",
+          "status": "not_applicable",
           "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "reason": "D-056: 음귀병·무희 병종을 제외하므로 이 연구 명령은 구현하지 않는다."
         },
         "effectsCostsFailures": {
-          "status": "missing",
+          "status": "not_applicable",
           "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "reason": "D-056: 음귀병·무희 병종을 제외하므로 이 연구 명령은 구현하지 않는다."
         },
         "persistence": {
-          "status": "missing",
+          "status": "not_applicable",
           "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "reason": "D-056: 음귀병·무희 병종을 제외하므로 이 연구 명령은 구현하지 않는다."
         },
         "restart": {
-          "status": "missing",
+          "status": "not_applicable",
           "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "reason": "D-056: 음귀병·무희 병종을 제외하므로 이 연구 명령은 구현하지 않는다."
         },
         "replay": {
-          "status": "missing",
+          "status": "not_applicable",
           "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "reason": "D-056: 음귀병·무희 병종을 제외하므로 이 연구 명령은 구현하지 않는다."
         },
         "independentReview": {
-          "status": "missing",
+          "status": "not_applicable",
           "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "reason": "D-056: 음귀병·무희 병종을 제외하므로 이 연구 명령은 구현하지 않는다."
         },
         "exactShaValidation": {
-          "status": "missing",
+          "status": "not_applicable",
           "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "reason": "D-056: 음귀병·무희 병종을 제외하므로 이 연구 명령은 구현하지 않는다."
         },
         "merge": {
-          "status": "missing",
+          "status": "not_applicable",
           "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "reason": "D-056: 음귀병·무희 병종을 제외하므로 이 연구 명령은 구현하지 않는다."
         }
       },
-      "blockers": ["G-03", "U-01", "U-02", "U-03"]
+      "blockers": []
     },
     {
       "id": "nation_research_fire_wheel",

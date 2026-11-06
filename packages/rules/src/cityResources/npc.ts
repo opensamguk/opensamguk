@@ -5,6 +5,7 @@ import type { NpcCandidate, NpcContext } from '../npc';
 import { readCampaignState } from '../campaign/state';
 import { readCityResourcesState } from './state';
 import { affordableByGoods } from '../logistics/consumption';
+import { crewContext, crewTypeFailure } from '../world/crewRequirements';
 
 const candidate = (key: string, args: Record<string, unknown>, score: number, reason: string): NpcCandidate => ({
   key,
@@ -15,7 +16,7 @@ const candidate = (key: string, args: Record<string, unknown>, score: number, re
 export function cityNpcRecruitPlan(
   view: WorldView,
   generalId: number,
-  context: Pick<NpcContext, 'unitSet'>,
+  context: Pick<NpcContext, 'unitSet' | 'tick'>,
   prepared: {
     resources: DeepReadonly<NonNullable<WorldState['cityResources']>['cities'][string]>;
     army: DeepReadonly<NonNullable<WorldState['campaign']>['units'][number]> | undefined;
@@ -24,9 +25,18 @@ export function cityNpcRecruitPlan(
   const general = view.generals[generalId]!,
     city = view.cities[general.cityKey]!;
   const { resources, army } = prepared;
+  const requirements = crewContext(view, { generalId, tick: context.tick ?? 0 });
+  const preferred = context.unitSet?.crewTypes.find(
+    (row) => row.id === (army?.crewType ?? general.crewType) && row.armType > 0,
+  );
+  const existingTroops =
+    (army?.troops ?? 0) + (resources.garrison.find((row) => row.crewType === preferred?.id)?.troops ?? 0);
   const type =
-    context.unitSet?.crewTypes.find((row) => row.id === (army?.crewType ?? general.crewType) && row.armType > 0) ??
-    context.unitSet?.crewTypes.filter((row) => row.armType > 0).sort((a, b) => a.id - b.id)[0];
+    preferred && (existingTroops > 0 || !crewTypeFailure(preferred, requirements))
+      ? preferred
+      : context.unitSet?.crewTypes
+          .filter((row) => row.armType > 0 && !crewTypeFailure(row, requirements))
+          .sort((a, b) => a.id - b.id)[0];
   if (!type) return null;
   const row = resources.garrison.find((entry) => entry.crewType === type.id);
   return {
@@ -36,6 +46,7 @@ export function cityNpcRecruitPlan(
     army,
     type,
     row,
+    recruitable: crewTypeFailure(type, requirements) === null,
     limit: Math.max(0, Math.min(2000 - (row?.troops ?? 0), city.population)),
   };
 }
@@ -49,9 +60,9 @@ export function cityNpcPreparation(view: WorldView, generalId: number, context: 
     army: owned.sort((a, b) => a.id - b.id)[0],
   });
   if (!plan) return [];
-  const { general, city, resources, army, type, row, limit } = plan;
+  const { general, city, resources, army, type, row, limit, recruitable } = plan;
   const choices: NpcCandidate[] = [];
-  if (!army && general.leadership > 0 && row?.troops)
+  if (recruitable && !army && general.leadership > 0 && row?.troops)
     choices.push(candidate('form_unit', { crewType: type.id }, 180, '도시 병력을 배속할 빈 부곡을 편성한다.'));
   if (row?.troops) {
     if (row.atmos < 70)
@@ -63,7 +74,7 @@ export function cityNpcPreparation(view: WorldView, generalId: number, context: 
         candidate('train', { target: 'city', crewType: type.id }, 160, '배속·수비 전에 도시 병사를 훈련한다.'),
       );
   }
-  if ((row?.troops ?? 0) < 2000) {
+  if (recruitable && (row?.troops ?? 0) < 2000) {
     let amount = affordableRecruits(view, { ...general, gold: resources.gold }, type.cost, limit);
     if (view.ruleFeatures?.includes('logistics-v1')) {
       const logistics = view.logistics,

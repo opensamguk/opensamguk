@@ -24,13 +24,13 @@ describe('T4-76 병종 검증', () => {
       target: { kind: 'root' },
     });
   });
-  it('모병 불가·없는 계통과 계수는 조언 경고이며 record 순서에 의존하지 않는다', () => {
+  it('모병 불가·없는 계통은 조언 경고이고 없는 계수는 오류이며 record 순서에 의존하지 않는다', () => {
     const unit = unitFixture();
     unit.defaultCrewTypeId = 1000;
     unit.crewTypes[1]!.armType = 9;
     unit.crewTypes[1]!.attackCoef = { z: 1, a: 1 };
     const first = validateUnitSet(unit);
-    expect(first.status).toBe('pass');
+    expect(first.status).toBe('fail');
     expect(codes(first)).toEqual([
       'unitset-default-not-recruitable',
       'unitset-arm-unknown',
