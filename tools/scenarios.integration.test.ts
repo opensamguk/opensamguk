@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb, type PrismaClient } from '../packages/db/src/index';
 import { buildInitialWorld, TICKS_PER_MONTH } from '../packages/rules/src/index';
+import { validateWorldResources } from '../packages/rules/src/world/validate';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
