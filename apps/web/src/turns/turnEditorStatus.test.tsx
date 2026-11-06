@@ -158,3 +158,29 @@ it('읽기 전용 칸과 끝난 판은 저장된 목록과 다른 상태로 알�
   await waitFor(() => expect(ended).toHaveBeenLastCalledWith({ kind: 'ended' }));
   expectNoRepeat(ended);
 });
+
+it('T4-86 AC-P2-26 병종표 조회가 실패해도 표는 병종 번호로 적고 병종 없는 명령을 넣어 저장한다', async () => {
+  // 가짜 tRPC는 resources.worldRules에 NOT_FOUND를 답한다.
+  const stored = [{ commandKey: 'recruit', args: { amount: 100, crewType: 1300 }, name: '징병' }, ...slots.slice(1)];
+  const save = vi.fn(async () => ({ ok: true as const, revision: 2, slots: stored }));
+  const source: TurnSourceFactory = (input) => ({
+    ...makeSource(null)(input),
+    list: {
+      queryKey: ['list', 't486'],
+      queryFn: async () => ({ revision: 1, slots: stored }),
+      select: (d) => d as TurnList,
+    },
+    save,
+  });
+  const onStatus = vi.fn();
+  await open(source, 'RUNNING', onStatus);
+  await waitFor(() => expect(document.querySelector('tr[data-slot="1"]')?.textContent).toContain('병종 1300'));
+  fireEvent.click(document.querySelector('tr[data-slot="2"]')!);
+  fireEvent.click(screen.getByRole('radio', { name: '농지 개간' }));
+  fireEvent.click(screen.getByRole('button', { name: '2번 칸에 넣기' }));
+  await waitFor(() =>
+    expect(onStatus).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'unsaved', edits: 1 })),
+  );
+  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  await waitFor(() => expect(save).toHaveBeenCalledOnce());
+});

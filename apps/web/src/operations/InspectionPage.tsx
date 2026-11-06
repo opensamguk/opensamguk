@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { errorCode, retryUnlessClientError } from '../game/errors';
 import { NoGeneral, QueryError } from '../game/QueryState';
-import { useHome, useWorldId, useWorldMap } from '../game/queries';
+import { useHome, useWorldId, useWorldMap, useWorldUnits } from '../game/queries';
 import { useTRPC } from '../trpc';
 import { serverMessage } from '../turns/apiError';
 import type { ArgNames } from '../turns/args';
@@ -27,6 +27,7 @@ export function InspectionPage() {
   const trpc = useTRPC();
   const home = useHome(worldId);
   const map = useWorldMap(worldId);
+  const { units } = useWorldUnits(worldId);
   const members = useQuery({
     ...trpc.inspection.members.queryOptions({ worldId }),
     refetchInterval: 30_000,
@@ -38,8 +39,9 @@ export function InspectionPage() {
     return {
       city: (key) => cities.find((c) => c.key === key)?.name,
       nation: (id) => nations.find((n) => n.id === id)?.name,
+      unit: units.name,
     };
-  }, [map.data]);
+  }, [map.data, units]);
 
   let body;
   if (home.isError && errorCode(home.error) === 'NOT_FOUND') body = <NoGeneral worldId={worldId} />;

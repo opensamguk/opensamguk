@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { argFields, buildArgs, describeArgs, requiredKeys } from './args';
+import { TEST_UNIT_SET } from '../battleSim/testUnitSet';
+import { worldUnits } from '../battleSim/unitChoices';
+import { argFields as argFieldsOf, buildArgs, describeArgs, requiredKeys } from './args';
 import {
   applyOps,
   describeSelection,
@@ -113,6 +115,10 @@ describe('예턴 초안 편집', () => {
   });
 });
 
+// 병종 칸은 월드 병종표로 만든다 (T4-86). 여기서는 단위 시험 고정물을 쓴다.
+const units = worldUnits(TEST_UNIT_SET);
+const argFields = (schema: unknown) => argFieldsOf(schema, units.all);
+
 describe('명령 인자 칸', () => {
   const recruit = {
     type: 'object',
@@ -128,13 +134,19 @@ describe('명령 인자 칸', () => {
       ['amount', 'integer'],
       ['crewType', 'unit'],
     ]);
-    // 병종은 번호 대신 모집할 수 있는 병종 이름으로 고른다.
+    // 병종은 번호 대신 월드 병종표의 장수 병종 이름으로 고른다. 모집 조건(1300의 tech)이 있어도 빼지 않는다.
     const crew = argFields(recruit)[1]!;
     expect(crew.kind === 'unit' && crew.options).toEqual([
-      { value: '1100', label: '보병' },
-      { value: '1200', label: '궁병' },
-      { value: '1300', label: '기병' },
+      { value: '1100', label: '시험 보병' },
+      { value: '1200', label: '시험 궁병' },
+      { value: '1300', label: '시험 기병' },
     ]);
+    // 병종표를 아직 못 받았으면 선택지가 비고 병종 칸은 빠진 값이 된다. 다른 칸은 그대로다.
+    const loading = argFieldsOf(recruit, worldUnits(undefined).all);
+    expect(loading[1]!.kind === 'unit' && loading[1]!.options).toEqual([]);
+    expect(buildArgs(loading, requiredKeys(recruit), { amount: '100', crewType: '1100' }).missing).toEqual(['병종']);
+    const rest = argFieldsOf({ properties: { amount: { type: 'integer', minimum: 1 } } }, []);
+    expect(buildArgs(rest, ['amount'], { amount: '5' })).toEqual({ args: { amount: 5 }, missing: [] });
     expect(argFields({ properties: { cityKey: { type: 'integer' } } })[0]!.kind).toBe('city');
     expect(argFields({ properties: { nationId: { not: {} } } })).toEqual([]);
     expect(argFields({ properties: { color: { type: 'string', pattern: '^#[0-9a-fA-F]{6}$' } } })[0]!.kind).toBe(
@@ -167,6 +179,13 @@ describe('명령 인자 칸', () => {
     expect(describeArgs({ cityKey: 3 }, names)).toBe('낙양');
     expect(describeArgs({ nationId: 9 }, names)).toBe('국가 9');
     expect(describeArgs({ amount: 100, buy: true }, names)).toBe('수량 100 · 쌀 사기');
+  });
+
+  it('T4-86 병종은 월드 병종표 이름으로 적고 못 읽었으면 번호로 적는다', () => {
+    const names = { city: () => undefined, nation: () => undefined };
+    expect(describeArgs({ amount: 100, crewType: 1300 }, { ...names, unit: units.name })).toBe('수량 100 · 시험 기병');
+    expect(describeArgs({ crewType: 4242 }, { ...names, unit: units.name })).toBe('병종 4242');
+    expect(describeArgs({ crewType: 1100 }, names)).toBe('병종 1100');
   });
 });
 

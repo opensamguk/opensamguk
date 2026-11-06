@@ -1,20 +1,31 @@
-import { readFileSync } from 'node:fs';
 import { expect, test, type Page, type Worker } from '@playwright/test';
-import { simulateBattle, unitSetSchema, commanderBattleModifiers } from '../packages/rules/src/index';
+import {
+  simulateBattle,
+  unitSetSchema,
+  commanderBattleModifiers,
+  type UnitSetResource,
+} from '../packages/rules/src/index';
 import { createRng } from '../packages/shared/src/index';
-import { appOrigin, createAccount } from './account';
-import { e2eWorld, setTurns, waitTurnWindow } from './game';
+import { initializeSan10Resources } from '../tools/san10-resources';
+import { appOrigin, createAccount, withE2eDb } from './account';
+import { e2eFeatureWorld, e2eWorld, setTurns, turns, waitTurnWindow } from './game';
 import { bindGeneral, query } from './world';
 
 // T4-34 · AC-P2-16 일부: 실제 Chromium에서 전투 시뮬레이터가 진짜 Web Worker로 simulateBattle을 한 번 실행하는지 본다.
-// 기대값은 손으로 적지 않고 Node에서 같은 packages/rules의 simulateBattle과 resources/unitset/basic.json으로 계산한다.
-// 실제 PostgreSQL은 로그인과 메인 초안 경로에만 쓴다. 시뮬레이터는 서버를 부르지 않는다.
+// T4-86 · AC-P2-26: 기대값은 손으로 적지 않고 Node에서 같은 packages/rules의 simulateBattle과
+// 그 월드의 DB World.unitSet으로 계산한다. 저장소 JSON을 읽지 않는다.
+// 시뮬레이터가 부르는 서버 요청은 월드 병종표 조회(resources.worldRules) 하나다.
 
 const STORAGE = 'test-results/t4-34-battle-sim-storage.json';
-const ctx = { worldId: '' };
-const unitSet = unitSetSchema.parse(
-  JSON.parse(readFileSync(new URL('../resources/unitset/basic.json', import.meta.url), 'utf8')),
-);
+const ctx = { worldId: '', unitSetKey: '' };
+let unitSet: UnitSetResource;
+
+async function worldUnitSet(worldId: string) {
+  const row = await withE2eDb((db) =>
+    db.world.findUniqueOrThrow({ where: { id: worldId }, select: { unitSetKey: true, unitSet: true } }),
+  );
+  return { unitSetKey: row.unitSetKey, unitSet: unitSetSchema.parse(row.unitSet) };
+}
 
 test.beforeAll(async ({ browser }) => {
   test.setTimeout(240_000);
@@ -22,6 +33,7 @@ test.beforeAll(async ({ browser }) => {
   const page = await context.newPage();
   await createAccount(page);
   ctx.worldId = await e2eWorld(page);
+  ({ unitSetKey: ctx.unitSetKey, unitSet } = await worldUnitSet(ctx.worldId));
   const { user } = await query<{ user: { id: string } }>(context.request, 'auth.me');
   await bindGeneral(ctx.worldId, user.id);
   // pnpm dev는 Worker가 처음 import하는 의존성(rules의 zod 등)을 첫 요청 때 최적화하고 화면을 다시 읽을 수 있다.
@@ -81,6 +93,8 @@ const result = (page: Page) => page.getByTestId('battle-result');
 // GameLayout이 원래 부르는 조회. 위쪽 띠의 세 조회와 메시지 단추의 안 읽음 수(MessageDock), 국가 공지 팝업(NationNotice)이다.
 // 둘 다 권한 값이 정해지거나 SSE ready로 전체를 다시 받을 때 다시 묻는다. 시뮬레이터가 더하는 요청은 없어야 한다.
 const TOPBAR_QUERIES = ['auth.me', 'home.get', 'world.summary', 'message.unread', 'notice.nation.get', 'sanction.mine'];
+// T4-86: 시뮬레이터가 더하는 요청은 월드 병종표 조회 하나다. 계산 중에는 늘지 않는다.
+const SIMULATOR_QUERIES = [...TOPBAR_QUERIES, 'resources.worldRules'];
 
 async function openSimulatorFromMenu(page: Page) {
   await page.goto(`/w/${ctx.worldId}`);
@@ -132,7 +146,7 @@ function summary(c: Case) {
   const e = expected(c);
   return {
     seed: c.seed,
-    unitSet: 'basic',
+    unitSet: unitSet.id,
     attacker: { crew: e.attacker.crew, atmos: e.attacker.atmos },
     defender: { crew: e.defender.crew, atmos: e.defender.atmos },
   };
@@ -198,7 +212,9 @@ test('메뉴로 들어가 진짜 Worker가 계산한 결과가 Node의 simulateB
   const workers: Worker[] = [];
   page.on('worker', (w) => workers.push(w));
   await openSimulatorFromMenu(page);
-  // 시뮬레이터는 tRPC를 부르지 않는다. 위쪽 띠가 원래 부르는 조회(1분 턴이 바뀌면 다시 받는다)만 허용한다.
+  await expect(page.getByText(`병종표는 이 월드의 병종표(${ctx.unitSetKey}) 기준입니다.`)).toBeVisible();
+  // 시뮬레이터는 월드 병종표 조회 말고 tRPC를 부르지 않는다. 위쪽 띠가 원래 부르는 조회(1분 턴이 바뀌면
+  // 다시 받는다)와 병종표 조회(메인의 명령 칸과 같은 캐시, 30초 뒤 다시 받을 수 있다)만 허용한다.
   const trpc: string[] = [];
   page.on('request', (r) => {
     const path = new URL(r.url()).pathname;
@@ -233,7 +249,29 @@ test('메뉴로 들어가 진짜 Worker가 계산한 결과가 Node의 simulateB
   await shot(page, 't4-34-wall-result.png');
 
   const procedures = trpc.flatMap((p) => p.split(','));
-  expect(procedures.filter((p) => !TOPBAR_QUERIES.includes(p))).toEqual([]);
+  expect(procedures.filter((p) => !SIMULATOR_QUERIES.includes(p))).toEqual([]);
+});
+
+test('T4-86 병종표 조회가 실패하면 폼 대신 오류와 다시 시도가 보이고 풀면 같은 결과가 나온다', async ({ page }) => {
+  const workers: Worker[] = [];
+  page.on('worker', (w) => workers.push(w));
+  // 묶음 요청이라 같은 요청의 다른 조회도 함께 끊긴다. 그 조회들은 각자 다시 묻는다.
+  await page.route('**/trpc/**', (route) =>
+    route.request().url().includes('resources.worldRules') ? route.abort() : route.fallback(),
+  );
+  await page.goto(`/w/${ctx.worldId}/simulator`);
+  const failed = page.getByRole('alert').filter({ hasText: '이 월드의 병종표를 불러오지 못했습니다' });
+  await expect(failed).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('button', { name: '실행', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('note', { name: '계산 가정' })).toBeVisible();
+  expect(workers.filter((w) => w.url().includes('battle.worker'))).toEqual([]);
+  await shot(page, 't4-86-unitset-error.png');
+
+  await page.unroute('**/trpc/**');
+  await failed.getByRole('button', { name: '다시 시도' }).click();
+  await fillCase(page, GENERAL_CASE);
+  await page.getByRole('button', { name: '실행', exact: true }).click();
+  await expect.poll(() => shown(page)).toEqual(summary(GENERAL_CASE));
 });
 
 test('병력에 1.5·-1·10001·빈칸을 넣으면 이유가 보이고 실행은 점선이며 Worker가 생기지 않는다', async ({ page }) => {
@@ -363,4 +401,71 @@ test('375px 폭에서 시뮬레이터 본문이 넘치지 않고 누르는 대�
     expect(label.height).toBeGreaterThanOrEqual(44);
   }
   await shot(page, 't4-34-narrow.png');
+});
+
+test('T4-86 AC-P2-26 확장 병종표 월드에서 시뮬레이터와 개인 예턴이 그 월드의 병종표를 쓴다', async ({ browser }) => {
+  test.setTimeout(240_000);
+  await withE2eDb((db) => initializeSan10Resources(db));
+  const worldId = await e2eFeatureWorld([], {
+    resources: ['--scenario', 'san10-191', '--map', 'san10', '--unit-set', 'expanded'],
+  });
+  const world = await worldUnitSet(worldId);
+  expect(world.unitSetKey).toBe('expanded');
+  const generals = world.unitSet.crewTypes.filter((unit) => unit.armType > 0);
+  const context = await browser.newContext({ baseURL: appOrigin(), storageState: { cookies: [], origins: [] } });
+  const page = await context.newPage();
+  await createAccount(page);
+
+  // 장수가 없는 사용자도 병종표를 받아 시뮬레이터를 쓴다.
+  await page.goto(`/w/${worldId}/simulator`);
+  await expect(page.getByText('병종표는 이 월드의 병종표(expanded) 기준입니다.')).toBeVisible({ timeout: 30_000 });
+  const attackerUnits = group(page, '공격').getByRole('combobox', { name: '병종' }).locator('option');
+  await expect(attackerUnits).toHaveCount(generals.length);
+  // basic에 없는 확장 전용 병종끼리 계산한 결과가 Node의 같은 함수·같은 병종표 결과와 같다.
+  const [first, second] = generals.filter((unit) => ![1100, 1200, 1300].includes(unit.id));
+  const expandedCase: Case = {
+    seed: 'e2e-확장',
+    attacker: { crew: 4000, crewType: first!.id, train: 80, atmos: 75 },
+    defender: { crew: 3500, crewType: second!.id, train: 70, atmos: 90 },
+    attackerTech: 3000,
+    defenderTech: 1000,
+  };
+  const { seed, ...input } = expandedCase;
+  const want = simulateBattle({ ...input, unitSet: world.unitSet }, createRng(seed));
+  await fillCase(page, expandedCase);
+  await page.getByRole('button', { name: '실행', exact: true }).click();
+  await expect
+    .poll(() => shown(page), { timeout: 15_000 })
+    .toEqual({
+      seed,
+      unitSet: world.unitSet.id,
+      attacker: { crew: want.attacker.crew, atmos: want.attacker.atmos },
+      defender: { crew: want.defender.crew, atmos: want.defender.atmos },
+    });
+  await shot(page, 't4-86-expanded-simulator.png');
+
+  // 지금 모집 조건(연구)을 못 갖춘 병종도 고르고 저장한다. 사전 검사는 경고만 하고 30칸 표는 월드 병종 이름을 적는다.
+  const { user } = await query<{ user: { id: string } }>(context.request, 'auth.me');
+  await bindGeneral(worldId, user.id);
+  const locked = generals.find((unit) => unit.requirements?.some((rule) => rule.kind === 'research'))!;
+  await waitTurnWindow(page, worldId, 45_000);
+  await page.goto(`/w/${worldId}/turns`);
+  const editor = page.getByTestId('turn-editor');
+  await expect(editor.locator('tr[data-slot="30"]')).toBeVisible();
+  await editor.locator('tr[data-slot="1"]').click();
+  await editor.getByLabel('명령 찾기').fill('모병');
+  await editor.getByRole('radio', { name: '모병' }).check();
+  const crew = editor.getByRole('combobox', { name: '병종' });
+  await expect(crew.locator('option:not([value=""])')).toHaveCount(generals.length);
+  await crew.selectOption(String(locked.id));
+  await editor.getByRole('spinbutton', { name: '수량' }).fill('100');
+  await expect(editor.getByRole('status').filter({ hasText: '사전 검사 경고' })).toBeVisible();
+  await editor.getByRole('button', { name: '1번 칸에 넣기', exact: true }).click();
+  await expect(editor.locator('tr[data-slot="1"]')).toContainText(`수량 100 · ${locked.name}`);
+  await editor.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(editor.getByText('저장했습니다.')).toBeVisible();
+  const saved = await turns(page, worldId);
+  expect(saved.slots[0]).toMatchObject({ commandKey: 'recruit', args: { amount: 100, crewType: locked.id } });
+  await shot(page, 't4-86-expanded-turns.png');
+  await context.close();
 });

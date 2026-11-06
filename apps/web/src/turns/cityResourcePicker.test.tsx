@@ -2,6 +2,8 @@
 import { createRef } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
+import { TEST_UNIT_SET } from '../battleSim/testUnitSet';
+import { worldUnits } from '../battleSim/unitChoices';
 import { CommandPicker } from './CommandPicker';
 afterEach(cleanup);
 it('INT-18C AC-INT-18C 구판의 인자 없는 훈련은 검색 Enter로 바로 넣는다', () => {
@@ -13,6 +15,7 @@ it('INT-18C AC-INT-18C 구판의 인자 없는 훈련은 검색 Enter로 바로 
       nations={[]}
       selectedCityKey={null}
       defaultCrewType={undefined}
+      units={worldUnits(TEST_UNIT_SET)}
       blockedReason={null}
       targetLabel="선택"
       searchRef={createRef()}
@@ -51,6 +54,7 @@ it('INT-18C AC-INT-18C 도시 훈련 선택은 target city를 보내며 부곡 �
       nations={[]}
       selectedCityKey={null}
       defaultCrewType={1100}
+      units={worldUnits(TEST_UNIT_SET)}
       blockedReason={null}
       targetLabel="선택"
       searchRef={createRef()}

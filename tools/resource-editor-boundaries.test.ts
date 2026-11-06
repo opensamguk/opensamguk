@@ -197,13 +197,18 @@ describe('전투 시뮬레이터 예외', () => {
     }
   });
 
-  it('E2: publicUnitSet.ts만 basic.json 하나를 상대 경로로 읽는다', async () => {
-    expect(await ruleIds(unitSetJson, 'apps/web/src/battleSim/publicUnitSet.ts')).toEqual([]);
+  // E2는 T4-86에서 없앴다. 화면은 월드 병종표를 resources.worldRules로 받고 저장소 JSON을 묶지 않는다.
+  it('E2 없음: battleSim 어느 파일도 resources JSON을 상대 경로로 읽지 못한다', async () => {
     const otherJson = "import map from '../../../../resources/map/che.json';\nexport { map };\n";
-    expect(await ruleIds(otherJson, 'apps/web/src/battleSim/publicUnitSet.ts')).toContain('no-restricted-imports');
     expect(await ruleIds(rulesValue, 'apps/web/src/battleSim/publicUnitSet.ts')).toContain('no-restricted-imports');
-    for (const file of ['apps/web/src/battleSim/request.ts', 'apps/web/src/battleSim/compute.ts']) {
+    for (const file of [
+      'apps/web/src/battleSim/publicUnitSet.ts',
+      'apps/web/src/battleSim/unitChoices.ts',
+      'apps/web/src/battleSim/request.ts',
+      'apps/web/src/battleSim/compute.ts',
+    ]) {
       expect(await ruleIds(unitSetJson, file), file).toContain('opensamguk/no-cross-package-relative');
+      expect(await ruleIds(otherJson, file), file).toContain('opensamguk/no-cross-package-relative');
     }
     expect(
       await ruleIds(

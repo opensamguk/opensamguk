@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from '@tanstack/react-router';
+import { useMemo } from 'react';
+import { worldUnits, type WorldUnits } from '../battleSim/unitChoices';
 import { useTRPC } from '../trpc';
 import { retryUnlessClientError } from './errors';
 import { summaryPollMs } from './worldWatch';
@@ -33,4 +35,28 @@ export function useHome(worldId: string) {
 export function useWorldMap(worldId: string) {
   const trpc = useTRPC();
   return useQuery({ ...trpc.world.map.queryOptions({ worldId }), retry: retryUnlessClientError, staleTime: 30_000 });
+}
+
+// 월드 병종표·능력치 규칙 (T4-85 resources.worldRules). 전투 시뮬레이터와 명령 병종 칸이 같은 캐시를 쓴다 (T4-86).
+// 조회 캐시의 구조 공유로 내용이 같으면 unitSet 참조가 그대로라 다시 받아도 Worker를 끝내지 않는다.
+export function useWorldRules(worldId: string) {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.resources.worldRules.queryOptions({ worldId }),
+    retry: retryUnlessClientError,
+    staleTime: 30_000,
+  });
+}
+
+// 명령 병종 칸과 예턴 표의 병종 이름 (T4-86). 불러오는 중·오류면 빈 목록과 이유다. 병종 없는 명령·표·저장은 막지 않는다.
+export function useWorldUnits(worldId: string): { units: WorldUnits; note: string | null } {
+  const rules = useWorldRules(worldId);
+  const unitSet = rules.data?.unitSet;
+  const units = useMemo(() => worldUnits(unitSet), [unitSet]);
+  const note = unitSet
+    ? null
+    : rules.isError
+      ? '이 월드의 병종표를 불러오지 못했습니다. 병종 없는 명령은 그대로 넣을 수 있습니다.'
+      : '병종표를 불러오는 중입니다.';
+  return { units, note };
 }
