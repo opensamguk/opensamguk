@@ -7,6 +7,8 @@ import type { Turn } from './draft';
 import type { Check, SourceQuery } from './source';
 import styles from './TurnEditor.module.css';
 import { cityPreparationNote, cityPreparationSchema, hasCityBranch, type PreparationTarget } from './cityResourceArgs';
+import { EquipmentTradeFields, equipmentUiSchema } from '../equipment/EquipmentTradeFields';
+import type { EquipmentRead } from '../equipment/useEquipment';
 
 export interface CommandInfo {
   key: string;
@@ -39,6 +41,7 @@ interface Props {
   selectedCityKey: number | null;
   defaultCrewType: number | undefined;
   cityResources?: boolean;
+  equipment?: EquipmentRead | undefined;
   // 넣을 수 없을 때의 이유. null이면 넣을 수 있다.
   blockedReason: string | null;
   targetLabel: string;
@@ -60,6 +63,7 @@ export function CommandPicker({
   selectedCityKey,
   defaultCrewType,
   cityResources = false,
+  equipment,
   blockedReason,
   targetLabel,
   searchRef,
@@ -86,7 +90,7 @@ export function CommandPicker({
   // 고른 카드만 고른 갈래를 쓰고, 나머지 카드는 기본 갈래(기존 부곡)로 설명한다.
   const targetOf = (key: string): PreparationTarget => (key === chosen ? preparationTarget : 'unit');
   const schemaFor = (item: CommandInfo, target: PreparationTarget) =>
-    cityPreparationSchema(item.argsSchema, cityResources, target);
+    item.key === 'equipment_trade' ? equipmentUiSchema : cityPreparationSchema(item.argsSchema, cityResources, target);
   // 국가 칸은 대상 장수를 이름으로 고르므로 카드 설명·입력 칸·누락 안내가 같은 이름을 쓴다.
   const fieldsFor = (target: unknown): ArgField[] =>
     target
@@ -164,9 +168,16 @@ export function CommandPicker({
     return nextSchema;
   };
 
+  // 장비 정보가 준비되지 않았으면 이미 고른 인자가 남아 있어도 넣거나 미리 검사하지 않는다.
+  const equipmentWait =
+    command?.key === 'equipment_trade' && equipment?.kind !== 'ready'
+      ? equipment?.kind === 'error'
+        ? '장비 정보를 다시 조회하세요.'
+        : '장비 정보를 불러오는 중입니다.'
+      : null;
   // 지금 넣으면 들어갈 명령. 칸이 덜 찼거나 형식을 모르면 없다.
   const ready: Turn | null =
-    command && schema && built.missing.length === 0
+    command && schema && equipmentWait === null && built.missing.length === 0
       ? {
           commandKey: command.key,
           args: cityDrill && preparationTarget === 'city' ? { ...built.args, target: 'city' } : built.args,
@@ -205,9 +216,11 @@ export function CommandPicker({
       ? '명령을 고르세요.'
       : !schema
         ? '명령 입력 형식을 확인하지 못했습니다.'
-        : built.missing.length > 0
-          ? `${built.missing.join(', ')} 칸을 채우세요.`
-          : null);
+        : equipmentWait !== null
+          ? equipmentWait
+          : built.missing.length > 0
+            ? `${built.missing.join(', ')} 칸을 채우세요.`
+            : null);
 
   return (
     <section className={styles.picker} aria-label="명령 고르기">
@@ -315,31 +328,35 @@ export function CommandPicker({
           {schema && fields.length === 0 ? <p className={styles.muted}>더 고를 것 없이 바로 넣는 명령입니다.</p> : null}
           {/* 휴식은 30칸 표처럼 검사하지 않는다. */}
           {ready && precheck && ready.commandKey !== 'rest' ? <PrecheckWarning query={precheck(ready)} /> : null}
-          {fields.map((field, i) => (
-            <ArgInput
-              key={field.key}
-              field={field}
-              value={values[field.key] ?? ''}
-              cities={cityOptions}
-              nations={nations}
-              generals={generals}
-              inputRef={i === 0 ? firstArgRef : undefined}
-              onKeyDown={onArgKey}
-              onChange={(value) => setValues((prev) => ({ ...prev, [field.key]: value }))}
-              note={field.kind === 'city' ? (choices?.note ?? null) : null}
-              mapHint={
-                field.kind === 'city' &&
-                selectedCityKey !== null &&
-                mapCityFor(command.key) !== null &&
-                values[field.key] !== String(selectedCityKey)
-                  ? {
-                      name: cities.find((c) => c.key === selectedCityKey)?.name ?? `도시 ${selectedCityKey}`,
-                      use: () => setValues((prev) => ({ ...prev, [field.key]: String(selectedCityKey) })),
-                    }
-                  : null
-              }
-            />
-          ))}
+          {command.key === 'equipment_trade' ? (
+            <EquipmentTradeFields read={equipment} values={values} onChange={setValues} firstArgRef={firstArgRef} />
+          ) : (
+            fields.map((field, i) => (
+              <ArgInput
+                key={field.key}
+                field={field}
+                value={values[field.key] ?? ''}
+                cities={cityOptions}
+                nations={nations}
+                generals={generals}
+                inputRef={i === 0 ? firstArgRef : undefined}
+                onKeyDown={onArgKey}
+                onChange={(value) => setValues((prev) => ({ ...prev, [field.key]: value }))}
+                note={field.kind === 'city' ? (choices?.note ?? null) : null}
+                mapHint={
+                  field.kind === 'city' &&
+                  selectedCityKey !== null &&
+                  mapCityFor(command.key) !== null &&
+                  values[field.key] !== String(selectedCityKey)
+                    ? {
+                        name: cities.find((c) => c.key === selectedCityKey)?.name ?? `도시 ${selectedCityKey}`,
+                        use: () => setValues((prev) => ({ ...prev, [field.key]: String(selectedCityKey) })),
+                      }
+                    : null
+                }
+              />
+            ))
+          )}
         </form>
       ) : null}
 

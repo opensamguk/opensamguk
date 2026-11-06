@@ -23,6 +23,7 @@ export function invalidationTargets(event: WorldEvent, worldId: string, trpc: Tr
       return 'all';
     case 'turn.result':
       return [
+        trpc.equipment.mine.queryKey({ worldId }),
         trpc.home.get.queryKey({ worldId }),
         trpc.turns.get.queryKey({ worldId }),
         trpc.records.general.pathKey(),
@@ -34,6 +35,7 @@ export function invalidationTargets(event: WorldEvent, worldId: string, trpc: Tr
       ];
     case 'monthly.done':
       return [
+        trpc.equipment.mine.queryKey({ worldId }),
         trpc.world.summary.queryKey({ worldId }),
         trpc.home.get.queryKey({ worldId }),
         trpc.world.map.queryKey({ worldId }),
