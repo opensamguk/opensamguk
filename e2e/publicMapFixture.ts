@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { createServer, type AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -135,6 +135,12 @@ export const test = base.extend<object, { publicMapStack: PublicMapStack }>({
         const webPort = await freePort();
         const webOrigin = `http://127.0.0.1:${webPort}`;
         db = createDb(databaseUrl);
+        // migration만 적용한 새 DB는 게시 자원 catalog가 비어 있다. 서버를 띄우기 전에 이 DB에만 내장 자원 초기화를 적용한다.
+        const { initializeResources } = await import('../tools/init-resources');
+        await initializeResources(
+          db,
+          await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
+        );
         api = await buildServer({
           db,
           logging: false,

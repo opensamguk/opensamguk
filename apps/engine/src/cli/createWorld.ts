@@ -1,7 +1,7 @@
 import { parseArgs } from 'node:util';
 import { createDb } from '@opensamguk/db';
 import { checkRuleFeatures } from '@opensamguk/rules';
-import { composeInitialWorld, loadInitialWorld, readInitialResources, loadPreset } from '../world/resources';
+import { composeInitialWorld, readInitialResources, loadPreset } from '../world/resources';
 import { createWorldFromCli } from '../admin/creation';
 
 async function main() {
@@ -27,6 +27,7 @@ async function main() {
     console.log(
       'pnpm world:create [--preset <key>] [--published] [--unit-set <key>] [--stat-rules <key>] [--portrait-map <key>] [--rule-features a,b] [--scenario 1030 --map che --turn-term <분>] --seed <문자열> --end-year <연도> --name <이름> [--treaty]',
     );
+    console.log('게시된 DB 자원을 사용합니다. --published는 이전 호출과의 호환을 위해 허용합니다.');
     return;
   }
   const preset = values.preset !== undefined ? await loadPreset(values.preset) : null;
@@ -44,13 +45,12 @@ async function main() {
     ...(values['stat-rules'] !== undefined ? { statRules: values['stat-rules'] } : {}),
     ...(values['portrait-map'] !== undefined ? { portraitMap: values['portrait-map'] } : {}),
   };
-  const fromFile = values.published ? undefined : await loadInitialWorld(selection);
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) throw new Error('DATABASE_URL이 없습니다. .env.example을 .env로 복사하세요.');
   const db = createDb(databaseUrl);
   try {
-    const resources = values.published ? await readInitialResources(db, selection) : undefined;
-    const state = resources ? composeInitialWorld(resources, seed) : fromFile!;
+    const resources = await readInitialResources(db, selection);
+    const state = composeInitialWorld(resources, seed);
     let ruleFeatures: string[] | undefined;
     const selectedFeatures = state.unitSet?.coefMode === 'multiply' ? ['battle-affinity-v2'] : [];
     if (values['rule-features'] !== undefined || selectedFeatures.length) {
@@ -74,7 +74,7 @@ async function main() {
             ...(values.treaty ? { treatyFormat: 1 } : {}),
             endYear: Number(values['end-year']),
           },
-          ...(resources ? ([resources] as const) : []),
+          resources,
         ),
       ),
     );

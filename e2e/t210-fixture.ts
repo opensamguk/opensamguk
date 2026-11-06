@@ -403,6 +403,9 @@ export const test = base.extend<{ world: T210World }, { t210Stack: T210Stack }>(
           db,
           await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
         );
+        // loadInitialWorld(integration191 등)를 쓰는 시험과 lobby 시나리오 제목이 읽는 통합판 공식 게시 4행만 더 준비한다.
+        const { initializeIntegrationResources } = await import('../tools/integration-resources');
+        await initializeIntegrationResources(db);
         api = await buildServer({
           db,
           logging: false,
