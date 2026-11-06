@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { hashState } from '@opensamguk/shared/node';
-import { featureProfileSchema, ruleRegistry, type RuleRegistry } from '@opensamguk/rules';
+import { hashState } from '../packages/shared/src/node/hashState';
+import { featureProfileSchema, ruleRegistry, type RuleRegistry } from '../packages/rules/src/index';
 import {
   creationFeatures,
   creationProfile,
@@ -9,21 +9,28 @@ import {
   creationSelection,
   expandedCreationProfile,
   creationOptionsInput,
-} from './worldCreateOptions';
+} from '../apps/server/src/admin/worldCreateOptions';
 
-const root = new URL('../../../../', import.meta.url);
+const root = new URL('../', import.meta.url);
 const json = (path: string): unknown => JSON.parse(readFileSync(new URL(path, root), 'utf8'));
-const paths = [
-  'map/integration',
-  'scenario/integration191',
-  'unitset/basic',
-  'scenario/five-stats',
-  'portraits/191-map',
-];
-const rows = creationRefs.map((ref, index) => {
-  const content = json(`resources/${paths[index]}.json`);
-  return { ...ref, content, contentHash: hashState(content) };
-});
+import { createDb, readPublishedResources } from '../packages/db/src/index';
+import { testDatabaseUrl } from './test-database';
+import { initializeIntegrationResources } from './integration-resources';
+const rows = await (async () => {
+  const db = createDb(testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL }).href);
+  try {
+    await initializeIntegrationResources(db);
+    return (await readPublishedResources(db, creationRefs)).map(({ kind, name, version, content, contentHash }) => ({
+      kind,
+      name,
+      version,
+      content,
+      contentHash,
+    }));
+  } finally {
+    await db.$disconnect();
+  }
+})();
 const presets = ['regular', 'speed', 'beginner', 'hardcore'].map((key) => ({
   key,
   value: json(`resources/preset/${key}.json`),

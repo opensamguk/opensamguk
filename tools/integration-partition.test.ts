@@ -111,6 +111,7 @@ describe('INT-01 / AC-INT-01 PostgreSQL CI 분할', () => {
       'tools/officer-ledger.integration.test.ts',
       'tools/int19-retinue-orders.integration.test.ts',
       'tools/city-scale-resources.integration.test.ts',
+      'tools/create-options-resources.integration.test.ts',
       'tools/campaign-source.integration.test.ts',
       'tools/feature-profile.integration.test.ts',
       'tools/resource-versions.integration.test.ts',
