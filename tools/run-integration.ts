@@ -2,9 +2,14 @@ import { spawnSync } from 'node:child_process';
 import { createDb } from '../packages/db/src/index';
 import { testDatabaseUrl } from './test-database';
 import { pnpmCli } from './node-cli';
-import { integrationPartition } from './integration-partition';
+import { integrationPartition, integrationShardArgs } from './integration-partition';
 
 const partition = integrationPartition(process.env.INTEGRATION_SUITE);
+const shard = integrationShardArgs(
+  process.env.INTEGRATION_SUITE,
+  process.env.INTEGRATION_SHARD,
+  process.env.INTEGRATION_REPORT,
+);
 const url = testDatabaseUrl(process.env);
 const databaseName = url.pathname.slice(1);
 const adminUrl = new URL(url);
@@ -28,4 +33,4 @@ function run(args: string[]) {
 }
 run(['--filter', '@opensamguk/db', 'migrate']);
 run(['db:init-resources']);
-run(['exec', 'vitest', 'run', '--config', 'vitest.integration.config.ts', ...partition]);
+run(['exec', 'vitest', 'run', '--config', 'vitest.integration.config.ts', ...partition, ...shard]);
