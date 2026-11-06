@@ -1,5 +1,13 @@
 # 요청·턴·저장 흐름
 
+## 국가 운영 조치 (INT-23 PR5 · AC-INT-23)
+
+기존 `admin.game.request`의 `action`에 `{kind:'admin.nation.setRuler',nationId,generalId,expectedRulerId}`와 `{kind:'admin.nation.disband',nationId}`를 추가한다. 형식3 월드에서는 국가 변천 기능이 꺼져 있어도 접수한다. 권한·제재·멱등·사유·처리 시각과 결과 조회 계약은 같다. 군주 후보는 같은 국가의 생존한 등장 장수다. 처리 당시 군주가 `expectedRulerId`와 다르면 `TARGET_CHANGED`, 후보 조건이 다르면 `INVALID_VALUE`다.
+
+군주 교체는 일반 선양의 전이를 재사용한다. 이전 군주는 관직1·경험70% 반올림, 새 군주는 관직12가 되고 국가의 NPC 여부도 새 군주를 따른다. 강제 해산은 도시 보유·전쟁·첫 달과 무관하게 전원 재야·병력 해산·개인 금과 쌀 각 최대1000을 적용한다. 소유 도시는 중립화하고 도시 수비병은 기존 소유 변경 규칙으로 해산한다. 개인 예턴30칸과 사용자 연결은 유지한다.
+
+공통 후처리 뒤 직책·거주 앵커는 `persistEffects`의 `beforeNationRemoval`에서 저장한다. 그다음 국가를 보관·삭제하여 직책 FK를 보존한다. 상태·입력 처리·감사·공개 운영 쪽지 한 행은 같은 트랜잭션으로 확정한다. 선양·해산의 별도 일반 명령 기록은 만들지 않는다. 사유는 감사에만 남긴다.
+
 ## 관리자 게임 조치 후보 (INT-23 PR1·2 · AC-INT-23)
 
 `admin.game.request`는 현재 세션의 관리자와 `expectedUserId`가 같은지 확인한다. World 잠금 뒤 현재 계정·세션·제재·인증·동의를 다시 검사한다. 입력은 `{expectedUserId,worldId,idempotencyKey,reason,action}`이다. 장수 이름·NPC 전환·30칸 비우기·내보내기·수치, 도시 수치, 국가 수치·이름·수뇌 임명 취소의9종을 받는다. 수치마다 `{expected,value}`를 받으며 장수 능력치나 도시 소유 국가는 바꾸지 않는다.

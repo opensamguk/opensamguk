@@ -7,6 +7,7 @@ import { isAppointableOfficerLevel } from '../personnel/permissions';
 import { emptyQueue } from '../policy';
 import { emptyTurns } from '../replayInputs';
 import { removeAdminGeneral } from './remove';
+import { applyAdminNation } from './nation';
 import {
   adminGamePayloadSchema,
   adminGameRejectMessages,
@@ -46,6 +47,10 @@ function snapshotSchema(action: AdminGameAction): z.ZodType<JsonValue> {
       });
     case 'admin.nation.dismissOffice':
       return z.strictObject({ officerLevel: counter });
+    case 'admin.nation.setRuler':
+      return z.strictObject({ rulerId: counter.min(1), previousRulerExperience: counter, nationIsNpc: z.boolean() });
+    case 'admin.nation.disband':
+      return z.strictObject({ exists: z.boolean(), members: counter, cities: counter });
     default:
       return z.strictObject(
         Object.fromEntries(
@@ -187,6 +192,33 @@ export function decideAdminGameAction(
       before = { officerLevel: general!.officerLevel };
       next.state.generals[action.generalId]!.officerLevel = 1;
       after = { officerLevel: 1 };
+      break;
+    }
+    case 'admin.nation.setRuler':
+    case 'admin.nation.disband': {
+      if (!Number.isInteger(context.tick) || context.tick! < 0 || context.tick! > 2_147_483_647)
+        throw Error('국가 운영 조치의 처리 tick이 없습니다.');
+      const code = applyAdminNation(next, action, context.tick!);
+      if (code) return reject(code);
+      if (action.kind === 'admin.nation.setRuler') {
+        before = {
+          rulerId: action.expectedRulerId,
+          previousRulerExperience: replay.state.generals[action.expectedRulerId]!.experience,
+          nationIsNpc: nation!.isNpc,
+        };
+        after = {
+          rulerId: action.generalId,
+          previousRulerExperience: next.state.generals[action.expectedRulerId]!.experience,
+          nationIsNpc: next.state.nations[action.nationId]!.isNpc,
+        };
+      } else {
+        before = {
+          exists: true,
+          members: Object.values(replay.state.generals).filter((row) => row.nationId === action.nationId).length,
+          cities: Object.values(replay.state.cities).filter((row) => row.nationId === action.nationId).length,
+        };
+        after = { exists: false, members: 0, cities: 0 };
+      }
       break;
     }
     default: {
