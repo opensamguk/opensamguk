@@ -219,14 +219,27 @@ test('AC-M3-04 CH-03 실제 읽기 응답의 표식 변경 주입은 POST0으로
 test('AC-M3-04 CH-04 실제 커밋 뒤 응답 유실과 수동 같은 요청은 한 번만 생성한다', async ({ page, legalStack }) => {
   const actor = await createActor(page, legalStack);
   await prepareCreation(page, legalStack);
-  await actualRoute(page, 'admin.world.create', async (route) => {
-    const response = await route.fetch({ timeout: 10_000 });
-    expect(response.status()).toBe(200);
-    await response.body();
-    await route.abort();
+  // 요청 상태 확인 버튼은 POST 전에 추적 번호를 보관하는 순간 보인다. 커밋 신호로 쓰지 않는다.
+  let intercepted!: (value: { work: Promise<void> }) => void;
+  const lost = new Promise<{ work: Promise<void> }>((resolve) => {
+    intercepted = resolve;
+  });
+  await actualRoute(page, 'admin.world.create', (route) => {
+    const work = (async () => {
+      const response = await route.fetch({ timeout: 10_000 });
+      expect(response.status()).toBe(200);
+      await response.body();
+      await route.abort();
+    })();
+    intercepted({ work });
+    return work;
   });
   const dialog = await reviewCreationPage(page);
   await dialog.getByRole('button', { name: '개장 전 월드 생성 요청', exact: true }).click();
+  // 실제 서버 200 응답 본문을 끝까지 받고 브라우저 쪽을 끊은 뒤에만 DB를 읽는다.
+  await (
+    await lost
+  ).work;
   await expect(page.getByRole('button', { name: '요청 상태 확인', exact: true })).toBeVisible();
   const before = await createRequest(legalStack, actor.id);
   await page.getByRole('button', { name: '요청 상태 확인', exact: true }).click();
