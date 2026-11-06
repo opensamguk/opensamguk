@@ -5,6 +5,7 @@ import { validateWorldResources } from '../../packages/rules/src/world/validate/
 import { hashState } from '../../packages/shared/src/node/hashState';
 import fixture from '../fixtures/t4-46-scenarios.json';
 import { BODY_TAG, CONTENT_TAG, requirePassingReport } from './convert';
+import { createDb, readPublishedResources } from '../../packages/db/src/index';
 
 export interface ScenarioRow {
   key: string;
@@ -125,9 +126,25 @@ ${SCENARIO_BODY_TAG};
 `;
 }
 
+export async function readScenarioMaterials(
+  db: Parameters<typeof readPublishedResources>[0],
+): Promise<ScenarioMaterials> {
+  const [map, unitSet, statRules, portraitMap] = await readPublishedResources(db, [
+    { kind: 'MAP', name: 'che', version: 1 },
+    { kind: 'UNIT_SET', name: 'basic', version: 1 },
+    { kind: 'STAT_RULES', name: 'default', version: 1 },
+    { kind: 'PORTRAIT_MAP', name: 'rtk14-map', version: 1 },
+  ]);
+  return {
+    map: map!.content,
+    unitSet: unitSet!.content,
+    statRules: statRules!.content,
+    portraitMap: portraitMap!.content,
+  };
+}
+
 async function main(): Promise<void> {
   const root = new URL('../../', import.meta.url);
-  const read = async (path: string) => JSON.parse(await readFile(new URL(path, root), 'utf8')) as unknown;
   const input = Object.fromEntries(
     await Promise.all(
       readyScenarioRows().map(async ({ key }) => [
@@ -136,12 +153,14 @@ async function main(): Promise<void> {
       ]),
     ),
   );
-  const materials = {
-    map: await read('resources/map/che.json'),
-    unitSet: await read('resources/unitset/basic.json'),
-    statRules: await read('resources/scenario/default.json'),
-    portraitMap: await read('resources/portraits/rtk14-map.json'),
-  };
+  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL이 필요합니다.');
+  const db = createDb(process.env.DATABASE_URL);
+  let materials: ScenarioMaterials;
+  try {
+    materials = await readScenarioMaterials(db);
+  } finally {
+    await db.$disconnect();
+  }
   const sql = convertScenariosToSql(input, await readFile(new URL('resources/NOTICE.md', root), 'utf8'), materials);
   const output = new URL('packages/db/sql/resources-scenarios.sql', root);
   await mkdir(new URL('./', output), { recursive: true });

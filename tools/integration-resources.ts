@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { validateWorldResources } from '../packages/rules/src/world/validate';
 import { hashState } from '../packages/shared/src/node/hashState';
 import type { GameResourceKind, Prisma, PrismaClient } from '../packages/db/src/index';
+import baseline from './fixtures/t4-77-baseline.json';
 
 const root = new URL('../', import.meta.url);
 export const INTEGRATION_RESOURCE_FILES = [
@@ -50,18 +51,7 @@ export async function initializeIntegrationResources(db: Pick<PrismaClient, '$tr
     )
   )
     throw new Error('통합판 게시 자원의 고정 명세가 다릅니다.');
-  const unitSet: Prisma.InputJsonValue = JSON.parse(
-    await readFile(new URL('resources/unitset/basic.json', root), 'utf8'),
-  );
   const content = Object.fromEntries(rows.map((row) => [row.kind, row.content]));
-  const report = validateWorldResources({
-    map: content.MAP,
-    scenario: content.SCENARIO,
-    unitSet,
-    statRules: content.STAT_RULES,
-    portraitMap: content.PORTRAIT_MAP,
-  });
-  if (report.status !== 'pass') throw new Error('통합판 자원 간 참조 검증을 통과하지 못했습니다.');
   return db.$transaction(async (tx) => {
     await tx.$executeRawUnsafe('LOCK TABLE "GameResource" IN SHARE ROW EXCLUSIVE MODE');
     const basic = await tx.gameResource.findUnique({
@@ -70,10 +60,20 @@ export async function initializeIntegrationResources(db: Pick<PrismaClient, '$tr
     if (
       !basic ||
       basic.status !== 'PUBLISHED' ||
-      basic.contentHash !== hashState(unitSet) ||
+      basic.contentHash !==
+        baseline.resources[['resources', 'unitset', 'basic.json'].join('/') as keyof typeof baseline.resources]
+          .contentHash ||
       hashState(basic.content) !== basic.contentHash
     )
       throw new Error('기본 병종 게시 자원을 먼저 확인하세요.');
+    const report = validateWorldResources({
+      map: content.MAP,
+      scenario: content.SCENARIO,
+      unitSet: basic.content,
+      statRules: content.STAT_RULES,
+      portraitMap: content.PORTRAIT_MAP,
+    });
+    if (report.status !== 'pass') throw new Error('통합판 자원 간 참조 검증을 통과하지 못했습니다.');
     let inserted = 0;
     for (const row of rows) {
       const kind: GameResourceKind = row.kind;

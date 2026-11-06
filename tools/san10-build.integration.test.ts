@@ -1,40 +1,61 @@
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { expect, it } from 'vitest';
-import { buildSan10Map, buildSan10Scenarios } from './san10';
-import { buildInitialWorld } from '../../packages/rules/src/world/bootstrap';
-import { validateWorldResources } from '../../packages/rules/src/world/validate';
-import { compileOperationalGraph, operationalMapSchema } from '../../packages/rules/src/world/map/operational';
-import { publicGeographySchema } from '../../packages/shared/src/publicGeography';
-import { hashState } from '../../packages/shared/src/node/hashState';
-import { loadInitialWorld, loadPreset, resolveWorldResourceSelection } from '../../apps/engine/src/world/resources';
-import { san10ResourceRows } from '../san10-resources';
-import { prepareInitialWorld } from '../../apps/engine/src/world/persistence';
-import { toWorldState } from '../../packages/rules/src/model/world';
-import { emptyCityResourcesState, readCityResourcesState } from '../../packages/rules/src/cityResources/state';
-import { commandRegistry } from '../../packages/rules/src/commands/registry';
-import { buildExpandedUnitSet } from '../unitset/expanded';
-import { readExpandedSource } from '../unitset/source';
+import { afterAll, beforeAll, expect, it } from 'vitest';
+import { buildSan10Map, buildSan10Scenarios } from './map-data/san10';
+import { buildInitialWorld } from '../packages/rules/src/world/bootstrap';
+import { validateWorldResources } from '../packages/rules/src/world/validate';
+import { compileOperationalGraph, operationalMapSchema } from '../packages/rules/src/world/map/operational';
+import { publicGeographySchema } from '../packages/shared/src/publicGeography';
+import { hashState } from '../packages/shared/src/node/hashState';
+import { loadInitialWorldFromDb, loadPreset, resolveWorldResourceSelection } from '../apps/engine/src/world/resources';
+import { san10ResourceRows } from './san10-resources';
+import { prepareInitialWorld } from '../apps/engine/src/world/persistence';
+import { toWorldState } from '../packages/rules/src/model/world';
+import { emptyCityResourcesState, readCityResourcesState } from '../packages/rules/src/cityResources/state';
+import { commandRegistry } from '../packages/rules/src/commands/registry';
+import { buildExpandedUnitSet } from './unitset/expanded';
+import { readExpandedSource } from './unitset/source';
 
-const root = new URL('../../', import.meta.url);
+import { initializeSan10Resources } from './san10-resources';
+import type { ScenarioResource } from '../packages/rules/src/world/resources';
+import { createDb, readPublishedResources } from '../packages/db/src/index';
+import { testDatabaseUrl } from './test-database';
+
+const db = createDb(testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL }).href);
+afterAll(async () => {
+  await db.$disconnect();
+});
+let original1030: unknown;
+let historical: ScenarioResource, empty: ScenarioResource;
+let materials: Omit<Parameters<typeof validateWorldResources>[0], 'scenario'>;
+beforeAll(async () => {
+  await initializeSan10Resources(db);
+  const [scenario, basic] = await readPublishedResources(db, [
+    { kind: 'SCENARIO', name: '1030', version: 1 },
+    { kind: 'UNIT_SET', name: 'basic', version: 1 },
+  ]);
+  original1030 = scenario!.content;
+  ({ historical, empty } = buildSan10Scenarios(map, original1030));
+  materials = {
+    map,
+    unitSet: basic!.content,
+    statRules: read('resources/scenario/five-stats.json'),
+    portraitMap: read('resources/portraits/191-map.json'),
+  };
+});
+
+const root = new URL('../', import.meta.url);
 const read = (path: string) => JSON.parse(readFileSync(new URL(path, root), 'utf8'));
 const hash = createHash('sha256')
   .update(readFileSync(new URL('apps/web/src/main/san10-basemap.json', root)))
   .digest('hex');
 const map = buildSan10Map(hash);
-const { historical, empty } = buildSan10Scenarios(map);
-const materials = {
-  map,
-  unitSet: read('resources/unitset/basic.json'),
-  statRules: read('resources/scenario/five-stats.json'),
-  portraitMap: read('resources/portraits/191-map.json'),
-};
 
 it('AC-INT-22: 두 번 생성한 지도·병종·시나리오가 게시 명세의 내용 해시와 모두 같다', async () => {
   const source = await readExpandedSource();
   const build = () => {
     const map = buildSan10Map(hash);
-    return [map, ...Object.values(buildSan10Scenarios(map)), buildExpandedUnitSet(source, map)];
+    return [map, ...Object.values(buildSan10Scenarios(map, original1030)), buildExpandedUnitSet(source, map)];
   };
   const first = build().map(hashState),
     second = build().map(hashState),
@@ -102,7 +123,7 @@ it('AC-INT-03: 두 정식 원생성의155거점 전체 경로와382방향 이동
 
   const move = commandRegistry.get('move')!;
   for (const scenario of ['san10-191', 'san10-empty']) {
-    const initial = await loadInitialWorld({ map: 'san10', scenario, seed: 'san10-all-movement' });
+    const initial = await loadInitialWorldFromDb(db, { map: 'san10', scenario, seed: 'san10-all-movement' });
     expect(initial.generals).toHaveLength(491);
     const originHash = hashState(initial);
     expect(
@@ -155,8 +176,8 @@ it('AC-INT-03: 두 정식 원생성의155거점 전체 경로와382방향 이동
 });
 
 it('두 시나리오는 동일한 지리·도로를 쓰고 역사는21국491명, 공백지는180년 전원 재야다', async () => {
-  const a = await loadInitialWorld({ map: 'san10', scenario: 'san10-191', seed: 'san10-deterministic' });
-  const b = await loadInitialWorld({ map: 'san10', scenario: 'san10-empty', seed: 'san10-deterministic' });
+  const a = await loadInitialWorldFromDb(db, { map: 'san10', scenario: 'san10-191', seed: 'san10-deterministic' });
+  const b = await loadInitialWorldFromDb(db, { map: 'san10', scenario: 'san10-empty', seed: 'san10-deterministic' });
   expect([a.startYear, a.nations.length, a.generals.length, a.cities.length]).toEqual([191, 21, 491, 155]);
   expect([b.startYear, b.nations.length, b.generals.length, b.cities.length]).toEqual([180, 0, 491, 155]);
   expect(b.diplomacies).toEqual([]);
@@ -179,7 +200,7 @@ it('두 시나리오는 동일한 지리·도로를 쓰고 역사는21국491명,
     ]),
   );
   expect(hashState(b)).toBe(
-    hashState(await loadInitialWorld({ map: 'san10', scenario: 'san10-empty', seed: 'san10-deterministic' })),
+    hashState(await loadInitialWorldFromDb(db, { map: 'san10', scenario: 'san10-empty', seed: 'san10-deterministic' })),
   );
   expect((await loadPreset('regular')).map).toBe('san10');
   expect((await loadPreset('empty')).scenario).toBe('san10-empty');
@@ -230,15 +251,15 @@ it('SAN10 파일·게시·생성·재생 추론은 같은 기본 자원 선택�
 });
 
 it('역사491명의 ID·소속·5능력치·초상은 기존191정본과 같고 공백지에서도 ID·능력치를 보존한다', async () => {
-  const original = await loadInitialWorld({
+  const original = await loadInitialWorldFromDb(db, {
     map: 'integration',
     scenario: 'integration191',
     statRules: 'five-stats',
     portraitMap: '191-map',
     seed: 'san10-identity',
   });
-  const historical = await loadInitialWorld({ map: 'san10', scenario: 'san10-191', seed: 'san10-identity' });
-  const empty = await loadInitialWorld({ map: 'san10', scenario: 'san10-empty', seed: 'san10-identity' });
+  const historical = await loadInitialWorldFromDb(db, { map: 'san10', scenario: 'san10-191', seed: 'san10-identity' });
+  const empty = await loadInitialWorldFromDb(db, { map: 'san10', scenario: 'san10-empty', seed: 'san10-identity' });
   const identity = ({
     id,
     name,
@@ -260,7 +281,7 @@ it('역사491명의 ID·소속·5능력치·초상은 기존191정본과 같고 
 });
 
 it.each(['san10-191', 'san10-empty'])('%s의 9기능 원생성은155거점 빈 원장 하나만 허용한다', async (scenario) => {
-  const initial = await loadInitialWorld({ map: 'san10', scenario, seed: 'san10-ledger' });
+  const initial = await loadInitialWorldFromDb(db, { map: 'san10', scenario, seed: 'san10-ledger' });
   const features = [
     'campaign-assignment-v2',
     'campaign-v1',

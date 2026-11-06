@@ -309,7 +309,7 @@ export const SAN10_191_GAP_FILL: Readonly<Record<string, readonly string[]>> = {
 // 공백지로 이을 길이 없는 영토는 공백지로 돌린다 (원술의 여남은 공주의 수도 초를 지나야만 닿는다).
 export const SAN10_191_RELEASE: Readonly<Record<string, readonly string[]>> = { 원술: ['여남'] };
 
-export function buildSan10Scenarios(map: OperationalMapResource) {
+export function buildSan10Scenarios(map: OperationalMapResource, original1030: unknown) {
   const draft: Draft = read('resources/map-drafts/san10/adopted-placement.json');
   const old = operationalMapSchema.parse(read('resources/map/integration.json'));
   const source = scenarioSchema.parse(read('resources/scenario/integration191.json'));
@@ -336,7 +336,7 @@ export function buildSan10Scenarios(map: OperationalMapResource) {
     }),
   };
   // 예전에는 표시뿐이던 네 거점도 원본의 소유국으로 돌려준다. 수도는 현재 정식 대응을 유지한다.
-  const original = scenarioSchema.parse(read('resources/scenario/1030.json'));
+  const original = scenarioSchema.parse(original1030);
   const existingOwners = new Set(historical.nation.flatMap((row) => row[8]));
   original.nation.forEach((row, index) => {
     for (const oldName of row[8]) {

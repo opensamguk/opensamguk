@@ -1,20 +1,39 @@
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { format, resolveConfig } from 'prettier';
 import { buildSan10Map, buildSan10Scenarios } from './san10';
 import { validateWorldResources } from '../../packages/rules/src/world/validate';
 import { hashState } from '../../packages/shared/src/node/hashState';
 import { buildExpandedUnitSet } from '../unitset/expanded';
 import { readExpandedSource } from '../unitset/source';
+import { createDb, readPublishedResources } from '../../packages/db/src/index';
 
 const root = new URL('../../', import.meta.url);
 const read = async (path: string) => JSON.parse(await readFile(new URL(path, root), 'utf8'));
-const write = async (path: string, value: unknown) =>
-  writeFile(new URL(path, root), `${JSON.stringify(value, null, 2)}\n`);
+const write = async (path: string, value: unknown) => {
+  const output = new URL(path, root);
+  const raw = `${JSON.stringify(value, null, 2)}\n`;
+  // 시나리오 두 파일은 저장소의 기존 줄 배치를 유지한다.
+  const text = path.startsWith('resources/scenario/')
+    ? await format(raw, { ...(await resolveConfig(fileURLToPath(output))), parser: 'json' })
+    : raw;
+  await writeFile(output, text);
+};
+if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL이 필요합니다.');
+const db = createDb(process.env.DATABASE_URL);
+let original1030: unknown;
+try {
+  const [row] = await readPublishedResources(db, [{ kind: 'SCENARIO', name: '1030', version: 1 }]);
+  original1030 = row!.content;
+} finally {
+  await db.$disconnect();
+}
 const gis = await readFile(new URL('apps/web/src/main/san10-basemap.json', root));
 const map = buildSan10Map(createHash('sha256').update(gis).digest('hex'));
 const unitSet = buildExpandedUnitSet(await readExpandedSource(), map);
 await write('resources/unitset/expanded.json', unitSet);
-const scenarios = buildSan10Scenarios(map);
+const scenarios = buildSan10Scenarios(map, original1030);
 const materials = {
   map,
   unitSet,

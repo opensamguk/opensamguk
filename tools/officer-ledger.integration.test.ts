@@ -1,9 +1,30 @@
 import { readFile } from 'node:fs/promises';
-import { describe, expect, it } from 'vitest';
-import { adaptOfficerStats, auditOfficerLedger, ledgerSchema, officerContentHash, sha256Text } from './audit';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import {
+  adaptOfficerStats,
+  auditOfficerLedger,
+  mainScenarioSourceText,
+  ledgerSchema,
+  officerContentHash,
+  sha256Text,
+} from './officer-stats/audit';
 
-const root = new URL('../../', import.meta.url);
-const main = await readFile(new URL('resources/scenario/1030.json', root), 'utf8');
+import { createDb, readPublishedResources } from '../packages/db/src/index';
+import { testDatabaseUrl } from './test-database';
+
+const db = createDb(testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL }).href);
+afterAll(async () => {
+  await db.$disconnect();
+});
+
+const root = new URL('../', import.meta.url);
+let main: string;
+let mainContent: Record<string, unknown>;
+beforeAll(async () => {
+  const [row] = await readPublishedResources(db, [{ kind: 'SCENARIO', name: '1030', version: 1 }]);
+  mainContent = row!.content as Record<string, unknown>;
+  main = mainScenarioSourceText(mainContent);
+});
 const sources = await readFile(new URL('tools/fixtures/int16-selected-officers.json', root), 'utf8');
 const original = ledgerSchema.parse(
   JSON.parse(await readFile(new URL('resources/officers/191-five-stats.json', root), 'utf8')),
@@ -96,4 +117,23 @@ describe('AC-INT-16 191년 인물 출처 원장', () => {
       expect(() => adaptOfficerStats(invalid)).toThrow();
     expect(sha256Text(main)).toBe(original.mainSha256);
   });
+});
+
+it('게시 1030의 출처 표현은 키 순서와 무관하며 추가·누락·변형을 원래 해시로 거부한다', () => {
+  const reversed = Object.fromEntries(Object.entries(mainContent).reverse());
+  expect(mainScenarioSourceText(reversed)).toBe(main);
+  expect(sha256Text(mainScenarioSourceText(reversed))).toBe(original.mainSha256);
+  const missing = { ...mainContent };
+  delete missing.history;
+  for (const invalid of [
+    null,
+    [],
+    missing,
+    { ...mainContent, extra: 1 },
+    { ...mainContent, const: { ...(mainContent.const as object), extra: 1 } },
+  ])
+    expect(() => mainScenarioSourceText(invalid)).toThrow('main 시나리오');
+  const changed = structuredClone(mainContent);
+  (changed.nation as unknown[][])[0]![0] = '변형';
+  expect(() => auditOfficerLedger(mainScenarioSourceText(changed), sources, original, false)).toThrow('main 시나리오');
 });
