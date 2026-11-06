@@ -1,0 +1,2053 @@
+{
+  "id": "expanded",
+  "name": "확장 병종",
+  "defaultCrewTypeId": 1100,
+  "armTypes": {
+    "0": "성벽",
+    "1": "보병",
+    "2": "궁병",
+    "3": "기병",
+    "4": "창극병",
+    "5": "차병"
+  },
+  "coefMode": "multiply",
+  "regionScheme": "province-191",
+  "crewTypes": [
+    {
+      "id": 1000,
+      "armType": 0,
+      "name": "성벽",
+      "attack": 100,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 99,
+      "rice": 9,
+      "attackCoef": [],
+      "defenceCoef": {
+        "1": 1.2
+      },
+      "requirements": [
+        {
+          "kind": "impossible"
+        }
+      ],
+      "effects": [
+        "firstVolley"
+      ],
+      "info": [
+        "게임의 기본 병종 또는 원작 병종입니다."
+      ]
+    },
+    {
+      "id": 1100,
+      "armType": 1,
+      "name": "보병",
+      "attack": 100,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 9,
+      "rice": 9,
+      "attackCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 1.2,
+        "3": 0.8,
+        "4": 1,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 0.8,
+        "3": 1.2,
+        "4": 1,
+        "5": 0.8
+      },
+      "effects": [
+        "guard5"
+      ],
+      "info": [
+        "게임의 기본 병종 또는 원작 병종입니다."
+      ]
+    },
+    {
+      "id": 1101,
+      "armType": 1,
+      "name": "청주병",
+      "attack": 100,
+      "defence": 200,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 10,
+      "rice": 11,
+      "attackCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 1.2,
+        "3": 0.8,
+        "4": 1,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 0.8,
+        "3": 1.2,
+        "4": 1,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "regions",
+          "regions": [
+            6,
+            4
+          ]
+        }
+      ],
+      "effects": [
+        "guard5"
+      ],
+      "info": [
+        "사료 근거: 資治通鑑 卷62: 道逢青州兵劫掠人. 병종 이름의 채택·수치·모집 조건은 게임 편성입니다."
+      ]
+    },
+    {
+      "id": 1102,
+      "armType": 1,
+      "name": "수병",
+      "attack": 150,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 11,
+      "rice": 10,
+      "attackCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 1.2,
+        "3": 0.8,
+        "4": 1,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 0.8,
+        "3": 1.2,
+        "4": 1,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "regions",
+          "regions": [
+            8
+          ]
+        }
+      ],
+      "effects": [
+        "guard5"
+      ],
+      "info": [
+        "원작의 창작 병종입니다. 같은 부대 이름을 검토한 시대 사료 색인에서 확인하지 못했습니다."
+      ]
+    },
+    {
+      "id": 1103,
+      "armType": 1,
+      "name": "자객병",
+      "attack": 100,
+      "defence": 150,
+      "speed": 8,
+      "avoid": 20,
+      "magicCoef": 0,
+      "cost": 10,
+      "rice": 10,
+      "attackCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 1.2,
+        "3": 0.8,
+        "4": 1,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 0.8,
+        "3": 1.2,
+        "4": 1,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            1126
+          ]
+        }
+      ],
+      "effects": [
+        "guard5",
+        "avoid"
+      ],
+      "info": [
+        "원작의 창작 병종입니다. 같은 부대 이름을 검토한 시대 사료 색인에서 확인하지 못했습니다."
+      ]
+    },
+    {
+      "id": 1104,
+      "armType": 1,
+      "name": "근위병",
+      "attack": 150,
+      "defence": 200,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 12,
+      "rice": 12,
+      "attackCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 1.2,
+        "3": 0.8,
+        "4": 1,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 0.8,
+        "3": 1.2,
+        "4": 1,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 3000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            3
+          ]
+        }
+      ],
+      "effects": [
+        "guard5"
+      ],
+      "info": [
+        "원작의 창작 병종입니다. 같은 부대 이름을 검토한 시대 사료 색인에서 확인하지 못했습니다."
+      ]
+    },
+    {
+      "id": 1105,
+      "armType": 1,
+      "name": "등갑병",
+      "attack": 100,
+      "defence": 225,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 10,
+      "attackCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 1.2,
+        "3": 0.8,
+        "4": 1,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 0.8,
+        "3": 1.2,
+        "4": 1,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "regions",
+          "regions": [
+            10
+          ]
+        }
+      ],
+      "effects": [
+        "guard5"
+      ],
+      "info": [
+        "원작의 창작 병종입니다. 같은 부대 이름을 검토한 시대 사료 색인에서 확인하지 못했습니다."
+      ]
+    },
+    {
+      "id": 1106,
+      "armType": 1,
+      "name": "백이병",
+      "attack": 175,
+      "defence": 175,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 11,
+      "attackCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 1.2,
+        "3": 0.8,
+        "4": 1,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 0.8,
+        "3": 1.2,
+        "4": 1,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 3000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            5
+          ]
+        }
+      ],
+      "effects": [
+        "guard5"
+      ],
+      "info": [
+        "원작의 창작 병종입니다. 같은 부대 이름을 검토한 시대 사료 색인에서 확인하지 못했습니다."
+      ]
+    },
+    {
+      "id": 1110,
+      "armType": 1,
+      "name": "단양병",
+      "attack": 100,
+      "defence": 200,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 10,
+      "rice": 11,
+      "attackCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 1.2,
+        "3": 0.8,
+        "4": 1,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 0.8,
+        "3": 1.2,
+        "4": 1,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            7
+          ]
+        }
+      ],
+      "effects": [
+        "guard5"
+      ],
+      "info": [
+        "사료 근거: 三國志 卷32 先主傳: 謙以丹楊兵四千益先主. 병종 이름의 채택·수치·모집 조건은 게임 편성입니다."
+      ]
+    },
+    {
+      "id": 1111,
+      "armType": 1,
+      "name": "청강병",
+      "attack": 100,
+      "defence": 150,
+      "speed": 8,
+      "avoid": 20,
+      "magicCoef": 0,
+      "cost": 10,
+      "rice": 10,
+      "attackCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 1.2,
+        "3": 0.8,
+        "4": 1,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 0.8,
+        "3": 1.2,
+        "4": 1,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "regions",
+          "regions": [
+            9
+          ]
+        }
+      ],
+      "effects": [
+        "guard5"
+      ],
+      "info": [
+        "사료 근거: 三國志 卷31 劉二牧傳: 焉出青羌與戰. 병종 이름의 채택·수치·모집 조건은 게임 편성입니다."
+      ]
+    },
+    {
+      "id": 1112,
+      "armType": 1,
+      "name": "종인병",
+      "attack": 100,
+      "defence": 150,
+      "speed": 8,
+      "avoid": 20,
+      "magicCoef": 0,
+      "cost": 10,
+      "rice": 10,
+      "attackCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 1.2,
+        "3": 0.8,
+        "4": 1,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 0.8,
+        "3": 1.2,
+        "4": 1,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            27
+          ]
+        }
+      ],
+      "effects": [
+        "guard5"
+      ],
+      "info": [
+        "사료 근거: 晉書 卷120: 募賨人平定三秦. 병종 이름의 채택·수치·모집 조건은 게임 편성입니다."
+      ]
+    },
+    {
+      "id": 1113,
+      "armType": 1,
+      "name": "해번병",
+      "attack": 150,
+      "defence": 200,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 12,
+      "rice": 12,
+      "attackCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 1.2,
+        "3": 0.8,
+        "4": 1,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 0.8,
+        "3": 1.2,
+        "4": 1,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 3000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            7
+          ]
+        }
+      ],
+      "effects": [
+        "guard5"
+      ],
+      "info": [
+        "사료 근거: 三國志 卷62: 立解煩兩部. 병종 이름의 채택·수치·모집 조건은 게임 편성입니다."
+      ]
+    },
+    {
+      "id": 91100,
+      "armType": 1,
+      "name": "대검병",
+      "attack": 150,
+      "defence": 225,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 13,
+      "attackCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 1.2,
+        "3": 0.8,
+        "4": 1,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 0.8,
+        "3": 1.2,
+        "4": 1,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 4000
+        },
+        {
+          "kind": "citiesWithLevel",
+          "cityKeys": [
+            10
+          ],
+          "level": 8
+        },
+        {
+          "kind": "research",
+          "name": "greatsword"
+        }
+      ],
+      "effects": [
+        "guard5"
+      ],
+      "info": [
+        "원작의 창작 병종입니다. 같은 부대 이름을 검토한 시대 사료 색인에서 확인하지 못했습니다."
+      ]
+    },
+    {
+      "id": 91101,
+      "armType": 1,
+      "name": "강습병",
+      "attack": 175,
+      "defence": 200,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 13,
+      "attackCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 1.2,
+        "3": 0.8,
+        "4": 1,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 0.8,
+        "3": 1.2,
+        "4": 1,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 4000
+        },
+        {
+          "kind": "citiesWithLevel",
+          "cityKeys": [
+            8
+          ],
+          "level": 8
+        }
+      ],
+      "effects": [
+        "guard5"
+      ],
+      "info": [
+        "원작의 창작 병종입니다. 같은 부대 이름을 검토한 시대 사료 색인에서 확인하지 못했습니다."
+      ]
+    },
+    {
+      "id": 1200,
+      "armType": 2,
+      "name": "궁병",
+      "attack": 100,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 10,
+      "rice": 10,
+      "attackCoef": {
+        "0": 1,
+        "1": 0.8,
+        "2": 1,
+        "3": 1.2,
+        "4": 1.2,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 1.2,
+        "2": 1,
+        "3": 0.8,
+        "4": 0.8,
+        "5": 0.8
+      },
+      "effects": [
+        "firstVolley"
+      ],
+      "info": [
+        "게임의 기본 병종 또는 원작 병종입니다."
+      ]
+    },
+    {
+      "id": 1201,
+      "armType": 2,
+      "name": "궁기병",
+      "attack": 100,
+      "defence": 100,
+      "speed": 8,
+      "avoid": 20,
+      "magicCoef": 0,
+      "cost": 11,
+      "rice": 12,
+      "attackCoef": {
+        "0": 1,
+        "1": 0.8,
+        "2": 1,
+        "3": 1.2,
+        "4": 1.2,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 1.2,
+        "2": 1,
+        "3": 0.8,
+        "4": 0.8,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            1121,
+            1124
+          ]
+        }
+      ],
+      "effects": [
+        "firstVolley",
+        "avoid"
+      ],
+      "info": [
+        "원작의 창작 병종입니다. 같은 부대 이름을 검토한 시대 사료 색인에서 확인하지 못했습니다."
+      ]
+    },
+    {
+      "id": 1202,
+      "armType": 2,
+      "name": "연노병",
+      "attack": 150,
+      "defence": 100,
+      "speed": 8,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 12,
+      "rice": 11,
+      "attackCoef": {
+        "0": 1,
+        "1": 0.8,
+        "2": 1,
+        "3": 1.2,
+        "4": 1.2,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 1.2,
+        "2": 1,
+        "3": 0.8,
+        "4": 0.8,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "regions",
+          "regions": [
+            9
+          ]
+        }
+      ],
+      "effects": [
+        "firstVolley"
+      ],
+      "info": [
+        "원작의 창작 병종입니다. 같은 부대 이름을 검토한 시대 사료 색인에서 확인하지 못했습니다."
+      ]
+    },
+    {
+      "id": 1203,
+      "armType": 2,
+      "name": "강궁병",
+      "attack": 150,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 13,
+      "attackCoef": {
+        "0": 1,
+        "1": 0.8,
+        "2": 1,
+        "3": 1.2,
+        "4": 1.2,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 1.2,
+        "2": 1,
+        "3": 0.8,
+        "4": 0.8,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 3000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            6
+          ]
+        }
+      ],
+      "effects": [
+        "firstVolley"
+      ],
+      "info": [
+        "원작의 창작 병종입니다. 같은 부대 이름을 검토한 시대 사료 색인에서 확인하지 못했습니다."
+      ]
+    },
+    {
+      "id": 1204,
+      "armType": 2,
+      "name": "석궁병",
+      "attack": 200,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 13,
+      "attackCoef": {
+        "0": 1,
+        "1": 0.8,
+        "2": 1,
+        "3": 1.2,
+        "4": 1.2,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 1.2,
+        "2": 1,
+        "3": 0.8,
+        "4": 0.8,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 3000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            7
+          ]
+        }
+      ],
+      "effects": [
+        "firstVolley"
+      ],
+      "info": [
+        "원작의 창작 병종입니다. 같은 부대 이름을 검토한 시대 사료 색인에서 확인하지 못했습니다."
+      ]
+    },
+    {
+      "id": 1210,
+      "armType": 2,
+      "name": "맥궁병",
+      "attack": 100,
+      "defence": 100,
+      "speed": 8,
+      "avoid": 20,
+      "magicCoef": 0,
+      "cost": 11,
+      "rice": 12,
+      "attackCoef": {
+        "0": 1,
+        "1": 0.8,
+        "2": 1,
+        "3": 1.2,
+        "4": 1.2,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 1.2,
+        "2": 1,
+        "3": 0.8,
+        "4": 0.8,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            1140,
+            1139
+          ]
+        }
+      ],
+      "effects": [
+        "firstVolley"
+      ],
+      "info": [
+        "사료 근거: 三國志 卷30: 出好弓，所謂貊弓是也. 병종 이름의 채택·수치·모집 조건은 게임 편성입니다."
+      ]
+    },
+    {
+      "id": 91200,
+      "armType": 2,
+      "name": "화랑",
+      "attack": 150,
+      "defence": 150,
+      "speed": 8,
+      "avoid": 25,
+      "magicCoef": 0,
+      "cost": 14,
+      "rice": 14,
+      "attackCoef": {
+        "0": 1,
+        "1": 0.8,
+        "2": 1,
+        "3": 1.2,
+        "4": 1.2,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 1.2,
+        "2": 1,
+        "3": 0.8,
+        "4": 0.8,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 4000
+        },
+        {
+          "kind": "citiesWithLevel",
+          "cityKeys": [
+            1147
+          ],
+          "level": 8
+        }
+      ],
+      "effects": [
+        "firstVolley",
+        "avoid"
+      ],
+      "info": [
+        "원작의 창작 병종입니다. 같은 부대 이름을 검토한 시대 사료 색인에서 확인하지 못했습니다."
+      ]
+    },
+    {
+      "id": 91201,
+      "armType": 2,
+      "name": "화시병",
+      "attack": 225,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 14,
+      "rice": 14,
+      "attackCoef": {
+        "0": 1,
+        "1": 0.8,
+        "2": 1,
+        "3": 1.2,
+        "4": 1.2,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 1.2,
+        "2": 1,
+        "3": 0.8,
+        "4": 0.8,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 4000
+        },
+        {
+          "kind": "citiesWithLevel",
+          "cityKeys": [
+            14
+          ],
+          "level": 8
+        },
+        {
+          "kind": "research",
+          "name": "fire_arrow"
+        }
+      ],
+      "effects": [
+        "firstVolley"
+      ],
+      "info": [
+        "원작의 창작 병종입니다. 같은 부대 이름을 검토한 시대 사료 색인에서 확인하지 못했습니다."
+      ]
+    },
+    {
+      "id": 91202,
+      "armType": 2,
+      "name": "원융노병",
+      "attack": 250,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 20,
+      "rice": 19,
+      "attackCoef": {
+        "0": 1,
+        "1": 0.8,
+        "2": 1,
+        "3": 1.2,
+        "4": 1.2,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 1.2,
+        "2": 1,
+        "3": 0.8,
+        "4": 0.8,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 5000
+        },
+        {
+          "kind": "citiesWithLevel",
+          "cityKeys": [
+            1125
+          ],
+          "level": 8
+        },
+        {
+          "kind": "research",
+          "name": "repeater"
+        }
+      ],
+      "effects": [
+        "firstVolley"
+      ],
+      "info": [
+        "원작의 창작 병종입니다. 같은 부대 이름을 검토한 시대 사료 색인에서 확인하지 못했습니다."
+      ]
+    },
+    {
+      "id": 1300,
+      "armType": 3,
+      "name": "기병",
+      "attack": 150,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 11,
+      "rice": 11,
+      "attackCoef": {
+        "0": 1,
+        "1": 1.2,
+        "2": 0.8,
+        "3": 1,
+        "4": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 0.8,
+        "2": 1.2,
+        "3": 1,
+        "4": 1.2,
+        "5": 0.8
+      },
+      "effects": [
+        "cavalryClash"
+      ],
+      "info": [
+        "게임의 기본 병종 또는 원작 병종입니다."
+      ]
+    },
+    {
+      "id": 1301,
+      "armType": 3,
+      "name": "백마병",
+      "attack": 200,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 12,
+      "rice": 13,
+      "attackCoef": {
+        "0": 1,
+        "1": 1.2,
+        "2": 0.8,
+        "3": 1,
+        "4": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 0.8,
+        "2": 1.2,
+        "3": 1,
+        "4": 1.2,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "regions",
+          "regions": [
+            3,
+            13
+          ]
+        }
+      ],
+      "effects": [
+        "cavalryClash"
+      ],
+      "info": [
+        "사료 근거: 後漢書 卷73: 自號白馬義從. 병종 이름의 채택·수치·모집 조건은 게임 편성입니다."
+      ]
+    },
+    {
+      "id": 1302,
+      "armType": 3,
+      "name": "중장기병",
+      "attack": 150,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 12,
+      "attackCoef": {
+        "0": 1,
+        "1": 1.2,
+        "2": 0.8,
+        "3": 1,
+        "4": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 0.8,
+        "2": 1.2,
+        "3": 1,
+        "4": 1.2,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "regions",
+          "regions": [
+            11
+          ]
+        }
+      ],
+      "effects": [
+        "cavalryClash"
+      ],
+      "info": [
+        "원작의 창작 병종입니다. 같은 부대 이름을 검토한 시대 사료 색인에서 확인하지 못했습니다."
+      ]
+    },
+    {
+      "id": 1303,
+      "armType": 3,
+      "name": "돌격기병",
+      "attack": 200,
+      "defence": 100,
+      "speed": 8,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 11,
+      "attackCoef": {
+        "0": 1,
+        "1": 1.2,
+        "2": 0.8,
+        "3": 1,
+        "4": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 0.8,
+        "2": 1.2,
+        "3": 1,
+        "4": 1.2,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            1125
+          ]
+        }
+      ],
+      "effects": [
+        "cavalryClash"
+      ],
+      "info": [
+        "원작의 창작 병종입니다. 같은 부대 이름을 검토한 시대 사료 색인에서 확인하지 못했습니다."
+      ]
+    },
+    {
+      "id": 1304,
+      "armType": 3,
+      "name": "철기병",
+      "attack": 100,
+      "defence": 250,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 11,
+      "rice": 13,
+      "attackCoef": {
+        "0": 1,
+        "1": 1.2,
+        "2": 0.8,
+        "3": 1,
+        "4": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 0.8,
+        "2": 1.2,
+        "3": 1,
+        "4": 1.2,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            1120
+          ]
+        }
+      ],
+      "effects": [
+        "cavalryClash"
+      ],
+      "info": [
+        "원작의 창작 병종입니다. 같은 부대 이름을 검토한 시대 사료 색인에서 확인하지 못했습니다."
+      ]
+    },
+    {
+      "id": 1305,
+      "armType": 3,
+      "name": "수렵기병",
+      "attack": 150,
+      "defence": 100,
+      "speed": 8,
+      "avoid": 15,
+      "magicCoef": 0,
+      "cost": 12,
+      "rice": 12,
+      "attackCoef": {
+        "0": 1,
+        "1": 1.2,
+        "2": 0.8,
+        "3": 1,
+        "4": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 0.8,
+        "2": 1.2,
+        "3": 1,
+        "4": 1.2,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            1123
+          ]
+        }
+      ],
+      "effects": [
+        "cavalryClash",
+        "avoid"
+      ],
+      "info": [
+        "원작의 창작 병종입니다. 같은 부대 이름을 검토한 시대 사료 색인에서 확인하지 못했습니다."
+      ]
+    },
+    {
+      "id": 1306,
+      "armType": 3,
+      "name": "맹수병",
+      "attack": 250,
+      "defence": 175,
+      "speed": 6,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 16,
+      "rice": 16,
+      "attackCoef": {
+        "0": 1,
+        "1": 1.2,
+        "2": 0.8,
+        "3": 1,
+        "4": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 0.8,
+        "2": 1.2,
+        "3": 1,
+        "4": 1.2,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            1122
+          ]
+        }
+      ],
+      "effects": [
+        "cavalryClash"
+      ],
+      "info": [
+        "원작의 창작 병종입니다. 같은 부대 이름을 검토한 시대 사료 색인에서 확인하지 못했습니다."
+      ]
+    },
+    {
+      "id": 1307,
+      "armType": 3,
+      "name": "호표기병",
+      "attack": 200,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 14,
+      "rice": 14,
+      "attackCoef": {
+        "0": 1,
+        "1": 1.2,
+        "2": 0.8,
+        "3": 1,
+        "4": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 0.8,
+        "2": 1.2,
+        "3": 1,
+        "4": 1.2,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 3000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            2
+          ]
+        }
+      ],
+      "effects": [
+        "cavalryClash"
+      ],
+      "info": [
+        "사료 근거: 三國志 卷9: 督虎豹騎從圍南皮. 병종 이름의 채택·수치·모집 조건은 게임 편성입니다."
+      ]
+    },
+    {
+      "id": 1310,
+      "armType": 3,
+      "name": "오환돌기",
+      "attack": 200,
+      "defence": 100,
+      "speed": 8,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 11,
+      "attackCoef": {
+        "0": 1,
+        "1": 1.2,
+        "2": 0.8,
+        "3": 1,
+        "4": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 0.8,
+        "2": 1.2,
+        "3": 1,
+        "4": 1.2,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            1121
+          ]
+        }
+      ],
+      "effects": [
+        "cavalryClash"
+      ],
+      "info": [
+        "사료 근거: 三國志 卷30: 三郡烏丸爲天下名騎. 병종 이름의 채택·수치·모집 조건은 게임 편성입니다."
+      ]
+    },
+    {
+      "id": 91300,
+      "armType": 3,
+      "name": "양마기병",
+      "attack": 200,
+      "defence": 175,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 15,
+      "rice": 15,
+      "attackCoef": {
+        "0": 1,
+        "1": 1.2,
+        "2": 0.8,
+        "3": 1,
+        "4": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 0.8,
+        "2": 1.2,
+        "3": 1,
+        "4": 1.2,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 4000
+        },
+        {
+          "kind": "citiesWithLevel",
+          "cityKeys": [
+            24
+          ],
+          "level": 8
+        }
+      ],
+      "effects": [
+        "cavalryClash"
+      ],
+      "info": [
+        "원작의 창작 병종입니다. 같은 부대 이름을 검토한 시대 사료 색인에서 확인하지 못했습니다."
+      ]
+    },
+    {
+      "id": 91301,
+      "armType": 3,
+      "name": "산저병",
+      "attack": 225,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 15,
+      "rice": 15,
+      "attackCoef": {
+        "0": 1,
+        "1": 1.2,
+        "2": 0.8,
+        "3": 1,
+        "4": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 0.8,
+        "2": 1.2,
+        "3": 1,
+        "4": 1.2,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 4000
+        },
+        {
+          "kind": "citiesWithLevel",
+          "cityKeys": [
+            11
+          ],
+          "level": 8
+        },
+        {
+          "kind": "research",
+          "name": "mountain"
+        }
+      ],
+      "effects": [
+        "cavalryClash"
+      ],
+      "info": [
+        "원작의 창작 병종입니다. 같은 부대 이름을 검토한 시대 사료 색인에서 확인하지 못했습니다."
+      ]
+    },
+    {
+      "id": 91302,
+      "armType": 3,
+      "name": "상병",
+      "attack": 225,
+      "defence": 250,
+      "speed": 5,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 24,
+      "rice": 24,
+      "attackCoef": {
+        "0": 1,
+        "1": 1.2,
+        "2": 0.8,
+        "3": 1,
+        "4": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 0.8,
+        "2": 1.2,
+        "3": 1,
+        "4": 1.2,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 5000
+        },
+        {
+          "kind": "citiesWithLevel",
+          "cityKeys": [
+            1122
+          ],
+          "level": 8
+        },
+        {
+          "kind": "research",
+          "name": "elephant"
+        }
+      ],
+      "effects": [
+        "cavalryClash"
+      ],
+      "info": [
+        "원작의 창작 병종입니다. 같은 부대 이름을 검토한 시대 사료 색인에서 확인하지 못했습니다."
+      ]
+    },
+    {
+      "id": 1400,
+      "armType": 4,
+      "name": "창극병",
+      "attack": 102,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 9,
+      "rice": 9,
+      "attackCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 0.8,
+        "3": 1.2,
+        "4": 1,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 1.2,
+        "3": 0.8,
+        "4": 1,
+        "5": 0.8
+      },
+      "effects": [
+        "pikeWall"
+      ],
+      "info": [
+        "게임의 기본 병종 또는 원작 병종입니다."
+      ]
+    },
+    {
+      "id": 1401,
+      "armType": 4,
+      "name": "왜모병",
+      "attack": 150,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 11,
+      "rice": 10,
+      "attackCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 0.8,
+        "3": 1.2,
+        "4": 1,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 1.2,
+        "3": 0.8,
+        "4": 1,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            1133
+          ]
+        }
+      ],
+      "effects": [
+        "pikeWall"
+      ],
+      "info": [
+        "사료 근거: 三國志 卷30 倭人條: 兵用矛、楯、木弓. 병종 이름의 채택·수치·모집 조건은 게임 편성입니다."
+      ]
+    },
+    {
+      "id": 1402,
+      "armType": 4,
+      "name": "함진영",
+      "attack": 100,
+      "defence": 150,
+      "speed": 8,
+      "avoid": 20,
+      "magicCoef": 0,
+      "cost": 10,
+      "rice": 10,
+      "attackCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 0.8,
+        "3": 1.2,
+        "4": 1,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 1.2,
+        "3": 0.8,
+        "4": 1,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            21
+          ]
+        }
+      ],
+      "effects": [
+        "pikeWall"
+      ],
+      "info": [
+        "사료 근거: 資治通鑑 卷62: 名陷陳營. 병종 이름의 채택·수치·모집 조건은 게임 편성입니다."
+      ]
+    },
+    {
+      "id": 1403,
+      "armType": 4,
+      "name": "대극사",
+      "attack": 150,
+      "defence": 200,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 12,
+      "rice": 12,
+      "attackCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 0.8,
+        "3": 1.2,
+        "4": 1,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 1.2,
+        "3": 0.8,
+        "4": 1,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 3000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            1
+          ]
+        }
+      ],
+      "effects": [
+        "pikeWall"
+      ],
+      "info": [
+        "사료 근거: 三國志 卷6: 大戟士百餘人自隨. 병종 이름의 채택·수치·모집 조건은 게임 편성입니다."
+      ]
+    },
+    {
+      "id": 91102,
+      "armType": 4,
+      "name": "극병",
+      "attack": 283,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 18,
+      "rice": 18,
+      "attackCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 0.8,
+        "3": 1.2,
+        "4": 1,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "0": 1,
+        "1": 1,
+        "2": 1.2,
+        "3": 0.8,
+        "4": 1,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 5000
+        },
+        {
+          "kind": "citiesWithLevel",
+          "cityKeys": [
+            1126
+          ],
+          "level": 8
+        },
+        {
+          "kind": "research",
+          "name": "halberd"
+        }
+      ],
+      "effects": [
+        "pikeWall"
+      ],
+      "info": [
+        "원작의 창작 병종입니다. 같은 부대 이름을 검토한 시대 사료 색인에서 확인하지 못했습니다."
+      ]
+    },
+    {
+      "id": 1500,
+      "armType": 5,
+      "name": "정란",
+      "attack": 100,
+      "defence": 100,
+      "speed": 6,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 14,
+      "rice": 5,
+      "attackCoef": {
+        "0": 1.8,
+        "1": 1.25,
+        "2": 1.25,
+        "3": 1.25,
+        "4": 1.25,
+        "1106": 1.112,
+        "91300": 1.112
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "2": 1.2,
+        "3": 1.2,
+        "4": 1.2,
+        "1106": 1.067,
+        "91300": 1.112
+      },
+      "requirements": [
+        {
+          "kind": "minRelYear",
+          "min": 3
+        }
+      ],
+      "effects": [
+        "firstVolley"
+      ],
+      "info": [
+        "게임의 기본 병종 또는 원작 병종입니다."
+      ]
+    },
+    {
+      "id": 1501,
+      "armType": 5,
+      "name": "충차",
+      "attack": 150,
+      "defence": 250,
+      "speed": 6,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 18,
+      "rice": 5,
+      "attackCoef": {
+        "0": 2.4,
+        "1": 0.8,
+        "2": 0.8,
+        "3": 0.8,
+        "4": 0.8,
+        "1106": 1.112,
+        "91300": 1.112
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "2": 1.2,
+        "3": 1.2,
+        "4": 1.2,
+        "1106": 1.067,
+        "91300": 1.067
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "minRelYear",
+          "min": 3
+        }
+      ],
+      "info": [
+        "게임의 기본 병종 또는 원작 병종입니다."
+      ]
+    },
+    {
+      "id": 1502,
+      "armType": 5,
+      "name": "벽력거",
+      "attack": 150,
+      "defence": 150,
+      "speed": 6,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 20,
+      "rice": 5,
+      "attackCoef": {
+        "0": 1.8,
+        "1": 1.25,
+        "2": 1.25,
+        "3": 1.25,
+        "4": 1.25,
+        "1106": 1.112,
+        "91300": 1.112
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "2": 1.2,
+        "3": 1.2,
+        "4": 1.2,
+        "1106": 1.067,
+        "91300": 1.112
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 3000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            1
+          ]
+        }
+      ],
+      "effects": [
+        "firstVolley"
+      ],
+      "info": [
+        "게임의 기본 병종 또는 원작 병종입니다."
+      ]
+    },
+    {
+      "id": 1503,
+      "armType": 5,
+      "name": "목우",
+      "attack": 50,
+      "defence": 600,
+      "speed": 5,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 15,
+      "rice": 5,
+      "attackCoef": {
+        "0": 1.8,
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1
+      },
+      "defenceCoef": {
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 3000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            5
+          ]
+        }
+      ],
+      "effects": [
+        "hold"
+      ],
+      "info": [
+        "게임의 기본 병종 또는 원작 병종입니다."
+      ]
+    },
+    {
+      "id": 91500,
+      "armType": 5,
+      "name": "화륜차",
+      "attack": 300,
+      "defence": 1000,
+      "speed": 5,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 40,
+      "rice": 5,
+      "attackCoef": {
+        "0": 1.25,
+        "1": 1.25,
+        "2": 1.25,
+        "3": 1.25,
+        "4": 1.25,
+        "1106": 1.112,
+        "91300": 1.112
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "2": 1.2,
+        "3": 1.2,
+        "4": 1.2,
+        "1106": 1.067,
+        "91300": 1.067
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 5000
+        },
+        {
+          "kind": "scorched",
+          "min": 1
+        },
+        {
+          "kind": "chief"
+        },
+        {
+          "kind": "research",
+          "name": "fire_wheel"
+        }
+      ],
+      "info": [
+        "게임의 기본 병종 또는 원작 병종입니다."
+      ]
+    }
+  ]
+}

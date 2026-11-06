@@ -270,15 +270,26 @@ it('AC-P2-32 가문을 끈 초기화는 성별 원장을 읽지 않는다', asyn
   expect(latest).not.toHaveBeenCalled();
 });
 
-async function san10RequestFixture(scenario: 'san10-191' | 'san10-empty') {
+async function san10RequestFixture(
+  scenario: 'san10-191' | 'san10-empty',
+  unitMode: 'stored-basic' | 'expanded' | 'basic-override' = 'stored-basic',
+) {
   const presetKey = scenario === 'san10-empty' ? 'empty' : 'regular',
-    preset = parsePreset(json(`resources/preset/${presetKey}.json`)),
+    // 구판 생성 당시 저장된 프리셋은 새 파일의 expanded로 바꾸지 않는다.
+    preset = {
+      ...parsePreset(json(`resources/preset/${presetKey}.json`)),
+      unitSet: unitMode === 'stored-basic' ? 'basic' : 'expanded',
+    },
     selected: InitialResources = {
       ...resources,
       map: resource('MAP', 'san10', 'resources/map/san10.json'),
       scenario: resource('SCENARIO', scenario, `resources/scenario/${scenario}.json`),
+      ...(unitMode === 'expanded'
+        ? { unitSet: resource('UNIT_SET', 'expanded', 'resources/unitset/expanded.json') }
+        : {}),
     },
     san10Features = [
+      ...(unitMode === 'expanded' ? ['battle-affinity-v2'] : []),
       'campaign-assignment-v2',
       'campaign-v1',
       'city-resources-v1',
@@ -312,7 +323,8 @@ async function san10RequestFixture(scenario: 'san10-191' | 'san10-empty') {
     presetKey,
     seed: oldSeed,
     endYear: f.world.endYear,
-    ruleFeatures: san10Features,
+    ruleFeatures: san10Features.filter((feature) => unitMode !== 'expanded' || feature !== 'battle-affinity-v2'),
+    ...(unitMode === 'basic-override' ? { unitSetKey: 'basic' } : {}),
   });
   f.rows.splice(0, f.rows.length, ...structuredClone(Object.values(selected)));
   f.requests[0] = {
@@ -321,7 +333,13 @@ async function san10RequestFixture(scenario: 'san10-191' | 'san10-empty') {
     intentHash: hashState(intent),
     resolution: {
       version: 1,
-      selection: { scenario, map: 'san10', unitSet: 'basic', statRules: 'five-stats', portraitMap: '191-map' },
+      selection: {
+        scenario,
+        map: 'san10',
+        unitSet: selected.unitSet.name,
+        statRules: 'five-stats',
+        portraitMap: '191-map',
+      },
       resources: Object.values(selected).map(({ kind, name, version, contentHash }) => ({
         kind,
         name,
@@ -337,6 +355,19 @@ async function san10RequestFixture(scenario: 'san10-191' | 'san10-empty') {
   } as unknown as Request;
   return { f, san10Features };
 }
+
+it.each(['expanded', 'basic-override'] as const)(
+  'AC-INT-22: 새 프리셋의 %s 초기화는 실제 선택한 병종과 자동 전투 기능을 함께 보존한다',
+  async (unitMode) => {
+    const { f, san10Features } = await san10RequestFixture('san10-191', unitMode);
+    const result = await prepareWorldReset(f.db, worldId, 'expanded-reset-seed', controller().signal);
+    const saved = await capture(result.prepared);
+    expect(saved.world.unitSetKey).toBe(unitMode === 'expanded' ? 'expanded' : 'basic');
+    expect(saved.world.ruleFeatures).toEqual(san10Features);
+    expect(saved.world.ruleFeatures.includes('battle-affinity-v2')).toBe(unitMode === 'expanded');
+    expect(result.evidence.provenance).toEqual({ kind: 'request', requestId });
+  },
+);
 
 it.each(['san10-191', 'san10-empty'] as const)(
   'AC-INT-18D %s의 생략된 기본 자원도 DONE 출처와155빈원장을 보존해 초기화한다',

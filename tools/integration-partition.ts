@@ -17,6 +17,7 @@ export const ENGINE_INTEGRATION_FILES = [
   'tools/int19-orders.integration.test.ts',
   // AC-P2-30·31·32·33: 정식 명단 확장 결합은 권한 기록 없이 엔진·저장·재생을 검사한다.
   'tools/expanded-native.integration.test.ts',
+  'tools/int22-expanded-units.integration.test.ts',
 ] as const;
 
 export function integrationPartition(value: string | undefined): string[] {

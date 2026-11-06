@@ -3,7 +3,7 @@
   "turnTermMinutes": 60,
   "scenario": "san10-empty",
   "map": "san10",
-  "unitSet": "basic",
+  "unitSet": "expanded",
   "commands": null,
   "npc": {
     "fillRatio": 1,

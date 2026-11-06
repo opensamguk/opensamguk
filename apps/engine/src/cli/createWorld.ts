@@ -12,6 +12,7 @@ async function main() {
       map: { type: 'string' },
       seed: { type: 'string' },
       'rule-features': { type: 'string' },
+      'unit-set': { type: 'string' },
       'stat-rules': { type: 'string' },
       'portrait-map': { type: 'string' },
       published: { type: 'boolean' },
@@ -24,7 +25,7 @@ async function main() {
   });
   if (values.help) {
     console.log(
-      'pnpm world:create [--preset <key>] [--published] [--stat-rules <key>] [--portrait-map <key>] [--rule-features a,b] [--scenario 1030 --map che --turn-term <분>] --seed <문자열> --end-year <연도> --name <이름> [--treaty]',
+      'pnpm world:create [--preset <key>] [--published] [--unit-set <key>] [--stat-rules <key>] [--portrait-map <key>] [--rule-features a,b] [--scenario 1030 --map che --turn-term <분>] --seed <문자열> --end-year <연도> --name <이름> [--treaty]',
     );
     return;
   }
@@ -43,16 +44,23 @@ async function main() {
       scenario,
       map,
       seed,
-      ...(preset ? { unitSet: preset.unitSet } : {}),
+      ...(values['unit-set'] !== undefined
+        ? { unitSet: values['unit-set'] }
+        : preset
+          ? { unitSet: preset.unitSet }
+          : {}),
       ...(values['stat-rules'] !== undefined ? { statRules: values['stat-rules'] } : {}),
       ...(values['portrait-map'] !== undefined ? { portraitMap: values['portrait-map'] } : {}),
     };
     const state = values.published ? await loadInitialWorldFromDb(db, selection) : await loadInitialWorld(selection);
     let ruleFeatures: string[] | undefined;
-    if (values['rule-features'] !== undefined) {
-      const requested = values['rule-features'].split(',');
+    const selectedFeatures = state.unitSetKey === 'expanded' ? ['battle-affinity-v2'] : [];
+    if (values['rule-features'] !== undefined || selectedFeatures.length) {
+      const requested = values['rule-features']?.split(',') ?? [];
       if (new Set(requested).size !== requested.length) throw new Error('규칙 기능이 중복됩니다.');
-      ruleFeatures = checkRuleFeatures([...new Set([...(state.ruleFeatures ?? []), ...requested])].sort());
+      ruleFeatures = checkRuleFeatures(
+        [...new Set([...(state.ruleFeatures ?? []), ...selectedFeatures, ...requested])].sort(),
+      );
       if (state.ruleFeatures) state.ruleFeatures = ruleFeatures;
     }
     console.log(

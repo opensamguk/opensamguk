@@ -21,3 +21,5 @@
 2026-10-30 D-045의 실행 파생물은 `resources/map/san10.json`, `resources/scenario/san10-191.json`, `resources/scenario/san10-empty.json`, `resources/san10-manifest.json`이다. 역사 인물·국가·능력치의 원본과 MIT 고지는 상위 고지와 기존 191년 검수 원장을 따른다. 공백지판은 같은 인물의 소속과 국가·외교를 비운 게임 편성이다. 45제안의 도로 활성화는 사용자 결정이며 역사 도로의 실재를 뜻하지 않는다.
 
 `apps/web/src/main/san10-basemap.json`은 위 육지를 같은 투영의 SVG 경로로 변환한 Public domain 파생물이다. `build-san10-basemap.py`는 입력 해시를 검사하고 `build-san10-resources.ts`가 화면 묶음의 바이트 해시를 지도·게시 명세에 고정한다. 이 새 범위에는 기존 지형 음영 그림을 늘여 쓰지 않는다. 옛 GIS와 게시 판은 보존한다.
+
+`provinces.json`은 INT-22의 모집 조건에 쓰는 155도시·관문의 州 배정표다. 각 행에 사서 URL·절·짧은 인용과 게임 대응의 한계를 적었다. 『後漢書』 郡國志의 郡·縣 소속을 기본으로 삼고 후대 지명이나 산·강은 별도 근거와 주석으로 구별한다. 남중은 익주를 나눈 게임 구역이며, 한반도·왜와 북방 외부 구역은 D-056의 게임 분류다. 대표 좌표가 사서의 정확한 치소나 도하 위치라는 뜻은 아니다. 새 `MAP/san10`의 `regionScheme`은 `province-191`이고 기존 게시 DB의 내용은 덮어쓰지 않는다.

@@ -4,8 +4,8 @@
     "name": "san10",
     "path": "resources/map/san10.json",
     "version": 1,
-    "contentHash": "3436ab2127d01f8ef153e3097d541b13748b1554847ccd795bf3e424695dcc59",
-    "source": "D-045; SAN10 user survey / core2026 df6c926 MIT / Natural Earth v5.1.2 public domain; resources/map-drafts/san10/NOTICE.md"
+    "contentHash": "b4a9cb1f63ba2a7fadda9fb9df474e0fb7c03e316ea532d39f1c801ebb41d697",
+    "source": "D-045/D-056; SAN10 user survey / core2026 df6c926 MIT / Natural Earth v5.1.2 public domain; resources/map-drafts/san10/NOTICE.md"
   },
   {
     "kind": "SCENARIO",
@@ -13,7 +13,7 @@
     "path": "resources/scenario/san10-191.json",
     "version": 1,
     "contentHash": "4723cfeeed7730c29386c43b155c12a19e188eb01e52ace148e572d13122c48c",
-    "source": "D-045; SAN10 user survey / core2026 df6c926 MIT / Natural Earth v5.1.2 public domain; resources/map-drafts/san10/NOTICE.md"
+    "source": "D-045/D-056; SAN10 user survey / core2026 df6c926 MIT / Natural Earth v5.1.2 public domain; resources/map-drafts/san10/NOTICE.md"
   },
   {
     "kind": "SCENARIO",
@@ -21,6 +21,14 @@
     "path": "resources/scenario/san10-empty.json",
     "version": 1,
     "contentHash": "836601df411c48860395a95efe84ead401f71c117bc9b845174a0cf589bb9d9e",
-    "source": "D-045; SAN10 user survey / core2026 df6c926 MIT / Natural Earth v5.1.2 public domain; resources/map-drafts/san10/NOTICE.md"
+    "source": "D-045/D-056; SAN10 user survey / core2026 df6c926 MIT / Natural Earth v5.1.2 public domain; resources/map-drafts/san10/NOTICE.md"
+  },
+  {
+    "kind": "UNIT_SET",
+    "name": "expanded",
+    "path": "resources/unitset/expanded.json",
+    "version": 1,
+    "contentHash": "e2e988c441efddc28079b461205353f766af9077f61b61017760aff9dae9f3b3",
+    "source": "D-045/D-056; SAN10 user survey / core2026 df6c926 MIT / Natural Earth v5.1.2 public domain; resources/map-drafts/san10/NOTICE.md"
   }
 ]

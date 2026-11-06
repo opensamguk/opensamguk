@@ -54,7 +54,7 @@ const profileIds = ['integration-v01', 'san10-191', 'san10-empty'] as const;
 type ProfileId = (typeof profileIds)[number];
 type Selection = Record<keyof typeof creationSelection, string>;
 type Identity = { id: ProfileId | 'integration-v01-expanded'; label: string };
-const san10Selection = { ...creationSelection, mapKey: 'san10' } as const;
+const san10Selection = { ...creationSelection, mapKey: 'san10', unitSetKey: 'expanded' } as const;
 const contracts = {
   'integration-v01': {
     ...identity,

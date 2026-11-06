@@ -111,6 +111,7 @@ test.afterEach(async ({ page, legalStack }, info) => {
 async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: Run) {
   const db = stack.db;
   const expanded = mode.id === 'integration-v01-expanded';
+  const unitSetKey = mode.id === 'integration-v01-expanded' ? 'basic' : 'expanded';
   const features = expanded
     ? [...creationFeatures, 'equipment-v1', 'governance-v1', 'heritage-v1', 'lineage-v1', 'logistics-v1'].sort()
     : [...creationFeatures];
@@ -146,6 +147,7 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
   expect(profile.ruleFeatures).toEqual(features);
   expect(profile.ruleFeatures).toHaveLength(expanded ? 15 : 10);
   expect(profile.resources).toHaveLength(5);
+  expect(profile.selection.unitSetKey).toBe(unitSetKey);
   const published = await step(run, () => db.gameResource.findMany({ where: { status: 'PUBLISHED' } }));
   const pinned = profile.resources.map((ref) => {
     const matches = published.filter(
@@ -270,7 +272,7 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
     startYear: mode.year,
     scenarioKey: profile.selection.scenarioKey,
     mapKey: profile.selection.mapKey,
-    unitSetKey: 'basic',
+    unitSetKey,
     seed,
     presetKey: mode.preset,
     endYear: mode.endYear,
@@ -280,7 +282,7 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
     selection: {
       map: profile.selection.mapKey,
       scenario: profile.selection.scenarioKey,
-      unitSet: 'basic',
+      unitSet: unitSetKey,
       statRules: 'five-stats',
       portraitMap: '191-map',
     },

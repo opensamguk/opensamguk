@@ -16,6 +16,7 @@ import { visibility } from '../visibility';
 import { activeSanctionWhere } from '../auth/sanction';
 import { requirePersonnelSession } from './personnelAdmission';
 import { readView, requireGeneral, requireRuleFeature, requireWorld } from './queries';
+import { recruitmentAvailability } from './recruitment';
 
 type ActorContext = Pick<Context, 'db' | 'sessionId' | 'now'> & { user: { id: string } };
 type Event = Prisma.InputEventGetPayload<Record<string, never>>;
@@ -203,6 +204,7 @@ export async function readCityResourceBoard(ctx: ActorContext, worldId: string, 
         armyTypes: initial.unitSet.crewTypes
           .filter((type) => campaignArmyTypes(initial).includes(type.id))
           .map(({ id, name }) => ({ id, name })),
+        ...recruitmentAvailability(initial.unitSet, view, { generalId: actor.id, tick: world.clockTick }),
       };
     },
     { isolationLevel: 'RepeatableRead' },
