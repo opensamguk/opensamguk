@@ -292,6 +292,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     const result = await query('world.map', { worldId });
     expect(result.status).toBe(200);
     expect(result.data).toEqual({
+      background: null,
       cities: state.cities.map((city) => ({
         key: city.cityKey,
         name: city.name,

@@ -1,3 +1,17 @@
+import { isAbsolute } from 'node:path';
+
+export const AUTHZ_SHARD_TOTAL = 3;
+
+export function integrationShardArgs(suite: string | undefined, shard: string | undefined, report: string | undefined) {
+  if (shard === undefined && report === undefined) return [];
+  if (suite !== 'api') throw new Error('authz shard suite');
+  if (!shard || !report || !isAbsolute(report) || !/^[1-9]\d*\/[1-9]\d*$/.test(shard))
+    throw new Error('authz shard-spec');
+  const [index, total] = shard.split('/').map(Number);
+  if (total !== AUTHZ_SHARD_TOTAL || index! > total) throw new Error('authz shard-spec');
+  return [`--shard=${shard}`, '--reporter=default', '--reporter=json', `--outputFile.json=${report}`];
+}
+
 // CI의 각 묶음은 자기 PostgreSQL 서비스를 쓴다. 로컬 기본 실행은 전체를 직렬 검사한다.
 export const ENGINE_INTEGRATION_FILES = [
   'tools/scenarios.integration.test.ts',
