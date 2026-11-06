@@ -13,6 +13,8 @@ import { prepareInitialWorld } from '../../apps/engine/src/world/persistence';
 import { toWorldState } from '../../packages/rules/src/model/world';
 import { emptyCityResourcesState, readCityResourcesState } from '../../packages/rules/src/cityResources/state';
 import { commandRegistry } from '../../packages/rules/src/commands/registry';
+import { buildExpandedUnitSet } from '../unitset/expanded';
+import { readExpandedSource } from '../unitset/source';
 
 const root = new URL('../../', import.meta.url);
 const read = (path: string) => JSON.parse(readFileSync(new URL(path, root), 'utf8'));
@@ -27,6 +29,19 @@ const materials = {
   statRules: read('resources/scenario/five-stats.json'),
   portraitMap: read('resources/portraits/191-map.json'),
 };
+
+it('AC-INT-22: 두 번 생성한 지도·병종·시나리오가 게시 명세의 내용 해시와 모두 같다', async () => {
+  const source = await readExpandedSource();
+  const build = () => {
+    const map = buildSan10Map(hash);
+    return [map, ...Object.values(buildSan10Scenarios(map)), buildExpandedUnitSet(source, map)];
+  };
+  const first = build().map(hashState),
+    second = build().map(hashState),
+    rows = await san10ResourceRows();
+  expect(second).toEqual(first);
+  expect(first).toEqual(rows.map((row) => row.contentHash));
+});
 
 it('D-045·D-049·D-052·D-055: 155표식이 모두 전략 거점이고 주변 제안 32개와 섬·파양 연결 4개를 포함한 191도로가 양방향 활성화된다', () => {
   expect(map).toEqual(read('resources/map/san10.json'));
@@ -168,7 +183,9 @@ it('두 시나리오는 동일한 지리·도로를 쓰고 역사는21국491명,
   );
   expect((await loadPreset('regular')).map).toBe('san10');
   expect((await loadPreset('empty')).scenario).toBe('san10-empty');
-  expect((await san10ResourceRows()).map((row) => row.contentHash)).toEqual([map, historical, empty].map(hashState));
+  expect((await san10ResourceRows()).map((row) => row.contentHash)).toEqual(
+    [map, historical, empty, read('resources/unitset/expanded.json')].map(hashState),
+  );
 });
 
 it('가변 캔버스도 실제 범위를 넘는 점·잘못된 GIS 범위·과대 면적을 거부한다', () => {

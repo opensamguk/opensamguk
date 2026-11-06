@@ -10,6 +10,7 @@
 - 지금 무엇을 하는지 알고 싶다면 → [인수조건](./product/acceptance-criteria.md)
 - 게임을 처음 하는 플레이어 → [플레이어 가이드](./user/index.md) (초안, 게임 안에서는 `/help`)
 - 코드를 처음 보는 개발자 → [개발자 핸드북](./developer/index.md)
+- 병종 선택 화면을 연결하는 개발자 → [모집 조건 응답](./developer/recruitment-availability.md) (AC-INT-22)
 - 운영자 → [릴리스 운영](./release-operations.md), [관리자 콘솔](./admin-console.md)
 
 공개 준비의 제재 안내 화면과 검증 범위는 [T3-06 첫 묶음](./plans/T3-06.md#공개-준비-첫-묶음-2026-10-28-ac-m3-04), 사용자 안내는 [국가와 기능](./user/nation-and-features.md)에 있다. 전체 관리자 인수는 진행 중이다.

@@ -288,7 +288,7 @@ async function verifyMode(stack: LegalStack, page: Page, info: TestInfo, run: Ru
   );
   await info.attach('새 지도 375px', { path: screenshot, contentType: 'image/png' });
   expect(hashState(await step(run, () => readWorldState(db, old.worldId)))).toBe(oldHash);
-  expect(await step(run, () => initializeSan10Resources(db))).toEqual({ inserted: 0, existing: 3 });
+  expect(await step(run, () => initializeSan10Resources(db))).toEqual({ inserted: 0, existing: 4 });
   expect(await step(run, () => db.inputEvent.count({ where: { worldId, status: 'PENDING' } }))).toBe(0);
 }
 

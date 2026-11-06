@@ -75,6 +75,48 @@ it('CLI boolean에 문자열 값을 넣으면 DB를 열기 전에 거부한다 (
   expect(mocks.createWorldFromCli).not.toHaveBeenCalled();
 });
 
+it.each([false, true])('확장 프리셋은 원작식 기능을 한 번만 합성한다 (명시=%s)', async (explicit) => {
+  mocks.loadPreset.mockResolvedValue({
+    scenario: 'san10-191',
+    map: 'san10',
+    unitSet: 'expanded',
+    turnTermMinutes: 60,
+  });
+  mocks.loadInitialWorld.mockResolvedValue({
+    seed: 'cli-unit',
+    unitSetKey: 'expanded',
+    ruleFeatures: ['five-stats', 'operational-map'],
+  });
+  process.argv = [
+    process.execPath,
+    'createWorld.ts',
+    '--preset',
+    'regular',
+    '--seed',
+    'cli-unit',
+    '--end-year',
+    '231',
+    '--name',
+    '확장 생성',
+    ...(explicit ? ['--rule-features', 'battle-affinity-v2'] : []),
+  ];
+  await import('./createWorld');
+  await vi.waitFor(() => expect(mocks.disconnect).toHaveBeenCalledOnce());
+  expect(mocks.loadInitialWorld).toHaveBeenCalledWith({
+    scenario: 'san10-191',
+    map: 'san10',
+    seed: 'cli-unit',
+    unitSet: 'expanded',
+  });
+  const features = ['battle-affinity-v2', 'five-stats', 'operational-map'];
+  expect(mocks.createWorldFromCli).toHaveBeenCalledWith(
+    expect.anything(),
+    { seed: 'cli-unit', unitSetKey: 'expanded', ruleFeatures: features },
+    expect.objectContaining({ ruleFeatures: features, preset: expect.objectContaining({ key: 'regular' }) }),
+  );
+  expect(console.error).not.toHaveBeenCalled();
+});
+
 it('자원 프로필과 요청 기능을 합칠 때 정렬한 뒤 의존 관계를 검사한다', async () => {
   mocks.loadInitialWorld.mockResolvedValue({ seed: 'cli-unit', ruleFeatures: ['five-stats', 'operational-map'] });
   process.argv = [

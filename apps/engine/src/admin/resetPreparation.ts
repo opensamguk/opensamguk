@@ -458,7 +458,16 @@ function prepared(
       features = options.ruleFeatures ?? [];
     if (request) {
       const intent = worldCreateIntentSchema.parse(request.intent);
-      if (!same([...new Set([...(state.ruleFeatures ?? []), ...(intent.ruleFeatures ?? [])])].sort(), features))
+      const presetFeatures =
+        options.preset?.value.unitSet === 'expanded' && resources.unitSet.name === 'expanded'
+          ? ['battle-affinity-v2']
+          : [];
+      if (
+        !same(
+          [...new Set([...(state.ruleFeatures ?? []), ...presetFeatures, ...(intent.ruleFeatures ?? [])])].sort(),
+          features,
+        )
+      )
         fail('PROVENANCE_INVALID');
     }
     if (state.generals.some((g) => g.userId !== null) || (state.ruleFeatures ?? []).some((f) => !features.includes(f)))

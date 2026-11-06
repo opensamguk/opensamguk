@@ -181,7 +181,7 @@ it.each([
     expected: {
       scenario: 'san10-191',
       map: 'san10',
-      unitSet: 'basic',
+      unitSet: 'expanded',
       statRules: 'five-stats',
       portraitMap: '191-map',
     },
@@ -192,7 +192,7 @@ it.each([
     expected: {
       scenario: 'san10-empty',
       map: 'san10',
-      unitSet: 'basic',
+      unitSet: 'expanded',
       statRules: 'five-stats',
       portraitMap: '191-map',
     },

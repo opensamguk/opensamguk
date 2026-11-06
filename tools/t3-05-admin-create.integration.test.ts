@@ -1233,6 +1233,7 @@ it('AC-M3-04 프리셋 위에 명시한 정식 자원·간격·긴 이름을 유
     request = await accepted(actor, signal, {
       presetKey: 'regular',
       name: long,
+      unitSetKey: 'basic',
       turnTermMinutes: 7,
       seed: 'create-fixed-seed',
     });
@@ -1436,7 +1437,7 @@ it('AC-M3-04 단일 PENDING을 두 실제 consumer가 경합해도 World·DONE·
   expect(await db.world.count({ where: { id: current.plannedWorldId } })).toBe(1);
   expect(await auditCount('world.create.applied', current.id)).toBe(1);
 });
-it('AC-M3-04 프리셋만 지정한 요청도 검증된 기존 기본 자원을 고정한다', async (signal) => {
+it('AC-M3-04·AC-INT-22 프리셋만 지정해도 확장 병종과 계산식을 함께 고정한다', async (signal) => {
   const result = await create(
     actor,
     {
@@ -1463,6 +1464,42 @@ it('AC-M3-04 프리셋만 지정한 요청도 검증된 기존 기본 자원을 
   ]);
   expect(await db.nation.count({ where: { worldId: world.id } })).toBe(21);
   expect(await db.general.count({ where: { worldId: world.id, userId: null } })).toBe(491);
+  expect(world.unitSetKey).toBe('expanded');
+  expect(world.ruleFeatures).toContain('battle-affinity-v2');
+  const archive = readArchive(await exportReplay(db, world.id));
+  expect(archive.origin.initial.unitSet.crewTypes).toHaveLength(45);
+  expect(hashState(archive.origin.initial)).toBe(world.initialStateHash);
+  await controlClock(db, world.id, 'start');
+  await controlClock(db, world.id, 'pause');
+  const paused = await db.world.findUniqueOrThrow({ where: { id: world.id } });
+  const reset = await call<{ plannedNewWorldId: string }>(
+    'admin.world.requestReset',
+    {
+      expectedUserId: actor.id,
+      worldId: world.id,
+      idempotencyKey: randomUUID(),
+      confirmName: paused.name,
+      expectedRevision: paused.clockRevision,
+      reason: '확장 프리셋 자동 기능의 원본 초기화 검증',
+    },
+    signal,
+    actor,
+    true,
+  );
+  expect(reset.status).toBe(200);
+  if (!reset.data) throw new Error('실제 확장 프리셋 초기화 접수가 필요합니다.');
+  const lease = await acquireLease(db, world.id);
+  if (!lease) throw new Error('자기 확장 프리셋 초기화 실행권이 필요합니다.');
+  await cleanupBoth(async () => {
+    const loop = new TurnLoop(db, lease);
+    for (let attempt = 0; attempt < 16; attempt++) {
+      if (!(await loop.poll(signal)).more) break;
+      if (attempt === 15) throw new Error('확장 프리셋 초기화 처리 상한을 넘었습니다.');
+    }
+  }, [() => releaseLease(db, lease)]);
+  const target = await db.world.findUniqueOrThrow({ where: { id: reset.data.plannedNewWorldId } });
+  expect(target).toMatchObject({ status: 'PREOPEN', unitSetKey: 'expanded', ruleFeatures: world.ruleFeatures });
+  expect(readArchive(await exportReplay(db, target.id)).origin.initial.unitSet.crewTypes).toHaveLength(45);
 });
 
 it('AC-M3-04 crash 전용 UUID DB에 전체 migration·게시 자원·PENDING을 준비한다', async (signal) => {
