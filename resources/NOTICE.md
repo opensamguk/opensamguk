@@ -6,12 +6,11 @@
 - 시나리오: `resources/scenario/scenario_1030.json` → `scenario/1030.json`
 - 능력치 규칙: `resources/scenario/default.json` → `scenario/default.json`
 - 병종: `resources/unitset/unitset_basic.json` → `unitset/basic.json`
-- 확장 병종(INT-22): 같은 커밋의 `resources/unitset/unitset_event_more_crewtype.json`을 포맷만 정리해 `tools/unitset/source/core2026-df6c926.json`에 보존했다. 원본 SHA-256은 `4b784547f5b131fac5630addb8b9d64f524f4c41792a570952dc665c310152bd`, 보존 파일은 `20d927b8ac7dbc57f07f3fcfb1c902a6d5ee346d31d45cd516b36745c3b66a92`다. 생성기 `tools/unitset/build-expanded.ts`는 귀병 12종을 제외하고 INT-22의 창극 계열·사료 이름·게임 모집 조건을 적용한다. 사료 이름은 계획의 권·인용을 `info`에 남기며 수치와 조건은 게임 편성이다. 기존 `unitset/basic.json`은 변경하지 않는다.
 - 계략 4종 공식: `packages/logic/src/actions/turn/general/strategyCommand.ts`, `che_화계.ts`, `che_파괴.ts`, `che_선동.ts`, `che_탈취.ts` → `packages/rules/src/commands/ext/stratagem/`. 비용·부상·미보급 탈취·기록과 RNG 판정은 T4-05의 S0~S7 결정과 기술 계약을 따른다.
 - 공개 국력: `app/game-engine/src/turn/monthlyNationStatsHandler.ts` → `packages/rules/src/ranking.ts`의 자원·도시·장수 합성식. 난수는 우리 시드 RNG를 쓰며 숙련도·전투 교환비·NPC 보정·국가 등급 조건은 옮기지 않았다.
 
 각 JSON의 `$comment`에 출처를 남겼고, 시나리오 식별용 `id`를 추가했습니다.
-기본 병종 판은 성벽·보병·궁병·기병 4종만 남기고 제외한 병종의 계수도 제거했습니다.
+병종은 성벽·보병·궁병·기병 4종만 남기고 제외한 병종의 계수도 제거했습니다.
 추가 장수(`general_ex`), 사건(`extends`), 역사 문구(`history`)는 원본 파일에 남아 있지만 로더는 사용하지 않습니다.
 원본 초상 경로는 사용하지 않습니다. 별도 한글 이름 대응표로 새 초상 ID를 부여하며, 대응하지 못한 이름은 null입니다.
 
@@ -122,3 +121,9 @@ v1에 없는 7명은 2026-10-27 웹에서 확인한 삼국지11 수치를 기록
 ## 일반 장비 18종
 
 `packages/rules/src/equipment/catalog.ts`의 일반 명마·무기·서적 이름과 금·치안·능력치 보너스는 core2026 커밋 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`의 `packages/logic/src/items/che_명마_01_노기.ts`~`che_서적_06_사민월령.ts` 18종에서 가져왔다. 원저작자 devsam의 위 MIT 고지를 유지한다. 말·철의 등급×5 소비는 사용자 승인 D-070의 추가 규칙이며 원작 산출량이 아니다. 서적의 추가 전투 계략 시도 효과는 첫 카탈로그에 옮기지 않았다.
+
+## 확장 병종 (INT-22)
+
+core2026 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`의 `resources/unitset/unitset_event_more_crewtype.json`을 포맷만 정리해 `tools/unitset/source/core2026-df6c926.json`에 보존했다. 원본 SHA-256은 `4b784547f5b131fac5630addb8b9d64f524f4c41792a570952dc665c310152bd`, 보존 파일은 `20d927b8ac7dbc57f07f3fcfb1c902a6d5ee346d31d45cd516b36745c3b66a92`다. 생성기 `tools/unitset/build-expanded.ts`는 귀병 12종을 제외하고 INT-22의 창극 계열·사료 이름·게임 모집 조건을 적용한다. 사료 이름은 계획의 권·인용을 `info`에 남기며 수치와 조건은 게임 편성이다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+위의 병종4종 고지는 기존 `unitset/basic.json`을 뜻한다. 새 `unitset/expanded.json`은 45종이며 기존 기본 병종 파일은 바꾸지 않는다.
