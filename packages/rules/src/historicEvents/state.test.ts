@@ -126,7 +126,7 @@ describe('T4-43 AC-P2-21 역사 사건의 공통 규칙', () => {
     expect(januaryResult.opened.map(({ id }) => id)).toEqual(['C', 'D']);
     expect(sequence).toEqual([1, 1, 2, 2]);
     expect(decemberResult.state.pending[0]!.choice).toBeNull();
-    expect(readHistoricEventsState(januaryResult.state, decemberEvents, 191)).toEqual(januaryResult.state);
+    expect(readHistoricEventsState(januaryResult.state, decemberEvents, 191, january)).toEqual(januaryResult.state);
     const repeated = settleHistoricEvents(januaryResult.state, decemberEvents, context(january));
     expect(repeated).toEqual({ state: januaryResult.state, resolved: [], opened: [] });
   });
@@ -181,8 +181,8 @@ describe('T4-43 AC-P2-21 역사 사건의 공통 규칙', () => {
 
   it('서로 겹치거나 없는 사건과 잘못된 기한이 기록된 상태를 거부한다', () => {
     const { state } = settleHistoricEvents(initialHistoricEvents(), decemberEvents, context(december));
-    expect(() => readHistoricEventsState({ ...state, skipped: ['A'] }, decemberEvents, 191)).toThrow('ID');
-    expect(() => readHistoricEventsState({ ...state, skipped: ['X'] }, decemberEvents, 191)).toThrow('ID');
+    expect(() => readHistoricEventsState({ ...state, skipped: ['A'] }, decemberEvents, 191, december)).toThrow('ID');
+    expect(() => readHistoricEventsState({ ...state, skipped: ['X'] }, decemberEvents, 191, december)).toThrow('ID');
     const [first, ...rest] = state.pending;
     expect(() =>
       readHistoricEventsState(
@@ -192,6 +192,7 @@ describe('T4-43 AC-P2-21 역사 사건의 공통 규칙', () => {
         },
         decemberEvents,
         191,
+        december,
       ),
     ).toThrow('기한');
     expect(() =>
@@ -202,8 +203,37 @@ describe('T4-43 AC-P2-21 역사 사건의 공통 규칙', () => {
         },
         decemberEvents,
         191,
+        december,
       ),
     ).toThrow('발생');
+  });
+
+  it('저장된 월 정산 시점에서 빠진 사건, 미래 사건, 기한이 지난 사건을 거부한다', () => {
+    const empty = initialHistoricEvents();
+    expect(readHistoricEventsState(empty, decemberEvents, 191, 0)).toEqual(empty);
+    expect(() => readHistoricEventsState(empty, decemberEvents, 191, december)).toThrow('월 정산 시점');
+    const { state } = settleHistoricEvents(empty, decemberEvents, context(december));
+    expect(() => readHistoricEventsState(state, decemberEvents, 191, december - TICKS_PER_MONTH)).toThrow(
+      '월 정산 시점',
+    );
+    const januaryState = settleHistoricEvents(state, decemberEvents, context(january)).state;
+    expect(() =>
+      readHistoricEventsState(
+        { ...januaryState, pending: [...state.pending, ...januaryState.pending], done: [] },
+        decemberEvents,
+        191,
+        january,
+      ),
+    ).toThrow('기한');
+    const [first, ...rest] = januaryState.done;
+    expect(() =>
+      readHistoricEventsState(
+        { ...januaryState, done: [{ ...first!, resolvedTick: january + TICKS_PER_MONTH }, ...rest] },
+        decemberEvents,
+        191,
+        january,
+      ),
+    ).toThrow('처리 결과');
   });
 
   it('엔진이 처리할 수 있는 마지막 월 경계까지만 설정·상태·정산을 받는다', () => {
@@ -216,9 +246,14 @@ describe('T4-43 AC-P2-21 역사 사건의 공통 규칙', () => {
 
     const { state: opened } = settleHistoricEvents(initialHistoricEvents(), config, context(december));
     const { state: finished } = settleHistoricEvents(opened, config, context(lastTick));
-    expect(readHistoricEventsState(finished, config, 191).done[0]?.resolvedTick).toBe(lastTick);
+    expect(readHistoricEventsState(finished, config, 191, lastTick).done[0]?.resolvedTick).toBe(lastTick);
     expect(() =>
-      readHistoricEventsState({ ...finished, done: [{ ...finished.done[0]!, resolvedTick: nextTick }] }, config, 191),
+      readHistoricEventsState(
+        { ...finished, done: [{ ...finished.done[0]!, resolvedTick: nextTick }] },
+        config,
+        191,
+        lastTick,
+      ),
     ).toThrow();
     expect(() => settleHistoricEvents(opened, config, context(nextTick))).toThrow('실행 범위');
   });

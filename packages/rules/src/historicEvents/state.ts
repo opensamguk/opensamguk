@@ -6,7 +6,7 @@ const maxMonth = Math.floor(MAX_ADVANCE_TICK / TICKS_PER_MONTH);
 const eventId = z.string().regex(/^[A-Za-z0-9_-]{1,32}$/);
 const option = z.union([z.literal(0), z.literal(1)]);
 const nation = z.strictObject({ nationId: z.number().int().positive(), name: z.string().min(1) });
-const monthlyTick = z
+const monthlyTickSchema = z
   .number()
   .int()
   .positive()
@@ -38,7 +38,7 @@ const stateSchema = z.strictObject({
     z.strictObject({
       id: eventId,
       nationId: z.number().int().positive(),
-      firedTick: monthlyTick,
+      firedTick: monthlyTickSchema,
       closesAtMonth: months,
       choice: option.nullable(),
     }),
@@ -49,7 +49,7 @@ const stateSchema = z.strictObject({
       nationId: z.number().int().positive(),
       choice: option.nullable(),
       defaulted: z.boolean(),
-      resolvedTick: monthlyTick,
+      resolvedTick: monthlyTickSchema,
     }),
   ),
   skipped: z.array(eventId),
@@ -89,19 +89,31 @@ export function readHistoricEventsConfig(
 
 export const initialHistoricEvents = (): HistoricEventsState => ({ pending: [], done: [], skipped: [] });
 
-export function readHistoricEventsState(value: unknown, config: HistoricEventsConfig, startYear: number) {
+export function readHistoricEventsState(
+  value: unknown,
+  config: HistoricEventsConfig,
+  startYear: number,
+  monthlyTick: number,
+) {
+  if (monthlyTick !== 0) monthlyTickSchema.parse(monthlyTick);
   const state = stateSchema.parse(value);
   const events = new Map(config.events.map((row) => [row.id, row]));
   const ids = [...state.pending.map(({ id }) => id), ...state.done.map(({ id }) => id), ...state.skipped];
-  if (new Set(ids).size !== ids.length || ids.some((id) => !events.has(id)))
+  const seen = new Set(ids);
+  if (seen.size !== ids.length || ids.some((id) => !events.has(id)))
     throw new Error('역사 사건 상태의 ID를 확인하세요.');
+  for (const row of config.events) {
+    const fired = eventMonth(startYear, row) * TICKS_PER_MONTH <= monthlyTick;
+    if (fired !== seen.has(row.id)) throw new Error('역사 사건 목록이 월 정산 시점과 다릅니다.');
+  }
   for (const pending of state.pending) {
     const row = events.get(pending.id)!;
     const month = eventMonth(startYear, row);
     if (
       pending.nationId !== row.chooser.nationId ||
       pending.firedTick !== month * TICKS_PER_MONTH ||
-      pending.closesAtMonth !== month + config.windowMonths
+      pending.closesAtMonth !== month + config.windowMonths ||
+      pending.closesAtMonth * TICKS_PER_MONTH <= monthlyTick
     )
       throw new Error('열린 역사 사건의 발생·기한을 확인하세요.');
   }
@@ -109,6 +121,7 @@ export function readHistoricEventsState(value: unknown, config: HistoricEventsCo
     const row = events.get(done.id)!;
     if (
       done.nationId !== row.chooser.nationId ||
+      done.resolvedTick > monthlyTick ||
       done.resolvedTick < (eventMonth(startYear, row) + config.windowMonths) * TICKS_PER_MONTH ||
       (done.defaulted && done.choice !== null && done.choice !== row.defaultOption) ||
       (!done.defaulted && done.choice === null)
