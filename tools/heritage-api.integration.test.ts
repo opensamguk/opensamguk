@@ -361,7 +361,7 @@ it.each(['spend', 'refund'] as const)(
   120000,
 );
 
-it('AC-P2-33 동의 계승 전후의 실제 36개월 활동을 한 계정에 합산하고 종료 재생을 보존한다', async () => {
+it('AC-P2-33 계승 전후 36개월 활동을 합산하고 다음 허용 기수에서 얻은 유산을 한 번 쓴다', async () => {
   const father = await user(),
     mother = await user(),
     id = await world({ lineage: true, endYear: 193 });
@@ -436,6 +436,46 @@ it('AC-P2-33 동의 계승 전후의 실제 36개월 활동을 한 계정에 합
   const archive = await exportReplay(db, id);
   expect(replayToEnd(archive)).toEqual(archive.end);
   expect(archive.end?.finalStateHash).toBe(result.finalStateHash);
+
+  const disabled = await world({ enabled: false });
+  const bonus = { leadership: 3 };
+  expect((await rpc('general.mine', { worldId: disabled }, father)).data!.creationRules).not.toHaveProperty('heritage');
+  expect((await rpc('general.create', { ...payload(disabled), heritage: bonus }, father)).status).toBe(400);
+  expect(await db.inputEvent.count({ where: { worldId: disabled, kind: 'general.create' } })).toBe(0);
+  expect((await invariant(father)).balance).toBe(3);
+
+  const next = await world({ endYear: 191 });
+  expect((await rpc('general.mine', { worldId: next }, father)).data!.creationRules.heritage).toMatchObject({
+    balance: 3,
+    perStat: 3,
+    perGeneral: 6,
+  });
+  const creation = await admit(next, father, { ...payload(next, '다음기수장수'), heritage: bonus });
+  await advance(next);
+  expect((await creation.result).data).toMatchObject({
+    status: 'created',
+    general: { leadership: 73, strength: 70, intel: 60 },
+  });
+  expect(
+    await db.general.findUniqueOrThrow({ where: { worldId_userId: { worldId: next, userId: father.id } } }),
+  ).toMatchObject({
+    leadership: 73,
+    strength: 70,
+    intel: 60,
+  });
+  const saved = await db.inputEvent.findFirstOrThrow({ where: { worldId: next, kind: 'general.create' } });
+  expect(saved.result).toMatchObject({ heritage: { version: 1, cost: 3, bonus } });
+  await advance(next, 12 * TICKS_PER_MONTH);
+  const nextResult = await db.worldResult.findUniqueOrThrow({ where: { worldId: next } });
+  expect(nextResult.reason).toBe('END_YEAR');
+  const account = await invariant(father);
+  expect(account.balance).toBe(0);
+  expect(account.entries).toHaveLength(2);
+  expect(account.entries).toContainEqual(expect.objectContaining({ worldId: next, kind: 'CREATION_SPEND', delta: -3 }));
+  const nextArchive = await exportReplay(db, next);
+  expect(replayToEnd(nextArchive)).toEqual(nextArchive.end);
+  expect(nextArchive.end?.finalStateHash).toBe(nextResult.finalStateHash);
+  expect(await exportReplay(db, id)).toEqual(archive);
 }, 120000);
 
 it('AC-P2-33 국가 예턴만 직접 편집한 12개월도 활동분을 지급한다', async () => {
