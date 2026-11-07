@@ -84,6 +84,7 @@ model World {
   assignmentOffers     AssignmentOffer[]
   sanctions            Sanction[]
   createRequest        WorldCreateRequest?
+  seasonGenerals       SeasonGeneral[]
 }
 
 model ReputationEvent {
@@ -307,6 +308,26 @@ model WorldResult {
   remainingNations Int
   finalStateHash   String
   endedAt          DateTime
+}
+
+model SeasonGeneral {
+  worldId      String
+  generalId    Int
+  userId       String?
+  name         String
+  nationId     Int?
+  nationName   String?
+  nationColor  String?
+  officerLevel Int
+  dedication   Int
+  experience   Int
+  wins         Int
+  captures     Int
+  world        World   @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  user         User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@id([worldId, generalId])
+  @@index([userId])
 }
 
 enum DiplomacyState {
@@ -606,6 +627,7 @@ model User {
   heritageAccount        HeritageAccount?
   heritageEntries        HeritageEntry[]
   resourceEditorGrant    ResourceEditorGrant?
+  seasonGenerals         SeasonGeneral[]
 }
 
 model ResourceEditorGrant {
