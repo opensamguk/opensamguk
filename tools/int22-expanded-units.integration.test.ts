@@ -100,6 +100,7 @@ it('AC-INT-22: 실제 프리셋 생성의45병종·155거점이12개월 DB 재�
   completedArchive = archive;
 }, 540_000);
 
+// 병합 큐에서 같은 3,193개 동작을 재생하는 별도 프로세스가 120초를 넘겼다.
 it('AC-INT-22: 실제 DB의12개월 원장을 별도 DB 없는 프로세스에서 재생한다', async () => {
   onTestFailed(() => {
     failed = true;
@@ -124,7 +125,7 @@ it('AC-INT-22: 실제 DB의12개월 원장을 별도 DB 없는 프로세스에�
       env: { ...process.env, DATABASE_URL: '', TEST_DATABASE_URL: '' },
       input: JSON.stringify(archive),
       encoding: 'utf8',
-      timeout: 120_000,
+      timeout: 180_000,
     },
   );
   expect(JSON.parse(replayed)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
@@ -132,4 +133,4 @@ it('AC-INT-22: 실제 DB의12개월 원장을 별도 DB 없는 프로세스에�
     'INT22-replayed',
     JSON.stringify({ months: archive.months.length, elapsedMs: Math.round(performance.now() - started) }),
   );
-}, 120_000);
+}, 180_000);
