@@ -64,6 +64,10 @@ type Out = inferRouterOutputs<AppRouter>;
 type Results = {
   'general.create': Out['general']['create'];
   'turns.set': Out['turns']['set'];
+  'turns.precheck': Out['turns']['precheck'];
+  'nationTurns.get': Out['nationTurns']['get'];
+  'nationTurns.set': Out['nationTurns']['set'];
+  'nationCommands.precheck': Out['nationCommands']['precheck'];
   'governance.get': Out['governance']['get'];
   'governance.submit': Out['governance']['submit'];
   'governance.request': Out['governance']['request'];
@@ -72,7 +76,14 @@ type Results = {
 };
 type User = { id: string; cookie: string };
 async function rpc<R extends keyof Results>(route: R, input: unknown, user?: User) {
-  const mutation = !['governance.get', 'governance.request', 'admin.game.requestStatus'].includes(route),
+  const mutation = ![
+      'governance.get',
+      'governance.request',
+      'admin.game.requestStatus',
+      'turns.precheck',
+      'nationTurns.get',
+      'nationCommands.precheck',
+    ].includes(route),
     encoded = JSON.stringify({ 0: input });
   const response = await fetch(
     `${base}/trpc/${route}?batch=1${mutation ? '' : `&input=${encodeURIComponent(encoded)}`}`,
@@ -311,6 +322,102 @@ afterAll(async () => {
 });
 
 describe('AC-P2-31 실제 HTTP 황실 접수·동의·경제', () => {
+  it('봉신 체결 전 저장한 선전포고·출병을 거부하고 계약 해제 뒤 선전포고한다', async () => {
+    const world = await fixture();
+    const worldId = world.id,
+      upper = world.ruler.nationId!,
+      lower = world.lower.nationId!;
+    const declare = { commandKey: 'nation_declare', args: { nationId: lower } };
+    const attack = { commandKey: 'attack', args: { cityKey: world.lower.cityKey } };
+    const reserveDeclaration = async () => {
+      const reply = await rpc('nationTurns.get', { worldId }, world.emperor);
+      const tab = reply.data?.tabs.find((row) => row.officerLevel === 12);
+      if (!tab) throw new Error('군주 예턴을 찾을 수 없습니다.');
+      const saved = await rpc(
+        'nationTurns.set',
+        {
+          worldId,
+          office: tab.office,
+          revision: tab.revision,
+          slots: Array.from({ length: 12 }, (_, slot) => (slot === 0 ? declare : null)),
+        },
+        world.emperor,
+      );
+      expect(saved.data, JSON.stringify(saved.error)).toMatchObject({ ok: true });
+    };
+    const precheckDeclaration = () => rpc('nationCommands.precheck', { worldId, ...declare }, world.emperor);
+    const relationBetween = (replay: Awaited<ReturnType<typeof snapshot>>) =>
+      replay.state.diplomacies.filter(
+        ({ nationA, nationB }) => nationA === Math.min(upper, lower) && nationB === Math.max(upper, lower),
+      );
+    const bound = '같은 봉신 계열의 국가를 공격하거나 선전포고할 수 없습니다.';
+
+    expect((await precheckDeclaration()).data).toEqual({ ok: true });
+    await reserveDeclaration();
+    const personal = await rpc(
+      'turns.set',
+      {
+        worldId,
+        revision: world.ruler.turnRevision,
+        slots: Array.from({ length: 30 }, (_, slot) => (slot === 0 ? attack : null)),
+      },
+      world.emperor,
+    );
+    expect(personal.data, JSON.stringify(personal.error)).toMatchObject({ ok: true });
+    await send(world, world.emperor, {
+      type: 'vassal.offer',
+      authority: 'OWN',
+      targetNationId: lower,
+      direction: 'DEMAND',
+      goldBp: 1000,
+      riceBp: 1000,
+    });
+    await send(world, world.vassal, { type: 'vassal.respond', offerId: 1, accept: true });
+    expect((await precheckDeclaration()).data).toEqual({ ok: false, reason: bound });
+    expect((await rpc('turns.precheck', { worldId, ...attack }, world.emperor)).data).toMatchObject({
+      ok: false,
+      code: 'VASSAL_BOUND',
+      message: bound,
+    });
+    const before = await snapshot(worldId);
+    const tick = world.ruler.nextTurnTick;
+    await advance(worldId, tick);
+    const blocked = await snapshot(worldId);
+    expect(relationBetween(blocked)).toEqual([]);
+    expect(blocked.state.governance!.vassals).toEqual(before.state.governance!.vassals);
+    expect(blocked.state.cities[world.lower.cityKey]!.nationId).toBe(lower);
+    expect(blocked.state.nations[upper]).toBeDefined();
+    expect(blocked.state.nations[lower]).toBeDefined();
+    expect(
+      await db.generalLog.findFirst({ where: { worldId, tick, generalId: world.ruler.id, commandKey: 'attack' } }),
+    ).toMatchObject({ kind: 'failure', text: `VASSAL_BOUND: ${bound}` });
+    const refused = await db.nationHistory.findMany({ where: { worldId, tick, nationId: upper } });
+    expect(refused).toMatchObject([{ data: { events: [`선전포고: VASSAL_BOUND: ${bound}`] } }]);
+
+    await send(world, world.emperor, { type: 'vassal.release', vassalId: before.state.governance!.vassals[0]!.id });
+    expect((await precheckDeclaration()).data).toEqual({ ok: true });
+    await reserveDeclaration();
+    const nextTick = tick + TICKS_PER_MONTH;
+    await advance(worldId, nextTick);
+    const allowed = await snapshot(worldId);
+    expect(allowed.state.governance!.vassals).toEqual([]);
+    expect(relationBetween(allowed)).toMatchObject([{ state: 'DECLARED' }]);
+    const declared = await db.nationHistory.findMany({
+      where: { worldId, tick: nextTick, nationId: { in: [upper, lower] } },
+      orderBy: { nationId: 'asc' },
+    });
+    expect(declared.map(({ nationId, data }) => ({ nationId, data }))).toEqual(
+      [upper, lower]
+        .sort((a, b) => a - b)
+        .map((nationId) => ({ nationId, data: { events: ['황실국 → 봉신국 선전포고'] } })),
+    );
+
+    await advance(worldId, 30_000);
+    const archive = await exportReplay(db, worldId);
+    expect(replayArchive(archive, 3)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
+    expect(archive.months.at(-1)!.stateHash).toBe(hashState(await snapshot(worldId)));
+  }, 60_000);
+
   it('두 상위국 제안을 함께 수락하면 접수 순서의 첫 계약만 저장한다', async () => {
     const world = await fixture(true);
     if (!world.rival) throw new Error('경합할 두 번째 상위국이 필요합니다.');
