@@ -83,25 +83,6 @@ export function resolveWorldResourceSelection(options: WorldResourceSelection): 
   };
 }
 
-export async function loadInitialWorld(
-  options: WorldResourceSelection & { seed: string },
-  root: URL = resolveResourceRoot(),
-) {
-  const selected = resolveWorldResourceSelection(options);
-  if (Object.values(selected).some((key) => parseResourceKey(key).version !== 1))
-    throw new Error('자원 2판 이상은 게시된 판으로 생성하세요.');
-  const readJson = async (path: string): Promise<unknown> => JSON.parse(await readFile(new URL(path, root), 'utf8'));
-  const [map, scenario, unitSet, statRules, portraitMap] = await Promise.all([
-    readJson(`map/${selected.map}.json`),
-    readJson(`scenario/${selected.scenario}.json`),
-    readJson(`unitset/${selected.unitSet}.json`),
-    readJson(`scenario/${selected.statRules}.json`),
-    readJson(`portraits/${selected.portraitMap}.json`),
-  ]);
-  validateInitialPair(map, scenario);
-  return buildInitialWorld({ map, scenario, unitSet, statRules, portraitMap, seed: options.seed });
-}
-
 export interface InitialResources {
   map: PublishedResource;
   scenario: PublishedResource;

@@ -48,7 +48,6 @@
     "world:create": "pnpm --filter @opensamguk/engine world:create",
     "engine:run": "pnpm --filter @opensamguk/engine engine:run",
     "db:migrate": "pnpm --filter @opensamguk/db migrate",
-    "resources:sql": "tsx tools/resources-sql/generate.ts",
     "resources:sql:scenarios": "tsx --env-file-if-exists=.env tools/resources-sql/generate-scenarios.ts",
     "db:init-resources": "tsx --env-file-if-exists=.env tools/init-resources.ts",
     "db:init-integration": "tsx --env-file-if-exists=.env tools/init-integration-resources.ts",

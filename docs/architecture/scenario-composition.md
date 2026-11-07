@@ -1,19 +1,20 @@
 # 시나리오 합성
 
 > 상태: T1-03 구현 · 관련 AC: M1-03, M2-03 · 출처: [리소스 고지](../../resources/NOTICE.md)
-> 이 문서가 답할 질문: 월드 하나를 만들 때 어떤 파일들을 어떻게 합쳐 초기 상태를 만드나?
+> 이 문서가 답할 질문: 월드 하나를 만들 때 어떤 게시 자원과 프리셋으로 초기 상태를 만드나?
 
 ## 1. 재료
 
-| 재료     | 파일                              | 출처 |
+| 재료     | 게시 판 또는 파일                 | 출처 |
 | -------- | --------------------------------- | ---- |
-| 지도     | `resources/map/che.json`          | core2026 `map_che.json` (도시 94개, 가정 A5) |
-| 시나리오 | `resources/scenario/1030.json`    | core2026 「군웅할거(191)」 (가정 A6) |
-| 병종     | `resources/unitset/basic.json`    | core2026 `unitset_basic.json` 참고 (가정 A7) |
-| 능력치   | `resources/scenario/default.json` | 합계 165, 최소 15, 최대 80 |
+| 지도     | `MAP/che/1`                       | core2026 `map_che.json` (도시 94개, 가정 A5) |
+| 시나리오 | `SCENARIO/1030/1`                 | core2026 「군웅할거(191)」 (가정 A6) |
+| 병종     | `UNIT_SET/basic/1`                | core2026 `unitset_basic.json` 참고 (가정 A7) |
+| 능력치   | `STAT_RULES/default/1`            | 합계 165, 최소 15, 최대 80 |
+| 초상 대응 | `PORTRAIT_MAP/rtk14-map/1`         | registry·한자 독음 표·수동 대응 |
 | 프리셋   | `resources/preset/*.json` (M2)    | 새로 작성 (D5) |
 
-core2026 파일을 옮길 때 출처(MIT, © 2025 devsam)를 남깁니다.
+내장 다섯 게시 판의 정본은 `packages/db/sql/resources-init.sql`입니다. 원본 전체 내용과 출처는 게시 행의 content·source와 [리소스 고지](../../resources/NOTICE.md)에 보존합니다. 프리셋과 추가 자원 파일은 남깁니다.
 
 내장 `che` 1판은 `version` 없는 v1입니다. v2는 `version: 2`, 정수 `canvas.width`·`canvas.height`, 필수 `terrain`과 네 층(`coast`, `lakes`, `mountains`, `rivers`)을 더합니다. `$comment`는 선택이며 도시 칸은 v1과 같습니다. v2는 모든 깊이에서 모르는 칸을 거부합니다. `defaults`는 `trust`·`supplyState`·선택 `trade`·선택 `frontState`만 받습니다. `normalizeMapToV2`는 v1을 700×500과 빈 지형으로 올리고 출처 고지를 보존하며 `meta`를 버립니다. 지도 초안의 저장과 게시는 v2만 받는 서버 작업(T4-78)에서 연결합니다.
 
@@ -55,9 +56,9 @@ core2026 파일을 옮길 때 출처(MIT, © 2025 devsam)를 남깁니다.
 
 `tools/fixtures/t4-46-scenarios.json`은 원작 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`의 시나리오 83행을 보존합니다. 기존 `1030`은 `existing`, 위 9종은 `ready`, 도시 없는 국가가 있는 `1050`·`1080`은 T4-48 대기의 `blocked`, 나머지 71종은 `unverified`입니다. `ready`는 생성기에 넣을 준비 상태이며 AC 완료가 아닙니다. 전체 AC-P2-24의 분모는 83종입니다.
 
-사본에서 출처와 `id`를 빼고 삭제한 하비를 원위치에 넣으면 fixture의 원작 JSON과 같습니다. 원작 바이트의 SHA-256과 사본의 `contentHash`, 두 시드의 초기 상태 해시도 따로 고정합니다. `1030` 파일·초기 해시와 내장 다섯 DB 판은 바꾸지 않습니다. 원작 `extends`·`general_ex`·`history`·`life`·`fiction`·`const`·`cities`는 이 묶음에 한해 기존 `1030`처럼 보존하되 로더에서 읽지 않습니다.
+사본에서 출처와 `id`를 빼고 삭제한 하비를 원위치에 넣으면 fixture의 원작 JSON과 같습니다. 원작 바이트의 SHA-256과 사본의 `contentHash`, 두 시드의 초기 상태 해시도 따로 고정합니다. `1030` 게시 판·초기 해시와 내장 다섯 DB 판은 바꾸지 않습니다. 원작 `extends`·`general_ex`·`history`·`life`·`fiction`·`const`·`cities`는 이 묶음에 한해 기존 `1030`처럼 보존하되 로더에서 읽지 않습니다.
 
-별도 생성물 `packages/db/sql/resources-scenarios.sql`은 `ready` 9종만 넣습니다. `pnpm db:init-resources` 뒤 `pnpm db:init-scenarios`로 적용합니다. 실제 DB 합성은 T4-77 S3의 `loadInitialWorldFromDb`를 쓰며 기존 파일 로더도 남아 있습니다. 병합과 운영 반영은 T4-77 S3 선행 및 정확한 SHA의 CI 검증 뒤입니다.
+별도 생성물 `packages/db/sql/resources-scenarios.sql`은 `ready` 9종만 넣습니다. `pnpm db:init-resources` 뒤 `pnpm db:init-scenarios`로 적용합니다. 실제 합성은 `loadInitialWorldFromDb`로 게시 판을 읽으며 원본 JSON 파일 로더는 제거했습니다.
 
 ## 2. 합성 순서
 
@@ -66,7 +67,7 @@ core2026 파일을 옮길 때 출처(MIT, © 2025 devsam)를 남깁니다.
    └─▶ 시나리오 + 지도 + 병종 ─▶ zod 검증 ─▶ 시드 고정 초기화 ─▶ 월드 초기 상태
 ```
 
-`apps/engine/src/world/resources.ts`만 파일을 읽고 `packages/rules/src/world/resources.ts`가 zod로 검증합니다.
+`apps/engine/src/world/resources.ts`가 선택한 게시 판을 읽고 `packages/rules/src/world/resources.ts`가 zod로 검증합니다. 프리셋·확장 설정·성별 원장은 별도 파일로 읽습니다.
 순수 함수 `buildInitialWorld()`가 국가·도시·장수·외교 상태를 만듭니다. 도시 ID는 지도 것을 쓰고 국가·장수 ID는 원본 배열 순서 + 1입니다.
 DB의 ID는 모두 월드 안에서만 유일합니다.
 
@@ -134,7 +135,7 @@ Node `crypto` 구현은 `@opensamguk/shared/node`에 분리하며 rules·브라�
 - 기본 병종이 없거나 병종 ID가 중복되면 거부합니다.
 - 엔진이 월드·국가·도시·장수·외교를 한 트랜잭션으로 저장합니다. 국가↔수도 참조는 도시 생성 뒤 연결하며
   중간 실패는 전체를 롤백합니다. 모든 관계는 `worldId`를 포함하는 외래키로 격리합니다.
-- 단위 테스트는 `tools/world-bootstrap.test.ts`, 실제 DB 검증은 `apps/engine/src/world/createWorld.integration.test.ts`입니다.
+- 합성과 실제 DB 대조는 `tools/world-bootstrap.integration.test.ts`와 `tools/resource-catalog.integration.test.ts`에서 검증합니다.
 
 ### 편집 자원 검증 (T4-76)
 
@@ -176,7 +177,7 @@ pnpm world:create --preset beginner --seed example --end-year 300 --name 초보�
 실제 군사 조언은 T3-07에서 구현합니다.
 
 생성 트랜잭션이 정규화한 사본을 `World.preset`, 선택 key를 `World.presetKey`에 한 번 저장합니다.
-리소스 파일이 나중에 바뀌어도 기존 월드에는 영향을 주지 않습니다.
+다른 자원 판을 게시해도 기존 월드에는 영향을 주지 않습니다.
 CLI 덮어쓰기 값은 기존 월드 칸에만 남고 프리셋 사본은 그대로입니다.
 보호·NPC 가중치·보정은 `presetRules`로 초기 상태·엔진·서버 보기·복제·재생에 전달합니다.
 v1 origin의 `initial`과 초기 해시가 이 값을 포함합니다. 기록 버전은 바꾸지 않습니다.

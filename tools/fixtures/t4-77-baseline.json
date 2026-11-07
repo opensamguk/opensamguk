@@ -220,5 +220,6 @@
       "diplomacies": 7,
       "portraits": 0
     }
-  }
+  },
+  "resourcesInitSqlSha256": "6822b04a6981a51c26d1d03ff31cf8acd76417c74e0696d1e3b98e574fc32754"
 }
