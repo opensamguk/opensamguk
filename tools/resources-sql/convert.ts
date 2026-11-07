@@ -54,6 +54,31 @@ function literal(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
+export function immutableResourceStatement(
+  entry: { kind: string; name: string; raw: string; contentHash: string; source: string },
+  tag: string,
+): string {
+  const key = [entry.kind, entry.name, 1].join('/');
+  const source = literal(entry.source);
+  const kind = literal(entry.kind);
+  const name = literal(entry.name);
+  const contentHash = literal(entry.contentHash);
+  return `  resource_content := ${tag}${entry.raw}${tag}::jsonb;
+  INSERT INTO "GameResource"
+    ("id", "kind", "name", "version", "status", "content", "contentHash", "source", "createdBy", "publishedAt")
+  VALUES
+    (gen_random_uuid()::text, ${kind}, ${name}, 1, 'PUBLISHED', resource_content, ${contentHash}, ${source}, NULL, now())
+  ON CONFLICT ("kind", "name", "version") DO NOTHING;
+  IF NOT EXISTS (
+    SELECT 1 FROM "GameResource"
+    WHERE "kind" = ${kind} AND "name" = ${name} AND "version" = 1
+      AND "content" = resource_content AND "contentHash" = ${contentHash}
+      AND "status" = 'PUBLISHED' AND "source" = ${source}
+  ) THEN
+    RAISE EXCEPTION ${literal(`초기화 자원 충돌: ${key}`)};
+  END IF;`;
+}
+
 export function requirePassingReport(report: { status: 'pass' | 'fail' | 'incomplete' }): void {
   if (report.status !== 'pass') throw new Error(`초기화 자원 검증 실패: ${report.status}`);
 }
@@ -93,24 +118,7 @@ export function convertResourcesToSql(input: ResourceTexts, notice: string): str
     }
     const comment = (entry.content as { $comment?: unknown }).$comment;
     if (typeof comment !== 'string') throw new Error(`초기화 자원 출처 누락: ${entry.key}`);
-    const source = literal(`${sourcePaths[index]}; ${comment}`);
-    const kind = literal(entry.kind);
-    const name = literal(entry.name);
-    const contentHash = literal(entry.contentHash);
-    return `  resource_content := ${CONTENT_TAG}${entry.raw}${CONTENT_TAG}::jsonb;
-  INSERT INTO "GameResource"
-    ("id", "kind", "name", "version", "status", "content", "contentHash", "source", "createdBy", "publishedAt")
-  VALUES
-    (gen_random_uuid()::text, ${kind}, ${name}, 1, 'PUBLISHED', resource_content, ${contentHash}, ${source}, NULL, now())
-  ON CONFLICT ("kind", "name", "version") DO NOTHING;
-  IF NOT EXISTS (
-    SELECT 1 FROM "GameResource"
-    WHERE "kind" = ${kind} AND "name" = ${name} AND "version" = 1
-      AND "content" = resource_content AND "contentHash" = ${contentHash}
-      AND "status" = 'PUBLISHED' AND "source" = ${source}
-  ) THEN
-    RAISE EXCEPTION '초기화 자원 충돌: ${entry.key}';
-  END IF;`;
+    return immutableResourceStatement({ ...entry, source: `${sourcePaths[index]}; ${comment}` }, CONTENT_TAG);
   });
   const normalizedNotice = notice.replaceAll('\r\n', '\n');
   if (normalizedNotice.includes('\0')) throw new Error('초기화 자원 출처에 NUL 문자가 있습니다.');

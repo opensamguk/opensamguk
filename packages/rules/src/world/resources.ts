@@ -135,7 +135,7 @@ export const crewRequirementSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('chief') }),
 ]);
 const crewEffects = z.enum(['firstVolley', 'guard5', 'cavalryClash', 'pikeWall', 'hold', 'avoid', 'wallFirst']);
-export const unitSetSchema = z.object({
+const unitSetValueSchema = z.object({
   id: name,
   name,
   defaultCrewTypeId: positive,
@@ -143,6 +143,12 @@ export const unitSetSchema = z.object({
   coefMode: z.literal('multiply').optional(),
   firstVolleyScope: z.literal('sortie').optional(),
   regionScheme: z.literal('province-191').optional(),
+  legacyCheMapIds: z
+    .array(name)
+    .min(1)
+    .max(8)
+    .refine((ids) => new Set(ids).size === ids.length, '병종 지도 ID가 겹칩니다.')
+    .optional(),
   legacyCheCityRegions: z
     .array(z.tuple([positive, name, natural]))
     .min(1)
@@ -175,6 +181,14 @@ export const unitSetSchema = z.object({
     )
     .min(1),
 });
+
+export const unitSetSchema = unitSetValueSchema.refine(
+  (unitSet) => !unitSet.legacyCheMapIds || !!unitSet.legacyCheCityRegions,
+  {
+    path: ['legacyCheCityRegions'],
+    message: '병종에 지정한 지도의 도시·지역 대응이 필요합니다.',
+  },
+);
 
 export const statRulesSchema = z.object({
   stat: statRulesValueSchema,

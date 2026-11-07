@@ -25,11 +25,13 @@ const originalSet = z.looseObject({
     }),
   ),
 });
+export const MINICHE_MAP_IDS = ['miniche', 'miniche_b', 'miniche_clean'] as const;
 
 export function projectCheUnitSet(source: unknown, mapInput: unknown) {
   const original = originalSet.parse(source);
   const map = mapSchema.parse(mapInput);
-  if (map.id !== 'che') throw Error('원작 병종의 che 지도가 필요합니다.');
+  const miniche = MINICHE_MAP_IDS.some((id) => id === map.id);
+  if (map.id !== 'che' && !miniche) throw Error('원작 병종의 che 지도가 필요합니다.');
   const regionIds = new Set(map.cities.map(({ region }) => region));
 
   function project(req: z.infer<typeof originalRequirement>): Requirement {
@@ -63,6 +65,7 @@ export function projectCheUnitSet(source: unknown, mapInput: unknown) {
 
   const unitSet = unitSetSchema.parse({
     ...original,
+    ...(miniche ? { id: 'che-miniche', name: 'che-miniche', legacyCheMapIds: MINICHE_MAP_IDS } : {}),
     coefMode: 'multiply',
     firstVolleyScope: 'sortie',
     legacyCheCityRegions: legacyCheCityRegions(map),

@@ -40,7 +40,13 @@ export function validateWorldResources(input: {
   ) {
     reports.unitSet.status = 'fail';
     reports.unitSet.issues.push(
-      issue('shape-invalid', { kind: 'path', path: ['crewTypes'] }, { expected: 'che 지도' }),
+      issue(
+        'shape-invalid',
+        { kind: 'path', path: ['crewTypes'] },
+        {
+          expected: `${(reports.unitSet.value.legacyCheMapIds ?? ['che']).join('·')} 지도`,
+        },
+      ),
     );
   }
   if (
