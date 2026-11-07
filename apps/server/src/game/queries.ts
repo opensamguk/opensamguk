@@ -26,6 +26,8 @@ import {
   readStoredEquipment,
   readStoredStratagemCards,
   readStoredNationStrategy,
+  readStoredPreparedTurns,
+  readStoredNationResearch,
   readStoredNationLifecycle,
   assertNationLifecycle,
 } from '@opensamguk/rules';
@@ -135,6 +137,10 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
   } else if (world.cityResourcesState != null) throw new Error('도시 자원 기능을 끈 월드에 저장 상태가 있습니다.');
   const nationStrategy = readStoredNationStrategy(world);
   if (nationStrategy) state.nationStrategy = nationStrategy;
+  const preparedTurns = readStoredPreparedTurns(world);
+  if (preparedTurns) state.preparedTurns = preparedTurns;
+  const nationResearch = readStoredNationResearch(world);
+  if (nationResearch) state.nationResearch = nationResearch;
   const nationLifecycle = readStoredNationLifecycle(world);
   if (nationLifecycle) state.nationLifecycle = nationLifecycle;
   assertNationLifecycle(state);

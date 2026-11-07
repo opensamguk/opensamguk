@@ -106,6 +106,16 @@ const contracts = {
     presets: presetKeys,
     suggestedEndYear: 231,
   },
+  'san10-191-research': {
+    id: 'san10-191-research',
+    label: 'SAN10 확장 · 병종 연구',
+    selection: { ...san10Selection, scenarioKey: 'san10-191@2' },
+    startYear: 191,
+    nations: 21,
+    counts: { cities: 147, gates: 8, ports: 0, fields: 0, anchors: 155 },
+    presets: presetKeys,
+    suggestedEndYear: 231,
+  },
 } as const;
 function profileRefs(id: ProfileId) {
   const selection = contracts[id].selection;
@@ -297,7 +307,8 @@ export function expandedCreationProfile(
   presets: readonly PresetSource[],
   data: unknown,
   registry: RuleRegistry = ruleRegistry,
-  profileId: 'integration-v01' | 'san10-191-expanded' | 'san10-191-lifecycle' = 'integration-v01',
+  profileId:
+    'integration-v01' | 'san10-191-expanded' | 'san10-191-lifecycle' | 'san10-191-research' = 'integration-v01',
 ): CreationProfile {
   const identity =
     profileId === 'integration-v01'
@@ -313,10 +324,12 @@ export function expandedCreationProfile(
             'integration-v01': 'expanded-191-v3',
             'san10-191-expanded': 'expanded-191-v4',
             'san10-191-lifecycle': 'expanded-191-v5',
+            'san10-191-research': 'expanded-191-v6',
           } as const
         )[profileId] ||
       !profile.ruleFeatures.includes('battle-affinity-v2') ||
       (profileId === 'san10-191-lifecycle' && !profile.ruleFeatures.includes('nation-lifecycle-v1')) ||
+      (profileId === 'san10-191-research' && !profile.ruleFeatures.includes('nation-research-v1')) ||
       profile.scenarioKey !== contracts[profileId].selection.scenarioKey ||
       profile.mapKey !== contracts[profileId].selection.mapKey ||
       (profileId !== 'integration-v01' &&
@@ -356,7 +369,8 @@ export async function getWorldCreationOptions(ctx: Context, input: z.infer<typeo
       async (tx) => {
         const userId = await requireCurrentAdmin(tx, ctx, false);
         const selectedIds: ProfileId[] = [...profileIds];
-        if (input.expandedProfiles === true) selectedIds.push('san10-191-expanded', 'san10-191-lifecycle');
+        if (input.expandedProfiles === true)
+          selectedIds.push('san10-191-expanded', 'san10-191-lifecycle', 'san10-191-research');
         const refs = [
           ...new Map(
             selectedIds.flatMap(profileRefs).map((ref) => [`${ref.kind}/${ref.name}/${ref.version}`, ref]),
@@ -405,6 +419,15 @@ export async function getWorldCreationOptions(ctx: Context, input: z.infer<typeo
             lifecycle = null;
           }
           profiles.push(expandedCreationProfile(rows, presets, lifecycle, ruleRegistry, 'san10-191-lifecycle'));
+          let research: unknown;
+          try {
+            research = JSON.parse(
+              await readFile(new URL('feature-profile/expanded-191-v6.json', resourceRoot()), 'utf8'),
+            );
+          } catch {
+            research = null;
+          }
+          profiles.push(expandedCreationProfile(rows, presets, research, ruleRegistry, 'san10-191-research'));
         }
         return { userId, revision: hashState(profiles), profiles };
       },

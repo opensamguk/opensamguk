@@ -14,6 +14,8 @@ import type { OfficeRevisions } from '../personnel/offices';
 import { assertTick, PersonnelInvariantError, type ClosedOffer, type PersonnelLog } from '../personnel/types';
 import { canExecuteCityNationCommand } from '../cityResources/commands';
 import { takeCampaignOrder, finishCampaignOrder } from '../campaign/orders';
+import { canExecuteResearchNationCommand } from '../nationResearch/commands';
+import { trackNationTurn } from '../preparedTurns/withPrepare';
 
 export type PersonnelTurnInput = Readonly<{ offices: DeepReadonly<OfficeRevisions> }>;
 export type PersonnelTurnChange = Readonly<{
@@ -77,7 +79,8 @@ export function runGeneralTurn(
       }
       if (
         !canExecuteNationCommand(take.officerLevel, slot.commandKey) &&
-        !canExecuteCityNationCommand(next, take.officerLevel, slot.commandKey)
+        !canExecuteCityNationCommand(next, take.officerLevel, slot.commandKey) &&
+        !canExecuteResearchNationCommand(next, take.officerLevel, slot.commandKey)
       )
         throw new PersonnelInvariantError('직책 칸 명령과 인자가 올바르지 않습니다.');
       let result: CommandResult | Failure;
@@ -96,6 +99,12 @@ export function runGeneralTurn(
         );
       }
       next = applyEffects(next, 'code' in result ? [] : result.effects);
+      next = trackNationTurn(
+        next,
+        { nationId: take.nationId, officerLevel: take.officerLevel },
+        slot.commandKey,
+        result,
+      );
       if (next.nations[take.nationId] && take.queue) {
         next.officeTurns ??= {};
         (next.officeTurns[take.nationId] ??= {})[take.officerLevel] = take.queue;

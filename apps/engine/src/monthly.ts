@@ -29,6 +29,8 @@ import { persistCampaignState, readCampaignArmyTypes } from './campaignState';
 import { persistCityResourcesState } from './cityResourcesState';
 import { persistCityRuins } from './cityScaleState';
 import { persistNationStrategy } from './nationStrategyState';
+import { persistPreparedTurns } from './preparedTurnsState';
+import { persistNationResearch } from './nationResearchState';
 import { persistNationLifecycle } from './nationLifecycleState';
 import { persistLogisticsState } from './logisticsState';
 import { persistGovernanceState } from './governance/repository';
@@ -142,6 +144,8 @@ export async function persistMonthly(
   await persistExt(tx, worldId, before.ext, next.ext);
   await persistCityRuins(tx, worldId, before, next);
   await persistNationStrategy(tx, worldId, before, next);
+  await persistPreparedTurns(tx, worldId, before, next);
+  await persistNationResearch(tx, worldId, before, next);
   await persistNationLifecycle(tx, worldId, before, next);
   await persistLogisticsState(tx, worldId, before, next);
   await persistGovernanceState(tx, worldId, before, next);

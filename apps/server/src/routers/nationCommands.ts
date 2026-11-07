@@ -1,6 +1,7 @@
 import {
   canExecuteNationCommand,
   canExecuteCityNationCommand,
+  canExecuteResearchNationCommand,
   canUseNationTurns,
   unitSetSchema,
 } from '@opensamguk/rules';
@@ -22,7 +23,8 @@ async function actorCommands(tx: Parameters<typeof requireWorld>[0], worldId: st
     .filter(
       (def) =>
         canExecuteNationCommand(actor.officerLevel, def.key) ||
-        canExecuteCityNationCommand(world, actor.officerLevel, def.key),
+        canExecuteCityNationCommand(world, actor.officerLevel, def.key) ||
+        canExecuteResearchNationCommand(world, actor.officerLevel, def.key),
     );
   return { world, actor, commands };
 }

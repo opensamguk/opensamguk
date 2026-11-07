@@ -8,6 +8,7 @@
 | 바꾸려는 것             | 고칠 곳                                                     |
 | ----------------------- | ----------------------------------------------------------- |
 | 새 명령                 | `packages/rules/src/commands/` + 테스트 + 명령 목록 생성     |
+| 국가 명령 준비·병종 연구 | `packages/rules/src/preparedTurns/`·`nationResearch/`, 엔진의 `preparedTurnsState.ts`·`nationResearchState.ts`, `tools/nation-research-api.integration.test.ts` |
 | 전투 계산               | `packages/rules/src/war/`                                   |
 | 월간 정산               | `packages/rules/src/monthly/` + `apps/engine`의 정산 단계    |
 | NPC 판단                | `packages/rules/src/npc/`                                   |

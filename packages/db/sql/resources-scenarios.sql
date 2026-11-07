@@ -137,6 +137,10 @@
 --
 -- 기존 지도·시나리오·기본 병종·능력치 규칙·초상 대응표의 전체 원문은 `packages/db/sql/resources-init.sql`에 보존한다. 원래 JSON 파일은 제거하며 위 원본 경로는 출처 기록으로 남긴다. MIT 전문과 초상 출처·내용·해시는 바꾸지 않는다. 초기화 SQL의 게시 1판을 읽고 새 내용은 별도 자원 판으로 다룬다.
 --
+-- ## 특수 병종 연구와 국가 명령 준비
+--
+-- `packages/rules/src/nationResearch/commands.ts`와 `preparedTurns/`는 core2026 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`의 `packages/logic/src/actions/turn/nation/eventResearch.ts`, 연구 명령 7종과 `app/game-engine/src/turn/reservedTurnHandler.ts`의 연속 실행 규칙을 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다. 기간·국고 비용·보상·직책은 사용자 승인 D-077을 적용하며 기존 확장판의 병종 조건은 바꾸지 않는다.
+--
 
 DO $t4_46_init$
 DECLARE

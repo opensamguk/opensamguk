@@ -42,6 +42,8 @@ import { cityScaleFeature } from './cityScale/feature';
 import { checkCityScaleInitial } from './cityScale/state';
 import { nationStrategyFeature } from './nationStrategy/feature';
 import { nationLifecycleFeature } from './nationLifecycle/feature';
+import { preparedTurnsFeature } from './preparedTurns/feature';
+import { nationResearchFeature } from './nationResearch/feature';
 
 export interface ReplayOriginV1 {
   version: 1;
@@ -97,6 +99,8 @@ export interface RuleRegistry {
 }
 export const ruleRegistry: RuleRegistry = {
   features: [
+    preparedTurnsFeature,
+    nationResearchFeature,
     personnelFeature,
     policyFeature,
     treatyFeature,

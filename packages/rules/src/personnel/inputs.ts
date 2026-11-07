@@ -8,6 +8,7 @@ import { canExecuteNationCommand, canUseNationTurns } from './permissions';
 import { canExecuteCityNationCommand } from '../cityResources/commands';
 import { cityAllocationArgs } from '../cityResources/allocation';
 import { nationStrategyCommands } from '../nationStrategy/commands';
+import { canExecuteResearchNationCommand, nationResearchCommands } from '../nationResearch/commands';
 import { NATION_STRATEGY_FEATURE } from '../nationStrategy/state';
 import {
   clonePersonnel,
@@ -302,11 +303,17 @@ export function applyNationTurnsRecord(
       commandRegistry.get(turn.commandKey) ??
       (view.ruleFeatures?.includes(NATION_STRATEGY_FEATURE)
         ? nationStrategyCommands.find((definition) => definition.key === turn.commandKey)
+        : undefined) ??
+      (canExecuteResearchNationCommand(view, actor.officerLevel, turn.commandKey)
+        ? nationResearchCommands.find((definition) => definition.key === turn.commandKey)
         : undefined);
     if (
       !command ||
       command.target !== 'nation' ||
-      !canExecuteNationCommand(actor.officerLevel, turn.commandKey) ||
+      !(
+        canExecuteNationCommand(actor.officerLevel, turn.commandKey) ||
+        canExecuteResearchNationCommand(view, actor.officerLevel, turn.commandKey)
+      ) ||
       !command.args.safeParse(turn.args).success
     )
       invariant('직책 칸 명령과 인자가 올바르지 않습니다.');
