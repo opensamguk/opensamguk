@@ -578,7 +578,8 @@ it('AC-M1-14 내정 8종과 휴식은 실제 예약·프로세스 재시작·월
     { commandKey: 'rest', accepted: true },
     ...domestic.map(({ commandKey }) => ({ commandKey, accepted: false })),
   ];
-  const actors = await Promise.all(cases.map(() => identity()));
+  const actors: Awaited<ReturnType<typeof identity>>[] = [];
+  for (let index = 0; index < cases.length; index++) actors.push(await identity());
   const initial = commandInitial();
   initial.diplomacies = [];
   const ruler = initial.generals[0]!;
