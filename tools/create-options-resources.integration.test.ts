@@ -68,6 +68,33 @@ const registered: RuleRegistry = {
   ],
 };
 describe('AC-M3-04 원생성 설정 조회', () => {
+  it('AC-M1-14 새 선택에서만 기존 연구판과 접경귀환을 함께 고정한다', () => {
+    const previous = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v6.json'));
+    const data = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v7.json'));
+    expect(data).toEqual({
+      ...previous,
+      key: 'expanded-191-v7',
+      ruleFeatures: [...previous.ruleFeatures, 'border-return-v1'].sort(),
+    });
+    const option = expandedCreationProfile(expandedRows, allPresets, data, ruleRegistry, 'san10-191-border-return');
+    expect(option).toMatchObject({
+      id: 'san10-191-border-return',
+      available: true,
+      featureProfileKey: data.key,
+      featureProfileHash: hashState(data),
+      ruleFeatures: data.ruleFeatures,
+    });
+    for (const key of ['border-return-v1', 'nation-lifecycle-v1', 'nation-research-v1'])
+      expect(
+        expandedCreationProfile(
+          expandedRows,
+          allPresets,
+          { ...data, ruleFeatures: data.ruleFeatures.filter((feature) => feature !== key) },
+          ruleRegistry,
+          'san10-191-border-return',
+        ),
+      ).toMatchObject({ available: false, code: 'FEATURE_PROFILE_UNAVAILABLE' });
+  });
   it('AC-P2-06 연구 선택은 새22기능 판을 고정하고 선행 기능 누락과 옛 판 교환을 거부한다', () => {
     const data = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v6.json'));
     const research = expandedCreationProfile(expandedRows, allPresets, data, ruleRegistry, 'san10-191-research');

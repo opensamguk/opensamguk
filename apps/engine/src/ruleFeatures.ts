@@ -220,6 +220,7 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   { key: 'five-stats' },
   { key: 'battle-affinity-v2' },
   { key: 'intel-v1' },
+  { key: 'border-return-v1' },
   { key: 'equipment-v1' },
   { key: 'operational-map' },
   { key: 'stratagem-basic' },
