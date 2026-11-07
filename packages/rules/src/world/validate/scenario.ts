@@ -68,6 +68,8 @@ export function validateScenario(input: unknown, ctx?: { map?: unknown }): Resou
     return out.finish(scenario);
   }
   out.did('map-refs');
+  if (scenario.openingCityProfile && 'version' in map && map.version === 3)
+    out.add(issue('shape-invalid', { kind: 'path', path: ['openingCityProfile'] }, { expected: '기존 지도 형식' }));
   const cities = 'version' in map && map.version === 3 ? operationalAnchors(map) : map.cities;
   if (scenario.cityScale)
     try {
