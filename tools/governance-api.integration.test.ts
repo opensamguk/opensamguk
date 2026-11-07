@@ -4,6 +4,7 @@ import type { inferRouterOutputs } from '@trpc/server';
 import { z } from 'zod';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
+import { TICKS_PER_MONTH } from '../packages/rules/src/clock/constants';
 import {
   buildCreatedGeneral,
   governanceMovementSchema,
@@ -66,10 +67,12 @@ type Results = {
   'governance.get': Out['governance']['get'];
   'governance.submit': Out['governance']['submit'];
   'governance.request': Out['governance']['request'];
+  'admin.game.request': Out['admin']['game']['request'];
+  'admin.game.requestStatus': Out['admin']['game']['requestStatus'];
 };
 type User = { id: string; cookie: string };
 async function rpc<R extends keyof Results>(route: R, input: unknown, user?: User) {
-  const mutation = !['governance.get', 'governance.request'].includes(route),
+  const mutation = !['governance.get', 'governance.request', 'admin.game.requestStatus'].includes(route),
     encoded = JSON.stringify({ 0: input });
   const response = await fetch(
     `${base}/trpc/${route}?batch=1${mutation ? '' : `&input=${encodeURIComponent(encoded)}`}`,
@@ -159,7 +162,13 @@ function selectPlayer(seed: string, id: number, tick: number, excluded: readonly
   }
   throw new Error('실제 세수를 받을 건국 도시를 찾지 못했습니다.');
 }
-async function createRuler(worldId: string, player: User, name: string) {
+async function createGeneralWithOrder(
+  worldId: string,
+  player: User,
+  name: string,
+  order:
+    { commandKey: 'found'; args: { name: string; color: string } } | { commandKey: 'join'; args: { nationId: number } },
+) {
   const creating = rpc('general.create', { worldId, ...creation(name) }, player);
   try {
     const deadline = performance.now() + 10_000;
@@ -179,23 +188,27 @@ async function createRuler(worldId: string, player: User, name: string) {
       {
         worldId,
         revision: general.turnRevision,
-        slots: Array.from({ length: 30 }, (_, slot) =>
-          slot === 0 ? { commandKey: 'found', args: { name, color: '#183b35' } } : null,
-        ),
+        slots: Array.from({ length: 30 }, (_, slot) => (slot === 0 ? order : null)),
       },
       player,
     );
     expect(edit.status, JSON.stringify(edit.error)).toBe(200);
     await advance(worldId, general.nextTurnTick);
-    const ruler = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: general.id } } });
-    expect(ruler.officerLevel).toBe(12);
-    if (ruler.nationId === null) throw new Error('실제 건국이 실패했습니다.');
-    return ruler;
+    return await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: general.id } } });
   } finally {
     await creating;
   }
 }
-async function fixture() {
+async function createRuler(worldId: string, player: User, name: string) {
+  const ruler = await createGeneralWithOrder(worldId, player, name, {
+    commandKey: 'found',
+    args: { name, color: '#183b35' },
+  });
+  expect(ruler.officerLevel).toBe(12);
+  if (ruler.nationId === null) throw new Error('실제 건국이 실패했습니다.');
+  return ruler;
+}
+async function fixture(withRival = false) {
   const seed = randomUUID(),
     firstId = Math.max(...initial.generals.map((general) => general.id)) + 1;
   const first = selectPlayer(seed, firstId, 0, [], 5000);
@@ -240,15 +253,24 @@ async function fixture() {
     ruler = await createRuler(id, emperor, '황실국');
   expect(ruler.cityKey).toBe(first.cityKey);
   const at = await db.world.findUniqueOrThrow({ where: { id } });
-  const second = selectPlayer(seed, firstId + 1, at.clockTick, [first.cityKey]);
+  const second = selectPlayer(seed, firstId + 1, at.clockTick, [first.cityKey], withRival ? 7500 : 10_000);
   const vassal = await user(second.userId),
     lower = await createRuler(id, vassal, '봉신국');
   expect(lower.cityKey).toBe(second.cityKey);
+  let rival;
+  if (withRival) {
+    const { clockTick } = await db.world.findUniqueOrThrow({ where: { id } });
+    const third = selectPlayer(seed, firstId + 2, clockTick, [first.cityKey, second.cityKey]);
+    const player = await user(third.userId);
+    const ruler = await createRuler(id, player, '경합국');
+    expect(ruler.cityKey).toBe(third.cityKey);
+    rival = { player, ruler };
+  }
   await advance(id, 10_000);
   const state = await snapshot(id);
   expect(state.state.governance!.legitimacy[String(ruler.nationId)]).toBe(2);
   expect(state.state.cityResources!.cities[String(lower.cityKey)]!.gold).toBeGreaterThan(100);
-  return { id, seed, emperor, ruler, vassal, lower };
+  return { id, seed, emperor, ruler, vassal, lower, rival };
 }
 type Fixture = Awaited<ReturnType<typeof fixture>>;
 async function send(world: Fixture, actor: User, payload: GovernanceInput) {
@@ -289,6 +311,208 @@ afterAll(async () => {
 });
 
 describe('AC-P2-31 실제 HTTP 황실 접수·동의·경제', () => {
+  it('두 상위국 제안을 함께 수락하면 접수 순서의 첫 계약만 저장한다', async () => {
+    const world = await fixture(true);
+    if (!world.rival) throw new Error('경합할 두 번째 상위국이 필요합니다.');
+    const upperNations = [world.ruler.nationId!, world.rival.ruler.nationId!];
+    const lowerNationId = world.lower.nationId!;
+    for (const player of [world.emperor, world.rival.player]) {
+      await send(world, player, {
+        type: 'vassal.offer',
+        authority: 'OWN',
+        targetNationId: lowerNationId,
+        direction: 'DEMAND',
+        goldBp: 1000,
+        riceBp: 1000,
+      });
+    }
+    const requests = upperNations.map((overlordNationId, index) => ({
+      requestId: randomUUID(),
+      offerId: index + 1,
+      overlordNationId,
+    }));
+    const replies = await Promise.all(
+      requests.map(({ requestId, offerId }) =>
+        rpc(
+          'governance.submit',
+          {
+            worldId: world.id,
+            requestId,
+            expectedUserId: world.vassal.id,
+            payload: { type: 'vassal.respond', offerId, accept: true },
+          },
+          world.vassal,
+        ),
+      ),
+    );
+    expect(replies.map(({ status, data }) => ({ status, requestStatus: data?.status }))).toEqual([
+      { status: 200, requestStatus: 'pending' },
+      { status: 200, requestStatus: 'pending' },
+    ]);
+    const events = await db.inputEvent.findMany({
+      where: { worldId: world.id, kind: 'governance.act', status: 'PENDING' },
+      orderBy: { id: 'asc' },
+    });
+    expect(events).toHaveLength(2);
+    const [winner, loser] = events.map((event) =>
+      requests.find(({ requestId }) => event.idempotencyKey === `governance:${requestId}`),
+    );
+    if (!winner || !loser || winner === loser) throw new Error('서로 다른 수락 요청 두 건이 필요합니다.');
+    expect((await snapshot(world.id)).state.governance!.vassals).toEqual([]);
+
+    await advance(world.id, 10_000);
+    for (const [request, status] of [
+      [winner, 'applied'],
+      [loser, 'rejected'],
+    ] as const) {
+      const reply = await rpc('governance.request', { worldId: world.id, requestId: request.requestId }, world.vassal);
+      expect(reply.status).toBe(200);
+      expect(reply.data).toMatchObject({ requestId: request.requestId, status });
+      if (status === 'rejected') expect(reply.data).toMatchObject({ result: { code: 'ALREADY_VASSAL' } });
+    }
+    const accepted = await snapshot(world.id);
+    expect(accepted.state.governance!.vassals).toEqual([
+      expect.objectContaining({ vassalNationId: lowerNationId, overlordNationId: winner.overlordNationId }),
+    ]);
+    expect(accepted.state.nations[loser.overlordNationId]).toBeDefined();
+
+    await advance(world.id, 20_000);
+    const archive = await exportReplay(db, world.id);
+    expect(replayArchive(archive, 2)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
+    expect(archive.months.at(-1)!.stateHash).toBe(hashState(await snapshot(world.id)));
+  }, 60_000);
+
+  it('황제국 해산 뒤 봉신국을 보존하고 먼저 접수된 해산으로 직위 수락을 거부한다', async () => {
+    const world = await fixture();
+    const emperorNationId = world.ruler.nationId!;
+    const lowerNationId = world.lower.nationId!;
+    await send(world, world.emperor, { type: 'throne.ascend' });
+    await send(world, world.emperor, {
+      type: 'vassal.offer',
+      authority: 'OWN',
+      targetNationId: lowerNationId,
+      direction: 'DEMAND',
+      goldBp: 1000,
+      riceBp: 1000,
+    });
+    await send(world, world.vassal, { type: 'vassal.respond', offerId: 1, accept: true });
+    await advance(world.id, 70_000);
+    expect(await db.governanceMovement.count({ where: { worldId: world.id, tick: 70_000, kind: 'TRIBUTE' } })).toBe(2);
+    await send(world, world.emperor, { type: 'court.offer', office: 'chancellor', generalId: world.lower.id });
+
+    const operator = await user();
+    await db.user.update({ where: { id: operator.id }, data: { role: 'ADMIN', emailVerifiedAt: new Date(now) } });
+    const disband = { expectedUserId: operator.id, worldId: world.id, idempotencyKey: randomUUID() };
+    const queued = await rpc(
+      'admin.game.request',
+      {
+        ...disband,
+        reason: '황제국 해산과 잔존 봉신국을 확인합니다.',
+        action: { kind: 'admin.nation.disband', nationId: emperorNationId },
+      },
+      operator,
+    );
+    expect(queued.status, JSON.stringify(queued.error)).toBe(200);
+    expect(queued.data?.status).toBe('PENDING');
+    const response = { worldId: world.id, requestId: randomUUID() };
+    const accepted = await rpc(
+      'governance.submit',
+      { ...response, expectedUserId: world.vassal.id, payload: { type: 'court.respond', offerId: 2, accept: true } },
+      world.vassal,
+    );
+    expect(accepted.status, JSON.stringify(accepted.error)).toBe(200);
+    expect(accepted.data?.status).toBe('pending');
+
+    await advance(world.id, 70_000);
+    expect((await rpc('admin.game.requestStatus', disband, operator)).data).toMatchObject({ status: 'APPLIED' });
+    expect((await rpc('governance.request', response, world.vassal)).data).toMatchObject({
+      status: 'rejected',
+      result: { code: 'NOT_FOUND' },
+    });
+    const after = await snapshot(world.id);
+    expect(after.state.nations[emperorNationId]).toBeUndefined();
+    expect(after.state.nations[lowerNationId]?.capitalCityKey).toBe(world.lower.cityKey);
+    expect(after.state.generals[world.lower.id]).toMatchObject({ nationId: lowerNationId, officerLevel: 12 });
+    expect(after.state.governance).toMatchObject({
+      throne: { emperorGeneralId: null, emperorNationId: null },
+      vassals: [],
+      offers: [],
+      court: { chancellor: null },
+    });
+    await advance(world.id, 100_000);
+    expect(await db.governanceMovement.count({ where: { worldId: world.id, tick: { gt: 70_000 } } })).toBe(0);
+    const archive = await exportReplay(db, world.id);
+    expect(replayArchive(archive, 10)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
+    expect(archive.months.at(-1)!.stateHash).toBe(hashState(await snapshot(world.id)));
+  }, 60_000);
+
+  it('제안한 나라의 군주를 먼저 교체하면 대기 중인 봉신 수락을 거부하고 두 나라를 보존한다', async () => {
+    const world = await fixture();
+    const nationId = world.ruler.nationId!;
+    const lowerNationId = world.lower.nationId!;
+    const successor = await createGeneralWithOrder(world.id, await user(), '후임장수', {
+      commandKey: 'join',
+      args: { nationId },
+    });
+    expect(successor).toMatchObject({ nationId, officerLevel: 1 });
+    await send(world, world.emperor, {
+      type: 'vassal.offer',
+      authority: 'OWN',
+      targetNationId: lowerNationId,
+      direction: 'DEMAND',
+      goldBp: 1000,
+      riceBp: 1000,
+    });
+    const operator = await user();
+    await db.user.update({ where: { id: operator.id }, data: { role: 'ADMIN', emailVerifiedAt: new Date(now) } });
+    const change = { expectedUserId: operator.id, worldId: world.id, idempotencyKey: randomUUID() };
+    const queued = await rpc(
+      'admin.game.request',
+      {
+        ...change,
+        reason: '군주 교체 뒤 봉신 수락을 검증합니다.',
+        action: { kind: 'admin.nation.setRuler', nationId, generalId: successor.id, expectedRulerId: world.ruler.id },
+      },
+      operator,
+    );
+    expect(queued.status, JSON.stringify(queued.error)).toBe(200);
+    expect(queued.data?.status).toBe('PENDING');
+    const response = { worldId: world.id, requestId: randomUUID() };
+    const accepted = await rpc(
+      'governance.submit',
+      {
+        ...response,
+        expectedUserId: world.vassal.id,
+        payload: { type: 'vassal.respond', offerId: 1, accept: true },
+      },
+      world.vassal,
+    );
+    expect(accepted.status, JSON.stringify(accepted.error)).toBe(200);
+    expect(accepted.data?.status).toBe('pending');
+
+    const { clockTick } = await db.world.findUniqueOrThrow({ where: { id: world.id } });
+    await advance(world.id, clockTick);
+    expect((await rpc('admin.game.requestStatus', change, operator)).data).toMatchObject({ status: 'APPLIED' });
+    expect((await rpc('governance.request', response, world.vassal)).data).toMatchObject({
+      status: 'rejected',
+      result: { code: 'NOT_FOUND' },
+    });
+    const after = await snapshot(world.id);
+    expect(after.state.nations[nationId]?.capitalCityKey).toBe(world.ruler.cityKey);
+    expect(after.state.nations[lowerNationId]?.capitalCityKey).toBe(world.lower.cityKey);
+    expect(after.state.generals[successor.id]).toMatchObject({ nationId, officerLevel: 12 });
+    expect(after.state.generals[world.ruler.id]).toMatchObject({ nationId, officerLevel: 1 });
+    expect(after.state.generals[world.lower.id]).toMatchObject({ nationId: lowerNationId, officerLevel: 12 });
+    expect(after.state.governance).toMatchObject({ vassals: [], offers: [] });
+    const nextMonth = Math.floor(clockTick / TICKS_PER_MONTH) + 1;
+    await advance(world.id, nextMonth * TICKS_PER_MONTH);
+    const archive = await exportReplay(db, world.id);
+    expect(replayArchive(archive, nextMonth)).toEqual(
+      archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })),
+    );
+    expect(archive.months.at(-1)!.stateHash).toBe(hashState(await snapshot(world.id)));
+  }, 60_000);
+
   it('동시 재전송은 한 번 접수하며 실패 뒤 새 엔진이 즉위를 한 번만 저장한다', async () => {
     const world = await fixture(),
       requestId = randomUUID();
