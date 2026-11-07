@@ -299,3 +299,4 @@ export {
 export { readStoredNationResearch } from './nationResearch/origin';
 export { canExecuteResearchNationCommand } from './nationResearch/commands';
 export { readHistoricEventsStorage } from './historicEvents/origin';
+export { historicEventsView } from './historicEvents/view';
