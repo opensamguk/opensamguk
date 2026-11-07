@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { execFileSync, spawn } from 'node:child_process';
+import { once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import type { inferRouterOutputs } from '@trpc/server';
@@ -141,6 +143,40 @@ async function advance(worldId: string, tick: number, fail = false, connection =
   }
 }
 const snapshot = (worldId: string) => db.$transaction((tx) => loadReplayState(tx, worldId));
+
+async function stopInputProcess(worldId: string, tick: number, inputId: bigint, phase: 'beforeCommit' | 'committed') {
+  const child = spawn(
+    process.execPath,
+    ['--import', 'tsx', 'apps/engine/test/creationWorker.ts', worldId, phase, String(tick), String(inputId)],
+    {
+      cwd: new URL('../', import.meta.url),
+      env: { ...process.env, TEST_DATABASE_URL: target.href },
+      stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
+      windowsHide: true,
+    },
+  );
+  const closed = once(child, 'close');
+  try {
+    const [message] = await Promise.race([
+      once(child, 'message', { signal: AbortSignal.timeout(20_000) }),
+      closed.then(() => {
+        throw Error('계승 중단 지점 전에 엔진이 끝났습니다.');
+      }),
+    ]);
+    expect(message).toBe(phase);
+    expect(child.kill('SIGKILL')).toBe(true);
+    expect(await closed).toEqual([null, 'SIGKILL']);
+  } finally {
+    if (!child.killed && child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+    await closed;
+  }
+  const lease = await db.engineLease.findUniqueOrThrow({ where: { worldId } });
+  await db.engineLease.update({
+    where: { worldId, fencingToken: lease.fencingToken },
+    data: { expiresAt: new Date(0) },
+  });
+  return lease.fencingToken;
+}
 
 it.each([
   { scenario: '1030', map: 'che', statRules: 'default', features: ['personnel', 'policy', 'lineage-v1'], count: 3 },
@@ -482,7 +518,7 @@ it('AC-P2-32 출생 트랜잭션 실패는 새 행·예약을 모두 되돌리�
   expect(replayed.at(-1)!.stateHash).toBe(hashState(state));
 }, 120000);
 
-it('AC-P2-32 전임자 해제 뒤 후계자 조작권 저장 실패는 모두 복구되고 새 리스에서 한 번만 적용된다', async () => {
+it('AC-P2-32 후계자 조작권 저장 실패와 실제 SIGKILL 뒤 계승은 한 번만 적용된다', async () => {
   const id = await world(),
     father = await user(),
     mother = await user(),
@@ -541,7 +577,8 @@ it('AC-P2-32 전임자 해제 뒤 후계자 조작권 저장 실패는 모두 �
   expect(before.replay.state.generals[from]!.gold).toBeGreaterThan(0);
   expect(before.replay.state.generals[from]!.rice).toBeGreaterThan(0);
   expect(before.replay.state.generals[heir]).toMatchObject({ userId: null });
-  expect(before.inputs.filter((row) => row.idempotencyKey === requestKey)).toMatchObject([{ status: 'PENDING' }]);
+  const request = before.inputs.find((row) => row.idempotencyKey === requestKey);
+  expect(request).toMatchObject({ kind: 'lineage.act', status: 'PENDING' });
   // 이름과 SQL 본문에 넣는 값은 이 시험이 만든 식별자뿐이다.
   expect(id).toMatch(/^[\w-]+$/);
   expect(father.id).toMatch(/^[\w-]+$/);
@@ -594,12 +631,11 @@ it('AC-P2-32 전임자 해제 뒤 후계자 조작권 저장 실패는 모두 �
   if (failure) throw failure;
   if (cleanupErrors.length) throw new AggregateError(cleanupErrors, '계승 시험 정리 실패');
   expect(await objects()).toEqual([{ triggers: 0, functions: 0 }]);
-  const restarted = createDb(url!);
-  try {
-    await advance(id, before.world.clockTick, false, restarted);
-  } finally {
-    await restarted.$disconnect();
-  }
+  const tick = before.world.clockTick;
+  const beforeCommitToken = await stopInputProcess(id, tick, request!.id, 'beforeCommit');
+  expect(await footprint()).toEqual(before);
+  const committedToken = await stopInputProcess(id, tick, request!.id, 'committed');
+  expect(committedToken).toBeGreaterThan(beforeCommitToken);
   const receipt = await rpc('lineage.request', { worldId: id, requestId: input.requestId }, father);
   expect(receipt.data?.status, JSON.stringify(receipt.error ?? receipt.data)).toBe('applied');
   const applied = await footprint();
@@ -614,6 +650,24 @@ it('AC-P2-32 전임자 해제 뒤 후계자 조작권 저장 실패는 모두 �
   expect(await db.general.findMany({ where: { worldId: id, userId: father.id }, select: { id: true } })).toEqual([
     { id: heir },
   ]);
+  const recovered = execFileSync(
+    process.execPath,
+    ['--import', 'tsx', 'apps/engine/test/presetWorker.ts', id, String(tick)],
+    {
+      cwd: new URL('../', import.meta.url),
+      env: { ...process.env, TEST_DATABASE_URL: target.href },
+      encoding: 'utf8',
+      timeout: 20_000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+      windowsHide: true,
+    },
+  );
+  const appliedHash = hashState(applied.replay);
+  expect(JSON.parse(recovered)).toMatchObject({ beforeHash: appliedHash, afterHash: appliedHash });
+  expect((await db.engineLease.findUniqueOrThrow({ where: { worldId: id } })).fencingToken).toBeGreaterThan(
+    committedToken,
+  );
+  expect(await footprint()).toEqual(applied);
   expect((await rpc('lineage.submit', input, father)).data?.status).toBe('applied');
   expect(
     (
