@@ -22,6 +22,7 @@ import { appendReputationEvents } from './review/ledger';
 import { isAdminSettingKind, validateAdminSettingRecord } from './admin/settings';
 import { validateAdminGameRecord } from './admin/apply';
 import { POSSESSION_KIND, validatePossessionRecord } from './entry/possess';
+import type { HistoricEventsConfig, HistoricEventsState } from './historicEvents/state';
 
 export interface QueuedTurn {
   commandKey: string;
@@ -41,6 +42,7 @@ export interface ReplayState {
   campaignArmyTypes?: number[];
   campaignUnitSet?: UnitSetResource;
   lineageResources?: import('./lineage/birth').LineageResources;
+  historicEvents?: { config: HistoricEventsConfig; state: HistoricEventsState };
 }
 export interface RecordedInput {
   sequence: number;

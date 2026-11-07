@@ -21,6 +21,7 @@ function fixture(personnelFormat: 1 | null, policyFromSequence: number | null = 
     preparedTurnsState: null,
     nationResearchState: null,
     nationLifecycleState: null,
+    historicEventsState: null,
     logisticsState: null,
     equipmentState: null,
     governanceState: null,

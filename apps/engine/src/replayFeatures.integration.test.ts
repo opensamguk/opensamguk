@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createDb, type Prisma } from '@opensamguk/db';
-import { type WorldInit } from '@opensamguk/rules';
+import { initialReplayState, type WorldInit } from '@opensamguk/rules';
 import { monthlyFixture } from '../test/monthlyFixture';
 import { featureRegistry, generateReplayV2EngineArchive } from '../test/replayFeaturesFixture';
 import { saveInitialWorld, readWorldState } from './world/persistence';
@@ -13,6 +13,7 @@ import { acquireLease, lockLease, releaseLease, renewLease, type Lease } from '.
 import { TurnLoop } from './turnLoop';
 import { exportReplay, replayArchive, replayToEnd, type ReplayArchiveV2 } from './replay';
 import { processInputs } from './inputs';
+import { loadReplayState } from './monthly';
 import type { EngineRegistry, QueuedInputHandler } from './features';
 
 const url = process.env.TEST_DATABASE_URL;
@@ -64,6 +65,32 @@ async function fenced(lease: Lease, fn: (tx: Prisma.TransactionClient) => Promis
 }
 
 describe('T2-26 실제 DB 형식·C2', () => {
+  it('AC-P2-21 사건 기능을 끈 월드의 저장 상태와 재생을 보존한다', async () => {
+    const { worldId, initial } = await create(3);
+    const stored = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+    expect(stored.historicEventsState).toBeNull();
+    expect(await loadReplayState(db, worldId)).toEqual(initialReplayState(initial));
+    const state = JSON.stringify({ pending: [], done: [], skipped: [] });
+    await expect(
+      db.$executeRaw`UPDATE "World" SET "historicEventsState" = ${state}::jsonb WHERE id = ${worldId}`,
+    ).rejects.toThrow('World_historicEventsState_feature_check');
+    await expect(
+      db.$executeRaw`UPDATE "World" SET "ruleFeatures" = ARRAY['historic-events'] WHERE id = ${worldId}`,
+    ).rejects.toThrow('World_historicEventsState_feature_check');
+    await expect(
+      db.$executeRaw`UPDATE "World" SET "ruleFeatures" = ARRAY['historic-events'],
+        "historicEventsState" = ${state}::jsonb, "scenarioKey" = '2060' WHERE id = ${worldId}`,
+    ).rejects.toThrow('World_historicEventsState_feature_check');
+    await expect(
+      db.$executeRaw`UPDATE "World" SET "ruleFeatures" = ARRAY[NULL]::text[],
+        "historicEventsState" = ${state}::jsonb, "scenarioKey" = '1030' WHERE id = ${worldId}`,
+    ).rejects.toThrow('World_historicEventsState_feature_check');
+    await expect(
+      db.$executeRaw`UPDATE "World" SET "ruleFeatures" = ARRAY['historic-events', NULL],
+        "historicEventsState" = ${state}::jsonb, "scenarioKey" = '1030' WHERE id = ${worldId}`,
+    ).rejects.toThrow('World_historicEventsState_feature_check');
+  });
+
   it('형식 1·3 초기·리소스 해시와 12개월 월간 해시가 같고 CLI가 v3을 읽는다', async () => {
     const old = await create(1),
       modern = await create(3);

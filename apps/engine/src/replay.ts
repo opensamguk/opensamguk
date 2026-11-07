@@ -10,6 +10,7 @@ import {
   readStoredPreparedTurns,
   readStoredNationResearch,
   readStoredNationLifecycle,
+  readHistoricEventsStorage,
   ruleRegistry,
   type RuleRegistry,
   type ReplayOriginV3,
@@ -153,6 +154,7 @@ export async function exportReplay(
       readStoredPreparedTurns(world);
       readStoredNationResearch(world);
       readStoredNationLifecycle(world);
+      readHistoricEventsStorage(world, checkReplayOrigin, hashState);
       await assertStoredCityResources(tx, world);
       await assertStoredCityRuins(tx, world);
       await assertStoredLogistics(tx, world);

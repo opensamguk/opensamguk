@@ -4,6 +4,8 @@ import { commandInitial } from '../packages/rules/test/commandFixture';
 import { TICKS_PER_MONTH } from '../packages/rules/src/clock/constants';
 import { checkReplayOrigin, type ReplayOriginV1, type ReplayOriginV3 } from '../packages/rules/src/ruleRegistry';
 import { HISTORIC_EVENTS_FEATURE, readHistoricEventsStorage } from '../packages/rules/src/historicEvents/origin';
+import { historicEventsFeature } from '../packages/rules/src/historicEvents/feature';
+import { initialReplayStateWithRegistry } from '../packages/rules/src/replay';
 import {
   initialHistoricEvents,
   settleHistoricEvents,
@@ -61,11 +63,10 @@ const record = () => ({
   historicEventsState: initialHistoricEvents(),
 });
 
+const registry = { features: [historicEventsFeature], inputKinds: [] };
+
 function checkOrigin(value: unknown): asserts value is ReplayOriginV1 | ReplayOriginV3 {
-  checkReplayOrigin(value, {
-    features: [{ key: HISTORIC_EVENTS_FEATURE, requires: [], conflicts: [] }],
-    inputKinds: [],
-  });
+  checkReplayOrigin(value, registry);
 }
 
 const read = (world: Parameters<typeof readHistoricEventsStorage>[0]) =>
@@ -75,6 +76,7 @@ describe('AC-P2-21 역사 사건의 생성 기록과 저장 상태', () => {
   it('현재 코드의 사건 표와 독립적으로 생성 기록에서 사건 사본을 복구한다', () => {
     const storage = read(record())!;
     expect(storage).toEqual({ config, state: initialHistoricEvents() });
+    expect(initialReplayStateWithRegistry(initial, registry, featureData).historicEvents).toEqual(storage);
     storage.config.events[0]!.title = '나중에 바꾼 제목';
     expect(read(record())!.config.events[0]!.title).toBe('생성 때의 제목');
   });
@@ -95,7 +97,11 @@ describe('AC-P2-21 역사 사건의 생성 기록과 저장 상태', () => {
     expect(() => read({ ...world, replayOrigin: { ...origin, featureData: changedData } })).toThrow('해시');
     const changedInitial = structuredClone(initial);
     changedInitial.nations[0]!.name = '변경한 국가';
-    expect(() => read({ ...world, replayOrigin: { ...origin, initial: changedInitial } })).toThrow('해시');
+    expect(() => read({ ...world, replayOrigin: { ...origin, initial: changedInitial } })).toThrow('국가');
+    changedData[HISTORIC_EVENTS_FEATURE].events[0]!.chooser.name = changedInitial.nations[0]!.name;
+    expect(() =>
+      read({ ...world, replayOrigin: { ...origin, initial: changedInitial, featureData: changedData } }),
+    ).toThrow('해시');
   });
 
   it('자체 해시가 맞는 다른 시드의 생성 기록도 원래 월드에 쓸 수 없다', () => {

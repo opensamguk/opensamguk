@@ -15,6 +15,8 @@ import {
   type WorldState,
   unitSetSchema,
   readLineageResources,
+  checkReplayOrigin,
+  readHistoricEventsStorage,
 } from '@opensamguk/rules';
 import { rngFor } from '@opensamguk/shared';
 import { hashState } from '@opensamguk/shared/node';
@@ -75,12 +77,14 @@ export async function loadReplayState(tx: Prisma.TransactionClient, worldId: str
         policy.lastActiveTicks[general.id] = general.lastActiveTick;
       }
     }
+  const historicEvents = readHistoricEventsStorage(world, checkReplayOrigin, hashState);
   let replay: ReplayState = {
     state,
     turns,
     revisions: Object.fromEntries(generals.map(({ id, turnRevision }) => [id, turnRevision])),
     monthlyTick: world.monthlyTick,
     ...(policy ? { policy } : {}),
+    ...(historicEvents ? { historicEvents } : {}),
     ...(world.ruleFeatures.includes('lineage-v1') ? { lineageResources: readLineageResources(world) } : {}),
     ...(world.ruleFeatures.includes('campaign-v1')
       ? { campaignArmyTypes: readCampaignArmyTypes(world), campaignUnitSet: unitSetSchema.parse(world.unitSet) }

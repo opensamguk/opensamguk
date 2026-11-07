@@ -72,6 +72,7 @@ model World {
   preparedTurnsState   Json?
   nationResearchState  Json?
   nationLifecycleState Json?
+  historicEventsState  Json?
   battleLogs           BattleLog[]
   ranking              RankingSnapshot?
   publicMaps           PublicMapSnapshot[]
