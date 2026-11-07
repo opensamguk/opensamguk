@@ -1,0 +1,107 @@
+[
+  {
+    "key": "abdicate",
+    "target": "general",
+    "feature": "nation-lifecycle-v1"
+  },
+  {
+    "key": "disband",
+    "target": "general",
+    "feature": "nation-lifecycle-v1"
+  },
+  {
+    "key": "equipment_trade",
+    "target": "general",
+    "feature": "equipment-v1"
+  },
+  {
+    "key": "fire_attack",
+    "target": "general",
+    "feature": "stratagem-basic"
+  },
+  {
+    "key": "incite",
+    "target": "general",
+    "feature": "stratagem-basic"
+  },
+  {
+    "key": "nation_mobilize",
+    "target": "nation",
+    "feature": "nation-strategy-v1"
+  },
+  {
+    "key": "nation_raid",
+    "target": "nation",
+    "feature": "nation-strategy-v1"
+  },
+  {
+    "key": "nation_research_elephant",
+    "target": "nation",
+    "feature": "nation-research-v1"
+  },
+  {
+    "key": "nation_research_fire_arrow",
+    "target": "nation",
+    "feature": "nation-research-v1"
+  },
+  {
+    "key": "nation_research_fire_wheel",
+    "target": "nation",
+    "feature": "nation-research-v1"
+  },
+  {
+    "key": "nation_research_greatsword",
+    "target": "nation",
+    "feature": "nation-research-v1"
+  },
+  {
+    "key": "nation_research_halberd",
+    "target": "nation",
+    "feature": "nation-research-v1"
+  },
+  {
+    "key": "nation_research_mountain",
+    "target": "nation",
+    "feature": "nation-research-v1"
+  },
+  {
+    "key": "nation_research_repeater",
+    "target": "nation",
+    "feature": "nation-research-v1"
+  },
+  {
+    "key": "nation_rivalry",
+    "target": "nation",
+    "feature": "nation-strategy-v1"
+  },
+  {
+    "key": "plunder",
+    "target": "general",
+    "feature": "stratagem-basic"
+  },
+  {
+    "key": "resettle",
+    "target": "general",
+    "feature": "nation-lifecycle-v1"
+  },
+  {
+    "key": "sabotage",
+    "target": "general",
+    "feature": "stratagem-basic"
+  },
+  {
+    "key": "spy",
+    "target": "general",
+    "feature": "intel-v1"
+  },
+  {
+    "key": "trade",
+    "target": "general",
+    "feature": "treaty-trade"
+  },
+  {
+    "key": "wander",
+    "target": "general",
+    "feature": "nation-lifecycle-v1"
+  }
+]

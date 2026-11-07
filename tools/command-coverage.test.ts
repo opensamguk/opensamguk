@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, normalize } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { commands, extensionCommands } from '../packages/rules/src/index';
+import { commands, extensionCommands, ruleRegistry } from '../packages/rules/src/index';
 import {
   STAGES,
   analyze,
@@ -66,6 +66,31 @@ const SHA_1FF = '1ffde70cfca4419ee23c972695005165fa3c8ed9';
 const RUN = (id: string | number) => `https://github.com/peppone-choi/opensamguk/actions/runs/${id}`;
 const runCli = (...args: string[]) =>
   spawnSync(process.execPath, ['tools/command-coverage.mjs', ...args], { cwd: root, encoding: 'utf8' });
+
+it('AC-M1-14 기능 명령 목록을 실제 등록과 대조하고 잘못된 대상·중복을 거부한다', () => {
+  const registered = ruleRegistry.features
+    .flatMap(({ key: feature, commandBindings = [] }) =>
+      commandBindings.map(({ definition: { key, target } }) => ({ key, target, feature })),
+    )
+    .sort((a, b) => a.key.localeCompare(b.key, 'en'));
+  expect(context.featureRegistry).toEqual(registered);
+  const extensionsByKey = new Map(extensionCommands.map((definition) => [definition.key, definition]));
+  for (const { commandBindings = [] } of ruleRegistry.features) {
+    for (const { definition } of commandBindings) {
+      const extension = extensionsByKey.get(definition.key);
+      if (extension) expect(definition, definition.key).toBe(extension);
+    }
+  }
+  expect(analyze(table(), context).errors).toEqual([]);
+  const first = registered[0]!;
+  expect(errorsOf(table(), withDocs({ featureRegistry: [...registered, first] }))).toContain(
+    `기능 registry key ${first.key}`,
+  );
+  const changed = registered.map((row) =>
+    row.key === first.key ? { ...row, target: first.target === 'general' ? 'nation' : 'general' } : row,
+  );
+  expect(errorsOf(table(), withDocs({ featureRegistry: changed }))).toContain(`commands[${first.key}]`);
+});
 
 describe('T4-02 등록된 확장 명령 대조', () => {
   const fixture = (files: Record<string, string>, run: (dir: string) => void, parent = tmpdir()) => {
@@ -813,7 +838,7 @@ describe('T4-02 등록된 확장 명령 대조', () => {
       const valid = analyze(table(), ctx);
       expect(valid.errors).toEqual([]);
       expect(valid.summary!.legacySubset).toEqual(analyze(table(), context).summary!.legacySubset);
-      expect(valid.summary!.denominator).toBe(91);
+      expect(valid.summary!.denominator).toBe(92);
       expect(valid.summary!.unresolvedReferences).toBe(3);
       const doc = table();
       doc.commands = doc.commands.filter(({ id }) => id !== 'fire_attack');
@@ -959,7 +984,10 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
     row(doc, 'fire_attack').stages.engine = { status: 'verified', evidence: [{ kind: 'ci', ref: RUN(1) }] };
     const errors = errorsOf(
       doc,
-      withDocs({ extensionRegistry: context.extensionRegistry.filter(({ key }) => key !== 'fire_attack') }),
+      withDocs({
+        extensionRegistry: context.extensionRegistry.filter(({ key }) => key !== 'fire_attack'),
+        featureRegistry: context.featureRegistry.filter(({ key }) => key !== 'fire_attack'),
+      }),
     );
     expect(errors).toContain('commands[farm].ui: verified에는 검증한 정확한 전체 SHA가 있어야 한다');
     expect(errors).toContain('commands[fire_attack].engine: verified에는 검증한 정확한 전체 SHA가 있어야 한다');
@@ -1109,11 +1137,11 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
       [
         {
           readme: context.readme.replace(
-            '원작 비교 분모 90개, 정본 분모 91개, 전 단계 완료 2개',
+            '원작 비교 분모 90개, 정본 분모 92개, 전 단계 완료 2개',
             '원작 비교 분모 37개, 정본 분모 37개, 전 단계 완료 37개',
           ),
         },
-        'README: 명령 대응표 출력(원작/정본/전 단계 완료) 불일치 (문서 37/37/37, 원장 90/91/2)',
+        'README: 명령 대응표 출력(원작/정본/전 단계 완료) 불일치 (문서 37/37/37, 원장 90/92/2)',
       ],
       [
         { readme: context.readme.replace(readmeM1Line, readmeM1Line.replace(readmeProgress, '통과')) },
@@ -1149,12 +1177,12 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
               line.startsWith('| AC-M1-14 ')
                 ? line
                     .replace('| 🟨 |', '| ✅ |')
-                    .replace('정본 분모 91(명령 88 + 미해결 원본 3), 전 단계 완료 2', '정본 분모 37, 전 단계 완료 37')
+                    .replace('정본 분모 92(명령 89 + 미해결 원본 3), 전 단계 완료 2', '정본 분모 37, 전 단계 완료 37')
                 : line,
             )
             .join('\n'),
         },
-        '인수조건 AC-M1-14: 남은 행이 있는데 ✅다 (전 단계 완료 2/91)',
+        '인수조건 AC-M1-14: 남은 행이 있는데 ✅다 (전 단계 완료 2/92)',
       ],
       [
         {
@@ -1203,7 +1231,7 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
     const noTrade = table();
     noTrade.commands = noTrade.commands.filter((command) => command.id !== 'trade');
     expect(errorsOf(noTrade)).toContain(
-      'README: 명령 대응표 출력(원작/정본/전 단계 완료) 불일치 (문서 90/91/2, 원장 90/90/2)',
+      'README: 명령 대응표 출력(원작/정본/전 단계 완료) 불일치 (문서 90/92/2, 원장 90/91/2)',
     );
   });
 
@@ -1419,6 +1447,7 @@ describe('전체 완료 게이트 (합성 저장소)', () => {
     withDocs({
       registry: [{ key: 'farm', target: 'general' }],
       extensionRegistry: [],
+      featureRegistry: [],
       baseline: baseline(),
       readDoc: (path: string) => (path === 'docs/plans/T1-08.md' ? reviewDoc : ''),
       ...docs(complete),
