@@ -49,6 +49,10 @@ export function checkOperationalProfile(
       if (city[field] !== anchor.initial[field] || city[`${field}Max`] !== anchor.max[field])
         throw new Error('운영 지도의 초기·최대 값과 생성 상태가 다릅니다.');
   }
-  if (initial.nations.some((nation) => cities.get(nation.capitalCityKey)?.kind !== 'CITY'))
+  if (
+    initial.nations.some(
+      (nation) => nation.capitalCityKey !== null && cities.get(nation.capitalCityKey)?.kind !== 'CITY',
+    )
+  )
     throw new Error('수도는 경제 도시여야 합니다.');
 }

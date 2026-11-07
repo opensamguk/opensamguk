@@ -94,6 +94,11 @@ async function fixture() {
   worldIds.push(worldId);
   await db.nation.createMany({ data: initial.nations.map((nation) => ({ ...nation, worldId, capitalCityKey: null })) });
   await db.city.createMany({ data: initial.cities.map((city) => ({ ...city, worldId })) });
+  for (const nation of initial.nations)
+    await db.nation.update({
+      where: { worldId_id: { worldId, id: nation.id } },
+      data: { capitalCityKey: nation.capitalCityKey },
+    });
   const generals = [
     { ...initial.generals[0]!, id: 1, userId: alice.id, nationId: 1, officerLevel: 5 },
     { ...initial.generals[1]!, id: 2, userId: bob.id, nationId: 1, officerLevel: 1 },

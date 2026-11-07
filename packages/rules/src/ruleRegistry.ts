@@ -1,5 +1,6 @@
 import type { JsonValue, WorldView } from './model/world';
 import type { WorldInit } from './world/bootstrap';
+import { assertInitialNationLifecycle, NATION_LIFECYCLE_FEATURE } from './nationLifecycle/state';
 import type { CommandDef } from './commands/types';
 import type { CommandResolver } from './commands/resolve';
 import { applyCreationInput, applyPolicyInput, applyTurnsInput } from './replayInputs';
@@ -45,7 +46,6 @@ import { nationLifecycleFeature } from './nationLifecycle/feature';
 import { preparedTurnsFeature } from './preparedTurns/feature';
 import { nationResearchFeature } from './nationResearch/feature';
 import { returnBorder } from './commands/ext/return_border/return_border';
-import { NATION_LIFECYCLE_FEATURE } from './nationLifecycle/state';
 
 export interface ReplayOriginV1 {
   version: 1;
@@ -243,6 +243,10 @@ export function checkReplayOrigin(
   checkStatProfile(origin.initial);
   checkCityScaleInitial(origin.initial);
   checkOperationalProfile(origin.initial);
+  assertInitialNationLifecycle(
+    origin.initial,
+    origin.version === 3 && origin.initial.ruleFeatures?.includes(NATION_LIFECYCLE_FEATURE) === true,
+  );
   if (origin.initial.unitSet.coefMode === 'multiply' && !origin.initial.ruleFeatures?.includes('battle-affinity-v2'))
     throw new Error('곱셈 병종 판에는 battle-affinity-v2 규칙 기능이 필요합니다.');
   if (origin.version === 1) {

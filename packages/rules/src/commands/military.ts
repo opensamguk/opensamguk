@@ -101,13 +101,13 @@ export const militaryCommands = [
       const general = view.generals[actor.generalId]!;
       const nation = general.nationId === null ? undefined : view.nations[general.nationId];
       if (!nation) return fail('NOT_NATION', '국가에 소속되어야 합니다.');
-      const target = view.cities[nation.capitalCityKey];
+      const target = nation.capitalCityKey === null ? undefined : view.cities[nation.capitalCityKey];
       if (target?.nationId !== nation.id) return fail('BAD_TARGET', '돌아갈 수도가 없습니다.');
       return general.cityKey === target.cityKey ? fail('BAD_STATE', '이미 수도에 있습니다.') : null;
     },
     change(state, actor) {
       const general = state.generals[actor.generalId]!;
-      general.cityKey = state.nations[general.nationId!]!.capitalCityKey;
+      general.cityKey = state.nations[general.nationId!]!.capitalCityKey!;
       return success(`${state.cities[general.cityKey]!.name} 귀환`);
     },
   }),

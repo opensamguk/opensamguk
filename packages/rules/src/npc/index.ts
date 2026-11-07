@@ -229,7 +229,7 @@ export function chooseNationTurn(view: WorldView, ruler: General, rng: Rng, cont
     for (const candidate of cityNpcAllocations(view, nation.id))
       choice.add(candidate.key, candidate.args, candidate.score, candidate.reason);
   const cities = Object.values(view.cities).filter((c) => c.nationId === nation.id);
-  const capital = view.cities[nation.capitalCityKey];
+  const capital = nation.capitalCityKey === null ? undefined : view.cities[nation.capitalCityKey];
   if (
     !capital?.supplied ||
     (cities.length > 1 && !capital.connections.some((key) => view.cities[key]?.nationId === nation.id))

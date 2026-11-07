@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { WorldView } from '../model/world';
+import type { InitialNation, WorldInit } from '../world/bootstrap';
 
 export const NATION_LIFECYCLE_FEATURE = 'nation-lifecycle-v1';
 export const WANDERING_MONTH_LIMIT = 24;
@@ -16,7 +17,25 @@ export const nationLifecycleSchema = z.strictObject({
   ),
 });
 export type NationLifecycleState = z.infer<typeof nationLifecycleSchema>;
-export const initialNationLifecycle = (): NationLifecycleState => ({ version: 1, nations: {} });
+export const initialNationLifecycle = (
+  nations: readonly Pick<InitialNation, 'id' | 'capitalCityKey'>[] = [],
+): NationLifecycleState => ({
+  version: 1,
+  nations: Object.fromEntries(
+    nations.filter((nation) => nation.capitalCityKey === null).map(({ id }) => [id, { sinceTick: 0 }]),
+  ),
+});
+
+export function assertInitialNationLifecycle(initial: Pick<WorldInit, 'nations' | 'cities'>, enabled: boolean) {
+  if (initial.nations.some((nation) => nation.capitalCityKey === null) && !enabled)
+    throw new Error('시작 방랑 국가에는 형식 3의 국가 변천 기능이 필요합니다.');
+  if (!enabled) return;
+  for (const nation of initial.nations) {
+    const ownsCities = initial.cities.some((city) => city.nationId === nation.id);
+    const hasCapital = nation.capitalCityKey !== null;
+    if (hasCapital !== ownsCities) throw new Error('시작 방랑 국가의 수도와 소유 도시가 다릅니다.');
+  }
+}
 
 export function readNationLifecycle(value: unknown, world: Pick<WorldView, 'ruleFeatures'>) {
   if (!world.ruleFeatures?.includes(NATION_LIFECYCLE_FEATURE)) {
@@ -36,6 +55,8 @@ export function isWandering(world: Pick<WorldView, 'ruleFeatures' | 'nationLifec
 
 export function assertNationLifecycle(world: WorldView): void {
   const state = readNationLifecycle(world.nationLifecycle, world);
+  if (Object.values(world.nations).some((nation) => nation.capitalCityKey === null && !isWandering(world, nation.id)))
+    throw new Error('수도가 없는 국가의 방랑 원장이 없습니다.');
   if (!state) return;
   for (const key of Object.keys(state.nations)) {
     const nationId = Number(key);

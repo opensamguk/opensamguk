@@ -75,8 +75,8 @@ export function settleGovernanceMonthly(world: WorldView, tick: number) {
       const from = lower?.capitalCityKey,
         to = upper?.capitalCityKey;
       const valid =
-        from !== undefined &&
-        to !== undefined &&
+        from != null &&
+        to != null &&
         state.cities[from]?.nationId === row.vassalNationId &&
         state.cities[to]?.nationId === row.overlordNationId;
       const bp = resource === 'gold' ? row.goldBp : row.riceBp;
