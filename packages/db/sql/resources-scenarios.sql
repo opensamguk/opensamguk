@@ -133,6 +133,10 @@
 --
 -- `packages/rules/src/nationStrategy/commands.ts`는 core2026 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`의 `packages/logic/src/actions/turn/nation/che_백성동원.ts`, `che_이호경식.ts`, `che_급습.ts`의 효과·대기 공식을 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다. 직책 범위, 선포 1개월 기준의 외교 효과와 기록 범위는 사용자 승인 D-074를 적용했다. 국가 성향의 대기 보정은 이번에 옮기지 않았다.
 --
+-- ## 내장 다섯 자원의 초기화 정본
+--
+-- 기존 지도·시나리오·기본 병종·능력치 규칙·초상 대응표의 전체 원문은 `packages/db/sql/resources-init.sql`에 보존한다. 원래 JSON 파일은 제거하며 위 원본 경로는 출처 기록으로 남긴다. MIT 전문과 초상 출처·내용·해시는 바꾸지 않는다. 초기화 SQL의 게시 1판을 읽고 새 내용은 별도 자원 판으로 다룬다.
+--
 
 DO $t4_46_init$
 DECLARE
