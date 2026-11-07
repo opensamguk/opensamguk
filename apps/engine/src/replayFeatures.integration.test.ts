@@ -4,7 +4,14 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createDb, type Prisma } from '@opensamguk/db';
-import { initialReplayState, type WorldInit } from '@opensamguk/rules';
+import {
+  HISTORIC_EVENTS_FEATURE,
+  initialHistoricEvents,
+  initialReplayState,
+  TICKS_PER_MONTH,
+  type ReplayState,
+  type WorldInit,
+} from '@opensamguk/rules';
 import { monthlyFixture } from '../test/monthlyFixture';
 import { featureRegistry, generateReplayV2EngineArchive } from '../test/replayFeaturesFixture';
 import { saveInitialWorld, readWorldState } from './world/persistence';
@@ -14,6 +21,7 @@ import { TurnLoop } from './turnLoop';
 import { exportReplay, replayArchive, replayToEnd, type ReplayArchiveV2 } from './replay';
 import { processInputs } from './inputs';
 import { loadReplayState } from './monthly';
+import { persistHistoricEventsState } from './historicEventsState';
 import type { EngineRegistry, QueuedInputHandler } from './features';
 
 const url = process.env.TEST_DATABASE_URL;
@@ -89,6 +97,69 @@ describe('T2-26 실제 DB 형식·C2', () => {
       db.$executeRaw`UPDATE "World" SET "ruleFeatures" = ARRAY['historic-events', NULL],
         "historicEventsState" = ${state}::jsonb, "scenarioKey" = '1030' WHERE id = ${worldId}`,
     ).rejects.toThrow('World_historicEventsState_feature_check');
+  });
+
+  it('AC-P2-21 월간 사건 쓰기는 월 정산과 함께 롤백되며 이미 바뀐 행을 덮지 않는다', async () => {
+    const { worldId, initial, lease } = await create(3);
+    const nation = initial.nations[0]!;
+    const initialState = initialHistoricEvents();
+    const before: ReplayState = {
+      ...initialReplayState(initial),
+      historicEvents: {
+        state: initialState,
+        config: {
+          windowMonths: 2,
+          events: [
+            {
+              id: 'E1',
+              year: initial.startYear,
+              month: 1,
+              chooser: { nationId: nation.id, name: nation.name },
+              counterpart: null,
+              title: '시험 사건',
+              text: '첫 달에 발생한다.',
+              options: [
+                { label: '찬성', effects: [] },
+                { label: '반대', effects: [] },
+              ],
+              defaultOption: 0,
+              ref: '시험',
+            },
+          ],
+        },
+      },
+    };
+    const pending = { id: 'E1', nationId: nation.id, firedTick: TICKS_PER_MONTH, closesAtMonth: 3, choice: null };
+    const next: ReplayState = {
+      ...before,
+      monthlyTick: TICKS_PER_MONTH,
+      historicEvents: { ...before.historicEvents!, state: { ...initialState, pending: [pending] } },
+    };
+    // 운영 기능 등록 전에도 DB 쓰기 경계를 실제 행에서 검증한다.
+    await db.world.update({
+      where: { id: worldId },
+      data: { ruleFeatures: [HISTORIC_EVENTS_FEATURE], scenarioKey: '1030', historicEventsState: initialState },
+    });
+    const nationKey = { worldId_id: { worldId, id: nation.id } };
+    const writeMonth = (fail: boolean) =>
+      fenced(lease, async (tx) => {
+        await tx.nation.update({ where: nationKey, data: { gold: { increment: 7 } } });
+        await persistHistoricEventsState(tx, worldId, before, next);
+        await tx.world.update({ where: { id: worldId }, data: { monthlyTick: TICKS_PER_MONTH } });
+        if (fail) throw new Error('월 정산 롤백 시험');
+      });
+    const read = () => db.world.findUniqueOrThrow({ where: { id: worldId } });
+    await expect(writeMonth(true)).rejects.toThrow('월 정산 롤백 시험');
+    expect(await read()).toMatchObject({ monthlyTick: 0, historicEventsState: initialState });
+    expect(await db.nation.findUniqueOrThrow({ where: nationKey })).toMatchObject({ gold: nation.gold });
+
+    await writeMonth(false);
+    expect(await read()).toMatchObject({
+      monthlyTick: TICKS_PER_MONTH,
+      historicEventsState: { ...initialState, pending: [pending] },
+    });
+    await expect(writeMonth(false)).rejects.toThrow('역사 사건 상태가 바뀌어');
+    expect(await db.nation.findUniqueOrThrow({ where: nationKey })).toMatchObject({ gold: nation.gold + 7 });
   });
 
   it('형식 1·3 초기·리소스 해시와 12개월 월간 해시가 같고 CLI가 v3을 읽는다', async () => {

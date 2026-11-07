@@ -298,5 +298,6 @@ export {
 } from './nationResearch/state';
 export { readStoredNationResearch } from './nationResearch/origin';
 export { canExecuteResearchNationCommand } from './nationResearch/commands';
-export { readHistoricEventsStorage } from './historicEvents/origin';
+export { HISTORIC_EVENTS_FEATURE, readHistoricEventsStorage } from './historicEvents/origin';
+export { initialHistoricEvents, readHistoricEventsState } from './historicEvents/state';
 export { historicEventsView } from './historicEvents/view';

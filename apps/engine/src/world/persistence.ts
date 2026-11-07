@@ -31,6 +31,8 @@ import {
   initialPreparedTurns,
   initialNationResearch,
   initialNationLifecycle,
+  HISTORIC_EVENTS_FEATURE,
+  initialHistoricEvents,
   INTEL_FEATURE,
   assertInitialNationLifecycle,
   assertNationLifecycle,
@@ -305,6 +307,7 @@ export function prepareInitialWorld(
         ...(features.includes('nation-lifecycle-v1')
           ? { nationLifecycleState: initialNationLifecycle(initial.nations) as Prisma.InputJsonValue }
           : {}),
+        ...(features.includes(HISTORIC_EVENTS_FEATURE) ? { historicEventsState: initialHistoricEvents() } : {}),
         ...(features.includes('logistics-v1')
           ? {
               logisticsState: initialLogisticsState(

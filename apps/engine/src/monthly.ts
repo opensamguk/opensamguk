@@ -39,6 +39,7 @@ import { persistGovernanceState } from './governance/repository';
 import { persistLineageState } from './lineage/repository';
 import { persistStratagemCardsState } from './stratagemCards/state';
 import { persistEquipmentState } from './equipmentState';
+import { persistHistoricEventsState } from './historicEventsState';
 
 export async function loadReplayState(tx: Prisma.TransactionClient, worldId: string): Promise<ReplayState> {
   const state = await loadWorld(tx, worldId);
@@ -151,6 +152,7 @@ export async function persistMonthly(
   await persistPreparedTurns(tx, worldId, before, next);
   await persistNationResearch(tx, worldId, before, next);
   await persistNationLifecycle(tx, worldId, before, next);
+  await persistHistoricEventsState(tx, worldId, beforeReplay, features.replay);
   await persistLogisticsState(tx, worldId, before, next);
   await persistGovernanceState(tx, worldId, before, next);
   await persistLineageState(tx, worldId, before, next);
