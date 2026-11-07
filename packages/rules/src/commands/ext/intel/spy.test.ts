@@ -97,7 +97,7 @@ describe('AC-P2-07 첩보 규칙', () => {
     expect(output.result).toEqual({
       effects: [{ kind: 'world', state: output.state }],
       logs: [{ kind: 'success', text: `첩보: 도시2 ${message}` }],
-      history: [{ nationId: 2, text: '도시2: 누군가 이 도시를 살폈습니다' }],
+      history: [{ nationId: 2, kind: 'intel', text: '도시2: 누군가 이 도시를 살폈습니다' }],
     });
     const record = output.intel['1']!['2']!;
     for (const [field, present] of [

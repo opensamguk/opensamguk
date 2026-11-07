@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { ExtSlice, ExtStateRegistry } from '../state';
 
+export const INTEL_FEATURE = 'intel-v1';
 const integer = z.number().int().nonnegative();
 const key = z.string().regex(/^[1-9][0-9]{0,9}$/);
 const techSchema = z.enum(['overwhelming', 'ahead', 'even', 'behind', 'far_behind']);
