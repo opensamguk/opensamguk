@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { execFileSync, spawn } from 'node:child_process';
+import { once } from 'node:events';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb, type Prisma } from '@opensamguk/db';
 import { hashState } from '@opensamguk/shared/node';
@@ -294,6 +296,127 @@ describe('AC-P2-30 실제 PostgreSQL 물류', () => {
       await reopened.$disconnect();
     }
   });
+
+  it.each(['beforeCommit', 'committed'])(
+    '실제 SIGKILL %s 뒤 수송 도착과 경로 손실은 한 번만 저장된다',
+    async (phase) => {
+      const world = await queuedFixture();
+      const amount = world.before.state.logistics!.cities[String(world.source)]!.iron;
+      const loss = Math.floor((amount * config.transport.lossBpPerHop) / 10_000);
+      expect(loss).toBeGreaterThan(0);
+      const event = await queue(world, {
+        type: 'dispatch',
+        fromCityKey: world.source,
+        toCityKey: world.destination,
+        goods: { iron: amount, wood: 0, horses: 0 },
+      });
+      await advance(world.id, 10_000);
+      const applied = await db.inputEvent.findUniqueOrThrow({ where: { id: event.id } });
+      expect(applied.status).toBe('APPLIED');
+      const { arriveTick, convoyId } = logisticsResultSchema.parse(applied.result);
+      expect(arriveTick).toBe(20_000);
+      const tick = arriveTick!;
+      const snapshot = () => db.$transaction((tx) => loadReplayState(tx, world.id));
+      const before = await snapshot();
+      expect(before.state.logistics!.cities[String(world.source)]!.iron).toBe(0);
+      expect(before.state.logistics!.convoys).toMatchObject([{ id: convoyId, goods: { iron: amount } }]);
+
+      const options = { env: { ...process.env, TEST_DATABASE_URL: url }, windowsHide: true };
+      const child = spawn(
+        process.execPath,
+        ['--import', 'tsx', 'apps/engine/test/monthlyWorker.ts', world.id, phase, String(tick)],
+        { ...options, stdio: ['ignore', 'ignore', 'ignore', 'ipc'] },
+      );
+      const closed = once(child, 'close');
+      try {
+        const [message] = await Promise.race([
+          once(child, 'message', { signal: AbortSignal.timeout(20_000) }),
+          closed.then(() => {
+            throw new Error('수송 도착 중단 지점 전에 엔진이 종료됐습니다.');
+          }),
+        ]);
+        expect(message).toBe(phase);
+        expect(child.kill('SIGKILL')).toBe(true);
+        expect(await closed).toEqual([null, 'SIGKILL']);
+      } finally {
+        if (!child.killed && child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+        await closed;
+      }
+
+      const yearbook = () => db.yearbookSnapshot.findUnique({ where: { worldId_tick: { worldId: world.id, tick } } });
+      const movements = () =>
+        db.logisticsMovement.findMany({
+          where: { worldId: world.id, tick, reason: { in: ['ARRIVE', 'LOSS_TRANSIT'] } },
+          orderBy: { ordinal: 'asc' },
+          select: { sequence: true, holder: true, holderId: true, good: true, delta: true, reason: true },
+        });
+      const interrupted = await snapshot();
+      const interruptedRows = await movements();
+      if (phase === 'beforeCommit') {
+        expect(interrupted).toEqual(before);
+        expect(await yearbook()).toBeNull();
+        expect(interruptedRows).toHaveLength(0);
+      } else {
+        expect(await yearbook()).not.toBeNull();
+        expect(interruptedRows).toHaveLength(3);
+      }
+
+      const oldLease = await db.engineLease.findUniqueOrThrow({ where: { worldId: world.id } });
+      await db.engineLease.update({
+        where: { worldId: world.id, fencingToken: oldLease.fencingToken },
+        data: { expiresAt: new Date(0) },
+      });
+      const restarted = execFileSync(
+        process.execPath,
+        ['--import', 'tsx', 'apps/engine/test/presetWorker.ts', world.id, String(tick)],
+        { ...options, encoding: 'utf8', timeout: 20_000, stdio: ['ignore', 'pipe', 'ignore'] },
+      );
+      const after = await snapshot();
+      expect(JSON.parse(restarted)).toMatchObject({ beforeHash: hashState(interrupted), afterHash: hashState(after) });
+      expect((await db.engineLease.findUniqueOrThrow({ where: { worldId: world.id } })).fencingToken).toBeGreaterThan(
+        oldLease.fencingToken,
+      );
+      if (phase === 'committed') {
+        expect(after).toEqual(interrupted);
+        expect(await movements()).toEqual(interruptedRows);
+      }
+      expect(after.state.logistics!.convoys).toHaveLength(0);
+      expect(after.state.logistics!.cities[String(world.destination)]!.iron).toBe(
+        before.state.logistics!.cities[String(world.destination)]!.iron + amount - loss,
+      );
+      const { seed } = await db.world.findUniqueOrThrow({ where: { id: world.id } });
+      const saved = await yearbook();
+      expect(saved?.stateHash).toBe(hashState(after));
+      expect(hashState(after)).toBe(hashState(runReplayAction(before, seed, initial.unitSet)));
+      expect(await movements()).toEqual([
+        {
+          sequence: saved!.sequence,
+          holder: 'convoy',
+          holderId: convoyId,
+          good: 'iron',
+          delta: -loss,
+          reason: 'LOSS_TRANSIT',
+        },
+        {
+          sequence: saved!.sequence,
+          holder: 'convoy',
+          holderId: convoyId,
+          good: 'iron',
+          delta: loss - amount,
+          reason: 'ARRIVE',
+        },
+        {
+          sequence: saved!.sequence,
+          holder: 'city',
+          holderId: world.destination,
+          good: 'iron',
+          delta: amount - loss,
+          reason: 'ARRIVE',
+        },
+      ]);
+    },
+    60_000,
+  );
 
   it('큐 교역 저장 뒤 실패는 금·재고·원장·입력·순번을 롤백하고 새 엔진이 한 번만 처리한다', async () => {
     const world = await queuedFixture();
