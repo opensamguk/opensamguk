@@ -405,12 +405,12 @@ it('S5 miniche 지도·병종의 게시, 롤백과 월드 재생', async () => {
 
     await db.$executeRawUnsafe(legacyMapsSql(resources.slice(0, -2)));
     const beforeUpgrade = await allRows(native);
-    expect(beforeUpgrade).toHaveLength(baseline.length + 5);
-    expect(await initializeLegacyMaps(db, generated)).toEqual({ inserted: 2, existing: 5 });
+    expect(beforeUpgrade).toHaveLength(baseline.length + 7);
+    expect(await initializeLegacyMaps(db, generated)).toEqual({ inserted: 2, existing: 7 });
     const published = await allRows(native);
-    expect(published).toHaveLength(baseline.length + 7);
+    expect(published).toHaveLength(baseline.length + 9);
     expect(published).toEqual(expect.arrayContaining(beforeUpgrade));
-    expect(await initializeLegacyMaps(db, generated)).toEqual({ inserted: 0, existing: 7 });
+    expect(await initializeLegacyMaps(db, generated)).toEqual({ inserted: 0, existing: 9 });
     expect(await allRows(native)).toEqual(published);
 
     const scenario = {
@@ -478,6 +478,8 @@ it('S5 miniche 지도·병종의 게시, 롤백과 월드 재생', async () => {
 it.each([
   { key: '2121', map: 'chess', cities: 64 },
   { key: '2210', map: 'pokemon_v1', cities: 23 },
+  { key: '910', map: 'cr', cities: 53 },
+  { key: '2171', map: 'ludo_rathowm', cities: 99 },
 ])('S5 $map 원작 지도의 도로를 저장하고 월드를 재생한다', async ({ key, map, cities }) => {
   await withDatabase(async ({ db, url }) => {
     await initializeLegacyMaps(db);

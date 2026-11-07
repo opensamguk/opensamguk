@@ -13201,5 +13201,4779 @@ $legacy_maps_content$::jsonb;
   ) THEN
     RAISE EXCEPTION '초기화 자원 충돌: MAP/pokemon_v1/1';
   END IF;
+
+  resource_content := $legacy_maps_content${
+    "id": "cr",
+    "name": "cr",
+    "cities": [
+        {
+            "id": 1,
+            "name": "서량",
+            "level": 5,
+            "region": 2,
+            "position": {
+                "x": 127.25,
+                "y": 101.25
+            },
+            "connections": [5],
+            "max": {
+                "population": 430000,
+                "agriculture": 5000,
+                "commerce": 5000,
+                "security": 5000,
+                "defence": 10100,
+                "wall": 9900
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["안정"]
+            }
+        },
+        {
+            "id": 2,
+            "name": "무도",
+            "level": 5,
+            "region": 2,
+            "position": {
+                "x": 127.25,
+                "y": 222.75
+            },
+            "connections": [6, 7, 52],
+            "max": {
+                "population": 355000,
+                "agriculture": 5000,
+                "commerce": 5000,
+                "security": 5000,
+                "defence": 5100,
+                "wall": 4900
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["한중", "검각", "천수"]
+            }
+        },
+        {
+            "id": 3,
+            "name": "성도",
+            "level": 8,
+            "region": 2,
+            "position": {
+                "x": 127.25,
+                "y": 344.25
+            },
+            "connections": [8, 9, 4],
+            "max": {
+                "population": 1112000,
+                "agriculture": 9000,
+                "commerce": 8000,
+                "security": 8500,
+                "defence": 20400,
+                "wall": 19600
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 5000,
+                "wall": 5000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["자동", "강주", "건녕"]
+            }
+        },
+        {
+            "id": 4,
+            "name": "건녕",
+            "level": 6,
+            "region": 2,
+            "position": {
+                "x": 127.25,
+                "y": 384.75
+            },
+            "connections": [3, 9, 51],
+            "max": {
+                "population": 775000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 5500,
+                "defence": 5100,
+                "wall": 4900
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["성도", "강주", "운남"]
+            }
+        },
+        {
+            "id": 5,
+            "name": "안정",
+            "level": 5,
+            "region": 2,
+            "position": {
+                "x": 167.75,
+                "y": 141.75
+            },
+            "connections": [1, 10, 52],
+            "max": {
+                "population": 290000,
+                "agriculture": 5000,
+                "commerce": 5000,
+                "security": 5500,
+                "defence": 5200,
+                "wall": 4800
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["서량", "장안", "천수"]
+            }
+        },
+        {
+            "id": 6,
+            "name": "한중",
+            "level": 7,
+            "region": 2,
+            "position": {
+                "x": 167.75,
+                "y": 222.75
+            },
+            "connections": [2, 7, 10, 52],
+            "max": {
+                "population": 1090000,
+                "agriculture": 6000,
+                "commerce": 8000,
+                "security": 7500,
+                "defence": 10100,
+                "wall": 9900
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["무도", "검각", "장안", "천수"]
+            }
+        },
+        {
+            "id": 7,
+            "name": "검각",
+            "level": 6,
+            "region": 2,
+            "position": {
+                "x": 167.75,
+                "y": 263.25
+            },
+            "connections": [2, 6, 8],
+            "max": {
+                "population": 575000,
+                "agriculture": 5000,
+                "commerce": 5000,
+                "security": 5000,
+                "defence": 5000,
+                "wall": 5000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["무도", "한중", "자동"]
+            }
+        },
+        {
+            "id": 8,
+            "name": "자동",
+            "level": 6,
+            "region": 2,
+            "position": {
+                "x": 167.75,
+                "y": 303.75
+            },
+            "connections": [3, 7, 9],
+            "max": {
+                "population": 795000,
+                "agriculture": 6000,
+                "commerce": 5000,
+                "security": 5500,
+                "defence": 5000,
+                "wall": 5000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["성도", "검각", "강주"]
+            }
+        },
+        {
+            "id": 9,
+            "name": "강주",
+            "level": 5,
+            "region": 2,
+            "position": {
+                "x": 167.75,
+                "y": 344.25
+            },
+            "connections": [3, 4, 8, 11],
+            "max": {
+                "population": 430000,
+                "agriculture": 5000,
+                "commerce": 5000,
+                "security": 6000,
+                "defence": 10000,
+                "wall": 10000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["성도", "건녕", "자동", "영안"]
+            }
+        },
+        {
+            "id": 10,
+            "name": "장안",
+            "level": 8,
+            "region": 2,
+            "position": {
+                "x": 208.25,
+                "y": 182.25
+            },
+            "connections": [5, 6, 12, 13],
+            "max": {
+                "population": 970000,
+                "agriculture": 9000,
+                "commerce": 9000,
+                "security": 9000,
+                "defence": 20200,
+                "wall": 19800
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 5000,
+                "wall": 5000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["안정", "한중", "홍농", "완"]
+            }
+        },
+        {
+            "id": 11,
+            "name": "영안",
+            "level": 6,
+            "region": 2,
+            "position": {
+                "x": 208.25,
+                "y": 384.75
+            },
+            "connections": [9, 15, 16, 17],
+            "max": {
+                "population": 690000,
+                "agriculture": 5000,
+                "commerce": 5000,
+                "security": 5000,
+                "defence": 5000,
+                "wall": 5000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["강주", "강릉", "무릉", "영릉"]
+            }
+        },
+        {
+            "id": 12,
+            "name": "홍농",
+            "level": 7,
+            "region": 2,
+            "position": {
+                "x": 248.75,
+                "y": 182.25
+            },
+            "connections": [10, 13, 18],
+            "max": {
+                "population": 800000,
+                "agriculture": 7000,
+                "commerce": 7000,
+                "security": 7000,
+                "defence": 15500,
+                "wall": 14500
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["장안", "완", "낙양"]
+            }
+        },
+        {
+            "id": 13,
+            "name": "완",
+            "level": 7,
+            "region": 2,
+            "position": {
+                "x": 248.75,
+                "y": 222.75
+            },
+            "connections": [10, 12, 18, 19],
+            "max": {
+                "population": 887000,
+                "agriculture": 7000,
+                "commerce": 8000,
+                "security": 7500,
+                "defence": 15100,
+                "wall": 14900
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["장안", "홍농", "낙양", "신야"]
+            }
+        },
+        {
+            "id": 14,
+            "name": "양양",
+            "level": 8,
+            "region": 2,
+            "position": {
+                "x": 248.75,
+                "y": 303.75
+            },
+            "connections": [15, 19, 20],
+            "max": {
+                "population": 1103500,
+                "agriculture": 8000,
+                "commerce": 8000,
+                "security": 8000,
+                "defence": 20500,
+                "wall": 19500
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 5000,
+                "wall": 5000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["강릉", "신야", "강하"]
+            }
+        },
+        {
+            "id": 15,
+            "name": "강릉",
+            "level": 7,
+            "region": 2,
+            "position": {
+                "x": 248.75,
+                "y": 344.25
+            },
+            "connections": [11, 14, 16, 20, 21],
+            "max": {
+                "population": 725000,
+                "agriculture": 8000,
+                "commerce": 6000,
+                "security": 7000,
+                "defence": 15400,
+                "wall": 14600
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["영안", "양양", "무릉", "강하", "장사"]
+            }
+        },
+        {
+            "id": 16,
+            "name": "무릉",
+            "level": 5,
+            "region": 2,
+            "position": {
+                "x": 248.75,
+                "y": 384.75
+            },
+            "connections": [11, 15, 17, 20, 21, 22],
+            "max": {
+                "population": 255000,
+                "agriculture": 3000,
+                "commerce": 3000,
+                "security": 3500,
+                "defence": 5000,
+                "wall": 5000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["영안", "강릉", "영릉", "강하", "장사", "계양"]
+            }
+        },
+        {
+            "id": 17,
+            "name": "영릉",
+            "level": 6,
+            "region": 2,
+            "position": {
+                "x": 248.75,
+                "y": 425.25
+            },
+            "connections": [11, 16, 21, 22, 23],
+            "max": {
+                "population": 775000,
+                "agriculture": 5000,
+                "commerce": 5000,
+                "security": 5500,
+                "defence": 5000,
+                "wall": 5000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["영안", "무릉", "장사", "계양", "남해"]
+            }
+        },
+        {
+            "id": 18,
+            "name": "낙양",
+            "level": 8,
+            "region": 2,
+            "position": {
+                "x": 289.25,
+                "y": 182.25
+            },
+            "connections": [12, 13, 26, 27, 25],
+            "max": {
+                "population": 1780000,
+                "agriculture": 8000,
+                "commerce": 10000,
+                "security": 9000,
+                "defence": 20900,
+                "wall": 19100
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 5000,
+                "wall": 5000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["홍농", "완", "허창", "여남", "진유"]
+            }
+        },
+        {
+            "id": 19,
+            "name": "신야",
+            "level": 6,
+            "region": 2,
+            "position": {
+                "x": 289.25,
+                "y": 263.25
+            },
+            "connections": [13, 14, 27],
+            "max": {
+                "population": 650000,
+                "agriculture": 4000,
+                "commerce": 4000,
+                "security": 4000,
+                "defence": 5000,
+                "wall": 5000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["완", "양양", "여남"]
+            }
+        },
+        {
+            "id": 20,
+            "name": "강하",
+            "level": 5,
+            "region": 2,
+            "position": {
+                "x": 289.25,
+                "y": 344.25
+            },
+            "connections": [14, 15, 16, 21, 28],
+            "max": {
+                "population": 415000,
+                "agriculture": 5000,
+                "commerce": 5000,
+                "security": 5000,
+                "defence": 10400,
+                "wall": 9600
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["양양", "강릉", "무릉", "장사", "시상"]
+            }
+        },
+        {
+            "id": 21,
+            "name": "장사",
+            "level": 7,
+            "region": 2,
+            "position": {
+                "x": 289.25,
+                "y": 384.75
+            },
+            "connections": [15, 16, 17, 20, 22, 28],
+            "max": {
+                "population": 1023500,
+                "agriculture": 7000,
+                "commerce": 6000,
+                "security": 7000,
+                "defence": 10000,
+                "wall": 10000
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["강릉", "무릉", "영릉", "강하", "계양", "시상"]
+            }
+        },
+        {
+            "id": 22,
+            "name": "계양",
+            "level": 6,
+            "region": 2,
+            "position": {
+                "x": 289.25,
+                "y": 425.25
+            },
+            "connections": [16, 17, 21, 23],
+            "max": {
+                "population": 600000,
+                "agriculture": 4000,
+                "commerce": 4000,
+                "security": 4000,
+                "defence": 5000,
+                "wall": 5000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["무릉", "영릉", "장사", "남해"]
+            }
+        },
+        {
+            "id": 23,
+            "name": "남해",
+            "level": 5,
+            "region": 2,
+            "position": {
+                "x": 289.25,
+                "y": 465.75
+            },
+            "connections": [17, 22],
+            "max": {
+                "population": 325000,
+                "agriculture": 3000,
+                "commerce": 4000,
+                "security": 3500,
+                "defence": 10300,
+                "wall": 9700
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["영릉", "계양"]
+            }
+        },
+        {
+            "id": 24,
+            "name": "업",
+            "level": 8,
+            "region": 2,
+            "position": {
+                "x": 329.75,
+                "y": 101.25
+            },
+            "connections": [25, 29, 30, 31],
+            "max": {
+                "population": 856500,
+                "agriculture": 9000,
+                "commerce": 8000,
+                "security": 8500,
+                "defence": 20500,
+                "wall": 19500
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 5000,
+                "wall": 5000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["진유", "평원", "복양", "초"]
+            }
+        },
+        {
+            "id": 25,
+            "name": "진유",
+            "level": 6,
+            "region": 2,
+            "position": {
+                "x": 329.75,
+                "y": 141.75
+            },
+            "connections": [18, 24, 26, 30, 31],
+            "max": {
+                "population": 651000,
+                "agriculture": 6000,
+                "commerce": 4000,
+                "security": 6000,
+                "defence": 10300,
+                "wall": 9700
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["낙양", "업", "허창", "복양", "초"]
+            }
+        },
+        {
+            "id": 26,
+            "name": "허창",
+            "level": 8,
+            "region": 2,
+            "position": {
+                "x": 329.75,
+                "y": 182.25
+            },
+            "connections": [18, 25, 27, 31, 32],
+            "max": {
+                "population": 1580000,
+                "agriculture": 10000,
+                "commerce": 8000,
+                "security": 9000,
+                "defence": 20600,
+                "wall": 19400
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 5000,
+                "wall": 5000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["낙양", "진유", "여남", "초", "수춘"]
+            }
+        },
+        {
+            "id": 27,
+            "name": "여남",
+            "level": 5,
+            "region": 2,
+            "position": {
+                "x": 329.75,
+                "y": 222.75
+            },
+            "connections": [18, 19, 26, 32, 33],
+            "max": {
+                "population": 410000,
+                "agriculture": 5000,
+                "commerce": 5000,
+                "security": 5000,
+                "defence": 15500,
+                "wall": 14500
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["낙양", "신야", "허창", "수춘", "단양"]
+            }
+        },
+        {
+            "id": 28,
+            "name": "시상",
+            "level": 6,
+            "region": 2,
+            "position": {
+                "x": 329.75,
+                "y": 344.25
+            },
+            "connections": [20, 21, 34],
+            "max": {
+                "population": 665000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 6000,
+                "defence": 10400,
+                "wall": 9600
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["강하", "장사", "여강"]
+            }
+        },
+        {
+            "id": 29,
+            "name": "평원",
+            "level": 5,
+            "region": 2,
+            "position": {
+                "x": 370.25,
+                "y": 60.75
+            },
+            "connections": [24, 30, 35, 36],
+            "max": {
+                "population": 548000,
+                "agriculture": 5000,
+                "commerce": 5000,
+                "security": 5000,
+                "defence": 5200,
+                "wall": 4800
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["업", "복양", "계", "남피"]
+            }
+        },
+        {
+            "id": 30,
+            "name": "복양",
+            "level": 7,
+            "region": 2,
+            "position": {
+                "x": 370.25,
+                "y": 101.25
+            },
+            "connections": [24, 25, 29, 31, 36, 37],
+            "max": {
+                "population": 770500,
+                "agriculture": 6000,
+                "commerce": 8000,
+                "security": 7000,
+                "defence": 15600,
+                "wall": 14400
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["업", "진유", "평원", "초", "남피", "소패"]
+            }
+        },
+        {
+            "id": 31,
+            "name": "초",
+            "level": 6,
+            "region": 2,
+            "position": {
+                "x": 370.25,
+                "y": 141.75
+            },
+            "connections": [24, 25, 26, 30, 37],
+            "max": {
+                "population": 514000,
+                "agriculture": 4000,
+                "commerce": 6000,
+                "security": 6500,
+                "defence": 10000,
+                "wall": 10000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["업", "진유", "허창", "복양", "소패"]
+            }
+        },
+        {
+            "id": 32,
+            "name": "수춘",
+            "level": 7,
+            "region": 2,
+            "position": {
+                "x": 370.25,
+                "y": 222.75
+            },
+            "connections": [26, 27, 33, 38],
+            "max": {
+                "population": 705000,
+                "agriculture": 8000,
+                "commerce": 8000,
+                "security": 8000,
+                "defence": 15400,
+                "wall": 14600
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["허창", "여남", "단양", "건업"]
+            }
+        },
+        {
+            "id": 33,
+            "name": "단양",
+            "level": 6,
+            "region": 2,
+            "position": {
+                "x": 370.25,
+                "y": 263.25
+            },
+            "connections": [27, 32, 34, 38],
+            "max": {
+                "population": 540000,
+                "agriculture": 7000,
+                "commerce": 6000,
+                "security": 5000,
+                "defence": 10300,
+                "wall": 9700
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["여남", "수춘", "여강", "건업"]
+            }
+        },
+        {
+            "id": 34,
+            "name": "여강",
+            "level": 5,
+            "region": 2,
+            "position": {
+                "x": 370.25,
+                "y": 303.75
+            },
+            "connections": [33, 28],
+            "max": {
+                "population": 350000,
+                "agriculture": 4000,
+                "commerce": 4000,
+                "security": 4000,
+                "defence": 5100,
+                "wall": 4900
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["단양", "시상"]
+            }
+        },
+        {
+            "id": 35,
+            "name": "계",
+            "level": 7,
+            "region": 2,
+            "position": {
+                "x": 410.75,
+                "y": 20.25
+            },
+            "connections": [29, 36, 39],
+            "max": {
+                "population": 855000,
+                "agriculture": 7000,
+                "commerce": 7000,
+                "security": 7000,
+                "defence": 15300,
+                "wall": 14700
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["평원", "남피", "북평"]
+            }
+        },
+        {
+            "id": 36,
+            "name": "남피",
+            "level": 7,
+            "region": 2,
+            "position": {
+                "x": 410.75,
+                "y": 60.75
+            },
+            "connections": [29, 30, 35, 39, 40],
+            "max": {
+                "population": 1173000,
+                "agriculture": 8000,
+                "commerce": 7000,
+                "security": 7500,
+                "defence": 15200,
+                "wall": 14800
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["평원", "복양", "계", "북평", "북해"]
+            }
+        },
+        {
+            "id": 37,
+            "name": "소패",
+            "level": 5,
+            "region": 2,
+            "position": {
+                "x": 410.75,
+                "y": 141.75
+            },
+            "connections": [30, 31, 40, 41, 42],
+            "max": {
+                "population": 314000,
+                "agriculture": 4000,
+                "commerce": 5000,
+                "security": 4000,
+                "defence": 5100,
+                "wall": 4900
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["복양", "초", "북해", "하비", "광릉"]
+            }
+        },
+        {
+            "id": 38,
+            "name": "건업",
+            "level": 8,
+            "region": 2,
+            "position": {
+                "x": 410.75,
+                "y": 222.75
+            },
+            "connections": [32, 33, 42, 43],
+            "max": {
+                "population": 980000,
+                "agriculture": 8000,
+                "commerce": 10000,
+                "security": 9000,
+                "defence": 20700,
+                "wall": 19300
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 5000,
+                "wall": 5000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["수춘", "단양", "광릉", "오"]
+            }
+        },
+        {
+            "id": 39,
+            "name": "북평",
+            "level": 6,
+            "region": 2,
+            "position": {
+                "x": 451.25,
+                "y": 20.25
+            },
+            "connections": [35, 36, 45],
+            "max": {
+                "population": 855000,
+                "agriculture": 7000,
+                "commerce": 5000,
+                "security": 6000,
+                "defence": 10100,
+                "wall": 9900
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["계", "남피", "양평"]
+            }
+        },
+        {
+            "id": 40,
+            "name": "북해",
+            "level": 6,
+            "region": 2,
+            "position": {
+                "x": 451.25,
+                "y": 101.25
+            },
+            "connections": [36, 37, 41, 48],
+            "max": {
+                "population": 654000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 7000,
+                "defence": 15200,
+                "wall": 14800
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["남피", "소패", "하비", "사비"]
+            }
+        },
+        {
+            "id": 41,
+            "name": "하비",
+            "level": 7,
+            "region": 2,
+            "position": {
+                "x": 451.25,
+                "y": 141.75
+            },
+            "connections": [37, 40, 42],
+            "max": {
+                "population": 798000,
+                "agriculture": 7000,
+                "commerce": 9000,
+                "security": 8000,
+                "defence": 15300,
+                "wall": 14700
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["소패", "북해", "광릉"]
+            }
+        },
+        {
+            "id": 42,
+            "name": "광릉",
+            "level": 6,
+            "region": 2,
+            "position": {
+                "x": 451.25,
+                "y": 182.25
+            },
+            "connections": [38, 41, 37],
+            "max": {
+                "population": 650000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 5000,
+                "defence": 15300,
+                "wall": 14700
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["건업", "하비", "소패"]
+            }
+        },
+        {
+            "id": 43,
+            "name": "오",
+            "level": 6,
+            "region": 2,
+            "position": {
+                "x": 451.25,
+                "y": 263.25
+            },
+            "connections": [38, 44],
+            "max": {
+                "population": 690000,
+                "agriculture": 4000,
+                "commerce": 7000,
+                "security": 6000,
+                "defence": 15600,
+                "wall": 14400
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["건업", "회계"]
+            }
+        },
+        {
+            "id": 44,
+            "name": "회계",
+            "level": 5,
+            "region": 2,
+            "position": {
+                "x": 451.25,
+                "y": 303.75
+            },
+            "connections": [43],
+            "max": {
+                "population": 370000,
+                "agriculture": 5000,
+                "commerce": 4000,
+                "security": 4500,
+                "defence": 10400,
+                "wall": 9600
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["오"]
+            }
+        },
+        {
+            "id": 45,
+            "name": "양평",
+            "level": 5,
+            "region": 2,
+            "position": {
+                "x": 491.75,
+                "y": 20.25
+            },
+            "connections": [39, 46, 47],
+            "max": {
+                "population": 350000,
+                "agriculture": 4000,
+                "commerce": 4000,
+                "security": 5000,
+                "defence": 5100,
+                "wall": 4900
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["북평", "국내", "한"]
+            }
+        },
+        {
+            "id": 46,
+            "name": "국내",
+            "level": 7,
+            "region": 2,
+            "position": {
+                "x": 532.25,
+                "y": 20.25
+            },
+            "connections": [45, 47, 49, 53],
+            "max": {
+                "population": 850000,
+                "agriculture": 6000,
+                "commerce": 7000,
+                "security": 6500,
+                "defence": 15500,
+                "wall": 14500
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["양평", "한", "매소", "졸본"]
+            }
+        },
+        {
+            "id": 47,
+            "name": "한",
+            "level": 8,
+            "region": 2,
+            "position": {
+                "x": 532.25,
+                "y": 60.75
+            },
+            "connections": [45, 46, 48, 49, 50, 53],
+            "max": {
+                "population": 1150000,
+                "agriculture": 9000,
+                "commerce": 8000,
+                "security": 8500,
+                "defence": 20700,
+                "wall": 19300
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 5000,
+                "wall": 5000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["양평", "국내", "사비", "매소", "서라벌", "졸본"]
+            }
+        },
+        {
+            "id": 48,
+            "name": "사비",
+            "level": 6,
+            "region": 2,
+            "position": {
+                "x": 532.25,
+                "y": 101.25
+            },
+            "connections": [47, 49, 50, 40],
+            "max": {
+                "population": 650000,
+                "agriculture": 6000,
+                "commerce": 7000,
+                "security": 4500,
+                "defence": 10300,
+                "wall": 9700
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["한", "매소", "서라벌", "북해"]
+            }
+        },
+        {
+            "id": 49,
+            "name": "매소",
+            "level": 5,
+            "region": 2,
+            "position": {
+                "x": 572.75,
+                "y": 60.75
+            },
+            "connections": [46, 47, 48, 50, 53],
+            "max": {
+                "population": 346500,
+                "agriculture": 4000,
+                "commerce": 5000,
+                "security": 4500,
+                "defence": 5000,
+                "wall": 5000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["국내", "한", "사비", "서라벌", "졸본"]
+            }
+        },
+        {
+            "id": 50,
+            "name": "서라벌",
+            "level": 6,
+            "region": 2,
+            "position": {
+                "x": 572.75,
+                "y": 101.25
+            },
+            "connections": [47, 48, 49],
+            "max": {
+                "population": 740000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 6000,
+                "defence": 10300,
+                "wall": 9700
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["한", "사비", "매소"]
+            }
+        },
+        {
+            "id": 51,
+            "name": "운남",
+            "level": 4,
+            "region": 2,
+            "position": {
+                "x": 127.25,
+                "y": 425.25
+            },
+            "connections": [4],
+            "max": {
+                "population": 952000,
+                "agriculture": 6000,
+                "commerce": 8000,
+                "security": 7000,
+                "defence": 5100,
+                "wall": 4900
+            },
+            "initial": {
+                "population": 50000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 1000,
+                "wall": 1000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["건녕"]
+            }
+        },
+        {
+            "id": 52,
+            "name": "천수",
+            "level": 5,
+            "region": 2,
+            "position": {
+                "x": 127.25,
+                "y": 182.25
+            },
+            "connections": [5, 6, 2],
+            "max": {
+                "population": 301000,
+                "agriculture": 5000,
+                "commerce": 5000,
+                "security": 5500,
+                "defence": 10200,
+                "wall": 9800
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["안정", "한중", "무도"]
+            }
+        },
+        {
+            "id": 53,
+            "name": "졸본",
+            "level": 6,
+            "region": 2,
+            "position": {
+                "x": 572.75,
+                "y": 20.25
+            },
+            "connections": [46, 47, 49],
+            "max": {
+                "population": 619000,
+                "agriculture": 5500,
+                "commerce": 5500,
+                "security": 5500,
+                "defence": 10100,
+                "wall": 9900
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["국내", "한", "매소"]
+            }
+        }
+    ],
+    "defaults": {
+        "trust": 50,
+        "trade": 100,
+        "supplyState": 1,
+        "frontState": 0
+    },
+    "meta": {
+        "source": "legacy",
+        "mapName": "cr"
+    }
+}
+$legacy_maps_content$::jsonb;
+  INSERT INTO "GameResource"
+    ("id", "kind", "name", "version", "status", "content", "contentHash", "source", "createdBy", "publishedAt")
+  VALUES
+    (gen_random_uuid()::text, 'MAP', 'cr', 1, 'PUBLISHED', resource_content, 'f3befba805a2226305330e5c93233bcfd1711f3a76752bae717215234ce4e51e', 'resources/map/map_cr.json; core2026 df6c9269fa1e2862418ba9da481c8dd2d758d6c5; MIT (c) 2025 devsam; resources/NOTICE.md', NULL, now())
+  ON CONFLICT ("kind", "name", "version") DO NOTHING;
+  IF NOT EXISTS (
+    SELECT 1 FROM "GameResource"
+    WHERE "kind" = 'MAP' AND "name" = 'cr' AND "version" = 1
+      AND "content" = resource_content AND "contentHash" = 'f3befba805a2226305330e5c93233bcfd1711f3a76752bae717215234ce4e51e'
+      AND "status" = 'PUBLISHED' AND "source" = 'resources/map/map_cr.json; core2026 df6c9269fa1e2862418ba9da481c8dd2d758d6c5; MIT (c) 2025 devsam; resources/NOTICE.md'
+  ) THEN
+    RAISE EXCEPTION '초기화 자원 충돌: MAP/cr/1';
+  END IF;
+
+  resource_content := $legacy_maps_content${
+    "id": "ludo_rathowm",
+    "name": "ludo_rathowm",
+    "cities": [
+        {
+            "id": 1,
+            "name": "구 마왕성",
+            "level": 8,
+            "region": 1,
+            "position": {
+                "x": 35,
+                "y": 142
+            },
+            "connections": [2, 9, 11],
+            "max": {
+                "population": 800000,
+                "agriculture": 12000,
+                "commerce": 12000,
+                "security": 10000,
+                "defence": 12000,
+                "wall": 12000
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 5000,
+                "wall": 5000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["악의 탑", "한탄의 협곡", "유황의 숲"]
+            }
+        },
+        {
+            "id": 2,
+            "name": "악의 탑",
+            "level": 4,
+            "region": 1,
+            "position": {
+                "x": 45,
+                "y": 40
+            },
+            "connections": [64, 1],
+            "max": {
+                "population": 350000,
+                "agriculture": 4000,
+                "commerce": 4000,
+                "security": 2000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "initial": {
+                "population": 50000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 1000,
+                "wall": 1000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["반리요새 A", "구 마왕성"]
+            }
+        },
+        {
+            "id": 3,
+            "name": "실키의 성",
+            "level": 6,
+            "region": 1,
+            "position": {
+                "x": 45,
+                "y": 270
+            },
+            "connections": [11, 4, 15],
+            "max": {
+                "population": 550000,
+                "agriculture": 8000,
+                "commerce": 8000,
+                "security": 6000,
+                "defence": 8000,
+                "wall": 8000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["유황의 숲", "카스케도바우", "죽음의 대지"]
+            }
+        },
+        {
+            "id": 4,
+            "name": "카스케도바우",
+            "level": 6,
+            "region": 1,
+            "position": {
+                "x": 120,
+                "y": 276
+            },
+            "connections": [3, 6],
+            "max": {
+                "population": 550000,
+                "agriculture": 8000,
+                "commerce": 8000,
+                "security": 6000,
+                "defence": 8000,
+                "wall": 8000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["실키의 성", "케셀링크의 성"]
+            }
+        },
+        {
+            "id": 5,
+            "name": "붉은 집",
+            "level": 1,
+            "region": 2,
+            "position": {
+                "x": 70,
+                "y": 335
+            },
+            "connections": [7, 6],
+            "max": {
+                "population": 250000,
+                "agriculture": 2000,
+                "commerce": 2000,
+                "security": 2000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "initial": {
+                "population": 5000,
+                "agriculture": 100,
+                "commerce": 100,
+                "security": 100,
+                "defence": 500,
+                "wall": 500
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["케이브리스의 성", "케셀링크의 성"]
+            }
+        },
+        {
+            "id": 6,
+            "name": "케셀링크의 성",
+            "level": 7,
+            "region": 2,
+            "position": {
+                "x": 135,
+                "y": 338
+            },
+            "connections": [5, 13, 4, 10],
+            "max": {
+                "population": 700000,
+                "agriculture": 10000,
+                "commerce": 10000,
+                "security": 8000,
+                "defence": 10000,
+                "wall": 10000
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["붉은 집", "메이드의 묘지", "카스케도바우", "뼈의 숲"]
+            }
+        },
+        {
+            "id": 7,
+            "name": "케이브리스의 성",
+            "level": 8,
+            "region": 2,
+            "position": {
+                "x": 37,
+                "y": 384
+            },
+            "connections": [5, 8, 15],
+            "max": {
+                "population": 800000,
+                "agriculture": 12000,
+                "commerce": 12000,
+                "security": 10000,
+                "defence": 12000,
+                "wall": 12000
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 5000,
+                "wall": 5000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["붉은 집", "푸른 집", "죽음의 대지"]
+            }
+        },
+        {
+            "id": 8,
+            "name": "푸른 집",
+            "level": 1,
+            "region": 2,
+            "position": {
+                "x": 59,
+                "y": 446
+            },
+            "connections": [7, 13, 12],
+            "max": {
+                "population": 250000,
+                "agriculture": 2000,
+                "commerce": 2000,
+                "security": 2000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "initial": {
+                "population": 5000,
+                "agriculture": 100,
+                "commerce": 100,
+                "security": 100,
+                "defence": 500,
+                "wall": 500
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["케이브리스의 성", "메이드의 묘지", "카미라의 성"]
+            }
+        },
+        {
+            "id": 9,
+            "name": "한탄의 협곡",
+            "level": 5,
+            "region": 1,
+            "position": {
+                "x": 97,
+                "y": 152
+            },
+            "connections": [1, 65],
+            "max": {
+                "population": 450000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 4000,
+                "defence": 6000,
+                "wall": 6000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["구 마왕성", "반리요새 B"]
+            }
+        },
+        {
+            "id": 10,
+            "name": "뼈의 숲",
+            "level": 5,
+            "region": 2,
+            "position": {
+                "x": 160,
+                "y": 386
+            },
+            "connections": [6, 34],
+            "max": {
+                "population": 450000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 4000,
+                "defence": 6000,
+                "wall": 6000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["케셀링크의 성", "마지노 A"]
+            }
+        },
+        {
+            "id": 11,
+            "name": "유황의 숲",
+            "level": 5,
+            "region": 1,
+            "position": {
+                "x": 72,
+                "y": 209
+            },
+            "connections": [1, 3],
+            "max": {
+                "population": 450000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 4000,
+                "defence": 6000,
+                "wall": 6000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["구 마왕성", "실키의 성"]
+            }
+        },
+        {
+            "id": 12,
+            "name": "카미라의 성",
+            "level": 7,
+            "region": 2,
+            "position": {
+                "x": 130,
+                "y": 460
+            },
+            "connections": [8, 14],
+            "max": {
+                "population": 700000,
+                "agriculture": 10000,
+                "commerce": 10000,
+                "security": 8000,
+                "defence": 10000,
+                "wall": 10000
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["푸른 집", "갈라놓은 숲"]
+            }
+        },
+        {
+            "id": 13,
+            "name": "메이드의 묘지",
+            "level": 4,
+            "region": 2,
+            "position": {
+                "x": 102,
+                "y": 380
+            },
+            "connections": [6, 8],
+            "max": {
+                "population": 350000,
+                "agriculture": 4000,
+                "commerce": 4000,
+                "security": 2000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "initial": {
+                "population": 50000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 1000,
+                "wall": 1000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["케셀링크의 성", "푸른 집"]
+            }
+        },
+        {
+            "id": 14,
+            "name": "갈라놓은 숲",
+            "level": 5,
+            "region": 2,
+            "position": {
+                "x": 186,
+                "y": 472
+            },
+            "connections": [12, 35],
+            "max": {
+                "population": 450000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 4000,
+                "defence": 6000,
+                "wall": 6000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["카미라의 성", "마지노 B"]
+            }
+        },
+        {
+            "id": 15,
+            "name": "죽음의 대지",
+            "level": 4,
+            "region": 2,
+            "position": {
+                "x": 10,
+                "y": 320
+            },
+            "connections": [7, 3],
+            "max": {
+                "population": 350000,
+                "agriculture": 4000,
+                "commerce": 4000,
+                "security": 2000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "initial": {
+                "population": 50000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 1000,
+                "wall": 1000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["케이브리스의 성", "실키의 성"]
+            }
+        },
+        {
+            "id": 16,
+            "name": "녹의 마을",
+            "level": 5,
+            "region": 3,
+            "position": {
+                "x": 202,
+                "y": 290
+            },
+            "connections": [34, 19],
+            "max": {
+                "population": 450000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 4000,
+                "defence": 6000,
+                "wall": 6000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["마지노 A", "파리티라온"]
+            }
+        },
+        {
+            "id": 17,
+            "name": "펜실 카우",
+            "level": 4,
+            "region": 3,
+            "position": {
+                "x": 297,
+                "y": 267
+            },
+            "connections": [19, 40],
+            "max": {
+                "population": 350000,
+                "agriculture": 4000,
+                "commerce": 4000,
+                "security": 2000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "initial": {
+                "population": 50000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 1000,
+                "wall": 1000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["파리티라온", "라보리"]
+            }
+        },
+        {
+            "id": 18,
+            "name": "샹그릴라",
+            "level": 7,
+            "region": 4,
+            "position": {
+                "x": 374,
+                "y": 272
+            },
+            "connections": [45, 61, 32, 67],
+            "max": {
+                "population": 700000,
+                "agriculture": 10000,
+                "commerce": 10000,
+                "security": 8000,
+                "defence": 10000,
+                "wall": 10000
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["스도리 13", "보르고 Z", "사바사바", "릿치"]
+            }
+        },
+        {
+            "id": 19,
+            "name": "파리티라온",
+            "level": 6,
+            "region": 5,
+            "position": {
+                "x": 259,
+                "y": 332
+            },
+            "connections": [16, 34, 20, 17],
+            "max": {
+                "population": 550000,
+                "agriculture": 8000,
+                "commerce": 8000,
+                "security": 6000,
+                "defence": 8000,
+                "wall": 8000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["녹의 마을", "마지노 A", "왕자의 탑", "펜실 카우"]
+            }
+        },
+        {
+            "id": 20,
+            "name": "왕자의 탑",
+            "level": 5,
+            "region": 5,
+            "position": {
+                "x": 259,
+                "y": 367
+            },
+            "connections": [19, 21, 22, 24],
+            "max": {
+                "population": 450000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 4000,
+                "defence": 6000,
+                "wall": 6000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["파리티라온", "도약의 탑", "일요일의 탑", "라그나로크 아크"]
+            }
+        },
+        {
+            "id": 21,
+            "name": "도약의 탑",
+            "level": 5,
+            "region": 6,
+            "position": {
+                "x": 265,
+                "y": 406
+            },
+            "connections": [20, 24, 23, 26],
+            "max": {
+                "population": 450000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 4000,
+                "defence": 6000,
+                "wall": 6000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["왕자의 탑", "라그나로크 아크", "탄창의 탑", "마크"]
+            }
+        },
+        {
+            "id": 22,
+            "name": "일요일의 탑",
+            "level": 5,
+            "region": 5,
+            "position": {
+                "x": 324,
+                "y": 358
+            },
+            "connections": [20, 24, 23, 31],
+            "max": {
+                "population": 450000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 4000,
+                "defence": 6000,
+                "wall": 6000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["왕자의 탑", "라그나로크 아크", "탄창의 탑", "나가르모르"]
+            }
+        },
+        {
+            "id": 23,
+            "name": "탄창의 탑",
+            "level": 5,
+            "region": 6,
+            "position": {
+                "x": 331,
+                "y": 409
+            },
+            "connections": [21, 24, 22, 28],
+            "max": {
+                "population": 450000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 4000,
+                "defence": 6000,
+                "wall": 6000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["도약의 탑", "라그나로크 아크", "일요일의 탑", "올드제스"]
+            }
+        },
+        {
+            "id": 24,
+            "name": "라그나로크 아크",
+            "level": 8,
+            "region": 5,
+            "position": {
+                "x": 295,
+                "y": 385
+            },
+            "connections": [20, 21, 23, 22],
+            "max": {
+                "population": 800000,
+                "agriculture": 12000,
+                "commerce": 12000,
+                "security": 10000,
+                "defence": 12000,
+                "wall": 12000
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 5000,
+                "wall": 5000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["왕자의 탑", "도약의 탑", "탄창의 탑", "일요일의 탑"]
+            }
+        },
+        {
+            "id": 25,
+            "name": "알텐누",
+            "level": 6,
+            "region": 6,
+            "position": {
+                "x": 293,
+                "y": 482
+            },
+            "connections": [26, 35],
+            "max": {
+                "population": 550000,
+                "agriculture": 8000,
+                "commerce": 8000,
+                "security": 6000,
+                "defence": 8000,
+                "wall": 8000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["마크", "마지노 B"]
+            }
+        },
+        {
+            "id": 26,
+            "name": "마크",
+            "level": 6,
+            "region": 6,
+            "position": {
+                "x": 288,
+                "y": 436
+            },
+            "connections": [25, 27, 21],
+            "max": {
+                "population": 550000,
+                "agriculture": 8000,
+                "commerce": 8000,
+                "security": 6000,
+                "defence": 8000,
+                "wall": 8000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["알텐누", "호박성", "도약의 탑"]
+            }
+        },
+        {
+            "id": 27,
+            "name": "호박성",
+            "level": 4,
+            "region": 6,
+            "position": {
+                "x": 328,
+                "y": 458
+            },
+            "connections": [26, 28],
+            "max": {
+                "population": 350000,
+                "agriculture": 4000,
+                "commerce": 4000,
+                "security": 2000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "initial": {
+                "population": 50000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 1000,
+                "wall": 1000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["마크", "올드제스"]
+            }
+        },
+        {
+            "id": 28,
+            "name": "올드제스",
+            "level": 8,
+            "region": 6,
+            "position": {
+                "x": 367,
+                "y": 444
+            },
+            "connections": [23, 27, 29, 99],
+            "max": {
+                "population": 800000,
+                "agriculture": 12000,
+                "commerce": 12000,
+                "security": 10000,
+                "defence": 12000,
+                "wall": 12000
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 5000,
+                "wall": 5000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["탄창의 탑", "호박성", "테이브", "카이즈"]
+            }
+        },
+        {
+            "id": 29,
+            "name": "테이브",
+            "level": 5,
+            "region": 6,
+            "position": {
+                "x": 385,
+                "y": 406
+            },
+            "connections": [30, 28],
+            "max": {
+                "population": 450000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 4000,
+                "defence": 6000,
+                "wall": 6000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["이탈리아", "올드제스"]
+            }
+        },
+        {
+            "id": 30,
+            "name": "이탈리아",
+            "level": 7,
+            "region": 5,
+            "position": {
+                "x": 375,
+                "y": 361
+            },
+            "connections": [29, 32, 33],
+            "max": {
+                "population": 700000,
+                "agriculture": 10000,
+                "commerce": 10000,
+                "security": 8000,
+                "defence": 10000,
+                "wall": 10000
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["테이브", "사바사바", "아담의탑"]
+            }
+        },
+        {
+            "id": 31,
+            "name": "나가르모르",
+            "level": 6,
+            "region": 5,
+            "position": {
+                "x": 322,
+                "y": 322
+            },
+            "connections": [22, 32],
+            "max": {
+                "population": 550000,
+                "agriculture": 8000,
+                "commerce": 8000,
+                "security": 6000,
+                "defence": 8000,
+                "wall": 8000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["일요일의 탑", "사바사바"]
+            }
+        },
+        {
+            "id": 32,
+            "name": "사바사바",
+            "level": 7,
+            "region": 5,
+            "position": {
+                "x": 375,
+                "y": 324
+            },
+            "connections": [31, 30, 18],
+            "max": {
+                "population": 700000,
+                "agriculture": 10000,
+                "commerce": 10000,
+                "security": 8000,
+                "defence": 10000,
+                "wall": 10000
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["나가르모르", "이탈리아", "샹그릴라"]
+            }
+        },
+        {
+            "id": 33,
+            "name": "아담의탑",
+            "level": 2,
+            "region": 5,
+            "position": {
+                "x": 420,
+                "y": 340
+            },
+            "connections": [30, 66],
+            "max": {
+                "population": 250000,
+                "agriculture": 2000,
+                "commerce": 2000,
+                "security": 2000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "initial": {
+                "population": 5000,
+                "agriculture": 100,
+                "commerce": 100,
+                "security": 100,
+                "defence": 500,
+                "wall": 500
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["이탈리아", "파라파라성채"]
+            }
+        },
+        {
+            "id": 34,
+            "name": "마지노 A",
+            "level": 3,
+            "region": 5,
+            "position": {
+                "x": 215,
+                "y": 365
+            },
+            "connections": [10, 16, 19],
+            "max": {
+                "population": 250000,
+                "agriculture": 2000,
+                "commerce": 2000,
+                "security": 2000,
+                "defence": 9000,
+                "wall": 9000
+            },
+            "initial": {
+                "population": 10000,
+                "agriculture": 100,
+                "commerce": 100,
+                "security": 100,
+                "defence": 1000,
+                "wall": 1000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["뼈의 숲", "녹의 마을", "파리티라온"]
+            }
+        },
+        {
+            "id": 35,
+            "name": "마지노 B",
+            "level": 3,
+            "region": 6,
+            "position": {
+                "x": 243,
+                "y": 477
+            },
+            "connections": [14, 25],
+            "max": {
+                "population": 250000,
+                "agriculture": 2000,
+                "commerce": 2000,
+                "security": 2000,
+                "defence": 9000,
+                "wall": 9000
+            },
+            "initial": {
+                "population": 10000,
+                "agriculture": 100,
+                "commerce": 100,
+                "security": 100,
+                "defence": 1000,
+                "wall": 1000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["갈라놓은 숲", "알텐누"]
+            }
+        },
+        {
+            "id": 36,
+            "name": "이코마",
+            "level": 6,
+            "region": 7,
+            "position": {
+                "x": 211,
+                "y": 60
+            },
+            "connections": [64, 42, 37, 38],
+            "max": {
+                "population": 550000,
+                "agriculture": 8000,
+                "commerce": 8000,
+                "security": 6000,
+                "defence": 8000,
+                "wall": 8000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["반리요새 A", "거대전함", "워크랜드", "로렌그라드"]
+            }
+        },
+        {
+            "id": 37,
+            "name": "워크랜드",
+            "level": 5,
+            "region": 7,
+            "position": {
+                "x": 177,
+                "y": 90
+            },
+            "connections": [36, 38],
+            "max": {
+                "population": 450000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 4000,
+                "defence": 6000,
+                "wall": 6000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["이코마", "로렌그라드"]
+            }
+        },
+        {
+            "id": 38,
+            "name": "로렌그라드",
+            "level": 7,
+            "region": 7,
+            "position": {
+                "x": 200,
+                "y": 126
+            },
+            "connections": [39, 41, 36, 65, 37],
+            "max": {
+                "population": 700000,
+                "agriculture": 10000,
+                "commerce": 10000,
+                "security": 8000,
+                "defence": 10000,
+                "wall": 10000
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["파르나스", "랑그바우", "이코마", "반리요새 B", "워크랜드"]
+            }
+        },
+        {
+            "id": 39,
+            "name": "파르나스",
+            "level": 6,
+            "region": 7,
+            "position": {
+                "x": 204,
+                "y": 171
+            },
+            "connections": [38, 43],
+            "max": {
+                "population": 550000,
+                "agriculture": 8000,
+                "commerce": 8000,
+                "security": 6000,
+                "defence": 8000,
+                "wall": 8000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["로렌그라드", "세미타포"]
+            }
+        },
+        {
+            "id": 40,
+            "name": "라보리",
+            "level": 6,
+            "region": 7,
+            "position": {
+                "x": 225,
+                "y": 219
+            },
+            "connections": [17, 44],
+            "max": {
+                "population": 550000,
+                "agriculture": 8000,
+                "commerce": 8000,
+                "security": 6000,
+                "defence": 8000,
+                "wall": 8000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["펜실 카우", "스도리 17"]
+            }
+        },
+        {
+            "id": 41,
+            "name": "랑그바우",
+            "level": 8,
+            "region": 7,
+            "position": {
+                "x": 263,
+                "y": 135
+            },
+            "connections": [38, 46],
+            "max": {
+                "population": 800000,
+                "agriculture": 12000,
+                "commerce": 12000,
+                "security": 10000,
+                "defence": 12000,
+                "wall": 12000
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 5000,
+                "wall": 5000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["로렌그라드", "마이크로그라드"]
+            }
+        },
+        {
+            "id": 42,
+            "name": "거대전함",
+            "level": 4,
+            "region": 7,
+            "position": {
+                "x": 273,
+                "y": 21
+            },
+            "connections": [36, 48, 58, 56],
+            "max": {
+                "population": 350000,
+                "agriculture": 4000,
+                "commerce": 4000,
+                "security": 2000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "initial": {
+                "population": 50000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 1000,
+                "wall": 1000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["이코마", "파스", "호라가의  탑", "시베리아"]
+            }
+        },
+        {
+            "id": 43,
+            "name": "세미타포",
+            "level": 5,
+            "region": 7,
+            "position": {
+                "x": 268,
+                "y": 174
+            },
+            "connections": [39, 44],
+            "max": {
+                "population": 450000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 4000,
+                "defence": 6000,
+                "wall": 6000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["파르나스", "스도리 17"]
+            }
+        },
+        {
+            "id": 44,
+            "name": "스도리 17",
+            "level": 2,
+            "region": 7,
+            "position": {
+                "x": 296,
+                "y": 214
+            },
+            "connections": [40, 43, 45],
+            "max": {
+                "population": 250000,
+                "agriculture": 2000,
+                "commerce": 2000,
+                "security": 2000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "initial": {
+                "population": 5000,
+                "agriculture": 100,
+                "commerce": 100,
+                "security": 100,
+                "defence": 500,
+                "wall": 500
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["라보리", "세미타포", "스도리 13"]
+            }
+        },
+        {
+            "id": 45,
+            "name": "스도리 13",
+            "level": 2,
+            "region": 7,
+            "position": {
+                "x": 359,
+                "y": 217
+            },
+            "connections": [18, 47, 44, 53, 61],
+            "max": {
+                "population": 250000,
+                "agriculture": 2000,
+                "commerce": 2000,
+                "security": 2000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "initial": {
+                "population": 5000,
+                "agriculture": 100,
+                "commerce": 100,
+                "security": 100,
+                "defence": 500,
+                "wall": 500
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["샹그릴라", "폰", "스도리 17", "코사크", "보르고 Z"]
+            }
+        },
+        {
+            "id": 46,
+            "name": "마이크로그라드",
+            "level": 5,
+            "region": 7,
+            "position": {
+                "x": 316,
+                "y": 166
+            },
+            "connections": [47, 41, 50],
+            "max": {
+                "population": 450000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 4000,
+                "defence": 6000,
+                "wall": 6000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["폰", "랑그바우", "스도리 10"]
+            }
+        },
+        {
+            "id": 47,
+            "name": "폰",
+            "level": 6,
+            "region": 7,
+            "position": {
+                "x": 377,
+                "y": 187
+            },
+            "connections": [46, 45, 53],
+            "max": {
+                "population": 550000,
+                "agriculture": 8000,
+                "commerce": 8000,
+                "security": 6000,
+                "defence": 8000,
+                "wall": 8000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["마이크로그라드", "스도리 13", "코사크"]
+            }
+        },
+        {
+            "id": 48,
+            "name": "파스",
+            "level": 6,
+            "region": 7,
+            "position": {
+                "x": 286,
+                "y": 90
+            },
+            "connections": [42, 49, 50],
+            "max": {
+                "population": 550000,
+                "agriculture": 8000,
+                "commerce": 8000,
+                "security": 6000,
+                "defence": 8000,
+                "wall": 8000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["거대전함", "큐로브", "스도리 10"]
+            }
+        },
+        {
+            "id": 49,
+            "name": "큐로브",
+            "level": 5,
+            "region": 7,
+            "position": {
+                "x": 341,
+                "y": 96
+            },
+            "connections": [48, 51],
+            "max": {
+                "population": 450000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 4000,
+                "defence": 6000,
+                "wall": 6000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["파스", "소로토이"]
+            }
+        },
+        {
+            "id": 50,
+            "name": "스도리 10",
+            "level": 2,
+            "region": 7,
+            "position": {
+                "x": 337,
+                "y": 137
+            },
+            "connections": [48, 52, 46],
+            "max": {
+                "population": 250000,
+                "agriculture": 2000,
+                "commerce": 2000,
+                "security": 2000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "initial": {
+                "population": 5000,
+                "agriculture": 100,
+                "commerce": 100,
+                "security": 100,
+                "defence": 500,
+                "wall": 500
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["파스", "로제스그라드", "마이크로그라드"]
+            }
+        },
+        {
+            "id": 51,
+            "name": "소로토이",
+            "level": 5,
+            "region": 8,
+            "position": {
+                "x": 382,
+                "y": 119
+            },
+            "connections": [49, 57],
+            "max": {
+                "population": 450000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 4000,
+                "defence": 6000,
+                "wall": 6000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["큐로브", "바바로프스"]
+            }
+        },
+        {
+            "id": 52,
+            "name": "로제스그라드",
+            "level": 8,
+            "region": 8,
+            "position": {
+                "x": 401,
+                "y": 148
+            },
+            "connections": [50, 57, 54],
+            "max": {
+                "population": 800000,
+                "agriculture": 12000,
+                "commerce": 12000,
+                "security": 10000,
+                "defence": 12000,
+                "wall": 12000
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 5000,
+                "wall": 5000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["스도리 10", "바바로프스", "아크그라드"]
+            }
+        },
+        {
+            "id": 53,
+            "name": "코사크",
+            "level": 6,
+            "region": 8,
+            "position": {
+                "x": 419,
+                "y": 204
+            },
+            "connections": [45, 61, 47],
+            "max": {
+                "population": 550000,
+                "agriculture": 8000,
+                "commerce": 8000,
+                "security": 6000,
+                "defence": 8000,
+                "wall": 8000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["스도리 13", "보르고 Z", "폰"]
+            }
+        },
+        {
+            "id": 54,
+            "name": "아크그라드",
+            "level": 5,
+            "region": 8,
+            "position": {
+                "x": 452,
+                "y": 179
+            },
+            "connections": [63, 52, 55],
+            "max": {
+                "population": 450000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 4000,
+                "defence": 6000,
+                "wall": 6000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["로그 B", "로제스그라드", "야크트크"]
+            }
+        },
+        {
+            "id": 55,
+            "name": "야크트크",
+            "level": 5,
+            "region": 8,
+            "position": {
+                "x": 437,
+                "y": 129
+            },
+            "connections": [54, 57, 59],
+            "max": {
+                "population": 450000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 4000,
+                "defence": 6000,
+                "wall": 6000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["아크그라드", "바바로프스", "고라크"]
+            }
+        },
+        {
+            "id": 56,
+            "name": "시베리아",
+            "level": 7,
+            "region": 8,
+            "position": {
+                "x": 394,
+                "y": 55
+            },
+            "connections": [57, 58, 42],
+            "max": {
+                "population": 700000,
+                "agriculture": 10000,
+                "commerce": 10000,
+                "security": 8000,
+                "defence": 10000,
+                "wall": 10000
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["바바로프스", "호라가의  탑", "거대전함"]
+            }
+        },
+        {
+            "id": 57,
+            "name": "바바로프스",
+            "level": 6,
+            "region": 8,
+            "position": {
+                "x": 418,
+                "y": 89
+            },
+            "connections": [56, 55, 51, 52],
+            "max": {
+                "population": 550000,
+                "agriculture": 8000,
+                "commerce": 8000,
+                "security": 6000,
+                "defence": 8000,
+                "wall": 8000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["시베리아", "야크트크", "소로토이", "로제스그라드"]
+            }
+        },
+        {
+            "id": 58,
+            "name": "호라가의  탑",
+            "level": 3,
+            "region": 8,
+            "position": {
+                "x": 561,
+                "y": 20
+            },
+            "connections": [56, 42, 72],
+            "max": {
+                "population": 250000,
+                "agriculture": 2000,
+                "commerce": 2000,
+                "security": 2000,
+                "defence": 9000,
+                "wall": 9000
+            },
+            "initial": {
+                "population": 10000,
+                "agriculture": 100,
+                "commerce": 100,
+                "security": 100,
+                "defence": 1000,
+                "wall": 1000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["시베리아", "거대전함", "떨어진 궁도"]
+            }
+        },
+        {
+            "id": 59,
+            "name": "고라크",
+            "level": 6,
+            "region": 8,
+            "position": {
+                "x": 478,
+                "y": 146
+            },
+            "connections": [60, 62, 55],
+            "max": {
+                "population": 550000,
+                "agriculture": 8000,
+                "commerce": 8000,
+                "security": 6000,
+                "defence": 8000,
+                "wall": 8000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["블라디보스토크", "로그 A", "야크트크"]
+            }
+        },
+        {
+            "id": 60,
+            "name": "블라디보스토크",
+            "level": 4,
+            "region": 8,
+            "position": {
+                "x": 500,
+                "y": 109
+            },
+            "connections": [59, 62],
+            "max": {
+                "population": 350000,
+                "agriculture": 4000,
+                "commerce": 4000,
+                "security": 2000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "initial": {
+                "population": 50000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 1000,
+                "wall": 1000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["고라크", "로그 A"]
+            }
+        },
+        {
+            "id": 61,
+            "name": "보르고 Z",
+            "level": 3,
+            "region": 8,
+            "position": {
+                "x": 436,
+                "y": 245
+            },
+            "connections": [53, 45, 63, 18],
+            "max": {
+                "population": 250000,
+                "agriculture": 2000,
+                "commerce": 2000,
+                "security": 2000,
+                "defence": 9000,
+                "wall": 9000
+            },
+            "initial": {
+                "population": 10000,
+                "agriculture": 100,
+                "commerce": 100,
+                "security": 100,
+                "defence": 1000,
+                "wall": 1000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["코사크", "스도리 13", "로그 B", "샹그릴라"]
+            }
+        },
+        {
+            "id": 62,
+            "name": "로그 A",
+            "level": 3,
+            "region": 8,
+            "position": {
+                "x": 506,
+                "y": 183
+            },
+            "connections": [59, 60, 63, 70],
+            "max": {
+                "population": 250000,
+                "agriculture": 2000,
+                "commerce": 2000,
+                "security": 2000,
+                "defence": 9000,
+                "wall": 9000
+            },
+            "initial": {
+                "population": 10000,
+                "agriculture": 100,
+                "commerce": 100,
+                "security": 100,
+                "defence": 1000,
+                "wall": 1000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["고라크", "블라디보스토크", "로그 B", "스케일"]
+            }
+        },
+        {
+            "id": 63,
+            "name": "로그 B",
+            "level": 3,
+            "region": 8,
+            "position": {
+                "x": 475,
+                "y": 216
+            },
+            "connections": [54, 62, 61, 69],
+            "max": {
+                "population": 250000,
+                "agriculture": 2000,
+                "commerce": 2000,
+                "security": 2000,
+                "defence": 9000,
+                "wall": 9000
+            },
+            "initial": {
+                "population": 10000,
+                "agriculture": 100,
+                "commerce": 100,
+                "security": 100,
+                "defence": 1000,
+                "wall": 1000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["아크그라드", "로그 A", "보르고 Z", "마우네스"]
+            }
+        },
+        {
+            "id": 64,
+            "name": "반리요새 A",
+            "level": 2,
+            "region": 7,
+            "position": {
+                "x": 149,
+                "y": 18
+            },
+            "connections": [2, 36],
+            "max": {
+                "population": 250000,
+                "agriculture": 2000,
+                "commerce": 2000,
+                "security": 2000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "initial": {
+                "population": 5000,
+                "agriculture": 100,
+                "commerce": 100,
+                "security": 100,
+                "defence": 500,
+                "wall": 500
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["악의 탑", "이코마"]
+            }
+        },
+        {
+            "id": 65,
+            "name": "반리요새 B",
+            "level": 2,
+            "region": 7,
+            "position": {
+                "x": 151,
+                "y": 153
+            },
+            "connections": [38, 9],
+            "max": {
+                "population": 250000,
+                "agriculture": 2000,
+                "commerce": 2000,
+                "security": 2000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "initial": {
+                "population": 5000,
+                "agriculture": 100,
+                "commerce": 100,
+                "security": 100,
+                "defence": 500,
+                "wall": 500
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["로렌그라드", "한탄의 협곡"]
+            }
+        },
+        {
+            "id": 66,
+            "name": "파라파라성채",
+            "level": 2,
+            "region": 9,
+            "position": {
+                "x": 449,
+                "y": 315
+            },
+            "connections": [33, 67],
+            "max": {
+                "population": 250000,
+                "agriculture": 2000,
+                "commerce": 2000,
+                "security": 2000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "initial": {
+                "population": 5000,
+                "agriculture": 100,
+                "commerce": 100,
+                "security": 100,
+                "defence": 500,
+                "wall": 500
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["아담의탑", "릿치"]
+            }
+        },
+        {
+            "id": 67,
+            "name": "릿치",
+            "level": 6,
+            "region": 9,
+            "position": {
+                "x": 476,
+                "y": 288
+            },
+            "connections": [68, 69, 66, 18],
+            "max": {
+                "population": 550000,
+                "agriculture": 8000,
+                "commerce": 8000,
+                "security": 6000,
+                "defence": 8000,
+                "wall": 8000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["푸아", "마우네스", "파라파라성채", "샹그릴라"]
+            }
+        },
+        {
+            "id": 68,
+            "name": "푸아",
+            "level": 5,
+            "region": 9,
+            "position": {
+                "x": 528,
+                "y": 289
+            },
+            "connections": [67, 94],
+            "max": {
+                "population": 450000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 4000,
+                "defence": 6000,
+                "wall": 6000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["릿치", "록아스"]
+            }
+        },
+        {
+            "id": 69,
+            "name": "마우네스",
+            "level": 5,
+            "region": 9,
+            "position": {
+                "x": 502,
+                "y": 250
+            },
+            "connections": [67, 63, 76],
+            "max": {
+                "population": 450000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 4000,
+                "defence": 6000,
+                "wall": 6000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["릿치", "로그 B", "노스"]
+            }
+        },
+        {
+            "id": 70,
+            "name": "스케일",
+            "level": 7,
+            "region": 10,
+            "position": {
+                "x": 542,
+                "y": 198
+            },
+            "connections": [62, 71, 76],
+            "max": {
+                "population": 700000,
+                "agriculture": 10000,
+                "commerce": 10000,
+                "security": 8000,
+                "defence": 10000,
+                "wall": 10000
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["로그 A", "아란", "노스"]
+            }
+        },
+        {
+            "id": 71,
+            "name": "아란",
+            "level": 6,
+            "region": 10,
+            "position": {
+                "x": 596,
+                "y": 154
+            },
+            "connections": [72, 73, 70, 74],
+            "max": {
+                "population": 550000,
+                "agriculture": 8000,
+                "commerce": 8000,
+                "security": 6000,
+                "defence": 8000,
+                "wall": 8000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["떨어진 궁도", "포나라", "스케일", "브리테리아"]
+            }
+        },
+        {
+            "id": 72,
+            "name": "떨어진 궁도",
+            "level": 4,
+            "region": 10,
+            "position": {
+                "x": 598,
+                "y": 111
+            },
+            "connections": [58, 71],
+            "max": {
+                "population": 350000,
+                "agriculture": 4000,
+                "commerce": 4000,
+                "security": 2000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "initial": {
+                "population": 50000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 1000,
+                "wall": 1000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["호라가의  탑", "아란"]
+            }
+        },
+        {
+            "id": 73,
+            "name": "포나라",
+            "level": 5,
+            "region": 10,
+            "position": {
+                "x": 640,
+                "y": 168
+            },
+            "connections": [71, 74, 82],
+            "max": {
+                "population": 450000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 4000,
+                "defence": 6000,
+                "wall": 6000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["아란", "브리테리아", "웨스"]
+            }
+        },
+        {
+            "id": 74,
+            "name": "브리테리아",
+            "level": 7,
+            "region": 10,
+            "position": {
+                "x": 587,
+                "y": 205
+            },
+            "connections": [71, 82, 73],
+            "max": {
+                "population": 700000,
+                "agriculture": 10000,
+                "commerce": 10000,
+                "security": 8000,
+                "defence": 10000,
+                "wall": 10000
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["아란", "웨스", "포나라"]
+            }
+        },
+        {
+            "id": 75,
+            "name": "파란치",
+            "level": 5,
+            "region": 10,
+            "position": {
+                "x": 667,
+                "y": 229
+            },
+            "connections": [82, 80],
+            "max": {
+                "population": 450000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 4000,
+                "defence": 6000,
+                "wall": 6000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["웨스", "이스"]
+            }
+        },
+        {
+            "id": 76,
+            "name": "노스",
+            "level": 6,
+            "region": 9,
+            "position": {
+                "x": 563,
+                "y": 255
+            },
+            "connections": [70, 69, 77, 78],
+            "max": {
+                "population": 550000,
+                "agriculture": 8000,
+                "commerce": 8000,
+                "security": 6000,
+                "defence": 8000,
+                "wall": 8000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["스케일", "마우네스", "오크", "리자스성"]
+            }
+        },
+        {
+            "id": 77,
+            "name": "오크",
+            "level": 6,
+            "region": 9,
+            "position": {
+                "x": 577,
+                "y": 295
+            },
+            "connections": [76, 79, 86],
+            "max": {
+                "population": 550000,
+                "agriculture": 8000,
+                "commerce": 8000,
+                "security": 6000,
+                "defence": 8000,
+                "wall": 8000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["노스", "사우스", "지오"]
+            }
+        },
+        {
+            "id": 78,
+            "name": "리자스성",
+            "level": 8,
+            "region": 9,
+            "position": {
+                "x": 611,
+                "y": 245
+            },
+            "connections": [76, 79, 82],
+            "max": {
+                "population": 800000,
+                "agriculture": 12000,
+                "commerce": 12000,
+                "security": 10000,
+                "defence": 12000,
+                "wall": 12000
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 5000,
+                "wall": 5000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["노스", "사우스", "웨스"]
+            }
+        },
+        {
+            "id": 79,
+            "name": "사우스",
+            "level": 5,
+            "region": 9,
+            "position": {
+                "x": 618,
+                "y": 285
+            },
+            "connections": [78, 77, 80],
+            "max": {
+                "population": 450000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 4000,
+                "defence": 6000,
+                "wall": 6000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["리자스성", "오크", "이스"]
+            }
+        },
+        {
+            "id": 80,
+            "name": "이스",
+            "level": 6,
+            "region": 9,
+            "position": {
+                "x": 656,
+                "y": 269
+            },
+            "connections": [79, 75, 81],
+            "max": {
+                "population": 550000,
+                "agriculture": 8000,
+                "commerce": 8000,
+                "security": 6000,
+                "defence": 8000,
+                "wall": 8000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["사우스", "파란치", "오크스"]
+            }
+        },
+        {
+            "id": 81,
+            "name": "오크스",
+            "level": 6,
+            "region": 9,
+            "position": {
+                "x": 650,
+                "y": 311
+            },
+            "connections": [80, 87, 83],
+            "max": {
+                "population": 550000,
+                "agriculture": 8000,
+                "commerce": 8000,
+                "security": 6000,
+                "defence": 8000,
+                "wall": 8000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["이스", "한나", "오슈"]
+            }
+        },
+        {
+            "id": 82,
+            "name": "웨스",
+            "level": 6,
+            "region": 10,
+            "position": {
+                "x": 632,
+                "y": 212
+            },
+            "connections": [78, 73, 75, 74],
+            "max": {
+                "population": 550000,
+                "agriculture": 8000,
+                "commerce": 8000,
+                "security": 6000,
+                "defence": 8000,
+                "wall": 8000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["리자스성", "포나라", "파란치", "브리테리아"]
+            }
+        },
+        {
+            "id": 83,
+            "name": "오슈",
+            "level": 4,
+            "region": 11,
+            "position": {
+                "x": 688,
+                "y": 308
+            },
+            "connections": [81, 84],
+            "max": {
+                "population": 350000,
+                "agriculture": 4000,
+                "commerce": 4000,
+                "security": 2000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "initial": {
+                "population": 50000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 1000,
+                "wall": 1000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["오크스", "오와리"]
+            }
+        },
+        {
+            "id": 84,
+            "name": "오와리",
+            "level": 8,
+            "region": 11,
+            "position": {
+                "x": 679,
+                "y": 394
+            },
+            "connections": [83, 85],
+            "max": {
+                "population": 800000,
+                "agriculture": 12000,
+                "commerce": 12000,
+                "security": 10000,
+                "defence": 12000,
+                "wall": 12000
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 5000,
+                "wall": 5000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["오슈", "모로코"]
+            }
+        },
+        {
+            "id": 85,
+            "name": "모로코",
+            "level": 1,
+            "region": 11,
+            "position": {
+                "x": 627,
+                "y": 450
+            },
+            "connections": [84, 89],
+            "max": {
+                "population": 250000,
+                "agriculture": 2000,
+                "commerce": 2000,
+                "security": 2000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "initial": {
+                "population": 5000,
+                "agriculture": 100,
+                "commerce": 100,
+                "security": 100,
+                "defence": 500,
+                "wall": 500
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["오와리", "포르투갈"]
+            }
+        },
+        {
+            "id": 86,
+            "name": "지오",
+            "level": 6,
+            "region": 12,
+            "position": {
+                "x": 578,
+                "y": 333
+            },
+            "connections": [77, 98, 88],
+            "max": {
+                "population": 550000,
+                "agriculture": 8000,
+                "commerce": 8000,
+                "security": 6000,
+                "defence": 8000,
+                "wall": 8000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["오크", "렛드", "M랜드"]
+            }
+        },
+        {
+            "id": 87,
+            "name": "한나",
+            "level": 5,
+            "region": 12,
+            "position": {
+                "x": 632,
+                "y": 342
+            },
+            "connections": [81, 88],
+            "max": {
+                "population": 450000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 4000,
+                "defence": 6000,
+                "wall": 6000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["오크스", "M랜드"]
+            }
+        },
+        {
+            "id": 88,
+            "name": "M랜드",
+            "level": 7,
+            "region": 12,
+            "position": {
+                "x": 616,
+                "y": 379
+            },
+            "connections": [86, 87, 98, 89],
+            "max": {
+                "population": 700000,
+                "agriculture": 10000,
+                "commerce": 10000,
+                "security": 8000,
+                "defence": 10000,
+                "wall": 10000
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["지오", "한나", "렛드", "포르투갈"]
+            }
+        },
+        {
+            "id": 89,
+            "name": "포르투갈",
+            "level": 6,
+            "region": 12,
+            "position": {
+                "x": 599,
+                "y": 422
+            },
+            "connections": [88, 90, 85],
+            "max": {
+                "population": 550000,
+                "agriculture": 8000,
+                "commerce": 8000,
+                "security": 6000,
+                "defence": 8000,
+                "wall": 8000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["M랜드", "투신도시", "모로코"]
+            }
+        },
+        {
+            "id": 90,
+            "name": "투신도시",
+            "level": 4,
+            "region": 12,
+            "position": {
+                "x": 553,
+                "y": 415
+            },
+            "connections": [89, 92, 96],
+            "max": {
+                "population": 350000,
+                "agriculture": 4000,
+                "commerce": 4000,
+                "security": 2000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "initial": {
+                "population": 50000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 1000,
+                "wall": 1000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["포르투갈", "커스텀", "파란쵸 왕국"]
+            }
+        },
+        {
+            "id": 91,
+            "name": "화성",
+            "level": 5,
+            "region": 13,
+            "position": {
+                "x": 503,
+                "y": 482
+            },
+            "connections": [92],
+            "max": {
+                "population": 450000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 4000,
+                "defence": 6000,
+                "wall": 6000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["커스텀"]
+            }
+        },
+        {
+            "id": 92,
+            "name": "커스텀",
+            "level": 8,
+            "region": 13,
+            "position": {
+                "x": 506,
+                "y": 416
+            },
+            "connections": [90, 95, 93, 96, 91],
+            "max": {
+                "population": 800000,
+                "agriculture": 12000,
+                "commerce": 12000,
+                "security": 10000,
+                "defence": 12000,
+                "wall": 12000
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 5000,
+                "wall": 5000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["투신도시", "지브테리아", "라지르", "파란쵸 왕국", "화성"]
+            }
+        },
+        {
+            "id": 93,
+            "name": "라지르",
+            "level": 5,
+            "region": 13,
+            "position": {
+                "x": 530,
+                "y": 358
+            },
+            "connections": [98, 92, 97],
+            "max": {
+                "population": 450000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 4000,
+                "defence": 6000,
+                "wall": 6000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["렛드", "커스텀", "아이스"]
+            }
+        },
+        {
+            "id": 94,
+            "name": "록아스",
+            "level": 6,
+            "region": 13,
+            "position": {
+                "x": 489,
+                "y": 329
+            },
+            "connections": [97, 68],
+            "max": {
+                "population": 550000,
+                "agriculture": 8000,
+                "commerce": 8000,
+                "security": 6000,
+                "defence": 8000,
+                "wall": 8000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["아이스", "푸아"]
+            }
+        },
+        {
+            "id": 95,
+            "name": "지브테리아",
+            "level": 7,
+            "region": 13,
+            "position": {
+                "x": 452,
+                "y": 370
+            },
+            "connections": [97, 99, 92],
+            "max": {
+                "population": 700000,
+                "agriculture": 10000,
+                "commerce": 10000,
+                "security": 8000,
+                "defence": 10000,
+                "wall": 10000
+            },
+            "initial": {
+                "population": 150000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["아이스", "카이즈", "커스텀"]
+            }
+        },
+        {
+            "id": 96,
+            "name": "파란쵸 왕국",
+            "level": 4,
+            "region": 12,
+            "position": {
+                "x": 537,
+                "y": 458
+            },
+            "connections": [92, 90],
+            "max": {
+                "population": 350000,
+                "agriculture": 4000,
+                "commerce": 4000,
+                "security": 2000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "initial": {
+                "population": 50000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 1000,
+                "wall": 1000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["커스텀", "투신도시"]
+            }
+        },
+        {
+            "id": 97,
+            "name": "아이스",
+            "level": 5,
+            "region": 13,
+            "position": {
+                "x": 489,
+                "y": 375
+            },
+            "connections": [94, 95, 93],
+            "max": {
+                "population": 450000,
+                "agriculture": 6000,
+                "commerce": 6000,
+                "security": 4000,
+                "defence": 6000,
+                "wall": 6000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 2000,
+                "wall": 2000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["록아스", "지브테리아", "라지르"]
+            }
+        },
+        {
+            "id": 98,
+            "name": "렛드",
+            "level": 6,
+            "region": 13,
+            "position": {
+                "x": 566,
+                "y": 372
+            },
+            "connections": [93, 88, 86],
+            "max": {
+                "population": 550000,
+                "agriculture": 8000,
+                "commerce": 8000,
+                "security": 6000,
+                "defence": 8000,
+                "wall": 8000
+            },
+            "initial": {
+                "population": 100000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 3000,
+                "wall": 3000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["라지르", "M랜드", "지오"]
+            }
+        },
+        {
+            "id": 99,
+            "name": "카이즈",
+            "level": 4,
+            "region": 14,
+            "position": {
+                "x": 439,
+                "y": 425
+            },
+            "connections": [28, 95],
+            "max": {
+                "population": 350000,
+                "agriculture": 4000,
+                "commerce": 4000,
+                "security": 2000,
+                "defence": 4000,
+                "wall": 4000
+            },
+            "initial": {
+                "population": 50000,
+                "agriculture": 1000,
+                "commerce": 1000,
+                "security": 1000,
+                "defence": 1000,
+                "wall": 1000
+            },
+            "meta": {
+                "source": "legacy",
+                "connectionNames": ["올드제스", "지브테리아"]
+            }
+        }
+    ],
+    "defaults": {
+        "trust": 50,
+        "trade": 100,
+        "supplyState": 1,
+        "frontState": 0
+    },
+    "meta": {
+        "source": "legacy",
+        "mapName": "ludo_rathowm"
+    }
+}
+$legacy_maps_content$::jsonb;
+  INSERT INTO "GameResource"
+    ("id", "kind", "name", "version", "status", "content", "contentHash", "source", "createdBy", "publishedAt")
+  VALUES
+    (gen_random_uuid()::text, 'MAP', 'ludo_rathowm', 1, 'PUBLISHED', resource_content, '90dd85700a36885ad1a090cc51fdbe753bbf92ac39bb1ab80520ab2f24a6f251', 'resources/map/map_ludo_rathowm.json; core2026 df6c9269fa1e2862418ba9da481c8dd2d758d6c5; MIT (c) 2025 devsam; resources/NOTICE.md; 중복 도로 24→21 한 건 정리', NULL, now())
+  ON CONFLICT ("kind", "name", "version") DO NOTHING;
+  IF NOT EXISTS (
+    SELECT 1 FROM "GameResource"
+    WHERE "kind" = 'MAP' AND "name" = 'ludo_rathowm' AND "version" = 1
+      AND "content" = resource_content AND "contentHash" = '90dd85700a36885ad1a090cc51fdbe753bbf92ac39bb1ab80520ab2f24a6f251'
+      AND "status" = 'PUBLISHED' AND "source" = 'resources/map/map_ludo_rathowm.json; core2026 df6c9269fa1e2862418ba9da481c8dd2d758d6c5; MIT (c) 2025 devsam; resources/NOTICE.md; 중복 도로 24→21 한 건 정리'
+  ) THEN
+    RAISE EXCEPTION '초기화 자원 충돌: MAP/ludo_rathowm/1';
+  END IF;
 END;
 $legacy_maps_init$;

@@ -19,6 +19,8 @@ const mapSources = [
 const alternateMapSources = [
   ['chess', '0da653a4de1480b4865bd5843637979ba4cec6591f51a248a94f8ac001edae05'],
   ['pokemon_v1', '734264221b3170cba6ade2501ccc0ce33e29b9248f5214bfb54faf8dd073ad8d'],
+  ['cr', '845bba664c25fcbee6bab9285a71a2f92a61ed393652292c19fcf55a22fc8103'],
+  ['ludo_rathowm', 'cfdffdeeb117b3ac559f8e4740f0c73999231fdba57edfa77ea5428ff9523386', '중복 도로 24→21 한 건 정리'],
 ] as const;
 const unitSetName = 'che-miniche';
 const exceptSiegeName = 'che_except_siege';
@@ -44,7 +46,7 @@ export async function legacyMapPublications() {
   );
   const unit = validateUnitSet(unitSet.content);
   if (unit.status !== 'pass' || unit.value?.id !== unitSetName) throw new Error('소형 지도 병종을 확인하세요.');
-  async function readMap([name, byteHash]: readonly [string, string]) {
+  async function readMap([name, byteHash, correction]: readonly [string, string, string?]) {
     const map = await readPinned(`resources/map/${name}.json`, byteHash);
     const report = validateMap(map.content, { scenarios: [] });
     if (report.status !== 'pass' || report.value?.id !== name) throw new Error(`원작 지도를 확인하세요: ${name}`);
@@ -56,7 +58,7 @@ export async function legacyMapPublications() {
       version: 1,
       raw: map.raw,
       contentHash: hashState(map.content),
-      source: `resources/map/map_${name}.json; ${source}`,
+      source: `resources/map/map_${name}.json; ${source}${correction === undefined ? '' : `; ${correction}`}`,
     };
   }
   const [rows, alternateMaps] = await Promise.all([
