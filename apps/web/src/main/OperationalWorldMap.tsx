@@ -166,8 +166,9 @@ export function OperationalWorldMap({
     );
     return (siteId: string) => gates.get(siteId) ?? 0;
   }, [levelKey, map]);
-  // 땅길은 확대 전후 모두 같은 가로세로 칸 길로 그린다(D-055).
-  const walks = useMemo(() => roadWalks(map, laneIds, gateCells), [map, laneIds, gateCells]);
+  // 땅길은 확대 전후 모두 같은 가로세로 칸 길로 그린다(D-055). 지형 칸을 읽으면 산을 돌고 물을 짧게 건넌다.
+  // 지형은 물길(laneIds)과 같은 때 한 번 읽히므로 길 계산이 더 늘지 않는다.
+  const walks = useMemo(() => roadWalks(map, laneIds, gateCells, ROAD_CELL, grid), [map, laneIds, gateCells, grid]);
   const canSelect = Boolean(onSelect);
   useEffect(() => {
     const element = svg.current;
