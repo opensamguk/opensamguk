@@ -11,6 +11,8 @@ import { persistLineageState } from './lineage/repository';
 import { persistStratagemCardsState } from './stratagemCards/state';
 import { persistEquipmentState } from './equipmentState';
 import { persistNationStrategy } from './nationStrategyState';
+import { persistPreparedTurns } from './preparedTurnsState';
+import { persistNationResearch } from './nationResearchState';
 import { persistNationLifecycle } from './nationLifecycleState';
 
 export async function loadCommandState(
@@ -46,6 +48,8 @@ export async function persistCommandState(
   const before = previous ?? (await loadWorld(tx, worldId));
   await persistNationLifecycle(tx, worldId, before, state);
   await persistNationStrategy(tx, worldId, before, state);
+  await persistPreparedTurns(tx, worldId, before, state);
+  await persistNationResearch(tx, worldId, before, state);
   await persistCampaignState(tx, worldId, before, state);
   const cityArmyTypes = before.ruleFeatures?.includes('city-resources-v1')
     ? (knownCityArmyTypes ??

@@ -28,6 +28,8 @@ import {
   emptyCityResourcesState,
   initialCityRuins,
   initialNationStrategy,
+  initialPreparedTurns,
+  initialNationResearch,
   initialNationLifecycle,
   initialLogisticsState,
   initialEquipment,
@@ -285,6 +287,12 @@ export function prepareInitialWorld(
           : {}),
         ...(features.includes('nation-strategy-v1')
           ? { nationStrategyState: initialNationStrategy() as Prisma.InputJsonValue }
+          : {}),
+        ...(features.includes('prepared-turns-v1')
+          ? { preparedTurnsState: initialPreparedTurns() as Prisma.InputJsonValue }
+          : {}),
+        ...(features.includes('nation-research-v1')
+          ? { nationResearchState: initialNationResearch() as Prisma.InputJsonValue }
           : {}),
         ...(features.includes('nation-lifecycle-v1')
           ? { nationLifecycleState: initialNationLifecycle() as Prisma.InputJsonValue }

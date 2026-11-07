@@ -7,6 +7,8 @@ import {
   initialReplayStateWithRegistry,
   checkReplayOrigin,
   readStoredNationStrategy,
+  readStoredPreparedTurns,
+  readStoredNationResearch,
   readStoredNationLifecycle,
   ruleRegistry,
   type RuleRegistry,
@@ -148,6 +150,8 @@ export async function exportReplay(
       if (world.replayOrigin === null) throw new Error('생성 기록이 없는 월드는 재생할 수 없습니다.');
       checkStoredReplayFormat(world);
       readStoredNationStrategy(world);
+      readStoredPreparedTurns(world);
+      readStoredNationResearch(world);
       readStoredNationLifecycle(world);
       await assertStoredCityResources(tx, world);
       await assertStoredCityRuins(tx, world);

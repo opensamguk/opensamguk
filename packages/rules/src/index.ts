@@ -281,3 +281,18 @@ export {
   type NationStrategyState,
 } from './nationStrategy/state';
 export { readStoredNationStrategy } from './nationStrategy/origin';
+export {
+  readPreparedTurns,
+  initialPreparedTurns,
+  PREPARED_TURNS_FEATURE,
+  type PreparedTurnsState,
+} from './preparedTurns/state';
+export { readStoredPreparedTurns } from './preparedTurns/origin';
+export {
+  readNationResearch,
+  initialNationResearch,
+  NATION_RESEARCH_FEATURE,
+  type NationResearchState,
+} from './nationResearch/state';
+export { readStoredNationResearch } from './nationResearch/origin';
+export { canExecuteResearchNationCommand } from './nationResearch/commands';

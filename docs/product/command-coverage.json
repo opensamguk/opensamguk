@@ -10821,12 +10821,16 @@
       "target": "nation",
       "sourceIds": ["nation:event_원융노병연구"],
       "replacementReason": null,
-      "approvalRefs": [],
+      "approvalRefs": ["D-077"],
       "acIds": ["AC-P2-06"],
       "queueIds": ["T4-09", "T4-53", "T4-50", "T4-51"],
       "ownerProfile": "opensamguk-implement",
       "reviewerProfile": "opensamguk-review",
-      "paths": ["docs/plans/phase2-expansion.md"],
+      "paths": [
+        "packages/rules/src/nationResearch/commands.ts",
+        "packages/rules/src/preparedTurns/withPrepare.ts",
+        "tools/nation-research-api.integration.test.ts"
+      ],
       "stages": {
         "ui": {
           "status": "missing",
@@ -10834,39 +10838,102 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "api": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "authorization": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "engine": {
           "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "packages/rules/src/nationResearch/commands.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "7종은 ruleRegistry 기능 binding에 구현했다. 현행 정적 검사는 commands/ext 등록만 읽으므로 이 단계의 검증 상태를 올리지 않는다. 최종 구현 인수와 검사기 대응은 남아 있다."
         },
         "effectsCostsFailures": {
           "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "packages/rules/src/nationResearch/commands.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "7종은 ruleRegistry 기능 binding에 구현했다. 현행 정적 검사는 commands/ext 등록만 읽으므로 이 단계의 검증 상태를 올리지 않는다. 최종 구현 인수와 검사기 대응은 남아 있다."
         },
         "persistence": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "restart": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "replay": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "independentReview": {
           "status": "missing",
@@ -10884,19 +10951,23 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         }
       },
-      "blockers": ["G-03", "U-01", "U-02"]
+      "blockers": []
     },
     {
       "id": "nation_research_fire_arrow",
       "target": "nation",
       "sourceIds": ["nation:event_화시병연구"],
       "replacementReason": null,
-      "approvalRefs": [],
+      "approvalRefs": ["D-077"],
       "acIds": ["AC-P2-06"],
       "queueIds": ["T4-09", "T4-53", "T4-50", "T4-51"],
       "ownerProfile": "opensamguk-implement",
       "reviewerProfile": "opensamguk-review",
-      "paths": ["docs/plans/phase2-expansion.md"],
+      "paths": [
+        "packages/rules/src/nationResearch/commands.ts",
+        "packages/rules/src/preparedTurns/withPrepare.ts",
+        "tools/nation-research-api.integration.test.ts"
+      ],
       "stages": {
         "ui": {
           "status": "missing",
@@ -10904,39 +10975,102 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "api": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "authorization": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "engine": {
           "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "packages/rules/src/nationResearch/commands.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "7종은 ruleRegistry 기능 binding에 구현했다. 현행 정적 검사는 commands/ext 등록만 읽으므로 이 단계의 검증 상태를 올리지 않는다. 최종 구현 인수와 검사기 대응은 남아 있다."
         },
         "effectsCostsFailures": {
           "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "packages/rules/src/nationResearch/commands.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "7종은 ruleRegistry 기능 binding에 구현했다. 현행 정적 검사는 commands/ext 등록만 읽으므로 이 단계의 검증 상태를 올리지 않는다. 최종 구현 인수와 검사기 대응은 남아 있다."
         },
         "persistence": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "restart": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "replay": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "independentReview": {
           "status": "missing",
@@ -10954,19 +11088,23 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         }
       },
-      "blockers": ["G-03", "U-01", "U-02"]
+      "blockers": []
     },
     {
       "id": "nation_research_greatsword",
       "target": "nation",
       "sourceIds": ["nation:event_대검병연구"],
       "replacementReason": null,
-      "approvalRefs": [],
+      "approvalRefs": ["D-077"],
       "acIds": ["AC-P2-06"],
       "queueIds": ["T4-09", "T4-53", "T4-50", "T4-51"],
       "ownerProfile": "opensamguk-implement",
       "reviewerProfile": "opensamguk-review",
-      "paths": ["docs/plans/phase2-expansion.md"],
+      "paths": [
+        "packages/rules/src/nationResearch/commands.ts",
+        "packages/rules/src/preparedTurns/withPrepare.ts",
+        "tools/nation-research-api.integration.test.ts"
+      ],
       "stages": {
         "ui": {
           "status": "missing",
@@ -10974,39 +11112,102 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "api": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "authorization": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "engine": {
           "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "packages/rules/src/nationResearch/commands.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "7종은 ruleRegistry 기능 binding에 구현했다. 현행 정적 검사는 commands/ext 등록만 읽으므로 이 단계의 검증 상태를 올리지 않는다. 최종 구현 인수와 검사기 대응은 남아 있다."
         },
         "effectsCostsFailures": {
           "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "packages/rules/src/nationResearch/commands.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "7종은 ruleRegistry 기능 binding에 구현했다. 현행 정적 검사는 commands/ext 등록만 읽으므로 이 단계의 검증 상태를 올리지 않는다. 최종 구현 인수와 검사기 대응은 남아 있다."
         },
         "persistence": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "restart": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "replay": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "independentReview": {
           "status": "missing",
@@ -11024,19 +11225,23 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         }
       },
-      "blockers": ["G-03", "U-01", "U-02"]
+      "blockers": []
     },
     {
       "id": "nation_research_mountain",
       "target": "nation",
       "sourceIds": ["nation:event_산저병연구"],
       "replacementReason": null,
-      "approvalRefs": [],
+      "approvalRefs": ["D-077"],
       "acIds": ["AC-P2-06"],
       "queueIds": ["T4-09", "T4-53", "T4-50", "T4-51"],
       "ownerProfile": "opensamguk-implement",
       "reviewerProfile": "opensamguk-review",
-      "paths": ["docs/plans/phase2-expansion.md"],
+      "paths": [
+        "packages/rules/src/nationResearch/commands.ts",
+        "packages/rules/src/preparedTurns/withPrepare.ts",
+        "tools/nation-research-api.integration.test.ts"
+      ],
       "stages": {
         "ui": {
           "status": "missing",
@@ -11044,39 +11249,102 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "api": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "authorization": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "engine": {
           "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "packages/rules/src/nationResearch/commands.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "7종은 ruleRegistry 기능 binding에 구현했다. 현행 정적 검사는 commands/ext 등록만 읽으므로 이 단계의 검증 상태를 올리지 않는다. 최종 구현 인수와 검사기 대응은 남아 있다."
         },
         "effectsCostsFailures": {
           "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "packages/rules/src/nationResearch/commands.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "7종은 ruleRegistry 기능 binding에 구현했다. 현행 정적 검사는 commands/ext 등록만 읽으므로 이 단계의 검증 상태를 올리지 않는다. 최종 구현 인수와 검사기 대응은 남아 있다."
         },
         "persistence": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "restart": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "replay": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "independentReview": {
           "status": "missing",
@@ -11094,19 +11362,23 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         }
       },
-      "blockers": ["G-03", "U-01", "U-02"]
+      "blockers": []
     },
     {
       "id": "nation_research_halberd",
       "target": "nation",
       "sourceIds": ["nation:event_극병연구"],
       "replacementReason": null,
-      "approvalRefs": [],
+      "approvalRefs": ["D-077"],
       "acIds": ["AC-P2-06"],
       "queueIds": ["T4-09", "T4-53", "T4-50", "T4-51"],
       "ownerProfile": "opensamguk-implement",
       "reviewerProfile": "opensamguk-review",
-      "paths": ["docs/plans/phase2-expansion.md"],
+      "paths": [
+        "packages/rules/src/nationResearch/commands.ts",
+        "packages/rules/src/preparedTurns/withPrepare.ts",
+        "tools/nation-research-api.integration.test.ts"
+      ],
       "stages": {
         "ui": {
           "status": "missing",
@@ -11114,39 +11386,102 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "api": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "authorization": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "engine": {
           "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "packages/rules/src/nationResearch/commands.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "7종은 ruleRegistry 기능 binding에 구현했다. 현행 정적 검사는 commands/ext 등록만 읽으므로 이 단계의 검증 상태를 올리지 않는다. 최종 구현 인수와 검사기 대응은 남아 있다."
         },
         "effectsCostsFailures": {
           "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "packages/rules/src/nationResearch/commands.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "7종은 ruleRegistry 기능 binding에 구현했다. 현행 정적 검사는 commands/ext 등록만 읽으므로 이 단계의 검증 상태를 올리지 않는다. 최종 구현 인수와 검사기 대응은 남아 있다."
         },
         "persistence": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "restart": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "replay": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "independentReview": {
           "status": "missing",
@@ -11164,19 +11499,23 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         }
       },
-      "blockers": ["G-03", "U-01", "U-02"]
+      "blockers": []
     },
     {
       "id": "nation_research_elephant",
       "target": "nation",
       "sourceIds": ["nation:event_상병연구"],
       "replacementReason": null,
-      "approvalRefs": [],
+      "approvalRefs": ["D-077"],
       "acIds": ["AC-P2-06"],
       "queueIds": ["T4-09", "T4-53", "T4-50", "T4-51"],
       "ownerProfile": "opensamguk-implement",
       "reviewerProfile": "opensamguk-review",
-      "paths": ["docs/plans/phase2-expansion.md"],
+      "paths": [
+        "packages/rules/src/nationResearch/commands.ts",
+        "packages/rules/src/preparedTurns/withPrepare.ts",
+        "tools/nation-research-api.integration.test.ts"
+      ],
       "stages": {
         "ui": {
           "status": "missing",
@@ -11184,39 +11523,102 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "api": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "authorization": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "engine": {
           "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "packages/rules/src/nationResearch/commands.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "7종은 ruleRegistry 기능 binding에 구현했다. 현행 정적 검사는 commands/ext 등록만 읽으므로 이 단계의 검증 상태를 올리지 않는다. 최종 구현 인수와 검사기 대응은 남아 있다."
         },
         "effectsCostsFailures": {
           "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "packages/rules/src/nationResearch/commands.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "7종은 ruleRegistry 기능 binding에 구현했다. 현행 정적 검사는 commands/ext 등록만 읽으므로 이 단계의 검증 상태를 올리지 않는다. 최종 구현 인수와 검사기 대응은 남아 있다."
         },
         "persistence": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "restart": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "replay": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "independentReview": {
           "status": "missing",
@@ -11234,7 +11636,7 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         }
       },
-      "blockers": ["G-03", "U-01", "U-02"]
+      "blockers": []
     },
     {
       "id": "nation_research_ghost",
@@ -11381,12 +11783,16 @@
       "target": "nation",
       "sourceIds": ["nation:event_화륜차연구"],
       "replacementReason": null,
-      "approvalRefs": [],
+      "approvalRefs": ["D-077"],
       "acIds": ["AC-P2-06"],
       "queueIds": ["T4-10", "T4-53", "T4-50", "T4-51"],
       "ownerProfile": "opensamguk-implement",
       "reviewerProfile": "opensamguk-review",
-      "paths": ["docs/plans/phase2-expansion.md"],
+      "paths": [
+        "packages/rules/src/nationResearch/commands.ts",
+        "packages/rules/src/preparedTurns/withPrepare.ts",
+        "tools/nation-research-api.integration.test.ts"
+      ],
       "stages": {
         "ui": {
           "status": "missing",
@@ -11394,39 +11800,102 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "api": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "authorization": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "engine": {
           "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "packages/rules/src/nationResearch/commands.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "7종은 ruleRegistry 기능 binding에 구현했다. 현행 정적 검사는 commands/ext 등록만 읽으므로 이 단계의 검증 상태를 올리지 않는다. 최종 구현 인수와 검사기 대응은 남아 있다."
         },
         "effectsCostsFailures": {
           "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "packages/rules/src/nationResearch/commands.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "7종은 ruleRegistry 기능 binding에 구현했다. 현행 정적 검사는 commands/ext 등록만 읽으므로 이 단계의 검증 상태를 올리지 않는다. 최종 구현 인수와 검사기 대응은 남아 있다."
         },
         "persistence": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "restart": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "replay": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            }
+          ],
+          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "independentReview": {
           "status": "missing",
@@ -11444,7 +11913,7 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         }
       },
-      "blockers": ["G-03", "U-01", "U-02", "U-03", "A-03"]
+      "blockers": []
     },
     {
       "id": "nation_rename",

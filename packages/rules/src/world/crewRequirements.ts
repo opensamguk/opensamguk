@@ -2,6 +2,7 @@ import { TICKS_PER_MONTH } from '../clock/constants';
 import type { Actor, Failure } from '../commands/types';
 import type { DeepReadonly, WorldView } from '../model/world';
 import { canUseNationTurns } from '../personnel/permissions';
+import { readNationResearch } from '../nationResearch/state';
 import type { UnitSetResource } from './resources';
 
 const provinces = [
@@ -54,7 +55,7 @@ export function crewContext(view: WorldView, actor: Pick<Actor, 'generalId' | 't
   const general = view.generals[actor.generalId];
   const nation = general?.nationId == null ? undefined : view.nations[general.nationId];
   const key = String(nation?.id);
-  const research = record(view.ext?.research)[key] ?? [];
+  const research = readNationResearch(view.nationResearch, view)?.nations[Number(key)] ?? [];
   const scorch = record(record(view.ext?.nation_scorch).specialScorch)[key] ?? 0;
   if (
     !Array.isArray(research) ||

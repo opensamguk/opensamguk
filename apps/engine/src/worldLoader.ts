@@ -17,6 +17,7 @@ import { engineFeatures } from './features';
 import { loadCommandState } from './commandPersistence';
 import { engineResolver, loadExt } from './extState';
 import { readStoredNationStrategy } from '@opensamguk/rules';
+import { readStoredPreparedTurns, readStoredNationResearch } from '@opensamguk/rules';
 import { assertWorldCapabilities } from './capsGate';
 import { loadTreaties } from './treatyState';
 import { assertPersonnelStorage } from './personnelState';
@@ -112,6 +113,10 @@ export async function loadWorldAfterCapabilityCheck(
   if (cityRuins) state.cityRuins = cityRuins;
   const nationStrategy = readStoredNationStrategy(world);
   if (nationStrategy) state.nationStrategy = nationStrategy;
+  const preparedTurns = readStoredPreparedTurns(world);
+  if (preparedTurns) state.preparedTurns = preparedTurns;
+  const nationResearch = readStoredNationResearch(world);
+  if (nationResearch) state.nationResearch = nationResearch;
   const nationLifecycle = readStoredNationLifecycle(world);
   if (nationLifecycle) state.nationLifecycle = nationLifecycle;
   assertNationLifecycle(state);
