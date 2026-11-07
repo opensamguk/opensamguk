@@ -29,7 +29,7 @@ export * from './commands/types';
 export * from './commands/effects';
 export * from './commands/registry';
 export { extSliceKeys, restoreExtState } from './commands/ext/state';
-export { INTEL_FEATURE, intelRecordSchema, intelSliceSchema } from './commands/ext/intel/record';
+export { INTEL_FEATURE, intelRecordSchema, getIntelSliceSchema } from './commands/ext/intel/record';
 export * from './monthly/index';
 export * from './replay';
 export {
