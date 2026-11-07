@@ -329,41 +329,38 @@ it.each([
   { research: 'repeater', unit: '원융노병', turns: 24, cost: 100_000 },
   { research: 'elephant', unit: '상병', turns: 24, cost: 100_000 },
   { research: 'fire_wheel', unit: '화륜차', turns: 24, cost: 100_000 },
-] as const)(
-  'AC-P2-06 $unit 연구는 $turns회 뒤에만 저장되고 해당 병종의 모집을 연다',
-  async ({ research, unit, turns, cost }) => {
-    const f = await fixture(true, research),
-      key = `nation_research_${research}`,
-      recruit = { worldId: f.worldId, commandKey: 'recruit', args: { amount: 1, crewType: 1100 } },
-      completionTick = (turns - 1) * 10_000 + 100;
-    expect((await rpc('turns.precheck', recruit, f.ruler)).data).toMatchObject({
-      ok: false,
-      message: expect.stringContaining(`${unit} 연구가 필요합니다.`),
-    });
+] as const)('AC-P2-06 $unit 연구의 완료 횟수와 모집 개방을 검증한다', async ({ research, unit, turns, cost }) => {
+  const f = await fixture(true, research),
+    key = `nation_research_${research}`,
+    recruit = { worldId: f.worldId, commandKey: 'recruit', args: { amount: 1, crewType: 1100 } },
+    completionTick = (turns - 1) * 10_000 + 100;
+  expect((await rpc('turns.precheck', recruit, f.ruler)).data).toMatchObject({
+    ok: false,
+    message: expect.stringContaining(`${unit} 연구가 필요합니다.`),
+  });
+  expect((await reserve(f, f.ruler, 12, key)).status).toBe(200);
+  if (turns === 24) {
+    await advance(f.worldId, 110_100);
+    const halfway = await snapshot(f.worldId);
+    expect(halfway.state.preparedTurns!.nations[1]![12]!.term).toBe(12);
+    expect(halfway.state.nationResearch!.nations).toEqual({});
     expect((await reserve(f, f.ruler, 12, key)).status).toBe(200);
-    if (turns === 24) {
-      await advance(f.worldId, 110_100);
-      const halfway = await snapshot(f.worldId);
-      expect(halfway.state.preparedTurns!.nations[1]![12]!.term).toBe(12);
-      expect(halfway.state.nationResearch!.nations).toEqual({});
-      expect((await reserve(f, f.ruler, 12, key)).status).toBe(200);
-    }
-    await advance(f.worldId, completionTick - 1);
-    const before = await snapshot(f.worldId);
-    expect(before.state.preparedTurns!.nations[1]![12]!.term).toBe(turns - 1);
-    expect(before.state.nationResearch!.nations).toEqual({});
-    await advance(f.worldId, completionTick);
-    const after = await snapshot(f.worldId);
-    expect(after.state.preparedTurns!.nations[1]).toBeUndefined();
-    expect(after.state.nationResearch!.nations[1]).toEqual([research]);
-    expect(after.state.nations[1]!.gold).toBe(before.state.nations[1]!.gold - cost);
-    expect(after.state.nations[1]!.rice).toBe(before.state.nations[1]!.rice - cost);
-    expect(after.state.generals[1]!.experience).toBe(before.state.generals[1]!.experience + turns * 5);
-    expect(after.state.generals[1]!.dedication).toBe(before.state.generals[1]!.dedication + turns * 5);
-    expect((await rpc('turns.precheck', recruit, f.ruler)).data).toMatchObject({ ok: true });
-    await expectReplay(f.worldId, turns * 10_000);
-  },
-);
+  }
+  await advance(f.worldId, completionTick - 1);
+  const before = await snapshot(f.worldId);
+  expect(before.state.preparedTurns!.nations[1]![12]!.term).toBe(turns - 1);
+  expect(before.state.nationResearch!.nations).toEqual({});
+  await advance(f.worldId, completionTick);
+  const after = await snapshot(f.worldId);
+  expect(after.state.preparedTurns!.nations[1]).toBeUndefined();
+  expect(after.state.nationResearch!.nations[1]).toEqual([research]);
+  expect(after.state.nations[1]!.gold).toBe(before.state.nations[1]!.gold - cost);
+  expect(after.state.nations[1]!.rice).toBe(before.state.nations[1]!.rice - cost);
+  expect(after.state.generals[1]!.experience).toBe(before.state.generals[1]!.experience + turns * 5);
+  expect(after.state.generals[1]!.dedication).toBe(before.state.generals[1]!.dedication + turns * 5);
+  expect((await rpc('turns.precheck', recruit, f.ruler)).data).toMatchObject({ ok: true });
+  await expectReplay(f.worldId, turns * 10_000);
+});
 
 it('SQL 제약과 읽기 경계는 빠지거나 잘못된 연구 상태를 거부한다', async () => {
   const f = await fixture();
