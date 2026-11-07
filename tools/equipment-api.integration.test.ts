@@ -1,4 +1,6 @@
+import { execFileSync, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
@@ -374,6 +376,71 @@ it.each([
   },
 );
 
+it.each(['beforeCommit', 'committed'] as const)(
+  'AC-P2-12·30 장비 구매 %s에서 프로세스를 종료해도 새 프로세스가 한 번만 저장한다',
+  async (phase) => {
+    const f = await fixture(true, false, 'horses');
+    await execute(f, 'trade_rice', { amount: 1000, buy: false });
+    const commandKey = 'equipment_trade';
+    const tick = await prepare(f, commandKey, { slot: 'horse', itemKey: 'horse_01' });
+    const before = await snapshot(f.id);
+    const stock = before.state.logistics!.cities['3']!;
+    expect(stock.horses).toBeGreaterThanOrEqual(5);
+    expect(before.turns[f.actorId]![0]).toMatchObject({ commandKey });
+
+    const options = { cwd: new URL('../', import.meta.url), env: { ...process.env, TEST_DATABASE_URL: url.href } };
+    const child = spawn(
+      process.execPath,
+      ['--import', 'tsx', 'apps/engine/test/turnWorker.ts', f.id, phase, String(tick), commandKey],
+      { ...options, stdio: ['ignore', 'ignore', 'ignore', 'ipc'], windowsHide: true },
+    );
+    const closed = once(child, 'close');
+    try {
+      const [message] = await Promise.race([
+        once(child, 'message', { signal: AbortSignal.timeout(20_000) }),
+        closed.then(() => {
+          throw new Error('장비 구매 중단 지점 전에 프로세스가 끝났습니다.');
+        }),
+      ]);
+      expect(message).toBe(phase);
+      expect(child.kill('SIGKILL')).toBe(true);
+      expect(await closed).toEqual([null, 'SIGKILL']);
+    } finally {
+      if (!child.killed && child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+      await closed;
+    }
+
+    const logs = () => db.generalLog.findMany({ where: { worldId: f.id, generalId: f.actorId, tick, commandKey } });
+    expect(await logs()).toHaveLength(phase === 'committed' ? 1 : 0);
+    const interrupted = await snapshot(f.id);
+    if (phase === 'beforeCommit') expect(interrupted).toEqual(before);
+    const oldLease = await db.engineLease.findUniqueOrThrow({ where: { worldId: f.id } });
+    await db.engineLease.update({
+      where: { worldId: f.id, fencingToken: oldLease.fencingToken },
+      data: { expiresAt: new Date(0) },
+    });
+
+    const output = execFileSync(
+      process.execPath,
+      ['--import', 'tsx', 'apps/engine/test/presetWorker.ts', f.id, String(tick)],
+      { ...options, encoding: 'utf8', timeout: 20_000, windowsHide: true },
+    );
+    const recovered = await snapshot(f.id);
+    expect(JSON.parse(output)).toMatchObject({ beforeHash: hashState(interrupted), afterHash: hashState(recovered) });
+    expect((await db.engineLease.findUniqueOrThrow({ where: { worldId: f.id } })).fencingToken).toBeGreaterThan(
+      oldLease.fencingToken,
+    );
+    expect(recovered.state.equipment?.generals[String(f.actorId)]).toEqual({ horse: 'horse_01' });
+    expect(recovered.state.generals[f.actorId]!.gold).toBe(before.state.generals[f.actorId]!.gold - 1000);
+    expect(recovered.state.generals[f.actorId]!.experience).toBe(before.state.generals[f.actorId]!.experience + 10);
+    expect(recovered.state.logistics?.cities['3']).toEqual({ ...stock, horses: stock.horses - 5 });
+    expect(recovered.revisions[f.actorId]).toBe(before.revisions[f.actorId]! + 1);
+    expect(recovered.turns[f.actorId]![0]!.commandKey).not.toBe(commandKey);
+    expect((await logs()).map(({ kind }) => kind)).toEqual(['success']);
+    if (phase === 'committed') expect(recovered).toEqual(interrupted);
+  },
+  60_000,
+);
 for (const category of categories) {
   it(
     `equipment.mine ${category}`,
