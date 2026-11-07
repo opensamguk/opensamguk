@@ -8,6 +8,7 @@ const scenarioBody = sql.split('$t4_77_content$').find((body) => body.includes('
 if (!scenarioBody) throw new Error('내장 1030 시나리오가 없습니다.');
 const scenario = scenarioSchema.parse(JSON.parse(scenarioBody));
 const initial = {
+  scenarioKey: scenario.id,
   startYear: scenario.startYear,
   nations: scenario.nation.map(([name], index) => ({ id: index + 1, name })),
 };
@@ -32,6 +33,10 @@ describe('AC-P2-21 1030 역사 사건', () => {
       if (effect.kind === 'nonAggression') expect(effect.months).toBe(3);
       else expect(Math.abs(effect.value)).toBe(effect.kind === 'atmos' ? 5 : 1_000);
     }
+  });
+
+  it.each(['integration191', 'san10-191'])('같은 국가를 쓰는 %s 시나리오를 거부한다', (scenarioKey) => {
+    expect(() => createHistoricEvents1030({ ...initial, scenarioKey })).toThrow('1030 시나리오');
   });
 
   it('생성 때마다 사본을 만들고 조합이 다른 시나리오를 거부한다', () => {

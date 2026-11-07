@@ -135,6 +135,9 @@ const config: HistoricEventsConfig = {
   ],
 };
 
-export function createHistoricEvents1030(initial: Parameters<typeof readHistoricEventsConfig>[0]) {
+export function createHistoricEvents1030(
+  initial: Parameters<typeof readHistoricEventsConfig>[0] & { scenarioKey: string },
+) {
+  if (initial.scenarioKey !== '1030') throw new Error('역사 사건은 1030 시나리오에서만 사용할 수 있습니다.');
   return readHistoricEventsConfig(initial, config);
 }
