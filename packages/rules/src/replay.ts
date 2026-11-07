@@ -124,18 +124,23 @@ function replayAction(
   unitSet: UnitSetResource | undefined,
   resolver: CommandResolver | undefined,
   registry: RuleRegistry,
-  shareInactiveQueues: boolean,
+  ownsArchiveState: boolean,
 ): ReplayState {
   const action = nextGameAction(replay);
   if (action.kind === 'monthly') {
     return settleReplayMonth(replay, seed, action.tick, registry).replay;
   }
-  const next = shareInactiveQueues
-    ? { ...structuredClone({ ...replay, turns: {} }), turns: { ...replay.turns } }
+  // 보관 루프에서는 규칙이 새 상태를 만들 때까지 직전 월드 상태를 읽는다.
+  const next = ownsArchiveState
+    ? {
+        ...structuredClone({ ...replay, state: undefined, turns: {} }),
+        state: replay.state,
+        turns: { ...replay.turns },
+      }
     : structuredClone(replay);
   const personnel = Object.hasOwn(replay, 'offices');
   const queue = next.turns[action.generalId] ?? emptyTurns();
-  const turns = shareInactiveQueues ? structuredClone(queue) : queue;
+  const turns = ownsArchiveState ? structuredClone(queue) : queue;
   const command = turns[0]!;
   const result = runGeneralTurn(
     next.state,

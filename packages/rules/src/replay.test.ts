@@ -6,6 +6,7 @@ import { ruleRegistry } from './ruleRegistry';
 import { createCommandResolver } from './commands/resolve';
 import { applyEffects } from './commands/effects';
 import { runMonthly } from './monthly';
+import { deepFreeze } from './personnel/testFixture';
 
 // shared/node의 canonicalJson과 같은 JSON을 Web Crypto로 해시한다. rules에서 node 모듈은 읽지 않는다.
 async function stateHash(value: unknown) {
@@ -70,11 +71,14 @@ it('AC-INT-22 기본 아카이브 재생만 실행하지 않는 장수의 예턴
   replay.turns[2]![0] = { commandKey: 'move', args: { cityKey: 3 }, explicit: true };
   const original = structuredClone(replay);
   const normal = runReplayAction(replay, 'queue-ownership', testUnits);
+  deepFreeze(replay.state);
   const archive = runArchiveReplayAction(replay, 'queue-ownership', testUnits, ruleRegistry);
   const custom = runArchiveReplayAction(replay, 'queue-ownership', testUnits, { ...ruleRegistry });
   expect(archive).toEqual(normal);
   expect(custom).toEqual(normal);
   expect(replay).toEqual(original);
+  expect(archive.state).not.toBe(replay.state);
+  expect(archive.state.generals[1]).not.toBe(replay.state.generals[1]);
   expect(archive.turns).not.toBe(replay.turns);
   expect(archive.turns[1]![0]).not.toBe(replay.turns[1]![1]);
   expect(archive.turns[1]![0]!.args).not.toBe(replay.turns[1]![1]!.args);
