@@ -3,7 +3,8 @@ import { validateScenario } from './scenario';
 import { validateUnitSet } from './unitSet';
 import { validateStatRules } from './statRules';
 import { validatePortraitMap } from './portraitMap';
-import type { ResourceReport } from './issues';
+import { issue, type ResourceReport } from './issues';
+import { legacyCheCrewRegionsMatch } from '../crewRegions';
 
 export function validateWorldResources(input: {
   map: unknown;
@@ -19,6 +20,28 @@ export function validateWorldResources(input: {
     statRules: validateStatRules(input.statRules),
     portraitMap: validatePortraitMap(input.portraitMap ?? { portraits: {} }),
   };
+  const requiredUnitSet = reports.scenario.value?.requiredUnitSet;
+  if (
+    reports.unitSet.status === 'pass' &&
+    reports.unitSet.value &&
+    requiredUnitSet !== undefined &&
+    reports.unitSet.value.id !== requiredUnitSet
+  ) {
+    reports.unitSet.status = 'fail';
+    reports.unitSet.issues.push(issue('shape-invalid', { kind: 'path', path: ['id'] }, { expected: requiredUnitSet }));
+  }
+  if (
+    reports.map.status === 'pass' &&
+    reports.map.value &&
+    reports.unitSet.status === 'pass' &&
+    reports.unitSet.value &&
+    !legacyCheCrewRegionsMatch(reports.unitSet.value, reports.map.value)
+  ) {
+    reports.unitSet.status = 'fail';
+    reports.unitSet.issues.push(
+      issue('shape-invalid', { kind: 'path', path: ['crewTypes'] }, { expected: 'che 지도' }),
+    );
+  }
   const values = Object.values(reports);
   const status: ResourceReport<unknown>['status'] = values.some((report) => report.status === 'fail')
     ? 'fail'

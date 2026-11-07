@@ -54,11 +54,11 @@
 | 1110 | 225 | 4 | 조예 도시 목록의 두 번째 하비 하나 삭제 |
 | 1120 | 188 | 13 | 없음 |
 
-`tools/fixtures/t4-46-scenarios.json`은 원작 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`의 시나리오 83행을 보존합니다. 기존 `1030`은 `existing`, 위 9종은 `ready`, 도시 없는 국가가 있는 `1050`·`1080`은 T4-48 대기의 `blocked`, 나머지 71종은 `unverified`입니다. `ready`는 생성기에 넣을 준비 상태이며 AC 완료가 아닙니다. 전체 AC-P2-24의 분모는 83종입니다.
+`tools/fixtures/t4-46-scenarios.json`은 원작 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`의 시나리오 83행을 보존합니다. 기존 `1030`은 `existing`입니다. 위 9종과 시작 방랑 국가가 있는 `1050`·`1080`, 정사 `1021`은 `ready`입니다. 나머지 70종은 `unverified`입니다. 전체 AC-P2-24의 분모는 83종입니다.
 
 사본에서 출처와 `id`를 빼고 삭제한 하비를 원위치에 넣으면 fixture의 원작 JSON과 같습니다. 원작 바이트의 SHA-256과 사본의 `contentHash`, 두 시드의 초기 상태 해시도 따로 고정합니다. `1030` 게시 판·초기 해시와 내장 다섯 DB 판은 바꾸지 않습니다. 원작 `extends`·`general_ex`·`history`·`life`·`fiction`·`const`·`cities`는 이 묶음에 한해 기존 `1030`처럼 보존하되 로더에서 읽지 않습니다.
 
-별도 생성물 `packages/db/sql/resources-scenarios.sql`은 `ready` 9종만 넣습니다. `pnpm db:init-resources` 뒤 `pnpm db:init-scenarios`로 적용합니다. 실제 합성은 `loadInitialWorldFromDb`로 게시 판을 읽으며 원본 JSON 파일 로더는 제거했습니다.
+별도 생성물 `packages/db/sql/resources-scenarios.sql`은 `ready` 시나리오 12종과 `che` 병종판을 넣습니다. `1021`은 이 병종판이 필요합니다. 원작 초기 도시 보정과 183년부터의 임관 제한을 적용합니다. `pnpm db:init-resources` 뒤 `pnpm db:init-scenarios`로 적용합니다. 실제 합성은 `loadInitialWorldFromDb`에서 게시 판을 읽습니다.
 
 ## 2. 합성 순서
 

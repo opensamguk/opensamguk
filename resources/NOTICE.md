@@ -145,3 +145,9 @@ core2026 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`의 `resources/scenario/scena
 ## 특수 병종 연구와 국가 명령 준비
 
 `packages/rules/src/nationResearch/commands.ts`와 `preparedTurns/`는 core2026 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`의 `packages/logic/src/actions/turn/nation/eventResearch.ts`, 연구 명령 7종과 `app/game-engine/src/turn/reservedTurnHandler.ts`의 연속 실행 규칙을 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다. 기간·국고 비용·보상·직책은 사용자 승인 D-077을 적용하며 기존 확장판의 병종 조건은 바꾸지 않는다.
+
+## 원작 che 병종
+
+core2026 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`의 `resources/unitset/unitset_che.json`을 JSON 서식만 정리해 `tools/unitset/source/che-core2026-df6c926.json`에 보존한다. 원작 blob은 `48d39ee2ef827459a0136e8c458ef47eef5f8c09`다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+`resources/scenario/1021.json`의 원작은 같은 커밋의 `resources/scenario/scenario_1021.json`이다. 도겸의 `하비.광릉`은 지도에 있는 하비와 광릉으로 나눈다. 상속 파일의 초기 도시 보정과 183년부터의 임관 제한을 시나리오 설정으로 표현하고 `che` 병종판을 요구한다. 원문과 해시는 `tools/fixtures/t4-46-scenarios.json`에 보존한다. 초기화 SQL은 시나리오와 `resources/unitset/che.json`의 병종판을 함께 게시한다.

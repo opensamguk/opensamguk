@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { rngFor } from '@opensamguk/shared';
 import { commandWorld, testUnits } from '../../test/commandFixture';
+import { emptyCityResourcesState } from '../cityResources/state';
 import { applyEffects } from '../commands/effects';
 import { deepFreeze } from '../personnel/testFixture';
 import { campaignAttack } from './attack';
@@ -21,11 +22,34 @@ function fixture() {
   return world;
 }
 const actor = { generalId: 1, tick: 100, unitSet: testUnits };
-function run(world = fixture()) {
-  expect(campaignAttack.check(world, actor, { cityKey: 2 })).toBeNull();
-  const result = campaignAttack.execute(deepFreeze(world), actor, { cityKey: 2 }, rngFor('campaign-attack', 1));
+function run(world = fixture(), acting = actor) {
+  expect(campaignAttack.check(world, acting, { cityKey: 2 })).toBeNull();
+  const result = campaignAttack.execute(deepFreeze(world), acting, { cityKey: 2 }, rngFor('campaign-attack', 1));
   return { result, state: applyEffects(world, result.effects) };
 }
+describe('AC-P2-24 공성 부곡의 성벽선제', () => {
+  it.each([0, 1, 100_000])('성벽 %i일 때 수비 부곡·주둔군과의 교전 순서를 판정한다', (wall) => {
+    const world = fixture();
+    world.cities[2]!.wall = wall;
+    world.generals[1]!.injury = 17;
+    world.ruleFeatures!.push('city-resources-v1');
+    world.cityResources = emptyCityResourcesState(world);
+    const garrison = [{ crewType: 1100, troops: 10, train: 100, atmos: 100 }];
+    world.cityResources.cities['2']!.garrison = garrison;
+    const unitSet = structuredClone(testUnits);
+    unitSet.crewTypes.find(({ id }) => id === world.campaign!.units[0]!.crewType)!.effects = ['wallFirst'];
+    const { result, state } = run(world, { ...actor, unitSet });
+    const rounds = result.logs[0]!.text.split('\n');
+    expect(rounds[0]!.includes('성벽 선제 교전')).toBe(wall > 0);
+    expect(rounds.findIndex((text) => text.includes('성벽 교전'))).toBe(wall === 0 ? 3 : wall === 1 ? -1 : 4);
+    expect(rounds.findIndex((text) => text.includes('대 도시 병종1100'))).toBe(wall === 0 ? 2 : 3);
+    expect(result.reports?.map(({ generalId }) => generalId)).toEqual([2, 3]);
+    expect(state.cityResources!.cities['2']!.garrison).toEqual([]);
+    expect(state.generals[1]!.injury).toBe(17);
+    expect(state.cities[2]!.nationId).toBe(wall > 1 ? 2 : 1);
+  });
+});
+
 describe('AC-M2-18 부곡의 실제 출병 대상', () => {
   it.each([10000, 0])('수비 부곡 없이 성벽 %i를 공격해도 점령 전 국가를 반환한다', (wall) => {
     const world = fixture();

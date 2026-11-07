@@ -241,7 +241,10 @@ const initialSchema = shape(
       npc: shape({ aggression: (v) => presetSchema.shape.npc.shape.aggression.safeParse(v).success }),
       boost: (v) => presetSchema.shape.boost.safeParse(v).success,
     }),
-    commandMeta: shape({ nextNationId: positive, offers: record(positive) }),
+    commandMeta: shape(
+      { nextNationId: positive, offers: record(positive) },
+      { lastNationRecruitmentLock: shape({ fromYear: (v) => positive(v) && Number(v) <= 9999 }) },
+    ),
     // args의 JSON 형태는 assertJson이 검사한다. 명령별 해석을 여기서 더하지 않는다.
     nationTurns: record(list(shape({ commandKey: name, args: (v) => v !== undefined }))),
   },

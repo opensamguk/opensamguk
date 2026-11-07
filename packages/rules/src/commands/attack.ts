@@ -75,8 +75,42 @@ function makeAttack(collect: typeof collectModifiers) {
       const battleOutcomes: NonNullable<CommandResult['battleOutcomes']> = [];
       const reputation = state.ruleFeatures?.includes('reputation-v1');
       const rounds: string[] = [];
-      let cleared = true;
-      for (const defender of defenders) {
+      let attackerFirstVolleyUsed = false;
+      const wallFirst =
+        defenders.length > 0 &&
+        city.wall > 0 &&
+        actor.unitSet!.crewTypes.find((unit) => unit.id === g.crewType)?.effects?.includes('wallFirst');
+      const fightWall = (openingSkirmish = false) => {
+        const wall: Force = { crew: city.wall, crewType: 1000, train: 100, atmos: 100, rice: 0 };
+        feed(g);
+        const battle = simulateBattle(
+          {
+            attacker: g,
+            defender: wall,
+            attackerTech: aTech,
+            defenderTech: bTech,
+            defence: city.defence,
+            openingSkirmish,
+            siege: !openingSkirmish,
+            attackerFirstVolleyUsed,
+            unitSet: actor.unitSet!,
+            coefMode: state.ruleFeatures?.includes('battle-affinity-v2') ? 'multiply' : 'divide',
+            attackerModifiers: {
+              dealt: collect(state, g.id, { stage: 'battle.dealt', commandKey: 'attack' }),
+              taken: collect(state, g.id, { stage: 'battle.taken', commandKey: 'attack' }),
+            },
+          },
+          rng,
+        );
+        attackerFirstVolleyUsed ||= battle.attackerFirstVolleyFired === true;
+        Object.assign(g, battle.attacker);
+        city.wall = battle.defender.crew;
+        const name = openingSkirmish ? '성벽 선제 교전' : '성벽 교전';
+        rounds.push(`${name}: 공격 ${g.crew}명, 성벽 ${city.wall}`);
+      };
+      if (wallFirst) fightWall(true);
+      let cleared = g.crew > 0 && g.atmos > 0;
+      for (const defender of cleared ? defenders : []) {
         feed(g);
         feed(defender);
         const battle = simulateBattle(
@@ -85,6 +119,7 @@ function makeAttack(collect: typeof collectModifiers) {
             defender,
             attackerTech: aTech,
             defenderTech: bTech,
+            attackerFirstVolleyUsed,
             unitSet: actor.unitSet!,
             coefMode: state.ruleFeatures?.includes('battle-affinity-v2') ? 'multiply' : 'divide',
             attackerModifiers: {
@@ -98,6 +133,7 @@ function makeAttack(collect: typeof collectModifiers) {
           },
           rng,
         );
+        attackerFirstVolleyUsed ||= battle.attackerFirstVolleyFired === true;
         Object.assign(g, battle.attacker);
         Object.assign(defender, battle.defender);
         const attackerSurvives = g.crew > 0 && g.atmos > 0;
@@ -117,30 +153,7 @@ function makeAttack(collect: typeof collectModifiers) {
           break;
         }
       }
-      if (cleared && g.crew > 0 && g.atmos > 0) {
-        const wall: Force = { crew: city.wall, crewType: 1000, train: 100, atmos: 100, rice: 0 };
-        feed(g);
-        const battle = simulateBattle(
-          {
-            attacker: g,
-            defender: wall,
-            attackerTech: aTech,
-            defenderTech: bTech,
-            defence: city.defence,
-            unitSet: actor.unitSet!,
-            coefMode: state.ruleFeatures?.includes('battle-affinity-v2') ? 'multiply' : 'divide',
-            attackerModifiers: {
-              dealt: collect(state, g.id, { stage: 'battle.dealt', commandKey: 'attack' }),
-              taken: collect(state, g.id, { stage: 'battle.taken', commandKey: 'attack' }),
-            },
-          },
-          rng,
-        );
-        Object.assign(g, battle.attacker);
-        Object.assign(wall, battle.defender);
-        city.wall = wall.crew;
-        rounds.push(`성벽 교전: 공격 ${g.crew}명, 성벽 ${city.wall}`);
-      }
+      if (cleared && (!wallFirst || city.wall > 0)) fightWall();
       const captured = cleared && city.wall === 0 && g.crew > 0 && g.atmos > 0;
       const history: { nationId: number; text: string }[] = [];
       if (captured) {

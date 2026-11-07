@@ -26,7 +26,7 @@ const input: Record<string, string> = Object.fromEntries(
   ),
 );
 
-describe('T4-46 / AC-P2-24 A9·B2 출처와 합성', () => {
+describe('T4-46 / AC-P2-24 A9·B2·C1 출처와 합성', () => {
   it('S0 원작 tree에서 대조한 83키·blob·sha256을 고정한다', () => {
     const expected = `0 1 2 900 901 902 903 904 905 906 908 910 911 912 913 914 915 916
 1010 1020 1021 1030 1031 1040 1041 1050 1060 1070 1080 1090 1100 1110 1120
@@ -63,6 +63,20 @@ describe('T4-46 / AC-P2-24 A9·B2 출처와 합성', () => {
       expect(cities.filter((name) => name === '하비')).toHaveLength(1);
       cities.splice(change.removedIndex, 0, change.cityName);
     }
+    if (row.unitSet === 'che') {
+      expect(copy).toMatchObject({
+        openingCityProfile: 'legacy-research-70',
+        lastNationRecruitmentLockYear: 183,
+        requiredUnitSet: 'che',
+      });
+      delete copy.openingCityProfile;
+      delete copy.lastNationRecruitmentLockYear;
+      delete copy.requiredUnitSet;
+      if (!Object.hasOwn(original, 'diplomacy')) delete copy.diplomacy;
+      const cities = (copy.nation as unknown[][]).find(([name]) => name === '도겸')![8] as string[];
+      expect(cities).toEqual(['서주', '하비', '광릉']);
+      cities.splice(1, 2, '하비.광릉');
+    }
     expect(copy).toEqual(original);
     expect(hashState(JSON.parse(input[row.key]!))).toBe(row.contentHash);
     const comment = JSON.parse(input[row.key]!).$comment as string;
@@ -70,6 +84,16 @@ describe('T4-46 / AC-P2-24 A9·B2 출처와 합성', () => {
     if (row.correction) {
       const change = row.correction;
       canonical.nation[change.nationIndex][change.cityListIndex].splice(change.removedIndex, 1);
+    }
+    if (row.unitSet === 'che') {
+      const cities = (canonical.nation as unknown[][]).find(([name]) => name === '도겸')![8] as string[];
+      cities.splice(1, 1, '하비', '광릉');
+      if (!Object.hasOwn(canonical, 'diplomacy')) Object.assign(canonical, { diplomacy: [] });
+      Object.assign(canonical, {
+        openingCityProfile: 'legacy-research-70',
+        lastNationRecruitmentLockYear: 183,
+        requiredUnitSet: 'che',
+      });
     }
     expect(input[row.key]!.replaceAll('\r\n', '\n')).toBe(JSON.stringify(canonical, null, 2) + '\n');
   });

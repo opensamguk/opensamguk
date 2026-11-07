@@ -1,6 +1,7 @@
 import type { CommandResolver } from './resolve';
 import { rngFor } from '@opensamguk/shared';
 import { BALANCE } from '../balance';
+import { toGameDate } from '../clock/clock';
 import type { DeepReadonly, WorldState } from '../model/world';
 import type { Actor, CommandResult, Failure } from './types';
 import { applyEffects } from './effects';
@@ -23,6 +24,15 @@ export type PersonnelTurnChange = Readonly<{
   closedOffers: ClosedOffer[];
   logs: PersonnelLog[];
 }>;
+
+function applyLastNationRecruitmentLock(state: WorldState, result: CommandResult | Failure, tick: number) {
+  const lock = state.commandMeta?.lastNationRecruitmentLock;
+  if (lock === undefined || lock.blockedNationId !== undefined) return;
+  const defender = 'code' in result ? undefined : result.attackTarget?.defendingNationId;
+  if (defender == null || state.nations[defender] || toGameDate(state.startYear, tick).year < lock.fromYear) return;
+  const remaining = Object.values(state.nations);
+  if (remaining.length === 1) lock.blockedNationId = remaining[0]!.id;
+}
 
 export function runGeneralTurn(
   state: WorldState,
@@ -149,6 +159,7 @@ export function runGeneralTurn(
   if (!instructed.order && general.userId !== null && command.explicit === false && options.policy !== undefined) {
     const policy = runPolicyCommand(next, { ...actor, target: 'general' }, options.policy, seed, resolver);
     next = applyEffects(next, policy.result.effects);
+    applyLastNationRecruitmentLock(next, policy.result, actor.tick ?? 0);
     return {
       state: next,
       result: policy.result,
@@ -179,6 +190,7 @@ export function runGeneralTurn(
     rngFor(seed, 'turn', actor.tick ?? 0, actor.generalId),
   );
   next = applyEffects(next, 'code' in result ? [] : result.effects);
+  applyLastNationRecruitmentLock(next, result, actor.tick ?? 0);
   if (instructed.order)
     next = finishCampaignOrder(
       next,

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { BALANCE } from '../balance';
 import { LINEAGE_EXITED_YEAR } from '../lineage/config';
 import { refreshSupply } from '../supply';
+import type { WorldView } from '../model/world';
 import { commandMeta, defineCommand, fail, noArgs, positive, ruler, success, targetGeneral } from './support';
 
 const establish = (uprising: boolean) =>
@@ -52,6 +53,18 @@ const establish = (uprising: boolean) =>
       };
     },
   });
+const blockedRecruitmentNation = (view: WorldView) => view.commandMeta?.lastNationRecruitmentLock?.blockedNationId;
+
+function recruitmentCandidates(view: WorldView) {
+  const blocked = blockedRecruitmentNation(view);
+  return Object.values(view.nations).filter(
+    (nation) =>
+      nation.id !== blocked &&
+      nation.capitalCityKey !== null &&
+      view.cities[nation.capitalCityKey]?.nationId === nation.id,
+  );
+}
+
 const join = (random: boolean) =>
   defineCommand<{ nationId?: number | undefined }>({
     key: random ? 'join_random' : 'join',
@@ -61,20 +74,17 @@ const join = (random: boolean) =>
     check(view, actor, args) {
       if (view.generals[actor.generalId]!.nationId !== null)
         return fail('BAD_STATE', '재야 장수만 임관할 수 있습니다.');
-      const candidates = Object.values(view.nations).filter(
-        (nation) => nation.capitalCityKey !== null && view.cities[nation.capitalCityKey]?.nationId === nation.id,
-      );
-      return (random ? candidates.length > 0 : candidates.some((n) => n.id === args.nationId))
-        ? null
-        : fail('BAD_TARGET', '임관할 국가가 없습니다.');
+      const candidates = recruitmentCandidates(view);
+      if (random ? candidates.length > 0 : candidates.some((nation) => nation.id === args.nationId)) return null;
+      const blocked = blockedRecruitmentNation(view);
+      if (blocked !== undefined && (random ? view.nations[blocked] : blocked === args.nationId))
+        return fail('PROTECTED', '이 국가에는 임관할 수 없습니다.');
+      return fail('BAD_TARGET', '임관할 국가가 없습니다.');
     },
     change(state, actor, args, rng) {
-      const nations = Object.values(state.nations)
-        .filter(
-          (nation) => nation.capitalCityKey !== null && state.cities[nation.capitalCityKey]?.nationId === nation.id,
-        )
-        .sort((a, b) => a.id - b.id);
-      const nation = random ? rng.pick(nations) : state.nations[args.nationId!]!;
+      const nation = random
+        ? rng.pick(recruitmentCandidates(state).sort((a, b) => a.id - b.id))
+        : state.nations[args.nationId!]!;
       const general = state.generals[actor.generalId]!;
       general.nationId = nation.id;
       general.officerLevel = 1;
@@ -133,6 +143,8 @@ export const personnelCommands = [
       const general = view.generals[actor.generalId]!;
       if (general.nationId !== null) return fail('BAD_STATE', '재야 장수만 수락할 수 있습니다.');
       const id = view.commandMeta?.offers[general.id];
+      if (id !== undefined && id === blockedRecruitmentNation(view))
+        return fail('PROTECTED', '이 국가에는 임관할 수 없습니다.');
       const nation = id === undefined ? undefined : view.nations[id];
       return nation && nation.capitalCityKey !== null && view.cities[nation.capitalCityKey]?.nationId === nation.id
         ? null
