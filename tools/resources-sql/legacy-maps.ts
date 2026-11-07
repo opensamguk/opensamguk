@@ -6,8 +6,8 @@ import { legacyCheCrewRegionsMatch } from '../../packages/rules/src/world/crewRe
 import { validateMap, validateUnitSet } from '../../packages/rules/src/world/validate';
 import { hashState } from '../../packages/shared/src/node/hashState';
 import { projectCheUnitSet } from '../unitset/che';
-import { readCheExceptSiegeSource } from '../unitset/source';
-import { immutableResourceStatement } from './convert';
+import { readAlternateCheSource, readCheExceptSiegeSource } from '../unitset/source';
+import { CONTENT_TAG, immutableResourceStatement, RESOURCE_INPUTS } from './convert';
 
 export const LEGACY_MAP_SQL = new URL('../../packages/db/sql/resources-legacy-maps.sql', import.meta.url);
 const source = 'core2026 df6c9269fa1e2862418ba9da481c8dd2d758d6c5; MIT (c) 2025 devsam; resources/NOTICE.md';
@@ -24,7 +24,8 @@ const alternateMapSources = [
 ] as const;
 const unitSetName = 'che-miniche';
 const exceptSiegeName = 'che_except_siege';
-export const legacyMapUnitSetNames = [unitSetName, exceptSiegeName] as const;
+const alternateUnitSets = ['cr', 'siegetank', 'ludo_rathowm'] as const;
+export const legacyMapUnitSetNames = [unitSetName, exceptSiegeName, ...alternateUnitSets] as const;
 export const LEGACY_MAP_BODY_TAG = '$legacy_maps_init$';
 export const LEGACY_MAP_CONTENT_TAG = '$legacy_maps_content$';
 const root = new URL('../../', import.meta.url);
@@ -37,6 +38,16 @@ async function readPinned(path: string, byteHash: string) {
   if (raw.includes(LEGACY_MAP_BODY_TAG) || raw.includes(LEGACY_MAP_CONTENT_TAG))
     throw new Error(`원작 자원의 SQL 구분자 충돌: ${path}`);
   return { raw, content: JSON.parse(raw) as unknown };
+}
+
+async function readBuiltinCheMap() {
+  const sql = await readFile(new URL('packages/db/sql/resources-init.sql', root), 'utf8');
+  const parts = sql.split(CONTENT_TAG);
+  const { contentHash } = RESOURCE_INPUTS[0];
+  const index = parts.findIndex((part) => part.includes("'MAP', 'che', 1, 'PUBLISHED', resource_content"));
+  const map: unknown = JSON.parse(parts[index - 1] ?? 'null');
+  if (hashState(map) !== contentHash) throw Error('내장 che 지도 해시를 확인하세요.');
+  return map;
 }
 
 export async function legacyMapPublications() {
@@ -68,6 +79,22 @@ export async function legacyMapPublications() {
   const miniche = rows.find(({ name }) => name === 'miniche')!;
   const { unitSet: exceptSiege } = projectCheUnitSet(await readCheExceptSiegeSource(), JSON.parse(miniche.raw));
   if (exceptSiege.id !== exceptSiegeName) throw new Error('축지 병종 판을 확인하세요.');
+  const cheMap = await readBuiltinCheMap();
+  const alternateUnits = await Promise.all(
+    alternateUnitSets.map(async (name) => {
+      const map = name === 'siegetank' ? cheMap : JSON.parse(alternateMaps.find((row) => row.name === name)!.raw);
+      const { unitSet: content } = projectCheUnitSet(await readAlternateCheSource(name), map);
+      if (content.id !== name) throw Error(`원작 병종 판 이름이 다릅니다. ${name}`);
+      return {
+        kind: 'UNIT_SET' as const,
+        name,
+        version: 1,
+        raw: JSON.stringify(content, null, 2) + '\n',
+        contentHash: hashState(content),
+        source: `resources/unitset/unitset_${name}.json; ${source}`,
+      };
+    }),
+  );
   return [
     ...rows,
     {
@@ -87,6 +114,7 @@ export async function legacyMapPublications() {
       source: `resources/unitset/unitset_che_except_siege.json; ${source}`,
     },
     ...alternateMaps,
+    ...alternateUnits,
   ];
 }
 

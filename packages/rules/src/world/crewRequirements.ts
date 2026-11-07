@@ -96,9 +96,13 @@ export function crewTypeFailure(
         break;
       case 'regions':
       case 'legacyCheRegions': {
-        const names = requirement.kind === 'legacyCheRegions' ? LEGACY_CHE_REGION_NAMES : provinces;
-        if (!context.ownedCities.some((city) => requirement.regions.includes(city.region)))
-          reason = `${requirement.regions.map((region) => names[region]).join('·')} 도시가 필요합니다.`;
+        if (!context.ownedCities.some((city) => requirement.regions.includes(city.region))) {
+          const names =
+            requirement.kind === 'legacyCheRegions'
+              ? requirement.regions.map((region) => LEGACY_CHE_REGION_NAMES[region])
+              : (requirement.names ?? requirement.regions.map((region) => provinces[region]));
+          reason = `${names.join('·')} 도시가 필요합니다.`;
+        }
         break;
       }
       case 'cities':

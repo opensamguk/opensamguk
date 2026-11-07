@@ -12,7 +12,7 @@ import { crewTypeFailure, type CrewContext } from '../../packages/rules/src/worl
 import { mapSchema, unitSetSchema } from '../../packages/rules/src/world/resources';
 import { validateWorldResources } from '../../packages/rules/src/world/validate/world';
 import { MINICHE_MAP_IDS, projectCheUnitSet } from './che';
-import { readCheExceptSiegeSource, readCheSource } from './source';
+import { readAlternateCheSource, readCheExceptSiegeSource, readCheSource } from './source';
 
 const sql = readFileSync(new URL('../../packages/db/sql/resources-init.sql', import.meta.url), 'utf8').split(
   '$t4_77_content$',
@@ -43,6 +43,91 @@ describe('T4-46 AC-P2-24 원작 che 병종 수치와 모집 조건', () => {
       });
     }
     expect(() => projectCheUnitSet(original, map)).toThrow('che 지도');
+  });
+
+  it('충차전과 거울세계의 수치·모집 거점·지도 제약을 원작대로 적용한다', async () => {
+    const crMap = mapSchema.parse(
+      JSON.parse(readFileSync(new URL('../../resources/map/cr.json', import.meta.url), 'utf8')),
+    );
+    const siegeSource = await readAlternateCheSource('siegetank');
+    const crSource = await readAlternateCheSource('cr');
+    const siege = projectCheUnitSet(siegeSource, map).unitSet;
+    const mirror = projectCheUnitSet(crSource, crMap).unitSet;
+    expect(siege.crewTypes).toHaveLength(10);
+    expect(siege.defaultCrewTypeId).toBe(1500);
+    expect(siege.crewTypes.find(({ id }) => id === 1501)).toMatchObject({
+      attackCoef: { 0: 2.4 },
+      requirements: [
+        { kind: 'tech', min: 1000 },
+        { kind: 'minRelYear', min: 3 },
+      ],
+    });
+    expect(siege.crewTypes.find(({ id }) => id === 1502)?.requirements).toContainEqual({
+      kind: 'cities',
+      cityKeys: [map.cities.find(({ name }) => name === '업')!.id],
+    });
+    const neutral = structuredClone(siege);
+    neutral.crewTypes.find(({ id }) => id === 1501)!.attackCoef = [];
+    function fight(unitSet: typeof siege, crewType: number) {
+      return simulateBattle(
+        {
+          attacker: { crew: 1000, crewType: 1501, train: 100, atmos: 100 },
+          defender: { crew: 2000, crewType, train: 100, atmos: 100 },
+          attackerTech: 0,
+          defenderTech: 0,
+          openingSkirmish: true,
+          unitSet,
+          coefMode: 'multiply',
+        },
+        rngFor('t4-46-siege-wall', 1),
+      );
+    }
+    expect(fight(siege, 1000).defender.crew).toBeLessThan(fight(neutral, 1000).defender.crew);
+    expect(fight(siege, 1100)).toEqual(fight(neutral, 1100));
+    expect(mirror.crewTypes).toHaveLength(22);
+    expect(mirror.crewTypes.filter(({ effects }) => effects?.includes('firstVolley'))).toHaveLength(6);
+    expect(() => projectCheUnitSet(siegeSource, crMap)).toThrow('che 지도');
+    expect(() => projectCheUnitSet(crSource, map)).toThrow('cr 지도');
+    const scenario = { id: 'test', title: '원작 병종', startYear: 180, nation: [], general: [], diplomacy: [] };
+    const statRules = published('STAT_RULES', 'default');
+    expect(validateWorldResources({ map: crMap, scenario, statRules, unitSet: mirror }).status).toBe('pass');
+    expect(validateWorldResources({ map, scenario, statRules, unitSet: siege }).status).toBe('pass');
+    expect(validateWorldResources({ map, scenario, statRules, unitSet: mirror }).unitSet.status).toBe('fail');
+    expect(validateWorldResources({ map: crMap, scenario, statRules, unitSet: siege }).unitSet.status).toBe('fail');
+  });
+
+  it('라트하우므 병종의 지역 제한은 원작 지역 이름과 거점 소유를 함께 확인한다', async () => {
+    const ludoMap = mapSchema.parse(
+      JSON.parse(readFileSync(new URL('../../resources/map/ludo_rathowm.json', import.meta.url), 'utf8')),
+    );
+    const { unitSet: ludo } = projectCheUnitSet(await readAlternateCheSource('ludo_rathowm'), ludoMap);
+    const monster = ludo.crewTypes.find(({ id }) => id === 217101)!;
+    expect(ludo.crewTypes).toHaveLength(46);
+    expect(ludo.defaultCrewTypeId).toBe(217100);
+    expect(monster.requirements).toEqual([
+      { kind: 'regions', regions: [1, 2], names: ['호넷 마인령', '케이브리스 마인령'] },
+    ]);
+    const context: CrewContext = {
+      nation: { id: 1, tech: 0 },
+      ownedCities: [],
+      cityNames: {},
+      year: 180,
+      startYear: 180,
+      research: [],
+      scorch: 0,
+      isChief: false,
+    };
+    expect(crewTypeFailure(monster, context)?.message).toContain('호넷 마인령·케이브리스 마인령 도시');
+    for (const region of [1, 2, 3]) {
+      const city = ludoMap.cities.find((row) => row.region === region)!;
+      expect(crewTypeFailure(monster, { ...context, ownedCities: [{ ...city, cityKey: city.id }] }) === null).toBe(
+        region !== 3,
+      );
+    }
+    const scenario = { id: 'test', title: '라트하우므 병종', startYear: 180, nation: [], general: [], diplomacy: [] };
+    const statRules = published('STAT_RULES', 'default');
+    expect(validateWorldResources({ map: ludoMap, scenario, statRules, unitSet: ludo }).status).toBe('pass');
+    expect(validateWorldResources({ map, scenario, statRules, unitSet: ludo }).unitSet.status).toBe('fail');
   });
 
   it('소형 지도 세 판의 모집 거점과 호환 지도를 고정한다', () => {
