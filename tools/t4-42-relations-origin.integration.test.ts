@@ -63,7 +63,20 @@ it('AC-P2-20 게시 1030 관계는 생성 원본에서 재적재·재생하고 �
     await db.world.update({ where: { id: worldId }, data: { replayOrigin: tampered as Prisma.InputJsonValue } });
     await expect(loadWorld(db, worldId)).rejects.toThrow('생성 기록과 해시');
     await expect(db.$transaction((tx) => readView(tx, worldId))).rejects.toThrow('생성 기록과 해시');
-    await db.world.update({ where: { id: worldId }, data: { replayOrigin: origin as Prisma.InputJsonValue } });
+
+    const alteredInitial = structuredClone(origin);
+    alteredInitial.initial.generals.find(({ id }) => id === relations.pairs[0]!.a.id)!.gold += 1;
+    await db.world.update({ where: { id: worldId }, data: { replayOrigin: alteredInitial as Prisma.InputJsonValue } });
+    await expect(loadWorld(db, worldId)).rejects.toThrow('생성 기록과 해시');
+    await expect(db.$transaction((tx) => readView(tx, worldId))).rejects.toThrow('생성 기록과 해시');
+
+    await db.world.update({
+      where: { id: worldId },
+      data: { replayOrigin: origin as Prisma.InputJsonValue, initialStateHash: hashState(alteredInitial.initial) },
+    });
+    await expect(loadWorld(db, worldId)).rejects.toThrow('생성 기록과 해시');
+    await expect(db.$transaction((tx) => readView(tx, worldId))).rejects.toThrow('생성 기록과 해시');
+    await db.world.update({ where: { id: worldId }, data: { initialStateHash: origin.initialStateHash } });
 
     await controlClock(db, worldId, 'start');
     const lease = await acquireLease(db, worldId, undefined, 120_000);
