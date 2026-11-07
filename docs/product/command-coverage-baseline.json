@@ -126,6 +126,22 @@
       "note": "D-076은 방랑 군주의 재정착 명령을 승인한다."
     },
     {
+      "kind": "addition",
+      "command": "nation_city_allocate",
+      "target": "nation",
+      "sourceIds": [],
+      "approvalRefs": ["D-040"],
+      "note": "D-040 권한자가 도시 수비병을 부곡에 배속하는 국가 예턴 명령이다."
+    },
+    {
+      "kind": "addition",
+      "command": "form_unit",
+      "target": "general",
+      "sourceIds": [],
+      "approvalRefs": ["D-040"],
+      "note": "D-040 도시 병력 배속에 앞서 빈 부곡을 편성하는 개인 명령이다."
+    },
+    {
       "kind": "replacement",
       "command": "nation_peace",
       "target": "nation",
