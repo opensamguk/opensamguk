@@ -173,6 +173,8 @@ const processPersonnelInput: QueuedInputHandler = async (tx, world, event, { tic
 
 export const builtInEngineFeatures: readonly EngineFeature[] = [
   { key: 'nation-strategy-v1' },
+  { key: 'prepared-turns-v1' },
+  { key: 'nation-research-v1' },
   { key: 'city-scale-v1' },
   {
     key: 'stratagem-cards-v1',
