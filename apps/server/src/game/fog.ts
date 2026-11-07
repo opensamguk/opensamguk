@@ -34,12 +34,18 @@ export async function readCityIntel(
   });
   if (sanction) return null;
 
-  const [row] = await tx.$queryRaw<{ record: unknown }[]>`
-    SELECT "value" -> ${String(nationId)}::text -> ${String(cityKey)}::text AS "record"
+  const [row] = await tx.$queryRaw<
+    { ledgerType: string; nationType: string | null; recordType: string | null; record: unknown }[]
+  >`
+    SELECT jsonb_typeof("value") AS "ledgerType",
+           jsonb_typeof("value" -> ${String(nationId)}::text) AS "nationType",
+           jsonb_typeof("value" -> ${String(nationId)}::text -> ${String(cityKey)}::text) AS "recordType",
+           "value" -> ${String(nationId)}::text -> ${String(cityKey)}::text AS "record"
     FROM "WorldExtSlice" WHERE "worldId" = ${world.id} AND "key" = 'intel'
   `;
-  if (!row) throw new Error('첩보 기록을 읽을 수 없습니다.');
-  if (row.record === null) return null;
+  if (row?.ledgerType !== 'object' || (row.nationType !== null && row.nationType !== 'object'))
+    throw new Error('첩보 기록을 읽을 수 없습니다.');
+  if (row.recordType === null) return null;
   const record = intelRecordSchema.safeParse(row.record);
   if (!record.success) throw new Error('첩보 기록을 읽을 수 없습니다.');
   const { unitSet } = await tx.world.findUniqueOrThrow({ where: { id: world.id }, select: { unitSet: true } });

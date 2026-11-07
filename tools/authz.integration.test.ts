@@ -386,6 +386,21 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
       const remoteCity = (await request('city.get', enemyCity, actor)).data;
       expect(remoteCity).toMatchObject({ fog: { intel: report.items[0], garrisonHidden: true }, generals: [] });
       expect(remoteCity).not.toHaveProperty('population');
+      for (const invalidLedger of [[], { 1: [] }, { 1: null }, { 1: { 2: null } }]) {
+        await db.worldExtSlice.update({
+          where: { worldId_key: { worldId: intelWorld, key: 'intel' } },
+          data: { value: invalidLedger },
+        });
+        try {
+          expect((await request('city.get', enemyCity, actor)).code).toBe('INTERNAL_SERVER_ERROR');
+          expect((await request('intel.records', input, actor)).code).toBe('INTERNAL_SERVER_ERROR');
+        } finally {
+          await db.$executeRaw`
+            UPDATE "WorldExtSlice" SET "value" = ${JSON.stringify(after.state.ext!.intel)}::jsonb
+            WHERE "worldId" = ${intelWorld} AND "key" = 'intel'
+          `;
+        }
+      }
       expect((await request('city.get', enemyCity, enemy)).data).toMatchObject({
         population: initial.cities[1]!.population,
         fog: { intel: null, garrisonHidden: false },
