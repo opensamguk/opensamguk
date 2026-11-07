@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { readFile, readdir } from 'node:fs/promises';
+import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { createDb, type Prisma } from '@opensamguk/db';
 import type { OfficeTurns } from '@opensamguk/rules';
@@ -98,11 +99,16 @@ afterAll(async () => {
     ).toBe(true);
     if (!adminConnected) return;
     if (created) {
-      expect((await catalog()).find((row) => row.datname === name)).toEqual({ datname: name, oid: createdOid });
-      const connections = (
-        await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1', [name])
-      ).rows;
+      const readConnections = async () =>
+        (await admin.query('SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1', [name])).rows;
+      let connections = await readConnections();
+      // 클라이언트가 닫힌 뒤 PostgreSQL이 연결 종료를 반영할 때까지 기다린다.
+      for (let attempt = 0; connections[0]?.count !== 0 && attempt < 30; attempt++) {
+        await delay(100);
+        connections = await readConnections();
+      }
       expect(connections).toEqual([{ count: 0 }]);
+      expect((await catalog()).find((row) => row.datname === name)).toEqual({ datname: name, oid: createdOid });
       // 이 실행이 만든 같은 OID의 DB만 연결 0개일 때 정상 삭제한다.
       await admin.query(`DROP DATABASE "${name}"`);
       const after = await catalog();
