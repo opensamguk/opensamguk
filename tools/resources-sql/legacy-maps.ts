@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { legacyCheCrewRegionsMatch } from '../../packages/rules/src/world/crewRegions';
 import { validateMap, validateUnitSet } from '../../packages/rules/src/world/validate';
 import { hashState } from '../../packages/shared/src/node/hashState';
+import { projectCheUnitSet } from '../unitset/che';
+import { readCheExceptSiegeSource } from '../unitset/source';
 import { immutableResourceStatement } from './convert';
 
 export const LEGACY_MAP_SQL = new URL('../../packages/db/sql/resources-legacy-maps.sql', import.meta.url);
@@ -15,6 +17,8 @@ const mapSources = [
   ['miniche_clean', 'bc2a4189e84dd63eccd9d9319d49b4931e79b804dbe04ce168cf1eb9d4b33181'],
 ] as const;
 const unitSetName = 'che-miniche';
+const exceptSiegeName = 'che_except_siege';
+export const legacyMapUnitSetNames = [unitSetName, exceptSiegeName] as const;
 export const LEGACY_MAP_BODY_TAG = '$legacy_maps_init$';
 export const LEGACY_MAP_CONTENT_TAG = '$legacy_maps_content$';
 const root = new URL('../../', import.meta.url);
@@ -56,6 +60,9 @@ export async function legacyMapPublications() {
       };
     }),
   );
+  const miniche = rows.find(({ name }) => name === 'miniche')!;
+  const { unitSet: exceptSiege } = projectCheUnitSet(await readCheExceptSiegeSource(), JSON.parse(miniche.raw));
+  if (exceptSiege.id !== exceptSiegeName) throw new Error('축지 병종 판을 확인하세요.');
   return [
     ...rows,
     {
@@ -65,6 +72,14 @@ export async function legacyMapPublications() {
       raw: unitSet.raw,
       contentHash: hashState(unitSet.content),
       source: `resources/unitset/unitset_che.json; ${source}`,
+    },
+    {
+      kind: 'UNIT_SET' as const,
+      name: exceptSiegeName,
+      version: 1,
+      raw: JSON.stringify(exceptSiege, null, 2) + '\n',
+      contentHash: hashState(exceptSiege),
+      source: `resources/unitset/unitset_che_except_siege.json; ${source}`,
     },
   ];
 }

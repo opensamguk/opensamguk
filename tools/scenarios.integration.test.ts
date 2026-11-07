@@ -401,11 +401,14 @@ it('S5 miniche 지도·병종의 게시, 롤백과 월드 재생', async () => {
     expect(await allRows(native)).toEqual(withConflict);
     await db.gameResource.delete({ where: { kind_name_version: ref } });
 
-    expect(await initializeLegacyMaps(db, generated)).toEqual({ inserted: 4, existing: 0 });
+    await db.$executeRawUnsafe(legacyMapsSql(resources.slice(0, -1)));
+    const beforeUpgrade = await allRows(native);
+    expect(beforeUpgrade).toHaveLength(baseline.length + 4);
+    expect(await initializeLegacyMaps(db, generated)).toEqual({ inserted: 1, existing: 4 });
     const published = await allRows(native);
-    expect(published).toHaveLength(baseline.length + 4);
-    expect(published).toEqual(expect.arrayContaining(baseline));
-    expect(await initializeLegacyMaps(db, generated)).toEqual({ inserted: 0, existing: 4 });
+    expect(published).toHaveLength(baseline.length + 5);
+    expect(published).toEqual(expect.arrayContaining(beforeUpgrade));
+    expect(await initializeLegacyMaps(db, generated)).toEqual({ inserted: 0, existing: 5 });
     expect(await allRows(native)).toEqual(published);
 
     const scenario = {
@@ -415,7 +418,7 @@ it('S5 miniche 지도·병종의 게시, 롤백과 월드 재생', async () => {
       nation: [],
       general: [],
       diplomacy: [],
-      requiredUnitSet: last.name,
+      requiredUnitSet: 'che-miniche',
     };
     await db.gameResource.create({
       data: {
@@ -441,7 +444,7 @@ it('S5 miniche 지도·병종의 게시, 롤백과 월드 재생', async () => {
           '--map',
           map.name,
           '--unit-set',
-          last.name,
+          scenario.requiredUnitSet,
           '--seed',
           't4-46-miniche-replay',
           '--turn-term',
@@ -470,67 +473,98 @@ it('S5 miniche 지도·병종의 게시, 롤백과 월드 재생', async () => {
   });
 }, 120000);
 
-it('S5 원작 소형 지도를 지정한 시나리오는 선행 게시 판을 대조한다', async () => {
-  await withDatabase(async ({ db, native }) => {
-    const content = {
-      id: '2190',
-      title: '소형 지도 시나리오 검증',
-      startYear: 180,
-      nation: [],
-      general: [],
-      diplomacy: [],
-      requiredMap: 'miniche',
-      requiredUnitSet: 'che-miniche',
-    };
-    const rows: ScenarioRow[] = [
-      {
-        ...scenarioRows.find(({ key }) => key === content.id)!,
-        support: 'ready',
-        resourceKey: content.id,
-        contentHash: hashState(content),
-        source: '소형 지도 시나리오 검증',
-        map: 'miniche',
-        unitSet: 'che-miniche',
-      },
-    ];
-    const legacy = await legacyMapPublications();
-    const material = {
-      ...(await readScenarioMaterials(db)),
-      legacyResources: new Map(legacy.map(({ kind, name, raw }) => [`${kind}/${name}`, JSON.parse(raw)])),
-    };
-    const scenarioInput = { [content.id]: JSON.stringify(content) };
-    const generated = convertScenariosToSql(scenarioInput, notice, material, rows);
-    const initial = await allRows(native);
-    await expect(readScenarioMaterials(db, rows)).rejects.toThrow('MAP/miniche/1');
-    await expect(initializeScenarios(db, generated, rows)).rejects.toMatchObject({
-      keys: ['MAP/miniche/1', 'UNIT_SET/che-miniche/1'],
-    });
-    expect(await allRows(native)).toEqual(initial);
-    expect(() =>
-      convertScenariosToSql(
-        { [content.id]: JSON.stringify({ ...content, requiredMap: undefined }) },
-        notice,
-        material,
-        rows,
-      ),
-    ).toThrow('시나리오 자원 검증 실패');
+it.each([
+  { key: '2190', unitSet: 'che-miniche' },
+  { key: '911', unitSet: 'che_except_siege' },
+] as const)(
+  'S5 원작 소형 지도 시나리오 $key는 선행 게시 판을 대조한다',
+  async ({ key, unitSet }) => {
+    await withDatabase(async ({ db, native, url }) => {
+      const content = {
+        id: key,
+        title: '소형 지도 시나리오 검증',
+        startYear: 180,
+        nation: [],
+        general: [],
+        diplomacy: [],
+        requiredMap: 'miniche',
+        requiredUnitSet: unitSet,
+      };
+      const rows: ScenarioRow[] = [
+        {
+          ...scenarioRows.find(({ key }) => key === content.id)!,
+          support: 'ready',
+          resourceKey: content.id,
+          contentHash: hashState(content),
+          source: '소형 지도 시나리오 검증',
+          map: 'miniche',
+          unitSet,
+        },
+      ];
+      const legacy = await legacyMapPublications();
+      const material = {
+        ...(await readScenarioMaterials(db)),
+        legacyResources: new Map(legacy.map(({ kind, name, raw }) => [`${kind}/${name}`, JSON.parse(raw)])),
+      };
+      const scenarioInput = { [content.id]: JSON.stringify(content) };
+      const generated = convertScenariosToSql(scenarioInput, notice, material, rows);
+      const initial = await allRows(native);
+      await expect(readScenarioMaterials(db, rows)).rejects.toThrow('MAP/miniche/1');
+      await expect(initializeScenarios(db, generated, rows)).rejects.toMatchObject({
+        keys: ['MAP/miniche/1', `UNIT_SET/${unitSet}/1`],
+      });
+      expect(await allRows(native)).toEqual(initial);
+      expect(() =>
+        convertScenariosToSql(
+          { [content.id]: JSON.stringify({ ...content, requiredMap: undefined }) },
+          notice,
+          material,
+          rows,
+        ),
+      ).toThrow('시나리오 자원 검증 실패');
 
-    await initializeLegacyMaps(db);
-    const published = await allRows(native);
-    expect(convertScenariosToSql(scenarioInput, notice, await readScenarioMaterials(db, rows), rows)).toBe(generated);
-    const damaged = generated.replace(
-      '\nEND;',
-      '\n  UPDATE "GameResource" SET "source" = \'changed\' WHERE "kind" = \'MAP\' AND "name" = \'miniche\' AND "version" = 1;\nEND;',
-    );
-    await expect(initializeScenarios(db, damaged, rows)).rejects.toMatchObject({
-      message: '시나리오 SQL 실패: SCENARIO/2190/1',
-      keys: ['SCENARIO/2190/1'],
+      await initializeLegacyMaps(db);
+      const published = await allRows(native);
+      expect(convertScenariosToSql(scenarioInput, notice, await readScenarioMaterials(db, rows), rows)).toBe(generated);
+      const damaged = generated.replace(
+        '\nEND;',
+        '\n  UPDATE "GameResource" SET "source" = \'changed\' WHERE "kind" = \'MAP\' AND "name" = \'miniche\' AND "version" = 1;\nEND;',
+      );
+      await expect(initializeScenarios(db, damaged, rows)).rejects.toMatchObject({
+        message: `시나리오 SQL 실패: SCENARIO/${key}/1`,
+        keys: [`SCENARIO/${key}/1`],
+      });
+      expect(await allRows(native)).toEqual(published);
+      expect(await initializeScenarios(db, generated, rows)).toEqual({ inserted: 1, existing: 0 });
+      expect(await initializeScenarios(db, generated, rows)).toEqual({ inserted: 0, existing: 1 });
+
+      const initialWorld = await loadInitialWorldFromDb(db, {
+        scenario: key,
+        map: 'miniche',
+        unitSet,
+        seed: 't4-46-miniche-dependencies',
+      });
+      expect(initialWorld.unitSet.id).toBe(unitSet);
+      expect(initialWorld.unitSet.crewTypes).toHaveLength(unitSet === 'che_except_siege' ? 33 : 34);
+      const { worldId } = await saveInitialWorld(db, initialWorld, {
+        name: `소형 지도 ${key}`,
+        turnTermMinutes: 60,
+        endYear: 200,
+        ruleFeatures: ['battle-affinity-v2'],
+      });
+      await controlClock(db, worldId, 'start');
+      const lease = await acquireLease(db, worldId);
+      if (!lease) throw new Error('소형 지도 검증 월드의 실행권을 얻지 못했습니다.');
+      try {
+        await new TurnLoop(db, lease).advanceTo(TICKS_PER_MONTH);
+      } finally {
+        await releaseLease(db, lease);
+      }
+      await expectReplayMatchesReloadedState(db, url, worldId);
     });
-    expect(await allRows(native)).toEqual(published);
-    expect(await initializeScenarios(db, generated, rows)).toEqual({ inserted: 1, existing: 0 });
-    expect(await initializeScenarios(db, generated, rows)).toEqual({ inserted: 0, existing: 1 });
-  });
-});
+  },
+  120000,
+);
 
 it.each(ready)('S6 $key 두 DB 월드의 행 수와 재적재 해시는 파일 합성과 같다', async (row) => {
   await withDatabase(async ({ db }) => {

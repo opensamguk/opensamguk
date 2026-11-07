@@ -161,6 +161,7 @@
 --
 -- - 원작 resources/map/map_miniche.json, map_miniche_b.json, map_miniche_clean.json은 각각 같은 이름에서 map_ 접두사를 뺀 파일에 원문 바이트를 보존했다.
 -- - resources/unitset/che-miniche.json은 같은 커밋의 unitset_che.json 모집 거점 이름을 세 지도에서 공통으로 쓰는 도시 ID로 변환했다. 병종 수치와 전투 효과는 이 저장소의 che 판을 따른다.
+-- - 축지의 `che_except_siege` 병종 판은 같은 커밋의 `resources/unitset/unitset_che_except_siege.json`에서 변환한다. 원작 blob `6c0fd71a1fda09c3288a4b1ed7e218a47e418777`는 JSON 서식만 정리해 `tools/unitset/source/che-except-siege-core2026-df6c926.json`에 보존한다. 같은 devsam MIT 고지를 적용한다.
 --
 
 DO $t4_46_init$

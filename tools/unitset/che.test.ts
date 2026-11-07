@@ -12,7 +12,7 @@ import { crewTypeFailure, type CrewContext } from '../../packages/rules/src/worl
 import { mapSchema, unitSetSchema } from '../../packages/rules/src/world/resources';
 import { validateWorldResources } from '../../packages/rules/src/world/validate/world';
 import { MINICHE_MAP_IDS, projectCheUnitSet } from './che';
-import { readCheSource } from './source';
+import { readCheExceptSiegeSource, readCheSource } from './source';
 
 const sql = readFileSync(new URL('../../packages/db/sql/resources-init.sql', import.meta.url), 'utf8').split(
   '$t4_77_content$',
@@ -28,6 +28,23 @@ const { unitSet, specials } = projectCheUnitSet(source, map);
 const unit = (id: number) => unitSet.crewTypes.find((row) => row.id === id)!;
 
 describe('T4-46 AC-P2-24 원작 che 병종 수치와 모집 조건', () => {
+  it('축지 판의 병종 33종과 철기병 수치·공성 계수를 원작대로 변환한다', async () => {
+    const original = (await readCheExceptSiegeSource()) as { crewTypes: Record<string, unknown>[] };
+    const smallMap = JSON.parse(readFileSync(new URL('../../resources/map/miniche.json', import.meta.url), 'utf8'));
+    const { unitSet: projected } = projectCheUnitSet(original, smallMap);
+    expect(projected.id).toBe('che_except_siege');
+    expect(projected.crewTypes).toHaveLength(33);
+    expect(projected.crewTypes.find(({ id }) => id === 1501)).toBeUndefined();
+    for (const id of [1304, 1500, 1502, 1503]) {
+      const row = original.crewTypes.find((candidate) => candidate.id === id)!;
+      expect(projected.crewTypes.find((candidate) => candidate.id === id)).toMatchObject({
+        defence: row.defence,
+        attackCoef: row.attackCoef,
+      });
+    }
+    expect(() => projectCheUnitSet(original, map)).toThrow('che 지도');
+  });
+
   it('소형 지도 세 판의 모집 거점과 호환 지도를 고정한다', () => {
     const smallUnits = unitSetSchema.parse(
       JSON.parse(readFileSync(new URL('../../resources/unitset/che-miniche.json', import.meta.url), 'utf8')),
