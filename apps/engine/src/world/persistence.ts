@@ -19,6 +19,7 @@ import {
   type WorldPreset,
   checkRuleFeatures,
   checkReplayOrigin,
+  replayResourceHashInput,
   type JsonValue,
   checkStatProfile,
   checkOperationalProfile,
@@ -181,14 +182,7 @@ export function prepareInitialWorld(
   let replayOrigin: unknown = {
     version: 1,
     initial,
-    resourceHash: hashState({
-      scenarioKey: state.scenarioKey,
-      mapKey: state.mapKey,
-      unitSetKey: state.unitSetKey,
-      statRules: state.statRules,
-      unitSet: state.unitSet,
-      ...(state.operationalMap ? { operationalMap: state.operationalMap } : {}),
-    }),
+    resourceHash: hashState(replayResourceHashInput(state)),
     initialStateHash: stateHash,
   };
   let creationState = initial;
@@ -201,15 +195,7 @@ export function prepareInitialWorld(
       ...(featureData !== undefined ? { featureData } : {}),
     };
     checkReplayOrigin(origin);
-    const resources = {
-      scenarioKey: initial.scenarioKey,
-      mapKey: initial.mapKey,
-      unitSetKey: initial.unitSetKey,
-      statRules: initial.statRules,
-      unitSet: initial.unitSet,
-      ...(initial.operationalMap ? { operationalMap: initial.operationalMap } : {}),
-    };
-    origin.resourceHash = hashState({ ...resources, ...(featureData !== undefined ? { featureData } : {}) });
+    origin.resourceHash = hashState(replayResourceHashInput(initial, featureData));
     replayOrigin = origin;
   }
   if (options.extFormat === 1) {

@@ -1,5 +1,5 @@
 import type { PrismaClient } from '@opensamguk/db';
-import { adminResetResourcesSchema, type WorldInit } from '@opensamguk/rules';
+import { adminResetResourcesSchema, createRelationsData, RELATIONS_FEATURE, type WorldInit } from '@opensamguk/rules';
 import type { InitialResources } from '../world/resources';
 import { prepareInitialWorld, savePreparedInitialWorld, type InitialWorldOptions } from '../world/persistence';
 
@@ -9,7 +9,12 @@ export async function createWorldFromCli(
   options: InitialWorldOptions,
   resources?: InitialResources,
 ) {
-  const prepared = prepareInitialWorld(state, options);
+  const relations = (options.ruleFeatures ?? state.ruleFeatures)?.includes(RELATIONS_FEATURE);
+  const selected =
+    relations && !Object.hasOwn(options.featureData ?? {}, RELATIONS_FEATURE)
+      ? { ...options, featureData: { ...options.featureData, [RELATIONS_FEATURE]: createRelationsData(state) } }
+      : options;
+  const prepared = prepareInitialWorld(state, selected);
   const refs = resources
     ? adminResetResourcesSchema.parse(
         Object.values(resources)
