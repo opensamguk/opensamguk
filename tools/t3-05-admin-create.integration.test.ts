@@ -25,7 +25,7 @@ import { exportReplay, readArchive, replayToEnd } from '../apps/engine/src/repla
 import { initialReplayStateWithRegistry, resolverForRuleFeatures, ruleRegistry } from '../packages/rules/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { loadWorld } from '../apps/engine/src/worldLoader';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { readWorldState, saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -737,16 +737,18 @@ for (const profileKey of [
   'expanded-191-v5',
   'expanded-191-v6',
   'expanded-191-v7',
+  'expanded-191-v8',
 ])
   it(`AC-P2-30·31·32·33 ${profileKey} 관리자 HTTP 확장 선택·엔진 생성·재생·저장 설정 초기화를 연결한다`, async (signal) => {
     const options = await creationOptions(actor, signal, true);
     expect(options.status).toBe(200);
-    expect(options.data?.profiles).toHaveLength(8);
+    expect(options.data?.profiles).toHaveLength(9);
     const profileIds: Record<string, string> = {
       'expanded-191-v4': 'san10-191-expanded',
       'expanded-191-v5': 'san10-191-lifecycle',
       'expanded-191-v6': 'san10-191-research',
       'expanded-191-v7': 'san10-191-border-return',
+      'expanded-191-v8': 'san10-191-intel',
     };
     const selected = options.data!.profiles.find(
       (profile) => profile.id === (profileIds[profileKey] ?? 'integration-v01-expanded'),
@@ -791,8 +793,14 @@ for (const profileKey of [
       if (world.ruleFeatures.includes('nation-lifecycle-v1'))
         expect(world.nationLifecycleState).toEqual({ version: 1, nations: {} });
       else expect(world.nationLifecycleState).toBeNull();
-      if (profileKey === 'expanded-191-v6' || profileKey === 'expanded-191-v7') {
-        expect(world.ruleFeatures).toHaveLength(profileKey === 'expanded-191-v7' ? 23 : 22);
+      const researchFeatureCounts: Record<string, number> = {
+        'expanded-191-v6': 22,
+        'expanded-191-v7': 23,
+        'expanded-191-v8': 24,
+      };
+      const featureCount = researchFeatureCounts[profileKey];
+      if (featureCount !== undefined) {
+        expect(world.ruleFeatures).toHaveLength(featureCount);
         expect(world.preparedTurnsState).toEqual({ version: 1, nations: {} });
         expect(world.nationResearchState).toEqual({ version: 1, nations: {} });
       } else {
@@ -816,8 +824,9 @@ for (const profileKey of [
     const archive = readArchive(await exportReplay(db, world.id));
     if (archive.version !== 3) throw new Error('확장 생성의 실제 V3 보관 파일이 필요합니다.');
     const reloaded = await loadWorld(db, world.id);
-    const borderReturn = resolverForRuleFeatures(reloaded)?.get('return_border');
-    if (profileKey === 'expanded-191-v7') {
+    const commands = resolverForRuleFeatures(reloaded);
+    const borderReturn = commands?.get('return_border');
+    if (profileKey === 'expanded-191-v7' || profileKey === 'expanded-191-v8') {
       expect(borderReturn).toMatchObject({
         key: 'return_border',
         name: '접경귀환',
@@ -825,6 +834,14 @@ for (const profileKey of [
         category: 'military',
       });
     } else expect(borderReturn).toBeUndefined();
+    if (profileKey === 'expanded-191-v8') {
+      expect(commands?.get('spy')).toMatchObject({ key: 'spy', target: 'general', category: 'military' });
+      expect(reloaded.ext).toEqual({ intel: {} });
+      expect(hashState(await readWorldState(db, world.id))).toBe(world.initialStateHash);
+    } else {
+      expect(commands?.get('spy')).toBeUndefined();
+      expect(reloaded.ext).toBeUndefined();
+    }
     expect(hashState(archive.origin.initial)).toBe(world.initialStateHash);
     expect(
       hashState(initialReplayStateWithRegistry(archive.origin.initial, ruleRegistry, archive.origin.featureData).state),
@@ -881,12 +898,17 @@ for (const profileKey of [
     const targetArchive = readArchive(await exportReplay(db, target.id));
     if (targetArchive.version !== 3) throw new Error('초기화의 실제 V3 보관 파일이 필요합니다.');
     expect(hashState(targetArchive.origin.initial)).toBe(target.initialStateHash);
+    const targetState = await loadWorld(db, target.id);
+    if (profileKey === 'expanded-191-v8') {
+      expect(targetState.ext).toEqual({ intel: {} });
+      expect(hashState(await readWorldState(db, target.id))).toBe(target.initialStateHash);
+    }
     expect(
       hashState(
         initialReplayStateWithRegistry(targetArchive.origin.initial, ruleRegistry, targetArchive.origin.featureData)
           .state,
       ),
-    ).toBe(hashState(await loadWorld(db, target.id)));
+    ).toBe(hashState(targetState));
     expect(
       initialReplayStateWithRegistry(targetArchive.origin.initial, ruleRegistry, targetArchive.origin.featureData).state
         .ruleFeatures,

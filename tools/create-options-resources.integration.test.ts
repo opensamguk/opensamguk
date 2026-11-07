@@ -68,6 +68,33 @@ const registered: RuleRegistry = {
   ],
 };
 describe('AC-M3-04 원생성 설정 조회', () => {
+  it('AC-P2-07·18 첩보 선택은 접경귀환판의 설정과 첩보 기능을 함께 고정한다', () => {
+    const previous = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v7.json'));
+    const data = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v8.json'));
+    expect(data).toEqual({
+      ...previous,
+      key: 'expanded-191-v8',
+      ruleFeatures: [...previous.ruleFeatures, 'intel-v1'].sort(),
+    });
+    const option = expandedCreationProfile(expandedRows, allPresets, data, ruleRegistry, 'san10-191-intel');
+    expect(option).toMatchObject({
+      id: 'san10-191-intel',
+      available: true,
+      featureProfileKey: data.key,
+      featureProfileHash: hashState(data),
+      ruleFeatures: data.ruleFeatures,
+    });
+    for (const key of ['border-return-v1', 'nation-lifecycle-v1', 'nation-research-v1', 'intel-v1', 'policy'])
+      expect(
+        expandedCreationProfile(
+          expandedRows,
+          allPresets,
+          { ...data, ruleFeatures: data.ruleFeatures.filter((feature) => feature !== key) },
+          ruleRegistry,
+          'san10-191-intel',
+        ),
+      ).toMatchObject({ available: false, code: 'FEATURE_PROFILE_UNAVAILABLE' });
+  });
   it('AC-M1-14 새 선택에서만 기존 연구판과 접경귀환을 함께 고정한다', () => {
     const previous = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v6.json'));
     const data = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v7.json'));
