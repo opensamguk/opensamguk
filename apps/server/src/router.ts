@@ -39,6 +39,7 @@ import { lineageRouter } from './routers/lineage';
 import { stratagemCardsRouter } from './routers/stratagemCards';
 import { heritageRouter } from './routers/heritage';
 import { notificationRouter } from './routers/notification';
+import { intelRouter } from './routers/intel';
 
 export const appRouter = router({
   auth: authRouter,
@@ -80,6 +81,7 @@ export const appRouter = router({
   stratagemCards: stratagemCardsRouter,
   heritage: heritageRouter,
   notification: notificationRouter,
+  intel: intelRouter,
   // 화면이 서버와 DB 연결을 확인하는 데 쓴다 (AC-M1-02).
   health: publicProcedure.query(async ({ ctx }) => {
     let db: 'ok' | 'down' = 'ok';

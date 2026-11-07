@@ -6,8 +6,9 @@ import { createCityResourceCommandResolver } from './cityResources/commands';
 import { createGovernanceCommandResolver } from './governance/commands';
 import { createStratagemCardResolver } from './stratagemCards/resolver';
 import { createNationLifecycleResolver } from './nationLifecycle/resolver';
+import { extRegistryForRuleFeatures } from './commands/ext/state';
 
-// 형식 3의 같은 기능 등록표에서 무상태 명령을 고른다. 기존 preset 선택은 따로 보존한다.
+// 형식 3의 기능 등록표에서 명령을 고른다. 기존 preset 선택은 따로 보존한다.
 export function resolverForRuleFeatures(
   state: Pick<WorldView, 'ruleFeatures'>,
   registry: RuleRegistry = ruleRegistry,
@@ -20,7 +21,8 @@ export function resolverForRuleFeatures(
   const campaign = features.includes('campaign-v1');
   const governance = features.includes('governance-v1');
   if (!bindings.length && !campaign && !governance) return undefined;
-  if (bindings.some((binding) => binding.sliceKeys.length))
+  const { slices } = extRegistryForRuleFeatures(features);
+  if (bindings.some((binding) => binding.sliceKeys.some((key) => !slices.some((slice) => slice.key === key))))
     throw new Error('이 규칙 명령은 저장 조각을 지원하지 않습니다.');
   const definitions = bindings.map((binding) => binding.definition);
   const enabled = {

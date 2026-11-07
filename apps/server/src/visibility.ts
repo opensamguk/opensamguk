@@ -1,6 +1,14 @@
 import { publicGeographySchema } from '@opensamguk/shared';
 import type { Prisma } from '@opensamguk/db';
-import { BALANCE, type CampaignUnitState } from '@opensamguk/rules';
+import {
+  BALANCE,
+  TICKS_PER_MONTH,
+  toGameDate,
+  type CampaignUnitState,
+  type intelRecordSchema,
+  type UnitSetResource,
+} from '@opensamguk/rules';
+import type { IntelDisclosurePolicy } from './intelPolicy';
 import { z } from 'zod';
 
 type General = Omit<
@@ -22,6 +30,42 @@ type Nation = Omit<
   'notice' | 'noticeDirective' | 'noticeRevision' | 'noticeUpdatedAt' | 'noticeUpdatedBy'
 >;
 export type Viewer = Pick<General, 'id' | 'nationId' | 'cityKey'> | null;
+
+export function intelRecordInfo(
+  cityKey: number,
+  record: z.infer<typeof intelRecordSchema>,
+  context: { startYear: number; tick: number; unitSet: UnitSetResource },
+  policy: IntelDisclosurePolicy,
+) {
+  const { year, month } = toGameDate(context.startYear, record.tick);
+  const ageMonths = Math.max(0, Math.floor(context.tick / TICKS_PER_MONTH) - Math.floor(record.tick / TICKS_PER_MONTH));
+  if (!policy.withinAge(ageMonths)) return null;
+  return {
+    cityKey,
+    tick: record.tick,
+    year,
+    month,
+    ageMonths,
+    level: record.level,
+    owner: record.owner,
+    population: record.population,
+    populationMax: record.populationMax,
+    trust: record.trust,
+    generals: record.generals,
+    crew: policy.crew(record.crew),
+    ...(record.domestic ? { domestic: record.domestic } : {}),
+    ...(record.crewTypes
+      ? {
+          crewTypes: record.crewTypes.map((row) => ({
+            crewType: row.crewType,
+            name: context.unitSet.crewTypes.find(({ id }) => id === row.crewType)?.name ?? String(row.crewType),
+            generals: row.generals,
+          })),
+        }
+      : {}),
+    ...(record.tech ? { tech: record.tech } : {}),
+  };
+}
 
 export function visibility(viewer: Viewer) {
   const sameNation = (nationId: number | null) =>

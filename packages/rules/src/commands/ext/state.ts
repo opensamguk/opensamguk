@@ -1,5 +1,6 @@
 import type { DeepReadonly, JsonValue, WorldExt, WorldState } from '../../model/world';
 import type { EnabledCommands } from '../resolve';
+import { INTEL_FEATURE, intelSlice, spyBinding } from './intel/record';
 
 export type ExtInitContext = DeepReadonly<Omit<WorldState, 'ext'>>;
 export interface ExtSlice<T extends JsonValue = JsonValue> {
@@ -98,8 +99,22 @@ export function extSliceKeysWithRegistry(enabled: EnabledCommands | null, regist
   return [...selected].sort();
 }
 
-export function restoreExtState(enabled: EnabledCommands | null, raw: unknown): WorldExt | undefined {
-  return restoreExtStateWithRegistry(enabled, raw, { slices: extSlices, bindings: extCommandBindings });
+export function restoreExtState(
+  enabled: EnabledCommands | null,
+  raw: unknown,
+  ruleFeatures?: readonly string[],
+): WorldExt | undefined {
+  return restoreExtStateWithRegistry(
+    ruleFeatures?.includes(INTEL_FEATURE) ? { general: ['spy'], nation: [] } : enabled,
+    raw,
+    extRegistryForRuleFeatures(ruleFeatures),
+  );
+}
+
+export function extRegistryForRuleFeatures(ruleFeatures?: readonly string[]): ExtStateRegistry {
+  return ruleFeatures?.includes(INTEL_FEATURE)
+    ? { slices: [intelSlice], bindings: [spyBinding] }
+    : { slices: extSlices, bindings: extCommandBindings };
 }
 
 export function restoreExtStateWithRegistry(

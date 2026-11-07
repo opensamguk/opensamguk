@@ -50,9 +50,14 @@ export function engineResolver(world: ResolverWorld) {
   };
 }
 
-export async function loadExt(tx: Prisma.TransactionClient, worldId: string, commands: EnabledCommands | null) {
+export async function loadExt(
+  tx: Prisma.TransactionClient,
+  worldId: string,
+  commands: EnabledCommands | null,
+  ruleFeatures?: readonly string[],
+) {
   // 호출자는 engineResolver로 저장된 선택과 프리셋을 먼저 대조한다.
-  return restoreExtState(commands, await readWorldExtRows(tx, worldId));
+  return restoreExtState(commands, await readWorldExtRows(tx, worldId), ruleFeatures);
 }
 
 export async function persistExt(
@@ -66,5 +71,5 @@ export async function persistExt(
 
 export async function verifyWorldExt(tx: Prisma.TransactionClient, world: ResolverWorld & { id: string }) {
   const { commands } = engineResolver(world);
-  await loadExt(tx, world.id, commands);
+  await loadExt(tx, world.id, commands, world.ruleFeatures);
 }
