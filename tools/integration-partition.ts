@@ -1,14 +1,16 @@
 import { isAbsolute } from 'node:path';
 
 export const AUTHZ_SHARD_TOTAL = 3;
+export const ENGINE_SHARD_TOTAL = 2;
 
 export function integrationShardArgs(suite: string | undefined, shard: string | undefined, report: string | undefined) {
   if (shard === undefined && report === undefined) return [];
-  if (suite !== 'api') throw new Error('authz shard suite');
+  if (suite !== 'api' && suite !== 'engine') throw new Error('integration shard suite');
   if (!shard || !report || !isAbsolute(report) || !/^[1-9]\d*\/[1-9]\d*$/.test(shard))
-    throw new Error('authz shard-spec');
+    throw new Error('integration shard-spec');
   const [index, total] = shard.split('/').map(Number);
-  if (total !== AUTHZ_SHARD_TOTAL || index! > total) throw new Error('authz shard-spec');
+  const expectedTotal = suite === 'api' ? AUTHZ_SHARD_TOTAL : ENGINE_SHARD_TOTAL;
+  if (total !== expectedTotal || index! > total) throw new Error('integration shard-spec');
   return [`--shard=${shard}`, '--reporter=default', '--reporter=json', `--outputFile.json=${report}`];
 }
 

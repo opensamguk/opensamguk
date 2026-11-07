@@ -194,14 +194,20 @@ jobs:
 
   # Slow engine scenarios use a separate PostgreSQL service. No tests or limits are removed.
   database-engine:
-    name: opensamguk-database-engine
+    name: opensamguk-database-engine (${{ matrix.shard }}/2)
     if: github.event_name != 'workflow_dispatch' || (inputs.load_expected_sha == '' && inputs.runtime_resources_expected_sha == '')
     runs-on: ubuntu-24.04
-    # INT-19 장수 지시 시나리오를 더해 약 20분이 걸린다.
+    # 전체가 30분 한도를 넘었다. 각 조각은 같은 개별 제한과 자기 PG를 쓴다.
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     env:
       CI: 'true'
       INTEGRATION_SUITE: engine
+      INTEGRATION_SHARD: ${{ matrix.shard }}/2
+      INTEGRATION_REPORT: ${{ runner.temp }}/engine-${{ matrix.shard }}.json
       DATABASE_URL: postgresql://opensamguk:opensamguk@127.0.0.1:5432/opensamguk_ci_e2e_test
       TEST_DATABASE_URL: postgresql://opensamguk:opensamguk@127.0.0.1:5432/opensamguk_ci_int_test
     services:
