@@ -26,7 +26,7 @@ const input: Record<string, string> = Object.fromEntries(
   ),
 );
 
-describe('T4-46 / AC-P2-24 A9 출처와 합성', () => {
+describe('T4-46 / AC-P2-24 A9·B2 출처와 합성', () => {
   it('S0 원작 tree에서 대조한 83키·blob·sha256을 고정한다', () => {
     const expected = `0 1 2 900 901 902 903 904 905 906 908 910 911 912 913 914 915 916
 1010 1020 1021 1030 1031 1040 1041 1050 1060 1070 1080 1090 1100 1110 1120
@@ -48,7 +48,7 @@ describe('T4-46 / AC-P2-24 A9 출처와 합성', () => {
     }
   });
 
-  it.each(cases)('S1 $key 원작 바이트와 하비 최소 수정만 보존한다', (row) => {
+  it.each(cases)('S1 $key 원작 바이트와 승인된 최소 수정만 보존한다', (row) => {
     expect(createHash('sha256').update(row.originalText).digest('hex')).toBe(row.sha256);
     const original = JSON.parse(row.originalText) as Record<string, unknown>;
     const copy = JSON.parse(input[row.key]!) as Record<string, unknown>;

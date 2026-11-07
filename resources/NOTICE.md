@@ -135,3 +135,9 @@ core2026 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`의 `resources/unitset/unitse
 ## 내장 다섯 자원의 초기화 정본
 
 기존 지도·시나리오·기본 병종·능력치 규칙·초상 대응표의 전체 원문은 `packages/db/sql/resources-init.sql`에 보존한다. 원래 JSON 파일은 제거하며 위 원본 경로는 출처 기록으로 남긴다. MIT 전문과 초상 출처·내용·해시는 바꾸지 않는다. 초기화 SQL의 게시 1판을 읽고 새 내용은 별도 자원 판으로 다룬다.
+
+## 도시 없이 시작하는 두 시나리오
+
+core2026 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`의 `resources/scenario/scenario_1050.json`과 `scenario_1080.json`을 `resources/scenario/1050.json`과 `1080.json`에 보존한다. 출처와 식별용 칸을 더하고 JSON 서식을 정리했다. 국가·도시 소유·장수 소속·명시 위치와 원작 값은 보존한다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+원문 바이트와 SHA-256은 `tools/fixtures/t4-46-scenarios.json`에 보관하며 두 게시 판은 기존 생성기로 `packages/db/sql/resources-scenarios.sql`에 추가한다. 도시 없는 국가의 시작 원장과 위치 미지정 소속 장수의 전체 지도 시드 배치는 사용자 승인 AC-P2-26·T4-48을 따른다. 기존 9종 사본과 1030 판은 보존한다.

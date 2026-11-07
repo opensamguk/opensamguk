@@ -16,7 +16,7 @@ export const nationLifecycleFeature: RuleFeatureDefinition = {
   checkOrigin({ initial, data }) {
     assertInitialNationLifecycle(initial, true);
     if (Object.hasOwn(initial, 'nationLifecycle') || data !== undefined)
-      throw new Error('국가 변천은 빈 방랑 원장에서 시작합니다.');
+      throw new Error('국가 변천 초기 원장은 생성 자료에서 도출합니다.');
   },
   initReplayState(replay) {
     if (Object.hasOwn(replay.state, 'nationLifecycle')) throw new Error('국가 변천 초기화가 중복됐습니다.');
