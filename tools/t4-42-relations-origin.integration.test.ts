@@ -9,8 +9,10 @@ import { exportReplay, readArchive } from '../apps/engine/src/replay';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { loadWorld } from '../apps/engine/src/worldLoader';
 import { controlClock } from '../apps/engine/src/world/clock';
-import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { composeInitialWorld, readInitialResources } from '../apps/engine/src/world/resources';
+import { savePreparedInitialWorld } from '../apps/engine/src/world/persistence';
+import { createWorldFromCli } from '../apps/engine/src/admin/creation';
+import { prepareWorldReset } from '../apps/engine/src/admin/resetPreparation';
 import { readView } from '../apps/server/src/game/queries';
 import { testDatabaseUrl } from './test-database';
 
@@ -21,7 +23,8 @@ const db = createDb(url.href);
 afterAll(() => db.$disconnect());
 
 it('AC-P2-20 게시 1030 관계는 생성 원본에서 재적재·재생하고 내용 변조를 거부한다', async () => {
-  const initial = await loadInitialWorldFromDb(db, { scenario: '1030', map: 'che', seed: 'relations-origin-1030' });
+  const resources = await readInitialResources(db, { scenario: '1030', map: 'che' });
+  const initial = composeInitialWorld(resources, 'relations-origin-1030');
   expect(initial.generals).toHaveLength(491);
   expect(initialReplayState(initial).state).not.toHaveProperty('relations');
   const options = { name: '인물 관계 원본 검증', turnTermMinutes: 60, endYear: null, replayFormat: 3 } as const;
@@ -33,11 +36,12 @@ it('AC-P2-20 게시 1030 관계는 생성 원본에서 재적재·재생하고 �
   const changed = structuredClone(initial);
   changed.generals.find(({ id }) => id === relations.pairs[0]!.a.id)!.name = '다른 장수';
   expect(() => createRelationsData(changed)).toThrow('생성 장수');
-  const { worldId } = await saveInitialWorld(db, initial, {
-    ...options,
-    ruleFeatures: [RELATIONS_FEATURE],
-    featureData: { [RELATIONS_FEATURE]: relations },
-  });
+  const { worldId } = await createWorldFromCli(
+    db,
+    initial,
+    { ...options, ruleFeatures: [RELATIONS_FEATURE] },
+    resources,
+  );
   try {
     const origin = readArchive(await exportReplay(db, worldId)).origin;
     const state = await loadWorld(db, worldId);
@@ -94,3 +98,41 @@ it('AC-P2-20 게시 1030 관계는 생성 원본에서 재적재·재생하고 �
     await db.world.delete({ where: { id: worldId } });
   }
 }, 300_000);
+
+it('AC-P2-20 초기화는 이전 원본의 관계 사본을 새 월드에 보존한다', async () => {
+  const resources = await readInitialResources(db, { scenario: '1030', map: 'che' });
+  const initial = composeInitialWorld(resources, 'relations-reset-source');
+  const current = createRelationsData(initial);
+  const archived = {
+    ...current,
+    pairs: [{ ...current.pairs[0]!, kind: 'lord' as const }, ...current.pairs.slice(1)],
+  };
+  expect(archived).not.toEqual(current);
+  const source = await createWorldFromCli(
+    db,
+    initial,
+    {
+      name: '과거 관계 원본 초기화',
+      turnTermMinutes: 60,
+      endYear: null,
+      replayFormat: 3,
+      ruleFeatures: [RELATIONS_FEATURE],
+      featureData: { [RELATIONS_FEATURE]: archived },
+    },
+    resources,
+  );
+  const ids = [source.worldId];
+  try {
+    const reset = await prepareWorldReset(db, source.worldId, 'relations-reset-target', new AbortController().signal);
+    const target = await db.$transaction((tx) => savePreparedInitialWorld(tx, reset.prepared));
+    ids.push(target.worldId);
+    expect(target.stateHash).not.toBe(source.stateHash);
+    const origin = readArchive(await exportReplay(db, target.worldId)).origin;
+    if (origin.version !== 3) throw new Error('형식 3 초기화 원본이 필요합니다.');
+    expect(origin.resourceHash).toBe(reset.evidence.sourceResourceHash);
+    expect(origin.featureData?.[RELATIONS_FEATURE]).toEqual(archived);
+    expect((await loadWorld(db, target.worldId)).relations).toEqual(archived);
+  } finally {
+    await db.world.deleteMany({ where: { id: { in: ids } } });
+  }
+}, 60_000);
