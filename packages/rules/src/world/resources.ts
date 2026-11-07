@@ -81,7 +81,7 @@ export const scenarioSchema = z.object({
     z.tuple([
       natural,
       name,
-      z.string(),
+      z.string().nullable(),
       natural,
       name.nullable(),
       natural.max(100),
