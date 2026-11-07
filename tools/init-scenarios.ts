@@ -5,7 +5,15 @@ import { parseArgs } from 'node:util';
 import { createDb, type PrismaClient } from '../packages/db/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { initialResourceKeys, verifyInitializedResources, type InitializedResourceRow } from './init-resources';
-import { readyScenarioRows, scenarioRows, type ScenarioRow } from './resources-sql/generate-scenarios';
+import {
+  cheUnitSetPublication,
+  readyScenarioRows,
+  readScenarioLegacyResources,
+  requiredScenarioLegacyResources,
+  requiredScenarioStatRules,
+  scenarioRows,
+  type ScenarioRow,
+} from './resources-sql/generate-scenarios';
 
 export class ScenarioInitializationError extends Error {
   constructor(
@@ -53,6 +61,14 @@ export async function initializeScenarios(
 ): Promise<{ inserted: number; existing: number }> {
   const ready = readyScenarioRows(rows);
   const keys = ready.map(({ key }) => `SCENARIO/${key}/1`);
+  const legacy = await requiredScenarioLegacyResources(ready);
+  const dependencies = [
+    ...(ready.some(({ unitSet }) => unitSet === 'che')
+      ? [{ kind: 'UNIT_SET' as const, ...cheUnitSetPublication }]
+      : []),
+    ...Array.from(requiredScenarioStatRules(ready), (publication) => ({ kind: 'STAT_RULES' as const, ...publication })),
+  ];
+  for (const { kind, name } of dependencies) keys.push(`${kind}/${name}/1`);
   const selected = `SELECT "kind"::text AS kind, "name", "version", "status"::text AS status, "content", "contentHash", "source"
     FROM "GameResource" WHERE "kind" = 'SCENARIO' AND "version" = 1
       AND "name" IN (${ready.map(({ key }) => `'${key}'`).join(', ')})`;
@@ -64,8 +80,20 @@ export async function initializeScenarios(
       } catch {
         throw new ScenarioInitializationError('내장 자원 초기화를 먼저 실행하세요', initialResourceKeys);
       }
+      const verifyLegacy = async () => {
+        try {
+          await readScenarioLegacyResources(tx, legacy);
+        } catch {
+          throw new ScenarioInitializationError(
+            '원작 지도 초기화 결과를 확인하세요',
+            legacy.map(({ kind, name, version }) => `${kind}/${name}/${version}`),
+          );
+        }
+      };
+      await verifyLegacy();
       const before = await tx.$queryRawUnsafe<ScenarioResourceRow[]>(selected);
       await tx.$executeRawUnsafe(sql);
+      await verifyLegacy();
       const after = await tx.$queryRawUnsafe<ScenarioResourceRow[]>(selected);
       for (const row of ready) {
         const matches = after.filter((saved) => saved.name === row.key);
@@ -78,6 +106,19 @@ export async function initializeScenarios(
           hashState(saved!.content) !== row.contentHash
         )
           throw new ScenarioInitializationError('시나리오 저장 행 불일치', [`SCENARIO/${row.key}/1`]);
+      }
+      for (const { kind, name, source, contentHash } of dependencies) {
+        const saved = await tx.gameResource.findUnique({
+          where: { kind_name_version: { kind, name, version: 1 } },
+        });
+        if (
+          !saved ||
+          saved.status !== 'PUBLISHED' ||
+          saved.source !== source ||
+          saved.contentHash !== contentHash ||
+          hashState(saved.content) !== contentHash
+        )
+          throw new ScenarioInitializationError('시나리오 저장 행 불일치', [`${kind}/${name}/1`]);
       }
       return { inserted: ready.length - before.length, existing: before.length };
     });

@@ -1,0 +1,1125 @@
+{
+  "id": "che_except_siege",
+  "name": "che_except_siege",
+  "defaultCrewTypeId": 1100,
+  "armTypes": {
+    "1": "보병",
+    "2": "궁병",
+    "3": "기병",
+    "4": "귀병",
+    "5": "차병"
+  },
+  "crewTypes": [
+    {
+      "id": 1000,
+      "armType": 0,
+      "name": "성벽",
+      "attack": 100,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 99,
+      "rice": 9,
+      "requirements": [
+        {
+          "type": "Impossible"
+        }
+      ],
+      "attackCoef": [],
+      "defenceCoef": {
+        "1": 1.2
+      },
+      "info": ["성벽입니다.", "생성할 수 없습니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_선제사격시도", "che_선제사격발동"],
+      "iActionList": null
+    },
+    {
+      "id": 1100,
+      "armType": 1,
+      "name": "보병",
+      "attack": 100,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 9,
+      "rice": 9,
+      "requirements": [],
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8
+      },
+      "info": ["표준적인 보병입니다.", "보병은 방어특화이며,", "상대가 회피하기 어렵습니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_방어력증가5p"],
+      "iActionList": null
+    },
+    {
+      "id": 1101,
+      "armType": 1,
+      "name": "청주병",
+      "attack": 100,
+      "defence": 200,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 10,
+      "rice": 11,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 1000
+        },
+        {
+          "type": "ReqRegions",
+          "regions": ["중원"]
+        }
+      ],
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8
+      },
+      "info": ["저렴하고 튼튼합니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_방어력증가5p"],
+      "iActionList": null
+    },
+    {
+      "id": 1102,
+      "armType": 1,
+      "name": "수병",
+      "attack": 150,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 11,
+      "rice": 10,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 1000
+        },
+        {
+          "type": "ReqRegions",
+          "regions": ["오월"]
+        }
+      ],
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8
+      },
+      "info": ["저렴하고 강력합니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_방어력증가5p"],
+      "iActionList": null
+    },
+    {
+      "id": 1103,
+      "armType": 1,
+      "name": "자객병",
+      "attack": 100,
+      "defence": 150,
+      "speed": 8,
+      "avoid": 20,
+      "magicCoef": 0,
+      "cost": 10,
+      "rice": 10,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 2000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["저"]
+        }
+      ],
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8
+      },
+      "info": ["은밀하고 날쌥니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_방어력증가5p"],
+      "iActionList": null
+    },
+    {
+      "id": 1104,
+      "armType": 1,
+      "name": "근위병",
+      "attack": 150,
+      "defence": 200,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 12,
+      "rice": 12,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 3000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["낙양"]
+        }
+      ],
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8
+      },
+      "info": ["최강의 보병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_방어력증가5p"],
+      "iActionList": null
+    },
+    {
+      "id": 1105,
+      "armType": 1,
+      "name": "등갑병",
+      "attack": 100,
+      "defence": 225,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 10,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 1000
+        },
+        {
+          "type": "ReqRegions",
+          "regions": ["남중"]
+        }
+      ],
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8
+      },
+      "info": ["등갑을 두른 보병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_방어력증가5p"],
+      "iActionList": null
+    },
+    {
+      "id": 1106,
+      "armType": 1,
+      "name": "백이병",
+      "attack": 175,
+      "defence": 175,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 11,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 3000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["성도"]
+        }
+      ],
+      "attackCoef": {
+        "2": 1.1,
+        "3": 0.9,
+        "5": 1.1
+      },
+      "defenceCoef": {
+        "2": 0.9,
+        "3": 1.1,
+        "5": 0.9
+      },
+      "info": ["정예 보병입니다. 불리한 싸움도 버텨냅니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_방어력증가5p"],
+      "iActionList": null
+    },
+    {
+      "id": 1200,
+      "armType": 2,
+      "name": "궁병",
+      "attack": 100,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 10,
+      "rice": 10,
+      "requirements": [],
+      "attackCoef": {
+        "3": 1.2,
+        "1": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "3": 0.8,
+        "1": 1.2,
+        "5": 0.8
+      },
+      "info": ["표준적인 궁병입니다.", "궁병은 선제사격을 하는 병종입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_선제사격시도", "che_선제사격발동"],
+      "iActionList": null
+    },
+    {
+      "id": 1201,
+      "armType": 2,
+      "name": "궁기병",
+      "attack": 100,
+      "defence": 100,
+      "speed": 8,
+      "avoid": 20,
+      "magicCoef": 0,
+      "cost": 11,
+      "rice": 12,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 1000
+        },
+        {
+          "type": "ReqRegions",
+          "regions": ["동이"]
+        }
+      ],
+      "attackCoef": {
+        "3": 1.2,
+        "1": 0.9,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "3": 0.8,
+        "1": 1.1,
+        "5": 0.8
+      },
+      "info": ["말을 타고 잘 피합니다. 특히 다른 궁병보다 보병에게 조금 더 강합니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_선제사격시도", "che_선제사격발동"],
+      "iActionList": null
+    },
+    {
+      "id": 1202,
+      "armType": 2,
+      "name": "연노병",
+      "attack": 150,
+      "defence": 100,
+      "speed": 8,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 12,
+      "rice": 11,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 1000
+        },
+        {
+          "type": "ReqRegions",
+          "regions": ["서촉"]
+        }
+      ],
+      "attackCoef": {
+        "3": 1.2,
+        "1": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "3": 0.8,
+        "1": 1.2,
+        "5": 0.8
+      },
+      "info": ["화살을 연사합니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_선제사격시도", "che_선제사격발동"],
+      "iActionList": null
+    },
+    {
+      "id": 1203,
+      "armType": 2,
+      "name": "강궁병",
+      "attack": 150,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 13,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 3000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["양양"]
+        }
+      ],
+      "attackCoef": {
+        "3": 1.2,
+        "1": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "3": 0.8,
+        "1": 1.2,
+        "5": 0.8
+      },
+      "info": ["강건한 궁병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_선제사격시도", "che_선제사격발동"],
+      "iActionList": null
+    },
+    {
+      "id": 1204,
+      "armType": 2,
+      "name": "석궁병",
+      "attack": 200,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 13,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 3000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["건업"]
+        }
+      ],
+      "attackCoef": {
+        "3": 1.2,
+        "1": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "3": 0.8,
+        "1": 1.2,
+        "5": 0.8
+      },
+      "info": ["강력한 화살을 쏩니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_선제사격시도", "che_선제사격발동"],
+      "iActionList": null
+    },
+    {
+      "id": 1300,
+      "armType": 3,
+      "name": "기병",
+      "attack": 150,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 11,
+      "rice": 11,
+      "requirements": [],
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8
+      },
+      "info": ["표준적인 기병입니다.", "기병은 공격특화입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_기병병종전투"],
+      "iActionList": null
+    },
+    {
+      "id": 1301,
+      "armType": 3,
+      "name": "백마병",
+      "attack": 200,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 12,
+      "rice": 13,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 1000
+        },
+        {
+          "type": "ReqRegions",
+          "regions": ["하북"]
+        }
+      ],
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8
+      },
+      "info": ["백마의 위용을 보여줍니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_기병병종전투"],
+      "iActionList": null
+    },
+    {
+      "id": 1302,
+      "armType": 3,
+      "name": "중장기병",
+      "attack": 150,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 12,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 1000
+        },
+        {
+          "type": "ReqRegions",
+          "regions": ["서북"]
+        }
+      ],
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8
+      },
+      "info": ["갑주를 두른 기병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_기병병종전투"],
+      "iActionList": null
+    },
+    {
+      "id": 1303,
+      "armType": 3,
+      "name": "돌격기병",
+      "attack": 200,
+      "defence": 100,
+      "speed": 8,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 11,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 2000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["흉노"]
+        }
+      ],
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8
+      },
+      "info": ["저돌적으로 공격합니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_기병병종전투"],
+      "iActionList": null
+    },
+    {
+      "id": 1304,
+      "armType": 3,
+      "name": "철기병",
+      "attack": 100,
+      "defence": 200,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 11,
+      "rice": 13,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 2000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["강"]
+        }
+      ],
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8
+      },
+      "info": ["철갑을 두른 기병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_기병병종전투"],
+      "iActionList": null
+    },
+    {
+      "id": 1305,
+      "armType": 3,
+      "name": "수렵기병",
+      "attack": 150,
+      "defence": 100,
+      "speed": 8,
+      "avoid": 15,
+      "magicCoef": 0,
+      "cost": 12,
+      "rice": 12,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 2000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["산월"]
+        }
+      ],
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8
+      },
+      "info": ["날쎄고 빠른 기병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_기병병종전투"],
+      "iActionList": null
+    },
+    {
+      "id": 1306,
+      "armType": 3,
+      "name": "맹수병",
+      "attack": 250,
+      "defence": 175,
+      "speed": 6,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 16,
+      "rice": 16,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 2000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["남만"]
+        }
+      ],
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8
+      },
+      "info": ["어느 누구보다 강력합니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_기병병종전투"],
+      "iActionList": null
+    },
+    {
+      "id": 1307,
+      "armType": 3,
+      "name": "호표기병",
+      "attack": 200,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 14,
+      "rice": 14,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 3000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["허창"]
+        }
+      ],
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8
+      },
+      "info": ["정예 기병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_기병병종전투"],
+      "iActionList": null
+    },
+    {
+      "id": 1400,
+      "armType": 4,
+      "name": "귀병",
+      "attack": 80,
+      "defence": 80,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0.5,
+      "cost": 9,
+      "rice": 9,
+      "requirements": [],
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "info": ["계략을 사용하는 병종입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 1401,
+      "armType": 4,
+      "name": "신귀병",
+      "attack": 80,
+      "defence": 80,
+      "speed": 7,
+      "avoid": 20,
+      "magicCoef": 0.6,
+      "cost": 10,
+      "rice": 10,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 1000
+        },
+        {
+          "type": "ReqRegions",
+          "regions": ["초"]
+        }
+      ],
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "info": ["신출귀몰한 귀병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 1402,
+      "armType": 4,
+      "name": "백귀병",
+      "attack": 80,
+      "defence": 130,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0.6,
+      "cost": 9,
+      "rice": 11,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 2000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["오환"]
+        }
+      ],
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "info": ["저렴하고 튼튼합니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 1403,
+      "armType": 4,
+      "name": "흑귀병",
+      "attack": 130,
+      "defence": 80,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0.6,
+      "cost": 11,
+      "rice": 9,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 2000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["왜"]
+        }
+      ],
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "info": ["저렴하고 강력합니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 1404,
+      "armType": 4,
+      "name": "악귀병",
+      "attack": 130,
+      "defence": 130,
+      "speed": 7,
+      "avoid": 0,
+      "magicCoef": 0.6,
+      "cost": 12,
+      "rice": 12,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 3000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["장안"]
+        }
+      ],
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "info": ["백병전에도 능숙합니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 1405,
+      "armType": 4,
+      "name": "남귀병",
+      "attack": 60,
+      "defence": 60,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0.8,
+      "cost": 8,
+      "rice": 8,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 1000
+        }
+      ],
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "info": ["전투를 포기하고 계략에 몰두합니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 1406,
+      "armType": 4,
+      "name": "황귀병",
+      "attack": 110,
+      "defence": 110,
+      "speed": 7,
+      "avoid": 0,
+      "magicCoef": 0.8,
+      "cost": 13,
+      "rice": 10,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 3000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["낙양"]
+        }
+      ],
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "info": ["고도로 훈련된 귀병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 1407,
+      "armType": 4,
+      "name": "천귀병",
+      "attack": 80,
+      "defence": 130,
+      "speed": 7,
+      "avoid": 15,
+      "magicCoef": 0.6,
+      "cost": 11,
+      "rice": 12,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 3000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["성도"]
+        }
+      ],
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "info": ["갑주를 두른 귀병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 1408,
+      "armType": 4,
+      "name": "마귀병",
+      "attack": 130,
+      "defence": 80,
+      "speed": 7,
+      "avoid": 15,
+      "magicCoef": 0.6,
+      "cost": 12,
+      "rice": 11,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 3000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["업"]
+        }
+      ],
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "info": ["날카로운 무기를 가진 귀병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 1500,
+      "armType": 5,
+      "name": "정란",
+      "attack": 100,
+      "defence": 100,
+      "speed": 6,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 14,
+      "rice": 5,
+      "requirements": [
+        {
+          "type": "ReqMinRelYear",
+          "year": 3
+        }
+      ],
+      "attackCoef": {
+        "1": 1.25,
+        "2": 1.25,
+        "3": 1.25,
+        "4": 1.25,
+        "0": 1.2,
+        "1106": 1.112
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "2": 1.2,
+        "3": 1.2,
+        "4": 1.2,
+        "1106": 1.067
+      },
+      "info": ["높은 구조물 위에서 공격합니다. 첫 공격은 성벽을 향합니다."],
+      "initSkillTrigger": ["che_성벽부상무효"],
+      "phaseSkillTrigger": ["che_선제사격시도", "che_선제사격발동"],
+      "iActionList": ["che_성벽선제"]
+    },
+    {
+      "id": 1502,
+      "armType": 5,
+      "name": "벽력거",
+      "attack": 150,
+      "defence": 100,
+      "speed": 6,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 20,
+      "rice": 5,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 3000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["업"]
+        }
+      ],
+      "attackCoef": {
+        "1": 1.25,
+        "2": 1.25,
+        "3": 1.25,
+        "4": 1.25,
+        "0": 1.2,
+        "1106": 1.112
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "2": 1.2,
+        "3": 1.2,
+        "4": 1.2,
+        "1106": 1.067
+      },
+      "info": ["상대에게 돌덩이를 날립니다. 첫 공격은 성벽을 향합니다."],
+      "initSkillTrigger": ["che_성벽부상무효"],
+      "phaseSkillTrigger": ["che_선제사격시도", "che_선제사격발동"],
+      "iActionList": ["che_성벽선제"]
+    },
+    {
+      "id": 1503,
+      "armType": 5,
+      "name": "목우",
+      "attack": 50,
+      "defence": 200,
+      "speed": 5,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 15,
+      "rice": 5,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 3000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["성도"]
+        }
+      ],
+      "attackCoef": {
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "0": 1.2
+      },
+      "defenceCoef": {
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "1106": 1
+      },
+      "info": ["상대를 저지하는 특수병기입니다."],
+      "initSkillTrigger": ["che_성벽부상무효"],
+      "phaseSkillTrigger": ["che_저지시도", "che_저지발동"],
+      "iActionList": null
+    }
+  ]
+}

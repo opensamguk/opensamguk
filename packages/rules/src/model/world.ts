@@ -45,7 +45,11 @@ export interface WorldState {
   diplomacies: InitialDiplomacy[];
   treaties?: TreatyState[];
   nationTrust?: NationTrustState[];
-  commandMeta?: { nextNationId: number; offers: Record<number, number> };
+  commandMeta?: {
+    nextNationId: number;
+    offers: Record<number, number>;
+    lastNationRecruitmentLock?: { fromYear: number; blockedNationId?: number };
+  };
   nationTurns?: Record<number, { commandKey: string; args: unknown }[]>;
   assignmentOffers?: Record<number, AssignmentOffer>;
   officeTurns?: OfficeTurns;

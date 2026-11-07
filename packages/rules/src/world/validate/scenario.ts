@@ -1,6 +1,6 @@
 import { parseMapInput, type MapInput } from '../map/format';
 import { operationalAnchors } from '../map/anchors';
-import { scenarioSchema, type ScenarioResource } from '../resources';
+import { scenarioMapMismatch, scenarioSchema, type ScenarioResource } from '../resources';
 import { resolveCityScale } from '../map/cityScale';
 import { addShapeIssues, issue, ReportBuilder, type ResourceReport } from './issues';
 import { scanLimits } from './limits';
@@ -68,6 +68,11 @@ export function validateScenario(input: unknown, ctx?: { map?: unknown }): Resou
     return out.finish(scenario);
   }
   out.did('map-refs');
+  const expected = scenarioMapMismatch(scenario, map.id);
+  if (expected !== undefined)
+    out.add(issue('scenario-map-mismatch', { kind: 'path', path: ['requiredMap'] }, { expected }));
+  if (scenario.openingCityProfile && 'version' in map && map.version === 3)
+    out.add(issue('shape-invalid', { kind: 'path', path: ['openingCityProfile'] }, { expected: '기존 지도 형식' }));
   const cities = 'version' in map && map.version === 3 ? operationalAnchors(map) : map.cities;
   if (scenario.cityScale)
     try {

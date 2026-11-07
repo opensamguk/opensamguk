@@ -1,6 +1,6 @@
 import type { Rng } from '@opensamguk/shared';
 import { BALANCE } from '../balance';
-import { simulateBattle, type BattleForce } from '../battle/simulate';
+import { simulateBattle, type BattleForce, type BattleInput } from '../battle/simulate';
 import { FIVE_STAT_KEYS, fiveStatsSchema } from '../general/fiveStats';
 import { fiveStatsBattleModifiers } from '../general/fiveStatsBattle';
 import { collectModifiers, type BattleModifiers } from '../modifiers';
@@ -62,6 +62,7 @@ export function fightCampaignUnits(
   defenderId: number,
   unitSet: DeepReadonly<UnitSetResource>,
   rng: Rng,
+  attackerFirstVolleyUsed = false,
 ) {
   if (attackerId === defenderId) throw new Error('같은 부곡을 양쪽에 배치할 수 없습니다.');
   const state = start(view),
@@ -80,6 +81,7 @@ export function fightCampaignUnits(
       attackerTech: state.nations[aNation]!.tech,
       defenderTech: state.nations[bNation]!.tech,
       unitSet,
+      attackerFirstVolleyUsed,
       coefMode: state.ruleFeatures?.includes('battle-affinity-v2') ? 'multiply' : 'divide',
       attackerModifiers: modifiers(state, attacker),
       defenderModifiers: modifiers(state, defender),
@@ -100,6 +102,10 @@ export function fightCampaignWall(
   cityKey: number,
   unitSet: DeepReadonly<UnitSetResource>,
   rng: Rng,
+  {
+    openingSkirmish = false,
+    attackerFirstVolleyUsed = false,
+  }: Pick<BattleInput, 'openingSkirmish' | 'attackerFirstVolleyUsed'> = {},
 ) {
   const state = start(view),
     attacker = unit(state, attackerId),
@@ -115,6 +121,9 @@ export function fightCampaignWall(
       attackerTech: state.nations[aNation]!.tech,
       defenderTech: city.nationId === null ? 0 : state.nations[city.nationId]!.tech,
       defence: city.defence,
+      openingSkirmish,
+      siege: !openingSkirmish,
+      attackerFirstVolleyUsed,
       unitSet,
       coefMode: state.ruleFeatures?.includes('battle-affinity-v2') ? 'multiply' : 'divide',
       attackerModifiers: modifiers(state, attacker),
@@ -134,6 +143,7 @@ export function fightCampaignCityGarrison(
   crewType: number,
   unitSet: DeepReadonly<UnitSetResource>,
   rng: Rng,
+  attackerFirstVolleyUsed = false,
 ) {
   if (!view.ruleFeatures?.includes('city-resources-v1')) throw new Error('도시 수비 규칙이 없는 판입니다.');
   const state = start(view),
@@ -173,6 +183,7 @@ export function fightCampaignCityGarrison(
       defenderTech: state.nations[city.nationId]!.tech,
       defence: city.defence,
       unitSet,
+      attackerFirstVolleyUsed,
       coefMode: state.ruleFeatures?.includes('battle-affinity-v2') ? 'multiply' : 'divide',
       attackerModifiers: modifiers(state, attacker),
     },
@@ -193,5 +204,6 @@ export function fightCampaignCityGarrison(
   return {
     state,
     text: `부곡${attackerId} 대 도시 병종${crewType}: 공격 ${attacker.troops}명, 수비 ${defender.troops}명, 민간 복귀 ${returned}명, 인구 상한 밖 ${overflow}명`,
+    ...(result.attackerFirstVolleyFired && { attackerFirstVolleyFired: result.attackerFirstVolleyFired }),
   };
 }

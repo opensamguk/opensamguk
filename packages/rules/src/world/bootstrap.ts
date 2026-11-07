@@ -1,8 +1,17 @@
 import type { PresetRules } from './preset';
 import { rngFor } from '@opensamguk/shared';
 import { TICKS_PER_MONTH } from '../clock/constants';
-import { mapSchema, portraitMapSchema, scenarioSchema, statRulesSchema, unitSetSchema } from './resources';
+import {
+  mapSchema,
+  portraitMapSchema,
+  scenarioMapMismatch,
+  scenarioSchema,
+  scenarioStatRulesMatch,
+  statRulesSchema,
+  unitSetSchema,
+} from './resources';
 import type { StatRules, UnitSetResource } from './resources';
+import { legacyCheCrewRegionsMatch } from './crewRegions';
 import type { WorldState, WorldExt } from '../model/world';
 import { operationalMapSchema, type OperationalMapResource } from './map/operational';
 import { operationalAnchors } from './map/anchors';
@@ -127,15 +136,25 @@ export function buildInitialWorld(input: {
   if (operational && validateMap(operational, { scenarios: [] }).status !== 'pass')
     throw new Error('운영 지도의 연결망을 확인하세요.');
   const scenario = scenarioSchema.parse(input.scenario);
+  if (operational && scenario.openingCityProfile)
+    throw new Error('정사 확장 초기 도시 설정은 기존 지도 형식이 필요합니다.');
   const sourceMap = operational
     ? { ...operational, cities: operationalAnchors(operational) }
     : mapSchema.parse(input.map);
+  const requiredMap = scenarioMapMismatch(scenario, sourceMap.id);
+  if (requiredMap !== undefined) throw new Error(`이 시나리오는 ${requiredMap} 지도가 필요합니다.`);
   const scaled = resolveCityScale(sourceMap.cities, scenario.cityScale?.cities);
   const map = { ...sourceMap, cities: scaled.cities };
   const unitSet = unitSetSchema.parse(input.unitSet);
-  if (unitSet.regionScheme !== undefined && unitSet.regionScheme !== operational?.regionScheme)
+  if (scenario.requiredUnitSet !== undefined && unitSet.id !== scenario.requiredUnitSet)
+    throw new Error(`이 시나리오는 ${scenario.requiredUnitSet} 병종 판이 필요합니다.`);
+  if (
+    (unitSet.regionScheme !== undefined && unitSet.regionScheme !== operational?.regionScheme) ||
+    !legacyCheCrewRegionsMatch(unitSet, operational ?? sourceMap)
+  )
     throw new Error('지도와 병종 판의 지역 기준이 다릅니다.');
   const statRules = statRulesSchema.parse(input.statRules).stat;
+  if (!scenarioStatRulesMatch(scenario, statRules)) throw new Error('시나리오와 장수 생성 능력치 판이 맞지 않습니다.');
   const five = statRules.count === 5;
   if (operational && !five) throw new Error('운영 지도는 5능력치 프로필이 필요합니다.');
   const historicalStats = new Map(scenario.generalStats?.map((row) => [row.generalId, row]));
@@ -236,6 +255,20 @@ export function buildInitialWorld(input: {
     supplied: map.defaults.supplyState === 1,
   }));
 
+  if (scenario.openingCityProfile === 'legacy-research-70') {
+    for (const city of cities) {
+      city.population = Math.round(city.populationMax * 0.7);
+      city.agriculture = Math.round(city.agricultureMax * 0.7);
+      city.commerce = Math.round(city.commerceMax * 0.7);
+      city.security = Math.round(city.securityMax * 0.7);
+      city.trust = 80;
+      if (city.nationId !== null) {
+        city.defence = Math.round(city.defenceMax * 0.7);
+        city.wall = Math.round(city.wallMax * 0.7);
+      }
+    }
+  }
+
   // 배치만 bootstrap 스트림을 소비한다. DB ID·시각은 규칙 상태에 넣지 않는다.
   const rng = rngFor(input.seed, 'bootstrap');
   const allCities = cities.filter((city) => city.kind !== 'PASS').map((city) => city.cityKey);
@@ -265,7 +298,10 @@ export function buildInitialWorld(input: {
     return {
       id: i + 1,
       userId: null,
-      affinity,
+      affinity:
+        affinity === 0 && scenario.randomizeZeroAffinity
+          ? rngFor(input.seed, 'bootstrap-affinity', i + 1).int(1, 150)
+          : affinity,
       name,
       portraitId: Object.hasOwn(portraits, name) ? portraits[name]! : null,
       nationId,
@@ -320,6 +356,15 @@ export function buildInitialWorld(input: {
       : {}),
     ...(scaled.record ? { cityScale: scaled.record } : {}),
     ...(operational ? { operationalMap: operational } : {}),
+    ...(scenario.lastNationRecruitmentLockYear === undefined
+      ? {}
+      : {
+          commandMeta: {
+            nextNationId: nations.length + 1,
+            offers: {},
+            lastNationRecruitmentLock: { fromYear: scenario.lastNationRecruitmentLockYear },
+          },
+        }),
     seed: input.seed,
     scenarioKey: scenario.id,
     mapKey: map.id,

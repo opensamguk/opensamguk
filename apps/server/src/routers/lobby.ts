@@ -5,7 +5,7 @@ import {
   effectiveWorldOptions,
   parsePreset,
   nowTick,
-  scenarioSchema,
+  scenarioIdentitySchema,
   toGameDate,
   parseResourceKey,
 } from '@opensamguk/rules';
@@ -13,13 +13,11 @@ import { z } from 'zod';
 import { publicProcedure, router } from '../trpc';
 import { worldClock } from '../queries';
 
-const titleSchema = scenarioSchema.pick({ id: true, title: true });
-
 export async function scenarioTitle(key: string, db: Pick<Prisma.TransactionClient, 'gameResource'>): Promise<string> {
   try {
     const ref = parseResourceKey(key);
     const [resource] = await readPublishedResources(db, [{ kind: 'SCENARIO', ...ref }]);
-    const value = titleSchema.parse(resource!.content);
+    const value = scenarioIdentitySchema.parse(resource!.content);
     if (value.id !== ref.name) throw new Error();
     return value.title;
   } catch {

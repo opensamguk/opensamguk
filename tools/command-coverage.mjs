@@ -36,6 +36,7 @@ export const STATUSES = ['missing', 'partial', 'verified', 'not_applicable'];
 export const EVIDENCE_KINDS = ['ci', 'review', 'test', 'commit', 'doc'];
 export const BASELINE_PATH = 'docs/product/command-coverage-baseline.json';
 const TARGETS = ['general', 'nation'];
+const FEATURE_REGISTRY_PATH = 'tools/fixtures/rule-feature-command-registry.json';
 const IMPLEMENTATION_STAGES = ['engine', 'effectsCostsFailures'];
 const SHA = /^[0-9a-f]{7,40}$/;
 const FULL_SHA = /^[0-9a-f]{40}$/;
@@ -621,6 +622,9 @@ export function loadContext(root) {
     root,
     registry: readRegistryKeys(root),
     extensionRegistry: readExtensionRegistryKeys(root),
+    featureRegistry: /** @type {{ key: string, target: string, feature: string }[]} */ (
+      JSON.parse(read(FEATURE_REGISTRY_PATH) || '[]')
+    ),
     baseline,
     readme: read('README.md'),
     prd: read('docs/product/prd.md'),
@@ -1173,6 +1177,27 @@ export function analyze(doc, context) {
     if (registry.has(key)) errors.push(`확장 registry key ${key}가 기본·확장 목록과 겹친다`);
     else registry.set(key, target);
   }
+  // JSON 목록은 Vitest에서 실제 기능 등록과 대조한다. 검사 대상 경로의 모듈은 실행하지 않는다.
+  const seenFeatureCommands = new Set();
+  if (!Array.isArray(context.featureRegistry)) errors.push('기능 registry 목록은 배열이어야 한다');
+  else
+    for (const entry of context.featureRegistry) {
+      if (!isObject(entry) || !isText(entry.key) || !isText(entry.feature) || !TARGETS.includes(entry.target)) {
+        errors.push('기능 registry 명령의 key·target·feature를 확인하세요');
+        continue;
+      }
+      const { key, target } = entry;
+      if (
+        seenFeatureCommands.has(key) ||
+        legacyRegistry.has(key) ||
+        (registry.has(key) && registry.get(key) !== target)
+      ) {
+        errors.push(`기능 registry key ${key}가 기본·확장 목록 또는 기능 명령과 충돌한다`);
+        continue;
+      }
+      seenFeatureCommands.add(key);
+      registry.set(key, target);
+    }
   const commandIds = new Map();
   const gaps = [];
   const rows = [];
