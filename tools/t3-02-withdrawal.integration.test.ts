@@ -3,6 +3,8 @@ import { readdir, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { afterAll, beforeAll, beforeEach, expect, it as test } from 'vitest';
 import { createDb, notifyWorld } from '../packages/db/src/index';
+import { lineageResultSchema, lineageStateSchema, type LineageInput } from '../packages/rules/src/index';
+import { lineageTestConfig } from '../packages/rules/src/lineage/testFixture';
 import { buildServer } from '../apps/server/src/server';
 import { newSession } from '../apps/server/src/auth/session';
 import { hashPassword } from '../apps/server/src/auth/password';
@@ -188,6 +190,53 @@ async function call(path: string, input: unknown, cookie?: string, selected = ap
 }
 const withdraw = (id: string, cookie: string, selected = api, value: string = password) =>
   call('account.withdraw', { expectedUserId: id, password: value }, cookie, selected);
+
+async function applyLineage(worldId: string, general: { id: number; userId: string }, payload: LineageInput) {
+  const { cookie } = await session(general.userId);
+  const requestId = randomUUID();
+  const pending = await call(
+    'lineage.submit',
+    {
+      worldId,
+      requestId,
+      expectedUserId: general.userId,
+      expectedGeneralId: general.id,
+      payload,
+    },
+    cookie,
+  );
+  expect(pending.status).toBe(200);
+  expect(pending.data).toMatchObject({ status: 'pending' });
+  const lease = await acquireLease(db, worldId);
+  if (!lease) throw Error('혼인 시험 실행권이 없습니다.');
+  try {
+    await new TurnLoop(db, lease).advanceTo(0);
+  } finally {
+    await releaseLease(db, lease);
+  }
+  const applied = await call('lineage.request', { worldId, requestId }, cookie, api, false);
+  expect(applied.status).toBe(200);
+  expect(applied.data).toMatchObject({ status: 'applied' });
+  return lineageResultSchema.parse((applied.data as { result?: unknown }).result);
+}
+
+async function familySnapshot(worldId: string) {
+  const [world, spouses] = await Promise.all([
+    db.world.findUniqueOrThrow({ where: { id: worldId }, select: { lineageState: true } }),
+    db.general.findMany({
+      where: { worldId, userId: { in: [humanUser, otherHumanUser] } },
+      select: { id: true, userId: true, sex: true },
+    }),
+  ]);
+  const first = spouses.find(({ userId }) => userId === humanUser);
+  const second = spouses.find(({ userId }) => userId === otherHumanUser);
+  if (!first?.userId || !second?.userId) throw Error('혼인 시험 장수가 없습니다.');
+  return {
+    first: { ...first, userId: first.userId },
+    second: { ...second, userId: second.userId },
+    lineage: lineageStateSchema.parse(world.lineageState),
+  };
+}
 async function footprint(excludeAccount = false) {
   const tables = await db.$queryRaw<
     Array<{ tablename: string }>
@@ -436,10 +485,12 @@ for (const index of [0, 1])
       portraitMap: '191-map',
       seed: 'account-withdrawal-' + index,
     });
+    const lineage = index === 1;
     initial.ruleFeatures = [
       'campaign-assignment-v2',
       'campaign-v1',
       'five-stats',
+      ...(lineage ? ['lineage-v1'] : []),
       'operational-map',
       'personnel',
       'policy',
@@ -452,6 +503,7 @@ for (const index of [0, 1])
       name: '탈퇴 검증' + index,
       turnTermMinutes: 60,
       endYear: 201,
+      ...(lineage ? { replayFormat: 3, featureData: { 'lineage-v1': lineageTestConfig } } : {}),
     });
     worlds.push(worldId);
     await controlClock(db, worldId, 'start');
@@ -471,6 +523,7 @@ for (const index of [0, 1])
                 intel: 55,
                 politics: 55,
                 charm: 55,
+                ...(lineage ? { sex: actorIndex === 0 ? 'MALE' : 'FEMALE' } : {}),
               },
               sid.cookie,
             ),
@@ -512,10 +565,27 @@ for (const index of [0, 1])
       const human = await db.general.findFirstOrThrow({ where: { worldId, userId } });
       expect(await db.generalTurn.count({ where: { worldId, generalId: human.id } })).toBe(30);
     }
+    if (lineage) {
+      const { first, second } = await familySnapshot(worldId);
+      expect(first.sex).toBe('MALE');
+      expect(second.sex).toBe('FEMALE');
+      const { offerId } = await applyLineage(worldId, first, { type: 'marriage.propose', targetGeneralId: second.id });
+      if (offerId === undefined) throw Error('혼인 시험 제의가 없습니다.');
+      await applyLineage(worldId, second, { type: 'marriage.respond', offerId, accept: true });
+    }
   });
 
-it('한 번의 탈퇴는 두 정식 월드·예약·원장을 보존하고 본인 세션·토큰만 원자적으로 지운다', async () => {
+it('한 번의 탈퇴는 두 정식 월드·예약·가문·원장을 보존하고 본인 세션·토큰만 원자적으로 지운다', async () => {
   expect(worlds).toHaveLength(2);
+  const lineageWorldId = worlds[1]!;
+  const beforeFamily = await familySnapshot(lineageWorldId);
+  expect(beforeFamily.lineage.marriages).toMatchObject([
+    {
+      a: Math.min(beforeFamily.first.id, beforeFamily.second.id),
+      b: Math.max(beforeFamily.first.id, beforeFamily.second.id),
+      householdGeneralId: beforeFamily.first.id,
+    },
+  ]);
   const sid = await session(humanUser),
     secondSid = await session(humanUser),
     otherSid = await session(otherHumanUser);
@@ -550,7 +620,16 @@ it('한 번의 탈퇴는 두 정식 월드·예약·원장을 보존하고 본�
     expect((await Promise.all([own.read(), remote.read()])).map((value) => value.done)).toEqual([true, true]);
     expect(Date.now() - started).toBeLessThan(2000);
     expect(await footprint(true)).toBe(before);
+    expect(await familySnapshot(lineageWorldId)).toEqual(beforeFamily);
     expect(await otherAccounts(humanUser)).toBe(otherBefore);
+    expect(await call('lineage.get', { worldId: lineageWorldId }, sid.cookie, api, false)).toMatchObject({
+      status: 401,
+      code: 'UNAUTHORIZED',
+    });
+    expect(await call('lineage.get', { worldId: lineageWorldId }, otherSid.cookie, api, false)).toMatchObject({
+      status: 200,
+      data: { view: { marriages: beforeFamily.lineage.marriages } },
+    });
     const general = await db.general.findFirstOrThrow({ where: { worldId: worlds[0]!, userId: otherHumanUser } });
     expect(await notifyWorld(db, worlds[0]!, { kind: 'turn.result', target: { generalId: general.id } })).toBe(true);
     const frame = await other.read();
