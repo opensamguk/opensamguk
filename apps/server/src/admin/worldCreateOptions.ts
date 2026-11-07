@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { PublishedResource } from '@opensamguk/db';
 import {
   checkRuleFeatures,
+  INTEL_FEATURE,
   parsePreset,
   ruleRegistry,
   scenarioSchema,
@@ -126,6 +127,16 @@ const contracts = {
     presets: presetKeys,
     suggestedEndYear: 231,
   },
+  'san10-191-intel': {
+    id: 'san10-191-intel',
+    label: 'SAN10 확장 · 첩보·전장의 안개',
+    selection: { ...san10Selection, scenarioKey: 'san10-191@2' },
+    startYear: 191,
+    nations: 21,
+    counts: { cities: 147, gates: 8, ports: 0, fields: 0, anchors: 155 },
+    presets: presetKeys,
+    suggestedEndYear: 231,
+  },
 } as const;
 const expandedProfiles = [
   ['integration-v01', 'expanded-191-v3'],
@@ -133,6 +144,7 @@ const expandedProfiles = [
   ['san10-191-lifecycle', 'expanded-191-v5'],
   ['san10-191-research', 'expanded-191-v6'],
   ['san10-191-border-return', 'expanded-191-v7'],
+  ['san10-191-intel', 'expanded-191-v8'],
 ] as const satisfies readonly (readonly [ProfileId, string])[];
 function profileRefs(id: ProfileId) {
   const selection = contracts[id].selection;
@@ -338,8 +350,9 @@ export function expandedCreationProfile(
       !profile.ruleFeatures.includes('battle-affinity-v2') ||
       (profileId === 'san10-191-lifecycle' && !profile.ruleFeatures.includes('nation-lifecycle-v1')) ||
       (profileId === 'san10-191-research' && !profile.ruleFeatures.includes('nation-research-v1')) ||
-      (profileId === 'san10-191-border-return' &&
+      ((profileId === 'san10-191-border-return' || profileId === 'san10-191-intel') &&
         (!profile.ruleFeatures.includes('border-return-v1') || !profile.ruleFeatures.includes('nation-research-v1'))) ||
+      (profileId === 'san10-191-intel' && !profile.ruleFeatures.includes(INTEL_FEATURE)) ||
       profile.scenarioKey !== contracts[profileId].selection.scenarioKey ||
       profile.mapKey !== contracts[profileId].selection.mapKey ||
       (profileId !== 'integration-v01' &&
