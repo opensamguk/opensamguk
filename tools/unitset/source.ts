@@ -27,6 +27,7 @@ export async function readCheExceptSiegeSource(): Promise<unknown> {
 const alternateSourceHashes = {
   cr: '3c08bb4ee0842a181809259ccd8f58859792d5354b0e2e38256a7db370311c86',
   siegetank: 'fc1009177b525c5376b3ea524c5d691dbb9a6d26789897cd64218ffe78f462ea',
+  ludo_rathowm: '3eb793012468d8b211ea7200ce5ac350b2891469d58f2c4310775f3d4eed4b5a',
 };
 
 export async function readAlternateCheSource(id: keyof typeof alternateSourceHashes): Promise<unknown> {

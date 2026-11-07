@@ -403,14 +403,14 @@ it('S5 miniche 지도·병종의 게시, 롤백과 월드 재생', async () => {
     expect(await allRows(native)).toEqual(withConflict);
     await db.gameResource.delete({ where: { kind_name_version: ref } });
 
-    await db.$executeRawUnsafe(legacyMapsSql(resources.slice(0, 9)));
+    await db.$executeRawUnsafe(legacyMapsSql(resources.slice(0, 11)));
     const beforeUpgrade = await allRows(native);
-    expect(beforeUpgrade).toHaveLength(baseline.length + 9);
-    expect(await initializeLegacyMaps(db, generated)).toEqual({ inserted: 2, existing: 9 });
+    expect(beforeUpgrade).toHaveLength(baseline.length + 11);
+    expect(await initializeLegacyMaps(db, generated)).toEqual({ inserted: 1, existing: 11 });
     const published = await allRows(native);
-    expect(published).toHaveLength(baseline.length + 11);
+    expect(published).toHaveLength(baseline.length + 12);
     expect(published).toEqual(expect.arrayContaining(beforeUpgrade));
-    expect(await initializeLegacyMaps(db, generated)).toEqual({ inserted: 0, existing: 11 });
+    expect(await initializeLegacyMaps(db, generated)).toEqual({ inserted: 0, existing: 12 });
     expect(await allRows(native)).toEqual(published);
 
     const scenario = {
@@ -480,7 +480,7 @@ it.each([
   { key: '2121', map: 'chess', cities: 64, unitSet: 'basic' },
   { key: '2210', map: 'pokemon_v1', cities: 23, unitSet: 'basic' },
   { key: '910', map: 'cr', cities: 53, unitSet: 'cr' },
-  { key: '2171', map: 'ludo_rathowm', cities: 99, unitSet: 'basic' },
+  { key: '2171', map: 'ludo_rathowm', cities: 99, unitSet: 'ludo_rathowm' },
 ] as const)('S5 $map 원작 지도의 도로를 저장하고 월드를 재생한다', async ({ key, map, cities, unitSet }) => {
   await withDatabase(async ({ db, url }) => {
     await initializeLegacyMaps(db);

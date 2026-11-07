@@ -96,6 +96,40 @@ describe('T4-46 AC-P2-24 원작 che 병종 수치와 모집 조건', () => {
     expect(validateWorldResources({ map: crMap, scenario, statRules, unitSet: siege }).unitSet.status).toBe('fail');
   });
 
+  it('라트하우므 병종의 지역 제한은 원작 지역 이름과 거점 소유를 함께 확인한다', async () => {
+    const ludoMap = mapSchema.parse(
+      JSON.parse(readFileSync(new URL('../../resources/map/ludo_rathowm.json', import.meta.url), 'utf8')),
+    );
+    const { unitSet: ludo } = projectCheUnitSet(await readAlternateCheSource('ludo_rathowm'), ludoMap);
+    const monster = ludo.crewTypes.find(({ id }) => id === 217101)!;
+    expect(ludo.crewTypes).toHaveLength(46);
+    expect(ludo.defaultCrewTypeId).toBe(217100);
+    expect(monster.requirements).toEqual([
+      { kind: 'regions', regions: [1, 2], names: ['호넷 마인령', '케이브리스 마인령'] },
+    ]);
+    const context: CrewContext = {
+      nation: { id: 1, tech: 0 },
+      ownedCities: [],
+      cityNames: {},
+      year: 180,
+      startYear: 180,
+      research: [],
+      scorch: 0,
+      isChief: false,
+    };
+    expect(crewTypeFailure(monster, context)?.message).toContain('호넷 마인령·케이브리스 마인령 도시');
+    for (const region of [1, 2, 3]) {
+      const city = ludoMap.cities.find((row) => row.region === region)!;
+      expect(crewTypeFailure(monster, { ...context, ownedCities: [{ ...city, cityKey: city.id }] }) === null).toBe(
+        region !== 3,
+      );
+    }
+    const scenario = { id: 'test', title: '라트하우므 병종', startYear: 180, nation: [], general: [], diplomacy: [] };
+    const statRules = published('STAT_RULES', 'default');
+    expect(validateWorldResources({ map: ludoMap, scenario, statRules, unitSet: ludo }).status).toBe('pass');
+    expect(validateWorldResources({ map, scenario, statRules, unitSet: ludo }).unitSet.status).toBe('fail');
+  });
+
   it('소형 지도 세 판의 모집 거점과 호환 지도를 고정한다', () => {
     const smallUnits = unitSetSchema.parse(
       JSON.parse(readFileSync(new URL('../../resources/unitset/che-miniche.json', import.meta.url), 'utf8')),

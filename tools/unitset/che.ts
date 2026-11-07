@@ -14,7 +14,7 @@ const originalRequirement = z.discriminatedUnion('type', [
 ]);
 const triggerList = z.array(z.string().min(1)).nullable();
 const originalSet = z.looseObject({
-  id: z.enum(['che', 'che_except_siege', 'cr', 'siegetank']),
+  id: z.enum(['che', 'che_except_siege', 'cr', 'siegetank', 'ludo_rathowm']),
   crewTypes: z.array(
     z.looseObject({
       id: z.number().int().positive(),
@@ -27,6 +27,24 @@ const originalSet = z.looseObject({
   ),
 });
 export const MINICHE_MAP_IDS = ['miniche', 'miniche_b', 'miniche_clean'] as const;
+// core2026 df6c926 resources/map/region_map.json의 ludo_rathowm, 번호 1~14.
+const ludoRegionNames = [
+  '',
+  '호넷 마인령',
+  '케이브리스 마인령',
+  '카라의 숲',
+  '샹그릴라',
+  '제스 북부',
+  '제스 남부',
+  '헬만 서부',
+  '헬만 동부',
+  '리자스 남부',
+  '리자스 북부',
+  'JAPAN',
+  '자유도시 동부',
+  '자유도시 서부',
+  'AL교',
+];
 
 export function projectCheUnitSet(source: unknown, mapInput: unknown) {
   const original = originalSet.parse(source);
@@ -37,10 +55,11 @@ export function projectCheUnitSet(source: unknown, mapInput: unknown) {
     che_except_siege: MINICHE_MAP_IDS,
     cr: ['cr'],
     siegetank: ['che'],
+    ludo_rathowm: ['ludo_rathowm'],
   }[original.id];
   if (!allowedMaps.includes(map.id))
-    throw Error(`원작 병종에 맞는 ${original.id === 'cr' ? 'cr' : 'che'} 지도가 필요합니다.`);
-  const boundMaps = miniche ? MINICHE_MAP_IDS : original.id === 'cr' ? allowedMaps : undefined;
+    throw Error(`원작 병종에 맞는 ${original.id === 'che_except_siege' ? 'che' : allowedMaps[0]} 지도가 필요합니다.`);
+  const boundMaps = miniche ? MINICHE_MAP_IDS : map.id === 'che' ? undefined : allowedMaps;
   const regionIds = new Set(map.cities.map(({ region }) => region));
 
   function project(req: z.infer<typeof originalRequirement>): Requirement {
@@ -51,15 +70,17 @@ export function projectCheUnitSet(source: unknown, mapInput: unknown) {
         return { kind: 'tech', min: req.tech };
       case 'ReqMinRelYear':
         return { kind: 'minRelYear', min: req.year };
-      case 'ReqRegions':
-        return {
-          kind: 'legacyCheRegions',
-          regions: req.regions.map((name) => {
-            const region = LEGACY_CHE_REGION_NAMES.findIndex((candidate) => candidate === name);
-            if (region <= 0 || !regionIds.has(region)) throw Error(`원작 병종의 지역 대응을 확인하세요. ${name}`);
-            return region;
-          }),
-        };
+      case 'ReqRegions': {
+        const names = original.id === 'ludo_rathowm' ? ludoRegionNames : LEGACY_CHE_REGION_NAMES;
+        const regions = req.regions.map((name) => {
+          const region = names.findIndex((candidate) => candidate === name);
+          if (region <= 0 || !regionIds.has(region)) throw Error(`원작 병종의 지역 대응을 확인하세요. ${name}`);
+          return region;
+        });
+        return original.id === 'ludo_rathowm'
+          ? { kind: 'regions', regions, names: req.regions }
+          : { kind: 'legacyCheRegions', regions };
+      }
       case 'ReqCities':
         return {
           kind: 'cities',

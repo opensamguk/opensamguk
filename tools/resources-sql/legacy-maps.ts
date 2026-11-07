@@ -24,7 +24,7 @@ const alternateMapSources = [
 ] as const;
 const unitSetName = 'che-miniche';
 const exceptSiegeName = 'che_except_siege';
-const alternateUnitSets = ['cr', 'siegetank'] as const;
+const alternateUnitSets = ['cr', 'siegetank', 'ludo_rathowm'] as const;
 export const legacyMapUnitSetNames = [unitSetName, exceptSiegeName, ...alternateUnitSets] as const;
 export const LEGACY_MAP_BODY_TAG = '$legacy_maps_init$';
 export const LEGACY_MAP_CONTENT_TAG = '$legacy_maps_content$';
@@ -79,14 +79,11 @@ export async function legacyMapPublications() {
   const miniche = rows.find(({ name }) => name === 'miniche')!;
   const { unitSet: exceptSiege } = projectCheUnitSet(await readCheExceptSiegeSource(), JSON.parse(miniche.raw));
   if (exceptSiege.id !== exceptSiegeName) throw new Error('축지 병종 판을 확인하세요.');
-  const crMap = JSON.parse(alternateMaps.find(({ name }) => name === 'cr')!.raw) as unknown;
   const cheMap = await readBuiltinCheMap();
   const alternateUnits = await Promise.all(
     alternateUnitSets.map(async (name) => {
-      const { unitSet: content } = projectCheUnitSet(
-        await readAlternateCheSource(name),
-        name === 'cr' ? crMap : cheMap,
-      );
+      const map = name === 'siegetank' ? cheMap : JSON.parse(alternateMaps.find((row) => row.name === name)!.raw);
+      const { unitSet: content } = projectCheUnitSet(await readAlternateCheSource(name), map);
       if (content.id !== name) throw Error(`원작 병종 판 이름이 다릅니다. ${name}`);
       return {
         kind: 'UNIT_SET' as const,

@@ -24,6 +24,7 @@ const blocked: [Requirement, string][] = [
   [{ kind: 'impossible' }, '모집할 수 없는 병종입니다.'],
   [{ kind: 'tech', min: 1 }, '기술 1이 필요합니다.'],
   [{ kind: 'regions', regions: [16] }, '이민족 도시가 필요합니다.'],
+  [{ kind: 'regions', regions: [14], names: ['AL교'] }, 'AL교 도시가 필요합니다.'],
   [{ kind: 'cities', cityKeys: [2] }, '도시2 거점이 필요합니다.'],
   [{ kind: 'citiesWithLevel', cityKeys: [1], level: 8 }, '규모 8 이상의 도시1 거점이 필요합니다.'],
   [{ kind: 'minRelYear', min: 1 }, '시작 1년 뒤부터 쓸 수 있습니다.'],
