@@ -174,8 +174,8 @@ async function drain(worldId: string, rollback = false) {
     throw new Error('준비한 입력 수를 넘었습니다.');
   });
 }
-async function createWorld(enabled = true) {
-  const source = structuredClone(initial);
+async function createWorld(enabled = true, fixture = initial) {
+  const source = structuredClone(fixture);
   if (!enabled) source.ruleFeatures = source.ruleFeatures!.filter((key) => key !== 'city-resources-v1');
   const { worldId } = await saveInitialWorld(db, source, {
     name: enabled ? 'INT18 정식 원생성' : 'INT18 기존 판',
@@ -225,8 +225,8 @@ async function createActor(worldId: string, index: number): Promise<Actor> {
 }
 
 // 부여한 직책·집결·도시 자원은 권한 경계 시험에만 쓴다. 생성 인물·출처는 실제 입력으로 만든다.
-async function authorityFixture() {
-  const worldId = await createWorld();
+async function authorityFixture(fixture = initial) {
+  const worldId = await createWorld(true, fixture);
   await controlClock(db, worldId, 'start');
   const actors = [await createActor(worldId, 0), await createActor(worldId, 1)] as [Actor, Actor];
   const nation = initial.nations.find(
@@ -396,6 +396,94 @@ describe('AC-INT-18B 정식 원생성·기존 판과 실제 PG', () => {
   });
 });
 describe('AC-INT-18B 정식 자료 기반 권한·잔량 통제 고정물', () => {
+  it('사람의 개인 편성과 수뇌의 국가 배속을 명령 목록에서 예약해 실행한다', async (signal) => {
+    const opening = structuredClone(initial);
+    // 이 사례는 사람 예약만 실행한다. 정식 NPC 실행은 별도 원생성 시험에서 본다.
+    for (const npc of opening.generals) npc.activeFromYear = Math.max(npc.activeFromYear, opening.startYear + 1);
+    const { worldId, actors, cityKey } = await authorityFixture(opening);
+    const staff = actors[1];
+    const recruitType = initial.unitSet.crewTypes.find(({ armType, id }) => armType > 0 && id !== 1100)!;
+    const form = { commandKey: 'form_unit', args: { crewType: recruitType.id } };
+    const allocate = {
+      commandKey: 'nation_city_allocate',
+      args: { cityKey, unitId: staff.unitId, crewType: 1100, amount: 200 },
+    };
+
+    const personalCommands = await api<Array<{ key: string }>>('commands.list', { worldId }, staff.cookie);
+    expect(personalCommands.data).toContainEqual(expect.objectContaining({ key: form.commandKey }));
+    const officeCommands = await api<Array<{ key: string }>>('nationCommands.list', { worldId }, staff.cookie);
+    expect(officeCommands.data).toContainEqual(expect.objectContaining({ key: allocate.commandKey }));
+    expect((await api('turns.precheck', { worldId, ...form }, staff.cookie)).data).toMatchObject({ ok: true });
+    expect((await api('nationCommands.precheck', { worldId, ...allocate }, staff.cookie)).data).toEqual({ ok: true });
+    expect(
+      (
+        await api(
+          'nationCommands.precheck',
+          { worldId, ...allocate, args: { ...allocate.args, amount: 301 } },
+          staff.cookie,
+        )
+      ).data,
+    ).toMatchObject({ ok: false });
+
+    const personal = await api<{ revision: number }>('turns.get', { worldId }, staff.cookie);
+    const office = await api<{ tabs: Array<{ officerLevel: number; office: unknown; revision: number }> }>(
+      'nationTurns.get',
+      { worldId },
+      staff.cookie,
+    );
+    const tab = office.data!.tabs.find(({ officerLevel }) => officerLevel === 5)!;
+    const put = (command: typeof form | typeof allocate) => ({ put: { from: 0, to: 0, ...command } });
+    const savedPersonal = await api<{ ok: boolean; slots: unknown[] }>(
+      'turns.edit',
+      { worldId, revision: personal.data!.revision, op: put(form) },
+      staff.cookie,
+      true,
+    );
+    expect(savedPersonal.data?.ok).toBe(true);
+    expect(savedPersonal.data?.slots[0]).toMatchObject(form);
+    const savedOffice = await api<{ ok: boolean; slots: unknown[] }>(
+      'nationTurns.edit',
+      { worldId, office: tab.office, revision: tab.revision, op: put(allocate) },
+      staff.cookie,
+      true,
+    );
+    expect(savedOffice.data?.ok).toBe(true);
+    expect(savedOffice.data?.slots).toHaveLength(12);
+    expect(savedOffice.data?.slots[0]).toMatchObject(allocate);
+
+    const before = await snapshot(worldId);
+    const tick = before.state.generals[staff.generalId]!.nextTurnTick;
+    const executed = await withLease(
+      worldId,
+      (lease, leaseSignal) => new TurnLoop(db, lease).advanceTo(tick, leaseSignal),
+      signal,
+    );
+    expect(executed).toContainEqual({ generalId: staff.generalId, tick, commandKey: form.commandKey });
+    const after = await snapshot(worldId);
+    const units = after.state.campaign!.units.filter(({ ownerId }) => ownerId === staff.generalId);
+    expect(units).toHaveLength(2);
+    expect(units.find(({ id }) => id === staff.unitId)).toMatchObject({ troops: 200, train: 40, atmos: 60 });
+    expect(units.find(({ crewType }) => crewType === recruitType.id)).toMatchObject({
+      troops: 0,
+      commanderId: staff.generalId,
+    });
+    expect(after.state.cityResources!.cities[String(cityKey)]!.garrison).toContainEqual({
+      crewType: 1100,
+      troops: 100,
+      train: 40,
+      atmos: 60,
+    });
+    expect(after.turns[staff.generalId]).toHaveLength(30);
+    expect(after.turns[staff.generalId]?.[0]?.commandKey).toBe('rest');
+    const afterOffice = await api<{ tabs: Array<{ officerLevel: number; slots: Array<{ commandKey: string }> }> }>(
+      'nationTurns.get',
+      { worldId },
+      staff.cookie,
+    );
+    expect(afterOffice.data!.tabs.find(({ officerLevel }) => officerLevel === 5)!.slots[0]?.commandKey).toBe(
+      'nation_rest',
+    );
+  });
   it('동시200명 요청 둘은 도시300명에서 한 번만 성공하고 두 월드를 격리한다', async () => {
     const f = await authorityFixture(),
       before = await snapshot(f.worldId),
