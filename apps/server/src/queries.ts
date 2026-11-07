@@ -89,11 +89,9 @@ export async function requireGeneral(db: Prisma.TransactionClient, worldId: stri
   return general;
 }
 
-export function worldSummary(world: ReadWorld, now: number) {
-  const clock = worldClock(world);
-  const tick = nowTick(clock, now);
+export function seasonResultInfo(world: Pick<ReadWorld, 'status' | 'result'>) {
   const row = world.status === 'ENDED' ? world.result : null;
-  const result = row
+  return row
     ? {
         reason: row.reason,
         year: row.endedYear,
@@ -106,6 +104,12 @@ export function worldSummary(world: ReadWorld, now: number) {
         endedAt: row.endedAt.toISOString(),
       }
     : null;
+}
+
+export function worldSummary(world: ReadWorld, now: number) {
+  const clock = worldClock(world);
+  const tick = nowTick(clock, now);
+  const result = seasonResultInfo(world);
   return {
     name: world.name,
     status: world.status,

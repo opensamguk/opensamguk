@@ -85,6 +85,7 @@ export const exemptions: AuthzExemption[] = [
   },
 
   { path: 'records.world', category: 'otherUser', reason: '공통 공개 연감이며 타인 소유 자원이 없다.' },
+  { path: 'records.season', category: 'otherUser', reason: '로그인 사용자에게 공개하는 종료 순위다.' },
   {
     path: 'timelapse.frames',
     category: 'otherUser',

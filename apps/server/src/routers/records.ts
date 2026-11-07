@@ -1,14 +1,46 @@
-import { protectedProcedure, router } from '../trpc';
-import { beforeCursor, page, readWorld, recordsInput, requireGeneral } from '../queries';
+import { TRPCError } from '@trpc/server';
+import { rankGenerals } from '@opensamguk/rules';
+import { protectedProcedure, router, worldVerifiedProcedure } from '../trpc';
+import { beforeCursor, page, readWorld, recordsInput, requireGeneral, seasonResultInfo, worldInput } from '../queries';
 import { logInfo, logSelect, nationRecordInfo, worldRecordInfo } from '../visibility';
 import { z } from 'zod';
 import { decodeRecordCursor, encodeRecordCursor, generalLogCursor } from '../recordCursor';
-import { worldInput } from '../queries';
 import { monthlyReviewSelect, readMonthlyReview } from '../review';
 
 const generalInput = worldInput.extend({ cursor: z.string().min(1).max(256).optional() }).strict();
 
+const seasonInput = worldInput.extend({ by: z.enum(['dedication', 'experience', 'merit']).default('dedication') });
+
 export const recordsRouter = router({
+  season: worldVerifiedProcedure.input(seasonInput).query(({ ctx, input }) =>
+    readWorld(ctx.db, input.worldId, async (tx, world) => {
+      const result = seasonResultInfo(world);
+      if (!result) throw new TRPCError({ code: 'NOT_FOUND', message: '기수 결과가 없습니다.' });
+      const rows = await tx.seasonGeneral.findMany({
+        where: { worldId: input.worldId },
+        select: {
+          generalId: true,
+          name: true,
+          nationId: true,
+          nationName: true,
+          nationColor: true,
+          dedication: true,
+          experience: true,
+          wins: true,
+          captures: true,
+        },
+      });
+      const generals = rankGenerals(
+        rows.map(({ generalId, nationId, nationName, nationColor, ...row }) => ({
+          ...row,
+          id: generalId,
+          nation: nationId === null ? null : { id: nationId, name: nationName!, color: nationColor! },
+        })),
+        input.by,
+      ).map(({ id, ...row }) => ({ generalId: id, ...row }));
+      return { result, generals };
+    }),
+  ),
   general: protectedProcedure.input(generalInput).query(({ ctx, input }) =>
     readWorld(ctx.db, input.worldId, async (tx) => {
       const general = await requireGeneral(tx, input.worldId, ctx.user.id);

@@ -10,6 +10,7 @@ import { newSession } from '../apps/server/src/auth/session';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { readFixture } from '../apps/server/test/readFixture';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { persistSeasonArchive } from '../apps/engine/src/seasonArchive';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -48,6 +49,7 @@ const paths = [
   'records.general',
   'records.nation',
   'records.world',
+  'records.season',
   'timelapse.frames',
   'timelapse.publicFrames',
   'ranking.generals',
@@ -59,7 +61,7 @@ function input(path: Path): unknown {
     return undefined;
   if (path === 'auth.signup') return { email: `${randomUUID()}@example.test`, password };
   if (path === 'auth.login') return { email: users[0]!.email, password };
-  if (path === 'timelapse.publicFrames') return { worldId: endedWorldId };
+  if (path === 'timelapse.publicFrames' || path === 'records.season') return { worldId: endedWorldId };
   if (path === 'general.create')
     return { worldId, name: '보안장수', leadership: 55, strength: 55, intel: 55, portraitId: 10001 };
   if (path === 'turns.set') return { worldId, revision: 0, slots: Array.from({ length: 30 }, () => null) };
@@ -108,6 +110,7 @@ async function snapshot() {
     db.user.findMany({ orderBy: { id: 'asc' } }),
     db.session.findMany({ orderBy: { id: 'asc' } }),
     db.world.findMany({ orderBy: { id: 'asc' } }),
+    db.seasonGeneral.findMany({ orderBy: [{ worldId: 'asc' }, { generalId: 'asc' }] }),
     db.general.findMany({ orderBy: [{ worldId: 'asc' }, { id: 'asc' }] }),
     db.generalTurn.findMany({ orderBy: [{ worldId: 'asc' }, { generalId: 'asc' }, { slot: 'asc' }] }),
     db.inputEvent.findMany({ orderBy: { id: 'asc' } }),
@@ -167,6 +170,7 @@ beforeAll(async () => {
       endedAt: new Date(now),
     },
   });
+  await db.$transaction((tx) => persistSeasonArchive(tx, endedWorldId, 191));
   await db.yearbookSnapshot.create({
     data: {
       worldId: endedWorldId,
@@ -306,6 +310,42 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
     expect((await request('auth.me', undefined, b)).data).toHaveProperty('user.id', users[1]!.id);
     await request('auth.logout', undefined, a);
     expect((await request('auth.me', undefined, b)).data).toHaveProperty('user.id', users[1]!.id);
+  });
+  it('AC-P2-22 종료 장수 순위는 저장 당시 값과 공개 항목만 돌려준다', async () => {
+    const input = { worldId: endedWorldId, by: 'merit' };
+    const cookie = await session();
+    const original = await request('records.season', input, cookie);
+    expect(original).toMatchObject({
+      status: 200,
+      data: { result: { reason: 'END_YEAR', year: 191 }, generals: expect.any(Array) },
+    });
+    const rows = (original.data as { generals: Record<string, unknown>[] }).generals;
+    expect(rows.length).toBeGreaterThan(0);
+    expect(Object.keys(rows[0]!).sort()).toEqual([
+      'captures',
+      'dedication',
+      'experience',
+      'generalId',
+      'merit',
+      'name',
+      'nation',
+      'rank',
+      'value',
+      'wins',
+    ]);
+    expect(rows[0]).toMatchObject({ merit: 0, rank: 1, value: 0 });
+    expect(await request('records.season', input, await session(3))).toEqual(original);
+    expect((await request('records.season', { worldId }, cookie)).code).toBe('NOT_FOUND');
+    expect((await request('records.season', { ...input, userId: users[1]!.id }, cookie)).code).toBe('BAD_REQUEST');
+    const generalId = Number(rows[0]!.generalId);
+    const where = { worldId_id: { worldId: endedWorldId, id: generalId } };
+    const general = await db.general.findUniqueOrThrow({ where, select: { battleWins: true } });
+    try {
+      await db.general.update({ where, data: { battleWins: general.battleWins + 1 } });
+      expect(await request('records.season', input, cookie)).toEqual(original);
+    } finally {
+      await db.general.update({ where, data: general });
+    }
   });
   it('health의 임의 입력은 계정 정보를 더하거나 DB를 바꾸지 않는다', async () => {
     const before = await snapshot();
