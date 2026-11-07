@@ -2,7 +2,13 @@ import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, beforeAll, beforeEach, describe, expect, it as test } from 'vitest';
 import { createDb } from '../packages/db/src/index';
-import { applyRecordedInput, checkReplayOrigin, initialReplayState, type WorldInit } from '../packages/rules/src/index';
+import {
+  applyRecordedInput,
+  checkReplayOrigin,
+  initialReplayState,
+  runReplayAction,
+  type WorldInit,
+} from '../packages/rules/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { readWorldState, saveInitialWorld } from '../apps/engine/src/world/persistence';
@@ -432,6 +438,8 @@ describe('AC-INT-18B 정식 자료 기반 권한·잔량 통제 고정물', () =
       staff.cookie,
     );
     const tab = office.data!.tabs.find(({ officerLevel }) => officerLevel === 5)!;
+    let replay = await snapshot(worldId);
+    const startSequence = (await db.world.findUniqueOrThrow({ where: { id: worldId } })).actionSequence;
     const put = (command: typeof form | typeof allocate) => ({ put: { from: 0, to: 0, ...command } });
     const savedPersonal = await api<{ ok: boolean; slots: unknown[] }>(
       'turns.edit',
@@ -453,12 +461,18 @@ describe('AC-INT-18B 정식 자료 기반 권한·잔량 통제 고정물', () =
 
     const before = await snapshot(worldId);
     const tick = before.state.generals[staff.generalId]!.nextTurnTick;
-    const executed = await withLease(
-      worldId,
-      (lease, leaseSignal) => new TurnLoop(db, lease).advanceTo(tick, leaseSignal),
-      signal,
-    );
-    expect(executed).toContainEqual({ generalId: staff.generalId, tick, commandKey: form.commandKey });
+    const reopened = createDb(url);
+    try {
+      expect(await snapshot(worldId, reopened)).toEqual(before);
+      const executed = await withLease(
+        worldId,
+        (lease, leaseSignal) => new TurnLoop(reopened, lease).advanceTo(tick, leaseSignal),
+        signal,
+      );
+      expect(executed).toContainEqual({ generalId: staff.generalId, tick, commandKey: form.commandKey });
+    } finally {
+      await reopened.$disconnect();
+    }
     const after = await snapshot(worldId);
     const units = after.state.campaign!.units.filter(({ ownerId }) => ownerId === staff.generalId);
     expect(units).toHaveLength(2);
@@ -483,6 +497,23 @@ describe('AC-INT-18B 정식 자료 기반 권한·잔량 통제 고정물', () =
     expect(afterOffice.data!.tabs.find(({ officerLevel }) => officerLevel === 5)!.slots[0]?.commandKey).toBe(
       'nation_rest',
     );
+
+    const events = await db.inputEvent.findMany({
+      where: { worldId, sequence: { gt: startSequence } },
+      orderBy: { sequence: 'asc' },
+      select: { kind: true, sequence: true, tick: true, generalId: true, status: true, payload: true, result: true },
+    });
+    expect(events.map(({ kind }) => kind)).toEqual(['turns.set', 'nationTurns.set']);
+    let sequence = startSequence;
+    for (const event of events) {
+      if (event.status !== 'APPLIED' || event.sequence !== ++sequence) throw new Error('예턴 기록 순서를 확인하세요.');
+      replay = applyRecordedInput(replay, { ...event, sequence: event.sequence, status: event.status });
+    }
+    expect(replay).toEqual(before);
+    const endSequence = (await db.world.findUniqueOrThrow({ where: { id: worldId } })).actionSequence;
+    expect(endSequence).toBeGreaterThan(sequence);
+    while (sequence++ < endSequence) replay = runReplayAction(replay, opening.seed, opening.unitSet);
+    expect(replay).toEqual(after);
   });
   it('동시200명 요청 둘은 도시300명에서 한 번만 성공하고 두 월드를 격리한다', async () => {
     const f = await authorityFixture(),
