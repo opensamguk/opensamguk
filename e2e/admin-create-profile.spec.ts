@@ -234,6 +234,7 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
     'integration-v01-expanded',
     'san10-191-expanded',
     'san10-191-lifecycle',
+    'san10-191-research',
   ]);
   const profile = options.profiles.find((entry) => entry.id === mode.id);
   expect(profile?.available).toBe(true);

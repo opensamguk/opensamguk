@@ -148,6 +148,8 @@ it('RUNNING·PAUSED만 createdAt/id 순서로 나열하고 사본 없는 월드�
     cityRuinsState,
     nationStrategyState,
     nationLifecycleState,
+    preparedTurnsState,
+    nationResearchState,
     runtimeOptions,
     ...sourceScalars
   } = source;
@@ -171,6 +173,10 @@ it('RUNNING·PAUSED만 createdAt/id 순서로 나열하고 사본 없는 월드�
   expect(nationStrategyState).toBeNull();
   expect(source.ruleFeatures).not.toContain('nation-lifecycle-v1');
   expect(nationLifecycleState).toBeNull();
+  expect(source.ruleFeatures).not.toContain('prepared-turns-v1');
+  expect(preparedTurnsState).toBeNull();
+  expect(source.ruleFeatures).not.toContain('nation-research-v1');
+  expect(nationResearchState).toBeNull();
   expect(runtimeOptions).toBeNull();
   if (source.statRules === null || source.unitSet === null) throw new Error('정식 능력치·병종 JSON이 필요합니다.');
   await db.world.update({ where: { id: worldId }, data: { createdAt: new Date(epoch + minute) } });

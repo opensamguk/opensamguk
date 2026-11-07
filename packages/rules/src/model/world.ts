@@ -22,6 +22,8 @@ export interface AssignmentOffer {
 export type OfficeTurns = Record<number, Record<number, { commandKey: string; args: unknown }[]>>;
 export type OfficeRevisions = Record<number, Record<number, { revision: number; tenure: number }>>;
 export interface WorldState {
+  preparedTurns?: import('../preparedTurns/state').PreparedTurnsState;
+  nationResearch?: import('../nationResearch/state').NationResearchState;
   nationLifecycle?: import('../nationLifecycle/state').NationLifecycleState;
   nationStrategy?: import('../nationStrategy/state').NationStrategyState;
   cityRuins?: import('../cityScale/state').CityRuinsState;

@@ -143,6 +143,10 @@
 --
 -- 원문 바이트와 SHA-256은 `tools/fixtures/t4-46-scenarios.json`에 보관하며 두 게시 판은 기존 생성기로 `packages/db/sql/resources-scenarios.sql`에 추가한다. 도시 없는 국가의 시작 원장과 위치 미지정 소속 장수의 전체 지도 시드 배치는 사용자 승인 AC-P2-26·T4-48을 따른다. 기존 9종 사본과 1030 판은 보존한다.
 --
+-- ## 특수 병종 연구와 국가 명령 준비
+--
+-- `packages/rules/src/nationResearch/commands.ts`와 `preparedTurns/`는 core2026 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`의 `packages/logic/src/actions/turn/nation/eventResearch.ts`, 연구 명령 7종과 `app/game-engine/src/turn/reservedTurnHandler.ts`의 연속 실행 규칙을 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다. 기간·국고 비용·보상·직책은 사용자 승인 D-077을 적용하며 기존 확장판의 병종 조건은 바꾸지 않는다.
+--
 
 DO $t4_46_init$
 DECLARE

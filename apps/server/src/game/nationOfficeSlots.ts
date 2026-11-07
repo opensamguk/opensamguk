@@ -5,6 +5,7 @@ import {
   canUseNationTurns,
   canExecuteNationCommand,
   canExecuteCityNationCommand,
+  canExecuteResearchNationCommand,
   officerTitle,
   type QueuedTurn,
 } from '@opensamguk/rules';
@@ -37,7 +38,11 @@ export function parseOfficeTurn(
   if (
     !def ||
     def.target !== 'nation' ||
-    !(canExecuteNationCommand(level, def.key) || canExecuteCityNationCommand(world, level, def.key)) ||
+    !(
+      canExecuteNationCommand(level, def.key) ||
+      canExecuteCityNationCommand(world, level, def.key) ||
+      canExecuteResearchNationCommand(world, level, def.key)
+    ) ||
     !args?.success
   )
     invalid();

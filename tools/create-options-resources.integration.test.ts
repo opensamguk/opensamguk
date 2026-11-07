@@ -68,6 +68,32 @@ const registered: RuleRegistry = {
   ],
 };
 describe('AC-M3-04 원생성 설정 조회', () => {
+  it('AC-P2-06 연구 선택은 새22기능 판을 고정하고 선행 기능 누락과 옛 판 교환을 거부한다', () => {
+    const data = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v6.json'));
+    const research = expandedCreationProfile(expandedRows, allPresets, data, ruleRegistry, 'san10-191-research');
+    expect(research).toMatchObject({
+      id: 'san10-191-research',
+      available: true,
+      featureProfileKey: 'expanded-191-v6',
+      featureProfileHash: hashState(data),
+    });
+    if (!research.available) throw new Error('연구 선택이 필요합니다.');
+    expect(research.ruleFeatures).toHaveLength(22);
+    for (const key of ['personnel', 'prepared-turns-v1', 'nation-research-v1'])
+      expect(
+        expandedCreationProfile(
+          expandedRows,
+          allPresets,
+          { ...data, ruleFeatures: data.ruleFeatures.filter((feature) => feature !== key) },
+          ruleRegistry,
+          'san10-191-research',
+        ),
+      ).toMatchObject({ available: false, code: 'FEATURE_PROFILE_UNAVAILABLE' });
+    expect(expandedCreationProfile(expandedRows, allPresets, data, ruleRegistry, 'san10-191-lifecycle')).toMatchObject({
+      available: false,
+      code: 'FEATURE_PROFILE_UNAVAILABLE',
+    });
+  });
   it('AC-P2-08·09 국가 변천 선택은 기존 확장과 별도로20기능을 고정하며 기능 누락은 거부한다', () => {
     const data = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v5.json'));
     const lifecycle = expandedCreationProfile(expandedRows, allPresets, data, ruleRegistry, 'san10-191-lifecycle');

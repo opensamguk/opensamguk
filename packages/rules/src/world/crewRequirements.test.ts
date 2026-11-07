@@ -163,7 +163,10 @@ describe('INT-22 병종 조건의 공통 모집 경계', () => {
 
   it('서버 행위자의 국가·자기 도시·연도·직책과 국가별 확장 표식을 읽는다', () => {
     const { world } = fixture([]);
-    world.ext = { research: { '1': ['greatsword'], '2': ['halberd'] }, nation_scorch: { specialScorch: { '1': 2 } } };
+    world.ruleFeatures = ['personnel', 'prepared-turns-v1', 'nation-research-v1'];
+    world.nationResearch = { version: 1, nations: { '1': ['greatsword'], '2': ['halberd'] } };
+    world.preparedTurns = { version: 1, nations: {} };
+    world.ext = { nation_scorch: { specialScorch: { '1': 2 } } };
     world.generals[1]!.officerLevel = 5;
     const context = crewContext(deepFreeze(world), { generalId: 1, tick: 12 * TICKS_PER_MONTH });
     expect(context).toMatchObject({

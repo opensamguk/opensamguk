@@ -149,6 +149,14 @@ ID와 amount는 1~1,000,000 정수입니다. resource는 gold 또는 rice이며 
 
 공격 기록은 GeneralLog, 수비 기록은 BattleLog에 둡니다. 수비 장수가 같은 tick에 자기 턴을 실행해도 기존 GeneralLog 유일성을 깨지 않습니다. 국가 역사는 같은 tick의 여러 사건을 events 배열에 덧붙입니다. 멸망은 국가 역사에 남고 다음 월간 연감에는 그 국가가 빠집니다. NationTurn·commandMeta도 생성 기록과 재생 상태 해시에 포함합니다. InputEvent의 기존 turns.set·general.create 계약은 바꾸지 않았습니다.
 
+### 선택형 국가 연구 (T4-07·09·10·53, AC-P2-05·06)
+
+`nation-research-v1`은 `personnel`·`prepared-turns-v1`을 요구한다. 자기 국가 도시의 직책 5~12가 기존 `nationCommands.list`·`nationCommands.precheck`·`nationTurns.get`·`nationTurns.set`을 쓴다. 연구 인자는 모두 엄격한 빈 객체다. 실행 장수와 직책은 기존 세션·직책 예약에서 정한다.
+
+대검병·화시병·산저병은 같은 명령을 12회, 극병·원융노병·상병·화륜차는 24회 실행한다. 준비는 국가·직책별로 같은 명령과 같은 인자를 세며 마지막 실행에만 D-077의 비용·보상을 적용한다. 실패는 진행을 유지하고 다른 국가 명령의 성공은 해당 직책의 진행을 지운다. 직책 담당자 교체와 국가 소멸 뒤의 기록은 보존한다. 조회·예턴 저장은 진행을 바꾸지 않는다.
+
+`World.preparedTurnsState`·`World.nationResearchState`는 기존 월드에서 NULL이다. 새 기능은 형식 3의 원생성에 고정하고 준비·완료·국고·보상·예약 이동을 같은 턴 트랜잭션에 저장한다. 공통 모집 조건은 국가별 완료 기록과 기존 병종 조건을 함께 검사한다. 새 생성 선택 `san10-191-research`는 `expanded-191-v6`를 사용한다.
+
 ## T1-05 명령 정의와 결과
 
 ### 선택형 장비 월드 (T4-22·23·24, AC-P2-12)
