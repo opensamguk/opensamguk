@@ -20,7 +20,7 @@ export interface ScenarioRow {
   contentHash: string | null;
   source?: string;
   map?: string;
-  unitSet?: 'che' | (typeof legacyMapUnitSetNames)[number];
+  unitSet?: 'basic' | 'che' | (typeof legacyMapUnitSetNames)[number];
   statRules?: string;
 }
 
@@ -56,7 +56,10 @@ export function requiredScenarioStatRules(rows: readonly ScenarioRow[]) {
 
 export async function requiredScenarioLegacyResources(ready: readonly ScenarioRow[]) {
   const keys = new Set(
-    ready.flatMap(({ map, unitSet }) => (map === undefined ? [] : [`MAP/${map}`, `UNIT_SET/${unitSet}`])),
+    ready.flatMap(({ map, unitSet }) => [
+      ...(map === undefined ? [] : [`MAP/${map}`]),
+      ...(unitSet === undefined || unitSet === 'basic' || unitSet === 'che' ? [] : [`UNIT_SET/${unitSet}`]),
+    ]),
   );
   if (keys.size === 0) return [];
 
@@ -87,7 +90,7 @@ export function scenarioMaterialsForRow(
 ) {
   const { cheUnitSet, legacyResources, ...basic } = materials;
   const unitSet =
-    row.unitSet === undefined
+    row.unitSet === undefined || row.unitSet === 'basic'
       ? basic.unitSet
       : row.unitSet === 'che'
         ? cheUnitSet
@@ -112,8 +115,8 @@ export function readyScenarioRows(rows: readonly ScenarioRow[] = scenarioRows): 
       keys.has(row.key) ||
       !row.contentHash?.match(/^[0-9a-f]{64}$/) ||
       !row.source ||
-      (row.unitSet !== undefined && row.unitSet !== 'che' && !legacyUnitSet) ||
-      (row.map !== undefined) !== legacyUnitSet
+      (row.unitSet !== undefined && row.unitSet !== 'basic' && row.unitSet !== 'che' && !legacyUnitSet) ||
+      (legacyUnitSet && row.map === undefined)
     ) {
       throw new Error(`시나리오 판 입력을 확인하세요: SCENARIO/${row.key}/1`);
     }
@@ -193,7 +196,8 @@ export function convertScenariosToSql(
       requirePassingReport(report);
       if (
         row.map !== undefined &&
-        (report.scenario.value?.requiredMap !== row.map || report.scenario.value.requiredUnitSet !== row.unitSet)
+        (report.scenario.value?.requiredMap !== row.map ||
+          report.scenario.value.requiredUnitSet !== (row.unitSet ?? 'basic'))
       )
         throw new Error('시나리오에 원작 지도와 병종을 지정하세요.');
     } catch {

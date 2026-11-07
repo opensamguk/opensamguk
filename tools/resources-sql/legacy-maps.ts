@@ -16,6 +16,10 @@ const mapSources = [
   ['miniche_b', 'e19b0f521f3304b782186260f71c4e74585b2358a9b5f346c22df1942831e4e6'],
   ['miniche_clean', 'bc2a4189e84dd63eccd9d9319d49b4931e79b804dbe04ce168cf1eb9d4b33181'],
 ] as const;
+const alternateMapSources = [
+  ['chess', '0da653a4de1480b4865bd5843637979ba4cec6591f51a248a94f8ac001edae05'],
+  ['pokemon_v1', '734264221b3170cba6ade2501ccc0ce33e29b9248f5214bfb54faf8dd073ad8d'],
+] as const;
 const unitSetName = 'che-miniche';
 const exceptSiegeName = 'che_except_siege';
 export const legacyMapUnitSetNames = [unitSetName, exceptSiegeName] as const;
@@ -40,26 +44,25 @@ export async function legacyMapPublications() {
   );
   const unit = validateUnitSet(unitSet.content);
   if (unit.status !== 'pass' || unit.value?.id !== unitSetName) throw new Error('소형 지도 병종을 확인하세요.');
-  const rows = await Promise.all(
-    mapSources.map(async ([name, byteHash]) => {
-      const map = await readPinned(`resources/map/${name}.json`, byteHash);
-      const report = validateMap(map.content, { scenarios: [] });
-      if (
-        report.status !== 'pass' ||
-        report.value?.id !== name ||
-        !legacyCheCrewRegionsMatch(unit.value!, report.value)
-      )
-        throw new Error(`원작 지도와 병종 조합이 맞지 않습니다: ${name}`);
-      return {
-        kind: 'MAP' as const,
-        name,
-        version: 1,
-        raw: map.raw,
-        contentHash: hashState(map.content),
-        source: `resources/map/map_${name}.json; ${source}`,
-      };
-    }),
-  );
+  async function readMap([name, byteHash]: readonly [string, string]) {
+    const map = await readPinned(`resources/map/${name}.json`, byteHash);
+    const report = validateMap(map.content, { scenarios: [] });
+    if (report.status !== 'pass' || report.value?.id !== name) throw new Error(`원작 지도를 확인하세요: ${name}`);
+    if (mapSources.some(([id]) => id === name) && !legacyCheCrewRegionsMatch(unit.value!, report.value))
+      throw new Error(`원작 지도와 병종 조합이 맞지 않습니다: ${name}`);
+    return {
+      kind: 'MAP' as const,
+      name,
+      version: 1,
+      raw: map.raw,
+      contentHash: hashState(map.content),
+      source: `resources/map/map_${name}.json; ${source}`,
+    };
+  }
+  const [rows, alternateMaps] = await Promise.all([
+    Promise.all(mapSources.map(readMap)),
+    Promise.all(alternateMapSources.map(readMap)),
+  ]);
   const miniche = rows.find(({ name }) => name === 'miniche')!;
   const { unitSet: exceptSiege } = projectCheUnitSet(await readCheExceptSiegeSource(), JSON.parse(miniche.raw));
   if (exceptSiege.id !== exceptSiegeName) throw new Error('축지 병종 판을 확인하세요.');
@@ -81,6 +84,7 @@ export async function legacyMapPublications() {
       contentHash: hashState(exceptSiege),
       source: `resources/unitset/unitset_che_except_siege.json; ${source}`,
     },
+    ...alternateMaps,
   ];
 }
 
