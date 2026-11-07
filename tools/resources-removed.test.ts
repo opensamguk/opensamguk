@@ -77,8 +77,10 @@ it('AC-P2-26 남는 동적 자원 소비자는 확인한 위치와 개수 그대
     'tools/resources-removed.test.ts': 2,
     'tools/resources-sql/convert.ts': 1,
     'tools/resources-sql/generate-scenarios.ts': 1,
+    'tools/resources-sql/legacy-maps.ts': 1,
     'tools/scenarios.integration.test.ts': 1,
     'tools/scenarios.test.ts': 1,
+    'tools/unitset/che.test.ts': 1,
   });
 });
 
