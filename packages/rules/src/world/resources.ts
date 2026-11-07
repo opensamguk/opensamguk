@@ -144,7 +144,16 @@ export const crewResearchNames = z.enum([
 export const crewRequirementSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('impossible') }),
   z.strictObject({ kind: z.literal('tech'), min: natural }),
-  z.strictObject({ kind: z.literal('regions'), regions: z.array(positive.max(16)).min(1) }),
+  z
+    .strictObject({
+      kind: z.literal('regions'),
+      regions: z.array(positive.max(16)).min(1),
+      names: z.array(name).optional(),
+    })
+    .refine(
+      ({ regions, names }) => names === undefined || names.length === regions.length,
+      '병종 지역 이름 수를 확인하세요.',
+    ),
   z.strictObject({ kind: z.literal('legacyCheRegions'), regions: z.array(positive.max(8)).min(1) }),
   z.strictObject({ kind: z.literal('cities'), cityKeys: z.array(positive).min(1) }),
   z.strictObject({ kind: z.literal('citiesWithLevel'), cityKeys: z.array(positive).min(1), level: positive }),

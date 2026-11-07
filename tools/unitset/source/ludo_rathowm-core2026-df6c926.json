@@ -1,0 +1,1621 @@
+{
+  "id": "ludo_rathowm",
+  "name": "ludo_rathowm",
+  "defaultCrewTypeId": 217100,
+  "armTypes": {
+    "1": "보병",
+    "2": "궁병",
+    "3": "기병",
+    "4": "귀병",
+    "5": "차병"
+  },
+  "crewTypes": [
+    {
+      "id": 1000,
+      "armType": 0,
+      "name": "성벽",
+      "attack": 100,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 99,
+      "rice": 9,
+      "requirements": [
+        {
+          "type": "Impossible"
+        }
+      ],
+      "attackCoef": [],
+      "defenceCoef": {
+        "1": 1.2
+      },
+      "info": ["성벽입니다.", "생성할 수 없습니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 217100,
+      "armType": 1,
+      "name": "보병",
+      "attack": 100,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 9,
+      "rice": 9,
+      "requirements": [],
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["표준적인 보병입니다. 보병은 방어특화입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_방어력증가5p"],
+      "iActionList": null
+    },
+    {
+      "id": 217101,
+      "armType": 1,
+      "name": "마물병",
+      "attack": 110,
+      "defence": 160,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 9,
+      "rice": 10,
+      "requirements": [
+        {
+          "type": "ReqRegions",
+          "regions": ["호넷 마인령", "케이브리스 마인령"]
+        }
+      ],
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["마군 지역 기본병종입니다. 조금더 강하지만 쌀을 많이 소비합니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_방어력증가5p"],
+      "iActionList": null
+    },
+    {
+      "id": 217102,
+      "armType": 1,
+      "name": "중장보병",
+      "attack": 100,
+      "defence": 250,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 10,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 1000
+        },
+        {
+          "type": "ReqRegions",
+          "regions": ["헬만 동부"]
+        }
+      ],
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["헬만 특유의 견고한 보병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_방어력증가5p"],
+      "iActionList": null
+    },
+    {
+      "id": 217103,
+      "armType": 1,
+      "name": "흑의 군 보병",
+      "attack": 150,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 12,
+      "rice": 11,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 1000
+        },
+        {
+          "type": "ReqRegions",
+          "regions": ["리자스 남부", "리자스 북부"]
+        }
+      ],
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["흑의 군 전통의 체계적인 훈련으로 공격력을 보완했습니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_방어력증가5p"],
+      "iActionList": null
+    },
+    {
+      "id": 217104,
+      "armType": 1,
+      "name": "용병",
+      "attack": 125,
+      "defence": 175,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 12,
+      "rice": 11,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 1000
+        },
+        {
+          "type": "ReqRegions",
+          "regions": ["자유도시 동부"]
+        }
+      ],
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["일반 보병보다 비싸지만 받은 만큼은 일해줍니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_방어력증가5p"],
+      "iActionList": null
+    },
+    {
+      "id": 217105,
+      "armType": 1,
+      "name": "사메라이",
+      "attack": 175,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 11,
+      "rice": 10,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 1000
+        },
+        {
+          "type": "ReqRegions",
+          "regions": ["제스 남부"]
+        }
+      ],
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["검으로 난무를 가하는 몬스터 보병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_방어력증가5p"],
+      "iActionList": null
+    },
+    {
+      "id": 217106,
+      "armType": 1,
+      "name": "템플나이트병",
+      "attack": 75,
+      "defence": 275,
+      "speed": 7,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 11,
+      "rice": 12,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 1000
+        },
+        {
+          "type": "ReqRegions",
+          "regions": ["AL교"]
+        }
+      ],
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["공격을 포기하고 오직 방어에만 집중합니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_방어력증가5p"],
+      "iActionList": null
+    },
+    {
+      "id": 217107,
+      "armType": 1,
+      "name": "메이드병",
+      "attack": 150,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 20,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 11,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 2000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["메이드의 묘지"]
+        }
+      ],
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["켓셀링크 휘하의 날렵한 전투메이드입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_방어력증가5p"],
+      "iActionList": null
+    },
+    {
+      "id": 217108,
+      "armType": 1,
+      "name": "요괴병",
+      "attack": 150,
+      "defence": 150,
+      "speed": 8,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 11,
+      "rice": 13,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 2000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["오슈"]
+        }
+      ],
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["단단한 육체를 믿고 적진을 돌파합니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_방어력증가5p"],
+      "iActionList": null
+    },
+    {
+      "id": 217109,
+      "armType": 1,
+      "name": "리자스 친위병",
+      "attack": 150,
+      "defence": 200,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 12,
+      "rice": 12,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 3000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["리자스성"]
+        }
+      ],
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["여왕을 수호하는 리자스 최강의 보병 정예보병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_방어력증가5p"],
+      "iActionList": null
+    },
+    {
+      "id": 217110,
+      "armType": 1,
+      "name": "케이브리스 마물병",
+      "attack": 200,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 14,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 3000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["케이브리스의 성"]
+        }
+      ],
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["케이브리스 직속의 마물 정예 전투보병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_방어력증가5p"],
+      "iActionList": null
+    },
+    {
+      "id": 217111,
+      "armType": 1,
+      "name": "투신",
+      "attack": 200,
+      "defence": 300,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 28,
+      "rice": 23,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 5000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["투신도시"]
+        }
+      ],
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["성마교단 유적에서 발굴된 사상 최강의 보병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_방어력증가5p"],
+      "iActionList": null
+    },
+    {
+      "id": 217200,
+      "armType": 2,
+      "name": "궁병",
+      "attack": 100,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 20,
+      "magicCoef": 0,
+      "cost": 10,
+      "rice": 10,
+      "requirements": [],
+      "attackCoef": {
+        "1": 0.8,
+        "3": 1.2,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "3": 0.8,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["표준적인 궁병입니다. 궁병은 회피특화입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 217201,
+      "armType": 2,
+      "name": "투척마물병",
+      "attack": 150,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 11,
+      "rice": 12,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 1000
+        },
+        {
+          "type": "ReqRegions",
+          "regions": ["호넷 마인령"]
+        }
+      ],
+      "attackCoef": {
+        "1": 0.8,
+        "3": 1.2,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "3": 0.8,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["날렵함을 포기하고 도끼를 투척합니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 217202,
+      "armType": 2,
+      "name": "백의 군 궁병",
+      "attack": 100,
+      "defence": 100,
+      "speed": 8,
+      "avoid": 30,
+      "magicCoef": 0,
+      "cost": 11,
+      "rice": 11,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 1000
+        },
+        {
+          "type": "ReqRegions",
+          "regions": ["리자스 남부"]
+        }
+      ],
+      "attackCoef": {
+        "1": 0.8,
+        "3": 1.2,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "3": 0.8,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["전략을 활용하여 치고 빠지기에 능합니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 217203,
+      "armType": 2,
+      "name": "벌레술사병",
+      "attack": 100,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 20,
+      "magicCoef": 0,
+      "cost": 12,
+      "rice": 12,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 2000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["호박성"]
+        }
+      ],
+      "attackCoef": {
+        "1": 0.8,
+        "3": 1.2,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "3": 0.8,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["벌레들을 부려 몸을 보호하는 궁병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 217204,
+      "armType": 2,
+      "name": "저격암살병",
+      "attack": 225,
+      "defence": 75,
+      "speed": 5,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 14,
+      "rice": 11,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 2000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["블라디보스토크"]
+        }
+      ],
+      "attackCoef": {
+        "1": 0.8,
+        "3": 1.2,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "3": 0.8,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["독을 바른 탄환으로 적의 목숨을 앗아갑니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 217205,
+      "armType": 2,
+      "name": "호루스병",
+      "attack": 150,
+      "defence": 100,
+      "speed": 8,
+      "avoid": 20,
+      "magicCoef": 0,
+      "cost": 11,
+      "rice": 12,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 2000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["거대전함"]
+        }
+      ],
+      "attackCoef": {
+        "1": 0.8,
+        "3": 1.2,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "3": 0.8,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["민첩하게 파고드는 호루스족 궁병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 217206,
+      "armType": 2,
+      "name": "튤립병",
+      "attack": 200,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 20,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 13,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 3000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["커스텀"]
+        }
+      ],
+      "attackCoef": {
+        "1": 0.8,
+        "3": 1.2,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "3": 0.8,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["최첨단병기 튤립으로 적을 폭격합니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 217207,
+      "armType": 2,
+      "name": "아이스플레임 궁병",
+      "attack": 150,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 20,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 13,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 3000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["라그나로크 아크"]
+        }
+      ],
+      "attackCoef": {
+        "1": 0.8,
+        "3": 1.2,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "3": 0.8,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["혁명을 성공으로 이끈 정예 게릴라 궁병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 217208,
+      "armType": 2,
+      "name": "카라 궁병",
+      "attack": 225,
+      "defence": 225,
+      "speed": 7,
+      "avoid": 30,
+      "magicCoef": 0,
+      "cost": 25,
+      "rice": 25,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 5000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["펜실 카우"]
+        }
+      ],
+      "attackCoef": {
+        "1": 0.8,
+        "3": 1.2,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "3": 0.8,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["선조의 힘을 이어받은 최강의 카라 정예 궁병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 217300,
+      "armType": 3,
+      "name": "기동병",
+      "attack": 150,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 11,
+      "rice": 11,
+      "requirements": [],
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["표준적인 기동병입니다. 기동병은 공격특화입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_기병병종전투"],
+      "iActionList": null
+    },
+    {
+      "id": 217301,
+      "armType": 3,
+      "name": "하치온나",
+      "attack": 175,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 15,
+      "magicCoef": 0,
+      "cost": 12,
+      "rice": 12,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 1000
+        },
+        {
+          "type": "ReqRegions",
+          "regions": ["자유도시 서부"]
+        }
+      ],
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["작은 몸으로 회피하며 따끔한 일격을 먹이는 몬스터 기동병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_기병병종전투"],
+      "iActionList": null
+    },
+    {
+      "id": 217302,
+      "armType": 3,
+      "name": "적의 군 기동병",
+      "attack": 200,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 12,
+      "rice": 13,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 1000
+        },
+        {
+          "type": "ReqRegions",
+          "regions": ["리자스 북부"]
+        }
+      ],
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["리자스군의 자랑인 기동부대입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_기병병종전투"],
+      "iActionList": null
+    },
+    {
+      "id": 217303,
+      "armType": 3,
+      "name": "안드로이드 기동병",
+      "attack": 175,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 12,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 2000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["악의 탑"]
+        }
+      ],
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["파이아르가 개발한 최첨단 안드로이드 기동병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_기병병종전투"],
+      "iActionList": null
+    },
+    {
+      "id": 217304,
+      "armType": 3,
+      "name": "파란쵸 기동병",
+      "attack": 200,
+      "defence": 100,
+      "speed": 8,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 11,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 2000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["파란쵸 왕국"]
+        }
+      ],
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["적진을 일점돌파하는 파란쵸왕국의 돌격 기동병입니다. "],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_기병병종전투"],
+      "iActionList": null
+    },
+    {
+      "id": 217305,
+      "armType": 3,
+      "name": "비행마물병",
+      "attack": 150,
+      "defence": 100,
+      "speed": 8,
+      "avoid": 15,
+      "magicCoef": 0,
+      "cost": 12,
+      "rice": 12,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 2000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["죽음의 대지"]
+        }
+      ],
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["비행마물에 올라탄 기동마물병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_기병병종전투"],
+      "iActionList": null
+    },
+    {
+      "id": 217306,
+      "armType": 3,
+      "name": "마물조련사병",
+      "attack": 250,
+      "defence": 200,
+      "speed": 6,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 16,
+      "rice": 16,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 3000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["랑그바우"]
+        }
+      ],
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["무시무시한 몬스터에 올라타서 싸우는 극강의 기동병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_기병병종전투"],
+      "iActionList": null
+    },
+    {
+      "id": 217307,
+      "armType": 3,
+      "name": "기마병",
+      "attack": 200,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 14,
+      "rice": 14,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 3000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["오와리"]
+        }
+      ],
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["JAPAN 특유의 기마에 올라타 적을 짓밟는 기동병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_기병병종전투"],
+      "iActionList": null
+    },
+    {
+      "id": 217308,
+      "armType": 3,
+      "name": "엔젤나이트",
+      "attack": 300,
+      "defence": 200,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 25,
+      "rice": 25,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 5000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["떨어진 궁도"]
+        }
+      ],
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "info": ["신의 명령으로 파멸을 내리기 위해 강림했습니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": ["che_기병병종전투"],
+      "iActionList": null
+    },
+    {
+      "id": 217400,
+      "armType": 4,
+      "name": "마법병",
+      "attack": 80,
+      "defence": 80,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0.6,
+      "cost": 9,
+      "rice": 9,
+      "requirements": [],
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "info": ["마법을 사용하는 병종입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 217401,
+      "armType": 4,
+      "name": "마물 마법병",
+      "attack": 90,
+      "defence": 90,
+      "speed": 7,
+      "avoid": 0,
+      "magicCoef": 0.6,
+      "cost": 11,
+      "rice": 9,
+      "requirements": [
+        {
+          "type": "ReqRegions",
+          "regions": ["호넷 마인령", "케이브리스 마인령"]
+        }
+      ],
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "info": ["마군 지역 기본병종입니다. 조금더 강하지만 금을 많이 소비합니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 217402,
+      "armType": 4,
+      "name": "카라 마법병",
+      "attack": 80,
+      "defence": 80,
+      "speed": 7,
+      "avoid": 20,
+      "magicCoef": 0.6,
+      "cost": 10,
+      "rice": 10,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 1000
+        },
+        {
+          "type": "ReqRegions",
+          "regions": ["카라의 숲"]
+        }
+      ],
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "info": ["신속히 움직이며 카라의 저주로 적을 공격합니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 217403,
+      "armType": 4,
+      "name": "제스 마법병",
+      "attack": 100,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 0,
+      "magicCoef": 0.6,
+      "cost": 10,
+      "rice": 10,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 1000
+        },
+        {
+          "type": "ReqRegions",
+          "regions": ["제스 북부"]
+        }
+      ],
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "info": ["마법국가 제스의 전통있는 마법병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 217404,
+      "armType": 4,
+      "name": "무녀",
+      "attack": 80,
+      "defence": 80,
+      "speed": 8,
+      "avoid": 10,
+      "magicCoef": 0.6,
+      "cost": 10,
+      "rice": 10,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 1000
+        },
+        {
+          "type": "ReqRegions",
+          "regions": ["JAPAN"]
+        }
+      ],
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "info": ["신마법과 함께 신통한 춤으로 활력을 불어넣는 마법병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 217405,
+      "armType": 4,
+      "name": "프로즌",
+      "attack": 90,
+      "defence": 70,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0.8,
+      "cost": 10,
+      "rice": 10,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 1000
+        },
+        {
+          "type": "ReqRegions",
+          "regions": ["헬만 서부"]
+        }
+      ],
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "info": ["백병전에 불리한 연약한 몸으로 마법 사용에 집중하는 몬스터입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 217406,
+      "armType": 4,
+      "name": "마소한 마법병",
+      "attack": 70,
+      "defence": 90,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0.8,
+      "cost": 11,
+      "rice": 10,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 1000
+        },
+        {
+          "type": "ReqRegions",
+          "regions": ["케이브리스 마인령"]
+        }
+      ],
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "info": ["로브를 여러겹 둘러입은 마물마법병입니다. 직접 전투보단 마법에 집중합니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 217407,
+      "armType": 4,
+      "name": "신관병",
+      "attack": 80,
+      "defence": 130,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0.6,
+      "cost": 9,
+      "rice": 11,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 2000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["카이즈"]
+        }
+      ],
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "info": ["AL교의 전투신관입니다. 몸을 보호하는 성스러운 마법을 사용합니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 217408,
+      "armType": 4,
+      "name": "중장마법병",
+      "attack": 80,
+      "defence": 130,
+      "speed": 7,
+      "avoid": 15,
+      "magicCoef": 0.6,
+      "cost": 11,
+      "rice": 12,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 3000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["로제스그라드"]
+        }
+      ],
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "info": ["두터운 로브를 입고 불길한 주문을 읊습니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 217409,
+      "armType": 4,
+      "name": "악마병",
+      "attack": 130,
+      "defence": 80,
+      "speed": 7,
+      "avoid": 15,
+      "magicCoef": 0.6,
+      "cost": 11,
+      "rice": 12,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 3000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["올드제스"]
+        }
+      ],
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "info": ["고대 제스 왕가의 계약에 따라 소환된 흑마법병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 217410,
+      "armType": 4,
+      "name": "호넷 마물병",
+      "attack": 130,
+      "defence": 130,
+      "speed": 7,
+      "avoid": 0,
+      "magicCoef": 0.6,
+      "cost": 12,
+      "rice": 12,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 3000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["구 마왕성"]
+        }
+      ],
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "info": ["호넷 직속의 최강 마물 마법병입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 217411,
+      "armType": 4,
+      "name": "Z가디언",
+      "attack": 180,
+      "defence": 180,
+      "speed": 7,
+      "avoid": 0,
+      "magicCoef": 0.7,
+      "cost": 28,
+      "rice": 20,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 5000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["라그나로크 아크"]
+        }
+      ],
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "info": ["제스의 기술력이 집약된 최고의 마법병기입니다."],
+      "initSkillTrigger": null,
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 217500,
+      "armType": 5,
+      "name": "정란",
+      "attack": 150,
+      "defence": 150,
+      "speed": 6,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 15,
+      "rice": 5,
+      "requirements": [
+        {
+          "type": "ReqMinRelYear",
+          "year": 3
+        }
+      ],
+      "attackCoef": {
+        "1": 0.8,
+        "2": 0.8,
+        "3": 0.8,
+        "4": 0.8,
+        "0": 1.8
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "2": 1.2,
+        "3": 1.2,
+        "4": 1.2
+      },
+      "info": ["높은 구조물 위에서 공격합니다."],
+      "initSkillTrigger": ["che_성벽부상무효"],
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 217501,
+      "armType": 5,
+      "name": "충차",
+      "attack": 150,
+      "defence": 100,
+      "speed": 6,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 20,
+      "rice": 5,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 1000
+        },
+        {
+          "type": "ReqMinRelYear",
+          "year": 3
+        }
+      ],
+      "attackCoef": {
+        "1": 0.8,
+        "2": 0.8,
+        "3": 0.8,
+        "4": 0.8,
+        "0": 2.4
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "2": 1.2,
+        "3": 1.2,
+        "4": 1.2
+      },
+      "info": ["엄청난 위력으로 성벽을 부수어버립니다."],
+      "initSkillTrigger": ["che_성벽부상무효"],
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    },
+    {
+      "id": 217502,
+      "armType": 5,
+      "name": "튤립3호",
+      "attack": 275,
+      "defence": 300,
+      "speed": 6,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 35,
+      "rice": 15,
+      "requirements": [
+        {
+          "type": "ReqTech",
+          "tech": 5000
+        },
+        {
+          "type": "ReqCities",
+          "cities": ["커스텀"]
+        }
+      ],
+      "attackCoef": [],
+      "defenceCoef": [],
+      "info": ["파괴적인 위력과 정말 파괴적인 비용을 자랑하는 전차입니다. "],
+      "initSkillTrigger": ["che_성벽부상무효"],
+      "phaseSkillTrigger": null,
+      "iActionList": null
+    }
+  ]
+}

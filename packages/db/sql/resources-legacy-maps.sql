@@ -17975,5 +17975,3847 @@ $legacy_maps_content$::jsonb;
   ) THEN
     RAISE EXCEPTION '초기화 자원 충돌: MAP/ludo_rathowm/1';
   END IF;
+
+  resource_content := $legacy_maps_content${
+  "id": "cr",
+  "name": "cr",
+  "defaultCrewTypeId": 1100,
+  "armTypes": {
+    "1": "보병",
+    "2": "궁병",
+    "3": "기병",
+    "4": "귀병",
+    "5": "차병"
+  },
+  "coefMode": "multiply",
+  "firstVolleyScope": "sortie",
+  "legacyCheMapIds": [
+    "cr"
+  ],
+  "legacyCheCityRegions": [
+    [
+      1,
+      "서량",
+      2
+    ],
+    [
+      2,
+      "무도",
+      2
+    ],
+    [
+      3,
+      "성도",
+      2
+    ],
+    [
+      4,
+      "건녕",
+      2
+    ],
+    [
+      5,
+      "안정",
+      2
+    ],
+    [
+      6,
+      "한중",
+      2
+    ],
+    [
+      7,
+      "검각",
+      2
+    ],
+    [
+      8,
+      "자동",
+      2
+    ],
+    [
+      9,
+      "강주",
+      2
+    ],
+    [
+      10,
+      "장안",
+      2
+    ],
+    [
+      11,
+      "영안",
+      2
+    ],
+    [
+      12,
+      "홍농",
+      2
+    ],
+    [
+      13,
+      "완",
+      2
+    ],
+    [
+      14,
+      "양양",
+      2
+    ],
+    [
+      15,
+      "강릉",
+      2
+    ],
+    [
+      16,
+      "무릉",
+      2
+    ],
+    [
+      17,
+      "영릉",
+      2
+    ],
+    [
+      18,
+      "낙양",
+      2
+    ],
+    [
+      19,
+      "신야",
+      2
+    ],
+    [
+      20,
+      "강하",
+      2
+    ],
+    [
+      21,
+      "장사",
+      2
+    ],
+    [
+      22,
+      "계양",
+      2
+    ],
+    [
+      23,
+      "남해",
+      2
+    ],
+    [
+      24,
+      "업",
+      2
+    ],
+    [
+      25,
+      "진유",
+      2
+    ],
+    [
+      26,
+      "허창",
+      2
+    ],
+    [
+      27,
+      "여남",
+      2
+    ],
+    [
+      28,
+      "시상",
+      2
+    ],
+    [
+      29,
+      "평원",
+      2
+    ],
+    [
+      30,
+      "복양",
+      2
+    ],
+    [
+      31,
+      "초",
+      2
+    ],
+    [
+      32,
+      "수춘",
+      2
+    ],
+    [
+      33,
+      "단양",
+      2
+    ],
+    [
+      34,
+      "여강",
+      2
+    ],
+    [
+      35,
+      "계",
+      2
+    ],
+    [
+      36,
+      "남피",
+      2
+    ],
+    [
+      37,
+      "소패",
+      2
+    ],
+    [
+      38,
+      "건업",
+      2
+    ],
+    [
+      39,
+      "북평",
+      2
+    ],
+    [
+      40,
+      "북해",
+      2
+    ],
+    [
+      41,
+      "하비",
+      2
+    ],
+    [
+      42,
+      "광릉",
+      2
+    ],
+    [
+      43,
+      "오",
+      2
+    ],
+    [
+      44,
+      "회계",
+      2
+    ],
+    [
+      45,
+      "양평",
+      2
+    ],
+    [
+      46,
+      "국내",
+      2
+    ],
+    [
+      47,
+      "한",
+      2
+    ],
+    [
+      48,
+      "사비",
+      2
+    ],
+    [
+      49,
+      "매소",
+      2
+    ],
+    [
+      50,
+      "서라벌",
+      2
+    ],
+    [
+      51,
+      "운남",
+      2
+    ],
+    [
+      52,
+      "천수",
+      2
+    ],
+    [
+      53,
+      "졸본",
+      2
+    ]
+  ],
+  "crewTypes": [
+    {
+      "id": 1000,
+      "armType": 0,
+      "name": "성벽",
+      "attack": 100,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 99,
+      "rice": 9,
+      "attackCoef": [],
+      "defenceCoef": {
+        "1": 1.2
+      },
+      "requirements": [
+        {
+          "kind": "impossible"
+        }
+      ]
+    },
+    {
+      "id": 1100,
+      "armType": 1,
+      "name": "보병",
+      "attack": 100,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 9,
+      "rice": 9,
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8
+      }
+    },
+    {
+      "id": 1200,
+      "armType": 2,
+      "name": "궁병",
+      "attack": 100,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 10,
+      "rice": 10,
+      "attackCoef": {
+        "1": 0.8,
+        "3": 1.2,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "3": 0.8,
+        "5": 0.8
+      },
+      "effects": [
+        "firstVolley"
+      ]
+    },
+    {
+      "id": 1300,
+      "armType": 3,
+      "name": "기병",
+      "attack": 150,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 11,
+      "rice": 11,
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8
+      }
+    },
+    {
+      "id": 1104,
+      "armType": 1,
+      "name": "근위병",
+      "attack": 150,
+      "defence": 200,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 12,
+      "rice": 12,
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            18
+          ]
+        }
+      ],
+      "effects": [
+        "guard5"
+      ]
+    },
+    {
+      "id": 1106,
+      "armType": 1,
+      "name": "백이병",
+      "attack": 175,
+      "defence": 175,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 11,
+      "attackCoef": {
+        "2": 1.1,
+        "3": 0.9,
+        "5": 1.1
+      },
+      "defenceCoef": {
+        "2": 0.9,
+        "3": 1.1,
+        "5": 0.9
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            3
+          ]
+        }
+      ],
+      "effects": [
+        "guard5"
+      ]
+    },
+    {
+      "id": 97201,
+      "armType": 2,
+      "name": "화랑",
+      "attack": 175,
+      "defence": 150,
+      "speed": 8,
+      "avoid": 15,
+      "magicCoef": 0.05,
+      "cost": 13,
+      "rice": 13,
+      "attackCoef": {
+        "1": 0.9,
+        "3": 1.2,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "1": 1.1,
+        "3": 0.8,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            47,
+            50
+          ]
+        }
+      ],
+      "effects": [
+        "firstVolley"
+      ]
+    },
+    {
+      "id": 1204,
+      "armType": 2,
+      "name": "석궁병",
+      "attack": 200,
+      "defence": 125,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 13,
+      "attackCoef": {
+        "1": 0.8,
+        "3": 1.2,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "3": 0.8,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            38
+          ]
+        }
+      ],
+      "effects": [
+        "firstVolley"
+      ]
+    },
+    {
+      "id": 1303,
+      "armType": 3,
+      "name": "돌격기병",
+      "attack": 200,
+      "defence": 125,
+      "speed": 8,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 12,
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            1,
+            5
+          ]
+        }
+      ],
+      "effects": [
+        "cavalryClash"
+      ]
+    },
+    {
+      "id": 1307,
+      "armType": 3,
+      "name": "호표기병",
+      "attack": 200,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 14,
+      "rice": 14,
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            26
+          ]
+        }
+      ],
+      "effects": [
+        "cavalryClash"
+      ]
+    },
+    {
+      "id": 1306,
+      "armType": 3,
+      "name": "맹수병",
+      "attack": 250,
+      "defence": 175,
+      "speed": 6,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 16,
+      "rice": 16,
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            51
+          ]
+        }
+      ],
+      "effects": [
+        "cavalryClash"
+      ]
+    },
+    {
+      "id": 1400,
+      "armType": 4,
+      "name": "귀병",
+      "attack": 80,
+      "defence": 80,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0.5,
+      "cost": 9,
+      "rice": 9,
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      }
+    },
+    {
+      "id": 1405,
+      "armType": 4,
+      "name": "남귀병",
+      "attack": 60,
+      "defence": 60,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0.8,
+      "cost": 8,
+      "rice": 8,
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        }
+      ]
+    },
+    {
+      "id": 1404,
+      "armType": 4,
+      "name": "악귀병",
+      "attack": 130,
+      "defence": 130,
+      "speed": 7,
+      "avoid": 0,
+      "magicCoef": 0.6,
+      "cost": 12,
+      "rice": 12,
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            10
+          ]
+        }
+      ]
+    },
+    {
+      "id": 1407,
+      "armType": 4,
+      "name": "천귀병",
+      "attack": 90,
+      "defence": 130,
+      "speed": 7,
+      "avoid": 15,
+      "magicCoef": 0.6,
+      "cost": 11,
+      "rice": 12,
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            3
+          ]
+        }
+      ]
+    },
+    {
+      "id": 1500,
+      "armType": 5,
+      "name": "정란",
+      "attack": 100,
+      "defence": 100,
+      "speed": 6,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 14,
+      "rice": 5,
+      "attackCoef": {
+        "0": 1.8,
+        "1": 1.25,
+        "2": 1.25,
+        "3": 1.25,
+        "4": 1.25,
+        "1106": 1.112
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "2": 1.2,
+        "3": 1.2,
+        "4": 1.2
+      },
+      "requirements": [
+        {
+          "kind": "minRelYear",
+          "min": 3
+        }
+      ],
+      "effects": [
+        "firstVolley"
+      ]
+    },
+    {
+      "id": 1501,
+      "armType": 5,
+      "name": "충차",
+      "attack": 150,
+      "defence": 100,
+      "speed": 6,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 20,
+      "rice": 5,
+      "attackCoef": {
+        "0": 2.4,
+        "1": 0.8,
+        "2": 0.8,
+        "3": 0.8,
+        "4": 0.8
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "2": 1.2,
+        "3": 1.2,
+        "4": 1.2
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "minRelYear",
+          "min": 3
+        }
+      ]
+    },
+    {
+      "id": 1502,
+      "armType": 5,
+      "name": "벽력거",
+      "attack": 135,
+      "defence": 100,
+      "speed": 6,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 20,
+      "rice": 5,
+      "attackCoef": {
+        "0": 1.8,
+        "1": 1.25,
+        "2": 1.25,
+        "3": 1.25,
+        "4": 1.25,
+        "1106": 1.112
+      },
+      "defenceCoef": {
+        "1": 0.833,
+        "2": 0.833,
+        "3": 0.833,
+        "4": 0.833,
+        "1106": 0.909
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            24
+          ]
+        }
+      ],
+      "effects": [
+        "firstVolley"
+      ]
+    },
+    {
+      "id": 97101,
+      "armType": 1,
+      "name": "중장보병",
+      "attack": 150,
+      "defence": 175,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 12,
+      "rice": 12,
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 3000
+        }
+      ],
+      "effects": [
+        "guard5"
+      ]
+    },
+    {
+      "id": 1202,
+      "armType": 2,
+      "name": "연노병",
+      "attack": 150,
+      "defence": 175,
+      "speed": 8,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 12,
+      "rice": 12,
+      "attackCoef": {
+        "1": 0.8,
+        "3": 1.2,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "3": 0.8,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 3000
+        }
+      ],
+      "effects": [
+        "firstVolley"
+      ]
+    },
+    {
+      "id": 1304,
+      "armType": 3,
+      "name": "철기병",
+      "attack": 175,
+      "defence": 175,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 13,
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 3000
+        }
+      ],
+      "effects": [
+        "cavalryClash"
+      ]
+    },
+    {
+      "id": 1401,
+      "armType": 4,
+      "name": "신귀병",
+      "attack": 100,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 20,
+      "magicCoef": 0.6,
+      "cost": 12,
+      "rice": 12,
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 3000
+        }
+      ]
+    }
+  ]
+}
+$legacy_maps_content$::jsonb;
+  INSERT INTO "GameResource"
+    ("id", "kind", "name", "version", "status", "content", "contentHash", "source", "createdBy", "publishedAt")
+  VALUES
+    (gen_random_uuid()::text, 'UNIT_SET', 'cr', 1, 'PUBLISHED', resource_content, 'bfe211239554a2b59925e199a2c72cac27a5e54fec6da8a7d324b218e0235796', 'resources/unitset/unitset_cr.json; core2026 df6c9269fa1e2862418ba9da481c8dd2d758d6c5; MIT (c) 2025 devsam; resources/NOTICE.md', NULL, now())
+  ON CONFLICT ("kind", "name", "version") DO NOTHING;
+  IF NOT EXISTS (
+    SELECT 1 FROM "GameResource"
+    WHERE "kind" = 'UNIT_SET' AND "name" = 'cr' AND "version" = 1
+      AND "content" = resource_content AND "contentHash" = 'bfe211239554a2b59925e199a2c72cac27a5e54fec6da8a7d324b218e0235796'
+      AND "status" = 'PUBLISHED' AND "source" = 'resources/unitset/unitset_cr.json; core2026 df6c9269fa1e2862418ba9da481c8dd2d758d6c5; MIT (c) 2025 devsam; resources/NOTICE.md'
+  ) THEN
+    RAISE EXCEPTION '초기화 자원 충돌: UNIT_SET/cr/1';
+  END IF;
+
+  resource_content := $legacy_maps_content${
+  "id": "siegetank",
+  "name": "siegetank",
+  "defaultCrewTypeId": 1500,
+  "armTypes": {
+    "1": "보병",
+    "2": "궁병",
+    "3": "기병",
+    "4": "귀병",
+    "5": "차병"
+  },
+  "coefMode": "multiply",
+  "firstVolleyScope": "sortie",
+  "legacyCheCityRegions": [
+    [
+      1,
+      "업",
+      1
+    ],
+    [
+      2,
+      "허창",
+      2
+    ],
+    [
+      3,
+      "낙양",
+      2
+    ],
+    [
+      4,
+      "장안",
+      3
+    ],
+    [
+      5,
+      "성도",
+      4
+    ],
+    [
+      6,
+      "양양",
+      6
+    ],
+    [
+      7,
+      "건업",
+      7
+    ],
+    [
+      8,
+      "북평",
+      1
+    ],
+    [
+      9,
+      "남피",
+      1
+    ],
+    [
+      10,
+      "완",
+      2
+    ],
+    [
+      11,
+      "수춘",
+      2
+    ],
+    [
+      12,
+      "서주",
+      2
+    ],
+    [
+      13,
+      "강릉",
+      6
+    ],
+    [
+      14,
+      "장사",
+      6
+    ],
+    [
+      15,
+      "시상",
+      7
+    ],
+    [
+      16,
+      "위례",
+      8
+    ],
+    [
+      17,
+      "계",
+      1
+    ],
+    [
+      18,
+      "복양",
+      2
+    ],
+    [
+      19,
+      "진류",
+      2
+    ],
+    [
+      20,
+      "여남",
+      2
+    ],
+    [
+      21,
+      "하비",
+      2
+    ],
+    [
+      22,
+      "서량",
+      3
+    ],
+    [
+      23,
+      "하내",
+      3
+    ],
+    [
+      24,
+      "한중",
+      4
+    ],
+    [
+      25,
+      "상용",
+      4
+    ],
+    [
+      26,
+      "덕양",
+      4
+    ],
+    [
+      27,
+      "강주",
+      4
+    ],
+    [
+      28,
+      "건녕",
+      5
+    ],
+    [
+      29,
+      "남해",
+      5
+    ],
+    [
+      30,
+      "계양",
+      6
+    ],
+    [
+      31,
+      "오",
+      7
+    ],
+    [
+      32,
+      "평양",
+      8
+    ],
+    [
+      33,
+      "사비",
+      8
+    ],
+    [
+      34,
+      "계림",
+      8
+    ],
+    [
+      35,
+      "진양",
+      1
+    ],
+    [
+      36,
+      "평원",
+      1
+    ],
+    [
+      37,
+      "북해",
+      1
+    ],
+    [
+      38,
+      "초",
+      2
+    ],
+    [
+      39,
+      "패",
+      2
+    ],
+    [
+      40,
+      "천수",
+      3
+    ],
+    [
+      41,
+      "안정",
+      3
+    ],
+    [
+      42,
+      "홍농",
+      3
+    ],
+    [
+      43,
+      "하변",
+      4
+    ],
+    [
+      44,
+      "자동",
+      4
+    ],
+    [
+      45,
+      "영안",
+      4
+    ],
+    [
+      46,
+      "귀양",
+      5
+    ],
+    [
+      47,
+      "주시",
+      5
+    ],
+    [
+      48,
+      "운남",
+      5
+    ],
+    [
+      49,
+      "남영",
+      5
+    ],
+    [
+      50,
+      "교지",
+      5
+    ],
+    [
+      51,
+      "신야",
+      6
+    ],
+    [
+      52,
+      "강하",
+      6
+    ],
+    [
+      53,
+      "무릉",
+      6
+    ],
+    [
+      54,
+      "영릉",
+      6
+    ],
+    [
+      55,
+      "상동",
+      6
+    ],
+    [
+      56,
+      "여강",
+      7
+    ],
+    [
+      57,
+      "회계",
+      7
+    ],
+    [
+      58,
+      "고창",
+      7
+    ],
+    [
+      59,
+      "대",
+      7
+    ],
+    [
+      60,
+      "안평",
+      8
+    ],
+    [
+      61,
+      "졸본",
+      8
+    ],
+    [
+      62,
+      "이도",
+      8
+    ],
+    [
+      63,
+      "강",
+      3
+    ],
+    [
+      64,
+      "저",
+      3
+    ],
+    [
+      65,
+      "흉노",
+      3
+    ],
+    [
+      66,
+      "남만",
+      5
+    ],
+    [
+      67,
+      "산월",
+      7
+    ],
+    [
+      68,
+      "오환",
+      8
+    ],
+    [
+      69,
+      "왜",
+      8
+    ],
+    [
+      70,
+      "호관",
+      1
+    ],
+    [
+      71,
+      "호로",
+      2
+    ],
+    [
+      72,
+      "사곡",
+      3
+    ],
+    [
+      73,
+      "함곡",
+      3
+    ],
+    [
+      74,
+      "사수",
+      2
+    ],
+    [
+      75,
+      "양평",
+      4
+    ],
+    [
+      76,
+      "가맹",
+      4
+    ],
+    [
+      77,
+      "역경",
+      1
+    ],
+    [
+      78,
+      "계교",
+      1
+    ],
+    [
+      79,
+      "동황",
+      1
+    ],
+    [
+      80,
+      "관도",
+      2
+    ],
+    [
+      81,
+      "정도",
+      2
+    ],
+    [
+      82,
+      "합비",
+      2
+    ],
+    [
+      83,
+      "광릉",
+      2
+    ],
+    [
+      84,
+      "적도",
+      3
+    ],
+    [
+      85,
+      "가정",
+      3
+    ],
+    [
+      86,
+      "기산",
+      4
+    ],
+    [
+      87,
+      "면죽",
+      4
+    ],
+    [
+      88,
+      "이릉",
+      6
+    ],
+    [
+      89,
+      "장판",
+      6
+    ],
+    [
+      90,
+      "백랑",
+      8
+    ],
+    [
+      91,
+      "적벽",
+      7
+    ],
+    [
+      92,
+      "파양",
+      7
+    ],
+    [
+      93,
+      "탐라",
+      8
+    ],
+    [
+      94,
+      "유구",
+      8
+    ]
+  ],
+  "crewTypes": [
+    {
+      "id": 1000,
+      "armType": 0,
+      "name": "성벽",
+      "attack": 100,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 99,
+      "rice": 9,
+      "attackCoef": [],
+      "defenceCoef": {
+        "1": 1.2
+      },
+      "requirements": [
+        {
+          "kind": "impossible"
+        }
+      ]
+    },
+    {
+      "id": 1100,
+      "armType": 1,
+      "name": "보병",
+      "attack": 100,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 18,
+      "rice": 18,
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2
+      }
+    },
+    {
+      "id": 1200,
+      "armType": 2,
+      "name": "궁병",
+      "attack": 100,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 20,
+      "magicCoef": 0,
+      "cost": 20,
+      "rice": 20,
+      "attackCoef": {
+        "1": 0.8,
+        "3": 1.2
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "3": 0.8
+      }
+    },
+    {
+      "id": 1300,
+      "armType": 3,
+      "name": "기병",
+      "attack": 150,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 22,
+      "rice": 22,
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2
+      }
+    },
+    {
+      "id": 1400,
+      "armType": 4,
+      "name": "귀병",
+      "attack": 80,
+      "defence": 80,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0.5,
+      "cost": 18,
+      "rice": 18,
+      "attackCoef": [],
+      "defenceCoef": []
+    },
+    {
+      "id": 1405,
+      "armType": 4,
+      "name": "남귀병",
+      "attack": 60,
+      "defence": 60,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0.8,
+      "cost": 16,
+      "rice": 16,
+      "attackCoef": [],
+      "defenceCoef": [],
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        }
+      ]
+    },
+    {
+      "id": 1500,
+      "armType": 5,
+      "name": "정란",
+      "attack": 100,
+      "defence": 100,
+      "speed": 6,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 7,
+      "rice": 3,
+      "attackCoef": {
+        "0": 1.8
+      },
+      "defenceCoef": []
+    },
+    {
+      "id": 1501,
+      "armType": 5,
+      "name": "충차",
+      "attack": 150,
+      "defence": 100,
+      "speed": 6,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 10,
+      "rice": 3,
+      "attackCoef": {
+        "0": 2.4
+      },
+      "defenceCoef": [],
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "minRelYear",
+          "min": 3
+        }
+      ]
+    },
+    {
+      "id": 1502,
+      "armType": 5,
+      "name": "벽력거",
+      "attack": 200,
+      "defence": 100,
+      "speed": 6,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 20,
+      "rice": 4,
+      "attackCoef": {
+        "0": 1.8
+      },
+      "defenceCoef": [],
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 3000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": 1503,
+      "armType": 5,
+      "name": "목우",
+      "attack": 50,
+      "defence": 200,
+      "speed": 5,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 15,
+      "rice": 3,
+      "attackCoef": [],
+      "defenceCoef": [],
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 3000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            5
+          ]
+        }
+      ]
+    }
+  ]
+}
+$legacy_maps_content$::jsonb;
+  INSERT INTO "GameResource"
+    ("id", "kind", "name", "version", "status", "content", "contentHash", "source", "createdBy", "publishedAt")
+  VALUES
+    (gen_random_uuid()::text, 'UNIT_SET', 'siegetank', 1, 'PUBLISHED', resource_content, '93e3811df22fd4d31798be2d7b1dffda72166dad173a7005bfe939c1e59b9a11', 'resources/unitset/unitset_siegetank.json; core2026 df6c9269fa1e2862418ba9da481c8dd2d758d6c5; MIT (c) 2025 devsam; resources/NOTICE.md', NULL, now())
+  ON CONFLICT ("kind", "name", "version") DO NOTHING;
+  IF NOT EXISTS (
+    SELECT 1 FROM "GameResource"
+    WHERE "kind" = 'UNIT_SET' AND "name" = 'siegetank' AND "version" = 1
+      AND "content" = resource_content AND "contentHash" = '93e3811df22fd4d31798be2d7b1dffda72166dad173a7005bfe939c1e59b9a11'
+      AND "status" = 'PUBLISHED' AND "source" = 'resources/unitset/unitset_siegetank.json; core2026 df6c9269fa1e2862418ba9da481c8dd2d758d6c5; MIT (c) 2025 devsam; resources/NOTICE.md'
+  ) THEN
+    RAISE EXCEPTION '초기화 자원 충돌: UNIT_SET/siegetank/1';
+  END IF;
+
+  resource_content := $legacy_maps_content${
+  "id": "ludo_rathowm",
+  "name": "ludo_rathowm",
+  "defaultCrewTypeId": 217100,
+  "armTypes": {
+    "1": "보병",
+    "2": "궁병",
+    "3": "기병",
+    "4": "귀병",
+    "5": "차병"
+  },
+  "coefMode": "multiply",
+  "firstVolleyScope": "sortie",
+  "legacyCheMapIds": [
+    "ludo_rathowm"
+  ],
+  "legacyCheCityRegions": [
+    [
+      1,
+      "구 마왕성",
+      1
+    ],
+    [
+      2,
+      "악의 탑",
+      1
+    ],
+    [
+      3,
+      "실키의 성",
+      1
+    ],
+    [
+      4,
+      "카스케도바우",
+      1
+    ],
+    [
+      5,
+      "붉은 집",
+      2
+    ],
+    [
+      6,
+      "케셀링크의 성",
+      2
+    ],
+    [
+      7,
+      "케이브리스의 성",
+      2
+    ],
+    [
+      8,
+      "푸른 집",
+      2
+    ],
+    [
+      9,
+      "한탄의 협곡",
+      1
+    ],
+    [
+      10,
+      "뼈의 숲",
+      2
+    ],
+    [
+      11,
+      "유황의 숲",
+      1
+    ],
+    [
+      12,
+      "카미라의 성",
+      2
+    ],
+    [
+      13,
+      "메이드의 묘지",
+      2
+    ],
+    [
+      14,
+      "갈라놓은 숲",
+      2
+    ],
+    [
+      15,
+      "죽음의 대지",
+      2
+    ],
+    [
+      16,
+      "녹의 마을",
+      3
+    ],
+    [
+      17,
+      "펜실 카우",
+      3
+    ],
+    [
+      18,
+      "샹그릴라",
+      4
+    ],
+    [
+      19,
+      "파리티라온",
+      5
+    ],
+    [
+      20,
+      "왕자의 탑",
+      5
+    ],
+    [
+      21,
+      "도약의 탑",
+      6
+    ],
+    [
+      22,
+      "일요일의 탑",
+      5
+    ],
+    [
+      23,
+      "탄창의 탑",
+      6
+    ],
+    [
+      24,
+      "라그나로크 아크",
+      5
+    ],
+    [
+      25,
+      "알텐누",
+      6
+    ],
+    [
+      26,
+      "마크",
+      6
+    ],
+    [
+      27,
+      "호박성",
+      6
+    ],
+    [
+      28,
+      "올드제스",
+      6
+    ],
+    [
+      29,
+      "테이브",
+      6
+    ],
+    [
+      30,
+      "이탈리아",
+      5
+    ],
+    [
+      31,
+      "나가르모르",
+      5
+    ],
+    [
+      32,
+      "사바사바",
+      5
+    ],
+    [
+      33,
+      "아담의탑",
+      5
+    ],
+    [
+      34,
+      "마지노 A",
+      5
+    ],
+    [
+      35,
+      "마지노 B",
+      6
+    ],
+    [
+      36,
+      "이코마",
+      7
+    ],
+    [
+      37,
+      "워크랜드",
+      7
+    ],
+    [
+      38,
+      "로렌그라드",
+      7
+    ],
+    [
+      39,
+      "파르나스",
+      7
+    ],
+    [
+      40,
+      "라보리",
+      7
+    ],
+    [
+      41,
+      "랑그바우",
+      7
+    ],
+    [
+      42,
+      "거대전함",
+      7
+    ],
+    [
+      43,
+      "세미타포",
+      7
+    ],
+    [
+      44,
+      "스도리 17",
+      7
+    ],
+    [
+      45,
+      "스도리 13",
+      7
+    ],
+    [
+      46,
+      "마이크로그라드",
+      7
+    ],
+    [
+      47,
+      "폰",
+      7
+    ],
+    [
+      48,
+      "파스",
+      7
+    ],
+    [
+      49,
+      "큐로브",
+      7
+    ],
+    [
+      50,
+      "스도리 10",
+      7
+    ],
+    [
+      51,
+      "소로토이",
+      8
+    ],
+    [
+      52,
+      "로제스그라드",
+      8
+    ],
+    [
+      53,
+      "코사크",
+      8
+    ],
+    [
+      54,
+      "아크그라드",
+      8
+    ],
+    [
+      55,
+      "야크트크",
+      8
+    ],
+    [
+      56,
+      "시베리아",
+      8
+    ],
+    [
+      57,
+      "바바로프스",
+      8
+    ],
+    [
+      58,
+      "호라가의  탑",
+      8
+    ],
+    [
+      59,
+      "고라크",
+      8
+    ],
+    [
+      60,
+      "블라디보스토크",
+      8
+    ],
+    [
+      61,
+      "보르고 Z",
+      8
+    ],
+    [
+      62,
+      "로그 A",
+      8
+    ],
+    [
+      63,
+      "로그 B",
+      8
+    ],
+    [
+      64,
+      "반리요새 A",
+      7
+    ],
+    [
+      65,
+      "반리요새 B",
+      7
+    ],
+    [
+      66,
+      "파라파라성채",
+      9
+    ],
+    [
+      67,
+      "릿치",
+      9
+    ],
+    [
+      68,
+      "푸아",
+      9
+    ],
+    [
+      69,
+      "마우네스",
+      9
+    ],
+    [
+      70,
+      "스케일",
+      10
+    ],
+    [
+      71,
+      "아란",
+      10
+    ],
+    [
+      72,
+      "떨어진 궁도",
+      10
+    ],
+    [
+      73,
+      "포나라",
+      10
+    ],
+    [
+      74,
+      "브리테리아",
+      10
+    ],
+    [
+      75,
+      "파란치",
+      10
+    ],
+    [
+      76,
+      "노스",
+      9
+    ],
+    [
+      77,
+      "오크",
+      9
+    ],
+    [
+      78,
+      "리자스성",
+      9
+    ],
+    [
+      79,
+      "사우스",
+      9
+    ],
+    [
+      80,
+      "이스",
+      9
+    ],
+    [
+      81,
+      "오크스",
+      9
+    ],
+    [
+      82,
+      "웨스",
+      10
+    ],
+    [
+      83,
+      "오슈",
+      11
+    ],
+    [
+      84,
+      "오와리",
+      11
+    ],
+    [
+      85,
+      "모로코",
+      11
+    ],
+    [
+      86,
+      "지오",
+      12
+    ],
+    [
+      87,
+      "한나",
+      12
+    ],
+    [
+      88,
+      "M랜드",
+      12
+    ],
+    [
+      89,
+      "포르투갈",
+      12
+    ],
+    [
+      90,
+      "투신도시",
+      12
+    ],
+    [
+      91,
+      "화성",
+      13
+    ],
+    [
+      92,
+      "커스텀",
+      13
+    ],
+    [
+      93,
+      "라지르",
+      13
+    ],
+    [
+      94,
+      "록아스",
+      13
+    ],
+    [
+      95,
+      "지브테리아",
+      13
+    ],
+    [
+      96,
+      "파란쵸 왕국",
+      12
+    ],
+    [
+      97,
+      "아이스",
+      13
+    ],
+    [
+      98,
+      "렛드",
+      13
+    ],
+    [
+      99,
+      "카이즈",
+      14
+    ]
+  ],
+  "crewTypes": [
+    {
+      "id": 1000,
+      "armType": 0,
+      "name": "성벽",
+      "attack": 100,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 99,
+      "rice": 9,
+      "attackCoef": [],
+      "defenceCoef": {
+        "1": 1.2
+      },
+      "requirements": [
+        {
+          "kind": "impossible"
+        }
+      ]
+    },
+    {
+      "id": 217100,
+      "armType": 1,
+      "name": "보병",
+      "attack": 100,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 9,
+      "rice": 9,
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "effects": [
+        "guard5"
+      ]
+    },
+    {
+      "id": 217101,
+      "armType": 1,
+      "name": "마물병",
+      "attack": 110,
+      "defence": 160,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 9,
+      "rice": 10,
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "requirements": [
+        {
+          "kind": "regions",
+          "regions": [
+            1,
+            2
+          ],
+          "names": [
+            "호넷 마인령",
+            "케이브리스 마인령"
+          ]
+        }
+      ],
+      "effects": [
+        "guard5"
+      ]
+    },
+    {
+      "id": 217102,
+      "armType": 1,
+      "name": "중장보병",
+      "attack": 100,
+      "defence": 250,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 10,
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "regions",
+          "regions": [
+            8
+          ],
+          "names": [
+            "헬만 동부"
+          ]
+        }
+      ],
+      "effects": [
+        "guard5"
+      ]
+    },
+    {
+      "id": 217103,
+      "armType": 1,
+      "name": "흑의 군 보병",
+      "attack": 150,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 12,
+      "rice": 11,
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "regions",
+          "regions": [
+            9,
+            10
+          ],
+          "names": [
+            "리자스 남부",
+            "리자스 북부"
+          ]
+        }
+      ],
+      "effects": [
+        "guard5"
+      ]
+    },
+    {
+      "id": 217104,
+      "armType": 1,
+      "name": "용병",
+      "attack": 125,
+      "defence": 175,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 12,
+      "rice": 11,
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "regions",
+          "regions": [
+            12
+          ],
+          "names": [
+            "자유도시 동부"
+          ]
+        }
+      ],
+      "effects": [
+        "guard5"
+      ]
+    },
+    {
+      "id": 217105,
+      "armType": 1,
+      "name": "사메라이",
+      "attack": 175,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 11,
+      "rice": 10,
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "regions",
+          "regions": [
+            6
+          ],
+          "names": [
+            "제스 남부"
+          ]
+        }
+      ],
+      "effects": [
+        "guard5"
+      ]
+    },
+    {
+      "id": 217106,
+      "armType": 1,
+      "name": "템플나이트병",
+      "attack": 75,
+      "defence": 275,
+      "speed": 7,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 11,
+      "rice": 12,
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "regions",
+          "regions": [
+            14
+          ],
+          "names": [
+            "AL교"
+          ]
+        }
+      ],
+      "effects": [
+        "guard5"
+      ]
+    },
+    {
+      "id": 217107,
+      "armType": 1,
+      "name": "메이드병",
+      "attack": 150,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 20,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 11,
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            13
+          ]
+        }
+      ],
+      "effects": [
+        "guard5"
+      ]
+    },
+    {
+      "id": 217108,
+      "armType": 1,
+      "name": "요괴병",
+      "attack": 150,
+      "defence": 150,
+      "speed": 8,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 11,
+      "rice": 13,
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            83
+          ]
+        }
+      ],
+      "effects": [
+        "guard5"
+      ]
+    },
+    {
+      "id": 217109,
+      "armType": 1,
+      "name": "리자스 친위병",
+      "attack": 150,
+      "defence": 200,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 12,
+      "rice": 12,
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 3000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            78
+          ]
+        }
+      ],
+      "effects": [
+        "guard5"
+      ]
+    },
+    {
+      "id": 217110,
+      "armType": 1,
+      "name": "케이브리스 마물병",
+      "attack": 200,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 14,
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 3000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            7
+          ]
+        }
+      ],
+      "effects": [
+        "guard5"
+      ]
+    },
+    {
+      "id": 217111,
+      "armType": 1,
+      "name": "투신",
+      "attack": 200,
+      "defence": 300,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 28,
+      "rice": 23,
+      "attackCoef": {
+        "2": 1.2,
+        "3": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "2": 0.8,
+        "3": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 5000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            90
+          ]
+        }
+      ],
+      "effects": [
+        "guard5"
+      ]
+    },
+    {
+      "id": 217200,
+      "armType": 2,
+      "name": "궁병",
+      "attack": 100,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 20,
+      "magicCoef": 0,
+      "cost": 10,
+      "rice": 10,
+      "attackCoef": {
+        "1": 0.8,
+        "3": 1.2,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "3": 0.8,
+        "5": 0.8,
+        "217502": 1
+      }
+    },
+    {
+      "id": 217201,
+      "armType": 2,
+      "name": "투척마물병",
+      "attack": 150,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 11,
+      "rice": 12,
+      "attackCoef": {
+        "1": 0.8,
+        "3": 1.2,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "3": 0.8,
+        "5": 0.8,
+        "217502": 1
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "regions",
+          "regions": [
+            1
+          ],
+          "names": [
+            "호넷 마인령"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 217202,
+      "armType": 2,
+      "name": "백의 군 궁병",
+      "attack": 100,
+      "defence": 100,
+      "speed": 8,
+      "avoid": 30,
+      "magicCoef": 0,
+      "cost": 11,
+      "rice": 11,
+      "attackCoef": {
+        "1": 0.8,
+        "3": 1.2,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "3": 0.8,
+        "5": 0.8,
+        "217502": 1
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "regions",
+          "regions": [
+            9
+          ],
+          "names": [
+            "리자스 남부"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 217203,
+      "armType": 2,
+      "name": "벌레술사병",
+      "attack": 100,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 20,
+      "magicCoef": 0,
+      "cost": 12,
+      "rice": 12,
+      "attackCoef": {
+        "1": 0.8,
+        "3": 1.2,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "3": 0.8,
+        "5": 0.8,
+        "217502": 1
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            27
+          ]
+        }
+      ]
+    },
+    {
+      "id": 217204,
+      "armType": 2,
+      "name": "저격암살병",
+      "attack": 225,
+      "defence": 75,
+      "speed": 5,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 14,
+      "rice": 11,
+      "attackCoef": {
+        "1": 0.8,
+        "3": 1.2,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "3": 0.8,
+        "5": 0.8,
+        "217502": 1
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 217205,
+      "armType": 2,
+      "name": "호루스병",
+      "attack": 150,
+      "defence": 100,
+      "speed": 8,
+      "avoid": 20,
+      "magicCoef": 0,
+      "cost": 11,
+      "rice": 12,
+      "attackCoef": {
+        "1": 0.8,
+        "3": 1.2,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "3": 0.8,
+        "5": 0.8,
+        "217502": 1
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            42
+          ]
+        }
+      ]
+    },
+    {
+      "id": 217206,
+      "armType": 2,
+      "name": "튤립병",
+      "attack": 200,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 20,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 13,
+      "attackCoef": {
+        "1": 0.8,
+        "3": 1.2,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "3": 0.8,
+        "5": 0.8,
+        "217502": 1
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 3000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            92
+          ]
+        }
+      ]
+    },
+    {
+      "id": 217207,
+      "armType": 2,
+      "name": "아이스플레임 궁병",
+      "attack": 150,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 20,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 13,
+      "attackCoef": {
+        "1": 0.8,
+        "3": 1.2,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "3": 0.8,
+        "5": 0.8,
+        "217502": 1
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 3000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            24
+          ]
+        }
+      ]
+    },
+    {
+      "id": 217208,
+      "armType": 2,
+      "name": "카라 궁병",
+      "attack": 225,
+      "defence": 225,
+      "speed": 7,
+      "avoid": 30,
+      "magicCoef": 0,
+      "cost": 25,
+      "rice": 25,
+      "attackCoef": {
+        "1": 0.8,
+        "3": 1.2,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "3": 0.8,
+        "5": 0.8,
+        "217502": 1
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 5000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            17
+          ]
+        }
+      ]
+    },
+    {
+      "id": 217300,
+      "armType": 3,
+      "name": "기동병",
+      "attack": 150,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 11,
+      "rice": 11,
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "effects": [
+        "cavalryClash"
+      ]
+    },
+    {
+      "id": 217301,
+      "armType": 3,
+      "name": "하치온나",
+      "attack": 175,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 15,
+      "magicCoef": 0,
+      "cost": 12,
+      "rice": 12,
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "regions",
+          "regions": [
+            13
+          ],
+          "names": [
+            "자유도시 서부"
+          ]
+        }
+      ],
+      "effects": [
+        "cavalryClash"
+      ]
+    },
+    {
+      "id": 217302,
+      "armType": 3,
+      "name": "적의 군 기동병",
+      "attack": 200,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 12,
+      "rice": 13,
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "regions",
+          "regions": [
+            10
+          ],
+          "names": [
+            "리자스 북부"
+          ]
+        }
+      ],
+      "effects": [
+        "cavalryClash"
+      ]
+    },
+    {
+      "id": 217303,
+      "armType": 3,
+      "name": "안드로이드 기동병",
+      "attack": 175,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 12,
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            2
+          ]
+        }
+      ],
+      "effects": [
+        "cavalryClash"
+      ]
+    },
+    {
+      "id": 217304,
+      "armType": 3,
+      "name": "파란쵸 기동병",
+      "attack": 200,
+      "defence": 100,
+      "speed": 8,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 13,
+      "rice": 11,
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            96
+          ]
+        }
+      ],
+      "effects": [
+        "cavalryClash"
+      ]
+    },
+    {
+      "id": 217305,
+      "armType": 3,
+      "name": "비행마물병",
+      "attack": 150,
+      "defence": 100,
+      "speed": 8,
+      "avoid": 15,
+      "magicCoef": 0,
+      "cost": 12,
+      "rice": 12,
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            15
+          ]
+        }
+      ],
+      "effects": [
+        "cavalryClash"
+      ]
+    },
+    {
+      "id": 217306,
+      "armType": 3,
+      "name": "마물조련사병",
+      "attack": 250,
+      "defence": 200,
+      "speed": 6,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 16,
+      "rice": 16,
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 3000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            41
+          ]
+        }
+      ],
+      "effects": [
+        "cavalryClash"
+      ]
+    },
+    {
+      "id": 217307,
+      "armType": 3,
+      "name": "기마병",
+      "attack": 200,
+      "defence": 150,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 14,
+      "rice": 14,
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 3000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            84
+          ]
+        }
+      ],
+      "effects": [
+        "cavalryClash"
+      ]
+    },
+    {
+      "id": 217308,
+      "armType": 3,
+      "name": "엔젤나이트",
+      "attack": 300,
+      "defence": 200,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0,
+      "cost": 25,
+      "rice": 25,
+      "attackCoef": {
+        "1": 1.2,
+        "2": 0.8,
+        "5": 1.2,
+        "217502": 1
+      },
+      "defenceCoef": {
+        "1": 0.8,
+        "2": 1.2,
+        "5": 0.8,
+        "217502": 1
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 5000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            72
+          ]
+        }
+      ],
+      "effects": [
+        "cavalryClash"
+      ]
+    },
+    {
+      "id": 217400,
+      "armType": 4,
+      "name": "마법병",
+      "attack": 80,
+      "defence": 80,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0.6,
+      "cost": 9,
+      "rice": 9,
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      }
+    },
+    {
+      "id": 217401,
+      "armType": 4,
+      "name": "마물 마법병",
+      "attack": 90,
+      "defence": 90,
+      "speed": 7,
+      "avoid": 0,
+      "magicCoef": 0.6,
+      "cost": 11,
+      "rice": 9,
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "regions",
+          "regions": [
+            1,
+            2
+          ],
+          "names": [
+            "호넷 마인령",
+            "케이브리스 마인령"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 217402,
+      "armType": 4,
+      "name": "카라 마법병",
+      "attack": 80,
+      "defence": 80,
+      "speed": 7,
+      "avoid": 20,
+      "magicCoef": 0.6,
+      "cost": 10,
+      "rice": 10,
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "regions",
+          "regions": [
+            3
+          ],
+          "names": [
+            "카라의 숲"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 217403,
+      "armType": 4,
+      "name": "제스 마법병",
+      "attack": 100,
+      "defence": 100,
+      "speed": 7,
+      "avoid": 0,
+      "magicCoef": 0.6,
+      "cost": 10,
+      "rice": 10,
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "regions",
+          "regions": [
+            5
+          ],
+          "names": [
+            "제스 북부"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 217404,
+      "armType": 4,
+      "name": "무녀",
+      "attack": 80,
+      "defence": 80,
+      "speed": 8,
+      "avoid": 10,
+      "magicCoef": 0.6,
+      "cost": 10,
+      "rice": 10,
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "regions",
+          "regions": [
+            11
+          ],
+          "names": [
+            "JAPAN"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 217405,
+      "armType": 4,
+      "name": "프로즌",
+      "attack": 90,
+      "defence": 70,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0.8,
+      "cost": 10,
+      "rice": 10,
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "regions",
+          "regions": [
+            7
+          ],
+          "names": [
+            "헬만 서부"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 217406,
+      "armType": 4,
+      "name": "마소한 마법병",
+      "attack": 70,
+      "defence": 90,
+      "speed": 7,
+      "avoid": 10,
+      "magicCoef": 0.8,
+      "cost": 11,
+      "rice": 10,
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "regions",
+          "regions": [
+            2
+          ],
+          "names": [
+            "케이브리스 마인령"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 217407,
+      "armType": 4,
+      "name": "신관병",
+      "attack": 80,
+      "defence": 130,
+      "speed": 7,
+      "avoid": 5,
+      "magicCoef": 0.6,
+      "cost": 9,
+      "rice": 11,
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 2000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            99
+          ]
+        }
+      ]
+    },
+    {
+      "id": 217408,
+      "armType": 4,
+      "name": "중장마법병",
+      "attack": 80,
+      "defence": 130,
+      "speed": 7,
+      "avoid": 15,
+      "magicCoef": 0.6,
+      "cost": 11,
+      "rice": 12,
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 3000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            52
+          ]
+        }
+      ]
+    },
+    {
+      "id": 217409,
+      "armType": 4,
+      "name": "악마병",
+      "attack": 130,
+      "defence": 80,
+      "speed": 7,
+      "avoid": 15,
+      "magicCoef": 0.6,
+      "cost": 11,
+      "rice": 12,
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 3000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            28
+          ]
+        }
+      ]
+    },
+    {
+      "id": 217410,
+      "armType": 4,
+      "name": "호넷 마물병",
+      "attack": 130,
+      "defence": 130,
+      "speed": 7,
+      "avoid": 0,
+      "magicCoef": 0.6,
+      "cost": 12,
+      "rice": 12,
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 3000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": 217411,
+      "armType": 4,
+      "name": "Z가디언",
+      "attack": 180,
+      "defence": 180,
+      "speed": 7,
+      "avoid": 0,
+      "magicCoef": 0.7,
+      "cost": 28,
+      "rice": 20,
+      "attackCoef": {
+        "5": 1.2
+      },
+      "defenceCoef": {
+        "5": 0.8
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 5000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            24
+          ]
+        }
+      ]
+    },
+    {
+      "id": 217500,
+      "armType": 5,
+      "name": "정란",
+      "attack": 150,
+      "defence": 150,
+      "speed": 6,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 15,
+      "rice": 5,
+      "attackCoef": {
+        "0": 1.8,
+        "1": 0.8,
+        "2": 0.8,
+        "3": 0.8,
+        "4": 0.8
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "2": 1.2,
+        "3": 1.2,
+        "4": 1.2
+      },
+      "requirements": [
+        {
+          "kind": "minRelYear",
+          "min": 3
+        }
+      ]
+    },
+    {
+      "id": 217501,
+      "armType": 5,
+      "name": "충차",
+      "attack": 150,
+      "defence": 100,
+      "speed": 6,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 20,
+      "rice": 5,
+      "attackCoef": {
+        "0": 2.4,
+        "1": 0.8,
+        "2": 0.8,
+        "3": 0.8,
+        "4": 0.8
+      },
+      "defenceCoef": {
+        "1": 1.2,
+        "2": 1.2,
+        "3": 1.2,
+        "4": 1.2
+      },
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 1000
+        },
+        {
+          "kind": "minRelYear",
+          "min": 3
+        }
+      ]
+    },
+    {
+      "id": 217502,
+      "armType": 5,
+      "name": "튤립3호",
+      "attack": 275,
+      "defence": 300,
+      "speed": 6,
+      "avoid": 0,
+      "magicCoef": 0,
+      "cost": 35,
+      "rice": 15,
+      "attackCoef": [],
+      "defenceCoef": [],
+      "requirements": [
+        {
+          "kind": "tech",
+          "min": 5000
+        },
+        {
+          "kind": "cities",
+          "cityKeys": [
+            92
+          ]
+        }
+      ]
+    }
+  ]
+}
+$legacy_maps_content$::jsonb;
+  INSERT INTO "GameResource"
+    ("id", "kind", "name", "version", "status", "content", "contentHash", "source", "createdBy", "publishedAt")
+  VALUES
+    (gen_random_uuid()::text, 'UNIT_SET', 'ludo_rathowm', 1, 'PUBLISHED', resource_content, 'fe4b625c18ceb778269bb961de77304b29da002bcbb9b4acf91bc66d9d8518bf', 'resources/unitset/unitset_ludo_rathowm.json; core2026 df6c9269fa1e2862418ba9da481c8dd2d758d6c5; MIT (c) 2025 devsam; resources/NOTICE.md', NULL, now())
+  ON CONFLICT ("kind", "name", "version") DO NOTHING;
+  IF NOT EXISTS (
+    SELECT 1 FROM "GameResource"
+    WHERE "kind" = 'UNIT_SET' AND "name" = 'ludo_rathowm' AND "version" = 1
+      AND "content" = resource_content AND "contentHash" = 'fe4b625c18ceb778269bb961de77304b29da002bcbb9b4acf91bc66d9d8518bf'
+      AND "status" = 'PUBLISHED' AND "source" = 'resources/unitset/unitset_ludo_rathowm.json; core2026 df6c9269fa1e2862418ba9da481c8dd2d758d6c5; MIT (c) 2025 devsam; resources/NOTICE.md'
+  ) THEN
+    RAISE EXCEPTION '초기화 자원 충돌: UNIT_SET/ludo_rathowm/1';
+  END IF;
 END;
 $legacy_maps_init$;
