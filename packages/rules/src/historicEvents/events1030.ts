@@ -1,4 +1,5 @@
-import { readHistoricEventsConfig, type HistoricEventsConfig } from './state';
+import { readHistoricEventsOriginConfig } from './origin';
+import type { HistoricEventsConfig } from './state';
 
 const emperorChronicle = 'https://zh.wikisource.org/wiki/後漢書/卷9#建安';
 const goldCost = { kind: 'gold', value: -1_000 } as const;
@@ -135,9 +136,6 @@ const config: HistoricEventsConfig = {
   ],
 };
 
-export function createHistoricEvents1030(
-  initial: Parameters<typeof readHistoricEventsConfig>[0] & { scenarioKey: string },
-) {
-  if (initial.scenarioKey !== '1030') throw new Error('역사 사건은 1030 시나리오에서만 사용할 수 있습니다.');
-  return readHistoricEventsConfig(initial, config);
+export function createHistoricEvents1030(initial: Parameters<typeof readHistoricEventsOriginConfig>[0]) {
+  return readHistoricEventsOriginConfig(initial, config);
 }
