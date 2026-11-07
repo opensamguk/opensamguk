@@ -154,14 +154,19 @@ Windows에서는 부모가 연 IPC 채널로 정상 종료를 요청하며 같�
 
 ## T4-46 추가 시나리오 초기화
 
-기존 migration을 적용한 뒤 내장 다섯 판을 먼저 넣고 추가 시나리오를 넣습니다.
+migration을 적용한 DB에서 내장 자원, 원작 지도·병종, 추가 시나리오 순으로 게시합니다.
 
 ```sh
 pnpm db:init-resources
+pnpm db:init-legacy-maps
 pnpm db:init-scenarios
 ```
 
-두 번째 명령은 `packages/db/sql/resources-scenarios.sql`을 한 트랜잭션에서 실행합니다. 내장 다섯 판을 확인한 뒤 시나리오 12종과 `che` 병종판의 내용·해시·상태·출처를 대조합니다. 같은 키에 다른 판이 있으면 전체 삽입을 되돌립니다. 출력에는 시나리오 삽입·기존 행 수와 실패 키를 남깁니다.
+`db:init-legacy-maps`는 내장 다섯 판을 확인한 뒤 `packages/db/sql/resources-legacy-maps.sql`을 실행합니다. 지도 7종(`miniche`, `miniche_b`, `miniche_clean`, `chess`, `pokemon_v1`, `cr`, `ludo_rathowm`)과 병종 2종(`che-miniche`, `che_except_siege`)을 게시합니다. 이 단계는 시나리오를 게시하지 않습니다.
+
+`db:init-scenarios`는 `packages/db/sql/resources-scenarios.sql`의 추가 시나리오 14종과 `che` 병종판을 같은 트랜잭션에서 게시합니다. 시나리오가 `db:init-legacy-maps`의 지도·병종을 요구하면 해당 게시 판을 먼저 대조합니다. 삽입·기존 행 수에는 시나리오만 셉니다. 현재 공개 목록과 원작 후보의 구분은 [시나리오 합성](./scenario-composition.md#t4-46-묶음-a)을 참고하세요.
+
+두 게시 명령은 각각 한 트랜잭션에서 내용·해시·게시 상태·출처를 검사합니다. 같은 판이 이미 있으면 기존 행 수에 넣습니다. 같은 키에 다른 판이 있으면 해당 명령의 삽입을 모두 되돌립니다. 성공하면 삽입·기존 행 수를 출력합니다. 실패하면 오류를 출력하고 0이 아닌 종료 코드를 반환합니다.
 
 `pnpm resources:sql:scenarios`는 83행 출처 fixture에서 `ready`인 시나리오와 병종판 해시를 읽어 SQL을 다시 만듭니다. 원형 복원은 `tools/scenarios.test.ts`, 두 시드·SQL 바이트·초기화·원자 거부·DB 합성·한 달 정산은 `tools/scenarios.integration.test.ts`에서 확인합니다. DB 시험은 자기 전용 `_test` DB에서 돌리고 정식 증거는 정확한 SHA의 CI에서 남깁니다.
 

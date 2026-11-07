@@ -105,13 +105,14 @@ pnpm db:init-san10
 | `pnpm db:migrate` | DB migration 적용 |
 | `pnpm db:init-resources` | 내장 자원을 GameResource에 초기화 |
 | `pnpm db:init-integration` | 통합판 지도·시나리오·5능력치 자원을 초기화 |
-| `pnpm db:init-scenarios` | 준비된 추가 시나리오 9개를 DB에 초기화 |
+| pnpm db:init-legacy-maps | 원작 지도·병종 자원 게시 |
+| pnpm db:init-scenarios | 추가 시나리오와 전용 병종·능력치 자원 게시 |
 | `pnpm sim` | NPC 시뮬레이터 실행 |
 | `pnpm test:authz` | 실제 HTTP·PostgreSQL 권한 대조 |
 | `pnpm build:public` | 공개 전용 빌드와 자산 검사 |
 | `pnpm e2e:public` | 공개 빌드 Chromium 검사 |
 
-추가 시나리오 9개가 필요하면 `pnpm db:init-scenarios`를 실행합니다. 월드 생성 CLI는 DB의 게시 자원을 읽습니다. 내장 다섯 종류 1판의 정본은 `packages/db/sql/resources-init.sql`이며 원본 JSON을 다시 읽지 않습니다. 실제 DB 검사는 전용 테스트 DB로 실행하고 Chromium은 `pnpm exec playwright install chromium`으로 준비합니다.
+추가 시나리오를 쓰려면 [원작 자원 게시 순서](docs/architecture/runtime.md#t4-46-추가-시나리오-초기화)에 따라 지도·병종과 시나리오를 게시합니다. 월드 생성 CLI는 DB의 게시 자원을 읽습니다. 내장 다섯 종류 1판의 정본은 `packages/db/sql/resources-init.sql`이며 원본 JSON을 다시 읽지 않습니다. 실제 DB 검사는 전용 테스트 DB로 실행하고 Chromium은 `pnpm exec playwright install chromium`으로 준비합니다.
 
 `pnpm sim` 실행만으로 개발 PC 시간 기준인 AC-M1-18이 통과한 것은 아닙니다. 완료 여부는 인수조건의 상태와 증거로 확인합니다.
 
