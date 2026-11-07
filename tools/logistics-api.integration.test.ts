@@ -2,22 +2,30 @@ import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { inferRouterOutputs } from '@trpc/server';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createDb } from '../packages/db/src/index';
-import { buildCreatedGeneral, type LogisticsConfig, type WorldInit } from '../packages/rules/src/index';
+import { createDb, readPublishedResources } from '../packages/db/src/index';
+import {
+  buildCreatedGeneral,
+  TICKS_PER_MONTH,
+  type LogisticsConfig,
+  type WorldInit,
+} from '../packages/rules/src/index';
 import { BALANCE } from '../packages/rules/src/balance';
+import { logisticsConfigSchema } from '../packages/rules/src/logistics/state';
+import { unitSetSchema } from '../packages/rules/src/world/resources';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { buildServer } from '../apps/server/src/server';
 import type { AppRouter } from '../apps/server/src/router';
 import { newSession } from '../apps/server/src/auth/session';
 import { authzCase } from '../apps/server/src/authz/case';
 import { categories } from '../apps/server/src/authz/coverage';
-import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { loadFeatureProfile, loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { loadReplayState } from '../apps/engine/src/monthly';
 import { exportReplay, replayArchive } from '../apps/engine/src/replay';
+import { initializeSan10Resources } from './san10-resources';
 
 // AC-P2-30·35: 실제 HTTP와 원생성부터 사람 생성·건국·물류. 조정한 NPC 차례는 origin에 기록한다.
 // 정식491명 원본 스케줄·전체 기수·화면·CF의 증거는 아니다.
@@ -78,7 +86,7 @@ async function rpc<R extends keyof Results>(route: R, input: unknown, user?: Use
   const body = Array.isArray(payload) ? payload[0]! : payload;
   return { status: response.status, data: body.result?.data, error: body.error };
 }
-async function user(id = randomUUID()) {
+async function user(id: string = randomUUID()) {
   userIds.push(id);
   await db.user.create({ data: { id, email: `${id}@example.invalid`, passwordHash: 'not-a-login-hash' } });
   const session = newSession(now);
@@ -139,9 +147,11 @@ async function createHuman(worldId: string, player: User, name: string) {
     await creating;
   }
 }
-async function fixture({ fundedRecruitment = false }: { fundedRecruitment?: boolean } = {}) {
+async function fixture({ fundedRecruitment = false, expandedRecruitment = false } = {}) {
   const seed = randomUUID(),
     payload = creation('물류군주');
+  const source = structuredClone(initial);
+  if (expandedRecruitment) source.generals = source.generals.filter((general) => general.officerLevel === 12);
   const neutral = initial.cities.filter(
     (city) =>
       city.kind !== 'PASS' &&
@@ -159,7 +169,7 @@ async function fixture({ fundedRecruitment = false }: { fundedRecruitment?: bool
       payload,
       userId: candidate,
       seed,
-      id: Math.max(...initial.generals.map((row) => row.id)) + 1,
+      id: Math.max(...source.generals.map((row) => row.id)) + 1,
       startYear: initial.startYear,
       tick: 0,
       monthlyTick: 0,
@@ -187,9 +197,21 @@ async function fixture({ fundedRecruitment = false }: { fundedRecruitment?: bool
     build: { wall: { iron: 0, wood: 1, horses: 0 }, defence: { iron: 1, wood: 1, horses: 0 } },
     trade: { iron: { buy: 3, sell: 1 }, wood: { buy: 3, sell: 1 }, horses: { buy: 3, sell: 1 } },
   };
+  if (expandedRecruitment) {
+    await initializeSan10Resources(db);
+    const [published] = await readPublishedResources(db, [{ kind: 'UNIT_SET', name: 'expanded', version: 1 }]);
+    const expanded = unitSetSchema.parse(published!.content);
+    const profile = await loadFeatureProfile('expanded-191-v6');
+    config.recruitPer100 = logisticsConfigSchema.parse(profile.value.featureData['logistics-v1']).recruitPer100;
+    source.unitSet = {
+      ...source.unitSet,
+      armTypes: expanded.armTypes,
+      crewTypes: [...source.unitSet.crewTypes, ...expanded.crewTypes.filter(({ id }) => id === 1400 || id === 1500)],
+    };
+  }
   const saved = await saveInitialWorld(
     db,
-    { ...structuredClone(initial), seed },
+    { ...source, seed },
     {
       name: 'AC-P2-30 물류 HTTP',
       turnTermMinutes: 60,
@@ -435,6 +457,96 @@ describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
     expect(replayed.at(-1)!.stateHash).toBe(hashState(state));
   });
 
+  it('D-072 창극병·차병의 공개 비용을 실제 모집에 적용하고 부족 실패까지 재생한다', async () => {
+    const world = await fixture({ fundedRecruitment: true, expandedRecruitment: true });
+    const recruitmentTick = 36 * TICKS_PER_MONTH;
+    for (let tick = 12 * TICKS_PER_MONTH; tick <= recruitmentTick; tick += 12 * TICKS_PER_MONTH)
+      await advance(world.id, tick);
+
+    const purchase = await rpc(
+      'logistics.submit',
+      {
+        worldId: world.id,
+        expectedUserId: world.player.id,
+        requestId: randomUUID(),
+        payload: { type: 'trade', cityKey: world.cityKey, good: 'iron', side: 'buy', amount: 6 },
+      },
+      world.player,
+    );
+    expect(purchase.status).toBe(200);
+    await advance(world.id, recruitmentTick);
+
+    const generalKey = { worldId_id: { worldId: world.id, id: world.generalId } };
+    const ruler = await db.general.findUniqueOrThrow({ where: generalKey });
+    const commands = [
+      { commandKey: 'recruit', args: { amount: 100, crewType: 1400 } },
+      { commandKey: 'recruit', args: { amount: 101, crewType: 1500 } },
+      { commandKey: 'recruit', args: { amount: 100, crewType: 1500 } },
+    ];
+    expect(
+      (
+        await rpc(
+          'turns.set',
+          {
+            worldId: world.id,
+            revision: ruler.turnRevision,
+            slots: Array.from({ length: 30 }, (_, i) => commands[i] ?? null),
+          },
+          world.player,
+        )
+      ).status,
+    ).toBe(200);
+    await advance(world.id, recruitmentTick);
+
+    const key = String(world.cityKey);
+    for (const [index, expected] of [
+      [{ good: 'iron', delta: -2 }],
+      [
+        { good: 'iron', delta: -4 },
+        { good: 'wood', delta: -20 },
+      ],
+      [],
+    ].entries()) {
+      const { nextTurnTick: tick } = await db.general.findUniqueOrThrow({ where: generalKey });
+      const before = (await snapshot(world.id)).state;
+      await advance(world.id, tick);
+      const after = (await snapshot(world.id)).state;
+      const rows = await db.logisticsMovement.findMany({
+        where: { worldId: world.id, tick, holder: 'city', holderId: world.cityKey, reason: 'CONSUME' },
+        orderBy: { ordinal: 'asc' },
+        select: { good: true, delta: true },
+      });
+      expect(rows).toEqual(expected);
+      const oldStock = before.logistics!.cities[key]!;
+      expect(after.logistics!.cities[key]).toMatchObject({
+        iron: oldStock.iron + (expected.find(({ good }) => good === 'iron')?.delta ?? 0),
+        wood: oldStock.wood + (expected.find(({ good }) => good === 'wood')?.delta ?? 0),
+        horses: oldStock.horses,
+      });
+      const resource = after.cityResources!.cities[key]!;
+      const previous = before.cityResources!.cities[key]!;
+      if (expected.length) {
+        const { amount, crewType } = commands[index]!.args;
+        expect(resource.garrison.find((row) => row.crewType === crewType)?.troops).toBe(amount);
+        expect(after.cities[world.cityKey]!.population).toBe(before.cities[world.cityKey]!.population - amount);
+      } else {
+        expect(resource).toEqual(previous);
+        expect(after.cities[world.cityKey]!.population).toBe(before.cities[world.cityKey]!.population);
+        expect(
+          await db.generalLog.findFirst({ where: { worldId: world.id, generalId: ruler.id, tick, kind: 'failure' } }),
+        ).toMatchObject({
+          commandKey: 'recruit',
+          text: expect.stringContaining('도시의 철·목재·말이 부족합니다.'),
+        });
+      }
+      await advance(world.id, Math.ceil(tick / TICKS_PER_MONTH) * TICKS_PER_MONTH);
+    }
+    const archive = await exportReplay(db, world.id);
+    const replayed = replayArchive(archive, 39);
+    expect(replayed.map(({ stateHash }) => stateHash)).toEqual(archive.months.map(({ stateHash }) => stateHash));
+    expect(replayed.at(-1)?.stateHash).toBe(hashState(await snapshot(world.id)));
+  });
+
   it('예약 뒤 재고가 사라지면 모집을 거부하고 금·인구·수비병·재화는 보존한다', async () => {
     const world = await fixture({ fundedRecruitment: true });
     const trade = async (good: 'iron' | 'horses', side: 'buy' | 'sell', amount: number) => {
@@ -454,7 +566,7 @@ describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
         ).status,
       ).toBe(200);
       await advance(world.id, 10_000);
-      const receipt = await rpc('logistics.request', { worldId: world.id, requestId }, world.player, false);
+      const receipt = await rpc('logistics.request', { worldId: world.id, requestId }, world.player);
       expect(receipt.data?.status).toBe('applied');
     };
     await trade('iron', 'buy', 7);
