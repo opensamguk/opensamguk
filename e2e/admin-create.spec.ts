@@ -197,6 +197,7 @@ test('AC-M3-04 CH-03 실제 읽기 응답의 표식 변경 주입은 POST0으로
         { id: 'san10-191-expanded', available: false, code: 'RESOURCES_UNAVAILABLE' },
         { id: 'san10-191-lifecycle', available: false, code: 'RESOURCES_UNAVAILABLE' },
         { id: 'san10-191-research', available: false, code: 'RESOURCES_UNAVAILABLE' },
+        { id: 'san10-191-border-return', available: false, code: 'RESOURCES_UNAVAILABLE' },
       ],
     });
     packet.result.data.revision = 'explicit-test-stamp-' + packet.result.data.revision;
