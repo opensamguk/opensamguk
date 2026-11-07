@@ -105,13 +105,37 @@ export function runReplayAction(
   resolver?: CommandResolver,
   registry: RuleRegistry = ruleRegistry,
 ): ReplayState {
+  return replayAction(replay, seed, unitSet, resolver, registry, false);
+}
+
+/** 읽은 아카이브의 작업 상태는 재생 루프만 소유한다. */
+export function runArchiveReplayAction(
+  replay: ReplayState,
+  seed: string,
+  unitSet: UnitSetResource,
+  registry: RuleRegistry,
+): ReplayState {
+  return replayAction(replay, seed, unitSet, undefined, registry, registry === ruleRegistry);
+}
+
+function replayAction(
+  replay: ReplayState,
+  seed: string,
+  unitSet: UnitSetResource | undefined,
+  resolver: CommandResolver | undefined,
+  registry: RuleRegistry,
+  shareInactiveQueues: boolean,
+): ReplayState {
   const action = nextGameAction(replay);
   if (action.kind === 'monthly') {
     return settleReplayMonth(replay, seed, action.tick, registry).replay;
   }
-  const next = structuredClone(replay);
+  const next = shareInactiveQueues
+    ? { ...structuredClone({ ...replay, turns: {} }), turns: { ...replay.turns } }
+    : structuredClone(replay);
   const personnel = Object.hasOwn(replay, 'offices');
-  const turns = next.turns[action.generalId] ?? emptyTurns();
+  const queue = next.turns[action.generalId] ?? emptyTurns();
+  const turns = shareInactiveQueues ? structuredClone(queue) : queue;
   const command = turns[0]!;
   const result = runGeneralTurn(
     next.state,

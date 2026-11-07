@@ -1,7 +1,8 @@
 import { expect, it } from 'vitest';
 import { rngFor } from '@opensamguk/shared';
 import { commandInitial, commandWorld, testUnits } from '../test/commandFixture';
-import { initialReplayState, runReplayAction, applyRecordedInput, emptyTurns } from './replay';
+import { initialReplayState, runReplayAction, runArchiveReplayAction, applyRecordedInput, emptyTurns } from './replay';
+import { ruleRegistry } from './ruleRegistry';
 import { createCommandResolver } from './commands/resolve';
 import { applyEffects } from './commands/effects';
 import { runMonthly } from './monthly';
@@ -61,6 +62,25 @@ it('운영 목록 밖 ext는 장수 턴 실행에서 조용히 버리지 않는�
   const replay = initialReplayState(commandInitial());
   replay.state.ext = { test: { nested: [1] } };
   expect(() => runReplayAction(replay, 'ext', testUnits)).toThrow('test');
+});
+
+it('AC-INT-22 기본 아카이브 재생만 실행하지 않는 장수의 예턴 배열을 공유한다', () => {
+  const replay = initialReplayState(commandInitial());
+  replay.turns[1]![1] = { commandKey: 'move', args: { cityKey: 2 }, explicit: false };
+  replay.turns[2]![0] = { commandKey: 'move', args: { cityKey: 3 }, explicit: true };
+  const original = structuredClone(replay);
+  const normal = runReplayAction(replay, 'queue-ownership', testUnits);
+  const archive = runArchiveReplayAction(replay, 'queue-ownership', testUnits, ruleRegistry);
+  const custom = runArchiveReplayAction(replay, 'queue-ownership', testUnits, { ...ruleRegistry });
+  expect(archive).toEqual(normal);
+  expect(custom).toEqual(normal);
+  expect(replay).toEqual(original);
+  expect(archive.turns).not.toBe(replay.turns);
+  expect(archive.turns[1]![0]).not.toBe(replay.turns[1]![1]);
+  expect(archive.turns[1]![0]!.args).not.toBe(replay.turns[1]![1]!.args);
+  expect(archive.turns[2]).toBe(replay.turns[2]);
+  expect(normal.turns[2]![0]!.args).not.toBe(replay.turns[2]![0]!.args);
+  expect(custom.turns[2]![0]!.args).not.toBe(replay.turns[2]![0]!.args);
 });
 
 it('월간·기록 입력·장수 턴 없는 12개월 재생은 시험 ext와 JSON 왕복 해시를 보존한다', async () => {
