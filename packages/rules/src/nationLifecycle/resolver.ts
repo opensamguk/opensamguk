@@ -3,7 +3,6 @@ import type { Rng } from '@opensamguk/shared';
 import type { CommandResolver } from '../commands/resolve';
 import type { Actor, CommandResult } from '../commands/types';
 import type { WorldView } from '../model/world';
-import { cloneWorld } from '../model/clone';
 import { reconcileNationLifecycle } from './operations';
 import { isWandering } from './state';
 
@@ -15,7 +14,7 @@ export function createNationLifecycleResolver(base: CommandResolver): CommandRes
     const general = world.generals[actor.generalId];
     const following = key === 'move' && general?.officerLevel === 12 && isWandering(world, general.nationId);
     if (!lifecycleKeys.has(key) && !following) return result;
-    const state = applyEffects(cloneWorld(world), result.effects);
+    const state = applyEffects(world, result.effects);
     const reports = [...(result.reports ?? [])];
     if (following) {
       const destination = state.generals[actor.generalId]!.cityKey;
