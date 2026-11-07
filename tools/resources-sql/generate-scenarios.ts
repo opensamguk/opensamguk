@@ -6,6 +6,7 @@ import { hashState } from '../../packages/shared/src/node/hashState';
 import fixture from '../fixtures/t4-46-scenarios.json';
 import { BODY_TAG, CONTENT_TAG, requirePassingReport } from './convert';
 import { createDb, readPublishedResources } from '../../packages/db/src/index';
+import { legacyMapPublications } from './legacy-maps';
 
 export interface ScenarioRow {
   key: string;
@@ -18,7 +19,8 @@ export interface ScenarioRow {
   resourceKey: string | null;
   contentHash: string | null;
   source?: string;
-  unitSet?: 'che';
+  map?: string;
+  unitSet?: 'che' | 'che-miniche';
   statRules?: string;
 }
 
@@ -38,6 +40,7 @@ const sqlTags = [
 export const cheUnitSetPublication = fixture.cheUnitSet;
 export type ScenarioMaterials = Omit<Parameters<typeof validateWorldResources>[0], 'scenario'> & {
   cheUnitSet: unknown;
+  legacyResources: ReadonlyMap<string, unknown>;
 };
 
 function scenarioStatRulesPublication({ statRules }: Pick<ScenarioRow, 'statRules'>) {
@@ -51,11 +54,41 @@ export function requiredScenarioStatRules(rows: readonly ScenarioRow[]) {
   return new Set(rows.map(scenarioStatRulesPublication).filter((publication) => publication !== undefined));
 }
 
-export function scenarioMaterialsForRow(materials: ScenarioMaterials, row: { unitSet?: string; statRules?: string }) {
-  const { cheUnitSet, ...basic } = materials;
+export async function requiredScenarioLegacyResources(ready: readonly ScenarioRow[]) {
+  const names = new Set(ready.flatMap(({ map }) => (map === undefined ? [] : [map])));
+  if (names.size === 0) return [];
+
+  const expected = (await legacyMapPublications()).filter(({ kind, name }) => kind === 'UNIT_SET' || names.has(name));
+  if (expected.length !== names.size + 1) throw new Error('시나리오에 지정한 원작 지도를 확인하세요.');
+  return expected;
+}
+
+export async function readScenarioLegacyResources(
+  db: Parameters<typeof readPublishedResources>[0],
+  expected: Awaited<ReturnType<typeof requiredScenarioLegacyResources>>,
+) {
+  const resources = new Map<string, unknown>();
+  if (expected.length === 0) return resources;
+  const saved = await readPublishedResources(db, expected);
+  for (const [index, row] of saved.entries()) {
+    const key = `${row.kind}/${row.name}`;
+    if (row.source !== expected[index]!.source || row.contentHash !== expected[index]!.contentHash)
+      throw new Error(`원작 지도 게시 판이 다릅니다: ${key}/${row.version}`);
+    resources.set(key, row.content);
+  }
+  return resources;
+}
+
+export function scenarioMaterialsForRow(
+  materials: ScenarioMaterials,
+  row: { map?: string; unitSet?: string; statRules?: string },
+) {
+  const { cheUnitSet, legacyResources, ...basic } = materials;
+  const unitSets = { che: cheUnitSet, 'che-miniche': legacyResources.get('UNIT_SET/che-miniche') };
   return {
     ...basic,
-    unitSet: row.unitSet === 'che' ? cheUnitSet : basic.unitSet,
+    map: row.map === undefined ? basic.map : legacyResources.get(`MAP/${row.map}`),
+    unitSet: row.unitSet === 'che' || row.unitSet === 'che-miniche' ? unitSets[row.unitSet] : basic.unitSet,
     statRules: scenarioStatRulesPublication(row)?.content ?? basic.statRules,
   };
 }
@@ -70,7 +103,8 @@ export function readyScenarioRows(rows: readonly ScenarioRow[] = scenarioRows): 
       row.resourceKey !== row.key ||
       keys.has(row.key) ||
       !row.contentHash?.match(/^[0-9a-f]{64}$/) ||
-      !row.source
+      !row.source ||
+      (row.map === undefined ? row.unitSet === 'che-miniche' : row.unitSet !== 'che-miniche')
     ) {
       throw new Error(`시나리오 판 입력을 확인하세요: SCENARIO/${row.key}/1`);
     }
@@ -146,7 +180,13 @@ export function convertScenariosToSql(
     }
     if (hasNul(content)) throw new Error(`시나리오 NUL 문자: ${key}`);
     try {
-      requirePassingReport(validateWorldResources({ ...scenarioMaterialsForRow(materials, row), scenario: content }));
+      const report = validateWorldResources({ ...scenarioMaterialsForRow(materials, row), scenario: content });
+      requirePassingReport(report);
+      if (
+        row.map !== undefined &&
+        (report.scenario.value?.requiredMap !== row.map || report.scenario.value.requiredUnitSet !== row.unitSet)
+      )
+        throw new Error('시나리오에 원작 지도와 병종을 지정하세요.');
     } catch {
       throw new Error(`시나리오 자원 검증 실패: ${key}`);
     }
@@ -187,6 +227,7 @@ ${SCENARIO_BODY_TAG};
 
 export async function readScenarioMaterials(
   db: Parameters<typeof readPublishedResources>[0],
+  rows: readonly ScenarioRow[] = scenarioRows,
 ): Promise<ScenarioMaterials> {
   const [map, unitSet, statRules, portraitMap] = await readPublishedResources(db, [
     { kind: 'MAP', name: 'che', version: 1 },
@@ -200,6 +241,10 @@ export async function readScenarioMaterials(
     statRules: statRules!.content,
     portraitMap: portraitMap!.content,
     cheUnitSet: JSON.parse(await readFile(new URL('../../resources/unitset/che.json', import.meta.url), 'utf8')),
+    legacyResources: await readScenarioLegacyResources(
+      db,
+      await requiredScenarioLegacyResources(readyScenarioRows(rows)),
+    ),
   };
 }
 

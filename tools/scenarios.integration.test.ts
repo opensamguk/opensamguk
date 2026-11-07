@@ -470,6 +470,68 @@ it('S5 miniche 지도·병종의 게시, 롤백과 월드 재생', async () => {
   });
 }, 120000);
 
+it('S5 원작 소형 지도를 지정한 시나리오는 선행 게시 판을 대조한다', async () => {
+  await withDatabase(async ({ db, native }) => {
+    const content = {
+      id: '2190',
+      title: '소형 지도 시나리오 검증',
+      startYear: 180,
+      nation: [],
+      general: [],
+      diplomacy: [],
+      requiredMap: 'miniche',
+      requiredUnitSet: 'che-miniche',
+    };
+    const rows: ScenarioRow[] = [
+      {
+        ...scenarioRows.find(({ key }) => key === content.id)!,
+        support: 'ready',
+        resourceKey: content.id,
+        contentHash: hashState(content),
+        source: '소형 지도 시나리오 검증',
+        map: 'miniche',
+        unitSet: 'che-miniche',
+      },
+    ];
+    const legacy = await legacyMapPublications();
+    const material = {
+      ...(await readScenarioMaterials(db)),
+      legacyResources: new Map(legacy.map(({ kind, name, raw }) => [`${kind}/${name}`, JSON.parse(raw)])),
+    };
+    const scenarioInput = { [content.id]: JSON.stringify(content) };
+    const generated = convertScenariosToSql(scenarioInput, notice, material, rows);
+    const initial = await allRows(native);
+    await expect(readScenarioMaterials(db, rows)).rejects.toThrow('MAP/miniche/1');
+    await expect(initializeScenarios(db, generated, rows)).rejects.toMatchObject({
+      keys: ['MAP/miniche/1', 'UNIT_SET/che-miniche/1'],
+    });
+    expect(await allRows(native)).toEqual(initial);
+    expect(() =>
+      convertScenariosToSql(
+        { [content.id]: JSON.stringify({ ...content, requiredMap: undefined }) },
+        notice,
+        material,
+        rows,
+      ),
+    ).toThrow('시나리오 자원 검증 실패');
+
+    await initializeLegacyMaps(db);
+    const published = await allRows(native);
+    expect(convertScenariosToSql(scenarioInput, notice, await readScenarioMaterials(db, rows), rows)).toBe(generated);
+    const damaged = generated.replace(
+      '\nEND;',
+      '\n  UPDATE "GameResource" SET "source" = \'changed\' WHERE "kind" = \'MAP\' AND "name" = \'miniche\' AND "version" = 1;\nEND;',
+    );
+    await expect(initializeScenarios(db, damaged, rows)).rejects.toMatchObject({
+      message: '시나리오 SQL 실패: SCENARIO/2190/1',
+      keys: ['SCENARIO/2190/1'],
+    });
+    expect(await allRows(native)).toEqual(published);
+    expect(await initializeScenarios(db, generated, rows)).toEqual({ inserted: 1, existing: 0 });
+    expect(await initializeScenarios(db, generated, rows)).toEqual({ inserted: 0, existing: 1 });
+  });
+});
+
 it.each(ready)('S6 $key 두 DB 월드의 행 수와 재적재 해시는 파일 합성과 같다', async (row) => {
   await withDatabase(async ({ db }) => {
     await initializeScenarios(db, sql);

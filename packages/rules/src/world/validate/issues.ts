@@ -30,6 +30,7 @@ const messages = {
   'terrain-open': '지형의 점 수나 닫힘이 맞지 않습니다.',
   'terrain-out-of-canvas': '지형 좌표가 캔버스 밖입니다.',
   'scenario-nation-city-missing': '국가의 도시가 지도에 없습니다.',
+  'scenario-map-mismatch': '시나리오가 지정한 지도와 다릅니다.',
   'scenario-general-city-missing': '장수의 도시가 지도에 없습니다.',
   'scenario-nation-name-duplicate': '국가 이름이 겹칩니다.',
   'scenario-city-owner-duplicate': '도시 소유가 겹칩니다.',

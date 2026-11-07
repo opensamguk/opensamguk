@@ -50,6 +50,8 @@ export const scenarioSchema = z.object({
   id: name,
   title: name,
   startYear: natural,
+  requiredMap: name.optional(),
+  randomizeZeroAffinity: z.literal(true).optional(),
   openingCityProfile: z.literal('legacy-research-70').optional(),
   lastNationRecruitmentLockYear: positive.max(9999).optional(),
   requiredUnitSet: name.optional(),
@@ -207,4 +209,8 @@ export function scenarioStatRulesMatch({ requiredStatRules }: ScenarioResource, 
       requiredStatRules.max === statRules.max &&
       requiredStatRules.count === statRules.count)
   );
+}
+
+export function scenarioMapMismatch(scenario: ScenarioResource, mapId: string): string | undefined {
+  return scenario.requiredMap === mapId ? undefined : scenario.requiredMap;
 }
