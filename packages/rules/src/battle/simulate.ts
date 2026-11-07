@@ -11,6 +11,9 @@ export type BattleInput = {
   attackerTech: number;
   defenderTech: number;
   defence?: number;
+  openingSkirmish?: boolean;
+  siege?: boolean;
+  attackerFirstVolleyUsed?: boolean;
   unitSet: DeepReadonly<UnitSetResource>;
   coefMode?: 'divide' | 'multiply';
   attackerModifiers?: BattleModifiers;
@@ -68,22 +71,31 @@ function copyForce(force: Readonly<BattleForce>): BattleForce {
   return { crew: force.crew, crewType: force.crewType, train: force.train, atmos: force.atmos };
 }
 
-export function simulateBattle(input: BattleInput, rng: Rng): { attacker: BattleForce; defender: BattleForce } {
+type BattleResult = { attacker: BattleForce; defender: BattleForce; attackerFirstVolleyFired?: true };
+
+export function simulateBattle(input: BattleInput, rng: Rng): BattleResult {
   const { unitSet } = input;
   const attacker = copyForce(input.attacker),
     defender = copyForce(input.defender);
   const canFight = () => attacker.crew > 0 && defender.crew > 0 && attacker.atmos > 0 && defender.atmos > 0;
-  if (!canFight()) return { attacker, defender };
+  const result: BattleResult = { attacker, defender };
+  if (!canFight()) return result;
   const aUnit = unit(unitSet, attacker.crewType),
     bUnit = unit(unitSet, defender.crewType);
-  if (aUnit.effects?.includes('firstVolley') || bUnit.effects?.includes('firstVolley')) {
-    const toDefender = aUnit.effects?.includes('firstVolley') ? damage(attacker, defender, input, rng, true, 2 / 3) : 0,
-      toAttacker = bUnit.effects?.includes('firstVolley') ? damage(defender, attacker, input, rng, false, 2 / 3) : 0;
+  const sortieVolley = unitSet.firstVolleyScope === 'sortie';
+  const attackerFires = aUnit.effects?.includes('firstVolley') && !(sortieVolley && input.attackerFirstVolleyUsed);
+  const defenderFires = bUnit.effects?.includes('firstVolley') && !(sortieVolley && input.siege);
+  if (attackerFires || defenderFires) {
+    const toDefender = attackerFires ? damage(attacker, defender, input, rng, true, 2 / 3) : 0,
+      toAttacker = defenderFires ? damage(defender, attacker, input, rng, false, 2 / 3) : 0;
     attacker.crew -= toAttacker;
     defender.crew -= toDefender;
+    if (sortieVolley && attackerFires) result.attackerFirstVolleyFired = true;
+    if (input.openingSkirmish) return result;
   }
   let held = false;
-  for (let phase = 0; phase < BALANCE.BATTLE_PHASES && canFight(); phase++) {
+  const phases = input.openingSkirmish ? 1 : BALANCE.BATTLE_PHASES;
+  for (let phase = 0; phase < phases && canFight(); phase++) {
     if (bUnit.effects?.includes('hold') && !held && rng.next() < (defender.train + defender.atmos) / 400) {
       held = true;
       continue;
@@ -98,5 +110,5 @@ export function simulateBattle(input: BattleInput, rng: Rng): { attacker: Battle
     attacker.atmos = Math.max(0, attacker.atmos - BALANCE.BATTLE_ATMOS_LOSS);
     defender.atmos = Math.max(0, defender.atmos - BALANCE.BATTLE_ATMOS_LOSS);
   }
-  return { attacker, defender };
+  return result;
 }

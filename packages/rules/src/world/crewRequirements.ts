@@ -4,6 +4,7 @@ import type { DeepReadonly, WorldView } from '../model/world';
 import { canUseNationTurns } from '../personnel/permissions';
 import { readNationResearch } from '../nationResearch/state';
 import type { UnitSetResource } from './resources';
+import { LEGACY_CHE_REGION_NAMES } from './crewRegions';
 
 const provinces = [
   '',
@@ -94,9 +95,12 @@ export function crewTypeFailure(
         if (!context.nation || context.nation.tech < requirement.min) reason = `기술 ${requirement.min}이 필요합니다.`;
         break;
       case 'regions':
+      case 'legacyCheRegions': {
+        const names = requirement.kind === 'legacyCheRegions' ? LEGACY_CHE_REGION_NAMES : provinces;
         if (!context.ownedCities.some((city) => requirement.regions.includes(city.region)))
-          reason = `${requirement.regions.map((region) => provinces[region]).join('·')} 도시가 필요합니다.`;
+          reason = `${requirement.regions.map((region) => names[region]).join('·')} 도시가 필요합니다.`;
         break;
+      }
       case 'cities':
         if (!context.ownedCities.some((city) => requirement.cityKeys.includes(city.cityKey)))
           reason = `${cityNames(requirement.cityKeys)} 거점이 필요합니다.`;

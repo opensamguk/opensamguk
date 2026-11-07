@@ -3,6 +3,7 @@ import { rngFor } from '@opensamguk/shared';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { mapSchema, portraitMapSchema, scenarioSchema, statRulesSchema, unitSetSchema } from './resources';
 import type { StatRules, UnitSetResource } from './resources';
+import { legacyCheCrewRegionsMatch } from './crewRegions';
 import type { WorldState, WorldExt } from '../model/world';
 import { operationalMapSchema, type OperationalMapResource } from './map/operational';
 import { operationalAnchors } from './map/anchors';
@@ -135,7 +136,12 @@ export function buildInitialWorld(input: {
   const scaled = resolveCityScale(sourceMap.cities, scenario.cityScale?.cities);
   const map = { ...sourceMap, cities: scaled.cities };
   const unitSet = unitSetSchema.parse(input.unitSet);
-  if (unitSet.regionScheme !== undefined && unitSet.regionScheme !== operational?.regionScheme)
+  if (scenario.requiredUnitSet !== undefined && unitSet.id !== scenario.requiredUnitSet)
+    throw new Error(`이 시나리오는 ${scenario.requiredUnitSet} 병종 판이 필요합니다.`);
+  if (
+    (unitSet.regionScheme !== undefined && unitSet.regionScheme !== operational?.regionScheme) ||
+    !legacyCheCrewRegionsMatch(unitSet, operational ?? sourceMap)
+  )
     throw new Error('지도와 병종 판의 지역 기준이 다릅니다.');
   const statRules = statRulesSchema.parse(input.statRules).stat;
   const five = statRules.count === 5;
@@ -336,6 +342,15 @@ export function buildInitialWorld(input: {
       : {}),
     ...(scaled.record ? { cityScale: scaled.record } : {}),
     ...(operational ? { operationalMap: operational } : {}),
+    ...(scenario.lastNationRecruitmentLockYear === undefined
+      ? {}
+      : {
+          commandMeta: {
+            nextNationId: nations.length + 1,
+            offers: {},
+            lastNationRecruitmentLock: { fromYear: scenario.lastNationRecruitmentLockYear },
+          },
+        }),
     seed: input.seed,
     scenarioKey: scenario.id,
     mapKey: map.id,

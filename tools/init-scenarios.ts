@@ -5,7 +5,12 @@ import { parseArgs } from 'node:util';
 import { createDb, type PrismaClient } from '../packages/db/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { initialResourceKeys, verifyInitializedResources, type InitializedResourceRow } from './init-resources';
-import { readyScenarioRows, scenarioRows, type ScenarioRow } from './resources-sql/generate-scenarios';
+import {
+  cheUnitSetPublication,
+  readyScenarioRows,
+  scenarioRows,
+  type ScenarioRow,
+} from './resources-sql/generate-scenarios';
 
 export class ScenarioInitializationError extends Error {
   constructor(
@@ -53,6 +58,9 @@ export async function initializeScenarios(
 ): Promise<{ inserted: number; existing: number }> {
   const ready = readyScenarioRows(rows);
   const keys = ready.map(({ key }) => `SCENARIO/${key}/1`);
+  const requiresChe = ready.some(({ unitSet }) => unitSet === 'che');
+  const cheKey = `UNIT_SET/${cheUnitSetPublication.name}/1`;
+  if (requiresChe) keys.push(cheKey);
   const selected = `SELECT "kind"::text AS kind, "name", "version", "status"::text AS status, "content", "contentHash", "source"
     FROM "GameResource" WHERE "kind" = 'SCENARIO' AND "version" = 1
       AND "name" IN (${ready.map(({ key }) => `'${key}'`).join(', ')})`;
@@ -78,6 +86,20 @@ export async function initializeScenarios(
           hashState(saved!.content) !== row.contentHash
         )
           throw new ScenarioInitializationError('시나리오 저장 행 불일치', [`SCENARIO/${row.key}/1`]);
+      }
+      if (requiresChe) {
+        const { name, source, contentHash } = cheUnitSetPublication;
+        const unitSet = await tx.gameResource.findUnique({
+          where: { kind_name_version: { kind: 'UNIT_SET', name, version: 1 } },
+        });
+        if (
+          !unitSet ||
+          unitSet.status !== 'PUBLISHED' ||
+          unitSet.source !== source ||
+          unitSet.contentHash !== contentHash ||
+          hashState(unitSet.content) !== contentHash
+        )
+          throw new ScenarioInitializationError('시나리오 저장 행 불일치', [cheKey]);
       }
       return { inserted: ready.length - before.length, existing: before.length };
     });

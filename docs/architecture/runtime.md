@@ -161,14 +161,15 @@ pnpm db:init-resources
 pnpm db:init-scenarios
 ```
 
-두 번째 명령은 `packages/db/sql/resources-scenarios.sql`을 한 트랜잭션에서 실행합니다. 기존 내장 판을 확인한 뒤 A9의 내용·해시·상태·출처를 대조합니다. 같은 판은 기존 행으로 세고 다른 판이 같은 키에 있으면 전체 삽입을 되돌립니다. 내장 다섯 판과 `1030`은 덮지 않습니다. 출력에는 삽입·기존 행 수와 실패 키만 남깁니다.
+두 번째 명령은 `packages/db/sql/resources-scenarios.sql`을 한 트랜잭션에서 실행합니다. 내장 다섯 판을 확인한 뒤 시나리오 12종과 `che` 병종판의 내용·해시·상태·출처를 대조합니다. 같은 키에 다른 판이 있으면 전체 삽입을 되돌립니다. 출력에는 시나리오 삽입·기존 행 수와 실패 키를 남깁니다.
 
-`pnpm resources:sql:scenarios`는 83행 출처 fixture에서 `ready`인 11종을 읽어 별도 SQL을 다시 만듭니다. `ready`는 생성 대상이며 전체 AC의 인수는 따로 확인합니다. 원형 복원은 `tools/scenarios.test.ts`, 두 시드·SQL 바이트·초기화·원자 거부·DB 합성·한 달 정산은 `tools/scenarios.integration.test.ts`에서 확인합니다. DB 시험은 자기 전용 `_test` DB에서 돌리고 정식 증거는 정확한 SHA의 CI에서 남깁니다.
+`pnpm resources:sql:scenarios`는 83행 출처 fixture에서 `ready`인 시나리오와 병종판 해시를 읽어 SQL을 다시 만듭니다. 원형 복원은 `tools/scenarios.test.ts`, 두 시드·SQL 바이트·초기화·원자 거부·DB 합성·한 달 정산은 `tools/scenarios.integration.test.ts`에서 확인합니다. DB 시험은 자기 전용 `_test` DB에서 돌리고 정식 증거는 정확한 SHA의 CI에서 남깁니다.
 
 1050·1080은 도시 없는 국가를 보존하며 형식3의 `personnel`·`nation-lifecycle-v1`을 명시적으로 선택해 생성합니다. 원문의 명시 위치를 보존하고 미지정 소속 장수는 전체 지도에서 같은 시드로 배치합니다. 국가의 초기 방랑 원장은 `sinceTick: 0`입니다.
 
 ```sh
 pnpm world:create --scenario 1050 --map che --rule-features personnel,nation-lifecycle-v1 --seed history-1050 --turn-term 60 --end-year 300 --name history-1050
+pnpm world:create --scenario 1021 --map che --unit-set che --seed history-1021 --turn-term 60 --end-year 300 --name history-1021
 ```
 
 ## 계정 토큰과 개발 메일함

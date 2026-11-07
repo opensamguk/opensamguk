@@ -41,6 +41,8 @@ export const scenarioSchema = z.object({
   title: name,
   startYear: natural,
   openingCityProfile: z.literal('legacy-research-70').optional(),
+  lastNationRecruitmentLockYear: positive.max(9999).optional(),
+  requiredUnitSet: name.optional(),
   cityScale: z
     .strictObject({
       cities: z
@@ -113,6 +115,7 @@ export const crewRequirementSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('impossible') }),
   z.strictObject({ kind: z.literal('tech'), min: natural }),
   z.strictObject({ kind: z.literal('regions'), regions: z.array(positive.max(16)).min(1) }),
+  z.strictObject({ kind: z.literal('legacyCheRegions'), regions: z.array(positive.max(8)).min(1) }),
   z.strictObject({ kind: z.literal('cities'), cityKeys: z.array(positive).min(1) }),
   z.strictObject({ kind: z.literal('citiesWithLevel'), cityKeys: z.array(positive).min(1), level: positive }),
   z.strictObject({ kind: z.literal('minRelYear'), min: natural }),
@@ -120,14 +123,20 @@ export const crewRequirementSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('scorched'), min: natural }),
   z.strictObject({ kind: z.literal('chief') }),
 ]);
-const crewEffects = z.enum(['firstVolley', 'guard5', 'cavalryClash', 'pikeWall', 'hold', 'avoid']);
+const crewEffects = z.enum(['firstVolley', 'guard5', 'cavalryClash', 'pikeWall', 'hold', 'avoid', 'wallFirst']);
 export const unitSetSchema = z.object({
   id: name,
   name,
   defaultCrewTypeId: positive,
   armTypes: z.record(z.string(), name),
   coefMode: z.literal('multiply').optional(),
+  firstVolleyScope: z.literal('sortie').optional(),
   regionScheme: z.literal('province-191').optional(),
+  legacyCheCityRegions: z
+    .array(z.tuple([positive, name, natural]))
+    .min(1)
+    .max(300)
+    .optional(),
   crewTypes: z
     .array(
       z

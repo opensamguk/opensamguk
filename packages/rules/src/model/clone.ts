@@ -63,7 +63,15 @@ export function cloneWorldWithRegistry(view: WorldView, registry: ExtStateRegist
       : {}),
     ...(view.nationTrust?.length ? { nationTrust: view.nationTrust.map((entry) => ({ ...entry })) } : {}),
     ...(view.commandMeta
-      ? { commandMeta: { nextNationId: view.commandMeta.nextNationId, offers: { ...view.commandMeta.offers } } }
+      ? {
+          commandMeta: {
+            nextNationId: view.commandMeta.nextNationId,
+            offers: { ...view.commandMeta.offers },
+            ...(view.commandMeta.lastNationRecruitmentLock
+              ? { lastNationRecruitmentLock: { ...view.commandMeta.lastNationRecruitmentLock } }
+              : {}),
+          },
+        }
       : {}),
     ...(view.nationTurns
       ? { nationTurns: structuredClone(view.nationTurns) as NonNullable<WorldState['nationTurns']> }

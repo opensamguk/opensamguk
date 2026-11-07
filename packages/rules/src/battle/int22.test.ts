@@ -41,6 +41,30 @@ function crews(result: ReturnType<typeof run>) {
   return [result.attacker.crew, result.defender.crew, result.calls];
 }
 
+it('AC-P2-24 선제 교전에서 양쪽 선제사격은 한 번만 계산한다', () => {
+  const input = fixture();
+  const [attacker, defender] = rows(input);
+  attacker.effects = defender.effects = ['firstVolley'];
+  input.openingSkirmish = true;
+  const result = run(input);
+  expect(crews(result)).toEqual([9756, 9756, 2]);
+  expect(result.attacker.atmos).toBe(input.attacker.atmos);
+  expect(result.defender.atmos).toBe(input.defender.atmos);
+});
+
+it('AC-P2-24 본공성에서 아직 쏘지 않은 공격군만 선제사격한다', () => {
+  const input = fixture();
+  input.defender.crewType = 1000;
+  input.unitSet.firstVolleyScope = 'sortie';
+  input.siege = true;
+  const [attacker, wall] = rows(input);
+  attacker.effects = wall.effects = ['firstVolley'];
+  expect(run(input)).toMatchObject({ calls: 3, attackerFirstVolleyFired: true });
+  const second = run({ ...input, attackerFirstVolleyUsed: true });
+  expect(second.calls).toBe(2);
+  expect(second).not.toHaveProperty('attackerFirstVolleyFired');
+});
+
 describe('AC-INT-22 기존 월드 전투', () => {
   it.each(legacyBattleGolden)('$a → $b의 실제 기존 결과와 난수 상태를 보존한다', (golden) => {
     const input = {

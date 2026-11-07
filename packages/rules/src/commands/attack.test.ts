@@ -12,6 +12,31 @@ describe('attack', () => {
   it('실패', () => verifyFailure('attack'));
 });
 
+describe('AC-P2-24 공성 병종의 성벽선제', () => {
+  it.each([0, 1, 100_000])('성벽 %i일 때 수비 장수와의 교전 순서를 판정한다', (wall) => {
+    const world = commandWorld();
+    world.cities[2]!.wall = wall;
+    world.generals[1]!.injury = 17;
+    const unitSet = structuredClone(testUnits);
+    unitSet.crewTypes.find(({ id }) => id === world.generals[1]!.crewType)!.effects = ['wallFirst'];
+    const result = runCommand(
+      world,
+      { generalId: 1, tick: 100, unitSet },
+      'attack',
+      { cityKey: 2 },
+      rngFor('che-wall-first', wall),
+    );
+    if ('code' in result) throw Error(result.message);
+    const rounds = result.logs[0]!.text.split('\n');
+    expect(rounds[0]!.includes('성벽 선제 교전')).toBe(wall > 0);
+    expect(rounds.findIndex((text) => text.includes('성벽 교전'))).toBe(wall === 0 ? 2 : wall === 1 ? -1 : 3);
+    expect(result.reports?.map(({ generalId }) => generalId)).toEqual([2, 3]);
+    const state = applyEffects(world, result.effects);
+    expect(state.generals[1]!.injury).toBe(17);
+    expect(state.cities[2]!.nationId).toBe(wall > 1 ? 2 : 1);
+  });
+});
+
 describe('AC-M2-18 실제 출병 대상', () => {
   it.each([10000, 0])('수비 장수 없이 성벽 %i를 공격해도 점령 전 국가를 반환한다', (wall) => {
     const state = commandWorld();
