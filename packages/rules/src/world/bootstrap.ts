@@ -1,7 +1,14 @@
 import type { PresetRules } from './preset';
 import { rngFor } from '@opensamguk/shared';
 import { TICKS_PER_MONTH } from '../clock/constants';
-import { mapSchema, portraitMapSchema, scenarioSchema, statRulesSchema, unitSetSchema } from './resources';
+import {
+  mapSchema,
+  portraitMapSchema,
+  scenarioSchema,
+  scenarioStatRulesMatch,
+  statRulesSchema,
+  unitSetSchema,
+} from './resources';
 import type { StatRules, UnitSetResource } from './resources';
 import { legacyCheCrewRegionsMatch } from './crewRegions';
 import type { WorldState, WorldExt } from '../model/world';
@@ -144,6 +151,7 @@ export function buildInitialWorld(input: {
   )
     throw new Error('지도와 병종 판의 지역 기준이 다릅니다.');
   const statRules = statRulesSchema.parse(input.statRules).stat;
+  if (!scenarioStatRulesMatch(scenario, statRules)) throw new Error('시나리오와 장수 생성 능력치 판이 맞지 않습니다.');
   const five = statRules.count === 5;
   if (operational && !five) throw new Error('운영 지도는 5능력치 프로필이 필요합니다.');
   const historicalStats = new Map(scenario.generalStats?.map((row) => [row.generalId, row]));

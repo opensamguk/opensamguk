@@ -36,6 +36,16 @@ export const mapSchema = z.object({
   defaults: z.object({ trust: z.number().min(0).max(100), supplyState: z.union([z.literal(0), z.literal(1)]) }),
 });
 
+const statRulesValueSchema = z
+  .object({ total: positive, min: natural, max: positive, count: z.literal(5).optional() })
+  .refine(
+    (value) =>
+      value.min <= value.max &&
+      value.total >= (value.count ?? 3) * value.min &&
+      value.total <= (value.count ?? 3) * value.max,
+    '능력치 합계·최소·최대가 맞지 않습니다.',
+  );
+
 export const scenarioSchema = z.object({
   id: name,
   title: name,
@@ -43,6 +53,7 @@ export const scenarioSchema = z.object({
   openingCityProfile: z.literal('legacy-research-70').optional(),
   lastNationRecruitmentLockYear: positive.max(9999).optional(),
   requiredUnitSet: name.optional(),
+  requiredStatRules: statRulesValueSchema.strict().optional(),
   cityScale: z
     .strictObject({
       cities: z
@@ -166,18 +177,20 @@ export const unitSetSchema = z.object({
 });
 
 export const statRulesSchema = z.object({
-  stat: z
-    .object({ total: positive, min: natural, max: positive, count: z.literal(5).optional() })
-    .refine(
-      (value) =>
-        value.min <= value.max &&
-        value.total >= (value.count ?? 3) * value.min &&
-        value.total <= (value.count ?? 3) * value.max,
-      '능력치 합계·최소·최대가 맞지 않습니다.',
-    ),
+  stat: statRulesValueSchema,
 });
 
 export type MapResource = z.infer<typeof mapSchema>;
 export type ScenarioResource = z.infer<typeof scenarioSchema>;
 export type UnitSetResource = z.infer<typeof unitSetSchema>;
 export type StatRules = z.infer<typeof statRulesSchema>['stat'];
+
+export function scenarioStatRulesMatch({ requiredStatRules }: ScenarioResource, statRules: StatRules): boolean {
+  return (
+    requiredStatRules === undefined ||
+    (requiredStatRules.total === statRules.total &&
+      requiredStatRules.min === statRules.min &&
+      requiredStatRules.max === statRules.max &&
+      requiredStatRules.count === statRules.count)
+  );
+}
