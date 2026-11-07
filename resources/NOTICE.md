@@ -151,3 +151,5 @@ core2026 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`의 `resources/scenario/scena
 core2026 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`의 `resources/unitset/unitset_che.json`을 JSON 서식만 정리해 `tools/unitset/source/che-core2026-df6c926.json`에 보존한다. 원작 blob은 `48d39ee2ef827459a0136e8c458ef47eef5f8c09`다. 원저작자 devsam의 위 MIT 고지를 유지한다.
 
 `resources/scenario/1021.json`의 원작은 같은 커밋의 `resources/scenario/scenario_1021.json`이다. 도겸의 `하비.광릉`은 지도에 있는 하비와 광릉으로 나눈다. 상속 파일의 초기 도시 보정과 183년부터의 임관 제한을 시나리오 설정으로 표현하고 `che` 병종판을 요구한다. 원문과 해시는 `tools/fixtures/t4-46-scenarios.json`에 보존한다. 초기화 SQL은 시나리오와 `resources/unitset/che.json`의 병종판을 함께 게시한다.
+
+`resources/scenario/2060.json`·`resources/scenario/2070.json`의 원작은 같은 커밋의 `resources/scenario/scenario_2060.json`·`resources/scenario/scenario_2070.json`이다. 원작의 기본 시작 연도 180과 183년부터의 임관 제한을 명시하고 `che` 병종판을 요구한다. 원문과 해시는 같은 fixture에 보존한다.
