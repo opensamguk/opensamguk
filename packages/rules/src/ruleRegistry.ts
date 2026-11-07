@@ -48,6 +48,7 @@ import { preparedTurnsFeature } from './preparedTurns/feature';
 import { nationResearchFeature } from './nationResearch/feature';
 import { INTEL_FEATURE, spyBinding } from './commands/ext/intel/record';
 import { spy } from './commands/ext/intel/spy';
+import { returnBorder } from './commands/ext/return_border/return_border';
 
 export interface ReplayOriginV1 {
   version: 1;
@@ -127,6 +128,12 @@ export const ruleRegistry: RuleRegistry = {
     cityScaleFeature,
     nationStrategyFeature,
     nationLifecycleFeature,
+    {
+      key: 'border-return-v1',
+      requires: [NATION_LIFECYCLE_FEATURE],
+      conflicts: [],
+      commandBindings: [{ definition: returnBorder, sliceKeys: [] }],
+    },
     {
       key: INTEL_FEATURE,
       requires: ['policy'],

@@ -163,3 +163,7 @@ core2026 커밋 df6c9269fa1e2862418ba9da481c8dd2d758d6c5의 MIT © 2025 devsam �
 - 축지의 `che_except_siege` 병종 판은 같은 커밋의 `resources/unitset/unitset_che_except_siege.json`에서 변환한다. 원작 blob `6c0fd71a1fda09c3288a4b1ed7e218a47e418777`는 JSON 서식만 정리해 `tools/unitset/source/che-except-siege-core2026-df6c926.json`에 보존한다. 같은 devsam MIT 고지를 적용한다.
 - 원작 `resources/map/map_chess.json`과 `resources/map/map_pokemon_v1.json`은 `resources/map/chess.json`과 `resources/map/pokemon_v1.json`에 원문 바이트를 보존했다. 같은 devsam MIT 고지를 적용한다.
 - 원작 `resources/map/map_cr.json`은 `resources/map/cr.json`에 원문 바이트를 보존했다. `resources/map/ludo_rathowm.json`은 `resources/map/map_ludo_rathowm.json`의 라그나로크 아크에서 도약의 탑으로 가는 중복 도로와 대응 이름을 한 번씩 덜어낸 판이다. 원문은 `resources/map-drafts/original/ludo-rathowm-core2026-df6c926.json`에 보존했다. 같은 devsam MIT 고지를 적용한다.
+
+## 접경귀환
+
+`packages/rules/src/commands/ext/return_border/`는 core2026 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`의 `packages/logic/src/actions/turn/general/che_접경귀환.ts`에서 연결 3칸의 탐색 규칙을 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다.
