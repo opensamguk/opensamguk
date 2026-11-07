@@ -39,6 +39,7 @@ import { preparePendingReset, type PendingResetPreparation } from './admin/reset
 import { PgHeritageRepository } from './heritage/repository';
 import { creditHeritageSeason } from './heritage/service';
 import { appendReputationEvents } from './reputationState';
+import { persistSeasonArchive } from './seasonArchive';
 
 export const CLOCK_CHECKPOINT_MS = 5_000;
 export const ENGINE_BATCH_STEPS = 64;
@@ -438,6 +439,7 @@ export class TurnLoop {
               endedAt: endedAt!,
             },
           });
+          await persistSeasonArchive(tx, worldId, date.year);
           if (world.ruleFeatures.includes('heritage-v1'))
             await creditHeritageSeason(new PgHeritageRepository(tx), {
               worldId,

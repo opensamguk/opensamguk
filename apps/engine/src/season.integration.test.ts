@@ -30,6 +30,7 @@ async function evidence(worldId: string) {
   return {
     world: await db.world.findUniqueOrThrow({ where: { id: worldId } }),
     result: await db.worldResult.findUnique({ where: { worldId } }),
+    archive: await db.seasonGeneral.findMany({ where: { worldId }, orderBy: { generalId: 'asc' } }),
     replay: await db.$transaction((tx) => loadReplayState(tx, worldId)),
     logs: await db.generalLog.findMany({ where: { worldId }, orderBy: { id: 'asc' } }),
     months: await db.yearbookSnapshot.findMany({ where: { worldId }, orderBy: { tick: 'asc' } }),
@@ -44,12 +45,34 @@ async function checkEnd(worldId: string, reason: 'END_YEAR' | 'UNIFIED') {
   expect(result.reason).toBe(reason);
   expect(result.winnerNationId).toBe(reason === 'UNIFIED' ? 1 : null);
   expect(hashState(value.replay)).toBe(result.finalStateHash);
+  const finished = await db.general.findMany({
+    where: { worldId, removedAt: null, activeFromYear: { lte: result.endedYear } },
+    orderBy: { id: 'asc' },
+    include: { nation: true },
+  });
+  expect(value.archive).toEqual(
+    finished.map((general) => ({
+      worldId,
+      generalId: general.id,
+      userId: general.userId,
+      name: general.name,
+      nationId: general.nation?.id ?? null,
+      nationName: general.nation?.name ?? null,
+      nationColor: general.nation?.color ?? null,
+      officerLevel: general.officerLevel,
+      dedication: general.dedication,
+      experience: general.experience,
+      wins: general.battleWins,
+      captures: general.captures,
+    })),
+  );
   const archive = await exportReplay(db, worldId);
   expect(replayToEnd(JSON.parse(JSON.stringify(archive)))).toEqual(archive.end);
   expect(value.world.actionSequence).toBe(result.endedSequence + archive.afterEnd.length);
   expect(value.logs.every((log) => log.tick <= result.endedTick)).toBe(true);
   expect(value.months.every((month) => month.tick <= result.endedTick)).toBe(true);
   if (reason === 'UNIFIED') {
+    expect(value.archive).toHaveLength(1);
     expect(archive.months).toHaveLength(0);
     expect(value.logs).toHaveLength(1);
     expect(value.logs[0]?.text).toContain('점령');
@@ -89,6 +112,7 @@ for (const reason of ['END_YEAR', 'UNIFIED'] as const) {
         });
         await expect(loop.advanceTo(120000)).rejects.toThrow('종료 롤백 탐침');
         expect(await db.worldResult.count({ where: { worldId } })).toBe(0);
+        expect(await db.seasonGeneral.count({ where: { worldId } })).toBe(0);
         expect((await db.world.findUniqueOrThrow({ where: { id: worldId } })).status).toBe('RUNNING');
         expect(await db.yearbookSnapshot.count({ where: { worldId } })).toBe(reason === 'END_YEAR' ? 11 : 0);
         expect(await db.generalLog.count({ where: { worldId } })).toBe(0);
@@ -221,7 +245,8 @@ it('종료 연도 정산과 같은 tick인 장수 턴은 실행하지 않는다'
   try {
     await new TurnLoop(db, lease).advanceTo(120000);
     expect(await db.generalLog.count({ where: { worldId } })).toBe(0);
-    await checkEnd(worldId, 'END_YEAR');
+    const finished = await checkEnd(worldId, 'END_YEAR');
+    expect(finished.archive).toHaveLength(1);
   } finally {
     await releaseLease(db, lease);
   }
