@@ -16,8 +16,9 @@ import { prepareWorldReset } from '../apps/engine/src/admin/resetPreparation';
 import { readView } from '../apps/server/src/game/queries';
 import { testDatabaseUrl } from './test-database';
 
-const url = testDatabaseUrl(process.env);
-if (!['127.0.0.1', 'localhost'].includes(url.hostname)) throw new Error('loopback 시험 서버가 필요합니다.');
+const url = testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL });
+if (!['127.0.0.1', 'localhost'].includes(url.hostname) || url.searchParams.has('host') || url.searchParams.has('port'))
+  throw new Error('loopback 시험 서버가 필요합니다.');
 const db = createDb(url.href);
 
 afterAll(() => db.$disconnect());
