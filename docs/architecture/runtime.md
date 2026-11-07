@@ -162,7 +162,7 @@ pnpm db:init-legacy-maps
 pnpm db:init-scenarios
 ```
 
-`db:init-legacy-maps`는 내장 다섯 판을 확인한 뒤 `packages/db/sql/resources-legacy-maps.sql`을 실행합니다. 지도 7종(`miniche`, `miniche_b`, `miniche_clean`, `chess`, `pokemon_v1`, `cr`, `ludo_rathowm`)과 병종 2종(`che-miniche`, `che_except_siege`)을 게시합니다. 이 단계는 시나리오를 게시하지 않습니다.
+`db:init-legacy-maps`는 내장 다섯 판을 확인한 뒤 `packages/db/sql/resources-legacy-maps.sql`을 실행합니다. 지도 7종(`miniche`, `miniche_b`, `miniche_clean`, `chess`, `pokemon_v1`, `cr`, `ludo_rathowm`)과 병종 5개 판(`che-miniche`, `che_except_siege`, `cr`, `siegetank`, `ludo_rathowm`)을 게시합니다. 시나리오는 다음 명령에서 게시합니다.
 
 `db:init-scenarios`는 `packages/db/sql/resources-scenarios.sql`의 추가 시나리오 14종과 `che` 병종판을 같은 트랜잭션에서 게시합니다. 시나리오가 `db:init-legacy-maps`의 지도·병종을 요구하면 해당 게시 판을 먼저 대조합니다. 삽입·기존 행 수에는 시나리오만 셉니다. 현재 공개 목록과 원작 후보의 구분은 [시나리오 합성](./scenario-composition.md#t4-46-묶음-a)을 참고하세요.
 
