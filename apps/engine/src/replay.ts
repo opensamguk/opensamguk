@@ -14,7 +14,7 @@ import {
   type RuleRegistry,
   type ReplayOriginV3,
   nextGameAction,
-  runReplayAction,
+  runArchiveReplayAction,
   settleReplayMonth,
   governanceMovementSchema,
   TICKS_PER_MONTH,
@@ -698,7 +698,7 @@ function replayArchiveWithLedger(
             .parse(settled.effects['governance-v1']);
           governanceRows.push(...movements.map((row, ordinal) => ({ ...row, ordinal, tick: action.tick, sequence })));
           replay = settled.replay;
-        } else replay = runReplayAction(replay, origin.initial.seed, origin.initial.unitSet, undefined, registry);
+        } else replay = runArchiveReplayAction(replay, origin.initial.seed, origin.initial.unitSet, registry);
         lastActionTick = action.tick;
         if (action.kind === 'turn') untouched.delete(action.generalId);
         if (archive.version !== 1) checkOutcome(archive, replay, sequence, action);
@@ -746,7 +746,7 @@ export function replayToEnd(value: unknown, registry: RuleRegistry = ruleRegistr
       checkMonthBoundary(expected, replay, (monthIndex + 1) * TICKS_PER_MONTH, sequence - 1, MAX_ACTION_SEQUENCE);
       if (expected.sequence !== sequence) throw new Error(`정산 순서가 다릅니다: ${action.tick}`);
     }
-    replay = runReplayAction(replay, origin.initial.seed, origin.initial.unitSet, undefined, registry);
+    replay = runArchiveReplayAction(replay, origin.initial.seed, origin.initial.unitSet, registry);
     lastActionTick = action.tick;
     if (action.kind === 'turn') untouched.delete(action.generalId);
     if (action.kind === 'monthly') checkMonth(replay, archive.months[monthIndex++]!);

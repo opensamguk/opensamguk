@@ -435,7 +435,7 @@ describe('T1-26 종료 재생', () => {
       month: afterMonth ? 2 : 1,
     });
     const next = vi.spyOn(rules, 'nextGameAction');
-    const run = vi.spyOn(rules, 'runReplayAction');
+    const run = vi.spyOn(rules, 'runArchiveReplayAction');
     expect(replayToEnd(roundTrip(archive))).toEqual(archive.end);
     expect(next).toHaveBeenCalledTimes(archive.end!.sequence - archive.inputs.length);
     expect(run).toHaveBeenCalledTimes(archive.end!.sequence - archive.inputs.length);
@@ -461,7 +461,7 @@ describe('T1-26 종료 재생', () => {
       month: 12,
     });
     expect(end.finalStateHash).toBe(archive.months[11]!.stateHash);
-    const run = vi.spyOn(rules, 'runReplayAction');
+    const run = vi.spyOn(rules, 'runArchiveReplayAction');
     expect(replayToEnd(roundTrip(archive))).toEqual(end);
     expect(run).toHaveBeenCalledTimes(34);
     expect(replayArchive(archive, 12)).toHaveLength(12);
