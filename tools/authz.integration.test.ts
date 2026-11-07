@@ -320,7 +320,7 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
     initial.ruleFeatures = [INTEL_FEATURE, 'policy'];
     initial.generals[0]!.userId = users[0]!.id;
     initial.generals[1]!.userId = users[1]!.id;
-    initial.generals[3]!.userId = users[3]!.id;
+    Object.assign(initial.generals[3]!, { userId: users[3]!.id, cityKey: 2 });
     for (const general of initial.generals) general.nextTurnTick = general.id === 1 ? 100 : 20_000;
     const { worldId: intelWorld } = await saveInitialWorld(db, initial, {
       name: '첩보 권한과 재생 검증',
@@ -336,6 +336,14 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
     const actor = await session();
     const enemy = await session(1);
     const neutral = await session(3);
+    const enemyCity = { ...input, cityKey: 2 };
+    expect((await request('city.get', { worldId, cityKey: state.cities[0]!.cityKey }, actor)).data).not.toHaveProperty(
+      'fog',
+    );
+    expect((await request('city.get', enemyCity, actor)).data).toMatchObject({
+      fog: { intel: null, garrisonHidden: true },
+      generals: [],
+    });
     expect((await request('intel.records', input, actor)).data).toEqual({ enabled: true, items: [], alerts: [] });
     expect(await request('turns.precheck', { ...input, commandKey: 'spy', args: { cityKey: 2 } }, actor)).toMatchObject(
       { status: 200, data: { ok: true } },
@@ -367,10 +375,35 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
         rice: initial.generals[0]!.rice - 60,
       });
       expect(after.state.ext).toMatchObject({ intel: { 1: { 2: { tick: 100, crew: 30 } } } });
-      expect((await request('intel.records', input, actor)).data).toMatchObject({
+      const report = (await request('intel.records', input, actor)).data as { items: unknown[] };
+      expect(report).toMatchObject({
         enabled: true,
         items: [{ cityKey: 2, tick: 100, year: 191, month: 1, ageMonths: 0, crew: { min: 1, max: 999 }, tech: 'even' }],
       });
+      const remoteCity = (await request('city.get', enemyCity, actor)).data;
+      expect(remoteCity).toMatchObject({ fog: { intel: report.items[0], garrisonHidden: true }, generals: [] });
+      expect(remoteCity).not.toHaveProperty('population');
+      expect((await request('city.get', enemyCity, enemy)).data).toMatchObject({
+        population: initial.cities[1]!.population,
+        fog: { intel: null, garrisonHidden: false },
+      });
+      expect((await request('city.get', enemyCity, neutral)).data).toMatchObject({
+        population: initial.cities[1]!.population,
+        fog: { intel: null, garrisonHidden: true },
+        generals: [],
+      });
+      const sanction = await db.sanction.create({
+        data: { worldId: intelWorld, userId: users[0]!.id, createdBy: users[1]!.id, reason: '첩보 권한 시험' },
+      });
+      try {
+        expect((await request('intel.records', input, actor)).code).toBe('FORBIDDEN');
+        expect((await request('city.get', enemyCity, actor)).data).toMatchObject({
+          fog: { intel: null, garrisonHidden: true },
+          generals: [],
+        });
+      } finally {
+        await db.sanction.delete({ where: { id: sanction.id } });
+      }
       expect((await request('intel.records', input, enemy)).data).toEqual({
         enabled: true,
         items: [],
