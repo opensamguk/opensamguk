@@ -72,6 +72,11 @@ export function buildIntelRecord(view: WorldView, actor: Actor, cityKey: number)
         g.removedAt === undefined && g.cityKey === cityKey && g.nationId === city.nationId && g.activeFromYear <= year,
     )
     .sort((a, b) => a.id - b.id);
+  const stationed = new Set(generals.map(({ id }) => id));
+  const units = view.campaign?.units.filter(
+    (unit) =>
+      unit.troops > 0 && stationed.has(unit.commanderId) && view.generals[unit.ownerId]?.nationId === city.nationId,
+  );
   const nation = city.nationId === null ? null : view.nations[city.nationId]!;
   const record: IntelRecord = {
     tick,
@@ -81,7 +86,7 @@ export function buildIntelRecord(view: WorldView, actor: Actor, cityKey: number)
     populationMax: city.populationMax,
     trust: city.trust,
     generals: generals.length,
-    crew: generals.reduce((sum, g) => sum + g.crew, 0),
+    crew: units ? units.reduce((sum, unit) => sum + unit.troops, 0) : generals.reduce((sum, g) => sum + g.crew, 0),
   };
   if (level <= 2) {
     record.domestic = {
@@ -98,11 +103,16 @@ export function buildIntelRecord(view: WorldView, actor: Actor, cityKey: number)
     };
   }
   if (level === 1) {
-    const counts = new Map<number, number>();
-    for (const g of generals) counts.set(g.crewType, (counts.get(g.crewType) ?? 0) + 1);
+    const people = units ? units.map(({ crewType, commanderId }) => ({ crewType, id: commanderId })) : generals;
+    const counts = new Map<number, Set<number>>();
+    for (const { crewType, id } of people) {
+      const commanders = counts.get(crewType) ?? new Set<number>();
+      commanders.add(id);
+      counts.set(crewType, commanders);
+    }
     record.crewTypes = [...counts]
       .sort(([a], [b]) => a - b)
-      .map(([crewType, count]) => ({ crewType, generals: count }));
+      .map(([crewType, commanders]) => ({ crewType, generals: commanders.size }));
     if (nation) record.tech = techCompare(nation.tech, view.nations[general.nationId!]!.tech);
   }
   return record;

@@ -9,8 +9,15 @@ import { categories } from '../apps/server/src/authz/coverage';
 import { newSession } from '../apps/server/src/auth/session';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { readFixture } from '../apps/server/test/readFixture';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { readWorldState, saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { persistSeasonArchive } from '../apps/engine/src/seasonArchive';
+import { commandInitial } from '../packages/rules/test/commandFixture';
+import { INTEL_FEATURE } from '../packages/rules/src/index';
+import { hashState } from '../packages/shared/src/node/hashState';
+import { acquireLease, releaseLease } from '../apps/engine/src/lease';
+import { TurnLoop } from '../apps/engine/src/turnLoop';
+import { loadReplayState } from '../apps/engine/src/monthly';
+import { exportReplay, replayArchive } from '../apps/engine/src/replay';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -50,6 +57,7 @@ const paths = [
   'records.nation',
   'records.world',
   'records.season',
+  'intel.records',
   'timelapse.frames',
   'timelapse.publicFrames',
   'ranking.generals',
@@ -346,6 +354,80 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
     } finally {
       await db.general.update({ where, data: general });
     }
+  });
+  it('AC-P2-07 첩보 예턴은 같은 국가에만 저장 보고서를 열고 병력을 구간으로 표시한다', async () => {
+    const initial = commandInitial();
+    initial.ruleFeatures = [INTEL_FEATURE, 'policy'];
+    initial.generals[0]!.userId = users[0]!.id;
+    initial.generals[1]!.userId = users[1]!.id;
+    initial.generals[3]!.userId = users[3]!.id;
+    for (const general of initial.generals) general.nextTurnTick = general.id === 1 ? 100 : 20_000;
+    const { worldId: intelWorld, stateHash } = await saveInitialWorld(db, initial, {
+      name: '첩보 권한과 재생 검증',
+      turnTermMinutes: 60,
+      endYear: null,
+      replayFormat: 3,
+    });
+    const snapshot = await readWorldState(db, intelWorld);
+    expect(snapshot).not.toHaveProperty('ext');
+    expect(hashState(snapshot)).toBe(stateHash);
+    await db.world.update({
+      where: { id: intelWorld },
+      data: { status: 'RUNNING', clockMode: 'ACCELERATED', clockAnchorAt: new Date(now) },
+    });
+    const input = { worldId: intelWorld };
+    const actor = await session();
+    const enemy = await session(1);
+    const neutral = await session(3);
+    expect((await request('intel.records', input, actor)).data).toEqual({ enabled: true, items: [], alerts: [] });
+    expect(await request('turns.precheck', { ...input, commandKey: 'spy', args: { cityKey: 2 } }, actor)).toMatchObject(
+      { status: 200, data: { ok: true } },
+    );
+    expect(
+      (await request('turns.precheck', { ...input, commandKey: 'spy', args: { cityKey: 2 } }, neutral)).data,
+    ).toMatchObject({ ok: false, code: 'NOT_NATION' });
+    expect(
+      (
+        await request(
+          'turns.set',
+          {
+            ...input,
+            revision: 0,
+            slots: [{ commandKey: 'spy', args: { cityKey: 2 } }, ...Array.from({ length: 29 }, () => null)],
+          },
+          actor,
+        )
+      ).status,
+    ).toBe(200);
+    const lease = await acquireLease(db, intelWorld, randomUUID(), 120_000);
+    if (!lease) throw new Error('첩보 시험 월드의 리스가 필요합니다.');
+    try {
+      const engine = new TurnLoop(db, lease);
+      await engine.advanceTo(100);
+      const after = await loadReplayState(db, intelWorld);
+      expect(after.state.generals[1]).toMatchObject({
+        gold: initial.generals[0]!.gold - 60,
+        rice: initial.generals[0]!.rice - 60,
+      });
+      expect(after.state.ext).toMatchObject({ intel: { 1: { 2: { tick: 100, crew: 30 } } } });
+      expect((await request('intel.records', input, actor)).data).toMatchObject({
+        enabled: true,
+        items: [{ cityKey: 2, tick: 100, year: 191, month: 1, ageMonths: 0, crew: { min: 1, max: 999 }, tech: 'even' }],
+      });
+      expect((await request('intel.records', input, enemy)).data).toEqual({
+        enabled: true,
+        items: [],
+        alerts: [{ tick: 100, text: '도시2: 누군가 이 도시를 살폈습니다' }],
+      });
+      expect((await request('intel.records', input, neutral)).data).toEqual({ enabled: true, items: [], alerts: [] });
+      expect((await request('intel.records', { ...input, nationId: 1 }, enemy)).code).toBe('BAD_REQUEST');
+      await engine.advanceTo(10_000);
+    } finally {
+      await releaseLease(db, lease);
+    }
+    const archive = await exportReplay(db, intelWorld);
+    const final = await loadReplayState(db, intelWorld);
+    expect(replayArchive(archive, 1)).toEqual([{ tick: 10_000, stateHash: hashState(final) }]);
   });
   it('health의 임의 입력은 계정 정보를 더하거나 DB를 바꾸지 않는다', async () => {
     const before = await snapshot();

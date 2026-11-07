@@ -40,7 +40,9 @@ export function makeSpyCommand(clone: (view: WorldView) => WorldState = cloneWor
         logs: [{ kind: 'success', text }],
         ...(city.nationId === null
           ? {}
-          : { history: [{ nationId: city.nationId, text: `${city.name}: 누군가 이 도시를 살폈습니다` }] }),
+          : {
+              history: [{ nationId: city.nationId, kind: 'intel', text: `${city.name}: 누군가 이 도시를 살폈습니다` }],
+            }),
       };
     },
   };

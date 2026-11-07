@@ -31,6 +31,7 @@ import {
   initialPreparedTurns,
   initialNationResearch,
   initialNationLifecycle,
+  INTEL_FEATURE,
   assertInitialNationLifecycle,
   assertNationLifecycle,
   readStoredNationLifecycle,
@@ -352,6 +353,7 @@ export function prepareInitialWorld(
       },
     });
     const worldId = world.id;
+    if (features.includes(INTEL_FEATURE)) await tx.worldExtSlice.create({ data: { worldId, key: 'intel', value: {} } });
     // 국가↔수도 순환 참조는 같은 트랜잭션에서 도시를 만든 뒤 연결한다.
     await tx.nation.createMany({
       data: creationState.nations.map((nation) => ({ ...nation, worldId, capitalCityKey: null })),
@@ -425,7 +427,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
         checkReplayOrigin(origin);
         cityScale = origin.initial.cityScale;
       }
-      const ext = await loadExt(tx, worldId, commands);
+      const ext = await loadExt(tx, worldId, commands, world.ruleFeatures);
       const cities = await tx.city.findMany({ where: { worldId }, orderBy: { cityKey: 'asc' } });
       const nations = await tx.nation.findMany({
         where: { worldId },
@@ -458,7 +460,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
         ...(cityScale ? { cityScale } : {}),
         ...(rules ? { presetRules: rules } : {}),
         ...(world.ruleFeatures?.length ? { ruleFeatures: [...world.ruleFeatures] } : {}),
-        ...(ext ? { ext } : {}),
+        ...(ext && world.replayFormat !== 3 ? { ext } : {}),
         seed: world.seed,
         scenarioKey: world.scenarioKey,
         mapKey: world.mapKey,

@@ -1,15 +1,16 @@
 import { z } from 'zod';
 import type { ExtSlice, ExtStateRegistry } from '../state';
 
+export const INTEL_FEATURE = 'intel-v1';
 const integer = z.number().int().nonnegative();
-const key = z.string().regex(/^[1-9][0-9]{0,9}$/);
+const key = z.string().refine((value) => /^[1-9][0-9]{0,9}$/.test(value));
 const techSchema = z.enum(['overwhelming', 'ahead', 'even', 'behind', 'far_behind']);
 export type IntelTech = z.infer<typeof techSchema>;
 
 export const intelRecordSchema = z
   .strictObject({
     tick: integer,
-    level: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+    level: z.literal([1, 2, 3]),
     owner: z.strictObject({ id: integer, name: z.string(), color: z.string() }).nullable(),
     population: integer,
     populationMax: integer,
@@ -61,14 +62,20 @@ function keyed<T extends z.ZodType>(schema: T) {
     z.record(key, schema),
   );
 }
-export const intelSliceSchema = keyed(keyed(intelRecordSchema));
+function buildIntelSliceSchema() {
+  return keyed(keyed(intelRecordSchema));
+}
+let sliceSchema: ReturnType<typeof buildIntelSliceSchema> | undefined;
+export function getIntelSliceSchema() {
+  return (sliceSchema ??= buildIntelSliceSchema());
+}
 const createIntel: ExtSlice<IntelSliceValue>['create'] = () => ({});
 
 export const intelSlice = {
   key: 'intel',
   create: createIntel,
   clone: (value) => structuredClone(value) as IntelSliceValue,
-  validate: (value): value is IntelSliceValue => intelSliceSchema.safeParse(value).success,
+  validate: (value): value is IntelSliceValue => getIntelSliceSchema().safeParse(value).success,
 } satisfies ExtSlice;
 
 export const spyBinding = {
