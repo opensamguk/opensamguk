@@ -63,8 +63,7 @@ describe('T4-46 AC-P2-24 원작 che 병종 수치와 모집 조건', () => {
         expect(() => buildInitialWorld({ ...input, map: wrongMap })).toThrow('지역 기준');
       }
     }
-    const { legacyCheCityRegions: _, ...missingSignature } = smallUnits;
-    expect(unitSetSchema.safeParse(missingSignature).success).toBe(false);
+    expect(unitSetSchema.safeParse({ ...smallUnits, legacyCheCityRegions: undefined }).success).toBe(false);
   });
 
   it('병종 34종의 원본 수치와 모집 조건 57개를 보존하고 전투 특수 목록을 따로 보관한다', () => {
