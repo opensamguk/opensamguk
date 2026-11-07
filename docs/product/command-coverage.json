@@ -9266,7 +9266,7 @@
             },
             {
               "kind": "test",
-              "ref": "tools/nation-lifecycle-profile.test.ts"
+              "ref": "packages/rules/src/nationLifecycle/commands.test.ts"
             }
           ],
           "reason": "전임자 경험 70%와 두 직책 예약 초기화, 후임자 개인 예턴 보존을 확인했다."
@@ -9644,7 +9644,7 @@
               "ref": "tools/equipment-api.integration.test.ts"
             }
           ],
-          "reason": "세션 HTTP에서 장비 목록과 매매 예약 및 사전 검사 결과를 확인했다."
+          "reason": "세션 HTTP에서 장비 목록과 매매 예약을 확인했다."
         },
         "authorization": {
           "status": "partial",
