@@ -207,7 +207,6 @@ jobs:
       CI: 'true'
       INTEGRATION_SUITE: engine
       INTEGRATION_SHARD: ${{ matrix.shard }}/2
-      INTEGRATION_REPORT: ${{ runner.temp }}/engine-${{ matrix.shard }}.json
       DATABASE_URL: postgresql://opensamguk:opensamguk@127.0.0.1:5432/opensamguk_ci_e2e_test
       TEST_DATABASE_URL: postgresql://opensamguk:opensamguk@127.0.0.1:5432/opensamguk_ci_int_test
     services:
@@ -242,6 +241,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:int
+        env:
+          INTEGRATION_REPORT: ${{ runner.temp }}/engine-${{ matrix.shard }}.json
 
   # Each shard has its own PostgreSQL service, so shards never share a database.
   # Every spec creates its own world and accounts when missing (e2e/game.ts e2eWorld), so file order across shards does not matter.

@@ -177,7 +177,10 @@ describe('T3-04 AC-M3-03 권한 조각 합본', () => {
     expect(engine.strategy.matrix.shard).toHaveLength(ENGINE_SHARD_TOTAL);
     expect(engine['timeout-minutes']).toBe(30);
     expect(engine.env.INTEGRATION_SHARD).toBe('${{ matrix.shard }}/2');
-    expect(engine.env.INTEGRATION_REPORT).toBe('${{ runner.temp }}/engine-${{ matrix.shard }}.json');
+    expect(engine.env).not.toHaveProperty('INTEGRATION_REPORT');
+    expect(engine.steps.find((step: { run?: string }) => step.run === 'pnpm test:int').env.INTEGRATION_REPORT).toBe(
+      '${{ runner.temp }}/engine-${{ matrix.shard }}.json',
+    );
     const cleanup = shard.steps.findIndex((s: { name?: string }) => s.name === 'Clean T2-15 binding files');
     expect(shard.steps[cleanup].if).toBe('always()');
     expect(shard.steps[cleanup + 1].if).toBe('success()');
