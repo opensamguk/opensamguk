@@ -1,9 +1,8 @@
 import { z } from 'zod';
-import { TICKS_PER_MONTH } from '../clock/constants';
+import { MAX_ADVANCE_TICK, TICKS_PER_MONTH } from '../clock/constants';
 import { monthlyDate } from '../monthly';
 
-const maxTick = 2_147_483_647;
-const maxMonth = Math.floor(maxTick / TICKS_PER_MONTH);
+const maxMonth = Math.floor(MAX_ADVANCE_TICK / TICKS_PER_MONTH);
 const eventId = z.string().regex(/^[A-Za-z0-9_-]{1,32}$/);
 const option = z.union([z.literal(0), z.literal(1)]);
 const nation = z.strictObject({ nationId: z.number().int().positive(), name: z.string().min(1) });
@@ -11,7 +10,7 @@ const monthlyTick = z
   .number()
   .int()
   .positive()
-  .max(maxTick)
+  .max(MAX_ADVANCE_TICK)
   .refine((tick) => tick % TICKS_PER_MONTH === 0);
 const months = z.number().int().positive().max(maxMonth);
 const effect = z.discriminatedUnion('kind', [
@@ -127,6 +126,7 @@ export function settleHistoricEvents(
   context: { startYear: number; tick: number; nationExists: (id: number) => boolean },
 ) {
   const { startYear, tick, nationExists } = context;
+  if (tick > MAX_ADVANCE_TICK) throw new Error('역사 사건의 정산 tick이 실행 범위를 넘었습니다.');
   const date = monthlyDate(startYear, tick);
   const month = tick / TICKS_PER_MONTH;
   const events = new Map(config.events.map((row) => [row.id, row]));

@@ -12,6 +12,7 @@ import {
   runGeneralTurn,
   unitSetSchema,
   TICKS_PER_MONTH,
+  MAX_ADVANCE_TICK,
   assertSlotSet,
   isPolicyKey,
   isPolicyMode,
@@ -103,7 +104,7 @@ export class TurnLoop {
   }
 
   async advanceTo(tick: number, signal?: AbortSignal): Promise<TurnExecution[]> {
-    if (!Number.isSafeInteger(tick) || tick < 0 || tick > 2_147_483_647 - TICKS_PER_MONTH) {
+    if (!Number.isSafeInteger(tick) || tick < 0 || tick > MAX_ADVANCE_TICK) {
       throw new Error('진행할 tick이 올바르지 않습니다.');
     }
     return (await this.drain(tick, signal)).executions;
@@ -226,7 +227,7 @@ export class TurnLoop {
             ? Math.max(world.clockTick, Math.min(boundary, earliest?.nextTurnTick ?? boundary))
             : checkpoint.clockTick);
         if (tick < world.clockTick) throw new Error('이미 저장된 시계보다 뒤로 진행할 수 없습니다.');
-        if (tick > 2_147_483_647 - TICKS_PER_MONTH) throw new Error('게임 tick 저장 범위를 넘었습니다.');
+        if (tick > MAX_ADVANCE_TICK) throw new Error('게임 tick 저장 범위를 넘었습니다.');
         const catchUp = world.replayFormat === 3 && boundary <= tick;
         const inputResult = catchUp
           ? false

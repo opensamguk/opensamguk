@@ -59,7 +59,6 @@ describe('T4-43 AC-P2-21 역사 사건의 공통 규칙', () => {
     const valid = row('A', 191, 12);
     expect(readHistoricEventsConfig(initial, { events: [valid], windowMonths: 1 }).events).toEqual([valid]);
     expect(() => readHistoricEventsConfig(initial, { events: [valid, valid], windowMonths: 1 })).toThrow('ID');
-    expect(() => readHistoricEventsConfig(initial, { events: [valid], windowMonths: 214748 })).toThrow('기한');
     expect(() => readHistoricEventsConfig(initial, { events: [{ ...valid, year: 190 }], windowMonths: 1 })).toThrow(
       '발생',
     );
@@ -205,5 +204,22 @@ describe('T4-43 AC-P2-21 역사 사건의 공통 규칙', () => {
         191,
       ),
     ).toThrow('발생');
+  });
+
+  it('엔진이 처리할 수 있는 마지막 월 경계까지만 설정·상태·정산을 받는다', () => {
+    const lastTick = 2_147_470_000;
+    const nextTick = lastTick + TICKS_PER_MONTH;
+    const windowMonths = (lastTick - december) / TICKS_PER_MONTH;
+    const events = [row('A', 191, 12)];
+    const config = readHistoricEventsConfig(initial, { events, windowMonths });
+    expect(() => readHistoricEventsConfig(initial, { events, windowMonths: windowMonths + 1 })).toThrow('기한');
+
+    const { state: opened } = settleHistoricEvents(initialHistoricEvents(), config, context(december));
+    const { state: finished } = settleHistoricEvents(opened, config, context(lastTick));
+    expect(readHistoricEventsState(finished, config, 191).done[0]?.resolvedTick).toBe(lastTick);
+    expect(() =>
+      readHistoricEventsState({ ...finished, done: [{ ...finished.done[0]!, resolvedTick: nextTick }] }, config, 191),
+    ).toThrow();
+    expect(() => settleHistoricEvents(opened, config, context(nextTick))).toThrow('실행 범위');
   });
 });
