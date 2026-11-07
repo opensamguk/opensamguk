@@ -10,10 +10,11 @@ import { readCityIntel } from '../game/fog';
 export const cityRouter = router({
   get: protectedProcedure.input(worldInput.extend({ cityKey: entityKey }).strict()).query(({ ctx, input }) =>
     readWorld(ctx.db, input.worldId, async (tx, world) => {
-      const viewer = await viewerGeneral(tx, input.worldId, ctx.user.id);
+      const fogEnabled = world.ruleFeatures.includes(INTEL_FEATURE);
+      const general = await viewerGeneral(tx, input.worldId, ctx.user.id);
+      const viewer = fogEnabled && general?.removedAt != null ? null : general;
       const city = await tx.city.findUnique({ where: { worldId_cityKey: input } });
       if (!city) throw new TRPCError({ code: 'NOT_FOUND', message: '도시를 찾을 수 없습니다.' });
-      const fogEnabled = world.ruleFeatures.includes(INTEL_FEATURE);
       const garrisonHidden = fogEnabled && city.nationId !== null && viewer?.nationId !== city.nationId;
       const generals = garrisonHidden
         ? []
@@ -31,8 +32,8 @@ export const cityRouter = router({
         campaignEnabled && !garrisonHidden ? (await readView(tx, input.worldId)).campaign!.units : undefined;
       const ruins = await readCityScaleProjection(tx, input.worldId, world.ruleFeatures);
       const intel =
-        fogEnabled && viewer?.nationId != null && viewer.removedAt === null && !visibility(viewer).city(city)
-          ? await readCityIntel(tx, world, { userId: ctx.user.id, nationId: viewer.nationId }, city.cityKey, ctx.now)
+        fogEnabled && viewer?.nationId != null && !visibility(viewer).city(city)
+          ? await readCityIntel(tx, world, viewer.nationId, city.cityKey, ctx)
           : null;
       return {
         ...cityInfo(city, viewer),

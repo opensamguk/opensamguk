@@ -1,6 +1,11 @@
 import type { Prisma } from '@opensamguk/db';
 import { intelRecordSchema, nowTick, unitSetSchema } from '@opensamguk/rules';
+import { TRPCError } from '@trpc/server';
 import { activeSanctionWhere } from '../auth/sanction';
+import type { Context } from '../context';
+import { requirePersonnelSession } from './personnelAdmission';
+import { personnelIdentity } from './personnelApi';
+import { requireVerifiedAccount } from '../trpc';
 import { intelPolicy } from '../intelPolicy';
 import { worldClock } from '../queries';
 import { intelRecordInfo } from '../visibility';
@@ -8,18 +13,29 @@ import { intelRecordInfo } from '../visibility';
 export async function readCityIntel(
   tx: Prisma.TransactionClient,
   world: Parameters<typeof worldClock>[0] & { id: string; startYear: number },
-  viewer: { userId: string; nationId: number },
+  nationId: number,
   cityKey: number,
-  now: number,
+  ctx: Context & { user: { id: string } },
 ) {
+  try {
+    await requirePersonnelSession(tx, personnelIdentity(ctx, performance.now()));
+    await requireVerifiedAccount(tx, ctx);
+  } catch (error) {
+    if (error instanceof TRPCError) return null;
+    throw error;
+  }
   const sanction = await tx.sanction.findFirst({
-    where: { worldId: world.id, userId: viewer.userId, ...activeSanctionWhere(now) },
+    where: {
+      userId: ctx.user.id,
+      ...activeSanctionWhere(ctx.now),
+      AND: [{ OR: [{ worldId: null }, { worldId: world.id }] }],
+    },
     select: { id: true },
   });
   if (sanction) return null;
 
   const [row] = await tx.$queryRaw<{ record: unknown }[]>`
-    SELECT "value" -> ${String(viewer.nationId)}::text -> ${String(cityKey)}::text AS "record"
+    SELECT "value" -> ${String(nationId)}::text -> ${String(cityKey)}::text AS "record"
     FROM "WorldExtSlice" WHERE "worldId" = ${world.id} AND "key" = 'intel'
   `;
   if (!row) throw new Error('첩보 기록을 읽을 수 없습니다.');
@@ -30,7 +46,7 @@ export async function readCityIntel(
   return intelRecordInfo(
     cityKey,
     record.data,
-    { startYear: world.startYear, tick: nowTick(worldClock(world), now), unitSet: unitSetSchema.parse(unitSet) },
+    { startYear: world.startYear, tick: nowTick(worldClock(world), ctx.now), unitSet: unitSetSchema.parse(unitSet) },
     intelPolicy,
   );
 }

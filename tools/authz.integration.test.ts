@@ -84,7 +84,7 @@ async function session(user = 0) {
   await db.session.create({ data: { id: value.id, userId: users[user]!.id, expiresAt: value.expiresAt } });
   return `sid=${value.token}`;
 }
-async function request(path: Path, data: unknown, cookie?: string) {
+async function request(path: Path, data: unknown, cookie?: string, apiBase = base) {
   const procedure: unknown = Object.getOwnPropertyDescriptor(appRouter._def.procedures, path)?.value;
   if (
     (typeof procedure !== 'object' && typeof procedure !== 'function') ||
@@ -103,7 +103,7 @@ async function request(path: Path, data: unknown, cookie?: string) {
     throw new Error('권한 검사 절차 종류를 확인하세요.');
   const mutation = definition.type === 'mutation';
   const encoded = JSON.stringify({ 0: data });
-  const res = await fetch(`${base}/trpc/${path}?batch=1${mutation ? '' : `&input=${encodeURIComponent(encoded)}`}`, {
+  const res = await fetch(`${apiBase}/trpc/${path}?batch=1${mutation ? '' : `&input=${encodeURIComponent(encoded)}`}`, {
     method: mutation ? 'POST' : 'GET',
     headers: { origin, ...(cookie ? { cookie } : {}), ...(mutation ? { 'content-type': 'application/json' } : {}) },
     ...(mutation ? { body: encoded } : {}),
@@ -395,6 +395,23 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
         fog: { intel: null, garrisonHidden: true },
         generals: [],
       });
+      const verifiedApp = await buildServer({
+        db,
+        now: () => now,
+        publicOrigin: origin,
+        logging: false,
+        emailVerificationRequired: true,
+      });
+      try {
+        const verifiedBase = await verifiedApp.listen({ port: 0, host: '127.0.0.1' });
+        expect((await request('intel.records', input, actor, verifiedBase)).code).toBe('FORBIDDEN');
+        expect((await request('city.get', enemyCity, actor, verifiedBase)).data).toMatchObject({
+          fog: { intel: null, garrisonHidden: true },
+          generals: [],
+        });
+      } finally {
+        await verifiedApp.close();
+      }
       const sanction = await db.sanction.create({
         data: { worldId: intelWorld, userId: users[0]!.id, createdBy: users[1]!.id, reason: '첩보 권한 시험' },
       });

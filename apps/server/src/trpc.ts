@@ -1,5 +1,6 @@
 import { initTRPC, TRPCError } from '@trpc/server';
 import type { Context } from './context';
+import type { Prisma } from '@opensamguk/db';
 import { missingConsents } from './legal/policy';
 import { activeSanctionWhere } from './auth/sanction';
 import { RESOURCE_HTTP_LIMITS } from './resourceAdmin/httpLimits';
@@ -56,11 +57,14 @@ export const protectedProcedure = publicProcedure.use(({ ctx, next, type }) => {
   return next({ ctx: { ...ctx, user: ctx.user } });
 });
 
-export const verifiedProcedure = protectedProcedure.meta({ accountAccess: 'verified' }).use(async ({ ctx, next }) => {
+export async function requireVerifiedAccount(
+  db: Pick<Prisma.TransactionClient, 'user'>,
+  ctx: Pick<Context, 'legalPolicyRequired' | 'legalPolicy' | 'emailVerificationRequired'> & { user: { id: string } },
+) {
   if (ctx.legalPolicyRequired && !ctx.legalPolicy)
     throw new TRPCError({ code: 'SERVICE_UNAVAILABLE', message: '약관을 준비하고 있습니다.' });
   if (ctx.emailVerificationRequired || ctx.legalPolicy) {
-    const user = await ctx.db.user.findUnique({
+    const user = await db.user.findUnique({
       where: { id: ctx.user.id },
       select: { status: true, emailVerifiedAt: true, consents: { select: { docType: true, version: true } } },
     });
@@ -79,6 +83,10 @@ export const verifiedProcedure = protectedProcedure.meta({ accountAccess: 'verif
         cause: new PublicReasonError('CONSENT_REQUIRED'),
       });
   }
+}
+
+export const verifiedProcedure = protectedProcedure.meta({ accountAccess: 'verified' }).use(async ({ ctx, next }) => {
+  await requireVerifiedAccount(ctx.db, ctx);
   return next();
 });
 
