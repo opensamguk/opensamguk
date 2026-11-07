@@ -1,5 +1,6 @@
 import type { JsonValue, WorldView } from './model/world';
 import type { WorldInit } from './world/bootstrap';
+import { checkInitialNpcStatLimits } from './world/initialNpcStats';
 import { assertInitialNationLifecycle, NATION_LIFECYCLE_FEATURE } from './nationLifecycle/state';
 import type { CommandDef } from './commands/types';
 import type { CommandResolver } from './commands/resolve';
@@ -248,6 +249,7 @@ export function checkReplayOrigin(
   if (!origin || ![1, 3].includes(origin.version) || !origin.initial || typeof origin.initial !== 'object')
     throw new Error('재생 생성 기록의 버전을 확인하세요.');
   checkStatProfile(origin.initial);
+  checkInitialNpcStatLimits(origin.initial);
   checkCityScaleInitial(origin.initial);
   checkOperationalProfile(origin.initial);
   assertInitialNationLifecycle(

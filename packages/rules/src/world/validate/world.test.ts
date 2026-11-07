@@ -1,11 +1,40 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { operationalInput } from '../../../test/operationalMapFixture';
 import { buildInitialWorld } from '../bootstrap';
+import { checkReplayOrigin } from '../../ruleRegistry';
 import { validateMap } from './map';
 import { validateWorldResources } from './world';
 import { codes, freezeDeep, mapFixture, scenarioFixture, unitFixture } from './testFixtures';
 
 describe('T4-76 자원 묶음 판정', () => {
+  it.each([
+    ['2121', 108],
+    ['2210', 140],
+    ['2200', 115],
+    ['2300', 120],
+  ] as const)('T4-46 AC-P2-24 %s 시작 NPC 능력치 원본의 상한 %s를 적용한다', (id, limit) => {
+    const scenario = { ...scenarioFixture(), id };
+    for (const stat of [5, 6, 7]) scenario.general[0]![stat] = limit;
+    const input = {
+      map: mapFixture(),
+      scenario,
+      unitSet: unitFixture(),
+      statRules: { stat: { total: 165, min: 15, max: 80 } },
+      seed: 't4-46-original-npc-stats',
+    };
+    expect(validateWorldResources(input).status).toBe('pass');
+    const initial = buildInitialWorld(input);
+    expect(initial.generals[0]).toMatchObject({ userId: null, leadership: limit, strength: limit, intel: limit });
+    expect(() => checkReplayOrigin({ version: 1, initial })).not.toThrow();
+
+    const human = structuredClone(initial);
+    human.generals[0]!.userId = 'account';
+    expect(() => checkReplayOrigin({ version: 1, initial: human })).toThrow('시작 장수의 기본 능력치');
+    expect(validateWorldResources({ ...input, scenario: { ...scenario, id: 'other' } }).scenario.status).toBe('fail');
+    scenario.general[0]![7] = limit + 1;
+    expect(validateWorldResources(input).scenario.status).toBe('fail');
+  });
+
   it('모든 자원이 통과해야 통과하며 초상 생략은 빈 표와 같다', () => {
     const input = freezeDeep({
       map: mapFixture(),
