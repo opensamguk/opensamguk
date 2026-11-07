@@ -1,4 +1,5 @@
-import { z } from 'zod';
+import type { ReplayOriginV1, ReplayOriginV3 } from '../ruleRegistry';
+import { checkOriginHashes } from '../world/originHashes';
 import { readHistoricEventsConfig, readHistoricEventsState } from './state';
 
 export const HISTORIC_EVENTS_FEATURE = 'historic-events';
@@ -18,27 +19,27 @@ interface HistoricEventsWorldRecord {
   historicEventsState: unknown;
 }
 
-const originSchema = z.object({
-  version: z.literal(3),
-  initial: z.object({
-    scenarioKey: z.string(),
-    startYear: z.number().int(),
-    nations: z.array(z.object({ id: z.number().int().positive(), name: z.string().min(1) })),
-    ruleFeatures: z.array(z.string()),
-  }),
-  featureData: z.record(z.string(), z.unknown()),
-});
-
-export function readHistoricEventsStorage(world: HistoricEventsWorldRecord) {
+export function readHistoricEventsStorage(
+  world: HistoricEventsWorldRecord,
+  checkOrigin: (value: unknown) => asserts value is ReplayOriginV1 | ReplayOriginV3,
+  hash: (value: unknown) => string,
+) {
   if (!world.ruleFeatures.includes(HISTORIC_EVENTS_FEATURE)) {
     if (world.historicEventsState != null) throw new Error('역사 사건 기능을 끈 월드에 저장 상태가 있습니다.');
     return undefined;
   }
-  const { initial, featureData } = originSchema.parse(world.replayOrigin);
-  if (world.replayFormat !== 3 || JSON.stringify(initial.ruleFeatures) !== JSON.stringify(world.ruleFeatures)) {
+  const origin = world.replayOrigin;
+  checkOrigin(origin);
+  if (
+    world.replayFormat !== 3 ||
+    origin.version !== 3 ||
+    JSON.stringify(origin.initial.ruleFeatures) !== JSON.stringify(world.ruleFeatures)
+  ) {
     throw new Error('역사 사건 기능이 생성 기록과 다릅니다.');
   }
-  const config = readHistoricEventsOriginConfig(initial, featureData[HISTORIC_EVENTS_FEATURE]);
+  checkOriginHashes(origin, hash);
+  const { initial, featureData } = origin;
+  const config = readHistoricEventsOriginConfig(initial, featureData?.[HISTORIC_EVENTS_FEATURE]);
   return {
     config,
     state: readHistoricEventsState(world.historicEventsState, config, initial.startYear, world.monthlyTick),
