@@ -10,6 +10,8 @@ export interface SketchRaster {
 
 // 편집기의 팔레트 순서와 같다. PNG 압축 방식은 래스터 해시에 넣지 않는다.
 const palette = Buffer.from('2b5d8ccbb98a4f8fd07a63476aa6d8', 'hex');
+const { sea, land, river, mountain, lake } = { sea: 0, land: 1, river: 2, mountain: 3, lake: 4 };
+const layerPriority = [river, lake, mountain, land, sea];
 const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 function invalid(reason: string): never {
   throw new Error(`밑그림 형식이 맞지 않습니다: ${reason}`);
@@ -89,11 +91,78 @@ export function readSketchPng(png: Uint8Array, expected: { width: number; height
   return { width, height, data };
 }
 
-export function sketchRasterHash({ width, height, data }: SketchRaster): string {
+function assertSketchRaster({ width, height, data }: SketchRaster) {
   dimensions(width, height);
   if (data.length !== width * height || data.some((value) => value > 4)) invalid('화소');
+}
+
+export function sketchRasterHash(raster: SketchRaster): string {
+  assertSketchRaster(raster);
+  const { width, height, data } = raster;
   const header = Buffer.alloc(8);
   header.writeUInt32BE(width, 0);
   header.writeUInt32BE(height, 4);
   return createHash('sha256').update(header).update(palette).update(data).digest('hex');
+}
+
+export function reduceSketchRaster(raster: SketchRaster, pixelSize: number): SketchRaster {
+  assertSketchRaster(raster);
+  if (!Number.isInteger(pixelSize) || pixelSize < 1 || raster.width % pixelSize || raster.height % pixelSize)
+    invalid('격자 크기');
+  const width = raster.width / pixelSize;
+  const height = raster.height / pixelSize;
+  const data = new Uint8Array(width * height);
+  const counts = new Float64Array(layerPriority.length);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      counts.fill(0);
+      for (let row = 0; row < pixelSize; row++) {
+        const start = (y * pixelSize + row) * raster.width + x * pixelSize;
+        for (const layer of raster.data.subarray(start, start + pixelSize)) counts[layer] = counts[layer]! + 1;
+      }
+      let selected = river;
+      for (const layer of layerPriority) {
+        if (counts[layer]! > counts[selected]!) selected = layer;
+      }
+      data[y * width + x] = selected;
+    }
+  }
+  return { width, height, data };
+}
+
+type GridCity = { name: string; x: number; y: number };
+
+function cityOnDryLand({ width, height, data }: SketchRaster, { x, y }: GridCity) {
+  if (!Number.isInteger(x) || !Number.isInteger(y) || x < 1 || y < 1 || x >= width - 1 || y >= height - 1) return false;
+  const center = data[y * width + x];
+  if (center !== land && center !== mountain) return false;
+  for (let row = y - 1; row <= y + 1; row++) {
+    for (let col = x - 1; col <= x + 1; col++) {
+      const layer = data[row * width + col];
+      if (layer === sea || layer === lake) return false;
+    }
+  }
+  return true;
+}
+
+// 두 래스터와 도시 좌표는 같은 논리 격자에 둔다.
+export function inspectSketchAlignment(sketch: SketchRaster, rendered: SketchRaster, cities: readonly GridCity[]) {
+  assertSketchRaster(sketch);
+  assertSketchRaster(rendered);
+  if (sketch.width !== rendered.width || sketch.height !== rendered.height) invalid('정렬 격자 크기');
+
+  const counts = new Float64Array(layerPriority.length);
+  const matches = new Float64Array(layerPriority.length);
+  let totalMatches = 0;
+  for (const [index, layer] of sketch.data.entries()) {
+    counts[layer] = counts[layer]! + 1;
+    if (layer === rendered.data[index]) {
+      matches[layer] = matches[layer]! + 1;
+      totalMatches++;
+    }
+  }
+  const overall = totalMatches / sketch.data.length;
+  const byLayer = Array.from(counts, (count, layer) => (count === 0 ? null : matches[layer]! / count));
+  const unsafeCities = cities.filter((city) => !cityOnDryLand(rendered, city)).map(({ name }) => name);
+  return { ok: overall >= 0.97 && unsafeCities.length === 0, overall, byLayer, unsafeCities };
 }

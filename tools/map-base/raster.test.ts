@@ -1,6 +1,6 @@
 import { crc32, deflateSync } from 'node:zlib';
 import { expect, it } from 'vitest';
-import { readSketchPng, sketchRasterHash } from './raster';
+import { inspectSketchAlignment, readSketchPng, reduceSketchRaster, sketchRasterHash } from './raster';
 import { encodeSketchPng } from '../../apps/web/src/mapEditor/sketch';
 
 const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
@@ -26,6 +26,67 @@ const plte = () => chunk('PLTE', palette);
 const idat = (data = rows) => chunk('IDAT', deflateSync(data));
 const iend = () => chunk('IEND');
 const valid = () => png([ihdr(), plte(), idat(), iend()]);
+
+it('AC-P2-28 격자 안의 최다 지형을 쓰고 동점은 강·호수·산·땅·바다 순으로 고른다', () => {
+  const rows = [
+    [0, 1, 3, 4, 4, 2, 0, 0, 1, 3],
+    [1, 0, 4, 3, 2, 4, 2, 0, 3, 1],
+  ];
+  const raster = { width: 10, height: 2, data: Uint8Array.from(rows.flat()) };
+  expect(reduceSketchRaster(raster, 2)).toEqual({ width: 5, height: 1, data: Uint8Array.of(1, 4, 2, 0, 3) });
+  expect(reduceSketchRaster(raster, 1)).toEqual(raster);
+  expect(raster.data).toEqual(Uint8Array.from(rows.flat()));
+  for (const size of [0, 1.5, 3]) expect(() => reduceSketchRaster(raster, size)).toThrow('격자 크기');
+  expect(() => reduceSketchRaster({ ...raster, data: raster.data.map(() => 5) }, 2)).toThrow('화소');
+});
+
+it('AC-P2-28 전체·지형별 일치율을 보고하고 97% 이상이면 통과한다', () => {
+  const data = new Uint8Array(100).fill(1);
+  data.set([0, 0, 0, 0, 4]);
+  const sketch = { width: 10, height: 10, data };
+  const rendered = { ...sketch, data: data.slice() };
+  expect(inspectSketchAlignment(sketch, rendered, [])).toEqual({
+    ok: true,
+    overall: 1,
+    byLayer: [1, 1, null, null, 1],
+    unsafeCities: [],
+  });
+  rendered.data.fill(1, 0, 3);
+  expect(inspectSketchAlignment(sketch, rendered, [])).toEqual({
+    ok: true,
+    overall: 0.97,
+    byLayer: [0.25, 1, null, null, 1],
+    unsafeCities: [],
+  });
+  rendered.data[3] = 1;
+  expect(inspectSketchAlignment(sketch, rendered, [])).toMatchObject({ ok: false, overall: 0.96 });
+  expect(() => inspectSketchAlignment(sketch, { ...rendered, width: 20, height: 5 }, [])).toThrow('정렬 격자 크기');
+});
+
+it('AC-P2-28 도시는 땅·산에 있어야 하며 둘레의 강은 허용하고 바다·호수는 거부한다', () => {
+  const data = new Uint8Array(100).fill(1);
+  data.set([3, 2], 11);
+  data.set([2, 1, 4], 15);
+  const raster = { width: 10, height: 10, data };
+  const cities = [
+    { name: '산성', x: 1, y: 1 },
+    { name: '강', x: 5, y: 1 },
+    { name: '호수 옆', x: 6, y: 1 },
+    { name: '경계', x: 9, y: 1 },
+  ];
+  expect(inspectSketchAlignment(raster, raster, cities)).toMatchObject({
+    ok: false,
+    overall: 1,
+    unsafeCities: ['강', '호수 옆', '경계'],
+  });
+  const rendered = { ...raster, data: data.slice() };
+  rendered.data[11] = 0;
+  expect(inspectSketchAlignment(raster, rendered, cities.slice(0, 1))).toMatchObject({
+    ok: false,
+    overall: 0.99,
+    unsafeCities: ['산성'],
+  });
+});
 
 it('AC-P2-28 기존 편집기의 실제 PNG 부호화 결과를 읽는다', async () => {
   const encoded = await encodeSketchPng({ ...expected, data: pixels });
