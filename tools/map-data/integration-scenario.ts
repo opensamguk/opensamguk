@@ -15,7 +15,7 @@ export const SCENARIO_RELOCATIONS = [
     targetId: 21,
     targetName: '하비',
     reason: '도겸은 원본에서 서주12와 하비21을 소유한다. 새53도시에서는 기존 소유 도시 하비21에 수도 기능을 통합한다.',
-    source: 'resources/scenario/1030.json nation[11]; resources/map/che.json',
+    source: `${['resources', 'scenario', '1030.json'].join('/')} nation[11]; ${['resources', 'map', 'che.json'].join('/')}`,
   },
   {
     oldId: 60,

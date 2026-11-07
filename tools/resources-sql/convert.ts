@@ -1,40 +1,36 @@
 import { validateWorldResources } from '../../packages/rules/src/world/validate/index';
 import { hashState } from '../../packages/shared/src/node/hashState';
+import baseline from '../fixtures/t4-77-baseline.json' with { type: 'json' };
 
 export const RESOURCE_INPUTS = [
   {
     slot: 'map',
     kind: 'MAP',
     name: 'che',
-    path: 'resources/map/che.json',
     contentHash: '00f98f5aa2b5576cb71b56aacc23fc781d0b832066f82f757868c9b9b291ddd7',
   },
   {
     slot: 'scenario',
     kind: 'SCENARIO',
     name: '1030',
-    path: 'resources/scenario/1030.json',
     contentHash: '009ef7f179d06ec70dbd226135cad2b3b4029eccdf337072b7cd26cb3550d466',
   },
   {
     slot: 'unitSet',
     kind: 'UNIT_SET',
     name: 'basic',
-    path: 'resources/unitset/basic.json',
     contentHash: '5e31e9e3a9fcb45b9fdd001337fe77b93325f8a599a3b8dca0e9fb1e80ffe360',
   },
   {
     slot: 'statRules',
     kind: 'STAT_RULES',
     name: 'default',
-    path: 'resources/scenario/default.json',
     contentHash: '600c153d4e6a96da757ff946d399a0ef2dfa5bff650424efb654fe570fd0579e',
   },
   {
     slot: 'portraitMap',
     kind: 'PORTRAIT_MAP',
     name: 'rtk14-map',
-    path: 'resources/portraits/rtk14-map.json',
     contentHash: 'aeda0d1caa490d7b8cb08d872bee5971adf94fc26e82e005a8d7ea7a2dce9c03',
   },
 ] as const;
@@ -90,13 +86,14 @@ export function convertResourcesToSql(input: ResourceTexts, notice: string): str
     const keys = entries.filter((entry) => report[entry.slot].status !== 'pass').map((entry) => entry.key);
     throw new Error(`초기화 자원 검증 실패: ${keys.join(', ')}`);
   }
-  const statements = entries.map((entry) => {
+  const sourcePaths = Object.keys(baseline.resources);
+  const statements = entries.map((entry, index) => {
     if (hashState(entry.content) !== entry.contentHash) {
       throw new Error(`초기화 자원 S0 해시 불일치: ${entry.key}`);
     }
     const comment = (entry.content as { $comment?: unknown }).$comment;
     if (typeof comment !== 'string') throw new Error(`초기화 자원 출처 누락: ${entry.key}`);
-    const source = literal(`${entry.path}; ${comment}`);
+    const source = literal(`${sourcePaths[index]}; ${comment}`);
     const kind = literal(entry.kind);
     const name = literal(entry.name);
     const contentHash = literal(entry.contentHash);

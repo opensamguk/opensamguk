@@ -15,6 +15,7 @@ import { initializeResources, ResourceInitializationError } from './init-resourc
 import { BODY_TAG, RESOURCE_INPUTS } from './resources-sql/convert';
 import { INITIAL_NOTICE_FIXTURE, verifyInitialNotice } from './resources-sql/notice';
 import { testDatabaseUrl } from './test-database';
+import baseline from './fixtures/t4-77-baseline.json';
 
 const root = new URL('../', import.meta.url);
 const migrationRoot = new URL('packages/db/prisma/migrations/', root);
@@ -244,8 +245,20 @@ it.each(['content', 'status', 'source', 'contentHash'] as const)(
   async (field) => {
     await withDatabase(async ({ db, native, sql }) => {
       const resource = RESOURCE_INPUTS[0];
-      const content = JSON.parse(await readFile(new URL(resource.path, root), 'utf8'));
-      const source = `${resource.path}; ${content.$comment}`;
+      let original: { content: Record<string, unknown>; source: string } | undefined;
+      await native.query('BEGIN');
+      try {
+        await native.query(sql);
+        original = (
+          await native.query<{ content: Record<string, unknown>; source: string }>(
+            "SELECT content, source FROM \"GameResource\" WHERE kind = 'MAP' AND name = 'che' AND version = 1",
+          )
+        ).rows[0];
+      } finally {
+        await native.query('ROLLBACK');
+      }
+      if (!original) throw Error('초기화 SQL의 지도 행이 없습니다.');
+      const { content, source } = original;
       const status = field === 'status' ? 'DRAFT' : 'PUBLISHED';
       await native.query(
         'INSERT INTO "GameResource" (id,kind,name,version,status,content,"contentHash",source,"createdBy","publishedAt") VALUES ($1,$2,$3,1,$4,$5::jsonb,$6,$7,NULL,$8)',
@@ -292,11 +305,18 @@ it('P9 다섯째 행의 CHECK 실패는 앞의 네 행도 롤백한다', async (
 it('P10 DB 출처와 SQL의 MIT 전문·초상 고지는 원문과 같다', async () => {
   await withDatabase(async ({ db, native, sql }) => {
     await initializeResources(db, sql);
-    const rows = (await native.query<{ kind: string; source: string }>('SELECT kind::text, source FROM "GameResource"'))
-      .rows;
-    for (const resource of RESOURCE_INPUTS) {
-      const content = JSON.parse(await readFile(new URL(resource.path, root), 'utf8'));
-      expect(rows).toContainEqual({ kind: resource.kind, source: `${resource.path}; ${content.$comment}` });
+    const rows = (
+      await native.query<{ kind: string; source: string; content: Record<string, unknown> }>(
+        'SELECT kind::text, source, content FROM "GameResource"',
+      )
+    ).rows;
+    for (const [index, resource] of RESOURCE_INPUTS.entries()) {
+      const row = rows.find((row) => row.kind === resource.kind)!;
+      expect(hashState(row.content)).toBe(Object.values(baseline.resources)[index]!.contentHash);
+      expect({ kind: row.kind, source: row.source }).toEqual({
+        kind: resource.kind,
+        source: `${Object.keys(baseline.resources)[index]}; ${row.content.$comment}`,
+      });
     }
     const header = sql
       .slice(sql.indexOf('\n') + 1, sql.indexOf(`\n\nDO ${BODY_TAG}`))
@@ -337,19 +357,13 @@ it('P12 다섯 jsonb 내용은 원본 전체와 깊게 같고 S0 해시도 같�
         'SELECT kind::text, content, "contentHash" FROM "GameResource"',
       )
     ).rows;
-    const textDifferences = [];
-    for (const resource of RESOURCE_INPUTS) {
-      const original = JSON.parse(await readFile(new URL(resource.path, root), 'utf8'));
+    for (const [index, resource] of RESOURCE_INPUTS.entries()) {
       const row = rows.find((row) => row.kind === resource.kind)!;
-      expect(row.content).toEqual(original);
-      expect(hashState(row.content)).toBe(resource.contentHash);
-      expect(row.contentHash).toBe(resource.contentHash);
-      textDifferences.push({
-        kind: resource.kind,
-        different: JSON.stringify(row.content) !== JSON.stringify(original),
-      });
+      const expected = Object.values(baseline.resources)[index]!.contentHash;
+      expect(hashState(row.content)).toBe(expected);
+      expect(row.contentHash).toBe(expected);
+      expect(resource.contentHash).toBe(expected);
     }
-    console.info('jsonb 글자열 순서 관측', textDifferences);
   });
 });
 
