@@ -140,7 +140,8 @@ export async function persistCommandReports(
   await tx.battleLog.createMany({
     data: (result.reports ?? []).map((report) => ({ ...report, worldId, tick, attackerId })),
   });
-  for (const entry of result.history ?? []) await appendNationHistory(tx, worldId, tick, entry.nationId, entry.text);
+  for (const entry of result.history ?? [])
+    await appendNationHistory(tx, worldId, tick, entry.nationId, entry.text, entry.kind);
 }
 export async function appendNationHistory(
   tx: Prisma.TransactionClient,
@@ -148,15 +149,18 @@ export async function appendNationHistory(
   tick: number,
   nationId: number,
   text: string,
+  kind?: 'intel',
 ) {
   const where = { worldId_tick_nationId: { worldId, tick, nationId } };
   const previous = await tx.nationHistory.findUnique({ where });
   const data = (previous?.data ?? {}) as Record<string, Prisma.InputJsonValue>;
   const events = Array.isArray(data.events) ? data.events : [];
+  const alerts = Array.isArray(data.intelAlerts) ? data.intelAlerts : [];
+  const next = { ...data, events: [...events, text], ...(kind === 'intel' ? { intelAlerts: [...alerts, text] } : {}) };
   await tx.nationHistory.upsert({
     where,
-    create: { worldId, tick, nationId, data: { events: [text] } },
-    update: { data: { ...data, events: [...events, text] } },
+    create: { worldId, tick, nationId, data: next },
+    update: { data: next },
   });
 }
 

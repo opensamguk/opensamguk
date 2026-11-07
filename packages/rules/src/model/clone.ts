@@ -1,10 +1,10 @@
 import type { PresetRules } from '../world/preset';
-import { cloneExtStateWithRegistry, extSlices, extCommandBindings, type ExtStateRegistry } from '../commands/ext/state';
+import { cloneExtStateWithRegistry, extRegistryForRuleFeatures, type ExtStateRegistry } from '../commands/ext/state';
 import type { WorldState, WorldView } from './world';
 
 // 모든 가변 필드를 복제한다. 평평한 장수 수백 명을 매 턴 직렬화하지 않는다.
 export function cloneWorld(view: WorldView): WorldState {
-  return cloneWorldWithRegistry(view, { slices: extSlices, bindings: extCommandBindings });
+  return cloneWorldWithRegistry(view, extRegistryForRuleFeatures(view.ruleFeatures));
 }
 
 export function cloneWorldWithRegistry(view: WorldView, registry: ExtStateRegistry): WorldState {

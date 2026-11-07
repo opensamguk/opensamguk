@@ -50,7 +50,7 @@ export async function loadWorldAfterCapabilityCheck(
   const { preset, commands } = engineResolver(world);
   const rules = effectiveWorldOptions(preset, world.runtimeOptions).presetRules;
   if (world.replayFormat === 3) await assertPersonnelStorage(tx, worldId, world.ruleFeatures.includes('personnel'));
-  const ext = await loadExt(tx, worldId, commands);
+  const ext = await loadExt(tx, worldId, commands, world.ruleFeatures);
   const cities = await tx.city.findMany({ where: { worldId } });
   const operationalMap = readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin);
   const nations = await tx.nation.findMany({

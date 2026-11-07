@@ -46,6 +46,8 @@ import { nationLifecycleFeature } from './nationLifecycle/feature';
 import { preparedTurnsFeature } from './preparedTurns/feature';
 import { nationResearchFeature } from './nationResearch/feature';
 import { relationsFeature } from './relations/data';
+import { INTEL_FEATURE, spyBinding } from './commands/ext/intel/record';
+import { spy } from './commands/ext/intel/spy';
 
 export interface ReplayOriginV1 {
   version: 1;
@@ -138,6 +140,18 @@ export const ruleRegistry: RuleRegistry = {
     cityScaleFeature,
     nationStrategyFeature,
     nationLifecycleFeature,
+    {
+      key: INTEL_FEATURE,
+      requires: ['policy'],
+      conflicts: [],
+      commandBindings: [{ definition: spy, sliceKeys: spyBinding.sliceKeys }],
+      checkOrigin({ initial, data }) {
+        if (Object.hasOwn(initial, 'ext') || data !== undefined) throw new Error('첩보는 빈 기록에서 시작합니다.');
+      },
+      initReplayState(replay) {
+        return { ...replay, state: { ...replay.state, ext: { intel: {} } } };
+      },
+    },
   ],
   monthlyOrder: [
     'treaty',

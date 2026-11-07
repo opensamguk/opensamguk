@@ -77,6 +77,37 @@ function golden(level: 1 | 2 | 3): IntelRecord {
 }
 
 describe('AC-P2-07 첩보 규칙', () => {
+  it('휘하 월드는 주둔 부곡의 병력을 합하고 같은 지휘관을 병종마다 한 번 센다', () => {
+    const state = world();
+    const units = [
+      { id: 1, ownerId: 2, commanderId: 2, troops: 600, crewType: 1100 },
+      { id: 2, ownerId: 2, commanderId: 2, troops: 400, crewType: 1100 },
+      { id: 3, ownerId: 2, commanderId: 3, troops: 200, crewType: 1200 },
+      { id: 4, ownerId: 1, commanderId: 1, troops: 900, crewType: 1100 },
+      { id: 5, ownerId: 2, commanderId: 2, troops: 0, crewType: 1300 },
+    ];
+    state.campaign = {
+      version: 1,
+      seed: 'intel-campaign',
+      revision: 0,
+      nextUnitId: 6,
+      nextOfferId: 1,
+      sources: {},
+      links: [],
+      offers: [],
+      units: units.map((unit) => ({ ...unit, train: 100, atmos: 100 })),
+      attempts: [],
+    };
+    expect(buildIntelRecord(state, actor, 2)).toMatchObject({
+      generals: 2,
+      crew: 1200,
+      crewTypes: [
+        { crewType: 1100, generals: 1 },
+        { crewType: 1200, generals: 1 },
+      ],
+    });
+  });
+
   it.each([
     [1, 1, '정보를 많이 얻었습니다'],
     [2, 4, '정보를 어느 정도 얻었습니다'],
@@ -97,7 +128,7 @@ describe('AC-P2-07 첩보 규칙', () => {
     expect(output.result).toEqual({
       effects: [{ kind: 'world', state: output.state }],
       logs: [{ kind: 'success', text: `첩보: 도시2 ${message}` }],
-      history: [{ nationId: 2, text: '도시2: 누군가 이 도시를 살폈습니다' }],
+      history: [{ nationId: 2, kind: 'intel', text: '도시2: 누군가 이 도시를 살폈습니다' }],
     });
     const record = output.intel['1']!['2']!;
     for (const [field, present] of [

@@ -1,6 +1,6 @@
 import type { PresetRules } from '../world/preset';
 import type { NationTrustState, TreatyState } from '../diplomacy/treatyTypes';
-import { cloneExtStateWithRegistry, extSlices, extCommandBindings, type ExtStateRegistry } from '../commands/ext/state';
+import { cloneExtStateWithRegistry, extRegistryForRuleFeatures, type ExtStateRegistry } from '../commands/ext/state';
 import type { InitialCity, InitialGeneral, InitialNation, InitialDiplomacy, WorldInit } from '../world/bootstrap';
 import type { CampaignState } from '../campaign/state';
 import type { CityResourcesState } from '../cityResources/state';
@@ -63,7 +63,7 @@ interface ReadonlyJsonObject {
 // 재귀 JSON의 mapped type을 매번 펼치지 않고 깊은 읽기 전용 경계를 유지한다.
 export type WorldView = DeepReadonly<WorldState>;
 export function toWorldState(initial: WorldInit): WorldState {
-  return toWorldStateWithRegistry(initial, { slices: extSlices, bindings: extCommandBindings });
+  return toWorldStateWithRegistry(initial, extRegistryForRuleFeatures(initial.ruleFeatures));
 }
 
 export function toWorldStateWithRegistry(initial: WorldInit, registry: ExtStateRegistry): WorldState {
