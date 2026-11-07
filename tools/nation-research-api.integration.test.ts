@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 import { createDb, type Prisma } from '../packages/db/src/index';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 import { FIVE_STAT_RULES } from '../packages/rules/src/general/fiveStats';
+import type { ResearchName } from '../packages/rules/src/nationResearch/state';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { loadReplayState } from '../apps/engine/src/monthly';
@@ -99,7 +100,7 @@ async function advance(worldId: string, tick = 0, beforeCommit?: (tx: Prisma.Tra
 }
 const snapshot = (worldId: string) =>
   db.$transaction((tx) => loadReplayState(tx, worldId), { isolationLevel: 'RepeatableRead' });
-async function fixture(enabled = true) {
+async function fixture(enabled = true, research: ResearchName = 'greatsword') {
   const initial = commandInitial();
   initial.seed = `nation-research-${randomUUID()}`;
   initial.statRules = { ...FIVE_STAT_RULES };
@@ -109,7 +110,7 @@ async function fixture(enabled = true) {
     'policy',
     ...(enabled ? ['prepared-turns-v1', 'nation-research-v1'] : []),
   ].sort();
-  initial.unitSet.crewTypes[1]!.requirements = [{ kind: 'research', name: 'greatsword' }];
+  initial.unitSet.crewTypes[1]!.requirements = [{ kind: 'research', name: research }];
   for (const general of initial.generals)
     Object.assign(general, {
       politics: 55,
@@ -321,25 +322,48 @@ it('12회 연구의 준비·완료 commit 실패는 전부 복구되고 새 리�
   await expectReplay(f.worldId, 120_000);
 });
 
-it('24회 연구는12칸을 다시 예약해 이어지며 중간 재시작 뒤에도 마지막에만 완료된다', async () => {
-  const f = await fixture(),
-    key = 'nation_research_repeater';
-  expect((await reserve(f, f.ruler, 12, key)).status).toBe(200);
-  await advance(f.worldId, 110_100);
-  expect((await snapshot(f.worldId)).state.preparedTurns!.nations[1]![12]!.term).toBe(12);
-  expect((await snapshot(f.worldId)).state.nationResearch!.nations).toEqual({});
-  expect((await reserve(f, f.ruler, 12, key)).status).toBe(200);
-  await advance(f.worldId, 230_099);
-  const before = await snapshot(f.worldId);
-  expect(before.state.preparedTurns!.nations[1]![12]!.term).toBe(23);
-  await advance(f.worldId, 230_100);
-  const after = await snapshot(f.worldId);
-  expect(after.state.nationResearch!.nations[1]).toEqual(['repeater']);
-  expect(after.state.nations[1]!.gold).toBe(before.state.nations[1]!.gold - 100_000);
-  expect(after.state.nations[1]!.rice).toBe(before.state.nations[1]!.rice - 100_000);
-  expect(after.state.generals[1]!.dedication).toBe(before.state.generals[1]!.dedication + 120);
-  await expectReplay(f.worldId, 240_000);
-});
+it.each([
+  { research: 'fire_arrow', unit: '화시병', turns: 12, cost: 50_000 },
+  { research: 'mountain', unit: '산저병', turns: 12, cost: 50_000 },
+  { research: 'halberd', unit: '극병', turns: 24, cost: 100_000 },
+  { research: 'repeater', unit: '원융노병', turns: 24, cost: 100_000 },
+  { research: 'elephant', unit: '상병', turns: 24, cost: 100_000 },
+  { research: 'fire_wheel', unit: '화륜차', turns: 24, cost: 100_000 },
+] as const)(
+  'AC-P2-06 $unit 연구는 $turns회 뒤에만 저장되고 해당 병종의 모집을 연다',
+  async ({ research, unit, turns, cost }) => {
+    const f = await fixture(true, research),
+      key = `nation_research_${research}`,
+      recruit = { worldId: f.worldId, commandKey: 'recruit', args: { amount: 1, crewType: 1100 } },
+      completionTick = (turns - 1) * 10_000 + 100;
+    expect((await rpc('turns.precheck', recruit, f.ruler)).data).toMatchObject({
+      ok: false,
+      message: expect.stringContaining(`${unit} 연구가 필요합니다.`),
+    });
+    expect((await reserve(f, f.ruler, 12, key)).status).toBe(200);
+    if (turns === 24) {
+      await advance(f.worldId, 110_100);
+      const halfway = await snapshot(f.worldId);
+      expect(halfway.state.preparedTurns!.nations[1]![12]!.term).toBe(12);
+      expect(halfway.state.nationResearch!.nations).toEqual({});
+      expect((await reserve(f, f.ruler, 12, key)).status).toBe(200);
+    }
+    await advance(f.worldId, completionTick - 1);
+    const before = await snapshot(f.worldId);
+    expect(before.state.preparedTurns!.nations[1]![12]!.term).toBe(turns - 1);
+    expect(before.state.nationResearch!.nations).toEqual({});
+    await advance(f.worldId, completionTick);
+    const after = await snapshot(f.worldId);
+    expect(after.state.preparedTurns!.nations[1]).toBeUndefined();
+    expect(after.state.nationResearch!.nations[1]).toEqual([research]);
+    expect(after.state.nations[1]!.gold).toBe(before.state.nations[1]!.gold - cost);
+    expect(after.state.nations[1]!.rice).toBe(before.state.nations[1]!.rice - cost);
+    expect(after.state.generals[1]!.experience).toBe(before.state.generals[1]!.experience + turns * 5);
+    expect(after.state.generals[1]!.dedication).toBe(before.state.generals[1]!.dedication + turns * 5);
+    expect((await rpc('turns.precheck', recruit, f.ruler)).data).toMatchObject({ ok: true });
+    await expectReplay(f.worldId, turns * 10_000);
+  },
+);
 
 it('SQL 제약과 읽기 경계는 빠지거나 잘못된 연구 상태를 거부한다', async () => {
   const f = await fixture();
