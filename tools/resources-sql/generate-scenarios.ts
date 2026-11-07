@@ -57,7 +57,7 @@ export function requiredScenarioStatRules(rows: readonly ScenarioRow[]) {
 export async function requiredScenarioLegacyResources(ready: readonly ScenarioRow[]) {
   const keys = new Set(
     ready.flatMap(({ map, unitSet }) => [
-      ...(map === undefined ? [] : [`MAP/${map}`]),
+      ...(map === undefined || map === 'che' ? [] : [`MAP/${map}`]),
       ...(unitSet === undefined || unitSet === 'basic' || unitSet === 'che' ? [] : [`UNIT_SET/${unitSet}`]),
     ]),
   );
@@ -97,7 +97,7 @@ export function scenarioMaterialsForRow(
         : legacyResources.get(`UNIT_SET/${row.unitSet}`);
   return {
     ...basic,
-    map: row.map === undefined ? basic.map : legacyResources.get(`MAP/${row.map}`),
+    map: row.map === undefined || row.map === 'che' ? basic.map : legacyResources.get(`MAP/${row.map}`),
     unitSet,
     statRules: scenarioStatRulesPublication(row)?.content ?? basic.statRules,
   };

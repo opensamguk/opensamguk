@@ -403,14 +403,14 @@ it('S5 miniche 지도·병종의 게시, 롤백과 월드 재생', async () => {
     expect(await allRows(native)).toEqual(withConflict);
     await db.gameResource.delete({ where: { kind_name_version: ref } });
 
-    await db.$executeRawUnsafe(legacyMapsSql(resources.slice(0, -2)));
+    await db.$executeRawUnsafe(legacyMapsSql(resources.slice(0, 9)));
     const beforeUpgrade = await allRows(native);
-    expect(beforeUpgrade).toHaveLength(baseline.length + 7);
-    expect(await initializeLegacyMaps(db, generated)).toEqual({ inserted: 2, existing: 7 });
+    expect(beforeUpgrade).toHaveLength(baseline.length + 9);
+    expect(await initializeLegacyMaps(db, generated)).toEqual({ inserted: 2, existing: 9 });
     const published = await allRows(native);
-    expect(published).toHaveLength(baseline.length + 9);
+    expect(published).toHaveLength(baseline.length + 11);
     expect(published).toEqual(expect.arrayContaining(beforeUpgrade));
-    expect(await initializeLegacyMaps(db, generated)).toEqual({ inserted: 0, existing: 9 });
+    expect(await initializeLegacyMaps(db, generated)).toEqual({ inserted: 0, existing: 11 });
     expect(await allRows(native)).toEqual(published);
 
     const scenario = {
@@ -476,31 +476,34 @@ it('S5 miniche 지도·병종의 게시, 롤백과 월드 재생', async () => {
 }, 120000);
 
 it.each([
-  { key: '2121', map: 'chess', cities: 64 },
-  { key: '2210', map: 'pokemon_v1', cities: 23 },
-  { key: '910', map: 'cr', cities: 53 },
-  { key: '2171', map: 'ludo_rathowm', cities: 99 },
-])('S5 $map 원작 지도의 도로를 저장하고 월드를 재생한다', async ({ key, map, cities }) => {
+  { key: '900', map: 'che', cities: 94, unitSet: 'siegetank' },
+  { key: '2121', map: 'chess', cities: 64, unitSet: 'basic' },
+  { key: '2210', map: 'pokemon_v1', cities: 23, unitSet: 'basic' },
+  { key: '910', map: 'cr', cities: 53, unitSet: 'cr' },
+  { key: '2171', map: 'ludo_rathowm', cities: 99, unitSet: 'basic' },
+] as const)('S5 $map 원작 지도의 도로를 저장하고 월드를 재생한다', async ({ key, map, cities, unitSet }) => {
   await withDatabase(async ({ db, url }) => {
     await initializeLegacyMaps(db);
-    const original = (await legacyMapPublications()).find(({ name }) => name === map)!;
     const savedMap = await db.gameResource.findUniqueOrThrow({
       where: { kind_name_version: { kind: 'MAP', name: map, version: 1 } },
     });
-    const expected = JSON.parse(original.raw) as { cities: { id: number; connections: number[] }[] };
-    expect(savedMap).toMatchObject({
-      status: 'PUBLISHED',
-      source: original.source,
-      contentHash: original.contentHash,
-      content: expected,
-    });
+    const expected = savedMap.content as { cities: { id: number; connections: number[] }[] };
+    if (map !== 'che') {
+      const original = (await legacyMapPublications()).find(({ kind, name }) => kind === 'MAP' && name === map)!;
+      expect(savedMap).toMatchObject({
+        status: 'PUBLISHED',
+        source: original.source,
+        contentHash: original.contentHash,
+        content: JSON.parse(original.raw),
+      });
+    }
 
     const scenario = {
       id: key,
       title: '원작 지도 검증',
       startYear: 180,
       requiredMap: map,
-      requiredUnitSet: 'basic',
+      requiredUnitSet: unitSet,
       nation: [],
       general: [],
       diplomacy: [],
@@ -513,7 +516,7 @@ it.each([
         contentHash: hashState(scenario),
         source: '원작 지도 검증용',
         map,
-        unitSet: 'basic',
+        unitSet,
       },
     ];
     const generated = convertScenariosToSql(
@@ -524,9 +527,15 @@ it.each([
     );
     expect(await initializeScenarios(db, generated, rows)).toEqual({ inserted: 1, existing: 0 });
     const options = { scenario: scenario.id, seed: 't4-46-alternate-legacy-map' };
-    await expect(loadInitialWorldFromDb(db, { ...options, map: 'che' })).rejects.toThrow('지도');
-    const initial = await loadInitialWorldFromDb(db, { ...options, map });
-    const { worldId } = await saveInitialWorld(db, initial, { name: map, turnTermMinutes: 60, endYear: 200 });
+    const wrongMap = map === 'che' ? 'cr' : 'che';
+    await expect(loadInitialWorldFromDb(db, { ...options, map: wrongMap, unitSet })).rejects.toThrow('지도');
+    const initial = await loadInitialWorldFromDb(db, { ...options, map, unitSet });
+    const { worldId } = await saveInitialWorld(db, initial, {
+      name: map,
+      turnTermMinutes: 60,
+      endYear: 200,
+      ...(unitSet === 'basic' ? {} : { ruleFeatures: ['battle-affinity-v2'] }),
+    });
     const savedCities = await db.city.findMany({
       where: { worldId },
       select: { cityKey: true, connections: true },

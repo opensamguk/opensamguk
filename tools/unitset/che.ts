@@ -14,10 +14,11 @@ const originalRequirement = z.discriminatedUnion('type', [
 ]);
 const triggerList = z.array(z.string().min(1)).nullable();
 const originalSet = z.looseObject({
-  id: z.enum(['che', 'che_except_siege']),
+  id: z.enum(['che', 'che_except_siege', 'cr', 'siegetank']),
   crewTypes: z.array(
     z.looseObject({
       id: z.number().int().positive(),
+      attackCoef: z.union([z.record(z.string(), z.number().nonnegative()), z.array(z.number().nonnegative()).max(1)]),
       requirements: z.array(originalRequirement),
       initSkillTrigger: triggerList,
       phaseSkillTrigger: triggerList,
@@ -31,7 +32,15 @@ export function projectCheUnitSet(source: unknown, mapInput: unknown) {
   const original = originalSet.parse(source);
   const map = mapSchema.parse(mapInput);
   const miniche = MINICHE_MAP_IDS.some((id) => id === map.id);
-  if (!miniche && (map.id !== 'che' || original.id !== 'che')) throw Error('원작 병종에 맞는 che 지도가 필요합니다.');
+  const allowedMaps = {
+    che: ['che', ...MINICHE_MAP_IDS],
+    che_except_siege: MINICHE_MAP_IDS,
+    cr: ['cr'],
+    siegetank: ['che'],
+  }[original.id];
+  if (!allowedMaps.includes(map.id))
+    throw Error(`원작 병종에 맞는 ${original.id === 'cr' ? 'cr' : 'che'} 지도가 필요합니다.`);
+  const boundMaps = miniche ? MINICHE_MAP_IDS : original.id === 'cr' ? allowedMaps : undefined;
   const regionIds = new Set(map.cities.map(({ region }) => region));
 
   function project(req: z.infer<typeof originalRequirement>): Requirement {
@@ -65,7 +74,7 @@ export function projectCheUnitSet(source: unknown, mapInput: unknown) {
 
   const unitSet = unitSetSchema.parse({
     ...original,
-    ...(miniche ? { legacyCheMapIds: MINICHE_MAP_IDS } : {}),
+    ...(boundMaps ? { legacyCheMapIds: boundMaps } : {}),
     ...(miniche && original.id === 'che' ? { id: 'che-miniche', name: 'che-miniche' } : {}),
     coefMode: 'multiply',
     firstVolleyScope: 'sortie',
@@ -77,7 +86,15 @@ export function projectCheUnitSet(source: unknown, mapInput: unknown) {
       if (row.phaseSkillTrigger?.includes('che_기병병종전투')) effects.push('cavalryClash');
       if (row.phaseSkillTrigger?.includes('che_저지발동')) effects.push('hold');
       if (row.iActionList?.includes('che_성벽선제')) effects.push('wallFirst');
-      return { ...row, requirements: row.requirements.map(project), effects: effects.length ? effects : undefined };
+      // 원작은 배열의 0번 값을 성벽 병과(0)의 상성으로 읽는다.
+      const attackCoef =
+        Array.isArray(row.attackCoef) && row.attackCoef.length ? { 0: row.attackCoef[0] } : row.attackCoef;
+      return {
+        ...row,
+        attackCoef,
+        requirements: row.requirements.map(project),
+        effects: effects.length ? effects : undefined,
+      };
     }),
   });
   if (validateUnitSet(unitSet).status !== 'pass') throw Error('원작 병종의 계수와 병과를 확인하세요.');

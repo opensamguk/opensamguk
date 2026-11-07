@@ -23,3 +23,15 @@ export async function readCheExceptSiegeSource(): Promise<unknown> {
     throw Error('che_except_siege 병종 원본 해시를 확인하세요.');
   return JSON.parse(source.toString('utf8'));
 }
+
+const alternateSourceHashes = {
+  cr: '3c08bb4ee0842a181809259ccd8f58859792d5354b0e2e38256a7db370311c86',
+  siegetank: 'fc1009177b525c5376b3ea524c5d691dbb9a6d26789897cd64218ffe78f462ea',
+};
+
+export async function readAlternateCheSource(id: keyof typeof alternateSourceHashes): Promise<unknown> {
+  const source = await readFile(new URL(`./source/${id}-core2026-df6c926.json`, import.meta.url));
+  if (createHash('sha256').update(source).digest('hex') !== alternateSourceHashes[id])
+    throw Error(`원작 병종 원본 해시를 확인하세요. ${id}`);
+  return JSON.parse(source.toString('utf8'));
+}

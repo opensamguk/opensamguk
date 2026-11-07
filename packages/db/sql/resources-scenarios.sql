@@ -162,6 +162,7 @@
 -- - 원작 resources/map/map_miniche.json, map_miniche_b.json, map_miniche_clean.json은 각각 같은 이름에서 map_ 접두사를 뺀 파일에 원문 바이트를 보존했다.
 -- - resources/unitset/che-miniche.json은 같은 커밋의 unitset_che.json 모집 거점 이름을 세 지도에서 공통으로 쓰는 도시 ID로 변환했다. 병종 수치와 전투 효과는 이 저장소의 che 판을 따른다.
 -- - 축지의 `che_except_siege` 병종 판은 같은 커밋의 `resources/unitset/unitset_che_except_siege.json`에서 변환한다. 원작 blob `6c0fd71a1fda09c3288a4b1ed7e218a47e418777`는 JSON 서식만 정리해 `tools/unitset/source/che-except-siege-core2026-df6c926.json`에 보존한다. 같은 devsam MIT 고지를 적용한다.
+-- - 거울세계 `cr`과 충차전 `siegetank` 병종 판은 같은 커밋의 `resources/unitset/unitset_cr.json`, `resources/unitset/unitset_siegetank.json`에서 변환한다. 원작 blob `b88d99b23860a8923d6f2358249791f5b86b9d0f`, `08d9470d998a06863e739debb52e33b34c4f6f9d`는 JSON 서식만 정리해 `tools/unitset/source/cr-core2026-df6c926.json`, `tools/unitset/source/siegetank-core2026-df6c926.json`에 보존한다. 충차전의 배열형 공성 계수는 같은 성벽 병과 키 0으로 옮긴다. 같은 devsam MIT 고지를 적용한다.
 -- - 원작 `resources/map/map_chess.json`과 `resources/map/map_pokemon_v1.json`은 `resources/map/chess.json`과 `resources/map/pokemon_v1.json`에 원문 바이트를 보존했다. 같은 devsam MIT 고지를 적용한다.
 -- - 원작 `resources/map/map_cr.json`은 `resources/map/cr.json`에 원문 바이트를 보존했다. `resources/map/ludo_rathowm.json`은 `resources/map/map_ludo_rathowm.json`의 라그나로크 아크에서 도약의 탑으로 가는 중복 도로와 대응 이름을 한 번씩 덜어낸 판이다. 원문은 `resources/map-drafts/original/ludo-rathowm-core2026-df6c926.json`에 보존했다. 같은 devsam MIT 고지를 적용한다.
 --
