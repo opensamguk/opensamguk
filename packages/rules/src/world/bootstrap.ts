@@ -4,6 +4,7 @@ import { TICKS_PER_MONTH } from '../clock/constants';
 import {
   mapSchema,
   portraitMapSchema,
+  scenarioMapMismatch,
   scenarioSchema,
   scenarioStatRulesMatch,
   statRulesSchema,
@@ -140,6 +141,8 @@ export function buildInitialWorld(input: {
   const sourceMap = operational
     ? { ...operational, cities: operationalAnchors(operational) }
     : mapSchema.parse(input.map);
+  const requiredMap = scenarioMapMismatch(scenario, sourceMap.id);
+  if (requiredMap !== undefined) throw new Error(`이 시나리오는 ${requiredMap} 지도가 필요합니다.`);
   const scaled = resolveCityScale(sourceMap.cities, scenario.cityScale?.cities);
   const map = { ...sourceMap, cities: scaled.cities };
   const unitSet = unitSetSchema.parse(input.unitSet);
@@ -295,7 +298,10 @@ export function buildInitialWorld(input: {
     return {
       id: i + 1,
       userId: null,
-      affinity,
+      affinity:
+        affinity === 0 && scenario.randomizeZeroAffinity
+          ? rngFor(input.seed, 'bootstrap-affinity', i + 1).int(1, 150)
+          : affinity,
       name,
       portraitId: Object.hasOwn(portraits, name) ? portraits[name]! : null,
       nationId,

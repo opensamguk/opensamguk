@@ -1,7 +1,7 @@
 import { MAP_DEFAULT_CANVAS, parseMapInput, type MapInput } from '../map/format';
 import { operationalAnchors } from '../map/anchors';
 import { checkMapCityScale, resolveCityScale } from '../map/cityScale';
-import { scenarioSchema } from '../resources';
+import { scenarioMapMismatch, scenarioSchema } from '../resources';
 import { issue, ReportBuilder, type ResourceIssue, type ResourceReport } from './issues';
 import { RESOURCE_LIMITS, scanLimits, type ScenarioCounts } from './limits';
 
@@ -170,6 +170,8 @@ export function validateMap(input: unknown, ctx?: { scenarios?: ReadonlyArray<un
     }
     const source = { kind: 'SCENARIO', index } as const;
     const add = (item: ResourceIssue) => out.add({ ...item, source });
+    const expected = scenarioMapMismatch(parsed.data, map.id);
+    if (expected !== undefined) add(issue('scenario-map-mismatch', { kind: 'path', path: ['id'] }, { expected }));
     if (parsed.data.cityScale)
       try {
         resolveCityScale(cities, parsed.data.cityScale.cities);
