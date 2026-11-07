@@ -104,12 +104,33 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
   const battleOutcomes: NonNullable<CommandResult['battleOutcomes']> = [];
   const reputation = state.ruleFeatures?.includes('reputation-v1');
   for (const attackerId of attackingIds) {
+    let attackerFirstVolleyUsed = false;
+    const fightWall = (openingSkirmish = false) => {
+      const outcome = fightCampaignWall(state, attackerId, cityKey, actor.unitSet!, rng, {
+        openingSkirmish,
+        attackerFirstVolleyUsed,
+      });
+      state = outcome.state;
+      attackerFirstVolleyUsed ||= outcome.attackerFirstVolleyFired === true;
+      const name = openingSkirmish ? '성벽 선제 교전' : '성벽 교전';
+      rounds.push(`부곡${attackerId} ${name}: 공격 ${get(attackerId).troops}명, 성벽 ${state.cities[cityKey]!.wall}`);
+    };
+    const wallFirst =
+      state.cities[cityKey]!.wall > 0 &&
+      actor.unitSet!.crewTypes.find((unit) => unit.id === get(attackerId).crewType)?.effects?.includes('wallFirst') &&
+      (defendingIds.some((id) => alive(get(id))) || cityDefense().some((row) => row.troops > 0 && row.atmos > 0));
+    if (wallFirst) {
+      fightWall(true);
+      if (!alive(get(attackerId))) continue;
+    }
     for (const defenderId of defendingIds) {
       if (!alive(get(attackerId))) break;
       if (!alive(get(defenderId))) continue;
       const attackerCommander = get(attackerId).commanderId,
         defenderCommander = get(defenderId).commanderId;
-      state = fightCampaignUnits(state, attackerId, defenderId, actor.unitSet!, rng).state;
+      const outcome = fightCampaignUnits(state, attackerId, defenderId, actor.unitSet!, rng, attackerFirstVolleyUsed);
+      state = outcome.state;
+      attackerFirstVolleyUsed ||= outcome.attackerFirstVolleyFired === true;
       const a = get(attackerId),
         d = get(defenderId);
       if (alive(a) && !alive(d)) {
@@ -132,17 +153,23 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
       .map((row) => row.crewType)
       .sort((a, b) => a - b)) {
       if (!alive(get(attackerId))) break;
-      const outcome = fightCampaignCityGarrison(state, attackerId, cityKey, crewType, actor.unitSet!, rng);
+      const outcome = fightCampaignCityGarrison(
+        state,
+        attackerId,
+        cityKey,
+        crewType,
+        actor.unitSet!,
+        rng,
+        attackerFirstVolleyUsed,
+      );
       state = outcome.state;
+      attackerFirstVolleyUsed ||= outcome.attackerFirstVolleyFired === true;
       rounds.push(outcome.text);
       if (cityDefense().some((row) => row.crewType === crewType && row.troops > 0 && row.atmos > 0)) break;
     }
     if (cityDefense().some((row) => row.troops > 0 && row.atmos > 0)) continue;
     // 기존 출병은 벽이 0이어도 점령 직전 군량을 한 번 소비한다.
-    if (alive(get(attackerId))) {
-      state = fightCampaignWall(state, attackerId, cityKey, actor.unitSet!, rng).state;
-      rounds.push(`부곡${attackerId} 성벽 교전: 공격 ${get(attackerId).troops}명, 성벽 ${state.cities[cityKey]!.wall}`);
-    }
+    if (alive(get(attackerId)) && (!wallFirst || state.cities[cityKey]!.wall > 0)) fightWall();
     if (state.cities[cityKey]!.wall === 0 && alive(get(attackerId))) break;
   }
   const captured =

@@ -8340,9 +8340,14 @@
           "reason": "구현 전"
         },
         "engine": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/command-coverage.test.ts"
+            }
+          ],
+          "reason": "실제 기능 등록과 장수·국가 대상을 대조했다. 이 단계의 실행 증거 연결은 남아 있다."
         },
         "effectsCostsFailures": {
           "status": "missing",
@@ -8410,9 +8415,14 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "engine": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/command-coverage.test.ts"
+            }
+          ],
+          "reason": "실제 기능 등록과 장수·국가 대상을 대조했다. 이 단계의 실행 증거 연결은 남아 있다."
         },
         "effectsCostsFailures": {
           "status": "partial",
@@ -8511,9 +8521,14 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "engine": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/command-coverage.test.ts"
+            }
+          ],
+          "reason": "실제 기능 등록과 장수·국가 대상을 대조했다. 이 단계의 실행 증거 연결은 남아 있다."
         },
         "effectsCostsFailures": {
           "status": "partial",
@@ -8612,9 +8627,14 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "engine": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/command-coverage.test.ts"
+            }
+          ],
+          "reason": "실제 기능 등록과 장수·국가 대상을 대조했다. 이 단계의 실행 증거 연결은 남아 있다."
         },
         "effectsCostsFailures": {
           "status": "partial",
@@ -8713,9 +8733,14 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "engine": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/command-coverage.test.ts"
+            }
+          ],
+          "reason": "실제 기능 등록과 장수·국가 대상을 대조했다. 이 단계의 실행 증거 연결은 남아 있다."
         },
         "effectsCostsFailures": {
           "status": "partial",
@@ -8814,9 +8839,14 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "engine": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/command-coverage.test.ts"
+            }
+          ],
+          "reason": "실제 기능 등록과 장수·국가 대상을 대조했다. 이 단계의 실행 증거 연결은 남아 있다."
         },
         "effectsCostsFailures": {
           "status": "missing",
@@ -8954,9 +8984,14 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "engine": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/command-coverage.test.ts"
+            }
+          ],
+          "reason": "실제 기능 등록과 장수·국가 대상을 대조했다. 이 단계의 실행 증거 연결은 남아 있다."
         },
         "effectsCostsFailures": {
           "status": "missing",
@@ -8997,6 +9032,81 @@
       "blockers": ["G-03", "U-19", "U-21", "원작에서는 입력 불가 내부 명령(INTERNAL_GENERAL_TURN_COMMAND_KEYS)이다"]
     },
     {
+      "id": "resettle",
+      "target": "general",
+      "sourceIds": [],
+      "replacementReason": "D-076에서 방랑 군주가 빈 도시에 다시 정착하는 명령을 승인했다.",
+      "approvalRefs": ["D-076"],
+      "acIds": ["AC-M1-14", "AC-P2-08"],
+      "queueIds": ["T4-48"],
+      "ownerProfile": "opensamguk-implement",
+      "reviewerProfile": "opensamguk-review",
+      "paths": ["packages/rules/src/nationLifecycle/commands.ts", "tools/nation-lifecycle-api.integration.test.ts"],
+      "stages": {
+        "ui": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "이 대응표의 단계별 검증 기록을 연결해야 한다."
+        },
+        "api": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "이 대응표의 단계별 검증 기록을 연결해야 한다."
+        },
+        "authorization": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "이 대응표의 단계별 검증 기록을 연결해야 한다."
+        },
+        "engine": {
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/command-coverage.test.ts"
+            }
+          ],
+          "reason": "실제 기능 등록과 장수 명령 대상을 대조했다."
+        },
+        "effectsCostsFailures": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "이 대응표의 단계별 검증 기록을 연결해야 한다."
+        },
+        "persistence": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "이 대응표의 단계별 검증 기록을 연결해야 한다."
+        },
+        "restart": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "이 대응표의 단계별 검증 기록을 연결해야 한다."
+        },
+        "replay": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "이 대응표의 단계별 검증 기록을 연결해야 한다."
+        },
+        "independentReview": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "이 대응표의 단계별 검증 기록을 연결해야 한다."
+        },
+        "exactShaValidation": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "이 대응표의 단계별 검증 기록을 연결해야 한다."
+        },
+        "merge": {
+          "status": "missing",
+          "evidence": [],
+          "reason": "이 대응표의 단계별 검증 기록을 연결해야 한다."
+        }
+      },
+      "blockers": ["브라우저, 재시작, 독립 리뷰 및 같은 SHA의 전 단계 검증 기록을 연결해야 한다."]
+    },
+    {
       "id": "abdicate",
       "target": "general",
       "sourceIds": ["general:che_선양"],
@@ -9024,9 +9134,14 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "engine": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/command-coverage.test.ts"
+            }
+          ],
+          "reason": "실제 기능 등록과 장수·국가 대상을 대조했다. 이 단계의 실행 증거 연결은 남아 있다."
         },
         "effectsCostsFailures": {
           "status": "missing",
@@ -9094,9 +9209,14 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "engine": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/command-coverage.test.ts"
+            }
+          ],
+          "reason": "실제 기능 등록과 장수·국가 대상을 대조했다. 이 단계의 실행 증거 연결은 남아 있다."
         },
         "effectsCostsFailures": {
           "status": "missing",
@@ -9304,9 +9424,14 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "engine": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/command-coverage.test.ts"
+            }
+          ],
+          "reason": "실제 기능 등록과 장수·국가 대상을 대조했다. 이 단계의 실행 증거 연결은 남아 있다."
         },
         "effectsCostsFailures": {
           "status": "missing",
@@ -10284,9 +10409,14 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "engine": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/command-coverage.test.ts"
+            }
+          ],
+          "reason": "실제 기능 등록과 장수·국가 대상을 대조했다. 이 단계의 실행 증거 연결은 남아 있다."
         },
         "effectsCostsFailures": {
           "status": "missing",
@@ -10354,9 +10484,14 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "engine": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/command-coverage.test.ts"
+            }
+          ],
+          "reason": "실제 기능 등록과 장수·국가 대상을 대조했다. 이 단계의 실행 증거 연결은 남아 있다."
         },
         "effectsCostsFailures": {
           "status": "missing",
@@ -10424,9 +10559,14 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "engine": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/command-coverage.test.ts"
+            }
+          ],
+          "reason": "실제 기능 등록과 장수·국가 대상을 대조했다. 이 단계의 실행 증거 연결은 남아 있다."
         },
         "effectsCostsFailures": {
           "status": "missing",
@@ -10866,7 +11006,7 @@
           "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "engine": {
-          "status": "missing",
+          "status": "partial",
           "evidence": [
             {
               "kind": "test",
@@ -10875,9 +11015,13 @@
             {
               "kind": "doc",
               "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            },
+            {
+              "kind": "test",
+              "ref": "tools/command-coverage.test.ts"
             }
           ],
-          "reason": "7종은 ruleRegistry 기능 binding에 구현했다. 현행 정적 검사는 commands/ext 등록만 읽으므로 이 단계의 검증 상태를 올리지 않는다. 최종 구현 인수와 검사기 대응은 남아 있다."
+          "reason": "기능 등록과 명령별 실행 시험을 확인했다. 실제 PostgreSQL에서는 12회·24회 연구를 각각 한 종씩 검증했다. 이 대응표의 독립 리뷰와 exact SHA 증거 연결은 남아 있다."
         },
         "effectsCostsFailures": {
           "status": "missing",
@@ -11003,7 +11147,7 @@
           "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "engine": {
-          "status": "missing",
+          "status": "partial",
           "evidence": [
             {
               "kind": "test",
@@ -11012,9 +11156,13 @@
             {
               "kind": "doc",
               "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            },
+            {
+              "kind": "test",
+              "ref": "tools/command-coverage.test.ts"
             }
           ],
-          "reason": "7종은 ruleRegistry 기능 binding에 구현했다. 현행 정적 검사는 commands/ext 등록만 읽으므로 이 단계의 검증 상태를 올리지 않는다. 최종 구현 인수와 검사기 대응은 남아 있다."
+          "reason": "기능 등록과 명령별 실행 시험을 확인했다. 실제 PostgreSQL에서는 12회·24회 연구를 각각 한 종씩 검증했다. 이 대응표의 독립 리뷰와 exact SHA 증거 연결은 남아 있다."
         },
         "effectsCostsFailures": {
           "status": "missing",
@@ -11140,7 +11288,7 @@
           "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "engine": {
-          "status": "missing",
+          "status": "partial",
           "evidence": [
             {
               "kind": "test",
@@ -11149,9 +11297,13 @@
             {
               "kind": "doc",
               "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            },
+            {
+              "kind": "test",
+              "ref": "tools/command-coverage.test.ts"
             }
           ],
-          "reason": "7종은 ruleRegistry 기능 binding에 구현했다. 현행 정적 검사는 commands/ext 등록만 읽으므로 이 단계의 검증 상태를 올리지 않는다. 최종 구현 인수와 검사기 대응은 남아 있다."
+          "reason": "기능 등록과 명령별 실행 시험을 확인했다. 실제 PostgreSQL에서는 12회·24회 연구를 각각 한 종씩 검증했다. 이 대응표의 독립 리뷰와 exact SHA 증거 연결은 남아 있다."
         },
         "effectsCostsFailures": {
           "status": "missing",
@@ -11277,7 +11429,7 @@
           "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "engine": {
-          "status": "missing",
+          "status": "partial",
           "evidence": [
             {
               "kind": "test",
@@ -11286,9 +11438,13 @@
             {
               "kind": "doc",
               "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            },
+            {
+              "kind": "test",
+              "ref": "tools/command-coverage.test.ts"
             }
           ],
-          "reason": "7종은 ruleRegistry 기능 binding에 구현했다. 현행 정적 검사는 commands/ext 등록만 읽으므로 이 단계의 검증 상태를 올리지 않는다. 최종 구현 인수와 검사기 대응은 남아 있다."
+          "reason": "기능 등록과 명령별 실행 시험을 확인했다. 실제 PostgreSQL에서는 12회·24회 연구를 각각 한 종씩 검증했다. 이 대응표의 독립 리뷰와 exact SHA 증거 연결은 남아 있다."
         },
         "effectsCostsFailures": {
           "status": "missing",
@@ -11414,7 +11570,7 @@
           "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "engine": {
-          "status": "missing",
+          "status": "partial",
           "evidence": [
             {
               "kind": "test",
@@ -11423,9 +11579,13 @@
             {
               "kind": "doc",
               "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            },
+            {
+              "kind": "test",
+              "ref": "tools/command-coverage.test.ts"
             }
           ],
-          "reason": "7종은 ruleRegistry 기능 binding에 구현했다. 현행 정적 검사는 commands/ext 등록만 읽으므로 이 단계의 검증 상태를 올리지 않는다. 최종 구현 인수와 검사기 대응은 남아 있다."
+          "reason": "기능 등록과 명령별 실행 시험을 확인했다. 실제 PostgreSQL에서는 12회·24회 연구를 각각 한 종씩 검증했다. 이 대응표의 독립 리뷰와 exact SHA 증거 연결은 남아 있다."
         },
         "effectsCostsFailures": {
           "status": "missing",
@@ -11551,7 +11711,7 @@
           "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "engine": {
-          "status": "missing",
+          "status": "partial",
           "evidence": [
             {
               "kind": "test",
@@ -11560,9 +11720,13 @@
             {
               "kind": "doc",
               "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            },
+            {
+              "kind": "test",
+              "ref": "tools/command-coverage.test.ts"
             }
           ],
-          "reason": "7종은 ruleRegistry 기능 binding에 구현했다. 현행 정적 검사는 commands/ext 등록만 읽으므로 이 단계의 검증 상태를 올리지 않는다. 최종 구현 인수와 검사기 대응은 남아 있다."
+          "reason": "기능 등록과 명령별 실행 시험을 확인했다. 실제 PostgreSQL에서는 12회·24회 연구를 각각 한 종씩 검증했다. 이 대응표의 독립 리뷰와 exact SHA 증거 연결은 남아 있다."
         },
         "effectsCostsFailures": {
           "status": "missing",
@@ -11828,7 +11992,7 @@
           "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
         },
         "engine": {
-          "status": "missing",
+          "status": "partial",
           "evidence": [
             {
               "kind": "test",
@@ -11837,9 +12001,13 @@
             {
               "kind": "doc",
               "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            },
+            {
+              "kind": "test",
+              "ref": "tools/command-coverage.test.ts"
             }
           ],
-          "reason": "7종은 ruleRegistry 기능 binding에 구현했다. 현행 정적 검사는 commands/ext 등록만 읽으므로 이 단계의 검증 상태를 올리지 않는다. 최종 구현 인수와 검사기 대응은 남아 있다."
+          "reason": "기능 등록과 명령별 실행 시험을 확인했다. 실제 PostgreSQL에서는 12회·24회 연구를 각각 한 종씩 검증했다. 이 대응표의 독립 리뷰와 exact SHA 증거 연결은 남아 있다."
         },
         "effectsCostsFailures": {
           "status": "missing",

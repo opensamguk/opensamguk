@@ -138,6 +138,11 @@ async function fixture(caps = true, modern = false) {
     generalLog: { create: vi.fn() },
     battleLog: { createMany: vi.fn() },
     nationHistory: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn() },
+    $executeRaw: vi.fn(async (strings: TemplateStringsArray) => {
+      const sql = strings.join('?').trim();
+      if (sql.startsWith('INSERT INTO "SeasonGeneral"')) return 1;
+      throw new Error(`예상하지 않은 단위 쓰기: ${sql}`);
+    }),
     $queryRaw: vi.fn(async (strings: TemplateStringsArray) => {
       const sql = strings.join('?').trim().replace(/\s+/g, ' ');
       if (sql.startsWith('SELECT 1 FROM "EngineLease"')) return [{}];
@@ -262,6 +267,8 @@ it('턴 종료는 조약을 일괄 닫지 않고 실제 loadReplayState 해시�
   expect(f.state().treaties).toEqual(treaties);
   expect(f.rows[0]).toMatchObject({ status: 'ACTIVE', closedSequence: null });
   expect(f.tx.treaty.updateMany).not.toHaveBeenCalled();
+  expect(f.tx.$executeRaw).toHaveBeenCalledTimes(1);
+  expect(f.tx.$executeRaw).toHaveBeenCalledWith(expect.any(Array), f.world.id, f.world.startYear);
   expect(f.ended[0]!.finalStateHash).toBe(hashState(await monthly.loadReplayState(f.client, f.world.id)));
 });
 
@@ -285,6 +292,8 @@ it('월간 뒤 기수 종료는 정산된 상태의 실제 loadReplayState 해�
   expect(await f.loop.advanceTo(120000)).toEqual([]);
   expect(f.ended[0]).toMatchObject({ reason: 'END_YEAR', endedTick: 120000, endedSequence: 1 });
   expect(Object.hasOwn(f.state(), 'treaties')).toBe(false);
+  expect(f.tx.$executeRaw).toHaveBeenCalledTimes(1);
+  expect(f.tx.$executeRaw).toHaveBeenCalledWith(expect.any(Array), f.world.id, f.world.startYear);
   expect(f.ended[0]!.finalStateHash).toBe(hashState(await monthly.loadReplayState(f.client, f.world.id)));
   expect(f.tx.treaty.updateMany).not.toHaveBeenCalled();
 });

@@ -6,6 +6,7 @@ import { hashState } from '../../packages/shared/src/node/hashState';
 import fixture from '../fixtures/t4-46-scenarios.json';
 import { BODY_TAG, CONTENT_TAG, requirePassingReport } from './convert';
 import { createDb, readPublishedResources } from '../../packages/db/src/index';
+import { legacyMapPublications, legacyMapUnitSetNames } from './legacy-maps';
 
 export interface ScenarioRow {
   key: string;
@@ -18,24 +19,104 @@ export interface ScenarioRow {
   resourceKey: string | null;
   contentHash: string | null;
   source?: string;
+  map?: string;
+  unitSet?: 'basic' | 'che' | (typeof legacyMapUnitSetNames)[number];
+  statRules?: string;
 }
 
 export const scenarioRows: readonly ScenarioRow[] = fixture.scenarios as ScenarioRow[];
 export const SCENARIO_CONTENT_TAG = '$t4_46_content$';
 export const SCENARIO_BODY_TAG = '$t4_46_init$';
-export type ScenarioMaterials = Omit<Parameters<typeof validateWorldResources>[0], 'scenario'>;
+export const UNIT_SET_CONTENT_TAG = '$t4_46_unitset$';
+export const STAT_RULES_CONTENT_TAG = '$t4_46_stat_rules$';
+const sqlTags = [
+  SCENARIO_CONTENT_TAG,
+  SCENARIO_BODY_TAG,
+  UNIT_SET_CONTENT_TAG,
+  STAT_RULES_CONTENT_TAG,
+  CONTENT_TAG,
+  BODY_TAG,
+];
+export const cheUnitSetPublication = fixture.cheUnitSet;
+export type ScenarioMaterials = Omit<Parameters<typeof validateWorldResources>[0], 'scenario'> & {
+  cheUnitSet: unknown;
+  legacyResources: ReadonlyMap<string, unknown>;
+};
+
+function scenarioStatRulesPublication({ statRules }: Pick<ScenarioRow, 'statRules'>) {
+  if (statRules === undefined) return undefined;
+  const publication = fixture.statRules.find(({ name }) => name === statRules);
+  if (!publication) throw new Error('시나리오 장수 생성 능력치 판을 확인하세요.');
+  return publication;
+}
+
+export function requiredScenarioStatRules(rows: readonly ScenarioRow[]) {
+  return new Set(rows.map(scenarioStatRulesPublication).filter((publication) => publication !== undefined));
+}
+
+export async function requiredScenarioLegacyResources(ready: readonly ScenarioRow[]) {
+  const keys = new Set(
+    ready.flatMap(({ map, unitSet }) => [
+      ...(map === undefined ? [] : [`MAP/${map}`]),
+      ...(unitSet === undefined || unitSet === 'basic' || unitSet === 'che' ? [] : [`UNIT_SET/${unitSet}`]),
+    ]),
+  );
+  if (keys.size === 0) return [];
+
+  const expected = (await legacyMapPublications()).filter(({ kind, name }) => keys.has(`${kind}/${name}`));
+  if (expected.length !== keys.size) throw new Error('시나리오에 지정한 원작 지도와 병종을 확인하세요.');
+  return expected;
+}
+
+export async function readScenarioLegacyResources(
+  db: Parameters<typeof readPublishedResources>[0],
+  expected: Awaited<ReturnType<typeof requiredScenarioLegacyResources>>,
+) {
+  const resources = new Map<string, unknown>();
+  if (expected.length === 0) return resources;
+  const saved = await readPublishedResources(db, expected);
+  for (const [index, row] of saved.entries()) {
+    const key = `${row.kind}/${row.name}`;
+    if (row.source !== expected[index]!.source || row.contentHash !== expected[index]!.contentHash)
+      throw new Error(`원작 지도 게시 판이 다릅니다: ${key}/${row.version}`);
+    resources.set(key, row.content);
+  }
+  return resources;
+}
+
+export function scenarioMaterialsForRow(
+  materials: ScenarioMaterials,
+  row: { map?: string; unitSet?: string; statRules?: string },
+) {
+  const { cheUnitSet, legacyResources, ...basic } = materials;
+  const unitSet =
+    row.unitSet === undefined || row.unitSet === 'basic'
+      ? basic.unitSet
+      : row.unitSet === 'che'
+        ? cheUnitSet
+        : legacyResources.get(`UNIT_SET/${row.unitSet}`);
+  return {
+    ...basic,
+    map: row.map === undefined ? basic.map : legacyResources.get(`MAP/${row.map}`),
+    unitSet,
+    statRules: scenarioStatRulesPublication(row)?.content ?? basic.statRules,
+  };
+}
 
 export function readyScenarioRows(rows: readonly ScenarioRow[] = scenarioRows): ScenarioRow[] {
   const ready = rows.filter((row) => row.support === 'ready');
   const keys = new Set<string>();
   for (const row of ready) {
+    const legacyUnitSet = legacyMapUnitSetNames.some((name) => row.unitSet === name);
     if (
       !/^(0|[1-9][0-9]*)$/.test(row.key) ||
       row.key === '1030' ||
       row.resourceKey !== row.key ||
       keys.has(row.key) ||
       !row.contentHash?.match(/^[0-9a-f]{64}$/) ||
-      !row.source
+      !row.source ||
+      (row.unitSet !== undefined && row.unitSet !== 'basic' && row.unitSet !== 'che' && !legacyUnitSet) ||
+      (legacyUnitSet && row.map === undefined)
     ) {
       throw new Error(`시나리오 판 입력을 확인하세요: SCENARIO/${row.key}/1`);
     }
@@ -54,9 +135,37 @@ function hasNul(value: unknown): boolean {
 
 function literal(value: string, key: string): string {
   if (value.includes('\0')) throw new Error(`시나리오 NUL 문자: ${key}`);
-  if ([SCENARIO_CONTENT_TAG, SCENARIO_BODY_TAG, CONTENT_TAG, BODY_TAG].some((tag) => value.includes(tag)))
-    throw new Error(`시나리오 구분자 충돌: ${key}`);
+  if (sqlTags.some((tag) => value.includes(tag))) throw new Error(`시나리오 구분자 충돌: ${key}`);
   return `'${value.replaceAll("'", "''")}'`;
+}
+
+const publicationTags = {
+  SCENARIO: SCENARIO_CONTENT_TAG,
+  UNIT_SET: UNIT_SET_CONTENT_TAG,
+  STAT_RULES: STAT_RULES_CONTENT_TAG,
+};
+
+function publicationSql(kind: keyof typeof publicationTags, name: string, raw: string, hash: string, source: string) {
+  const key = `${kind}/${name}/1`;
+  const tag = publicationTags[kind];
+  const sqlName = literal(name, key);
+  const sqlSource = literal(source, key);
+  const contentHash = literal(hash, key);
+  if (sqlTags.some((value) => raw.includes(value))) throw new Error(`시나리오 구분자 충돌: ${key}`);
+  return `  resource_content := ${tag}${raw}${tag}::jsonb;
+  INSERT INTO "GameResource"
+    ("id", "kind", "name", "version", "status", "content", "contentHash", "source", "createdBy", "publishedAt")
+  VALUES
+    (gen_random_uuid()::text, '${kind}', ${sqlName}, 1, 'PUBLISHED', resource_content, ${contentHash}, ${sqlSource}, NULL, now())
+  ON CONFLICT ("kind", "name", "version") DO NOTHING;
+  IF NOT EXISTS (
+    SELECT 1 FROM "GameResource"
+    WHERE "kind" = '${kind}' AND "name" = ${sqlName} AND "version" = 1
+      AND "content" = resource_content AND "contentHash" = ${contentHash}
+      AND "status" = 'PUBLISHED' AND "source" = ${sqlSource}
+  ) THEN
+    RAISE EXCEPTION '시나리오 자원 충돌: ${key}';
+  END IF;`;
 }
 
 export function convertScenariosToSql(
@@ -69,12 +178,12 @@ export function convertScenariosToSql(
     if (['1030', 'che', 'basic', 'default', 'rtk14-map'].includes(key))
       throw new Error(`내장 자원은 추가 SQL에 넣을 수 없습니다: ${key}`);
   }
-  const statements = readyScenarioRows(rows).map((row) => {
+  const ready = readyScenarioRows(rows);
+  const statements = ready.map((row) => {
     const key = `SCENARIO/${row.key}/1`;
     const raw = input[row.key]?.replaceAll('\r\n', '\n');
     if (raw === undefined) throw new Error(`시나리오 원문이 없습니다: ${key}`);
-    if ([SCENARIO_CONTENT_TAG, SCENARIO_BODY_TAG, CONTENT_TAG, BODY_TAG].some((tag) => raw.includes(tag)))
-      throw new Error(`시나리오 구분자 충돌: ${key}`);
+    if (sqlTags.some((tag) => raw.includes(tag))) throw new Error(`시나리오 구분자 충돌: ${key}`);
     let content: unknown;
     try {
       content = JSON.parse(raw);
@@ -83,30 +192,33 @@ export function convertScenariosToSql(
     }
     if (hasNul(content)) throw new Error(`시나리오 NUL 문자: ${key}`);
     try {
-      requirePassingReport(validateWorldResources({ ...materials, scenario: content }));
+      const report = validateWorldResources({ ...scenarioMaterialsForRow(materials, row), scenario: content });
+      requirePassingReport(report);
+      if (
+        row.map !== undefined &&
+        (report.scenario.value?.requiredMap !== row.map ||
+          report.scenario.value.requiredUnitSet !== (row.unitSet ?? 'basic'))
+      )
+        throw new Error('시나리오에 원작 지도와 병종을 지정하세요.');
     } catch {
       throw new Error(`시나리오 자원 검증 실패: ${key}`);
     }
     if (hashState(content) !== row.contentHash) throw new Error(`시나리오 상수 해시 불일치: ${key}`);
     if ((content as { id?: unknown }).id !== row.resourceKey) throw new Error(`시나리오 내용의 id가 다릅니다: ${key}`);
-    const name = literal(row.key, key);
-    const source = literal(row.source!, key);
-    const contentHash = literal(row.contentHash!, key);
-    return `  resource_content := ${SCENARIO_CONTENT_TAG}${raw}${SCENARIO_CONTENT_TAG}::jsonb;
-  INSERT INTO "GameResource"
-    ("id", "kind", "name", "version", "status", "content", "contentHash", "source", "createdBy", "publishedAt")
-  VALUES
-    (gen_random_uuid()::text, 'SCENARIO', ${name}, 1, 'PUBLISHED', resource_content, ${contentHash}, ${source}, NULL, now())
-  ON CONFLICT ("kind", "name", "version") DO NOTHING;
-  IF NOT EXISTS (
-    SELECT 1 FROM "GameResource"
-    WHERE "kind" = 'SCENARIO' AND "name" = ${name} AND "version" = 1
-      AND "content" = resource_content AND "contentHash" = ${contentHash}
-      AND "status" = 'PUBLISHED' AND "source" = ${source}
-  ) THEN
-    RAISE EXCEPTION '시나리오 자원 충돌: ${key}';
-  END IF;`;
+    return publicationSql('SCENARIO', row.key, raw, row.contentHash!, row.source!);
   });
+  if (ready.some(({ unitSet }) => unitSet === 'che')) {
+    const { name, contentHash, source } = cheUnitSetPublication;
+    const content = materials.cheUnitSet;
+    if (hasNul(content) || hashState(content) !== contentHash)
+      throw new Error(`병종 판 내용과 해시를 확인하세요: UNIT_SET/${name}/1`);
+    statements.push(publicationSql('UNIT_SET', name, `${JSON.stringify(content, null, 2)}\n`, contentHash, source));
+  }
+  for (const { name, source, contentHash, content } of requiredScenarioStatRules(ready)) {
+    if (hasNul(content) || hashState(content) !== contentHash)
+      throw new Error(`능력치 판 내용과 해시를 확인하세요: STAT_RULES/${name}/1`);
+    statements.push(publicationSql('STAT_RULES', name, JSON.stringify(content, null, 2) + '\n', contentHash, source));
+  }
   const normalizedNotice = notice.replaceAll('\r\n', '\n');
   if (normalizedNotice.includes('\0')) throw new Error('시나리오 출처에 NUL 문자가 있습니다.');
   const header = normalizedNotice
@@ -128,6 +240,7 @@ ${SCENARIO_BODY_TAG};
 
 export async function readScenarioMaterials(
   db: Parameters<typeof readPublishedResources>[0],
+  rows: readonly ScenarioRow[] = scenarioRows,
 ): Promise<ScenarioMaterials> {
   const [map, unitSet, statRules, portraitMap] = await readPublishedResources(db, [
     { kind: 'MAP', name: 'che', version: 1 },
@@ -140,6 +253,11 @@ export async function readScenarioMaterials(
     unitSet: unitSet!.content,
     statRules: statRules!.content,
     portraitMap: portraitMap!.content,
+    cheUnitSet: JSON.parse(await readFile(new URL('../../resources/unitset/che.json', import.meta.url), 'utf8')),
+    legacyResources: await readScenarioLegacyResources(
+      db,
+      await requiredScenarioLegacyResources(readyScenarioRows(rows)),
+    ),
   };
 }
 

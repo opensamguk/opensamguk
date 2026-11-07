@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { fiveStatsSchema } from '../general/fiveStats';
+import { MAX_STARTING_NPC_STAT, startingNpcStatLimit } from './initialNpcStats';
 
 const natural = z.number().int().nonnegative();
 const positive = z.number().int().positive();
@@ -36,10 +37,29 @@ export const mapSchema = z.object({
   defaults: z.object({ trust: z.number().min(0).max(100), supplyState: z.union([z.literal(0), z.literal(1)]) }),
 });
 
-export const scenarioSchema = z.object({
+const statRulesValueSchema = z
+  .object({ total: positive, min: natural, max: positive, count: z.literal(5).optional() })
+  .refine(
+    (value) =>
+      value.min <= value.max &&
+      value.total >= (value.count ?? 3) * value.min &&
+      value.total <= (value.count ?? 3) * value.max,
+    '능력치 합계·최소·최대가 맞지 않습니다.',
+  );
+
+export const scenarioIdentitySchema = z.object({
   id: name,
   title: name,
+});
+
+const scenarioObjectSchema = scenarioIdentitySchema.extend({
   startYear: natural,
+  requiredMap: name.optional(),
+  randomizeZeroAffinity: z.literal(true).optional(),
+  openingCityProfile: z.literal('legacy-research-70').optional(),
+  lastNationRecruitmentLockYear: positive.max(9999).optional(),
+  requiredUnitSet: name.optional(),
+  requiredStatRules: statRulesValueSchema.strict().optional(),
   cityScale: z
     .strictObject({
       cities: z
@@ -81,12 +101,12 @@ export const scenarioSchema = z.object({
     z.tuple([
       natural,
       name,
-      z.string(),
+      z.string().nullable(),
       natural,
       name.nullable(),
-      natural.max(100),
-      natural.max(100),
-      natural.max(100),
+      natural.max(MAX_STARTING_NPC_STAT),
+      natural.max(MAX_STARTING_NPC_STAT),
+      natural.max(MAX_STARTING_NPC_STAT),
       natural.max(12),
       natural,
       natural,
@@ -96,6 +116,19 @@ export const scenarioSchema = z.object({
     ]),
   ),
   diplomacy: z.array(z.tuple([positive, positive, z.union([z.literal(0), z.literal(1), z.literal(7)]), natural])),
+});
+
+export const scenarioSchema = scenarioObjectSchema.superRefine((scenario, ctx) => {
+  const limit = startingNpcStatLimit(scenario.id);
+  scenario.general.forEach((row, index) => {
+    for (const stat of [5, 6, 7] as const)
+      if (row[stat] > limit)
+        ctx.addIssue({
+          code: 'custom',
+          path: ['general', index, stat],
+          message: `시작 NPC 능력치 상한은 ${limit}입니다.`,
+        });
+  });
 });
 
 const coefficients = z.union([z.record(z.string(), z.number().nonnegative()), z.array(z.never())]);
@@ -112,6 +145,7 @@ export const crewRequirementSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('impossible') }),
   z.strictObject({ kind: z.literal('tech'), min: natural }),
   z.strictObject({ kind: z.literal('regions'), regions: z.array(positive.max(16)).min(1) }),
+  z.strictObject({ kind: z.literal('legacyCheRegions'), regions: z.array(positive.max(8)).min(1) }),
   z.strictObject({ kind: z.literal('cities'), cityKeys: z.array(positive).min(1) }),
   z.strictObject({ kind: z.literal('citiesWithLevel'), cityKeys: z.array(positive).min(1), level: positive }),
   z.strictObject({ kind: z.literal('minRelYear'), min: natural }),
@@ -119,14 +153,26 @@ export const crewRequirementSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('scorched'), min: natural }),
   z.strictObject({ kind: z.literal('chief') }),
 ]);
-const crewEffects = z.enum(['firstVolley', 'guard5', 'cavalryClash', 'pikeWall', 'hold', 'avoid']);
-export const unitSetSchema = z.object({
+const crewEffects = z.enum(['firstVolley', 'guard5', 'cavalryClash', 'pikeWall', 'hold', 'avoid', 'wallFirst']);
+const unitSetValueSchema = z.object({
   id: name,
   name,
   defaultCrewTypeId: positive,
   armTypes: z.record(z.string(), name),
   coefMode: z.literal('multiply').optional(),
+  firstVolleyScope: z.literal('sortie').optional(),
   regionScheme: z.literal('province-191').optional(),
+  legacyCheMapIds: z
+    .array(name)
+    .min(1)
+    .max(8)
+    .refine((ids) => new Set(ids).size === ids.length, '병종 지도 ID가 겹칩니다.')
+    .optional(),
+  legacyCheCityRegions: z
+    .array(z.tuple([positive, name, natural]))
+    .min(1)
+    .max(300)
+    .optional(),
   crewTypes: z
     .array(
       z
@@ -155,19 +201,33 @@ export const unitSetSchema = z.object({
     .min(1),
 });
 
+export const unitSetSchema = unitSetValueSchema.refine(
+  (unitSet) => !unitSet.legacyCheMapIds || !!unitSet.legacyCheCityRegions,
+  {
+    path: ['legacyCheCityRegions'],
+    message: '병종에 지정한 지도의 도시·지역 대응이 필요합니다.',
+  },
+);
+
 export const statRulesSchema = z.object({
-  stat: z
-    .object({ total: positive, min: natural, max: positive, count: z.literal(5).optional() })
-    .refine(
-      (value) =>
-        value.min <= value.max &&
-        value.total >= (value.count ?? 3) * value.min &&
-        value.total <= (value.count ?? 3) * value.max,
-      '능력치 합계·최소·최대가 맞지 않습니다.',
-    ),
+  stat: statRulesValueSchema,
 });
 
 export type MapResource = z.infer<typeof mapSchema>;
 export type ScenarioResource = z.infer<typeof scenarioSchema>;
 export type UnitSetResource = z.infer<typeof unitSetSchema>;
 export type StatRules = z.infer<typeof statRulesSchema>['stat'];
+
+export function scenarioStatRulesMatch({ requiredStatRules }: ScenarioResource, statRules: StatRules): boolean {
+  return (
+    requiredStatRules === undefined ||
+    (requiredStatRules.total === statRules.total &&
+      requiredStatRules.min === statRules.min &&
+      requiredStatRules.max === statRules.max &&
+      requiredStatRules.count === statRules.count)
+  );
+}
+
+export function scenarioMapMismatch(scenario: ScenarioResource, mapId: string): string | undefined {
+  return scenario.requiredMap === mapId ? undefined : scenario.requiredMap;
+}

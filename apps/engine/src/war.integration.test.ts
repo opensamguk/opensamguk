@@ -375,6 +375,53 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
     },
     60000,
   );
+  it('AC-P2-24 마지막 국가의 임관 제한은 멸망 턴에 저장되며 재적재와 재생이 일치한다', async () => {
+    const initial = await warFixture();
+    initial.startYear = 195;
+    initial.commandMeta = {
+      nextNationId: 3,
+      offers: { 4: 1 },
+      lastNationRecruitmentLock: { fromYear: 195 },
+    };
+    for (const general of initial.generals) general.nextTurnTick = general.id * 100;
+    const { worldId, loop, lease } = await create(initial, ['battle-affinity-v2']);
+    try {
+      await queue(worldId, 1, 'attack', { cityKey: 2 });
+      await queue(worldId, 2, 'join', { nationId: 1 });
+      await queue(worldId, 3, 'join_random', {});
+      await queue(worldId, 4, 'accept_invite', {});
+      await expect(
+        new TurnLoop(db, lease, {
+          beforeCommit: async () => {
+            throw Error('recruitment lock rollback');
+          },
+        }).advanceTo(100),
+      ).rejects.toThrow('recruitment lock rollback');
+      expect((await readWorldState(db, worldId)).commandMeta).toEqual(initial.commandMeta);
+      await loop.advanceTo(100);
+      const captured = await readWorldState(db, worldId);
+      expect(captured.nations.map(({ id }) => id)).toEqual([1]);
+      expect(captured.cities.find(({ cityKey }) => cityKey === 999)!.nationId).toBeNull();
+      expect(captured.commandMeta?.lastNationRecruitmentLock).toEqual({ fromYear: 195, blockedNationId: 1 });
+      const restarted = new TurnLoop(db, lease);
+      await restarted.advanceTo(10000);
+      const final = await readWorldState(db, worldId);
+      expect(final.commandMeta?.lastNationRecruitmentLock).toEqual(captured.commandMeta?.lastNationRecruitmentLock);
+      expect(final.generals.filter(({ id }) => id !== 1).map(({ nationId }) => nationId)).toEqual([null, null, null]);
+      expect(final.commandMeta?.offers[4]).toBe(1);
+      expect(
+        (await db.generalLog.findMany({ where: { worldId, generalId: { in: [2, 3, 4] } } })).map((log) => log.text),
+      ).toEqual(Array(3).fill('PROTECTED: 이 국가에는 임관할 수 없습니다.'));
+      const archive = await exportReplay(db, worldId);
+      expect(archive.months).toHaveLength(1);
+      expect(replayArchive(archive, 1).map(({ stateHash }) => stateHash)).toEqual(
+        archive.months.map(({ stateHash }) => stateHash),
+      );
+    } finally {
+      await releaseLease(db, lease);
+    }
+  });
+
   it('건국·등용제안·수락은 DB 재적재 후 유지되고 재생도 일치한다', async () => {
     const initial = await warFixture();
     initial.generals[3]!.nextTurnTick = 50;

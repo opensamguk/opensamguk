@@ -510,6 +510,7 @@ it.each(['empty', 'legacy'] as const)(
         ReputationEvent: [],
         MonthlyReview: [],
         MapBackground: [],
+        SeasonGeneral: [],
       });
       expect(await readSlices()).toEqual(slices);
       expect(

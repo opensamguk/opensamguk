@@ -5,6 +5,8 @@ import {
   assertReplayPolicy,
   buildYearbook,
   capsResourceHashInput,
+  checkInitialNpcStatLimits,
+  MAX_STARTING_NPC_STAT,
   monthlyDate,
   nextGameAction,
   parseCapsOrigin,
@@ -185,9 +187,9 @@ const generalFields = shape({
   portraitId: nullable(positive),
   nationId: nullable(positive),
   cityKey: positive,
-  leadership: (v) => natural(v) && v <= 100,
-  strength: (v) => natural(v) && v <= 100,
-  intel: (v) => natural(v) && v <= 100,
+  leadership: (v) => natural(v) && v <= MAX_STARTING_NPC_STAT,
+  strength: (v) => natural(v) && v <= MAX_STARTING_NPC_STAT,
+  intel: (v) => natural(v) && v <= MAX_STARTING_NPC_STAT,
   officerLevel: (v) => natural(v) && v <= 12,
   birthYear: natural,
   deathYear: natural,
@@ -241,7 +243,10 @@ const initialSchema = shape(
       npc: shape({ aggression: (v) => presetSchema.shape.npc.shape.aggression.safeParse(v).success }),
       boost: (v) => presetSchema.shape.boost.safeParse(v).success,
     }),
-    commandMeta: shape({ nextNationId: positive, offers: record(positive) }),
+    commandMeta: shape(
+      { nextNationId: positive, offers: record(positive) },
+      { lastNationRecruitmentLock: shape({ fromYear: (v) => positive(v) && Number(v) <= 9999 }) },
+    ),
     // args의 JSON 형태는 assertJson이 검사한다. 명령별 해석을 여기서 더하지 않는다.
     nationTurns: record(list(shape({ commandKey: name, args: (v) => v !== undefined }))),
   },
@@ -322,6 +327,7 @@ function assertJson(value: unknown, ancestors = new Set<object>()): void {
 }
 
 function checkInitial(initial: WorldInit): void {
+  checkInitialNpcStatLimits(initial);
   const unique = (ids: number[]) => {
     const set = new Set(ids);
     if (set.size !== ids.length) throw new Error('생성 기록의 ID가 겹칩니다.');

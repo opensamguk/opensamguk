@@ -118,6 +118,14 @@
       "note": "D-010 D16 교역, D-014 교역 명령 추가. D-022 §승인된 대체에도 적혀 있다"
     },
     {
+      "kind": "addition",
+      "command": "resettle",
+      "target": "general",
+      "sourceIds": [],
+      "approvalRefs": ["D-076"],
+      "note": "D-076은 방랑 군주의 재정착 명령을 승인한다."
+    },
+    {
       "kind": "replacement",
       "command": "nation_peace",
       "target": "nation",

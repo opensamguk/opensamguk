@@ -40,6 +40,7 @@ type Results = {
   'equipment.mine': Awaited<ReturnType<typeof readEquipmentBoard>>;
   'general.create': unknown;
   'turns.set': unknown;
+  'logistics.submit': { status: string };
   'lineage.get': Awaited<ReturnType<typeof readLineageBoard>>;
   'lineage.submit': unknown;
   'lineage.request': Awaited<ReturnType<typeof readLineageRequest>>;
@@ -87,7 +88,7 @@ async function advance(id: string, tick: number, fail = false) {
   }
 }
 const snapshot = (id: string) => db.$transaction((tx) => loadReplayState(tx, id));
-async function fixture(enabled = true, lineage = false) {
+async function fixture(enabled = true, lineage = false, specialty: 'iron' | 'horses' = 'iron') {
   const input = operationalInput();
   const template = input.map.sites.find((site) => site.kind === 'CITY')!;
   if (template.kind !== 'CITY') throw Error('시험 도시가 없습니다.');
@@ -133,7 +134,7 @@ async function fixture(enabled = true, lineage = false) {
   initial.ruleFeatures = features;
   const logistics = structuredClone(TEST_EQUIPMENT_LOGISTICS_CONFIG);
   logistics.capacity.base = 10000;
-  logistics.specialties = [{ cityKey: 3, good: 'iron', perMonth: 500 }];
+  logistics.specialties = [{ cityKey: 3, good: specialty, perMonth: specialty === 'iron' ? 500 : 100 }];
   const family = structuredClone(lineageTestConfig);
   family.birth.comingOfAgeYears = 1;
   family.marriage.npc.perMonth = 0;
@@ -294,62 +295,84 @@ afterAll(async () => {
   }
 });
 
-it('AC-P2-12: 실제 명령의 금·철·장비·경험은 함께 저장·롤백되고 12개월 전체 재생과 재접속 해시가 같다', async () => {
-  const f = await fixture();
-  expect((await rpc('equipment.mine', { worldId: f.id }, f.player)).data?.items).toHaveLength(18);
-  await execute(f, 'trade_rice', { amount: 1000, buy: false });
-  const tick = await prepare(f, 'equipment_trade', { slot: 'weapon', itemKey: 'weapon_01' });
-  const beforeReplay = await snapshot(f.id),
-    before = beforeReplay.state;
-  await expect(advance(f.id, tick, true)).rejects.toThrow('equipment-save-failure');
-  expect(await snapshot(f.id)).toEqual(beforeReplay);
-  await advance(f.id, tick);
-  const after = (await snapshot(f.id)).state;
-  expect(after.equipment?.generals['3']).toEqual({ weapon: 'weapon_01' });
-  expect(after.generals[3]!.gold).toBe(before.generals[3]!.gold - 1000);
-  expect(after.generals[3]!.experience).toBe(before.generals[3]!.experience + 10);
-  expect(after.generals[3]!.strength).toBe(before.generals[3]!.strength);
-  expect(after.logistics?.cities['3']?.iron).toBe(before.logistics!.cities['3']!.iron - 5);
-  await expect(db.$transaction((tx) => persistEquipmentState(tx, f.id, before, after))).rejects.toThrow(
-    '장비 상태가 바뀌어',
-  );
-  expect((await snapshot(f.id)).state).toEqual(after);
-  await expect(db.$executeRaw`UPDATE "World" SET "equipmentState"=NULL WHERE id=${f.id}`).rejects.toThrow();
-  await expect(
-    db.$transaction(async (tx) => {
-      await tx.world.update({
-        where: { id: f.id },
-        data: { equipmentState: { ...after.equipment!, generals: { '9999': { weapon: 'weapon_01' } } } },
-      });
-      await loadReplayState(tx, f.id);
-    }),
-  ).rejects.toThrow();
-  expect((await snapshot(f.id)).state).toEqual(after);
-  const board = await rpc('equipment.mine', { worldId: f.id }, f.player);
-  expect(board.data?.stats.strength).toBe(board.data!.baseStats.strength + 1);
-  expect(board.data?.sales.find((sale) => sale.slot === 'weapon')?.proceeds).toBe(500);
-  await advance(f.id, 120000);
-  const archive = await exportReplay(db, f.id);
-  expect(archive.months).toHaveLength(12);
-  expect(replayArchive(archive, 12).map((month) => month.stateHash)).toEqual(
-    archive.months.map((month) => month.stateHash),
-  );
-  const reconnected = createDb(url.href);
-  try {
-    const restored = await reconnected.$transaction((tx) => loadReplayState(tx, f.id));
-    expect(hashState(restored)).toBe(archive.months.at(-1)!.stateHash);
-    expect(restored.state.equipment?.generals['3']).toEqual({ weapon: 'weapon_01' });
-    expect(restored.state.equipment).toEqual((await snapshot(f.id)).state.equipment);
-  } finally {
-    await reconnected.$disconnect();
-  }
-  const saleTick = await prepare(f, 'equipment_trade', { slot: 'weapon', itemKey: 'none' });
-  const beforeSale = (await snapshot(f.id)).state;
-  await advance(f.id, saleTick);
-  const sold = (await snapshot(f.id)).state;
-  expect(sold.equipment?.generals['3']).toBeUndefined();
-  expect(sold.generals[3]!.gold).toBe(beforeSale.generals[3]!.gold + 500);
-});
+it.each([
+  { slot: 'weapon', itemKey: 'weapon_01', good: 'iron', stat: 'strength' },
+  { slot: 'horse', itemKey: 'horse_01', good: 'horses', stat: 'leadership' },
+] as const)(
+  'AC-P2-12·30 $slot 구매의 재료·장비·경험이 함께 저장·롤백되고 12개월 재생과 재접속 해시가 같다',
+  async ({ slot, itemKey, good, stat }) => {
+    const f = await fixture(true, false, good);
+    expect((await rpc('equipment.mine', { worldId: f.id }, f.player)).data?.items).toHaveLength(18);
+    await execute(f, 'trade_rice', { amount: 1000, buy: false });
+    for (const other of ['iron', 'wood', 'horses'].filter((resource) => resource !== good)) {
+      const order = await rpc(
+        'logistics.submit',
+        {
+          worldId: f.id,
+          expectedUserId: f.player.id,
+          requestId: randomUUID(),
+          payload: { type: 'trade', cityKey: 3, good: other, side: 'buy', amount: 2 },
+        },
+        f.player,
+      );
+      expect(order.data?.status, JSON.stringify(order.error)).toBe('pending');
+    }
+    const tick = await prepare(f, 'equipment_trade', { slot, itemKey });
+    const beforeReplay = await snapshot(f.id),
+      before = beforeReplay.state;
+    const stock = before.logistics!.cities['3']!;
+    expect(Math.min(stock.iron, stock.wood, stock.horses)).toBeGreaterThan(0);
+    await expect(advance(f.id, tick, true)).rejects.toThrow('equipment-save-failure');
+    expect(await snapshot(f.id)).toEqual(beforeReplay);
+    await advance(f.id, tick);
+    const after = (await snapshot(f.id)).state;
+    expect(after.equipment?.generals['3']).toEqual({ [slot]: itemKey });
+    expect(after.generals[3]!.gold).toBe(before.generals[3]!.gold - 1000);
+    expect(after.generals[3]!.experience).toBe(before.generals[3]!.experience + 10);
+    expect(after.generals[3]![stat]).toBe(before.generals[3]![stat]);
+    expect(after.logistics?.cities['3']).toEqual({ ...stock, [good]: stock[good] - 5 });
+    await expect(db.$transaction((tx) => persistEquipmentState(tx, f.id, before, after))).rejects.toThrow(
+      '장비 상태가 바뀌어',
+    );
+    expect((await snapshot(f.id)).state).toEqual(after);
+    await expect(db.$executeRaw`UPDATE "World" SET "equipmentState"=NULL WHERE id=${f.id}`).rejects.toThrow();
+    await expect(
+      db.$transaction(async (tx) => {
+        await tx.world.update({
+          where: { id: f.id },
+          data: { equipmentState: { ...after.equipment!, generals: { '9999': { [slot]: itemKey } } } },
+        });
+        await loadReplayState(tx, f.id);
+      }),
+    ).rejects.toThrow();
+    expect((await snapshot(f.id)).state).toEqual(after);
+    const board = await rpc('equipment.mine', { worldId: f.id }, f.player);
+    expect(board.data?.stats[stat]).toBe(board.data!.baseStats[stat] + 1);
+    expect(board.data?.sales.find((sale) => sale.slot === slot)?.proceeds).toBe(500);
+    await advance(f.id, 120000);
+    const archive = await exportReplay(db, f.id);
+    expect(archive.months).toHaveLength(12);
+    expect(replayArchive(archive, 12).map((month) => month.stateHash)).toEqual(
+      archive.months.map((month) => month.stateHash),
+    );
+    const reconnected = createDb(url.href);
+    try {
+      const restored = await reconnected.$transaction((tx) => loadReplayState(tx, f.id));
+      expect(hashState(restored)).toBe(archive.months.at(-1)!.stateHash);
+      expect(restored.state.equipment?.generals['3']).toEqual({ [slot]: itemKey });
+      expect(restored.state.equipment).toEqual((await snapshot(f.id)).state.equipment);
+    } finally {
+      await reconnected.$disconnect();
+    }
+    const saleTick = await prepare(f, 'equipment_trade', { slot, itemKey: 'none' });
+    const beforeSale = (await snapshot(f.id)).state;
+    await advance(f.id, saleTick);
+    const sold = (await snapshot(f.id)).state;
+    expect(sold.equipment?.generals['3']).toBeUndefined();
+    expect(sold.generals[3]!.gold).toBe(beforeSale.generals[3]!.gold + 500);
+    expect(sold.logistics?.cities['3']).toEqual(beforeSale.logistics?.cities['3']);
+  },
+);
 
 for (const category of categories) {
   it(

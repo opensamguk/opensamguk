@@ -10,6 +10,7 @@ import { newSession } from '../apps/server/src/auth/session';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { readFixture } from '../apps/server/test/readFixture';
 import { readWorldState, saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { persistSeasonArchive } from '../apps/engine/src/seasonArchive';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 import { INTEL_FEATURE } from '../packages/rules/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
@@ -55,6 +56,7 @@ const paths = [
   'records.general',
   'records.nation',
   'records.world',
+  'records.season',
   'intel.records',
   'timelapse.frames',
   'timelapse.publicFrames',
@@ -67,7 +69,7 @@ function input(path: Path): unknown {
     return undefined;
   if (path === 'auth.signup') return { email: `${randomUUID()}@example.test`, password };
   if (path === 'auth.login') return { email: users[0]!.email, password };
-  if (path === 'timelapse.publicFrames') return { worldId: endedWorldId };
+  if (path === 'timelapse.publicFrames' || path === 'records.season') return { worldId: endedWorldId };
   if (path === 'general.create')
     return { worldId, name: '보안장수', leadership: 55, strength: 55, intel: 55, portraitId: 10001 };
   if (path === 'turns.set') return { worldId, revision: 0, slots: Array.from({ length: 30 }, () => null) };
@@ -84,7 +86,7 @@ async function session(user = 0) {
   await db.session.create({ data: { id: value.id, userId: users[user]!.id, expiresAt: value.expiresAt } });
   return `sid=${value.token}`;
 }
-async function request(path: Path, data: unknown, cookie?: string) {
+async function request(path: Path, data: unknown, cookie?: string, apiBase = base) {
   const procedure: unknown = Object.getOwnPropertyDescriptor(appRouter._def.procedures, path)?.value;
   if (
     (typeof procedure !== 'object' && typeof procedure !== 'function') ||
@@ -103,7 +105,7 @@ async function request(path: Path, data: unknown, cookie?: string) {
     throw new Error('권한 검사 절차 종류를 확인하세요.');
   const mutation = definition.type === 'mutation';
   const encoded = JSON.stringify({ 0: data });
-  const res = await fetch(`${base}/trpc/${path}?batch=1${mutation ? '' : `&input=${encodeURIComponent(encoded)}`}`, {
+  const res = await fetch(`${apiBase}/trpc/${path}?batch=1${mutation ? '' : `&input=${encodeURIComponent(encoded)}`}`, {
     method: mutation ? 'POST' : 'GET',
     headers: { origin, ...(cookie ? { cookie } : {}), ...(mutation ? { 'content-type': 'application/json' } : {}) },
     ...(mutation ? { body: encoded } : {}),
@@ -116,6 +118,7 @@ async function snapshot() {
     db.user.findMany({ orderBy: { id: 'asc' } }),
     db.session.findMany({ orderBy: { id: 'asc' } }),
     db.world.findMany({ orderBy: { id: 'asc' } }),
+    db.seasonGeneral.findMany({ orderBy: [{ worldId: 'asc' }, { generalId: 'asc' }] }),
     db.general.findMany({ orderBy: [{ worldId: 'asc' }, { id: 'asc' }] }),
     db.generalTurn.findMany({ orderBy: [{ worldId: 'asc' }, { generalId: 'asc' }, { slot: 'asc' }] }),
     db.inputEvent.findMany({ orderBy: { id: 'asc' } }),
@@ -175,6 +178,7 @@ beforeAll(async () => {
       endedAt: new Date(now),
     },
   });
+  await db.$transaction((tx) => persistSeasonArchive(tx, endedWorldId, 191));
   await db.yearbookSnapshot.create({
     data: {
       worldId: endedWorldId,
@@ -315,12 +319,48 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
     await request('auth.logout', undefined, a);
     expect((await request('auth.me', undefined, b)).data).toHaveProperty('user.id', users[1]!.id);
   });
+  it('AC-P2-22 종료 장수 순위는 저장 당시 값과 공개 항목만 돌려준다', async () => {
+    const input = { worldId: endedWorldId, by: 'merit' };
+    const cookie = await session();
+    const original = await request('records.season', input, cookie);
+    expect(original).toMatchObject({
+      status: 200,
+      data: { result: { reason: 'END_YEAR', year: 191 }, generals: expect.any(Array) },
+    });
+    const rows = (original.data as { generals: Record<string, unknown>[] }).generals;
+    expect(rows.length).toBeGreaterThan(0);
+    expect(Object.keys(rows[0]!).sort()).toEqual([
+      'captures',
+      'dedication',
+      'experience',
+      'generalId',
+      'merit',
+      'name',
+      'nation',
+      'rank',
+      'value',
+      'wins',
+    ]);
+    expect(rows[0]).toMatchObject({ merit: 0, rank: 1, value: 0 });
+    expect(await request('records.season', input, await session(3))).toEqual(original);
+    expect((await request('records.season', { worldId }, cookie)).code).toBe('NOT_FOUND');
+    expect((await request('records.season', { ...input, userId: users[1]!.id }, cookie)).code).toBe('BAD_REQUEST');
+    const generalId = Number(rows[0]!.generalId);
+    const where = { worldId_id: { worldId: endedWorldId, id: generalId } };
+    const general = await db.general.findUniqueOrThrow({ where, select: { battleWins: true } });
+    try {
+      await db.general.update({ where, data: { battleWins: general.battleWins + 1 } });
+      expect(await request('records.season', input, cookie)).toEqual(original);
+    } finally {
+      await db.general.update({ where, data: general });
+    }
+  });
   it('AC-P2-07 첩보 예턴은 같은 국가에만 저장 보고서를 열고 병력을 구간으로 표시한다', async () => {
     const initial = commandInitial();
     initial.ruleFeatures = [INTEL_FEATURE, 'policy'];
     initial.generals[0]!.userId = users[0]!.id;
     initial.generals[1]!.userId = users[1]!.id;
-    initial.generals[3]!.userId = users[3]!.id;
+    Object.assign(initial.generals[3]!, { userId: users[3]!.id, cityKey: 2 });
     for (const general of initial.generals) general.nextTurnTick = general.id === 1 ? 100 : 20_000;
     const { worldId: intelWorld, stateHash } = await saveInitialWorld(db, initial, {
       name: '첩보 권한과 재생 검증',
@@ -339,6 +379,14 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
     const actor = await session();
     const enemy = await session(1);
     const neutral = await session(3);
+    const enemyCity = { ...input, cityKey: 2 };
+    expect((await request('city.get', { worldId, cityKey: state.cities[0]!.cityKey }, actor)).data).not.toHaveProperty(
+      'fog',
+    );
+    expect((await request('city.get', enemyCity, actor)).data).toMatchObject({
+      fog: { intel: null, garrisonHidden: true },
+      generals: [],
+    });
     expect((await request('intel.records', input, actor)).data).toEqual({ enabled: true, items: [], alerts: [] });
     expect(await request('turns.precheck', { ...input, commandKey: 'spy', args: { cityKey: 2 } }, actor)).toMatchObject(
       { status: 200, data: { ok: true } },
@@ -370,10 +418,67 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
         rice: initial.generals[0]!.rice - 60,
       });
       expect(after.state.ext).toMatchObject({ intel: { 1: { 2: { tick: 100, crew: 30 } } } });
-      expect((await request('intel.records', input, actor)).data).toMatchObject({
+      const report = (await request('intel.records', input, actor)).data as { items: unknown[] };
+      expect(report).toMatchObject({
         enabled: true,
         items: [{ cityKey: 2, tick: 100, year: 191, month: 1, ageMonths: 0, crew: { min: 1, max: 999 }, tech: 'even' }],
       });
+      const remoteCity = (await request('city.get', enemyCity, actor)).data;
+      expect(remoteCity).toMatchObject({ fog: { intel: report.items[0], garrisonHidden: true }, generals: [] });
+      expect(remoteCity).not.toHaveProperty('population');
+      for (const invalidLedger of [[], { 1: [] }, { 1: null }, { 1: { 2: null } }]) {
+        await db.worldExtSlice.update({
+          where: { worldId_key: { worldId: intelWorld, key: 'intel' } },
+          data: { value: invalidLedger },
+        });
+        try {
+          expect((await request('city.get', enemyCity, actor)).code).toBe('INTERNAL_SERVER_ERROR');
+          expect((await request('intel.records', input, actor)).code).toBe('INTERNAL_SERVER_ERROR');
+        } finally {
+          await db.$executeRaw`
+            UPDATE "WorldExtSlice" SET "value" = ${JSON.stringify(after.state.ext!.intel)}::jsonb
+            WHERE "worldId" = ${intelWorld} AND "key" = 'intel'
+          `;
+        }
+      }
+      expect((await request('city.get', enemyCity, enemy)).data).toMatchObject({
+        population: initial.cities[1]!.population,
+        fog: { intel: null, garrisonHidden: false },
+      });
+      expect((await request('city.get', enemyCity, neutral)).data).toMatchObject({
+        population: initial.cities[1]!.population,
+        fog: { intel: null, garrisonHidden: true },
+        generals: [],
+      });
+      const verifiedApp = await buildServer({
+        db,
+        now: () => now,
+        publicOrigin: origin,
+        logging: false,
+        emailVerificationRequired: true,
+      });
+      try {
+        const verifiedBase = await verifiedApp.listen({ port: 0, host: '127.0.0.1' });
+        expect((await request('intel.records', input, actor, verifiedBase)).code).toBe('FORBIDDEN');
+        expect((await request('city.get', enemyCity, actor, verifiedBase)).data).toMatchObject({
+          fog: { intel: null, garrisonHidden: true },
+          generals: [],
+        });
+      } finally {
+        await verifiedApp.close();
+      }
+      const sanction = await db.sanction.create({
+        data: { worldId: intelWorld, userId: users[0]!.id, createdBy: users[1]!.id, reason: '첩보 권한 시험' },
+      });
+      try {
+        expect((await request('intel.records', input, actor)).code).toBe('FORBIDDEN');
+        expect((await request('city.get', enemyCity, actor)).data).toMatchObject({
+          fog: { intel: null, garrisonHidden: true },
+          generals: [],
+        });
+      } finally {
+        await db.sanction.delete({ where: { id: sanction.id } });
+      }
       expect((await request('intel.records', input, enemy)).data).toEqual({
         enabled: true,
         items: [],

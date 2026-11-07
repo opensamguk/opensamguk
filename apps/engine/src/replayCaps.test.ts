@@ -407,6 +407,24 @@ const marker = (archive: CapsArchive) => archive.inputs.find((input) => input.ki
 const expectReadFailure = (value: unknown) => expect(() => readCapsArchive(value)).toThrow();
 
 describe('T4-03 / AC-P2-02 archive 6 순수 parser와 걷기', () => {
+  it('T4-46 AC-P2-24 형식 6에서도 지정 시나리오의 시작 NPC만 원본 능력치를 받는다', async () => {
+    const value = await fixture();
+    const { origin } = value;
+    const first = origin.initial.generals[0]!;
+    first.leadership = 140;
+    function verify(scenarioKey: string, userId: string | null) {
+      origin.initial.scenarioKey = scenarioKey;
+      first.userId = userId;
+      origin.initialStateHash = hashState(origin.initial);
+      origin.resourceHash = hashState(capsResourceHashInput(origin));
+      return readCapsArchive(value);
+    }
+    expect(verify('2210@2', null).origin.initial.generals[0]!.leadership).toBe(140);
+    expect(() => verify('2210@2', 'account')).toThrow('시작 장수의 기본 능력치');
+    expect(() => verify('2121', null)).toThrow('시작 장수의 기본 능력치');
+    expect(() => verify('1030', null)).toThrow('시작 장수의 기본 능력치');
+  });
+
   it('A1 정상 off·F0·사람 T·NPC null의 12개월과 종료를 재현하고 남는 top 키를 거부한다', () => {
     for (const archive of [off, defaults, human, npc, delayed]) {
       const before = hashState(archive);

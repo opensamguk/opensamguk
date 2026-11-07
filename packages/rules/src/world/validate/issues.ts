@@ -30,6 +30,7 @@ const messages = {
   'terrain-open': '지형의 점 수나 닫힘이 맞지 않습니다.',
   'terrain-out-of-canvas': '지형 좌표가 캔버스 밖입니다.',
   'scenario-nation-city-missing': '국가의 도시가 지도에 없습니다.',
+  'scenario-map-mismatch': '시나리오가 지정한 지도와 다릅니다.',
   'scenario-general-city-missing': '장수의 도시가 지도에 없습니다.',
   'scenario-nation-name-duplicate': '국가 이름이 겹칩니다.',
   'scenario-city-owner-duplicate': '도시 소유가 겹칩니다.',
@@ -47,6 +48,7 @@ const messages = {
   'unitset-arm-unknown': '병종의 계통 이름이 없습니다.',
   'unitset-coef-arm-unknown': '병종 계수의 병종·계열이 없습니다.',
   'stat-rules-inconsistent': '능력치 합계와 범위가 맞지 않습니다.',
+  'scenario-stat-rules-mismatch': '시나리오와 장수 생성 능력치 판이 맞지 않습니다.',
 } as const;
 export type ResourceIssueCode = keyof typeof messages;
 export interface ResourceIssue {
