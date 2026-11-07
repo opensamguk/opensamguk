@@ -8,6 +8,8 @@ import { initialResourceKeys, verifyInitializedResources, type InitializedResour
 import {
   cheUnitSetPublication,
   readyScenarioRows,
+  readScenarioLegacyResources,
+  requiredScenarioLegacyResources,
   requiredScenarioStatRules,
   scenarioRows,
   type ScenarioRow,
@@ -59,6 +61,7 @@ export async function initializeScenarios(
 ): Promise<{ inserted: number; existing: number }> {
   const ready = readyScenarioRows(rows);
   const keys = ready.map(({ key }) => `SCENARIO/${key}/1`);
+  const legacy = await requiredScenarioLegacyResources(ready);
   const dependencies = [
     ...(ready.some(({ unitSet }) => unitSet === 'che')
       ? [{ kind: 'UNIT_SET' as const, ...cheUnitSetPublication }]
@@ -77,8 +80,20 @@ export async function initializeScenarios(
       } catch {
         throw new ScenarioInitializationError('내장 자원 초기화를 먼저 실행하세요', initialResourceKeys);
       }
+      const verifyLegacy = async () => {
+        try {
+          await readScenarioLegacyResources(tx, legacy);
+        } catch {
+          throw new ScenarioInitializationError(
+            '원작 지도 초기화 결과를 확인하세요',
+            legacy.map(({ kind, name, version }) => `${kind}/${name}/${version}`),
+          );
+        }
+      };
+      await verifyLegacy();
       const before = await tx.$queryRawUnsafe<ScenarioResourceRow[]>(selected);
       await tx.$executeRawUnsafe(sql);
+      await verifyLegacy();
       const after = await tx.$queryRawUnsafe<ScenarioResourceRow[]>(selected);
       for (const row of ready) {
         const matches = after.filter((saved) => saved.name === row.key);
