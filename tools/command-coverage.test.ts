@@ -89,6 +89,7 @@ describe('T4-02 등록된 확장 명령 대조', () => {
         '../balance.ts',
         '../model/clone.ts',
         'ext/state.ts',
+        'ext/intel/record.ts',
         '../personnel/permissions.ts',
         '../personnel/types.ts',
       ].map((file) => [file, readFileSync(join(root, 'packages/rules/src/commands', file), 'utf8')]),
