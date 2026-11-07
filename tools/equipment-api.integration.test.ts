@@ -420,7 +420,7 @@ it('AC-P2-12: 장비 비활성 월드는 저장값이 없고 조회·장비 명�
   ).rejects.toThrow();
 });
 
-it('AC-P2-12·32: 기록된 혼인·출생·사람 계승은 장비와 조작자를 함께 옮기고 다음 월 재생도 같다', async () => {
+async function equippedFamily() {
   // 기존 가문 결합 시험처럼 등장 1년·출산 100%를 명시한 인공 시험이다. 공개 프로필 기본값이 아니다.
   const f = await fixture(true, true);
   await execute(f, 'trade_rice', { amount: 1000, buy: false });
@@ -443,6 +443,11 @@ it('AC-P2-12·32: 기록된 혼인·출생·사람 계승은 장비와 조작자
   );
   expect(grown.generals[heir], JSON.stringify(grown.lineage)).toBeDefined();
   await lineageAction(f, f.player, f.actorId, { type: 'heir.designate', heirGeneralId: heir });
+  return { f, heir };
+}
+
+it('AC-P2-12·32: 기록된 혼인·출생·사람 계승은 장비와 조작자를 함께 옮기고 다음 월 재생도 같다', async () => {
+  const { f, heir } = await equippedFamily();
   const board = await rpc('lineage.get', { worldId: f.id }, f.player),
     preview = board.data?.view.mine?.preview;
   if (!preview) throw Error(`계승 미리보기가 없습니다: ${JSON.stringify(board)}`);
@@ -458,4 +463,58 @@ it('AC-P2-12·32: 기록된 혼인·출생·사람 계승은 장비와 조작자
   const archive = await exportReplay(db, f.id);
   expect(replayArchive(archive, 25).map((row) => row.stateHash)).toEqual(archive.months.map((row) => row.stateHash));
   expect(archive.months.at(-1)?.stateHash).toBe(hashState(await snapshot(f.id)));
+});
+
+it('AC-P2-12·32: 접수 뒤 장비가 겹치면 계승을 거부하고 전임자 판매 뒤에만 조작권을 옮긴다', async () => {
+  const { f, heir } = await equippedFamily();
+  const board = await rpc('lineage.get', { worldId: f.id }, f.player);
+  const preview = board.data?.view.mine?.preview;
+  if (!preview) throw Error('접수할 계승 미리보기가 없습니다.');
+  const requestId = randomUUID();
+  const input = {
+    worldId: f.id,
+    expectedUserId: f.player.id,
+    expectedGeneralId: f.actorId,
+    requestId,
+    payload: { type: 'succession.confirm', heirGeneralId: heir, expected: preview },
+  };
+  expect(await rpc('lineage.submit', input, f.player)).toMatchObject({ status: 200, data: { status: 'pending' } });
+  // 접수와 실행 사이에 후계자가 이미 장착한 경우만 시험 고정물로 만든다.
+  await db.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${f.id} FOR UPDATE`;
+    const before = (await loadReplayState(tx, f.id)).state;
+    const after = structuredClone(before);
+    after.equipment!.generals[String(heir)] = { weapon: 'weapon_02' };
+    await persistEquipmentState(tx, f.id, before, after);
+  });
+  const conflict = await rpc('lineage.get', { worldId: f.id }, f.player);
+  expect(conflict.data?.view.mine).toMatchObject({
+    preview: null,
+    previewFailure: { code: 'EQUIPMENT_CONFLICT', message: expect.stringContaining('먼저 판매') },
+  });
+  const before = (await snapshot(f.id)).state;
+  await advance(f.id, 240000);
+  expect((await rpc('lineage.request', { worldId: f.id, requestId }, f.player)).data).toMatchObject({
+    status: 'rejected',
+    result: { code: 'EQUIPMENT_CONFLICT' },
+  });
+  const rejected = (await snapshot(f.id)).state;
+  expect(rejected.generals).toEqual(before.generals);
+  expect(rejected.lineage).toEqual(before.lineage);
+  expect(rejected.equipment).toEqual(before.equipment);
+
+  await execute(f, 'equipment_trade', { slot: 'weapon', itemKey: 'none' });
+  const refreshed = (await rpc('lineage.get', { worldId: f.id }, f.player)).data?.view.mine?.preview;
+  if (!refreshed) throw Error('판매 뒤 계승 미리보기가 없습니다.');
+  expect(refreshed.equipment).toEqual({
+    from: null,
+    heir: { weapon: 'weapon_02' },
+    inherited: { weapon: 'weapon_02' },
+  });
+  await lineageAction(f, f.player, f.actorId, { type: 'succession.confirm', heirGeneralId: heir, expected: refreshed });
+  const inherited = (await snapshot(f.id)).state;
+  expect(inherited.equipment?.generals).toEqual({ [heir]: { weapon: 'weapon_02' } });
+  expect(inherited.generals[heir]?.userId).toBe(f.player.id);
+  expect(inherited.generals[f.actorId]?.userId).toBeNull();
+  expect((await rpc('equipment.mine', { worldId: f.id }, f.player)).data?.generalId).toBe(heir);
 });
