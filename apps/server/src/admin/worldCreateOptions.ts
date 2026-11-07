@@ -116,7 +116,24 @@ const contracts = {
     presets: presetKeys,
     suggestedEndYear: 231,
   },
+  'san10-191-border-return': {
+    id: 'san10-191-border-return',
+    label: 'SAN10 확장 · 접경귀환',
+    selection: { ...san10Selection, scenarioKey: 'san10-191@2' },
+    startYear: 191,
+    nations: 21,
+    counts: { cities: 147, gates: 8, ports: 0, fields: 0, anchors: 155 },
+    presets: presetKeys,
+    suggestedEndYear: 231,
+  },
 } as const;
+const expandedProfiles = [
+  ['integration-v01', 'expanded-191-v3'],
+  ['san10-191-expanded', 'expanded-191-v4'],
+  ['san10-191-lifecycle', 'expanded-191-v5'],
+  ['san10-191-research', 'expanded-191-v6'],
+  ['san10-191-border-return', 'expanded-191-v7'],
+] as const satisfies readonly (readonly [ProfileId, string])[];
 function profileRefs(id: ProfileId) {
   const selection = contracts[id].selection;
   return [
@@ -307,8 +324,7 @@ export function expandedCreationProfile(
   presets: readonly PresetSource[],
   data: unknown,
   registry: RuleRegistry = ruleRegistry,
-  profileId:
-    'integration-v01' | 'san10-191-expanded' | 'san10-191-lifecycle' | 'san10-191-research' = 'integration-v01',
+  profileId: (typeof expandedProfiles)[number][0] = 'integration-v01',
 ): CreationProfile {
   const identity =
     profileId === 'integration-v01'
@@ -318,18 +334,12 @@ export function expandedCreationProfile(
   try {
     profile = featureProfileSchema.parse(data);
     if (
-      profile.key !==
-        (
-          {
-            'integration-v01': 'expanded-191-v3',
-            'san10-191-expanded': 'expanded-191-v4',
-            'san10-191-lifecycle': 'expanded-191-v5',
-            'san10-191-research': 'expanded-191-v6',
-          } as const
-        )[profileId] ||
+      profile.key !== expandedProfiles.find(([id]) => id === profileId)?.[1] ||
       !profile.ruleFeatures.includes('battle-affinity-v2') ||
       (profileId === 'san10-191-lifecycle' && !profile.ruleFeatures.includes('nation-lifecycle-v1')) ||
       (profileId === 'san10-191-research' && !profile.ruleFeatures.includes('nation-research-v1')) ||
+      (profileId === 'san10-191-border-return' &&
+        (!profile.ruleFeatures.includes('border-return-v1') || !profile.ruleFeatures.includes('nation-research-v1'))) ||
       profile.scenarioKey !== contracts[profileId].selection.scenarioKey ||
       profile.mapKey !== contracts[profileId].selection.mapKey ||
       (profileId !== 'integration-v01' &&
@@ -369,8 +379,7 @@ export async function getWorldCreationOptions(ctx: Context, input: z.infer<typeo
       async (tx) => {
         const userId = await requireCurrentAdmin(tx, ctx, false);
         const selectedIds: ProfileId[] = [...profileIds];
-        if (input.expandedProfiles === true)
-          selectedIds.push('san10-191-expanded', 'san10-191-lifecycle', 'san10-191-research');
+        if (input.expandedProfiles === true) selectedIds.push(...expandedProfiles.map(([id]) => id));
         const refs = [
           ...new Map(
             selectedIds.flatMap(profileRefs).map((ref) => [`${ref.kind}/${ref.name}/${ref.version}`, ref]),
@@ -394,40 +403,15 @@ export async function getWorldCreationOptions(ctx: Context, input: z.infer<typeo
         );
         const profiles = profileIds.map((id) => creationProfile(rows, presets, ruleRegistry, id));
         if (input.expandedProfiles === true) {
-          let value: unknown;
-          try {
-            value = JSON.parse(await readFile(new URL('feature-profile/expanded-191-v3.json', resourceRoot()), 'utf8'));
-          } catch {
-            value = null;
+          for (const [id, key] of expandedProfiles) {
+            let value: unknown;
+            try {
+              value = JSON.parse(await readFile(new URL(`feature-profile/${key}.json`, resourceRoot()), 'utf8'));
+            } catch {
+              value = null;
+            }
+            profiles.push(expandedCreationProfile(rows, presets, value, ruleRegistry, id));
           }
-          profiles.push(expandedCreationProfile(rows, presets, value));
-          let expanded: unknown;
-          try {
-            expanded = JSON.parse(
-              await readFile(new URL('feature-profile/expanded-191-v4.json', resourceRoot()), 'utf8'),
-            );
-          } catch {
-            expanded = null;
-          }
-          profiles.push(expandedCreationProfile(rows, presets, expanded, ruleRegistry, 'san10-191-expanded'));
-          let lifecycle: unknown;
-          try {
-            lifecycle = JSON.parse(
-              await readFile(new URL('feature-profile/expanded-191-v5.json', resourceRoot()), 'utf8'),
-            );
-          } catch {
-            lifecycle = null;
-          }
-          profiles.push(expandedCreationProfile(rows, presets, lifecycle, ruleRegistry, 'san10-191-lifecycle'));
-          let research: unknown;
-          try {
-            research = JSON.parse(
-              await readFile(new URL('feature-profile/expanded-191-v6.json', resourceRoot()), 'utf8'),
-            );
-          } catch {
-            research = null;
-          }
-          profiles.push(expandedCreationProfile(rows, presets, research, ruleRegistry, 'san10-191-research'));
         }
         return { userId, revision: hashState(profiles), profiles };
       },

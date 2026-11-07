@@ -44,6 +44,8 @@ import { nationStrategyFeature } from './nationStrategy/feature';
 import { nationLifecycleFeature } from './nationLifecycle/feature';
 import { preparedTurnsFeature } from './preparedTurns/feature';
 import { nationResearchFeature } from './nationResearch/feature';
+import { returnBorder } from './commands/ext/return_border/return_border';
+import { NATION_LIFECYCLE_FEATURE } from './nationLifecycle/state';
 
 export interface ReplayOriginV1 {
   version: 1;
@@ -123,6 +125,12 @@ export const ruleRegistry: RuleRegistry = {
     cityScaleFeature,
     nationStrategyFeature,
     nationLifecycleFeature,
+    {
+      key: 'border-return-v1',
+      requires: [NATION_LIFECYCLE_FEATURE],
+      conflicts: [],
+      commandBindings: [{ definition: returnBorder, sliceKeys: [] }],
+    },
   ],
   monthlyOrder: [
     'treaty',

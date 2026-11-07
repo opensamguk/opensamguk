@@ -139,3 +139,5 @@ core2026 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`의 `resources/unitset/unitse
 ## 특수 병종 연구와 국가 명령 준비
 
 `packages/rules/src/nationResearch/commands.ts`와 `preparedTurns/`는 core2026 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`의 `packages/logic/src/actions/turn/nation/eventResearch.ts`, 연구 명령 7종과 `app/game-engine/src/turn/reservedTurnHandler.ts`의 연속 실행 규칙을 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다. 기간·국고 비용·보상·직책은 사용자 승인 D-077을 적용하며 기존 확장판의 병종 조건은 바꾸지 않는다.
+
+`packages/rules/src/commands/ext/return_border/`는 같은 커밋의 `packages/logic/src/actions/turn/general/che_접경귀환.ts`에서 연결 3칸의 탐색 규칙을 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다.
