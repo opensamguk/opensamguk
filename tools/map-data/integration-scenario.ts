@@ -29,12 +29,11 @@ export const SCENARIO_RELOCATIONS = [
   },
 ] as const;
 
-export function buildIntegrationScenario() {
-  const mainText = read('resources/scenario/1030.json');
+export function buildIntegrationScenario(mainText: string, legacyContent: unknown) {
   const original = JSON.parse(mainText) as Record<string, unknown>;
   const main = scenarioSchema.parse(original);
-  const legacy = mapSchema.parse(JSON.parse(read('resources/map/che.json')));
-  const map = buildOperationalMap();
+  const legacy = mapSchema.parse(legacyContent);
+  const map = buildOperationalMap(legacyContent);
   const rows = auditOfficerLedger(
     mainText,
     read('tools/fixtures/int16-selected-officers.json'),

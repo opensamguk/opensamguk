@@ -1,14 +1,16 @@
 import { isAbsolute } from 'node:path';
 
 export const AUTHZ_SHARD_TOTAL = 3;
+export const ENGINE_SHARD_TOTAL = 2;
 
 export function integrationShardArgs(suite: string | undefined, shard: string | undefined, report: string | undefined) {
   if (shard === undefined && report === undefined) return [];
-  if (suite !== 'api') throw new Error('authz shard suite');
+  if (suite !== 'api' && suite !== 'engine') throw new Error('integration shard suite');
   if (!shard || !report || !isAbsolute(report) || !/^[1-9]\d*\/[1-9]\d*$/.test(shard))
-    throw new Error('authz shard-spec');
+    throw new Error('integration shard-spec');
   const [index, total] = shard.split('/').map(Number);
-  if (total !== AUTHZ_SHARD_TOTAL || index! > total) throw new Error('authz shard-spec');
+  const expectedTotal = suite === 'api' ? AUTHZ_SHARD_TOTAL : ENGINE_SHARD_TOTAL;
+  if (total !== expectedTotal || index! > total) throw new Error('integration shard-spec');
   return [`--shard=${shard}`, '--reporter=default', '--reporter=json', `--outputFile.json=${report}`];
 }
 
@@ -24,6 +26,27 @@ export const ENGINE_INTEGRATION_FILES = [
   'tools/integration-scenario.integration.test.ts',
   'tools/resource-catalog.integration.test.ts',
   'tools/battle-sim-resources.integration.test.ts',
+  'tools/commands.integration.test.ts',
+  'tools/world-bootstrap.integration.test.ts',
+  'tools/resource-editor-validate.integration.test.ts',
+  'tools/resource-validate.integration.test.ts',
+  'tools/world-presets.integration.test.ts',
+  'tools/load-profile.integration.test.ts',
+  'tools/operational-map.integration.test.ts',
+  'tools/integration-scenario-build.integration.test.ts',
+  'tools/san10-build.integration.test.ts',
+  'tools/officer-ledger.integration.test.ts',
+  'tools/int19-retinue-orders.integration.test.ts',
+  'tools/city-scale-resources.integration.test.ts',
+  'tools/create-options-resources.integration.test.ts',
+  'tools/campaign-source.integration.test.ts',
+  'tools/feature-profile.integration.test.ts',
+  'tools/resource-versions.integration.test.ts',
+  'tools/portrait-map-convert.integration.test.ts',
+  'tools/officer-sex-ledger.integration.test.ts',
+  'tools/create-request-resources.integration.test.ts',
+  'tools/reset-preparation-resources.integration.test.ts',
+  'tools/world-reset-resource.integration.test.ts',
   'tools/t4-17-ext-n2.integration.test.ts',
   'tools/preset.integration.test.ts',
   'tools/t1-11.integration.test.ts',

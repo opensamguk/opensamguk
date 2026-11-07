@@ -1,10 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import map from '../resources/map/che.json';
-import scenario from '../resources/scenario/1030.json';
-import unitSet from '../resources/unitset/basic.json';
-import statRules from '../resources/scenario/default.json';
 import { createRng } from '../packages/shared/src/rng';
 import { applyEffects, buildInitialWorld, commands, runCommand, toWorldState } from '../packages/rules/src/index';
+
+import { createDb } from '../packages/db/src/index';
+import type { MapResource, ScenarioResource, UnitSetResource } from '../packages/rules/src/world/resources';
+import { readInitialResources } from '../apps/engine/src/world/resources';
+import { testDatabaseUrl } from './test-database';
+
+// 게시된 원문을 그대로 대조한다. schema parse로 meta 등 검증 대상 속성을 지우지 않는다.
+const resources = await (async () => {
+  const db = createDb(testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL }).href);
+  try {
+    return await readInitialResources(db, { map: 'che', scenario: '1030' });
+  } finally {
+    await db.$disconnect();
+  }
+})();
+const map = resources.map.content as MapResource & { $comment?: unknown };
+const scenario = resources.scenario.content as ScenarioResource;
+const unitSet = resources.unitSet.content as UnitSetResource;
+const statRules = resources.statRules.content;
 
 function fixture() {
   const state = toWorldState(buildInitialWorld({ map, scenario, unitSet, statRules, seed: 'command-fixture' }));

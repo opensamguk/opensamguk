@@ -1,19 +1,40 @@
 import { readFileSync } from 'node:fs';
-import { expect, it } from 'vitest';
-import { buildInitialWorld } from '../../packages/rules/src/world/bootstrap';
-import { validateWorldResources } from '../../packages/rules/src/world/validate';
-import { hashState } from '../../packages/shared/src/node/hashState';
-import { loadInitialWorld } from '../../apps/engine/src/world/resources';
-import { integrationResourceRows } from '../integration-resources';
-import { buildIntegrationScenario } from './integration-scenario';
-import { buildOperationalMap } from './operational';
+import { afterAll, beforeAll, expect, it } from 'vitest';
+import { buildInitialWorld } from '../packages/rules/src/world/bootstrap';
+import { validateWorldResources } from '../packages/rules/src/world/validate';
+import { hashState } from '../packages/shared/src/node/hashState';
+import { loadInitialWorldFromDb, readInitialResources } from '../apps/engine/src/world/resources';
+import { integrationResourceRows } from './integration-resources';
+import { buildIntegrationScenario } from './map-data/integration-scenario';
+import { buildOperationalMap } from './map-data/operational';
 
-const root = new URL('../../', import.meta.url);
+import { mainScenarioSourceText } from './officer-stats/audit';
+import { createDb, readPublishedResources } from '../packages/db/src/index';
+import { testDatabaseUrl } from './test-database';
+
+const db = createDb(testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL }).href);
+afterAll(async () => {
+  await db.$disconnect();
+});
+let legacyContent: unknown, original1030: unknown, unitSet: unknown, statRules: unknown;
+let mainText: string;
+beforeAll(async () => {
+  const { initializeIntegrationResources } = await import('./integration-resources');
+  await initializeIntegrationResources(db);
+  const rows = await readInitialResources(db, { map: 'che', scenario: '1030' });
+  legacyContent = rows.map.content;
+  original1030 = rows.scenario.content;
+  unitSet = rows.unitSet.content;
+  statRules = rows.statRules.content;
+  mainText = mainScenarioSourceText(original1030);
+});
+
+const root = new URL('../', import.meta.url);
 const read = (path: string) => JSON.parse(readFileSync(new URL(path, root), 'utf8'));
 const resources = () => ({
-  map: buildOperationalMap(),
-  scenario: buildIntegrationScenario().scenario,
-  unitSet: read('resources/unitset/basic.json'),
+  map: buildOperationalMap(legacyContent),
+  scenario: buildIntegrationScenario(mainText, legacyContent).scenario,
+  unitSet: unitSet,
   statRules: read('resources/scenario/five-stats.json'),
   portraitMap: read('resources/portraits/191-map.json'),
 });
@@ -37,10 +58,10 @@ it('INT-04 정식191년21국491명 자원은 생성 결과와 같고 연결 검�
 it('INT-04 인물 ID·소속·시기·성격·초기병력·금/쌀과 개인 시드 오프셋을 보존한다', () => {
   const seed = 'integration191-contract';
   const old = buildInitialWorld({
-    map: read('resources/map/che.json'),
-    scenario: read('resources/scenario/1030.json'),
-    unitSet: read('resources/unitset/basic.json'),
-    statRules: read('resources/scenario/default.json'),
+    map: legacyContent,
+    scenario: original1030,
+    unitSet: unitSet,
+    statRules: statRules,
     seed,
   });
   const current = buildInitialWorld({ ...resources(), seed });
@@ -76,10 +97,10 @@ it('INT-04 인물 ID·소속·시기·성격·초기병력·금/쌀과 개인 �
   }
 });
 
-it('INT-04 원본491행과 검수 원장의5값·출처·인물ID를 모두 보존하며 원본 파일을 바꾸지 않는다', () => {
-  const original = read('resources/scenario/1030.json');
+it('INT-04 원본491행과 검수 원장의5값·출처·인물ID를 모두 보존하며 원본 파일을 바꾸지 않는다', async () => {
+  const original = original1030;
   const before = hashState(original);
-  const generated = buildIntegrationScenario();
+  const generated = buildIntegrationScenario(mainText, legacyContent);
   expect(generated.scenario.general).toEqual(original.general);
   expect(generated.scenario.generalStats).toEqual(
     read('resources/officers/191-five-stats.json').rows.map(
@@ -98,7 +119,9 @@ it('INT-04 원본491행과 검수 원장의5값·출처·인물ID를 모두 보�
       }) => ({ generalId, stats, sourceId, sourceRevision, officerId }),
     ),
   );
-  expect(hashState(read('resources/scenario/1030.json'))).toBe(before);
+  expect(hashState(original1030)).toBe(before);
+  const [unchanged] = await readPublishedResources(db, [{ kind: 'SCENARIO', name: '1030', version: 1 }]);
+  expect(hashState(unchanged!.content)).toBe(before);
   const initial = buildInitialWorld({ ...resources(), seed: 'sourced' });
   for (const row of generated.scenario.generalStats) {
     const general = initial.generals.find((general) => general.id === row.generalId)!;
@@ -114,7 +137,7 @@ it('INT-04 원본491행과 검수 원장의5값·출처·인물ID를 모두 보�
 });
 
 it('INT-04 수도2건과 전장4건은 명시적 대응표로 남고 같은 이름의 양평을 섞지 않는다', () => {
-  const generated = buildIntegrationScenario();
+  const generated = buildIntegrationScenario(mainText, legacyContent);
   expect({ removed: generated.removed, relocations: generated.relocations }).toEqual(
     read('resources/scenario/integration191-correspondence.json'),
   );
@@ -140,7 +163,7 @@ it('INT-04 수도2건과 전장4건은 명시적 대응표로 남고 같은 이�
 });
 
 it('INT-04 새 규칙·초상 선택으로 정식 파일을 읽고 옛 기본 선택은 유지한다', async () => {
-  const current = await loadInitialWorld({
+  const current = await loadInitialWorldFromDb(db, {
     scenario: 'integration191',
     map: 'integration',
     statRules: 'five-stats',
@@ -148,11 +171,11 @@ it('INT-04 새 규칙·초상 선택으로 정식 파일을 읽고 옛 기본 �
     seed: 'selection',
   });
   expect(current).toEqual(buildInitialWorld({ ...resources(), seed: 'selection' }));
-  const legacy = await loadInitialWorld({ scenario: '1030', map: 'che', seed: 'selection' });
+  const legacy = await loadInitialWorldFromDb(db, { scenario: '1030', map: 'che', seed: 'selection' });
   expect(legacy).not.toHaveProperty('operationalMap');
   expect(legacy.generals[0]).not.toHaveProperty('politics');
   await expect(
-    loadInitialWorld({ scenario: '1030', map: 'che', statRules: '../secret', seed: 'selection' }),
+    loadInitialWorldFromDb(db, { scenario: '1030', map: 'che', statRules: '../secret', seed: 'selection' }),
   ).rejects.toThrow('리소스 ID');
 });
 

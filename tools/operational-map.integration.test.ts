@@ -1,14 +1,27 @@
-import { OPERATIONAL_GIS_SHA256 } from '../../apps/web/src/main/operationalGeography';
+import { OPERATIONAL_GIS_SHA256 } from '../apps/web/src/main/operationalGeography';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { expect, it } from 'vitest';
-import { compileOperationalGraph, operationalMapSchema } from '../../packages/rules/src/world/map/operational';
-import { validateMap } from '../../packages/rules/src/world/validate/map';
-import { createCampaignDraft } from '../../apps/web/src/mapEditor/campaignSeed';
-import { buildOperationalMap, legacyAnchorCorrespondence } from './operational';
+import { afterAll, beforeAll, expect, it } from 'vitest';
+import { compileOperationalGraph, operationalMapSchema } from '../packages/rules/src/world/map/operational';
+import { validateMap } from '../packages/rules/src/world/validate/map';
+import { createCampaignDraft } from '../apps/web/src/mapEditor/campaignSeed';
+import { buildOperationalMap, legacyAnchorCorrespondence } from './map-data/operational';
 
-const root = new URL('../../', import.meta.url);
-function path(from: number, to: number, map = buildOperationalMap()): number[] | null {
+import { createDb, readPublishedResources } from '../packages/db/src/index';
+import { testDatabaseUrl } from './test-database';
+
+const db = createDb(testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL }).href);
+afterAll(async () => {
+  await db.$disconnect();
+});
+let legacyContent: unknown;
+beforeAll(async () => {
+  const [row] = await readPublishedResources(db, [{ kind: 'MAP', name: 'che', version: 1 }]);
+  legacyContent = row!.content;
+});
+
+const root = new URL('../', import.meta.url);
+function path(from: number, to: number, map = buildOperationalMap(legacyContent)): number[] | null {
   const graph = new Map(compileOperationalGraph(map).map((node) => [node.cityKey, node.connections]));
   const pending = [[from]],
     seen = new Set([from]);
@@ -25,7 +38,7 @@ function path(from: number, to: number, map = buildOperationalMap()): number[] |
 }
 
 it('INT-03 정식80표식은 61운영 거점과 6항구 시설·13전장으로 분리되고 전체가 연결된다', () => {
-  const map = buildOperationalMap();
+  const map = buildOperationalMap(legacyContent);
   expect(
     ['CITY', 'PASS', 'PORT', 'FIELD'].map((kind) => map.sites.filter((site) => site.kind === kind).length),
   ).toEqual([53, 8, 6, 13]);
@@ -36,11 +49,11 @@ it('INT-03 정식80표식은 61운영 거점과 6항구 시설·13전장으로 �
 });
 
 it('INT-03 정식 자원·대응표와 생성 결과가 같고 GIS 원본 SHA와 좌표가 일치한다', () => {
-  const first = buildOperationalMap();
-  expect(buildOperationalMap()).toEqual(first);
+  const first = buildOperationalMap(legacyContent);
+  expect(buildOperationalMap(legacyContent)).toEqual(first);
   expect(JSON.parse(readFileSync(new URL('resources/map/integration.json', root), 'utf8'))).toEqual(first);
   expect(JSON.parse(readFileSync(new URL('resources/map/integration-correspondence.json', root), 'utf8'))).toEqual(
-    legacyAnchorCorrespondence(),
+    legacyAnchorCorrespondence(legacyContent),
   );
   expect(first.basemap.sha256).toBe(
     createHash('sha256')
@@ -60,12 +73,14 @@ it('INT-03 장안·낙양과 한중·성도는 명시한 관문을 지나고 장
   expect(path(4, 3)).toEqual([4, 100, 42, 73, 3]);
   expect(path(24, 5)).toEqual([24, 75, 102, 44, 87, 5]);
   expect(path(6, 13)).toEqual([6, 13]);
-  const edge = buildOperationalMap().routes.find((route) => route.from === 'city:6' && route.to === 'city:13');
+  const edge = buildOperationalMap(legacyContent).routes.find(
+    (route) => route.from === 'city:6' && route.to === 'city:13',
+  );
   expect(edge?.via).toEqual(['field:89']);
 });
 
 it('INT-03 차단된 길목을 자동 우회하지 않으며 활성 연결만 그래프에 포함한다', () => {
-  const map = buildOperationalMap();
+  const map = buildOperationalMap(legacyContent);
   map.routes = map.routes.filter((route) =>
     ['route:land-4-100', 'route:land-100-42', 'route:land-42-73', 'route:land-73-3'].includes(route.id),
   );
@@ -76,10 +91,10 @@ it('INT-03 차단된 길목을 자동 우회하지 않으며 활성 연결만 �
 });
 
 it('INT-03 전체 판의 우회는 명시한 무관·상용 경로를 따르며 새 지름길을 만들지 않는다', () => {
-  const west = buildOperationalMap();
+  const west = buildOperationalMap(legacyContent);
   west.routes.find((route) => route.id === 'route:land-4-100')!.enabled = false;
   expect(path(4, 3, west)).toEqual([4, 101, 10, 2, 71, 3]);
-  const shu = buildOperationalMap();
+  const shu = buildOperationalMap(legacyContent);
   shu.routes.find((route) => route.id === 'route:land-75-102')!.enabled = false;
   expect(path(24, 5, shu)).toEqual([24, 25, 45, 27, 44, 87, 5]);
   expect(validateMap(west).issues).toEqual([]);
@@ -87,22 +102,22 @@ it('INT-03 전체 판의 우회는 명시한 무관·상용 경로를 따르며 
 });
 
 it('INT-03 모든 수로의 양끝은 해당 도시 항구이며 다른 도시 귀속과 전장 목표를 거부한다', () => {
-  const map = buildOperationalMap();
+  const map = buildOperationalMap(legacyContent);
   expect(map.routes.filter((route) => route.mode === 'RIVER')).toHaveLength(5);
   expect(new Set(map.routes.flatMap((route) => route.portIds ?? [])).size).toBe(6);
   const river = map.routes.find((route) => route.mode === 'RIVER')!;
   river.portIds = ['port:7', 'port:52'];
   expect(operationalMapSchema.safeParse(map).success).toBe(false);
-  const target = buildOperationalMap();
+  const target = buildOperationalMap(legacyContent);
   target.routes[0]!.to = 'field:90';
   expect(operationalMapSchema.safeParse(target).success).toBe(false);
 });
 
 it('INT-03 기존 도시 경제 값은 같은 원본 ID의 값을 보존한다', () => {
-  const legacy = JSON.parse(readFileSync(new URL('resources/map/che.json', root), 'utf8')) as {
+  const legacy = legacyContent as {
     cities: Array<{ id: number; level: number; region: number; initial: unknown; max: unknown }>;
   };
-  for (const site of buildOperationalMap().sites) {
+  for (const site of buildOperationalMap(legacyContent).sites) {
     if (site.kind !== 'CITY' || site.legacyCityId === undefined) continue;
     const old = legacy.cities.find((city) => city.id === site.legacyCityId)!;
     expect({ level: site.level, region: site.region, initial: site.initial, max: site.max }).toEqual({
@@ -115,5 +130,5 @@ it('INT-03 기존 도시 경제 값은 같은 원본 ID의 값을 보존한다',
 });
 
 it('INT-10 화면의 GIS 식별값은 운영 자원의 실제 원본 해시와 같다', () => {
-  expect(buildOperationalMap().basemap.sha256).toBe(OPERATIONAL_GIS_SHA256);
+  expect(buildOperationalMap(legacyContent).basemap.sha256).toBe(OPERATIONAL_GIS_SHA256);
 });

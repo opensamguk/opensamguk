@@ -5,7 +5,7 @@ import { parse } from 'yaml';
 import { describe, expect, it } from 'vitest';
 import { categories, compareAuthz } from '../apps/server/src/authz/coverage';
 import { buildShardRecord, mergeShardRecords, parseAuthzArgs, readShardDir } from './authz-shards';
-import { AUTHZ_SHARD_TOTAL, integrationShardArgs } from './integration-partition';
+import { AUTHZ_SHARD_TOTAL, ENGINE_SHARD_TOTAL, integrationShardArgs } from './integration-partition';
 
 const sha = 'a'.repeat(40);
 const root = resolve('authz-test-fixture');
@@ -112,12 +112,18 @@ describe('T3-04 AC-M3-03 권한 조각 합본', () => {
     ])
       expect(() => parseAuthzArgs(args)).toThrow('usage');
   });
-  it('분할 인자는 API에만 추가하고 한쪽 누락·잘못된 경로를 DB 전에 거부한다', () => {
+  it('분할 인자는 API·엔진의 정해진 조각만 허용하고 잘못된 경로를 DB 전에 거부한다', () => {
     expect(integrationShardArgs(undefined, undefined, undefined)).toEqual([]);
     expect(integrationShardArgs('engine', undefined, undefined)).toEqual([]);
     expect(integrationShardArgs('api', '1/3', join(root, 'report.json'))).toContain('--shard=1/3');
-    for (const suite of [undefined, 'all', 'engine'])
-      expect(() => integrationShardArgs(suite, '1/3', root)).toThrow('suite');
+    for (const shard of ['1/2', '2/2'])
+      expect(integrationShardArgs('engine', shard, join(root, 'report.json'))).toEqual([
+        `--shard=${shard}`,
+        '--reporter=default',
+        '--reporter=json',
+        `--outputFile.json=${join(root, 'report.json')}`,
+      ]);
+    for (const suite of [undefined, 'all']) expect(() => integrationShardArgs(suite, '1/3', root)).toThrow('suite');
     for (const [shard, report] of [
       [undefined, root],
       ['1/3', undefined],
@@ -127,6 +133,16 @@ describe('T3-04 AC-M3-03 권한 조각 합본', () => {
       ['1/4', root],
     ])
       expect(() => integrationShardArgs('api', shard, report)).toThrow('shard-spec');
+    for (const [shard, report] of [
+      [undefined, root],
+      ['1/2', undefined],
+      ['1/2', 'relative'],
+      ['0/2', root],
+      ['3/2', root],
+      ['1/3', root],
+      ['1-2', root],
+    ])
+      expect(() => integrationShardArgs('engine', shard, report)).toThrow('shard-spec');
   });
   it('자기 artifact 디렉터리 이름·파일 수·형식을 확인한다', () => {
     const prefix = join(tmpdir(), 'opensamguk-authz-');
@@ -156,6 +172,15 @@ describe('T3-04 AC-M3-03 권한 조각 합본', () => {
     expect(shard.strategy.matrix.shard).toHaveLength(AUTHZ_SHARD_TOTAL);
     expect(shard['timeout-minutes']).toBe(75);
     expect(shard.services).toEqual(jobs['database-engine'].services);
+    const engine = jobs['database-engine'];
+    expect(engine.strategy).toEqual({ 'fail-fast': false, matrix: { shard: [1, 2] } });
+    expect(engine.strategy.matrix.shard).toHaveLength(ENGINE_SHARD_TOTAL);
+    expect(engine['timeout-minutes']).toBe(30);
+    expect(engine.env.INTEGRATION_SHARD).toBe('${{ matrix.shard }}/2');
+    expect(engine.env).not.toHaveProperty('INTEGRATION_REPORT');
+    expect(engine.steps.find((step: { run?: string }) => step.run === 'pnpm test:int').env.INTEGRATION_REPORT).toBe(
+      '${{ runner.temp }}/engine-${{ matrix.shard }}.json',
+    );
     const cleanup = shard.steps.findIndex((s: { name?: string }) => s.name === 'Clean T2-15 binding files');
     expect(shard.steps[cleanup].if).toBe('always()');
     expect(shard.steps[cleanup + 1].if).toBe('success()');
@@ -165,5 +190,6 @@ describe('T3-04 AC-M3-03 권한 조각 합본', () => {
     expect(merge.if).toMatch(/^always\(\)/);
     expect(jobs['database-browser'].needs).toEqual(['database-authz', 'database-engine', 'database-e2e']);
     expect(jobs['database-browser'].steps[0].run).toContain('test "$AUTHZ" = success');
+    expect(jobs['database-browser'].steps[0].run).toContain('test "$ENGINE" = success');
   });
 });

@@ -2,6 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import type { Context } from '../context';
 import { buildInitialWorld, toWorldState, unitSetSchema, emptyCampaignState } from '@opensamguk/rules';
 import { readFileSync } from 'node:fs';
+import { visibilityFixture } from '../../test/visibilityFixture';
 import { readView, requireGeneral, requireWorld } from './queries';
 import { submitCampaignOrder, readCampaignOrders } from './campaignOrders';
 
@@ -19,7 +20,7 @@ vi.mock('@opensamguk/rules', async (original) => ({
 beforeEach(() => vi.resetAllMocks());
 const resource = (path: string) =>
   JSON.parse(readFileSync(new URL('../../../../resources/' + path + '.json', import.meta.url), 'utf8'));
-const testUnits = unitSetSchema.parse(resource('unitset/basic'));
+const testUnits = unitSetSchema.parse((await visibilityFixture()).unitSet);
 function fixture() {
   const view = toWorldState(
     buildInitialWorld({

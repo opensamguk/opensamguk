@@ -6,7 +6,7 @@ import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { initializeIntegrationResources } from '../tools/integration-resources';
 import { test as legalTest, expect, type LegalStack } from './legalFixture';
 import { TEST_PASSWORD } from './account';
@@ -16,7 +16,7 @@ import { trpcCalls } from './t210-fixture';
 // origin에 기록한 NPC 일정과 시험 계정 바인딩·위치를 통제한다. 사람 원생성/정식491/CF 증거가 아니다.
 async function fixture(stack: LegalStack, browser: Browser) {
   await initializeIntegrationResources(stack.db);
-  const initial = await loadInitialWorld({
+  const initial = await loadInitialWorldFromDb(stack.db, {
     scenario: 'integration191',
     map: 'integration',
     statRules: 'five-stats',

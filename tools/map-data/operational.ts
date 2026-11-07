@@ -5,7 +5,6 @@ import { mapSchema } from '../../packages/rules/src/world/resources';
 import { createCampaignDraft } from '../../apps/web/src/mapEditor/campaignSeed';
 
 const root = new URL('../../', import.meta.url);
-const legacy = mapSchema.parse(JSON.parse(readFileSync(new URL('resources/map/che.json', root), 'utf8')));
 const source = new URL('apps/web/src/mapEditor/geodata/natural-earth.json', root);
 
 // 새 도시의 게임 경제 초깃값이다. 역사 자료의 인구·세입으로 주장하지 않는다.
@@ -97,7 +96,8 @@ const corridors: Array<[number, number, string?]> = [
   [56, 7],
 ];
 
-export function buildOperationalMap(): OperationalMapResource {
+export function buildOperationalMap(legacyContent: unknown): OperationalMapResource {
+  const legacy = mapSchema.parse(legacyContent);
   const draft = createCampaignDraft();
   const sites: OperationalMapResource['sites'] = draft.sites.map((site) => {
     const common = {
@@ -191,8 +191,9 @@ export function buildOperationalMap(): OperationalMapResource {
   });
 }
 
-export function legacyAnchorCorrespondence() {
-  return buildOperationalMap().sites.flatMap((site) =>
+export function legacyAnchorCorrespondence(legacyContent: unknown) {
+  const legacy = mapSchema.parse(legacyContent);
+  return buildOperationalMap(legacyContent).sites.flatMap((site) =>
     'legacyCityId' in site && site.legacyCityId !== undefined
       ? [
           {

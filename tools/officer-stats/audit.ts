@@ -59,6 +59,40 @@ export function sha256Text(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
+// 고정 1030 출처의 표현 형식이다. 값은 게시 원문에서 받고 원래 audit의 바이트 SHA로 확인한다.
+export function mainScenarioSourceText(content: unknown): string {
+  const keys = [
+    '$comment',
+    'id',
+    'title',
+    'extends',
+    'startYear',
+    'life',
+    'fiction',
+    'const',
+    'nation',
+    'diplomacy',
+    'general',
+    'general_ex',
+    'cities',
+    'history',
+  ];
+  const invalid = () => new Error('main 시나리오 원문이 기준과 다릅니다.');
+  if (content === null || typeof content !== 'object' || Array.isArray(content)) throw invalid();
+  const source = content as Record<string, unknown>;
+  if (Object.keys(source).length !== keys.length || keys.some((key) => !Object.hasOwn(source, key))) throw invalid();
+  const constants = source.const;
+  if (
+    constants === null ||
+    typeof constants !== 'object' ||
+    Array.isArray(constants) ||
+    Object.keys(constants).length !== 1 ||
+    !Object.hasOwn(constants, 'defaultMaxGeneral')
+  )
+    throw invalid();
+  return JSON.stringify(Object.fromEntries(keys.map((key) => [key, source[key]])), null, 2) + '\n';
+}
+
 /** Selected facts and their URL, not a digest of the third-party page's HTML. */
 export function supplementalRevision(identity: string, stats: z.infer<typeof fiveStatsSchema>, url: string): string {
   return `sha256:${sha256Text(JSON.stringify({ identity, stats: fiveStatsSchema.parse(stats), url }))}`;

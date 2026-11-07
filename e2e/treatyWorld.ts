@@ -177,17 +177,21 @@ export class TreatyFixture {
 
   // 두 월드를 만들고 형식을 DB에서 확인한 뒤 실제 controlClock으로 시작한다.
   static async open(): Promise<TreatyFixture> {
-    const [{ createDb }, { loadInitialWorld }, { saveInitialWorld }, { controlClock }, rules] = await Promise.all([
-      import('../packages/db/src/index'),
-      import('../apps/engine/src/world/resources'),
-      import('../apps/engine/src/world/persistence'),
-      import('../apps/engine/src/world/clock'),
-      import('../packages/rules/src/index'),
-    ]);
+    const [{ createDb }, { loadInitialWorldFromDb }, { saveInitialWorld }, { controlClock }, rules] = await Promise.all(
+      [
+        import('../packages/db/src/index'),
+        import('../apps/engine/src/world/resources'),
+        import('../apps/engine/src/world/persistence'),
+        import('../apps/engine/src/world/clock'),
+        import('../packages/rules/src/index'),
+      ],
+    );
     const db = createDb(e2eDatabaseUrl());
     try {
       const runId = randomUUID();
-      const state = shapeWorld(await loadInitialWorld({ scenario: '1030', map: 'che', seed: `t207-first3-${runId}` }));
+      const state = shapeWorld(
+        await loadInitialWorldFromDb(db, { scenario: '1030', map: 'che', seed: `t207-first3-${runId}` }),
+      );
       const common = { turnTermMinutes: TURN_TERM_MINUTES, endYear: null, replayFormat: 'legacy' } as const;
       const treaty = await saveInitialWorld(db, structuredClone(state), {
         ...common,

@@ -4,7 +4,7 @@ import type { Route } from '@playwright/test';
 import { test, expect, apiMutate, apiQuery } from './t210-fixture';
 import { rngFor } from '../packages/shared/src/index';
 import { applyCampaignRelationship } from '../packages/rules/src/index';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { loadReplayState } from '../apps/engine/src/monthly';
@@ -36,7 +36,7 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
     }
   }
   expect(seed).not.toBe('');
-  const initial = await loadInitialWorld({
+  const initial = await loadInitialWorldFromDb(db, {
     scenario: 'integration191',
     map: 'integration',
     statRules: 'five-stats',

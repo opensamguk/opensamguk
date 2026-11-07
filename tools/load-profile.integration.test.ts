@@ -1,12 +1,19 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import { loadInitialWorld } from '../../apps/engine/src/world/resources';
-import type { WorldInit } from '../../packages/rules/src/index';
-import { LOAD_RESOURCES } from './contract';
-import { assertLoadProfile } from './profile';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { createDb } from '../packages/db/src/index';
+import { testDatabaseUrl } from './test-database';
+import type { WorldInit } from '../packages/rules/src/index';
+import { LOAD_RESOURCES } from './load/contract';
+import { assertLoadProfile } from './load/profile';
 
 let formal: WorldInit;
 beforeAll(async () => {
-  formal = await loadInitialWorld({ ...LOAD_RESOURCES, seed: 'load-profile-unit' });
+  const db = createDb(testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL }).href);
+  try {
+    formal = await loadInitialWorldFromDb(db, { ...LOAD_RESOURCES, seed: 'load-profile-unit' });
+  } finally {
+    await db.$disconnect();
+  }
 });
 
 describe('T3-11 현재 정식 자원 프로필', () => {

@@ -7,7 +7,7 @@ import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { loadWorld } from '../apps/engine/src/worldLoader';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { initializeIntegrationResources } from '../tools/integration-resources';
 import { test as legalTest, expect, type LegalStack } from './legalFixture';
 
@@ -16,7 +16,7 @@ import { test as legalTest, expect, type LegalStack } from './legalFixture';
 const panel = (page: Page) => page.getByRole('region', { name: '황실', exact: true });
 async function fixture(stack: LegalStack, browser: Browser) {
   await initializeIntegrationResources(stack.db);
-  const initial = await loadInitialWorld({
+  const initial = await loadInitialWorldFromDb(stack.db, {
     scenario: 'integration191',
     map: 'integration',
     statRules: 'five-stats',

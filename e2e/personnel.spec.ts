@@ -1,8 +1,17 @@
-import { expect, test, type Browser, type Page } from '@playwright/test';
+import {
+  expect,
+  test,
+  type Browser,
+  type BrowserContext,
+  type Page,
+  type Request as PlaywrightRequest,
+  type Response as PlaywrightResponse,
+} from '@playwright/test';
+import { writeFile } from 'node:fs/promises';
 import { setTimeout as delay } from 'node:timers/promises';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { createAccount, withE2eDb } from './account';
 import {
@@ -35,17 +44,21 @@ let nationId: number;
 let hold: LeaseHold | undefined;
 
 async function personnelWorld(): Promise<string> {
-  const initial = await loadInitialWorld({ scenario: '1030', map: 'che', seed: `e2e-personnel-${Date.now()}` });
-  const { worldId } = await withE2eDb((db) =>
-    saveInitialWorld(db, initial, {
+  const { worldId } = await withE2eDb(async (db) => {
+    const initial = await loadInitialWorldFromDb(db, {
+      scenario: '1030',
+      map: 'che',
+      seed: `e2e-personnel-${Date.now()}`,
+    });
+    return saveInitialWorld(db, initial, {
       name: 'E2E 인사 대기 월드',
       // 인사 접수 시험에 실시간 월간 캐치업이 끼지 않게 한다. 실행권만 쥐어도 시계는 흐른다.
       turnTermMinutes: 60,
       endYear: 300,
       replayFormat: 3,
       ruleFeatures: ['personnel', 'policy'],
-    }),
-  );
+    });
+  });
   hold = await holdLease(worldId);
   await withE2eDb((db) => controlClock(db, worldId, 'start'));
   return worldId;
@@ -399,10 +412,208 @@ test('재접속: 처리 중에 새로 고치면 다시 처리 중이고 결과 �
   await expect(notice(page)).toHaveCount(0);
 });
 
+// 아래 사례(탭을 닫은 사이 끝난 접수)의 CI 간헐 실패 진단 (T4-77 AC-P2-26 B). 실패할 때만 고정 구조 JSON을 남긴다.
+// 화이트리스트만 적는다: 세 조회의 절차 이름·HTTP status·tRPC 오류 code·상대 시각, mine의 인사 플래그,
+// recent의 kind/status 개수와 이번 접수 포함 여부, 이번 접수의 InputEvent 상태·안내 이력 포함 여부(boolean).
+// URL·본문·헤더·쿠키·계정·requestId 원문은 적지 않는다. DOM은 Playwright error-context가 맡는다.
+const RECOVERY_RPCS = ['auth.me', 'general.mine', 'personnel.recent'] as const;
+type RecoveryRpc = (typeof RECOVERY_RPCS)[number];
+interface RecoveryCall {
+  procedure: RecoveryRpc;
+  requestMs: number;
+  responseMs: number | null;
+  httpStatus: number | null;
+  networkFailed: boolean;
+  errorCode: string | null;
+  personnelEnabled?: boolean | null;
+  recent?: { count: number; byKindStatus: Record<string, number>; includesCurrent: boolean } | null;
+}
+const RECOVERY_KINDS = ['personnel.appoint', 'personnel.dismiss', 'offer.respond'];
+const RECOVERY_STATUSES = ['pending', 'applied', 'rejected'];
+
+// 진단 수집이 원래 실패를 늦추거나 가리지 않게 2초 안에 못 끝나면 버린다.
+function within<T>(work: Promise<T>, ms = 2_000): Promise<T | undefined> {
+  return Promise.race([work, delay(ms).then(() => undefined)]).catch(() => undefined);
+}
+
+function requestIdIn(body: string | null): string | null {
+  const find = (value: unknown): string | null => {
+    if (!value || typeof value !== 'object') return null;
+    const id = (value as { requestId?: unknown }).requestId;
+    if (typeof id === 'string') return id;
+    for (const child of Object.values(value)) {
+      const found = find(child);
+      if (found) return found;
+    }
+    return null;
+  };
+  try {
+    return find(JSON.parse(body ?? 'null'));
+  } catch {
+    return null;
+  }
+}
+
+function recoveryDiagnostic(context: BrowserContext, currentRequestId: () => string | null) {
+  const started = Date.now();
+  const since = () => Date.now() - started;
+  const calls = new Map<PlaywrightRequest, RecoveryCall[]>();
+  const reads: Promise<unknown>[] = [];
+  const marks: Record<string, number> = {};
+  const procedures = (request: PlaywrightRequest): Array<{ procedure: RecoveryRpc; index: number }> => {
+    const path = new URL(request.url()).pathname;
+    if (!path.startsWith('/trpc/')) return [];
+    return path
+      .slice('/trpc/'.length)
+      .split(',')
+      .flatMap((name, index) =>
+        RECOVERY_RPCS.includes(name as RecoveryRpc) ? [{ procedure: name as RecoveryRpc, index }] : [],
+      );
+  };
+  const onRequest = (request: PlaywrightRequest) => {
+    const watched = procedures(request);
+    if (watched.length === 0) return;
+    const requestMs = since();
+    calls.set(
+      request,
+      watched.map(({ procedure }) => ({
+        procedure,
+        requestMs,
+        responseMs: null,
+        httpStatus: null,
+        networkFailed: false,
+        errorCode: null,
+      })),
+    );
+  };
+  const onResponse = (response: PlaywrightResponse) => {
+    const entries = calls.get(response.request());
+    if (!entries) return;
+    const responseMs = since();
+    const watched = procedures(response.request());
+    const batched = new URL(response.url()).searchParams.has('batch');
+    for (const entry of entries) {
+      entry.responseMs = responseMs;
+      entry.httpStatus = response.status();
+    }
+    reads.push(
+      response
+        .json()
+        .then((body: unknown) => {
+          watched.forEach(({ index }, i) => {
+            const entry = entries[i]!;
+            const item = (batched && Array.isArray(body) ? body[index] : body) as
+              { result?: { data?: unknown }; error?: { data?: { code?: unknown } } } | undefined;
+            const code = item?.error?.data?.code;
+            entry.errorCode =
+              typeof code === 'string' && /^[A-Z_]{1,40}$/.test(code) ? code : item?.error ? 'other' : null;
+            const data = item?.result?.data;
+            if (entry.procedure === 'general.mine')
+              entry.personnelEnabled =
+                data && typeof data === 'object'
+                  ? (data as { creationRules?: { personnelEnabled?: unknown } }).creationRules?.personnelEnabled ===
+                    true
+                  : null;
+            if (entry.procedure === 'personnel.recent') {
+              if (!Array.isArray(data)) {
+                entry.recent = null;
+                return;
+              }
+              const byKindStatus: Record<string, number> = {};
+              let includesCurrent = false;
+              for (const row of data as Array<{ kind?: unknown; state?: { status?: unknown; requestId?: unknown } }>) {
+                const kind = RECOVERY_KINDS.includes(row?.kind as string) ? (row.kind as string) : 'other';
+                const status = RECOVERY_STATUSES.includes(row?.state?.status as string)
+                  ? (row.state!.status as string)
+                  : 'other';
+                byKindStatus[`${kind}/${status}`] = (byKindStatus[`${kind}/${status}`] ?? 0) + 1;
+                if (currentRequestId() !== null && row?.state?.requestId === currentRequestId()) includesCurrent = true;
+              }
+              entry.recent = { count: data.length, byKindStatus, includesCurrent };
+            }
+          });
+        })
+        .catch(() => undefined),
+    );
+  };
+  const onFailed = (request: PlaywrightRequest) => {
+    for (const entry of calls.get(request) ?? []) {
+      entry.networkFailed = true;
+      entry.responseMs = since();
+    }
+  };
+  context.on('request', onRequest);
+  context.on('response', onResponse);
+  context.on('requestfailed', onFailed);
+  return {
+    mark: (name: string) => void (marks[name] = since()),
+    stop() {
+      context.off('request', onRequest);
+      context.off('response', onResponse);
+      context.off('requestfailed', onFailed);
+    },
+    async write(outputPath: string, step: string, page: Page) {
+      const failedMs = since();
+      await within(Promise.allSettled(reads));
+      const requestId = currentRequestId();
+      const inputEvent = requestId
+        ? await within(
+            withE2eDb((db) =>
+              db.inputEvent.findFirst({
+                where: { worldId: world, idempotencyKey: `personnel:${requestId}` },
+                select: { status: true },
+              }),
+            ).then((row) => ({ found: row !== null, status: row?.status ?? null })),
+          )
+        : undefined;
+      const announcedHasCurrent = requestId
+        ? await within(
+            page.evaluate(
+              (id) =>
+                Object.keys(localStorage)
+                  .filter((key) => key.startsWith('opensamguk.personnelAnnounced.v1:'))
+                  .some((key) => {
+                    try {
+                      return (JSON.parse(localStorage.getItem(key) ?? '[]') as unknown[]).includes(id);
+                    } catch {
+                      return false;
+                    }
+                  }),
+              requestId,
+            ),
+          )
+        : undefined;
+      await writeFile(
+        outputPath,
+        JSON.stringify(
+          {
+            schema: 1,
+            case: 'personnel.spec.ts 탭을 닫은 사이 끝난 접수',
+            failedStep: step,
+            marks: { ...marks, failedMs },
+            requestIdCaptured: requestId !== null,
+            inputEvent: inputEvent ?? null,
+            announcedHasCurrent: announcedHasCurrent ?? null,
+            calls: [...calls.values()].flat().sort((a, b) => a.requestMs - b.requestMs),
+          },
+          null,
+          2,
+        ),
+      );
+    },
+  };
+}
+
 test('탭을 닫은 사이 끝난 접수: 다시 들어오면 결과 안내가 한 번 보인다', async () => {
   const { page } = member;
   await insertOffer();
   await page.goto(`/w/${world}`);
+  // 진단용: 이번 접수의 requestId를 보낸 요청에서 읽어 둔다(비교에만 쓰고 기록하지 않는다).
+  let requestId: string | null = null;
+  page.on('request', (request) => {
+    if (requestId === null && new URL(request.url()).pathname.includes('offers.respond'))
+      requestId = requestIdIn(request.postData());
+  });
   await offerBox(page).getByRole('button', { name: '수락' }).click();
   await expect(offerBox(page).getByRole('status')).toHaveText('처리 중');
   const context = page.context();
@@ -422,12 +633,30 @@ test('탭을 닫은 사이 끝난 접수: 다시 들어오면 결과 안내가 �
       .toBe(0),
   );
 
+  const diagnostic = recoveryDiagnostic(context, () => requestId);
   const again = await context.newPage();
-  await stubPortraits(again);
-  await again.goto(`/w/${world}`);
-  await expect(notice(again)).toContainText('발령을 수락해');
-  await again.reload();
-  await expect(notice(again)).toHaveCount(0);
+  let step = 'goto';
+  let failed = true;
+  try {
+    await stubPortraits(again);
+    await again.goto(`/w/${world}`);
+    diagnostic.mark('gotoDoneMs');
+    step = 'notice';
+    await expect(notice(again)).toContainText('발령을 수락해');
+    diagnostic.mark('noticeSeenMs');
+    step = 'reload';
+    await again.reload();
+    step = 'noticeGone';
+    await expect(notice(again)).toHaveCount(0);
+    failed = false;
+  } finally {
+    diagnostic.stop();
+    // 진단 기록이 실패해도 원래 단언 실패를 그대로 올린다.
+    if (failed)
+      await diagnostic
+        .write(test.info().outputPath('personnel-recovery-diagnostic.json'), step, again)
+        .catch(() => undefined);
+  }
   member = { ...member, page: again };
 });
 

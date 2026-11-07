@@ -3,7 +3,7 @@ import type { Page, Request } from '@playwright/test';
 import { test as base, expect, apiMutate, type T210World } from './t210-fixture';
 import { adminRole } from './adminSetup';
 import { TEST_PASSWORD } from './account';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -95,7 +95,7 @@ test('T3-06 AC-M3-04 정식191 장수 검색·감사·자동 조회 금지·오�
     });
     const special = `${prefix}%_\\@example.test`;
     await db.user.create({ data: { email: special, passwordHash } });
-    const initial = await loadInitialWorld({
+    const initial = await loadInitialWorldFromDb(db, {
       scenario: 'integration191',
       map: 'integration',
       statRules: 'five-stats',

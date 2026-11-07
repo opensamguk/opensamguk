@@ -1,17 +1,17 @@
 import { readFileSync } from 'node:fs';
-import type { Prisma, PrismaClient, PublishedResource } from '@opensamguk/db';
-import { parsePreset, worldCreateIntent, ADMIN_RESET_KIND, type ReplayOriginV3 } from '@opensamguk/rules';
-import { hashState } from '@opensamguk/shared/node';
+import type { Prisma, PrismaClient, PublishedResource } from '../packages/db/src/index';
+import { parsePreset, worldCreateIntent, ADMIN_RESET_KIND, type ReplayOriginV3 } from '../packages/rules/src/index';
+import { hashState } from '../packages/shared/src/node/hashState';
 import { afterEach, beforeAll, expect, it, vi } from 'vitest';
-import { composeInitialWorld, type InitialResources } from '../world/resources';
-import * as resourceLoaders from '../world/resources';
-import { lineageTestConfig } from '@opensamguk/rules/testing/lineage';
+import { composeInitialWorld, type InitialResources } from '../apps/engine/src/world/resources';
+import * as resourceLoaders from '../apps/engine/src/world/resources';
+import { lineageTestConfig } from '../packages/rules/src/lineage/testFixture';
 import {
   prepareInitialWorld,
   savePreparedInitialWorld,
   type InitialWorldOptions,
   type PreparedInitialWorld,
-} from '../world/persistence';
+} from '../apps/engine/src/world/persistence';
 import {
   prepareWorldReset,
   ResetPreparationError,
@@ -19,23 +19,35 @@ import {
   resetSourceSettingsHash,
   resetSettingsReference,
   type ResetPreparation,
-} from './resetPreparation';
+} from '../apps/engine/src/admin/resetPreparation';
 
 const worldId = '00000000-0000-4000-8000-000000000001';
 const requestId = '00000000-0000-4000-8000-000000000002';
 const userId = '00000000-0000-4000-8000-000000000003';
 const oldSeed = 'reset-source-seed';
 const controller = () => new AbortController();
-const json = (path: string): unknown =>
-  JSON.parse(readFileSync(new URL('../../../../' + path, import.meta.url), 'utf8'));
+const json = (path: string): unknown => JSON.parse(readFileSync(new URL('../' + path, import.meta.url), 'utf8'));
 function resource(kind: PublishedResource['kind'], name: string, path: string): PublishedResource {
   const content = json(path);
   return { kind, name, version: 1, content, contentHash: hashState(content), source: 'repository formal fixture' };
 }
+import { readInitialResources } from '../apps/engine/src/world/resources';
+import { createDb } from '../packages/db/src/index';
+import { testDatabaseUrl } from './test-database';
+
+const selectedResources = await (async () => {
+  const db = createDb(testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL }).href);
+  try {
+    return await readInitialResources(db, { map: 'che', scenario: '1030' });
+  } finally {
+    await db.$disconnect();
+  }
+})();
+
 const resources: InitialResources = {
   map: resource('MAP', 'integration', 'resources/map/integration.json'),
   scenario: resource('SCENARIO', 'integration191', 'resources/scenario/integration191.json'),
-  unitSet: resource('UNIT_SET', 'basic', 'resources/unitset/basic.json'),
+  unitSet: { ...selectedResources.unitSet, source: 'repository formal fixture' },
   statRules: resource('STAT_RULES', 'five-stats', 'resources/scenario/five-stats.json'),
   portraitMap: resource('PORTRAIT_MAP', '191-map', 'resources/portraits/191-map.json'),
 };

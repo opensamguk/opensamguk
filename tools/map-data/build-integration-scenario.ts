@@ -2,9 +2,24 @@ import { writeFile } from 'node:fs/promises';
 import { buildIntegrationScenario } from './integration-scenario';
 import { FIVE_STAT_RULES } from '../../packages/rules/src/general/fiveStats';
 import { integrationResourceRows } from '../integration-resources';
+import { createDb, readPublishedResources } from '../../packages/db/src/index';
+import { mainScenarioSourceText } from '../officer-stats/audit';
 
 const root = new URL('../../', import.meta.url);
-const { scenario, removed, relocations } = buildIntegrationScenario();
+if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL이 필요합니다.');
+const db = createDb(process.env.DATABASE_URL);
+let mainText: string, legacy: unknown;
+try {
+  const [scenario, map] = await readPublishedResources(db, [
+    { kind: 'SCENARIO', name: '1030', version: 1 },
+    { kind: 'MAP', name: 'che', version: 1 },
+  ]);
+  mainText = mainScenarioSourceText(scenario!.content);
+  legacy = map!.content;
+} finally {
+  await db.$disconnect();
+}
+const { scenario, removed, relocations } = buildIntegrationScenario(mainText, legacy);
 await writeFile(new URL('resources/scenario/integration191.json', root), `${JSON.stringify(scenario, null, 2)}\n`);
 await writeFile(
   new URL('resources/scenario/integration191-correspondence.json', root),

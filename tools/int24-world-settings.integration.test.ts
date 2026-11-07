@@ -148,6 +148,26 @@ async function advance(worldId: string, tick = 0, signal?: AbortSignal) {
     await releaseLease(db, lease);
   }
 }
+async function advanceToMonthlyCheckpoint(worldId: string, tick: number, signal?: AbortSignal) {
+  await advance(worldId, tick - 1, signal);
+  signal?.throwIfAborted();
+  const lease = await acquireLease(db, worldId);
+  if (!lease) throw Error('자기 시험 월드의 리스를 얻지 못했습니다.');
+  const completed = new AbortController();
+  try {
+    await new TurnLoop(db, lease, {
+      beforeCommit: (tx) => renewLease(tx, lease),
+      commitMetricSink: async (metric) => {
+        // 월말과 같은 tick의 장수 턴이 돌기 전에 정산 commit에서 비교한다.
+        if (metric.kind === 'monthly' && metric.tick === tick) completed.abort();
+      },
+    }).advanceTo(tick, AbortSignal.any([completed.signal, ...(signal ? [signal] : [])]));
+    signal?.throwIfAborted();
+    expect(completed.signal.aborted).toBe(true);
+  } finally {
+    await releaseLease(db, lease);
+  }
+}
 function command(worldId: string, setting: AdminSetting, userId = actor.id) {
   return { expectedUserId: userId, worldId, idempotencyKey: randomUUID(), reason: '공개하지 않는 운영 사유', setting };
 }
@@ -536,6 +556,30 @@ it('AC-INT-24 옵션은 깊게 병합되고 로더·조회·재시작·엄격한
   expect(() => readArchive(JSON.parse(JSON.stringify(archive)))).not.toThrow();
 });
 
+it('AC-INT-24 월말과 같은 tick의 장수 턴은 정산 체크포인트 뒤에 따로 진행한다', async () => {
+  const initial = commandInitial();
+  initial.generals[0]!.nextTurnTick = 0;
+  initial.ruleFeatures = ['personnel', 'policy'];
+  const { worldId } = await saveInitialWorld(db, initial, {
+    name: '월경계 비교',
+    turnTermMinutes: 60,
+    endYear: 231,
+    replayFormat: 3,
+  });
+  await controlClock(db, worldId, 'start');
+  await advanceToMonthlyCheckpoint(worldId, TICKS_PER_MONTH);
+  const archive = await exportReplay(db, worldId);
+  const snapshot = replayArchive(readArchive(JSON.parse(JSON.stringify(archive))), 1)[0]!;
+  const settled = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+  expect(snapshot.stateHash).toBe(hashState(await db.$transaction((tx) => loadReplayState(tx, worldId))));
+  expect(settled.actionSequence).toBe(archive.months[0]!.sequence);
+  await advance(worldId, TICKS_PER_MONTH);
+  const withTail = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+  expect(withTail.monthlyTick).toBe(settled.monthlyTick);
+  expect(withTail.actionSequence).toBeGreaterThan(settled.actionSequence);
+  expect(hashState(await db.$transaction((tx) => loadReplayState(tx, worldId)))).not.toBe(snapshot.stateHash);
+});
+
 it('AC-INT-24 원본 설정으로 A→B 초기화하고 B 변경 뒤 A 내보내기·B 재초기화가 유지된다', async () => {
   // 같은 CI의 정식 한 달만 33.7초다. 두 초기화·재생을 포함한 이 사례에만 120초를 둔다.
   const signal = AbortSignal.timeout(110_000),
@@ -603,7 +647,7 @@ it('AC-INT-24 원본 설정으로 A→B 초기화하고 B 변경 뒤 A 내보내
   expect(() => replayToEnd(readArchive(JSON.parse(JSON.stringify(sourceArchive))))).not.toThrow();
   checkpoint('A 수출·엄격 재생');
   await controlClock(db, child.id, 'start');
-  await advance(child.id, TICKS_PER_MONTH, signal);
+  await advanceToMonthlyCheckpoint(child.id, TICKS_PER_MONTH, signal);
   checkpoint('B 한 달 DB 진행');
   const firstMonth = await exportReplay(db, child.id);
   expect(replayArchive(readArchive(JSON.parse(JSON.stringify(firstMonth))), 1)[0]!.stateHash).toBe(

@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test';
 import { createAccount, e2eDatabaseUrl, withE2eDb } from './account';
 import { holdLease, query } from './game';
 import { cleanupHeldWorld } from './heldWorldCleanup';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -55,29 +55,29 @@ test.afterEach(async ({ page }) => {
 test('정식191년 메인·예턴 메뉴 이동·초점·375~1440px·30초 재조회 뒤 초안 보존', async ({ page }, info) => {
   test.setTimeout(180_000);
   const execution = (async () => {
-    const initial = await loadInitialWorld({
-      scenario: 'integration191',
-      map: 'integration',
-      statRules: 'five-stats',
-      portraitMap: '191-map',
-      seed: 'main-sections-191',
-    });
-    initial.ruleFeatures = [
-      'campaign-assignment-v2',
-      'campaign-v1',
-      'five-stats',
-      'operational-map',
-      'personnel',
-      'policy',
-      'stratagem-basic',
-      'treaty',
-    ];
-    expect(initial.generals).toHaveLength(491);
-    expect(initial.nations).toHaveLength(21);
     ownWorld = (
-      await withE2eDb((db) =>
-        saveInitialWorld(db, initial, { name: '메인 영역 정식191', turnTermMinutes: 60, endYear: 201 }),
-      )
+      await withE2eDb(async (db) => {
+        const initial = await loadInitialWorldFromDb(db, {
+          scenario: 'integration191',
+          map: 'integration',
+          statRules: 'five-stats',
+          portraitMap: '191-map',
+          seed: 'main-sections-191',
+        });
+        initial.ruleFeatures = [
+          'campaign-assignment-v2',
+          'campaign-v1',
+          'five-stats',
+          'operational-map',
+          'personnel',
+          'policy',
+          'stratagem-basic',
+          'treaty',
+        ];
+        expect(initial.generals).toHaveLength(491);
+        expect(initial.nations).toHaveLength(21);
+        return saveInitialWorld(db, initial, { name: '메인 영역 정식191', turnTermMinutes: 60, endYear: 201 });
+      })
     ).worldId;
     hold = await holdLease(ownWorld);
     await controlClock(hold.db, ownWorld, 'start');

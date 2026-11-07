@@ -3,14 +3,14 @@ import type { Page } from '@playwright/test';
 import { expect, type LegalStack } from './legalFixture';
 import { holdLease, type LeaseHold } from './game';
 import { releaseLease } from '../apps/engine/src/lease';
-import { loadInitialWorld } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 
 export type ClockWorld = { id: string; hold: LeaseHold };
 export async function clockWorld(stack: LegalStack, releases: Array<() => Promise<unknown>>, running = true) {
-  const initial = await loadInitialWorld({
+  const initial = await loadInitialWorldFromDb(stack.db, {
     scenario: 'integration191',
     map: 'integration',
     statRules: 'five-stats',

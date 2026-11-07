@@ -1,27 +1,37 @@
-import { readFileSync } from 'node:fs';
-import type { Prisma, PrismaClient } from '@opensamguk/db';
+import { readInitialResources } from '../apps/engine/src/world/resources';
+import { createDb } from '../packages/db/src/index';
+import { testDatabaseUrl } from './test-database';
+
+const selectedResources = await (async () => {
+  const db = createDb(testDatabaseUrl({ TEST_DATABASE_URL: process.env.TEST_DATABASE_URL }).href);
+  try {
+    return await readInitialResources(db, { map: 'che', scenario: '1030' });
+  } finally {
+    await db.$disconnect();
+  }
+})();
+
+import type { Prisma, PrismaClient } from '../packages/db/src/index';
 import {
   buildInitialWorld,
   requestWorldResetInput,
   adminResetPayloadSchema,
   adminResetRejectMessages,
-} from '@opensamguk/rules';
-import { hashState } from '@opensamguk/shared/node';
+} from '../packages/rules/src/index';
+import { hashState } from '../packages/shared/src/node/hashState';
 import { expect, it, vi } from 'vitest';
-import type { Context } from '../context';
-import { requestWorldReset, getWorldResetRequest } from './worldReset';
+import type { Context } from '../apps/server/src/context';
+import { requestWorldReset, getWorldResetRequest } from '../apps/server/src/admin/worldReset';
 
 const worldId = '00000000-0000-4000-8000-000000000001',
   userId = '00000000-0000-4000-8000-000000000002',
   key = '00000000-0000-4000-8000-000000000003',
   peer = '00000000-0000-4000-8000-000000000004';
-const resource = (file: string): unknown =>
-  JSON.parse(readFileSync(new URL('../../../../resources/' + file, import.meta.url), 'utf8'));
 const initial = buildInitialWorld({
-  map: resource('map/che.json'),
-  scenario: resource('scenario/1030.json'),
-  unitSet: resource('unitset/basic.json'),
-  statRules: resource('scenario/default.json'),
+  map: selectedResources.map.content,
+  scenario: selectedResources.scenario.content,
+  unitSet: selectedResources.unitSet.content,
+  statRules: selectedResources.statRules.content,
   seed: 'source',
 });
 const origin = {

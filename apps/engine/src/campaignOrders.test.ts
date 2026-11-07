@@ -1,15 +1,13 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { Prisma } from '@opensamguk/db';
 import { applyCampaignOrder, unitSetSchema } from '@opensamguk/rules';
-import { readFileSync } from 'node:fs';
 import { processCampaignQueuedInput } from './campaignInput';
 import { loadReplayState } from './monthly';
 import { persistEffects } from './persist';
 import { databaseNow } from './lease';
 import type { EngineInput, EngineWorld } from './features';
-const testUnits = unitSetSchema.parse(
-  JSON.parse(readFileSync(new URL('../../../resources/unitset/basic.json', import.meta.url), 'utf8')),
-);
+import { monthlyFixture } from '../test/monthlyFixture';
+const testUnits = unitSetSchema.parse((await monthlyFixture()).unitSet);
 
 vi.mock('./monthly', () => ({ loadReplayState: vi.fn() }));
 vi.mock('./persist', () => ({ persistEffects: vi.fn() }));

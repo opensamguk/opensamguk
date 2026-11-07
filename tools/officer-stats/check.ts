@@ -1,10 +1,19 @@
 import { readFile } from 'node:fs/promises';
-import { auditOfficerLedger } from './audit';
+import { auditOfficerLedger, mainScenarioSourceText } from './audit';
+import { createDb, readPublishedResources } from '../../packages/db/src/index';
 
 const root = new URL('../../', import.meta.url);
 const read = (path: string) => readFile(new URL(path, root), 'utf8');
-const [main, sources, ledger] = await Promise.all([
-  read('resources/scenario/1030.json'),
+if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL이 필요합니다.');
+const db = createDb(process.env.DATABASE_URL);
+let main: string;
+try {
+  const [row] = await readPublishedResources(db, [{ kind: 'SCENARIO', name: '1030', version: 1 }]);
+  main = mainScenarioSourceText(row!.content);
+} finally {
+  await db.$disconnect();
+}
+const [sources, ledger] = await Promise.all([
   read('tools/fixtures/int16-selected-officers.json'),
   read('resources/officers/191-five-stats.json'),
 ]);
