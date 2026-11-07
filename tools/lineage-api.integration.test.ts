@@ -482,6 +482,170 @@ it('AC-P2-32 출생 트랜잭션 실패는 새 행·예약을 모두 되돌리�
   expect(replayed.at(-1)!.stateHash).toBe(hashState(state));
 }, 120000);
 
+it('AC-P2-32 전임자 해제 뒤 후계자 조작권 저장 실패는 모두 복구되고 새 리스에서 한 번만 적용된다', async () => {
+  const id = await world(),
+    father = await user(),
+    mother = await user(),
+    from = await create(id, father, '복구가문부', 'MALE'),
+    mom = await create(id, mother, '복구가문모', 'FEMALE');
+  const offered = await send(id, father, from, { type: 'marriage.propose', targetGeneralId: mom });
+  if (offered.result.data?.status !== 'applied') throw Error('혼인 제안 결과가 없습니다.');
+  await send(id, mother, mom, {
+    type: 'marriage.respond',
+    offerId: offered.result.data.result.offerId!,
+    accept: true,
+  });
+  await advance(id, 10000);
+  const child = Object.entries((await snapshot(id)).state.lineage!.persons).find(([, p]) =>
+    p.parents.some((parent) => parent === from),
+  );
+  if (!child) throw Error('실제 출생한 자녀가 없습니다.');
+  const heir = Number(child[0]);
+  expect(Number.isSafeInteger(heir)).toBe(true);
+  expect(heir).toBeGreaterThan(from);
+  for (let month = 2; month <= 12; month++) {
+    await send(id, father, from, { type: 'heir.designate', heirGeneralId: null });
+    await send(id, mother, mom, { type: 'heir.designate', heirGeneralId: null });
+    await advance(id, month * 10000);
+  }
+  await send(id, father, from, { type: 'heir.designate', heirGeneralId: heir });
+  const board = await rpc('lineage.get', { worldId: id }, father),
+    preview = board.data?.view.mine?.preview;
+  if (!preview) throw Error('성인이 된 후계자의 미리보기가 없습니다.');
+  const input = {
+    worldId: id,
+    expectedUserId: father.id,
+    expectedGeneralId: from,
+    requestId: randomUUID(),
+    payload: { type: 'succession.confirm' as const, heirGeneralId: heir, expected: preview },
+  };
+  expect((await rpc('lineage.submit', input, father)).data?.status).toBe('pending');
+  const footprint = async () => ({
+    replay: await snapshot(id),
+    generals: await db.general.findMany({ where: { worldId: id }, orderBy: { id: 'asc' } }),
+    turns: await db.generalTurn.findMany({ where: { worldId: id }, orderBy: [{ generalId: 'asc' }, { slot: 'asc' }] }),
+    world: await db.world.findUniqueOrThrow({
+      where: { id },
+      select: { clockTick: true, actionSequence: true, lineageState: true },
+    }),
+    inputs: await db.inputEvent.findMany({ where: { worldId: id }, orderBy: { id: 'asc' } }),
+    logs: await db.generalLog.findMany({ where: { worldId: id }, orderBy: { id: 'asc' } }),
+    history: await db.nationHistory.findMany({
+      where: { worldId: id },
+      orderBy: [{ tick: 'asc' }, { nationId: 'asc' }],
+    }),
+  });
+  const before = await footprint(),
+    requestKey = `lineage:${input.requestId}`;
+  expect(before.replay.state.generals[from]).toMatchObject({ userId: father.id });
+  expect(before.replay.state.generals[from]!.gold).toBeGreaterThan(0);
+  expect(before.replay.state.generals[from]!.rice).toBeGreaterThan(0);
+  expect(before.replay.state.generals[heir]).toMatchObject({ userId: null });
+  expect(before.inputs.filter((row) => row.idempotencyKey === requestKey)).toMatchObject([{ status: 'PENDING' }]);
+  // 이름과 SQL 본문에 넣는 값은 이 시험이 만든 식별자뿐이다.
+  expect(id).toMatch(/^[\w-]+$/);
+  expect(father.id).toMatch(/^[\w-]+$/);
+  const fault = `lineage_control_${randomUUID().replaceAll('-', '')}`;
+  const objects = () => db.$queryRaw<Array<{ triggers: number; functions: number }>>`
+    SELECT (SELECT count(*)::int FROM pg_trigger WHERE tgname=${fault}) AS triggers,
+      (SELECT count(*)::int FROM pg_proc WHERE proname=${fault}) AS functions`;
+  expect(await objects()).toEqual([{ triggers: 0, functions: 0 }]);
+  let failure: unknown;
+  const cleanupErrors: unknown[] = [];
+  try {
+    await db.$executeRawUnsafe(`CREATE FUNCTION "${fault}"() RETURNS trigger LANGUAGE plpgsql AS $fault$
+      BEGIN
+        IF NEW."worldId" = '${id}' AND NEW.id = ${heir}
+          AND OLD."userId" IS NULL AND NEW."userId" = '${father.id}' THEN
+          IF NOT EXISTS (SELECT 1 FROM "General" WHERE "worldId" = '${id}' AND id = ${from}
+            AND "userId" IS NULL AND gold = 0 AND rice = 0) THEN
+            RAISE EXCEPTION 'lineage-predecessor-observation-failed';
+          END IF;
+          RAISE EXCEPTION 'lineage-heir-control-save-failure';
+        END IF;
+        RETURN NEW;
+      END;
+    $fault$`);
+    await db.$executeRawUnsafe(
+      `CREATE TRIGGER "${fault}" AFTER UPDATE ON "General" FOR EACH ROW EXECUTE FUNCTION "${fault}"()`,
+    );
+    // 전임자의 해제·자산 저장이 끝난 뒤 후계자 UPDATE에서 막아 문장 사이 롤백을 본다.
+    await expect(advance(id, before.world.clockTick)).rejects.toThrow('lineage-heir-control-save-failure');
+    expect(await footprint()).toEqual(before);
+    expect(hashState(await snapshot(id))).toBe(hashState(before.replay));
+    expect(await db.general.findMany({ where: { worldId: id, userId: father.id }, select: { id: true } })).toEqual([
+      { id: from },
+    ]);
+  } catch (error) {
+    failure = error;
+  } finally {
+    try {
+      await db.$executeRawUnsafe(`DROP TRIGGER IF EXISTS "${fault}" ON "General"`);
+    } catch (error) {
+      cleanupErrors.push(error);
+    }
+    try {
+      await db.$executeRawUnsafe(`DROP FUNCTION IF EXISTS "${fault}"()`);
+    } catch (error) {
+      cleanupErrors.push(error);
+    }
+  }
+  if (failure && cleanupErrors.length) throw new AggregateError([failure, ...cleanupErrors], '계승 시험과 정리 실패');
+  if (failure) throw failure;
+  if (cleanupErrors.length) throw new AggregateError(cleanupErrors, '계승 시험 정리 실패');
+  expect(await objects()).toEqual([{ triggers: 0, functions: 0 }]);
+  const restarted = createDb(url!);
+  try {
+    await advance(id, before.world.clockTick, false, restarted);
+  } finally {
+    await restarted.$disconnect();
+  }
+  const receipt = await rpc('lineage.request', { worldId: id, requestId: input.requestId }, father);
+  expect(receipt.data?.status, JSON.stringify(receipt.error ?? receipt.data)).toBe('applied');
+  const applied = await footprint();
+  expect(applied.replay.state.generals[from]).toMatchObject({ userId: null, gold: 0, rice: 0 });
+  expect(applied.replay.state.generals[heir]).toMatchObject({
+    userId: father.id,
+    gold: preview.gold,
+    rice: preview.rice,
+  });
+  expect(applied.inputs.filter((row) => row.idempotencyKey === requestKey)).toMatchObject([{ status: 'APPLIED' }]);
+  expect(applied.logs.length).toBeGreaterThan(before.logs.length);
+  expect(await db.general.findMany({ where: { worldId: id, userId: father.id }, select: { id: true } })).toEqual([
+    { id: heir },
+  ]);
+  expect((await rpc('lineage.submit', input, father)).data?.status).toBe('applied');
+  expect(
+    (
+      await rpc(
+        'lineage.submit',
+        { ...input, requestId: randomUUID(), payload: { type: 'heir.designate', heirGeneralId: null } },
+        father,
+      )
+    ).error?.data.code,
+  ).toBe('CONFLICT');
+  expect(await footprint()).toEqual(applied);
+  await advance(id, 129999);
+  const lease = await acquireLease(db, id, randomUUID(), 120000);
+  if (!lease) throw Error('계승 재생 검증의 실행권이 없습니다.');
+  const completed = new AbortController();
+  try {
+    await new TurnLoop(db, lease, {
+      commitMetricSink: async (metric) => {
+        if (metric.kind === 'monthly' && metric.tick === 130000) completed.abort();
+      },
+    }).advanceTo(130000, completed.signal);
+    expect(completed.signal.aborted).toBe(true);
+  } finally {
+    await releaseLease(db, lease);
+  }
+  const archive = await exportReplay(db, id),
+    replayed = replayArchive(archive, 13);
+  expect(replayed).toHaveLength(13);
+  expect(replayed.map((month) => month.stateHash)).toEqual(archive.months.map((month) => month.stateHash));
+  expect(replayed.at(-1)!.stateHash).toBe(hashState(await snapshot(id)));
+}, 120000);
+
 it('AC-P2-32 NPC 부모·자녀·손자녀 자동 계승은 연결 재개 뒤에도 같은 사슬과 월간 재생을 보존한다', async () => {
   // 인공4명·출생자 수명18년·성인 등장1년이다. 혼인·부모 최소16과 실제 자손의 명령은 유지한다.
   const id = await world(true, 2_400_000, true);
