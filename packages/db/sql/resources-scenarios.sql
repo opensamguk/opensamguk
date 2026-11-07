@@ -155,6 +155,13 @@
 --
 -- `resources/scenario/2060.json`·`resources/scenario/2070.json`의 원작은 같은 커밋의 `resources/scenario/scenario_2060.json`·`resources/scenario/scenario_2070.json`이다. 원작의 기본 시작 연도 180과 183년부터의 임관 제한을 명시하고 `che` 병종판을 요구한다. 원문과 해시는 같은 fixture에 보존한다.
 --
+-- ## 원작 miniche 지도와 병종
+--
+-- core2026 커밋 df6c9269fa1e2862418ba9da481c8dd2d758d6c5의 MIT © 2025 devsam 자료다.
+--
+-- - 원작 resources/map/map_miniche.json, map_miniche_b.json, map_miniche_clean.json은 각각 같은 이름에서 map_ 접두사를 뺀 파일에 원문 바이트를 보존했다.
+-- - resources/unitset/che-miniche.json은 같은 커밋의 unitset_che.json 모집 거점 이름을 세 지도에서 공통으로 쓰는 도시 ID로 변환했다. 병종 수치와 전투 효과는 이 저장소의 che 판을 따른다.
+--
 
 DO $t4_46_init$
 DECLARE

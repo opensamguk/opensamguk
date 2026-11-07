@@ -11,7 +11,7 @@ import { buildInitialWorld } from '../../packages/rules/src/world/bootstrap';
 import { crewTypeFailure, type CrewContext } from '../../packages/rules/src/world/crewRequirements';
 import { mapSchema, unitSetSchema } from '../../packages/rules/src/world/resources';
 import { validateWorldResources } from '../../packages/rules/src/world/validate/world';
-import { projectCheUnitSet } from './che';
+import { MINICHE_MAP_IDS, projectCheUnitSet } from './che';
 import { readCheSource } from './source';
 
 const sql = readFileSync(new URL('../../packages/db/sql/resources-init.sql', import.meta.url), 'utf8').split(
@@ -28,6 +28,45 @@ const { unitSet, specials } = projectCheUnitSet(source, map);
 const unit = (id: number) => unitSet.crewTypes.find((row) => row.id === id)!;
 
 describe('T4-46 AC-P2-24 원작 che 병종 수치와 모집 조건', () => {
+  it('소형 지도 세 판의 모집 거점과 호환 지도를 고정한다', () => {
+    const smallUnits = unitSetSchema.parse(
+      JSON.parse(readFileSync(new URL('../../resources/unitset/che-miniche.json', import.meta.url), 'utf8')),
+    );
+    for (const id of MINICHE_MAP_IDS) {
+      const smallMap = JSON.parse(readFileSync(new URL(`../../resources/map/${id}.json`, import.meta.url), 'utf8'));
+      expect(projectCheUnitSet(source, smallMap).unitSet).toEqual(smallUnits);
+      expect(smallUnits.crewTypes.find((row) => row.id === 1103)?.requirements).toContainEqual({
+        kind: 'cities',
+        cityKeys: [75],
+      });
+      const input = {
+        map: smallMap,
+        unitSet: smallUnits,
+        scenario: { id: 'test', title: '소형 지도', startYear: 180, nation: [], general: [], diplomacy: [] },
+        statRules: published('STAT_RULES', 'default'),
+        seed: 't4-46-miniche',
+      };
+      expect(validateWorldResources(input).status).toBe('pass');
+      expect(buildInitialWorld(input).unitSet).toEqual(smallUnits);
+      expect(validateWorldResources({ ...input, unitSet }).unitSet.status).toBe('fail');
+
+      const wrongMaps = [
+        map,
+        { ...smallMap, id: 'other' },
+        {
+          ...smallMap,
+          cities: mapSchema.parse(smallMap).cities.map((city) => (city.id === 75 ? { ...city, region: 1 } : city)),
+        },
+      ];
+      for (const wrongMap of wrongMaps) {
+        expect(validateWorldResources({ ...input, map: wrongMap }).unitSet.status).toBe('fail');
+        expect(() => buildInitialWorld({ ...input, map: wrongMap })).toThrow('지역 기준');
+      }
+    }
+    const { legacyCheCityRegions: _, ...missingSignature } = smallUnits;
+    expect(unitSetSchema.safeParse(missingSignature).success).toBe(false);
+  });
+
   it('병종 34종의 원본 수치와 모집 조건 57개를 보존하고 전투 특수 목록을 따로 보관한다', () => {
     const before = JSON.stringify(source);
     expect(projectCheUnitSet(source, map)).toEqual({ unitSet, specials });
