@@ -1,3 +1,4 @@
+import { hashState } from '@opensamguk/shared/node';
 import type { Prisma } from '@opensamguk/db';
 import {
   effectiveWorldOptions,
@@ -10,6 +11,7 @@ import {
   readStoredStratagemCards,
   readStoredEquipment,
   readStoredNationLifecycle,
+  readStoredRelations,
   assertNationLifecycle,
   type WorldState,
 } from '@opensamguk/rules';
@@ -116,6 +118,8 @@ export async function loadWorldAfterCapabilityCheck(
   if (preparedTurns) state.preparedTurns = preparedTurns;
   const nationResearch = readStoredNationResearch(world);
   if (nationResearch) state.nationResearch = nationResearch;
+  const relations = readStoredRelations(world, hashState);
+  if (relations) state.relations = relations;
   const nationLifecycle = readStoredNationLifecycle(world);
   if (nationLifecycle) state.nationLifecycle = nationLifecycle;
   assertNationLifecycle(state);

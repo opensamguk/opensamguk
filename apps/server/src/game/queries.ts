@@ -1,3 +1,4 @@
+import { hashState } from '@opensamguk/shared/node';
 import { TRPCError } from '@trpc/server';
 import { isDeepStrictEqual } from 'node:util';
 import { readWorldExtRows, type Prisma } from '@opensamguk/db';
@@ -29,6 +30,7 @@ import {
   readStoredPreparedTurns,
   readStoredNationResearch,
   readStoredNationLifecycle,
+  readStoredRelations,
   assertNationLifecycle,
 } from '@opensamguk/rules';
 import { z } from 'zod';
@@ -141,6 +143,8 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
   if (preparedTurns) state.preparedTurns = preparedTurns;
   const nationResearch = readStoredNationResearch(world);
   if (nationResearch) state.nationResearch = nationResearch;
+  const relations = readStoredRelations(world, hashState);
+  if (relations) state.relations = relations;
   const nationLifecycle = readStoredNationLifecycle(world);
   if (nationLifecycle) state.nationLifecycle = nationLifecycle;
   assertNationLifecycle(state);
