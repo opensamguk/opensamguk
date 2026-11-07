@@ -15,6 +15,7 @@ interface HistoricEventsWorldRecord {
   replayFormat: number;
   ruleFeatures: readonly string[];
   replayOrigin: unknown;
+  initialStateHash: string;
   monthlyTick: number;
   historicEventsState: unknown;
 }
@@ -37,6 +38,7 @@ export function readHistoricEventsStorage(
   ) {
     throw new Error('역사 사건 기능이 생성 기록과 다릅니다.');
   }
+  if (world.initialStateHash !== origin.initialStateHash) throw new Error('월드와 원생성 상태 해시가 다릅니다.');
   checkOriginHashes(origin, hash);
   const { initial, featureData } = origin;
   const config = readHistoricEventsOriginConfig(initial, featureData?.[HISTORIC_EVENTS_FEATURE]);

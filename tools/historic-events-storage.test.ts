@@ -56,6 +56,7 @@ const record = () => ({
   replayFormat: 3,
   ruleFeatures: initial.ruleFeatures,
   replayOrigin: origin,
+  initialStateHash: origin.initialStateHash,
   monthlyTick: 0,
   historicEventsState: initialHistoricEvents(),
 });
@@ -95,6 +96,15 @@ describe('AC-P2-21 역사 사건의 생성 기록과 저장 상태', () => {
     const changedInitial = structuredClone(initial);
     changedInitial.nations[0]!.name = '변경한 국가';
     expect(() => read({ ...world, replayOrigin: { ...origin, initial: changedInitial } })).toThrow('해시');
+  });
+
+  it('자체 해시가 맞는 다른 시드의 생성 기록도 원래 월드에 쓸 수 없다', () => {
+    const otherInitial = { ...initial, seed: 'other-seed' };
+    const otherOrigin = { ...origin, initial: otherInitial, initialStateHash: hashState(otherInitial) };
+    expect(
+      read({ ...record(), replayOrigin: otherOrigin, initialStateHash: otherOrigin.initialStateHash }),
+    ).toBeDefined();
+    expect(() => read({ ...record(), replayOrigin: otherOrigin })).toThrow('월드와 원생성 상태 해시');
   });
 
   it('꺼진 기존 월드는 저장 상태가 없고 켜진 월드는 월 정산과 일치한다', () => {
