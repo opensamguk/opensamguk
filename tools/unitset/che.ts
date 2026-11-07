@@ -14,7 +14,7 @@ const originalRequirement = z.discriminatedUnion('type', [
 ]);
 const triggerList = z.array(z.string().min(1)).nullable();
 const originalSet = z.looseObject({
-  id: z.literal('che'),
+  id: z.enum(['che', 'che_except_siege']),
   crewTypes: z.array(
     z.looseObject({
       id: z.number().int().positive(),
@@ -31,7 +31,7 @@ export function projectCheUnitSet(source: unknown, mapInput: unknown) {
   const original = originalSet.parse(source);
   const map = mapSchema.parse(mapInput);
   const miniche = MINICHE_MAP_IDS.some((id) => id === map.id);
-  if (map.id !== 'che' && !miniche) throw Error('원작 병종의 che 지도가 필요합니다.');
+  if (!miniche && (map.id !== 'che' || original.id !== 'che')) throw Error('원작 병종에 맞는 che 지도가 필요합니다.');
   const regionIds = new Set(map.cities.map(({ region }) => region));
 
   function project(req: z.infer<typeof originalRequirement>): Requirement {
@@ -65,7 +65,8 @@ export function projectCheUnitSet(source: unknown, mapInput: unknown) {
 
   const unitSet = unitSetSchema.parse({
     ...original,
-    ...(miniche ? { id: 'che-miniche', name: 'che-miniche', legacyCheMapIds: MINICHE_MAP_IDS } : {}),
+    ...(miniche ? { legacyCheMapIds: MINICHE_MAP_IDS } : {}),
+    ...(miniche && original.id === 'che' ? { id: 'che-miniche', name: 'che-miniche' } : {}),
     coefMode: 'multiply',
     firstVolleyScope: 'sortie',
     legacyCheCityRegions: legacyCheCityRegions(map),

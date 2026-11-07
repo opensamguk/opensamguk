@@ -27,6 +27,25 @@ const input: Record<string, string> = Object.fromEntries(
 );
 
 describe('T4-46 / AC-P2-24 추가 시나리오의 출처와 합성', () => {
+  it('라트하우므 지도 원문에서 중복 도로와 이름 한 쌍만 덜어낸다', async () => {
+    const [source, published] = await Promise.all([
+      readFile(new URL('resources/map-drafts/original/ludo-rathowm-core2026-df6c926.json', root), 'utf8'),
+      readFile(new URL('resources/map/ludo_rathowm.json', root), 'utf8'),
+    ]);
+    expect(createHash('sha256').update(source).digest('hex')).toBe(
+      '9e96b06266d6e6603d498733605edd7e40955eb3a657e5542240fc8ed591f2d3',
+    );
+    const original = JSON.parse(source) as {
+      cities: { id: number; connections: number[]; meta: { connectionNames: string[] } }[];
+    };
+    const city = original.cities.find(({ id }) => id === 24)!;
+    expect(city.connections).toEqual([20, 21, 21, 23, 22]);
+    expect(city.meta.connectionNames.slice(1, 3)).toEqual(['도약의 탑', '도약의 탑']);
+    city.connections.splice(2, 1);
+    city.meta.connectionNames.splice(2, 1);
+    expect(JSON.parse(published)).toEqual(original);
+  });
+
   it('S0 원작 tree에서 대조한 83키·blob·sha256을 고정한다', () => {
     const expected = `0 1 2 900 901 902 903 904 905 906 908 910 911 912 913 914 915 916
 1010 1020 1021 1030 1031 1040 1041 1050 1060 1070 1080 1090 1100 1110 1120

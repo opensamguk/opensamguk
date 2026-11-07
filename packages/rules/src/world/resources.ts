@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { fiveStatsSchema } from '../general/fiveStats';
+import { MAX_STARTING_NPC_STAT, startingNpcStatLimit } from './initialNpcStats';
 
 const natural = z.number().int().nonnegative();
 const positive = z.number().int().positive();
@@ -46,9 +47,12 @@ const statRulesValueSchema = z
     '능력치 합계·최소·최대가 맞지 않습니다.',
   );
 
-export const scenarioSchema = z.object({
+export const scenarioIdentitySchema = z.object({
   id: name,
   title: name,
+});
+
+const scenarioObjectSchema = scenarioIdentitySchema.extend({
   startYear: natural,
   requiredMap: name.optional(),
   randomizeZeroAffinity: z.literal(true).optional(),
@@ -100,9 +104,9 @@ export const scenarioSchema = z.object({
       z.string().nullable(),
       natural,
       name.nullable(),
-      natural.max(100),
-      natural.max(100),
-      natural.max(100),
+      natural.max(MAX_STARTING_NPC_STAT),
+      natural.max(MAX_STARTING_NPC_STAT),
+      natural.max(MAX_STARTING_NPC_STAT),
       natural.max(12),
       natural,
       natural,
@@ -112,6 +116,19 @@ export const scenarioSchema = z.object({
     ]),
   ),
   diplomacy: z.array(z.tuple([positive, positive, z.union([z.literal(0), z.literal(1), z.literal(7)]), natural])),
+});
+
+export const scenarioSchema = scenarioObjectSchema.superRefine((scenario, ctx) => {
+  const limit = startingNpcStatLimit(scenario.id);
+  scenario.general.forEach((row, index) => {
+    for (const stat of [5, 6, 7] as const)
+      if (row[stat] > limit)
+        ctx.addIssue({
+          code: 'custom',
+          path: ['general', index, stat],
+          message: `시작 NPC 능력치 상한은 ${limit}입니다.`,
+        });
+  });
 });
 
 const coefficients = z.union([z.record(z.string(), z.number().nonnegative()), z.array(z.never())]);

@@ -6,7 +6,7 @@ import { hashState } from '../../packages/shared/src/node/hashState';
 import fixture from '../fixtures/t4-46-scenarios.json';
 import { BODY_TAG, CONTENT_TAG, requirePassingReport } from './convert';
 import { createDb, readPublishedResources } from '../../packages/db/src/index';
-import { legacyMapPublications } from './legacy-maps';
+import { legacyMapPublications, legacyMapUnitSetNames } from './legacy-maps';
 
 export interface ScenarioRow {
   key: string;
@@ -20,7 +20,7 @@ export interface ScenarioRow {
   contentHash: string | null;
   source?: string;
   map?: string;
-  unitSet?: 'che' | 'che-miniche';
+  unitSet?: 'basic' | 'che' | (typeof legacyMapUnitSetNames)[number];
   statRules?: string;
 }
 
@@ -55,11 +55,16 @@ export function requiredScenarioStatRules(rows: readonly ScenarioRow[]) {
 }
 
 export async function requiredScenarioLegacyResources(ready: readonly ScenarioRow[]) {
-  const names = new Set(ready.flatMap(({ map }) => (map === undefined ? [] : [map])));
-  if (names.size === 0) return [];
+  const keys = new Set(
+    ready.flatMap(({ map, unitSet }) => [
+      ...(map === undefined ? [] : [`MAP/${map}`]),
+      ...(unitSet === undefined || unitSet === 'basic' || unitSet === 'che' ? [] : [`UNIT_SET/${unitSet}`]),
+    ]),
+  );
+  if (keys.size === 0) return [];
 
-  const expected = (await legacyMapPublications()).filter(({ kind, name }) => kind === 'UNIT_SET' || names.has(name));
-  if (expected.length !== names.size + 1) throw new Error('시나리오에 지정한 원작 지도를 확인하세요.');
+  const expected = (await legacyMapPublications()).filter(({ kind, name }) => keys.has(`${kind}/${name}`));
+  if (expected.length !== keys.size) throw new Error('시나리오에 지정한 원작 지도와 병종을 확인하세요.');
   return expected;
 }
 
@@ -84,11 +89,16 @@ export function scenarioMaterialsForRow(
   row: { map?: string; unitSet?: string; statRules?: string },
 ) {
   const { cheUnitSet, legacyResources, ...basic } = materials;
-  const unitSets = { che: cheUnitSet, 'che-miniche': legacyResources.get('UNIT_SET/che-miniche') };
+  const unitSet =
+    row.unitSet === undefined || row.unitSet === 'basic'
+      ? basic.unitSet
+      : row.unitSet === 'che'
+        ? cheUnitSet
+        : legacyResources.get(`UNIT_SET/${row.unitSet}`);
   return {
     ...basic,
     map: row.map === undefined ? basic.map : legacyResources.get(`MAP/${row.map}`),
-    unitSet: row.unitSet === 'che' || row.unitSet === 'che-miniche' ? unitSets[row.unitSet] : basic.unitSet,
+    unitSet,
     statRules: scenarioStatRulesPublication(row)?.content ?? basic.statRules,
   };
 }
@@ -97,6 +107,7 @@ export function readyScenarioRows(rows: readonly ScenarioRow[] = scenarioRows): 
   const ready = rows.filter((row) => row.support === 'ready');
   const keys = new Set<string>();
   for (const row of ready) {
+    const legacyUnitSet = legacyMapUnitSetNames.some((name) => row.unitSet === name);
     if (
       !/^(0|[1-9][0-9]*)$/.test(row.key) ||
       row.key === '1030' ||
@@ -104,7 +115,8 @@ export function readyScenarioRows(rows: readonly ScenarioRow[] = scenarioRows): 
       keys.has(row.key) ||
       !row.contentHash?.match(/^[0-9a-f]{64}$/) ||
       !row.source ||
-      (row.map === undefined ? row.unitSet === 'che-miniche' : row.unitSet !== 'che-miniche')
+      (row.unitSet !== undefined && row.unitSet !== 'basic' && row.unitSet !== 'che' && !legacyUnitSet) ||
+      (legacyUnitSet && row.map === undefined)
     ) {
       throw new Error(`시나리오 판 입력을 확인하세요: SCENARIO/${row.key}/1`);
     }
@@ -184,7 +196,8 @@ export function convertScenariosToSql(
       requirePassingReport(report);
       if (
         row.map !== undefined &&
-        (report.scenario.value?.requiredMap !== row.map || report.scenario.value.requiredUnitSet !== row.unitSet)
+        (report.scenario.value?.requiredMap !== row.map ||
+          report.scenario.value.requiredUnitSet !== (row.unitSet ?? 'basic'))
       )
         throw new Error('시나리오에 원작 지도와 병종을 지정하세요.');
     } catch {
