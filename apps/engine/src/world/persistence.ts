@@ -460,7 +460,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
         ...(cityScale ? { cityScale } : {}),
         ...(rules ? { presetRules: rules } : {}),
         ...(world.ruleFeatures?.length ? { ruleFeatures: [...world.ruleFeatures] } : {}),
-        ...(ext ? { ext } : {}),
+        ...(ext && world.replayFormat !== 3 ? { ext } : {}),
         seed: world.seed,
         scenarioKey: world.scenarioKey,
         mapKey: world.mapKey,

@@ -9,7 +9,7 @@ import { categories } from '../apps/server/src/authz/coverage';
 import { newSession } from '../apps/server/src/auth/session';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { readFixture } from '../apps/server/test/readFixture';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { readWorldState, saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 import { INTEL_FEATURE } from '../packages/rules/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
@@ -322,12 +322,15 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
     initial.generals[1]!.userId = users[1]!.id;
     initial.generals[3]!.userId = users[3]!.id;
     for (const general of initial.generals) general.nextTurnTick = general.id === 1 ? 100 : 20_000;
-    const { worldId: intelWorld } = await saveInitialWorld(db, initial, {
+    const { worldId: intelWorld, stateHash } = await saveInitialWorld(db, initial, {
       name: '첩보 권한과 재생 검증',
       turnTermMinutes: 60,
       endYear: null,
       replayFormat: 3,
     });
+    const snapshot = await readWorldState(db, intelWorld);
+    expect(snapshot).not.toHaveProperty('ext');
+    expect(hashState(snapshot)).toBe(stateHash);
     await db.world.update({
       where: { id: intelWorld },
       data: { status: 'RUNNING', clockMode: 'ACCELERATED', clockAnchorAt: new Date(now) },
