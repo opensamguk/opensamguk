@@ -35,7 +35,12 @@ describe('AC-P2-21 1030 역사 사건', () => {
     }
   });
 
-  it.each(['integration191', 'san10-191'])('같은 국가를 쓰는 %s 시나리오를 거부한다', (scenarioKey) => {
+  it('게시된 1030의 다른 판도 사건에 필요한 국가가 일치하면 사용한다', () => {
+    expect(createHistoricEvents1030({ ...initial, scenarioKey: '1030@2' })).toEqual(createHistoricEvents1030(initial));
+    expect(() => createHistoricEvents1030({ ...initial, scenarioKey: '1030@2147483648' })).toThrow('판 번호');
+  });
+
+  it.each(['integration191', 'san10-191', '2060@2'])('같은 국가를 쓰는 %s 시나리오를 거부한다', (scenarioKey) => {
     expect(() => createHistoricEvents1030({ ...initial, scenarioKey })).toThrow('1030 시나리오');
   });
 

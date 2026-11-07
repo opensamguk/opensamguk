@@ -90,6 +90,10 @@ describe('T2-26 실제 DB 형식·C2', () => {
         "historicEventsState" = ${state}::jsonb, "scenarioKey" = '2060' WHERE id = ${worldId}`,
     ).rejects.toThrow('World_historicEventsState_feature_check');
     await expect(
+      db.$executeRaw`UPDATE "World" SET "ruleFeatures" = ARRAY['historic-events'],
+        "historicEventsState" = ${state}::jsonb, "scenarioKey" = '1030@2147483648' WHERE id = ${worldId}`,
+    ).rejects.toThrow('World_historicEventsState_feature_check');
+    await expect(
       db.$executeRaw`UPDATE "World" SET "ruleFeatures" = ARRAY[NULL]::text[],
         "historicEventsState" = ${state}::jsonb, "scenarioKey" = '1030' WHERE id = ${worldId}`,
     ).rejects.toThrow('World_historicEventsState_feature_check');
@@ -138,7 +142,7 @@ describe('T2-26 실제 DB 형식·C2', () => {
     // 운영 기능 등록 전에도 DB 쓰기 경계를 실제 행에서 검증한다.
     await db.world.update({
       where: { id: worldId },
-      data: { ruleFeatures: [HISTORIC_EVENTS_FEATURE], scenarioKey: '1030', historicEventsState: initialState },
+      data: { ruleFeatures: [HISTORIC_EVENTS_FEATURE], scenarioKey: '1030@2', historicEventsState: initialState },
     });
     const nationKey = { worldId_id: { worldId, id: nation.id } };
     const writeMonth = (fail: boolean) =>

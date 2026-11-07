@@ -1,5 +1,6 @@
 import type { ReplayOriginV1, ReplayOriginV3 } from '../ruleRegistry';
 import { checkOriginHashes } from '../world/originHashes';
+import { parseResourceKey } from '../world/resourceKey';
 import { readHistoricEventsConfig, readHistoricEventsState } from './state';
 
 export const HISTORIC_EVENTS_FEATURE = 'historic-events';
@@ -7,7 +8,8 @@ export const HISTORIC_EVENTS_FEATURE = 'historic-events';
 type HistoricEventsInitial = Parameters<typeof readHistoricEventsConfig>[0] & { scenarioKey: string };
 
 export function readHistoricEventsOriginConfig(initial: HistoricEventsInitial, data: unknown) {
-  if (initial.scenarioKey !== '1030') throw new Error('역사 사건은 1030 시나리오에서만 사용할 수 있습니다.');
+  if (parseResourceKey(initial.scenarioKey).name !== '1030')
+    throw new Error('역사 사건은 1030 시나리오에서만 사용할 수 있습니다.');
   return readHistoricEventsConfig(initial, data);
 }
 
