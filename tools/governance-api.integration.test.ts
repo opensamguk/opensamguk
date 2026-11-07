@@ -1,4 +1,6 @@
+import { execFileSync, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { inferRouterOutputs } from '@trpc/server';
 import { z } from 'zod';
@@ -118,6 +120,35 @@ async function advance(worldId: string, tick: number, fail = false, connection =
   }
 }
 const snapshot = (worldId: string) => db.$transaction((tx) => loadReplayState(tx, worldId));
+
+async function stopMonthlyProcess(worldId: string, phase: 'beforeCommit' | 'committed') {
+  const child = spawn(
+    process.execPath,
+    ['--import', 'tsx', 'tools/governance-monthly-crash-worker.ts', worldId, phase],
+    { cwd: new URL('../', import.meta.url), stdio: ['ignore', 'ignore', 'inherit', 'ipc'], windowsHide: true },
+  );
+  const closed = once(child, 'close');
+  try {
+    const [message] = await Promise.race([
+      once(child, 'message', { signal: AbortSignal.timeout(20_000) }),
+      closed.then(() => {
+        throw Error('황실 정산 중단 지점 전에 프로세스가 끝났습니다.');
+      }),
+    ]);
+    expect(message).toBe(phase);
+    expect(child.kill('SIGKILL')).toBe(true);
+    expect(await closed).toEqual([null, 'SIGKILL']);
+  } finally {
+    if (!child.killed && child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+    await closed;
+  }
+  const { fencingToken } = await db.engineLease.findUniqueOrThrow({ where: { worldId } });
+  await db.engineLease.update({
+    where: { worldId, fencingToken },
+    data: { expiresAt: new Date(0) },
+  });
+  return fencingToken;
+}
 function creation(name: string) {
   const stat = Math.floor(initial.statRules.total / 5);
   return {
@@ -559,7 +590,7 @@ describe('AC-P2-31 실제 HTTP 황실 접수·동의·경제', () => {
     expect(hashState(await snapshot(world.id))).toBe(after);
   }, 60_000);
 
-  it('사람 계약·직위 동의와 공납·봉록을 저장하고 월 롤백·원생성 재생을 확인한다', async () => {
+  it('사람 계약·직위 동의와 공납·봉록을 저장하고 월 정산의 프로세스 종료를 복구한다', async () => {
     const world = await fixture();
     await send(world, world.emperor, { type: 'throne.ascend' });
     await send(world, world.emperor, {
@@ -612,20 +643,52 @@ describe('AC-P2-31 실제 HTTP 황실 접수·동의·경제', () => {
       .object({ movements: z.array(governanceMovementSchema) })
       .parse(expected.effects['governance-v1']).movements;
     const yearbooks = await db.yearbookSnapshot.count({ where: { worldId: world.id } });
-    await expect(advance(world.id, 70_000, true)).rejects.toThrow('governance-save-failure');
+    const monthKey = { worldId_tick: { worldId: world.id, tick: 70_000 } };
+    const cursor = () =>
+      db.world.findUniqueOrThrow({
+        where: { id: world.id },
+        select: { monthlyTick: true, actionSequence: true },
+      });
+    const beforeCursor = await cursor();
+    const rollbackToken = await stopMonthlyProcess(world.id, 'beforeCommit');
     expect(hashState(await snapshot(world.id))).toBe(hashState(before));
+    expect(await cursor()).toEqual(beforeCursor);
     expect(await db.governanceMovement.count({ where: { worldId: world.id } })).toBe(count);
     expect(await db.yearbookSnapshot.count({ where: { worldId: world.id } })).toBe(yearbooks);
-    const fresh = createDb(url);
-    try {
-      await advance(world.id, 70_000, false, fresh);
-    } finally {
-      await fresh.$disconnect();
-    }
-    const rows = await db.governanceMovement.findMany({
-      where: { worldId: world.id, tick: 70_000 },
-      orderBy: { ordinal: 'asc' },
-    });
+
+    const committedToken = await stopMonthlyProcess(world.id, 'committed');
+    expect(committedToken).toBeGreaterThan(rollbackToken);
+    const committed = await snapshot(world.id);
+    const committedMonth = await db.yearbookSnapshot.findUniqueOrThrow({ where: monthKey });
+    const monthlyRows = () =>
+      db.governanceMovement.findMany({
+        where: { worldId: world.id, tick: 70_000 },
+        orderBy: { ordinal: 'asc' },
+      });
+    const rows = await monthlyRows();
+    expect(rows).toHaveLength(4);
+    expect(rows.every(({ sequence }) => sequence === committedMonth.sequence)).toBe(true);
+    expect(await db.yearbookSnapshot.count({ where: { worldId: world.id } })).toBe(yearbooks + 1);
+    expect(await db.governanceMovement.count({ where: { worldId: world.id } })).toBe(count + 4);
+    expect(committed.monthlyTick).toBe(70_000);
+    const committedCursor = await cursor();
+    expect(committedCursor.actionSequence).toBe(committedMonth.sequence);
+
+    const recovered = execFileSync(
+      process.execPath,
+      ['--import', 'tsx', 'apps/engine/test/presetWorker.ts', world.id, '70000'],
+      { cwd: new URL('../', import.meta.url), encoding: 'utf8', timeout: 20_000, windowsHide: true },
+    );
+    const committedHash = hashState(committed);
+    expect(JSON.parse(recovered)).toMatchObject({ beforeHash: committedHash, afterHash: committedHash });
+    expect((await db.engineLease.findUniqueOrThrow({ where: { worldId: world.id } })).fencingToken).toBeGreaterThan(
+      committedToken,
+    );
+    expect(await db.yearbookSnapshot.findUniqueOrThrow({ where: monthKey })).toEqual(committedMonth);
+    expect(await monthlyRows()).toEqual(rows);
+    expect(await cursor()).toEqual(committedCursor);
+    expect(await db.yearbookSnapshot.count({ where: { worldId: world.id } })).toBe(yearbooks + 1);
+    expect(await db.governanceMovement.count({ where: { worldId: world.id } })).toBe(count + 4);
     expect(rows.filter((row) => row.kind === 'TRIBUTE')).toHaveLength(2);
     expect(rows.filter((row) => row.kind === 'STIPEND')).toHaveLength(2);
     expect(rows.reduce((sum, row) => sum + row.delta, 0)).toBe(0);
