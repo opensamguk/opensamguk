@@ -19,6 +19,8 @@ import { buildServer } from '../apps/server/src/server';
 import { newSession } from '../apps/server/src/auth/session';
 import fixture from './fixtures/t4-46-scenarios.json';
 import { initializeResources } from './init-resources';
+import { initializeLegacyMaps } from './init-legacy-maps';
+import { LEGACY_MAP_SQL, legacyMapPublications, legacyMapsSql } from './resources-sql/legacy-maps';
 import { initializeScenarios, ScenarioInitializationError } from './init-scenarios';
 import { pnpmCli } from './node-cli';
 import {
@@ -322,6 +324,97 @@ it('S5 작은따옴표가 있는 source와 내용도 원문으로 되읽는다',
     expect(saved.contentHash).toBe(hashState(content));
   });
 });
+
+it('S5 miniche 지도·병종의 게시, 롤백과 월드 재생', async () => {
+  await withDatabase(async ({ db, native, url }) => {
+    const resources = await legacyMapPublications();
+    const generated = await readFile(LEGACY_MAP_SQL, 'utf8');
+    expect(legacyMapsSql(resources)).toBe(generated);
+    const baseline = await allRows(native);
+    const last = resources.at(-1)!;
+    const ref = { kind: last.kind, name: last.name, version: last.version };
+    const key = [ref.kind, ref.name, ref.version].join('/');
+    await expect(initializeLegacyMaps(db, legacyMapsSql(resources.slice(0, -1)))).rejects.toMatchObject({
+      keys: [key],
+    });
+    expect(await allRows(native)).toEqual(baseline);
+
+    await db.gameResource.create({
+      data: { ...ref, status: 'DRAFT', content: {}, contentHash: '0'.repeat(64), source: '다른 출처' },
+    });
+    const withConflict = await allRows(native);
+    await expect(initializeLegacyMaps(db, generated)).rejects.toThrow(key);
+    expect(await allRows(native)).toEqual(withConflict);
+    await db.gameResource.delete({ where: { kind_name_version: ref } });
+
+    expect(await initializeLegacyMaps(db, generated)).toEqual({ inserted: 4, existing: 0 });
+    const published = await allRows(native);
+    expect(published).toHaveLength(baseline.length + 4);
+    expect(published).toEqual(expect.arrayContaining(baseline));
+    expect(await initializeLegacyMaps(db, generated)).toEqual({ inserted: 0, existing: 4 });
+    expect(await allRows(native)).toEqual(published);
+
+    const scenario = {
+      id: 'miniche-replay-test',
+      title: '소형 지도 검증',
+      startYear: 180,
+      nation: [],
+      general: [],
+      diplomacy: [],
+      requiredUnitSet: last.name,
+    };
+    await db.gameResource.create({
+      data: {
+        kind: 'SCENARIO',
+        name: scenario.id,
+        version: 1,
+        status: 'PUBLISHED',
+        source: '시험용',
+        contentHash: hashState(scenario),
+        content: scenario,
+        publishedAt: new Date(),
+      },
+    });
+    for (const map of resources.filter(({ kind }) => kind === 'MAP')) {
+      const output = execFileSync(
+        process.execPath,
+        [
+          '--import',
+          'tsx',
+          'apps/engine/src/cli/createWorld.ts',
+          '--scenario',
+          scenario.id,
+          '--map',
+          map.name,
+          '--unit-set',
+          last.name,
+          '--seed',
+          't4-46-miniche-replay',
+          '--turn-term',
+          '60',
+          '--end-year',
+          '200',
+          '--name',
+          map.name,
+        ],
+        { cwd: root, env: { ...process.env, DATABASE_URL: url.href }, encoding: 'utf8', timeout: 30000 },
+      );
+      const { worldId } = JSON.parse(output) as { worldId: string };
+      expect(await db.city.count({ where: { worldId } })).toBe(78);
+      const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+      expect(world.ruleFeatures).toContain('battle-affinity-v2');
+      await controlClock(db, worldId, 'start');
+      const lease = await acquireLease(db, worldId);
+      if (!lease) throw new Error('소형 지도 검증 월드의 실행권을 얻지 못했습니다.');
+      try {
+        await new TurnLoop(db, lease).advanceTo(TICKS_PER_MONTH);
+      } finally {
+        await releaseLease(db, lease);
+      }
+      await expectReplayMatchesReloadedState(db, url, worldId);
+    }
+  });
+}, 120000);
 
 it.each(ready)('S6 $key 두 DB 월드의 행 수와 재적재 해시는 파일 합성과 같다', async (row) => {
   await withDatabase(async ({ db }) => {
