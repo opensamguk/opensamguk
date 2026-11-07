@@ -29,6 +29,9 @@ import {
   initialCityRuins,
   initialNationStrategy,
   initialNationLifecycle,
+  assertInitialNationLifecycle,
+  assertNationLifecycle,
+  readStoredNationLifecycle,
   initialLogisticsState,
   initialEquipment,
   equipmentConfigSchema,
@@ -132,6 +135,10 @@ export function prepareInitialWorld(
         featureData = { ...featureData, policy: { version: 1, turnTermMinutes: options.turnTermMinutes } };
     }
   }
+  assertInitialNationLifecycle(
+    frozen,
+    featureFormat && options.replayFormat !== 1 && features.includes('nation-lifecycle-v1'),
+  );
   if (frozen.unitSet.coefMode === 'multiply' && !features.includes('battle-affinity-v2'))
     throw new Error('곱셈 병종 판에는 battle-affinity-v2 규칙 기능이 필요합니다.');
   const parsedPreset = options.preset ? parsePreset(options.preset.value) : null;
@@ -287,7 +294,7 @@ export function prepareInitialWorld(
           ? { nationStrategyState: initialNationStrategy() as Prisma.InputJsonValue }
           : {}),
         ...(features.includes('nation-lifecycle-v1')
-          ? { nationLifecycleState: initialNationLifecycle() as Prisma.InputJsonValue }
+          ? { nationLifecycleState: initialNationLifecycle(initial.nations) as Prisma.InputJsonValue }
           : {}),
         ...(features.includes('logistics-v1')
           ? {
@@ -438,7 +445,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
       };
       const operationalMap = readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin);
       const rules = effectiveWorldOptions(preset, world.runtimeOptions).presetRules;
-      return {
+      const initial: WorldInit = {
         ...(operationalMap ? { operationalMap } : {}),
         ...(cityScale ? { cityScale } : {}),
         ...(rules ? { presetRules: rules } : {}),
@@ -453,7 +460,6 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
         unitSet: unitSetSchema.parse(world.unitSet),
         cities: attachOperationalKinds(cities.map(stripWorldId), operationalMap),
         nations: nations.map((nation) => {
-          if (nation.capitalCityKey === null) throw new Error(`국가 ${nation.id}의 수도가 없습니다.`);
           return { ...stripWorldId(nation), capitalCityKey: nation.capitalCityKey };
         }),
         generals: generals.map(({ turnRevision, battleWins, captures, ...general }) => {
@@ -471,6 +477,11 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
         diplomacies: diplomacies.map(stripWorldId),
         ...(await loadCommandState(tx, worldId)),
       };
+      const nationLifecycle = readStoredNationLifecycle(world);
+      const state = toWorldState(initial);
+      if (nationLifecycle) state.nationLifecycle = nationLifecycle;
+      assertNationLifecycle(state);
+      return initial;
     },
     { isolationLevel: 'RepeatableRead' },
   );

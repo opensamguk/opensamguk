@@ -77,7 +77,6 @@ export async function loadWorldAfterCapabilityCheck(
     ),
     nations: Object.fromEntries(
       nations.map((nation) => {
-        if (nation.capitalCityKey === null) throw new Error(`국가 ${nation.id}의 수도가 없습니다.`);
         return [nation.id, { ...stripWorldId(nation), capitalCityKey: nation.capitalCityKey }];
       }),
     ),

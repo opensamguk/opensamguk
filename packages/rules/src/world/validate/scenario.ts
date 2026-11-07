@@ -80,6 +80,7 @@ export function validateScenario(input: unknown, ctx?: { map?: unknown }): Resou
     if (
       'version' in map &&
       map.version === 3 &&
+      nation[8].length > 0 &&
       !cities.some((city) => city.name === nation[8][0] && 'kind' in city && city.kind === 'CITY')
     )
       out.add(issue('shape-invalid', { kind: 'path', path: ['nation', index, 8, 0] }, { expected: 'CITY' }));

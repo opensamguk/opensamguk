@@ -61,20 +61,24 @@ const join = (random: boolean) =>
     check(view, actor, args) {
       if (view.generals[actor.generalId]!.nationId !== null)
         return fail('BAD_STATE', '재야 장수만 임관할 수 있습니다.');
-      const candidates = Object.values(view.nations).filter((n) => view.cities[n.capitalCityKey]?.nationId === n.id);
+      const candidates = Object.values(view.nations).filter(
+        (nation) => nation.capitalCityKey !== null && view.cities[nation.capitalCityKey]?.nationId === nation.id,
+      );
       return (random ? candidates.length > 0 : candidates.some((n) => n.id === args.nationId))
         ? null
         : fail('BAD_TARGET', '임관할 국가가 없습니다.');
     },
     change(state, actor, args, rng) {
       const nations = Object.values(state.nations)
-        .filter((n) => state.cities[n.capitalCityKey]?.nationId === n.id)
+        .filter(
+          (nation) => nation.capitalCityKey !== null && state.cities[nation.capitalCityKey]?.nationId === nation.id,
+        )
         .sort((a, b) => a.id - b.id);
       const nation = random ? rng.pick(nations) : state.nations[args.nationId!]!;
       const general = state.generals[actor.generalId]!;
       general.nationId = nation.id;
       general.officerLevel = 1;
-      general.cityKey = nation.capitalCityKey;
+      general.cityKey = nation.capitalCityKey!;
       if (state.commandMeta) delete state.commandMeta.offers[general.id];
       return success(`${nation.name} 임관`);
     },
@@ -130,7 +134,7 @@ export const personnelCommands = [
       if (general.nationId !== null) return fail('BAD_STATE', '재야 장수만 수락할 수 있습니다.');
       const id = view.commandMeta?.offers[general.id];
       const nation = id === undefined ? undefined : view.nations[id];
-      return nation && view.cities[nation.capitalCityKey]?.nationId === nation.id
+      return nation && nation.capitalCityKey !== null && view.cities[nation.capitalCityKey]?.nationId === nation.id
         ? null
         : fail('NO_OFFER', '수락할 등용 제안이 없습니다.');
     },
@@ -138,7 +142,7 @@ export const personnelCommands = [
       const general = state.generals[actor.generalId]!;
       const nation = state.nations[state.commandMeta!.offers[general.id]!]!;
       general.nationId = nation.id;
-      general.cityKey = nation.capitalCityKey;
+      general.cityKey = nation.capitalCityKey!;
       general.officerLevel = 1;
       delete state.commandMeta!.offers[general.id];
       return success(`${nation.name} 등용 수락`);

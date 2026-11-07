@@ -45,7 +45,7 @@ export interface InitialNation {
   tech: number;
   philosophy: string;
   level: number;
-  capitalCityKey: number;
+  capitalCityKey: number | null;
   isNpc: boolean;
 }
 
@@ -183,7 +183,11 @@ export function buildInitialWorld(input: {
       ownerByCity.set(city.id, id);
       return city.id;
     });
-    if (operational && !mapCities.some((city) => city.name === cityNames[0] && 'kind' in city && city.kind === 'CITY'))
+    if (
+      operational &&
+      cityNames.length > 0 &&
+      !mapCities.some((city) => city.name === cityNames[0] && 'kind' in city && city.kind === 'CITY')
+    )
       throw new Error(`${name}: 수도는 도시여야 합니다.`);
     ownedCities.set(id, cityKeys);
     return {
@@ -196,7 +200,7 @@ export function buildInitialWorld(input: {
       tech,
       philosophy,
       level,
-      capitalCityKey: cityKeys[0]!,
+      capitalCityKey: cityKeys[0] ?? null,
       isNpc: true,
     };
   });
@@ -256,7 +260,8 @@ export function buildInitialWorld(input: {
     if (birthYear > deathYear) throw new Error(`${name}: 생년이 몰년보다 늦습니다.`);
     const explicitCity = cityName === null ? undefined : byName.get(cityName);
     if (cityName !== null && !explicitCity) throw new Error(`${name}: 지도에 없는 도시 ${cityName}`);
-    const cityKey = explicitCity?.id ?? rng.pick(nationId === null ? allCities : ownedCities.get(nationId)!);
+    const homeCities = nationId === null ? allCities : ownedCities.get(nationId)!;
+    const cityKey = explicitCity?.id ?? rng.pick(homeCities.length ? homeCities : allCities);
     return {
       id: i + 1,
       userId: null,
