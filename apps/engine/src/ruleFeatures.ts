@@ -219,6 +219,7 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   { key: 'city-resources-v1', queuedInputs: { 'city.resources': processCityResourceInput } },
   { key: 'five-stats' },
   { key: 'battle-affinity-v2' },
+  { key: 'border-return-v1' },
   { key: 'equipment-v1' },
   { key: 'operational-map' },
   { key: 'stratagem-basic' },
