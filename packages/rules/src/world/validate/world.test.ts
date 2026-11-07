@@ -1,4 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
+import { operationalInput } from '../../../test/operationalMapFixture';
 import { buildInitialWorld } from '../bootstrap';
 import { validateWorldResources } from './world';
 import { codes, freezeDeep, mapFixture, scenarioFixture, unitFixture } from './testFixtures';
@@ -20,6 +21,38 @@ describe('T4-76 자원 묶음 판정', () => {
       map: { status: 'fail' },
       scenario: { status: 'incomplete' },
     });
+  });
+
+  it('T4-46 AC-P2-24 원작 초기 도시 보정은 공백지와 점령지의 최대치를 기준으로 적용한다', () => {
+    const map = mapFixture();
+    for (const city of map.cities) {
+      city.max = { population: 105, agriculture: 109, commerce: 101, security: 125, defence: 111, wall: 115 };
+      city.initial = { population: 11, agriculture: 12, commerce: 13, security: 14, defence: 15, wall: 16 };
+    }
+    const scenario = scenarioFixture();
+    const input = freezeDeep({
+      map,
+      unitSet: unitFixture(),
+      statRules: { stat: { total: 165, min: 15, max: 80 } },
+      seed: 't4-46-opening-city',
+    });
+    const legacy = buildInitialWorld({ ...input, scenario });
+    const withOpening = { ...scenario, openingCityProfile: 'legacy-research-70' };
+    expect(validateWorldResources({ ...input, scenario: withOpening }).status).toBe('pass');
+    const ready = buildInitialWorld({ ...input, scenario: withOpening });
+    const common = { population: 74, agriculture: 76, commerce: 71, security: 88, trust: 80 };
+    expect(ready.cities[0]).toMatchObject({ ...common, nationId: 1, defence: 78, wall: 81 });
+    expect(ready.cities[1]).toMatchObject({ ...common, nationId: null, defence: 15, wall: 16 });
+    expect(legacy.cities[0]).toMatchObject({ ...map.cities[0]!.initial, trust: 50 });
+    expect(ready).toEqual(buildInitialWorld({ ...input, scenario: withOpening }));
+    expect(ready.generals).toEqual(legacy.generals);
+  });
+
+  it('T4-46 AC-P2-24 정사 초기 도시 보정을 운영 지도와 섞을 수 없다', () => {
+    const input = operationalInput();
+    const scenario = { ...input.scenario, openingCityProfile: 'legacy-research-70' };
+    expect(codes(validateWorldResources({ ...input, scenario }).scenario)).toContain('shape-invalid');
+    expect(() => buildInitialWorld({ ...input, scenario })).toThrow('기존 지도 형식');
   });
 
   it('T4-46 AC-P2-24 원작 그림 경로의 null은 생성 초상과 상태를 바꾸지 않는다', () => {

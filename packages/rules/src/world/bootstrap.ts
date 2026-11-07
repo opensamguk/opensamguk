@@ -127,6 +127,8 @@ export function buildInitialWorld(input: {
   if (operational && validateMap(operational, { scenarios: [] }).status !== 'pass')
     throw new Error('운영 지도의 연결망을 확인하세요.');
   const scenario = scenarioSchema.parse(input.scenario);
+  if (operational && scenario.openingCityProfile)
+    throw new Error('정사 확장 초기 도시 설정은 기존 지도 형식이 필요합니다.');
   const sourceMap = operational
     ? { ...operational, cities: operationalAnchors(operational) }
     : mapSchema.parse(input.map);
@@ -235,6 +237,20 @@ export function buildInitialWorld(input: {
     trust: map.defaults.trust,
     supplied: map.defaults.supplyState === 1,
   }));
+
+  if (scenario.openingCityProfile === 'legacy-research-70') {
+    for (const city of cities) {
+      city.population = Math.round(city.populationMax * 0.7);
+      city.agriculture = Math.round(city.agricultureMax * 0.7);
+      city.commerce = Math.round(city.commerceMax * 0.7);
+      city.security = Math.round(city.securityMax * 0.7);
+      city.trust = 80;
+      if (city.nationId !== null) {
+        city.defence = Math.round(city.defenceMax * 0.7);
+        city.wall = Math.round(city.wallMax * 0.7);
+      }
+    }
+  }
 
   // 배치만 bootstrap 스트림을 소비한다. DB ID·시각은 규칙 상태에 넣지 않는다.
   const rng = rngFor(input.seed, 'bootstrap');

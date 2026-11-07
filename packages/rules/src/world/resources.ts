@@ -40,6 +40,7 @@ export const scenarioSchema = z.object({
   id: name,
   title: name,
   startYear: natural,
+  openingCityProfile: z.literal('legacy-research-70').optional(),
   cityScale: z
     .strictObject({
       cities: z
