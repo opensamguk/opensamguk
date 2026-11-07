@@ -32,6 +32,7 @@ import {
   type ScenarioMaterials,
   SCENARIO_BODY_TAG,
   SCENARIO_CONTENT_TAG,
+  STAT_RULES_CONTENT_TAG,
   UNIT_SET_CONTENT_TAG,
 } from './resources-sql/generate-scenarios';
 import { BODY_TAG, CONTENT_TAG } from './resources-sql/convert';
@@ -297,6 +298,59 @@ it('S5 che 병종판 충돌은 1021과 다른 시나리오 등록도 롤백한�
     expect(error).toBeInstanceOf(ScenarioInitializationError);
     expect((error as ScenarioInitializationError).keys).toEqual(['UNIT_SET/che/1']);
     expect(await allRows(native)).toEqual(before);
+  });
+});
+
+it('S5 능력치 판을 시나리오와 함께 게시하고 누락과 충돌 때 되돌린다', async () => {
+  await withDatabase(async ({ db, native }) => {
+    const publication = fixture.statRules[0]!;
+    const content = { ...JSON.parse(input['1010']!), requiredStatRules: publication.content.stat };
+    const row = readyScenarioRows().find(({ key }) => key === '1010')!;
+    const rows = [{ ...row, statRules: publication.name, contentHash: hashState(content) }];
+    const generated = convertScenariosToSql(
+      { '1010': JSON.stringify(content) },
+      notice,
+      await readScenarioMaterials(db),
+      rows,
+    );
+    const withoutStatRules =
+      generated.slice(0, generated.indexOf(`  resource_content := ${STAT_RULES_CONTENT_TAG}`)) +
+      `END;\n${SCENARIO_BODY_TAG};\n`;
+    const key = `STAT_RULES/${publication.name}/1`;
+    const where = { kind_name_version: { kind: 'STAT_RULES' as const, name: publication.name, version: 1 } };
+    const before = await allRows(native);
+
+    await expect(initializeScenarios(db, withoutStatRules, rows)).rejects.toMatchObject({ keys: [key] });
+    expect(await allRows(native)).toEqual(before);
+
+    await db.gameResource.create({
+      data: {
+        ...where.kind_name_version,
+        status: 'DRAFT',
+        content: {},
+        contentHash: '0'.repeat(64),
+        source: '다른 출처',
+      },
+    });
+    const beforeConflict = await allRows(native);
+    await expect(initializeScenarios(db, generated, rows)).rejects.toMatchObject({ keys: [key] });
+    expect(await allRows(native)).toEqual(beforeConflict);
+    await db.gameResource.delete({ where });
+
+    expect(await initializeScenarios(db, generated, rows)).toEqual({ inserted: 1, existing: 0 });
+    expect(await db.gameResource.findUniqueOrThrow({ where })).toMatchObject({
+      status: 'PUBLISHED',
+      source: publication.source,
+      contentHash: publication.contentHash,
+      content: publication.content,
+    });
+    expect(await initializeScenarios(db, withoutStatRules, rows)).toEqual({ inserted: 0, existing: 1 });
+    const options = { scenario: '1010', map: 'che', seed: 't4-46-stat-rules' };
+    await expect(loadInitialWorldFromDb(db, options)).rejects.toThrow(
+      '시나리오와 장수 생성 능력치 판이 맞지 않습니다.',
+    );
+    const world = await loadInitialWorldFromDb(db, { ...options, statRules: publication.name });
+    expect(world.statRules).toEqual(publication.content.stat);
   });
 });
 

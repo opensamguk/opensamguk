@@ -8,6 +8,14 @@
     "contentHash": "742256c869847ebf7f0d3b43e395be60a9e96a2fef18814122d110a586f4bad9",
     "source": "core2026 df6c926 / resources/unitset/unitset_che.json; MIT (c) 2025 devsam; resources/NOTICE.md"
   },
+  "statRules": [
+    {
+      "name": "legacy-220",
+      "contentHash": "678697d2d248391a487dbcb0a2038d7151251858d4e198d2b1ce6636e2f27932",
+      "source": "core2026 df6c926 / resources/scenario/scenario_2011.json, scenario_2151.json; MIT (c) 2025 devsam; resources/NOTICE.md",
+      "content": { "stat": { "total": 220, "min": 40, "max": 95 } }
+    }
+  ],
   "scenarios": [
     {
       "key": "0",

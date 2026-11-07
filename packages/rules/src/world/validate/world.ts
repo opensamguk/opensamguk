@@ -5,6 +5,7 @@ import { validateStatRules } from './statRules';
 import { validatePortraitMap } from './portraitMap';
 import { issue, type ResourceReport } from './issues';
 import { legacyCheCrewRegionsMatch } from '../crewRegions';
+import { scenarioStatRulesMatch } from '../resources';
 
 export function validateWorldResources(input: {
   map: unknown;
@@ -41,6 +42,14 @@ export function validateWorldResources(input: {
     reports.unitSet.issues.push(
       issue('shape-invalid', { kind: 'path', path: ['crewTypes'] }, { expected: 'che 지도' }),
     );
+  }
+  if (
+    reports.scenario.value &&
+    reports.statRules.value &&
+    !scenarioStatRulesMatch(reports.scenario.value, reports.statRules.value.stat)
+  ) {
+    reports.statRules.status = 'fail';
+    reports.statRules.issues.push(issue('scenario-stat-rules-mismatch', { kind: 'path', path: ['stat'] }));
   }
   const values = Object.values(reports);
   const status: ResourceReport<unknown>['status'] = values.some((report) => report.status === 'fail')

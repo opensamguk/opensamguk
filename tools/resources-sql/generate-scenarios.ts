@@ -19,21 +19,45 @@ export interface ScenarioRow {
   contentHash: string | null;
   source?: string;
   unitSet?: 'che';
+  statRules?: string;
 }
 
 export const scenarioRows: readonly ScenarioRow[] = fixture.scenarios as ScenarioRow[];
 export const SCENARIO_CONTENT_TAG = '$t4_46_content$';
 export const SCENARIO_BODY_TAG = '$t4_46_init$';
 export const UNIT_SET_CONTENT_TAG = '$t4_46_unitset$';
-const sqlTags = [SCENARIO_CONTENT_TAG, SCENARIO_BODY_TAG, UNIT_SET_CONTENT_TAG, CONTENT_TAG, BODY_TAG];
+export const STAT_RULES_CONTENT_TAG = '$t4_46_stat_rules$';
+const sqlTags = [
+  SCENARIO_CONTENT_TAG,
+  SCENARIO_BODY_TAG,
+  UNIT_SET_CONTENT_TAG,
+  STAT_RULES_CONTENT_TAG,
+  CONTENT_TAG,
+  BODY_TAG,
+];
 export const cheUnitSetPublication = fixture.cheUnitSet;
 export type ScenarioMaterials = Omit<Parameters<typeof validateWorldResources>[0], 'scenario'> & {
   cheUnitSet: unknown;
 };
 
-export function scenarioMaterialsForRow(materials: ScenarioMaterials, row: { unitSet?: string }) {
+function scenarioStatRulesPublication({ statRules }: Pick<ScenarioRow, 'statRules'>) {
+  if (statRules === undefined) return undefined;
+  const publication = fixture.statRules.find(({ name }) => name === statRules);
+  if (!publication) throw new Error('시나리오 장수 생성 능력치 판을 확인하세요.');
+  return publication;
+}
+
+export function requiredScenarioStatRules(rows: readonly ScenarioRow[]) {
+  return new Set(rows.map(scenarioStatRulesPublication).filter((publication) => publication !== undefined));
+}
+
+export function scenarioMaterialsForRow(materials: ScenarioMaterials, row: { unitSet?: string; statRules?: string }) {
   const { cheUnitSet, ...basic } = materials;
-  return row.unitSet === 'che' ? { ...basic, unitSet: cheUnitSet } : basic;
+  return {
+    ...basic,
+    unitSet: row.unitSet === 'che' ? cheUnitSet : basic.unitSet,
+    statRules: scenarioStatRulesPublication(row)?.content ?? basic.statRules,
+  };
 }
 
 export function readyScenarioRows(rows: readonly ScenarioRow[] = scenarioRows): ScenarioRow[] {
@@ -69,9 +93,15 @@ function literal(value: string, key: string): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
-function publicationSql(kind: 'SCENARIO' | 'UNIT_SET', name: string, raw: string, hash: string, source: string) {
+const publicationTags = {
+  SCENARIO: SCENARIO_CONTENT_TAG,
+  UNIT_SET: UNIT_SET_CONTENT_TAG,
+  STAT_RULES: STAT_RULES_CONTENT_TAG,
+};
+
+function publicationSql(kind: keyof typeof publicationTags, name: string, raw: string, hash: string, source: string) {
   const key = `${kind}/${name}/1`;
-  const tag = kind === 'SCENARIO' ? SCENARIO_CONTENT_TAG : UNIT_SET_CONTENT_TAG;
+  const tag = publicationTags[kind];
   const sqlName = literal(name, key);
   const sqlSource = literal(source, key);
   const contentHash = literal(hash, key);
@@ -130,6 +160,11 @@ export function convertScenariosToSql(
     if (hasNul(content) || hashState(content) !== contentHash)
       throw new Error(`병종 판 내용과 해시를 확인하세요: UNIT_SET/${name}/1`);
     statements.push(publicationSql('UNIT_SET', name, `${JSON.stringify(content, null, 2)}\n`, contentHash, source));
+  }
+  for (const { name, source, contentHash, content } of requiredScenarioStatRules(ready)) {
+    if (hasNul(content) || hashState(content) !== contentHash)
+      throw new Error(`능력치 판 내용과 해시를 확인하세요: STAT_RULES/${name}/1`);
+    statements.push(publicationSql('STAT_RULES', name, JSON.stringify(content, null, 2) + '\n', contentHash, source));
   }
   const normalizedNotice = notice.replaceAll('\r\n', '\n');
   if (normalizedNotice.includes('\0')) throw new Error('시나리오 출처에 NUL 문자가 있습니다.');

@@ -23,6 +23,34 @@ describe('T4-76 자원 묶음 판정', () => {
     });
   });
 
+  it('T4-46 AC-P2-24 시나리오가 지정한 장수 생성 능력치 판만 받는다', () => {
+    const requiredStatRules = { total: 220, min: 40, max: 95 };
+    const input = freezeDeep({
+      map: mapFixture(),
+      scenario: { ...scenarioFixture(), requiredStatRules },
+      unitSet: unitFixture(),
+      seed: 't4-46-stat-rules',
+    });
+    const correct = { ...input, statRules: { stat: requiredStatRules } };
+    expect(validateWorldResources(correct).status).toBe('pass');
+    expect(buildInitialWorld(correct).statRules).toEqual(requiredStatRules);
+
+    for (const stat of [
+      { total: 165, min: 15, max: 80 },
+      { ...requiredStatRules, count: 5 },
+    ]) {
+      const wrong = { ...input, statRules: { stat } };
+      expect(validateWorldResources(wrong)).toMatchObject({
+        status: 'fail',
+        statRules: {
+          status: 'fail',
+          issues: [{ code: 'scenario-stat-rules-mismatch', target: { kind: 'path', path: ['stat'] } }],
+        },
+      });
+      expect(() => buildInitialWorld(wrong)).toThrow('시나리오와 장수 생성 능력치 판이 맞지 않습니다.');
+    }
+  });
+
   it('T4-46 AC-P2-24 원작 초기 도시 보정은 공백지와 점령지의 최대치를 기준으로 적용한다', () => {
     const map = mapFixture();
     for (const city of map.cities) {

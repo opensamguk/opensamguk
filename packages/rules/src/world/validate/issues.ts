@@ -47,6 +47,7 @@ const messages = {
   'unitset-arm-unknown': '병종의 계통 이름이 없습니다.',
   'unitset-coef-arm-unknown': '병종 계수의 병종·계열이 없습니다.',
   'stat-rules-inconsistent': '능력치 합계와 범위가 맞지 않습니다.',
+  'scenario-stat-rules-mismatch': '시나리오와 장수 생성 능력치 판이 맞지 않습니다.',
 } as const;
 export type ResourceIssueCode = keyof typeof messages;
 export interface ResourceIssue {
