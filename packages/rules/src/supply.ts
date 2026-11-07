@@ -4,7 +4,7 @@ import type { WorldState } from './model/world';
 export function refreshSupply(state: WorldState): void {
   const supplied = new Set<number>();
   for (const nation of Object.values(state.nations).sort((a, b) => a.id - b.id)) {
-    const capital = state.cities[nation.capitalCityKey];
+    const capital = nation.capitalCityKey === null ? undefined : state.cities[nation.capitalCityKey];
     if (capital?.nationId !== nation.id) continue;
     const queue = [capital.cityKey];
     supplied.add(capital.cityKey);

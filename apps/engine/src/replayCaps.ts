@@ -335,7 +335,7 @@ function checkInitial(initial: WorldInit): void {
       (city) =>
         (city.nationId !== null && !nations.has(city.nationId)) || city.connections.some((key) => !cities.has(key)),
     ) ||
-    initial.nations.some((nation) => !cities.has(nation.capitalCityKey)) ||
+    initial.nations.some((nation) => nation.capitalCityKey === null || !cities.has(nation.capitalCityKey)) ||
     initial.generals.some(
       (general) => !cities.has(general.cityKey) || (general.nationId !== null && !nations.has(general.nationId)),
     ) ||
