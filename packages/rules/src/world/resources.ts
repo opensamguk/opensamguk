@@ -74,7 +74,7 @@ export const scenarioSchema = z.object({
       z.number().nonnegative(),
       z.string(),
       natural.max(7),
-    z.array(name),
+      z.array(name),
     ]),
   ),
   general: z.array(
