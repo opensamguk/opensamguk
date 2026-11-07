@@ -111,8 +111,9 @@ async function world(quietNpcs = false, withTreaty = false) {
     endYear: 231,
     replayFormat: 3,
   });
-  await controlClock(db, worldId, 'start');
-  await controlClock(db, worldId, 'pause');
+  const clockNow = Date.now();
+  await controlClock(db, worldId, 'start', clockNow);
+  await controlClock(db, worldId, 'pause', clockNow);
   return worldId;
 }
 async function advance(worldId: string, tick = 0) {
