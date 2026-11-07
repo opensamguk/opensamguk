@@ -130,33 +130,34 @@ it(
   }),
 );
 
-it('AC-P2-20 같은 연도 경계에서 진행 월드는 새 관계를 표시하고 직전 연도에 종료한 월드는 가린다', async () => {
+it('AC-P2-20 진행·관리자 종료는 저장된 연도를 사용하고 정상 종료는 종료 연도까지만 표시한다', async () => {
   const boundary = 12 * TICKS_PER_MONTH;
   await db.world.update({ where: { id: worldId }, data: { monthlyTick: boundary, status: 'RUNNING' } });
   const running = await request({ worldId }, owner);
   expect(running).toMatchObject({ status: 200, data: { enabled: true } });
   expect((running.data as { items: unknown[] }).items).toContainEqual(future);
 
+  await db.world.update({ where: { id: worldId }, data: { status: 'ENDED' } });
+  expect(await db.worldResult.findUnique({ where: { worldId } })).toBeNull();
+  expect(await request({ worldId }, owner)).toEqual(running);
+
   await db.general.update({
     where: { worldId_id: { worldId, id: 47 } },
     data: { removedAt: boundary },
   });
-  await db.$transaction([
-    db.world.update({ where: { id: worldId }, data: { status: 'ENDED' } }),
-    db.worldResult.create({
-      data: {
-        worldId,
-        reason: 'END_YEAR',
-        endedYear: year,
-        endedMonth: 12,
-        endedTick: boundary,
-        endedSequence: 1,
-        remainingNations: nationCount,
-        finalStateHash: 'relations-list-boundary',
-        endedAt: new Date(now),
-      },
-    }),
-  ]);
+  await db.worldResult.create({
+    data: {
+      worldId,
+      reason: 'END_YEAR',
+      endedYear: year,
+      endedMonth: 12,
+      endedTick: boundary,
+      endedSequence: 1,
+      remainingNations: nationCount,
+      finalStateHash: 'relations-list-boundary',
+      endedAt: new Date(now),
+    },
+  });
   const ended = await request({ worldId }, owner);
   expect(ended).toMatchObject({ status: 200, data: { enabled: true } });
   const { items } = ended.data as { items: unknown[] };

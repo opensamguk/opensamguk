@@ -15,7 +15,7 @@ export const relationsRouter = router({
         const { year } = toGameDate(world.startYear, world.monthlyTick);
         const end =
           world.status === 'ENDED'
-            ? await tx.worldResult.findUniqueOrThrow({ where: { worldId: world.id }, select: { endedYear: true } })
+            ? await tx.worldResult.findUnique({ where: { worldId: world.id }, select: { endedYear: true } })
             : null;
         const ids = [...new Set(relations.pairs.flatMap(({ a, b }) => [a.id, b.id]))];
         const generals = await tx.general.findMany({
