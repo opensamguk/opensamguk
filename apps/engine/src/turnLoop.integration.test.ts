@@ -75,6 +75,52 @@ async function engine(worldId: string) {
   if (!lease) throw new Error('테스트 리스 획득 실패');
   return new TurnLoop(db, lease);
 }
+
+it('AC-M3-07 연결 풀이 잠시 가득 차도 다음 턴을 한 번만 저장한다', async () => {
+  const { worldId } = await create(1, true);
+  await queue(worldId);
+  const lease = (await acquireLease(db, worldId, undefined, 30_000))!;
+  const contended = createDb(url!);
+  let release!: () => void;
+  const hold = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  // createDb가 사용하는 pg 기본 풀의 연결 10개를 실제 트랜잭션으로 점유한다.
+  let ready!: () => void;
+  const acquired = new Promise<void>((resolve) => {
+    ready = resolve;
+  });
+  let remaining = 10;
+  const holders = Array.from({ length: remaining }, () =>
+    contended.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT 1`;
+        if (--remaining === 0) ready();
+        await hold;
+      },
+      { maxWait: 5000, timeout: 15000 },
+    ),
+  );
+  const allHolders = Promise.all(holders);
+  void allHolders.catch(() => undefined);
+  try {
+    await Promise.race([acquired, allHolders]);
+    const loop = new TurnLoop(contended, lease);
+    const pending = loop.advanceTo(500);
+    void pending.catch(() => undefined);
+    await delay(2500);
+    expect(await db.generalLog.count({ where: { worldId } })).toBe(0);
+    release();
+    await pending;
+    await loop.advanceTo(500);
+    expect(await db.generalLog.count({ where: { worldId, generalId: 1, commandKey: 'farm' } })).toBe(1);
+  } finally {
+    release();
+    await allHolders.catch(() => undefined);
+    await contended.$disconnect();
+    await releaseLease(db, lease);
+  }
+}, 30000);
 async function expire(worldId: string) {
   await db.$executeRaw`UPDATE "EngineLease" SET "expiresAt" = (clock_timestamp() AT TIME ZONE 'UTC') - interval '1 second'
     WHERE "worldId" = ${worldId}`;
