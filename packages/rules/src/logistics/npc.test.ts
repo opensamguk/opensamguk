@@ -97,6 +97,31 @@ describe('AC-P2-30 NPC의 실제 물류 예산·수송·모집', () => {
     expect(turn.state.cityResources!.cities['1']!.gold).toBe(5470);
     expect(world.logistics!.cities['1']!.iron).toBe(0);
   });
+  it('국고 상한을 고정한 판은 여러 도시의 실제 구매 지출을 합산한다', () => {
+    const world = fixture();
+    world.nations[1]!.gold = 450;
+    Object.assign(world.generals[3]!, { nationId: 1, cityKey: 4, crewType: 1100 });
+    world.cities[4]!.connections = [1, 2];
+    world.cities[2]!.connections.push(4);
+    world.cityResources!.cities['4']!.gold = 10_000;
+    const { npc: old } = month(cloneWorld(world));
+    expect(old.movements.map(({ id, delta }) => [id, delta])).toEqual([
+      [4, 10],
+      [1, 10],
+    ]);
+
+    world.logistics!.config.npc = { ...settings, treasuryBudgetBp: 1000 };
+    const { npc } = month(cloneWorld(world));
+    expect(npc.movements.map(({ id, delta }) => [id, delta])).toEqual([
+      [4, 10],
+      [1, 5],
+    ]);
+    expect(npc.state.cityResources!.cities['4']!.gold).toBe(9970);
+    expect(npc.state.cityResources!.cities['1']!.gold).toBe(9985);
+    expect(npc.state.nations[1]!.gold).toBe(450);
+    world.nations[1]!.gold = 0;
+    expect(month(world).npc.movements).toEqual([]);
+  });
   it('후방 재고를 자기 보급 경로로 보내며 도착 손실을 매입으로 보충한다', () => {
     const world = fixture();
     world.logistics!.cities['4']!.iron = 10;
