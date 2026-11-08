@@ -29,11 +29,15 @@ describe('T4-76 자원 묶음 판정', () => {
     expect(validateWorldResources(input).status).toBe('pass');
     const initial = buildInitialWorld(input);
     expect(initial.generals[0]).toMatchObject({ userId: null, leadership: limit, strength: limit, intel: limit });
-    expect(() => checkReplayOrigin({ version: 1, initial })).not.toThrow();
+    const current = { version: 3, initial, initialStateHash: '', resourceHash: '' };
+    expect(() => checkReplayOrigin(current)).not.toThrow();
+    const legacy = () => checkReplayOrigin({ version: 1, initial });
+    if (['2121', '2200', '2210', '2300'].includes(id)) expect(legacy).not.toThrow();
+    else expect(legacy).toThrow('시작 장수의 기본 능력치');
 
     const human = structuredClone(initial);
     human.generals[0]!.userId = 'account';
-    expect(() => checkReplayOrigin({ version: 1, initial: human })).toThrow('시작 장수의 기본 능력치');
+    expect(() => checkReplayOrigin({ ...current, initial: human })).toThrow('시작 장수의 기본 능력치');
     expect(validateWorldResources({ ...input, scenario: { ...scenario, id: 'other' } }).scenario.status).toBe('fail');
     scenario.general[0]![7] = limit + 1;
     expect(validateWorldResources(input).scenario.status).toBe('fail');

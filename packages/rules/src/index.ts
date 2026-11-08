@@ -4,7 +4,11 @@ export * from './world/bootstrap';
 export * from './world/preset';
 export * from './world/options';
 export * from './world/resources';
-export { checkInitialNpcStatLimits, MAX_STARTING_NPC_STAT } from './world/initialNpcStats';
+export {
+  checkInitialNpcStatLimits,
+  MAX_LEGACY_STARTING_NPC_STAT,
+  MAX_STARTING_NPC_STAT,
+} from './world/initialNpcStats';
 export { crewContext, crewTypeFailure } from './world/crewRequirements';
 export { readOperationalMap, attachOperationalKinds, operationalMapDisplay } from './world/map/stored';
 export { checkOperationalProfile } from './world/map/profile';

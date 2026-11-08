@@ -19,6 +19,7 @@ import {
   type WorldPreset,
   checkRuleFeatures,
   checkReplayOrigin,
+  checkInitialNpcStatLimits,
   type JsonValue,
   checkStatProfile,
   checkOperationalProfile,
@@ -171,6 +172,7 @@ export function prepareInitialWorld(
   else for (const general of initial.generals) assertGeneralSex(general, false);
   const stateHash = hashState(initial);
   checkStatProfile(initial);
+  if (!featureFormat) checkInitialNpcStatLimits(initial, 'legacy');
   checkOperationalProfile(initial);
   if (
     options.endYear !== null &&
