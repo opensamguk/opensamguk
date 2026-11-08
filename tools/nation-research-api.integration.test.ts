@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
+import { once } from 'node:events';
 import type { inferRouterOutputs } from '@trpc/server';
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 import { createDb, type Prisma } from '../packages/db/src/index';
@@ -210,6 +211,41 @@ async function footprint(worldId: string) {
     history: await db.nationHistory.findMany({ where: { worldId }, orderBy: [{ tick: 'asc' }, { nationId: 'asc' }] }),
   };
 }
+
+async function stopTurnProcess(worldId: string, phase: 'beforeCommit' | 'committed', tick: number) {
+  const child = spawn(
+    process.execPath,
+    ['--import', 'tsx', 'apps/engine/test/turnWorker.ts', worldId, phase, String(tick)],
+    {
+      cwd: new URL('../', import.meta.url),
+      env: { ...process.env, TEST_DATABASE_URL: url.href },
+      stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
+      windowsHide: true,
+    },
+  );
+  const closed = once(child, 'close');
+  try {
+    const [message] = await Promise.race([
+      once(child, 'message', { signal: AbortSignal.timeout(20_000) }),
+      closed.then(([code, signal]) => {
+        throw new Error(`연구 시험 워커가 먼저 종료됐습니다: ${code ?? signal}`);
+      }),
+    ]);
+    expect(message).toBe(phase);
+    expect(child.kill('SIGKILL')).toBe(true);
+    expect(await closed).toEqual([null, 'SIGKILL']);
+  } finally {
+    if (child.exitCode === null && child.signalCode === null && !child.killed) child.kill('SIGKILL');
+    await closed;
+  }
+  const lease = await db.engineLease.findUniqueOrThrow({ where: { worldId } });
+  await db.engineLease.update({
+    where: { worldId, fencingToken: lease.fencingToken },
+    data: { expiresAt: new Date(0) },
+  });
+  return lease.fencingToken;
+}
+
 async function expectReplay(worldId: string, tick: number) {
   // 월말 직후의 저장 해시와 같은 순번에서 멈춘다.
   await advance(worldId, tick);
@@ -361,6 +397,38 @@ it.each([
   expect((await rpc('turns.precheck', recruit, f.ruler)).data).toMatchObject({ ok: true });
   await expectReplay(f.worldId, turns * 10_000);
 });
+
+it('AC-P2-06 준비 중과 완료 직후 실제 SIGKILL 뒤 연구를 한 번만 반영한다', async () => {
+  const f = await fixture(true, 'halberd');
+  const key = 'nation_research_halberd';
+  expect((await reserve(f, f.ruler, 12, key)).status).toBe(200);
+  await advance(f.worldId, 110_099);
+  const preparing = await footprint(f.worldId);
+  expect(preparing.replay.state.preparedTurns!.nations[1]![12]!.term).toBe(11);
+  const stopped = await stopTurnProcess(f.worldId, 'beforeCommit', 110_100);
+  expect(await footprint(f.worldId)).toEqual(preparing);
+
+  expect(await stopTurnProcess(f.worldId, 'committed', 110_100)).toBe(stopped + 1);
+  expect((await snapshot(f.worldId)).state.preparedTurns!.nations[1]![12]!.term).toBe(12);
+  expect((await reserve(f, f.ruler, 12, key)).status).toBe(200);
+  await advance(f.worldId, 230_099);
+  const before = await snapshot(f.worldId);
+  expect(before.state.preparedTurns!.nations[1]![12]!.term).toBe(23);
+  expect(before.state.nationResearch!.nations).toEqual({});
+
+  const completed = await stopTurnProcess(f.worldId, 'committed', 230_100);
+  const saved = await footprint(f.worldId);
+  const state = saved.replay.state;
+  expect(state.preparedTurns!.nations[1]).toBeUndefined();
+  expect(state.nationResearch!.nations[1]).toEqual(['halberd']);
+  expect(state.nations[1]!.gold).toBe(before.state.nations[1]!.gold - 100_000);
+  expect(state.nations[1]!.rice).toBe(before.state.nations[1]!.rice - 100_000);
+  expect(state.generals[1]!.experience).toBe(before.state.generals[1]!.experience + 120);
+  expect(state.generals[1]!.dedication).toBe(before.state.generals[1]!.dedication + 120);
+  expect(await stopTurnProcess(f.worldId, 'committed', 230_100)).toBe(completed + 1);
+  expect(await footprint(f.worldId)).toEqual(saved);
+  await expectReplay(f.worldId, 240_000);
+}, 90_000);
 
 it('SQL 제약과 읽기 경계는 빠지거나 잘못된 연구 상태를 거부한다', async () => {
   const f = await fixture();

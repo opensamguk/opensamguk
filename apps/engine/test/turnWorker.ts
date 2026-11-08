@@ -7,6 +7,7 @@ const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
 const worldId = process.argv[2]!;
 const phase = process.argv[3]!;
+const tick = Number(process.argv[4] ?? 500);
 const db = createDb(url);
 const lease = await acquireLease(db, worldId);
 if (!lease) {
@@ -29,7 +30,7 @@ if (!lease) {
         }
       : {},
   );
-  await loop.advanceTo(500);
+  await loop.advanceTo(tick);
   process.send?.('committed');
   await hold();
 }
