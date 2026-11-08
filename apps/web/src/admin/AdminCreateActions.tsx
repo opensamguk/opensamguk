@@ -8,17 +8,28 @@ import {
   CreateDraftError,
   createFailurePhase,
   createPointer,
-  createRejections,
+  changedFields,
+  failureMessage,
   freezeCreation,
   initialCreateProfile,
+  loadingLists,
+  lockedFields,
+  mergeVersionPages,
   ownCreateReply,
+  resourceChoice,
+  resourceFieldList,
+  resourceFields,
   reviewCreation,
+  versionLabel,
   type CreateCommand,
   type CreateDraft,
   type CreateOptions,
   type CreatePointer,
   type CreateReply,
   type CreateReview,
+  type ResourceField,
+  type VersionItem,
+  type VersionLists,
 } from './adminCreateModel';
 import styles from './AdminCreateActions.module.css';
 
@@ -31,6 +42,13 @@ const resourceLabels = {
   unitSetKey: '병종 자원',
   statRulesKey: '능력치 자원',
   portraitMapKey: '초상 자원',
+} as const;
+const kindNames = {
+  scenarioKey: '시나리오',
+  mapKey: '지도',
+  unitSetKey: '병종',
+  statRulesKey: '능력치',
+  portraitMapKey: '초상',
 } as const;
 export function AdminCreateActions({
   viewerId,
@@ -50,6 +68,7 @@ export function AdminCreateActions({
   const [expanded, setExpanded] = useState(false),
     [fresh, setFresh] = useState(false),
     [options, setOptions] = useState<CreateOptions | null>(null),
+    [lists, setLists] = useState<VersionLists | null>(null),
     [draft, setDraft] = useState<CreateDraft>(createDraft),
     [review, setReview] = useState<CreateReview | null>(null),
     [open, setOpen] = useState(false),
@@ -100,6 +119,7 @@ export function AdminCreateActions({
       active.current?.abort();
       setFresh(false);
       setOptions(null);
+      setLists(null);
       setReview(null);
       setChecked(false);
       setOpen(false);
@@ -138,6 +158,7 @@ export function AdminCreateActions({
     setExpanded(false);
     setOpen(false);
     setOptions(null);
+    setLists(null);
     setReview(null);
     setReply(null);
     setDraft(createDraft());
@@ -182,6 +203,52 @@ export function AdminCreateActions({
     setDraft((old) => (old.profileId ? old : { ...old, profileId: initialCreateProfile(value) }));
     setFresh(true);
     return value;
+  }
+  // 칸마다 next가 null이 될 때까지 cursor로 이어 읽는다. 쪽 크기는 가정하지 않는다.
+  async function readKind(field: ResourceField, signal: AbortSignal) {
+    const pages: VersionItem[][] = [],
+      seen = new Set<string>();
+    let cursor: string | undefined;
+    for (;;) {
+      const page = await client.admin.world.creationVersions.query(
+        { expectedUserId: viewerId, kind: resourceFields[field], ...(cursor === undefined ? {} : { cursor }) },
+        { signal },
+      );
+      pages.push(page.items);
+      if (page.next === null) return mergeVersionPages(pages);
+      if (seen.has(page.next)) throw new Error('게시 목록의 쪽 이동을 끝내지 못했습니다.');
+      seen.add(page.next);
+      cursor = page.next;
+    }
+  }
+  async function loadVersions(signal: AbortSignal, own: number, fields: readonly ResourceField[]) {
+    const results = await Promise.allSettled(fields.map((field) => readKind(field, signal)));
+    if (!current(own, signal)) return;
+    if (
+      results.some(
+        (result) =>
+          result.status === 'rejected' &&
+          ['UNAUTHORIZED', 'FORBIDDEN'].includes(publicFailure(result.reason)?.code ?? ''),
+      )
+    ) {
+      denied();
+      return;
+    }
+    setLists((old) => {
+      const next = { ...(old ?? loadingLists()) };
+      fields.forEach((field, index) => {
+        const result = results[index]!;
+        next[field] = result.status === 'fulfilled' ? { status: 'ready', items: result.value } : { status: 'error' };
+      });
+      return next;
+    });
+  }
+  function retryVersions(field: ResourceField) {
+    if (busy.current || disabled) return;
+    void operation(async (signal, own) => {
+      setLists((old) => (old ? { ...old, [field]: { status: 'loading' } } : old));
+      await loadVersions(signal, own, [field]);
+    });
   }
   function keepPointer(value: CreatePointer | null) {
     pointerRef.current = value;
@@ -259,9 +326,12 @@ export function AdminCreateActions({
     if (busy.current || disabled || !onAcquire()) return;
     setExpanded(true);
     void operation(async (signal, own) => {
+      setLists(loadingLists());
       const value = await settings(signal, own);
       if (!value) return;
       loadPointer();
+      // 복구할 이전 요청이 있으면 양식을 보이지 않으므로 판 목록을 읽지 않는다.
+      if (!pointerRef.current) await loadVersions(signal, own, resourceFieldList);
     });
   }
   function change(patch: Partial<CreateDraft>) {
@@ -277,7 +347,7 @@ export function AdminCreateActions({
       autoSeed.current = [...crypto.getRandomValues(new Uint8Array(16))]
         .map((byte) => byte.toString(16).padStart(2, '0'))
         .join('');
-    return reviewCreation(value, draft, viewerId, autoSeed.current);
+    return reviewCreation(value, draft, viewerId, autoSeed.current, lists);
   }
   function prepare(event: FormEvent) {
     event.preventDefault();
@@ -400,6 +470,7 @@ export function AdminCreateActions({
     setReply(null);
     setReview(null);
     setOptions(null);
+    setLists(null);
     setOpen(false);
     setChecked(false);
     setDraft(createDraft());
@@ -416,6 +487,9 @@ export function AdminCreateActions({
     onRelease();
   }
   const shownInput = command?.input ?? review?.input;
+  const locked = available ? lockedFields(available) : [],
+    changed = available ? changedFields(available, draft) : [],
+    listsPending = lists === null || resourceFieldList.some((field) => lists[field].status === 'loading');
   return (
     <section className={styles.create} aria-label="새 월드 생성">
       <h3>새 월드 생성</h3>
@@ -467,7 +541,7 @@ export function AdminCreateActions({
             </div>
           ) : null}
           {fresh && reply?.status === 'FAILED' && reply.error ? (
-            <p role="status">생성하지 않음 · {createRejections[reply.error.code as keyof typeof createRejections]}</p>
+            <p role="status">생성하지 않음 · {failureMessage(reply.error)}</p>
           ) : null}
           {recoveryBlocked ? (
             <ErrorState title="보관한 요청 정보를 읽지 못했습니다. 관리자 기록에서 접수 여부를 먼저 확인하세요." />
@@ -513,6 +587,7 @@ export function AdminCreateActions({
                           presetKey: '',
                           turnTerm: '',
                           endYear: selected?.available ? String(selected.suggestedEndYear) : '',
+                          resources: {},
                         });
                       }}
                     >
@@ -550,23 +625,88 @@ export function AdminCreateActions({
                   ) : null}
                   {available ? (
                     <>
-                      <p>
-                        {available.startYear}년 · {available.counts.nations}국 · NPC {available.counts.generals}명 ·
-                        도시 {available.counts.cities} · 관문 {available.counts.gates}
-                        <br />
-                        5능력치 · 휘하·부곡 · 도시 자원 규칙을 포함합니다.
-                      </p>
+                      {changed.length ? (
+                        <p>자원 판을 바꾼 조합입니다. 시작 연도와 규모는 생성할 때 서버가 확인합니다.</p>
+                      ) : (
+                        <p>
+                          {available.startYear}년 · {available.counts.nations}국 · NPC {available.counts.generals}명 ·
+                          도시 {available.counts.cities} · 관문 {available.counts.gates}
+                          <br />
+                          5능력치 · 휘하·부곡 · 도시 자원 규칙을 포함합니다.
+                        </p>
+                      )}
                       <details className={styles.resources}>
                         <summary>사용 자원 확인</summary>
                         <dl>
-                          {(Object.keys(resourceLabels) as Array<keyof typeof resourceLabels>).map((key) => (
+                          {resourceFieldList.map((key) => (
                             <Fragment key={key}>
                               <dt>{resourceLabels[key]}</dt>
-                              <dd>{available.selection[key]}</dd>
+                              <dd>{resourceChoice(available, draft, key)}</dd>
                             </Fragment>
                           ))}
                         </dl>
                       </details>
+                      <fieldset className={styles.versions}>
+                        <legend>생성 자원 판</legend>
+                        {listsPending ? <p role="status">게시된 생성 자원을 확인하고 있습니다.</p> : null}
+                        {locked.length ? (
+                          <p>
+                            확장 묶음은 {locked.length === resourceFieldList.length ? '다섯 자원' : '시나리오·지도'}를
+                            묶어서 보냅니다. 다른 판은 일반 시나리오에서 고르세요.
+                          </p>
+                        ) : null}
+                        {resourceFieldList.map((field) => {
+                          const list = lists?.[field] ?? { status: 'loading' as const },
+                            items = list.status === 'ready' ? list.items : [],
+                            fallback = available.selection[field],
+                            value = resourceChoice(available, draft, field),
+                            missing = !items.some((item) => item.key === value) && value !== fallback;
+                          return (
+                            <div key={field}>
+                              <label>
+                                {resourceLabels[field]} 판
+                                <select
+                                  name={field}
+                                  aria-label={`${resourceLabels[field]} 판`}
+                                  value={value}
+                                  aria-invalid={invalidField === field || undefined}
+                                  aria-describedby={invalidField === field ? 'create-form-error' : undefined}
+                                  disabled={sending || locked.includes(field) || list.status !== 'ready'}
+                                  onChange={(event) => {
+                                    const rest = { ...draft.resources };
+                                    if (event.target.value === fallback) delete rest[field];
+                                    else rest[field] = event.target.value;
+                                    change({ resources: rest });
+                                  }}
+                                >
+                                  {items.some((item) => item.key === fallback) ? null : (
+                                    <option value={fallback}>{fallback} · 기본</option>
+                                  )}
+                                  {items.map((item) => (
+                                    <option key={item.key} value={item.key}>
+                                      {versionLabel(item)}
+                                      {item.key === fallback ? ' · 기본' : ''}
+                                    </option>
+                                  ))}
+                                  {missing ? <option value={value}>{value} · 게시 목록에 없음</option> : null}
+                                </select>
+                              </label>
+                              {list.status === 'error' ? (
+                                <>
+                                  <ErrorState title={`${kindNames[field]} 판 목록을 읽지 못했습니다.`} />
+                                  <button type="button" disabled={sending} onClick={() => retryVersions(field)}>
+                                    {kindNames[field]} 판 목록 다시 시도
+                                  </button>
+                                </>
+                              ) : null}
+                              {list.status === 'ready' && items.length === 0 ? (
+                                <p>게시한 {kindNames[field]} 판이 없습니다.</p>
+                              ) : null}
+                              {missing ? <p role="alert">선택한 판이 게시 목록에 없습니다: {value}</p> : null}
+                            </div>
+                          );
+                        })}
+                      </fieldset>
                       <label>
                         프리셋
                         <select
@@ -635,7 +775,7 @@ export function AdminCreateActions({
                           종료 연도
                           <input
                             type="number"
-                            min={available.startYear}
+                            min={changed.length ? 1 : available.startYear}
                             max={10000}
                             step={1}
                             value={draft.endYear}
@@ -680,7 +820,7 @@ export function AdminCreateActions({
                           </small>
                         </label>
                       ) : null}
-                      <button ref={reviewButton} type="submit" disabled={sending}>
+                      <button ref={reviewButton} type="submit" disabled={sending || listsPending}>
                         현재 설정 검토
                       </button>
                     </>
@@ -712,8 +852,11 @@ export function AdminCreateActions({
               <dt>이름</dt>
               <dd>{shownInput.name}</dd>
               <dt>시나리오</dt>
-              <dd>{review.profileLabel}</dd>
-              {(Object.keys(resourceLabels) as Array<keyof typeof resourceLabels>).map((key) => (
+              <dd>
+                {review.profileLabel}
+                {review.changed.length ? ' (자원 판 일부 변경)' : ''}
+              </dd>
+              {resourceFieldList.map((key) => (
                 <Fragment key={key}>
                   <dt>{resourceLabels[key]}</dt>
                   <dd>{shownInput[key]}</dd>
@@ -731,9 +874,13 @@ export function AdminCreateActions({
               </dd>
             </dl>
             <p>
-              {review.startYear}년 · {review.counts.nations}국 · NPC {review.counts.generals}명 · 도시
-              {review.counts.cities} · 관문{review.counts.gates} · {shownInput.ruleFeatures?.length}개 기능. 현재 조회한
-              프리셋과 게시 자원을 사용하며 최종 설정은 생성 처리 때 확정됩니다.
+              {review.startYear !== null && review.counts
+                ? `${review.startYear}년 · ${review.counts.nations}국 · NPC ${review.counts.generals}명 · 도시${review.counts.cities} · 관문${review.counts.gates}`
+                : '자원 판을 바꾼 조합이라 시작 연도와 규모는 생성할 때 서버가 확인합니다.'}
+              {shownInput.ruleFeatures
+                ? ` · ${shownInput.ruleFeatures.length}개 기능`
+                : ' · 규칙 기능은 서버가 판에서 계산'}
+              . 현재 조회한 프리셋과 게시 자원을 사용하며 최종 설정은 생성 처리 때 확정됩니다.
             </p>
             {shownInput.featureProfileKey ? <p>{expandedProfileHelp}</p> : null}
             <ul>

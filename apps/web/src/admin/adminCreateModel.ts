@@ -5,8 +5,22 @@ export type CreateOptions = inferRouterOutputs<AppRouter>['admin']['world']['cre
 export type CreateProfile = Extract<CreateOptions['profiles'][number], { available: true }>;
 export type CreateInput = inferRouterInputs<AppRouter>['admin']['world']['create'];
 export type CreateReply = inferRouterOutputs<AppRouter>['admin']['world']['createStatus'];
+export const resourceFields = {
+  scenarioKey: 'SCENARIO',
+  mapKey: 'MAP',
+  unitSetKey: 'UNIT_SET',
+  statRulesKey: 'STAT_RULES',
+  portraitMapKey: 'PORTRAIT_MAP',
+} as const;
+export type ResourceField = keyof typeof resourceFields;
+export const resourceFieldList = Object.keys(resourceFields) as ResourceField[];
+export type VersionItem = { key: string; name: string; version: number; contentHash: string };
+export type VersionList = { status: 'loading' } | { status: 'error' } | { status: 'ready'; items: VersionItem[] };
+export type VersionLists = Record<ResourceField, VersionList>;
 export type CreateDraft = {
   profileId: string;
+  /** 기본 묶음과 다르게 고른 칸만 담는다. 비어 있으면 프로필 기본 키를 그대로 보낸다. */
+  resources: Partial<Record<ResourceField, string>>;
   name: string;
   presetKey: string;
   turnTerm: string;
@@ -22,8 +36,10 @@ export type CreateReview = Readonly<{
   presetLabel: string;
   presetDescriptions: readonly string[];
   scenarioTitle: string;
-  startYear: number;
-  counts: Readonly<CreateProfile['counts']>;
+  /** 칸을 바꾼 조합의 연도·수치는 기본 프로필 값이 아니므로 null이다. 서버가 생성 때 확인한다. */
+  startYear: number | null;
+  counts: Readonly<CreateProfile['counts']> | null;
+  changed: readonly ResourceField[];
   seedMode: 'auto' | 'custom';
   input: Readonly<Omit<CreateInput, 'idempotencyKey'>>;
 }>;
@@ -31,6 +47,7 @@ export type CreateCommand = Readonly<{ review: CreateReview; input: Readonly<Cre
 export type CreatePointer = { version: 1; viewerId: string; idempotencyKey: string; requestId?: string };
 export const createDraft = (): CreateDraft => ({
   profileId: '',
+  resources: {},
   name: '',
   presetKey: '',
   turnTerm: '',
@@ -56,7 +73,7 @@ export function storedText(value: string) {
 }
 export class CreateDraftError extends Error {
   constructor(
-    readonly field: 'profileId' | 'name' | 'presetKey' | 'turnTerm' | 'endYear' | 'seed',
+    readonly field: 'profileId' | 'name' | 'presetKey' | 'turnTerm' | 'endYear' | 'seed' | ResourceField,
     message: string,
   ) {
     super(message);
@@ -69,11 +86,45 @@ function integer(value: string, min: number, max: number, field: 'turnTerm' | 'e
     throw new CreateDraftError(field, '연도와 턴 간격의 범위를 확인하세요.');
   return number;
 }
+// 확장 묶음 잠금은 서버(apps/engine/src/admin/createRequests.ts)의 묶음 검사와 같아야 한다.
+// 형식 2인 expanded-191-v3만 시나리오·지도를 잠그고(병종·능력치·초상은 서버가 검사하지 않음),
+// 나머지 확장 묶음은 다섯 칸을 모두 잠근다.
+const scenarioMapOnly = new Set(['expanded-191-v3']);
+export function lockedFields(profile: Pick<CreateProfile, 'featureProfileKey'>): readonly ResourceField[] {
+  if (profile.featureProfileKey === undefined) return [];
+  return scenarioMapOnly.has(profile.featureProfileKey) ? ['scenarioKey', 'mapKey'] : resourceFieldList;
+}
+export const resourceChoice = (profile: Pick<CreateProfile, 'selection'>, draft: CreateDraft, field: ResourceField) =>
+  draft.resources[field] ?? profile.selection[field];
+export function changedFields(profile: CreateProfile, draft: CreateDraft): ResourceField[] {
+  const locked = lockedFields(profile);
+  return resourceFieldList.filter(
+    (field) => !locked.includes(field) && resourceChoice(profile, draft, field) !== profile.selection[field],
+  );
+}
+export const loadingLists = (): VersionLists => ({
+  scenarioKey: { status: 'loading' },
+  mapKey: { status: 'loading' },
+  unitSetKey: { status: 'loading' },
+  statRulesKey: { status: 'loading' },
+  portraitMapKey: { status: 'loading' },
+});
+export function versionLabel(item: Pick<VersionItem, 'name' | 'version'>) {
+  return item.version === 1 ? item.name : `${item.name}@${item.version}`;
+}
+const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+/** 쪽마다 받은 목록을 키 중복 없이 name, version 순으로 합친다. */
+export function mergeVersionPages(pages: readonly (readonly VersionItem[])[]): VersionItem[] {
+  const byKey = new Map<string, VersionItem>();
+  for (const page of pages) for (const item of page) if (!byKey.has(item.key)) byKey.set(item.key, item);
+  return [...byKey.values()].sort((a, b) => compare(a.name, b.name) || a.version - b.version);
+}
 export function reviewCreation(
   options: CreateOptions,
   draft: CreateDraft,
   viewerId: string,
   autoSeed: string,
+  versions?: VersionLists | null,
 ): CreateReview {
   const profile = options.profiles.find(
     (entry): entry is CreateProfile => entry.available && entry.id === draft.profileId,
@@ -86,18 +137,32 @@ export function reviewCreation(
   if (!storedText(name)) throw new CreateDraftError('name', '월드 이름을 확인하세요.');
   if (!preset) throw new CreateDraftError('presetKey', '현재 프리셋을 선택하세요.');
   if (!storedText(seed)) throw new CreateDraftError('seed', '시드의 빈칸과 저장할 수 없는 문자를 확인하세요.');
+  const changed = changedFields(profile, draft);
+  for (const field of changed) {
+    const list = versions?.[field];
+    if (list?.status !== 'ready' || !list.items.some((item) => item.key === draft.resources[field]))
+      throw new CreateDraftError(field, `선택한 판이 게시 목록에 없습니다: ${draft.resources[field]}`);
+  }
+  const selection = { ...profile.selection };
+  for (const field of changed) selection[field] = draft.resources[field]!;
   const input = {
     expectedUserId: viewerId,
     name,
-    ...profile.selection,
+    ...selection,
     ...(profile.featureProfileKey === undefined ? {} : { featureProfileKey: profile.featureProfileKey }),
     presetKey: preset.key,
     turnTermMinutes: integer(draft.turnTerm, 1, 2147483647, 'turnTerm'),
-    endYear: draft.endMode === 'none' ? null : integer(draft.endYear, profile.startYear, 10000, 'endYear'),
+    endYear:
+      draft.endMode === 'none'
+        ? null
+        : integer(draft.endYear, changed.length ? 1 : profile.startYear, 10000, 'endYear'),
     seed,
-    ruleFeatures: [...profile.ruleFeatures],
+    // 일반 조합에서 칸을 바꾸면 생략하고 서버가 판에서 기능을 계산한다.
+    // 확장 묶음은 서버가 featureProfileKey와 ruleFeatures의 정확한 묶음 일치를 요구하므로 바꿔도 프로필 목록을 유지한다.
+    ...(profile.featureProfileKey === undefined && changed.length > 0
+      ? {}
+      : { ruleFeatures: Object.freeze([...profile.ruleFeatures]) as string[] }),
   };
-  Object.freeze(input.ruleFeatures);
   return Object.freeze({
     revision: options.revision,
     profileId: profile.id,
@@ -105,17 +170,29 @@ export function reviewCreation(
     presetLabel: preset.label,
     presetDescriptions: Object.freeze([...preset.descriptions]),
     scenarioTitle: profile.scenarioTitle,
-    startYear: profile.startYear,
-    counts: Object.freeze({ ...profile.counts }),
+    startYear: changed.length ? null : profile.startYear,
+    counts: changed.length ? null : Object.freeze({ ...profile.counts }),
+    changed: Object.freeze(changed),
     seedMode: draft.seedMode,
     input: Object.freeze(input),
   });
 }
 export function freezeCreation(review: CreateReview, idempotencyKey: string): CreateCommand {
   if (!uuid(idempotencyKey)) throw new Error('요청 번호를 준비하지 못했습니다.');
-  const input = { ...review.input, ruleFeatures: [...(review.input.ruleFeatures ?? [])], idempotencyKey };
-  Object.freeze(input.ruleFeatures);
+  // ruleFeatures를 생략한 검토는 생략한 채 보낸다. 빈 배열로 바꾸면 서버 계산과 다른 요청이 된다.
+  const input = {
+    ...review.input,
+    ...(review.input.ruleFeatures === undefined
+      ? {}
+      : { ruleFeatures: Object.freeze([...review.input.ruleFeatures]) as string[] }),
+    idempotencyKey,
+  };
   return Object.freeze({ review, input: Object.freeze(input) });
+}
+/** FAILED 응답은 서버 문구를 우선 보이고, 비어 있을 때만 고정 문구를 쓴다. */
+export function failureMessage(error: { code: string; message?: string | null }) {
+  const message = typeof error.message === 'string' ? error.message.trim() : '';
+  return message || createRejections[error.code as keyof typeof createRejections] || createRejections.INPUT_INVALID;
 }
 export const createRejections = {
   ACTOR_INACTIVE: '활성 관리자 계정이 아닙니다.',
