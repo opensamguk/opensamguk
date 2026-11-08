@@ -169,3 +169,7 @@ core2026 커밋 df6c9269fa1e2862418ba9da481c8dd2d758d6c5의 MIT © 2025 devsam �
 ## 접경귀환
 
 `packages/rules/src/commands/ext/return_border/`는 core2026 `df6c9269fa1e2862418ba9da481c8dd2d758d6c5`의 `packages/logic/src/actions/turn/general/che_접경귀환.ts`에서 연결 3칸의 탐색 규칙을 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+## 새 지도·시나리오 초안
+
+`resources/map-drafts/san10-v2/`의 출처와 권리는 [그 폴더의 고지](./map-drafts/san10-v2/NOTICE.md)에 따로 적었다. 게임 런타임은 이 폴더를 읽지 않는다.
