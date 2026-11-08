@@ -8966,70 +8966,122 @@
       "queueIds": ["T4-48", "T4-02", "T4-03", "T4-04"],
       "ownerProfile": "opensamguk-implement",
       "reviewerProfile": "opensamguk-review",
-      "paths": ["docs/plans/phase2-expansion.md"],
+      "paths": ["docs/plans/phase2-expansion.md", "tools/nation-lifecycle-api.integration.test.ts"],
       "stages": {
         "ui": {
           "status": "missing",
           "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "reason": "공개 빌드에서 이 명령 카드를 선택하고 실제 결과를 다시 보는 검증이 필요하다."
         },
         "api": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
+            }
+          ],
+          "reason": "기능을 끈 월드의 목록과 예약 거부 및 후임 장수의 군주 권한 거부를 확인했다."
         },
         "authorization": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
+            }
+          ],
+          "reason": "무인증 명령 목록과 같은 나라의 군주가 아닌 장수의 방랑을 거부했다."
         },
         "engine": {
           "status": "partial",
           "evidence": [
             {
               "kind": "test",
-              "ref": "tools/command-coverage.test.ts"
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
             }
           ],
-          "reason": "실제 기능 등록과 장수·국가 대상을 대조했다. 이 단계의 실행 증거 연결은 남아 있다."
+          "reason": "실제 TurnLoop의 개인 예턴 실행과 해당 명령의 결과를 확인했다."
         },
         "effectsCostsFailures": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
+            },
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-profile.test.ts"
+            }
+          ],
+          "reason": "도시를 떠난 뒤 방랑 시작 시각과 군주 이동에 동행한 장수를 확인했다."
         },
         "persistence": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
+            }
+          ],
+          "reason": "실제 PostgreSQL에 예턴을 저장하고 실행 뒤 DB에서 결과를 다시 읽었다."
         },
         "restart": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
+            }
+          ],
+          "reason": "새 리스의 TurnLoop가 DB에서 진행을 이었다. 별도 엔진 프로세스의 복구는 확인이 필요하다."
         },
         "replay": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
+            }
+          ],
+          "reason": "저장한 월별 해시를 DB 연결 없는 별도 프로세스의 재생과 대조했다."
         },
         "independentReview": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "review",
+              "ref": "https://github.com/opensamguk/opensamguk/pull/398#issuecomment-6691625586",
+              "sha": "850b8ead2ab5cab34652dcc506406435af47af3d"
+            }
+          ],
+          "reason": "독립 리뷰가 최종 구현 범위를 통과로 판정했다."
         },
         "exactShaValidation": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42264152316",
+              "sha": "850b8ead2ab5cab34652dcc506406435af47af3d"
+            }
+          ],
+          "reason": "최종 구현 SHA의 source CI가 통과했다. 이 카드 자체의 브라우저 검증은 남았다."
         },
         "merge": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "commit",
+              "ref": "https://github.com/opensamguk/opensamguk/commit/d78601793d3d728c4e0ec7267b9e782c60bc9c4b",
+              "sha": "d78601793d3d728c4e0ec7267b9e782c60bc9c4b"
+            }
+          ],
+          "reason": "기능 선택형 국가 존속 명령을 메인에 병합했다."
         }
       },
-      "blockers": ["G-03", "U-19", "U-21", "원작에서는 입력 불가 내부 명령(INTERNAL_GENERAL_TURN_COMMAND_KEYS)이다"]
+      "blockers": ["공개 빌드의 명령별 카드 조작과 별도 엔진 프로세스 복구, 단계별 최종 증거가 남아 있다."]
     },
     {
       "id": "resettle",
@@ -9046,65 +9098,117 @@
         "ui": {
           "status": "missing",
           "evidence": [],
-          "reason": "이 대응표의 단계별 검증 기록을 연결해야 한다."
+          "reason": "공개 빌드에서 이 명령 카드를 선택하고 실제 결과를 다시 보는 검증이 필요하다."
         },
         "api": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "이 대응표의 단계별 검증 기록을 연결해야 한다."
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
+            }
+          ],
+          "reason": "실제 명령 목록과 군주의 개인 예턴 저장을 확인했다."
         },
         "authorization": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "이 대응표의 단계별 검증 기록을 연결해야 한다."
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
+            }
+          ],
+          "reason": "세션에서 정한 군주의 예약 실행을 확인했다. 이 명령별 HTTP 권한 반례는 더 필요하다."
         },
         "engine": {
           "status": "partial",
           "evidence": [
             {
               "kind": "test",
-              "ref": "tools/command-coverage.test.ts"
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
             }
           ],
-          "reason": "실제 기능 등록과 장수 명령 대상을 대조했다."
+          "reason": "실제 TurnLoop의 개인 예턴 실행과 해당 명령의 결과를 확인했다."
         },
         "effectsCostsFailures": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "이 대응표의 단계별 검증 기록을 연결해야 한다."
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
+            },
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-profile.test.ts"
+            }
+          ],
+          "reason": "빈 도시에 다시 정착해 수도와 소유국을 정하고 방랑 원장을 비웠다."
         },
         "persistence": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "이 대응표의 단계별 검증 기록을 연결해야 한다."
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
+            }
+          ],
+          "reason": "실제 PostgreSQL에 예턴을 저장하고 실행 뒤 DB에서 결과를 다시 읽었다."
         },
         "restart": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "이 대응표의 단계별 검증 기록을 연결해야 한다."
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
+            }
+          ],
+          "reason": "새 리스의 TurnLoop가 DB에서 진행을 이었다. 별도 엔진 프로세스의 복구는 확인이 필요하다."
         },
         "replay": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "이 대응표의 단계별 검증 기록을 연결해야 한다."
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
+            }
+          ],
+          "reason": "저장한 월별 해시를 DB 연결 없는 별도 프로세스의 재생과 대조했다."
         },
         "independentReview": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "이 대응표의 단계별 검증 기록을 연결해야 한다."
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "review",
+              "ref": "https://github.com/opensamguk/opensamguk/pull/398#issuecomment-6691625586",
+              "sha": "850b8ead2ab5cab34652dcc506406435af47af3d"
+            }
+          ],
+          "reason": "독립 리뷰가 최종 구현 범위를 통과로 판정했다."
         },
         "exactShaValidation": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "이 대응표의 단계별 검증 기록을 연결해야 한다."
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42264152316",
+              "sha": "850b8ead2ab5cab34652dcc506406435af47af3d"
+            }
+          ],
+          "reason": "최종 구현 SHA의 source CI가 통과했다. 이 카드 자체의 브라우저 검증은 남았다."
         },
         "merge": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "이 대응표의 단계별 검증 기록을 연결해야 한다."
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "commit",
+              "ref": "https://github.com/opensamguk/opensamguk/commit/d78601793d3d728c4e0ec7267b9e782c60bc9c4b",
+              "sha": "d78601793d3d728c4e0ec7267b9e782c60bc9c4b"
+            }
+          ],
+          "reason": "기능 선택형 국가 존속 명령을 메인에 병합했다."
         }
       },
-      "blockers": ["브라우저, 재시작, 독립 리뷰 및 같은 SHA의 전 단계 검증 기록을 연결해야 한다."]
+      "blockers": ["공개 빌드의 명령별 카드 조작과 별도 엔진 프로세스 복구, 단계별 최종 증거가 남아 있다."]
     },
     {
       "id": "abdicate",
@@ -9116,70 +9220,122 @@
       "queueIds": ["T4-15", "T4-17", "T4-02", "T4-03", "T4-04"],
       "ownerProfile": "opensamguk-implement",
       "reviewerProfile": "opensamguk-review",
-      "paths": ["docs/plans/phase2-expansion.md"],
+      "paths": ["docs/plans/phase2-expansion.md", "tools/nation-lifecycle-api.integration.test.ts"],
       "stages": {
         "ui": {
           "status": "missing",
           "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "reason": "공개 빌드에서 이 명령 카드를 선택하고 실제 결과를 다시 보는 검증이 필요하다."
         },
         "api": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
+            }
+          ],
+          "reason": "실제 명령 목록과 군주의 개인 예턴 저장을 확인했다."
         },
         "authorization": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
+            }
+          ],
+          "reason": "세션에서 정한 군주의 예약 실행을 확인했다. 이 명령별 HTTP 권한 반례는 더 필요하다."
         },
         "engine": {
           "status": "partial",
           "evidence": [
             {
               "kind": "test",
-              "ref": "tools/command-coverage.test.ts"
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
             }
           ],
-          "reason": "실제 기능 등록과 장수·국가 대상을 대조했다. 이 단계의 실행 증거 연결은 남아 있다."
+          "reason": "실제 TurnLoop의 개인 예턴 실행과 해당 명령의 결과를 확인했다."
         },
         "effectsCostsFailures": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
+            },
+            {
+              "kind": "test",
+              "ref": "packages/rules/src/nationLifecycle/commands.test.ts"
+            }
+          ],
+          "reason": "전임자 경험 70%와 두 직책 예약 초기화, 후임자 개인 예턴 보존을 확인했다."
         },
         "persistence": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
+            }
+          ],
+          "reason": "실제 PostgreSQL에 예턴을 저장하고 실행 뒤 DB에서 결과를 다시 읽었다."
         },
         "restart": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
+            }
+          ],
+          "reason": "새 리스의 TurnLoop가 DB에서 진행을 이었다. 별도 엔진 프로세스의 복구는 확인이 필요하다."
         },
         "replay": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
+            }
+          ],
+          "reason": "저장한 월별 해시를 DB 연결 없는 별도 프로세스의 재생과 대조했다."
         },
         "independentReview": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "review",
+              "ref": "https://github.com/opensamguk/opensamguk/pull/398#issuecomment-6691625586",
+              "sha": "850b8ead2ab5cab34652dcc506406435af47af3d"
+            }
+          ],
+          "reason": "독립 리뷰가 최종 구현 범위를 통과로 판정했다."
         },
         "exactShaValidation": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42264152316",
+              "sha": "850b8ead2ab5cab34652dcc506406435af47af3d"
+            }
+          ],
+          "reason": "최종 구현 SHA의 source CI가 통과했다. 이 카드 자체의 브라우저 검증은 남았다."
         },
         "merge": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "commit",
+              "ref": "https://github.com/opensamguk/opensamguk/commit/d78601793d3d728c4e0ec7267b9e782c60bc9c4b",
+              "sha": "d78601793d3d728c4e0ec7267b9e782c60bc9c4b"
+            }
+          ],
+          "reason": "기능 선택형 국가 존속 명령을 메인에 병합했다."
         }
       },
-      "blockers": ["G-03", "U-19"]
+      "blockers": ["공개 빌드의 명령별 카드 조작과 별도 엔진 프로세스 복구, 단계별 최종 증거가 남아 있다."]
     },
     {
       "id": "disband",
@@ -9191,70 +9347,122 @@
       "queueIds": ["T4-15", "T4-17", "T4-02", "T4-03", "T4-04"],
       "ownerProfile": "opensamguk-implement",
       "reviewerProfile": "opensamguk-review",
-      "paths": ["docs/plans/phase2-expansion.md"],
+      "paths": ["docs/plans/phase2-expansion.md", "tools/nation-lifecycle-api.integration.test.ts"],
       "stages": {
         "ui": {
           "status": "missing",
           "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "reason": "공개 빌드에서 이 명령 카드를 선택하고 실제 결과를 다시 보는 검증이 필요하다."
         },
         "api": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
+            }
+          ],
+          "reason": "실제 명령 목록과 군주의 개인 예턴 저장을 확인했다."
         },
         "authorization": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
+            }
+          ],
+          "reason": "세션에서 정한 군주의 예약 실행을 확인했다. 이 명령별 HTTP 권한 반례는 더 필요하다."
         },
         "engine": {
           "status": "partial",
           "evidence": [
             {
               "kind": "test",
-              "ref": "tools/command-coverage.test.ts"
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
             }
           ],
-          "reason": "실제 기능 등록과 장수·국가 대상을 대조했다. 이 단계의 실행 증거 연결은 남아 있다."
+          "reason": "실제 TurnLoop의 개인 예턴 실행과 해당 명령의 결과를 확인했다."
         },
         "effectsCostsFailures": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
+            },
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-profile.test.ts"
+            }
+          ],
+          "reason": "수동 해산 뒤 전원 재야·병력 해산·금과 쌀 각 1,000 상한과 멸망 기록을 확인했다."
         },
         "persistence": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
+            }
+          ],
+          "reason": "실제 PostgreSQL에 예턴을 저장하고 실행 뒤 DB에서 결과를 다시 읽었다."
         },
         "restart": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
+            }
+          ],
+          "reason": "새 리스의 TurnLoop가 DB에서 진행을 이었다. 별도 엔진 프로세스의 복구는 확인이 필요하다."
         },
         "replay": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts"
+            }
+          ],
+          "reason": "저장한 월별 해시를 DB 연결 없는 별도 프로세스의 재생과 대조했다."
         },
         "independentReview": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "review",
+              "ref": "https://github.com/opensamguk/opensamguk/pull/398#issuecomment-6691625586",
+              "sha": "850b8ead2ab5cab34652dcc506406435af47af3d"
+            }
+          ],
+          "reason": "독립 리뷰가 최종 구현 범위를 통과로 판정했다."
         },
         "exactShaValidation": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42264152316",
+              "sha": "850b8ead2ab5cab34652dcc506406435af47af3d"
+            }
+          ],
+          "reason": "최종 구현 SHA의 source CI가 통과했다. 이 카드 자체의 브라우저 검증은 남았다."
         },
         "merge": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "commit",
+              "ref": "https://github.com/opensamguk/opensamguk/commit/d78601793d3d728c4e0ec7267b9e782c60bc9c4b",
+              "sha": "d78601793d3d728c4e0ec7267b9e782c60bc9c4b"
+            }
+          ],
+          "reason": "기능 선택형 국가 존속 명령을 메인에 병합했다."
         }
       },
-      "blockers": ["G-03", "U-19"]
+      "blockers": ["공개 빌드의 명령별 카드 조작과 별도 엔진 프로세스 복구, 단계별 최종 증거가 남아 있다."]
     },
     {
       "id": "rebel",
@@ -9406,70 +9614,167 @@
       "queueIds": ["T4-18", "T4-22", "T4-23", "T4-24", "T4-02", "T4-03", "T4-04"],
       "ownerProfile": "opensamguk-implement",
       "reviewerProfile": "opensamguk-review",
-      "paths": ["docs/plans/phase2-expansion.md"],
+      "paths": [
+        "docs/plans/phase2-expansion.md",
+        "docs/plans/T4-24.md",
+        "tools/equipment-api.integration.test.ts",
+        "e2e/t4-24-equipment.spec.ts"
+      ],
       "stages": {
         "ui": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "e2e/t4-24-equipment.spec.ts"
+            },
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42147863161",
+              "sha": "7f2bb4dea26346d166b3c7f48fdd1e9a7b8d7b5e"
+            }
+          ],
+          "reason": "실제 공개 빌드에서 카드 예약·구매·판매·합산 능력치와 오류 복구를 확인했다."
         },
         "api": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/equipment-api.integration.test.ts"
+            }
+          ],
+          "reason": "세션 HTTP에서 장비 목록과 매매 예약을 확인했다."
         },
         "authorization": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/equipment-api.integration.test.ts"
+            }
+          ],
+          "reason": "장비 비활성 월드의 장비 조회와 예약을 거부하고 세션 장수의 장착만 읽었다."
         },
         "engine": {
           "status": "partial",
           "evidence": [
             {
               "kind": "test",
-              "ref": "tools/command-coverage.test.ts"
+              "ref": "tools/equipment-api.integration.test.ts"
             }
           ],
-          "reason": "실제 기능 등록과 장수·국가 대상을 대조했다. 이 단계의 실행 증거 연결은 남아 있다."
+          "reason": "개인 예턴이 무기·명마의 실제 매매와 재고 차감을 실행했다."
         },
         "effectsCostsFailures": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/equipment-api.integration.test.ts"
+            },
+            {
+              "kind": "test",
+              "ref": "packages/rules/src/equipment/trade.test.ts"
+            }
+          ],
+          "reason": "구매·판매 금액과 경험·장착·철 또는 말의 차감, 부족·치안 등 순수 규칙 반례를 확인했다."
         },
         "persistence": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/equipment-api.integration.test.ts"
+            }
+          ],
+          "reason": "실제 PostgreSQL에서 장착·금·경험·재고를 함께 저장하고 commit 실패 때 함께 되돌렸다."
         },
         "restart": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/equipment-api.integration.test.ts"
+            }
+          ],
+          "reason": "새 DB 연결에서 장착과 상태 해시를 다시 확인했다. 별도 엔진 프로세스의 복구는 확인이 필요하다."
         },
         "replay": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/equipment-api.integration.test.ts"
+            },
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42396668367",
+              "sha": "6d831425c31ccc23c9664bcd55acd6a7320542fa"
+            }
+          ],
+          "reason": "무기와 명마의 원생성부터 12개월 동안 DB의 월별 해시와 재생 해시를 대조했다."
         },
         "independentReview": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "review",
+              "ref": "https://github.com/opensamguk/opensamguk/pull/373#issuecomment-6672891826",
+              "sha": "7c3d0a282c44eb2c52171fbe58a879935e32d18b"
+            },
+            {
+              "kind": "review",
+              "ref": "https://github.com/opensamguk/opensamguk/pull/388#issuecomment-6676032759",
+              "sha": "7f2bb4dea26346d166b3c7f48fdd1e9a7b8d7b5e"
+            }
+          ],
+          "reason": "장비 카드와 오류 처리의 최종 변경을 각 SHA에서 독립 리뷰했다."
         },
         "exactShaValidation": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42129582525",
+              "sha": "7c3d0a282c44eb2c52171fbe58a879935e32d18b"
+            },
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42147863161",
+              "sha": "7f2bb4dea26346d166b3c7f48fdd1e9a7b8d7b5e"
+            },
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42396668367",
+              "sha": "6d831425c31ccc23c9664bcd55acd6a7320542fa"
+            }
+          ],
+          "reason": "카드와 오류 복구, 명마·무기 재료 검증에 해당하는 source CI가 각각 통과했다."
         },
         "merge": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "commit",
+              "ref": "https://github.com/opensamguk/opensamguk/commit/ab5b87a0356e15dc5bb3c1b319857f47f339a825",
+              "sha": "ab5b87a0356e15dc5bb3c1b319857f47f339a825"
+            },
+            {
+              "kind": "commit",
+              "ref": "https://github.com/opensamguk/opensamguk/commit/10db29cc96179c539bf76aa29c672e2d3b0d56d1",
+              "sha": "10db29cc96179c539bf76aa29c672e2d3b0d56d1"
+            },
+            {
+              "kind": "commit",
+              "ref": "https://github.com/opensamguk/opensamguk/commit/b47c93d03a2d0ae98c0cedfc5137f43a8795ab10",
+              "sha": "b47c93d03a2d0ae98c0cedfc5137f43a8795ab10"
+            }
+          ],
+          "reason": "장비 카드·오류 복구와 명마·무기의 재료 검증이 메인에 병합됐다."
         }
       },
-      "blockers": ["G-03", "U-06", "U-19"]
+      "blockers": ["별도 엔진 프로세스 복구와 장비 효과까지 이어지는 공개 빌드 검증, 단계별 최종 증거가 남아 있다."]
     },
     {
       "id": "reset_domestic_trait",
