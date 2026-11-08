@@ -182,7 +182,7 @@ async function queuedFixture() {
 }
 
 // 정식 491명 검증이 아니다. 해당 국가의 군주와 한 NPC만 남겨 모집 경쟁을 원생성에서 고정한다.
-async function npcFixture(mode: 'buy' | 'transport') {
+async function npcFixture(mode: 'buy' | 'transport', treasuryBudgetBp?: number) {
   const source = structuredClone(initial),
     byCity = new Map(source.cities.map((city) => [city.cityKey, city]));
   const rulers = source.generals.filter(
@@ -227,7 +227,14 @@ async function npcFixture(mode: 'buy' | 'transport') {
     ...structuredClone(config),
     specialties: mode === 'transport' ? [{ cityKey: rear.cityKey, good: 'iron', perMonth: 1000 }] : [],
     transport: { ...config.transport, lossBpPerHop: 5000 },
-    npc: { recruitTarget: 100, budgetBp: 2000, maxActions: 3, stockCapBp: 8000, upgradeAtBp: 9000 },
+    npc: {
+      recruitTarget: 100,
+      budgetBp: 2000,
+      maxActions: 3,
+      stockCapBp: 8000,
+      upgradeAtBp: 9000,
+      ...(treasuryBudgetBp === undefined ? {} : { treasuryBudgetBp }),
+    },
   };
   const seed = `npc-logistics-storage-${mode}`,
     saved = await fixture(source, rules, seed);
@@ -521,6 +528,27 @@ describe('AC-P2-30 실제 PostgreSQL 물류', () => {
     expect(replayed).toHaveLength(2);
     expect(replayed.at(-1)!.stateHash).toBe(hashState(final));
     expect(replayArchive(archive, 2)).toEqual(replayed);
+  });
+
+  it('국고 10% 상한을 설정한 실제 NPC 월 교역의 비용과 설정을 저장하고 재생한다', async () => {
+    const world = await npcFixture('buy', 1000);
+    const city = world.before.cities[world.cityKey]!;
+    const nationId = city.nationId!;
+    const date = monthlyDate(world.before.startYear, 10_000);
+    const base = runMonthly(world.before, 10_000, rngFor(world.seed, 'monthly', date.year, date.month)).state;
+    await controlClock(db, world.id, 'start');
+    await advance(world.id, 10_000);
+    const stored = await db.$transaction((tx) => loadReplayState(tx, world.id));
+    const rows = await db.logisticsMovement.findMany({ where: { worldId: world.id, tick: 10_000, reason: 'TRADE' } });
+    expect(rows).toMatchObject([{ holder: 'city', holderId: world.cityKey, good: 'iron', delta: 2 }]);
+    const expense =
+      base.cityResources!.cities[world.cityKey]!.gold - stored.state.cityResources!.cities[world.cityKey]!.gold;
+    expect(expense).toBe(2 * config.trade.iron.buy);
+    expect(expense).toBeLessThanOrEqual(Math.floor(base.nations[nationId]!.gold / 10));
+    expect(stored.state.nations[nationId]!.gold).toBe(base.nations[nationId]!.gold);
+    expect(stored.state.logistics!.config.npc?.treasuryBudgetBp).toBe(1000);
+    const archive = await exportReplay(db, world.id);
+    expect(replayArchive(archive, 1)[0]!.stateHash).toBe(hashState(stored));
   });
 
   it('NPC 특산 후방의 실제 수송·도착 손실·보충·모집 원장을 네 달 재생과 대조한다', async () => {

@@ -59,6 +59,7 @@ export const logisticsConfigSchema = z
           .max(2000)
           .refine((amount) => amount % 100 === 0),
         budgetBp: identifier.max(10_000),
+        treasuryBudgetBp: identifier.max(10_000).optional(),
         maxActions: identifier.max(3),
         stockCapBp: identifier.max(10_000),
         upgradeAtBp: identifier.max(10_000),
