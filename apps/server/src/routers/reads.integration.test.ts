@@ -417,6 +417,38 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     expect(own.cities[0]).not.toHaveProperty('population');
   });
 
+  it('AC-M1-19 소유 도시를 자국에서만 지역과 규모 기준으로 정렬한다', async () => {
+    const id = await fixtureWorld('nation-city-order');
+    const keys = state.cities
+      .slice(0, 4)
+      .map((city) => city.cityKey)
+      .sort((a, b) => a - b);
+    const [first, second, third, fourth] = keys;
+    try {
+      await db.$transaction(
+        [
+          { region: 2, level: 9 },
+          { region: 1, level: 4 },
+          { region: 1, level: 7 },
+          { region: 1, level: 7 },
+        ].map((data, index) =>
+          db.city.update({
+            where: { worldId_cityKey: { worldId: id, cityKey: keys[index]! } },
+            data: { ...data, nationId: 1 },
+          }),
+        ),
+      );
+      const input = { worldId: id, nationId: 1 };
+      const own = (await query('nation.get', input)).data.cities;
+      const foreign = (await query('nation.get', input, users[1]!.cookie)).data.cities;
+      expect(own.map((city) => city.key)).toEqual([third, fourth, second, first]);
+      expect(foreign.map((city) => city.key)).toEqual(keys);
+      for (const city of [...own, ...foreign]) expect(city).not.toHaveProperty('region');
+    } finally {
+      await db.world.delete({ where: { id } });
+    }
+  });
+
   it('재야 home은 국가 null·본인 상세만 반환하고 없는 예턴을 휴식5개로 채운다', async () => {
     const { data } = await query('home.get', { worldId }, users[2]!.cookie);
     expect(data.nation).toBeNull();
