@@ -48,6 +48,12 @@ export const featureProfileSchema = z
     }),
   ])
   .superRefine((profile, context) => {
+    if (profile.key === 'expanded-191-v8' && profile.featureData['logistics-v1'].npc?.treasuryBudgetBp !== 1000)
+      context.addIssue({
+        code: 'custom',
+        path: ['featureData', 'logistics-v1', 'npc', 'treasuryBudgetBp'],
+        message: '첩보 확장판의 NPC 국고 예산 상한은 10%입니다.',
+      });
     try {
       checkRuleFeatures(profile.ruleFeatures);
       if (FEATURE_PROFILE_DATA_KEYS.some((feature) => !profile.ruleFeatures.includes(feature))) throw new Error();

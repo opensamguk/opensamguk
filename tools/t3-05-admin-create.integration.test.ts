@@ -1000,6 +1000,35 @@ it('AC-P2-30·31·32·33 설정 파일 누락·손상은 기존 HTTP 목록과 r
     });
 });
 
+it('AC-P2-30 expanded-191-v8 국고 상한이 빠지거나 다르면 직접 생성 요청도 거부한다', async (signal) => {
+  const { value } = await loadFeatureProfile('expanded-191-v8');
+  if (value.version !== 3) throw Error('형식3 설정이 필요합니다.');
+  const { scenarioKey, mapKey, unitSetKey, statRulesKey, portraitMapKey, ruleFeatures } = value;
+  for (const budget of [undefined, 999]) {
+    const broken = structuredClone(value);
+    const npc = broken.featureData['logistics-v1'].npc!;
+    if (budget === undefined) delete npc.treasuryBudgetBp;
+    else npc.treasuryBudgetBp = budget;
+    const root = await resourceFixture();
+    await writeFile(new URL('feature-profile/expanded-191-v8.json', root), JSON.stringify(broken), { flag: 'wx' });
+    await withResourceRoot(root, async () => {
+      const pair = await accepted(actor, signal, {
+        scenarioKey,
+        mapKey,
+        unitSetKey,
+        statRulesKey,
+        portraitMapKey,
+        ruleFeatures,
+        featureProfileKey: value.key,
+      });
+      await processOne(signal);
+      const stored = await row(pair.receipt.requestId);
+      expect(stored).toMatchObject({ status: 'FAILED', errorCode: 'RESOURCE_INVALID' });
+      expect(await db.world.count({ where: { id: stored.plannedWorldId } })).toBe(0);
+    });
+  }
+});
+
 it('AC-P2-30·31·32·33 입력 목록 누락을 시나리오 기능으로 채우지 않고 미지 키를 확정 거부한다', async (signal) => {
   const { value } = await loadFeatureProfile('expanded-191-v3');
   for (const [extra, expected] of [
