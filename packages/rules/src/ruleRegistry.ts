@@ -249,7 +249,7 @@ export function checkReplayOrigin(
   if (!origin || ![1, 3].includes(origin.version) || !origin.initial || typeof origin.initial !== 'object')
     throw new Error('재생 생성 기록의 버전을 확인하세요.');
   checkStatProfile(origin.initial);
-  checkInitialNpcStatLimits(origin.initial);
+  checkInitialNpcStatLimits(origin.initial, origin.version === 3 ? 'current' : 'legacy');
   checkCityScaleInitial(origin.initial);
   checkOperationalProfile(origin.initial);
   assertInitialNationLifecycle(

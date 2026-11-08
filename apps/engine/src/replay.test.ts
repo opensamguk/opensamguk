@@ -6,6 +6,7 @@ import { hashState } from '@opensamguk/shared/node';
 import {
   exportReplay,
   readArchive,
+  resourceHash,
   resourceHashV3,
   type ReplayArchiveV3,
   replayArchive,
@@ -15,6 +16,7 @@ import {
   type ReplayArchiveV5,
 } from './replay';
 import { loadReplayState } from './monthly';
+import { prepareInitialWorld } from './world/persistence';
 import { endYearArchive, recordedArchive, rejectedInput, unifiedArchive } from '../test/replayFixture';
 import { monthlyFixture } from '../test/monthlyFixture';
 
@@ -27,6 +29,28 @@ const asV2 = (archive: ReplayArchive): ReplayArchiveV2 => ({
   config: { endYear: null, outcomeFromSequence: 0 },
   end: null,
   afterEnd: [],
+});
+
+it('T4-46 AC-P2-24 추가 NPC 상한은 형식 3 생성과 재생에만 적용한다', async () => {
+  const initial = await monthlyFixture();
+  initial.scenarioKey = '2702@2';
+  initial.generals[0]!.leadership = 156;
+  initial.generals[0]!.userId = null;
+  const initialStateHash = hashState(initial);
+  const options = { name: '원작 시작 NPC', turnTermMinutes: 60, endYear: null };
+
+  expect(prepareInitialWorld(initial, options).stateHash).toBe(initialStateHash);
+  for (const replayFormat of [1, 'legacy', 'policy'] as const)
+    expect(() => prepareInitialWorld(initial, { ...options, replayFormat })).toThrow('시작 장수의 기본 능력치');
+
+  const config = { endYear: null, outcomeFromSequence: 0 };
+  const archive = { months: [], inputs: [] };
+  const origin = { initial, initialStateHash, resourceHash: resourceHash(initial) };
+  const current = { ...archive, version: 3, origin: { ...origin, version: 3 }, config, end: null, afterEnd: [] };
+  expect(readArchive(current)).toBe(current);
+  const legacy = { ...archive, version: 1, origin: { ...origin, version: 1 } };
+  for (const older of [legacy, ...[2, 5].map((version) => ({ ...legacy, version, config, end: null, afterEnd: [] }))])
+    expect(() => readArchive(older)).toThrow('시작 장수의 기본 능력치');
 });
 
 async function adminEndArchive(features: string[] = []): Promise<ReplayArchiveV3> {

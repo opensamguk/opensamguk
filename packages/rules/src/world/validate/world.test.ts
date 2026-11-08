@@ -8,10 +8,14 @@ import { codes, freezeDeep, mapFixture, scenarioFixture, unitFixture } from './t
 
 describe('T4-76 자원 묶음 판정', () => {
   it.each([
+    ['2090', 103],
     ['2121', 108],
+    ['2140', 102],
+    ['2150', 105],
     ['2210', 140],
     ['2200', 115],
     ['2300', 120],
+    ['2702', 156],
   ] as const)('T4-46 AC-P2-24 %s 시작 NPC 능력치 원본의 상한 %s를 적용한다', (id, limit) => {
     const scenario = { ...scenarioFixture(), id };
     for (const stat of [5, 6, 7]) scenario.general[0]![stat] = limit;
@@ -25,11 +29,15 @@ describe('T4-76 자원 묶음 판정', () => {
     expect(validateWorldResources(input).status).toBe('pass');
     const initial = buildInitialWorld(input);
     expect(initial.generals[0]).toMatchObject({ userId: null, leadership: limit, strength: limit, intel: limit });
-    expect(() => checkReplayOrigin({ version: 1, initial })).not.toThrow();
+    const current = { version: 3, initial, initialStateHash: '', resourceHash: '' };
+    expect(() => checkReplayOrigin(current)).not.toThrow();
+    const legacy = () => checkReplayOrigin({ version: 1, initial });
+    if (['2121', '2200', '2210', '2300'].includes(id)) expect(legacy).not.toThrow();
+    else expect(legacy).toThrow('시작 장수의 기본 능력치');
 
     const human = structuredClone(initial);
     human.generals[0]!.userId = 'account';
-    expect(() => checkReplayOrigin({ version: 1, initial: human })).toThrow('시작 장수의 기본 능력치');
+    expect(() => checkReplayOrigin({ ...current, initial: human })).toThrow('시작 장수의 기본 능력치');
     expect(validateWorldResources({ ...input, scenario: { ...scenario, id: 'other' } }).scenario.status).toBe('fail');
     scenario.general[0]![7] = limit + 1;
     expect(validateWorldResources(input).scenario.status).toBe('fail');
