@@ -423,6 +423,11 @@ describe('T4-03 / AC-P2-02 archive 6 순수 parser와 걷기', () => {
     expect(() => verify('2210@2', 'account')).toThrow('시작 장수의 기본 능력치');
     expect(() => verify('2121', null)).toThrow('시작 장수의 기본 능력치');
     expect(() => verify('1030', null)).toThrow('시작 장수의 기본 능력치');
+
+    first.leadership = 156;
+    expect(verify('2702@2', null).origin.initial.generals[0]!.leadership).toBe(156);
+    expect(() => verify('2702@2', 'account')).toThrow('시작 장수의 기본 능력치');
+    expect(() => verify('2210@2', null)).toThrow('시작 장수의 기본 능력치');
   });
 
   it('A1 정상 off·F0·사람 T·NPC null의 12개월과 종료를 재현하고 남는 top 키를 거부한다', () => {

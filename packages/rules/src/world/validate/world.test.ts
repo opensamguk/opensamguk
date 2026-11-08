@@ -8,10 +8,14 @@ import { codes, freezeDeep, mapFixture, scenarioFixture, unitFixture } from './t
 
 describe('T4-76 자원 묶음 판정', () => {
   it.each([
+    ['2090', 103],
     ['2121', 108],
+    ['2140', 102],
+    ['2150', 105],
     ['2210', 140],
     ['2200', 115],
     ['2300', 120],
+    ['2702', 156],
   ] as const)('T4-46 AC-P2-24 %s 시작 NPC 능력치 원본의 상한 %s를 적용한다', (id, limit) => {
     const scenario = { ...scenarioFixture(), id };
     for (const stat of [5, 6, 7]) scenario.general[0]![stat] = limit;
