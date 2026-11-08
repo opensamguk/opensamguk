@@ -69,6 +69,34 @@ describe('AC-P2-31 황실 단계 안의 공납·봉록 보존', () => {
     expect(result.state.generals[11]!.gold).toBe(world.generals[11]!.gold);
     expect(result.state.cityResources).toEqual(world.cityResources);
   });
+  it('AC-P2-31 지급 불가 직위를 건너뛰고 남은 금을 직위 순서대로 지급한다', () => {
+    const world = fixture();
+    const seat = world.cityResources!.cities['1']!;
+    seat.gold = 100;
+    world.governance!.vassals = [];
+    for (const id of [11, 12, 13]) world.generals[id] = { ...world.generals[1]!, id, officerLevel: 0, gold: 0 };
+    world.generals[11]!.gold = CITY_RESOURCE_MAX - 99;
+    world.governance!.court = {
+      minister: { generalId: 13, appointedTick: 0 },
+      grandMarshal: { generalId: 12, appointedTick: 0 },
+      chancellor: { generalId: 11, appointedTick: 0 },
+    };
+
+    const result = settleGovernanceMonthly(deepFreeze(world), 10_000);
+    expect(result.payments).toMatchObject([
+      { refId: 1, paid: 0, status: 'SKIPPED', reason: 'HOLDER_FULL' },
+      { refId: 2, paid: 100, status: 'PAID', reason: 'TRANSFER' },
+      { refId: 3, paid: 0, status: 'SKIPPED', reason: 'SEAT_SHORT' },
+    ]);
+    expect(result.movements).toMatchObject([
+      { refId: 2, holder: 'city', holderId: 1, delta: -100 },
+      { refId: 2, holder: 'general', holderId: 12, delta: 100 },
+    ]);
+    expect(result.state.cityResources!.cities['1']!.gold).toBe(0);
+    expect(result.state.generals[11]!.gold).toBe(CITY_RESOURCE_MAX - 99);
+    expect(result.state.generals[12]!.gold).toBe(100);
+    expect(result.state.generals[13]!.gold).toBe(0);
+  });
   it('이탈은 다음 월 시작에 적용하고 남은 하위 관계와 재산을 지킨다', () => {
     const world = fixture();
     world.governance!.pendingRenounce = [2];
