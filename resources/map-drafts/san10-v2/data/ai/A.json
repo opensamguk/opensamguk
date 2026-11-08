@@ -1,0 +1,3789 @@
+[
+ {
+  "id": 20500,
+  "chain": "hun",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20501,
+  "chain": "hun>216:cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20503,
+  "chain": "hun",
+  "death": null,
+  "birth": 191,
+  "basis": "추정"
+ },
+ {
+  "id": 20504,
+  "chain": "wuhuan",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20505,
+  "chain": "wuhuan",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20508,
+  "chain": "wuhuan",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20509,
+  "chain": "shanyue",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20510,
+  "chain": "shanyue",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20512,
+  "chain": "shanyue",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20513,
+  "chain": "qiang",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20514,
+  "chain": "qiang",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20515,
+  "chain": "qiang",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20516,
+  "chain": "di",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20519,
+  "chain": "shu>250:cao>251:shu",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 20701,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20702,
+  "chain": "han",
+  "death": 190,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20703,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20705,
+  "chain": "",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 20706,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 20707,
+  "chain": "",
+  "death": 200,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20709,
+  "chain": "han",
+  "death": 201,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20712,
+  "chain": "yuan",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 20713,
+  "chain": "yuan",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 20716,
+  "chain": "liaodong",
+  "death": 238,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20717,
+  "chain": "liaodong",
+  "death": 238,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20718,
+  "chain": "liaodong",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20719,
+  "chain": "liaodong",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20720,
+  "chain": "",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20721,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20723,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20729,
+  "chain": "cao",
+  "death": 252,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20735,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20736,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20739,
+  "chain": "cao",
+  "death": 223,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20742,
+  "chain": "cao",
+  "death": 268,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20755,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20758,
+  "chain": "jing>208:cao",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 20759,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20763,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20764,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20765,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20769,
+  "chain": "shu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20771,
+  "chain": "shu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20772,
+  "chain": "shu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20774,
+  "chain": "cao",
+  "death": 249,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20775,
+  "chain": "shu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20776,
+  "chain": "shu",
+  "death": 263,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20778,
+  "chain": "shu>263:cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20786,
+  "chain": "han>196:wu",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 20788,
+  "chain": "wu",
+  "death": 239,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20796,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20801,
+  "chain": "wu>280:cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20804,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20808,
+  "chain": "xianbei",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20811,
+  "chain": "wuhuan",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20813,
+  "chain": "xianbei",
+  "death": 279,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 20814,
+  "chain": "xianbei",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20815,
+  "chain": "xianbei",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20816,
+  "chain": "xianbei",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20820,
+  "chain": "cao",
+  "death": 278,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20824,
+  "chain": "cao",
+  "death": 285,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20825,
+  "chain": "cao",
+  "death": 283,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20828,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20829,
+  "chain": "cao",
+  "death": 306,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20830,
+  "chain": "gog",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20831,
+  "chain": "gog",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20832,
+  "chain": "gog",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20833,
+  "chain": "gog",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20834,
+  "chain": "gog",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20835,
+  "chain": "gog",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20836,
+  "chain": "gog",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20837,
+  "chain": "gog",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20838,
+  "chain": "gog",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20839,
+  "chain": "gog",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20840,
+  "chain": "gog",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20841,
+  "chain": "gog",
+  "death": 203,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20842,
+  "chain": "gog",
+  "death": 230,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20843,
+  "chain": "gog",
+  "death": 254,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20844,
+  "chain": "gog",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20845,
+  "chain": "gog",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20846,
+  "chain": "gog",
+  "death": 246,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20847,
+  "chain": "gog",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20848,
+  "chain": "gog",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20849,
+  "chain": "gog",
+  "death": 292,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20850,
+  "chain": "bj",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20851,
+  "chain": "bj",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20852,
+  "chain": "bj",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20853,
+  "chain": "bj",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20854,
+  "chain": "bj",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20855,
+  "chain": "bj",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20856,
+  "chain": "bj",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20857,
+  "chain": "bj",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20858,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20859,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20860,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20861,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20862,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20863,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20864,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20865,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20866,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20867,
+  "chain": "sr",
+  "death": 249,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20868,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20869,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20870,
+  "chain": "gy",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20871,
+  "chain": "gy",
+  "death": 253,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20872,
+  "chain": "gy",
+  "death": 291,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20873,
+  "chain": "by",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20874,
+  "chain": "by",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20875,
+  "chain": "by",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20876,
+  "chain": "by",
+  "death": 285,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20877,
+  "chain": "wa",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20878,
+  "chain": "wa",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20879,
+  "chain": "wa",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20880,
+  "chain": "wa",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20881,
+  "chain": "wa",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20882,
+  "chain": "wa",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20883,
+  "chain": "wa",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20884,
+  "chain": "wa",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20885,
+  "chain": "wa",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20886,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20888,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20892,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20893,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20894,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20895,
+  "chain": "wu>209:shu>211:wu",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 20896,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20897,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20898,
+  "chain": "wu",
+  "death": 238,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20899,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20900,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20901,
+  "chain": "shu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20902,
+  "chain": "shu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20903,
+  "chain": "shu",
+  "death": 245,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20904,
+  "chain": "shu",
+  "death": 237,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20905,
+  "chain": "shu>263:cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20908,
+  "chain": "shu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20909,
+  "chain": "gog",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20910,
+  "chain": "gog",
+  "death": 248,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20911,
+  "chain": "gog",
+  "death": 248,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20912,
+  "chain": "gog",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20913,
+  "chain": "gog",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20914,
+  "chain": "gog",
+  "death": 271,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20915,
+  "chain": "gog",
+  "death": 294,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20916,
+  "chain": "gog",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20917,
+  "chain": "gog",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20918,
+  "chain": "gog",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20919,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20920,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20921,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20922,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20923,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20924,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20925,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20926,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20927,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 20928,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20929,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20930,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20931,
+  "chain": "sr",
+  "death": 255,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20932,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20933,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20934,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20935,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20936,
+  "chain": "sr",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20937,
+  "chain": "",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 20938,
+  "chain": "bj",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20939,
+  "chain": "bj",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20940,
+  "chain": "bj",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20941,
+  "chain": "bj",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20942,
+  "chain": "bj",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20943,
+  "chain": "wa",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20944,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20945,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20946,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20947,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20948,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20949,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20950,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20951,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20952,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20953,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20954,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20955,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20956,
+  "chain": "han",
+  "death": 184,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20957,
+  "chain": "han",
+  "death": 184,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20958,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20959,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20960,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20961,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20962,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20963,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20964,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20965,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20966,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20968,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20969,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20970,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20971,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20973,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20974,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20975,
+  "chain": "jing>208:cao",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 20976,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20977,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20978,
+  "chain": "dong",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20981,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20982,
+  "chain": "dong",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20983,
+  "chain": "hj",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20985,
+  "chain": "han",
+  "death": 192,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20987,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20988,
+  "chain": "dong",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20989,
+  "chain": "dong>195:han",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 20990,
+  "chain": "dong",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20991,
+  "chain": "dong",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20992,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20994,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20996,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20997,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 20999,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21000,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21001,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21002,
+  "chain": "dong",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21004,
+  "chain": "hj",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21005,
+  "chain": "dong",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21006,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21007,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21008,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21009,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21010,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21011,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21012,
+  "chain": "han",
+  "death": 192,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21013,
+  "chain": "dong",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21014,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21015,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21016,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21017,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21018,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21019,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21020,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21021,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21022,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21023,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21024,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21025,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21026,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21027,
+  "chain": "han",
+  "death": 214,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21028,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21029,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21030,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21031,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21035,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21036,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21037,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21038,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21039,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21040,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21042,
+  "chain": "cao",
+  "death": 252,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21043,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21044,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21045,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21046,
+  "chain": "",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21047,
+  "chain": "",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21048,
+  "chain": "",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21049,
+  "chain": "jing>208:cao",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21050,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21051,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21052,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21053,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21054,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21055,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21058,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21060,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21061,
+  "chain": "yuan>204:cao",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21062,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21063,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21065,
+  "chain": "",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21066,
+  "chain": "",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21067,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21068,
+  "chain": "",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21070,
+  "chain": "cao",
+  "death": 220,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21071,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21072,
+  "chain": "cao",
+  "death": 217,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21075,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21076,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21079,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21080,
+  "chain": "yuan>204:cao",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21081,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21082,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21084,
+  "chain": "",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21085,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21086,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21087,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21089,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21096,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21097,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21098,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21099,
+  "chain": "cao>255:wu>280:cao",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21102,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21103,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21106,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21107,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21108,
+  "chain": "yi",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21109,
+  "chain": "yi",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21110,
+  "chain": "jing>208:cao",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21111,
+  "chain": "shu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21112,
+  "chain": "shu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21113,
+  "chain": "shu",
+  "death": 234,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21115,
+  "chain": "shu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21116,
+  "chain": "shu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21119,
+  "chain": "shu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21120,
+  "chain": "shu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21123,
+  "chain": "shu",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21124,
+  "chain": "shu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21125,
+  "chain": "shu>263:cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21127,
+  "chain": "shu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21129,
+  "chain": "shu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21130,
+  "chain": "shu",
+  "death": 264,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21131,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21132,
+  "chain": "cao>219:wu>220:cao",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21133,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21134,
+  "chain": "wu>280:cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21135,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21139,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21140,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21142,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21143,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21144,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21147,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21154,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21155,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21156,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21157,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21158,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21159,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21160,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21161,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21162,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21163,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21164,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21166,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21167,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21168,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21169,
+  "chain": "wuhuan",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21170,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21171,
+  "chain": "wuhuan>237:cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21172,
+  "chain": "wuhuan>237:cao",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21173,
+  "chain": "wuhuan>237:cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21174,
+  "chain": "xianbei",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21175,
+  "chain": "xianbei",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21176,
+  "chain": "wuhuan",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21178,
+  "chain": "wuhuan",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21179,
+  "chain": "xianbei",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21180,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21181,
+  "chain": "xianbei",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21182,
+  "chain": "xianbei",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21183,
+  "chain": "shu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21184,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21186,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21187,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21188,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21189,
+  "chain": "xianbei",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21190,
+  "chain": "xianbei",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21191,
+  "chain": "xianbei",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21192,
+  "chain": "xianbei",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21193,
+  "chain": "xianbei",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21194,
+  "chain": "cao",
+  "death": 234,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21195,
+  "chain": "cao",
+  "death": 292,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21196,
+  "chain": "cao",
+  "death": 300,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21197,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21199,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21200,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21202,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21203,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21204,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21205,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21206,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21207,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21208,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21209,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21210,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21212,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21213,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21214,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21215,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21216,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21217,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21218,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21219,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21220,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21222,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21223,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21224,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21225,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21228,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21229,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21230,
+  "chain": "shu>263:cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21231,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21232,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21233,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21234,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21235,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21236,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21237,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21239,
+  "chain": "wu>280:cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21240,
+  "chain": "wu>280:cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21241,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21242,
+  "chain": "wu",
+  "death": 263,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21243,
+  "chain": "wu",
+  "death": 263,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21244,
+  "chain": "wu>263:cao",
+  "death": 263,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21245,
+  "chain": "wu>263:cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21246,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21247,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21248,
+  "chain": "cao>271:wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21249,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21250,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21251,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21252,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21253,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21254,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21255,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21256,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21260,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21261,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21262,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21263,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21264,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21266,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21267,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21268,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21270,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21271,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21272,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21273,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21274,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21275,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21276,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21277,
+  "chain": "cao",
+  "death": 218,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21278,
+  "chain": "cao",
+  "death": 218,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21279,
+  "chain": "cao",
+  "death": 218,
+  "birth": 160,
+  "basis": "추정"
+ },
+ {
+  "id": 21280,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21281,
+  "chain": "cao",
+  "death": 218,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21282,
+  "chain": "",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21283,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21286,
+  "chain": "cao",
+  "death": 249,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21288,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21291,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21292,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21293,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21294,
+  "chain": "",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21295,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21296,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21297,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21298,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21301,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21303,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21306,
+  "chain": "cao",
+  "death": 270,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21311,
+  "chain": "cao",
+  "death": 263,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21313,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21315,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21316,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21320,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21323,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21324,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21325,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21326,
+  "chain": "wu",
+  "death": 280,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21327,
+  "chain": "wu",
+  "death": 280,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21328,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21329,
+  "chain": "wu>280:cao",
+  "death": 303,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21330,
+  "chain": "wu>280:cao",
+  "death": 303,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21331,
+  "chain": "wu>280:cao",
+  "death": 297,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21332,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21335,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21336,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21337,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21338,
+  "chain": "han>197:jing",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21339,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21340,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21342,
+  "chain": "jing>208:cao",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21344,
+  "chain": "jing",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21345,
+  "chain": "jing",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21346,
+  "chain": "yuan",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21348,
+  "chain": "",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21350,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21351,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21352,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21353,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21354,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21355,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21356,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21359,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21360,
+  "chain": "",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21361,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21362,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21363,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21364,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21365,
+  "chain": "liaodong",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21366,
+  "chain": "",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21367,
+  "chain": "xianbei",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21369,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21370,
+  "chain": "",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21371,
+  "chain": "qiang",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21372,
+  "chain": "qiang",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21373,
+  "chain": "hun",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21374,
+  "chain": "qiang",
+  "death": 247,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21375,
+  "chain": "qiang",
+  "death": 247,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21376,
+  "chain": "qiang",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21377,
+  "chain": "qiang",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21378,
+  "chain": "shu>249:cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21379,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21380,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21381,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21382,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21383,
+  "chain": "cao",
+  "death": 291,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21384,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21385,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21386,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21388,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21389,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21390,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21391,
+  "chain": "wu",
+  "death": 250,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21392,
+  "chain": "wu",
+  "death": 250,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21393,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21394,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21395,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21396,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21397,
+  "chain": "wu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21398,
+  "chain": "shu>264:cao",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 21401,
+  "chain": "man",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21402,
+  "chain": "shu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21405,
+  "chain": "",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 21406,
+  "chain": "shu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 30001,
+  "chain": "jing>208:wu",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 30002,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 30003,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 30004,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 30005,
+  "chain": "cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 30006,
+  "chain": "yuan>200:cao",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 30007,
+  "chain": "",
+  "death": null,
+  "birth": null,
+  "basis": "추정"
+ },
+ {
+  "id": 30008,
+  "chain": "han",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 30009,
+  "chain": "yi>214:shu",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ },
+ {
+  "id": 30010,
+  "chain": "ys",
+  "death": null,
+  "birth": null,
+  "basis": "열전"
+ }
+]

@@ -165,3 +165,7 @@ core2026 커밋 df6c9269fa1e2862418ba9da481c8dd2d758d6c5의 MIT © 2025 devsam �
 - 라트하우므 `ludo_rathowm` 병종 판은 같은 커밋의 `resources/unitset/unitset_ludo_rathowm.json`에서 변환한다. 원작 blob `2ff0c321a68cc4207e9c40c4f43c66b74074c248`는 JSON 서식만 정리해 `tools/unitset/source/ludo_rathowm-core2026-df6c926.json`에 보존한다. 모집 지역 번호와 이름은 `resources/map/region_map.json`의 `ludo_rathowm` 항목(blob `474c4a75963117c792842f78e2976404c23a3b1a`)에서 가져왔다. 같은 devsam MIT 고지를 적용한다.
 - 원작 `resources/map/map_chess.json`과 `resources/map/map_pokemon_v1.json`은 `resources/map/chess.json`과 `resources/map/pokemon_v1.json`에 원문 바이트를 보존했다. 같은 devsam MIT 고지를 적용한다.
 - 원작 `resources/map/map_cr.json`은 `resources/map/cr.json`에 원문 바이트를 보존했다. `resources/map/ludo_rathowm.json`은 `resources/map/map_ludo_rathowm.json`의 라그나로크 아크에서 도약의 탑으로 가는 중복 도로와 대응 이름을 한 번씩 덜어낸 판이다. 원문은 `resources/map-drafts/original/ludo-rathowm-core2026-df6c926.json`에 보존했다. 같은 devsam MIT 고지를 적용한다.
+
+## 새 지도·시나리오 초안
+
+`resources/map-drafts/san10-v2/`의 출처와 권리는 [그 폴더의 고지](./map-drafts/san10-v2/NOTICE.md)에 따로 적었다. 게임 런타임은 이 폴더를 읽지 않는다.
