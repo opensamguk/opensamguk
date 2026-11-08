@@ -454,6 +454,36 @@ test.describe('장수가 있는 계정', () => {
       await shot(page, `v1-navigation-${width}.png`);
     });
   }
+
+  // INT-20 첫 턴 안내: 닫은 기억은 localStorage에 월드별로 남고, 도움말의 다시 보기 링크가 그 기억을 지운다.
+  test('첫 턴 안내는 닫으면 새로고침 뒤에도 안 뜨고, 도움말 다시 보기에서 다시 뜬다', async ({ page }) => {
+    // 브라우저 자동화(navigator.webdriver)에서는 안내를 자동으로 띄우지 않는다. 이 시험만 그 판정을 끄고 실제 경로를 본다.
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => false });
+    });
+    const guide = page.getByTestId('first-turn-guide');
+    const storedGuide = (key: string) => page.evaluate((k) => localStorage.getItem(k), key);
+    const key = `opensamguk:first-turn-guide:${ctx.worldId}`;
+
+    await openMain(page);
+    await expect(guide).toBeVisible();
+    await expect(guide.getByRole('heading', { level: 2, name: '지도에서 내 도시를 찾으세요' })).toBeVisible();
+    await guide.getByRole('button', { name: '안내 닫기' }).click();
+    await expect(guide).toHaveCount(0);
+    expect(await storedGuide(key)).toBe('1');
+
+    // 새로고침 뒤 home 데이터(명령 목록 30칸)가 다 올라온 뒤에도 안내가 없어야 한다.
+    await page.reload();
+    await expect(editor(page).locator('tr[data-slot]')).toHaveCount(30);
+    await expect(guide).toHaveCount(0);
+
+    await page.getByRole('navigation', { name: '게임 메뉴' }).getByRole('link', { name: '도움말' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: '시작하기' })).toBeVisible();
+    await page.getByRole('link', { name: '첫 턴 안내 다시 보기' }).click();
+    await expect(page).toHaveURL(new RegExp(`/w/${ctx.worldId}$`));
+    await expect(guide).toBeVisible();
+    expect(await storedGuide(key)).toBeNull();
+  });
 });
 
 test('장수 생성 API로 만든 재야 장수는 메인에서 바로 재야 상태로 보인다', async ({ page }) => {
