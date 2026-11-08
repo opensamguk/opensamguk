@@ -55,6 +55,8 @@ describe('AC-P2-30 NPC의 실제 물류 예산·수송·모집', () => {
       parsed = logisticsConfigSchema.parse(config);
     expect(JSON.stringify(parsed)).toBe(JSON.stringify(config));
     expect(Object.hasOwn(parsed, 'npc')).toBe(false);
+    const oldNpcConfig = { ...config, npc: settings };
+    expect(logisticsConfigSchema.parse(oldNpcConfig)).toStrictEqual(oldNpcConfig);
     const base = actions.settleLogisticsMonthly(world, 10_000);
     expect(settleNpcLogistics(deepFreeze(base.state), 10_000, undefined)).toEqual({ state: base.state, movements: [] });
     expect(settleNpcLogistics(base.state, 10_000, undefined).state).toBe(base.state);
@@ -110,7 +112,7 @@ describe('AC-P2-30 NPC의 실제 물류 예산·수송·모집', () => {
       [1, 10],
     ]);
 
-    world.logistics!.config.npc = { ...settings, treasuryBudgetBp: 1000 };
+    world.logistics!.config = { ...config, npc: { ...settings, treasuryBudgetBp: 1000 } };
     const { npc } = month(cloneWorld(world));
     expect(npc.movements.map(({ id, delta }) => [id, delta])).toEqual([
       [4, 10],
