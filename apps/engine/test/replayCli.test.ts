@@ -7,10 +7,18 @@ import { fileURLToPath } from 'node:url';
 import { endYearArchive } from './replayFixture';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
-const run = (...args: string[]) =>
-  spawnSync(process.execPath, ['--import', 'tsx', 'tools/replay.ts', ...args], { cwd: root, encoding: 'utf8' });
+const run = (...args: string[]) => {
+  const result = spawnSync(process.execPath, ['--import', 'tsx', 'tools/replay.ts', ...args], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 10_000,
+  });
+  if (result.error) throw result.error;
+  return result;
+};
 
-describe('T1-26 replay CLI', () => {
+// 별도 Node의 tsx 초기화는 Windows 전체 검사에서 5초를 넘길 수 있다.
+describe('T1-26 replay CLI', { timeout: 15_000 }, () => {
   it('기존 v1 --months 경로를 유지한다', () => {
     const result = run('--from', 'apps/engine/test/fixtures/replay-v1-b8f5074.json', '--months', '1');
     expect(result.status, result.stderr).toBe(0);
