@@ -41,7 +41,8 @@ export function applySexLedger<G extends { id: number; name: string; sex?: Gener
   initial: { scenarioKey: string; generals: G[] },
   ledger: SexLedger,
 ): Array<G & { sex: GeneralSex }> {
-  const covered = ledger.scenarios.includes(parseResourceKey(initial.scenarioKey).name);
+  const { name, version } = parseResourceKey(initial.scenarioKey);
+  const covered = ledger.scenarios.includes(name) || ledger.scenarios.includes(`${name}@${version}`);
   if (covered) {
     if (initial.generals.some((general) => Object.hasOwn(general, 'sex')))
       throw Error('성별 원장 대상 시나리오에 직접 성별을 지정할 수 없습니다.');

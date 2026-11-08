@@ -17,7 +17,12 @@ function validateInitialPair(map: unknown, scenario: unknown) {
     throw new Error('지도와 시나리오의 조합이 자원 검사를 통과하지 못했습니다.');
 }
 
-const SEX_LEDGER_FILES = ['officers/191-sex.json', 'officers/191-sex-2.json', 'officers/191-sex-3.json'] as const;
+const SEX_LEDGER_FILES = [
+  'officers/191-sex.json',
+  'officers/191-sex-2.json',
+  'officers/191-sex-3.json',
+  'officers/191-sex-4.json',
+] as const;
 const sexLedgers = new Map<string, SexLedger>();
 // 생성 때만 읽고 적용 값을 재생 원본에 고정한다. 사실 추가는 기존 원장을 덮지 않고 새 판으로 다룬다.
 function readSexLedger(path: (typeof SEX_LEDGER_FILES)[number]): SexLedger {
