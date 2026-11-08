@@ -11,7 +11,7 @@ import {
   unitSetSchema,
 } from './resources';
 import type { StatRules, UnitSetResource } from './resources';
-import { legacyCheCrewRegionsMatch } from './crewRegions';
+import { legacyCheCrewRegionsMatch, unitSetRegionSchemeMatches } from './crewRegions';
 import type { WorldState, WorldExt } from '../model/world';
 import { operationalMapSchema, type OperationalMapResource } from './map/operational';
 import { operationalAnchors } from './map/anchors';
@@ -149,7 +149,7 @@ export function buildInitialWorld(input: {
   if (scenario.requiredUnitSet !== undefined && unitSet.id !== scenario.requiredUnitSet)
     throw new Error(`이 시나리오는 ${scenario.requiredUnitSet} 병종 판이 필요합니다.`);
   if (
-    (unitSet.regionScheme !== undefined && unitSet.regionScheme !== operational?.regionScheme) ||
+    !unitSetRegionSchemeMatches(unitSet, operational ?? sourceMap) ||
     !legacyCheCrewRegionsMatch(unitSet, operational ?? sourceMap)
   )
     throw new Error('지도와 병종 판의 지역 기준이 다릅니다.');

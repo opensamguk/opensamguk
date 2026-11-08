@@ -53,6 +53,26 @@ describe('T4-76 자원 묶음 판정', () => {
     });
   });
 
+  it('T4-46 AC-P2-24 병종판과 지도의 지역 기준을 생성과 같은 방식으로 검증한다', () => {
+    const input = operationalInput();
+    const regionScheme = 'province-191';
+    const unitSet = { ...input.unitSet, regionScheme };
+    const incompatible = { ...input, unitSet };
+
+    expect(validateWorldResources(incompatible)).toMatchObject({
+      status: 'fail',
+      unitSet: {
+        status: 'fail',
+        issues: [{ code: 'shape-invalid', target: { kind: 'path', path: ['regionScheme'] } }],
+      },
+    });
+    expect(() => buildInitialWorld(incompatible)).toThrow('지도와 병종 판의 지역 기준이 다릅니다.');
+
+    const compatible = { ...incompatible, map: { ...input.map, regionScheme } };
+    expect(validateWorldResources(compatible).status).toBe('pass');
+    expect(buildInitialWorld(compatible).operationalMap?.regionScheme).toBe(regionScheme);
+  });
+
   it('T4-46 AC-P2-24 시나리오가 지정한 장수 생성 능력치 판만 받는다', () => {
     const requiredStatRules = { total: 220, min: 40, max: 95 };
     const input = freezeDeep({
