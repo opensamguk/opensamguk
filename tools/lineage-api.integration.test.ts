@@ -16,7 +16,12 @@ import { exportReplay, replayArchive } from '../apps/engine/src/replay';
 import { buildServer } from '../apps/server/src/server';
 import { newSession } from '../apps/server/src/auth/session';
 import type { AppRouter } from '../apps/server/src/router';
-import { loadInitialWorldFromDb, loadSexLedgers } from '../apps/engine/src/world/resources';
+import {
+  composeInitialWorld,
+  loadInitialWorldFromDb,
+  loadSexLedgers,
+  readInitialResources,
+} from '../apps/engine/src/world/resources';
 import { initializeIntegrationResources } from './integration-resources';
 import { initializeExpandedResources } from './expanded-resources';
 import { authzCase } from '../apps/server/src/authz/case';
@@ -249,24 +254,46 @@ it.each([
             portraitMap: 'rtk14-map',
             features: ['lineage-v1', 'personnel', 'policy'],
           };
-    const initial = await loadInitialWorldFromDb(db, { ...selection, seed: 'old-sex-edition-pg' });
+    const resources = await readInitialResources(db, selection);
+    const initial = composeInitialWorld(resources, 'old-sex-edition-pg');
     initial.ruleFeatures = ruleFeatures;
-    const saved = await db.$transaction((tx) =>
-      savePreparedInitialWorld(
-        tx,
-        prepareInitialWorld(
-          initial,
-          {
-            name: `성별 원장 ${edition}판 보존`,
-            turnTermMinutes: 60,
-            endYear: null,
-            replayFormat: 3,
-            ruleFeatures,
-            featureData: { 'lineage-v1': lineageTestConfig },
-          },
-          loadSexLedgers()[edition - 1],
-        ),
-      ),
+    const saved = await db.$transaction(
+      async (tx) => {
+        const result = await savePreparedInitialWorld(
+          tx,
+          prepareInitialWorld(
+            initial,
+            {
+              name: `성별 원장 ${edition}판 보존`,
+              turnTermMinutes: 60,
+              endYear: null,
+              replayFormat: 3,
+              ruleFeatures,
+              featureData: { 'lineage-v1': lineageTestConfig },
+            },
+            loadSexLedgers()[edition - 1],
+          ),
+        );
+        if (edition === 3) {
+          await tx.auditLog.create({
+            data: {
+              actorKind: 'CLI',
+              action: 'world.create.applied',
+              targetType: 'World',
+              targetId: result.worldId,
+              worldId: result.worldId,
+              payload: {
+                stateHash: result.stateHash,
+                resources: Object.values(resources)
+                  .map(({ kind, name, version, contentHash }) => ({ kind, name, version, contentHash }))
+                  .sort((a, b) => a.kind.localeCompare(b.kind)),
+              },
+            },
+          });
+        }
+        return result;
+      },
+      { timeout: 30_000 },
     );
     const id = saved.worldId;
     worldIds.push(id);
@@ -306,7 +333,7 @@ it.each([
     expect(admitted.data?.status).toBe('PENDING');
     await advance(id, 10000);
     const receipt = await rpc('admin.world.resetRequest', binding, administrator);
-    expect(receipt.data?.status).toBe('APPLIED');
+    expect(receipt.data?.status, JSON.stringify(receipt.data?.result)).toBe('APPLIED');
     const newId = receipt.data!.plannedNewWorldId;
     worldIds.push(newId);
     expect(newId).not.toBe(id);
