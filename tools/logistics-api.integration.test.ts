@@ -62,6 +62,9 @@ type Results = {
   'logistics.get': Out['logistics']['get'];
   'logistics.request': Out['logistics']['request'];
   'logistics.submit': Out['logistics']['submit'];
+  'admin.world.requestSetting': Out['admin']['world']['requestSetting'];
+  'entry.possess': Out['entry']['possess'];
+  'cityResources.allocate': Out['cityResources']['allocate'];
   'general.create': Out['general']['create'];
   'turns.set': Out['turns']['set'];
 };
@@ -86,9 +89,9 @@ async function rpc<R extends keyof Results>(route: R, input: unknown, user?: Use
   const body = Array.isArray(payload) ? payload[0]! : payload;
   return { status: response.status, data: body.result?.data, error: body.error };
 }
-async function user(id: string = randomUUID()) {
+async function user(id: string = randomUUID(), role: 'USER' | 'ADMIN' = 'USER') {
   userIds.push(id);
-  await db.user.create({ data: { id, email: `${id}@example.invalid`, passwordHash: 'not-a-login-hash' } });
+  await db.user.create({ data: { id, email: `${id}@example.invalid`, passwordHash: 'not-a-login-hash', role } });
   const session = newSession(now);
   await db.session.create({ data: { id: session.id, userId: id, expiresAt: session.expiresAt } });
   return { id, sessionId: session.id, cookie: `sid=${session.token}` };
@@ -147,6 +150,22 @@ async function createHuman(worldId: string, player: User, name: string) {
     await creating;
   }
 }
+function logisticsConfig(cityKey: number): LogisticsConfig {
+  return {
+    version: 1,
+    specialties: [{ cityKey, good: 'wood', perMonth: 100 }],
+    capacity: { base: 10_000, perLevel: 1000, maxLevel: 2 },
+    upgrade: { gold: 1, wood: 1 },
+    transport: { maxHops: 8, hopsPerMonth: 2, lossBpPerHop: 100, maxPerOrder: 100, maxActivePerNation: 20 },
+    recruitPer100: Object.fromEntries(
+      [...new Set(initial.unitSet.crewTypes.filter((type) => type.armType > 0).map((type) => type.armType))].map(
+        (armType) => [String(armType), { iron: 2, wood: 0, horses: armType === 3 ? 1 : 0 }],
+      ),
+    ),
+    build: { wall: { iron: 0, wood: 1, horses: 0 }, defence: { iron: 1, wood: 1, horses: 0 } },
+    trade: { iron: { buy: 3, sell: 1 }, wood: { buy: 3, sell: 1 }, horses: { buy: 3, sell: 1 } },
+  };
+}
 async function fixture({ fundedRecruitment = false, expandedRecruitment = false } = {}) {
   const seed = randomUUID(),
     payload = creation('물류군주');
@@ -183,20 +202,7 @@ async function fixture({ fundedRecruitment = false, expandedRecruitment = false 
     }
   }
   if (!playerId) throw new Error('건국 가능한 생성 시드를 찾지 못했습니다.');
-  const config: LogisticsConfig = {
-    version: 1,
-    specialties: [{ cityKey, good: 'wood', perMonth: 100 }],
-    capacity: { base: 10_000, perLevel: 1000, maxLevel: 2 },
-    upgrade: { gold: 1, wood: 1 },
-    transport: { maxHops: 8, hopsPerMonth: 2, lossBpPerHop: 100, maxPerOrder: 100, maxActivePerNation: 20 },
-    recruitPer100: Object.fromEntries(
-      [...new Set(initial.unitSet.crewTypes.filter((type) => type.armType > 0).map((type) => type.armType))].map(
-        (armType) => [String(armType), { iron: 2, wood: 0, horses: armType === 3 ? 1 : 0 }],
-      ),
-    ),
-    build: { wall: { iron: 0, wood: 1, horses: 0 }, defence: { iron: 1, wood: 1, horses: 0 } },
-    trade: { iron: { buy: 3, sell: 1 }, wood: { buy: 3, sell: 1 }, horses: { buy: 3, sell: 1 } },
-  };
+  const config = logisticsConfig(cityKey);
   if (expandedRecruitment) {
     await initializeSan10Resources(db);
     const [published] = await readPublishedResources(db, [{ kind: 'UNIT_SET', name: 'expanded', version: 1 }]);
@@ -294,6 +300,194 @@ afterAll(async () => {
 });
 
 describe('AC-P2-30 실제 HTTP 물류 접수·조회·엔진', () => {
+  it.each([
+    { reason: 'RETURN', target: 20, attackerCity: 11, recipient: 10 },
+    { reason: 'CAPTURE', target: 38, attackerCity: 2, recipient: 38 },
+    { reason: 'LOSS_TRANSIT', target: 10, attackerCity: 2, recipient: null },
+  ])(
+    '수송 중 도시 점령 뒤 $reason 창고·원장과 재생이 일치한다',
+    async ({ reason, target, attackerCity, recipient }) => {
+      // 완–여남–초는 실제 통합 지도에서 우회 없이 두 홉으로 연결된다.
+      const from = 10,
+        middle = 20,
+        to = 38,
+        crewType = 1100;
+      const [attacker, defender, operator] = await Promise.all([user(), user(), user(randomUUID(), 'ADMIN')]);
+      const source = structuredClone(initial);
+      const [attackNation, defendNation] = source.nations.sort((a, b) => a.id - b.id);
+      source.nations = [
+        { ...attackNation!, isNpc: true, capitalCityKey: attackerCity },
+        { ...defendNation!, isNpc: true, capitalCityKey: from },
+      ];
+      const [attackId, defendId] = source.nations.map((nation) => nation.id) as [number, number];
+      source.generals = source.nations.map((nation, index) => {
+        const ruler = initial.generals.find(
+          (general) => general.nationId === nation.id && general.officerLevel === 12,
+        )!;
+        return {
+          ...ruler,
+          cityKey: nation.capitalCityKey!,
+          activeFromYear: source.startYear,
+          rice: 20_000,
+          nextTurnTick: index === 0 ? 100 : 1_000_000,
+        };
+      });
+      source.diplomacies = [{ nationA: attackId, nationB: defendId, state: 'WAR', untilTick: 0 }];
+      for (const city of source.cities) {
+        city.nationId =
+          city.cityKey === attackerCity ? attackId : [from, middle, to].includes(city.cityKey) ? defendId : null;
+        if (city.cityKey === target) {
+          city.wall = 1;
+          city.defence = 0;
+        }
+      }
+      // 전투를 한 차례에 끝내도록 낮춘 성벽·수비도 원생성 지도와 일치시킨다.
+      const site = source.operationalMap!.sites.find((row) => row.kind === 'CITY' && row.anchorKey === target);
+      if (site?.kind !== 'CITY') throw new Error('점령 대상 도시가 없습니다.');
+      Object.assign(site.initial, { wall: 1, defence: 0 });
+      const config = logisticsConfig(from);
+      config.specialties.push({ cityKey: attackerCity, good: 'iron', perMonth: 100 });
+      const { worldId } = await saveInitialWorld(db, source, {
+        name: 'AC-P2-30 수송 중 점령',
+        turnTermMinutes: 60,
+        endYear: 201,
+        replayFormat: 3,
+        ruleFeatures: features,
+        featureData: { 'logistics-v1': config },
+      });
+      worldIds.push(worldId);
+      const entry = await rpc(
+        'admin.world.requestSetting',
+        {
+          worldId,
+          expectedUserId: operator.id,
+          idempotencyKey: randomUUID(),
+          reason: '수송 점령 시험의 NPC 맡기',
+          setting: { kind: 'admin.world.setOption', key: 'entry.npcPlay', value: 'on' },
+        },
+        operator,
+      );
+      expect(entry.status, JSON.stringify(entry.error)).toBe(200);
+      await advance(worldId, 0);
+      for (const [actor, general] of [
+        [attacker, source.generals[0]!],
+        [defender, source.generals[1]!],
+      ] as const) {
+        const idempotencyKey = randomUUID();
+        const waiting = rpc(
+          'entry.possess',
+          { worldId, generalId: general.id, expectedUserId: actor.id, idempotencyKey },
+          actor,
+        );
+        try {
+          await expect
+            .poll(() =>
+              db.inputEvent.count({
+                where: { worldId, userId: actor.id, idempotencyKey, status: 'PENDING' },
+              }),
+            )
+            .toBe(1);
+          await advance(worldId, 0);
+          const reply = await waiting;
+          expect(reply.data, JSON.stringify(reply.error)).toEqual({ status: 'possessed', generalId: general.id });
+        } finally {
+          await waiting;
+        }
+      }
+      await controlClock(db, worldId, 'start');
+      const ruler = await db.general.findUniqueOrThrow({
+        where: { worldId_id: { worldId, id: source.generals[0]!.id } },
+      });
+      const commands = [
+        { commandKey: 'form_unit', args: { crewType } },
+        { commandKey: 'recruit', args: { amount: 100, crewType } },
+        { commandKey: 'morale', args: { target: 'city', crewType } },
+        { commandKey: 'attack', args: { cityKey: target } },
+      ];
+      const edited = await rpc(
+        'turns.set',
+        {
+          worldId,
+          revision: ruler.turnRevision,
+          slots: Array.from({ length: 30 }, (_, slot) => commands[slot] ?? null),
+        },
+        attacker,
+      );
+      expect(edited.status, JSON.stringify(edited.error)).toBe(200);
+      await advance(worldId, 20_100);
+      const [unit] = (await snapshot(worldId)).state.campaign!.units;
+      expect(unit).toMatchObject({ commanderId: source.generals[0]!.id, troops: 0 });
+      const allocation = await rpc(
+        'cityResources.allocate',
+        {
+          worldId,
+          requestId: randomUUID(),
+          expectedUserId: attacker.id,
+          payload: { cityKey: attackerCity, unitId: unit!.id, crewType, amount: 100 },
+        },
+        attacker,
+      );
+      expect(allocation.data, JSON.stringify(allocation.error)).toMatchObject({ status: 'pending' });
+      await advance(worldId, 30_000);
+      const before = (await snapshot(worldId)).state;
+      expect(before.campaign!.units[0]!.troops).toBe(100);
+      expect(before.campaign!.units[0]!.atmos).toBeGreaterThan(0);
+      const requestId = randomUUID();
+      const dispatch = await rpc(
+        'logistics.submit',
+        {
+          worldId,
+          requestId,
+          expectedUserId: defender.id,
+          payload: { type: 'dispatch', fromCityKey: from, toCityKey: to, goods: { iron: 0, wood: 20, horses: 0 } },
+        },
+        defender,
+      );
+      expect(dispatch.data, JSON.stringify(dispatch.error)).toMatchObject({ status: 'pending' });
+      await advance(worldId, 30_000);
+      const sailing = (await snapshot(worldId)).state.logistics!;
+      expect(sailing.convoys).toMatchObject([{ path: [from, middle, to], arriveTick: 40_000, goods: { wood: 20 } }]);
+      expect(sailing.cities[String(from)]!.wood).toBe(before.logistics!.cities[String(from)]!.wood - 20);
+      await advance(worldId, 30_100);
+      const captured = (await snapshot(worldId)).state;
+      const logs = await db.generalLog.findMany({
+        where: { worldId, tick: 30_100, generalId: source.generals[0]!.id, commandKey: 'attack' },
+        select: { kind: true, text: true },
+      });
+      expect(captured.cities[target]!.nationId, JSON.stringify(logs)).toBe(attackId);
+      expect(Object.keys(captured.nations).map(Number)).toEqual([attackId, defendId]);
+      if (reason === 'RETURN') expect(captured.cities[to]).toMatchObject({ nationId: defendId, supplied: false });
+      expect(captured.logistics!.convoys).toEqual(sailing.convoys);
+
+      await advance(worldId, 40_000);
+      const after = await snapshot(worldId);
+      expect(after.state.logistics!.convoys).toEqual([]);
+      const movements = await db.logisticsMovement.findMany({
+        where: { worldId, tick: 40_000, good: 'wood' },
+        orderBy: { ordinal: 'asc' },
+        select: { holder: true, holderId: true, good: true, delta: true, reason: true },
+      });
+      const [production] = movements.filter((row) => row.reason === 'PRODUCE');
+      expect(production).toMatchObject({ holder: 'city', holderId: from });
+      expect(production!.delta).toBeGreaterThan(0);
+      expect(movements).toEqual([
+        { holder: 'convoy', holderId: sailing.convoys[0]!.id, good: 'wood', delta: -20, reason },
+        ...(recipient === null ? [] : [{ holder: 'city', holderId: recipient, good: 'wood', delta: 20, reason }]),
+        production,
+      ]);
+      for (const cityKey of [from, middle, to])
+        expect(after.state.logistics!.cities[String(cityKey)]!.wood).toBe(
+          captured.logistics!.cities[String(cityKey)]!.wood +
+            (cityKey === from ? production!.delta : 0) +
+            (cityKey === recipient ? 20 : 0),
+        );
+      const archive = await exportReplay(db, worldId);
+      const replayed = replayArchive(archive, 4);
+      expect(replayed.map(({ stateHash }) => stateHash)).toEqual(archive.months.map(({ stateHash }) => stateHash));
+      expect(replayed.at(-1)?.stateHash).toBe(hashState(after));
+    },
+  );
+
   it('일반 차례 저장 뒤 실패는 소비·금·도시·예턴·로그·순번을 함께 롤백하고 새 엔진이 한 번 처리한다', async () => {
     const world = await fixture({ fundedRecruitment: true });
     const ruler = await db.general.findUniqueOrThrow({
