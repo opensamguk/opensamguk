@@ -6,7 +6,7 @@ import { recruitCost, drillGain } from '../commands/statScores';
 import { deepFreeze } from '../personnel/testFixture';
 import { applyCityAllocation } from './allocation';
 import { applyCityPreparation } from './preparation';
-import { emptyCityResourcesState } from './state';
+import { CITY_RESOURCE_MAX, emptyCityResourcesState } from './state';
 
 function fixture() {
   const world = commandWorld();
@@ -69,6 +69,23 @@ describe('AC-INT-18A 도시 모집·준비·배속의 보존과 권한', () => {
       ok: false,
       code: 'NO_GOLD',
     });
+  });
+  it.each(['recruit', 'conscript'] as const)('AC-INT-18A %s는 도시 수비병 총량 한도를 지킨다', (key) => {
+    const world = fixture();
+    const troops = world.cityResources!.cities['1']!.garrison[0]!;
+    troops.troops = CITY_RESOURCE_MAX - 1;
+    const args = { amount: 1, crewType: 1100 };
+    const full = applied(applyCityPreparation(world, actor, key, args)).state;
+    expect(full.cityResources!.cities['1']!.garrison[0]!.troops).toBe(CITY_RESOURCE_MAX);
+
+    if (key === 'recruit') troops.troops++;
+    else world.cityResources!.cities['1']!.garrison.push({ ...troops, crewType: 1200, troops: 1 });
+    const before = structuredClone(world);
+    expect(applyCityPreparation(deepFreeze(world), actor, key, args)).toMatchObject({
+      ok: false,
+      code: 'AT_MAX',
+    });
+    expect(world).toEqual(before);
   });
   it.each(['train', 'morale'] as const)('%s는 실행 장수 산식과 도시 비용만 사용한다', (key) => {
     const world = fixture(),
