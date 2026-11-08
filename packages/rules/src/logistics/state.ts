@@ -64,13 +64,14 @@ export const logisticsConfigSchema = z
         stockCapBp: identifier.max(10_000),
         upgradeAtBp: identifier.max(10_000),
       })
-      .transform(({ treasuryBudgetBp, ...settings }) => {
-        const withoutCap: typeof settings & { treasuryBudgetBp?: never } = settings;
-        return treasuryBudgetBp === undefined ? withoutCap : { ...settings, treasuryBudgetBp };
-      })
+      .transform(({ treasuryBudgetBp, ...settings }): typeof settings & { treasuryBudgetBp?: number } =>
+        treasuryBudgetBp === undefined ? settings : { ...settings, treasuryBudgetBp },
+      )
       .optional(),
   })
-  .transform(({ npc, ...config }) => (npc === undefined ? config : { ...config, npc }));
+  .transform(({ npc, ...config }): typeof config & { npc?: NonNullable<typeof npc> } =>
+    npc === undefined ? config : { ...config, npc },
+  );
 export type LogisticsConfig = z.infer<typeof logisticsConfigSchema>;
 const convoySchema = z.strictObject({
   id: identifier,
