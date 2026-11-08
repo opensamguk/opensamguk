@@ -48,8 +48,7 @@ export const featureProfileSchema = z
     }),
   ])
   .superRefine((profile, context) => {
-    const logistics = profile.featureData['logistics-v1'];
-    if (profile.key === 'expanded-191-v8' && (!('npc' in logistics) || logistics.npc.treasuryBudgetBp !== 1000))
+    if (profile.key === 'expanded-191-v8' && profile.featureData['logistics-v1'].npc?.treasuryBudgetBp !== 1000)
       context.addIssue({
         code: 'custom',
         path: ['featureData', 'logistics-v1', 'npc', 'treasuryBudgetBp'],
