@@ -125,7 +125,7 @@ export function registerRealtime<L extends FastifyBaseLogger>(
     let admitted = !activate;
     connection.inFlight++;
     try {
-      await db.$transaction(async (tx) => {
+      return await db.$transaction(async (tx) => {
         await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${connection.userId} FOR SHARE`;
         const rows = await tx.$queryRaw<
           Audience[]
@@ -133,7 +133,7 @@ export function registerRealtime<L extends FastifyBaseLogger>(
         const audience = rows[0];
         if (!audience) {
           if (admitted) close(connection);
-          return;
+          return 'audience-closed' as const;
         }
         if (!eligible(audience, target)) return;
         if (kind === 'ready' && (!listener || !listening.has(worldChannel(connection.worldId)))) return;
@@ -326,8 +326,7 @@ export function registerRealtime<L extends FastifyBaseLogger>(
         inFlight: 0,
         release,
       };
-      await send(connection, 'ready', undefined, 'world', () => {
-        if (cancelled()) return false;
+      const openStream = () => {
         reply.hijack();
         reply.raw.writeHead(200, {
           'content-type': 'text/event-stream; charset=utf-8',
@@ -336,6 +335,10 @@ export function registerRealtime<L extends FastifyBaseLogger>(
           'x-content-type-options': 'nosniff',
           'x-accel-buffering': 'no',
         });
+      };
+      const outcome = await send(connection, 'ready', undefined, 'world', () => {
+        if (cancelled()) return false;
+        openStream();
         connected = true;
         streaming++;
         preparing.delete(expire);
@@ -344,7 +347,12 @@ export function registerRealtime<L extends FastifyBaseLogger>(
         reply.raw.once('close', () => detach(connection));
         return true;
       });
-      if (!connected && !cancelled()) return unavailable();
+      if (!connected && !cancelled()) {
+        if (outcome !== 'audience-closed') return unavailable();
+        // 인증 뒤 폐기된 세션은 기존 계약대로 이벤트 없이 스트림을 닫는다.
+        openStream();
+        reply.raw.end();
+      }
     } catch (error) {
       if (!cancelled()) throw error;
     } finally {
