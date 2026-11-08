@@ -340,6 +340,42 @@ describe('AC-INT-19B 실제차례 한 번 실행·현재권한·예약 펜스', 
     expect(turn.state.nations).toEqual(baseline.state.nations);
     expect(turn.state.campaign!.orders!.items[0]!.status).toBe('CANCELLED');
   });
+  it.each(['DIRECT', 'SOVEREIGN'] as const)(
+    'AC-INT-19A %s 권한이 사라지면 다른 지시 권한이 생겨도 수락한 지시는 취소된다',
+    (authority) => {
+      const { world, context } = fixture();
+      const link = world.campaign!.links.find((entry) => entry.personId === 3)!;
+      if (authority === 'SOVEREIGN') {
+        world.campaign!.links = world.campaign!.links.filter((entry) => entry !== link);
+        world.generals[1]!.officerLevel = 12;
+        world.generals[2]!.officerLevel = 1;
+      }
+      const issued = ok(applyCampaignOrder(world, issue(3), 1, context));
+      const accepted = ok(applyCampaignOrder(issued.state, response(), 3, { ...context, userId: 'recipient' }));
+      expect(accepted.state.campaign!.orders!.items[0]).toMatchObject({ authority, status: 'READY' });
+
+      if (authority === 'DIRECT') {
+        accepted.state.campaign!.links = accepted.state.campaign!.links.filter((entry) => entry.personId !== 3);
+        accepted.state.generals[1]!.officerLevel = 12;
+        accepted.state.generals[2]!.officerLevel = 1;
+      } else {
+        accepted.state.campaign!.links.push(link);
+        accepted.state.generals[1]!.officerLevel = 1;
+        accepted.state.generals[2]!.officerLevel = 12;
+      }
+      expect(canIssueCampaignOrder(accepted.state, 1, 3)).toBe(true);
+      const turn = runGeneralTurn(
+        accepted.state,
+        { generalId: 3, tick: 2, unitSet: testUnits },
+        slot,
+        'order-seed',
+        { policy: 'farm', turnRevision: 0 },
+        resolver,
+      );
+      expect(turn.commandKey).toBe('farm');
+      expect(turn.state.campaign!.orders!.items[0]).toMatchObject({ authority, status: 'CANCELLED' });
+    },
+  );
   it('명시NPC이동만 군사gate를 지나며 상관·사람·타소유부곡을 이동시키지 않는다', () => {
     const f = fixture();
     f.world.campaign!.nextUnitId = 2;
