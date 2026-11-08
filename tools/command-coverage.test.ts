@@ -546,9 +546,34 @@ describe('T4-02 등록된 확장 명령 대조', () => {
         class Register { static changed = extensionCommands.push(${command('hidden_command')}); }`,
       },
     ],
-  ] satisfies [string, Record<string, string>][])(
-    '%s의 숨은 등록은 실제로 실행되지만 정적 도구와 CLI는 거부한다',
-    (_name, files) => {
+    [
+      '참조하지 않은 초기값의 즉시 실행',
+      {
+        'ext/registry.ts': `const first = ${command('fire_attack')};
+        const hidden = (() => { first.key = 'never_registered'; })();
+        export const extensionCommands = [first];`,
+      },
+      [{ key: 'never_registered', target: 'general' }],
+    ],
+    [
+      '구조 분해 선언의 초기값',
+      {
+        'ext/registry.ts': `const first = ${command('fire_attack')};
+        const { hidden } = { hidden: (first.target = 'nation') };
+        export const extensionCommands = [first];`,
+      },
+      [{ key: 'fire_attack', target: 'nation' }],
+    ],
+  ] satisfies [string, Record<string, string>, { key: string; target: string }[]?][])(
+    'AC-P2-02 %s의 실행이 등록 항목을 바꾸면 정적 도구와 CLI가 거부한다',
+    (
+      _name,
+      files,
+      expected = [
+        { key: 'fire_attack', target: 'general' },
+        { key: 'hidden_command', target: 'general' },
+      ],
+    ) => {
       fixture(files, (dir) => {
         const file = pathToFileURL(join(dir, 'packages/rules/src/commands/ext/registry.ts')).href;
         const runtime = spawnSync(
@@ -561,10 +586,7 @@ describe('T4-02 등록된 확장 명령 대조', () => {
           { encoding: 'utf8' },
         );
         expect(runtime.status, runtime.stderr).toBe(0);
-        expect(JSON.parse(runtime.stdout)).toEqual([
-          { key: 'fire_attack', target: 'general' },
-          { key: 'hidden_command', target: 'general' },
-        ]);
+        expect(JSON.parse(runtime.stdout)).toEqual(expected);
         expect(() => readExtensionRegistryKeys(dir)).toThrow('확장 registry');
         emptyLegacyRegistry(dir);
         const result = main(['--root', dir, '--file', tablePath]);
