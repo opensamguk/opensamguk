@@ -8,6 +8,7 @@ import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { test, expect, type LegalStack } from './legalFixture';
+import { endActor, endControls, confirmEnd, endSubmit, endQuery } from './adminEndSetup';
 
 // AC-P2-33: 실제 공개 웹·HTTP·PG·엔진. 짧은 인공 월드이며 전체 기수·장애 복구를 대신하지 않는다.
 async function actor(stack: LegalStack, browser: Browser) {
@@ -79,6 +80,7 @@ const allocation = (page: Page) => page.getByRole('group', { name: '유산 능�
 test('AC-P2-33 실제 보상·5능력치 유산 생성·계정 기록과 키보드·세 화면 폭', async ({
   legalStack: stack,
   browser,
+  page: adminPage,
 }, info) => {
   test.setTimeout(180000);
   const player = await actor(stack, browser),
@@ -90,6 +92,7 @@ test('AC-P2-33 실제 보상·5능력치 유산 생성·계정 기록과 키보�
       sent.push(request.postDataJSON());
   });
   try {
+    await endActor(adminPage, stack);
     await earn(stack, player.id);
     const id = await world(stack, { five: true });
     await player.page.goto(`/w/${id}/create`);
@@ -144,6 +147,8 @@ test('AC-P2-33 실제 보상·5능력치 유산 생성·계정 기록과 키보�
     await expect(history).toBeVisible();
     await expect(history.getByText('생성 사용', { exact: true })).toBeVisible();
     await expect(history.getByText('기수 지급', { exact: true })).toHaveCount(3);
+    const held = history.getByText('보유', { exact: true }).locator('..');
+    await expect(held).toHaveText(/보유\s*0\s*점/);
     await expect(history).not.toContainText(player.id);
     await expect(history).not.toContainText(id);
     for (const width of [375, 768, 1440])
@@ -156,6 +161,28 @@ test('AC-P2-33 실제 보상·5능력치 유산 생성·계정 기록과 키보�
           fullPage: true,
         });
       }
+    await controlClock(stack.db, id, 'pause');
+    const endedWorld = await stack.db.world.findUniqueOrThrow({ where: { id } });
+    const dialog = await endControls(adminPage, stack, id);
+    await confirmEnd(dialog, endedWorld.name, '유산 반환 화면 검증');
+    await endSubmit(dialog).click();
+    await expect(dialog.getByText('접수됨 · 엔진 처리 대기', { exact: true })).toBeVisible();
+    await advance(stack, id, endedWorld.clockTick);
+    await endQuery(dialog).click();
+    await expect(dialog).toContainText('종료 적용 완료');
+    await player.page.reload();
+    await expect(history).toBeVisible();
+    await expect(history.getByText('반환', { exact: true })).toHaveCount(1);
+    await expect(
+      history.getByText('관리자 강제 종료로 이 월드에서 장수 생성에 쓴 점수 반환', { exact: true }),
+    ).toBeVisible();
+    await expect(history.getByText('기수 지급', { exact: true })).toHaveCount(3);
+    await expect(held).toHaveText(/보유\s*6\s*점/);
+    const refunds = await stack.db.heritageEntry.findMany({
+      where: { userId: player.id, worldId: id, kind: 'CREATION_REFUND' },
+    });
+    expect(refunds).toHaveLength(1);
+    expect(refunds[0]!.delta).toBe(6);
     const old = await world(stack, { off: true });
     await player.page.goto(`/w/${old}/create`);
     await expect(player.page.getByRole('heading', { name: '장수 생성', exact: true })).toBeVisible();
