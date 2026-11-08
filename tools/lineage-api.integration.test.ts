@@ -4,8 +4,11 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 import type { inferRouterOutputs } from '@trpc/server';
 import { createDb } from '../packages/db/src/index';
 import { commandInitial } from '../packages/rules/test/commandFixture';
+import { operationalInput } from '../packages/rules/test/operationalMapFixture';
+import { TEST_EQUIPMENT_LOGISTICS_CONFIG } from '../packages/rules/src/equipment/testFixture';
+import { governanceTestConfig } from '../packages/rules/src/governance/testFixture';
 import { lineageTestConfig } from '../packages/rules/src/lineage/testFixture';
-import { CREATION_ERRORS, type LineageInput } from '../packages/rules/src/index';
+import { buildInitialWorld, CREATION_ERRORS, type LineageInput } from '../packages/rules/src/index';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { saveInitialWorld, prepareInitialWorld, savePreparedInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
@@ -44,16 +47,31 @@ type Out = inferRouterOutputs<AppRouter>;
 type Results = {
   'general.create': Out['general']['create'];
   'general.mine': Out['general']['mine'];
+  'entry.possess': Out['entry']['possess'];
   'lineage.get': Out['lineage']['get'];
   'lineage.submit': Out['lineage']['submit'];
   'lineage.request': Out['lineage']['request'];
+  'governance.submit': Out['governance']['submit'];
+  'governance.request': Out['governance']['request'];
+  'logistics.submit': Out['logistics']['submit'];
+  'logistics.request': Out['logistics']['request'];
   'message.send': Out['message']['send'];
   'admin.world.requestReset': Out['admin']['world']['requestReset'];
+  'admin.world.requestSetting': Out['admin']['world']['requestSetting'];
   'admin.world.resetRequest': Out['admin']['world']['resetRequest'];
 };
 type User = { id: string; cookie: string };
 async function rpc<R extends keyof Results>(route: R, input: unknown, user?: User) {
-  const mutation = ['general.create', 'lineage.submit', 'message.send', 'admin.world.requestReset'].includes(route),
+  const mutation = [
+      'general.create',
+      'entry.possess',
+      'lineage.submit',
+      'governance.submit',
+      'logistics.submit',
+      'message.send',
+      'admin.world.requestReset',
+      'admin.world.requestSetting',
+    ].includes(route),
     encoded = JSON.stringify({ 0: input });
   const response = await fetch(
     `${base}/trpc/${route}?batch=1${mutation ? '' : `&input=${encodeURIComponent(encoded)}`}`,
@@ -644,6 +662,144 @@ it('AC-P2-32 전임자 해제 뒤 후계자 조작권 저장 실패는 모두 �
   expect(replayed).toHaveLength(13);
   expect(replayed.map((month) => month.stateHash)).toEqual(archive.months.map((month) => month.stateHash));
   expect(replayed.at(-1)!.stateHash).toBe(hashState(await snapshot(id)));
+}, 120000);
+
+it('AC-P2-32 동의 계승 뒤 전임자의 대기 중인 즉위와 교역을 거부하고 영수증과 재생을 보존한다', async () => {
+  const father = await user(),
+    mother = await user(),
+    initial = buildInitialWorld(operationalInput()),
+    from = 1,
+    mom = 3;
+  initial.seed = 'lineage-pg-queued-orders';
+  for (const general of initial.generals)
+    Object.assign(general, { crew: 0, sex: 'UNKNOWN', nextTurnTick: 1_000_000_000 });
+  const ruler = initial.generals[0]!;
+  Object.assign(ruler, { sex: 'MALE', birthYear: 166, age: 25 });
+  initial.generals.push({ ...ruler, id: mom, name: '계승가문모', sex: 'FEMALE', officerLevel: 1 });
+  initial.diplomacies = [{ nationA: 1, nationB: 2, state: 'NON_AGGRESSION', untilTick: 300000 }];
+  initial.ruleFeatures = [
+    'campaign-assignment-v2',
+    'campaign-v1',
+    'city-resources-v1',
+    'five-stats',
+    'governance-v1',
+    'lineage-v1',
+    'logistics-v1',
+    'operational-map',
+    'personnel',
+    'policy',
+    'treaty',
+  ];
+  const { worldId } = await saveInitialWorld(db, initial, {
+    name: 'AC-P2-32 계승 뒤 대기 요청',
+    turnTermMinutes: 60,
+    endYear: null,
+    replayFormat: 3,
+    featureData: {
+      'lineage-v1': { ...lineageTestConfig, birth: { ...lineageTestConfig.birth, comingOfAgeYears: 1 } },
+      'governance-v1': { ...governanceTestConfig, legitimacy: { ...governanceTestConfig.legitimacy, ascendAt: 1 } },
+      'logistics-v1': { ...TEST_EQUIPMENT_LOGISTICS_CONFIG, specialties: [{ cityKey: 1, good: 'iron', perMonth: 10 }] },
+    },
+  });
+  worldIds.push(worldId);
+  await controlClock(db, worldId, 'start');
+  const administrator = await user();
+  await db.user.update({ where: { id: administrator.id }, data: { role: 'ADMIN' } });
+  const setting = await rpc(
+    'admin.world.requestSetting',
+    {
+      worldId,
+      expectedUserId: administrator.id,
+      idempotencyKey: randomUUID(),
+      reason: '가문 시험의 기존 장수 맡기',
+      setting: { kind: 'admin.world.setOption', key: 'entry.npcPlay', value: 'on' },
+    },
+    administrator,
+  );
+  expect(setting.status, JSON.stringify(setting.error)).toBe(200);
+  await advance(worldId, 0);
+  for (const [generalId, player] of [
+    [from, father],
+    [mom, mother],
+  ] as const) {
+    const idempotencyKey = randomUUID();
+    const claiming = rpc('entry.possess', { worldId, generalId, expectedUserId: player.id, idempotencyKey }, player);
+    try {
+      await expect.poll(() => db.inputEvent.count({ where: { worldId, idempotencyKey, status: 'PENDING' } })).toBe(1);
+      await advance(worldId, 0);
+      expect((await claiming).data).toEqual({ status: 'possessed', generalId });
+    } finally {
+      await claiming;
+    }
+  }
+  const marriage = await send(worldId, father, from, { type: 'marriage.propose', targetGeneralId: mom });
+  if (marriage.result.data?.status !== 'applied') throw Error('혼인 제안 결과가 없습니다.');
+  await send(worldId, mother, mom, {
+    type: 'marriage.respond',
+    offerId: marriage.result.data.result.offerId!,
+    accept: true,
+  });
+  await advance(worldId, 10000);
+  const born = (await snapshot(worldId)).state.lineage!.persons;
+  const heir = Number(Object.keys(born).find((id) => born[Number(id)]!.parents.some((parent) => parent === from)));
+  expect(heir).toBeGreaterThan(mom);
+  for (let month = 2; month <= 12; month++) await advance(worldId, month * 10000);
+  await send(worldId, father, from, { type: 'heir.designate', heirGeneralId: heir });
+  const preview = (await rpc('lineage.get', { worldId }, father)).data?.view.mine?.preview;
+  if (!preview) throw Error('성인이 된 후계자의 미리보기가 없습니다.');
+  const actor = { worldId, expectedUserId: father.id, expectedGeneralId: from },
+    succession = {
+      ...actor,
+      requestId: randomUUID(),
+      payload: { type: 'succession.confirm', heirGeneralId: heir, expected: preview },
+    },
+    ascend = { ...actor, requestId: randomUUID(), payload: { type: 'throne.ascend' } },
+    trade = {
+      ...actor,
+      requestId: randomUUID(),
+      payload: { type: 'trade', cityKey: 1, good: 'iron', side: 'sell', amount: 1 },
+    };
+  // 엔진이 도착하기 전에 세 요청을 접수한다. 즉위와 매도는 아직 권한 있는 전임자의 요청이다.
+  expect((await rpc('lineage.submit', succession, father)).data?.status).toBe('pending');
+  const pendingAscend = await rpc('governance.submit', ascend, father);
+  expect(pendingAscend.data?.status, JSON.stringify(pendingAscend.error)).toBe('pending');
+  const pendingTrade = await rpc('logistics.submit', trade, father);
+  expect(pendingTrade.data?.status, JSON.stringify(pendingTrade.error)).toBe('pending');
+  const before = (await snapshot(worldId)).state;
+  const movementCount = await db.logisticsMovement.count({ where: { worldId } });
+  await advance(worldId, 120000);
+  const after = (await snapshot(worldId)).state;
+  expect(after.generals[from]?.userId).toBeNull();
+  expect(after.generals[heir]?.userId).toBe(father.id);
+  expect(after.governance?.throne.emperorGeneralId).toBeNull();
+  expect(after.logistics).toEqual(before.logistics);
+  expect(after.cityResources).toEqual(before.cityResources);
+  expect(await db.logisticsMovement.count({ where: { worldId } })).toBe(movementCount);
+  expect((await rpc('lineage.request', { worldId, requestId: succession.requestId }, father)).data?.status).toBe(
+    'applied',
+  );
+  expect((await rpc('governance.submit', ascend, father)).data).toMatchObject({
+    requestId: ascend.requestId,
+    status: 'rejected',
+    result: { code: 'NOT_OWNER' },
+  });
+  expect((await rpc('logistics.submit', trade, father)).data).toMatchObject({
+    requestId: trade.requestId,
+    status: 'rejected',
+    result: { code: 'ACTOR_INACTIVE' },
+  });
+  expect((await rpc('governance.request', { worldId, requestId: ascend.requestId }, mother)).error?.data.code).toBe(
+    'NOT_FOUND',
+  );
+  expect((await rpc('logistics.request', { worldId, requestId: trade.requestId }, mother)).error?.data.code).toBe(
+    'NOT_FOUND',
+  );
+  await advance(worldId, 130000);
+  const archive = await exportReplay(db, worldId);
+  expect(archive.months).toHaveLength(13);
+  expect(replayArchive(archive, 13).map((month) => month.stateHash)).toEqual(
+    archive.months.map((month) => month.stateHash),
+  );
 }, 120000);
 
 it('AC-P2-32 NPC 부모·자녀·손자녀 자동 계승은 연결 재개 뒤에도 같은 사슬과 월간 재생을 보존한다', async () => {
