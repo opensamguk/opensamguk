@@ -9,7 +9,8 @@ import { publicGeographySchema } from '../packages/shared/src/publicGeography';
 import { hashState } from '../packages/shared/src/node/hashState';
 import { loadInitialWorldFromDb, loadPreset, resolveWorldResourceSelection } from '../apps/engine/src/world/resources';
 import { san10ResourceRows } from './san10-resources';
-import { prepareInitialWorld } from '../apps/engine/src/world/persistence';
+import { prepareInitialWorld, readWorldState, saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { checkOperationalProfile } from '../packages/rules/src/world/map/profile';
 import { toWorldState } from '../packages/rules/src/model/world';
 import { emptyCityResourcesState, readCityResourcesState } from '../packages/rules/src/cityResources/state';
 import { commandRegistry } from '../packages/rules/src/commands/registry';
@@ -278,6 +279,31 @@ it('역사491명의 ID·소속·5능력치·초상은 기존191정본과 같고 
   expect(historical.nations.map(({ id, name }) => ({ id, name }))).toEqual(
     original.nations.map(({ id, name }) => ({ id, name })),
   );
+});
+
+it('T4-46 AC-P2-24: 개막 도시 보정을 저장하고 다시 읽어도 생성 해시가 같다', async () => {
+  const initial = buildInitialWorld({
+    ...materials,
+    scenario: { ...historical, openingCityProfile: 'legacy-research-70' },
+    scenarioKey: 'san10-191@3',
+    mapKey: 'san10',
+    unitSetKey: 'basic',
+    seed: 'san10-opening-reload',
+  });
+  const saved = await saveInitialWorld(db, initial, {
+    name: '삼10 개막 재적재',
+    turnTermMinutes: 60,
+    endYear: null,
+    ruleFeatures: initial.ruleFeatures,
+  });
+  try {
+    const reloaded = await readWorldState(db, saved.worldId);
+    expect(reloaded.openingCityProfile).toBe('legacy-research-70');
+    expect(hashState(reloaded)).toBe(saved.stateHash);
+    expect(() => checkOperationalProfile(reloaded)).not.toThrow();
+  } finally {
+    await db.world.delete({ where: { id: saved.worldId } });
+  }
 });
 
 it.each(['san10-191', 'san10-empty'])('%s의 9기능 원생성은155거점 빈 원장 하나만 허용한다', async (scenario) => {

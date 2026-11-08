@@ -23,6 +23,7 @@ import {
   checkStatProfile,
   checkOperationalProfile,
   readOperationalMap,
+  readOpeningCityProfile,
   attachOperationalKinds,
   emptyCampaignState,
   emptyCityResourcesState,
@@ -454,10 +455,12 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
         return value;
       };
       const operationalMap = readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin);
+      const openingCityProfile = operationalMap ? readOpeningCityProfile(world.replayOrigin) : undefined;
       const rules = effectiveWorldOptions(preset, world.runtimeOptions).presetRules;
       const initial: WorldInit = {
         ...(operationalMap ? { operationalMap } : {}),
         ...(cityScale ? { cityScale } : {}),
+        ...(openingCityProfile ? { openingCityProfile } : {}),
         ...(rules ? { presetRules: rules } : {}),
         ...(world.ruleFeatures?.length ? { ruleFeatures: [...world.ruleFeatures] } : {}),
         ...(ext && world.replayFormat !== 3 ? { ext } : {}),
