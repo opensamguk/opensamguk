@@ -454,6 +454,56 @@ test.describe('장수가 있는 계정', () => {
       await shot(page, `v1-navigation-${width}.png`);
     });
   }
+
+  // INT-20 AC-INT-20: 768px·1440px × 라이트·다크에서 지도가 보이고 쓸 수 있으며 가로 넘침이 없고 테마가 실제로 적용된다.
+  for (const width of [768, 1440]) {
+    for (const colorScheme of ['light', 'dark'] as const) {
+      test(`INT-20 AC-INT-20 지도 ${width}px ${colorScheme} 사용성`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 900 });
+        await page.emulateMedia({ colorScheme });
+        await openMain(page);
+
+        // 테마: 미디어 조건이 맞고, 토큰(--color-bg·--color-text)이 본문 색으로 실제 적용돼야 한다.
+        const expected =
+          colorScheme === 'dark'
+            ? { bg: 'rgb(21, 23, 28)', text: 'rgb(236, 227, 207)' }
+            : { bg: 'rgb(229, 217, 189)', text: 'rgb(34, 29, 23)' };
+        const theme = await page.evaluate(() => ({
+          dark: matchMedia('(prefers-color-scheme: dark)').matches,
+          bg: getComputedStyle(document.body).backgroundColor,
+          text: getComputedStyle(document.body).color,
+        }));
+        expect(theme).toEqual({ dark: colorScheme === 'dark', bg: expected.bg, text: expected.text });
+
+        // 지도: 보이고, 뷰포트 안에 들어오며, 내 도시 표식이 실제로 눌릴 수 있는 맨 위 요소다.
+        const map = page.getByTestId('world-map');
+        await expect(map).toBeVisible();
+        const box = (await map.boundingBox())!;
+        const viewport = page.viewportSize()!;
+        expect(box.width).toBeGreaterThan(300);
+        expect(box.height).toBeGreaterThan(200);
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+
+        const mine = map.locator(`[data-city-key="${ctx.home.general.cityKey}"]`);
+        await mine.scrollIntoViewIfNeeded();
+        const hittable = await mine.evaluate((el) => {
+          const r = el.getBoundingClientRect();
+          const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+          return !!top && el.contains(top);
+        });
+        expect(hittable).toBe(true);
+
+        // 가로 넘침 없음
+        const overflow = await page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        );
+        expect(overflow).toBeLessThanOrEqual(0);
+
+        await shot(page, `int20-map-${width}-${colorScheme}.png`);
+      });
+    }
+  }
 });
 
 test('장수 생성 API로 만든 재야 장수는 메인에서 바로 재야 상태로 보인다', async ({ page }) => {
