@@ -222,6 +222,7 @@ async function npcFixture(mode: 'buy' | 'transport', treasuryBudgetBp?: number) 
     (row) => row.nationId !== city.nationId || row.id === ruler.id || row.id === general.id,
   );
   for (const nation of source.nations) nation.isNpc = nation.id === city.nationId;
+  if (treasuryBudgetBp !== undefined) source.nations.find((nation) => nation.id === city.nationId)!.gold = 90;
   general.nextTurnTick = mode === 'buy' ? 10_010 : 30_010;
   const rules: LogisticsConfig = {
     ...structuredClone(config),
@@ -539,13 +540,26 @@ describe('AC-P2-30 실제 PostgreSQL 물류', () => {
     await controlClock(db, world.id, 'start');
     await advance(world.id, 10_000);
     const stored = await db.$transaction((tx) => loadReplayState(tx, world.id));
-    const rows = await db.logisticsMovement.findMany({ where: { worldId: world.id, tick: 10_000, reason: 'TRADE' } });
-    expect(rows).toMatchObject([{ holder: 'city', holderId: world.cityKey, good: 'iron', delta: 2 }]);
-    const expense =
-      base.cityResources!.cities[world.cityKey]!.gold - stored.state.cityResources!.cities[world.cityKey]!.gold;
-    expect(expense).toBe(2 * config.trade.iron.buy);
-    expect(expense).toBeLessThanOrEqual(Math.floor(base.nations[nationId]!.gold / 10));
-    expect(stored.state.nations[nationId]!.gold).toBe(base.nations[nationId]!.gold);
+    const rows = await db.logisticsMovement.findMany({
+      where: { worldId: world.id, tick: 10_000, reason: 'TRADE' },
+      orderBy: { ordinal: 'asc' },
+    });
+    expect(rows).toMatchObject([
+      { holder: 'city', good: 'iron', delta: 2 },
+      { holder: 'city', holderId: world.cityKey, good: 'iron', delta: 1 },
+    ]);
+    expect(rows[0]!.holderId).not.toBe(rows[1]!.holderId);
+    let totalExpense = 0;
+    for (const row of rows) {
+      expect(stored.state.cities[row.holderId]!.nationId).toBe(nationId);
+      const expense =
+        base.cityResources!.cities[row.holderId]!.gold - stored.state.cityResources!.cities[row.holderId]!.gold;
+      expect(expense).toBe(row.delta * config.trade.iron.buy);
+      totalExpense += expense;
+    }
+    expect(base.nations[nationId]!.gold).toBe(90);
+    expect(totalExpense).toBe(Math.floor(base.nations[nationId]!.gold / 10));
+    expect(stored.state.nations[nationId]!.gold).toBe(90);
     expect(stored.state.logistics!.config.npc?.treasuryBudgetBp).toBe(1000);
     const archive = await exportReplay(db, world.id);
     expect(replayArchive(archive, 1)[0]!.stateHash).toBe(hashState(stored));
