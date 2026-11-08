@@ -27,7 +27,7 @@ it('AC-P2-32 검토된 성별 사실 해시와 191년 시나리오의 인물 대
       });
       for (const key of ledger.scenarios) {
         const file = key === 'san10-191@1' ? 'san10-191' : key === 'san10-191@2' ? 'san10-191-v2' : key;
-        const general = key === '1030' ? scenario.general : read('resources/scenario/' + file + '.json').general;
+        const general = key === '1030' ? scenario.general : read(`resources/scenario/${file}.json`).general;
         expect(general[row.generalId - 1]![1]).toBe(row.name);
       }
     }
