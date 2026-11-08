@@ -309,6 +309,37 @@ export const SAN10_191_GAP_FILL: Readonly<Record<string, readonly string[]>> = {
 // 공백지로 이을 길이 없는 영토는 공백지로 돌린다 (원술의 여남은 공주의 수도 초를 지나야만 닿는다).
 export const SAN10_191_RELEASE: Readonly<Record<string, readonly string[]>> = { 원술: ['여남'] };
 
+export function buildSan10MapV2(map: OperationalMapResource): OperationalMapResource {
+  return operationalMapSchema.parse({
+    ...map,
+    sites: [
+      ...map.sites,
+      {
+        id: 'pass:72',
+        name: '사곡관',
+        kind: 'PASS',
+        anchorKey: 72,
+        legacyCityId: 72,
+        position: { x: 457, y: 505 },
+        region: 1,
+        defence: { initial: 1000, max: 9900 },
+        wall: { initial: 1000, max: 10100 },
+      },
+    ],
+    routes: [
+      ...map.routes,
+      ...[3, 42].map((key) => ({
+        id: `route:land-${key}-72`,
+        from: `city:${key}`,
+        to: 'pass:72',
+        mode: 'LAND',
+        direction: 'BOTH',
+        enabled: true,
+      })),
+    ],
+  });
+}
+
 export function buildSan10Scenarios(map: OperationalMapResource, original1030: unknown) {
   const draft: Draft = read('resources/map-drafts/san10/adopted-placement.json');
   const old = operationalMapSchema.parse(read('resources/map/integration.json'));

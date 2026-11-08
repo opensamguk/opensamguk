@@ -19,7 +19,7 @@ export async function san10ResourceRows() {
   const manifest: ManifestRow[] = await read('resources/san10-manifest.json');
   if (
     manifest.map((row) => `${row.kind}/${row.name}/${row.version}`).join(',') !==
-    'MAP/san10/1,SCENARIO/san10-191/1,SCENARIO/san10-empty/1,UNIT_SET/expanded/1'
+    'MAP/san10/1,SCENARIO/san10-191/1,SCENARIO/san10-empty/1,UNIT_SET/expanded/1,MAP/san10/2'
   )
     throw Error('SAN10 게시 명세를 확인하세요.');
   return Promise.all(
@@ -34,14 +34,16 @@ export async function san10ResourceRows() {
 export async function initializeSan10Resources(db: Pick<PrismaClient, '$transaction'>) {
   const rows = await san10ResourceRows();
   const materials = {
-    map: rows[0]!.content,
     unitSet: rows[3]!.content,
     statRules: await read('resources/scenario/five-stats.json'),
     portraitMap: await read('resources/portraits/191-map.json'),
   };
-  for (const scenario of rows.filter((row) => row.kind === 'SCENARIO'))
-    if (validateWorldResources({ ...materials, scenario: scenario.content }).status !== 'pass')
-      throw Error(`SAN10 시나리오 검증 실패: ${scenario.name}`);
+  const maps = rows.filter((row) => row.kind === 'MAP');
+  const scenarios = rows.filter((row) => row.kind === 'SCENARIO');
+  for (const map of maps)
+    for (const scenario of scenarios)
+      if (validateWorldResources({ ...materials, map: map.content, scenario: scenario.content }).status !== 'pass')
+        throw Error(`SAN10 지도 ${map.version}판의 시나리오 검증 실패: ${scenario.name}`);
   await initializeIntegrationResources(db);
   return db.$transaction(async (tx) => {
     await tx.$executeRawUnsafe('LOCK TABLE "GameResource" IN SHARE ROW EXCLUSIVE MODE');
