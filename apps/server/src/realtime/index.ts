@@ -52,12 +52,15 @@ export interface RealtimeOptions {
   heartbeatMs?: number;
   reconnectMs?: number;
   applicationName?: string;
+  admission?: { total: number; perAccount: number; preparing: number; deadlineMs: number };
 }
 interface Connection {
   worldId: string;
   sessionId: string;
   userId: string;
   response: ServerResponse;
+  inFlight: number;
+  release: () => void;
 }
 interface Audience {
   id: number;
@@ -88,6 +91,12 @@ export function registerRealtime<L extends FastifyBaseLogger>(
   now: () => number = Date.now,
 ) {
   const connections = new Set<Connection>();
+  const limits = options.admission ?? { total: 512, perAccount: 8, preparing: 32, deadlineMs: 5000 };
+  if (Object.values(limits).some((limit) => !Number.isSafeInteger(limit) || limit < 1 || limit > 2_147_483_647))
+    throw new RangeError('실시간 연결 한도가 올바르지 않습니다.');
+  const preparing = new Set<() => void>();
+  const byAccount = new Map<string, number>();
+  let streaming = 0;
   const requested = new Set<string>(['sessions_closed']);
   const listening = new Set<string>();
   let listener: Client | null = null;
@@ -95,15 +104,26 @@ export function registerRealtime<L extends FastifyBaseLogger>(
   let retry: ReturnType<typeof setTimeout> | undefined;
   let closing = false;
   const warn = () => server.log.warn('실시간 알림 연결 실패');
+  function detach(connection: Connection) {
+    if (connections.delete(connection) && connection.inFlight === 0) connection.release();
+  }
   function close(connection: Connection) {
-    connections.delete(connection);
+    detach(connection);
     connection.response.end();
   }
   function closeSession(sessionId: string) {
     for (const connection of connections) if (connection.sessionId === sessionId) close(connection);
   }
-  async function send(connection: Connection, kind: string | null, scope?: string, target: RealtimeTarget = 'world') {
-    if (!connections.has(connection)) return;
+  async function send(
+    connection: Connection,
+    kind: string | null,
+    scope?: string,
+    target: RealtimeTarget = 'world',
+    activate?: () => boolean,
+  ) {
+    if (!activate && !connections.has(connection)) return;
+    let admitted = !activate;
+    connection.inFlight++;
     try {
       await db.$transaction(async (tx) => {
         await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${connection.userId} FOR SHARE`;
@@ -112,11 +132,13 @@ export function registerRealtime<L extends FastifyBaseLogger>(
         >`SELECT g.id, g."nationId", g."officerLevel" FROM "Session" s JOIN "User" u ON u.id = s."userId" JOIN "General" g ON g."userId" = u.id WHERE s.id = ${connection.sessionId} AND u.id = ${connection.userId} AND g."worldId" = ${connection.worldId} AND u.status = 'ACTIVE' AND s."expiresAt" > clock_timestamp() FOR SHARE OF s, u, g`;
         const audience = rows[0];
         if (!audience) {
-          close(connection);
+          if (admitted) close(connection);
           return;
         }
-        if (!eligible(audience, target) || !connections.has(connection)) return;
+        if (!eligible(audience, target)) return;
         if (kind === 'ready' && (!listener || !listening.has(worldChannel(connection.worldId)))) return;
+        if (activate) admitted = activate();
+        if (!admitted || !connections.has(connection)) return;
         const data =
           kind === null
             ? ': hb\n\n'
@@ -125,7 +147,10 @@ export function registerRealtime<L extends FastifyBaseLogger>(
       });
     } catch {
       warn();
-      close(connection);
+      if (admitted) close(connection);
+    } finally {
+      connection.inFlight--;
+      if (admitted && connection.inFlight === 0 && !connections.has(connection)) connection.release();
     }
   }
   async function broadcastReady() {
@@ -243,42 +268,95 @@ export function registerRealtime<L extends FastifyBaseLogger>(
       return reply.code(403).send({ error: '같은 출처에서 요청하세요.' });
     const parsed = worldInput.safeParse(request.query);
     if (!parsed.success) return reply.code(400).send({ error: '월드 ID를 확인하세요.' });
-    const identity = await authenticate(db, request.cookies.sid, now(), false);
-    if (!identity) return reply.code(401).send({ error: '로그인이 필요합니다.' });
-    const general = await db.general.findUnique({
-      where: { worldId_userId: { worldId: parsed.data.worldId, userId: identity.user.id } },
-      select: { id: true },
-    });
-    if (!general) return reply.code(404).send({ error: '이 월드에 내 장수가 없습니다.' });
-    requested.add(worldChannel(parsed.data.worldId));
-    try {
-      await ensure();
-    } catch {
-      warn();
-      return reply.code(503).send({ error: '실시간 연결을 다시 시도하세요.' });
-    }
-    // 연결 준비를 기다리는 동안 종료되거나 요청이 끊겼으면 새 스트림을 등록하지 않는다.
-    if (closing || reply.raw.destroyed) return reply.code(503).send({ error: '실시간 연결을 다시 시도하세요.' });
-    reply.hijack();
-    reply.raw.writeHead(200, {
-      'content-type': 'text/event-stream; charset=utf-8',
-      'cache-control': 'no-store',
-      connection: 'keep-alive',
-      'x-content-type-options': 'nosniff',
-      'x-accel-buffering': 'no',
-    });
-    const connection: Connection = {
-      worldId: parsed.data.worldId,
-      userId: identity.user.id,
-      sessionId: identity.sessionId,
-      response: reply.raw,
+    const unavailable = () => reply.code(503).send({ error: '실시간 연결을 다시 시도하세요.' });
+    if (closing) return unavailable();
+    if (preparing.size >= limits.preparing || preparing.size + streaming >= limits.total)
+      return reply.code(503).send({ error: '실시간 연결이 많습니다. 잠시 뒤 다시 시도하세요.' });
+    let account: string | undefined;
+    let expired = false;
+    let connected = false;
+    const deadline = performance.now() + limits.deadlineMs;
+    const expire = () => {
+      expired = true;
+      if (!reply.raw.destroyed && !reply.sent) unavailable();
     };
-    connections.add(connection);
-    reply.raw.on('close', () => connections.delete(connection));
-    await send(connection, 'ready');
+    const cancelled = () => {
+      if (performance.now() >= deadline && !expired) expire();
+      return expired || reply.raw.destroyed || reply.sent;
+    };
+    preparing.add(expire);
+    const timer = setTimeout(expire, limits.deadlineMs);
+    timer.unref();
+    const release = () => {
+      if (connected) streaming--;
+      if (account !== undefined) {
+        const count = byAccount.get(account)!;
+        if (count === 1) byAccount.delete(account);
+        else byAccount.set(account, count - 1);
+      }
+    };
+    try {
+      const identity = await authenticate(db, request.cookies.sid, now(), false);
+      if (cancelled()) return;
+      if (!identity) return reply.code(401).send({ error: '로그인이 필요합니다.' });
+      const count = byAccount.get(identity.user.id) ?? 0;
+      if (count >= limits.perAccount) return reply.code(429).send({ error: '계정의 실시간 연결 한도에 도달했습니다.' });
+      account = identity.user.id;
+      byAccount.set(account, count + 1);
+      const general = await db.general.findUnique({
+        where: { worldId_userId: { worldId: parsed.data.worldId, userId: account } },
+        select: { id: true },
+      });
+      if (cancelled()) return;
+      if (!general) return reply.code(404).send({ error: '이 월드에 내 장수가 없습니다.' });
+      requested.add(worldChannel(parsed.data.worldId));
+      try {
+        await ensure();
+      } catch {
+        warn();
+        if (!cancelled()) return unavailable();
+        return;
+      }
+      if (cancelled()) return;
+      const connection: Connection = {
+        worldId: parsed.data.worldId,
+        userId: account,
+        sessionId: identity.sessionId,
+        response: reply.raw,
+        inFlight: 0,
+        release,
+      };
+      await send(connection, 'ready', undefined, 'world', () => {
+        if (cancelled()) return false;
+        reply.hijack();
+        reply.raw.writeHead(200, {
+          'content-type': 'text/event-stream; charset=utf-8',
+          'cache-control': 'no-store',
+          connection: 'keep-alive',
+          'x-content-type-options': 'nosniff',
+          'x-accel-buffering': 'no',
+        });
+        connected = true;
+        streaming++;
+        preparing.delete(expire);
+        clearTimeout(timer);
+        connections.add(connection);
+        reply.raw.once('close', () => detach(connection));
+        return true;
+      });
+      if (!connected && !cancelled()) return unavailable();
+    } catch (error) {
+      if (!cancelled()) throw error;
+    } finally {
+      // 응답이 먼저 닫혀도 기다리던 DB 작업이 끝난 뒤에만 자리를 반환한다.
+      preparing.delete(expire);
+      clearTimeout(timer);
+      if (!connected) release();
+    }
   });
   server.addHook('preClose', async () => {
     closing = true;
+    for (const expire of preparing) expire();
     clearInterval(heartbeat);
     clearTimeout(retry);
     for (const connection of [...connections]) close(connection);
