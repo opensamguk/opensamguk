@@ -233,6 +233,36 @@ describe('AC-P2-30 물류 정본·수량 보존', () => {
       ).toThrow('방향');
   });
 
+  it.each(['PRODUCE', 'TRADE', 'UPGRADE'] as const)(
+    'AC-P2-30 수량이 맞아도 보유처에 맞지 않는 %s 기록은 거부한다',
+    (reason) => {
+      const world = fixture();
+      const result = send(world);
+      const reverse = reason === 'UPGRADE';
+      const before = world.logistics!;
+      const after = result.state.logistics!;
+      const movements = result.result.movements.map((row) => ({
+        ...row,
+        delta: reverse ? -row.delta : row.delta,
+        reason: row.holder === 'convoy' ? reason : ('TRADE' as const),
+      }));
+      expect(() => assertLogisticsConserved(reverse ? after : before, reverse ? before : after, movements)).toThrow(
+        '사유와 보유처',
+      );
+    },
+  );
+
+  it('AC-P2-30 도시 재고 감소를 수송 중 손실로 기록할 수 없다', () => {
+    const before = fixture().logistics!;
+    const after = structuredClone(before);
+    after.cities['1']!.iron--;
+    expect(() =>
+      assertLogisticsConserved(before, after, [
+        { holder: 'city', id: 1, good: 'iron', delta: -1, reason: 'LOSS_TRANSIT' },
+      ]),
+    ).toThrow('사유와 보유처');
+  });
+
   it('같은 입력의 처리 결과를 재현하고 결과 수량·tick 위조를 거부한다', () => {
     const world = fixture(),
       result = send(world),
