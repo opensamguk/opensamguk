@@ -720,9 +720,10 @@ describe('AC-P2-31 실제 HTTP 황실 접수·동의·경제', () => {
       where: { worldId: world.id, tick: 70_000, kind: 'TRIBUTE' },
       orderBy: { ordinal: 'asc' },
     });
+    const payment = { refId: indirect!.id, resource: 'gold', fromNationId: lowerNationId, toNationId: upperNationId };
     expect(tribute).toMatchObject([
-      { refId: indirect!.id, fromNationId: lowerNationId, toNationId: upperNationId, holderId: ruler.cityKey },
-      { refId: indirect!.id, fromNationId: lowerNationId, toNationId: upperNationId, holderId: world.lower.cityKey },
+      { ...payment, holderId: ruler.cityKey },
+      { ...payment, holderId: world.lower.cityKey },
     ]);
     expect(tribute[0]!.delta).toBeLessThan(0);
     expect(tribute[1]!.delta).toBe(-tribute[0]!.delta);
