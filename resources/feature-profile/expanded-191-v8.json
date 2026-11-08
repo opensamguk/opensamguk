@@ -153,7 +153,8 @@
         "upgradeAtBp": 8000,
         "recruitTarget": 1000,
         "stockCapBp": 5000,
-        "budgetBp": 1000
+        "budgetBp": 1000,
+        "treasuryBudgetBp": 1000
       }
     },
     "governance-v1": {

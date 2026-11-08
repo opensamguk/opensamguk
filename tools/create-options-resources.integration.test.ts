@@ -68,13 +68,19 @@ const registered: RuleRegistry = {
   ],
 };
 describe('AC-M3-04 원생성 설정 조회', () => {
-  it('AC-P2-07·18 첩보 선택은 접경귀환판의 설정과 첩보 기능을 함께 고정한다', () => {
+  it('AC-P2-07·18·30 첩보 선택은 첩보 기능과 NPC 국고 예산 상한을 고정한다', () => {
     const previous = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v7.json'));
     const data = featureProfileSchema.parse(json('resources/feature-profile/expanded-191-v8.json'));
+    const logistics = previous.featureData['logistics-v1'];
+    expect(logistics.npc?.treasuryBudgetBp).toBeUndefined();
     expect(data).toEqual({
       ...previous,
       key: 'expanded-191-v8',
       ruleFeatures: [...previous.ruleFeatures, 'intel-v1'].sort(),
+      featureData: {
+        ...previous.featureData,
+        'logistics-v1': { ...logistics, npc: { ...logistics.npc, treasuryBudgetBp: 1000 } },
+      },
     });
     const option = expandedCreationProfile(expandedRows, allPresets, data, ruleRegistry, 'san10-191-intel');
     expect(option).toMatchObject({
@@ -84,6 +90,15 @@ describe('AC-M3-04 원생성 설정 조회', () => {
       featureProfileHash: hashState(data),
       ruleFeatures: data.ruleFeatures,
     });
+    expect(
+      expandedCreationProfile(
+        expandedRows,
+        allPresets,
+        { ...data, featureData: { ...data.featureData, 'logistics-v1': logistics } },
+        ruleRegistry,
+        'san10-191-intel',
+      ),
+    ).toMatchObject({ available: false, code: 'FEATURE_PROFILE_UNAVAILABLE' });
     for (const key of ['border-return-v1', 'nation-lifecycle-v1', 'nation-research-v1', 'intel-v1', 'policy'])
       expect(
         expandedCreationProfile(

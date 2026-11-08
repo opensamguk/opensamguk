@@ -352,7 +352,9 @@ export function expandedCreationProfile(
       (profileId === 'san10-191-research' && !profile.ruleFeatures.includes('nation-research-v1')) ||
       ((profileId === 'san10-191-border-return' || profileId === 'san10-191-intel') &&
         (!profile.ruleFeatures.includes('border-return-v1') || !profile.ruleFeatures.includes('nation-research-v1'))) ||
-      (profileId === 'san10-191-intel' && !profile.ruleFeatures.includes(INTEL_FEATURE)) ||
+      (profileId === 'san10-191-intel' &&
+        (!profile.ruleFeatures.includes(INTEL_FEATURE) ||
+          profile.featureData['logistics-v1'].npc?.treasuryBudgetBp !== 1000)) ||
       profile.scenarioKey !== contracts[profileId].selection.scenarioKey ||
       profile.mapKey !== contracts[profileId].selection.mapKey ||
       (profileId !== 'integration-v01' &&

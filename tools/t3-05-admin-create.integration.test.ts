@@ -837,10 +837,12 @@ for (const profileKey of [
     if (profileKey === 'expanded-191-v8') {
       expect(commands?.get('spy')).toMatchObject({ key: 'spy', target: 'general', category: 'military' });
       expect(reloaded.ext).toEqual({ intel: {} });
+      expect(reloaded.logistics?.config.npc?.treasuryBudgetBp).toBe(1000);
       expect(hashState(await readWorldState(db, world.id))).toBe(world.initialStateHash);
     } else {
       expect(commands?.get('spy')).toBeUndefined();
       expect(reloaded.ext).toBeUndefined();
+      expect(reloaded.logistics?.config.npc?.treasuryBudgetBp).toBeUndefined();
     }
     expect(hashState(archive.origin.initial)).toBe(world.initialStateHash);
     expect(
@@ -901,6 +903,7 @@ for (const profileKey of [
     const targetState = await loadWorld(db, target.id);
     if (profileKey === 'expanded-191-v8') {
       expect(targetState.ext).toEqual({ intel: {} });
+      expect(targetState.logistics?.config.npc?.treasuryBudgetBp).toBe(1000);
       expect(hashState(await readWorldState(db, target.id))).toBe(target.initialStateHash);
     }
     expect(
