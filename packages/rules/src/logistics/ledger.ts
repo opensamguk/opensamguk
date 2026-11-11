@@ -56,6 +56,11 @@ export function assertLogisticsConserved(
     const delta = BigInt(row.delta);
     if (row.reason === 'CONSUME' && row.holder !== 'city') throw new Error('물류 소비는 도시에서만 기록합니다.');
     if (
+      (row.holder === 'convoy' && ['PRODUCE', 'TRADE', 'UPGRADE'].includes(row.reason)) ||
+      (row.holder === 'city' && row.reason === 'LOSS_TRANSIT')
+    )
+      throw new Error('물류 변동 사유와 보유처가 일치하지 않습니다.');
+    if (
       (row.reason === 'DEPART' && (row.holder === 'city' ? row.delta > 0 : row.delta < 0)) ||
       (['ARRIVE', 'RETURN', 'CAPTURE'].includes(row.reason) && (row.holder === 'city' ? row.delta < 0 : row.delta > 0))
     )

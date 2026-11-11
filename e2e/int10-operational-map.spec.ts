@@ -85,6 +85,45 @@ test('AC-INT-10 정식191년 실제 API·80표식·375px·키보드·지연 공�
       .toBeGreaterThan(beforeKeyboardX);
     await user.page.getByRole('button', { name: '지도 전체' }).click();
     await expect(map).toHaveAttribute('viewBox', '0 0 1000 700');
+    // INT-20 AC: 지도 조작 글자와 주변 안내 글자의 실제 계산 색 대비(WCAG 2.x, 일반 글자 4.5:1 이상). 밝은 색·어두운 색 둘 다.
+    const zoomGroup = user.page.getByRole('group', { name: '지도 배율' });
+    const contrastTargets = [
+      { name: '지도 확대 버튼', locator: zoomGroup.getByRole('button', { name: '지도 확대' }) },
+      { name: '지도 전체 버튼', locator: zoomGroup.getByRole('button', { name: '지도 전체' }) },
+      { name: '지도 배율 표시', locator: zoomGroup.locator('output') },
+      { name: '지도 거점 선택 글자', locator: user.page.locator('label', { hasText: '지도 거점' }) },
+      { name: '지도 거점 선택 상자', locator: user.page.getByRole('combobox', { name: '지도 거점' }) },
+      { name: '지도 안내 문장', locator: user.page.getByText('드래그나 방향키로 이동') },
+    ];
+    for (const scheme of ['light', 'dark'] as const) {
+      await user.page.emulateMedia({ colorScheme: scheme });
+      for (const target of contrastTargets) {
+        const sample = await target.locator.evaluate((element) => {
+          const channels = (value: string) => value.match(/[\d.]+/g)!.map(Number);
+          const fg = channels(getComputedStyle(element).color);
+          let bg: number[] | null = null;
+          for (let node: Element | null = element; node && !bg; node = node.parentElement) {
+            const value = channels(getComputedStyle(node).backgroundColor);
+            if (value.length < 4 || value[3] === 1) bg = value.slice(0, 3);
+          }
+          return { fg: fg.slice(0, 3), bg: bg ?? [255, 255, 255], text: element.textContent?.trim() ?? '' };
+        });
+        const luminance = ([r, g, b]: number[]) => {
+          const [R, G, B] = [r, g, b].map((c) => {
+            const s = c / 255;
+            return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+          });
+          return 0.2126 * R! + 0.7152 * G! + 0.0722 * B!;
+        };
+        const [hi, lo] = [luminance(sample.fg), luminance(sample.bg)].sort((a, b) => b - a) as [number, number];
+        const ratio = (hi + 0.05) / (lo + 0.05);
+        expect(
+          ratio,
+          `${scheme} ${target.name} "${sample.text}": fg rgb(${sample.fg}) on bg rgb(${sample.bg}) = ${ratio.toFixed(2)}:1`,
+        ).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+    await user.page.emulateMedia({ colorScheme: null });
     await user.page.setViewportSize({ width: 375, height: 812 });
     const selector = user.page.getByRole('combobox', { name: '지도 거점' });
     await expect(selector.locator('option')).toHaveCount(62);
