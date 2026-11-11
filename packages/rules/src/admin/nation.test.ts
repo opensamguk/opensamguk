@@ -33,8 +33,30 @@ it('AC-INT-23 국가 조치는 위조 필드와 누락된 expected 군주를 받
     { ...rulerAction, expectedRulerId: 0 },
     { ...rulerAction, userId: 'forged' },
     { ...disbandAction, force: true },
+    { ...disbandAction, expected: { name: '확인한 국가' } },
+    { ...disbandAction, expected: { name: '확인한 국가', rulerId: 0 } },
   ])
     expect(adminGamePayloadSchema.safeParse(payload(action)).success).toBe(false);
+});
+
+it('AC-INT-23 확인한 국가명이나 군주가 바뀌면 해산을 거절한다', () => {
+  const replay = fixture();
+  const nation = replay.state.nations[2]!;
+  const action = { ...disbandAction, expected: { name: nation.name, rulerId: 2 } };
+  expect(apply(action, replay).status).toBe('APPLIED');
+  expect(apply({ ...action, expected: { ...action.expected, rulerId: null } }, replay)).toMatchObject({
+    status: 'REJECTED',
+    result: { code: 'TARGET_CHANGED' },
+  });
+  const changedRuler = apply(rulerAction, replay);
+  expect(changedRuler.status).toBe('APPLIED');
+  expect(apply(action, changedRuler.replay)).toMatchObject({
+    status: 'REJECTED',
+    result: { code: 'TARGET_CHANGED' },
+  });
+  const renamed = structuredClone(replay);
+  renamed.state.nations[2]!.name = '바뀐 국가';
+  expect(apply(action, renamed)).toMatchObject({ status: 'REJECTED', result: { code: 'TARGET_CHANGED' } });
 });
 
 it.each([null, 'new-ruler'])(

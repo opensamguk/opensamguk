@@ -1120,6 +1120,35 @@ it('AC-INT-23 국가 운영 조치는 같은 API 권한·멱등과 군주 expect
   await expectReplayedState(worldId);
 });
 
+it.each([
+  { kind: 'admin.nation.rename', nationId: 2, name: '새국가' },
+  { kind: 'admin.nation.setRuler', nationId: 2, generalId: 3, expectedRulerId: 2 },
+] as const)('AC-INT-23 확인 뒤 $kind 적용 시 강제 해산을 거절한다', async (change) => {
+  const worldId = await world();
+  const prior = command(worldId, change);
+  const disband = command(worldId, {
+    kind: 'admin.nation.disband',
+    nationId: 2,
+    expected: { name: '국가2', rulerId: 2 },
+  });
+  for (const input of [prior, disband])
+    expect((await call('admin.game.request', input, actor.cookie)).data).toMatchObject({ status: 'PENDING' });
+  await advance(worldId);
+  expect((await call('admin.game.requestStatus', statusInput(prior), actor.cookie)).data).toMatchObject({
+    status: 'APPLIED',
+  });
+  expect((await call('admin.game.requestStatus', statusInput(disband), actor.cookie)).data).toMatchObject({
+    status: 'REJECTED',
+    result: { code: 'TARGET_CHANGED' },
+  });
+  expect(await db.nation.count({ where: { worldId, id: 2 } })).toBe(1);
+  expect(await db.removedNation.count({ where: { worldId, nationId: 2 } })).toBe(0);
+  expect(await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId, cityKey: 2 } } })).toMatchObject({
+    nationId: 2,
+  });
+  await expectReplayedState(worldId);
+});
+
 it('AC-INT-23 운영 강제 해산은 직책 삭제 전에 저장하고 원자적 rollback·새 리스·재적재를 보존한다', async () => {
   const worldId = await world();
   const input = command(worldId, { kind: 'admin.nation.disband', nationId: 2 });

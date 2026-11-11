@@ -18,16 +18,28 @@ export function applyAdminNation(
   action: NationAction,
   tick: number,
 ): AdminGameRejectCode | undefined {
-  if (action.kind === 'admin.nation.setRuler') {
+  if (action.kind === 'admin.nation.setRuler' || action.expected !== undefined) {
     const ruler = Object.values(replay.state.generals).find(
       (general) =>
         general.nationId === action.nationId && general.officerLevel === 12 && lineageAlive(replay.state, general.id),
     );
-    if (ruler?.id !== action.expectedRulerId) return 'TARGET_CHANGED';
-    const target = replay.state.generals[action.generalId]!;
-    if (target.nationId !== action.nationId || target.id === ruler.id || !lineageActive(replay.state, target.id, tick))
-      return 'INVALID_VALUE';
-    transferRulership(replay.state, action.nationId, ruler.id, target.id);
+    if (action.kind === 'admin.nation.setRuler') {
+      if (ruler?.id !== action.expectedRulerId) return 'TARGET_CHANGED';
+      const target = replay.state.generals[action.generalId]!;
+      if (
+        target.nationId !== action.nationId ||
+        target.id === ruler.id ||
+        !lineageActive(replay.state, target.id, tick)
+      )
+        return 'INVALID_VALUE';
+      transferRulership(replay.state, action.nationId, ruler.id, target.id);
+    } else if (
+      action.expected &&
+      (replay.state.nations[action.nationId]?.name !== action.expected.name ||
+        (ruler?.id ?? null) !== action.expected.rulerId)
+    ) {
+      return 'TARGET_CHANGED';
+    }
   }
   try {
     if (action.kind === 'admin.nation.disband') dissolveNation(replay.state, action.nationId);
