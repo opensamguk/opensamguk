@@ -96,6 +96,19 @@ test('AC-INT-10 정식191년 실제 API·80표식·375px·키보드·지연 공�
       44,
     );
     await user.page.screenshot({ path: 'test-results/int10-formal-191-mobile.png', fullPage: true });
+    // INT-20 다크 모드: 같은 375px 화면에서 지도가 가로로 잘리지 않고 확대 단추 44px를 유지해야 한다.
+    await user.page.emulateMedia({ colorScheme: 'dark' });
+    await expect(map).toBeVisible();
+    const darkBox = await map.boundingBox();
+    expect(darkBox!.x).toBeGreaterThanOrEqual(0);
+    expect(darkBox!.x + darkBox!.width).toBeLessThanOrEqual(375);
+    expect(
+      await user.page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+    ).toBeLessThanOrEqual(0);
+    expect((await user.page.getByRole('button', { name: '지도 확대' }).boundingBox())!.height).toBeGreaterThanOrEqual(
+      44,
+    );
+    await user.page.screenshot({ path: 'test-results/int10-formal-191-mobile-dark.png', fullPage: true });
     await db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${worldId} FOR UPDATE`;
       const state = await loadWorld(tx, worldId);
