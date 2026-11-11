@@ -516,6 +516,114 @@ describe('T2-09 국가 공지 revision', () => {
 });
 
 describe('T2-09 실제 PostgreSQL LISTEN·SSE', () => {
+  it('AC-M2-07 계정과 서버 연결 한도를 각각 적용하고 종료 뒤 다시 받는다', async () => {
+    const limited = await buildServer({
+      db,
+      logging: false,
+      realtime: { connectionString: url, admission: { total: 2, perAccount: 1, preparing: 2, deadlineMs: 5000 } },
+    });
+    const endpoint = await limited.listen({ host: '127.0.0.1', port: 0 });
+    const status = async (user: number) => {
+      const response = await fetch(`${endpoint}/sse?worldId=${worldId}`, {
+        headers: { cookie: users[user]!.cookie },
+      });
+      await response.body?.cancel();
+      return response.status;
+    };
+    try {
+      const first = await stream(0, endpoint);
+      expect(await status(0)).toBe(429);
+      await stream(1, endpoint);
+      expect(await status(2)).toBe(503);
+      first.abort();
+      await until(async () => (await status(2)) === 200);
+    } finally {
+      await limited.close();
+    }
+  });
+
+  it.each(['disconnect', 'deadline', 'ready-deadline', 'stream-disconnect'] as const)(
+    'AC-M2-07 %s 뒤에도 실제 PostgreSQL 조회가 끝날 때까지 자리를 유지한다',
+    async (ending) => {
+      const name = `sse-admission-${randomUUID()}`;
+      const namedUrl = new URL(url!);
+      namedUrl.searchParams.set('application_name', name);
+      const connection = createDb(namedUrl.href);
+      const limited = await buildServer({
+        db: connection,
+        logging: false,
+        realtime: {
+          connectionString: url,
+          admission: {
+            total: ending === 'stream-disconnect' ? 1 : 2,
+            perAccount: 1,
+            preparing: 1,
+            deadlineMs: ending === 'disconnect' ? 5000 : 1000,
+          },
+        },
+      });
+      let disconnected = false;
+      limited.addHook('onRequest', async (request, reply) => {
+        if (request.headers.cookie === users[0]!.cookie)
+          reply.raw.once('close', () => {
+            disconnected = true;
+          });
+      });
+      const endpoint = await limited.listen({ host: '127.0.0.1', port: 0 });
+      const controller = new AbortController();
+      const request = (user: number, signal?: AbortSignal) =>
+        fetch(`${endpoint}/sse?worldId=${worldId}`, {
+          headers: { cookie: users[user]!.cookie },
+          signal: signal ?? null,
+        });
+      const waiting = async () => {
+        const [row] = await db.$queryRaw<Array<{ waiting: boolean }>>`
+          SELECT EXISTS (SELECT 1 FROM pg_stat_activity
+            WHERE application_name = ${name} AND wait_event_type = 'Lock') AS waiting`;
+        return row!.waiting;
+      };
+      try {
+        const established = ending === 'stream-disconnect' ? await stream(0, endpoint) : undefined;
+        await db.$transaction(async (tx) => {
+          if (ending === 'ready-deadline' || established)
+            await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${users[0]!.id} FOR UPDATE`;
+          else await tx.$executeRaw`LOCK TABLE "General" IN ACCESS EXCLUSIVE MODE`;
+          const first = established ? undefined : request(0, controller.signal);
+          try {
+            if (established) await signal({ kind: 'monthly.done', target: 'world' });
+            await until(waiting);
+            if (established) {
+              established.abort();
+              await until(() => disconnected);
+            } else if (ending === 'disconnect') {
+              controller.abort();
+              await expect(first).rejects.toMatchObject({ name: 'AbortError' });
+              await until(() => disconnected);
+            } else {
+              const response = await first!;
+              expect(response.status).toBe(503);
+              await response.json();
+            }
+            expect(await waiting()).toBe(true);
+            const denied = await request(1, AbortSignal.timeout(2000));
+            expect(denied.status).toBe(503);
+            expect(await denied.json()).toEqual({ error: '실시간 연결이 많습니다. 잠시 뒤 다시 시도하세요.' });
+          } finally {
+            controller.abort();
+            await first?.catch(() => undefined);
+          }
+        });
+        await until(async () => {
+          const response = await request(1, AbortSignal.timeout(2000));
+          await response.body?.cancel();
+          return response.status === 200;
+        });
+      } finally {
+        await limited.close();
+        await connection.$disconnect();
+      }
+    },
+  );
   it('다른 사용자가 같은 월드나 다른 월드에 연결해도 기존 연결에 ready를 다시 보내지 않는다', async () => {
     const a = await stream();
     const readyCount = () => a.events.filter((event) => event.kind === 'ready').length;

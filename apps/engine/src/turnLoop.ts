@@ -500,7 +500,7 @@ export class TurnLoop {
           status: outcome ? ('ENDED' as const) : world.status,
         };
       },
-      { timeout: 30_000 },
+      { maxWait: 5_000, timeout: 30_000 },
     );
     if (metric && this.hooks.commitMetricSink) await observeCommittedStep(this.db, metric, this.hooks.commitMetricSink);
     this.extVerified = true;

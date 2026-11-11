@@ -334,7 +334,28 @@ test.describe('장수가 있는 계정', () => {
     const nation = page.getByRole('region', { name: '국가 정보', exact: true });
     await nation.getByRole('button', { name: '소속 장수·도시 펼치기' }).click();
     await expect(nation.getByRole('table').filter({ hasText: '소속 장수' })).toBeVisible();
-    await expect(nation.getByRole('table').filter({ hasText: '소유 도시' })).toBeVisible();
+    const cityTable = nation.getByRole('table').filter({ hasText: '소유 도시' });
+    await expect(cityTable).toBeVisible();
+    // 처음 보이는 순서는 지역 오름차순, 규모 내림차순, 도시 키 오름차순이다.
+    // 기대값은 world.map의 소유 관계와 같은 국가 도시의 city.get 상세(지역·규모)에서 만든다.
+    const owned = ctx.map.cities.filter((c) => c.nationId === ctx.home.general.nationId);
+    const details = await Promise.all(
+      owned.map((c) =>
+        query<{ key: number; name: string; region: number; level: number }>(page.request, 'city.get', {
+          worldId: ctx.worldId,
+          cityKey: c.key,
+        }),
+      ),
+    );
+    for (const d of details) {
+      expect(typeof d.region).toBe('number');
+      expect(typeof d.level).toBe('number');
+    }
+    const expectedNames = [...details]
+      .sort((a, b) => a.region - b.region || b.level - a.level || a.key - b.key)
+      .map((d) => d.name);
+    expect(expectedNames).toHaveLength(owned.length);
+    await expect(cityTable.locator('tbody tr td:first-child')).toHaveText(expectedNames);
     await nation.getByRole('button', { name: /^병력/ }).click();
     await expect(nation.getByRole('columnheader', { name: /^병력/ })).toHaveAttribute('aria-sort', 'descending');
     await shot(page, '03-main-nation-tables.png');
