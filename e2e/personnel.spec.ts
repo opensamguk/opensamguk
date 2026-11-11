@@ -639,8 +639,16 @@ test('탭을 닫은 사이 끝난 접수: 다시 들어오면 결과 안내가 �
   let failed = true;
   try {
     await stubPortraits(again);
+    // 발령 결과 조회가 실제로 끝난 뒤 안내의 렌더링을 확인한다.
+    const recentSeen = again.waitForResponse(
+      (response) => new URL(response.url()).pathname.includes('personnel.recent'),
+      { timeout: 30_000 },
+    );
+    void recentSeen.catch(() => undefined);
     await again.goto(`/w/${world}`);
     diagnostic.mark('gotoDoneMs');
+    step = 'recent';
+    await recentSeen;
     step = 'notice';
     await expect(notice(again)).toContainText('발령을 수락해');
     diagnostic.mark('noticeSeenMs');
