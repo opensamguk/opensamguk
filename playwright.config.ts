@@ -20,6 +20,7 @@ export default defineConfig({
     '**/admin-end.spec.ts',
     '**/admin-create.spec.ts',
     '**/admin-create-profile.spec.ts',
+    '**/admin-create-resources.spec.ts',
     '**/admin-reset.spec.ts',
     '**/t4-24-equipment.spec.ts',
     '**/t4-93-logistics.spec.ts',

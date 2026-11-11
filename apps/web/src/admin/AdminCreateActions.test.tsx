@@ -10,6 +10,7 @@ const state = vi.hoisted(() => ({
   me: vi.fn(),
   whoami: vi.fn(),
   settings: vi.fn(),
+  versions: vi.fn(),
   create: vi.fn(),
   status: vi.fn(),
   invalidate: vi.fn(),
@@ -22,12 +23,25 @@ vi.mock('../trpc', () => ({
       whoami: { query: state.whoami },
       world: {
         creationOptions: { query: state.settings },
+        creationVersions: { query: state.versions },
         create: { mutate: state.create },
         createStatus: { query: state.status },
       },
     },
   }),
 }));
+type Kind = 'SCENARIO' | 'MAP' | 'UNIT_SET' | 'STAT_RULES' | 'PORTRAIT_MAP';
+const row = (key: string) => {
+  const [name, version] = key.split('@');
+  return { key, name: name!, version: Number(version ?? 1), contentHash: `hash-${key}` };
+};
+const baseKeys: Record<Kind, string[]> = {
+  SCENARIO: ['integration191', '1030@2'],
+  MAP: ['integration', 'che@2'],
+  UNIT_SET: ['basic'],
+  STAT_RULES: ['five-stats'],
+  PORTRAIT_MAP: ['191-map'],
+};
 const failure = (code: string) =>
   new TRPCClientError(code, { result: { error: { code: -32000, message: code, data: { code } } } });
 const pending = (key: string) => ({
@@ -106,6 +120,10 @@ beforeEach(() => {
   state.me.mockResolvedValue({ user: { id: viewerId } });
   state.whoami.mockResolvedValue({ admin: true });
   state.settings.mockResolvedValue(structuredClone(options));
+  state.versions.mockImplementation(async (input: { kind: Kind }) => ({
+    items: baseKeys[input.kind].map(row),
+    next: null,
+  }));
   state.create.mockImplementation(async (input: CreateInput) => pending(input.idempotencyKey));
   state.status.mockImplementation(async (input: { idempotencyKey: string }) => pending(input.idempotencyKey));
 });
@@ -309,7 +327,8 @@ describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
       expect(control).toBe(screen.getByLabelText(label, { exact: true }));
       return control;
     };
-    expect(screen.getAllByRole('combobox')).toHaveLength(labels.length);
+    const versionLabels = ['시나리오', '지도', '병종', '능력치', '초상'].map((kind) => `${kind} 자원 판`);
+    expect(screen.getAllByRole('combobox')).toHaveLength(labels.length + versionLabels.length);
     for (const label of labels)
       expect(screen.getByRole('combobox', { name: label })).toBe(screen.getByLabelText(label, { exact: true }));
     exactLabels();
@@ -319,7 +338,7 @@ describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
       for (const seedMode of ['auto', 'custom']) {
         fireEvent.change(screen.getByRole('combobox', { name: '시드 선택' }), { target: { value: seedMode } });
         exactLabels();
-        const controls = labels.map((label) => screen.getByRole('combobox', { name: label }));
+        const controls = [...labels, ...versionLabels].map((label) => screen.getByRole('combobox', { name: label }));
         controls.push(exactInput('textbox', '월드 이름'), exactInput('spinbutton', '턴 간격 (분)'));
         if (endMode === 'year') controls.push(exactInput('spinbutton', '종료 연도'));
         else expect(screen.queryByRole('spinbutton', { name: '종료 연도' })).toBeNull();
@@ -495,6 +514,281 @@ describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
     expect(retry.disabled).toBe(true);
     await waitFor(() => expect(retry.disabled).toBe(false), { timeout: 2000 });
     expect(state.create).toHaveBeenCalledTimes(1);
+  });
+  describe('T4-90 다섯 칸 판 고르기', () => {
+    const select = (kind: string) => screen.getByRole('combobox', { name: `${kind} 자원 판` }) as HTMLSelectElement;
+    const values = (kind: string) => Array.from(select(kind).options, (option) => option.value);
+    async function openForm() {
+      fireEvent.click(screen.getByRole('button', { name: '새 월드 생성 준비' }));
+      await chooseLegacy();
+      await screen.findByLabelText('월드 이름');
+      await waitFor(() => expect(select('시나리오').disabled).toBe(false));
+      fireEvent.change(screen.getByLabelText('월드 이름'), { target: { value: '판 고르기' } });
+      fireEvent.change(screen.getByLabelText('프리셋'), { target: { value: 'regular' } });
+    }
+    async function confirm() {
+      fireEvent.click(screen.getByRole('button', { name: '현재 설정 검토' }));
+      return within(await screen.findByRole('dialog'));
+    }
+    it('다섯 종류를 각자 next가 null일 때까지 cursor로 읽고 중복 없이 정렬해 보인다', async () => {
+      const pages: Record<Kind, Array<{ items: string[]; next: string | null }>> = {
+        SCENARIO: [
+          { items: ['integration191', 'zeta@2'], next: 'a' },
+          { items: ['1030@2', 'zeta@2'], next: 'b' },
+          { items: ['1030'], next: null },
+        ],
+        MAP: [
+          { items: ['che@2'], next: 'm' },
+          { items: ['integration', 'che@10'], next: null },
+        ],
+        UNIT_SET: [{ items: ['basic'], next: null }],
+        STAT_RULES: [{ items: ['five-stats'], next: null }],
+        PORTRAIT_MAP: [{ items: ['191-map'], next: null }],
+      };
+      state.versions.mockImplementation(async (input: { kind: Kind; cursor?: string }) => {
+        const list = pages[input.kind];
+        const index = input.cursor === undefined ? 0 : list.findIndex((_, i) => list[i - 1]?.next === input.cursor);
+        const page = list[index]!;
+        return { items: page.items.map(row), next: page.next };
+      });
+      setup();
+      await openForm();
+      expect(state.versions.mock.calls.map(([input]) => [input.kind, input.cursor])).toEqual(
+        expect.arrayContaining([
+          ['SCENARIO', undefined],
+          ['SCENARIO', 'a'],
+          ['SCENARIO', 'b'],
+          ['MAP', undefined],
+          ['MAP', 'm'],
+          ['UNIT_SET', undefined],
+          ['STAT_RULES', undefined],
+          ['PORTRAIT_MAP', undefined],
+        ]),
+      );
+      expect(state.versions).toHaveBeenCalledTimes(3 + 2 + 1 + 1 + 1);
+      for (const [input, call] of state.versions.mock.calls) {
+        expect(input.expectedUserId).toBe(viewerId);
+        const keys = input.cursor === undefined ? ['expectedUserId', 'kind'] : ['cursor', 'expectedUserId', 'kind'];
+        expect(Object.keys(input).sort()).toEqual(keys);
+        expect(call.signal).toBeInstanceOf(AbortSignal);
+      }
+      expect(values('시나리오')).toEqual(['1030', '1030@2', 'integration191', 'zeta@2']);
+      expect(values('지도')).toEqual(['che@2', 'che@10', 'integration']);
+      expect(select('시나리오').value).toBe('integration191');
+    });
+    it('시나리오와 지도를 따로 고르면 정확한 키만 보내고 ruleFeatures·기본 요약은 보내지도 보이지도 않는다', async () => {
+      setup();
+      await openForm();
+      fireEvent.change(select('시나리오'), { target: { value: '1030@2' } });
+      expect(select('지도').value).toBe('integration');
+      expect(screen.queryByText(/191년 · 21국/)).toBeNull();
+      fireEvent.change(select('지도'), { target: { value: 'che@2' } });
+      const confirmation = await confirm();
+      expect(confirmation.queryByText(/191년 · 21국/)).toBeNull();
+      expect(confirmation.getByText('1030@2')).toBeTruthy();
+      expect(confirmation.getByText('che@2')).toBeTruthy();
+      expect(confirmation.getByText(/자원 판 일부 변경/)).toBeTruthy();
+      expect(confirmation.getByText(/서버가 확인/)).toBeTruthy();
+      await submit();
+      const input = state.create.mock.calls[0]![0] as CreateInput;
+      expect(input).toMatchObject({
+        scenarioKey: '1030@2',
+        mapKey: 'che@2',
+        unitSetKey: 'basic',
+        statRulesKey: 'five-stats',
+        portraitMapKey: '191-map',
+      });
+      expect(Object.keys(input)).not.toContain('ruleFeatures');
+      expect(Object.keys(input)).not.toContain('featureProfileKey');
+      expect(JSON.stringify(input)).not.toContain('@1');
+    });
+    it('건드리지 않은 기본 묶음은 이전과 같은 다섯 키와 10기능을 보낸다', async () => {
+      setup();
+      await openForm();
+      await confirm();
+      await submit();
+      const input = state.create.mock.calls[0]![0] as CreateInput;
+      expect(input).toMatchObject({
+        scenarioKey: 'integration191',
+        mapKey: 'integration',
+        unitSetKey: 'basic',
+        statRulesKey: 'five-stats',
+        portraitMapKey: '191-map',
+      });
+      expect(input.ruleFeatures).toEqual(options.profiles[0]!.available ? options.profiles[0]!.ruleFeatures : []);
+    });
+    it('한 종류의 목록이 실패하면 그 칸만 잠그고 다시 시도하며 기본 묶음 제출은 막지 않는다', async () => {
+      let broken = true;
+      state.versions.mockImplementation(async (input: { kind: Kind }) => {
+        if (input.kind === 'UNIT_SET' && broken) throw failure('INTERNAL_SERVER_ERROR');
+        return { items: baseKeys[input.kind].map(row), next: null };
+      });
+      setup();
+      await openForm();
+      expect(select('병종').disabled).toBe(true);
+      expect(select('시나리오').disabled).toBe(false);
+      await screen.findByText('병종 판 목록을 읽지 못했습니다.');
+      broken = false;
+      fireEvent.click(screen.getByRole('button', { name: '병종 판 목록 다시 시도' }));
+      await waitFor(() => expect(select('병종').disabled).toBe(false));
+      expect(screen.queryByText('병종 판 목록을 읽지 못했습니다.')).toBeNull();
+      expect(state.versions.mock.calls.filter(([input]) => input.kind === 'UNIT_SET')).toHaveLength(2);
+      broken = true;
+      fireEvent.change(select('지도'), { target: { value: 'che@2' } });
+      fireEvent.click(screen.getByRole('button', { name: '현재 설정 검토' }));
+      await screen.findByRole('dialog');
+      expect(state.create).not.toHaveBeenCalled();
+    });
+    it('목록이 실패해도 칸을 건드리지 않은 기본 묶음은 검토까지 간다', async () => {
+      state.versions.mockRejectedValue(failure('INTERNAL_SERVER_ERROR'));
+      setup();
+      fireEvent.click(screen.getByRole('button', { name: '새 월드 생성 준비' }));
+      await chooseLegacy();
+      await screen.findByLabelText('월드 이름');
+      for (const kind of ['시나리오', '지도', '병종', '능력치', '초상']) {
+        expect(select(kind).disabled).toBe(true);
+        expect(screen.getByText(`${kind} 판 목록을 읽지 못했습니다.`)).toBeTruthy();
+      }
+      fireEvent.change(screen.getByLabelText('월드 이름'), { target: { value: '기본만' } });
+      fireEvent.change(screen.getByLabelText('프리셋'), { target: { value: 'regular' } });
+      await confirm();
+      await submit();
+      expect(state.create.mock.calls[0]![0]).toMatchObject({ scenarioKey: 'integration191', mapKey: 'integration' });
+    });
+    it('게시 목록이 비어 있으면 안내하고 기본 키만 남겨 기본 묶음을 보낸다', async () => {
+      state.versions.mockImplementation(async (input: { kind: Kind }) => ({
+        items: input.kind === 'PORTRAIT_MAP' ? [] : baseKeys[input.kind].map(row),
+        next: null,
+      }));
+      setup();
+      await openForm();
+      expect(screen.getByText('게시한 초상 판이 없습니다.')).toBeTruthy();
+      expect(values('초상')).toEqual(['191-map']);
+      await confirm();
+      await submit();
+      expect(state.create.mock.calls[0]![0]).toMatchObject({ portraitMapKey: '191-map' });
+    });
+    it('고른 판이 다시 읽은 목록에서 사라지면 제출을 막고 키를 알린다', async () => {
+      setup();
+      await openForm();
+      fireEvent.change(select('지도'), { target: { value: 'che@2' } });
+      state.versions.mockImplementation(async (input: { kind: Kind }) => ({
+        items: baseKeys[input.kind].filter((key) => key !== 'che@2').map(row),
+        next: null,
+      }));
+      await act(async () => {
+        window.dispatchEvent(new Event('blur'));
+      });
+      fireEvent.click(screen.getByRole('button', { name: '계정과 생성 설정 다시 확인' }));
+      await waitFor(() => expect(select('지도').disabled).toBe(false));
+      expect(select('지도').value).toBe('che@2');
+      expect(screen.getByRole('alert').textContent).toBe('선택한 판이 게시 목록에 없습니다: che@2');
+      fireEvent.click(screen.getByRole('button', { name: '현재 설정 검토' }));
+      await screen.findAllByText('선택한 판이 게시 목록에 없습니다: che@2');
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(state.create).not.toHaveBeenCalled();
+    });
+    it('창이 흐려져 세대가 바뀌면 늦은 목록 응답을 버리고 요청을 중단한다', async () => {
+      const release: Array<() => void> = [];
+      state.versions.mockImplementation(
+        (input: { kind: Kind }) =>
+          new Promise((resolve) => {
+            release.push(() => resolve({ items: baseKeys[input.kind].map(row), next: null }));
+          }),
+      );
+      setup();
+      fireEvent.click(screen.getByRole('button', { name: '새 월드 생성 준비' }));
+      await waitFor(() => expect(state.versions).toHaveBeenCalledTimes(5));
+      await act(async () => {
+        window.dispatchEvent(new Event('blur'));
+      });
+      for (const [, call] of state.versions.mock.calls) expect(call.signal.aborted).toBe(true);
+      await act(async () => {
+        for (const finish of release) finish();
+      });
+      expect(screen.queryByRole('combobox', { name: '시나리오 자원 판' })).toBeNull();
+      expect(screen.getByRole('button', { name: '계정과 생성 설정 다시 확인' })).toBeTruthy();
+      expect(state.create).not.toHaveBeenCalled();
+    });
+    it('목록 조회가 계정 변경(UNAUTHORIZED)으로 거절되면 양식을 비우고 권한을 다시 확인한다', async () => {
+      state.versions.mockRejectedValue(failure('UNAUTHORIZED'));
+      setup();
+      fireEvent.click(screen.getByRole('button', { name: '새 월드 생성 준비' }));
+      await waitFor(() => expect(state.invalidate).toHaveBeenCalled());
+      expect(screen.queryByLabelText('월드 이름')).toBeNull();
+      expect(screen.queryByRole('combobox', { name: '시나리오 자원 판' })).toBeNull();
+      expect(state.create).not.toHaveBeenCalled();
+    });
+    it('확장 묶음은 서버 묶음 범위만 잠근다: 통합판 확장은 시나리오·지도, 그 밖은 다섯 칸', async () => {
+      for (const [featureProfileKey, locked] of [
+        ['expanded-191-v3', ['시나리오', '지도']],
+        ['expanded-191-v4', ['시나리오', '지도', '병종', '능력치', '초상']],
+      ] as const) {
+        const value = structuredClone(options);
+        value.profiles.push({ ...structuredClone(expandedProfile), featureProfileKey });
+        state.settings.mockResolvedValue(value);
+        const view = setup();
+        fireEvent.click(screen.getByRole('button', { name: '새 월드 생성 준비' }));
+        const scenario = await screen.findByRole('combobox', { name: '시나리오' });
+        await waitFor(() => expect((scenario as HTMLSelectElement).disabled).toBe(false));
+        fireEvent.change(scenario, { target: { value: expandedProfile.id } });
+        await waitFor(() => expect(screen.queryByText('게시된 생성 자원을 확인하고 있습니다.')).toBeNull());
+        for (const kind of ['시나리오', '지도', '병종', '능력치', '초상'])
+          expect(select(kind).disabled).toBe(locked.some((name) => name === kind));
+        view.unmount();
+        vi.clearAllMocks();
+        state.me.mockResolvedValue({ user: { id: viewerId } });
+        state.whoami.mockResolvedValue({ admin: true });
+        state.versions.mockImplementation(async (input: { kind: Kind }) => ({
+          items: baseKeys[input.kind].map(row),
+          next: null,
+        }));
+      }
+    });
+    it('FAILED는 서버 error.message를 그대로 보이고 비었을 때만 고정 문구를 쓴다', async () => {
+      const mismatch = '시나리오와 지도의 짝이 맞지 않습니다: 1030@2 / integration';
+      for (const [message, shown] of [
+        [mismatch, mismatch],
+        ['', '월드 생성 설정을 확인하세요.'],
+      ] as const) {
+        state.create.mockImplementation(async (input: CreateInput) => ({
+          ...pending(input.idempotencyKey),
+          status: 'FAILED',
+          error: { code: 'INPUT_INVALID', message },
+        }));
+        const view = setup();
+        await review();
+        await submit();
+        await screen.findByText(`생성하지 않음 · ${shown}`);
+        expect(sessionStorage.getItem(`opensamguk:admin-create:v1:${viewerId}`)).toBeNull();
+        view.unmount();
+        vi.clearAllMocks();
+        sessionStorage.clear();
+        state.me.mockResolvedValue({ user: { id: viewerId } });
+        state.whoami.mockResolvedValue({ admin: true });
+        state.settings.mockResolvedValue(structuredClone(options));
+        state.versions.mockImplementation(async (input: { kind: Kind }) => ({
+          items: baseKeys[input.kind].map(row),
+          next: null,
+        }));
+      }
+    });
+    it('상태 조회로 받은 FAILED도 서버 문구를 보이고 멱등 재접수는 같은 입력 객체를 쓴다', async () => {
+      state.create.mockRejectedValueOnce(new TRPCClientError('network'));
+      setup();
+      await review();
+      await submit();
+      const first = state.create.mock.calls[0]![0];
+      state.status.mockImplementation(async (input: { idempotencyKey: string }) => ({
+        ...pending(input.idempotencyKey),
+        status: 'FAILED',
+        error: { code: 'RESOURCE_INVALID', message: '게시하지 않은 판입니다: che@9' },
+      }));
+      fireEvent.click(screen.getByRole('button', { name: '요청 상태 확인' }));
+      await screen.findByText('생성하지 않음 · 게시하지 않은 판입니다: che@9');
+      expect(state.create).toHaveBeenCalledTimes(1);
+      expect(state.create.mock.calls[0]![0]).toBe(first);
+    });
   });
   it('저장 불가에도 개인정보를 출력하지 않고 복구 한계를 알린다', async () => {
     setup();

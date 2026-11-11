@@ -381,6 +381,9 @@ jobs:
       - name: Check SAN10 administrator creation profiles in public Chromium
         if: matrix.shard == 1
         run: pnpm e2e:admin-create-profile --reporter=line
+      - name: Check administrator creation resource version selection in Chromium
+        if: matrix.shard == 1
+        run: pnpm e2e:admin-create-resources --reporter=line
       - name: Preserve expanded world selection screenshots
         if: always() && matrix.shard == 1
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
