@@ -58,6 +58,7 @@ export function useAuthority(worldId: string) {
 
 // 권한에 따라 답이 달라지는 키. 첫 값을 정하거나 권한을 거둘 때는 이 월드의 메시지·공지 키를 모두 비운다.
 // 다른 세션이나 이전 마운트 때 남은 캐시를 믿지 않으려는 것이다.
+// 첩보 기록(T4-13)도 지금 소속 국가가 답을 정하므로 같은 경계에서 비운다(intel/IntelRecordsTab.tsx).
 function messagingKeys(trpc: Trpc, worldId: string, all: boolean): QueryKey[] {
   const keys: QueryKey[] = [
     trpc.message.unread.queryKey({ worldId }),
@@ -65,6 +66,7 @@ function messagingKeys(trpc: Trpc, worldId: string, all: boolean): QueryKey[] {
     trpc.notice.nation.get.queryKey({ worldId }),
     trpc.message.list.infiniteQueryKey({ worldId, scope: 'NATION' }),
     trpc.message.list.infiniteQueryKey({ worldId, scope: 'DIPLOMACY' }),
+    trpc.intel.records.queryKey({ worldId }),
   ];
   if (!all) return keys;
   return [

@@ -27,6 +27,7 @@ export default defineConfig({
     '**/t4-94-governance.spec.ts',
     '**/t4-95-lineage.spec.ts',
     '**/t4-96-heritage.spec.ts',
+    '**/intel.spec.ts',
   ],
   forbidOnly: isCI,
   use: { baseURL: 'http://127.0.0.1:5173' },

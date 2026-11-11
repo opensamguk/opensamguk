@@ -1,7 +1,6 @@
 import { INTEL_FEATURE, getIntelSliceSchema, nowTick, unitSetSchema } from '@opensamguk/rules';
 import { requireGeneral, requireWorld } from '../game/queries';
-import { requirePersonnelSession } from '../game/personnelAdmission';
-import { personnelIdentity } from '../game/personnelApi';
+import { requireIntelReader } from '../game/fog';
 import { intelPolicy } from '../intelPolicy';
 import { worldClock, worldInput } from '../queries';
 import { router, worldVerifiedProcedure } from '../trpc';
@@ -12,7 +11,7 @@ export const intelRouter = router({
     const started = performance.now();
     return ctx.db.$transaction(
       async (tx) => {
-        await requirePersonnelSession(tx, personnelIdentity(ctx, started));
+        await requireIntelReader(tx, ctx, input.worldId, started);
         const world = await requireWorld(tx, input.worldId);
         const general = await requireGeneral(tx, world.id, ctx.user.id);
         if (world.replayFormat !== 3 || !world.ruleFeatures.includes(INTEL_FEATURE))

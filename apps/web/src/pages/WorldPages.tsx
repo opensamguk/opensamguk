@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { QueryError } from '../game/QueryState';
 import { useHome, useWorldId, useWorldMap, useWorldSummary } from '../game/queries';
 import { isMemberNation } from '../game/types';
+import { IntelRecordsTab } from '../intel/IntelRecordsTab';
 import { CityInfo } from '../main/CityInfo';
 import { NationSummaryGrid, NationTables, useNation } from '../main/NationInfo';
 import { Panel } from '../main/Panel';
@@ -133,13 +134,14 @@ export function NationPage({ nationIdParam }: { nationIdParam: string }) {
   );
 }
 
-type RecordTab = RecordKind | 'timelapse';
+type RecordTab = RecordKind | 'timelapse' | 'intel';
 
 const RECORD_TABS: Array<{ kind: RecordTab; label: string }> = [
   { kind: 'general', label: '내 장수' },
   { kind: 'nation', label: '국가 역사' },
   { kind: 'world', label: '월드 정세' },
   { kind: 'timelapse', label: '영토 재생' },
+  { kind: 'intel', label: '첩보 기록' },
 ];
 
 // /w/:worldId/records?tab=: 기록을 넓게 이어 본다. 메인 아래 기록 칸과 같은 목록이다.
@@ -173,6 +175,10 @@ export function RecordsPage({ tab, city }: { tab: RecordTab; city?: number }) {
       {tab === 'timelapse' ? (
         <Panel title="영토 재생">
           <TimelapsePanel key={worldId} worldId={worldId} />
+        </Panel>
+      ) : tab === 'intel' ? (
+        <Panel title="첩보 기록">
+          <IntelRecordsTab key={worldId} worldId={worldId} cities={map.data?.cities ?? []} />
         </Panel>
       ) : (
         <Panel title={RECORD_LABELS[tab]}>
