@@ -147,7 +147,7 @@ beforeAll(async () => {
   await db.user.deleteMany();
   const passwordHash = await hashPassword(password);
   users = [];
-  for (let index = 0; index < 4; index++)
+  for (let index = 0; index < 5; index++)
     users.push(
       await db.user.create({
         data: { email: `${randomUUID()}@example.test`, passwordHash, status: index === 2 ? 'SANCTIONED' : 'ACTIVE' },
@@ -360,6 +360,7 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
     initial.ruleFeatures = [INTEL_FEATURE, 'policy'];
     initial.generals[0]!.userId = users[0]!.id;
     initial.generals[1]!.userId = users[1]!.id;
+    Object.assign(initial.generals[2]!, { userId: users[4]!.id, nationId: 1 });
     Object.assign(initial.generals[3]!, { userId: users[3]!.id, cityKey: 2 });
     for (const general of initial.generals) general.nextTurnTick = general.id === 1 ? 100 : 20_000;
     const { worldId: intelWorld, stateHash } = await saveInitialWorld(db, initial, {
@@ -378,6 +379,7 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
     const input = { worldId: intelWorld };
     const actor = await session();
     const enemy = await session(1);
+    const ally = await session(4);
     const neutral = await session(3);
     const enemyCity = { ...input, cityKey: 2 };
     expect((await request('city.get', { worldId, cityKey: state.cities[0]!.cityKey }, actor)).data).not.toHaveProperty(
@@ -417,12 +419,13 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
         gold: initial.generals[0]!.gold - 60,
         rice: initial.generals[0]!.rice - 60,
       });
-      expect(after.state.ext).toMatchObject({ intel: { 1: { 2: { tick: 100, crew: 30 } } } });
-      const report = (await request('intel.records', input, actor)).data as { items: unknown[] };
+      expect(after.state.ext).toMatchObject({ intel: { 1: { 2: { tick: 100, crew: 20 } } } });
+      const report = (await request('intel.records', input, actor)).data as { items: Record<string, unknown>[] };
       expect(report).toMatchObject({
         enabled: true,
         items: [{ cityKey: 2, tick: 100, year: 191, month: 1, ageMonths: 0, crew: { min: 1, max: 999 }, tech: 'even' }],
       });
+      expect((await request('intel.records', input, ally)).data).toEqual(report);
       const remoteCity = (await request('city.get', enemyCity, actor)).data;
       expect(remoteCity).toMatchObject({ fog: { intel: report.items[0], garrisonHidden: true }, generals: [] });
       expect(remoteCity).not.toHaveProperty('population');
@@ -487,6 +490,9 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
       expect((await request('intel.records', input, neutral)).data).toEqual({ enabled: true, items: [], alerts: [] });
       expect((await request('intel.records', { ...input, nationId: 1 }, enemy)).code).toBe('BAD_REQUEST');
       await engine.advanceTo(10_000);
+      expect((await request('intel.records', input, ally)).data).toMatchObject({
+        items: [{ ...report.items[0], ageMonths: 1 }],
+      });
     } finally {
       await releaseLease(db, lease);
     }

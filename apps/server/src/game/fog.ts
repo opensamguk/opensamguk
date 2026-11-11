@@ -10,6 +10,25 @@ import { intelPolicy } from '../intelPolicy';
 import { worldClock } from '../queries';
 import { intelRecordInfo } from '../visibility';
 
+export async function requireIntelReader(
+  tx: Prisma.TransactionClient,
+  ctx: Context & { user: { id: string } },
+  worldId: string,
+  started: number,
+) {
+  await requirePersonnelSession(tx, personnelIdentity(ctx, started));
+  await requireVerifiedAccount(tx, ctx);
+  const sanction = await tx.sanction.findFirst({
+    where: {
+      userId: ctx.user.id,
+      ...activeSanctionWhere(ctx.now),
+      AND: [{ OR: [{ worldId: null }, { worldId }] }],
+    },
+    select: { id: true },
+  });
+  if (sanction) throw new TRPCError({ code: 'FORBIDDEN', message: '이 월드의 이용이 제한됐습니다.' });
+}
+
 export async function readCityIntel(
   tx: Prisma.TransactionClient,
   world: Parameters<typeof worldClock>[0] & { id: string; startYear: number },
@@ -18,22 +37,11 @@ export async function readCityIntel(
   ctx: Context & { user: { id: string } },
 ) {
   try {
-    await requirePersonnelSession(tx, personnelIdentity(ctx, performance.now()));
-    await requireVerifiedAccount(tx, ctx);
+    await requireIntelReader(tx, ctx, world.id, performance.now());
   } catch (error) {
     if (error instanceof TRPCError) return null;
     throw error;
   }
-  const sanction = await tx.sanction.findFirst({
-    where: {
-      userId: ctx.user.id,
-      ...activeSanctionWhere(ctx.now),
-      AND: [{ OR: [{ worldId: null }, { worldId: world.id }] }],
-    },
-    select: { id: true },
-  });
-  if (sanction) return null;
-
   const [row] = await tx.$queryRaw<
     { ledgerType: string; nationType: string | null; recordType: string | null; record: unknown }[]
   >`

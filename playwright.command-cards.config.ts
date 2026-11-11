@@ -15,6 +15,7 @@ export default defineConfig({
     't4-94-governance.spec.ts',
     't4-95-lineage.spec.ts',
     't4-96-heritage.spec.ts',
+    'intel.spec.ts',
   ],
   testIgnore: [],
   forbidOnly: true,
