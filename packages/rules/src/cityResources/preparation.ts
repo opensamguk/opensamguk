@@ -7,7 +7,7 @@ import { cloneWorld } from '../model/clone';
 import type { WorldView } from '../model/world';
 import { readCampaignState } from '../campaign/state';
 import { recruitCityGarrison } from './ledger';
-import { readCityResourcesState } from './state';
+import { CITY_RESOURCE_MAX, readCityResourcesState } from './state';
 import { consumeCityGoods, recruitGoods } from '../logistics/consumption';
 import { crewContext, crewTypeFailure } from '../world/crewRequirements';
 
@@ -47,6 +47,8 @@ export function applyCityPreparation(view: WorldView, actor: Actor, key: CityPre
     if (city.population < amount) return fail('NO_POPULATION', '도시 인구가 부족합니다.');
     const cost = recruitCost(view, general, amount, crewType.cost, key === 'conscript');
     if (resource.gold < cost) return fail('NO_GOLD', '도시 금이 부족합니다.');
+    const troops = resource.garrison.reduce((total, row) => total + row.troops, 0);
+    if (amount > CITY_RESOURCE_MAX - troops) return fail('AT_MAX', '도시 전체 병력 수량 한도를 넘었습니다.');
     if (view.ruleFeatures?.includes('logistics-v1')) {
       if (!view.logistics) throw new Error('물류 판의 재고가 없습니다.');
       const spent = consumeCityGoods(view, city.cityKey, recruitGoods(view.logistics.config, crewType.armType, amount));
