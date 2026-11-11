@@ -62,7 +62,11 @@ export const adminGameActionSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('admin.nation.rename'), nationId: id, name: z.string().trim().min(1).max(30) }),
   z.strictObject({ kind: z.literal('admin.nation.dismissOffice'), nationId: id, generalId: id }),
   z.strictObject({ kind: z.literal('admin.nation.setRuler'), nationId: id, generalId: id, expectedRulerId: id }),
-  z.strictObject({ kind: z.literal('admin.nation.disband'), nationId: id }),
+  z.strictObject({
+    kind: z.literal('admin.nation.disband'),
+    nationId: id,
+    expected: z.strictObject({ name: z.string(), rulerId: id.nullable() }).optional(),
+  }),
   z
     .strictObject({
       kind: z.literal('admin.message.send'),
