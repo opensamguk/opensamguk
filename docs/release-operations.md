@@ -20,8 +20,9 @@
 
 호스트는 요청 만료, 관리자 자격, 현재 버전, 승인 목록을 다시 확인해 한 건만 실행한다. 실행기에 `-Operation`, `-ExpectedRevision`, `-Revision`, `-ManifestPath`, `-PreflightReceiptPath`, `-RequestId`를 전달한다. 실행기에는 사유를 넘기지 않는다. 웹에는 Docker 접근 권한, 호스트 파일 경로, 실행 로그를 전달하지 않는다. 새 버전의 서버와 엔진을 확인한 뒤 성공을 기록한다. 실행 중 호스트가 종료되거나 오류가 발생하면 자동 재실행을 차단한다. 운영 상태와 실행 기록을 확인한 운영자가 `-ResolveRequest <UUID>`로 실제 이전 판 또는 대상 판과 결과를 대조해 이력을 확정한다.
 
-저장소의 전진 배포 실행기는 `tools/release-compose-driver.ps1`이다. `OPENSAMGUK_RELEASE_COMPOSE_CONFIG`가 가리키는 호스트 설정에는 위 DB·프로젝트·Docker 항목과 `bashExecutable`, `backupScript`, `backupScriptSha256`, `backupDirectory`, `backupDockerConfig`, `runtimeDirectory`, `publicOrigin`을 지정한다. 현재 서비스 정지, 기존 `backup.sh`로 백업, 새 migration 적용, 서비스와 공개 HTML 해시 확인 순서로 실행한다. migration 시도 또는 새 writer 기동 뒤 실패하면 서비스를 정지하고 호스트 점검을 기다린다. 복원·전환을 검증한 별도의 되돌리기 실행기를 등록할 때까지 되돌리기 대상은 비워 둔다.
+저장소의 Compose 배포 실행기는 `tools/release-compose-driver.ps1`이다. `OPENSAMGUK_RELEASE_COMPOSE_CONFIG`가 가리키는 호스트 설정에는 위 DB·프로젝트·Docker 항목과 `bashExecutable`, `backupScript`, `backupScriptSha256`, `backupDirectory`, `backupDockerConfig`, `runtimeDirectory`, `publicOrigin`을 지정한다. 현재 서비스 정지, 기존 `backup.sh`로 백업, 새 migration 적용, 서비스와 공개 HTML 해시 확인 순서로 실행한다. migration 시도 또는 새 writer 기동 뒤 실패하면 서비스를 정지하고 호스트 점검을 기다린다.
 
+되돌리기는 현재 DB를 그대로 쓰는 경우에 같은 실행기를 등록한다. Compose 설정의 `rollbackPairs`에는 소유자가 애플리케이션 데이터 호환성을 검토한 `fromRevision`, `revision`, `currentManifest`, `currentManifestSha256`, `targetManifestSha256`을 지정한다. 실행기는 양쪽 산출물의 migration 이름·해시와 자원 SQL 해시, 현재 이미지 ID, 실제 DB의 적용 기록을 모두 확인한다. 서비스 정지와 백업 뒤 같은 DB로 이전 이미지를 기동하고 공개 화면을 확인한다. DB 스키마 또는 자료 계약이 다르면 별도 DB 복원과 전환 절차를 검증한 뒤 승인한다. 현재 `restore.sh`의 운영 대상은 접근 권한과 전환 절차가 정해질 때까지 보류한다.
 <!-- TODO(M2): 명령 하나로 배포 (AC-M2-08). migration 적용 → server·engine 재시작 → 상태 확인. -->
 
 ### 로컬 산출물 사전 확인 (T2-15 B2b3a)

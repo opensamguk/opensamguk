@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-  [Parameter(Mandatory)][ValidateSet('DEPLOY')][string]$Operation,
+  [Parameter(Mandatory)][ValidateSet('DEPLOY', 'ROLLBACK')][string]$Operation,
   [Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$ExpectedRevision,
   [Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$Revision,
   [Parameter(Mandatory)][string]$ManifestPath,
@@ -97,12 +97,21 @@ function Assert-Database {
     throw '배포 대상 DB가 다릅니다.'
   }
 }
+function Migration-Ledger($Manifest) {
+  return $Manifest.migrations | ForEach-Object {
+    if ($_.name -cnotmatch '^[0-9]{14}_[a-z0-9_]+$' -or $_.sha256 -cnotmatch '^[0-9a-f]{64}$') {
+      throw '배포판의 migration 형식이 잘못되었습니다.'
+    }
+    "$($_.name) $($_.sha256)"
+  }
+}
 function Confirm-Migrations([bool]$Exact) {
   if ((Invoke-Sql 'SELECT COUNT(*) FROM "_prisma_migrations" WHERE finished_at IS NULL AND rolled_back_at IS NULL;') -cne '0') {
     throw '종료되지 않은 migration이 있습니다.'
   }
   $applied = @(Invoke-Sql 'SELECT migration_name || '' '' || checksum FROM "_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL ORDER BY migration_name COLLATE "C";')
-  $expected = @($manifest.migrations | ForEach-Object { "$($_.name) $($_.sha256)" })
+  $expected = @(Migration-Ledger $manifest)
+  if ($expected.Count -eq 0) { throw '배포판에 migration 기록이 없습니다.' }
   if ($applied.Count -gt $expected.Count -or ($Exact -and $applied.Count -ne $expected.Count)) {
     throw '배포판에 없는 migration이 적용됐거나 적용할 migration이 남아 있습니다.'
   }
@@ -111,12 +120,41 @@ function Confirm-Migrations([bool]$Exact) {
   }
   return ($expected.Count - $applied.Count)
 }
+function Assert-RollbackContract {
+  # An approved pair binds both artifacts and the owner's application-data compatibility review.
+  $pairs = @($options.rollbackPairs | Where-Object {
+    $_.fromRevision -ceq $ExpectedRevision -and $_.revision -ceq $Revision
+  })
+  if ($pairs.Count -ne 1) { throw '현재 판과 이전 판의 데이터 호환 검토가 필요합니다.' }
+  $pair = $pairs[0]
+  $currentFile = Existing-Path $pair.currentManifest
+  if ((Fingerprint $currentFile) -cne $pair.currentManifestSha256 -or
+      (Fingerprint $manifestFile) -cne $pair.targetManifestSha256) {
+    throw '데이터 호환을 검토한 배포판이 다릅니다.'
+  }
+  $current = Get-Content -Raw -LiteralPath $currentFile | ConvertFrom-Json -AsHashtable
+  if ($current.sourceRevision -cne $ExpectedRevision -or
+      $current.resourcesSql.sha256 -cnotmatch '^[0-9a-f]{64}$' -or
+      $current.resourcesSql.sha256 -cne $manifest.resourcesSql.sha256 -or
+      ((Migration-Ledger $current) -join "`n") -cne ((Migration-Ledger $manifest) -join "`n")) {
+    throw '복원과 전환을 검증한 되돌리기 절차가 필요합니다.'
+  }
+  foreach ($service in @('server', 'engine')) {
+    $live = Inspect-Container $service '{{.Image}}'
+    $approved = @($current.images | Where-Object target -CEQ $service)
+    if ($approved.Count -ne 1 -or $approved[0].id -cne $live) {
+      throw '현재 이미지가 데이터 호환을 검토한 이미지와 다릅니다.'
+    }
+  }
+}
 
 $lock = [IO.File]::Open((Join-Path $runtimeDirectory "$project.compose.release.lock"), 'OpenOrCreate', 'ReadWrite', 'None')
 try {
   Assert-Database
   Assert-LiveRevision $ExpectedRevision
-  [void](Confirm-Migrations $false)
+  $isRollback = $Operation -ceq 'ROLLBACK'
+  if ($isRollback) { Assert-RollbackContract }
+  [void](Confirm-Migrations $isRollback)
   $oldCompose = Existing-Path (Inspect-Container 'server' '{{index .Config.Labels "com.docker.compose.project.config_files"}}')
   $oldEnv = Existing-Path (Inspect-Container 'server' '{{index .Config.Labels "com.docker.compose.project.environment_file"}}')
   $values = @{ PUBLIC_WEB_DIRECTORY = $web.Replace('\', '/') }
@@ -187,10 +225,10 @@ try {
   $stopped = $false
   $possibleDbChange = $false
   try {
-    Stop-Services $oldArgs
     $stopped = $true
+    Stop-Services $oldArgs
     Assert-Database
-    $pending = Confirm-Migrations $false
+    $pending = Confirm-Migrations $isRollback
     $dockerHost = & $docker context inspect --format '{{(index .Endpoints "docker").Host}}'
     Assert-Exit 'Docker 연결 확인'
     $priorHost = $env:DOCKER_HOST
@@ -199,7 +237,7 @@ try {
       $env:DOCKER_HOST = $dockerHost
       $env:DOCKER_CONFIG = Existing-Path $options.backupDockerConfig $true
       & $bash ($backupScript.Replace('\', '/')) --docker $docker --container $dbContainer --system-identifier $dbSystem --db-user $dbUser --admin-db postgres --source-db $dbName --backup-dir ($backupDirectory.Replace('\', '/')) --reason pre-deploy --release-sha $ExpectedRevision
-      Assert-Exit '배포 전 백업'
+      Assert-Exit '서비스 전환 전 백업'
     } finally {
       $env:DOCKER_HOST = $priorHost
       $env:DOCKER_CONFIG = $priorConfig
@@ -209,6 +247,7 @@ try {
       & $docker @newArgs run --rm migrate
       Assert-Exit 'migration 적용'
     }
+    Assert-Database
     [void](Confirm-Migrations $true)
     $possibleDbChange = $true
     Start-Services $newArgs
