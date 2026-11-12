@@ -10878,39 +10878,105 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "api": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42423166785",
+              "sha": "8e946cd65dda95a0d3d5d75882b8d2bdf108f04b"
+            },
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts#L291",
+              "sha": "8e946cd65dda95a0d3d5d75882b8d2bdf108f04b"
+            }
+          ],
+          "reason": "PR #419에서 기능을 켠 월드의 HTTP 목록·사전 검사·예턴 저장과 끈 월드의 예약 거부를 확인했다. 보호 병합이 남아 있다"
         },
         "authorization": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42423166785",
+              "sha": "8e946cd65dda95a0d3d5d75882b8d2bdf108f04b"
+            },
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts#L291",
+              "sha": "8e946cd65dda95a0d3d5d75882b8d2bdf108f04b"
+            }
+          ],
+          "reason": "PR #419에서 무인증 거부와 장수의 현재 상태 검사, 인자 주입 거부를 확인했다. 타인·제재 경계 검증이 남아 있다"
         },
         "engine": {
           "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "evidence": [
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42423166785",
+              "sha": "8e946cd65dda95a0d3d5d75882b8d2bdf108f04b"
+            },
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts#L291",
+              "sha": "8e946cd65dda95a0d3d5d75882b8d2bdf108f04b"
+            }
+          ],
+          "reason": "main 등록을 기다린다. PR #419에서 실제 엔진이 보급 도시를 골라 장수를 옮겼다. 기존 귀환과 기능 선행 조건을 대조한 규칙 시험이 있다"
         },
         "effectsCostsFailures": {
           "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "evidence": [
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42423166785",
+              "sha": "8e946cd65dda95a0d3d5d75882b8d2bdf108f04b"
+            },
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts#L291",
+              "sha": "8e946cd65dda95a0d3d5d75882b8d2bdf108f04b"
+            }
+          ],
+          "reason": "main 등록을 기다린다. PR #419에서 아군 도시의 명령을 거부하고 정상 귀환 시 장수의 금·쌀·경험을 보존했다"
         },
         "persistence": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42423166785",
+              "sha": "8e946cd65dda95a0d3d5d75882b8d2bdf108f04b"
+            },
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts#L291",
+              "sha": "8e946cd65dda95a0d3d5d75882b8d2bdf108f04b"
+            }
+          ],
+          "reason": "PR #419에서 PostgreSQL 턴 저장 오류 뒤 상태 불변을 확인하고 같은 턴을 다시 실행했다. 보호 병합이 남아 있다"
         },
         "restart": {
           "status": "missing",
           "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "reason": "저장 오류를 주입한 뒤 턴 재시도를 확인했다. 엔진 프로세스 종료와 새 프로세스 재개 검증이 남아 있다"
         },
         "replay": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42423166785",
+              "sha": "8e946cd65dda95a0d3d5d75882b8d2bdf108f04b"
+            },
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts#L291",
+              "sha": "8e946cd65dda95a0d3d5d75882b8d2bdf108f04b"
+            }
+          ],
+          "reason": "PR #419에서 예턴 예약과 접경귀환을 포함한 두 달을 재생해 PostgreSQL의 월간 해시를 대조했다. 보호 병합이 남아 있다"
         },
         "independentReview": {
           "status": "missing",
@@ -10918,9 +10984,20 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "exactShaValidation": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42423166785",
+              "sha": "8e946cd65dda95a0d3d5d75882b8d2bdf108f04b"
+            },
+            {
+              "kind": "test",
+              "ref": "tools/nation-lifecycle-api.integration.test.ts#L291",
+              "sha": "8e946cd65dda95a0d3d5d75882b8d2bdf108f04b"
+            }
+          ],
+          "reason": "PR #419의 실제 PostgreSQL 생활 명령 시험 7건을 동일 커밋 CI에서 확인했다. 전 단계 동일 커밋 검증이 남아 있다"
         },
         "merge": {
           "status": "missing",
@@ -10928,7 +11005,7 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         }
       },
-      "blockers": ["A-04", "작업 분해 없음", "수치 환산 미정"]
+      "blockers": ["PR #419의 보호 병합, 브라우저, 타인·제재 권한, 실제 엔진 재시작과 전 단계 독립 검증이 남아 있다"]
     },
     {
       "id": "nation_mobilize",
