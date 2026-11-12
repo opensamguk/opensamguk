@@ -114,6 +114,9 @@ export function AdminLayout() {
           <Link to="/admin/notices" preload={false}>
             공지 관리
           </Link>
+          <Link to="/admin/releases" preload={false}>
+            배포 관리
+          </Link>
         </nav>
         <p className={styles.privacy}>조회 결과에는 개인정보가 포함됩니다. 필요한 범위만 확인하세요.</p>
         {checkError ? (
