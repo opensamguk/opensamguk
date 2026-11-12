@@ -211,7 +211,8 @@ try {
           $response = Invoke-WebRequest -Uri "$($options.publicOrigin)$path" -TimeoutSec 7 -Headers @{'Cache-Control' = 'no-cache'}
           if ($response.StatusCode -ne 200) { throw '공개 응답이 정상 상태가 아닙니다.' }
         }
-        Invoke-WebRequest -Uri "$($options.publicOrigin)/lobby" -TimeoutSec 7 -OutFile $output -Headers @{'Cache-Control' = 'no-cache'}
+        # The tunnel edge can add a browser analytics tag to HTML document requests.
+        Invoke-WebRequest -Uri "$($options.publicOrigin)/lobby" -TimeoutSec 7 -OutFile $output -Headers @{'Cache-Control' = 'no-cache'; 'Accept' = '*/*'}
         if ((Fingerprint $output) -cne $entry[0].sha256) { throw '공개 화면이 승인된 배포판과 다릅니다.' }
         return
       } catch {
