@@ -77,13 +77,19 @@ test('로그인 → 로비 → 장수 만들기 → 메인 → 로비로 돌아�
   test.setTimeout(120_000);
   const email = await createAccount(page);
   const world = await e2eWorld(page);
-  const worlds = await query<LobbyWorld[]>(page, 'lobby.worlds', {});
-  const listed = worlds.find((w) => w.id === world)!;
-  expect(listed.startedAt).not.toBeNull();
   await page.context().clearCookies();
 
   await page.goto('/login');
-  await login(page, email);
+  // Compare with the response rendered by the lobby. The live world can advance during login.
+  const routes = (url: string) => new URL(url).pathname.split('/').at(-1)?.split(',') ?? [];
+  const [response] = await Promise.all([
+    page.waitForResponse((value) => value.ok() && routes(value.url()).includes('lobby.worlds')),
+    login(page, email),
+  ]);
+  const replies = (await response.json()) as { result: { data: LobbyWorld[] } }[];
+  const worlds = replies[routes(response.url()).indexOf('lobby.worlds')]!.result.data;
+  const listed = worlds.find((w) => w.id === world)!;
+  expect(listed.startedAt).not.toBeNull();
   await expect(page).toHaveURL('/lobby');
   const target = card(page, listed.name);
   const startDate = await page.evaluate((date) => {
