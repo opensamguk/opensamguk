@@ -379,12 +379,24 @@ export function prepareInitialWorld(
           : { defaultPolicy: 'none', lastActiveTick: general.userId === null ? null : 0 }),
       })),
     });
-    if (featureFormat ? features.includes('policy') : options.replayFormat !== 'legacy')
-      await tx.generalTurn.createMany({
-        data: creationState.generals.flatMap((general) =>
-          emptyQueue().map((turn, slot) => ({ ...turn, args: {}, worldId, generalId: general.id, slot })),
-        ),
-      });
+    if (featureFormat ? features.includes('policy') : options.replayFormat !== 'legacy') {
+      const queue = emptyQueue();
+      if (creationState.mapKey === 'san10-expanded') {
+        // 확장판 공백지는 예턴 90,330칸을 만든다. DB에서 같은 빈 칸을 합성해 바인딩을 줄인다.
+        const empty = queue[0]!;
+        await tx.$executeRaw`
+          INSERT INTO "GeneralTurn" ("worldId", "generalId", slot, "commandKey", args, explicit)
+          SELECT g."worldId", g.id, slot, ${empty.commandKey}, '{}'::jsonb, ${empty.explicit}
+          FROM "General" g CROSS JOIN generate_series(0, ${queue.length - 1}::int) AS slots(slot)
+          WHERE g."worldId" = ${worldId}`;
+      } else {
+        await tx.generalTurn.createMany({
+          data: creationState.generals.flatMap((general) =>
+            queue.map((turn, slot) => ({ ...turn, args: {}, worldId, generalId: general.id, slot })),
+          ),
+        });
+      }
+    }
     await tx.diplomacy.createMany({
       data: creationState.diplomacies.map((diplomacy) => ({ ...diplomacy, worldId })),
     });
