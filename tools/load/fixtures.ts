@@ -10,6 +10,7 @@ import {
   LOAD_CONTRACT,
   LOAD_FEATURES,
   LOAD_FIXTURE_POLICY,
+  LOAD_PREPARATION_TURN_MINUTES,
   LOAD_RESOURCES,
   loadDatabaseName,
   loadWorldPlans,
@@ -29,6 +30,39 @@ export type LoadFixtureOptions = {
   onWorldCreated: (worldId: string) => void;
   onActorPrepared: () => void;
 };
+
+async function setMeasurementTurnTerm(
+  db: PrismaClient,
+  actor: LoadActor,
+  turnTermMinutes: number,
+  signal: AbortSignal,
+) {
+  const { worldId, userId, client } = actor;
+  const role = await db.user.updateMany({ where: { id: userId, role: 'USER' }, data: { role: 'ADMIN' } });
+  if (role.count !== 1) throw new Error('LOAD_SETUP_OPERATOR_ROLE_INVALID');
+  let restored: boolean;
+  try {
+    const input = { worldId, expectedUserId: userId, idempotencyKey: randomUUID() };
+    let { data: result } = await client.request(
+      'admin.world.requestSetting',
+      {
+        ...input,
+        reason: '격리 부하 측정 턴 간격 적용',
+        setting: { kind: 'admin.world.setTurnTerm', turnTermMinutes },
+      },
+      signal,
+    );
+    while (result.status === 'PENDING') {
+      await delay(100, undefined, { signal });
+      ({ data: result } = await client.request('admin.world.settingRequest', input, signal));
+    }
+    if (result.status !== 'APPLIED' || result.sequence === null) throw new Error('LOAD_SETUP_TURN_TERM_NOT_APPLIED');
+  } finally {
+    const result = await db.user.updateMany({ where: { id: userId, role: 'ADMIN' }, data: { role: 'USER' } });
+    restored = result.count === 1;
+  }
+  if (!restored) throw new Error('LOAD_SETUP_OPERATOR_ROLE_INVALID');
+}
 
 export async function prepareLoadFixtures(db: PrismaClient, options: LoadFixtureOptions) {
   loadOrigin(options.target);
@@ -52,7 +86,7 @@ export async function prepareLoadFixtures(db: PrismaClient, options: LoadFixture
       () =>
         saveInitialWorld(db, initial, {
           name: `부하 ${plan.label}`,
-          turnTermMinutes: plan.turnTermMinutes,
+          turnTermMinutes: LOAD_PREPARATION_TURN_MINUTES,
           endYear: 201,
         }),
       { ...options, startClock: (id) => controlClock(db, id, 'start') },
@@ -153,5 +187,30 @@ export async function prepareLoadFixtures(db: PrismaClient, options: LoadFixture
     new Set(worlds.map((world) => world.worldId)).size !== 2
   )
     throw new Error('LOAD_FIXTURE_CARDINALITY_MISMATCH');
-  return { resourceManifest, worlds, fixtureAccounts, realApiHumans };
+  for (const world of worlds) {
+    options.signal.throwIfAborted();
+    await setMeasurementTurnTerm(db, world.actors[0]!, world.turnTermMinutes, options.signal);
+  }
+  const finalWorlds = await db.world.findMany({
+    select: { id: true, status: true, clockMode: true, turnTermMinutes: true },
+  });
+  const pendingInputs = await db.inputEvent.count({ where: { status: 'PENDING' } });
+  const temporaryOperators = await db.user.count({ where: { role: 'ADMIN' } });
+  if (
+    pendingInputs !== 0 ||
+    temporaryOperators !== 0 ||
+    finalWorlds.length !== worlds.length ||
+    worlds.some(
+      (world) =>
+        !finalWorlds.some(
+          (row) =>
+            row.id === world.worldId &&
+            row.status === 'RUNNING' &&
+            row.clockMode === 'REALTIME' &&
+            row.turnTermMinutes === world.turnTermMinutes,
+        ),
+    )
+  )
+    throw new Error('LOAD_SETUP_HANDOFF_INVALID');
+  return { resourceManifest, worlds, fixtureAccounts, realApiHumans, pendingInputs, temporaryOperators };
 }

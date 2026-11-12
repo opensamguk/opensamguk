@@ -2,10 +2,12 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import { z } from 'zod';
 import { createDb, type PrismaClient } from '../../packages/db/src/index';
 import { TICKS_PER_MONTH, toGameDate } from '../../packages/rules/src/index';
 import { initializeResources, ResourceInitializationError } from '../init-resources';
 import { initializeIntegrationResources } from '../integration-resources';
+import { LOAD_CONTRACT, LOAD_PREPARATION_TURN_MINUTES } from './contract';
 import { prepareLoadFixtures } from './fixtures';
 import { runNativeLoad } from './generator';
 import { LoadHttpError } from './http';
@@ -13,6 +15,12 @@ import { nativeJournal } from './journal';
 import { workerFailureReasonPattern, writeEvidence } from './lifecycle';
 import { loadDatabaseUrl } from './server';
 import type { LoadRun } from './report';
+
+const turnSettingResult = z.object({
+  version: z.literal(1),
+  before: z.object({ turnTermMinutes: z.literal(LOAD_PREPARATION_TURN_MINUTES) }),
+  after: z.object({ turnTermMinutes: z.union([z.literal(1), z.literal(2)]) }),
+});
 
 export function assertActionCoverage(input: {
   worldId: string;
@@ -72,6 +80,34 @@ export async function readDatabaseWitness(db: PrismaClient, worldIds: readonly s
         ]);
         const own = assertActionCoverage({ worldId, lastSequence: world.actionSequence, turns, months, inputs });
         witnesses.push(...own);
+        const settings = await tx.inputEvent.findMany({ where: { worldId, kind: 'admin.world.setTurnTerm' } });
+        const setting = settings[0];
+        const settingResult = turnSettingResult.safeParse(setting?.result);
+        if (
+          settings.length !== 1 ||
+          setting?.status !== 'APPLIED' ||
+          setting.sequence === null ||
+          !settingResult.success ||
+          settingResult.data.after.turnTermMinutes !== world.turnTermMinutes
+        )
+          throw new Error('LOAD_SETUP_HANDOFF_INVALID');
+        const settingSequence = setting.sequence;
+        const registrations = await tx.inputEvent.findMany({
+          where: { worldId, kind: 'general.create' },
+          select: { status: true, sequence: true },
+        });
+        const applied = await tx.auditLog.findMany({
+          where: { worldId, action: 'world.setting.applied', inputEventId: setting.id },
+          select: { at: true },
+        });
+        if (
+          registrations.length !== LOAD_CONTRACT.humansPerWorld ||
+          registrations.some(
+            (row) => row.status !== 'APPLIED' || row.sequence === null || row.sequence >= settingSequence,
+          ) ||
+          applied.length !== 1
+        )
+          throw new Error('LOAD_SETUP_HANDOFF_INVALID');
         const millisecondsPerTick = (world.turnTermMinutes * 60_000) / TICKS_PER_MONTH;
         const epoch = world.clockAnchorAt.getTime() - world.clockTick * millisecondsPerTick;
         const cutoffTick = Math.ceil((cutoffAt - epoch) / millisecondsPerTick) - 1;
@@ -89,6 +125,12 @@ export async function readDatabaseWitness(db: PrismaClient, worldIds: readonly s
           pendingDueMonthly,
           committedActionCount: own.length,
           lastSequence: world.actionSequence,
+          preparation: {
+            turnTermMinutes: LOAD_PREPARATION_TURN_MINUTES,
+            appliedRegistrations: LOAD_CONTRACT.humansPerWorld,
+            settingSequence,
+            settingAppliedAt: applied[0]!.at.getTime(),
+          },
         });
       }
       return { databaseWitnesses: witnesses, databaseCoverage: coverage };
@@ -230,6 +272,9 @@ async function main() {
             worlds: 2,
             fixtureAccounts: fixtures.fixtureAccounts,
             apiHumans: fixtures.realApiHumans,
+            pendingInputs: fixtures.pendingInputs,
+            temporaryOperators: fixtures.temporaryOperators,
+            turnTermMinutes: fixtures.worlds.map((world) => world.turnTermMinutes),
           });
           phase = 'measurement';
           controller.signal.throwIfAborted();

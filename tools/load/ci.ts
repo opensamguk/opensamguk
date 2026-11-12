@@ -13,8 +13,10 @@ import {
   workerFailureReasonPattern,
   writeEvidence,
 } from './lifecycle';
+import { LOAD_CONTRACT } from './contract';
+import { readCommitMetrics } from './metricFiles';
 import { readRunnerProvenance, sampleAdmission, selfCgroupPath } from './observe';
-import { evaluateLoadRun, loadRunSchema } from './report';
+import { evaluateLoadRun, loadRunSchema, percentile, requestSampleSchema } from './report';
 import { bodyFailureReasonPattern, requireImageSource, volumeInitFailurePattern } from './run';
 
 // 공식 release/registry manifest: https://github.com/moby/buildkit/releases/tag/v0.34.1
@@ -236,6 +238,55 @@ export function publicLoadSummary(raw: unknown, lifecycle: unknown) {
     errors5xx: result.errors5xx,
     unexpected4xx: result.unexpected4xx,
     cleanupVerified: true,
+  };
+}
+
+async function partialMeasurementSummary(reportPath: string) {
+  const partial = resolve(reportPath, 'partial-artifacts');
+  const fragment = z
+    .object({
+      mode: z.literal('formal'),
+      complete: z.literal(true),
+      warmupStartedAt: z.number().finite(),
+      measurementStartedAt: z.number().finite(),
+      measurementFinishedAt: z.number().finite(),
+      requests: z.array(requestSampleSchema),
+      sse: z
+        .array(z.object({ readyAt: z.number().finite(), closedAt: z.number().finite(), failed: z.literal(false) }))
+        .length(LOAD_CONTRACT.concurrentUsers),
+    })
+    .safeParse(
+      await readFile(resolve(partial, 'fragment.json'), 'utf8')
+        .then(JSON.parse)
+        .catch(() => null),
+    );
+  if (!fragment.success) return null;
+  const { warmupStartedAt, measurementStartedAt, measurementFinishedAt, requests, sse } = fragment.data;
+  if (
+    measurementStartedAt - warmupStartedAt < LOAD_CONTRACT.warmupMs ||
+    measurementFinishedAt - measurementStartedAt < LOAD_CONTRACT.measurementMs ||
+    sse.some((row) => row.readyAt > measurementStartedAt || row.closedAt < measurementFinishedAt)
+  )
+    return null;
+  const inWindow = (at: number) => at >= measurementStartedAt && at < measurementFinishedAt;
+  const measured = requests.filter((row) => row.phase === 'measure' && inWindow(row.startedAt));
+  if (!measured.length) return null;
+  const metrics = (await readCommitMetrics(resolve(partial, 'metrics.jsonl')).catch(() => [])).filter(
+    (row) => row.valid && row.dueAt !== null && inWindow(row.dueAt),
+  );
+  return {
+    measurementSeconds: (measurementFinishedAt - measurementStartedAt) / 1000,
+    concurrentSse: sse.length,
+    measuredRequests: measured.length,
+    observedApiP95Ms: percentile(
+      measured.map((row) => row.durationMs),
+      0.95,
+    ),
+    observedCommits: metrics.length,
+    largestObservedCommitLagMs: metrics.reduce<number | null>(
+      (max, row) => (row.lagMs === null ? max : Math.max(max ?? 0, row.lagMs)),
+      null,
+    ),
   };
 }
 
@@ -680,7 +731,15 @@ async function main() {
         setupRemainingMs: z.int().nullable(),
         bodyRemainingMs: z.int().nullable(),
         http: z
-          .object({ procedure: z.enum(['general.create', 'general.mine']), status: z.int().min(0).max(599) })
+          .object({
+            procedure: z.enum([
+              'admin.world.requestSetting',
+              'admin.world.settingRequest',
+              'general.create',
+              'general.mine',
+            ]),
+            status: z.int().min(0).max(599),
+          })
           .nullable(),
       })
       .safeParse(
@@ -708,6 +767,7 @@ async function main() {
         failed: result?.failed ?? [],
         p95Ms: result?.p95Ms ?? null,
         maxCommitUpperBoundMs: result?.maxCommitUpperBoundMs ?? null,
+        incompleteMeasurement: run.success ? null : await partialMeasurementSummary(reportPath),
       })}\n`,
     );
   }

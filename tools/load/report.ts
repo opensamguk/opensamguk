@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { LOAD_CONTRACT } from './contract';
+import { LOAD_CONTRACT, LOAD_PREPARATION_TURN_MINUTES } from './contract';
 import { userWorkload, WORKLOAD_WEIGHTS } from './workload';
 import { TICKS_PER_MONTH } from '../../packages/rules/src/index';
 
@@ -130,6 +130,14 @@ export const loadRunSchema = z.strictObject({
       pendingDueMonthly: natural,
       committedActionCount: natural,
       lastSequence: natural,
+      preparation: z
+        .strictObject({
+          turnTermMinutes: z.literal(LOAD_PREPARATION_TURN_MINUTES),
+          appliedRegistrations: z.literal(LOAD_CONTRACT.humansPerWorld),
+          settingSequence: natural.positive(),
+          settingAppliedAt: finite,
+        })
+        .optional(),
     }),
   ),
   environment: z.strictObject({
@@ -384,6 +392,11 @@ export function evaluateLoadRun(raw: unknown) {
   }
   const metricKeys = new Set<string>();
   const epochs = new Map<string, number>();
+  const preparationEpochs = new Map<string, number>();
+  const preparations = new Map(
+    run.databaseCoverage.flatMap((row) => (row.preparation ? [[row.worldId, row.preparation] as const] : [])),
+  );
+  if (preparations.size > 0 && preparations.size !== worldIds.size) invalid.push('PREPARATION_HANDOFF_MISSING');
   for (const metric of run.metrics) {
     const key = actionKey(metric);
     const action = witnessMap.get(key);
@@ -402,15 +415,26 @@ export function evaluateLoadRun(raw: unknown) {
     )
       invalid.push('COMMIT_METRIC_INVALID');
     if (metric.clockEpochAt !== null) {
-      if (epochs.has(metric.worldId) && epochs.get(metric.worldId) !== metric.clockEpochAt)
+      const preparation = preparations.get(metric.worldId);
+      const isPreparation = preparation !== undefined && metric.sequence < preparation.settingSequence;
+      const epochByWorld = isPreparation ? preparationEpochs : epochs;
+      if (epochByWorld.has(metric.worldId) && epochByWorld.get(metric.worldId) !== metric.clockEpochAt)
         invalid.push('CLOCK_EPOCH_CHANGED');
-      epochs.set(metric.worldId, metric.clockEpochAt);
+      epochByWorld.set(metric.worldId, metric.clockEpochAt);
       const world = run.worlds.find((candidate) => candidate.worldId === metric.worldId);
+      const turnTermMinutes = isPreparation ? preparation.turnTermMinutes : world?.turnTermMinutes;
       if (
-        !world ||
-        metric.dueAt !== metric.clockEpochAt + (metric.tick * world.turnTermMinutes * 60_000) / TICKS_PER_MONTH
+        turnTermMinutes === undefined ||
+        metric.dueAt !== metric.clockEpochAt + (metric.tick * turnTermMinutes * 60_000) / TICKS_PER_MONTH
       )
         invalid.push('DUE_AT_CLOCK_CONFLICT');
+      if (
+        preparation &&
+        (metric.sequence === preparation.settingSequence ||
+          (isPreparation &&
+            (metric.commitObservedAt === null || metric.commitObservedAt > preparation.settingAppliedAt)))
+      )
+        invalid.push('PREPARATION_HANDOFF_CONFLICT');
     }
   }
   if (!witnessMap.size || witnessMap.size !== metricKeys.size) invalid.push('COMMIT_SAMPLE_MISSING');
@@ -431,10 +455,21 @@ export function evaluateLoadRun(raw: unknown) {
       metrics.some((row) => row.commitObservedAt === null || row.commitObservedAt > coverage.observedAt)
     )
       invalid.push('DUE_ACTION_TAIL_UNCONFIRMED');
+    if (
+      coverage.preparation &&
+      (coverage.preparation.settingAppliedAt > run.warmupStartedAt ||
+        coverage.preparation.settingSequence > coverage.lastSequence)
+    )
+      invalid.push('PREPARATION_HANDOFF_CONFLICT');
     coverageWorlds.add(coverage.worldId);
   }
   if (coverageWorlds.size !== worldIds.size) invalid.push('DUE_ACTION_TAIL_UNCONFIRMED');
-  const measuredMetrics = run.metrics.filter((metric) => metric.dueAt !== null && inMeasure(metric.dueAt));
+  const measuredMetrics = run.metrics.filter(
+    (metric) =>
+      metric.sequence > (preparations.get(metric.worldId)?.settingSequence ?? 0) &&
+      metric.dueAt !== null &&
+      inMeasure(metric.dueAt),
+  );
   for (const [index, world] of run.worlds.entries()) {
     const metrics = measuredMetrics.filter((metric) => metric.worldId === world.worldId);
     if (!metrics.some((metric) => metric.kind === 'turn')) invalid.push('TURN_METRIC_MISSING');

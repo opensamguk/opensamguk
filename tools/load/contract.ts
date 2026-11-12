@@ -15,6 +15,8 @@ export const LOAD_CONTRACT = Object.freeze({
   turnLagLimitMs: 10_000,
 });
 
+export const LOAD_PREPARATION_TURN_MINUTES = 60;
+
 export const LOAD_FEATURES = Object.freeze([
   'campaign-assignment-v2',
   'campaign-v1',
