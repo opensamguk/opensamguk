@@ -9911,9 +9911,14 @@
             {
               "kind": "test",
               "ref": "tools/equipment-api.integration.test.ts"
+            },
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42424225498",
+              "sha": "1618f93a59eca6b2857b35d2b2e0711adde03a84"
             }
           ],
-          "reason": "실제 PostgreSQL에서 장착·금·경험·재고를 함께 저장하고 commit 실패 때 함께 되돌렸다."
+          "reason": "무기·명마의 DB 저장 시험과 PR #447의 명마 구매 비용·재고·예턴 이동·성공 로그를 확인했다. 보호 병합 근거가 남아 있다"
         },
         "restart": {
           "status": "partial",
@@ -9921,9 +9926,14 @@
             {
               "kind": "test",
               "ref": "tools/equipment-api.integration.test.ts"
+            },
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42424225498",
+              "sha": "1618f93a59eca6b2857b35d2b2e0711adde03a84"
             }
           ],
-          "reason": "새 DB 연결에서 장착과 상태 해시를 다시 확인했다. 별도 엔진 프로세스의 복구는 확인이 필요하다."
+          "reason": "PR #447에서 명마 구매의 커밋 직전·직후 프로세스를 실제 SIGKILL했다. 새 엔진은 비용·재고와 성공 로그를 한 번만 반영했다. 다른 장비와 보호 병합 근거가 남아 있다"
         },
         "replay": {
           "status": "partial",
@@ -9973,9 +9983,18 @@
               "kind": "ci",
               "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42396668367",
               "sha": "6d831425c31ccc23c9664bcd55acd6a7320542fa"
+            },
+            {
+              "kind": "test",
+              "ref": "tools/equipment-api.integration.test.ts"
+            },
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42424225498",
+              "sha": "1618f93a59eca6b2857b35d2b2e0711adde03a84"
             }
           ],
-          "reason": "카드와 오류 복구, 명마·무기 재료 검증에 해당하는 source CI가 각각 통과했다."
+          "reason": "PR #447의 실제 PostgreSQL 장비 시험 12건을 동일 커밋 CI에서 확인했다. 전 단계 동일 커밋 검증이 남아 있다"
         },
         "merge": {
           "status": "partial",
@@ -12118,7 +12137,7 @@
           "reason": "기능 등록과 명령별 실행 시험을 확인했다. 실제 PostgreSQL에서는 12회·24회 연구를 각각 한 종씩 검증했다. 이 대응표의 독립 리뷰와 exact SHA 증거 연결은 남아 있다."
         },
         "effectsCostsFailures": {
-          "status": "missing",
+          "status": "partial",
           "evidence": [
             {
               "kind": "test",
@@ -12127,9 +12146,18 @@
             {
               "kind": "doc",
               "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            },
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42443010262",
+              "sha": "f061b260fddc221915ac8abc535640d2308044f4"
             }
           ],
-          "reason": "7종은 ruleRegistry 기능 binding에 구현했다. 현행 정적 검사는 commands/ext 등록만 읽으므로 이 단계의 검증 상태를 올리지 않는다. 최종 구현 인수와 검사기 대응은 남아 있다."
+          "reason": "PR #463에서 연구 준비와 완료, 국고 금·쌀 10만씩 차감과 장수 경험·공헌 120을 확인했다. 명령 대표 실패 검증과 보호 병합이 남아 있다"
         },
         "persistence": {
           "status": "partial",
@@ -12141,9 +12169,14 @@
             {
               "kind": "doc",
               "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            },
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42443010262",
+              "sha": "f061b260fddc221915ac8abc535640d2308044f4"
             }
           ],
-          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
+          "reason": "PR #463에서 실제 PostgreSQL로 준비 23회 뒤 완료 목록에 극병 하나만 들어가고 준비 행이 비는 것을 확인했다. 보호 병합이 남아 있다"
         },
         "restart": {
           "status": "partial",
@@ -12155,9 +12188,14 @@
             {
               "kind": "doc",
               "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            },
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42443010262",
+              "sha": "f061b260fddc221915ac8abc535640d2308044f4"
             }
           ],
-          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
+          "reason": "PR #463에서 극병 준비 커밋 직전과 완료 커밋 직후에 엔진을 SIGKILL했다. 새 엔진은 준비와 완료를 각각 한 번만 반영했다. 보호 병합이 남아 있다"
         },
         "replay": {
           "status": "partial",
@@ -12169,9 +12207,14 @@
             {
               "kind": "doc",
               "ref": "docs/plans/T4-53.md#구현-기록-codex"
+            },
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42443010262",
+              "sha": "f061b260fddc221915ac8abc535640d2308044f4"
             }
           ],
-          "reason": "연구 공통 경로의 실제 HTTP·PG 4건과 생성 선택 26건을 확인했다. 12·24회 저장·재개·재생의 대표 사례이며 최종 CI·독립 리뷰·보호 병합 전이다."
+          "reason": "PR #463에서 24개월 기록을 새 프로세스로 재생해 월간 해시를 대조했다. 보호 병합이 남아 있다"
         },
         "independentReview": {
           "status": "missing",
@@ -12179,9 +12222,19 @@
           "reason": "구현 전 (D-022로 MVP 필수)"
         },
         "exactShaValidation": {
-          "status": "missing",
-          "evidence": [],
-          "reason": "구현 전 (D-022로 MVP 필수)"
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "tools/nation-research-api.integration.test.ts"
+            },
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42443010262",
+              "sha": "f061b260fddc221915ac8abc535640d2308044f4"
+            }
+          ],
+          "reason": "PR #463의 실제 PostgreSQL 연구 시험 10건을 동일 커밋 CI에서 확인했다. 전 단계 동일 커밋 검증이 남아 있다"
         },
         "merge": {
           "status": "missing",
