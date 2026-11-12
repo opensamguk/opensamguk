@@ -19,6 +19,7 @@ export function cloneWorldWithRegistry(view: WorldView, registry: ExtStateRegist
   for (const key in view.nations) nations[key] = { ...view.nations[key]! };
   for (const key in view.generals) generals[key] = { ...view.generals[key]! };
   return {
+    ...(view.relations ? { relations: structuredClone(view.relations) as NonNullable<WorldState['relations']> } : {}),
     ...(view.preparedTurns
       ? { preparedTurns: structuredClone(view.preparedTurns) as NonNullable<WorldState['preparedTurns']> }
       : {}),

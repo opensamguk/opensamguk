@@ -188,6 +188,8 @@ export {
 } from './modifiers';
 
 export * from './ruleRegistry';
+export { createRelationsData, RELATIONS_FEATURE } from './relations/data';
+export { readStoredRelations } from './relations/origin';
 export { applyPersonnelInputStep } from './personnel/inputStep';
 export { completePersonnelStep } from './personnel/step';
 export type { PersonnelStepPacket } from './personnel/step';
