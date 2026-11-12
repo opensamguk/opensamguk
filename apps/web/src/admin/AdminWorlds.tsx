@@ -9,6 +9,7 @@ import { AdminClockActions } from './AdminClockActions';
 import { AdminEndActions } from './AdminEndActions';
 import { AdminCreateActions } from './AdminCreateActions';
 import { AdminResetActions } from './AdminResetActions';
+import { AdminWorldSettings, hasWorldSettingRequest } from './AdminWorldSettings';
 import styles from './AdminPages.module.css';
 
 type Worlds = inferRouterOutputs<AppRouter>['admin']['world']['list'];
@@ -23,8 +24,9 @@ export function AdminWorlds() {
   const viewerId = useRouteContext({ from: '/admin' }).adminViewerId,
     client = useTRPCClient(),
     query = usePrivateRead<Worlds>(viewerId);
-  const [owner, setOwner] = useState<'clock' | 'end' | 'create' | 'reset' | null>(null);
-  const ownerRef = useRef<'clock' | 'end' | 'create' | 'reset' | null>(null);
+  const [owner, setOwner] = useState<'clock' | 'end' | 'create' | 'reset' | 'settings' | null>(null);
+  const ownerRef = useRef<'clock' | 'end' | 'create' | 'reset' | 'settings' | null>(null);
+  const [settingsId, setSettingsId] = useState<string | null>(null);
   const acquireCreate = useCallback(() => {
     if (ownerRef.current !== null && ownerRef.current !== 'create') return false;
     ownerRef.current = 'create';
@@ -73,6 +75,7 @@ export function AdminWorlds() {
   useLayoutEffect(() => {
     ownerRef.current = null;
     setOwner(null);
+    setSettingsId(null);
   }, [viewerId]);
   return (
     <section>
@@ -86,8 +89,8 @@ export function AdminWorlds() {
         월드 조회
       </button>
       <div
-        inert={owner === 'end' || owner === 'create' || owner === 'reset'}
-        aria-hidden={owner === 'end' || owner === 'create' || owner === 'reset' || undefined}
+        inert={owner === 'end' || owner === 'create' || owner === 'reset' || owner === 'settings'}
+        aria-hidden={owner === 'end' || owner === 'create' || owner === 'reset' || owner === 'settings' || undefined}
       >
         <AdminClockActions
           key={viewerId}
@@ -98,46 +101,59 @@ export function AdminWorlds() {
         />
       </div>
       <div
-        inert={owner === 'clock' || owner === 'create' || owner === 'reset'}
-        aria-hidden={owner === 'clock' || owner === 'create' || owner === 'reset' || undefined}
+        inert={owner === 'clock' || owner === 'create' || owner === 'reset' || owner === 'settings'}
+        aria-hidden={owner === 'clock' || owner === 'create' || owner === 'reset' || owner === 'settings' || undefined}
       >
         <AdminEndActions
           key={viewerId}
           viewerId={viewerId}
           worlds={query.data}
-          disabled={owner === 'clock' || owner === 'create' || owner === 'reset'}
+          disabled={owner === 'clock' || owner === 'create' || owner === 'reset' || owner === 'settings'}
           onAcquire={acquireEnd}
           onRelease={releaseEnd}
           onClear={query.clear}
         />
       </div>
       <div
-        inert={owner === 'clock' || owner === 'end' || owner === 'reset'}
-        aria-hidden={owner === 'clock' || owner === 'end' || owner === 'reset' || undefined}
+        inert={owner === 'clock' || owner === 'end' || owner === 'reset' || owner === 'settings'}
+        aria-hidden={owner === 'clock' || owner === 'end' || owner === 'reset' || owner === 'settings' || undefined}
       >
         <AdminCreateActions
           key={viewerId}
           viewerId={viewerId}
-          disabled={owner === 'clock' || owner === 'end' || owner === 'reset'}
+          disabled={owner === 'clock' || owner === 'end' || owner === 'reset' || owner === 'settings'}
           onAcquire={acquireCreate}
           onRelease={releaseCreate}
           onClear={query.clear}
         />
       </div>
       <div
-        inert={owner === 'clock' || owner === 'end' || owner === 'create'}
-        aria-hidden={owner === 'clock' || owner === 'end' || owner === 'create' || undefined}
+        inert={owner === 'clock' || owner === 'end' || owner === 'create' || owner === 'settings'}
+        aria-hidden={owner === 'clock' || owner === 'end' || owner === 'create' || owner === 'settings' || undefined}
       >
         <AdminResetActions
           key={viewerId}
           viewerId={viewerId}
           worlds={query.data}
-          disabled={owner === 'clock' || owner === 'end' || owner === 'create'}
+          disabled={owner === 'clock' || owner === 'end' || owner === 'create' || owner === 'settings'}
           onAcquire={acquireReset}
           onRelease={releaseReset}
           onClear={query.clear}
         />
       </div>
+      {settingsId && owner === 'settings' ? (
+        <AdminWorldSettings
+          key={`${viewerId}:${settingsId}`}
+          viewerId={viewerId}
+          worldId={settingsId}
+          onClose={() => {
+            ownerRef.current = null;
+            setOwner(null);
+            setSettingsId(null);
+          }}
+          onApplied={() => void query.read((signal) => client.admin.world.list.query(undefined, { signal }))}
+        />
+      ) : null}
       {query.pending ? <LoadingState>월드 조회 중</LoadingState> : null}
       {query.error ? <ErrorState title={query.error} /> : null}
       {query.data ? (
@@ -148,6 +164,24 @@ export function AdminWorlds() {
             {query.data.map((world) => (
               <li key={world.id}>
                 <h3>{world.name}</h3>
+                {world.replayFormat === 3 &&
+                (world.status === 'RUNNING' ||
+                  world.status === 'PAUSED' ||
+                  hasWorldSettingRequest(viewerId, world.id)) ? (
+                  <button
+                    type="button"
+                    aria-label={`${world.name} ${world.status === 'ENDED' ? '설정 변경 결과' : '설정 편집'}`}
+                    disabled={owner !== null}
+                    onClick={() => {
+                      if (ownerRef.current !== null) return;
+                      ownerRef.current = 'settings';
+                      setOwner('settings');
+                      setSettingsId(world.id);
+                    }}
+                  >
+                    {world.status === 'ENDED' ? '설정 변경 결과' : '설정 편집'}
+                  </button>
+                ) : null}
                 <dl>
                   <dt>월드 UUID</dt>
                   <dd>

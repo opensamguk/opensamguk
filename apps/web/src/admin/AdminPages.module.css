@@ -377,3 +377,31 @@
   min-width: 44px;
   max-width: 100%;
 }
+
+.worldSettings {
+  display: grid;
+  gap: 0.75rem;
+  margin-block: 1rem;
+}
+.worldSettingsHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.worldSettingsFields {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: 0.5rem;
+}
+.worldSettingsFields button {
+  display: grid;
+  gap: 0.25rem;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+.worldSettingsFields button[aria-pressed='true'] {
+  outline: 2px solid currentColor;
+}
