@@ -76,6 +76,11 @@
     "target": "general"
   },
   {
+    "key": "return_border",
+    "target": "general",
+    "feature": "border-return-v1"
+  },
+  {
     "key": "sabotage",
     "target": "general"
   },
