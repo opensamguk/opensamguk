@@ -136,8 +136,24 @@ export async function persistMonthly(
       continue;
     }
     if (JSON.stringify(general) !== JSON.stringify(before.generals[general.id])) {
-      await tx.general.update({ where: { worldId_id: { worldId, id: general.id } }, data: general });
+      await tx.general.update({
+        where: { worldId_id: { worldId, id: general.id } },
+        data: { ...general, ...(before.officeEffects ? { officerCityKey: general.officerCityKey ?? null } : {}) },
+      });
     }
+  }
+  if (result.officeTaxLogs.length) {
+    await tx.generalLog.createMany({
+      data: result.officeTaxLogs.map((log, ordinal) => ({
+        ...log,
+        worldId,
+        tick,
+        sequence,
+        ordinal,
+        commandKey: 'office.residence',
+        kind: 'success',
+      })),
+    });
   }
   await tx.diplomacy.deleteMany({ where: { worldId } });
   await tx.diplomacy.createMany({ data: next.diplomacies.map((entry) => ({ ...entry, worldId })) });

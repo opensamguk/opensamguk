@@ -1,6 +1,7 @@
 import type { GameDate } from '@opensamguk/shared';
 import { BALANCE } from './balance';
 import { CITY_RESOURCE_MAX, readCityResourcesState } from './cityResources/state';
+import { residentOfficeBonuses } from './personnel/residentOffice';
 import { cloneWorld } from './model/clone';
 import type { WorldState, WorldView } from './model/world';
 
@@ -28,7 +29,12 @@ function sameFields(before: object, after: object, except?: string): boolean {
 }
 
 // 기존 정산의 실제 지급을 받아 국고 증가분만 도시 원장으로 옮긴다.
-export function applyCityResourceIncome(before: WorldView, settled: WorldView, date: GameDate): WorldState {
+export function applyCityResourceIncome(
+  before: WorldView,
+  settled: WorldView,
+  date: GameDate,
+  bonuses = residentOfficeBonuses(before, date.year),
+): WorldState {
   const active = before.ruleFeatures?.includes('city-resources-v1') ?? false;
   if (active !== (settled.ruleFeatures?.includes('city-resources-v1') ?? false))
     throw new Error('도시 세수 정산 중 규칙 판이 바뀌었습니다.');
@@ -97,8 +103,10 @@ export function applyCityResourceIncome(before: WorldView, settled: WorldView, d
     const exactWeights = cities.map((city) => {
       quantity(city[field]);
       quantity(city.population);
-      weight += city[field] * (city.population / BALANCE.MONTHLY_POPULATION_UNIT) * BALANCE.MONTHLY_TAX_RATE;
-      return BigInt(city[field]) * BigInt(city.population);
+      const rate = 100 + (bonuses.get(city.cityKey)?.tax?.percent ?? 0);
+      weight +=
+        city[field] * (city.population / BALANCE.MONTHLY_POPULATION_UNIT) * BALANCE.MONTHLY_TAX_RATE * (rate / 100);
+      return BigInt(city[field]) * BigInt(city.population) * BigInt(rate);
     });
     const gross = quantity(Math.round(weight));
     let salaries = 0;

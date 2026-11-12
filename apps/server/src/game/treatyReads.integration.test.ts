@@ -37,6 +37,7 @@ const json = (value: unknown): Prisma.JsonValue => JSON.parse(JSON.stringify(val
 function world(patch: Partial<World> = {}): World {
   return {
     runtimeOptions: null,
+    officeEffects: null,
     id: 'world',
     name: '조약 조회 단위',
     operationalMap: null,
@@ -94,6 +95,7 @@ function world(patch: Partial<World> = {}): World {
 function general(patch: Partial<General> = {}): General {
   return {
     ...initial.generals[0]!,
+    officerCityKey: null,
     removedAt: null,
     sex: null,
     politics: null,

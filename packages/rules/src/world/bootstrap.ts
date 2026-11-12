@@ -73,6 +73,7 @@ export interface InitialGeneral {
   politics?: number;
   charm?: number;
   officerLevel: number;
+  officerCityKey?: number | null;
   birthYear: number;
   deathYear: number;
   activeFromYear: number;

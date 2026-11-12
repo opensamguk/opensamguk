@@ -1,5 +1,5 @@
 import type { Prisma } from '@opensamguk/db';
-import { APPOINTABLE_OFFICER_LEVELS, canManagePersonnel, officerTitle } from '@opensamguk/rules';
+import { APPOINTABLE_OFFICER_LEVELS, canManagePersonnel, isOfficeResident, officerTitle } from '@opensamguk/rules';
 import { TRPCError } from '@trpc/server';
 import { requireGeneral } from './queries';
 
@@ -12,9 +12,13 @@ type PersonnelMember = {
   isHuman: boolean;
   city: { cityKey: number; name: string };
   dedication: number;
+  officerCityKey?: number | null;
+  resident?: boolean;
 };
 export type PersonnelBoard = {
   actorId: number;
+  officeEffectsEnabled?: true;
+  officeCities?: { cityKey: number; name: string }[];
   appoint: Allowed;
   levels: { officerLevel: number; title: string; holderId: number | null }[];
   members: PersonnelMember[];
@@ -30,6 +34,7 @@ function titleFor(level: number): string {
 export async function readPersonnelBoard(
   tx: Prisma.TransactionClient,
   input: { worldId: string; userId: string },
+  officeEffectsEnabled = false,
 ): Promise<PersonnelBoard> {
   const actor = await requireGeneral(tx, input.worldId, input.userId);
   if (actor.nationId === null) throw new TRPCError({ code: 'FORBIDDEN', message: '국가에 소속되어야 합니다.' });
@@ -42,7 +47,8 @@ export async function readPersonnelBoard(
       officerLevel: true,
       userId: true,
       dedication: true,
-      city: { select: { cityKey: true, name: true } },
+      ...(officeEffectsEnabled ? { officerCityKey: true } : {}),
+      city: { select: { cityKey: true, name: true, ...(officeEffectsEnabled ? { nationId: true } : {}) } },
     },
   });
   const members = rows.map((row) => ({
@@ -51,11 +57,34 @@ export async function readPersonnelBoard(
     officerLevel: row.officerLevel,
     title: titleFor(row.officerLevel),
     isHuman: row.userId !== null,
-    city: row.city,
+    city: { cityKey: row.city.cityKey, name: row.city.name },
+    ...(officeEffectsEnabled
+      ? {
+          officerCityKey: row.officerCityKey ?? null,
+          resident: isOfficeResident(
+            { ...row, nationId: actor.nationId, cityKey: row.city.cityKey },
+            row.city.nationId ?? null,
+          ),
+        }
+      : {}),
     dedication: row.dedication,
   }));
   return {
     actorId: actor.id,
+    ...(officeEffectsEnabled
+      ? {
+          officeEffectsEnabled: true as const,
+          officeCities: await tx.city.findMany({
+            where: {
+              worldId: input.worldId,
+              nationId: actor.nationId,
+              OR: [{ kind: null }, { kind: { not: 'PASS' } }],
+            },
+            orderBy: { cityKey: 'asc' },
+            select: { cityKey: true, name: true },
+          }),
+        }
+      : {}),
     appoint: canManagePersonnel(actor.officerLevel)
       ? { ok: true }
       : { ok: false, reason: '군주만 임명·해임할 수 있습니다.' },

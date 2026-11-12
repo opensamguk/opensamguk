@@ -1,3 +1,4 @@
+import { OFFICE_EFFECTS_FEATURE, defaultOfficeEffects, officeEffectsSchema } from '@opensamguk/rules';
 import type { PrismaClient, Prisma } from '@opensamguk/db';
 import type { WorldInit } from '@opensamguk/rules';
 import {
@@ -126,6 +127,8 @@ export function prepareInitialWorld(
       (featureData === null || typeof featureData !== 'object' || Array.isArray(featureData))
     )
       throw new Error('규칙 기능 자료를 확인하세요.');
+    if (features.includes(OFFICE_EFFECTS_FEATURE) && featureData?.[OFFICE_EFFECTS_FEATURE] === undefined)
+      featureData = { ...featureData, [OFFICE_EFFECTS_FEATURE]: defaultOfficeEffects };
     if (features.includes('policy')) {
       const policy = featureData?.policy;
       if (
@@ -274,6 +277,9 @@ export function prepareInitialWorld(
           ? {
               replayFormat: typeof options.replayFormat === 'number' ? options.replayFormat : 3,
               ruleFeatures: features,
+              ...(features.includes(OFFICE_EFFECTS_FEATURE)
+                ? { officeEffects: officeEffectsSchema.parse(featureData?.[OFFICE_EFFECTS_FEATURE]) }
+                : {}),
             }
           : options.replayFormat === 'legacy'
             ? {}
@@ -494,13 +500,16 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
         nations: nations.map((nation) => {
           return { ...stripWorldId(nation), capitalCityKey: nation.capitalCityKey };
         }),
-        generals: generals.map(({ turnRevision, battleWins, captures, ...general }) => {
+        generals: generals.map(({ turnRevision, battleWins, captures, officerCityKey, ...general }) => {
           void turnRevision;
           void battleWins;
           void captures;
           return storedGeneralStats(
             storedGeneralRemoval(
-              storedGeneralSex(stripWorldId(general), world.ruleFeatures.includes('lineage-v1')),
+              storedGeneralSex(
+                { ...stripWorldId(general), ...(officerCityKey == null ? {} : { officerCityKey }) },
+                world.ruleFeatures.includes('lineage-v1'),
+              ),
               world.replayFormat,
             ),
             world.ruleFeatures?.includes('five-stats') ?? false,

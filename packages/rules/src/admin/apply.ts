@@ -1,3 +1,4 @@
+import { isLocalOffice } from '../personnel/residentOffice';
 import { z } from 'zod';
 import type { JsonValue } from '../model/world';
 import type { RecordedInput, ReplayState } from '../replay';
@@ -187,10 +188,15 @@ export function decideAdminGameAction(
       break;
     }
     case 'admin.nation.dismissOffice': {
-      if (general!.nationId !== action.nationId || !isAppointableOfficerLevel(general!.officerLevel))
+      if (
+        general!.nationId !== action.nationId ||
+        (!isAppointableOfficerLevel(general!.officerLevel) &&
+          !(replay.state.officeEffects && isLocalOffice(general!.officerLevel) && general!.officerCityKey != null))
+      )
         return reject('INVALID_VALUE');
       before = { officerLevel: general!.officerLevel };
       next.state.generals[action.generalId]!.officerLevel = 1;
+      delete next.state.generals[action.generalId]!.officerCityKey;
       after = { officerLevel: 1 };
       break;
     }

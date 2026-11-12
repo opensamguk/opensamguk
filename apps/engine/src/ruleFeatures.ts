@@ -163,15 +163,23 @@ const processPersonnelInput: QueuedInputHandler = async (tx, world, event, { tic
     tick,
     createdHumanId: null,
   });
-  await persistEffects(tx, world.id, outcome.packet.state, [{ kind: 'world', state: outcome.packet.state }], {
-    tick,
-    sequence,
-  });
+  await persistEffects(
+    tx,
+    world.id,
+    outcome.packet.state,
+    [{ kind: 'world', state: outcome.packet.state }],
+    {
+      tick,
+      sequence,
+    },
+    before.state,
+  );
   await persistPersonnelPacket(tx, world.id, before, outcome.packet, anchors, { tick, sequence });
   return { status: 'APPLIED', result: outcome.result as unknown as Prisma.InputJsonValue };
 };
 
 export const builtInEngineFeatures: readonly EngineFeature[] = [
+  { key: 'office-effects' },
   { key: 'nation-strategy-v1' },
   { key: 'prepared-turns-v1' },
   { key: 'nation-research-v1' },

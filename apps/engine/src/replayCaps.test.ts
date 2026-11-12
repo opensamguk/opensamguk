@@ -171,6 +171,7 @@ function exportFixture(source: CapsArchive, ended = true) {
   const json = (value: unknown): Prisma.JsonValue => JSON.parse(JSON.stringify(value));
   const world: Prisma.WorldGetPayload<Record<string, never>> = {
     runtimeOptions: null,
+    officeEffects: null,
     id: 'caps-export',
     name: '수출 단위 시험',
     operationalMap: null,

@@ -39,6 +39,7 @@ import { ADMIN_GAME_KINDS } from './admin/game';
 import { applyAdminGameRecord } from './admin/apply';
 import { ADMIN_SETTING_KINDS, applyAdminSettingRecord } from './admin/settings';
 import type { UnitSetResource } from './world/resources';
+import { OFFICE_EFFECTS_FEATURE, officeEffectsSchema } from './personnel/residentOffice';
 import { reputationFeature } from './review/feature';
 import { cityScaleFeature } from './cityScale/feature';
 import { checkCityScaleInitial } from './cityScale/state';
@@ -106,6 +107,19 @@ export const ruleRegistry: RuleRegistry = {
     preparedTurnsFeature,
     nationResearchFeature,
     personnelFeature,
+    {
+      key: OFFICE_EFFECTS_FEATURE,
+      requires: ['personnel'],
+      conflicts: [],
+      checkOrigin({ initial, data }) {
+        officeEffectsSchema.parse(data);
+        if (initial.generals.some((general) => Object.hasOwn(general, 'officerCityKey')))
+          throw new Error('초기 장수에는 도시 관직을 배정할 수 없습니다.');
+      },
+      initReplayState(replay, { data }) {
+        return { ...replay, state: { ...replay.state, officeEffects: officeEffectsSchema.parse(data) } };
+      },
+    },
     policyFeature,
     treatyFeature,
     treatyBreakFeature,

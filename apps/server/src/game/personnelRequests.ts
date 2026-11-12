@@ -4,7 +4,12 @@ import { z } from 'zod';
 
 const kinds = ['personnel.appoint', 'personnel.dismiss', 'offer.respond'] as const;
 type PersonnelKind = (typeof kinds)[number];
-export type AppointResult = { generalId: number; officerLevel: number; title: string };
+export type AppointResult = {
+  generalId: number;
+  officerLevel: number;
+  title: string;
+  officerCityKey?: number | undefined;
+};
 export type RespondResult = {
   offerStatus: 'ACCEPTED' | 'REJECTED';
   city: { cityKey: number; name: string };
@@ -15,13 +20,18 @@ export type RequestState<R> =
   | { status: 'applied'; requestId: string; result: R }
   | { status: 'rejected'; requestId: string; code: string; message: string };
 export type PersonnelRecord = { kind: PersonnelKind; state: RequestState<AppointResult | RespondResult> };
-export type PersonnelReady = Readonly<{ worldId: string; personnel: 'ready' }>;
+export type PersonnelReady = Readonly<{ worldId: string; personnel: 'ready'; officeEffectsEnabled?: true }>;
 type EventRow = Pick<
   Prisma.InputEventGetPayload<Record<string, never>>,
   'kind' | 'idempotencyKey' | 'status' | 'result'
 >;
 const positive = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
-const appointResult = z.object({ generalId: positive, officerLevel: z.number().int(), title: z.string().min(1) });
+const appointResult = z.object({
+  generalId: positive,
+  officerLevel: z.number().int(),
+  title: z.string().min(1),
+  officerCityKey: positive.optional(),
+});
 const respondResult = z.object({
   offerStatus: z.enum(['ACCEPTED', 'REJECTED']),
   city: z.object({ cityKey: positive, name: z.string() }),

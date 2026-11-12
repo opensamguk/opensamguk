@@ -3,6 +3,7 @@ import { TRPCError } from '@trpc/server';
 import type { Prisma } from '@opensamguk/db';
 import { hashState } from '@opensamguk/shared/node';
 import {
+  defaultOfficeEffects,
   requestWorldCreateInput,
   worldCreateStatusInput,
   worldCreateIntent,
@@ -81,6 +82,7 @@ export async function requestWorldCreate(ctx: Context, input: z.infer<typeof req
           idempotencyKey: input.idempotencyKey,
           intentHash,
           intent,
+          ...(intent.ruleFeatures?.includes('personnel') ? { officeEffects: defaultOfficeEffects } : {}),
           effectiveSeed: intent.seed ?? randomBytes(16).toString('hex'),
           plannedWorldId: randomUUID(),
         },

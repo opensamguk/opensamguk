@@ -3,7 +3,13 @@ import { protectedProcedure, router } from '../trpc';
 import { entityKey, readWorld, viewerGeneral, worldInput } from '../queries';
 import { cityInfo, garrisonGeneralInfo, visibility } from '../visibility';
 import { readView } from '../game/queries';
-import { INTEL_FEATURE, LINEAGE_EXITED_YEAR } from '@opensamguk/rules';
+import {
+  INTEL_FEATURE,
+  LINEAGE_EXITED_YEAR,
+  OFFICE_EFFECTS_FEATURE,
+  toGameDate,
+  isOfficeResident,
+} from '@opensamguk/rules';
 import { readCityScaleProjection } from '../game/cityScale';
 import { readCityIntel } from '../game/fog';
 
@@ -35,7 +41,33 @@ export const cityRouter = router({
         fogEnabled && viewer?.nationId != null && !visibility(viewer).city(city)
           ? await readCityIntel(tx, world, viewer.nationId, city.cityKey, ctx)
           : null;
+      const officeEffectsEnabled = world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE);
+      const officers =
+        officeEffectsEnabled && city.nationId !== null && city.kind !== 'PASS'
+          ? await tx.general.findMany({
+              where: {
+                worldId: input.worldId,
+                nationId: city.nationId,
+                removedAt: null,
+                activeFromYear: { lte: toGameDate(world.startYear, world.clockTick).year },
+                OR: [{ officerCityKey: city.cityKey }, { cityKey: city.cityKey, officerLevel: { gte: 5, lte: 11 } }],
+              },
+              orderBy: [{ officerLevel: 'desc' }, { id: 'asc' }],
+              select: { id: true, name: true, nationId: true, officerLevel: true, officerCityKey: true, cityKey: true },
+            })
+          : [];
       return {
+        ...(officeEffectsEnabled
+          ? {
+              officeEffectsEnabled: true as const,
+              officers: officers.map((officer) => ({
+                generalId: officer.id,
+                name: officer.name,
+                officerLevel: officer.officerLevel,
+                resident: isOfficeResident(officer, city.nationId),
+              })),
+            }
+          : {}),
         ...cityInfo(city, viewer),
         ...(ruins ? { ruin: ruins.get(city.cityKey) ?? null } : {}),
         ...(campaignEnabled ? { campaignEnabled: true as const } : {}),

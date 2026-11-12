@@ -1,3 +1,5 @@
+import { localOfficeTitle } from './residentOffice';
+
 const noCommands = Object.freeze([] as const);
 const personnelCommands = Object.freeze([
   'nation_rest',
@@ -70,7 +72,10 @@ export function officerRole(officerLevel: unknown): OfficerRole | null {
   return OFFICER_ROLES.find((role) => role.levels.some((level) => level === officerLevel)) ?? null;
 }
 
-export const officerTitle = (officerLevel: unknown) => officerRole(officerLevel)?.title ?? null;
+export const officerTitle = (officerLevel: unknown) =>
+  officerLevel === 3 || officerLevel === 4
+    ? localOfficeTitle(officerLevel)
+    : (officerRole(officerLevel)?.title ?? null);
 export const canManagePersonnel = (officerLevel: unknown): boolean =>
   officerRole(officerLevel)?.managePersonnel === true;
 export const canUseNationTurns = (officerLevel: unknown): boolean =>

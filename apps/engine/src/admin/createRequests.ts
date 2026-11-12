@@ -1,6 +1,8 @@
 import type { Prisma, PrismaClient } from '@opensamguk/db';
 import {
   checkRuleFeatures,
+  OFFICE_EFFECTS_FEATURE,
+  officeEffectsSchema,
   worldCreateIntentSchema,
   featureProfileReferenceSchema,
   type WorldCreateRejectCode,
@@ -108,8 +110,14 @@ async function resolveCreation(db: PrismaClient, request: Request) {
   let prepared: PreparedInitialWorld | undefined;
   try {
     const presetFeatures = state.unitSet.coefMode === 'multiply' ? ['battle-affinity-v2'] : [];
+    const officeEffects = request.officeEffects == null ? undefined : officeEffectsSchema.parse(request.officeEffects);
     const combined = [
-      ...new Set([...(state.ruleFeatures ?? []), ...presetFeatures, ...(intent.ruleFeatures ?? [])]),
+      ...new Set([
+        ...(state.ruleFeatures ?? []),
+        ...presetFeatures,
+        ...(intent.ruleFeatures ?? []),
+        ...(officeEffects ? [OFFICE_EFFECTS_FEATURE] : []),
+      ]),
     ].sort();
     const ruleFeatures = combined.length ? checkRuleFeatures(combined) : [];
     if (state.ruleFeatures) state.ruleFeatures = ruleFeatures;
@@ -118,7 +126,14 @@ async function resolveCreation(db: PrismaClient, request: Request) {
       turnTermMinutes,
       endYear: intent.endYear,
       ruleFeatures,
-      ...(featureProfile ? { featureData: featureProfile.value.featureData } : {}),
+      ...(featureProfile || officeEffects
+        ? {
+            featureData: {
+              ...featureProfile?.value.featureData,
+              ...(officeEffects ? { [OFFICE_EFFECTS_FEATURE]: officeEffects } : {}),
+            },
+          }
+        : {}),
       ...(preset ? { preset: { key: intent.presetKey!, value: preset } } : {}),
     };
     const frozenHash =
