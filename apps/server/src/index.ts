@@ -2,6 +2,7 @@ import { createMailTransport } from './mail/transport';
 import { resourceRoot } from '@opensamguk/shared/resource-root';
 import { loadLoginAuditOptions } from './config/loginAudit';
 import { startNotificationDispatcher } from './notifications/dispatcher';
+import { startAccountRetention } from './auth/accountRetention';
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -34,8 +35,10 @@ const dispatcher = startNotificationDispatcher(
   () => server.log.warn('알림 대기열 처리 실패'),
 );
 
+const retention = startAccountRetention(db, () => server.log.warn('탈퇴 기록 보존 기간 처리 실패'));
+
 const shutdown = async () => {
-  await dispatcher.stop();
+  await Promise.all([dispatcher.stop(), retention.stop()]);
   await server.close();
   await db.$disconnect();
   process.exit(0);

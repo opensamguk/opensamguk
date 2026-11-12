@@ -618,6 +618,8 @@ model User {
   role                   UserRole             @default(USER)
   createdAt              DateTime             @default(now())
   emailVerifiedAt        DateTime?
+  withdrawnAt            DateTime?
+  retentionPurgedAt      DateTime?
   sessions               Session[]
   accountTokens          AccountToken[]
   consents               ConsentRecord[]
@@ -629,6 +631,8 @@ model User {
   heritageEntries        HeritageEntry[]
   resourceEditorGrant    ResourceEditorGrant?
   seasonGenerals         SeasonGeneral[]
+
+  @@index([status, retentionPurgedAt, withdrawnAt, id])
 }
 
 model AccountPortrait {
@@ -744,6 +748,7 @@ model AdminSanctionRequest {
   createdAt      DateTime @default(now()) @db.Timestamptz(3)
 
   @@id([actorUserId, idempotencyKey])
+  @@index([sanctionId])
 }
 
 model Sanction {
