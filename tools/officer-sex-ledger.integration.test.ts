@@ -25,10 +25,11 @@ it('AC-P2-32 검토된 성별 사실 해시와 191년 시나리오의 인물 대
         name: row.name,
         identity: row.identity,
       });
-      for (const key of ledger.scenarios)
-        expect(
-          (key === '1030' ? scenario : read(`resources/scenario/${key}.json`)).general[row.generalId - 1]![1],
-        ).toBe(row.name);
+      for (const key of ledger.scenarios) {
+        const file = key === 'san10-191@1' ? 'san10-191' : key === 'san10-191@2' ? 'san10-191-v2' : key;
+        const general = key === '1030' ? scenario.general : read(`resources/scenario/${file}.json`).general;
+        expect(general[row.generalId - 1]![1]).toBe(row.name);
+      }
     }
   expect(ledgers[0]!.rows.map((row) => [row.generalId, row.sex])).toEqual([
     [108, 'MALE'],
