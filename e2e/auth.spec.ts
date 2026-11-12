@@ -87,6 +87,7 @@ test('Tab과 Enter만으로 로그인한다', async ({ page }) => {
   const email = await createAccount(page);
   await page.context().clearCookies();
   await page.goto('/login?next=/w/1');
+  await expect(page.getByRole('status')).toHaveText('서버 정상 · DB 정상');
   await page.locator('body').focus();
   await page.keyboard.press('Tab');
   await expect(page.getByLabel('이메일')).toBeFocused();
