@@ -27,6 +27,8 @@ export function invalidationTargets(event: WorldEvent, worldId: string, trpc: Tr
         trpc.home.get.queryKey({ worldId }),
         trpc.turns.get.queryKey({ worldId }),
         trpc.records.general.pathKey(),
+        trpc.city.get.queryKey({ worldId }),
+        trpc.personnel.officers.queryKey({ worldId }),
       ];
     case 'message.new':
       return [
@@ -35,6 +37,8 @@ export function invalidationTargets(event: WorldEvent, worldId: string, trpc: Tr
       ];
     case 'monthly.done':
       return [
+        trpc.city.get.queryKey({ worldId }),
+        trpc.personnel.officers.queryKey({ worldId }),
         trpc.equipment.mine.queryKey({ worldId }),
         trpc.world.summary.queryKey({ worldId }),
         trpc.home.get.queryKey({ worldId }),

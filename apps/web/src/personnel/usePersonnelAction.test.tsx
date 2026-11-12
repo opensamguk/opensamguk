@@ -28,6 +28,7 @@ vi.mock('../trpc', () => {
       },
     },
     home: { get: { queryKey: ({ worldId }: { worldId: string }) => ['home', worldId] } },
+    city: { get: { queryKey: ({ worldId }: { worldId: string }) => ['city', worldId] } },
     // 인사 기능이 있는 월드만 recent를 묻는다. 시험 월드는 모두 켜 둔다.
     general: {
       mine: {
@@ -167,14 +168,15 @@ describe('인사 전송과 서버 접수', () => {
       await send(hook);
       expect(hook.result.current.busy).toBe(false);
       expect(hook.result.current.notices).toEqual([{ tone: 'ok', text: '발령을 수락해 북평으로 옮겼습니다.' }]);
-      expect(refresh).toHaveBeenCalledTimes(4);
+      expect(refresh).toHaveBeenCalledTimes(5);
+      expect(refresh).toHaveBeenCalledWith({ queryKey: ['city', 'w1'] });
       act(() => hook.result.current.dismissNotices());
       const requestId = actRequest.mock.calls[0]![0].requestId;
       await act(async () => mutation.resolve(late === 'pending' ? pending(requestId) : applied(requestId)));
       await tick();
       expect(hook.result.current.busy).toBe(false);
       expect(hook.result.current.notices).toEqual([]);
-      expect(refresh).toHaveBeenCalledTimes(4);
+      expect(refresh).toHaveBeenCalledTimes(5);
       expect(readAnnounced(localStorage, announcedKey('u1', 'w1'))).toEqual([requestId]);
     });
 

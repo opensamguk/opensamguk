@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // 브라우저의 online·offline 힌트를 실제 window 사건으로 보내려고 jsdom에서 돌린다. EventSource는 아래 FakeSource로 바꾼다.
-import { QueryClient, QueryObserver } from '@tanstack/react-query';
+import { QueryClient, QueryObserver, type QueryKey } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MessageScope } from '../messages/api';
 import { readDraft, writeDraft } from '../messages/drafts';
@@ -101,6 +101,8 @@ describe('SSE 알림 해석', () => {
       trpc.home.get.queryKey({ worldId: WORLD }),
       trpc.turns.get.queryKey({ worldId: WORLD }),
       trpc.records.general.pathKey(),
+      trpc.city.get.queryKey({ worldId: WORLD }),
+      trpc.personnel.officers.queryKey({ worldId: WORLD }),
     ]);
     expect(invalidationTargets({ kind: 'notice.updated', scope: 'nation' }, WORLD, trpc)).toEqual([
       trpc.notice.nation.get.queryKey({ worldId: WORLD }),
@@ -120,6 +122,20 @@ describe('SSE 재조회와 초안', () => {
     client.setQueryData(trpc.turns.get.queryKey({ worldId: WORLD }), { actorId: 1, revision: 1, slots: [] });
   };
   const invalidated = (client: QueryClient, key: readonly unknown[]) => client.getQueryState(key)?.isInvalidated;
+
+  it.each(['turn.result', 'monthly.done'] as const)('%s가 같은 월드의 도시와 인사부 주재 조회를 갱신한다', (kind) => {
+    const client = new QueryClient();
+    const same: QueryKey[] = [
+      trpc.city.get.queryKey({ worldId: WORLD, cityKey: 1 }),
+      trpc.personnel.officers.queryKey({ worldId: WORLD }),
+    ];
+    const other: QueryKey = trpc.city.get.queryKey({ worldId: 'other', cityKey: 1 });
+    for (const key of [...same, other]) client.setQueryData(key, {});
+    applyWorldEvent(client, trpc, WORLD, { kind });
+    expect(same.map((key) => invalidated(client, key))).toEqual([true, true]);
+    expect(invalidated(client, other)).toBe(false);
+    client.clear();
+  });
 
   it('message.new는 그 범위 목록과 안 읽음 수만 무효화한다', () => {
     const client = new QueryClient();
