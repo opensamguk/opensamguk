@@ -482,7 +482,9 @@ async function main(): Promise<number> {
     } else assertContainerLimits([row], mode, image, postgresImage);
     await verifyActiveParent(row, signal);
     signal.throwIfAborted();
-    await invoke(['exec', ...(workdir ? ['--workdir', workdir] : []), id, ...command], 'execute');
+    // An exec process gets the container's configured environment, without the entrypoint's secret export.
+    const entrypoint = role === 'initialize' ? [] : ['/app/deploy/entrypoint.sh'];
+    await invoke(['exec', ...(workdir ? ['--workdir', workdir] : []), id, ...entrypoint, ...command], 'execute');
     signal.throwIfAborted();
     await invoke(['stop', '--time', '1', id], 'stop');
     const stopped: unknown = JSON.parse(await invoke(['inspect', id], 'exit-proof'));
