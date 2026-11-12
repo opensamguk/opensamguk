@@ -96,6 +96,7 @@ export async function syntheticBundle(mode: 'm2' | 'm3' = 'm2') {
         at: at(seconds + 2),
         status: 'ok',
         observationRef: `observation-${index}-${n}`,
+        ...(step === 'login' ? { login: { accountRef: p.accountRef, loginSessionRef: p.loginSessionRef } } : {}),
       });
     }
     put(p.nativeRef, 'native', {
@@ -149,13 +150,22 @@ export async function syntheticBundle(mode: 'm2' | 'm3' = 'm2') {
       put(
         'plan',
         'plan',
-        parsePlan(
-          Object.fromEntries(
-            ['version', 'sourceSHA', 'mode', 'registeredAt', 'startsAt', 'endsAt', 'participants', 'worlds'].map(
-              (key) => [key, m[key as keyof Manifest]],
-            ),
-          ),
-        ),
+        parsePlan({
+          version: m.version,
+          sourceSHA: m.sourceSHA,
+          mode: m.mode,
+          registeredAt: m.registeredAt,
+          startsAt: m.startsAt,
+          endsAt: m.endsAt,
+          worlds: m.worlds,
+          participants: m.participants.map(({ participantId, agent, sessionRef, nativeRef }, index) => ({
+            participantId,
+            agent,
+            sessionRef,
+            nativeRef,
+            worldIds: [m.worlds[index % m.worlds.length]!.worldId],
+          })),
+        }),
       );
     m.artifacts = await Promise.all(
       [...records].map(async ([ref, item]) => {

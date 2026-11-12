@@ -128,8 +128,32 @@ export async function validateBundle(manifestFile: string, expectedSHA: string):
     };
     for (const item of data.values()) parsers[item.kind](item.value);
     const plan = artifact(m.planRef, 'plan', parsePlan);
-    const frozen = parsePlan(Object.fromEntries(Object.keys(plan).map((key) => [key, m[key as keyof Manifest]])));
-    check(isDeepStrictEqual(plan, frozen), 'FROZEN_PLAN_CHANGED');
+    const { participants: planned, ...period } = plan;
+    const actualPeriod = Object.fromEntries(Object.keys(period).map((key) => [key, m[key as keyof Manifest]]));
+    const actualIdentity = m.participants.map(({ participantId, agent, sessionRef, nativeRef }) => ({
+      participantId,
+      agent,
+      sessionRef,
+      nativeRef,
+    }));
+    const plannedIdentity = planned.map(({ participantId, agent, sessionRef, nativeRef }) => ({
+      participantId,
+      agent,
+      sessionRef,
+      nativeRef,
+    }));
+    check(
+      isDeepStrictEqual(period, actualPeriod) && isDeepStrictEqual(plannedIdentity, actualIdentity),
+      'FROZEN_PLAN_CHANGED',
+    );
+    const assignments = new Map(planned.map((participant) => [participant.participantId, participant.worldIds]));
+    for (const participant of planned) {
+      check(
+        participant.worldIds.length > 0 && participant.worldIds.every((worldId) => worlds.has(worldId)),
+        'INVALID_WORLD_ASSIGNMENT',
+      );
+      unique(participant.worldIds, 'DUPLICATE_WORLD_ASSIGNMENT');
+    }
     const eventsText = await readLocal(m.events.file);
     check(digest(eventsText) === m.events.sha256, 'EVENTS_HASH_MISMATCH');
     const lines = eventsText.trim() ? eventsText.trimEnd().split('\n') : [];
@@ -223,6 +247,7 @@ export async function validateBundle(manifestFile: string, expectedSHA: string):
     for (const a of actions) {
       const w = worlds.get(a.worldId);
       check(participants.has(a.participantId) && w, 'UNKNOWN_PARTICIPANT_OR_WORLD');
+      check(assignments.get(a.participantId)?.includes(a.worldId), 'UNASSIGNED_PARTICIPANT_WORLD');
       check(a.sourceSHA === m.sourceSHA, 'ACTION_SHA_MISMATCH');
       check(w && a.at >= w.startsAt && a.at <= w.endsAt, 'ACTION_OUTSIDE_PERIOD');
       check(!/(?:admin|internal|engine|database)/i.test(a.path), 'NON_PLAYER_ACTION');
@@ -237,6 +262,15 @@ export async function validateBundle(manifestFile: string, expectedSHA: string):
         'RESULT_MISMATCH',
       );
       check(result.status === 'ok', 'BLOCKED_PARTICIPANT');
+      const participant = participants.get(a.participantId);
+      check(
+        a.step === 'login'
+          ? result.login !== undefined &&
+              result.login.accountRef === participant?.accountRef &&
+              result.login.loginSessionRef === participant?.loginSessionRef
+          : result.login === undefined,
+        'LOGIN_IDENTITY_MISMATCH',
+      );
     }
     unique(
       m.outcomes.map((o) => o.worldId),
@@ -250,9 +284,7 @@ export async function validateBundle(manifestFile: string, expectedSHA: string):
       );
       const outcome = m.outcomes.find((o) => o.worldId === w.worldId);
       check(outcome?.rollbackCount === 0, 'ROLLBACK_NONZERO_OR_MISSING');
-      const members = m.participants.filter((p) =>
-        actions.some((a) => a.participantId === p.participantId && a.worldId === w.worldId),
-      );
+      const members = planned.filter((p) => p.worldIds.includes(w.worldId));
       for (const p of members) {
         let last = w.startsAt;
         for (const step of ['lobby', 'general_create', 'turn_submit', 'turn_result']) {
@@ -281,9 +313,7 @@ export async function validateBundle(manifestFile: string, expectedSHA: string):
             w.endCondition.type === 'year' ? end.year >= w.endCondition.year : end.winner !== null,
             'END_CONDITION_NOT_REACHED',
           );
-          for (const p of m.participants.filter((p) =>
-            actions.some((a) => a.participantId === p.participantId && a.worldId === w.worldId),
-          )) {
+          for (const p of members) {
             check(
               actions.some(
                 (a) =>
