@@ -1,7 +1,8 @@
-import { readFile, readlink, statfs } from 'node:fs/promises';
+import { readFile, statfs } from 'node:fs/promises';
 import { posix, isAbsolute } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { AdmissionSample, CgroupSample, RunnerProvenance } from './admission';
+import { workerAncestor } from './bootstrap.mjs';
 
 export type CpuCounter = Readonly<{ total: number; idle: number }>;
 export function parseCpuCounter(text: string): CpuCounter {
@@ -64,21 +65,6 @@ export function selfCgroupPath(text: string): string {
   return absolute;
 }
 
-async function runnerAncestor(): Promise<boolean> {
-  let pid = process.ppid;
-  const visited = new Set<number>();
-  for (let depth = 0; pid > 1 && depth < 32 && !visited.has(pid); depth++) {
-    visited.add(pid);
-    const [stat, executable] = await Promise.all([readFile(`/proc/${pid}/stat`, 'utf8'), readlink(`/proc/${pid}/exe`)]);
-    // 커널이 보고한 실제 실행 파일과 조상 관계를 사용한다. CI 변수로 대체하지 않는다.
-    if (/\/bin\/Runner\.Worker$/.test(executable)) return true;
-    const parent = /^\d+ \(.+\) \S (\d+) /.exec(stat)?.[1];
-    if (!parent) return false;
-    pid = Number(parent);
-  }
-  return false;
-}
-
 export async function readRunnerProvenance(): Promise<RunnerProvenance> {
   let version = '',
     worker = false;
@@ -86,7 +72,7 @@ export async function readRunnerProvenance(): Promise<RunnerProvenance> {
     try {
       const release = await readFile('/etc/os-release', 'utf8');
       if (/^ID=ubuntu$/m.test(release)) version = /^VERSION_ID="?([^"\r\n]+)"?$/m.exec(release)?.[1] ?? '';
-      worker = await runnerAncestor();
+      worker = await workerAncestor();
     } catch {
       /* 확인하지 못한 플랫폼은 거부한다. 원본 경로나 오류를 출력하지 않는다. */
     }
