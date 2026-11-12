@@ -1,5 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { performance } from 'node:perf_hooks';
+import { toSaveSlots, toTurn } from '../../apps/web/src/turns/draft';
 import type { LoadActor, prepareLoadFixtures } from './fixtures';
 import { LoadHttpError, type LoadInput, type LoadOutput } from './http';
 import { LOAD_CONTRACT } from './contract';
@@ -278,7 +279,7 @@ export async function runNativeLoad(
           const value = await request(state, procedure, {
             worldId,
             revision: state.turns.revision,
-            slots: state.turns.slots,
+            slots: toSaveSlots(state.turns.slots.map(toTurn)),
           });
           if (value) state.turns = { revision: value.revision, slots: value.slots };
           break;
