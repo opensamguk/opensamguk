@@ -2,6 +2,8 @@ import type { Prisma } from '@opensamguk/db';
 import {
   projectTreatyRows,
   selectWorldCapabilities,
+  TICKS_PER_MONTH,
+  toGameDate,
   validateClosedTreatyRow,
   validateTreatyState,
   validateBrokenTreatyRow,
@@ -32,6 +34,11 @@ export type TreatyDetail = {
   endTick: number | null;
   cost: { from: number; to: number } | null;
 };
+
+// 기한에 도달하는 첫 월간 정산이 조약의 집행을 끝낸다.
+export function toTreatySettlementDate(startYear: number, endTick: number) {
+  return toGameDate(startYear, Math.ceil(endTick / TICKS_PER_MONTH) * TICKS_PER_MONTH);
+}
 
 function invalid(): never {
   throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: '저장된 조약을 확인하지 못했습니다.' });

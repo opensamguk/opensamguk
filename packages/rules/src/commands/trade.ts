@@ -14,6 +14,12 @@ type TradeRouteView = {
 };
 export type TradeRoute = { cityKey: number; treatyId: string; endTick: number };
 
+function atWar(diplomacies: TradeRouteView['diplomacies'], a: number, b: number) {
+  return diplomacies.some(
+    (d) => d.state === 'WAR' && ((d.nationA === a && d.nationB === b) || (d.nationA === b && d.nationB === a)),
+  );
+}
+
 // 공개 도시·관계·검증된 조약만으로 후보를 정한다. 상업과 국고는 읽지 않는다.
 export function findTradeRoutes(view: TradeRouteView, nationId: number, cityKey: number, tick: number): TradeRoute[] {
   if (!Number.isSafeInteger(tick) || tick < 0) throw new RangeError('교역 시각을 확인하세요.');
@@ -26,14 +32,7 @@ export function findTradeRoutes(view: TradeRouteView, nationId: number, cityKey:
     if (target?.kind === 'PASS') continue;
     const other = target?.nationId;
     if (other === undefined || other === null || other === nationId || !view.nations[other]) continue;
-    if (
-      view.diplomacies.some(
-        (d) =>
-          d.state === 'WAR' &&
-          ((d.nationA === nationId && d.nationB === other) || (d.nationA === other && d.nationB === nationId)),
-      )
-    )
-      continue;
+    if (atWar(view.diplomacies, nationId, other)) continue;
     const treaty = view.treaties
       ?.filter(
         (t) =>
@@ -79,13 +78,19 @@ function check(view: WorldView, actor: Actor, args: TradeArgs): Failure | null {
   const target = view.cities[args.cityKey];
   if (!target || target.nationId === null || target.nationId === general.nationId)
     return { code: 'BAD_TARGET', message: '다른 국가의 도시를 고르세요.' };
-  if (!view.cities[general.cityKey]!.connections.includes(args.cityKey))
-    return { code: 'NOT_ADJACENT', message: '연결된 도시가 아닙니다.' };
-  return findTradeRoutes(view, general.nationId!, general.cityKey, actor.tick!).some(
-    (route) => route.cityKey === args.cityKey,
+  const home = view.cities[general.cityKey]!;
+  if (!home.connections.includes(args.cityKey)) return { code: 'NOT_ADJACENT', message: '연결된 도시가 아닙니다.' };
+  if (
+    findTradeRoutes(view, general.nationId!, general.cityKey, actor.tick!).some(
+      (route) => route.cityKey === args.cityKey,
+    )
   )
-    ? null
-    : { code: 'BAD_STATE', message: '유효한 교역 조약이 없거나 교전 중입니다.' };
+    return null;
+  if (home.kind === 'PASS' || target.kind === 'PASS')
+    return { code: 'BAD_STATE', message: '관문은 교역 경로에 포함되지 않습니다.' };
+  if (view.nations[target.nationId] && atWar(view.diplomacies, general.nationId!, target.nationId))
+    return { code: 'BAD_STATE', message: '교전 중인 국가와는 교역할 수 없습니다.' };
+  return { code: 'BAD_STATE', message: '교역 조약이 없거나 만료되었습니다.' };
 }
 
 export const trade: CommandDef<TradeArgs> = {

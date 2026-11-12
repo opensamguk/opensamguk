@@ -1,8 +1,8 @@
 import type { Prisma } from '@opensamguk/db';
-import { findTradeRoutes, toGameDate } from '@opensamguk/rules';
+import { findTradeRoutes, TICKS_PER_MONTH } from '@opensamguk/rules';
 import { TRPCError } from '@trpc/server';
 import { requireGeneral, requireWorld } from './queries';
-import { checkTreatyRow, requireTreatyWorld, treatyTradeEnabled } from './treatyQueries';
+import { checkTreatyRow, requireTreatyWorld, toTreatySettlementDate, treatyTradeEnabled } from './treatyQueries';
 
 type TradeTarget = {
   cityKey: number;
@@ -53,6 +53,8 @@ export async function listTradeTargets(
     return checked;
   });
   const refs = new Map(nations.map((nation) => [nation.id, { id: nation.id, name: nation.name, color: nation.color }]));
+  // 이미 수락한 조약은 이번 달에 적용된다. 만료는 다음 월간 정산이 확정할 때부터 반영한다.
+  const routeTick = world.monthlyTick + TICKS_PER_MONTH - 1;
   const routes = findTradeRoutes(
     {
       cities: {
@@ -70,7 +72,7 @@ export async function listTradeTargets(
     },
     nationId,
     home.cityKey,
-    world.clockTick,
+    routeTick,
   );
   const items = routes.map((route) => {
     const city = cities.find((candidate) => candidate.cityKey === route.cityKey)!;
@@ -80,7 +82,7 @@ export async function listTradeTargets(
       cityName: city.name,
       nation,
       treatyId: route.treatyId,
-      tradeEndsAt: toGameDate(world.startYear, route.endTick),
+      tradeEndsAt: toTreatySettlementDate(world.startYear, route.endTick),
     };
   });
   return {

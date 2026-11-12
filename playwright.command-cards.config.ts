@@ -16,6 +16,7 @@ export default defineConfig({
     't4-95-lineage.spec.ts',
     't4-96-heritage.spec.ts',
     'intel.spec.ts',
+    't2-07-nonaggression-expiry.spec.ts',
   ],
   testIgnore: [],
   forbidOnly: true,

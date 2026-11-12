@@ -351,7 +351,7 @@ describe('T2-07 / AC-M2-06 새 조회 leaf 보조 단위', () => {
       _count: { _all: true },
     });
   });
-  it('L3 ACTIVE의 비용은 실제 차감액이며 추정과 응답 단추는 없다', async () => {
+  it('L3 ACTIVE는 실제 차감액과 만료 월간 정산을 보여 주며 응답 단추는 없다', async () => {
     const f = fixture(),
       proposed = proposal();
     const applied = applyTreatyInput(
@@ -380,7 +380,8 @@ describe('T2-07 / AC-M2-06 새 조회 leaf 보조 단위', () => {
       canReject: null,
       respondBy: null,
       startAt: toGameDate(191, 1501),
-      endAt: toGameDate(191, 121501),
+      endTick: 121501,
+      endAt: toGameDate(191, 130000),
     });
     expect(f.groups).not.toHaveBeenCalled();
     expect(f.nationQuery).not.toHaveBeenCalled();
