@@ -9,6 +9,8 @@ import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { controlClock } from '../apps/engine/src/world/clock';
+import { processWorldCreateRequest } from '../apps/engine/src/admin/createRequests';
+import { prepareWorldReset } from '../apps/engine/src/admin/resetPreparation';
 import { exportReplay, replayArchive } from '../apps/engine/src/replay';
 import { rngFor } from '../packages/shared/src/index';
 import { defaultOfficeEffects, residentOfficeBonuses, runMonthly } from '../packages/rules/src/index';
@@ -29,6 +31,7 @@ beforeAll(async () => {
 });
 afterAll(async () => {
   await app.close();
+  await db.worldCreateRequest.deleteMany({ where: { requestedBy: { in: users } } });
   await db.world.deleteMany({ where: { id: { in: worlds } } });
   await db.user.deleteMany({ where: { id: { in: users } } });
   await db.$disconnect();
@@ -331,4 +334,36 @@ it('AC-M3-12 PostgreSQL 전투가 담당 도시를 빼앗으면 같은 장수 �
   });
   expect(await current()).toMatchObject({ officerCityKey: null, officerLevel: 1, cityKey: 4, nationId: 2 });
   expect(await call('city.get', { worldId, cityKey: 2 }, attacker)).toMatchObject({ data: { officers: [] } });
+});
+
+it('AC-M3-12 운영 생성 요청과 초기화 준비가 주재 효과 표의 같은 사본을 쓴다', async () => {
+  const admin = await identity('ADMIN');
+  const input = {
+    expectedUserId: admin.id,
+    idempotencyKey: randomUUID(),
+    name: '주재 설정 원본 검증',
+    scenarioKey: '1030',
+    mapKey: 'che',
+    turnTermMinutes: 60,
+    endYear: null,
+    ruleFeatures: ['personnel'],
+  };
+  expect(await call('admin.world.create', input, admin)).toMatchObject({ status: 200, data: { status: 'PENDING' } });
+  const where = { requestedBy_idempotencyKey: { requestedBy: admin.id, idempotencyKey: input.idempotencyKey } };
+  const pending = await db.worldCreateRequest.findUniqueOrThrow({ where });
+  expect(pending.officeEffects).toEqual(defaultOfficeEffects);
+  worlds.push(pending.plannedWorldId);
+  const signal = new AbortController().signal;
+  expect(await processWorldCreateRequest(db, signal)).toBe(true);
+  const worldId = pending.plannedWorldId;
+  expect(await call('admin.world.create', input, admin)).toMatchObject({ data: { status: 'DONE', worldId } });
+  const world = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+  expect(world).toMatchObject({
+    officeEffects: defaultOfficeEffects,
+    ruleFeatures: ['office-effects', 'personnel'],
+    replayOrigin: { featureData: { 'office-effects': defaultOfficeEffects } },
+  });
+  expect(await db.publicMapSnapshot.count({ where: { worldId } })).toBe(1);
+  const reset = await prepareWorldReset(db, worldId, '새주재검증시드', signal);
+  expect(reset.evidence).toMatchObject({ sourceWorldId: worldId, sourceInitialHash: world.initialStateHash });
 });
