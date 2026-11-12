@@ -1,5 +1,5 @@
 import { BALANCE } from '../balance';
-import type { WorldState } from '../model/world';
+import type { WorldState, WorldView } from '../model/world';
 import { cloneWorld } from '../model/clone';
 
 type Change<K extends string, F extends string> = { kind: K; id: number; field: F; op: 'add' | 'set'; value: number };
@@ -10,7 +10,7 @@ export type Effect =
   | Change<'nation', 'gold' | 'rice' | 'tech'>
   | Change<'general', 'gold' | 'rice' | 'crew' | 'train' | 'atmos' | 'experience' | 'dedication' | 'injury'>;
 
-export function applyEffects(state: WorldState, effects: readonly Effect[]): WorldState {
+export function applyEffects(state: WorldView, effects: readonly Effect[]): WorldState {
   let next: WorldState | undefined;
   for (const effect of effects) {
     if (effect.kind === 'world') {
