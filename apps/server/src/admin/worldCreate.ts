@@ -11,6 +11,12 @@ import {
 import type { z } from 'zod';
 import type { Context } from '../context';
 import { requireCurrentAdmin } from './access';
+import {
+  artifactMapVersion,
+  artifactPublication,
+  artifactScenarioPattern,
+  artifactSelection,
+} from './worldCreateOptions';
 
 function expectedActor(ctx: Context, expectedUserId: string) {
   if (!ctx.user || ctx.user.id !== expectedUserId)
@@ -52,6 +58,22 @@ export async function requestWorldCreate(ctx: Context, input: z.infer<typeof req
         if (prior.intentHash !== intentHash)
           throw new TRPCError({ code: 'CONFLICT', message: '이 요청 번호는 다른 내용에 썼습니다.' });
         return response(prior);
+      }
+      const expandedMap = await tx.gameResource.findFirst({ where: artifactMapVersion, select: { id: true } });
+      if (expandedMap) {
+        const { scenarioKey } = intent;
+        const usesArtifactSelection = Object.entries(artifactSelection).every(
+          ([key, value]) => intent[key as keyof typeof artifactSelection] === value,
+        );
+        const scenario =
+          usesArtifactSelection && scenarioKey && new RegExp(artifactScenarioPattern).test(scenarioKey)
+            ? await tx.gameResource.findFirst({
+                where: { kind: 'SCENARIO', name: scenarioKey, version: 1, ...artifactPublication },
+                select: { content: true },
+              })
+            : null;
+        if ((scenario?.content as { requiredMap?: string } | null)?.requiredMap !== artifactSelection.mapKey)
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'SAN10 확장 확정판 지도와 시나리오를 선택하세요.' });
       }
       const request = await tx.worldCreateRequest.create({
         data: {
