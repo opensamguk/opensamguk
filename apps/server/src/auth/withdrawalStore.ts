@@ -49,7 +49,7 @@ export async function withdrawAccount(
       );
       await tx.user.update({
         where: { id: identity.userId },
-        data: { status: 'WITHDRAWN', email, passwordHash, emailVerifiedAt: null },
+        data: { status: 'WITHDRAWN', email, passwordHash, emailVerifiedAt: null, withdrawnAt: clock.now },
       });
       await tx.accountPortrait.deleteMany({ where: { userId: identity.userId } });
       await tx.session.deleteMany({ where: { userId: identity.userId } });
