@@ -159,6 +159,23 @@ it('읽기 전용 칸과 끝난 판은 저장된 목록과 다른 상태로 알�
   expectNoRepeat(ended);
 });
 
+it('AC-M1-08 선택한 칸에 한 번에 저장하고 충돌하면 방금 넣은 명령을 보존한다', async () => {
+  const save = vi.fn(async (_input: unknown) => ({ ok: false as const, reason: 'STALE' as const, revision: 2, slots }));
+  await open((input) => ({ ...makeSource(null)(input), save }), 'RUNNING', vi.fn());
+  await screen.findByRole('grid', { name: '예턴 30칸' });
+  fireEvent.click(document.querySelector('tr[data-slot="1"]')!);
+  fireEvent.click(await screen.findByRole('radio', { name: '농지 개간' }));
+  fireEvent.click(screen.getByRole('button', { name: '1번 칸에 저장' }));
+  await waitFor(() =>
+    expect(save.mock.calls[0]?.[0]).toMatchObject({
+      revision: 1,
+      slots: [{ commandKey: 'farm', args: {} }, ...Array.from({ length: 29 }, () => null)],
+    }),
+  );
+  fireEvent.click(await screen.findByRole('button', { name: '내 편집 다시 적용' }));
+  expect(document.querySelector('tr[data-slot="1"]')?.textContent).toContain('농지 개간');
+});
+
 it('T4-86 AC-P2-26 병종표 조회가 실패해도 표는 병종 번호로 적고 병종 없는 명령을 넣어 저장한다', async () => {
   // 가짜 tRPC는 resources.worldRules에 NOT_FOUND를 답한다.
   const stored = [{ commandKey: 'recruit', args: { amount: 100, crewType: 1300 }, name: '징병' }, ...slots.slice(1)];

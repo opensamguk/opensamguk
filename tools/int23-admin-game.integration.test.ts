@@ -247,6 +247,7 @@ for (const path of ['admin.game.request', 'admin.game.requestStatus'])
     );
 
 for (const path of [
+  'admin.game.editor',
   'admin.game.general',
   'admin.game.generalLogs',
   'admin.game.generalInputs',
@@ -267,7 +268,13 @@ for (const path of [
                 ? sanctioned.cookie
                 : actor.cookie;
         const input =
-          category === 'invalidInput' ? {} : path === 'admin.game.nationLogs' ? { worldId } : { worldId, generalId: 1 };
+          category === 'invalidInput'
+            ? {}
+            : path === 'admin.game.editor'
+              ? { worldId, target: 'general', search: '1' }
+              : path === 'admin.game.nationLogs'
+                ? { worldId }
+                : { worldId, generalId: 1 };
         const before = await db.auditLog.count({ where: { worldId, action: 'admin.game.read' } });
         const response = await call(path, input, cookie);
         expect(response.status).toBe(
@@ -278,6 +285,49 @@ for (const path of [
         );
       }),
     );
+
+it('AC-INT-23 편집기에서 장수·국가·도시를 조회하고 읽은 도시 값을 일시정지 월드에서 수정한다', async () => {
+  const worldId = await world();
+  const read = (target: string, search = '', after?: number) =>
+    call('admin.game.editor', { worldId, target, search, after }, actor.cookie);
+  expect(await read('general', '1')).toMatchObject({
+    status: 200,
+    data: { target: 'general', rows: [{ id: 1, player: false }], next: null },
+  });
+  const nation = await db.nation.findFirstOrThrow({ where: { worldId }, orderBy: { id: 'asc' } });
+  expect(await read('nation', nation.name)).toMatchObject({
+    status: 200,
+    data: { target: 'nation', rows: [{ id: nation.id, name: nation.name, gold: nation.gold }] },
+  });
+  const city = await db.city.findFirstOrThrow({ where: { worldId }, orderBy: { cityKey: 'asc' } });
+  expect(await read('city', String(city.cityKey), city.cityKey)).toMatchObject({
+    status: 200,
+    data: { rows: [], next: null },
+  });
+  expect(await read('city', city.name)).toMatchObject({
+    status: 200,
+    data: { target: 'city', rows: [{ id: city.cityKey, name: city.name, trust: city.trust }] },
+  });
+  const value = city.trust === 0 ? 1 : 0;
+  const input = command(worldId, {
+    kind: 'admin.city.adjust',
+    cityKey: city.cityKey,
+    changes: { trust: { expected: city.trust, value } },
+  });
+  expect(await call('admin.game.request', input, actor.cookie)).toMatchObject({
+    status: 200,
+    data: { status: 'PENDING' },
+  });
+  await advance(worldId);
+  expect(await call('admin.game.requestStatus', statusInput(input), actor.cookie)).toMatchObject({
+    status: 200,
+    data: { status: 'APPLIED' },
+  });
+  expect(await read('city', String(city.cityKey))).toMatchObject({
+    data: { rows: [{ id: city.cityKey, trust: value }] },
+  });
+  await expectReplayedState(worldId);
+});
 
 it('AC-INT-23 같은 tick 운영 기록은 개인 30행·관리자100행에서 누락 없이 이어지고 읽기는 감사한다', async () => {
   const worldId = await world(true);

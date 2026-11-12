@@ -16,6 +16,7 @@ export const runtimeRuleOptionsSchema = z
   .refine(nonempty);
 export const generalCreationEntrySchema = z.enum(['open', 'closed']);
 export const npcPlayEntrySchema = z.enum(['off', 'on']);
+export const recruitmentLocationSchema = z.enum(['territory', 'city']);
 export const runtimeOptionsSchema = z
   .strictObject({
     rules: runtimeRuleOptionsSchema.optional(),
@@ -24,6 +25,7 @@ export const runtimeOptionsSchema = z
       .refine(nonempty)
       .optional(),
     truce: truceSchema.nullable().optional(),
+    recruitmentLocation: recruitmentLocationSchema.optional(),
   })
   .refine(nonempty);
 export type RuntimeRuleOptions = z.infer<typeof runtimeRuleOptionsSchema>;
@@ -58,5 +60,6 @@ export function effectiveWorldOptions(preset: WorldPreset | null, stored: unknow
       rules === undefined ? undefined : runtime?.rules === undefined ? rules : applyRuleOptions(rules, runtime.rules),
     entry: { generalCreation: runtime?.entry?.generalCreation ?? 'open', npcPlay: runtime?.entry?.npcPlay ?? 'off' },
     truce: runtime?.truce === undefined ? (preset?.truce ?? null) : runtime.truce,
+    recruitmentLocation: runtime?.recruitmentLocation ?? 'territory',
   };
 }

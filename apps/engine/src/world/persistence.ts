@@ -98,6 +98,8 @@ export function prepareInitialWorld(
   const featureFormat =
     typeof options.replayFormat === 'number' ||
     (options.replayFormat === undefined && options.extFormat === undefined && options.treatyFormat === undefined);
+  if (state.recruitmentLocation && (!featureFormat || options.replayFormat === 1))
+    throw new Error('도시별 모집은 재생 형식 3에서 사용할 수 있습니다.');
   if (
     (featureFormat && (options.extFormat !== undefined || options.treatyFormat !== undefined)) ||
     (!featureFormat &&
@@ -280,6 +282,9 @@ export function prepareInitialWorld(
             : { policyFromSequence: 0 }),
         ...(options.treatyFormat === 1 ? { treatyFormat: 1 } : {}),
         replayOrigin: replayOrigin as Prisma.InputJsonValue,
+        ...(initial.recruitmentLocation
+          ? { runtimeOptions: { recruitmentLocation: initial.recruitmentLocation } }
+          : {}),
         statRules: creationState.statRules,
         unitSet: creationState.unitSet as Prisma.InputJsonValue,
         ...(features.includes('campaign-v1')
@@ -476,11 +481,12 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
         return value;
       };
       const operationalMap = readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin);
-      const rules = effectiveWorldOptions(preset, world.runtimeOptions).presetRules;
+      const { presetRules: rules, recruitmentLocation } = effectiveWorldOptions(preset, world.runtimeOptions);
       const initial: WorldInit = {
         ...(operationalMap ? { operationalMap } : {}),
         ...(cityScale ? { cityScale } : {}),
         ...(rules ? { presetRules: rules } : {}),
+        ...(recruitmentLocation === 'city' ? { recruitmentLocation } : {}),
         ...(world.ruleFeatures?.length ? { ruleFeatures: [...world.ruleFeatures] } : {}),
         ...(ext && world.replayFormat !== 3 ? { ext } : {}),
         seed: world.seed,

@@ -581,7 +581,7 @@ it(
   }),
 );
 
-it('같은 인물·같은 계정의 동시 접수는 엔진에서 하나만 적용한다', async () => {
+it('같은 인물의 동시 접수는 엔진에서 하나만 적용하고 같은 계정의 두 번째 접수는 API에서 막는다', async () => {
   for (const sameUser of [false, true]) {
     const worldId = await world();
     await enable(worldId);
@@ -593,16 +593,39 @@ it('같은 인물·같은 계정의 동시 접수는 엔진에서 하나만 적�
     ];
     await expect
       .poll(() => db.inputEvent.count({ where: { worldId, kind: POSSESSION_KIND, status: 'PENDING' } }))
-      .toBe(2);
+      .toBe(sameUser ? 1 : 2);
     await advance(worldId);
     const results = await Promise.all(requests);
-    expect(results.filter((result) => (result.data as { status: string }).status === 'possessed')).toHaveLength(1);
-    expect(results.find((result) => (result.data as { status: string }).status === 'rejected')!.data).toMatchObject({
-      rejectCode: sameUser ? 'ALREADY_HAS_GENERAL' : 'TAKEN',
-    });
+    expect(
+      results.filter((result) => (result.data as { status: string } | undefined)?.status === 'possessed'),
+    ).toHaveLength(1);
+    if (sameUser) expect(results).toContainEqual(expect.objectContaining({ status: 409, code: 'CONFLICT' }));
+    else
+      expect(results).toContainEqual(
+        expect.objectContaining({ data: expect.objectContaining({ rejectCode: 'TAKEN' }) }),
+      );
     expect(await db.generalLog.count({ where: { worldId, kind: 'possess' } })).toBe(1);
     await expectReplayed(worldId);
   }
+});
+
+it('NPC 무장 맡기가 대기 중인 계정은 신규 장수를 함께 만들 수 없다', async () => {
+  const worldId = await world();
+  await enable(worldId);
+  const input = claim(worldId, 3);
+  const pending = call('entry.possess', input, ordinary.cookie);
+  await expect
+    .poll(() => db.inputEvent.count({ where: { worldId, kind: POSSESSION_KIND, status: 'PENDING' } }))
+    .toBe(1);
+  expect(
+    await call(
+      'general.create',
+      { worldId, name: '새장수', leadership: 70, strength: 70, intel: 60, portraitId: null },
+      ordinary.cookie,
+    ),
+  ).toMatchObject({ status: 409, code: 'CONFLICT' });
+  await advance(worldId);
+  expect(await pending).toMatchObject({ data: { status: 'possessed', generalId: 3 } });
 });
 
 it('엔진이 없는 pending은 회수하고 꺼진 뒤에는 엔진 거절 결과를 보존한다', async () => {

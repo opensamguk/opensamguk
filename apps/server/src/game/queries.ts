@@ -54,7 +54,7 @@ export async function requireGeneral(tx: Prisma.TransactionClient, worldId: stri
 export async function readView(tx: Prisma.TransactionClient, worldId: string) {
   const world = await requireWorld(tx, worldId);
   const { preset, commands } = worldResolver(world);
-  const rules = effectiveWorldOptions(preset, world.runtimeOptions).presetRules;
+  const { presetRules: rules, recruitmentLocation } = effectiveWorldOptions(preset, world.runtimeOptions);
   const capabilities = world.replayFormat === 3 ? null : selectWorldCapabilities(world);
   const treatyRows = await tx.treaty.findMany({
     where: { worldId },
@@ -99,6 +99,7 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
   const diplomacies = await tx.diplomacy.findMany({ where: { worldId } });
   const state = toWorldState({
     ...(rules ? { presetRules: rules } : {}),
+    ...(recruitmentLocation === 'city' ? { recruitmentLocation } : {}),
     ...(world.ruleFeatures?.length ? { ruleFeatures: [...world.ruleFeatures] } : {}),
     ...(ext ? { ext } : {}),
     startYear: world.startYear,

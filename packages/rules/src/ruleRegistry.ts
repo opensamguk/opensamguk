@@ -248,6 +248,11 @@ export function checkReplayOrigin(
   const origin = value as ReplayOriginV3 | ReplayOriginV1;
   if (!origin || ![1, 3].includes(origin.version) || !origin.initial || typeof origin.initial !== 'object')
     throw new Error('재생 생성 기록의 버전을 확인하세요.');
+  if (
+    Object.hasOwn(origin.initial, 'recruitmentLocation') &&
+    (origin.version !== 3 || origin.initial.recruitmentLocation !== 'city')
+  )
+    throw new Error('재생 생성 기록의 모집 위치를 확인하세요.');
   checkStatProfile(origin.initial);
   checkInitialNpcStatLimits(origin.initial, origin.version === 3 ? 'current' : 'legacy');
   checkCityScaleInitial(origin.initial);

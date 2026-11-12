@@ -228,7 +228,13 @@ function Editor<S extends DisplaySlot>({
   const nations = useMemo(() => map.data?.nations ?? [], [map.data]);
   const generals = source.generals;
   // 월드 병종표 (T4-86). 불러오는 중·오류여도 병종 없는 명령·표·저장은 그대로 쓰고 병종은 번호로 적는다.
-  const { units, note: unitNote } = useWorldUnits(worldId);
+  const { units, note: unitNote, recruitment } = useWorldUnits(worldId);
+  const city = home.data?.city;
+  const needsRecruitmentRefresh = recruitment?.cityKey != null && city != null && recruitment.cityKey !== city.key;
+  useEffect(() => {
+    if (needsRecruitmentRefresh)
+      void queryClient.invalidateQueries({ queryKey: trpc.resources.worldRules.queryKey({ worldId }) });
+  }, [needsRecruitmentRefresh, city?.key, queryClient, trpc, worldId]);
   const names: ArgNames = useMemo(
     () => ({
       city: (key: number) => cities.find((c) => c.key === key)?.name,
@@ -343,9 +349,11 @@ function Editor<S extends DisplaySlot>({
         ? `반복 횟수는 1~${slotCount - 1}입니다.`
         : null);
 
-  const onPut = (turn: Turn) => {
+  const onPut = (turn: Turn, save = false) => {
     if (putBlocked) return;
-    state.edit({ put: { indices: [...selected].sort((a, b) => a - b), turn } });
+    const edit = { put: { indices: [...selected].sort((a, b) => a - b), turn } };
+    if (save) state.editAndSave(edit);
+    else state.edit(edit);
     rowRefs.current[focus]?.focus();
   };
   const onClear = () => onPut(EMPTY);
@@ -608,11 +616,20 @@ function Editor<S extends DisplaySlot>({
           defaultCrewType={home.data?.general.crewType}
           units={units}
           unitNote={unitNote}
+          recruitment={
+            recruitment?.cityKey != null
+              ? {
+                  city: cities.find(({ key }) => key === (city?.key ?? recruitment.cityKey))?.name ?? '현재 도시',
+                  byCrewType: needsRecruitmentRefresh ? {} : recruitment.byCrewType,
+                }
+              : undefined
+          }
           cityResources={summary.data?.cityResourcesEnabled === true}
           blockedReason={putBlocked}
           targetLabel={targetLabel}
           searchRef={searchRef}
           onPut={onPut}
+          onSave={(turn) => onPut(turn, true)}
           cityChoicesFor={cityChoicesFor}
           precheck={source.precheck}
         />

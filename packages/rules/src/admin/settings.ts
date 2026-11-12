@@ -8,6 +8,7 @@ import {
   applyRuleOptions,
   generalCreationEntrySchema,
   npcPlayEntrySchema,
+  recruitmentLocationSchema,
   effectiveWorldOptions,
   mergeRuntimeRules,
   type RuntimeOptions,
@@ -37,6 +38,7 @@ export const adminSettingSchema = z.union([
   option('boost.lateJoin', presetSchema.shape.boost.shape.lateJoin),
   option('entry.generalCreation', generalCreationEntrySchema),
   option('entry.npcPlay', npcPlayEntrySchema),
+  option('recruitment.location', recruitmentLocationSchema),
 ]);
 export const ADMIN_SETTING_KINDS = [
   'admin.world.rename',
@@ -86,6 +88,7 @@ function snapshot(setting: AdminSetting): z.ZodType<JsonValue> {
     case 'admin.world.setOption': {
       if (setting.key === 'entry.generalCreation') return z.strictObject({ value: generalCreationEntrySchema });
       if (setting.key === 'entry.npcPlay') return z.strictObject({ value: npcPlayEntrySchema });
+      if (setting.key === 'recruitment.location') return z.strictObject({ value: recruitmentLocationSchema });
       const value =
         setting.key === 'protection.foundUntilMonths'
           ? presetSchema.shape.protection.shape.foundUntilMonths
@@ -116,7 +119,10 @@ export interface WorldSettings {
   runtimeOptions: RuntimeOptions | null;
 }
 type OptionSetting = Extract<AdminSetting, { kind: 'admin.world.setOption' }>;
-type RuleOptionSetting = Exclude<OptionSetting, { key: 'entry.generalCreation' | 'entry.npcPlay' }>;
+type RuleOptionSetting = Exclude<
+  OptionSetting,
+  { key: 'entry.generalCreation' | 'entry.npcPlay' | 'recruitment.location' }
+>;
 export function ruleOptionPatch(setting: RuleOptionSetting): RuntimeRuleOptions {
   switch (setting.key) {
     case 'protection.foundUntilMonths':
@@ -203,6 +209,14 @@ export function decideAdminSetting(
       settings.runtimeOptions = { ...current.runtimeOptions, truce: setting.truce };
       break;
     case 'admin.world.setOption': {
+      if (setting.key === 'recruitment.location') {
+        before = { value: current.runtimeOptions?.recruitmentLocation ?? 'territory' };
+        after = { value: setting.value };
+        settings.runtimeOptions = { ...current.runtimeOptions, recruitmentLocation: setting.value };
+        if (setting.value === 'city') next.state.recruitmentLocation = 'city';
+        else delete next.state.recruitmentLocation;
+        break;
+      }
       if (setting.key === 'entry.generalCreation' || setting.key === 'entry.npcPlay') {
         const effective = effectiveWorldOptions(current.preset, current.runtimeOptions);
         before = {
@@ -299,6 +313,13 @@ export function applyAdminSettingRecord(replay: ReplayState, input: RecordedInpu
     }
   } else {
     if (setting.key === 'entry.generalCreation' || setting.key === 'entry.npcPlay') return replay;
+    if (setting.key === 'recruitment.location') {
+      if ((next.state.recruitmentLocation ?? 'territory') !== before.value)
+        throw Error('모집 위치의 변경 전 값이 재생과 다릅니다.');
+      if (setting.value === 'city') next.state.recruitmentLocation = 'city';
+      else delete next.state.recruitmentLocation;
+      return next;
+    }
     if (!next.state.presetRules || !sameJson(optionValue(next.state.presetRules, setting), before.value!))
       throw Error('규칙 옵션의 변경 전 값이 재생과 다릅니다.');
     next.state.presetRules = applyRuleOptions(next.state.presetRules, ruleOptionPatch(setting));

@@ -102,6 +102,7 @@ async function resolveCreation(db: PrismaClient, request: Request) {
   let state;
   try {
     state = composeInitialWorld(resources, request.effectiveSeed);
+    if (intent.recruitmentLocation) state.recruitmentLocation = intent.recruitmentLocation;
   } catch (error) {
     resourceFailure(error);
   }

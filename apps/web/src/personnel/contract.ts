@@ -92,6 +92,8 @@ export interface PersonnelApi {
     input: W & {
       office: Office;
       revision: number;
+      expectedUserId?: string;
+      expectedActorId?: number;
       slots: Array<{ commandKey: string; args: Record<string, unknown> } | null>;
     },
   ): Promise<NationTurnSave>;

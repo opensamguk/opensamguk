@@ -25,6 +25,7 @@ import {
   getWorldSettings,
 } from '../admin/settings';
 import {
+  adminEditorInput,
   adminGeneralInput,
   adminGeneralRecordsInput,
   adminNationRecordsInput,
@@ -34,6 +35,7 @@ import {
   readAdminGeneralInputs,
   readAdminNationLogs,
   readAdminBattles,
+  readAdminEditor,
 } from '../admin/gameRead';
 import {
   requestAdminGame,
@@ -59,6 +61,7 @@ import {
 
 export const adminRouter = router({
   game: router({
+    editor: adminProcedure.input(adminEditorInput).query(({ ctx, input }) => readAdminEditor(ctx, input)),
     general: adminProcedure.input(adminGeneralInput).query(({ ctx, input }) => readAdminGeneral(ctx, input)),
     generalLogs: adminProcedure
       .input(adminGeneralRecordsInput)

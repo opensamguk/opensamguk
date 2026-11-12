@@ -100,6 +100,7 @@ export interface InitialDiplomacy {
 }
 
 export interface WorldInit {
+  recruitmentLocation?: 'city';
   cityScale?: CityScaleRecord;
   operationalMap?: OperationalMapResource;
   presetRules?: PresetRules;

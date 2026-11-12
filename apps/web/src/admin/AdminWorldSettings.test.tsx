@@ -43,6 +43,7 @@ const settings = {
   },
   entry: { generalCreation: 'open', npcPlay: 'off' },
   truce: null,
+  recruitmentLocation: 'territory',
 };
 
 beforeEach(() => {
