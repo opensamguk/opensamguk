@@ -76,8 +76,8 @@ const builderSchema = z.looseObject({
   Image: z.string(),
   State: z.looseObject({ Running: z.literal(true), Pid: z.number().int().positive(), OOMKilled: z.literal(false) }),
   HostConfig: z.looseObject({
-    CPUQuota: z.literal(100000),
-    CPUPeriod: z.literal(100000),
+    CpuQuota: z.literal(100000),
+    CpuPeriod: z.literal(100000),
     Memory: z.literal(2147483648),
     MemorySwap: z.literal(2147483648),
     CgroupParent: z.string(),

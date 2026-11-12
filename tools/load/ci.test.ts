@@ -162,8 +162,8 @@ describe('L5 수동 build/공개 요약 경계', () => {
       Image: 'buildkit-image',
       State: { Running: true, Pid: 123, OOMKilled: false },
       HostConfig: {
-        CPUQuota: 100000,
-        CPUPeriod: 100000,
+        CpuQuota: 100000,
+        CpuPeriod: 100000,
         Memory: 2147483648,
         MemorySwap: 2147483648,
         CgroupParent: '',
@@ -178,7 +178,8 @@ describe('L5 수동 build/공개 요약 경계', () => {
       'LOAD_BUILDER_UNVERIFIED',
     );
     for (const patch of [
-      { CPUQuota: 200000 },
+      { CpuQuota: 200000 },
+      { CpuPeriod: 200000 },
       { Memory: 4294967296 },
       { MemorySwap: -1 },
       { CgroupnsMode: 'host' },
