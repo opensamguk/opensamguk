@@ -246,6 +246,7 @@ test('T3-10 정식191년 모바일 명령·방침·탭의 크기와 30번 칸 �
         {
           measurements,
           remainingSmallSvgOrTable: remaining.filter((size) => size.width < 44 || size.height < 44),
+          wholeResponsiveAcPassed: false,
         },
         null,
         2,
