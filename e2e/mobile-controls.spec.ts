@@ -1,21 +1,27 @@
+import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
+import { promisify } from 'node:util';
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './t210-fixture';
 import { TICKS_PER_MONTH } from '../packages/rules/src/index';
 import { createAccount, withE2eDb } from './account';
 import { holdLease, releaseHold } from './game';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
-import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { prepareInitialWorld, saveInitialWorld, savePreparedInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
-import { loadWorld } from '../apps/engine/src/worldLoader';
-import { persistPublicMap } from '../apps/engine/src/publicMap';
 import { initializeExpandedResources } from '../tools/expanded-resources';
 
 // T3-10 · AC-M3-08 첫 묶음. 표 정렬과 SVG 도시의 남은 크기는 별도로 기록한다.
 // 이 시험이 통과해도 전체 반응형 AC를 완료하지 않는다.
 const executions = new Set<Promise<unknown>>();
+const run = promisify(execFile);
+const expandedFixtureDir = process.env.SAN10_EXPANDED_FIXTURE_DIR;
+const expandedManifestSha = process.env.SAN10_EXPANDED_MANIFEST_SHA;
+if (Boolean(expandedFixtureDir) !== Boolean(expandedManifestSha)) {
+  throw new Error('SAN10 확장판 검증에는 데이터 디렉터리와 manifest SHA-256이 모두 필요합니다.');
+}
 test.use({ isMobile: true, hasTouch: true });
 let ownWorld: string | undefined;
 let ownEmail: string | undefined;
@@ -112,17 +118,30 @@ async function measureMobileScreen(page: Page) {
   });
 }
 
-async function joinMobileWorld(page: Page, name: string, san10 = false) {
+async function joinMobileWorld(page: Page, name: string, edition: 'integration' | 'san10' | 'san10-expanded') {
+  if (edition === 'san10-expanded' && expandedFixtureDir && expandedManifestSha) {
+    await withE2eDb(initializeExpandedResources);
+    await run(process.execPath, [
+      '--import',
+      'tsx',
+      'tools/init-san10-expanded-resources.ts',
+      expandedFixtureDir,
+      expandedManifestSha,
+    ]);
+  }
   const { worldId } = await withE2eDb(async (db) => {
-    if (san10) await initializeExpandedResources(db);
+    if (edition === 'san10') await initializeExpandedResources(db);
+    const expanded = edition === 'san10-expanded';
     const initial = await loadInitialWorldFromDb(db, {
-      scenario: san10 ? 'san10-191' : 'integration191',
-      map: san10 ? 'san10' : 'integration',
+      scenario: expanded ? 'san10-expanded-s0185' : edition === 'san10' ? 'san10-191' : 'integration191',
+      map: edition,
       statRules: 'five-stats',
-      portraitMap: '191-map',
+      portraitMap: expanded ? 'san10-expanded-portraits' : '191-map',
+      ...(expanded ? { unitSet: 'expanded' } : {}),
       seed: 'mobile-controls-191',
     });
     initial.ruleFeatures = [
+      ...(expanded ? ['battle-affinity-v2'] : []),
       'campaign-v1',
       'five-stats',
       'operational-map',
@@ -131,10 +150,13 @@ async function joinMobileWorld(page: Page, name: string, san10 = false) {
       'stratagem-basic',
       'treaty',
     ];
-    expect(initial.generals).toHaveLength(491);
-    expect(initial.nations).toHaveLength(21);
-    expect(initial.cities).toHaveLength(san10 ? 155 : 61);
-    return saveInitialWorld(db, initial, { name, turnTermMinutes: 60, endYear: 201 });
+    expect(initial.generals).toHaveLength(expanded ? 928 : 491);
+    expect(initial.nations).toHaveLength(expanded ? 20 : 21);
+    expect(initial.cities).toHaveLength(expanded ? 322 : edition === 'san10' ? 155 : 61);
+    const options = { name, turnTermMinutes: 60, endYear: initial.startYear + 10 };
+    if (edition === 'integration') return saveInitialWorld(db, initial, options);
+    const prepared = prepareInitialWorld(initial, options);
+    return db.$transaction((tx) => savePreparedInitialWorld(tx, prepared), { timeout: 30_000 });
   });
   ownWorld = worldId;
   const worldHold = await holdLease(worldId);
@@ -159,7 +181,7 @@ async function joinMobileWorld(page: Page, name: string, san10 = false) {
 test('T3-10 정식191년 모바일 명령·방침·탭의 크기와 30번 칸 실제 저장·초안 복귀', async ({ page }, info) => {
   test.setTimeout(120_000);
   const execution = (async () => {
-    const { worldHold: hold } = await joinMobileWorld(page, '모바일 조작 정식191');
+    const { worldHold: hold } = await joinMobileWorld(page, '모바일 조작 정식191', 'integration');
     const main = `/w/${ownWorld}?city=40`;
     await page.goto(main);
     const editor = page.getByTestId('turn-editor');
@@ -279,73 +301,75 @@ test('T3-10 정식191년 모바일 명령·방침·탭의 크기와 30번 칸 �
   await execution;
 });
 
-test('AC-M3-08 SAN10 로비와 핵심 화면에 375px 가로 넘침과 44px 미만 조작 대상이 없다', async ({ page }, info) => {
-  test.setTimeout(120_000);
-  const execution = (async () => {
-    const name = '모바일 SAN10';
-    const { worldId, worldHold } = await joinMobileWorld(page, name, true);
-    await new TurnLoop(worldHold.db, worldHold.lease).advanceTo(TICKS_PER_MONTH);
-    await worldHold.db.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${worldId} FOR UPDATE`;
-      await persistPublicMap(tx, worldHold.lease, await loadWorld(tx, worldId), 0, Date.now() - 11 * 60_000, {
-        delayMinutes: 10,
-        intervalMinutes: 5,
-      });
-    });
-    const world = `/w/${worldId}`;
-    const routeChecks: Array<[string, string, Locator]> = [
-      ['lobby', '/lobby', page.getByTestId('public-map').getByTestId('world-map')],
-      ['main', `${world}?city=40`, page.getByTestId('turn-editor')],
-      ['map', `${world}/map`, page.getByTestId('world-map')],
-      ['turns', `${world}/turns`, page.getByTestId('turn-editor')],
-      ['city', `${world}/city/40`, page.getByRole('heading', { name: /^도시 정보 · / })],
-      ['nation', `${world}/nation/1`, page.getByRole('heading', { name: /^국가 정보 · / })],
-      ['records-general', `${world}/records?tab=general`, page.getByRole('heading', { name: '기록 · 내 장수' })],
-      ['records-nation', `${world}/records?tab=nation`, page.getByRole('heading', { name: '기록 · 국가 역사' })],
-      ['records-world', `${world}/records?tab=world`, page.getByRole('heading', { name: '기록 · 월드 정세' })],
-      ['records-timelapse', `${world}/records?tab=timelapse`, page.getByTestId('timelapse-map')],
-      ['records-intel', `${world}/records?tab=intel`, page.getByRole('heading', { name: '기록 · 첩보 기록' })],
-      ['ranking', `${world}/ranking`, page.getByRole('table')],
-    ];
-    const screens = [];
-    for (const [screen, path, ready] of routeChecks) {
-      await page.goto(path);
-      if (screen === 'lobby') await page.getByRole('tab', { name, exact: true }).tap();
-      await expect(ready).toBeVisible();
-      if (screen === 'map') await expect(ready.getByTestId('map-tap-target')).toHaveCount(155);
-      await expect(page.locator('[data-state="loading"]:visible')).toHaveCount(0);
-      await expect(page.locator('[data-state="error"]:visible')).toHaveCount(0);
-      screens.push({ screen, ...(await measureMobileScreen(page)) });
-      await page.screenshot({ path: info.outputPath(`mobile-${screen}-375.png`), fullPage: true });
-      if (screen === 'main') {
-        const menu = page.locator('summary').filter({ hasText: /^전체$/ });
-        const close = page.getByRole('button', { name: '메뉴 닫기', exact: true });
-        await expect(close).toBeHidden();
-        await menu.tap();
-        await expect(close).toBeVisible();
-        screens.push({ screen: 'main-open-menu', ...(await measureMobileScreen(page)) });
-        await page.screenshot({ path: info.outputPath('mobile-main-open-menu-375.png') });
-        await close.tap();
-        await expect(close).toBeHidden();
+const editions = [
+  { edition: 'san10', sites: 155 },
+  ...(expandedFixtureDir ? [{ edition: 'san10-expanded', sites: 322 } as const] : []),
+] as const;
+for (const { edition, sites } of editions) {
+  test(`AC-M3-08 ${edition} 로비와 핵심 화면에 375px 가로 넘침과 44px 미만 조작 대상이 없다`, async ({
+    page,
+  }, info) => {
+    test.setTimeout(180_000);
+    const execution = (async () => {
+      const name = `모바일 ${edition}`;
+      const { worldId, worldHold } = await joinMobileWorld(page, name, edition);
+      await new TurnLoop(worldHold.db, worldHold.lease).advanceTo(TICKS_PER_MONTH);
+      const world = `/w/${worldId}`;
+      const routeChecks: Array<[string, string, Locator]> = [
+        ['lobby', '/lobby', page.getByTestId('public-map').getByTestId('world-map')],
+        ['main', `${world}?city=40`, page.getByTestId('turn-editor')],
+        ['map', `${world}/map`, page.getByTestId('world-map')],
+        ['turns', `${world}/turns`, page.getByTestId('turn-editor')],
+        ['city', `${world}/city/40`, page.getByRole('heading', { name: /^도시 정보 · / })],
+        ['nation', `${world}/nation/1`, page.getByRole('heading', { name: /^국가 정보 · / })],
+        ['records-general', `${world}/records?tab=general`, page.getByRole('heading', { name: '기록 · 내 장수' })],
+        ['records-nation', `${world}/records?tab=nation`, page.getByRole('heading', { name: '기록 · 국가 역사' })],
+        ['records-world', `${world}/records?tab=world`, page.getByRole('heading', { name: '기록 · 월드 정세' })],
+        ['records-timelapse', `${world}/records?tab=timelapse`, page.getByTestId('timelapse-map')],
+        ['records-intel', `${world}/records?tab=intel`, page.getByRole('heading', { name: '기록 · 첩보 기록' })],
+        ['ranking', `${world}/ranking`, page.getByRole('table')],
+      ];
+      const screens = [];
+      for (const [screen, path, ready] of routeChecks) {
+        await page.goto(path);
+        if (screen === 'lobby') await page.getByRole('tab', { name, exact: true }).tap();
+        await expect(ready).toBeVisible();
+        if (screen === 'map') await expect(ready.getByTestId('map-tap-target')).toHaveCount(sites);
+        if (screen === 'lobby') await expect(ready.locator('[data-anchor-key]')).toHaveCount(sites);
+        await expect(page.locator('[data-state="loading"]:visible')).toHaveCount(0);
+        await expect(page.locator('[data-state="error"]:visible')).toHaveCount(0);
+        screens.push({ screen, ...(await measureMobileScreen(page)) });
+        await page.screenshot({ path: info.outputPath(`mobile-${screen}-375.png`), fullPage: true });
+        if (screen === 'main') {
+          const menu = page.locator('summary').filter({ hasText: /^전체$/ });
+          const close = page.getByRole('button', { name: '메뉴 닫기', exact: true });
+          await expect(close).toBeHidden();
+          await menu.tap();
+          await expect(close).toBeVisible();
+          screens.push({ screen: 'main-open-menu', ...(await measureMobileScreen(page)) });
+          await page.screenshot({ path: info.outputPath('mobile-main-open-menu-375.png') });
+          await close.tap();
+          await expect(close).toBeHidden();
+        }
       }
-    }
-    await page.context().clearCookies();
-    await page.goto('/lobby');
-    await expect(page.getByRole('link', { name: '로그인', exact: true }).first()).toBeVisible();
-    await page.getByRole('tab', { name, exact: true }).tap();
-    await expect(page.getByTestId('public-map').getByTestId('world-map')).toBeVisible();
-    await expect(page.locator('[data-state="loading"]:visible')).toHaveCount(0);
-    screens.push({ screen: 'lobby-anonymous', ...(await measureMobileScreen(page)) });
-    await page.screenshot({ path: info.outputPath('mobile-lobby-anonymous-375.png'), fullPage: true });
-    await writeFile(info.outputPath('mobile-screen-measurements.json'), JSON.stringify(screens, null, 2));
-    for (const { screen, width, targetCount, undersized, overflow } of screens) {
-      expect.soft(width, screen).toBe(375);
-      expect.soft(targetCount, screen).toBeGreaterThan(0);
-      expect.soft(undersized, `${screen}: 44px`).toEqual([]);
-      expect.soft(overflow, `${screen}: horizontal overflow`).toEqual([]);
-    }
-  })();
-  executions.add(execution);
-  void execution.finally(() => executions.delete(execution)).catch(() => undefined);
-  await execution;
-});
+      await page.context().clearCookies();
+      await page.goto('/lobby');
+      await expect(page.getByRole('link', { name: '로그인', exact: true }).first()).toBeVisible();
+      await page.getByRole('tab', { name, exact: true }).tap();
+      await expect(page.getByTestId('public-map').getByTestId('world-map')).toBeVisible();
+      await expect(page.locator('[data-state="loading"]:visible')).toHaveCount(0);
+      screens.push({ screen: 'lobby-anonymous', ...(await measureMobileScreen(page)) });
+      await page.screenshot({ path: info.outputPath('mobile-lobby-anonymous-375.png'), fullPage: true });
+      await writeFile(info.outputPath('mobile-screen-measurements.json'), JSON.stringify(screens, null, 2));
+      for (const { screen, width, targetCount, undersized, overflow } of screens) {
+        expect.soft(width, screen).toBe(375);
+        expect.soft(targetCount, screen).toBeGreaterThan(0);
+        expect.soft(undersized, `${screen}: 44px`).toEqual([]);
+        expect.soft(overflow, `${screen}: horizontal overflow`).toEqual([]);
+      }
+    })();
+    executions.add(execution);
+    void execution.finally(() => executions.delete(execution)).catch(() => undefined);
+    await execution;
+  });
+}
