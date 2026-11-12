@@ -549,6 +549,7 @@ async function main(): Promise<number> {
     );
   };
   const failures: Error[] = [];
+  let bodyFailureStep: string | undefined;
   try {
     const collisions = await native(
       ['ps', '-aq', '--filter', `label=com.docker.compose.project=${project}`],
@@ -820,6 +821,7 @@ async function main(): Promise<number> {
     succeeded = finalVerdict === 'PASS' || finalVerdict === 'SMOKE_ONLY';
     complete = true;
   } catch {
+    bodyFailureStep = commands.receipts.at(-1)?.label;
     failures.push(new Error('LOAD_BODY_FAILED'));
   }
   {
@@ -978,6 +980,7 @@ async function main(): Promise<number> {
             !commands.stickyUnsettled &&
             (deleted || values.keep === true),
           verdict: finalVerdict,
+          bodyFailureStep: bodyFailureStep ?? null,
           sourceUnchanged,
           ownershipMatches,
           databaseOidMatches,

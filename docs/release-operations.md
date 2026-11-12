@@ -191,7 +191,7 @@ Node24.22.0·pnpm10.33.0을 준비한 뒤 의존성 없는 `bootstrap.mjs`가 �
 
 설치 전에 호스트의 실제60초 CPU, 메모리·cgroup 조상과 Docker 자료/근거 파일시스템 두 곳의 여유를1 CPU·2GiB·4GiB 예산으로 심사합니다. 의존성 설치는 새 systemd scope에서 CPU100%·메모리2GiB·추가 swap0으로 제한합니다. scope 내부에서 비root UID, 실제 조상과 커널 제한을 다시 확인한 뒤 설치하고 종료·잔여 scope를 확인합니다. 설치 전 점검과 설치·정리는 합계5분 안에 마쳐야 합니다. scope가 조상 관계를 끊거나 실제 제한을 확인하지 못하면 실패합니다.
 
-설치 뒤에는 기존 심사 코드로 다시 확인하고 전용 BuildKit builder를 만듭니다. 공식 `moby/buildkit:v0.34.1`의 고정 digest, 실제1 CPU·2GiB 제한과 로컬 커널의 parent를 확인한 뒤 기존 `deploy/Dockerfile`의 runtime을 빌드합니다. 이 builder는 공식 Docker container driver의 privileged 동작을 사용하므로 사용자 서버에서 실행하지 않습니다. 임시 GitHub VM 안에서만 쓰고 측정 전 정상 종료·삭제를 확인합니다. 공식 [driver 동작](https://docs.docker.com/build/builders/drivers/docker-container/)과 [고정 release](https://github.com/moby/buildkit/releases/tag/v0.34.1)를 참고합니다.
+설치 뒤에는 기존 심사 코드로 다시 확인하고 전용 BuildKit builder를 만듭니다. 공식 `moby/buildkit:v0.34.1`의 고정 digest, 실제1 CPU·2GiB 제한과 로컬 커널의 parent를 확인한 뒤 `deploy/Dockerfile`의 검증 전용 `load-runtime`을 빌드합니다. 이 단계에 검증 실행 코드와 생성한 Prisma client가 들어갑니다. 이 builder는 공식 Docker container driver의 privileged 동작을 사용하므로 사용자 서버에서 실행하지 않습니다. 임시 GitHub VM 안에서만 쓰고 측정 전 정상 종료·삭제를 확인합니다. 공식 [driver 동작](https://docs.docker.com/build/builders/drivers/docker-container/)과 [고정 release](https://github.com/moby/buildkit/releases/tag/v0.34.1)를 참고합니다.
 
 BuildKit와 PostgreSQL 고정 이미지의 pull·압축 해제는 Docker daemon이 수행하며 builder의 CPU·메모리 제한 밖입니다. 이를 제한된 작업으로 표시하지 않습니다. 두 고정 digest의 실제 image ID와 플랫폼을 검증하고 준비 뒤 호스트·cgroup·두 디스크를 재심사합니다. 이미지 준비·재심사·빌드의 합계 제한은15분, 자기 builder 정리는2분입니다. 실제 준비 IO나 자원 부족 때문에 이 한도를 넘기면 실패로 남깁니다.
 

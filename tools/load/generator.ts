@@ -15,7 +15,7 @@ type State = {
   nationId: number;
   recipientId: number;
   thinkMs: number;
-  turns: LoadOutput<'turns.get'>;
+  turns: Pick<LoadOutput<'turns.get'>, 'revision' | 'slots'>;
   worker: LoadRun['workers'][number] | null;
 };
 

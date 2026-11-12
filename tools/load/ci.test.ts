@@ -227,9 +227,15 @@ describe('L5 수동 build/공개 요약 경계', () => {
     });
     expect(args).toContain('SOURCE_REVISION=' + 'b'.repeat(40));
     expect(args).toContain('SOURCE_TREE_SHA256=' + 'c'.repeat(64));
-    expect(args).toContain('runtime');
+    expect(args[args.indexOf('--target') + 1]).toBe('load-runtime');
     expect(args).not.toContain('--push');
     expect(CI_LIMITS.driverMs).toBe((11 + 20 + 5) * 60000);
+  });
+  it('uses the source and generated dependencies for the isolated load services', async () => {
+    const dockerfile = await readFile(new URL('../../deploy/Dockerfile', import.meta.url), 'utf8');
+    expect(dockerfile).toMatch(
+      /RUN pnpm install --frozen-lockfile && pnpm generate\r?\n\r?\n#[^\r\n]+\r?\nFROM dependencies AS load-runtime/,
+    );
   });
   it('수학적으로 유효한 원자료도 실제 정리가 없으면 공개 성공 요약을 만들지 않는다', () => {
     const raw = mathematicalSmoke();

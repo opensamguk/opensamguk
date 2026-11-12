@@ -190,7 +190,7 @@ export function runtimeBuildArguments(builder: string, iidFile: string, source: 
     builder,
     '--load',
     '--target',
-    'runtime',
+    'load-runtime',
     '--file',
     'deploy/Dockerfile',
     '--provenance=false',
@@ -607,6 +607,7 @@ async function main() {
   if (before.head !== afterBuild.head || before.sha256 !== afterBuild.sha256) throw new Error('LOAD_CI_SOURCE_CHANGED');
   const driverFailures: Error[] = [];
   let summary: ReturnType<typeof publicLoadSummary> | undefined;
+  const reportPath = resolve(root, '.load-reports', bootstrap.runId);
   try {
     await commands.run(
       process.execPath,
@@ -631,7 +632,6 @@ async function main() {
       ],
       { label: 'actual-load-driver', signal, timeoutMs: CI_LIMITS.driverMs, env },
     );
-    const reportPath = resolve(root, '.load-reports', bootstrap.runId);
     const rawRun: unknown = JSON.parse(await readFile(resolve(reportPath, 'run.json'), 'utf8'));
     const lifecycle: unknown = JSON.parse(await readFile(resolve(reportPath, 'lifecycle.json'), 'utf8'));
     summary = publicLoadSummary(rawRun, lifecycle);
@@ -648,6 +648,37 @@ async function main() {
       throw new Error('LOAD_CI_FINAL_UNVERIFIED');
   } catch {
     driverFailures.push(new Error('LOAD_DRIVER_OR_FINAL_EVIDENCE_FAILED'));
+    const lifecycle = await readFile(resolve(reportPath, 'lifecycle.json'), 'utf8')
+      .then(JSON.parse)
+      .catch(() => null);
+    const state = z
+      .looseObject({
+        bodyFailureStep: z
+          .string()
+          .regex(/^[a-z0-9-]{1,64}$/)
+          .nullable(),
+        complete: z.boolean(),
+        deleted: z.boolean(),
+      })
+      .safeParse(lifecycle);
+    const report = await readFile(resolve(reportPath, 'run.json'), 'utf8')
+      .then(JSON.parse)
+      .catch(() => null);
+    const run = loadRunSchema.safeParse(report);
+    const result = run.success ? evaluateLoadRun(run.data) : null;
+    process.stderr.write(
+      `${JSON.stringify({
+        event: 'LOAD_CI_DRIVER_DIAGNOSTIC',
+        bodyFailureStep: state.success ? state.data.bodyFailureStep : null,
+        complete: state.success ? state.data.complete : false,
+        deleted: state.success ? state.data.deleted : false,
+        verdict: result?.verdict ?? null,
+        invalid: result?.invalid ?? [],
+        failed: result?.failed ?? [],
+        p95Ms: result?.p95Ms ?? null,
+        maxCommitUpperBoundMs: result?.maxCommitUpperBoundMs ?? null,
+      })}\n`,
+    );
   }
   try {
     await writeEvidence(resolve(output, 'driver-lifecycle.json'), {
