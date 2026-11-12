@@ -8,6 +8,7 @@ import {
   validateTreatyState,
   validateBrokenTreatyRow,
   TREATY_INPUTS,
+  treatyOptions,
   type BrokenTreatyRow,
   type ClosedTreatyRow,
   type ConnectedTreatyClause,
@@ -66,6 +67,10 @@ export function treatyTradeEnabled(world: StoredWorld): boolean {
   );
 }
 
+export function worldTreatyOptions(world: StoredWorld) {
+  return treatyOptions(world.replayFormat === 3 && world.ruleFeatures.includes('treaty') ? world.ruleFeatures : []);
+}
+
 export function treatyBreakEnabled(world: StoredWorld): boolean {
   return (
     world.replayFormat === 3 && world.ruleFeatures.includes('treaty') && world.ruleFeatures.includes('treaty-break')
@@ -108,15 +113,15 @@ export function checkTreatyRow(world: StoredWorld, row: StoredTreaty): CheckedTr
               invalid();
             for (const cost of [costFrom, costTo])
               if (cost !== null && (!Number.isSafeInteger(cost) || cost < 0 || cost > 2147483647)) invalid();
-            return [validateTreatyState(open, { tradeEnabled: true })];
+            return [validateTreatyState(open, worldTreatyOptions(world))];
           })()
         : projectTreatyRows([storage]);
       if (treaties?.length !== 1) invalid();
       checked = { ...treaties[0]!, costFrom: storage.costFrom, costTo: storage.costTo, closedSequence: null };
     } else if (storage.status === 'BROKEN') {
       if (!treatyBreakEnabled(world)) invalid();
-      checked = validateBrokenTreatyRow(storage, { tradeEnabled: treatyTradeEnabled(world) });
-    } else checked = validateClosedTreatyRow(storage, { tradeEnabled: treatyTradeEnabled(world) });
+      checked = validateBrokenTreatyRow(storage, worldTreatyOptions(world));
+    } else checked = validateClosedTreatyRow(storage, worldTreatyOptions(world));
     if (
       checked.id > world.actionSequence ||
       (checked.closedSequence !== null && checked.closedSequence > world.actionSequence)

@@ -1,7 +1,7 @@
 export type TreatyClause =
   | { kind: 'peace' }
   | { kind: 'nonAggression'; months: number }
-  | { kind: 'passage'; cityKeys: number[] }
+  | { kind: 'passage'; cityKeys: number[]; months?: number | undefined }
   | { kind: 'tribute'; payerNationId: number; gold: number; rice: number; months: number }
   | { kind: 'trade'; months: number }
   | { kind: 'cityTransfer'; cityKey: number; giverNationId: number }
@@ -9,7 +9,7 @@ export type TreatyClause =
 
 export type FirstTreatyClause = Extract<TreatyClause, { kind: 'peace' | 'nonAggression' | 'note' }>;
 
-export type ConnectedTreatyClause = FirstTreatyClause | Extract<TreatyClause, { kind: 'trade' }>;
+export type ConnectedTreatyClause = TreatyClause;
 
 export interface TreatyState {
   id: number;
@@ -112,6 +112,7 @@ export interface TreatyRecordContext {
   treaty: { version: number } | null;
   treatyBreak?: { version: number } | null;
   treatyTrade?: { version: number } | null;
+  treatyExpanded?: { version: number } | null;
   monthlyTick: number;
   endTick?: number;
 }
