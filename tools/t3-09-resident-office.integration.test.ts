@@ -13,7 +13,7 @@ import { processWorldCreateRequest } from '../apps/engine/src/admin/createReques
 import { prepareWorldReset } from '../apps/engine/src/admin/resetPreparation';
 import { exportReplay, replayArchive } from '../apps/engine/src/replay';
 import { rngFor } from '../packages/shared/src/index';
-import { defaultOfficeEffects, residentOfficeBonuses, runMonthly } from '../packages/rules/src/index';
+import { defaultOfficeEffects, INTEL_FEATURE, residentOfficeBonuses, runMonthly } from '../packages/rules/src/index';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 
 const url = process.env.TEST_DATABASE_URL;
@@ -99,7 +99,7 @@ async function claim(worldId: string, generalId: number, actor: Actor) {
     userId: actor.id,
   });
 }
-async function createWorld(capture = false) {
+async function createWorld(capture = false, fog = false) {
   const initial = commandInitial();
   const base = initial.generals[2]!;
   Object.assign(base, { nationId: 1, cityKey: 1, strength: 65, intel: 65 });
@@ -119,7 +119,7 @@ async function createWorld(capture = false) {
   } else {
     initial.diplomacies = [];
   }
-  initial.ruleFeatures = ['office-effects', 'personnel', 'policy'];
+  initial.ruleFeatures = [...(fog ? [INTEL_FEATURE] : []), 'office-effects', 'personnel', 'policy'];
   const { worldId } = await saveInitialWorld(db, initial, { name: '주재 검증', turnTermMinutes: 60, endYear: 230 });
   worlds.push(worldId);
   await controlClock(db, worldId, 'start');
@@ -366,4 +366,25 @@ it('AC-M3-12 운영 생성 요청과 초기화 준비가 주재 효과 표의 �
   expect(await db.publicMapSnapshot.count({ where: { worldId } })).toBe(1);
   const reset = await prepareWorldReset(db, worldId, '새주재검증시드', signal);
   expect(reset.evidence).toMatchObject({ sourceWorldId: worldId, sourceInitialHash: world.initialStateHash });
+});
+
+it('AC-M3-12 첩보 안개가 가린 도시의 관직과 주재 위치를 공개하지 않는다', async () => {
+  const operator = await identity('ADMIN'),
+    ruler = await identity(),
+    viewer = await identity();
+  const worldId = await createWorld(false, true);
+  await enableClaims(worldId, operator);
+  await claim(worldId, 1, ruler);
+  const appoint = call(
+    'personnel.appoint',
+    { worldId, requestId: randomUUID(), generalId: 3, officerLevel: 11 },
+    ruler,
+  );
+  expect(await applyQueued(worldId, 'personnel.appoint', appoint)).toMatchObject({ data: { status: 'applied' } });
+  expect(await call('city.get', { worldId, cityKey: 1 }, ruler)).toMatchObject({
+    data: { officers: [{ generalId: 3, officerLevel: 11, resident: true }], fog: { garrisonHidden: false } },
+  });
+  const hidden = await call('city.get', { worldId, cityKey: 1 }, viewer);
+  expect(hidden).toMatchObject({ data: { officeEffectsEnabled: true, generals: [], fog: { garrisonHidden: true } } });
+  expect(hidden.data).not.toHaveProperty('officers');
 });

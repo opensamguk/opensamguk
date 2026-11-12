@@ -43,7 +43,7 @@ export const cityRouter = router({
           : null;
       const officeEffectsEnabled = world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE);
       const officers =
-        officeEffectsEnabled && city.nationId !== null && city.kind !== 'PASS'
+        officeEffectsEnabled && !garrisonHidden && city.nationId !== null && city.kind !== 'PASS'
           ? await tx.general.findMany({
               where: {
                 worldId: input.worldId,
@@ -60,12 +60,16 @@ export const cityRouter = router({
         ...(officeEffectsEnabled
           ? {
               officeEffectsEnabled: true as const,
-              officers: officers.map((officer) => ({
-                generalId: officer.id,
-                name: officer.name,
-                officerLevel: officer.officerLevel,
-                resident: isOfficeResident(officer, city.nationId),
-              })),
+              ...(!garrisonHidden
+                ? {
+                    officers: officers.map((officer) => ({
+                      generalId: officer.id,
+                      name: officer.name,
+                      officerLevel: officer.officerLevel,
+                      resident: isOfficeResident(officer, city.nationId),
+                    })),
+                  }
+                : {}),
             }
           : {}),
         ...cityInfo(city, viewer),
