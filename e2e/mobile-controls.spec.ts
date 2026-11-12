@@ -153,6 +153,9 @@ async function joinMobileWorld(page: Page, name: string, edition: 'integration' 
     expect(initial.generals).toHaveLength(expanded ? 928 : 491);
     expect(initial.nations).toHaveLength(expanded ? 20 : 21);
     expect(initial.cities).toHaveLength(expanded ? 322 : edition === 'san10' ? 155 : 61);
+    // 확장판 화면 검증은 첫 월간 기록을 사용하므로 초기 NPC 개인 턴만 다음 달로 미룬다.
+    if (expanded)
+      initial.generals = initial.generals.map((general) => ({ ...general, nextTurnTick: TICKS_PER_MONTH + 1 }));
     const options = { name, turnTermMinutes: 60, endYear: initial.startYear + 10 };
     if (edition === 'integration') return saveInitialWorld(db, initial, options);
     const prepared = prepareInitialWorld(initial, options);
