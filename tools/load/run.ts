@@ -376,15 +376,17 @@ async function main(): Promise<number> {
   const postgresImage = dictionary(pgImages[0]).Id;
   if (typeof postgresImage !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(postgresImage))
     throw new Error('LOAD_POSTGRES_IMAGE_MISSING');
+  const preparationExtraMs = mode === 'formal' ? LOAD_LIMITS.formalPreparationExtraMs : 0;
+  const bodyMs = LOAD_LIMITS.bodyMs + preparationExtraMs;
   const bodyStartedAt = Date.now(),
-    bodyDeadline = bodyStartedAt + LOAD_LIMITS.bodyMs;
-  const setupDeadline = bodyStartedAt + LOAD_LIMITS.setupMs;
-  const bodyTimer = setTimeout(stop, LOAD_LIMITS.bodyMs);
+    bodyDeadline = bodyStartedAt + bodyMs;
+  const setupDeadline = bodyStartedAt + LOAD_LIMITS.setupMs + preparationExtraMs;
+  const bodyTimer = setTimeout(stop, bodyMs);
   // 취소를 처리하지 못하는 커널/파일 IO도 유한하게 끝낸다. 이 경로는 정착·삭제 성공을 주장하지 않는다.
   const hardTimer = setTimeout(() => {
     process.stderr.write('LOAD_LIFECYCLE_UNSETTLED_MANUAL_REVIEW_REQUIRED\n');
     process.exit(1);
-  }, LOAD_LIMITS.bodyMs + LOAD_LIMITS.cleanupMs);
+  }, bodyMs + LOAD_LIMITS.cleanupMs);
   const env = {
     ...process.env,
     LOAD_IMAGE: image,

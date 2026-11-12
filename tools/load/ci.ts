@@ -2,7 +2,7 @@ import { readFile, mkdir, appendFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
-import { admissionSite, evaluateAdmission } from './admission';
+import { admissionSite, evaluateAdmission, LOAD_LIMITS } from './admission';
 import { BUILD_BUDGET, requireDispatch } from './bootstrap.mjs';
 import { bindLocalDocker, LOAD_DOCKER } from './docker';
 import {
@@ -688,7 +688,12 @@ async function main() {
         '--source-sha256',
         before.sha256,
       ],
-      { label: 'actual-load-driver', signal, timeoutMs: CI_LIMITS.driverMs, env },
+      {
+        label: 'actual-load-driver',
+        signal,
+        timeoutMs: CI_LIMITS.driverMs + (mode === 'formal' ? LOAD_LIMITS.formalPreparationExtraMs : 0),
+        env,
+      },
     );
     const rawRun: unknown = JSON.parse(await readFile(resolve(reportPath, 'run.json'), 'utf8'));
     const lifecycle: unknown = JSON.parse(await readFile(resolve(reportPath, 'lifecycle.json'), 'utf8'));

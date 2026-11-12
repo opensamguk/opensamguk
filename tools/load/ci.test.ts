@@ -276,7 +276,7 @@ describe('L5 수동 build/공개 요약 경계', () => {
       expect(document).toMatchObject({
         on: { workflow_dispatch: { inputs: { expected_sha: { required: true, type: 'string' } } } },
         permissions: { contents: 'read' },
-        jobs: { load: { 'runs-on': 'ubuntu-24.04', 'timeout-minutes': 75 } },
+        jobs: { load: { 'runs-on': 'ubuntu-24.04', 'timeout-minutes': name === 'load-m3.yml' ? 78 : 75 } },
       });
       const events = zObject(document).on;
       expect(Object.keys(zObject(events))).toEqual(['workflow_dispatch']);

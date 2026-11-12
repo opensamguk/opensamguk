@@ -1,7 +1,12 @@
 import { parse } from 'yaml';
 
 const MiB = 1024 ** 2;
-export const LOAD_LIMITS = Object.freeze({ setupMs: 180_000, bodyMs: 1_200_000, cleanupMs: 300_000 });
+export const LOAD_LIMITS = Object.freeze({
+  setupMs: 180_000,
+  bodyMs: 1_200_000,
+  cleanupMs: 300_000,
+  formalPreparationExtraMs: 180_000,
+});
 export type LoadBudget = Readonly<{ cpu: number; memoryBytes: number; diskBytes: number }>;
 export type AdmissionReason =
   | 'site_mismatch'

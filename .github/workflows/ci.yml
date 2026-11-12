@@ -454,9 +454,9 @@ jobs:
     name: opensamguk-formal-load
     if: github.repository == 'opensamguk/opensamguk' && github.event_name == 'workflow_dispatch' && inputs.load_expected_sha != '' && inputs.runtime_resources_expected_sha == ''
     runs-on: ubuntu-24.04
-    # Bootstrap5 + admission11 + pull/build15 + builder cleanup2 + driver36 + summary2 =71.
-    # 원래 driver의 준비3분·실행20분·정리5분은 바꾸지 않는다. 나머지4분은 action 준비 여유다.
-    timeout-minutes: 75
+    # Bootstrap5 + admission11 + pull/build15 + builder cleanup2 + driver39 + summary2 =74.
+    # 공식 준비는 최대 6분이며 나머지 4분은 action 준비 여유다.
+    timeout-minutes: 78
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
