@@ -166,6 +166,7 @@ export function settleNpcLogistics(world: WorldState, tick: number, unitSet: Npc
     let attempts = 0,
       checks = 0,
       upgraded = false;
+    let treasuryRemaining = npc.treasuryBudgetBp === undefined ? Infinity : fraction(nation.gold, npc.treasuryBudgetBp);
     const incoming = (cityKey: number) => incomingByCity.get(`${nation.id}:${cityKey}`) ?? zero();
     const deficit = (demand: Demand, good: LogisticsGood) =>
       Math.max(0, demand.need[good] - stock.cities[String(demand.cityKey)]![good] - incoming(demand.cityKey)[good]);
@@ -181,6 +182,7 @@ export function settleNpcLogistics(world: WorldState, tick: number, unitSet: Npc
         Math.min(
           demand.budget - (spent.get(demand.cityKey) ?? 0),
           state.cityResources!.cities[String(demand.cityKey)]!.gold - demand.recruitGold,
+          treasuryRemaining,
         ),
       );
     const act = (args: NpcAction) => {
@@ -200,7 +202,11 @@ export function settleNpcLogistics(world: WorldState, tick: number, unitSet: Npc
       if (!result.ok) return false;
       successes++;
       const paid = gold - state.cityResources!.cities[String(cityKey)]!.gold;
-      if (paid > 0) spent.set(cityKey, (spent.get(cityKey) ?? 0) + paid);
+      if (paid > 0) {
+        if (paid > treasuryRemaining) throw new Error('NPC 물류의 국고 기준 월 예산을 넘었습니다.');
+        spent.set(cityKey, (spent.get(cityKey) ?? 0) + paid);
+        treasuryRemaining -= paid;
+      }
       if (args.type === 'trade') (args.side === 'buy' ? bought : sold).add(args.good);
       if (args.type === 'upgrade') upgraded = true;
       if (args.type === 'dispatch') {

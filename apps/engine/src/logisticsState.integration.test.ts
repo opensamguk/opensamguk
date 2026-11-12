@@ -184,7 +184,7 @@ async function queuedFixture() {
 }
 
 // 정식 491명 검증이 아니다. 해당 국가의 군주와 한 NPC만 남겨 모집 경쟁을 원생성에서 고정한다.
-async function npcFixture(mode: 'buy' | 'transport') {
+async function npcFixture(mode: 'buy' | 'transport', treasuryBudgetBp?: number) {
   const source = structuredClone(initial),
     byCity = new Map(source.cities.map((city) => [city.cityKey, city]));
   const rulers = source.generals.filter(
@@ -224,12 +224,20 @@ async function npcFixture(mode: 'buy' | 'transport') {
     (row) => row.nationId !== city.nationId || row.id === ruler.id || row.id === general.id,
   );
   for (const nation of source.nations) nation.isNpc = nation.id === city.nationId;
+  if (treasuryBudgetBp !== undefined) source.nations.find((nation) => nation.id === city.nationId)!.gold = 90;
   general.nextTurnTick = mode === 'buy' ? 10_010 : 30_010;
   const rules: LogisticsConfig = {
     ...structuredClone(config),
     specialties: mode === 'transport' ? [{ cityKey: rear.cityKey, good: 'iron', perMonth: 1000 }] : [],
     transport: { ...config.transport, lossBpPerHop: 5000 },
-    npc: { recruitTarget: 100, budgetBp: 2000, maxActions: 3, stockCapBp: 8000, upgradeAtBp: 9000 },
+    npc: {
+      recruitTarget: 100,
+      budgetBp: 2000,
+      maxActions: 3,
+      stockCapBp: 8000,
+      upgradeAtBp: 9000,
+      ...(treasuryBudgetBp === undefined ? {} : { treasuryBudgetBp }),
+    },
   };
   const seed = `npc-logistics-storage-${mode}`,
     saved = await fixture(source, rules, seed);
@@ -644,6 +652,40 @@ describe('AC-P2-30 실제 PostgreSQL 물류', () => {
     expect(replayed).toHaveLength(2);
     expect(replayed.at(-1)!.stateHash).toBe(hashState(final));
     expect(replayArchive(archive, 2)).toEqual(replayed);
+  });
+
+  it('국고 10% 상한을 설정한 실제 NPC 월 교역의 비용과 설정을 저장하고 재생한다', async () => {
+    const world = await npcFixture('buy', 1000);
+    const city = world.before.cities[world.cityKey]!;
+    const nationId = city.nationId!;
+    const date = monthlyDate(world.before.startYear, 10_000);
+    const base = runMonthly(world.before, 10_000, rngFor(world.seed, 'monthly', date.year, date.month)).state;
+    await controlClock(db, world.id, 'start');
+    await advance(world.id, 10_000);
+    const stored = await db.$transaction((tx) => loadReplayState(tx, world.id));
+    const rows = await db.logisticsMovement.findMany({
+      where: { worldId: world.id, tick: 10_000, reason: 'TRADE' },
+      orderBy: { ordinal: 'asc' },
+    });
+    expect(rows).toMatchObject([
+      { holder: 'city', good: 'iron', delta: 2 },
+      { holder: 'city', holderId: world.cityKey, good: 'iron', delta: 1 },
+    ]);
+    expect(rows[0]!.holderId).not.toBe(rows[1]!.holderId);
+    let totalExpense = 0;
+    for (const row of rows) {
+      expect(stored.state.cities[row.holderId]!.nationId).toBe(nationId);
+      const expense =
+        base.cityResources!.cities[row.holderId]!.gold - stored.state.cityResources!.cities[row.holderId]!.gold;
+      expect(expense).toBe(row.delta * config.trade.iron.buy);
+      totalExpense += expense;
+    }
+    expect(base.nations[nationId]!.gold).toBe(90);
+    expect(totalExpense).toBe(Math.floor(base.nations[nationId]!.gold / 10));
+    expect(stored.state.nations[nationId]!.gold).toBe(90);
+    expect(stored.state.logistics!.config.npc?.treasuryBudgetBp).toBe(1000);
+    const archive = await exportReplay(db, world.id);
+    expect(replayArchive(archive, 1)[0]!.stateHash).toBe(hashState(stored));
   });
 
   it('NPC 특산 후방의 실제 수송·도착 손실·보충·모집 원장을 네 달 재생과 대조한다', async () => {
