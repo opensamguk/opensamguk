@@ -3,6 +3,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import type { PolicyKey, PolicySlot } from '../packages/rules/src/policy';
 import { commandInitial } from '../packages/rules/test/commandFixture';
+import { renewLeaseDuringTest } from '../apps/engine/test/leaseHeartbeat';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -357,6 +358,7 @@ it('방침 월드에서 HTTP 장수 생성 뒤 빈칸·활동과 archive5의 12�
 
 it('방침 월드 NPC는 빈칸에서도 AI를 실행하고 12개월 실제 엔진과 재생이 일치한다', async () => {
   const f = await fixture({ npc: true });
+  renewLeaseDuringTest(db, f.lease);
   expect(await db.generalTurn.count({ where: { worldId: f.worldId, generalId: 2, explicit: false } })).toBe(30);
   await f.loop.advanceTo(5000);
   const sequence = (await db.world.findUniqueOrThrow({ where: { id: f.worldId } })).actionSequence;
@@ -403,6 +405,7 @@ async function refusedWrites(f: Awaited<ReturnType<typeof fixture>>) {
 
 it('정상 T 전환 뒤 로그인·생성을 순서대로 처리하고 실제 예턴 저장만 활동을 남긴다', async () => {
   const f = await fixture();
+  renewLeaseDuringTest(db, f.lease);
   await legacyWorld(f, true);
   await refusedWrites(f);
   await rpc('auth.login', { email: f.alice.email, password }, undefined, true);
