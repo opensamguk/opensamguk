@@ -107,11 +107,14 @@ export function verifyBuilder(raw: unknown, expected: { name: string; imageId: s
   // Buildx의 systemd driver는 CgroupParent를 비워 둔다. 빈 값을 기본 parent의 증거로 쓰지 않고
   // 실제 로컬 커널 경로를 확인하여 system.slice로 해석된 경우만 허용한다.
   const failedChecks = [];
+  const cgroupRoot = `${LOAD_DOCKER.cgroupPath}/docker-${row.Id}.scope`;
+  const actualCgroup = selfCgroupPath(expected.cgroupText);
   if (row.Name !== `/${containerName}`) failedChecks.push('container-name');
   if (row.Image !== expected.imageId) failedChecks.push('pinned-image-id');
   if (!['', LOAD_DOCKER.cgroupParent].includes(row.HostConfig.CgroupParent)) failedChecks.push('docker-cgroup-parent');
-  if (selfCgroupPath(expected.cgroupText) !== `${LOAD_DOCKER.cgroupPath}/docker-${row.Id}.scope`)
-    failedChecks.push('kernel-cgroup-parent');
+  // The pinned BuildKit moves its startup processes into the same container scope's init child.
+  // https://github.com/moby/buildkit/blob/v0.34.1/executor/resources/monitor.go#L236-L256
+  if (actualCgroup !== cgroupRoot && actualCgroup !== `${cgroupRoot}/init`) failedChecks.push('kernel-cgroup-parent');
   if (
     row.Mounts.length !== 1 ||
     row.Mounts[0]?.Type !== 'volume' ||
@@ -125,6 +128,7 @@ export function verifyBuilder(raw: unknown, expected: { name: string; imageId: s
     pid: row.State.Pid,
     volume,
     containerName,
+    cgroupRoot,
     actualParent: LOAD_DOCKER.cgroupPath,
     configuredParent: row.HostConfig.CgroupParent,
   };
@@ -401,8 +405,17 @@ async function main() {
         imageId: buildkitId,
         cgroupText: await readFile(`/proc/${pid}/cgroup`, 'utf8'),
       });
+      const { cgroupRoot } = builderProof;
+      const [cpuMax, memoryMax, swapMax] = await Promise.all(
+        ['cpu.max', 'memory.max', 'memory.swap.max'].map(async (file) =>
+          (await readFile(resolve(cgroupRoot, file), 'utf8')).trim(),
+        ),
+      );
+      if (cpuMax !== '100000 100000' || memoryMax !== '2147483648' || swapMax !== '0')
+        throw new BuilderVerificationError(['kernel-cgroup-limits']);
       await writeEvidence(resolve(output, 'builder.json'), {
         ...builderProof,
+        kernelLimits: { cpuMax, memoryMax, swapMax },
         budget: BUILD_BUDGET,
         daemonPreparationIoOutsideBuilderCaps: true,
         image: BUILDKIT_IMAGE,
@@ -438,7 +451,7 @@ async function main() {
         lastStep: last?.label ?? null,
         lastExitCode: last?.exitCode ?? null,
         createAttempted,
-        builderVerified: builderProof !== undefined,
+        builderIdentityVerified: builderProof !== undefined,
         failedBuilderChecks: error instanceof BuilderVerificationError ? error.failedChecks : [],
       })}\n`,
     );

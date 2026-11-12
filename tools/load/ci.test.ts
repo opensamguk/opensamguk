@@ -174,6 +174,12 @@ describe('L5 수동 build/공개 요약 경계', () => {
     };
     const expected = { name, imageId: row.Image, cgroupText: `0::/system.slice/docker-${row.Id}.scope\n` };
     expect(verifyBuilder(row, expected).configuredParent).toBe('');
+    expect(
+      verifyBuilder(row, { ...expected, cgroupText: `0::/system.slice/docker-${row.Id}.scope/init\n` }).cgroupRoot,
+    ).toBe(`/sys/fs/cgroup/system.slice/docker-${row.Id}.scope`);
+    expect(() =>
+      verifyBuilder(row, { ...expected, cgroupText: `0::/system.slice/docker-${row.Id}.scope-other/init\n` }),
+    ).toThrow('LOAD_BUILDER_UNVERIFIED');
     expect(() => verifyBuilder(row, { ...expected, cgroupText: `0::/narrow.slice/docker-${row.Id}.scope\n` })).toThrow(
       'LOAD_BUILDER_UNVERIFIED',
     );
