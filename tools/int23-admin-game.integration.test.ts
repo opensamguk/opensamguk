@@ -100,6 +100,11 @@ async function call(path: string, input: unknown, cookie?: string) {
   const [body] = (await response.json()) as [{ result?: { data: unknown }; error?: { data: { code: string } } }];
   return { status: response.status, data: body.result?.data, code: body.error?.data.code };
 }
+async function startPaused(worldId: string) {
+  const clockNow = Date.now();
+  await controlClock(db, worldId, 'start', clockNow);
+  await controlClock(db, worldId, 'pause', clockNow);
+}
 async function world(quietNpcs = false, withTreaty = false) {
   const initial = commandInitial();
   initial.ruleFeatures = ['personnel', 'policy', ...(withTreaty ? ['treaty'] : [])];
@@ -111,8 +116,7 @@ async function world(quietNpcs = false, withTreaty = false) {
     endYear: 231,
     replayFormat: 3,
   });
-  await controlClock(db, worldId, 'start');
-  await controlClock(db, worldId, 'pause');
+  await startPaused(worldId);
   return worldId;
 }
 async function advance(worldId: string, tick = 0) {
@@ -964,8 +968,7 @@ it('AC-INT-23 정식491명 부곡 월드는 병력 조정을 거절하고 금 �
     endYear: 231,
   });
   expect(await db.general.count({ where: { worldId } })).toBe(491);
-  await controlClock(db, worldId, 'start');
-  await controlClock(db, worldId, 'pause');
+  await startPaused(worldId);
   const general = await db.general.findFirstOrThrow({ where: { worldId }, orderBy: { id: 'asc' } });
   for (const changes of [
     { crew: { expected: general.crew, value: 1 } },
@@ -1033,8 +1036,7 @@ it('AC-INT-23 확장20기능 정식491명 월드의 운영 군주 교체·해산
     ruleFeatures: profile.ruleFeatures,
     featureData: profile.featureData,
   });
-  await controlClock(db, worldId, 'start');
-  await controlClock(db, worldId, 'pause');
+  await startPaused(worldId);
   expect(await db.general.count({ where: { worldId } })).toBe(491);
   const ruler = await db.general.findFirstOrThrow({ where: { worldId, officerLevel: 12 }, orderBy: { id: 'asc' } });
   const successor = await db.general.findFirstOrThrow({
