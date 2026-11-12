@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { commandWorld } from '../../test/commandFixture';
-import { applyTreatyInput, settleTreaties, validateTreatyState } from './treaty';
+import { applyTreatyInput, settleMonthlyTreaties, validateTreatyState } from './treaty';
 import { hasTreatyPassage } from './treatyClauses';
 import type { TreatyClause } from './treatyTypes';
 import type { WorldState } from '../model/world';
@@ -57,18 +57,18 @@ describe('AC-M2-06 확장 조약', () => {
     expect(hasTreatyPassage(result.state, 2, 4, 20000)).toBe(false);
     result.state.generals[1]!.cityKey = 2;
     result.state.nations[1]!.gold = 800;
-    const first = settleTreaties(result.state, 20000, true);
+    const first = settleMonthlyTreaties(result.state, 20000).state;
     expect(first.nations[1]).toMatchObject({ gold: 800, rice: 99990 });
     expect(first.nations[2]).toMatchObject({ gold: 99975, rice: 100010 });
     expect(first.generals[1]!.cityKey).toBe(2);
-    const second = settleTreaties(first, 30000, true);
+    const second = settleMonthlyTreaties(first, 30000).state;
     expect(second.generals[1]!.cityKey).toBe(1);
     expect(second.generals[3]!.cityKey).toBe(2);
     expect(second.nations[2]!.rice).toBe(100020);
-    const third = settleTreaties(second, 40000, true);
+    const third = settleMonthlyTreaties(second, 40000).state;
     expect(third.nations[2]!.rice).toBe(100020);
     expect(third.treaties).toHaveLength(1);
-    expect(settleTreaties(third, 50000, true).treaties).toBeUndefined();
+    expect(settleMonthlyTreaties(third, 50000).state.treaties).toBeUndefined();
   });
 
   it('파기가 남은 통행을 종료하되 이양으로 옮긴 도시와 다른 조약을 보존한다', () => {

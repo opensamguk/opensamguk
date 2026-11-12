@@ -9,6 +9,7 @@ import {
   payMonthlyTribute,
   returnExpiredVisitors,
   validTreatyTargets,
+  type TreatyAidFailure,
 } from './treatyClauses';
 import type {
   BrokenTreatyRow,
@@ -876,12 +877,24 @@ export function applyTreatyInput(
 }
 
 // 기존 diplomacy 단계가 관계를 정산한 뒤 같은 월 경계에서 부른다.
-export function settleTreaties(state: TreatyView, tick: number, payTribute = false): TreatyWorldState {
+export function settleTreaties(state: TreatyView, tick: number): TreatyWorldState {
+  return settleTreatyState(state, tick, false).state;
+}
+
+export function settleMonthlyTreaties(state: TreatyView, tick: number) {
+  return settleTreatyState(state, tick, true);
+}
+
+function settleTreatyState(
+  state: TreatyView,
+  tick: number,
+  payTribute: boolean,
+): { state: TreatyWorldState; aidFailures: TreatyAidFailure[] } {
   if (!Number.isSafeInteger(tick) || tick <= 0 || tick % TICKS_PER_MONTH !== 0)
     throw new RangeError('월 경계 tick이 필요합니다.');
   const next = structuredClone(state) as TreatyWorldState;
   const expanded = state.ruleFeatures?.includes(EXPANDED_TREATY_FEATURE);
-  if (expanded && payTribute) payMonthlyTribute(next, tick);
+  const aidFailures = expanded && payTribute ? payMonthlyTribute(next, tick) : [];
   putTreaties(
     next,
     (next.treaties ?? []).filter(
@@ -892,7 +905,7 @@ export function settleTreaties(state: TreatyView, tick: number, payTribute = fal
     ),
   );
   if (expanded) returnExpiredVisitors(state, next, tick);
-  return next;
+  return { state: next, aidFailures };
 }
 
 export function treatyClosures(before: TreatyView, next: TreatyView): TreatyClosure[] {

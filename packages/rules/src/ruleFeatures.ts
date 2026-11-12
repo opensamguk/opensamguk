@@ -12,7 +12,7 @@ import { updateResidenceAnchors } from './personnel/residence';
 import { recordedLineageSuccession } from './lineage/control';
 import { recordedPossession } from './entry/possess';
 import { completePersonnelStep, type PersonnelStepPacket } from './personnel/step';
-import { applyTreatyInput, settleTreaties, treatyOptions, validateTreatyRecord } from './diplomacy/treaty';
+import { applyTreatyInput, settleMonthlyTreaties, treatyOptions, validateTreatyRecord } from './diplomacy/treaty';
 import { EXPANDED_TREATY_FEATURE } from './diplomacy/treatyClauses';
 import { validatePolicyInput } from './replayInputs';
 import { trade } from './commands/trade';
@@ -257,7 +257,8 @@ export const treatyFeature: RuleFeatureDefinition = {
     }
   },
   settleMonthly({ settled, tick }) {
-    return { replay: { ...settled, state: settleTreaties(settled.state, tick, true) }, effects: null };
+    const { state, aidFailures } = settleMonthlyTreaties(settled.state, tick);
+    return { replay: { ...settled, state }, effects: aidFailures };
   },
 };
 

@@ -109,7 +109,10 @@ export function executeCityTransfer(
 }
 
 // 월간 정산에서만 부른다. 수락 이후 첫 월 경계부터 지정된 개월 수만큼 이체한다.
-export function payMonthlyTribute(state: WorldState, tick: number): void {
+export type TreatyAidFailure = { nationId: number; text: string };
+
+export function payMonthlyTribute(state: WorldState, tick: number): TreatyAidFailure[] {
+  const failures: TreatyAidFailure[] = [];
   for (const treaty of state.treaties ?? []) {
     if (treaty.status !== 'ACTIVE' || treaty.startTick === null || tick <= treaty.startTick) continue;
     const tribute = treaty.clauses.find((clause) => clause.kind === 'tribute');
@@ -120,9 +123,21 @@ export function payMonthlyTribute(state: WorldState, tick: number): void {
     if (!payer || !receiver) continue;
     for (const resource of ['gold', 'rice'] as const) {
       const amount = tribute[resource];
-      if (payer[resource] < amount || receiver[resource] > 2_147_483_647 - amount) continue;
+      if (amount === 0) continue;
+      const reason =
+        payer[resource] < amount
+          ? '지급국의 국고 부족'
+          : receiver[resource] > 2_147_483_647 - amount
+            ? '수취국의 국고 상한'
+            : null;
+      if (reason) {
+        const text = `조약 ${treaty.id} 월 원조 실패 · ${resource === 'gold' ? '금' : '쌀'} ${amount} · ${reason}`;
+        failures.push({ nationId: payer.id, text }, { nationId: receiver.id, text });
+        continue;
+      }
       payer[resource] -= amount;
       receiver[resource] += amount;
     }
   }
+  return failures;
 }
