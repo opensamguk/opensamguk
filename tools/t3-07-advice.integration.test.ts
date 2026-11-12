@@ -220,7 +220,7 @@ describe('T3-07 AC-M3-13 실제 HTTP 군사 조언', () => {
       const before = await snapshot(f.worldId);
       const result = await advice(f.worldId, f.ruler);
       expect(result.status).toBe(200);
-      expect(result.data!.basis).toEqual({ tick: 0, revision: 0 });
+      expect(result.data!.basis).toEqual({ tick: 0, revision: 0, userId: f.ruler.id, actorId: 1 });
       expect(result.data!.expandedByDefault).toBe(false);
       expect(result.data!.items[0]).toMatchObject({ source: 'notice', commandKey: 'rest', reason: '우리 국가의 지시' });
       expect(JSON.stringify(result)).not.toContain('타국 비공개');

@@ -18,6 +18,7 @@ export function MonthlyReview({ worldId }: { worldId: string }) {
   const latest = useQuery({ ...trpc.review.latest.queryOptions({ worldId }), retry: retryUnlessClientError });
   const months = useQuery({ ...trpc.review.months.queryOptions({ worldId }), retry: retryUnlessClientError });
   const list = months.data ?? [];
+  const latestKey = list[0] ? monthKey(list[0]) : '';
   const target = picked === null ? null : (list.find((m) => monthKey(m) === picked) ?? null);
   const chosen = useQuery({
     ...trpc.review.get.queryOptions({ worldId, year: target?.year ?? 0, month: target?.month ?? 1 }),
@@ -41,8 +42,8 @@ export function MonthlyReview({ worldId }: { worldId: string }) {
             <select
               id={selectId}
               className={styles.select}
-              value={target ? monthKey(target) : monthKey(list[0]!)}
-              onChange={(event) => setPicked(event.target.value)}
+              value={target ? monthKey(target) : latestKey}
+              onChange={(event) => setPicked(event.target.value === latestKey ? null : event.target.value)}
             >
               {list.map((m) => (
                 <option key={monthKey(m)} value={monthKey(m)}>

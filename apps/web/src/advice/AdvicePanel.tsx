@@ -34,7 +34,9 @@ export function AdvicePanel({ worldId, draft }: { worldId: string; draft: TurnDr
   const queryClient = useQueryClient();
   const headingId = useId();
   const bodyId = useId();
+  const confirmDescriptionId = useId();
   const ended = useWorldEnded(worldId);
+  const me = useQuery(trpc.auth.me.queryOptions());
   const advice = useQuery({ ...trpc.advice.get.queryOptions({ worldId }), retry: retryUnlessClientError });
   const commands = useQuery({ ...trpc.commands.list.queryOptions({ worldId }), staleTime: Infinity });
   const commandName = (key: string) => commands.data?.find((c) => c.key === key)?.name ?? key;
@@ -50,16 +52,23 @@ export function AdvicePanel({ worldId, draft }: { worldId: string; draft: TurnDr
 
   const data = advice.data;
   const serverRevision = draft.server.data?.revision;
+  const actorId = draft.server.data?.actorId;
+  const userId = me.data?.user?.id;
+  const actorMatches = data !== undefined && data.basis.userId === userId && data.basis.actorId === actorId;
   const first = draft.server.data?.slots[0];
   const basisRevision = data?.basis.revision;
 
   // 예턴 목록이 바뀌면(저장·턴 실행·다른 탭) 조언도 새로 받는다.
-  const seenRevision = useRef(serverRevision);
+  const listIdentity =
+    userId && actorId !== undefined && serverRevision !== undefined
+      ? `${userId}:${actorId}:${serverRevision}`
+      : undefined;
+  const seenList = useRef(listIdentity);
   useEffect(() => {
-    if (serverRevision === undefined || seenRevision.current === serverRevision) return;
-    seenRevision.current = serverRevision;
+    if (listIdentity === undefined || seenList.current === listIdentity) return;
+    seenList.current = listIdentity;
     void queryClient.invalidateQueries({ queryKey: trpc.advice.get.queryKey({ worldId }) });
-  }, [serverRevision, queryClient, trpc, worldId]);
+  }, [listIdentity, queryClient, trpc, worldId]);
 
   const refresh = () =>
     Promise.all([
@@ -97,6 +106,7 @@ export function AdvicePanel({ worldId, draft }: { worldId: string; draft: TurnDr
     pending: draft.pending !== null,
     hasDraft: draft.draft !== null,
     serverRevision: first ? serverRevision : undefined,
+    actorMatches,
     basisRevision: basisRevision ?? -1,
     fetching: advice.isFetching,
     putting: edit.isPending,
@@ -108,6 +118,8 @@ export function AdvicePanel({ worldId, draft }: { worldId: string; draft: TurnDr
     edit.mutate({
       worldId,
       revision: data.basis.revision,
+      expectedUserId: data.basis.userId,
+      expectedActorId: data.basis.actorId,
       op: { put: { from: 0, to: 0, commandKey: item.commandKey, args: item.args } },
     });
   };
@@ -183,6 +195,7 @@ export function AdvicePanel({ worldId, draft }: { worldId: string; draft: TurnDr
                         <div
                           role="alertdialog"
                           aria-label="1칸 바꾸기 확인"
+                          aria-describedby={confirmDescriptionId}
                           className={styles.confirm}
                           onKeyDown={(event) => {
                             if (event.key !== 'Escape') return;
@@ -190,7 +203,7 @@ export function AdvicePanel({ worldId, draft }: { worldId: string; draft: TurnDr
                             cancelConfirmation(key);
                           }}
                         >
-                          <p>{replaceText(first?.name ?? '', item.commandName)}</p>
+                          <p id={confirmDescriptionId}>{replaceText(first?.name ?? '', item.commandName)}</p>
                           <div className={styles.buttons}>
                             <button
                               type="button"

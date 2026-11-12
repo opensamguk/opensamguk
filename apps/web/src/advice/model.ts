@@ -57,6 +57,7 @@ export interface PutGuard {
   pending: boolean;
   hasDraft: boolean;
   serverRevision: number | undefined;
+  actorMatches: boolean;
   basisRevision: number;
   fetching: boolean;
   putting: boolean;
@@ -70,6 +71,7 @@ export function putBlockedReason(g: PutGuard): string | null {
   if (g.pending) return '먼저 편집기의 충돌 안내에서 다시 적용할지 고르세요.';
   if (g.hasDraft) return DRAFT_REASON;
   if (g.serverRevision === undefined) return '예턴을 불러온 뒤에 넣을 수 있습니다.';
+  if (!g.actorMatches) return '계정이나 장수가 바뀌어 조언을 다시 확인해야 합니다.';
   if (g.fetching || g.serverRevision !== g.basisRevision) return '예턴이 바뀌어 조언을 다시 받는 중입니다.';
   return null;
 }

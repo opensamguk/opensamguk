@@ -55,7 +55,7 @@ export const adviceRouter = router({
         });
         return {
           ...result,
-          basis: { tick, revision: general.turnRevision },
+          basis: { tick, revision: general.turnRevision, userId: ctx.user.id, actorId: general.id },
           expandedByDefault: preset?.features.advisor ?? false,
         };
       },
