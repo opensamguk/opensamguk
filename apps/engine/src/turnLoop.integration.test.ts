@@ -207,6 +207,23 @@ describe('AC-M1-10 턴 실행, 실제 PostgreSQL', () => {
     expect(await db.generalLog.count({ where: { worldId } })).toBe(6);
   });
 
+  it('내용이 동일한 30칸은 다시 쓰지 않고 턴과 revision을 커밋한다', async () => {
+    const { worldId } = await create(1, true);
+    await db.generalTurn.createMany({
+      data: Array.from({ length: 30 }, (_, slot) => ({ worldId, generalId: 1, slot, explicit: true })),
+    });
+    const rowVersions = () => db.$queryRaw<{ slot: number; version: string }[]>`
+      SELECT slot, xmin::text AS version FROM "GeneralTurn" WHERE "worldId" = ${worldId} ORDER BY slot
+    `;
+    const before = await rowVersions();
+    expect(before).toHaveLength(30);
+    const loop = await engine(worldId);
+    expect(await loop.advanceTo(500)).toEqual([{ generalId: 1, tick: 500, commandKey: 'rest' }]);
+    expect(await rowVersions()).toEqual(before);
+    expect(await general(worldId)).toMatchObject({ turnRevision: 1, nextTurnTick: 10_500 });
+    expect(await db.generalLog.count({ where: { worldId } })).toBe(1);
+  });
+
   it('실행 시 재검사 실패는 실패 로그를 남기고 턴과 예턴을 진행한다', async () => {
     const { worldId, cityKey } = await create();
     await queue(worldId);
