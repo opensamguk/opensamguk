@@ -77,7 +77,7 @@ export async function persistCommandState(
       await tx.nation.update({ where: { worldId_id: { worldId, id: nation.id } }, data: nation });
   }
   const generals = Object.values(state.generals);
-  if (state.officeEffects) {
+  if (before.officeEffects) {
     for (const general of generals) {
       const old = before.generals[general.id];
       if (

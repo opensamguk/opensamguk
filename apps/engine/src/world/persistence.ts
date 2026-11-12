@@ -175,6 +175,8 @@ export function prepareInitialWorld(
   };
   if (features.includes('lineage-v1')) initial.generals = applySexLedger(initial, sexLedger ?? loadSexLedger());
   else for (const general of initial.generals) assertGeneralSex(general, false);
+  if (initial.generals.some((general) => Object.hasOwn(general, 'officerCityKey')))
+    throw new Error('초기 장수에는 도시 관직을 배정할 수 없습니다.');
   const stateHash = hashState(initial);
   checkStatProfile(initial);
   if (!featureFormat) checkInitialNpcStatLimits(initial, 'legacy');

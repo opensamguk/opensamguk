@@ -201,11 +201,7 @@ export function runMonthly(state: WorldView, tick: number, rng: Rng) {
     for (const [cityKey, { tax }] of bonuses) {
       if (!tax) continue;
       const city = state.cities[cityKey]!;
-      const increase = Math.round(
-        (city[field] * (city.population / BALANCE.MONTHLY_POPULATION_UNIT) * BALANCE.MONTHLY_TAX_RATE * tax.percent) /
-          100,
-      );
-      if (increase > 0)
+      if (city[field] > 0 && city.population > 0)
         officeTaxLogs.push({ generalId: tax.generalId, text: `${city.name} 주재로 세수 ${tax.percent}% 보정` });
     }
   }

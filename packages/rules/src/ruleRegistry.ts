@@ -111,10 +111,8 @@ export const ruleRegistry: RuleRegistry = {
       key: OFFICE_EFFECTS_FEATURE,
       requires: ['personnel'],
       conflicts: [],
-      checkOrigin({ initial, data }) {
+      checkOrigin({ data }) {
         officeEffectsSchema.parse(data);
-        if (initial.generals.some((general) => Object.hasOwn(general, 'officerCityKey')))
-          throw new Error('초기 장수에는 도시 관직을 배정할 수 없습니다.');
       },
       initReplayState(replay, { data }) {
         return { ...replay, state: { ...replay.state, officeEffects: officeEffectsSchema.parse(data) } };
@@ -262,6 +260,8 @@ export function checkReplayOrigin(
   const origin = value as ReplayOriginV3 | ReplayOriginV1;
   if (!origin || ![1, 3].includes(origin.version) || !origin.initial || typeof origin.initial !== 'object')
     throw new Error('재생 생성 기록의 버전을 확인하세요.');
+  if (origin.initial.generals.some((general) => Object.hasOwn(general, 'officerCityKey')))
+    throw new Error('초기 장수에는 도시 관직을 배정할 수 없습니다.');
   checkStatProfile(origin.initial);
   checkInitialNpcStatLimits(origin.initial, origin.version === 3 ? 'current' : 'legacy');
   checkCityScaleInitial(origin.initial);
