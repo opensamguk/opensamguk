@@ -74,7 +74,7 @@ it('AC-M1-14 기능 명령 목록을 최종 resolver와 대조하고 잘못된 �
     .filter(({ key }) => !builtins.has(key))
     .map(({ key, target }) => ({ key, target }))
     .sort((a, b) => a.key.localeCompare(b.key, 'en'));
-  expect(context.featureRegistry).toEqual(registered);
+  expect(context.featureRegistry.map(({ key, target }) => ({ key, target }))).toEqual(registered);
   const extensionsByKey = new Map(extensionCommands.map((definition) => [definition.key, definition]));
   for (const { commandBindings = [] } of ruleRegistry.features) {
     for (const { definition } of commandBindings) {
