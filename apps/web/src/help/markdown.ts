@@ -4,6 +4,7 @@
 
 export type Inline =
   | { kind: 'text'; text: string }
+  | { kind: 'break'; text: '' }
   | { kind: 'code'; text: string }
   | { kind: 'strong'; text: string }
   | { kind: 'link'; text: string; href: string };
@@ -27,8 +28,8 @@ export function slug(text: string): string {
 
 const plain = (inlines: Inline[]) => inlines.map((inline) => inline.text).join('');
 
-export function parseInline(source: string): Inline[] {
-  const result: Inline[] = [];
+export function parseInline(source: string): Exclude<Inline, { kind: 'break' }>[] {
+  const result: Exclude<Inline, { kind: 'break' }>[] = [];
   const pattern = /`([^`]+)`|\*\*([^*]+)\*\*|\[([^\]]+)\]\(([^)\s]+)\)/g;
   let last = 0;
   for (const match of source.matchAll(pattern)) {
@@ -42,13 +43,35 @@ export function parseInline(source: string): Inline[] {
   return result;
 }
 
-const cells = (line: string) =>
-  line
-    .trim()
-    .replace(/^\|/, '')
-    .replace(/\|$/, '')
-    .split(/(?<!\\)\|/)
-    .map((cell) => parseInline(cell.trim().replace(/\\\|/g, '|')));
+const cellEntities: Readonly<Record<string, string>> = { '&amp;': '&', '&lt;': '<', '&gt;': '>' };
+
+function cells(line: string): Inline[][] {
+  const values = [''];
+  const source = line.trim().replace(/^\|/, '').replace(/\|$/, '');
+  for (let i = 0; i < source.length; i++) {
+    const char = source[i]!;
+    const next = source[i + 1];
+    if (char === '\\' && (next === '\\' || next === '|')) {
+      values[values.length - 1] += next;
+      i++;
+    } else if (char === '|') values.push('');
+    else values[values.length - 1] += char;
+  }
+  return values.map((cell) =>
+    cell
+      .trim()
+      .split('<br>')
+      .flatMap((part, index) => {
+        const inlines: Inline[] = index ? [{ kind: 'break', text: '' }] : [];
+        return inlines.concat(
+          parseInline(part).map((inline) => ({
+            ...inline,
+            text: inline.text.replace(/&(amp|lt|gt);/g, (entity) => cellEntities[entity]!),
+          })),
+        );
+      }),
+  );
+}
 const isTableRule = (line: string) => /^\s*\|(\s*:?-+:?\s*\|)+\s*$/.test(line);
 const listItem = /^\s*(?:([-*])|(\d+)\.)\s+(.*)$/;
 
@@ -59,6 +82,7 @@ export function parseMarkdown(source: string): Block[] {
     .replace(/\r\n/g, '\n')
     .split('\n');
   const blocks: Block[] = [];
+  const headingIds = new Set<string>();
   let i = 0;
   while (i < lines.length) {
     const line = lines[i]!;
@@ -77,7 +101,11 @@ export function parseMarkdown(source: string): Block[] {
     const heading = /^(#{1,6})\s+(.*)$/.exec(line);
     if (heading) {
       const text = parseInline(heading[2]!);
-      blocks.push({ kind: 'heading', level: heading[1]!.length, id: slug(plain(text)), text });
+      const base = slug(plain(text));
+      let id = base;
+      for (let suffix = 1; headingIds.has(id); suffix++) id = `${base}-${suffix}`;
+      headingIds.add(id);
+      blocks.push({ kind: 'heading', level: heading[1]!.length, id, text });
       i++;
       continue;
     }

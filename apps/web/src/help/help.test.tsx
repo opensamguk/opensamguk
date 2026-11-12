@@ -78,9 +78,7 @@ describe('가이드 10개', () => {
     for (const guide of GUIDE_ORDER) expect(GUIDES[guide.doc], guide.doc).toBeTypeOf('string');
   });
 
-  it('문서 사이 링크와 절 앵커가 모두 있다. 생성 목록은 T2-16 계획의 분류 소제목만 쓴다', () => {
-    // T2-16 계획(docs/plans/T2-16.md 생성 규칙)의 절과 소제목. 생성 문서가 생기면 실제 제목으로 확인한다.
-    const plannedCatalog = new Set(['장수-명령', '국가-명령', '내정', '군사', '인사', '개인', '국가']);
+  it('문서 사이 링크와 생성 목록의 절 앵커가 모두 있다', () => {
     const broken: string[] = [];
     for (const [doc, source] of Object.entries(GUIDES)) {
       for (const href of links(parseMarkdown(source))) {
@@ -90,8 +88,7 @@ describe('가이드 10개', () => {
           continue;
         }
         const text = GUIDES[target.doc];
-        const ids =
-          text !== undefined ? headingIds(parseMarkdown(text)) : target.doc === CATALOG_DOC ? plannedCatalog : null;
+        const ids = text !== undefined ? headingIds(parseMarkdown(text)) : null;
         if (!ids) broken.push(`${doc}: ${href} (문서 없음)`);
         else if (target.hash && !ids.has(target.hash)) broken.push(`${doc}: ${href} (절 없음)`);
       }
@@ -145,10 +142,12 @@ describe('도움말 화면', () => {
     expect(document.getElementById('3-실패-이유와-대처')).not.toBeNull();
   });
 
-  it('생성 목록이 아직 없으면 준비 중으로 보인다', async () => {
+  it('생성 목록에서 장수·국가 명령과 조건 줄바꿈이 보인다', async () => {
     await renderHelp(`/help/${CATALOG_DOC}`);
-    if (GUIDES[CATALOG_DOC] === undefined) expect(await screen.findByText('명령 목록은 준비 중입니다')).toBeTruthy();
-    else expect(await screen.findByTestId('help-article')).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: '장수 명령' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: '국가 명령' })).toBeTruthy();
+    const recruit = screen.getByRole('row', { name: /군사 모병 병사를 모집합니다/ });
+    expect(recruit.querySelectorAll('br')).toHaveLength(2);
   });
 
   it('없는 문서는 없다고 보인다', async () => {
