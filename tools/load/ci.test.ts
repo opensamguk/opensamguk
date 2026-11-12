@@ -9,6 +9,7 @@ import {
   publicLoadSummary,
   runtimeBuildArguments,
   verifyBuilder,
+  verifyBuilderStopped,
 } from './ci';
 import { userWorkload } from './workload';
 import type { LoadRun } from './report';
@@ -19,6 +20,28 @@ it('publishes only allowlisted CI failure codes', () => {
   expect(ciFailureCode(new Error('LOAD_BUILDER_UNVERIFIED'))).toBe('LOAD_BUILDER_UNVERIFIED');
   expect(ciFailureCode(new Error('LOAD_NATIVE_FAILURE_WITH_PRIVATE_OUTPUT'))).toBe('UNCLASSIFIED');
 });
+it('requires a stopped owned BuildKit process after the explicit stop and rejects OOM or forced exit', () => {
+  const id = 'a'.repeat(64);
+  const finishedAt = '2026-11-12T10:12:00.002Z';
+  const stopRequestedAt = Date.parse('2026-11-12T10:12:00.000Z');
+  const state = { Running: false, Pid: 0, ExitCode: 1, OOMKilled: false, FinishedAt: finishedAt };
+  expect(verifyBuilderStopped([{ Id: id, State: state }], id, stopRequestedAt)).toEqual({ exitCode: 1, finishedAt });
+  for (const State of [
+    { ...state, ExitCode: 137 },
+    { ...state, OOMKilled: true },
+    { ...state, Pid: 24 },
+  ])
+    expect(() => verifyBuilderStopped([{ Id: id, State }], id, stopRequestedAt)).toThrow(
+      'LOAD_BUILDER_EXIT_UNCONFIRMED',
+    );
+  expect(() => verifyBuilderStopped([{ Id: id, State: state }], id, stopRequestedAt + 3)).toThrow(
+    'LOAD_BUILDER_EXIT_UNCONFIRMED',
+  );
+  expect(() => verifyBuilderStopped([{ Id: 'b'.repeat(64), State: state }], id, stopRequestedAt)).toThrow(
+    'LOAD_BUILDER_EXIT_UNCONFIRMED',
+  );
+});
+
 // 공개 요약 경계의 수학 고정물이다. 실제 부하·계정·월드 인수로 세지 않는다.
 function mathematicalSmoke(): LoadRun {
   const end = 15001,

@@ -28,6 +28,10 @@ const ciFailureCodes = new Set([
   'LOAD_BUILD_ADMISSION_DEADLINE',
   'LOAD_BUILD_ADMISSION_REFUSED',
   'LOAD_BUILDER_BASELINE_NOT_EMPTY',
+  'LOAD_BUILDER_CHILD_UNSETTLED',
+  'LOAD_BUILDER_EXIT_UNCONFIRMED',
+  'LOAD_BUILDER_IDENTITY_UNCONFIRMED',
+  'LOAD_BUILDER_REMAINS',
   'LOAD_BUILDER_UNVERIFIED',
   'LOAD_CI_BUILD_FAILED',
   'LOAD_CI_DAEMON_UNVERIFIED',
@@ -132,6 +136,29 @@ export function verifyBuilder(raw: unknown, expected: { name: string; imageId: s
     actualParent: LOAD_DOCKER.cgroupPath,
     configuredParent: row.HostConfig.CgroupParent,
   };
+}
+
+export function verifyBuilderStopped(raw: unknown, id: string, stopRequestedAt: number) {
+  const stopped = z
+    .array(
+      z.looseObject({
+        Id: z.literal(id),
+        State: z.looseObject({
+          Running: z.literal(false),
+          Pid: z.literal(0),
+          ExitCode: z.union([z.literal(0), z.literal(1)]),
+          OOMKilled: z.literal(false),
+          FinishedAt: z.string(),
+        }),
+      }),
+    )
+    .length(1)
+    .safeParse(raw);
+  const state = stopped.success ? stopped.data[0]?.State : undefined;
+  // The pinned buildkitd returns code 1 after SIGTERM unwinds its graceful server stop.
+  // https://github.com/moby/buildkit/blob/v0.34.1/cmd/buildkitd/main.go#L436-L473
+  if (!state || !(Date.parse(state.FinishedAt) >= stopRequestedAt)) throw new Error('LOAD_BUILDER_EXIT_UNCONFIRMED');
+  return { exitCode: state.ExitCode, finishedAt: state.FinishedAt };
 }
 
 export function fixedImageId(raw: unknown, pin: string): string {
@@ -344,6 +371,7 @@ async function main() {
     imageId: string | undefined,
     buildPhaseStartedAt: number | undefined;
   const cleanupFailures: string[] = [];
+  let builderExit: ReturnType<typeof verifyBuilderStopped> | undefined;
   try {
     await admit(Date.now() + CI_LIMITS.admissionMs, true);
     const listedContainers = (
@@ -481,26 +509,32 @@ async function main() {
             await native(['inspect', builderProof.id], 'builder-cleanup-identity', clean.signal),
           );
           const current = z
-            .array(z.looseObject({ Id: z.literal(builderProof.id), Name: z.literal(`/${containerName}`) }))
-            .length(1)
-            .safeParse(fresh);
-          if (!current.success) throw new Error('LOAD_BUILDER_IDENTITY_UNCONFIRMED');
-          await native(['stop', '--time', '20', builderProof.id], 'stop-owned-builder', clean.signal, 30000);
-          const stopped = z
             .array(
               z.looseObject({
                 Id: z.literal(builderProof.id),
+                Name: z.literal(`/${containerName}`),
                 State: z.looseObject({
-                  Running: z.literal(false),
-                  Pid: z.literal(0),
-                  ExitCode: z.literal(0),
+                  Running: z.literal(true),
+                  Pid: z.literal(builderProof.pid),
                   OOMKilled: z.literal(false),
                 }),
               }),
             )
             .length(1)
-            .safeParse(JSON.parse(await native(['inspect', builderProof.id], 'builder-actual-exit', clean.signal)));
-          if (!stopped.success) throw new Error('LOAD_BUILDER_EXIT_UNCONFIRMED');
+            .safeParse(fresh);
+          if (!current.success) throw new Error('LOAD_BUILDER_IDENTITY_UNCONFIRMED');
+          const stopRequestedAt = Date.now();
+          await native(
+            ['stop', '--signal', 'SIGTERM', '--time', '20', builderProof.id],
+            'stop-owned-builder',
+            clean.signal,
+            30000,
+          );
+          builderExit = verifyBuilderStopped(
+            JSON.parse(await native(['inspect', builderProof.id], 'builder-actual-exit', clean.signal)),
+            builderProof.id,
+            stopRequestedAt,
+          );
           if (
             commands.pending.size ||
             commands.stickyUnsettled ||
@@ -529,8 +563,13 @@ async function main() {
           }
         }
         builderClosed = true;
-      } catch {
-        cleanupFailures.push('BUILDER_CLEANUP_UNCONFIRMED');
+      } catch (error) {
+        const last = commands.receipts.at(-1);
+        const code = ciFailureCode(error);
+        cleanupFailures.push(code);
+        process.stderr.write(
+          `${JSON.stringify({ event: 'LOAD_CI_BUILDER_CLEANUP_DIAGNOSTIC', code, lastStep: last?.label ?? null, lastExitCode: last?.exitCode ?? null, builderExitCode: builderExit?.exitCode ?? null })}\n`,
+        );
       } finally {
         try {
           await writeEvidence(resolve(output, 'lifecycle.json'), {
@@ -539,6 +578,7 @@ async function main() {
             builderDeleted,
             createAttempted,
             builderProof: builderProof ?? null,
+            builderExit: builderExit ?? null,
             commands: commands.receipts,
             pending: commands.pending.size,
             stickyUnsettled: commands.stickyUnsettled,
