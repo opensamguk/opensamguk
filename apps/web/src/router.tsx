@@ -174,7 +174,7 @@ const loginRoute = createRoute({
   path: 'login',
   validateSearch: authSearch,
   beforeLoad: async ({ context, search }) => {
-    const user = await currentUser(context);
+    const user = await currentUser(context).catch(() => null);
     if (!user) return { consentUserId: null };
     const destination = accountNext(search.next) ?? '/lobby';
     const account = await context.queryClient.fetchQuery({ ...context.trpc.account.get.queryOptions(), staleTime: 0 });
