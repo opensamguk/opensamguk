@@ -23,6 +23,28 @@ export const CI_LIMITS = Object.freeze({
   driverMs: 2160000,
   summaryMs: 120000,
 });
+const ciFailureCodes = new Set([
+  'LOAD_BOOTSTRAP_SCOPE_UNVERIFIED',
+  'LOAD_BUILD_ADMISSION_DEADLINE',
+  'LOAD_BUILD_ADMISSION_REFUSED',
+  'LOAD_BUILDER_BASELINE_NOT_EMPTY',
+  'LOAD_BUILDER_UNVERIFIED',
+  'LOAD_CI_BUILD_FAILED',
+  'LOAD_CI_DAEMON_UNVERIFIED',
+  'LOAD_CI_FINAL_FAILED',
+  'LOAD_CI_OPTIONS_INVALID',
+  'LOAD_CI_PLATFORM_UNVERIFIED',
+  'LOAD_CI_SOURCE_CHANGED',
+  'LOAD_FIXED_IMAGE_UNVERIFIED',
+  'LOAD_IMAGE_PREPARATION_DEADLINE',
+  'LOAD_IMAGE_SOURCE_INVALID',
+  'LOAD_LOCAL_DOCKER_REQUIRED',
+  'LOAD_NATIVE_CHILD_UNSETTLED',
+  'LOAD_NATIVE_COMMAND_FAILED',
+]);
+export function ciFailureCode(error: unknown): string {
+  return error instanceof Error && ciFailureCodes.has(error.message) ? error.message : 'UNCLASSIFIED';
+}
 const hash = z.string().regex(/^[a-f0-9]{64}$/),
   head = z.string().regex(/^[a-f0-9]{40}$/);
 const sourceSchema = z.strictObject({ head, sha256: hash, files: z.number().int().positive() });
@@ -392,8 +414,20 @@ async function main() {
       // 실제 정리는 아래 독립 단계에서 진행한다. 그 단계의 같은 절대 기한을 유지한다.
       clearTimeout(phaseGuard);
     }
-  } catch {
+  } catch (error) {
     failure = true;
+    const last = commands.receipts.at(-1);
+    // Only internal command labels and allowlisted codes may leave the runner.
+    process.stderr.write(
+      `${JSON.stringify({
+        event: 'LOAD_CI_BUILD_DIAGNOSTIC',
+        code: ciFailureCode(error),
+        lastStep: last?.label ?? null,
+        lastExitCode: last?.exitCode ?? null,
+        createAttempted,
+        builderVerified: builderProof !== undefined,
+      })}\n`,
+    );
   } finally {
     const cleanup = async () => {
       const cleanupMs = Math.max(
@@ -581,8 +615,8 @@ async function main() {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  void main().catch(() => {
-    process.stderr.write('LOAD_CI_FAILED\n');
+  void main().catch((error: unknown) => {
+    process.stderr.write(`LOAD_CI_FAILED ${ciFailureCode(error)}\n`);
     process.exit(1);
   });
 }

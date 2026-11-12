@@ -1,11 +1,24 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
-import { BUILDKIT_IMAGE, CI_LIMITS, fixedImageId, publicLoadSummary, runtimeBuildArguments, verifyBuilder } from './ci';
+import {
+  BUILDKIT_IMAGE,
+  CI_LIMITS,
+  ciFailureCode,
+  fixedImageId,
+  publicLoadSummary,
+  runtimeBuildArguments,
+  verifyBuilder,
+} from './ci';
 import { userWorkload } from './workload';
 import type { LoadRun } from './report';
 
 const id = (n: number) => `00000000-0000-4000-8000-${n.toString(16).padStart(12, '0')}`;
+
+it('publishes only allowlisted CI failure codes', () => {
+  expect(ciFailureCode(new Error('LOAD_BUILDER_UNVERIFIED'))).toBe('LOAD_BUILDER_UNVERIFIED');
+  expect(ciFailureCode(new Error('LOAD_NATIVE_FAILURE_WITH_PRIVATE_OUTPUT'))).toBe('UNCLASSIFIED');
+});
 // 공개 요약 경계의 수학 고정물이다. 실제 부하·계정·월드 인수로 세지 않는다.
 function mathematicalSmoke(): LoadRun {
   const end = 15001,
