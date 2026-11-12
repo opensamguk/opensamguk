@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import { buildServer } from '../apps/server/src/server';
@@ -12,7 +12,7 @@ import { loadWorld } from '../apps/engine/src/worldLoader';
 import { saveInitialWorld, readWorldState } from '../apps/engine/src/world/persistence';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 import { hashState } from '../packages/shared/src/node/hashState';
-import { adviseGeneral, unitSetSchema, STANDARD_EQUIPMENT_CONFIG } from '../packages/rules/src/index';
+import { adviseGeneral, parsePreset, unitSetSchema, STANDARD_EQUIPMENT_CONFIG } from '../packages/rules/src/index';
 import { worldResolver } from '../apps/server/src/game/resolver';
 import { acquireLease, releaseLease, renewLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -66,7 +66,7 @@ function setNotice(worldId: string, actor: Actor, body: string, directive?: unkn
     actor,
   );
 }
-async function fixture() {
+async function fixture(preset?: 'beginner' | 'regular') {
   const ruler = await identity(),
     enemy = await identity(),
     free = await identity();
@@ -80,6 +80,16 @@ async function fixture() {
     turnTermMinutes: 60,
     endYear: 231,
     replayFormat: 3,
+    ...(preset
+      ? {
+          preset: {
+            key: preset,
+            value: parsePreset(
+              JSON.parse(readFileSync(new URL(`../resources/preset/${preset}.json`, import.meta.url), 'utf8')),
+            ),
+          },
+        }
+      : {}),
   });
   worlds.push(worldId);
   return { worldId, ruler, enemy, free };
@@ -211,12 +221,25 @@ describe('T3-07 AC-M3-13 실제 HTTP 군사 조언', () => {
       const result = await advice(f.worldId, f.ruler);
       expect(result.status).toBe(200);
       expect(result.data!.basis).toEqual({ tick: 0, revision: 0 });
+      expect(result.data!.expandedByDefault).toBe(false);
       expect(result.data!.items[0]).toMatchObject({ source: 'notice', commandKey: 'rest', reason: '우리 국가의 지시' });
       expect(JSON.stringify(result)).not.toContain('타국 비공개');
       expect(await advice(f.worldId, f.ruler)).toEqual(result);
       expect(await snapshot(f.worldId)).toEqual(before);
     }),
   );
+
+  it('초보 프리셋은 군사 조언을 펼치고 정규 프리셋은 접어서 시작한다', async () => {
+    for (const [preset, expected] of [
+      ['beginner', true],
+      ['regular', false],
+    ] as const) {
+      const f = await fixture(preset);
+      const result = await advice(f.worldId, f.ruler);
+      expect(result.status).toBe(200);
+      expect(result.data?.expandedByDefault).toBe(expected);
+    }
+  });
 
   it('만료·회수된 세션과 비활성 계정은 거부하고 재야는 임관 후보만 받는다', async () => {
     const f = await fixture();

@@ -36,7 +36,7 @@ export const adviceRouter = router({
                 select: { notice: true, noticeDirective: true },
               });
         const directive = nation?.noticeDirective == null ? null : noticeDirectiveSchema.parse(nation.noticeDirective);
-        const { resolver } = worldResolver(world);
+        const { preset, resolver } = worldResolver(world);
         const result = adviseGeneral(view, general.id, {
           tick: general.nextTurnTick,
           unitSet: unitSetSchema.parse(world.unitSet),
@@ -53,7 +53,11 @@ export const adviceRouter = router({
                 },
               }),
         });
-        return { basis: { tick, revision: general.turnRevision }, ...result };
+        return {
+          ...result,
+          basis: { tick, revision: general.turnRevision },
+          expandedByDefault: preset?.features.advisor ?? false,
+        };
       },
       { isolationLevel: 'RepeatableRead' },
     ),

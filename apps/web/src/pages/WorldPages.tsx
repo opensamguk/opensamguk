@@ -9,6 +9,7 @@ import { NationSummaryGrid, NationTables, useNation } from '../main/NationInfo';
 import { Panel } from '../main/Panel';
 import { RECORD_LABELS, RecordList, type RecordKind } from '../main/Records';
 import { MapLegend, WorldMap } from '../main/WorldMap';
+import { MonthlyReview } from '../review/MonthlyReview';
 import { TimelapsePanel } from '../timelapse/TimelapsePanel';
 import { NationBadge } from '../ui/NationBadge';
 import { EmptyState, LoadingState } from '../ui/States';
@@ -182,6 +183,7 @@ export function RecordsPage({ tab, city }: { tab: RecordTab; city?: number }) {
         </Panel>
       ) : (
         <Panel title={RECORD_LABELS[tab]}>
+          {tab === 'world' ? <MonthlyReview key={worldId} worldId={worldId} /> : null}
           <RecordList
             key={tab}
             kind={tab}

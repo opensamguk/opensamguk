@@ -102,8 +102,19 @@ describe('SSE 알림 해석', () => {
       trpc.turns.get.queryKey({ worldId: WORLD }),
       trpc.records.general.pathKey(),
     ]);
+    expect(invalidationTargets({ kind: 'monthly.done' }, WORLD, trpc)).toEqual([
+      trpc.equipment.mine.queryKey({ worldId: WORLD }),
+      trpc.world.summary.queryKey({ worldId: WORLD }),
+      trpc.home.get.queryKey({ worldId: WORLD }),
+      trpc.world.map.queryKey({ worldId: WORLD }),
+      trpc.advice.get.queryKey({ worldId: WORLD }),
+      trpc.review.latest.queryKey({ worldId: WORLD }),
+      trpc.review.months.queryKey({ worldId: WORLD }),
+      trpc.records.world.queryKey({ worldId: WORLD }),
+    ]);
     expect(invalidationTargets({ kind: 'notice.updated', scope: 'nation' }, WORLD, trpc)).toEqual([
       trpc.notice.nation.get.queryKey({ worldId: WORLD }),
+      trpc.advice.get.queryKey({ worldId: WORLD }),
     ]);
     expect(invalidationTargets({ kind: 'notice.updated', scope: 'world' }, WORLD, trpc)).toEqual([
       trpc.notice.world.list.queryKey({ worldId: WORLD }),
@@ -129,6 +140,26 @@ describe('SSE 재조회와 초안', () => {
     expect(invalidated(client, unreadKey)).toBe(true);
     expect(invalidated(client, listKey('NATION'))).toBe(false);
     expect(invalidated(client, trpc.turns.get.queryKey({ worldId: WORLD }))).toBe(false);
+  });
+
+  it('monthly.done은 그 월드의 월단평과 중원 정세 기록만 무효화한다', () => {
+    const client = new QueryClient();
+    const other = 'w2';
+    const keys = {
+      latest: trpc.review.latest.queryKey({ worldId: WORLD }),
+      months: trpc.review.months.queryKey({ worldId: WORLD }),
+      otherLatest: trpc.review.latest.queryKey({ worldId: other }),
+      // 기록 화면이 쓰는 이어 받기 키와 같은 모양이다.
+      world: [...trpc.records.world.queryKey({ worldId: WORLD }), 'pages'] as const,
+      otherWorld: [...trpc.records.world.queryKey({ worldId: other }), 'pages'] as const,
+    };
+    for (const key of Object.values(keys)) client.setQueryData(key, null);
+    applyWorldEvent(client, trpc, WORLD, { kind: 'monthly.done' });
+    expect(invalidated(client, keys.latest)).toBe(true);
+    expect(invalidated(client, keys.months)).toBe(true);
+    expect(invalidated(client, keys.world)).toBe(true);
+    expect(invalidated(client, keys.otherLatest)).toBe(false);
+    expect(invalidated(client, keys.otherWorld)).toBe(false);
   });
 
   it('ready는 전체를 다시 조회하지만 캐시 밖의 초안은 건드리지 않는다', () => {

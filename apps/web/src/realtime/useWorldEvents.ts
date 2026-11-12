@@ -39,6 +39,11 @@ export function invalidationTargets(event: WorldEvent, worldId: string, trpc: Tr
         trpc.world.summary.queryKey({ worldId }),
         trpc.home.get.queryKey({ worldId }),
         trpc.world.map.queryKey({ worldId }),
+        trpc.advice.get.queryKey({ worldId }),
+        // 월단평(T3-08). 지난 달 review.get은 바뀌지 않아 latest·months와 그 월드의 중원 정세 목록만 다시 읽는다.
+        trpc.review.latest.queryKey({ worldId }),
+        trpc.review.months.queryKey({ worldId }),
+        trpc.records.world.queryKey({ worldId }),
       ];
     // 발령 상자(T2-06 offers·personnel)와 외교실(T2-08 treaty)의 경로 키다. 그 라우터가 없으면 맞는 query가 없어 아무 일도 없다.
     case 'offer.new':
@@ -47,9 +52,10 @@ export function invalidationTargets(event: WorldEvent, worldId: string, trpc: Tr
       return [[['treaty']]];
     case 'notice.updated':
       return [
-        event.scope === 'nation'
-          ? trpc.notice.nation.get.queryKey({ worldId })
-          : trpc.notice.world.list.queryKey({ worldId }),
+        ...(event.scope === 'nation'
+          ? // 국가 공지는 군사 조언의 공지 출처이기도 하다.
+            [trpc.notice.nation.get.queryKey({ worldId }), trpc.advice.get.queryKey({ worldId })]
+          : [trpc.notice.world.list.queryKey({ worldId })]),
       ];
   }
 }

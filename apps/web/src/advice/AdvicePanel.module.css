@@ -1,0 +1,143 @@
+/* 메인 명령 목록 칸의 군사 조언 (T3-08). 누르는 대상은 44px 이상, 375px에서 가로 스크롤이 없다. */
+.panel {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  margin-bottom: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: var(--frame);
+  background: var(--color-surface);
+  font-size: var(--text-sm);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--text-md);
+}
+
+.toggle,
+.primary,
+.secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-weight: 500;
+  border: var(--frame);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-button);
+  cursor: pointer;
+}
+
+.toggle,
+.secondary {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.primary {
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+}
+
+.list,
+.skippedList {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-1) var(--space-3);
+  align-items: center;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.what {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.command {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.reason {
+  grid-column: 1;
+  margin: 0;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.action {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.confirm {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.confirm p {
+  margin: 0;
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.skipped {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.muted {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.ok {
+  margin: 0;
+  color: var(--color-success);
+}
+
+.warn {
+  margin: 0;
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+@media (max-width: 767px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .action {
+    grid-column: 1;
+    grid-row: auto;
+  }
+}
