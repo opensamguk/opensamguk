@@ -31,34 +31,37 @@ export function usePrivateRead<T>(viewerId: string) {
     };
   }, [clear, viewerId]);
 
-  async function read(query: (signal: AbortSignal) => Promise<T>) {
-    clear();
-    const own = generation.current,
-      controller = new AbortController();
-    active.current = controller;
-    setState({ data: null, pending: true, error: null });
-    const results = await Promise.allSettled([
-      client.auth.me.query(undefined, { signal: controller.signal }),
-      Promise.resolve().then(() => query(controller.signal)),
-    ]);
-    if (generation.current !== own || controller.signal.aborted) return;
-    active.current = null;
-    const identity = results[0],
-      result = results[1];
-    const denied = results.some(
-      (item) =>
-        item.status === 'rejected' && ['UNAUTHORIZED', 'FORBIDDEN'].includes(publicFailure(item.reason)?.code ?? ''),
-    );
-    if (denied || (identity.status === 'fulfilled' && identity.value.user?.id !== viewerId)) {
-      setState({ data: null, pending: false, error: '계정과 권한을 다시 확인합니다.' });
-      void router.invalidate();
-      return;
-    }
-    if (identity.status === 'rejected' || result.status === 'rejected') {
-      setState({ data: null, pending: false, error: '조회하지 못했습니다. 입력을 확인한 뒤 다시 조회하세요.' });
-      return;
-    }
-    setState({ data: result.value, pending: false, error: null });
-  }
+  const read = useCallback(
+    async (query: (signal: AbortSignal) => Promise<T>) => {
+      clear();
+      const own = generation.current,
+        controller = new AbortController();
+      active.current = controller;
+      setState({ data: null, pending: true, error: null });
+      const results = await Promise.allSettled([
+        client.auth.me.query(undefined, { signal: controller.signal }),
+        Promise.resolve().then(() => query(controller.signal)),
+      ]);
+      if (generation.current !== own || controller.signal.aborted) return;
+      active.current = null;
+      const identity = results[0],
+        result = results[1];
+      const denied = results.some(
+        (item) =>
+          item.status === 'rejected' && ['UNAUTHORIZED', 'FORBIDDEN'].includes(publicFailure(item.reason)?.code ?? ''),
+      );
+      if (denied || (identity.status === 'fulfilled' && identity.value.user?.id !== viewerId)) {
+        setState({ data: null, pending: false, error: '계정과 권한을 다시 확인합니다.' });
+        void router.invalidate();
+        return;
+      }
+      if (identity.status === 'rejected' || result.status === 'rejected') {
+        setState({ data: null, pending: false, error: '조회하지 못했습니다. 입력을 확인한 뒤 다시 조회하세요.' });
+        return;
+      }
+      setState({ data: result.value, pending: false, error: null });
+    },
+    [clear, client, router, viewerId],
+  );
   return { ...state, read, clear };
 }
