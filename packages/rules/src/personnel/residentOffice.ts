@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import defaultEffects from '../../../../resources/office-effects.json';
+import defaultEffects from '../../../../resources/office-effects.json' with { type: 'json' };
 import type { WorldState, WorldView } from '../model/world';
 import type { InitialGeneral } from '../world/bootstrap';
 
