@@ -258,6 +258,16 @@ const blank: Entry = {
   officers: source.roster.map(([id]) => [id, -1, '']),
 };
 const entries = [...source.scenarios, blank];
+const categoryBySourceType = new Map([
+  ['역사', 'history'],
+  ['IF', 'if'],
+  ['공백지', 'empty'],
+]);
+const categories = await read('../../resources/scenario/san10-expanded-categories.json');
+const expectedCategories = Object.fromEntries(
+  entries.map(({ id, type }) => [`${mapId}-${id}`, categoryBySourceType.get(type)]),
+);
+if (hashState(categories) !== hashState(expectedCategories)) throw Error('아티팩트 시나리오 분류가 다릅니다.');
 if (
   source.sites.length !== 322 ||
   source.routes.length !== 467 ||
