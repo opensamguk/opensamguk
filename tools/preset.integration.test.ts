@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -138,6 +138,69 @@ const createPayload = (worldId: string, name = '신규장수') => ({
 });
 
 describe('T2-02 실제 DB 생성·고정', () => {
+  it('AC-M2-03 두 프리셋 파일의 턴 간격·보호 기간·NPC·명령 설정을 실제 월드에 적용한다', async () => {
+    const temp = await mkdtemp(join(tmpdir(), 'opensamguk-preset-pair-'));
+    try {
+      await mkdir(join(temp, 'preset'));
+      const rootUrl = pathToFileURL(`${temp}/`);
+      const modes = [
+        { key: 'beginner', turnMinutes: 30, peaceMonths: 24, aggression: 0.5, command: false },
+        { key: 'speed', turnMinutes: 10, peaceMonths: 0, aggression: 1, command: true },
+      ] as const;
+      for (const { key, turnMinutes, peaceMonths, aggression, command } of modes) {
+        const original = await loadPreset(key);
+        await writeFile(
+          join(temp, 'preset', `${key}.json`),
+          JSON.stringify({
+            ...original,
+            map: 'che',
+            scenario: '1030',
+            unitSet: 'basic',
+            commands: command ? { general: ['fire_attack'], nation: [] } : null,
+          }),
+        );
+        const preset = await loadPreset(key, rootUrl);
+        const output = execFileSync(
+          process.execPath,
+          [
+            '--import',
+            'tsx',
+            'apps/engine/src/cli/createWorld.ts',
+            '--preset',
+            key,
+            '--seed',
+            'preset-pair',
+            '--end-year',
+            '300',
+            '--name',
+            '프리셋 비교',
+            ...(command ? ['--ext'] : []),
+          ],
+          {
+            cwd: root,
+            env: { ...process.env, DATABASE_URL: url, OPENSAMGUK_RESOURCES_ROOT: temp },
+            encoding: 'utf8',
+            timeout: 30_000,
+          },
+        );
+        const { worldId } = JSON.parse(output.trim().split('\n').at(-1)!) as { worldId: string };
+        const stored = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+        expect(stored).toMatchObject({ turnTermMinutes: turnMinutes, preset });
+        expect((await readWorldState(db, worldId)).presetRules).toMatchObject({
+          protection: { peaceMonths },
+          npc: { aggression },
+        });
+        const response = await request<{ key: string; argsSchema: unknown }[]>('commands.list', { worldId });
+        expect(response.status).toBe(200);
+        expect(response.data?.some(({ key }) => key === 'farm')).toBe(true);
+        const fireAttack = response.data?.find(({ key }) => key === 'fire_attack');
+        if (command) expect(fireAttack?.argsSchema).toBeDefined();
+        else expect(fireAttack).toBeUndefined();
+      }
+    } finally {
+      await rm(temp, { recursive: true, force: true });
+    }
+  });
   it.each(['speed', 'beginner'])('%s CLI 생성값과 초기 DB·origin·엔진 해시가 같다', async (key) => {
     const output = execFileSync(
       process.execPath,
