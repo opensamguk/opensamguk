@@ -2,16 +2,22 @@ import { skipToken, useQuery } from '@tanstack/react-query';
 import { useId, useState, type ReactNode } from 'react';
 import { formatYearMonth } from '../game/gameDate';
 import { retryUnlessClientError } from '../game/errors';
+import type { WorldMap } from '../game/types';
 import { useTRPC } from '../trpc';
 import { DisabledReason } from '../ui/DisabledReason';
 import { Tag } from '../ui/Tag';
 import {
   buildClauses,
   canChoosePeace,
+  clauseCities,
   CLAUSE_LABELS,
+  describeClause,
   emptyCompose,
+  emptyExpandedClauses,
   isEnforced,
   noteLength,
+  TREATY_MAX_MONTHS,
+  TRIBUTE_MAX_AMOUNT,
   UNSUPPORTED_CLAUSE_LABELS,
   UNSUPPORTED_CLAUSE_REASON,
   type ComposeState,
@@ -55,18 +61,40 @@ interface Props {
   worldId: string;
   targets: TreatyTarget[];
   tradeEnabled?: boolean;
+  expandedEnabled?: boolean;
+  ownNationId: number;
+  map: WorldMap | undefined;
   // 이 상대에게 보낸 제안이 처리 중이면 그 안내. 있으면 보내기를 잠근다.
   busyFor: (toNationId: number) => string | null;
   onPropose: (input: ProposeInput) => void;
 }
 
 // 조약서 쓰기. 조항을 고르면 서버 견적의 비용과 문제, 집행·기록 구분을 바로 보여 준다 (T2-08 화면 절).
-export function TreatyComposer({ worldId, targets, busyFor, onPropose, tradeEnabled = false }: Props) {
+export function TreatyComposer({
+  worldId,
+  targets,
+  busyFor,
+  onPropose,
+  tradeEnabled = false,
+  expandedEnabled = false,
+  ownNationId,
+  map,
+}: Props) {
   const trpc = useTRPC();
   const [form, setForm] = useState<ComposeState>(emptyCompose);
   const ids = { target: useId(), note: useId() };
   const target = targets.find((t) => t.nation.id === form.toNationId);
-  const built = buildClauses(form, target?.relation);
+  const parties = map?.nations.filter(({ id }) => id === ownNationId || id === target?.nation.id) ?? [];
+  const cities = clauseCities(map?.cities ?? [], parties);
+  const built = buildClauses(form, target?.relation, expandedEnabled ? { parties, cities } : undefined);
+  const labels = {
+    city: (key: number) => map?.cities.find((city) => city.key === key)?.name ?? `도시 ${key}`,
+    nation: (id: number) => parties.find((nation) => nation.id === id)?.name ?? `국가 ${id}`,
+    recipient: (id: number) => parties.find((nation) => nation.id !== id)?.name ?? '상대 국가',
+  };
+  const cityOption = (city: (typeof cities.passage)[number]) =>
+    `${city.name} (${city.nationId === null ? '공백지' : labels.nation(city.nationId)})`;
+  const unavailableCities = !target ? '상대 국가를 고르세요.' : !map ? '지도에서 도시를 확인하지 못했습니다.' : null;
 
   // 비용과 문제는 서버가 계산한다. 저장하지 않는 조회라 쓰는 동안 바로 다시 묻는다.
   const quoteInput =
@@ -92,7 +120,13 @@ export function TreatyComposer({ worldId, targets, busyFor, onPropose, tradeEnab
   };
 
   const peaceOk = canChoosePeace(target?.relation);
-  const enforcedKinds = built.clauses.filter((c) => isEnforced(c.kind)).map((c) => CLAUSE_LABELS[c.kind]);
+  const enforcedKinds = built.clauses
+    .filter((c) => isEnforced(c.kind))
+    .map((c) =>
+      c.kind === 'passage' || c.kind === 'tribute' || c.kind === 'cityTransfer'
+        ? describeClause(c, labels)
+        : CLAUSE_LABELS[c.kind],
+    );
   const recordKinds = built.clauses.filter((c) => !isEnforced(c.kind)).map((c) => CLAUSE_LABELS[c.kind]);
 
   return (
@@ -112,7 +146,7 @@ export function TreatyComposer({ worldId, targets, busyFor, onPropose, tradeEnab
           onChange={(e) => {
             const id = e.target.value === '' ? null : Number(e.target.value);
             // 상대가 바뀌면 관계가 달라지므로 종전은 다시 고른다.
-            setForm((prev) => ({ ...prev, toNationId: id, peace: false }));
+            setForm((prev) => ({ ...prev, ...emptyExpandedClauses(), toNationId: id, peace: false }));
           }}
         >
           <option value="">고르세요</option>
@@ -197,16 +231,153 @@ export function TreatyComposer({ worldId, targets, busyFor, onPropose, tradeEnab
             </label>
           </ClauseRow>
         ) : null}
-        {UNSUPPORTED_CLAUSE_LABELS.filter((label) => !tradeEnabled || label !== '교역 허용').map((label) => (
-          <ClauseRow
-            key={label}
-            label={label}
-            checked={false}
-            disabledReason={UNSUPPORTED_CLAUSE_REASON}
-            onToggle={() => undefined}
-            unsupported
-          />
-        ))}
+        {expandedEnabled ? (
+          <>
+            <ClauseRow
+              label={CLAUSE_LABELS.passage}
+              checked={form.passage.on}
+              disabledReason={
+                unavailableCities ?? (cities.passage.length === 0 ? '고를 수 있는 통행 도시가 없습니다.' : null)
+              }
+              onToggle={(on) => set('passage', { ...form.passage, on })}
+            >
+              <label className={styles.inline}>
+                통행 기간(개월)
+                <input
+                  type="number"
+                  min={1}
+                  max={TREATY_MAX_MONTHS}
+                  step={1}
+                  value={form.passage.months}
+                  onChange={(e) => set('passage', { ...form.passage, months: e.target.value })}
+                />
+              </label>
+              <fieldset className={styles.passageCities}>
+                <legend>통행 도시</legend>
+                <ul>
+                  {cities.passage.map((city) => (
+                    <li key={city.key}>
+                      <label className={styles.check}>
+                        <input
+                          type="checkbox"
+                          checked={form.passage.cityKeys.includes(city.key)}
+                          onChange={(e) =>
+                            set('passage', {
+                              ...form.passage,
+                              cityKeys: e.target.checked
+                                ? [...form.passage.cityKeys, city.key]
+                                : form.passage.cityKeys.filter((key) => key !== city.key),
+                            })
+                          }
+                        />
+                        {cityOption(city)}
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              </fieldset>
+            </ClauseRow>
+            <ClauseRow
+              label={CLAUSE_LABELS.tribute}
+              checked={form.tribute.on}
+              disabledReason={unavailableCities}
+              onToggle={(on) => set('tribute', { ...form.tribute, on })}
+            >
+              <label className={styles.inline}>
+                원조를 보내는 국가
+                <select
+                  value={form.tribute.payerNationId ?? ''}
+                  onChange={(e) =>
+                    set('tribute', {
+                      ...form.tribute,
+                      payerNationId: e.target.value === '' ? null : Number(e.target.value),
+                    })
+                  }
+                >
+                  <option value="">고르세요</option>
+                  {parties.map((nation) => (
+                    <option key={nation.id} value={nation.id}>
+                      {nation.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className={styles.inline}>
+                원조 기간(개월)
+                <input
+                  type="number"
+                  min={1}
+                  max={TREATY_MAX_MONTHS}
+                  step={1}
+                  value={form.tribute.months}
+                  onChange={(e) => set('tribute', { ...form.tribute, months: e.target.value })}
+                />
+              </label>
+              {(['gold', 'rice'] as const).map((resource) => (
+                <label className={styles.inline} key={resource}>
+                  {resource === 'gold' ? '매달 금' : '매달 쌀'}
+                  <input
+                    type="number"
+                    min={0}
+                    max={TRIBUTE_MAX_AMOUNT}
+                    step={1}
+                    value={form.tribute[resource]}
+                    onChange={(e) => set('tribute', { ...form.tribute, [resource]: e.target.value })}
+                  />
+                </label>
+              ))}
+            </ClauseRow>
+            <ClauseRow
+              label={CLAUSE_LABELS.cityTransfer}
+              checked={form.cityTransfer.on}
+              disabledReason={
+                unavailableCities ?? (cities.transfer.length === 0 ? '이양할 비수도 도시가 없습니다.' : null)
+              }
+              onToggle={(on) => set('cityTransfer', { ...form.cityTransfer, on })}
+            >
+              <label className={styles.inline}>
+                이양할 도시
+                <select
+                  value={
+                    cities.transfer.some(
+                      (city) =>
+                        city.key === form.cityTransfer.cityKey && city.nationId === form.cityTransfer.giverNationId,
+                    )
+                      ? (form.cityTransfer.cityKey ?? '')
+                      : ''
+                  }
+                  onChange={(e) => {
+                    const city = cities.transfer.find((candidate) => candidate.key === Number(e.target.value));
+                    set('cityTransfer', {
+                      ...form.cityTransfer,
+                      cityKey: city?.key ?? null,
+                      giverNationId: city?.nationId ?? null,
+                    });
+                  }}
+                >
+                  <option value="">고르세요</option>
+                  {cities.transfer.map((city) => (
+                    <option key={city.key} value={city.key}>
+                      {cityOption(city)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </ClauseRow>
+          </>
+        ) : null}
+        {UNSUPPORTED_CLAUSE_LABELS.filter((label) => (label === '교역 허용' ? !tradeEnabled : !expandedEnabled)).map(
+          (label) => (
+            <ClauseRow
+              key={label}
+              label={label}
+              checked={false}
+              disabledReason={UNSUPPORTED_CLAUSE_REASON}
+              onToggle={() => undefined}
+              unsupported
+            />
+          ),
+        )}
       </fieldset>
 
       <section className={styles.summary} aria-label="조약서 요약" aria-live="polite">

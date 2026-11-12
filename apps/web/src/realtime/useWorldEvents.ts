@@ -44,7 +44,12 @@ export function invalidationTargets(event: WorldEvent, worldId: string, trpc: Tr
     case 'offer.new':
       return [[['offers']], [['personnel']]];
     case 'treaty.new':
-      return [[['treaty']]];
+      return [
+        [['treaty']],
+        trpc.world.map.queryKey({ worldId }),
+        trpc.city.get.queryKey({ worldId }),
+        trpc.home.get.queryKey({ worldId }),
+      ];
     case 'notice.updated':
       return [
         event.scope === 'nation'

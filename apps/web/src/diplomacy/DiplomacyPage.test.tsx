@@ -119,6 +119,76 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('외교실 첫 세 조항 화면', () => {
+  it('확장 조항의 당사국·도시·금액·기간을 견적과 제안에 함께 보낸다', async () => {
+    on('treaty.list', () => ({ ...listPage({ tradeEnabled: true }), expandedEnabled: true }));
+    on('world.map', () => ({
+      cities: [
+        { key: 11, name: '허창', nationId: 1 },
+        { key: 12, name: '복양', nationId: 1 },
+        { key: 21, name: '업', nationId: 2 },
+        { key: 22, name: '남피', nationId: 2 },
+        { key: 31, name: '양양', nationId: 3 },
+        { key: 41, name: '낙양', nationId: null },
+        { key: 42, name: '호로관', nationId: 1, kind: 'PASS' },
+      ],
+      nations: [
+        { ...nation(1, '조조'), capitalCityKey: 11 },
+        { ...nation(2, '원소'), capitalCityKey: 21 },
+        { ...nation(3, '유표'), capitalCityKey: 31 },
+      ],
+    }));
+    on('treaty.quote', () => ({ cost: { mine: 100, theirs: 100 }, problem: null }));
+    on(
+      'treaty.propose',
+      (input) =>
+        ({
+          status: 'applied',
+          requestId: (input as { requestId: string }).requestId,
+          kind: 'treaty.propose',
+          outcome: 'PROPOSED',
+          treatyId: '12',
+          treaty: null,
+        }) satisfies RequestState,
+    );
+    renderPage('write');
+    const form = within(await screen.findByRole('form', { name: '조약서 쓰기' }));
+    fireEvent.change(form.getByLabelText('상대'), { target: { value: '2' } });
+    await waitFor(() => expect((form.getByLabelText('통행 허용') as HTMLInputElement).disabled).toBe(false));
+    fireEvent.click(form.getByLabelText('통행 허용'));
+    fireEvent.change(form.getByLabelText('통행 기간(개월)'), { target: { value: '120' } });
+    const passage = within(form.getByRole('group', { name: '통행 도시' }));
+    expect(passage.queryByRole('checkbox', { name: /양양|낙양|호로관/ })).toBeNull();
+    fireEvent.click(passage.getByRole('checkbox', { name: '업 (원소)' }));
+    fireEvent.click(passage.getByRole('checkbox', { name: '복양 (조조)' }));
+    fireEvent.click(form.getByLabelText('정기 원조'));
+    fireEvent.change(form.getByRole('combobox', { name: '원조를 보내는 국가' }), { target: { value: '2' } });
+    fireEvent.click(form.getByRole('button', { name: /제안 보내기\s*\(사용 불가\)/ }));
+    expect(form.getByRole('note').textContent).toContain('금과 쌀을 각각');
+    fireEvent.change(form.getByLabelText('매달 쌀'), { target: { value: '10000' } });
+    fireEvent.click(form.getByLabelText('도시 이양'));
+    const transfer = form.getByRole('combobox', { name: '이양할 도시' });
+    expect(
+      within(transfer)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['고르세요', '복양 (조조)', '남피 (원소)']);
+    fireEvent.change(transfer, { target: { value: '22' } });
+    const clauses = [
+      { kind: 'passage', cityKeys: [12, 21], months: 120 },
+      { kind: 'tribute', payerNationId: 2, gold: 0, rice: 10_000, months: 12 },
+      { kind: 'cityTransfer', cityKey: 22, giverNationId: 2 },
+    ];
+    await waitFor(() =>
+      expect(callsTo('treaty.quote').at(-1)?.input).toEqual({ worldId: 'w1', toNationId: 2, clauses }),
+    );
+    fireEvent.click(form.getByRole('button', { name: '제안 보내기' }));
+    await screen.findByText(/제안을 보냈습니다/);
+    expect(callsTo('treaty.propose').at(-1)?.input).toMatchObject({ toNationId: 2, clauses });
+    fireEvent.change(form.getByLabelText('상대'), { target: { value: '3' } });
+    expect(form.queryByRole('group', { name: '통행 도시' })).toBeNull();
+    expect(form.queryByRole('combobox', { name: '이양할 도시' })).toBeNull();
+  });
+
   it('교역 기능이 있는 월드의 조항 작성은 실제 견적·제안 입력에 교역 기간을 넣는다', async () => {
     on('treaty.list', () => listPage({ tradeEnabled: true }));
     on('treaty.quote', () => ({ cost: { mine: 100, theirs: 100 }, problem: null }));

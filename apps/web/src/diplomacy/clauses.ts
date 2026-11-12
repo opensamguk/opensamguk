@@ -1,9 +1,17 @@
 import { NON_AGGRESSION_MONTHS, NOTE_MAX_LENGTH, type Clause, type ClauseKind, type Relation } from './contract';
+import type { MapCity, MapNation } from '../game/types';
 
 // 조약서 쓰기의 순수 계산. 화면 검사는 보내기 전에 돕는 것이고 최종 판단은 서버(quote·엔진)가 한다.
-// 이 편집기는 종전·불가침·기록만 남길 약속 셋을 만든다. 나머지 넷은 고를 수 없게 보인다.
+export const TREATY_MAX_MONTHS = 120;
+export const TRIBUTE_MAX_AMOUNT = 10_000;
 
-export interface ComposeState {
+export const emptyExpandedClauses = () => ({
+  passage: { on: false, months: '12', cityKeys: [] as number[] },
+  tribute: { on: false, months: '12', payerNationId: null as number | null, gold: '0', rice: '0' },
+  cityTransfer: { on: false, cityKey: null as number | null, giverNationId: null as number | null },
+});
+
+export interface ComposeState extends ReturnType<typeof emptyExpandedClauses> {
   toNationId: number | null;
   peace: boolean;
   nonAggression: { on: boolean; months: string };
@@ -17,6 +25,7 @@ export const emptyCompose = (): ComposeState => ({
   nonAggression: { on: false, months: '24' },
   note: { on: false, text: '' },
   trade: { on: false, months: '24' },
+  ...emptyExpandedClauses(),
 });
 
 export const CLAUSE_LABELS: Record<ClauseKind, string> = {
@@ -24,6 +33,9 @@ export const CLAUSE_LABELS: Record<ClauseKind, string> = {
   nonAggression: '불가침',
   note: '기록만 남길 약속',
   trade: '교역 허용',
+  passage: '통행 허용',
+  tribute: '정기 원조',
+  cityTransfer: '도시 이양',
 };
 
 // 이 편집기에서 아직 선택하지 않는 조항. 서버 지원은 월드의 기능 선택에 따른다.
@@ -37,6 +49,27 @@ const positiveInt = (raw: string) => {
   const n = Number(raw.trim());
   return raw.trim() !== '' && Number.isInteger(n) && n >= 1 ? n : null;
 };
+const boundedAmount = (raw: string) => {
+  const n = Number(raw.trim());
+  return raw.trim() !== '' && Number.isInteger(n) && n >= 0 && n <= TRIBUTE_MAX_AMOUNT ? n : null;
+};
+
+export type ClauseCity = Pick<MapCity, 'key' | 'name' | 'nationId' | 'kind'>;
+export type ClauseNation = Pick<MapNation, 'id' | 'name' | 'capitalCityKey'>;
+export function clauseCities(cities: readonly ClauseCity[], parties: readonly ClauseNation[]) {
+  const passage = cities.filter(
+    (city) => city.kind !== 'PASS' && parties.some((nation) => nation.id === city.nationId),
+  );
+  const transfer = passage.filter((city) => {
+    const owner = parties.find((nation) => nation.id === city.nationId);
+    return (
+      owner &&
+      city.key !== owner.capitalCityKey &&
+      passage.some((capital) => capital.key === owner.capitalCityKey && capital.nationId === owner.id)
+    );
+  });
+  return { passage, transfer };
+}
 
 // 서버는 약속 문장을 NFC로 바꾼 뒤 코드포인트로 센다.
 export const noteLength = (text: string) => [...text.normalize('NFC')].length;
@@ -48,7 +81,11 @@ export interface BuiltClauses {
 }
 
 // 폼 값을 조항 목록으로 바꾼다. 순서는 서버 저장 순서(종전·불가침·약속)와 같다.
-export function buildClauses(state: ComposeState, relation: Relation | undefined): BuiltClauses {
+export function buildClauses(
+  state: ComposeState,
+  relation: Relation | undefined,
+  options?: { parties: readonly ClauseNation[]; cities: ReturnType<typeof clauseCities> },
+): BuiltClauses {
   const clauses: Clause[] = [];
   const problems: string[] = [];
   if (state.toNationId === null) problems.push('상대 국가를 고르세요.');
@@ -68,6 +105,32 @@ export function buildClauses(state: ComposeState, relation: Relation | undefined
     if (months === null || months < 1 || months > 120) problems.push('교역 기간은 1~120개월입니다.');
     else clauses.push({ kind: 'trade', months });
   }
+  if (options && state.passage.on) {
+    const months = positiveInt(state.passage.months);
+    const cityKeys = [...new Set(state.passage.cityKeys)].sort((a, b) => a - b);
+    if (months === null || months > TREATY_MAX_MONTHS) problems.push('통행 기간은 1~120개월입니다.');
+    else if (!cityKeys.length || cityKeys.some((key) => !options.cities.passage.some((city) => city.key === key)))
+      problems.push('양국의 통행 도시를 하나 이상 고르세요.');
+    else clauses.push({ kind: 'passage', cityKeys, months });
+  }
+  if (options && state.tribute.on) {
+    const { payerNationId } = state.tribute;
+    const months = positiveInt(state.tribute.months);
+    const gold = boundedAmount(state.tribute.gold);
+    const rice = boundedAmount(state.tribute.rice);
+    if (payerNationId === null || !options.parties.some((nation) => nation.id === payerNationId))
+      problems.push('원조를 보내는 국가를 고르세요.');
+    else if (months === null || months > TREATY_MAX_MONTHS) problems.push('정기 원조 기간은 1~120개월입니다.');
+    else if (gold === null || rice === null || gold + rice === 0)
+      problems.push('금과 쌀을 각각 0~10,000으로 입력하고 하나 이상을 보내세요.');
+    else clauses.push({ kind: 'tribute', payerNationId, gold, rice, months });
+  }
+  if (options && state.cityTransfer.on) {
+    const city = options.cities.transfer.find(({ key }) => key === state.cityTransfer.cityKey);
+    if (!city || city.nationId === null || city.nationId !== state.cityTransfer.giverNationId)
+      problems.push('이양할 비수도 도시를 고르세요.');
+    else clauses.push({ kind: 'cityTransfer', cityKey: city.key, giverNationId: city.nationId });
+  }
   if (state.note.on) {
     const text = state.note.text.trim();
     if (text === '') problems.push('기록만 남길 약속의 문장을 쓰세요.');
@@ -75,7 +138,7 @@ export function buildClauses(state: ComposeState, relation: Relation | undefined
     else clauses.push({ kind: 'note', text });
   }
 
-  if (!state.peace && !state.nonAggression.on && !state.note.on && !state.trade?.on)
+  if (clauses.length === 0 && problems.length === Number(state.toNationId === null))
     problems.push('조항을 하나 이상 고르세요.');
   return { clauses, problems };
 }
@@ -84,7 +147,13 @@ export function buildClauses(state: ComposeState, relation: Relation | undefined
 export const isEnforced = (kind: ClauseKind) => kind !== 'note';
 
 // 조항 한 줄 요약. 받은 제안 카드와 조약 목록에 쓴다.
-export function describeClause(clause: Clause): string {
+export function describeClause(
+  clause: Clause,
+  labels?: { city: (key: number) => string; nation: (id: number) => string; recipient: (id: number) => string },
+): string {
+  const city = (key: number) => labels?.city(key) ?? `도시 ${key}`;
+  const nation = (id: number) => labels?.nation(id) ?? `국가 ${id}`;
+  const recipient = (id: number) => (labels ? ` → ${labels.recipient(id)}` : '');
   switch (clause.kind) {
     case 'peace':
       return '종전';
@@ -94,5 +163,11 @@ export function describeClause(clause: Clause): string {
       return `기록만 남길 약속 (${clause.text})`;
     case 'trade':
       return `교역 허용 ${clause.months}개월`;
+    case 'passage':
+      return `통행 허용${clause.months === undefined ? '' : ` ${clause.months}개월`} · ${clause.cityKeys.map(city).join(', ')}`;
+    case 'tribute':
+      return `정기 원조 ${clause.months}개월 · ${nation(clause.payerNationId)}${recipient(clause.payerNationId)} · 매달 금 ${clause.gold.toLocaleString('ko-KR')} · 쌀 ${clause.rice.toLocaleString('ko-KR')}`;
+    case 'cityTransfer':
+      return `도시 이양 · ${nation(clause.giverNationId)}의 ${city(clause.cityKey)}${recipient(clause.giverNationId)} · 수락 즉시`;
   }
 }
