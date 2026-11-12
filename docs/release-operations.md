@@ -22,7 +22,7 @@
 
 저장소의 Compose 배포 실행기는 `tools/release-compose-driver.ps1`이다. `OPENSAMGUK_RELEASE_COMPOSE_CONFIG`가 가리키는 호스트 설정에는 위 DB·프로젝트·Docker 항목과 `bashExecutable`, `backupScript`, `backupScriptSha256`, `backupDirectory`, `backupDockerConfig`, `runtimeDirectory`, `publicOrigin`을 지정한다. 현재 서비스 정지, 기존 `backup.sh`로 백업, 새 migration 적용, 서비스와 공개 HTML 해시 확인 순서로 실행한다. migration 시도 또는 새 writer 기동 뒤 실패하면 서비스를 정지하고 호스트 점검을 기다린다.
 
-되돌리기는 현재 DB를 그대로 쓰는 경우에 같은 실행기를 등록한다. Compose 설정의 `rollbackPairs`에는 소유자가 애플리케이션 데이터 호환성을 검토한 `fromRevision`, `revision`, `currentManifest`, `currentManifestSha256`, `targetManifestSha256`을 지정한다. 실행기는 양쪽 산출물의 migration 이름·해시와 자원 SQL 해시, 현재 이미지 ID, 실제 DB의 적용 기록을 모두 확인한다. 서비스 정지와 백업 뒤 같은 DB로 이전 이미지를 기동하고 공개 화면을 확인한다. DB 스키마 또는 자료 계약이 다르면 별도 DB 복원과 전환 절차를 검증한 뒤 승인한다. 현재 `restore.sh`의 운영 대상은 접근 권한과 전환 절차가 정해질 때까지 보류한다.
+되돌리기는 현재 DB를 그대로 쓰는 경우에 같은 실행기를 등록한다. Compose 설정의 `rollbackPairs`에는 소유자가 애플리케이션 데이터 호환성을 검토한 `fromRevision`, `revision`, `currentManifest`, `currentManifestSha256`, `targetManifestSha256`을 지정한다. 실행기는 양쪽 산출물의 migration 이름·해시와 자원 SQL 해시, 현재 이미지 ID, 실제 DB의 적용 기록을 모두 확인한다. 서비스 정지와 백업 뒤 같은 DB로 이전 이미지를 기동하고 공개 화면을 확인한다. DB 스키마 또는 자료 계약이 다르면 별도 DB 복원과 전환 절차를 검증한 뒤 승인한다. 스키마가 다른 배포판의 전환은 별도 승인을 거친다. 아래 단계에서 승인된 백업을 격리 DB로 준비할 수 있다.
 <!-- TODO(M2): 명령 하나로 배포 (AC-M2-08). migration 적용 → server·engine 재시작 → 상태 확인. -->
 
 ### 로컬 산출물 사전 확인 (T2-15 B2b3a)
@@ -98,7 +98,9 @@ Windows 시험은 PATH의 Bash 대신 `C:/Program Files/Git/bin/bash.exe`를 사
 
 dump와 성공 manifest가 한 쌍이어야 백업 성공입니다. manifest에는 아카이브 SHA-256과 같은 snapshot의 적용 migration 목록을 남깁니다. 성공 실행 뒤에만 7일보다 오래된 성공 백업을 정리합니다. 외부 복사는 `not-configured`입니다. 매일 실행할 일정 설치와 외부 복사는 아직 하지 않았습니다.
 
-복구는 새 리허설 대상만 받으며 기존 DB를 덮어쓰지 않습니다. 복원 실패 시 이번 실행이 만든 대상의 OID와 연결 0을 확인해야 삭제합니다. 운영 복구 대상의 비밀 파일·cutover 계약은 B2·B3 배정 전이므로 운영 복구는 거부합니다.
+복구는 새 DB에만 수행합니다. 리허설 복원 실패 시 이번 실행이 만든 대상의 OID와 연결 0을 확인한 뒤 삭제합니다. 격리된 운영 복원 대상에서 실패한 경우에는 확인할 수 있도록 대상 DB를 보존합니다.
+
+전환 전 운영 복원 준비에는 `opensamguk_restore_<UTC시각>_<8자리 hex>`의 새 대상과 `--approved-source-db`, `--approved-source-oid`, `--approved-manifest-sha256`, `--approved-release-sha`, `--stage-receipt`를 지정합니다. 원본과 백업의 PostgreSQL 시스템 식별자·DB OID·승인 릴리스가 같고 서비스 정지 시점의 백업이어야 합니다. 복원 후 대상 DB의 migration 원장과 내용 해시를 백업과 대조합니다. 성공 영수증은 대상의 OID와 원본·백업 해시, 연결 차단 및 전환 미승인 상태를 기록합니다. 원본 DB와 서비스 연결은 그대로 둡니다. 실제 전환은 별도의 호스트 실행 계약에서 다룹니다.
 
 리허설의 준비와 각 진행 단계는 자체20초 기한을 둡니다. 기한을 넘기면 다음 진행을 막고 남은 작업의 종료를 기다린 뒤 자기 DB만 정리합니다. 기존 시험의30초 상한은 늘리지 않습니다.
 
