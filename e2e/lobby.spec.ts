@@ -50,6 +50,23 @@ const card = (page: Page, name: string) => page.getByRole('article', { name, exa
 // 상태 배지는 글자가 정확히 같은 칸 하나다. 부분 일치로 찾으면 상태 글자가 든 월드 이름(h3)까지 잡는다.
 const badge = (scope: Page | Locator, text: string) => scope.getByText(text, { exact: true });
 
+// Vite can serve the app before its API process is ready to accept requests.
+test.beforeAll(async ({ request }) => {
+  await expect
+    .poll(
+      async () => {
+        try {
+          const response = await request.get('/trpc/auth.me', { timeout: 2_000 });
+          return response.ok() && (await response.json()).result?.data?.user === null;
+        } catch {
+          return false;
+        }
+      },
+      { timeout: 25_000 },
+    )
+    .toBe(true);
+});
+
 async function login(page: Page, email: string) {
   await page.getByLabel('이메일').fill(email);
   await page.getByLabel('비밀번호', { exact: true }).fill(TEST_PASSWORD);
