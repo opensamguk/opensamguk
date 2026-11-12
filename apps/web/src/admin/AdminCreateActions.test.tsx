@@ -211,6 +211,38 @@ describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
     expect((scenario as HTMLSelectElement).value).toBe('integration-v01');
     expect(state.create).not.toHaveBeenCalled();
   });
+  it('확정판의 역사, IF, 공백지를 별도 그룹에 표시한다', async () => {
+    const legacy = profileOptions().profiles[0]!;
+    if (!legacy.available) throw new Error('Available fixture required');
+    const profile = (id: CreateProfile['id'], label: string, scenarioCategory: CreateProfile['scenarioCategory']) => ({
+      ...legacy,
+      id,
+      label,
+      scenarioCategory,
+      selection: { ...legacy.selection, scenarioKey: id, mapKey: 'san10-expanded' },
+    });
+    state.settings.mockResolvedValue({
+      ...options,
+      profiles: [
+        profile('san10-expanded-n30', 'IF 시나리오', 'if'),
+        profile('san10-expanded-n19', '191년 군웅할거', 'history'),
+        profile('san10-expanded-empty', '180년 공백지', 'empty'),
+      ],
+    });
+    setup();
+    fireEvent.click(screen.getByRole('button', { name: '새 월드 생성 준비' }));
+    const scenario = await screen.findByRole('combobox', { name: '시나리오' });
+    for (const [group, option] of [
+      ['역사', '191년 군웅할거'],
+      ['IF', 'IF 시나리오'],
+      ['공백지', '180년 공백지'],
+    ]) {
+      expect(
+        within(within(scenario).getByRole('group', { name: group })).getByRole('option', { name: option }),
+      ).toBeTruthy();
+    }
+    expect((scenario as HTMLSelectElement).value).toBe('san10-expanded-n19');
+  });
   it('프로필 순서와 관계없이 SAN10 191년을 기본 선택하고 해당 5자원·10기능만 전송한다', async () => {
     const value = profileOptions();
     state.settings.mockResolvedValue(value);

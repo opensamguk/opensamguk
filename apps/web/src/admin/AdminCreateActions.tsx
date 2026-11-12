@@ -592,22 +592,22 @@ export function AdminCreateActions({
                       }}
                     >
                       <option value="">시나리오를 선택하세요</option>
-                      {options.profiles.some((entry) => entry.id === 'san10-expanded-empty')
+                      {options.profiles.some((entry) => entry.available && entry.scenarioCategory)
                         ? (
                             [
-                              [
-                                '자료의 전체 시나리오',
-                                options.profiles.filter((entry) => entry.id !== 'san10-expanded-empty'),
-                              ],
-                              ['공백지', options.profiles.filter((entry) => entry.id === 'san10-expanded-empty')],
+                              ['history', '역사'],
+                              ['if', 'IF'],
+                              ['empty', '공백지'],
                             ] as const
-                          ).map(([label, entries]) => (
-                            <optgroup key={label} label={label}>
-                              {entries.map((entry) => (
-                                <option key={entry.id} value={entry.id} disabled={!entry.available}>
-                                  {entry.label}
-                                </option>
-                              ))}
+                          ).map(([category, label]) => (
+                            <optgroup key={category} label={label}>
+                              {options.profiles
+                                .filter((entry) => entry.available && entry.scenarioCategory === category)
+                                .map((entry) => (
+                                  <option key={entry.id} value={entry.id}>
+                                    {entry.label}
+                                  </option>
+                                ))}
                             </optgroup>
                           ))
                         : options.profiles.map((entry) => (

@@ -142,10 +142,12 @@ export type CreationPreset = {
   turnTermMinutes: number;
   descriptions: string[];
 };
+const scenarioCategorySchema = z.enum(['history', 'if', 'empty']);
 export type AvailableCreationProfile = Identity & {
   available: true;
   selection: Selection;
   scenarioTitle: string;
+  scenarioCategory?: z.infer<typeof scenarioCategorySchema>;
   mapName: string;
   startYear: number;
   counts: {
@@ -405,6 +407,11 @@ async function artifactCreationProfiles(
       AND "createdBy" IS NULL AND "publishedBy" IS NULL
       AND name ~ ${artifactScenarioPattern} AND content->>'requiredMap' = ${artifactMap}
     ORDER BY (name = 'san10-expanded-empty'), year, name`;
+  const categories = z
+    .record(z.string(), scenarioCategorySchema)
+    .parse(JSON.parse(await readFile(new URL('scenario/san10-expanded-categories.json', resourceRoot()), 'utf8')));
+  if (entries.length !== Object.keys(categories).length || entries.some(({ name }) => !categories[name]))
+    throw new Error('확장 확정판 시나리오 분류를 확인하세요.');
   const regular = parsePreset(presets.find((row) => row.key === 'regular')?.value);
   const empty = parsePreset(presets.find((row) => row.key === 'empty')?.value);
   const resources = rows.map((row) => ({
@@ -414,7 +421,8 @@ async function artifactCreationProfiles(
     contentHash: row.contentHash,
   }));
   return entries.map((entry) => {
-    const isEmpty = entry.name === 'san10-expanded-empty';
+    const scenarioCategory = categories[entry.name]!;
+    const isEmpty = scenarioCategory === 'empty';
     const preset = isEmpty ? empty : regular;
     return {
       id: entry.name,
@@ -422,6 +430,7 @@ async function artifactCreationProfiles(
       available: true,
       selection: { ...artifactSelection, scenarioKey: entry.name },
       scenarioTitle: entry.title,
+      scenarioCategory,
       mapName: 'SAN10 확장 확정판',
       startYear: entry.year,
       counts: {
