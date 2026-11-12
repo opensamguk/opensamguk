@@ -29,6 +29,7 @@ export default defineConfig({
     '**/t4-96-heritage.spec.ts',
     '**/intel.spec.ts',
     '**/relations.spec.ts',
+    '**/npc-entry-acceptance.spec.ts',
   ],
   forbidOnly: isCI,
   use: { baseURL: 'http://127.0.0.1:5173' },
