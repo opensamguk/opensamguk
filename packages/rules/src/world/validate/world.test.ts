@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import { operationalInput } from '../../../test/operationalMapFixture';
 import { buildInitialWorld } from '../bootstrap';
 import { checkReplayOrigin } from '../../ruleRegistry';
+import { checkOperationalProfile } from '../map/profile';
 import { validateMap } from './map';
 import { validateWorldResources } from './world';
 import { codes, freezeDeep, mapFixture, scenarioFixture, unitFixture } from './testFixtures';
@@ -134,11 +135,65 @@ describe('T4-76 자원 묶음 판정', () => {
     expect(ready.generals).toEqual(legacy.generals);
   });
 
-  it('T4-46 AC-P2-24 정사 초기 도시 보정을 운영 지도와 섞을 수 없다', () => {
+  it('T4-46 AC-P2-24 운영 지도는 개막 도시 보정과 기존 관문 방어를 재생 원장에 고정한다', () => {
     const input = operationalInput();
+    input.map.defaults.trust = 60;
+    const source = input.map.sites.find((site) => site.kind === 'CITY')!;
+    input.map.sites.push({
+      ...source,
+      id: 'city:3',
+      name: '도시3',
+      anchorKey: 3,
+      legacyCityId: 3,
+      position: { x: 400, y: 400 },
+    });
+    input.map.routes.push({
+      id: 'route:3',
+      from: 'pass:99',
+      to: 'city:3',
+      mode: 'LAND',
+      direction: 'BOTH',
+      enabled: true,
+    });
     const scenario = { ...input.scenario, openingCityProfile: 'legacy-research-70' };
-    expect(codes(validateWorldResources({ ...input, scenario }).scenario)).toContain('shape-invalid');
-    expect(() => buildInitialWorld({ ...input, scenario })).toThrow('기존 지도 형식');
+    expect(validateWorldResources({ ...input, scenario }).status).toBe('pass');
+    const base = buildInitialWorld(input);
+    const initial = buildInitialWorld({ ...input, scenario });
+    expect(initial.openingCityProfile).toBe('legacy-research-70');
+    expect(initial.operationalMap).toEqual(base.operationalMap);
+    expect(initial.cities[0]).toMatchObject({ nationId: 1, population: 1400, defence: 70, wall: 70, trust: 80 });
+    expect(initial.cities[2]).toMatchObject({ nationId: null, population: 1400, defence: 100, wall: 100, trust: 80 });
+    expect(initial.cities[3]).toEqual(base.cities[3]);
+    expect(() =>
+      checkReplayOrigin({
+        version: 3,
+        initial,
+        initialStateHash: 'b'.repeat(64),
+        resourceHash: 'a'.repeat(64),
+      }),
+    ).not.toThrow();
+    const { openingCityProfile, ...withoutProfile } = initial;
+    expect(openingCityProfile).toBe(scenario.openingCityProfile);
+    expect(() => checkOperationalProfile(withoutProfile)).toThrow();
+    initial.cities[0]!.trust = 60;
+    expect(() => checkOperationalProfile(initial)).toThrow('개막 민심');
+  });
+
+  it('T4-46 AC-P2-24 운영 지도의 개막 보정은 무 규모와 폐허의 초기값을 보존한다', () => {
+    const input = operationalInput();
+    const scenario = {
+      ...input.scenario,
+      cityScale: {
+        cities: [
+          { city: '도시1', level: 0 },
+          { city: '도시2', ruin: true },
+        ],
+      },
+    };
+    const base = buildInitialWorld({ ...input, scenario });
+    const opened = buildInitialWorld({ ...input, scenario: { ...scenario, openingCityProfile: 'legacy-research-70' } });
+    expect(opened.cities).toEqual(base.cities);
+    expect(() => checkOperationalProfile(opened)).not.toThrow();
   });
 
   it('T4-46 AC-P2-24 도시가 같아도 시나리오가 지정한 지도 ID를 대조한다', () => {

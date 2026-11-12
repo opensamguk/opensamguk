@@ -3,11 +3,18 @@ import { operationalMapSchema } from './operational';
 import { operationalAnchors } from './anchors';
 import { validateMap } from '../validate/map';
 import { CITY_SCALE_FEATURE, cityScaleRecordSchema, resolveCityScale } from './cityScale';
+import { appliesOperationalOpening, LEGACY_OPENING_CITY_PROFILE, legacyOpeningCityValues } from '../openingCityProfile';
 
 export function checkOperationalProfile(
-  initial: Pick<WorldInit, 'ruleFeatures' | 'operationalMap' | 'cities' | 'nations' | 'cityScale'>,
+  initial: Pick<
+    WorldInit,
+    'ruleFeatures' | 'operationalMap' | 'cities' | 'nations' | 'cityScale' | 'openingCityProfile'
+  >,
 ) {
   const enabled = initial.ruleFeatures?.includes('operational-map') ?? false;
+  const opening = Object.hasOwn(initial, 'openingCityProfile');
+  if (opening && (!enabled || initial.openingCityProfile !== LEGACY_OPENING_CITY_PROFILE))
+    throw new Error('운영 지도의 개막 도시 설정을 확인하세요.');
   if (!enabled) {
     if (Object.hasOwn(initial, 'operationalMap') || initial.cities.some((city) => Object.hasOwn(city, 'kind')))
       throw new Error('기존 지도 판에는 운영 지도 원장·거점 종류를 넣을 수 없습니다.');
@@ -45,8 +52,14 @@ export function checkOperationalProfile(
       JSON.stringify(city.connections) !== JSON.stringify(anchor.connections)
     )
       throw new Error('운영 지도의 앵커와 생성 상태가 다릅니다.');
+    const openingValues =
+      opening && appliesOperationalOpening(anchor, record)
+        ? legacyOpeningCityValues(anchor.initial, anchor.max, city.nationId !== null)
+        : undefined;
+    if (openingValues && city.trust !== openingValues.trust)
+      throw new Error('운영 지도의 개막 민심과 생성 상태가 다릅니다.');
     for (const field of ['population', 'agriculture', 'commerce', 'security', 'defence', 'wall'] as const)
-      if (city[field] !== anchor.initial[field] || city[`${field}Max`] !== anchor.max[field])
+      if (city[field] !== (openingValues ?? anchor.initial)[field] || city[`${field}Max`] !== anchor.max[field])
         throw new Error('운영 지도의 초기·최대 값과 생성 상태가 다릅니다.');
   }
   if (
