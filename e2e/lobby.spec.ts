@@ -7,7 +7,17 @@ import { createGeneralByApi, e2eWorld, query } from './game';
 // T2-04 · AC-M2-02: 로비에서 월드 목록을 보고 참가한다. 실제 서버·DB·엔진으로 돈다.
 // D-025(가오픈 생성·총정원)는 승인 전이라 승인 전 모습만 시험한다.
 
-type LobbyWorld = { id: string; name: string; status: string; startedAt: string | null };
+type LobbyWorld = {
+  id: string;
+  name: string;
+  status: string;
+  startedAt: string | null;
+  scenarioTitle: string;
+  startYear: number;
+  gameDate: { year: number; month: number };
+  turnTermMinutes: number;
+  humanGenerals: number;
+};
 
 function run(args: string[]): string {
   e2eDatabaseUrl();
@@ -40,6 +50,23 @@ const card = (page: Page, name: string) => page.getByRole('article', { name, exa
 // 상태 배지는 글자가 정확히 같은 칸 하나다. 부분 일치로 찾으면 상태 글자가 든 월드 이름(h3)까지 잡는다.
 const badge = (scope: Page | Locator, text: string) => scope.getByText(text, { exact: true });
 
+// Vite can serve the app before its API process is ready to accept requests.
+test.beforeAll(async ({ request }) => {
+  await expect
+    .poll(
+      async () => {
+        try {
+          const response = await request.get('/trpc/auth.me', { timeout: 2_000 });
+          return response.ok() && (await response.json()).result?.data?.user === null;
+        } catch {
+          return false;
+        }
+      },
+      { timeout: 25_000 },
+    )
+    .toBe(true);
+});
+
 async function login(page: Page, email: string) {
   await page.getByLabel('이메일').fill(email);
   await page.getByLabel('비밀번호', { exact: true }).fill(TEST_PASSWORD);
@@ -51,13 +78,26 @@ test('로그인 → 로비 → 장수 만들기 → 메인 → 로비로 돌아�
   const email = await createAccount(page);
   const world = await e2eWorld(page);
   const worlds = await query<LobbyWorld[]>(page, 'lobby.worlds', {});
-  const name = worlds.find((w) => w.id === world)!.name;
+  const listed = worlds.find((w) => w.id === world)!;
+  expect(listed.startedAt).not.toBeNull();
   await page.context().clearCookies();
 
   await page.goto('/login');
   await login(page, email);
   await expect(page).toHaveURL('/lobby');
-  const target = card(page, name);
+  const target = card(page, listed.name);
+  const startDate = await page.evaluate((date) => {
+    const local = new Date(date);
+    return `${local.getMonth() + 1}/${local.getDate()}`;
+  }, listed.startedAt!);
+  const metadata = [
+    `${listed.scenarioTitle}(${listed.startYear})`,
+    `${listed.gameDate.year}년 ${listed.gameDate.month}월`,
+    `턴 ${listed.turnTermMinutes}분`,
+    `장수 ${listed.humanGenerals}`,
+    `시작 ${startDate}`,
+  ].join(' · ');
+  await expect(target.getByText(metadata, { exact: true })).toBeVisible();
   await expect(badge(target, '진행 중')).toBeVisible();
   await expect(badge(target, '진행 중')).toHaveAttribute('data-tone', 'accent');
   await expect(target.getByText('내 장수 없음')).toBeVisible();
