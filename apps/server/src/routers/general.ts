@@ -19,6 +19,7 @@ import { router, protectedProcedure, worldVerifiedProcedure } from '../trpc';
 import { requireGeneral, requireWorld, worldInput } from '../game/queries';
 import { ownGeneral } from '../game/projection';
 import { readPolicy, requirePolicyReady } from '../game/policy';
+import { PLAYER_PORTRAIT_MIN_ID } from '@opensamguk/shared';
 import { hashState } from '@opensamguk/shared/node';
 import { PgHeritageBalanceStore } from '../heritage/pgStore';
 import { readCreationHeritage } from '../heritage/service';
@@ -171,6 +172,13 @@ export const generalRouter = router({
         world.ruleFeatures.includes('heritage-v1'),
       );
       if (!checked.ok) throw new TRPCError({ code: 'BAD_REQUEST', message: checked.message });
+      const { portraitId } = checked.value;
+      if (
+        portraitId !== null &&
+        portraitId >= PLAYER_PORTRAIT_MIN_ID &&
+        !(await tx.accountPortrait.findUnique({ where: { id: portraitId, userId: ctx.user.id }, select: { id: true } }))
+      )
+        throw new TRPCError({ code: 'BAD_REQUEST', message: '내 계정에 등록한 초상을 선택하세요.' });
       if (pending) {
         // PostgreSQL jsonb의 키 순서는 입력 객체 순서와 다르다.
         const equal = hashState(checked.value) === hashState(pending.payload);

@@ -52,6 +52,21 @@ async function pick(page: Page, command: string) {
   await editor(page).getByRole('radio', { name: command }).check();
 }
 
+async function uploadPortrait(page: Page) {
+  await page.getByLabel('내 초상 등록').setInputFiles({
+    name: 'portrait.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNYtfvMfwAHdQMxTAUe1QAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  });
+  const image = page.getByRole('group', { name: '초상' }).getByRole('img').last();
+  await expect(image).toHaveAttribute('src', /^\/trpc\/player-portrait\/\d+$/);
+  const portraitUrl = (await image.getAttribute('src'))!;
+  return { portraitUrl, portraitId: Number(portraitUrl.split('/').pop()) };
+}
+
 test.describe('장수 생성', () => {
   test.beforeEach(async ({ page }) => stubPortraits(page));
   test.afterAll(releaseIdleWorld);
@@ -63,7 +78,10 @@ test.describe('장수 생성', () => {
     await expect(page).toHaveURL(/\/login\?next=/);
   });
 
-  test('합계를 넘으면 막고 이유를 보이며, 정상 생성하면 메인으로 가고 두 번째 생성은 거부된다', async ({ page }) => {
+  test('합계를 넘으면 막고 이유를 보이며, 정상 생성하면 메인으로 가고 두 번째 생성은 거부된다', async ({
+    page,
+    request,
+  }) => {
     await createAccount(page);
     const world = await e2eWorld(page);
     const name = newGeneralName();
@@ -82,13 +100,22 @@ test.describe('장수 생성', () => {
 
     await page.getByRole('spinbutton', { name: '무력' }).fill('70');
     await expect(page.getByTestId('remaining')).toHaveText('남은 점수 0');
-    await page.getByRole('radio', { name: '초상 1' }).check();
+    const portraits = page.getByRole('group', { name: '초상' });
+    await expect(portraits.getByRole('radio')).toHaveCount(1);
+    await expect(portraits.getByRole('radio', { name: /초상 없음/ })).toBeChecked();
+    const { portraitUrl, portraitId } = await uploadPortrait(page);
+    await expect(portraits.getByRole('radio')).toHaveCount(2);
+    expect((await page.request.get(portraitUrl)).headers()['content-type']).toContain('image/png');
+    expect((await request.get(portraitUrl)).status()).toBe(404);
+    await portraits.getByRole('radio', { name: /내 초상/ }).check();
     await page.screenshot({ path: 'test-results/t1-15-create.png', fullPage: true });
     await page.getByRole('button', { name: '장수 만들기', exact: true }).click();
 
     await expect(page).toHaveURL(`/w/${world}`);
     const { general } = await mine(page, world);
-    expect(general).toMatchObject({ name, portraitId: 10001, leadership: 80, strength: 70, intel: 15 });
+    expect(general).toMatchObject({ name, portraitId, leadership: 80, strength: 70, intel: 15 });
+    expect((await request.get(portraitUrl)).status()).toBe(404);
+    expect((await page.request.get(portraitUrl)).status()).toBe(200);
 
     await page.goto(`/w/${world}/create`);
     await expect(page.getByText(`이 월드의 내 장수는 ${name}입니다.`)).toBeVisible();
@@ -155,7 +182,8 @@ test.describe('장수 생성', () => {
     await page.getByRole('spinbutton', { name: '통솔' }).fill('70');
     await page.getByRole('spinbutton', { name: '무력' }).fill('50');
     await page.getByRole('spinbutton', { name: '지력' }).fill('45');
-    await page.getByRole('radio', { name: '초상 2' }).check();
+    const { portraitId } = await uploadPortrait(page);
+    await page.getByRole('radio', { name: /내 초상/ }).check();
     const first = page.waitForResponse((r) => r.url().includes('general.create'));
     await page.getByRole('button', { name: '장수 만들기', exact: true }).click();
     expect(JSON.stringify(await (await first).json())).toContain('"status":"pending"');
@@ -174,7 +202,7 @@ test.describe('장수 생성', () => {
     await expect(making).toHaveCount(0);
     await expect(nameInput).toHaveValue(taken);
     await expect(page.getByRole('spinbutton', { name: '통솔' })).toHaveValue('70');
-    await expect(page.getByRole('radio', { name: '초상 2' })).toBeChecked();
+    await expect(page.getByRole('radio', { name: /내 초상/ })).toBeChecked();
     expect((await mine(page, world)).creation?.status).toBe('rejected');
     await page.screenshot({ path: 'test-results/t1-15-create-rejected.png', fullPage: true });
 
@@ -193,7 +221,7 @@ test.describe('장수 생성', () => {
     }
     expect((await mine(page, world)).general).toMatchObject({
       name,
-      portraitId: 10002,
+      portraitId,
       leadership: 70,
       strength: 50,
       intel: 45,

@@ -21,9 +21,6 @@ export const FIVE_STAT_PRESETS = [
 export type StatKey = (typeof FIVE_STATS)[number]['key'];
 export type StatValues = Record<(typeof STATS)[number]['key'], string> & Partial<Record<'politics' | 'charm', string>>;
 
-// M1은 초상 목록 화면 없이 기본 이미지 몇 개 중 고르거나 고르지 않는다 (T1-15 계획).
-export const PORTRAIT_CHOICES = [10001, 10002, 10003, 10004, 10005, 10006] as const;
-
 const NAME_PATTERN = /^[가-힣\p{Script=Han}A-Za-z0-9]+$/u;
 
 export function normalizeName(name: string): string {

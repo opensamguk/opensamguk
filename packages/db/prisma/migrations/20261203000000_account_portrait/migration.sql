@@ -1,0 +1,7 @@
+CREATE TABLE "AccountPortrait" (
+    "id" SERIAL PRIMARY KEY CHECK ("id" >= 1000000),
+    "userId" TEXT NOT NULL UNIQUE REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    "png" BYTEA NOT NULL CHECK (octet_length("png") BETWEEN 1 AND 350000)
+);
+
+ALTER SEQUENCE "AccountPortrait_id_seq" RESTART WITH 1000000;

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { Prisma } from '@opensamguk/db';
 import { protectedProcedure, publicProcedure, router } from '../trpc';
 import { readWorld, worldInput, worldSummary } from '../queries';
 import { mapCity, publicMapInfo } from '../visibility';
@@ -9,8 +10,15 @@ import { readMapBackgrounds } from '../resourceAdmin/mapBackground';
 export const worldRouter = router({
   publicMaps: publicProcedure.input(z.void()).query(async ({ ctx }) => {
     const { delayMinutes } = ctx.publicMapConfig;
+    const initial = {
+      tick: 0,
+      takenAt: { lte: new Date(ctx.now) },
+      data: { path: ['initial'], equals: true },
+    } satisfies Prisma.PublicMapSnapshotWhereInput;
     const worlds = await ctx.db.world.findMany({
-      where: { status: { in: ['RUNNING', 'PAUSED'] } },
+      where: {
+        OR: [{ status: { in: ['RUNNING', 'PAUSED'] } }, { status: 'PREOPEN', publicMaps: { some: initial } }],
+      },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       select: {
         id: true,
@@ -18,7 +26,7 @@ export const worldRouter = router({
         status: true,
         mapKey: true,
         publicMaps: {
-          where: { takenAt: { lte: new Date(ctx.now - delayMinutes * 60_000) } },
+          where: { OR: [initial, { takenAt: { lte: new Date(ctx.now - delayMinutes * 60_000) } }] },
           orderBy: { takenAt: 'desc' },
           take: 1,
           select: { takenAt: true, year: true, month: true, data: true },
@@ -37,7 +45,7 @@ export const worldRouter = router({
         return {
           id,
           name,
-          status: status as 'RUNNING' | 'PAUSED',
+          status: status as 'PREOPEN' | 'RUNNING' | 'PAUSED',
           background: backgrounds.get(mapKey) ?? null,
           map:
             snapshot && data

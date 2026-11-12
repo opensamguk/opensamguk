@@ -51,6 +51,7 @@ export async function withdrawAccount(
         where: { id: identity.userId },
         data: { status: 'WITHDRAWN', email, passwordHash, emailVerifiedAt: null },
       });
+      await tx.accountPortrait.deleteMany({ where: { userId: identity.userId } });
       await tx.session.deleteMany({ where: { userId: identity.userId } });
       await forfeitHeritageBalance(tx, identity.userId);
       await tx.accountToken.deleteMany({ where: { userId: identity.userId } });

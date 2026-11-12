@@ -5,9 +5,10 @@ import { notifySessionClosed } from '@opensamguk/db';
 import { passwordSchema } from '../auth/password';
 import type { Context } from '../context';
 import { accountMail } from '../mail/templates';
-import { protectedProcedure, publicProcedure, PublicReasonError, router } from '../trpc';
+import { protectedProcedure, publicProcedure, PublicReasonError, router, verifiedProcedure } from '../trpc';
 import { missingConsents } from '../legal/policy';
 import { withdrawAccount } from '../auth/withdrawalStore';
+import { portraitMaxBytes, readPlayerPortrait } from '../auth/playerPortrait';
 
 const tokenInput = z.strictObject({ token: z.string().max(256) });
 const ok = { ok: true as const };
@@ -37,6 +38,7 @@ export const accountRouter = router({
       select: {
         email: true,
         emailVerifiedAt: true,
+        portrait: { select: { id: true } },
         consents: {
           orderBy: [{ docType: 'asc' }, { agreedAt: 'asc' }],
           select: { docType: true, version: true, agreedAt: true },
@@ -45,6 +47,7 @@ export const accountRouter = router({
     });
     return {
       userId: ctx.user.id,
+      portraitId: user.portrait?.id ?? null,
       email: user.email,
       emailVerified: user.emailVerifiedAt !== null,
       emailVerificationRequired: ctx.emailVerificationRequired ?? false,
@@ -54,6 +57,33 @@ export const accountRouter = router({
       consents: user.consents.map((consent) => ({ ...consent, agreedAt: consent.agreedAt.toISOString() })),
     };
   }),
+  setPortrait: verifiedProcedure
+    .input(z.strictObject({ expectedUserId: z.uuid(), png: z.string().max(Math.ceil(portraitMaxBytes / 3) * 4) }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.id !== input.expectedUserId)
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: '현재 계정을 다시 확인하세요.' });
+      const decision = ctx.rateLimiter.consume([
+        { namespace: 'account.portrait.user', key: ctx.user.id, limit: 10, windowMs: 60_000 },
+      ]);
+      if (!decision.allowed) {
+        ctx.reply.header('Retry-After', String(decision.retryAfterSeconds));
+        throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: '잠시 뒤 다시 요청하세요.' });
+      }
+      const png = readPlayerPortrait(input.png);
+      if (!png) throw new TRPCError({ code: 'BAD_REQUEST', message: '초상 이미지 파일을 확인하세요.' });
+      return ctx.db.$transaction(async (tx) => {
+        const active = await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT id FROM "User" WHERE id=${ctx.user.id} AND status='ACTIVE' FOR UPDATE`;
+        if (!active.length) throw new TRPCError({ code: 'UNAUTHORIZED', message: '현재 계정을 다시 확인하세요.' });
+        const { id } = await tx.accountPortrait.upsert({
+          where: { userId: ctx.user.id },
+          create: { userId: ctx.user.id, png: new Uint8Array(png) },
+          update: { png: new Uint8Array(png) },
+          select: { id: true },
+        });
+        return { portraitId: id };
+      });
+    }),
   withdraw: protectedProcedure
     .meta({ accountAccess: 'recovery' })
     .input(z.strictObject({ expectedUserId: z.uuid(), password: z.string().min(1).max(128) }))

@@ -87,7 +87,7 @@ export function PublicMapView({
   const tabRow = (
     <div className={backdrop ? `${styles.tabRow} ${styles.backdropBox}` : styles.tabRow}>
       <img className={styles.icon} src={mapIconUrl} alt="" width={32} height={32} />
-      <div className={styles.tabs} role="tablist" aria-label="진행 중인 월드" onKeyDown={move}>
+      <div className={styles.tabs} role="tablist" aria-label="공개 월드" onKeyDown={move}>
         {worlds.map((world, i) => {
           const selected = i === index;
           return (
@@ -108,6 +108,7 @@ export function PublicMapView({
             >
               {world.name}
               {world.status === 'PAUSED' ? <Tag tone="muted">멈춤</Tag> : null}
+              {world.status === 'PREOPEN' ? <Tag tone="muted">시작 전</Tag> : null}
             </button>
           );
         })}
@@ -141,7 +142,7 @@ export function PublicMapView({
     >
       {snapshot === null ? (
         <>
-          {/* 새 월드는 첫 턴이 지나고 공개 지연이 끝날 때까지 사본이 없다. 그동안 로그인 배경이 빈 바다로 남지 않게 바탕 그림을 깐다. */}
+          {/* 공개 사본이 없는 기존 월드는 로그인 배경에 바탕 그림을 깐다. */}
           {backdrop ? (
             <img className={styles.backdropImage} src={basemapUrl} alt="" data-testid="public-map-basemap" />
           ) : null}

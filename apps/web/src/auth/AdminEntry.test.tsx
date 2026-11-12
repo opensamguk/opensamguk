@@ -33,12 +33,13 @@ const B = '10000000-0000-4000-8000-00000000000b';
 interface Session {
   user: string | null;
   whoami: Whoami;
+  emailVerified?: boolean;
   server?: string | null;
   hold?: Promise<void>;
 }
 
-const identityOf = (user: string | null) => ({
-  user: user ? { id: user, email: 'unit@example.test', emailVerified: true, consentRequired: [] } : null,
+const identityOf = (user: string | null, emailVerified = true) => ({
+  user: user ? { id: user, email: 'unit@example.test', emailVerified, consentRequired: [] } : null,
 });
 
 // 일반 화면 운영 입구 (INT-20, AC-INT-20). 실제 서버 권한 검사는 e2e/admin-read.spec.ts에서 본다.
@@ -53,7 +54,7 @@ async function mount(user: string | null, whoami: Whoami, extra: Omit<Session, '
       observable((observer) => {
         calls.push(op.path);
         if (op.path === 'auth.me') {
-          observer.next({ result: { type: 'data', data: identityOf(session.user) } });
+          observer.next({ result: { type: 'data', data: identityOf(session.user, session.emailVerified) } });
           observer.complete();
         } else observer.error(TRPCClientError.from(new Error('운영 입구는 화면 클라이언트로 묻지 않는다')));
       });
@@ -64,7 +65,7 @@ async function mount(user: string | null, whoami: Whoami, extra: Omit<Session, '
       entryRequests.push(path);
       await session.hold;
       const { whoami } = session;
-      const identity = identityOf(session.server === undefined ? session.user : session.server);
+      const identity = identityOf(session.server === undefined ? session.user : session.server, session.emailVerified);
       if (whoami === 'offline') throw new TypeError('연결 실패');
       const permission =
         whoami === 'admin'
@@ -115,7 +116,8 @@ async function mount(user: string | null, whoami: Whoami, extra: Omit<Session, '
   return { calls, entryRequests, client, session, switchTo };
 }
 
-const entryState = (client: QueryClient, user: string) => client.getQueryState(['adminEntry', user]);
+const entryState = (client: QueryClient, user: string, emailVerified = true) =>
+  client.getQueryState(['adminEntry', user, emailVerified]);
 
 describe('운영 입구', () => {
   it('관리자에게는 /admin으로 가는 운영 링크를 접근성 이름과 함께 보인다', async () => {
@@ -131,9 +133,7 @@ describe('운영 입구', () => {
 
   it('관리자가 아니면 링크도 빈 자리도 그리지 않고 다시 묻지 않는다', async () => {
     const { entryRequests, client } = await mount('10000000-0000-4000-8000-000000000002', 'forbidden');
-    await waitFor(() =>
-      expect(client.getQueryState(['adminEntry', '10000000-0000-4000-8000-000000000002'])?.status).toBe('error'),
-    );
+    await waitFor(() => expect(entryState(client, '10000000-0000-4000-8000-000000000002')?.status).toBe('error'));
     expect(screen.queryByRole('link')).toBeNull();
     expect(screen.getByRole('banner').textContent).toBe('내 계정');
     expect(entryRequests).toEqual(['/trpc/auth.me,admin.whoami']);
@@ -141,9 +141,7 @@ describe('운영 입구', () => {
 
   it('연결 실패도 조용히 숨긴다', async () => {
     const { client } = await mount('10000000-0000-4000-8000-000000000003', 'offline');
-    await waitFor(() =>
-      expect(client.getQueryState(['adminEntry', '10000000-0000-4000-8000-000000000003'])?.status).toBe('error'),
-    );
+    await waitFor(() => expect(entryState(client, '10000000-0000-4000-8000-000000000003')?.status).toBe('error'));
     expect(screen.queryByRole('link')).toBeNull();
     expect(screen.getByRole('banner').textContent).toBe('내 계정');
   });
@@ -157,6 +155,16 @@ describe('운영 입구', () => {
     await waitFor(() => expect(screen.queryByRole('link')).toBeNull());
     expect(entryState(client, A)?.status).toBe('error');
     expect(entryState(client, A)?.data).toBeUndefined();
+    expect(entryRequests).toHaveLength(2);
+  });
+
+  it('이메일 인증이 끝나면 같은 계정의 운영 권한을 다시 확인한다', async () => {
+    const { client, entryRequests, session } = await mount(A, 'forbidden', { emailVerified: false });
+    await waitFor(() => expect(entryState(client, A, false)?.status).toBe('error'));
+    session.emailVerified = true;
+    session.whoami = 'admin';
+    await client.invalidateQueries({ queryKey: trpc.auth.me.queryKey() });
+    expect((await screen.findByRole('link', { name: '운영 화면' })).getAttribute('href')).toBe('/admin');
     expect(entryRequests).toHaveLength(2);
   });
 

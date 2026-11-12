@@ -57,7 +57,7 @@ const selectedName = () => tabs().find((tab) => tab.getAttribute('aria-selected'
 describe('공개 지도 탭', () => {
   it('처음에는 첫 월드를 열고 탭을 누르면 지도 하나와 기준 시각 줄이 그 월드로 바뀐다', () => {
     render(<PublicMapView data={data} now={now} />);
-    expect(screen.getByRole('tablist').getAttribute('aria-label')).toBe('진행 중인 월드');
+    expect(screen.getByRole('tablist').getAttribute('aria-label')).toBe('공개 월드');
     expect(tabs().map((tab) => tab.textContent)).toEqual(['첫 천하', '둘째 천하멈춤', '셋째 천하']);
     expect(selectedName()).toBe('첫 천하');
     expect(screen.getAllByTestId('world-map')).toHaveLength(1);

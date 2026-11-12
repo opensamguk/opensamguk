@@ -607,6 +607,7 @@ enum AuditActorKind {
 }
 
 model User {
+  portrait               AccountPortrait?
   notificationOutbox     NotificationOutbox[]
   notificationGeneration Int                  @default(0)
   notificationTarget     NotificationTarget?
@@ -628,6 +629,13 @@ model User {
   heritageEntries        HeritageEntry[]
   resourceEditorGrant    ResourceEditorGrant?
   seasonGenerals         SeasonGeneral[]
+}
+
+model AccountPortrait {
+  id      Int    @id @default(autoincrement())
+  userId  String @unique
+  png     Bytes
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model ResourceEditorGrant {

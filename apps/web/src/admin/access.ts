@@ -13,6 +13,8 @@ export async function requireAdmin(next: string) {
     if (failure?.code === 'UNAUTHORIZED') throw redirect({ to: '/login', search: { next: destination } });
     if (failure?.code === 'FORBIDDEN' && failure.reason === 'EMAIL_NOT_VERIFIED')
       throw redirect({ to: '/verify-email', search: { next: destination } });
+    if (failure?.code === 'FORBIDDEN' && failure.reason === 'CONSENT_REQUIRED')
+      throw redirect({ to: '/login', search: { next: destination } });
     if (failure?.code === 'FORBIDDEN') throw notFound();
     throw new Error('접근 권한을 확인하지 못했습니다.');
   }

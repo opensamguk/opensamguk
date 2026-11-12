@@ -76,6 +76,7 @@ export function VerifyEmailPage() {
     gcTime: 0,
     onSuccess() {
       void queryClient.invalidateQueries({ queryKey: trpc.account.get.queryKey() });
+      void queryClient.invalidateQueries({ queryKey: trpc.auth.me.queryKey() });
     },
   });
   const { mutate } = mutation;

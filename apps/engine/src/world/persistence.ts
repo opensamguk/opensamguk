@@ -53,6 +53,7 @@ import { hashState } from '@opensamguk/shared/node';
 import { loadCommandState } from '../commandPersistence';
 import { engineResolver, loadExt } from '../extState';
 import { storedGeneralStats } from '../generalStats';
+import { persistInitialPublicMap } from '../publicMap';
 import { loadSexLedger } from './resources';
 
 export type InitialWorldOptions = {
@@ -74,6 +75,7 @@ export interface PreparedInitialWorld {
 type StorePreparedWorld = (
   tx: Prisma.TransactionClient,
   plannedWorldId?: string,
+  publishInitialMap?: boolean,
 ) => Promise<{ worldId: string; stateHash: string }>;
 const preparedWorlds = new WeakMap<PreparedInitialWorld, StorePreparedWorld>();
 
@@ -253,9 +255,9 @@ export function prepareInitialWorld(
     creationState = parsedOrigin.initial;
   }
   const prepared = Object.freeze({ stateHash });
-  preparedWorlds.set(prepared, async (tx, plannedWorldId) => {
+  preparedWorlds.set(prepared, async (tx, plannedWorldId, publishInitialMap) => {
     const world = await tx.world.create({
-      select: { id: true },
+      select: { id: true, createdAt: true },
       data: {
         ...(plannedWorldId === undefined ? {} : { id: plannedWorldId }),
         name: options.name,
@@ -397,6 +399,11 @@ export function prepareInitialWorld(
         })),
       ),
     });
+    if (publishInitialMap) {
+      const publicState = toWorldState(creationState);
+      if (features.includes('city-scale-v1')) publicState.cityRuins = initialCityRuins(creationState);
+      await persistInitialPublicMap(tx, world, publicState, creationState.operationalMap);
+    }
     return { worldId: world.id, stateHash };
   });
   return prepared;
@@ -406,15 +413,16 @@ export async function savePreparedInitialWorld(
   tx: Prisma.TransactionClient,
   prepared: PreparedInitialWorld,
   plannedWorldId?: string,
+  publishInitialMap = true,
 ) {
   const store = preparedWorlds.get(prepared);
   if (!store) throw new Error('검증한 초기 월드 자료가 필요합니다.');
-  return store(tx, plannedWorldId);
+  return store(tx, plannedWorldId, publishInitialMap);
 }
 
 export async function saveInitialWorld(db: PrismaClient, state: WorldInit, options: InitialWorldOptions) {
   const prepared = prepareInitialWorld(state, options);
-  return db.$transaction((tx) => savePreparedInitialWorld(tx, prepared), { timeout: 30_000 });
+  return db.$transaction((tx) => savePreparedInitialWorld(tx, prepared, undefined, false), { timeout: 30_000 });
 }
 
 export async function readWorldState(db: PrismaClient, worldId: string): Promise<WorldInit> {

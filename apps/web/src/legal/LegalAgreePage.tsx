@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { getRouteApi, Link, useNavigate, useRouter } from '@tanstack/react-router';
+import { Link, useNavigate, useRouter } from '@tanstack/react-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useTRPCClient } from '../trpc';
+import { useTRPC, useTRPCClient } from '../trpc';
 import { AccountFrame } from '../account/AccountParts';
 import { accountNext, isVerificationDenied, needsConsent, needsEmailVerification } from '../account/access';
 import { publicFailure } from '../auth/credentials';
@@ -16,12 +16,10 @@ import {
 } from './model';
 import styles from './Legal.module.css';
 
-const route = getRouteApi('/legal/agree');
 type View = { current: CurrentPolicy; required: ConsentDocument[] };
 
-export function LegalAgreePage() {
-  const { consentUserId: viewerId } = route.useRouteContext();
-  const { next } = route.useSearch();
+export function LegalAgreePage({ viewerId, next }: { viewerId: string; next?: string | undefined }) {
+  const trpc = useTRPC();
   const client = useTRPCClient(),
     queries = useQueryClient(),
     router = useRouter(),
@@ -170,6 +168,9 @@ export function LegalAgreePage() {
         (stamp === null && !(afterPolicy.status === 'pending' && !afterPolicy.signupRequiresPolicy))
       )
         throw new Error('remaining');
+      queries.setQueryData(trpc.auth.me.queryKey(), afterIdentity);
+      queries.setQueryData(trpc.account.get.queryKey(), afterAccount);
+      queries.removeQueries({ queryKey: ['adminEntry', viewerId] });
       await navigate({ href: destination, replace: true });
     } catch (failure) {
       if (!live()) return;
@@ -188,7 +189,7 @@ export function LegalAgreePage() {
   }
 
   return (
-    <AccountFrame title="현재 문서 동의" plaque="새 판에 동의">
+    <AccountFrame title="현재 문서 동의" plaque="로그인">
       {pending ? <p role="status">계정과 현재 문서를 확인하고 있습니다…</p> : null}
       {error ? <p role="alert">{error}</p> : null}
       {!pending && !view ? (
