@@ -34,6 +34,62 @@ type Source = { sites: Site[]; routes: [string, string, string][]; roster: Roste
 const sourceUrl = 'https://claude.ai/artifact/YDyLtPmfANcJ6uqj8Vpi82';
 const sourceHash = '023f60bf7625f0a318ad6a9ed22224fab564c57d7bae83e5467e4ac5c5e48275';
 const mapId = 'san10-expanded';
+const factionColorSource = 'https://namu.wiki/w/삼국지%20시리즈/상징색';
+const san10FactionColors = new Map(
+  Object.entries({
+    조조: '#2929ef',
+    조비: '#2929ef',
+    조예: '#2929ef',
+    조방: '#2929ef',
+    조모: '#2929ef',
+    조환: '#2929ef',
+    유비: '#397b00',
+    유선: '#397b00',
+    손견: '#d60029',
+    손책: '#d60029',
+    손권: '#d60029',
+    손량: '#d60029',
+    손휴: '#d60029',
+    손호: '#d60029',
+    공손찬: '#e74a00',
+    도겸: '#c6ff8c',
+    동탁: '#6b6b6b',
+    이각: '#6b6b6b',
+    여포: '#b57b8c',
+    장제: '#6b6b6b',
+    장수: '#6b6b6b',
+    마등: '#9c6b00',
+    마초: '#9c6b00',
+    한수: '#e7e721',
+    맹획: '#f39700',
+    원소: '#ffff00',
+    원상: '#ffff00',
+    원술: '#ef8cf7',
+    유언: '#18004a',
+    유장: '#18004a',
+    유표: '#5acef7',
+    유기: '#5acef7',
+    장각: '#f7b500',
+    하진: '#524a31',
+    공손도: '#c6adef',
+    공손강: '#c6adef',
+    공손공: '#c6adef',
+    공손연: '#c6adef',
+    공융: '#ce089c',
+    공주: '#b5efde',
+    사섭: '#c6ad6b',
+    엄백호: '#9c9463',
+    왕랑: '#efefce',
+    유대: '#9c9cef',
+    유요: '#736bef',
+    유우: '#730052',
+    장로: '#cee79c',
+    장양: '#521800',
+    장연: '#4242ad',
+    정원: '#b57b8c',
+    한복: '#843900',
+  }),
+);
 const aliases = new Map(
   Object.entries({ 무위: '서량', 자동: '재동', 구원: '오원', 역경: '역현', 하동: '평양', 남창: '예장', 불이: '불내' }),
 );
@@ -127,6 +183,15 @@ function hexColor(input: string) {
   };
   return `#${channel(0)}${channel(8)}${channel(4)}`;
 }
+const factionAliases = new Map([
+  ['연', '공손연'],
+  ['흑산', '장연'],
+]);
+function factionColor(faction: Entry['factions'][number]) {
+  const rulerName = faction.ruler === null ? undefined : roster.get(faction.ruler)?.[1];
+  if (faction.name === '유표' && rulerName === '유표(劉豹)') return hexColor(faction.color);
+  return san10FactionColors.get(factionAliases.get(faction.name) ?? faction.name) ?? hexColor(faction.color);
+}
 function compileScenario(entry: Entry): ScenarioResource {
   const id = `san10-expanded-${entry.id}`;
   const general: ScenarioResource['general'] = [];
@@ -171,7 +236,7 @@ function compileScenario(entry: Entry): ScenarioResource {
     diplomacy: [],
     nation: entry.factions.map((f) => [
       f.name,
-      hexColor(f.color),
+      factionColor(f),
       0,
       0,
       '',
@@ -226,6 +291,7 @@ for (const { scenario } of scenarios) await write(`${scenario.id}.json`, scenari
 await write('manifest.json', {
   sourceUrl,
   sourceHash,
+  factionColorSource,
   map: { path: 'map.json', contentHash: hashState(map) },
   scenarios: scenarios.map(({ scenario, meta, initialHash }) => ({
     id: scenario.id,
