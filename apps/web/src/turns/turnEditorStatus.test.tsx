@@ -16,7 +16,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import type { WorldSummary } from '../game/types';
 import { TRPCProvider } from '../trpc';
 import type { CommandInfo } from './CommandPicker';
-import type { Check, TurnList, TurnSourceFactory } from './source';
+import type { Check, TurnList, TurnSource, TurnSourceFactory } from './source';
 import { TurnEditor, type TurnEditorStatus } from './TurnEditor';
 
 // T4-97 U2: 편집기가 바깥 띠에 알리는 저장 상태. 가짜 tRPC와 가짜 칸 연결로 실제 편집기를 띄운다.
@@ -160,7 +160,7 @@ it('읽기 전용 칸과 끝난 판은 저장된 목록과 다른 상태로 알�
 });
 
 it('AC-M1-08 선택한 칸에 한 번에 저장하고 충돌하면 방금 넣은 명령을 보존한다', async () => {
-  const save = vi.fn(async (_input: unknown) => ({ ok: false as const, reason: 'STALE' as const, revision: 2, slots }));
+  const save = vi.fn<TurnSource['save']>().mockResolvedValue({ ok: false, reason: 'STALE', revision: 2, slots });
   await open((input) => ({ ...makeSource(null)(input), save }), 'RUNNING', vi.fn());
   await screen.findByRole('grid', { name: '예턴 30칸' });
   fireEvent.click(document.querySelector('tr[data-slot="1"]')!);
