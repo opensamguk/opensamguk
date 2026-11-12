@@ -63,7 +63,15 @@ export function nationSource(
               }
             : old,
         ),
-      save: ({ revision, slots }) => api.setNationTurns({ worldId, office, revision, slots }),
+      save: ({ revision, slots, expectedActorId }) =>
+        api.setNationTurns({
+          worldId,
+          office,
+          revision,
+          slots,
+          expectedUserId: userId,
+          ...(expectedActorId === undefined ? {} : { expectedActorId }),
+        }),
       commands: {
         queryKey: personnelKeys.nationCommands(worldId),
         queryFn: () => api.nationCommands({ worldId }),

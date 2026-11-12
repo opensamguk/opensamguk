@@ -48,7 +48,7 @@ export interface TurnSource<S extends DisplaySlot = DisplaySlot> {
   list: SourceQuery<TurnList<S>>;
   // 저장 뒤 받은 칸을 조회 캐시에 넣는다.
   writeList: (queryClient: QueryClient, list: TurnList<S>) => void;
-  save: (input: { revision: number; slots: SaveSlots }) => Promise<SaveResult<S>>;
+  save: (input: { revision: number; slots: SaveSlots; expectedActorId?: number }) => Promise<SaveResult<S>>;
   commands: SourceQuery<CommandInfo[]>;
   precheck: (turn: Turn) => SourceQuery<Check>;
   // 서버 목록이 바뀌면 이 키 아래 사전 검사를 다시 받는다.
@@ -92,7 +92,8 @@ export const personalSource: TurnSourceFactory<PersonalSlot> = ({ trpc, userId, 
     // 조회 값의 actorId는 그대로 두고 저장 결과의 revision·칸만 바꾼다.
     writeList: (queryClient, list) =>
       queryClient.setQueryData(get.queryKey, (old) => old && { ...old, revision: list.revision, slots: list.slots }),
-    save: ({ revision, slots }) => trpcClient.turns.set.mutate({ worldId, revision, slots }),
+    save: ({ revision, slots, expectedActorId }) =>
+      trpcClient.turns.set.mutate({ worldId, revision, slots, expectedUserId: userId, expectedActorId }),
     commands: {
       queryKey: commands.queryKey,
       queryFn: commands.queryFn as QueryFunction<unknown>,

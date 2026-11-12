@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { publicFailure } from '../auth/credentials';
 import { useTRPCClient } from '../trpc';
 import { usePrivateRead } from './usePrivateRead';
+import { useAdminResultPolling } from './useAdminResultPolling';
 import styles from './AdminPages.module.css';
 
 type Settings = inferRouterOutputs<AppRouter>['admin']['world']['settings'];
@@ -18,12 +19,23 @@ const minute = (value: string) => {
 };
 const time = (value: number) =>
   `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
-const allowed = { on: '허용', off: '금지', open: '열림', closed: '닫힘' } as const;
-const entryChoices = { npcPlay: ['off', 'on'], generalCreation: ['closed', 'open'] } as const;
+const allowed = {
+  on: '허용',
+  off: '금지',
+  open: '열림',
+  closed: '닫힘',
+  city: '주둔 도시',
+  territory: '국가 보유 도시',
+} as const;
+const entryChoices = {
+  npcPlay: ['off', 'on'],
+  generalCreation: ['closed', 'open'],
+  recruitmentLocation: ['city', 'territory'],
+} as const;
 const sections = [
   ['기본 설정', ['name', 'turn', 'endYear']],
   ['입장 설정', ['npcPlay', 'generalCreation']],
-  ['진행 규칙', ['truce', 'foundUntil', 'peace', 'aggression', 'smallWorld', 'lateJoin']],
+  ['진행 규칙', ['truce', 'recruitmentLocation', 'foundUntil', 'peace', 'aggression', 'smallWorld', 'lateJoin']],
 ] as const;
 type Field = (typeof sections)[number][1][number];
 const labels: Record<Field, string> = {
@@ -33,6 +45,7 @@ const labels: Record<Field, string> = {
   npcPlay: 'NPC 무장 플레이',
   generalCreation: '신규 장수 생성',
   truce: '야간 휴전',
+  recruitmentLocation: '모병·징병 지역 조건',
   foundUntil: '건국 가능 기간 (개월)',
   peace: '초반 보호 기간 (개월)',
   aggression: 'NPC 공격성',
@@ -58,6 +71,8 @@ function fieldValue(settings: Settings, field: Field): string {
       return settings.entry.npcPlay;
     case 'generalCreation':
       return settings.entry.generalCreation;
+    case 'recruitmentLocation':
+      return settings.recruitmentLocation;
     case 'truce':
       return settings.truce ? 'on' : 'off';
     case 'foundUntil':
@@ -94,6 +109,12 @@ function settingValue(field: Field, value: string, truce: { start: string; end: 
       };
     case 'npcPlay':
       return { kind: 'admin.world.setOption', key: 'entry.npcPlay', value: value === 'on' ? 'on' : 'off' };
+    case 'recruitmentLocation':
+      return {
+        kind: 'admin.world.setOption',
+        key: 'recruitment.location',
+        value: value === 'city' ? 'city' : 'territory',
+      };
     case 'generalCreation':
       return {
         kind: 'admin.world.setOption',
@@ -118,7 +139,7 @@ function settingValue(field: Field, value: string, truce: { start: string; end: 
 }
 function currentText(settings: Settings, field: Field) {
   const value = fieldValue(settings, field);
-  if (field === 'npcPlay' || field === 'generalCreation') return allowed[value as keyof typeof allowed];
+  if (field in entryChoices) return allowed[value as keyof typeof allowed];
   if (field === 'truce') {
     const truce = settings.truce;
     return truce ? `${time(truce.startMinute)}–${time(truce.endMinute)} (UTC ${truce.utcOffsetMinutes}분)` : '꺼짐';
@@ -174,6 +195,7 @@ export function AdminWorldSettings({
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [requestMissing, setRequestMissing] = useState(false);
+  const [pollPaused, setPollPaused] = useState(false);
   const panel = useRef<HTMLElement>(null);
   const inFlight = useRef(false);
   const mounted = useRef(false);
@@ -229,6 +251,7 @@ export function AdminWorldSettings({
         : await client.admin.world.settingRequest.query({ expectedUserId: viewerId, worldId, idempotencyKey: id });
       if (!mounted.current || generation.current !== own) return;
       if (result.status === 'PENDING') {
+        setPollPaused(false);
         setMessage(`변경 요청 ${result.requestId} 접수 완료. 엔진 적용을 기다리고 있습니다.`);
         return;
       }
@@ -246,6 +269,7 @@ export function AdminWorldSettings({
     } catch (failure) {
       if (!mounted.current || generation.current !== own) return;
       const code = publicFailure(failure)?.code;
+      if (code === 'UNAUTHORIZED' || code === 'FORBIDDEN' || code === 'NOT_FOUND') setPollPaused(true);
       if (code === 'UNAUTHORIZED' || code === 'FORBIDDEN') {
         setField(null);
         setReason('');
@@ -286,9 +310,11 @@ export function AdminWorldSettings({
     const input = { expectedUserId: viewerId, worldId, idempotencyKey: id, reason: reason.trim(), setting };
     settingPointer(pointer, id);
     setRequestKey(id);
+    setPollPaused(false);
     setCommand(input);
     void run(id, input);
   }
+  useAdminResultPolling(requestKey, pollPaused, (id) => void run(id));
   const editable = data?.status === 'RUNNING' || data?.status === 'PAUSED';
   return (
     <section ref={panel} tabIndex={-1} className={styles.worldSettings} aria-label="월드 설정 편집">
@@ -369,7 +395,7 @@ export function AdminWorldSettings({
             <legend>{labels[field]} 변경</legend>
             <label>
               {labels[field]}
-              {field === 'npcPlay' || field === 'generalCreation' ? (
+              {field === 'npcPlay' || field === 'generalCreation' || field === 'recruitmentLocation' ? (
                 <select value={value} onChange={(event) => setValue(event.target.value)}>
                   {entryChoices[field].map((choice) => (
                     <option key={choice} value={choice}>

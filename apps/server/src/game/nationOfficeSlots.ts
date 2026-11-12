@@ -107,13 +107,21 @@ export async function readNationOfficeTabs(tx: Prisma.TransactionClient, worldId
 // caller의 동일 tx에서 World·장수·직책을 잠근 뒤 칸·기록·활동을 함께 저장한다.
 export async function saveNationOfficeTurns(
   tx: Prisma.TransactionClient,
-  input: { worldId: string; userId: string; office: OfficeIdentity; revision: number },
+  input: {
+    worldId: string;
+    userId: string;
+    office: OfficeIdentity;
+    revision: number;
+    expectedActorId?: number | undefined;
+  },
   change: (old: QueuedTurn[], world: World, officerLevel: number) => QueuedTurn[],
 ) {
   const world = await requireWorld(tx, input.worldId, true);
   requirePersonnelWorld(world);
   if (world.status === 'ENDED') throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '종료된 월드입니다.' });
   const actor = await requireGeneral(tx, world.id, input.userId, true);
+  if (input.expectedActorId !== undefined && input.expectedActorId !== actor.id)
+    throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '장수가 바뀌었습니다. 국가 예턴을 다시 확인하세요.' });
   const nationId = requireOfficeActor(actor);
   await tx.$queryRaw`SELECT "nationId" FROM "NationOffice" WHERE "worldId" = ${world.id} AND "nationId" = ${nationId} AND "officerLevel" = ${actor.officerLevel} FOR UPDATE`;
   const where = { worldId: world.id, nationId, officerLevel: actor.officerLevel };

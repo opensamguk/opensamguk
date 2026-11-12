@@ -48,6 +48,7 @@ export function cloneWorldWithRegistry(view: WorldView, registry: ExtStateRegist
     ...(view.campaign ? { campaign: structuredClone(view.campaign) as NonNullable<WorldState['campaign']> } : {}),
     ...(ext ? { ext } : {}),
     ...(view.presetRules ? { presetRules: structuredClone(view.presetRules) as PresetRules } : {}),
+    ...(view.recruitmentLocation ? { recruitmentLocation: view.recruitmentLocation } : {}),
     ...(view.ruleFeatures ? { ruleFeatures: [...view.ruleFeatures] } : {}),
     startYear: view.startYear,
     cities,

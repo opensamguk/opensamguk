@@ -21,6 +21,10 @@ import { requirePolicyReady } from '../game/policy';
 import { worldResolver } from '../game/resolver';
 
 const revision = z.number().int().min(0).max(2_147_483_646);
+const actorInput = {
+  expectedUserId: z.uuid().optional(),
+  expectedActorId: z.number().int().positive().max(2_147_483_647).optional(),
+};
 const index = z.number().int().min(0).max(29);
 const range = { from: index, to: index };
 type SubmittedTurn = { commandKey: string; args?: unknown };
@@ -59,10 +63,17 @@ async function submittedWorld(
 }
 async function save(
   ctx: Context & { user: NonNullable<Context['user']> },
-  input: { worldId: string; revision: number },
+  input: {
+    worldId: string;
+    revision: number;
+    expectedUserId?: string | undefined;
+    expectedActorId?: number | undefined;
+  },
   change: (old: QueuedTurn[], parse: (turn: SubmittedTurn | null) => QueuedTurn) => QueuedTurn[],
   submitted: readonly SubmittedTurn[] = [],
 ) {
+  if (input.expectedUserId !== undefined && input.expectedUserId !== ctx.user.id)
+    throw new TRPCError({ code: 'UNAUTHORIZED', message: '로그인한 계정이 바뀌었습니다.' });
   const key = `turns.set:${randomUUID()}`;
   return ctx.db.$transaction(async (tx) => {
     const world = await submittedWorld(tx, input.worldId, true, submitted);
@@ -78,6 +89,8 @@ async function save(
     });
     if (previous) throw new TRPCError({ code: 'CONFLICT', message: '이미 처리한 요청입니다.' });
     const actor = await requireGeneral(tx, input.worldId, ctx.user.id, true);
+    if (input.expectedActorId !== undefined && input.expectedActorId !== actor.id)
+      throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '장수가 바뀌었습니다. 예턴을 다시 확인하세요.' });
     const old = await readSlots(tx, input.worldId, actor.id);
     if (actor.turnRevision !== input.revision)
       return {
@@ -146,7 +159,7 @@ export const turnsRouter = router({
     ),
   ),
   set: worldVerifiedProcedure
-    .input(worldInput.extend({ revision, slots: z.array(slotInput).length(30) }))
+    .input(worldInput.extend({ revision, ...actorInput, slots: z.array(slotInput).length(30) }))
     .mutation(({ ctx, input }) =>
       save(
         ctx,
@@ -155,21 +168,23 @@ export const turnsRouter = router({
         input.slots.filter((slot) => slot !== null),
       ),
     ),
-  edit: worldVerifiedProcedure.input(worldInput.extend({ revision, op: opSchema })).mutation(({ ctx, input }) => {
-    const submitted = 'put' in input.op ? [input.op.put] : [];
-    return save(
-      ctx,
-      input,
-      (old, parse) => {
-        const op: ArrayEdit<QueuedTurn> =
-          'put' in input.op
-            ? { put: { from: input.op.put.from, to: input.op.put.to, value: parse(input.op.put) } }
-            : input.op;
-        return editArray(old, op, emptyTurn);
-      },
-      submitted,
-    );
-  }),
+  edit: worldVerifiedProcedure
+    .input(worldInput.extend({ revision, ...actorInput, op: opSchema }))
+    .mutation(({ ctx, input }) => {
+      const submitted = 'put' in input.op ? [input.op.put] : [];
+      return save(
+        ctx,
+        input,
+        (old, parse) => {
+          const op: ArrayEdit<QueuedTurn> =
+            'put' in input.op
+              ? { put: { from: input.op.put.from, to: input.op.put.to, value: parse(input.op.put) } }
+              : input.op;
+          return editArray(old, op, emptyTurn);
+        },
+        submitted,
+      );
+    }),
   precheck: protectedProcedure.input(worldInput.extend(commandInput)).query(({ ctx, input }) => {
     return ctx.db.$transaction(
       async (tx) => {

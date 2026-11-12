@@ -102,6 +102,7 @@ export interface InitialDiplomacy {
 
 export interface WorldInit {
   openingCityProfile?: typeof LEGACY_OPENING_CITY_PROFILE;
+  recruitmentLocation?: 'city';
   cityScale?: CityScaleRecord;
   operationalMap?: OperationalMapResource;
   presetRules?: PresetRules;

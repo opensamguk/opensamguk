@@ -164,6 +164,7 @@ export function reviewCreation(
         ? null
         : integer(draft.endYear, changed.length ? 1 : profile.startYear, 10000, 'endYear'),
     seed,
+    recruitmentLocation: 'city' as const,
     // 일반 조합에서 칸을 바꾸면 생략하고 서버가 판에서 기능을 계산한다.
     // 확장 묶음은 서버가 featureProfileKey와 ruleFeatures의 정확한 묶음 일치를 요구하므로 바꿔도 프로필 목록을 유지한다.
     ...(profile.featureProfileKey === undefined && changed.length > 0

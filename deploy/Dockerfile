@@ -73,7 +73,10 @@ CMD ["node", "/app/engine/engine.mjs"]
 
 FROM runtime AS migrate
 USER root
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl \
+COPY --from=dependencies /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources \
+    && apt-get -o Acquire::Retries=3 update \
+    && apt-get -o Acquire::Retries=3 install -y --no-install-recommends ca-certificates openssl \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=migrate-pack /opt/migrate/node_modules /app/migrate/node_modules
 COPY packages/db/prisma /app/migrate/prisma

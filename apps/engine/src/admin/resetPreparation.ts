@@ -501,6 +501,7 @@ function prepared(
       features = options.ruleFeatures ?? [];
     if (request) {
       const intent = worldCreateIntentSchema.parse(request.intent);
+      if (intent.recruitmentLocation !== original.initial.recruitmentLocation) fail('PROVENANCE_INVALID');
       const inferred = [state.unitSet.coefMode === 'multiply' ? ['battle-affinity-v2'] : []];
       // 기존 1판 요청의 기능 합성도 원생성 해시와 함께 확인한다.
       if (Object.values(resources).every((resource) => resource.version === 1))
@@ -522,6 +523,7 @@ function prepared(
     if (state.generals.some((g) => g.userId !== null) || (state.ruleFeatures ?? []).some((f) => !features.includes(f)))
       fail('RESOURCE_INVALID');
     if (state.ruleFeatures || features.length) state.ruleFeatures = [...features];
+    if (original.initial.recruitmentLocation) state.recruitmentLocation = original.initial.recruitmentLocation;
     if (resourceHashV3({ ...original, initial: state }) !== original.resourceHash) fail('RESOURCE_INVALID');
     return prepareInitialWorld(state, options, sexLedger);
   });

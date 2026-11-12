@@ -1,5 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import type { Prisma } from '@opensamguk/db';
+import { LINEAGE_EXITED_YEAR } from '@opensamguk/rules';
 import { z } from 'zod';
 import type { Context } from '../context';
 import { worldInput, entityKey } from '../queries';
@@ -8,6 +9,13 @@ import { decodeRecordCursor, encodeRecordCursor, generalLogCursor, recordId, rec
 import { requireCurrentAdmin } from './access';
 
 export const adminGeneralInput = worldInput.extend({ generalId: entityKey }).strict();
+export const adminEditorInput = worldInput
+  .extend({
+    target: z.enum(['general', 'nation', 'city']),
+    search: z.string().trim().max(50),
+    after: entityKey.optional(),
+  })
+  .strict();
 const filters = worldInput.extend({
   fromTick: recordTick.optional(),
   toTick: recordTick.optional(),
@@ -54,6 +62,107 @@ async function read<T>(
     if (error instanceof TRPCError) throw error;
     throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: '운영 기록을 확인하지 못했습니다.' });
   }
+}
+export function readAdminEditor(ctx: Context, input: z.infer<typeof adminEditorInput>) {
+  return read(ctx, input.worldId, 'editor', input.worldId, async (tx) => {
+    const world = await tx.world.findUnique({
+      where: { id: input.worldId },
+      select: { replayFormat: true, status: true, ruleFeatures: true },
+    });
+    if (!world) throw new TRPCError({ code: 'NOT_FOUND', message: '월드를 찾을 수 없습니다.' });
+    if (world.replayFormat !== 3 || !['RUNNING', 'PAUSED'].includes(world.status))
+      throw new TRPCError({ code: 'CONFLICT', message: '진행 중이거나 일시정지된 월드를 선택하세요.' });
+    const where = { worldId: input.worldId, name: { contains: input.search, mode: 'insensitive' as const } };
+    const number = /^\d{1,10}$/.test(input.search) ? Number(input.search) : 0;
+    const id = number > 0 && number <= 2_147_483_647 ? number : undefined;
+    const ids = { gt: input.after ?? 0 };
+    const limit = 50;
+    const result = <T extends { id: number }>(rows: T[]) => ({
+      rows: rows.slice(0, limit),
+      next: rows.length > limit ? rows[limit - 1]!.id : null,
+    });
+    if (input.target === 'general') {
+      const rows = await tx.general.findMany({
+        where: {
+          worldId: where.worldId,
+          id: ids,
+          removedAt: null,
+          activeFromYear: { not: LINEAGE_EXITED_YEAR },
+          OR: [id ? { id } : { name: where.name }],
+        },
+        take: limit + 1,
+        orderBy: { id: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          userId: true,
+          cityKey: true,
+          officerLevel: true,
+          nation: { select: { name: true } },
+          city: { select: { name: true } },
+          gold: true,
+          rice: true,
+          crew: true,
+          crewType: true,
+          train: true,
+          atmos: true,
+        },
+      });
+      return {
+        target: input.target,
+        campaign: world.ruleFeatures.includes('campaign-v1'),
+        ...result(rows.map(({ userId, ...row }) => ({ ...row, player: userId !== null }))),
+      };
+    }
+    if (input.target === 'nation') {
+      const rows = await tx.nation.findMany({
+        where: { worldId: where.worldId, id: ids, OR: [id ? { id } : { name: where.name }] },
+        take: limit + 1,
+        orderBy: { id: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          gold: true,
+          rice: true,
+          tech: true,
+          generals: {
+            where: { removedAt: null, activeFromYear: { not: LINEAGE_EXITED_YEAR }, officerLevel: 12 },
+            orderBy: { id: 'asc' },
+            take: 1,
+            select: { id: true, name: true },
+          },
+        },
+      });
+      return {
+        target: input.target,
+        ...result(rows.map(({ generals, ...row }) => ({ ...row, ruler: generals[0] ?? null }))),
+      };
+    }
+    const rows = await tx.city.findMany({
+      where: { worldId: where.worldId, cityKey: ids, OR: [id ? { cityKey: id } : { name: where.name }] },
+      take: limit + 1,
+      orderBy: { cityKey: 'asc' },
+      select: {
+        cityKey: true,
+        name: true,
+        nation: { select: { name: true } },
+        population: true,
+        agriculture: true,
+        commerce: true,
+        security: true,
+        defence: true,
+        wall: true,
+        trust: true,
+        populationMax: true,
+        agricultureMax: true,
+        commerceMax: true,
+        securityMax: true,
+        defenceMax: true,
+        wallMax: true,
+      },
+    });
+    return { target: input.target, ...result(rows.map(({ cityKey, ...row }) => ({ ...row, id: cityKey }))) };
+  });
 }
 export async function readAdminGeneral(ctx: Context, input: z.infer<typeof adminGeneralInput>) {
   const general = await read(ctx, input.worldId, 'general', String(input.generalId), async (tx) => {
@@ -108,7 +217,13 @@ export function readAdminGeneralInputs(ctx: Context, input: z.infer<typeof admin
       },
     });
     return page(
-      rows.map((row) => ({ ...row, id: String(row.id), createdAt: row.createdAt.toISOString() })),
+      rows.map((row) => ({
+        ...row,
+        id: String(row.id),
+        createdAt: row.createdAt.toISOString(),
+        payload: row.payload as unknown,
+        result: row.result as unknown,
+      })),
       (row) => [row.id],
     );
   });
@@ -127,7 +242,10 @@ export function readAdminNationLogs(ctx: Context, input: z.infer<typeof adminNat
       take: 101,
       select: { tick: true, nationId: true, data: true },
     });
-    return page(rows, (row) => [row.tick, row.nationId]);
+    return page(
+      rows.map((row) => ({ ...row, data: row.data as unknown })),
+      (row) => [row.tick, row.nationId],
+    );
   });
 }
 export function readAdminBattles(ctx: Context, input: z.infer<typeof adminBattlesInput>) {

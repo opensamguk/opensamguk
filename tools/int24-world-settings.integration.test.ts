@@ -556,6 +556,25 @@ it('AC-INT-24 옵션은 깊게 병합되고 로더·조회·재시작·엄격한
   expect(() => readArchive(JSON.parse(JSON.stringify(archive)))).not.toThrow();
 });
 
+it('AC-INT-22 도시별 모집을 운영 중 바꿔도 기존 설정 원본과 재생이 유지된다', async () => {
+  const worldId = await world(false);
+  const before = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+  for (const value of ['city', 'territory'] as const) {
+    const input = command(worldId, { kind: 'admin.world.setOption', key: 'recruitment.location', value });
+    expect(await call('admin.world.requestSetting', input, actor.cookie)).toMatchObject({ status: 200 });
+    await advance(worldId);
+    expect(await call('admin.world.settingRequest', statusInput(input), actor.cookie)).toMatchObject({
+      status: 200,
+      data: { status: 'APPLIED' },
+    });
+    const live = await db.$transaction((tx) => loadReplayState(tx, worldId));
+    expect(live.state.recruitmentLocation).toBe(value === 'city' ? 'city' : undefined);
+    await expectReplayedState(worldId);
+  }
+  const after = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+  expect(after.replayOrigin).toEqual(before.replayOrigin);
+});
+
 it('AC-INT-24 월말과 같은 tick의 장수 턴은 정산 체크포인트 뒤에 따로 진행한다', async () => {
   const initial = commandInitial();
   initial.generals[0]!.nextTurnTick = 0;

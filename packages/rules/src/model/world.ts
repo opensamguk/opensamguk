@@ -36,6 +36,7 @@ export interface WorldState {
   cityResources?: CityResourcesState;
   campaign?: CampaignState;
   presetRules?: PresetRules;
+  recruitmentLocation?: 'city';
   ruleFeatures?: string[];
   ext?: WorldExt;
   startYear: number;
@@ -76,6 +77,7 @@ export function toWorldStateWithRegistry(initial: WorldInit, registry: ExtStateR
   return {
     ...(ext ? { ext } : {}),
     ...(state.presetRules ? { presetRules: state.presetRules } : {}),
+    ...(state.recruitmentLocation ? { recruitmentLocation: state.recruitmentLocation } : {}),
     ...(state.ruleFeatures ? { ruleFeatures: state.ruleFeatures } : {}),
     startYear: state.startYear,
     cities: Object.fromEntries(state.cities.map((city) => [city.cityKey, city])),
