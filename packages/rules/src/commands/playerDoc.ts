@@ -1,5 +1,7 @@
 import { BALANCE } from '../balance';
 import { STRATAGEM } from './ext/stratagem/base';
+import { INTEL } from './ext/intel/base';
+import { nationResearchSpecs } from '../nationResearch/commands';
 import { DOMESTIC_SPECS } from './domestic/investment';
 
 interface PlayerDoc {
@@ -160,6 +162,96 @@ export const commandPlayerDocs: Readonly<Record<string, PlayerDoc>> = {
     requires: [authorized, '교전 또는 선전포고 중이 아닌 다른 국가', '원조할 국고 자원'],
     cost: '국고에서 보내는 금 또는 쌀',
   },
+  trade: {
+    summary: '인접 도시와 교역해 국고 금·쌀을 늘리고 우리 도시의 상업과 농업을 높입니다.',
+    requires: ['조약 교역 기능을 켠 월드', '자기 국가 도시', '교전 중이 아닌 상대 도시와 유효한 교역 조약'],
+    cost: null,
+  },
+  spy: {
+    summary: '대상 도시의 정보를 얻습니다. 가까운 도시일수록 더 자세히 확인합니다.',
+    requires: ['첩보 기능을 켠 월드', '국가 소속', '자기 국가 밖의 도시'],
+    cost: `금 ${INTEL.COST_GOLD}, 쌀 ${INTEL.COST_RICE}`,
+  },
+  equipment_trade: {
+    summary: '장비를 사서 착용하거나 선택한 칸의 장비를 팝니다.',
+    requires: ['장비와 물류 기능을 켠 월드', ownCity, '구매는 장비별 치안과 재료, 판매는 해당 칸에 장착한 장비'],
+    cost: '구매할 장비의 금과 도시 재료',
+  },
+  abdicate: {
+    summary: '같은 국가의 다른 장수에게 군주 자리를 넘깁니다.',
+    requires: ['국가 변천 기능을 켠 월드', '군주', '이미 등장한 같은 국가 장수'],
+    cost: null,
+  },
+  wander: {
+    summary: '보유 도시를 놓고 소속 장수와 방랑을 시작합니다.',
+    requires: ['국가 변천 기능을 켠 월드', '군주', '보호 기간이 끝나고 전쟁이나 선포가 없는 국가'],
+    cost: '보유 도시',
+  },
+  resettle: {
+    summary: '방랑을 끝내고 현재 도시를 새 수도로 삼습니다.',
+    requires: ['국가 변천 기능을 켠 월드', '방랑 국가의 군주', '소속 장수 두 명 이상', '소·중 규모의 빈 도시'],
+    cost: null,
+  },
+  disband: {
+    summary: '방랑 국가를 해산하고 소속 장수를 재야로 돌려보냅니다.',
+    requires: ['국가 변천 기능을 켠 월드', '방랑 국가의 군주', '월드 시작 다음 달부터'],
+    cost: null,
+  },
+  nation_mobilize: {
+    summary: '자기 국가 도시의 수비와 성벽을 최대치의 80%까지 복구합니다.',
+    requires: ['국가 전략 기능을 켠 월드', '군주·참모·수뇌', '전략 재사용 대기 종료'],
+    cost: null,
+  },
+  nation_rivalry: {
+    summary: '적국과의 관계를 선전포고 상태로 두고 교전 시작을 한 달 늦춥니다.',
+    requires: [
+      '국가 전략 기능을 켠 월드',
+      '군주 또는 참모',
+      '선전포고 중이거나 교전 중인 상대',
+      '전략 재사용 대기 종료',
+    ],
+    cost: null,
+  },
+  nation_raid: {
+    summary: '선전포고 대기 기간을 즉시 끝냅니다.',
+    requires: [
+      '국가 전략 기능을 켠 월드',
+      '군주 또는 참모',
+      '상대와의 선전포고 기간 한 달 이상',
+      '전략 재사용 대기 종료',
+    ],
+    cost: null,
+  },
+  form_unit: {
+    summary: '선택한 병종으로 병력이 없는 새 부곡을 편성합니다.',
+    requires: ['도시 자원 기능을 켠 월드', ownCity, '편성할 수 있는 병종과 같은 병종의 빈 부곡 없음'],
+    cost: null,
+  },
+  nation_city_allocate: {
+    summary: '도시 수비병을 같은 병종의 부곡으로 옮깁니다.',
+    requires: [
+      '도시 자원 기능을 켠 월드',
+      '군주·참모·수뇌',
+      '부곡 소유자와 지휘관이 대상 도시에 집결',
+      '도시 병력과 지휘 한도',
+    ],
+    cost: '배속 수량만큼의 도시 수비병',
+  },
+  ...Object.fromEntries(
+    nationResearchSpecs.map(({ key, name, turns, cost }) => [
+      key,
+      {
+        summary: `${name}를 완료해 국가의 특수 병종을 해금합니다.`,
+        requires: [
+          '특수 병종 연구 기능을 켠 월드',
+          '자기 국가 도시의 군주·참모·수뇌',
+          '완료 이력이 없는 연구',
+          `준비를 포함한 ${turns}턴`,
+        ],
+        cost: `국고 금 ${cost}, 쌀 ${cost}`,
+      },
+    ]),
+  ),
   fire_attack: { summary: '화계로 대상 도시의 시설에 피해를 줍니다.', requires: stratagem, cost: stratagemCost },
   sabotage: { summary: '대상 도시의 수비 시설을 파괴합니다.', requires: stratagem, cost: stratagemCost },
   incite: { summary: '대상 도시의 주민을 선동해 민심을 떨어뜨립니다.', requires: stratagem, cost: stratagemCost },

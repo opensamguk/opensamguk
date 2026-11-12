@@ -51,6 +51,10 @@ test('생성 명령 목록과 그 분류 절 링크가 열린다', async ({ page
   const recruit = article.getByRole('row', { name: /군사 모병 병사를 모집합니다/ });
   await expect(recruit.locator('br')).toHaveCount(2);
   await expect(article.getByRole('row', { name: /전략 화계/ })).toContainText('일부 월드에서는 쓸 수 없음');
+  await expect(article.getByRole('row', { name: /국가 극병 연구/ })).toContainText('준비를 포함한 24턴');
+  await page.goto('/help/commands-and-timing');
+  await page.getByTestId('help-article').getByRole('link', { name: '국가 전략', exact: true }).click();
+  await expect(page.locator('[id="전략-1"]')).toBeInViewport();
 });
 
 test('게임 메뉴의 도움말이 시작하기를 연다', async ({ page }) => {

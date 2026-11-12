@@ -7,6 +7,9 @@ import {
   extensionCommands,
   parsePreset,
   resolverForPreset,
+  resolverForRuleFeatures,
+  ruleRegistry,
+  type CommandDef,
 } from '../../packages/rules/src/index';
 import { commandPlayerDocs } from '../../packages/rules/src/commands/playerDoc';
 import { renderCommandCatalog } from './command-catalog';
@@ -24,7 +27,33 @@ const fieldLabels = {
   resource: '자원',
   name: '나라 이름',
   color: '나라 색',
+  unitId: '대상 부곡',
+  target: '훈련 대상',
+  slot: '장비 칸',
+  itemKey: '장비 종류',
 };
+
+function inputFields(schema: z.core.JSONSchema.JSONSchema): string[] {
+  const fields = Object.entries(schema.properties ?? {})
+    .filter(([, field]) => field !== false && (field === true || !Object.hasOwn(field, 'not')))
+    .map(([field]) => field);
+  const branches = [...(schema.anyOf ?? []), ...(schema.oneOf ?? []), ...(schema.allOf ?? [])];
+  return [...fields, ...branches.flatMap(inputFields)];
+}
+
+function featureCommands(): CommandDef[] {
+  const features = new Map(ruleRegistry.features.map((feature) => [feature.key, feature]));
+  return ruleRegistry.features.flatMap(({ key }) => {
+    const selected = new Set([key]);
+    for (const dependency of selected) {
+      const feature = features.get(dependency);
+      if (!feature) throw new Error(`등록부에 없는 선행 기능입니다: ${dependency}`);
+      for (const required of feature.requires) selected.add(required);
+    }
+    const resolver = resolverForRuleFeatures({ ruleFeatures: [...selected].sort() });
+    return resolver ? [...resolver.list('general'), ...resolver.list('nation')] : [];
+  });
+}
 
 export async function generateCommandCatalog(): Promise<Buffer> {
   const files = (await readdir(presetDir)).filter((file) => file.endsWith('.json')).sort();
@@ -34,30 +63,41 @@ export async function generateCommandCatalog(): Promise<Buffer> {
       return { name: preset.name, resolver: resolverForPreset(preset) };
     }),
   );
-  const definitions = [...commands, ...extensionCommands];
-  const keys = new Set(definitions.map(({ key }) => key));
-  if (keys.size !== definitions.length) throw new Error('명령 등록부에 중복 키가 있습니다.');
+  const definitions = new Map<string, CommandDef>();
+  const fields = new Map<string, Set<string>>();
+  const presetKeys = new Set(extensionCommands.map(({ key }) => key));
+  const baseDefinitions = [...commands, ...extensionCommands];
+  if (new Set(baseDefinitions.map(({ key }) => key)).size !== baseDefinitions.length)
+    throw new Error('명령 등록부에 중복 키가 있습니다.');
+  for (const definition of [...baseDefinitions, ...featureCommands()]) {
+    const { key, name, target, category, args } = definition;
+    const known = definitions.get(key);
+    if (known && (known.name !== name || known.target !== target || known.category !== category))
+      throw new Error(`명령의 이름·분류·대상이 기능에 따라 달라집니다: ${key}`);
+    if (!known) definitions.set(key, definition);
+    const accepted = fields.get(key) ?? new Set<string>();
+    for (const field of inputFields(z.toJSONSchema(args, { io: 'input' }))) accepted.add(field);
+    fields.set(key, accepted);
+  }
   for (const key of Object.keys(commandPlayerDocs)) {
-    if (!keys.has(key)) throw new Error(`명령 등록부에 없는 도움말입니다: ${key}`);
+    if (!definitions.has(key)) throw new Error(`명령 등록부에 없는 도움말입니다: ${key}`);
   }
   const markdown = renderCommandCatalog({
     categories: COMMAND_CATEGORIES.map((id) => ({ id, heading: headings[id] })),
     fieldLabels,
-    commands: definitions.map(({ target, key, category, name, args }) => {
+    commands: [...definitions.values()].map(({ target, key, category, name }) => {
       const doc = commandPlayerDocs[key];
       if (!Object.hasOwn(commandPlayerDocs, key) || !doc) throw new Error(`명령 도움말이 없습니다: ${key}`);
-      const schema = z.toJSONSchema(args, { io: 'input' });
-      const inputFields = Object.entries(schema.properties ?? {})
-        .filter(([, field]) => field !== false && (field === true || !Object.hasOwn(field, 'not')))
-        .map(([field]) => field);
       return {
         target,
         key,
         category,
         name,
         ...doc,
-        inputFields,
-        unavailableIn: presets.filter(({ resolver }) => !resolver.get(key)).map(({ name }) => name),
+        inputFields: [...fields.get(key)!],
+        unavailableIn: presetKeys.has(key)
+          ? presets.filter(({ resolver }) => !resolver.get(key)).map(({ name }) => name)
+          : [],
       };
     }),
   });

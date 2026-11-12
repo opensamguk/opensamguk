@@ -82,6 +82,7 @@ export function parseMarkdown(source: string): Block[] {
     .replace(/\r\n/g, '\n')
     .split('\n');
   const blocks: Block[] = [];
+  const headingIds = new Set<string>();
   let i = 0;
   while (i < lines.length) {
     const line = lines[i]!;
@@ -100,7 +101,11 @@ export function parseMarkdown(source: string): Block[] {
     const heading = /^(#{1,6})\s+(.*)$/.exec(line);
     if (heading) {
       const text = parseInline(heading[2]!);
-      blocks.push({ kind: 'heading', level: heading[1]!.length, id: slug(plain(text)), text });
+      const base = slug(plain(text));
+      let id = base;
+      for (let suffix = 1; headingIds.has(id); suffix++) id = `${base}-${suffix}`;
+      headingIds.add(id);
+      blocks.push({ kind: 'heading', level: heading[1]!.length, id, text });
       i++;
       continue;
     }
