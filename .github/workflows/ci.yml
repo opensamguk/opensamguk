@@ -345,6 +345,16 @@ jobs:
       - name: Check command cards and expansion flows in Chromium
         if: matrix.shard == 4
         run: pnpm exec playwright test --config playwright.command-cards.config.ts --reporter=line
+      - name: Preserve 375px mobile acceptance evidence
+        if: always() && matrix.shard == 4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mobile-acceptance-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            test-results/**/mobile-screen-measurements.json
+            test-results/**/mobile-*-375.png
+          if-no-files-found: error
+          retention-days: 30
       - name: Check required email verification in Chromium
         if: matrix.shard == 1
         run: pnpm e2e:account --reporter=line
