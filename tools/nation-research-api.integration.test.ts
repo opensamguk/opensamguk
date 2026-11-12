@@ -36,6 +36,7 @@ type Out = inferRouterOutputs<AppRouter>;
 type Routes = {
   'admin.world.requestSetting': Out['admin']['world']['requestSetting'];
   'entry.possess': Out['entry']['possess'];
+  'entry.possessStatus': Out['entry']['possessStatus'];
   'nationCommands.list': Out['nationCommands']['list'];
   'nationCommands.precheck': Out['nationCommands']['precheck'];
   'turns.precheck': Out['turns']['precheck'];
@@ -162,7 +163,10 @@ async function fixture(enabled = true, research: ResearchName = 'greatsword') {
         .poll(() => db.inputEvent.count({ where: { worldId, userId: actor.id, idempotencyKey, status: 'PENDING' } }))
         .toBe(1);
       await advance(worldId);
-      expect((await waiting).data).toEqual({ status: 'possessed', generalId });
+      expect((await waiting).status).toBe(200);
+      const result = await rpc('entry.possessStatus', { worldId, expectedUserId: actor.id, idempotencyKey }, actor);
+      expect(result.status).toBe(200);
+      expect(result.data).toEqual({ status: 'possessed', generalId });
     } finally {
       await waiting;
     }
