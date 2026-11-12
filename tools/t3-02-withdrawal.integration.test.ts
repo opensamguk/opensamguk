@@ -9,6 +9,7 @@ import { buildServer } from '../apps/server/src/server';
 import { newSession } from '../apps/server/src/auth/session';
 import { hashPassword } from '../apps/server/src/auth/password';
 import { newAccountToken } from '../apps/server/src/auth/accountToken';
+import { purgeExpiredAccountRecords, startAccountRetention } from '../apps/server/src/auth/accountRetention';
 import { authzCase } from '../apps/server/src/authz/case';
 import { categories } from '../apps/server/src/authz/coverage';
 import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
@@ -44,6 +45,7 @@ adminUrl.pathname = '/postgres';
 const admin = new Client({ connectionString: adminUrl.href }),
   gate = new Client({ connectionString: target.href }),
   db = createDb(target.href);
+const historicalTombstone = randomUUID();
 const origin = 'http://127.0.0.1:5173',
   password = randomUUID(),
   executions = new Set<Promise<unknown>>(),
@@ -68,6 +70,7 @@ let api: Api,
   passwordHash: string,
   oid: string | undefined,
   gatePid: number,
+  historicalMigrationStartedAt: number,
   humanUser: string,
   otherHumanUser: string;
 function track<T>(work: () => Promise<T>) {
@@ -361,8 +364,17 @@ beforeAll(() =>
     await gate.connect();
     gatePid = Number((await gate.query('SELECT pg_backend_pid() AS pid')).rows[0]!.pid);
     const migrations = new URL('../packages/db/prisma/migrations/', import.meta.url);
-    for (const migration of (await readdir(migrations)).filter((v) => /^\d{14}_/.test(v)).sort())
+    for (const migration of (await readdir(migrations)).filter((v) => /^\d{14}_/.test(v)).sort()) {
+      if (migration === '20261205000000_account_retention') {
+        await gate.query(
+          `INSERT INTO "User" (id, email, "passwordHash", status, "createdAt")
+           VALUES ($1, $2, 'old-fixture', 'WITHDRAWN', '2020-01-01')`,
+          [historicalTombstone, `withdrawn+${historicalTombstone}@invalid`],
+        );
+      }
+      if (migration === '20261205000000_account_retention') historicalMigrationStartedAt = Date.now();
       await gate.query(await readFile(new URL(migration + '/migration.sql', migrations), 'utf8'));
+    }
     await initializeResources(
       db,
       await readFile(new URL('../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
@@ -662,6 +674,132 @@ it('한 번의 탈퇴는 두 정식 월드·예약·가문·원장을 보존하�
   const renewed = (signup.data as { user: { id: string } }).user.id;
   expect(renewed).not.toBe(humanUser);
   expect(await db.general.count({ where: { userId: renewed } })).toBe(0);
+});
+
+it('D-051 AC-M3-02 1년을 넘긴 탈퇴 계정만 원자적으로 정리하고 감사와 게임 기록을 보존한다', async () => {
+  const actor = await user();
+  const adminUser = await user();
+  const active = await user();
+  const young = await user();
+  const rollbackWithdrawal = await user();
+  await db.user.update({
+    where: { id: rollbackWithdrawal.id },
+    data: { status: 'WITHDRAWN', email: `withdrawn+${rollbackWithdrawal.id}@invalid`, emailVerifiedAt: null },
+  });
+  expect((await db.user.findUniqueOrThrow({ where: { id: rollbackWithdrawal.id } })).withdrawnAt).toBeInstanceOf(Date);
+  const legacy = await db.user.findUniqueOrThrow({ where: { id: historicalTombstone } });
+  expect(legacy.withdrawnAt!.getTime()).toBeGreaterThanOrEqual(historicalMigrationStartedAt);
+  await db.consentRecord.create({
+    data: { userId: legacy.id, docType: 'TERMS', version: policy.terms.version },
+  });
+  const beforeWithdrawal = Date.now();
+  for (const account of [actor, young]) {
+    expect((await withdraw(account.id, (await session(account.id)).cookie)).status).toBe(200);
+  }
+  expect((await db.user.findUniqueOrThrow({ where: { id: actor.id } })).withdrawnAt!.getTime()).toBeGreaterThanOrEqual(
+    beforeWithdrawal,
+  );
+  const sanction = await db.sanction.create({
+    data: {
+      userId: actor.id,
+      createdBy: adminUser.id,
+      reason: '만료 대상 제재',
+      liftedAt: new Date(),
+      liftedBy: adminUser.id,
+      liftReason: '제재 해제',
+    },
+  });
+  await db.adminSanctionRequest.create({
+    data: {
+      actorUserId: adminUser.id,
+      idempotencyKey: randomUUID(),
+      requestHash: createHash('sha256').update('fixture-request').digest('hex'),
+      sanctionId: sanction.id,
+    },
+  });
+  const audits = await Promise.all(
+    [
+      [actor.id, 'sanction.create'],
+      [actor.id, 'sanction.lift'],
+      [actor.id, 'account.other'],
+      [active.id, 'sanction.create'],
+      [young.id, 'sanction.create'],
+    ].map(([targetId, action]) =>
+      db.auditLog.create({
+        data: {
+          actorKind: 'ADMIN',
+          actorUserId: adminUser.id,
+          action: action!,
+          targetType: 'User',
+          targetId: targetId!,
+          reason: '보존 기간 시험 사유',
+          payload: { sanctionId: sanction.id, details: '제재 내용' },
+        },
+      }),
+    ),
+  );
+  const [expiredCreate, expiredLift, unrelated, activeAudit, youngAudit] = audits;
+  const redact = (id: bigint, alterAction = false) =>
+    gate.query(
+      `UPDATE "AuditLog" SET "targetId"=NULL, "worldId"=NULL, reason=NULL, payload='{"retentionRedacted":true}'::jsonb,
+          action=CASE WHEN $2 THEN 'forged.action' ELSE action END WHERE id=$1`,
+      [id, alterAction],
+    );
+  await expect(redact(expiredCreate!.id)).rejects.toThrow('AuditLog is append-only');
+  await expect(redact(activeAudit!.id)).rejects.toThrow('AuditLog is append-only');
+  await expect(redact(youngAudit!.id)).rejects.toThrow('AuditLog is append-only');
+  await db.$executeRaw`
+    UPDATE "User" SET "withdrawnAt" = (statement_timestamp() AT TIME ZONE 'UTC') - interval '1 year 1 day'
+    WHERE id IN (${actor.id}, ${active.id})
+  `;
+  await expect(redact(expiredCreate!.id, true)).rejects.toThrow('AuditLog is append-only');
+  await expect(redact(unrelated!.id)).rejects.toThrow('AuditLog is append-only');
+  await expect(gate.query('DELETE FROM "AuditLog" WHERE id=$1', [expiredLift!.id])).rejects.toThrow(
+    'AuditLog is append-only',
+  );
+  await expect(gate.query('TRUNCATE "AuditLog"')).rejects.toThrow('AuditLog is append-only');
+  const gameBefore = await db.general.findMany({
+    where: { worldId: { in: worlds } },
+    orderBy: [{ worldId: 'asc' }, { id: 'asc' }],
+  });
+  const completed = await Promise.all([purgeExpiredAccountRecords(db), purgeExpiredAccountRecords(db)]);
+  expect(
+    await db.general.findMany({ where: { worldId: { in: worlds } }, orderBy: [{ worldId: 'asc' }, { id: 'asc' }] }),
+  ).toEqual(gameBefore);
+  expect(completed.sort()).toEqual([0, 1]);
+  expect(await db.consentRecord.count({ where: { userId: actor.id } })).toBe(0);
+  expect(
+    await db.consentRecord.count({
+      where: { userId: { in: [active.id, young.id, legacy.id, rollbackWithdrawal.id] } },
+    }),
+  ).toBe(7);
+  expect(await db.sanction.count({ where: { id: sanction.id } })).toBe(0);
+  expect(await db.adminSanctionRequest.count({ where: { sanctionId: sanction.id } })).toBe(0);
+  for (const row of [expiredCreate!, expiredLift!]) {
+    expect(await db.auditLog.findUnique({ where: { id: row.id } })).toEqual({
+      ...row,
+      targetId: null,
+      worldId: null,
+      reason: null,
+      payload: { retentionRedacted: true },
+    });
+  }
+  for (const row of [unrelated!, activeAudit!, youngAudit!])
+    expect(await db.auditLog.findUnique({ where: { id: row.id } })).toEqual(row);
+  expect(await db.user.findUnique({ where: { id: actor.id } })).toMatchObject({
+    status: 'WITHDRAWN',
+    retentionPurgedAt: expect.any(Date),
+  });
+  expect(await purgeExpiredAccountRecords(db)).toBe(0);
+  await db.$executeRaw`
+    UPDATE "User" SET "withdrawnAt" = (statement_timestamp() AT TIME ZONE 'UTC') - interval '2 years'
+    WHERE id = ${young.id}
+  `;
+  let errors = 0;
+  const task = startAccountRetention(db, () => errors++);
+  await task.stop();
+  expect(errors).toBe(0);
+  expect(await db.consentRecord.count({ where: { userId: young.id } })).toBe(0);
 });
 
 for (const mode of ['password', 'logout', 'status', 'sanction'] as const)
