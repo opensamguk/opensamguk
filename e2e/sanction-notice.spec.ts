@@ -263,6 +263,11 @@ scenario(
     const page = actor.page;
     let network: CDPSession | undefined;
     let readyEvents = 0;
+    const guardFetching = () =>
+      page.evaluate(async (moduleUrl) => {
+        const { queryClient, trpc } = await import(moduleUrl);
+        return queryClient.getQueryState(trpc.auth.me.queryKey())?.fetchStatus === 'fetching';
+      }, '/src/trpc.ts');
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     page.on('console', (message) => {
@@ -277,7 +282,8 @@ scenario(
     const requests: Promise<unknown>[] = [];
     const handler = (route: Route) => {
       const task = (async () => {
-        if (held || !new URL(route.request().url()).pathname.split('/').at(-1)!.split(',').includes('auth.me')) {
+        const paths = new URL(route.request().url()).pathname.split('/').at(-1)!.split(',');
+        if (held || !paths.includes('auth.me') || !(await guardFetching())) {
           await route.continue();
           return;
         }
@@ -299,11 +305,7 @@ scenario(
       });
       await page.goto(`/w/${worldId}`);
       await expect(page.getByRole('heading', { name: '군략도', exact: true })).toBeVisible();
-      const guardFetching = () =>
-        page.evaluate(async (moduleUrl) => {
-          const { queryClient, trpc } = await import(moduleUrl);
-          return queryClient.getQueryState(trpc.auth.me.queryKey())?.fetchStatus === 'fetching';
-        }, '/src/trpc.ts');
+      await expect.poll(() => readyEvents).toBeGreaterThan(0);
       await expect.poll(guardFetching).toBe(false);
       await page.route('**/trpc/**', handler);
       await page.getByRole('navigation', { name: '게임 메뉴' }).getByRole('link', { name: '전투 시뮬레이터' }).click();
