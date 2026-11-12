@@ -594,6 +594,7 @@ it('같은 인물의 동시 접수는 엔진에서 하나만 적용하고 같은
     await expect
       .poll(() => db.inputEvent.count({ where: { worldId, kind: POSSESSION_KIND, status: 'PENDING' } }))
       .toBe(sameUser ? 1 : 2);
+    if (sameUser) expect(await Promise.race(requests)).toMatchObject({ status: 409, code: 'CONFLICT' });
     await advance(worldId);
     const results = await Promise.all(requests);
     expect(

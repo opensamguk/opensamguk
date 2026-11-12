@@ -286,6 +286,8 @@ for (const c of CASES) {
     const set = await saved;
     evidence.turnsSet = set;
     expect(set.input).toEqual({
+      expectedUserId: world.userId,
+      expectedActorId: world.generalId,
       worldId: world.id,
       revision: initial.revision,
       slots: [
