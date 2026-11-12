@@ -8,7 +8,7 @@ import { bindLocalDocker, LOAD_DOCKER } from './docker';
 import { commandSettled, OwnedCommands, sourceSnapshot, writeEvidence } from './lifecycle';
 import { readRunnerProvenance, sampleAdmission, selfCgroupPath } from './observe';
 import { evaluateLoadRun, loadRunSchema } from './report';
-import { requireImageSource } from './run';
+import { requireImageSource, volumeInitFailurePattern } from './run';
 
 // 공식 release/registry manifest: https://github.com/moby/buildkit/releases/tag/v0.34.1
 // index sha256은 registry의 Docker-Content-Digest와 실제 응답 body SHA256을 대조했다.
@@ -657,6 +657,7 @@ async function main() {
           .string()
           .regex(/^[a-z0-9-]{1,64}$/)
           .nullable(),
+        volumeInitFailure: z.string().regex(volumeInitFailurePattern).nullable(),
         complete: z.boolean(),
         deleted: z.boolean(),
       })
@@ -670,6 +671,7 @@ async function main() {
       `${JSON.stringify({
         event: 'LOAD_CI_DRIVER_DIAGNOSTIC',
         bodyFailureStep: state.success ? state.data.bodyFailureStep : null,
+        volumeInitFailure: state.success ? state.data.volumeInitFailure : null,
         complete: state.success ? state.data.complete : false,
         deleted: state.success ? state.data.deleted : false,
         verdict: result?.verdict ?? null,

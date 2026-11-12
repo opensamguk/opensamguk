@@ -214,15 +214,39 @@ export function verifyDatabaseIdentity(
 }
 
 const initializeSecrets = `
-const fs=require('node:fs'),crypto=require('node:crypto');
-const password=crypto.randomBytes(48).toString('base64url');
-const database=process.env.LOAD_DATABASE;
-if(!/^opensamguk_load_[a-f0-9]{32}_test$/.test(database||''))process.exit(1);
-for(const name of ['app','pg','data','evidence'])fs.chmodSync('/owned/'+name,0o700);
-for(const [dir,name,value,uid] of [['app','database_url','postgresql://load:'+password+'@postgres/'+database,10001],['pg','pg_password',password,70]]){
- const path='/owned/'+dir+'/'+name;fs.writeFileSync(path,value,{flag:'wx',mode:0o600});fs.chownSync(path,uid,uid);
-}
-for(const [name,uid] of [['app',10001],['pg',70],['data',70],['evidence',10001]])fs.chownSync('/owned/'+name,uid,uid);`;
+const fs = require('node:fs'), crypto = require('node:crypto');
+const database = process.env.LOAD_DATABASE;
+if (!/^opensamguk_load_[a-f0-9]{32}_test$/.test(database || '')) process.exit(1);
+const volumes = [['app', 10001], ['pg', 70], ['data', 70], ['evidence', 10001]];
+let stage = 'verify';
+try {
+  for (const [name] of volumes) {
+    const dir = '/owned/' + name;
+    const stat = fs.lstatSync(dir);
+    if (!stat.isDirectory() || stat.uid !== 0 || stat.gid !== 0 || fs.readdirSync(dir).length !== 0)
+      throw Object.assign(new Error(), {code: 'VOLUME_NOT_FRESH'});
+  }
+  stage = 'permissions';
+  for (const [name] of volumes) fs.chmodSync('/owned/' + name, 0o700);
+  stage = 'secrets';
+  const password = crypto.randomBytes(48).toString('base64url');
+  for (const [dir, name, value, uid] of [
+    ['app', 'database_url', 'postgresql://load:' + password + '@postgres/' + database, 10001],
+    ['pg', 'pg_password', password, 70],
+  ]) {
+    const path = '/owned/' + dir + '/' + name;
+    fs.writeFileSync(path, value, {flag: 'wx', mode: 0o600});
+    fs.chownSync(path, uid, uid);
+  }
+  stage = 'ownership';
+  for (const [name, uid] of volumes) fs.chownSync('/owned/' + name, uid, uid);
+  process.stdout.write('READY');
+} catch (error) {
+  const code = ['EACCES', 'EPERM', 'ENOENT', 'EEXIST', 'EROFS', 'VOLUME_NOT_FRESH'].includes(error?.code) ? error.code : 'OTHER';
+  process.stdout.write(stage + ':' + code);
+}`;
+export const volumeInitFailurePattern =
+  /^(UNCLASSIFIED|(verify|permissions|secrets|ownership):(EACCES|EPERM|ENOENT|EEXIST|EROFS|OTHER|VOLUME_NOT_FRESH))$/;
 
 async function main(): Promise<number> {
   const { values } = parseArgs({
@@ -391,7 +415,8 @@ async function main(): Promise<number> {
   const observer = new AbortController();
   const observations: LoadRun['environment']['observations'] = [];
   let sourceUnchanged = false,
-    finalVerdict = 'INVALID';
+    finalVerdict = 'INVALID',
+    volumeInitFailure: string | null = null;
   const recordedParents = new Set<string>();
   const verifyActiveParent = async (row: Container, ownSignal: AbortSignal) => {
     ownSignal.throwIfAborted();
@@ -484,7 +509,14 @@ async function main(): Promise<number> {
     signal.throwIfAborted();
     // An exec process gets the container's configured environment, without the entrypoint's secret export.
     const entrypoint = role === 'initialize' ? [] : ['/app/deploy/entrypoint.sh'];
-    await invoke(['exec', ...(workdir ? ['--workdir', workdir] : []), id, ...entrypoint, ...command], 'execute');
+    const executed = await invoke(
+      ['exec', ...(workdir ? ['--workdir', workdir] : []), id, ...entrypoint, ...command],
+      'execute',
+    );
+    if (role === 'initialize' && executed !== 'READY') {
+      volumeInitFailure = volumeInitFailurePattern.test(executed) ? executed : 'UNCLASSIFIED';
+      throw new Error('LOAD_VOLUME_INIT_UNCONFIRMED');
+    }
     signal.throwIfAborted();
     await invoke(['stop', '--time', '1', id], 'stop');
     const stopped: unknown = JSON.parse(await invoke(['inspect', id], 'exit-proof'));
@@ -613,7 +645,7 @@ async function main(): Promise<number> {
         'node',
         ...volumes.flatMap((name) => [
           '--mount',
-          `type=volume,src=${project}_${name},dst=/owned/${{ 'pg-data': 'data', 'pg-secrets': 'pg', 'app-secrets': 'app', evidence: 'evidence' }[name]}`,
+          `type=volume,src=${project}_${name},dst=/owned/${{ 'pg-data': 'data', 'pg-secrets': 'pg', 'app-secrets': 'app', evidence: 'evidence' }[name]},volume-nocopy`,
         ]),
         '-e',
         `LOAD_DATABASE=${databaseName}`,
@@ -983,6 +1015,7 @@ async function main(): Promise<number> {
             (deleted || values.keep === true),
           verdict: finalVerdict,
           bodyFailureStep: bodyFailureStep ?? null,
+          volumeInitFailure,
           sourceUnchanged,
           ownershipMatches,
           databaseOidMatches,
