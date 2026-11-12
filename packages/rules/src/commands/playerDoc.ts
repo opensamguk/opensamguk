@@ -72,6 +72,11 @@ export const commandPlayerDocs: Readonly<Record<string, PlayerDoc>> = {
     requires: ['국가 소속', '돌아갈 수도가 있고 현재 위치가 수도 밖'],
     cost: null,
   },
+  return_border: {
+    summary: '가장 가까운 보급 가능한 자기 국가 도시로 돌아갑니다.',
+    requires: ['접경귀환 기능을 켠 월드', '방랑 중이 아닌 국가 소속', '자기 국가 밖에서 3칸 안에 보급되는 자기 도시'],
+    cost: null,
+  },
   dismiss: { summary: '병력을 해산하고 소속 도시에서는 인구로 돌려보냅니다.', requires: ['해산할 병력'], cost: null },
   attack: {
     summary: '인접한 거점에 출병해 전투하고 이기면 점령합니다.',
