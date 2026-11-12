@@ -236,7 +236,7 @@ describe('AC-M3-04 원생성 화면과 실제 요청 전 경계', () => {
       ['역사', '191년 군웅할거'],
       ['IF', 'IF 시나리오'],
       ['공백지', '180년 공백지'],
-    ]) {
+    ] as const) {
       expect(
         within(within(scenario).getByRole('group', { name: group })).getByRole('option', { name: option }),
       ).toBeTruthy();
