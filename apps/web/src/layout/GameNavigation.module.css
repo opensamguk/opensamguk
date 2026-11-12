@@ -116,7 +116,7 @@
     inset-inline: var(--space-2);
     max-height: calc(100dvh - 96px - env(safe-area-inset-bottom, 0px));
     overflow-y: auto;
-    display: grid;
+    display: none;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: var(--space-1);
     padding: var(--space-2);
@@ -124,6 +124,9 @@
     border: var(--frame);
     border-radius: var(--radius);
     box-shadow: 0 -4px 0 rgb(34 29 23 / 30%);
+  }
+  .more[open] > .menu {
+    display: grid;
   }
   .close {
     grid-column: 1 / -1;
