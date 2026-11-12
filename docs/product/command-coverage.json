@@ -12947,6 +12947,184 @@
         }
       },
       "blockers": ["A-02", "작업 분해 없음", "수치 환산 미정"]
+    },
+    {
+      "id": "form_unit",
+      "target": "general",
+      "sourceIds": [],
+      "replacementReason": "D-040 도시 병력 배속에 앞서 빈 부곡을 편성하는 개인 명령이다.",
+      "approvalRefs": ["D-040"],
+      "acIds": ["AC-M1-14", "AC-INT-18B", "AC-INT-18C"],
+      "queueIds": ["INT-18B", "INT-18C"],
+      "ownerProfile": "opensamguk-implement",
+      "reviewerProfile": "opensamguk-review",
+      "paths": ["packages/rules/src/cityResources/commands.ts", "tools/int18-city-resources.integration.test.ts"],
+      "stages": {
+        "ui": {
+          "status": "missing",
+          "evidence": []
+        },
+        "api": {
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "https://github.com/opensamguk/opensamguk/blob/63bf3a264454562d26a66b970dd1750952625b6e/tools/int18-city-resources.integration.test.ts#L399"
+            }
+          ],
+          "reason": "명령 목록과 사전 검사, 예턴 한 칸 저장을 실제 서버 요청으로 확인했다."
+        },
+        "authorization": {
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "https://github.com/opensamguk/opensamguk/blob/63bf3a264454562d26a66b970dd1750952625b6e/tools/int18-city-resources.integration.test.ts#L399"
+            }
+          ],
+          "reason": "인증된 수뇌 계정이 자기 개인·직책 예턴에서 저장하고 실행하는 경로를 확인했다."
+        },
+        "engine": {
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "https://github.com/opensamguk/opensamguk/blob/63bf3a264454562d26a66b970dd1750952625b6e/tools/int18-city-resources.integration.test.ts#L399"
+            }
+          ],
+          "reason": "실제 엔진이 두 예턴을 실행하고 해당 칸을 소비했다."
+        },
+        "effectsCostsFailures": {
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "https://github.com/opensamguk/opensamguk/blob/63bf3a264454562d26a66b970dd1750952625b6e/tools/int18-city-resources.integration.test.ts#L399"
+            }
+          ],
+          "reason": "빈 부곡 생성과 도시 수비병 배속 수량을 실제 DB에서 확인했다."
+        },
+        "persistence": {
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "https://github.com/opensamguk/opensamguk/blob/63bf3a264454562d26a66b970dd1750952625b6e/tools/int18-city-resources.integration.test.ts#L399"
+            }
+          ],
+          "reason": "실행 뒤 DB를 다시 읽어 도시 병력과 부곡을 확인했다."
+        },
+        "restart": {
+          "status": "missing",
+          "evidence": []
+        },
+        "replay": {
+          "status": "missing",
+          "evidence": []
+        },
+        "independentReview": {
+          "status": "missing",
+          "evidence": []
+        },
+        "exactShaValidation": {
+          "status": "missing",
+          "evidence": []
+        },
+        "merge": {
+          "status": "missing",
+          "evidence": []
+        }
+      },
+      "blockers": ["개인·국가 예턴 카드의 실제 브라우저 동작, 재시작·재생과 전 단계 검증 기록이 남아 있다."]
+    },
+    {
+      "id": "nation_city_allocate",
+      "target": "nation",
+      "sourceIds": [],
+      "replacementReason": "D-040 권한자가 도시 수비병을 부곡에 배속하는 국가 예턴 명령이다.",
+      "approvalRefs": ["D-040"],
+      "acIds": ["AC-M1-14", "AC-INT-18B", "AC-INT-18C"],
+      "queueIds": ["INT-18B", "INT-18C"],
+      "ownerProfile": "opensamguk-implement",
+      "reviewerProfile": "opensamguk-review",
+      "paths": ["packages/rules/src/cityResources/commands.ts", "tools/int18-city-resources.integration.test.ts"],
+      "stages": {
+        "ui": {
+          "status": "missing",
+          "evidence": []
+        },
+        "api": {
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "https://github.com/opensamguk/opensamguk/blob/63bf3a264454562d26a66b970dd1750952625b6e/tools/int18-city-resources.integration.test.ts#L399"
+            }
+          ],
+          "reason": "명령 목록과 사전 검사, 예턴 한 칸 저장을 실제 서버 요청으로 확인했다."
+        },
+        "authorization": {
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "https://github.com/opensamguk/opensamguk/blob/63bf3a264454562d26a66b970dd1750952625b6e/tools/int18-city-resources.integration.test.ts#L399"
+            }
+          ],
+          "reason": "인증된 수뇌 계정이 자기 개인·직책 예턴에서 저장하고 실행하는 경로를 확인했다."
+        },
+        "engine": {
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "https://github.com/opensamguk/opensamguk/blob/63bf3a264454562d26a66b970dd1750952625b6e/tools/int18-city-resources.integration.test.ts#L399"
+            }
+          ],
+          "reason": "실제 엔진이 두 예턴을 실행하고 해당 칸을 소비했다."
+        },
+        "effectsCostsFailures": {
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "https://github.com/opensamguk/opensamguk/blob/63bf3a264454562d26a66b970dd1750952625b6e/tools/int18-city-resources.integration.test.ts#L399"
+            }
+          ],
+          "reason": "빈 부곡 생성과 도시 수비병 배속 수량을 실제 DB에서 확인했다."
+        },
+        "persistence": {
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "https://github.com/opensamguk/opensamguk/blob/63bf3a264454562d26a66b970dd1750952625b6e/tools/int18-city-resources.integration.test.ts#L399"
+            }
+          ],
+          "reason": "실행 뒤 DB를 다시 읽어 도시 병력과 부곡을 확인했다."
+        },
+        "restart": {
+          "status": "missing",
+          "evidence": []
+        },
+        "replay": {
+          "status": "missing",
+          "evidence": []
+        },
+        "independentReview": {
+          "status": "missing",
+          "evidence": []
+        },
+        "exactShaValidation": {
+          "status": "missing",
+          "evidence": []
+        },
+        "merge": {
+          "status": "missing",
+          "evidence": []
+        }
+      },
+      "blockers": ["개인·국가 예턴 카드의 실제 브라우저 동작, 재시작·재생과 전 단계 검증 기록이 남아 있다."]
     }
   ]
 }

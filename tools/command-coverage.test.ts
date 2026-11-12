@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, normalize } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { commands, extensionCommands, ruleRegistry } from '../packages/rules/src/index';
+import { commands, extensionCommands, resolverForRuleFeatures, ruleRegistry } from '../packages/rules/src/index';
 import {
   STAGES,
   analyze,
@@ -67,11 +67,12 @@ const RUN = (id: string | number) => `https://github.com/peppone-choi/opensamguk
 const runCli = (...args: string[]) =>
   spawnSync(process.execPath, ['tools/command-coverage.mjs', ...args], { cwd: root, encoding: 'utf8' });
 
-it('AC-M1-14 기능 명령 목록을 실제 등록과 대조하고 잘못된 대상·중복을 거부한다', () => {
-  const registered = ruleRegistry.features
-    .flatMap(({ key: feature, commandBindings = [] }) =>
-      commandBindings.map(({ definition: { key, target } }) => ({ key, target, feature })),
-    )
+it('AC-M1-14 기능 명령 목록을 최종 resolver와 대조하고 잘못된 대상·중복을 거부한다', () => {
+  const resolver = resolverForRuleFeatures({ ruleFeatures: ruleRegistry.features.map(({ key }) => key).sort() })!;
+  const builtins = new Set(commands.map(({ key }) => key));
+  const registered = [...resolver.list('general'), ...resolver.list('nation')]
+    .filter(({ key }) => !builtins.has(key))
+    .map(({ key, target }) => ({ key, target }))
     .sort((a, b) => a.key.localeCompare(b.key, 'en'));
   expect(context.featureRegistry).toEqual(registered);
   const extensionsByKey = new Map(extensionCommands.map((definition) => [definition.key, definition]));
@@ -90,6 +91,11 @@ it('AC-M1-14 기능 명령 목록을 실제 등록과 대조하고 잘못된 대
     row.key === first.key ? { ...row, target: first.target === 'general' ? 'nation' : 'general' } : row,
   );
   expect(errorsOf(table(), withDocs({ featureRegistry: changed }))).toContain(`commands[${first.key}]`);
+  const cityCoverage = table();
+  row(cityCoverage, 'form_unit').acIds.push('AC-INT-18Z');
+  expect(errorsOf(cityCoverage)).toContain('AC AC-INT-18Z가 인수조건·Phase 2 명세에 없다');
+  row(cityCoverage, 'form_unit').queueIds.push('INT-18Z');
+  expect(errorsOf(cityCoverage)).toContain('작업 INT-18Z가 대기열·계획에 없다');
 });
 
 describe('T4-02 등록된 확장 명령 대조', () => {
@@ -860,7 +866,7 @@ describe('T4-02 등록된 확장 명령 대조', () => {
       const valid = analyze(table(), ctx);
       expect(valid.errors).toEqual([]);
       expect(valid.summary!.legacySubset).toEqual(analyze(table(), context).summary!.legacySubset);
-      expect(valid.summary!.denominator).toBe(92);
+      expect(valid.summary!.denominator).toBe(94);
       expect(valid.summary!.unresolvedReferences).toBe(3);
       const doc = table();
       doc.commands = doc.commands.filter(({ id }) => id !== 'fire_attack');
@@ -1159,11 +1165,11 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
       [
         {
           readme: context.readme.replace(
-            '원작 비교 분모 90개, 정본 분모 92개, 전 단계 완료 2개',
+            '원작 비교 분모 90개, 정본 분모 94개, 전 단계 완료 2개',
             '원작 비교 분모 37개, 정본 분모 37개, 전 단계 완료 37개',
           ),
         },
-        'README: 명령 대응표 출력(원작/정본/전 단계 완료) 불일치 (문서 37/37/37, 원장 90/92/2)',
+        'README: 명령 대응표 출력(원작/정본/전 단계 완료) 불일치 (문서 37/37/37, 원장 90/94/2)',
       ],
       [
         { readme: context.readme.replace(readmeM1Line, readmeM1Line.replace(readmeProgress, '통과')) },
@@ -1199,12 +1205,12 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
               line.startsWith('| AC-M1-14 ')
                 ? line
                     .replace('| 🟨 |', '| ✅ |')
-                    .replace('정본 분모 92(명령 89 + 미해결 원본 3), 전 단계 완료 2', '정본 분모 37, 전 단계 완료 37')
+                    .replace('정본 분모 94(명령 91 + 미해결 원본 3), 전 단계 완료 2', '정본 분모 37, 전 단계 완료 37')
                 : line,
             )
             .join('\n'),
         },
-        '인수조건 AC-M1-14: 남은 행이 있는데 ✅다 (전 단계 완료 2/92)',
+        '인수조건 AC-M1-14: 남은 행이 있는데 ✅다 (전 단계 완료 2/94)',
       ],
       [
         {
@@ -1253,7 +1259,7 @@ describe('AC-M1-14 전체 명령 대응표 (D-022)', () => {
     const noTrade = table();
     noTrade.commands = noTrade.commands.filter((command) => command.id !== 'trade');
     expect(errorsOf(noTrade)).toContain(
-      'README: 명령 대응표 출력(원작/정본/전 단계 완료) 불일치 (문서 90/92/2, 원장 90/91/2)',
+      'README: 명령 대응표 출력(원작/정본/전 단계 완료) 불일치 (문서 90/94/2, 원장 90/93/2)',
     );
   });
 
