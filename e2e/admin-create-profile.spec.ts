@@ -365,6 +365,7 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
     ...profile.selection,
     ...(mode.profile === null ? {} : { featureProfileKey: mode.profile }),
     presetKey: mode.preset,
+    recruitmentLocation: 'city',
     turnTermMinutes: profile.presets.find((entry) => entry.key === mode.preset)!.turnTermMinutes,
     endYear: mode.endYear,
     seed,
