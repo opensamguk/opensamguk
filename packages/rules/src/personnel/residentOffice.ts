@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import defaultEffects from '../../../../resources/office-effects.json' with { type: 'json' };
+import { officeEffectsConfig } from './office-effects';
 import type { WorldState, WorldView } from '../model/world';
 import type { InitialGeneral } from '../world/bootstrap';
 
@@ -11,7 +11,7 @@ export const officeEffectsSchema = z.strictObject({
   tax: z.strictObject({ 3: percent, 4: percent, 11: percent }),
   supplyLoss: z.strictObject({ 5: percent, 6: percent, 7: percent, 8: percent, 9: percent, 10: percent }),
 });
-export const defaultOfficeEffects = officeEffectsSchema.parse(defaultEffects);
+export const defaultOfficeEffects = officeEffectsSchema.parse(officeEffectsConfig);
 export type OfficeEffects = z.infer<typeof officeEffectsSchema>;
 export const isLocalOffice = (level: number): level is 3 | 4 => level === 3 || level === 4;
 export const localOfficeTitle = (level: 3 | 4) => (level === 3 ? '군사' : '태수');

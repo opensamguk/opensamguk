@@ -102,8 +102,7 @@ export function settleSupply(state: WorldView, bonuses: OfficeBonuses = new Map(
     if (city.nationId === null || target.supplied) continue;
     const loss = (100 - (bonuses.get(city.cityKey)?.supplyLoss?.percent ?? 0)) / 100;
     for (const field of ['agriculture', 'commerce', 'security', 'defence', 'wall'] as const) {
-      const factor =
-        loss === 1 || field === 'security' ? BALANCE.UNSUPPLIED_FACTOR : 1 - (1 - BALANCE.UNSUPPLIED_FACTOR) * loss;
+      const factor = loss === 1 ? BALANCE.UNSUPPLIED_FACTOR : 1 - (1 - BALANCE.UNSUPPLIED_FACTOR) * loss;
       target[field] = Math.max(0, Math.round(city[field] * factor));
     }
     if (campaign) {
@@ -207,7 +206,7 @@ export function runMonthly(state: WorldView, tick: number, rng: Rng) {
           100,
       );
       if (increase > 0)
-        officeTaxLogs.push({ generalId: tax.generalId, text: `${city.name} 주재로 세수 ${increase} 증가` });
+        officeTaxLogs.push({ generalId: tax.generalId, text: `${city.name} 주재로 세수 ${tax.percent}% 보정` });
     }
   }
   return { state: next, date, officeTaxLogs, stages: [...MONTHLY_STAGES], yearbook: buildYearbook(next, date.year) };

@@ -1,6 +1,8 @@
 import type { Prisma, PrismaClient, PublishedResource } from '@opensamguk/db';
 import {
   checkReplayOrigin,
+  OFFICE_EFFECTS_FEATURE,
+  officeEffectsSchema,
   parsePreset,
   presetRules,
   statRulesSchema,
@@ -420,6 +422,9 @@ function requestRefs(
       resolution.initialStateHash !== world.initialStateHash
     )
       fail('PROVENANCE_INVALID');
+    const requestedOfficeEffects =
+      request.officeEffects == null ? null : officeEffectsSchema.parse(request.officeEffects);
+    if (!same(requestedOfficeEffects, origin.featureData?.[OFFICE_EFFECTS_FEATURE] ?? null)) fail('PROVENANCE_INVALID');
     if ((intent.featureProfileKey === undefined) !== (resolution.featureProfile === undefined))
       fail('PROVENANCE_INVALID');
     if (resolution.featureProfile !== undefined) {
@@ -449,7 +454,10 @@ function requestRefs(
       if (
         profile.key !== resolution.featureProfile.key ||
         hashState(profile) !== resolution.featureProfile.contentHash ||
-        !same([...profile.ruleFeatures].sort(), origin.initial.ruleFeatures)
+        !same(
+          [...new Set([...profile.ruleFeatures, ...(requestedOfficeEffects ? [OFFICE_EFFECTS_FEATURE] : [])])].sort(),
+          origin.initial.ruleFeatures,
+        )
       )
         fail('PROVENANCE_INVALID');
     }
@@ -512,7 +520,14 @@ function prepared(
       if (
         !inferred.some((presetFeatures) =>
           same(
-            [...new Set([...(state.ruleFeatures ?? []), ...presetFeatures, ...(intent.ruleFeatures ?? [])])].sort(),
+            [
+              ...new Set([
+                ...(state.ruleFeatures ?? []),
+                ...presetFeatures,
+                ...(intent.ruleFeatures ?? []),
+                ...(request.officeEffects != null ? [OFFICE_EFFECTS_FEATURE] : []),
+              ]),
+            ].sort(),
             features,
           ),
         )

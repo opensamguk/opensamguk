@@ -132,6 +132,7 @@ export {
 } from './personnel/permissions';
 export {
   PERSONNEL_INPUTS,
+  appointOfficer,
   applyPersonnelInput,
   validatePersonnelRecord,
   replayPersonnelInput,

@@ -1,5 +1,12 @@
 import type { Prisma } from '@opensamguk/db';
-import { APPOINTABLE_OFFICER_LEVELS, canManagePersonnel, isOfficeResident, officerTitle } from '@opensamguk/rules';
+import {
+  APPOINTABLE_OFFICER_LEVELS,
+  canManagePersonnel,
+  isLocalOffice,
+  isOfficeResident,
+  localOfficeTitle,
+  officerTitle,
+} from '@opensamguk/rules';
 import { TRPCError } from '@trpc/server';
 import { requireGeneral } from './queries';
 
@@ -55,7 +62,10 @@ export async function readPersonnelBoard(
     generalId: row.id,
     name: row.name,
     officerLevel: row.officerLevel,
-    title: titleFor(row.officerLevel),
+    title:
+      officeEffectsEnabled && isLocalOffice(row.officerLevel)
+        ? localOfficeTitle(row.officerLevel)
+        : titleFor(row.officerLevel),
     isHuman: row.userId !== null,
     city: { cityKey: row.city.cityKey, name: row.city.name },
     ...(officeEffectsEnabled
