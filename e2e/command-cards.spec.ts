@@ -3,6 +3,8 @@ import type { AppRouter } from '../apps/server/src/router';
 import { readFixture } from '../apps/server/test/readFixture';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
+import { loadPreset } from '../apps/engine/src/world/resources';
+import { commandInitial } from '../packages/rules/test/commandFixture';
 import { holdLease, releaseHold } from './game';
 import { test, expect, apiQuery } from './t210-fixture';
 
@@ -200,5 +202,51 @@ test('T4-92 명령 카드의 개인 30칸·국가 12칸 저장과 모바일·키
   } finally {
     await page.close();
     await releaseHold(hold);
+  }
+});
+
+test('AC-M2-03 프리셋이 켠 화계와 대상 도시 칸을 실제 화면에서 선택하고 저장한다', async ({ world }) => {
+  test.setTimeout(120_000);
+  const actor = await world.user('ruler');
+  const db = world.hold.db;
+  for (const enabled of [false, true]) {
+    const initial = commandInitial();
+    const general = initial.generals[0]!;
+    general.userId = actor.userId;
+    const target = initial.cities.find((city) => city.nationId !== null && city.nationId !== general.nationId)!;
+    const key = enabled ? 'speed' : 'beginner';
+    const preset = {
+      ...(await loadPreset(key)),
+      commands: enabled ? { general: ['fire_attack'], nation: [] } : null,
+    };
+    const { worldId } = await saveInitialWorld(db, initial, {
+      name: '프리셋 명령 비교',
+      turnTermMinutes: preset.turnTermMinutes,
+      endYear: null,
+      preset: { key, value: preset },
+      ...(enabled ? { extFormat: 1 } : {}),
+    });
+    await controlClock(db, worldId, 'start');
+    await actor.page.goto(`/w/${worldId}/turns`);
+    const editor = actor.page.getByTestId('turn-editor');
+    const picker = editor.getByRole('region', { name: '명령 고르기' });
+    await expect(picker.getByRole('radio', { name: '농지 개간', exact: true })).toBeVisible();
+    const fire = picker.getByRole('radio', { name: '화계', exact: true });
+    if (!enabled) {
+      await expect(fire).toHaveCount(0);
+      continue;
+    }
+    await fire.check();
+    const city = picker.getByRole('combobox', { name: '대상 도시', exact: true });
+    await expect(city).toBeVisible();
+    await city.selectOption(String(target.cityKey));
+    await editor.locator('tr[data-slot="1"]').click();
+    await picker.getByRole('button', { name: '1번 칸에 넣기', exact: true }).click();
+    await editor.getByRole('button', { name: '저장', exact: true }).click();
+    await expect(editor.getByText('저장했습니다.', { exact: true })).toBeVisible();
+    await actor.page.reload();
+    await expect(editor.locator('tr[data-slot="1"]')).toContainText('화계');
+    const row = await db.generalTurn.findFirstOrThrow({ where: { worldId, generalId: general.id, slot: 0 } });
+    expect(row).toMatchObject({ commandKey: 'fire_attack', args: { cityKey: target.cityKey } });
   }
 });
