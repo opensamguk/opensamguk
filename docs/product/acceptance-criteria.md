@@ -20,7 +20,7 @@
 | ------------------------------ | ---- | -- | -- | -- |
 | M1 혼자 + NPC로 한 판 완주     | 22   | 20 | 2  | 0  |
 | M2 지인 테스트 | 20 | 4 | 3 | 13 |
-| M3 공개 오픈 = MVP 완료 | 16 | 2 | 1 | 13 |
+| M3 공개 오픈 = MVP 완료 | 16 | 5 | 0 | 11 |
 
 차별화 기능 AC: M2-06(D1), M2-14(D16), M2-15(D2), M2-16(D11), M2-17(D12), M2-18(D6), M3-12(D17), M3-13(D3), M3-14(D15), M3-15(D10)
 
@@ -148,9 +148,9 @@ AC-M1-21은 보호된 main `1a453224`에서 연속 녹화로 다시 검증했다
 | --------- | ---- | --------- | ---- | ---- |
 | AC-M3-01  | 가입할 때 이메일 인증을 거친다. 비밀번호 재설정 링크는 1회용이고 30분 뒤 만료된다 (가정 A14) | E2E (테스트 메일함) | ✅ | 2026-11-12 독립 리뷰에서 보호 main `2f60a98c`의 [Chromium 7건](https://github.com/opensamguk/opensamguk/actions/runs/43191805777/job/131095369273)과 [PostgreSQL 18건](https://github.com/opensamguk/opensamguk/actions/runs/43191805777/job/131095366673)을 대조했다. 재설정 링크의 재사용 거부와 30분 만료 경계를 확인했다. 운영 HTTPS에서 새 계정에 Resend 인증 메일이 도착했고 링크로 인증해 로그인과 장수 등록까지 진행했다. | <!-- lint-text-ignore C-5 -->
 | AC-M3-02  | 약관·개인정보처리방침 동의가 버전과 함께 기록된다. 탈퇴하면 개인정보가 지워지고 게임 기록은 익명이 된다 | API 테스트 + DB 조회 | ⬜ | | <!-- lint-text-ignore C-5 -->
-| AC-M3-03  | 로그인 요청 제한, 세션 쿠키(HttpOnly·Secure·SameSite), CSRF 방어가 있다. 모든 API에 무인증·타인·제재·잘못된 입력 테스트가 있다 | 권한 테스트 목록과 API 목록 자동 대조 | 🟨 | 현재 API 부분: T3-04 Claude 재리뷰 통과(PR #93 `2ebc395`, 구현 `511862f`). `tools/authz.integration.test.ts`가 실제 `appRouter` 절차 23개를 HTTP·PostgreSQL로 실행해 사례 97개, 사유 있는 면제 18개, 누락 0개를 출력한다. 요청 제한·429·`Retry-After`, Origin·JSON 415, 운영 Secure 시작 검사, 보안 헤더, 거부 시 DB·쿠키 불변도 같은 실행에서 본다(CI 39571672741, 39571664050). T3-02 메일 절차와 M2에서 더할 API가 같은 대조를 통과하면 통과로 바꾼다. [T3-04 재리뷰](../plans/T3-04.md#재리뷰-claude-2026-10-21) | <!-- lint-text-ignore C-5 -->
-| AC-M3-04  | 관리자 화면에서 월드 생성·일시정지·재개·종료·초기화, 공지, 사용자 조회·제재·해제를 한다. 모든 조치가 감사 로그에 남는다 | E2E + 감사 로그 조회 | ⬜ | | <!-- lint-text-ignore C-5 -->
-| AC-M3-05  | 로그인 IP와 기기 해시가 기록되고 관리자가 같은 월드에서 IP·기기를 공유하는 계정 목록을 볼 수 있다 | API 테스트 | ⬜ | | <!-- lint-text-ignore C-5 -->
+| AC-M3-03  | 로그인 요청 제한, 세션 쿠키(HttpOnly·Secure·SameSite), CSRF 방어가 있다. 모든 API에 무인증·타인·제재·잘못된 입력 테스트가 있다 | 권한 테스트 목록과 API 목록 자동 대조 | ✅ | [T3-04 재리뷰](../plans/T3-04.md#재리뷰-claude-2026-10-21)와 2026-11-12 보호 main `2f60a98c`의 실제 [권한 대조](https://github.com/opensamguk/opensamguk/actions/runs/43191805777/job/131112983641) 및 [보안 통합 42건](https://github.com/opensamguk/opensamguk/actions/runs/43191805777/job/131095378349)을 독립 대조했다. PostgreSQL·HTTP 절차 150개, 실행 726개, 사유 있는 면제 24개, 누락 0개다. 로그인 429, 세션 쿠키 속성, Origin과 JSON 방어, 거부 시 상태 불변을 확인했다. | <!-- lint-text-ignore C-5 -->
+| AC-M3-04  | 관리자 화면에서 월드 생성·일시정지·재개·종료·초기화, 공지, 사용자 조회·제재·해제를 한다. 모든 조치가 감사 로그에 남는다 | E2E + 감사 로그 조회 | ✅ | 2026-11-12 보호 main `2f60a98c`에서 실제 Chromium [월드 생성 12건·초기화 10건·사용자 조회와 제재 8건](https://github.com/opensamguk/opensamguk/actions/runs/43191805777/job/131095369273), [월드 시계 10건·공지 3건](https://github.com/opensamguk/opensamguk/actions/runs/43191805777/job/131095369062), [월드 종료 10건](https://github.com/opensamguk/opensamguk/actions/runs/43191805777/job/131095368417)이 통과했다. 각 화면의 실제 서버 조치와 PostgreSQL 감사 조회, 권한 회수와 재전송 시 중복 기록 방지를 독립 검토했다. | <!-- lint-text-ignore C-5 -->
+| AC-M3-05  | 로그인 IP와 기기 해시가 기록되고 관리자가 같은 월드에서 IP·기기를 공유하는 계정 목록을 볼 수 있다 | API 테스트 | ✅ | 2026-11-12 보호 main `2f60a98c`의 [실제 PostgreSQL 로그인 조사 5건](https://github.com/opensamguk/opensamguk/actions/runs/43191805777/job/131095378349)과 [Chromium 관리자 조사 3건](https://github.com/opensamguk/opensamguk/actions/runs/43191805777/job/131095369273)을 독립 검토했다. 실제 가입·로그인, 기기 쿠키, 키 버전, 같은 월드의 공유 묶음과 월드 간 격리, 역할 회수와 응답의 식별자 비노출을 확인했다. 운영 DB에는 관찰 시점의 로그인 기록 3건 모두 두 해시가 있었다. | <!-- lint-text-ignore C-5 -->
 | AC-M3-06  | 공개할 이미지 세트(와 장수 데이터 출처)가 결정 기록에 남아 있고 공개 빌드가 승인되지 않은 이미지 경로를 참조하지 않는다 (가정 A8) | 결정 기록 + 자동 검사 | ⬜ | | <!-- lint-text-ignore C-5 -->
 | AC-M3-07  | 월드 2개 × 장수 600 × 동시 접속 100 부하에서 API p95가 300ms 미만, 턴 처리 지연이 10초 미만이다 (가정 A19) | 부하 테스트 리포트 | ⬜ | | <!-- lint-text-ignore C-5 -->
 | AC-M3-08  | 375px 폭에서 로비와 핵심 화면 6개를 가로 스크롤 없이 쓴다. 누르는 대상은 44px 이상이다 | Playwright 모바일 뷰포트 | ⬜ | | <!-- lint-text-ignore C-5 -->
