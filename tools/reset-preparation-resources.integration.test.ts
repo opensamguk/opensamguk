@@ -70,9 +70,10 @@ async function capture(prepared: PreparedInitialWorld) {
     world: {
       create: vi.fn(async (input: { data: Record<string, unknown> }) => {
         data = input.data;
-        return { id: worldId };
+        return { id: worldId, createdAt: new Date(0) };
       }),
     },
+    publicMapSnapshot: { create: vi.fn(async () => ({})) },
     nation: { createMany, update: vi.fn(async () => ({})) },
     city: { createMany },
     general: { createMany },

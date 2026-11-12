@@ -490,6 +490,7 @@ it.each(['empty', 'legacy'] as const)(
       ).toEqual([]);
       expect(await existingRows(client)).toEqual({
         ...settled,
+        AccountPortrait: [],
         AccountToken: [],
         NotificationTarget: [],
         NotificationOutbox: [],
