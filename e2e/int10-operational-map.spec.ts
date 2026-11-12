@@ -1,6 +1,6 @@
 import { test, expect, apiMutate, apiQuery } from './t210-fixture';
 import { initializeIntegrationResources } from '../tools/integration-resources';
-import { loadInitialWorldFromDb } from '../apps/engine/src/world/resources';
+import { loadInitialWorldFromDb, readInitialResources } from '../apps/engine/src/world/resources';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
@@ -8,6 +8,66 @@ import { loadWorld } from '../apps/engine/src/worldLoader';
 import { persistPublicMap } from '../apps/engine/src/publicMap';
 import { holdLease, releaseHold } from './game';
 import type { WorldMap as WorldMapResponse } from '../apps/web/src/game/types';
+import { buildInitialWorld } from '../packages/rules/src/world/bootstrap';
+
+test('AC-INT-21 폐허 복구 상태를 도시와 지연 공개 지도에서 확인한다', async ({ world, browser }) => {
+  const user = await world.user('ruler');
+  const db = world.hold.db;
+  await initializeIntegrationResources(db);
+  const resources = await readInitialResources(db, {
+    scenario: 'integration191',
+    map: 'integration',
+    statRules: 'five-stats',
+    portraitMap: '191-map',
+  });
+  const scenario = resources.scenario.content;
+  if (!scenario || typeof scenario !== 'object' || Array.isArray(scenario)) throw new Error('시나리오 형식 오류');
+  const initial = buildInitialWorld({
+    map: resources.map.content,
+    unitSet: resources.unitSet.content,
+    statRules: resources.statRules.content,
+    portraitMap: resources.portraitMap.content,
+    scenario: { ...scenario, cityScale: { cities: [{ city: '낙양', ruin: true }] } },
+    seed: 'city-ruins-display',
+  });
+  initial.generals[0]!.userId = user.userId;
+  const name = '폐허 복구 확인 월드';
+  const { worldId } = await saveInitialWorld(db, initial, { name, turnTermMinutes: 60, endYear: null });
+  const hold = await holdLease(worldId);
+  const anonymous = await browser.newContext({ baseURL: world.stack.webOrigin });
+  try {
+    await controlClock(db, worldId, 'start');
+    await user.page.goto(`/w/${worldId}/map`);
+    const map = user.page.getByTestId('world-map');
+    const marker = map.locator('[data-ruin="10"]');
+    await expect(marker).toHaveAccessibleName(/낙양.*폐허 복구 10%/);
+    await expect(marker.getByText(/낙양.*폐허/)).toBeVisible();
+    await expect(map.locator('[data-ruin]')).toHaveCount(1);
+
+    const city = await marker.getAttribute('data-city-key');
+    await user.page.goto(`/w/${worldId}/city/${city}`);
+    await expect(user.page.getByText('폐허 복구 10%', { exact: true })).toBeVisible();
+
+    await db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "World" WHERE id = ${worldId} FOR UPDATE`;
+      const state = await loadWorld(tx, worldId);
+      await persistPublicMap(tx, hold.lease, state, 0, Date.now() - 11 * 60_000, {
+        delayMinutes: 10,
+        intervalMinutes: 5,
+      });
+    });
+    const publicPage = await anonymous.newPage();
+    await publicPage.goto('/login');
+    await publicPage.getByRole('tab', { name, exact: true }).click();
+    await expect(publicPage.getByTestId('public-map').locator('[data-ruin="10"]')).toHaveAccessibleName(
+      /낙양.*폐허 복구 10%/,
+    );
+  } finally {
+    await anonymous.close();
+    await releaseHold(hold);
+    await db.world.deleteMany({ where: { id: worldId } });
+  }
+});
 
 test('AC-INT-10 정식191년 실제 API·80표식·375px·키보드·지연 공개 지도', async ({ world, browser }) => {
   const user = await world.user('member');

@@ -23,7 +23,7 @@ import { mapTapTargets, tapCandidates, type MapView } from './mapTapTargets';
 import styles from './OperationalWorldMap.module.css';
 
 type MapData = PublicGeography;
-type DrawnCity = Pick<MapCity, 'key' | 'name' | 'kind' | 'x' | 'y' | 'nationId'> & {
+type DrawnCity = Pick<MapCity, 'key' | 'name' | 'kind' | 'x' | 'y' | 'nationId' | 'ruin'> & {
   supplied?: boolean;
   recorded?: boolean;
   level?: number;
@@ -539,7 +539,7 @@ export function OperationalWorldMap({
           const parent = site.kind === 'PORT' ? siteById.get(site.parentCityId!) : undefined;
           const grade = site.kind === 'CITY' ? levelName(city?.level) : undefined;
           const capital = city !== undefined && isCapital(city, nation);
-          const plate = capital ? `${CAPITAL_MARK}${site.name}` : site.name;
+          const plate = `${capital ? CAPITAL_MARK : ''}${site.name}${city?.ruin ? ' (폐허)' : ''}`;
           const label = [
             site.name,
             grade ? `${grade} ${labels[site.kind]}` : labels[site.kind],
@@ -547,6 +547,7 @@ export function OperationalWorldMap({
             capital ? '수도' : null,
             parent ? `${parent.name} 소속` : null,
             mine ? '내 위치' : null,
+            city?.ruin ? `폐허 복구 ${city.ruin.percent}%` : null,
             city?.supplied === false && city.nationId !== null ? '보급 끊김' : null,
           ]
             .filter(Boolean)
@@ -569,6 +570,7 @@ export function OperationalWorldMap({
               data-site-kind={site.kind}
               data-city-key={city?.key}
               data-nation-id={city?.nationId ?? ''}
+              data-ruin={city?.ruin?.percent}
               data-mine={mine || undefined}
               data-selected={selected || undefined}
               className={action ? styles.anchor : styles.display}
@@ -624,7 +626,8 @@ export function OperationalWorldMap({
                   x={site.position.x}
                   y={site.position.y}
                   kind={site.kind}
-                  level={site.kind === 'CITY' ? city?.level : undefined}
+                  level={level}
+                  ruined={city?.ruin != null}
                   axis={axis}
                   color={city && city.recorded !== false ? (nation?.color ?? null) : null}
                   pixelsPerUnit={pixelsPerUnit}
@@ -661,6 +664,7 @@ export function OperationalWorldMap({
               city && isCapital(city, nation) ? '수도' : null,
               parent ? `${parent.name} 소속` : null,
               city?.key === myCityKey ? '내 위치' : null,
+              city?.ruin ? `폐허 복구 ${city.ruin.percent}%` : null,
               city?.supplied === false && city.nationId !== null ? '보급 끊김' : null,
             ].filter((note): note is string => note !== null);
             // 커서 오른쪽 아래에 띄우되 지도 밖으로 나가면 왼쪽·위로 넘긴다.

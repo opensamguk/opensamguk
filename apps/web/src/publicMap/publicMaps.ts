@@ -50,13 +50,14 @@ const notNull = <T>(value: T | null): value is T => value !== null;
 
 function pickCity(value: unknown): PublicCity | null {
   if (!isObject(value)) return null;
-  const { key, name, level, x, y, nationId, links } = value;
+  const { key, name, level, x, y, nationId, links, ruin } = value;
   const cityKey = toCityKey(key);
   if (cityKey === null || !isText(name) || !isInt(level) || !isCoord(x) || !isCoord(y)) return null;
   // 소유가 틀린 도시를 공백지로 바꾸면 거짓 색이 된다. 도시째 버린다.
   if (nationId !== null && !isInt(nationId)) return null;
   if (!Array.isArray(links)) return null;
   if (value.kind !== undefined && value.kind !== 'CITY' && value.kind !== 'PASS') return null;
+  const percent = isObject(ruin) ? ruin.percent : undefined;
   return {
     key: cityKey,
     name,
@@ -66,6 +67,7 @@ function pickCity(value: unknown): PublicCity | null {
     nationId,
     links: links.map(toCityKey).filter(notNull),
     ...(value.kind ? { kind: value.kind } : {}),
+    ...(value.kind !== 'PASS' && (percent === 10 || percent === 40 || percent === 70) ? { ruin: { percent } } : {}),
   };
 }
 
