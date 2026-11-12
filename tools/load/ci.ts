@@ -87,26 +87,39 @@ const builderSchema = z.looseObject({
   Mounts: z.array(z.looseObject({ Type: z.string(), Name: z.string().optional(), Destination: z.string() })),
 });
 
+class BuilderVerificationError extends Error {
+  constructor(readonly failedChecks: readonly string[]) {
+    super('LOAD_BUILDER_UNVERIFIED');
+  }
+}
+
 export function verifyBuilder(raw: unknown, expected: { name: string; imageId: string; cgroupText: string }) {
   const parsed = builderSchema.safeParse(raw);
-  if (!parsed.success || !/^opensamguk-load-build-[a-f0-9]{32}$/.test(expected.name))
-    throw new Error('LOAD_BUILDER_UNVERIFIED');
+  if (!parsed.success) {
+    // These paths describe the fixed schema. Never expose received values or issue messages.
+    throw new BuilderVerificationError(parsed.error.issues.map(({ path }) => path.join('.')));
+  }
+  if (!/^opensamguk-load-build-[a-f0-9]{32}$/.test(expected.name))
+    throw new BuilderVerificationError(['expected-builder-name']);
   const row = parsed.data,
     containerName = `buildx_buildkit_${expected.name}0`,
     volume = `${containerName}_state`;
   // Buildx의 systemd driver는 CgroupParent를 비워 둔다. 빈 값을 기본 parent의 증거로 쓰지 않고
   // 실제 로컬 커널 경로를 확인하여 system.slice로 해석된 경우만 허용한다.
+  const failedChecks = [];
+  if (row.Name !== `/${containerName}`) failedChecks.push('container-name');
+  if (row.Image !== expected.imageId) failedChecks.push('pinned-image-id');
+  if (!['', LOAD_DOCKER.cgroupParent].includes(row.HostConfig.CgroupParent)) failedChecks.push('docker-cgroup-parent');
+  if (selfCgroupPath(expected.cgroupText) !== `${LOAD_DOCKER.cgroupPath}/docker-${row.Id}.scope`)
+    failedChecks.push('kernel-cgroup-parent');
   if (
-    row.Name !== `/${containerName}` ||
-    row.Image !== expected.imageId ||
-    !['', LOAD_DOCKER.cgroupParent].includes(row.HostConfig.CgroupParent) ||
-    selfCgroupPath(expected.cgroupText) !== `${LOAD_DOCKER.cgroupPath}/docker-${row.Id}.scope` ||
     row.Mounts.length !== 1 ||
     row.Mounts[0]?.Type !== 'volume' ||
     row.Mounts[0].Name !== volume ||
     row.Mounts[0].Destination !== '/var/lib/buildkit'
   )
-    throw new Error('LOAD_BUILDER_UNVERIFIED');
+    failedChecks.push('owned-state-volume');
+  if (failedChecks.length) throw new BuilderVerificationError(failedChecks);
   return {
     id: row.Id,
     pid: row.State.Pid,
@@ -426,6 +439,7 @@ async function main() {
         lastExitCode: last?.exitCode ?? null,
         createAttempted,
         builderVerified: builderProof !== undefined,
+        failedBuilderChecks: error instanceof BuilderVerificationError ? error.failedChecks : [],
       })}\n`,
     );
   } finally {
