@@ -3,6 +3,7 @@ import { afterAll, expect, it, vi } from 'vitest';
 import { createDb, nextActionSequence } from '../packages/db/src/index';
 import { emptyQueue, emptyTurns, isInactive } from '../packages/rules/src/index';
 import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
+import { renewLeaseDuringTest } from '../apps/engine/test/leaseHeartbeat';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease, lockLease, assertLease, LeaseLostError } from '../apps/engine/src/lease';
@@ -158,6 +159,7 @@ async function oldCommand(f: Awaited<ReturnType<typeof fixture>>) {
 it('정상 RUNNING은 지평과 다른 잠근 T로 전환하고 옛 생성 포함 6+6개월을 재생한다', async () => {
   const f = await fixture(0),
     oldUser = await user();
+  renewLeaseDuringTest(db, f.lease);
   const part = Math.floor(f.initial.statRules.total / 3);
   await db.inputEvent.create({
     data: {

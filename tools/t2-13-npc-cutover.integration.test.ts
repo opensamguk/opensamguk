@@ -3,6 +3,7 @@ import { afterAll, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import { emptyQueue, enableReplayPolicy } from '../packages/rules/src/index';
 import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
+import { renewLeaseDuringTest } from '../apps/engine/test/leaseHeartbeat';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { acquireLease, releaseLease, LeaseLostError } from '../apps/engine/src/lease';
@@ -81,6 +82,7 @@ async function snapshot(worldId: string) {
 
 it('옛 NPC 월드의 전환 전후 6개월과 재시작·coverage·해시가 일치한다', async () => {
   const f = await fixture();
+  renewLeaseDuringTest(db, f.lease);
   await controlClock(db, f.worldId, 'start');
   await f.loop.advanceTo(60000);
   const legacy = await exportReplay(db, f.worldId);
