@@ -5,7 +5,14 @@ import { z } from 'zod';
 import { admissionSite, evaluateAdmission } from './admission';
 import { BUILD_BUDGET, requireDispatch } from './bootstrap.mjs';
 import { bindLocalDocker, LOAD_DOCKER } from './docker';
-import { commandSettled, helperDiagnosticPattern, OwnedCommands, sourceSnapshot, writeEvidence } from './lifecycle';
+import {
+  commandSettled,
+  helperDiagnosticPattern,
+  OwnedCommands,
+  sourceSnapshot,
+  workerFailureReasonPattern,
+  writeEvidence,
+} from './lifecycle';
 import { readRunnerProvenance, sampleAdmission, selfCgroupPath } from './observe';
 import { evaluateLoadRun, loadRunSchema } from './report';
 import { bodyFailureReasonPattern, requireImageSource, volumeInitFailurePattern } from './run';
@@ -669,6 +676,9 @@ async function main() {
         phase: z.enum(['starting', 'fixtures', 'generator', 'measurement', 'due-tail']),
         actorsPrepared: z.int().min(0).max(218),
         sseReady: z.int().min(0).max(100),
+        reason: z.string().regex(workerFailureReasonPattern),
+        setupRemainingMs: z.int().nullable(),
+        bodyRemainingMs: z.int().nullable(),
         http: z
           .object({ procedure: z.enum(['general.create', 'general.mine']), status: z.int().min(0).max(599) })
           .nullable(),

@@ -10,7 +10,7 @@ import { prepareLoadFixtures } from './fixtures';
 import { runNativeLoad } from './generator';
 import { LoadHttpError } from './http';
 import { nativeJournal } from './journal';
-import { writeEvidence } from './lifecycle';
+import { workerFailureReasonPattern, writeEvidence } from './lifecycle';
 import { loadDatabaseUrl } from './server';
 import type { LoadRun } from './report';
 
@@ -118,6 +118,8 @@ async function main() {
   let failed = false,
     journal: ReturnType<typeof nativeJournal> | undefined;
   let setupTimer: ReturnType<typeof setTimeout> | undefined, bodyTimer: ReturnType<typeof setTimeout> | undefined;
+  let setupDeadline: number | undefined, bodyDeadline: number | undefined;
+  let deadlineFailure: string | undefined;
   let phase = 'starting';
   let actorsPrepared = 0;
   let sseReady = 0;
@@ -167,10 +169,17 @@ async function main() {
     const runId = process.env.LOAD_RUN_ID ?? '',
       mode = process.env.LOAD_MODE;
     if (mode !== 'formal' && mode !== 'smoke') throw new Error('LOAD_MODE_INVALID');
-    const setupDeadline = deadline(process.env, 'LOAD_SETUP_DEADLINE'),
-      bodyDeadline = deadline(process.env, 'LOAD_BODY_DEADLINE');
-    setupTimer = setTimeout(stop, setupDeadline - Date.now());
-    bodyTimer = setTimeout(stop, bodyDeadline - Date.now());
+    const setupEndsAt = deadline(process.env, 'LOAD_SETUP_DEADLINE');
+    setupDeadline = setupEndsAt;
+    bodyDeadline = deadline(process.env, 'LOAD_BODY_DEADLINE');
+    setupTimer = setTimeout(() => {
+      deadlineFailure = 'SETUP_TIMEOUT';
+      stop();
+    }, setupEndsAt - Date.now());
+    bodyTimer = setTimeout(() => {
+      deadlineFailure = 'BODY_TIMEOUT';
+      stop();
+    }, bodyDeadline - Date.now());
     journal = nativeJournal('/evidence/generator.jsonl');
     await writeEvidence('/evidence/worker-started.json', {
       version: 1,
@@ -213,7 +222,7 @@ async function main() {
         controller.signal.throwIfAborted();
         if (event.kind === 'sse' && event.state === 'ready') sseReady++;
         if (event.kind === 'start') {
-          if (event.at > setupDeadline || Date.now() > setupDeadline) throw new Error('LOAD_SETUP_DEADLINE_EXCEEDED');
+          if (event.at > setupEndsAt || Date.now() > setupEndsAt) throw new Error('LOAD_SETUP_DEADLINE_EXCEEDED');
           clearTimeout(setupTimer);
           await writeEvidence('/evidence/setup-completed.json', {
             completedAt: event.at,
@@ -286,14 +295,20 @@ async function main() {
     const helperPhase = helperPhases[phase];
     if (helperPhase) process.stderr.write(`${helperPhase}\n`);
     try {
+      const now = Date.now();
+      const stable = error instanceof Error && 'code' in error ? error.code : error instanceof Error && error.message;
+      const reason = deadlineFailure ?? (controller.signal.aborted ? 'ABORTED' : stable);
       await writeEvidence('/evidence/worker-failure.json', {
         failed: true,
         phase,
         worldIds,
         actorsPrepared,
         sseReady,
+        reason: typeof reason === 'string' && workerFailureReasonPattern.test(reason) ? reason : 'OTHER',
+        setupRemainingMs: setupDeadline === undefined ? null : setupDeadline - now,
+        bodyRemainingMs: bodyDeadline === undefined ? null : bodyDeadline - now,
         http: error instanceof LoadHttpError ? { procedure: error.procedure, status: error.status } : null,
-        at: Date.now(),
+        at: now,
       });
     } catch {
       /* 원 실패를 유지한다. */
