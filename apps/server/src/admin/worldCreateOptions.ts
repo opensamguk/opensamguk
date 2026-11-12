@@ -1,3 +1,4 @@
+import type { Prisma } from '@opensamguk/db';
 import { readFile } from 'node:fs/promises';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
@@ -54,7 +55,7 @@ const identity = { id: 'integration-v01', label: '통합판 v0.1 · 191년 군�
 const profileIds = ['integration-v01', 'san10-191', 'san10-empty'] as const;
 type ProfileId = keyof typeof contracts;
 type Selection = Record<keyof typeof creationSelection, string>;
-type Identity = { id: ProfileId | 'integration-v01-expanded'; label: string };
+type Identity = { id: ProfileId | 'integration-v01-expanded' | `san10-expanded-${string}`; label: string };
 const san10Selection = { ...creationSelection, mapKey: 'san10', unitSetKey: 'expanded' } as const;
 const contracts = {
   'integration-v01': {
@@ -360,6 +361,96 @@ export function expandedCreationProfile(
   };
 }
 
+const artifactMap = 'san10-expanded';
+export const artifactSelection = {
+  mapKey: artifactMap,
+  unitSetKey: 'expanded',
+  statRulesKey: 'five-stats',
+  portraitMapKey: 'san10-expanded-portraits',
+};
+export const artifactScenarioPattern = '^san10-expanded-[a-z0-9]+$';
+export const artifactPublication = { status: 'PUBLISHED', createdBy: null, publishedBy: null } as const;
+export const artifactMapVersion = { kind: 'MAP', name: artifactMap, version: 1, ...artifactPublication } as const;
+const artifactRefs = [
+  artifactMapVersion,
+  { kind: 'UNIT_SET', name: artifactSelection.unitSetKey, version: 1 },
+  { kind: 'STAT_RULES', name: artifactSelection.statRulesKey, version: 1 },
+  { kind: 'PORTRAIT_MAP', name: artifactSelection.portraitMapKey, version: 1 },
+] as const;
+
+async function artifactCreationProfiles(
+  tx: Prisma.TransactionClient,
+  presets: readonly PresetSource[],
+): Promise<CreationProfile[] | null> {
+  const rows = await tx.gameResource.findMany({
+    where: { status: 'PUBLISHED', OR: artifactRefs.map((ref) => ({ ...ref })) },
+    select: { kind: true, name: true, version: true, contentHash: true },
+  });
+  if (!rows.some((row) => row.kind === 'MAP')) return null;
+  if (rows.length !== artifactRefs.length) throw new Error('확장 확정판 공통 자원을 확인하세요.');
+  const entries = await tx.$queryRaw<
+    Array<{
+      name: `san10-expanded-${string}`;
+      title: string;
+      year: number;
+      generals: number;
+      nations: number;
+      contentHash: string;
+    }>
+  >`
+    SELECT name, content->>'title' AS title, (content->>'startYear')::int AS year,
+      jsonb_array_length(content->'general') AS generals, jsonb_array_length(content->'nation') AS nations, "contentHash"
+    FROM "GameResource"
+    WHERE kind = 'SCENARIO' AND version = 1 AND status = 'PUBLISHED'
+      AND "createdBy" IS NULL AND "publishedBy" IS NULL
+      AND name ~ ${artifactScenarioPattern} AND content->>'requiredMap' = ${artifactMap}
+    ORDER BY (name = 'san10-expanded-empty'), year, name`;
+  const regular = parsePreset(presets.find((row) => row.key === 'regular')?.value);
+  const empty = parsePreset(presets.find((row) => row.key === 'empty')?.value);
+  const resources = rows.map((row) => ({
+    kind: row.kind,
+    key: row.name,
+    version: row.version,
+    contentHash: row.contentHash,
+  }));
+  return entries.map((entry) => {
+    const isEmpty = entry.name === 'san10-expanded-empty';
+    const preset = isEmpty ? empty : regular;
+    return {
+      id: entry.name,
+      label: entry.title,
+      available: true,
+      selection: { ...artifactSelection, scenarioKey: entry.name },
+      scenarioTitle: entry.title,
+      mapName: 'SAN10 확장 확정판',
+      startYear: entry.year,
+      counts: {
+        cities: 314,
+        gates: 8,
+        ports: 0,
+        fields: 0,
+        anchors: 322,
+        markers: 322,
+        roads: 467,
+        generals: entry.generals,
+        nations: entry.nations,
+      },
+      resources: [...resources, { kind: 'SCENARIO', key: entry.name, version: 1, contentHash: entry.contentHash }],
+      ruleFeatures: [...creationFeatures],
+      presets: [
+        {
+          key: isEmpty ? 'empty' : 'regular',
+          label: preset.name,
+          contentHash: hashState(preset),
+          turnTermMinutes: preset.turnTermMinutes,
+          descriptions: [],
+        },
+      ],
+      suggestedEndYear: entry.year + 40,
+    };
+  });
+}
+
 export async function getWorldCreationOptions(ctx: Context, input: z.infer<typeof creationOptionsInput>) {
   if (!ctx.user || ctx.user.id !== input.expectedUserId)
     throw new TRPCError({ code: 'UNAUTHORIZED', message: '로그인한 계정이 바뀌었습니다. 다시 확인하세요.' });
@@ -392,6 +483,8 @@ export async function getWorldCreationOptions(ctx: Context, input: z.infer<typeo
             }
           }),
         );
+        const artifactProfiles = await artifactCreationProfiles(tx, presets);
+        if (artifactProfiles) return { userId, revision: hashState(artifactProfiles), profiles: artifactProfiles };
         const profiles = profileIds.map((id) => creationProfile(rows, presets, ruleRegistry, id));
         if (input.expandedProfiles === true) {
           let value: unknown;

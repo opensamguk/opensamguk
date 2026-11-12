@@ -57,7 +57,11 @@ export const createDraft = (): CreateDraft => ({
   seed: '',
 });
 export function initialCreateProfile(options: CreateOptions, preferredId = 'san10-191') {
-  return options.profiles.find((profile) => profile.id === preferredId)?.id ?? '';
+  return (
+    options.profiles.find((profile) => profile.id === preferredId)?.id ??
+    options.profiles.find((profile) => profile.id === 'san10-expanded-n19')?.id ??
+    ''
+  );
 }
 export const uuid = (value: unknown): value is string =>
   typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
@@ -90,7 +94,10 @@ function integer(value: string, min: number, max: number, field: 'turnTerm' | 'e
 // 형식 2인 expanded-191-v3만 시나리오·지도를 잠그고(병종·능력치·초상은 서버가 검사하지 않음),
 // 나머지 확장 묶음은 다섯 칸을 모두 잠근다.
 const scenarioMapOnly = new Set(['expanded-191-v3']);
-export function lockedFields(profile: Pick<CreateProfile, 'featureProfileKey'>): readonly ResourceField[] {
+export function lockedFields(
+  profile: Pick<CreateProfile, 'featureProfileKey'> & Partial<Pick<CreateProfile, 'selection'>>,
+): readonly ResourceField[] {
+  if (profile.selection?.mapKey === 'san10-expanded') return resourceFieldList;
   if (profile.featureProfileKey === undefined) return [];
   return scenarioMapOnly.has(profile.featureProfileKey) ? ['scenarioKey', 'mapKey'] : resourceFieldList;
 }

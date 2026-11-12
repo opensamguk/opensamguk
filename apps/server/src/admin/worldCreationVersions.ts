@@ -5,6 +5,7 @@ import type { Context } from '../context';
 import { listInput, listResources } from '../resourceAdmin/read';
 import { RESOURCE_PAYLOAD_LIMITS } from '../resourceAdmin/payload';
 import { requireCurrentAdmin } from './access';
+import { artifactMapVersion } from './worldCreateOptions';
 
 export const creationVersionsInput = z.strictObject({
   expectedUserId: z.uuid(),
@@ -20,6 +21,13 @@ export async function getWorldCreationVersions(ctx: Context, input: z.infer<type
     return await ctx.db.$transaction(
       async (tx) => {
         await requireCurrentAdmin(tx, ctx, false);
+        if (input.kind === 'MAP') {
+          const map = await tx.gameResource.findFirst({
+            where: artifactMapVersion,
+            select: { name: true, version: true, contentHash: true },
+          });
+          if (map) return { items: [{ ...map, key: formatResourceKey(map) }], next: null };
+        }
         const page = await listResources(
           tx,
           { kind: input.kind, status: 'PUBLISHED', cursor: input.cursor },
