@@ -13,6 +13,7 @@ import {
   recordedLineageSuccession,
   reputationInputEvents,
   recordedPossession,
+  type TreatyAidFailure,
   type PersonnelMonthResult,
   type PersonnelStepPacket,
   type ReplayState,
@@ -317,8 +318,10 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
           treatyExpandedEnabled: world.ruleFeatures.includes(EXPANDED_TREATY_FEATURE),
         }),
     },
-    async persistMonthly(tx, worldId, before, next, _effects, context) {
+    async persistMonthly(tx, worldId, before, next, effects, context) {
       await persistTreatyClosures(tx, worldId, before.state, next.state, context);
+      for (const failure of effects as readonly TreatyAidFailure[])
+        await appendNationHistory(tx, worldId, context.tick, failure.nationId, failure.text);
     },
   },
   {
