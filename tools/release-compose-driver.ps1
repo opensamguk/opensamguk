@@ -1,11 +1,11 @@
 [CmdletBinding()]
 param(
-  [Parameter(Mandatory)][ValidateSet('DEPLOY', 'ROLLBACK')][string]$Operation,
+  [Parameter(Mandatory)][ValidateSet('DEPLOY', 'ROLLBACK', IgnoreCase = $false)][string]$Operation,
   [Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$ExpectedRevision,
   [Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$Revision,
   [Parameter(Mandatory)][string]$ManifestPath,
   [Parameter(Mandatory)][string]$PreflightReceiptPath,
-  [Parameter(Mandatory)][ValidatePattern('^[0-9a-f-]{36}$')][string]$RequestId
+  [Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')][string]$RequestId
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
