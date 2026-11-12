@@ -514,9 +514,14 @@
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39557351030",
               "sha": "422229a"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-화면-시험",
+              "sha": "592ba1810c6348faa3346dff05f155b3b811e408"
             }
           ],
-          "reason": "30칸 편집기 명령 목록과 일부 명령 인자만 E2E로 확인했다. 명령별 화면 증거는 없다"
+          "reason": "기존 30칸 편집기 시험과 PR #498에서 명령 선택·소속 경고·한 번 저장·새로고침을 확인했다. 화면 독립 검토를 통과했고 필수 CI와 보호 병합이 남아 있다"
         },
         "api": {
           "status": "verified",
@@ -611,9 +616,14 @@
             {
               "kind": "test",
               "ref": "apps/engine/src/turnLoop.integration.test.ts"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-저장재시작재생-검토",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "턴 저장 경로 공통 시험만 있다. 이 명령 전용 DB 시험은 없다"
+          "reason": "공통 턴 시험과 PR #457에서 HTTP 예약·조회, 성공 효과·비용, 금 부족 시 금 불변과 실패 로그, 다음 칸 이동을 실제 PostgreSQL로 확인했다. 보호 병합 증거가 남아 있다"
         },
         "restart": {
           "status": "partial",
@@ -625,9 +635,14 @@
             {
               "kind": "test",
               "ref": "apps/engine/src/turnLoop.integration.test.ts"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-저장재시작재생-검토",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "리스·SIGKILL 재시작 공통 시험만 있다"
+          "reason": "공통 리스 시험과 PR #457의 커밋 뒤 실제 SIGKILL을 확인했다. 새 엔진 프로세스에서 상태와 명령 로그가 그대로였다. 커밋 직전 종료와 보호 병합 증거가 남아 있다"
         },
         "replay": {
           "status": "partial",
@@ -640,9 +655,14 @@
             {
               "kind": "test",
               "ref": "apps/engine/src/monthly.integration.test.ts"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-저장재시작재생-검토",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "12개월 재생 공통 시험만 있다. 이 명령의 재생 하한 시험은 없다"
+          "reason": "공통 12개월 시험과 PR #457의 이 명령을 포함한 월간 재생 1개월을 확인했다. 실제 PostgreSQL 상태 해시와 일치했다. 보호 병합 증거가 남아 있다"
         },
         "independentReview": {
           "status": "partial",
@@ -688,9 +708,14 @@
             {
               "kind": "test",
               "ref": "tools/command-coverage.test.ts"
+            },
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42427010103",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "81ffd1b CI는 규칙·실행 단계 증거다. 전 단계 exact SHA 검증은 없다"
+          "reason": "T1-08 규칙·실행 CI와 PR #457의 해당 SHA에서 PostgreSQL 저장·재시작·1개월 재생을 확인했다. 전 단계 동일 커밋 검증 증거가 남아 있다"
         },
         "merge": {
           "status": "partial",
@@ -704,7 +729,7 @@
           "reason": "규칙 구현은 main에 있다. 나머지 단계는 병합 전이다"
         }
       },
-      "blockers": ["명령별 화면·DB·재시작·재생 증거와 전 단계 리뷰·exact SHA·병합 증거가 없다"]
+      "blockers": ["명령별 권한, 커밋 직전 복구, 전 단계 독립 리뷰·동일 커밋 검증·보호 병합 증거가 남아 있다"]
     },
     {
       "id": "commerce",
@@ -730,9 +755,14 @@
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39557351030",
               "sha": "422229a"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-화면-시험",
+              "sha": "592ba1810c6348faa3346dff05f155b3b811e408"
             }
           ],
-          "reason": "30칸 편집기 명령 목록과 일부 명령 인자만 E2E로 확인했다. 명령별 화면 증거는 없다"
+          "reason": "기존 30칸 편집기 시험과 PR #498에서 명령 선택·소속 경고·한 번 저장·새로고침을 확인했다. 화면 독립 검토를 통과했고 필수 CI와 보호 병합이 남아 있다"
         },
         "api": {
           "status": "verified",
@@ -827,9 +857,14 @@
             {
               "kind": "test",
               "ref": "apps/engine/src/turnLoop.integration.test.ts"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-저장재시작재생-검토",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "턴 저장 경로 공통 시험만 있다. 이 명령 전용 DB 시험은 없다"
+          "reason": "공통 턴 시험과 PR #457에서 HTTP 예약·조회, 성공 효과·비용, 금 부족 시 금 불변과 실패 로그, 다음 칸 이동을 실제 PostgreSQL로 확인했다. 보호 병합 증거가 남아 있다"
         },
         "restart": {
           "status": "partial",
@@ -841,9 +876,14 @@
             {
               "kind": "test",
               "ref": "apps/engine/src/turnLoop.integration.test.ts"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-저장재시작재생-검토",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "리스·SIGKILL 재시작 공통 시험만 있다"
+          "reason": "공통 리스 시험과 PR #457의 커밋 뒤 실제 SIGKILL을 확인했다. 새 엔진 프로세스에서 상태와 명령 로그가 그대로였다. 커밋 직전 종료와 보호 병합 증거가 남아 있다"
         },
         "replay": {
           "status": "partial",
@@ -856,9 +896,14 @@
             {
               "kind": "test",
               "ref": "apps/engine/src/monthly.integration.test.ts"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-저장재시작재생-검토",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "12개월 재생 공통 시험만 있다. 이 명령의 재생 하한 시험은 없다"
+          "reason": "공통 12개월 시험과 PR #457의 이 명령을 포함한 월간 재생 1개월을 확인했다. 실제 PostgreSQL 상태 해시와 일치했다. 보호 병합 증거가 남아 있다"
         },
         "independentReview": {
           "status": "partial",
@@ -904,9 +949,14 @@
             {
               "kind": "test",
               "ref": "tools/command-coverage.test.ts"
+            },
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42427010103",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "81ffd1b CI는 규칙·실행 단계 증거다. 전 단계 exact SHA 검증은 없다"
+          "reason": "T1-08 규칙·실행 CI와 PR #457의 해당 SHA에서 PostgreSQL 저장·재시작·1개월 재생을 확인했다. 전 단계 동일 커밋 검증 증거가 남아 있다"
         },
         "merge": {
           "status": "partial",
@@ -920,7 +970,7 @@
           "reason": "규칙 구현은 main에 있다. 나머지 단계는 병합 전이다"
         }
       },
-      "blockers": ["명령별 화면·DB·재시작·재생 증거와 전 단계 리뷰·exact SHA·병합 증거가 없다"]
+      "blockers": ["명령별 권한, 커밋 직전 복구, 전 단계 독립 리뷰·동일 커밋 검증·보호 병합 증거가 남아 있다"]
     },
     {
       "id": "security",
@@ -946,9 +996,14 @@
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39557351030",
               "sha": "422229a"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-화면-시험",
+              "sha": "592ba1810c6348faa3346dff05f155b3b811e408"
             }
           ],
-          "reason": "30칸 편집기 명령 목록과 일부 명령 인자만 E2E로 확인했다. 명령별 화면 증거는 없다"
+          "reason": "기존 30칸 편집기 시험과 PR #498에서 명령 선택·소속 경고·한 번 저장·새로고침을 확인했다. 화면 독립 검토를 통과했고 필수 CI와 보호 병합이 남아 있다"
         },
         "api": {
           "status": "verified",
@@ -1043,9 +1098,14 @@
             {
               "kind": "test",
               "ref": "apps/engine/src/turnLoop.integration.test.ts"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-저장재시작재생-검토",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "턴 저장 경로 공통 시험만 있다. 이 명령 전용 DB 시험은 없다"
+          "reason": "공통 턴 시험과 PR #457에서 HTTP 예약·조회, 성공 효과·비용, 금 부족 시 금 불변과 실패 로그, 다음 칸 이동을 실제 PostgreSQL로 확인했다. 보호 병합 증거가 남아 있다"
         },
         "restart": {
           "status": "partial",
@@ -1057,9 +1117,14 @@
             {
               "kind": "test",
               "ref": "apps/engine/src/turnLoop.integration.test.ts"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-저장재시작재생-검토",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "리스·SIGKILL 재시작 공통 시험만 있다"
+          "reason": "공통 리스 시험과 PR #457의 커밋 뒤 실제 SIGKILL을 확인했다. 새 엔진 프로세스에서 상태와 명령 로그가 그대로였다. 커밋 직전 종료와 보호 병합 증거가 남아 있다"
         },
         "replay": {
           "status": "partial",
@@ -1072,9 +1137,14 @@
             {
               "kind": "test",
               "ref": "apps/engine/src/monthly.integration.test.ts"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-저장재시작재생-검토",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "12개월 재생 공통 시험만 있다. 이 명령의 재생 하한 시험은 없다"
+          "reason": "공통 12개월 시험과 PR #457의 이 명령을 포함한 월간 재생 1개월을 확인했다. 실제 PostgreSQL 상태 해시와 일치했다. 보호 병합 증거가 남아 있다"
         },
         "independentReview": {
           "status": "partial",
@@ -1120,9 +1190,14 @@
             {
               "kind": "test",
               "ref": "tools/command-coverage.test.ts"
+            },
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42427010103",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "81ffd1b CI는 규칙·실행 단계 증거다. 전 단계 exact SHA 검증은 없다"
+          "reason": "T1-08 규칙·실행 CI와 PR #457의 해당 SHA에서 PostgreSQL 저장·재시작·1개월 재생을 확인했다. 전 단계 동일 커밋 검증 증거가 남아 있다"
         },
         "merge": {
           "status": "partial",
@@ -1136,7 +1211,7 @@
           "reason": "규칙 구현은 main에 있다. 나머지 단계는 병합 전이다"
         }
       },
-      "blockers": ["명령별 화면·DB·재시작·재생 증거와 전 단계 리뷰·exact SHA·병합 증거가 없다"]
+      "blockers": ["명령별 권한, 커밋 직전 복구, 전 단계 독립 리뷰·동일 커밋 검증·보호 병합 증거가 남아 있다"]
     },
     {
       "id": "settle",
@@ -1162,9 +1237,14 @@
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39557351030",
               "sha": "422229a"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-화면-시험",
+              "sha": "592ba1810c6348faa3346dff05f155b3b811e408"
             }
           ],
-          "reason": "30칸 편집기 명령 목록과 일부 명령 인자만 E2E로 확인했다. 명령별 화면 증거는 없다"
+          "reason": "기존 30칸 편집기 시험과 PR #498에서 명령 선택·소속 경고·한 번 저장·새로고침을 확인했다. 화면 독립 검토를 통과했고 필수 CI와 보호 병합이 남아 있다"
         },
         "api": {
           "status": "verified",
@@ -1259,9 +1339,14 @@
             {
               "kind": "test",
               "ref": "apps/engine/src/turnLoop.integration.test.ts"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-저장재시작재생-검토",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "턴 저장 경로 공통 시험만 있다. 이 명령 전용 DB 시험은 없다"
+          "reason": "공통 턴 시험과 PR #457에서 HTTP 예약·조회, 성공 효과·비용, 금 부족 시 금 불변과 실패 로그, 다음 칸 이동을 실제 PostgreSQL로 확인했다. 보호 병합 증거가 남아 있다"
         },
         "restart": {
           "status": "partial",
@@ -1273,9 +1358,14 @@
             {
               "kind": "test",
               "ref": "apps/engine/src/turnLoop.integration.test.ts"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-저장재시작재생-검토",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "리스·SIGKILL 재시작 공통 시험만 있다"
+          "reason": "공통 리스 시험과 PR #457의 커밋 뒤 실제 SIGKILL을 확인했다. 새 엔진 프로세스에서 상태와 명령 로그가 그대로였다. 커밋 직전 종료와 보호 병합 증거가 남아 있다"
         },
         "replay": {
           "status": "partial",
@@ -1288,9 +1378,14 @@
             {
               "kind": "test",
               "ref": "apps/engine/src/monthly.integration.test.ts"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-저장재시작재생-검토",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "12개월 재생 공통 시험만 있다. 이 명령의 재생 하한 시험은 없다"
+          "reason": "공통 12개월 시험과 PR #457의 이 명령을 포함한 월간 재생 1개월을 확인했다. 실제 PostgreSQL 상태 해시와 일치했다. 보호 병합 증거가 남아 있다"
         },
         "independentReview": {
           "status": "partial",
@@ -1336,9 +1431,14 @@
             {
               "kind": "test",
               "ref": "tools/command-coverage.test.ts"
+            },
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42427010103",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "81ffd1b CI는 규칙·실행 단계 증거다. 전 단계 exact SHA 검증은 없다"
+          "reason": "T1-08 규칙·실행 CI와 PR #457의 해당 SHA에서 PostgreSQL 저장·재시작·1개월 재생을 확인했다. 전 단계 동일 커밋 검증 증거가 남아 있다"
         },
         "merge": {
           "status": "partial",
@@ -1352,7 +1452,7 @@
           "reason": "규칙 구현은 main에 있다. 나머지 단계는 병합 전이다"
         }
       },
-      "blockers": ["명령별 화면·DB·재시작·재생 증거와 전 단계 리뷰·exact SHA·병합 증거가 없다"]
+      "blockers": ["명령별 권한, 커밋 직전 복구, 전 단계 독립 리뷰·동일 커밋 검증·보호 병합 증거가 남아 있다"]
     },
     {
       "id": "goodwill",
@@ -1378,9 +1478,14 @@
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39557351030",
               "sha": "422229a"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-화면-시험",
+              "sha": "592ba1810c6348faa3346dff05f155b3b811e408"
             }
           ],
-          "reason": "30칸 편집기 명령 목록과 일부 명령 인자만 E2E로 확인했다. 명령별 화면 증거는 없다"
+          "reason": "기존 30칸 편집기 시험과 PR #498에서 명령 선택·소속 경고·한 번 저장·새로고침을 확인했다. 화면 독립 검토를 통과했고 필수 CI와 보호 병합이 남아 있다"
         },
         "api": {
           "status": "verified",
@@ -1475,9 +1580,14 @@
             {
               "kind": "test",
               "ref": "apps/engine/src/turnLoop.integration.test.ts"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-저장재시작재생-검토",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "턴 저장 경로 공통 시험만 있다. 이 명령 전용 DB 시험은 없다"
+          "reason": "공통 턴 시험과 PR #457에서 HTTP 예약·조회, 성공 효과·비용, 금 부족 시 금 불변과 실패 로그, 다음 칸 이동을 실제 PostgreSQL로 확인했다. 보호 병합 증거가 남아 있다"
         },
         "restart": {
           "status": "partial",
@@ -1489,9 +1599,14 @@
             {
               "kind": "test",
               "ref": "apps/engine/src/turnLoop.integration.test.ts"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-저장재시작재생-검토",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "리스·SIGKILL 재시작 공통 시험만 있다"
+          "reason": "공통 리스 시험과 PR #457의 커밋 뒤 실제 SIGKILL을 확인했다. 새 엔진 프로세스에서 상태와 명령 로그가 그대로였다. 커밋 직전 종료와 보호 병합 증거가 남아 있다"
         },
         "replay": {
           "status": "partial",
@@ -1504,9 +1619,14 @@
             {
               "kind": "test",
               "ref": "apps/engine/src/monthly.integration.test.ts"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-저장재시작재생-검토",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "12개월 재생 공통 시험만 있다. 이 명령의 재생 하한 시험은 없다"
+          "reason": "공통 12개월 시험과 PR #457의 이 명령을 포함한 월간 재생 1개월을 확인했다. 실제 PostgreSQL 상태 해시와 일치했다. 보호 병합 증거가 남아 있다"
         },
         "independentReview": {
           "status": "partial",
@@ -1552,9 +1672,14 @@
             {
               "kind": "test",
               "ref": "tools/command-coverage.test.ts"
+            },
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42427010103",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "81ffd1b CI는 규칙·실행 단계 증거다. 전 단계 exact SHA 검증은 없다"
+          "reason": "T1-08 규칙·실행 CI와 PR #457의 해당 SHA에서 PostgreSQL 저장·재시작·1개월 재생을 확인했다. 전 단계 동일 커밋 검증 증거가 남아 있다"
         },
         "merge": {
           "status": "partial",
@@ -1568,7 +1693,7 @@
           "reason": "규칙 구현은 main에 있다. 나머지 단계는 병합 전이다"
         }
       },
-      "blockers": ["명령별 화면·DB·재시작·재생 증거와 전 단계 리뷰·exact SHA·병합 증거가 없다"]
+      "blockers": ["명령별 권한, 커밋 직전 복구, 전 단계 독립 리뷰·동일 커밋 검증·보호 병합 증거가 남아 있다"]
     },
     {
       "id": "defence",
@@ -1594,9 +1719,14 @@
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39557351030",
               "sha": "422229a"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-화면-시험",
+              "sha": "592ba1810c6348faa3346dff05f155b3b811e408"
             }
           ],
-          "reason": "30칸 편집기 명령 목록과 일부 명령 인자만 E2E로 확인했다. 명령별 화면 증거는 없다"
+          "reason": "기존 30칸 편집기 시험과 PR #498에서 명령 선택·소속 경고·한 번 저장·새로고침을 확인했다. 화면 독립 검토를 통과했고 필수 CI와 보호 병합이 남아 있다"
         },
         "api": {
           "status": "verified",
@@ -1691,9 +1821,14 @@
             {
               "kind": "test",
               "ref": "apps/engine/src/turnLoop.integration.test.ts"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-저장재시작재생-검토",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "턴 저장 경로 공통 시험만 있다. 이 명령 전용 DB 시험은 없다"
+          "reason": "공통 턴 시험과 PR #457에서 HTTP 예약·조회, 성공 효과·비용, 금 부족 시 금 불변과 실패 로그, 다음 칸 이동을 실제 PostgreSQL로 확인했다. 보호 병합 증거가 남아 있다"
         },
         "restart": {
           "status": "partial",
@@ -1705,9 +1840,14 @@
             {
               "kind": "test",
               "ref": "apps/engine/src/turnLoop.integration.test.ts"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-저장재시작재생-검토",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "리스·SIGKILL 재시작 공통 시험만 있다"
+          "reason": "공통 리스 시험과 PR #457의 커밋 뒤 실제 SIGKILL을 확인했다. 새 엔진 프로세스에서 상태와 명령 로그가 그대로였다. 커밋 직전 종료와 보호 병합 증거가 남아 있다"
         },
         "replay": {
           "status": "partial",
@@ -1720,9 +1860,14 @@
             {
               "kind": "test",
               "ref": "apps/engine/src/monthly.integration.test.ts"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-저장재시작재생-검토",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "12개월 재생 공통 시험만 있다. 이 명령의 재생 하한 시험은 없다"
+          "reason": "공통 12개월 시험과 PR #457의 이 명령을 포함한 월간 재생 1개월을 확인했다. 실제 PostgreSQL 상태 해시와 일치했다. 보호 병합 증거가 남아 있다"
         },
         "independentReview": {
           "status": "partial",
@@ -1768,9 +1913,14 @@
             {
               "kind": "test",
               "ref": "tools/command-coverage.test.ts"
+            },
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42427010103",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "81ffd1b CI는 규칙·실행 단계 증거다. 전 단계 exact SHA 검증은 없다"
+          "reason": "T1-08 규칙·실행 CI와 PR #457의 해당 SHA에서 PostgreSQL 저장·재시작·1개월 재생을 확인했다. 전 단계 동일 커밋 검증 증거가 남아 있다"
         },
         "merge": {
           "status": "partial",
@@ -1784,7 +1934,7 @@
           "reason": "규칙 구현은 main에 있다. 나머지 단계는 병합 전이다"
         }
       },
-      "blockers": ["명령별 화면·DB·재시작·재생 증거와 전 단계 리뷰·exact SHA·병합 증거가 없다"]
+      "blockers": ["명령별 권한, 커밋 직전 복구, 전 단계 독립 리뷰·동일 커밋 검증·보호 병합 증거가 남아 있다"]
     },
     {
       "id": "wall",
@@ -1810,9 +1960,14 @@
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39557351030",
               "sha": "422229a"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-화면-시험",
+              "sha": "592ba1810c6348faa3346dff05f155b3b811e408"
             }
           ],
-          "reason": "30칸 편집기 명령 목록과 일부 명령 인자만 E2E로 확인했다. 명령별 화면 증거는 없다"
+          "reason": "기존 30칸 편집기 시험과 PR #498에서 명령 선택·소속 경고·한 번 저장·새로고침을 확인했다. 화면 독립 검토를 통과했고 필수 CI와 보호 병합이 남아 있다"
         },
         "api": {
           "status": "verified",
@@ -1907,9 +2062,14 @@
             {
               "kind": "test",
               "ref": "apps/engine/src/turnLoop.integration.test.ts"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-저장재시작재생-검토",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "턴 저장 경로 공통 시험만 있다. 이 명령 전용 DB 시험은 없다"
+          "reason": "공통 턴 시험과 PR #457에서 HTTP 예약·조회, 성공 효과·비용, 금 부족 시 금 불변과 실패 로그, 다음 칸 이동을 실제 PostgreSQL로 확인했다. 보호 병합 증거가 남아 있다"
         },
         "restart": {
           "status": "partial",
@@ -1921,9 +2081,14 @@
             {
               "kind": "test",
               "ref": "apps/engine/src/turnLoop.integration.test.ts"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-저장재시작재생-검토",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "리스·SIGKILL 재시작 공통 시험만 있다"
+          "reason": "공통 리스 시험과 PR #457의 커밋 뒤 실제 SIGKILL을 확인했다. 새 엔진 프로세스에서 상태와 명령 로그가 그대로였다. 커밋 직전 종료와 보호 병합 증거가 남아 있다"
         },
         "replay": {
           "status": "partial",
@@ -1936,9 +2101,14 @@
             {
               "kind": "test",
               "ref": "apps/engine/src/monthly.integration.test.ts"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-저장재시작재생-검토",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "12개월 재생 공통 시험만 있다. 이 명령의 재생 하한 시험은 없다"
+          "reason": "공통 12개월 시험과 PR #457의 이 명령을 포함한 월간 재생 1개월을 확인했다. 실제 PostgreSQL 상태 해시와 일치했다. 보호 병합 증거가 남아 있다"
         },
         "independentReview": {
           "status": "partial",
@@ -1984,9 +2154,14 @@
             {
               "kind": "test",
               "ref": "tools/command-coverage.test.ts"
+            },
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42427010103",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "81ffd1b CI는 규칙·실행 단계 증거다. 전 단계 exact SHA 검증은 없다"
+          "reason": "T1-08 규칙·실행 CI와 PR #457의 해당 SHA에서 PostgreSQL 저장·재시작·1개월 재생을 확인했다. 전 단계 동일 커밋 검증 증거가 남아 있다"
         },
         "merge": {
           "status": "partial",
@@ -2000,7 +2175,7 @@
           "reason": "규칙 구현은 main에 있다. 나머지 단계는 병합 전이다"
         }
       },
-      "blockers": ["명령별 화면·DB·재시작·재생 증거와 전 단계 리뷰·exact SHA·병합 증거가 없다"]
+      "blockers": ["명령별 권한, 커밋 직전 복구, 전 단계 독립 리뷰·동일 커밋 검증·보호 병합 증거가 남아 있다"]
     },
     {
       "id": "research",
@@ -2026,9 +2201,14 @@
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39557351030",
               "sha": "422229a"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-화면-시험",
+              "sha": "592ba1810c6348faa3346dff05f155b3b811e408"
             }
           ],
-          "reason": "30칸 편집기 명령 목록과 일부 명령 인자만 E2E로 확인했다. 명령별 화면 증거는 없다"
+          "reason": "기존 30칸 편집기 시험과 PR #498에서 명령 선택·소속 경고·한 번 저장·새로고침을 확인했다. 화면 독립 검토를 통과했고 필수 CI와 보호 병합이 남아 있다"
         },
         "api": {
           "status": "verified",
@@ -2123,9 +2303,14 @@
             {
               "kind": "test",
               "ref": "apps/engine/src/turnLoop.integration.test.ts"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-저장재시작재생-검토",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "턴 저장 경로 공통 시험만 있다. 이 명령 전용 DB 시험은 없다"
+          "reason": "공통 턴 시험과 PR #457에서 HTTP 예약·조회, 성공 효과·비용, 금 부족 시 금 불변과 실패 로그, 다음 칸 이동을 실제 PostgreSQL로 확인했다. 보호 병합 증거가 남아 있다"
         },
         "restart": {
           "status": "partial",
@@ -2137,9 +2322,14 @@
             {
               "kind": "test",
               "ref": "apps/engine/src/turnLoop.integration.test.ts"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-저장재시작재생-검토",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "리스·SIGKILL 재시작 공통 시험만 있다"
+          "reason": "공통 리스 시험과 PR #457의 커밋 뒤 실제 SIGKILL을 확인했다. 새 엔진 프로세스에서 상태와 명령 로그가 그대로였다. 커밋 직전 종료와 보호 병합 증거가 남아 있다"
         },
         "replay": {
           "status": "partial",
@@ -2152,9 +2342,14 @@
             {
               "kind": "test",
               "ref": "apps/engine/src/monthly.integration.test.ts"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-저장재시작재생-검토",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "12개월 재생 공통 시험만 있다. 이 명령의 재생 하한 시험은 없다"
+          "reason": "공통 12개월 시험과 PR #457의 이 명령을 포함한 월간 재생 1개월을 확인했다. 실제 PostgreSQL 상태 해시와 일치했다. 보호 병합 증거가 남아 있다"
         },
         "independentReview": {
           "status": "partial",
@@ -2200,9 +2395,14 @@
             {
               "kind": "test",
               "ref": "tools/command-coverage.test.ts"
+            },
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42427010103",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "81ffd1b CI는 규칙·실행 단계 증거다. 전 단계 exact SHA 검증은 없다"
+          "reason": "T1-08 규칙·실행 CI와 PR #457의 해당 SHA에서 PostgreSQL 저장·재시작·1개월 재생을 확인했다. 전 단계 동일 커밋 검증 증거가 남아 있다"
         },
         "merge": {
           "status": "partial",
@@ -2216,7 +2416,7 @@
           "reason": "규칙 구현은 main에 있다. 나머지 단계는 병합 전이다"
         }
       },
-      "blockers": ["명령별 화면·DB·재시작·재생 증거와 전 단계 리뷰·exact SHA·병합 증거가 없다"]
+      "blockers": ["명령별 권한, 커밋 직전 복구, 전 단계 독립 리뷰·동일 커밋 검증·보호 병합 증거가 남아 있다"]
     },
     {
       "id": "rest",
@@ -2242,9 +2442,14 @@
               "kind": "ci",
               "ref": "https://github.com/peppone-choi/opensamguk/actions/runs/39557351030",
               "sha": "422229a"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-화면-시험",
+              "sha": "592ba1810c6348faa3346dff05f155b3b811e408"
             }
           ],
-          "reason": "30칸 편집기 명령 목록과 일부 명령 인자만 E2E로 확인했다. 명령별 화면 증거는 없다"
+          "reason": "기존 30칸 편집기 시험과 PR #498에서 9번 칸에 직접 넣은 휴식을 한 번 저장하고 새로고침 뒤 확인했다. 화면 독립 검토를 통과했고 필수 CI와 보호 병합이 남아 있다"
         },
         "api": {
           "status": "verified",
@@ -2339,9 +2544,14 @@
             {
               "kind": "test",
               "ref": "apps/engine/src/turnLoop.integration.test.ts"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-저장재시작재생-검토",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "턴 저장 경로 공통 시험만 있다. 이 명령 전용 DB 시험은 없다"
+          "reason": "공통 턴 시험과 PR #457에서 HTTP 예약·조회, 부상 감소와 금 불변, 성공 로그, 다음 칸 이동을 실제 PostgreSQL로 확인했다. 보호 병합 증거가 남아 있다"
         },
         "restart": {
           "status": "partial",
@@ -2353,9 +2563,14 @@
             {
               "kind": "test",
               "ref": "apps/engine/src/turnLoop.integration.test.ts"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-저장재시작재생-검토",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "리스·SIGKILL 재시작 공통 시험만 있다"
+          "reason": "공통 리스 시험과 PR #457의 커밋 뒤 실제 SIGKILL을 확인했다. 새 엔진 프로세스에서 상태와 명령 로그가 그대로였다. 커밋 직전 종료와 보호 병합 증거가 남아 있다"
         },
         "replay": {
           "status": "partial",
@@ -2368,9 +2583,14 @@
             {
               "kind": "test",
               "ref": "apps/engine/src/monthly.integration.test.ts"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/plans/T1-11.md#내정-8종과-휴식의-예턴-저장재시작재생-검토",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "12개월 재생 공통 시험만 있다. 이 명령의 재생 하한 시험은 없다"
+          "reason": "공통 12개월 시험과 PR #457의 이 명령을 포함한 월간 재생 1개월을 확인했다. 실제 PostgreSQL 상태 해시와 일치했다. 보호 병합 증거가 남아 있다"
         },
         "independentReview": {
           "status": "partial",
@@ -2416,9 +2636,14 @@
             {
               "kind": "test",
               "ref": "tools/command-coverage.test.ts"
+            },
+            {
+              "kind": "ci",
+              "ref": "https://github.com/opensamguk/opensamguk/actions/runs/42427010103",
+              "sha": "9555876f0b934b227ded1b4fc40dbddf96071395"
             }
           ],
-          "reason": "81ffd1b CI는 규칙·실행 단계 증거다. 전 단계 exact SHA 검증은 없다"
+          "reason": "T1-08 규칙·실행 CI와 PR #457의 해당 SHA에서 PostgreSQL 저장·재시작·1개월 재생을 확인했다. 전 단계 동일 커밋 검증 증거가 남아 있다"
         },
         "merge": {
           "status": "partial",
@@ -2432,7 +2657,7 @@
           "reason": "규칙 구현은 main에 있다. 나머지 단계는 병합 전이다"
         }
       },
-      "blockers": ["명령별 화면·DB·재시작·재생 증거와 전 단계 리뷰·exact SHA·병합 증거가 없다"]
+      "blockers": ["명령별 권한, 커밋 직전 복구, 전 단계 독립 리뷰·동일 커밋 검증·보호 병합 증거가 남아 있다"]
     },
     {
       "id": "recruit",
