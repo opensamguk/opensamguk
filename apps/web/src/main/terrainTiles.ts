@@ -269,31 +269,65 @@ function minHeap<T>() {
 // 지도 전체 길을 그릴 때 앞서 그린 길과 다른 표식 (D-055).
 // 칸 번호. 지도 칸은 가로세로 65536칸보다 작다.
 const cellNo = (x: number, y: number) => y * 65536 + x;
-export type RoadContext = { used: ReadonlySet<number>; blocked: (point: Point) => boolean };
+// extra: 새 칸을 낼 때 더하는 지형 값(terrainToll). 없으면 지형을 보지 않는다.
+export type RoadContext = {
+  used: ReadonlySet<number>;
+  blocked: (point: Point) => boolean;
+  extra?: ((point: Point) => number) | undefined;
+};
 // 앞서 그린 길 칸은 새 칸의 3할 값이고, 꺾임 한 번은 새 칸 두 개 값이다.
 const ON_ROAD = 0.3;
 const TURN = 2;
+// 지형 길값 (INT-20). 길은 산줄기 사이 평지·골짜기를 따라 굽고 물은 좁은 데서 건넌다. 새 칸 하나에 더하는 값이며
+// 평지·농지·초원·황토·사막·모래톱과 알 수 없는 칸은 0이다. 이미 낸 길 칸에는 더하지 않아 뒤 길이 같은 고개·나루로 모인다.
+const TOLL: Partial<Record<Terrain, number>> = {
+  forest: 1,
+  hills: 1,
+  mountains: 6,
+  highMountains: 12,
+  snow: 12,
+  river: 4,
+  lake: 4,
+  shallow: 4,
+  sea: 8,
+  deepSea: 12,
+};
+const MAX_TOLL = 12;
+const tollOf = TERRAINS.map((name) => TOLL[name] ?? 0);
+
+// 지형 칸 번호의 길값. 격자 밖·색 판 밖 칸은 0이다(지형을 모를 때와 같다).
+export function terrainToll(ground: Grid) {
+  return ({ x, y }: Point) => {
+    if (x < 0 || y < 0 || x >= ground.columns || y >= ground.rows) return 0;
+    return tollOf[ground.cells[y * ground.columns + x]!] ?? 0;
+  };
+}
 
 // D-055: 두 문 밖 칸 사이를 기존 길에 겹쳐 타며 적게 꺾는 가로세로 길로 잇는다. 막힌 칸(두 표식 상자와 다른 표식 상자)은
 // 기존 길 칸이 아니면 어떤 우회보다 비싸게 친다. 두 점을 둘러싼 범위 밖으로 8칸까지만 찾고 되돌아 걷지 않는다.
+// extra가 있으면 새 칸마다 지형 값(0~MAX_TOLL)을 더해 산을 돌고 물을 짧게 건넌다. 범위 칸마다 한 번만 부른다.
 export function bundledRun(
   start: Point,
   end: Point,
   heading: { dx: number; dy: number },
   blocked: (point: Point) => boolean,
   used: ReadonlySet<number>,
+  extra?: (point: Point) => number,
 ): Point[] {
   const x0 = Math.min(start.x, end.x) - 8;
   const y0 = Math.min(start.y, end.y) - 8;
   const width = Math.max(start.x, end.x) + 8 - x0 + 1;
   const height = Math.max(start.y, end.y) + 8 - y0 + 1;
-  const wall = width * height * (1 + TURN);
-  // 범위 칸마다 한 번만 읽는다: 1 기존 길, 2 막힌 칸.
+  // 막힌 칸 하나가 범위 안 어떤 우회(칸마다 새 칸·꺾임·가장 비싼 지형)보다 비싸다.
+  const wall = width * height * (1 + TURN + (extra ? MAX_TOLL : 0));
+  // 범위 칸마다 한 번만 읽는다: 1 기존 길, 2 막힌 칸. toll은 새 칸의 지형 값이다.
   const kind = new Uint8Array(width * height);
+  const toll = new Float32Array(width * height);
   for (let y = 0; y < height; y += 1)
     for (let x = 0; x < width; x += 1) {
       const point = { x: x0 + x, y: y0 + y };
       kind[y * width + x] = used.has(cellNo(point.x, point.y)) ? 1 : blocked(point) ? 2 : 0;
+      if (extra) toll[y * width + x] = Math.min(MAX_TOLL, Math.max(0, extra(point) || 0));
     }
   const index = (point: Point) => (point.y - y0) * width + (point.x - x0);
   const goal = index(end);
@@ -326,7 +360,8 @@ export function bundledRun(
       if (x + dx < 0 || x + dx >= width || y + dy < 0 || y + dy >= height) continue;
       const cell = at + dy * width + dx;
       const road = kind[cell] === 1;
-      const step = (road ? ON_ROAD : 1) + (next !== dir ? TURN : 0) + (kind[cell] === 2 && cell !== goal ? wall : 0);
+      const step =
+        (road ? ON_ROAD : 1 + toll[cell]!) + (next !== dir ? TURN : 0) + (kind[cell] === 2 && cell !== goal ? wall : 0);
       const total = here + step;
       const to = cell * 4 + next;
       if (cost[to]! <= total) continue;
@@ -379,7 +414,14 @@ export function gatedWalk(
     const start = outbound.at(-1)!;
     const end = inbound[0]!;
     const middle = context
-      ? bundledRun(start, end, leaving.heading, (point) => inBox(point) || context.blocked(point), context.used)
+      ? bundledRun(
+          start,
+          end,
+          leaving.heading,
+          (point) => inBox(point) || context.blocked(point),
+          context.used,
+          context.extra,
+        )
       : clearRun(start, end, inBox, [
           cornersFor(start, leaving.heading, end, entering.heading),
           [start, { x: end.x, y: start.y }, end],
@@ -394,12 +436,16 @@ export function gatedWalk(
 
 // 땅길·다리의 칸 길 (D-055). 여울·물길과 물길로 따로 그리는 경로(skip)는 뺀다. 곧은 거리가 짧은 길부터 내고
 // 뒤 길은 앞 길 칸에 겹쳐 타서 같은 쪽으로 가는 길이 한 줄로 합쳐진다. 지나가는 길은 다른 표식 상자를 비켜 간다.
+// ground(도트 바탕 지형 칸, 길 칸과 같은 크기)가 있으면 산을 돌아 골짜기·평지를 따르고 물은 좁은 데서 건넌다.
+// 없으면(바탕을 읽기 전) 지형을 보지 않는 기존 길이다. 화면 표시만 바뀌고 경로·이동 규칙은 그대로다.
 export function roadWalks(
   map: Pick<PublicGeography, 'sites' | 'routes'>,
   skip: ReadonlySet<string> = new Set(),
   gateCells: (siteId: string) => SiteGate = () => 0,
   cell = ROAD_CELL,
+  ground?: Grid | null,
 ): Map<string, Point[]> {
+  const extra = ground ? terrainToll(ground) : undefined;
   const siteById = new Map(map.sites.map((site) => [site.id, site]));
   const boxes = new Map<number, string[]>();
   for (const site of map.sites) {
@@ -431,7 +477,7 @@ export function roadWalks(
   for (const { route, points } of drawn) {
     const own = new Set(routeSiteIds(route));
     const blocked = (point: Point) => (boxes.get(cellNo(point.x, point.y)) ?? []).some((id) => !own.has(id));
-    const cells = gatedWalk(points, routeSiteIds(route).map(gateCells), cell, { used, blocked });
+    const cells = gatedWalk(points, routeSiteIds(route).map(gateCells), cell, { used, blocked, extra });
     for (const point of cells) used.add(cellNo(point.x, point.y));
     walks.set(route.id, cells);
   }
