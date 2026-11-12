@@ -9,9 +9,17 @@ const entryClient = createTRPCClient<AppRouter>({ links: [httpBatchLink({ url: '
 
 // 일반 화면의 운영 입구 (INT-20, AC-INT-20). admin.whoami가 성공한 계정에만 링크를 그린다.
 // 거절·연결 실패는 다시 묻지 않고 아무것도 그리지 않는다. 권한은 /admin 가드가 들어갈 때 다시 확인한다.
-export function AdminLink({ userId, className }: { userId: string; className?: string | undefined }) {
+export function AdminLink({
+  userId,
+  emailVerified,
+  className,
+}: {
+  userId: string;
+  emailVerified: boolean;
+  className?: string | undefined;
+}) {
   const admin = useQuery({
-    queryKey: ['adminEntry', userId],
+    queryKey: ['adminEntry', userId, emailVerified],
     queryFn: async ({ signal }) => {
       const [identity, permission] = await Promise.all([
         entryClient.auth.me.query(undefined, { signal }),

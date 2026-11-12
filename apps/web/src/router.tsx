@@ -85,7 +85,7 @@ function RootFrame() {
         const target = isVerificationDenied(event.action.error)
           ? '/verify-email'
           : isConsentDenied(event.action.error)
-            ? '/legal/agree'
+            ? '/login'
             : null;
         if (!target || router.state.location.pathname === target) return;
         void queryClient.invalidateQueries({ queryKey: trpc.account.get.queryKey() });
@@ -120,7 +120,7 @@ async function requireGameAccess(context: RouterContext, next: string) {
   }
   if (needsEmailVerification(account))
     throw redirect({ to: '/verify-email', search: { next: destination }, replace: true });
-  if (needsConsent(account)) throw redirect({ to: '/legal/agree', search: { next: destination }, replace: true });
+  if (needsConsent(account)) throw redirect({ to: '/login', search: { next: destination }, replace: true });
 }
 
 function GuardError() {
@@ -173,7 +173,22 @@ const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'login',
   validateSearch: authSearch,
-  component: LoginPage,
+  beforeLoad: async ({ context, search }) => {
+    const user = await currentUser(context);
+    if (!user) return { consentUserId: null };
+    const destination = accountNext(search.next) ?? '/lobby';
+    const account = await context.queryClient.fetchQuery({ ...context.trpc.account.get.queryOptions(), staleTime: 0 });
+    if (needsEmailVerification(account))
+      throw redirect({ to: '/verify-email', search: { next: destination }, replace: true });
+    if (needsConsent(account)) return { consentUserId: user.id };
+    throw redirect({ href: destination, replace: true });
+  },
+  component: function LoginRoute() {
+    const { consentUserId } = loginRoute.useRouteContext();
+    const { next } = loginRoute.useSearch();
+    return consentUserId ? <LegalAgreePage key={consentUserId} viewerId={consentUserId} next={next} /> : <LoginPage />;
+  },
+  errorComponent: GuardError,
 });
 const signupRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -250,16 +265,9 @@ const legalAgreeRoute = createRoute({
     const next = accountNext(search.next);
     return next ? { next } : {};
   },
-  beforeLoad: async ({ context, search }) => {
-    const user = await currentUser(context);
-    if (!user) throw redirect({ to: '/login', search: { next: search.next ?? '/lobby' } });
-    const account = await context.queryClient.fetchQuery({ ...context.trpc.account.get.queryOptions(), staleTime: 0 });
-    if (needsEmailVerification(account))
-      throw redirect({ to: '/verify-email', search: { next: search.next ?? '/lobby' }, replace: true });
-    return { consentUserId: user.id };
+  beforeLoad: ({ search }) => {
+    throw redirect({ to: '/login', search: { next: search.next ?? '/lobby' }, replace: true });
   },
-  component: LegalAgreePage,
-  errorComponent: GuardError,
 });
 
 // 계정 단위 알림 설정 (T2-21). 월드와 무관하고 로그인이 필요하다.

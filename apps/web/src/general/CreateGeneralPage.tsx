@@ -10,7 +10,6 @@ import { DisabledReason } from '../ui/DisabledReason';
 import { EmptyState, ErrorState } from '../ui/States';
 import {
   checkCreation,
-  PORTRAIT_CHOICES,
   STATS,
   FIVE_STATS,
   FIVE_STAT_PRESETS,
@@ -272,8 +271,52 @@ function CreateForm({
 }) {
   const trpc = useTRPC();
   const create = useMutation(trpc.general.create.mutationOptions());
+  const account = useQuery(trpc.account.get.queryOptions());
+  const queryClient = useQueryClient();
+  const upload = useMutation(trpc.account.setPortrait.mutationOptions());
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [portraitRevision, setPortraitRevision] = useState(0);
+  const ownPortrait = account.data?.portraitId ?? null;
+  const portraitId = draft.portraitId === ownPortrait ? ownPortrait : null;
+
+  async function registerPortrait(file: File, userId: string) {
+    setUploading(true);
+    setUploadError(null);
+    try {
+      if (file.size > 5_000_000) {
+        setUploadError('5MB 이하의 이미지 파일을 선택하세요.');
+        return;
+      }
+      const image = await createImageBitmap(file);
+      const canvas = document.createElement('canvas');
+      try {
+        const scale = Math.min(1, 256 / Math.max(image.width, image.height));
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('초상 이미지를 처리하지 못했습니다.');
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      } finally {
+        image.close();
+      }
+      const png = canvas.toDataURL('image/png').split(',')[1];
+      if (!png) throw new Error('초상 이미지를 처리하지 못했습니다.');
+      const saved = await upload.mutateAsync({ expectedUserId: userId, png });
+      const key = trpc.account.get.queryKey();
+      await queryClient.cancelQueries({ queryKey: key });
+      queryClient.setQueryData(key, (previous) =>
+        previous?.userId === userId ? { ...previous, portraitId: saved.portraitId } : previous,
+      );
+      setPortraitRevision((revision) => revision + 1);
+    } catch (error) {
+      setUploadError(serverMessage(error) ?? '초상 이미지를 등록하지 못했습니다.');
+    } finally {
+      setUploading(false);
+    }
+  }
   // 입력은 화면(CreateGeneral)이 갖는다. 기다리는 동안 폼이 사라졌다가 거절로 돌아와도 보낸 값이 남는다.
-  const { name, stats, portraitId, sex, bonus } = draft;
+  const { name, stats, sex, bonus } = draft;
   const setName = (value: string) => onDraft((prev) => ({ ...prev, name: value }));
   const setStats = (update: (prev: StatValues) => StatValues) =>
     onDraft((prev) => ({ ...prev, stats: update(prev.stats) }));
@@ -305,7 +348,7 @@ function CreateForm({
   const submit = (event: FormEvent) => {
     event.preventDefault();
     setTouched(true);
-    if (!check.stats || problems.length > 0 || create.isPending || draft.owner !== currentOwner) return;
+    if (!check.stats || problems.length > 0 || create.isPending || uploading || draft.owner !== currentOwner) return;
     // 0인 능력치는 빼고 합이 0이면 heritage 키를 보내지 않는다. 보너스는 서버가 기본값에 더한다.
     const heritagePayload =
       heritageCheck && spent > 0
@@ -326,7 +369,11 @@ function CreateForm({
         ...(lineage && sex !== '' ? { sex } : {}),
         ...heritagePayload,
         // 유산 월드에서는 입력을 시작한 계정을 함께 보낸다. 세션이 바뀌었으면 서버가 입력·잔액을 건드리기 전에 거절한다.
-        ...(heritage && draft.owner !== null ? { expectedUserId: draft.owner } : {}),
+        ...(portraitId !== null && account.data
+          ? { expectedUserId: account.data.userId }
+          : heritage && draft.owner !== null
+            ? { expectedUserId: draft.owner }
+            : {}),
       },
       {
         onSuccess: (result) => {
@@ -501,16 +548,42 @@ function CreateForm({
         <label className={styles.portraitOption}>
           <input type="radio" name="portrait" checked={portraitId === null} onChange={() => setPortraitId(null)} />
           <Portrait id={null} name={check.name || '장수'} variant="thumb" />
-          <span>기본 이미지</span>
+          <span>초상 없음</span>
         </label>
-        {PORTRAIT_CHOICES.map((id, i) => (
-          <label key={id} className={styles.portraitOption}>
-            <input type="radio" name="portrait" checked={portraitId === id} onChange={() => setPortraitId(id)} />
-            <Portrait id={id} name={`초상 ${i + 1}`} variant="thumb" />
-            <span>초상 {i + 1}</span>
+        {ownPortrait !== null ? (
+          <label className={styles.portraitOption}>
+            <input
+              type="radio"
+              name="portrait"
+              checked={portraitId === ownPortrait}
+              onChange={() => setPortraitId(ownPortrait)}
+            />
+            <Portrait key={portraitRevision} id={ownPortrait} name={check.name || '장수'} variant="thumb" />
+            <span>내 초상</span>
           </label>
-        ))}
+        ) : null}
       </fieldset>
+      {account.data ? (
+        <label>
+          {ownPortrait === null ? '내 초상 등록' : '내 초상 변경'}
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            disabled={uploading}
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0];
+              event.currentTarget.value = '';
+              if (file && account.data) void registerPortrait(file, account.data.userId);
+            }}
+          />
+        </label>
+      ) : null}
+      {uploading ? <p role="status">초상을 등록하는 중입니다.</p> : null}
+      {uploadError ? (
+        <p role="alert" className={styles.errorText}>
+          {uploadError}
+        </p>
+      ) : null}
 
       <div id={problemsId} className={styles.problems} aria-live="polite">
         {problems.length > 0 ? (

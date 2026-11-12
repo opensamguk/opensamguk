@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { rngFor } from '@opensamguk/shared';
+import { PLAYER_PORTRAIT_MIN_ID, rngFor } from '@opensamguk/shared';
 import { monthlyDate } from '../monthly/index';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { statRulesSchema, unitSetSchema } from '../world/resources';
@@ -52,7 +52,7 @@ export const generalCreationSchema = z.strictObject({
   charm: dbInt.optional(),
   sex: knownGeneralSexSchema.optional(),
   heritage: heritageBonusSchema.optional(),
-  portraitId: z.number().int().min(10001).max(11008).nullable(),
+  portraitId: z.union([z.number().int().min(10001).max(11008), dbInt.min(PLAYER_PORTRAIT_MIN_ID)]).nullable(),
 });
 export type GeneralCreation = z.infer<typeof generalCreationSchema>;
 export const CREATION_ERRORS = {

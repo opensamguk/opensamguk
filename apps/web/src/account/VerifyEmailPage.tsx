@@ -76,6 +76,7 @@ export function VerifyEmailPage() {
     gcTime: 0,
     onSuccess() {
       void queryClient.invalidateQueries({ queryKey: trpc.account.get.queryKey() });
+      void queryClient.invalidateQueries({ queryKey: trpc.auth.me.queryKey() });
     },
   });
   const { mutate } = mutation;
@@ -110,7 +111,9 @@ export function VerifyEmailPage() {
       {(accountToken.kind === 'token' && mutation.isSuccess) ||
       (accountToken.kind === 'missing' && account.data?.emailVerified) ? (
         <div className={styles.links}>
-          <a href={accountNext(next) ?? '/lobby'}>계속하기</a>
+          <Link to="/login" search={{ next: accountNext(next) ?? '/lobby' }}>
+            계속하기
+          </Link>
         </div>
       ) : null}
       {accountToken.kind === 'token' && mutation.isError && describeFailure(mutation.error).kind === 'retry' ? (

@@ -106,7 +106,8 @@ function pickMap(value: unknown): PublicMap | null {
 function pickWorld(value: unknown): PublicWorld | null {
   if (!isObject(value)) return null;
   const { id, name, status, map } = value;
-  if (!isText(id) || !isText(name) || (status !== 'RUNNING' && status !== 'PAUSED')) return null;
+  if (!isText(id) || !isText(name) || (status !== 'PREOPEN' && status !== 'RUNNING' && status !== 'PAUSED'))
+    return null;
   return { id, name, status, map: pickMap(map) };
 }
 

@@ -106,6 +106,28 @@ async function account(stack: LegalStack, page: Page, verified = true) {
   return user;
 }
 
+test('AC-M2-02 AC-M3-04 관리자가 같은 로그인 화면에서 동의하고 로비에서 운영으로 이동한다', ({
+  page,
+  legalStack: stack,
+}) =>
+  track(async () => {
+    await stack.restart(policy('admin-entry'), true);
+    const user = await account(stack, page);
+    await stack.db.user.update({ where: { id: user.id }, data: { role: 'ADMIN' } });
+    await page.context().clearCookies();
+    await page.goto(stack.origin + '/login?next=%2Flobby');
+    await credentials(page, user.email);
+    await page.getByRole('button', { name: '로그인', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '현재 문서 동의' })).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe('/login');
+    await checkBoth(page);
+    await page.getByRole('button', { name: '동의하고 계속하기' }).click();
+    await expect(page).toHaveURL(stack.origin + '/lobby');
+    await page.getByRole('link', { name: '운영 화면' }).click();
+    await expect(page).toHaveURL(stack.origin + '/admin');
+    await expect(page.getByRole('heading', { name: '관리자 콘솔' })).toBeVisible();
+  }));
+
 test('T3-03 AC-M3-02 실제 운영 준비 상태는 화면 가입과 직접 입력을 막고 계정을 만들지 않는다', ({
   page,
   legalStack: stack,

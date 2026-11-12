@@ -40,7 +40,11 @@ function database() {
   const tx = {
     auditLog: { create: vi.fn(async () => ({})) },
     world: {
-      create: vi.fn(async ({ data }: { data: Prisma.WorldCreateInput }) => ({ ...data, id: worldId })),
+      create: vi.fn(async ({ data }: { data: Prisma.WorldCreateInput }) => ({
+        ...data,
+        id: worldId,
+        createdAt: new Date(0),
+      })),
       update: forbidden,
       updateMany: forbidden,
     },
@@ -50,6 +54,7 @@ function database() {
     generalTurn: { createMany: createMany() },
     diplomacy: { createMany: createMany() },
     nationTurn: { createMany: createMany() },
+    publicMapSnapshot: { create: vi.fn(async () => ({})) },
     treaty: { create: forbidden, createMany: forbidden, update: forbidden, updateMany: forbidden },
   };
   const transaction = vi.fn(async (run: (client: Prisma.TransactionClient) => Promise<unknown>) =>

@@ -16,12 +16,18 @@ const AdminLink = lazy(() =>
 export function AdminEntry({ className }: { className?: string | undefined }) {
   const trpc = useTRPC();
   const me = useQuery(trpc.auth.me.queryOptions());
-  const userId = me.data?.user?.id;
-  if (!userId) return null;
-  // 계정이 바뀌면 새로 그린다. 같은 관찰자의 키만 바꾸면 거절된 확인도 다시 묻는다 (retryOnMount가 적용되지 않는다).
+  const user = me.data?.user;
+  if (!user || user.consentRequired.length > 0) return null;
+  const { id: userId, emailVerified } = user;
+  // 계정이나 이메일 인증 상태가 바뀌면 권한 확인을 새로 시작한다.
   return (
     <Suspense fallback={null}>
-      <AdminLink key={userId} userId={userId} className={className} />
+      <AdminLink
+        key={`${userId}:${emailVerified}`}
+        userId={userId}
+        emailVerified={emailVerified}
+        className={className}
+      />
     </Suspense>
   );
 }
