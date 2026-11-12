@@ -280,6 +280,8 @@ test('3 빈 칸과 직접 넣은 휴식은 저장과 새로고침을 거쳐도 �
   const set = await saved;
   evidence.turnsSet = set;
   expect(set.input).toEqual({
+    expectedUserId: world.userId,
+    expectedActorId: world.generalId,
     worldId: world.id,
     revision: before.revision,
     slots: [{ commandKey: 'rest', args: {} }, ...Array.from({ length: 29 }, () => null)],
