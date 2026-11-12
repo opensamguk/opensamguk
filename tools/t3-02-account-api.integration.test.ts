@@ -51,7 +51,7 @@ async function server(transport: MailTransport) {
   });
 }
 async function call(
-  path: Path | 'auth.login' | 'auth.signup',
+  path: Path | 'account.setPortrait' | 'auth.login' | 'auth.signup',
   input: unknown,
   cookie?: string,
   requestOrigin: string | null = origin,
@@ -104,6 +104,7 @@ async function snapshot() {
       JSON.stringify({
         users: await db.user.findMany({ where: { id: { in: ids } }, orderBy: { id: 'asc' } }),
         sessions: await db.session.findMany({ where: { userId: { in: ids } }, orderBy: { id: 'asc' } }),
+        portraits: await db.accountPortrait.findMany({ where: { userId: { in: ids } }, orderBy: { id: 'asc' } }),
         tokens: await db.accountToken.findMany({ where: { userId: { in: ids } }, orderBy: { id: 'asc' } }),
         consents: await db.consentRecord.findMany({ where: { userId: { in: ids } }, orderBy: { id: 'asc' } }),
       }),
@@ -174,6 +175,7 @@ for (const path of paths)
         } else if (path === 'account.get') {
           expect(response.body.result?.data).toEqual({
             userId: actor.id,
+            portraitId: null,
             email: actor.email,
             emailVerified: false,
             emailVerificationRequired: false,
@@ -204,6 +206,34 @@ for (const path of paths)
           expect(logs.includes(secret)).toBe(false);
       }),
     );
+
+for (const category of categories)
+  it(
+    `account.setPortrait ${category}`,
+    authzCase('account.setPortrait', category, async () => {
+      const [actor, other] = actors;
+      const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNYtfvMfwAHdQMxTAUe1QAAAABJRU5ErkJggg==';
+      if (category === 'sanctioned') await db.user.update({ where: { id: actor!.id }, data: { status: 'SANCTIONED' } });
+      const before = await snapshot();
+      const response = await call(
+        'account.setPortrait',
+        {
+          expectedUserId: category === 'otherUser' ? other!.id : actor!.id,
+          png: category === 'invalidInput' ? 'bad' : png,
+        },
+        category === 'unauthenticated' ? undefined : actor!.cookie,
+      );
+      expect(response.status).toBe(category === 'success' ? 200 : category === 'invalidInput' ? 400 : 401);
+      if (category === 'success') {
+        const saved = await db.accountPortrait.findUniqueOrThrow({ where: { userId: actor!.id } });
+        expect(response.body.result?.data).toEqual({ portraitId: saved.id });
+        expect(Buffer.from(saved.png).toString('base64')).toBe(png);
+      } else {
+        expect(await snapshot()).toBe(before);
+      }
+      expect(logs).not.toContain(png);
+    }),
+  );
 
 it('재발급·분 창 경계·인증 후 다시 보내기와 토큰 재사용을 실제 메일함으로 확인한다', async () => {
   const actor = actors[0]!;

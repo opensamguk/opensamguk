@@ -111,9 +111,7 @@ export function VerifyEmailPage() {
       {(accountToken.kind === 'token' && mutation.isSuccess) ||
       (accountToken.kind === 'missing' && account.data?.emailVerified) ? (
         <div className={styles.links}>
-          <Link to="/login" search={{ next: accountNext(next) ?? '/lobby' }}>
-            계속하기
-          </Link>
+          <a href={accountNext(next) ?? '/lobby'}>계속하기</a>
         </div>
       ) : null}
       {accountToken.kind === 'token' && mutation.isError && describeFailure(mutation.error).kind === 'retry' ? (
