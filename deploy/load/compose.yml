@@ -63,7 +63,8 @@ services:
     command: [node, --import, tsx, tools/load/server.ts]
     environment:
       LOAD_RUN_ID: ${LOAD_RUN_ID:?}
-      NODE_ENV: production
+      # The isolated service uses its private HTTP origin and requires verified accounts.
+      NODE_ENV: test
       CAPACITY_MONITOR_ENABLED: '0'
     ports: ['127.0.0.1::3001']
     healthcheck:

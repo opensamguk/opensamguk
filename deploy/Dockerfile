@@ -19,6 +19,7 @@ RUN node -e 'if(!/^[a-f0-9]{40}$/.test(process.argv[1])||!/^[a-f0-9]{64}$/.test(
 LABEL org.opencontainers.image.revision="$SOURCE_REVISION" \
       org.opensamguk.source-tree-sha256="$SOURCE_TREE_SHA256"
 ENV NODE_ENV=production
+ENV OPENSAMGUK_RESOURCES_ROOT=/app/resources
 USER 10001:10001
 ENTRYPOINT ["/app/deploy/entrypoint.sh"]
 

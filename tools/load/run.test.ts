@@ -47,14 +47,23 @@ describe('L4 실제 실행 전 소유권/source/compose 계약', () => {
           },
           server: {
             cgroup_parent: LOAD_DOCKER.cgroupParent,
+            environment: { NODE_ENV: 'test' },
             tmpfs: ['/tmp:rw,noexec,nosuid,size=64m,mode=1777'],
             volumes: [
               { source: 'app-secrets', target: '/run/secrets', read_only: true, volume: { nocopy: true } },
               { source: 'evidence', target: '/evidence', volume: { nocopy: true } },
             ],
           },
-          engine: { cgroup_parent: LOAD_DOCKER.cgroupParent, tmpfs: ['/tmp:rw,noexec,nosuid,size=64m,mode=1777'] },
-          generator: { cgroup_parent: LOAD_DOCKER.cgroupParent, tmpfs: ['/tmp:rw,noexec,nosuid,size=64m,mode=1777'] },
+          engine: {
+            cgroup_parent: LOAD_DOCKER.cgroupParent,
+            environment: { NODE_ENV: 'production' },
+            tmpfs: ['/tmp:rw,noexec,nosuid,size=64m,mode=1777'],
+          },
+          generator: {
+            cgroup_parent: LOAD_DOCKER.cgroupParent,
+            environment: { NODE_ENV: 'production' },
+            tmpfs: ['/tmp:rw,noexec,nosuid,size=64m,mode=1777'],
+          },
         },
       });
     }
