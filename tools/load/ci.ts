@@ -8,7 +8,7 @@ import { bindLocalDocker, LOAD_DOCKER } from './docker';
 import { commandSettled, helperDiagnosticPattern, OwnedCommands, sourceSnapshot, writeEvidence } from './lifecycle';
 import { readRunnerProvenance, sampleAdmission, selfCgroupPath } from './observe';
 import { evaluateLoadRun, loadRunSchema } from './report';
-import { requireImageSource, volumeInitFailurePattern } from './run';
+import { bodyFailureReasonPattern, requireImageSource, volumeInitFailurePattern } from './run';
 
 // 공식 release/registry manifest: https://github.com/moby/buildkit/releases/tag/v0.34.1
 // index sha256은 registry의 Docker-Content-Digest와 실제 응답 body SHA256을 대조했다.
@@ -658,11 +658,26 @@ async function main() {
           .regex(/^[a-z0-9-]{1,64}$/)
           .nullable(),
         bodyFailureDiagnostic: z.string().regex(helperDiagnosticPattern).nullable(),
+        bodyFailureReason: z.string().regex(bodyFailureReasonPattern).nullable(),
         volumeInitFailure: z.string().regex(volumeInitFailurePattern).nullable(),
         complete: z.boolean(),
         deleted: z.boolean(),
       })
       .safeParse(lifecycle);
+    const worker = z
+      .object({
+        phase: z.enum(['starting', 'fixtures', 'generator', 'measurement', 'due-tail']),
+        actorsPrepared: z.int().min(0).max(218),
+        sseReady: z.int().min(0).max(100),
+        http: z
+          .object({ procedure: z.enum(['general.create', 'general.mine']), status: z.int().min(0).max(599) })
+          .nullable(),
+      })
+      .safeParse(
+        await readFile(resolve(reportPath, 'partial-artifacts/worker-failure.json'), 'utf8')
+          .then(JSON.parse)
+          .catch(() => null),
+      );
     const report = await readFile(resolve(reportPath, 'run.json'), 'utf8')
       .then(JSON.parse)
       .catch(() => null);
@@ -673,6 +688,8 @@ async function main() {
         event: 'LOAD_CI_DRIVER_DIAGNOSTIC',
         bodyFailureStep: state.success ? state.data.bodyFailureStep : null,
         bodyFailureDiagnostic: state.success ? state.data.bodyFailureDiagnostic : null,
+        bodyFailureReason: state.success ? state.data.bodyFailureReason : null,
+        worker: worker.success ? worker.data : null,
         volumeInitFailure: state.success ? state.data.volumeInitFailure : null,
         complete: state.success ? state.data.complete : false,
         deleted: state.success ? state.data.deleted : false,

@@ -27,6 +27,7 @@ export type LoadFixtureOptions = {
   // L4 소유자가 실제 감독/엔진 프로세스를 기동·추적한다. 진행 tick을 직접 주입하지 않는다.
   startEngine: (worldId: string) => Promise<void>;
   onWorldCreated: (worldId: string) => void;
+  onActorPrepared: () => void;
 };
 
 export async function prepareLoadFixtures(db: PrismaClient, options: LoadFixtureOptions) {
@@ -57,7 +58,7 @@ export async function prepareLoadFixtures(db: PrismaClient, options: LoadFixture
       { ...options, startClock: (id) => controlClock(db, id, 'start') },
     );
     const actors: LoadActor[] = [];
-    for (const name of plan.humanNames) {
+    async function prepareActor(name: string): Promise<LoadActor> {
       options.signal.throwIfAborted();
       const userId = randomUUID();
       const now = new Date();
@@ -115,7 +116,18 @@ export async function prepareLoadFixtures(db: PrismaClient, options: LoadFixture
         (await db.generalTurn.count({ where: { worldId, generalId: row.id } })) !== 30
       )
         throw new Error('LOAD_API_CREATION_EVIDENCE_MISSING');
-      actors.push(Object.freeze({ userId, generalId: row.id, worldId, client }));
+      options.onActorPrepared();
+      return Object.freeze({ userId, generalId: row.id, worldId, client });
+    }
+    // Independent accounts can wait on the same engine poll. Retain the planned client order and settle every request.
+    const creationBatchSize = 8;
+    for (let offset = 0; offset < plan.humanNames.length; offset += creationBatchSize) {
+      const batch = plan.humanNames.slice(offset, offset + creationBatchSize);
+      const settled = await Promise.allSettled(batch.map(prepareActor));
+      for (const result of settled) {
+        if (result.status === 'rejected') throw result.reason;
+        actors.push(result.value);
+      }
     }
     const historicalRows = await db.general.count({
       where: { worldId, id: { in: profile.historicalGeneralIds }, userId: null },

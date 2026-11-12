@@ -122,21 +122,30 @@ export async function runNativeLoad(
   }
   try {
     signal.throwIfAborted();
-    for (const [worldIndex, world] of worlds.entries()) {
-      for (const [index, actor] of world.users.slice(0, perWorld).entries()) {
-        const recipient = world.actors[(index + 1) % world.actors.length]!;
-        setups.push(
-          (async () => {
-            const state = await prepareUser(actor, recipient.generalId, signal);
-            signal.throwIfAborted();
-            await connect(actor, worldIndex, index);
-            signal.throwIfAborted();
-            return state;
-          })(),
-        );
-      }
+    const clients = worlds.flatMap((world, worldIndex) =>
+      world.users.slice(0, perWorld).map((actor, index) => ({
+        actor,
+        worldIndex,
+        index,
+        recipientId: world.actors[(index + 1) % world.actors.length]!.generalId,
+      })),
+    );
+    const states: State[] = [];
+    // The server allows 32 SSE preparations. All admitted streams stay open during the same measured window.
+    const setupBatchSize = 16;
+    for (let offset = 0; offset < clients.length; offset += setupBatchSize) {
+      const batch = clients
+        .slice(offset, offset + setupBatchSize)
+        .map(async ({ actor, worldIndex, index, recipientId }) => {
+          const state = await prepareUser(actor, recipientId, signal);
+          signal.throwIfAborted();
+          await connect(actor, worldIndex, index);
+          signal.throwIfAborted();
+          return state;
+        });
+      setups.push(...batch);
+      states.push(...(await Promise.all(batch)));
     }
-    const states = await Promise.all(setups);
     clearTimeout(setupTimer);
     signal.throwIfAborted();
     const warmupMs = options.mode === 'formal' ? LOAD_CONTRACT.warmupMs : 1000;

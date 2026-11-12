@@ -9,13 +9,19 @@ import type { GeneratorEvent } from './journal';
 describe('L4 생성기 후크와 전체 본문 시간', () => {
   it('attempt 영속 대기와 본문 소비를 모두 duration에 포함하고 취소 후 새 후크를 내보내지 않는다', async () => {
     let clock = 0,
-      abortedEvents = 0;
+      abortedEvents = 0,
+      preparing = 0,
+      maxPreparing = 0;
     const controller = new AbortController(),
       events: GeneratorEvent[] = [];
     vi.spyOn(performance, 'now').mockImplementation(() => clock);
     const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
       const url = new URL(String(input));
       if (url.pathname === '/sse') {
+        preparing++;
+        maxPreparing = Math.max(maxPreparing, preparing);
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        preparing--;
         return new Response(
           new ReadableStream<Uint8Array>({
             start(stream) {
@@ -75,7 +81,7 @@ describe('L4 생성기 후크와 전체 본문 시간', () => {
         };
       });
       const run = await runNativeLoad(worlds, {
-        mode: 'smoke',
+        mode: 'formal',
         seed: 'hook-unit',
         signal: controller.signal,
         onEvent: async (event) => {
@@ -88,6 +94,10 @@ describe('L4 생성기 후크와 전체 본문 시간', () => {
       expect(run.requests.length).toBeGreaterThan(0);
       expect(run.requests.every((sample) => sample.durationMs >= 100)).toBe(true);
       expect(events.some((event) => event.kind === 'attempt')).toBe(true);
+      const firstAttempt = events.findIndex((event) => event.kind === 'attempt');
+      expect(events.slice(0, firstAttempt).filter((event) => event.kind === 'sse')).toHaveLength(100);
+      expect(maxPreparing).toBeGreaterThan(1);
+      expect(maxPreparing).toBeLessThanOrEqual(16);
       expect(events.filter((event) => event.kind === 'complete')).toHaveLength(1);
       expect(abortedEvents).toBe(0);
       expect(run.complete).toBe(false);

@@ -247,6 +247,8 @@ try {
 }`;
 export const volumeInitFailurePattern =
   /^(UNCLASSIFIED|(verify|permissions|secrets|ownership):(EACCES|EPERM|ENOENT|EEXIST|EROFS|OTHER|VOLUME_NOT_FRESH))$/;
+export const bodyFailureReasonPattern =
+  /^LOAD_(SETUP_DEADLINE_EXCEEDED|GENERATOR_FAILED|GENERATOR_PHASE_INVALID|OBSERVER_FAILED|RUNTIME_RESOURCE_EXHAUSTED|NATIVE_COMMAND_FAILED|NATIVE_CHILD_UNSETTLED|BODY_FAILED)$/;
 
 async function main(): Promise<number> {
   const { values } = parseArgs({
@@ -585,6 +587,7 @@ async function main(): Promise<number> {
   const failures: Error[] = [];
   let bodyFailureStep: string | undefined;
   let bodyFailureDiagnostic: string | undefined;
+  let bodyFailureReason: string | undefined;
   try {
     const collisions = await native(
       ['ps', '-aq', '--filter', `label=com.docker.compose.project=${project}`],
@@ -855,12 +858,17 @@ async function main(): Promise<number> {
     finalVerdict = report.verdict;
     succeeded = finalVerdict === 'PASS' || finalVerdict === 'SMOKE_ONLY';
     complete = true;
-  } catch {
+  } catch (error) {
     const last =
       commands.receipts.findLast((row) => row.failed || (row.exitCode !== null && row.exitCode !== 0)) ??
       commands.receipts.at(-1);
     bodyFailureStep = last?.label;
     bodyFailureDiagnostic = last?.diagnostic;
+    bodyFailureReason = observeFailure
+      ? 'LOAD_OBSERVER_FAILED'
+      : error instanceof Error && bodyFailureReasonPattern.test(error.message)
+        ? error.message
+        : 'LOAD_BODY_FAILED';
     failures.push(new Error('LOAD_BODY_FAILED'));
   }
   {
@@ -1021,6 +1029,7 @@ async function main(): Promise<number> {
           verdict: finalVerdict,
           bodyFailureStep: bodyFailureStep ?? null,
           bodyFailureDiagnostic: bodyFailureDiagnostic ?? null,
+          bodyFailureReason: bodyFailureReason ?? null,
           volumeInitFailure,
           sourceUnchanged,
           ownershipMatches,

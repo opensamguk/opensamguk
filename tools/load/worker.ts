@@ -8,6 +8,7 @@ import { initializeResources, ResourceInitializationError } from '../init-resour
 import { initializeIntegrationResources } from '../integration-resources';
 import { prepareLoadFixtures } from './fixtures';
 import { runNativeLoad } from './generator';
+import { LoadHttpError } from './http';
 import { nativeJournal } from './journal';
 import { writeEvidence } from './lifecycle';
 import { loadDatabaseUrl } from './server';
@@ -118,6 +119,8 @@ async function main() {
     journal: ReturnType<typeof nativeJournal> | undefined;
   let setupTimer: ReturnType<typeof setTimeout> | undefined, bodyTimer: ReturnType<typeof setTimeout> | undefined;
   let phase = 'starting';
+  let actorsPrepared = 0;
+  let sseReady = 0;
   const stop = () => controller.abort();
   process.once('SIGINT', stop);
   process.once('SIGTERM', stop);
@@ -186,6 +189,9 @@ async function main() {
       onWorldCreated: (id) => {
         worldIds.push(id);
       },
+      onActorPrepared: () => {
+        actorsPrepared++;
+      },
       startEngine: async (worldId) => {
         // 기존 실제 엔진 감독이 새 월드의 lease를 얻을 때까지 기다리며 tick은 주입하지 않는다.
         while (true) {
@@ -205,6 +211,7 @@ async function main() {
       signal: controller.signal,
       onEvent: async (event) => {
         controller.signal.throwIfAborted();
+        if (event.kind === 'sse' && event.state === 'ready') sseReady++;
         if (event.kind === 'start') {
           if (event.at > setupDeadline || Date.now() > setupDeadline) throw new Error('LOAD_SETUP_DEADLINE_EXCEEDED');
           clearTimeout(setupTimer);
@@ -215,6 +222,7 @@ async function main() {
             fixtureAccounts: fixtures.fixtureAccounts,
             apiHumans: fixtures.realApiHumans,
           });
+          phase = 'measurement';
           controller.signal.throwIfAborted();
         }
         await journal!.sink(event);
@@ -278,7 +286,15 @@ async function main() {
     const helperPhase = helperPhases[phase];
     if (helperPhase) process.stderr.write(`${helperPhase}\n`);
     try {
-      await writeEvidence('/evidence/worker-failure.json', { failed: true, phase, worldIds, at: Date.now() });
+      await writeEvidence('/evidence/worker-failure.json', {
+        failed: true,
+        phase,
+        worldIds,
+        actorsPrepared,
+        sseReady,
+        http: error instanceof LoadHttpError ? { procedure: error.procedure, status: error.status } : null,
+        at: Date.now(),
+      });
     } catch {
       /* 원 실패를 유지한다. */
     }
