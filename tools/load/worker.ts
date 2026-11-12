@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createDb, type PrismaClient } from '../../packages/db/src/index';
 import { TICKS_PER_MONTH, toGameDate } from '../../packages/rules/src/index';
-import { initializeResources } from '../init-resources';
+import { initializeResources, ResourceInitializationError } from '../init-resources';
 import { initializeIntegrationResources } from '../integration-resources';
 import { prepareLoadFixtures } from './fixtures';
 import { runNativeLoad } from './generator';
@@ -105,7 +105,13 @@ function deadline(env: NodeJS.ProcessEnv, key: string): number {
 async function main() {
   const command = process.argv[2];
   if (!['resources', 'generate', 'witness'].includes(command ?? '')) throw new Error('LOAD_WORKER_COMMAND_INVALID');
-  const db = createDb(loadDatabaseUrl(process.env));
+  let db: PrismaClient;
+  try {
+    db = createDb(loadDatabaseUrl(process.env));
+  } catch {
+    process.stderr.write('LOAD_WORKER_DATABASE\n');
+    throw new Error('LOAD_WORKER_FAILED');
+  }
   const controller = new AbortController(),
     worldIds: string[] = [];
   let failed = false,
@@ -117,16 +123,18 @@ async function main() {
   process.once('SIGTERM', stop);
   const work = async () => {
     if (command === 'resources') {
-      await initializeResources(
-        db,
-        await readFile(new URL('../../packages/db/sql/resources-init.sql', import.meta.url), 'utf8'),
-      );
+      phase = 'resources-sql-read';
+      const sql = await readFile(new URL('../../packages/db/sql/resources-init.sql', import.meta.url), 'utf8');
+      phase = 'resources-baseline-sql';
+      await initializeResources(db, sql);
       controller.signal.throwIfAborted();
+      phase = 'resources-integration';
       await initializeIntegrationResources(db);
       controller.signal.throwIfAborted();
       return;
     }
     if (command === 'witness') {
+      phase = 'witness';
       const fragment: unknown = JSON.parse(await readFile('/evidence/fragment.json', 'utf8'));
       if (
         !fragment ||
@@ -256,8 +264,19 @@ async function main() {
   };
   try {
     await work();
-  } catch {
+  } catch (error) {
     failed = true;
+    const helperPhases: Partial<Record<string, string>> = {
+      'resources-sql-read': 'LOAD_WORKER_RESOURCES_SQL_READ',
+      'resources-baseline-sql':
+        error instanceof ResourceInitializationError && !error.message.startsWith('초기화 자원 SQL 실패:')
+          ? 'LOAD_WORKER_RESOURCES_BASELINE_VERIFY'
+          : 'LOAD_WORKER_RESOURCES_BASELINE_SQL',
+      'resources-integration': 'LOAD_WORKER_RESOURCES_INTEGRATION',
+      witness: 'LOAD_WORKER_WITNESS',
+    };
+    const helperPhase = helperPhases[phase];
+    if (helperPhase) process.stderr.write(`${helperPhase}\n`);
     try {
       await writeEvidence('/evidence/worker-failure.json', { failed: true, phase, worldIds, at: Date.now() });
     } catch {
@@ -274,6 +293,7 @@ async function main() {
     try {
       await db.$disconnect();
     } catch {
+      if (!failed && command !== 'generate') process.stderr.write('LOAD_WORKER_DISCONNECT\n');
       failed = true;
     }
     process.removeListener('SIGINT', stop);

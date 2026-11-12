@@ -584,6 +584,7 @@ async function main(): Promise<number> {
   };
   const failures: Error[] = [];
   let bodyFailureStep: string | undefined;
+  let bodyFailureDiagnostic: string | undefined;
   try {
     const collisions = await native(
       ['ps', '-aq', '--filter', `label=com.docker.compose.project=${project}`],
@@ -855,7 +856,11 @@ async function main(): Promise<number> {
     succeeded = finalVerdict === 'PASS' || finalVerdict === 'SMOKE_ONLY';
     complete = true;
   } catch {
-    bodyFailureStep = commands.receipts.at(-1)?.label;
+    const last =
+      commands.receipts.findLast((row) => row.failed || (row.exitCode !== null && row.exitCode !== 0)) ??
+      commands.receipts.at(-1);
+    bodyFailureStep = last?.label;
+    bodyFailureDiagnostic = last?.diagnostic;
     failures.push(new Error('LOAD_BODY_FAILED'));
   }
   {
@@ -1015,6 +1020,7 @@ async function main(): Promise<number> {
             (deleted || values.keep === true),
           verdict: finalVerdict,
           bodyFailureStep: bodyFailureStep ?? null,
+          bodyFailureDiagnostic: bodyFailureDiagnostic ?? null,
           volumeInitFailure,
           sourceUnchanged,
           ownershipMatches,

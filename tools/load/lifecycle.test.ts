@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { commandSettled, mayDeleteOwnedData, type CommandReceipt } from './lifecycle';
+import { commandSettled, mayDeleteOwnedData, OwnedCommands, type CommandReceipt } from './lifecycle';
 
 const closed: CommandReceipt = {
   label: 'owned',
@@ -43,5 +43,17 @@ describe('L4 실제 자식 정착과 소유 DB 삭제 경계', () => {
     ])
       expect(mayDeleteOwnedData({ ...valid, ...patch })).toBe(false);
     expect(mayDeleteOwnedData({ ...valid, commands: [{ ...closed, stderrEnded: false }] })).toBe(false);
+  });
+  it('격리 도우미 실패에 고정 진단 코드만 남긴다', async () => {
+    const commands = new OwnedCommands(process.cwd());
+    await expect(
+      commands.run(process.execPath, ['-e', "console.error('LOAD_WORKER_RESOURCES_SQL_READ\\nprivate-sentinel'); process.exitCode = 1"], {
+        label: 'resources-execute',
+        signal: new AbortController().signal,
+        timeoutMs: 5000,
+      }),
+    ).rejects.toThrow('LOAD_NATIVE_COMMAND_FAILED');
+    expect(commands.receipts[0]?.diagnostic).toBe('LOAD_WORKER_RESOURCES_SQL_READ');
+    expect(JSON.stringify(commands.receipts)).not.toContain('private-sentinel');
   });
 });
