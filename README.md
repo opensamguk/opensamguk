@@ -25,7 +25,7 @@ v1의 필요한 규칙과 데이터를 TypeScript 엔진·API·React에 연결�
 
 | 관문 | 완료 조건 | 상태 |
 | --- | --- | --- |
-| M1 혼자와 NPC로 한 판 완주 | [AC-M1 22개](docs/product/acceptance-criteria.md#m1) 통과 | 진행 중 (✅ 20 · 🟨 2 · ⬜ 0) | <!-- lint-text-ignore C-5 -->
+| M1 혼자와 NPC로 한 판 완주 | [AC-M1 22개](docs/product/acceptance-criteria.md#m1) 통과 | 진행 중 (✅ 21 · 🟨 1 · ⬜ 0) | <!-- lint-text-ignore C-5 -->
 | M2 독립 에이전트 참가 시험 | [AC-M2 20개](docs/product/acceptance-criteria.md#m2) 통과 | 진행 중 (✅ 4 · 🟨 3 · ⬜ 13) | <!-- lint-text-ignore C-5 -->
 | M3 기존 전체 인수 | [AC-M3 16개](docs/product/acceptance-criteria.md#m3) 통과 | 진행 중 (✅ 0 · 🟨 1 · ⬜ 15) | <!-- lint-text-ignore C-5 -->
 
