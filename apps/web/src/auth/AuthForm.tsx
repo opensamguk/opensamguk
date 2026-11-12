@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useRouter } from '@tanstack/react-router';
 import { useId, useRef, useState, type FormEvent } from 'react';
 import { useTRPC } from '../trpc';
 import { ErrorState } from '../ui/States';
@@ -20,6 +20,7 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string | undefined
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const router = useRouter();
   const id = useId();
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [showPassword, setShowPassword] = useState(false);
@@ -38,7 +39,8 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string | undefined
         return;
       }
       if (needsConsent(account)) {
-        await navigate({ to: '/legal/agree', search: { next: accountNext(next) ?? '/lobby' }, replace: true });
+        if (mode === 'login') await router.invalidate();
+        else await navigate({ to: '/login', search: { next: accountNext(next) ?? '/lobby' }, replace: true });
         return;
       }
     } catch {

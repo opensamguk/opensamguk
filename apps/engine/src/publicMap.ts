@@ -5,10 +5,52 @@ import {
   operationalMapDisplay,
   readCityRuins,
   RUIN_PERCENT,
+  type OperationalMapResource,
   type WorldState,
 } from '@opensamguk/rules';
 import type { PublicMapConfig } from '@opensamguk/shared';
 import { assertLease, lockLease, type Lease } from './lease';
+
+function publicMapData(state: WorldState, map?: OperationalMapResource) {
+  const ruins = readCityRuins(state.cityRuins, state);
+  const recovery = new Map(ruins?.cities.map((row) => [row.cityKey, { percent: RUIN_PERCENT[row.stage] }]));
+  return {
+    ...(map ? { operationalMap: operationalMapDisplay(map) } : {}),
+    cities: Object.values(state.cities)
+      .sort((a, b) => a.cityKey - b.cityKey)
+      .map((city) => ({
+        key: String(city.cityKey),
+        name: city.name,
+        level: city.level,
+        ...(city.kind ? { kind: city.kind } : {}),
+        ...(ruins ? { ruin: recovery.get(city.cityKey) ?? null } : {}),
+        x: city.x,
+        y: city.y,
+        nationId: city.nationId,
+        links: city.connections.map(String),
+      })),
+    nations: Object.values(state.nations)
+      .sort((a, b) => a.id - b.id)
+      .map(({ id, name, color }) => ({ id, name, color })),
+  };
+}
+
+export async function persistInitialPublicMap(
+  tx: Prisma.TransactionClient,
+  world: { id: string; createdAt: Date },
+  state: WorldState,
+  map?: OperationalMapResource,
+) {
+  await tx.publicMapSnapshot.create({
+    data: {
+      worldId: world.id,
+      takenAt: world.createdAt,
+      tick: 0,
+      ...toGameDate(state.startYear, 0),
+      data: { ...publicMapData(state, map), initial: true },
+    },
+  });
+}
 
 // 턴과 같은 트랜잭션에서 저장과 오래된 사본 정리를 함께 반영한다.
 export async function persistPublicMap(
@@ -49,34 +91,13 @@ export async function persistPublicMap(
   const map = geography
     ? readOperationalMap(geography.operationalMap, geography.ruleFeatures, geography.replayOrigin)
     : undefined;
-  const date = toGameDate(state.startYear, tick);
-  const ruins = readCityRuins(state.cityRuins, state);
-  const recovery = new Map(ruins?.cities.map((row) => [row.cityKey, { percent: RUIN_PERCENT[row.stage] }]));
   await tx.publicMapSnapshot.create({
     data: {
       worldId,
       takenAt: new Date(now),
       tick,
-      ...date,
-      data: {
-        ...(map ? { operationalMap: operationalMapDisplay(map) } : {}),
-        cities: Object.values(state.cities)
-          .sort((a, b) => a.cityKey - b.cityKey)
-          .map((city) => ({
-            key: String(city.cityKey),
-            name: city.name,
-            level: city.level,
-            ...(city.kind ? { kind: city.kind } : {}),
-            ...(ruins ? { ruin: recovery.get(city.cityKey) ?? null } : {}),
-            x: city.x,
-            y: city.y,
-            nationId: city.nationId,
-            links: city.connections.map(String),
-          })),
-        nations: Object.values(state.nations)
-          .sort((a, b) => a.id - b.id)
-          .map(({ id, name, color }) => ({ id, name, color })),
-      },
+      ...toGameDate(state.startYear, tick),
+      data: publicMapData(state, map),
     },
   });
   const anchor = await tx.publicMapSnapshot.findFirst({

@@ -54,6 +54,15 @@ vi.mock('../trpc', () => ({
       },
       create: { mutationOptions: () => ({ mutationFn: mocks.create }) },
     },
+    account: {
+      get: {
+        queryOptions: () => ({
+          queryKey: ['account'],
+          queryFn: async () => ({ userId: mocks.userId, portraitId: null }),
+        }),
+      },
+      setPortrait: { mutationOptions: () => ({}) },
+    },
     home: { get: { queryKey: () => ['home'] } },
   }),
 }));

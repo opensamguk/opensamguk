@@ -103,9 +103,10 @@ function sexEditionRequest(frozen: 'old' | 'second' | 'latest' | 'missing' | nul
     world: {
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
         stored = data;
-        return { id: request.plannedWorldId };
+        return { id: request.plannedWorldId, createdAt: new Date(0) };
       }),
     },
+    publicMapSnapshot: { create: vi.fn(async () => ({})) },
     nation: { createMany, update: vi.fn(async () => ({})) },
     city: { createMany },
     general: { createMany },

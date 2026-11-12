@@ -1,4 +1,4 @@
-import { publicMapConfig } from '@opensamguk/shared';
+import { PLAYER_PORTRAIT_MIN_ID, publicMapConfig } from '@opensamguk/shared';
 import { requestGuard } from '@opensamguk/shared/request-policy';
 import { randomBytes } from 'node:crypto';
 import cookie from '@fastify/cookie';
@@ -134,6 +134,30 @@ export async function buildServer(options: {
       }
     }
     return payload;
+  });
+  server.get<{ Params: { id: string } }>('/trpc/player-portrait/:id', async (req, reply) => {
+    reply.header('Cache-Control', 'private, no-store');
+    const id = Number(req.params.id);
+    if (!/^\d{7,10}$/.test(req.params.id) || id < PLAYER_PORTRAIT_MIN_ID || id > 2_147_483_647)
+      return reply.code(404).send();
+    const identity = await authenticate(options.db, req.cookies.sid, clock(), false);
+    if (!identity) return reply.code(404).send();
+    const portrait = await options.db.accountPortrait.findUnique({ where: { id, user: { status: 'ACTIVE' } } });
+    if (!portrait) return reply.code(404).send();
+    if (
+      identity.user.id !== portrait.userId &&
+      !(await options.db.general.findFirst({
+        where: {
+          userId: portrait.userId,
+          portraitId: id,
+          removedAt: null,
+          nation: { generals: { some: { userId: identity.user.id, removedAt: null } } },
+        },
+        select: { id: true },
+      }))
+    )
+      return reply.code(404).send();
+    return reply.type('image/png').send(Buffer.from(portrait.png));
   });
   registerOpsHealth(server, options.db);
   const dummyPasswordHash = await hashPassword(randomBytes(32).toString('hex'));

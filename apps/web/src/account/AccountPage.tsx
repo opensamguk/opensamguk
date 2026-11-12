@@ -306,7 +306,7 @@ export function AccountPage({ viewerId }: { viewerId: string }) {
             <h2>동의 기록</h2>
             {view.account.consentRequired.length > 0 ? (
               <p>
-                <Link to="/legal/agree" search={{ next: '/account' }}>
+                <Link to="/login" search={{ next: '/account' }}>
                   현재 문서를 확인하고 동의하기
                 </Link>
               </p>

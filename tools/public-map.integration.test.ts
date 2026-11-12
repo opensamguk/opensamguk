@@ -5,6 +5,7 @@ import { buildServer } from '../apps/server/src/server';
 import { newSession } from '../apps/server/src/auth/session';
 import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
+import { createWorldFromCli } from '../apps/engine/src/admin/creation';
 import { acquireLease, LeaseLostError } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { loadReplayState } from '../apps/engine/src/monthly';
@@ -91,6 +92,29 @@ async function cookie(index: number) {
   await db.session.create({ data: { id: session.id, userId: userIds[index]!, expiresAt: session.expiresAt } });
   return `sid=${session.token}`;
 }
+
+it('AC-M2-20 월드 생성과 함께 시작 전 지도를 공개하고 진행 중 사본에는 지연을 적용한다', async () => {
+  const initial = structuredClone(template);
+  const { worldId } = await createWorldFromCli(db, initial, {
+    name: '시작 전 공개 지도',
+    turnTermMinutes: 60,
+    endYear: null,
+  });
+  const [snapshot] = await rows(worldId);
+  expect(snapshot).toMatchObject({ tick: 0, year: initial.startYear, month: 1, data: { initial: true } });
+  now = snapshot!.takenAt.getTime();
+  const preopen = (await maps()).data?.worlds[0];
+  expect(preopen).toMatchObject({ id: worldId, status: 'PREOPEN', map: { year: initial.startYear, month: 1 } });
+  expect(preopen?.map).not.toHaveProperty('initial');
+  await db.world.update({ where: { id: worldId }, data: { status: 'RUNNING' } });
+  await db.publicMapSnapshot.create({
+    data: { ...snapshot!, tick: 1, takenAt: new Date(now + minute), data: { cities: [], nations: [] } },
+  });
+  now += minute;
+  expect((await maps()).data?.worlds[0]?.map?.cities.length).toBe(initial.cities.length);
+  now += 10 * minute;
+  expect((await maps()).data?.worlds[0]?.map?.cities).toEqual([]);
+});
 
 it('실제 엔진 사본 A/B는 10분 경계를 포함해 늦게 공개되고 현재 소유·이름·미래 사본은 새지 않는다', async () => {
   const { worldId, loop } = await world();
