@@ -13,8 +13,7 @@ import { controlClock } from '../apps/engine/src/world/clock';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
 import { initializeExpandedResources } from '../tools/expanded-resources';
 
-// T3-10 · AC-M3-08 첫 묶음. 표 정렬과 SVG 도시의 남은 크기는 별도로 기록한다.
-// 이 시험이 통과해도 전체 반응형 AC를 완료하지 않는다.
+// T3-10 · AC-M3-08. 기존 예턴 저장 회귀와 SAN10 핵심 화면의 375px 검사를 함께 실행한다.
 const executions = new Set<Promise<unknown>>();
 const run = promisify(execFile);
 const expandedFixtureDir = process.env.SAN10_EXPANDED_FIXTURE_DIR;
@@ -121,13 +120,11 @@ async function measureMobileScreen(page: Page) {
 async function joinMobileWorld(page: Page, name: string, edition: 'integration' | 'san10' | 'san10-expanded') {
   if (edition === 'san10-expanded' && expandedFixtureDir && expandedManifestSha) {
     await withE2eDb(initializeExpandedResources);
-    await run(process.execPath, [
-      '--import',
-      'tsx',
-      'tools/init-san10-expanded-resources.ts',
-      expandedFixtureDir,
-      expandedManifestSha,
-    ]);
+    await run(
+      process.execPath,
+      ['--import', 'tsx', 'tools/init-san10-expanded-resources.ts', expandedFixtureDir, expandedManifestSha],
+      { timeout: 60_000 },
+    );
   }
   const { worldId } = await withE2eDb(async (db) => {
     if (edition === 'san10') await initializeExpandedResources(db);
@@ -249,7 +246,6 @@ test('T3-10 정식191년 모바일 명령·방침·탭의 크기와 30번 칸 �
         {
           measurements,
           remainingSmallSvgOrTable: remaining.filter((size) => size.width < 44 || size.height < 44),
-          wholeResponsiveAcPassed: false,
         },
         null,
         2,
@@ -337,6 +333,9 @@ for (const { edition, sites } of editions) {
         await page.goto(path);
         if (screen === 'lobby') await page.getByRole('tab', { name, exact: true }).tap();
         await expect(ready).toBeVisible();
+        if (screen === 'main' || screen === 'turns') {
+          await expect(page.getByRole('combobox', { name: '기본 방침', exact: true })).toBeVisible();
+        }
         if (screen === 'map') await expect(ready.getByTestId('map-tap-target')).toHaveCount(sites);
         if (screen === 'lobby') await expect(ready.locator('[data-anchor-key]')).toHaveCount(sites);
         await expect(page.locator('[data-state="loading"]:visible')).toHaveCount(0);
