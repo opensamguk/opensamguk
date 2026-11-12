@@ -98,8 +98,9 @@ test.describe('국가 작전판', () => {
     await form.getByRole('button', { name: '작전 만들기' }).click();
     await expect(chief.page).toHaveURL(/\/operations\/[^/]+$/);
     const timeline = chief.page.getByTestId('operation-timeline');
-    await expect(timeline.locator('tbody tr').first()).toHaveAttribute('data-verdict', /READY|LATE|WEAK|MISSING/);
-    await expect(timeline).toContainText(/준비됨|늦음|미흡|없음/);
+    const participant = timeline.locator('tbody tr').first();
+    await expect(participant).toHaveAttribute('data-verdict', 'MISSING');
+    await expect(participant.getByRole('cell', { name: /^✕ 없음 / })).toBeVisible();
     // 이 시험이 저장한 빈 칸과 명시 휴식이 서로 다른 글자로 보이는지 본다.
     await expect(timeline.locator('td[data-kind="empty"]').first()).toHaveText('빈 칸');
     await expect(timeline.locator('td[data-kind="rest"]').first()).toHaveText('휴식');

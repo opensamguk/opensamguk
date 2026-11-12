@@ -573,6 +573,10 @@ cloudflared와 Caddy는 server의 네트워크 namespace를 공유한다. Caddy�
 
 새 이미지 커밋에서 jsDelivr의 실루엣 SVG 요청이 403을 반환했다. PNG·WebP는 GitHub raw, SVG는 MIME과 CORS가 맞는 rawcdn.githack.com을 쓴다. 두 주소 모두 같은 전체 커밋 SHA로 고정하고 CSP에는 두 이미지 출처만 추가한다. 공개 자산 검사는 정확한 승인 URL·불변 SHA·해시 목록과 이미지 없는 배포 파일을 대조한다. CDN이 끊기면 그림이 빠질 수 있으므로 기본 배경색·장수 이름 표시는 유지하고 원격 바이트와 실제 브라우저를 검증한다.
 
+2026-11-12 공개판의 이미지 목록은 `opensamguk-images`의 `b7efb438b70058aefdfa2fbc4693ca7db259bbc6`에 고정한다. D-047의 생성 그림은 OpenAI 약관의 출력물 귀속 조건을 따르고 바탕 지도는 Natural Earth의 퍼블릭 도메인 자료를 쓴다. [OpenAI 이용 약관](https://openai.com/policies/row-terms-of-use/) · [Natural Earth 이용 조건](https://www.naturalearthdata.com/about/terms-of-use/)
+
+사용자가 지정한 SAN10 확장 시나리오의 장수·개막 배치는 Claude 아티팩트를 추출한 원장 `san10-scenario-data`의 `5e03009ab8477c06fbffef84ed70dcad49b3a6c8`에 고정한다. 능력치 규칙은 게임의 게시 자원을 쓴다. 기존 core2026 시나리오와 통합판 191년의 장수·능력치 원장은 각 출처 고지를 따른다. [SAN10 확장 출처](https://github.com/opensamguk/san10-scenario-data/blob/5e03009ab8477c06fbffef84ed70dcad49b3a6c8/NOTICE.md) · [기존 장수 자료 출처](../../resources/NOTICE.md)
+
 사용자가 이번 범위 밖 리팩토링도 승인해 Workers 채팅과 협의했다. 공유 패키지에는 순수 Origin·JSON·요청 제한 계산만 옮기고 계수 저장소·HTTP 전송·DB·게임 규칙은 각 담당에 남긴다. 턴 루프 재작성은 이 변경에 섞지 않는다.
 
 ## D-061 명령 카드와 자원·통치·계승·유산을 구현 범위에 넣는다 (2026-11-02)
