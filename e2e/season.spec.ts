@@ -271,7 +271,7 @@ test('정지 중에 가속으로 바꾸고 재개하면 두 화면이 따라오�
     // 장수가 있는 계정의 예턴 편집은 막혀 있고 이유를 보여 준다.
     const editor = a.page.getByTestId('turn-editor');
     await expect(editor.getByTestId('turns-locked')).toHaveText('끝난 판이라 예턴을 바꿀 수 없습니다.');
-    const save = editor.getByRole('button', { name: '저장 (사용 불가)' });
+    const save = editor.getByRole('button', { name: '저장 (사용 불가)', exact: true });
     await save.click();
     await expect(editor.getByRole('note')).toHaveText('끝난 판이라 예턴을 바꿀 수 없습니다.');
 
