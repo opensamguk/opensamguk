@@ -32,7 +32,10 @@ https://{$PUBLIC_HOST}:8443 {
 	}
 
 	@file path /assets /assets/*
-	@extension path_regexp \.[^/]+$
+	@extension {
+		path_regexp \.[^/]+$
+		not path /help/command-catalog.generated
+	}
 	handle @file {
 		file_server
 	}

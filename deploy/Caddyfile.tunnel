@@ -31,7 +31,10 @@ http://:8080 {
 	}
 
 	@file path /assets /assets/*
-	@extension path_regexp \.[^/]+$
+	@extension {
+		path_regexp \.[^/]+$
+		not path /help/command-catalog.generated
+	}
 	handle @file {
 		file_server
 	}
