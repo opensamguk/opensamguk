@@ -267,6 +267,13 @@ export const recordsRouter = router({
       ).map(({ id, ...row }) => ({ generalId: id, ...row, ...archived.get(id)! }));
       const stats = winnerSummarySchema.safeParse(world.result?.winnerSummary).data;
       const winner = result.winner;
+      const topStratagem = winner
+        ? rows
+            .filter((row) => row.nationId === winner.nationId && row.stratagemSuccesses > 0)
+            .sort((a, b) => b.stratagemSuccesses - a.stratagemSuccesses || a.generalId - b.generalId)
+            .slice(0, 7)
+            .map(({ generalId, name, stratagemSuccesses }) => ({ generalId, name, successes: stratagemSuccesses }))
+        : [];
       const winnerSummary =
         winner && stats
           ? {
@@ -305,6 +312,7 @@ export const recordsRouter = router({
       for (const month of history) {
         if (month.activeGenerals !== null)
           peakGenerals = Math.max(peakGenerals ?? final.generals, month.activeGenerals);
+        if (typeof month.data !== 'object' || month.data === null || !('nations' in month.data)) continue;
         const nations = worldRecordInfo(month.data).nations;
         peak.nations = Math.max(peak.nations, nations.filter(({ cities }) => cities > 0).length);
         peak.affiliatedGenerals = Math.max(
@@ -318,6 +326,7 @@ export const recordsRouter = router({
         result,
         generals,
         winnerSummary,
+        topStratagem,
         statistics: {
           final,
           peak: {
