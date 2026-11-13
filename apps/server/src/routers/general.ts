@@ -18,6 +18,7 @@ import {
 import { z } from 'zod';
 import { router, protectedProcedure, worldVerifiedProcedure } from '../trpc';
 import { requireGeneral, requireWorld, worldInput } from '../game/queries';
+import { countHumanGenerals } from '../queries';
 import { ownGeneral } from '../game/projection';
 import { readPolicy, requirePolicyReady } from '../game/policy';
 import { PLAYER_PORTRAIT_MIN_ID } from '@opensamguk/shared';
@@ -151,6 +152,7 @@ export const generalRouter = router({
         status: world.status,
         hasGeneral: existing !== null,
         hasPending: pending !== null,
+        humanCount: await countHumanGenerals(tx, worldId),
         entryOpen:
           effectiveWorldOptions(world.preset === null ? null : parsePreset(world.preset), world.runtimeOptions).entry
             .generalCreation === 'open',

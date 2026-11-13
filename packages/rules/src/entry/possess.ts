@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ClockStatus } from '../clock/clock';
+import { HUMAN_GENERAL_LIMIT } from '../general/creationBlock';
 import { lineageActive } from '../lineage/eligibility';
 import type { WorldView } from '../model/world';
 import type { RecordedInput, ReplayState } from '../replay';
@@ -12,6 +13,7 @@ export const POSSESSION_ERRORS = {
   TAKEN: '이미 다른 사람이 맡은 장수입니다.',
   ALREADY_HAS_GENERAL: '이미 이 판에서 맡은 장수가 있습니다.',
   NOT_ELIGIBLE: '지금은 이 장수를 맡을 수 없습니다.',
+  WORLD_FULL: '이 판의 장수 정원에 닿았습니다.',
   ENTRY_CLOSED: '이 판은 NPC 장수 맡기를 허용하지 않습니다.',
   ACTOR_INACTIVE: '장수를 맡을 수 없는 계정입니다.',
   ACTOR_SANCTIONED: '이 월드의 이용이 제한됐습니다.',
@@ -112,6 +114,11 @@ export function decidePossession(
   if (!context.npcPlay) return reject('ENTRY_CLOSED');
   if (Object.values(replay.state.generals).some((general) => general.userId === payload.userId))
     return reject('ALREADY_HAS_GENERAL');
+  if (
+    Object.values(replay.state.generals).filter((general) => general.userId !== null && general.removedAt === undefined)
+      .length >= HUMAN_GENERAL_LIMIT
+  )
+    return reject('WORLD_FULL');
   const target = replay.state.generals[payload.generalId];
   if (target?.userId != null) return reject('TAKEN');
   const revision = replay.revisions[payload.generalId];

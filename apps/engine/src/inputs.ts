@@ -296,12 +296,13 @@ const processGeneralCreation: QueuedInputHandler = async (tx, world, event, { ti
   await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${event.userId} FOR SHARE`;
   const existing = await tx.general.findMany({
     where: { worldId: world.id },
-    select: { id: true, userId: true, name: true },
+    select: { id: true, userId: true, name: true, removedAt: true },
   });
   const block = creationBlock({
     status: world.status,
     hasGeneral: existing.some((g) => g.userId === event.userId),
     hasPending: false,
+    humanCount: existing.filter((general) => general.userId !== null && general.removedAt === null).length,
     entryOpen:
       effectiveWorldOptions(world.preset === null ? null : parsePreset(world.preset), world.runtimeOptions).entry
         .generalCreation === 'open',
