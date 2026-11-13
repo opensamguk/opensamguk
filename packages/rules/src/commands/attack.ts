@@ -72,6 +72,7 @@ function makeAttack(collect: typeof collectModifiers) {
       const reports: { generalId: number; text: string }[] = [];
       const battleAwards: NonNullable<CommandResult['battleAwards']> = [];
       const battleOutcomes: NonNullable<CommandResult['battleOutcomes']> = [];
+      const generalEngagements: NonNullable<CommandResult['generalEngagements']> = [];
       const reputation = state.ruleFeatures?.includes('reputation-v1');
       const rounds: string[] = [];
       let attackerFirstVolleyUsed = false;
@@ -133,10 +134,19 @@ function makeAttack(collect: typeof collectModifiers) {
           rng,
         );
         attackerFirstVolleyUsed ||= battle.attackerFirstVolleyFired === true;
+        const attackerLoss = g.crew - battle.attacker.crew;
+        const defenderLoss = defender.crew - battle.defender.crew;
         Object.assign(g, battle.attacker);
         Object.assign(defender, battle.defender);
         const attackerSurvives = g.crew > 0 && g.atmos > 0;
         const defenderSurvives = defender.crew > 0 && defender.atmos > 0;
+        generalEngagements.push({
+          attackerId: g.id,
+          defenderId: defender.id,
+          attackerLoss,
+          defenderLoss,
+          winnerId: attackerSurvives === defenderSurvives ? null : attackerSurvives ? g.id : defender.id,
+        });
         if (attackerSurvives && !defenderSurvives) {
           battleAwards.push({ generalId: g.id, wins: 1, captures: 0 });
           if (reputation) battleOutcomes.push({ winnerId: g.id, loserId: defender.id });
@@ -189,6 +199,7 @@ function makeAttack(collect: typeof collectModifiers) {
         reports,
         history,
         battleAwards,
+        ...(actor.recordBattleStats ? { generalEngagements } : {}),
         ...(reputation ? { battleOutcomes } : {}),
         attackTarget: { cityKey: args.cityKey, defendingNationId: defendingNation },
       };

@@ -534,11 +534,14 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       'general',
       'nation',
       'nextTurnAt',
+      'presence',
       'recentLogs',
       'turnSchedule',
       'turnsPreview',
     ]);
     expect(data.general).toMatchObject({ id: 1, gold: 11001, rice: 12001, crew: 13001, train: 41, atmos: 51 });
+    expect(data.general.battleStats).toBeNull();
+    expect(data.presence).toEqual({ nationIds: [], allies: [] });
     expect(data.city).toMatchObject({ population: state.cities[0]!.population });
     expect(data.nation).toMatchObject({
       id: 1,

@@ -81,6 +81,7 @@ export function GeneralInfo({
   const age = displayedAge(g, summary);
   const retirementAge = condition?.retirementAge ?? 70;
   const progression = g.progression;
+  const battle = g.battleStats;
   const ageStyle =
     age < retirementAge * 0.75 ? styles.ageNormal : age < retirementAge ? styles.ageWarning : styles.ageHigh;
   return (
@@ -161,6 +162,21 @@ export function GeneralInfo({
           { label: '기본 방침', value: g.policy.name },
         ]}
       />
+      {battle && (
+        <details>
+          <summary>전투 전과</summary>
+          <InfoGrid
+            items={[
+              { label: '교전', value: `${n(battle.engagements)}회 · ${n(battle.wins)}승 ${n(battle.losses)}패` },
+              { label: '승률', value: `${(battle.winRate * 100).toFixed(1)}%` },
+              { label: '사살', value: BigInt(battle.kills).toLocaleString('ko-KR') },
+              { label: '피살', value: BigInt(battle.casualties).toLocaleString('ko-KR') },
+              { label: '살상률', value: battle.killRate === null ? '—' : `${(battle.killRate * 100).toFixed(1)}%` },
+              { label: '최근 전투', value: `${battle.lastBattle.year}년 ${battle.lastBattle.month}월` },
+            ]}
+          />
+        </details>
+      )}
       {/* 장착 장비는 원작 장수 칸처럼 여기 둔다. 가문(T4-95)은 내 정보 화면(/me)으로 옮겼다 (INT-25). */}
       {equipment ? <EquipmentStatus read={equipment} /> : null}
       {summary && 'relationsEnabled' in summary ? <RelationList worldId={worldId} generalId={g.id} /> : null}

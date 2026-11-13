@@ -10,6 +10,7 @@ datasource db {
 }
 
 model World {
+  generalBattleStats   GeneralBattleStats[]
   reputationEvents     ReputationEvent[]
   publicNationEvents   PublicNationEvent[]
   monthlyReviews       MonthlyReview[]
@@ -595,6 +596,20 @@ model NationOfficeTurn {
   nation       Nation @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([worldId, nationId, officerLevel, slot])
+}
+
+model GeneralBattleStats {
+  worldId     String
+  generalId   Int
+  engagements Int    @default(0)
+  wins        Int    @default(0)
+  losses      Int    @default(0)
+  kills       BigInt @default(0)
+  casualties  BigInt @default(0)
+  lastTick    Int
+  world       World  @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@id([worldId, generalId])
 }
 
 model BattleLog {

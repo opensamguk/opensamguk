@@ -289,7 +289,12 @@ export class TurnLoop {
             world.treatyFormat === 1 ? hashState(state.treaties ? { treaties: state.treaties } : {}) : null;
           const turn = runGeneralTurn(
             state,
-            { generalId: due.id, tick: due.nextTurnTick, unitSet: unitSetSchema.parse(world.unitSet) },
+            {
+              generalId: due.id,
+              tick: due.nextTurnTick,
+              unitSet: unitSetSchema.parse(world.unitSet),
+              recordBattleStats: true,
+            },
             {
               commandKey: command?.commandKey ?? 'rest',
               args: command?.args ?? {},
