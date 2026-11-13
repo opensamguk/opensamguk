@@ -499,6 +499,10 @@ describe('T2-03 실제 로비 HTTP·PostgreSQL', () => {
         expect((await call('lobby.hallOfFame', { worldId, by: 'experience' }, cookie)).data).toEqual([
           expect.objectContaining({ worldId, value: 2, rank: 1 }),
         ]);
+        const winner = (result.data?.[0] as { scenarioTitle?: string } | undefined)?.scenarioTitle;
+        expect(winner).toEqual(expect.any(String));
+        expect((await call('lobby.hallOfFame', { scenarioTitle: winner }, cookie)).data).toEqual(result.data);
+        expect((await call('lobby.hallOfFame', { scenarioTitle: '없는 시나리오' }, cookie)).data).toEqual([]);
       }),
     );
   }
