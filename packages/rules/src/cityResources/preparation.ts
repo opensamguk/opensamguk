@@ -46,7 +46,7 @@ export function applyCityPreparation(view: WorldView, actor: Actor, key: CityPre
   if (recruiting) {
     const { amount } = cityRecruitArgs.parse(value);
     if (city.population < amount) return fail('NO_POPULATION', '도시 인구가 부족합니다.');
-    const cost = recruitCost(view, general, amount, crewType.cost, key === 'conscript');
+    const cost = recruitCost(view, general, amount, crewType.cost, key === 'conscript', crewType.armType);
     if (resource.gold < cost) return fail('NO_GOLD', '도시 금이 부족합니다.');
     const troops = resource.garrison.reduce((total, row) => total + row.troops, 0);
     if (amount > CITY_RESOURCE_MAX - troops) return fail('AT_MAX', '도시 전체 병력 수량 한도를 넘었습니다.');

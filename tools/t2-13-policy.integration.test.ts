@@ -1,3 +1,5 @@
+import { COMBAT_SPECIALTY_FEATURE } from '../packages/rules/src/general/combatSpecialty';
+import { BALANCE } from '../packages/rules/src/balance';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
@@ -13,7 +15,7 @@ import { DOMESTIC_SPECIALTY_FEATURE } from '../packages/rules/src/general/domest
 import { GENERAL_PERSONALITY_FEATURE } from '../packages/rules/src/general/personality';
 import { INACTIVE_REMOVAL_FEATURE, inactiveRemovalTick } from '../packages/rules/src/policy/inactiveRemoval';
 import { PLAYER_AUTOPLAY_FEATURE } from '../packages/rules/src/policy';
-import { commandInitial } from '../packages/rules/test/commandFixture';
+import { commandInitial, testUnits } from '../packages/rules/test/commandFixture';
 import { renewLeaseDuringTest } from '../apps/engine/test/leaseHeartbeat';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
@@ -877,6 +879,47 @@ it('내정 특기의 할인과 효과가 실제 턴에 적용되고 월말 기�
   await loop.advanceTo(100);
   const row = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
   expect(row.gold).toBe(initial.generals[0]!.gold - 80);
+  await loop.advanceTo(10000);
+  const archive = await exportReplay(db, worldId);
+  expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
+});
+
+it('병종 특기의 징병 할인과 월말 재생이 일치한다', async () => {
+  const alice = await user();
+  const initial = commandInitial();
+  initial.generals = initial.generals.slice(0, 2).map((general, index) => ({
+    ...general,
+    userId: index === 0 ? alice.id : null,
+    special: index === 0 ? 'che_보병' : null,
+    crew: index === 0 ? 0 : general.crew,
+    nextTurnTick: index === 0 ? 100 : 100000,
+  }));
+  const { worldId } = await saveInitialWorld(db, initial, {
+    name: '병종 특기 실제 PG',
+    turnTermMinutes: 30,
+    endYear: null,
+    replayFormat: 3,
+    ruleFeatures: [COMBAT_SPECIALTY_FEATURE, 'policy'],
+  });
+  worlds.push(worldId);
+  await db.world.update({ where: { id: worldId }, data: { status: 'RUNNING', clockAnchorAt: new Date(now) } });
+  const lease = await acquireLease(db, worldId);
+  if (!lease) throw new Error('시험 실행권이 없습니다.');
+  leases.push(lease);
+  const loop = new TurnLoop(db, lease);
+  const home = await rpc('home.get', { worldId }, alice.cookie);
+  expect(home.data).toMatchObject({ general: { combatSpecialty: { name: '보병', armType: 1 } } });
+  const args = { amount: 100, crewType: 1100 };
+  const slots = Array.from({ length: 30 }, (_, slot) => (slot === 0 ? { commandKey: 'conscript', args } : null));
+  expect((await rpc('turns.set', { worldId, revision: 0, slots }, alice.cookie, true)).data).toMatchObject({
+    ok: true,
+  });
+  await loop.advanceTo(100);
+  const row = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
+  const unit = testUnits.crewTypes.find((type) => type.id === 1100)!;
+  const cost = Math.ceil(args.amount * unit.cost * BALANCE.CONSCRIPT_COST_FACTOR * 0.9);
+  expect(row.gold).toBe(initial.generals[0]!.gold - cost);
+  expect(row.crew).toBe(args.amount);
   await loop.advanceTo(10000);
   const archive = await exportReplay(db, worldId);
   expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));

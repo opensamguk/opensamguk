@@ -363,4 +363,5 @@ export { GENERAL_PERSONALITY_FEATURE, personalityEffects } from './general/perso
 
 export { GENERAL_PROFICIENCY_FEATURE, proficiencyGrade, storedGeneralProficiency } from './general/proficiency';
 
+export { COMBAT_SPECIALTY_FEATURE, combatSpecialty } from './general/combatSpecialty';
 export { DOMESTIC_SPECIALTY_FEATURE, domesticSpecialty } from './general/domesticSpecialty';

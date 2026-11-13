@@ -1,3 +1,4 @@
+import { combatSpecialty } from '../general/combatSpecialty';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { z } from 'zod';
 import { nationRestrictions } from '../personnel/nationRestrictions';
@@ -100,6 +101,7 @@ function makeAttack(collect: typeof collectModifiers) {
             attacker: g,
             attackerReadiness: personalityEffects(state, g.personality),
             attackerProficiency: g.proficiency,
+            attackerSpecialty: combatSpecialty(state, g.special),
             defender: wall,
             recordPhases: actor.recordBattleStats === true,
             attackerTech: aTech,
@@ -135,9 +137,11 @@ function makeAttack(collect: typeof collectModifiers) {
             attacker: g,
             attackerReadiness: personalityEffects(state, g.personality),
             attackerProficiency: g.proficiency,
+            attackerSpecialty: combatSpecialty(state, g.special),
             defender,
             defenderReadiness: personalityEffects(state, defender.personality),
             defenderProficiency: defender.proficiency,
+            defenderSpecialty: combatSpecialty(state, defender.special),
             recordPhases: actor.recordBattleStats === true,
             attackerTech: aTech,
             defenderTech: bTech,

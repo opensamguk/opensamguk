@@ -78,7 +78,7 @@ export function cityNpcPreparation(view: WorldView, generalId: number, context: 
       );
   }
   if (recruitable && (row?.troops ?? 0) < policy.recruitTarget) {
-    let amount = affordableRecruits(view, { ...general, gold: resources.gold }, type.cost, limit);
+    let amount = affordableRecruits(view, { ...general, gold: resources.gold }, type.cost, limit, type.armType);
     if (view.ruleFeatures?.includes('logistics-v1')) {
       const logistics = view.logistics,
         cost = logistics?.config.recruitPer100[String(type.armType)],

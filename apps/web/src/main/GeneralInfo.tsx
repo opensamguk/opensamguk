@@ -157,7 +157,11 @@ export function GeneralInfo({
             : []),
           { label: '나이', value: <span className={ageStyle}>{age}세</span> },
           { label: '성격', value: personality?.name || g.personality || '—', title: personalityDetails },
-          { label: '특기', value: specialty?.name || g.special || '—', title: specialtyDetails },
+          {
+            label: '특기',
+            value: specialty?.name || g.combatSpecialty?.name || g.special || '—',
+            title: specialtyDetails ?? g.combatSpecialty?.description,
+          },
           { label: '금', value: n(g.gold) },
           { label: '쌀', value: n(g.rice) },
           ...(salary ? [{ label: '다음 봉급', value: `금 ${n(salary.gold)} · 쌀 ${n(salary.rice)}`, wide: true }] : []),

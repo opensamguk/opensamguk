@@ -64,7 +64,7 @@ export function applyCampaignPreparation(view: WorldView, actor: Actor, key: Cam
     if (commanded + args.amount > commander.leadership * BALANCE.CREW_PER_LEADERSHIP)
       return fail('AT_MAX', '실제 지휘관의 전체 병력 상한을 넘습니다.');
     if (city.population < args.amount) return fail('NO_POPULATION', '도시 인구가 부족합니다.');
-    const cost = recruitCost(view, owner, args.amount, crewType.cost, key === 'conscript');
+    const cost = recruitCost(view, owner, args.amount, crewType.cost, key === 'conscript', crewType.armType);
     if (owner.gold < cost) return fail('NO_GOLD', '금이 부족합니다.');
     if (!unit) {
       unit = {
