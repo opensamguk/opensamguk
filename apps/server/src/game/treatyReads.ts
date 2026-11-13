@@ -35,7 +35,8 @@ import { normalizeTreatyRequestPayload, type TreatyRequestKind } from './treatyR
 type GameDate = { year: number; month: number };
 type NationRef = { id: number; name: string; color: string };
 export type TrustRow = { nation: NationRef; brokenTreaties: number; lastBrokenAt: GameDate | null };
-export type TreatyDenyCode = 'NO_PERMISSION' | 'WORLD_CLOSED' | 'IN_PROGRESS' | 'BAD_TARGET' | TreatyResponseGuideCode;
+export type TreatyDenyCode =
+  'NO_PERMISSION' | 'WORLD_CLOSED' | 'IN_PROGRESS' | 'BAD_TARGET' | 'BAD_INPUT' | TreatyResponseGuideCode;
 export type TreatyAllowed = { ok: true } | { ok: false; code: TreatyDenyCode; reason: string };
 export type TreatyListItem = TreatyDetail & {
   from: NationRef | null;
@@ -254,10 +255,18 @@ export async function listTreaties(
 
   const nations = await tx.nation.findMany({
     where: { worldId: input.worldId },
-    select: { id: true, name: true, color: true, ...(worldTreatyOptions(world).rankedAidEnabled ? { level: true } : {}) },
+    select: {
+      id: true,
+      name: true,
+      color: true,
+      ...(worldTreatyOptions(world).rankedAidEnabled ? { level: true } : {}),
+    },
     orderBy: { id: 'asc' },
   });
   const refs = new Map(nations.map((n) => [n.id, publicNation(n)]));
+  const rankedAid = worldTreatyOptions(world).rankedAidEnabled
+    ? new Map(nations.map(({ id, level }) => [id, rankedAidLimit(level)]))
+    : null;
   const diplomacies = await tx.diplomacy.findMany({
     where: { worldId: input.worldId, OR: [{ nationA: nationId }, { nationB: nationId }] },
     select: { nationA: true, nationB: true, state: true, untilTick: true },
@@ -397,6 +406,7 @@ export async function listTreaties(
       to = refs.get(row.toNationId) ?? null;
     const current = relations.get(row.fromNationId === nationId ? row.toNationId : row.fromNationId)?.state ?? 'NONE';
     let estimate: TreatyListItem['estimate'] = null;
+    let aidUnavailable: string | null = null;
     if (row.status === 'PROPOSED' && from !== null && to !== null) {
       const result = quote(
         {
@@ -405,13 +415,16 @@ export async function listTreaties(
           clauses: row.clauses,
           fromCityCount: cityCounts.get(row.fromNationId) ?? 0,
           target: { relation: current, cityCount: cityCounts.get(row.toNationId) ?? 0 },
+          ...(rankedAid ? { tributeLimits: rankedAid } : {}),
         },
         worldTreatyOptions(world),
       );
-      if (result.cost === null) invalid();
-      estimate = detail.incoming
-        ? { mine: result.cost.to, theirs: result.cost.from }
-        : { mine: result.cost.from, theirs: result.cost.to };
+      if (result.cost === null && !rankedAid) invalid();
+      if (rankedAid && result.problem?.code === 'BAD_INPUT') aidUnavailable = result.problem.message;
+      if (result.cost)
+        estimate = detail.incoming
+          ? { mine: result.cost.to, theirs: result.cost.from }
+          : { mine: result.cost.from, theirs: result.cost.to };
     }
     let canAccept: TreatyAllowed | null = null,
       canReject: TreatyAllowed | null = null;
@@ -459,6 +472,7 @@ export async function listTreaties(
           worldTreatyOptions(world),
         );
         canAccept = guidance.accept === null ? { ok: true } : allowed(guidance.accept.code, guidance.accept.message);
+        if (canAccept.ok && aidUnavailable !== null) canAccept = allowed('BAD_INPUT', aidUnavailable);
         canReject = guidance.reject === null ? { ok: true } : allowed(guidance.reject.code, guidance.reject.message);
       }
     }
@@ -499,9 +513,7 @@ export async function listTreaties(
     ...(worldTreatyOptions(world).expandedEnabled ? { expandedEnabled: true } : {}),
     canPropose,
     targets,
-    ...(worldTreatyOptions(world).rankedAidEnabled
-      ? { rankedAid: { limits: nations.map(({ id, level }) => ({ nationId: id, amount: rankedAidLimit(level) })) } }
-      : {}),
+    ...(rankedAid ? { rankedAid: { limits: [...rankedAid].map(([nationId, amount]) => ({ nationId, amount })) } } : {}),
     items,
     nextCursor: page.length > 30 ? String(checked.at(-1)!.id) : null,
     pending,
