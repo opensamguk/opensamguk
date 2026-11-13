@@ -86,7 +86,7 @@ export const nationRouter = router({
     }),
   ),
   setRestrictions: worldVerifiedProcedure
-    .input(nationRestrictionsInput.extend(worldInput.shape))
+    .input(nationRestrictionsInput.safeExtend(worldInput.shape))
     .mutation(({ ctx, input }) =>
       ctx.db.$transaction(async (tx) => {
         const world = await requireWorld(tx, input.worldId, true);
@@ -109,10 +109,19 @@ export const nationRouter = router({
           },
           select: { payload: true },
         });
-        const payload = { nationId: input.nationId, setting: input.setting, blocked: input.blocked };
+        const payload = {
+          nationId: input.nationId,
+          setting: input.setting,
+          ...(input.blocked === undefined ? {} : { blocked: input.blocked }),
+          ...(input.confidentialYears === undefined ? {} : { confidentialYears: input.confidentialYears }),
+        };
         if (pending) {
           const previous = nationRestrictionsInput.parse(pending.payload);
-          if (previous.setting !== input.setting || previous.blocked !== input.blocked)
+          if (
+            previous.setting !== input.setting ||
+            previous.blocked !== input.blocked ||
+            previous.confidentialYears !== input.confidentialYears
+          )
             throw new TRPCError({ code: 'CONFLICT', message: '다른 국가 제한 변경을 처리하고 있습니다.' });
           return { status: 'pending' as const };
         }
@@ -284,7 +293,9 @@ export const nationRouter = router({
           ? {
               restrictions: {
                 recruitmentBlocked: restrictions.recruitmentBlocked,
-                ...(ownNation ? { warBlocked: restrictions.warBlocked } : {}),
+                ...(ownNation
+                  ? { warBlocked: restrictions.warBlocked, confidentialYears: restrictions.confidentialYears ?? null }
+                  : {}),
                 ...(canEditRestrictions
                   ? {
                       editor: {

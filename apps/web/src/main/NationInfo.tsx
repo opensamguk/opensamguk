@@ -430,6 +430,7 @@ export function NationRestrictions({ worldId, nation }: { worldId: string; natio
       },
     }),
   );
+  const [confidentialDraft, setConfidentialDraft] = useState<string>();
   const restrictions = nation.restrictions;
   if (!restrictions) return null;
   const editor = restrictions.editor;
@@ -462,6 +463,40 @@ export function NationRestrictions({ worldId, nation }: { worldId: string; natio
             {restrictions.warBlocked ? '출병 허용' : '출병 금지'}
           </button>{' '}
           <small>출병 제한 변경 {editor.warChanges}회 남음</small>
+          <div>
+            <label>
+              기밀실 최소 소속 연차
+              <input
+                type="number"
+                min={1}
+                max={99}
+                value={confidentialDraft ?? restrictions.confidentialYears ?? ''}
+                onChange={(event) => setConfidentialDraft(event.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              disabled={
+                save.isPending ||
+                editor.pending !== null ||
+                !confidentialDraft ||
+                !/^[1-9][0-9]?$/.test(confidentialDraft)
+              }
+              onClick={() =>
+                save.mutate(
+                  {
+                    worldId,
+                    nationId: nation.id,
+                    setting: 'confidential',
+                    confidentialYears: Number(confidentialDraft),
+                  },
+                  { onSuccess: () => setConfidentialDraft(undefined) },
+                )
+              }
+            >
+              기밀 권한 변경
+            </button>
+          </div>
         </>
       ) : null}
       {editor?.pending ? <p role="status">국가 제한 변경을 처리하고 있습니다.</p> : null}
