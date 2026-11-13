@@ -23,6 +23,8 @@ import type { Context } from '../context';
 import { router, protectedProcedure, worldVerifiedProcedure } from '../trpc';
 import { countHumanGenerals, worldInput, worldClock } from '../queries';
 import { requireWorld, readView } from '../game/queries';
+import { generalProgress } from '../game/generalProgress';
+import { generalType } from '../visibility';
 
 const statusInput = worldInput.extend({ expectedUserId: z.uuid(), idempotencyKey: z.uuid() }).strict();
 const possessInput = statusInput.extend({ generalId: possessionPayloadSchema.shape.generalId }).strict();
@@ -154,8 +156,13 @@ export const entryRouter = router({
           politics?: number;
           charm?: number;
           officerLevel: number;
+          age: number;
+          dedication: number;
+          generalType: ReturnType<typeof generalType>;
+          progression: ReturnType<typeof generalProgress>;
           recommendedNation: { id: number; name: string; reason: string } | null;
         };
+        const gameDate = toGameDate(world.startYear, tick);
         const roles: Record<EntryRole, Candidate[]> = { ruler: [], core: [], retainer: [], free: [] };
         if (blockedReason === null) {
           const view = await readView(tx, input.worldId);
@@ -191,6 +198,10 @@ export const entryRouter = router({
                 ? { politics: general.politics!, charm: general.charm! }
                 : {}),
               officerLevel: general.officerLevel,
+              age: Math.max(0, gameDate.year - general.birthYear),
+              dedication: general.dedication,
+              generalType: generalType(general),
+              progression: generalProgress(general.experience, general.dedication),
               recommendedNation: suggested
                 ? { id: suggested.id, name: suggested.name, reason: suggested.reason }
                 : null,
@@ -198,7 +209,7 @@ export const entryRouter = router({
           }
         }
         return {
-          gameDate: toGameDate(world.startYear, tick),
+          gameDate,
           quota: { humans, max: HUMAN_GENERAL_LIMIT },
           mine: mine ? { generalId: mine.id } : null,
           roles,

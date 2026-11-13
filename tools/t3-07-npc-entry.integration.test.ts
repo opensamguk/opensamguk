@@ -459,6 +459,10 @@ it(
           'strength',
           'intel',
           'officerLevel',
+          'age',
+          'dedication',
+          'generalType',
+          'progression',
           'recommendedNation',
         ].sort(),
       );

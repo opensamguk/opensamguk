@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import type { inferRouterOutputs } from '@trpc/server';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { displayName } from '../game/names';
+import { displayName, officerName } from '../game/names';
 import { Portrait } from '../portrait/Portrait';
 import { useTRPC, useTRPCClient } from '../trpc';
 import { errorCode, retryUnlessClientError, serverMessage } from '../turns/apiError';
@@ -279,6 +279,13 @@ function NpcEntry({
                           <strong>{displayName(general.name)}</strong> · {general.nation?.name ?? '재야'} ·{' '}
                           {general.city.name}
                         </span>
+                        {general.progression && (
+                          <span className={styles.npcStats}>
+                            {general.age}세 · Lv {general.progression.level} · {general.progression.honorTitle} ·{' '}
+                            {general.progression.dedicationRank} · {general.generalType} ·{' '}
+                            {officerName(general.officerLevel, general.nation !== null)}
+                          </span>
+                        )}
                         <span className={`num ${styles.npcStats}`} data-testid="npc-stats">
                           {candidateStats(general)
                             .map((cell) => `${cell.label} ${cell.value}`)
