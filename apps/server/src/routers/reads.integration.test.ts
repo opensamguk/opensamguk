@@ -435,6 +435,9 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     expect(ruler.npcPolicy?.nationOrders).toEqual(
       expect.arrayContaining([expect.objectContaining({ key: 'nation_rest', score: 0 })]),
     );
+    expect(ruler.npcPolicy?.generalOrders).toEqual(
+      expect.arrayContaining([expect.objectContaining({ key: 'rest', score: 0 })]),
+    );
     expect((await query('nation.get', { worldId: id, nationId: 2 })).data).not.toHaveProperty('npcPolicy');
   });
 

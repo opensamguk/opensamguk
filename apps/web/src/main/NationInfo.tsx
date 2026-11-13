@@ -166,18 +166,23 @@ export function NationNpcPolicy({ nation }: { nation: NationView }) {
           { label: '출병·선전포고 점수 배율', value: `×${n(policy.aggression)}` },
         ]}
       />
-      {policy.nationOrders?.length ? (
-        <>
-          <h3>현재 국가 명령 후보</h3>
-          <ol>
-            {policy.nationOrders.map(({ key, name, score, reason }) => (
-              <li key={key}>
-                {name} · {n(score)}점 · {reason}
-              </li>
-            ))}
-          </ol>
-        </>
-      ) : null}
+      {[
+        { label: '현재 국가 명령 후보', orders: policy.nationOrders },
+        { label: '현재 NPC 장수 명령 후보', orders: policy.generalOrders },
+      ].map(({ label, orders }) =>
+        orders?.length ? (
+          <section key={label}>
+            <h3>{label}</h3>
+            <ol>
+              {orders.map(({ key, name, score, reason }) => (
+                <li key={key}>
+                  {name} · {n(score)}점 · {reason}
+                </li>
+              ))}
+            </ol>
+          </section>
+        ) : null,
+      )}
     </details>
   );
 }

@@ -10,12 +10,14 @@ import {
   TICKS_PER_MONTH,
   WANDERING_MONTH_LIMIT,
   diplomaticAidMonths,
+  generalTurnCandidates,
   nationTurnCandidates,
   nowTick,
   parsePreset,
   readStoredNationStrategy,
   strategyMonth,
   toGameDate,
+  unitSetSchema,
 } from '@opensamguk/rules';
 import { protectedProcedure, router } from '../trpc';
 import { entityKey, readWorld, viewerGeneral, worldClock, worldInput } from '../queries';
@@ -87,7 +89,7 @@ export const nationRouter = router({
               salaryRate,
               npcPolicy: {
                 ...NPC_DEFAULT_POLICY,
-                ...(npcOrders ? { nationOrders: npcOrders } : {}),
+                ...npcOrders,
                 aggression: world.preset === null ? 1 : parsePreset(world.preset).npc.aggression,
               },
             }
@@ -109,22 +111,36 @@ export const nationRouter = router({
         const stored = await requireWorld(tx, input.worldId);
         const { resolver } = worldResolver(stored);
         const ruler = view.generals[viewer!.id];
-        if (!ruler) return [];
-        const candidates = nationTurnCandidates(view, ruler, {
+        if (!ruler) return undefined;
+        const context = {
           resolver,
-          tick: ruler.nextTurnTick,
+          unitSet: unitSetSchema.safeParse(stored.unitSet).data,
           worldSeed: stored.seed,
-        });
-        const bestByCommand = new Map<string, (typeof candidates)[number]>();
-        for (const candidate of candidates) {
-          if (!bestByCommand.has(candidate.key)) bestByCommand.set(candidate.key, candidate);
-        }
-        return [...bestByCommand.values()].map(({ key, score, reason }) => ({
-          key,
-          name: resolver.get(key)?.name ?? key,
-          score,
-          reason,
-        }));
+        };
+        const summarize = (candidates: ReturnType<typeof generalTurnCandidates>) => {
+          const bestByCommand = new Map<string, (typeof candidates)[number]>();
+          for (const candidate of candidates) {
+            const best = bestByCommand.get(candidate.key);
+            if (!best || candidate.score > best.score) bestByCommand.set(candidate.key, candidate);
+          }
+          return [...bestByCommand.values()]
+            .sort((a, b) => b.score - a.score || a.key.localeCompare(b.key, 'en'))
+            .map(({ key, score, reason }) => ({ key, name: resolver.get(key)?.name ?? key, score, reason }));
+        };
+        const currentYear = toGameDate(world.startYear, nowTick(worldClock(world), ctx.now)).year;
+        const npcs = Object.values(view.generals).filter(
+          (general) =>
+            general.nationId === input.nationId &&
+            general.userId === null &&
+            general.removedAt === undefined &&
+            general.activeFromYear <= currentYear,
+        );
+        return {
+          nationOrders: summarize(nationTurnCandidates(view, ruler, { ...context, tick: ruler.nextTurnTick })),
+          generalOrders: summarize(
+            npcs.flatMap((general) => generalTurnCandidates(view, general, { ...context, tick: general.nextTurnTick })),
+          ),
+        };
       }
 
       async function readStrategyStatus() {
