@@ -1,6 +1,6 @@
 import type { Prisma } from '@opensamguk/db';
 import { TRPCError } from '@trpc/server';
-import { courtOfficeTitle, rankGenerals, reputationEventSchema, toGameDate } from '@opensamguk/rules';
+import { courtOfficeTitle, rankGenerals, reputationEventSchema, TICKS_PER_MONTH, toGameDate } from '@opensamguk/rules';
 import { protectedProcedure, router, worldVerifiedProcedure } from '../trpc';
 import {
   beforeCursor,
@@ -18,7 +18,12 @@ import { decodeRecordCursor, encodeRecordCursor, generalLogCursor, recordId, rec
 import { monthlyReviewSelect, readMonthlyReview } from '../review';
 
 const generalInput = worldInput.extend({ cursor: z.string().min(1).max(256).optional() }).strict();
-const activityInput = generalInput.extend({ scope: z.enum(['all', 'world', 'biography']).default('all') });
+const activityInput = generalInput.extend({
+  scope: z.enum(['all', 'world', 'biography']).default('all'),
+  period: z
+    .strictObject({ year: z.number().int().min(0).max(9999), month: z.number().int().min(1).max(12) })
+    .optional(),
+});
 const activityCursor = z.tuple([recordTick, z.enum(['reputation', 'nation']), recordId]);
 const nationEventKind = z.enum(['found', 'fall', 'declare', 'capture', 'promotion', 'enlist', 'capital']);
 const battleCursor = z.tuple([recordTick, entityKey]);
@@ -91,19 +96,26 @@ export const recordsRouter = router({
   activity: protectedProcedure.input(activityInput).query(({ ctx, input }) =>
     readWorld(ctx.db, input.worldId, async (tx, world) => {
       const cursor = input.cursor === undefined ? null : decodeRecordCursor(input.cursor, activityCursor);
+      const biography = input.scope === 'biography' ? await requireGeneral(tx, input.worldId, ctx.user.id) : null;
+      const start = input.period
+        ? ((input.period.year - world.startYear) * 12 + input.period.month - 1) * TICKS_PER_MONTH
+        : null;
+      if (start !== null && (start < 0 || start > 2_147_483_647 - TICKS_PER_MONTH))
+        return { items: [], nextCursor: null };
+      const period = start === null ? {} : { AND: [{ tick: { gte: start, lt: start + TICKS_PER_MONTH } }] };
       const before = (source: 'reputation' | 'nation') => {
         if (!cursor) return {};
         const [tick, cursorSource, id] = cursor;
         if (source !== cursorSource) return { tick: source === 'nation' ? { lte: tick } : { lt: tick } };
         return { OR: [{ tick: { lt: tick } }, { tick, id: { lt: BigInt(id) } }] };
       };
-      const biography = input.scope === 'biography' ? await requireGeneral(tx, input.worldId, ctx.user.id) : null;
       const rows =
         input.scope === 'world'
           ? []
           : await tx.reputationEvent.findMany({
               where: {
                 worldId: input.worldId,
+                ...period,
                 ...before('reputation'),
                 ...(biography ? { generalId: biography.id, kind: { in: ['conquest', 'victory'] } } : {}),
               },
@@ -130,6 +142,7 @@ export const recordsRouter = router({
         : await tx.publicNationEvent.findMany({
             where: {
               worldId: input.worldId,
+              ...period,
               ...before('nation'),
               ...(input.scope === 'world' ? { kind: { not: 'enlist' } } : {}),
             },
