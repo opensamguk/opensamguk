@@ -166,6 +166,18 @@ export function NationNpcPolicy({ nation }: { nation: NationView }) {
           { label: '출병·선전포고 점수 배율', value: `×${n(policy.aggression)}` },
         ]}
       />
+      {policy.nationOrders?.length ? (
+        <>
+          <h3>현재 국가 명령 후보</h3>
+          <ol>
+            {policy.nationOrders.map(({ key, name, score, reason }) => (
+              <li key={key}>
+                {name} · {n(score)}점 · {reason}
+              </li>
+            ))}
+          </ol>
+        </>
+      ) : null}
     </details>
   );
 }
