@@ -3,6 +3,8 @@ import { nextTurnAt, turnSchedule, readWorld, requireGeneral, worldClock, worldI
 import { cityInfo, ownGeneralInfo, logInfo, logSelect, nationInfo } from '../visibility';
 import {
   GENERAL_CONDITION_FEATURE,
+  INACTIVE_REMOVAL_FEATURE,
+  inactiveRemovalTick,
   DEFENSE_STANCES,
   DEFENSE_STANCE_FEATURE,
   DEFENSE_STANCE_KIND,
@@ -172,6 +174,14 @@ export const homeRouter = router({
                   startsAt: nextTurnAt(world, autoplay.startsAtTick),
                   expiresAt: nextTurnAt(world, autoplay.expiresAtTick),
                   expiresOn: toGameDate(world.startYear, autoplay.expiresAtTick),
+                  ...(world.ruleFeatures.includes(INACTIVE_REMOVAL_FEATURE) && general.lastActiveTick !== null
+                    ? {
+                        removalOn: toGameDate(
+                          world.startYear,
+                          inactiveRemovalTick(general.lastActiveTick, world.turnTermMinutes),
+                        ),
+                      }
+                    : {}),
                   slots: Array.from({ length: turns.length }, (_, slot) => slot).filter((slot) => {
                     const turn = general.nextTurnTick + slot * TICKS_PER_MONTH;
                     return turn >= autoplay.startsAtTick && turn < autoplay.expiresAtTick;

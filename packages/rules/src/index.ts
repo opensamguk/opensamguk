@@ -356,3 +356,5 @@ export {
   storedNationRestrictions,
   changeNationRestrictions,
 } from './personnel/nationRestrictions';
+
+export { INACTIVE_REMOVAL_FEATURE, inactiveRemovalTick } from './policy/inactiveRemoval';

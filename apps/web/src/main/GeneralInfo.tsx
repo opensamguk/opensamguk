@@ -180,6 +180,14 @@ export function GeneralInfo({
             : { label: '전공', value: '—', title: merit.at },
           { label: '다음 턴', value: formatClock(home.nextTurnAt) },
           { label: '기본 방침', value: g.policy.name },
+          ...(g.autoplay?.removalOn
+            ? [
+                {
+                  label: '미접속 퇴장 예정',
+                  value: `${g.autoplay.removalOn.year}년 ${g.autoplay.removalOn.month}월`,
+                },
+              ]
+            : []),
           ...(g.autoplay
             ? [
                 {

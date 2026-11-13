@@ -177,3 +177,7 @@ core2026 커밋 df6c9269fa1e2862418ba9da481c8dd2d758d6c5의 MIT © 2025 devsam �
 ### INT-26 국가 임관·출병 제한
 
 임관·출병 제한과 출병 제한 변경 한도는 core2026 `c81d304`의 `packages/logic/src/constraints/general.ts`, `packages/logic/src/constraints/nation.ts`, `app/game-engine/src/turn/monthlyNationStatsHandler.ts`를 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+### INT-26 미접속 장수 퇴장
+
+장수 퇴장과 군주 계승은 core2026 `c81d304`의 `app/game-engine/src/turn/reservedTurnHandler.ts`를 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다. OpenSamguk은 자율 행동 기간 종료 뒤 첫 월말에 기존 장수·국가 정리 규칙을 적용한다.

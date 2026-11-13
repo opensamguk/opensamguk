@@ -8,6 +8,8 @@ import {
 } from '../packages/rules/src/personnel/nationRestrictions';
 import { NPC_NATION_POLICY_FEATURE, NPC_NATION_POLICY_KIND } from '../packages/rules/src/npc/policy';
 import type { PolicyKey, PolicySlot } from '../packages/rules/src/policy';
+import { INACTIVE_REMOVAL_FEATURE, inactiveRemovalTick } from '../packages/rules/src/policy/inactiveRemoval';
+import { PLAYER_AUTOPLAY_FEATURE } from '../packages/rules/src/policy';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 import { renewLeaseDuringTest } from '../apps/engine/test/leaseHeartbeat';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
@@ -697,3 +699,46 @@ for (const category of ['unauthenticated', 'otherUser', 'sanctioned', 'invalidIn
     }),
   );
 }
+
+it('미접속 퇴장은 예고 뒤 월말에 적용되고 사용자를 분리하며 재생된다', async () => {
+  const alice = await user();
+  const initial = commandInitial();
+  initial.generals = initial.generals.slice(0, 2).map((general, index) => ({
+    ...general,
+    userId: index === 0 ? alice.id : null,
+    nextTurnTick: 1000000,
+  }));
+  const term = 1440;
+  const { worldId } = await saveInitialWorld(db, initial, {
+    name: '미접속 퇴장 실제 PG',
+    turnTermMinutes: term,
+    endYear: null,
+    replayFormat: 3,
+    ruleFeatures: [INACTIVE_REMOVAL_FEATURE, PLAYER_AUTOPLAY_FEATURE, 'policy'],
+  });
+  worlds.push(worldId);
+  await db.world.update({ where: { id: worldId }, data: { status: 'RUNNING', clockAnchorAt: new Date(now) } });
+  const lease = await acquireLease(db, worldId);
+  if (!lease) throw new Error('시험 실행권이 없습니다.');
+  leases.push(lease);
+  const loop = new TurnLoop(db, lease);
+  const tick = inactiveRemovalTick(0, term);
+  const home = () => rpc('home.get', { worldId }, alice.cookie);
+  expect((await home()).data).toMatchObject({ general: { autoplay: { removalOn: expect.any(Object) } } });
+  await loop.advanceTo(tick - 10000);
+  expect((await home()).status).toBe(200);
+  await loop.advanceTo(tick);
+  expect((await home()).error).toBe('NOT_FOUND');
+  expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } })).toMatchObject({
+    userId: null,
+    removedAt: tick,
+    nationId: null,
+    lastActiveTick: null,
+    lastActiveAt: null,
+  });
+  expect(await db.generalLog.count({ where: { worldId, generalId: 1, commandKey: 'general.inactive-removal' } })).toBe(
+    1,
+  );
+  const archive = await exportReplay(db, worldId);
+  expect(replayArchive(archive, 29)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
+});
