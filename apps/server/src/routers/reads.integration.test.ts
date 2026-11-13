@@ -24,6 +24,7 @@ type Results = {
   'records.battles': Out['records']['battles'];
   'records.activity': Out['records']['activity'];
   'records.nation': Out['records']['nation'];
+  'records.nationEvents': Out['records']['nationEvents'];
   'records.world': Out['records']['world'];
   'records.season': Out['records']['season'];
 };
@@ -926,6 +927,26 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       }
     } finally {
       await db.world.delete({ where: { id: eventWorld } });
+    }
+  });
+
+  it('국가 사건은 같은 국가 문장만 반환하고 빈 행을 건너뛴다', async () => {
+    await db.nationHistory.create({ data: { worldId, nationId: 1, tick: 500000, data: { events: [], gold: 999999 } } });
+    try {
+      const first = await query('records.nationEvents', { worldId });
+      expect(first.status).toBe(200);
+      expect(first.data.items).toHaveLength(30);
+      expect(first.data.items[0]).toEqual({ tick: 400039, events: ['primary-nation-1-event-400039'] });
+      const second = await query('records.nationEvents', { worldId, cursor: first.data.nextCursor });
+      expect(second.data.items[0]?.tick).toBe(400009);
+      const other = await query('records.nationEvents', { worldId }, users[1]!.cookie);
+      expect(other.data.items[0]?.events).toEqual(['primary-nation-2-event-400039']);
+      expect((await query('records.nationEvents', { worldId }, users[2]!.cookie)).data).toEqual({
+        items: [],
+        nextCursor: null,
+      });
+    } finally {
+      await db.nationHistory.delete({ where: { worldId_tick_nationId: { worldId, tick: 500000, nationId: 1 } } });
     }
   });
 
