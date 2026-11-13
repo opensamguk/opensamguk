@@ -127,7 +127,7 @@ describe('인사부 내부 읽기', () => {
     rows[0]!.battleWins = 4;
     rows[1]!.battleWins = 4;
     rows[2]!.battleWins = 6;
-    rows[2]!.removedAt = new Date(0);
+    rows[2]!.removedAt = 191;
     const board = await readPersonnelBoard(db, { worldId: 'world', userId: 'own' });
     expect(board.topVictories?.map(({ generalId, wins }) => [generalId, wins])).toEqual([
       [1, 4],
