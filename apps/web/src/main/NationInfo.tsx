@@ -807,6 +807,7 @@ export function NationTables({
   const crewTypes = useWorldRules(worldId).data?.unitSet.crewTypes;
   // 소유 도시 표에서 펼친 도시 (원작 세력 도시의 암행부 연동). 한 번에 한 도시만 펼친다.
   const [openCity, setOpenCity] = useState<number | null>(null);
+  const [showCapacity, setShowCapacity] = useState(false);
   const panelId = useId();
   // 예턴·다음 턴 시각·NPC 여부는 감찰 자료다. 이 국가 소속 직책자만 받는다.
   const inspection = useInspectionRows(worldId, nationId);
@@ -846,6 +847,7 @@ export function NationTables({
     { key: 'defence', max: 'defenceMax', label: '수비' },
     { key: 'wall', max: 'wallMax', label: '성벽' },
   ] as const;
+  const capacityColumns = [{ key: 'population', max: 'populationMax', label: '주민' }, ...detailedCityStats] as const;
   const marketRate = (city: City) => ('riceMarket' in city ? (city.riceMarket?.rate ?? null) : null);
   const opened = openCity === null ? undefined : data.cities.find((c) => c.key === openCity);
 
@@ -973,6 +975,25 @@ export function NationTables({
     },
   ];
 
+  const cityTableColumns =
+    showCapacity && showPopulation
+      ? cityColumns.map((column) => {
+          const field = capacityColumns.find(({ key }) => key === column.key);
+          if (!field) return column;
+          const remaining = (city: City) =>
+            isDetailedCity(city) ? Math.max(0, city[field.max] - city[field.key]) : null;
+          return {
+            ...column,
+            label: `남은 ${field.label}`,
+            sortValue: remaining,
+            render: (city: City) => {
+              const value = remaining(city);
+              return value === null ? '—' : n(value);
+            },
+          };
+        })
+      : cityColumns;
+
   const hidden = (g: General) => (isDetailedGeneral(g) ? undefined : HIDDEN_NATION);
   const num = (pick: (g: Extract<General, { leadership: number }>) => number | undefined) => ({
     numeric: true,
@@ -1061,10 +1082,16 @@ export function NationTables({
         </p>
       )}
       <div id="cities">
+        {showPopulation ? (
+          <label className={styles.note}>
+            <input type="checkbox" checked={showCapacity} onChange={(event) => setShowCapacity(event.target.checked)} />{' '}
+            최대치까지 남은 양 보기
+          </label>
+        ) : null}
         <DataTable
           caption={`소유 도시 ${data.cities.length}곳`}
           rows={data.cities}
-          columns={cityColumns}
+          columns={cityTableColumns}
           rowKey={(c) => c.key}
           mobileDetails={[
             'region',
