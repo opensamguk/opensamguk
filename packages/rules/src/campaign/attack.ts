@@ -101,6 +101,7 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
     reports: NonNullable<CommandResult['reports']> = [];
   const battleAwards: NonNullable<CommandResult['battleAwards']> = [];
   const battleOutcomes: NonNullable<CommandResult['battleOutcomes']> = [];
+  const generalEngagements: NonNullable<CommandResult['generalEngagements']> = [];
   const reputation = state.ruleFeatures?.includes('reputation-v1');
   for (const attackerId of attackingIds) {
     let attackerFirstVolleyUsed = false;
@@ -127,11 +128,20 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
       if (!alive(get(defenderId))) continue;
       const attackerCommander = get(attackerId).commanderId,
         defenderCommander = get(defenderId).commanderId;
+      const attackerTroops = get(attackerId).troops;
+      const defenderTroops = get(defenderId).troops;
       const outcome = fightCampaignUnits(state, attackerId, defenderId, actor.unitSet!, rng, attackerFirstVolleyUsed);
       state = outcome.state;
       attackerFirstVolleyUsed ||= outcome.attackerFirstVolleyFired === true;
       const a = get(attackerId),
         d = get(defenderId);
+      generalEngagements.push({
+        attackerId: attackerCommander,
+        defenderId: defenderCommander,
+        attackerLoss: attackerTroops - a.troops,
+        defenderLoss: defenderTroops - d.troops,
+        winnerId: alive(a) === alive(d) ? null : alive(a) ? attackerCommander : defenderCommander,
+      });
       if (alive(a) && !alive(d)) {
         battleAwards.push({ generalId: attackerCommander, wins: 1, captures: 0 });
         if (reputation) battleOutcomes.push({ winnerId: attackerCommander, loserId: defenderCommander });
@@ -225,6 +235,7 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
     reports,
     history,
     battleAwards,
+    ...(actor.recordBattleStats ? { generalEngagements } : {}),
     attackTarget: { cityKey, defendingNationId: defendingNation },
     ...(reputation ? { battleOutcomes } : {}),
   };

@@ -11,6 +11,7 @@ export interface Actor {
   unitSet?: DeepReadonly<UnitSetResource> | undefined;
   authority?: 'office';
   campaignOrderId?: number;
+  recordBattleStats?: true;
 }
 export interface Failure {
   code:
@@ -54,6 +55,13 @@ export interface CommandResult {
   battleAwards?: { generalId: number; wins: number; captures: number }[];
   stratagemSucceeded?: true;
   battleOutcomes?: { winnerId: number; loserId: number }[];
+  generalEngagements?: {
+    attackerId: number;
+    defenderId: number;
+    attackerLoss: number;
+    defenderLoss: number;
+    winnerId: number | null;
+  }[];
 }
 export const COMMAND_CATEGORIES = ['domestic', 'military', 'strategy', 'personal', 'nation'] as const;
 export type CommandCategory = (typeof COMMAND_CATEGORIES)[number];

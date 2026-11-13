@@ -159,6 +159,27 @@ export async function persistCommandReports(
       data: { battleWins: { increment: award.wins }, captures: { increment: award.captures } },
     });
   }
+  for (const engagement of result.generalEngagements ?? []) {
+    for (const [generalId, kills, casualties] of [
+      [engagement.attackerId, engagement.defenderLoss, engagement.attackerLoss],
+      [engagement.defenderId, engagement.attackerLoss, engagement.defenderLoss],
+    ] as const) {
+      const wins = Number(engagement.winnerId === generalId);
+      const losses = Number(engagement.winnerId !== null && engagement.winnerId !== generalId);
+      await tx.generalBattleStats.upsert({
+        where: { worldId_generalId: { worldId, generalId } },
+        create: { worldId, generalId, engagements: 1, wins, losses, kills, casualties, lastTick: tick },
+        update: {
+          engagements: { increment: 1 },
+          wins: { increment: wins },
+          losses: { increment: losses },
+          kills: { increment: kills },
+          casualties: { increment: casualties },
+          lastTick: tick,
+        },
+      });
+    }
+  }
   await tx.battleLog.createMany({
     data: (result.reports ?? []).map((report) => ({ ...report, worldId, tick, attackerId })),
   });

@@ -8,6 +8,7 @@ import {
   nowTick,
   OFFICE_EFFECTS_FEATURE,
   policyOptions,
+  toGameDate,
 } from '@opensamguk/rules';
 import { displaySlots, readSlots } from '../game/slots';
 import { readCityScaleProjection } from '../game/cityScale';
@@ -65,6 +66,9 @@ export const homeRouter = router({
         select: logSelect,
       });
       const sessions = ctx.connectedSessions?.(input.worldId) ?? [];
+      const battle = await tx.generalBattleStats.findUnique({
+        where: { worldId_generalId: { worldId: input.worldId, generalId: general.id } },
+      });
       const connected =
         sessions.length === 0
           ? []
@@ -84,6 +88,19 @@ export const homeRouter = router({
       return {
         general: {
           ...ownGeneralInfo(general),
+          battleStats:
+            battle === null
+              ? null
+              : {
+                  engagements: battle.engagements,
+                  wins: battle.wins,
+                  losses: battle.losses,
+                  kills: String(battle.kills),
+                  casualties: String(battle.casualties),
+                  winRate: battle.wins / battle.engagements,
+                  killRate: battle.casualties === 0n ? null : Number(battle.kills) / Number(battle.casualties),
+                  lastBattle: toGameDate(world.startYear, battle.lastTick),
+                },
           ...(world.ruleFeatures.includes(GENERAL_CONDITION_FEATURE)
             ? { condition: generalCondition(general, nation?.level ?? 0) }
             : {}),
