@@ -91,6 +91,31 @@ async function snapshot(worldId: string) {
 }
 
 describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
+  it('초기 소속은 0, 하야는 null, 재임관은 새 턴으로 저장하며 재생 해시를 보존한다', async () => {
+    const initial = await warFixture();
+    const general = initial.generals[0]!;
+    const nationId = general.nationId!;
+    general.officerLevel = 1;
+    const { worldId, loop, lease } = await create(initial);
+    const read = () => db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: general.id } } });
+    try {
+      expect((await read()).nationJoinedTick).toBe(0);
+      await queue(worldId, general.id, 'resign', {});
+      await loop.advanceTo(general.nextTurnTick);
+      expect(await read()).toMatchObject({ nationId: null, nationJoinedTick: null });
+      const joinedTick = (await read()).nextTurnTick;
+      await queue(worldId, general.id, 'join', { nationId });
+      await loop.advanceTo(joinedTick);
+      expect(await read()).toMatchObject({ nationId, nationJoinedTick: joinedTick });
+      await loop.advanceTo(20_000);
+      const archive = await exportReplay(db, worldId);
+      const replay = replayArchive(archive, 2);
+      expect(replay.at(-1)?.stateHash).toBe(hashState(await db.$transaction((tx) => loadReplayState(tx, worldId))));
+    } finally {
+      await releaseLease(db, lease);
+    }
+  });
+
   it.each(['basic', 'effects'] as const)(
     'AC-INT-22 %s의 새 계산식은 실제 전투·rollback·12개월 재생·재적재가 같다',
     async (mode) => {

@@ -20,14 +20,18 @@ export function personnelIdentity(ctx: PersonnelActorContext, started: number) {
 export async function withPersonnel<T>(
   ctx: PersonnelActorContext,
   worldId: string,
-  read: (tx: Prisma.TransactionClient, ready: PersonnelReady) => Promise<T>,
+  read: (
+    tx: Prisma.TransactionClient,
+    ready: PersonnelReady,
+    world: Awaited<ReturnType<typeof requireWorld>>,
+  ) => Promise<T>,
   started = performance.now(),
 ): Promise<T> {
   return ctx.db.$transaction(
     async (tx) => {
       await requirePersonnelSession(tx, personnelIdentity(ctx, started));
-      const ready = requirePersonnelWorld(await requireWorld(tx, worldId));
-      return read(tx, ready);
+      const world = await requireWorld(tx, worldId);
+      return read(tx, requirePersonnelWorld(world), world);
     },
     { isolationLevel: 'RepeatableRead' },
   );

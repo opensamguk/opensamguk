@@ -30,6 +30,7 @@ export interface PersonnelMember {
   isHuman: boolean;
   city: CityRef;
   dedication: number;
+  tenureYears?: number;
   officerCityKey?: number | null;
   resident?: boolean;
   eligibleLocalOffices?: number[];

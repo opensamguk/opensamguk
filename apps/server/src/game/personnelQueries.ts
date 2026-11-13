@@ -11,6 +11,7 @@ import {
 } from '@opensamguk/rules';
 import { TRPCError } from '@trpc/server';
 import { requireGeneral } from './queries';
+import { nationTenureYears } from './nationTenure';
 
 type Allowed = { ok: true } | { ok: false; reason: string };
 type PersonnelMember = {
@@ -21,6 +22,7 @@ type PersonnelMember = {
   isHuman: boolean;
   city: { cityKey: number; name: string };
   dedication: number;
+  tenureYears?: number;
   officerCityKey?: number | null;
   resident?: boolean;
   eligibleLocalOffices?: number[];
@@ -45,7 +47,7 @@ function titleFor(level: number): string {
 // userId는 세션 사용자다. 요청의 국가·장수 ID를 권한 근거로 받지 않는다.
 export async function readPersonnelBoard(
   tx: Prisma.TransactionClient,
-  input: { worldId: string; userId: string },
+  input: { worldId: string; userId: string; tick?: number },
   officeEffectsEnabled = false,
   courtRankEnabled = false,
   localOfficeMinimum?: number,
@@ -73,40 +75,48 @@ export async function readPersonnelBoard(
       portraitId: true,
       removedAt: true,
       stratagemSuccesses: true,
+      ...(input.tick === undefined ? {} : { nationJoinedTick: true }),
       ...(localOfficeMinimum === undefined ? {} : { strength: true, intel: true }),
       ...(officeEffectsEnabled ? { officerCityKey: true } : {}),
       city: { select: { cityKey: true, name: true, ...(officeEffectsEnabled ? { nationId: true } : {}) } },
     },
   });
-  const members = rows.map((row) => ({
-    generalId: row.id,
-    name: row.name,
-    officerLevel: row.officerLevel,
-    title:
-      officeEffectsEnabled && isLocalOffice(row.officerLevel)
-        ? localOfficeTitle(row.officerLevel)
-        : (courtTitle(row.officerLevel) ?? titleFor(row.officerLevel)),
-    isHuman: row.userId !== null,
-    city: { cityKey: row.city.cityKey, name: row.city.name },
-    ...(officeEffectsEnabled
-      ? {
-          officerCityKey: row.officerCityKey ?? null,
-          resident: isOfficeResident(
-            { ...row, nationId: actor.nationId, cityKey: row.city.cityKey },
-            row.city.nationId ?? null,
-          ),
-        }
-      : {}),
-    ...(localOfficeMinimum === undefined
-      ? {}
-      : {
-          eligibleLocalOffices:
-            row.removedAt === null
-              ? ([2, 3, 4] as const).filter((level) => localOfficeAbility(row, level, localOfficeMinimum))
-              : [],
-        }),
-    dedication: row.dedication,
-  }));
+  const members = rows.map((row) => {
+    const tenureYears =
+      input.tick !== undefined && row.removedAt === null
+        ? nationTenureYears(row.nationJoinedTick, input.tick)
+        : undefined;
+    return {
+      generalId: row.id,
+      name: row.name,
+      officerLevel: row.officerLevel,
+      title:
+        officeEffectsEnabled && isLocalOffice(row.officerLevel)
+          ? localOfficeTitle(row.officerLevel)
+          : (courtTitle(row.officerLevel) ?? titleFor(row.officerLevel)),
+      isHuman: row.userId !== null,
+      city: { cityKey: row.city.cityKey, name: row.city.name },
+      ...(officeEffectsEnabled
+        ? {
+            officerCityKey: row.officerCityKey ?? null,
+            resident: isOfficeResident(
+              { ...row, nationId: actor.nationId, cityKey: row.city.cityKey },
+              row.city.nationId ?? null,
+            ),
+          }
+        : {}),
+      ...(localOfficeMinimum === undefined
+        ? {}
+        : {
+            eligibleLocalOffices:
+              row.removedAt === null
+                ? ([2, 3, 4] as const).filter((level) => localOfficeAbility(row, level, localOfficeMinimum))
+                : [],
+          }),
+      dedication: row.dedication,
+      ...(tenureYears === undefined ? {} : { tenureYears }),
+    };
+  });
   const topStratagem = rows
     .filter((row) => row.removedAt === null && row.stratagemSuccesses > 0)
     .sort((a, b) => b.stratagemSuccesses - a.stratagemSuccesses || a.id - b.id)

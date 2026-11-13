@@ -62,7 +62,7 @@ export async function loadWorldAfterCapabilityCheck(
   });
   const generals = await tx.general.findMany({
     where: { worldId },
-    omit: { noticeSeen: true, defaultPolicy: true, lastActiveTick: true, lastActiveAt: true },
+    omit: { noticeSeen: true, defaultPolicy: true, lastActiveTick: true, lastActiveAt: true, nationJoinedTick: true },
   });
   if (world.replayFormat === 3 && !world.ruleFeatures.includes('personnel')) assertNoResidenceAnchorsInRows(generals);
   const diplomacies = await tx.diplomacy.findMany({

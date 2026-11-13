@@ -172,6 +172,7 @@ function LocalOfficeSlot({
       <legend>{title}</legend>
       <p className={styles.officeNote}>
         {holder ? `${holder.name} · ${presence(holder.resident === true)}` : '빈 자리'}
+        {holder?.tenureYears === undefined ? '' : ` · 임관 ${holder.tenureYears}년`}
       </p>
       <p className={styles.officeNote}>{qualification}</p>
       <label className={styles.officeField}>
@@ -187,6 +188,7 @@ function LocalOfficeSlot({
           {candidates.map((member) => (
             <option key={member.generalId} value={member.generalId}>
               {member.name}
+              {member.tenureYears === undefined ? '' : ` · 임관 ${member.tenureYears}년`}
             </option>
           ))}
         </select>

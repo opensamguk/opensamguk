@@ -1,19 +1,20 @@
-import { isLocalOffice } from '@opensamguk/rules';
+import { isLocalOffice, nowTick } from '@opensamguk/rules';
 import { z } from 'zod';
 import { protectedProcedure, router, worldVerifiedProcedure } from '../trpc';
 import { worldInput } from '../game/queries';
 import { readPersonnelBoard } from '../game/personnelQueries';
 import { readPersonnelRecent, readPersonnelRequest } from '../game/personnelRequests';
 import { submitAndWaitPersonnel, withPersonnel } from '../game/personnelApi';
+import { worldClock } from '../queries';
 
 const requestInput = worldInput.extend({ requestId: z.uuid() });
 const generalId = z.number().int().positive().max(2_147_483_647);
 export const personnelRouter = router({
   officers: protectedProcedure.input(worldInput).query(({ ctx, input }) =>
-    withPersonnel(ctx, input.worldId, async (tx, ready) => ({
+    withPersonnel(ctx, input.worldId, async (tx, ready, world) => ({
       ...(await readPersonnelBoard(
         tx,
-        { worldId: input.worldId, userId: ctx.user.id },
+        { worldId: input.worldId, userId: ctx.user.id, tick: nowTick(worldClock(world), ctx.now) },
         ready.officeEffectsEnabled === true,
         ready.courtRankEnabled === true,
         ready.localOfficeMinimum,

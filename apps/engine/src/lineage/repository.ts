@@ -153,6 +153,7 @@ export async function persistLineageMonth(
       data: {
         ...general,
         worldId,
+        ...(general.nationId === null ? {} : { nationJoinedTick: at.tick }),
         turnRevision: 0,
         defaultPolicy: 'none',
         lastActiveTick: null,
