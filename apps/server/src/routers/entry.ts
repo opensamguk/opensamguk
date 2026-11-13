@@ -17,7 +17,7 @@ import {
   combatSpecialty,
   domesticSpecialty,
   classifyRole,
-  recommendNations,
+  nationRecommendations,
   effectiveWorldOptions,
   parsePreset,
   toGameDate,
@@ -195,9 +195,10 @@ export const entryRouter = router({
                 b.leadership + b.strength + b.intel - (a.leadership + a.strength + a.intel) ||
                 a.id - b.id,
             );
+          const recommend = nationRecommendations(view, tick);
           for (const general of candidates) {
             const nation = general.nationId === null ? null : view.nations[general.nationId]!;
-            const suggested = general.nationId === null ? recommendNations(view, general.id, tick)[0] : undefined;
+            const suggested = general.nationId === null ? recommend(general.id)[0] : undefined;
             const domestic = domesticSpecialty(world, general.special);
             const combat = combatSpecialty(world, general.special);
             roles[classifyRole(general)].push({
