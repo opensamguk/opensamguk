@@ -639,6 +639,7 @@ export function OperationalWorldMap({
                   color={city && city.recorded !== false ? (nation?.color ?? null) : null}
                   pixelsPerUnit={pixelsPerUnit}
                   flagMaskId={flagMaskId}
+                  cut={city?.supplied === false && city.nationId !== null}
                 />
               </g>
               <g transform={`translate(${site.position.x} ${site.position.y + below + 2}) scale(${labelScale})`}>

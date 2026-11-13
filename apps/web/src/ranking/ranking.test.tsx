@@ -71,6 +71,20 @@ describe('장수 순위 표', () => {
     expect(screen.queryByRole('button', { name: '내 순위로' })).toBeNull();
   });
 
+  // 원작 명장일람처럼 전공 옆에 승리·점령을 나눠 쓰고 이름의 괄호는 뺀다 (INT-25).
+  it('전공 옆에 승리·점령 열을 따로 두고 이름 괄호를 뺀다', () => {
+    const top = [general(1, 7, '조조(曹操)')];
+    render(<GeneralRankingTable ranking={{ top, me: null, at }} by="merit" onSort={() => {}} />);
+    const table = screen.getByRole('table', { name: '장수 순위' });
+    const headers = within(table)
+      .getAllByRole('columnheader')
+      .map((th) => th.textContent);
+    expect(headers.slice(-2)).toEqual(['승리', '점령']);
+    const cells = within(table).getAllByRole('row')[1]!.children;
+    expect(cells[1]?.textContent).toBe('조조');
+    expect([cells[6]?.textContent, cells[7]?.textContent]).toEqual(['5', '4']);
+  });
+
   it('재야는 소속이 재야로 나온다', () => {
     const top = [{ ...general(1, 9, '여포'), nation: null }];
     render(<GeneralRankingTable ranking={{ top, me: null, at }} by="dedication" onSort={() => {}} />);

@@ -27,6 +27,7 @@ export function MapSiteMarker({
   color,
   pixelsPerUnit,
   flagMaskId,
+  cut = false,
 }: {
   x: number;
   y: number;
@@ -38,8 +39,23 @@ export function MapSiteMarker({
   color: string | null;
   pixelsPerUnit: number;
   flagMaskId: string;
+  // 보급이 끊긴 국가 도시. 원작처럼 다른 표시를 얹는다: 표식을 가로지르는 붉은 사선 (INT-25).
+  cut?: boolean;
 }) {
   const box = markerBox(kind, level, axis);
+  const slash = (width: number, height: number) =>
+    cut ? (
+      <line
+        data-testid="marker-cut"
+        x1={x - width / 2}
+        y1={y - height / 2}
+        x2={x + width / 2}
+        y2={y + height / 2}
+        stroke="#9b2c1f"
+        strokeWidth={Math.max(width, height) * 0.12}
+        strokeLinecap="square"
+      />
+    ) : null;
   const units = Math.max(box.width, box.height);
   const detail = markerDetail(units, pixelsPerUnit);
   if (detail === 'square') {
@@ -47,7 +63,7 @@ export function MapSiteMarker({
     const grow = pixelsPerUnit > 0 ? Math.max(1, SQUARE_MIN_PX / pixelsPerUnit / Math.min(box.width, box.height)) : 1;
     const width = box.width * grow;
     const height = box.height * grow;
-    return (
+    const square = (
       <rect
         data-marker-detail="square"
         x={x - width / 2}
@@ -58,6 +74,14 @@ export function MapSiteMarker({
         stroke="#221d17"
         strokeWidth={Math.min(1, 1 / pixelsPerUnit)}
       />
+    );
+    return cut ? (
+      <g data-marker-cut="true">
+        {square}
+        {slash(width, height)}
+      </g>
+    ) : (
+      square
     );
   }
   const art = markerArt(kind, level, { ruined, axis });
@@ -74,6 +98,7 @@ export function MapSiteMarker({
         style={{ imageRendering: 'pixelated' }}
       />
       {banner}
+      {slash(box.width, box.height)}
     </g>
   );
 }
