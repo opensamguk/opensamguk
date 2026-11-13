@@ -291,6 +291,29 @@ describe('T2-09 실제 HTTP 메시지·공지 권한 대조', () => {
     });
     expect(list.items).toHaveLength(1);
   });
+  it('발신자가 5분 안에 삭제하면 본문을 비우고 읽음 수에서 뺀다', async () => {
+    const send = async (body: string) =>
+      (await call<Outputs['message']['send']>('message.send', { worldId, scope: 'PRIVATE', toGeneralId: 2, body }))
+        .data!.item;
+    const sent = await send('삭제할 본문');
+    expect(sent.retractUntil).toBeTruthy();
+    expect((await call('message.retract', { worldId, id: sent.id }, 1)).code).toBe('NOT_FOUND');
+    expect((await call('message.retract', { worldId: otherWorldId, id: sent.id })).code).toBe('NOT_FOUND');
+    expect((await call<Outputs['message']['unread']>('message.unread', { worldId }, 1)).data!.PRIVATE).toBe(1);
+    const retract = () => call('message.retract', { worldId, id: sent.id });
+    expect((await retract()).status).toBe(200);
+    expect((await retract()).status).toBe(200);
+    expect((await call<Outputs['message']['unread']>('message.unread', { worldId }, 1)).data!.PRIVATE).toBe(0);
+    const inbox = (await call<Outputs['message']['list']>('message.list', { worldId, scope: 'PRIVATE' }, 1)).data!;
+    expect(inbox.items[0]).toMatchObject({ id: sent.id, body: '', deletedAt: expect.any(String), read: true });
+    expect(inbox.items[0]).not.toHaveProperty('retractUntil');
+    expect(await db.message.findUnique({ where: { id: sent.id }, select: { body: true } })).toEqual({ body: '' });
+
+    const expired = await send('시간이 지난 본문');
+    await db.message.update({ where: { id: expired.id }, data: { sentAt: new Date(Date.now() - 6 * 60_000) } });
+    expect((await call('message.retract', { worldId, id: expired.id })).code).toBe('BAD_REQUEST');
+  });
+
   it('국가·외교 권한은 현재 소속·직책을 따르고 표시용 국명은 발신 시점을 보존한다', async () => {
     expect((await call('message.send', { worldId, scope: 'NATION', body: '국가만' }, 5)).status).toBe(200);
     expect((await call('message.send', { worldId, scope: 'DIPLOMACY', toNationId: 2, body: '외교' }, 5)).code).toBe(
@@ -368,7 +391,14 @@ describe('T2-09 실제 HTTP 메시지·공지 권한 대조', () => {
     ).toBe('BAD_REQUEST');
     const recipients = (await call<Outputs['message']['recipients']>('message.recipients', { worldId })).data!;
     expect(recipients.generals.map((g) => g.id)).not.toContain(1);
-    expect(Object.keys(recipients.generals[0]!).sort()).toEqual(['id', 'name', 'nation', 'portraitId']);
+    expect(Object.keys(recipients.generals[0]!).sort()).toEqual([
+      'id',
+      'isAmbassador',
+      'name',
+      'nation',
+      'officerLevel',
+      'portraitId',
+    ]);
     expect(recipients.nations.map((n) => n.id)).toEqual([2]);
   });
   it('같은 시각의 41행을 시간·ID 커서로 빠짐과 중복 없이 읽는다', async () => {

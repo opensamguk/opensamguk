@@ -21,7 +21,7 @@ export function mergeMessages(pages: readonly (readonly MessageItem[])[]): Messa
   for (const items of pages) {
     for (const item of items) {
       const seen = byId.get(item.id);
-      byId.set(item.id, seen ? { ...item, read: seen.read || item.read } : item);
+      byId.set(item.id, seen ? { ...(seen.deletedAt ? seen : item), read: seen.read || item.read } : item);
     }
   }
   return [...byId.values()].sort(compareMessages);

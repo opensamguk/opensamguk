@@ -4,6 +4,8 @@ import { z } from 'zod';
 import type { Context } from './context';
 import { requireGeneral } from './queries';
 
+export const MESSAGE_RETRACTION_MS = 5 * 60_000;
+
 export const messageScope = z.enum(['PRIVATE', 'NATION', 'DIPLOMACY', 'WORLD']);
 export type MessageScope = z.infer<typeof messageScope>;
 export const bodyLimit = z.string().refine((value) => [...value].length <= 1000, '본문은 1,000자까지 쓸 수 있습니다.');
@@ -60,6 +62,7 @@ export async function unreadMessages(tx: Prisma.TransactionClient, worldId: stri
             worldId,
             OR: [{ senderId: null }, { senderId: { not: general.id } }],
             reads: { none: { generalId: general.id } },
+            deletedAt: null,
           },
         ],
       },
@@ -99,10 +102,14 @@ export function messageItem(
     direction: sent ? ('sent' as const) : ('received' as const),
     from: withPortrait(from),
     to: to === null ? null : withPortrait(to),
-    body: row.body,
+    body: row.deletedAt ? '' : row.body,
+    ...(row.deletedAt ? { deletedAt: row.deletedAt.toISOString() } : {}),
+    ...(sent && !row.deletedAt
+      ? { retractUntil: new Date(row.sentAt.getTime() + MESSAGE_RETRACTION_MS).toISOString() }
+      : {}),
     sentAt: row.sentAt.toISOString(),
     gameDate: { year: row.year, month: row.month },
-    read: sent || row.reads.some((read) => read.generalId === generalId),
+    read: row.deletedAt !== null || sent || row.reads.some((read) => read.generalId === generalId),
   };
 }
 

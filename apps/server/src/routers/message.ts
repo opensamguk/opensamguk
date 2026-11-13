@@ -10,6 +10,7 @@ import {
   isLeader,
   messageBody,
   messageItem,
+  MESSAGE_RETRACTION_MS,
   messageScope,
   messagingActor,
   nationTagSelect,
@@ -163,6 +164,34 @@ export const messageRouter = router({
         return { item: messageItem(row, g.id) };
       }),
     ),
+  retract: worldVerifiedProcedure.input(worldInput.extend({ id: z.uuid() }).strict()).mutation(({ ctx, input }) =>
+    writeMessaging(ctx, async (tx, notify) => {
+      const actor = await messagingActor(tx, ctx, input.worldId, true);
+      const row = await tx.message.findFirst({
+        where: { worldId: input.worldId, id: input.id, senderId: actor.id },
+      });
+      if (!row) throw new TRPCError({ code: 'NOT_FOUND', message: '내가 보낸 메시지를 찾을 수 없습니다.' });
+      visibleMessages(actor, row.scope);
+      if (row.deletedAt) return { id: row.id };
+      const now = await databaseTime(tx);
+      if (now.getTime() >= row.sentAt.getTime() + MESSAGE_RETRACTION_MS)
+        throw new TRPCError({ code: 'BAD_REQUEST', message: '보낸 뒤 5분 동안 메시지를 삭제할 수 있습니다.' });
+      await tx.message.update({
+        where: { worldId_id: { worldId: input.worldId, id: input.id } },
+        data: { deletedAt: now, body: '' },
+      });
+      const target =
+        row.scope === 'PRIVATE'
+          ? { generalId: row.recipientId! }
+          : row.scope === 'NATION'
+            ? { nationId: row.recipientNationId! }
+            : row.scope === 'WORLD'
+              ? 'world'
+              : { nationIds: [row.senderNationId!, row.recipientNationId!], leadersOnly: true as const };
+      notify(input.worldId, { kind: 'message.new', scope: row.scope, target });
+      return { id: row.id };
+    }),
+  ),
   unread: protectedProcedure
     .input(worldInput)
     .query(({ ctx, input }) =>

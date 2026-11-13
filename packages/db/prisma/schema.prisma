@@ -1072,6 +1072,7 @@ model Message {
   toParty           Json?
   body              String
   sentAt            DateTime      @default(now()) @db.Timestamptz(3)
+  deletedAt         DateTime?     @db.Timestamptz(3)
   year              Int
   month             Int
   world             World         @relation(fields: [worldId], references: [id], onDelete: Cascade)
