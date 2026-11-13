@@ -41,6 +41,12 @@ export async function persistRanking(
               winRate: battle.wins / battle.engagements,
               kills: Number(battle.kills),
               killRate: Number(battle.kills) / Math.max(1, Number(battle.casualties)),
+              ...(battle.humanEngagements > 0
+                ? {
+                    humanKills: Number(battle.humanKills),
+                    humanKillRate: Number(battle.humanKills) / Math.max(1, Number(battle.humanCasualties)),
+                  }
+                : {}),
             }
           : null;
       })(),
