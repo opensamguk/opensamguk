@@ -19,6 +19,7 @@ type Results = {
   'city.get': Out['city']['get'];
   'nation.get': Out['nation']['get'];
   'treaty.relations': Out['treaty']['relations'];
+  'message.recipients': Out['message']['recipients'];
   'diplomaticDocuments.list': Out['diplomaticDocuments']['list'];
   'diplomaticDocuments.send': Out['diplomaticDocuments']['send'];
   'diplomaticDocuments.respond': Out['diplomaticDocuments']['respond'];
@@ -265,6 +266,9 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     expect((await respond(sent.data.id, 'accept')).status).toBe(403);
     expect((await delegate(1, recipientGeneral.id, 'AMBASSADOR')).status).toBe(403);
     expect((await delegate(2, recipientGeneral.id, 'AMBASSADOR')).status).toBe(200);
+    expect((await query('message.recipients', { worldId: world })).data.generals).toContainEqual(
+      expect.objectContaining({ id: recipientGeneral.id, isAmbassador: true }),
+    );
     expect((await respond(sent.data.id, 'accept')).data.status).toBe('ACTIVE');
     const successor = { ...payload, previousId: sent.data.id, brief: '후속 문서' };
     const rejected = await send({ ...successor, requestId: randomUUID() });
@@ -283,6 +287,9 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     await changeOfficer(1, 2, 1);
     expect((await list(1)).data.items[0]?.detail).toBeNull();
     expect(await db.diplomaticDelegate.count({ where: { worldId: world, generalId: recipientGeneral.id } })).toBe(0);
+    expect((await query('message.recipients', { worldId: world })).data.generals).toContainEqual(
+      expect.objectContaining({ id: recipientGeneral.id, isAmbassador: false }),
+    );
     expect((await delegate(2, actingGeneral.id, 'ADVISER')).status).toBe(400);
   });
   it('AC-INT-26 외교 관계표는 모든 국가 쌍과 공개 외교 상태만 반환한다', async () => {
