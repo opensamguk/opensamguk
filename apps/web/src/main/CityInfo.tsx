@@ -172,6 +172,14 @@ export function CityInfo({
         </p>
       )}
       <CityStats rows={rows} />
+      {data.incomeEstimate ? (
+        <p className={styles.meta}>
+          예상 세입 · 금 {n(data.incomeEstimate.gold.amount)} ({data.incomeEstimate.gold.year}년{' '}
+          {data.incomeEstimate.gold.month}월)
+          {' · '}쌀 {n(data.incomeEstimate.rice.amount)} ({data.incomeEstimate.rice.year}년{' '}
+          {data.incomeEstimate.rice.month}월)
+        </p>
+      ) : null}
       {data.riceMarket && (
         <p className={styles.facts}>
           쌀 시세 {data.riceMarket.rate === null ? '상인 없음' : `${data.riceMarket.rate}%`}

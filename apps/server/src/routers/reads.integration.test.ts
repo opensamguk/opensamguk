@@ -986,6 +986,12 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     expect(own.cities[0]).toHaveProperty('incomeEstimate.gold', own.financeEstimate?.gold.gross);
     expect(own.cities[0]).toHaveProperty('incomeEstimate.rice', own.financeEstimate?.rice.gross);
     expect(enemy.cities[0]).not.toHaveProperty('incomeEstimate');
+    const cityKey = own.cities[0]!.key;
+    expect((await query('city.get', { worldId, cityKey })).data.incomeEstimate).toMatchObject({
+      gold: { month: 1, amount: own.financeEstimate?.gold.gross },
+      rice: { month: 4, amount: own.financeEstimate?.rice.gross },
+    });
+    expect((await query('city.get', { worldId, cityKey }, users[3]!.cookie)).data.incomeEstimate).toBeUndefined();
     const home = (await query('home.get', { worldId })).data;
     expect(home.nation).toMatchObject({
       population: own.population,
