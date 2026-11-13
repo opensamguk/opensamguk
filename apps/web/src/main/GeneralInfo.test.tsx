@@ -95,13 +95,13 @@ function ageCell() {
   return screen.getByText('나이').nextElementSibling?.textContent;
 }
 
-function renderCard(equipment?: EquipmentRead) {
+function renderCard(equipment?: EquipmentRead, currentHome = home) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
       <GeneralInfo
         worldId="world-one"
-        home={home}
+        home={currentHome}
         cityName="낙양"
         nation={undefined}
         onSelectCity={() => {}}
@@ -111,6 +111,19 @@ function renderCard(equipment?: EquipmentRead) {
   );
   return client;
 }
+
+it('장수 카드에 수비 참여 병력과 다음 봉급을 표시한다', () => {
+  renderCard(undefined, {
+    ...home,
+    general: {
+      ...home.general,
+      defense: { participating: true, troops: 1234, minimumTraining: 20, minimumMorale: 20 },
+      salaryEstimate: { gold: 500, rice: 800 },
+    },
+  });
+  expect(screen.getByText('참전 · 1,234명')).toBeTruthy();
+  expect(screen.getByText('금 500 · 쌀 800')).toBeTruthy();
+});
 
 // 장비 조회가 실패해도 기본 능력치는 그대로 보이고, 공통 오류 칸의 다시 시도로 같은 조회만 다시 받는다 (AC-P2-34).
 describe('장수 정보 칸 장비 상태', () => {
