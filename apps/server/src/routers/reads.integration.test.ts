@@ -22,6 +22,8 @@ type Results = {
   'diplomaticDocuments.list': Out['diplomaticDocuments']['list'];
   'diplomaticDocuments.send': Out['diplomaticDocuments']['send'];
   'diplomaticDocuments.respond': Out['diplomaticDocuments']['respond'];
+  'diplomaticDocuments.delegates': Out['diplomaticDocuments']['delegates'];
+  'diplomaticDocuments.setDelegate': Out['diplomaticDocuments']['setDelegate'];
   'commands.recruitCandidates': Out['commands']['recruitCandidates'];
   'records.general': Out['records']['general'];
   'records.battles': Out['records']['battles'];
@@ -242,6 +244,8 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     const send = (input: typeof payload & { previousId?: number } = payload) =>
       query('diplomaticDocuments.send', input, users[0]!.cookie, 'POST');
     const list = (index: number) => query('diplomaticDocuments.list', { worldId: world }, users[index]!.cookie);
+    const delegate = (index: number, generalId: number, role: 'ADVISER' | 'AMBASSADOR' | null) =>
+      query('diplomaticDocuments.setDelegate', { worldId: world, generalId, role }, users[index]!.cookie, 'POST');
     const respond = (id: number, action: 'accept' | 'decline' | 'withdraw', index = 1) =>
       query('diplomaticDocuments.respond', { worldId: world, id, action }, users[index]!.cookie, 'POST');
     const [sent, retry] = await Promise.all([send(), send()]);
@@ -253,8 +257,14 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     await changeOfficer(1, 2, 1);
     expect((await list(1)).data.items).toMatchObject([{ brief: payload.brief, detail: null }]);
     expect((await respond(sent.data.id, 'accept')).status).toBe(403);
-    await changeOfficer(1, 2, 12);
+    const actingGeneral = await changeOfficer(2, 2, 12);
+    const recipientGeneral = await changeOfficer(1, 2, 1);
+    expect((await delegate(0, recipientGeneral.id, 'ADVISER')).status).toBe(404);
+    expect((await delegate(2, recipientGeneral.id, 'ADVISER')).status).toBe(200);
     expect((await list(1)).data.items).toMatchObject([{ detail: payload.detail }]);
+    expect((await respond(sent.data.id, 'accept')).status).toBe(403);
+    expect((await delegate(1, recipientGeneral.id, 'AMBASSADOR')).status).toBe(403);
+    expect((await delegate(2, recipientGeneral.id, 'AMBASSADOR')).status).toBe(200);
     expect((await respond(sent.data.id, 'accept')).data.status).toBe('ACTIVE');
     const successor = { ...payload, previousId: sent.data.id, brief: '후속 문서' };
     const rejected = await send({ ...successor, requestId: randomUUID() });
@@ -265,6 +275,15 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     expect((await send({ ...successor, requestId: randomUUID() })).status).toBe(409);
     expect((await respond(next.data.id, 'accept')).data.status).toBe('ACTIVE');
     expect((await list(0)).data.items.map(({ status }) => status)).toEqual(['ACTIVE', 'CANCELLED', 'REPLACED']);
+    expect((await query('diplomaticDocuments.delegates', { worldId: world }, users[1]!.cookie)).data).toMatchObject({
+      canAppoint: false,
+      members: [{ id: recipientGeneral.id, role: 'AMBASSADOR' }],
+    });
+    await changeOfficer(1, 3, 1);
+    await changeOfficer(1, 2, 1);
+    expect((await list(1)).data.items[0]?.detail).toBeNull();
+    expect(await db.diplomaticDelegate.count({ where: { worldId: world, generalId: recipientGeneral.id } })).toBe(0);
+    expect((await delegate(2, actingGeneral.id, 'ADVISER')).status).toBe(400);
   });
   it('AC-INT-26 외교 관계표는 모든 국가 쌍과 공개 외교 상태만 반환한다', async () => {
     const world = await fixtureWorld('relations');

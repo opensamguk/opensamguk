@@ -28,6 +28,7 @@ import { Notices } from './OfferBox';
 import { cityOfficeHolder, LocalOffices, localOfficeTarget, MemberResidence } from './OfficeResidence';
 import styles from './Personnel.module.css';
 import pageStyles from './PersonnelPage.module.css';
+import { DiplomaticDelegates } from './DiplomaticDelegates';
 import { usePersonnelAction } from './usePersonnelAction';
 
 const KINDS = ['personnel.appoint', 'personnel.dismiss'] as const;
@@ -160,6 +161,7 @@ export function PersonnelPage() {
       ) : (
         <LoadingState />
       )}
+      {roster.nation ? <DiplomaticDelegates key={`${roster.nation.id}:${board.data?.actorId ?? ''}`} worldId={worldId} /> : null}
     </section>
   );
 }
