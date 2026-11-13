@@ -11,6 +11,10 @@ export const npcPolicyLimits = {
   trainingTarget: { min: 20, max: 100 },
   moraleTarget: { min: 20, max: 100 },
   rewardGoldTarget: { min: 0, max: 1_000_000 },
+  rewardRiceTarget: { min: 0, max: 1_000_000 },
+  reserveRice: { min: 0, max: 1_000_000 },
+  seizeGoldAbove: { min: 0, max: 1_000_000 },
+  seizeRiceAbove: { min: 0, max: 1_000_000 },
   minRecruitPopulation: { min: 0, max: 1_000_000 },
   safeRecruitPopulationPercent: { min: 0, max: 100 },
   reserveGold: { min: 0, max: 1_000_000 },
@@ -45,6 +49,7 @@ export const npcNationCommands = [
   'nation_capital',
   'nation_declare',
   'nation_reward',
+  'nation_seize',
   'nation_city_allocate',
   'nation_mobilize',
   'nation_rivalry',
@@ -62,6 +67,10 @@ export const npcNationPolicySchema = z
     trainingTarget: bounded(npcPolicyLimits.trainingTarget),
     moraleTarget: bounded(npcPolicyLimits.moraleTarget),
     rewardGoldTarget: bounded(npcPolicyLimits.rewardGoldTarget),
+    rewardRiceTarget: bounded(npcPolicyLimits.rewardRiceTarget).optional(),
+    reserveRice: bounded(npcPolicyLimits.reserveRice).optional(),
+    seizeGoldAbove: bounded(npcPolicyLimits.seizeGoldAbove).optional(),
+    seizeRiceAbove: bounded(npcPolicyLimits.seizeRiceAbove).optional(),
     minRecruitPopulation: bounded(npcPolicyLimits.minRecruitPopulation).optional(),
     safeRecruitPopulationPercent: bounded(npcPolicyLimits.safeRecruitPopulationPercent).optional(),
     reserveGold: bounded(npcPolicyLimits.reserveGold).optional(),
@@ -77,6 +86,12 @@ export const npcNationPolicySchema = z
     (policy) =>
       policy.minReward === undefined || policy.maxReward === undefined || policy.minReward <= policy.maxReward,
     '최소 포상 금액은 최대 포상 금액 이하여야 합니다.',
+  )
+  .refine(
+    (policy) =>
+      (policy.seizeGoldAbove ?? Infinity) >= policy.rewardGoldTarget &&
+      (policy.seizeRiceAbove ?? Infinity) >= (policy.rewardRiceTarget ?? 0),
+    '몰수 기준은 해당 자원의 포상 기준 이상이어야 합니다.',
   );
 export type NpcNationPolicy = z.infer<typeof npcNationPolicySchema>;
 

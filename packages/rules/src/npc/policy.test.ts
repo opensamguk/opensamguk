@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { commandWorld, testUnits } from '../../test/commandFixture';
 import { generalTurnCandidates, nationTurnCandidates } from './index';
-import { NPC_DEFAULT_POLICY, NPC_NATION_POLICY_FEATURE } from './policy';
+import { NPC_DEFAULT_POLICY, NPC_NATION_POLICY_FEATURE, npcNationPolicySchema } from './policy';
 
 it('applies country-specific recruitment, drill, morale and reward targets when generating actual candidates', () => {
   const world = commandWorld();
@@ -83,4 +83,37 @@ it('applies cure, leadership and troop readiness to NPC decisions', () => {
   expect(keys()).toContain('attack');
   general.injury = 10;
   expect(keys()).not.toContain('heal');
+});
+
+it('awards rice and replenishes low treasury only from surplus held by NPCs', () => {
+  const world = commandWorld();
+  world.ruleFeatures = [NPC_NATION_POLICY_FEATURE];
+  const nation = world.nations[1]!;
+  const ruler = world.generals[1]!;
+  const person = world.generals[2]!;
+  Object.assign(ruler, { gold: 16000, rice: 1000 });
+  Object.assign(person, { nationId: 1, userId: 'owner', gold: 30000 });
+  Object.assign(nation, {
+    gold: 4000,
+    rice: 8000,
+    npcSettings: {
+      ...NPC_DEFAULT_POLICY,
+      reserveGold: 7000,
+      reserveRice: 5000,
+      rewardRiceTarget: 3000,
+      seizeGoldAbove: 14000,
+      minReward: 500,
+      maxReward: 1500,
+    },
+  });
+  const candidates = () => nationTurnCandidates(world, ruler, { tick: 100 });
+  expect(candidates()).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ key: 'nation_reward', args: { generalId: 1, resource: 'rice', amount: 1500 } }),
+      expect.objectContaining({ key: 'nation_seize', args: { generalId: 1, resource: 'gold', amount: 1500 } }),
+    ]),
+  );
+  ruler.gold = 14499;
+  expect(candidates().some(({ key }) => key === 'nation_seize')).toBe(false);
+  expect(npcNationPolicySchema.safeParse({ ...nation.npcSettings, seizeGoldAbove: 9999 }).success).toBe(false);
 });
