@@ -571,6 +571,19 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     const input = { worldId, cityKey: state.cities[0]!.cityKey };
     const ally = (await query('city.get', input)).data;
     expect(ally).toMatchObject({ population: state.cities[0]!.population, wall: state.cities[0]!.wall });
+    expect(ally.defense).toEqual({
+      minimumTraining: 20,
+      minimumMorale: 20,
+      troops: 26003,
+      generals: [
+        { generalId: 1, troops: 13001 },
+        { generalId: 2, troops: 13002 },
+      ],
+    });
+    expect((await query('home.get', { worldId })).data.general.defense).toMatchObject({
+      participating: true,
+      troops: 13001,
+    });
     expect(ally.generals.slice(0, 2)).toMatchObject([
       { id: 1, gold: 11001 },
       { id: 2, gold: 11002 },
@@ -579,6 +592,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       state.generals.slice(2).map(({ id, name, nationId }) => ({ id, name, nationId, isHuman: id !== 2 })),
     );
     const resident = (await query('city.get', input, users[1]!.cookie)).data;
+    expect(resident.defense).toBeUndefined();
     expect(resident).toHaveProperty('population');
     expect(resident.generals[0]).toEqual({ id: 1, name: state.generals[0]!.name, nationId: 1, isHuman: true });
     for (const user of users) {

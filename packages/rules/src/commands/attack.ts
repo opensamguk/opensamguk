@@ -2,6 +2,7 @@ import { TICKS_PER_MONTH } from '../clock/constants';
 import { z } from 'zod';
 import { BALANCE } from '../balance';
 import { simulateBattle } from '../battle/simulate';
+import { canDefend } from '../battle/defenders';
 import type { CommandResult } from './types';
 import type { InitialGeneral } from '../world/bootstrap';
 import { refreshSupply } from '../supply';
@@ -64,9 +65,7 @@ function makeAttack(collect: typeof collectModifiers) {
             defendingNation !== null &&
             d.nationId === defendingNation &&
             d.cityKey === city.cityKey &&
-            d.crew > 0 &&
-            d.train >= BALANCE.DEFEND_TRAIN &&
-            d.atmos >= BALANCE.DEFEND_ATMOS &&
+            canDefend(d.crew, d.train, d.atmos) &&
             d.activeFromYear <= state.startYear + Math.floor((actor.tick ?? 0) / (12 * 10000)),
         )
         .sort((a, b) => b.crew - a.crew || a.id - b.id);
