@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { retryUnlessClientError } from '../game/errors';
 import { displayName, officerName } from '../game/names';
+import { SeasonNationChronicle } from './Records';
 import { InfoGrid } from './Panel';
 import { useWorldId } from '../game/queries';
 import type { WorldSummary } from '../game/types';
@@ -138,6 +139,7 @@ function SeasonGenerals({ winnerNationId }: { winnerNationId: number | null }) {
                 {nation.peakCities === null ? '' : ` · 월간 최대 영토 ${n(nation.peakCities)}`}
                 {nation.peakPower === null ? '' : ` · 월간 최고 국력 ${n(nation.peakPower)}`}
                 {nation.cities.length ? <p>{nation.cities.map(({ name }) => name).join(' · ')}</p> : null}
+                <SeasonNationChronicle worldId={worldId} nationId={nation.nationId} />
                 {nation.final?.roster.length ? (
                   <details>
                     <summary>최종 장수 명단</summary>

@@ -25,12 +25,17 @@ import { decodeRecordCursor, encodeRecordCursor, generalLogCursor, recordId, rec
 import { monthlyReviewSelect, readMonthlyReview } from '../review';
 
 const generalInput = worldInput.extend({ cursor: z.string().min(1).max(256).optional() }).strict();
-const activityInput = generalInput.extend({
-  scope: z.enum(['all', 'world', 'biography']).default('all'),
-  period: z
-    .strictObject({ year: z.number().int().min(0).max(9999), month: z.number().int().min(1).max(12) })
-    .optional(),
-});
+const activityInput = generalInput
+  .extend({
+    scope: z.enum(['all', 'world', 'biography']).default('all'),
+    nationId: entityKey.optional(),
+    period: z
+      .strictObject({ year: z.number().int().min(0).max(9999), month: z.number().int().min(1).max(12) })
+      .optional(),
+  })
+  .refine(({ nationId, scope }) => nationId === undefined || scope === 'world', {
+    message: '국가별 기수 기록은 중원 정세에서 조회합니다.',
+  });
 const activityCursor = z.tuple([recordTick, z.enum(['reputation', 'nation', 'milestone']), recordId]);
 const nationEventKind = z.enum(['found', 'fall', 'declare', 'capture', 'promotion', 'enlist', 'capital', 'transfer']);
 const battleCursor = z.tuple([recordTick, entityKey]);
@@ -123,6 +128,8 @@ export const recordsRouter = router({
   activity: protectedProcedure.input(activityInput).query(({ ctx, input }) =>
     readWorld(ctx.db, input.worldId, async (tx, world) => {
       const cursor = input.cursor === undefined ? null : decodeRecordCursor(input.cursor, activityCursor);
+      if (input.nationId !== undefined && !seasonResultInfo(world))
+        throw new TRPCError({ code: 'NOT_FOUND', message: '기수 결과가 없습니다.' });
       const biography = input.scope === 'biography' ? await requireGeneral(tx, input.worldId, ctx.user.id) : null;
       const start = input.period
         ? ((input.period.year - world.startYear) * 12 + input.period.month - 1) * TICKS_PER_MONTH
@@ -173,7 +180,11 @@ export const recordsRouter = router({
               worldId: input.worldId,
               ...period,
               ...before('nation'),
-              ...(input.scope === 'world' ? { kind: { not: 'enlist' } } : {}),
+              ...(input.nationId !== undefined
+                ? { nationIds: { has: input.nationId } }
+                : input.scope === 'world'
+                  ? { kind: { not: 'enlist' } }
+                  : {}),
             },
             orderBy: [{ tick: 'desc' }, { id: 'desc' }],
             take: 31,
