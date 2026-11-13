@@ -14,6 +14,7 @@ import type {
   PersonnelRecord,
   RequestState,
 } from './contract';
+import type { MemberDetail } from './candidates';
 import { NATION_SLOT_COUNT, nationDraftKey, nationSource } from './NationTurnsPage';
 import { OfferCard } from './OfferBox';
 import { CityOfficeResidences } from './OfficeResidence';
@@ -354,14 +355,64 @@ describe('인사부', () => {
     ],
   };
 
-  it('군주는 빈 자리에 직책 없는 장수만 고르고 앉은 자리는 해임한다', () => {
+  const detail = (stats: [number, number, number], extra: Partial<MemberDetail> = {}): MemberDetail => ({
+    portraitId: null,
+    leadership: stats[0],
+    strength: stats[1],
+    intel: stats[2],
+    personality: null,
+    special: null,
+    troops: 0,
+    injury: 0,
+    ...extra,
+  });
+  const details = new Map<number, MemberDetail>([
+    [1, detail([90, 80, 80])],
+    [2, detail([70, 30, 100], { personality: '안전', special: '신산' })],
+    [3, detail([90, 96, 76], { politics: 65, charm: 81, troops: 3000, injury: 12 })],
+  ]);
+
+  it('군주는 후보 카드에서 장수를 골라 빈 자리에 임명하고 앉은 자리는 해임한다', () => {
     const onAppoint = vi.fn();
     const onDismiss = vi.fn();
-    render(<PersonnelBoardView board={board} busyTarget={null} onAppoint={onAppoint} onDismiss={onDismiss} />);
-    const select = screen.getByLabelText('수뇌 임명할 장수');
-    expect([...select.querySelectorAll('option')].map((o) => o.textContent)).toEqual(['고르세요', '조운']);
-    fireEvent.change(select, { target: { value: '3' } });
-    fireEvent.click(screen.getByRole('button', { name: '임명' }));
+    render(
+      <PersonnelBoardView
+        board={board}
+        details={details}
+        busyTarget={null}
+        onAppoint={onAppoint}
+        onDismiss={onDismiss}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /^임명\s*\(사용 불가\)$/ })).toBeTruthy();
+    const open = screen.getByRole('button', { name: '수뇌 임명할 장수 고르기' });
+    expect(open.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(open);
+    const picker = screen.getByRole('group', { name: '수뇌 임명 후보' });
+    expect(open.getAttribute('aria-controls')).toBe(picker.id);
+    // 군주는 후보가 아니다. 직책 없는 조운이 먼저, 참모 제갈량은 다른 관직 재직으로 뒤에 둔다.
+    const cards = within(picker).getAllByRole('button');
+    expect(cards.map((card) => card.getAttribute('data-general-id'))).toEqual(['3', '2']);
+    const zhao = cards[0]!;
+    expect(zhao.textContent).toContain('양양 · 장수');
+    expect(zhao.textContent).toContain('임명 가능');
+    expect(zhao.querySelector('[data-variant="icon"]')).not.toBeNull();
+    expect([...zhao.querySelectorAll('[data-stat]')].map((el) => el.textContent)).toEqual([
+      '통솔 90',
+      '무력 96',
+      '지력 76',
+      '정치 65',
+      '매력 81',
+    ]);
+    expect(zhao.textContent).toContain('병력 3,000 · 부상 12');
+    expect(cards[1]!.textContent).toContain('참모 재직');
+    expect(cards[1]!.textContent).toContain('신산');
+
+    fireEvent.click(zhao);
+    expect(screen.queryByRole('group', { name: '수뇌 임명 후보' })).toBeNull();
+    const appoint = screen.getByRole('button', { name: '임명' });
+    expect(document.activeElement).toBe(appoint);
+    fireEvent.click(appoint);
     fireEvent.click(screen.getByRole('button', { name: '해임' }));
     expect(onAppoint.mock.calls).toEqual([[3, 10]]);
     expect(onDismiss.mock.calls).toEqual([[2, 11]]);
@@ -439,6 +490,27 @@ describe('인사부', () => {
     expect(panel.getByText('태수 장비 · 부재')).toBeTruthy();
     expect(panel.getByText('군사 없음')).toBeTruthy();
     expect(panel.getByText('참모 제갈량 · 주재')).toBeTruthy();
+  });
+
+  it('후보는 이름·도시로 거르고 앉은 장수 칸에 소재 도시를 적는다', () => {
+    render(
+      <PersonnelBoardView board={board} details={details} busyTarget={null} onAppoint={vi.fn()} onDismiss={vi.fn()} />,
+    );
+    const holder = document.querySelector('tr[data-level="11"]')!;
+    expect(holder.textContent).toContain('제갈량');
+    expect(holder.textContent).toContain('신야');
+    fireEvent.click(screen.getByRole('button', { name: '수뇌 임명할 장수 고르기' }));
+    const search = screen.getByLabelText('후보 찾기');
+    fireEvent.change(search, { target: { value: '신야' } });
+    const picker = screen.getByRole('group', { name: '수뇌 임명 후보' });
+    expect(
+      within(picker)
+        .getAllByRole('button')
+        .map((card) => card.getAttribute('data-general-id')),
+    ).toEqual(['2']);
+    fireEvent.change(search, { target: { value: '없는 이름' } });
+    expect(within(picker).getByText('찾는 장수가 없습니다.')).toBeTruthy();
+    expect(within(picker).getByText('후보 0명')).toBeTruthy();
   });
 
   it('군주가 아니면 입력을 열지 않고 서버가 준 이유를 보인다', () => {

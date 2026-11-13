@@ -1291,6 +1291,11 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
         ).toEqual({ userId: actor.userId, actorId: actor.generalId, cityKey: enemy.cityKey, visible: false });
         await actor.page.setViewportSize({ width: 375, height: 812 });
         await actor.page.getByRole('button', { name: '내 도시로', exact: true }).click();
+        // 375px 메인은 하단 막대로 패널을 바꾼다 (INT-25). 도시 자원과 배속은 `현황` 패널의 도시 칸에 있다.
+        await actor.page
+          .getByRole('tablist', { name: '메인 화면', exact: true })
+          .getByRole('tab', { name: '현황', exact: true })
+          .click();
         await showResources(main, actor, cityKey);
         await expect(editor.locator('tr[data-slot="4"]')).toContainText('농지 개간');
         const form = actor.page.getByRole('form', { name: '도시 병력 배속', exact: true });

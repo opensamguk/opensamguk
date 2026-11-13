@@ -159,7 +159,9 @@ describe('이름표', () => {
     expect(officerName(12)).toBe('군주');
     expect(officerName(0)).toBe('재야');
     expect(officerName(0, true)).toBe('일반');
-    expect(officerName(5)).toBe('관직 5단계');
+    expect(officerName(11)).toBe('참모');
+    expect([10, 7, 5].map((level) => officerName(level))).toEqual(['수뇌', '수뇌', '수뇌']);
+    expect(officerName(3)).toBe('관직 3단계');
   });
 });
 

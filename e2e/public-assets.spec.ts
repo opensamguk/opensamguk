@@ -6,12 +6,13 @@ import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page, type Response } from '@playwright/test';
 
-// T3-13 · AC-M3-06 · D-031: 이미 만든 공개 dist(`pnpm build:public`)를 vite preview로 띄워 첫 화면과 로그인 화면의
+// T3-13 · AC-M3-06 · D-060 · D-087: 이미 만든 공개 dist(`pnpm build:public`)를 vite preview로 띄워 첫 화면과 로그인 화면의
 // 네트워크 요청을 대조한다. 이 시험은 빌드하지 않는다. dist의 파일 바이트가 public-build.json과 같아야 시작한다.
 // 기본 실행 설정(playwright.config.ts)의 webServer와 baseURL에 기대지 않는다. 공개 자산 전용 설정으로 따로 실행한다.
 // /trpc·/sse는 화면이 열리기 전에 가로채 503으로 막는다. 실제 API·DB에 닿지 않으며 이 시험을 게임 API 검증으로 세지 않는다.
-// 초상 표시는 공개 모드 화면 단위 시험(apps/web/src/portrait/public.test.tsx)이 맡는다. 여기서 이미지 요청이 없다는 것만으로
-// Portrait가 기본 이미지를 그린다고 보지 않는다. 배출된 기본 SVG는 시험 안에서 직접 불러 응답 바이트만 확인한다.
+// D-087으로 공개 빌드도 게임 초상을 보인다. 초상 주소 해석은 공개 모드 화면 단위 시험(apps/web/src/portrait/public.test.tsx)이
+// 맡는다. 여기서는 초상 요청이 있다면 manifest의 remoteImageBases 중 빌드에 쓴 base 아래인지만 본다.
+// 배출된 기본 SVG는 시험 안에서 직접 불러 응답 바이트만 확인한다.
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 const webDir = join(repoRoot, 'apps', 'web');
@@ -56,7 +57,13 @@ function readVerifiedMeta(): PublicBuildMeta {
   const meta = JSON.parse(readFileSync(join(distDir, META_FILE), 'utf8')) as PublicBuildMeta;
   expect(meta.schema).toBe(2);
   expect(meta.mode).toBe('public');
-  expect(meta.imageBaseUrl).toBe('');
+  // 빌드에 쓴 초상 base는 승인 목록 안의 고정 주소다 (D-087).
+  const policy = JSON.parse(readFileSync(join(repoRoot, 'manifest/public-assets.json'), 'utf8')) as {
+    portraitPolicy: string;
+    remoteImageBases: string[];
+  };
+  expect(policy.portraitPolicy).toBe('remote');
+  expect(policy.remoteImageBases).toContain(meta.imageBaseUrl);
   const onDisk = listFiles(distDir)
     .map((path) => relative(distDir, path).split(sep).join('/'))
     .filter((file) => file !== META_FILE)
@@ -165,7 +172,7 @@ async function watch(page: Page): Promise<Seen> {
   const seen: Seen = { external: [], api: [], assets: [], pending: [] };
   await page.route('**/*', (route) => {
     const url = new URL(route.request().url());
-    if (url.origin !== origin && !meta.remoteImages.some((image) => image.url === url.href)) {
+    if (url.origin !== origin && !meta.remoteImages.some((image) => image.url === url.href) && !isPortrait(url.href)) {
       seen.external.push(url.href);
       return route.abort('blockedbyclient');
     }
@@ -196,15 +203,23 @@ async function watch(page: Page): Promise<Seen> {
   return seen;
 }
 
+// 승인한 초상 base 아래의 세 변형 경로만 초상 요청으로 본다.
+const isPortrait = (href: string) =>
+  meta.imageBaseUrl !== '' &&
+  href.startsWith(`${meta.imageBaseUrl}/portraits/`) &&
+  /^(?:portrait\/\d+\.png|(?:icon|thumb)\/\d+\.webp)$/.test(href.slice(`${meta.imageBaseUrl}/portraits/`.length));
+
 // 문서 요청은 SPA라 어느 주소든 index.html이다. 나머지는 dist 파일 이름 그대로다.
 const distKey = (path: string, type: string) => (type === 'document' ? 'index.html' : decodeURI(path.slice(1)));
 
 function expectOnlyDistAssets(seen: Seen) {
   expect(seen.external, '승인 목록 밖 요청').toEqual([]);
   for (const asset of seen.assets) {
-    expect(asset.path, '원작 초상 경로').not.toContain('/portraits/');
     expect(asset.status, asset.path).toBe(200);
-    if (asset.path.startsWith('https://')) {
+    if (isPortrait(asset.path)) {
+      expect(asset.type, asset.path).toBe('image');
+    } else if (asset.path.startsWith('https://')) {
+      expect(asset.path, '승인 base 밖 초상 경로').not.toContain('/portraits/');
       const approved = meta.remoteImages.find((image) => image.url === asset.path);
       expect(approved, asset.path).toBeDefined();
       expect(asset.sha256, asset.path).toBe(approved!.sha256);
@@ -231,7 +246,7 @@ test('dist에는 이미지 바이트가 없고 승인한 고정 주소와 해시
 });
 
 for (const path of ['/', '/login']) {
-  test(`${path} 화면은 승인한 CDN 이미지와 dist만 받고 원작 초상을 요청하지 않는다`, async ({ page }) => {
+  test(`${path} 화면은 승인한 CDN 이미지·초상 base와 dist만 받는다`, async ({ page }) => {
     const seen = await watch(page);
     await page.goto(`${origin}${path}`, { waitUntil: 'networkidle' });
     await expect(page.locator('#root > *').first()).toBeAttached();
@@ -257,7 +272,10 @@ for (const path of ['/', '/login']) {
     ).toBe(true);
     expect(types.has('script') && types.has('stylesheet')).toBe(true);
     const srcs = await page.locator('img').evaluateAll((imgs) => imgs.map((img) => img.getAttribute('src') ?? ''));
-    for (const src of srcs) expect(src).not.toMatch(/\/portraits\/|^data:image/);
+    for (const src of srcs) {
+      expect(src).not.toMatch(/^data:image/);
+      if (src.includes('/portraits/')) expect(isPortrait(src), src).toBe(true);
+    }
   });
 }
 

@@ -93,23 +93,31 @@
   gap: var(--space-3);
   align-items: start;
 }
-.layout > [data-main-area='map'] {
+/* 좁은 화면의 패널 묶음(INT-25). 넓은 화면에서는 상자를 만들지 않아 안의 칸이 그대로 위 격자에 놓인다. */
+.tabPanel {
+  display: contents;
+}
+.tabPanel > [data-main-area='map'] {
   grid-area: map;
 }
-.layout > [data-main-area='commands'] {
+.tabPanel > [data-main-area='commands'] {
   grid-area: commands;
   align-self: stretch;
 }
-.layout > [data-main-area='city'] {
+.tabPanel > [data-main-area='city'] {
   grid-area: city;
 }
-.layout > [data-main-area='nation'] {
+.tabPanel > [data-main-area='nation'] {
   grid-area: nation;
   align-self: stretch;
 }
-.layout > [data-main-area='general'] {
+.tabPanel > [data-main-area='general'] {
   grid-area: general;
   align-self: stretch;
+}
+/* 메시지 패널은 좁은 화면에서만 쓴다. */
+.tabPanel[data-mobile-panel='messages'] {
+  display: none;
 }
 .records {
   grid-area: records;
@@ -144,6 +152,56 @@
   }
   .records {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 375px 메인 (INT-25 5단계): 위 바로가기 띠 대신 하단 막대로 패널을 하나씩 바꿔 본다. 막대는 화면 아래에 붙어 있으므로
+   그만큼 아래를 비운다. 패널을 바꾸면 패널 묶음의 위가 화면 위에 오도록 옮긴다 (MainPage.tsx). */
+@media (max-width: 767px) {
+  .page {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+  .sections {
+    display: none;
+  }
+  .layout {
+    grid-template-areas: none;
+  }
+  .tabPanel,
+  .tabPanel[data-mobile-panel='messages'] {
+    display: grid;
+    gap: var(--space-3);
+    min-width: 0;
+  }
+  .tabPanel[data-active='false'] {
+    display: none;
+  }
+  /* 인자 입력 화면은 모달 dialog다. 연 채로 폭이 좁아져도 감춘 패널 안에서 보이지 않는 채 화면을 막지 않게 그 패널은 그린다. */
+  .tabPanel[data-active='false']:has(dialog[open]) {
+    display: grid;
+  }
+  /* 첫 예턴 화면에 칸 12개가 들도록 명령 목록 머리글은 화면 읽기에만 남기고(하단 막대의 `예턴`이 제목 구실을 한다)
+     기본 방침은 편집기 아래로 내린다. 머리글은 초점을 받을 수 있게 그대로 둔다. */
+  .tabPanel > [data-main-area='commands'] {
+    position: relative;
+  }
+  .tabPanel > [data-main-area='commands'] > header {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .commandsBody {
+    display: flex;
+    flex-direction: column;
+  }
+  .policy {
+    order: 1;
+    padding-top: var(--space-3);
   }
 }
 
@@ -185,6 +243,12 @@
 .menuItem:hover {
   background: var(--color-surface-muted);
 }
+/* 좁은 메인 `메뉴` 패널의 로그아웃 단추도 링크와 같은 모양으로 둔다. */
+.menuItem:is(button) {
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
 @media (max-width: 767px) {
   .menuRow {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -194,5 +258,9 @@
   }
   .menuItem {
     min-height: 44px;
+    /* 375px 3칸에서 긴 이름(전투 시뮬레이터)이 칸 밖으로 넘치지 않게 줄을 바꾼다. */
+    white-space: normal;
+    text-align: center;
+    overflow-wrap: anywhere;
   }
 }

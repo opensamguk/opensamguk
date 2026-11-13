@@ -1,6 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useRef } from 'react';
 import { errorCode } from '../game/errors';
+import { displayName } from '../game/names';
+import { Portrait } from '../portrait/Portrait';
+import { portraitIdOf } from '../portrait/portraitUrl';
 import { QueryError } from '../game/QueryState';
 import { serverMessage } from '../turns/apiError';
 import { useTRPC } from '../trpc';
@@ -170,10 +173,18 @@ function MessageList({ worldId, scope }: { worldId: string; scope: MessageScope 
   );
 }
 
+// 장수가 보낸·받은 쪽이면 원형 icon과 괄호를 뺀 이름을 보인다 (D-085). 국가 명의는 이름만 둔다.
+function partyName(party: Party): string {
+  return party.generalId !== null ? displayName(party.name) : party.name;
+}
+
 function PartyName({ party }: { party: Party }) {
   return (
     <span className={styles.party}>
-      <span>{party.name}</span>
+      {party.generalId !== null ? (
+        <Portrait id={portraitIdOf(party)} name={partyName(party)} variant="icon" shape="round" size={24} decorative />
+      ) : null}
+      <span>{partyName(party)}</span>
       {party.nation && party.generalId !== null ? (
         <NationBadge name={party.nation.name} color={party.nation.color} />
       ) : null}
@@ -208,13 +219,19 @@ export function MessageRow({ item }: { item: MessageItem }) {
 }
 
 function partiesLabel(item: MessageItem): string {
-  return item.to ? `보낸 이 ${item.from.name}, 받는 이 ${item.to.name}` : `보낸 이 ${item.from.name}`;
+  return item.to ? `보낸 이 ${partyName(item.from)}, 받는 이 ${partyName(item.to)}` : `보낸 이 ${partyName(item.from)}`;
 }
 
 export function formatTime(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+// 받는 장수 고르기에서는 괄호를 뺀 이름이 다른 장수와 겹치면 원래 이름(괄호 포함)을 그대로 둔다 (INT-25).
+export function pickerName(name: string, all: readonly { name: string }[]): string {
+  const shown = displayName(name);
+  return all.some((other) => other.name !== name && displayName(other.name) === shown) ? name : shown;
 }
 
 interface ComposeDraft {
@@ -299,11 +316,14 @@ function Compose({ worldId, scope, draftKey }: { worldId: string; scope: SendSco
             }
           >
             <option value="">고르세요</option>
-            {recipients.data?.generals.map((general) => (
-              <option key={general.id} value={general.id}>
-                {general.nation ? `${general.name} (${general.nation.name})` : `${general.name} (재야)`}
-              </option>
-            ))}
+            {recipients.data?.generals.map((general, _index, all) => {
+              const name = pickerName(general.name, all);
+              return (
+                <option key={general.id} value={general.id}>
+                  {general.nation ? `${name} (${general.nation.name})` : `${name} (재야)`}
+                </option>
+              );
+            })}
           </select>
         </label>
       ) : null}

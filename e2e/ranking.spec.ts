@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { expect, test, type BrowserContext, type Locator, type Page } from '@playwright/test';
+import { displayName } from '../apps/web/src/game/names';
 import { pnpmCli } from '../tools/node-cli';
 import { createAccount } from './account';
 import { e2eWorld } from './game';
@@ -108,7 +109,8 @@ test('머리글을 누르면 주소의 by와 순서가 바뀌고 새로고침해
   const worldId = worlds.settled;
   const byDedication = await query<GeneralsResponse>(page, 'ranking.generals', { worldId, by: 'dedication' });
   const byExperience = await query<GeneralsResponse>(page, 'ranking.generals', { worldId, by: 'experience' });
-  const first = (r: GeneralsResponse) => r.top.slice(0, 5).map((g) => g.name);
+  // 화면은 이름의 괄호를 뺀다 (D-085).
+  const first = (r: GeneralsResponse) => r.top.slice(0, 5).map((g) => displayName(g.name));
   expect(first(byDedication)).not.toEqual(first(byExperience));
 
   await page.goto(`/w/${worldId}/ranking?tab=generals&by=dedication`);
@@ -137,7 +139,7 @@ test('내 장수 행은 강조하고 「나」를 붙이며 내 순위로 이동
   await page.goto(`/w/${worldId}/ranking?tab=generals&by=dedication`);
   const mine = generalsTable(page).locator('tr[data-me]');
   await expect(mine).toHaveCount(1);
-  await expect(mine).toContainText(data.me!.name);
+  await expect(mine).toContainText(displayName(data.me!.name));
   await expect(mine.getByText('나', { exact: true })).toBeVisible();
   await expect(generalsTable(page).locator('tbody').first().locator('tr').first()).toHaveAttribute('data-me', 'true');
   await page.getByRole('button', { name: '내 순위로' }).click();
@@ -156,7 +158,7 @@ test('상위 100위 밖이면 표 끝에 따로 한 줄 두고 내 순위로 이
   await expect(generalsTable(page).locator('tbody').first().locator('tr')).toHaveCount(100);
   const last = generalsTable(page).locator('tr').last();
   await expect(last).toHaveAttribute('data-me', 'true');
-  await expect(last).toContainText(data.me!.name);
+  await expect(last).toContainText(displayName(data.me!.name));
   await expect(last.locator('td').first()).toHaveText(String(data.me!.rank));
   await expect(last.getByText('나', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '내 순위로' }).click();

@@ -4,6 +4,7 @@ import { readFixture } from '../apps/server/test/readFixture';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
 import { loadPreset } from '../apps/engine/src/world/resources';
+import { hashState } from '@opensamguk/shared/node';
 import { commandInitial } from '../packages/rules/test/commandFixture';
 import { holdLease, releaseHold } from './game';
 import { test, expect, apiQuery } from './t210-fixture';
@@ -213,8 +214,21 @@ test('AC-M2-03 프리셋이 켠 화계와 대상 도시 칸을 실제 화면에�
   test.setTimeout(120_000);
   const actor = await world.user('ruler');
   const db = world.hold.db;
+  const content = { id: 'command-test', title: '프리셋 명령 비교' };
+  await db.gameResource.create({
+    data: {
+      kind: 'SCENARIO',
+      name: content.id,
+      version: 1,
+      status: 'PUBLISHED',
+      content,
+      contentHash: hashState(content),
+      source: 'command-cards browser fixture',
+      publishedAt: new Date(),
+    },
+  });
   for (const enabled of [false, true]) {
-    const initial = { ...commandInitial(), scenarioKey: 'integration191' };
+    const initial = commandInitial();
     const general = initial.generals[0]!;
     general.userId = actor.userId;
     const target = initial.cities.find((city) => city.nationId !== null && city.nationId !== general.nationId)!;

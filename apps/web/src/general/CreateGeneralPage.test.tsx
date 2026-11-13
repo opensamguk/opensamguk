@@ -65,6 +65,26 @@ vi.mock('../trpc', () => ({
       setPortrait: { mutationOptions: () => ({}) },
     },
     home: { get: { queryKey: () => ['home'] } },
+    // 머리의 서버 정보 한 줄 (INT-25 단계 3).
+    world: {
+      summary: {
+        queryOptions: () => ({
+          queryKey: ['summary'],
+          queryFn: async () => ({ status: 'RUNNING', gameDate: { year: 190, month: 3 }, turnTermMinutes: 10 }),
+        }),
+      },
+    },
+    lobby: {
+      worlds: {
+        queryOptions: () => ({
+          queryKey: ['worlds'],
+          queryFn: async () => [
+            { id: 'world-two', humanGenerals: 9 },
+            { id: 'world-one', humanGenerals: 4 },
+          ],
+        }),
+      },
+    },
   }),
 }));
 
@@ -90,6 +110,19 @@ afterEach(() => {
   cleanup();
   for (const client of clients) client.clear();
   clients.length = 0;
+});
+
+it('INT-25 AC-INT-25 머리에 재야 시작 안내와 이 월드의 연월·턴 간격·사람 장수 수를 보이고 지도는 접어 둔다', async () => {
+  mount();
+  expect(await screen.findByTestId('create-world-status')).toHaveProperty(
+    'textContent',
+    '지금 190년 3월 · 턴 10분 · 사람 장수 4명',
+  );
+  expect(screen.getByText('무작위 도시에서 재야로 시작합니다. 임관과 건국은 들어간 뒤 명령으로 합니다.')).toBeTruthy();
+  const glance = screen.getByText('지금 세력 지도').closest('details');
+  expect(glance?.open).toBe(false);
+  // 접어 둔 동안은 world.map을 받지 않는다(모의 클라이언트에 world.map이 없다).
+  expect(screen.queryByTestId('world-map')).toBeNull();
 });
 
 it('T4-95 AC-P2-32 가문 월드는 기본 선택 없는 성별 칸을 보이고 고르기 전에는 보내지 않는다', async () => {

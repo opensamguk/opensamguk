@@ -2,7 +2,7 @@ import type { AppRouter } from '@opensamguk/server/router';
 import type { QueryClient, QueryFunction, QueryKey } from '@tanstack/react-query';
 import type { inferRouterOutputs } from '@trpc/server';
 import { trpcClient, type Trpc } from '../trpc';
-import type { CommandInfo } from './CommandPicker';
+import type { CommandInfo, GeneralChoice } from './CommandPicker';
 import { SLOT_COUNT, type Turn } from './draft';
 
 // 예턴 편집기가 읽고 쓰는 칸 목록. 개인 30칸(turns.*)과 국가 직책 12칸(nationTurns.*, T2-06)이 같은 편집기를 쓴다.
@@ -58,7 +58,10 @@ export interface TurnSource<S extends DisplaySlot = DisplaySlot> {
   // 편집할 수 없는 칸이면 서버가 준 이유. null이면 편집할 수 있다.
   readOnly: string | null;
   // 대상 장수 인자(generalId)를 이름으로 고를 장수 목록. 없으면 번호로 넣는다.
-  generals?: Array<{ id: number; name: string }> | undefined;
+  // 소재 도시·유저 여부가 있으면 인자 입력 화면의 후보 줄에 적는다 (INT-25).
+  generals?: GeneralChoice[] | undefined;
+  // 'nation'이면 인자 입력 화면과 편집기 위에 내 금·쌀 대신 국고를 적는다 (국가 예턴, INT-25).
+  walletKind?: 'general' | 'nation' | undefined;
   // 서버가 본 직책과 지금 직책이 다르다고 저장을 거부했을 때(국가 칸). 초안은 편집기가 버린다.
   onOfficeChanged?: (message: string) => void;
 }

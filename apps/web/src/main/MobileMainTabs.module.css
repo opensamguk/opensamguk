@@ -1,0 +1,72 @@
+/* 375px 메인 하단 막대 (INT-25 5단계). 게임 메뉴의 좁은 화면 막대와 같은 먹색 띠에 주칠 윗선. */
+.bar {
+  display: none;
+}
+.tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: var(--space-1) 2px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--color-rail-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: 1.2;
+  text-align: center;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.tab:hover {
+  background: rgb(255 255 255 / 8%);
+}
+/* 고른 패널은 바탕색과 굵은 글자를 함께 쓴다 (색만으로 알리지 않는다). */
+.tab[aria-selected='true'],
+.tab[aria-selected='true']:hover {
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  font-weight: 700;
+}
+.tab:focus-visible {
+  outline: 2px solid var(--color-rail-text);
+  outline-offset: -4px;
+}
+/* 예턴 저장 상태·안 읽은 메시지 수. 단추 크기를 바꾸지 않도록 모서리에 얹는다. */
+.badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 16px;
+  padding: 0 3px;
+  border: 1px solid var(--color-rail-text);
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  font-size: var(--text-xs);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  line-height: 14px;
+  text-align: center;
+}
+.badge[data-danger='true'] {
+  background: var(--color-danger);
+}
+
+@media (max-width: 767px) {
+  .bar {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 10;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 2px;
+    padding: var(--space-1);
+    padding-bottom: calc(var(--space-1) + env(safe-area-inset-bottom, 0px));
+    background: var(--color-rail);
+    border-top: 3px solid var(--color-accent);
+  }
+}

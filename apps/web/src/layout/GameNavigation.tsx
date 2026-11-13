@@ -155,8 +155,10 @@ export function GameNavigation({
       </Link>
     </>
   );
+  // 좁은 메인은 메인 하단 막대(지도·예턴·현황·기록·메시지·메뉴, INT-25)가 이 막대를 대신한다. 다른 화면은 그대로다.
+  const onMain = pathname.replace(/\/$/, '') === `/w/${worldId}`;
   return (
-    <div className={styles.navigation}>
+    <div className={styles.navigation} data-main-page={onMain ? 'true' : undefined}>
       <nav className={styles.rail} aria-label="게임 메뉴">
         {links}
       </nav>

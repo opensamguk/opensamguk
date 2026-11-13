@@ -1,22 +1,29 @@
-import { Link, useLocation, useNavigate, useSearch } from '@tanstack/react-router';
+import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { AdvicePanel } from '../advice/AdvicePanel';
 import { errorCode } from '../game/errors';
 import { NoGeneral, QueryError } from '../game/QueryState';
 import { useHome, useWorldId, useWorldMap, useWorldSummary } from '../game/queries';
+import { AccountLinks } from '../layout/AccountLinks';
 import { CityInfo } from '../main/CityInfo';
 import { GeneralInfo } from '../main/GeneralInfo';
 import { useEquipment } from '../equipment/useEquipment';
+import { useAuthority } from '../messages/authority';
+import { unreadTotal } from '../messages/merge';
+import { MessagePanel } from '../messages/MessagePanel';
+import { useUnread } from '../messages/queries';
+import { MobileMainBar, MobileTabPanel, panelOfArea, useMainPanel, type MobilePanel } from '../main/MobileMainTabs';
 import { NationInfo } from '../main/NationInfo';
 import { Panel } from '../main/Panel';
-import { RECORD_LABELS, RecordList } from '../main/Records';
+import { MainRecords } from '../main/MainRecords';
 import { SeasonResult } from '../main/SeasonResult';
 import { MapLegend, WorldMap } from '../main/WorldMap';
 import { PolicyBar } from '../policy/PolicyBar';
 import { OfferBox } from '../personnel/OfferBox';
 import { TurnEditor, type TurnEditorStatus } from '../turns/TurnEditor';
 import { EmptyState, LoadingState } from '../ui/States';
+import { useNarrowTable } from '../ui/useNarrowTable';
 import { useTRPC } from '../trpc';
 import styles from './MainPage.module.css';
 
@@ -65,18 +72,36 @@ function turnStatusBadge(status: TurnEditorStatus): string | null {
 // 메인 작업 화면이다. 원작 core2026 MainView(R1, df6c926)의 데스크톱 배치를 따른다.
 // 지도(왼쪽)와 명령 목록(오른쪽)을 한 화면에 두고, 지도 아래 도시 정보, 그 아래 국가·장수 정보, 맨 아래 기록을 둔다.
 // 지도에서 도시를 고르면 주소의 ?city만 바꾼다. 같은 화면이 유지되므로 다른 칸의 상태(예턴 편집 초안 등)는 그대로다.
+// 768px 미만은 하단 막대(지도·예턴·현황·기록·메시지·메뉴)로 패널을 하나씩 바꿔 본다 (INT-25). 고른 패널은 주소 해시에 두고,
+// 숨긴 패널도 그대로 붙여 두므로 예턴 편집 초안과 고른 칸, 지도 선택이 패널을 오가도 남는다.
 export function MainPage() {
   const page = useRef<HTMLElement>(null);
+  const layout = useRef<HTMLDivElement>(null);
+  const narrow = useNarrowTable();
+  // 폭이 바뀔 때마다 아래 해시 효과가 다시 돌아 초점을 빼앗지 않도록 최신 값만 읽는다.
+  const narrowRef = useRef(narrow);
+  useEffect(() => {
+    narrowRef.current = narrow;
+  }, [narrow]);
   const focusSection = useCallback((area: string) => {
     const heading = page.current?.querySelector<HTMLElement>(`[data-main-area="${area}"] h2`);
     heading?.focus({ preventScroll: true });
     heading?.scrollIntoView({ block: 'start', behavior: 'instant' });
   }, []);
+  // 좁은 화면에서 패널을 바꾸면 고른 패널의 처음부터 보이도록 패널 묶음의 위를 화면 위에 맞춘다.
+  const scrollToPanels = useCallback(() => {
+    layout.current?.scrollIntoView({ block: 'start', behavior: 'instant' });
+  }, []);
   const worldId = useWorldId();
-  const hash = useLocation({ select: (location) => location.hash });
-  useEffect(() => {
-    if (hash === 'main-commands') focusSection('commands');
-  }, [hash, worldId, focusSection]);
+  // 주소로 들어온 경우: 새로고침, 다른 화면의 `예턴` 링크(#main-commands), 뒤로 가기.
+  const onArrive = useCallback(
+    (hash: string) => {
+      if (hash === 'main-commands') focusSection('commands');
+      else if (narrowRef.current && hash) scrollToPanels();
+    },
+    [focusSection, scrollToPanels],
+  );
+  const { panel, openPanel } = useMainPanel({ scope: worldId, onArrive, onOpen: scrollToPanels });
   const { city: selected } = useSearch({ from: '/w/$worldId/' });
   const navigate = useNavigate({ from: '/w/$worldId/' });
   const summary = useWorldSummary(worldId);
@@ -87,21 +112,43 @@ export function MainPage() {
   const map = useWorldMap(worldId);
   const [turnStatus, setTurnStatus] = useState<TurnEditorStatus | null>(null);
   const turnStatusId = useId();
+  const unreadId = useId();
+  const authority = useAuthority(worldId);
+  const unread = useUnread(worldId);
+  const unreadCount = unreadTotal(authority.ready ? unread.data : undefined);
 
+  // 메인의 한 칸으로 간다. 좁은 화면이면 그 칸이 있는 패널부터 연다.
+  const showArea = (area: string) => {
+    if (narrowRef.current) openPanel(panelOfArea(area), () => focusSection(area));
+    else focusSection(area);
+  };
+
+  // 해시(고른 패널)를 그대로 두어 현황 패널에서 다른 도시를 골라도 패널이 바뀌지 않는다.
   const selectCity = useCallback(
-    (key: number) => void navigate({ search: (prev) => ({ ...prev, city: key }), replace: true, resetScroll: false }),
+    (key: number) =>
+      void navigate({
+        search: (prev) => ({ ...prev, city: key }),
+        hash: true,
+        replace: true,
+        resetScroll: false,
+        hashScrollIntoView: false,
+      }),
     [navigate],
   );
 
   // 지도에서 고른 도시는 이미 명령의 대상 도시 기본값이다. 여기서는 명령 칸으로 옮기기만 하고 바로 넣지 않는다.
   // 고른 칸이 있으면 명령 찾기로, 없으면 칸 목록으로 간다 (칸에서 Enter를 누르면 명령 찾기로 간다).
   const editable = turnStatus?.kind === 'saved' || turnStatus?.kind === 'unsaved';
-  const chooseForCity = () => {
+  const focusCommandTarget = () => {
     const area = page.current?.querySelector('[data-main-area="commands"]');
     const hasSelection = turnStatus && 'selection' in turnStatus && turnStatus.selection > 0;
     const target = area?.querySelector<HTMLElement>(hasSelection ? 'input[type="search"]' : 'tr[tabindex="0"]');
     target?.focus({ preventScroll: true });
     target?.scrollIntoView({ block: 'center', behavior: 'instant' });
+  };
+  const chooseForCity = () => {
+    if (narrowRef.current) openPanel('commands', focusCommandTarget);
+    else focusCommandTarget();
   };
 
   const noGeneral = home.isError && errorCode(home.error) === 'NOT_FOUND';
@@ -112,6 +159,8 @@ export function MainPage() {
   const nations = map.data?.nations ?? [];
   const nationById = new Map(nations.map((nation) => [nation.id, nation]));
   const cityName = (key: number) => cities.find((city) => city.key === key)?.name ?? String(key);
+  const shownTurnStatus = turnStatus && !noGeneral ? turnStatus : null;
+  const turnBadge = shownTurnStatus ? turnStatusBadge(shownTurnStatus) : null;
 
   const withHome = (render: (data: NonNullable<typeof homeData>) => ReactNode) => {
     if (homeData) return render(homeData);
@@ -120,6 +169,12 @@ export function MainPage() {
       return <QueryError error={home.error} notFound="월드를 찾을 수 없습니다" onRetry={() => void home.refetch()} />;
     return <LoadingState />;
   };
+  // 좁은 화면 패널 묶음. 넓은 화면에서는 감싼 칸이 그대로 메인 격자에 놓인다.
+  const tab = (key: MobilePanel, children: ReactNode, part?: string) => (
+    <MobileTabPanel panel={key} active={panel} narrow={narrow} className={styles.tabPanel} {...(part ? { part } : {})}>
+      {children}
+    </MobileTabPanel>
+  );
 
   return (
     <section className={styles.page} ref={page}>
@@ -142,8 +197,8 @@ export function MainPage() {
       <nav className={styles.sections} aria-label="메인 영역 바로가기">
         {SECTIONS.map(({ area, label, name }) => {
           // 장수가 없는 계정은 예턴 상태 대신 장수 만들기 안내를 본다.
-          const status = area === 'commands' && turnStatus && !noGeneral ? turnStatus : null;
-          const badge = status ? turnStatusBadge(status) : null;
+          const status = area === 'commands' ? shownTurnStatus : null;
+          const badge = status ? turnBadge : null;
           return (
             <button
               key={area}
@@ -165,144 +220,212 @@ export function MainPage() {
             </button>
           );
         })}
-        {turnStatus && !noGeneral ? (
-          <span id={turnStatusId} className={styles.srOnly} data-testid="main-turn-status">
-            {turnStatusText(turnStatus)}
-          </span>
-        ) : null}
       </nav>
+      {/* 예턴 상태 문장. 넓은 화면의 바로가기 띠와 좁은 화면의 하단 막대가 함께 쓴다. */}
+      {shownTurnStatus ? (
+        <span id={turnStatusId} className={styles.srOnly} data-testid="main-turn-status">
+          {turnStatusText(shownTurnStatus)}
+        </span>
+      ) : null}
+      {unreadCount > 0 ? (
+        <span id={unreadId} className={styles.srOnly}>
+          안 읽은 메시지 {unreadCount}건
+        </span>
+      ) : null}
 
       {/* 끝난 판이면 결과를 맨 위에 둔다. 나머지 칸은 그대로 읽는다 (T1-27). */}
       {summary.data?.status === 'ENDED' ? <SeasonResult result={summary.data.result} /> : null}
       {/* 발령 제안(T2-06, D11). 편집기와 형제라 응답 결과가 와도 예턴 초안과 지도 선택은 그대로다. */}
       <OfferBox worldId={worldId} />
 
-      <div className={styles.layout}>
-        <Panel
-          title="지도"
-          area="map"
-          headingId="main-map"
-          flush
-          actions={
-            <>
-              {cityKey !== null ? (
-                <button type="button" className={styles.action} onClick={() => focusSection('city')}>
-                  도시 정보 보기
-                </button>
-              ) : null}
-              {myCityKey !== null && cityKey !== myCityKey ? (
-                <button type="button" className={styles.action} onClick={() => selectCity(myCityKey)}>
-                  내 도시로
-                </button>
-              ) : null}
-            </>
-          }
-        >
-          {map.data ? (
-            <div className={styles.mapBody}>
-              <WorldMap
-                operationalMap={map.data.operationalMap}
-                cities={cities}
-                nations={nations}
-                myCityKey={myCityKey}
-                selectedKey={cityKey}
-                onSelect={selectCity}
-              />
-              <MapLegend cities={cities} nations={nations} />
-            </div>
-          ) : map.isError ? (
-            <QueryError error={map.error} notFound="월드를 찾을 수 없습니다" onRetry={() => void map.refetch()} />
-          ) : (
-            <LoadingState />
-          )}
-        </Panel>
+      <div className={styles.layout} ref={layout}>
+        {tab(
+          'map',
+          <Panel
+            title="지도"
+            area="map"
+            headingId="main-map"
+            flush
+            actions={
+              <>
+                {cityKey !== null ? (
+                  <button type="button" className={styles.action} onClick={() => showArea('city')}>
+                    도시 정보 보기
+                  </button>
+                ) : null}
+                {myCityKey !== null && cityKey !== myCityKey ? (
+                  <button type="button" className={styles.action} onClick={() => selectCity(myCityKey)}>
+                    내 도시로
+                  </button>
+                ) : null}
+              </>
+            }
+          >
+            {map.data ? (
+              <div className={styles.mapBody}>
+                <WorldMap
+                  operationalMap={map.data.operationalMap}
+                  cities={cities}
+                  nations={nations}
+                  myCityKey={myCityKey}
+                  selectedKey={cityKey}
+                  onSelect={selectCity}
+                />
+                <MapLegend cities={cities} nations={nations} />
+              </div>
+            ) : map.isError ? (
+              <QueryError error={map.error} notFound="월드를 찾을 수 없습니다" onRetry={() => void map.refetch()} />
+            ) : (
+              <LoadingState />
+            )}
+          </Panel>,
+        )}
 
-        <MainMenu
-          worldId={worldId}
-          nationId={homeData?.nation?.id ?? null}
-          campaignEnabled={mine.data?.creationRules.campaignEnabled === true}
-          cityKey={myCityKey}
-        />
-
-        <Panel
-          title="도시 정보"
-          area="city"
-          headingId="main-city"
-          actions={
-            cityKey !== null && editable ? (
-              <button type="button" className={styles.action} onClick={chooseForCity}>
-                이 도시로 명령 고르기
-              </button>
-            ) : null
-          }
-        >
-          {cityKey !== null ? (
-            <CityInfo
+        {tab(
+          'menu',
+          <>
+            <MainMenu
               worldId={worldId}
-              cityKey={cityKey}
-              nations={nations}
-              onSelectCity={selectCity}
-              logisticsEnabled={summary.data?.logisticsEnabled === true}
-              summary
+              nationId={homeData?.nation?.id ?? null}
+              campaignEnabled={mine.data?.creationRules.campaignEnabled === true}
+              cityKey={myCityKey}
             />
-          ) : home.isPending ? (
-            <LoadingState />
-          ) : (
-            <EmptyState title="지도에서 도시를 고르세요" />
-          )}
-        </Panel>
+            {/* 좁은 메인에는 게임 메뉴 막대가 없으므로 그 막대의 나머지 화면과 계정 조작을 여기에 둔다. */}
+            {narrow ? <MobileMoreMenu worldId={worldId} city={selected} /> : null}
+          </>,
+        )}
+
+        {tab(
+          'status',
+          <Panel
+            title="도시 정보"
+            area="city"
+            headingId="main-city"
+            actions={
+              cityKey !== null && editable ? (
+                <button type="button" className={styles.action} onClick={chooseForCity}>
+                  이 도시로 명령 고르기
+                </button>
+              ) : null
+            }
+          >
+            {cityKey !== null ? (
+              <CityInfo
+                worldId={worldId}
+                cityKey={cityKey}
+                nations={nations}
+                onSelectCity={selectCity}
+                logisticsEnabled={summary.data?.logisticsEnabled === true}
+                summary
+              />
+            ) : home.isPending ? (
+              <LoadingState />
+            ) : (
+              <EmptyState title="지도에서 도시를 고르세요" />
+            )}
+          </Panel>,
+          'city',
+        )}
 
         {/* 30칸 예턴 편집기(T1-15). 지도 선택은 대상 도시 기본값으로만 넘긴다. 조회 상태와 무관하게 늘 같은 자리에 두어
-            도시 선택·재조회 때 다시 만들지 않는다. 그래서 저장하지 않은 편집과 고른 칸이 유지된다. */}
-        <Panel title="명령 목록" area="commands" headingId="main-commands">
-          <PolicyBar worldId={worldId} />
-          <TurnEditor
+            도시 선택·재조회 때 다시 만들지 않는다. 그래서 저장하지 않은 편집과 고른 칸이 유지된다.
+            좁은 화면에서 다른 패널을 볼 때도 내리지 않고 감추기만 한다. */}
+        {tab(
+          'commands',
+          <Panel title="명령 목록" area="commands" headingId="main-commands">
+            <div className={styles.commandsBody}>
+              <div className={styles.policy}>
+                <PolicyBar worldId={worldId} />
+              </div>
+              <TurnEditor
+                worldId={worldId}
+                selectedCityKey={selected ?? null}
+                onStatus={setTurnStatus}
+                renderTop={(draft) => <AdvicePanel key={worldId} worldId={worldId} draft={draft} />}
+              />
+            </div>
+          </Panel>,
+        )}
+
+        {tab(
+          'status',
+          <Panel title="국가 정보" area="nation" headingId="main-nation">
+            {withHome((data) => (
+              <NationInfo worldId={worldId} nation={data.nation} cities={cities} />
+            ))}
+          </Panel>,
+          'nation',
+        )}
+
+        {tab(
+          'status',
+          <Panel title="장수 정보" area="general" headingId="main-general">
+            {withHome((data) => (
+              <GeneralInfo
+                equipment={equipment}
+                worldId={worldId}
+                home={data}
+                campaignEnabled={mine.data?.creationRules.campaignEnabled ?? false}
+                cityName={cityName(data.general.cityKey)}
+                nation={data.general.nationId === null ? undefined : nationById.get(data.general.nationId)}
+                onSelectCity={selectCity}
+              />
+            ))}
+          </Panel>,
+          'general',
+        )}
+
+        {tab(
+          'records',
+          <MainRecords
+            className={styles.records}
             worldId={worldId}
-            selectedCityKey={selected ?? null}
-            onStatus={setTurnStatus}
-            renderTop={(draft) => <AdvicePanel key={worldId} worldId={worldId} draft={draft} />}
-          />
-        </Panel>
+            clock={summary.data}
+            nations={nations}
+            cities={cities}
+            hasNation={homeData ? homeData.nation !== null : !noGeneral}
+          />,
+        )}
 
-        <Panel title="국가 정보" area="nation" headingId="main-nation">
-          {withHome((data) => (
-            <NationInfo worldId={worldId} nation={data.nation} cities={cities} />
-          ))}
-        </Panel>
-
-        <Panel title="장수 정보" area="general" headingId="main-general">
-          {withHome((data) => (
-            <GeneralInfo
-              equipment={equipment}
-              worldId={worldId}
-              home={data}
-              campaignEnabled={mine.data?.creationRules.campaignEnabled ?? false}
-              cityName={cityName(data.general.cityKey)}
-              nation={data.general.nationId === null ? undefined : nationById.get(data.general.nationId)}
-              onSelectCity={selectCity}
-            />
-          ))}
-        </Panel>
-
-        <div className={styles.records}>
-          <Panel title={RECORD_LABELS.general} area="general-records" headingId="main-general-records">
-            <RecordList kind="general" worldId={worldId} clock={summary.data} nations={nations} compact />
-          </Panel>
-          <Panel title={RECORD_LABELS.nation} area="nation-records">
-            <RecordList
-              kind="nation"
-              worldId={worldId}
-              clock={summary.data}
-              nations={nations}
-              hasNation={homeData ? homeData.nation !== null : !noGeneral}
-              compact
-            />
-          </Panel>
-          <Panel title={RECORD_LABELS.world} area="world-records">
-            <RecordList kind="world" worldId={worldId} clock={summary.data} nations={nations} compact />
-          </Panel>
-        </div>
+        {/* 메시지 패널은 좁은 화면에서만 연다. 열면 읽음 처리를 하므로 고른 동안에만 붙인다.
+            넓은 화면은 위 띠의 메시지 단추(서랍)와 메시지 화면을 그대로 쓴다. */}
+        {tab(
+          'messages',
+          narrow && panel === 'messages' ? (
+            <Panel
+              title="메시지"
+              area="messages"
+              actions={
+                <Link to="/w/$worldId/messages" params={{ worldId }} className={styles.action}>
+                  전체 화면
+                </Link>
+              }
+            >
+              <MessagePanel worldId={worldId} />
+            </Panel>
+          ) : null,
+        )}
       </div>
+
+      <MobileMainBar
+        active={panel}
+        onSelect={(next) => openPanel(next)}
+        notes={{
+          ...(shownTurnStatus
+            ? {
+                commands: {
+                  badge: turnBadge,
+                  danger: turnBadge === '!',
+                  status: shownTurnStatus.kind,
+                  describedBy: turnStatusId,
+                },
+              }
+            : {}),
+          ...(unreadCount > 0
+            ? { messages: { badge: unreadCount > 99 ? '99+' : String(unreadCount), describedBy: unreadId } }
+            : {}),
+        }}
+      />
     </section>
   );
 }
@@ -394,6 +517,43 @@ function MainMenu({
         <Link to="/w/$worldId/map" params={{ worldId }} className={styles.menuItem}>
           지도 크게
         </Link>
+      </div>
+    </nav>
+  );
+}
+
+// 좁은 메인 `메뉴` 패널의 나머지 줄. 게임 메뉴 막대의 `전체`에 있던 공통 화면과 위 띠에서 옮긴 계정 조작이다 (T4-97 U1).
+function MobileMoreMenu({ worldId, city }: { worldId: string; city: number | undefined }) {
+  return (
+    <nav className={styles.menu} aria-label="공통 메뉴">
+      <div className={styles.menuRow}>
+        <span className={styles.menuHead}>공통</span>
+        <Link
+          to="/w/$worldId/records"
+          params={{ worldId }}
+          search={{ tab: 'general', ...(city === undefined ? {} : { city }) }}
+          className={styles.menuItem}
+        >
+          기록
+        </Link>
+        <Link
+          to="/w/$worldId/ranking"
+          params={{ worldId }}
+          search={{ tab: 'generals', by: 'dedication' }}
+          className={styles.menuItem}
+        >
+          순위
+        </Link>
+        <Link to="/w/$worldId/simulator" params={{ worldId }} className={styles.menuItem}>
+          전투 시뮬레이터
+        </Link>
+        <Link to="/help/$doc" params={{ doc: 'index' }} className={styles.menuItem}>
+          도움말
+        </Link>
+      </div>
+      <div className={styles.menuRow} role="group" aria-label="계정">
+        <span className={styles.menuHead}>계정</span>
+        <AccountLinks className={styles.menuItem} logout />
       </div>
     </nav>
   );

@@ -9,9 +9,10 @@ import {
   type ReactNode,
 } from 'react';
 import { formatYearMonth, personalLogDate } from '../game/gameDate';
-import { officerName } from '../game/names';
+import { displayName, officerName } from '../game/names';
 import { useWorldSummary } from '../game/queries';
 import base from '../governance/governance.module.css';
+import { Portrait } from '../portrait/Portrait';
 import { DataTable, type Column } from '../ui/DataTable';
 import { DisabledReason } from '../ui/DisabledReason';
 import { NationBadge } from '../ui/NationBadge';
@@ -368,7 +369,16 @@ function Person({ ctx, id }: { ctx: Ctx; id: number }) {
   const age = personAge(person);
   return (
     <span className={styles.person}>
-      <b>{person.name}</b>
+      {/* 목록·요약의 장수는 원형 icon (D-085). 다른 국가 장수처럼 초상 번호가 없으면 실루엣과 첫 글자다. */}
+      <Portrait
+        id={person.portraitId ?? null}
+        name={displayName(person.name)}
+        variant="icon"
+        shape="round"
+        size={28}
+        decorative
+      />
+      <b>{displayName(person.name)}</b>
       <SexTag sex={person.sex} />
       {person.exit ? (
         <Tag tone="muted">
@@ -898,7 +908,7 @@ function HistoryTab({ ctx }: { ctx: Ctx }) {
         key: `born:${person.id}`,
         tick: person.bornTick,
         kind: '출생',
-        text: `${person.name} 출생 · 가주 ${name(person.parents[0]!)}, 다른 부모 ${name(person.parents[1]!)}`,
+        text: `${displayName(person.name)} 출생 · 가주 ${name(person.parents[0]!)}, 다른 부모 ${name(person.parents[1]!)}`,
       });
     if (person.exit)
       rows.push({
@@ -907,8 +917,8 @@ function HistoryTab({ ctx }: { ctx: Ctx }) {
         kind: person.exit.cause === 'DIED' ? '사망' : '계승',
         text:
           person.exit.cause === 'DIED'
-            ? `${person.name} 사망${person.successorId !== null ? ` · ${name(person.successorId)}이(가) 이음` : ''}`
-            : `${person.name} 은퇴 · ${person.successorId !== null ? name(person.successorId) : '후계자'}이(가) 이음`,
+            ? `${displayName(person.name)} 사망${person.successorId !== null ? ` · ${name(person.successorId)}이(가) 이음` : ''}`
+            : `${displayName(person.name)} 은퇴 · ${person.successorId !== null ? name(person.successorId) : '후계자'}이(가) 이음`,
       });
   }
   for (const row of view.marriages)

@@ -41,6 +41,22 @@
   padding: var(--space-1) 0;
   border-bottom: 1px solid var(--color-border);
 }
+/* 중원 정세 글줄 (INT-25). 한 달에 여러 줄이면 아래로 쌓는다. */
+.yearbook:has(.events) {
+  flex-wrap: wrap;
+}
+.events {
+  display: grid;
+  gap: 2px;
+  flex: 1 1 12em;
+  min-width: 0;
+}
+.event {
+  overflow-wrap: anywhere;
+}
+.events + .nations {
+  flex-basis: 100%;
+}
 .nations {
   display: flex;
   flex-wrap: wrap;

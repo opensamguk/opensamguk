@@ -476,6 +476,18 @@ test.describe('장수가 있는 계정', () => {
     test(`T3-10 AC-M3-08 v1 공통 메뉴 ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await openMain(page);
+      if (width < 768) {
+        // 좁은 메인은 게임 메뉴 막대 대신 메인 하단 막대 하나를 쓴다 (INT-25). 공통 메뉴는 다른 화면에서 본다.
+        await expect(page.getByRole('navigation', { name: '게임 메뉴' }).filter({ visible: true })).toHaveCount(0);
+        const bar = page.getByRole('tablist', { name: '메인 화면', exact: true });
+        await expect(bar.getByRole('tab')).toHaveCount(6);
+        await bar.getByRole('tab', { name: '메뉴', exact: true }).click();
+        await page
+          .getByRole('navigation', { name: '공통 메뉴', exact: true })
+          .getByRole('link', { name: '기록', exact: true })
+          .click();
+        await expect(page.getByRole('heading', { level: 1, name: '기록 · 내 장수' })).toBeVisible();
+      }
       const nav = page.getByRole('navigation', { name: '게임 메뉴' }).filter({ visible: true });
       await expect(nav).toHaveCount(1);
       await page.getByRole('banner').locator('a,button').filter({ visible: true }).last().focus();

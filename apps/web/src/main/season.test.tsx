@@ -1,10 +1,57 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { cleanup, fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
+import type { ReactElement } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { WorldSummary } from '../game/types';
-import { SeasonResult } from './SeasonResult';
+import { fiveTigers, SeasonResult } from './SeasonResult';
 
-afterEach(cleanup);
+// records.season 응답 모양의 시험 값. 기준(by)마다 같은 장수를 그 기준으로 줄 세운다.
+const season = vi.hoisted(() => ({
+  rows: [] as Array<{
+    generalId: number;
+    name: string;
+    nation: { id: number; name: string; color: string } | null;
+    dedication: number;
+    experience: number;
+    wins: number;
+    captures: number;
+  }>,
+  calls: [] as string[],
+}));
+vi.mock('../game/queries', () => ({ useWorldId: () => 'world-one' }));
+vi.mock('../trpc', () => ({
+  useTRPC: () => ({
+    records: {
+      season: {
+        queryOptions: ({ by }: { by: 'dedication' | 'experience' | 'merit' }) => ({
+          queryKey: ['season', by],
+          queryFn: async () => {
+            season.calls.push(by);
+            const value = (row: (typeof season.rows)[number]) => (by === 'merit' ? row.wins + row.captures : row[by]);
+            return {
+              result: null,
+              generals: [...season.rows]
+                .sort((a, b) => value(b) - value(a))
+                .map((row, index) => ({ ...row, merit: row.wins + row.captures, rank: index + 1 })),
+            };
+          },
+        }),
+      },
+    },
+  }),
+}));
+
+afterEach(() => {
+  cleanup();
+  season.rows = [];
+  season.calls = [];
+});
+
+function render(ui: ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return rtlRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
 
 type Result = NonNullable<WorldSummary['result']>;
 const result = (extra: Partial<Result>): Result => ({
@@ -55,5 +102,56 @@ describe('기수 결과 칸 (T1-27)', () => {
     expect(region.textContent).toBe('이 판은 끝났습니다.');
     expect(screen.queryByTestId('season-reason')).toBeNull();
     expect(screen.queryByTestId('season-winner')).toBeNull();
+  });
+});
+
+// 끝난 기수의 최종 장수 순위와 오호장군 (INT-25, 원작 명예의 전당·왕조 상세).
+describe('기수 결과 칸 최종 장수 순위', () => {
+  const wei = { id: 4, name: '위', color: '#000080' };
+  const shu = { id: 5, name: '촉', color: '#008000' };
+  const row = (
+    generalId: number,
+    name: string,
+    nation: typeof wei | null,
+    values: [number, number, number, number],
+  ) => ({
+    generalId,
+    name,
+    nation,
+    dedication: values[0],
+    experience: values[1],
+    wins: values[2],
+    captures: values[3],
+  });
+
+  it('오호장군은 승자 국가의 승리 상위 다섯 명이고 승리 0은 뺀다', () => {
+    const rows = [
+      row(1, '하후돈(夏侯惇)', wei, [0, 0, 9, 0]),
+      row(2, '관우', shu, [0, 0, 20, 0]),
+      row(3, '장료', wei, [0, 0, 7, 0]),
+      row(4, '허저', wei, [0, 0, 0, 0]),
+      ...[5, 6, 7, 8].map((id) => row(id, `위장수${id}`, wei, [0, 0, id - 4, 0])),
+    ];
+    expect(fiveTigers(rows, 4)).toEqual(['하후돈(9)', '장료(7)', '위장수8(4)', '위장수7(3)', '위장수6(2)']);
+    expect(fiveTigers(rows, null)).toEqual([]);
+  });
+
+  it('공헌 순으로 열고 기준 단추로 다시 받는다', async () => {
+    season.rows = [row(1, '조조(曹操)', wei, [50, 10, 1, 1]), row(2, '유비', shu, [40, 90, 5, 0])];
+    render(
+      <SeasonResult result={result({ reason: 'UNIFIED', winner: { nationId: 4, name: '위', color: '#000080' } })} />,
+    );
+    await screen.findByRole('table', { name: '최종 장수 순위' });
+    // 기준을 바꾸면 표를 다시 그리므로 매번 새로 찾는다.
+    const names = () =>
+      within(screen.getByRole('table', { name: '최종 장수 순위' }))
+        .getAllByRole('row')
+        .slice(1)
+        .map((tr) => tr.children[1]!.textContent);
+    expect(names()).toEqual(['조조', '유비']);
+    fireEvent.click(screen.getByRole('button', { name: '경험' }));
+    await waitFor(() => expect(names()).toEqual(['유비', '조조']));
+    expect(screen.getByRole('button', { name: '경험' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByTestId('season-tigers').textContent).toBe('오호장군: 조조(1)');
   });
 });

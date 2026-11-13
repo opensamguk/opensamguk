@@ -39,7 +39,7 @@ PNG·WebP는 GitHub raw의 전체 커밋 주소, SVG는 같은 커밋의 githack
 ### 화면의 해석 (T1-17)
 
 - 코드는 `apps/web/src/portrait/`에 있습니다. 주소는 `portraitUrl(id, variant)`, 화면 부품은 `<Portrait id name variant>`입니다.
-- `VITE_IMAGE_BASE_URL`이 비었거나 없으면 `https://raw.githubusercontent.com/opensamguk/opensamguk-images/48163bd1ce8d54c54c94fb5484b05f9db9e50c62`를 씁니다.
+- `VITE_IMAGE_BASE_URL`이 비었거나 없으면 `https://raw.githubusercontent.com/opensamguk/opensamguk-images/48163bd1ce8d54c54c94fb5484b05f9db9e50c62`를 씁니다. 공개 빌드(`pnpm build:public`)도 같습니다 (D-087).
   고정 대상은 이미지 저장소 정리 커밋 `48163bd`이며 태그가 아닌 커밋으로 고정합니다. 2026-10-20에 id 10002의 세 변형이 200으로 응답했습니다.
 - 값의 앞뒤 공백과 끝의 `/`는 떼고 씁니다. 값은 빌드 때 화면에 박히므로 바꾸면 다시 빌드하거나 dev 서버를 다시 띄웁니다.
 - ID가 null이거나10001~11008 밖일 때, 파일을 못 불러왔을 때(`onError`) 기본 이미지를 씁니다. 보충11001~11008은 개발 모드에서만 원본을 읽으며 일반 빌드·공개 빌드는 기본 이미지를 씁니다.
@@ -75,6 +75,8 @@ PNG·WebP는 GitHub raw의 전체 커밋 주소, SVG는 같은 커밋의 githack
 1. 공개 빌드에서 위험한 초상을 쓰지 않는다 (생성 초상·기본 이미지로 교체)
 2. 위험을 알고 그대로 쓴다 (운영자 책임 명시)
 3. 그 밖의 방법 (권리 확인 등)
+
+2026-11-13 [D-087](./product/decisions.md#d-087-공개-빌드도-장수-초상을-보인다-2026-11-13)으로 2번을 골랐습니다. 공개 빌드도 개발과 같은 `VITE_IMAGE_BASE_URL`(비우면 위의 고정 커밋 주소)로 초상 세 변형을 보입니다. 공개 번들이 쓸 수 있는 base는 `manifest/public-assets.json`의 `remoteImageBases`이고 `pnpm assets:check`가 빌드 값·CSP와 대조합니다. 시안과 문서에는 원작 초상을 싣지 않습니다 (D-085).
 
 장수 능력치 데이터의 출처도 같은 관문에서 확인합니다 (A8).
 

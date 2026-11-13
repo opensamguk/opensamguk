@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
 import { useWorldId } from '../game/queries';
+import type { GeneralChoice } from '../turns/CommandPicker';
 import type { Check, TurnList, TurnSourceFactory } from '../turns/source';
 import { TurnEditor } from '../turns/TurnEditor';
 import { LoadingState } from '../ui/States';
@@ -32,7 +33,7 @@ export function nationSource(
   api: PersonnelApi,
   tab: NationTurnTab,
   options: {
-    generals?: Array<{ id: number; name: string }> | undefined;
+    generals?: GeneralChoice[] | undefined;
     onOfficeChanged: (message: string) => void;
   },
 ): TurnSourceFactory<NationSlot> {
@@ -93,6 +94,7 @@ export function nationSource(
       timed: tab.edit.ok,
       readOnly: tab.edit.ok ? null : tab.edit.reason,
       generals: options.generals,
+      walletKind: 'nation',
       onOfficeChanged: options.onOfficeChanged,
     };
   };
@@ -180,6 +182,7 @@ export function NationTurnsPage() {
   );
 }
 
-function membersOf(board: PersonnelBoard | undefined) {
-  return board?.members.map((m) => ({ id: m.generalId, name: m.name }));
+// 인자 입력 화면의 대상 장수 후보. 소재 도시와 유저 여부도 넘겨 `이름 (도시)`와 NPC 표시에 쓴다 (INT-25).
+function membersOf(board: PersonnelBoard | undefined): GeneralChoice[] | undefined {
+  return board?.members.map((m) => ({ id: m.generalId, name: m.name, cityName: m.city.name, isHuman: m.isHuman }));
 }

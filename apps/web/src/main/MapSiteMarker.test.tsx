@@ -6,7 +6,7 @@ import { RoadPixelLayer } from './RoadPixelLayer';
 
 afterEach(cleanup);
 
-const draw = (pixelsPerUnit: number, color: string | null = '#3366aa', level = 8) =>
+const draw = (pixelsPerUnit: number, color: string | null = '#3366aa', level = 8, cut = false) =>
   render(
     <svg>
       <defs>
@@ -20,6 +20,7 @@ const draw = (pixelsPerUnit: number, color: string | null = '#3366aa', level = 8
         color={color}
         pixelsPerUnit={pixelsPerUnit}
         flagMaskId="flag"
+        cut={cut}
       />
     </svg>,
   ).container;
@@ -82,4 +83,16 @@ it('AC-INT-20 도로 층은 길 종류마다 path 하나를 그린다', () => {
   const paths = container.querySelectorAll('[data-testid="road-pixels"] path');
   expect([...paths].map((path) => path.getAttribute('data-road-mode'))).toEqual(['LAND']);
   expect(paths[0]!.getAttribute('d')).toBe('M10 10h32v2h-32z');
+});
+
+// 보급 끊긴 도시는 원작처럼 표식에 다른 표시를 얹는다. 네모와 그림 모두 같은 사선이다 (INT-25).
+it('보급이 끊긴 도시만 표식을 가로지르는 사선을 긋는다', () => {
+  expect(draw(0.5).querySelector('[data-testid="marker-cut"]')).toBeNull();
+  cleanup();
+  const far = draw(0.5, '#3366aa', 8, true);
+  expect(far.querySelector('[data-marker-cut="true"] [data-marker-detail="square"]')).not.toBeNull();
+  expect(far.querySelector('[data-testid="marker-cut"]')).not.toBeNull();
+  cleanup();
+  const near = draw(2, '#3366aa', 8, true);
+  expect(near.querySelector('[data-marker-detail="small"] [data-testid="marker-cut"]')).not.toBeNull();
 });

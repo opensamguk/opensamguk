@@ -9,7 +9,7 @@ export type RankingTab = 'generals' | 'nations';
 export type GeneralSortKey = RankingInputs['generals']['by'];
 export type NationSortKey = RankingInputs['nations']['by'];
 
-// 응답에는 화면에 쓰지 않는 항목(at.tick, 장수의 wins·captures·value, 국가의 value)도 있다. 보이지 않게 둔다.
+// 응답에는 화면에 쓰지 않는 항목(at.tick, 장수·국가의 value)도 있다. 보이지 않게 둔다. 장수의 wins·captures는 전공 옆에 따로 보인다 (INT-25).
 export type GeneralRanking = RankingOutputs['generals'];
 export type NationRanking = RankingOutputs['nations'];
 export type RankedGeneral = GeneralRanking['top'][number];

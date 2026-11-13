@@ -1,6 +1,6 @@
 import type { PublicGeography } from '@opensamguk/shared';
 import { OperationalWorldMap } from './OperationalWorldMap';
-import { CAPITAL_MARK, isCapital, type DrawnNation } from './siteMarkers';
+import { CAPITAL_MARK, isCapital, levelName, type DrawnNation } from './siteMarkers';
 import { readableTextColor } from '../ui/color';
 import type { MapCity } from '../game/types';
 import styles from './WorldMap.module.css';
@@ -137,7 +137,10 @@ export function WorldMap({
               })
             }
           >
-            <title>{cityLabel(city, nation, mine)}</title>
+            <title>
+              {cityLabel(city, nation, mine)}
+              {levelName(city.level) ? ` · ${levelName(city.level)}` : ''}
+            </title>
             {mine ? <circle className={styles.mine} cx={city.x} cy={city.y} r={r + 5} /> : null}
             {selected ? <circle className={styles.selected} cx={city.x} cy={city.y} r={r + 3} /> : null}
             <circle
@@ -220,12 +223,30 @@ export function MapLegend({
           </span>
         </>
       )}
-      <span className={styles.legendItem}>
-        <svg width="14" height="14" aria-hidden="true">
-          <circle cx="7" cy="7" r="5" className={styles.dot} style={{ fill: NEUTRAL }} />
-        </svg>
-        공백지 {empty}
-      </span>
+      {readOnly || empty === 0 ? (
+        <span className={styles.legendItem}>
+          <svg width="14" height="14" aria-hidden="true">
+            <circle cx="7" cy="7" r="5" className={styles.dot} style={{ fill: NEUTRAL }} />
+          </svg>
+          공백지 {empty}
+        </span>
+      ) : (
+        // 원작 세력일람의 【재야】 속령 일람. 누르면 공백지 이름을 펼친다 (INT-25).
+        <details className={styles.emptyList}>
+          <summary className={styles.legendItem}>
+            <svg width="14" height="14" aria-hidden="true">
+              <circle cx="7" cy="7" r="5" className={styles.dot} style={{ fill: NEUTRAL }} />
+            </svg>
+            공백지 {empty}
+          </summary>
+          <span className={styles.emptyNames}>
+            {cities
+              .filter((city) => city.nationId === null)
+              .map((city) => city.name)
+              .join(', ')}
+          </span>
+        </details>
+      )}
       {ranked.map(({ nation, count }) => (
         <span key={nation.id} className={styles.legendItem} data-nation-id={nation.id}>
           <span className={styles.swatch} style={{ background: nation.color }} aria-hidden="true" />

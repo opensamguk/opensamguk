@@ -2,7 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { errorCode, retryUnlessClientError } from '../game/errors';
 import { NoGeneral, QueryError } from '../game/QueryState';
+import { displayName } from '../game/names';
 import { useHome, useWorldId, useWorldMap, useWorldUnits } from '../game/queries';
+import { Portrait } from '../portrait/Portrait';
+import { portraitIdOf } from '../portrait/portraitUrl';
 import { useTRPC } from '../trpc';
 import { serverMessage } from '../turns/apiError';
 import type { ArgNames } from '../turns/args';
@@ -119,7 +122,15 @@ export function InspectionTable({
         {rows.map((row) => (
           <tr key={row.generalId} className={row.idle ? styles.idle : undefined} data-idle={row.idle}>
             <th scope="row">
-              {row.name}
+              <Portrait
+                id={portraitIdOf(row)}
+                name={displayName(row.name)}
+                variant="thumb"
+                size={20}
+                decorative
+                className={styles.face}
+              />
+              {displayName(row.name)}
               {row.isHuman ? null : (
                 <>
                   {' '}

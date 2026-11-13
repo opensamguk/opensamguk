@@ -137,10 +137,16 @@ test('T3-10 정식 GIS61거점 실제 터치·밀집 후보·끌기·취소와 �
     await page.goto(`/w/${ownWorld}?city=40`);
     const editor = page.getByTestId('turn-editor');
     await expect(editor.locator('tr[data-slot]')).toHaveCount(30);
+    // 375px 메인은 하단 막대로 패널을 바꾼다 (INT-25). 예턴에 넣고 지도로 돌아와도 초안은 그대로다.
+    const bar = page.getByRole('tablist', { name: '메인 화면', exact: true });
+    await bar.getByRole('tab', { name: '예턴', exact: true }).click();
     await editor.locator('tr[data-slot="1"]').click();
     await editor.getByLabel('명령 찾기').fill('농지 개간');
     await editor.getByRole('radio', { name: '농지 개간', exact: true }).check();
     await editor.getByRole('button', { name: '1번 칸에 넣기', exact: true }).click();
+    await bar.getByRole('tab', { name: '지도', exact: true }).click();
+    await expect(page.getByTestId('world-map')).toBeVisible();
+    await expect(editor).toBeHidden();
     const before = await hold.db.generalTurn.findMany({
       where: { worldId: ownWorld },
       orderBy: [{ generalId: 'asc' }, { slot: 'asc' }],

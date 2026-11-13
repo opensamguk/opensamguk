@@ -77,6 +77,23 @@
   font-size: var(--text-sm);
 }
 
+/* 국가 소개와 방랑 기한 (INT-25) */
+.extras {
+  display: grid;
+  gap: var(--space-1);
+}
+.extraLine {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  align-items: center;
+  font-size: var(--text-sm);
+}
+.extraLabel {
+  color: var(--color-text-muted);
+}
+
 /* 좁은 화면에서는 링크 줄도 손가락으로 누를 크기(44px)로 둔다 (AC-M3-08). */
 @media (max-width: 767px) {
   .links a {

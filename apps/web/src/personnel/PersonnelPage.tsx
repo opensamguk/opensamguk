@@ -1,21 +1,37 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { useState } from 'react';
-import { useWorldId } from '../game/queries';
+import { useId, useMemo, useRef, useState } from 'react';
+import { retryUnlessClientError } from '../game/errors';
+import { useHome, useWorldId } from '../game/queries';
+import { Portrait } from '../portrait/Portrait';
+import { useTRPC } from '../trpc';
 import { errorCode, serverMessage } from '../turns/apiError';
 import { DataTable } from '../ui/DataTable';
 import { DisabledReason } from '../ui/DisabledReason';
+import { NationBadge } from '../ui/NationBadge';
 import { EmptyState, ErrorState, LoadingState } from '../ui/States';
 import { Tag } from '../ui/Tag';
+import { CandidatePicker } from './CandidatePicker';
+import {
+  appointCandidates,
+  memberDetails,
+  nameLabels,
+  traitTags,
+  type Candidate,
+  type MemberDetail,
+} from './candidates';
 import { personnelKeys, usePersonnelApi, type PersonnelBoard, type PersonnelMember } from './contract';
 import { Notices } from './OfferBox';
 import { cityOfficeHolder, LocalOffices, localOfficeTarget, MemberResidence } from './OfficeResidence';
 import styles from './Personnel.module.css';
+import pageStyles from './PersonnelPage.module.css';
 import { usePersonnelAction } from './usePersonnelAction';
 
 const KINDS = ['personnel.appoint', 'personnel.dismiss'] as const;
 const ACTOR_CHANGED = '장수가 바뀌었습니다. 요청을 보내지 않았습니다. 화면을 다시 확인하세요.';
 const OFFICE_CHANGED = '담당 관직이 바뀌었습니다. 새 담당자를 확인하세요.';
+
+type DetailsState = 'ready' | 'loading' | 'error';
 
 // 국가 메뉴의 두 화면을 잇는 띠.
 export function NationNav({ worldId, current }: { worldId: string; current: 'personnel' | 'turns' }) {
@@ -42,6 +58,27 @@ export function LoadError({ error, onRetry }: { error: unknown; onRetry: () => v
   return <ErrorState title="불러오지 못했습니다" onRetry={onRetry} />;
 }
 
+// 같은 국가 장수의 초상·능력치·병력·성격·특기 (INT-25 단계 3). personnel.officers에 없는 값이라 nation.get을 함께 읽는다.
+// 못 받아도 인사 칸은 그대로 쓴다. 카드만 능력치 없이 보인다.
+function useNationRoster(worldId: string) {
+  const trpc = useTRPC();
+  const home = useHome(worldId);
+  const nation = home.data?.nation ?? null;
+  const roster = useQuery({
+    ...trpc.nation.get.queryOptions({ worldId, nationId: nation?.id ?? 0 }),
+    enabled: nation !== null,
+    retry: retryUnlessClientError,
+  });
+  const generals = roster.data?.generals;
+  const details = useMemo(() => (generals ? memberDetails(generals) : undefined), [generals]);
+  const state: DetailsState = details
+    ? 'ready'
+    : roster.isError || home.isError || (home.data !== undefined && nation === null)
+      ? 'error'
+      : 'loading';
+  return { nation, details, state };
+}
+
 // /w/:worldId/nation/personnel. 소속 장수 표와 군주의 임명·해임 (T2-06, AC-M2-05).
 export function PersonnelPage() {
   const worldId = useWorldId();
@@ -51,6 +88,7 @@ export function PersonnelPage() {
     queryFn: () => api.officers({ worldId }),
     retry: false,
   });
+  const roster = useNationRoster(worldId);
   const members = board.data?.members;
   const action = usePersonnelAction({
     worldId,
@@ -74,6 +112,7 @@ export function PersonnelPage() {
     <section className={styles.page}>
       <header className={styles.header}>
         <h1>인사부</h1>
+        {roster.nation ? <NationBadge name={roster.nation.name} color={roster.nation.color} /> : null}
         <NationNav worldId={worldId} current="personnel" />
       </header>
       <Notices notices={action.notices} />
@@ -81,6 +120,8 @@ export function PersonnelPage() {
         <PersonnelBoardView
           key={board.data.actorId}
           board={board.data}
+          details={roster.details}
+          detailsState={roster.state}
           busyTarget={action.busy ? (action.busyTarget ?? '') : null}
           busyLabel={action.busyLabel}
           onAppoint={(generalId, officerLevel, cityKey) => {
@@ -122,6 +163,9 @@ export function PersonnelPage() {
 
 interface BoardProps {
   board: PersonnelBoard;
+  // nation.get에서 이은 장수 정보. 없으면 카드와 표가 능력치 없이 보인다.
+  details?: ReadonlyMap<number, MemberDetail> | undefined;
+  detailsState?: DetailsState;
   // 처리 중인 접수가 있으면 그 대상(level-<직책>). 다시 접속해 되살린 접수는 빈 문자열이다. 없으면 null.
   busyTarget: string | null;
   busyLabel?: string;
@@ -129,16 +173,26 @@ interface BoardProps {
   onDismiss: (generalId: number, officerLevel: number, cityKey?: number) => void;
 }
 
-export function PersonnelBoardView({ board, busyTarget, busyLabel = '처리 중', onAppoint, onDismiss }: BoardProps) {
-  const nameOf = (id: number) => board.members.find((m) => m.generalId === id)?.name ?? `장수 ${id}`;
-  const holders = new Set(board.levels.map((level) => level.holderId).filter((id) => id !== null));
-  // 직책이 없는 장수만 후보로 둔다. 최종 판단은 서버가 한다.
-  const candidates = board.members.filter((m) => !holders.has(m.generalId) && m.officerLevel <= 1);
+export function PersonnelBoardView({
+  board,
+  details,
+  detailsState = details ? 'ready' : 'loading',
+  busyTarget,
+  busyLabel = '처리 중',
+  onAppoint,
+  onDismiss,
+}: BoardProps) {
+  const labels = useMemo(() => nameLabels(board.members), [board.members]);
+  const byId = useMemo(() => new Map(board.members.map((m) => [m.generalId, m])), [board.members]);
+  const candidates = useMemo(() => appointCandidates(board, details, labels), [board, details, labels]);
+  // 후보 목록은 한 번에 한 직책만 펼친다.
+  const [openLevel, setOpenLevel] = useState<number | null>(null);
+  const label = (m: PersonnelMember) => labels.get(m.generalId) ?? m.name;
   return (
     <>
       <section className={styles.section} aria-labelledby="levels-title">
         <h2 id="levels-title">직책 바꾸기</h2>
-        <table className={styles.levels}>
+        <table className={`${styles.levels} ${pageStyles.levels}`}>
           <thead>
             <tr>
               <th scope="col">직책</th>
@@ -148,23 +202,22 @@ export function PersonnelBoardView({ board, busyTarget, busyLabel = '처리 중'
           </thead>
           <tbody>
             {board.levels.map((level) => (
-              <tr key={level.officerLevel} data-level={level.officerLevel}>
-                <td>{level.title}</td>
-                <td>
-                  {level.holderId === null ? <span className={styles.muted}>빈 자리</span> : nameOf(level.holderId)}
-                </td>
-                <td>
-                  <LevelControl
-                    level={level}
-                    appoint={board.appoint}
-                    candidates={candidates}
-                    busy={busyTarget === null ? null : busyTarget === `level-${level.officerLevel}`}
-                    busyLabel={busyLabel}
-                    onAppoint={onAppoint}
-                    onDismiss={onDismiss}
-                  />
-                </td>
-              </tr>
+              <LevelRows
+                key={level.officerLevel}
+                level={level}
+                holder={level.holderId === null ? null : (byId.get(level.holderId) ?? level.holderId)}
+                holderLabel={level.holderId === null ? '' : (labels.get(level.holderId) ?? `장수 ${level.holderId}`)}
+                holderDetail={level.holderId === null ? undefined : details?.get(level.holderId)}
+                appoint={board.appoint}
+                candidates={candidates}
+                detailsState={detailsState}
+                open={openLevel === level.officerLevel}
+                onOpen={(open) => setOpenLevel(open ? level.officerLevel : null)}
+                busy={busyTarget === null ? null : busyTarget === `level-${level.officerLevel}`}
+                busyLabel={busyLabel}
+                onAppoint={onAppoint}
+                onDismiss={onDismiss}
+              />
             ))}
           </tbody>
         </table>
@@ -172,7 +225,7 @@ export function PersonnelBoardView({ board, busyTarget, busyLabel = '처리 중'
       {board.officeEffectsEnabled ? (
         <LocalOffices
           board={board}
-          candidates={candidates}
+          candidates={candidates.filter(({ state }) => state.kind === 'free').map(({ member }) => member)}
           busyTarget={busyTarget}
           busyLabel={busyLabel}
           onAppoint={onAppoint}
@@ -191,10 +244,10 @@ export function PersonnelBoardView({ board, busyTarget, busyLabel = '처리 중'
               {
                 key: 'name',
                 label: '이름',
-                sortValue: (m) => m.name,
+                sortValue: (m) => label(m),
                 render: (m) => (
                   <>
-                    {m.name} {m.isHuman ? <Tag tone="accent">사람</Tag> : <Tag tone="muted">NPC</Tag>}
+                    {label(m)} {m.isHuman ? <Tag tone="accent">사람</Tag> : <Tag tone="muted">NPC</Tag>}
                   </>
                 ),
               },
@@ -217,6 +270,19 @@ export function PersonnelBoardView({ board, busyTarget, busyLabel = '처리 중'
                 sortValue: (m) => m.dedication,
                 render: (m) => m.dedication.toLocaleString('ko-KR'),
               },
+              {
+                key: 'traits',
+                label: '성격·특기',
+                render: (m) => (
+                  <span className={pageStyles.traits}>
+                    {traitTags(details?.get(m.generalId)).map((trait) => (
+                      <Tag key={trait} tone="muted">
+                        {trait}
+                      </Tag>
+                    ))}
+                  </span>
+                ),
+              },
             ]}
           />
         )}
@@ -225,74 +291,152 @@ export function PersonnelBoardView({ board, busyTarget, busyLabel = '처리 중'
   );
 }
 
-function LevelControl({
+type Level = PersonnelBoard['levels'][number];
+
+function LevelRows({
   level,
+  holder,
+  holderLabel,
+  holderDetail,
   appoint,
   candidates,
+  detailsState,
+  open,
+  onOpen,
   busy,
   busyLabel,
   onAppoint,
   onDismiss,
 }: {
-  level: PersonnelBoard['levels'][number];
+  level: Level;
+  // 앉은 장수. 소속 장수 목록에 없으면 id만 온다.
+  holder: PersonnelMember | number | null;
+  holderLabel: string;
+  holderDetail: MemberDetail | undefined;
   appoint: PersonnelBoard['appoint'];
-  candidates: PersonnelMember[];
+  candidates: readonly Candidate[];
+  detailsState: DetailsState;
+  open: boolean;
+  onOpen: (open: boolean) => void;
   // null: 처리 중인 접수 없음. true: 이 직책을 처리 중. false: 다른 접수를 처리 중.
   busy: boolean | null;
   busyLabel: string;
   onAppoint: (generalId: number, officerLevel: number) => void;
   onDismiss: (generalId: number, officerLevel: number) => void;
 }) {
-  const [chosen, setChosen] = useState('');
-  const label = level.holderId === null ? '임명' : '해임';
-  // 권한은 서버가 준 appoint로만 판단한다. 군주가 아니면 칸을 열지 않고 이유를 보인다.
-  if (!appoint.ok) return <DisabledReason reason={appoint.reason}>{label}</DisabledReason>;
-  if (busy !== null)
-    return (
-      <span className={styles.controls}>
-        <DisabledReason reason={busyLabel === '보내는 중' ? '요청을 보내는 중입니다.' : '요청을 처리하는 중입니다.'}>
-          {label}
-        </DisabledReason>
-        {busy ? (
-          <span className={styles.busy} role="status">
-            {busyLabel}
-          </span>
-        ) : null}
-      </span>
-    );
-  if (level.holderId !== null) {
-    const holderId = level.holderId;
-    return (
-      <button
-        type="button"
-        className={`${styles.secondary} ${styles.danger}`}
-        onClick={() => onDismiss(holderId, level.officerLevel)}
-      >
-        해임
-      </button>
-    );
-  }
-  const generalId = Number(chosen);
+  const [chosen, setChosen] = useState<number | null>(null);
+  const pickerId = useId();
+  // 카드를 고르면 목록을 닫고 「임명」으로 초점을 옮긴다.
+  const focusAppoint = useRef(false);
+  // 고른 장수가 새로 받은 목록에 없으면(다른 직책에 앉았거나 떠남) 고르지 않은 것으로 본다.
+  const picked = chosen === null ? undefined : candidates.find((c) => c.member.generalId === chosen);
+  const canPick = appoint.ok && busy === null && level.holderId === null;
   return (
-    <span className={styles.controls}>
-      <label>
-        <span className={styles.muted}>임명할 장수 </span>
-        <select value={chosen} onChange={(e) => setChosen(e.target.value)} aria-label={`${level.title} 임명할 장수`}>
-          <option value="">고르세요</option>
-          {candidates.map((m) => (
-            <option key={m.generalId} value={String(m.generalId)}>
-              {m.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      {chosen === '' ? (
-        <DisabledReason reason="임명할 장수를 고르세요.">임명</DisabledReason>
-      ) : (
-        <button type="button" className={styles.primary} onClick={() => onAppoint(generalId, level.officerLevel)}>
-          임명
-        </button>
-      )}
-    </span>
+    <>
+      <tr data-level={level.officerLevel}>
+        <td>{level.title}</td>
+        <td>
+          {holder === null ? (
+            <span className={styles.muted}>빈 자리</span>
+          ) : (
+            <span className={pageStyles.holder}>
+              <span className={pageStyles.holderFace} aria-hidden="true">
+                <Portrait
+                  id={holderDetail?.portraitId ?? null}
+                  name={holderLabel}
+                  variant="icon"
+                  shape="round"
+                  className={pageStyles.holderIcon}
+                />
+              </span>
+              <span className={pageStyles.holderText}>
+                <span>{holderLabel}</span>
+                {typeof holder === 'object' ? <span className={pageStyles.holderCity}>{holder.city.name}</span> : null}
+              </span>
+            </span>
+          )}
+        </td>
+        <td>
+          {!appoint.ok ? (
+            // 권한은 서버가 준 appoint로만 판단한다. 군주가 아니면 칸을 열지 않고 이유를 보인다.
+            <DisabledReason reason={appoint.reason}>{level.holderId === null ? '임명' : '해임'}</DisabledReason>
+          ) : busy !== null ? (
+            <span className={styles.controls}>
+              <DisabledReason
+                reason={busyLabel === '보내는 중' ? '요청을 보내는 중입니다.' : '요청을 처리하는 중입니다.'}
+              >
+                {level.holderId === null ? '임명' : '해임'}
+              </DisabledReason>
+              {busy ? (
+                <span className={styles.busy} role="status">
+                  {busyLabel}
+                </span>
+              ) : null}
+            </span>
+          ) : level.holderId !== null ? (
+            <button
+              type="button"
+              className={`${styles.secondary} ${styles.danger} ${pageStyles.tap}`}
+              onClick={() => onDismiss(level.holderId!, level.officerLevel)}
+            >
+              해임
+            </button>
+          ) : (
+            <span className={styles.controls}>
+              <button
+                type="button"
+                className={`${styles.secondary} ${pageStyles.tap}`}
+                aria-label={`${level.title} 임명할 장수 고르기`}
+                aria-expanded={open}
+                aria-controls={open ? pickerId : undefined}
+                onClick={() => onOpen(!open)}
+              >
+                장수 고르기
+              </button>
+              {picked ? (
+                <>
+                  <span className={pageStyles.chosen}>
+                    고른 장수 <strong>{picked.label}</strong>
+                  </span>
+                  <button
+                    type="button"
+                    ref={(button) => {
+                      if (button && focusAppoint.current) {
+                        focusAppoint.current = false;
+                        button.focus();
+                      }
+                    }}
+                    className={`${styles.primary} ${pageStyles.tap}`}
+                    onClick={() => onAppoint(picked.member.generalId, level.officerLevel)}
+                  >
+                    임명
+                  </button>
+                </>
+              ) : (
+                <DisabledReason reason="임명할 장수를 고르세요.">임명</DisabledReason>
+              )}
+            </span>
+          )}
+        </td>
+      </tr>
+      {canPick && open ? (
+        <tr className={pageStyles.pickerRow}>
+          <td colSpan={3}>
+            <CandidatePicker
+              id={pickerId}
+              title={level.title}
+              candidates={candidates}
+              chosen={picked ? picked.member.generalId : null}
+              detailsState={detailsState}
+              onPick={(generalId) => {
+                focusAppoint.current = true;
+                setChosen(generalId);
+                onOpen(false);
+              }}
+            />
+          </td>
+        </tr>
+      ) : null}
+    </>
   );
 }

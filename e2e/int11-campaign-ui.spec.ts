@@ -279,7 +279,8 @@ test('AC-INT-11 정식491명 생성·사람 동의·NPC 영입·부곡 지휘·�
     const ownRow = garrison
       .getByRole('row')
       .filter({ has: owner.page.getByRole('cell', { name: '화면장수0', exact: true }) });
-    await expect(ownRow.getByRole('cell').nth(7)).toHaveText('10');
+    // 장수·소속·직책·통솔·무력·지력·정치·매력 다음이 지휘 병력이다 (INT-25에서 직책 열을 더했다).
+    await expect(ownRow.getByRole('cell').nth(8)).toHaveText('10');
     expect((await apiQuery<Board>(owner, 'campaign.get', { worldId })).units[0]!.troops).toBe(10);
     expect((await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: ownerId } } })).crew).toBe(0);
     expect(

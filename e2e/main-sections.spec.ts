@@ -85,13 +85,24 @@ test('정식191년 메인·예턴 메뉴 이동·초점·375~1440px·30초 재�
     await createAccount(page, ownEmail);
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto(`/w/${ownWorld}`);
+    // 768px 이상은 위 바로가기 띠, 그보다 좁으면 하단 막대(지도·예턴·현황·기록·메시지·메뉴)로 패널을 하나씩 본다 (INT-25).
     const nav = page.getByRole('navigation', { name: '메인 영역 바로가기', exact: true });
+    const bar = page.getByRole('tablist', { name: '메인 화면', exact: true });
+    const tab = (name: string) => bar.getByRole('tab', { name, exact: true });
     const cityPanel = page.getByRole('region', { name: '도시 정보', exact: true });
     const commandPanel = page.getByRole('region', { name: '명령 목록', exact: true });
+    const mainPath = `/w/${ownWorld}`;
+    await expect(nav).toBeHidden();
+    await expect(tab('지도')).toHaveAttribute('aria-selected', 'true');
+    await expect(commandPanel).toBeHidden();
+    await tab('예턴').click();
+    await expect(page).toHaveURL(new RegExp(`${mainPath}#main-commands$`));
     await expect(commandPanel.getByText('이 월드에 내 장수가 없습니다', { exact: true })).toBeVisible();
-    await nav.getByRole('button', { name: '도시로 이동', exact: true }).click();
-    await expect(cityPanel.getByRole('heading', { name: '도시 정보', exact: true })).toBeFocused();
+    await tab('현황').click();
+    await expect(tab('현황')).toHaveAttribute('aria-selected', 'true');
     await expect(cityPanel.getByText('지도에서 도시를 고르세요', { exact: true })).toBeVisible();
+    await expect(commandPanel).toBeHidden();
+    await tab('예턴').click();
 
     await commandPanel.getByRole('link', { name: '장수 만들기', exact: true }).click();
     await expect(page.getByRole('spinbutton')).toHaveCount(5);
@@ -114,9 +125,16 @@ test('정식191년 메인·예턴 메뉴 이동·초점·375~1440px·30초 재�
     const measurements = [];
     for (const width of [375, 767, 768, 1440]) {
       await page.setViewportSize({ width, height: 900 });
-      await nav.getByRole('button', { name: '지도로 이동', exact: true }).click();
+      const mobile = width < 768;
+      if (mobile) {
+        await expect(nav).toBeHidden();
+        await tab('지도').click();
+      } else {
+        await expect(bar).toBeHidden();
+        await nav.getByRole('button', { name: '지도로 이동', exact: true }).click();
+      }
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-      const sizes = await nav.locator('button').evaluateAll((buttons) =>
+      const sizes = await (mobile ? bar.getByRole('tab') : nav.locator('button')).evaluateAll((buttons) =>
         buttons.map((button) => {
           const rect = button.getBoundingClientRect();
           return { label: button.textContent, width: rect.width, height: rect.height };
@@ -128,26 +146,50 @@ test('정식191년 메인·예턴 메뉴 이동·초점·375~1440px·30초 재�
       expect(detailTarget.width).toBeGreaterThanOrEqual(44);
       expect(detailTarget.height).toBeGreaterThanOrEqual(44);
       const mapBox = (await page.getByRole('region', { name: '지도', exact: true }).boundingBox())!;
-      const cityBox = (await cityPanel.boundingBox())!;
-      const commandsBox = (await commandPanel.boundingBox())!;
-      expect(cityBox.y).toBeGreaterThan(mapBox.y + mapBox.height - 1);
-      if (width <= 1100) expect(commandsBox.y).toBeGreaterThan(cityBox.y + cityBox.height - 1);
-      else expect(commandsBox.x).toBeGreaterThan(mapBox.x + mapBox.width - 1);
-      measurements.push({ width, sizes, detailTarget, mapBox, cityBox, commandsBox });
+      if (mobile) {
+        // 한 번에 한 패널만 보이고 막대는 화면 아래에 붙어 있다.
+        await expect(cityPanel).toBeHidden();
+        await expect(commandPanel).toBeHidden();
+        const barBox = (await bar.boundingBox())!;
+        expect(barBox.y + barBox.height).toBeCloseTo(900, 0);
+        expect(barBox.width).toBe(await page.evaluate(() => document.documentElement.clientWidth));
+        measurements.push({ width, sizes, detailTarget, mapBox, barBox });
+      } else {
+        const cityBox = (await cityPanel.boundingBox())!;
+        const commandsBox = (await commandPanel.boundingBox())!;
+        expect(cityBox.y).toBeGreaterThan(mapBox.y + mapBox.height - 1);
+        if (width <= 1100) expect(commandsBox.y).toBeGreaterThan(cityBox.y + cityBox.height - 1);
+        else expect(commandsBox.x).toBeGreaterThan(mapBox.x + mapBox.width - 1);
+        measurements.push({ width, sizes, detailTarget, mapBox, cityBox, commandsBox });
+      }
       await page.screenshot({ path: info.outputPath(`main-sections-${width}.png`), fullPage: true });
     }
 
+    // 375×812 첫 예턴 화면: 막대의 `예턴`을 키보드로 고르면 44px 칸이 12개 이상 막대 위에 다 보인다.
     await page.setViewportSize({ width: 375, height: 812 });
-    const shortcut = nav.getByRole('button', { name: '예턴으로 이동', exact: true });
-    await shortcut.focus();
+    await tab('지도').focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(tab('예턴')).toBeFocused();
+    await expect(tab('지도')).toHaveAttribute('aria-selected', 'true');
     await page.keyboard.press('Enter');
-    await expect(commandPanel.getByRole('heading', { name: '명령 목록', exact: true })).toBeFocused();
-    const navBox = (await nav.boundingBox())!;
-    const focusedHeading = (await commandPanel.getByRole('heading', { name: '명령 목록', exact: true }).boundingBox())!;
-    expect(focusedHeading.y).toBeGreaterThan(navBox.y + navBox.height);
-    await page.screenshot({ path: info.outputPath('main-sections-focus-375.png') });
-    await page.keyboard.press('Tab');
-    expect(await commandPanel.evaluate((panel) => panel.contains(document.activeElement))).toBe(true);
+    await expect(tab('예턴')).toHaveAttribute('aria-selected', 'true');
+    await expect(tab('예턴')).toBeFocused();
+    await expect(page).toHaveURL(new RegExp(`${mainPath}#main-commands$`));
+    await expect(editor).toBeVisible();
+    const barTop = (await bar.boundingBox())!.y;
+    const firstScreen = await editor.locator('tr[data-slot]').evaluateAll((rows, limit) => {
+      const heights = rows.map((row) => row.getBoundingClientRect().height);
+      const shown = rows.filter((row) => {
+        const rect = row.getBoundingClientRect();
+        const box = row.closest('table')!.parentElement!.getBoundingClientRect();
+        return rect.top >= 0 && rect.bottom <= Math.min(limit, box.bottom) + 0.5;
+      }).length;
+      return { heights, shown };
+    }, barTop);
+    expect(firstScreen.heights.every((height) => height >= 44)).toBe(true);
+    expect(firstScreen.shown).toBeGreaterThanOrEqual(12);
+    measurements.push({ width: 375, height: 812, firstTurnScreen: firstScreen });
+    await page.screenshot({ path: info.outputPath('main-sections-turns-375x812.png') });
     await editor.getByRole('button', { name: '선택 해제', exact: true }).click();
     await editor.locator('tr[data-slot="30"]').click();
     await editor.getByLabel('명령 찾기').fill('농지 개간');
@@ -159,29 +201,59 @@ test('정식191년 메인·예턴 메뉴 이동·초점·375~1440px·30초 재�
     const enemy = map.cities.find(
       (city) => city.nationId !== null && city.nationId !== actor.nationId && city.key !== actor.cityKey,
     )!;
-    await nav.getByRole('button', { name: '지도로 이동', exact: true }).click();
+    await tab('지도').click();
+    await expect(page).toHaveURL(new RegExp(`${mainPath}$`));
     const enemyMarker = page.getByTestId('world-map').locator(`[data-city-key="${enemy.key}"]`);
     await enemyMarker.focus();
     await page.keyboard.press('Enter');
+    // 지도에서 고른 도시는 패널을 바꾸지 않는다. `도시 정보 보기`가 현황 패널을 열고 도시 머리글로 초점을 옮긴다.
+    await expect(tab('지도')).toHaveAttribute('aria-selected', 'true');
     await page.getByRole('button', { name: '도시 정보 보기', exact: true }).click();
+    await expect(tab('현황')).toHaveAttribute('aria-selected', 'true');
     await expect(cityPanel.getByRole('heading', { name: '도시 정보', exact: true })).toBeFocused();
     await expect(cityPanel.locator(`[data-city-key="${enemy.key}"][data-visibility="public"]`)).toBeVisible();
     await expect(cityPanel.getByRole('meter')).toHaveCount(0);
     await page.screenshot({ path: info.outputPath('main-sections-city-375.png') });
+    const base = `${new URL(page.url()).origin}${mainPath}?city=${enemy.key}`;
     const selectedUrl = page.url();
+    expect(selectedUrl).toBe(`${base}#main-status`);
+    // 새로고침해도 고른 패널과 도시가 남는다. 저장하지 않은 편집은 탭의 sessionStorage에 있다.
+    await page.reload();
+    await expect(tab('현황')).toHaveAttribute('aria-selected', 'true');
+    await expect(cityPanel.locator(`[data-city-key="${enemy.key}"][data-visibility="public"]`)).toBeVisible();
+    await expect(editor.getByTestId('draft-state')).toHaveText('저장하지 않은 편집 1건');
+    await editor.evaluate((node) => Object.assign(window, { __mainSectionEditor: node }));
 
     for (const width of [1440, 375]) {
       await page.setViewportSize({ width, height: 900 });
-      const gameNav = page.getByRole('navigation', { name: '게임 메뉴', exact: true }).filter({ visible: true });
-      const turnsLink = gameNav.getByRole('link', { name: '예턴', exact: true }).filter({ visible: true });
-      await expect(turnsLink).toHaveAttribute('href', `/w/${ownWorld}?city=${enemy.key}#main-commands`);
       const historyLength = await page.evaluate(() => history.length);
-      await turnsLink.click();
-      await expect(commandPanel.getByRole('heading', { name: '명령 목록', exact: true })).toBeFocused();
-      await turnsLink.focus();
-      await page.keyboard.press('Enter');
-      await expect(commandPanel.getByRole('heading', { name: '명령 목록', exact: true })).toBeFocused();
-      expect(page.url()).toBe(selectedUrl);
+      if (width === 375) {
+        // 좁은 메인에는 게임 메뉴 막대 대신 메인 하단 막대 하나만 있다.
+        await expect(
+          page.getByRole('navigation', { name: '게임 메뉴', exact: true }).filter({ visible: true }),
+        ).toHaveCount(0);
+        await expect(page.locator('summary').filter({ hasText: /^전체$/ })).toBeHidden();
+        await tab('예턴').click();
+        await expect(tab('예턴')).toHaveAttribute('aria-selected', 'true');
+        await expect(page).toHaveURL(`${base}#main-commands`);
+      } else {
+        const gameNav = page.getByRole('navigation', { name: '게임 메뉴', exact: true }).filter({ visible: true });
+        const turnsLink = gameNav.getByRole('link', { name: '예턴', exact: true }).filter({ visible: true });
+        await expect(turnsLink).toHaveAttribute('href', `/w/${ownWorld}?city=${enemy.key}#main-commands`);
+        await turnsLink.click();
+        await expect(commandPanel.getByRole('heading', { name: '명령 목록', exact: true })).toBeFocused();
+        await turnsLink.focus();
+        await page.keyboard.press('Enter');
+        await expect(commandPanel.getByRole('heading', { name: '명령 목록', exact: true })).toBeFocused();
+        expect(page.url()).toBe(selectedUrl);
+        await expect(
+          gameNav.getByRole('link', { name: '군략도', exact: true }).filter({ visible: true }),
+        ).toHaveAttribute('aria-current', 'page');
+        await expect(turnsLink).not.toHaveAttribute('aria-current');
+        const headingBox = (await commandPanel.getByRole('heading', { name: '명령 목록', exact: true }).boundingBox())!;
+        const shortcutBox = (await nav.boundingBox())!;
+        expect(headingBox.y).toBeGreaterThan(shortcutBox.y + shortcutBox.height);
+      }
       expect(await page.evaluate(() => history.length)).toBe(historyLength);
       expect(
         await editor.evaluate(
@@ -190,23 +262,11 @@ test('정식191년 메인·예턴 메뉴 이동·초점·375~1440px·30초 재�
       ).toBe(true);
       await expect(editor.getByTestId('draft-state')).toHaveText('저장하지 않은 편집 1건');
       await expect(editor.locator('tr[data-slot="30"]')).toHaveAttribute('aria-selected', 'true');
-      await expect(
-        gameNav.getByRole('link', { name: '군략도', exact: true }).filter({ visible: true }),
-      ).toHaveAttribute('aria-current', 'page');
-      await expect(turnsLink).not.toHaveAttribute('aria-current');
-      if (width === 375) {
-        await gameNav.locator('summary').click();
-        await gameNav.locator('details').getByRole('link', { name: '예턴', exact: true }).click();
-        await expect(gameNav.locator('details')).not.toHaveAttribute('open');
-        await expect(commandPanel.getByRole('heading', { name: '명령 목록', exact: true })).toBeFocused();
-        expect(page.url()).toBe(selectedUrl);
-      }
-      const headingBox = (await commandPanel.getByRole('heading', { name: '명령 목록', exact: true }).boundingBox())!;
-      const shortcutBox = (await nav.boundingBox())!;
-      expect(headingBox.y).toBeGreaterThan(shortcutBox.y + shortcutBox.height);
       await page.screenshot({ path: info.outputPath(`main-turns-menu-${width}.png`) });
     }
 
+    // 768~1099px은 한 줄로 쌓인 칸을 위 바로가기 띠로 오간다. 375px은 하단 막대로 패널을 바꾼다. 둘 다 도시 선택은 그대로다.
+    await page.setViewportSize({ width: 1024, height: 900 });
     for (const [name, heading] of [
       ['국가로 이동', '국가 정보'],
       ['장수로 이동', '장수 정보'],
@@ -217,7 +277,23 @@ test('정식191년 메인·예턴 메뉴 이동·초점·375~1440px·30초 재�
       await button.focus();
       await page.keyboard.press('Space');
       await expect(page.getByRole('heading', { name: heading, exact: true })).toBeFocused();
-      expect(page.url()).toBe(selectedUrl);
+      expect(new URL(page.url()).searchParams.get('city')).toBe(String(enemy.key));
+    }
+    await page.setViewportSize({ width: 375, height: 900 });
+    const mainMenu = page.getByRole('navigation', { name: '국가와 내 장수 메뉴', exact: true });
+    for (const [name, regions, hash] of [
+      ['현황', ['도시 정보', '국가 정보', '장수 정보'], 'main-status'],
+      ['기록', ['개인 기록'], 'main-records'],
+      ['메뉴', [], 'main-menu'],
+      ['예턴', ['명령 목록'], 'main-commands'],
+    ] as const) {
+      await tab(name).focus();
+      await page.keyboard.press('Space');
+      await expect(tab(name)).toHaveAttribute('aria-selected', 'true');
+      await expect(page).toHaveURL(`${base}#${hash}`);
+      for (const region of regions) await expect(page.getByRole('region', { name: region, exact: true })).toBeVisible();
+      if (name === '메뉴') await expect(mainMenu).toBeVisible();
+      else await expect(mainMenu).toBeHidden();
     }
     const turnsRefresh = page.waitForResponse((response) => response.url().includes('turns.get') && response.ok());
     // 10초 주기 재조회가 여러 번 지나도 초안과 선택을 유지한다.
@@ -234,31 +310,48 @@ test('정식191년 메인·예턴 메뉴 이동·초점·375~1440px·30초 재�
     // 보조 화면에서도 같은 월드·도시의 메인 예턴으로 돌아온다. 뒤로·앞으로 이동과 단독 주소도 유지한다.
     for (const width of [1440, 375]) {
       await page.setViewportSize({ width, height: 900 });
-      const gameNav = page.getByRole('navigation', { name: '게임 메뉴', exact: true }).filter({ visible: true });
-      await gameNav.getByRole('link', { name: '기록', exact: true }).filter({ visible: true }).click();
+      if (width === 375) {
+        // 좁은 메인의 공통 화면은 `메뉴` 패널에 있다.
+        await tab('메뉴').click();
+        await page
+          .getByRole('navigation', { name: '공통 메뉴', exact: true })
+          .getByRole('link', { name: '기록', exact: true })
+          .click();
+      } else {
+        await page
+          .getByRole('navigation', { name: '게임 메뉴', exact: true })
+          .filter({ visible: true })
+          .getByRole('link', { name: '기록', exact: true })
+          .filter({ visible: true })
+          .click();
+      }
       await expect(page.getByRole('heading', { level: 1, name: '기록 · 내 장수', exact: true })).toBeVisible();
       const recordsUrl = page.url();
       expect(new URL(recordsUrl).searchParams.get('city')).toBe(String(enemy.key));
+      const gameNav = page.getByRole('navigation', { name: '게임 메뉴', exact: true }).filter({ visible: true });
       const turnsLink = gameNav.getByRole('link', { name: '예턴', exact: true }).filter({ visible: true });
       await turnsLink.focus();
       await page.keyboard.press('Enter');
-      await expect(page).toHaveURL(`${selectedUrl}#main-commands`);
+      await expect(page).toHaveURL(`${base}#main-commands`);
       await expect(commandPanel.getByRole('heading', { name: '명령 목록', exact: true })).toBeFocused();
+      if (width === 375) await expect(tab('예턴')).toHaveAttribute('aria-selected', 'true');
       await expect(editor.getByTestId('draft-state')).toHaveText('저장하지 않은 편집 1건');
       await expect(editor.locator('tr[data-slot="30"]')).toHaveAttribute('aria-selected', 'true');
       await expect(editor.locator('tr[data-slot="30"]')).toContainText('농지 개간');
       await page.goBack();
       await expect(page).toHaveURL(recordsUrl);
       await page.goForward();
-      await expect(page).toHaveURL(`${selectedUrl}#main-commands`);
+      await expect(page).toHaveURL(`${base}#main-commands`);
       await expect(commandPanel.getByRole('heading', { name: '명령 목록', exact: true })).toBeFocused();
       const historyLength = await page.evaluate(() => history.length);
-      await turnsLink.click();
+      // 메인에서 다시 예턴을 골라도 기록이 쌓이지 않는다. 좁은 메인은 게임 메뉴 대신 하단 막대를 쓴다.
+      if (width === 375) await tab('예턴').click();
+      else await turnsLink.click();
       expect(await page.evaluate(() => history.length)).toBe(historyLength);
       await page.goBack();
       await expect(page).toHaveURL(recordsUrl);
       await page.goForward();
-      await expect(page).toHaveURL(`${selectedUrl}#main-commands`);
+      await expect(page).toHaveURL(`${base}#main-commands`);
       await expect(editor.getByTestId('draft-state')).toHaveText('저장하지 않은 편집 1건');
       await editor.getByLabel('명령 찾기').focus();
       const refresh = page.waitForResponse((response) => response.url().includes('turns.get') && response.ok());
@@ -266,6 +359,14 @@ test('정식191년 메인·예턴 메뉴 이동·초점·375~1440px·30초 재�
       await expect(editor.getByLabel('명령 찾기')).toBeFocused();
       await page.screenshot({ path: info.outputPath(`main-turns-return-${width}.png`) });
     }
+    // 좁은 메인의 다른 패널에서 보조 화면으로 갔다가 뒤로 오면 그 패널이 그대로다.
+    await tab('메뉴').click();
+    await mainMenu.getByRole('link', { name: '지도 크게', exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/w/${ownWorld}/map$`));
+    await page.goBack();
+    await expect(page).toHaveURL(`${base}#main-menu`);
+    await expect(tab('메뉴')).toHaveAttribute('aria-selected', 'true');
+    await expect(mainMenu).toBeVisible();
     await page.goto(`/w/${ownWorld}/turns`);
     await expect(page.getByRole('heading', { level: 1, name: '예턴 편집', exact: true })).toBeVisible();
     await expect(editor.locator('tr[data-slot]')).toHaveCount(30);
@@ -278,9 +379,10 @@ test('정식191년 메인·예턴 메뉴 이동·초점·375~1440px·30초 재�
       .click();
     await expect(page).toHaveURL(new RegExp(`/w/${ownWorld}#main-commands$`));
     await expect(commandPanel.getByRole('heading', { name: '명령 목록', exact: true })).toBeFocused();
+    await expect(tab('예턴')).toHaveAttribute('aria-selected', 'true');
     await expect(editor.locator('tr[data-slot]')).toHaveCount(30);
     await expect(editor.getByTestId('draft-state')).toHaveText('저장하지 않은 편집 1건');
-    await page.goto(selectedUrl);
+    await page.goto(`${base}#main-commands`);
     await expect(editor.getByTestId('draft-state')).toHaveText('저장하지 않은 편집 1건');
     await editor.getByRole('button', { name: '저장', exact: true }).click();
     await expect(editor.getByText('저장했습니다.', { exact: true })).toBeVisible();
@@ -291,7 +393,7 @@ test('정식191년 메인·예턴 메뉴 이동·초점·375~1440px·30초 재�
     expect(saved).toHaveLength(30);
     expect(saved[29]).toMatchObject({ slot: 29, commandKey: 'farm' });
 
-    // 실제 조회 실패와 장수 없음은 구분하고, 복구한 뒤 같은 바로가기를 쓸 수 있다.
+    // 실제 조회 실패와 장수 없음은 구분하고, 복구한 뒤 같은 막대를 쓸 수 있다.
     await page.route('**/trpc/**', async (route) => {
       if (route.request().url().includes('world.map')) await route.abort('failed');
       else await route.continue();
@@ -299,8 +401,9 @@ test('정식191년 메인·예턴 메뉴 이동·초점·375~1440px·30초 재�
     await page.reload();
     const mapPanel = page.getByRole('region', { name: '지도', exact: true });
     await expect(mapPanel.getByRole('alert')).toContainText('불러오지 못했습니다', { timeout: 20_000 });
-    await nav.getByRole('button', { name: '지도로 이동', exact: true }).click();
-    await expect(mapPanel.getByRole('heading', { name: '지도', exact: true })).toBeFocused();
+    await tab('지도').click();
+    await expect(mapPanel).toBeVisible();
+    await expect(page).toHaveURL(base);
     await mapPanel.getByRole('button', { name: '다시 시도', exact: true }).click();
     await page.unroute('**/trpc/**');
     await expect(page.getByTestId('operational-world-map')).toBeVisible();
