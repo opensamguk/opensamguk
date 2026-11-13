@@ -366,11 +366,11 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       { id: 2, gold: 11002 },
     ]);
     expect(ally.generals.slice(2)).toEqual(
-      state.generals.slice(2).map(({ id, name, nationId }) => ({ id, name, nationId })),
+      state.generals.slice(2).map(({ id, name, nationId }) => ({ id, name, nationId, isHuman: id !== 2 })),
     );
     const resident = (await query('city.get', input, users[1]!.cookie)).data;
     expect(resident).toHaveProperty('population');
-    expect(resident.generals[0]).toEqual({ id: 1, name: state.generals[0]!.name, nationId: 1 });
+    expect(resident.generals[0]).toEqual({ id: 1, name: state.generals[0]!.name, nationId: 1, isHuman: true });
     for (const user of users) {
       const unseen = (await query('city.get', { worldId, cityKey: state.cities[2]!.cityKey }, user.cookie)).data;
       for (const field of [
@@ -387,7 +387,9 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     }
     const spectator = (await query('city.get', input, users[3]!.cookie)).data;
     expect(spectator).not.toHaveProperty('population');
-    expect(spectator.generals).toEqual(state.generals.map(({ id, name, nationId }) => ({ id, name, nationId })));
+    expect(spectator.generals).toEqual(
+      state.generals.map(({ id, name, nationId }) => ({ id, name, nationId, isHuman: id !== 2 })),
+    );
   });
 
   it('적 국가·재야·미생성 계정은 국고·군량·세율·장수 상세를 받지 않는다', async () => {
@@ -401,14 +403,14 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       'id',
       'name',
     ]);
-    expect(enemy.generals).toEqual([{ id: 3, name: state.generals[2]!.name, nationId: 2 }]);
+    expect(enemy.generals).toEqual([{ id: 3, name: state.generals[2]!.name, nationId: 2, isHuman: true }]);
     expect(enemy.cities).toHaveLength(1);
     for (const user of users.slice(1)) {
       const nation = (await query('nation.get', { worldId, nationId: 1 }, user.cookie)).data;
       for (const field of ['gold', 'rice', 'taxRate', 'tech', 'capitalCityKey'])
         expect(nation).not.toHaveProperty(field);
       expect(nation.generals).toEqual(
-        state.generals.slice(0, 2).map(({ id, name, nationId }) => ({ id, name, nationId })),
+        state.generals.slice(0, 2).map(({ id, name, nationId }) => ({ id, name, nationId, isHuman: id !== 2 })),
       );
     }
     const own = (await query('nation.get', { worldId, nationId: 1 })).data;
