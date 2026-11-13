@@ -317,6 +317,7 @@ model WorldResult {
   winnerNationId   Int?
   winnerName       String?
   winnerColor      String?
+  winnerSummary    Json?
   endedYear        Int
   endedMonth       Int
   endedTick        Int

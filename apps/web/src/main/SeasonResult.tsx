@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { retryUnlessClientError } from '../game/errors';
-import { displayName } from '../game/names';
+import { displayName, officerName } from '../game/names';
+import { InfoGrid } from './Panel';
 import { useWorldId } from '../game/queries';
 import type { WorldSummary } from '../game/types';
 import { useTRPC } from '../trpc';
@@ -85,9 +86,34 @@ function SeasonGenerals({ winnerNationId }: { winnerNationId: number | null }) {
     retry: retryUnlessClientError,
   });
   const tigers = merit.data ? fiveTigers(merit.data.generals, winnerNationId) : [];
+  const winner = merit.data?.winnerSummary;
   const n = (value: number) => value.toLocaleString('ko-KR');
   return (
     <div className={styles.generals} data-testid="season-generals">
+      {winner && (
+        <>
+          <h3>통일 국가 현황</h3>
+          <InfoGrid
+            items={[
+              { label: '성향', value: winner.philosophy },
+              { label: '국력', value: n(winner.power) },
+              { label: '도시', value: n(winner.cities) },
+              { label: '장수', value: n(winner.generals) },
+              { label: '주민', value: `${n(winner.population)} / ${n(winner.populationMax)}` },
+              { label: '국고', value: `금 ${n(winner.gold)} · 쌀 ${n(winner.rice)}` },
+            ]}
+          />
+          {winner.officers.length > 0 && (
+            <ul>
+              {winner.officers.map((officer) => (
+                <li key={officer.officerLevel + ':' + officer.name}>
+                  {officer.title ?? officerName(officer.officerLevel)} · {displayName(officer.name)}
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
       {tigers.length > 0 ? (
         <p className={styles.lead} data-testid="season-tigers">
           오호장군: {tigers.join(' · ')}

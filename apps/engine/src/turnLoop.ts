@@ -39,7 +39,7 @@ import { preparePendingReset, type PendingResetPreparation } from './admin/reset
 import { PgHeritageRepository } from './heritage/repository';
 import { creditHeritageSeason } from './heritage/service';
 import { appendReputationEvents } from './reputationState';
-import { persistSeasonArchive } from './seasonArchive';
+import { persistSeasonArchive, seasonWinnerSummary } from './seasonArchive';
 
 export const CLOCK_CHECKPOINT_MS = 5_000;
 export const ENGINE_BATCH_STEPS = 64;
@@ -435,6 +435,15 @@ export class TurnLoop {
               ...outcome,
               winnerName: winner?.name ?? null,
               winnerColor: winner?.color ?? null,
+              ...(winner
+                ? {
+                    winnerSummary: seasonWinnerSummary(next!, winner.id, {
+                      seed: world.seed,
+                      tick: endedTick!,
+                      year: date.year,
+                    }),
+                  }
+                : {}),
               endedYear: date.year,
               endedMonth: date.month,
               endedTick: endedTick!,

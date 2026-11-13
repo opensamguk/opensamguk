@@ -1,6 +1,6 @@
 import type { Prisma } from '@opensamguk/db';
 import { TRPCError } from '@trpc/server';
-import { rankGenerals, reputationEventSchema, toGameDate } from '@opensamguk/rules';
+import { courtOfficeTitle, rankGenerals, reputationEventSchema, toGameDate } from '@opensamguk/rules';
 import { protectedProcedure, router, worldVerifiedProcedure } from '../trpc';
 import {
   beforeCursor,
@@ -33,6 +33,17 @@ async function recordPortraits(tx: Prisma.TransactionClient, worldId: string, id
 }
 
 const seasonInput = worldInput.extend({ by: z.enum(['dedication', 'experience', 'merit']).default('dedication') });
+const winnerSummarySchema = z.strictObject({
+  level: z.number().int(),
+  philosophy: z.string(),
+  cities: z.number().int().nonnegative(),
+  generals: z.number().int().nonnegative(),
+  power: z.number().int().nonnegative(),
+  population: z.number().int().nonnegative(),
+  populationMax: z.number().int().nonnegative(),
+  gold: z.number().int().nonnegative(),
+  rice: z.number().int().nonnegative(),
+});
 
 export const recordsRouter = router({
   battles: protectedProcedure.input(generalInput).query(({ ctx, input }) =>
@@ -176,14 +187,34 @@ export const recordsRouter = router({
         ]),
       );
       const generals = rankGenerals(
-        rows.map(({ generalId, nationId, nationName, nationColor, officerLevel: _officerLevel, ...row }) => ({
-          ...row,
+        rows.map(({ generalId, name, nationId, nationName, nationColor, dedication, experience, wins, captures }) => ({
           id: generalId,
+          name,
+          dedication,
+          experience,
+          wins,
+          captures,
           nation: nationId === null ? null : { id: nationId, name: nationName!, color: nationColor! },
         })),
         input.by,
       ).map(({ id, ...row }) => ({ generalId: id, ...row, ...archived.get(id)! }));
-      return { result, generals };
+      const stats = winnerSummarySchema.safeParse(world.result?.winnerSummary).data;
+      const winner = result.winner;
+      const winnerSummary =
+        winner && stats
+          ? {
+              ...stats,
+              officers: rows
+                .filter((row) => row.nationId === winner.nationId && row.officerLevel >= 5)
+                .sort((a, b) => b.officerLevel - a.officerLevel || a.generalId - b.generalId)
+                .map(({ name, officerLevel }) => ({
+                  name,
+                  officerLevel,
+                  title: courtOfficeTitle(stats.level, officerLevel),
+                })),
+            }
+          : null;
+      return { result, generals, winnerSummary };
     }),
   ),
   general: protectedProcedure.input(generalInput).query(({ ctx, input }) =>
