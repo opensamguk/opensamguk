@@ -34,7 +34,13 @@ type City = Omit<Prisma.CityGetPayload<true>, 'kind' | 'seasonalEvent' | 'confli
 };
 type Nation = Omit<
   Prisma.NationGetPayload<true>,
-  'notice' | 'noticeDirective' | 'noticeRevision' | 'noticeUpdatedAt' | 'noticeUpdatedBy' | 'diplomaticAidUntilMonth'
+  | 'notice'
+  | 'recruitmentNotice'
+  | 'noticeDirective'
+  | 'noticeRevision'
+  | 'noticeUpdatedAt'
+  | 'noticeUpdatedBy'
+  | 'diplomaticAidUntilMonth'
 >;
 export type Viewer = Pick<General, 'id' | 'nationId' | 'cityKey'> | null;
 

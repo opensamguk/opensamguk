@@ -96,7 +96,10 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
     : undefined;
   const ext = restoreExtState(commands, await readWorldExtRows(tx, worldId), world.ruleFeatures);
   const cities = await tx.city.findMany({ where: { worldId }, omit: { conflictTick: true, stratagemTick: true } });
-  const nations = await tx.nation.findMany({ where: { worldId }, omit: { noticeDirective: true } });
+  const nations = await tx.nation.findMany({
+    where: { worldId },
+    omit: { noticeDirective: true, recruitmentNotice: true },
+  });
   const generals = await tx.general.findMany({
     where: { worldId },
     omit: {

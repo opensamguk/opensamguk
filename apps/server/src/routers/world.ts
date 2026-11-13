@@ -143,7 +143,7 @@ export const worldRouter = router({
       const nations = await tx.nation.findMany({
         where: { worldId: input.worldId },
         orderBy: { id: 'asc' },
-        select: { id: true, name: true, color: true, capitalCityKey: true, description: true },
+        select: { id: true, name: true, color: true, capitalCityKey: true, description: true, recruitmentNotice: true },
       });
       const world = await tx.world.findUniqueOrThrow({
         where: { id: input.worldId },
@@ -190,7 +190,10 @@ export const worldRouter = router({
             ...(ruins ? { ruin: ruins.get(city.cityKey) ?? null } : {}),
           };
         }),
-        nations,
+        nations: nations.map(({ recruitmentNotice, ...nation }) => ({
+          ...nation,
+          ...(recruitmentNotice ? { recruitmentNotice } : {}),
+        })),
         generals: generals.map(({ userId, ...general }) => ({ ...general, isHuman: userId !== null })),
         ...(map ? { operationalMap: operationalMapDisplay(map) } : {}),
       };

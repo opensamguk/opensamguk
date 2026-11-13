@@ -86,6 +86,10 @@ export const nationRouter = router({
         ...(world.ruleFeatures.includes('five-stats') ? { fiveStats: true as const } : {}),
         ...nationInfo(nation, { cityCount: settlements.length, generalCount: generals.length }, viewer),
         philosophy: nation.philosophy,
+        ...(nation.recruitmentNotice ? { recruitmentNotice: nation.recruitmentNotice } : {}),
+        ...(ownNation && viewer?.officerLevel === BALANCE.RULER_LEVEL && world.status !== 'ENDED'
+          ? { canEditRecruitmentNotice: true as const }
+          : {}),
         ...nationPopulation(settlements),
         ...(ownNation
           ? {

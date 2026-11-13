@@ -58,7 +58,14 @@ export async function loadWorldAfterCapabilityCheck(
   const operationalMap = readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin);
   const nations = await tx.nation.findMany({
     where: { worldId },
-    omit: { notice: true, noticeDirective: true, noticeRevision: true, noticeUpdatedAt: true, noticeUpdatedBy: true },
+    omit: {
+      notice: true,
+      recruitmentNotice: true,
+      noticeDirective: true,
+      noticeRevision: true,
+      noticeUpdatedAt: true,
+      noticeUpdatedBy: true,
+    },
   });
   const generals = await tx.general.findMany({
     where: { worldId },
