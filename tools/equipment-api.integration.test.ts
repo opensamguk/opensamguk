@@ -95,7 +95,7 @@ async function fixture(
   enabled = true,
   lineage = false,
   specialty: 'iron' | 'horses' = 'iron',
-  toolProfile: boolean | 'morale' | 'rare' = false,
+  toolProfile: boolean | 'morale' | 'rare' | 'fullRare' = false,
 ) {
   const input = operationalInput();
   const template = input.map.sites.find((site) => site.kind === 'CITY')!;
@@ -120,7 +120,7 @@ async function fixture(
   });
   const initial = buildInitialWorld(input);
   initial.seed = `equipment-pg-${randomUUID()}`;
-  if (toolProfile === 'rare') {
+  if (toolProfile === 'rare' || toolProfile === 'fullRare') {
     for (let i = 0; ; i++) {
       const seed = `equipment-rare-${i}`;
       if (rngFor(seed, 'monthly', initial.startYear, 1).next() < 0.1) {
@@ -170,8 +170,9 @@ async function fixture(
               ? {
                   ...STANDARD_EQUIPMENT_CONFIG,
                   treatmentTool: true,
-                  ...(toolProfile === 'morale' || toolProfile === 'rare' ? { moraleTool: true } : {}),
-                  ...(toolProfile === 'rare' ? { rareEquipment: true } : {}),
+                  ...(typeof toolProfile === 'string' ? { moraleTool: true } : {}),
+                  ...(toolProfile === 'rare' || toolProfile === 'fullRare' ? { rareEquipment: true } : {}),
+                  ...(toolProfile === 'fullRare' ? { fullRareEquipment: true } : {}),
                 }
               : STANDARD_EQUIPMENT_CONFIG,
           }
@@ -215,7 +216,10 @@ async function fixture(
   const creation = rpc('general.create', { worldId: saved.worldId, ...payload }, player);
   const deadline = Date.now() + 5000;
   while (!(await db.inputEvent.findFirst({ where: { worldId: saved.worldId, status: 'PENDING' } }))) {
-    if (Date.now() >= deadline) throw Error('장수 생성 입력이 접수되지 않았습니다.');
+    if (Date.now() >= deadline) {
+      const result = await creation;
+      throw Error(`장수 생성 입력이 접수되지 않았습니다. HTTP ${result.status}: ${result.error?.message ?? ''}`);
+    }
     await delay(10);
   }
   await advance(saved.worldId, 0);
@@ -388,6 +392,28 @@ it(
     );
   }),
 );
+
+it('INT-26 SAN10 명품 목록은 60개를 공개하고 월말 발견을 재생한다', async () => {
+  const f = await fixture(true, false, 'iron', 'fullRare');
+  const board = () => rpc('equipment.rare', { worldId: f.id }, f.player);
+  const before = (await board()).data!.items;
+  expect(before).toHaveLength(60);
+  expect(new Set(before.map(({ key }) => key)).size).toBe(60);
+  expect(before).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ name: '한혈마', bonus: 15, slot: 'horse', owner: null }),
+      expect.objectContaining({ name: '방천화극', bonus: 14, slot: 'weapon', owner: null }),
+      expect.objectContaining({ name: '한비자', bonus: 14, slot: 'book', owner: null }),
+    ]),
+  );
+  await advance(f.id, 10_000);
+  const after = (await board()).data!.items;
+  expect(after.filter(({ owner }) => owner?.id === f.actorId)).toHaveLength(1);
+  const archive = await exportReplay(db, f.id);
+  expect(replayArchive(archive, archive.months.length)).toEqual(
+    archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })),
+  );
+});
 
 for (const category of ['unauthenticated', 'otherUser', 'sanctioned', 'invalidInput'] as const) {
   it(

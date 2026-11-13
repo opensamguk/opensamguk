@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { additionalRareEquipment } from './rareCatalog';
 
 export const EQUIPMENT_MAX = 2_147_483_647;
 export const EQUIPMENT_STATS = { horse: 'leadership', weapon: 'strength', book: 'intel' } as const;
@@ -25,7 +26,7 @@ export const equipmentTools = { tool_01: TREATMENT_TOOL, tool_02: MORALE_TOOL };
 export const equipmentToolKeySchema = z.enum(['tool_01', 'tool_02']);
 export const equipmentSlotSchema = z.enum(['horse', 'weapon', 'book']);
 export const equipmentKeySchema = z.string().regex(/^(horse|weapon|book)_0[1-6]$/);
-export const rareEquipmentKeySchema = z.string().regex(/^(horse|weapon|book)_15$/);
+export const rareEquipmentKeySchema = z.string().regex(/^(horse|weapon|book)_(15|(?:0[7-9]|1[0-5])_[가-힣0-9]+)$/);
 export const equippedItemKeySchema = z.union([equipmentKeySchema, rareEquipmentKeySchema]);
 // Names and +15 stat effects from core2026 c81d304 items (MIT). Discovery is a new rule.
 export const rareEquipment = [
@@ -33,6 +34,13 @@ export const rareEquipment = [
   { key: 'weapon_15', name: '의천검', slot: 'weapon', stat: 'strength', bonus: 15, description: '무력 +15' },
   { key: 'book_15', name: '손자병법', slot: 'book', stat: 'intel', bonus: 15, description: '지력 +15' },
 ] as const;
+const fullRareEquipment = [...rareEquipment, ...additionalRareEquipment];
+type RareEquipmentOptions = { rareEquipment?: true; fullRareEquipment?: true };
+
+export function rareEquipmentCatalog(config: Pick<EquipmentConfig, 'version'> & RareEquipmentOptions) {
+  return config.fullRareEquipment ? fullRareEquipment : hasRareEquipment(config) ? rareEquipment : [];
+}
+
 const quantity = z.number().int().min(0).max(EQUIPMENT_MAX);
 const itemSchema = z
   .strictObject({
@@ -68,12 +76,14 @@ const moraleEquipmentConfigSchema = baseEquipmentConfigSchema.extend({
   treatmentTool: z.literal(true),
   moraleTool: z.literal(true),
 });
+const rareEquipmentConfigSchema = moraleEquipmentConfigSchema.extend({ rareEquipment: z.literal(true) });
 export const equipmentConfigSchema = z
   .union([
     baseEquipmentConfigSchema,
     baseEquipmentConfigSchema.extend({ treatmentTool: z.literal(true) }),
     moraleEquipmentConfigSchema,
-    moraleEquipmentConfigSchema.extend({ rareEquipment: z.literal(true) }),
+    rareEquipmentConfigSchema,
+    rareEquipmentConfigSchema.extend({ fullRareEquipment: z.literal(true) }),
   ])
   .superRefine((config, context) => {
     const keys = new Set<string>();
@@ -103,13 +113,11 @@ export function equippedItem(
   config: Pick<EquipmentConfig, 'version'> & {
     items: readonly Readonly<EquipmentConfig['items'][number]>[];
     rareEquipment?: true;
+    fullRareEquipment?: true;
   },
   key: string | undefined,
 ) {
-  return (
-    config.items.find((item) => item.key === key) ??
-    (hasRareEquipment(config) ? rareEquipment.find((item) => item.key === key) : undefined)
-  );
+  return config.items.find((item) => item.key === key) ?? rareEquipmentCatalog(config).find((item) => item.key === key);
 }
 
 export function toolSaleProceeds(held: { key: keyof typeof equipmentTools; charges: number }, sellRateBp: number) {

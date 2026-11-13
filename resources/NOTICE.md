@@ -233,3 +233,7 @@ core2026 커밋 df6c9269fa1e2862418ba9da481c8dd2d758d6c5의 MIT © 2025 devsam �
 ### INT-26 능력치 초기화
 
 기수별 한 번, 무료 무작위 배분과 유산 1,000점 직접 배분은 core2026 `c81d304`의 `app/game-engine/src/turn/inheritanceActionService.ts`를 참고했다. 배분 범위는 OpenSamguk의 생성 규칙을 따른다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+### INT-26 명품 장비 목록
+
+SAN10 확장 명품 프로필의 명마·무기·서적 60종 이름과 기본 능력치 효과는 core2026 `c81d304`의 `packages/logic/src/items/`를 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다.

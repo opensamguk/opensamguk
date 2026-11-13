@@ -5,7 +5,7 @@ import {
   MORALE_TOOL,
   hasMoraleTool,
   hasRareEquipment,
-  rareEquipment,
+  rareEquipmentCatalog,
   equipmentTools,
   toolSaleProceeds,
   hasTreatmentTool,
@@ -53,7 +53,7 @@ export function readEquipmentBoard(ctx: PersonnelActorContext, worldId: string, 
           : {}),
         ...(hasMoraleTool(equipment.config) ? { tools: [toolEntry(TREATMENT_TOOL), toolEntry(MORALE_TOOL)] } : {}),
         ...(hasRareEquipment(equipment.config)
-          ? { rare: rareEquipment.filter((item) => slots[item.slot] === item.key) }
+          ? { rare: rareEquipmentCatalog(equipment.config).filter((item) => slots[item.slot] === item.key) }
           : {}),
         baseStats,
         stats: withEquipmentBonus(state, general.id, baseStats),
@@ -87,7 +87,7 @@ export function readRareEquipment(db: PersonnelActorContext['db'], worldId: stri
     if (!hasRareEquipment(equipment.config)) return { enabled: false, items: [] };
     return {
       enabled: true,
-      items: rareEquipment.map((item) => {
+      items: rareEquipmentCatalog(equipment.config).map((item) => {
         const match = Object.entries(equipment.generals).find(([, slots]) => slots[item.slot] === item.key);
         const owner = match ? state.generals[Number(match[0])] : undefined;
         const nation = owner?.nationId != null ? state.nations[owner.nationId] : undefined;

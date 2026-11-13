@@ -1,6 +1,6 @@
 import type { WorldState } from '../model/world';
 import type { SuccessionMode } from '../lineage/succession';
-import { rareEquipment } from './config';
+import { rareEquipmentCatalog } from './config';
 import { readEquipmentState } from './state';
 
 // 호출자가 복제한 상태만 바꾼다. 사람의 겹치는 칸은 판매 후 다시 계승하도록 보류한다.
@@ -9,6 +9,7 @@ export function inheritEquipment(world: WorldState, fromId: number, toId: number
   const state = readEquipmentState(world.equipment, world),
     from = state.generals[String(fromId)],
     to = toId === null ? undefined : state.generals[String(toId)];
+  const rareEquipment = rareEquipmentCatalog(state.config);
   if (
     mode === 'HUMAN' &&
     from &&

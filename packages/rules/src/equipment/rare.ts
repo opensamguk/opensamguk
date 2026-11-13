@@ -1,11 +1,12 @@
 import type { Rng } from '@opensamguk/shared';
 import type { WorldState } from '../model/world';
-import { hasRareEquipment, rareEquipment } from './config';
+import { rareEquipmentCatalog } from './config';
 
 // One 10% discovery roll per month across the whole world, with a single rare item per general.
 export function discoverRareEquipment(state: WorldState, year: number, rng: Rng) {
   const equipment = state.equipment;
-  if (!equipment || !hasRareEquipment(equipment.config)) return [];
+  if (!equipment) return [];
+  const rareEquipment = rareEquipmentCatalog(equipment.config);
   const found = new Set(Object.values(equipment.generals).flatMap((slots) => Object.values(slots)));
   const available = rareEquipment.filter(({ key }) => !found.has(key));
   if (!available.length || rng.next() >= 0.1) return [];

@@ -8,8 +8,7 @@ import {
   hasTreatmentTool,
   equipmentConfigSchema,
   equippedItemKeySchema,
-  rareEquipment,
-  hasRareEquipment,
+  rareEquipmentCatalog,
   equipmentToolKeySchema,
   equipmentTools,
   type EquipmentConfig,
@@ -52,9 +51,8 @@ export function readEquipmentState(value: unknown, world: WorldView): EquipmentS
   const generals = (value as { generals?: unknown } | null)?.generals;
   if (generals && typeof generals === 'object') for (const key of Object.keys(generals)) generalKey.parse(key);
   const state = stateSchema.parse(value);
-  const items = new Map(
-    [...state.config.items, ...(hasRareEquipment(state.config) ? rareEquipment : [])].map((item) => [item.key, item]),
-  );
+  const rareEquipment = rareEquipmentCatalog(state.config);
+  const items = new Map([...state.config.items, ...rareEquipment].map((item) => [item.key, item]));
   const rareKeys = new Set<string>(rareEquipment.map(({ key }) => key));
   const unique = new Set<string>();
   for (const [key, slots] of Object.entries(state.generals)) {
