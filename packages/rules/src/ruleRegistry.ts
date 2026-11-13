@@ -24,6 +24,7 @@ import {
 } from './ruleFeatures';
 import { checkStatProfile } from './general/fiveStats';
 import { GENERAL_CONDITION_FEATURE } from './general/condition';
+import { RICE_MARKET_FEATURE } from './world/riceMarket';
 import { RANKED_AID_FEATURE } from './diplomacy/treaty';
 import { EXPANDED_TREATY_FEATURE } from './diplomacy/treatyClauses';
 import { checkOperationalProfile } from './world/map/profile';
@@ -158,6 +159,7 @@ export const ruleRegistry: RuleRegistry = {
     { key: RANKED_AID_FEATURE, requires: [EXPANDED_TREATY_FEATURE], conflicts: [] },
     fiveStatsFeature,
     { key: GENERAL_CONDITION_FEATURE, requires: ['five-stats'], conflicts: [] },
+    { key: RICE_MARKET_FEATURE, requires: [], conflicts: [] },
     operationalMapFeature,
     basicStratagemFeature,
     battleAffinityFeature,

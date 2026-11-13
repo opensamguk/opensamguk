@@ -17,6 +17,7 @@ import { canExecuteCityNationCommand } from '../cityResources/commands';
 import { takeCampaignOrder, finishCampaignOrder } from '../campaign/orders';
 import { canExecuteResearchNationCommand } from '../nationResearch/commands';
 import { trackNationTurn } from '../preparedTurns/withPrepare';
+import { RICE_MARKET_FEATURE } from '../world/riceMarket';
 
 export type PersonnelTurnInput = Readonly<{ offices: DeepReadonly<OfficeRevisions> }>;
 export type PersonnelTurnChange = Readonly<{
@@ -49,6 +50,7 @@ export function runGeneralTurn(
   commandKey: string;
   personnel?: PersonnelTurnChange;
 } {
+  if (state.ruleFeatures?.includes(RICE_MARKET_FEATURE)) actor = { ...actor, worldSeed: seed };
   if (personnel !== undefined) {
     if (Object.hasOwn(state, 'nationTurns'))
       throw new PersonnelInvariantError('인사 기능을 켠 월드에 국가 예턴이 있습니다.');
@@ -70,7 +72,7 @@ export function runGeneralTurn(
   let nation: { commandKey: string; result: CommandResult | Failure; nationId: number } | undefined;
   // 국가 예턴은 턴 시작 시 군주가 한 번만 실행한다. 국가 명령 뒤 장수 명령을 재검사한다.
   const npcNation = general.userId === null && nationId !== null && state.nations[nationId]?.isNpc;
-  const context = { ...options, tick: actor.tick ?? 0, unitSet: actor.unitSet, resolver };
+  const context = { ...options, tick: actor.tick ?? 0, unitSet: actor.unitSet, worldSeed: actor.worldSeed, resolver };
   if (personnelChange) {
     if (take) {
       let slot = take.slot;

@@ -7,6 +7,7 @@ import {
   checkRuleFeatures,
   GENERAL_CONDITION_FEATURE,
   RANKED_AID_FEATURE,
+  RICE_MARKET_FEATURE,
   parsePreset,
   ruleRegistry,
   scenarioSchema,
@@ -469,7 +470,14 @@ async function artifactCreationProfiles(
         nations: entry.nations,
       },
       resources: [...resources, { kind: 'SCENARIO', key: entry.name, version: 1, contentHash: entry.contentHash }],
-      ruleFeatures: [...creationFeatures, 'treaty-break', 'treaty-expanded', 'treaty-trade', RANKED_AID_FEATURE].sort(),
+      ruleFeatures: [
+        ...creationFeatures,
+        'treaty-break',
+        'treaty-expanded',
+        'treaty-trade',
+        RANKED_AID_FEATURE,
+        RICE_MARKET_FEATURE,
+      ].sort(),
       presets: [
         {
           key: isEmpty ? 'empty' : 'regular',
