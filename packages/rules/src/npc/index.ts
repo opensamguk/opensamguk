@@ -14,7 +14,7 @@ import type { CommandResolver } from '../commands/resolve';
 import { readCampaignState } from '../campaign/state';
 import { cityNpcAllocations, cityNpcPreparation } from '../cityResources/npc';
 import { frontier } from './frontier';
-import { npcNationPolicy } from './policy';
+import { npcNationPolicy, npcRecruitPopulation } from './policy';
 export { NPC_DEFAULT_POLICY } from './policy';
 import { crewContext, crewTypeFailure } from '../world/crewRequirements';
 import { nationStrategyNpcCandidates } from '../nationStrategy/npc';
@@ -41,6 +41,9 @@ const compareText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 function chooser(view: WorldView, general: General, context: NpcContext, target: 'general' | 'nation') {
   const candidates: NpcCandidate[] = [];
+  const policy = npcNationPolicy(view, general.nationId === null ? undefined : view.nations[general.nationId]);
+  const priority: readonly string[] | undefined = target === 'general' ? policy.generalPriority : policy.nationPriority;
+  const fallback = target === 'general' ? 'rest' : 'nation_rest';
   const actor: Actor = {
     generalId: general.id,
     tick: context.tick ?? 0,
@@ -50,6 +53,7 @@ function chooser(view: WorldView, general: General, context: NpcContext, target:
   };
   return {
     add(key: string, args: Record<string, unknown>, score: number, reason: string) {
+      if (priority && key !== fallback && !priority.includes(key)) return;
       const command = context.resolver ? context.resolver.get(key) : commandRegistry.get(key);
       const parsed = command?.args.safeParse(args);
       if (command?.target === target && parsed?.success && !command.check(view, actor, parsed.data)) {
@@ -60,6 +64,14 @@ function chooser(view: WorldView, general: General, context: NpcContext, target:
       }
     },
     finish(): NpcCandidate[] {
+      if (priority) {
+        const scores = candidates.map(({ score }) => score);
+        const spread = Math.max(0, ...scores) - Math.min(0, ...scores) + 1;
+        for (const candidate of candidates) {
+          if (candidate.key !== fallback)
+            candidate.score += (priority.length - priority.indexOf(candidate.key)) * spread;
+        }
+      }
       candidates.sort(
         (a, b) =>
           b.score - a.score || compareText(a.key, b.key) || compareText(JSON.stringify(a.args), JSON.stringify(b.args)),
@@ -191,7 +203,7 @@ export function generalTurnCandidates(view: WorldView, general: General, context
     if (cityResources)
       for (const candidate of cityNpcPreparation(view, general.id, context))
         choice.add(candidate.key, candidate.args, candidate.score, candidate.reason);
-    if (!cityResources && troops < minimum && unit) {
+    if (!cityResources && troops < minimum && unit && npcRecruitPopulation(policy, city)) {
       const limit = Math.min(capacity - commanded, city.population);
       const amount =
         stats ||
@@ -287,8 +299,10 @@ export function nationTurnCandidates(view: WorldView, ruler: General, context: N
         choice.add('nation_declare', { nationId: id }, 100, '교전국이 없어 접경 국가에 선전포고한다.');
     }
   }
-  const rewardGoldTarget = npcNationPolicy(view, nation).rewardGoldTarget;
-  if (nation.gold >= rewardGoldTarget) {
+  const policy = npcNationPolicy(view, nation);
+  const { rewardGoldTarget } = policy;
+  const availableGold = Math.max(0, nation.gold - (policy.reserveGold ?? 0));
+  if (nation.gold >= rewardGoldTarget && availableGold > 0) {
     const members = Object.values(view.generals).filter(
       (g) =>
         g.removedAt === undefined &&
@@ -296,10 +310,13 @@ export function nationTurnCandidates(view: WorldView, ruler: General, context: N
         g.activeFromYear <= view.startYear + Math.floor((context.tick ?? 0) / (12 * TICKS_PER_MONTH)),
     );
     const poorest = members.sort((a, b) => a.gold - b.gold || a.id - b.id)[0];
-    if (poorest && poorest.gold < rewardGoldTarget)
+    const amount = poorest
+      ? Math.min(rewardGoldTarget - poorest.gold, availableGold, policy.maxReward ?? availableGold)
+      : 0;
+    if (poorest && amount > 0 && amount >= (policy.minReward ?? 0))
       choice.add(
         'nation_reward',
-        { generalId: poorest.id, resource: 'gold', amount: Math.min(rewardGoldTarget - poorest.gold, nation.gold) },
+        { generalId: poorest.id, resource: 'gold', amount },
         50,
         '국고의 금을 자원이 부족한 장수에게 포상한다.',
       );

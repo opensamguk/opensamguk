@@ -2,7 +2,7 @@ import { BALANCE } from '../balance';
 import { affordableRecruits } from '../commands/statScores';
 import type { DeepReadonly, WorldState, WorldView } from '../model/world';
 import type { NpcCandidate, NpcContext } from '../npc';
-import { npcNationPolicy } from '../npc/policy';
+import { npcNationPolicy, npcRecruitPopulation } from '../npc/policy';
 import { readCampaignState } from '../campaign/state';
 import { readCityResourcesState } from './state';
 import { affordableByGoods } from '../logistics/consumption';
@@ -50,7 +50,9 @@ export function cityNpcRecruitPlan(
     row,
     policy,
     recruitable: crewTypeFailure(type, requirements) === null,
-    limit: Math.max(0, Math.min(policy.recruitTarget - (row?.troops ?? 0), city.population)),
+    limit: npcRecruitPopulation(policy, city)
+      ? Math.max(0, Math.min(policy.recruitTarget - (row?.troops ?? 0), city.population))
+      : 0,
   };
 }
 

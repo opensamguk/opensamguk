@@ -343,6 +343,8 @@ export {
   NPC_NATION_POLICY_FEATURE,
   NPC_NATION_POLICY_KIND,
   npcNationPolicy,
+  npcGeneralCommands,
+  npcNationCommands,
   npcNationPolicyInput,
   npcNationPolicySchema,
   npcPolicyLimits,

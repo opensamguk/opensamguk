@@ -16,7 +16,18 @@ export function cloneWorldWithRegistry(view: WorldView, registry: ExtStateRegist
     const city = view.cities[key]!;
     cities[key] = { ...city, connections: [...city.connections] };
   }
-  for (const key in view.nations) nations[key] = { ...view.nations[key]! };
+  for (const key in view.nations) {
+    const { npcSettings, ...nation } = view.nations[key]!;
+    nations[key] = nation;
+    if (npcSettings) {
+      const { generalPriority, nationPriority, ...settings } = npcSettings;
+      nations[key]!.npcSettings = {
+        ...settings,
+        ...(generalPriority ? { generalPriority: [...generalPriority] } : {}),
+        ...(nationPriority ? { nationPriority: [...nationPriority] } : {}),
+      };
+    }
+  }
   for (const key in view.generals) generals[key] = { ...view.generals[key]! };
   return {
     ...(view.relations ? { relations: structuredClone(view.relations) as NonNullable<WorldState['relations']> } : {}),
