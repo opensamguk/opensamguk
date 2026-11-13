@@ -443,7 +443,7 @@ it(
       ordinary.cookie,
     );
     expect(response.status).toBe(200);
-    expect(response.data).toMatchObject({ canPossess: true, mine: null, quota: { humans: 0, max: null } });
+    expect(response.data).toMatchObject({ canPossess: true, mine: null, quota: { humans: 0, max: 500 } });
     expect(response.data!.roles.ruler!.map((row) => row.generalId)).toEqual([1, 2]);
     expect(response.data!.roles.core!.map((row) => row.generalId)).toEqual([3]);
     expect(response.data!.roles.free![0]).toMatchObject({ generalId: 4, recommendedNation: { id: 1 } });

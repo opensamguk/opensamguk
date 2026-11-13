@@ -82,6 +82,10 @@ export async function readWorld<T>(
   );
 }
 
+export function countHumanGenerals(tx: Prisma.TransactionClient, worldId: string) {
+  return tx.general.count({ where: { worldId, userId: { not: null }, removedAt: null } });
+}
+
 export async function viewerGeneral(db: Prisma.TransactionClient, worldId: string, userId: string) {
   return db.general.findUnique({ where: { worldId_userId: { worldId, userId } } });
 }

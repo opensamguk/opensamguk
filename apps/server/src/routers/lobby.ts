@@ -57,7 +57,7 @@ export const lobbyRouter = router({
               startedAt: true,
               createdAt: true,
               result: { select: { endedYear: true, endedMonth: true, winnerName: true, winnerColor: true } },
-              _count: { select: { generals: { where: { userId: { not: null } } } } },
+              _count: { select: { generals: { where: { userId: { not: null }, removedAt: null } } } },
             },
           });
           const ids = worlds.map((world) => world.id);
@@ -161,6 +161,7 @@ export const lobbyRouter = router({
                   status: world.status,
                   hasGeneral: general !== undefined,
                   hasPending: pendingWorlds.has(world.id),
+                  humanCount: world._count.generals,
                   entryOpen:
                     effectiveWorldOptions(
                       world.preset === null ? null : parsePreset(world.preset),

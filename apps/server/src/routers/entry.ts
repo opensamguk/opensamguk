@@ -4,6 +4,7 @@ import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import {
   POSSESSION_KIND,
+  HUMAN_GENERAL_LIMIT,
   POSSESSION_ERRORS,
   possessionPayloadSchema,
   possessionAppliedSchema,
@@ -20,7 +21,7 @@ import {
 } from '@opensamguk/rules';
 import type { Context } from '../context';
 import { router, protectedProcedure, worldVerifiedProcedure } from '../trpc';
-import { worldInput, worldClock } from '../queries';
+import { countHumanGenerals, worldInput, worldClock } from '../queries';
 import { requireWorld, readView } from '../game/queries';
 
 const statusInput = worldInput.extend({ expectedUserId: z.uuid(), idempotencyKey: z.uuid() }).strict();
@@ -128,6 +129,7 @@ export const entryRouter = router({
           world.replayFormat === 3 &&
           effectiveWorldOptions(world.preset === null ? null : parsePreset(world.preset), world.runtimeOptions).entry
             .npcPlay === 'on';
+        const humans = await countHumanGenerals(tx, input.worldId);
         const blockedReason = mine
           ? POSSESSION_ERRORS.ALREADY_HAS_GENERAL
           : !enabled
@@ -136,7 +138,9 @@ export const entryRouter = router({
               ? POSSESSION_ERRORS.NOT_ELIGIBLE
               : pending
                 ? '입장 요청을 처리하고 있습니다.'
-                : null;
+                : humans >= HUMAN_GENERAL_LIMIT
+                  ? POSSESSION_ERRORS.WORLD_FULL
+                  : null;
         const tick = nowTick(worldClock(world), ctx.now);
         type Candidate = {
           generalId: number;
@@ -195,12 +199,7 @@ export const entryRouter = router({
         }
         return {
           gameDate: toGameDate(world.startYear, tick),
-          quota: {
-            humans: await tx.general.count({
-              where: { worldId: input.worldId, userId: { not: null }, removedAt: null },
-            }),
-            max: null,
-          },
+          quota: { humans, max: HUMAN_GENERAL_LIMIT },
           mine: mine ? { generalId: mine.id } : null,
           roles,
           canPossess: blockedReason === null,
@@ -251,6 +250,7 @@ export const entryRouter = router({
         })
       )
         throw new TRPCError({ code: 'CONFLICT', message: '입장 요청을 처리하고 있습니다.' });
+      if ((await countHumanGenerals(tx, input.worldId)) >= HUMAN_GENERAL_LIMIT) return rejected('WORLD_FULL');
       const target = await tx.general.findUnique({
         where: { worldId_id: { worldId: input.worldId, id: input.generalId } },
       });
