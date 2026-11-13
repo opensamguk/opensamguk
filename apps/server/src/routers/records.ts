@@ -170,9 +170,13 @@ export const recordsRouter = router({
       });
       const officerLevels = new Map(rows.map(({ generalId, officerLevel }) => [generalId, officerLevel]));
       const generals = rankGenerals(
-        rows.map(({ generalId, nationId, nationName, nationColor, officerLevel: _officerLevel, ...row }) => ({
-          ...row,
+        rows.map(({ generalId, name, nationId, nationName, nationColor, dedication, experience, wins, captures }) => ({
           id: generalId,
+          name,
+          dedication,
+          experience,
+          wins,
+          captures,
           nation: nationId === null ? null : { id: nationId, name: nationName!, color: nationColor! },
         })),
         input.by,
