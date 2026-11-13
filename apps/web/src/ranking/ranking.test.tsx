@@ -71,6 +71,21 @@ describe('장수 순위 표', () => {
     expect(screen.queryByRole('button', { name: '내 순위로' })).toBeNull();
   });
 
+  it('INT-25 이름은 괄호를 빼고 행마다 20×28 thumb 얼굴을 둔다', () => {
+    const top = [{ ...general(1, 7, '조조(曹操)'), portraitId: 10006 }, general(2, 3, '유비')];
+    const { container } = render(
+      <GeneralRankingTable ranking={{ top, me: null, at }} by="dedication" onSort={() => {}} />,
+    );
+    expect(screen.getByText('조조')).toBeTruthy();
+    expect(screen.queryByText('조조(曹操)')).toBeNull();
+    const faces = container.querySelectorAll('[data-variant="thumb"]');
+    expect(faces).toHaveLength(2);
+    expect((faces[0] as HTMLElement).style.width).toBe('20px');
+    expect((faces[0] as HTMLElement).style.height).toBe('28px');
+    expect(faces[0]?.getAttribute('data-state')).toBe('image');
+    expect(faces[1]?.getAttribute('data-state')).toBe('fallback');
+  });
+
   it('재야는 소속이 재야로 나온다', () => {
     const top = [{ ...general(1, 9, '여포'), nation: null }];
     render(<GeneralRankingTable ranking={{ top, me: null, at }} by="dedication" onSort={() => {}} />);

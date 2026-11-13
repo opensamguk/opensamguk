@@ -1,5 +1,6 @@
 import type { AppRouter } from '@opensamguk/server/router';
 import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
+import { displayName } from '../game/names';
 
 // 황실 API 계약의 화면 쪽 타입과 표시 도움 함수 (T4-94, AC-P2-31).
 // 값·한도는 governance.get이 준 것만 쓴다. 아래 이유 목록은 단추를 막고 까닭을 보이는 안내일 뿐이며
@@ -63,8 +64,12 @@ export function realm(view: GovernanceView) {
 
 export const nationName = (view: GovernanceView, id: number | null) =>
   id === null ? '—' : (view.nations.find((row) => row.id === id)?.name ?? `국가 ${id}`);
-export const generalName = (view: GovernanceView, id: number | null) =>
-  id === null ? '—' : (view.generals.find((row) => row.id === id)?.name ?? `장수 ${id}`);
+// 장수 이름은 괄호를 뺀다 (D-085).
+export const generalName = (view: GovernanceView, id: number | null) => {
+  if (id === null) return '—';
+  const name = view.generals.find((row) => row.id === id)?.name;
+  return name === undefined ? `장수 ${id}` : displayName(name);
+};
 export const legitimacyOf = (view: GovernanceView, id: number | null) =>
   id === null ? null : (view.legitimacy.find((row) => row.nationId === id)?.value ?? null);
 export const viewerOffice = (view: GovernanceView): GovernanceOffice | null =>

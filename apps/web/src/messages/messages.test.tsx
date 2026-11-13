@@ -43,7 +43,7 @@ vi.mock('../trpc', async (importOriginal) => {
 
 const { TRPCProvider, trpc, trpcClient } = await import('../trpc');
 const { useAuthorityWatch } = await import('./authority');
-const { MessagePanel } = await import('./MessagePanel');
+const { MessagePanel, MessageRow, pickerName } = await import('./MessagePanel');
 const { NationNoticeBox, NationNoticePopup } = await import('./NationNotice');
 
 const WORLD = 'w1';
@@ -781,5 +781,28 @@ describe('국가 공지 팝업', () => {
     await waitFor(() => expect(screen.getByRole('dialog').getAttribute('data-nation-id')).toBe('1'));
     expect(screen.getByRole('dialog').getAttribute('data-revision')).toBe('3');
     expect(screen.getByRole('dialog').textContent).toContain('A 공지');
+  });
+});
+
+describe('INT-25 메시지의 장수 얼굴과 이름', () => {
+  it('보낸·받는 장수는 괄호를 뺀 이름과 원형 icon으로 보인다', () => {
+    const { container } = render(
+      <ul>
+        <MessageRow
+          item={item('a', {
+            from: { generalId: 2, name: '하후돈(夏侯惇)', nation: { id: 1, name: '위', color: '#000080' } },
+          })}
+        />
+      </ul>,
+    );
+    expect(screen.getByLabelText('보낸 이 하후돈, 받는 이 조조')).toBeTruthy();
+    expect(container.textContent).not.toContain('夏侯惇');
+    expect(container.querySelectorAll('[data-variant="icon"]')).toHaveLength(2);
+  });
+
+  it('받는 장수 고르기는 괄호를 뺀 이름이 겹칠 때만 원래 이름을 둔다', () => {
+    const all = [{ name: '유도(145년생)' }, { name: '유도(170년생)' }, { name: '조조(曹操)' }];
+    expect(pickerName('조조(曹操)', all)).toBe('조조');
+    expect(pickerName('유도(145년생)', all)).toBe('유도(145년생)');
   });
 });

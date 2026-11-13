@@ -38,3 +38,11 @@ export function portraitUrl(
   if (id > 11000) return import.meta.env.DEV ? `/__dev-portraits/${id}` : null;
   return `${base}/portraits/${variant}/${id}.${PORTRAIT_VARIANTS[variant].ext}`;
 }
+
+// 서버 응답에 portraitId가 있으면 그 값을, 없으면 null(실루엣)을 준다.
+// 메시지·순위처럼 아직 초상 번호를 주지 않는 응답도 같은 화면 코드로 쓰고, 서버가 값을 더하면 바로 얼굴이 보인다 (INT-26).
+export function portraitIdOf(value: unknown): number | null {
+  if (typeof value !== 'object' || value === null || !('portraitId' in value)) return null;
+  const id = value.portraitId;
+  return typeof id === 'number' ? id : null;
+}

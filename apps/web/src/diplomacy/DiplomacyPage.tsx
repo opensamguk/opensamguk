@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { errorCode, retryUnlessClientError } from '../game/errors';
 import { formatYearMonth } from '../game/gameDate';
 import { NoGeneral, QueryError } from '../game/QueryState';
+import { displayName } from '../game/names';
 import { useHome, useWorldId, useWorldMap } from '../game/queries';
 import { useTRPC } from '../trpc';
 import { serverMessage } from '../turns/apiError';
@@ -110,7 +111,7 @@ export function busyText(
   const mine = trackedFor(tracked, { treatyId });
   if (mine) return `${actionLabel(mine.action)} ${phaseText(mine.phase)}`;
   const other = pending.find((p) => p.kind !== 'treaty.propose' && p.treatyId === treatyId);
-  return other ? `${other.requestedBy.name}의 요청을 처리하는 중입니다.` : null;
+  return other ? `${displayName(other.requestedBy.name)}의 요청을 처리하는 중입니다.` : null;
 }
 
 // 형식 1(legacy) 월드는 서버가 PRECONDITION_FAILED로 조약 조회를 막는다. 빈 목록으로 그리지 않고 그 문장을 보인다.

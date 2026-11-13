@@ -9,12 +9,14 @@ import { treatyListBlocked } from '../diplomacy/DiplomacyPage';
 import { nationName } from '../diplomacy/TreatyCard';
 import { errorCode } from '../game/errors';
 import { formatYearMonth } from '../game/gameDate';
+import { displayName } from '../game/names';
 import { NoGeneral, QueryError } from '../game/QueryState';
 import { useHome, useWorldId } from '../game/queries';
 import { CAMPAIGN_RELATIONS } from '../personnel/CampaignPanel';
 import { personnelKeys, usePersonnelApi } from '../personnel/contract';
 import { usePersonnelEnabled } from '../personnel/usePersonnelEnabled';
 import { OfferBox } from '../personnel/OfferBox';
+import { Portrait } from '../portrait/Portrait';
 import { useTRPC } from '../trpc';
 import { EmptyState, LoadingState } from '../ui/States';
 import { incomingTreaties, retinueOffers } from './count';
@@ -79,7 +81,7 @@ export function Inbox({ worldId, hasNation, campaign }: { worldId: string; hasNa
   const loading = (personnel && offers.isPending) || (campaign && board.isPending) || (hasNation && treaties.isPending);
   const retinue = campaign ? retinueOffers(board.data) : [];
   const incoming = hasNation ? incomingTreaties(treaties.data) : [];
-  const names = new Map(board.data?.people.map((person) => [person.id, person.name]) ?? []);
+  const people = new Map(board.data?.people.map((person) => [person.id, person]) ?? []);
   const empty = !loading && (offers.data?.length ?? 0) + retinue.length + incoming.length === 0;
   const treatyBlocked = treaties.isError && treatyListBlocked(treaties.error) !== null;
 
@@ -96,8 +98,19 @@ export function Inbox({ worldId, hasNation, campaign }: { worldId: string; hasNa
             </h2>
             <ul className={styles.rows}>
               {retinue.map((offer) => (
-                <li key={offer.id}>
-                  {names.get(offer.masterId) ?? `장수 ${offer.masterId}`}의 {CAMPAIGN_RELATIONS[offer.relation]} 제안
+                <li key={offer.id} className={styles.personRow}>
+                  <Portrait
+                    id={people.get(offer.masterId)?.portraitId ?? null}
+                    name={displayName(people.get(offer.masterId)?.name ?? `장수 ${offer.masterId}`)}
+                    variant="icon"
+                    shape="round"
+                    size={28}
+                    decorative
+                  />
+                  <span>
+                    {displayName(people.get(offer.masterId)?.name ?? `장수 ${offer.masterId}`)}의{' '}
+                    {CAMPAIGN_RELATIONS[offer.relation]} 제안
+                  </span>
                 </li>
               ))}
             </ul>
