@@ -97,6 +97,7 @@ export function GeneralInfo({
               <NationBadge name="재야" color={null} />
             )}
             <span>{officerName(g.officerLevel, g.nationId !== null)}</span>
+            {g.generalType ? <Tag tone="muted">{g.generalType}</Tag> : null}
             <button type="button" className={styles.place} onClick={() => onSelectCity(g.cityKey)}>
               {cityName}
             </button>
