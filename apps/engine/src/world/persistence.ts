@@ -450,7 +450,11 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
         cityScale = origin.initial.cityScale;
       }
       const ext = await loadExt(tx, worldId, commands, world.ruleFeatures);
-      const cities = await tx.city.findMany({ where: { worldId }, orderBy: { cityKey: 'asc' } });
+      const cities = await tx.city.findMany({
+        where: { worldId },
+        orderBy: { cityKey: 'asc' },
+        omit: { conflictTick: true, stratagemTick: true },
+      });
       const nations = await tx.nation.findMany({
         where: { worldId },
         orderBy: { id: 'asc' },

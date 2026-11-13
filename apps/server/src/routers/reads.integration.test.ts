@@ -226,13 +226,24 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
   it('도시 계절 사건은 소속 도시와 공백지에 이름과 종류를 표시한다', async () => {
     const id = await fixtureWorld('seasonal-event');
     const cityKey = state.cities.find(({ nationId }) => nationId === 1)!.cityKey;
-    await db.city.update({ where: { worldId_cityKey: { worldId: id, cityKey } }, data: { seasonalEvent: 'boom' } });
+    await db.city.update({
+      where: { worldId_cityKey: { worldId: id, cityKey } },
+      data: { seasonalEvent: 'boom', conflictTick: 100, stratagemTick: 100 },
+    });
     expect((await query('city.get', { worldId: id, cityKey })).data.seasonalEvent).toEqual({
       kind: 'boom',
       name: '호황',
       favorable: true,
     });
     expect((await query('city.get', { worldId: id, cityKey }, users[3]!.cookie)).data.seasonalEvent).toBeUndefined();
+    const marker = (monthsRemaining: number) => ({ kind: 'conflict', name: '교전', favorable: false, monthsRemaining });
+    const mapEvents = async () =>
+      (await query('world.map', { worldId: id })).data.cities.find(({ key }) => key === cityKey)?.events;
+    expect(await mapEvents()).toMatchObject([marker(3), { kind: 'stratagem', monthsRemaining: 2 }, { kind: 'boom' }]);
+    await db.world.update({ where: { id }, data: { clockTick: 20_000, clockAnchorAt: new Date(now) } });
+    expect(await mapEvents()).toMatchObject([marker(1), { kind: 'boom' }]);
+    await db.world.update({ where: { id }, data: { clockTick: 30_000 } });
+    expect(await mapEvents()).toMatchObject([{ kind: 'boom' }]);
     const neutralCity = state.cities.find(({ nationId }) => nationId === null);
     if (neutralCity) {
       await db.city.update({

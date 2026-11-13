@@ -143,9 +143,12 @@ export function CityInfo({
           </span>
         )}
         {data.ruin ? <Tag tone="danger">폐허 복구 {data.ruin.percent}%</Tag> : null}
-        {data.seasonalEvent ? (
-          <Tag tone={data.seasonalEvent.favorable ? 'info' : 'danger'}>{data.seasonalEvent.name}</Tag>
-        ) : null}
+        {data.events?.map((event) => (
+          <Tag key={event.kind} tone={event.favorable ? 'info' : 'danger'}>
+            {event.name}
+            {event.monthsRemaining ? ` · ${event.monthsRemaining}개월` : ''}
+          </Tag>
+        ))}
         {owner ? (
           <Link to="/w/$worldId/nation/$nationId" params={{ worldId, nationId: String(owner.id) }}>
             <NationBadge name={owner.name} color={owner.color} />

@@ -158,6 +158,10 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
     await loop.advanceTo(100);
     await loop.advanceTo(100);
     const stored = toWorldState(await readWorldState(db, worldId));
+    expect(await db.city.findUnique({ where: { worldId_cityKey: { worldId, cityKey: 2 } } })).toMatchObject({
+      conflictTick: 100,
+      stratagemTick: null,
+    });
     expected.generals[1]!.nextTurnTick = 10100;
     expect(hashState(stored)).toBe(hashState(expected));
     expect(await db.nationTurn.count({ where: { worldId, nationId: 2 } })).toBe(0);

@@ -95,7 +95,7 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
     ? projectTreatyRows(breakEnabled ? treatyRows.filter((row) => row.status !== 'BROKEN') : treatyRows, clauses)
     : undefined;
   const ext = restoreExtState(commands, await readWorldExtRows(tx, worldId), world.ruleFeatures);
-  const cities = await tx.city.findMany({ where: { worldId } });
+  const cities = await tx.city.findMany({ where: { worldId }, omit: { conflictTick: true, stratagemTick: true } });
   const nations = await tx.nation.findMany({ where: { worldId }, omit: { noticeDirective: true } });
   const generals = await tx.general.findMany({
     where: { worldId },

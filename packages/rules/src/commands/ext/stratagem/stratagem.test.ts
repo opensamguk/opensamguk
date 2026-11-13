@@ -134,6 +134,7 @@ describe('stratagem success seed goldens', () => {
     it(golden.key, () => {
       expect(run(golden.key)).toEqual({
         stratagemSucceeded: true,
+        stratagemCityKey: 2,
         effects: [
           ...growth(269, 179),
           ...golden.fields.map((field, i) => ({ kind: 'city', id: 2, field, op: 'add', value: -golden.values[i]! })),
@@ -148,6 +149,7 @@ describe('stratagem success seed goldens', () => {
   it('plunder', () => {
     expect(run('plunder')).toEqual({
       stratagemSucceeded: true,
+      stratagemCityKey: 2,
       effects: [
         ...growth(269, 179),
         { kind: 'nation', id: 2, field: 'gold', op: 'add', value: -447 },

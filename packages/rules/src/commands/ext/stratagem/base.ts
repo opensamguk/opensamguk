@@ -237,6 +237,7 @@ export function executeStratagem(
     : `금 ${Math.round(primary)}, 쌀 ${Math.round(secondary)}`;
   return {
     stratagemSucceeded: true,
+    stratagemCityKey: cityKey,
     effects,
     logs: [
       {

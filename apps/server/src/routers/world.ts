@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import type { Prisma } from '@opensamguk/db';
 import { protectedProcedure, publicProcedure, router } from '../trpc';
-import { countHumanGenerals, readWorld, viewerGeneral, worldInput, worldSummary } from '../queries';
+import { countHumanGenerals, readWorld, viewerGeneral, worldClock, worldInput, worldSummary } from '../queries';
 import { mapCity, publicMapInfo } from '../visibility';
+import { cityEvents } from '../game/cityEvents';
 import {
   cityRegionName,
   HUMAN_GENERAL_LIMIT,
@@ -17,6 +18,7 @@ import {
   scenarioIdentitySchema,
   TICKS_PER_MONTH,
   toGameDate,
+  nowTick,
 } from '@opensamguk/rules';
 import { readCityScaleProjection } from '../game/cityScale';
 import { readMapBackgrounds } from '../resourceAdmin/mapBackground';
@@ -145,6 +147,10 @@ export const worldRouter = router({
       const fogEnabled = worldInfo.ruleFeatures.includes(INTEL_FEATURE);
       const viewer = fogEnabled ? await viewerGeneral(tx, input.worldId, ctx.user.id) : null;
       const ownNation = viewer?.removedAt === null ? viewer.nationId : null;
+      const tick =
+        worldInfo.status === 'ENDED'
+          ? (worldInfo.result?.endedTick ?? worldInfo.clockTick)
+          : nowTick(worldClock(worldInfo), ctx.now);
       const generals = await tx.general.findMany({
         where: {
           worldId: input.worldId,
@@ -167,12 +173,17 @@ export const worldRouter = router({
       const backgrounds = await readMapBackgrounds(tx, [world.mapKey]);
       return {
         background: backgrounds.get(world.mapKey) ?? null,
-        cities: cities.map((city) => ({
-          ...mapCity(city),
-          region: city.region,
-          regionName: cityRegionName(city.region, world.mapKey, map?.regionScheme),
-          ...(ruins ? { ruin: ruins.get(city.cityKey) ?? null } : {}),
-        })),
+        cities: cities.map((city) => {
+          const events =
+            !fogEnabled || city.nationId === null || city.nationId === ownNation ? cityEvents(city, tick) : [];
+          return {
+            ...mapCity(city),
+            region: city.region,
+            regionName: cityRegionName(city.region, world.mapKey, map?.regionScheme),
+            ...(events.length ? { events } : {}),
+            ...(ruins ? { ruin: ruins.get(city.cityKey) ?? null } : {}),
+          };
+        }),
         nations,
         generals: generals.map(({ userId, ...general }) => ({ ...general, isHuman: userId !== null })),
         ...(map ? { operationalMap: operationalMapDisplay(map) } : {}),

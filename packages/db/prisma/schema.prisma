@@ -391,6 +391,8 @@ model Nation {
 }
 
 model City {
+  conflictTick     Int?
+  stratagemTick    Int?
   seasonalEvent    String?
   worldId          String
   cityKey          Int

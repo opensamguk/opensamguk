@@ -54,7 +54,7 @@ export async function loadWorldAfterCapabilityCheck(
   const { presetRules: rules, recruitmentLocation } = effectiveWorldOptions(preset, world.runtimeOptions);
   if (world.replayFormat === 3) await assertPersonnelStorage(tx, worldId, world.ruleFeatures.includes('personnel'));
   const ext = await loadExt(tx, worldId, commands, world.ruleFeatures);
-  const cities = await tx.city.findMany({ where: { worldId } });
+  const cities = await tx.city.findMany({ where: { worldId }, omit: { conflictTick: true, stratagemTick: true } });
   const operationalMap = readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin);
   const nations = await tx.nation.findMany({
     where: { worldId },
