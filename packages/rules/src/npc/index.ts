@@ -308,25 +308,47 @@ export function nationTurnCandidates(view: WorldView, ruler: General, context: N
     }
   }
   const policy = npcNationPolicy(view, nation);
-  const { rewardGoldTarget } = policy;
-  const availableGold = Math.max(0, nation.gold - (policy.reserveGold ?? 0));
-  if (nation.gold >= rewardGoldTarget && availableGold > 0) {
-    const members = Object.values(view.generals).filter(
-      (g) =>
-        g.removedAt === undefined &&
-        g.nationId === nation.id &&
-        g.activeFromYear <= view.startYear + Math.floor((context.tick ?? 0) / (12 * TICKS_PER_MONTH)),
-    );
-    const poorest = members.sort((a, b) => a.gold - b.gold || a.id - b.id)[0];
-    const amount = poorest
-      ? Math.min(rewardGoldTarget - poorest.gold, availableGold, policy.maxReward ?? availableGold)
-      : 0;
-    if (poorest && amount > 0 && amount >= (policy.minReward ?? 0))
+  const members = Object.values(view.generals).filter(
+    (g) =>
+      g.removedAt === undefined &&
+      g.nationId === nation.id &&
+      g.activeFromYear <= view.startYear + Math.floor((context.tick ?? 0) / (12 * TICKS_PER_MONTH)),
+  );
+  for (const [resource, target, reserve, surplus] of [
+    ['gold', policy.rewardGoldTarget, policy.reserveGold, policy.seizeGoldAbove],
+    ['rice', policy.rewardRiceTarget, policy.reserveRice, policy.seizeRiceAbove],
+  ] as const) {
+    const label = resource === 'gold' ? '금' : '쌀';
+    const available = nation[resource] - (reserve ?? 0);
+    const poorest = members.sort((a, b) => a[resource] - b[resource] || a.id - b.id)[0];
+    const reward = target === undefined || !poorest ? 0 : Math.min(target - poorest[resource], available);
+    const rewardAmount = Math.min(reward, policy.maxReward ?? reward);
+    if (
+      poorest &&
+      target !== undefined &&
+      nation[resource] >= target &&
+      rewardAmount > 0 &&
+      rewardAmount >= (policy.minReward ?? 0)
+    )
       choice.add(
         'nation_reward',
-        { generalId: poorest.id, resource: 'gold', amount },
+        { generalId: poorest.id, resource, amount: rewardAmount },
         50,
-        '국고의 금을 자원이 부족한 장수에게 포상한다.',
+        `국고의 ${label}을 자원이 부족한 장수에게 포상한다.`,
+      );
+    if (surplus === undefined || nation[resource] >= (reserve ?? 0)) continue;
+    const richest = members
+      .filter((general) => general.userId === null)
+      .sort((a, b) => b[resource] - a[resource] || a.id - b.id)[0];
+    if (!richest) continue;
+    const need = (reserve ?? 0) - nation[resource];
+    const seizeAmount = Math.min(richest[resource] - surplus, need, policy.maxReward ?? need);
+    if (seizeAmount > 0 && seizeAmount >= (policy.minReward ?? 0))
+      choice.add(
+        'nation_seize',
+        { generalId: richest.id, resource, amount: seizeAmount },
+        55,
+        `자원이 부족한 국고를 채우기 위해 NPC 장수의 여유 ${label}을 거둔다.`,
       );
   }
   return choice.finish();
