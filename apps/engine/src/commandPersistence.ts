@@ -2,7 +2,7 @@ import type { Prisma } from '@opensamguk/db';
 import type { RealtimeSignal } from '@opensamguk/db';
 import type { CommandResult, WorldState } from '@opensamguk/rules';
 import { loadWorld } from './worldLoader';
-import { persistRemovedNations, type ActionAt } from './nationArchive';
+import { persistPublicNationEvents, persistRemovedNations, type ActionAt } from './nationArchive';
 import { persistCampaignState, readCampaignArmyTypes } from './campaignState';
 import { persistCityResourcesState } from './cityResourcesState';
 import { persistLogisticsState } from './logisticsState';
@@ -105,6 +105,7 @@ export async function persistCommandState(
   await persistCommandMeta(tx, worldId, before, state);
   // 새 국가의 FK 대상은 생긴 뒤, 멸망 국가의 직책이 연쇄 삭제되기 전에 후속 상태를 저장한다.
   await beforeNationRemoval?.();
+  await persistPublicNationEvents(tx, worldId, before, state, at);
   await persistRemovedNations(tx, worldId, before, state, at);
 }
 

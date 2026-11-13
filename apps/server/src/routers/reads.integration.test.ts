@@ -222,13 +222,17 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         generalName: `공개 장수 ${index + 1}`,
       })),
     });
+    await db.publicNationEvent.create({
+      data: { worldId: world, sequence: 1, tick: 1, kind: 'found', text: '공개 국가 건국' },
+    });
     const first = await query('records.activity', { worldId: world }, users[3]!.cookie);
     expect(first.status).toBe(200);
-    expect(first.data.items.map(({ generalId }) => generalId)).toEqual(
+    expect(first.data.items.map((item) => (item.source === 'reputation' ? item.generalId : null))).toEqual(
       Array.from({ length: 30 }, (_, index) => 31 - index),
     );
     expect(first.data.items[0]).toEqual({
       id: expect.any(String),
+      source: 'reputation',
       generalId: 31,
       year: state.startYear,
       month: 1,
@@ -238,8 +242,13 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       data: { name: '공개 장수 31', nation: null, city: null },
     });
     const next = await query('records.activity', { worldId: world, cursor: first.data.nextCursor });
-    expect(next.data.items.map(({ generalId }) => generalId)).toEqual([1]);
+    expect(next.data.items).toEqual([
+      expect.objectContaining({ source: 'reputation', generalId: 1 }),
+      expect.objectContaining({ source: 'nation', kind: 'found', text: '공개 국가 건국' }),
+    ]);
     expect(next.data.nextCursor).toBeNull();
+    const news = await query('records.activity', { worldId: world, scope: 'world' });
+    expect(news.data.items).toEqual([expect.objectContaining({ source: 'nation', kind: 'found' })]);
     expect((await query('records.activity', { worldId: otherWorldId })).data.items).toEqual([]);
     expect((await query('records.activity', { worldId: world, cursor: '?' })).status).toBe(400);
   });

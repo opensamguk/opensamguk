@@ -21,7 +21,7 @@ import { hashState } from '@opensamguk/shared/node';
 import { engineFeatures } from './features';
 import { loadWorld } from './worldLoader';
 import { persistRanking } from './ranking';
-import { persistYearbookNations, persistRemovedNations } from './nationArchive';
+import { persistYearbookNations, persistRemovedNations, persistPublicNationEvents } from './nationArchive';
 import { persistCommandMeta } from './commandPersistence';
 import { persistExt } from './extState';
 import { persistTreatyClosures } from './treatyState';
@@ -170,6 +170,7 @@ export async function persistMonthly(
       });
   }
   await persistCommandMeta(tx, worldId, before, next);
+  await persistPublicNationEvents(tx, worldId, before, next, { tick, sequence });
   await persistRemovedNations(tx, worldId, before, next, { tick, sequence });
   await tx.world.update({ where: { id: worldId }, data: { monthlyTick: tick } });
   const snapshot = await loadReplayState(tx, worldId);
