@@ -90,7 +90,7 @@ export function nationSource(
         select: (data): CommandInfo[] =>
           (data as NationCommandRow[]).map((c) => ({
             ...c,
-            category: c.category ?? 'nation',
+            category: c.group ?? c.category ?? 'nation',
           })),
       },
       precheck: (turn) => ({

@@ -58,8 +58,14 @@ export const CATEGORY_LABELS: Record<string, string> = {
   strategy: '전략',
   personal: '개인',
   nation: '국가',
+  rest: '휴식',
+  personnel: '인사',
+  diplomacy: '외교',
+  special: '특수',
+  other: '기타',
 };
 const CATEGORY_ORDER = ['domestic', 'military', 'strategy', 'personal', 'nation'];
+const NATION_CATEGORY_ORDER = ['rest', 'personnel', 'diplomacy', 'special', 'strategy', 'other', 'nation'];
 
 // 명령마다 대상 도시 후보를 바꿀 때 쓴다 (교역 대상, T2-08). note는 후보가 없을 때의 이유 같은 안내다.
 export interface CityChoices {
@@ -178,10 +184,13 @@ export function CommandPicker({
 
   const categories = useMemo(
     () =>
-      [...new Set([...CATEGORY_ORDER, ...commands.map((command) => command.category)])].filter((key) =>
-        commands.some((command) => command.category === key),
-      ),
-    [commands],
+      [
+        ...new Set([
+          ...(argContext.walletKind === 'nation' ? NATION_CATEGORY_ORDER : CATEGORY_ORDER),
+          ...commands.map((command) => command.category),
+        ]),
+      ].filter((key) => commands.some((command) => command.category === key)),
+    [commands, argContext.walletKind],
   );
   const activeCategory = categories.includes(category) ? category : 'all';
 
