@@ -3,12 +3,14 @@ import {
   DIPLOMATIC_COOLDOWN_FEATURE,
   INTEL_FEATURE,
   NATION_STRATEGY_FEATURE,
+  NPC_DEFAULT_POLICY,
   OFFICE_EFFECTS_FEATURE,
   STRATEGY_KEYS,
   TICKS_PER_MONTH,
   WANDERING_MONTH_LIMIT,
   diplomaticAidMonths,
   nowTick,
+  parsePreset,
   readStoredNationStrategy,
   strategyMonth,
   toGameDate,
@@ -75,7 +77,15 @@ export const nationRouter = router({
         ...nationInfo(nation, { cityCount: settlements.length, generalCount: generals.length }, viewer),
         philosophy: nation.philosophy,
         ...nationPopulation(settlements),
-        ...(ownNation ? { salaryRate } : {}),
+        ...(ownNation
+          ? {
+              salaryRate,
+              npcPolicy: {
+                ...NPC_DEFAULT_POLICY,
+                aggression: world.preset === null ? 1 : parsePreset(world.preset).npc.aggression,
+              },
+            }
+          : {}),
         ...(finance ? { financeEstimate: finance.financeEstimate } : {}),
         ...(strategyStatus ? { strategyStatus } : {}),
         ...(diplomaticAid ? { diplomaticAid } : {}),

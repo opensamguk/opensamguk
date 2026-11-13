@@ -958,7 +958,16 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     expect(enemy.cities).toHaveLength(1);
     for (const user of users.slice(1)) {
       const nation = (await query('nation.get', { worldId, nationId: 1 }, user.cookie)).data;
-      for (const field of ['gold', 'rice', 'taxRate', 'tech', 'capitalCityKey', 'financeEstimate', 'salaryRate'])
+      for (const field of [
+        'gold',
+        'rice',
+        'taxRate',
+        'tech',
+        'capitalCityKey',
+        'financeEstimate',
+        'salaryRate',
+        'npcPolicy',
+      ])
         expect(nation).not.toHaveProperty(field);
       expect(nation.generals).toMatchObject(
         state.generals.slice(0, 2).map(({ id, name, nationId, leadership }) => ({
@@ -982,6 +991,12 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     expect(own.generals[1]).toMatchObject({ id: 2, gold: 11002, crew: 13002 });
     expect(own.cities[0]).toHaveProperty('population', state.cities[0]!.population);
     expect(own.cities[0]).toHaveProperty('populationMax', state.cities[0]!.populationMax);
+    expect(own.npcPolicy).toMatchObject({
+      recruitTarget: 2000,
+      trainingTarget: 60,
+      moraleTarget: 70,
+      rewardGoldTarget: 10000,
+    });
     expect(own).toHaveProperty('salaryRate', 0.5);
     expect(own.cities[0]).toHaveProperty('incomeEstimate.gold', own.financeEstimate?.gold.gross);
     expect(own.cities[0]).toHaveProperty('incomeEstimate.rice', own.financeEstimate?.rice.gross);

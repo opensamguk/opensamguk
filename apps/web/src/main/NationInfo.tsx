@@ -150,6 +150,25 @@ export function NationSummaryGrid({
   );
 }
 
+export function NationNpcPolicy({ nation }: { nation: NationView }) {
+  const policy = nation.npcPolicy;
+  if (!policy) return null;
+  return (
+    <details>
+      <summary>NPC 운영 기준</summary>
+      <InfoGrid
+        items={[
+          { label: '전선 모집 목표', value: `${n(policy.recruitTarget)}명` },
+          { label: '훈련 목표', value: n(policy.trainingTarget) },
+          { label: '사기 목표', value: n(policy.moraleTarget) },
+          { label: '포상 기준 금', value: n(policy.rewardGoldTarget) },
+          { label: '출병·선전포고 점수 배율', value: `×${n(policy.aggression)}` },
+        ]}
+      />
+    </details>
+  );
+}
+
 const signed = (value: number) => `${value < 0 ? '−' : '+'}${n(Math.abs(value))}`;
 const due = (row: FinanceEstimate['gold']) => `${row.year}년 ${row.month}월`;
 
