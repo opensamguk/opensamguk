@@ -274,7 +274,7 @@
   }
 }
 
-/* 로비의 내 장수 (D-083): 원형 icon 얼굴 + 이름·소속·능력치 */
+/* 로비의 내 장수 (D-085): 원형 icon 얼굴 + 이름·소속·능력치 */
 .myGeneral {
   display: flex;
   align-items: center;

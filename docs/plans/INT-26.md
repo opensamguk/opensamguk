@@ -1,6 +1,6 @@
 # INT-26 원작 정보 동등성
 
-> AC-INT-26 · 구현 Codex · 리뷰 Claude · 결정 [D-083](../product/decisions.md) · 사용자 직접 요청 2026-11-13
+> AC-INT-26 · 구현 Codex · 리뷰 Claude · 결정 [D-085](../product/decisions.md) · 사용자 직접 요청 2026-11-13
 > 기준: main `f93440e0`, 대조 대상은 공개 알파 배포 커밋 `2d54c23d`와 core2026 `c81d304`. 대조표: [INT-26 원작 정보 대조표](./INT-26-parity.md).
 > 짝 계획은 [INT-25 원작 배치 화면 개편](./INT-25.md)이다. 화면은 이 작업이 더하는 값의 자리를 먼저 만든다.
 

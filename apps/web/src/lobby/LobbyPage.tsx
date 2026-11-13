@@ -168,7 +168,7 @@ function WorldCard({ world, loggedIn }: { world: LobbyWorld; loggedIn: boolean }
   );
 }
 
-// 로비 카드의 내 장수 (D-083). 얼굴과 소속·관직·능력치를 함께 보인다.
+// 로비 카드의 내 장수 (D-085). 얼굴과 소속·관직·능력치를 함께 보인다.
 // 서버가 아직 주지 않는 값은 칸을 그리지 않는다 (INT-25 PR 4, lobby.list 응답 확장 대기).
 type MyGeneralInfo = NonNullable<LobbyWorld['myGeneral']> & {
   portraitId?: number | null;

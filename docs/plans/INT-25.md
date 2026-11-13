@@ -1,6 +1,6 @@
 # INT-25 원작 배치 화면 개편
 
-> AC-INT-25 · 구현 Claude · 리뷰 Codex · 결정 [D-083](../product/decisions.md) · 사용자 직접 요청 2026-11-13
+> AC-INT-25 · 구현 Claude · 리뷰 Codex · 결정 [D-085](../product/decisions.md) · 사용자 직접 요청 2026-11-13
 > 기준: main `f93440e0`, 점검 대상은 공개 알파 배포 커밋 `2d54c23d`. 시안: [화면 개편 시안 캔버스](https://claude.ai/artifact/UNgoJSYNWzdzFegQFbiQLd)의 `시안 A — 원작 배치`.
 > 짝 계획은 [INT-26 원작 정보 동등성](./INT-26.md)이다. 화면은 INT-26이 응답에 더하는 값을 자리부터 만들고 값이 오면 채운다.
 

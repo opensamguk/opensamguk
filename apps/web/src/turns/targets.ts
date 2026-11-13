@@ -60,7 +60,7 @@ export function groupByDistance<T extends TargetCity>(
     }));
 }
 
-// 장수 이름 표시 (D-083). 괄호와 그 안을 뺀다. 조조(曹操) → 조조, 유도(145년생) → 유도.
+// 장수 이름 표시 (D-085). 괄호와 그 안을 뺀다. 조조(曹操) → 조조, 유도(145년생) → 유도.
 export function displayName(name: string): string {
   const stripped = name.replace(/\s*[（(][^()（）]*[)）]\s*/g, '').trim();
   return stripped === '' ? name : stripped;

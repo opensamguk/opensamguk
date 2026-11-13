@@ -8,7 +8,7 @@ interface PortraitProps {
   id: number | null | undefined;
   name: string;
   variant?: PortraitVariant;
-  // icon만 원형으로 쓸 수 있다 (D-083). 메인은 portrait, 목록·요약은 원형 icon, 표는 thumb.
+  // icon만 원형으로 쓸 수 있다 (D-085). 메인은 portrait, 목록·요약은 원형 icon, 표는 thumb.
   shape?: 'square' | 'round';
   className?: string | undefined;
 }

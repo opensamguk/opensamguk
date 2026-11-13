@@ -7,7 +7,7 @@ import { NationBadge } from '../ui/NationBadge';
 import { cityDistances, displayName, groupByDistance } from './targets';
 import styles from './CommandArgsScreen.module.css';
 
-// 인자가 있는 명령의 입력 화면 (INT-25, D-083). 원작처럼 화면 전체를 덮는다.
+// 인자가 있는 명령의 입력 화면 (INT-25, D-085). 원작처럼 화면 전체를 덮는다.
 // 주소는 바꾸지 않는다. Esc·명령 취소로 닫고 명령 다시 고르기로 카드 목록에 돌아간다.
 // 값이 맞는지는 서버의 사전 검사와 실행이 판정한다. 화면은 고르기를 돕는 자료만 보인다.
 // 자료는 편집기가 이미 받은 조회(지도·내 장수·병종표)를 넘겨받는다. 없으면 지도 없이 목록만 보인다.
