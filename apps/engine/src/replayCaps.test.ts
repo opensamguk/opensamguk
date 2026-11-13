@@ -172,6 +172,7 @@ function exportFixture(source: CapsArchive, ended = true) {
   const world: Prisma.WorldGetPayload<Record<string, never>> = {
     runtimeOptions: null,
     officeEffects: null,
+    cityOfficeVolunteers: null,
     id: 'caps-export',
     name: '수출 단위 시험',
     operationalMap: null,

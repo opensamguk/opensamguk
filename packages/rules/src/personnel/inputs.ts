@@ -3,6 +3,14 @@ import { TROOP_FEATURE } from '../commands/ext/troop/state';
 import { z } from 'zod';
 import { commandRegistry } from '../commands/registry';
 import type { DeepReadonly } from '../model/world';
+import {
+  CITY_OFFICE_VOLUNTEER_FEATURE,
+  actOnCityOfficeVolunteer,
+  cityOfficeVolunteerAction,
+  cityOfficeVolunteerResult,
+  settleCityOfficeVolunteers,
+  syncCityOfficeVolunteers,
+} from './cityOfficeVolunteers';
 import { clearLostCityOffices } from './residentOffice';
 import { appointOfficer, dismissOfficer } from './appointments';
 import { closeInvalidOffersInPlace, respondAssignment } from './assignments';
@@ -63,6 +71,7 @@ const commonCodes = ['WORLD_CLOSED', 'ACTOR_INACTIVE', 'NO_GENERAL', 'GENERAL_RE
 const appointCodes = [...commonCodes, 'NOT_NATION', 'NOT_RULER', 'BAD_ARGS', 'BAD_TARGET', 'BAD_STATE'] as const;
 const dismissCodes = [...commonCodes, 'NOT_NATION', 'NOT_RULER', 'BAD_TARGET'] as const;
 const respondCodes = [...commonCodes, 'OFFER_CLOSED'] as const;
+const volunteerCodes = [...commonCodes, 'BAD_STATE'] as const;
 export const PERSONNEL_INPUTS = Object.freeze({
   'personnel.appoint': Object.freeze({
     payloadSchema: appointPayload,
@@ -79,16 +88,30 @@ export const PERSONNEL_INPUTS = Object.freeze({
     appliedResultSchema: respondResult,
     rejectedCodes: Object.freeze(respondCodes),
   }),
+  'personnel.volunteer': Object.freeze({
+    payloadSchema: cityOfficeVolunteerAction,
+    appliedResultSchema: cityOfficeVolunteerResult,
+    rejectedCodes: Object.freeze(volunteerCodes),
+  }),
   'nationTurns.set': Object.freeze({
     payloadSchema: turnsPayload,
     appliedResultSchema: z.strictObject({ revision: natural }),
     rejectedCodes: Object.freeze([]),
   }),
 });
-export type PersonnelInputKind = 'personnel.appoint' | 'personnel.dismiss' | 'offer.respond';
+export const PERSONNEL_QUEUED_KINDS = [
+  'personnel.appoint',
+  'personnel.dismiss',
+  'offer.respond',
+  'personnel.volunteer',
+] as const;
+export type PersonnelInputKind = (typeof PERSONNEL_QUEUED_KINDS)[number];
 export type PersonnelRecordKind = keyof typeof PERSONNEL_INPUTS;
 export type PersonnelRejectCode =
-  (typeof appointCodes)[number] | (typeof dismissCodes)[number] | (typeof respondCodes)[number];
+  | (typeof appointCodes)[number]
+  | (typeof dismissCodes)[number]
+  | (typeof respondCodes)[number]
+  | (typeof volunteerCodes)[number];
 const envelope = { sequence: positive.max(2_147_483_647), generalId: positive };
 const rejected = <T extends readonly [string, ...string[]]>(codes: T) =>
   z.strictObject({ ...tickResult, code: z.enum(codes), message: z.string().min(1) });
@@ -137,6 +160,20 @@ const recordSchema = z.union([
   }),
   z.strictObject({
     ...envelope,
+    kind: z.literal('personnel.volunteer'),
+    status: z.literal('APPLIED'),
+    payload: cityOfficeVolunteerAction,
+    result: cityOfficeVolunteerResult,
+  }),
+  z.strictObject({
+    ...envelope,
+    kind: z.literal('personnel.volunteer'),
+    status: z.literal('REJECTED'),
+    payload: cityOfficeVolunteerAction,
+    result: rejected(volunteerCodes),
+  }),
+  z.strictObject({
+    ...envelope,
     kind: z.literal('nationTurns.set'),
     status: z.literal('APPLIED'),
     payload: turnsPayload,
@@ -169,7 +206,7 @@ export type PersonnelStepResult = {
 };
 export type PersonnelRecordContext = Readonly<{ monthlyTick: number; endTick?: number }>;
 const pendingSchema = z.strictObject({
-  kind: z.enum(['personnel.appoint', 'personnel.dismiss', 'offer.respond']),
+  kind: z.enum(PERSONNEL_QUEUED_KINDS),
   userId: z.string().min(1),
   generalId: positive,
   idempotencyKey: z
@@ -194,6 +231,20 @@ function applyDomain(view: OfficeView, generalId: number, kind: PersonnelInputKi
     }
     case 'personnel.dismiss':
       return dismissOfficer(view, generalId, dismissPayload.parse(payload).generalId);
+    case 'personnel.volunteer': {
+      if (!view.ruleFeatures?.includes(CITY_OFFICE_VOLUNTEER_FEATURE))
+        return { ok: false as const, code: 'BAD_STATE' as const, message: '도시 관직 자원을 사용할 수 없습니다.' };
+      const outcome = actOnCityOfficeVolunteer(view, generalId, cityOfficeVolunteerAction.parse(payload), tick);
+      if (!outcome.ok) return { ...outcome, code: 'BAD_STATE' as const };
+      const { generalId: applicant, quarter, status } = outcome.request;
+      return {
+        ok: true as const,
+        state: outcome.state,
+        result: { generalId: applicant, quarter, status },
+        logs: [],
+        closedOffers: [],
+      };
+    }
     case 'offer.respond': {
       const args = respondPayload.parse(payload);
       return respondAssignment(view, generalId, args.offerId, args.accept, tick);
@@ -268,6 +319,8 @@ export function finishPersonnelStep(
 ): PersonnelStepResult {
   const synced = syncOffices(before, change.state, offices);
   clearLostCityOffices(before, synced.state);
+  syncCityOfficeVolunteers(before, synced.state, tick);
+  settleCityOfficeVolunteers(synced.state, tick, false);
   const cancelled = closeInvalidOffersInPlace(synced.state, tick);
   const closedOffers = [...change.closedOffers, ...cancelled.closedOffers];
   const remaining = new Set(Object.values(cancelled.state.assignmentOffers ?? {}).map((offer) => offer.id));

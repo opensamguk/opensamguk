@@ -208,6 +208,11 @@ export function MainPage() {
     <section className={styles.page} ref={page}>
       <header className={styles.header}>
         <h1 className={styles.h1}>군략도</h1>
+        {homeData?.pendingCityOfficeRequests ? (
+          <Link to="/w/$worldId/nation/personnel" params={{ worldId }}>
+            인사부 · 관직 요청 {homeData.pendingCityOfficeRequests}건
+          </Link>
+        ) : null}
         {summary.data ? (
           <p className={styles.progress} aria-label="게임 진행 정보" data-testid="main-progress">
             <span>

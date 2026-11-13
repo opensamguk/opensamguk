@@ -170,6 +170,7 @@ export {
 } from './personnel/permissions';
 export {
   PERSONNEL_INPUTS,
+  PERSONNEL_QUEUED_KINDS,
   appointOfficer,
   applyPersonnelInput,
   validatePersonnelRecord,
@@ -292,6 +293,7 @@ export * from './lineage/visibility';
 export * from './lineage/history';
 export * from './personnel/assignmentRows';
 export * from './personnel/residentOffice';
+export * from './personnel/cityOfficeVolunteers';
 export * from './lineage/control';
 export { reconcileLineage } from './lineage/reconcile';
 export * from './lineage/monthly';

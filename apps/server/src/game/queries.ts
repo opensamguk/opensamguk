@@ -38,6 +38,7 @@ import {
   assertNationLifecycle,
   OFFICE_EFFECTS_FEATURE,
   officeEffectsSchema,
+  readCityOfficeVolunteers,
   storedCitySeasonalEvent,
   storedDefenseStance,
   storedGeneralProficiency,
@@ -166,6 +167,8 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
   } as unknown as WorldInit);
   if (world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE)) {
     state.officeEffects = officeEffectsSchema.parse(world.officeEffects);
+    const volunteers = readCityOfficeVolunteers(world.ruleFeatures, world.cityOfficeVolunteers);
+    if (volunteers) state.cityOfficeVolunteers = volunteers;
   }
   if (world.ruleFeatures.includes('campaign-v1')) {
     if (Object.values(state.generals).some((general) => general.crew !== 0))

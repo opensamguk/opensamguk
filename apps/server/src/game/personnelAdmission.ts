@@ -12,7 +12,9 @@ import {
   localOfficeAbility,
   OFFICE_EFFECTS_FEATURE,
   officeEffectsSchema,
+  CITY_OFFICE_VOLUNTEER_FEATURE,
   PERSONNEL_INPUTS,
+  PERSONNEL_QUEUED_KINDS,
   type PersonnelInputKind,
 } from '@opensamguk/rules';
 import { TRPCError } from '@trpc/server';
@@ -21,7 +23,7 @@ import { requireGeneral, requireWorld } from './queries';
 import type { PersonnelReady } from './personnelRequests';
 
 export type PersonnelIdentity = { userId: string; sessionId: string; at: Date };
-const kinds = ['personnel.appoint', 'personnel.dismiss', 'offer.respond'] as const;
+const kinds = PERSONNEL_QUEUED_KINDS;
 
 export async function requirePersonnelSession(tx: Prisma.TransactionClient, input: PersonnelIdentity) {
   if (!input.sessionId || !input.userId || !Number.isFinite(input.at.getTime()))
@@ -50,6 +52,7 @@ export function requirePersonnelWorld(world: {
     ...(world.ruleFeatures.includes(COURT_RANK_FEATURE) ? { courtRankEnabled: true as const } : {}),
     ...(world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE) ? { officeEffectsEnabled: true as const } : {}),
     ...(officeEffects ? { localOfficeMinimum: officeEffects.minimumAbility } : {}),
+    ...(world.ruleFeatures.includes(CITY_OFFICE_VOLUNTEER_FEATURE) ? { volunteersEnabled: true as const } : {}),
     ...(hasCitySecretary(officeEffects) ? { secretaryEnabled: true as const } : {}),
   };
 }
@@ -84,7 +87,14 @@ export async function submitPersonnelRequest(
   if (world.status !== 'RUNNING')
     throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '실행 중인 월드가 아닙니다.' });
   const actor = await requireGeneral(tx, world.id, input.userId, true);
-  if (kind.data === 'offer.respond') {
+  if (kind.data === 'personnel.volunteer') {
+    if (
+      !world.ruleFeatures.includes(CITY_OFFICE_VOLUNTEER_FEATURE) ||
+      actor.nationId === null ||
+      actor.removedAt !== null
+    )
+      throw new TRPCError({ code: 'FORBIDDEN', message: '도시 관직 자원을 사용할 수 없습니다.' });
+  } else if (kind.data === 'offer.respond') {
     if (!('offerId' in payload)) throw new Error('발령 응답 입력이 다릅니다.');
     const offer = await tx.assignmentOffer.findUnique({
       where: { worldId_id: { worldId: world.id, id: payload.offerId } },

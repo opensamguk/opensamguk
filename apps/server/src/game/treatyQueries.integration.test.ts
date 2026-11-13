@@ -55,6 +55,7 @@ function world(patch: Partial<World> = {}): World {
   return {
     runtimeOptions: null,
     officeEffects: null,
+    cityOfficeVolunteers: null,
     id: 'world',
     name: '저장 행 단위',
     operationalMap: null,

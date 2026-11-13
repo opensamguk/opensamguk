@@ -75,6 +75,7 @@ import { ADMIN_GAME_KINDS } from './admin/game';
 import { applyAdminGameRecord } from './admin/apply';
 import { ADMIN_SETTING_KINDS, applyAdminSettingRecord } from './admin/settings';
 import type { UnitSetResource } from './world/resources';
+import { CITY_OFFICE_VOLUNTEER_FEATURE, initialCityOfficeVolunteers } from './personnel/cityOfficeVolunteers';
 import { OFFICE_EFFECTS_FEATURE, officeEffectsSchema } from './personnel/residentOffice';
 import { reputationFeature } from './review/feature';
 import { cityScaleFeature } from './cityScale/feature';
@@ -186,6 +187,18 @@ export const ruleRegistry: RuleRegistry = {
       },
       initReplayState(replay, { data }) {
         return { ...replay, state: { ...replay.state, officeEffects: officeEffectsSchema.parse(data) } };
+      },
+    },
+    {
+      key: CITY_OFFICE_VOLUNTEER_FEATURE,
+      requires: [OFFICE_EFFECTS_FEATURE],
+      conflicts: [],
+      checkOrigin({ initial, data }) {
+        if (data !== undefined || Object.hasOwn(initial, 'cityOfficeVolunteers'))
+          throw new Error('도시 관직 자원은 빈 상태에서 시작합니다.');
+      },
+      initReplayState(replay) {
+        return { ...replay, state: { ...replay.state, cityOfficeVolunteers: initialCityOfficeVolunteers() } };
       },
     },
     policyFeature,
