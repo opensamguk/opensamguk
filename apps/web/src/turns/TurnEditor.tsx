@@ -200,6 +200,7 @@ function Editor<S extends DisplaySlot>({
   // 빈 칸이 실제로 무엇을 할지 보여 주려고 지금 방침을 읽는다. 못 읽으면 빈 칸은 휴식으로 보인다.
   const policy = usePolicyQuery(worldId);
   const emptyLabel = emptySlotLabel(policy.data);
+  const autoplay = source.timed ? home.data?.general.autoplay : undefined;
 
   const [selected, setSelected] = useStoredSelection(source.storageKey);
   const [anchor, setAnchor] = useState<number | null>(null);
@@ -700,6 +701,7 @@ function Editor<S extends DisplaySlot>({
               const changed = !!draft && !pending && !!serverTurns && turnKey(serverTurns[i]!) !== turnKey(turn);
               const check = turn.commandKey === 'rest' ? undefined : precheckByKey.get(turnKey(turn));
               const isEmpty = !turn.explicit;
+              const isAutoplay = isEmpty && autoplay?.slots.includes(i);
               const args = describeArgs(turn.args, withTargets(names, slotTargets.get(turnKey(turn))));
               const time = times30[i]!;
               return (
@@ -716,6 +718,7 @@ function Editor<S extends DisplaySlot>({
                     .join(' ')}
                   data-slot={i + 1}
                   data-empty={isEmpty ? 'true' : undefined}
+                  data-autoplay={isAutoplay ? 'true' : undefined}
                   onClick={(e) => onRowClick(e, i)}
                   onFocus={() => setFocus(i)}
                 >
@@ -727,7 +730,14 @@ function Editor<S extends DisplaySlot>({
                     {time.time ? <time dateTime={time.iso ?? undefined}>{time.time}</time> : null}
                   </td>
                   <td role="gridcell">
-                    {isEmpty ? (
+                    {isAutoplay && autoplay ? (
+                      <span
+                        className={styles.autoplaySlot}
+                        title={`자율 행동 종료 ${autoplay.expiresOn.year}년 ${autoplay.expiresOn.month}월${autoplay.expiresAt ? ` · ${new Date(autoplay.expiresAt).toLocaleString('ko-KR')}` : ''}`}
+                      >
+                        (자율 행동)
+                      </span>
+                    ) : isEmpty ? (
                       <span className={styles.emptySlot} title="비워 둔 칸입니다. 기본 방침대로 실행합니다.">
                         ({emptyLabel.tag}) {emptyLabel.command}
                       </span>

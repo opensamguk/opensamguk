@@ -9,6 +9,7 @@ import {
   OFFICE_EFFECTS_FEATURE,
   PLAYER_AUTOPLAY_FEATURE,
   playerAutoplayWindow,
+  TICKS_PER_MONTH,
   policyOptions,
   toGameDate,
 } from '@opensamguk/rules';
@@ -139,6 +140,10 @@ export const homeRouter = router({
                   startsAt: nextTurnAt(world, autoplay.startsAtTick),
                   expiresAt: nextTurnAt(world, autoplay.expiresAtTick),
                   expiresOn: toGameDate(world.startYear, autoplay.expiresAtTick),
+                  slots: Array.from({ length: turns.length }, (_, slot) => slot).filter((slot) => {
+                    const turn = general.nextTurnTick + slot * TICKS_PER_MONTH;
+                    return turn >= autoplay.startsAtTick && turn < autoplay.expiresAtTick;
+                  }),
                 },
               }
             : {}),
