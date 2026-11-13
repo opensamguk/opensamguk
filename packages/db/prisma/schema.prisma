@@ -360,6 +360,7 @@ enum DiplomacyState {
 model Nation {
   diplomaticAidUntilMonth Int?
   npcSettings             Json?
+  financeRates            Json?
   restrictions            Json?
   diplomaticDelegates DiplomaticDelegate[]
   worldId         String

@@ -11,6 +11,7 @@ import {
   NATION_RESTRICTIONS_KIND,
 } from '../packages/rules/src/personnel/nationRestrictions';
 import { NPC_NATION_POLICY_FEATURE, NPC_NATION_POLICY_KIND } from '../packages/rules/src/npc/policy';
+import { NATION_FINANCE_FEATURE, NATION_FINANCE_KIND } from '../packages/rules/src/personnel/financeRates';
 import type { PolicyKey, PolicySlot } from '../packages/rules/src/policy';
 import { GENERAL_PROFICIENCY_FEATURE } from '../packages/rules/src/general/proficiency';
 import { DOMESTIC_SPECIALTY_FEATURE } from '../packages/rules/src/general/domesticSpecialty';
@@ -61,7 +62,14 @@ async function user(status: 'ACTIVE' | 'SANCTIONED' = 'ACTIVE') {
   return { id: row.id, email, cookie: `sid=${session.token}`, sessionId: session.id };
 }
 async function fixture(
-  options: { farmMax?: boolean; npc?: boolean; defense?: boolean; npcPolicy?: boolean; restrictions?: boolean } = {},
+  options: {
+    farmMax?: boolean;
+    npc?: boolean;
+    defense?: boolean;
+    npcPolicy?: boolean;
+    restrictions?: boolean;
+    finance?: boolean;
+  } = {},
 ) {
   const alice = await user(),
     bob = await user();
@@ -77,7 +85,7 @@ async function fixture(
     turnTermMinutes: 30,
     endYear: null,
     // 이 회귀 시험은 archive 5와 기존 전환 표지 계약을 검증한다.
-    ...(options.defense || options.npcPolicy || options.restrictions
+    ...(options.defense || options.npcPolicy || options.restrictions || options.finance
       ? {
           replayFormat: 3,
           ruleFeatures: [
@@ -85,7 +93,9 @@ async function fixture(
               ? DEFENSE_STANCE_FEATURE
               : options.npcPolicy
                 ? NPC_NATION_POLICY_FEATURE
-                : NATION_RESTRICTIONS_FEATURE,
+                : options.finance
+                  ? NATION_FINANCE_FEATURE
+                  : NATION_RESTRICTIONS_FEATURE,
             'policy',
           ],
         }
@@ -612,6 +622,53 @@ const editedNpcPolicy = {
   generalPriority: ['recruit', 'farm'],
   nationPriority: ['nation_reward'],
 };
+
+it('국가 세율·지급률을 예산 예상과 실제 월말 정산에 적용한다', async () => {
+  const f = await fixture({ finance: true });
+  const input = { worldId: f.worldId, nationId: 1, rates: { taxPercent: 30, salaryPercent: 200 } };
+  const request = (body: unknown, cookie?: string) => rpc(NATION_FINANCE_KIND, body, cookie, true);
+  const query = () =>
+    rpc<{ financeEstimate: { gold: { gross: number; net: number; perGeneral: number } } }>(
+      'nation.get',
+      { worldId: f.worldId, nationId: 1 },
+      f.alice.cookie,
+    );
+  await authzCase(NATION_FINANCE_KIND, 'unauthenticated', async () => {
+    expect((await request(input)).error).toBe('UNAUTHORIZED');
+  })();
+  await authzCase(NATION_FINANCE_KIND, 'otherUser', async () => {
+    expect((await request(input, f.bob.cookie)).error).toBe('FORBIDDEN');
+  })();
+  await authzCase(NATION_FINANCE_KIND, 'sanctioned', async () => {
+    expect((await request(input, (await user('SANCTIONED')).cookie)).error).toBe('UNAUTHORIZED');
+  })();
+  await authzCase(NATION_FINANCE_KIND, 'invalidInput', async () => {
+    expect((await request({ ...input, rates: { taxPercent: 31, salaryPercent: 200 } }, f.alice.cookie)).error).toBe(
+      'BAD_REQUEST',
+    );
+  })();
+  await authzCase(NATION_FINANCE_KIND, 'success', async () => {
+    const before = (await query()).data!.financeEstimate.gold.gross;
+    expect((await request(input, f.alice.cookie)).data).toEqual({ status: 'pending' });
+    expect((await request(input, f.alice.cookie)).data).toEqual({ status: 'pending' });
+    expect((await query()).data).toMatchObject({ financeEditor: { pending: input.rates } });
+    await f.loop.advanceTo(0);
+    const result = await query();
+    expect(result.data).toMatchObject({ taxRate: 0.3, salaryRate: 2, financeEditor: { pending: null } });
+    const gold = result.data!.financeEstimate.gold;
+    expect(gold.gross).toBeGreaterThan(before);
+    expect(gold.net).toBeLessThan(0);
+    await f.loop.advanceTo(9999);
+    const where = { worldId_id: { worldId: f.worldId, id: 1 } };
+    const treasury = await db.nation.findUniqueOrThrow({ where });
+    const general = await db.general.findUniqueOrThrow({ where });
+    await f.loop.advanceTo(10000);
+    expect((await db.nation.findUniqueOrThrow({ where })).gold).toBe(treasury.gold + gold.net);
+    expect((await db.general.findUniqueOrThrow({ where })).gold).toBe(general.gold + gold.perGeneral);
+    const archive = await exportReplay(db, f.worldId);
+    expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
+  })();
+});
 
 it('국가 게시판과 기밀실을 현재 소속·직책으로 분리한다', async () => {
   const f = await fixture();

@@ -2,6 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { TRPCError } from '@trpc/server';
 import {
   BALANCE,
+  NATION_FINANCE_FEATURE,
+  NATION_FINANCE_KIND,
+  financeRatesInput,
+  canUseNationTurns,
   DIPLOMATIC_COOLDOWN_FEATURE,
   INTEL_FEATURE,
   NATION_STRATEGY_FEATURE,
@@ -39,12 +43,48 @@ import { protectedProcedure, router, worldVerifiedProcedure } from '../trpc';
 import { entityKey, readWorld, viewerGeneral, worldClock, worldInput } from '../queries';
 import { cityCapacity, cityInfo, garrisonGeneralInfo, mapCity, nationInfo, visibility } from '../visibility';
 import { readView, requireGeneral, requireRuleFeature, requireWorld } from '../game/queries';
-import { nationPopulation, projectNationFinance, salaryRate } from '../game/nationFinance';
+import { effectiveFinanceRates, nationPopulation, projectNationFinance } from '../game/nationFinance';
 import { nationTenureYears } from '../game/nationTenure';
 import { worldResolver } from '../game/resolver';
 import { possessedGenerals } from '../game/possessedGenerals';
 
 export const nationRouter = router({
+  setFinanceRates: worldVerifiedProcedure.input(financeRatesInput.extend(worldInput.shape)).mutation(({ ctx, input }) =>
+    ctx.db.$transaction(async (tx) => {
+      const world = await requireWorld(tx, input.worldId, true);
+      requireRuleFeature(world, NATION_FINANCE_FEATURE);
+      if (world.status === 'ENDED') throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '종료된 월드입니다.' });
+      const actor = await requireGeneral(tx, input.worldId, ctx.user.id, true);
+      if (actor.nationId !== input.nationId || !canUseNationTurns(actor.officerLevel))
+        throw new TRPCError({ code: 'FORBIDDEN', message: '소속 국가의 수뇌부만 세율·지급률을 바꿀 수 있습니다.' });
+      const pending = await tx.inputEvent.findFirst({
+        where: {
+          worldId: input.worldId,
+          kind: NATION_FINANCE_KIND,
+          status: 'PENDING',
+          payload: { path: ['nationId'], equals: input.nationId },
+        },
+        select: { payload: true },
+      });
+      if (pending) {
+        const previous = financeRatesInput.parse(pending.payload).rates;
+        if (previous.taxPercent !== input.rates.taxPercent || previous.salaryPercent !== input.rates.salaryPercent)
+          throw new TRPCError({ code: 'CONFLICT', message: '다른 세율·지급률 요청을 처리하고 있습니다.' });
+      } else {
+        await tx.inputEvent.create({
+          data: {
+            worldId: input.worldId,
+            userId: ctx.user.id,
+            generalId: actor.id,
+            kind: NATION_FINANCE_KIND,
+            idempotencyKey: `${NATION_FINANCE_KIND}:${randomUUID()}`,
+            payload: { nationId: input.nationId, rates: input.rates },
+          },
+        });
+      }
+      return { status: 'pending' as const };
+    }),
+  ),
   setRestrictions: worldVerifiedProcedure
     .input(nationRestrictionsInput.extend(worldInput.shape))
     .mutation(({ ctx, input }) =>
@@ -166,7 +206,7 @@ export const nationRouter = router({
       const settlements = cities.filter((city) => city.kind !== 'PASS').sort((a, b) => a.cityKey - b.cityKey);
       const finance =
         ownNation && world.status !== 'ENDED'
-          ? projectNationFinance(world, ctx.now, settlements, generals, state, nation.philosophy)
+          ? projectNationFinance(world, ctx.now, settlements, generals, state, nation)
           : undefined;
       const strategyStatus =
         ownNation && world.status !== 'ENDED' && world.ruleFeatures.includes(NATION_STRATEGY_FEATURE)
@@ -208,6 +248,22 @@ export const nationRouter = router({
           })
         : null;
       const npcPolicyHistory = npcPolicyEnabled && ownNation ? await readNpcPolicyHistory() : undefined;
+      const canEditFinance =
+        ownNation &&
+        canUseNationTurns(viewer?.officerLevel) &&
+        world.status !== 'ENDED' &&
+        world.ruleFeatures.includes(NATION_FINANCE_FEATURE);
+      const financePending = canEditFinance
+        ? await tx.inputEvent.findFirst({
+            where: {
+              worldId: input.worldId,
+              kind: NATION_FINANCE_KIND,
+              status: 'PENDING',
+              payload: { path: ['nationId'], equals: input.nationId },
+            },
+            select: { payload: true },
+          })
+        : null;
       return {
         ...(lifecycle
           ? {
@@ -247,7 +303,14 @@ export const nationRouter = router({
         ...nationPopulation(settlements),
         ...(ownNation
           ? {
-              salaryRate,
+              ...effectiveFinanceRates(world, nation),
+              ...(canEditFinance
+                ? {
+                    financeEditor: {
+                      pending: financePending ? financeRatesInput.parse(financePending.payload).rates : null,
+                    },
+                  }
+                : {}),
               npcPolicy: {
                 ...npcNationPolicy(world, storedNpcNationPolicy(npcPolicyEnabled, nation.npcSettings)),
                 ...(npcPolicyHistory === undefined ? {} : { history: npcPolicyHistory }),

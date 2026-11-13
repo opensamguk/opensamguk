@@ -14,6 +14,9 @@ import {
   DOMESTIC_SPECIALTY_FEATURE,
   GENERAL_PROFICIENCY_FEATURE,
   NPC_NATION_POLICY_FEATURE,
+  NATION_FINANCE_FEATURE,
+  NATION_FINANCE_KIND,
+  financeRatesInput,
   NATION_RESTRICTIONS_FEATURE,
   NATION_RESTRICTIONS_KIND,
   NATION_RESTRICTIONS_MIN_OFFICE,
@@ -200,6 +203,40 @@ const processNpcNationPolicy: QueuedInputHandler = async (tx, world, event) => {
   return { status: 'APPLIED', result: input.data };
 };
 
+const processFinanceRates: QueuedInputHandler = async (tx, world, event) => {
+  const request = financeRatesInput.safeParse(event.payload);
+  if (!request.success || world.status === 'ENDED')
+    return { status: 'REJECTED', result: { code: 'BAD_FINANCE_RATES' } };
+  await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${event.userId} FOR SHARE`;
+  const actor =
+    event.generalId === null
+      ? null
+      : await tx.general.findUnique({
+          where: { worldId_id: { worldId: world.id, id: event.generalId } },
+          select: {
+            userId: true,
+            nationId: true,
+            officerLevel: true,
+            removedAt: true,
+            user: { select: { status: true } },
+          },
+        });
+  if (
+    !actor ||
+    actor.userId !== event.userId ||
+    actor.user?.status !== 'ACTIVE' ||
+    actor.nationId !== request.data.nationId ||
+    actor.officerLevel < 5 ||
+    actor.removedAt !== null
+  )
+    return { status: 'REJECTED', result: { code: 'FORBIDDEN' } };
+  await tx.nation.update({
+    where: { worldId_id: { worldId: world.id, id: request.data.nationId } },
+    data: { financeRates: request.data.rates },
+  });
+  return { status: 'APPLIED', result: request.data };
+};
+
 const processDefenseStance: QueuedInputHandler = async (tx, world, event) => {
   const reject = (code: string, message: string) => ({ status: 'REJECTED' as const, result: { code, message } });
   if (world.status === 'ENDED') return reject('WORLD_CLOSED', '종료된 월드입니다.');
@@ -325,6 +362,7 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   },
   { key: NATION_RESTRICTIONS_FEATURE, queuedInputs: { [NATION_RESTRICTIONS_KIND]: processNationRestrictions } },
   { key: NPC_NATION_POLICY_FEATURE, queuedInputs: { [NPC_NATION_POLICY_KIND]: processNpcNationPolicy } },
+  { key: NATION_FINANCE_FEATURE, queuedInputs: { [NATION_FINANCE_KIND]: processFinanceRates } },
   { key: DEFENSE_STANCE_FEATURE, queuedInputs: { [DEFENSE_STANCE_KIND]: processDefenseStance } },
   { key: NATION_PHILOSOPHY_FEATURE },
   { key: PLAYER_AUTOPLAY_FEATURE },

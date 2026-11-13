@@ -2,6 +2,8 @@ import type { GameDate } from '@opensamguk/shared';
 import { BALANCE } from './balance';
 import { CITY_RESOURCE_MAX, readCityResourcesState } from './cityResources/state';
 import { residentOfficeBonuses } from './personnel/residentOffice';
+import { financeRates } from './personnel/financeRates';
+import { nationPhilosophy } from './personnel/nationPhilosophy';
 import { cloneWorld } from './model/clone';
 import type { WorldState, WorldView } from './model/world';
 
@@ -100,15 +102,15 @@ export function applyCityResourceIncome(
       .filter((city) => city.nationId === nation.id && city.kind !== 'PASS')
       .sort((left, right) => left.cityKey - right.cityKey);
     let weight = 0;
+    const { taxRate } = financeRates(nation.financeRates);
     const exactWeights = cities.map((city) => {
       quantity(city[field]);
       quantity(city.population);
       const rate = 100 + (bonuses.get(city.cityKey)?.tax?.percent ?? 0);
-      weight +=
-        city[field] * (city.population / BALANCE.MONTHLY_POPULATION_UNIT) * BALANCE.MONTHLY_TAX_RATE * (rate / 100);
+      weight += city[field] * (city.population / BALANCE.MONTHLY_POPULATION_UNIT) * taxRate * (rate / 100);
       return BigInt(city[field]) * BigInt(city.population) * BigInt(rate);
     });
-    const gross = quantity(Math.round(weight));
+    const gross = quantity(Math.round(weight * (nationPhilosophy(before, nation.philosophy)?.[resource] ?? 1)));
     let salaries = 0;
     for (const general of Object.values(before.generals).filter((row) => row.nationId === nation.id)) {
       const current = settled.generals[general.id];

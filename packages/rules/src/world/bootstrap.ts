@@ -60,6 +60,7 @@ export interface InitialNation {
   isNpc: boolean;
   diplomaticAidUntilMonth?: number;
   npcSettings?: import('../npc/policy').NpcNationPolicy;
+  financeRates?: import('../personnel/financeRates').FinanceRates;
   restrictions?: import('../personnel/nationRestrictions').NationRestrictions;
 }
 

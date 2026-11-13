@@ -4,6 +4,7 @@ export * from './world/bootstrap';
 export * from './world/preset';
 export * from './world/options';
 export * from './world/resources';
+export * from './personnel/financeRates';
 export {
   checkInitialNpcStatLimits,
   MAX_LEGACY_STARTING_NPC_STAT,

@@ -507,6 +507,64 @@ export function NationFinanceGrid({ nation }: { nation: NationSummary }) {
   );
 }
 
+function NationFinanceEditor({ worldId, nation }: { worldId: string; nation: NationView }) {
+  const trpc = useTRPC();
+  const client = useQueryClient();
+  const [tax, setTax] = useState<number>();
+  const [salary, setSalary] = useState<number>();
+  const save = useMutation(
+    trpc.nation.setFinanceRates.mutationOptions({
+      onSuccess: async () => {
+        setTax(undefined);
+        setSalary(undefined);
+        await client.invalidateQueries({ queryKey: trpc.nation.get.queryKey({ worldId, nationId: nation.id }) });
+      },
+    }),
+  );
+  const editor = nation.financeEditor;
+  if (!editor) return null;
+  const taxPercent =
+    tax ?? editor.pending?.taxPercent ?? Math.round(('taxRate' in nation ? nation.taxRate : 0.2) * 100);
+  const salaryPercent = salary ?? editor.pending?.salaryPercent ?? Math.round((nation.salaryRate ?? 0.5) * 100);
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        save.mutate({ worldId, nationId: nation.id, rates: { taxPercent, salaryPercent } });
+      }}
+    >
+      <fieldset disabled={save.isPending || editor.pending !== null}>
+        <legend>세율·지급률 설정</legend>
+        <label>
+          세율 (%){' '}
+          <input
+            type="number"
+            required
+            min={5}
+            max={30}
+            value={taxPercent}
+            onChange={(event) => setTax(Number(event.target.value))}
+          />
+        </label>
+        <label>
+          지급률 (%){' '}
+          <input
+            type="number"
+            required
+            min={20}
+            max={200}
+            value={salaryPercent}
+            onChange={(event) => setSalary(Number(event.target.value))}
+          />
+        </label>
+        <button type="submit">저장</button>
+      </fieldset>
+      {editor.pending ? <p role="status">세율·지급률 변경을 처리하고 있습니다.</p> : null}
+      {save.error ? <p role="alert">{save.error.message}</p> : null}
+    </form>
+  );
+}
+
 export function useNation(worldId: string, nationId: number, enabled = true) {
   const trpc = useTRPC();
   return useQuery({
@@ -514,7 +572,11 @@ export function useNation(worldId: string, nationId: number, enabled = true) {
     enabled,
     retry: retryUnlessClientError,
     refetchInterval: (query) =>
-      query.state.data?.npcPolicy?.editor?.pending || query.state.data?.restrictions?.editor?.pending ? 1000 : false,
+      query.state.data?.npcPolicy?.editor?.pending ||
+      query.state.data?.restrictions?.editor?.pending ||
+      query.state.data?.financeEditor?.pending
+        ? 1000
+        : false,
   });
 }
 
@@ -638,6 +700,7 @@ export function NationInfo({
         power={power}
       />
       {detail.data ? <NationFinanceGrid nation={detail.data} /> : null}
+      {detail.data ? <NationFinanceEditor key={detail.data.id} worldId={worldId} nation={detail.data} /> : null}
       <NationExtras worldId={worldId} nation={detail.data ?? nation} />
       {/* 소속 장수·도시 표와 통치는 전용 화면으로 옮겼다 (INT-25). */}
       <p className={styles.links}>
