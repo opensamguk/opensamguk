@@ -34,6 +34,7 @@ type General = Omit<
   | 'heritageBenefits'
   | 'heritageSpecialty'
   | 'heritageTurnTime'
+  | 'heritageStatReset'
   | 'combatSpecial'
 > & { politics?: number | null; charm?: number | null };
 type City = Omit<

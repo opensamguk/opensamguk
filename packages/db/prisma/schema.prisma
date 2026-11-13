@@ -503,6 +503,7 @@ model General {
   heritageBenefits  Json?
   heritageSpecialty Json?
   heritageTurnTime Json?
+  heritageStatReset Boolean?
   combatSpecial     String?
   special           String?
   gold              Int

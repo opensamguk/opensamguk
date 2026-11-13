@@ -159,6 +159,7 @@ export async function loadWorldAfterCapabilityCheck(
           heritageBenefits,
           heritageSpecialty,
           heritageTurnTime,
+          heritageStatReset,
           combatSpecial,
           ...general
         }) => {
@@ -182,6 +183,7 @@ export async function loadWorldAfterCapabilityCheck(
                     ),
                     ...(heritageSpecialty == null ? {} : { combatSpecial }),
                     ...storedHeritageTurnTime(heritageTurnTime),
+                    ...(heritageStatReset === true ? { heritageStatReset: true as const } : {}),
                     ...storedHeritageBenefits(world.ruleFeatures.includes(HERITAGE_BENEFITS_FEATURE), heritageBenefits),
                     ...storedGeneralProficiency(world.ruleFeatures.includes(GENERAL_PROFICIENCY_FEATURE), proficiency),
                     ...storedStatExperience(statExperience),

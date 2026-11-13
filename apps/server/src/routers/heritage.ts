@@ -7,6 +7,11 @@ import {
   HERITAGE_SPECIALTY_FEATURE,
   HERITAGE_SPECIALTY_KIND,
   HERITAGE_TURN_TIME_KIND,
+  HERITAGE_STAT_RESET_KIND,
+  POSSESSION_KIND,
+  heritageStatResetInput,
+  purchaseHeritageStatReset,
+  statRulesSchema,
   heritageTurnTimeQuote,
   heritageTurnTimeInput,
   storedHeritageTurnTime,
@@ -61,7 +66,9 @@ export const heritageRouter = router({
             worldId: world.id,
             userId: ctx.user.id,
             generalId: general.id,
-            kind: { in: [HERITAGE_BENEFIT_KIND, HERITAGE_SPECIALTY_KIND, HERITAGE_TURN_TIME_KIND] },
+            kind: {
+              in: [HERITAGE_BENEFIT_KIND, HERITAGE_SPECIALTY_KIND, HERITAGE_TURN_TIME_KIND, HERITAGE_STAT_RESET_KIND],
+            },
           },
           orderBy: { id: 'desc' },
           select: { status: true, result: true },
@@ -71,6 +78,13 @@ export const heritageRouter = router({
           world.ruleFeatures.includes(HERITAGE_SPECIALTY_FEATURE),
           general.heritageSpecialty,
         );
+        const specialtyEnabled = world.ruleFeatures.includes(HERITAGE_SPECIALTY_FEATURE);
+        const possessed =
+          specialtyEnabled &&
+          (await tx.inputEvent.findFirst({
+            where: { worldId: world.id, generalId: general.id, kind: POSSESSION_KIND, status: 'APPLIED' },
+            select: { id: true },
+          }));
         const current =
           combatSpecialty(world, heritageSpecialty ? general.combatSpecial : general.special)?.name ?? null;
         const timing = heritageTurnTimeQuote({
@@ -81,6 +95,12 @@ export const heritageRouter = router({
           enabled: true as const,
           ...(world.ruleFeatures.includes(HERITAGE_SPECIALTY_FEATURE)
             ? {
+                statReset: {
+                  used: general.heritageStatReset === true,
+                  eligible: !possessed,
+                  cost: 1_000,
+                  rules: statRulesSchema.parse({ stat: world.statRules }).stat,
+                },
                 turnTime: {
                   ...timing,
                   pendingAt: timing.pendingTick === null ? null : nextTurnAt(world, timing.pendingTick),
@@ -240,6 +260,79 @@ export const heritageRouter = router({
             userId: ctx.user.id,
             generalId: general.id,
             kind: HERITAGE_TURN_TIME_KIND,
+            idempotencyKey,
+            payload,
+          },
+          select: { id: true },
+        });
+        return { id: String(event.id) };
+      }),
+    ),
+  statReset: worldVerifiedProcedure
+    .input(
+      worldInput
+        .extend({
+          ...heritageStatResetInput.shape,
+          requestId: z.uuid(),
+          expectedGeneralId: z.number().int().positive(),
+        })
+        .strict(),
+    )
+    .mutation(({ ctx, input }) =>
+      ctx.db.$transaction(async (tx) => {
+        const world = await requireWorld(tx, input.worldId, true);
+        requireRuleFeature(world, HERITAGE_SPECIALTY_FEATURE);
+        if (world.status !== 'RUNNING')
+          throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '실행 중인 월드가 아닙니다.' });
+        const general = await requireGeneral(tx, world.id, ctx.user.id, true);
+        if (general.id !== input.expectedGeneralId || general.removedAt !== null)
+          throw new TRPCError({ code: 'CONFLICT', message: '내 장수를 다시 확인하세요.' });
+        const idempotencyKey = HERITAGE_STAT_RESET_KIND + ':' + input.requestId;
+        const payload = heritageStatResetInput.parse({
+          stats: input.stats,
+          ...(input.bonus === undefined ? {} : { bonus: input.bonus }),
+          expectedCost: input.expectedCost,
+        });
+        const prior = await tx.inputEvent.findUnique({
+          where: { worldId_userId_idempotencyKey: { worldId: world.id, userId: ctx.user.id, idempotencyKey } },
+          select: { id: true, payload: true, generalId: true },
+        });
+        if (prior) {
+          if (prior.generalId !== general.id || !isDeepStrictEqual(prior.payload, payload))
+            throw new TRPCError({ code: 'CONFLICT', message: '같은 요청 번호의 내용이 다릅니다.' });
+          return { id: String(prior.id) };
+        }
+        const possessed = await tx.inputEvent.findFirst({
+          where: { worldId: world.id, generalId: general.id, kind: POSSESSION_KIND, status: 'APPLIED' },
+          select: { id: true },
+        });
+        if (possessed)
+          throw new TRPCError({ code: 'CONFLICT', message: '맡은 NPC 장수의 능력치는 초기화할 수 없습니다.' });
+        const quote = purchaseHeritageStatReset(
+          { id: general.id, ...(general.heritageStatReset ? { heritageStatReset: true as const } : {}) },
+          statRulesSchema.parse({ stat: world.statRules }).stat,
+          world.seed,
+          payload,
+        );
+        if (!quote)
+          throw new TRPCError({ code: 'CONFLICT', message: '이미 초기화했거나 배분 능력치가 올바르지 않습니다.' });
+        const pending = await tx.inputEvent.findFirst({
+          where: { worldId: world.id, generalId: general.id, kind: HERITAGE_STAT_RESET_KIND, status: 'PENDING' },
+          select: { id: true },
+        });
+        if (pending) throw new TRPCError({ code: 'CONFLICT', message: '이미 능력치 초기화를 처리하고 있습니다.' });
+        const balance = await tx.heritageAccount.findUnique({
+          where: { userId: ctx.user.id },
+          select: { balance: true },
+        });
+        if ((balance?.balance ?? 0) < input.expectedCost)
+          throw new TRPCError({ code: 'CONFLICT', message: '유산 포인트가 부족합니다.' });
+        const event = await tx.inputEvent.create({
+          data: {
+            worldId: world.id,
+            userId: ctx.user.id,
+            generalId: general.id,
+            kind: HERITAGE_STAT_RESET_KIND,
             idempotencyKey,
             payload,
           },

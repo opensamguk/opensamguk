@@ -15,6 +15,7 @@ import {
   SPECIALTY_GROWTH_FEATURE,
   HERITAGE_SPECIALTY_KIND,
 } from './heritage/specialty';
+import { applyHeritageStatReset, HERITAGE_STAT_RESET_KIND } from './heritage/statReset';
 import { applyHeritageTurnTime, HERITAGE_TURN_TIME_KIND } from './heritage/turnTime';
 import { applyHeritagePurchase, HERITAGE_BENEFIT_KIND, HERITAGE_BENEFITS_FEATURE } from './heritage/benefits';
 import { applyDefenseStance, DEFENSE_STANCE_FEATURE, DEFENSE_STANCE_KIND } from './battle/defenders';
@@ -81,7 +82,7 @@ import { heritageFeature } from './heritage/feature';
 import { ADMIN_GAME_KINDS } from './admin/game';
 import { applyAdminGameRecord } from './admin/apply';
 import { ADMIN_SETTING_KINDS, applyAdminSettingRecord } from './admin/settings';
-import type { UnitSetResource } from './world/resources';
+import type { StatRules, UnitSetResource } from './world/resources';
 import { CITY_OFFICE_VOLUNTEER_FEATURE, initialCityOfficeVolunteers } from './personnel/cityOfficeVolunteers';
 import { OFFICE_EFFECTS_FEATURE, officeEffectsSchema } from './personnel/residentOffice';
 import { reputationFeature } from './review/feature';
@@ -157,7 +158,12 @@ export interface InputKindDefinition {
   apply(
     replay: ReplayState,
     input: RecordedInput,
-    context?: { resolver?: CommandResolver | undefined; unitSet?: UnitSetResource; seed?: string },
+    context?: {
+      resolver?: CommandResolver | undefined;
+      unitSet?: UnitSetResource;
+      seed?: string;
+      statRules?: StatRules;
+    },
   ): ReplayState;
 }
 export interface RuleRegistry {
@@ -317,6 +323,12 @@ export const ruleRegistry: RuleRegistry = {
     TROOP_FEATURE,
   ],
   inputKinds: [
+    {
+      kind: HERITAGE_STAT_RESET_KIND,
+      feature: HERITAGE_SPECIALTY_FEATURE,
+      route: 'queued',
+      apply: applyHeritageStatReset,
+    },
     {
       kind: HERITAGE_TURN_TIME_KIND,
       feature: HERITAGE_SPECIALTY_FEATURE,

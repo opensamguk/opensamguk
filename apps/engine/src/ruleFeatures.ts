@@ -14,6 +14,7 @@ import {
   HERITAGE_SPECIALTY_FEATURE,
   HERITAGE_SPECIALTY_KIND,
   HERITAGE_TURN_TIME_KIND,
+  HERITAGE_STAT_RESET_KIND,
   DOMESTIC_SPECIALTY_FEATURE,
   GENERAL_PROFICIENCY_FEATURE,
   NPC_NATION_POLICY_FEATURE,
@@ -408,6 +409,7 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
     queuedInputs: {
       [HERITAGE_SPECIALTY_KIND]: processHeritagePurchase,
       [HERITAGE_TURN_TIME_KIND]: processHeritagePurchase,
+      [HERITAGE_STAT_RESET_KIND]: processHeritagePurchase,
     },
   },
   { key: HERITAGE_BENEFITS_FEATURE, queuedInputs: { [HERITAGE_BENEFIT_KIND]: processHeritagePurchase } },

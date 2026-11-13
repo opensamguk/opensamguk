@@ -551,6 +551,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
             combatSpecial,
             heritageSpecialty,
             heritageTurnTime,
+            heritageStatReset,
             ...general
           }) => {
             void turnRevision;
@@ -569,6 +570,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
                     ),
                     ...(heritageSpecialty == null ? {} : { combatSpecial }),
                     ...storedHeritageTurnTime(heritageTurnTime),
+                    ...(heritageStatReset === true ? { heritageStatReset: true as const } : {}),
                   },
                   world.ruleFeatures.includes('lineage-v1'),
                 ),

@@ -71,6 +71,7 @@ type Replies = {
   'heritage.benefits': Out['heritage']['benefits'];
   'heritage.specialty': Out['heritage']['specialty'];
   'heritage.turnTime': Out['heritage']['turnTime'];
+  'heritage.statReset': Out['heritage']['statReset'];
   'heritage.purchase': Out['heritage']['purchase'];
   'lineage.get': Out['lineage']['get'];
   'lineage.submit': Out['lineage']['submit'];
@@ -88,6 +89,7 @@ async function rpc<R extends keyof Replies>(route: R, input: unknown, user?: Use
       route === 'heritage.purchase' ||
       route === 'heritage.specialty' ||
       route === 'heritage.turnTime' ||
+      route === 'heritage.statReset' ||
       route === 'nationTurns.set' ||
       route === 'lineage.submit' ||
       route === 'admin.world.requestReset',
@@ -1546,6 +1548,47 @@ it('전투 특기 유산의 확인 가격·중복 요청·초기화와 월말 �
   expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
 });
 
+it.each([false, true])('유산 능력치 초기화는 기수당 한 번 배분한다 (직접 배분 %s)', async (manual) => {
+  const player = await user();
+  const worldId = await world({ actor: player, specialty: true });
+  if (manual) await db.heritageAccount.create({ data: { userId: player.id, balance: 1_000 } });
+  const request = {
+    worldId,
+    requestId: randomUUID(),
+    expectedGeneralId: 1,
+    expectedCost: manual ? 1_000 : 0,
+    stats: { leadership: 70, strength: 65, intel: 65 },
+    ...(manual ? { bonus: { strength: 3 } } : {}),
+  };
+  await authzCase('heritage.statReset', 'otherUser', async () => {
+    expect((await rpc('heritage.statReset', request, await user())).status).toBe(404);
+  })();
+  expect((await rpc('heritage.statReset', { ...request, stats: { ...request.stats, intel: 1 } }, player)).status).toBe(
+    409,
+  );
+  await authzCase('heritage.statReset', 'success', async () => {
+    const first = await rpc('heritage.statReset', request, player);
+    expect(first.status).toBe(200);
+    expect((await rpc('heritage.statReset', request, player)).data).toEqual(first.data);
+  })();
+  await advance(worldId);
+  const { heritageStatReset, leadership, strength, intel } = await db.general.findUniqueOrThrow({
+    where: { worldId_id: { worldId, id: 1 } },
+  });
+  expect(heritageStatReset).toBe(true);
+  if (manual) expect([leadership, strength, intel]).toEqual([70, 68, 65]);
+  else expect(leadership + strength + intel).toBeGreaterThanOrEqual(203);
+  expect((await rpc('heritage.statReset', { ...request, requestId: randomUUID() }, player)).status).toBe(409);
+  expect((await rpc('heritage.benefits', { worldId }, player)).data).toMatchObject({
+    balance: 0,
+    statReset: { used: true },
+  });
+  expect(await db.heritageEntry.count({ where: { worldId, kind: 'BENEFIT_SPEND' } })).toBe(manual ? 1 : 0);
+  await advance(worldId, TICKS_PER_MONTH);
+  const archive = await exportReplay(db, worldId);
+  expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
+});
+
 it('유산 턴 시간 초기화는 다음 턴을 유지하고 다다음 턴과 재생에 한 번 적용한다', async () => {
   const player = await user();
   const worldId = await world({ actor: player, specialty: true, turnTime: true });
@@ -1649,7 +1692,13 @@ it('미접속 퇴장 시 미사용 특기 예약을 한 번만 반환한다', as
   );
 }, 60_000);
 
-for (const path of ['heritage.benefits', 'heritage.purchase', 'heritage.specialty', 'heritage.turnTime'] as const) {
+for (const path of [
+  'heritage.benefits',
+  'heritage.purchase',
+  'heritage.specialty',
+  'heritage.turnTime',
+  'heritage.statReset',
+] as const) {
   for (const category of ['unauthenticated', 'sanctioned', 'invalidInput'] as const) {
     it(
       `유산 혜택 접근 경계 ${path} ${category}`,
@@ -1666,7 +1715,14 @@ for (const path of ['heritage.benefits', 'heritage.purchase', 'heritage.specialt
               ? { requestId: randomUUID(), expectedGeneralId: 1, expectedCost: 1000, action: { action: 'reset' } }
               : path === 'heritage.turnTime'
                 ? { requestId: randomUUID(), expectedGeneralId: 1, expectedCost: 1000 }
-                : {}),
+                : path === 'heritage.statReset'
+                  ? {
+                      requestId: randomUUID(),
+                      expectedGeneralId: 1,
+                      expectedCost: 0,
+                      stats: { leadership: 55, strength: 55, intel: 55 },
+                    }
+                  : {}),
         };
         const result = await rpc(path, input, category === 'unauthenticated' ? undefined : player);
         expect(result.error?.data.code).toBe(category === 'invalidInput' ? 'BAD_REQUEST' : 'UNAUTHORIZED');

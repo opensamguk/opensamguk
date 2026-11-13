@@ -6,7 +6,7 @@ import type { CommandResolver } from './commands/resolve';
 import { resolverForRuleFeatures } from './ruleCommands';
 import { rngFor } from '@opensamguk/shared';
 import { runGeneralTurn } from './commands/turn';
-import type { UnitSetResource } from './world/resources';
+import type { StatRules, UnitSetResource } from './world/resources';
 import { TICKS_PER_MONTH } from './clock/constants';
 import { toWorldState, type WorldState, type OfficeRevisions } from './model/world';
 import { monthlyDate, runMonthly } from './monthly/index';
@@ -202,7 +202,7 @@ export function applyRecordedInput(
   replay: ReplayState,
   input: RecordedInput,
   registry: RuleRegistry = ruleRegistry,
-  context?: { unitSet?: UnitSetResource; seed?: string },
+  context?: { unitSet?: UnitSetResource; seed?: string; statRules?: StatRules },
 ): ReplayState {
   if (isAdminClockKind(input.kind)) return applyAdminClockRecord(replay, input);
   if (isAdminGameKind(input.kind)) validateAdminGameRecord(input);

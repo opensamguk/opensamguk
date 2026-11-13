@@ -87,6 +87,7 @@ export interface InitialGeneral {
   combatSpecial?: string | null;
   heritageSpecialty?: import('../heritage/specialty').HeritageSpecialtyState;
   heritageTurnTime?: import('../heritage/turnTime').HeritageTurnTimeState;
+  heritageStatReset?: true;
   heritageBenefits?: import('../heritage/benefits').HeritageBenefits;
   proficiency?: import('../general/proficiency').GeneralProficiency;
   statExperience?: import('../general/statGrowth').StatExperience;

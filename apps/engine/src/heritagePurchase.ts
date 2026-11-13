@@ -2,6 +2,11 @@ import {
   BATTLE_TACTICS_FEATURE,
   HERITAGE_SPECIALTY_KIND,
   HERITAGE_TURN_TIME_KIND,
+  HERITAGE_STAT_RESET_KIND,
+  POSSESSION_KIND,
+  heritageStatResetInput,
+  purchaseHeritageStatReset,
+  statRulesSchema,
   heritageTurnTimeInput,
   purchaseHeritageTurnTime,
   storedHeritageTurnTime,
@@ -23,8 +28,16 @@ export const processHeritagePurchase: QueuedInputHandler = async (tx, world, eve
     event.kind === HERITAGE_SPECIALTY_KIND ? heritageSpecialtyInput.safeParse(event.payload) : undefined;
   const timingAction =
     event.kind === HERITAGE_TURN_TIME_KIND ? heritageTurnTimeInput.safeParse(event.payload) : undefined;
-  const action = specialtyAction || timingAction ? undefined : heritageBenefitInput.safeParse(event.payload);
-  if (specialtyAction?.success === false || timingAction?.success === false || action?.success === false)
+  const statAction =
+    event.kind === HERITAGE_STAT_RESET_KIND ? heritageStatResetInput.safeParse(event.payload) : undefined;
+  const action =
+    specialtyAction || timingAction || statAction ? undefined : heritageBenefitInput.safeParse(event.payload);
+  if (
+    specialtyAction?.success === false ||
+    timingAction?.success === false ||
+    statAction?.success === false ||
+    action?.success === false
+  )
     return reject('BAD_BENEFIT', '구매할 유산 혜택을 확인하세요.');
   if (
     action?.success &&
@@ -60,6 +73,7 @@ export const processHeritagePurchase: QueuedInputHandler = async (tx, world, eve
       combatSpecial: true,
       heritageSpecialty: true,
       heritageTurnTime: true,
+      heritageStatReset: true,
       nextTurnTick: true,
       id: true,
     },
@@ -86,38 +100,60 @@ export const processHeritagePurchase: QueuedInputHandler = async (tx, world, eve
         timingAction.data.expectedCost,
       )
     : null;
-  const purchase = timing ?? specialty ?? benefit;
+  if (
+    statAction?.success &&
+    (await tx.inputEvent.findFirst({
+      where: { worldId: world.id, generalId: general.id, kind: POSSESSION_KIND, status: 'APPLIED' },
+      select: { id: true },
+    }))
+  )
+    return reject('NOT_ELIGIBLE', '맡은 NPC 장수의 능력치는 초기화할 수 없습니다.');
+  const reset = statAction?.success
+    ? purchaseHeritageStatReset(
+        { id: general.id, ...(general.heritageStatReset ? { heritageStatReset: true as const } : {}) },
+        statRulesSchema.parse({ stat: world.statRules }).stat,
+        world.seed,
+        statAction.data,
+      )
+    : null;
+  const purchase = reset ?? timing ?? specialty ?? benefit;
   if (!purchase)
     return reject(
       'ALREADY_OWNED',
-      timingAction
-        ? '턴 시간 초기화 비용이나 예약 상태가 바뀌었습니다.'
-        : specialtyAction
-          ? '현재 선택한 특기 요청을 처리할 수 없습니다.'
-          : '이미 같은 단계 이상의 혜택을 보유했습니다.',
+      statAction
+        ? '이미 초기화했거나 배분 능력치가 바뀌었습니다.'
+        : timingAction
+          ? '턴 시간 초기화 비용이나 예약 상태가 바뀌었습니다.'
+          : specialtyAction
+            ? '현재 선택한 특기 요청을 처리할 수 없습니다.'
+            : '이미 같은 단계 이상의 혜택을 보유했습니다.',
     );
-  const debit = await tx.heritageAccount.updateMany({
-    where: { userId: event.userId, balance: { gte: purchase.cost } },
-    data: { balance: { decrement: purchase.cost } },
-  });
-  if (debit.count !== 1) return reject('HERITAGE_INSUFFICIENT', '유산 포인트가 부족합니다.');
-  await tx.heritageEntry.create({
-    data: {
-      userId: event.userId,
-      worldId: world.id,
-      key: `benefit:${world.id}:${sequence}`,
-      kind: 'BENEFIT_SPEND',
-      delta: -purchase.cost,
-      detail: purchase,
-    },
-  });
+  if (purchase.cost > 0) {
+    const debit = await tx.heritageAccount.updateMany({
+      where: { userId: event.userId, balance: { gte: purchase.cost } },
+      data: { balance: { decrement: purchase.cost } },
+    });
+    if (debit.count !== 1) return reject('HERITAGE_INSUFFICIENT', '유산 포인트가 부족합니다.');
+    await tx.heritageEntry.create({
+      data: {
+        userId: event.userId,
+        worldId: world.id,
+        key: `benefit:${world.id}:${sequence}`,
+        kind: 'BENEFIT_SPEND',
+        delta: -purchase.cost,
+        detail: purchase,
+      },
+    });
+  }
   await tx.general.update({
     where,
-    data: timing
-      ? { heritageTurnTime: timing.heritageTurnTime }
-      : specialty
-        ? { combatSpecial: specialty.combatSpecial, heritageSpecialty: specialty.heritageSpecialty }
-        : { heritageBenefits: { ...heritageBenefits, [benefit!.benefit]: benefit!.level } },
+    data: reset
+      ? { ...reset.stats, heritageStatReset: true }
+      : timing
+        ? { heritageTurnTime: timing.heritageTurnTime }
+        : specialty
+          ? { combatSpecial: specialty.combatSpecial, heritageSpecialty: specialty.heritageSpecialty }
+          : { heritageBenefits: { ...heritageBenefits, [benefit!.benefit]: benefit!.level } },
   });
   return { status: 'APPLIED', result: purchase };
 };

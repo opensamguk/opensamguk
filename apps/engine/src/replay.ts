@@ -556,6 +556,7 @@ function applyArchiveInput(
   return applyRecordedInput(replay, input, registry, {
     unitSet: archive.origin.initial.unitSet,
     seed: archive.origin.initial.seed,
+    statRules: archive.origin.initial.statRules,
   });
 }
 

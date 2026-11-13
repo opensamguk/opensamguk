@@ -157,6 +157,7 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
         heritageBenefits,
         heritageSpecialty,
         heritageTurnTime,
+        heritageStatReset,
         combatSpecial,
         statExperience,
         ...general
@@ -169,6 +170,7 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
               ...storedHeritageSpecialty(world.ruleFeatures.includes(HERITAGE_SPECIALTY_FEATURE), heritageSpecialty),
               ...(heritageSpecialty == null ? {} : { combatSpecial }),
               ...storedHeritageTurnTime(heritageTurnTime),
+              ...(heritageStatReset === true ? { heritageStatReset: true as const } : {}),
               ...storedHeritageBenefits(world.ruleFeatures.includes(HERITAGE_BENEFITS_FEATURE), heritageBenefits),
               ...storedGeneralProficiency(world.ruleFeatures.includes(GENERAL_PROFICIENCY_FEATURE), proficiency),
               ...storedStatExperience(statExperience),

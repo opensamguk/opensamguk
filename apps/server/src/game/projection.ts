@@ -11,6 +11,7 @@ export function ownGeneral(
     | 'heritageBenefits'
     | 'heritageSpecialty'
     | 'heritageTurnTime'
+    | 'heritageStatReset'
     | 'statExperience'
   > & {
     politics?: number | null;
