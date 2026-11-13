@@ -351,6 +351,7 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   },
   { key: 'treaty-trade' },
   { key: EXPANDED_TREATY_FEATURE },
+  { key: 'ranked-aid-v1' },
   {
     key: 'reputation-v1',
     async loadReplayState(tx, worldId, replay) {

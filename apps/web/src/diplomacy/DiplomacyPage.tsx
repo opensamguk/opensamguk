@@ -277,6 +277,7 @@ function Diplomacy({
             targets={head.targets}
             tradeEnabled={head.tradeEnabled === true}
             expandedEnabled={head.expandedEnabled === true}
+            rankedAidLimits={head.rankedAid?.limits}
             ownNationId={ownNationId}
             map={map.data}
             busyFor={(toNationId) => {

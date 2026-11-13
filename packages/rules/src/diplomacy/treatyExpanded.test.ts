@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { commandWorld } from '../../test/commandFixture';
-import { applyTreatyInput, settleMonthlyTreaties, validateTreatyState } from './treaty';
+import {
+  applyTreatyInput,
+  quoteTreatyProposal,
+  settleMonthlyTreaties,
+  treatyOptions,
+  validateTreatyState,
+} from './treaty';
 import { hasTreatyPassage } from './treatyClauses';
 import type { TreatyClause } from './treatyTypes';
 import type { WorldState } from '../model/world';
@@ -44,6 +50,29 @@ function accepted(state: WorldState, clauses: TreatyClause[]) {
 }
 
 describe('AC-M2-06 확장 조약', () => {
+  it('INT-26 정기 원조는 새 월드의 지급국 작위 한도를 따른다', () => {
+    const state = world();
+    state.nations[2]!.level = 3;
+    const clause: TreatyClause = { kind: 'tribute', payerNationId: 2, gold: 30_000, rice: 1, months: 2 };
+    expect(propose(state, [clause])).toMatchObject({ ok: false, result: { code: 'BAD_INPUT' } });
+    state.ruleFeatures!.push('ranked-aid-v1');
+    expect(propose(state, [clause])).toMatchObject({ ok: true });
+    const tooMuch = { ...clause, gold: 30_001 };
+    expect(propose(state, [tooMuch])).toMatchObject({ ok: false, result: { code: 'BAD_INPUT' } });
+    expect(
+      quoteTreatyProposal(
+        {
+          fromNationId: 1,
+          toNationId: 2,
+          fromCityCount: 2,
+          target: { cityCount: 1, relation: 'NONE' },
+          clauses: [tooMuch],
+          tributeLimits: new Map([[2, 30_000]]),
+        },
+        treatyOptions(state.ruleFeatures!),
+      ),
+    ).toMatchObject({ problem: { code: 'BAD_INPUT' } });
+  });
   it('가장 긴 기간으로 납부하고 통행은 지정 도시와 자기 종료 시각까지만 허용한다', () => {
     const result = accepted(world(), [
       { kind: 'passage', cityKeys: [2], months: 1 },

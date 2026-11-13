@@ -12,7 +12,13 @@ import { updateResidenceAnchors } from './personnel/residence';
 import { recordedLineageSuccession } from './lineage/control';
 import { recordedPossession } from './entry/possess';
 import { completePersonnelStep, type PersonnelStepPacket } from './personnel/step';
-import { applyTreatyInput, settleMonthlyTreaties, treatyOptions, validateTreatyRecord } from './diplomacy/treaty';
+import {
+  applyTreatyInput,
+  RANKED_AID_FEATURE,
+  settleMonthlyTreaties,
+  treatyOptions,
+  validateTreatyRecord,
+} from './diplomacy/treaty';
 import { EXPANDED_TREATY_FEATURE } from './diplomacy/treatyClauses';
 import { validatePolicyInput } from './replayInputs';
 import { trade } from './commands/trade';
@@ -250,6 +256,7 @@ export const treatyFeature: RuleFeatureDefinition = {
         treaty: { version: 1 },
         ...(origin.initial.ruleFeatures?.includes('treaty-trade') ? { treatyTrade: { version: 1 } } : {}),
         ...(origin.initial.ruleFeatures?.includes(EXPANDED_TREATY_FEATURE) ? { treatyExpanded: { version: 1 } } : {}),
+        rankedAidEnabled: origin.initial.ruleFeatures?.includes(RANKED_AID_FEATURE) ?? false,
         monthlyTick: 0,
         ...(end && input.sequence > end.sequence ? { endTick: end.tick } : {}),
       });
@@ -279,6 +286,7 @@ export const treatyBreakFeature: RuleFeatureDefinition = {
         treatyBreak: { version: 1 },
         ...(origin.initial.ruleFeatures?.includes('treaty-trade') ? { treatyTrade: { version: 1 } } : {}),
         ...(origin.initial.ruleFeatures?.includes(EXPANDED_TREATY_FEATURE) ? { treatyExpanded: { version: 1 } } : {}),
+        rankedAidEnabled: origin.initial.ruleFeatures?.includes(RANKED_AID_FEATURE) ?? false,
         monthlyTick: 0,
         ...(end && input.sequence > end.sequence ? { endTick: end.tick } : {}),
       });
@@ -316,6 +324,7 @@ function applyTreaty(replay: ReplayState, input: RecordedInput): ReplayState {
       ? { treatyExpanded: { version: 1 as const } }
       : {}),
     monthlyTick: replay.monthlyTick,
+    rankedAidEnabled: replay.state.ruleFeatures?.includes(RANKED_AID_FEATURE) ?? false,
   };
   const validated = validateTreatyRecord(record, context);
   if (validated.status !== 'APPLIED' || validated.result.tick !== tick) throw new Error('조약 처리 tick이 다릅니다.');

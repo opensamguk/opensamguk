@@ -128,6 +128,7 @@ async function resolveTreatyInput(
     ...(at.treatyExpandedEnabled ? { treatyExpanded: { version: 1 } } : {}),
     ...(at.treatyBreakEnabled ? { treatyBreak: { version: 1 } } : {}),
     monthlyTick: world.monthlyTick,
+    rankedAidEnabled: world.ruleFeatures.includes('ranked-aid-v1'),
   };
   if (world.status === 'ENDED') {
     const ended = await tx.worldResult.findUnique({ where: { worldId: world.id }, select: { endedTick: true } });
