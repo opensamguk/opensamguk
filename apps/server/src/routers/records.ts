@@ -57,6 +57,10 @@ const battlePhases = z.array(
     defenderLoss: z.number().int().nonnegative(),
     attackerEvaded: z.boolean().optional(),
     defenderEvaded: z.boolean().optional(),
+    attackerCritical: z.boolean().optional(),
+    defenderCritical: z.boolean().optional(),
+    attackerTactic: z.object({ name: z.string(), success: z.boolean() }).optional(),
+    defenderTactic: z.object({ name: z.string(), success: z.boolean() }).optional(),
   }),
 );
 

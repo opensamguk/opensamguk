@@ -1,3 +1,4 @@
+import { rollBattleTactics, type battleTacticsStats, type PhaseTactic } from './tactics';
 import type { HeritageBenefits } from '../heritage/benefits';
 import type { CombatSpecialty } from '../general/combatSpecialty';
 import type { Rng } from '@opensamguk/shared';
@@ -30,6 +31,8 @@ export type BattleInput = {
   defenderSpecialty?: CombatSpecialty | undefined;
   attackerHeritage?: HeritageBenefits | undefined;
   defenderHeritage?: HeritageBenefits | undefined;
+  attackerTactics?: ReturnType<typeof battleTacticsStats>;
+  defenderTactics?: ReturnType<typeof battleTacticsStats>;
 };
 
 type Unit = DeepReadonly<UnitSetResource['crewTypes'][number]>;
@@ -122,6 +125,10 @@ export type BattlePhase = {
   defenderLoss: number;
   attackerEvaded?: boolean;
   defenderEvaded?: boolean;
+  attackerCritical?: boolean;
+  defenderCritical?: boolean;
+  attackerTactic?: PhaseTactic;
+  defenderTactic?: PhaseTactic;
 };
 type BattleResult = {
   attacker: BattleForce;
@@ -159,6 +166,28 @@ export function simulateBattle(input: BattleInput, rng: Rng): BattleResult {
       result.phases?.push({ kind: 'hold', attackerLoss: 0, defenderLoss: 0 });
       continue;
     }
+    const attackerTactic = rollBattleTactics(
+      input.attackerTactics,
+      aUnit,
+      bUnit,
+      input.attackerSpecialty,
+      input.defenderSpecialty,
+      input.attackerHeritage,
+      input.defenderHeritage,
+      phase === 0,
+      rng,
+    );
+    const defenderTactic = rollBattleTactics(
+      input.defenderTactics,
+      bUnit,
+      aUnit,
+      input.defenderSpecialty,
+      input.attackerSpecialty,
+      input.defenderHeritage,
+      input.attackerHeritage,
+      phase === 0,
+      rng,
+    );
     const attackerAvoidBonus = input.attackerSpecialty?.avoid ?? 0;
     const defenderAvoidBonus = input.defenderSpecialty?.avoid ?? 0;
     const attackerCanAvoid = aUnit.effects?.includes('avoid');
@@ -168,14 +197,30 @@ export function simulateBattle(input: BattleInput, rng: Rng): BattleResult {
     const defenderHeritageAvoid =
       ((input.defenderHeritage?.evasion ?? 0) - (input.attackerHeritage?.opponentEvasion ?? 0)) / 100;
     const avoidAttacker =
+      !defenderTactic.ignoresEvasion &&
       (attackerCanAvoid || attackerAvoidBonus + attackerHeritageAvoid > 0) &&
       rng.next() < (attackerCanAvoid ? aUnit.avoid / 100 : 0) + attackerAvoidBonus + attackerHeritageAvoid;
     const avoidDefender =
+      !attackerTactic.ignoresEvasion &&
       (defenderCanAvoid || defenderAvoidBonus + defenderHeritageAvoid > 0) &&
       rng.next() < (defenderCanAvoid ? bUnit.avoid / 100 : 0) + defenderAvoidBonus + defenderHeritageAvoid;
     // 양쪽 피해는 같은 페이즈 시작 상태로 계산하고 동시에 적용한다.
-    const toDefender = damage(attacker, defender, input, rng, true, avoidDefender ? 1 / 6 : 1),
-      toAttacker = damage(defender, attacker, input, rng, false, avoidAttacker ? 1 / 6 : 1);
+    const toDefender = damage(
+      attacker,
+      defender,
+      input,
+      rng,
+      true,
+      (avoidDefender ? 1 / 6 : 1) * attackerTactic.dealt * defenderTactic.opposing,
+    );
+    const toAttacker = damage(
+      defender,
+      attacker,
+      input,
+      rng,
+      false,
+      (avoidAttacker ? 1 / 6 : 1) * defenderTactic.dealt * attackerTactic.opposing,
+    );
     attacker.crew -= toAttacker;
     defender.crew -= toDefender;
     result.phases?.push({
@@ -184,6 +229,10 @@ export function simulateBattle(input: BattleInput, rng: Rng): BattleResult {
       defenderLoss: toDefender,
       ...(avoidAttacker ? { attackerEvaded: true } : {}),
       ...(avoidDefender ? { defenderEvaded: true } : {}),
+      ...(attackerTactic.critical ? { attackerCritical: true } : {}),
+      ...(defenderTactic.critical ? { defenderCritical: true } : {}),
+      ...(attackerTactic.tactic ? { attackerTactic: attackerTactic.tactic } : {}),
+      ...(defenderTactic.tactic ? { defenderTactic: defenderTactic.tactic } : {}),
     });
     attacker.atmos = Math.max(0, attacker.atmos - BALANCE.BATTLE_ATMOS_LOSS);
     defender.atmos = Math.max(0, defender.atmos - BALANCE.BATTLE_ATMOS_LOSS);

@@ -1,3 +1,4 @@
+import { BATTLE_TACTICS_FEATURE } from './battle/tactics';
 import { applyHeritagePurchase, HERITAGE_BENEFIT_KIND, HERITAGE_BENEFITS_FEATURE } from './heritage/benefits';
 import { applyDefenseStance, DEFENSE_STANCE_FEATURE, DEFENSE_STANCE_KIND } from './battle/defenders';
 import { NPC_NATION_POLICY_FEATURE, NPC_NATION_POLICY_KIND, applyNpcNationPolicy } from './npc/policy';
@@ -147,6 +148,7 @@ export interface RuleRegistry {
 }
 export const ruleRegistry: RuleRegistry = {
   features: [
+    { key: BATTLE_TACTICS_FEATURE, requires: ['combat-specialty-v1'], conflicts: [] },
     { key: HERITAGE_BENEFITS_FEATURE, requires: ['heritage-v1'], conflicts: [] },
     preparedTurnsFeature,
     nationResearchFeature,

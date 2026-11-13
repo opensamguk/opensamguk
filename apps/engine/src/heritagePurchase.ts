@@ -1,4 +1,10 @@
-import { heritageBenefitInput, heritagePurchase, storedHeritageBenefits } from '@opensamguk/rules';
+import {
+  BATTLE_TACTICS_FEATURE,
+  battleHeritageBenefits,
+  heritageBenefitInput,
+  heritagePurchase,
+  storedHeritageBenefits,
+} from '@opensamguk/rules';
 import type { QueuedInputHandler } from './features';
 import { databaseNow } from './lease';
 
@@ -7,6 +13,11 @@ export const processHeritagePurchase: QueuedInputHandler = async (tx, world, eve
   if (world.status !== 'RUNNING') return reject('WORLD_CLOSED', '실행 중인 월드가 아닙니다.');
   const action = heritageBenefitInput.safeParse(event.payload);
   if (!action.success) return reject('BAD_BENEFIT', '구매할 유산 혜택을 확인하세요.');
+  if (
+    (battleHeritageBenefits as readonly string[]).includes(action.data.benefit) &&
+    !world.ruleFeatures.includes(BATTLE_TACTICS_FEATURE)
+  )
+    return reject('NOT_ENABLED', '이 월드에서 전투계략과 필살을 켜지 않았습니다.');
   await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${event.userId} FOR SHARE`;
   const user = await tx.user.findUnique({ where: { id: event.userId }, select: { status: true } });
   if (user?.status !== 'ACTIVE') return reject('ACTOR_INACTIVE', '활성 계정이 아닙니다.');
