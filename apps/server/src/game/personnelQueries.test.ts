@@ -117,9 +117,22 @@ describe('인사부 내부 읽기', () => {
         portraitId: true,
         removedAt: true,
         stratagemSuccesses: true,
+        battleWins: true,
         city: { select: { cityKey: true, name: true } },
       },
     });
+  });
+  it('오호장군은 재직 장수의 승전 횟수와 장수 번호 순으로 정한다', async () => {
+    const { db, rows } = fixture();
+    rows[0]!.battleWins = 4;
+    rows[1]!.battleWins = 4;
+    rows[2]!.battleWins = 6;
+    rows[2]!.removedAt = new Date(0);
+    const board = await readPersonnelBoard(db, { worldId: 'world', userId: 'own' });
+    expect(board.topVictories?.map(({ generalId, wins }) => [generalId, wins])).toEqual([
+      [1, 4],
+      [3, 4],
+    ]);
   });
   it('지방 관직의 능력치 기준과 직책별 후보 자격을 내려준다', async () => {
     const { db, rows } = fixture();

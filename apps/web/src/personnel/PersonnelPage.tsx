@@ -210,6 +210,18 @@ export function PersonnelBoardView({
   );
   return (
     <>
+      {board.topVictories?.length ? (
+        <section className={styles.section} aria-labelledby="victory-leaders">
+          <h2 id="victory-leaders">오호장군</h2>
+          <ol>
+            {board.topVictories.map((member) => (
+              <li key={member.generalId}>
+                {member.name} · 승전 {member.wins}회
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
       {board.topStratagem?.length ? (
         <section className={styles.section} aria-labelledby="stratagem-leaders">
           <h2 id="stratagem-leaders">건안칠자</h2>
