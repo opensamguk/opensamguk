@@ -256,7 +256,14 @@ export * from './equipment/config';
 export * from './equipment/state';
 export * from './equipment/origin';
 export * from './equipment/stats';
-export { TREATMENT_TOOL, hasTreatmentTool } from './equipment/config';
+export {
+  TREATMENT_TOOL,
+  MORALE_TOOL,
+  hasTreatmentTool,
+  hasMoraleTool,
+  equipmentTools,
+  toolSaleProceeds,
+} from './equipment/config';
 export { STANDARD_EQUIPMENT_CONFIG } from './equipment/catalog';
 export * from './logistics/ledger';
 export * from './logistics/consumption';

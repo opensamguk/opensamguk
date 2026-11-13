@@ -37,13 +37,15 @@ export function EquipmentTradeFields({
     values.slot === 'tool' && board.tool
       ? 'tool'
       : (EQUIPMENT_SLOTS.find((row) => row.key === values.slot)?.key ?? 'horse');
-  const tool = slot === 'tool' ? board.tool : undefined;
+  const equippedTool = slot === 'tool' ? board.tool : undefined;
+  const tools = equippedTool ? (board.tools ?? [equippedTool]) : [];
+  const tool = tools.find((row) => row.key === values.itemKey);
   // 지금 살 수 있는 장비를 앞에 둔다. 못 사는 장비도 예약할 수 있어 목록에 남기고 (불가)를 붙인다 (INT-25).
   const items = board.items
     .filter((item) => item.slot === slot)
     .sort((a, b) => Number(a.failure !== null) - Number(b.failure !== null));
   const item = items.find((row) => row.key === values.itemKey);
-  const sale = tool?.sale ?? board.sales.find((row) => row.slot === slot)!;
+  const sale = equippedTool?.sale ?? board.sales.find((row) => row.slot === slot)!;
   const selling = values.itemKey === 'none';
   const held = board.items.find((row) => row.key === board.slots[slot]);
   const materials = item
@@ -89,20 +91,28 @@ export function EquipmentTradeFields({
                 {row.failure ? ' (불가)' : ''}
               </option>
             ))}
-            {tool ? (
-              <option value={tool.key}>
-                {tool.name} · 금 {n(tool.cost)}
-                {tool.failure ? ' (불가)' : ''}
+            {tools.map((row) => (
+              <option key={row.key} value={row.key}>
+                {row.name} · 금 {n(row.cost)}
+                {row.failure ? ' (불가)' : ''}
               </option>
-            ) : null}
+            ))}
             <option value="none">현재 장비 판매{sale.failure ? ' (불가)' : ''}</option>
           </select>
         </label>
       </div>
       <p className={styles.muted}>
-        현재 장착: {tool?.remainingCharges ? `${tool.name} · ${tool.remainingCharges}회` : (held?.name ?? '미장착')}
+        현재 장착:{' '}
+        {equippedTool?.remainingCharges
+          ? `${equippedTool.name} · ${equippedTool.remainingCharges}회`
+          : (held?.name ?? '미장착')}
       </p>
-      {tool && values.itemKey === tool.key ? <p>{tool.description}</p> : null}
+      {tool ? (
+        <p>
+          {tool.description}
+          {'requiredSecurity' in tool ? ` 치안 ${n(tool.requiredSecurity)} 이상.` : ''}
+        </p>
+      ) : null}
       {item ? (
         <p>
           <strong>
@@ -121,7 +131,8 @@ export function EquipmentTradeFields({
         </p>
       ) : null}
       {selling ? <p>현재 장착품 기준 판매 금액: 금 {n(sale.proceeds)}</p> : null}
-      {item && held && held.key !== item.key ? (
+      {(item && held && held.key !== item.key) ||
+      (tool && equippedTool?.remainingCharges && equippedTool.key !== tool.key) ? (
         <p className={styles.warn} role="note">
           교체하면 기존 장비 금액은 돌려받지 않습니다.
         </p>

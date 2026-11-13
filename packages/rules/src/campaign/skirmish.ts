@@ -1,3 +1,4 @@
+import { useBattleMoraleTool } from '../equipment/morale';
 import { battleTacticsStats } from '../battle/tactics';
 import { combatSpecialty, combatSpecialtyKey } from '../general/combatSpecialty';
 import type { Rng } from '@opensamguk/shared';
@@ -81,6 +82,8 @@ export function fightCampaignUnits(
     throw new Error('서로 다른 국가의 부곡만 교전할 수 있습니다.');
   feed(state, attacker);
   feed(state, defender);
+  useBattleMoraleTool(state, attacker.commanderId, attacker);
+  useBattleMoraleTool(state, defender.commanderId, defender);
   const result = simulateBattle(
     {
       attacker: force(attacker),
@@ -133,6 +136,7 @@ export function fightCampaignWall(
   if (!city || aNation === null || city.nationId === aNation || city.wall < 0)
     throw new Error('교전할 성벽을 확인하세요.');
   feed(state, attacker);
+  useBattleMoraleTool(state, attacker.commanderId, attacker);
   const result = simulateBattle(
     {
       attacker: force(attacker),
@@ -201,6 +205,7 @@ export function fightCampaignCityGarrison(
     return { state, text: `도시 병종${crewType} 패주: 민간 복귀 ${returned}명, 인구 상한 밖 ${overflow}명` };
   }
   feed(state, attacker);
+  useBattleMoraleTool(state, attacker.commanderId, attacker);
   const result = simulateBattle(
     {
       attacker: force(attacker),

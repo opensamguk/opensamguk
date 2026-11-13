@@ -89,7 +89,12 @@ async function advance(id: string, tick: number, fail = false) {
   }
 }
 const snapshot = (id: string) => db.$transaction((tx) => loadReplayState(tx, id));
-async function fixture(enabled = true, lineage = false, specialty: 'iron' | 'horses' = 'iron', treatmentTool = false) {
+async function fixture(
+  enabled = true,
+  lineage = false,
+  specialty: 'iron' | 'horses' = 'iron',
+  toolProfile: boolean | 'morale' = false,
+) {
   const input = operationalInput();
   const template = input.map.sites.find((site) => site.kind === 'CITY')!;
   if (template.kind !== 'CITY') throw Error('시험 도시가 없습니다.');
@@ -150,8 +155,12 @@ async function fixture(enabled = true, lineage = false, specialty: 'iron' | 'hor
       'logistics-v1': logistics,
       ...(enabled
         ? {
-            'equipment-v1': treatmentTool
-              ? { ...STANDARD_EQUIPMENT_CONFIG, treatmentTool: true }
+            'equipment-v1': toolProfile
+              ? {
+                  ...STANDARD_EQUIPMENT_CONFIG,
+                  treatmentTool: true,
+                  ...(toolProfile === 'morale' ? { moraleTool: true } : {}),
+                }
               : STANDARD_EQUIPMENT_CONFIG,
           }
         : {}),
@@ -321,6 +330,25 @@ it('INT-26 환약 구매와 판매를 예턴·PostgreSQL·재생에서 처리한
   });
   const archive = await exportReplay(db, f.id);
   expect(archive.months.length).toBeGreaterThan(0);
+  expect(replayArchive(archive, archive.months.length).map(({ stateHash }) => stateHash)).toEqual(
+    archive.months.map(({ stateHash }) => stateHash),
+  );
+});
+
+it('INT-26 탁주를 구매하고 판매할 때 활성 도구와 실제 판매가를 돌려준다', async () => {
+  const f = await fixture(true, false, 'iron', 'morale');
+  const board = () => rpc('equipment.mine', { worldId: f.id }, f.player);
+  expect((await board()).data?.tools?.map((tool) => tool.key)).toEqual(['tool_01', 'tool_02']);
+  await execute(f, 'trade_rice', { amount: 1000, buy: false });
+  await execute(f, 'equipment_trade', { slot: 'tool', itemKey: 'tool_02' });
+  expect((await board()).data?.tool).toMatchObject({
+    key: 'tool_02',
+    remainingCharges: 1,
+    sale: { proceeds: 500 },
+  });
+  await execute(f, 'equipment_trade', { slot: 'tool', itemKey: 'none' });
+  expect((await board()).data?.tool).toMatchObject({ key: 'tool_01', remainingCharges: 0 });
+  const archive = await exportReplay(db, f.id);
   expect(replayArchive(archive, archive.months.length).map(({ stateHash }) => stateHash)).toEqual(
     archive.months.map(({ stateHash }) => stateHash),
   );

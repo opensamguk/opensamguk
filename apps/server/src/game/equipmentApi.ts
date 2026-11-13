@@ -2,6 +2,10 @@ import { TRPCError } from '@trpc/server';
 import {
   equipmentSlotSchema,
   TREATMENT_TOOL,
+  MORALE_TOOL,
+  hasMoraleTool,
+  equipmentTools,
+  toolSaleProceeds,
   hasTreatmentTool,
   equipmentBonus,
   fiveStatsSchema,
@@ -29,26 +33,22 @@ export function readEquipmentBoard(ctx: PersonnelActorContext, worldId: string, 
       const actor = { generalId: general.id };
       const { leadership, strength, intel, politics, charm } = state.generals[general.id]!;
       const baseStats = fiveStatsSchema.parse({ leadership, strength, intel, politics, charm });
+      const toolEntry = (tool: (typeof equipmentTools)[keyof typeof equipmentTools]) => ({
+        ...tool,
+        remainingCharges: slots.tool?.key === tool.key ? slots.tool.charges : 0,
+        failure: command.check(state, actor, { slot: 'tool', itemKey: tool.key }),
+        sale: {
+          proceeds: slots.tool ? toolSaleProceeds(slots.tool, equipment.config.sellRateBp) : 0,
+          failure: command.check(state, actor, { slot: 'tool', itemKey: 'none' }),
+        },
+      });
       return {
         generalId: general.id,
         slots,
         ...(hasTreatmentTool(equipment.config)
-          ? {
-              tool: {
-                ...TREATMENT_TOOL,
-                remainingCharges: slots.tool?.charges ?? 0,
-                failure: command.check(state, actor, { slot: 'tool', itemKey: TREATMENT_TOOL.key }),
-                sale: {
-                  proceeds: Math.floor(
-                    (Math.floor((TREATMENT_TOOL.cost * (slots.tool?.charges ?? 0)) / TREATMENT_TOOL.charges) *
-                      equipment.config.sellRateBp) /
-                      10_000,
-                  ),
-                  failure: command.check(state, actor, { slot: 'tool', itemKey: 'none' }),
-                },
-              },
-            }
+          ? { tool: toolEntry(slots.tool ? equipmentTools[slots.tool.key] : TREATMENT_TOOL) }
           : {}),
+        ...(hasMoraleTool(equipment.config) ? { tools: [toolEntry(TREATMENT_TOOL), toolEntry(MORALE_TOOL)] } : {}),
         baseStats,
         stats: withEquipmentBonus(state, general.id, baseStats),
         bonus: equipmentBonus(state, general.id),
