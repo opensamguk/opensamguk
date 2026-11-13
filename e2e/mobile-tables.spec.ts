@@ -156,7 +156,8 @@ async function statValue(row: Locator, label: string, value: string, mobile: boo
 }
 
 test('T3-10 정식191년 도시·국가·월간 순위 표의 모든 값·정렬·375px와 초안 보존', async ({ page }, info) => {
-  test.setTimeout(120000);
+  // 정식 시나리오에서 여러 화면의 4개 너비·정렬·스크린샷을 한 브라우저로 검증한다.
+  test.setTimeout(240000);
   const execution = (async () => {
     ownWorld = (
       await withE2eDb(async (db) => {
