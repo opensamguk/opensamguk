@@ -45,6 +45,17 @@ const generalsById = (state: WorldView) =>
     .sort((a, b) => a.id - b.id);
 const nationsById = (state: WorldView) => Object.values(state.nations).sort((a, b) => a.id - b.id);
 
+function byNation<T extends { nationId: number | null }>(rows: readonly T[]) {
+  const groups = new Map<number, T[]>();
+  for (const row of rows) {
+    if (row.nationId === null) continue;
+    const members = groups.get(row.nationId) ?? [];
+    members.push(row);
+    groups.set(row.nationId, members);
+  }
+  return groups;
+}
+
 export type TaxCity = Parameters<typeof wallRiceIncome>[0] & {
   cityKey: number;
   commerce: number;
@@ -112,11 +123,11 @@ export function settleIncome(
   const next = structuredClone(state) as WorldState;
   const resource = [1, 7].includes(date.month) ? 'gold' : [4, 10].includes(date.month) ? 'rice' : null;
   if (!resource) return next;
+  const cityGroups = byNation(citiesById(next).filter((city) => city.kind !== 'PASS'));
+  const generalGroups = byNation(generalsById(next).filter((general) => general.activeFromYear <= date.year));
   for (const nation of nationsById(next)) {
-    const cities = citiesById(next).filter((city) => city.nationId === nation.id && city.kind !== 'PASS');
-    const members = generalsById(next).filter(
-      (general) => general.nationId === nation.id && general.activeFromYear <= date.year,
-    );
+    const cities = cityGroups.get(nation.id) ?? [];
+    const members = generalGroups.get(nation.id) ?? [];
     const multiplier = nationPhilosophy(next, nation.philosophy)?.[resource];
     const reserves = next.ruleFeatures?.includes('city-resources-v1') ? 0 : nation[resource];
     const rates = financeRates(nation.financeRates);
@@ -225,12 +236,27 @@ export function settleDiplomacy(state: WorldView, tick: number): WorldState {
 
 export function buildYearbook(state: WorldView, year: number): Yearbook {
   const campaign = state.ruleFeatures?.includes('campaign-v1') ? readCampaignState(state.campaign, state) : undefined;
+  const cities = citiesById(state);
+  const cityGroups = byNation(cities.filter((city) => city.kind !== 'PASS'));
+  const generalGroups = byNation(generalsById(state).filter((general) => general.activeFromYear <= year));
+  const campaignTroops = new Map<number, number>();
+  if (campaign) {
+    for (const unit of campaign.units) {
+      const owner = state.generals[unit.ownerId]!;
+      if (
+        owner.nationId === null ||
+        owner.removedAt !== undefined ||
+        owner.activeFromYear > year ||
+        state.generals[unit.commanderId]!.activeFromYear > year
+      )
+        continue;
+      campaignTroops.set(owner.nationId, (campaignTroops.get(owner.nationId) ?? 0) + unit.troops);
+    }
+  }
   return {
     nations: nationsById(state).map((nation) => {
-      const cities = citiesById(state).filter((city) => city.nationId === nation.id && city.kind !== 'PASS');
-      const generals = generalsById(state).filter(
-        (general) => general.nationId === nation.id && general.activeFromYear <= year,
-      );
+      const cities = cityGroups.get(nation.id) ?? [];
+      const generals = generalGroups.get(nation.id) ?? [];
       return {
         nationId: nation.id,
         cities: cities.length,
@@ -240,20 +266,14 @@ export function buildYearbook(state: WorldView, year: number): Yearbook {
             nation.rice +
             cities.reduce((sum, city) => sum + city.population, 0) +
             (campaign
-              ? campaign.units
-                  .filter(
-                    (unit) =>
-                      generals.some((general) => general.id === unit.ownerId) &&
-                      state.generals[unit.commanderId]!.activeFromYear <= year,
-                  )
-                  .reduce((sum, unit) => sum + unit.troops, 0)
+              ? (campaignTroops.get(nation.id) ?? 0)
               : generals.reduce((sum, general) => sum + general.crew, 0)),
         ),
         gold: nation.gold,
         rice: nation.rice,
       };
     }),
-    cities: citiesById(state).map(({ cityKey, nationId }) => ({ cityKey, nationId })),
+    cities: cities.map(({ cityKey, nationId }) => ({ cityKey, nationId })),
   };
 }
 
