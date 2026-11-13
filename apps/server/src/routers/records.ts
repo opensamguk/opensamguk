@@ -24,7 +24,7 @@ const activityInput = generalInput.extend({
     .strictObject({ year: z.number().int().min(0).max(9999), month: z.number().int().min(1).max(12) })
     .optional(),
 });
-const activityCursor = z.tuple([recordTick, z.enum(['reputation', 'nation']), recordId]);
+const activityCursor = z.tuple([recordTick, z.enum(['reputation', 'nation', 'milestone']), recordId]);
 const nationEventKind = z.enum(['found', 'fall', 'declare', 'capture', 'promotion', 'enlist', 'capital']);
 const battleCursor = z.tuple([recordTick, entityKey]);
 
@@ -107,10 +107,12 @@ export const recordsRouter = router({
       if (start !== null && (start < 0 || start > 2_147_483_647 - TICKS_PER_MONTH))
         return { items: [], nextCursor: null };
       const period = start === null ? {} : { AND: [{ tick: { gte: start, lt: start + TICKS_PER_MONTH } }] };
-      const before = (source: 'reputation' | 'nation') => {
+      const sourceOrder = { reputation: 0, nation: 1, milestone: 2 };
+      const before = (source: keyof typeof sourceOrder) => {
         if (!cursor) return {};
         const [tick, cursorSource, id] = cursor;
-        if (source !== cursorSource) return { tick: source === 'nation' ? { lte: tick } : { lt: tick } };
+        if (source !== cursorSource)
+          return { tick: sourceOrder[source] > sourceOrder[cursorSource] ? { lte: tick } : { lt: tick } };
         return { OR: [{ tick: { lt: tick } }, { tick, id: { lt: BigInt(id) } }] };
       };
       const rows =
@@ -154,6 +156,21 @@ export const recordsRouter = router({
             take: 31,
             select: { id: true, tick: true, kind: true, text: true },
           });
+      const milestones = biography
+        ? await tx.generalLog.findMany({
+            where: {
+              worldId: input.worldId,
+              generalId: biography.id,
+              kind: 'success',
+              commandKey: { in: ['join', 'accept_invite', 'found', 'uprising', 'personnel.appoint'] },
+              ...period,
+              ...before('milestone'),
+            },
+            orderBy: [{ tick: 'desc' }, { id: 'desc' }],
+            take: 31,
+            select: { id: true, tick: true, commandKey: true, text: true },
+          })
+        : [];
       const reputation = rows.map((row) => {
         const { id, generalName, nationId, nationName, nationColor, cityKey, cityName, ...event } = row;
         return {
@@ -178,7 +195,15 @@ export const recordsRouter = router({
         text,
       }));
       // 각 원장은 이미 같은 tick에서 id 내림차순이다. 같은 tick은 평판 원장을 먼저 읽는다.
-      const sorted = [...reputation, ...nation].sort((a, b) => b.tick - a.tick);
+      const history = milestones.map(({ id, tick, commandKey, text }) => ({
+        source: 'milestone' as const,
+        id: id.toString(),
+        tick,
+        ...toGameDate(world.startYear, tick),
+        kind: commandKey,
+        text,
+      }));
+      const sorted = [...reputation, ...nation, ...history].sort((a, b) => b.tick - a.tick);
       const page = sorted.slice(0, 30);
       const portraits = await recordPortraits(
         tx,
