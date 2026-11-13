@@ -33,6 +33,8 @@ import {
   readStoredNationLifecycle,
   readStoredRelations,
   assertNationLifecycle,
+  OFFICE_EFFECTS_FEATURE,
+  officeEffectsSchema,
 } from '@opensamguk/rules';
 import { z } from 'zod';
 import { worldResolver } from './resolver';
@@ -116,6 +118,9 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
     diplomacies,
     ...(world.commandMeta ? { commandMeta: world.commandMeta } : {}),
   } as unknown as WorldInit);
+  if (world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE)) {
+    state.officeEffects = officeEffectsSchema.parse(world.officeEffects);
+  }
   if (world.ruleFeatures.includes('campaign-v1')) {
     if (Object.values(state.generals).some((general) => general.crew !== 0))
       throw new Error('부곡 월드에 중복 병력이 있습니다.');

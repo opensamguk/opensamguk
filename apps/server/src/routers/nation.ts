@@ -3,6 +3,8 @@ import {
   BALANCE,
   estimateTaxIncome,
   nowTick,
+  OFFICE_EFFECTS_FEATURE,
+  residentOfficeBonuses,
   TICKS_PER_MONTH,
   toGameDate,
   WANDERING_MONTH_LIMIT,
@@ -26,9 +28,13 @@ export const nationRouter = router({
         orderBy: ownNation ? [{ region: 'asc' }, { level: 'desc' }, { cityKey: 'asc' }] : { cityKey: 'asc' },
       });
       const generals = await tx.general.findMany({ where: input, orderBy: { id: 'asc' } });
-      const state = world.ruleFeatures.some((feature) => ['campaign-v1', 'nation-lifecycle-v1'].includes(feature))
-        ? await readView(tx, input.worldId)
-        : undefined;
+      const needsOfficeEffects =
+        ownNation && world.status !== 'ENDED' && world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE);
+      const state =
+        needsOfficeEffects ||
+        world.ruleFeatures.some((feature) => ['campaign-v1', 'nation-lifecycle-v1'].includes(feature))
+          ? await readView(tx, input.worldId)
+          : undefined;
       const units = state?.campaign?.units;
       const lifecycle = state?.nationLifecycle;
       const wandering = lifecycle?.nations[String(nation.id)];
@@ -43,7 +49,8 @@ export const nationRouter = router({
                 const members = generals.filter(
                   (general) => general.removedAt === null && general.activeFromYear <= year,
                 );
-                return { year, month, ...estimateTaxIncome(settlements, members.length, resource) };
+                const bonuses = state?.officeEffects ? residentOfficeBonuses(state, year) : undefined;
+                return { year, month, ...estimateTaxIncome(settlements, members.length, resource, bonuses) };
               };
               return {
                 gold: estimate('gold', [1, 7]),
