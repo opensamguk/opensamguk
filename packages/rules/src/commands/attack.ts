@@ -69,7 +69,7 @@ function makeAttack(collect: typeof collectModifiers) {
             d.activeFromYear <= state.startYear + Math.floor((actor.tick ?? 0) / (12 * 10000)),
         )
         .sort((a, b) => b.crew - a.crew || a.id - b.id);
-      const reports: { generalId: number; text: string }[] = [];
+      const reports: NonNullable<CommandResult['reports']> = [];
       const battleAwards: NonNullable<CommandResult['battleAwards']> = [];
       const battleOutcomes: NonNullable<CommandResult['battleOutcomes']> = [];
       const generalEngagements: NonNullable<CommandResult['generalEngagements']> = [];
@@ -117,6 +117,7 @@ function makeAttack(collect: typeof collectModifiers) {
           {
             attacker: g,
             defender,
+            recordPhases: actor.recordBattleStats === true,
             attackerTech: aTech,
             defenderTech: bTech,
             attackerFirstVolleyUsed,
@@ -156,7 +157,7 @@ function makeAttack(collect: typeof collectModifiers) {
         }
         const text = `${g.name} 대 ${defender.name}: 공격 ${g.crew}명, 수비 ${defender.crew}명`;
         rounds.push(text);
-        reports.push({ generalId: defender.id, text });
+        reports.push({ generalId: defender.id, text, ...(battle.phases?.length ? { phases: battle.phases } : {}) });
         if (g.crew <= 0 || g.atmos <= 0 || (defender.crew > 0 && defender.atmos > 0)) {
           cleared = false;
           break;

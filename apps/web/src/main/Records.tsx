@@ -534,6 +534,26 @@ export function BattleList({ worldId }: { worldId: string }) {
                 <Portrait id={item.portraitId} name="공격 장수" variant="icon" size={20} decorative />{' '}
                 {battleText(item.text)}
               </span>
+              {item.phases?.length ? (
+                <details>
+                  <summary>교전 단계</summary>
+                  <ol>
+                    {item.phases.map((phase, index) => (
+                      <li key={index}>
+                        {phase.kind === 'hold' ? (
+                          '수비 측 교전 저지'
+                        ) : (
+                          <>
+                            {phase.kind === 'volley' ? '선제 사격' : '교전'} · 공격 측 {n(phase.attackerLoss)}명 피해 ·
+                            수비 측 {n(phase.defenderLoss)}명 피해{phase.attackerEvaded ? ' · 공격 측 회피' : ''}
+                            {phase.defenderEvaded ? ' · 수비 측 회피' : ''}
+                          </>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                </details>
+              ) : null}
             </li>
           ))}
         </ol>

@@ -623,6 +623,7 @@ model BattleLog {
   attackerId Int
   generalId  Int
   text       String
+  phases     Json?
   world      World   @relation(fields: [worldId], references: [id], onDelete: Cascade)
   general    General @relation(fields: [worldId, generalId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction)
 

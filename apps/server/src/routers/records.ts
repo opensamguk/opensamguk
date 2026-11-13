@@ -44,6 +44,15 @@ const winnerSummarySchema = z.strictObject({
   gold: z.number().int().nonnegative(),
   rice: z.number().int().nonnegative(),
 });
+const battlePhases = z.array(
+  z.object({
+    kind: z.enum(['volley', 'hold', 'exchange']),
+    attackerLoss: z.number().int().nonnegative(),
+    defenderLoss: z.number().int().nonnegative(),
+    attackerEvaded: z.boolean().optional(),
+    defenderEvaded: z.boolean().optional(),
+  }),
+);
 
 export const recordsRouter = router({
   battles: protectedProcedure.input(generalInput).query(({ ctx, input }) =>
@@ -58,7 +67,7 @@ export const recordsRouter = router({
         },
         orderBy: [{ tick: 'desc' }, { attackerId: 'desc' }],
         take: 31,
-        select: { tick: true, attackerId: true, text: true },
+        select: { tick: true, attackerId: true, text: true, phases: true },
       });
       const page = rows.slice(0, 30);
       const portraits = await recordPortraits(
@@ -71,6 +80,7 @@ export const recordsRouter = router({
         attackerId: row.attackerId,
         portraitId: portraits.get(row.attackerId) ?? null,
         text: row.text,
+        ...(row.phases === null ? {} : { phases: battlePhases.parse(row.phases) }),
         gameDate: toGameDate(world.startYear, row.tick),
       }));
       const last = items.at(-1);

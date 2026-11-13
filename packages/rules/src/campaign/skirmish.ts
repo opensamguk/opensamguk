@@ -66,6 +66,7 @@ export function fightCampaignUnits(
   unitSet: DeepReadonly<UnitSetResource>,
   rng: Rng,
   attackerFirstVolleyUsed = false,
+  recordPhases = false,
 ) {
   if (attackerId === defenderId) throw new Error('같은 부곡을 양쪽에 배치할 수 없습니다.');
   const state = start(view),
@@ -85,6 +86,7 @@ export function fightCampaignUnits(
       defenderTech: state.nations[bNation]!.tech,
       unitSet,
       attackerFirstVolleyUsed,
+      recordPhases,
       coefMode: state.ruleFeatures?.includes('battle-affinity-v2') ? 'multiply' : 'divide',
       attackerModifiers: modifiers(state, attacker),
       defenderModifiers: modifiers(state, defender),

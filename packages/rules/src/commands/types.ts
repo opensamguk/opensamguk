@@ -48,7 +48,7 @@ export interface LogEntry {
 export interface CommandResult {
   effects: Effect[];
   logs: LogEntry[];
-  reports?: { generalId: number; text: string }[];
+  reports?: { generalId: number; text: string; phases?: import('../battle/simulate').BattlePhase[] }[];
   // 실제로 해결한 공격의 점령 전 대상이다. 알림·보고용이며 상태에는 넣지 않는다.
   attackTarget?: { cityKey: number; defendingNationId: number | null };
   history?: { nationId: number; text: string; kind?: 'intel' }[];
