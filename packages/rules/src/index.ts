@@ -326,4 +326,4 @@ export { readStoredNationResearch } from './nationResearch/origin';
 export { canExecuteResearchNationCommand } from './nationResearch/commands';
 
 export { NATION_PHILOSOPHY_FEATURE, nationPhilosophy, nationPhilosophyEffects } from './personnel/nationPhilosophy';
-export { COURT_RANK_FEATURE, courtOfficeTitle, nationRank } from './personnel/nationRank';
+export { COURT_RANK_FEATURE, COURT_PROMOTION_FEATURE, courtOfficeTitle, nationRank } from './personnel/nationRank';

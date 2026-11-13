@@ -1,4 +1,5 @@
 import type { GameDate, Rng } from '@opensamguk/shared';
+import { COURT_PROMOTION_FEATURE, promoteNationCourts } from '../personnel/nationRank';
 import { nationPhilosophy } from '../personnel/nationPhilosophy';
 import { BALANCE } from '../balance';
 import { TICKS_PER_MONTH } from '../clock/constants';
@@ -199,6 +200,7 @@ export function runMonthly(state: WorldView, tick: number, rng: Rng) {
   next = settlePopulation(next);
   next = settleSupply(next, bonuses);
   next = settleDiplomacy(next, tick);
+  if (state.ruleFeatures?.includes(COURT_PROMOTION_FEATURE)) promoteNationCourts(next);
   const seasonalEventLogs = state.ruleFeatures?.includes(CITY_SEASONAL_EVENTS_FEATURE)
     ? settleCitySeasonalEvents(next, date, rng)
     : [];

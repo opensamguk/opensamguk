@@ -20,7 +20,7 @@ import { monthlyReviewSelect, readMonthlyReview } from '../review';
 const generalInput = worldInput.extend({ cursor: z.string().min(1).max(256).optional() }).strict();
 const activityInput = generalInput.extend({ scope: z.enum(['all', 'world', 'biography']).default('all') });
 const activityCursor = z.tuple([recordTick, z.enum(['reputation', 'nation']), recordId]);
-const nationEventKind = z.enum(['found', 'fall', 'declare', 'capture']);
+const nationEventKind = z.enum(['found', 'fall', 'declare', 'capture', 'promotion']);
 const battleCursor = z.tuple([recordTick, entityKey]);
 
 async function recordPortraits(tx: Prisma.TransactionClient, worldId: string, ids: number[]) {
