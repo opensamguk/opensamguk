@@ -35,6 +35,15 @@
 .text {
   min-width: 0;
 }
+.recordCity {
+  color: var(--color-info);
+}
+.successfulOutcome {
+  color: var(--color-success);
+}
+.failedOutcome {
+  color: var(--color-danger);
+}
 .headline {
   flex: 1 0 100%;
   font-size: var(--text-sm);
