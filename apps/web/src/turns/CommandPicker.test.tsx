@@ -4,6 +4,7 @@ import type { ComponentProps } from 'react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { TEST_UNIT_SET } from '../battleSim/testUnitSet';
 import { worldUnits } from '../battleSim/unitChoices';
+import { NationTargetPicker } from './CommandArgsScreen';
 import { CommandPicker, type CommandInfo } from './CommandPicker';
 import type { EquipmentBoard } from '../equipment/useEquipment';
 
@@ -442,4 +443,231 @@ it('T4-86 AC-P2-26 병종 칸은 월드 병종표로 고르고 병종표를 불�
     args: { amount: 100, crewType: 1300 },
     explicit: true,
   });
+});
+
+// INT-25 3단계: 인자 입력 화면에 원작(core2026)이 보이던 정보를 우리 서버 조회로 채운다.
+const resourceSchema = {
+  type: 'object',
+  properties: {
+    generalId: { type: 'integer', exclusiveMinimum: 0 },
+    resource: { type: 'string', enum: ['gold', 'rice'] },
+    amount: { type: 'integer', exclusiveMinimum: 0, maximum: 1000000 },
+  },
+  required: ['generalId', 'resource', 'amount'],
+};
+
+it('INT-25 AC-INT-25 포상 대상은 금이 적은 장수부터 `이름 (도시)`·능력치·물자로 보이고 국고와 전부 단추를 쓴다', () => {
+  const reward: CommandInfo = { key: 'nation_reward', name: '포상', category: 'nation', argsSchema: resourceSchema };
+  const input = props({
+    commands: [reward],
+    generals: [
+      { id: 1, name: '하후돈(夏侯惇)', cityName: '진류', isHuman: false },
+      { id: 2, name: '조인', cityName: '허창', isHuman: true },
+    ],
+    argContext: {
+      here: null,
+      ownNationId: 1,
+      walletKind: 'nation',
+      wallet: { gold: 10, rice: 20 },
+      treasury: { gold: 52000, rice: 31000 },
+      members: [
+        { id: 1, name: '하후돈(夏侯惇)', leadership: 90, strength: 92, intel: 60, gold: 900, rice: 50, crew: 3000 },
+        { id: 2, name: '조인', leadership: 85, strength: 80, intel: 70, gold: 100, rice: 70, crew: 0 },
+      ],
+    },
+  });
+  render(<CommandPicker {...input} />);
+  fireEvent.click(screen.getByRole('radio', { name: '포상' }));
+  expect(screen.getByTestId('args-treasury').textContent).toBe('국고 금 52,000 · 쌀 31,000');
+  expect(screen.queryByTestId('args-wallet')).toBeNull();
+  const rows = within(screen.getByRole('radiogroup', { name: '대상 장수' })).getAllByRole('radio');
+  expect(rows.map((row) => row.getAttribute('data-value'))).toEqual(['2', '1']);
+  expect(rows[1]!.textContent).toContain('하후돈 (진류)');
+  expect(rows[1]!.textContent).not.toContain('夏侯惇');
+  expect(rows[1]!.textContent).toContain('NPC');
+  expect(rows[1]!.textContent).toContain('통솔 90 · 무력 92 · 지력 60');
+  expect(rows[1]!.textContent).toContain('금 900 · 쌀 50');
+  // 쌀로 바꾸면 쌀이 적은 장수부터다.
+  fireEvent.change(screen.getByRole('combobox', { name: '자원' }), { target: { value: 'rice' } });
+  expect(
+    within(screen.getByRole('radiogroup', { name: '대상 장수' }))
+      .getAllByRole('radio')
+      .map((row) => row.getAttribute('data-value')),
+  ).toEqual(['1', '2']);
+  pickIn('대상 장수', /^조인/);
+  expect(screen.getByTestId('picked-general').textContent).toContain('병력 0 · 훈련 0 · 사기 0');
+  fireEvent.click(screen.getByRole('button', { name: '전부 31,000' }));
+  expect((screen.getByRole('spinbutton', { name: '수량' }) as HTMLInputElement).value).toBe('31000');
+  fireEvent.click(screen.getByRole('button', { name: '1번 칸에 넣기' }));
+  expect(input.onPut).toHaveBeenCalledWith({
+    commandKey: 'nation_reward',
+    args: { generalId: 2, resource: 'rice', amount: 31000 },
+    explicit: true,
+  });
+});
+
+it('INT-25 AC-INT-25 모병은 현황 줄과 통솔 한도까지의 절반·채우기 단추를 보이고 못 고르는 병종은 사유와 함께 둔다', () => {
+  const recruit: CommandInfo = {
+    key: 'recruit',
+    name: '모병',
+    category: 'military',
+    argsSchema: {
+      type: 'object',
+      properties: {
+        amount: { type: 'integer', exclusiveMinimum: 0, maximum: 1000000 },
+        crewType: { type: 'integer', exclusiveMinimum: 0, maximum: 1000000 },
+      },
+      required: ['amount', 'crewType'],
+    },
+  };
+  const input = props({
+    commands: [recruit],
+    defaultCrewType: 1100,
+    argContext: {
+      here: null,
+      ownNationId: 1,
+      unitSet: TEST_UNIT_SET as never,
+      recruitment: { byCrewType: { '1300': { message: '기술 3,000이 필요합니다.' } } },
+      me: { id: 9, leadership: 75, crew: 3000, crewType: 1100, gold: 4200 },
+      tech: 1200,
+    },
+  });
+  render(<CommandPicker {...input} />);
+  fireEvent.click(screen.getByRole('radio', { name: '모병' }));
+  expect(screen.getByTestId('recruit-status').textContent).toBe(
+    '통솔 75(최대 병력 7,500) · 현재 병종 시험 보병 · 현재 병력 3,000 · 금 4,200 · 국가 기술 1,200',
+  );
+  const blocked = screen.getByRole('radio', { name: /시험 기병/ }).closest('tr')!;
+  expect(blocked.getAttribute('data-blocked')).toBe('true');
+  expect(blocked.textContent).toContain('불가 기술 3,000이 필요합니다.');
+  fireEvent.click(screen.getByRole('button', { name: '절반 2,200명' }));
+  expect((screen.getByRole('spinbutton', { name: '수량' }) as HTMLInputElement).value).toBe('2200');
+  fireEvent.click(screen.getByRole('button', { name: '채우기 4,500명' }));
+  expect((screen.getByRole('spinbutton', { name: '수량' }) as HTMLInputElement).value).toBe('4500');
+});
+
+const targetMap = {
+  cities: [
+    { key: 1, name: '허창', level: 8, nationId: 1, links: [2, 3], x: 0, y: 0, supplied: true },
+    { key: 2, name: '진류', level: 6, nationId: 2, links: [1], x: 0, y: 0, supplied: true },
+    { key: 3, name: '진', level: 6, nationId: 1, links: [1], x: 0, y: 0, supplied: true },
+  ],
+  nations: [
+    { id: 1, name: '위', color: '#336699', capitalCityKey: 1 },
+    { id: 2, name: '촉', color: '#993333', capitalCityKey: 2 },
+  ],
+  background: null,
+};
+
+it('INT-25 AC-INT-25 천도 대상 도시는 `도시명 (국가명)`이고 같은 거리에서 내 국가 도시를 먼저 둔다', () => {
+  const capital: CommandInfo = {
+    key: 'nation_capital',
+    name: '천도',
+    category: 'nation',
+    argsSchema: { type: 'object', properties: { cityKey: { type: 'integer' } }, required: ['cityKey'] },
+  };
+  const input = props({
+    commands: [capital],
+    cities: targetMap.cities,
+    argContext: { here: 1, ownNationId: 1, map: targetMap as never },
+  });
+  render(<CommandPicker {...input} />);
+  fireEvent.click(screen.getByRole('radio', { name: '천도' }));
+  const names = within(screen.getByRole('radiogroup', { name: '대상 도시' }))
+    .getAllByRole('radio')
+    .map((radio) => radio.textContent);
+  expect(names[1]).toMatch(/^진 \(위\)/);
+  expect(names[2]).toMatch(/^진류 \(촉\)/);
+  fireEvent.change(screen.getByRole('searchbox', { name: /대상 도시 찾기/ }), { target: { value: 'ㅈㄹ' } });
+  expect(within(screen.getByRole('radiogroup', { name: '대상 도시' })).getAllByRole('radio')).toHaveLength(1);
+  expect(screen.getByText('1개 / 3개')).toBeTruthy();
+});
+
+it('INT-25 AC-INT-25 대상 국가 카드는 수도·국력·도시·장수와 관계를 적고 사전 검사 불가 국가는 사유와 함께 뒤에 둔다', () => {
+  const map = {
+    ...targetMap,
+    cities: [
+      ...targetMap.cities,
+      { key: 4, name: '건업', level: 8, nationId: 3, links: [], x: 0, y: 0, supplied: true },
+    ],
+    nations: [...targetMap.nations, { id: 3, name: '오', color: '#339933', capitalCityKey: 4 }],
+  };
+  const context = {
+    here: 1,
+    ownNationId: 1,
+    map: map as never,
+    nationFacts: new Map([
+      [2, { power: 900, cities: 5, generals: 20 }],
+      [3, { power: 1200, cities: 7, generals: 25 }],
+    ]),
+    relations: new Map([[2, '선포 · 12개월 남음']]),
+  };
+  render(
+    <NationTargetPicker
+      context={context}
+      label="대상 국가"
+      value="2"
+      options={map.nations.filter((n) => n.id !== 1)}
+      onChange={vi.fn()}
+      checks={
+        new Map([
+          [2, { ok: true as const }],
+          [3, { ok: false as const, message: '인접 국가가 아닙니다.' }],
+        ])
+      }
+    />,
+  );
+  const rows = within(screen.getByRole('radiogroup', { name: '대상 국가' })).getAllByRole('radio');
+  expect(rows.map((row) => row.getAttribute('data-value'))).toEqual(['2', '3']);
+  expect(rows[0]!.textContent).toContain('수도 진류 · 국력 900 · 도시 5 · 장수 20');
+  expect(rows[0]!.textContent).toContain('선포 · 12개월 남음');
+  expect(rows[0]!.textContent).toContain('가능');
+  expect(rows[1]!.textContent).toContain('불가');
+  expect(rows[1]!.textContent).toContain('인접 국가가 아닙니다.');
+});
+
+it('INT-25 AC-INT-26 명령 도움말이 오면 카드 둘째 줄에 비용을, 인자 화면 안내 줄에 설명과 비용을 적는다', () => {
+  const move = commands.find((c) => c.key === 'move')!;
+  const documented = { ...move, description: '이웃 도시로 옮깁니다.', cost: '금 50' } as CommandInfo;
+  render(<CommandPicker {...props({ commands: [documented, commands[0]!] })} />);
+  const card = screen.getByRole('radio', { name: '이동' });
+  const described = card
+    .getAttribute('aria-describedby')!
+    .split(' ')
+    .map((id) => document.getElementById(id)?.textContent);
+  expect(described).toEqual(['금 50', '군사 · 대상 도시 (필수)']);
+  // 도움말이 없는 명령은 둘째 줄이 없다.
+  expect(screen.getByRole('radio', { name: '농지 개간' }).getAttribute('aria-describedby')!.split(' ')).toHaveLength(1);
+  fireEvent.click(card);
+  expect(screen.getByTestId('command-description').textContent).toBe('이웃 도시로 옮깁니다.');
+  expect(screen.getByTestId('command-cost').textContent).toBe('비용: 금 50');
+});
+
+it('INT-25 AC-INT-25 개인 예턴의 선양은 같은 국가 장수(나 제외)를 이름으로 고른다', () => {
+  const abdicate: CommandInfo = {
+    key: 'abdicate',
+    name: '선양',
+    category: 'strategy',
+    argsSchema: { type: 'object', properties: { generalId: { type: 'integer' } }, required: ['generalId'] },
+  };
+  const input = props({
+    commands: [abdicate],
+    argContext: {
+      here: null,
+      ownNationId: 1,
+      me: { id: 9, leadership: 50, crew: 0, crewType: 1100, gold: 0 },
+      members: [
+        { id: 9, name: '조조', cityName: '허창', leadership: 90, strength: 72, intel: 91 },
+        { id: 10, name: '조비', cityName: '업', leadership: 70, strength: 60, intel: 80 },
+      ],
+    },
+  });
+  render(<CommandPicker {...input} />);
+  const card = screen.getByRole('radio', { name: '선양' });
+  expect(document.getElementById(card.getAttribute('aria-describedby')!)?.textContent).toBe('전략 · 대상 장수 (필수)');
+  fireEvent.click(card);
+  const rows = within(screen.getByRole('radiogroup', { name: '대상 장수' })).getAllByRole('radio');
+  expect(rows.map((row) => row.getAttribute('data-value'))).toEqual(['10']);
+  expect(rows[0]!.textContent).toContain('조비 (업)');
+  expect(rows[0]!.textContent).toContain('통솔 70 · 무력 60 · 지력 80');
 });

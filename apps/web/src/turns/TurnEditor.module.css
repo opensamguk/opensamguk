@@ -342,6 +342,27 @@
   font-size: var(--text-xs);
 }
 
+/* 카드 둘째 줄의 비용 (INT-26 도움말). */
+.commandCost {
+  color: var(--color-text);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+/* 수량 칸 옆 예상 금 (사전 검사 미리보기). */
+.costPreview {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+/* 국가 예턴 위의 국고 한 줄. */
+.treasury {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
 .argForm {
   display: flex;
   flex-wrap: wrap;
