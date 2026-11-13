@@ -27,11 +27,21 @@ async function tagLayout(page: Page, slot: number) {
       const cellBox = cell.getBoundingClientRect();
       const text = document.createRange();
       text.selectNodeContents(tag);
-      const others = [...cell.children].filter((el) => el !== tag);
+      // 요약과 태그는 칸 안의 한 줄(flex) 상자에 나란히 있다. 태그의 형제(요약)와 겹침을 잰다.
+      const others = [...tag.parentElement!.children].filter((el) => el !== tag);
       const inside = (r: DOMRect) => r.left >= cellBox.left - 0.5 && r.right <= cellBox.right + 0.5;
       return {
         lineBoxes: tag.getClientRects().length,
         textLines: text.getClientRects().length,
+        // 요약 글은 줄바꿈 없이 한 줄이고 넘치면 말줄임으로 잘린다.
+        summaryTextLines: Math.max(
+          ...others.map((el) => {
+            const range = document.createRange();
+            range.selectNodeContents(el);
+            return range.getClientRects().length;
+          }),
+        ),
+        summaryEllipsis: others.every((el) => getComputedStyle(el).textOverflow === 'ellipsis'),
         overlapsCommandOrArgs: others.some((el) =>
           [...el.getClientRects()].some(
             (r) =>
@@ -78,9 +88,10 @@ test('좁은 메인 명령 칸에서 긴 인자와 긴 대상 도시 이름에�
     .getByRole('radio', { name: new RegExp(`^${longest.name}`) })
     .click();
   await editor(page).getByRole('button', { name: '2번 칸에 넣기', exact: true }).click();
-  await expect(row(page, 1)).toContainText('모병');
-  await expect(row(page, 1)).toContainText('수량 1000000');
-  await expect(row(page, 2)).toContainText(longest.name);
+  // 칸 요약은 원작 예턴 요약 한 줄이다 (INT-26). 좁은 칸에서는 말줄임으로 잘려도 글은 그대로 있다.
+  await expect(row(page, 1)).toContainText('1000000명 모병');
+  await expect(row(page, 2)).toContainText(`【${longest.name}】`);
+  await expect(row(page, 2)).toContainText('이동');
   await expect(editor(page).getByTestId('draft-state')).toHaveText('저장하지 않은 편집 2건');
 
   // 글꼴이 정착한 뒤 좁은 명령 칸과 메인 배치 전환 양쪽을 잰다. 실패해도 같은 순간의 그림과 폭을 남긴다.
@@ -117,6 +128,8 @@ test('좁은 메인 명령 칸에서 긴 인자와 긴 대상 도시 이름에�
       expect(layout, `viewport ${width}`).toEqual({
         lineBoxes: 1,
         textLines: 1,
+        summaryTextLines: 1,
+        summaryEllipsis: true,
         overlapsCommandOrArgs: false,
         allInsideCell: true,
         tableScrollsSideways: false,

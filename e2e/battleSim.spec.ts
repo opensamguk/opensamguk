@@ -471,7 +471,7 @@ test('T4-86 AC-P2-26 확장 병종표 월드에서 시뮬레이터와 개인 예
   await editor.getByRole('spinbutton', { name: '수량' }).fill('100');
   await expect(editor.getByRole('status').filter({ hasText: '사전 검사 경고' })).toBeVisible();
   await editor.getByRole('button', { name: '1번 칸에 넣기', exact: true }).click();
-  await expect(editor.locator('tr[data-slot="1"]')).toContainText(`수량 100 · ${locked.name}`);
+  await expect(editor.locator('tr[data-slot="1"]')).toContainText(`【${locked.name}】 100명 모병`);
   await editor.getByRole('button', { name: '저장', exact: true }).click();
   await expect(editor.getByText('저장했습니다.')).toBeVisible();
   const saved = await turns(page, worldId);

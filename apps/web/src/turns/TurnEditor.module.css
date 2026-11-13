@@ -172,6 +172,32 @@
   font-weight: 600;
 }
 
+/* 명령 칸은 표 폭의 절반을 받는다. 요약 줄의 내용 폭이 0이라 긴 요약이 칸(과 표)을 늘리지 않는다. */
+.commandCell {
+  width: 50%;
+}
+
+/* 원작 예턴 요약은 한 줄로 두고 넘치면 말줄임으로 자른다. width 0 + min-width 100%는 칸 폭에 맞추되 칸의 최소 폭에 보태지 않는다. */
+.commandLine {
+  display: flex;
+  align-items: center;
+  width: 0;
+  min-width: 100%;
+}
+
+.commandLine > .command,
+.commandLine > .emptySlot {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 바뀜 태그는 줄이지 않는다. 요약이 먼저 말줄임으로 줄어든다 (#112). */
+.commandLine > .changedTag {
+  flex: none;
+}
+
 /* 비워 둔 칸. 직접 넣은 명령(굵은 .command)과 구분하려고 흐린 보통 굵기로 두고, 괄호 안 방침 이름을 글자로 함께 쓴다 (NFR-08). */
 .emptySlot {
   color: var(--color-text-muted);
