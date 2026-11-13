@@ -72,6 +72,7 @@ it('같은 트랜잭션의 이전 상태를 넘기면 재조회 없이 기존과
           color: before.nations[2]!.color,
           removedSequence: 7,
           removedTick: 100,
+          finalSummary: expect.objectContaining({ nationId: 2, name: before.nations[2]!.name }),
         },
       },
     ],

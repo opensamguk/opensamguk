@@ -1,5 +1,13 @@
 import { notifyActivityOnCommit, type Prisma } from '@opensamguk/db';
-import { COURT_PROMOTION_FEATURE, nationRank, type CommandResult, type WorldState } from '@opensamguk/rules';
+import {
+  COURT_PROMOTION_FEATURE,
+  nationRank,
+  toGameDate,
+  type CommandResult,
+  type WorldState,
+} from '@opensamguk/rules';
+
+import { finalNationSummaries } from './seasonArchive';
 
 export type ActionAt = { sequence: number; tick: number };
 
@@ -66,31 +74,22 @@ export async function persistPublicNationEvents(
   }
 }
 
-export async function archiveRemovedNation(
-  tx: Prisma.TransactionClient,
-  worldId: string,
-  nation: { id: number; name: string; color: string },
-  at: ActionAt,
-) {
-  await tx.removedNation.create({
-    data: {
-      worldId,
-      nationId: nation.id,
-      name: nation.name,
-      color: nation.color,
-      removedSequence: at.sequence,
-      removedTick: at.tick,
-    },
-  });
-}
-
 export async function persistYearbookNations(
   tx: Prisma.TransactionClient,
   worldId: string,
   tick: number,
   nations: readonly { id: number; name: string; color: string; power: number }[],
+  troopTotals: ReadonlyMap<number, number>,
 ) {
-  const data = nations.map(({ id, name, color, power }) => ({ worldId, tick, nationId: id, name, color, power }));
+  const data = nations.map(({ id, name, color, power }) => ({
+    worldId,
+    tick,
+    nationId: id,
+    name,
+    color,
+    power,
+    troops: troopTotals.get(id) ?? 0,
+  }));
   if (data.length) await tx.yearbookNation.createMany({ data });
 }
 
@@ -102,10 +101,25 @@ export async function persistRemovedNations(
   next: WorldState,
   at: ActionAt,
 ) {
-  for (const nation of Object.values(before.nations)) {
-    if (next.nations[nation.id]) continue;
-    await archiveRemovedNation(tx, worldId, nation, at);
-    await tx.nation.update({ where: { worldId_id: { worldId, id: nation.id } }, data: { capitalCityKey: null } });
-    await tx.nation.delete({ where: { worldId_id: { worldId, id: nation.id } } });
+  const ids = Object.values(before.nations)
+    .filter(({ id }) => !next.nations[id])
+    .map(({ id }) => id);
+  if (!ids.length) return;
+  const year = toGameDate(before.startYear, at.tick).year;
+  for (const nation of finalNationSummaries(before, year, ids)) {
+    const where = { worldId_id: { worldId, id: nation.nationId } };
+    await tx.removedNation.create({
+      data: {
+        worldId,
+        nationId: nation.nationId,
+        name: nation.name,
+        color: nation.color,
+        removedSequence: at.sequence,
+        removedTick: at.tick,
+        finalSummary: nation,
+      },
+    });
+    await tx.nation.update({ where, data: { capitalCityKey: null } });
+    await tx.nation.delete({ where });
   }
 }

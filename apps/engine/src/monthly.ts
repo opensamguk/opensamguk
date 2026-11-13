@@ -21,7 +21,7 @@ import { hashState } from '@opensamguk/shared/node';
 import { engineFeatures } from './features';
 import { loadWorld } from './worldLoader';
 import { persistRanking } from './ranking';
-import { activeSeasonGenerals } from './seasonArchive';
+import { activeSeasonGenerals, nationTroopTotals } from './seasonArchive';
 import { persistYearbookNations, persistRemovedNations, persistPublicNationEvents } from './nationArchive';
 import { persistCommandMeta } from './commandPersistence';
 import { persistExt } from './extState';
@@ -225,7 +225,7 @@ export async function persistMonthly(
       activeGenerals: activeSeasonGenerals(next, date.year).length,
     },
   });
-  await persistYearbookNations(tx, worldId, tick, rankedNations);
+  await persistYearbookNations(tx, worldId, tick, rankedNations, nationTroopTotals(next, date.year));
   for (const nation of yearbook.nations) {
     const where = { worldId_tick_nationId: { worldId, tick, nationId: nation.nationId } };
     // 같은 월드 잠금 안에서 기존 사건을 보존하고 월간 수치를 덧붙인다.

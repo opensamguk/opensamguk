@@ -1,6 +1,13 @@
 import type { Prisma } from '@opensamguk/db';
 import { TRPCError } from '@trpc/server';
-import { courtOfficeTitle, rankGenerals, reputationEventSchema, TICKS_PER_MONTH, toGameDate } from '@opensamguk/rules';
+import {
+  courtOfficeTitle,
+  nationRank,
+  rankGenerals,
+  reputationEventSchema,
+  TICKS_PER_MONTH,
+  toGameDate,
+} from '@opensamguk/rules';
 import { protectedProcedure, router, worldVerifiedProcedure } from '../trpc';
 import {
   beforeCursor,
@@ -48,6 +55,16 @@ const winnerSummarySchema = z.strictObject({
   populationMax: z.number().int().nonnegative(),
   gold: z.number().int().nonnegative(),
   rice: z.number().int().nonnegative(),
+});
+const finalNationSchema = z.object({
+  nationId: entityKey,
+  name: z.string(),
+  color: z.string(),
+  philosophy: z.string(),
+  level: z.number().int(),
+  tech: z.number().nonnegative(),
+  troops: z.number().int().nonnegative(),
+  roster: z.array(z.object({ generalId: entityKey, name: z.string(), portraitId: z.number().int().nullable() })),
 });
 const traitCounts = z.array(z.strictObject({ name: z.string().min(1), count: z.number().int().positive() }));
 const traitDistributionSchema = z.strictObject({
@@ -292,7 +309,10 @@ export const recordsRouter = router({
         where: { worldId: input.worldId },
         orderBy: { tick: 'asc' },
         select: {
-          nations: { orderBy: { nationId: 'asc' }, select: { nationId: true, name: true, color: true, power: true } },
+          nations: {
+            orderBy: { nationId: 'asc' },
+            select: { nationId: true, name: true, color: true, power: true, troops: true },
+          },
           tick: true,
           data: true,
           activeGenerals: true,
@@ -301,12 +321,14 @@ export const recordsRouter = router({
       const removed = await tx.removedNation.findMany({
         where: { worldId: input.worldId },
         orderBy: { nationId: 'asc' },
-        select: { nationId: true, name: true, color: true, removedTick: true },
+        select: { nationId: true, name: true, color: true, removedTick: true, finalSummary: true },
       });
+      const finalNations = z.array(finalNationSchema).safeParse(world.result?.finalNations).data ?? [];
       const nationNames = new Map(removed.map(({ nationId, name }) => [nationId, name]));
       for (const month of history) for (const nation of month.nations) nationNames.set(nation.nationId, nation.name);
       for (const row of rows)
         if (row.nationId !== null && row.nationName) nationNames.set(row.nationId, row.nationName);
+      for (const { nationId, name } of finalNations) nationNames.set(nationId, name);
       const cityNames = new Map(
         (
           await tx.city.findMany({
@@ -322,7 +344,10 @@ export const recordsRouter = router({
         removedTick: number | null;
         peakCities: number | null;
         peakPower: number | null;
+        peakTroops: number | null;
+        final: (z.infer<typeof finalNationSchema> & { title: string | null }) | null;
         recordedAtTick: number | null;
+        recordedAt: { year: number; month: number } | null;
         cities: { cityKey: number; name: string }[];
         finalGenerals: number;
       };
@@ -335,20 +360,33 @@ export const recordsRouter = router({
           removedTick: null,
           peakCities: null,
           peakPower: null,
+          peakTroops: null,
+          final: null,
           recordedAtTick: null,
+          recordedAt: null,
           cities: [],
           finalGenerals: 0,
         });
+      const applyFinal = (summary: z.infer<typeof finalNationSchema>, tick: number) => {
+        const nation = nationArchive.get(summary.nationId)!;
+        nation.color = summary.color;
+        nation.recordedAtTick = tick;
+        nation.final = { ...summary, title: nationRank(summary.level)?.title ?? null };
+        nation.finalGenerals = summary.roster.length;
+        nation.peakTroops = Math.max(nation.peakTroops ?? 0, summary.troops);
+      };
       for (const row of removed) {
         const nation = nationArchive.get(row.nationId)!;
         nation.color = row.color;
         nation.removedTick = row.removedTick;
+        const summary = finalNationSchema.safeParse(row.finalSummary).data;
+        if (summary?.nationId === row.nationId) applyFinal(summary, row.removedTick);
       }
       for (const row of rows) {
         if (row.nationId === null || !row.nationName) continue;
         const nation = nationArchive.get(row.nationId)!;
         nation.color = row.nationColor;
-        nation.finalGenerals++;
+        if (nation.final === null) nation.finalGenerals++;
       }
       const final = { nations: result.remainingNations, generals: rows.length };
       const peak = { nations: final.nations, affiliatedGenerals: rows.filter((row) => row.nationId !== null).length };
@@ -359,8 +397,9 @@ export const recordsRouter = router({
         for (const row of month.nations) {
           const nation = nationArchive.get(row.nationId)!;
           nation.color ??= row.color;
-          nation.recordedAtTick = month.tick;
+          if (nation.final === null) nation.recordedAtTick = month.tick;
           if (row.power !== null) nation.peakPower = Math.max(nation.peakPower ?? 0, row.power);
+          if (row.troops !== null) nation.peakTroops = Math.max(nation.peakTroops ?? 0, row.troops);
         }
         if (typeof month.data !== 'object' || month.data === null || !('nations' in month.data)) continue;
         const { nations, cities } = worldRecordInfo(month.data);
@@ -384,6 +423,16 @@ export const recordsRouter = router({
           peak.affiliatedGenerals,
           nations.reduce((total, nation) => total + nation.generals, 0),
         );
+      }
+      for (const summary of finalNations) {
+        applyFinal(summary, world.result!.endedTick);
+        nationArchive.get(summary.nationId)!.recordedAt = { year: result.year, month: result.month };
+      }
+      for (const nation of nationArchive.values()) {
+        if (!nation.recordedAt && nation.recordedAtTick !== null) {
+          const tick = nation.final ? nation.recordedAtTick : Math.max(0, nation.recordedAtTick - 1);
+          nation.recordedAt = toGameDate(world.startYear, tick);
+        }
       }
       const traits = traitDistributionSchema.safeParse(world.result?.traitDistribution).data;
       if (traits && history.length === 0) peakGenerals = final.generals;
