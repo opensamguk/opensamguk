@@ -1,4 +1,5 @@
 import type { Rng } from '@opensamguk/shared';
+import { personalityEffects } from '../general/personality';
 import { BALANCE } from '../balance';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { commandRegistry } from '../commands/registry';
@@ -191,9 +192,10 @@ export function generalTurnCandidates(view: WorldView, general: General, context
         choice.add(candidate.key, candidate.args, candidate.score, candidate.reason);
     if (!cityResources && troops < minimum && unit) {
       const limit = Math.min(capacity - commanded, city.population);
-      const amount = stats
-        ? affordableRecruits(view, general, unit.cost, limit)
-        : Math.min(limit, Math.floor(general.gold / unit.cost));
+      const amount =
+        stats || personalityEffects(view, general.personality)?.recruitPercent !== undefined
+          ? affordableRecruits(view, general, unit.cost, limit)
+          : Math.min(limit, Math.floor(general.gold / unit.cost));
       if (amount > 0)
         choice.add(
           'recruit',

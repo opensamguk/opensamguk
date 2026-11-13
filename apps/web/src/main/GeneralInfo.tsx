@@ -81,6 +81,19 @@ export function GeneralInfo({
   const age = displayedAge(g, summary);
   const retirementAge = condition?.retirementAge ?? 70;
   const progression = g.progression;
+  const personality = g.personalityEffects;
+  const signed = (value: number) => (value > 0 ? `+${value}` : String(value));
+  const personalityDetails = personality
+    ? [
+        personality.train !== undefined && `전투 훈련 ${signed(personality.train)}`,
+        personality.morale !== undefined && `전투 사기 ${signed(personality.morale)}`,
+        personality.recruitPercent !== undefined && `징·모병 비용 ${signed(personality.recruitPercent - 100)}%`,
+        personality.experiencePercent !== undefined && `명성 획득 ${signed(personality.experiencePercent - 100)}%`,
+        personality.dedicationPercent !== undefined && `공헌 획득 ${signed(personality.dedicationPercent - 100)}%`,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : undefined;
   const battle = g.battleStats;
   const defense = g.defense;
   const salary = g.salaryEstimate;
@@ -122,7 +135,7 @@ export function GeneralInfo({
             : []),
           { label: '나이', value: <span className={ageStyle}>{age}세</span> },
           // 성격·특기는 시나리오 장수만 값이 있다. 효과 설명은 규칙이 생긴 뒤에 붙인다 (INT-25).
-          { label: '성격', value: g.personality || '—' },
+          { label: '성격', value: personality?.name || g.personality || '—', title: personalityDetails },
           { label: '특기', value: g.special || '—' },
           { label: '금', value: n(g.gold) },
           { label: '쌀', value: n(g.rice) },

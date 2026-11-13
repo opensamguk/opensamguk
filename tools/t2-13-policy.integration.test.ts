@@ -8,6 +8,7 @@ import {
 } from '../packages/rules/src/personnel/nationRestrictions';
 import { NPC_NATION_POLICY_FEATURE, NPC_NATION_POLICY_KIND } from '../packages/rules/src/npc/policy';
 import type { PolicyKey, PolicySlot } from '../packages/rules/src/policy';
+import { GENERAL_PERSONALITY_FEATURE } from '../packages/rules/src/general/personality';
 import { INACTIVE_REMOVAL_FEATURE, inactiveRemovalTick } from '../packages/rules/src/policy/inactiveRemoval';
 import { PLAYER_AUTOPLAY_FEATURE } from '../packages/rules/src/policy';
 import { commandInitial } from '../packages/rules/test/commandFixture';
@@ -741,4 +742,45 @@ it('미접속 퇴장은 예고 뒤 월말에 적용되고 사용자를 분리하
   );
   const archive = await exportReplay(db, worldId);
   expect(replayArchive(archive, 29)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
+});
+
+it('성격의 공헌 보정을 실제 장수 턴에 적용하고 같은 결과를 재생한다', async () => {
+  const alice = await user();
+  const initial = commandInitial();
+  initial.generals = initial.generals.slice(0, 2).map((general, index) => ({
+    ...general,
+    userId: index === 0 ? alice.id : null,
+    personality: index === 0 ? 'che_은둔' : null,
+    nextTurnTick: index === 0 ? 100 : 5000,
+  }));
+  const { worldId } = await saveInitialWorld(db, initial, {
+    name: '성격 실제 PG',
+    turnTermMinutes: 30,
+    endYear: null,
+    replayFormat: 3,
+    ruleFeatures: [GENERAL_PERSONALITY_FEATURE, 'policy'],
+  });
+  worlds.push(worldId);
+  await db.world.update({ where: { id: worldId }, data: { status: 'RUNNING', clockAnchorAt: new Date(now) } });
+  const lease = await acquireLease(db, worldId);
+  if (!lease) throw new Error('시험 실행권이 없습니다.');
+  leases.push(lease);
+  const loop = new TurnLoop(db, lease);
+  const home = () => rpc('home.get', { worldId }, alice.cookie);
+  expect((await home()).data).toMatchObject({
+    general: { personalityEffects: { name: '은둔', dedicationPercent: 90 } },
+  });
+  const turns = Array.from({ length: 30 }, (_, slot) =>
+    slot === 0 ? { commandKey: 'donate', args: { resource: 'gold', amount: 100 } } : null,
+  );
+  expect((await rpc('turns.set', { worldId, revision: 0, slots: turns }, alice.cookie, true)).data).toMatchObject({
+    ok: true,
+  });
+  await loop.advanceTo(100);
+  expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } })).toMatchObject({
+    dedication: initial.generals[0]!.dedication + 90,
+  });
+  await loop.advanceTo(10000);
+  const archive = await exportReplay(db, worldId);
+  expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
 });

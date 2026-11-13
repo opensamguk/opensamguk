@@ -8,6 +8,7 @@ import { applyEffects } from './effects';
 import { commandRegistry, runCommand } from './registry';
 import { chooseAutoplayTurn, chooseGeneralTurn, chooseNationTurn, type NpcContext } from '../npc';
 import { runPolicyCommand } from '../policy/execute';
+import { applyPersonalityProgress } from '../general/personality';
 import { PLAYER_AUTOPLAY_FEATURE, playerAutoplayWindow, type PolicyKey } from '../policy';
 import { runOfficeAssign, takeOfficeTurn } from '../personnel/officeTurn';
 import { canExecuteNationCommand } from '../personnel/permissions';
@@ -181,7 +182,9 @@ export function runGeneralTurn(
   if (autoplay) selected = { commandKey: autoplay.key, args: autoplay.args };
   if (emptyHumanTurn && !autoplay && options.policy !== undefined) {
     const policy = runPolicyCommand(next, { ...actor, target: 'general' }, options.policy, seed, resolver);
+    const before = next.generals[actor.generalId]!;
     next = applyEffects(next, policy.result.effects);
+    applyPersonalityProgress(next, next.generals[actor.generalId]!, before);
     applyLastNationRecruitmentLock(next, policy.result, actor.tick ?? 0);
     return {
       state: next,
@@ -205,6 +208,7 @@ export function runGeneralTurn(
     );
     if (decision.chosen) selected = { commandKey: decision.chosen.key, args: decision.chosen.args };
   }
+  const before = next.generals[actor.generalId]!;
   const result = run(
     next,
     { ...actor, target: 'general', ...(instructed.order ? { campaignOrderId: instructed.order.id } : {}) },
@@ -213,6 +217,7 @@ export function runGeneralTurn(
     rngFor(seed, 'turn', actor.tick ?? 0, actor.generalId),
   );
   next = applyEffects(next, 'code' in result ? [] : result.effects);
+  applyPersonalityProgress(next, next.generals[actor.generalId]!, before);
   applyLastNationRecruitmentLock(next, result, actor.tick ?? 0);
   if (instructed.order)
     next = finishCampaignOrder(

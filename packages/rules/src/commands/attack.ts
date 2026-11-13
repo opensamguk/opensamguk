@@ -1,6 +1,7 @@
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { z } from 'zod';
 import { nationRestrictions } from '../personnel/nationRestrictions';
+import { personalityEffects } from '../general/personality';
 import { BALANCE } from '../balance';
 import { simulateBattle, type BattlePhase } from '../battle/simulate';
 import { canDefend, DEFENSE_STANCE_FEATURE } from '../battle/defenders';
@@ -96,6 +97,7 @@ function makeAttack(collect: typeof collectModifiers) {
         const battle = simulateBattle(
           {
             attacker: g,
+            attackerReadiness: personalityEffects(state, g.personality),
             defender: wall,
             recordPhases: actor.recordBattleStats === true,
             attackerTech: aTech,
@@ -128,7 +130,9 @@ function makeAttack(collect: typeof collectModifiers) {
         const battle = simulateBattle(
           {
             attacker: g,
+            attackerReadiness: personalityEffects(state, g.personality),
             defender,
+            defenderReadiness: personalityEffects(state, defender.personality),
             recordPhases: actor.recordBattleStats === true,
             attackerTech: aTech,
             defenderTech: bTech,

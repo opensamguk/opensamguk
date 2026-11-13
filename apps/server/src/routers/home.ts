@@ -3,6 +3,7 @@ import { nextTurnAt, turnSchedule, readWorld, requireGeneral, worldClock, worldI
 import { cityInfo, ownGeneralInfo, logInfo, logSelect, nationInfo } from '../visibility';
 import {
   GENERAL_CONDITION_FEATURE,
+  personalityEffects,
   INACTIVE_REMOVAL_FEATURE,
   inactiveRemovalTick,
   DEFENSE_STANCES,
@@ -114,6 +115,7 @@ export const homeRouter = router({
       return {
         general: {
           ...ownGeneralInfo(general),
+          personalityEffects: personalityEffects(world, general.personality) ?? null,
           battleStats:
             battle === null
               ? null
