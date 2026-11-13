@@ -126,7 +126,7 @@ async function world(
     actor?: User;
     enabled?: boolean;
     benefits?: boolean;
-    specialty?: boolean;
+    specialty?: boolean | 'growth';
     endYear?: number | null;
     personnel?: boolean;
     maxGenerals?: number;
@@ -148,7 +148,12 @@ async function world(
   } else if (options.actor) {
     initial.generals[0]!.userId = options.actor.id;
   }
-  if (options.specialty) initial.generals[0]!.special = 'che_보병';
+  if (options.specialty && options.specialty !== 'growth') initial.generals[0]!.special = 'che_보병';
+  if (options.specialty === 'growth') {
+    initial.generals[0]!.birthYear = initial.startYear - 70;
+    initial.generals[0]!.age = 70;
+    initial.generals[0]!.deathYear = initial.startYear + 10;
+  }
   const enabled = options.enabled !== false,
     withLineage = Boolean(options.maxGenerals || options.lineage);
   const featureData = {
@@ -178,6 +183,7 @@ async function world(
       ...(enabled ? ['heritage-v1'] : []),
       ...(options.benefits || options.specialty ? [HERITAGE_BENEFITS_FEATURE] : []),
       ...(options.specialty ? ['combat-specialty-v1', 'heritage-specialty-v1'] : []),
+      ...(options.specialty === 'growth' ? ['domestic-specialty-v1', 'specialty-growth-v1'] : []),
       'policy',
       ...(options.personnel || withLineage ? ['personnel'] : []),
       ...(withLineage ? ['lineage-v1'] : []),
@@ -1531,6 +1537,41 @@ it('전투 특기 유산의 확인 가격·중복 요청·초기화와 월말 �
   expect(await db.heritageEntry.count({ where: { worldId, kind: 'BENEFIT_SPEND' } })).toBe(2);
   const archive = await exportReplay(db, worldId);
   expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
+});
+
+it('성장 특기 월드는 3년까지 기다렸다가 내정 특기와 예약 전투 특기를 함께 얻는다', async () => {
+  const player = await user();
+  const worldId = await world({ actor: player, specialty: 'growth' });
+  await db.heritageAccount.create({ data: { userId: player.id, balance: 4000 } });
+  const reply = await rpc(
+    'heritage.specialty',
+    {
+      worldId,
+      requestId: randomUUID(),
+      expectedGeneralId: 1,
+      expectedCost: 4000,
+      action: { action: 'reserve', specialty: '기병' },
+    },
+    player,
+  );
+  expect(reply.status).toBe(200);
+  await advance(worldId, TICKS_PER_MONTH);
+  expect((await rpc('heritage.benefits', { worldId }, player)).data).toMatchObject({
+    specialty: { current: null, next: '기병' },
+  });
+  await advance(worldId, TICKS_PER_MONTH * 37);
+  expect((await rpc('heritage.benefits', { worldId }, player)).data).toMatchObject({
+    specialty: { current: '기병', next: null },
+  });
+  const logs = await db.generalLog.findMany({
+    where: { worldId, generalId: 1, commandKey: 'specialty.growth' },
+    orderBy: { ordinal: 'asc' },
+  });
+  expect(logs.map(({ text }) => text)).toEqual([expect.stringContaining('내정 특기'), '전투 특기 【기병】 습득']);
+  const archive = await exportReplay(db, worldId);
+  expect(replayArchive(archive, archive.months.length)).toEqual(
+    archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })),
+  );
 });
 
 for (const path of ['heritage.benefits', 'heritage.purchase', 'heritage.specialty'] as const) {

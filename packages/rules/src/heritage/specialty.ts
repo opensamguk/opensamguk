@@ -1,8 +1,11 @@
 import { z } from 'zod';
+import type { Rng } from '@opensamguk/shared';
+import { domesticSpecialty, domesticSpecialtyNames, DOMESTIC_SPECIALTY_FEATURE } from '../general/domesticSpecialty';
 import { combatSpecialty, combatSpecialtyKey, combatSpecialtyNames } from '../general/combatSpecialty';
 import type { WorldState, WorldView } from '../model/world';
 import type { RecordedInput, ReplayState } from '../replay';
 
+export const SPECIALTY_GROWTH_FEATURE = 'specialty-growth-v1';
 export const HERITAGE_SPECIALTY_FEATURE = 'heritage-specialty-v1';
 export const HERITAGE_SPECIALTY_KIND = 'heritage.combatSpecialty';
 export const heritageSpecialtyCost = 4_000;
@@ -84,8 +87,47 @@ export function applyHeritageSpecialtyPurchase(replay: ReplayState, input: Recor
   };
 }
 
-export function settleHeritageSpecialties(state: WorldState, year: number) {
-  if (!state.ruleFeatures?.includes(HERITAGE_SPECIALTY_FEATURE)) return;
+// core2026 c81d304 monthlySpecialityBetrayAction.ts (MIT): maturity ages after the third season year.
+function specialtyAge(general: WorldView['generals'][number], startYear: number, divisor: number) {
+  const enteredYear = Math.max(startYear, general.activeFromYear);
+  const startAge = Math.max(0, enteredYear - general.birthYear);
+  const yearsIntoSeason = enteredYear - startYear;
+  return startAge + Math.max(Math.round((80 - startAge) / divisor - yearsIntoSeason / 2), 3);
+}
+
+export function settleHeritageSpecialties(state: WorldState, year: number, rng: Rng) {
+  const logs: { generalId: number; text: string }[] = [];
+  if (!state.ruleFeatures?.includes(HERITAGE_SPECIALTY_FEATURE)) return logs;
+  const growth = state.ruleFeatures.includes(SPECIALTY_GROWTH_FEATURE);
+  if (growth) {
+    if (year < state.startYear + 3) return logs;
+    const generals = Object.values(state.generals)
+      .filter(({ activeFromYear, removedAt }) => activeFromYear <= year && removedAt === undefined)
+      .sort((a, b) => a.id - b.id);
+    if (state.ruleFeatures.includes(DOMESTIC_SPECIALTY_FEATURE))
+      for (const general of generals) {
+        const age = year - general.birthYear;
+        const combat = combatSpecialty(state, combatSpecialtyKey(general));
+        if (domesticSpecialty(state, general.special) || age < specialtyAge(general, state.startYear, 12)) continue;
+        if (combat && general.combatSpecial === undefined) {
+          general.combatSpecial = combat.name;
+          general.heritageSpecialty ??= { next: null, resets: 0 };
+        }
+        general.special = rng.pick(domesticSpecialtyNames);
+        logs.push({ generalId: general.id, text: `내정 특기 【${general.special}】 습득` });
+      }
+    for (const general of generals) {
+      if (
+        combatSpecialty(state, combatSpecialtyKey(general)) ||
+        year - general.birthYear < specialtyAge(general, state.startYear, 6)
+      )
+        continue;
+      general.combatSpecial = general.heritageSpecialty?.next ?? rng.pick(combatSpecialtyNames);
+      general.heritageSpecialty = { next: null, resets: general.heritageSpecialty?.resets ?? 0 };
+      logs.push({ generalId: general.id, text: `전투 특기 【${general.combatSpecial}】 습득` });
+    }
+    return logs;
+  }
   for (const general of Object.values(state.generals)) {
     const next = general.heritageSpecialty?.next;
     if (
@@ -98,4 +140,5 @@ export function settleHeritageSpecialties(state: WorldState, year: number) {
     general.combatSpecial = next;
     general.heritageSpecialty = { ...general.heritageSpecialty!, next: null };
   }
+  return logs;
 }

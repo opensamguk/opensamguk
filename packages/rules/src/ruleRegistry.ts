@@ -12,6 +12,7 @@ import {
 import {
   applyHeritageSpecialtyPurchase,
   HERITAGE_SPECIALTY_FEATURE,
+  SPECIALTY_GROWTH_FEATURE,
   HERITAGE_SPECIALTY_KIND,
 } from './heritage/specialty';
 import { applyHeritagePurchase, HERITAGE_BENEFIT_KIND, HERITAGE_BENEFITS_FEATURE } from './heritage/benefits';
@@ -166,6 +167,7 @@ export interface RuleRegistry {
 export const ruleRegistry: RuleRegistry = {
   features: [
     { key: BATTLE_TACTICS_FEATURE, requires: ['combat-specialty-v1'], conflicts: [] },
+    { key: SPECIALTY_GROWTH_FEATURE, requires: [HERITAGE_SPECIALTY_FEATURE, 'domestic-specialty-v1'], conflicts: [] },
     { key: HERITAGE_SPECIALTY_FEATURE, requires: [HERITAGE_BENEFITS_FEATURE, 'combat-specialty-v1'], conflicts: [] },
     { key: HERITAGE_BENEFITS_FEATURE, requires: ['heritage-v1'], conflicts: [] },
     preparedTurnsFeature,

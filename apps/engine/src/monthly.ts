@@ -192,6 +192,20 @@ export async function persistMonthly(
       })),
     });
   }
+  if (result.specialtyGrowthLogs.length) {
+    await tx.generalLog.createMany({
+      data: result.specialtyGrowthLogs.map((log, index) => ({
+        ...log,
+        worldId,
+        tick,
+        sequence,
+        ordinal:
+          result.officeTaxLogs.length + result.seasonalEventLogs.length + result.rareEquipmentLogs.length + index,
+        commandKey: 'specialty.growth',
+        kind: 'success',
+      })),
+    });
+  }
   await tx.diplomacy.deleteMany({ where: { worldId } });
   await tx.diplomacy.createMany({ data: next.diplomacies.map((entry) => ({ ...entry, worldId })) });
   await persistExt(tx, worldId, before.ext, next.ext);
