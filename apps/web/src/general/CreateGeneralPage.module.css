@@ -24,6 +24,36 @@
   color: var(--color-text-muted);
 }
 
+/* 서버 정보 한 줄과 접어 두는 세력 지도 (INT-25 단계 3). */
+.worldStatus {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.glance {
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+/* 펼침 표시를 지키려고 list-item 그대로 두고 높이를 44px로 맞춘다. */
+.glance > summary {
+  padding: var(--space-3);
+  line-height: 20px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.glanceMap {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: 0 var(--space-3) var(--space-3);
+}
+
 /* 꾸밈 현판. 제목이 아니라 글자 띠다. */
 .plaque {
   display: inline-flex;
