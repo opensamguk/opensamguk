@@ -5,6 +5,7 @@ import { createDb } from '@opensamguk/db';
 import { nationRank } from '@opensamguk/rules';
 import { readFixture } from '../../test/readFixture';
 import { newSession } from '../auth/session';
+import { authzCase } from '../authz/case';
 import type { AppRouter } from '../router';
 import { buildServer } from '../server';
 
@@ -224,15 +225,36 @@ describe('T2-22 / AC-M2-19 실제 TCP HTTP·PostgreSQL 순위', () => {
     });
     try {
       const input = { worldId: emptyWorldId };
-      const result = await query('ranking.freeGenerals', input, users[2]!.cookie);
-      expect(result.status).toBe(200);
-      expect(result.data).toMatchObject({ count: 1, items: [{ id: 106, name: '재야 장수 106', isHuman: false }] });
-      expect(JSON.stringify(result.data)).not.toContain('userId');
-      expect((await query('ranking.freeGenerals', input, null)).status).toBe(401);
+      const result = await query('ranking.freeGenerals', input);
+      await authzCase('ranking.freeGenerals', 'success', async () => {
+        expect(result.status).toBe(200);
+        expect(result.data).toMatchObject({ count: 1, items: [{ id: 106, name: '재야 장수 106', isHuman: false }] });
+        expect(JSON.stringify(result.data)).not.toContain('userId');
+      })();
+      await authzCase('ranking.freeGenerals', 'otherUser', async () => {
+        expect(await query('ranking.freeGenerals', input, users[2]!.cookie)).toEqual(result);
+      })();
+      await authzCase('ranking.freeGenerals', 'unauthenticated', async () => {
+        expect((await query('ranking.freeGenerals', input, null)).status).toBe(401);
+      })();
+      await authzCase('ranking.freeGenerals', 'invalidInput', async () => {
+        expect((await query('ranking.freeGenerals', { worldId: '' })).status).toBe(400);
+      })();
     } finally {
       await db.general.deleteMany({ where: { worldId: emptyWorldId, id: { in: [106, 107] } } });
     }
   });
+  it(
+    '재야 목록은 제재된 계정의 세션을 거부한다',
+    authzCase('ranking.freeGenerals', 'sanctioned', async () => {
+      await db.user.update({ where: { id: users[0]!.id }, data: { status: 'SANCTIONED' } });
+      try {
+        expect((await query('ranking.freeGenerals', { worldId })).status).toBe(401);
+      } finally {
+        await db.user.update({ where: { id: users[0]!.id }, data: { status: 'ACTIVE' } });
+      }
+    }),
+  );
 
   it('상위 100명 밖 내 순위도 반환하고 세션마다 본인 장수만 고른다', async () => {
     const input = { worldId, by: 'dedication' };

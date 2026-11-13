@@ -10,6 +10,7 @@ import { readFixture } from '../../test/readFixture';
 import { buildServer } from '../server';
 import type { AppRouter } from '../router';
 import { newSession } from '../auth/session';
+import { authzCase } from '../authz/case';
 
 type Out = inferRouterOutputs<AppRouter>;
 type Results = {
@@ -273,11 +274,16 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         name,
         nationName,
       });
-      expect((await query('ranking.heritage', { worldId: id })).data).toEqual({
-        identitiesVisible: false,
-        spent: [entry(3, null, null)],
-        earned: [entry(2, null, null)],
-      });
+      const anonymous = { identitiesVisible: false, spent: [entry(3, null, null)], earned: [entry(2, null, null)] };
+      await authzCase('ranking.heritage', 'success', async () => {
+        expect(await query('ranking.heritage', { worldId: id })).toMatchObject({ status: 200, data: anonymous });
+      })();
+      await authzCase('ranking.heritage', 'otherUser', async () => {
+        expect(await query('ranking.heritage', { worldId: id }, users[3]!.cookie)).toMatchObject({
+          status: 200,
+          data: anonymous,
+        });
+      })();
       await db.seasonGeneral.create({
         data: {
           worldId: id,
@@ -355,18 +361,26 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     const respond = (id: number, action: 'accept' | 'decline' | 'withdraw', index = 1) =>
       query('diplomaticDocuments.respond', { worldId: world, id, action }, users[index]!.cookie, 'POST');
     const [sent, retry] = await Promise.all([send(), send()]);
-    expect(sent.status).toBe(200);
+    await authzCase('diplomaticDocuments.send', 'success', async () => expect(sent.status).toBe(200))();
     expect(retry.data).toEqual(sent.data);
     expect((await send({ ...payload, brief: '다른 내용' })).status).toBe(409);
-    expect((await list(2)).data.items).toEqual([]);
-    expect((await respond(sent.data.id, 'accept', 2)).status).toBe(404);
+    await authzCase('diplomaticDocuments.list', 'otherUser', async () =>
+      expect((await list(2)).data.items).toEqual([]),
+    )();
+    await authzCase('diplomaticDocuments.respond', 'otherUser', async () => {
+      expect((await respond(sent.data.id, 'accept', 2)).status).toBe(404);
+    })();
     await changeOfficer(1, 2, 1);
     expect((await list(1)).data.items).toMatchObject([{ brief: payload.brief, detail: null }]);
     expect((await respond(sent.data.id, 'accept')).status).toBe(403);
     const actingGeneral = await changeOfficer(2, 2, 12);
     const recipientGeneral = await changeOfficer(1, 2, 1);
-    expect((await delegate(0, recipientGeneral.id, 'ADVISER')).status).toBe(404);
-    expect((await delegate(2, recipientGeneral.id, 'ADVISER')).status).toBe(200);
+    await authzCase('diplomaticDocuments.setDelegate', 'otherUser', async () => {
+      expect((await delegate(0, recipientGeneral.id, 'ADVISER')).status).toBe(404);
+    })();
+    await authzCase('diplomaticDocuments.setDelegate', 'success', async () => {
+      expect((await delegate(2, recipientGeneral.id, 'ADVISER')).status).toBe(200);
+    })();
     expect((await list(1)).data.items).toMatchObject([{ detail: payload.detail }]);
     expect((await respond(sent.data.id, 'accept')).status).toBe(403);
     expect((await delegate(1, recipientGeneral.id, 'AMBASSADOR')).status).toBe(403);
@@ -374,7 +388,9 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     expect((await query('message.recipients', { worldId: world })).data.generals).toContainEqual(
       expect.objectContaining({ id: recipientGeneral.id, isAmbassador: true }),
     );
-    expect((await respond(sent.data.id, 'accept')).data.status).toBe('ACTIVE');
+    await authzCase('diplomaticDocuments.respond', 'success', async () => {
+      expect((await respond(sent.data.id, 'accept')).data.status).toBe('ACTIVE');
+    })();
     const successor = { ...payload, previousId: sent.data.id, brief: '후속 문서' };
     const rejected = await send({ ...successor, requestId: randomUUID() });
     expect((await respond(rejected.data.id, 'decline')).data.status).toBe('CANCELLED');
@@ -383,11 +399,23 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     expect(next.status).toBe(200);
     expect((await send({ ...successor, requestId: randomUUID() })).status).toBe(409);
     expect((await respond(next.data.id, 'accept')).data.status).toBe('ACTIVE');
-    expect((await list(0)).data.items.map(({ status }) => status)).toEqual(['ACTIVE', 'CANCELLED', 'REPLACED']);
-    expect((await query('diplomaticDocuments.delegates', { worldId: world }, users[1]!.cookie)).data).toMatchObject({
-      canAppoint: false,
-      members: [{ id: recipientGeneral.id, role: 'AMBASSADOR' }],
-    });
+    await authzCase('diplomaticDocuments.list', 'success', async () => {
+      expect((await list(0)).data.items.map(({ status }) => status)).toEqual(['ACTIVE', 'CANCELLED', 'REPLACED']);
+    })();
+    await authzCase('diplomaticDocuments.delegates', 'success', async () => {
+      expect((await query('diplomaticDocuments.delegates', { worldId: world }, users[1]!.cookie)).data).toMatchObject({
+        canAppoint: false,
+        members: [{ id: recipientGeneral.id, role: 'AMBASSADOR' }],
+      });
+    })();
+    await authzCase('diplomaticDocuments.delegates', 'otherUser', async () => {
+      expect((await query('diplomaticDocuments.delegates', { worldId: world })).data.members).not.toContainEqual(
+        expect.objectContaining({ id: recipientGeneral.id }),
+      );
+    })();
+    await authzCase('diplomaticDocuments.send', 'otherUser', async () => {
+      expect((await query('diplomaticDocuments.send', payload, users[2]!.cookie, 'POST')).status).toBe(409);
+    })();
     await changeOfficer(1, 3, 1);
     await changeOfficer(1, 2, 1);
     expect((await list(1)).data.items[0]?.detail).toBeNull();
@@ -397,6 +425,31 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     );
     expect((await delegate(2, actingGeneral.id, 'ADVISER')).status).toBe(400);
   });
+  const additionalAccess = [
+    ['diplomaticDocuments.list', 'GET', {}],
+    ['diplomaticDocuments.delegates', 'GET', {}],
+    ['diplomaticDocuments.send', 'POST', { requestId: randomUUID(), toNationId: 2, brief: '문서', detail: '' }],
+    ['diplomaticDocuments.respond', 'POST', { id: 1, action: 'accept' }],
+    ['diplomaticDocuments.setDelegate', 'POST', { generalId: 1, role: 'ADVISER' }],
+    ['records.nationEvents', 'GET', {}],
+    ['ranking.heritage', 'GET', {}],
+  ] as const;
+  for (const [route, method, fields] of additionalAccess) {
+    it.each(['unauthenticated', 'invalidInput', 'sanctioned'] as const)(`${route} %s`, async (category) => {
+      await authzCase(route, category, async () => {
+        const input = { ...fields, worldId: category === 'invalidInput' ? '' : worldId };
+        if (category === 'sanctioned')
+          await db.user.update({ where: { id: users[0]!.id }, data: { status: 'SANCTIONED' } });
+        try {
+          const result = await query(route, input, category === 'unauthenticated' ? null : users[0]!.cookie, method);
+          expect(result.status).toBe(category === 'invalidInput' ? 400 : 401);
+        } finally {
+          if (category === 'sanctioned')
+            await db.user.update({ where: { id: users[0]!.id }, data: { status: 'ACTIVE' } });
+        }
+      })();
+    });
+  }
   it('AC-INT-26 외교 관계표는 모든 국가 쌍과 공개 외교 상태만 반환한다', async () => {
     const world = await fixtureWorld('relations');
     await db.nation.create({
@@ -1153,13 +1206,18 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     await db.nationHistory.create({ data: { worldId, nationId: 1, tick: 500000, data: { events: [], gold: 999999 } } });
     try {
       const first = await query('records.nationEvents', { worldId });
-      expect(first.status).toBe(200);
-      expect(first.data.items).toHaveLength(30);
-      expect(first.data.items[0]).toEqual({ tick: 400039, events: ['primary-nation-1-event-400039'] });
+      await authzCase('records.nationEvents', 'success', async () => {
+        expect(first.status).toBe(200);
+        expect(first.data.items).toHaveLength(30);
+        expect(first.data.items[0]).toEqual({ tick: 400039, events: ['primary-nation-1-event-400039'] });
+      })();
       const second = await query('records.nationEvents', { worldId, cursor: first.data.nextCursor });
       expect(second.data.items[0]?.tick).toBe(400009);
-      const other = await query('records.nationEvents', { worldId }, users[1]!.cookie);
-      expect(other.data.items[0]?.events).toEqual(['primary-nation-2-event-400039']);
+      await authzCase('records.nationEvents', 'otherUser', async () => {
+        const other = await query('records.nationEvents', { worldId }, users[1]!.cookie);
+        expect(other.data.items[0]?.events).toEqual(['primary-nation-2-event-400039']);
+        expect(other.data.items.flatMap(({ events }) => events)).not.toContain('primary-nation-1-event-400039');
+      })();
       expect((await query('records.nationEvents', { worldId }, users[2]!.cookie)).data).toEqual({
         items: [],
         nextCursor: null,
