@@ -121,6 +121,7 @@ function nation(id = 1, patch: Partial<Nation> = {}): Nation {
     ...initial.nations[id - 1]!,
     worldId: 'world',
     diplomaticAidUntilMonth: null,
+    npcSettings: null,
     notice: '비공개 표지',
     recruitmentNotice: '',
     noticeDirective: null,

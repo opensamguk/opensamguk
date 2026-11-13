@@ -1,10 +1,16 @@
+import { randomUUID } from 'node:crypto';
 import { TRPCError } from '@trpc/server';
 import {
   BALANCE,
   DIPLOMATIC_COOLDOWN_FEATURE,
   INTEL_FEATURE,
   NATION_STRATEGY_FEATURE,
-  NPC_DEFAULT_POLICY,
+  NPC_NATION_POLICY_FEATURE,
+  NPC_NATION_POLICY_KIND,
+  npcNationPolicy,
+  npcNationPolicyInput,
+  npcPolicyLimits,
+  storedNpcNationPolicy,
   OFFICE_EFFECTS_FEATURE,
   STRATEGY_KEYS,
   TICKS_PER_MONTH,
@@ -20,15 +26,47 @@ import {
   toGameDate,
   unitSetSchema,
 } from '@opensamguk/rules';
-import { protectedProcedure, router } from '../trpc';
+import { protectedProcedure, router, worldVerifiedProcedure } from '../trpc';
 import { entityKey, readWorld, viewerGeneral, worldClock, worldInput } from '../queries';
 import { cityCapacity, cityInfo, garrisonGeneralInfo, mapCity, nationInfo, visibility } from '../visibility';
-import { readView, requireWorld } from '../game/queries';
+import { readView, requireGeneral, requireRuleFeature, requireWorld } from '../game/queries';
 import { nationPopulation, projectNationFinance, salaryRate } from '../game/nationFinance';
 import { nationTenureYears } from '../game/nationTenure';
 import { worldResolver } from '../game/resolver';
 
 export const nationRouter = router({
+  setNpcPolicy: worldVerifiedProcedure.input(npcNationPolicyInput.extend(worldInput.shape)).mutation(({ ctx, input }) =>
+    ctx.db.$transaction(async (tx) => {
+      const world = await requireWorld(tx, input.worldId, true);
+      requireRuleFeature(world, NPC_NATION_POLICY_FEATURE);
+      if (world.status === 'ENDED') throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '종료된 월드입니다.' });
+      const actor = await requireGeneral(tx, input.worldId, ctx.user.id, true);
+      if (actor.removedAt !== null || actor.officerLevel !== BALANCE.RULER_LEVEL || actor.nationId !== input.nationId)
+        throw new TRPCError({ code: 'FORBIDDEN', message: '현재 군주만 NPC 운영 기준을 변경할 수 있습니다.' });
+      const pending = await tx.inputEvent.findFirst({
+        where: { worldId: input.worldId, generalId: actor.id, kind: NPC_NATION_POLICY_KIND, status: 'PENDING' },
+        select: { payload: true },
+      });
+      const payload = { nationId: input.nationId, policy: input.policy };
+      if (pending) {
+        const previous = npcNationPolicyInput.parse(pending.payload);
+        if (previous.nationId !== input.nationId || JSON.stringify(previous.policy) !== JSON.stringify(input.policy))
+          throw new TRPCError({ code: 'CONFLICT', message: '다른 NPC 운영 기준 요청을 처리하고 있습니다.' });
+      } else {
+        await tx.inputEvent.create({
+          data: {
+            worldId: input.worldId,
+            userId: ctx.user.id,
+            generalId: actor.id,
+            kind: NPC_NATION_POLICY_KIND,
+            idempotencyKey: `${NPC_NATION_POLICY_KIND}:${randomUUID()}`,
+            payload,
+          },
+        });
+      }
+      return { status: 'pending' as const };
+    }),
+  ),
   get: protectedProcedure.input(worldInput.extend({ nationId: entityKey }).strict()).query(({ ctx, input }) =>
     readWorld(ctx.db, input.worldId, async (tx, world) => {
       const viewer = await viewerGeneral(tx, input.worldId, ctx.user.id);
@@ -70,6 +108,14 @@ export const nationRouter = router({
           ? { remainingMonths: diplomaticAidMonths(nation, strategyMonth(tick)) }
           : undefined;
       const npcOrders = showNpcOrders && state ? await readNpcOrders(state) : undefined;
+      const npcPolicyEnabled = world.ruleFeatures.includes(NPC_NATION_POLICY_FEATURE);
+      const npcPolicyEditable = npcPolicyEnabled && showNpcOrders;
+      const npcPolicyPending = npcPolicyEditable
+        ? await tx.inputEvent.findFirst({
+            where: { worldId: input.worldId, generalId: viewer!.id, kind: NPC_NATION_POLICY_KIND, status: 'PENDING' },
+            select: { payload: true },
+          })
+        : null;
       return {
         ...(lifecycle
           ? {
@@ -95,7 +141,15 @@ export const nationRouter = router({
           ? {
               salaryRate,
               npcPolicy: {
-                ...NPC_DEFAULT_POLICY,
+                ...npcNationPolicy(world, storedNpcNationPolicy(npcPolicyEnabled, nation.npcSettings)),
+                ...(npcPolicyEditable
+                  ? {
+                      editor: {
+                        limits: npcPolicyLimits,
+                        pending: npcPolicyPending ? npcNationPolicyInput.parse(npcPolicyPending.payload).policy : null,
+                      },
+                    }
+                  : {}),
                 ...npcOrders,
                 aggression:
                   effectiveWorldOptions(world.preset === null ? null : parsePreset(world.preset), world.runtimeOptions)
