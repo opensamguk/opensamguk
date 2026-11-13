@@ -64,6 +64,7 @@ async function checkEnd(worldId: string, reason: 'END_YEAR' | 'UNIFIED') {
       experience: general.experience,
       wins: general.battleWins,
       captures: general.captures,
+      stratagemSuccesses: general.stratagemSuccesses,
     })),
   );
   const archive = await exportReplay(db, worldId);
@@ -78,7 +79,9 @@ async function checkEnd(worldId: string, reason: 'END_YEAR' | 'UNIFIED') {
     expect(value.logs[0]?.text).toContain('점령');
     expect(result.winnerName).toBeTruthy();
     expect(result.winnerColor).toBeTruthy();
+    expect(result.winnerSummary).toMatchObject({ generals: 1, cities: expect.any(Number), power: expect.any(Number) });
   } else {
+    expect(result.winnerSummary).toBeNull();
     expect(result.endedMonth).toBe(12);
     expect(value.months).toHaveLength(12);
     expect(result.finalStateHash).toBe(value.months.at(-1)?.stateHash);
