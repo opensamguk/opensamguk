@@ -672,7 +672,14 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
     expect(await turns(world, actor)).toHaveLength(30);
     return actor;
   }
-  async function put(actor: Actor, slot: number, name: string, fields: Record<string, string> = {}) {
+  // beforePut은 넣기 전, 인자 입력 화면이 열려 있을 때 화면을 검사한다. 넣으면 화면이 닫힌다 (INT-25).
+  async function put(
+    actor: Actor,
+    slot: number,
+    name: string,
+    fields: Record<string, string> = {},
+    beforePut?: (editor: Locator) => Promise<void>,
+  ) {
     await actor.page.bringToFront();
     const editor = actor.page.getByTestId('turn-editor');
     await expect(editor.locator('tr[data-slot]')).toHaveCount(30);
@@ -695,6 +702,7 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
       if ((await control.evaluate((element) => element.tagName)) === 'SELECT') await control.selectOption(value);
       else await control.fill(value);
     }
+    if (beforePut) await beforePut(editor);
     await editor.getByRole('button', { name: `${slot}번 칸에 넣기`, exact: true }).click();
     await expect(editor.locator(`tr[data-slot="${slot}"]`)).toContainText(name);
   }
@@ -1357,15 +1365,20 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
         });
         expect(Object.hasOwn(summary, 'cityResourcesEnabled')).toBe(false);
         await expect(resourcePanel(oldActor.page)).toHaveCount(0);
-        await put(oldActor, 1, '모병', {
-          수량: '1',
-          병종: '1100',
-          '부곡 번호': '1',
-        });
-        await expect(oldActor.page.getByTestId('turn-editor').getByLabel('부곡 번호', { exact: true })).toBeVisible();
-        await expect(
-          oldActor.page.getByTestId('turn-editor').getByLabel('훈련·사기 대상', { exact: true }),
-        ).toHaveCount(0);
+        await put(
+          oldActor,
+          1,
+          '모병',
+          {
+            수량: '1',
+            병종: '1100',
+            '부곡 번호': '1',
+          },
+          async (editor) => {
+            await expect(editor.getByLabel('부곡 번호', { exact: true })).toBeVisible();
+            await expect(editor.getByLabel('훈련·사기 대상', { exact: true })).toHaveCount(0);
+          },
+        );
         expect(oldCalls.filter((call) => call.path.startsWith('cityResources.'))).toHaveLength(0);
         expect((await db.world.findUniqueOrThrow({ where: { id: oldWorld.id } })).cityResourcesState).toBeNull();
         await photo(oldActor.page, info, '07-legacy-without-city-resources');
