@@ -72,6 +72,10 @@ import { nationLifecycleFeature } from './nationLifecycle/feature';
 import { preparedTurnsFeature } from './preparedTurns/feature';
 import { nationResearchFeature } from './nationResearch/feature';
 import { relationsFeature } from './relations/data';
+import { cleanTroops, gatherBinding, TROOP_FEATURE } from './commands/ext/troop/state';
+import { TROOP_ACTION_KIND } from './commands/ext/troop/actions';
+import { applyTroopInput } from './commands/ext/troop/replay';
+import { troopGather } from './commands/ext/troop/gather';
 import { INTEL_FEATURE, spyBinding } from './commands/ext/intel/record';
 import { spy } from './commands/ext/intel/spy';
 import { returnBorder } from './commands/ext/return_border/return_border';
@@ -220,6 +224,22 @@ export const ruleRegistry: RuleRegistry = {
       commandBindings: [{ definition: returnBorder, sliceKeys: [] }],
     },
     {
+      key: TROOP_FEATURE,
+      requires: ['policy'],
+      conflicts: [],
+      commandBindings: [{ definition: troopGather, sliceKeys: gatherBinding.sliceKeys }],
+      checkOrigin({ initial, data }) {
+        if (Object.hasOwn(initial, 'ext') || data !== undefined) throw new Error('부대는 빈 상태에서 시작합니다.');
+      },
+      initReplayState(replay) {
+        return { ...replay, state: { ...replay.state, ext: { ...replay.state.ext, troop: { troops: {} } } } };
+      },
+      settleMonthly({ settled }) {
+        cleanTroops(settled.state);
+        return { replay: settled, effects: null };
+      },
+    },
+    {
       key: INTEL_FEATURE,
       requires: ['policy'],
       conflicts: [],
@@ -228,7 +248,7 @@ export const ruleRegistry: RuleRegistry = {
         if (Object.hasOwn(initial, 'ext') || data !== undefined) throw new Error('첩보는 빈 기록에서 시작합니다.');
       },
       initReplayState(replay) {
-        return { ...replay, state: { ...replay.state, ext: { intel: {} } } };
+        return { ...replay, state: { ...replay.state, ext: { ...replay.state.ext, intel: {} } } };
       },
     },
   ],
@@ -244,8 +264,10 @@ export const ruleRegistry: RuleRegistry = {
     'stratagem-cards-v1',
     'reputation-v1',
     'city-scale-v1',
+    TROOP_FEATURE,
   ],
   inputKinds: [
+    { kind: TROOP_ACTION_KIND, feature: TROOP_FEATURE, route: 'queued', apply: applyTroopInput },
     ...ADMIN_SETTING_KINDS.map((kind) => ({
       kind,
       feature: null,

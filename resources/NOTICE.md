@@ -197,3 +197,7 @@ core2026 커밋 df6c9269fa1e2862418ba9da481c8dd2d758d6c5의 MIT © 2025 devsam �
 ### INT-26 장수 전투 특기
 
 병종·전투 특기의 징·모병비, 숙련, 피해와 회피 보정은 core2026 `c81d304`의 `packages/logic/src/actionModules/traits/war/`를 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다.
+
+### INT-26 부대
+
+부대 이름 폭·소속 규칙과 집합은 core2026 `c81d304`의 `packages/logic/src/troop/management.ts`, `app/game-engine/src/turn/worldCommandHandler.ts`, `packages/logic/src/actions/turn/general/che_집합.ts`를 참고했다. 원저작자 devsam의 위 MIT 고지를 유지한다.

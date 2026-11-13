@@ -3,6 +3,9 @@ import { nextTurnAt, turnSchedule, readWorld, requireGeneral, worldClock, worldI
 import { cityInfo, ownGeneralInfo, logInfo, logSelect, nationInfo } from '../visibility';
 import {
   GENERAL_CONDITION_FEATURE,
+  TROOP_FEATURE,
+  readTroops,
+  troopOf,
   combatSpecialty,
   personalityEffects,
   domesticSpecialty,
@@ -56,9 +59,13 @@ export const homeRouter = router({
             });
       const state =
         world.ruleFeatures.includes('campaign-v1') ||
+        world.ruleFeatures.includes(TROOP_FEATURE) ||
         (nation && world.status !== 'ENDED' && world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE))
           ? await readView(tx, input.worldId)
           : undefined;
+      const troops = state ? readTroops(state) : undefined;
+      const troop = troops ? troopOf(troops, general.id) : undefined;
+      const troopLeader = troop ? state?.generals[troop.leaderId] : undefined;
       const finance =
         nation && world.status !== 'ENDED'
           ? projectNationFinance(world, ctx.now, nation.cities, nation.generals, state, nation.philosophy)
@@ -139,6 +146,16 @@ export const homeRouter = router({
           personalityEffects: personalityEffects(world, general.personality) ?? null,
           domesticSpecialty: domesticSpecialty(world, general.special) ?? null,
           combatSpecialty: combatSpecialty(world, general.special) ?? null,
+          troop:
+            troop && troopLeader
+              ? {
+                  id: troop.leaderId,
+                  name: troop.name,
+                  leader: troopLeader.name,
+                  leaderCity:
+                    troopLeader.cityKey === general.cityKey ? null : (state?.cities[troopLeader.cityKey]?.name ?? null),
+                }
+              : null,
           ...(unitSet
             ? {
                 proficiency: Object.entries(unitSet.armTypes)

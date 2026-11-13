@@ -1,3 +1,4 @@
+import { TROOP_FEATURE } from '../packages/rules/src/commands/ext/troop/state';
 import { COMBAT_SPECIALTY_FEATURE } from '../packages/rules/src/general/combatSpecialty';
 import { BALANCE } from '../packages/rules/src/balance';
 import { randomUUID } from 'node:crypto';
@@ -924,3 +925,99 @@ it('병종 특기의 징병 할인과 월말 재생이 일치한다', async () =
   const archive = await exportReplay(db, worldId);
   expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
 });
+
+it('부대 창설·가입·집합·추방을 실제 DB와 월말 재생에서 확인한다', async () => {
+  const [alice, bob, outsider] = await Promise.all([user(), user(), user()]);
+  const initial = commandInitial();
+  initial.generals = initial.generals.slice(0, 3).map((general, index) => ({
+    ...general,
+    userId: [alice.id, bob.id, outsider.id][index]!,
+    nationId: index === 1 ? 1 : general.nationId,
+    cityKey: index === 1 ? 4 : general.cityKey,
+    officerLevel: index === 1 ? 1 : general.officerLevel,
+    nextTurnTick: index === 0 ? 100 : 100000,
+  }));
+  const { worldId } = await saveInitialWorld(db, initial, {
+    name: '부대 실제 PG',
+    turnTermMinutes: 30,
+    endYear: null,
+    replayFormat: 3,
+    ruleFeatures: ['policy', TROOP_FEATURE],
+  });
+  worlds.push(worldId);
+  await db.world.update({ where: { id: worldId }, data: { status: 'RUNNING', clockAnchorAt: new Date(now) } });
+  const lease = await acquireLease(db, worldId);
+  if (!lease) throw new Error('시험 실행권이 없습니다.');
+  leases.push(lease);
+  const loop = new TurnLoop(db, lease);
+  const update = (cookie: string, change: object) =>
+    rpc(
+      'troop.update',
+      { worldId, expectedGeneralId: [alice.cookie, bob.cookie, outsider.cookie].indexOf(cookie) + 1, change },
+      cookie,
+      true,
+    );
+  const list = (cookie: string) => rpc('troop.list', { worldId }, cookie);
+  const create = { action: 'create', name: '청주병' };
+  const requested = await update(alice.cookie, create);
+  await authzCase('troop.update', 'success', async () => {
+    expect(requested.data).toMatchObject({ status: 'pending' });
+    expect((await update(alice.cookie, create)).data).toEqual(requested.data);
+  })();
+  await loop.advanceTo(0);
+  await authzCase('troop.list', 'success', async () => {
+    expect(await list(alice.cookie)).toMatchObject({
+      status: 200,
+      data: { myTroop: 1, troops: [{ name: '청주병', members: [] }] },
+    });
+  })();
+  await authzCase('troop.list', 'otherUser', async () => {
+    expect((await list(outsider.cookie)).data).toMatchObject({ myTroop: null, troops: [] });
+  })();
+  const join = { action: 'join', leaderId: 1 };
+  await authzCase('troop.update', 'otherUser', async () => {
+    expect((await update(outsider.cookie, join)).status).toBe(400);
+    expect(
+      (await rpc('troop.update', { worldId, expectedGeneralId: 1, change: { action: 'leave' } }, bob.cookie, true))
+        .status,
+    ).toBe(409);
+  })();
+  expect((await update(bob.cookie, join)).data).toMatchObject({ status: 'pending' });
+  await loop.advanceTo(0);
+  expect((await list(bob.cookie)).data).toMatchObject({ myTroop: 1, troops: [{ members: [{ id: 2, cityKey: 4 }] }] });
+  const slots = Array.from({ length: 30 }, (_, slot) => (slot === 0 ? { commandKey: 'troop_gather', args: {} } : null));
+  expect((await rpc('turns.set', { worldId, revision: 0, slots }, alice.cookie, true)).data).toMatchObject({
+    ok: true,
+  });
+  expect((await list(bob.cookie)).data).toMatchObject({
+    troops: [{ gatherSlots: [true, false, false, false, false] }],
+  });
+  await loop.advanceTo(100);
+  expect((await list(bob.cookie)).data).toMatchObject({ troops: [{ members: [{ id: 2, cityKey: 1 }] }] });
+  expect((await update(alice.cookie, { action: 'kick', memberId: 2 })).data).toMatchObject({ status: 'pending' });
+  await loop.advanceTo(100);
+  expect((await list(bob.cookie)).data).toMatchObject({ myTroop: null, troops: [{ members: [] }] });
+  await loop.advanceTo(10000);
+  const archive = await exportReplay(db, worldId);
+  expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
+});
+
+for (const path of ['troop.list', 'troop.update'] as const) {
+  for (const category of ['unauthenticated', 'sanctioned', 'invalidInput'] as const) {
+    it(
+      `부대 접근 경계 ${path} ${category}`,
+      authzCase(path, category, async () => {
+        const f = await fixture();
+        const mutation = path === 'troop.update';
+        const actor = category === 'sanctioned' ? await user('SANCTIONED') : f.alice;
+        const input = {
+          worldId: category === 'invalidInput' ? 1 : f.worldId,
+          ...(mutation ? { expectedGeneralId: 1, change: { action: 'leave' } } : {}),
+        };
+        const result = await rpc(path, input, category === 'unauthenticated' ? undefined : actor.cookie, mutation);
+        expect(result.error).toBe(category === 'invalidInput' ? 'BAD_REQUEST' : 'UNAUTHORIZED');
+        if (mutation) expect(await db.inputEvent.count({ where: { worldId: f.worldId, kind: path } })).toBe(0);
+      }),
+    );
+  }
+}

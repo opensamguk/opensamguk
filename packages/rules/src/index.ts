@@ -48,6 +48,8 @@ export * from './commands/types';
 export * from './commands/effects';
 export * from './commands/registry';
 export { commandPlayerDocs } from './commands/playerDoc';
+export { TROOP_FEATURE, readTroops } from './commands/ext/troop/state';
+export { TROOP_ACTION_KIND, troopActionSchema, changeTroop, troopOf } from './commands/ext/troop/actions';
 export { extSliceKeys, restoreExtState } from './commands/ext/state';
 export { INTEL_FEATURE, intelRecordSchema, getIntelSliceSchema } from './commands/ext/intel/record';
 export * from './monthly/index';

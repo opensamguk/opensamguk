@@ -28,6 +28,7 @@ import { Notices } from './OfferBox';
 import { cityOfficeHolder, LocalOffices, localOfficeTarget, MemberResidence } from './OfficeResidence';
 import styles from './Personnel.module.css';
 import pageStyles from './PersonnelPage.module.css';
+import { TroopBoard } from './TroopBoard';
 import { DiplomaticDelegates } from './DiplomaticDelegates';
 import { usePersonnelAction } from './usePersonnelAction';
 
@@ -161,6 +162,7 @@ export function PersonnelPage() {
       ) : (
         <LoadingState />
       )}
+      {roster.nation ? <TroopBoard key={board.data?.actorId} worldId={worldId} /> : null}
       {roster.nation ? (
         <DiplomaticDelegates key={`${roster.nation.id}:${board.data?.actorId ?? ''}`} worldId={worldId} />
       ) : null}

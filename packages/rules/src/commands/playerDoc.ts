@@ -45,6 +45,11 @@ export const commandPlayerDocs: Readonly<Record<string, PlayerDoc>> = {
       ];
     }),
   ),
+  troop_gather: {
+    summary: '부대원의 위치를 부대장이 있는 도시로 옮깁니다.',
+    requires: [ownCity, '부대장이며 부대원이 있음'],
+    cost: null,
+  },
   convert_proficiency: {
     summary: '병종 숙련의 40%를 빼고 그중 90%를 다른 계열에 옮깁니다.',
     requires: [ownCity, '숙련을 가진 병종과 서로 다른 대상 병종'],

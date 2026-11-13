@@ -6,6 +6,8 @@ import {
   INACTIVE_REMOVAL_FEATURE,
   GENERAL_PERSONALITY_FEATURE,
   COMBAT_SPECIALTY_FEATURE,
+  TROOP_FEATURE,
+  TROOP_ACTION_KIND,
   DOMESTIC_SPECIALTY_FEATURE,
   GENERAL_PROFICIENCY_FEATURE,
   NPC_NATION_POLICY_FEATURE,
@@ -46,6 +48,7 @@ import {
   type NationLifecycleEffects,
 } from '@opensamguk/rules';
 import type { EngineFeature, QueuedInputHandler } from './features';
+import { processTroopInput } from './troopInput';
 import { loadReplayState } from './monthly';
 import { loadWorld } from './worldLoader';
 import { loadOfficeRevisions, loadOfficeState, persistOfficeState } from './personnelState';
@@ -324,6 +327,7 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   { key: 'general-condition-v1' },
   { key: GENERAL_PERSONALITY_FEATURE },
   { key: COMBAT_SPECIALTY_FEATURE },
+  { key: TROOP_FEATURE, queuedInputs: { [TROOP_ACTION_KIND]: processTroopInput } },
   { key: DOMESTIC_SPECIALTY_FEATURE },
   { key: GENERAL_PROFICIENCY_FEATURE },
   { key: 'rice-market-v1' },
