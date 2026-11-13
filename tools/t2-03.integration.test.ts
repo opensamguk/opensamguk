@@ -186,7 +186,7 @@ describe('T2-03 실제 로비 HTTP·PostgreSQL', () => {
     expect(row.winner).toEqual(ended.winnerName === null ? null : { name: ended.winnerName, color: ended.winnerColor });
     expect(row.gameDate).toEqual({ year: ended.endedYear, month: ended.endedMonth });
     expect(row.gameDate).toEqual(summary.data!.gameDate);
-    expect(row.gameDate.month).toBe(12);
+    expect(row.gameDate.month).toBe(reason === 'END_YEAR' ? 12 : 1);
   });
 
   for (const status of ['RUNNING', 'PREOPEN', 'PAUSED', 'ENDED'] as const) {
