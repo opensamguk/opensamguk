@@ -8,7 +8,7 @@ import {
   TICKS_PER_MONTH,
   toGameDate,
 } from '@opensamguk/rules';
-import { protectedProcedure, router, worldVerifiedProcedure } from '../trpc';
+import { protectedProcedure, publicProcedure, router, worldVerifiedProcedure } from '../trpc';
 import {
   beforeCursor,
   entityKey,
@@ -23,6 +23,7 @@ import { logInfo, logSelect, nationRecordInfo, worldRecordInfo } from '../visibi
 import { z } from 'zod';
 import { decodeRecordCursor, encodeRecordCursor, generalLogCursor, recordId, recordTick } from '../recordCursor';
 import { monthlyReviewSelect, readMonthlyReview } from '../review';
+import { readWorldTraffic } from '../game/worldTraffic';
 
 const generalInput = worldInput.extend({ cursor: z.string().min(1).max(256).optional() }).strict();
 const activityInput = generalInput
@@ -93,6 +94,11 @@ const battlePhases = z.array(
 );
 
 export const recordsRouter = router({
+  traffic: publicProcedure
+    .input(worldInput)
+    .query(({ ctx, input }) =>
+      readWorld(ctx.db, input.worldId, (tx, world) => readWorldTraffic(tx, world.id, world.startYear)),
+    ),
   battles: protectedProcedure.input(generalInput).query(({ ctx, input }) =>
     readWorld(ctx.db, input.worldId, async (tx, world) => {
       const general = await requireGeneral(tx, input.worldId, ctx.user.id);
