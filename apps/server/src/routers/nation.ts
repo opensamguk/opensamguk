@@ -25,6 +25,8 @@ import {
   npcPolicyLimits,
   storedNpcNationPolicy,
   OFFICE_EFFECTS_FEATURE,
+  RICE_MARKET_FEATURE,
+  riceMarketRate,
   STRATEGY_KEYS,
   TICKS_PER_MONTH,
   WANDERING_MONTH_LIMIT,
@@ -194,6 +196,10 @@ export const nationRouter = router({
         where: input,
         orderBy: ownNation ? [{ region: 'asc' }, { level: 'desc' }, { cityKey: 'asc' }] : { cityKey: 'asc' },
       });
+      const marketWorld =
+        ownNation && world.ruleFeatures.includes(RICE_MARKET_FEATURE)
+          ? await tx.world.findUniqueOrThrow({ where: { id: world.id }, select: { seed: true, monthlyTick: true } })
+          : null;
       const generals = await tx.general.findMany({ where: input, orderBy: { id: 'asc' } });
       const possessed = await possessedGenerals(
         tx,
@@ -347,7 +353,21 @@ export const nationRouter = router({
         cities: cities.map((city) => {
           if (!ownNation) return { ...mapCity(city), ...cityCapacity(city) };
           const incomeEstimate = finance?.cityIncome.get(city.cityKey);
-          return { ...cityInfo(city, viewer), ...(incomeEstimate ? { incomeEstimate } : {}) };
+          const market = marketWorld
+            ? {
+                rate: riceMarketRate(marketWorld.seed, marketWorld.monthlyTick, {
+                  cityKey: city.cityKey,
+                  level: city.level,
+                  supplied: city.supplied,
+                  kind: city.kind === 'PASS' ? 'PASS' : 'CITY',
+                }),
+              }
+            : undefined;
+          return {
+            ...cityInfo(city, viewer),
+            ...(incomeEstimate ? { incomeEstimate } : {}),
+            ...(market ? { riceMarket: market } : {}),
+          };
         }),
         generals: generals.map((general) => {
           const tenureYears =

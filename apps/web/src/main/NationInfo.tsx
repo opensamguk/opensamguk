@@ -839,6 +839,14 @@ export function NationTables({
   const regionName = new Map(map?.cities.map((city) => [city.key, city.regionName ?? null]) ?? []);
   const showRegion = data.cities.some((city) => regionName.get(city.key));
   const showPopulation = data.cities.some(isDetailedCity);
+  const detailedCityStats = [
+    { key: 'agriculture', max: 'agricultureMax', label: '농업' },
+    { key: 'commerce', max: 'commerceMax', label: '상업' },
+    { key: 'security', max: 'securityMax', label: '치안' },
+    { key: 'defence', max: 'defenceMax', label: '수비' },
+    { key: 'wall', max: 'wallMax', label: '성벽' },
+  ] as const;
+  const marketRate = (city: City) => ('riceMarket' in city ? (city.riceMarket?.rate ?? null) : null);
   const opened = openCity === null ? undefined : data.cities.find((c) => c.key === openCity);
 
   const cityColumns: Column<City>[] = [
@@ -883,6 +891,46 @@ export function NationTables({
             numeric: true,
             sortValue: (c: City) => (isDetailedCity(c) ? c.population : null),
             render: (c: City) => (isDetailedCity(c) ? `${n(c.population)} / ${n(c.populationMax)}` : '—'),
+          },
+        ]
+      : []),
+    ...(showPopulation
+      ? [
+          {
+            key: 'populationRate',
+            label: '주민율',
+            numeric: true,
+            sortValue: (c: City) => (isDetailedCity(c) && c.populationMax > 0 ? c.population / c.populationMax : null),
+            render: (c: City) =>
+              isDetailedCity(c) && c.populationMax > 0 ? `${Math.round((c.population / c.populationMax) * 100)}%` : '—',
+          },
+          {
+            key: 'trust',
+            label: '민심',
+            numeric: true,
+            sortValue: (c: City) => (isDetailedCity(c) ? c.trust : null),
+            render: (c: City) => (isDetailedCity(c) ? n(c.trust) : '—'),
+          },
+          ...detailedCityStats.map(({ key, max, label }) => ({
+            key,
+            label,
+            numeric: true,
+            sortValue: (c: City) => (isDetailedCity(c) ? c[key] : null),
+            render: (c: City) => (isDetailedCity(c) ? `${n(c[key])} / ${n(c[max])}` : '—'),
+          })),
+        ]
+      : []),
+    ...(data.cities.some((city) => 'riceMarket' in city)
+      ? [
+          {
+            key: 'market',
+            label: '시세',
+            numeric: true,
+            sortValue: marketRate,
+            render: (c: City) => {
+              const rate = marketRate(c);
+              return rate === null ? '상인 없음' : `${n(rate)}%`;
+            },
           },
         ]
       : []),
@@ -1017,7 +1065,14 @@ export function NationTables({
           rows={data.cities}
           columns={cityColumns}
           rowKey={(c) => c.key}
-          mobileDetails={['region', 'population']}
+          mobileDetails={[
+            'region',
+            'population',
+            'populationRate',
+            'trust',
+            'market',
+            ...detailedCityStats.map(({ key }) => key),
+          ]}
         />
         {member && opened ? (
           <StationedPanel
