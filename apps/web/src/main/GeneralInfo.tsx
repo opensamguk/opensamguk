@@ -82,6 +82,8 @@ export function GeneralInfo({
   const retirementAge = condition?.retirementAge ?? 70;
   const progression = g.progression;
   const battle = g.battleStats;
+  const defense = g.defense;
+  const salary = g.salaryEstimate;
   const ageStyle =
     age < retirementAge * 0.75 ? styles.ageNormal : age < retirementAge ? styles.ageWarning : styles.ageHigh;
   return (
@@ -124,6 +126,7 @@ export function GeneralInfo({
           { label: '특기', value: g.special || '—' },
           { label: '금', value: n(g.gold) },
           { label: '쌀', value: n(g.rice) },
+          ...(salary ? [{ label: '다음 봉급', value: `금 ${n(salary.gold)} · 쌀 ${n(salary.rice)}`, wide: true }] : []),
           ...(campaignEnabled
             ? [{ label: '병력·훈련·사기', value: '부곡별 현황 참조' }]
             : [
@@ -132,6 +135,15 @@ export function GeneralInfo({
                 { label: '훈련', value: n(g.train) },
                 { label: '사기', value: n(g.atmos) },
               ]),
+          ...(defense
+            ? [
+                {
+                  label: '도시 수비',
+                  value: defense.participating ? `참전 · ${n(defense.troops)}명` : '참전 조건 미충족',
+                  title: `수비 기준은 훈련 ${defense.minimumTraining}, 사기 ${defense.minimumMorale} 이상입니다`,
+                },
+              ]
+            : []),
           {
             label: '경험',
             value: progression ? (
