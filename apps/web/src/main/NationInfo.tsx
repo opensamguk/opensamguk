@@ -201,6 +201,9 @@ const npcPolicyLabels = {
   reserveGold: '포상 뒤 보유할 국고 금',
   minReward: '최소 포상 금',
   maxReward: '최대 포상 금',
+  minWarCrew: '출병 최소 병력',
+  minNpcWarLeadership: '전투 참여 최소 통솔',
+  cureThreshold: '요양 기준 부상',
 } satisfies Record<keyof NationNpcSettings, string>;
 
 function NationNpcPolicyEditor({
@@ -254,6 +257,7 @@ function NationNpcPolicyEditor({
     morale: '사기진작',
     trade_rice: '군량 매입',
     attack: '출병',
+    heal: '요양',
     nation_capital: '천도',
     nation_declare: '선전포고',
     nation_reward: '포상',

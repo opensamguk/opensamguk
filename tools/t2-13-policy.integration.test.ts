@@ -602,6 +602,9 @@ const editedNpcPolicy = {
   reserveGold: 500,
   minReward: 250,
   maxReward: 5000,
+  minWarCrew: 1500,
+  minNpcWarLeadership: 40,
+  cureThreshold: 10,
   generalPriority: ['recruit', 'farm'],
   nationPriority: ['nation_reward'],
 };
