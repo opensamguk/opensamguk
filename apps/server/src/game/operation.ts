@@ -16,7 +16,7 @@ import {
 } from '@opensamguk/rules';
 import { TRPCError } from '@trpc/server';
 import type { Context } from '../context';
-import { nextTurnAt, readWorld, requireGeneral, worldClock } from '../queries';
+import { nextTurnAt, readWorld, requireGeneral, worldClock, type ClockWorld } from '../queries';
 import { publicNationDisplaySelect } from '../visibility';
 import { readView } from './queries';
 import { displaySlots, readSlots } from './slots';
@@ -79,7 +79,7 @@ export function operationTick(value: bigint): number {
   return tick;
 }
 
-export function operationTargetAt(world: ReadWorld, tick: number): string | null {
+export function operationTargetAt(world: ClockWorld, tick: number): string | null {
   try {
     return nextTurnAt(world, tick);
   } catch (error) {
