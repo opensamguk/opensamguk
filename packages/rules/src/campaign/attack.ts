@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { Rng } from '@opensamguk/shared';
 import { BALANCE } from '../balance';
+import { canDefend } from '../battle/defenders';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { fail, positive, relation, removeNation, success } from '../commands/support';
 import type { Actor, CommandDef, CommandResult } from '../commands/types';
@@ -30,7 +31,7 @@ export function campaignAttackingUnits(view: WorldView, actor: Actor) {
     })
     .sort((a, b) => a.id - b.id);
 }
-function defenders(view: WorldView, actor: Actor, cityKey: number) {
+export function campaignDefenders(view: WorldView, tick: number, cityKey: number) {
   const city = view.cities[cityKey]!;
   return readCampaignState(view.campaign, view)
     .units.filter((unit) => {
@@ -40,10 +41,8 @@ function defenders(view: WorldView, actor: Actor, cityKey: number) {
         city.nationId !== null &&
         owner.nationId === city.nationId &&
         commander.cityKey === cityKey &&
-        commander.activeFromYear <= year(view, actor.tick ?? 0) &&
-        unit.troops > 0 &&
-        unit.train >= BALANCE.DEFEND_TRAIN &&
-        unit.atmos >= BALANCE.DEFEND_ATMOS
+        commander.activeFromYear <= year(view, tick) &&
+        canDefend(unit.troops, unit.train, unit.atmos)
       );
     })
     .sort((a, b) => b.troops - a.troops || a.id - b.id);
@@ -69,7 +68,7 @@ function check(view: WorldView, actor: Actor, raw: unknown) {
     throw new Error('부곡 월드에 장수 병력을 중복 저장할 수 없습니다.');
   const force = campaignAttackingUnits(view, actor);
   if (!force.length) return fail('NO_CREW', '같은 거점에 집결한 부곡 병력이나 사기가 부족합니다.');
-  const all = [...force, ...defenders(view, actor, target.cityKey)];
+  const all = [...force, ...campaignDefenders(view, actor.tick ?? 0, target.cityKey)];
   if (view.ruleFeatures?.includes('city-resources-v1'))
     readCityResourcesState(
       view.cityResources,
@@ -93,7 +92,7 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
     defendingNation = state.cities[cityKey]!.nationId;
   const attackingIds = campaignAttackingUnits(state, actor).map((unit) => unit.id);
   // 출병 시작 때의 수비 순서를 고정한다. 사람의 예약이나 다른 소유자의 부곡을 공격 편성에 넣지 않는다.
-  const defendingIds = defenders(state, actor, cityKey).map((unit) => unit.id);
+  const defendingIds = campaignDefenders(state, actor.tick ?? 0, cityKey).map((unit) => unit.id);
   const cityResources = state.ruleFeatures?.includes('city-resources-v1') ?? false;
   const cityDefense = () => (cityResources ? state.cityResources!.cities[String(cityKey)]!.garrison : []);
   const alive = (unit: CampaignUnitState) => unit.troops > 0 && unit.atmos > 0;
