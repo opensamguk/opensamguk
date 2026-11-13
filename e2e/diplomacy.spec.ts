@@ -257,6 +257,16 @@ test.describe('외교실', () => {
     await expect(a.page.getByTestId('treaty-requests').locator('[data-result="applied"]')).toContainText(
       '신의 기록에 남았습니다',
     );
+    // 끝남 탭의 카드는 조약 번호와 파기한 국가를 적는다 (INT-25 p4-nation-29·31).
+    await a.page.goto(`/w/${world}/diplomacy?tab=ended`);
+    const broken = a.page.getByTestId('treaty-card').filter({ has: a.page.getByTestId('treaty-broken-by') });
+    await expect(broken.first().getByTestId('treaty-broken-by')).toHaveText(`파기: ${x!.name}`);
+    await expect(broken.first().getByTestId('treaty-number')).toHaveText(/^조약 #\d+$/);
+    // 국가 탭은 순위 스냅숏의 국력·장수·도시 열을 함께 보인다 (INT-25 p4-nation-14).
+    await a.page.goto(`/w/${world}/diplomacy?tab=nations`);
+    const relations = a.page.getByTestId('nation-relations');
+    for (const name of ['국가', '국력', '장수', '도시', '우리와의 관계', '이어 보기'])
+      await expect(relations.getByRole('columnheader', { name, exact: true })).toBeVisible();
 
     await c.page.goto(`/w/${world}/diplomacy?tab=trust`);
     await expect(c.page.getByTestId('trust-table').getByRole('row', { name: new RegExp(x!.name) })).toContainText(

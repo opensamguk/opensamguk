@@ -417,23 +417,68 @@ describe('외교실 첫 세 조항 화면', () => {
 });
 
 describe('외교실 국가 탭 (INT-20)', () => {
-  it('이미 받은 상대 목록으로 관계와 이어 볼 곳을 한 줄씩 보이고 새 조회를 하지 않는다', async () => {
-    on('treaty.list', () => listPage({ items: [treaty({})] }));
+  it('상대 목록에 순위 스냅숏의 국력·장수·도시를 nationId로 합치고 관계에 남은 개월을 붙인다', async () => {
+    on('treaty.list', () =>
+      listPage({
+        items: [treaty({})],
+        targets: [
+          { nation: nation(2, '원소'), relation: 'NONE', relationEndAt: null },
+          { nation: nation(3, '유표'), relation: 'NON_AGGRESSION', relationEndAt: { year: 191, month: 9 } },
+          { nation: nation(4, '손견'), relation: 'WAR', relationEndAt: null },
+        ],
+      }),
+    );
+    on('ranking.nations', () => ({
+      items: [
+        { nationId: 3, name: '유표', color: '#336699', cities: 4, generals: 12, power: 3456, rank: 2 },
+        { nationId: 2, name: '원소', color: '#336699', cities: 9, generals: 30, power: 12000, rank: 1 },
+      ],
+      at: { tick: 600, year: 191, month: 2 },
+    }));
+    on('world.summary', () => ({ gameDate: { year: 191, month: 3 } }));
     renderPage('nations');
     const table = await screen.findByTestId('nation-relations');
     expect(
       within(table)
         .getAllByRole('columnheader')
         .map((cell) => cell.textContent),
-    ).toEqual(['국가', '우리와의 관계', '이어 보기']);
-    // 시험의 Link 대역은 aria-label을 넘기지 않으므로 줄 글자로 본다.
+    ).toEqual(['국가', '국력', '장수', '도시', '우리와의 관계', '이어 보기']);
+    await waitFor(() =>
+      expect(screen.getByTestId('nation-stats-note').textContent).toBe('국력·장수·도시는 191년 2월 정산 기준입니다.'),
+    );
+    await waitFor(() => expect(screen.getByTestId('relation-months-left').textContent).toBe(' (6개월 남음)'));
+    // 시험의 Link 대역은 aria-label을 넘기지 않으므로 줄 글자로 본다. 스냅숏에 없는 국가는 —로 둔다.
     expect(
       within(table)
         .getAllByRole('row')
         .slice(1)
         .map((row) => row.textContent),
-    ).toEqual(['원소관계 없음받은 제안 보기', '유표교전조약서 쓰기']);
+    ).toEqual([
+      '원소12,000309관계 없음받은 제안 보기',
+      '유표3,456124불가침 (191년 9월까지) (6개월 남음)조약서 쓰기',
+      '손견———교전조약서 쓰기',
+    ]);
     expect(within(table).getByText('교전').dataset.tone).toBe('danger');
     expect(callsTo('treaty.trust')).toHaveLength(0);
+    expect(callsTo('ranking.nations').map((call) => call.input)).toEqual([{ worldId: 'w1', by: 'power' }]);
+  });
+
+  it('순위 조회가 실패해도 관계 표는 그대로 보이고 수치 칸만 비운다', async () => {
+    on('treaty.list', () => listPage({}));
+    // 클라이언트 오류는 다시 시도하지 않으므로 실패 문장이 바로 보인다.
+    on('ranking.nations', () => {
+      throw serverError('FORBIDDEN', '순위 실패');
+    });
+    on('world.summary', () => ({ gameDate: { year: 191, month: 3 } }));
+    renderPage('nations');
+    await waitFor(() =>
+      expect(screen.getByTestId('nation-stats-note').textContent).toBe('국력·장수·도시를 불러오지 못했습니다.'),
+    );
+    expect(
+      within(screen.getByTestId('nation-relations'))
+        .getAllByRole('row')
+        .slice(1)
+        .map((row) => row.textContent),
+    ).toEqual(['원소———관계 없음조약서 쓰기', '유표———교전조약서 쓰기']);
   });
 });

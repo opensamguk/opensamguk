@@ -28,6 +28,9 @@ function Party({ nation, id }: { nation: NationRef | null; id: number }) {
   );
 }
 
+// 파기한 쪽. 서버는 BROKEN 조약에만 brokenBy를 준다 (원작 외교부의 '송신측의 파기 요청').
+export const brokenByText = (nation: NationRef) => `파기: ${nation.name}`;
+
 const gold = (value: number) => value.toLocaleString('ko-KR');
 
 // 제안 중 비용은 지금 도시 수로 낸 추정이다. 수락 때 엔진이 다시 계산한다.
@@ -118,10 +121,18 @@ export function TreatyCard({ treaty, busy, onRespond, onBreak }: Props) {
       aria-label={`${nationName(treaty.from, treaty.fromNationId)}와 ${nationName(treaty.to, treaty.toNationId)}의 조약`}
     >
       <header className={styles.cardHead}>
+        <span className={`num ${styles.muted} ${styles.treatyNo}`} data-testid="treaty-number">
+          조약 #{treaty.id}
+        </span>
         <Party nation={treaty.from} id={treaty.fromNationId} />
         <span aria-hidden="true">→</span>
         <Party nation={treaty.to} id={treaty.toNationId} />
         <Tag tone={status.tone}>{status.text}</Tag>
+        {treaty.status === 'BROKEN' && treaty.brokenBy ? (
+          <span className={styles.muted} data-testid="treaty-broken-by">
+            {brokenByText(treaty.brokenBy)}
+          </span>
+        ) : null}
         {busy !== null ? <Tag tone="warning">처리 중</Tag> : null}
       </header>
 
