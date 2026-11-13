@@ -10,6 +10,7 @@ import { expect, test } from './legalFixture';
 test('AC-M3-14 네 역할에서 NPC를 맡고 이미 맡긴 무장을 제외하며 직접 생성한다', async ({ legalStack, browser }) => {
   test.setTimeout(150_000);
   const { db, origin } = legalStack;
+  await legalStack.restart(null);
   const initial = commandInitial();
   initial.generals.push({
     ...initial.generals[2]!,
@@ -69,7 +70,7 @@ test('AC-M3-14 네 역할에서 NPC를 맡고 이미 맡긴 무장을 제외하�
         setting: { kind: 'admin.world.setOption', key: 'entry.npcPlay', value: 'on' },
       },
     });
-    expect(setting.ok()).toBe(true);
+    expect(setting.ok(), await setting.text()).toBe(true);
     await loop.advanceTo(0);
     await controlClock(db, worldId, 'start');
 
@@ -90,6 +91,7 @@ test('AC-M3-14 네 역할에서 NPC를 맡고 이미 맡긴 무장을 제외하�
       await panel.getByRole('button', { name: `${name}(으)로 시작`, exact: true }).click();
       await processEntry(id, 'general.possess');
       await expect(page).toHaveURL(new URL(worldUrl, origin).href);
+      await page.getByRole('tab', { name: '현황', exact: true }).click();
       await expect(page.getByRole('region', { name: '장수 정보', exact: true }).getByRole('strong').first()).toHaveText(
         name,
       );
