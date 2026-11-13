@@ -206,6 +206,9 @@
     order: 1;
     padding-top: var(--space-3);
   }
+  .commandsBody [data-testid='military-advice'] {
+    order: 1;
+  }
 }
 
 /* 국가·내 장수 메뉴 (INT-25): 원작 국가 메뉴처럼 2줄 단추 */
