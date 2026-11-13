@@ -95,9 +95,14 @@ function BattleSimForm({
   const importAttacker = () => {
     if (!general) return;
     const nation = home.data?.nation;
+    const battleHeritage = { ...general.heritageBenefits };
+    delete battleHeritage.domesticSuccess;
+    delete battleHeritage.domesticFailure;
     const traits = {
       ...(general.personalityEffects ? { personality: general.personalityEffects.name } : {}),
       ...(general.combatSpecialty ? { specialty: general.combatSpecialty.name } : {}),
+      ...(general.battleTactics ? { tactics: general.battleTactics } : {}),
+      ...(Object.keys(battleHeritage).length ? { heritage: battleHeritage } : {}),
       ...(general.proficiency?.length
         ? { proficiency: Object.fromEntries(general.proficiency.map(({ armType, value }) => [armType, value])) }
         : {}),
@@ -159,6 +164,8 @@ function BattleSimForm({
                     form.attackerTraits.personality,
                     form.attackerTraits.specialty,
                     form.attackerTraits.proficiency && '병종 숙련',
+                    form.attackerTraits.tactics && '전투계략',
+                    form.attackerTraits.heritage && '유산 혜택',
                   ]
                     .filter(Boolean)
                     .join(' · ')}
@@ -562,11 +569,21 @@ function ResultPanel({
             <details>
               <summary>교전 단계</summary>
               <ol>
-                {state.result.phases.map(({ kind, attackerLoss, defenderLoss }, index) => (
+                {state.result.phases.map((phase, index) => (
                   <li key={index}>
-                    {{ volley: '선제 사격', hold: '저지', exchange: '교전' }[kind]}
-                    {' · '}공격군 손실 {attackerLoss.toLocaleString('ko-KR')}
-                    {' · '}수비군 손실 {defenderLoss.toLocaleString('ko-KR')}
+                    {{ volley: '선제 사격', hold: '저지', exchange: '교전' }[phase.kind]}
+                    {' · '}공격군 손실 {phase.attackerLoss.toLocaleString('ko-KR')}
+                    {' · '}수비군 손실 {phase.defenderLoss.toLocaleString('ko-KR')}
+                    {phase.attackerEvaded ? ' · 공격 측 회피' : ''}
+                    {phase.defenderEvaded ? ' · 수비 측 회피' : ''}
+                    {phase.attackerCritical ? ' · 공격 측 필살' : ''}
+                    {phase.defenderCritical ? ' · 수비 측 필살' : ''}
+                    {phase.attackerTactic
+                      ? ` · 공격 측 ${phase.attackerTactic.name} ${phase.attackerTactic.success ? '성공' : '실패'}`
+                      : ''}
+                    {phase.defenderTactic
+                      ? ` · 수비 측 ${phase.defenderTactic.name} ${phase.defenderTactic.success ? '성공' : '실패'}`
+                      : ''}
                   </li>
                 ))}
               </ol>
