@@ -400,6 +400,7 @@ model City {
   stratagemTick    Int?
   seasonalEvent    String?
   warCasualties    Int?
+  conflict         Json?
   worldId          String
   cityKey          Int
   kind             String?

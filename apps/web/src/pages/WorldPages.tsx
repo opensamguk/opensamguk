@@ -71,6 +71,33 @@ export function MapPage() {
               <MapLegend cities={map.data.cities} nations={map.data.nations} />
             </div>
           </Panel>
+          {map.data.conflicts?.length ? (
+            <Panel title="분쟁 현황">
+              {map.data.conflicts.map(({ cityKey: key, cityName, shares }) => (
+                <section key={key}>
+                  <button type="button" onClick={() => setSelected(key)}>
+                    {cityName}
+                  </button>
+                  <ul>
+                    {shares.map(({ id, name, color, percent }) => (
+                      <li key={id}>
+                        <span>
+                          {name} {percent.toFixed(1)}%
+                        </span>{' '}
+                        <meter
+                          min={0}
+                          max={100}
+                          value={percent}
+                          aria-label={`${name} 공략 지분`}
+                          style={{ accentColor: color }}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </Panel>
+          ) : null}
           {cityKey !== null ? (
             <Panel title="도시 정보">
               <CityInfo worldId={worldId} cityKey={cityKey} nations={map.data.nations} onSelectCity={setSelected} />

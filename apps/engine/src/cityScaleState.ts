@@ -24,7 +24,7 @@ export async function assertStoredCityRuins(tx: Prisma.TransactionClient, world:
     readStoredCityRuins(world, { cities: {}, ruleFeatures: world.ruleFeatures });
     return;
   }
-  const rows = await tx.city.findMany({ where: { worldId: world.id }, omit: { kind: true } });
+  const rows = await tx.city.findMany({ where: { worldId: world.id }, omit: { kind: true, conflict: true } });
   readStoredCityRuins(world, {
     cities: Object.fromEntries(rows.map((city) => [city.cityKey, city])),
     ruleFeatures: world.ruleFeatures,

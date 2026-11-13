@@ -1,5 +1,6 @@
 import { BATTLE_TACTICS_FEATURE } from './battle/tactics';
 import { WAR_INCOME_FEATURE } from './monthly/warIncome';
+import { CITY_CONFLICT_FEATURE } from './battle/cityConflict';
 import {
   applyFinanceRates,
   NATION_FINANCE_FEATURE,
@@ -194,6 +195,7 @@ export const ruleRegistry: RuleRegistry = {
     { key: RANKED_PAYROLL_FEATURE, requires: [NATION_FINANCE_FEATURE], conflicts: [] },
     { key: WALL_INCOME_FEATURE, requires: [], conflicts: [] },
     { key: WAR_INCOME_FEATURE, requires: [], conflicts: [] },
+    { key: CITY_CONFLICT_FEATURE, requires: [], conflicts: [] },
     { key: DEFENSE_STANCE_FEATURE, requires: [], conflicts: [] },
     { key: PLAYER_AUTOPLAY_FEATURE, requires: ['policy'], conflicts: [] },
     { key: CITY_SEASONAL_EVENTS_FEATURE, requires: [], conflicts: [] },

@@ -1,4 +1,5 @@
 import { BATTLE_TACTICS_FEATURE } from '../packages/rules/src/battle/tactics';
+import { CITY_CONFLICT_FEATURE } from '../packages/rules/src/battle/cityConflict';
 import { WAR_INCOME_FEATURE } from '../packages/rules/src/monthly/warIncome';
 import { TROOP_FEATURE } from '../packages/rules/src/commands/ext/troop/state';
 import { COMBAT_SPECIALTY_FEATURE } from '../packages/rules/src/general/combatSpecialty';
@@ -1335,7 +1336,13 @@ it('실제 출병의 전투계략과 단기 수입을 월말에 재생한다', a
     turnTermMinutes: 30,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: [BATTLE_TACTICS_FEATURE, COMBAT_SPECIALTY_FEATURE, 'policy', WAR_INCOME_FEATURE],
+    ruleFeatures: [
+      BATTLE_TACTICS_FEATURE,
+      CITY_CONFLICT_FEATURE,
+      COMBAT_SPECIALTY_FEATURE,
+      'policy',
+      WAR_INCOME_FEATURE,
+    ],
   });
   worlds.push(worldId);
   await db.world.update({ where: { id: worldId }, data: { status: 'RUNNING', clockAnchorAt: new Date(now) } });
@@ -1369,6 +1376,8 @@ it('실제 출병의 전투계략과 단기 수입을 월말에 재생한다', a
   const where = { worldId_id: { worldId, id: 1 } };
   const before = await db.nation.findUniqueOrThrow({ where });
   expect(await db.city.count({ where: { worldId, warCasualties: { gt: 0 } } })).toBe(2);
+  const siege = await db.city.findUniqueOrThrow({ where: { worldId_cityKey: { worldId, cityKey: 2 } } });
+  expect(siege.conflict).not.toBeNull();
   await loop.advanceTo(10000);
   expect((await db.nation.findUniqueOrThrow({ where })).gold).toBe(
     before.gold + estimate.gold.net + estimate.warIncome,
