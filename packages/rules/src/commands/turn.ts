@@ -9,6 +9,7 @@ import { commandRegistry, runCommand } from './registry';
 import { chooseAutoplayTurn, chooseGeneralTurn, chooseNationTurn, type NpcContext } from '../npc';
 import { runPolicyCommand } from '../policy/execute';
 import { applyPersonalityProgress } from '../general/personality';
+import { growDomesticStat } from '../general/statGrowth';
 import { PLAYER_AUTOPLAY_FEATURE, playerAutoplayWindow, type PolicyKey } from '../policy';
 import { runOfficeAssign, takeOfficeTurn } from '../personnel/officeTurn';
 import { canExecuteNationCommand } from '../personnel/permissions';
@@ -185,6 +186,7 @@ export function runGeneralTurn(
     const before = next.generals[actor.generalId]!;
     next = applyEffects(next, policy.result.effects);
     applyPersonalityProgress(next, next.generals[actor.generalId]!, before);
+    if (!('code' in policy.result)) growDomesticStat(next, actor.generalId, policy.commandKey);
     applyLastNationRecruitmentLock(next, policy.result, actor.tick ?? 0);
     return {
       state: next,
@@ -218,6 +220,7 @@ export function runGeneralTurn(
   );
   next = applyEffects(next, 'code' in result ? [] : result.effects);
   applyPersonalityProgress(next, next.generals[actor.generalId]!, before);
+  if (!('code' in result)) growDomesticStat(next, actor.generalId, selected.commandKey);
   applyLastNationRecruitmentLock(next, result, actor.tick ?? 0);
   if (instructed.order)
     next = finishCampaignOrder(

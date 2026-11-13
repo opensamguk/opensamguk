@@ -85,6 +85,7 @@ export interface InitialGeneral {
   defenseThreshold?: number;
   heritageBenefits?: import('../heritage/benefits').HeritageBenefits;
   proficiency?: import('../general/proficiency').GeneralProficiency;
+  statExperience?: import('../general/statGrowth').StatExperience;
   birthYear: number;
   deathYear: number;
   activeFromYear: number;

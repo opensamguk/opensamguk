@@ -5,6 +5,7 @@ export * from './world/preset';
 export * from './world/options';
 export * from './world/resources';
 export * from './personnel/financeRates';
+export * from './general/statGrowth';
 export {
   checkInitialNpcStatLimits,
   MAX_LEGACY_STARTING_NPC_STAT,

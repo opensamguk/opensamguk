@@ -17,6 +17,7 @@ import {
   assertNationLifecycle,
   storedCitySeasonalEvent,
   storedCityConflict,
+  storedStatExperience,
   storedDefenseStance,
   storedGeneralProficiency,
   storedHeritageBenefits,
@@ -150,6 +151,7 @@ export async function loadWorldAfterCapabilityCheck(
           officerCityKey,
           defenseThreshold,
           proficiency,
+          statExperience,
           heritageBenefits,
           ...general
         }) => {
@@ -169,6 +171,7 @@ export async function loadWorldAfterCapabilityCheck(
                     ...(officerCityKey == null ? {} : { officerCityKey }),
                     ...storedHeritageBenefits(world.ruleFeatures.includes(HERITAGE_BENEFITS_FEATURE), heritageBenefits),
                     ...storedGeneralProficiency(world.ruleFeatures.includes(GENERAL_PROFICIENCY_FEATURE), proficiency),
+                    ...storedStatExperience(statExperience),
                     ...storedDefenseStance(world.ruleFeatures.includes(DEFENSE_STANCE_FEATURE), defenseThreshold),
                   },
                   world.ruleFeatures.includes('lineage-v1'),

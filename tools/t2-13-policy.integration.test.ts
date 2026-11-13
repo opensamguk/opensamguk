@@ -1,5 +1,6 @@
 import { BATTLE_TACTICS_FEATURE } from '../packages/rules/src/battle/tactics';
 import { CITY_CONFLICT_FEATURE } from '../packages/rules/src/battle/cityConflict';
+import { STAT_GROWTH_FEATURE } from '../packages/rules/src/general/statGrowth';
 import { WAR_INCOME_FEATURE } from '../packages/rules/src/monthly/warIncome';
 import { TROOP_FEATURE } from '../packages/rules/src/commands/ext/troop/state';
 import { COMBAT_SPECIALTY_FEATURE } from '../packages/rules/src/general/combatSpecialty';
@@ -1112,6 +1113,43 @@ it('내정 특기의 할인과 효과가 실제 턴에 적용되고 월말 기�
   await loop.advanceTo(100);
   const row = await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
   expect(row.gold).toBe(initial.generals[0]!.gold - 80);
+  await loop.advanceTo(10000);
+  const archive = await exportReplay(db, worldId);
+  expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
+});
+
+it('내정 성공으로 지력이 오르고 다음 월말을 재생한다', async () => {
+  const alice = await user();
+  const initial = commandInitial();
+  initial.generals = initial.generals.slice(0, 1).map((general) => ({
+    ...general,
+    userId: alice.id,
+    nextTurnTick: 100,
+    statExperience: { leadership: 0, strength: 0, intel: 29 },
+  }));
+  const { worldId } = await saveInitialWorld(db, initial, {
+    name: '능력치 성장 실제 PG',
+    turnTermMinutes: 30,
+    endYear: null,
+    replayFormat: 3,
+    ruleFeatures: ['policy', STAT_GROWTH_FEATURE],
+  });
+  worlds.push(worldId);
+  await db.world.update({ where: { id: worldId }, data: { status: 'RUNNING', clockAnchorAt: new Date(now) } });
+  const lease = await acquireLease(db, worldId);
+  if (!lease) throw new Error('시험 실행권이 없습니다.');
+  leases.push(lease);
+  const loop = new TurnLoop(db, lease);
+  const home = () => rpc('home.get', { worldId }, alice.cookie);
+  expect((await home()).data).toMatchObject({ general: { statUpgradeLimit: 30, statExperience: { intel: 29 } } });
+  const slots = Array.from({ length: 30 }, (_, slot) => (slot === 0 ? { commandKey: 'farm', args: {} } : null));
+  expect((await rpc('turns.set', { worldId, revision: 0, slots }, alice.cookie, true)).data).toMatchObject({
+    ok: true,
+  });
+  await loop.advanceTo(100);
+  expect((await home()).data).toMatchObject({
+    general: { intel: initial.generals[0]!.intel + 1, statExperience: { intel: 0 } },
+  });
   await loop.advanceTo(10000);
   const archive = await exportReplay(db, worldId);
   expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));

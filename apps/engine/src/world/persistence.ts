@@ -488,6 +488,7 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
           nationJoinedTick: true,
           defenseThreshold: true,
           proficiency: true,
+          statExperience: true,
           heritageBenefits: true,
         },
       });

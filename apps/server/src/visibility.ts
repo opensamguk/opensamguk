@@ -30,6 +30,7 @@ type General = Omit<
   | 'nationJoinedTick'
   | 'defenseThreshold'
   | 'proficiency'
+  | 'statExperience'
   | 'heritageBenefits'
 > & { politics?: number | null; charm?: number | null };
 type City = Omit<
