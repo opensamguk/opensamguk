@@ -361,10 +361,15 @@ test.describe('장수가 있는 계정', () => {
     await shot(page, '12-main-turn-result.png');
   });
 
-  test('국가 정보에서 소속 장수·소유 도시 표를 펼치고 정렬한다', async ({ page }) => {
+  test('국가 정보의 세력 장수 링크로 국가 화면에서 소속 장수·소유 도시 표를 보고 정렬한다', async ({ page }) => {
     await openMain(page);
-    const nation = page.getByRole('region', { name: '국가 정보', exact: true });
-    await nation.getByRole('button', { name: '소속 장수·도시 펼치기' }).click();
+    // 표는 국가 화면에 있다 (INT-25). 메인 국가 칸에는 링크만 둔다.
+    await page
+      .getByRole('region', { name: '국가 정보', exact: true })
+      .getByRole('link', { name: /^세력 장수/ })
+      .click();
+    await expect(page).toHaveURL(new RegExp(`/w/${ctx.worldId}/nation/${ctx.home.general.nationId}$`));
+    const nation = page.getByRole('main');
     await expect(nation.getByRole('table').filter({ hasText: '소속 장수' })).toBeVisible();
     const cityTable = nation.getByRole('table').filter({ hasText: '소유 도시' });
     await expect(cityTable).toBeVisible();

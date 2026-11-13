@@ -467,7 +467,7 @@ export class OfferFixture {
       ),
     );
     this.progress('final-board-navigation');
-    await page.goto(`/w/${this.worlds[0]!.id}`);
+    await page.goto(`/w/${this.worlds[0]!.id}/campaign`);
     this.progress('final-board-response');
     const response = await loaded;
     const call = calls(response.request()).find((call) => call.path === 'campaign.get')!;
@@ -641,28 +641,39 @@ export class OfferFixture {
   async draft() {
     this.scope.check();
     const page = this.users[0]!.page;
+    const worldId = this.worlds[0]!.id;
+    // 휘하·부곡은 전용 화면이다 (INT-25). 예턴은 군략도에서 고치고 돌아온다.
+    // 저장하지 않은 편집은 이 탭의 sessionStorage에 남고, 휘하 제안을 오가는 동안 바뀌거나 저장되지 않아야 한다.
+    await page.goto(`/w/${worldId}`);
     const editor = page.getByTestId('turn-editor');
     await editor.locator('tr[data-slot="30"]').click();
     await editor.getByLabel('명령 찾기').fill('농지 개간');
     await editor.getByRole('radio', { name: '농지 개간', exact: true }).check();
     await editor.getByRole('button', { name: /에 넣기$/ }).click();
-    const node = await editor.elementHandle();
+    await expect(editor.locator('tr[data-slot="30"]')).toContainText('농지 개간');
+    const drafts = () =>
+      page.evaluate(
+        (id) =>
+          Object.entries(sessionStorage).filter(
+            ([key]) => key.startsWith('opensamguk.turnDraft.v1:') && key.endsWith(`:${id}`),
+          ),
+        worldId,
+      );
+    const saved = await drafts();
+    expect(saved.length).toBeGreaterThan(0);
+    await page.goto(`/w/${worldId}/campaign`);
+    await expect(this.panel()).toBeVisible();
     const url = page.url();
     const turns = await this.worlds[0]!.hold.db.generalTurn.findMany({
-      where: { worldId: this.worlds[0]!.id },
+      where: { worldId },
       orderBy: [{ generalId: 'asc' }, { slot: 'asc' }],
     });
     return async () => {
       expect(page.url()).toBe(url);
-      expect(
-        await node!.evaluate(
-          (element) => element.isConnected && element === document.querySelector('[data-testid="turn-editor"]'),
-        ),
-      ).toBe(true);
-      await expect(editor.locator('tr[data-slot="30"]')).toContainText('농지 개간');
+      expect(await drafts()).toEqual(saved);
       expect(
         await this.worlds[0]!.hold.db.generalTurn.findMany({
-          where: { worldId: this.worlds[0]!.id },
+          where: { worldId },
           orderBy: [{ generalId: 'asc' }, { slot: 'asc' }],
         }),
       ).toEqual(turns);

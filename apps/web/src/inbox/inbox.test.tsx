@@ -150,7 +150,7 @@ describe('받은 제안함', () => {
 
     const retinue = await screen.findByRole('region', { name: '휘하 제안 1' });
     expect(within(retinue).getByText('하후돈의 가신 제안')).toBeTruthy();
-    expect(within(retinue).getByText('휘하·부곡에서 답하기').getAttribute('data-hash')).toBe('campaign-title');
+    expect(within(retinue).getByText('휘하·부곡에서 답하기').getAttribute('data-to')).toBe('/w/$worldId/campaign');
 
     const treaties = await screen.findByRole('region', { name: '외교 제안 1' });
     expect(within(treaties).getByText('원소의 조약 제안 · 응답 기한 191년 9월')).toBeTruthy();

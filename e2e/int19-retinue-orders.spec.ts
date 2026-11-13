@@ -159,7 +159,7 @@ test('AC-INT-19C 정식491명 장수 지시 발송·수락 실행·거절·NPC �
     const targetTurns = await turns(targetId);
     expect(targetTurns).toHaveLength(30);
 
-    for (const user of [owner, target]) await user.page.goto(`/w/${worldId}`);
+    for (const user of [owner, target]) await user.page.goto(`/w/${worldId}/campaign`);
     await expect(panel(owner)).toBeVisible();
     await sendFarm(targetId);
     await expect(panel(owner)).toContainText('지시장수0 → 지시장수1: 농지 개간');

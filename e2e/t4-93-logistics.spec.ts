@@ -129,7 +129,8 @@ async function fixture(stack: LegalStack, browser: Browser) {
     return id;
   };
   const userId = await loginAs(ruler.id);
-  await page.goto(`/w/${worldId}`);
+  // 물류 칸은 도시 화면에 있다 (INT-25). 메인 도시 칸에는 링크만 둔다.
+  await page.goto(`/w/${worldId}/city/${source.cityKey}`);
   await expect(panel(page)).toBeVisible();
   await expect(panel(page).getByRole('tab', { name: '보내기', exact: true })).toBeVisible();
   const orders = () =>
@@ -231,7 +232,7 @@ test('AC-P2-30 실제 수송·취소·도착·교역·증축과 새로고침 복
   });
   await panel(page).getByRole('tab', { name: '기록', exact: true }).click();
   await expect(panel(page).getByText('도착', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: game.source.name, exact: true }).first().click();
+  await page.goto(`/w/${worldId}/city/${game.source.cityKey}`);
   await expect(panel(page).getByRole('button', { name: '보내기 요청', exact: true })).toBeVisible();
   await panel(page).getByRole('tab', { name: '교역', exact: true }).click();
   await panel(page).getByRole('combobox', { name: '재화', exact: true }).selectOption('wood');

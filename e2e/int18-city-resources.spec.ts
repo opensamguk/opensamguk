@@ -681,15 +681,17 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
     await editor.getByLabel('명령 찾기', { exact: true }).fill(name);
     await editor.getByRole('radio', { name, exact: true }).check();
     for (const [label, value] of Object.entries(fields)) {
+      // 대상 도시·국가·장수와 병종은 인자 입력 화면의 고르기 목록이다 (INT-25). 번호로 고른다.
       const group = editor.getByRole('radiogroup', { name: label, exact: true });
-      if (await group.count()) {
-        await group.locator(`[value="${value}"]`).click();
-        continue;
-      }
       const control = editor
         .getByRole('combobox', { name: label, exact: true })
         .or(editor.getByRole('spinbutton', { name: label, exact: true }))
         .or(editor.getByRole('textbox', { name: label, exact: true }));
+      await group.or(control).first().waitFor();
+      if ((await group.count()) > 0) {
+        await group.locator(`[data-value="${value}"], input[value="${value}"]`).first().click();
+        continue;
+      }
       if ((await control.evaluate((element) => element.tagName)) === 'SELECT') await control.selectOption(value);
       else await control.fill(value);
     }
@@ -889,6 +891,8 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
           independentHumanCommands: true,
           resourceOrPositionInjection: false,
         };
+        // 휘하·부곡은 전용 화면이다 (INT-25). 부곡을 편성한 뒤 군략도로 돌아간다.
+        await owner.page.goto(`/w/${main.id}/campaign`);
         const campaign = owner.page.getByRole('region', {
           name: '개인 휘하·부곡',
           exact: true,
@@ -922,6 +926,7 @@ async function createJourney(legalStack: LegalStack, browser: Browser, cityRun: 
         expect(await turns(main, other)).toHaveLength(30);
         await expect(campaign).toContainText('소유 부곡 1개');
         await photo(owner.page, info, '02-person-30slots-empty-unit');
+        await owner.page.goto(`/w/${main.id}`);
         // 같은 세수 준비를 첫 검사에 둔다. 다음 검사는 기존 네 명령과 단차 검증을 이어서 실행한다.
         actor = owner!;
         protectedActor = other!;

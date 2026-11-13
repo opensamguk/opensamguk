@@ -102,7 +102,7 @@ export function Inbox({ worldId, hasNation, campaign }: { worldId: string; hasNa
               ))}
             </ul>
           </div>
-          <Link to="/w/$worldId" params={{ worldId }} hash="campaign-title" className={styles.button}>
+          <Link to="/w/$worldId/campaign" params={{ worldId }} className={styles.button}>
             휘하·부곡에서 답하기
           </Link>
         </section>

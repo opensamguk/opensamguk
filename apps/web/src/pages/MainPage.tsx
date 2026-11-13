@@ -1,4 +1,4 @@
-import { useLocation, useNavigate, useSearch } from '@tanstack/react-router';
+import { Link, useLocation, useNavigate, useSearch } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { AdvicePanel } from '../advice/AdvicePanel';
@@ -15,8 +15,6 @@ import { SeasonResult } from '../main/SeasonResult';
 import { MapLegend, WorldMap } from '../main/WorldMap';
 import { PolicyBar } from '../policy/PolicyBar';
 import { OfferBox } from '../personnel/OfferBox';
-import { CampaignPanel } from '../personnel/CampaignPanel';
-import { RetinueOrdersPanel } from '../personnel/RetinueOrdersPanel';
 import { TurnEditor, type TurnEditorStatus } from '../turns/TurnEditor';
 import { EmptyState, LoadingState } from '../ui/States';
 import { useTRPC } from '../trpc';
@@ -219,6 +217,13 @@ export function MainPage() {
           )}
         </Panel>
 
+        <MainMenu
+          worldId={worldId}
+          nationId={homeData?.nation?.id ?? null}
+          campaignEnabled={mine.data?.creationRules.campaignEnabled === true}
+          cityKey={myCityKey}
+        />
+
         <Panel
           title="도시 정보"
           area="city"
@@ -238,6 +243,7 @@ export function MainPage() {
               nations={nations}
               onSelectCity={selectCity}
               logisticsEnabled={summary.data?.logisticsEnabled === true}
+              summary
             />
           ) : home.isPending ? (
             <LoadingState />
@@ -260,7 +266,7 @@ export function MainPage() {
 
         <Panel title="국가 정보" area="nation" headingId="main-nation">
           {withHome((data) => (
-            <NationInfo worldId={worldId} nation={data.nation} cities={cities} onSelectCity={selectCity} />
+            <NationInfo worldId={worldId} nation={data.nation} cities={cities} />
           ))}
         </Panel>
 
@@ -297,8 +303,98 @@ export function MainPage() {
           </Panel>
         </div>
       </div>
-      {mine.data?.general && mine.data.creationRules.campaignEnabled ? <CampaignPanel worldId={worldId} /> : null}
-      {mine.data?.general && mine.data.creationRules.campaignEnabled ? <RetinueOrdersPanel worldId={worldId} /> : null}
     </section>
+  );
+}
+
+// 국가·내 장수 메뉴 (INT-25, 원작 국가 메뉴 2줄). 메인에서 옮긴 전용 화면과 기존 화면으로 한 번에 간다.
+function MainMenu({
+  worldId,
+  nationId,
+  campaignEnabled,
+  cityKey,
+}: {
+  worldId: string;
+  nationId: number | null;
+  campaignEnabled: boolean;
+  cityKey: number | null;
+}) {
+  return (
+    <nav className={styles.menu} aria-label="국가와 내 장수 메뉴">
+      <div className={styles.menuRow}>
+        <span className={styles.menuHead}>국가</span>
+        <Link to="/w/$worldId/nation/personnel" params={{ worldId }} className={styles.menuItem}>
+          인사부
+        </Link>
+        <Link to="/w/$worldId/nation/turns" params={{ worldId }} className={styles.menuItem}>
+          국가 예턴
+        </Link>
+        <Link to="/w/$worldId/operations" params={{ worldId }} className={styles.menuItem}>
+          작전
+        </Link>
+        <Link to="/w/$worldId/nation/inspection" params={{ worldId }} className={styles.menuItem}>
+          감찰
+        </Link>
+        <Link to="/w/$worldId/diplomacy" params={{ worldId }} search={{ tab: 'nations' }} className={styles.menuItem}>
+          외교실
+        </Link>
+        <Link to="/w/$worldId/nation/governance" params={{ worldId }} className={styles.menuItem}>
+          통치
+        </Link>
+        {nationId !== null ? (
+          <Link
+            to="/w/$worldId/nation/$nationId"
+            params={{ worldId, nationId: String(nationId) }}
+            hash="cities"
+            className={styles.menuItem}
+          >
+            세력 도시
+          </Link>
+        ) : null}
+        {nationId !== null ? (
+          <Link
+            to="/w/$worldId/nation/$nationId"
+            params={{ worldId, nationId: String(nationId) }}
+            className={styles.menuItem}
+          >
+            세력 장수
+          </Link>
+        ) : null}
+      </div>
+      <div className={styles.menuRow}>
+        <span className={styles.menuHead}>내 장수</span>
+        {cityKey !== null ? (
+          <Link
+            to="/w/$worldId/city/$cityKey"
+            params={{ worldId, cityKey: String(cityKey) }}
+            className={styles.menuItem}
+          >
+            현재 도시
+          </Link>
+        ) : null}
+        {campaignEnabled ? (
+          <Link to="/w/$worldId/campaign" params={{ worldId }} className={styles.menuItem}>
+            휘하·부곡
+          </Link>
+        ) : null}
+        {campaignEnabled ? (
+          <Link to="/w/$worldId/campaign" params={{ worldId }} hash="retinue-orders" className={styles.menuItem}>
+            장수 지시
+          </Link>
+        ) : null}
+        <Link to="/w/$worldId/inbox" params={{ worldId }} className={styles.menuItem}>
+          제안함
+        </Link>
+        <Link to="/w/$worldId/me" params={{ worldId }} className={styles.menuItem}>
+          내 정보
+        </Link>
+        <Link to="/w/$worldId/messages" params={{ worldId }} className={styles.menuItem}>
+          메시지
+        </Link>
+        <Link to="/w/$worldId/map" params={{ worldId }} className={styles.menuItem}>
+          지도 크게
+        </Link>
+      </div>
+    </nav>
   );
 }

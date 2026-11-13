@@ -436,10 +436,12 @@ export function CommandPicker({
               </label>
             ) : null}
             {command.key === 'equipment_trade' ? (
-              <EquipmentTradeFields read={equipment} values={values} onChange={setValues} firstArgRef={firstArgRef} />
+              <div className={styles.argScreenPanel}>
+                <EquipmentTradeFields read={equipment} values={values} onChange={setValues} firstArgRef={firstArgRef} />
+              </div>
             ) : (
               <>
-                <div className={styles.argScreenFields}>
+                <div className={`${styles.argScreenFields} ${styles.argScreenPanel}`}>
                   {fields
                     .filter(
                       (field) =>

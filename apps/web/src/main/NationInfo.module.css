@@ -66,3 +66,12 @@
     box-sizing: border-box;
   }
 }
+
+/* 전용 화면으로 가는 링크 (INT-25) */
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: var(--space-2) 0;
+  font-size: var(--text-sm);
+}

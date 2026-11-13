@@ -221,28 +221,20 @@ test('T3-10 정식191년 도시·국가·월간 순위 표의 모든 값·정렬
     const own = city.generals.find((g) => g.id === actor.id)!;
     expect(isDetailedGeneral(own)).toBe(true);
     const measurements = [];
+    const garrison = page.getByRole('table', { name: /^주둔 장수/ });
+    const generals = page.getByRole('table', { name: /^소속 장수/ });
+    const cities = page.getByRole('table', { name: /^소유 도시/ });
     for (const width of [375, 390, 768, 1440]) {
       const mobile = width < 768;
       await page.setViewportSize({ width, height: 900 });
-      await page.getByRole('button', { name: '소속 장수·도시 펼치기', exact: true }).click();
-      const garrison = page.getByRole('table', { name: /^주둔 장수/ });
-      const generals = page.getByRole('table', { name: /^소속 장수/ });
-      const cities = page.getByRole('table', { name: /^소유 도시/ });
-      await expect(generals.locator('tbody tr')).toHaveCount(nation.generals.length);
-      for (const table of [garrison, generals, cities]) await tableGeometry(table, mobile);
+      // 주둔 장수 표는 도시 화면, 소속 장수·소유 도시 표는 국가 화면에 있다 (INT-25).
+      await page.goto(`/w/${ownWorld}/city/${actor.cityKey}`);
+      await expect(garrison).toBeVisible();
+      await tableGeometry(garrison, mobile);
       await noOverflow(page);
       if (mobile) {
         expect(city.generals.some((g) => !isDetailedGeneral(g))).toBe(true);
         await assertMobileDetails(garrison, city.generals, 'city', new Map());
-        await assertMobileDetails(
-          generals,
-          nation.generals,
-          'nation',
-          new Map(nation.cities.map((c) => [c.key, c.name])),
-        );
-        expect(await cities.locator('tbody tr td:first-child').allTextContents()).toEqual(
-          nation.cities.map((c) => c.name),
-        );
       }
       const ownRow = garrison
         .locator('tbody tr')
@@ -256,7 +248,24 @@ test('T3-10 정식191년 도시·국가·월간 순위 표의 모든 값·정렬
         ['매력', 'charm', 6],
       ] as const)
         await statValue(ownRow, label, number(own[key]!), mobile, index);
+      await page.screenshot({ path: info.outputPath(`formal-city-${width}.png`), fullPage: true });
+      await garrison.locator('caption').scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath(`formal-garrison-viewport-${width}.png`) });
+
+      await page.goto(`/w/${ownWorld}/nation/1`);
+      await expect(generals.locator('tbody tr')).toHaveCount(nation.generals.length);
+      for (const table of [generals, cities]) await tableGeometry(table, mobile);
+      await noOverflow(page);
       if (mobile) {
+        await assertMobileDetails(
+          generals,
+          nation.generals,
+          'nation',
+          new Map(nation.cities.map((c) => [c.key, c.name])),
+        );
+        expect(await cities.locator('tbody tr td:first-child').allTextContents()).toEqual(
+          nation.cities.map((c) => c.name),
+        );
         const select = generals.locator('..').getByRole('combobox');
         await select.selectOption('intel');
         await expect(generals.locator('..').getByRole('button', { name: /정렬 방향 내림차순, 바꾸기$/ })).toHaveText(
@@ -283,16 +292,16 @@ test('T3-10 정식191년 도시·국가·월간 순위 표의 모든 값·정렬
       measurements.push({ width, cityRows: city.generals.length, nationRows: nation.generals.length });
       await page.screenshot({ path: info.outputPath(`formal-tables-${width}.png`), fullPage: true });
       for (const [name, table] of [
-        ['garrison', garrison],
         ['nation', generals],
         ['cities', cities],
       ] as const) {
         await table.locator('caption').scrollIntoViewIfNeeded();
         await page.screenshot({ path: info.outputPath(`formal-${name}-viewport-${width}.png`) });
       }
-      await page.getByRole('button', { name: '소속 장수·도시 접기', exact: true }).click();
-      await expect(editor.locator('tr[data-slot="30"]')).toContainText('농지 개간');
     }
+    // 화면을 오가도 저장하지 않은 예턴 편집은 sessionStorage에 남아 있다.
+    await page.goto(`/w/${ownWorld}`);
+    await expect(editor.locator('tr[data-slot="30"]')).toContainText('농지 개간');
     expect(
       await hold.db.generalTurn.findMany({
         where: { worldId: ownWorld, generalId: actor.id },

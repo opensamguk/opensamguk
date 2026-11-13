@@ -431,6 +431,13 @@
   align-items: flex-end;
   gap: var(--space-3);
 }
+/* 인자 화면의 다른 칸(지도·목록·표)과 같은 판 위에 둔다. 경고 글자 대비(AC-P2-34)도 이 판 기준이다. */
+.argScreenPanel {
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: var(--frame);
+  box-shadow: var(--frame-inset), var(--shadow-step);
+}
 .argScreenFields:empty {
   display: none;
 }

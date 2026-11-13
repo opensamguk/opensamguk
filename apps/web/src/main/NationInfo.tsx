@@ -1,11 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { useState } from 'react';
 import { retryUnlessClientError } from '../game/errors';
 import { officerName } from '../game/names';
 import { QueryError } from '../game/QueryState';
 import { isDetailedGeneral, isMemberNation, type Home, type MapCity, type NationView } from '../game/types';
-import { GovernancePanel } from '../governance/GovernancePanel';
 import { NationNoticeBox } from '../messages/NationNotice';
 import { useTRPC } from '../trpc';
 import { DataTable, type Column } from '../ui/DataTable';
@@ -51,25 +49,26 @@ export function useNation(worldId: string, nationId: number, enabled = true) {
   return useQuery({ ...trpc.nation.get.queryOptions({ worldId, nationId }), enabled, retry: retryUnlessClientError });
 }
 
-// 메인의 국가 정보 칸. 요약을 먼저 보이고, 소속 장수·소유 도시 표는 같은 자리에서 펼친다.
+// 메인의 국가 정보 칸. 요약만 보이고, 소속 장수·소유 도시 표와 통치는 전용 화면 링크로 잇는다 (INT-25).
 export function NationInfo({
   worldId,
   nation,
   cities,
-  onSelectCity,
 }: {
   worldId: string;
   nation: Home['nation'];
   cities: readonly MapCity[];
-  onSelectCity: (key: number) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  // 황실 칸은 공개 정보라 재야 장수에게도 보인다. 기능을 켜지 않은 월드면 칸이 아무것도 그리지 않는다.
+  // 통치(황실·정통성)는 전용 화면으로 옮겼다 (INT-25). 재야 장수도 링크로 공개 정보를 본다.
   if (nation === null)
     return (
       <>
         <EmptyState title="재야입니다">국가에 임관하면 국고·군량과 소속 장수를 여기서 봅니다.</EmptyState>
-        <GovernancePanel worldId={worldId} />
+        <p className={styles.links}>
+          <Link to="/w/$worldId/nation/governance" params={{ worldId }}>
+            통치
+          </Link>
+        </p>
       </>
     );
   const capital = isMemberNation(nation) ? cities.find((city) => city.key === nation.capitalCityKey) : undefined;
@@ -86,12 +85,19 @@ export function NationInfo({
         </Link>
       </div>
       <NationSummaryGrid nation={nation} capitalName={capital?.name} />
-      <button type="button" className={styles.toggle} aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-        {open ? '소속 장수·도시 접기' : '소속 장수·도시 펼치기'}
-      </button>
-      {open ? <NationTables worldId={worldId} nationId={nation.id} onSelectCity={onSelectCity} /> : null}
+      {/* 소속 장수·도시 표와 통치는 전용 화면으로 옮겼다 (INT-25). */}
+      <p className={styles.links}>
+        <Link to="/w/$worldId/nation/$nationId" params={{ worldId, nationId: String(nation.id) }}>
+          세력 장수 {n(nation.generalCount)}명
+        </Link>
+        <Link to="/w/$worldId/nation/$nationId" params={{ worldId, nationId: String(nation.id) }} hash="cities">
+          세력 도시 {n(nation.cityCount)}곳
+        </Link>
+        <Link to="/w/$worldId/nation/governance" params={{ worldId }}>
+          통치
+        </Link>
+      </p>
       <NationNoticeBox worldId={worldId} />
-      <GovernancePanel worldId={worldId} />
     </div>
   );
 }
