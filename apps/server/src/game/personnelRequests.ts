@@ -23,6 +23,7 @@ export type PersonnelRecord = { kind: PersonnelKind; state: RequestState<Appoint
 export type PersonnelReady = Readonly<{
   worldId: string;
   personnel: 'ready';
+  courtRankEnabled?: true;
   officeEffectsEnabled?: true;
   secretaryEnabled?: true;
 }>;
