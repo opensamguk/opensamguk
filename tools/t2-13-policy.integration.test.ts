@@ -1473,6 +1473,11 @@ it('동률인 공성 기여의 순위대로 도시를 양도하고 월말 해시
   expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } })).toMatchObject({
     cityKey: 1,
   });
+  expect((await rpc('records.activity', { worldId, scope: 'world' }, alice.cookie)).data).toMatchObject({
+    items: expect.arrayContaining([
+      expect.objectContaining({ kind: 'transfer', text: '도시2 공략 후 국가1에서 국가3에 양도' }),
+    ]),
+  });
   await loop.advanceTo(10000);
   const archive = await exportReplay(db, worldId);
   expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));

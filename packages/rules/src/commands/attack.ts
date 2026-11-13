@@ -252,6 +252,9 @@ function makeAttack(collect: typeof collectModifiers) {
         ...(actor.recordBattleStats ? { generalEngagements } : {}),
         ...(reputation ? { battleOutcomes } : {}),
         attackTarget: { cityKey: args.cityKey, defendingNationId: defendingNation },
+        ...(captured && city.nationId !== attackingNation
+          ? { cityTransfer: { cityKey: city.cityKey, fromNationId: attackingNation, toNationId: city.nationId! } }
+          : {}),
       };
     },
   });

@@ -43,6 +43,7 @@ export async function persistCommandState(
   beforeNationRemoval?: () => Promise<void>,
   // 같은 트랜잭션에서 잠근 World 행의 원생성을 검증해 얻은 목록만 전달한다.
   knownCityArmyTypes?: readonly number[],
+  cityTransfer?: CommandResult['cityTransfer'],
 ) {
   // 같은 잠긴 트랜잭션에서 읽은 사본은 다시 조회하지 않는다.
   const before = previous ?? (await loadWorld(tx, worldId));
@@ -128,7 +129,7 @@ export async function persistCommandState(
   await persistCommandMeta(tx, worldId, before, state);
   // 새 국가의 FK 대상은 생긴 뒤, 멸망 국가의 직책이 연쇄 삭제되기 전에 후속 상태를 저장한다.
   await beforeNationRemoval?.();
-  await persistPublicNationEvents(tx, worldId, before, state, at);
+  await persistPublicNationEvents(tx, worldId, before, state, at, cityTransfer);
   await persistRemovedNations(tx, worldId, before, state, at);
 }
 

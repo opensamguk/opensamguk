@@ -304,6 +304,9 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
     battleAwards,
     ...(actor.recordBattleStats ? { generalEngagements } : {}),
     attackTarget: { cityKey, defendingNationId: defendingNation },
+    ...(captured && state.cities[cityKey]!.nationId !== nationId
+      ? { cityTransfer: { cityKey, fromNationId: nationId, toNationId: state.cities[cityKey]!.nationId! } }
+      : {}),
     ...(reputation ? { battleOutcomes } : {}),
   };
 }

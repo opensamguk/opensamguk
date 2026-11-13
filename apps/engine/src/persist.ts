@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 import type { Prisma } from '@opensamguk/db';
-import { assertSlotSet, isPolicyMode, type Effect, type WorldState } from '@opensamguk/rules';
+import { assertSlotSet, isPolicyMode, type CommandResult, type Effect, type WorldState } from '@opensamguk/rules';
 import { persistCommandState } from './commandPersistence';
 import type { ActionAt } from './nationArchive';
 
@@ -13,10 +13,11 @@ export async function persistEffects(
   previous?: WorldState,
   beforeNationRemoval?: () => Promise<void>,
   cityArmyTypes?: readonly number[],
+  cityTransfer?: CommandResult['cityTransfer'],
 ) {
   // 규칙에서 보정한 최종값만 저장한다. 같은 필드의 효과가 여럿이어도 한 번 쓴다.
   if (effects.some((effect) => effect.kind === 'world')) {
-    await persistCommandState(tx, worldId, state, at, previous, beforeNationRemoval, cityArmyTypes);
+    await persistCommandState(tx, worldId, state, at, previous, beforeNationRemoval, cityArmyTypes, cityTransfer);
     return;
   }
   const changes = new Map<string, Exclude<Effect, { kind: 'world' }>>();

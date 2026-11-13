@@ -366,6 +366,7 @@ export class TurnLoop {
                   })
               : undefined,
             capabilities.kind === 'registry' ? capabilities.armyTypes : undefined,
+            failed ? undefined : result.cityTransfer,
           );
           await persistExt(tx, worldId, state.ext, next.ext);
           if (world.ruleFeatures.includes('reputation-v1'))
