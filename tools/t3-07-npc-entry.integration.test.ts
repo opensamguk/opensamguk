@@ -279,7 +279,7 @@ it('AC-M3-14 정식491명 확장 판에서5능력치 후보를 맡고 장비·�
     seed: 'npc-expanded-ownership',
   });
   expect(initial.generals).toHaveLength(491);
-  const features = [...profile.ruleFeatures, 'equipment-v1'].sort();
+  const features = [...profile.ruleFeatures, 'equipment-v1', 'general-proficiency-v1'].sort();
   initial.ruleFeatures = features;
   const { worldId } = await saveInitialWorld(db, initial, {
     name: '정식 확장 맡기',
@@ -304,7 +304,11 @@ it('AC-M3-14 정식491명 확장 판에서5능력치 후보를 맡고 장비·�
     Object.values(response.data!.roles)
       .flat()
       .find((row) => row.generalId === candidate.id),
-  ).toMatchObject({ politics: candidate.politics, charm: candidate.charm });
+  ).toMatchObject({
+    politics: candidate.politics,
+    charm: candidate.charm,
+    proficiency: expect.arrayContaining([expect.objectContaining({ armType: 1, grade: 'F-', value: 0 })]),
+  });
   expect((await applyClaim(claim(worldId, candidate.id))).data).toEqual({
     status: 'possessed',
     generalId: candidate.id,

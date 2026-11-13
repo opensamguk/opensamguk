@@ -5,6 +5,9 @@ import { z } from 'zod';
 import {
   POSSESSION_KIND,
   HUMAN_GENERAL_LIMIT,
+  GENERAL_PROFICIENCY_FEATURE,
+  proficiencyByArmType,
+  unitSetSchema,
   POSSESSION_ERRORS,
   possessionPayloadSchema,
   possessionAppliedSchema,
@@ -155,6 +158,7 @@ export const entryRouter = router({
           intel: number;
           politics?: number;
           charm?: number;
+          proficiency?: ReturnType<typeof proficiencyByArmType>;
           officerLevel: number;
           age: number;
           dedication: number;
@@ -168,6 +172,9 @@ export const entryRouter = router({
         const roles: Record<EntryRole, Candidate[]> = { ruler: [], core: [], retainer: [], free: [] };
         if (blockedReason === null) {
           const view = await readView(tx, input.worldId);
+          const unitSet = world.ruleFeatures.includes(GENERAL_PROFICIENCY_FEATURE)
+            ? unitSetSchema.parse(world.unitSet)
+            : undefined;
           const selectable = new Set(
             (
               await tx.general.findMany({
@@ -199,6 +206,7 @@ export const entryRouter = router({
               ...(world.ruleFeatures.includes('five-stats')
                 ? { politics: general.politics!, charm: general.charm! }
                 : {}),
+              ...(unitSet ? { proficiency: proficiencyByArmType(unitSet.armTypes, general.proficiency) } : {}),
               officerLevel: general.officerLevel,
               age: Math.max(0, gameDate.year - general.birthYear),
               dedication: general.dedication,

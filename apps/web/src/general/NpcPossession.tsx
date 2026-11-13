@@ -302,6 +302,12 @@ function NpcEntry({
                             .join(' · ')}{' '}
                           · 합 {statTotal(general)}
                         </span>
+                        {general.proficiency?.length ? (
+                          <span className={styles.npcStats}>
+                            {'병종 숙련 '}
+                            {general.proficiency.map(({ name, grade }) => `${name} ${grade}`).join(' · ')}
+                          </span>
+                        ) : null}
                       </span>
                     </label>
                   ))}

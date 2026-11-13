@@ -386,7 +386,12 @@ export { INACTIVE_REMOVAL_FEATURE, inactiveRemovalTick } from './policy/inactive
 
 export { GENERAL_PERSONALITY_FEATURE, personalityEffects } from './general/personality';
 
-export { GENERAL_PROFICIENCY_FEATURE, proficiencyGrade, storedGeneralProficiency } from './general/proficiency';
+export {
+  GENERAL_PROFICIENCY_FEATURE,
+  proficiencyByArmType,
+  proficiencyGrade,
+  storedGeneralProficiency,
+} from './general/proficiency';
 
 export { BATTLE_TACTICS_FEATURE } from './battle/tactics';
 export { COMBAT_SPECIALTY_FEATURE, combatSpecialty } from './general/combatSpecialty';
