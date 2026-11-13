@@ -1,6 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import { protectedProcedure, router } from '../trpc';
-import { entityKey, readWorld, viewerGeneral, worldInput } from '../queries';
+import { entityKey, readWorld, viewerGeneral, worldClock, worldInput } from '../queries';
 import { cityInfo, garrisonGeneralInfo, visibility } from '../visibility';
 import { readView } from '../game/queries';
 import {
@@ -13,9 +13,11 @@ import {
   readOperationalMap,
   officeEffectsSchema,
   hasCitySecretary,
+  nowTick,
 } from '@opensamguk/rules';
 import { readCityScaleProjection } from '../game/cityScale';
 import { readCityIntel } from '../game/fog';
+import { cityDefense } from '../game/defenseRead';
 
 export const cityRouter = router({
   get: protectedProcedure.input(worldInput.extend({ cityKey: entityKey }).strict()).query(({ ctx, input }) =>
@@ -41,8 +43,8 @@ export const cityRouter = router({
             orderBy: { id: 'asc' },
           });
       const campaignEnabled = world.ruleFeatures.includes('campaign-v1');
-      const units =
-        campaignEnabled && !garrisonHidden ? (await readView(tx, input.worldId)).campaign!.units : undefined;
+      const view = campaignEnabled && !garrisonHidden ? await readView(tx, input.worldId) : undefined;
+      const units = view?.campaign?.units;
       const ruins = await readCityScaleProjection(tx, input.worldId, world.ruleFeatures);
       const intel =
         fogEnabled && viewer?.nationId != null && !visibility(viewer).city(city)
@@ -100,6 +102,9 @@ export const cityRouter = router({
             }
           : {}),
         ...cityInfo(city, viewer),
+        ...(!garrisonHidden && city.nationId !== null && city.nationId === viewer?.nationId
+          ? { defense: cityDefense(city, generals, world.startYear, nowTick(worldClock(world), ctx.now), view) }
+          : {}),
         region: city.region,
         regionName: cityRegionName(
           city.region,

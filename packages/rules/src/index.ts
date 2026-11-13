@@ -19,6 +19,7 @@ export {
 export { checkOperationalProfile } from './world/map/profile';
 export type { OperationalMapResource } from './world/map/operational';
 export * from './clock/constants';
+export { canDefend } from './battle/defenders';
 export * from './clock/clock';
 export * from './clock/admin';
 export * from './admin/game';
@@ -206,6 +207,7 @@ export { resolverForRuleFeatures } from './ruleCommands';
 
 export * from './campaign/retinue';
 export * from './campaign/state';
+export { campaignDefenders } from './campaign/attack';
 export * from './campaign/relationships';
 export * from './campaign/record';
 export * from './campaign/unitInputs';
