@@ -399,11 +399,12 @@ test('정식191년 메인·예턴 메뉴 이동·초점·375~1440px·30초 재�
       else await route.continue();
     });
     await page.reload();
+    // 새로 고친 문서는 예턴 칸(#main-commands)에서 열린다. 숨은 칸의 안내는 접근성 트리에 없으므로 지도 칸을 먼저 연다.
     const mapPanel = page.getByRole('region', { name: '지도', exact: true });
-    await expect(mapPanel.getByRole('alert')).toContainText('불러오지 못했습니다', { timeout: 20_000 });
     await tab('지도').click();
     await expect(mapPanel).toBeVisible();
     await expect(page).toHaveURL(base);
+    await expect(mapPanel.getByRole('alert')).toContainText('불러오지 못했습니다', { timeout: 20_000 });
     await mapPanel.getByRole('button', { name: '다시 시도', exact: true }).click();
     await page.unroute('**/trpc/**');
     await expect(page.getByTestId('operational-world-map')).toBeVisible();
