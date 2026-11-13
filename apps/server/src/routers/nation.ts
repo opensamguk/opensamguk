@@ -201,6 +201,7 @@ export const nationRouter = router({
             select: { payload: true },
           })
         : null;
+      const npcPolicyHistory = npcPolicyEnabled && ownNation ? await readNpcPolicyHistory() : undefined;
       return {
         ...(lifecycle
           ? {
@@ -243,6 +244,7 @@ export const nationRouter = router({
               salaryRate,
               npcPolicy: {
                 ...npcNationPolicy(world, storedNpcNationPolicy(npcPolicyEnabled, nation.npcSettings)),
+                ...(npcPolicyHistory === undefined ? {} : { history: npcPolicyHistory }),
                 ...(npcPolicyEditable
                   ? {
                       editor: {
@@ -278,6 +280,37 @@ export const nationRouter = router({
           };
         }),
       };
+
+      async function readNpcPolicyHistory() {
+        const events = await tx.inputEvent.findMany({
+          where: {
+            worldId: input.worldId,
+            kind: NPC_NATION_POLICY_KIND,
+            status: 'APPLIED',
+            payload: { path: ['nationId'], equals: input.nationId },
+          },
+          orderBy: { sequence: 'desc' },
+          take: 11,
+          select: { sequence: true, tick: true, generalId: true, createdAt: true, result: true },
+        });
+        const generalIds = [...new Set(events.flatMap((event) => (event.generalId === null ? [] : [event.generalId])))];
+        const actors = generalIds.length
+          ? await tx.general.findMany({
+              where: { worldId: input.worldId, id: { in: generalIds } },
+              select: { id: true, name: true },
+            })
+          : [];
+        const names = new Map(actors.map(({ id, name }) => [id, name]));
+        const policies = events.map(({ result }) => npcNationPolicyInput.parse(result).policy);
+        return events.slice(0, 10).map((event, index) => ({
+          sequence: event.sequence!,
+          date: toGameDate(world.startYear, event.tick!),
+          requestedAt: event.createdAt.toISOString(),
+          generalName: event.generalId === null ? null : (names.get(event.generalId) ?? null),
+          previous: policies[index + 1] ?? null,
+          current: policies[index]!,
+        }));
+      }
 
       async function readNpcOrders(view: NonNullable<typeof state>) {
         const stored = await requireWorld(tx, input.worldId);

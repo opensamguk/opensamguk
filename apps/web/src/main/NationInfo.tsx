@@ -169,6 +169,36 @@ export function NationNpcPolicy({ worldId, nation }: { worldId: string; nation: 
           { label: '출병·선전포고 점수 배율', value: `×${n(policy.aggression)}` },
         ]}
       />
+      {policy.history?.length ? (
+        <section>
+          <h3>정책 변경 이력</h3>
+          {policy.history.map(({ sequence, date, requestedAt, generalName, previous, current }) => (
+            <details key={sequence}>
+              <summary>
+                {date.year}년 {date.month}월 · {generalName ?? '장수 정보 없음'} ·{' '}
+                <time dateTime={requestedAt}>{new Date(requestedAt).toLocaleString('ko-KR')}</time>
+              </summary>
+              <ul>
+                {(Object.keys(npcPolicyLabels) as Array<keyof NationNpcSettings>)
+                  .filter((field) => previous?.[field] !== current[field])
+                  .map((field) => (
+                    <li key={field}>
+                      {npcPolicyLabels[field]} · {previous?.[field] ?? '—'} → {current[field] ?? '—'}
+                    </li>
+                  ))}
+                {(['generalPriority', 'nationPriority'] as const)
+                  .filter((field) => JSON.stringify(previous?.[field]) !== JSON.stringify(current[field]))
+                  .map((field) => (
+                    <li key={field}>
+                      {field === 'generalPriority' ? '장수 명령 순서' : '국가 명령 순서'} ·{' '}
+                      {previous === null ? '—' : npcPriorityText(previous[field])} → {npcPriorityText(current[field])}
+                    </li>
+                  ))}
+              </ul>
+            </details>
+          ))}
+        </section>
+      ) : null}
       {[
         { label: '현재 국가 명령 후보', orders: policy.nationOrders },
         { label: '현재 NPC 장수 명령 후보', orders: policy.generalOrders },
@@ -191,6 +221,8 @@ export function NationNpcPolicy({ worldId, nation }: { worldId: string; nation: 
 }
 
 type NationNpcSettings = NonNullable<NonNullable<NationView['npcPolicy']>['editor']>['limits'];
+const npcPriorityText = (priority: readonly string[] | undefined) =>
+  priority === undefined ? '기본 순서' : priority.join(', ') || '모두 끔';
 const npcPolicyLabels = {
   recruitTarget: '전선 모집 목표',
   trainingTarget: '훈련 목표',
