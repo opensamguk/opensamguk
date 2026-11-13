@@ -21,7 +21,7 @@ import {
 import type { QueuedInputHandler } from './features';
 import { databaseNow } from './lease';
 
-export const processHeritagePurchase: QueuedInputHandler = async (tx, world, event, { sequence }) => {
+export const processHeritagePurchase: QueuedInputHandler = async (tx, world, event, { sequence, emit }) => {
   const reject = (code: string, message: string) => ({ status: 'REJECTED' as const, result: { code, message } });
   if (world.status !== 'RUNNING') return reject('WORLD_CLOSED', '실행 중인 월드가 아닙니다.');
   const specialtyAction =
@@ -155,5 +155,6 @@ export const processHeritagePurchase: QueuedInputHandler = async (tx, world, eve
           ? { combatSpecial: specialty.combatSpecial, heritageSpecialty: specialty.heritageSpecialty }
           : { heritageBenefits: { ...heritageBenefits, [benefit!.benefit]: benefit!.level } },
   });
+  if (reset || timing || specialty) emit?.({ kind: 'turn.result', target: { generalId: general.id } });
   return { status: 'APPLIED', result: purchase };
 };

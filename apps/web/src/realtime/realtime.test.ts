@@ -102,6 +102,7 @@ describe('SSE 알림 해석', () => {
     ]);
     expect(invalidationTargets({ kind: 'turn.result' }, WORLD, trpc)).toEqual([
       trpc.equipment.mine.queryKey({ worldId: WORLD }),
+      trpc.heritage.benefits.queryKey({ worldId: WORLD }),
       trpc.home.get.queryKey({ worldId: WORLD }),
       trpc.turns.get.queryKey({ worldId: WORLD }),
       trpc.records.general.pathKey(),

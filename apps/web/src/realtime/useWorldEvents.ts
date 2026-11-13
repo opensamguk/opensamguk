@@ -26,6 +26,7 @@ export function invalidationTargets(event: WorldEvent, worldId: string, trpc: Tr
     case 'turn.result':
       return [
         trpc.equipment.mine.queryKey({ worldId }),
+        trpc.heritage.benefits.queryKey({ worldId }),
         trpc.home.get.queryKey({ worldId }),
         trpc.turns.get.queryKey({ worldId }),
         trpc.records.general.pathKey(),
