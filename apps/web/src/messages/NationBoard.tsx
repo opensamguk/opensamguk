@@ -67,12 +67,17 @@ export function NationBoard({ worldId, nationId, canWrite }: { worldId: string; 
           {post.replyCount ? (
             <details>
               <summary>댓글 {post.replyCount}개</summary>
-              {post.replyCount > post.replies.length ? <p>최근 {post.replies.length}개</p> : null}
+              {post.replyCount > post.replies.length && post.replies[0] ? (
+                <OlderReplies
+                  worldId={worldId}
+                  nationId={nationId}
+                  confidential={confidential}
+                  postId={post.id}
+                  cursor={post.replies[0].id}
+                />
+              ) : null}
               {post.replies.map((reply) => (
-                <div key={reply.id}>
-                  <BoardAuthor row={reply} />
-                  <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{reply.body}</p>
-                </div>
+                <BoardReply key={reply.id} row={reply} />
               ))}
             </details>
           ) : null}
@@ -142,6 +147,43 @@ export function NationBoard({ worldId, nationId, canWrite }: { worldId: string; 
         </form>
       ) : null}
     </section>
+  );
+}
+
+function OlderReplies(input: {
+  worldId: string;
+  nationId: number;
+  confidential: boolean;
+  postId: string;
+  cursor: string;
+}) {
+  const trpc = useTRPC();
+  const [open, setOpen] = useState(false);
+  const page = useQuery({ ...trpc.nationBoard.replies.queryOptions(input), enabled: open, gcTime: 0 });
+  if (!open)
+    return (
+      <button type="button" onClick={() => setOpen(true)}>
+        이전 댓글 보기
+      </button>
+    );
+  return (
+    <>
+      {page.isPending ? <p role="status">댓글을 불러오는 중입니다.</p> : null}
+      {page.error ? <p role="alert">{page.error.message}</p> : null}
+      {page.data?.next ? <OlderReplies {...input} cursor={page.data.next} /> : null}
+      {page.data?.items.map((row) => (
+        <BoardReply key={row.id} row={row} />
+      ))}
+    </>
+  );
+}
+
+function BoardReply({ row }: { row: Parameters<typeof BoardAuthor>[0]['row'] & { body: string } }) {
+  return (
+    <div>
+      <BoardAuthor row={row} />
+      <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{row.body}</p>
+    </div>
   );
 }
 
