@@ -17,6 +17,11 @@ import {
 } from './rankingView';
 
 const number = (value: number) => value.toLocaleString('ko-KR');
+// 전공(승리+점령)을 나눈 두 값 (원작 명장일람의 승리·점령). 서버 순위 기준에는 없어 정렬하지 않는다.
+const MERIT_PARTS = [
+  { key: 'wins', label: '승리' },
+  { key: 'captures', label: '점령' },
+] as const;
 
 function MobileSort<K extends string>({
   columns,
@@ -118,6 +123,12 @@ function GeneralRow({
                 <dd>{number(row[column.key])}</dd>
               </div>
             ))}
+            {MERIT_PARTS.map((part) => (
+              <div key={part.key}>
+                <dt>{part.label}</dt>
+                <dd>{number(row[part.key])}</dd>
+              </div>
+            ))}
           </dl>
         ) : null}
       </td>
@@ -133,6 +144,8 @@ function GeneralRow({
           <td className="num">{number(row.dedication)}</td>
           <td className="num">{number(row.experience)}</td>
           <td className="num">{number(row.merit)}</td>
+          <td className="num">{number(row.wins)}</td>
+          <td className="num">{number(row.captures)}</td>
         </>
       )}
     </tr>
@@ -178,6 +191,13 @@ export function GeneralRankingTable({
               : GENERAL_COLUMNS.map((column) => (
                   <SortHeader key={column.key} column={column} active={column.key === by} onSort={onSort} />
                 ))}
+            {narrow
+              ? null
+              : MERIT_PARTS.map((part) => (
+                  <th key={part.key} scope="col" className="num">
+                    {part.label}
+                  </th>
+                ))}
           </tr>
         </thead>
         <tbody>
@@ -191,7 +211,7 @@ export function GeneralRankingTable({
         {ranking.me && !meInTop ? (
           <tbody className={styles.outside}>
             <tr aria-hidden="true">
-              <td colSpan={narrow ? 3 : 6} className={styles.gap}>
+              <td colSpan={narrow ? 3 : 8} className={styles.gap}>
                 ⋯
               </td>
             </tr>

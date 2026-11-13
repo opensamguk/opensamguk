@@ -2,12 +2,13 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { retryUnlessClientError, errorCode } from '../game/errors';
 import { formatYearMonth, personalLogDate, tickDate } from '../game/gameDate';
 import { NoGeneral, QueryError } from '../game/QueryState';
-import type { MapNation, WorldSummary } from '../game/types';
+import type { MapCity, MapNation, WorldSummary } from '../game/types';
 import { trpcClient, useTRPC } from '../trpc';
 import { NationBadge } from '../ui/NationBadge';
 import { EmptyState, LoadingState } from '../ui/States';
 import { Tag } from '../ui/Tag';
 import { ValueDelta } from '../ui/ValueDelta';
+import { worldEvents } from './infoView';
 import styles from './Records.module.css';
 
 export type RecordKind = 'general' | 'nation' | 'world';
@@ -56,6 +57,7 @@ export function RecordList({
   worldId,
   clock,
   nations,
+  cities = [],
   hasNation = true,
   compact = false,
 }: {
@@ -63,6 +65,8 @@ export function RecordList({
   worldId: string;
   clock: Clock;
   nations: readonly MapNation[];
+  // 중원 정세 글줄의 도시 이름. 없으면 도시 번호로 쓴다.
+  cities?: readonly Pick<MapCity, 'key' | 'name'>[];
   hasNation?: boolean;
   compact?: boolean;
 }) {
@@ -85,7 +89,7 @@ export function RecordList({
       {query.isFetchingNextPage ? '불러오는 중' : '더 보기'}
     </button>
   ) : null;
-  const body = renderRecords(kind, pages, clock, nations);
+  const body = renderRecords(kind, pages, clock, nations, cities, compact);
   return (
     <div className={compact ? `${styles.records} ${styles.compact}` : styles.records} data-record-kind={kind}>
       {body ?? <EmptyState title={emptyText[kind]} />}
@@ -103,7 +107,14 @@ const emptyText: Record<RecordKind, string> = {
 
 type Pages = Array<{ items: unknown[] }>;
 
-function renderRecords(kind: RecordKind, pages: Pages, clock: Clock, nations: readonly MapNation[]) {
+function renderRecords(
+  kind: RecordKind,
+  pages: Pages,
+  clock: Clock,
+  nations: readonly MapNation[],
+  cities: readonly Pick<MapCity, 'key' | 'name'>[],
+  compact: boolean,
+) {
   if (kind === 'general') {
     const items = pages.flatMap((page) => page.items as GeneralItem[]);
     if (items.length === 0) return null;
@@ -116,7 +127,7 @@ function renderRecords(kind: RecordKind, pages: Pages, clock: Clock, nations: re
   }
   const items = pages.flatMap((page) => page.items as WorldItem[]);
   if (items.length === 0) return null;
-  return <WorldHistoryList items={items} nations={nations} />;
+  return <WorldHistoryList items={items} nations={nations} cities={cities} compact={compact} />;
 }
 
 interface GeneralItem {
@@ -140,6 +151,8 @@ interface WorldItem {
   month: number;
   nations: Array<{ nationId: number; cities: number; generals: number }>;
   cities: Array<{ cityKey: number; nationId: number | null }>;
+  // reputation-v1 월드의 그 달 월단평 머리글 (records.world).
+  review?: { headline: string };
 }
 
 export function GeneralLogList({ items, clock }: { items: readonly GeneralItem[]; clock: Clock }) {
@@ -204,32 +217,82 @@ function NationHistoryTable({ items, clock }: { items: readonly NationItem[]; cl
   );
 }
 
-function WorldHistoryList({ items, nations }: { items: readonly WorldItem[]; nations: readonly MapNation[] }) {
+// 중원 정세 (원작 메인의 중원 정세 칸). 서버 연감에는 사건 글이 없어 달마다 앞 달과 도시 소유를 견주어 글줄을 만든다.
+// 메인(compact)은 글줄만, 기록 화면은 글줄 아래 그 달의 세력 크기를 함께 보인다.
+export function WorldHistoryList({
+  items,
+  nations,
+  cities = [],
+  compact = false,
+}: {
+  items: readonly WorldItem[];
+  nations: readonly MapNation[];
+  cities?: readonly Pick<MapCity, 'key' | 'name'>[];
+  compact?: boolean;
+}) {
   const byId = new Map(nations.map((nation) => [nation.id, nation]));
+  const cityName = new Map(cities.map((city) => [city.key, city.name]));
+  const names = {
+    nation: (id: number) => byId.get(id)?.name,
+    city: (key: number) => cityName.get(key) ?? `도시 ${key}`,
+  };
+  const months = items.map((item, i) => ({
+    item,
+    lines: [...(item.review ? [`월단평: ${item.review.headline}`] : []), ...worldEvents(item, items[i + 1], names)],
+  }));
+  const shown = compact ? months.filter((month) => month.lines.length > 0) : months;
+  // 메인에서 불러온 달에 변화가 하나도 없으면 가장 최근 달의 세력 수만 한 줄로 쓴다.
+  if (shown.length === 0 && months[0]) {
+    const latest = months[0].item;
+    return (
+      <ol className={styles.lines}>
+        <li className={styles.yearbook}>
+          <span className={`num ${styles.date}`}>
+            {latest.year}년 {latest.month}월
+          </span>
+          <span className={styles.text}>
+            영토 변화 없음 · 세력 {latest.nations.filter((x) => x.cities > 0).length}곳 · 공백지{' '}
+            {latest.cities.filter((city) => city.nationId === null).length}성
+          </span>
+        </li>
+      </ol>
+    );
+  }
   return (
     <ol className={styles.lines}>
-      {items.map((item) => {
+      {shown.map(({ item, lines }) => {
         const ranked = [...item.nations].filter((x) => x.cities > 0).sort((a, b) => b.cities - a.cities);
         const empty = item.cities.filter((city) => city.nationId === null).length;
         return (
-          <li key={item.tick} className={styles.yearbook}>
+          <li key={item.tick} className={styles.yearbook} data-world-month={`${item.year}-${item.month}`}>
             <span className={`num ${styles.date}`}>
               {item.year}년 {item.month}월
             </span>
-            <span className={styles.nations}>
-              {ranked.map((entry) => {
-                const nation = byId.get(entry.nationId);
-                return (
-                  <span key={entry.nationId} className={styles.nationEntry}>
-                    <NationBadge name={nation?.name ?? `국가 ${entry.nationId}`} color={nation?.color ?? null} />
-                    <span className="num">
-                      {entry.cities}성 {entry.generals}명
-                    </span>
+            {lines.length > 0 ? (
+              <span className={styles.events}>
+                {lines.map((line) => (
+                  <span key={line} className={styles.event}>
+                    {line}
                   </span>
-                );
-              })}
-              <span className={styles.nationEntry}>공백지 {empty}성</span>
-            </span>
+                ))}
+              </span>
+            ) : null}
+            {compact ? null : (
+              <span className={styles.nations}>
+                {ranked.map((entry) => {
+                  const nation = byId.get(entry.nationId);
+                  return (
+                    <span key={entry.nationId} className={styles.nationEntry}>
+                      <NationBadge name={nation?.name ?? `국가 ${entry.nationId}`} color={nation?.color ?? null} />
+                      <span className="num">
+                        {entry.cities}성 {entry.generals}명
+                      </span>
+                    </span>
+                  );
+                })}
+                <span className={styles.nationEntry}>공백지 {empty}성</span>
+              </span>
+            )}
           </li>
         );
       })}

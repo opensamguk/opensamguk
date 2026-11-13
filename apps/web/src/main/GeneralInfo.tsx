@@ -1,11 +1,16 @@
+import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { officerName } from '../game/names';
+import { retryUnlessClientError } from '../game/errors';
+import { displayName, officerName } from '../game/names';
 import { useWorldSummary } from '../game/queries';
 import type { Home, MapNation, WorldSummary } from '../game/types';
 import { Portrait } from '../portrait/Portrait';
 import { NationBadge } from '../ui/NationBadge';
 import { Tag } from '../ui/Tag';
+import { useTRPC } from '../trpc';
+import { meritText } from './infoView';
 import { InfoGrid } from './Panel';
+import { UnitName } from './UnitName';
 import styles from './GeneralInfo.module.css';
 import { EquipmentStatus } from '../equipment/EquipmentStatus';
 import type { EquipmentRead } from '../equipment/useEquipment';
@@ -50,6 +55,7 @@ export function GeneralInfo({
 }) {
   const g = home.general;
   const summary = useWorldSummary(worldId).data;
+  const merit = useMyMerit(worldId);
   const board = equipment?.kind === 'ready' && equipment.data.generalId === g.id ? equipment.data : null;
   const stat = (key: 'leadership' | 'strength' | 'intel') =>
     board && board.bonus[key] > 0 ? (
@@ -65,9 +71,9 @@ export function GeneralInfo({
   return (
     <div className={styles.general} data-general-id={g.id}>
       <div className={styles.head}>
-        <Portrait id={g.portraitId} name={g.name} variant="portrait" />
+        <Portrait id={g.portraitId} name={displayName(g.name)} variant="portrait" />
         <div className={styles.who}>
-          <strong className={styles.name}>{g.name}</strong>
+          <strong className={styles.name}>{displayName(g.name)}</strong>
           <span className={styles.line}>
             {nation ? (
               <Link to="/w/$worldId/nation/$nationId" params={{ worldId, nationId: String(nation.id) }}>
@@ -96,17 +102,24 @@ export function GeneralInfo({
               ]
             : []),
           { label: '나이', value: `${displayedAge(g, summary)}세` },
+          // 성격·특기는 시나리오 장수만 값이 있다. 효과 설명은 규칙이 생긴 뒤에 붙인다 (INT-25).
+          { label: '성격', value: g.personality || '—' },
+          { label: '특기', value: g.special || '—' },
           { label: '금', value: n(g.gold) },
           { label: '쌀', value: n(g.rice) },
           ...(campaignEnabled
             ? [{ label: '병력·훈련·사기', value: '부곡별 현황 참조' }]
             : [
+                { label: '병종', value: <UnitName worldId={worldId} crewType={g.crewType} /> },
                 { label: '병력', value: n(g.crew) },
                 { label: '훈련', value: n(g.train) },
                 { label: '사기', value: n(g.atmos) },
               ]),
           { label: '경험', value: n(g.experience) },
           { label: '공헌', value: n(g.dedication) },
+          merit.row
+            ? { label: '전공', value: meritText(merit.row), title: merit.at }
+            : { label: '전공', value: '—', title: merit.at },
           { label: '다음 턴', value: formatClock(home.nextTurnAt) },
           { label: '기본 방침', value: g.policy.name },
         ]}
@@ -123,4 +136,19 @@ export function GeneralInfo({
       </p>
     </div>
   );
+}
+
+// 내 승리·점령 수 (원작 장수 상세의 승리). 실시간 값은 없고 달마다 찍는 순위 값(ranking.generals의 me)을 쓴다.
+function useMyMerit(worldId: string) {
+  const trpc = useTRPC();
+  const query = useQuery({
+    ...trpc.ranking.generals.queryOptions({ worldId, by: 'merit' }),
+    retry: retryUnlessClientError,
+    staleTime: 60_000,
+  });
+  const at = query.data?.at;
+  return {
+    row: query.data?.me ?? null,
+    at: at ? `${at.year}년 ${at.month}월 정산 기준` : '월간 정산 뒤에 보입니다',
+  };
 }

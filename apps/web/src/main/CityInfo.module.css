@@ -64,3 +64,28 @@
     min-height: 44px;
   }
 }
+
+/* 첩보 기록 줄·인구율·주둔 병력 요약 (INT-25) */
+.intel,
+.facts {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  align-items: center;
+  font-size: var(--text-sm);
+}
+/* 표 행의 이름 칸: 얼굴·이름·부상. 28px 행에 맞춰 thumb을 20×28로 줄인다. */
+.who {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.faceBox {
+  display: inline-flex;
+}
+.faceBox .face {
+  width: 20px;
+  height: 28px;
+  border-width: 1px;
+}
