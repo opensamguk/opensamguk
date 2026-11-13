@@ -57,7 +57,7 @@ describe('서버 문자열 도시 키', () => {
     expect(result).toEqual(expected);
   });
 
-  it('문자열 key 응답에 섞인 보급·장수·병력 값은 결과에 남지 않는다', () => {
+  it('문자열 key 응답에서 보급만 허용하고 장수·병력은 버린다', () => {
     const leaked = {
       delayMinutes: 10,
       secret: 'x',
@@ -83,8 +83,10 @@ describe('서버 문자열 도시 키', () => {
       ],
     };
     const result = toPublicMaps(leaked);
-    expect(result.worlds[0]?.map?.cities).toHaveLength(2);
-    expect(result).toEqual(expected);
+    const withSupply = structuredClone(expected);
+    Object.assign(withSupply.worlds[0]!.map!.cities[0]!, { supplied: false });
+    Object.assign(withSupply.worlds[0]!.map!.cities[1]!, { supplied: true });
+    expect(result).toEqual(withSupply);
   });
 
   it('이상하거나 겹치는 키, 알 수 없는 국가의 도시는 다른 키나 색으로 바꾸지 않고 버린다', () => {

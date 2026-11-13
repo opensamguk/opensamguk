@@ -15,6 +15,7 @@ function publicMapData(state: WorldState, map?: OperationalMapResource) {
   const ruins = readCityRuins(state.cityRuins, state);
   const recovery = new Map(ruins?.cities.map((row) => [row.cityKey, { percent: RUIN_PERCENT[row.stage] }]));
   return {
+    capitalAndSupply: true,
     ...(map ? { operationalMap: operationalMapDisplay(map) } : {}),
     cities: Object.values(state.cities)
       .sort((a, b) => a.cityKey - b.cityKey)
@@ -27,11 +28,12 @@ function publicMapData(state: WorldState, map?: OperationalMapResource) {
         x: city.x,
         y: city.y,
         nationId: city.nationId,
+        supplied: city.supplied,
         links: city.connections.map(String),
       })),
     nations: Object.values(state.nations)
       .sort((a, b) => a.id - b.id)
-      .map(({ id, name, color }) => ({ id, name, color })),
+      .map(({ id, name, color, capitalCityKey }) => ({ id, name, color, capitalCityKey })),
   };
 }
 

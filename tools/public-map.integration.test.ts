@@ -77,8 +77,8 @@ async function maps(input?: unknown, cookie?: string) {
             takenAt: string;
             year: number;
             month: number;
-            cities: Array<{ key: string; nationId: number | null }>;
-            nations: Array<{ id: number; name: string; color: string }>;
+            cities: Array<{ key: string; nationId: number | null; supplied?: boolean }>;
+            nations: Array<{ id: number; name: string; color: string; capitalCityKey?: number | null }>;
           };
         }>;
       };
@@ -106,6 +106,16 @@ it('AC-M2-20 월드 생성과 함께 시작 전 지도를 공개하고 진행 �
   const preopen = (await maps()).data?.worlds[0];
   expect(preopen).toMatchObject({ id: worldId, status: 'PREOPEN', map: { year: initial.startYear, month: 1 } });
   expect(preopen?.map).not.toHaveProperty('initial');
+  expect(preopen?.map).not.toHaveProperty('capitalAndSupply');
+  const capital = initial.nations[0]!;
+  expect(preopen?.map?.nations.find((nation) => nation.id === capital.id)).toHaveProperty(
+    'capitalCityKey',
+    capital.capitalCityKey,
+  );
+  expect(preopen?.map?.cities.find((city) => city.key === String(capital.capitalCityKey))).toHaveProperty(
+    'supplied',
+    initial.cities.find((city) => city.cityKey === capital.capitalCityKey)!.supplied,
+  );
   await db.world.update({ where: { id: worldId }, data: { status: 'RUNNING' } });
   await db.publicMapSnapshot.create({
     data: { ...snapshot!, tick: 1, takenAt: new Date(now + minute), data: { cities: [], nations: [] } },
@@ -143,7 +153,12 @@ it('실제 엔진 사본 A/B는 10분 경계를 포함해 늦게 공개되고 �
     now = time;
     const map = (await maps()).data!.worlds[0]!.map!;
     expect(map.takenAt).toBe(a.takenAt.toISOString());
-    expect(map.cities.find((entry) => entry.key === String(city.cityKey))?.nationId).toBe(oldNation);
+    expect(map.cities.find((entry) => entry.key === String(city.cityKey))).toMatchObject({
+      nationId: oldNation,
+      supplied: (a.data as { cities: Array<{ key: string; supplied: boolean }> }).cities.find(
+        (entry) => entry.key === String(city.cityKey),
+      )?.supplied,
+    });
     expect(JSON.stringify(map)).not.toContain('현재 비공개 이름');
   }
   now = epoch + 15 * minute;
@@ -256,7 +271,9 @@ it('무인증·다른 계정·제재 세션은 같고 입력 ID 주입은 거부
   const snapshot = (await rows(worldId))[0]!;
   const data = snapshot.data as Prisma.JsonObject;
   const polluted = structuredClone(data);
+  delete polluted.capitalAndSupply;
   (polluted.cities as Prisma.JsonObject[])[0]!.supplied = true;
+  (polluted.nations as Prisma.JsonObject[])[0]!.capitalCityKey = 99999;
   (polluted.cities as Prisma.JsonObject[])[0]!.crew = 123456;
   (polluted.nations as Prisma.JsonObject[])[0]!.gold = 654321;
   polluted.generals = [{ userId: 'private-user', crew: 999 }];
