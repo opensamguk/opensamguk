@@ -487,7 +487,15 @@ export function NationFinanceGrid({ nation }: { nation: NationSummary }) {
       <InfoGrid
         items={[
           { label: '세금', value: `금 ${n(gold.gross)} · ${due(gold)}`, title: '상업·주민으로 걷는 금', wide: true },
-          { label: '세곡', value: `쌀 ${n(rice.gross)} · ${due(rice)}`, title: '농업·주민으로 걷는 쌀', wide: true },
+          {
+            label: '세곡',
+            value: `쌀 ${n(rice.gross - (rice.wallIncome ?? 0))} · ${due(rice)}`,
+            title: '농업·주민으로 걷는 쌀',
+            wide: true,
+          },
+          ...(rice.wallIncome === undefined
+            ? []
+            : [{ label: '둔전', value: `쌀 ${n(rice.wallIncome)} · ${due(rice)}`, wide: true }]),
           {
             label: rate === undefined ? '봉급' : `봉급(지급률 ${Math.round(rate * 100)}%)`,
             value: `금 ${n(gold.payroll)} · 쌀 ${n(rice.payroll)}`,

@@ -4,6 +4,7 @@ import {
   NATION_FINANCE_FEATURE,
   rankedPayroll,
   RANKED_PAYROLL_FEATURE,
+  WALL_INCOME_FEATURE,
   estimateTaxIncome,
   nationPhilosophy,
   nowTick,
@@ -26,7 +27,16 @@ function nextTaxDate(current: { year: number; month: number }, first: number, se
   return { month, year: current.year + (month < current.month ? 1 : 0) };
 }
 
-type NationFinanceSource = { philosophy: string; financeRates: unknown; gold?: number; rice?: number };
+type NationFinanceSource = {
+  philosophy: string;
+  financeRates: unknown;
+  capitalCityKey: number | null;
+  level: number;
+  gold?: number;
+  rice?: number;
+};
+const wallIncomeNation = (world: World, nation?: NationFinanceSource | null) =>
+  world.ruleFeatures.includes(WALL_INCOME_FEATURE) ? (nation ?? undefined) : undefined;
 export const effectiveFinanceRates = (world: World, nation?: NationFinanceSource | null) =>
   financeRates(
     world.ruleFeatures.includes(NATION_FINANCE_FEATURE) ? storedFinanceRates(nation?.financeRates) : undefined,
@@ -44,9 +54,20 @@ export function projectCityIncome(
     const date = nextTaxDate(current, first, second);
     const bonuses = state?.officeEffects ? residentOfficeBonuses(state, date.year) : undefined;
     const multiplier = nationPhilosophy(world, nation?.philosophy)?.[resource];
+    const income = estimateTaxIncome(
+      [city],
+      0,
+      resource,
+      bonuses,
+      multiplier,
+      effectiveFinanceRates(world, nation),
+      0,
+      wallIncomeNation(world, nation),
+    );
     return {
       ...date,
-      amount: estimateTaxIncome([city], 0, resource, bonuses, multiplier, effectiveFinanceRates(world, nation)).gross,
+      amount: income.gross,
+      ...(income.wallIncome === undefined ? {} : { wallIncome: income.wallIncome }),
     };
   };
   return { gold: estimate('gold', 1, 7), rice: estimate('rice', 4, 10) };
@@ -75,7 +96,8 @@ export function projectNationFinance(
     const multiplier = nationPhilosophy(world, nation?.philosophy)?.[resource];
     const rates = effectiveFinanceRates(world, nation);
     const reserves = world.ruleFeatures.includes('city-resources-v1') ? 0 : (nation?.[resource] ?? 0);
-    const totals = estimateTaxIncome(settlements, members.length, resource, bonuses, multiplier, rates, reserves);
+    const wall = wallIncomeNation(world, nation);
+    const totals = estimateTaxIncome(settlements, members.length, resource, bonuses, multiplier, rates, reserves, wall);
     const ranked = world.ruleFeatures.includes(RANKED_PAYROLL_FEATURE);
     const payments = ranked
       ? rankedPayroll(members, rates.salaryRate, totals.gross + reserves)
@@ -86,6 +108,7 @@ export function projectNationFinance(
         year,
         month,
         gross: totals.gross,
+        ...(totals.wallIncome === undefined ? {} : { wallIncome: totals.wallIncome }),
         payroll,
         net: totals.gross - payroll,
         perGeneral: ranked && members.length ? Math.floor(payroll / members.length) : totals.perGeneral,
@@ -94,7 +117,7 @@ export function projectNationFinance(
       cityGross: new Map(
         settlements.map((city) => [
           city.cityKey,
-          estimateTaxIncome([city], 0, resource, bonuses, multiplier, rates).gross,
+          estimateTaxIncome([city], 0, resource, bonuses, multiplier, rates, 0, wall).gross,
         ]),
       ),
     };

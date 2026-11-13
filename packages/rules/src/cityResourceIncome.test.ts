@@ -4,6 +4,7 @@ import { applyCityResourceIncome } from './cityResourceIncome';
 import { CITY_RESOURCE_MAX, emptyCityResourcesState } from './cityResources/state';
 import { settleIncome } from './monthly';
 import { deepFreeze } from './personnel/testFixture';
+import { WALL_INCOME_FEATURE } from './personnel/financeRates';
 
 function fixture() {
   const world = commandWorld();
@@ -25,6 +26,18 @@ function fixture() {
 }
 
 describe('AC-INT-18A 기존 급여를 보존하는 도시 세수 배분', () => {
+  it('보급 중인 도시의 둔전 쌀만 해당 도시 창고와 장수 봉급으로 나눈다', () => {
+    const before = fixture();
+    before.ruleFeatures!.push(WALL_INCOME_FEATURE);
+    for (const city of Object.values(before.cities)) Object.assign(city, { agriculture: 0, supplied: false });
+    Object.assign(before.cities[1]!, { supplied: true, defence: 300, wall: 100, wallMax: 100, security: 0 });
+    before.nations[1]!.level = 0;
+    const date = { year: 191, month: 4 };
+    const next = applyCityResourceIncome(before, settleIncome(before, date), date);
+    expect(next.generals[1]!.rice - before.generals[1]!.rice).toBe(25);
+    expect(next.cityResources!.cities['1']!.rice - before.cityResources!.cities['1']!.rice).toBe(50);
+    expect(next.cityResources!.cities['4']!.rice).toBe(before.cityResources!.cities['4']!.rice);
+  });
   it.each([1, 7])('%s월에는 실제 기존 급여를 보존하고 금 국고 증가분만 도시에 적립한다', (month) => {
     const before = fixture();
     const settled = settleIncome(before, { year: 191, month });

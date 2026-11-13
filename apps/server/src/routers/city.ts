@@ -5,6 +5,7 @@ import { cityInfo, commandedTroops, garrisonGeneralInfo, visibility } from '../v
 import { readView } from '../game/queries';
 import {
   NATION_FINANCE_FEATURE,
+  WALL_INCOME_FEATURE,
   NATION_PHILOSOPHY_FEATURE,
   cityRegionName,
   DEFENSE_STANCE_FEATURE,
@@ -82,11 +83,14 @@ export const cityRouter = router({
         showIncome &&
         city.nationId !== null &&
         world.ruleFeatures.some(
-          (feature) => feature === NATION_PHILOSOPHY_FEATURE || feature === NATION_FINANCE_FEATURE,
+          (feature) =>
+            feature === NATION_PHILOSOPHY_FEATURE ||
+            feature === NATION_FINANCE_FEATURE ||
+            feature === WALL_INCOME_FEATURE,
         )
           ? await tx.nation.findUnique({
               where: { worldId_id: { worldId: input.worldId, id: city.nationId } },
-              select: { philosophy: true, financeRates: true },
+              select: { philosophy: true, financeRates: true, capitalCityKey: true, level: true },
             })
           : undefined;
       const officeEffectsEnabled = world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE);

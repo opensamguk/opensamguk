@@ -2,7 +2,7 @@ import type { GameDate } from '@opensamguk/shared';
 import { BALANCE } from './balance';
 import { CITY_RESOURCE_MAX, readCityResourcesState } from './cityResources/state';
 import { residentOfficeBonuses } from './personnel/residentOffice';
-import { financeRates } from './personnel/financeRates';
+import { financeRates, WALL_INCOME_FEATURE, wallRiceIncome } from './personnel/financeRates';
 import { nationPhilosophy } from './personnel/nationPhilosophy';
 import { cloneWorld } from './model/clone';
 import type { WorldState, WorldView } from './model/world';
@@ -102,15 +102,30 @@ export function applyCityResourceIncome(
       .filter((city) => city.nationId === nation.id && city.kind !== 'PASS')
       .sort((left, right) => left.cityKey - right.cityKey);
     let weight = 0;
+    let wallWeight = 0;
     const { taxRate } = financeRates(nation.financeRates);
+    const multiplier = nationPhilosophy(before, nation.philosophy)?.[resource] ?? 1;
+    const hasWallIncome = resource === 'rice' && before.ruleFeatures?.includes(WALL_INCOME_FEATURE);
     const exactWeights = cities.map((city) => {
       quantity(city[field]);
       quantity(city.population);
       const rate = 100 + (bonuses.get(city.cityKey)?.tax?.percent ?? 0);
-      weight += city[field] * (city.population / BALANCE.MONTHLY_POPULATION_UNIT) * taxRate * (rate / 100);
+      const tax = city[field] * (city.population / BALANCE.MONTHLY_POPULATION_UNIT) * taxRate * (rate / 100);
+      weight += tax;
+      if (hasWallIncome) {
+        const wall = wallRiceIncome(
+          city,
+          taxRate,
+          multiplier,
+          rate / 100,
+          city.cityKey === nation.capitalCityKey ? nation.level : 0,
+        );
+        wallWeight += wall;
+        return BigInt(Math.round((tax * multiplier + wall) * 1000));
+      }
       return BigInt(city[field]) * BigInt(city.population) * BigInt(rate);
     });
-    const gross = quantity(Math.round(weight * (nationPhilosophy(before, nation.philosophy)?.[resource] ?? 1)));
+    const gross = quantity(Math.round(weight * multiplier) + Math.round(wallWeight));
     let salaries = 0;
     for (const general of Object.values(before.generals).filter((row) => row.nationId === nation.id)) {
       const current = settled.generals[general.id];
@@ -122,7 +137,7 @@ export function applyCityResourceIncome(
     next.nations[nation.id]![resource] = nation[resource];
     if (delta === 0) continue;
     const exactTotal = exactWeights.reduce((total, value) => total + value, 0n);
-    if (weight <= 0 || exactTotal === 0n) throw new Error('적립할 도시의 세수 가중치가 없습니다.');
+    if (exactTotal === 0n) throw new Error('적립할 도시의 세수 가중치가 없습니다.');
     // 공통 인구 단위·세율을 소거해 큰 곱셈에서도 정수 버림을 정확히 계산한다.
     const deposits = exactWeights.map((value) => Number((BigInt(delta) * value) / exactTotal));
     let remainder = delta - deposits.reduce((total, value) => sum(total, value), 0);
