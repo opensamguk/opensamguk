@@ -87,7 +87,12 @@ export function LobbyPage() {
             월드
           </h2>
           {body}
-          {ended.length > 0 ? <PastSeasons worlds={ended} /> : null}
+          {ended.length > 0 ? (
+            <>
+              <PastSeasons worlds={ended} />
+              <HallOfFame worlds={ended} />
+            </>
+          ) : null}
         </section>
         {noticeBoard ? <aside className={styles.side}>{noticeBoard}</aside> : null}
       </div>
@@ -96,6 +101,68 @@ export function LobbyPage() {
 }
 
 // 공지는 서버 순서 그대로 두고 첫 줄만 펼친다. 한 번에 하나만 연다.
+function HallOfFame({ worlds }: { worlds: LobbyWorld[] }) {
+  const trpc = useTRPC();
+  const [open, setOpen] = useState(false);
+  const [worldId, setWorldId] = useState('');
+  const [by, setBy] = useState<'dedication' | 'experience' | 'merit'>('merit');
+  const ranking = useQuery({
+    ...trpc.lobby.hallOfFame.queryOptions({ by, worldId: worldId || undefined }),
+    enabled: open,
+  });
+  return (
+    <details className={styles.past} onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary>명예의 전당</summary>
+      {open ? (
+        <>
+          <label>
+            기수{' '}
+            <select value={worldId} onChange={(event) => setWorldId(event.currentTarget.value)}>
+              <option value="">전체 기수</option>
+              {worlds.map((world) => (
+                <option key={world.id} value={world.id}>
+                  {world.name} · {world.scenarioTitle}
+                </option>
+              ))}
+            </select>
+          </label>{' '}
+          <label>
+            기준{' '}
+            <select
+              value={by}
+              onChange={(event) => {
+                const value = event.currentTarget.value;
+                if (value === 'dedication' || value === 'experience' || value === 'merit') setBy(value);
+              }}
+            >
+              <option value="merit">전공</option>
+              <option value="dedication">공헌</option>
+              <option value="experience">경험</option>
+            </select>
+          </label>
+          {ranking.isPending ? <LoadingState /> : null}
+          {ranking.isError ? (
+            <ErrorState title="순위를 불러오지 못했습니다" onRetry={() => void ranking.refetch()} />
+          ) : null}
+          {ranking.data?.length === 0 ? <EmptyState title="보관된 순위가 없습니다" /> : null}
+          {ranking.data?.length ? (
+            <ol>
+              {ranking.data.map((row) => (
+                <li key={`${row.worldId}:${row.generalId}`}>
+                  {displayName(row.name)} · {row.nationName ?? '재야'} · {row.value.toLocaleString('ko-KR')}
+                  {' · '}
+                  {row.worldName} · {row.scenarioTitle}
+                  {row.winnerName ? ` · 통일 ${row.winnerName}` : ''}
+                </li>
+              ))}
+            </ol>
+          ) : null}
+        </>
+      ) : null}
+    </details>
+  );
+}
+
 export function NoticeBoard({ notices }: { notices: LobbyNotice[] }) {
   const [openId, setOpenId] = useState<string | null>(notices[0]?.id ?? null);
   const id = useId();
