@@ -297,6 +297,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       cities: state.cities.map((city) => ({
         key: city.cityKey,
         name: city.name,
+        region: city.region,
         regionName: cityRegionName(city.region, 'che'),
         level: city.level,
         x: city.x,
@@ -390,6 +391,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     const spectator = (await query('city.get', input, users[3]!.cookie)).data;
     expect(spectator).not.toHaveProperty('population');
     expect(spectator.regionName).toBe(cityRegionName(state.cities[0]!.region, 'che'));
+    expect(spectator.region).toBe(state.cities[0]!.region);
     expect(spectator.generals).toEqual(state.generals.map(({ id, name, nationId }) => ({ id, name, nationId })));
   });
 

@@ -85,6 +85,7 @@ export const worldRouter = router({
         background: backgrounds.get(world.mapKey) ?? null,
         cities: cities.map((city) => ({
           ...mapCity(city),
+          region: city.region,
           regionName: cityRegionName(city.region, world.mapKey, map?.regionScheme),
           ...(ruins ? { ruin: ruins.get(city.cityKey) ?? null } : {}),
         })),

@@ -40,6 +40,7 @@ export const cityRouter = router({
           : null;
       return {
         ...cityInfo(city, viewer),
+        region: city.region,
         regionName: cityRegionName(
           city.region,
           city.world.mapKey,
