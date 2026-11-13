@@ -1,5 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
+import type { AppRouter } from '@opensamguk/server/router';
+import type { inferRouterOutputs } from '@trpc/server';
 import type { WorldUnits } from '../battleSim/unitChoices';
 import { DisabledReason } from '../ui/DisabledReason';
 import { argFields, buildArgs, describeArgs, requiredKeys, type ArgField } from './args';
@@ -11,31 +13,29 @@ import {
   NationTargetPicker,
   UnitPicker,
   type ArgContext,
+  type ArgNeed,
   type CandidateCheck,
   type TargetGeneral,
 } from './CommandArgsScreen';
 import type { Turn } from './draft';
 import type { Check, SourceQuery } from './source';
 import { amountLimit, amountPresets, displayName, OWN_CITY_FIRST, recruitRoom, RESOURCE_ORDER } from './targets';
+import { commandAvailability, commandDoc, requirementsText, turnsText } from './commandDoc';
 import styles from './TurnEditor.module.css';
 import { cityPreparationNote, cityPreparationSchema, hasCityBranch, type PreparationTarget } from './cityResourceArgs';
 import { EquipmentTradeFields, equipmentUiSchema } from '../equipment/EquipmentTradeFields';
 import type { EquipmentRead } from '../equipment/useEquipment';
 
-export interface CommandInfo {
+type ServerCommand = inferRouterOutputs<AppRouter>['commands']['list'][number];
+
+// 서버 명령 목록(commands.list)의 한 줄. 국가 명령(nationCommands.list)은 도움말 없이 가능 여부만 실어 도움말 칸은 비어 있을 수 있다.
+// argsSchema는 화면이 JSON Schema로 읽기만 하므로 unknown으로 둔다.
+export type CommandInfo = {
   key: string;
   name: string;
   category: string;
   argsSchema: unknown;
-}
-
-// 명령 도움말 (INT-26). commands.list가 싣기 시작하면 쓴다. 아직 싣지 않는 서버와 국가 명령은 비어 있어 아무것도 그리지 않는다.
-type CommandDoc = { description?: string; cost?: string; requirements?: string; turns?: number };
-function commandDoc(command: CommandInfo): { description: string | null; cost: string | null } {
-  const doc = command as CommandInfo & CommandDoc;
-  const text = (value: unknown) => (typeof value === 'string' && value.trim() !== '' ? value.trim() : null);
-  return { description: text(doc.description), cost: text(doc.cost) };
-}
+} & Partial<Pick<ServerCommand, 'description' | 'cost' | 'requirements' | 'turns' | 'available' | 'reason'>>;
 
 // 예턴 연결이 넘기는 대상 장수. 국가 칸은 인사부 조회의 소재 도시·유저 여부를 함께 싣는다.
 export interface GeneralChoice {
@@ -45,8 +45,10 @@ export interface GeneralChoice {
   isHuman?: boolean | undefined;
 }
 
-// 개인 예턴에서 같은 국가 장수를 대상으로 고르는 명령(선양). 등용은 재야 장수라 목록이 없어 번호로 넣는다.
+// 개인 예턴에서 같은 국가 장수를 대상으로 고르는 명령(선양).
 const SAME_NATION_TARGET = new Set(['abdicate']);
+// 등용. 대상은 서버가 고른 재야 장수 후보(commands.recruitCandidates)에서 고른다.
+const RECRUIT_COMMAND = 'invite';
 // 대상 국가 후보마다 사전 검사를 묻는 수의 한도. 넘으면 후보 판정 없이 고른 뒤 한 번만 검사한다.
 const CANDIDATE_CHECK_LIMIT = 30;
 
@@ -93,7 +95,7 @@ interface Props {
   // 인자 입력 화면이 쓰는 지도·내 장수·병종표 (INT-25). 없으면 지도 없이 목록만 보인다.
   argContext?: ArgContext | undefined;
   // 인자 입력 화면이 국가·장수 대상을 열 때 알린다. 편집기는 그때부터 순위·외교·국가 장수 조회를 받는다.
-  onNeed?: ((kind: 'nations' | 'generals') => void) | undefined;
+  onNeed?: ((kind: ArgNeed) => void) | undefined;
   // 최근 넣은 명령 줄 (원작 최근 실행). 편집기가 만들어 넘기며 명령 찾기 위에 그린다. 없으면 그리지 않는다.
   recent?: ReactNode;
 }
@@ -154,7 +156,9 @@ export function CommandPicker({
   // 수치·얼굴·소재 도시는 같은 국가 장수 상세(argContext.members)에서 붙인다.
   const members = argContext.members;
   const myId = argContext.me?.id;
+  const recruits = argContext.recruits;
   const generalsFor = (key: string | undefined): TargetGeneral[] | undefined => {
+    if (key === RECRUIT_COMMAND && recruits) return [...recruits.list];
     const byId = new Map((members ?? []).map((member) => [member.id, member]));
     if (generals)
       return generals.map((general) => {
@@ -332,13 +336,18 @@ export function CommandPicker({
 
   // 국가·장수 대상 화면을 열면 편집기에 알려 순위·외교·국가 장수 조회를 받게 한다.
   const wantsNations = needsScreen && fields.some((field) => field.kind === 'nation');
-  const wantsGenerals = needsScreen && fields.some((field) => field.key === 'generalId');
+  // 등용 대상은 재야 장수라 국가 장수 상세 대신 등용 후보를 받는다.
+  const recruiting = needsScreen && command?.key === RECRUIT_COMMAND;
+  const wantsGenerals = needsScreen && !recruiting && fields.some((field) => field.key === 'generalId');
   useEffect(() => {
     if (wantsNations) onNeed?.('nations');
   }, [wantsNations, onNeed]);
   useEffect(() => {
     if (wantsGenerals) onNeed?.('generals');
   }, [wantsGenerals, onNeed]);
+  useEffect(() => {
+    if (recruiting) onNeed?.('recruits');
+  }, [recruiting, onNeed]);
 
   // 대상 국가 후보마다 넣을 명령. 국가 하나만 고르는 명령(임관·선전포고·불가침 등)만 묻는다.
   // 수량처럼 치는 칸이 있으면 칠 때마다 후보 수만큼 다시 묻게 되므로 묻지 않는다. 후보가 많아도 묻지 않는다.
@@ -453,15 +462,28 @@ export function CommandPicker({
                 const cardRequired = requiredKeys(cardSchema);
                 const cardId = `${listId}-${item.key}`;
                 const cost = commandDoc(item).cost;
+                const availability = commandAvailability(item);
+                const describedBy = [
+                  cost ? `${cardId}-cost` : null,
+                  availability.reason ? `${cardId}-reason` : null,
+                  `${cardId}-hint`,
+                ]
+                  .filter(Boolean)
+                  .join(' ');
                 return (
-                  <label key={item.key} className={styles.commandOption} data-checked={chosen === item.key}>
+                  <label
+                    key={item.key}
+                    className={styles.commandOption}
+                    data-checked={chosen === item.key}
+                    data-available={availability.dimmed ? 'false' : undefined}
+                  >
                     <input
                       type="radio"
                       name={`${listId}-command`}
                       value={item.key}
                       checked={chosen === item.key}
                       aria-labelledby={`${cardId}-name`}
-                      aria-describedby={cost ? `${cardId}-cost ${cardId}-hint` : `${cardId}-hint`}
+                      aria-describedby={describedBy}
                       onChange={() => choose(item.key)}
                     />
                     <span className={styles.commandBody}>
@@ -470,6 +492,12 @@ export function CommandPicker({
                       {cost ? (
                         <span id={`${cardId}-cost`} className={styles.commandCost}>
                           {cost}
+                        </span>
+                      ) : null}
+                      {/* 지금 실행할 수 없는 명령은 흐리게 두고 사유를 적는다. 그래도 고르고 넣을 수 있다. */}
+                      {availability.reason ? (
+                        <span id={`${cardId}-reason`} className={styles.commandReason} data-testid="command-reason">
+                          {availability.reason}
                         </span>
                       ) : null}
                       <span id={`${cardId}-hint`} className={styles.commandHint}>
@@ -638,6 +666,9 @@ export function CommandPicker({
                         options={screenGenerals}
                         onChange={set}
                         order={direction ? { resource, direction } : null}
+                        {...(command.key === RECRUIT_COMMAND && recruits
+                          ? { note: recruits.note, empty: '등용할 수 있는 재야 장수가 없습니다' }
+                          : {})}
                       />
                     );
                   }
@@ -796,14 +827,17 @@ function ArgInput({
   );
 }
 
-// 명령 도움말 (INT-26). 서버가 설명·비용을 실어 줄 때만 안내 줄에 적는다.
+// 명령 도움말 (INT-26). 서버가 실어 준 설명·비용·요구 조건·소요 턴만 안내 줄에 적는다.
 function CommandDocNotes({ command }: { command: CommandInfo }) {
-  const { description, cost } = commandDoc(command);
-  if (!description && !cost) return null;
+  const { description, cost, requirements, turns } = commandDoc(command);
+  const requires = requirementsText(requirements);
+  const duration = turnsText(turns);
   return (
     <>
       {description ? <span data-testid="command-description">{description}</span> : null}
       {cost ? <span data-testid="command-cost">비용: {cost}</span> : null}
+      {requires ? <span data-testid="command-requirements">{requires}</span> : null}
+      {duration ? <span data-testid="command-turns">{duration}</span> : null}
     </>
   );
 }

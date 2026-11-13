@@ -350,6 +350,22 @@
   font-weight: 600;
 }
 
+/* 지금 실행할 수 없는 명령 카드 (commands.list available false). 글자는 흐리지 않고 바탕·테두리로 구분해 대비를 지킨다. */
+.commandOption[data-available='false'] {
+  border-style: dashed;
+  background: var(--color-surface-muted);
+}
+
+.commandOption[data-available='false'] strong {
+  color: var(--color-text-muted);
+}
+
+/* 카드의 실행 불가 사유. */
+.commandReason {
+  color: var(--color-warning);
+  font-size: var(--text-xs);
+}
+
 /* 수량 칸 옆 예상 금 (사전 검사 미리보기). */
 .costPreview {
   margin: 0;

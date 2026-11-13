@@ -267,3 +267,34 @@ it('INT-25 남의 직책 칸은 넘겨받은 다음 턴 시각에 칸마다 턴 
     new Date(at.getTime() + 2 * 60 * 60_000).toISOString(),
   );
 });
+
+it('INT-26 AC-INT-26 예턴 표는 서버 칸이 실은 대상 이름을 번호 대신 적고 칸을 밀어도 같은 이름을 쓴다', async () => {
+  const stored = [
+    { commandKey: 'invite', args: { generalId: 21 }, name: '등용', targets: { general: '서서(徐庶)' } },
+    { commandKey: 'move', args: { cityKey: 99 }, name: '이동', targets: { city: '신야' } },
+    // 서버가 이름을 주지 않은 장수(안개)는 번호로 적는다.
+    { commandKey: 'invite', args: { generalId: 30 }, name: '등용', targets: { general: null } },
+    ...slots.slice(3),
+  ];
+  const source: TurnSourceFactory = (input) => ({
+    ...makeSource(null)(input),
+    list: {
+      queryKey: ['list', 'targets'],
+      queryFn: async () => ({ revision: 1, slots: stored }),
+      select: (d) => d as TurnList,
+    },
+  });
+  await open(source, 'RUNNING', vi.fn());
+  const row = (n: number) => document.querySelector(`tr[data-slot="${n}"]`)?.textContent ?? '';
+  await waitFor(() => expect(row(1)).toContain('서서'));
+  expect(row(1)).not.toContain('徐庶');
+  expect(row(1)).not.toContain('21');
+  expect(row(2)).toContain('신야');
+  expect(row(2)).not.toContain('도시 99');
+  expect(row(3)).toContain('장수 30');
+  // 1번 칸을 골라 한 칸 밀면 등용이 2번 칸으로 가도 이름이 따라간다.
+  fireEvent.click(document.querySelector('tr[data-slot="1"]')!);
+  fireEvent.click(screen.getByRole('button', { name: '밀기' }));
+  await waitFor(() => expect(row(2)).toContain('서서'));
+  expect(row(3)).toContain('신야');
+});

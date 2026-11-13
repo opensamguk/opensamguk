@@ -1,6 +1,7 @@
 // 명령 인자 입력 칸. commands.list가 준 JSON Schema(argsSchema)에서 칸을 만든다.
 // 화면은 형식만 돕고, 인자가 맞는지는 서버가 저장·사전 검사 때 다시 본다.
 import type { UnitInfo } from '../battleSim/unitChoices';
+import { displayName } from '../game/names';
 
 export type ArgField =
   | { key: string; kind: 'city'; label: string }
@@ -153,7 +154,7 @@ export function describeArgs(args: Record<string, unknown>, names: ArgNames): st
     if (key === 'cityKey' && typeof value === 'number') parts.push(names.city(value) ?? `도시 ${value}`);
     else if (key === 'nationId' && typeof value === 'number') parts.push(names.nation(value) ?? `국가 ${value}`);
     else if (key === 'generalId' && typeof value === 'number' && names.general)
-      parts.push(names.general(value) ?? `장수 ${value}`);
+      parts.push(displayName(names.general(value) ?? `장수 ${value}`));
     else if (key === 'crewType' && typeof value === 'number') parts.push(names.unit?.(value) ?? `병종 ${value}`);
     else if (key === 'buy' && typeof value === 'boolean') parts.push(value ? '쌀 사기' : '쌀 팔기');
     else if (key === 'resource' && typeof value === 'string') parts.push(ENUM_LABELS[value] ?? value);
@@ -165,4 +166,23 @@ export function describeArgs(args: Record<string, unknown>, names: ArgNames): st
     else parts.push(`${LABELS[key] ?? key} ${String(value)}`);
   }
   return parts.join(' · ');
+}
+
+// 서버가 예턴 칸에 실어 준 대상 이름 (turns.get 칸의 targets, INT-26). null은 서버가 이름을 주지 않은 대상이다(안개·없어진 장수).
+export interface SlotTargets {
+  city?: string | null | undefined;
+  nation?: string | null | undefined;
+  general?: string | null | undefined;
+}
+
+// 칸의 대상 이름을 먼저 쓰고, 없으면 지도·장수 목록에서 찾는다. 장수 이름을 끝내 모르면 번호로 적는다.
+// 개인 칸에도 장수 대상(등용·선양)이 있어 장수 이름 찾기를 늘 둔다.
+export function withTargets(names: ArgNames, targets: SlotTargets | undefined): ArgNames {
+  if (!targets) return names.general ? names : { ...names, general: () => undefined };
+  return {
+    ...names,
+    city: (key) => targets.city ?? names.city(key),
+    nation: (id) => targets.nation ?? names.nation(id),
+    general: (id) => targets.general ?? names.general?.(id),
+  };
 }

@@ -33,6 +33,15 @@ export interface TargetGeneral extends GeneralFacts {
   cityName?: string | undefined;
 }
 
+// 인자 입력 화면이 열릴 때 편집기에 받아 달라고 알리는 조회. 국가 대상은 순위·외교, 장수 대상은 국가 장수 상세, 등용은 등용 후보다.
+export type ArgNeed = 'nations' | 'generals' | 'recruits';
+
+// 등용 대상 재야 장수 (commands.recruitCandidates). 불러오는 중·오류면 목록이 비고 note가 이유다.
+export interface RecruitChoices {
+  list: readonly TargetGeneral[];
+  note: string | null;
+}
+
 export interface NationFacts {
   power: number;
   cities: number;
@@ -60,6 +69,8 @@ export interface ArgContext {
   nationFacts?: ReadonlyMap<number, NationFacts> | undefined;
   // 우리와의 관계와 남은 기간 (조약 조회). 조약을 쓰지 않는 월드는 비어 있다.
   relations?: ReadonlyMap<number, string> | undefined;
+  // 등용 후보 (개인 예턴만). 없으면 등용 대상은 번호로 넣는다.
+  recruits?: RecruitChoices | undefined;
 }
 
 const num = (value: number) => value.toLocaleString('ko-KR');
@@ -460,12 +471,17 @@ export function GeneralTargetPicker({
   options,
   onChange,
   order = null,
+  note = null,
+  empty = '고를 수 있는 장수가 없습니다',
 }: {
   label: string;
   value: string;
   options: readonly TargetGeneral[];
   onChange: (value: string) => void;
   order?: { resource: 'gold' | 'rice'; direction: 'asc' | 'desc' } | null;
+  // 목록 위 안내(불러오는 중·오류). 있으면 빈 목록 문구 대신 이것만 적는다.
+  note?: string | null;
+  empty?: string;
 }) {
   const [query, setQuery] = useState('');
   const listId = useId();
@@ -507,7 +523,13 @@ export function GeneralTargetPicker({
         <span className={styles.count}>{countText(pool.length, options.length, query)}</span>
       </label>
       <div id={listId} className={`${styles.list} ${styles.generalColumns}`} role="radiogroup" aria-label={label}>
-        {rows.length === 0 ? <p className={styles.muted}>고를 수 있는 장수가 없습니다</p> : null}
+        {note ? (
+          <p className={styles.muted} role="note">
+            {note}
+          </p>
+        ) : rows.length === 0 ? (
+          <p className={styles.muted}>{empty}</p>
+        ) : null}
         {rows.map((general) => {
           const stats = statLine(general);
           const second = [order ? purseLine(general) : troopLine(general)].filter(Boolean).join('');
