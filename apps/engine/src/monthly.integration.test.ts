@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb, nextActionSequence, type Prisma } from '@opensamguk/db';
-import { CITY_SEASONAL_EVENTS_FEATURE, emptyTurns, type WorldInit } from '@opensamguk/rules';
+import { CITY_SEASONAL_EVENTS_FEATURE, emptyTurns, NATION_PHILOSOPHY_FEATURE, type WorldInit } from '@opensamguk/rules';
 import { rngFor } from '@opensamguk/shared';
 import { hashState } from '@opensamguk/shared/node';
 import { monthlyFixture } from '../test/monthlyFixture';
@@ -85,6 +85,20 @@ async function setTurns(worldId: string, commandKey: string, idempotencyKey: str
 }
 
 describe('AC-M1-12 실제 PostgreSQL 월 경계', () => {
+  it('성향을 적용한 실제 세수와 인구 정산이 재생과 일치한다', async () => {
+    const initial = structuredClone(template);
+    initial.ruleFeatures = [NATION_PHILOSOPHY_FEATURE];
+    initial.nations[0]!.philosophy = '법가';
+    for (const general of initial.generals) general.activeFromYear = initial.startYear + 1;
+    const { worldId } = await saveInitialWorld(db, initial, { name: '성향 정산', turnTermMinutes: 60, endYear: null });
+    await controlClock(db, worldId, 'start');
+    const lease = (await acquireLease(db, worldId))!;
+    const loop = new TurnLoop(db, lease);
+    await loop.advanceTo(10_000);
+    const archive = await exportReplay(db, worldId);
+    expect(replayArchive(archive, 1)[0]?.stateHash).toBe(archive.months[0]?.stateHash);
+  });
+
   it('분기 도시 사건과 수치가 월 경계에 저장되고 이후 해제되며 재생 결과와 일치한다', async () => {
     const initial = structuredClone(template);
     initial.ruleFeatures = [CITY_SEASONAL_EVENTS_FEATURE];

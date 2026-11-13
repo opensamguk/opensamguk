@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { philosophyDomestic } from '../../personnel/nationPhilosophy';
 import { BALANCE } from '../../balance';
 import type { WorldView } from '../../model/world';
 import type { Actor, CommandDef, Failure } from '../types';
@@ -66,7 +67,11 @@ export function makeInvestmentWithProviders(spec: Spec, providers: readonly Modi
 }
 
 function makeInvestmentWithCollector(spec: Spec, collect: typeof collectModifiers): CommandDef {
-  const cost = BALANCE.DEVEL_COST * (spec.costFactor ?? 1);
+  const baseCost = BALANCE.DEVEL_COST * (spec.costFactor ?? 1);
+  const cost = (view: WorldView, nationId: number | null) => {
+    const multiplier = philosophyDomestic(view, nationId, spec.key).cost;
+    return multiplier === 1 ? baseCost : Math.round(baseCost * multiplier);
+  };
   const construction = spec.field === 'wall' || spec.field === 'defence' ? spec.field : null;
   function check(view: WorldView, actor: Actor): Failure | null {
     const general = view.generals[actor.generalId];
@@ -79,7 +84,7 @@ function makeInvestmentWithCollector(spec: Spec, collect: typeof collectModifier
     if (city.kind === 'PASS' && spec.field !== 'defence' && spec.field !== 'wall')
       return { code: 'BAD_TARGET', message: '관문에서는 수비와 성벽을 보강할 수 있습니다.' };
     if (!city.supplied) return { code: 'NO_SUPPLY', message: '보급이 끊긴 도시입니다.' };
-    if (general.gold < cost) return { code: 'NO_GOLD', message: '금이 부족합니다.' };
+    if (general.gold < cost(view, general.nationId)) return { code: 'NO_GOLD', message: '금이 부족합니다.' };
     const value = spec.field === 'tech' ? nation.tech : city[spec.field];
     const max =
       spec.field === 'tech' ? BALANCE.MAX_TECH : spec.field === 'trust' ? BALANCE.MAX_TRUST : city[`${spec.field}Max`];
@@ -122,6 +127,7 @@ function makeInvestmentWithCollector(spec: Spec, collect: typeof collectModifier
       score = applyModifiers(score, collect(view, general.id, { stage: 'domestic.score', commandKey: spec.key }), {
         min: 0,
       });
+      score *= philosophyDomestic(view, general.nationId, spec.key).score;
       const points = Math.round(score);
       // 인구·민심의 단위만 바꾼다. 경험·공헌은 기존 점수로 계산한다.
       const thresholds = view.presetRules?.boost.smallWorld;
@@ -137,7 +143,7 @@ function makeInvestmentWithCollector(spec: Spec, collect: typeof collectModifier
         effects: [
           ...material,
           effect,
-          { kind: 'general', id: general.id, field: 'gold', op: 'add', value: -cost },
+          { kind: 'general', id: general.id, field: 'gold', op: 'add', value: -cost(view, general.nationId) },
           { kind: 'general', id: general.id, field: 'experience', op: 'add', value: Math.round(score * 0.7) },
           { kind: 'general', id: general.id, field: 'dedication', op: 'add', value: points },
         ],

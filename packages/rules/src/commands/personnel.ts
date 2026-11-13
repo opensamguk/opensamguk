@@ -2,6 +2,7 @@ import { TICKS_PER_MONTH } from '../clock/constants';
 import { z } from 'zod';
 import { BALANCE } from '../balance';
 import { LINEAGE_EXITED_YEAR } from '../lineage/config';
+import { NATION_PHILOSOPHY_FEATURE, nationPhilosophyNames } from '../personnel/nationPhilosophy';
 import { refreshSupply } from '../supply';
 import { DIPLOMATIC_COOLDOWN_FEATURE } from '../diplomacy/cooldown';
 import type { WorldView } from '../model/world';
@@ -12,8 +13,14 @@ const establish = (uprising: boolean) =>
     key: uprising ? 'uprising' : 'found',
     name: uprising ? '거병' : '건국',
     category: 'strategy',
-    args: z.strictObject({ name: z.string().trim().min(1).max(30), color: z.string().regex(/^#[0-9a-fA-F]{6}$/) }),
+    args: z.strictObject({
+      name: z.string().trim().min(1).max(30),
+      color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+      philosophy: z.enum(nationPhilosophyNames).optional(),
+    }),
     check(view, actor, args) {
+      if (args.philosophy && !view.ruleFeatures?.includes(NATION_PHILOSOPHY_FEATURE))
+        return fail('BAD_ARGS', '이 월드는 국가 성향 선택을 지원하지 않습니다.');
       if (Math.floor((actor.tick ?? 0) / TICKS_PER_MONTH) < (view.presetRules?.protection.foundUntilMonths ?? 0))
         return fail('PROTECTED', '초반 보호 기간에는 건국하거나 거병할 수 없습니다.');
       const general = view.generals[actor.generalId]!;
@@ -37,7 +44,7 @@ const establish = (uprising: boolean) =>
         rice: 0,
         description: '',
         tech: 0,
-        philosophy: '',
+        philosophy: args.philosophy ?? '',
         level: 0,
         capitalCityKey: general.cityKey,
         isNpc: general.userId === null,

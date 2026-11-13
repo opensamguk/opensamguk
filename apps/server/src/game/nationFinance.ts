@@ -1,6 +1,7 @@
 import {
   BALANCE,
   estimateTaxIncome,
+  nationPhilosophy,
   nowTick,
   residentOfficeBonuses,
   toGameDate,
@@ -21,12 +22,13 @@ function nextTaxDate(current: { year: number; month: number }, first: number, se
   return { month, year: current.year + (month < current.month ? 1 : 0) };
 }
 
-export function projectCityIncome(world: World, now: number, city: City, state?: WorldView) {
+export function projectCityIncome(world: World, now: number, city: City, state?: WorldView, philosophy?: string) {
   const current = toGameDate(world.startYear, nowTick(worldClock(world), now));
   const estimate = (resource: 'gold' | 'rice', first: number, second: number) => {
     const date = nextTaxDate(current, first, second);
     const bonuses = state?.officeEffects ? residentOfficeBonuses(state, date.year) : undefined;
-    return { ...date, amount: estimateTaxIncome([city], 0, resource, bonuses).gross };
+    const multiplier = nationPhilosophy(world, philosophy)?.[resource];
+    return { ...date, amount: estimateTaxIncome([city], 0, resource, bonuses, multiplier).gross };
   };
   return { gold: estimate('gold', 1, 7), rice: estimate('rice', 4, 10) };
 }
@@ -46,16 +48,18 @@ export function projectNationFinance(
   settlements: readonly City[],
   generals: readonly Member[],
   state?: WorldView,
+  philosophy?: string,
 ) {
   const current = toGameDate(world.startYear, nowTick(worldClock(world), now));
   const estimate = (resource: 'gold' | 'rice', first: number, second: number) => {
     const { year, month } = nextTaxDate(current, first, second);
     const members = generals.filter((general) => general.removedAt === null && general.activeFromYear <= year);
     const bonuses = state?.officeEffects ? residentOfficeBonuses(state, year) : undefined;
+    const multiplier = nationPhilosophy(world, philosophy)?.[resource];
     return {
-      totals: { year, month, ...estimateTaxIncome(settlements, members.length, resource, bonuses) },
+      totals: { year, month, ...estimateTaxIncome(settlements, members.length, resource, bonuses, multiplier) },
       cityGross: new Map(
-        settlements.map((city) => [city.cityKey, estimateTaxIncome([city], 0, resource, bonuses).gross]),
+        settlements.map((city) => [city.cityKey, estimateTaxIncome([city], 0, resource, bonuses, multiplier).gross]),
       ),
     };
   };

@@ -1,18 +1,34 @@
-import { commandPlayerDocs, commands, unitSetSchema, type CommandDef } from '@opensamguk/rules';
+import {
+  commandPlayerDocs,
+  commands,
+  NATION_PHILOSOPHY_FEATURE,
+  nationPhilosophyEffects,
+  unitSetSchema,
+  type CommandDef,
+} from '@opensamguk/rules';
 import { z } from 'zod';
 import { router, protectedProcedure } from '../trpc';
 import { readView, requireGeneral, requireWorld, worldInput } from '../game/queries';
 import { worldResolver } from '../game/resolver';
 import { commandAvailability } from '../game/commandAvailability';
 import { viewerGeneral, worldInput as strictWorldInput } from '../queries';
-export function describeCommand(def: CommandDef) {
+export function describeCommand(def: CommandDef, allowPhilosophy = false) {
   const doc = commandPlayerDocs[def.key];
   if (!doc) throw new Error(`명령 도움말이 없습니다: ${def.key}`);
+  const argsSchema = z.toJSONSchema(def.args, { io: 'input' });
+  if (argsSchema.properties?.philosophy) {
+    if (allowPhilosophy)
+      argsSchema.properties.philosophy = {
+        ...(argsSchema.properties.philosophy as z.core.JSONSchema.JSONSchema),
+        'x-philosophy-effects': nationPhilosophyEffects(),
+      };
+    else delete argsSchema.properties.philosophy;
+  }
   return {
     key: def.key,
     name: def.name,
     category: def.category,
-    argsSchema: z.toJSONSchema(def.args, { io: 'input' }),
+    argsSchema,
     description: doc.summary,
     cost: doc.cost,
     requirements: doc.requires,
@@ -20,7 +36,7 @@ export function describeCommand(def: CommandDef) {
   };
 }
 
-export const commandList = commands.filter((def) => def.target === 'general').map(describeCommand);
+export const commandList = commands.filter((def) => def.target === 'general').map((def) => describeCommand(def));
 export const commandsRouter = router({
   recruitCandidates: protectedProcedure.input(strictWorldInput).query(({ ctx, input }) =>
     ctx.db.$transaction(
@@ -66,7 +82,7 @@ export const commandsRouter = router({
         return worldResolver(world)
           .resolver.list('general')
           .map((def) => ({
-            ...describeCommand(def),
+            ...describeCommand(def, world.ruleFeatures.includes(NATION_PHILOSOPHY_FEATURE)),
             ...commandAvailability(def, view, actor, ended),
           }));
       },

@@ -16,6 +16,8 @@ import { commandConditionStats, GENERAL_CONDITION_FEATURE, generalCondition } fr
 // S3: 부상 80 이상은 유지. S4: 불탐 표시·성공 횟수·별도 능력치 경험은 생략한다.
 // S5: 탈취는 보급과 무관하게 대상 재고에서 뺀다. S6: 장비는 능력치에 합산하며 별도 특기 보정은 없다.
 // S7: 장수 로그·다친 장수 보고·대상 국가 기록. 판정은 확률 0·0.5에도 next 한 번이다.
+import { nationPhilosophy } from '../../../personnel/nationPhilosophy';
+
 export const STRATAGEM = {
   COST_GOLD: 100,
   COST_RICE: 100,
@@ -108,10 +110,10 @@ export function stratagemProbability(
     (Math.log2(defenders.length + 1) - 1.25) * 0.04 +
     developmentRatio(view, city.security, city.securityMax) / 5 +
     (city.supplied ? 0.1 : 0);
-  return Math.min(
-    STRATAGEM.MAX_PROBABILITY,
-    Math.max(0, (STRATAGEM.BASE_PROBABILITY + attack - defence) / stratagemDistance(view, general.cityKey, cityKey)),
-  );
+  const nation = general.nationId === null ? undefined : view.nations[general.nationId];
+  const bonus = nationPhilosophy(view, nation?.philosophy)?.stratagem ?? 0;
+  const base = (STRATAGEM.BASE_PROBABILITY + attack - defence) / stratagemDistance(view, general.cityKey, cityKey);
+  return Math.min(STRATAGEM.MAX_PROBABILITY, Math.max(0, base + bonus));
 }
 
 // 폐허의 내림으로 최대치가 0이 된 새 월드만 비율을 0으로 읽는다. 기존 공식은 보존한다.

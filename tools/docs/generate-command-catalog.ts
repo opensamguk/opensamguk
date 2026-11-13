@@ -27,6 +27,7 @@ const fieldLabels = {
   resource: '자원',
   name: '나라 이름',
   color: '나라 색',
+  philosophy: '국가 성향(지원 월드에서 선택)',
   unitId: '대상 부곡',
   target: '훈련 대상',
   slot: '장비 칸',

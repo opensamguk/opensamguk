@@ -9,6 +9,8 @@ import { fail, positive, relation, targetGeneral } from '../commands/support';
 import type { Actor, CommandDef, CommandResult, Failure } from '../commands/types';
 import { readNationStrategy, strategyMonth, type StrategyKey } from './state';
 
+import { nationPhilosophy } from '../personnel/nationPhilosophy';
+
 const WAIT_FACTOR = { nation_mobilize: 4, nation_rivalry: 16, nation_raid: 16 } as const;
 interface StrategySpec<A> {
   key: StrategyKey;
@@ -70,8 +72,10 @@ function defineStrategy<A>(spec: StrategySpec<A>): CommandDef {
           (row) => row.nationId === nationId && row.activeFromYear <= year && row.removedAt === undefined,
         ).length,
       );
-      cooldown.strategicUntil = current + 9;
-      cooldown.commands[spec.key] = current + Math.round(Math.sqrt(count * WAIT_FACTOR[spec.key]) * 10);
+      const policy = nationPhilosophy(state, state.nations[nationId]!.philosophy);
+      cooldown.strategicUntil = current + Math.round(9 * (policy?.globalDelay ?? 1));
+      const delay = Math.round(Math.sqrt(count * WAIT_FACTOR[spec.key]) * 10);
+      cooldown.commands[spec.key] = current + Math.round(delay * (policy?.delay ?? 1));
       state.nationStrategy = ledger;
       general.experience += 5;
       general.dedication += 5;

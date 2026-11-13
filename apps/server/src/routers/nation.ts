@@ -50,7 +50,7 @@ export const nationRouter = router({
       const settlements = cities.filter((city) => city.kind !== 'PASS').sort((a, b) => a.cityKey - b.cityKey);
       const finance =
         ownNation && world.status !== 'ENDED'
-          ? projectNationFinance(world, ctx.now, settlements, generals, state)
+          ? projectNationFinance(world, ctx.now, settlements, generals, state, nation.philosophy)
           : undefined;
       const strategyStatus =
         ownNation && world.status !== 'ENDED' && world.ruleFeatures.includes(NATION_STRATEGY_FEATURE)

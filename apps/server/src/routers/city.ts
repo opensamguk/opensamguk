@@ -3,6 +3,7 @@ import { protectedProcedure, router } from '../trpc';
 import { entityKey, readWorld, viewerGeneral, worldClock, worldInput } from '../queries';
 import { cityInfo, commandedTroops, garrisonGeneralInfo, visibility } from '../visibility';
 import { readView } from '../game/queries';
+import { NATION_PHILOSOPHY_FEATURE } from '@opensamguk/rules';
 import {
   cityRegionName,
   INTEL_FEATURE,
@@ -73,6 +74,15 @@ export const cityRouter = router({
           ? await tx.world.findUniqueOrThrow({ where: { id: world.id }, select: { seed: true, monthlyTick: true } })
           : null;
       const showIncome = full && city.nationId !== null && city.kind !== 'PASS' && world.status !== 'ENDED';
+      const cityPhilosophy =
+        showIncome && city.nationId !== null && world.ruleFeatures.includes(NATION_PHILOSOPHY_FEATURE)
+          ? (
+              await tx.nation.findUnique({
+                where: { worldId_id: { worldId: input.worldId, id: city.nationId } },
+                select: { philosophy: true },
+              })
+            )?.philosophy
+          : undefined;
       const officeEffectsEnabled = world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE);
       const view =
         (campaignEnabled && !garrisonHidden) || (showIncome && officeEffectsEnabled)
@@ -135,7 +145,7 @@ export const cityRouter = router({
             }
           : {}),
         ...cityInfo(city, activeViewer, alliedResidence),
-        ...(showIncome ? { incomeEstimate: projectCityIncome(world, ctx.now, city, view) } : {}),
+        ...(showIncome ? { incomeEstimate: projectCityIncome(world, ctx.now, city, view, cityPhilosophy) } : {}),
         ...(events.length
           ? {
               events,
