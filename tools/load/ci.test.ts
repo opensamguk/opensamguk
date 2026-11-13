@@ -1,11 +1,47 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
-import { BUILDKIT_IMAGE, CI_LIMITS, fixedImageId, publicLoadSummary, runtimeBuildArguments, verifyBuilder } from './ci';
+import {
+  BUILDKIT_IMAGE,
+  CI_LIMITS,
+  ciFailureCode,
+  fixedImageId,
+  publicLoadSummary,
+  runtimeBuildArguments,
+  verifyBuilder,
+  verifyBuilderStopped,
+} from './ci';
 import { userWorkload } from './workload';
 import type { LoadRun } from './report';
 
 const id = (n: number) => `00000000-0000-4000-8000-${n.toString(16).padStart(12, '0')}`;
+
+it('publishes only allowlisted CI failure codes', () => {
+  expect(ciFailureCode(new Error('LOAD_BUILDER_UNVERIFIED'))).toBe('LOAD_BUILDER_UNVERIFIED');
+  expect(ciFailureCode(new Error('LOAD_NATIVE_FAILURE_WITH_PRIVATE_OUTPUT'))).toBe('UNCLASSIFIED');
+});
+it('requires a stopped owned BuildKit process after the explicit stop and rejects OOM or forced exit', () => {
+  const id = 'a'.repeat(64);
+  const finishedAt = '2026-11-12T10:12:00.002Z';
+  const stopRequestedAt = Date.parse('2026-11-12T10:12:00.000Z');
+  const state = { Running: false, Pid: 0, ExitCode: 1, OOMKilled: false, FinishedAt: finishedAt };
+  expect(verifyBuilderStopped([{ Id: id, State: state }], id, stopRequestedAt)).toEqual({ exitCode: 1, finishedAt });
+  for (const State of [
+    { ...state, ExitCode: 137 },
+    { ...state, OOMKilled: true },
+    { ...state, Pid: 24 },
+  ])
+    expect(() => verifyBuilderStopped([{ Id: id, State }], id, stopRequestedAt)).toThrow(
+      'LOAD_BUILDER_EXIT_UNCONFIRMED',
+    );
+  expect(() => verifyBuilderStopped([{ Id: id, State: state }], id, stopRequestedAt + 3)).toThrow(
+    'LOAD_BUILDER_EXIT_UNCONFIRMED',
+  );
+  expect(() => verifyBuilderStopped([{ Id: 'b'.repeat(64), State: state }], id, stopRequestedAt)).toThrow(
+    'LOAD_BUILDER_EXIT_UNCONFIRMED',
+  );
+});
+
 // 공개 요약 경계의 수학 고정물이다. 실제 부하·계정·월드 인수로 세지 않는다.
 function mathematicalSmoke(): LoadRun {
   const end = 15001,
@@ -149,8 +185,8 @@ describe('L5 수동 build/공개 요약 경계', () => {
       Image: 'buildkit-image',
       State: { Running: true, Pid: 123, OOMKilled: false },
       HostConfig: {
-        CPUQuota: 100000,
-        CPUPeriod: 100000,
+        CpuQuota: 100000,
+        CpuPeriod: 100000,
         Memory: 2147483648,
         MemorySwap: 2147483648,
         CgroupParent: '',
@@ -161,11 +197,18 @@ describe('L5 수동 build/공개 요약 경계', () => {
     };
     const expected = { name, imageId: row.Image, cgroupText: `0::/system.slice/docker-${row.Id}.scope\n` };
     expect(verifyBuilder(row, expected).configuredParent).toBe('');
+    expect(
+      verifyBuilder(row, { ...expected, cgroupText: `0::/system.slice/docker-${row.Id}.scope/init\n` }).cgroupRoot,
+    ).toBe(`/sys/fs/cgroup/system.slice/docker-${row.Id}.scope`);
+    expect(() =>
+      verifyBuilder(row, { ...expected, cgroupText: `0::/system.slice/docker-${row.Id}.scope-other/init\n` }),
+    ).toThrow('LOAD_BUILDER_UNVERIFIED');
     expect(() => verifyBuilder(row, { ...expected, cgroupText: `0::/narrow.slice/docker-${row.Id}.scope\n` })).toThrow(
       'LOAD_BUILDER_UNVERIFIED',
     );
     for (const patch of [
-      { CPUQuota: 200000 },
+      { CpuQuota: 200000 },
+      { CpuPeriod: 200000 },
       { Memory: 4294967296 },
       { MemorySwap: -1 },
       { CgroupnsMode: 'host' },
@@ -184,9 +227,15 @@ describe('L5 수동 build/공개 요약 경계', () => {
     });
     expect(args).toContain('SOURCE_REVISION=' + 'b'.repeat(40));
     expect(args).toContain('SOURCE_TREE_SHA256=' + 'c'.repeat(64));
-    expect(args).toContain('runtime');
+    expect(args[args.indexOf('--target') + 1]).toBe('load-runtime');
     expect(args).not.toContain('--push');
     expect(CI_LIMITS.driverMs).toBe((11 + 20 + 5) * 60000);
+  });
+  it('uses the source and generated dependencies for the isolated load services', async () => {
+    const dockerfile = await readFile(new URL('../../deploy/Dockerfile', import.meta.url), 'utf8');
+    expect(dockerfile).toMatch(
+      /RUN pnpm install --frozen-lockfile && pnpm generate\r?\n\r?\n#[^\r\n]+\r?\nFROM dependencies AS load-runtime/,
+    );
   });
   it('수학적으로 유효한 원자료도 실제 정리가 없으면 공개 성공 요약을 만들지 않는다', () => {
     const raw = mathematicalSmoke();
@@ -227,7 +276,7 @@ describe('L5 수동 build/공개 요약 경계', () => {
       expect(document).toMatchObject({
         on: { workflow_dispatch: { inputs: { expected_sha: { required: true, type: 'string' } } } },
         permissions: { contents: 'read' },
-        jobs: { load: { 'runs-on': 'ubuntu-24.04', 'timeout-minutes': 75 } },
+        jobs: { load: { 'runs-on': 'ubuntu-24.04', 'timeout-minutes': name === 'load-m3.yml' ? 78 : 75 } },
       });
       const events = zObject(document).on;
       expect(Object.keys(zObject(events))).toEqual(['workflow_dispatch']);

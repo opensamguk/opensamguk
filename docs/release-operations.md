@@ -191,12 +191,14 @@ Node24.22.0·pnpm10.33.0을 준비한 뒤 의존성 없는 `bootstrap.mjs`가 �
 
 설치 전에 호스트의 실제60초 CPU, 메모리·cgroup 조상과 Docker 자료/근거 파일시스템 두 곳의 여유를1 CPU·2GiB·4GiB 예산으로 심사합니다. 의존성 설치는 새 systemd scope에서 CPU100%·메모리2GiB·추가 swap0으로 제한합니다. scope 내부에서 비root UID, 실제 조상과 커널 제한을 다시 확인한 뒤 설치하고 종료·잔여 scope를 확인합니다. 설치 전 점검과 설치·정리는 합계5분 안에 마쳐야 합니다. scope가 조상 관계를 끊거나 실제 제한을 확인하지 못하면 실패합니다.
 
-설치 뒤에는 기존 심사 코드로 다시 확인하고 전용 BuildKit builder를 만듭니다. 공식 `moby/buildkit:v0.34.1`의 고정 digest, 실제1 CPU·2GiB 제한과 로컬 커널의 parent를 확인한 뒤 기존 `deploy/Dockerfile`의 runtime을 빌드합니다. 이 builder는 공식 Docker container driver의 privileged 동작을 사용하므로 사용자 서버에서 실행하지 않습니다. 임시 GitHub VM 안에서만 쓰고 측정 전 정상 종료·삭제를 확인합니다. 공식 [driver 동작](https://docs.docker.com/build/builders/drivers/docker-container/)과 [고정 release](https://github.com/moby/buildkit/releases/tag/v0.34.1)를 참고합니다.
+설치 뒤에는 기존 심사 코드로 다시 확인하고 전용 BuildKit builder를 만듭니다. 공식 `moby/buildkit:v0.34.1`의 고정 digest, 실제1 CPU·2GiB 제한과 로컬 커널의 parent를 확인한 뒤 `deploy/Dockerfile`의 검증 전용 `load-runtime`을 빌드합니다. 이 단계에 검증 실행 코드와 생성한 Prisma client가 들어갑니다. 이 builder는 공식 Docker container driver의 privileged 동작을 사용하므로 사용자 서버에서 실행하지 않습니다. 임시 GitHub VM 안에서만 쓰고 측정 전 정상 종료·삭제를 확인합니다. 공식 [driver 동작](https://docs.docker.com/build/builders/drivers/docker-container/)과 [고정 release](https://github.com/moby/buildkit/releases/tag/v0.34.1)를 참고합니다.
 
 BuildKit와 PostgreSQL 고정 이미지의 pull·압축 해제는 Docker daemon이 수행하며 builder의 CPU·메모리 제한 밖입니다. 이를 제한된 작업으로 표시하지 않습니다. 두 고정 digest의 실제 image ID와 플랫폼을 검증하고 준비 뒤 호스트·cgroup·두 디스크를 재심사합니다. 이미지 준비·재심사·빌드의 합계 제한은15분, 자기 builder 정리는2분입니다. 실제 준비 IO나 자원 부족 때문에 이 한도를 넘기면 실패로 남깁니다.
 
 정식 부하는 두 월드 각각491 NPC와 실제 API로 만든 사람 장수109명, 합계 시험 계정218개와 예턴6540칸을 준비합니다. 월드별 시계는1분·2분이고 동시 SSE100개, 준비 운동120초와 측정900초를 유지합니다. API p95는300ms 미만, 턴 저장 지연의 보수적 상계는10초 미만이어야 합니다. 시험 생성자의 명시 정책만 쓰며 운영 정책 승인이나 메일 수신을 대신하지 않습니다. smoke는 동시 SSE10개·준비 운동1초·측정60초의 연결 확인이며 정식 통과로 세지 않습니다.
 
-`pnpm load:m3`와 `pnpm load:smoke`는 기존 실행기 `run.ts`의 직접 진입점입니다. 직접 실행하려면 검증한 이미지 ID와 `--source-head`, `--source-sha256`, 승인된 장소의 `--site github-hosted`가 필요합니다. 수동 워크플로의 `ci.ts`가 설치·빌드·입장 심사·직접 실행을 순서대로 연결합니다. 실행기의 준비180초·실행1200초·정리300초는 바꾸지 않습니다. 워크플로75분은 설치5분, 빌드 전 심사11분, 이미지 준비·빌드15분, builder 정리2분, 측정 심사와 실행·정리36분, 요약2분의71분 상계와 action 준비4분을 합한 값입니다.
+`pnpm load:m3`와 `pnpm load:smoke`는 실행기 `run.ts`의 직접 진입점입니다. 직접 실행하려면 검증한 이미지 ID와 `--source-head`, `--source-sha256`, 승인된 장소의 `--site github-hosted`가 필요합니다. 수동 워크플로의 `ci.ts`가 설치·빌드·입장 심사·직접 실행을 순서대로 연결합니다. 공식 준비 상한은 360초이며 준비를 포함한 실행 상한은 1380초입니다. 스모크 준비 상한은 180초이고 실행 상한은 1200초입니다. 정리 상한은 각각 300초입니다. 워크플로 상한은 공식 78분과 스모크 75분입니다.
+
+격리 월드는 60분 턴 간격으로 시작해 일반 장수 등록 API와 엔진으로 월드마다 109명을 준비합니다. 준비가 끝나면 운영 설정 API와 엔진으로 턴 간격을 1분과 2분으로 적용합니다. 대기 입력과 임시 운영자 계정 수가 모두 0인 상태에서 준비 운동을 시작합니다. 최종 DB 대조는 각 월드의 설정 변경 시퀀스를 기준으로 준비와 실측의 시계를 각각 확인합니다.
 
 원자료는 실행기의 `.load-reports/`에 보존하고 공개 Actions 산출물로 업로드하지 않습니다. 공개 저장소에서는 소유자만 내려받도록 보장할 수 없기 때문입니다. 공개 job summary에는 소스 SHA·판정·개수·지연 수치와 정리 확인만 씁니다. 계정·월드 UUID, 로그·쿠키·연결 문자열·volume 내용은 내보내지 않습니다. 임시 VM이 없어지면 상세 실패 근거도 소실되므로 재현 실행이나 별도 승인한 비공개 보관 경로가 필요합니다. 정상 종료·같은 DB OID·연결0·소유 자원 정리·원자료 재집계 중 하나라도 확인하지 못하면 공개 성공으로 표시하지 않습니다. 기존 사용자 점검용5200과 기존 DB는 이 경로에서 사용하지 않습니다.

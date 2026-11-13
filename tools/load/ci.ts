@@ -2,13 +2,22 @@ import { readFile, mkdir, appendFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
-import { admissionSite, evaluateAdmission } from './admission';
+import { admissionSite, evaluateAdmission, LOAD_LIMITS } from './admission';
 import { BUILD_BUDGET, requireDispatch } from './bootstrap.mjs';
 import { bindLocalDocker, LOAD_DOCKER } from './docker';
-import { commandSettled, OwnedCommands, sourceSnapshot, writeEvidence } from './lifecycle';
+import {
+  commandSettled,
+  helperDiagnosticPattern,
+  OwnedCommands,
+  sourceSnapshot,
+  workerFailureReasonPattern,
+  writeEvidence,
+} from './lifecycle';
+import { LOAD_CONTRACT } from './contract';
+import { readCommitMetrics } from './metricFiles';
 import { readRunnerProvenance, sampleAdmission, selfCgroupPath } from './observe';
-import { evaluateLoadRun, loadRunSchema } from './report';
-import { requireImageSource } from './run';
+import { evaluateLoadRun, loadRunSchema, percentile, requestSampleSchema } from './report';
+import { bodyFailureReasonPattern, requireImageSource, volumeInitFailurePattern } from './run';
 
 // 공식 release/registry manifest: https://github.com/moby/buildkit/releases/tag/v0.34.1
 // index sha256은 registry의 Docker-Content-Digest와 실제 응답 body SHA256을 대조했다.
@@ -23,6 +32,32 @@ export const CI_LIMITS = Object.freeze({
   driverMs: 2160000,
   summaryMs: 120000,
 });
+const ciFailureCodes = new Set([
+  'LOAD_BOOTSTRAP_SCOPE_UNVERIFIED',
+  'LOAD_BUILD_ADMISSION_DEADLINE',
+  'LOAD_BUILD_ADMISSION_REFUSED',
+  'LOAD_BUILDER_BASELINE_NOT_EMPTY',
+  'LOAD_BUILDER_CHILD_UNSETTLED',
+  'LOAD_BUILDER_EXIT_UNCONFIRMED',
+  'LOAD_BUILDER_IDENTITY_UNCONFIRMED',
+  'LOAD_BUILDER_REMAINS',
+  'LOAD_BUILDER_UNVERIFIED',
+  'LOAD_CI_BUILD_FAILED',
+  'LOAD_CI_DAEMON_UNVERIFIED',
+  'LOAD_CI_FINAL_FAILED',
+  'LOAD_CI_OPTIONS_INVALID',
+  'LOAD_CI_PLATFORM_UNVERIFIED',
+  'LOAD_CI_SOURCE_CHANGED',
+  'LOAD_FIXED_IMAGE_UNVERIFIED',
+  'LOAD_IMAGE_PREPARATION_DEADLINE',
+  'LOAD_IMAGE_SOURCE_INVALID',
+  'LOAD_LOCAL_DOCKER_REQUIRED',
+  'LOAD_NATIVE_CHILD_UNSETTLED',
+  'LOAD_NATIVE_COMMAND_FAILED',
+]);
+export function ciFailureCode(error: unknown): string {
+  return error instanceof Error && ciFailureCodes.has(error.message) ? error.message : 'UNCLASSIFIED';
+}
 const hash = z.string().regex(/^[a-f0-9]{64}$/),
   head = z.string().regex(/^[a-f0-9]{40}$/);
 const sourceSchema = z.strictObject({ head, sha256: hash, files: z.number().int().positive() });
@@ -54,8 +89,8 @@ const builderSchema = z.looseObject({
   Image: z.string(),
   State: z.looseObject({ Running: z.literal(true), Pid: z.number().int().positive(), OOMKilled: z.literal(false) }),
   HostConfig: z.looseObject({
-    CPUQuota: z.literal(100000),
-    CPUPeriod: z.literal(100000),
+    CpuQuota: z.literal(100000),
+    CpuPeriod: z.literal(100000),
     Memory: z.literal(2147483648),
     MemorySwap: z.literal(2147483648),
     CgroupParent: z.string(),
@@ -65,34 +100,74 @@ const builderSchema = z.looseObject({
   Mounts: z.array(z.looseObject({ Type: z.string(), Name: z.string().optional(), Destination: z.string() })),
 });
 
+class BuilderVerificationError extends Error {
+  constructor(readonly failedChecks: readonly string[]) {
+    super('LOAD_BUILDER_UNVERIFIED');
+  }
+}
+
 export function verifyBuilder(raw: unknown, expected: { name: string; imageId: string; cgroupText: string }) {
   const parsed = builderSchema.safeParse(raw);
-  if (!parsed.success || !/^opensamguk-load-build-[a-f0-9]{32}$/.test(expected.name))
-    throw new Error('LOAD_BUILDER_UNVERIFIED');
+  if (!parsed.success) {
+    // These paths describe the fixed schema. Never expose received values or issue messages.
+    throw new BuilderVerificationError(parsed.error.issues.map(({ path }) => path.join('.')));
+  }
+  if (!/^opensamguk-load-build-[a-f0-9]{32}$/.test(expected.name))
+    throw new BuilderVerificationError(['expected-builder-name']);
   const row = parsed.data,
     containerName = `buildx_buildkit_${expected.name}0`,
     volume = `${containerName}_state`;
   // Buildx의 systemd driver는 CgroupParent를 비워 둔다. 빈 값을 기본 parent의 증거로 쓰지 않고
   // 실제 로컬 커널 경로를 확인하여 system.slice로 해석된 경우만 허용한다.
+  const failedChecks = [];
+  const cgroupRoot = `${LOAD_DOCKER.cgroupPath}/docker-${row.Id}.scope`;
+  const actualCgroup = selfCgroupPath(expected.cgroupText);
+  if (row.Name !== `/${containerName}`) failedChecks.push('container-name');
+  if (row.Image !== expected.imageId) failedChecks.push('pinned-image-id');
+  if (!['', LOAD_DOCKER.cgroupParent].includes(row.HostConfig.CgroupParent)) failedChecks.push('docker-cgroup-parent');
+  // The pinned BuildKit moves its startup processes into the same container scope's init child.
+  // https://github.com/moby/buildkit/blob/v0.34.1/executor/resources/monitor.go#L236-L256
+  if (actualCgroup !== cgroupRoot && actualCgroup !== `${cgroupRoot}/init`) failedChecks.push('kernel-cgroup-parent');
   if (
-    row.Name !== `/${containerName}` ||
-    row.Image !== expected.imageId ||
-    !['', LOAD_DOCKER.cgroupParent].includes(row.HostConfig.CgroupParent) ||
-    selfCgroupPath(expected.cgroupText) !== `${LOAD_DOCKER.cgroupPath}/docker-${row.Id}.scope` ||
     row.Mounts.length !== 1 ||
     row.Mounts[0]?.Type !== 'volume' ||
     row.Mounts[0].Name !== volume ||
     row.Mounts[0].Destination !== '/var/lib/buildkit'
   )
-    throw new Error('LOAD_BUILDER_UNVERIFIED');
+    failedChecks.push('owned-state-volume');
+  if (failedChecks.length) throw new BuilderVerificationError(failedChecks);
   return {
     id: row.Id,
     pid: row.State.Pid,
     volume,
     containerName,
+    cgroupRoot,
     actualParent: LOAD_DOCKER.cgroupPath,
     configuredParent: row.HostConfig.CgroupParent,
   };
+}
+
+export function verifyBuilderStopped(raw: unknown, id: string, stopRequestedAt: number) {
+  const stopped = z
+    .array(
+      z.looseObject({
+        Id: z.literal(id),
+        State: z.looseObject({
+          Running: z.literal(false),
+          Pid: z.literal(0),
+          ExitCode: z.union([z.literal(0), z.literal(1)]),
+          OOMKilled: z.literal(false),
+          FinishedAt: z.string(),
+        }),
+      }),
+    )
+    .length(1)
+    .safeParse(raw);
+  const state = stopped.success ? stopped.data[0]?.State : undefined;
+  // The pinned buildkitd returns code 1 after SIGTERM unwinds its graceful server stop.
+  // https://github.com/moby/buildkit/blob/v0.34.1/cmd/buildkitd/main.go#L436-L473
+  if (!state || !(Date.parse(state.FinishedAt) >= stopRequestedAt)) throw new Error('LOAD_BUILDER_EXIT_UNCONFIRMED');
+  return { exitCode: state.ExitCode, finishedAt: state.FinishedAt };
 }
 
 export function fixedImageId(raw: unknown, pin: string): string {
@@ -124,7 +199,7 @@ export function runtimeBuildArguments(builder: string, iidFile: string, source: 
     builder,
     '--load',
     '--target',
-    'runtime',
+    'load-runtime',
     '--file',
     'deploy/Dockerfile',
     '--provenance=false',
@@ -163,6 +238,55 @@ export function publicLoadSummary(raw: unknown, lifecycle: unknown) {
     errors5xx: result.errors5xx,
     unexpected4xx: result.unexpected4xx,
     cleanupVerified: true,
+  };
+}
+
+async function partialMeasurementSummary(reportPath: string) {
+  const partial = resolve(reportPath, 'partial-artifacts');
+  const fragment = z
+    .object({
+      mode: z.literal('formal'),
+      complete: z.literal(true),
+      warmupStartedAt: z.number().finite(),
+      measurementStartedAt: z.number().finite(),
+      measurementFinishedAt: z.number().finite(),
+      requests: z.array(requestSampleSchema),
+      sse: z
+        .array(z.object({ readyAt: z.number().finite(), closedAt: z.number().finite(), failed: z.literal(false) }))
+        .length(LOAD_CONTRACT.concurrentUsers),
+    })
+    .safeParse(
+      await readFile(resolve(partial, 'fragment.json'), 'utf8')
+        .then(JSON.parse)
+        .catch(() => null),
+    );
+  if (!fragment.success) return null;
+  const { warmupStartedAt, measurementStartedAt, measurementFinishedAt, requests, sse } = fragment.data;
+  if (
+    measurementStartedAt - warmupStartedAt < LOAD_CONTRACT.warmupMs ||
+    measurementFinishedAt - measurementStartedAt < LOAD_CONTRACT.measurementMs ||
+    sse.some((row) => row.readyAt > measurementStartedAt || row.closedAt < measurementFinishedAt)
+  )
+    return null;
+  const inWindow = (at: number) => at >= measurementStartedAt && at < measurementFinishedAt;
+  const measured = requests.filter((row) => row.phase === 'measure' && inWindow(row.startedAt));
+  if (!measured.length) return null;
+  const metrics = (await readCommitMetrics(resolve(partial, 'metrics.jsonl')).catch(() => [])).filter(
+    (row) => row.valid && row.dueAt !== null && inWindow(row.dueAt),
+  );
+  return {
+    measurementSeconds: (measurementFinishedAt - measurementStartedAt) / 1000,
+    concurrentSse: sse.length,
+    measuredRequests: measured.length,
+    observedApiP95Ms: percentile(
+      measured.map((row) => row.durationMs),
+      0.95,
+    ),
+    observedCommits: metrics.length,
+    largestObservedCommitLagMs: metrics.reduce<number | null>(
+      (max, row) => (row.lagMs === null ? max : Math.max(max ?? 0, row.lagMs)),
+      null,
+    ),
   };
 }
 
@@ -305,6 +429,7 @@ async function main() {
     imageId: string | undefined,
     buildPhaseStartedAt: number | undefined;
   const cleanupFailures: string[] = [];
+  let builderExit: ReturnType<typeof verifyBuilderStopped> | undefined;
   try {
     await admit(Date.now() + CI_LIMITS.admissionMs, true);
     const listedContainers = (
@@ -366,8 +491,17 @@ async function main() {
         imageId: buildkitId,
         cgroupText: await readFile(`/proc/${pid}/cgroup`, 'utf8'),
       });
+      const { cgroupRoot } = builderProof;
+      const [cpuMax, memoryMax, swapMax] = await Promise.all(
+        ['cpu.max', 'memory.max', 'memory.swap.max'].map(async (file) =>
+          (await readFile(resolve(cgroupRoot, file), 'utf8')).trim(),
+        ),
+      );
+      if (cpuMax !== '100000 100000' || memoryMax !== '2147483648' || swapMax !== '0')
+        throw new BuilderVerificationError(['kernel-cgroup-limits']);
       await writeEvidence(resolve(output, 'builder.json'), {
         ...builderProof,
+        kernelLimits: { cpuMax, memoryMax, swapMax },
         budget: BUILD_BUDGET,
         daemonPreparationIoOutsideBuilderCaps: true,
         image: BUILDKIT_IMAGE,
@@ -392,8 +526,21 @@ async function main() {
       // 실제 정리는 아래 독립 단계에서 진행한다. 그 단계의 같은 절대 기한을 유지한다.
       clearTimeout(phaseGuard);
     }
-  } catch {
+  } catch (error) {
     failure = true;
+    const last = commands.receipts.at(-1);
+    // Only internal command labels and allowlisted codes may leave the runner.
+    process.stderr.write(
+      `${JSON.stringify({
+        event: 'LOAD_CI_BUILD_DIAGNOSTIC',
+        code: ciFailureCode(error),
+        lastStep: last?.label ?? null,
+        lastExitCode: last?.exitCode ?? null,
+        createAttempted,
+        builderIdentityVerified: builderProof !== undefined,
+        failedBuilderChecks: error instanceof BuilderVerificationError ? error.failedChecks : [],
+      })}\n`,
+    );
   } finally {
     const cleanup = async () => {
       const cleanupMs = Math.max(
@@ -420,26 +567,32 @@ async function main() {
             await native(['inspect', builderProof.id], 'builder-cleanup-identity', clean.signal),
           );
           const current = z
-            .array(z.looseObject({ Id: z.literal(builderProof.id), Name: z.literal(`/${containerName}`) }))
-            .length(1)
-            .safeParse(fresh);
-          if (!current.success) throw new Error('LOAD_BUILDER_IDENTITY_UNCONFIRMED');
-          await native(['stop', '--time', '20', builderProof.id], 'stop-owned-builder', clean.signal, 30000);
-          const stopped = z
             .array(
               z.looseObject({
                 Id: z.literal(builderProof.id),
+                Name: z.literal(`/${containerName}`),
                 State: z.looseObject({
-                  Running: z.literal(false),
-                  Pid: z.literal(0),
-                  ExitCode: z.literal(0),
+                  Running: z.literal(true),
+                  Pid: z.literal(builderProof.pid),
                   OOMKilled: z.literal(false),
                 }),
               }),
             )
             .length(1)
-            .safeParse(JSON.parse(await native(['inspect', builderProof.id], 'builder-actual-exit', clean.signal)));
-          if (!stopped.success) throw new Error('LOAD_BUILDER_EXIT_UNCONFIRMED');
+            .safeParse(fresh);
+          if (!current.success) throw new Error('LOAD_BUILDER_IDENTITY_UNCONFIRMED');
+          const stopRequestedAt = Date.now();
+          await native(
+            ['stop', '--signal', 'SIGTERM', '--time', '20', builderProof.id],
+            'stop-owned-builder',
+            clean.signal,
+            30000,
+          );
+          builderExit = verifyBuilderStopped(
+            JSON.parse(await native(['inspect', builderProof.id], 'builder-actual-exit', clean.signal)),
+            builderProof.id,
+            stopRequestedAt,
+          );
           if (
             commands.pending.size ||
             commands.stickyUnsettled ||
@@ -468,8 +621,13 @@ async function main() {
           }
         }
         builderClosed = true;
-      } catch {
-        cleanupFailures.push('BUILDER_CLEANUP_UNCONFIRMED');
+      } catch (error) {
+        const last = commands.receipts.at(-1);
+        const code = ciFailureCode(error);
+        cleanupFailures.push(code);
+        process.stderr.write(
+          `${JSON.stringify({ event: 'LOAD_CI_BUILDER_CLEANUP_DIAGNOSTIC', code, lastStep: last?.label ?? null, lastExitCode: last?.exitCode ?? null, builderExitCode: builderExit?.exitCode ?? null })}\n`,
+        );
       } finally {
         try {
           await writeEvidence(resolve(output, 'lifecycle.json'), {
@@ -478,6 +636,7 @@ async function main() {
             builderDeleted,
             createAttempted,
             builderProof: builderProof ?? null,
+            builderExit: builderExit ?? null,
             commands: commands.receipts,
             pending: commands.pending.size,
             stickyUnsettled: commands.stickyUnsettled,
@@ -506,6 +665,7 @@ async function main() {
   if (before.head !== afterBuild.head || before.sha256 !== afterBuild.sha256) throw new Error('LOAD_CI_SOURCE_CHANGED');
   const driverFailures: Error[] = [];
   let summary: ReturnType<typeof publicLoadSummary> | undefined;
+  const reportPath = resolve(root, '.load-reports', bootstrap.runId);
   try {
     await commands.run(
       process.execPath,
@@ -528,9 +688,13 @@ async function main() {
         '--source-sha256',
         before.sha256,
       ],
-      { label: 'actual-load-driver', signal, timeoutMs: CI_LIMITS.driverMs, env },
+      {
+        label: 'actual-load-driver',
+        signal,
+        timeoutMs: CI_LIMITS.driverMs + (mode === 'formal' ? LOAD_LIMITS.formalPreparationExtraMs : 0),
+        env,
+      },
     );
-    const reportPath = resolve(root, '.load-reports', bootstrap.runId);
     const rawRun: unknown = JSON.parse(await readFile(resolve(reportPath, 'run.json'), 'utf8'));
     const lifecycle: unknown = JSON.parse(await readFile(resolve(reportPath, 'lifecycle.json'), 'utf8'));
     summary = publicLoadSummary(rawRun, lifecycle);
@@ -547,6 +711,70 @@ async function main() {
       throw new Error('LOAD_CI_FINAL_UNVERIFIED');
   } catch {
     driverFailures.push(new Error('LOAD_DRIVER_OR_FINAL_EVIDENCE_FAILED'));
+    const lifecycle = await readFile(resolve(reportPath, 'lifecycle.json'), 'utf8')
+      .then(JSON.parse)
+      .catch(() => null);
+    const state = z
+      .looseObject({
+        bodyFailureStep: z
+          .string()
+          .regex(/^[a-z0-9-]{1,64}$/)
+          .nullable(),
+        bodyFailureDiagnostic: z.string().regex(helperDiagnosticPattern).nullable(),
+        bodyFailureReason: z.string().regex(bodyFailureReasonPattern).nullable(),
+        volumeInitFailure: z.string().regex(volumeInitFailurePattern).nullable(),
+        complete: z.boolean(),
+        deleted: z.boolean(),
+      })
+      .safeParse(lifecycle);
+    const worker = z
+      .object({
+        phase: z.enum(['starting', 'fixtures', 'generator', 'measurement', 'due-tail']),
+        actorsPrepared: z.int().min(0).max(218),
+        sseReady: z.int().min(0).max(100),
+        reason: z.string().regex(workerFailureReasonPattern),
+        setupRemainingMs: z.int().nullable(),
+        bodyRemainingMs: z.int().nullable(),
+        http: z
+          .object({
+            procedure: z.enum([
+              'admin.world.requestSetting',
+              'admin.world.settingRequest',
+              'general.create',
+              'general.mine',
+            ]),
+            status: z.int().min(0).max(599),
+          })
+          .nullable(),
+      })
+      .safeParse(
+        await readFile(resolve(reportPath, 'partial-artifacts/worker-failure.json'), 'utf8')
+          .then(JSON.parse)
+          .catch(() => null),
+      );
+    const report = await readFile(resolve(reportPath, 'run.json'), 'utf8')
+      .then(JSON.parse)
+      .catch(() => null);
+    const run = loadRunSchema.safeParse(report);
+    const result = run.success ? evaluateLoadRun(run.data) : null;
+    process.stderr.write(
+      `${JSON.stringify({
+        event: 'LOAD_CI_DRIVER_DIAGNOSTIC',
+        bodyFailureStep: state.success ? state.data.bodyFailureStep : null,
+        bodyFailureDiagnostic: state.success ? state.data.bodyFailureDiagnostic : null,
+        bodyFailureReason: state.success ? state.data.bodyFailureReason : null,
+        worker: worker.success ? worker.data : null,
+        volumeInitFailure: state.success ? state.data.volumeInitFailure : null,
+        complete: state.success ? state.data.complete : false,
+        deleted: state.success ? state.data.deleted : false,
+        verdict: result?.verdict ?? null,
+        invalid: result?.invalid ?? [],
+        failed: result?.failed ?? [],
+        p95Ms: result?.p95Ms ?? null,
+        maxCommitUpperBoundMs: result?.maxCommitUpperBoundMs ?? null,
+        incompleteMeasurement: run.success ? null : await partialMeasurementSummary(reportPath),
+      })}\n`,
+    );
   }
   try {
     await writeEvidence(resolve(output, 'driver-lifecycle.json'), {
@@ -581,8 +809,8 @@ async function main() {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  void main().catch(() => {
-    process.stderr.write('LOAD_CI_FAILED\n');
+  void main().catch((error: unknown) => {
+    process.stderr.write(`LOAD_CI_FAILED ${ciFailureCode(error)}\n`);
     process.exit(1);
   });
 }

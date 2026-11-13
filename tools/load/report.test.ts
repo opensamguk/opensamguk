@@ -172,6 +172,36 @@ describe('L3 리포트 순수 집계', () => {
     metric.commitObservedAt = metric.dueAt! + 10000;
     expect(evaluateLoadRun(run)).toMatchObject({ verdict: 'FAIL', failed: ['COMMIT_LAG_LIMIT'] });
   });
+  it('준비와 측정의 DB 시퀀스와 시계를 각각 대조하며 측정 지연을 보존한다', () => {
+    const run = mathematicalRun();
+    for (const row of [...run.metrics, ...run.databaseWitnesses]) row.sequence += 200;
+    for (const coverage of run.databaseCoverage) {
+      coverage.lastSequence += 200;
+      coverage.committedActionCount++;
+      const settingAppliedAt = run.warmupStartedAt - 1000;
+      coverage.preparation = { turnTermMinutes: 60, appliedRegistrations: 109, settingSequence: 200, settingAppliedAt };
+      const dueAt = settingAppliedAt - 20_000;
+      const row = { worldId: coverage.worldId, sequence: 150, tick: 1, kind: 'turn' } as const;
+      run.metrics.push({
+        ...row,
+        version: 1,
+        sampleKind: 'post-commit-upper-bound',
+        valid: true,
+        dueAt,
+        clockEpochAt: dueAt - 360,
+        lagMs: 15_000,
+        commitObservedAt: dueAt + 15_000,
+      });
+      run.databaseWitnesses.push(row);
+    }
+    expect(evaluateLoadRun(run)).toMatchObject({ verdict: 'PASS', maxCommitUpperBoundMs: 25 });
+    const metric = run.metrics[0]!;
+    metric.lagMs = 10_000;
+    metric.commitObservedAt = metric.dueAt! + 10_000;
+    expect(evaluateLoadRun(run)).toMatchObject({ verdict: 'FAIL', failed: ['COMMIT_LAG_LIMIT'] });
+    run.databaseCoverage[0]!.preparation!.settingAppliedAt = run.warmupStartedAt + 1;
+    expect(evaluateLoadRun(run)).toMatchObject({ verdict: 'INVALID', invalid: ['PREPARATION_HANDOFF_CONFLICT'] });
+  });
   it.each(['metric', 'witness', 'invalid', 'epoch', 'due', 'duplicate', 'monthly'] as const)(
     '%s누락·상충을버리지않고INVALID로남긴다',
     (kind) => {

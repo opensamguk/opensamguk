@@ -214,15 +214,41 @@ export function verifyDatabaseIdentity(
 }
 
 const initializeSecrets = `
-const fs=require('node:fs'),crypto=require('node:crypto');
-const password=crypto.randomBytes(48).toString('base64url');
-const database=process.env.LOAD_DATABASE;
-if(!/^opensamguk_load_[a-f0-9]{32}_test$/.test(database||''))process.exit(1);
-for(const name of ['app','pg','data','evidence'])fs.chmodSync('/owned/'+name,0o700);
-for(const [dir,name,value,uid] of [['app','database_url','postgresql://load:'+password+'@postgres/'+database,10001],['pg','pg_password',password,70]]){
- const path='/owned/'+dir+'/'+name;fs.writeFileSync(path,value,{flag:'wx',mode:0o600});fs.chownSync(path,uid,uid);
-}
-for(const [name,uid] of [['app',10001],['pg',70],['data',70],['evidence',10001]])fs.chownSync('/owned/'+name,uid,uid);`;
+const fs = require('node:fs'), crypto = require('node:crypto');
+const database = process.env.LOAD_DATABASE;
+if (!/^opensamguk_load_[a-f0-9]{32}_test$/.test(database || '')) process.exit(1);
+const volumes = [['app', 10001], ['pg', 70], ['data', 70], ['evidence', 10001]];
+let stage = 'verify';
+try {
+  for (const [name] of volumes) {
+    const dir = '/owned/' + name;
+    const stat = fs.lstatSync(dir);
+    if (!stat.isDirectory() || stat.uid !== 0 || stat.gid !== 0 || fs.readdirSync(dir).length !== 0)
+      throw Object.assign(new Error(), {code: 'VOLUME_NOT_FRESH'});
+  }
+  stage = 'permissions';
+  for (const [name] of volumes) fs.chmodSync('/owned/' + name, 0o700);
+  stage = 'secrets';
+  const password = crypto.randomBytes(48).toString('base64url');
+  for (const [dir, name, value, uid] of [
+    ['app', 'database_url', 'postgresql://load:' + password + '@postgres/' + database, 10001],
+    ['pg', 'pg_password', password, 70],
+  ]) {
+    const path = '/owned/' + dir + '/' + name;
+    fs.writeFileSync(path, value, {flag: 'wx', mode: 0o600});
+    fs.chownSync(path, uid, uid);
+  }
+  stage = 'ownership';
+  for (const [name, uid] of volumes) fs.chownSync('/owned/' + name, uid, uid);
+  process.stdout.write('READY');
+} catch (error) {
+  const code = ['EACCES', 'EPERM', 'ENOENT', 'EEXIST', 'EROFS', 'VOLUME_NOT_FRESH'].includes(error?.code) ? error.code : 'OTHER';
+  process.stdout.write(stage + ':' + code);
+}`;
+export const volumeInitFailurePattern =
+  /^(UNCLASSIFIED|(verify|permissions|secrets|ownership):(EACCES|EPERM|ENOENT|EEXIST|EROFS|OTHER|VOLUME_NOT_FRESH))$/;
+export const bodyFailureReasonPattern =
+  /^LOAD_(SETUP_DEADLINE_EXCEEDED|GENERATOR_FAILED|GENERATOR_PHASE_INVALID|OBSERVER_FAILED|RUNTIME_RESOURCE_EXHAUSTED|NATIVE_COMMAND_FAILED|NATIVE_CHILD_UNSETTLED|BODY_FAILED)$/;
 
 async function main(): Promise<number> {
   const { values } = parseArgs({
@@ -350,15 +376,17 @@ async function main(): Promise<number> {
   const postgresImage = dictionary(pgImages[0]).Id;
   if (typeof postgresImage !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(postgresImage))
     throw new Error('LOAD_POSTGRES_IMAGE_MISSING');
+  const preparationExtraMs = mode === 'formal' ? LOAD_LIMITS.formalPreparationExtraMs : 0;
+  const bodyMs = LOAD_LIMITS.bodyMs + preparationExtraMs;
   const bodyStartedAt = Date.now(),
-    bodyDeadline = bodyStartedAt + LOAD_LIMITS.bodyMs;
-  const setupDeadline = bodyStartedAt + LOAD_LIMITS.setupMs;
-  const bodyTimer = setTimeout(stop, LOAD_LIMITS.bodyMs);
+    bodyDeadline = bodyStartedAt + bodyMs;
+  const setupDeadline = bodyStartedAt + LOAD_LIMITS.setupMs + preparationExtraMs;
+  const bodyTimer = setTimeout(stop, bodyMs);
   // 취소를 처리하지 못하는 커널/파일 IO도 유한하게 끝낸다. 이 경로는 정착·삭제 성공을 주장하지 않는다.
   const hardTimer = setTimeout(() => {
     process.stderr.write('LOAD_LIFECYCLE_UNSETTLED_MANUAL_REVIEW_REQUIRED\n');
     process.exit(1);
-  }, LOAD_LIMITS.bodyMs + LOAD_LIMITS.cleanupMs);
+  }, bodyMs + LOAD_LIMITS.cleanupMs);
   const env = {
     ...process.env,
     LOAD_IMAGE: image,
@@ -391,7 +419,8 @@ async function main(): Promise<number> {
   const observer = new AbortController();
   const observations: LoadRun['environment']['observations'] = [];
   let sourceUnchanged = false,
-    finalVerdict = 'INVALID';
+    finalVerdict = 'INVALID',
+    volumeInitFailure: string | null = null;
   const recordedParents = new Set<string>();
   const verifyActiveParent = async (row: Container, ownSignal: AbortSignal) => {
     ownSignal.throwIfAborted();
@@ -482,7 +511,16 @@ async function main(): Promise<number> {
     } else assertContainerLimits([row], mode, image, postgresImage);
     await verifyActiveParent(row, signal);
     signal.throwIfAborted();
-    await invoke(['exec', ...(workdir ? ['--workdir', workdir] : []), id, ...command], 'execute');
+    // An exec process gets the container's configured environment, without the entrypoint's secret export.
+    const entrypoint = role === 'initialize' ? [] : ['/app/deploy/entrypoint.sh'];
+    const executed = await invoke(
+      ['exec', ...(workdir ? ['--workdir', workdir] : []), id, ...entrypoint, ...command],
+      'execute',
+    );
+    if (role === 'initialize' && executed !== 'READY') {
+      volumeInitFailure = volumeInitFailurePattern.test(executed) ? executed : 'UNCLASSIFIED';
+      throw new Error('LOAD_VOLUME_INIT_UNCONFIRMED');
+    }
     signal.throwIfAborted();
     await invoke(['stop', '--time', '1', id], 'stop');
     const stopped: unknown = JSON.parse(await invoke(['inspect', id], 'exit-proof'));
@@ -549,6 +587,9 @@ async function main(): Promise<number> {
     );
   };
   const failures: Error[] = [];
+  let bodyFailureStep: string | undefined;
+  let bodyFailureDiagnostic: string | undefined;
+  let bodyFailureReason: string | undefined;
   try {
     const collisions = await native(
       ['ps', '-aq', '--filter', `label=com.docker.compose.project=${project}`],
@@ -610,7 +651,7 @@ async function main(): Promise<number> {
         'node',
         ...volumes.flatMap((name) => [
           '--mount',
-          `type=volume,src=${project}_${name},dst=/owned/${{ 'pg-data': 'data', 'pg-secrets': 'pg', 'app-secrets': 'app', evidence: 'evidence' }[name]}`,
+          `type=volume,src=${project}_${name},dst=/owned/${{ 'pg-data': 'data', 'pg-secrets': 'pg', 'app-secrets': 'app', evidence: 'evidence' }[name]},volume-nocopy`,
         ]),
         '-e',
         `LOAD_DATABASE=${databaseName}`,
@@ -819,7 +860,17 @@ async function main(): Promise<number> {
     finalVerdict = report.verdict;
     succeeded = finalVerdict === 'PASS' || finalVerdict === 'SMOKE_ONLY';
     complete = true;
-  } catch {
+  } catch (error) {
+    const last =
+      commands.receipts.findLast((row) => row.failed || (row.exitCode !== null && row.exitCode !== 0)) ??
+      commands.receipts.at(-1);
+    bodyFailureStep = last?.label;
+    bodyFailureDiagnostic = last?.diagnostic;
+    bodyFailureReason = observeFailure
+      ? 'LOAD_OBSERVER_FAILED'
+      : error instanceof Error && bodyFailureReasonPattern.test(error.message)
+        ? error.message
+        : 'LOAD_BODY_FAILED';
     failures.push(new Error('LOAD_BODY_FAILED'));
   }
   {
@@ -978,6 +1029,10 @@ async function main(): Promise<number> {
             !commands.stickyUnsettled &&
             (deleted || values.keep === true),
           verdict: finalVerdict,
+          bodyFailureStep: bodyFailureStep ?? null,
+          bodyFailureDiagnostic: bodyFailureDiagnostic ?? null,
+          bodyFailureReason: bodyFailureReason ?? null,
+          volumeInitFailure,
           sourceUnchanged,
           ownershipMatches,
           databaseOidMatches,

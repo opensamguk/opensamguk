@@ -7,6 +7,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 COPY . .
 RUN pnpm install --frozen-lockfile && pnpm generate
 
+# The isolated load runner invokes the source and generated Prisma client directly.
+FROM dependencies AS load-runtime
+ARG SOURCE_REVISION
+ARG SOURCE_TREE_SHA256
+RUN node -e 'if(!/^[a-f0-9]{40}$/.test(process.argv[1])||!/^[a-f0-9]{64}$/.test(process.argv[2]))process.exit(1)' "$SOURCE_REVISION" "$SOURCE_TREE_SHA256" \
+    && groupadd --gid 10001 opensamguk \
+    && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin opensamguk \
+    && install -d -o 10001 -g 10001 -m 0700 /run/secrets \
+    && chmod 0555 /app/deploy/entrypoint.sh
+LABEL org.opencontainers.image.revision="$SOURCE_REVISION" \
+      org.opensamguk.source-tree-sha256="$SOURCE_TREE_SHA256"
+ENV NODE_ENV=production
+ENV OPENSAMGUK_RESOURCES_ROOT=/app/resources
+USER 10001:10001
+ENTRYPOINT ["/app/deploy/entrypoint.sh"]
+
 FROM dependencies AS public-build
 RUN pnpm build:public
 

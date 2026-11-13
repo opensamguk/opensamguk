@@ -3,6 +3,8 @@ import { z } from 'zod';
 import type { AppRouter } from '../../apps/server/src/router';
 
 type Procedures = {
+  'admin.world.requestSetting': AppRouter['admin']['world']['requestSetting'];
+  'admin.world.settingRequest': AppRouter['admin']['world']['settingRequest'];
   'general.create': AppRouter['general']['create'];
   'general.mine': AppRouter['general']['mine'];
   'home.get': AppRouter['home']['get'];
@@ -21,7 +23,12 @@ type Procedures = {
 export type LoadProcedure = keyof Procedures;
 export type LoadInput<P extends LoadProcedure> = Procedures[P]['_def']['$types']['input'];
 export type LoadOutput<P extends LoadProcedure> = Procedures[P]['_def']['$types']['output'];
-const mutations: ReadonlySet<LoadProcedure> = new Set(['general.create', 'turns.set', 'message.send']);
+const mutations: ReadonlySet<LoadProcedure> = new Set([
+  'admin.world.requestSetting',
+  'general.create',
+  'turns.set',
+  'message.send',
+]);
 const envelope = z.object({ result: z.object({ data: z.unknown() }).optional(), error: z.unknown().optional() });
 
 export function loadOrigin(value: string): string {

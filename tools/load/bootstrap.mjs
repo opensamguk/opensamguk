@@ -170,12 +170,22 @@ export function assertBootstrapScope(value) {
     throw new Error('LOAD_INSTALL_SCOPE_UNVERIFIED');
 }
 
-async function workerAncestor() {
-  let pid = process.ppid;
+export async function workerAncestor(
+  pid = process.ppid,
+  { readStat = (path) => readFile(path, 'utf8'), readExecutable = readlink } = {},
+) {
   const visited = new Set();
   for (let depth = 0; pid > 1 && depth < 32 && !visited.has(pid); depth++) {
     visited.add(pid);
-    const [stat, executable] = await Promise.all([readFile(`/proc/${pid}/stat`, 'utf8'), readlink(`/proc/${pid}/exe`)]);
+    const [stat, executable] = await Promise.all([
+      readStat(`/proc/${pid}/stat`),
+      readExecutable(`/proc/${pid}/exe`).catch((error) => {
+        // The unprivileged installer can follow a root intermediary's PPID even when it cannot read its executable.
+        if (error?.code === 'EACCES' || error?.code === 'EPERM') return '';
+        throw error;
+      }),
+    ]);
+    // An accessible executable in the actual parent chain is still required to identify Runner.Worker.
     if (/\/bin\/Runner\.Worker$/.test(executable)) return true;
     const parent = /^\d+ \(.+\) \S (\d+) /.exec(stat)?.[1];
     if (!parent) return false;

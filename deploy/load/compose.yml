@@ -13,8 +13,8 @@ x-app: &app
   stop_grace_period: 20s
   networks: [backend]
   volumes:
-    - app-secrets:/run/secrets:ro
-    - evidence:/evidence
+    - { type: volume, source: app-secrets, target: /run/secrets, read_only: true, volume: { nocopy: true } }
+    - { type: volume, source: evidence, target: /evidence, volume: { nocopy: true } }
   labels:
     org.opensamguk.load.run: ${LOAD_RUN_ID:?}
   logging:
@@ -41,8 +41,8 @@ services:
       POSTGRES_DB: ${LOAD_DATABASE:?}
       POSTGRES_PASSWORD_FILE: /run/secrets/pg_password
     volumes:
-      - pg-data:/var/lib/postgresql
-      - pg-secrets:/run/secrets:ro
+      - { type: volume, source: pg-data, target: /var/lib/postgresql, volume: { nocopy: true } }
+      - { type: volume, source: pg-secrets, target: /run/secrets, read_only: true, volume: { nocopy: true } }
     networks: [backend]
     restart: 'no'
     stop_grace_period: 30s
@@ -63,7 +63,8 @@ services:
     command: [node, --import, tsx, tools/load/server.ts]
     environment:
       LOAD_RUN_ID: ${LOAD_RUN_ID:?}
-      NODE_ENV: production
+      # The isolated service uses its private HTTP origin and requires verified accounts.
+      NODE_ENV: test
       CAPACITY_MONITOR_ENABLED: '0'
     ports: ['127.0.0.1::3001']
     healthcheck:
