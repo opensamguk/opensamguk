@@ -1,0 +1,45 @@
+import type { WorldView } from '../model/world';
+
+export const COMBAT_SPECIALTY_FEATURE = 'combat-specialty-v1';
+
+type Specialty = {
+  description: string;
+  armType?: number;
+  dealt?: readonly [attacking: number, defending: number];
+  taken?: readonly [attacking: number, defending: number];
+  wallDamage?: number;
+  regional?: boolean;
+  avoid?: number;
+};
+
+const specialties: Readonly<Record<string, Specialty>> = {
+  보병: {
+    description: '보병 징·모병비 10% 감소, 공격 시 받는 피해 10% 감소, 수비 시 20% 감소',
+    armType: 1,
+    taken: [0.9, 0.8],
+  },
+  궁병: { description: '궁병 징·모병비 10% 감소, 회피 확률 20%p 증가', armType: 2, avoid: 0.2 },
+  기병: {
+    description: '기병 징·모병비 10% 감소, 공격 피해 20% 증가, 수비 중 가하는 피해 10% 증가',
+    armType: 3,
+    dealt: [1.2, 1.1],
+  },
+  귀병: { description: '귀병 징·모병비 10% 감소, 귀병 숙련 가산', armType: 4 },
+  공성: { description: '차병 징·모병비 10% 감소, 성벽에 가하는 피해 100% 증가', armType: 5, wallDamage: 2 },
+  견고: { description: '받는 피해 10% 감소', taken: [0.9, 0.9] },
+  돌격: { description: '공격 피해 5% 증가', dealt: [1.05, 1] },
+  척사: {
+    description: '지역 제한 병종 상대 피해 20% 증가, 받는 피해 20% 감소',
+    dealt: [1.2, 1.2],
+    taken: [0.8, 0.8],
+    regional: true,
+  },
+};
+
+export function combatSpecialty(view: Pick<WorldView, 'ruleFeatures'>, key: string | null | undefined) {
+  const name = key?.replace(/^che_/, '');
+  if (!view.ruleFeatures?.includes(COMBAT_SPECIALTY_FEATURE) || !name || !Object.hasOwn(specialties, name))
+    return undefined;
+  return { name, ...specialties[name]! };
+}
+export type CombatSpecialty = NonNullable<ReturnType<typeof combatSpecialty>>;

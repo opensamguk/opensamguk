@@ -28,7 +28,7 @@ const recruits = (forced: boolean) =>
       if (general.crew + args.amount > general.leadership * BALANCE.CREW_PER_LEADERSHIP)
         return fail('AT_MAX', '통솔 가능한 병력을 넘습니다.');
       if (city.population < args.amount) return fail('NO_POPULATION', '도시 인구가 부족합니다.');
-      const cost = recruitCost(view, general, args.amount, unit.cost, forced);
+      const cost = recruitCost(view, general, args.amount, unit.cost, forced, unit.armType);
       if (general.gold < cost) return fail('NO_GOLD', '금이 부족합니다.');
       return null;
     },
@@ -36,7 +36,7 @@ const recruits = (forced: boolean) =>
       const general = state.generals[actor.generalId]!;
       const city = state.cities[general.cityKey]!;
       const unit = actor.unitSet!.crewTypes.find((unit) => unit.id === args.crewType)!;
-      general.gold -= recruitCost(state, general, args.amount, unit.cost, forced);
+      general.gold -= recruitCost(state, general, args.amount, unit.cost, forced, unit.armType);
       general.train = Math.floor((general.train * general.crew) / (general.crew + args.amount));
       general.atmos = Math.floor((general.atmos * general.crew) / (general.crew + args.amount));
       general.crew += args.amount;

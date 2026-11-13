@@ -3,6 +3,7 @@ import { nextTurnAt, turnSchedule, readWorld, requireGeneral, worldClock, worldI
 import { cityInfo, ownGeneralInfo, logInfo, logSelect, nationInfo } from '../visibility';
 import {
   GENERAL_CONDITION_FEATURE,
+  combatSpecialty,
   personalityEffects,
   domesticSpecialty,
   GENERAL_PROFICIENCY_FEATURE,
@@ -137,6 +138,7 @@ export const homeRouter = router({
 
           personalityEffects: personalityEffects(world, general.personality) ?? null,
           domesticSpecialty: domesticSpecialty(world, general.special) ?? null,
+          combatSpecialty: combatSpecialty(world, general.special) ?? null,
           ...(unitSet
             ? {
                 proficiency: Object.entries(unitSet.armTypes)

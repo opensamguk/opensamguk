@@ -1,3 +1,4 @@
+import { combatSpecialty } from '../general/combatSpecialty';
 import { personalityEffects } from '../general/personality';
 import { BALANCE } from '../balance';
 import { FIVE_STAT_KEYS, fiveStatsSchema, type FiveStats } from '../general/fiveStats';
@@ -46,15 +47,19 @@ export function recruitCost(
   amount: number,
   unitCost: number,
   forced: boolean,
+  armType?: number,
 ): number {
   const stats = commandFiveStats(view, general);
   const rate = personalityEffects(view, general.personality)?.recruitPercent;
-  if (rate === undefined) {
+  const specialty = combatSpecialty(view, general.special);
+  const discount = armType !== undefined && specialty?.armType === armType ? 90 : undefined;
+  if (rate === undefined && discount === undefined) {
     if (forced) return Math.ceil(amount * unitCost * BALANCE.CONSCRIPT_COST_FACTOR);
     return stats ? Math.ceil((amount * unitCost * (250 - stats.charm)) / 200) : Math.ceil(amount * unitCost);
   }
   const factor = forced ? BALANCE.CONSCRIPT_COST_FACTOR : stats ? (250 - stats.charm) / 200 : 1;
-  return Math.ceil((amount * unitCost * factor * rate) / 100);
+  const cost = (amount * unitCost * factor * (rate ?? 100)) / 100;
+  return Math.ceil(discount === undefined ? cost : (cost * discount) / 100);
 }
 
 export function drillGain(view: WorldView, general: General, morale: boolean): number {
@@ -64,12 +69,18 @@ export function drillGain(view: WorldView, general: General, morale: boolean): n
   return 8 + Math.floor(score / 25);
 }
 
-export function affordableRecruits(view: WorldView, general: General, unitCost: number, limit: number): number {
+export function affordableRecruits(
+  view: WorldView,
+  general: General,
+  unitCost: number,
+  limit: number,
+  armType?: number,
+): number {
   let low = 0;
   let high = Math.floor(limit);
   while (low < high) {
     const amount = Math.ceil((low + high) / 2);
-    if (recruitCost(view, general, amount, unitCost, false) <= general.gold) low = amount;
+    if (recruitCost(view, general, amount, unitCost, false, armType) <= general.gold) low = amount;
     else high = amount - 1;
   }
   return low;

@@ -1,3 +1,4 @@
+import { combatSpecialty } from '../general/combatSpecialty';
 import type { Rng } from '@opensamguk/shared';
 import { personalityEffects } from '../general/personality';
 import { BALANCE } from '../balance';
@@ -193,8 +194,10 @@ export function generalTurnCandidates(view: WorldView, general: General, context
     if (!cityResources && troops < minimum && unit) {
       const limit = Math.min(capacity - commanded, city.population);
       const amount =
-        stats || personalityEffects(view, general.personality)?.recruitPercent !== undefined
-          ? affordableRecruits(view, general, unit.cost, limit)
+        stats ||
+        personalityEffects(view, general.personality)?.recruitPercent !== undefined ||
+        combatSpecialty(view, general.special)?.armType === unit.armType
+          ? affordableRecruits(view, general, unit.cost, limit, unit.armType)
           : Math.min(limit, Math.floor(general.gold / unit.cost));
       if (amount > 0)
         choice.add(

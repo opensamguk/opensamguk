@@ -1,3 +1,4 @@
+import type { CombatSpecialty } from '../general/combatSpecialty';
 import type { Rng } from '@opensamguk/shared';
 import { proficiencyDamageFactor, type GeneralProficiency } from '../general/proficiency';
 import { BALANCE } from '../balance';
@@ -24,6 +25,8 @@ export type BattleInput = {
   defenderReadiness?: { train?: number; morale?: number } | undefined;
   attackerProficiency?: Readonly<GeneralProficiency> | undefined;
   defenderProficiency?: Readonly<GeneralProficiency> | undefined;
+  attackerSpecialty?: CombatSpecialty | undefined;
+  defenderSpecialty?: CombatSpecialty | undefined;
 };
 
 type Unit = DeepReadonly<UnitSetResource['crewTypes'][number]>;
@@ -38,6 +41,12 @@ function coefficient(table: Unit['attackCoef'], target: Unit, idFirst: boolean) 
   // 기존 월드는 사용자 병종의 ID 계수도 당시처럼 건너뛴다.
   return (idFirst ? values[String(target.id)] : undefined) ?? values[String(target.armType)] ?? 1;
 }
+function regionalUnit(unit: Unit) {
+  return unit.requirements?.some(
+    ({ kind }) => kind === 'regions' || kind === 'legacyCheRegions' || kind === 'cities' || kind === 'citiesWithLevel',
+  );
+}
+
 function damage(a: BattleForce, b: BattleForce, input: BattleInput, rng: Rng, attackingSide: boolean, scale = 1) {
   const { unitSet } = input;
   const attacking = unit(unitSet, a.crewType),
@@ -69,11 +78,28 @@ function damage(a: BattleForce, b: BattleForce, input: BattleInput, rng: Rng, at
     attacking.armType !== 0
   )
     power *= attackingSide ? 1.02 : 0.97;
+  const attackTrait = attackingSide ? input.attackerSpecialty : input.defenderSpecialty;
+  const defenseTrait = attackingSide ? input.defenderSpecialty : input.attackerSpecialty;
+  if (attackTrait && (!attackTrait.regional || regionalUnit(defending))) {
+    power *= attackTrait.dealt?.[attackingSide ? 0 : 1] ?? 1;
+    if (defending.armType === 0) power *= attackTrait.wallDamage ?? 1;
+  }
+  if (defenseTrait && (!defenseTrait.regional || regionalUnit(attacking))) {
+    power *= defenseTrait.taken?.[attackingSide ? 1 : 0] ?? 1;
+  }
   if (input.attackerProficiency || input.defenderProficiency) {
     const attack = attackingSide ? input.attackerProficiency : input.defenderProficiency;
     const defense = attackingSide ? input.defenderProficiency : input.attackerProficiency;
     const armType = attacking.armType === 0 ? 5 : attacking.armType;
-    power *= proficiencyDamageFactor(attack?.[armType] ?? 0, defense?.[armType] ?? 0);
+    const attackBonus =
+      attackTrait?.armType && armType === (attackingSide ? defending.armType : attacking.armType)
+        ? (attack?.[attackTrait.armType] ?? 0)
+        : 0;
+    const defenseBonus =
+      defenseTrait?.armType && armType === (attackingSide ? defending.armType : attacking.armType)
+        ? (defense?.[defenseTrait.armType] ?? 0)
+        : 0;
+    power *= proficiencyDamageFactor((attack?.[armType] ?? 0) + attackBonus, (defense?.[armType] ?? 0) + defenseBonus);
   }
   power *= scale;
   const attackerModifiers = attackingSide ? input.attackerModifiers : input.defenderModifiers;
@@ -130,8 +156,16 @@ export function simulateBattle(input: BattleInput, rng: Rng): BattleResult {
       result.phases?.push({ kind: 'hold', attackerLoss: 0, defenderLoss: 0 });
       continue;
     }
-    const avoidAttacker = aUnit.effects?.includes('avoid') && rng.next() < aUnit.avoid / 100;
-    const avoidDefender = bUnit.effects?.includes('avoid') && rng.next() < bUnit.avoid / 100;
+    const attackerAvoidBonus = input.attackerSpecialty?.avoid ?? 0;
+    const defenderAvoidBonus = input.defenderSpecialty?.avoid ?? 0;
+    const attackerCanAvoid = aUnit.effects?.includes('avoid');
+    const defenderCanAvoid = bUnit.effects?.includes('avoid');
+    const avoidAttacker =
+      (attackerCanAvoid || attackerAvoidBonus > 0) &&
+      rng.next() < (attackerCanAvoid ? aUnit.avoid / 100 : 0) + attackerAvoidBonus;
+    const avoidDefender =
+      (defenderCanAvoid || defenderAvoidBonus > 0) &&
+      rng.next() < (defenderCanAvoid ? bUnit.avoid / 100 : 0) + defenderAvoidBonus;
     // 양쪽 피해는 같은 페이즈 시작 상태로 계산하고 동시에 적용한다.
     const toDefender = damage(attacker, defender, input, rng, true, avoidDefender ? 1 / 6 : 1),
       toAttacker = damage(defender, attacker, input, rng, false, avoidAttacker ? 1 / 6 : 1);

@@ -60,7 +60,7 @@ export function commandStatPreview(
     const unit = actor.unitSet?.crewTypes.find((row) => row.id === parsed.data.crewType && row.armType > 0);
     if (!unit) return null;
     if (crewTypeFailure(unit, crewContext(view, actor))) return null;
-    return { goldCost: recruitCost(view, general, parsed.data.amount, unit.cost, key === 'conscript') };
+    return { goldCost: recruitCost(view, general, parsed.data.amount, unit.cost, key === 'conscript', unit.armType) };
   }
   return null;
 }
