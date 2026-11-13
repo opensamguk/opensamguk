@@ -18,6 +18,10 @@ export async function persistPublicNationEvents(
       const title = nationRank(nation.level)?.title;
       if (title) data.push({ kind: 'promotion', text: `${nation.name} 작위 승급 · ${title}` });
     }
+    if (prior && nation.capitalCityKey !== null && prior.capitalCityKey !== nation.capitalCityKey) {
+      const capital = next.cities[nation.capitalCityKey];
+      if (capital) data.push({ kind: 'capital', text: `${nation.name} ${capital.name} 천도` });
+    }
   }
   for (const nation of Object.values(before.nations)) {
     if (!next.nations[nation.id]) data.push({ kind: 'fall', text: `${nation.name} 멸망` });

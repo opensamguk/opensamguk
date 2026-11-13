@@ -317,6 +317,9 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
       expect(events.filter((event) => event.includes('천도'))).toEqual([
         `${initial.nations[1]!.name} 수도 함락, 도시3 천도`,
       ]);
+      expect(await db.publicNationEvent.findMany({ where: { worldId, tick: 100, kind: 'capital' } })).toEqual([
+        expect.objectContaining({ text: `${initial.nations[1]!.name} 도시3 천도` }),
+      ]);
       const counterattackSequence = (await db.world.findUniqueOrThrow({ where: { id: worldId } })).actionSequence + 1;
       await loop.advanceTo(200);
       expect(
