@@ -180,11 +180,11 @@ async function existingRows(client: PgClient) {
       table === 'World'
         ? "to_jsonb(t) - 'treatyFormat' - 'personnelFormat' - 'replayFormat' - 'ruleFeatures' - 'operationalMap' - 'campaignState' - 'cityResourcesState' - 'logisticsState' - 'governanceState' - 'lineageState' - 'stratagemCardsState' - 'equipmentState' - 'runtimeOptions' - 'cityRuinsState' - 'nationStrategyState' - 'nationLifecycleState' - 'preparedTurnsState' - 'nationResearchState' - 'officeEffects'"
         : table === 'Nation'
-          ? "to_jsonb(t) - 'noticeDirective'"
+          ? "to_jsonb(t) - 'noticeDirective' - 'diplomaticAidUntilMonth' - 'recruitmentNotice'"
           : table === 'City'
-            ? "to_jsonb(t) - 'kind'"
+            ? "to_jsonb(t) - 'kind' - 'seasonalEvent' - 'conflictTick' - 'stratagemTick'"
             : table === 'General'
-              ? "to_jsonb(t) - 'residenceTick' - 'politics' - 'charm' - 'sex' - 'removedAt' - 'officerCityKey'"
+              ? "to_jsonb(t) - 'residenceTick' - 'politics' - 'charm' - 'sex' - 'removedAt' - 'officerCityKey' - 'stratagemSuccesses' - 'nationJoinedTick'"
               : "to_jsonb(t) - 'treatyFormat'";
     rows[table] = (await client.query(`SELECT ${data} AS data FROM "${table}" t ORDER BY to_jsonb(t)::text`)).rows;
   }
@@ -511,6 +511,10 @@ it.each(['empty', 'legacy'] as const)(
         HeritageAccount: [],
         HeritageEntry: [],
         ReputationEvent: [],
+        PublicNationEvent: [],
+        GeneralBattleStats: [],
+        DiplomaticDocument: [],
+        DiplomaticDelegate: [],
         MonthlyReview: [],
         MapBackground: [],
         SeasonGeneral: [],
