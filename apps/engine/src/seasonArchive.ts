@@ -1,6 +1,28 @@
 import type { Prisma } from '@opensamguk/db';
 import { publicNationPower, type WorldState } from '@opensamguk/rules';
 
+export function activeSeasonGenerals(state: WorldState, year: number) {
+  return Object.values(state.generals).filter(
+    (general) => general.removedAt === undefined && general.activeFromYear <= year,
+  );
+}
+
+export function seasonTraitDistribution(state: WorldState, year: number) {
+  const counts = (values: (string | null)[]) => {
+    const totals = new Map<string, number>();
+    for (const value of values) if (value) totals.set(value, (totals.get(value) ?? 0) + 1);
+    return [...totals]
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'ko'));
+  };
+  const generals = activeSeasonGenerals(state, year);
+  return {
+    philosophies: counts(Object.values(state.nations).map(({ philosophy }) => philosophy)),
+    personalities: counts(generals.map(({ personality }) => personality)),
+    specialties: counts(generals.map(({ special }) => special)),
+  };
+}
+
 export function seasonWinnerSummary(
   state: WorldState,
   nationId: number,
@@ -12,10 +34,7 @@ export function seasonWinnerSummary(
     level: nation.level,
     philosophy: nation.philosophy,
     cities: cities.length,
-    generals: Object.values(state.generals).filter(
-      (general) =>
-        general.nationId === nationId && general.removedAt === undefined && general.activeFromYear <= at.year,
-    ).length,
+    generals: activeSeasonGenerals(state, at.year).filter((general) => general.nationId === nationId).length,
     power: publicNationPower(state, nationId, at),
     population: cities.reduce((sum, city) => sum + city.population, 0),
     populationMax: cities.reduce((sum, city) => sum + city.populationMax, 0),

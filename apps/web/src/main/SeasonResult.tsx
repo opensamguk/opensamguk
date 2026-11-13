@@ -89,6 +89,8 @@ function SeasonGenerals({ winnerNationId }: { winnerNationId: number | null }) {
   const winner = merit.data?.winnerSummary;
   const statistics = query.data?.statistics;
   const n = (value: number) => value.toLocaleString('ko-KR');
+  const formatTraits = (rows: { name: string; count: number }[]) =>
+    rows.map(({ name, count }) => `${name} ${n(count)}`).join(' · ') || '—';
   return (
     <div className={styles.generals} data-testid="season-generals">
       {statistics ? (
@@ -101,10 +103,16 @@ function SeasonGenerals({ winnerNationId }: { winnerNationId: number | null }) {
                 label: '최종 장수 수',
                 value: n(statistics.final.generals),
               },
-              {
-                label: '소속 장수 최대 수 (월간 기록)',
-                value: n(statistics.peak.affiliatedGenerals),
-              },
+              statistics.peak.generals === undefined
+                ? { label: '소속 장수 최대 수 (월간 기록)', value: n(statistics.peak.affiliatedGenerals) }
+                : { label: '전체 장수 최대 수 (월간 기록)', value: n(statistics.peak.generals) },
+              ...(statistics.traits
+                ? [
+                    { label: '국가 성향 분포', value: formatTraits(statistics.traits.philosophies) },
+                    { label: '장수 성격 분포', value: formatTraits(statistics.traits.personalities) },
+                    { label: '장수 특기 분포', value: formatTraits(statistics.traits.specialties) },
+                  ]
+                : []),
               ...(statistics.nationNames.length
                 ? [{ label: '등장 국가', value: statistics.nationNames.join(' · ') }]
                 : []),

@@ -8,6 +8,7 @@ import { HERITAGE_BENEFIT_KIND } from './benefits';
 import { TROOP_ACTION_KIND } from '../commands/ext/troop/actions';
 import { DEFENSE_STANCE_KIND } from '../battle/defenders';
 import { NPC_NATION_POLICY_KIND } from '../npc/policy';
+import { NATION_FINANCE_KIND } from '../personnel/financeRates';
 import { NATION_RESTRICTIONS_KIND } from '../personnel/nationRestrictions';
 
 export const HERITAGE_DIRECT_INPUT_KINDS = [
@@ -39,6 +40,7 @@ export const HERITAGE_IGNORED_INPUT_KINDS = [
   HERITAGE_BENEFIT_KIND,
   NPC_NATION_POLICY_KIND,
   NATION_RESTRICTIONS_KIND,
+  NATION_FINANCE_KIND,
   ...ADMIN_CLOCK_KINDS,
   ADMIN_END_KIND,
   ADMIN_RESET_KIND,

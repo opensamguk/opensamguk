@@ -33,7 +33,8 @@ vi.mock('../trpc', () => ({
               result: null,
               statistics: {
                 final: { nations: 2, generals: 7 },
-                peak: { nations: 5, affiliatedGenerals: 12 },
+                peak: { nations: 5, affiliatedGenerals: 12, generals: 14 },
+                traits: { philosophies: [{ name: '법가', count: 2 }], personalities: [], specialties: [] },
                 nationNames: ['위', '촉'],
               },
               generals: [...season.rows]
@@ -161,7 +162,8 @@ describe('기수 결과 칸 최종 장수 순위', () => {
     fireEvent.click(screen.getByText('기수 통계'));
     expect(screen.getByText('최종 2 · 최대 5')).toBeTruthy();
     expect(screen.getByText('최종 장수 수')).toBeTruthy();
-    expect(screen.getByText('소속 장수 최대 수 (월간 기록)')).toBeTruthy();
+    expect(screen.getByText('전체 장수 최대 수 (월간 기록)')).toBeTruthy();
+    expect(screen.getByText('법가 2')).toBeTruthy();
     expect(screen.getByText('위 · 촉')).toBeTruthy();
   });
 });

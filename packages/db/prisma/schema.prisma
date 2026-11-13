@@ -321,6 +321,7 @@ model WorldResult {
   winnerName       String?
   winnerColor      String?
   winnerSummary    Json?
+  traitDistribution Json?
   endedYear        Int
   endedMonth       Int
   endedTick        Int
@@ -1014,6 +1015,7 @@ model YearbookSnapshot {
   sequence  Int
   data      Json
   stateHash String
+  activeGenerals Int?
   world     World            @relation(fields: [worldId], references: [id], onDelete: Cascade)
   nations   YearbookNation[]
 
