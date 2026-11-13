@@ -1,5 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import {
+  BALANCE,
   DIPLOMATIC_COOLDOWN_FEATURE,
   INTEL_FEATURE,
   NATION_STRATEGY_FEATURE,
@@ -9,6 +10,7 @@ import {
   TICKS_PER_MONTH,
   WANDERING_MONTH_LIMIT,
   diplomaticAidMonths,
+  nationTurnCandidates,
   nowTick,
   parsePreset,
   readStoredNationStrategy,
@@ -39,8 +41,10 @@ export const nationRouter = router({
       const generals = await tx.general.findMany({ where: input, orderBy: { id: 'asc' } });
       const needsOfficeEffects =
         ownNation && world.status !== 'ENDED' && world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE);
+      const showNpcOrders = ownNation && viewer?.officerLevel === BALANCE.RULER_LEVEL && world.status !== 'ENDED';
       const state =
         needsOfficeEffects ||
+        showNpcOrders ||
         world.ruleFeatures.some((feature) => ['campaign-v1', 'nation-lifecycle-v1'].includes(feature))
           ? await readView(tx, input.worldId)
           : undefined;
@@ -60,6 +64,7 @@ export const nationRouter = router({
         ownNation && world.ruleFeatures.includes(DIPLOMATIC_COOLDOWN_FEATURE) && world.status !== 'ENDED'
           ? { remainingMonths: diplomaticAidMonths(nation, strategyMonth(nowTick(worldClock(world), ctx.now))) }
           : undefined;
+      const npcOrders = showNpcOrders && state ? await readNpcOrders(state) : undefined;
       return {
         ...(lifecycle
           ? {
@@ -82,6 +87,7 @@ export const nationRouter = router({
               salaryRate,
               npcPolicy: {
                 ...NPC_DEFAULT_POLICY,
+                ...(npcOrders ? { nationOrders: npcOrders } : {}),
                 aggression: world.preset === null ? 1 : parsePreset(world.preset).npc.aggression,
               },
             }
@@ -98,6 +104,28 @@ export const nationRouter = router({
           garrisonGeneralInfo(general, viewer, units, { stats: openRoster, biography: openRoster }),
         ),
       };
+
+      async function readNpcOrders(view: NonNullable<typeof state>) {
+        const stored = await requireWorld(tx, input.worldId);
+        const { resolver } = worldResolver(stored);
+        const ruler = view.generals[viewer!.id];
+        if (!ruler) return [];
+        const candidates = nationTurnCandidates(view, ruler, {
+          resolver,
+          tick: ruler.nextTurnTick,
+          worldSeed: stored.seed,
+        });
+        const bestByCommand = new Map<string, (typeof candidates)[number]>();
+        for (const candidate of candidates) {
+          if (!bestByCommand.has(candidate.key)) bestByCommand.set(candidate.key, candidate);
+        }
+        return [...bestByCommand.values()].map(({ key, score, reason }) => ({
+          key,
+          name: resolver.get(key)?.name ?? key,
+          score,
+          reason,
+        }));
+      }
 
       async function readStrategyStatus() {
         const storedWorld = await requireWorld(tx, input.worldId);

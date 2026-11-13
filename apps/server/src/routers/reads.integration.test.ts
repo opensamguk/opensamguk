@@ -425,6 +425,19 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     const other = await query('treaty.relations', { worldId: otherWorldId });
     expect(other.data.pairs).toEqual([{ nationA: 1, nationB: 2, relation: 'NONE', relationEndAt: null }]);
   });
+  it('군주만 소속국의 NPC 국가 명령 후보와 점수를 본다', async () => {
+    const id = await fixtureWorld('npc-nation-orders');
+    await db.general.update({
+      where: { worldId_id: { worldId: id, id: 1 } },
+      data: { officerLevel: 12 },
+    });
+    const ruler = (await query('nation.get', { worldId: id, nationId: 1 })).data;
+    expect(ruler.npcPolicy?.nationOrders).toEqual(
+      expect.arrayContaining([expect.objectContaining({ key: 'nation_rest', score: 0 })]),
+    );
+    expect((await query('nation.get', { worldId: id, nationId: 2 })).data).not.toHaveProperty('npcPolicy');
+  });
+
   it('AC-INT-26 군주 등용 후보는 실제 명령 사전 검사와 같다', async () => {
     const world = await fixtureWorld('recruit');
     await db.general.update({
@@ -997,6 +1010,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       moraleTarget: 70,
       rewardGoldTarget: 10000,
     });
+    expect(own.npcPolicy).not.toHaveProperty('nationOrders');
     expect(own).toHaveProperty('salaryRate', 0.5);
     expect(own.cities[0]).toHaveProperty('incomeEstimate.gold', own.financeEstimate?.gold.gross);
     expect(own.cities[0]).toHaveProperty('incomeEstimate.rice', own.financeEstimate?.rice.gross);

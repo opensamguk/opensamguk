@@ -239,14 +239,14 @@ export function generalTurnCandidates(view: WorldView, general: General, context
 }
 
 export function chooseNationTurn(view: WorldView, ruler: General, rng: Rng, context: NpcContext = {}): NpcDecision {
-  const nation = ruler.nationId === null ? undefined : view.nations[ruler.nationId];
-  if (
-    ruler.removedAt !== undefined ||
-    ruler.userId !== null ||
-    !nation?.isNpc ||
-    ruler.officerLevel !== BALANCE.RULER_LEVEL
-  )
+  if (ruler.userId !== null || ruler.nationId === null || !view.nations[ruler.nationId]?.isNpc)
     return { chosen: null, candidates: [] };
+  return decision(nationTurnCandidates(view, ruler, context), rng);
+}
+
+export function nationTurnCandidates(view: WorldView, ruler: General, context: NpcContext = {}): NpcCandidate[] {
+  const nation = ruler.nationId === null ? undefined : view.nations[ruler.nationId];
+  if (ruler.removedAt !== undefined || !nation || ruler.officerLevel !== BALANCE.RULER_LEVEL) return [];
   const choice = chooser(view, ruler, context, 'nation');
   choice.add('nation_rest', {}, 0, '국가 명령이 없으면 쉰다.');
   for (const candidate of nationStrategyNpcCandidates(view, nation.id, context.tick ?? 0))
@@ -298,5 +298,5 @@ export function chooseNationTurn(view: WorldView, ruler: General, rng: Rng, cont
         '국고의 금을 자원이 부족한 장수에게 포상한다.',
       );
   }
-  return decision(choice.finish(), rng);
+  return choice.finish();
 }
