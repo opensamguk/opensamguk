@@ -270,7 +270,10 @@ test.describe('외교실', () => {
     // 그 아래 외교 현황 표는 treaty.relations의 모든 국가 쌍을 기호로 보이고 우리 줄에 「우리」를 붙인다 (INT-26 p4-nation-8).
     const grid = a.page.getByTestId('relation-grid');
     await expect(grid.getByRole('rowheader')).toHaveCount(map.nations.length);
-    await expect(grid.getByRole('rowheader', { name: `${x!.name}우리` })).toHaveAttribute('data-own', 'true');
+    const ownRow = grid.locator('th[scope="row"][data-own="true"]');
+    await expect(ownRow).toHaveCount(1);
+    await expect(ownRow).toContainText(x!.name);
+    await expect(ownRow).toContainText('우리');
 
     await c.page.goto(`/w/${world}/diplomacy?tab=trust`);
     await expect(c.page.getByTestId('trust-table').getByRole('row', { name: new RegExp(x!.name) })).toContainText(
