@@ -55,7 +55,7 @@ const candidate = (generalId: number, name: string, stats: number[], portraitId:
   recommendedNation: null,
 });
 
-const roles = (ruler: ReturnType<typeof candidate>[]) => ({
+const roles = <T extends ReturnType<typeof candidate>>(ruler: T[]) => ({
   gameDate: { year: 191, month: 3 },
   quota: { humans: 1, max: null },
   mine: null,
@@ -106,6 +106,27 @@ describe('NPC 무장 맡기 후보 줄', () => {
     expect(face.getAttribute('data-state')).toBe('image');
     fireEvent.click(radios[0]!);
     expect(screen.getByRole('button', { name: '조조(으)로 시작' })).toBeTruthy();
+  });
+
+  it('후보가 가진 내정과 전투 특기의 효과를 표시한다', async () => {
+    wire.handlers.set('entry.roles', () =>
+      roles([
+        {
+          ...candidate(2, '장수2', [80, 80, 70]),
+          special: '경작',
+          domesticSpecialty: { name: '경작', commands: ['farm'], score: 1.1, cost: 0.8, successBonus: 0.1 },
+        },
+        {
+          ...candidate(3, '장수3', [70, 60, 50]),
+          special: '공성',
+          combatSpecialty: { name: '공성', description: '성벽에 가하는 피해 100% 증가' },
+        },
+      ]),
+    );
+    renderEntry();
+    fireEvent.click(await screen.findByRole('button', { name: 'NPC 무장 맡기' }));
+    expect(await screen.findByTitle(/농지 개간.*효과 \+10%/)).toBeTruthy();
+    expect(screen.getByTitle('성벽에 가하는 피해 100% 증가')).toBeTruthy();
   });
 
   it('3능력치 월드는 통솔·무력·지력 세 칸만 쓴다', async () => {

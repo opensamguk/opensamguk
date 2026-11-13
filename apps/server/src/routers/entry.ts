@@ -14,6 +14,8 @@ import {
   possessionRejectedSchema,
   validatePossessionRecord,
   availableNpc,
+  combatSpecialty,
+  domesticSpecialty,
   classifyRole,
   recommendNations,
   effectiveWorldOptions,
@@ -164,6 +166,8 @@ export const entryRouter = router({
           dedication: number;
           personality?: string;
           special?: string;
+          domesticSpecialty?: ReturnType<typeof domesticSpecialty>;
+          combatSpecialty?: ReturnType<typeof combatSpecialty>;
           generalType: ReturnType<typeof generalType>;
           progression: ReturnType<typeof generalProgress>;
           recommendedNation: { id: number; name: string; reason: string } | null;
@@ -194,6 +198,8 @@ export const entryRouter = router({
           for (const general of candidates) {
             const nation = general.nationId === null ? null : view.nations[general.nationId]!;
             const suggested = general.nationId === null ? recommendNations(view, general.id, tick)[0] : undefined;
+            const domestic = domesticSpecialty(world, general.special);
+            const combat = combatSpecialty(world, general.special);
             roles[classifyRole(general)].push({
               generalId: general.id,
               name: general.name,
@@ -212,6 +218,8 @@ export const entryRouter = router({
               dedication: general.dedication,
               ...(general.personality ? { personality: general.personality.replace(/^che_/, '') } : {}),
               ...(general.special ? { special: general.special.replace(/^che_/, '') } : {}),
+              ...(domestic ? { domesticSpecialty: domestic } : {}),
+              ...(combat ? { combatSpecialty: combat } : {}),
               generalType: generalType(general),
               progression: generalProgress(general.experience, general.dedication),
               recommendedNation: suggested

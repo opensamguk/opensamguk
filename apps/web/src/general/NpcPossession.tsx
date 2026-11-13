@@ -1,3 +1,4 @@
+import { domesticSpecialtyDetails } from '../game/specialtyDetails';
 import type { AppRouter } from '@opensamguk/server/router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
@@ -288,12 +289,23 @@ function NpcEntry({
                         )}
                         {general.personality || general.special ? (
                           <span className={styles.npcStats}>
-                            {[
-                              general.personality && `성격 ${general.personality}`,
-                              general.special && `특기 ${general.special}`,
-                            ]
-                              .filter(Boolean)
-                              .join(' · ')}
+                            {general.personality ? `성격 ${general.personality}` : null}
+                            {general.personality && general.special ? ' · ' : null}
+                            {general.special ? (
+                              <span
+                                title={
+                                  domesticSpecialtyDetails(general.domesticSpecialty) ??
+                                  general.combatSpecialty?.description
+                                }
+                              >
+                                {general.domesticSpecialty
+                                  ? '내정 특기'
+                                  : general.combatSpecialty
+                                    ? '전투 특기'
+                                    : '특기'}{' '}
+                                {general.special}
+                              </span>
+                            ) : null}
                           </span>
                         ) : null}
                         <span className={`num ${styles.npcStats}`} data-testid="npc-stats">
