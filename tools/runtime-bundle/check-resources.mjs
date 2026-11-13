@@ -23,7 +23,7 @@ const files = [
   'feature-profile/expanded-191-v4.json',
   'feature-profile/expanded-191-v5.json',
   'scenario/san10-191-v2.json',
-  ...['191-sex.json', '191-sex-2.json', '191-sex-3.json'].map((file) => `officers/${file}`),
+  ...['191-sex.json', '191-sex-2.json', '191-sex-3.json', '191-sex-4.json'].map((file) => `officers/${file}`),
 ];
 const output = process.env.RUNTIME_RESOURCES_OUTPUT;
 let reserved = false,

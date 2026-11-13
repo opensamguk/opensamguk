@@ -187,6 +187,7 @@ export async function getWorldSettings(ctx: Context, input: z.infer<typeof world
         rules: effective.presetRules ?? null,
         entry: effective.entry,
         truce: effective.truce,
+        recruitmentLocation: effective.recruitmentLocation,
       };
     });
     if (!result) throw new TRPCError({ code: 'NOT_FOUND', message: '월드를 찾을 수 없습니다.' });

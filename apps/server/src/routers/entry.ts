@@ -239,6 +239,18 @@ export const entryRouter = router({
         })
       )
         return rejected('ALREADY_HAS_GENERAL');
+      if (
+        await tx.inputEvent.findFirst({
+          where: {
+            worldId: input.worldId,
+            userId,
+            status: 'PENDING',
+            kind: { in: ['general.create', POSSESSION_KIND] },
+          },
+          select: { id: true },
+        })
+      )
+        throw new TRPCError({ code: 'CONFLICT', message: '입장 요청을 처리하고 있습니다.' });
       const target = await tx.general.findUnique({
         where: { worldId_id: { worldId: input.worldId, id: input.generalId } },
       });

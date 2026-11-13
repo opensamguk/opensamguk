@@ -46,8 +46,10 @@ import { nationStrategyFeature } from './nationStrategy/feature';
 import { nationLifecycleFeature } from './nationLifecycle/feature';
 import { preparedTurnsFeature } from './preparedTurns/feature';
 import { nationResearchFeature } from './nationResearch/feature';
+import { relationsFeature } from './relations/data';
 import { INTEL_FEATURE, spyBinding } from './commands/ext/intel/record';
 import { spy } from './commands/ext/intel/spy';
+import { returnBorder } from './commands/ext/return_border/return_border';
 
 export interface ReplayOriginV1 {
   version: 1;
@@ -62,6 +64,18 @@ export interface ReplayOriginV3 {
   resourceHash: string;
   featureData?: Record<string, JsonValue>;
 }
+export function replayResourceHashInput(initial: WorldInit, featureData?: ReplayOriginV3['featureData']) {
+  return {
+    scenarioKey: initial.scenarioKey,
+    mapKey: initial.mapKey,
+    unitSetKey: initial.unitSetKey,
+    statRules: initial.statRules,
+    unitSet: initial.unitSet,
+    ...(initial.operationalMap ? { operationalMap: initial.operationalMap } : {}),
+    ...(featureData === undefined ? {} : { featureData }),
+  };
+}
+
 export interface RuleFeatureDefinition {
   key: string;
   requires: readonly string[];
@@ -105,6 +119,7 @@ export const ruleRegistry: RuleRegistry = {
   features: [
     preparedTurnsFeature,
     nationResearchFeature,
+    relationsFeature,
     personnelFeature,
     policyFeature,
     treatyFeature,
@@ -127,6 +142,12 @@ export const ruleRegistry: RuleRegistry = {
     cityScaleFeature,
     nationStrategyFeature,
     nationLifecycleFeature,
+    {
+      key: 'border-return-v1',
+      requires: [NATION_LIFECYCLE_FEATURE],
+      conflicts: [],
+      commandBindings: [{ definition: returnBorder, sliceKeys: [] }],
+    },
     {
       key: INTEL_FEATURE,
       requires: ['policy'],
@@ -248,6 +269,11 @@ export function checkReplayOrigin(
   const origin = value as ReplayOriginV3 | ReplayOriginV1;
   if (!origin || ![1, 3].includes(origin.version) || !origin.initial || typeof origin.initial !== 'object')
     throw new Error('재생 생성 기록의 버전을 확인하세요.');
+  if (
+    Object.hasOwn(origin.initial, 'recruitmentLocation') &&
+    (origin.version !== 3 || origin.initial.recruitmentLocation !== 'city')
+  )
+    throw new Error('재생 생성 기록의 모집 위치를 확인하세요.');
   checkStatProfile(origin.initial);
   checkInitialNpcStatLimits(origin.initial, origin.version === 3 ? 'current' : 'legacy');
   checkCityScaleInitial(origin.initial);

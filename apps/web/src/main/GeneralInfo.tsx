@@ -4,6 +4,7 @@ import { useWorldSummary } from '../game/queries';
 import type { Home, MapNation, WorldSummary } from '../game/types';
 import { LineagePanel } from '../lineage/LineagePanel';
 import { Portrait } from '../portrait/Portrait';
+import { RelationList } from '../relations/RelationList';
 import { NationBadge } from '../ui/NationBadge';
 import { Tag } from '../ui/Tag';
 import { InfoGrid } from './Panel';
@@ -114,6 +115,7 @@ export function GeneralInfo({
       />
       {/* 가문 칸(T4-95)은 lineage-v1 월드에서만 그린다. 계승으로 장수가 바뀌어도 대기 요청을 이어 보도록 장수 id로 다시 만들지 않는다. */}
       {equipment ? <EquipmentStatus read={equipment} /> : null}
+      {summary && 'relationsEnabled' in summary ? <RelationList worldId={worldId} generalId={g.id} /> : null}
       <LineagePanel worldId={worldId} />
     </div>
   );

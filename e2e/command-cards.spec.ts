@@ -133,8 +133,7 @@ test('T4-92 명령 카드의 개인 30칸·국가 12칸 저장과 모바일·키
       await editor.getByRole('button', { name: '선택 해제', exact: true }).click();
       await editor.locator('tr[data-slot="2"]').click();
       await editor.getByRole('radio', { name: '농지 개간', exact: true }).check();
-      await editor.getByRole('button', { name: '2번 칸에 넣기', exact: true }).click();
-      await editor.getByRole('button', { name: '저장', exact: true }).click();
+      await editor.getByRole('button', { name: '2번 칸에 저장', exact: true }).click();
       await expect(editor.getByText('저장했습니다.', { exact: true })).toBeVisible();
       await late.getByRole('button', { name: '저장', exact: true }).click();
       const conflict = late.getByTestId('stale-alert');

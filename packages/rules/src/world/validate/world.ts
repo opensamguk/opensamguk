@@ -4,7 +4,7 @@ import { validateUnitSet } from './unitSet';
 import { validateStatRules } from './statRules';
 import { validatePortraitMap } from './portraitMap';
 import { issue, type ResourceReport } from './issues';
-import { legacyCheCrewRegionsMatch } from '../crewRegions';
+import { legacyCheCrewRegionsMatch, unitSetRegionSchemeMatches } from '../crewRegions';
 import { scenarioStatRulesMatch } from '../resources';
 
 export function validateWorldResources(input: {
@@ -48,6 +48,16 @@ export function validateWorldResources(input: {
         },
       ),
     );
+  }
+  if (
+    reports.map.status === 'pass' &&
+    reports.map.value &&
+    reports.unitSet.status === 'pass' &&
+    reports.unitSet.value &&
+    !unitSetRegionSchemeMatches(reports.unitSet.value, reports.map.value)
+  ) {
+    reports.unitSet.status = 'fail';
+    reports.unitSet.issues.push(issue('shape-invalid', { kind: 'path', path: ['regionScheme'] }));
   }
   if (
     reports.scenario.value &&

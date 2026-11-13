@@ -36,7 +36,7 @@ export function withPrepare(definition: CommandDef, spec: { preReqTurn: number }
         };
       }
       const result = definition.execute(view, actor, args, rng);
-      const state = applyEffects(cloneWorld(view), result.effects);
+      const state = applyEffects(view, result.effects);
       clearRecord(state, nationId, officerLevel);
       return { ...result, effects: [{ kind: 'world', state }] };
     },

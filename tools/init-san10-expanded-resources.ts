@@ -7,8 +7,14 @@ import { scenarioSchema } from '../packages/rules/src/world/resources';
 import { validateWorldResources } from '../packages/rules/src/world/validate';
 import { hashState } from '../packages/shared/src/node/hashState';
 
-const [directory, manifestSha] = process.argv.slice(2);
-if (!directory || !manifestSha || !/^[a-f0-9]{64}$/.test(manifestSha) || process.argv.length !== 4)
+const [directory, manifestSha, mode, ...extra] = process.argv.slice(2);
+if (
+  !directory ||
+  !manifestSha ||
+  !/^[a-f0-9]{64}$/.test(manifestSha) ||
+  extra.length ||
+  (mode !== undefined && mode !== '--bootstrap-sql')
+)
   throw Error('데이터 저장소의 디렉터리와 고정한 manifest SHA-256을 지정하세요.');
 const manifestBytes = await readFile(join(directory, 'manifest.json'));
 if (createHash('sha256').update(manifestBytes).digest('hex') !== manifestSha)
@@ -69,38 +75,68 @@ for (const entry of manifest.scenarios) {
     throw Error('공백지의 재야 장수 명단을 확인하세요.');
   add('SCENARIO', entry.id, scenario);
 }
-if (!process.env.DATABASE_URL) throw Error('DATABASE_URL이 필요합니다.');
-const db = createDb(process.env.DATABASE_URL);
-try {
-  const result = await db.$transaction(
-    async (tx) => {
-      await tx.$executeRaw`LOCK TABLE "GameResource" IN SHARE ROW EXCLUSIVE MODE`;
-      const [dbUnitSet, dbStatRules] = await readPublishedResources(tx, [
-        { kind: 'UNIT_SET', name: 'expanded', version: 1 },
-        { kind: 'STAT_RULES', name: 'five-stats', version: 1 },
-      ]);
-      if (dbUnitSet?.contentHash !== hashState(unitSet) || dbStatRules?.contentHash !== hashState(statRules))
-        throw Error('게시된 병종 또는 능력치 자원이 검증한 판과 다릅니다.');
-      const inserted = [];
-      for (const row of rows) {
-        const { kind, name, version } = row;
-        const existing = await tx.gameResource.findUnique({ where: { kind_name_version: { kind, name, version } } });
-        if (!existing) inserted.push(row);
-        else if (
-          existing.status !== 'PUBLISHED' ||
-          existing.contentHash !== row.contentHash ||
-          hashState(existing.content) !== row.contentHash
-        )
-          throw Error(`이미 등록된 자원의 내용이 다릅니다: ${name}`);
-      }
-      const result = await tx.gameResource.createMany({
-        data: inserted.map((row) => ({ ...row, source, status: 'PUBLISHED', publishedAt: new Date() })),
-      });
-      return { inserted: result.count, existing: rows.length - result.count };
-    },
-    { timeout: 120_000 },
+if (mode === '--bootstrap-sql') {
+  add('UNIT_SET', 'expanded', unitSet as Prisma.InputJsonValue);
+  add('STAT_RULES', 'five-stats', statRules as Prisma.InputJsonValue);
+  const literal = (value: string) => "'" + value.replaceAll("'", "''") + "'";
+  const values = rows.map(
+    (row) =>
+      `(${literal(row.kind)}, ${literal(row.name)}, ${literal(JSON.stringify(row.content))}, ${literal(row.contentHash)})`,
   );
-  console.log(JSON.stringify(result));
-} finally {
-  await db.$disconnect();
+  process.stdout.write(`BEGIN;
+SET LOCAL standard_conforming_strings = on;
+LOCK TABLE public."GameResource" IN SHARE ROW EXCLUSIVE MODE;
+CREATE TEMP TABLE san10_seed (kind public."GameResourceKind", name text, content jsonb, hash text) ON COMMIT DROP;
+INSERT INTO san10_seed VALUES
+${values.join(',\n')};
+DO $bootstrap$
+BEGIN
+  IF EXISTS (SELECT 1 FROM san10_seed s JOIN public."GameResource" r ON (r.kind, r.name, r.version) = (s.kind, s.name, 1)
+      WHERE r.status <> 'PUBLISHED' OR r.content <> s.content OR r."contentHash" <> s.hash)
+  THEN RAISE EXCEPTION 'Published SAN10 resource differs from bootstrap data'; END IF;
+END
+$bootstrap$;
+INSERT INTO public."GameResource" ("id", "kind", "name", "version", "status", "content", "contentHash", "source", "publishedAt")
+SELECT gen_random_uuid()::text, kind, name, 1, 'PUBLISHED', content, hash,
+  CASE WHEN kind IN ('UNIT_SET', 'STAT_RULES') THEN 'resources/NOTICE.md' ELSE ${literal(source)} END, now()
+FROM san10_seed
+ON CONFLICT ("kind", "name", "version") DO NOTHING;
+COMMIT;
+`);
+} else {
+  if (!process.env.DATABASE_URL) throw Error('DATABASE_URL이 필요합니다.');
+  const db = createDb(process.env.DATABASE_URL);
+  try {
+    const result = await db.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`LOCK TABLE "GameResource" IN SHARE ROW EXCLUSIVE MODE`;
+        const [dbUnitSet, dbStatRules] = await readPublishedResources(tx, [
+          { kind: 'UNIT_SET', name: 'expanded', version: 1 },
+          { kind: 'STAT_RULES', name: 'five-stats', version: 1 },
+        ]);
+        if (dbUnitSet?.contentHash !== hashState(unitSet) || dbStatRules?.contentHash !== hashState(statRules))
+          throw Error('게시된 병종 또는 능력치 자원이 검증한 판과 다릅니다.');
+        const inserted = [];
+        for (const row of rows) {
+          const { kind, name, version } = row;
+          const existing = await tx.gameResource.findUnique({ where: { kind_name_version: { kind, name, version } } });
+          if (!existing) inserted.push(row);
+          else if (
+            existing.status !== 'PUBLISHED' ||
+            existing.contentHash !== row.contentHash ||
+            hashState(existing.content) !== row.contentHash
+          )
+            throw Error(`이미 등록된 자원의 내용이 다릅니다: ${name}`);
+        }
+        const result = await tx.gameResource.createMany({
+          data: inserted.map((row) => ({ ...row, source, status: 'PUBLISHED', publishedAt: new Date() })),
+        });
+        return { inserted: result.count, existing: rows.length - result.count };
+      },
+      { timeout: 120_000 },
+    );
+    console.log(JSON.stringify(result));
+  } finally {
+    await db.$disconnect();
+  }
 }

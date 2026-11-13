@@ -10,6 +10,7 @@ import { AdminEndActions } from './AdminEndActions';
 import { AdminCreateActions } from './AdminCreateActions';
 import { AdminResetActions } from './AdminResetActions';
 import { AdminWorldSettings, hasWorldSettingRequest } from './AdminWorldSettings';
+import { AdminWorldGameEditor, hasGameEditorRequest } from './AdminWorldGameEditor';
 import styles from './AdminPages.module.css';
 
 type Worlds = inferRouterOutputs<AppRouter>['admin']['world']['list'];
@@ -26,7 +27,18 @@ export function AdminWorlds() {
     query = usePrivateRead<Worlds>(viewerId);
   const [owner, setOwner] = useState<'clock' | 'end' | 'create' | 'reset' | 'settings' | null>(null);
   const ownerRef = useRef<'clock' | 'end' | 'create' | 'reset' | 'settings' | null>(null);
-  const [settingsId, setSettingsId] = useState<string | null>(null);
+  const [panel, setPanel] = useState<{ world: Worlds[number]; mode: 'settings' | 'game' } | null>(null);
+  function openPanel(world: Worlds[number], mode: 'settings' | 'game') {
+    if (ownerRef.current !== null) return;
+    ownerRef.current = 'settings';
+    setOwner('settings');
+    setPanel({ world, mode });
+  }
+  function closePanel() {
+    ownerRef.current = null;
+    setOwner(null);
+    setPanel(null);
+  }
   const acquireCreate = useCallback(() => {
     if (ownerRef.current !== null && ownerRef.current !== 'create') return false;
     ownerRef.current = 'create';
@@ -75,7 +87,7 @@ export function AdminWorlds() {
   useLayoutEffect(() => {
     ownerRef.current = null;
     setOwner(null);
-    setSettingsId(null);
+    setPanel(null);
   }, [viewerId]);
   return (
     <section>
@@ -141,17 +153,23 @@ export function AdminWorlds() {
           onClear={query.clear}
         />
       </div>
-      {settingsId && owner === 'settings' ? (
+      {panel?.mode === 'settings' && owner === 'settings' ? (
         <AdminWorldSettings
-          key={`${viewerId}:${settingsId}`}
+          key={`${viewerId}:${panel.world.id}`}
           viewerId={viewerId}
-          worldId={settingsId}
-          onClose={() => {
-            ownerRef.current = null;
-            setOwner(null);
-            setSettingsId(null);
-          }}
+          worldId={panel.world.id}
+          onClose={closePanel}
           onApplied={() => void query.read((signal) => client.admin.world.list.query(undefined, { signal }))}
+        />
+      ) : null}
+      {panel?.mode === 'game' && owner === 'settings' ? (
+        <AdminWorldGameEditor
+          key={`${viewerId}:${panel.world.id}`}
+          viewerId={viewerId}
+          worldId={panel.world.id}
+          worldName={panel.world.name}
+          editable={panel.world.status === 'RUNNING' || panel.world.status === 'PAUSED'}
+          onClose={closePanel}
         />
       ) : null}
       {query.pending ? <LoadingState>월드 조회 중</LoadingState> : null}
@@ -172,14 +190,22 @@ export function AdminWorlds() {
                     type="button"
                     aria-label={`${world.name} ${world.status === 'ENDED' ? '설정 변경 결과' : '설정 편집'}`}
                     disabled={owner !== null}
-                    onClick={() => {
-                      if (ownerRef.current !== null) return;
-                      ownerRef.current = 'settings';
-                      setOwner('settings');
-                      setSettingsId(world.id);
-                    }}
+                    onClick={() => openPanel(world, 'settings')}
                   >
                     {world.status === 'ENDED' ? '설정 변경 결과' : '설정 편집'}
+                  </button>
+                ) : null}
+                {world.replayFormat === 3 &&
+                (world.status === 'RUNNING' ||
+                  world.status === 'PAUSED' ||
+                  hasGameEditorRequest(viewerId, world.id)) ? (
+                  <button
+                    type="button"
+                    aria-label={`${world.name} ${world.status === 'ENDED' ? '게임 편집 결과' : '게임 편집'}`}
+                    disabled={owner !== null}
+                    onClick={() => openPanel(world, 'game')}
+                  >
+                    {world.status === 'ENDED' ? '게임 편집 결과' : '게임 편집'}
                   </button>
                 ) : null}
                 <dl>

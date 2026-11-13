@@ -1,3 +1,4 @@
+import { hashState } from '@opensamguk/shared/node';
 import type { Prisma } from '@opensamguk/db';
 import {
   effectiveWorldOptions,
@@ -10,6 +11,7 @@ import {
   readStoredStratagemCards,
   readStoredEquipment,
   readStoredNationLifecycle,
+  readStoredRelations,
   assertNationLifecycle,
   type WorldState,
 } from '@opensamguk/rules';
@@ -46,7 +48,7 @@ export async function loadWorldAfterCapabilityCheck(
     ? ((capabilities.kind === 'registry' ? capabilities.armyTypes : undefined) ?? readCampaignArmyTypes(world))
     : [];
   const { preset, commands } = engineResolver(world);
-  const rules = effectiveWorldOptions(preset, world.runtimeOptions).presetRules;
+  const { presetRules: rules, recruitmentLocation } = effectiveWorldOptions(preset, world.runtimeOptions);
   if (world.replayFormat === 3) await assertPersonnelStorage(tx, worldId, world.ruleFeatures.includes('personnel'));
   const ext = await loadExt(tx, worldId, commands, world.ruleFeatures);
   const cities = await tx.city.findMany({ where: { worldId } });
@@ -70,6 +72,7 @@ export async function loadWorldAfterCapabilityCheck(
   };
   let state: WorldState = {
     ...(rules ? { presetRules: rules } : {}),
+    ...(recruitmentLocation === 'city' ? { recruitmentLocation } : {}),
     ...(world.ruleFeatures?.length ? { ruleFeatures: [...world.ruleFeatures] } : {}),
     ...(ext ? { ext } : {}),
     startYear: world.startYear,
@@ -116,6 +119,8 @@ export async function loadWorldAfterCapabilityCheck(
   if (preparedTurns) state.preparedTurns = preparedTurns;
   const nationResearch = readStoredNationResearch(world);
   if (nationResearch) state.nationResearch = nationResearch;
+  const relations = readStoredRelations(world, hashState);
+  if (relations) state.relations = relations;
   const nationLifecycle = readStoredNationLifecycle(world);
   if (nationLifecycle) state.nationLifecycle = nationLifecycle;
   assertNationLifecycle(state);

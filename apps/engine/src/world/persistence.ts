@@ -20,10 +20,12 @@ import {
   checkRuleFeatures,
   checkReplayOrigin,
   checkInitialNpcStatLimits,
+  replayResourceHashInput,
   type JsonValue,
   checkStatProfile,
   checkOperationalProfile,
   readOperationalMap,
+  readOpeningCityProfile,
   attachOperationalKinds,
   emptyCampaignState,
   emptyCityResourcesState,
@@ -98,6 +100,8 @@ export function prepareInitialWorld(
   const featureFormat =
     typeof options.replayFormat === 'number' ||
     (options.replayFormat === undefined && options.extFormat === undefined && options.treatyFormat === undefined);
+  if (state.recruitmentLocation && (!featureFormat || options.replayFormat === 1))
+    throw new Error('도시별 모집은 재생 형식 3에서 사용할 수 있습니다.');
   if (
     (featureFormat && (options.extFormat !== undefined || options.treatyFormat !== undefined)) ||
     (!featureFormat &&
@@ -185,14 +189,7 @@ export function prepareInitialWorld(
   let replayOrigin: unknown = {
     version: 1,
     initial,
-    resourceHash: hashState({
-      scenarioKey: state.scenarioKey,
-      mapKey: state.mapKey,
-      unitSetKey: state.unitSetKey,
-      statRules: state.statRules,
-      unitSet: state.unitSet,
-      ...(state.operationalMap ? { operationalMap: state.operationalMap } : {}),
-    }),
+    resourceHash: hashState(replayResourceHashInput(state)),
     initialStateHash: stateHash,
   };
   let creationState = initial;
@@ -205,15 +202,7 @@ export function prepareInitialWorld(
       ...(featureData !== undefined ? { featureData } : {}),
     };
     checkReplayOrigin(origin);
-    const resources = {
-      scenarioKey: initial.scenarioKey,
-      mapKey: initial.mapKey,
-      unitSetKey: initial.unitSetKey,
-      statRules: initial.statRules,
-      unitSet: initial.unitSet,
-      ...(initial.operationalMap ? { operationalMap: initial.operationalMap } : {}),
-    };
-    origin.resourceHash = hashState({ ...resources, ...(featureData !== undefined ? { featureData } : {}) });
+    origin.resourceHash = hashState(replayResourceHashInput(initial, featureData));
     replayOrigin = origin;
   }
   if (options.extFormat === 1) {
@@ -280,6 +269,9 @@ export function prepareInitialWorld(
             : { policyFromSequence: 0 }),
         ...(options.treatyFormat === 1 ? { treatyFormat: 1 } : {}),
         replayOrigin: replayOrigin as Prisma.InputJsonValue,
+        ...(initial.recruitmentLocation
+          ? { runtimeOptions: { recruitmentLocation: initial.recruitmentLocation } }
+          : {}),
         statRules: creationState.statRules,
         unitSet: creationState.unitSet as Prisma.InputJsonValue,
         ...(features.includes('campaign-v1')
@@ -476,11 +468,14 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
         return value;
       };
       const operationalMap = readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin);
-      const rules = effectiveWorldOptions(preset, world.runtimeOptions).presetRules;
+      const openingCityProfile = operationalMap ? readOpeningCityProfile(world.replayOrigin) : undefined;
+      const { presetRules: rules, recruitmentLocation } = effectiveWorldOptions(preset, world.runtimeOptions);
       const initial: WorldInit = {
         ...(operationalMap ? { operationalMap } : {}),
         ...(cityScale ? { cityScale } : {}),
+        ...(openingCityProfile ? { openingCityProfile } : {}),
         ...(rules ? { presetRules: rules } : {}),
+        ...(recruitmentLocation === 'city' ? { recruitmentLocation } : {}),
         ...(world.ruleFeatures?.length ? { ruleFeatures: [...world.ruleFeatures] } : {}),
         ...(ext && world.replayFormat !== 3 ? { ext } : {}),
         seed: world.seed,

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTRPC } from '../trpc';
 import { useWorldEnded } from '../game/queries';
 import { errorCode, retryUnlessClientError, serverMessage } from './apiError';
@@ -162,6 +162,7 @@ export function useTurnDraft<S extends DisplaySlot>(worldId: string, source: Tur
 
   const [stored, setStored] = useState<Stored>(() => readStored(sessionStore(), storageKey, source.slotCount));
   const [notice, setNotice] = useState<SaveNotice>(null);
+  const sending = useRef(false);
   const { draft, pending } = stored;
 
   useLayoutEffect(() => writeStored(sessionStore(), storageKey, stored), [storageKey, stored]);
@@ -182,7 +183,7 @@ export function useTurnDraft<S extends DisplaySlot>(worldId: string, source: Tur
   const edit = useCallback(
     (op: EditOp) => {
       const data = server.data;
-      if (!data || !serverTurns || source.readOnly !== null) return;
+      if (!data || !serverTurns || source.readOnly !== null || sending.current) return;
       setNotice(null);
       setStored((prev) => {
         if (prev.pending) return prev;
@@ -241,19 +242,43 @@ export function useTurnDraft<S extends DisplaySlot>(worldId: string, source: Tur
         writeStored(sessionStore(), storageKey, empty);
         setStored(empty);
         source.onOfficeChanged(serverMessage(error) ?? '직책이 바뀌었습니다. 국가 예턴을 다시 불러오세요.');
-      } else
+      } else {
+        if (code === 'PRECONDITION_FAILED') void server.refetch();
         setNotice({
           kind: 'error',
           message: serverMessage(error) ?? '저장하지 못했습니다. 연결을 확인하고 다시 저장하세요.',
         });
+      }
+    },
+    onSettled: () => {
+      sending.current = false;
     },
   });
 
-  const submit = useCallback(() => {
-    if (!draft || save.isPending) return;
+  function send(next: Draft) {
+    if (sending.current) return;
+    sending.current = true;
     setNotice(null);
-    save.mutate({ revision: draft.baseRevision, slots: toSaveSlots(draft.turns) });
-  }, [draft, save]);
+    save.mutate({
+      revision: next.baseRevision,
+      slots: toSaveSlots(next.turns),
+      ...(actorId === undefined ? {} : { expectedActorId: actorId }),
+    });
+  }
+
+  function submit() {
+    if (draft && !actorChanged && !ended && source.readOnly === null) send(draft);
+  }
+
+  function editAndSave(op: EditOp) {
+    const data = server.data;
+    if (!data || !serverTurns || pending || actorChanged || ended || source.readOnly !== null || sending.current)
+      return;
+    const base = draft ?? { baseRevision: data.revision, ops: [], turns: serverTurns };
+    const next = { ...base, ops: [...base.ops, op], turns: applyOp(base.turns, op) };
+    setStored({ draft: next, pending: null, actorId: draft ? draftActor : data.actorId });
+    send(next);
+  }
 
   const authLost = notice?.kind === 'auth' || (server.isError && errorCode(server.error) === 'UNAUTHORIZED');
 
@@ -272,6 +297,7 @@ export function useTurnDraft<S extends DisplaySlot>(worldId: string, source: Tur
     discard,
     reapply,
     submit,
+    editAndSave,
   };
 }
 

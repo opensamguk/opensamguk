@@ -117,7 +117,7 @@ export function createCityResourceCommandResolver(base: CommandResolver): Comman
           outcome && outcome.ok
             ? { ...success(outcome.text), effects: [{ kind: 'world' as const, state: outcome.state }] }
             : original!.execute(view, actor, value, rng);
-        let state = applyEffects(cloneWorld(view), result.effects);
+        let state = applyEffects(view, result.effects);
         const logs = [...result.logs];
         for (const before of Object.values(view.cities)) {
           if (state.cities[before.cityKey]?.nationId === before.nationId) continue;

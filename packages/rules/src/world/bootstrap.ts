@@ -11,12 +11,13 @@ import {
   unitSetSchema,
 } from './resources';
 import type { StatRules, UnitSetResource } from './resources';
-import { legacyCheCrewRegionsMatch } from './crewRegions';
+import { legacyCheCrewRegionsMatch, unitSetRegionSchemeMatches } from './crewRegions';
 import type { WorldState, WorldExt } from '../model/world';
 import { operationalMapSchema, type OperationalMapResource } from './map/operational';
 import { operationalAnchors } from './map/anchors';
 import { validateMap } from './validate/map';
-import { CITY_SCALE_FEATURE, resolveCityScale, type CityScaleRecord } from './map/cityScale';
+import { CITY_SCALE_FEATURE, resolveCityScale, type CityScaleRecord, type ScaleAnchor } from './map/cityScale';
+import { appliesOperationalOpening, LEGACY_OPENING_CITY_PROFILE, legacyOpeningCityValues } from './openingCityProfile';
 
 export interface InitialCity {
   kind?: 'CITY' | 'PASS';
@@ -100,6 +101,8 @@ export interface InitialDiplomacy {
 }
 
 export interface WorldInit {
+  openingCityProfile?: typeof LEGACY_OPENING_CITY_PROFILE;
+  recruitmentLocation?: 'city';
   cityScale?: CityScaleRecord;
   operationalMap?: OperationalMapResource;
   presetRules?: PresetRules;
@@ -136,20 +139,18 @@ export function buildInitialWorld(input: {
   if (operational && validateMap(operational, { scenarios: [] }).status !== 'pass')
     throw new Error('운영 지도의 연결망을 확인하세요.');
   const scenario = scenarioSchema.parse(input.scenario);
-  if (operational && scenario.openingCityProfile)
-    throw new Error('정사 확장 초기 도시 설정은 기존 지도 형식이 필요합니다.');
   const sourceMap = operational
     ? { ...operational, cities: operationalAnchors(operational) }
     : mapSchema.parse(input.map);
   const requiredMap = scenarioMapMismatch(scenario, sourceMap.id);
   if (requiredMap !== undefined) throw new Error(`이 시나리오는 ${requiredMap} 지도가 필요합니다.`);
-  const scaled = resolveCityScale(sourceMap.cities, scenario.cityScale?.cities);
+  const scaled = resolveCityScale<ScaleAnchor>(sourceMap.cities, scenario.cityScale?.cities);
   const map = { ...sourceMap, cities: scaled.cities };
   const unitSet = unitSetSchema.parse(input.unitSet);
   if (scenario.requiredUnitSet !== undefined && unitSet.id !== scenario.requiredUnitSet)
     throw new Error(`이 시나리오는 ${scenario.requiredUnitSet} 병종 판이 필요합니다.`);
   if (
-    (unitSet.regionScheme !== undefined && unitSet.regionScheme !== operational?.regionScheme) ||
+    !unitSetRegionSchemeMatches(unitSet, operational ?? sourceMap) ||
     !legacyCheCrewRegionsMatch(unitSet, operational ?? sourceMap)
   )
     throw new Error('지도와 병종 판의 지역 기준이 다릅니다.');
@@ -205,7 +206,7 @@ export function buildInitialWorld(input: {
     if (
       operational &&
       cityNames.length > 0 &&
-      !mapCities.some((city) => city.name === cityNames[0] && 'kind' in city && city.kind === 'CITY')
+      !mapCities.some((city) => city.name === cityNames[0] && city.kind === 'CITY')
     )
       throw new Error(`${name}: 수도는 도시여야 합니다.`);
     ownedCities.set(id, cityKeys);
@@ -224,50 +225,33 @@ export function buildInitialWorld(input: {
     };
   });
 
-  const cities: InitialCity[] = mapCities.map((city) => ({
-    ...(operational
-      ? {
-          kind: operational.sites.find((site) => 'anchorKey' in site && site.anchorKey === city.id)!.kind as
-            'CITY' | 'PASS',
-        }
-      : {}),
-    cityKey: city.id,
-    name: city.name,
-    level: city.level,
-    region: city.region,
-    x: city.position.x,
-    y: city.position.y,
-    connections: [...city.connections].sort((a, b) => a - b),
-    nationId: ownerByCity.get(city.id) ?? null,
-    population: city.initial.population,
-    populationMax: city.max.population,
-    agriculture: city.initial.agriculture,
-    agricultureMax: city.max.agriculture,
-    commerce: city.initial.commerce,
-    commerceMax: city.max.commerce,
-    security: city.initial.security,
-    securityMax: city.max.security,
-    defence: city.initial.defence,
-    defenceMax: city.max.defence,
-    wall: city.initial.wall,
-    wallMax: city.max.wall,
-    trust: map.defaults.trust,
-    supplied: map.defaults.supplyState === 1,
-  }));
-
-  if (scenario.openingCityProfile === 'legacy-research-70') {
-    for (const city of cities) {
-      city.population = Math.round(city.populationMax * 0.7);
-      city.agriculture = Math.round(city.agricultureMax * 0.7);
-      city.commerce = Math.round(city.commerceMax * 0.7);
-      city.security = Math.round(city.securityMax * 0.7);
-      city.trust = 80;
-      if (city.nationId !== null) {
-        city.defence = Math.round(city.defenceMax * 0.7);
-        city.wall = Math.round(city.wallMax * 0.7);
-      }
-    }
-  }
+  const cities: InitialCity[] = mapCities.map((city) => {
+    const nationId = ownerByCity.get(city.id) ?? null;
+    const starting =
+      scenario.openingCityProfile === LEGACY_OPENING_CITY_PROFILE &&
+      (!operational || appliesOperationalOpening(city, scaled.record))
+        ? legacyOpeningCityValues(city.initial, city.max, nationId !== null)
+        : { ...city.initial, trust: map.defaults.trust };
+    return {
+      ...(city.kind === undefined ? {} : { kind: city.kind }),
+      cityKey: city.id,
+      name: city.name,
+      level: city.level,
+      region: city.region,
+      x: city.position.x,
+      y: city.position.y,
+      connections: [...city.connections].sort((a, b) => a - b),
+      nationId,
+      ...starting,
+      populationMax: city.max.population,
+      agricultureMax: city.max.agriculture,
+      commerceMax: city.max.commerce,
+      securityMax: city.max.security,
+      defenceMax: city.max.defence,
+      wallMax: city.max.wall,
+      supplied: map.defaults.supplyState === 1,
+    };
+  });
 
   // 배치만 bootstrap 스트림을 소비한다. DB ID·시각은 규칙 상태에 넣지 않는다.
   const rng = rngFor(input.seed, 'bootstrap');
@@ -356,6 +340,7 @@ export function buildInitialWorld(input: {
       : {}),
     ...(scaled.record ? { cityScale: scaled.record } : {}),
     ...(operational ? { operationalMap: operational } : {}),
+    ...(operational && scenario.openingCityProfile ? { openingCityProfile: scenario.openingCityProfile } : {}),
     ...(scenario.lastNationRecruitmentLockYear === undefined
       ? {}
       : {

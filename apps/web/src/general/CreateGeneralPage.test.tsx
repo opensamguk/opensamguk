@@ -22,6 +22,7 @@ vi.mock('@tanstack/react-router', () => ({
 }));
 vi.mock('../trpc', () => ({
   useTRPC: () => ({
+    auth: { me: { queryOptions: () => ({ queryKey: ['auth'], queryFn: async () => ({ user: null }) }) } },
     general: {
       mine: {
         queryKey: () => ['mine'],

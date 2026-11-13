@@ -10,6 +10,7 @@ import {
   updateResidenceAnchors,
   recordedLineageSuccession,
   reputationInputEvents,
+  RELATIONS_FEATURE,
   recordedPossession,
   type PersonnelMonthResult,
   type PersonnelStepPacket,
@@ -175,6 +176,7 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   { key: 'nation-strategy-v1' },
   { key: 'prepared-turns-v1' },
   { key: 'nation-research-v1' },
+  { key: RELATIONS_FEATURE },
   { key: 'city-scale-v1' },
   {
     key: 'stratagem-cards-v1',
@@ -219,6 +221,7 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   { key: 'city-resources-v1', queuedInputs: { 'city.resources': processCityResourceInput } },
   { key: 'five-stats' },
   { key: 'battle-affinity-v2' },
+  { key: 'border-return-v1' },
   { key: 'intel-v1' },
   { key: 'equipment-v1' },
   { key: 'operational-map' },

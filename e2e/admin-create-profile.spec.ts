@@ -235,6 +235,7 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
     'san10-191-expanded',
     'san10-191-lifecycle',
     'san10-191-research',
+    'san10-191-border-return',
   ]);
   const profile = options.profiles.find((entry) => entry.id === mode.id);
   expect(profile?.available).toBe(true);
@@ -365,6 +366,7 @@ async function verifySelection(page: Page, stack: LegalStack, mode: Mode, run: R
     ...profile.selection,
     ...(mode.profile === null ? {} : { featureProfileKey: mode.profile }),
     presetKey: mode.preset,
+    recruitmentLocation: 'city',
     turnTermMinutes: profile.presets.find((entry) => entry.key === mode.preset)!.turnTermMinutes,
     endYear: mode.endYear,
     seed,

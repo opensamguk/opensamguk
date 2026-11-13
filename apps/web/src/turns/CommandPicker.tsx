@@ -44,6 +44,7 @@ interface Props {
   // 월드 병종표 (T4-86). 불러오는 중·오류면 빈 목록이고 unitNote가 이유다. 병종 없는 명령은 그대로 넣을 수 있다.
   units: WorldUnits;
   unitNote?: string | null | undefined;
+  recruitment?: { city: string; byCrewType: Readonly<Record<string, { message: string } | null>> } | undefined;
   cityResources?: boolean;
   equipment?: EquipmentRead | undefined;
   // 넣을 수 없을 때의 이유. null이면 넣을 수 있다.
@@ -51,6 +52,7 @@ interface Props {
   targetLabel: string;
   searchRef: RefObject<HTMLInputElement | null>;
   onPut: (turn: Turn) => void;
+  onSave?: (turn: Turn) => void;
   // 없거나 null을 돌려주면 지도의 모든 도시가 후보다.
   cityChoicesFor?: ((commandKey: string) => CityChoices | null) | undefined;
   // 있으면 고른 명령을 넣기 전에 서버 사전 검사를 받아 경고를 미리 보인다. 30칸 표와 같은 조회 키라 캐시를 같이 쓴다.
@@ -68,12 +70,14 @@ export function CommandPicker({
   defaultCrewType,
   units,
   unitNote = null,
+  recruitment,
   cityResources = false,
   equipment,
   blockedReason,
   targetLabel,
   searchRef,
   onPut,
+  onSave,
   cityChoicesFor,
   precheck,
 }: Props) {
@@ -98,11 +102,17 @@ export function CommandPicker({
   const schemaFor = (item: CommandInfo, target: PreparationTarget) =>
     item.key === 'equipment_trade' ? equipmentUiSchema : cityPreparationSchema(item.argsSchema, cityResources, target);
   // 국가 칸은 대상 장수를 이름으로 고르므로 카드 설명·입력 칸·누락 안내가 같은 이름을 쓴다.
-  const fieldsFor = (target: unknown): ArgField[] =>
+  const fieldsFor = (target: unknown, key: string): ArgField[] =>
     target
-      ? argFields(target, units.all).map((field) =>
-          field.key === 'generalId' && generals ? { ...field, label: '대상 장수' } : field,
-        )
+      ? argFields(target, units.all).map((field) => {
+          if (field.key === 'generalId' && generals) return { ...field, label: '대상 장수' };
+          if (field.kind === 'unit' && recruitment && (key === 'recruit' || key === 'conscript'))
+            return {
+              ...field,
+              options: field.options.filter((option) => recruitment.byCrewType[option.value] === null),
+            };
+          return field;
+        })
       : [];
 
   const categories = useMemo(
@@ -131,7 +141,7 @@ export function CommandPicker({
   );
   const command = commands.find((c) => c.key === chosen) ?? null;
   const schema = command ? schemaFor(command, preparationTarget) : null;
-  const fields = fieldsFor(schema);
+  const fields = command ? fieldsFor(schema, command.key) : [];
   const required = schema ? requiredKeys(schema) : [];
   // 도시 자원 판에서 서버 schema에 도시 수비병 갈래가 있는 명령(INT-18의 훈련·사기)만 갈래를 고른다.
   // 고른 뒤 서버 목록에서 갈래가 사라져도 부곡으로 되돌릴 수 있도록 고른 상태면 선택 칸을 남긴다.
@@ -157,7 +167,7 @@ export function CommandPicker({
     const initial: Record<string, string> = {};
     const mapCity = mapCityFor(next?.key);
     const nextSchema = next ? schemaFor(next, target) : null;
-    for (const field of fieldsFor(nextSchema)) {
+    for (const field of fieldsFor(nextSchema, key)) {
       if (field.kind === 'city' && mapCity !== null) initial[field.key] = String(mapCity);
       // 지금 거느린 병종을 먼저 고른다(병력이 있으면 소집해제 전엔 바꿀 수 없다). 없으면 월드 기본 병종, 첫 장수 병종 순이다.
       if (field.kind === 'unit') {
@@ -190,9 +200,9 @@ export function CommandPicker({
           explicit: true,
         }
       : null;
-  const put = () => {
+  const put = (save = true) => {
     if (!ready || blockedReason) return;
-    onPut(ready);
+    (save && onSave ? onSave : onPut)(ready);
   };
 
   const onSearchKey = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -201,7 +211,11 @@ export function CommandPicker({
     const first = groups[0]?.items[0];
     if (!first) return;
     const nextSchema = choose(first.key);
-    if (nextSchema && !(cityResources && hasCityBranch(first.argsSchema)) && fieldsFor(nextSchema).length === 0) {
+    if (
+      nextSchema &&
+      !(cityResources && hasCityBranch(first.argsSchema)) &&
+      fieldsFor(nextSchema, first.key).length === 0
+    ) {
       if (!blockedReason) onPut({ commandKey: first.key, args: {}, explicit: true });
     } else {
       // 인자 칸이 그려진 뒤 옮긴다.
@@ -268,7 +282,7 @@ export function CommandPicker({
             <div className={styles.commandCards}>
               {group.items.map((item) => {
                 const cardSchema = schemaFor(item, targetOf(item.key));
-                const cardFields = fieldsFor(cardSchema);
+                const cardFields = fieldsFor(cardSchema, item.key);
                 const cardRequired = requiredKeys(cardSchema);
                 const cardId = `${listId}-${item.key}`;
                 return (
@@ -354,8 +368,14 @@ export function CommandPicker({
                 note={
                   field.kind === 'city'
                     ? (choices?.note ?? null)
-                    : field.kind === 'unit' && field.options.length === 0
-                      ? unitNote
+                    : field.kind === 'unit'
+                      ? recruitment && (command.key === 'recruit' || command.key === 'conscript')
+                        ? field.options.length
+                          ? `${recruitment.city}에서 현재 모집할 수 있는 병종입니다.`
+                          : `${recruitment.city}에서 현재 모집할 수 있는 병종이 없습니다.`
+                        : field.options.length === 0
+                          ? unitNote
+                          : null
                       : null
                 }
                 mapHint={
@@ -376,8 +396,22 @@ export function CommandPicker({
       ) : null}
 
       <div className={styles.putRow}>
+        {onSave ? (
+          putReason === null ? (
+            <button type="submit" form={formId} className={styles.primary}>
+              {targetLabel}에 저장
+            </button>
+          ) : (
+            <DisabledReason reason={putReason}>{targetLabel}에 저장</DisabledReason>
+          )
+        ) : null}
         {putReason === null ? (
-          <button type="submit" form={formId} className={styles.primary}>
+          <button
+            type="button"
+            className={onSave ? styles.secondary : styles.primary}
+            onClick={() => put(false)}
+            title={onSave ? '초안에만 넣습니다. 나중에 함께 저장할 수 있습니다.' : undefined}
+          >
             {targetLabel}에 넣기
           </button>
         ) : (

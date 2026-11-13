@@ -33,6 +33,7 @@ const createFields = {
   seed: seed.optional(),
   turnTermMinutes: interval.optional(),
   endYear: z.number().int().min(1).max(10000).nullable(),
+  recruitmentLocation: z.literal('city').optional(),
 };
 export const requestWorldCreateInput = z
   .strictObject({
@@ -60,6 +61,7 @@ export const worldCreateIntentSchema = z.strictObject({
   seed: seed.nullable(),
   turnTermMinutes: interval.nullable(),
   endYear: createFields.endYear,
+  recruitmentLocation: createFields.recruitmentLocation,
 });
 export type WorldCreateIntent = z.infer<typeof worldCreateIntentSchema>;
 export function worldCreateIntent(input: z.infer<typeof requestWorldCreateInput>): WorldCreateIntent {
@@ -78,6 +80,7 @@ export function worldCreateIntent(input: z.infer<typeof requestWorldCreateInput>
     seed: input.seed ?? null,
     turnTermMinutes: input.turnTermMinutes ?? null,
     endYear: input.endYear,
+    ...(input.recruitmentLocation ? { recruitmentLocation: input.recruitmentLocation } : {}),
   };
 }
 export const worldCreateStatusInput = z

@@ -172,6 +172,10 @@ function settingText(setting: AdminSetting): string {
           return setting.value === 'open' ? '새 장수 생성을 다시 받습니다.' : '새 장수 생성을 닫았습니다.';
         case 'entry.npcPlay':
           return setting.value === 'on' ? 'NPC 장수 맡기를 허용합니다.' : 'NPC 장수 맡기를 닫았습니다.';
+        case 'recruitment.location':
+          return setting.value === 'city'
+            ? '지역 병종은 장수가 있는 도시에서만 모집할 수 있습니다.'
+            : '국가가 해당 도시를 보유하면 지역 병종을 모집할 수 있습니다.';
         case 'protection.foundUntilMonths':
           return `건국 보호 기간을 ${setting.value}개월로 변경했습니다.`;
         case 'protection.peaceMonths':

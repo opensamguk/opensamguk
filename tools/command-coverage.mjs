@@ -622,9 +622,7 @@ export function loadContext(root) {
     root,
     registry: readRegistryKeys(root),
     extensionRegistry: readExtensionRegistryKeys(root),
-    featureRegistry: /** @type {{ key: string, target: string, feature: string }[]} */ (
-      JSON.parse(read(FEATURE_REGISTRY_PATH) || '[]')
-    ),
+    featureRegistry: /** @type {{ key: string, target: string }[]} */ (JSON.parse(read(FEATURE_REGISTRY_PATH) || '[]')),
     baseline,
     readme: read('README.md'),
     prd: read('docs/product/prd.md'),
@@ -645,12 +643,12 @@ const isTextArray = (value) => Array.isArray(value) && value.every(isText);
 
 function referenceExists(id, context) {
   if (/^D-\d{3}$/.test(id)) return new RegExp(`^## ${id}(?:\\.|\\s)`, 'm').test(context.decisions);
-  if (/^T\d-\d{2}$/.test(id))
+  if (/^(?:T\d-\d{2}|INT-\d{2}[A-Z]?)$/.test(id))
     return (
       context.planFiles.has(`${id}.md`) || context.phases.includes(`| ${id} `) || context.phase2.includes(`| ${id} `)
     );
   if (/^[UAG]-\d{2}$/.test(id)) return context.phase2.includes(`| ${id} `);
-  if (/^AC-M\d-\d{2}$/.test(id)) return context.acceptance.includes(`| ${id} `);
+  if (/^AC-(?:M\d-\d{2}|INT-\d{2}[A-Z]?)$/.test(id)) return context.acceptance.includes(`| ${id} `);
   if (/^AC-P2-\d{2}$/.test(id)) return context.phase2.includes(`| ${id} `);
   return false;
 }
@@ -1177,13 +1175,13 @@ export function analyze(doc, context) {
     if (registry.has(key)) errors.push(`확장 registry key ${key}가 기본·확장 목록과 겹친다`);
     else registry.set(key, target);
   }
-  // JSON 목록은 Vitest에서 실제 기능 등록과 대조한다. 검사 대상 경로의 모듈은 실행하지 않는다.
+  // JSON 목록은 Vitest에서 최종 명령 resolver와 대조한다. 검사 대상 경로의 모듈은 실행하지 않는다.
   const seenFeatureCommands = new Set();
   if (!Array.isArray(context.featureRegistry)) errors.push('기능 registry 목록은 배열이어야 한다');
   else
     for (const entry of context.featureRegistry) {
-      if (!isObject(entry) || !isText(entry.key) || !isText(entry.feature) || !TARGETS.includes(entry.target)) {
-        errors.push('기능 registry 명령의 key·target·feature를 확인하세요');
+      if (!isObject(entry) || !isText(entry.key) || !TARGETS.includes(entry.target)) {
+        errors.push('기능 registry 명령의 key·target을 확인하세요');
         continue;
       }
       const { key, target } = entry;

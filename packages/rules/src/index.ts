@@ -10,7 +10,12 @@ export {
   MAX_STARTING_NPC_STAT,
 } from './world/initialNpcStats';
 export { crewContext, crewTypeFailure } from './world/crewRequirements';
-export { readOperationalMap, attachOperationalKinds, operationalMapDisplay } from './world/map/stored';
+export {
+  readOperationalMap,
+  readOpeningCityProfile,
+  attachOperationalKinds,
+  operationalMapDisplay,
+} from './world/map/stored';
 export { checkOperationalProfile } from './world/map/profile';
 export type { OperationalMapResource } from './world/map/operational';
 export * from './clock/constants';
@@ -183,6 +188,8 @@ export {
 } from './modifiers';
 
 export * from './ruleRegistry';
+export { createRelationsData, RELATIONS_FEATURE } from './relations/data';
+export { readStoredRelations } from './relations/origin';
 export { applyPersonnelInputStep } from './personnel/inputStep';
 export { completePersonnelStep } from './personnel/step';
 export type { PersonnelStepPacket } from './personnel/step';

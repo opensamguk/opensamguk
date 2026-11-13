@@ -1,6 +1,7 @@
 import { editArray, type ArrayEdit } from '@opensamguk/shared';
 import type { QueuedTurn } from '@opensamguk/rules';
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { protectedProcedure, router, worldVerifiedProcedure } from '../trpc';
 import { worldInput } from '../game/queries';
 import { commandInput, slotInput } from '../game/slots';
@@ -39,6 +40,8 @@ const saveInput = worldInput.extend({
     tenure: z.number().int().min(0).max(2_147_483_647),
   }),
   revision: z.number().int().min(0).max(2_147_483_646),
+  expectedUserId: z.uuid().optional(),
+  expectedActorId: z.number().int().positive().max(2_147_483_647).optional(),
 });
 type ActorContext = Context & { user: NonNullable<Context['user']> };
 function save(
@@ -46,6 +49,8 @@ function save(
   input: z.infer<typeof saveInput>,
   change: Parameters<typeof saveNationOfficeTurns>[2],
 ) {
+  if (input.expectedUserId !== undefined && input.expectedUserId !== ctx.user.id)
+    throw new TRPCError({ code: 'UNAUTHORIZED', message: '로그인한 계정이 바뀌었습니다.' });
   const started = performance.now();
   return ctx.db.$transaction(async (tx) => {
     await requirePersonnelSession(tx, personnelIdentity(ctx, started));

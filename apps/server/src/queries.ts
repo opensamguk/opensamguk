@@ -2,6 +2,7 @@ import type { Prisma, PrismaClient } from '@opensamguk/db';
 import { TRPCError } from '@trpc/server';
 import {
   nowTick,
+  RELATIONS_FEATURE,
   TICKS_PER_MONTH,
   toGameDate,
   effectiveWorldOptions,
@@ -126,6 +127,7 @@ export function worldSummary(world: ReadWorld, now: number) {
     ...(world.ruleFeatures.includes('logistics-v1') ? { logisticsEnabled: true as const } : {}),
     ...(world.ruleFeatures.includes('governance-v1') ? { governanceEnabled: true as const } : {}),
     ...(world.ruleFeatures.includes('lineage-v1') ? { lineageEnabled: true as const } : {}),
+    ...(world.ruleFeatures.includes(RELATIONS_FEATURE) ? { relationsEnabled: true as const } : {}),
     ...(world.ruleFeatures.includes('equipment-v1') ? { equipmentEnabled: true as const } : {}),
   };
 }
