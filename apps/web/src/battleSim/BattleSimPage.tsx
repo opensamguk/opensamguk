@@ -50,6 +50,7 @@ export function BattleSimPage() {
           unitSetKey={rules.data.unitSetKey}
           unitSet={rules.data.unitSet}
           fiveStats={rules.data.statRules.count === 5}
+          battleAffinity={rules.data.battleAffinity}
         />
       ) : (
         <>
@@ -70,11 +71,13 @@ function BattleSimForm({
   unitSetKey,
   unitSet,
   fiveStats,
+  battleAffinity,
 }: {
   worldId: string;
   unitSetKey: string;
   unitSet: WorldUnitSet;
   fiveStats: boolean;
+  battleAffinity: 'multiply' | undefined;
 }) {
   const home = useHome(worldId);
   const trpc = useTRPC();
@@ -90,7 +93,10 @@ function BattleSimForm({
   // shortcut: 장수 병종이 없는 병종표면 0으로 두어 병종 칸 오류로 보인다. 실제 출병도 그런 표로는 돌지 않는다.
   const [form, setForm] = useState<BattleForm>(() => defaultForm(units.defaultId ?? 0));
   const { state, run, cancel, retry } = useBattleWorker(unitSet);
-  const checked = useMemo(() => checkForm(form, units.all, true), [form, units]);
+  const checked = useMemo(
+    () => checkForm(form, units.all, { recordPhases: true, ...(battleAffinity ? { coefMode: battleAffinity } : {}) }),
+    [form, units, battleAffinity],
+  );
   const problems = useMemo(() => {
     const byField = new Map<string, FieldProblem>();
     for (const found of checked.problems) if (!byField.has(found.field)) byField.set(found.field, found);

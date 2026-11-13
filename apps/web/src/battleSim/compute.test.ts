@@ -112,6 +112,17 @@ describe('AC-INT-11 통합판의 단일 교전', () => {
     });
   });
 
+  it('월드의 병종 상성 규칙을 그대로 적용한다', () => {
+    expect(compute(general({ coefMode: 'multiply' }))).toMatchObject({
+      type: 'result',
+      input: { coefMode: 'multiply' },
+    });
+    expect(simulateBattle).toHaveBeenLastCalledWith(
+      expect.objectContaining({ coefMode: 'multiply' }),
+      expect.anything(),
+    );
+  });
+
   it('성벽에는 가짜 지휘관을 만들지 않고 공격 지휘관만 보정한다', () => {
     const commanders = { attacker: { leadership: 78, strength: 80 } };
     const message = wall({ commanders });

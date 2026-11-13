@@ -21,6 +21,7 @@ export type BattleRunInput = {
   defence?: number;
   commanders?: BattleCommanders;
   recordPhases?: true;
+  coefMode?: 'multiply';
   attackerTraits?: AttackerTraits;
 };
 export type BattleRunBody = BattleRunInput & { seed: string };
@@ -95,6 +96,7 @@ const REQUEST_KEYS = new Set([
   'defenderTech',
   'commanders',
   'recordPhases',
+  'coefMode',
   'attackerTraits',
 ]);
 const combatHeritageKeys = [
@@ -138,6 +140,7 @@ export function requestProblems(message: unknown, units: readonly UnitChoice[]):
     if (!REQUEST_KEYS.has(key) && key !== 'defence') add(key, { problem: 'unexpected' });
   }
 
+  if ('coefMode' in message && message.coefMode !== 'multiply') add('coefMode', { problem: 'unexpected' });
   if ('recordPhases' in message && message.recordPhases !== true) add('recordPhases', { problem: 'unexpected' });
 
   if ('attackerTraits' in message) {
@@ -281,6 +284,7 @@ export function checkRequest(message: unknown, units: readonly UnitChoice[]): Ch
   };
   if (m.defender.crewType === WALL_CREW_TYPE) request.defence = m.defence!;
   if (m.recordPhases) request.recordPhases = true;
+  if (m.coefMode) request.coefMode = m.coefMode;
   if (m.attackerTraits) {
     const { personality, specialty, proficiency, tactics, heritage } = m.attackerTraits;
     request.attackerTraits = {
@@ -375,8 +379,12 @@ export function formBody(form: BattleForm): Record<string, unknown> {
 
 export type FormCheck = { body: BattleRunBody; problems: [] } | { body: null; problems: FieldProblem[] };
 
-export function checkForm(form: BattleForm, units: readonly UnitChoice[], recordPhases?: true): FormCheck {
-  const message = { type: 'run', requestId: 1, ...formBody(form), ...(recordPhases ? { recordPhases } : {}) };
+export function checkForm(
+  form: BattleForm,
+  units: readonly UnitChoice[],
+  options: Pick<BattleRunInput, 'recordPhases' | 'coefMode'> = {},
+): FormCheck {
+  const message = { type: 'run', requestId: 1, ...formBody(form), ...options };
   const checked = checkRequest(message, units);
   if (!checked.ok) return { body: null, problems: requestProblems(message, units) };
   return { body: requestBody(checked.request), problems: [] };
@@ -393,6 +401,7 @@ export function requestBody(request: BattleRunRequest): BattleRunBody {
   };
   if (request.defence !== undefined) body.defence = request.defence;
   if (request.recordPhases) body.recordPhases = true;
+  if (request.coefMode) body.coefMode = request.coefMode;
   if (request.attackerTraits) body.attackerTraits = request.attackerTraits;
   if (request.commanders) body.commanders = request.commanders;
   return body;
