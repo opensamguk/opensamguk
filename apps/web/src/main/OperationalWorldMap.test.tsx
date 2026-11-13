@@ -12,6 +12,8 @@ const san10Resource: unknown = JSON.parse(
 );
 import {
   MIN_VIEW_WIDTH,
+  chooserGroups,
+  chooserTag,
   matchesOperationalGeography,
   operationalOverview,
   wheelFactor,
@@ -300,4 +302,53 @@ it('D-053 수도는 이름표 앞 별표와 접근성 이름 「수도」로 누
   // 공개 지도 사본처럼 수도를 모르는 국가는 별표를 달지 않는다.
   const plain = draw();
   expect([...plain.container.querySelectorAll('svg text')].some((text) => text.textContent?.includes('★'))).toBe(false);
+});
+
+it('INT-25 AC-INT-25 지도 거점 고르기는 본국·타국·공백지를 붙이고 본국을 먼저 묶는다', () => {
+  const three = [
+    { ...makeCity(1, '허창', 'CITY', 300), nationId: 2 },
+    { ...makeCity(2, '관문', 'PASS', 600), nationId: null },
+    { ...makeCity(3, '진류', 'CITY', 700), nationId: 1 },
+  ];
+  const sites = [
+    ...map.sites,
+    { id: 'city:3', name: '진류', kind: 'CITY' as const, anchorKey: 3, position: { x: 700, y: 200 } },
+  ];
+  render(
+    <WorldMap
+      cities={three}
+      nations={[...nations, { id: 2, name: '촉', color: '#2f6e5e' }]}
+      operationalMap={{ ...map, sites }}
+      myCityKey={3}
+      myNationId={1}
+      selectedKey={3}
+      onSelect={vi.fn()}
+    />,
+  );
+  const select = screen.getByRole('combobox', { name: '지도 거점' });
+  // 비활성 안내 한 줄 + 거점 3개. 묶음은 option 수를 바꾸지 않는다.
+  expect(select.querySelectorAll('option')).toHaveLength(4);
+  expect([...select.querySelectorAll('optgroup')].map((group) => group.label)).toEqual(['본국', '타국', '공백지']);
+  expect([...select.querySelectorAll('optgroup option')].map((option) => option.textContent)).toEqual([
+    '진류 (도시) · 본국',
+    '허창 (도시) · 타국',
+    '관문 (관문) · 공백지',
+  ]);
+});
+
+it('INT-25 AC-INT-25 재야는 본국 없이 타국·공백지로, 내 국가를 모르면 묶지 않는다', () => {
+  const byKey = new Map([
+    [1, { nationId: 1 }],
+    [2, { nationId: null }],
+    [3, { nationId: 1, recorded: false }],
+  ]);
+  const anchors = [{ anchorKey: 1 }, { anchorKey: 2 }, { anchorKey: 3 }];
+  expect(chooserGroups(anchors, byKey, null).map((group) => [group.tag, group.sites.length])).toEqual([
+    ['타국', 1],
+    ['공백지', 1],
+    ['기록 없음', 1],
+  ]);
+  expect(chooserTag({ nationId: 1 }, 1)).toBe('본국');
+  draw();
+  expect(screen.getByRole('combobox', { name: '지도 거점' }).querySelectorAll('optgroup')).toHaveLength(0);
 });

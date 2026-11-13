@@ -57,6 +57,7 @@ export function WorldMap({
   cities,
   nations,
   myCityKey = null,
+  myNationId,
   selectedKey = null,
   onSelect,
   operationalMap,
@@ -66,6 +67,8 @@ export function WorldMap({
   cities: readonly DrawnCity[];
   nations: readonly DrawnNation[];
   myCityKey?: number | null;
+  // 운영 지도의 거점 고르기를 본국·타국·공백지로 묶을 때 쓰는 내 국가 (INT-25). 안 주면 묶지 않는다.
+  myNationId?: number | null | undefined;
   selectedKey?: number | null;
   onSelect?: (key: number) => void;
   operationalMap?: PublicGeography | undefined;
@@ -79,6 +82,7 @@ export function WorldMap({
         cities={cities}
         nations={nations}
         myCityKey={myCityKey}
+        myNationId={myNationId}
         selectedKey={selectedKey}
         {...(onSelect ? { onSelect } : {})}
         map={operationalMap}

@@ -97,11 +97,40 @@ export function matchesOperationalGeography(map: MapData, cities: readonly Drawn
   });
 }
 
+// 지도 거점 고르기의 소속 구분 (INT-25, 원작 현재 도시 화면의 도시선택 `본국`·`타국`·`공백지`).
+export type ChooserTag = '본국' | '타국' | '공백지' | '기록 없음';
+const CHOOSER_ORDER: readonly ChooserTag[] = ['본국', '타국', '공백지', '기록 없음'];
+
+export function chooserTag(
+  city: Pick<DrawnCity, 'nationId' | 'recorded'> | undefined,
+  myNationId: number | null,
+): ChooserTag {
+  if (!city || city.recorded === false) return '기록 없음';
+  if (city.nationId === null) return '공백지';
+  return myNationId !== null && city.nationId === myNationId ? '본국' : '타국';
+}
+
+// 거점을 소속별로 묶는다. 본국을 먼저 두고 묶음 안에서는 지도 자료 순서를 지킨다. 빈 묶음은 뺀다.
+export function chooserGroups<T extends { anchorKey?: number | undefined }>(
+  anchors: readonly T[],
+  cityByKey: ReadonlyMap<number, Pick<DrawnCity, 'nationId' | 'recorded'>>,
+  myNationId: number | null,
+): Array<{ tag: ChooserTag; sites: T[] }> {
+  return CHOOSER_ORDER.map((tag) => ({
+    tag,
+    sites: anchors.filter(
+      (site) =>
+        chooserTag(site.anchorKey === undefined ? undefined : cityByKey.get(site.anchorKey), myNationId) === tag,
+    ),
+  })).filter((group) => group.sites.length > 0);
+}
+
 export function OperationalWorldMap({
   cities,
   nations,
   map,
   myCityKey,
+  myNationId,
   selectedKey,
   onSelect,
   fill = false,
@@ -112,6 +141,8 @@ export function OperationalWorldMap({
   nations: readonly DrawnNation[];
   map: MapData;
   myCityKey: number | null;
+  /** 내 국가. 주면 지도 거점 고르기를 본국·타국·공백지로 묶는다(재야는 null). 안 주면 묶지 않는다. */
+  myNationId?: number | null | undefined;
   selectedKey: number | null;
   onSelect?: (key: number) => void;
   /** 부모 상자를 가득 채운다(로그인 배경). 남는 가장자리는 바다색이다. */
@@ -392,11 +423,21 @@ export function OperationalWorldMap({
               <option value="" disabled>
                 도시·관문 선택
               </option>
-              {anchors.map((site) => (
-                <option key={site.id} value={site.anchorKey}>
-                  {site.name} ({labels[site.kind]})
-                </option>
-              ))}
+              {myNationId === undefined
+                ? anchors.map((site) => (
+                    <option key={site.id} value={site.anchorKey}>
+                      {site.name} ({labels[site.kind]})
+                    </option>
+                  ))
+                : chooserGroups(anchors, cityByKey, myNationId).map((group) => (
+                    <optgroup key={group.tag} label={group.tag}>
+                      {group.sites.map((site) => (
+                        <option key={site.id} value={site.anchorKey}>
+                          {site.name} ({labels[site.kind]}) · {group.tag}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
             </select>
           </label>
         )}

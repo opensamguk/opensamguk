@@ -65,6 +65,22 @@ export function visibleScopes(unread: UnreadResponse | undefined): MessageScope[
   return MESSAGE_SCOPES.filter((scope) => unread[scope] !== null);
 }
 
+// 위 띠 메시지 단추의 배지 (INT-25, 원작 메인의 `새로운 개인 메시지`·`새로운 외교 메시지` 알림).
+// 개인과 외교는 따로 세고, 국가·전체는 기타로 묶는다. 볼 권한이 없는 범위(null)는 세지 않는다.
+export interface UnreadBadges {
+  private: number;
+  diplomacy: number;
+  other: number;
+}
+export function unreadBadges(unread: UnreadResponse | undefined): UnreadBadges {
+  if (!unread) return { private: 0, diplomacy: 0, other: 0 };
+  return {
+    private: unread.PRIVATE ?? 0,
+    diplomacy: unread.DIPLOMACY ?? 0,
+    other: (unread.NATION ?? 0) + (unread.WORLD ?? 0),
+  };
+}
+
 export function unreadTotal(unread: UnreadResponse | undefined): number {
   if (!unread) return 0;
   return MESSAGE_SCOPES.reduce((sum, scope) => sum + (unread[scope] ?? 0), 0);
