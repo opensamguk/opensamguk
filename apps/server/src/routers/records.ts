@@ -1,5 +1,5 @@
 import { TRPCError } from '@trpc/server';
-import { rankGenerals } from '@opensamguk/rules';
+import { rankGenerals, reputationEventSchema } from '@opensamguk/rules';
 import { protectedProcedure, router, worldVerifiedProcedure } from '../trpc';
 import { beforeCursor, page, readWorld, recordsInput, requireGeneral, seasonResultInfo, worldInput } from '../queries';
 import { logInfo, logSelect, nationRecordInfo, worldRecordInfo } from '../visibility';
@@ -12,6 +12,52 @@ const generalInput = worldInput.extend({ cursor: z.string().min(1).max(256).opti
 const seasonInput = worldInput.extend({ by: z.enum(['dedication', 'experience', 'merit']).default('dedication') });
 
 export const recordsRouter = router({
+  activity: protectedProcedure.input(generalInput).query(({ ctx, input }) =>
+    readWorld(ctx.db, input.worldId, async (tx) => {
+      const cursor = input.cursor === undefined ? null : decodeRecordCursor(input.cursor, generalLogCursor);
+      const rows = await tx.reputationEvent.findMany({
+        where: {
+          worldId: input.worldId,
+          ...(cursor ? { OR: [{ tick: { lt: cursor[0] } }, { tick: cursor[0], id: { lt: BigInt(cursor[1]) } }] } : {}),
+        },
+        orderBy: [{ tick: 'desc' }, { id: 'desc' }],
+        take: 31,
+        select: {
+          id: true,
+          generalId: true,
+          year: true,
+          month: true,
+          kind: true,
+          score: true,
+          tick: true,
+          generalName: true,
+          nationId: true,
+          nationName: true,
+          nationColor: true,
+          cityKey: true,
+          cityName: true,
+        },
+      });
+      const items = rows.slice(0, 30).map((row) => {
+        const { id, generalName, nationId, nationName, nationColor, cityKey, cityName, ...event } = row;
+        return {
+          id: id.toString(),
+          ...reputationEventSchema.parse({
+            ...event,
+            data: {
+              name: generalName,
+              nation: nationId === null ? null : { id: nationId, name: nationName, color: nationColor },
+              city: cityKey === null ? null : { cityKey, name: cityName },
+            },
+          }),
+        };
+      });
+      return {
+        items,
+        nextCursor: rows.length > 30 ? encodeRecordCursor([items.at(-1)!.tick, items.at(-1)!.id]) : null,
+      };
+    }),
+  ),
   season: worldVerifiedProcedure.input(seasonInput).query(({ ctx, input }) =>
     readWorld(ctx.db, input.worldId, async (tx, world) => {
       const result = seasonResultInfo(world);
