@@ -282,7 +282,7 @@ describe('메시지 패널', () => {
     expect(box.value).toBe('쓰던 글');
   });
 
-  it('전체 탭은 고정 공지를 맨 위에 두고 작성 칸이 없다', async () => {
+  it('전체 탭은 고정 공지를 보이고 수신자 지정 없이 보낸다', async () => {
     on('notice.world.list', () => ({
       items: [{ id: 'n1', body: '점검 안내', pinned: true, publishedAt: '2026-10-23T00:00:00Z' }],
     }));
@@ -290,7 +290,15 @@ describe('메시지 패널', () => {
     fireEvent.click(await screen.findByRole('tab', { name: '전체' }));
     expect(await screen.findByText('점검 안내')).toBeTruthy();
     expect(screen.getByText('고정')).toBeTruthy();
-    expect(screen.queryByRole('textbox')).toBeNull();
+    const box = await screen.findByRole('textbox', { name: '메시지 내용' });
+    expect(screen.queryByRole('combobox')).toBeNull();
+    fireEvent.change(box, { target: { value: '월드 대화' } });
+    fireEvent.click(screen.getByRole('button', { name: '보내기' }));
+    await waitFor(() =>
+      expect(callsTo('message.send').map((call) => call.input)).toEqual([
+        { worldId: WORLD, scope: 'WORLD', body: '월드 대화' },
+      ]),
+    );
   });
 
   it('본문이 코드포인트 1,000자를 넘으면 보내지 않고 서버와 같은 이유를 보인다', async () => {

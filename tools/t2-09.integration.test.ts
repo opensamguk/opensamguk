@@ -322,9 +322,30 @@ describe('T2-09 실제 HTTP 메시지·공지 권한 대조', () => {
       WORLD: 0,
     });
   });
+  it('재야도 전체 메시지를 보내고 같은 월드의 다른 장수가 읽는다', async () => {
+    const sent = await call<Outputs['message']['send']>(
+      'message.send',
+      { worldId, scope: 'WORLD', body: '천하에 인사합니다' },
+      3,
+    );
+    expect(sent.status).toBe(200);
+    expect(sent.data?.item).toMatchObject({ direction: 'sent', scope: 'WORLD', from: { nation: null } });
+    const inbox = await call<Outputs['message']['list']>('message.list', { worldId, scope: 'WORLD' }, 2);
+    expect(inbox.data?.items[0]).toMatchObject({
+      id: sent.data?.item.id,
+      direction: 'received',
+      body: '천하에 인사합니다',
+      read: false,
+    });
+    const unread = await call<Outputs['message']['unread']>('message.unread', { worldId }, 2);
+    expect(unread.data?.WORLD).toBe(1);
+    expect((await call('message.send', { worldId, scope: 'WORLD', body: '잘못', toGeneralId: 2 }, 3)).code).toBe(
+      'BAD_REQUEST',
+    );
+  });
   it('입력·수신자·scope와 cursor를 엄격히 검사하고 공개 수신자 목록만 낸다', async () => {
     for (const data of [
-      { scope: 'WORLD', body: '금지' },
+      { scope: 'WORLD', toNationId: 2, body: '잘못' },
       { scope: 'PRIVATE', body: '없음' },
       { scope: 'NATION', toGeneralId: 2, body: '잘못' },
       { scope: 'PRIVATE', toGeneralId: 999, body: '없음' },
