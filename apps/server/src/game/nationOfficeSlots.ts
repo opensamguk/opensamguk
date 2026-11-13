@@ -7,6 +7,7 @@ import {
   canExecuteCityNationCommand,
   canExecuteResearchNationCommand,
   officerTitle,
+  COURT_RANK_FEATURE,
   nationRank,
   type QueuedTurn,
 } from '@opensamguk/rules';
@@ -94,11 +95,13 @@ export async function readNationOfficeTabs(tx: Prisma.TransactionClient, worldId
     const occupied = holders.filter((general) => general.officerLevel === officerLevel);
     if (occupied.length > 1) throw new Error('한 직책에 장수가 둘 이상 있습니다.');
     const holder = occupied[0];
+    const courtTitle = rank?.offices.find((office) => office.officerLevel === officerLevel)?.title ?? null;
+    if (!holder && courtTitle === null && world.ruleFeatures.includes(COURT_RANK_FEATURE)) continue;
     tabs.push({
       office: { nationId, officerLevel, tenure: row?.tenure ?? 0 },
       officerLevel,
       title: officerTitle(officerLevel)!,
-      courtTitle: rank?.offices.find((office) => office.officerLevel === officerLevel)?.title ?? null,
+      courtTitle,
       holder: holder
         ? { generalId: holder.id, name: holder.name, portraitId: holder.portraitId, isHuman: holder.userId !== null }
         : null,

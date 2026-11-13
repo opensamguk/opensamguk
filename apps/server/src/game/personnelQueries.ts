@@ -2,6 +2,7 @@ import type { Prisma } from '@opensamguk/db';
 import {
   APPOINTABLE_OFFICER_LEVELS,
   canManagePersonnel,
+  courtOfficeTitle,
   isLocalOffice,
   isOfficeResident,
   localOfficeTitle,
@@ -42,9 +43,19 @@ export async function readPersonnelBoard(
   tx: Prisma.TransactionClient,
   input: { worldId: string; userId: string },
   officeEffectsEnabled = false,
+  courtRankEnabled = false,
 ): Promise<PersonnelBoard> {
   const actor = await requireGeneral(tx, input.worldId, input.userId);
   if (actor.nationId === null) throw new TRPCError({ code: 'FORBIDDEN', message: '국가에 소속되어야 합니다.' });
+  const courtRank = courtRankEnabled
+    ? (
+        await tx.nation.findUniqueOrThrow({
+          where: { worldId_id: { worldId: input.worldId, id: actor.nationId } },
+          select: { level: true },
+        })
+      ).level
+    : null;
+  const courtTitle = (level: number) => (courtRank === null ? null : courtOfficeTitle(courtRank, level));
   const rows = await tx.general.findMany({
     where: { worldId: input.worldId, nationId: actor.nationId },
     orderBy: [{ officerLevel: 'desc' }, { id: 'asc' }],
@@ -65,7 +76,7 @@ export async function readPersonnelBoard(
     title:
       officeEffectsEnabled && isLocalOffice(row.officerLevel)
         ? localOfficeTitle(row.officerLevel)
-        : titleFor(row.officerLevel),
+        : (courtTitle(row.officerLevel) ?? titleFor(row.officerLevel)),
     isHuman: row.userId !== null,
     city: { cityKey: row.city.cityKey, name: row.city.name },
     ...(officeEffectsEnabled
@@ -98,11 +109,13 @@ export async function readPersonnelBoard(
     appoint: canManagePersonnel(actor.officerLevel)
       ? { ok: true }
       : { ok: false, reason: '군주만 임명·해임할 수 있습니다.' },
-    levels: APPOINTABLE_OFFICER_LEVELS.map((officerLevel) => {
+    levels: APPOINTABLE_OFFICER_LEVELS.flatMap((officerLevel) => {
       const holders = members.filter((member) => member.officerLevel === officerLevel);
       if (holders.length > 1)
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: '직책에 장수가 둘 이상 있습니다.' });
-      return { officerLevel, title: titleFor(officerLevel), holderId: holders[0]?.generalId ?? null };
+      const title = courtTitle(officerLevel);
+      if (courtRank !== null && title === null && holders.length === 0) return [];
+      return [{ officerLevel, title: title ?? titleFor(officerLevel), holderId: holders[0]?.generalId ?? null }];
     }),
     members,
   };

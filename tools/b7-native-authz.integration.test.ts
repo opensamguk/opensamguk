@@ -4,6 +4,7 @@ import { createDb } from '../packages/db/src/index';
 import {
   TICKS_PER_MONTH,
   officerTitle,
+  COURT_RANK_FEATURE,
   toGameDate,
   assignmentRejectCost,
   ASSIGNMENT_REJECT_PERCENT,
@@ -76,9 +77,10 @@ afterAll(async () => {
   await db.$disconnect();
 });
 
-async function fixture(path: Path, options: { owner?: number; requestId?: string } = {}) {
+async function fixture(path: Path, options: { owner?: number; requestId?: string; courtRank?: boolean } = {}) {
   const owner = options.owner ?? 0;
   const state = structuredClone(initial);
+  if (options.courtRank) state.nations[0]!.level = 1;
   // 형식 3의 기원은 NPC만 담는다. 접속 계정 연결은 생성 후 현재 DB 상태에만 둔다.
   for (const general of state.generals) general.userId = null;
   state.generals[0]!.officerLevel = path.startsWith('offers.') ? 5 : 12;
@@ -92,7 +94,7 @@ async function fixture(path: Path, options: { owner?: number; requestId?: string
     turnTermMinutes: 60,
     endYear: null,
     replayFormat: 3,
-    ruleFeatures: ['personnel', 'policy'],
+    ruleFeatures: [...(options.courtRank ? [COURT_RANK_FEATURE] : []), 'personnel', 'policy'],
   });
   worldIds.add(worldId);
   await db.world.update({
@@ -496,6 +498,21 @@ async function expectLowerRole(path: Path, f: Fixture) {
     await expectNoWriteRejection(path, input(path, f), f, 'FORBIDDEN', 403, cookies[1]);
   }
 }
+
+it('호족은 잠긴 빈 직책을 조회하거나 임명할 수 없다', async () => {
+  const f = await fixture('personnel.appoint', { courtRank: true });
+  const board = await request('personnel.officers', { worldId: f.worldId }, cookies[0]);
+  expect(board.status).toBe(200);
+  expect(board.data).toHaveProperty('levels.0.title', '참모');
+  expect(board.data).not.toHaveProperty('levels.2');
+  const appoint = await request(
+    'personnel.appoint',
+    { ...input('personnel.appoint', f), officerLevel: 10 },
+    cookies[0],
+  );
+  expect(appoint.status).toBe(400);
+  expect(await db.inputEvent.count({ where: { worldId: f.worldId, kind: 'personnel.appoint' } })).toBe(0);
+});
 
 describe('B7 실제 HTTP·PostgreSQL 인가 기록', () => {
   for (const path of paths)
