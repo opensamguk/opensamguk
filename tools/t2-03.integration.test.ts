@@ -449,6 +449,61 @@ describe('T2-03 실제 로비 HTTP·PostgreSQL', () => {
   }
   for (const category of ['success', 'unauthenticated', 'sanctioned', 'invalidInput'] as const) {
     it(
+      `lobby.hallOfFame 권한 ${category}`,
+      authzCase('lobby.hallOfFame', category, async () => {
+        const user = await identity();
+        if (category === 'sanctioned') await db.user.update({ where: { id: user.id }, data: { status: 'SANCTIONED' } });
+        const { worldId } = await fixture('ENDED');
+        const { worldId: liveId } = await fixture('RUNNING');
+        for (const id of [worldId, liveId]) {
+          await db.worldResult.create({
+            data: {
+              worldId: id,
+              reason: 'END_YEAR',
+              endedYear: 191,
+              endedMonth: 12,
+              endedTick: 10000,
+              endedSequence: 1,
+              remainingNations: 2,
+              finalStateHash: 'hall-of-fame-test',
+              endedAt: new Date(),
+            },
+          });
+          await db.seasonGeneral.create({
+            data: {
+              worldId: id,
+              generalId: 1,
+              userId: user.id,
+              name: '기록 장수',
+              officerLevel: 1,
+              dedication: 1,
+              experience: 2,
+              wins: id === liveId ? 500 : 3,
+              captures: 4,
+            },
+          });
+        }
+        const cookie = category === 'unauthenticated' ? undefined : user.cookie;
+        const result = await call<{ worldId: string; value: number }[]>(
+          'lobby.hallOfFame',
+          category === 'invalidInput' ? { userId: user.id } : { by: 'merit' },
+          cookie,
+        );
+        if (category === 'invalidInput') {
+          expect(result.code).toBe('BAD_REQUEST');
+          return;
+        }
+        expect(result.status).toBe(200);
+        expect(result.data).toEqual([expect.objectContaining({ worldId, value: 7, rank: 1 })]);
+        expect(result.data?.[0]).not.toHaveProperty('userId');
+        expect((await call('lobby.hallOfFame', { worldId, by: 'experience' }, cookie)).data).toEqual([
+          expect.objectContaining({ worldId, value: 2, rank: 1 }),
+        ]);
+      }),
+    );
+  }
+  for (const category of ['success', 'unauthenticated', 'sanctioned', 'invalidInput'] as const) {
+    it(
       `lobby.notices 권한 ${category}`,
       authzCase('lobby.notices', category, async () => {
         const user = await identity();
