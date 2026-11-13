@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { format, resolveConfig } from 'prettier';
-import { buildSan10Map, buildSan10Scenarios } from './san10';
+import { buildSan10Map, buildSan10MapV2, buildSan10Scenarios } from './san10';
 import { validateWorldResources } from '../../packages/rules/src/world/validate';
 import { hashState } from '../../packages/shared/src/node/hashState';
 import { buildExpandedUnitSet } from '../unitset/expanded';
@@ -46,6 +46,8 @@ for (const scenario of Object.values(scenarios)) {
   await write(`resources/scenario/${scenario.id}.json`, scenario);
 }
 await write('resources/map/san10.json', map);
+const mapV2 = buildSan10MapV2(map);
+await write('resources/map/san10-v2.json', mapV2);
 const source =
   'D-045/D-056; SAN10 user survey / core2026 df6c926 MIT / Natural Earth v5.1.2 public domain; resources/map-drafts/san10/NOTICE.md';
 await write('resources/san10-manifest.json', [
@@ -65,6 +67,14 @@ await write('resources/san10-manifest.json', [
     version: 1,
     contentHash: hashState(unitSet),
     source,
+  },
+  {
+    kind: 'MAP',
+    name: mapV2.id,
+    path: 'resources/map/san10-v2.json',
+    version: 2,
+    contentHash: hashState(mapV2),
+    source: 'D-082; core2026 df6c926 MIT; resources/map-drafts/san10/NOTICE.md',
   },
 ]);
 await writeFile(
