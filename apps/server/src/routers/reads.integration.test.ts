@@ -16,6 +16,7 @@ type Results = {
   'home.get': Out['home']['get'];
   'city.get': Out['city']['get'];
   'nation.get': Out['nation']['get'];
+  'commands.recruitCandidates': Out['commands']['recruitCandidates'];
   'records.general': Out['records']['general'];
   'records.nation': Out['records']['nation'];
   'records.world': Out['records']['world'];
@@ -26,6 +27,7 @@ const routes = [
   'home.get',
   'city.get',
   'nation.get',
+  'commands.recruitCandidates',
   'records.general',
   'records.nation',
   'records.world',
@@ -205,6 +207,28 @@ afterAll(async () => {
 });
 
 describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
+  it('AC-INT-26 군주 등용 후보는 실제 명령 사전 검사와 같다', async () => {
+    const world = await fixtureWorld('recruit');
+    await db.general.update({
+      where: { worldId_id: { worldId: world, id: 1 } },
+      data: { officerLevel: 12 },
+    });
+    const candidate = state.generals[3]!;
+    const result = await query('commands.recruitCandidates', { worldId: world });
+    expect(result.status).toBe(200);
+    expect(result.data).toEqual([
+      {
+        id: candidate.id,
+        name: candidate.name,
+        portraitId: candidate.portraitId ?? null,
+        isHuman: true,
+        cityKey: candidate.cityKey,
+        cityName: state.cities[0]!.name,
+      },
+    ]);
+    expect((await query('commands.recruitCandidates', { worldId: world }, users[2]!.cookie)).data).toEqual([]);
+    expect((await query('commands.recruitCandidates', { worldId: world }, users[3]!.cookie)).status).toBe(404);
+  });
   it('summary는 서버 시계와 공개 기수 설정을 반환한다', async () => {
     expect(await query('world.summary', { worldId })).toEqual({
       status: 200,

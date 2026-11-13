@@ -50,6 +50,7 @@ const paths = [
   'turns.edit',
   'turns.precheck',
   'commands.list',
+  'commands.recruitCandidates',
   'home.get',
   'city.get',
   'nation.get',
