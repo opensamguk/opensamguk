@@ -9,11 +9,16 @@ export const equipmentEffectText = (item: Pick<EquipmentItem, 'stat' | 'bonus'>)
   `${EQUIPMENT_STATS[item.stat]} +${item.bonus}`;
 
 // 이름과 효과를 따로 감싼다. 이름만으로 찾는 기존 시험(getByText 정확히 일치)이 그대로 맞는다.
-function EquippedItem({ item }: { item: Pick<EquipmentItem, 'name' | 'stat' | 'bonus'> | undefined }) {
+function EquippedItem({
+  item,
+}: {
+  item: (Pick<EquipmentItem, 'name' | 'stat' | 'bonus'> & { description?: string }) | undefined;
+}) {
   if (!item) return <>미장착</>;
   return (
     <>
-      <span>{item.name}</span> <span data-testid="equipment-effect">({equipmentEffectText(item)})</span>
+      <span>{item.name}</span>{' '}
+      <span data-testid="equipment-effect">({item.description ?? equipmentEffectText(item)})</span>
     </>
   );
 }
