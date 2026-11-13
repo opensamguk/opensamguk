@@ -20,7 +20,12 @@ export type RequestState<R> =
   | { status: 'applied'; requestId: string; result: R }
   | { status: 'rejected'; requestId: string; code: string; message: string };
 export type PersonnelRecord = { kind: PersonnelKind; state: RequestState<AppointResult | RespondResult> };
-export type PersonnelReady = Readonly<{ worldId: string; personnel: 'ready'; officeEffectsEnabled?: true }>;
+export type PersonnelReady = Readonly<{
+  worldId: string;
+  personnel: 'ready';
+  officeEffectsEnabled?: true;
+  secretaryEnabled?: true;
+}>;
 type EventRow = Pick<
   Prisma.InputEventGetPayload<Record<string, never>>,
   'kind' | 'idempotencyKey' | 'status' | 'result'

@@ -4,6 +4,7 @@ import {
   canManagePersonnel,
   isAppointableOfficerLevel,
   isLocalOffice,
+  hasCitySecretary,
   localOfficeAbility,
   OFFICE_EFFECTS_FEATURE,
   officeEffectsSchema,
@@ -32,6 +33,7 @@ export function requirePersonnelWorld(world: {
   id: string;
   replayFormat: number;
   ruleFeatures: readonly string[];
+  officeEffects?: unknown;
 }): PersonnelReady {
   if (world.replayFormat !== 3 || !world.ruleFeatures.includes('personnel'))
     throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '이 월드에서 인사 기능을 사용할 수 없습니다.' });
@@ -39,6 +41,10 @@ export function requirePersonnelWorld(world: {
     worldId: world.id,
     personnel: 'ready',
     ...(world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE) ? { officeEffectsEnabled: true as const } : {}),
+    ...(world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE) &&
+    hasCitySecretary(officeEffectsSchema.safeParse(world.officeEffects).data)
+      ? { secretaryEnabled: true as const }
+      : {}),
   };
 }
 
@@ -92,6 +98,9 @@ export async function submitPersonnelRequest(
       if (isLocalOffice(appointment.officerLevel)) {
         if (!world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE) || appointment.cityKey === undefined)
           throw new TRPCError({ code: 'BAD_REQUEST', message: '직책과 담당 도시를 확인하세요.' });
+        const officeEffects = officeEffectsSchema.parse(world.officeEffects);
+        if (appointment.officerLevel === 2 && !hasCitySecretary(officeEffects))
+          throw new TRPCError({ code: 'BAD_REQUEST', message: '이 월드에서 종사를 임명할 수 없습니다.' });
         const city = await tx.city.findUnique({
           where: { worldId_cityKey: { worldId: world.id, cityKey: appointment.cityKey } },
         });
@@ -99,11 +108,7 @@ export async function submitPersonnelRequest(
           throw new TRPCError({ code: 'BAD_REQUEST', message: '자기 국가의 도시만 담당할 수 있습니다.' });
         if (
           target.removedAt !== null ||
-          !localOfficeAbility(
-            target,
-            appointment.officerLevel,
-            officeEffectsSchema.parse(world.officeEffects).minimumAbility,
-          )
+          !localOfficeAbility(target, appointment.officerLevel, officeEffects.minimumAbility)
         )
           throw new TRPCError({ code: 'BAD_REQUEST', message: '임명 자격을 갖춘 일반 장수만 가능합니다.' });
         if (appointment.expectedHolderId !== undefined) {

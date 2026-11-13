@@ -14,6 +14,7 @@ export interface PersonnelBoard {
   actorId: number;
   appoint: Allowed;
   officeEffectsEnabled?: boolean;
+  secretaryEnabled?: boolean;
   officeCities?: CityRef[];
   levels: Array<{ officerLevel: number; title: string; holderId: number | null }>;
   members: PersonnelMember[];

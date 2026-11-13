@@ -5,23 +5,32 @@ import type { InitialGeneral } from '../world/bootstrap';
 
 export const OFFICE_EFFECTS_FEATURE = 'office-effects';
 const percent = z.number().int().min(0).max(50);
-export const officeEffectsSchema = z.strictObject({
+const officeEffectsBase = z.strictObject({
   version: z.literal(1),
   minimumAbility: z.number().int().positive().max(100),
   tax: z.strictObject({ 3: percent, 4: percent, 11: percent }),
   supplyLoss: z.strictObject({ 5: percent, 6: percent, 7: percent, 8: percent, 9: percent, 10: percent }),
 });
+export const officeEffectsSchema = z.union([
+  officeEffectsBase.extend({ secretary: z.literal(true) }),
+  officeEffectsBase,
+]);
 export const defaultOfficeEffects = officeEffectsSchema.parse(officeEffectsConfig);
 export type OfficeEffects = z.infer<typeof officeEffectsSchema>;
-export const isLocalOffice = (level: number): level is 3 | 4 => level === 3 || level === 4;
-export const localOfficeTitle = (level: 3 | 4) => (level === 3 ? '군사' : '태수');
+export const hasCitySecretary = (effects: OfficeEffects | undefined): boolean =>
+  effects !== undefined && 'secretary' in effects;
+const localOfficeTitles = { 2: '종사', 3: '군사', 4: '태수' } as const;
+type LocalOfficeLevel = keyof typeof localOfficeTitles;
+export const isLocalOffice = (level: number): level is LocalOfficeLevel => Object.hasOwn(localOfficeTitles, level);
+export const localOfficeTitle = (level: LocalOfficeLevel) => localOfficeTitles[level];
 
 export function localOfficeAbility(
   general: Pick<InitialGeneral, 'officerLevel' | 'strength' | 'intel'>,
-  level: 3 | 4,
+  level: LocalOfficeLevel,
   minimum: number,
 ): boolean {
-  return general.officerLevel <= 1 && (level === 4 ? general.strength : general.intel) >= minimum;
+  // 원작 officeRequest의 종사(2)에는 무력·지력 문턱이 없다.
+  return general.officerLevel <= 1 && (level === 2 || (level === 4 ? general.strength : general.intel) >= minimum);
 }
 
 export function isOfficeResident(

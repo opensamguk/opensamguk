@@ -430,14 +430,16 @@ describe('인사부', () => {
     render(
       <CityOfficeResidences
         officers={[
-          { generalId: 1, name: '장비', officerLevel: 4, resident: false },
-          { generalId: 2, name: '제갈량', officerLevel: 11, resident: true },
+          { generalId: 1, name: '장비', officerLevel: 4, resident: false, isHuman: true, portraitId: null },
+          { generalId: 2, name: '제갈량', officerLevel: 11, resident: true, isHuman: false, portraitId: null },
         ]}
+        secretaryEnabled
       />,
     );
     const panel = within(screen.getByRole('region', { name: '관직 주재' }));
     expect(panel.getByText('태수 장비 · 부재')).toBeTruthy();
     expect(panel.getByText('군사 없음')).toBeTruthy();
+    expect(panel.getByText('종사 없음')).toBeTruthy();
     expect(panel.getByText('참모 제갈량 · 주재')).toBeTruthy();
   });
 

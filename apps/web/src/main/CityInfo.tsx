@@ -93,7 +93,7 @@ export function CityInfo({
       )}
       <StatTable rows={rows} />
       {data.nationId !== null && data.kind !== 'PASS' && data.officeEffectsEnabled && data.officers ? (
-        <CityOfficeResidences officers={data.officers} />
+        <CityOfficeResidences officers={data.officers} secretaryEnabled={data.secretaryEnabled === true} />
       ) : null}
       <CityResourcesPanel worldId={worldId} cityKey={cityKey} />
       {logisticsEnabled ? <LogisticsPanel worldId={worldId} cityKey={cityKey} /> : null}
