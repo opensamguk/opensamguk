@@ -1,4 +1,4 @@
-import type { Prisma } from '@opensamguk/db';
+import { notifyActivityOnCommit, type Prisma } from '@opensamguk/db';
 import type { WorldState } from '@opensamguk/rules';
 
 export type ActionAt = { sequence: number; tick: number };
@@ -36,7 +36,10 @@ export async function persistPublicNationEvents(
       if (a && b) data.push({ kind: 'declare', text: `${a.name}·${b.name} 사이 선전포고` });
     }
   }
-  if (data.length) await tx.publicNationEvent.createMany({ data: data.map((event) => ({ ...event, worldId, ...at })) });
+  if (data.length) {
+    await tx.publicNationEvent.createMany({ data: data.map((event) => ({ ...event, worldId, ...at })) });
+    await notifyActivityOnCommit(tx, worldId);
+  }
 }
 
 export async function archiveRemovedNation(

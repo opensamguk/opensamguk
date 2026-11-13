@@ -21,7 +21,15 @@ const targetSchema = z.union([
 ]);
 const signalSchema = z
   .strictObject({
-    kind: z.enum(['turn.result', 'message.new', 'monthly.done', 'offer.new', 'treaty.new', 'notice.updated']),
+    kind: z.enum([
+      'activity.updated',
+      'turn.result',
+      'message.new',
+      'monthly.done',
+      'offer.new',
+      'treaty.new',
+      'notice.updated',
+    ]),
     target: targetSchema,
     scope: z.enum(['PRIVATE', 'NATION', 'DIPLOMACY', 'WORLD', 'nation', 'world']).optional(),
   })
@@ -33,7 +41,7 @@ const signalSchema = z
     const valid =
       value.kind === 'turn.result'
         ? general && value.scope === undefined
-        : value.kind === 'monthly.done'
+        : value.kind === 'monthly.done' || value.kind === 'activity.updated'
           ? t === 'world' && value.scope === undefined
           : value.kind === 'offer.new'
             ? (general || (nations && t.leadersOnly === true)) && value.scope === undefined

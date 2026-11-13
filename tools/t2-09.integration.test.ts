@@ -1,3 +1,4 @@
+import { notifyActivityOnCommit } from '../packages/db/src/realtime';
 import { randomUUID } from 'node:crypto';
 import { fork, spawn } from 'node:child_process';
 import { writeFile, mkdtemp, rm } from 'node:fs/promises';
@@ -696,6 +697,20 @@ describe('T2-09 실제 PostgreSQL LISTEN·SSE', () => {
     const s = await stream();
     expect(s.events).toContainEqual({ kind: 'ready' });
     await until(() => s.heartbeats() > 0);
+  });
+  it('공개 활동 알림은 저장 성공 뒤에만 다른 장수에게 전달된다', async () => {
+    const other = await stream(2);
+    await expect(
+      db.$transaction(async (tx) => {
+        await notifyActivityOnCommit(tx, worldId);
+        throw Error('rollback');
+      }),
+    ).rejects.toThrow('rollback');
+    await delay(100);
+    expect(other.events.some((event) => event.kind === 'activity.updated')).toBe(false);
+    await db.$transaction((tx) => notifyActivityOnCommit(tx, worldId));
+    await until(() => other.events.some((event) => event.kind === 'activity.updated'));
+    expect(other.events).toContainEqual({ kind: 'activity.updated' });
   });
   it('개인·국가·외교·월드 신호는 현재 권한에만 가고 본문·ID는 보내지 않는다', async () => {
     const own = await stream(),
