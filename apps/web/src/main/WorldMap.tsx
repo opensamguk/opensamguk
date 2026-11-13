@@ -10,7 +10,7 @@ export const MAP_WIDTH = 700;
 export const MAP_HEIGHT = 500;
 const NEUTRAL = '#d6d0c4';
 
-// 공개 지도(T2-25)는 보급 값을 받지 않는다. 보급이 없는 도시는 끊김 표시를 하지 않는다.
+// 예전 공개 지도 사본에는 보급 값이 없을 수 있다.
 type DrawnCity = Omit<MapCity, 'supplied'> & { supplied?: boolean };
 
 // 연결선은 양쪽에 같은 연결이 있으므로 한 번만 그린다. 없는 도시를 가리키는 연결은 버린다.
@@ -186,7 +186,7 @@ export function WorldMap({
 }
 
 // 지도 아래 범례. 색만으로 뜻을 전하지 않도록 기호와 글자를 같이 쓴다.
-// readOnly(공개 지도)에서는 내 위치와 보급 끊김을 빼고 국가 색 견본과 공백지만 둔다.
+// 공개 지도에서는 내 위치를 숨기고 사본에 보급 정보가 있을 때 범례에 표시한다.
 export function MapLegend({
   cities,
   nations,
@@ -208,21 +208,21 @@ export function MapLegend({
   return (
     <div className={styles.legend} aria-label="지도 범례">
       {readOnly ? null : (
-        <>
-          <span className={styles.legendItem}>
-            <svg width="14" height="14" aria-hidden="true">
-              <circle cx="7" cy="7" r="5" className={styles.mine} />
-            </svg>
-            내 위치
-          </span>
-          <span className={styles.legendItem}>
-            <svg width="14" height="14" aria-hidden="true">
-              <circle cx="7" cy="7" r="5" className={`${styles.dot} ${styles.unsupplied}`} style={{ fill: NEUTRAL }} />
-            </svg>
-            보급 끊김 {unsupplied}
-          </span>
-        </>
+        <span className={styles.legendItem}>
+          <svg width="14" height="14" aria-hidden="true">
+            <circle cx="7" cy="7" r="5" className={styles.mine} />
+          </svg>
+          내 위치
+        </span>
       )}
+      {!readOnly || cities.some((city) => city.supplied !== undefined) ? (
+        <span className={styles.legendItem}>
+          <svg width="14" height="14" aria-hidden="true">
+            <circle cx="7" cy="7" r="5" className={`${styles.dot} ${styles.unsupplied}`} style={{ fill: NEUTRAL }} />
+          </svg>
+          보급 끊김 {unsupplied}
+        </span>
+      ) : null}
       {readOnly || empty === 0 ? (
         <span className={styles.legendItem}>
           <svg width="14" height="14" aria-hidden="true">

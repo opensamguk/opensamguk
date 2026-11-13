@@ -169,7 +169,7 @@ describe('공개 범위', () => {
             { ...rawCity(1, 1, [2]), supplied: false, generals: [{ name: '조조' }], troops: 5000, population: 1 },
             { ...rawCity(2, 1, [1]), supplied: false },
           ],
-          nations: [{ id: 1, name: '위', color: '#000080', gold: 9999, rice: 9999 }],
+          nations: [{ id: 1, name: '위', color: '#000080', capitalCityKey: 1, gold: 9999, rice: 9999 }],
           generals: [{ id: 1, name: '조조', crew: 5000 }],
         },
       },
@@ -190,22 +190,26 @@ describe('공개 범위', () => {
             takenAt: takenAt(14, 10),
             year: 190,
             month: 3,
-            cities: [city(1, 1, [2]), city(2, 1, [1])],
-            nations: [{ id: 1, name: '위', color: '#000080' }],
+            cities: [
+              { ...city(1, 1, [2]), supplied: false },
+              { ...city(2, 1, [1]), supplied: false },
+            ],
+            nations: [{ id: 1, name: '위', color: '#000080', capitalCityKey: 1 }],
           },
         },
       ],
     });
   });
 
-  it('섞여 온 보급·장수·병력 값은 화면에 나오지 않는다', () => {
+  it('수도와 보급을 표시하고 장수·병력은 숨긴다', () => {
     render(<PublicMapView data={toPublicMaps(raw)} now={now} />);
     const area = screen.getByTestId('public-map');
     expect(tabs()).toHaveLength(1);
-    expect(screen.getByRole('img', { name: '도시1, 위' })).toBeTruthy();
-    expect(area.querySelector('[data-cut]')).toBeNull();
-    expect(area.querySelector('[data-supplied]')).toBeNull();
-    expect(area.textContent).not.toMatch(/조조|5000|9999|보급|내 위치/);
+    const capital = screen.getByRole('img', { name: '도시1, 위, 수도, 보급 끊김' });
+    expect(capital.getAttribute('data-cut')).toBe('true');
+    expect(capital.getAttribute('data-supplied')).toBe('false');
+    expect(area.textContent).toContain('보급 끊김 2');
+    expect(area.textContent).not.toMatch(/조조|5000|9999|내 위치/);
   });
 
   it('숫자로 읽을 수 없는 도시 키와 연결은 버리고 사본 없는 월드는 그대로 둔다', () => {

@@ -1,8 +1,7 @@
 import { publicGeographySchema, type PublicGeography } from '@opensamguk/shared';
 import type { PublicCity, PublicNation, PublicWorldStatus } from './contract';
 
-// 화면이 쓰는 공개 지도. 서버 응답(PublicMapsOutput)에서 공개 범위(D-026: 도시 소유 색과 국가 이름) 안의 키만 골라 담는다.
-// 서버가 실수로 보급·장수·병력 같은 값을 섞어 보내도 화면까지 오지 않는다.
+// 공개 지도는 D-088이 허용한 수도와 보급을 포함한 지도 필드만 담는다.
 export interface PublicMap {
   takenAt: string;
   year: number;
@@ -66,6 +65,7 @@ function pickCity(value: unknown): PublicCity | null {
     y,
     nationId,
     links: links.map(toCityKey).filter(notNull),
+    ...(typeof value.supplied === 'boolean' && nationId !== null ? { supplied: value.supplied } : {}),
     ...(value.kind ? { kind: value.kind } : {}),
     ...(value.kind !== 'PASS' && (percent === 10 || percent === 40 || percent === 70) ? { ruin: { percent } } : {}),
   };
@@ -73,8 +73,16 @@ function pickCity(value: unknown): PublicCity | null {
 
 function pickNation(value: unknown): PublicNation | null {
   if (!isObject(value)) return null;
-  const { id, name, color } = value;
-  return isInt(id) && isText(name) && isColor(color) ? { id, name, color } : null;
+  const { id, name, color, capitalCityKey } = value;
+  if (!isInt(id) || !isText(name) || !isColor(color)) return null;
+  return {
+    id,
+    name,
+    color,
+    ...(capitalCityKey === null || (isInt(capitalCityKey) && Number.isSafeInteger(capitalCityKey))
+      ? { capitalCityKey }
+      : {}),
+  };
 }
 
 function pickMap(value: unknown): PublicMap | null {
@@ -88,7 +96,7 @@ function pickMap(value: unknown): PublicMap | null {
   const pickedCities = dropDuplicates(cities.map(pickCity).filter(notNull), (city) => city.key).filter(
     (city) => city.nationId === null || nationIds.has(city.nationId),
   );
-  const cityKeys = new Set(pickedCities.map((city) => city.key));
+  const cityOwners = new Map(pickedCities.map((city) => [city.key, city.nationId]));
   const geography =
     value.operationalMap === undefined ? undefined : publicGeographySchema.safeParse(value.operationalMap);
   if (geography && !geography.success) return null;
@@ -99,9 +107,13 @@ function pickMap(value: unknown): PublicMap | null {
     month,
     cities: pickedCities.map((city) => ({
       ...city,
-      links: [...new Set(city.links)].filter((key) => key !== city.key && cityKeys.has(key)),
+      links: [...new Set(city.links)].filter((key) => key !== city.key && cityOwners.has(key)),
     })),
-    nations: pickedNations,
+    nations: pickedNations.map(({ capitalCityKey, ...nation }) =>
+      capitalCityKey === null || (capitalCityKey !== undefined && cityOwners.get(capitalCityKey) === nation.id)
+        ? { ...nation, capitalCityKey }
+        : nation,
+    ),
   };
 }
 

@@ -7,6 +7,6 @@ import type { MapCity, MapNation } from '../game/types';
 export type PublicMapsOutput = inferRouterOutputs<AppRouter>['world']['publicMaps'];
 export type PublicWorldStatus = PublicMapsOutput['worlds'][number]['status'];
 
-// 화면이 쓰는 도시는 메인 지도(WorldMap)와 같은 숫자 키 단위다. 보급 값은 받지 않는다.
-export type PublicCity = Omit<MapCity, 'supplied'>;
-export type PublicNation = Pick<MapNation, 'id' | 'name' | 'color'>;
+// 화면이 쓰는 도시는 메인 지도(WorldMap)와 같은 숫자 키 단위다.
+export type PublicCity = Omit<MapCity, 'supplied'> & { supplied?: boolean };
+export type PublicNation = Pick<MapNation, 'id' | 'name' | 'color'> & { capitalCityKey?: number | null };
