@@ -105,6 +105,51 @@ function allowed(code: TreatyDenyCode, reason: string): TreatyAllowed {
 function publicNation(nation: NationRef): NationRef {
   return { id: nation.id, name: nation.name, color: nation.color };
 }
+function publicRelation(startYear: number, diplomacy?: { state: Exclude<TreatyRelation, 'NONE'>; untilTick: number }) {
+  const relation: TreatyRelation = diplomacy?.state ?? 'NONE';
+  return {
+    relation,
+    relationEndAt:
+      diplomacy?.state === 'DECLARED' || diplomacy?.state === 'NON_AGGRESSION'
+        ? toGameDate(startYear, diplomacy.untilTick)
+        : null,
+  };
+}
+export async function listRelations(tx: Prisma.TransactionClient, worldId: string, userId: string) {
+  const { startYear } = await requireWorld(tx, worldId);
+  const [nations, diplomacies, viewer] = await Promise.all([
+    tx.nation.findMany({
+      where: { worldId },
+      select: { id: true, name: true, color: true },
+      orderBy: { id: 'asc' },
+    }),
+    tx.diplomacy.findMany({
+      where: { worldId },
+      select: { nationA: true, nationB: true, state: true, untilTick: true },
+    }),
+    tx.general.findUnique({
+      where: { worldId_userId: { worldId, userId } },
+      select: { nationId: true, removedAt: true },
+    }),
+  ]);
+  const viewerNation = viewer?.removedAt === null ? viewer.nationId : null;
+  const byPair = new Map(
+    diplomacies
+      .filter(
+        ({ state, nationA, nationB }) =>
+          state !== 'NON_AGGRESSION' || viewerNation === nationA || viewerNation === nationB,
+      )
+      .map((entry) => [`${entry.nationA}:${entry.nationB}`, entry]),
+  );
+  const pairs = nations.flatMap((nationA, index) =>
+    nations.slice(index + 1).map((nationB) => ({
+      nationA: nationA.id,
+      nationB: nationB.id,
+      ...publicRelation(startYear, byPair.get(`${nationA.id}:${nationB.id}`)),
+    })),
+  );
+  return { nations, pairs };
+}
 function quote(input: Parameters<typeof quoteTreatyProposal>[0], options: TreatyOptions) {
   try {
     return quoteTreatyProposal(input, options);
@@ -445,16 +490,7 @@ export async function listTreaties(
   }
   const targets = nations
     .filter((n) => n.id !== nationId)
-    .map((n) => {
-      const d = relations.get(n.id);
-      const current: TreatyRelation = d?.state ?? 'NONE';
-      return {
-        nation: publicNation(n),
-        relation: current,
-        relationEndAt:
-          d?.state === 'DECLARED' || d?.state === 'NON_AGGRESSION' ? toGameDate(world.startYear, d.untilTick) : null,
-      };
-    });
+    .map((n) => ({ nation: publicNation(n), ...publicRelation(world.startYear, relations.get(n.id)) }));
   return {
     ...(breakEnabled ? { breakEnabled: true } : {}),
     ...(treatyTradeEnabled(world) ? { tradeEnabled: true } : {}),
