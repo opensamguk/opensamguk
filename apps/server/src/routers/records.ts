@@ -162,13 +162,19 @@ export const recordsRouter = router({
           nationName: true,
           nationColor: true,
           officerLevel: true,
+          stratagemSuccesses: true,
           dedication: true,
           experience: true,
           wins: true,
           captures: true,
         },
       });
-      const officerLevels = new Map(rows.map(({ generalId, officerLevel }) => [generalId, officerLevel]));
+      const archived = new Map(
+        rows.map(({ generalId, officerLevel, stratagemSuccesses }) => [
+          generalId,
+          { officerLevel, stratagemSuccesses },
+        ]),
+      );
       const generals = rankGenerals(
         rows.map(({ generalId, nationId, nationName, nationColor, officerLevel: _officerLevel, ...row }) => ({
           ...row,
@@ -176,7 +182,7 @@ export const recordsRouter = router({
           nation: nationId === null ? null : { id: nationId, name: nationName!, color: nationColor! },
         })),
         input.by,
-      ).map(({ id, ...row }) => ({ generalId: id, ...row, officerLevel: officerLevels.get(id)! }));
+      ).map(({ id, ...row }) => ({ generalId: id, ...row, ...archived.get(id)! }));
       return { result, generals };
     }),
   ),

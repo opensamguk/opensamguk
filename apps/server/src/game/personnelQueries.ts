@@ -25,6 +25,7 @@ type PersonnelMember = {
 };
 export type PersonnelBoard = {
   actorId: number;
+  topStratagem?: { generalId: number; name: string; portraitId: number | null; successes: number }[];
   officeEffectsEnabled?: true;
   officeCities?: { cityKey: number; name: string }[];
   appoint: Allowed;
@@ -65,6 +66,9 @@ export async function readPersonnelBoard(
       officerLevel: true,
       userId: true,
       dedication: true,
+      portraitId: true,
+      removedAt: true,
+      stratagemSuccesses: true,
       ...(officeEffectsEnabled ? { officerCityKey: true } : {}),
       city: { select: { cityKey: true, name: true, ...(officeEffectsEnabled ? { nationId: true } : {}) } },
     },
@@ -90,8 +94,22 @@ export async function readPersonnelBoard(
       : {}),
     dedication: row.dedication,
   }));
+  const topStratagem = rows
+    .filter((row) => row.removedAt === null && row.stratagemSuccesses > 0)
+    .sort((a, b) => b.stratagemSuccesses - a.stratagemSuccesses || a.id - b.id)
+    .slice(0, 7);
   return {
     actorId: actor.id,
+    ...(topStratagem.length
+      ? {
+          topStratagem: topStratagem.map(({ id, name, portraitId, stratagemSuccesses }) => ({
+            generalId: id,
+            name,
+            portraitId,
+            successes: stratagemSuccesses,
+          })),
+        }
+      : {}),
     ...(officeEffectsEnabled
       ? {
           officeEffectsEnabled: true as const,

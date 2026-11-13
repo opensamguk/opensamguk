@@ -230,6 +230,7 @@ export function executeStratagem(
     ? `${spec.labels![0]} ${primary}, ${spec.labels![1]} ${spec.key === 'incite' ? secondary.toFixed(1) : secondary} 감소`
     : `금 ${Math.round(primary)}, 쌀 ${Math.round(secondary)}`;
   return {
+    stratagemSucceeded: true,
     effects,
     logs: [
       {
