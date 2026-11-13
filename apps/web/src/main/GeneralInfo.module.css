@@ -42,7 +42,8 @@
 
 @media (max-width: 767px) {
   .place,
-  .line a {
+  .line a,
+  .links a {
     display: inline-flex;
     align-items: center;
     justify-content: center;
