@@ -25,6 +25,8 @@ export const GENERAL_COLUMNS: ReadonlyArray<{ key: GeneralSortKey; label: string
   { key: 'winRate', label: '승률' },
   { key: 'kills', label: '사살' },
   { key: 'killRate', label: '살상률' },
+  { key: 'humanKills', label: '대인 사살' },
+  { key: 'humanKillRate', label: '대인 살상률' },
 ];
 
 export const NATION_COLUMNS: ReadonlyArray<{ key: NationSortKey; label: string }> = [

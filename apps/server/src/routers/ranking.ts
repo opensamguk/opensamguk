@@ -21,6 +21,8 @@ const generalRows = z.array(
         winRate: z.number().min(0).max(1),
         kills: z.number().int().nonnegative(),
         killRate: z.number().nonnegative(),
+        humanKills: z.number().int().nonnegative().optional(),
+        humanKillRate: z.number().nonnegative().optional(),
       })
       .nullable()
       .default(null),
@@ -53,7 +55,18 @@ export const rankingRouter = router({
     .input(
       worldInput
         .extend({
-          by: z.enum(['dedication', 'experience', 'merit', 'stratagem', 'engagements', 'winRate', 'kills', 'killRate']),
+          by: z.enum([
+            'dedication',
+            'experience',
+            'merit',
+            'stratagem',
+            'engagements',
+            'winRate',
+            'kills',
+            'killRate',
+            'humanKills',
+            'humanKillRate',
+          ]),
           kind: z.enum(['all', 'human', 'npc']).default('all'),
           page: z.number().int().min(1).max(10_000).default(1),
         })

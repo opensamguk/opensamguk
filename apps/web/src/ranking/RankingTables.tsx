@@ -93,7 +93,9 @@ function generalValue(row: RankedGeneral, key: GeneralSortKey) {
   if (key === 'dedication' || key === 'experience' || key === 'merit') return number(row[key]);
   const value = row.battleStats?.[key];
   if (value === undefined) return '—';
-  return key === 'winRate' || key === 'killRate' ? `${(value * 100).toFixed(1)}%` : number(value);
+  return key === 'winRate' || key === 'killRate' || key === 'humanKillRate'
+    ? `${(value * 100).toFixed(1)}%`
+    : number(value);
 }
 
 function GeneralRow({

@@ -159,22 +159,52 @@ export async function persistCommandReports(
       data: { battleWins: { increment: award.wins }, captures: { increment: award.captures } },
     });
   }
-  for (const engagement of result.generalEngagements ?? []) {
-    for (const [generalId, kills, casualties] of [
-      [engagement.attackerId, engagement.defenderLoss, engagement.attackerLoss],
-      [engagement.defenderId, engagement.attackerLoss, engagement.defenderLoss],
+  const engagements = result.generalEngagements ?? [];
+  const opponents = new Set(engagements.flatMap(({ attackerId, defenderId }) => [attackerId, defenderId]));
+  const humans = new Set(
+    opponents.size
+      ? (
+          await tx.general.findMany({
+            where: { worldId, id: { in: [...opponents] }, userId: { not: null } },
+            select: { id: true },
+          })
+        ).map(({ id }) => id)
+      : [],
+  );
+  for (const engagement of engagements) {
+    for (const [generalId, opponentId, kills, casualties] of [
+      [engagement.attackerId, engagement.defenderId, engagement.defenderLoss, engagement.attackerLoss],
+      [engagement.defenderId, engagement.attackerId, engagement.attackerLoss, engagement.defenderLoss],
     ] as const) {
       const wins = Number(engagement.winnerId === generalId);
       const losses = Number(engagement.winnerId !== null && engagement.winnerId !== generalId);
+      const human = humans.has(opponentId);
       await tx.generalBattleStats.upsert({
         where: { worldId_generalId: { worldId, generalId } },
-        create: { worldId, generalId, engagements: 1, wins, losses, kills, casualties, lastTick: tick },
+        create: {
+          worldId,
+          generalId,
+          engagements: 1,
+          wins,
+          losses,
+          kills,
+          casualties,
+          lastTick: tick,
+          ...(human ? { humanEngagements: 1, humanKills: kills, humanCasualties: casualties } : {}),
+        },
         update: {
           engagements: { increment: 1 },
           wins: { increment: wins },
           losses: { increment: losses },
           kills: { increment: kills },
           casualties: { increment: casualties },
+          ...(human
+            ? {
+                humanEngagements: { increment: 1 },
+                humanKills: { increment: kills },
+                humanCasualties: { increment: casualties },
+              }
+            : {}),
           lastTick: tick,
         },
       });

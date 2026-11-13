@@ -15,8 +15,10 @@ const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
 const db = createDb(url);
 const worlds: string[] = [];
+const users: string[] = [];
 afterAll(async () => {
   await db.world.deleteMany({ where: { id: { in: worlds } } });
+  await db.user.deleteMany({ where: { id: { in: users } } });
   await db.$disconnect();
 });
 
@@ -81,6 +83,10 @@ describe('T2-22 / AC-M2-19 엔진 순위 집계', () => {
 
   it('전투 누계는 실패한 턴에서 롤백되고 재시도·엔진 재시작에도 한 번만 저장된다', async () => {
     const initial = await warFixture();
+    const human = await db.user.create({
+      data: { email: `${crypto.randomUUID()}@example.test`, passwordHash: 'fixture-only' },
+    });
+    users.push(human.id);
     const { worldId } = await saveInitialWorld(db, initial, {
       replayFormat: 'legacy',
       name: '순위 전투',
@@ -88,6 +94,7 @@ describe('T2-22 / AC-M2-19 엔진 순위 집계', () => {
       endYear: null,
     });
     worlds.push(worldId);
+    await db.general.update({ where: { worldId_id: { worldId, id: 2 } }, data: { userId: human.id } });
     await controlClock(db, worldId, 'start');
     const lease = (await acquireLease(db, worldId))!;
     await db.generalTurn.create({
@@ -111,6 +118,12 @@ describe('T2-22 / AC-M2-19 엔진 순위 집계', () => {
     expect(recordedBattles.slice(1).map((row) => row.losses)).toEqual([1, 1]);
     expect(recordedBattles[0]!.kills).toBe(recordedBattles[1]!.casualties + recordedBattles[2]!.casualties);
     expect(recordedBattles[0]!.casualties).toBe(recordedBattles[1]!.kills + recordedBattles[2]!.kills);
+    expect(recordedBattles[0]).toMatchObject({
+      humanEngagements: 1,
+      humanKills: recordedBattles[1]!.casualties,
+      humanCasualties: recordedBattles[1]!.kills,
+    });
+    expect(recordedBattles.slice(1).every(({ humanEngagements }) => humanEngagements === 0)).toBe(true);
     await new TurnLoop(db, lease).advanceTo(100);
     expect(await actor()).toMatchObject({ battleWins: 2, captures: 1 });
     expect(await engagements()).toEqual(recordedBattles);
@@ -125,6 +138,9 @@ describe('T2-22 / AC-M2-19 엔진 순위 집계', () => {
             winRate: 1,
             kills: Number(recordedBattles[0]!.kills),
             killRate: Number(recordedBattles[0]!.kills) / Math.max(1, Number(recordedBattles[0]!.casualties)),
+            humanKills: Number(recordedBattles[0]!.humanKills),
+            humanKillRate:
+              Number(recordedBattles[0]!.humanKills) / Math.max(1, Number(recordedBattles[0]!.humanCasualties)),
           },
         }),
       ]),

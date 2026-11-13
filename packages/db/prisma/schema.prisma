@@ -608,6 +608,9 @@ model GeneralBattleStats {
   losses      Int    @default(0)
   kills       BigInt @default(0)
   casualties  BigInt @default(0)
+  humanEngagements Int @default(0)
+  humanKills BigInt @default(0)
+  humanCasualties BigInt @default(0)
   lastTick    Int
   world       World  @relation(fields: [worldId], references: [id], onDelete: Cascade)
 
