@@ -8,7 +8,11 @@ import type { AppRouter } from '../router';
 import { buildServer } from '../server';
 
 type Out = inferRouterOutputs<AppRouter>['ranking'];
-type Results = { 'ranking.generals': Out['generals']; 'ranking.nations': Out['nations'] };
+type Results = {
+  'ranking.generals': Out['generals'];
+  'ranking.nations': Out['nations'];
+  'ranking.freeGenerals': Out['freeGenerals'];
+};
 const routes = ['ranking.generals', 'ranking.nations'] as const;
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test')) throw new Error('전용 테스트 DB가 필요합니다.');
@@ -203,6 +207,30 @@ describe('T2-22 / AC-M2-19 실제 TCP HTTP·PostgreSQL 순위', () => {
     expect(npc.top.every((row) => row.isHuman === false)).toBe(true);
     expect(npc.top[0]?.rank).toBe(1);
     expect(npc.me).toBeNull();
+  });
+
+  it('재야 목록은 순위 정산 없이 현재 월드의 등장한 무소속 장수만 공개한다', async () => {
+    await db.general.createMany({
+      data: [106, 107].map((id) => ({
+        ...state.generals[0]!,
+        worldId: emptyWorldId,
+        id,
+        name: `재야 장수 ${id}`,
+        nationId: null,
+        userId: null,
+        activeFromYear: id === 106 ? 190 : 9999,
+      })),
+    });
+    try {
+      const input = { worldId: emptyWorldId };
+      const result = await query('ranking.freeGenerals', input, users[2]!.cookie);
+      expect(result.status).toBe(200);
+      expect(result.data).toMatchObject({ count: 1, items: [{ id: 106, name: '재야 장수 106', isHuman: false }] });
+      expect(JSON.stringify(result.data)).not.toContain('userId');
+      expect((await query('ranking.freeGenerals', input, null)).status).toBe(401);
+    } finally {
+      await db.general.deleteMany({ where: { worldId: emptyWorldId, id: { in: [106, 107] } } });
+    }
   });
 
   it('상위 100명 밖 내 순위도 반환하고 세션마다 본인 장수만 고른다', async () => {

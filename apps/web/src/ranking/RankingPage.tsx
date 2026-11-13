@@ -1,5 +1,8 @@
 import { publicImageUrl } from '@opensamguk/shared/public-images';
 import { getRouteApi, Link } from '@tanstack/react-router';
+import { useQuery } from '@tanstack/react-query';
+import { useTRPC } from '../trpc';
+import { displayName } from '../game/names';
 const rankingIcon = publicImageUrl('apps/web/src/art/icons/ranking.png');
 import { EmptyState, ErrorState } from '../ui/States';
 import styles from './Ranking.module.css';
@@ -33,6 +36,7 @@ export function RankingPage() {
       data={data}
       onSort={(by) => void navigate({ search: { ...search, by } as RankingSearch, replace: true })}
       onKind={(kind) => void navigate({ search: parseRankingSearch({ ...search, kind }), replace: true })}
+      freeGenerals={search.tab === 'nations' ? <FreeGenerals worldId={worldId} /> : undefined}
       renderTab={(tab, label, active) => (
         <Link
           key={tab}
@@ -56,12 +60,14 @@ export function RankingView({
   onSort,
   renderTab,
   onKind,
+  freeGenerals,
 }: {
   search: RankingSearch;
   data: RankingData;
   onSort: (by: GeneralSortKey | NationSortKey) => void;
   renderTab: (tab: RankingSearch['tab'], label: string, active: boolean) => React.ReactNode;
   onKind?: (kind: GeneralKind) => void;
+  freeGenerals?: React.ReactNode;
 }) {
   return (
     <section className={styles.page}>
@@ -97,7 +103,30 @@ export function RankingView({
         </div>
       ) : null}
       <RankingBody search={search} data={data} onSort={onSort} />
+      {freeGenerals}
     </section>
+  );
+}
+
+function FreeGenerals({ worldId }: { worldId: string }) {
+  const trpc = useTRPC();
+  const query = useQuery(trpc.ranking.freeGenerals.queryOptions({ worldId }));
+  if (query.isPending) return <p role="status">재야 장수를 불러오는 중…</p>;
+  if (query.isError) return <ErrorState title="재야 장수를 불러오지 못했습니다" onRetry={() => void query.refetch()} />;
+  return (
+    <details>
+      <summary>재야 장수 {query.data.count}명</summary>
+      {query.data.items.length > 0 ? (
+        <ul>
+          {query.data.items.map((general) => (
+            <li key={general.id}>
+              {displayName(general.name)}
+              {general.isHuman ? '' : ' · NPC'}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </details>
   );
 }
 
