@@ -567,6 +567,12 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     expect(next.data.nextCursor).toBeNull();
     const news = await query('records.activity', { worldId: world, scope: 'world' });
     expect(news.data.items).toEqual([expect.objectContaining({ source: 'nation', kind: 'found' })]);
+    await db.publicNationEvent.create({
+      data: { worldId: world, tick: 3, sequence: 2, kind: 'enlist', text: '공개 장수 1 공개 국가 임관' },
+    });
+    const activity = await query('records.activity', { worldId: world }, users[3]!.cookie);
+    expect(activity.data.items[0]).toMatchObject({ kind: 'enlist', text: '공개 장수 1 공개 국가 임관' });
+    expect((await query('records.activity', { worldId: world, scope: 'world' })).data.items).toEqual(news.data.items);
     expect((await query('records.activity', { worldId: otherWorldId })).data.items).toEqual([]);
     expect((await query('records.activity', { worldId: world, cursor: '?' })).status).toBe(400);
     await db.reputationEvent.createMany({
@@ -632,7 +638,13 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     });
     await db.general.update({
       where: { worldId_id: { worldId: world, id: 1 } },
-      data: { officerLevel: 2, officerCityKey: cityKey, portraitId: 10001, activeFromYear: state.startYear },
+      data: {
+        officerLevel: 2,
+        officerCityKey: cityKey,
+        portraitId: 10001,
+        activeFromYear: state.startYear,
+        nationJoinedTick: 0,
+      },
     });
     const result = await query('city.get', { worldId: world, cityKey });
     expect(result.status).toBe(200);
@@ -644,6 +656,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       portraitId: 10001,
       isHuman: true,
       resident: true,
+      tenureYears: 1,
     });
   });
   it('summary는 서버 시계와 공개 기수 설정을 반환한다', async () => {

@@ -18,9 +18,19 @@ export async function persistPublicNationEvents(
       const title = nationRank(nation.level)?.title;
       if (title) data.push({ kind: 'promotion', text: `${nation.name} 작위 승급 · ${title}` });
     }
+    if (prior && nation.capitalCityKey !== null && prior.capitalCityKey !== nation.capitalCityKey) {
+      const capital = next.cities[nation.capitalCityKey];
+      if (capital) data.push({ kind: 'capital', text: `${nation.name} ${capital.name} 천도` });
+    }
   }
   for (const nation of Object.values(before.nations)) {
     if (!next.nations[nation.id]) data.push({ kind: 'fall', text: `${nation.name} 멸망` });
+  }
+  for (const general of Object.values(next.generals)) {
+    const prior = before.generals[general.id];
+    if (!prior || general.nationId === null || prior.nationId === general.nationId) continue;
+    const nation = before.nations[general.nationId];
+    if (nation && next.nations[nation.id]) data.push({ kind: 'enlist', text: `${general.name} ${nation.name} 임관` });
   }
   for (const city of Object.values(next.cities)) {
     const previous = before.cities[city.cityKey]?.nationId;

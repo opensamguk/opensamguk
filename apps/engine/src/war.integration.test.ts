@@ -107,6 +107,12 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
       await queue(worldId, general.id, 'join', { nationId });
       await loop.advanceTo(joinedTick);
       expect(await read()).toMatchObject({ nationId, nationJoinedTick: joinedTick });
+      expect(await db.publicNationEvent.findMany({ where: { worldId, tick: joinedTick, kind: 'enlist' } })).toEqual([
+        expect.objectContaining({
+          tick: joinedTick,
+          text: `${general.name} ${initial.nations.find((n) => n.id === nationId)!.name} 임관`,
+        }),
+      ]);
       await loop.advanceTo(20_000);
       const archive = await exportReplay(db, worldId);
       const replay = replayArchive(archive, 2);
@@ -310,6 +316,9 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
       const events = (history.data as { events: string[] }).events;
       expect(events.filter((event) => event.includes('천도'))).toEqual([
         `${initial.nations[1]!.name} 수도 함락, 도시3 천도`,
+      ]);
+      expect(await db.publicNationEvent.findMany({ where: { worldId, tick: 100, kind: 'capital' } })).toEqual([
+        expect.objectContaining({ text: `${initial.nations[1]!.name} 도시3 천도` }),
       ]);
       const counterattackSequence = (await db.world.findUniqueOrThrow({ where: { id: worldId } })).actionSequence + 1;
       await loop.advanceTo(200);
