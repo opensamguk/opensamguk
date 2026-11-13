@@ -122,6 +122,16 @@
   gap: var(--space-4);
 }
 
+.documentText {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.documentForm label {
+  display: grid;
+  gap: var(--space-1);
+}
+
 /* 조약 카드는 첩: 먹 테두리 안 금니 실선, 계단 그림자. */
 .card {
   display: flex;

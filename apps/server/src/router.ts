@@ -26,6 +26,7 @@ import { lobbyRouter } from './routers/lobby';
 import { operationRouter } from './routers/operation';
 import { inspectionRouter } from './routers/inspection';
 import { treatyRouter } from './routers/treaty';
+import { diplomaticDocumentsRouter } from './routers/diplomaticDocuments';
 import { personnelRouter } from './routers/personnel';
 import { offersRouter } from './routers/offers';
 import { nationTurnsRouter } from './routers/nationTurns';
@@ -69,6 +70,7 @@ export const appRouter = router({
   operation: operationRouter,
   inspection: inspectionRouter,
   treaty: treatyRouter,
+  diplomaticDocuments: diplomaticDocumentsRouter,
   personnel: personnelRouter,
   offers: offersRouter,
   nationTurns: nationTurnsRouter,

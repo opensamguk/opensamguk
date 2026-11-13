@@ -36,12 +36,22 @@ import { RelationGrid } from './RelationGrid';
 import { nationName, TreatyCard } from './TreatyCard';
 import { relationText, TreatyComposer } from './TreatyComposer';
 import { useTreatyRequests } from './useTreatyRequests';
+import { DiplomaticDocuments } from './DiplomaticDocuments';
 
 // 외교실 (T2-08, AC-M2-06). 받은 제안·보낸 제안·진행 중·끝남·조약서 쓰기를 탭으로 나눈다.
 // 제안·수락·거절은 엔진이 처리한 뒤에 결과가 정해진다. 화면은 applied·rejected를 받기 전에는 성공 문구를 띄우지 않는다.
 // 신의·파기는 월드가 켠 기능과 서버 권한을 따른다.
 
-export const DIPLOMACY_TABS = ['nations', 'incoming', 'outgoing', 'active', 'ended', 'write', 'trust'] as const;
+export const DIPLOMACY_TABS = [
+  'nations',
+  'incoming',
+  'outgoing',
+  'active',
+  'ended',
+  'write',
+  'documents',
+  'trust',
+] as const;
 export type DiplomacyTab = (typeof DIPLOMACY_TABS)[number];
 
 const TAB_LABELS: Record<DiplomacyTab, string> = {
@@ -51,6 +61,7 @@ const TAB_LABELS: Record<DiplomacyTab, string> = {
   active: '진행 중',
   ended: '끝남',
   write: '조약서 쓰기',
+  documents: '외교 문서',
   trust: '신의',
 };
 
@@ -227,7 +238,7 @@ function Diplomacy({
       <nav className={styles.tabs} aria-label="외교실 탭">
         {DIPLOMACY_TABS.map((key) => {
           if (key === 'trust' && !head?.breakEnabled) return null;
-          const count = key === 'write' || !head ? null : treatiesForTab(items, key).length;
+          const count = key === 'write' || key === 'documents' || !head ? null : treatiesForTab(items, key).length;
           return (
             <Link
               key={key}
@@ -243,13 +254,15 @@ function Diplomacy({
           );
         })}
       </nav>
-      {pageNote !== null ? (
+      {tab !== 'documents' && pageNote !== null ? (
         <p className={styles.muted} data-testid="treaty-page-note">
           {pageNote}
         </p>
       ) : null}
 
-      {!head ? (
+      {tab === 'documents' ? (
+        <DiplomaticDocuments worldId={worldId} />
+      ) : !head ? (
         blocked !== null ? (
           <div data-testid="treaty-unavailable">
             <ErrorState title={blocked} />
@@ -317,7 +330,7 @@ function Diplomacy({
         </>
       )}
 
-      {head && head.myRecent.length > 0 ? (
+      {tab !== 'documents' && head && head.myRecent.length > 0 ? (
         <section className={styles.recent} aria-label="최근 처리된 내 요청">
           <h2>최근 처리된 내 요청</h2>
           <ul>
