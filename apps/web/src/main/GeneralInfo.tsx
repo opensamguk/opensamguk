@@ -80,6 +80,7 @@ export function GeneralInfo({
   };
   const age = displayedAge(g, summary);
   const retirementAge = condition?.retirementAge ?? 70;
+  const progression = g.progression;
   const ageStyle =
     age < retirementAge * 0.75 ? styles.ageNormal : age < retirementAge ? styles.ageWarning : styles.ageHigh;
   return (
@@ -130,8 +131,29 @@ export function GeneralInfo({
                 { label: '훈련', value: n(g.train) },
                 { label: '사기', value: n(g.atmos) },
               ]),
-          { label: '경험', value: n(g.experience) },
-          { label: '공헌', value: n(g.dedication) },
+          {
+            label: '경험',
+            value: progression ? (
+              <span>
+                Lv {progression.level} · {progression.honorTitle}
+                <small className={styles.statNote}>{n(g.experience)} 경험</small>
+                {progression.experienceForNextLevel !== null && (
+                  <progress
+                    aria-label="다음 레벨까지 경험"
+                    value={progression.experienceInLevel}
+                    max={progression.experienceForNextLevel}
+                    className={styles.levelProgress}
+                  />
+                )}
+              </span>
+            ) : (
+              n(g.experience)
+            ),
+          },
+          {
+            label: '공헌',
+            value: progression ? `${n(g.dedication)} · ${progression.dedicationRank}` : n(g.dedication),
+          },
           merit.row
             ? { label: '전공', value: meritText(merit.row), title: merit.at }
             : { label: '전공', value: '—', title: merit.at },

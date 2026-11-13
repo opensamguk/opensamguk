@@ -33,6 +33,28 @@ describe('T1-12 / AC-M1-19 공개 범위 표', () => {
   ] as const)('장수 유형을 기본 능력치 %i·%i·%i에서 계산한다', (leadership, strength, intel, expected) => {
     expect(generalType({ leadership, strength, intel })).toBe(expected);
   });
+  it('명성 및 레벨 경계에서 다음 경험 기준과 품관을 계산한다', () => {
+    const general = {
+      ...state.generals[0]!,
+      worldId: 'world',
+      turnRevision: 0,
+      residenceTick: null,
+      experience: 1_000,
+      dedication: 101,
+    } as Parameters<typeof generalInfo>[0];
+    expect(generalInfo(general, general)).toMatchObject({
+      progression: {
+        level: 10,
+        experienceInLevel: 0,
+        experienceForNextLevel: 210,
+        honorTitle: '무명',
+        dedicationRank: '29품관',
+      },
+    });
+    expect(generalInfo({ ...general, experience: 77_440 }, general)).toMatchObject({
+      progression: { level: 88, honorTitle: '구세주' },
+    });
+  });
   it.each([
     { viewer: 0, cities: [true, false, false], nations: [true, false], generals: [true, true, false, false] },
     { viewer: 2, cities: [true, true, false], nations: [false, true], generals: [false, false, true, false] },
