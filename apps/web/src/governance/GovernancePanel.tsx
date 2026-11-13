@@ -2,7 +2,6 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent
 import { formatYearMonth, personalLogDate } from '../game/gameDate';
 import { useWorldMap, useWorldSummary } from '../game/queries';
 import { Portrait } from '../portrait/Portrait';
-import { portraitIdOf } from '../portrait/portraitUrl';
 import { DataTable, type Column } from '../ui/DataTable';
 import { DisabledReason } from '../ui/DisabledReason';
 import { NationBadge } from '../ui/NationBadge';
@@ -354,7 +353,14 @@ function Nation({ view, id }: { view: GovernanceView; id: number | null }) {
 function GeneralFace({ view, id }: { view: GovernanceView; id: number }) {
   const row = view.generals.find((general) => general.id === id);
   return (
-    <Portrait id={portraitIdOf(row)} name={generalName(view, id)} variant="icon" shape="round" size={32} decorative />
+    <Portrait
+      id={row?.portraitId ?? null}
+      name={generalName(view, id)}
+      variant="icon"
+      shape="round"
+      size={32}
+      decorative
+    />
   );
 }
 

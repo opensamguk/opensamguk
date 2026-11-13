@@ -129,4 +129,20 @@ describe('중원 정세 글줄', () => {
     expect(rows[0]!.textContent).toContain('성도가 공백지가 되었습니다.');
     expect(rows[0]!.textContent).toContain('공백지 1성');
   });
+
+  // 기록 화면 월별 세력 (INT-25, D-085). 사건 글줄과 월단평은 서버 사건을 쓰는 중원 정세 칸에만 있다.
+  it('글줄을 끄면 달마다 세력 크기만 쓰고 월단평 머리글을 두 번 쓰지 않는다', () => {
+    render(
+      <WorldHistoryList
+        items={[month(20, 3, null, '조조가 성도를 얻다'), month(10, 2, 2)]}
+        nations={nations}
+        cities={cities}
+        lines={false}
+      />,
+    );
+    const rows = screen.getAllByRole('listitem');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]!.textContent).toBe('191년 3월위1성 3명공백지 1성');
+    expect(screen.queryByTestId('world-review-headline')).toBeNull();
+  });
 });

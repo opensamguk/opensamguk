@@ -121,3 +121,10 @@
   color: var(--color-danger);
   font-size: var(--text-sm);
 }
+/* 좁은 화면에서 더 보기는 손가락 크기(44px) 이상이다. */
+@media (max-width: 767px) {
+  .more {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

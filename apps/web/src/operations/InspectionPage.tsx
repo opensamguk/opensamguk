@@ -5,7 +5,6 @@ import { NoGeneral, QueryError } from '../game/QueryState';
 import { displayName } from '../game/names';
 import { useHome, useWorldId, useWorldMap, useWorldUnits } from '../game/queries';
 import { Portrait } from '../portrait/Portrait';
-import { portraitIdOf } from '../portrait/portraitUrl';
 import { useTRPC } from '../trpc';
 import { serverMessage } from '../turns/apiError';
 import type { ArgNames } from '../turns/args';
@@ -123,7 +122,7 @@ export function InspectionTable({
           <tr key={row.generalId} className={row.idle ? styles.idle : undefined} data-idle={row.idle}>
             <th scope="row">
               <Portrait
-                id={portraitIdOf(row)}
+                id={row.portraitId ?? null}
                 name={displayName(row.name)}
                 variant="thumb"
                 size={20}

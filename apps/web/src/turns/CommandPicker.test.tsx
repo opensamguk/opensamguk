@@ -626,9 +626,17 @@ it('INT-25 AC-INT-25 대상 국가 카드는 수도·국력·도시·장수와 �
   expect(rows[1]!.textContent).toContain('인접 국가가 아닙니다.');
 });
 
-it('INT-25 AC-INT-26 명령 도움말이 오면 카드 둘째 줄에 비용을, 인자 화면 안내 줄에 설명과 비용을 적는다', () => {
+it('INT-25 AC-INT-26 명령 도움말이 오면 카드 둘째 줄에 비용을, 인자 화면 안내 줄에 설명·비용·조건·소요 턴을 적는다', () => {
   const move = commands.find((c) => c.key === 'move')!;
-  const documented = { ...move, description: '이웃 도시로 옮깁니다.', cost: '금 50' } as CommandInfo;
+  const documented: CommandInfo = {
+    ...move,
+    description: '이웃 도시로 옮깁니다.',
+    cost: '금 50',
+    requirements: ['이웃 도시', '보급선'],
+    turns: 1,
+    available: null,
+    reason: '대상이나 값을 고르면 실행 가능 여부를 확인합니다.',
+  };
   render(<CommandPicker {...props({ commands: [documented, commands[0]!] })} />);
   const card = screen.getByRole('radio', { name: '이동' });
   const described = card
@@ -641,6 +649,94 @@ it('INT-25 AC-INT-26 명령 도움말이 오면 카드 둘째 줄에 비용을, 
   fireEvent.click(card);
   expect(screen.getByTestId('command-description').textContent).toBe('이웃 도시로 옮깁니다.');
   expect(screen.getByTestId('command-cost').textContent).toBe('비용: 금 50');
+  expect(screen.getByTestId('command-requirements').textContent).toBe('조건: 이웃 도시 · 보급선');
+  expect(screen.getByTestId('command-turns').textContent).toBe('소요 1턴');
+});
+
+it('INT-25 INT-26 AC-INT-26 지금 실행할 수 없는 명령은 흐리게 두고 사유를 적지만 고르고 넣을 수 있다', () => {
+  const blocked: CommandInfo = {
+    ...commands[0]!,
+    cost: '금 30',
+    available: false,
+    reason: '자기 국가 도시가 아닙니다.',
+  };
+  const needsArgs: CommandInfo = { ...commands.find((c) => c.key === 'move')!, available: null, reason: '인자 필요' };
+  const ok: CommandInfo = { ...commands[1]!, available: true, reason: null };
+  const input = props({ commands: [blocked, needsArgs, ok] });
+  render(<CommandPicker {...input} />);
+  const card = screen.getByRole('radio', { name: '농지 개간' });
+  expect(card.closest('label')!.getAttribute('data-available')).toBe('false');
+  const described = card
+    .getAttribute('aria-describedby')!
+    .split(' ')
+    .map((id) => document.getElementById(id)?.textContent);
+  expect(described).toEqual(['금 30', '자기 국가 도시가 아닙니다.', '내정 · 고를 것 없음']);
+  // null은 인자를 골라야 판정하므로 흐리지 않고 사유도 적지 않는다. true도 그대로다.
+  for (const name of ['이동', '휴식']) {
+    const radio = screen.getByRole('radio', { name });
+    expect(radio.closest('label')!.getAttribute('data-available')).toBeNull();
+  }
+  expect(screen.getAllByTestId('command-reason')).toHaveLength(1);
+  fireEvent.click(card);
+  fireEvent.click(screen.getByRole('button', { name: '1번 칸에 넣기' }));
+  expect(input.onPut).toHaveBeenCalledWith({ commandKey: 'farm', args: {}, explicit: true });
+});
+
+const invite: CommandInfo = {
+  key: 'invite',
+  name: '등용',
+  category: 'personal',
+  argsSchema: { type: 'object', properties: { generalId: { type: 'integer', minimum: 1 } }, required: ['generalId'] },
+};
+
+it('INT-25 INT-26 AC-INT-26 등용은 번호 대신 등용 후보 재야 장수를 얼굴·`이름 (도시)`·NPC 표시로 고른다', () => {
+  const onNeed = vi.fn();
+  const input = props({
+    commands: [invite],
+    onNeed,
+    argContext: {
+      here: null,
+      ownNationId: 1,
+      recruits: {
+        list: [
+          { id: 21, name: '서서(徐庶)', portraitId: 5, isHuman: false, cityName: '신야' },
+          { id: 22, name: '방통', portraitId: null, isHuman: true, cityName: '양양' },
+        ],
+        note: null,
+      },
+    },
+  });
+  render(<CommandPicker {...input} />);
+  const card = screen.getByRole('radio', { name: '등용' });
+  expect(document.getElementById(card.getAttribute('aria-describedby')!)?.textContent).toBe('개인 · 대상 장수 (필수)');
+  fireEvent.click(card);
+  expect(onNeed).toHaveBeenCalledWith('recruits');
+  expect(onNeed).not.toHaveBeenCalledWith('generals');
+  // 번호 입력은 없다.
+  expect(screen.queryByRole('spinbutton')).toBeNull();
+  const rows = within(screen.getByRole('radiogroup', { name: '대상 장수' })).getAllByRole('radio');
+  expect(rows.map((row) => row.getAttribute('data-value')).sort()).toEqual(['21', '22']);
+  const seo = rows.find((row) => row.getAttribute('data-value') === '21')!;
+  expect(seo.textContent).toContain('서서 (신야)');
+  expect(seo.textContent).toContain('NPC');
+  expect(rows.find((row) => row.getAttribute('data-value') === '22')!.textContent).not.toContain('NPC');
+  pickIn('대상 장수', /^서서/);
+  expect(screen.getByText('등용 · 서서')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: '1번 칸에 넣기' }));
+  expect(input.onPut).toHaveBeenCalledWith({ commandKey: 'invite', args: { generalId: 21 }, explicit: true });
+});
+
+it('INT-26 AC-INT-26 등용 후보를 불러오는 중이면 빈 목록 대신 안내를 적고 넣지 않는다', () => {
+  const input = props({
+    commands: [invite],
+    argContext: { here: null, ownNationId: 1, recruits: { list: [], note: '등용 후보를 불러오는 중입니다.' } },
+  });
+  render(<CommandPicker {...input} />);
+  fireEvent.click(screen.getByRole('radio', { name: '등용' }));
+  const group = screen.getByRole('radiogroup', { name: '대상 장수' });
+  expect(within(group).getByRole('note').textContent).toBe('등용 후보를 불러오는 중입니다.');
+  expect(within(group).queryByText('등용할 수 있는 재야 장수가 없습니다')).toBeNull();
+  expect(input.onPut).not.toHaveBeenCalled();
 });
 
 it('INT-25 AC-INT-25 개인 예턴의 선양은 같은 국가 장수(나 제외)를 이름으로 고른다', () => {

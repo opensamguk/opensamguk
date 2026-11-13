@@ -187,6 +187,15 @@ describe('명령 인자 칸', () => {
     expect(describeArgs({ crewType: 4242 }, { ...names, unit: units.name })).toBe('병종 4242');
     expect(describeArgs({ crewType: 1100 }, names)).toBe('병종 1100');
   });
+
+  it('INT-25 장비매매는 칸 이름과 장비 이름을 적고 none은 판매로 적는다', () => {
+    const base = { city: () => undefined, nation: () => undefined };
+    const names = { ...base, equipment: (key: string) => (key === 'weapon_01' ? '단도' : undefined) };
+    expect(describeArgs({ slot: 'weapon', itemKey: 'weapon_01' }, names)).toBe('무기 · 단도');
+    expect(describeArgs({ slot: 'horse', itemKey: 'none' }, names)).toBe('명마 · 판매');
+    // 장비 정보를 못 받았으면 품목 키를 적는다.
+    expect(describeArgs({ slot: 'book', itemKey: 'book_02' }, base)).toBe('서적 · 장비 book_02');
+  });
 });
 
 describe('실행 예정 시기', () => {

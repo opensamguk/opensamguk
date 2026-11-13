@@ -3,7 +3,6 @@ import { useEffect, useId, useRef } from 'react';
 import { errorCode } from '../game/errors';
 import { displayName } from '../game/names';
 import { Portrait } from '../portrait/Portrait';
-import { portraitIdOf } from '../portrait/portraitUrl';
 import { QueryError } from '../game/QueryState';
 import { serverMessage } from '../turns/apiError';
 import { useTRPC } from '../trpc';
@@ -180,7 +179,14 @@ function PartyName({ party }: { party: Party }) {
   return (
     <span className={styles.party}>
       {party.generalId !== null ? (
-        <Portrait id={portraitIdOf(party)} name={partyName(party)} variant="icon" shape="round" size={24} decorative />
+        <Portrait
+          id={party.portraitId ?? null}
+          name={partyName(party)}
+          variant="icon"
+          shape="round"
+          size={24}
+          decorative
+        />
       ) : null}
       <span>{partyName(party)}</span>
       {party.nation && party.generalId !== null ? (

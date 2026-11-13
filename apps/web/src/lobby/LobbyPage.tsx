@@ -14,15 +14,16 @@ import { NationBadge } from '../ui/NationBadge';
 import { Portrait } from '../portrait/Portrait';
 import { displayName } from '../game/names';
 import type { LobbyNotice, LobbyWorld } from './contract';
-import { lobbyAction, metaText, myGeneralText, shortDate, STATUS_LABEL } from './lobbyView';
+import { endedText, lobbyAction, splitWorlds, metaText, myGeneralText, shortDate, STATUS_LABEL } from './lobbyView';
 import styles from './LobbyPage.module.css';
 
 // 로비 (T2-04, AC-M2-02). 로그인하지 않아도 목록을 본다. 버튼만 auth.me로 가른다.
 export function LobbyPage() {
   const trpc = useTRPC();
   const me = useQuery({ ...trpc.auth.me.queryOptions(), staleTime: 0 });
-  // M2 화면은 includeEnded를 보내지 않는다. 끝난 월드는 서버 기본값대로 빠진다.
-  const worlds = useQuery({ ...trpc.lobby.worlds.queryOptions(), staleTime: 0 });
+  // 끝난 월드까지 한 번에 받아 진행 중 카드와 지난 기수 목록으로 나눈다 (INT-26, 원작 역대 왕조).
+  const worlds = useQuery({ ...trpc.lobby.worlds.queryOptions({ includeEnded: true }), staleTime: 0 });
+  const { live, ended } = splitWorlds(worlds.data ?? []);
   const notices = useQuery(trpc.lobby.notices.queryOptions());
   const loggedIn = Boolean(me.data?.user);
 
@@ -38,8 +39,8 @@ export function LobbyPage() {
       />
     );
   } else if (worlds.isPending || me.isPending) body = <LoadingState />;
-  else if (worlds.data.length === 0) body = <EmptyState title="열린 월드가 없습니다" />;
-  else body = <WorldList worlds={worlds.data} loggedIn={loggedIn} />;
+  else if (live.length === 0) body = <EmptyState title="열린 월드가 없습니다" />;
+  else body = <WorldList worlds={live} loggedIn={loggedIn} />;
 
   const noticeBoard = notices.isError ? (
     <ErrorState title="공지를 불러오지 못했습니다" onRetry={() => void notices.refetch()} />
@@ -86,6 +87,7 @@ export function LobbyPage() {
             월드
           </h2>
           {body}
+          {ended.length > 0 ? <PastSeasons worlds={ended} /> : null}
         </section>
         {noticeBoard ? <aside className={styles.side}>{noticeBoard}</aside> : null}
       </div>
@@ -198,6 +200,56 @@ function MyGeneral({ general }: { general: MyGeneralInfo }) {
         ) : null}
       </div>
     </div>
+  );
+}
+
+// 지난 기수 (INT-26, p7-records-20). 줄마다 기수 이름, 통일 국가 이름과 색, 끝난 연월, 영토 재생 공유를 둔다.
+// 서버 순서(끝난 월드는 최근 시작 순)를 그대로 쓴다. 승자 기록이 없는 월드는 「통일 국가 없음」으로 쓴다.
+export function PastSeasons({ worlds }: { worlds: LobbyWorld[] }) {
+  return (
+    <section aria-labelledby="lobby-past" className={styles.past}>
+      <h2 id="lobby-past" className={styles.heading}>
+        지난 기수
+      </h2>
+      <ul className={styles.pastList}>
+        {worlds.map((world) => (
+          <li key={world.id} className={styles.pastRow} data-testid="past-season">
+            <span className={styles.pastName}>{world.name}</span>
+            <span className={styles.pastWinner}>
+              {world.winner ? (
+                <>
+                  <span className={styles.muted}>통일</span>
+                  <NationBadge name={world.winner.name} color={world.winner.color} />
+                </>
+              ) : (
+                <span className={styles.muted}>통일 국가 없음</span>
+              )}
+              <span className="num">{endedText(world)}</span>
+            </span>
+            <span className={styles.pastLinks}>
+              <Link
+                to="/share/timelapse/$worldId"
+                params={{ worldId: world.id }}
+                className={styles.action}
+                aria-label={`${world.name} 영토 재생 보기`}
+              >
+                영토 재생
+              </Link>
+              {world.myGeneral ? (
+                <Link
+                  to="/w/$worldId"
+                  params={{ worldId: world.id }}
+                  className={styles.action}
+                  aria-label={`${world.name} 기록 보기`}
+                >
+                  기록 보기
+                </Link>
+              ) : null}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

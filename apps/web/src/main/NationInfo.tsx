@@ -1,20 +1,49 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
+import { useEffect, useId, useRef, useState } from 'react';
 import { retryUnlessClientError } from '../game/errors';
 import { formatYearMonth, personalLogDate } from '../game/gameDate';
 import { displayName, officerName } from '../game/names';
 import { useWorldMap, useWorldRules, useWorldSummary } from '../game/queries';
 import { QueryError } from '../game/QueryState';
-import { isDetailedGeneral, isMemberNation, type Home, type MapCity, type NationView } from '../game/types';
+import {
+  isDetailedCity,
+  isDetailedGeneral,
+  isMemberNation,
+  type Home,
+  type MapCity,
+  type NationView,
+  type WorldSummary,
+} from '../game/types';
 import { NationNoticeBox } from '../messages/NationNotice';
+import type { InspectionRow } from '../operations/contract';
+import type { ArgNames } from '../turns/args';
+import { formatTime, slotTimes } from '../turns/schedule';
 import { useTRPC } from '../trpc';
 import { DataTable, type Column } from '../ui/DataTable';
 import { NationBadge } from '../ui/NationBadge';
 import { EmptyState, LoadingState } from '../ui/States';
 import { Tag } from '../ui/Tag';
-import { GeneralNameCell } from './CityInfo';
+import {
+  BandText,
+  GeneralNameCell,
+  TURNS_OFFICER_ONLY,
+  TurnFive,
+  useArgNames,
+  useCity,
+  useInspectionRows,
+} from './CityInfo';
 import { displayedAge } from './GeneralInfo';
-import { armyOf, cityLevelText, nationHeads, nationTotals, techText, type ArmyFields } from './infoView';
+import {
+  armyOf,
+  cityBands,
+  cityLevelText,
+  nationHeads,
+  nationTotals,
+  populationRate,
+  techText,
+  type ArmyFields,
+} from './infoView';
 import { InfoGrid } from './Panel';
 import { unitNameOf } from './UnitName';
 import styles from './NationInfo.module.css';
@@ -23,6 +52,7 @@ const HIDDEN_NATION = '다른 국가 정보';
 const n = (value: number) => value.toLocaleString('ko-KR');
 
 type NationSummary = NonNullable<Home['nation']> | NationView;
+type FinanceEstimate = NonNullable<NationView['financeEstimate']>;
 type NationGenerals = NationView['generals'];
 // 공개 국력과 순위 (ranking.nations, 달마다 찍은 값). 아직 정산 전이면 null이다.
 export type NationPower = { power: number; rank: number; at: string } | null;
@@ -46,6 +76,13 @@ export function NationSummaryGrid({
   const heads = generals ? nationHeads(detailed) : undefined;
   const totals = member && generals ? nationTotals(detailed) : null;
   const headValue = (name: string | null | undefined) => (name ? displayName(name) : '—');
+  // 성향은 모든 국가에 공개된다 (nation.get philosophy, INT-26). 홈 응답처럼 값이 없으면 소속국만 보인다.
+  const philosophy = 'philosophy' in nation ? nation.philosophy : undefined;
+  // 총 주민은 nation.get이 모든 국가에 준다 (소유 도시 주민 합계 / 최대, INT-26).
+  const population =
+    'populationMax' in nation && typeof nation.population === 'number' && typeof nation.populationMax === 'number'
+      ? { value: nation.population, max: nation.populationMax }
+      : null;
   return (
     <InfoGrid
       items={[
@@ -53,6 +90,14 @@ export function NationSummaryGrid({
         member ? { label: '참모', value: headValue(heads?.advisor) } : { label: '참모', ...hidden },
         { label: '속령', value: n(nation.cityCount) },
         { label: '장수', value: n(nation.generalCount) },
+        population
+          ? {
+              label: '총 주민',
+              value: `${n(population.value)} / ${n(population.max)}`,
+              title: '소유 도시 주민 합계 / 최대 주민 합계',
+              wide: true,
+            }
+          : { label: '총 주민', value: '—', title: '국가 정보를 불러오는 중입니다', wide: true },
         member
           ? {
               label: '총 병사',
@@ -69,9 +114,46 @@ export function NationSummaryGrid({
         member ? { label: '기술', value: techText(nation.tech) } : { label: '기술', ...hidden },
         // 수도는 지도 응답(world.map)에 모든 국가 것이 있어 다른 국가도 보인다 (원작 세력일람의 [수도]).
         { label: '수도', value: capitalName ?? '—' },
-        member ? { label: '성향', value: nation.philosophy || '—' } : { label: '성향', ...hidden },
+        philosophy !== undefined ? { label: '성향', value: philosophy || '—' } : { label: '성향', ...hidden },
       ]}
     />
+  );
+}
+
+const signed = (value: number) => `${value < 0 ? '−' : '+'}${n(Math.abs(value))}`;
+const due = (row: FinanceEstimate['gold']) => `${row.year}년 ${row.month}월`;
+
+// 다음 세금·세곡 예상과 봉급·순수입 (nation.get financeEstimate, INT-26). 소속국에만 온다.
+// 원작 국가 카드의 세금·세곡·지급률·예산 줄을 글자와 숫자로 쓴다 (색만으로 뜻을 전하지 않는다).
+export function NationFinanceGrid({ nation }: { nation: NationSummary }) {
+  const estimate = 'financeEstimate' in nation ? nation.financeEstimate : undefined;
+  if (!estimate) return null;
+  const rate = 'salaryRate' in nation && typeof nation.salaryRate === 'number' ? nation.salaryRate : undefined;
+  const { gold, rice } = estimate;
+  const toCity = estimate.destination === 'city';
+  return (
+    <div className={styles.finance} data-testid="nation-finance">
+      <p className={styles.financeTitle}>다음 정산 예상</p>
+      <InfoGrid
+        items={[
+          { label: '세금', value: `금 ${n(gold.gross)} · ${due(gold)}`, title: '상업·주민으로 걷는 금', wide: true },
+          { label: '세곡', value: `쌀 ${n(rice.gross)} · ${due(rice)}`, title: '농업·주민으로 걷는 쌀', wide: true },
+          {
+            label: rate === undefined ? '봉급' : `봉급(지급률 ${Math.round(rate * 100)}%)`,
+            value: `금 ${n(gold.payroll)} · 쌀 ${n(rice.payroll)}`,
+            title: '세입 가운데 소속 장수에게 나눠 주는 몫',
+            wide: true,
+          },
+          { label: '1인 봉급', value: `금 ${n(gold.perGeneral)} · 쌀 ${n(rice.perGeneral)}`, wide: true },
+          {
+            label: toCity ? '순수입(도시 창고)' : '순수입(국고)',
+            value: `금 ${signed(gold.net)} · 쌀 ${signed(rice.net)}`,
+            title: toCity ? '봉급을 뺀 나머지가 각 도시 창고로 들어갑니다' : '봉급을 뺀 나머지가 국고로 들어갑니다',
+            wide: true,
+          },
+        ]}
+      />
+    </div>
   );
 }
 
@@ -169,7 +251,14 @@ export function NationInfo({
           국가 화면
         </Link>
       </div>
-      <NationSummaryGrid nation={nation} capitalName={capital?.name} generals={detail.data?.generals} power={power} />
+      {/* 성향·총 주민·정산 예상은 nation.get 값이다 (INT-26). 받기 전에는 홈 응답 값으로 그린다. */}
+      <NationSummaryGrid
+        nation={detail.data ?? nation}
+        capitalName={capital?.name}
+        generals={detail.data?.generals}
+        power={power}
+      />
+      {detail.data ? <NationFinanceGrid nation={detail.data} /> : null}
       <NationExtras worldId={worldId} nation={detail.data ?? nation} />
       {/* 소속 장수·도시 표와 통치는 전용 화면으로 옮겼다 (INT-25). */}
       <p className={styles.links}>
@@ -223,6 +312,12 @@ export function NationTables({
   const map = useWorldMap(worldId).data;
   const summary = useWorldSummary(worldId).data;
   const crewTypes = useWorldRules(worldId).data?.unitSet.crewTypes;
+  // 소유 도시 표에서 펼친 도시 (원작 세력 도시의 암행부 연동). 한 번에 한 도시만 펼친다.
+  const [openCity, setOpenCity] = useState<number | null>(null);
+  const panelId = useId();
+  // 예턴·다음 턴 시각·NPC 여부는 감찰 자료다. 이 국가 소속 직책자만 받는다.
+  const inspection = useInspectionRows(worldId, nationId);
+  const names = useArgNames(worldId);
   if (query.isPending) return <LoadingState />;
   if (query.isError)
     return <QueryError error={query.error} notFound="없는 국가입니다" onRetry={() => void query.refetch()} />;
@@ -237,11 +332,21 @@ export function NationTables({
   type City = (typeof data.cities)[number];
   type General = (typeof data.generals)[number];
   // 도시별 배치 장수 (원작 세력 도시의 장수 목록). 위치는 같은 국가 장수만 온다.
-  const stationed = new Map<number, string[]>();
+  const stationed = new Map<number, DetailedNationGeneral[]>();
   for (const general of data.generals)
     if (isDetailedGeneral(general))
-      stationed.set(general.cityKey, [...(stationed.get(general.cityKey) ?? []), displayName(general.name)]);
+      stationed.set(general.cityKey, [...(stationed.get(general.cityKey) ?? []), general]);
+  const stationedNames = (key: number) =>
+    stationed
+      .get(key)
+      ?.map((g) => displayName(g.name))
+      .join(', ');
   const member = isMemberNation(data);
+  // 지역 이름은 world.map regionName(INT-26)에서 읽는다. 소속국 도시만 주민(city.get 상세 모양)이 온다.
+  const regionName = new Map(map?.cities.map((city) => [city.key, city.regionName ?? null]) ?? []);
+  const showRegion = data.cities.some((city) => regionName.get(city.key));
+  const showPopulation = data.cities.some(isDetailedCity);
+  const opened = openCity === null ? undefined : data.cities.find((c) => c.key === openCity);
 
   const cityColumns: Column<City>[] = [
     {
@@ -259,6 +364,17 @@ export function NationTables({
           </Link>
         ),
     },
+    ...(showRegion
+      ? [
+          {
+            key: 'region',
+            label: '지역',
+            // 지역 번호 순서(서버의 소속국 기본 순서)로 정렬한다.
+            sortValue: (c: City) => ('region' in c && typeof c.region === 'number' ? c.region : null),
+            render: (c: City) => regionName.get(c.key) ?? '—',
+          },
+        ]
+      : []),
     {
       key: 'level',
       label: '규모',
@@ -266,13 +382,42 @@ export function NationTables({
       sortValue: (c) => c.level,
       render: (c) => cityLevelText(c.level),
     },
+    ...(showPopulation
+      ? [
+          {
+            key: 'population',
+            label: '주민',
+            numeric: true,
+            sortValue: (c: City) => (isDetailedCity(c) ? c.population : null),
+            render: (c: City) => (isDetailedCity(c) ? `${n(c.population)} / ${n(c.populationMax)}` : '—'),
+          },
+        ]
+      : []),
     {
       key: 'generals',
       label: '장수',
       numeric: true,
       sortValue: (c) => (member ? (stationed.get(c.key)?.length ?? 0) : null),
-      render: (c) => (member ? n(stationed.get(c.key)?.length ?? 0) : '—'),
-      title: (c) => (member ? stationed.get(c.key)?.join(', ') : HIDDEN_NATION),
+      // 소속국은 누르면 그 도시 장수의 능력치·자금·병력과 (직책자는) 예턴을 표 아래에 펼친다.
+      render: (c) => {
+        if (!member) return '—';
+        const count = stationed.get(c.key)?.length ?? 0;
+        const open = openCity === c.key;
+        return (
+          <button
+            type="button"
+            className={styles.expand}
+            aria-expanded={open}
+            aria-controls={panelId}
+            aria-label={`${c.name} 장수 ${count}명 ${open ? '접기' : '펼치기'}`}
+            onClick={() => setOpenCity(open ? null : c.key)}
+          >
+            {n(count)}
+            <span aria-hidden="true">{open ? ' ▲' : ' ▼'}</span>
+          </button>
+        );
+      },
+      title: (c) => (member ? stationedNames(c.key) : HIDDEN_NATION),
     },
     {
       key: 'state',
@@ -372,8 +517,23 @@ export function NationTables({
           rows={data.cities}
           columns={cityColumns}
           rowKey={(c) => c.key}
-          mobileDetails={[]}
+          mobileDetails={['region', 'population']}
         />
+        {member && opened ? (
+          <StationedPanel
+            id={panelId}
+            worldId={worldId}
+            city={opened}
+            generals={stationed.get(opened.key) ?? []}
+            crewTypes={crewTypes}
+            campaign={campaign}
+            fiveStats={fiveStats}
+            inspection={inspection}
+            names={names}
+            summary={summary}
+            onClose={() => setOpenCity(null)}
+          />
+        ) : null}
       </div>
       {member ? <NationTotalsGrid generals={data.generals} /> : null}
       <DataTable
@@ -405,6 +565,194 @@ export function NationTables({
         />
       ) : null}
     </div>
+  );
+}
+
+type DetailedNationGeneral = Extract<NationGenerals[number], { leadership: number }>;
+type CrewTypes = NonNullable<ReturnType<typeof useWorldRules>['data']>['unitSet']['crewTypes'];
+
+// 다음 턴. 직책자는 감찰 자료의 서버 시각을 쓰고, 그 밖에는 장수의 nextTurnTick으로 센 게임 연월만 쓴다.
+// 화면에서 시각을 지어내지 않는다 (턴 시각은 서버가 준 값만 보인다).
+export function nextTurnText(
+  general: { nextTurnTick: number },
+  row: Pick<InspectionRow, 'nextTurnAt'> | undefined,
+  summary: WorldSummary | undefined,
+  now = new Date(),
+): string {
+  if (row?.nextTurnAt) return formatTime(new Date(row.nextTurnAt), now);
+  return slotTimes(1, summary, general.nextTurnTick, null, now)[0]?.date ?? '—';
+}
+
+// 펼친 도시 한 곳의 장수 (원작 세력 도시의 암행부 연동, INT-25 p2-city-18).
+// 능력치·금·쌀·병종·병력·훈련·사기·다음 턴은 nation.get 장수 행, 예턴 앞 5칸은 직책자만 받는 감찰 자료다.
+export function StationedPanel({
+  id,
+  worldId,
+  city,
+  generals,
+  crewTypes,
+  campaign,
+  fiveStats,
+  inspection,
+  names,
+  summary,
+  onClose,
+}: {
+  id: string;
+  worldId: string;
+  city: { key: number; name: string };
+  generals: readonly DetailedNationGeneral[];
+  crewTypes: CrewTypes | undefined;
+  campaign: boolean;
+  fiveStats: boolean;
+  inspection: Map<number, InspectionRow> | null;
+  names: ArgNames;
+  summary: WorldSummary | undefined;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => {
+    ref.current?.scrollIntoView?.({ block: 'nearest' });
+  }, [city.key]);
+  return (
+    <section ref={ref} id={id} className={styles.stationed} aria-label={`${city.name} 장수`} data-city-key={city.key}>
+      <div className={styles.stationedHead}>
+        <h3 className={styles.stationedTitle}>
+          {city.name} 장수 {n(generals.length)}명
+        </h3>
+        <button type="button" className={styles.toggle} onClick={onClose}>
+          접기
+        </button>
+      </div>
+      <CityBandLine worldId={worldId} cityKey={city.key} />
+      {generals.length === 0 ? (
+        <p className={styles.note}>이 도시에 있는 소속 장수가 없습니다.</p>
+      ) : (
+        <StationedTable
+          caption={`${city.name} 배치 장수 ${generals.length}명`}
+          generals={generals}
+          crewTypes={crewTypes}
+          campaign={campaign}
+          fiveStats={fiveStats}
+          inspection={inspection}
+          names={names}
+          summary={summary}
+        />
+      )}
+      {inspection ? null : <p className={styles.hint}>{TURNS_OFFICER_ONLY}.</p>}
+    </section>
+  );
+}
+
+// 펼친 도시의 인구율과 개발 정도 구간. 소속국 도시는 city.get 상세가 온다.
+function CityBandLine({ worldId, cityKey }: { worldId: string; cityKey: number }) {
+  const city = useCity(worldId, cityKey).data;
+  if (!city || !isDetailedCity(city)) return null;
+  return (
+    <p className={styles.bands} data-testid="stationed-bands">
+      <span>인구율 {populationRate(city.population, city.populationMax)}</span>
+      {cityBands(city).map((row) => (
+        <BandText key={row.label} band={row.band} label={row.label} />
+      ))}
+    </p>
+  );
+}
+
+export function StationedTable({
+  caption,
+  generals,
+  crewTypes,
+  campaign,
+  fiveStats,
+  inspection,
+  names,
+  summary,
+  now,
+}: {
+  caption: string;
+  generals: readonly DetailedNationGeneral[];
+  crewTypes: CrewTypes | undefined;
+  campaign: boolean;
+  fiveStats: boolean;
+  inspection: Map<number, InspectionRow> | null;
+  names: ArgNames;
+  summary: WorldSummary | undefined;
+  now?: Date;
+}) {
+  type G = DetailedNationGeneral;
+  const num = (pick: (g: G) => number) => ({
+    numeric: true,
+    sortValue: (g: G) => pick(g),
+    render: (g: G) => n(pick(g)),
+  });
+  const statKeys = fiveStats
+    ? (['leadership', 'strength', 'intel', 'politics', 'charm'] as const)
+    : (['leadership', 'strength', 'intel'] as const);
+  const columns: Column<G>[] = [
+    {
+      key: 'name',
+      label: '장수',
+      sortValue: (g) => displayName(g.name),
+      // NPC 딱지는 장수 행의 isHuman으로 단다. 감찰 자료의 사람 여부도 함께 본다.
+      render: (g) => <GeneralNameCell general={g} npc={inspection?.get(g.id)?.isHuman === false} />,
+    },
+    {
+      key: 'officer',
+      label: '직책',
+      sortValue: (g) => g.officerLevel,
+      render: (g) => officerName(g.officerLevel, g.nationId !== null),
+    },
+    {
+      key: 'stats',
+      label: fiveStats ? '통·무·지·정·매' : '통·무·지',
+      numeric: true,
+      sortValue: (g) => g.leadership,
+      render: (g) => statKeys.map((key) => g[key] ?? '—').join(' / '),
+      title: () => (fiveStats ? '통솔 / 무력 / 지력 / 정치 / 매력' : '통솔 / 무력 / 지력'),
+    },
+    { key: 'gold', label: '금', ...num((g) => g.gold) },
+    { key: 'rice', label: '쌀', ...num((g) => g.rice) },
+    ...(campaign
+      ? []
+      : [
+          {
+            key: 'crewType',
+            label: '병종',
+            sortValue: (g: G) => g.crewType,
+            render: (g: G) => unitNameOf(crewTypes, g.crewType).name,
+            title: (g: G) => unitNameOf(crewTypes, g.crewType).title,
+          },
+        ]),
+    { key: 'crew', label: campaign ? '지휘 병력' : '병력', ...num((g) => armyOf(g).troops) },
+    { key: 'train', label: campaign ? '평균 훈련' : '훈련', ...num((g) => armyOf(g).train) },
+    { key: 'atmos', label: campaign ? '평균 사기' : '사기', ...num((g) => armyOf(g).atmos) },
+    {
+      key: 'next',
+      label: '다음 턴',
+      sortValue: (g) => g.nextTurnTick,
+      render: (g) => nextTurnText(g, inspection?.get(g.id), summary, now),
+    },
+    ...(inspection
+      ? [
+          {
+            key: 'turns',
+            label: '예턴',
+            render: (g: G) => {
+              const row = inspection.get(g.id);
+              return row ? <TurnFive turns={row.turns} names={names} /> : '—';
+            },
+          },
+        ]
+      : []),
+  ];
+  return (
+    <DataTable
+      caption={caption}
+      rows={generals}
+      columns={columns}
+      rowKey={(g) => g.id}
+      mobileDetails={['officer', 'stats', 'gold', 'rice', 'crewType', 'train', 'atmos', 'next', 'turns']}
+    />
   );
 }
 

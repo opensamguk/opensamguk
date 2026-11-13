@@ -105,6 +105,8 @@ describe('SSE 알림 해석', () => {
       trpc.home.get.queryKey({ worldId: WORLD }),
       trpc.turns.get.queryKey({ worldId: WORLD }),
       trpc.records.general.pathKey(),
+      trpc.records.battles.queryKey({ worldId: WORLD }),
+      trpc.records.activity.queryKey({ worldId: WORLD }),
       trpc.city.get.queryKey({ worldId: WORLD }),
       trpc.personnel.officers.queryKey({ worldId: WORLD }),
     ]);
@@ -119,6 +121,7 @@ describe('SSE 알림 해석', () => {
       trpc.review.latest.queryKey({ worldId: WORLD }),
       trpc.review.months.queryKey({ worldId: WORLD }),
       trpc.records.world.queryKey({ worldId: WORLD }),
+      trpc.records.activity.queryKey({ worldId: WORLD }),
     ]);
     expect(invalidationTargets({ kind: 'notice.updated', scope: 'nation' }, WORLD, trpc)).toEqual([
       trpc.notice.nation.get.queryKey({ worldId: WORLD }),
@@ -202,6 +205,34 @@ describe('SSE 재조회와 초안', () => {
     expect(invalidated(client, keys.world)).toBe(true);
     expect(invalidated(client, keys.otherLatest)).toBe(false);
     expect(invalidated(client, keys.otherWorld)).toBe(false);
+  });
+
+  // 장수 동향·중원 정세(records.activity scope all · world)와 전투 기록은 기록 칸의 이어 받기 키를 쓴다 (INT-25, INT-26).
+  it('턴 결과와 월간 정산은 그 월드의 장수 동향·중원 정세를 두 scope 모두 다시 읽고 전투 기록은 턴 결과에서 읽는다', () => {
+    const other = 'w2';
+    const keys = {
+      all: [...trpc.records.activity.queryKey({ worldId: WORLD, scope: 'all' }), 'pages'] as const,
+      world: [...trpc.records.activity.queryKey({ worldId: WORLD, scope: 'world' }), 'pages'] as const,
+      battles: [...trpc.records.battles.queryKey({ worldId: WORLD }), 'pages'] as const,
+      otherAll: [...trpc.records.activity.queryKey({ worldId: other, scope: 'all' }), 'pages'] as const,
+      otherBattles: [...trpc.records.battles.queryKey({ worldId: other }), 'pages'] as const,
+    };
+    const turn = new QueryClient();
+    for (const key of Object.values(keys)) turn.setQueryData(key, null);
+    applyWorldEvent(turn, trpc, WORLD, { kind: 'turn.result' });
+    expect(invalidated(turn, keys.all)).toBe(true);
+    expect(invalidated(turn, keys.world)).toBe(true);
+    expect(invalidated(turn, keys.battles)).toBe(true);
+    expect(invalidated(turn, keys.otherAll)).toBe(false);
+    expect(invalidated(turn, keys.otherBattles)).toBe(false);
+
+    const monthly = new QueryClient();
+    for (const key of Object.values(keys)) monthly.setQueryData(key, null);
+    applyWorldEvent(monthly, trpc, WORLD, { kind: 'monthly.done' });
+    expect(invalidated(monthly, keys.all)).toBe(true);
+    expect(invalidated(monthly, keys.world)).toBe(true);
+    expect(invalidated(monthly, keys.battles)).toBe(false);
+    expect(invalidated(monthly, keys.otherAll)).toBe(false);
   });
 
   it('ready는 전체를 다시 조회하지만 캐시 밖의 초안은 건드리지 않는다', () => {
