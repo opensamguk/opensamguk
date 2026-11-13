@@ -25,6 +25,7 @@ type Results = {
   'records.activity': Out['records']['activity'];
   'records.nation': Out['records']['nation'];
   'records.world': Out['records']['world'];
+  'records.season': Out['records']['season'];
 };
 const routes = [
   'world.summary',
@@ -503,6 +504,38 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         const result = await query('world.summary', { worldId: endedWorldId }, user.cookie);
         expect(result).toEqual({ status: 200, error: undefined, data: expected });
       }
+      await db.removedNation.create({
+        data: {
+          worldId: endedWorldId,
+          nationId: 80,
+          name: '소멸국',
+          color: '#000000',
+          removedSequence: 1,
+          removedTick: 1,
+        },
+      });
+      await db.yearbookNation.create({
+        data: { worldId: endedWorldId, tick: 10000, nationId: 1, name: '월간 기록 국가', color: '#000000' },
+      });
+      await db.seasonGeneral.create({
+        data: {
+          worldId: endedWorldId,
+          generalId: 80,
+          name: '재야 장수',
+          officerLevel: 0,
+          dedication: 0,
+          experience: 0,
+          wins: 0,
+          captures: 0,
+        },
+      });
+      const season = await query('records.season', { worldId: endedWorldId });
+      expect(season.status).toBe(200);
+      expect(season.data.statistics).toEqual({
+        final: { nations: state.nations.length, generals: 1 },
+        peak: { nations: state.nations.length, affiliatedGenerals: state.nations.length + 1 },
+        nationNames: ['소멸국', '월간 기록 국가'],
+      });
       expect(await db.world.findUniqueOrThrow({ where: { id: endedWorldId }, include: { result: true } })).toEqual(
         before,
       );

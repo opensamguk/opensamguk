@@ -31,6 +31,11 @@ vi.mock('../trpc', () => ({
             const value = (row: (typeof season.rows)[number]) => (by === 'merit' ? row.wins + row.captures : row[by]);
             return {
               result: null,
+              statistics: {
+                final: { nations: 2, generals: 7 },
+                peak: { nations: 5, affiliatedGenerals: 12 },
+                nationNames: ['위', '촉'],
+              },
               generals: [...season.rows]
                 .sort((a, b) => value(b) - value(a))
                 .map((row, index) => ({ ...row, merit: row.wins + row.captures, rank: index + 1 })),
@@ -153,5 +158,10 @@ describe('기수 결과 칸 최종 장수 순위', () => {
     await waitFor(() => expect(names()).toEqual(['유비', '조조']));
     expect(screen.getByRole('button', { name: '경험' }).getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByTestId('season-tigers').textContent).toBe('오호장군: 조조(1)');
+    fireEvent.click(screen.getByText('기수 통계'));
+    expect(screen.getByText('최종 2 · 최대 5')).toBeTruthy();
+    expect(screen.getByText('최종 장수 수')).toBeTruthy();
+    expect(screen.getByText('소속 장수 최대 수 (월간 기록)')).toBeTruthy();
+    expect(screen.getByText('위 · 촉')).toBeTruthy();
   });
 });
