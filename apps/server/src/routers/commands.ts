@@ -5,7 +5,7 @@ import { readView, requireGeneral, requireWorld, worldInput } from '../game/quer
 import { worldResolver } from '../game/resolver';
 import { commandAvailability } from '../game/commandAvailability';
 import { viewerGeneral, worldInput as strictWorldInput } from '../queries';
-function describeCommand(def: CommandDef) {
+export function describeCommand(def: CommandDef) {
   const doc = commandPlayerDocs[def.key];
   if (!doc) throw new Error(`명령 도움말이 없습니다: ${def.key}`);
   return {

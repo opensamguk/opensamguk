@@ -28,7 +28,7 @@ import type { EquipmentRead } from '../equipment/useEquipment';
 
 type ServerCommand = inferRouterOutputs<AppRouter>['commands']['list'][number];
 
-// 서버 명령 목록(commands.list)의 한 줄. 국가 명령(nationCommands.list)은 도움말 없이 가능 여부만 실어 도움말 칸은 비어 있을 수 있다.
+// 개인·국가 명령 목록에서 명령 카드에 사용하는 응답 필드.
 // argsSchema는 화면이 JSON Schema로 읽기만 하므로 unknown으로 둔다.
 export type CommandInfo = {
   key: string;
