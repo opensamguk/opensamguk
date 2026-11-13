@@ -40,6 +40,7 @@ export async function persistRanking(
         id: nation.id,
         name: nation.name,
         color: nation.color,
+        philosophy: nation.philosophy,
         cities,
         generals: count,
         power: publicNationPower(state, nation.id, { seed, tick: at.tick, year: at.year }),

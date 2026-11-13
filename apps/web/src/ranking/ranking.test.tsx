@@ -120,7 +120,17 @@ describe('장수 순위 표', () => {
 describe('국가 순위 표', () => {
   it('국가·도시·장수·국력만 있고 국고·군량 열은 없다', () => {
     const items: RankedNation[] = [
-      { rank: 1, nationId: 1, name: '위', color: '#2f5f9e', cities: 12, generals: 30, power: 4321, value: 12 },
+      {
+        rank: 1,
+        nationId: 1,
+        name: '위',
+        color: '#2f5f9e',
+        philosophy: null,
+        cities: 12,
+        generals: 30,
+        power: 4321,
+        value: 12,
+      },
     ];
     render(<NationRankingTable ranking={{ items, at }} by="cities" onSort={() => {}} />);
     const headers = screen.getAllByRole('columnheader').map((h) => h.textContent);
