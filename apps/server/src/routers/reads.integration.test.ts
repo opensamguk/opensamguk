@@ -595,8 +595,18 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         cityName: state.cities[0]!.name,
       })),
     });
+    await db.generalLog.createMany({
+      data: [
+        { generalId: 1, commandKey: 'join', kind: 'success', text: '국가 임관' },
+        { generalId: 1, commandKey: 'personnel.appoint', kind: 'success', text: '참모 임명' },
+        { generalId: 1, commandKey: 'join', kind: 'failure', text: '실패한 임관' },
+        { generalId: 2, commandKey: 'personnel.appoint', kind: 'success', text: '다른 장수 임명' },
+      ].map((row, index) => ({ ...row, worldId: world, tick: 3 + index })),
+    });
     const biography = await query('records.activity', { worldId: world, scope: 'biography' });
     expect(biography.data.items).toEqual([
+      expect.objectContaining({ source: 'milestone', kind: 'personnel.appoint', text: '참모 임명' }),
+      expect.objectContaining({ source: 'milestone', kind: 'join', text: '국가 임관' }),
       expect.objectContaining({ source: 'reputation', kind: 'victory', generalId: 1, portraitId: 101 }),
     ]);
     expect((await query('records.activity', { worldId: world, scope: 'biography' }, users[3]!.cookie)).status).toBe(

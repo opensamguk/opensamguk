@@ -462,7 +462,7 @@ export function ActivityFeed({
       {lines.length > 0 ? (
         <FeedList months={groupByMonth(lines)} testId="activity-feed" />
       ) : (
-        <EmptyState title={biography ? '열전에 기록된 점령·승전이 없습니다' : '장수 동향이 아직 없습니다'} />
+        <EmptyState title={biography ? '열전에 기록된 임관·임명·전공이 없습니다' : '장수 동향이 아직 없습니다'} />
       )}
       <MoreButton query={query} />
     </div>

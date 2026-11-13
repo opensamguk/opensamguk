@@ -74,7 +74,7 @@ export function reputationSentence(item: Pick<ReputationItem, 'kind' | 'data'>):
 
 export function activityLine(item: ActivityItem): FeedLine {
   const base = { key: activityKey(item), tick: item.tick, year: item.year, month: item.month, kind: item.kind };
-  if (item.source === 'nation') return { ...base, source: 'nation', text: item.text };
+  if (item.source !== 'reputation') return { ...base, source: 'nation', text: item.text };
   const nation = item.data.nation;
   return {
     ...base,
