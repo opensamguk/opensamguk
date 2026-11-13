@@ -507,7 +507,13 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         supplied: city.supplied,
         links: city.connections,
       })),
-      nations: state.nations.map(({ id, name, color, capitalCityKey }) => ({ id, name, color, capitalCityKey })),
+      nations: state.nations.map(({ id, name, color, capitalCityKey, description }) => ({
+        id,
+        name,
+        color,
+        capitalCityKey,
+        description,
+      })),
       generals: state.generals.map(({ id, name, cityKey, nationId, portraitId }, index) => ({
         id,
         name,

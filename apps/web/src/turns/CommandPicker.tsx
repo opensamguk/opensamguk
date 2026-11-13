@@ -645,6 +645,7 @@ export function CommandPicker({
                         options={nations}
                         onChange={set}
                         checks={checks}
+                        showIntroductions={command.key === 'join'}
                       />
                     );
                     return precheck && candidateTurns.length > 0 ? (

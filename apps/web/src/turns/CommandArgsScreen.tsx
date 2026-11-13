@@ -330,6 +330,7 @@ export function NationTargetPicker({
   onChange,
   context,
   checks,
+  showIntroductions = false,
 }: {
   context: ArgContext;
   label: string;
@@ -338,15 +339,14 @@ export function NationTargetPicker({
   onChange: (value: string) => void;
   // 있으면 후보마다 가능·불가를 붙이고 가능한 국가를 앞에 둔다.
   checks?: ReadonlyMap<number, CandidateCheck> | undefined;
+  showIntroductions?: boolean;
 }) {
   const [query, setQuery] = useState('');
   const listId = useId();
   const map = context.map;
   const cities = useMemo(() => map?.cities ?? [], [map]);
   const nations = useMemo(
-    () =>
-      map?.nations ??
-      options.map((option) => ({ ...option, color: null as string | null, capitalCityKey: null as number | null })),
+    () => map?.nations ?? options.map((option) => ({ ...option, color: null, capitalCityKey: null, description: '' })),
     [map, options],
   );
   const allowed = useMemo(() => new Set(options.map((option) => option.id)), [options]);
@@ -453,6 +453,9 @@ export function NationTargetPicker({
                   {check ? check.ok ? <Tag tone="info">가능</Tag> : <Tag tone="warning">불가</Tag> : null}
                 </span>
                 <span className={styles.cardLine}>{cardText(nation)}</span>
+                {showIntroductions && nation.description?.trim() ? (
+                  <span className={styles.cardLine}>{nation.description}</span>
+                ) : null}
                 {check && !check.ok ? <span className={styles.reason}>{check.message}</span> : null}
               </button>
             );
