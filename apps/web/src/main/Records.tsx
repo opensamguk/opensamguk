@@ -80,7 +80,7 @@ function useRecords(kind: RecordKind, worldId: string, enabled: boolean) {
 }
 
 // 장수 동향(scope all: 평판 사건 + 공개 국가 사건)과 중원 정세(scope world: 국가 사건만). 같은 procedure의 다른 입력이다.
-function useActivity(worldId: string, scope: 'all' | 'world') {
+function useActivity(worldId: string, scope: 'all' | 'world' | 'biography') {
   const trpc = useTRPC();
   return useCursorPages(trpc.records.activity.queryKey({ worldId, scope }), (cursor) =>
     trpcClient.records.activity.query(withCursor({ worldId, scope }, cursor)),
@@ -405,8 +405,16 @@ function FeedList({ months, testId }: { months: readonly FeedMonth[]; testId: st
 const feedClass = (compact: boolean) => (compact ? `${styles.records} ${styles.compact}` : styles.records);
 
 // 장수 동향 (원작 메인 첫 칸). 온 세상 장수의 공개 평판 사건과 건국·멸망·선전포고·점령을 최신순으로 쓴다.
-export function ActivityFeed({ worldId, compact = false }: { worldId: string; compact?: boolean }) {
-  const query = useActivity(worldId, 'all');
+export function ActivityFeed({
+  worldId,
+  compact = false,
+  biography = false,
+}: {
+  worldId: string;
+  compact?: boolean;
+  biography?: boolean;
+}) {
+  const query = useActivity(worldId, biography ? 'biography' : 'all');
   if (query.isPending) return <LoadingState />;
   if (query.isError)
     return <QueryError error={query.error} notFound="월드를 찾을 수 없습니다" onRetry={() => void query.refetch()} />;
@@ -416,7 +424,7 @@ export function ActivityFeed({ worldId, compact = false }: { worldId: string; co
       {lines.length > 0 ? (
         <FeedList months={groupByMonth(lines)} testId="activity-feed" />
       ) : (
-        <EmptyState title="장수 동향이 아직 없습니다" />
+        <EmptyState title={biography ? '열전에 기록된 점령·승전이 없습니다' : '장수 동향이 아직 없습니다'} />
       )}
       <MoreButton query={query} />
     </div>

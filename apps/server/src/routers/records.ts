@@ -18,7 +18,7 @@ import { decodeRecordCursor, encodeRecordCursor, generalLogCursor, recordId, rec
 import { monthlyReviewSelect, readMonthlyReview } from '../review';
 
 const generalInput = worldInput.extend({ cursor: z.string().min(1).max(256).optional() }).strict();
-const activityInput = generalInput.extend({ scope: z.enum(['all', 'world']).default('all') });
+const activityInput = generalInput.extend({ scope: z.enum(['all', 'world', 'biography']).default('all') });
 const activityCursor = z.tuple([recordTick, z.enum(['reputation', 'nation']), recordId]);
 const nationEventKind = z.enum(['found', 'fall', 'declare', 'capture']);
 const battleCursor = z.tuple([recordTick, entityKey]);
@@ -86,6 +86,7 @@ export const recordsRouter = router({
         if (source !== cursorSource) return { tick: source === 'nation' ? { lte: tick } : { lt: tick } };
         return { OR: [{ tick: { lt: tick } }, { tick, id: { lt: BigInt(id) } }] };
       };
+      const biography = input.scope === 'biography' ? await requireGeneral(tx, input.worldId, ctx.user.id) : null;
       const rows =
         input.scope === 'world'
           ? []
@@ -93,6 +94,7 @@ export const recordsRouter = router({
               where: {
                 worldId: input.worldId,
                 ...before('reputation'),
+                ...(biography ? { generalId: biography.id, kind: { in: ['conquest', 'victory'] } } : {}),
               },
               orderBy: [{ tick: 'desc' }, { id: 'desc' }],
               take: 31,
@@ -112,12 +114,14 @@ export const recordsRouter = router({
                 cityName: true,
               },
             });
-      const news = await tx.publicNationEvent.findMany({
-        where: { worldId: input.worldId, ...before('nation') },
-        orderBy: [{ tick: 'desc' }, { id: 'desc' }],
-        take: 31,
-        select: { id: true, tick: true, kind: true, text: true },
-      });
+      const news = biography
+        ? []
+        : await tx.publicNationEvent.findMany({
+            where: { worldId: input.worldId, ...before('nation') },
+            orderBy: [{ tick: 'desc' }, { id: 'desc' }],
+            take: 31,
+            select: { id: true, tick: true, kind: true, text: true },
+          });
       const reputation = rows.map((row) => {
         const { id, generalName, nationId, nationName, nationColor, cityKey, cityName, ...event } = row;
         return {

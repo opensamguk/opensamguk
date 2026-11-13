@@ -309,6 +309,27 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     expect(news.data.items).toEqual([expect.objectContaining({ source: 'nation', kind: 'found' })]);
     expect((await query('records.activity', { worldId: otherWorldId })).data.items).toEqual([]);
     expect((await query('records.activity', { worldId: world, cursor: '?' })).status).toBe(400);
+    await db.reputationEvent.createMany({
+      data: [1, 2].map((generalId) => ({
+        worldId: world,
+        generalId,
+        year: state.startYear,
+        month: 1,
+        kind: 'victory',
+        score: REPUTATION_POINTS.victory,
+        tick: 2,
+        generalName: `공개 장수 ${generalId}`,
+        cityKey: state.cities[0]!.cityKey,
+        cityName: state.cities[0]!.name,
+      })),
+    });
+    const biography = await query('records.activity', { worldId: world, scope: 'biography' });
+    expect(biography.data.items).toEqual([
+      expect.objectContaining({ source: 'reputation', kind: 'victory', generalId: 1, portraitId: 101 }),
+    ]);
+    expect((await query('records.activity', { worldId: world, scope: 'biography' }, users[3]!.cookie)).status).toBe(
+      404,
+    );
   });
   it('AC-INT-26 지도 장수 초상은 도시 주둔 공개 범위를 따른다', async () => {
     const world = await fixtureWorld('map-generals');
