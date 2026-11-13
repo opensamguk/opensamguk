@@ -268,6 +268,56 @@ function NationNpcPolicyEditor({
   );
 }
 
+export function NationRestrictions({ worldId, nation }: { worldId: string; nation: NationView }) {
+  const trpc = useTRPC();
+  const client = useQueryClient();
+  const save = useMutation(
+    trpc.nation.setRestrictions.mutationOptions({
+      onSuccess: async () => {
+        await client.invalidateQueries({ queryKey: trpc.nation.get.queryKey({ worldId, nationId: nation.id }) });
+      },
+    }),
+  );
+  const restrictions = nation.restrictions;
+  if (!restrictions) return null;
+  const editor = restrictions.editor;
+  const change = (setting: 'recruitment' | 'war', blocked: boolean) =>
+    save.mutate({ worldId, nationId: nation.id, setting, blocked });
+  return (
+    <section aria-label="임관과 출병">
+      <InfoGrid
+        items={[
+          { label: '임관', value: restrictions.recruitmentBlocked ? '금지' : '허용' },
+          ...(restrictions.warBlocked === undefined
+            ? []
+            : [{ label: '출병', value: restrictions.warBlocked ? '금지' : '허용' }]),
+        ]}
+      />
+      {editor ? (
+        <>
+          <button
+            type="button"
+            disabled={save.isPending || editor.pending !== null}
+            onClick={() => change('recruitment', !restrictions.recruitmentBlocked)}
+          >
+            {restrictions.recruitmentBlocked ? '임관 허용' : '임관 금지'}
+          </button>{' '}
+          <button
+            type="button"
+            disabled={save.isPending || editor.pending !== null || editor.warChanges === 0}
+            onClick={() => change('war', !restrictions.warBlocked)}
+          >
+            {restrictions.warBlocked ? '출병 허용' : '출병 금지'}
+          </button>{' '}
+          <small>출병 제한 변경 {editor.warChanges}회 남음</small>
+        </>
+      ) : null}
+      {editor?.pending ? <p role="status">국가 제한 변경을 처리하고 있습니다.</p> : null}
+      {save.isError ? <p role="alert">{save.error.message}</p> : null}
+    </section>
+  );
+}
+
 const signed = (value: number) => `${value < 0 ? '−' : '+'}${n(Math.abs(value))}`;
 const due = (row: FinanceEstimate['gold']) => `${row.year}년 ${row.month}월`;
 
@@ -311,7 +361,8 @@ export function useNation(worldId: string, nationId: number, enabled = true) {
     ...trpc.nation.get.queryOptions({ worldId, nationId }),
     enabled,
     retry: retryUnlessClientError,
-    refetchInterval: (query) => (query.state.data?.npcPolicy?.editor?.pending ? 1000 : false),
+    refetchInterval: (query) =>
+      query.state.data?.npcPolicy?.editor?.pending || query.state.data?.restrictions?.editor?.pending ? 1000 : false,
   });
 }
 

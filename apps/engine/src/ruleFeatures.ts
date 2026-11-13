@@ -4,6 +4,13 @@ import {
   CITY_SEASONAL_EVENTS_FEATURE,
   DEFENSE_STANCE_FEATURE,
   NPC_NATION_POLICY_FEATURE,
+  NATION_RESTRICTIONS_FEATURE,
+  NATION_RESTRICTIONS_KIND,
+  NATION_RESTRICTIONS_MIN_OFFICE,
+  changeNationRestrictions,
+  nationRestrictions,
+  nationRestrictionsInput,
+  storedNationRestrictions,
   NPC_NATION_POLICY_KIND,
   npcNationPolicyInput,
   BALANCE,
@@ -120,6 +127,37 @@ export async function persistPersonnelPacket(
   }
   await persistResidenceAnchors(tx, worldId, before.residenceAnchors!, anchors);
 }
+
+const processNationRestrictions: QueuedInputHandler = async (tx, world, event, { tick }) => {
+  const reject = (code: string, message: string) => ({ status: 'REJECTED' as const, result: { code, message } });
+  if (world.status === 'ENDED') return reject('WORLD_CLOSED', '종료된 월드입니다.');
+  const input = nationRestrictionsInput.safeParse(event.payload);
+  if (!input.success) return reject('BAD_RESTRICTION', '국가 제한을 확인하세요.');
+  await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${event.userId} FOR SHARE`;
+  const user = await tx.user.findUnique({ where: { id: event.userId }, select: { status: true } });
+  if (user?.status !== 'ACTIVE') return reject('ACTOR_INACTIVE', '활성 계정이 아닙니다.');
+  const actor =
+    event.generalId === null
+      ? null
+      : await tx.general.findUnique({
+          where: { worldId_id: { worldId: world.id, id: event.generalId } },
+          select: { userId: true, officerLevel: true, nationId: true },
+        });
+  if (
+    !actor ||
+    actor.userId !== event.userId ||
+    actor.officerLevel < NATION_RESTRICTIONS_MIN_OFFICE ||
+    actor.nationId !== input.data.nationId
+  )
+    return reject('FORBIDDEN', '현재 소속국 수뇌부만 제한을 변경할 수 있습니다.');
+  const where = { worldId_id: { worldId: world.id, id: input.data.nationId } };
+  const nation = await tx.nation.findUniqueOrThrow({ where, select: { restrictions: true } });
+  const state = nationRestrictions(world, storedNationRestrictions(true, nation.restrictions), tick);
+  const changed = changeNationRestrictions(state, input.data);
+  if (!changed) return reject('NO_WAR_CHANGES', '이번 달 출병 제한 변경 횟수가 남아 있지 않습니다.');
+  await tx.nation.update({ where, data: { restrictions: changed } });
+  return { status: 'APPLIED', result: changed };
+};
 
 const processNpcNationPolicy: QueuedInputHandler = async (tx, world, event) => {
   const reject = (code: string, message: string) => ({ status: 'REJECTED' as const, result: { code, message } });
@@ -245,6 +283,7 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   { key: 'court-rank-v1' },
   { key: COURT_PROMOTION_FEATURE },
   { key: CITY_SEASONAL_EVENTS_FEATURE },
+  { key: NATION_RESTRICTIONS_FEATURE, queuedInputs: { [NATION_RESTRICTIONS_KIND]: processNationRestrictions } },
   { key: NPC_NATION_POLICY_FEATURE, queuedInputs: { [NPC_NATION_POLICY_KIND]: processNpcNationPolicy } },
   { key: DEFENSE_STANCE_FEATURE, queuedInputs: { [DEFENSE_STANCE_KIND]: processDefenseStance } },
   { key: NATION_PHILOSOPHY_FEATURE },

@@ -450,6 +450,9 @@ export function NationTargetPicker({
                 <span className={styles.cardHead}>
                   <NationBadge name={nation.name} color={nation.color} />
                   {relation ? <span className={styles.muted}>{relation}</span> : null}
+                  {showIntroductions && 'recruitmentBlocked' in nation && nation.recruitmentBlocked ? (
+                    <Tag tone="warning">임관 금지</Tag>
+                  ) : null}
                   {check ? check.ok ? <Tag tone="info">가능</Tag> : <Tag tone="warning">불가</Tag> : null}
                 </span>
                 <span className={styles.cardLine}>{cardText(nation)}</span>

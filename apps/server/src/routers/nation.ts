@@ -6,6 +6,13 @@ import {
   INTEL_FEATURE,
   NATION_STRATEGY_FEATURE,
   NPC_NATION_POLICY_FEATURE,
+  NATION_RESTRICTIONS_FEATURE,
+  NATION_RESTRICTIONS_KIND,
+  NATION_RESTRICTIONS_MIN_OFFICE,
+  changeNationRestrictions,
+  nationRestrictions,
+  nationRestrictionsInput,
+  storedNationRestrictions,
   NPC_NATION_POLICY_KIND,
   npcNationPolicy,
   npcNationPolicyInput,
@@ -35,6 +42,60 @@ import { nationTenureYears } from '../game/nationTenure';
 import { worldResolver } from '../game/resolver';
 
 export const nationRouter = router({
+  setRestrictions: worldVerifiedProcedure
+    .input(nationRestrictionsInput.extend(worldInput.shape))
+    .mutation(({ ctx, input }) =>
+      ctx.db.$transaction(async (tx) => {
+        const world = await requireWorld(tx, input.worldId, true);
+        requireRuleFeature(world, NATION_RESTRICTIONS_FEATURE);
+        if (world.status === 'ENDED')
+          throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '종료된 월드입니다.' });
+        const actor = await requireGeneral(tx, input.worldId, ctx.user.id, true);
+        if (
+          actor.removedAt !== null ||
+          actor.officerLevel < NATION_RESTRICTIONS_MIN_OFFICE ||
+          actor.nationId !== input.nationId
+        )
+          throw new TRPCError({ code: 'FORBIDDEN', message: '현재 소속국 수뇌부만 제한을 변경할 수 있습니다.' });
+        const pending = await tx.inputEvent.findFirst({
+          where: {
+            worldId: input.worldId,
+            kind: NATION_RESTRICTIONS_KIND,
+            status: 'PENDING',
+            payload: { path: ['nationId'], equals: input.nationId },
+          },
+          select: { payload: true },
+        });
+        const payload = { nationId: input.nationId, setting: input.setting, blocked: input.blocked };
+        if (pending) {
+          const previous = nationRestrictionsInput.parse(pending.payload);
+          if (previous.setting !== input.setting || previous.blocked !== input.blocked)
+            throw new TRPCError({ code: 'CONFLICT', message: '다른 국가 제한 변경을 처리하고 있습니다.' });
+          return { status: 'pending' as const };
+        }
+        const row = await tx.nation.findUniqueOrThrow({
+          where: { worldId_id: { worldId: input.worldId, id: input.nationId } },
+          select: { restrictions: true },
+        });
+        const current = nationRestrictions(world, storedNationRestrictions(true, row.restrictions), world.clockTick);
+        if (!changeNationRestrictions(current, payload))
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: '이번 달 출병 제한 변경 횟수가 남아 있지 않습니다.',
+          });
+        await tx.inputEvent.create({
+          data: {
+            worldId: input.worldId,
+            userId: ctx.user.id,
+            generalId: actor.id,
+            kind: NATION_RESTRICTIONS_KIND,
+            idempotencyKey: `${NATION_RESTRICTIONS_KIND}:${randomUUID()}`,
+            payload,
+          },
+        });
+        return { status: 'pending' as const };
+      }),
+    ),
   setNpcPolicy: worldVerifiedProcedure.input(npcNationPolicyInput.extend(worldInput.shape)).mutation(({ ctx, input }) =>
     ctx.db.$transaction(async (tx) => {
       const world = await requireWorld(tx, input.worldId, true);
@@ -108,6 +169,28 @@ export const nationRouter = router({
           ? { remainingMonths: diplomaticAidMonths(nation, strategyMonth(tick)) }
           : undefined;
       const npcOrders = showNpcOrders && state ? await readNpcOrders(state) : undefined;
+      const restrictionsEnabled = world.ruleFeatures.includes(NATION_RESTRICTIONS_FEATURE);
+      const restrictions = nationRestrictions(
+        world,
+        storedNationRestrictions(restrictionsEnabled, nation.restrictions),
+        world.clockTick,
+      );
+      const canEditRestrictions =
+        restrictionsEnabled &&
+        ownNation &&
+        world.status !== 'ENDED' &&
+        (viewer?.officerLevel ?? 0) >= NATION_RESTRICTIONS_MIN_OFFICE;
+      const restrictionPending = canEditRestrictions
+        ? await tx.inputEvent.findFirst({
+            where: {
+              worldId: input.worldId,
+              kind: NATION_RESTRICTIONS_KIND,
+              status: 'PENDING',
+              payload: { path: ['nationId'], equals: nation.id },
+            },
+            select: { payload: true },
+          })
+        : null;
       const npcPolicyEnabled = world.ruleFeatures.includes(NPC_NATION_POLICY_FEATURE);
       const npcPolicyEditable = npcPolicyEnabled && showNpcOrders;
       const npcPolicyPending = npcPolicyEditable
@@ -132,6 +215,22 @@ export const nationRouter = router({
         ...(world.ruleFeatures.includes('five-stats') ? { fiveStats: true as const } : {}),
         ...nationInfo(nation, { cityCount: settlements.length, generalCount: generals.length }, viewer),
         philosophy: nation.philosophy,
+        ...(restrictionsEnabled
+          ? {
+              restrictions: {
+                recruitmentBlocked: restrictions.recruitmentBlocked,
+                ...(ownNation ? { warBlocked: restrictions.warBlocked } : {}),
+                ...(canEditRestrictions
+                  ? {
+                      editor: {
+                        warChanges: restrictions.warChanges,
+                        pending: restrictionPending ? nationRestrictionsInput.parse(restrictionPending.payload) : null,
+                      },
+                    }
+                  : {}),
+              },
+            }
+          : {}),
         ...(nation.recruitmentNotice ? { recruitmentNotice: nation.recruitmentNotice } : {}),
         ...(ownNation && viewer?.officerLevel === BALANCE.RULER_LEVEL && world.status !== 'ENDED'
           ? { canEditRecruitmentNotice: true as const }

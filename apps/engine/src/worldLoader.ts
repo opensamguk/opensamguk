@@ -18,6 +18,8 @@ import {
   storedCitySeasonalEvent,
   storedDefenseStance,
   storedNpcNationPolicy,
+  storedNationRestrictions,
+  NATION_RESTRICTIONS_FEATURE,
   NPC_NATION_POLICY_FEATURE,
   DEFENSE_STANCE_FEATURE,
   type WorldState,
@@ -112,13 +114,14 @@ export async function loadWorldAfterCapabilityCheck(
       ).map((city) => [city.cityKey, city]),
     ),
     nations: Object.fromEntries(
-      nations.map(({ diplomaticAidUntilMonth, npcSettings, ...nation }) => {
+      nations.map(({ diplomaticAidUntilMonth, npcSettings, restrictions, ...nation }) => {
         return [
           nation.id,
           {
             ...stripWorldId(nation),
             ...(diplomaticAidUntilMonth != null ? { diplomaticAidUntilMonth } : {}),
             ...storedNpcNationPolicy(world.ruleFeatures.includes(NPC_NATION_POLICY_FEATURE), npcSettings),
+            ...storedNationRestrictions(world.ruleFeatures.includes(NATION_RESTRICTIONS_FEATURE), restrictions),
           },
         ];
       }),

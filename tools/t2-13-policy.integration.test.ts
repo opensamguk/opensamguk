@@ -2,6 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { createDb } from '../packages/db/src/index';
 import { DEFENSE_STANCE_FEATURE, DEFENSE_STANCE_KIND } from '../packages/rules/src/battle/defenders';
+import {
+  NATION_RESTRICTIONS_FEATURE,
+  NATION_RESTRICTIONS_KIND,
+} from '../packages/rules/src/personnel/nationRestrictions';
 import { NPC_NATION_POLICY_FEATURE, NPC_NATION_POLICY_KIND } from '../packages/rules/src/npc/policy';
 import type { PolicyKey, PolicySlot } from '../packages/rules/src/policy';
 import { commandInitial } from '../packages/rules/test/commandFixture';
@@ -46,7 +50,9 @@ async function user(status: 'ACTIVE' | 'SANCTIONED' = 'ACTIVE') {
   await db.session.create({ data: { id: session.id, userId: row.id, expiresAt: session.expiresAt } });
   return { id: row.id, email, cookie: `sid=${session.token}`, sessionId: session.id };
 }
-async function fixture(options: { farmMax?: boolean; npc?: boolean; defense?: boolean; npcPolicy?: boolean } = {}) {
+async function fixture(
+  options: { farmMax?: boolean; npc?: boolean; defense?: boolean; npcPolicy?: boolean; restrictions?: boolean } = {},
+) {
   const alice = await user(),
     bob = await user();
   const initial = commandInitial();
@@ -61,10 +67,17 @@ async function fixture(options: { farmMax?: boolean; npc?: boolean; defense?: bo
     turnTermMinutes: 30,
     endYear: null,
     // 이 회귀 시험은 archive 5와 기존 전환 표지 계약을 검증한다.
-    ...(options.defense || options.npcPolicy
+    ...(options.defense || options.npcPolicy || options.restrictions
       ? {
           replayFormat: 3,
-          ruleFeatures: [options.defense ? DEFENSE_STANCE_FEATURE : NPC_NATION_POLICY_FEATURE, 'policy'],
+          ruleFeatures: [
+            options.defense
+              ? DEFENSE_STANCE_FEATURE
+              : options.npcPolicy
+                ? NPC_NATION_POLICY_FEATURE
+                : NATION_RESTRICTIONS_FEATURE,
+            'policy',
+          ],
         }
       : { replayFormat: 'policy' }),
   });
@@ -618,6 +631,69 @@ for (const category of ['unauthenticated', 'otherUser', 'sanctioned', 'invalidIn
         }[category],
       );
       expect(await db.inputEvent.count({ where: { worldId: f.worldId, kind: NPC_NATION_POLICY_KIND } })).toBe(0);
+    }),
+  );
+}
+
+it(
+  '수뇌가 임관을 막으면 공개 조회와 다음 엔진 재생에 반영한다',
+  authzCase(NATION_RESTRICTIONS_KIND, 'success', async () => {
+    const f = await fixture({ restrictions: true });
+    const input = { worldId: f.worldId, nationId: 1, setting: 'recruitment', blocked: true };
+    const request = () => rpc(NATION_RESTRICTIONS_KIND, input, f.alice.cookie, true);
+    expect((await request()).data).toEqual({ status: 'pending' });
+    expect((await request()).data).toEqual({ status: 'pending' });
+    expect(await db.inputEvent.count({ where: { worldId: f.worldId, kind: NATION_RESTRICTIONS_KIND } })).toBe(1);
+    await f.loop.advanceTo(0);
+    expect((await rpc('nation.get', { worldId: f.worldId, nationId: 1 }, f.bob.cookie)).data).toMatchObject({
+      restrictions: { recruitmentBlocked: true },
+    });
+    expect((await rpc('world.map', { worldId: f.worldId }, f.bob.cookie)).data).toMatchObject({
+      nations: expect.arrayContaining([expect.objectContaining({ id: 1, recruitmentBlocked: true })]),
+    });
+    expect((await rpc(NATION_RESTRICTIONS_KIND, { ...input, setting: 'war' }, f.alice.cookie, true)).error).toBe(
+      'PRECONDITION_FAILED',
+    );
+    await f.loop.advanceTo(10000);
+    expect((await rpc(NATION_RESTRICTIONS_KIND, { ...input, setting: 'war' }, f.alice.cookie, true)).data).toEqual({
+      status: 'pending',
+    });
+    await f.loop.advanceTo(10000);
+    const own = () => rpc('nation.get', { worldId: f.worldId, nationId: 1 }, f.alice.cookie);
+    expect((await own()).data).toMatchObject({ restrictions: { warBlocked: true, editor: { warChanges: 1 } } });
+    await f.loop.advanceTo(20000);
+    expect((await own()).data).toMatchObject({ restrictions: { warBlocked: true, editor: { warChanges: 3 } } });
+    const archive = await exportReplay(db, f.worldId);
+    expect(replayArchive(archive, 2)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
+  }),
+);
+
+for (const category of ['unauthenticated', 'otherUser', 'sanctioned', 'invalidInput'] as const) {
+  it(
+    `국가 제한 설정 권한 ${category}`,
+    authzCase(NATION_RESTRICTIONS_KIND, category, async () => {
+      const f = await fixture({ restrictions: true });
+      const actor = category === 'otherUser' ? f.bob : category === 'sanctioned' ? await user('SANCTIONED') : f.alice;
+      const result = await rpc(
+        NATION_RESTRICTIONS_KIND,
+        {
+          worldId: f.worldId,
+          nationId: 1,
+          setting: category === 'invalidInput' ? 'all' : 'recruitment',
+          blocked: true,
+        },
+        category === 'unauthenticated' ? undefined : actor.cookie,
+        true,
+      );
+      expect(result.error).toBe(
+        {
+          unauthenticated: 'UNAUTHORIZED',
+          otherUser: 'FORBIDDEN',
+          sanctioned: 'UNAUTHORIZED',
+          invalidInput: 'BAD_REQUEST',
+        }[category],
+      );
+      expect(await db.inputEvent.count({ where: { worldId: f.worldId, kind: NATION_RESTRICTIONS_KIND } })).toBe(0);
     }),
   );
 }

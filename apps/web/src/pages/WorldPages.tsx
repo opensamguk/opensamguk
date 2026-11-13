@@ -9,6 +9,7 @@ import {
   NationExtras,
   NationFinanceGrid,
   NationNpcPolicy,
+  NationRestrictions,
   NationSummaryGrid,
   NationTables,
   useNation,
@@ -149,6 +150,7 @@ export function NationPage({ nationIdParam }: { nationIdParam: string }) {
             />
             {/* 소속국은 다음 세금·세곡과 봉급·순수입 예상을 함께 본다 (INT-26). */}
             <NationFinanceGrid nation={nation.data} />
+            <NationRestrictions worldId={worldId} nation={nation.data} />
             <NationNpcPolicy worldId={worldId} nation={nation.data} />
             <RecruitmentNotice key={`${worldId}:${nation.data.id}`} worldId={worldId} nation={nation.data} />
             <NationExtras worldId={worldId} nation={nation.data} />
