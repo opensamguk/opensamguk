@@ -41,6 +41,7 @@ export const resourcesRouter = router({
         : null;
       return {
         unitSetKey: stored.unitSetKey,
+        ...(world.ruleFeatures.includes('battle-affinity-v2') ? { battleAffinity: 'multiply' as const } : {}),
         unitSet: {
           ...unitSet,
           crewTypes: unitSet.crewTypes.map((unit) => {
