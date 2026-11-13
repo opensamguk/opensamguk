@@ -1,5 +1,5 @@
 import { notifyActivityOnCommit, type Prisma } from '@opensamguk/db';
-import type { WorldState } from '@opensamguk/rules';
+import { COURT_PROMOTION_FEATURE, nationRank, type WorldState } from '@opensamguk/rules';
 
 export type ActionAt = { sequence: number; tick: number };
 
@@ -12,7 +12,12 @@ export async function persistPublicNationEvents(
 ) {
   const data: { kind: string; text: string }[] = [];
   for (const nation of Object.values(next.nations)) {
-    if (!before.nations[nation.id]) data.push({ kind: 'found', text: `${nation.name} 건국` });
+    const prior = before.nations[nation.id];
+    if (!prior) data.push({ kind: 'found', text: `${nation.name} 건국` });
+    else if (next.ruleFeatures?.includes(COURT_PROMOTION_FEATURE) && prior.level < nation.level) {
+      const title = nationRank(nation.level)?.title;
+      if (title) data.push({ kind: 'promotion', text: `${nation.name} 작위 승급 · ${title}` });
+    }
   }
   for (const nation of Object.values(before.nations)) {
     if (!next.nations[nation.id]) data.push({ kind: 'fall', text: `${nation.name} 멸망` });
