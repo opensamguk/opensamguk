@@ -1,4 +1,5 @@
 import { isLocalOffice } from '../personnel/residentOffice';
+import { cleanTroops } from '../commands/ext/troop/state';
 import { z } from 'zod';
 import type { JsonValue } from '../model/world';
 import type { RecordedInput, ReplayState } from '../replay';
@@ -272,6 +273,7 @@ export function decideAdminGameAction(
       else Object.assign(next.state.nations[action.nationId]!, after);
     }
   }
+  cleanTroops(next.state);
   return {
     status: 'APPLIED',
     result: adminGameAppliedSchema(action).parse({ version: 1, before, after }),

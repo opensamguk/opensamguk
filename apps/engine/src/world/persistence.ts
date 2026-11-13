@@ -36,6 +36,7 @@ import {
   initialNationResearch,
   initialNationLifecycle,
   INTEL_FEATURE,
+  TROOP_FEATURE,
   assertInitialNationLifecycle,
   assertNationLifecycle,
   readStoredNationLifecycle,
@@ -357,6 +358,8 @@ export function prepareInitialWorld(
       },
     });
     const worldId = world.id;
+    if (features.includes(TROOP_FEATURE))
+      await tx.worldExtSlice.create({ data: { worldId, key: 'troop', value: { troops: {} } } });
     if (features.includes(INTEL_FEATURE)) await tx.worldExtSlice.create({ data: { worldId, key: 'intel', value: {} } });
     // 국가↔수도 순환 참조는 같은 트랜잭션에서 도시를 만든 뒤 연결한다.
     await tx.nation.createMany({

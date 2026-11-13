@@ -1,3 +1,4 @@
+import { cleanTroops } from '../commands/ext/troop/state';
 import { z } from 'zod';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import type { WorldState, WorldView } from '../model/world';
@@ -161,6 +162,7 @@ export function decideLineageAction(
     }
   }
   state.revision++;
+  cleanTroops(next);
   return {
     ok: true as const,
     world: next,

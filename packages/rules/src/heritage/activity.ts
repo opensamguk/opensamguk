@@ -4,6 +4,7 @@ import { ADMIN_END_KIND } from '../clock/end';
 import { ADMIN_RESET_KIND } from '../clock/reset';
 import { ADMIN_GAME_KINDS } from '../admin/game';
 import { ADMIN_SETTING_KINDS } from '../admin/settings';
+import { TROOP_ACTION_KIND } from '../commands/ext/troop/actions';
 import { DEFENSE_STANCE_KIND } from '../battle/defenders';
 import { NPC_NATION_POLICY_KIND } from '../npc/policy';
 import { NATION_RESTRICTIONS_KIND } from '../personnel/nationRestrictions';
@@ -33,6 +34,7 @@ export const HERITAGE_IGNORED_INPUT_KINDS = [
   'general.possess',
   'system.policy.enable',
   DEFENSE_STANCE_KIND,
+  TROOP_ACTION_KIND,
   NPC_NATION_POLICY_KIND,
   NATION_RESTRICTIONS_KIND,
   ...ADMIN_CLOCK_KINDS,

@@ -162,6 +162,15 @@ export function GeneralInfo({
             value: specialty?.name || g.combatSpecialty?.name || g.special || '—',
             title: specialtyDetails ?? g.combatSpecialty?.description,
           },
+          ...(g.troop
+            ? [
+                {
+                  label: '부대',
+                  value: g.troop.leaderCity ? `${g.troop.name} (${g.troop.leaderCity})` : g.troop.name,
+                  title: `부대장 ${g.troop.leader}`,
+                },
+              ]
+            : []),
           { label: '금', value: n(g.gold) },
           { label: '쌀', value: n(g.rice) },
           ...(salary ? [{ label: '다음 봉급', value: `금 ${n(salary.gold)} · 쌀 ${n(salary.rice)}`, wide: true }] : []),

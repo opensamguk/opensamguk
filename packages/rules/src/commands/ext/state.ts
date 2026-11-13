@@ -1,5 +1,6 @@
 import type { DeepReadonly, JsonValue, WorldExt, WorldState } from '../../model/world';
 import type { EnabledCommands } from '../resolve';
+import { gatherBinding, TROOP_FEATURE, troopSlice } from './troop/state';
 import { INTEL_FEATURE, intelSlice, spyBinding } from './intel/record';
 
 export type ExtInitContext = DeepReadonly<Omit<WorldState, 'ext'>>;
@@ -104,17 +105,18 @@ export function restoreExtState(
   raw: unknown,
   ruleFeatures?: readonly string[],
 ): WorldExt | undefined {
-  return restoreExtStateWithRegistry(
-    ruleFeatures?.includes(INTEL_FEATURE) ? { general: ['spy'], nation: [] } : enabled,
-    raw,
-    extRegistryForRuleFeatures(ruleFeatures),
-  );
+  const general = ruleFeatures?.includes(INTEL_FEATURE) ? ['spy'] : [...(enabled?.general ?? [])];
+  if (ruleFeatures?.includes(TROOP_FEATURE)) general.push(gatherBinding.commandKey);
+  const nation = ruleFeatures?.includes(INTEL_FEATURE) ? [] : (enabled?.nation ?? []);
+  return restoreExtStateWithRegistry({ general, nation }, raw, extRegistryForRuleFeatures(ruleFeatures));
 }
 
 export function extRegistryForRuleFeatures(ruleFeatures?: readonly string[]): ExtStateRegistry {
-  return ruleFeatures?.includes(INTEL_FEATURE)
-    ? { slices: [intelSlice], bindings: [spyBinding] }
-    : { slices: extSlices, bindings: extCommandBindings };
+  const intel = ruleFeatures?.includes(INTEL_FEATURE);
+  const slices = intel ? [intelSlice] : [...extSlices];
+  const bindings = intel ? [spyBinding] : [...extCommandBindings];
+  if (!ruleFeatures?.includes(TROOP_FEATURE)) return { slices, bindings };
+  return { slices: [...slices, troopSlice], bindings: [...bindings, gatherBinding] };
 }
 
 export function restoreExtStateWithRegistry(
