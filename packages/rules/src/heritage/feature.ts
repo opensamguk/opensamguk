@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { HERITAGE_BIRTH_FEATURE } from './birth';
 import type { RuleFeatureDefinition } from '../ruleRegistry';
 import { validateGeneralCreation } from '../general/create';
 import { assertHeritageCreationResult } from './creation';
@@ -22,6 +23,7 @@ export const heritageFeature: RuleFeatureDefinition = {
         origin.initial.ruleFeatures?.includes('lineage-v1'),
         true,
         origin.initial.ruleFeatures?.includes(GENERAL_PERSONALITY_FEATURE),
+        origin.initial.ruleFeatures?.includes(HERITAGE_BIRTH_FEATURE),
       );
       if (!checked.ok) throw new Error('유산 생성 입력의 능력치·배분을 확인하세요.');
       assertHeritageCreationResult(checked.value, input.result, true, five);

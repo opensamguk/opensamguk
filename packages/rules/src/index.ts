@@ -317,6 +317,7 @@ export * from './heritage/activity';
 export * from './heritage/awards';
 export * from './heritage/refund';
 export * from './heritage/creation';
+export * from './heritage/birth';
 export { heritageFeatureDataSchema } from './heritage/feature';
 export * from './clock/featureProfile';
 export * from './entry/possess';

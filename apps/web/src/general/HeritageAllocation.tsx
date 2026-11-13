@@ -49,8 +49,8 @@ export function HeritageAllocation({
   const step = (row: HeritageRow, delta: 1 | -1) => {
     pressed.current = `${row.key}${delta > 0 ? '+' : '-'}`;
     const next = row.bonus + delta;
-    const spent = result.spent + delta;
-    const after = heritage.balance - spent;
+    const after = result.after - delta;
+    const spent = heritage.balance - after;
     onStep(row.key, next);
     setAnnounce(
       `${row.label} 유산 +${next}. 최종 ${row.final === null ? '계산 전' : row.final + delta}. 이번 사용 ${spent}점, ${
@@ -83,7 +83,7 @@ export function HeritageAllocation({
         <div>
           <dt>이번 사용</dt>
           <dd>
-            <span className={styles.pixelNum}>{result.spent}</span>점
+            <span className={styles.pixelNum}>{heritage.balance - result.after}</span>점
           </dd>
         </div>
         <div>

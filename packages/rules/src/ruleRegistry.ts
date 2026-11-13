@@ -31,6 +31,7 @@ import { convertProficiency } from './commands/convertProficiency';
 import { COMBAT_SPECIALTY_FEATURE } from './general/combatSpecialty';
 import { DOMESTIC_SPECIALTY_FEATURE } from './general/domesticSpecialty';
 import { GENERAL_PERSONALITY_FEATURE } from './general/personality';
+import { HERITAGE_BIRTH_FEATURE } from './heritage/birth';
 import { RESEARCH_ERA_FEATURE } from './nationResearch/era';
 import { NATION_PHILOSOPHY_FEATURE } from './personnel/nationPhilosophy';
 import { COURT_ABILITY_FEATURE, COURT_PROMOTION_FEATURE, COURT_RANK_FEATURE } from './personnel/nationRank';
@@ -177,6 +178,7 @@ export const ruleRegistry: RuleRegistry = {
     { key: SPECIALTY_GROWTH_FEATURE, requires: [HERITAGE_SPECIALTY_FEATURE, 'domestic-specialty-v1'], conflicts: [] },
     { key: HERITAGE_SPECIALTY_FEATURE, requires: [HERITAGE_BENEFITS_FEATURE, 'combat-specialty-v1'], conflicts: [] },
     { key: HERITAGE_BENEFITS_FEATURE, requires: ['heritage-v1'], conflicts: [] },
+    { key: HERITAGE_BIRTH_FEATURE, requires: [HERITAGE_SPECIALTY_FEATURE], conflicts: [] },
     preparedTurnsFeature,
     nationResearchFeature,
     relationsFeature,

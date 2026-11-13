@@ -7,6 +7,13 @@ import {
   DEFENSE_STANCE_FEATURE,
   DEFENSE_STANCE_KIND,
   GENERAL_PERSONALITY_FEATURE,
+  HERITAGE_BIRTH_FEATURE,
+  HERITAGE_BIRTH_ZONES,
+  heritageBirthCosts,
+  combatSpecialty,
+  combatSpecialtyNames,
+  cityRegionName,
+  readOperationalMap,
   generalPersonalityChoices,
   defenseStanceInput,
   creationBlock,
@@ -64,6 +71,7 @@ const creationEnvelope = worldInput.extend({
   sex: z.unknown().optional(),
   personality: z.unknown().optional(),
   heritage: z.unknown().optional(),
+  heritageBirth: z.unknown().optional(),
   expectedUserId: z.uuid().optional(),
   portraitId: z.unknown(),
 });
@@ -207,7 +215,7 @@ export const generalRouter = router({
             ? CREATION_ERRORS.BAD_SEX
             : parsed.error.issues.some((issue) => issue.path[0] === 'personality')
               ? CREATION_ERRORS.BAD_PERSONALITY
-              : parsed.error.issues.some((issue) => issue.path[0] === 'heritage')
+              : parsed.error.issues.some((issue) => issue.path[0] === 'heritage' || issue.path[0] === 'heritageBirth')
                 ? CREATION_ERRORS.BAD_HERITAGE
                 : parsed.error.message,
           cause: parsed.error,
@@ -218,9 +226,18 @@ export const generalRouter = router({
         world.ruleFeatures.includes('lineage-v1'),
         world.ruleFeatures.includes('heritage-v1'),
         world.ruleFeatures.includes(GENERAL_PERSONALITY_FEATURE),
+        world.ruleFeatures.includes(HERITAGE_BIRTH_FEATURE),
       );
       if (!checked.ok) throw new TRPCError({ code: 'BAD_REQUEST', message: checked.message });
-      const { portraitId } = checked.value;
+      const { portraitId, heritageBirth } = checked.value;
+      if (
+        heritageBirth?.cityKey !== undefined &&
+        !(await tx.city.findFirst({
+          where: { worldId, cityKey: heritageBirth.cityKey, OR: [{ kind: null }, { kind: 'CITY' }] },
+          select: { cityKey: true },
+        }))
+      )
+        throw new TRPCError({ code: 'BAD_REQUEST', message: CREATION_ERRORS.BAD_HERITAGE });
       if (
         portraitId !== null &&
         portraitId >= PLAYER_PORTRAIT_MIN_ID &&
@@ -278,6 +295,10 @@ export const generalRouter = router({
     ctx.db.$transaction(
       async (tx) => {
         const world = await requireWorld(tx, input.worldId);
+        const birthEnabled = world.ruleFeatures.includes(HERITAGE_BIRTH_FEATURE);
+        const regionScheme = birthEnabled
+          ? readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin)?.regionScheme
+          : undefined;
         const creationRules = {
           ...statRulesSchema.parse({ stat: world.statRules }).stat,
           count: world.ruleFeatures.includes('five-stats') ? (5 as const) : (3 as const),
@@ -294,6 +315,25 @@ export const generalRouter = router({
           ...(world.ruleFeatures.includes('lineage-v1') ? { lineageEnabled: true as const } : {}),
           ...(world.ruleFeatures.includes(GENERAL_PERSONALITY_FEATURE)
             ? { personalities: generalPersonalityChoices }
+            : {}),
+          ...(birthEnabled
+            ? {
+                heritageBirth: {
+                  costs: heritageBirthCosts,
+                  turnZones: HERITAGE_BIRTH_ZONES,
+                  specialties: combatSpecialtyNames.flatMap((name) => combatSpecialty(world, name) ?? []),
+                  cities: (
+                    await tx.city.findMany({
+                      where: { worldId: world.id, OR: [{ kind: null }, { kind: 'CITY' }] },
+                      select: { cityKey: true, name: true, level: true, region: true },
+                      orderBy: { cityKey: 'asc' },
+                    })
+                  ).map(({ region, ...city }) => ({
+                    ...city,
+                    regionName: cityRegionName(region, world.mapKey, regionScheme),
+                  })),
+                },
+              }
             : {}),
           ...(world.ruleFeatures.includes('nation-lifecycle-v1') ? { nationLifecycleEnabled: true as const } : {}),
           ...(world.ruleFeatures.includes('heritage-v1')

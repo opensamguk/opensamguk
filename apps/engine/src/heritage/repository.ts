@@ -1,5 +1,5 @@
 import type { Prisma } from '@opensamguk/db';
-import { HERITAGE_DIRECT_INPUT_KINDS } from '@opensamguk/rules';
+import { HERITAGE_DIRECT_INPUT_KINDS, HERITAGE_V1, heritageCreationRecordSchema } from '@opensamguk/rules';
 import { hashState } from '@opensamguk/shared/node';
 import type { HeritageEntryWrite, HeritageRepository } from './port';
 
@@ -77,9 +77,17 @@ export class PgHeritageRepository implements HeritageRepository {
   async creationSpends(worldId: string) {
     const rows = await this.tx.heritageEntry.findMany({
       where: { worldId, kind: 'CREATION_SPEND' },
-      select: { userId: true, key: true, delta: true },
+      select: { userId: true, key: true, delta: true, detail: true },
     });
-    return rows.map((row) => ({ ...row, sequence: Number(row.key.slice(`spend:${worldId}:`.length)) }));
+    return rows.map(({ detail, ...row }) => {
+      const birthAllocation =
+        row.delta < -HERITAGE_V1.perGeneral ? heritageCreationRecordSchema.parse(detail) : undefined;
+      return {
+        ...row,
+        sequence: Number(row.key.slice(`spend:${worldId}:`.length)),
+        ...(birthAllocation?.version === 2 ? { birthAllocation } : {}),
+      };
+    });
   }
 
   async refundKeys(worldId: string) {

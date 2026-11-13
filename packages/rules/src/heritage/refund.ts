@@ -1,10 +1,12 @@
 import { HERITAGE_V1 } from './constants';
+import type { HeritageCreationRecord } from './creation';
 
 export interface HeritageCreationSpend {
   userId: string;
   key: string;
   delta: number;
   sequence: number;
+  birthAllocation?: Extract<HeritageCreationRecord, { version: 2 }>;
 }
 export interface HeritageRefundEntry {
   userId: string;
@@ -12,7 +14,7 @@ export interface HeritageRefundEntry {
   key: string;
   kind: 'CREATION_REFUND' | 'FORFEIT';
   delta: number;
-  detail: { version: 1; sourceKey: string; reason: 'ADMIN_END' | 'ADMIN_RESET' };
+  detail: { version: 1 | 2; birth?: true; sourceKey: string; reason: 'ADMIN_END' | 'ADMIN_RESET' };
 }
 
 export function creationRefunds(input: {
@@ -35,7 +37,7 @@ export function creationRefunds(input: {
       spend.key !== `spend:${input.worldId}:${spend.sequence}` ||
       !Number.isInteger(spend.delta) ||
       spend.delta > -1 ||
-      spend.delta < -HERITAGE_V1.perGeneral ||
+      (spend.birthAllocation ? spend.delta !== -spend.birthAllocation.cost : spend.delta < -HERITAGE_V1.perGeneral) ||
       seen.has(spend.key)
     )
       throw new Error('유산 사용 원장을 확인하세요.');
@@ -50,7 +52,11 @@ export function creationRefunds(input: {
       key,
       kind: 'CREATION_REFUND',
       delta: -spend.delta,
-      detail: { version: 1, sourceKey: spend.key, reason: input.reason },
+      detail: {
+        ...(spend.birthAllocation ? { version: 2 as const, birth: true as const } : { version: 1 as const }),
+        sourceKey: spend.key,
+        reason: input.reason,
+      },
     };
     result.push(entry);
     if (input.withdrawnUserIds.has(spend.userId))

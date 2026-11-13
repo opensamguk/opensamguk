@@ -56,7 +56,8 @@ export async function refundHeritageCreations(
     await repository.append({
       ...entry,
       detail: {
-        version: 1,
+        version: entry.detail.version,
+        ...(entry.detail.birth ? { birth: entry.detail.birth } : {}),
         reason,
         spendKey: entry.detail.sourceKey,
         requestId: context.requestId,

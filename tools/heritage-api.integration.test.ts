@@ -132,6 +132,7 @@ async function world(
     benefits?: boolean;
     specialty?: boolean | 'growth';
     turnTime?: boolean;
+    birth?: boolean;
     inactive?: boolean;
     turnTermMinutes?: number;
     endYear?: number | null;
@@ -189,8 +190,9 @@ async function world(
     endYear: options.endYear ?? null,
     ruleFeatures: [
       ...(enabled ? ['heritage-v1'] : []),
-      ...(options.benefits || options.specialty ? [HERITAGE_BENEFITS_FEATURE] : []),
-      ...(options.specialty ? ['combat-specialty-v1', 'heritage-specialty-v1'] : []),
+      ...(options.benefits || options.specialty || options.birth ? [HERITAGE_BENEFITS_FEATURE] : []),
+      ...(options.specialty || options.birth ? ['combat-specialty-v1', 'heritage-specialty-v1'] : []),
+      ...(options.birth ? ['heritage-birth-v1'] : []),
       ...(options.specialty === 'growth' ? ['domestic-specialty-v1', 'specialty-growth-v1'] : []),
       ...(options.inactive ? ['inactive-removal-v1', 'player-autoplay-v1'] : []),
       'policy',
@@ -584,6 +586,49 @@ it('AC-P2-33 다른 대기 배분은 409이고 성공 응답과 생성 규칙에
   expect((await request.result).data).toMatchObject({
     status: 'created',
     general: { leadership: 73, strength: 70, intel: 63 },
+  });
+}, 120000);
+
+it('INT-26 시작 도시·턴 시간대·전투 특기 가격을 한 번 차감하고 관리자 종료 때 돌려준다', async () => {
+  const player = await user();
+  const id = await world({ birth: true });
+  const mine = await rpc('general.mine', { worldId: id }, player);
+  expect(mine.data!.creationRules.heritageBirth).toMatchObject({
+    costs: { cityKey: 1000, turnZone: 2500, specialty: 6000 },
+    turnZones: 60,
+  });
+  const cityKey = mine.data!.creationRules.heritageBirth.cities.at(-1).cityKey;
+  const birth = { cityKey, turnZone: 59, specialty: '궁병' };
+  const creation = { ...payload(id), heritageBirth: birth };
+  expect(
+    (await rpc('general.create', { ...creation, heritageBirth: { ...birth, cityKey: 999999 } }, player)).status,
+  ).toBe(400);
+  const rejected = await admit(id, player, creation);
+  await advance(id);
+  expect((await rejected.result).status).toBe(409);
+  expect(await invariant(player)).toEqual({ balance: 0, entries: [] });
+
+  await db.heritageAccount.create({ data: { userId: player.id, balance: 9506 } });
+  const accepted = await admit(id, player, creation);
+  await advance(id);
+  expect((await accepted.result).status).toBe(200);
+  const general = await db.general.findUniqueOrThrow({ where: { worldId_userId: { worldId: id, userId: player.id } } });
+  expect(general).toMatchObject({ cityKey, special: '궁병', leadership: 73, intel: 63 });
+  expect(general.nextTurnTick % TICKS_PER_MONTH).toBeGreaterThanOrEqual(9833);
+  expect((await db.heritageAccount.findUniqueOrThrow({ where: { userId: player.id } })).balance).toBe(0);
+  expect(await db.heritageEntry.findMany({ where: { userId: player.id } })).toMatchObject([
+    { kind: 'CREATION_SPEND', delta: -9506, detail: { version: 2, birth, cost: 9506 } },
+  ]);
+  await enqueueEnd(id, player);
+  await advance(id);
+  const archive = await exportReplay(db, id);
+  expect(replayToEnd(archive)).toEqual(archive.end);
+  expect((await db.heritageAccount.findUniqueOrThrow({ where: { userId: player.id } })).balance).toBe(9506);
+  expect(
+    await db.heritageEntry.findFirstOrThrow({ where: { userId: player.id, kind: 'CREATION_REFUND' } }),
+  ).toMatchObject({
+    delta: 9506,
+    detail: { version: 2, birth: true },
   });
 }, 120000);
 

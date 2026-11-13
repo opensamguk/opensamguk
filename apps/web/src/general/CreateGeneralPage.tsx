@@ -1,6 +1,6 @@
 import type { AppRouter } from '@opensamguk/server/router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { inferRouterOutputs } from '@trpc/server';
+import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { Portrait } from '../portrait/Portrait';
@@ -26,6 +26,7 @@ import {
   type HeritageRules,
 } from './heritage';
 import { HeritageAllocation } from './HeritageAllocation';
+import { HeritageBirthFields } from './HeritageBirthFields';
 import { NpcPossession } from './NpcPossession';
 import { stepStat, summarizeStats } from './statSummary';
 import { WorldGlanceMap, WorldStatusLine } from './WorldGlance';
@@ -41,12 +42,14 @@ interface Draft {
   personality: string;
   // 유산 월드에서만 쓰는 능력치별 유산 배분. 0인 능력치는 키가 없다.
   bonus: HeritageBonus;
+  birth: BirthSelection;
   // 유산 월드에서 이 입력을 시작한 계정(creationRules.heritage.userId). 보낼 때 expectedUserId로 쓴다. 다른 월드는 null이다.
   owner: string | null;
 }
 
 type HeritageState = 'ok' | 'stale' | 'refreshed';
 type Mine = inferRouterOutputs<AppRouter>['general']['mine'];
+type BirthSelection = NonNullable<inferRouterInputs<AppRouter>['general']['create']['heritageBirth']>;
 
 const EMPTY_DRAFT: Draft = {
   name: '',
@@ -55,6 +58,7 @@ const EMPTY_DRAFT: Draft = {
   sex: '',
   personality: '',
   bonus: {},
+  birth: {},
   owner: null,
 };
 const SEX_REQUIRED = '성별을 선택하세요.';
@@ -181,6 +185,7 @@ function CreateGeneral({ worldId }: { worldId: string }) {
             worldId={worldId}
             rules={mine.data.creationRules}
             personalities={mine.data.creationRules.personalities}
+            birthRules={mine.data.creationRules.heritageBirth}
             lineage={'lineageEnabled' in mine.data.creationRules && mine.data.creationRules.lineageEnabled === true}
             heritage={'heritage' in mine.data.creationRules ? mine.data.creationRules.heritage : undefined}
             currentOwner={owner}
@@ -235,7 +240,12 @@ function CreateGeneral({ worldId }: { worldId: string }) {
           이름과 초상, 능력치를 정해 이 월드의 내 장수를 만듭니다. 한 월드에 장수는 하나입니다.
         </p>
         {/* 원작 장수 선택 화면의 안내와 서버 정보 (INT-25 단계 3). 새 장수는 무작위 도시에서 재야로 시작한다. */}
-        <p className={styles.lead}>무작위 도시에서 재야로 시작합니다. 임관과 건국은 들어간 뒤 명령으로 합니다.</p>
+        <p className={styles.lead}>
+          {mine.data?.creationRules.heritageBirth
+            ? '시작 도시를 지정하지 않으면 무작위 도시에서 재야로 시작합니다.'
+            : '무작위 도시에서 재야로 시작합니다.'}{' '}
+          임관과 건국은 들어간 뒤 명령으로 합니다.
+        </p>
         <WorldStatusLine worldId={worldId} />
       </div>
       <WorldGlanceMap worldId={worldId} />
@@ -261,6 +271,7 @@ function CreateForm({
   worldId,
   rules,
   personalities,
+  birthRules,
   lineage,
   heritage,
   currentOwner,
@@ -278,6 +289,7 @@ function CreateForm({
   worldId: string;
   rules: CreationRules;
   personalities: Mine['creationRules']['personalities'];
+  birthRules: Mine['creationRules']['heritageBirth'];
   // lineage-v1 월드면 성별을 꼭 고른다. 다른 월드에는 성별 칸이 없고 보내지도 않는다.
   lineage: boolean;
   // heritage-v1 월드에만 있다. 없으면 유산 첩도 heritage 키도 없다.
@@ -342,7 +354,7 @@ function CreateForm({
     }
   }
   // 입력은 화면(CreateGeneral)이 갖는다. 기다리는 동안 폼이 사라졌다가 거절로 돌아와도 보낸 값이 남는다.
-  const { name, stats, sex, bonus, personality } = draft;
+  const { name, stats, sex, bonus, personality, birth } = draft;
   const chosenPersonality = personalities?.find((choice) => choice.name === personality);
   const setName = (value: string) => onDraft((prev) => ({ ...prev, name: value }));
   const setStats = (update: (prev: StatValues) => StatValues) =>
@@ -357,7 +369,15 @@ function CreateForm({
     });
   const [touched, setTouched] = useState(false);
   const check = checkCreation(name, stats, rules);
-  const heritageCheck = heritage ? checkHeritage(bonus, stats, rules, heritage, heritageState === 'stale') : null;
+  const birthCost = birthRules
+    ? Object.entries(birthRules.costs).reduce(
+        (sum, [key, price]) => sum + (birth[key as keyof BirthSelection] === undefined ? 0 : price),
+        0,
+      )
+    : 0;
+  const heritageCheck = heritage
+    ? checkHeritage(bonus, stats, rules, heritage, heritageState === 'stale', birthCost)
+    : null;
   const problems = [
     ...check.problems,
     ...(lineage && sex === '' ? [SEX_REQUIRED] : []),
@@ -371,7 +391,7 @@ function CreateForm({
   const sexHelpId = useId();
   // 유산 월드에서는 유산을 더한 최종 능력치로 요약한다. 보낼 능력치는 기본값 그대로다.
   const summary = summarizeStats(heritage ? withBonus(stats, bonus) : stats, rules);
-  const spent = heritageCheck?.spent ?? 0;
+  const spent = (heritageCheck?.spent ?? 0) + birthCost;
   const submitLabel = spent > 0 ? `장수 만들기 (유산 ${spent}점 사용)` : '장수 만들기';
 
   const submit = (event: FormEvent) => {
@@ -380,7 +400,7 @@ function CreateForm({
     if (!check.stats || problems.length > 0 || create.isPending || uploading || draft.owner !== currentOwner) return;
     // 0인 능력치는 빼고 합이 0이면 heritage 키를 보내지 않는다. 보너스는 서버가 기본값에 더한다.
     const heritagePayload =
-      heritageCheck && spent > 0
+      heritageCheck && heritageCheck.spent > 0
         ? {
             heritage: Object.fromEntries(
               heritageCheck.rows.filter((row) => row.bonus > 0).map((row) => [row.key, row.bonus]),
@@ -398,6 +418,7 @@ function CreateForm({
         ...(lineage && sex !== '' ? { sex } : {}),
         ...(chosenPersonality ? { personality: chosenPersonality.name } : {}),
         ...heritagePayload,
+        ...(birthCost ? { heritageBirth: birth } : {}),
         // 유산 월드에서는 입력을 시작한 계정을 함께 보낸다. 세션이 바뀌었으면 서버가 입력·잔액을 건드리기 전에 거절한다.
         ...(portraitId !== null && account.data
           ? { expectedUserId: account.data.userId }
@@ -574,6 +595,13 @@ function CreateForm({
         </p>
       ) : null}
 
+      {birthRules && heritage ? (
+        <HeritageBirthFields
+          rules={birthRules}
+          value={birth}
+          onChange={(update) => onDraft((prev) => ({ ...prev, birth: update }))}
+        />
+      ) : null}
       {heritage && heritageCheck ? (
         <HeritageAllocation
           heritage={heritage}

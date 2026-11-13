@@ -12,6 +12,7 @@ const USER_B = '00000000-0000-4000-8000-00000000000b';
 const mocks = vi.hoisted(() => ({
   lineage: true,
   personality: false,
+  birth: false,
   heritageBalance: null as number | null,
   userId: '',
   create: vi.fn(),
@@ -40,6 +41,16 @@ vi.mock('../trpc', () => ({
               campaignEnabled: false,
               ...(mocks.lineage ? { lineageEnabled: true } : {}),
               ...(mocks.personality ? { personalities: [{ name: '대의', experiencePercent: 110, train: -5 }] } : {}),
+              ...(mocks.birth
+                ? {
+                    heritageBirth: {
+                      costs: { cityKey: 1000, turnZone: 2500, specialty: 6000 },
+                      turnZones: 60,
+                      cities: [{ cityKey: 7, name: '낙양', level: 4, regionName: '사예' }],
+                      specialties: [{ name: '궁병', description: '회피 확률 20%p 증가' }],
+                    },
+                  }
+                : {}),
               ...(mocks.heritageBalance === null
                 ? {}
                 : {
@@ -109,6 +120,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   mocks.lineage = true;
   mocks.personality = false;
+  mocks.birth = false;
   mocks.heritageBalance = null;
   mocks.userId = USER_A;
   // 결과는 보지 않는다. 보낸 입력만 확인한다.
@@ -144,6 +156,29 @@ it('INT-26 서버가 허용한 성격의 효과를 확인하고 장수 생성에
   await waitFor(() =>
     expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ personality: '대의' }), expect.anything()),
   );
+});
+
+it('INT-26 시작 조건 가격과 능력치 비용을 합산하고 고른 시작 조건만 보낸다', async () => {
+  mocks.lineage = false;
+  mocks.birth = true;
+  mocks.heritageBalance = 1001;
+  mount();
+  fireEvent.change(await screen.findByLabelText('이름'), { target: { value: '서윤' } });
+  fireEvent.change(screen.getByLabelText('시작 도시 · 1,000점'), { target: { value: '7' } });
+  fireEvent.change(screen.getByLabelText('전투 특기 · 6,000점'), { target: { value: '궁병' } });
+  expect(screen.getByText('회피 확률 20%p 증가')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: /장수 만들기.*사용 불가/ }));
+  expect(screen.getByRole('note').textContent).toContain('5999점 줄이세요.');
+  expect(mocks.create).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByLabelText('전투 특기 · 6,000점'), { target: { value: '' } });
+  fireEvent.click(screen.getByRole('button', { name: '통솔 유산 늘리기' }));
+  fireEvent.click(screen.getByRole('button', { name: '장수 만들기 (유산 1001점 사용)' }));
+  await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1));
+  expect(mocks.create.mock.calls[0]![0]).toMatchObject({
+    heritage: { leadership: 1 },
+    heritageBirth: { cityKey: 7 },
+    expectedUserId: USER_A,
+  });
 });
 
 it('T4-95 AC-P2-32 가문 월드는 기본 선택 없는 성별 칸을 보이고 고르기 전에는 보내지 않는다', async () => {

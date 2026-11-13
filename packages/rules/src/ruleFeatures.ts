@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { HERITAGE_BIRTH_FEATURE } from './heritage/birth';
 import { createdHeritageStat } from './heritage/creation';
 import { FIVE_STAT_KEYS, FIVE_STAT_RULES, checkStatProfile } from './general/fiveStats';
 import { validateGeneralCreation } from './general/create';
@@ -73,6 +74,7 @@ export const fiveStatsFeature: RuleFeatureDefinition = {
         origin.initial.ruleFeatures?.includes('lineage-v1'),
         origin.initial.ruleFeatures?.includes('heritage-v1'),
         origin.initial.ruleFeatures?.includes(GENERAL_PERSONALITY_FEATURE),
+        origin.initial.ruleFeatures?.includes(HERITAGE_BIRTH_FEATURE),
       );
       const general = (input.result as { general?: Record<string, unknown> } | null)?.general;
       if (
