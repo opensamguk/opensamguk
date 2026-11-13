@@ -70,7 +70,12 @@ vi.mock('../trpc', () => ({
       summary: {
         queryOptions: () => ({
           queryKey: ['summary'],
-          queryFn: async () => ({ status: 'RUNNING', gameDate: { year: 190, month: 3 }, turnTermMinutes: 10 }),
+          queryFn: async () => ({
+            status: 'RUNNING',
+            gameDate: { year: 190, month: 3 },
+            turnTermMinutes: 10,
+            quota: { humans: 4, max: 500 },
+          }),
         }),
       },
     },
@@ -116,7 +121,7 @@ it('INT-25 AC-INT-25 머리에 재야 시작 안내와 이 월드의 연월·턴
   mount();
   expect(await screen.findByTestId('create-world-status')).toHaveProperty(
     'textContent',
-    '지금 190년 3월 · 턴 10분 · 사람 장수 4명',
+    '지금 190년 3월 · 턴 10분 · 사람 장수 4 / 정원 500',
   );
   expect(screen.getByText('무작위 도시에서 재야로 시작합니다. 임관과 건국은 들어간 뒤 명령으로 합니다.')).toBeTruthy();
   const glance = screen.getByText('지금 세력 지도').closest('details');

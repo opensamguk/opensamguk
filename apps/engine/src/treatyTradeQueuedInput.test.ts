@@ -25,9 +25,13 @@ async function fixture(respond = false) {
     if (!proposed.ok) throw Error('제안 fixture 실패');
     state = proposed.state;
   }
-  const world = { id: 'world', status: 'RUNNING', monthlyTick: 0, actionSequence: 19 } as Prisma.WorldGetPayload<
-    Record<string, never>
-  >;
+  const world = {
+    id: 'world',
+    status: 'RUNNING',
+    monthlyTick: 0,
+    actionSequence: 19,
+    ruleFeatures: [] as string[],
+  } as Prisma.WorldGetPayload<Record<string, never>>;
   const event = {
     id: 1n,
     worldId: 'world',
