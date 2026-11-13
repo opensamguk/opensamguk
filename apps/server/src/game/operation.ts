@@ -445,6 +445,11 @@ export function inspectMembers(ctx: OperationContext, worldId: string) {
       include: { city: { select: { name: true } } },
       orderBy: [{ officerLevel: 'desc' }, { id: 'asc' }],
     });
+    const battles = await tx.generalBattleStats.findMany({
+      where: { worldId, generalId: { in: rows.map(({ id }) => id) } },
+      select: { generalId: true, lastTick: true, engagements: true },
+    });
+    const byGeneral = new Map(battles.map(({ generalId, ...stats }) => [generalId, stats]));
     return {
       items: await Promise.all(
         rows.map(async (general) => ({
@@ -457,6 +462,7 @@ export function inspectMembers(ctx: OperationContext, worldId: string) {
           isHuman: general.userId !== null,
           crew: general.crew,
           stratagemSuccesses: general.stratagemSuccesses,
+          battle: byGeneral.get(general.id) ?? null,
           train: general.train,
           atmos: general.atmos,
           turns: displaySlots(await readSlots(tx, worldId, general.id)).slice(0, 5),
