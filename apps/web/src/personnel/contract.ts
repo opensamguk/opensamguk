@@ -18,7 +18,13 @@ export interface PersonnelBoard {
   localOfficeMinimum?: number;
   secretaryEnabled?: boolean;
   officeCities?: CityRef[];
-  levels: Array<{ officerLevel: number; title: string; holderId: number | null }>;
+  levels: Array<{
+    officerLevel: number;
+    title: string;
+    holderId: number | null;
+    qualification?: string;
+    eligibleIds?: number[];
+  }>;
   members: PersonnelMember[];
 }
 

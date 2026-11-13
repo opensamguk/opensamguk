@@ -2,7 +2,9 @@ import { isDeepStrictEqual } from 'node:util';
 import type { Prisma } from '@opensamguk/db';
 import {
   canManagePersonnel,
+  COURT_ABILITY_FEATURE,
   COURT_RANK_FEATURE,
+  courtAbilityRequirement,
   courtOfficeTitle,
   isAppointableOfficerLevel,
   isLocalOffice,
@@ -137,6 +139,11 @@ export async function submitPersonnelRequest(
           });
           if (courtOfficeTitle(nation.level, appointment.officerLevel) === null)
             throw new TRPCError({ code: 'BAD_REQUEST', message: '현재 작위에서 열리지 않은 직책입니다.' });
+        }
+        if (world.ruleFeatures.includes(COURT_ABILITY_FEATURE)) {
+          const required = courtAbilityRequirement(appointment.officerLevel);
+          if (target.removedAt !== null || (required && target[required.stat] < required.minimum))
+            throw new TRPCError({ code: 'BAD_REQUEST', message: '임명 자격을 갖춘 장수만 가능합니다.' });
         }
         const occupied = await tx.general.findFirst({
           where: { worldId: world.id, nationId: actor.nationId, officerLevel: appointment.officerLevel },

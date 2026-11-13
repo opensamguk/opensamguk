@@ -1,4 +1,5 @@
 import { BATTLE_TACTICS_FEATURE } from '../packages/rules/src/battle/tactics';
+import { COURT_ABILITY_FEATURE, COURT_RANK_FEATURE } from '../packages/rules/src/personnel/nationRank';
 import { CITY_CONFLICT_AWARD_FEATURE, CITY_CONFLICT_FEATURE } from '../packages/rules/src/battle/cityConflict';
 import { MILITARY_STAT_GROWTH_FEATURE, STAT_GROWTH_FEATURE } from '../packages/rules/src/general/statGrowth';
 import { WAR_INCOME_FEATURE } from '../packages/rules/src/monthly/warIncome';
@@ -1471,6 +1472,89 @@ it('동률인 공성 기여의 순위대로 도시를 양도하고 월말 해시
   });
   expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } })).toMatchObject({
     cityKey: 1,
+  });
+  await loop.advanceTo(10000);
+  const archive = await exportReplay(db, worldId);
+  expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
+});
+
+it('수뇌 임명 기준을 후보 목록과 엔진에 적용한다', async () => {
+  const alice = await user();
+  const initial = commandInitial();
+  initial.nations[0]!.level = 2;
+  for (const [index, general] of initial.generals.slice(2).entries()) {
+    Object.assign(general, { nationId: 1, cityKey: 1, officerLevel: 1, strength: 69 + index, nextTurnTick: 100000 });
+  }
+  initial.generals[0]!.nextTurnTick = 100000;
+  initial.generals[1]!.nextTurnTick = 100000;
+  const { worldId } = await saveInitialWorld(db, initial, {
+    name: '수뇌 임명 실제 PG',
+    turnTermMinutes: 30,
+    endYear: null,
+    replayFormat: 3,
+    ruleFeatures: [COURT_ABILITY_FEATURE, COURT_RANK_FEATURE, 'personnel'],
+  });
+  worlds.push(worldId);
+  const lease = await acquireLease(db, worldId);
+  if (!lease) throw new Error('시험 실행권이 없습니다.');
+  leases.push(lease);
+  const loop = new TurnLoop(db, lease);
+  const operator = await user();
+  await db.user.update({ where: { id: operator.id }, data: { role: 'ADMIN' } });
+  expect(
+    (
+      await rpc(
+        'admin.world.requestSetting',
+        {
+          worldId,
+          expectedUserId: operator.id,
+          idempotencyKey: randomUUID(),
+          reason: '수뇌 임명 시험에서 NPC 맡기를 허용합니다.',
+          setting: { kind: 'admin.world.setOption', key: 'entry.npcPlay', value: 'on' },
+        },
+        operator.cookie,
+        true,
+      )
+    ).status,
+  ).toBe(200);
+  await loop.advanceTo(0);
+  const idempotencyKey = randomUUID();
+  const possession = rpc(
+    'entry.possess',
+    {
+      worldId,
+      generalId: 1,
+      expectedUserId: alice.id,
+      idempotencyKey,
+    },
+    alice.cookie,
+    true,
+  );
+  await expect.poll(() => db.inputEvent.count({ where: { worldId, idempotencyKey, status: 'PENDING' } })).toBe(1);
+  await loop.advanceTo(0);
+  expect((await possession).data).toMatchObject({ status: 'possessed' });
+  await controlClock(db, worldId, 'start', now);
+  expect((await rpc('personnel.officers', { worldId }, alice.cookie)).data).toMatchObject({
+    levels: expect.arrayContaining([
+      expect.objectContaining({
+        officerLevel: 10,
+        eligibleIds: [4],
+        qualification: expect.stringContaining('무력 70'),
+      }),
+      expect.objectContaining({ officerLevel: 11, eligibleIds: [3, 4] }),
+    ]),
+  });
+  const appoint = (generalId: number) =>
+    rpc('personnel.appoint', { worldId, requestId: randomUUID(), generalId, officerLevel: 10 }, alice.cookie, true);
+  expect((await appoint(3)).error).toBe('BAD_REQUEST');
+  const accepted = appoint(4);
+  await expect
+    .poll(() => db.inputEvent.count({ where: { worldId, kind: 'personnel.appoint', status: 'PENDING' } }))
+    .toBe(1);
+  await loop.advanceTo(0);
+  expect((await accepted).status).toBe(200);
+  expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 4 } } })).toMatchObject({
+    officerLevel: 10,
   });
   await loop.advanceTo(10000);
   const archive = await exportReplay(db, worldId);

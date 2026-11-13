@@ -241,7 +241,11 @@ export function PersonnelBoardView({
                 holderLabel={level.holderId === null ? '' : (labels.get(level.holderId) ?? `장수 ${level.holderId}`)}
                 holderDetail={level.holderId === null ? undefined : details?.get(level.holderId)}
                 appoint={board.appoint}
-                candidates={candidates}
+                candidates={
+                  level.eligibleIds
+                    ? candidates.filter(({ member }) => level.eligibleIds!.includes(member.generalId))
+                    : candidates
+                }
                 detailsState={detailsState}
                 open={openLevel === level.officerLevel}
                 onOpen={(open) => setOpenLevel(open ? level.officerLevel : null)}
@@ -517,6 +521,7 @@ function LevelRows({
             <CandidatePicker
               id={pickerId}
               title={level.title}
+              qualification={level.qualification}
               candidates={candidates}
               chosen={picked ? picked.member.generalId : null}
               detailsState={detailsState}

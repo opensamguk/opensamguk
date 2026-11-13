@@ -1,4 +1,4 @@
-import { isLocalOffice, nowTick } from '@opensamguk/rules';
+import { COURT_ABILITY_FEATURE, isLocalOffice, nowTick } from '@opensamguk/rules';
 import { z } from 'zod';
 import { protectedProcedure, router, worldVerifiedProcedure } from '../trpc';
 import { worldInput } from '../game/queries';
@@ -18,6 +18,7 @@ export const personnelRouter = router({
         ready.officeEffectsEnabled === true,
         ready.courtRankEnabled === true,
         ready.localOfficeMinimum,
+        world.ruleFeatures.includes(COURT_ABILITY_FEATURE),
       )),
       ...(ready.secretaryEnabled ? { secretaryEnabled: true as const } : {}),
     })),

@@ -2,6 +2,7 @@ import type { Prisma } from '@opensamguk/db';
 import {
   APPOINTABLE_OFFICER_LEVELS,
   canManagePersonnel,
+  courtAbilityRequirement,
   courtOfficeTitle,
   isLocalOffice,
   isOfficeResident,
@@ -34,7 +35,13 @@ export type PersonnelBoard = {
   localOfficeMinimum?: number;
   officeCities?: { cityKey: number; name: string }[];
   appoint: Allowed;
-  levels: { officerLevel: number; title: string; holderId: number | null }[];
+  levels: {
+    officerLevel: number;
+    title: string;
+    holderId: number | null;
+    qualification?: string;
+    eligibleIds?: number[];
+  }[];
   members: PersonnelMember[];
 };
 function titleFor(level: number): string {
@@ -51,6 +58,7 @@ export async function readPersonnelBoard(
   officeEffectsEnabled = false,
   courtRankEnabled = false,
   localOfficeMinimum?: number,
+  courtAbilityEnabled = false,
 ): Promise<PersonnelBoard> {
   const actor = await requireGeneral(tx, input.worldId, input.userId);
   if (actor.nationId === null) throw new TRPCError({ code: 'FORBIDDEN', message: '국가에 소속되어야 합니다.' });
@@ -76,7 +84,7 @@ export async function readPersonnelBoard(
       removedAt: true,
       stratagemSuccesses: true,
       ...(input.tick === undefined ? {} : { nationJoinedTick: true }),
-      ...(localOfficeMinimum === undefined ? {} : { strength: true, intel: true }),
+      ...(localOfficeMinimum !== undefined || courtAbilityEnabled ? { strength: true, intel: true } : {}),
       ...(officeEffectsEnabled ? { officerCityKey: true } : {}),
       city: { select: { cityKey: true, name: true, ...(officeEffectsEnabled ? { nationId: true } : {}) } },
     },
@@ -157,7 +165,29 @@ export async function readPersonnelBoard(
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: '직책에 장수가 둘 이상 있습니다.' });
       const title = courtTitle(officerLevel);
       if (courtRank !== null && title === null && holders.length === 0) return [];
-      return [{ officerLevel, title: title ?? titleFor(officerLevel), holderId: holders[0]?.generalId ?? null }];
+      const required = courtAbilityRequirement(officerLevel);
+      return [
+        {
+          officerLevel,
+          title: title ?? titleFor(officerLevel),
+          holderId: holders[0]?.generalId ?? null,
+          ...(courtAbilityEnabled
+            ? {
+                qualification: required
+                  ? `${required.stat === 'strength' ? '무력' : '지력'} ${required.minimum} 이상인 장수만 표시합니다.`
+                  : '군주를 제외한 장수 중에서 임명할 수 있습니다.',
+                eligibleIds: rows
+                  .filter(
+                    (row) =>
+                      row.removedAt === null &&
+                      row.officerLevel !== 12 &&
+                      (!required || row[required.stat] >= required.minimum),
+                  )
+                  .map(({ id }) => id),
+              }
+            : {}),
+        },
+      ];
     }),
     members,
   };
