@@ -126,8 +126,27 @@ export function InspectionTable({
   worldId?: string;
 }) {
   const [opened, setOpened] = useState<number | null>(null);
+  const [sort, setSort] = useState<'office' | 'lastTick' | 'engagements'>('office');
+  const sorted =
+    sort === 'office' ? rows : [...rows].sort((a, b) => (b.battle?.[sort] ?? -1) - (a.battle?.[sort] ?? -1));
   return (
     <table className={styles.table} data-testid="inspection-table">
+      <caption>
+        <label>
+          정렬{' '}
+          <select
+            value={sort}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              setSort(value === 'lastTick' || value === 'engagements' ? value : 'office');
+            }}
+          >
+            <option value="office">직책</option>
+            <option value="lastTick">최근 전투</option>
+            <option value="engagements">교전 횟수</option>
+          </select>
+        </label>
+      </caption>
       <thead>
         <tr>
           <th scope="col">장수</th>
@@ -145,13 +164,16 @@ export function InspectionTable({
           <th scope="col" className="num">
             계략 성공
           </th>
+          <th scope="col" className="num">
+            교전 횟수
+          </th>
           <th scope="col">예턴 앞 5칸</th>
           <th scope="col">다음 턴</th>
           <th scope="col">마지막 접속</th>
         </tr>
       </thead>
       <tbody>
-        {rows.map((row) => (
+        {sorted.map((row) => (
           <tr key={row.generalId} className={row.idle ? styles.idle : undefined} data-idle={row.idle}>
             <th scope="row">
               <Portrait
@@ -188,6 +210,7 @@ export function InspectionTable({
             <td className="num">{row.train}</td>
             <td className="num">{row.atmos}</td>
             <td className="num">{row.stratagemSuccesses}</td>
+            <td className="num">{row.battle?.engagements ?? '—'}</td>
             <td>
               <TurnPreview turns={row.turns} names={names} />
             </td>
