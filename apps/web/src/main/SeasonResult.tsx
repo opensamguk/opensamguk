@@ -87,9 +87,31 @@ function SeasonGenerals({ winnerNationId }: { winnerNationId: number | null }) {
   });
   const tigers = merit.data ? fiveTigers(merit.data.generals, winnerNationId) : [];
   const winner = merit.data?.winnerSummary;
+  const statistics = query.data?.statistics;
   const n = (value: number) => value.toLocaleString('ko-KR');
   return (
     <div className={styles.generals} data-testid="season-generals">
+      {statistics ? (
+        <details>
+          <summary>기수 통계</summary>
+          <InfoGrid
+            items={[
+              { label: '국가 수', value: `최종 ${n(statistics.final.nations)} · 최대 ${n(statistics.peak.nations)}` },
+              {
+                label: '최종 장수 수',
+                value: n(statistics.final.generals),
+              },
+              {
+                label: '소속 장수 최대 수 (월간 기록)',
+                value: n(statistics.peak.affiliatedGenerals),
+              },
+              ...(statistics.nationNames.length
+                ? [{ label: '등장 국가', value: statistics.nationNames.join(' · ') }]
+                : []),
+            ]}
+          />
+        </details>
+      ) : null}
       {winner && (
         <>
           <h3>통일 국가 현황</h3>

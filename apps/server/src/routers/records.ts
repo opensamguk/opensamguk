@@ -218,7 +218,31 @@ export const recordsRouter = router({
                 })),
             }
           : null;
-      return { result, generals, winnerSummary };
+      const history = await tx.yearbookSnapshot.findMany({
+        where: { worldId: input.worldId },
+        orderBy: { tick: 'asc' },
+        select: { nations: { orderBy: { nationId: 'asc' }, select: { nationId: true, name: true } }, data: true },
+      });
+      const removed = await tx.removedNation.findMany({
+        where: { worldId: input.worldId },
+        orderBy: { nationId: 'asc' },
+        select: { nationId: true, name: true },
+      });
+      const nationNames = new Map(removed.map(({ nationId, name }) => [nationId, name]));
+      for (const month of history) for (const nation of month.nations) nationNames.set(nation.nationId, nation.name);
+      for (const row of rows)
+        if (row.nationId !== null && row.nationName) nationNames.set(row.nationId, row.nationName);
+      const final = { nations: result.remainingNations, generals: rows.length };
+      const peak = { nations: final.nations, affiliatedGenerals: rows.filter((row) => row.nationId !== null).length };
+      for (const month of history) {
+        const nations = worldRecordInfo(month.data).nations;
+        peak.nations = Math.max(peak.nations, nations.filter(({ cities }) => cities > 0).length);
+        peak.affiliatedGenerals = Math.max(
+          peak.affiliatedGenerals,
+          nations.reduce((total, nation) => total + nation.generals, 0),
+        );
+      }
+      return { result, generals, winnerSummary, statistics: { final, peak, nationNames: [...nationNames.values()] } };
     }),
   ),
   general: protectedProcedure.input(generalInput).query(({ ctx, input }) =>
