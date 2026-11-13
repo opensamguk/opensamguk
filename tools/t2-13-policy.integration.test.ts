@@ -1020,6 +1020,9 @@ it('부대 창설·가입·집합·추방을 실제 DB와 월말 재생에서 �
     expect((await request).data).toEqual({ status: 'possessed', generalId });
   }
   await controlClock(db, worldId, 'start', now);
+  expect((await rpc('nation.get', { worldId, nationId: 1 }, alice.cookie)).data).toMatchObject({
+    generals: expect.arrayContaining([expect.objectContaining({ id: 1, isHuman: true, possessedNpc: true })]),
+  });
   const update = (cookie: string, change: object) =>
     rpc(
       'troop.update',
@@ -1096,6 +1099,9 @@ it('부대 창설·가입·집합·추방을 실제 DB와 월말 재생에서 �
   await loop.advanceTo(10100);
   expect((await list(bob.cookie)).data).toMatchObject({ myTroop: null, troops: [{ members: [] }] });
   await loop.advanceTo(20000);
+  expect((await rpc('ranking.generals', { worldId, by: 'dedication' }, alice.cookie)).data).toMatchObject({
+    top: expect.arrayContaining([expect.objectContaining({ generalId: 1, isHuman: true, possessedNpc: true })]),
+  });
   const archive = await exportReplay(db, worldId);
   expect(replayArchive(archive, 2)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
 });

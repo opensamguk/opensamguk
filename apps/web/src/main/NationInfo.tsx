@@ -1081,7 +1081,9 @@ export function StationedTable({
       label: '장수',
       sortValue: (g) => displayName(g.name),
       // NPC 딱지는 장수 행의 isHuman으로 단다. 감찰 자료의 사람 여부도 함께 본다.
-      render: (g) => <GeneralNameCell general={g} npc={inspection?.get(g.id)?.isHuman === false} />,
+      render: (g) => (
+        <GeneralNameCell general={g} npc={inspection?.get(g.id)?.isHuman === false} possessedNpc={g.possessedNpc} />
+      ),
     },
     {
       key: 'officer',

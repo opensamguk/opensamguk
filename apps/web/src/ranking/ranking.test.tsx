@@ -21,6 +21,7 @@ const general = (rank: number, generalId: number, name: string, nation = wei): R
   generalId,
   portraitId: null,
   isHuman: true,
+  possessedNpc: false,
   name,
   nation,
   dedication: 1000 - rank,

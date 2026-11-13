@@ -42,6 +42,7 @@ import { readView, requireGeneral, requireRuleFeature, requireWorld } from '../g
 import { nationPopulation, projectNationFinance, salaryRate } from '../game/nationFinance';
 import { nationTenureYears } from '../game/nationTenure';
 import { worldResolver } from '../game/resolver';
+import { possessedGenerals } from '../game/possessedGenerals';
 
 export const nationRouter = router({
   setRestrictions: worldVerifiedProcedure
@@ -145,6 +146,11 @@ export const nationRouter = router({
         orderBy: ownNation ? [{ region: 'asc' }, { level: 'desc' }, { cityKey: 'asc' }] : { cityKey: 'asc' },
       });
       const generals = await tx.general.findMany({ where: input, orderBy: { id: 'asc' } });
+      const possessed = await possessedGenerals(
+        tx,
+        input.worldId,
+        generals.filter((general) => general.userId !== null).map(({ id }) => id),
+      );
       const needsOfficeEffects =
         ownNation && world.status !== 'ENDED' && world.ruleFeatures.includes(OFFICE_EFFECTS_FEATURE);
       const showNpcOrders = ownNation && viewer?.officerLevel === BALANCE.RULER_LEVEL && world.status !== 'ENDED';
@@ -276,6 +282,7 @@ export const nationRouter = router({
               : undefined;
           return {
             ...garrisonGeneralInfo(general, viewer, units, { stats: openRoster, biography: openRoster }),
+            possessedNpc: possessed.has(general.id),
             ...(tenureYears === undefined ? {} : { tenureYears }),
           };
         }),
