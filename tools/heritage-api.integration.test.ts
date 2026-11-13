@@ -904,6 +904,9 @@ it('AC-P2-33 실제 통일 보상을 중복 없이 지급하고 6점을 넘는 �
 it('AC-P2-33 실제 서로 다른 12개월 직접 명령은 정상 종료 때 활동 1점을 지급한다', async () => {
   const player = await user(),
     id = await world({ actor: player, endYear: 191 });
+  expect((await rpc('heritage.mine', undefined, player)).data?.activeWorlds).toContainEqual(
+    expect.objectContaining({ worldId: id, activityMonths: 0, activityPoints: 0, monthsToNextPoint: 12 }),
+  );
   for (let month = 0; month < 12; month++) {
     const saved = await rpc(
       'turns.set',
@@ -912,7 +915,12 @@ it('AC-P2-33 실제 서로 다른 12개월 직접 명령은 정상 종료 때 �
     );
     expect(saved.data).toMatchObject({ ok: true });
     await advance(id, (month + 1) * TICKS_PER_MONTH);
+    if (month === 1)
+      expect((await rpc('heritage.mine', undefined, player)).data?.activeWorlds).toContainEqual(
+        expect.objectContaining({ worldId: id, activityMonths: 2, activityPoints: 0, monthsToNextPoint: 10 }),
+      );
   }
+  expect((await rpc('heritage.mine', undefined, player)).data?.activeWorlds).toEqual([]);
   expect((await db.worldResult.findUniqueOrThrow({ where: { worldId: id } })).reason).toBe('END_YEAR');
   const result = await invariant(player);
   expect(result.balance).toBe(1);

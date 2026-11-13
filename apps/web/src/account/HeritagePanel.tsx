@@ -69,6 +69,19 @@ export function HeritagePanel({ heritage }: { heritage: Heritage }) {
           <li>보유 점수에는 상한이 없습니다. 탈퇴하면 남은 점수는 몰수되어 되살리지 않습니다.</li>
         </ul>
       </details>
+      {(heritage.activeWorlds?.length ?? 0) > 0 && (
+        <>
+          <h3 className={own.subtitle}>진행 중인 유산 월드</h3>
+          <ul>
+            {heritage.activeWorlds.map((world) => (
+              <li key={world.worldId}>
+                <b>{world.worldName}</b> · 직접 명령 {world.activityMonths}개월 · 활동으로 {world.activityPoints}점
+                {world.monthsToNextPoint === null ? '' : ` · 다음 기준까지 ${world.monthsToNextPoint}개월`}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
       <h3 id="heritage-history" className={own.subtitle}>
         최근 기록
       </h3>
