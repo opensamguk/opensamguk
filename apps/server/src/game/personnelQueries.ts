@@ -30,6 +30,7 @@ type PersonnelMember = {
 };
 export type PersonnelBoard = {
   actorId: number;
+  topVictories?: { generalId: number; name: string; portraitId: number | null; wins: number }[];
   topStratagem?: { generalId: number; name: string; portraitId: number | null; successes: number }[];
   officeEffectsEnabled?: true;
   localOfficeMinimum?: number;
@@ -83,6 +84,7 @@ export async function readPersonnelBoard(
       portraitId: true,
       removedAt: true,
       stratagemSuccesses: true,
+      battleWins: true,
       ...(input.tick === undefined ? {} : { nationJoinedTick: true }),
       ...(localOfficeMinimum !== undefined || courtAbilityEnabled ? { strength: true, intel: true } : {}),
       ...(officeEffectsEnabled ? { officerCityKey: true } : {}),
@@ -125,12 +127,18 @@ export async function readPersonnelBoard(
       ...(tenureYears === undefined ? {} : { tenureYears }),
     };
   });
+  const topVictories = rows
+    .filter((row) => row.removedAt === null && row.battleWins > 0)
+    .sort((a, b) => b.battleWins - a.battleWins || a.id - b.id)
+    .slice(0, 5)
+    .map(({ id, name, portraitId, battleWins }) => ({ generalId: id, name, portraitId, wins: battleWins }));
   const topStratagem = rows
     .filter((row) => row.removedAt === null && row.stratagemSuccesses > 0)
     .sort((a, b) => b.stratagemSuccesses - a.stratagemSuccesses || a.id - b.id)
     .slice(0, 7);
   return {
     actorId: actor.id,
+    ...(topVictories.length ? { topVictories } : {}),
     ...(localOfficeMinimum === undefined ? {} : { localOfficeMinimum }),
     ...(topStratagem.length
       ? {
