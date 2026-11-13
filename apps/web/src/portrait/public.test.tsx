@@ -6,7 +6,7 @@ const fallbackUrl = publicImageUrl('apps/web/src/portrait/fallback.svg');
 import { Portrait } from './Portrait';
 import { PORTRAIT_VARIANTS, type PortraitVariant } from './portraitUrl';
 
-// D-086: 공개 빌드(`vite build --mode public`)도 개발과 같은 base로 게임 초상을 보인다.
+// D-087: 공개 빌드(`vite build --mode public`)도 개발과 같은 base로 게임 초상을 보인다.
 // 실제 번들에서는 MODE가 빌드 때 상수로 바뀐다. 여기서는 같은 값을 vi.stubEnv로 넣는다.
 // 일반 모드 시험은 portrait.test.tsx에 그대로 있다. 이 파일은 끝날 때마다 환경값과 모듈 목록을 되돌린다.
 

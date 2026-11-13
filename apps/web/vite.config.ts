@@ -11,12 +11,12 @@ import { PUBLIC_IMAGES } from '@opensamguk/shared/public-images';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 
-// 공개 빌드 (D-031, T3-13, D-086). `vite build --mode public`일 때만 아래가 적용된다. 일반 dev/build는 그대로다.
+// 공개 빌드 (D-031, T3-13, D-087). `vite build --mode public`일 때만 아래가 적용된다. 일반 dev/build는 그대로다.
 const PUBLIC_MODE = 'public';
 const PUBLIC_BUILD_META = 'public-build.json';
 const IMAGE_FILE = /\.(png|jpe?g|webp|gif|svg|avif|ico|bmp)$/i;
 
-// 공개 빌드도 개발과 같은 초상 base URL을 쓴다 (D-086). 셸 환경이 .env 파일보다 먼저다(Vite와 같은 순서).
+// 공개 빌드도 개발과 같은 초상 base URL을 쓴다 (D-087). 셸 환경이 .env 파일보다 먼저다(Vite와 같은 순서).
 // 비었으면 portrait/imageBase.ts의 고정 커밋 기본값이다. https가 아니거나 질의·조각이 붙으면 빌드를 멈춘다.
 // 승인 목록 대조는 공개 자산 검사(tools/public-assets)가 manifest의 remoteImageBases로 한다.
 function publicImageBase(env: Record<string, string>): string {
@@ -35,7 +35,7 @@ function publicImageBase(env: Record<string, string>): string {
     url.password !== ''
   ) {
     throw new Error(
-      '공개 빌드(D-086)의 초상 base URL은 질의·조각 없는 https 주소여야 합니다. VITE_IMAGE_BASE_URL을 확인하세요.',
+      '공개 빌드(D-087)의 초상 base URL은 질의·조각 없는 https 주소여야 합니다. VITE_IMAGE_BASE_URL을 확인하세요.',
     );
   }
   return base;

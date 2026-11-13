@@ -6,11 +6,11 @@ import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page, type Response } from '@playwright/test';
 
-// T3-13 · AC-M3-06 · D-060 · D-086: 이미 만든 공개 dist(`pnpm build:public`)를 vite preview로 띄워 첫 화면과 로그인 화면의
+// T3-13 · AC-M3-06 · D-060 · D-087: 이미 만든 공개 dist(`pnpm build:public`)를 vite preview로 띄워 첫 화면과 로그인 화면의
 // 네트워크 요청을 대조한다. 이 시험은 빌드하지 않는다. dist의 파일 바이트가 public-build.json과 같아야 시작한다.
 // 기본 실행 설정(playwright.config.ts)의 webServer와 baseURL에 기대지 않는다. 공개 자산 전용 설정으로 따로 실행한다.
 // /trpc·/sse는 화면이 열리기 전에 가로채 503으로 막는다. 실제 API·DB에 닿지 않으며 이 시험을 게임 API 검증으로 세지 않는다.
-// D-086으로 공개 빌드도 게임 초상을 보인다. 초상 주소 해석은 공개 모드 화면 단위 시험(apps/web/src/portrait/public.test.tsx)이
+// D-087으로 공개 빌드도 게임 초상을 보인다. 초상 주소 해석은 공개 모드 화면 단위 시험(apps/web/src/portrait/public.test.tsx)이
 // 맡는다. 여기서는 초상 요청이 있다면 manifest의 remoteImageBases 중 빌드에 쓴 base 아래인지만 본다.
 // 배출된 기본 SVG는 시험 안에서 직접 불러 응답 바이트만 확인한다.
 
@@ -57,7 +57,7 @@ function readVerifiedMeta(): PublicBuildMeta {
   const meta = JSON.parse(readFileSync(join(distDir, META_FILE), 'utf8')) as PublicBuildMeta;
   expect(meta.schema).toBe(2);
   expect(meta.mode).toBe('public');
-  // 빌드에 쓴 초상 base는 승인 목록 안의 고정 주소다 (D-086).
+  // 빌드에 쓴 초상 base는 승인 목록 안의 고정 주소다 (D-087).
   const policy = JSON.parse(readFileSync(join(repoRoot, 'manifest/public-assets.json'), 'utf8')) as {
     portraitPolicy: string;
     remoteImageBases: string[];

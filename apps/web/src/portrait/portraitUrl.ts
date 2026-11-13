@@ -4,7 +4,7 @@ import { resolveImageBaseUrl } from './imageBase';
 export { DEFAULT_IMAGE_BASE_URL, resolveImageBaseUrl } from './imageBase';
 
 // 초상 경로 규칙: docs/image-assets.md §2. 게임 데이터는 초상 ID만 저장하고 주소는 화면이 만든다 (FR-IMG-01·02).
-// 공개 빌드(`vite build --mode public`)도 같은 규칙으로 초상을 보인다 (D-086, D-031의 공개 빌드 초상 부분을 대체).
+// 공개 빌드(`vite build --mode public`)도 같은 규칙으로 초상을 보인다 (D-087, D-031의 공개 빌드 초상 부분을 대체).
 
 export const PORTRAIT_ID_MIN = 10001;
 export const PORTRAIT_ID_MAX = 11008;

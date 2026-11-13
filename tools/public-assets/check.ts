@@ -46,14 +46,14 @@ export class PublicAssetsError extends Error {
   }
 }
 
-// 초상 정책은 둘 중 하나다. D-031: 공개 빌드는 실루엣만 쓴다. D-086: 공개 빌드도 승인한 base의 초상을 쓴다.
-// D-086이면 remoteImageBases가 그 base 목록이다. 개별 주소 규칙은 portraitBaseFailures가 본다.
+// 초상 정책은 둘 중 하나다. D-031: 공개 빌드는 실루엣만 쓴다. D-087: 공개 빌드도 승인한 base의 초상을 쓴다.
+// D-087이면 remoteImageBases가 그 base 목록이다. 개별 주소 규칙은 portraitBaseFailures가 본다.
 function portraitPolicyValid(value: Record<string, unknown>): boolean {
   if (!stringArray(value.remoteImageBases)) return false;
   if (value.decision === 'D-031' && value.portraitPolicy === 'fallback-only')
     return value.remoteImageBases.length === 0;
   return (
-    value.decision === 'D-086' &&
+    value.decision === 'D-087' &&
     value.portraitPolicy === 'remote' &&
     value.remoteImageBases.length > 0 &&
     new Set(value.remoteImageBases).size === value.remoteImageBases.length
@@ -86,7 +86,7 @@ function manifestFrom(value: unknown): Manifest {
         )))
   ) {
     throw new PublicAssetsError([
-      'manifest/public-assets.json: decision-policy: D-031·D-086의 공개 이미지 승인 목록이 아닙니다.',
+      'manifest/public-assets.json: decision-policy: D-031·D-087의 공개 이미지 승인 목록이 아닙니다.',
     ]);
   }
   return value as unknown as Manifest;
@@ -102,7 +102,7 @@ function safeRelative(value: string): boolean {
   );
 }
 
-// 실루엣만 쓰는 정책이면 imageBaseUrl은 빈 값, D-086이면 manifest의 remoteImageBases 중 하나다.
+// 실루엣만 쓰는 정책이면 imageBaseUrl은 빈 값, D-087이면 manifest의 remoteImageBases 중 하나다.
 function metadataFrom(value: unknown, imageBases: readonly string[] = []): Metadata {
   const allowedBases = imageBases.length ? imageBases : [''];
   if (
@@ -335,7 +335,7 @@ export function inspectAssetText(
   return [...failures];
 }
 
-// D-086 초상 base. https·고정 주소만 받고 CSP img-src에 그 origin이 있어야 한다.
+// D-087 초상 base. https·고정 주소만 받고 CSP img-src에 그 origin이 있어야 한다.
 // opensamguk-images 원본이면 움직이는 브랜치 대신 전체 커밋 SHA로 고정해야 한다.
 const githubRawPortraitBase = /^https:\/\/raw\.githubusercontent\.com\/opensamguk\/opensamguk-images\/[0-9a-f]{40}$/;
 export function portraitBaseFailures(bases: readonly string[], imageSources: readonly string[]): string[] {
@@ -403,8 +403,8 @@ async function checkExternalAssets(root: string, dist: string, raw: Record<strin
   if (meta.images.length) failures.push('public-build.json: image-set: 이미지 바이트는 게임 배포에 넣지 않습니다.');
   const decisions = await readFile(resolve(root, 'docs/product/decisions.md'), 'utf8');
   if (!/^## D-060[. ]/m.test(decisions)) failures.push('docs/product/decisions.md: missing-decision: D-060');
-  if (manifest.decision === 'D-086' && !/^## D-086[. ]/m.test(decisions))
-    failures.push('docs/product/decisions.md: missing-decision: D-086');
+  if (manifest.decision === 'D-087' && !/^## D-087[. ]/m.test(decisions))
+    failures.push('docs/product/decisions.md: missing-decision: D-087');
   const csp = await readFile(resolve(root, 'deploy/security.caddy'), 'utf8');
   const imageSources = [...csp.matchAll(/img-src\s+([^;"\r\n]+)/g)];
   if (
@@ -417,7 +417,7 @@ async function checkExternalAssets(root: string, dist: string, raw: Record<strin
   if (JSON.stringify(Object.keys(meta.files).sort()) !== JSON.stringify(actual))
     failures.push('public-build.json: file-set: 배포 파일 목록이 다릅니다.');
   if (!actual.includes('index.html')) failures.push('index.html: missing-entry: 공개 화면이 없습니다.');
-  // D-086이면 초상 base와 경로 틀의 '/portraits/' 조각만 더 허용한다. 완성된 초상 주소 문자열은 여전히 거부한다.
+  // D-087이면 초상 base와 경로 틀의 '/portraits/' 조각만 더 허용한다. 완성된 초상 주소 문자열은 여전히 거부한다.
   const urls = new Set([
     ...expected.map((image) => image.url),
     ...portraitBases,
@@ -451,7 +451,7 @@ export async function checkPublicAssets(options: { root?: string; dist?: string 
   // 이미지를 번들에 넣는 옛 방식은 img-src가 self뿐이라 원격 초상을 쓸 수 없다.
   if (manifest.portraitPolicy !== 'fallback-only')
     throw new PublicAssetsError([
-      'manifest/public-assets.json: decision-policy: 원격 초상(D-086)은 외부 이미지 배포에서만 씁니다.',
+      'manifest/public-assets.json: decision-policy: 원격 초상(D-087)은 외부 이미지 배포에서만 씁니다.',
     ]);
   const metadata = metadataFrom(await readJson(resolve(dist, metadataName)));
   const failures: string[] = [];

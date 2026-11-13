@@ -251,7 +251,7 @@ describe('T2-15 AC-INT-20 외부 이미지 배포', () => {
     ])
       expect(inspectAssetText(`const x=${JSON.stringify(url)}`, 'main.js', new Set(), urls).length).toBeGreaterThan(0);
   });
-  describe('D-086 공개 빌드 초상', () => {
+  describe('D-087 공개 빌드 초상', () => {
     const portraitBase = `https://raw.githubusercontent.com/opensamguk/opensamguk-images/${'c'.repeat(40)}`;
     const portraitCode = (base: string) =>
       `const base=${JSON.stringify(base)};const url=(v,i)=>\`\${base}/portraits/\${v}/\${i}.webp\`;`;
@@ -276,7 +276,7 @@ describe('T2-15 AC-INT-20 외부 이미지 배포', () => {
         'manifest/public-assets.json',
         JSON.stringify({
           ...manifest,
-          decision: 'D-086',
+          decision: 'D-087',
           portraitPolicy: 'remote',
           remoteImageBases: [portraitBase],
           delivery: 'external',
@@ -286,14 +286,14 @@ describe('T2-15 AC-INT-20 외부 이미지 배포', () => {
           ...patch.manifest,
         }),
       );
-      await put('docs/product/decisions.md', '## D-031. 기본 SVG\n## D-060 이미지 분리\n## D-086 공개 초상\n');
+      await put('docs/product/decisions.md', '## D-031. 기본 SVG\n## D-060 이미지 분리\n## D-087 공개 초상\n');
     }
     it('승인 base와 경로 틀만 있는 빌드를 통과시킨다', async () => {
       await remote();
       await expect(checkPublicAssets({ root })).resolves.toMatchObject({
         images: 0,
         portraitBases: 1,
-        decision: 'D-086',
+        decision: 'D-087',
       });
     });
     it('빌드에 쓴 base가 승인 목록에 없으면 거부한다', async () => {
@@ -315,7 +315,7 @@ describe('T2-15 AC-INT-20 외부 이미지 배포', () => {
       await remote({ code: portraitCode('https://raw.githubusercontent.com/opensamguk/opensamguk-images/main') });
       await expect(checkPublicAssets({ root })).rejects.toThrow('external-url');
     });
-    it('D-086 결정 기록이 없으면 거부한다', async () => {
+    it('D-087 결정 기록이 없으면 거부한다', async () => {
       await remote();
       await put('docs/product/decisions.md', '## D-031. 기본 SVG\n## D-060 이미지 분리\n');
       await expect(checkPublicAssets({ root })).rejects.toThrow('missing-decision');
@@ -324,7 +324,7 @@ describe('T2-15 AC-INT-20 외부 이미지 배포', () => {
       await remote();
       await put(
         'manifest/public-assets.json',
-        JSON.stringify({ ...manifest, decision: 'D-086', portraitPolicy: 'remote', remoteImageBases: [portraitBase] }),
+        JSON.stringify({ ...manifest, decision: 'D-087', portraitPolicy: 'remote', remoteImageBases: [portraitBase] }),
       );
       await expect(checkPublicAssets({ root })).rejects.toThrow('decision-policy');
     });
