@@ -263,6 +263,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       await db.heritageEntry.createMany({
         data: [
           { worldId: id, kind: 'CREATION_SPEND', delta: -3 },
+          { worldId: id, kind: 'BENEFIT_SPEND', delta: -4 },
           { worldId: id, kind: 'SEASON_CREDIT', delta: 2 },
           { worldId: id, kind: 'CREATION_REFUND', delta: 3 },
           { worldId: otherWorldId, kind: 'SEASON_CREDIT', delta: 5 },
@@ -274,7 +275,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         name,
         nationName,
       });
-      const anonymous = { identitiesVisible: false, spent: [entry(3, null, null)], earned: [entry(2, null, null)] };
+      const anonymous = { identitiesVisible: false, spent: [entry(7, null, null)], earned: [entry(2, null, null)] };
       await authzCase('ranking.heritage', 'success', async () => {
         expect(await query('ranking.heritage', { worldId: id })).toMatchObject({ status: 200, data: anonymous });
       })();
@@ -320,7 +321,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       });
       expect((await query('ranking.heritage', { worldId: id }, users[3]!.cookie)).data).toEqual({
         identitiesVisible: true,
-        spent: [entry(3, '최종 장수', '통일 국가')],
+        spent: [entry(7, '최종 장수', '통일 국가')],
         earned: [entry(2, '최종 장수', '통일 국가')],
       });
     } finally {

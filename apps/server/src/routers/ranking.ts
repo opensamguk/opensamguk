@@ -67,10 +67,10 @@ export const rankingRouter = router({
     readWorld(ctx.db, input.worldId, async (tx, world) => {
       const worldId = world.id;
       const united = world.status === 'ENDED' && world.result?.reason === 'UNIFIED';
-      const rank = async (kind: 'SEASON_CREDIT' | 'CREATION_SPEND', sort: 'asc' | 'desc') => {
+      const rank = async (kinds: string[], sort: 'asc' | 'desc') => {
         const totals = await tx.heritageEntry.groupBy({
           by: ['userId'],
-          where: { worldId, kind, delta: sort === 'asc' ? { lt: 0 } : { gt: 0 } },
+          where: { worldId, kind: { in: kinds }, delta: sort === 'asc' ? { lt: 0 } : { gt: 0 } },
           _sum: { delta: true },
           orderBy: [{ _sum: { delta: sort } }, { userId: 'asc' }],
           take: 10,
@@ -93,8 +93,8 @@ export const rankingRouter = router({
           };
         });
       };
-      const spent = await rank('CREATION_SPEND', 'asc');
-      const earned = await rank('SEASON_CREDIT', 'desc');
+      const spent = await rank(['CREATION_SPEND', 'BENEFIT_SPEND'], 'asc');
+      const earned = await rank(['SEASON_CREDIT'], 'desc');
       return { spent, earned, identitiesVisible: united };
     }),
   ),
