@@ -4,7 +4,7 @@ import { router, protectedProcedure } from '../trpc';
 import { readView, requireGeneral, requireWorld, worldInput } from '../game/queries';
 import { worldResolver } from '../game/resolver';
 import { commandAvailability } from '../game/commandAvailability';
-import { viewerGeneral } from '../queries';
+import { viewerGeneral, worldInput as strictWorldInput } from '../queries';
 function describeCommand(def: CommandDef) {
   const doc = commandPlayerDocs[def.key];
   if (!doc) throw new Error(`명령 도움말이 없습니다: ${def.key}`);
@@ -22,7 +22,7 @@ function describeCommand(def: CommandDef) {
 
 export const commandList = commands.filter((def) => def.target === 'general').map(describeCommand);
 export const commandsRouter = router({
-  recruitCandidates: protectedProcedure.input(worldInput).query(({ ctx, input }) =>
+  recruitCandidates: protectedProcedure.input(strictWorldInput).query(({ ctx, input }) =>
     ctx.db.$transaction(
       async (tx) => {
         const world = await requireWorld(tx, input.worldId);

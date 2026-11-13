@@ -4,7 +4,11 @@ import { protectedProcedure, publicProcedure, router } from '../trpc';
 import { readWorld, viewerGeneral, worldInput, worldSummary } from '../queries';
 import { mapCity, publicMapInfo } from '../visibility';
 import {
-  cityRegionName, INTEL_FEATURE, LINEAGE_EXITED_YEAR, readOperationalMap, operationalMapDisplay,
+  cityRegionName,
+  INTEL_FEATURE,
+  LINEAGE_EXITED_YEAR,
+  readOperationalMap,
+  operationalMapDisplay,
 } from '@opensamguk/rules';
 import { readCityScaleProjection } from '../game/cityScale';
 import { readMapBackgrounds } from '../resourceAdmin/mapBackground';

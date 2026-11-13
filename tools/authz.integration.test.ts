@@ -236,7 +236,8 @@ describe('T3-04 실제 AppRouter HTTP·PostgreSQL 실행 대조', () => {
               : path === 'auth.login' && category === 'sanctioned'
                 ? { email: users[2]!.email, password }
                 : input(path);
-          const publicWorldRead = path === 'commands.list' || path === 'treaty.relations' || path === 'records.activity';
+          const publicWorldRead =
+            path === 'commands.list' || path === 'treaty.relations' || path === 'records.activity';
           const ownerCookie = publicWorldRead && category === 'otherUser' ? await session() : undefined;
           const before = await snapshot();
           const result = await request(path, data, cookie);

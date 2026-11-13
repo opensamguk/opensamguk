@@ -433,6 +433,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         msPerTick: 6,
         turnTermMinutes: 1,
         truce: null,
+        quota: { humans: 3, max: null },
       };
       for (const user of users) {
         const result = await query('world.summary', { worldId: endedWorldId }, user.cookie);
@@ -627,7 +628,8 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       const foreign = (await query('nation.get', input, users[1]!.cookie)).data.cities;
       expect(own.map((city) => city.key)).toEqual([third, fourth, second, first]);
       expect(foreign.map((city) => city.key)).toEqual(keys);
-      for (const city of [...own, ...foreign]) expect(city).not.toHaveProperty('region');
+      expect(own.map((city) => city.region)).toEqual([1, 1, 1, 2]);
+      for (const city of foreign) expect(city).not.toHaveProperty('region');
     } finally {
       await db.world.delete({ where: { id } });
     }
