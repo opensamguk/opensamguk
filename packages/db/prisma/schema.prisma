@@ -100,9 +100,11 @@ model PublicNationEvent {
   tick     Int
   kind     String
   text     String
+  nationIds Int[] @default([])
   world    World  @relation(fields: [worldId], references: [id], onDelete: Cascade)
 
   @@index([worldId, tick, id])
+  @@index([nationIds], type: Gin)
 }
 
 model ReputationEvent {

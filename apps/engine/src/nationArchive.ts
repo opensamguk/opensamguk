@@ -19,27 +19,28 @@ export async function persistPublicNationEvents(
   at: ActionAt,
   transfer?: CommandResult['cityTransfer'],
 ) {
-  const data: { kind: string; text: string }[] = [];
+  const data: { kind: string; text: string; nationIds: number[] }[] = [];
   for (const nation of Object.values(next.nations)) {
     const prior = before.nations[nation.id];
-    if (!prior) data.push({ kind: 'found', text: `${nation.name} 건국` });
+    if (!prior) data.push({ kind: 'found', nationIds: [nation.id], text: `${nation.name} 건국` });
     else if (next.ruleFeatures?.includes(COURT_PROMOTION_FEATURE) && prior.level < nation.level) {
       const title = nationRank(nation.level)?.title;
-      if (title) data.push({ kind: 'promotion', text: `${nation.name} 작위 승급 · ${title}` });
+      if (title) data.push({ kind: 'promotion', nationIds: [nation.id], text: `${nation.name} 작위 승급 · ${title}` });
     }
     if (prior && nation.capitalCityKey !== null && prior.capitalCityKey !== nation.capitalCityKey) {
       const capital = next.cities[nation.capitalCityKey];
-      if (capital) data.push({ kind: 'capital', text: `${nation.name} ${capital.name} 천도` });
+      if (capital) data.push({ kind: 'capital', nationIds: [nation.id], text: `${nation.name} ${capital.name} 천도` });
     }
   }
   for (const nation of Object.values(before.nations)) {
-    if (!next.nations[nation.id]) data.push({ kind: 'fall', text: `${nation.name} 멸망` });
+    if (!next.nations[nation.id]) data.push({ kind: 'fall', nationIds: [nation.id], text: `${nation.name} 멸망` });
   }
   for (const general of Object.values(next.generals)) {
     const prior = before.generals[general.id];
     if (!prior || general.nationId === null || prior.nationId === general.nationId) continue;
     const nation = before.nations[general.nationId];
-    if (nation && next.nations[nation.id]) data.push({ kind: 'enlist', text: `${general.name} ${nation.name} 임관` });
+    if (nation && next.nations[nation.id])
+      data.push({ kind: 'enlist', nationIds: [nation.id], text: `${general.name} ${nation.name} 임관` });
   }
   for (const city of Object.values(next.cities)) {
     const previous = before.cities[city.cityKey]?.nationId;
@@ -51,8 +52,16 @@ export async function persistPublicNationEvents(
         : undefined;
     data.push(
       attacker
-        ? { kind: 'transfer', text: `${city.name} 공략 후 ${attacker.name}에서 ${owner.name}에 양도` }
-        : { kind: 'capture', text: `${owner.name}의 ${city.name} 점령` },
+        ? {
+            kind: 'transfer',
+            nationIds: [...new Set([attacker.id, owner.id, previous].filter((id) => id !== null))],
+            text: `${city.name} 공략 후 ${attacker.name}에서 ${owner.name}에 양도`,
+          }
+        : {
+            kind: 'capture',
+            nationIds: previous === null ? [owner.id] : [owner.id, previous],
+            text: `${owner.name}의 ${city.name} 점령`,
+          },
     );
   }
   if (before.diplomacies !== next.diplomacies) {
@@ -65,7 +74,8 @@ export async function persistPublicNationEvents(
       if (state !== 'DECLARED' || prior.has(`${nationA}:${nationB}`)) continue;
       const a = next.nations[nationA],
         b = next.nations[nationB];
-      if (a && b) data.push({ kind: 'declare', text: `${a.name}·${b.name} 사이 선전포고` });
+      if (a && b)
+        data.push({ kind: 'declare', nationIds: [nationA, nationB], text: `${a.name}·${b.name} 사이 선전포고` });
     }
   }
   if (data.length) {

@@ -867,6 +867,58 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     }
   });
 
+  it('종료 기수의 국가열전은 해당 국가의 공개 사건만 같은 tick에서 이어 읽는다', async () => {
+    const world = await fixtureWorld('season-chronicle');
+    const input = { worldId: world, scope: 'world', nationId: 1 } as const;
+    try {
+      expect((await query('records.activity', input)).status).toBe(404);
+      expect((await query('records.activity', { ...input, scope: 'all' })).status).toBe(400);
+      await db.world.update({ where: { id: world }, data: { status: 'ENDED' } });
+      await db.worldResult.create({
+        data: {
+          worldId: world,
+          reason: 'END_YEAR',
+          endedYear: state.startYear,
+          endedMonth: 12,
+          endedTick: 120000,
+          endedSequence: 40,
+          remainingNations: state.nations.length,
+          finalStateHash: 'season-chronicle-fixture',
+          endedAt: new Date(now),
+        },
+      });
+      await db.publicNationEvent.createMany({
+        data: [
+          ...Array.from({ length: 31 }, (_, index) => ({
+            worldId: world,
+            tick: 1,
+            sequence: index + 1,
+            kind: 'enlist',
+            text: `국가 1 공개 임관 ${index + 1}`,
+            nationIds: [1],
+          })),
+          { worldId: world, tick: 2, sequence: 32, kind: 'declare', text: '공개 선전포고', nationIds: [1, 2] },
+          { worldId: world, tick: 3, sequence: 33, kind: 'fall', text: '다른 국가 멸망', nationIds: [2] },
+          { worldId: world, tick: 4, sequence: 34, kind: 'found', text: '이전 공개 사건' },
+        ],
+      });
+      const first = await query('records.activity', input, users[3]!.cookie);
+      expect(first.status).toBe(200);
+      expect(first.data.items).toHaveLength(30);
+      expect(first.data.items[0]).toMatchObject({ kind: 'declare', text: '공개 선전포고' });
+      const last = await query('records.activity', { ...input, cursor: first.data.nextCursor });
+      expect(last.data.items).toMatchObject([
+        { kind: 'enlist', text: '국가 1 공개 임관 2' },
+        { kind: 'enlist', text: '국가 1 공개 임관 1' },
+      ]);
+      expect(last.data.nextCursor).toBeNull();
+      const other = await query('records.activity', { ...input, nationId: 2 });
+      expect(other.data.items).toMatchObject([{ kind: 'fall' }, { kind: 'declare' }]);
+    } finally {
+      await db.world.delete({ where: { id: world } });
+    }
+  });
+
   it('전략 대기는 소속국에서만 공통·명령별 가능 연월을 반환한다', async () => {
     const id = await fixtureWorld('strategy-status');
     const ruleFeatures = ['nation-strategy-v1', 'personnel'];

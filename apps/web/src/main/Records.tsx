@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Portrait } from '../portrait/Portrait';
 import { useInfiniteQuery, type QueryKey } from '@tanstack/react-query';
 import { retryUnlessClientError, errorCode } from '../game/errors';
@@ -82,11 +83,55 @@ function useRecords(kind: RecordKind, worldId: string, enabled: boolean) {
 // 장수 동향(scope all: 평판 사건 + 공개 국가 사건)과 중원 정세(scope world: 국가 사건만). 같은 procedure의 다른 입력이다.
 type ActivityPeriod = { year: number; month: number };
 
-function useActivity(worldId: string, scope: 'all' | 'world' | 'biography', period?: ActivityPeriod) {
+function useActivity(
+  worldId: string,
+  scope: 'all' | 'world' | 'biography',
+  period?: ActivityPeriod,
+  nationId?: number,
+  enabled = true,
+) {
   const trpc = useTRPC();
-  const input = { worldId, scope, ...(period ? { period } : {}) };
-  return useCursorPages(trpc.records.activity.queryKey(input), (cursor) =>
-    trpcClient.records.activity.query(withCursor(input, cursor)),
+  const input = { worldId, scope, ...(period ? { period } : {}), ...(nationId === undefined ? {} : { nationId }) };
+  return useCursorPages(
+    trpc.records.activity.queryKey(input),
+    (cursor) => trpcClient.records.activity.query(withCursor(input, cursor)),
+    enabled,
+  );
+}
+
+export function SeasonNationChronicle({ worldId, nationId }: { worldId: string; nationId: number }) {
+  const [open, setOpen] = useState(false);
+  const query = useActivity(worldId, 'world', undefined, nationId, open);
+  const items = (query.data?.pages ?? []).flatMap(({ items }) => items.filter((item) => item.source === 'nation'));
+  return (
+    <details onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary>국가열전</summary>
+      {open && (
+        <>
+          {query.isPending ? <LoadingState /> : null}
+          {query.isError ? (
+            <QueryError
+              error={query.error}
+              notFound="국가 기록을 찾을 수 없습니다"
+              onRetry={() => void query.refetch()}
+            />
+          ) : null}
+          {query.isSuccess &&
+            (items.length ? (
+              <ol className={styles.lines}>
+                {items.map(({ id, year, month, text }) => (
+                  <li key={id}>
+                    <span className={styles.date}>{formatYearMonth({ year, month })}</span> {text}
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <EmptyState title="공개 사건 기록이 없습니다" />
+            ))}
+          <MoreButton query={query} />
+        </>
+      )}
+    </details>
   );
 }
 
