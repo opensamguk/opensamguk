@@ -3,10 +3,13 @@ import type { WorldView } from '../model/world';
 import { LINEAGE_EXITED_YEAR } from '../lineage/config';
 import {
   EQUIPMENT_MAX,
-  TREATMENT_TOOL,
+  MORALE_TOOL,
+  hasMoraleTool,
   hasTreatmentTool,
   equipmentConfigSchema,
   equipmentKeySchema,
+  equipmentToolKeySchema,
+  equipmentTools,
   type EquipmentConfig,
 } from './config';
 
@@ -17,9 +20,10 @@ export const equipmentSlotsSchema = z
     book: equipmentKeySchema.optional(),
     tool: z
       .strictObject({
-        key: z.literal(TREATMENT_TOOL.key),
-        charges: z.number().int().min(1).max(TREATMENT_TOOL.charges),
+        key: equipmentToolKeySchema,
+        charges: z.number().int().min(1),
       })
+      .refine(({ key, charges }) => charges <= equipmentTools[key].charges, '도구 사용 횟수가 한도를 넘었습니다.')
       .optional(),
   })
   .refine(
@@ -54,7 +58,8 @@ export function readEquipmentState(value: unknown, world: WorldView): EquipmentS
       throw new Error('퇴장한 장수의 장비가 남아 있습니다.');
     for (const [slot, itemKey] of Object.entries(slots)) {
       if (slot === 'tool') {
-        if (!hasTreatmentTool(state.config)) throw new Error('도구를 사용할 수 없는 월드입니다.');
+        if (!hasTreatmentTool(state.config) || (slots.tool?.key === MORALE_TOOL.key && !hasMoraleTool(state.config)))
+          throw new Error('도구를 사용할 수 없는 월드입니다.');
         continue;
       }
       const item = typeof itemKey === 'string' ? items.get(itemKey) : undefined;

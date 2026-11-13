@@ -2,12 +2,22 @@ import { z } from 'zod';
 import { defineCommand, fail, ownCity, success } from '../commands/support';
 import { checkCityGoods, consumeCityGoods } from '../logistics/consumption';
 import { LINEAGE_EXITED_YEAR } from '../lineage/config';
-import { EQUIPMENT_MAX, TREATMENT_TOOL, hasTreatmentTool, equipmentKeySchema, equipmentSlotSchema } from './config';
+import {
+  EQUIPMENT_MAX,
+  MORALE_TOOL,
+  hasTreatmentTool,
+  hasMoraleTool,
+  equipmentKeySchema,
+  equipmentSlotSchema,
+  equipmentTools,
+  equipmentToolKeySchema,
+  toolSaleProceeds,
+} from './config';
 import { readEquipmentState } from './state';
 
 const argsSchema = z.union([
   z.strictObject({ slot: equipmentSlotSchema, itemKey: z.union([z.literal('none'), equipmentKeySchema]) }),
-  z.strictObject({ slot: z.literal('tool'), itemKey: z.enum(['none', TREATMENT_TOOL.key]) }),
+  z.strictObject({ slot: z.literal('tool'), itemKey: z.union([z.literal('none'), equipmentToolKeySchema]) }),
 ]);
 const proceeds = (cost: number, rate: number) => Math.floor((cost * rate) / 10_000);
 
@@ -35,13 +45,22 @@ export const equipmentTrade = defineCommand({
       if (!hasTreatmentTool(equipment.config)) return fail('COMMAND_DISABLED', '도구를 사용할 수 없는 월드입니다.');
       if (args.itemKey === 'none') {
         if (!slots?.tool) return fail('BAD_STATE', '판매할 도구가 없습니다.');
-        const value = Math.floor((TREATMENT_TOOL.cost * slots.tool.charges) / TREATMENT_TOOL.charges);
-        return general.gold > EQUIPMENT_MAX - proceeds(value, equipment.config.sellRateBp)
+        return general.gold > EQUIPMENT_MAX - toolSaleProceeds(slots.tool, equipment.config.sellRateBp)
           ? fail('BAD_STATE', '금의 한도에 도달했습니다.')
           : null;
       }
-      if (slots?.tool?.charges === TREATMENT_TOOL.charges) return fail('BAD_STATE', '환약이 충분히 남았습니다.');
-      return general.gold < TREATMENT_TOOL.cost ? fail('NO_GOLD', '금이 부족합니다.') : null;
+      const tool = equipmentTools[args.itemKey];
+      if (tool.key === MORALE_TOOL.key) {
+        if (!hasMoraleTool(equipment.config)) return fail('COMMAND_DISABLED', '탁주를 사용할 수 없는 월드입니다.');
+        if (view.cities[general.cityKey]!.security < tool.requiredSecurity)
+          return fail('BAD_STATE', '도시의 치안이 부족합니다.');
+      }
+      if (slots?.tool?.key === tool.key && slots.tool.charges === tool.charges)
+        return fail(
+          'BAD_STATE',
+          tool.key === MORALE_TOOL.key ? '탁주가 충분히 남았습니다.' : '환약이 충분히 남았습니다.',
+        );
+      return general.gold < tool.cost ? fail('NO_GOLD', '금이 부족합니다.') : null;
     }
     const held = slots?.[args.slot];
     if (args.itemKey === 'none') {
@@ -66,15 +85,15 @@ export const equipmentTrade = defineCommand({
     if (args.slot === 'tool') {
       if (args.itemKey === 'none') {
         const slots = equipment.generals[key]!;
-        const value = Math.floor((TREATMENT_TOOL.cost * slots.tool!.charges) / TREATMENT_TOOL.charges);
-        general.gold += proceeds(value, equipment.config.sellRateBp);
+        general.gold += toolSaleProceeds(slots.tool!, equipment.config.sellRateBp);
         delete slots.tool;
         if (Object.keys(slots).length === 0) delete equipment.generals[key];
       } else {
-        general.gold -= TREATMENT_TOOL.cost;
+        const tool = equipmentTools[args.itemKey];
+        general.gold -= tool.cost;
         equipment.generals[key] = {
           ...equipment.generals[key],
-          tool: { key: TREATMENT_TOOL.key, charges: TREATMENT_TOOL.charges },
+          tool: { key: tool.key, charges: tool.charges },
         };
       }
     } else if (args.itemKey === 'none') {

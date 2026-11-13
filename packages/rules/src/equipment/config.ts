@@ -11,6 +11,18 @@ export const TREATMENT_TOOL = {
   charges: 3,
   injuryThreshold: 10,
 } as const;
+// core2026 c81d304, packages/logic/src/items/che_사기_탁주.ts (MIT).
+export const MORALE_TOOL = {
+  key: 'tool_02',
+  name: '탁주(사기)',
+  description: '전투 시작 때 사기가 최대 30 오릅니다. 1회용.',
+  cost: 1_000,
+  charges: 1,
+  requiredSecurity: 1_000,
+  morale: 30,
+} as const;
+export const equipmentTools = { [TREATMENT_TOOL.key]: TREATMENT_TOOL, [MORALE_TOOL.key]: MORALE_TOOL };
+export const equipmentToolKeySchema = z.enum([TREATMENT_TOOL.key, MORALE_TOOL.key]);
 export const equipmentSlotSchema = z.enum(['horse', 'weapon', 'book']);
 export const equipmentKeySchema = z.string().regex(/^(horse|weapon|book)_0[1-6]$/);
 const quantity = z.number().int().min(0).max(EQUIPMENT_MAX);
@@ -45,7 +57,11 @@ const baseEquipmentConfigSchema = z.strictObject({
   tradeExperience: quantity,
 });
 export const equipmentConfigSchema = z
-  .union([baseEquipmentConfigSchema, baseEquipmentConfigSchema.extend({ treatmentTool: z.literal(true) })])
+  .union([
+    baseEquipmentConfigSchema,
+    baseEquipmentConfigSchema.extend({ treatmentTool: z.literal(true) }),
+    baseEquipmentConfigSchema.extend({ treatmentTool: z.literal(true), moraleTool: z.literal(true) }),
+  ])
   .superRefine((config, context) => {
     const keys = new Set<string>();
     for (const [index, item] of config.items.entries()) {
@@ -60,4 +76,14 @@ export type EquipmentConfig = z.infer<typeof equipmentConfigSchema>;
 
 export function hasTreatmentTool(config: Readonly<{ treatmentTool?: true } & Pick<EquipmentConfig, 'version'>>) {
   return config.treatmentTool === true;
+}
+
+export function hasMoraleTool(config: Readonly<EquipmentConfig>) {
+  return 'moraleTool' in config && config.moraleTool === true;
+}
+
+export function toolSaleProceeds(held: { key: keyof typeof equipmentTools; charges: number }, sellRateBp: number) {
+  const tool = equipmentTools[held.key];
+  const value = Math.floor((tool.cost * held.charges) / tool.charges);
+  return Math.floor((value * sellRateBp) / 10_000);
 }

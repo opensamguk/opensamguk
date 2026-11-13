@@ -1,3 +1,4 @@
+import { useBattleMoraleTool } from '../equipment/morale';
 import { battleTacticsStats } from '../battle/tactics';
 import { combatSpecialty, combatSpecialtyKey } from '../general/combatSpecialty';
 import { TICKS_PER_MONTH } from '../clock/constants';
@@ -99,6 +100,7 @@ function makeAttack(collect: typeof collectModifiers) {
       const fightWall = (openingSkirmish = false) => {
         const wall: Force = { crew: city.wall, crewType: 1000, train: 100, atmos: 100, rice: 0 };
         feed(g);
+        useBattleMoraleTool(state, g.id, g);
         const battle = simulateBattle(
           {
             attacker: g,
@@ -140,6 +142,8 @@ function makeAttack(collect: typeof collectModifiers) {
       for (const defender of cleared ? defenders : []) {
         feed(g);
         feed(defender);
+        useBattleMoraleTool(state, g.id, g);
+        useBattleMoraleTool(state, defender.id, defender);
         const battle = simulateBattle(
           {
             attacker: g,

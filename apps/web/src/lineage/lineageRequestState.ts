@@ -42,9 +42,10 @@ function readEquipmentSlots(value: unknown): NonNullable<SuccessionPreview['equi
   }
   if (Object.hasOwn(raw, 'tool')) {
     const tool = record(raw.tool);
-    if (!tool || !exactKeys(tool, ['key', 'charges']) || tool.key !== 'tool_01' || !int(tool.charges, 1, 3))
-      return undefined;
-    result.tool = { key: tool.key, charges: tool.charges };
+    if (!tool || !exactKeys(tool, ['key', 'charges'])) return undefined;
+    if (tool.key === 'tool_01' && int(tool.charges, 1, 3)) result.tool = { key: tool.key, charges: tool.charges };
+    else if (tool.key === 'tool_02' && tool.charges === 1) result.tool = { key: tool.key, charges: tool.charges };
+    else return undefined;
   }
   return result;
 }
