@@ -90,6 +90,8 @@ const battlePhases = z.array(
     defenderCritical: z.boolean().optional(),
     attackerTactic: z.object({ name: z.string(), success: z.boolean() }).optional(),
     defenderTactic: z.object({ name: z.string(), success: z.boolean() }).optional(),
+    attackerSniped: z.boolean().optional(),
+    defenderSniped: z.boolean().optional(),
   }),
 );
 

@@ -83,6 +83,8 @@ export function fightCampaignUnits(
     throw new Error('서로 다른 국가의 부곡만 교전할 수 있습니다.');
   const attackerEquipment = equipmentBattleEffects(state, attacker.commanderId);
   const defenderEquipment = equipmentBattleEffects(state, defender.commanderId);
+  const attackerCommander = state.generals[attacker.commanderId]!;
+  const defenderCommander = state.generals[defender.commanderId]!;
   feed(state, attacker, attackerEquipment?.riceFactor);
   feed(state, defender, defenderEquipment?.riceFactor);
   useBattleMoraleTool(state, attacker.commanderId, attacker);
@@ -92,6 +94,8 @@ export function fightCampaignUnits(
       attacker: force(attacker),
       attackerEquipment,
       defenderEquipment,
+      attackerInjury: attackerCommander.injury,
+      defenderInjury: defenderCommander.injury,
       attackerReadiness: personalityEffects(state, state.generals[attacker.commanderId]!.personality),
       attackerProficiency: state.generals[attacker.commanderId]!.proficiency,
       attackerSpecialty: combatSpecialty(state, combatSpecialtyKey(state.generals[attacker.commanderId]!)),
@@ -115,6 +119,8 @@ export function fightCampaignUnits(
     rng,
   );
   // 두 부곡의 최종 피해를 함께 반영한 뒤 전체 지휘 상한을 검사한다.
+  if (result.attackerInjury !== undefined) attackerCommander.injury = result.attackerInjury;
+  if (result.defenderInjury !== undefined) defenderCommander.injury = result.defenderInjury;
   defender.troops = result.defender.crew;
   defender.train = result.defender.train;
   defender.atmos = result.defender.atmos;

@@ -655,6 +655,8 @@ export function BattleList({ worldId }: { worldId: string }) {
                               : ''}
                           </>
                         )}
+                        {phase.attackerSniped ? ' · 공격 측 저격' : ''}
+                        {phase.defenderSniped ? ' · 수비 측 저격' : ''}
                       </li>
                     ))}
                   </ol>

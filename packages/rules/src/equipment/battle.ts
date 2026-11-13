@@ -9,6 +9,7 @@ export type EquipmentBattleEffects = {
   opposingTacticsSuccess?: number;
   tacticsDamageFactor?: number;
   counterTactics?: number;
+  snipe?: { chance: number; morale: number };
 };
 
 // core2026 c81d304, packages/logic/src/items (MIT).
@@ -43,6 +44,16 @@ export function equipmentBattleEffects(world: WorldView, generalId: number): Equ
     case 'book_07_사마법':
     case 'book_12_산해경':
       effects.counterTactics = 0.1;
+      break;
+  }
+  switch (slots.weapon) {
+    case 'weapon_07_맥궁':
+    case 'weapon_09_동호비궁':
+      effects.snipe = { chance: 0.2, morale: 20 };
+      break;
+    case 'weapon_11_이광궁':
+    case 'weapon_13_양유기궁':
+      effects.snipe = { chance: 0.1, morale: 10 };
       break;
   }
   return effects;

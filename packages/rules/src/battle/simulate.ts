@@ -36,6 +36,8 @@ export type BattleInput = {
   defenderTactics?: ReturnType<typeof battleTacticsStats>;
   attackerEquipment?: EquipmentBattleEffects | undefined;
   defenderEquipment?: EquipmentBattleEffects | undefined;
+  attackerInjury?: number;
+  defenderInjury?: number;
 };
 
 type Unit = DeepReadonly<UnitSetResource['crewTypes'][number]>;
@@ -134,11 +136,15 @@ export type BattlePhase = {
   defenderCritical?: boolean;
   attackerTactic?: PhaseTactic;
   defenderTactic?: PhaseTactic;
+  attackerSniped?: boolean;
+  defenderSniped?: boolean;
 };
 type BattleResult = {
   attacker: BattleForce;
   defender: BattleForce;
   attackerFirstVolleyFired?: true;
+  attackerInjury?: number;
+  defenderInjury?: number;
   phases?: BattlePhase[];
 };
 
@@ -149,6 +155,19 @@ export function simulateBattle(input: BattleInput, rng: Rng): BattleResult {
   const canFight = () => attacker.crew > 0 && defender.crew > 0 && attacker.atmos > 0 && defender.atmos > 0;
   const result: BattleResult = { attacker, defender, ...(input.recordPhases ? { phases: [] } : {}) };
   if (!canFight()) return result;
+  const attackerSnipe = input.attackerEquipment?.snipe;
+  const defenderSnipe = input.defenderEquipment?.snipe;
+  const attackerSniped = attackerSnipe && rng.next() < attackerSnipe.chance;
+  const defenderSniped = defenderSnipe && rng.next() < defenderSnipe.chance;
+  const snipes = { ...(attackerSniped ? { attackerSniped } : {}), ...(defenderSniped ? { defenderSniped } : {}) };
+  if (attackerSniped) {
+    attacker.atmos = Math.min(100, attacker.atmos + attackerSnipe.morale);
+    if (input.defenderInjury !== undefined) result.defenderInjury = snipeInjury(input.defenderInjury, rng);
+  }
+  if (defenderSniped) {
+    defender.atmos = Math.min(100, defender.atmos + defenderSnipe.morale);
+    if (input.attackerInjury !== undefined) result.attackerInjury = snipeInjury(input.attackerInjury, rng);
+  }
   const aUnit = unit(unitSet, attacker.crewType),
     bUnit = unit(unitSet, defender.crewType);
   const sortieVolley = unitSet.firstVolleyScope === 'sortie';
@@ -159,16 +178,17 @@ export function simulateBattle(input: BattleInput, rng: Rng): BattleResult {
       toAttacker = defenderFires ? damage(defender, attacker, input, rng, false, 2 / 3) : 0;
     attacker.crew -= toAttacker;
     defender.crew -= toDefender;
-    result.phases?.push({ kind: 'volley', attackerLoss: toAttacker, defenderLoss: toDefender });
+    result.phases?.push({ kind: 'volley', attackerLoss: toAttacker, defenderLoss: toDefender, ...snipes });
     if (sortieVolley && attackerFires) result.attackerFirstVolleyFired = true;
     if (input.openingSkirmish) return result;
   }
   let held = false;
   const phases = input.openingSkirmish ? 1 : BALANCE.BATTLE_PHASES + (input.attackerEquipment?.extraPhases ?? 0);
   for (let phase = 0; phase < phases && canFight(); phase++) {
+    const openingSnipes = phase === 0 && !attackerFires && !defenderFires ? snipes : {};
     if (bUnit.effects?.includes('hold') && !held && rng.next() < (defender.train + defender.atmos) / 400) {
       held = true;
-      result.phases?.push({ kind: 'hold', attackerLoss: 0, defenderLoss: 0 });
+      result.phases?.push({ kind: 'hold', attackerLoss: 0, defenderLoss: 0, ...openingSnipes });
       continue;
     }
     const attackerTactic = rollBattleTactics(
@@ -244,6 +264,7 @@ export function simulateBattle(input: BattleInput, rng: Rng): BattleResult {
       kind: 'exchange',
       attackerLoss: toAttacker,
       defenderLoss: toDefender,
+      ...openingSnipes,
       ...(avoidAttacker ? { attackerEvaded: true } : {}),
       ...(avoidDefender ? { defenderEvaded: true } : {}),
       ...(attackerTactic.critical ? { attackerCritical: true } : {}),
@@ -260,6 +281,10 @@ export function simulateBattle(input: BattleInput, rng: Rng): BattleResult {
 function equipmentEvasion(force: BattleForce, equipment: EquipmentBattleEffects | undefined) {
   const leadership = equipment?.evasionLeadership;
   return leadership ? Math.min(0.5, Math.max(0, (1 - force.crew / (100 * leadership)) * 0.5)) : 0;
+}
+
+function snipeInjury(injury: number, rng: Rng) {
+  return Math.max(injury, Math.min(80, injury + rng.int(20, 40)));
 }
 
 function reflectedTactic(

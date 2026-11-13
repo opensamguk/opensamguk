@@ -79,6 +79,22 @@ it('INT-26 반계 장비는 성공한 계략의 피해를 반대편에 적용하
   expect(reflected.defender.crew).toBeGreaterThan(normal.defender.crew);
 });
 
+it('INT-26 저격은 첫 교전에만 사기를 올리고 장수의 부상을 80까지 올린다', () => {
+  const input = fixture();
+  input.attackerEquipment = { snipe: { chance: 0.2, morale: 20 } };
+  input.defenderInjury = 79;
+  input.recordPhases = true;
+  const hit = run(input, [0.1]);
+  expect(hit.defenderInjury).toBe(80);
+  expect(hit.attacker.atmos).toBe(20);
+  expect(hit.phases?.[0]?.attackerSniped).toBe(true);
+  expect(run(input, [0.2])).not.toHaveProperty('defenderInjury');
+  const { defenderInjury: _injury, ...wallInput } = input;
+  const wall = run(wallInput, [0.1]);
+  expect(wall).not.toHaveProperty('defenderInjury');
+  expect(wall.attacker.atmos).toBe(20);
+});
+
 describe('AC-INT-22 기존 월드 전투', () => {
   it.each(legacyBattleGolden)('$a → $b의 실제 기존 결과와 난수 상태를 보존한다', (golden) => {
     const input = {

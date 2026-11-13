@@ -153,6 +153,8 @@ function makeAttack(collect: typeof collectModifiers) {
             attacker: g,
             attackerEquipment,
             defenderEquipment,
+            attackerInjury: g.injury,
+            defenderInjury: defender.injury,
             attackerReadiness: personalityEffects(state, g.personality),
             attackerProficiency: g.proficiency,
             attackerSpecialty: combatSpecialty(state, combatSpecialtyKey(g)),
@@ -195,6 +197,8 @@ function makeAttack(collect: typeof collectModifiers) {
         );
         Object.assign(g, battle.attacker);
         Object.assign(defender, battle.defender);
+        if (battle.attackerInjury !== undefined) g.injury = battle.attackerInjury;
+        if (battle.defenderInjury !== undefined) defender.injury = battle.defenderInjury;
         const attackerSurvives = g.crew > 0 && g.atmos > 0;
         const defenderSurvives = defender.crew > 0 && defender.atmos > 0;
         generalEngagements.push({
