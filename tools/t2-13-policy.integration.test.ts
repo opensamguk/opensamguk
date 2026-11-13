@@ -628,7 +628,24 @@ it(
       npcPolicy: { recruitTarget: 2000, editor: { pending: editedNpcPolicy } },
     });
     await f.loop.advanceTo(0);
-    expect((await query()).data).toMatchObject({ npcPolicy: { ...editedNpcPolicy, editor: { pending: null } } });
+    expect((await query()).data).toMatchObject({
+      npcPolicy: {
+        ...editedNpcPolicy,
+        editor: { pending: null },
+        history: [{ sequence: expect.any(Number), generalName: '장수1', previous: null, current: editedNpcPolicy }],
+      },
+    });
+    const nextPolicy = { ...editedNpcPolicy, trainingTarget: 90 };
+    expect((await rpc(NPC_NATION_POLICY_KIND, { ...input, policy: nextPolicy }, f.alice.cookie, true)).data).toEqual({
+      status: 'pending',
+    });
+    await f.loop.advanceTo(0);
+    expect((await query()).data).toMatchObject({
+      npcPolicy: { history: [{ previous: editedNpcPolicy, current: nextPolicy }, { previous: null }] },
+    });
+    expect((await rpc('nation.get', { worldId: f.worldId, nationId: 1 }, f.bob.cookie)).data).not.toHaveProperty(
+      'npcPolicy',
+    );
     await f.loop.advanceTo(10000);
     const archive = await exportReplay(db, f.worldId);
     expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
