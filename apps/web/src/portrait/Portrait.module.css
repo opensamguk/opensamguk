@@ -63,3 +63,9 @@
 .thumb::after {
   box-shadow: inset 0 0 0 1px var(--color-gold);
 }
+
+/* 원형 icon (D-083). 브랜드의 모서리 규칙에서 이것만 예외다. */
+.round,
+.round::after {
+  border-radius: 50%;
+}

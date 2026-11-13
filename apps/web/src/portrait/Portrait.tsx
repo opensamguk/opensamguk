@@ -8,11 +8,13 @@ interface PortraitProps {
   id: number | null | undefined;
   name: string;
   variant?: PortraitVariant;
-  className?: string;
+  // icon만 원형으로 쓸 수 있다 (D-083). 메인은 portrait, 목록·요약은 원형 icon, 표는 thumb.
+  shape?: 'square' | 'round';
+  className?: string | undefined;
 }
 
 // 초상 ID가 없거나 범위 밖이면, 또는 파일을 못 불러오면 실루엣에 이름 첫 글자를 얹어 보여 준다 (FR-IMG-03).
-export function Portrait({ id, name, variant = 'portrait', className }: PortraitProps) {
+export function Portrait({ id, name, variant = 'portrait', shape = 'square', className }: PortraitProps) {
   const src = portraitUrl(id, variant);
   // 실패한 주소를 기억한다. 주소가 바뀌면(다른 장수, 다른 base) 다시 시도한다.
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
@@ -21,7 +23,14 @@ export function Portrait({ id, name, variant = 'portrait', className }: Portrait
 
   return (
     <span
-      className={[styles.frame, styles[variant], className].filter(Boolean).join(' ')}
+      className={[
+        styles.frame,
+        styles[variant],
+        shape === 'round' && variant === 'icon' ? styles.round : null,
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
       data-variant={variant}
       data-state={fallback ? 'fallback' : 'image'}
     >

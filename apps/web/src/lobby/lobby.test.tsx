@@ -129,7 +129,9 @@ describe('월드 카드', { timeout: 30_000 }, () => {
     expect(within(first).getByText('진행 중').getAttribute('data-tone')).toBe('accent');
     expect(within(first).getByText('정규')).toBeTruthy();
     expect(within(first).getByText('군웅할거(191) · 193년 4월 · 턴 60분 · 장수 34 · 시작 10/18')).toBeTruthy();
-    expect(within(first).getByText('내 장수: 조운 (공손찬)')).toBeTruthy();
+    // 내 장수는 얼굴(원형 icon)과 이름·소속으로 보인다 (D-083).
+    expect(within(first).getByRole('img', { name: '조운' })).toBeTruthy();
+    expect(within(first).getByText('공손찬')).toBeTruthy();
     expect(within(first).getByRole('link', { name: '들어가기' }).getAttribute('href')).toBe(
       '/w/00000000-0000-4000-8000-000000000001',
     );

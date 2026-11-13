@@ -389,64 +389,68 @@ export function UnitPicker({
   const armName = (armType: number) => unitSet?.armTypes[String(armType)] ?? '';
   return (
     <section className={styles.single} aria-label={`${label} 표`}>
-      <table className={styles.table}>
-        <caption className={styles.caption}>{label} · 100명당 비용</caption>
-        <thead>
-          <tr>
-            <th scope="col">{label}</th>
-            <th scope="col">계열</th>
-            <th scope="col" className="num">
-              공격
-            </th>
-            <th scope="col" className="num">
-              방어
-            </th>
-            <th scope="col" className="num">
-              기동
-            </th>
-            <th scope="col" className="num">
-              회피
-            </th>
-            <th scope="col" className="num">
-              금
-            </th>
-            <th scope="col" className="num">
-              쌀
-            </th>
-            <th scope="col">모집</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((unit) => {
-            const failure = recruitment?.byCrewType[String(unit.id)] ?? null;
-            const checked = String(unit.id) === value;
-            return (
-              <tr key={unit.id} data-checked={checked} data-blocked={failure !== null}>
-                <th scope="row">
-                  <label className={styles.unitName}>
-                    <input
-                      type="radio"
-                      name="crew-type"
-                      value={unit.id}
-                      checked={checked}
-                      onChange={() => onChange(String(unit.id))}
-                    />
-                    {unit.name}
-                  </label>
+      {rows.length > 0 ? (
+        <div role="radiogroup" aria-label={label} className={styles.tableBox}>
+          <table className={styles.table}>
+            <caption className={styles.caption}>{label} · 100명당 비용</caption>
+            <thead>
+              <tr>
+                <th scope="col">{label}</th>
+                <th scope="col">계열</th>
+                <th scope="col" className="num">
+                  공격
                 </th>
-                <td>{armName(unit.armType)}</td>
-                <td className="num">{unit.attack}</td>
-                <td className="num">{unit.defence}</td>
-                <td className="num">{unit.speed}</td>
-                <td className="num">{unit.avoid}</td>
-                <td className="num">{unit.cost}</td>
-                <td className="num">{unit.rice}</td>
-                <td className={failure ? styles.muted : styles.ok}>{failure ? failure.message : '가능'}</td>
+                <th scope="col" className="num">
+                  방어
+                </th>
+                <th scope="col" className="num">
+                  기동
+                </th>
+                <th scope="col" className="num">
+                  회피
+                </th>
+                <th scope="col" className="num">
+                  금
+                </th>
+                <th scope="col" className="num">
+                  쌀
+                </th>
+                <th scope="col">모집</th>
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
+            </thead>
+            <tbody>
+              {rows.map((unit) => {
+                const failure = recruitment?.byCrewType[String(unit.id)] ?? null;
+                const checked = String(unit.id) === value;
+                return (
+                  <tr key={unit.id} data-checked={checked} data-blocked={failure !== null}>
+                    <th scope="row">
+                      <label className={styles.unitName}>
+                        <input
+                          type="radio"
+                          name="crew-type"
+                          value={unit.id}
+                          checked={checked}
+                          onChange={() => onChange(String(unit.id))}
+                        />
+                        {unit.name}
+                      </label>
+                    </th>
+                    <td>{armName(unit.armType)}</td>
+                    <td className="num">{unit.attack}</td>
+                    <td className="num">{unit.defence}</td>
+                    <td className="num">{unit.speed}</td>
+                    <td className="num">{unit.avoid}</td>
+                    <td className="num">{unit.cost}</td>
+                    <td className="num">{unit.rice}</td>
+                    <td className={failure ? styles.muted : styles.ok}>{failure ? failure.message : '가능'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
       {note ? (
         <p className={styles.muted} role="note">
           {note}

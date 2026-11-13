@@ -70,6 +70,19 @@
 - 공개 빌드도 초상을 보인다. `portraitUrl.ts`의 공개 모드 분기, `vite.config.ts`의 `assertNoPublicImageBase`, 공개 자산 검사(`tools/public-assets`)와 D-031·T3-13·AC-M3-06 기록을 함께 고친다. 이 변경은 별도 PR로 한다.
 - 장수 이름 표시는 `game/names.ts`에 `displayName()` 하나를 두고 모든 화면이 쓴다. 괄호와 그 안을 뺀다. 같은 화면에서 이름이 겹치면 괄호를 그대로 둔다.
 
+### 로비의 내 장수
+
+사용자가 2026-11-13 정했다. 로비 월드 카드의 내 장수도 얼굴과 정보를 보인다. 화면은 원형 icon(64px), 이름, 국가 이름표, 관직, 도시, 능력치를 그린다. 지금 `lobby.list`의 `myGeneral`은 `id`·`name`·`nationName`뿐이라 얼굴은 실루엣과 첫 글자로, 나머지 칸은 비워 둔다. Codex에 아래 응답 추가를 요청한다(값은 내 장수 본인 것이라 공개 범위 문제가 없다).
+
+```ts
+myGeneral: {
+  id: number; name: string; nationName: string | null;
+  portraitId: number | null; nationColor: string | null;
+  officerTitle: string; cityName: string;
+  stats: { leadership: number; strength: number; intel: number; politics?: number; charm?: number };
+} | null
+```
+
 ### 모바일
 
 375px 메인은 하단 막대(지도 · 예턴 · 현황 · 기록 · 메시지 · 메뉴)로 패널을 하나씩 바꾼다. 예턴 칸 행은 44px, 첫 화면 12칸 이상.
