@@ -276,6 +276,22 @@ export function NationRankingTable({
               <RankCell rank={row.rank} />
               <td>
                 <NationBadge name={row.name} color={row.color} />
+                {row.rankTitle || row.philosophy ? (
+                  <dl className={styles.details}>
+                    {row.rankTitle ? (
+                      <div>
+                        <dt>작위</dt>
+                        <dd>{row.rankTitle}</dd>
+                      </div>
+                    ) : null}
+                    {row.philosophy ? (
+                      <div>
+                        <dt>성향</dt>
+                        <dd>{row.philosophy}</dd>
+                      </div>
+                    ) : null}
+                  </dl>
+                ) : null}
                 {row.forceEstimate ? (
                   <details>
                     <summary>현재 병력 추정</summary>

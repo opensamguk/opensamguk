@@ -1,5 +1,13 @@
 import { z } from 'zod';
-import { isInactive, LINEAGE_EXITED_YEAR, nowTick, rankGenerals, rankNations, toGameDate } from '@opensamguk/rules';
+import {
+  isInactive,
+  LINEAGE_EXITED_YEAR,
+  nationRank,
+  nowTick,
+  rankGenerals,
+  rankNations,
+  toGameDate,
+} from '@opensamguk/rules';
 import { protectedProcedure, router } from '../trpc';
 import { readWorld, worldClock, worldInput } from '../queries';
 
@@ -31,6 +39,7 @@ const generalRows = z.array(
 const nationRows = z.array(
   nationIdentity.extend({
     philosophy: z.string().optional(),
+    level: z.number().int().optional(),
     cities: z.number().int().nonnegative(),
     generals: z.number().int().nonnegative(),
     power: z.number().int().nonnegative(),
@@ -192,15 +201,29 @@ export const rankingRouter = router({
         });
         if (!snapshot) return { items: [], at: null };
         const nations = nationRows.parse(snapshot.nations);
-        const missingPhilosophy = nations.filter((nation) => nation.philosophy === undefined).map(({ id }) => id);
-        const liveNations = missingPhilosophy.length
+        const missingMetadata = nations
+          .filter((nation) => nation.philosophy === undefined || nation.level === undefined)
+          .map(({ id }) => id);
+        const liveNations = missingMetadata.length
           ? await tx.nation.findMany({
-              where: { worldId: input.worldId, id: { in: missingPhilosophy } },
-              select: { id: true, philosophy: true },
+              where: { worldId: input.worldId, id: { in: missingMetadata } },
+              select: { id: true, philosophy: true, level: true },
             })
           : [];
-        const philosophy = new Map(liveNations.map((nation) => [nation.id, nation.philosophy]));
-        for (const nation of nations) if (nation.philosophy !== undefined) philosophy.set(nation.id, nation.philosophy);
+        const liveById = new Map(liveNations.map((nation) => [nation.id, nation]));
+        const metadata = new Map(
+          nations.map((nation) => {
+            const live = liveById.get(nation.id);
+            const level = nation.level ?? live?.level;
+            return [
+              nation.id,
+              {
+                philosophy: nation.philosophy ?? live?.philosophy ?? null,
+                rankTitle: level === undefined ? null : (nationRank(level)?.title ?? null),
+              },
+            ] as const;
+          }),
+        );
         const forceByNation = new Map<number, ReturnType<typeof emptyForce>>();
         if (input.includeForceEstimate && world.status !== 'ENDED') {
           const tick = nowTick(worldClock(world), ctx.now);
@@ -241,7 +264,7 @@ export const rankingRouter = router({
         return {
           items: rankNations(nations, input.by).map(({ id, ...row }) => ({
             nationId: id,
-            philosophy: philosophy.get(id) ?? null,
+            ...(metadata.get(id) ?? { philosophy: null, rankTitle: null }),
             ...(forceByNation.has(id) ? { forceEstimate: forceByNation.get(id)! } : {}),
             ...row,
           })),
