@@ -214,7 +214,7 @@ test('AC-M2-03 프리셋이 켠 화계와 대상 도시 칸을 실제 화면에�
   const actor = await world.user('ruler');
   const db = world.hold.db;
   for (const enabled of [false, true]) {
-    const initial = commandInitial();
+    const initial = { ...commandInitial(), scenarioKey: 'integration191' };
     const general = initial.generals[0]!;
     general.userId = actor.userId;
     const target = initial.cities.find((city) => city.nationId !== null && city.nationId !== general.nationId)!;
