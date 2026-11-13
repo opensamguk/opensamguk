@@ -1,17 +1,51 @@
 import { TRPCError } from '@trpc/server';
-import { rankGenerals } from '@opensamguk/rules';
+import { rankGenerals, toGameDate } from '@opensamguk/rules';
 import { protectedProcedure, router, worldVerifiedProcedure } from '../trpc';
-import { beforeCursor, page, readWorld, recordsInput, requireGeneral, seasonResultInfo, worldInput } from '../queries';
+import {
+  beforeCursor,
+  entityKey,
+  page,
+  readWorld,
+  recordsInput,
+  requireGeneral,
+  seasonResultInfo,
+  worldInput,
+} from '../queries';
 import { logInfo, logSelect, nationRecordInfo, worldRecordInfo } from '../visibility';
 import { z } from 'zod';
-import { decodeRecordCursor, encodeRecordCursor, generalLogCursor } from '../recordCursor';
+import { decodeRecordCursor, encodeRecordCursor, generalLogCursor, recordTick } from '../recordCursor';
 import { monthlyReviewSelect, readMonthlyReview } from '../review';
 
 const generalInput = worldInput.extend({ cursor: z.string().min(1).max(256).optional() }).strict();
+const battleCursor = z.tuple([recordTick, entityKey]);
 
 const seasonInput = worldInput.extend({ by: z.enum(['dedication', 'experience', 'merit']).default('dedication') });
 
 export const recordsRouter = router({
+  battles: protectedProcedure.input(generalInput).query(({ ctx, input }) =>
+    readWorld(ctx.db, input.worldId, async (tx, world) => {
+      const general = await requireGeneral(tx, input.worldId, ctx.user.id);
+      const cursor = input.cursor === undefined ? null : decodeRecordCursor(input.cursor, battleCursor);
+      const rows = await tx.battleLog.findMany({
+        where: {
+          worldId: input.worldId,
+          generalId: general.id,
+          ...(cursor ? { OR: [{ tick: { lt: cursor[0] } }, { tick: cursor[0], attackerId: { lt: cursor[1] } }] } : {}),
+        },
+        orderBy: [{ tick: 'desc' }, { attackerId: 'desc' }],
+        take: 31,
+        select: { tick: true, attackerId: true, text: true },
+      });
+      const items = rows.slice(0, 30).map((row) => ({
+        tick: row.tick,
+        attackerId: row.attackerId,
+        text: row.text,
+        gameDate: toGameDate(world.startYear, row.tick),
+      }));
+      const last = items.at(-1);
+      return { items, nextCursor: rows.length > 30 && last ? encodeRecordCursor([last.tick, last.attackerId]) : null };
+    }),
+  ),
   season: worldVerifiedProcedure.input(seasonInput).query(({ ctx, input }) =>
     readWorld(ctx.db, input.worldId, async (tx, world) => {
       const result = seasonResultInfo(world);
