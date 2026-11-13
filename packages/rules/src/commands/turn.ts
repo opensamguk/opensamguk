@@ -6,9 +6,9 @@ import type { DeepReadonly, WorldState } from '../model/world';
 import type { Actor, CommandResult, Failure } from './types';
 import { applyEffects } from './effects';
 import { commandRegistry, runCommand } from './registry';
-import { chooseGeneralTurn, chooseNationTurn, type NpcContext } from '../npc';
+import { chooseAutoplayTurn, chooseGeneralTurn, chooseNationTurn, type NpcContext } from '../npc';
 import { runPolicyCommand } from '../policy/execute';
-import type { PolicyKey } from '../policy';
+import { PLAYER_AUTOPLAY_FEATURE, playerAutoplayWindow, type PolicyKey } from '../policy';
 import { runOfficeAssign, takeOfficeTurn } from '../personnel/officeTurn';
 import { canExecuteNationCommand } from '../personnel/permissions';
 import type { OfficeRevisions } from '../personnel/offices';
@@ -40,7 +40,11 @@ export function runGeneralTurn(
   actor: Actor,
   command: { commandKey: string; args: unknown; explicit?: boolean },
   seed: string,
-  options: Pick<NpcContext, 'convergence'> & { policy?: PolicyKey; turnRevision?: number } = {},
+  options: Pick<NpcContext, 'convergence'> & {
+    policy?: PolicyKey;
+    turnRevision?: number;
+    activity?: { lastActiveTick: number; turnTermMinutes: number };
+  } = {},
   resolver?: CommandResolver,
   personnel?: PersonnelTurnInput,
 ): {
@@ -158,7 +162,24 @@ export function runGeneralTurn(
   const instructed = takeCampaignOrder(next, actor.generalId, options.turnRevision, command, actor.tick ?? 0);
   next = instructed.state as WorldState;
   let selected = instructed.order ? { ...instructed.order.command, explicit: true } : command;
-  if (!instructed.order && general.userId !== null && command.explicit === false && options.policy !== undefined) {
+  const emptyHumanTurn = !instructed.order && general.userId !== null && command.explicit === false;
+  const tick = actor.tick ?? 0;
+  let autoplay;
+  if (emptyHumanTurn && options.activity && next.ruleFeatures?.includes(PLAYER_AUTOPLAY_FEATURE)) {
+    const { startsAtTick, expiresAtTick } = playerAutoplayWindow(
+      options.activity.lastActiveTick,
+      options.activity.turnTermMinutes,
+    );
+    if (tick >= startsAtTick && tick < expiresAtTick)
+      autoplay = chooseAutoplayTurn(
+        next,
+        next.generals[actor.generalId]!,
+        rngFor(seed, 'player-autoplay', tick, actor.generalId),
+        context,
+      );
+  }
+  if (autoplay) selected = { commandKey: autoplay.key, args: autoplay.args };
+  if (emptyHumanTurn && !autoplay && options.policy !== undefined) {
     const policy = runPolicyCommand(next, { ...actor, target: 'general' }, options.policy, seed, resolver);
     next = applyEffects(next, policy.result.effects);
     applyLastNationRecruitmentLock(next, policy.result, actor.tick ?? 0);

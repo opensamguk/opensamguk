@@ -303,6 +303,9 @@ export class TurnLoop {
             world.seed,
             {
               ...(modern ? { policy: actor.defaultPolicy as import('@opensamguk/rules').PolicyKey } : {}),
+              ...(modern && actor.lastActiveTick !== null
+                ? { activity: { lastActiveTick: actor.lastActiveTick, turnTermMinutes: world.turnTermMinutes } }
+                : {}),
               turnRevision: actor.turnRevision,
             },
             engineResolver(world).resolver,

@@ -5,6 +5,16 @@ import { TICKS_PER_MONTH } from '../clock/constants';
 export const POLICY_KEYS = ['farm', 'commerce', 'security', 'defend', 'drill', 'none'] as const;
 export type PolicyKey = (typeof POLICY_KEYS)[number];
 export const INACTIVE_AFTER_DAYS = 14;
+export const PLAYER_AUTOPLAY_FEATURE = 'player-autoplay-v1';
+const AUTOPLAY_UNTIL_DAYS = 28;
+
+export function playerAutoplayWindow(lastActiveTick: number, turnTermMinutes: number) {
+  const offset = (days: number) => Math.floor((days * 1440 * TICKS_PER_MONTH) / turnTermMinutes);
+  return {
+    startsAtTick: lastActiveTick + offset(INACTIVE_AFTER_DAYS) + 1,
+    expiresAtTick: lastActiveTick + offset(AUTOPLAY_UNTIL_DAYS) + 1,
+  };
+}
 
 const definitions: Record<PolicyKey, { name: string; first: string; then?: string }> = {
   farm: { name: '권농', first: 'farm' },
