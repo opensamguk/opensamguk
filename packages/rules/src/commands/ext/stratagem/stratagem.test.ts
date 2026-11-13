@@ -15,6 +15,8 @@ import {
   stratagemProbability,
 } from './base';
 import { stratagemCommands } from './index';
+import { initialEquipment } from '../../../equipment/state';
+import { TEST_EQUIPMENT_CONFIG } from '../../../equipment/testFixture';
 
 const enabled = { general: stratagemCommands.map((def) => def.key), nation: [] };
 const resolver = createCommandResolverWithCommands(enabled, stratagemCommands);
@@ -71,6 +73,26 @@ function script(values: number[]) {
   };
   return { rng, calls, remaining: values };
 }
+
+it('INT-26 계략 도구의 확률 보정과 성공 때만 소모되는 장비 원장을 적용한다', () => {
+  const state = world();
+  const normal = stratagemProbability(state, actor, args.cityKey, 'intel', 'fire_attack');
+  state.equipment = initialEquipment({
+    ...TEST_EQUIPMENT_CONFIG,
+    treatmentTool: true,
+    moraleTool: true,
+    rareEquipment: true,
+    fullRareEquipment: true,
+  });
+  state.equipment.generals['1'] = { tool: { key: 'tool_05', charges: 1 }, book: 'book_01' };
+  expect(stratagemProbability(state, actor, args.cityKey, 'intel', 'fire_attack')).toBeCloseTo(normal + 0.5);
+  const fail = run('fire_attack', state, script([1, 1, 1]).rng);
+  expect(applyEffects(state, fail.effects).equipment?.generals['1']?.tool?.key).toBe('tool_05');
+  const hit = run('fire_attack', state, script([normal + 0.25, 100, 100, 201, 141]).rng);
+  expect(hit.stratagemSucceeded).toBe(true);
+  expect(applyEffects(state, hit.effects).equipment?.generals['1']).toEqual({ book: 'book_01' });
+  expect(state.equipment.generals['1']?.tool?.key).toBe('tool_05');
+});
 
 const goldens = [
   {

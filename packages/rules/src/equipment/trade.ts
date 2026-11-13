@@ -55,7 +55,7 @@ export const equipmentTrade = defineCommand({
       if (!availableEquipmentTools(equipment.config).some(({ key }) => key === tool.key))
         return fail(
           'COMMAND_DISABLED',
-          tool.key === MORALE_TOOL.key ? '탁주를 사용할 수 없는 월드입니다.' : '청주를 사용할 수 없는 월드입니다.',
+          tool.key === MORALE_TOOL.key ? '탁주를 사용할 수 없는 월드입니다.' : '이 도구를 사용할 수 없는 월드입니다.',
         );
       if ('requiredSecurity' in tool && view.cities[general.cityKey]!.security < tool.requiredSecurity)
         return fail('BAD_STATE', '도시의 치안이 부족합니다.');
@@ -66,7 +66,7 @@ export const equipmentTrade = defineCommand({
             ? '환약이 충분히 남았습니다.'
             : tool.key === MORALE_TOOL.key
               ? '탁주가 충분히 남았습니다.'
-              : '청주가 충분히 남았습니다.',
+              : '같은 도구가 충분히 남았습니다.',
         );
       return general.gold < tool.cost ? fail('NO_GOLD', '금이 부족합니다.') : null;
     }

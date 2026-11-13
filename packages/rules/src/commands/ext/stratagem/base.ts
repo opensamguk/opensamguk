@@ -7,10 +7,12 @@ import { toGameDate } from '../../../clock/clock';
 import type { WorldView } from '../../../model/world';
 import type { InitialGeneral } from '../../../world/bootstrap';
 import type { CityField, Effect } from '../../effects';
+import { applyEffects } from '../../effects';
 import { fail, ownCity, positive, relation } from '../../support';
 import type { Actor, CommandResult, Failure } from '../../types';
 import { fiveStatsSchema } from '../../../general/fiveStats';
 import { equipmentBonus } from '../../../equipment/stats';
+import { equipmentTools } from '../../../equipment/config';
 import { commandConditionStats, GENERAL_CONDITION_FEATURE, generalCondition } from '../../../general/condition';
 
 // S1: 연도와 무관하게 금·쌀 각 100. S2: 부상으로 능력치를 줄이지 않는다.
@@ -115,7 +117,16 @@ export function stratagemProbability(
   const bonus = nationPhilosophy(view, nation?.philosophy)?.stratagem ?? 0;
   const base = (STRATAGEM.BASE_PROBABILITY + attack - defence) / stratagemDistance(view, general.cityKey, cityKey);
   const specialty = domesticSpecialtyFor(view, general, 'stratagem')?.successBonus ?? 0;
-  return Math.min(STRATAGEM.MAX_PROBABILITY, Math.max(0, base + bonus + specialty));
+  const normal = Math.min(STRATAGEM.MAX_PROBABILITY, Math.max(0, base + bonus + specialty));
+  return normal + (stratagemTool(view, general.id)?.stratagemBonus ?? 0);
+}
+
+function stratagemTool(view: WorldView, generalId: number) {
+  const equipment = view.equipment;
+  if (!equipment || !('fullRareEquipment' in equipment.config)) return undefined;
+  const key = equipment.generals[generalId]?.tool?.key;
+  const tool = key && equipmentTools[key];
+  return tool && 'stratagemBonus' in tool ? tool : undefined;
 }
 
 // 폐허의 내림으로 최대치가 0이 된 새 월드만 비율을 0으로 읽는다. 기존 공식은 보존한다.
@@ -236,6 +247,14 @@ export function executeStratagem(
     ...damage,
   ];
   if (!success) return { effects, logs: [{ kind: 'success', text: `${spec.name} 실패: ${city.name}` }] };
+  const tool = stratagemTool(view, general.id);
+  if (tool) {
+    const state = applyEffects(view, effects);
+    const slots = state.equipment!.generals[general.id]!;
+    delete slots.tool;
+    if (Object.keys(slots).length === 0) delete state.equipment!.generals[general.id];
+    effects.splice(0, effects.length, { kind: 'world', state });
+  }
   const amounts = spec.fields
     ? `${spec.labels![0]} ${primary}, ${spec.labels![1]} ${spec.key === 'incite' ? secondary.toFixed(1) : secondary} 감소`
     : `금 ${Math.round(primary)}, 쌀 ${Math.round(secondary)}`;
@@ -246,7 +265,7 @@ export function executeStratagem(
     logs: [
       {
         kind: 'success',
-        text: `${spec.name} 성공: ${city.name} ${amounts}${spec.fields ? `, 장수 ${reports.length}명 부상` : ' 획득'}`,
+        text: `${spec.name} 성공: ${city.name} ${amounts}${spec.fields ? `, 장수 ${reports.length}명 부상` : ' 획득'}${tool ? ` · ${tool.name} 사용` : ''}`,
       },
     ],
     ...(spec.fields ? { reports } : {}),

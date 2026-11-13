@@ -32,8 +32,31 @@ export const TRAINING_TOOL = {
   requiredSecurity: 1_000,
   train: 40,
 } as const;
-export const equipmentTools = { tool_01: TREATMENT_TOOL, tool_02: MORALE_TOOL, tool_03: TRAINING_TOOL };
-export const equipmentToolKeySchema = z.enum(['tool_01', 'tool_02', 'tool_03']);
+// core2026 c81d304, packages/logic/src/items/che_계략_이추.ts and che_계략_향낭.ts (MIT).
+export const equipmentTools = {
+  tool_01: TREATMENT_TOOL,
+  tool_02: MORALE_TOOL,
+  tool_03: TRAINING_TOOL,
+  tool_04: {
+    key: 'tool_04',
+    name: '이추(계략)',
+    description: '도시 계략 성공 확률 +20%p. 성공하면 소모합니다.',
+    cost: 1000,
+    charges: 1,
+    requiredSecurity: 1000,
+    stratagemBonus: 0.2,
+  },
+  tool_05: {
+    key: 'tool_05',
+    name: '향낭(계략)',
+    description: '도시 계략 성공 확률 +50%p. 성공하면 소모합니다.',
+    cost: 3000,
+    charges: 1,
+    requiredSecurity: 2000,
+    stratagemBonus: 0.5,
+  },
+} as const;
+export const equipmentToolKeySchema = z.enum(['tool_01', 'tool_02', 'tool_03', 'tool_04', 'tool_05']);
 export const equipmentSlotSchema = z.enum(['horse', 'weapon', 'book']);
 export const equipmentKeySchema = z.string().regex(/^(horse|weapon|book)_0[1-6]$/);
 export const rareEquipmentKeySchema = z.string().regex(/^(horse|weapon|book)_(15|(?:0[7-9]|1[0-5])_[가-힣0-9]+)$/);
@@ -116,7 +139,7 @@ export function hasMoraleTool(config: Readonly<EquipmentConfig>) {
 }
 
 export function availableEquipmentTools(config: Readonly<EquipmentConfig>) {
-  if ('fullRareEquipment' in config) return [TREATMENT_TOOL, MORALE_TOOL, TRAINING_TOOL];
+  if ('fullRareEquipment' in config) return Object.values(equipmentTools);
   if (hasMoraleTool(config)) return [TREATMENT_TOOL, MORALE_TOOL];
   return hasTreatmentTool(config) ? [TREATMENT_TOOL] : [];
 }

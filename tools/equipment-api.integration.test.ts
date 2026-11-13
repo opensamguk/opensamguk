@@ -418,7 +418,13 @@ it('INT-26 SAN10 명품 목록은 60개를 공개하고 월말 발견을 재생�
 it('INT-26 SAN10 훈련 청주는 장비매매로 구매하고 보유 도구로 조회한다', async () => {
   const f = await fixture(true, false, 'iron', 'fullRare');
   const board = () => rpc('equipment.mine', { worldId: f.id }, f.player);
-  expect((await board()).data?.tools?.map((tool) => tool.key)).toEqual(['tool_01', 'tool_02', 'tool_03']);
+  expect((await board()).data?.tools?.map((tool) => tool.key)).toEqual([
+    'tool_01',
+    'tool_02',
+    'tool_03',
+    'tool_04',
+    'tool_05',
+  ]);
   expect((await board()).data?.items).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ key: 'weapon_02', battleEffect: expect.stringContaining('1% 확률') }),
