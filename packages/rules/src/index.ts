@@ -38,6 +38,7 @@ export * from './balance';
 export * from './commands/types';
 export * from './commands/effects';
 export * from './commands/registry';
+export { commandPlayerDocs } from './commands/playerDoc';
 export { extSliceKeys, restoreExtState } from './commands/ext/state';
 export { INTEL_FEATURE, intelRecordSchema, getIntelSliceSchema } from './commands/ext/intel/record';
 export * from './monthly/index';
