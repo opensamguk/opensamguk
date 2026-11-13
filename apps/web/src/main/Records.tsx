@@ -132,9 +132,42 @@ export function RecordList({
   const body = renderRecords(kind, query.data.pages, clock, nations, cities, compact, worldLines);
   return (
     <div className={compact ? `${styles.records} ${styles.compact}` : styles.records} data-record-kind={kind}>
+      {kind === 'nation' && !compact ? <NationChronicle worldId={worldId} clock={clock} /> : null}
       {body ?? <EmptyState title={emptyText[kind]} />}
       <MoreButton query={query} />
     </div>
+  );
+}
+
+function NationChronicle({ worldId, clock }: { worldId: string; clock: Clock }) {
+  const trpc = useTRPC();
+  const query = useCursorPages(trpc.records.nationEvents.queryKey({ worldId }), (cursor) =>
+    trpcClient.records.nationEvents.query(withCursor({ worldId }, cursor)),
+  );
+  if (query.isPending) return <p role="status">국가 사건을 불러오는 중…</p>;
+  if (query.isError)
+    return (
+      <QueryError error={query.error} notFound="국가 기록을 찾을 수 없습니다" onRetry={() => void query.refetch()} />
+    );
+  const items = query.data.pages.flatMap(({ items }) => items);
+  if (!items.length) return null;
+  return (
+    <details>
+      <summary>국가 사건</summary>
+      <ol className={styles.lines}>
+        {items.map(({ tick, events }) => (
+          <li key={tick}>
+            <span className={`num ${styles.date}`}>{logDateOf(tick, clock)}</span>
+            <ul>
+              {events.map((event, index) => (
+                <li key={index}>{event}</li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ol>
+      <MoreButton query={query} />
+    </details>
   );
 }
 

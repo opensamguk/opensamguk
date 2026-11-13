@@ -290,6 +290,32 @@ export const recordsRouter = router({
       return page(history.map((row) => ({ tick: row.tick, ...nationRecordInfo(row.data) })));
     }),
   ),
+  nationEvents: protectedProcedure.input(recordsInput).query(({ ctx, input }) =>
+    readWorld(ctx.db, input.worldId, async (tx) => {
+      const general = await requireGeneral(tx, input.worldId, ctx.user.id);
+      if (general.nationId === null || general.removedAt !== null) return { items: [], nextCursor: null };
+      const events = await tx.nationHistory.findMany({
+        where: {
+          worldId: input.worldId,
+          nationId: general.nationId,
+          AND: [
+            { data: { path: ['events'], array_contains: [] } },
+            { NOT: { data: { path: ['events'], equals: [] } } },
+          ],
+          ...beforeCursor(input.cursor),
+        },
+        orderBy: { tick: 'desc' },
+        take: 31,
+        select: { tick: true, data: true },
+      });
+      return page(
+        events.map(({ tick, data }) => ({
+          tick,
+          events: z.object({ events: z.array(z.string()) }).parse(data).events,
+        })),
+      );
+    }),
+  ),
   world: protectedProcedure.input(recordsInput).query(({ ctx, input }) =>
     readWorld(ctx.db, input.worldId, async (tx, world) => {
       const history = await tx.yearbookSnapshot.findMany({
