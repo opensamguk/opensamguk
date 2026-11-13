@@ -100,6 +100,7 @@ export function readExtensionRegistryKeys(root) {
     'optional',
     'nullable',
     'regex',
+    'extend',
   ]);
   const numericLiteral = (node) =>
     ts.isNumericLiteral(node) ||
