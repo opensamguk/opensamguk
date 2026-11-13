@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { router, protectedProcedure } from '../trpc';
 import { readView, requireGeneral, requireWorld, worldInput } from '../game/queries';
 import { worldResolver } from '../game/resolver';
+import { worldInput as strictWorldInput } from '../queries';
 export const commandList = commands
   .filter((def) => def.target === 'general')
   .map((def) => ({
@@ -12,7 +13,7 @@ export const commandList = commands
     argsSchema: z.toJSONSchema(def.args, { io: 'input' }),
   }));
 export const commandsRouter = router({
-  recruitCandidates: protectedProcedure.input(worldInput).query(({ ctx, input }) =>
+  recruitCandidates: protectedProcedure.input(strictWorldInput).query(({ ctx, input }) =>
     ctx.db.$transaction(
       async (tx) => {
         const world = await requireWorld(tx, input.worldId);
