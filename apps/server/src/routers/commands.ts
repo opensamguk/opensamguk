@@ -1,8 +1,10 @@
-import { commandPlayerDocs, commands, type CommandDef } from '@opensamguk/rules';
+import { commandPlayerDocs, commands, unitSetSchema, type CommandDef } from '@opensamguk/rules';
 import { z } from 'zod';
 import { router, protectedProcedure } from '../trpc';
 import { readView, requireGeneral, requireWorld, worldInput } from '../game/queries';
 import { worldResolver } from '../game/resolver';
+import { commandAvailability } from '../game/commandAvailability';
+import { viewerGeneral } from '../queries';
 function describeCommand(def: CommandDef) {
   const doc = commandPlayerDocs[def.key];
   if (!doc) throw new Error(`명령 도움말이 없습니다: ${def.key}`);
@@ -46,8 +48,29 @@ export const commandsRouter = router({
       { isolationLevel: 'RepeatableRead' },
     ),
   ),
-  list: protectedProcedure.input(worldInput).query(async ({ ctx, input }) => {
-    const world = await requireWorld(ctx.db, input.worldId);
-    return worldResolver(world).resolver.list('general').map(describeCommand);
-  }),
+  list: protectedProcedure.input(worldInput).query(({ ctx, input }) =>
+    ctx.db.$transaction(
+      async (tx) => {
+        const world = await requireWorld(tx, input.worldId);
+        const ended = world.status === 'ENDED';
+        const general = ended ? null : await viewerGeneral(tx, input.worldId, ctx.user.id);
+        const actor =
+          general?.removedAt === null
+            ? {
+                generalId: general.id,
+                tick: general.nextTurnTick,
+                unitSet: unitSetSchema.safeParse(world.unitSet).data,
+              }
+            : null;
+        const view = actor ? await readView(tx, input.worldId) : null;
+        return worldResolver(world)
+          .resolver.list('general')
+          .map((def) => ({
+            ...describeCommand(def),
+            ...commandAvailability(def, view, actor, ended),
+          }));
+      },
+      { isolationLevel: 'RepeatableRead' },
+    ),
+  ),
 });

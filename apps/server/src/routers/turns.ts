@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { TRPCError } from '@trpc/server';
 import { nextActionSequence, type Prisma } from '@opensamguk/db';
-import { commandStatPreview, emptyTurn, unitSetSchema, type QueuedTurn } from '@opensamguk/rules';
+import { commandStatPreview, emptyTurn, INTEL_FEATURE, unitSetSchema, type QueuedTurn } from '@opensamguk/rules';
 import { editArray, type ArrayEdit } from '@opensamguk/shared';
 import { z } from 'zod';
 import { router, protectedProcedure, worldVerifiedProcedure } from '../trpc';
@@ -12,6 +12,7 @@ import {
   parseSlot,
   readSlots,
   displaySlots,
+  displaySlotTargets,
   assertEnabledSlots,
   hasExtensionSlot,
   invalidSlot,
@@ -152,7 +153,15 @@ export const turnsRouter = router({
         return {
           actorId: actor.id,
           revision: actor.turnRevision,
-          slots: displaySlots(await readSlots(tx, input.worldId, actor.id), worldResolver(world).resolver),
+          slots: await displaySlotTargets(
+            tx,
+            input.worldId,
+            displaySlots(await readSlots(tx, input.worldId, actor.id), worldResolver(world).resolver),
+            {
+              fogEnabled: world.ruleFeatures.includes(INTEL_FEATURE),
+              nationId: actor.removedAt === null ? actor.nationId : null,
+            },
+          ),
         };
       },
       { isolationLevel: 'RepeatableRead' },

@@ -64,6 +64,68 @@ export function displaySlots(turns: QueuedTurn[], resolver?: CommandResolver) {
     name: (resolver ? resolver.get(turn.commandKey) : commandRegistry.get(turn.commandKey))?.name ?? turn.commandKey,
   }));
 }
+export async function displaySlotTargets(
+  tx: Prisma.TransactionClient,
+  worldId: string,
+  slots: ReturnType<typeof displaySlots>,
+  visibility: { fogEnabled: boolean; nationId: number | null },
+) {
+  const references = slots.map(({ args }) => {
+    if (!args || typeof args !== 'object') return {};
+    const { cityKey, nationId, generalId } = args as Record<string, unknown>;
+    return {
+      ...(typeof cityKey === 'number' && Number.isInteger(cityKey) && cityKey > 0 && cityKey <= 2_147_483_647
+        ? { cityKey }
+        : {}),
+      ...(typeof nationId === 'number' && Number.isInteger(nationId) && nationId > 0 && nationId <= 2_147_483_647
+        ? { nationId }
+        : {}),
+      ...(typeof generalId === 'number' && Number.isInteger(generalId) && generalId > 0 && generalId <= 2_147_483_647
+        ? { generalId }
+        : {}),
+    };
+  });
+  const cityKeys = references.flatMap(({ cityKey }) => (cityKey === undefined ? [] : [cityKey]));
+  const nationIds = references.flatMap(({ nationId }) => (nationId === undefined ? [] : [nationId]));
+  const generalIds = references.flatMap(({ generalId }) => (generalId === undefined ? [] : [generalId]));
+  const [cities, nations, generals] = await Promise.all([
+    cityKeys.length
+      ? tx.city.findMany({
+          where: { worldId, cityKey: { in: cityKeys } },
+          select: { cityKey: true, name: true },
+        })
+      : [],
+    nationIds.length
+      ? tx.nation.findMany({
+          where: { worldId, id: { in: nationIds } },
+          select: { id: true, name: true },
+        })
+      : [],
+    generalIds.length
+      ? tx.general.findMany({
+          where: {
+            worldId,
+            id: { in: generalIds },
+            removedAt: null,
+            ...(visibility.fogEnabled ? { city: { OR: [{ nationId: null }, { nationId: visibility.nationId }] } } : {}),
+          },
+          select: { id: true, name: true },
+        })
+      : [],
+  ]);
+  const cityNames = new Map(cities.map(({ cityKey, name }) => [cityKey, name]));
+  const nationNames = new Map(nations.map(({ id, name }) => [id, name]));
+  const generalNames = new Map(generals.map(({ id, name }) => [id, name]));
+  return slots.map((slot, index) => {
+    const { cityKey, nationId, generalId } = references[index]!;
+    const targets = {
+      ...(cityKey === undefined ? {} : { city: cityNames.get(cityKey) ?? null }),
+      ...(nationId === undefined ? {} : { nation: nationNames.get(nationId) ?? null }),
+      ...(generalId === undefined ? {} : { general: generalNames.get(generalId) ?? null }),
+    };
+    return Object.keys(targets).length ? { ...slot, targets } : slot;
+  });
+}
 export async function readSlots(tx: Prisma.TransactionClient, worldId: string, generalId: number) {
   const rows = await tx.generalTurn.findMany({ where: { worldId, generalId } });
   const world = await tx.world.findUniqueOrThrow({ where: { id: worldId } });
