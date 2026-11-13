@@ -4,6 +4,10 @@
     "target": "general"
   },
   {
+    "key": "convert_proficiency",
+    "target": "general"
+  },
+  {
     "key": "disband",
     "target": "general"
   },

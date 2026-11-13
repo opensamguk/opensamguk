@@ -6,6 +6,8 @@ import {
   applyNationRestrictions,
 } from './personnel/nationRestrictions';
 import { inactiveRemovalFeature, INACTIVE_REMOVAL_FEATURE } from './policy/inactiveRemoval';
+import { GENERAL_PROFICIENCY_FEATURE } from './general/proficiency';
+import { convertProficiency } from './commands/convertProficiency';
 import { GENERAL_PERSONALITY_FEATURE } from './general/personality';
 import { RESEARCH_ERA_FEATURE } from './nationResearch/era';
 import { NATION_PHILOSOPHY_FEATURE } from './personnel/nationPhilosophy';
@@ -182,6 +184,12 @@ export const ruleRegistry: RuleRegistry = {
     { key: RANKED_AID_FEATURE, requires: [EXPANDED_TREATY_FEATURE], conflicts: [] },
     { key: DIPLOMATIC_COOLDOWN_FEATURE, requires: [RANKED_AID_FEATURE], conflicts: [] },
     fiveStatsFeature,
+    {
+      key: GENERAL_PROFICIENCY_FEATURE,
+      requires: [],
+      conflicts: [],
+      commandBindings: [{ definition: convertProficiency, sliceKeys: [] }],
+    },
     { key: GENERAL_PERSONALITY_FEATURE, requires: [], conflicts: [] },
     { key: GENERAL_CONDITION_FEATURE, requires: ['five-stats'], conflicts: [] },
     { key: RICE_MARKET_FEATURE, requires: [], conflicts: [] },
@@ -346,6 +354,8 @@ export function checkReplayOrigin(
     throw new Error('초기 장수에는 도시 관직을 배정할 수 없습니다.');
   if (origin.initial.generals.some((general) => Object.hasOwn(general, 'defenseThreshold')))
     throw new Error('초기 장수에는 개별 수비 기준을 지정할 수 없습니다.');
+  if (origin.initial.generals.some((general) => Object.hasOwn(general, 'proficiency')))
+    throw new Error('초기 장수의 숙련도는 기본값에서 시작합니다.');
   if (origin.initial.nations.some((nation) => Object.hasOwn(nation, 'npcSettings')))
     throw new Error('초기 국가에는 개별 NPC 운영 기준을 지정할 수 없습니다.');
   if (origin.initial.nations.some((nation) => Object.hasOwn(nation, 'restrictions')))

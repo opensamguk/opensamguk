@@ -8,6 +8,7 @@ import {
 } from '../packages/rules/src/personnel/nationRestrictions';
 import { NPC_NATION_POLICY_FEATURE, NPC_NATION_POLICY_KIND } from '../packages/rules/src/npc/policy';
 import type { PolicyKey, PolicySlot } from '../packages/rules/src/policy';
+import { GENERAL_PROFICIENCY_FEATURE } from '../packages/rules/src/general/proficiency';
 import { GENERAL_PERSONALITY_FEATURE } from '../packages/rules/src/general/personality';
 import { INACTIVE_REMOVAL_FEATURE, inactiveRemovalTick } from '../packages/rules/src/policy/inactiveRemoval';
 import { PLAYER_AUTOPLAY_FEATURE } from '../packages/rules/src/policy';
@@ -783,4 +784,55 @@ it('성격의 공헌 보정을 실제 장수 턴에 적용하고 같은 결과�
   await loop.advanceTo(10000);
   const archive = await exportReplay(db, worldId);
   expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
+});
+
+it('병종 숙련을 징병으로 얻고 변환 명령으로 옮겨도 DB와 재생 결과가 일치한다', async () => {
+  const alice = await user();
+  const initial = commandInitial();
+  initial.generals = initial.generals.slice(0, 2).map((general, index) => ({
+    ...general,
+    userId: index === 0 ? alice.id : null,
+    crew: index === 0 ? 0 : general.crew,
+    nextTurnTick: index === 0 ? 100 : 100000,
+  }));
+  const { worldId } = await saveInitialWorld(db, initial, {
+    name: '숙련전환 실제 PG',
+    turnTermMinutes: 30,
+    endYear: null,
+    replayFormat: 3,
+    ruleFeatures: [GENERAL_PROFICIENCY_FEATURE, 'policy'],
+  });
+  worlds.push(worldId);
+  await db.world.update({ where: { id: worldId }, data: { status: 'RUNNING', clockAnchorAt: new Date(now) } });
+  const lease = await acquireLease(db, worldId);
+  if (!lease) throw new Error('시험 실행권이 없습니다.');
+  leases.push(lease);
+  const loop = new TurnLoop(db, lease);
+  const commands = await rpc<Array<{ key: string }>>('commands.list', { worldId }, alice.cookie);
+  expect(commands.data).toEqual(expect.arrayContaining([expect.objectContaining({ key: 'convert_proficiency' })]));
+  const orders = [
+    { commandKey: 'conscript', args: { amount: 1000, crewType: 1100 } },
+    { commandKey: 'convert_proficiency', args: { srcArmType: 1, destArmType: 2 } },
+  ];
+  const slots = Array.from({ length: 30 }, (_, slot) => orders[slot] ?? null);
+  expect((await rpc('turns.set', { worldId, revision: 0, slots }, alice.cookie, true)).data).toMatchObject({
+    ok: true,
+  });
+  await loop.advanceTo(100);
+  const read = () => db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } });
+  expect((await read()).proficiency).toEqual({ 1: 1000 });
+  await loop.advanceTo(10100);
+  expect((await read()).proficiency).toEqual({ 1: 600, 2: 360 });
+  await loop.advanceTo(20000);
+  const home = await rpc('home.get', { worldId }, alice.cookie);
+  expect(home.data).toMatchObject({
+    general: {
+      proficiency: expect.arrayContaining([
+        expect.objectContaining({ armType: 1, value: 600, grade: 'F' }),
+        expect.objectContaining({ armType: 2, value: 360, grade: 'F' }),
+      ]),
+    },
+  });
+  const archive = await exportReplay(db, worldId);
+  expect(replayArchive(archive, 2)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
 });

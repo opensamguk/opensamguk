@@ -218,6 +218,20 @@ export function GeneralInfo({
             : []),
         ]}
       />
+      {g.proficiency?.length ? (
+        <details>
+          <summary>병종 숙련도</summary>
+          <ul>
+            {g.proficiency.map(({ armType, name, grade, value, progress, overall }) => (
+              <li key={armType}>
+                {name} · {grade} · {n(value)}
+                <progress aria-label={`${name} 등급 진행률`} max={100} value={progress} />
+                <progress aria-label={`${name} 전체 진행률`} max={100} value={overall} />
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
       {battle && (
         <details>
           <summary>전투 전과</summary>

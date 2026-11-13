@@ -23,6 +23,8 @@ const fieldLabels = {
   generalId: '대상 장수',
   amount: '수량',
   crewType: '병종',
+  srcArmType: '기존 병종 계열',
+  destArmType: '전환할 병종 계열',
   buy: '사고팔기',
   resource: '자원',
   name: '나라 이름',

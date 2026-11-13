@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { addGeneralProficiency } from '../general/proficiency';
 import { BALANCE } from '../balance';
 import { ownCity } from '../commands/support';
 import { recruitCost, drillGain } from '../commands/statScores';
@@ -59,7 +60,10 @@ export function applyCityPreparation(view: WorldView, actor: Actor, key: CityPre
     recruited.gold -= cost;
     ledger.cities[String(general.cityKey)] = recruited;
     city.population -= amount;
-    if (key === 'conscript') city.trust = Math.max(0, city.trust - BALANCE.CONSCRIPT_TRUST_LOSS);
+    if (key === 'conscript') {
+      city.trust = Math.max(0, city.trust - BALANCE.CONSCRIPT_TRUST_LOSS);
+      addGeneralProficiency(state, general, crewType.armType, amount);
+    }
     text = `${key === 'conscript' ? '징병' : '모병'}: 도시 수비병 ${amount}명 모집`;
   } else {
     const row = resource.garrison.find((entry) => entry.crewType === crewType.id);
@@ -68,7 +72,9 @@ export function applyCityPreparation(view: WorldView, actor: Actor, key: CityPre
     if (row[field] >= 100) return fail('AT_MAX', '이미 최대치입니다.');
     if (resource.gold < BALANCE.DRILL_COST) return fail('NO_GOLD', '도시 금이 부족합니다.');
     resource.gold -= BALANCE.DRILL_COST;
-    row[field] = Math.min(100, row[field] + drillGain(view, general, key === 'morale'));
+    const before = row[field];
+    row[field] = Math.min(100, before + drillGain(view, general, key === 'morale'));
+    addGeneralProficiency(state, general, crewType.armType, row[field] - before);
     text = `도시 수비병 ${key === 'morale' ? '사기진작' : '훈련'}: ${row[field]}`;
   }
   readCityResourcesState(ledger, state, armyTypes);

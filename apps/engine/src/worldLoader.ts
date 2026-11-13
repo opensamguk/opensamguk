@@ -17,6 +17,8 @@ import {
   assertNationLifecycle,
   storedCitySeasonalEvent,
   storedDefenseStance,
+  storedGeneralProficiency,
+  GENERAL_PROFICIENCY_FEATURE,
   storedNpcNationPolicy,
   storedNationRestrictions,
   NATION_RESTRICTIONS_FEATURE,
@@ -136,6 +138,7 @@ export async function loadWorldAfterCapabilityCheck(
           residenceTick,
           officerCityKey,
           defenseThreshold,
+          proficiency,
           ...general
         }) => {
           void turnRevision;
@@ -152,6 +155,7 @@ export async function loadWorldAfterCapabilityCheck(
                   {
                     ...stripWorldId(general),
                     ...(officerCityKey == null ? {} : { officerCityKey }),
+                    ...storedGeneralProficiency(world.ruleFeatures.includes(GENERAL_PROFICIENCY_FEATURE), proficiency),
                     ...storedDefenseStance(world.ruleFeatures.includes(DEFENSE_STANCE_FEATURE), defenseThreshold),
                   },
                   world.ruleFeatures.includes('lineage-v1'),

@@ -1,6 +1,7 @@
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { z } from 'zod';
 import { nationRestrictions } from '../personnel/nationRestrictions';
+import { addGeneralProficiency } from '../general/proficiency';
 import { personalityEffects } from '../general/personality';
 import { BALANCE } from '../balance';
 import { simulateBattle, type BattlePhase } from '../battle/simulate';
@@ -117,6 +118,7 @@ function makeAttack(collect: typeof collectModifiers) {
         );
         attackerFirstVolleyUsed ||= battle.attackerFirstVolleyFired === true;
         Object.assign(g, battle.attacker);
+        addGeneralProficiency(state, g, 5, city.wall - battle.defender.crew);
         city.wall = battle.defender.crew;
         const name = openingSkirmish ? '성벽 선제 교전' : '성벽 교전';
         for (const phase of battle.phases ?? []) attackPhases.push({ ...phase, opponent: '성벽' });
@@ -153,6 +155,14 @@ function makeAttack(collect: typeof collectModifiers) {
         attackerFirstVolleyUsed ||= battle.attackerFirstVolleyFired === true;
         const attackerLoss = g.crew - battle.attacker.crew;
         const defenderLoss = defender.crew - battle.defender.crew;
+        const arms = actor.unitSet!.crewTypes;
+        addGeneralProficiency(state, g, arms.find((type) => type.id === g.crewType)!.armType, defenderLoss);
+        addGeneralProficiency(
+          state,
+          defender,
+          arms.find((type) => type.id === defender.crewType)!.armType,
+          attackerLoss * 0.8,
+        );
         Object.assign(g, battle.attacker);
         Object.assign(defender, battle.defender);
         const attackerSurvives = g.crew > 0 && g.atmos > 0;

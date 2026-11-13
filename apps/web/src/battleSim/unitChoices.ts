@@ -9,6 +9,7 @@ export type UnitInfo = { readonly id: number; readonly armType: number; readonly
 export type WorldUnits = {
   // 요청 검사용 전체 목록 (성벽 포함)
   all: readonly UnitInfo[];
+  armTypes?: Readonly<Record<string, string>>;
   // 장수 병종 (armType > 0)
   generals: readonly UnitInfo[];
   // 월드 기본 병종이 장수 병종이면 그것, 아니면 첫 장수 병종
@@ -24,6 +25,7 @@ export function worldUnits(unitSet: WorldUnitSet | undefined): WorldUnits {
   const byId = new Map(all.map((unit) => [unit.id, unit.name]));
   return {
     all,
+    ...(unitSet ? { armTypes: unitSet.armTypes } : {}),
     generals,
     defaultId: generals.find((unit) => unit.id === unitSet?.defaultCrewTypeId)?.id ?? generals[0]?.id,
     hasWall: byId.has(WALL_CREW_TYPE),

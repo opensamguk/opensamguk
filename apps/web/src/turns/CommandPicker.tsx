@@ -177,7 +177,7 @@ export function CommandPicker({
   // 대상 장수를 이름으로 고르면 카드 설명·입력 칸·누락 안내가 같은 이름을 쓴다.
   const fieldsFor = (target: unknown, key?: string): ArgField[] =>
     target
-      ? argFields(target, units.all).map((field) =>
+      ? argFields(target, units.all, units.armTypes).map((field) =>
           field.key === 'generalId' && generalsFor(key) ? { ...field, label: '대상 장수' } : field,
         )
       : [];
@@ -336,6 +336,7 @@ export function CommandPicker({
           nation: (id) => nations.find((n) => n.id === id)?.name,
           general: screenGenerals ? (id) => screenGenerals.find((g) => g.id === id)?.name : undefined,
           unit: (id) => units.name(id),
+          armType: (id) => units.armTypes?.[id],
           equipment: equipmentName(equipment),
         }),
       ]

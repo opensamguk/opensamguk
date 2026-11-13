@@ -391,6 +391,7 @@ function Editor<S extends DisplaySlot>({
         ? (id: number) => generals.find((g) => g.id === id)?.name
         : (id: number) => recruits.list.find((g) => g.id === id)?.name,
       unit: units.name,
+      armType: (id: number) => units.armTypes?.[id],
       equipment: equipmentName(equipment),
     }),
     [cities, nations, generals, units, equipment, recruits],
