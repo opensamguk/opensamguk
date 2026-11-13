@@ -27,6 +27,7 @@ import {
 } from './heritage';
 import { HeritageAllocation } from './HeritageAllocation';
 import { stepStat, summarizeStats } from './statSummary';
+import { WorldGlanceMap, WorldStatusLine } from './WorldGlance';
 
 const EVEN: StatValues = { leadership: '55', strength: '55', intel: '55', politics: '55', charm: '55' };
 
@@ -214,7 +215,11 @@ function CreateGeneral({ worldId }: { worldId: string }) {
         <p className={styles.lead}>
           이름과 초상, 능력치를 정해 이 월드의 내 장수를 만듭니다. 한 월드에 장수는 하나입니다.
         </p>
+        {/* 원작 장수 선택 화면의 안내와 서버 정보 (INT-25 단계 3). 새 장수는 무작위 도시에서 재야로 시작한다. */}
+        <p className={styles.lead}>무작위 도시에서 재야로 시작합니다. 임관과 건국은 들어간 뒤 명령으로 합니다.</p>
+        <WorldStatusLine worldId={worldId} />
       </div>
+      <WorldGlanceMap worldId={worldId} />
       {body}
     </section>
   );
