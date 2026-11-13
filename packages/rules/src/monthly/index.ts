@@ -33,30 +33,37 @@ const generalsById = (state: WorldView) =>
     .sort((a, b) => a.id - b.id);
 const nationsById = (state: WorldView) => Object.values(state.nations).sort((a, b) => a.id - b.id);
 
+export function estimateTaxIncome(
+  cities: readonly { commerce: number; agriculture: number; population: number }[],
+  memberCount: number,
+  resource: 'gold' | 'rice',
+) {
+  const gross = Math.round(
+    cities.reduce(
+      (sum, city) =>
+        sum +
+        city[resource === 'gold' ? 'commerce' : 'agriculture'] *
+          (city.population / BALANCE.MONTHLY_POPULATION_UNIT) *
+          BALANCE.MONTHLY_TAX_RATE,
+      0,
+    ),
+  );
+  const perGeneral = memberCount ? Math.floor(Math.round(gross * BALANCE.MONTHLY_SALARY_RATE) / memberCount) : 0;
+  const payroll = perGeneral * memberCount;
+  return { gross, perGeneral, payroll, net: gross - payroll };
+}
+
 export function settleIncome(state: WorldView, date: GameDate): WorldState {
   const next = structuredClone(state) as WorldState;
   const resource = [1, 7].includes(date.month) ? 'gold' : [4, 10].includes(date.month) ? 'rice' : null;
   if (!resource) return next;
   for (const nation of nationsById(next)) {
-    const income = Math.round(
-      citiesById(next)
-        .filter((city) => city.nationId === nation.id && city.kind !== 'PASS')
-        .reduce(
-          (sum, city) =>
-            sum +
-            city[resource === 'gold' ? 'commerce' : 'agriculture'] *
-              (city.population / BALANCE.MONTHLY_POPULATION_UNIT) *
-              BALANCE.MONTHLY_TAX_RATE,
-          0,
-        ),
-    );
+    const cities = citiesById(next).filter((city) => city.nationId === nation.id && city.kind !== 'PASS');
     const members = generalsById(next).filter(
       (general) => general.nationId === nation.id && general.activeFromYear <= date.year,
     );
-    const perGeneral = members.length
-      ? Math.floor(Math.round(income * BALANCE.MONTHLY_SALARY_RATE) / members.length)
-      : 0;
-    next.nations[nation.id]![resource] += income - perGeneral * members.length;
+    const { net, perGeneral } = estimateTaxIncome(cities, members.length, resource);
+    next.nations[nation.id]![resource] += net;
     for (const general of members) next.generals[general.id]![resource] += perGeneral;
   }
   return next;
