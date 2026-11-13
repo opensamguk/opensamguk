@@ -127,6 +127,8 @@ async function world(
     enabled?: boolean;
     benefits?: boolean;
     specialty?: boolean | 'growth';
+    inactive?: boolean;
+    turnTermMinutes?: number;
     endYear?: number | null;
     personnel?: boolean;
     maxGenerals?: number;
@@ -176,7 +178,7 @@ async function world(
   };
   const saved = await saveInitialWorld(db, initial, {
     name: '유산 실제 처리 검증',
-    turnTermMinutes: 60,
+    turnTermMinutes: options.turnTermMinutes ?? 60,
     replayFormat: 3,
     endYear: options.endYear ?? null,
     ruleFeatures: [
@@ -184,6 +186,7 @@ async function world(
       ...(options.benefits || options.specialty ? [HERITAGE_BENEFITS_FEATURE] : []),
       ...(options.specialty ? ['combat-specialty-v1', 'heritage-specialty-v1'] : []),
       ...(options.specialty === 'growth' ? ['domestic-specialty-v1', 'specialty-growth-v1'] : []),
+      ...(options.inactive ? ['inactive-removal-v1', 'player-autoplay-v1'] : []),
       'policy',
       ...(options.personnel || withLineage ? ['personnel'] : []),
       ...(withLineage ? ['lineage-v1'] : []),
@@ -1573,6 +1576,40 @@ it('성장 특기 월드는 3년까지 기다렸다가 내정 특기와 예약 �
     archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })),
   );
 });
+
+it('미접속 퇴장 시 미사용 특기 예약을 한 번만 반환한다', async () => {
+  const player = await user();
+  const worldId = await world({ actor: player, specialty: 'growth', inactive: true, turnTermMinutes: 1440 });
+  await db.heritageAccount.create({ data: { userId: player.id, balance: 4000 } });
+  expect(
+    (
+      await rpc(
+        'heritage.specialty',
+        {
+          worldId,
+          requestId: randomUUID(),
+          expectedGeneralId: 1,
+          expectedCost: 4000,
+          action: { action: 'reserve', specialty: '기병' },
+        },
+        player,
+      )
+    ).status,
+  ).toBe(200);
+  await advance(worldId, 0);
+  expect((await rpc('heritage.mine', undefined, player)).data?.balance).toBe(0);
+  const { inactiveRemovalTick } = await import('../packages/rules/src/index');
+  const exit = inactiveRemovalTick(0, 1440);
+  await advance(worldId, exit);
+  await advance(worldId, exit + TICKS_PER_MONTH);
+  const ledger = (await rpc('heritage.mine', undefined, player)).data;
+  expect(ledger?.balance).toBe(4000);
+  expect(ledger?.entries.filter(({ kind }) => kind === 'SPECIALTY_REFUND')).toMatchObject([{ delta: 4000 }]);
+  const archive = await exportReplay(db, worldId);
+  expect(replayArchive(archive, archive.months.length)).toEqual(
+    archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })),
+  );
+}, 60_000);
 
 for (const path of ['heritage.benefits', 'heritage.purchase', 'heritage.specialty'] as const) {
   for (const category of ['unauthenticated', 'sanctioned', 'invalidInput'] as const) {

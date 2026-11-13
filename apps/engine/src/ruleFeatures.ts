@@ -66,6 +66,8 @@ import {
 } from '@opensamguk/rules';
 import type { EngineFeature, QueuedInputHandler } from './features';
 import { processHeritagePurchase } from './heritagePurchase';
+import { PgHeritageRepository } from './heritage/repository';
+import { refundRemovedGeneralSpecialties } from './heritage/service';
 import { processTroopInput } from './troopInput';
 import { loadReplayState } from './monthly';
 import { loadWorld } from './worldLoader';
@@ -352,9 +354,10 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
   { key: CITY_SEASONAL_EVENTS_FEATURE },
   {
     key: INACTIVE_REMOVAL_FEATURE,
-    async persistMonthly(tx, worldId, _before, _next, effects, { tick, sequence }) {
+    async persistMonthly(tx, worldId, before, next, effects, { tick, sequence }) {
       const ids = z.array(z.number().int().positive()).parse(effects);
       if (!ids.length) return;
+      await refundRemovedGeneralSpecialties(new PgHeritageRepository(tx), worldId, before.state, next.state, ids);
       await tx.general.updateMany({
         where: { worldId, id: { in: ids } },
         data: { lastActiveTick: null, lastActiveAt: null },
