@@ -9,6 +9,8 @@ import {
   HUMAN_GENERAL_LIMIT,
   INTEL_FEATURE,
   LINEAGE_EXITED_YEAR,
+  RESEARCH_ERA_FEATURE,
+  researchEra,
   readOperationalMap,
   operationalMapDisplay,
   effectiveWorldOptions,
@@ -111,11 +113,15 @@ export const worldRouter = router({
         world.status === 'ENDED' || months <= currentMonth
           ? null
           : { remainingMonths: months - currentMonth, endsAt: toGameDate(world.startYear, months * TICKS_PER_MONTH) };
+      const technologyEra = world.ruleFeatures.includes(RESEARCH_ERA_FEATURE)
+        ? researchEra(world.startYear, summary.gameDate.year)
+        : undefined;
       const engineActive = world.status === 'RUNNING' || world.status === 'PAUSED';
       const health = engineActive ? countEngineHealth(ctx.now, [{ engineHeartbeat: heartbeat }]) : null;
       return {
         ...summary,
         quota: { humans, max: HUMAN_GENERAL_LIMIT },
+        ...(technologyEra ? { technologyEra } : {}),
         npcCount,
         scenarioType:
           scenario?.fiction === 0 ? ('historical' as const) : scenario?.fiction === 1 ? ('fictional' as const) : null,

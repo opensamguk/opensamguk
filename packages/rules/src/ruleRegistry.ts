@@ -1,3 +1,4 @@
+import { RESEARCH_ERA_FEATURE } from './nationResearch/era';
 import { NATION_PHILOSOPHY_FEATURE } from './personnel/nationPhilosophy';
 import { COURT_PROMOTION_FEATURE, COURT_RANK_FEATURE } from './personnel/nationRank';
 import type { JsonValue, WorldView } from './model/world';
@@ -159,6 +160,7 @@ export const ruleRegistry: RuleRegistry = {
     { key: PLAYER_AUTOPLAY_FEATURE, requires: ['policy'], conflicts: [] },
     { key: CITY_SEASONAL_EVENTS_FEATURE, requires: [], conflicts: [] },
     { key: NATION_PHILOSOPHY_FEATURE, requires: [], conflicts: [] },
+    { key: RESEARCH_ERA_FEATURE, requires: [], conflicts: [] },
     { key: COURT_PROMOTION_FEATURE, requires: [COURT_RANK_FEATURE], conflicts: [] },
     treatyFeature,
     treatyBreakFeature,
