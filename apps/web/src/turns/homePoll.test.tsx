@@ -38,6 +38,12 @@ const summary = (status: WorldSummary['status'], clockMode: WorldSummary['clockM
   turnTermMinutes: 1,
   truce: null,
   quota: { humans: 0, max: null },
+  npcCount: 0,
+  scenarioType: null,
+  serverTime: '2026-01-01T00:00:00.000Z',
+  engine: null,
+  engineStale: null,
+  protection: { war: null, founding: null },
 });
 
 // 화면이 읽는 필드만 채운 장수 있는 계정의 home.get.
