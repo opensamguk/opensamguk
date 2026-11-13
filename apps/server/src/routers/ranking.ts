@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   isInactive,
+  GENERAL_PROFICIENCY_FEATURE,
   LINEAGE_EXITED_YEAR,
   nationRank,
   nowTick,
@@ -20,6 +21,7 @@ const generalRows = z.array(
     nation: nationIdentity.nullable(),
     dedication: z.number().int(),
     experience: z.number().int(),
+    proficiency: z.record(z.string(), z.number().int().nonnegative()).optional(),
     wins: z.number().int().nonnegative(),
     captures: z.number().int().nonnegative(),
     stratagemSuccesses: z.number().int().nonnegative().default(0),
@@ -110,6 +112,11 @@ export const rankingRouter = router({
             'killRate',
             'humanKills',
             'humanKillRate',
+            'proficiency1',
+            'proficiency2',
+            'proficiency3',
+            'proficiency4',
+            'proficiency5',
           ]),
           kind: z.enum(['all', 'human', 'npc']).default('all'),
           page: z.number().int().min(1).max(10_000).default(1),
@@ -117,12 +124,14 @@ export const rankingRouter = router({
         .strict(),
     )
     .query(({ ctx, input }) =>
-      readWorld(ctx.db, input.worldId, async (tx) => {
+      readWorld(ctx.db, input.worldId, async (tx, world) => {
         const snapshot = await tx.rankingSnapshot.findUnique({
           where: { worldId: input.worldId },
           select: { tick: true, year: true, month: true, generals: true },
         });
-        if (!snapshot) return { top: [], me: null, at: null, pagination: null };
+        const proficiencyEnabled = world.ruleFeatures.includes(GENERAL_PROFICIENCY_FEATURE);
+        const feature = proficiencyEnabled ? { proficiencyEnabled: true as const } : {};
+        if (!snapshot) return { top: [], me: null, at: null, pagination: null, ...feature };
         const generals = generalRows.parse(snapshot.generals);
         const identity = new Map(
           (
@@ -140,7 +149,22 @@ export const rankingRouter = router({
         const base = sort === 'dedication' || sort === 'experience' || sort === 'merit';
         const value = (id: number) => {
           const row = byId.get(id)!;
-          return sort === 'stratagem' ? row.stratagemSuccesses : base ? 0 : (row.battleStats?.[sort] ?? -1);
+          switch (sort) {
+            case 'stratagem':
+              return row.stratagemSuccesses;
+            case 'proficiency1':
+            case 'proficiency2':
+            case 'proficiency3':
+            case 'proficiency4':
+            case 'proficiency5':
+              return row.proficiency?.[sort.at(-1)!] ?? 0;
+            case 'dedication':
+            case 'experience':
+            case 'merit':
+              return 0;
+            default:
+              return row.battleStats?.[sort] ?? -1;
+          }
         };
         const ranked = rankGenerals(candidates, base ? sort : 'merit');
         if (!base) ranked.sort((a, b) => value(b.id) - value(a.id) || a.id - b.id);
@@ -150,6 +174,7 @@ export const rankingRouter = router({
           rank: index + 1,
           stratagemSuccesses: byId.get(id)!.stratagemSuccesses,
           battleStats: byId.get(id)!.battleStats,
+          ...(proficiencyEnabled ? { proficiency: byId.get(id)!.proficiency ?? {} } : {}),
           portraitId: identity.get(id)?.portraitId ?? null,
           isHuman: identity.get(id)?.isHuman ?? null,
           ...(!base ? { value: Math.max(0, value(id)) } : {}),
@@ -162,7 +187,13 @@ export const rankingRouter = router({
         const page = Math.min(input.page, pageCount);
         const top = rows.slice((page - 1) * 100, page * 100);
         const me = viewer ? (rows.find((row) => row.generalId === viewer.id) ?? null) : null;
-        return { top, me, at: snapshotAt(snapshot), pagination: pageCount > 1 ? { page, pageCount } : null };
+        return {
+          top,
+          me,
+          at: snapshotAt(snapshot),
+          pagination: pageCount > 1 ? { page, pageCount } : null,
+          ...feature,
+        };
       }),
     ),
   freeGenerals: protectedProcedure.input(worldInput).query(({ ctx, input }) =>

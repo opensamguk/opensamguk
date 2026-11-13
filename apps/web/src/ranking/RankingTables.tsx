@@ -91,6 +91,14 @@ function SortHeader<K extends string>({
 function generalValue(row: RankedGeneral, key: GeneralSortKey) {
   if (key === 'stratagem') return number(row.stratagemSuccesses);
   if (key === 'dedication' || key === 'experience' || key === 'merit') return number(row[key]);
+  if (
+    key === 'proficiency1' ||
+    key === 'proficiency2' ||
+    key === 'proficiency3' ||
+    key === 'proficiency4' ||
+    key === 'proficiency5'
+  )
+    return number(row.proficiency?.[key.at(-1)!] ?? 0);
   const value = row.battleStats?.[key];
   if (value === undefined) return '—';
   return key === 'winRate' || key === 'killRate' || key === 'humanKillRate'
@@ -103,11 +111,13 @@ function GeneralRow({
   me,
   rowRef,
   narrow,
+  columns,
 }: {
   row: RankedGeneral;
   me: boolean;
   rowRef?: (el: HTMLElement | null) => void;
   narrow: boolean;
+  columns: typeof GENERAL_COLUMNS;
 }) {
   return (
     <tr ref={rowRef} tabIndex={me ? -1 : undefined} data-me={me || undefined} className={me ? styles.meRow : undefined}>
@@ -129,7 +139,7 @@ function GeneralRow({
         {me ? <span className={styles.meChip}>나</span> : null}
         {narrow ? (
           <dl className={styles.details}>
-            {GENERAL_COLUMNS.map((column) => (
+            {columns.map((column) => (
               <div key={column.key}>
                 <dt>{column.label}</dt>
                 <dd>{generalValue(row, column.key)}</dd>
@@ -153,7 +163,7 @@ function GeneralRow({
       </td>
       {narrow ? null : (
         <>
-          {GENERAL_COLUMNS.map(({ key }) => (
+          {columns.map(({ key }) => (
             <td key={key} className="num">
               {generalValue(row, key)}
             </td>
@@ -179,6 +189,10 @@ export function GeneralRankingTable({
 }) {
   const mine = useRef<HTMLElement | null>(null);
   const narrow = useNarrowTable();
+  const columns =
+    'proficiencyEnabled' in ranking && ranking.proficiencyEnabled
+      ? GENERAL_COLUMNS
+      : GENERAL_COLUMNS.filter(({ key }) => !key.startsWith('proficiency') || key === by);
   const meId = ranking.me?.generalId ?? null;
   const meInTop = meId !== null && ranking.top.some((row) => row.generalId === meId);
   const mineRef = (el: HTMLElement | null) => {
@@ -191,7 +205,7 @@ export function GeneralRankingTable({
 
   return (
     <div className={styles.wrap}>
-      {narrow ? <MobileSort columns={GENERAL_COLUMNS} by={by} onSort={onSort} label="장수 순위" /> : null}
+      {narrow ? <MobileSort columns={columns} by={by} onSort={onSort} label="장수 순위" /> : null}
       <table className={styles.table} aria-label="장수 순위">
         <thead>
           <tr>
@@ -202,7 +216,7 @@ export function GeneralRankingTable({
             <th scope="col">소속</th>
             {narrow
               ? null
-              : GENERAL_COLUMNS.map((column) => (
+              : columns.map((column) => (
                   <SortHeader key={column.key} column={column} active={column.key === by} onSort={onSort} />
                 ))}
             {narrow
@@ -218,18 +232,25 @@ export function GeneralRankingTable({
           {ranking.top.map((row) => {
             const me = row.generalId === meId;
             return (
-              <GeneralRow key={row.generalId} row={row} me={me} narrow={narrow} {...(me ? { rowRef: mineRef } : {})} />
+              <GeneralRow
+                key={row.generalId}
+                row={row}
+                me={me}
+                narrow={narrow}
+                columns={columns}
+                {...(me ? { rowRef: mineRef } : {})}
+              />
             );
           })}
         </tbody>
         {ranking.me && !meInTop ? (
           <tbody className={styles.outside}>
             <tr aria-hidden="true">
-              <td colSpan={narrow ? 3 : 3 + GENERAL_COLUMNS.length + MERIT_PARTS.length} className={styles.gap}>
+              <td colSpan={narrow ? 3 : 3 + columns.length + MERIT_PARTS.length} className={styles.gap}>
                 ⋯
               </td>
             </tr>
-            <GeneralRow row={ranking.me} me rowRef={mineRef} narrow={narrow} />
+            <GeneralRow row={ranking.me} me rowRef={mineRef} narrow={narrow} columns={columns} />
           </tbody>
         ) : null}
       </table>

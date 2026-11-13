@@ -1,4 +1,5 @@
 import type { Rng } from '@opensamguk/shared';
+import { proficiencyDamageFactor, type GeneralProficiency } from '../general/proficiency';
 import { BALANCE } from '../balance';
 import type { DeepReadonly } from '../model/world';
 import type { UnitSetResource } from '../world/resources';
@@ -21,6 +22,8 @@ export type BattleInput = {
   recordPhases?: boolean;
   attackerReadiness?: { train?: number; morale?: number } | undefined;
   defenderReadiness?: { train?: number; morale?: number } | undefined;
+  attackerProficiency?: Readonly<GeneralProficiency> | undefined;
+  defenderProficiency?: Readonly<GeneralProficiency> | undefined;
 };
 
 type Unit = DeepReadonly<UnitSetResource['crewTypes'][number]>;
@@ -66,6 +69,12 @@ function damage(a: BattleForce, b: BattleForce, input: BattleInput, rng: Rng, at
     attacking.armType !== 0
   )
     power *= attackingSide ? 1.02 : 0.97;
+  if (input.attackerProficiency || input.defenderProficiency) {
+    const attack = attackingSide ? input.attackerProficiency : input.defenderProficiency;
+    const defense = attackingSide ? input.defenderProficiency : input.attackerProficiency;
+    const armType = attacking.armType === 0 ? 5 : attacking.armType;
+    power *= proficiencyDamageFactor(attack?.[armType] ?? 0, defense?.[armType] ?? 0);
+  }
   power *= scale;
   const attackerModifiers = attackingSide ? input.attackerModifiers : input.defenderModifiers;
   const defenderModifiers = attackingSide ? input.defenderModifiers : input.attackerModifiers;

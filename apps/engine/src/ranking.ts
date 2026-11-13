@@ -30,6 +30,7 @@ export async function persistRanking(
       nation: nationInfo(general.nationId),
       dedication: general.dedication,
       experience: general.experience,
+      ...(general.proficiency ? { proficiency: general.proficiency } : {}),
       wins: byId.get(general.id)!.battleWins,
       captures: byId.get(general.id)!.captures,
       stratagemSuccesses: byId.get(general.id)!.stratagemSuccesses,
