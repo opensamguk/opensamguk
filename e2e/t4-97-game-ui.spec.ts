@@ -39,6 +39,7 @@ test('T4-97 메인 HUD 계정 메뉴·예턴 상태·도시에서 명령 고르�
     await expect(turnStatus).toHaveText('저장된 목록');
     await expect(shortcuts.getByRole('button')).toHaveCount(6);
     // 768px 미만 메인은 위 바로가기 띠와 게임 메뉴 막대 대신 하단 막대 하나를 쓴다 (INT-25). 예턴 탭이 같은 상태를 단다.
+    await page.setViewportSize({ width: 375, height: 812 });
     const bar = page.getByRole('tablist', { name: '메인 화면', exact: true });
     const turnTab = bar.getByRole('tab', { name: '예턴', exact: true });
     await expect(turnTab).toHaveAttribute('data-status', 'saved');
