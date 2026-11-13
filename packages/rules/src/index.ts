@@ -296,6 +296,8 @@ export {
 } from './stratagemCards/feature';
 export {
   readNationStrategy,
+  strategyMonth,
+  STRATEGY_KEYS,
   initialNationStrategy,
   NATION_STRATEGY_FEATURE,
   type NationStrategyState,

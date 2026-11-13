@@ -3,6 +3,10 @@ import {
   canExecuteCityNationCommand,
   canExecuteResearchNationCommand,
   canUseNationTurns,
+  STRATEGY_KEYS,
+  strategyMonth,
+  TICKS_PER_MONTH,
+  toGameDate,
   unitSetSchema,
 } from '@opensamguk/rules';
 import { TRPCError } from '@trpc/server';
@@ -42,12 +46,28 @@ export const nationCommandsRouter = router({
         tick: actor.nextTurnTick,
         unitSet: unitSetSchema.safeParse(world.unitSet).data,
       };
-      return commands.map((def) => ({
-        key: def.key,
-        name: def.name,
-        argsSchema: z.toJSONSchema(def.args, { io: 'input' }),
-        ...commandAvailability(def, view, commandActor, ended),
-      }));
+      const cooldown = view?.nationStrategy?.nations[actor.nationId!];
+      const current = strategyMonth(commandActor.tick);
+      return commands.map((def) => {
+        const key = STRATEGY_KEYS.find((key) => key === def.key);
+        const availableMonth = key ? Math.max(cooldown?.strategicUntil ?? 0, cooldown?.commands[key] ?? 0) : 0;
+        return {
+          key: def.key,
+          name: def.name,
+          category: def.category,
+          ...(key
+            ? {
+                cooldown: {
+                  remainingMonths: Math.max(0, availableMonth - current),
+                  availableAt:
+                    availableMonth > current ? toGameDate(world.startYear, availableMonth * TICKS_PER_MONTH) : null,
+                },
+              }
+            : {}),
+          argsSchema: z.toJSONSchema(def.args, { io: 'input' }),
+          ...commandAvailability(def, view, commandActor, ended),
+        };
+      });
     }),
   ),
   precheck: protectedProcedure.input(worldInput.extend(commandInput)).query(({ ctx, input }) =>
