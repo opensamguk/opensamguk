@@ -65,7 +65,7 @@ export const rankingRouter = router({
           where: { worldId: input.worldId },
           select: { tick: true, year: true, month: true, generals: true },
         });
-        if (!snapshot) return { top: [], me: null, at: null };
+        if (!snapshot) return { top: [], me: null, at: null, pagination: undefined };
         const generals = generalRows.parse(snapshot.generals);
         const identity = new Map(
           (
