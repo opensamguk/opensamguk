@@ -110,7 +110,8 @@ export function fightCampaignWall(
   {
     openingSkirmish = false,
     attackerFirstVolleyUsed = false,
-  }: Pick<BattleInput, 'openingSkirmish' | 'attackerFirstVolleyUsed'> = {},
+    recordPhases = false,
+  }: Pick<BattleInput, 'openingSkirmish' | 'attackerFirstVolleyUsed' | 'recordPhases'> = {},
 ) {
   const state = start(view),
     attacker = unit(state, attackerId),
@@ -127,6 +128,7 @@ export function fightCampaignWall(
       defenderTech: city.nationId === null ? 0 : state.nations[city.nationId]!.tech,
       defence: city.defence,
       openingSkirmish,
+      recordPhases,
       siege: !openingSkirmish,
       attackerFirstVolleyUsed,
       unitSet,
@@ -149,6 +151,7 @@ export function fightCampaignCityGarrison(
   unitSet: DeepReadonly<UnitSetResource>,
   rng: Rng,
   attackerFirstVolleyUsed = false,
+  recordPhases = false,
 ) {
   if (!view.ruleFeatures?.includes('city-resources-v1')) throw new Error('도시 수비 규칙이 없는 판입니다.');
   const state = start(view),
@@ -189,6 +192,7 @@ export function fightCampaignCityGarrison(
       defence: city.defence,
       unitSet,
       attackerFirstVolleyUsed,
+      recordPhases,
       coefMode: state.ruleFeatures?.includes('battle-affinity-v2') ? 'multiply' : 'divide',
       attackerModifiers: modifiers(state, attacker),
     },
@@ -210,5 +214,6 @@ export function fightCampaignCityGarrison(
     state,
     text: `부곡${attackerId} 대 도시 병종${crewType}: 공격 ${attacker.troops}명, 수비 ${defender.troops}명, 민간 복귀 ${returned}명, 인구 상한 밖 ${overflow}명`,
     ...(result.attackerFirstVolleyFired && { attackerFirstVolleyFired: result.attackerFirstVolleyFired }),
+    ...(result.phases?.length ? { phases: result.phases } : {}),
   };
 }

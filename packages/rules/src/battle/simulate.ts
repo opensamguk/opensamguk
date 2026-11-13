@@ -74,6 +74,7 @@ function copyForce(force: Readonly<BattleForce>): BattleForce {
 
 export type BattlePhase = {
   kind: 'volley' | 'hold' | 'exchange';
+  opponent?: string;
   attackerLoss: number;
   defenderLoss: number;
   attackerEvaded?: boolean;

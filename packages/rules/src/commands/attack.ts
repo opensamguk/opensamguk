@@ -1,7 +1,7 @@
 import { TICKS_PER_MONTH } from '../clock/constants';
 import { z } from 'zod';
 import { BALANCE } from '../balance';
-import { simulateBattle } from '../battle/simulate';
+import { simulateBattle, type BattlePhase } from '../battle/simulate';
 import { canDefend } from '../battle/defenders';
 import type { CommandResult } from './types';
 import type { InitialGeneral } from '../world/bootstrap';
@@ -75,6 +75,7 @@ function makeAttack(collect: typeof collectModifiers) {
       const generalEngagements: NonNullable<CommandResult['generalEngagements']> = [];
       const reputation = state.ruleFeatures?.includes('reputation-v1');
       const rounds: string[] = [];
+      const attackPhases: BattlePhase[] = [];
       let attackerFirstVolleyUsed = false;
       const wallFirst =
         defenders.length > 0 &&
@@ -87,6 +88,7 @@ function makeAttack(collect: typeof collectModifiers) {
           {
             attacker: g,
             defender: wall,
+            recordPhases: actor.recordBattleStats === true,
             attackerTech: aTech,
             defenderTech: bTech,
             defence: city.defence,
@@ -106,6 +108,7 @@ function makeAttack(collect: typeof collectModifiers) {
         Object.assign(g, battle.attacker);
         city.wall = battle.defender.crew;
         const name = openingSkirmish ? '성벽 선제 교전' : '성벽 교전';
+        for (const phase of battle.phases ?? []) attackPhases.push({ ...phase, opponent: '성벽' });
         rounds.push(`${name}: 공격 ${g.crew}명, 성벽 ${city.wall}`);
       };
       if (wallFirst) fightWall(true);
@@ -157,6 +160,7 @@ function makeAttack(collect: typeof collectModifiers) {
         }
         const text = `${g.name} 대 ${defender.name}: 공격 ${g.crew}명, 수비 ${defender.crew}명`;
         rounds.push(text);
+        for (const phase of battle.phases ?? []) attackPhases.push({ ...phase, opponent: defender.name });
         reports.push({ generalId: defender.id, text, ...(battle.phases?.length ? { phases: battle.phases } : {}) });
         if (g.crew <= 0 || g.atmos <= 0 || (defender.crew > 0 && defender.atmos > 0)) {
           cleared = false;
@@ -193,6 +197,8 @@ function makeAttack(collect: typeof collectModifiers) {
       }
       const summary = `${g.name} ${city.name} ${captured ? '점령' : '점령 실패'}: 병력 ${g.crew}명`;
       for (const report of reports) report.text += `, ${captured ? '점령' : '수비 유지'}`;
+      if (actor.recordBattleStats)
+        reports.push({ generalId: g.id, text: summary, ...(attackPhases.length ? { phases: attackPhases } : {}) });
       history.push({ nationId: attackingNation, text: `${rounds.join('; ')}; ${summary}` });
       if (defendingNation !== null) history.push({ nationId: defendingNation, text: summary });
       return {

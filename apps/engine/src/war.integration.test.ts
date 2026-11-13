@@ -163,6 +163,7 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
     expect(await db.nationTurn.count({ where: { worldId, nationId: 2 } })).toBe(0);
     expect(await db.nationTurn.count({ where: { worldId, nationId: 1 } })).toBe(30);
     expect(await db.battleLog.findMany({ where: { worldId }, orderBy: { generalId: 'asc' } })).toMatchObject([
+      { generalId: 1, text: expect.stringContaining('점령') },
       { generalId: 2, text: expect.stringContaining('점령') },
       { generalId: 3, text: expect.stringContaining('점령') },
     ]);
@@ -321,7 +322,7 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
       expect(await snapshot(worldId)).toEqual(before);
       expect(loop.state).toBeNull();
       await new TurnLoop(db, lease).advanceTo(100);
-      expect(await db.battleLog.count({ where: { worldId } })).toBe(2);
+      expect(await db.battleLog.count({ where: { worldId } })).toBe(3);
     },
   );
   it.each(['beforeCommit', 'committed'])(
@@ -345,7 +346,7 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
         expect(message).toBe(phase);
         child.kill('SIGKILL');
         await exited;
-        expect(await db.battleLog.count({ where: { worldId } })).toBe(phase === 'committed' ? 2 : 0);
+        expect(await db.battleLog.count({ where: { worldId } })).toBe(phase === 'committed' ? 3 : 0);
         expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } })).toMatchObject({
           battleWins: phase === 'committed' ? 2 : 0,
           captures: phase === 'committed' ? 1 : 0,
@@ -354,7 +355,7 @@ describe('AC-M1-14~16 실제 PostgreSQL 명령·전투', () => {
         const loop = new TurnLoop(db, (await acquireLease(db, worldId))!);
         await loop.advanceTo(500);
         await loop.advanceTo(500);
-        expect(await db.battleLog.count({ where: { worldId } })).toBe(2);
+        expect(await db.battleLog.count({ where: { worldId } })).toBe(3);
         expect(await db.generalLog.count({ where: { worldId } })).toBe(1);
         expect(await db.general.findUniqueOrThrow({ where: { worldId_id: { worldId, id: 1 } } })).toMatchObject({
           battleWins: 2,

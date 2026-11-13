@@ -115,8 +115,14 @@ describe('T2-22 / AC-M2-19 엔진 순위 집계', () => {
     expect(await actor()).toMatchObject({ battleWins: 2, captures: 1, nextTurnTick: 10100 });
     const recordedBattles = await engagements();
     const reports = await db.battleLog.findMany({ where: { worldId }, orderBy: { generalId: 'asc' } });
-    expect(reports).toHaveLength(2);
+    expect(reports).toHaveLength(3);
     expect(reports[0]?.phases).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ opponent: initial.generals.find(({ id }) => id === 2)!.name }),
+        expect.objectContaining({ opponent: '성벽' }),
+      ]),
+    );
+    expect(reports[1]?.phases).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           kind: 'exchange',

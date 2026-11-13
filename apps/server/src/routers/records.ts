@@ -47,6 +47,7 @@ const winnerSummarySchema = z.strictObject({
 const battlePhases = z.array(
   z.object({
     kind: z.enum(['volley', 'hold', 'exchange']),
+    opponent: z.string().optional(),
     attackerLoss: z.number().int().nonnegative(),
     defenderLoss: z.number().int().nonnegative(),
     attackerEvaded: z.boolean().optional(),
