@@ -182,7 +182,8 @@ describe('국가 순위 표', () => {
         nationId: 1,
         name: '위',
         color: '#2f5f9e',
-        philosophy: null,
+        philosophy: '왕도',
+        rankTitle: '주목',
         cities: 12,
         generals: 30,
         power: 4321,
@@ -202,6 +203,8 @@ describe('국가 순위 표', () => {
     expect(headers).toEqual(['순위', '국가', '도시▼', '장수', '국력']);
     expect(screen.queryByText(/국고|군량|금|쌀/)).toBeNull();
     expect(screen.getByText('4,321')).toBeTruthy();
+    expect(screen.getByText('주목')).toBeTruthy();
+    expect(screen.getByText('왕도')).toBeTruthy();
     fireEvent.click(screen.getByText('현재 병력 추정'));
     expect(screen.getByText('1명 · 약 9,000명')).toBeTruthy();
     expect(screen.getByText('2명 · 약 15,000명')).toBeTruthy();

@@ -90,6 +90,7 @@ export function NationSummaryGrid({
       items={[
         member ? { label: '군주', value: headValue(heads?.ruler) } : { label: '군주', ...hidden },
         member ? { label: '참모', value: headValue(heads?.advisor) } : { label: '참모', ...hidden },
+        { label: '작위', value: nation.rank?.title ?? '—' },
         { label: '속령', value: n(nation.cityCount) },
         { label: '장수', value: n(nation.generalCount) },
         population
