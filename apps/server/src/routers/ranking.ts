@@ -51,6 +51,41 @@ const emptyForce = () => ({
 });
 
 export const rankingRouter = router({
+  heritage: protectedProcedure.input(worldInput).query(({ ctx, input }) =>
+    readWorld(ctx.db, input.worldId, async (tx, world) => {
+      const worldId = world.id;
+      const united = world.status === 'ENDED' && world.result?.reason === 'UNIFIED';
+      const rank = async (kind: 'SEASON_CREDIT' | 'CREATION_SPEND', sort: 'asc' | 'desc') => {
+        const totals = await tx.heritageEntry.groupBy({
+          by: ['userId'],
+          where: { worldId, kind, delta: sort === 'asc' ? { lt: 0 } : { gt: 0 } },
+          _sum: { delta: true },
+          orderBy: [{ _sum: { delta: sort } }, { userId: 'asc' }],
+          take: 10,
+        });
+        const roster = united
+          ? await tx.seasonGeneral.findMany({
+              where: { worldId, userId: { in: totals.map(({ userId }) => userId) } },
+              select: { userId: true, name: true, nationName: true },
+              orderBy: { generalId: 'asc' },
+            })
+          : [];
+        const players = new Map(roster.map((row) => [row.userId, row]));
+        return totals.map(({ userId, _sum }, index) => {
+          const general = players.get(userId);
+          return {
+            rank: index + 1,
+            points: Math.abs(_sum.delta ?? 0),
+            name: general?.name ?? null,
+            nationName: general?.nationName ?? null,
+          };
+        });
+      };
+      const spent = await rank('CREATION_SPEND', 'asc');
+      const earned = await rank('SEASON_CREDIT', 'desc');
+      return { spent, earned, identitiesVisible: united };
+    }),
+  ),
   generals: protectedProcedure
     .input(
       worldInput
