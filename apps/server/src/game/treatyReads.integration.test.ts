@@ -374,8 +374,20 @@ describe('T2-07 / AC-M2-06 새 조회 leaf 보조 단위', () => {
         },
       ])
       .mockResolvedValueOnce([]);
+    f.events
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        completed(),
+        completed({ generalId: 2, kind: 'treaty.respond', result: json(applied.result) }),
+      ]);
+    f.generals.mockResolvedValueOnce([f.actor]).mockResolvedValueOnce([
+      { ...f.actor, name: '제안자', portraitId: 101 },
+      { ...f.actor, id: 2, name: '수락자', portraitId: 102 },
+    ]);
     const result = await listTreaties(f.db, identity);
     expect(result.items[0]).toMatchObject({
+      signatories: { proposer: { name: '제안자', portraitId: 101 }, approver: { name: '수락자', portraitId: 102 } },
       status: 'ACTIVE',
       cost: applied.result.cost,
       estimate: null,
@@ -473,7 +485,7 @@ describe('T2-07 / AC-M2-06 새 조회 leaf 보조 단위', () => {
       },
     ]);
     expect(result.items[0]).toMatchObject({ canAccept: { code: 'IN_PROGRESS' }, canReject: { code: 'IN_PROGRESS' } });
-    expect(f.events).toHaveBeenLastCalledWith({
+    expect(f.events).toHaveBeenCalledWith({
       where: {
         worldId: 'world',
         status: 'PENDING',
@@ -632,7 +644,7 @@ describe('T2-07 / AC-M2-06 새 조회 leaf 보조 단위', () => {
       orderBy: { sequence: 'desc' },
       take: 5,
     });
-    expect(f.events).toHaveBeenLastCalledWith({
+    expect(f.events).toHaveBeenCalledWith({
       where: {
         worldId: 'world',
         status: 'PENDING',
