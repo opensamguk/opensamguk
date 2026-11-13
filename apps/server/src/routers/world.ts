@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import type { Prisma } from '@opensamguk/db';
 import { protectedProcedure, publicProcedure, router } from '../trpc';
-import { readWorld, worldInput, worldSummary } from '../queries';
+import { readWorld, viewerGeneral, worldInput, worldSummary } from '../queries';
 import { mapCity, publicMapInfo } from '../visibility';
-import { readOperationalMap, operationalMapDisplay } from '@opensamguk/rules';
+import { INTEL_FEATURE, LINEAGE_EXITED_YEAR, readOperationalMap, operationalMapDisplay } from '@opensamguk/rules';
 import { readCityScaleProjection } from '../game/cityScale';
 import { readMapBackgrounds } from '../resourceAdmin/mapBackground';
 
@@ -67,7 +67,7 @@ export const worldRouter = router({
     .input(worldInput)
     .query(({ ctx, input }) => readWorld(ctx.db, input.worldId, async (_tx, world) => worldSummary(world, ctx.now))),
   map: protectedProcedure.input(worldInput).query(({ ctx, input }) =>
-    readWorld(ctx.db, input.worldId, async (tx) => {
+    readWorld(ctx.db, input.worldId, async (tx, worldInfo) => {
       const cities = await tx.city.findMany({ where: { worldId: input.worldId }, orderBy: { cityKey: 'asc' } });
       const nations = await tx.nation.findMany({
         where: { worldId: input.worldId },
@@ -79,6 +79,27 @@ export const worldRouter = router({
         select: { operationalMap: true, ruleFeatures: true, replayOrigin: true, mapKey: true },
       });
       const map = readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin);
+      const fogEnabled = worldInfo.ruleFeatures.includes(INTEL_FEATURE);
+      const viewer = fogEnabled ? await viewerGeneral(tx, input.worldId, ctx.user.id) : null;
+      const ownNation = viewer?.removedAt === null ? viewer.nationId : null;
+      const generals = await tx.general.findMany({
+        where: {
+          worldId: input.worldId,
+          removedAt: null,
+          activeFromYear: { not: LINEAGE_EXITED_YEAR },
+          ...(fogEnabled
+            ? {
+                cityKey: {
+                  in: cities
+                    .filter((city) => city.nationId === null || city.nationId === ownNation)
+                    .map((city) => city.cityKey),
+                },
+              }
+            : {}),
+        },
+        orderBy: { id: 'asc' },
+        select: { id: true, name: true, cityKey: true, nationId: true, portraitId: true, userId: true },
+      });
       const ruins = await readCityScaleProjection(tx, input.worldId, world.ruleFeatures, cities);
       const backgrounds = await readMapBackgrounds(tx, [world.mapKey]);
       return {
@@ -88,6 +109,7 @@ export const worldRouter = router({
           ...(ruins ? { ruin: ruins.get(city.cityKey) ?? null } : {}),
         })),
         nations,
+        generals: generals.map(({ userId, ...general }) => ({ ...general, isHuman: userId !== null })),
         ...(map ? { operationalMap: operationalMapDisplay(map) } : {}),
       };
     }),

@@ -205,6 +205,29 @@ afterAll(async () => {
 });
 
 describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
+  it('AC-INT-26 지도 장수 초상은 도시 주둔 공개 범위를 따른다', async () => {
+    const world = await fixtureWorld('map-generals');
+    await db.general.update({
+      where: { worldId_id: { worldId: world, id: 1 } },
+      data: { portraitId: 10001 },
+    });
+    const input = { worldId: world };
+    const open = await query('world.map', input, users[3]!.cookie);
+    expect(open.data.generals[0]).toEqual({
+      id: 1,
+      name: state.generals[0]!.name,
+      cityKey: state.cities[0]!.cityKey,
+      nationId: 1,
+      portraitId: 10001,
+      isHuman: true,
+    });
+    expect(open.data.generals[1]).toHaveProperty('isHuman', false);
+    await db.world.update({ where: { id: world }, data: { ruleFeatures: { push: 'intel-v1' } } });
+    const foreign = await query('world.map', input, users[3]!.cookie);
+    expect(foreign.status).toBe(200);
+    expect(foreign.data.generals).toEqual([]);
+    expect((await query('world.map', input)).data.generals).toEqual(open.data.generals);
+  });
   it('summary는 서버 시계와 공개 기수 설정을 반환한다', async () => {
     expect(await query('world.summary', { worldId })).toEqual({
       status: 200,
@@ -288,7 +311,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     }
   });
 
-  it('94도시 지도는 정렬한 공개 필드·연결·보급과 국가 색·수도만 반환한다', async () => {
+  it('94도시 지도는 정렬한 공개 도시·국가·장수 정보만 반환한다', async () => {
     const result = await query('world.map', { worldId });
     expect(result.status).toBe(200);
     expect(result.data).toEqual({
@@ -304,6 +327,14 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
         links: city.connections,
       })),
       nations: state.nations.map(({ id, name, color, capitalCityKey }) => ({ id, name, color, capitalCityKey })),
+      generals: state.generals.map(({ id, name, cityKey, nationId, portraitId }, index) => ({
+        id,
+        name,
+        cityKey,
+        nationId,
+        portraitId: portraitId ?? null,
+        isHuman: index !== 1,
+      })),
     });
     expect(result.data.cities).toHaveLength(94);
     for (const city of result.data.cities)
