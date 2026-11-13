@@ -17,7 +17,7 @@ import {
 import { TRPCError } from '@trpc/server';
 import type { Context } from '../context';
 import { nextTurnAt, readWorld, requireGeneral, worldClock, type ClockWorld } from '../queries';
-import { publicNationDisplaySelect } from '../visibility';
+import { logInfo, logSelect, publicNationDisplaySelect } from '../visibility';
 import { readView } from './queries';
 import { displaySlots, readSlots } from './slots';
 
@@ -407,6 +407,36 @@ export function closeOperation(ctx: OperationContext, input: { worldId: string; 
     );
   });
 }
+export function inspectMemberRecords(ctx: OperationContext, worldId: string, generalId: number) {
+  return readOperation(ctx, worldId, async (tx, world, actor) => {
+    if (!officer(actor)) throw new TRPCError({ code: 'FORBIDDEN', message: '직책자만 감찰할 수 있습니다.' });
+    const member = await tx.general.findFirst({
+      where: { worldId, id: generalId, nationId: actor.nationId, removedAt: null },
+      select: { id: true },
+    });
+    if (!member) throw new TRPCError({ code: 'NOT_FOUND', message: '소속 장수를 찾을 수 없습니다.' });
+    const [logs, battles] = await Promise.all([
+      tx.generalLog.findMany({
+        where: { worldId, generalId },
+        orderBy: [{ tick: 'desc' }, { id: 'desc' }],
+        take: 10,
+        select: logSelect,
+      }),
+      tx.battleLog.findMany({
+        where: { worldId, generalId },
+        orderBy: [{ tick: 'desc' }, { attackerId: 'desc' }],
+        take: 10,
+        select: { tick: true, attackerId: true, text: true },
+      }),
+    ]);
+    const date = (tick: number) => toGameDate(world.startYear, tick);
+    return {
+      logs: logs.map((log) => ({ ...logInfo(log), gameDate: date(log.tick) })),
+      battles: battles.map((battle) => ({ ...battle, gameDate: date(battle.tick) })),
+    };
+  });
+}
+
 export function inspectMembers(ctx: OperationContext, worldId: string) {
   return readOperation(ctx, worldId, async (tx, world, actor) => {
     if (!officer(actor)) throw new TRPCError({ code: 'FORBIDDEN', message: '직책자만 감찰할 수 있습니다.' });
