@@ -3,6 +3,7 @@ import type { QueryClient, QueryFunction, QueryKey } from '@tanstack/react-query
 import type { inferRouterOutputs } from '@trpc/server';
 import { trpcClient, type Trpc } from '../trpc';
 import type { CommandInfo, GeneralChoice } from './CommandPicker';
+import type { SlotTargets } from './args';
 import { SLOT_COUNT, type Turn } from './draft';
 
 // 예턴 편집기가 읽고 쓰는 칸 목록. 개인 30칸(turns.*)과 국가 직책 12칸(nationTurns.*, T2-06)이 같은 편집기를 쓴다.
@@ -13,6 +14,8 @@ export interface DisplaySlot {
   commandKey: string;
   args?: unknown;
   name: string;
+  // 인자가 가리키는 도시·국가·장수 이름 (turns.get, INT-26). 국가 칸은 아직 싣지 않는다.
+  targets?: SlotTargets | undefined;
 }
 
 // 개인 칸은 AppRouter의 turns.get 칸 모양이다. 서버가 explicit을 실으면 캐시와 저장 결과에도 그대로 남는다.

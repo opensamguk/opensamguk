@@ -19,10 +19,10 @@ import { useTRPC } from '../trpc';
 import { DisabledReason } from '../ui/DisabledReason';
 import { EmptyState, ErrorState, LoadingState } from '../ui/States';
 import { errorCode, retryUnlessClientError } from './apiError';
-import { describeArgs, type ArgNames } from './args';
+import { describeArgs, withTargets, type ArgNames, type SlotTargets } from './args';
 import { useWorldRules, useWorldUnits } from '../game/queries';
 import { isDetailedCity, isDetailedGeneral, isMemberNation } from '../game/types';
-import type { ArgContext } from './CommandArgsScreen';
+import type { ArgContext, ArgNeed, RecruitChoices } from './CommandArgsScreen';
 import { CommandPicker, equipmentName, type CommandInfo } from './CommandPicker';
 import { useEquipment } from '../equipment/useEquipment';
 import {
@@ -247,9 +247,9 @@ function Editor<S extends DisplaySlot>({
   const rules = useWorldRules(worldId);
 
   // 인자 입력 화면이 국가·장수 대상을 열면 그때부터 받는 조회 (INT-25 3단계). 한 번 열면 편집기가 있는 동안 계속 쓴다.
-  const [needs, setNeeds] = useState<{ nations: boolean; generals: boolean }>({ nations: false, generals: false });
+  const [needs, setNeeds] = useState<Record<ArgNeed, boolean>>({ nations: false, generals: false, recruits: false });
   const onNeed = useCallback(
-    (kind: 'nations' | 'generals') => setNeeds((prev) => (prev[kind] ? prev : { ...prev, [kind]: true })),
+    (kind: ArgNeed) => setNeeds((prev) => (prev[kind] ? prev : { ...prev, [kind]: true })),
     [],
   );
   const myNationId = home.data?.general.nationId ?? null;
@@ -277,7 +277,35 @@ function Editor<S extends DisplaySlot>({
     retry: false,
   });
   const treatyTargets = treaties.data?.pages[0]?.targets;
+  // 등용 후보 재야 장수 (INT-26). 등용 인자 화면을 열면 받는다. 국가 칸에는 등용 명령이 없다.
+  const recruitQuery = useQuery({
+    ...trpc.commands.recruitCandidates.queryOptions({ worldId }),
+    enabled: needs.recruits,
+    staleTime: 15_000,
+    retry: retryUnlessClientError,
+  });
   const gameDate = summary.data?.gameDate;
+
+  const recruits = useMemo((): RecruitChoices => {
+    const data = recruitQuery.data;
+    if (data)
+      return {
+        list: data.map((candidate) => ({
+          id: candidate.id,
+          name: candidate.name,
+          portraitId: candidate.portraitId,
+          isHuman: candidate.isHuman,
+          cityName: candidate.cityName ?? undefined,
+        })),
+        note: null,
+      };
+    return {
+      list: [],
+      note: recruitQuery.isError
+        ? '등용 후보를 불러오지 못했습니다. 화면을 닫았다가 다시 여세요.'
+        : '등용 후보를 불러오는 중입니다.',
+    };
+  }, [recruitQuery.data, recruitQuery.isError]);
 
   const argContext = useMemo((): ArgContext => {
     const general = home.data?.general;
@@ -338,6 +366,7 @@ function Editor<S extends DisplaySlot>({
             ]),
           )
         : undefined,
+      recruits,
     };
   }, [
     map.data,
@@ -350,17 +379,27 @@ function Editor<S extends DisplaySlot>({
     ranking.data,
     treatyTargets,
     gameDate,
+    recruits,
   ]);
   const names: ArgNames = useMemo(
     () => ({
       city: (key: number) => cities.find((c) => c.key === key)?.name,
       nation: (id: number) => nations.find((n) => n.id === id)?.name,
-      general: generals ? (id: number) => generals.find((g) => g.id === id)?.name : undefined,
+      // 국가 칸은 넘겨받은 장수 목록, 개인 칸은 받아 둔 등용 후보에서 장수 이름을 찾는다.
+      general: generals
+        ? (id: number) => generals.find((g) => g.id === id)?.name
+        : (id: number) => recruits.list.find((g) => g.id === id)?.name,
       unit: units.name,
       equipment: equipmentName(equipment),
     }),
-    [cities, nations, generals, units, equipment],
+    [cities, nations, generals, units, equipment, recruits],
   );
+  // 서버 칸이 실은 대상 이름. 칸을 당기거나 밀어도 같은 명령·인자면 같은 이름을 쓴다.
+  const slotTargets = useMemo(() => {
+    const byKey = new Map<string, SlotTargets>();
+    for (const slot of server.data?.slots ?? []) if (slot.targets) byKey.set(turnKey(toTurn(slot)), slot.targets);
+    return byKey;
+  }, [server.data]);
 
   // 같은 명령·인자는 사전 검사를 한 번만 묻는다. 휴식은 묻지 않는다.
   // 읽기 전용 칸은 내 상태로 검사할 수 없으므로 묻지 않는다.
@@ -661,7 +700,7 @@ function Editor<S extends DisplaySlot>({
               const changed = !!draft && !pending && !!serverTurns && turnKey(serverTurns[i]!) !== turnKey(turn);
               const check = turn.commandKey === 'rest' ? undefined : precheckByKey.get(turnKey(turn));
               const isEmpty = !turn.explicit;
-              const args = describeArgs(turn.args, names);
+              const args = describeArgs(turn.args, withTargets(names, slotTargets.get(turnKey(turn))));
               const time = times30[i]!;
               return (
                 <tr
@@ -862,7 +901,7 @@ function ReadOnlySlots({
   names,
 }: {
   label: string;
-  slots: Array<{ commandKey: string; args?: unknown; name: string }>;
+  slots: DisplaySlot[];
   times: SlotTime[];
   names: ArgNames;
 }) {
@@ -880,7 +919,7 @@ function ReadOnlySlots({
         </thead>
         <tbody>
           {slots.map((slot, i) => {
-            const args = describeArgs(toTurn(slot).args, names);
+            const args = describeArgs(toTurn(slot).args, withTargets(names, slot.targets));
             const time = times[i];
             return (
               <tr key={i} className={styles.row} data-slot={i + 1}>

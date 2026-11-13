@@ -4,7 +4,9 @@ import { retryUnlessClientError } from '../game/errors';
 import { displayName } from '../game/names';
 import { useWorldId } from '../game/queries';
 import { useTRPC } from '../trpc';
-import type { GeneralChoice } from '../turns/CommandPicker';
+import type { AppRouter } from '@opensamguk/server/router';
+import type { inferRouterOutputs } from '@trpc/server';
+import type { CommandInfo, GeneralChoice } from '../turns/CommandPicker';
 import { formatTime } from '../turns/schedule';
 import type { Check, TurnList, TurnSourceFactory } from '../turns/source';
 import { TurnEditor } from '../turns/TurnEditor';
@@ -32,6 +34,7 @@ export const nationDraftKey = (userId: string, worldId: string, office: Office) 
 type TabsData = { actorId: number; tabs: NationTurnTab[] };
 // 국가 칸은 임시 계약(PersonnelApi)의 칸 모양 그대로 캐시와 저장 결과에 쓴다. 개인 칸 모양과 섞지 않는다.
 type NationSlot = NationTurnTab['slots'][number];
+type NationCommandRow = inferRouterOutputs<AppRouter>['nationCommands']['list'][number];
 
 // 국가 직책 12칸 연결. 저장은 읽은 탭의 office와 revision을 그대로 돌려보낸다 (T2-05 국가 예턴 절).
 export function nationSource(
@@ -83,8 +86,9 @@ export function nationSource(
       commands: {
         queryKey: personnelKeys.nationCommands(worldId),
         queryFn: () => api.nationCommands({ worldId }),
-        select: (data) =>
-          (data as Array<{ key: string; name: string; argsSchema: unknown }>).map((c) => ({
+        // 서버가 실은 실행 가능 여부·사유(available·reason, INT-26)를 그대로 넘겨 명령 카드가 흐림과 사유를 그린다.
+        select: (data): CommandInfo[] =>
+          (data as NationCommandRow[]).map((c) => ({
             ...c,
             category: 'nation',
           })),
