@@ -243,6 +243,7 @@ export function publicTimelapseCityInfo(city: Prisma.CityGetPayload<{ select: ty
 }
 
 const publicMapData = z.object({
+  capitalAndSupply: z.unknown().optional(),
   operationalMap: publicGeographySchema.optional(),
   cities: z.array(
     z.object({
@@ -258,13 +259,40 @@ const publicMapData = z.object({
       y: z.number(),
       nationId: z.number().int().nullable(),
       links: z.array(z.string()),
+      supplied: z.unknown().optional(),
     }),
   ),
-  nations: z.array(z.object({ id: z.number().int(), name: z.string(), color: z.string() })),
+  nations: z.array(
+    z.object({
+      id: z.number().int(),
+      name: z.string(),
+      color: z.string(),
+      capitalCityKey: z.unknown().optional(),
+    }),
+  ),
 });
 
 // 오염되거나 형식이 깨진 사본은 현재 상태로 대체하지 않는다.
 export function publicMapInfo(data: Prisma.JsonValue) {
   const result = publicMapData.safeParse(data);
-  return result.success ? result.data : null;
+  if (!result.success) return null;
+  const { capitalAndSupply, cities, nations, ...geography } = result.data;
+  const cityOwners = new Map(cities.map((city) => [city.key, city.nationId]));
+  return {
+    ...geography,
+    cities: cities.map(({ supplied, ...city }) =>
+      capitalAndSupply === true && typeof supplied === 'boolean' && city.nationId !== null
+        ? { ...city, supplied }
+        : city,
+    ),
+    nations: nations.map(({ capitalCityKey, ...nation }) =>
+      capitalAndSupply === true &&
+      (capitalCityKey === null ||
+        (typeof capitalCityKey === 'number' &&
+          Number.isSafeInteger(capitalCityKey) &&
+          cityOwners.get(String(capitalCityKey)) === nation.id))
+        ? { ...nation, capitalCityKey }
+        : nation,
+    ),
+  };
 }
