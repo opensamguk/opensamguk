@@ -2,6 +2,8 @@ import {
   financeRates,
   storedFinanceRates,
   NATION_FINANCE_FEATURE,
+  rankedPayroll,
+  RANKED_PAYROLL_FEATURE,
   estimateTaxIncome,
   nationPhilosophy,
   nowTick,
@@ -13,7 +15,7 @@ import { worldClock } from '../queries';
 
 type TaxCity = Parameters<typeof estimateTaxIncome>[0][number];
 type City = TaxCity & { populationMax: number };
-type Member = { activeFromYear: number; removedAt: number | null };
+type Member = { id: number; dedication: number; activeFromYear: number; removedAt: number | null };
 type World = Parameters<typeof worldClock>[0] & {
   startYear: number;
   ruleFeatures: readonly string[];
@@ -73,12 +75,22 @@ export function projectNationFinance(
     const multiplier = nationPhilosophy(world, nation?.philosophy)?.[resource];
     const rates = effectiveFinanceRates(world, nation);
     const reserves = world.ruleFeatures.includes('city-resources-v1') ? 0 : (nation?.[resource] ?? 0);
+    const totals = estimateTaxIncome(settlements, members.length, resource, bonuses, multiplier, rates, reserves);
+    const ranked = world.ruleFeatures.includes(RANKED_PAYROLL_FEATURE);
+    const payments = ranked
+      ? rankedPayroll(members, rates.salaryRate, totals.gross + reserves)
+      : members.map(() => totals.perGeneral);
+    const payroll = payments.reduce((sum, amount) => sum + amount, 0);
     return {
       totals: {
         year,
         month,
-        ...estimateTaxIncome(settlements, members.length, resource, bonuses, multiplier, rates, reserves),
+        gross: totals.gross,
+        payroll,
+        net: totals.gross - payroll,
+        perGeneral: ranked && members.length ? Math.floor(payroll / members.length) : totals.perGeneral,
       },
+      salaries: new Map(members.map(({ id }, index) => [id, payments[index]!])),
       cityGross: new Map(
         settlements.map((city) => [
           city.cityKey,
@@ -94,7 +106,9 @@ export function projectNationFinance(
       gold: gold.totals,
       rice: rice.totals,
       destination: world.ruleFeatures.includes('city-resources-v1') ? ('city' as const) : ('nation' as const),
+      ...(world.ruleFeatures.includes(RANKED_PAYROLL_FEATURE) ? { rankedPayroll: true as const } : {}),
     },
+    salaries: { gold: gold.salaries, rice: rice.salaries },
     cityIncome: new Map(
       settlements.map((city) => [
         city.cityKey,

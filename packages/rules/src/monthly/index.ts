@@ -9,7 +9,7 @@ import { readCampaignState } from '../campaign/state';
 import { residentOfficeBonuses, type OfficeBonuses } from '../personnel/residentOffice';
 import { applyCityResourceIncome } from '../cityResourceIncome';
 import { CITY_SEASONAL_EVENTS_FEATURE, settleCitySeasonalEvents } from './citySeasonalEvents';
-import { financeRates } from '../personnel/financeRates';
+import { financeRates, rankedPayroll, RANKED_PAYROLL_FEATURE } from '../personnel/financeRates';
 
 export const MONTHLY_STAGES = ['income', 'population', 'supply', 'diplomacy', 'yearbook'] as const;
 export interface NationSummary {
@@ -79,17 +79,25 @@ export function settleIncome(
       (general) => general.nationId === nation.id && general.activeFromYear <= date.year,
     );
     const multiplier = nationPhilosophy(next, nation.philosophy)?.[resource];
-    const { net, perGeneral } = estimateTaxIncome(
+    const reserves = next.ruleFeatures?.includes('city-resources-v1') ? 0 : nation[resource];
+    const rates = financeRates(nation.financeRates);
+    const { gross, net, perGeneral } = estimateTaxIncome(
       cities,
       members.length,
       resource,
       bonuses,
       multiplier,
-      financeRates(nation.financeRates),
-      next.ruleFeatures?.includes('city-resources-v1') ? 0 : nation[resource],
+      rates,
+      reserves,
     );
-    next.nations[nation.id]![resource] += net;
-    for (const general of members) next.generals[general.id]![resource] += perGeneral;
+    if (next.ruleFeatures?.includes(RANKED_PAYROLL_FEATURE)) {
+      const payments = rankedPayroll(members, rates.salaryRate, gross + reserves);
+      next.nations[nation.id]![resource] += gross - payments.reduce((sum, payment) => sum + payment, 0);
+      members.forEach((general, index) => (next.generals[general.id]![resource] += payments[index]!));
+    } else {
+      next.nations[nation.id]![resource] += net;
+      for (const general of members) next.generals[general.id]![resource] += perGeneral;
+    }
   }
   return next;
 }

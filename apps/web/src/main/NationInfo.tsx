@@ -494,7 +494,11 @@ export function NationFinanceGrid({ nation }: { nation: NationSummary }) {
             title: '세입 가운데 소속 장수에게 나눠 주는 몫',
             wide: true,
           },
-          { label: '1인 봉급', value: `금 ${n(gold.perGeneral)} · 쌀 ${n(rice.perGeneral)}`, wide: true },
+          {
+            label: estimate.rankedPayroll ? '평균 봉급' : '1인 봉급',
+            value: `금 ${n(gold.perGeneral)} · 쌀 ${n(rice.perGeneral)}`,
+            wide: true,
+          },
           {
             label: toCity ? '순수입(도시 창고)' : '순수입(국고)',
             value: `금 ${signed(gold.net)} · 쌀 ${signed(rice.net)}`,

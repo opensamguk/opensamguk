@@ -55,7 +55,7 @@ export const homeRouter = router({
                   orderBy: { cityKey: 'asc' },
                   select: { cityKey: true, commerce: true, agriculture: true, population: true, populationMax: true },
                 },
-                generals: { select: { activeFromYear: true, removedAt: true } },
+                generals: { select: { id: true, dedication: true, activeFromYear: true, removedAt: true } },
               },
             });
       const state =
@@ -204,14 +204,8 @@ export const homeRouter = router({
           ...(finance
             ? {
                 salaryEstimate: {
-                  gold:
-                    general.activeFromYear <= finance.financeEstimate.gold.year
-                      ? finance.financeEstimate.gold.perGeneral
-                      : 0,
-                  rice:
-                    general.activeFromYear <= finance.financeEstimate.rice.year
-                      ? finance.financeEstimate.rice.perGeneral
-                      : 0,
+                  gold: finance.salaries.gold.get(general.id) ?? 0,
+                  rice: finance.salaries.rice.get(general.id) ?? 0,
                 },
               }
             : {}),
