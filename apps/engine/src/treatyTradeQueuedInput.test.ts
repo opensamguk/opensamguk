@@ -30,7 +30,7 @@ async function fixture(respond = false) {
     status: 'RUNNING',
     monthlyTick: 0,
     actionSequence: 19,
-    ruleFeatures: [],
+    ruleFeatures: [] as string[],
   } as Prisma.WorldGetPayload<Record<string, never>>;
   const event = {
     id: 1n,
