@@ -48,6 +48,10 @@
 .ageHigh {
   color: var(--color-danger);
 }
+.levelProgress {
+  width: 100%;
+  accent-color: var(--color-accent);
+}
 
 @media (max-width: 767px) {
   .place,

@@ -10,6 +10,7 @@ import {
   type UnitSetResource,
 } from '@opensamguk/rules';
 import type { IntelDisclosurePolicy } from './intelPolicy';
+import { generalProgress } from './game/generalProgress';
 import { z } from 'zod';
 
 type General = Omit<
@@ -143,6 +144,7 @@ export function ownGeneralInfo(general: General) {
     atmos: general.atmos,
     experience: general.experience,
     dedication: general.dedication,
+    progression: generalProgress(general.experience, general.dedication),
     age: general.age,
     injury: general.injury,
     nextTurnTick: general.nextTurnTick,
