@@ -61,3 +61,13 @@
   margin: var(--space-2) 0 0;
   font-size: var(--text-sm);
 }
+
+/* 좁은 화면에서는 링크 줄도 손가락으로 누를 크기(44px)로 둔다 (AC-M3-08). */
+@media (max-width: 767px) {
+  .links a {
+    display: inline-flex;
+    align-items: center;
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
