@@ -114,6 +114,21 @@ describe('T2-22 / AC-M2-19 엔진 순위 집계', () => {
     await new TurnLoop(db, lease).advanceTo(100);
     expect(await actor()).toMatchObject({ battleWins: 2, captures: 1 });
     expect(await engagements()).toEqual(recordedBattles);
+    await new TurnLoop(db, lease).advanceTo(10_000);
+    const snapshot = await db.rankingSnapshot.findUniqueOrThrow({ where: { worldId } });
+    expect(snapshot.generals).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 1,
+          battleStats: {
+            engagements: 2,
+            winRate: 1,
+            kills: Number(recordedBattles[0]!.kills),
+            killRate: Number(recordedBattles[0]!.kills) / Math.max(1, Number(recordedBattles[0]!.casualties)),
+          },
+        }),
+      ]),
+    );
     const state = await db.$transaction((tx) => tx.general.findMany({ where: { worldId } }));
     expect(state.filter((g) => g.id !== 1).every((g) => g.battleWins === 0 && g.captures === 0)).toBe(true);
     const recorded = { stratagemSucceeded: true } as const;

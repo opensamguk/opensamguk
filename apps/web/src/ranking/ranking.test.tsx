@@ -28,6 +28,7 @@ const general = (rank: number, generalId: number, name: string, nation = wei): R
   captures: 4,
   merit: 10 - rank,
   stratagemSuccesses: 0,
+  battleStats: null,
   value: 1000 - rank,
 });
 const at = { tick: 30000, year: 193, month: 4 };
@@ -99,7 +100,11 @@ describe('장수 순위 표', () => {
     expect(headers.slice(-2)).toEqual(['승리', '점령']);
     const cells = within(table).getAllByRole('row')[1]!.children;
     expect(cells[1]?.textContent).toBe('조조');
-    expect([cells[7]?.textContent, cells[8]?.textContent]).toEqual(['5', '4']);
+    expect(
+      Array.from(cells)
+        .slice(-2)
+        .map((cell) => cell.textContent),
+    ).toEqual(['5', '4']);
   });
 
   it('재야는 소속이 재야로 나온다', () => {
