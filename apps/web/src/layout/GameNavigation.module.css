@@ -88,6 +88,10 @@
   .rail {
     display: none;
   }
+  /* 좁은 메인은 메인 하단 막대가 대신한다 (INT-25). 아래 막대가 두 줄로 겹치지 않게 이 막대를 감춘다. */
+  .navigation[data-main-page='true'] {
+    display: none;
+  }
   .mobile {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));

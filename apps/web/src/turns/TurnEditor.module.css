@@ -379,6 +379,11 @@
     --row-height: 44px;
   }
 
+  /* 44px 칸 12개가 머리글 줄과 함께 한 번에 보이게 한다 (INT-25 375px 첫 예턴 화면 12칸). 칸 사이 선 1px과 두 줄로 접힐 수 있는 머리글 줄 몫을 더한다. */
+  .tableWrap {
+    max-height: calc((var(--row-height) + 1px) * 12 + 4em);
+  }
+
   .primary,
   .secondary,
   .chip,
