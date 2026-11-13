@@ -53,6 +53,7 @@ model World {
   generals             General[]
   diplomacies          Diplomacy[]
   diplomaticDocuments  DiplomaticDocument[]
+  diplomaticDelegates  DiplomaticDelegate[]
   engineLease          EngineLease?
   engineHeartbeat      EngineHeartbeat?
   monthlyTick          Int                  @default(0)
@@ -357,6 +358,7 @@ enum DiplomacyState {
 
 model Nation {
   diplomaticAidUntilMonth Int?
+  diplomaticDelegates DiplomaticDelegate[]
   worldId         String
   id              Int
   name            String
@@ -427,6 +429,7 @@ model City {
 
 model General {
   sex               String?
+  diplomaticDelegate DiplomaticDelegate?
   worldId           String
   id                Int
   userId            String?
@@ -623,6 +626,24 @@ enum DiplomaticDocumentStatus {
   ACTIVE
   CANCELLED
   REPLACED
+}
+
+enum DiplomaticDelegateRole {
+  AMBASSADOR
+  ADVISER
+}
+
+model DiplomaticDelegate {
+  worldId   String
+  nationId  Int
+  generalId Int
+  role      DiplomaticDelegateRole
+  world     World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  nation    Nation @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction, map: "DiplomaticDelegate_nation_fkey")
+  general   General @relation(fields: [worldId, generalId], references: [worldId, id], onDelete: Cascade, onUpdate: NoAction, map: "DiplomaticDelegate_general_fkey")
+
+  @@id([worldId, generalId])
+  @@index([worldId, nationId, role])
 }
 
 model DiplomaticDocument {
