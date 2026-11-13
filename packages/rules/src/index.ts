@@ -137,6 +137,7 @@ export {
 } from './personnel/permissions';
 export {
   PERSONNEL_INPUTS,
+  appointOfficer,
   applyPersonnelInput,
   validatePersonnelRecord,
   replayPersonnelInput,
@@ -255,6 +256,7 @@ export * from './lineage/preview';
 export * from './lineage/visibility';
 export * from './lineage/history';
 export * from './personnel/assignmentRows';
+export * from './personnel/residentOffice';
 export * from './lineage/control';
 export { reconcileLineage } from './lineage/reconcile';
 export * from './lineage/monthly';

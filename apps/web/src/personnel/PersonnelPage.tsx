@@ -9,11 +9,13 @@ import { EmptyState, ErrorState, LoadingState } from '../ui/States';
 import { Tag } from '../ui/Tag';
 import { personnelKeys, usePersonnelApi, type PersonnelBoard, type PersonnelMember } from './contract';
 import { Notices } from './OfferBox';
+import { cityOfficeHolder, LocalOffices, localOfficeTarget, MemberResidence } from './OfficeResidence';
 import styles from './Personnel.module.css';
 import { usePersonnelAction } from './usePersonnelAction';
 
 const KINDS = ['personnel.appoint', 'personnel.dismiss'] as const;
 const ACTOR_CHANGED = '장수가 바뀌었습니다. 요청을 보내지 않았습니다. 화면을 다시 확인하세요.';
+const OFFICE_CHANGED = '담당 관직이 바뀌었습니다. 새 담당자를 확인하세요.';
 
 // 국가 메뉴의 두 화면을 잇는 띠.
 export function NationNav({ worldId, current }: { worldId: string; current: 'personnel' | 'turns' }) {
@@ -59,10 +61,13 @@ export function PersonnelPage() {
   // 표는 장수 id로 key해 장수가 바뀌면 고르던 임명 후보를 버린다.
   const queryClient = useQueryClient();
   const actorId = board.data?.actorId;
-  const sameActor = async () => {
+  const sameActor = async (office?: { cityKey: number; officerLevel: number; holderId: number | undefined }) => {
     const fresh = await api.officers({ worldId });
     queryClient.setQueryData(personnelKeys.officers(worldId), fresh);
-    return fresh.actorId === actorId ? null : ACTOR_CHANGED;
+    if (fresh.actorId !== actorId) return ACTOR_CHANGED;
+    if (office && cityOfficeHolder(fresh.members, office.cityKey, office.officerLevel)?.generalId !== office.holderId)
+      return OFFICE_CHANGED;
+    return null;
   };
 
   return (
@@ -78,15 +83,32 @@ export function PersonnelPage() {
           board={board.data}
           busyTarget={action.busy ? (action.busyTarget ?? '') : null}
           busyLabel={action.busyLabel}
-          onAppoint={(generalId, officerLevel) =>
+          onAppoint={(generalId, officerLevel, cityKey) => {
+            const office =
+              cityKey === undefined
+                ? undefined
+                : {
+                    cityKey,
+                    officerLevel,
+                    holderId: cityOfficeHolder(members ?? [], cityKey, officerLevel)?.generalId,
+                  };
             void action.submit(
-              { kind: 'personnel.appoint', generalId, officerLevel },
-              `level-${officerLevel}`,
-              sameActor,
+              {
+                kind: 'personnel.appoint',
+                generalId,
+                officerLevel,
+                ...(office ? { cityKey: office.cityKey, expectedHolderId: office.holderId ?? null } : {}),
+              },
+              cityKey === undefined ? `level-${officerLevel}` : localOfficeTarget(cityKey, officerLevel),
+              () => sameActor(office),
+            );
+          }}
+          onDismiss={(generalId, officerLevel, cityKey) =>
+            void action.submit(
+              { kind: 'personnel.dismiss', generalId },
+              cityKey === undefined ? `level-${officerLevel}` : localOfficeTarget(cityKey, officerLevel),
+              () => sameActor(cityKey === undefined ? undefined : { cityKey, officerLevel, holderId: generalId }),
             )
-          }
-          onDismiss={(generalId, officerLevel) =>
-            void action.submit({ kind: 'personnel.dismiss', generalId }, `level-${officerLevel}`, sameActor)
           }
         />
       ) : board.isError ? (
@@ -103,8 +125,8 @@ interface BoardProps {
   // 처리 중인 접수가 있으면 그 대상(level-<직책>). 다시 접속해 되살린 접수는 빈 문자열이다. 없으면 null.
   busyTarget: string | null;
   busyLabel?: string;
-  onAppoint: (generalId: number, officerLevel: number) => void;
-  onDismiss: (generalId: number, officerLevel: number) => void;
+  onAppoint: (generalId: number, officerLevel: number, cityKey?: number) => void;
+  onDismiss: (generalId: number, officerLevel: number, cityKey?: number) => void;
 }
 
 export function PersonnelBoardView({ board, busyTarget, busyLabel = '처리 중', onAppoint, onDismiss }: BoardProps) {
@@ -147,6 +169,16 @@ export function PersonnelBoardView({ board, busyTarget, busyLabel = '처리 중'
           </tbody>
         </table>
       </section>
+      {board.officeEffectsEnabled ? (
+        <LocalOffices
+          board={board}
+          candidates={candidates}
+          busyTarget={busyTarget}
+          busyLabel={busyLabel}
+          onAppoint={onAppoint}
+          onDismiss={onDismiss}
+        />
+      ) : null}
       <section className={styles.section} aria-labelledby="members-title">
         <h2 id="members-title">소속 장수</h2>
         {board.members.length === 0 ? (
@@ -167,7 +199,17 @@ export function PersonnelBoardView({ board, busyTarget, busyLabel = '처리 중'
                 ),
               },
               { key: 'title', label: '직책', sortValue: (m) => m.officerLevel, render: (m) => m.title },
-              { key: 'city', label: '도시', sortValue: (m) => m.city.name, render: (m) => m.city.name },
+              {
+                key: 'city',
+                label: '도시',
+                sortValue: (m) => m.city.name,
+                render: (m) =>
+                  board.officeEffectsEnabled ? (
+                    <MemberResidence member={m} cities={board.officeCities ?? []} />
+                  ) : (
+                    m.city.name
+                  ),
+              },
               {
                 key: 'dedication',
                 label: '공헌',

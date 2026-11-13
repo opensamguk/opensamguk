@@ -59,6 +59,7 @@ model World {
   personnelFormat      Int?
   replayFormat         Int                  @default(1)
   ruleFeatures         String[]             @default([])
+  officeEffects        Json?
   replayOrigin         Json?
   inputEvents          InputEvent[]
   nationHistory        NationHistory[]
@@ -174,6 +175,7 @@ model WorldCreateRequest {
   version        Int               @default(1)
   intentHash     String
   intent         Json
+  officeEffects  Json?
   effectiveSeed  String
   plannedWorldId String            @unique
   resolution     Json?
@@ -397,6 +399,7 @@ model City {
   nation           Nation?     @relation("OwnedCities", fields: [worldId, nationId], references: [worldId, id], onDelete: NoAction)
   capitalOf        Nation[]    @relation("Capital")
   generals         General[]
+  appointedOfficers General[] @relation("CityOffice")
   operationTargets Operation[]
 
   @@id([worldId, cityKey])
@@ -421,6 +424,7 @@ model General {
   politics          Int?
   charm             Int?
   officerLevel      Int
+  officerCityKey    Int?
   birthYear         Int
   deathYear         Int
   activeFromYear    Int
@@ -455,6 +459,7 @@ model General {
   world             World             @relation(fields: [worldId], references: [id], onDelete: Cascade)
   nation            Nation?           @relation(fields: [worldId, nationId], references: [worldId, id], onDelete: NoAction)
   city              City              @relation(fields: [worldId, cityKey], references: [worldId, cityKey], onDelete: NoAction)
+  officerCity       City?             @relation("CityOffice", fields: [worldId, officerCityKey], references: [worldId, cityKey], onDelete: NoAction, onUpdate: NoAction, map: "General_officerCityKey_fkey")
 
   @@id([worldId, id])
   @@unique([worldId, userId])

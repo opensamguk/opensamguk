@@ -11,6 +11,7 @@ type Event = Prisma.InputEventGetPayload<Record<string, never>>;
 function fixture(personnelFormat: 1 | null, policyFromSequence: number | null = null) {
   const world: World = {
     runtimeOptions: null,
+    officeEffects: null,
     id: 'world',
     name: '입력 시험',
     operationalMap: null,

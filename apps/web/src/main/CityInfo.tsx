@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router';
 import { retryUnlessClientError } from '../game/errors';
 import { QueryError } from '../game/QueryState';
 import { isDetailedCity, isDetailedGeneral, type MapNation, type GeneralView } from '../game/types';
+import { CityOfficeResidences } from '../personnel/OfficeResidence';
 import { useTRPC } from '../trpc';
 import { DataTable, type Column } from '../ui/DataTable';
 import { NationBadge } from '../ui/NationBadge';
@@ -92,6 +93,9 @@ export function CityInfo({
         </p>
       )}
       <StatTable rows={rows} />
+      {data.nationId !== null && data.kind !== 'PASS' && data.officeEffectsEnabled && data.officers ? (
+        <CityOfficeResidences officers={data.officers} />
+      ) : null}
       <CityResourcesPanel worldId={worldId} cityKey={cityKey} />
       {logisticsEnabled ? <LogisticsPanel worldId={worldId} cityKey={cityKey} /> : null}
       {data.links.length > 0 ? (

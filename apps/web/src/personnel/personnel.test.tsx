@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { QueryClient } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { TRPCClientError } from '@trpc/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { toSaveSlots, toTurn } from '../turns/draft';
@@ -16,6 +16,7 @@ import type {
 } from './contract';
 import { NATION_SLOT_COUNT, nationDraftKey, nationSource } from './NationTurnsPage';
 import { OfferCard } from './OfferBox';
+import { CityOfficeResidences } from './OfficeResidence';
 import { PersonnelBoardView } from './PersonnelPage';
 import { euro, iGa, markAnnounced, noticeFor, readAnnounced, recover, sendAction } from './request';
 
@@ -366,6 +367,78 @@ describe('인사부', () => {
     expect(onDismiss.mock.calls).toEqual([[2, 11]]);
     expect(screen.getAllByText('사람')).toHaveLength(2);
     expect(screen.getByText('NPC')).toBeTruthy();
+  });
+
+  const officeBoard: PersonnelBoard = {
+    ...board,
+    officeEffectsEnabled: true,
+    officeCities: [{ cityKey: 1, name: '신야' }],
+    members: [
+      ...board.members.map((member) => ({ ...member, resident: member.generalId === 2 })),
+      {
+        ...board.members[2]!,
+        generalId: 4,
+        name: '장비',
+        officerLevel: 4,
+        title: '태수',
+        officerCityKey: 1,
+        resident: false,
+      },
+    ],
+  };
+
+  it('담당 도시를 골라 지방 장수를 교체하고 조회의 주재 상태를 보인다', () => {
+    const onAppoint = vi.fn();
+    const onDismiss = vi.fn();
+    render(<PersonnelBoardView board={officeBoard} busyTarget={null} onAppoint={onAppoint} onDismiss={onDismiss} />);
+    const panel = within(screen.getByRole('region', { name: '지방 관직' }));
+    expect(panel.queryByRole('button', { name: '교체 임명' })).toBeNull();
+    fireEvent.change(panel.getByLabelText('담당 도시'), { target: { value: '1' } });
+    expect(panel.getByText('장비 · 부재')).toBeTruthy();
+    expect(screen.getByText('현재 신야 · 주재')).toBeTruthy();
+    expect(screen.getByText('담당 신야 · 부재')).toBeTruthy();
+    const slot = within(panel.getByRole('group', { name: '태수' }));
+    const select = slot.getByLabelText('임명할 장수');
+    expect([...select.querySelectorAll('option')].map((option) => option.textContent)).toEqual(['고르세요', '조운']);
+    fireEvent.change(select, { target: { value: '3' } });
+    fireEvent.click(panel.getByRole('button', { name: '교체 임명' }));
+    expect(onAppoint).not.toHaveBeenCalled();
+    expect(panel.getByText('기존 담당자 장비 해임 후 신야 태수에 조운 임명')).toBeTruthy();
+    fireEvent.click(panel.getByRole('button', { name: '교체 확인' }));
+    expect(onAppoint).toHaveBeenCalledExactlyOnceWith(3, 4, 1);
+    fireEvent.click(panel.getByRole('button', { name: '태수 해임' }));
+    expect(onDismiss).toHaveBeenCalledExactlyOnceWith(4, 4, 1);
+  });
+
+  it('일반 장수도 담당지와 주재를 읽을 수 있고 임명 입력은 군주에게만 열린다', () => {
+    render(
+      <PersonnelBoardView
+        board={{ ...officeBoard, appoint: { ok: false, reason: '군주만 임명할 수 있습니다' } }}
+        busyTarget={null}
+        onAppoint={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('담당 신야 · 부재')).toBeTruthy();
+    const panel = within(screen.getByRole('region', { name: '지방 관직' }));
+    expect(panel.queryByRole('combobox')).toBeNull();
+    fireEvent.click(panel.getByRole('button', { name: /지방 관직 임명/ }));
+    expect(panel.getByRole('note').textContent).toBe('군주만 임명할 수 있습니다');
+  });
+
+  it('도시에서는 공개 관직과 주재만 표시하고 빈 지방 관직을 드러낸다', () => {
+    render(
+      <CityOfficeResidences
+        officers={[
+          { generalId: 1, name: '장비', officerLevel: 4, resident: false },
+          { generalId: 2, name: '제갈량', officerLevel: 11, resident: true },
+        ]}
+      />,
+    );
+    const panel = within(screen.getByRole('region', { name: '관직 주재' }));
+    expect(panel.getByText('태수 장비 · 부재')).toBeTruthy();
+    expect(panel.getByText('군사 없음')).toBeTruthy();
+    expect(panel.getByText('참모 제갈량 · 주재')).toBeTruthy();
   });
 
   it('군주가 아니면 입력을 열지 않고 서버가 준 이유를 보인다', () => {

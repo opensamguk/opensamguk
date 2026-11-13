@@ -76,7 +76,22 @@ export async function persistCommandState(
     if (JSON.stringify(nation) !== JSON.stringify(before.nations[nation.id]))
       await tx.nation.update({ where: { worldId_id: { worldId, id: nation.id } }, data: nation });
   }
-  for (const general of Object.values(state.generals)) {
+  const generals = Object.values(state.generals);
+  if (before.officeEffects) {
+    for (const general of generals) {
+      const old = before.generals[general.id];
+      if (
+        old?.officerCityKey == null ||
+        (general.officerCityKey === old.officerCityKey && general.officerLevel === old.officerLevel)
+      )
+        continue;
+      await tx.general.update({
+        where: { worldId_id: { worldId, id: general.id } },
+        data: { officerCityKey: null },
+      });
+    }
+  }
+  for (const general of generals) {
     if (JSON.stringify(general) !== JSON.stringify(before.generals[general.id])) {
       // 장수 턴의 nextTurnTick·revision은 TurnLoop의 조건부 갱신만 바꾼다.
       const { nextTurnTick, ...data } = general;

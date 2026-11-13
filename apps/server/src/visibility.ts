@@ -23,6 +23,7 @@ type General = Omit<
   | 'charm'
   | 'sex'
   | 'removedAt'
+  | 'officerCityKey'
 > & { politics?: number | null; charm?: number | null };
 type City = Omit<Prisma.CityGetPayload<true>, 'kind'> & { kind?: string | null };
 type Nation = Omit<

@@ -13,6 +13,8 @@ export interface PersonnelBoard {
   // 이 조회를 받은 계정의 지금 장수. 계승으로 바뀌면 화면이 예전 장수의 입력으로 보내지 않는다 (T4-95).
   actorId: number;
   appoint: Allowed;
+  officeEffectsEnabled?: boolean;
+  officeCities?: CityRef[];
   levels: Array<{ officerLevel: number; title: string; holderId: number | null }>;
   members: PersonnelMember[];
 }
@@ -25,6 +27,8 @@ export interface PersonnelMember {
   isHuman: boolean;
   city: CityRef;
   dedication: number;
+  officerCityKey?: number | null;
+  resident?: boolean;
 }
 
 export interface Office {
@@ -77,7 +81,13 @@ type W = { worldId: string };
 
 // 즉시 행동 셋의 요청. requestId는 화면이 만들고 재전송 때 그대로 쓴다.
 export type ActionInput =
-  | { kind: 'personnel.appoint'; generalId: number; officerLevel: number }
+  | {
+      kind: 'personnel.appoint';
+      generalId: number;
+      officerLevel: number;
+      cityKey?: number;
+      expectedHolderId?: number | null;
+    }
   | { kind: 'personnel.dismiss'; generalId: number }
   | { kind: 'offer.respond'; offerId: string; accept: boolean };
 

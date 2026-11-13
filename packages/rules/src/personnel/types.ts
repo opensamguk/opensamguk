@@ -35,7 +35,7 @@ export type PersonnelFailure = {
   message: string;
 };
 export type PersonnelResult<T> = (PersonnelChange & { ok: true; result: T }) | PersonnelFailure;
-export type AppointResult = { generalId: number; officerLevel: number; title: string };
+export type AppointResult = { generalId: number; officerLevel: number; title: string; officerCityKey?: number };
 export type RespondResult = {
   offerStatus: 'ACCEPTED' | 'REJECTED';
   city: { cityKey: number; name: string };

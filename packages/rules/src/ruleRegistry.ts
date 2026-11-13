@@ -39,6 +39,7 @@ import { ADMIN_GAME_KINDS } from './admin/game';
 import { applyAdminGameRecord } from './admin/apply';
 import { ADMIN_SETTING_KINDS, applyAdminSettingRecord } from './admin/settings';
 import type { UnitSetResource } from './world/resources';
+import { OFFICE_EFFECTS_FEATURE, officeEffectsSchema } from './personnel/residentOffice';
 import { reputationFeature } from './review/feature';
 import { cityScaleFeature } from './cityScale/feature';
 import { checkCityScaleInitial } from './cityScale/state';
@@ -121,6 +122,17 @@ export const ruleRegistry: RuleRegistry = {
     nationResearchFeature,
     relationsFeature,
     personnelFeature,
+    {
+      key: OFFICE_EFFECTS_FEATURE,
+      requires: ['personnel'],
+      conflicts: [],
+      checkOrigin({ data }) {
+        officeEffectsSchema.parse(data);
+      },
+      initReplayState(replay, { data }) {
+        return { ...replay, state: { ...replay.state, officeEffects: officeEffectsSchema.parse(data) } };
+      },
+    },
     policyFeature,
     treatyFeature,
     treatyBreakFeature,
@@ -274,6 +286,8 @@ export function checkReplayOrigin(
     (origin.version !== 3 || origin.initial.recruitmentLocation !== 'city')
   )
     throw new Error('재생 생성 기록의 모집 위치를 확인하세요.');
+  if (origin.initial.generals.some((general) => Object.hasOwn(general, 'officerCityKey')))
+    throw new Error('초기 장수에는 도시 관직을 배정할 수 없습니다.');
   checkStatProfile(origin.initial);
   checkInitialNpcStatLimits(origin.initial, origin.version === 3 ? 'current' : 'legacy');
   checkCityScaleInitial(origin.initial);

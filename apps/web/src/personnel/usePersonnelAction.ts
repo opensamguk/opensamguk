@@ -95,6 +95,7 @@ export function usePersonnelAction({ worldId, kinds, nameOf }: Options) {
     ])
       void queryClient.invalidateQueries({ queryKey });
     void queryClient.invalidateQueries({ queryKey: trpc.home.get.queryKey({ worldId }) });
+    void queryClient.invalidateQueries({ queryKey: trpc.city.get.queryKey({ worldId }) });
   }, [queryClient, trpc, worldId]);
   const finish = useCallback(
     (requestId: string, notice: Notice | null) => {
