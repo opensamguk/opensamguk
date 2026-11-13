@@ -9,16 +9,24 @@ export const NATION_RESTRICTIONS_KIND = 'nation.setRestrictions';
 export const NATION_RESTRICTIONS_MIN_OFFICE = 5;
 const MAX_WAR_CHANGES = 10;
 const WAR_CHANGES_PER_MONTH = 2;
-export const nationRestrictionsInput = z.strictObject({
-  nationId: z.number().int().positive().max(2_147_483_647),
-  setting: z.enum(['recruitment', 'war']),
-  blocked: z.boolean(),
-});
+export const nationRestrictionsInput = z
+  .strictObject({
+    nationId: z.number().int().positive().max(2_147_483_647),
+    setting: z.enum(['recruitment', 'war', 'confidential']),
+    blocked: z.boolean().optional(),
+    confidentialYears: z.number().int().min(1).max(99).optional(),
+  })
+  .refine(({ setting, blocked, confidentialYears }) =>
+    setting === 'confidential'
+      ? confidentialYears !== undefined && blocked === undefined
+      : blocked !== undefined && confidentialYears === undefined,
+  );
 const settingsSchema = z.strictObject({
   recruitmentBlocked: z.boolean(),
   warBlocked: z.boolean(),
   warChanges: z.number().int().min(0).max(MAX_WAR_CHANGES),
   warMonth: z.number().int().min(0),
+  confidentialYears: z.number().int().min(1).max(99).optional(),
 });
 export type NationRestrictions = z.infer<typeof settingsSchema>;
 const defaults: NationRestrictions = {
@@ -56,11 +64,12 @@ export function changeNationRestrictions(
   current: NationRestrictions,
   input: z.infer<typeof nationRestrictionsInput>,
 ): NationRestrictions | null {
-  if (input.setting === 'recruitment') return { ...current, recruitmentBlocked: input.blocked };
+  if (input.setting === 'confidential') return { ...current, confidentialYears: input.confidentialYears! };
+  if (input.setting === 'recruitment') return { ...current, recruitmentBlocked: input.blocked! };
   if (input.blocked === current.warBlocked) return current;
   return current.warChanges === 0
     ? null
-    : { ...current, warBlocked: input.blocked, warChanges: current.warChanges - 1 };
+    : { ...current, warBlocked: input.blocked!, warChanges: current.warChanges - 1 };
 }
 
 export function applyNationRestrictions(replay: ReplayState, input: RecordedInput): ReplayState {
@@ -81,7 +90,7 @@ export function applyNationRestrictions(replay: ReplayState, input: RecordedInpu
   const changed = changeNationRestrictions(nationRestrictions(replay.state, nation, input.tick), request);
   if (
     !changed ||
-    Object.keys(changed).some(
+    [...Object.keys(changed), ...Object.keys(result)].some(
       (key) => changed[key as keyof NationRestrictions] !== result[key as keyof NationRestrictions],
     )
   )

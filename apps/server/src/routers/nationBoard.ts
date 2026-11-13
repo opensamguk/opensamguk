@@ -1,10 +1,11 @@
 import type { Prisma } from '@opensamguk/db';
-import { canUseNationTurns } from '@opensamguk/rules';
+import { canUseNationTurns, nowTick, NATION_RESTRICTIONS_FEATURE, storedNationRestrictions } from '@opensamguk/rules';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import type { Context } from '../context';
 import { messageBody, messagingActor } from '../messaging';
-import { entityKey, worldInput } from '../queries';
+import { nationTenureYears } from '../game/nationTenure';
+import { entityKey, worldClock, worldInput } from '../queries';
 import { protectedProcedure, router, worldVerifiedProcedure } from '../trpc';
 
 const boardInput = worldInput.extend({ nationId: entityKey, confidential: z.boolean() });
@@ -13,13 +14,41 @@ const newest = [{ sentAt: 'desc' }, { id: 'desc' }] as const;
 
 async function boardActor(tx: Prisma.TransactionClient, ctx: Context, input: z.infer<typeof boardInput>, lock = false) {
   const actor = await messagingActor(tx, ctx, input.worldId, lock);
-  if (actor.nationId !== input.nationId || (input.confidential && !canUseNationTurns(actor.officerLevel)))
+  if (actor.nationId !== input.nationId || actor.removedAt !== null)
     throw new TRPCError({ code: 'FORBIDDEN', message: '이 게시판을 이용할 권한이 없습니다.' });
-  if (lock) {
-    const world = await tx.world.findUniqueOrThrow({ where: { id: input.worldId }, select: { status: true } });
-    if (world.status === 'ENDED') throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '종료된 월드입니다.' });
+  let canReadConfidential = canUseNationTurns(actor.officerLevel);
+  const world =
+    lock || (!canReadConfidential && actor.officerLevel > 0)
+      ? await tx.world.findUniqueOrThrow({
+          where: { id: input.worldId },
+          select: {
+            status: true,
+            ruleFeatures: true,
+            clockMode: true,
+            clockTick: true,
+            clockAnchorAt: true,
+            turnTermMinutes: true,
+            preset: true,
+            runtimeOptions: true,
+          },
+        })
+      : null;
+  if (lock && world?.status === 'ENDED')
+    throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '종료된 월드입니다.' });
+  if (!canReadConfidential && actor.officerLevel > 0 && world?.ruleFeatures.includes(NATION_RESTRICTIONS_FEATURE)) {
+    const nation = await tx.nation.findUniqueOrThrow({
+      where: { worldId_id: { worldId: input.worldId, id: actor.nationId } },
+      select: { restrictions: true },
+    });
+    const years = storedNationRestrictions(true, nation.restrictions).restrictions?.confidentialYears;
+    if (years !== undefined) {
+      const tick = nowTick(worldClock(world), ctx.now);
+      canReadConfidential = (nationTenureYears(actor.nationJoinedTick, tick) ?? 0) >= years;
+    }
   }
-  return { nationId: actor.nationId, name: actor.name, portraitId: actor.portraitId, officerLevel: actor.officerLevel };
+  if (input.confidential && !canReadConfidential)
+    throw new TRPCError({ code: 'FORBIDDEN', message: '이 게시판을 이용할 권한이 없습니다.' });
+  return { nationId: actor.nationId, name: actor.name, portraitId: actor.portraitId, canReadConfidential };
 }
 
 export const nationBoardRouter = router({
@@ -53,7 +82,7 @@ export const nationBoardRouter = router({
         });
         const page = posts.slice(0, 20);
         return {
-          canReadConfidential: canUseNationTurns(actor.officerLevel),
+          canReadConfidential: actor.canReadConfidential,
           items: page.map(({ _count, replies, sentAt, ...post }) => ({
             ...post,
             sentAt: sentAt.toISOString(),

@@ -1560,3 +1560,43 @@ it('수뇌 임명 기준을 후보 목록과 엔진에 적용한다', async () =
   const archive = await exportReplay(db, worldId);
   expect(replayArchive(archive, 1)).toEqual(archive.months.map(({ tick, stateHash }) => ({ tick, stateHash })));
 });
+
+it('기밀실 소속 연차를 설정하고 다른 국가와 신규 장수의 접근을 막는다', async () => {
+  const f = await fixture({ restrictions: true });
+  const member = await user();
+  await db.world.update({ where: { id: f.worldId }, data: { clockMode: 'ACCELERATED' } });
+  await db.general.create({
+    data: {
+      ...commandInitial().generals[2]!,
+      worldId: f.worldId,
+      id: 3,
+      userId: member.id,
+      nationId: 1,
+      officerLevel: 1,
+      nationJoinedTick: 0,
+    },
+  });
+  const policy = { worldId: f.worldId, nationId: 1, setting: 'confidential', confidentialYears: 1 };
+  const secret = { worldId: f.worldId, nationId: 1, confidential: true };
+  const read = (cookie: string) => rpc('nationBoard.list', secret, cookie);
+  expect((await read(member.cookie)).error).toBe('FORBIDDEN');
+  expect((await rpc(NATION_RESTRICTIONS_KIND, { ...policy, confidentialYears: 100 }, f.alice.cookie, true)).error).toBe(
+    'BAD_REQUEST',
+  );
+  expect((await rpc(NATION_RESTRICTIONS_KIND, policy, f.alice.cookie, true)).data).toEqual({ status: 'pending' });
+  await f.loop.advanceTo(0);
+  expect((await read(member.cookie)).data).toMatchObject({ canReadConfidential: true });
+  expect((await read(f.bob.cookie)).error).toBe('FORBIDDEN');
+  expect((await rpc('nation.get', { worldId: f.worldId, nationId: 1 }, member.cookie)).data).toMatchObject({
+    restrictions: { confidentialYears: 1 },
+  });
+  expect((await rpc(NATION_RESTRICTIONS_KIND, { ...policy, confidentialYears: 2 }, f.alice.cookie, true)).data).toEqual(
+    { status: 'pending' },
+  );
+  await f.loop.advanceTo(0);
+  expect((await read(member.cookie)).error).toBe('FORBIDDEN');
+  expect((await read(f.alice.cookie)).data).toMatchObject({ canReadConfidential: true });
+  expect((await rpc('nation.get', { worldId: f.worldId, nationId: 1 }, member.cookie)).data).toMatchObject({
+    restrictions: { confidentialYears: 2 },
+  });
+});
