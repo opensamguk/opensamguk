@@ -1,3 +1,4 @@
+import { nationRank } from '@opensamguk/rules';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { visibilityFixture } from '../test/visibilityFixture';
 import {
@@ -47,6 +48,7 @@ describe('T1-12 / AC-M1-19 공개 범위 표', () => {
       id: 1,
       name: nation.name,
       color: nation.color,
+      rank: nationRank(nation.level),
       cityCount: 1,
       generalCount: 2,
     });

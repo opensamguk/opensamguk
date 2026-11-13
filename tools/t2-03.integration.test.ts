@@ -9,7 +9,7 @@ import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { acquireLease, releaseLease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
-import { CREATION_ERRORS, officerTitle, toGameDate } from '../packages/rules/src/index';
+import { CREATION_ERRORS, nationRank, officerTitle, toGameDate } from '../packages/rules/src/index';
 import { loadPreset } from '../apps/engine/src/world/resources';
 import { prepareSeasonWorld, finishSeasonWorld } from '../apps/engine/test/seasonFixture';
 
@@ -215,6 +215,10 @@ describe('T2-03 실제 로비 HTTP·PostgreSQL', () => {
                 portraitId: general.portraitId ?? null,
                 cityName: initial.cities.find((city) => city.cityKey === general.cityKey)!.name,
                 officerTitle: officerTitle(general.officerLevel),
+                courtTitle:
+                  nationRank(initial.nations[0]!.level)?.offices.find(
+                    (office) => office.officerLevel === general.officerLevel,
+                  )?.title ?? null,
                 stats: {
                   leadership: general.leadership,
                   strength: general.strength,

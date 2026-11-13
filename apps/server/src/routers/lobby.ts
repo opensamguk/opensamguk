@@ -8,6 +8,7 @@ import {
   isLocalOffice,
   localOfficeTitle,
   officerTitle,
+  nationRank,
   scenarioIdentitySchema,
   toGameDate,
   parseResourceKey,
@@ -74,7 +75,7 @@ export const lobbyRouter = router({
                   intel: true,
                   politics: true,
                   charm: true,
-                  nation: { select: { name: true, color: true } },
+                  nation: { select: { name: true, color: true, level: true } },
                   city: { select: { name: true } },
                 },
               })
@@ -139,6 +140,11 @@ export const lobbyRouter = router({
                       world.ruleFeatures.includes('office-effects') && isLocalOffice(general.officerLevel)
                         ? localOfficeTitle(general.officerLevel)
                         : (officerTitle(general.officerLevel) ?? (general.nation ? '장수' : '재야')),
+                    courtTitle: general.nation
+                      ? (nationRank(general.nation.level)?.offices.find(
+                          (office) => office.officerLevel === general.officerLevel,
+                        )?.title ?? null)
+                      : null,
                     cityName: general.city.name,
                     stats: {
                       leadership: general.leadership,

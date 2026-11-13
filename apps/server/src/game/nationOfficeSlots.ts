@@ -7,6 +7,7 @@ import {
   canExecuteCityNationCommand,
   canExecuteResearchNationCommand,
   officerTitle,
+  nationRank,
   type QueuedTurn,
 } from '@opensamguk/rules';
 import { TRPCError } from '@trpc/server';
@@ -77,10 +78,15 @@ export async function readNationOfficeTabs(tx: Prisma.TransactionClient, worldId
   requirePersonnelWorld(world);
   const actor = await requireGeneral(tx, worldId, userId);
   const nationId = requireOfficeActor(actor);
+  const nation = await tx.nation.findUniqueOrThrow({
+    where: { worldId_id: { worldId, id: nationId } },
+    select: { level: true },
+  });
+  const rank = nationRank(nation.level);
   const offices = await tx.nationOffice.findMany({ where: { worldId, nationId } });
   const holders = await tx.general.findMany({
     where: { worldId, nationId },
-    select: { id: true, name: true, officerLevel: true },
+    select: { id: true, name: true, officerLevel: true, portraitId: true, userId: true },
   });
   const tabs = [];
   for (const officerLevel of [12, ...APPOINTABLE_OFFICER_LEVELS]) {
@@ -92,7 +98,10 @@ export async function readNationOfficeTabs(tx: Prisma.TransactionClient, worldId
       office: { nationId, officerLevel, tenure: row?.tenure ?? 0 },
       officerLevel,
       title: officerTitle(officerLevel)!,
-      holder: holder ? { generalId: holder.id, name: holder.name } : null,
+      courtTitle: rank?.offices.find((office) => office.officerLevel === officerLevel)?.title ?? null,
+      holder: holder
+        ? { generalId: holder.id, name: holder.name, portraitId: holder.portraitId, isHuman: holder.userId !== null }
+        : null,
       edit:
         actor.officerLevel === officerLevel
           ? { ok: true as const }
