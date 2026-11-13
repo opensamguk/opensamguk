@@ -1,18 +1,10 @@
 import { TRPCError } from '@trpc/server';
-import {
-  BALANCE,
-  estimateTaxIncome,
-  nowTick,
-  OFFICE_EFFECTS_FEATURE,
-  residentOfficeBonuses,
-  TICKS_PER_MONTH,
-  toGameDate,
-  WANDERING_MONTH_LIMIT,
-} from '@opensamguk/rules';
+import { OFFICE_EFFECTS_FEATURE, TICKS_PER_MONTH, WANDERING_MONTH_LIMIT } from '@opensamguk/rules';
 import { protectedProcedure, router } from '../trpc';
-import { entityKey, readWorld, viewerGeneral, worldClock, worldInput } from '../queries';
+import { entityKey, readWorld, viewerGeneral, worldInput } from '../queries';
 import { cityInfo, garrisonGeneralInfo, mapCity, nationInfo, visibility } from '../visibility';
 import { readView } from '../game/queries';
+import { nationPopulation, projectNationFinance, salaryRate } from '../game/nationFinance';
 
 export const nationRouter = router({
   get: protectedProcedure.input(worldInput.extend({ nationId: entityKey }).strict()).query(({ ctx, input }) =>
@@ -39,25 +31,9 @@ export const nationRouter = router({
       const lifecycle = state?.nationLifecycle;
       const wandering = lifecycle?.nations[String(nation.id)];
       const settlements = cities.filter((city) => city.kind !== 'PASS').sort((a, b) => a.cityKey - b.cityKey);
-      const financeEstimate =
+      const finance =
         ownNation && world.status !== 'ENDED'
-          ? (() => {
-              const current = toGameDate(world.startYear, nowTick(worldClock(world), ctx.now));
-              const estimate = (resource: 'gold' | 'rice', months: readonly number[]) => {
-                const month = months.find((value) => value >= current.month) ?? months[0]!;
-                const year = current.year + (month < current.month ? 1 : 0);
-                const members = generals.filter(
-                  (general) => general.removedAt === null && general.activeFromYear <= year,
-                );
-                const bonuses = state?.officeEffects ? residentOfficeBonuses(state, year) : undefined;
-                return { year, month, ...estimateTaxIncome(settlements, members.length, resource, bonuses) };
-              };
-              return {
-                gold: estimate('gold', [1, 7]),
-                rice: estimate('rice', [4, 10]),
-                destination: world.ruleFeatures.includes('city-resources-v1') ? ('city' as const) : ('nation' as const),
-              };
-            })()
+          ? projectNationFinance(world, ctx.now, settlements, generals, state)
           : undefined;
       return {
         ...(lifecycle
@@ -75,11 +51,14 @@ export const nationRouter = router({
         ...(world.ruleFeatures.includes('five-stats') ? { fiveStats: true as const } : {}),
         ...nationInfo(nation, { cityCount: settlements.length, generalCount: generals.length }, viewer),
         philosophy: nation.philosophy,
-        population: settlements.reduce((sum, city) => sum + city.population, 0),
-        populationMax: settlements.reduce((sum, city) => sum + city.populationMax, 0),
-        ...(ownNation ? { salaryRate: BALANCE.MONTHLY_SALARY_RATE } : {}),
-        ...(financeEstimate ? { financeEstimate } : {}),
-        cities: cities.map((city) => (ownNation ? cityInfo(city, viewer) : mapCity(city))),
+        ...nationPopulation(settlements),
+        ...(ownNation ? { salaryRate } : {}),
+        ...(finance ? { financeEstimate: finance.financeEstimate } : {}),
+        cities: cities.map((city) => {
+          if (!ownNation) return mapCity(city);
+          const incomeEstimate = finance?.cityIncome.get(city.cityKey);
+          return { ...cityInfo(city, viewer), ...(incomeEstimate ? { incomeEstimate } : {}) };
+        }),
         generals: generals.map((general) => garrisonGeneralInfo(general, viewer, units)),
       };
     }),
