@@ -108,6 +108,7 @@ function CandidateCard({
         </span>
         <span className={styles.meta}>
           {member.city.name} · {member.title}
+          {member.tenureYears === undefined ? '' : ` · 임관 ${n(member.tenureYears)}년`}
         </span>
         {detail ? (
           <>

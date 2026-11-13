@@ -374,6 +374,7 @@ export function prepareInitialWorld(
       data: creationState.generals.map((general) => ({
         ...general,
         worldId,
+        ...(general.nationId === null ? {} : { nationJoinedTick: 0 }),
         ...((featureFormat ? !features.includes('policy') : options.replayFormat === 'legacy')
           ? {}
           : { defaultPolicy: 'none', lastActiveTick: general.userId === null ? null : 0 }),
@@ -469,7 +470,14 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
       const generals = await tx.general.findMany({
         where: { worldId },
         orderBy: { id: 'asc' },
-        omit: { noticeSeen: true, defaultPolicy: true, lastActiveTick: true, lastActiveAt: true, residenceTick: true },
+        omit: {
+          noticeSeen: true,
+          defaultPolicy: true,
+          lastActiveTick: true,
+          lastActiveAt: true,
+          residenceTick: true,
+          nationJoinedTick: true,
+        },
       });
       const diplomacies = await tx.diplomacy.findMany({
         where: { worldId },

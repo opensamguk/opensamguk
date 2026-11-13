@@ -21,6 +21,7 @@ function general(changes: Partial<General> = {}): General {
     id: 1,
     userId: 'own',
     nationId: 1,
+    nationJoinedTick: null,
     cityKey: 1,
     officerLevel: 12,
     officerCityKey: null,
@@ -123,6 +124,13 @@ describe('인사부 내부 읽기', () => {
     const board = await readPersonnelBoard(db, { worldId: 'world', userId: 'own' }, true, false, 60);
     expect(board.localOfficeMinimum).toBe(60);
     expect(board.members.map(({ eligibleLocalOffices }) => eligibleLocalOffices)).toEqual([[], [], [2, 4]]);
+  });
+  it('임관한 해를 1년으로 세고 기록이 없는 장수는 연차를 생략한다', async () => {
+    const { db, rows } = fixture();
+    rows[0]!.nationJoinedTick = 119_000;
+    rows[1]!.nationJoinedTick = 120_000;
+    const board = await readPersonnelBoard(db, { worldId: 'world', userId: 'own', tick: 120_000 });
+    expect(board.members.map(({ tenureYears }) => tenureYears)).toEqual([2, 1, undefined]);
   });
   it.each([0, 1, 5, 10, 11, 12])('현재 행위자 직책 %i로만 인사 권한을 계산한다', async (officerLevel) => {
     const { db } = fixture(general({ officerLevel }));

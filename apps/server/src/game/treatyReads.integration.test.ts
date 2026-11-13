@@ -96,6 +96,7 @@ function general(patch: Partial<General> = {}): General {
   return {
     ...initial.generals[0]!,
     officerCityKey: null,
+    nationJoinedTick: null,
     removedAt: null,
     sex: null,
     politics: null,

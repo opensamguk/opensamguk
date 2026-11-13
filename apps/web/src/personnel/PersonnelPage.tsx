@@ -322,6 +322,13 @@ function memberColumns(
     },
     { key: 'title', label: '직책', sortValue: (m) => m.officerLevel, render: (m) => m.title },
     {
+      key: 'tenureYears',
+      label: '임관',
+      numeric: true,
+      sortValue: (m) => m.tenureYears ?? null,
+      render: (m) => (m.tenureYears === undefined ? '—' : `${m.tenureYears}년`),
+    },
+    {
       key: 'city',
       label: '도시',
       sortValue: (m) => m.city.name,
@@ -428,7 +435,12 @@ function LevelRows({
               </span>
               <span className={pageStyles.holderText}>
                 <span>{holderLabel}</span>
-                {typeof holder === 'object' ? <span className={pageStyles.holderCity}>{holder.city.name}</span> : null}
+                {typeof holder === 'object' ? (
+                  <span className={pageStyles.holderCity}>
+                    {holder.tenureYears === undefined ? '' : `${holder.tenureYears}년 · `}
+                    {holder.city.name}
+                  </span>
+                ) : null}
               </span>
             </span>
           )}

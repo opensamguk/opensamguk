@@ -141,7 +141,13 @@ export async function persistMonthly(
     if (JSON.stringify(general) !== JSON.stringify(before.generals[general.id])) {
       await tx.general.update({
         where: { worldId_id: { worldId, id: general.id } },
-        data: { ...general, ...(before.officeEffects ? { officerCityKey: general.officerCityKey ?? null } : {}) },
+        data: {
+          ...general,
+          ...(before.officeEffects ? { officerCityKey: general.officerCityKey ?? null } : {}),
+          ...(general.nationId === before.generals[general.id]!.nationId
+            ? {}
+            : { nationJoinedTick: general.nationId === null ? null : tick }),
+        },
       });
     }
   }

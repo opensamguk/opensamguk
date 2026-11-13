@@ -441,6 +441,7 @@ model General {
   name              String
   portraitId        Int?
   nationId          Int?
+  nationJoinedTick  Int?
   cityKey           Int
   leadership        Int
   strength          Int

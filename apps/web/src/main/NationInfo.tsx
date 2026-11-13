@@ -589,6 +589,13 @@ export function NationTables({
     { key: 'gold', label: '금', ...num((g) => g.gold) },
     { key: 'rice', label: '쌀', ...num((g) => g.rice) },
     { key: 'age', label: '나이', ...num((g) => displayedAge(g, summary)) },
+    {
+      key: 'tenureYears',
+      label: '임관',
+      numeric: true,
+      sortValue: (g) => g.tenureYears ?? null,
+      render: (g) => (g.tenureYears === undefined ? '—' : `${n(g.tenureYears)}년`),
+    },
     { key: 'experience', label: '경험', ...num((g) => g.experience) },
     { key: 'dedication', label: '공헌', ...num((g) => g.dedication) },
     { key: 'personality', label: '성격', ...text((g) => g.personality) },
@@ -652,7 +659,7 @@ export function NationTables({
           rows={data.generals}
           columns={recordColumns}
           rowKey={(g) => g.id}
-          mobileDetails={['age', 'experience', 'dedication', 'personality', 'special']}
+          mobileDetails={['age', 'tenureYears', 'experience', 'dedication', 'personality', 'special']}
         />
       ) : null}
     </div>

@@ -25,6 +25,7 @@ import { entityKey, readWorld, viewerGeneral, worldClock, worldInput } from '../
 import { cityCapacity, cityInfo, garrisonGeneralInfo, mapCity, nationInfo, visibility } from '../visibility';
 import { readView, requireWorld } from '../game/queries';
 import { nationPopulation, projectNationFinance, salaryRate } from '../game/nationFinance';
+import { nationTenureYears } from '../game/nationTenure';
 import { worldResolver } from '../game/resolver';
 
 export const nationRouter = router({
@@ -37,6 +38,7 @@ export const nationRouter = router({
       if (!nation) throw new TRPCError({ code: 'NOT_FOUND', message: '국가를 찾을 수 없습니다.' });
       const openRoster = !world.ruleFeatures.includes(INTEL_FEATURE);
       const ownNation = visibility(viewer).nation(nation);
+      const tick = world.result?.endedTick ?? nowTick(worldClock(world), ctx.now);
       const cities = await tx.city.findMany({
         where: input,
         orderBy: ownNation ? [{ region: 'asc' }, { level: 'desc' }, { cityKey: 'asc' }] : { cityKey: 'asc' },
@@ -65,7 +67,7 @@ export const nationRouter = router({
           : undefined;
       const diplomaticAid =
         ownNation && world.ruleFeatures.includes(DIPLOMATIC_COOLDOWN_FEATURE) && world.status !== 'ENDED'
-          ? { remainingMonths: diplomaticAidMonths(nation, strategyMonth(nowTick(worldClock(world), ctx.now))) }
+          ? { remainingMonths: diplomaticAidMonths(nation, strategyMonth(tick)) }
           : undefined;
       const npcOrders = showNpcOrders && state ? await readNpcOrders(state) : undefined;
       return {
@@ -105,9 +107,16 @@ export const nationRouter = router({
           const incomeEstimate = finance?.cityIncome.get(city.cityKey);
           return { ...cityInfo(city, viewer), ...(incomeEstimate ? { incomeEstimate } : {}) };
         }),
-        generals: generals.map((general) =>
-          garrisonGeneralInfo(general, viewer, units, { stats: openRoster, biography: openRoster }),
-        ),
+        generals: generals.map((general) => {
+          const tenureYears =
+            (ownNation || openRoster) && general.removedAt === null
+              ? nationTenureYears(general.nationJoinedTick, tick)
+              : undefined;
+          return {
+            ...garrisonGeneralInfo(general, viewer, units, { stats: openRoster, biography: openRoster }),
+            ...(tenureYears === undefined ? {} : { tenureYears }),
+          };
+        }),
       };
 
       async function readNpcOrders(view: NonNullable<typeof state>) {
@@ -130,7 +139,7 @@ export const nationRouter = router({
             .sort((a, b) => b.score - a.score || a.key.localeCompare(b.key, 'en'))
             .map(({ key, score, reason }) => ({ key, name: resolver.get(key)?.name ?? key, score, reason }));
         };
-        const currentYear = toGameDate(world.startYear, nowTick(worldClock(world), ctx.now)).year;
+        const currentYear = toGameDate(world.startYear, tick).year;
         const npcs = Object.values(view.generals).filter(
           (general) =>
             general.nationId === input.nationId &&
@@ -149,7 +158,7 @@ export const nationRouter = router({
       async function readStrategyStatus() {
         const storedWorld = await requireWorld(tx, input.worldId);
         const ledger = readStoredNationStrategy(storedWorld)?.nations[input.nationId];
-        const current = strategyMonth(nowTick(worldClock(world), ctx.now));
+        const current = strategyMonth(tick);
         const globalUntil = ledger?.strategicUntil ?? 0;
         const availability = (until: number) => ({
           remainingMonths: Math.max(0, until - current),

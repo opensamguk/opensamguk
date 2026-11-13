@@ -96,7 +96,15 @@ export async function persistCommandState(
       // 장수 턴의 nextTurnTick·revision은 TurnLoop의 조건부 갱신만 바꾼다.
       const { nextTurnTick, ...data } = general;
       void nextTurnTick;
-      await tx.general.update({ where: { worldId_id: { worldId, id: general.id } }, data });
+      await tx.general.update({
+        where: { worldId_id: { worldId, id: general.id } },
+        data: {
+          ...data,
+          ...(general.nationId === before.generals[general.id]?.nationId
+            ? {}
+            : { nationJoinedTick: general.nationId === null ? null : at.tick }),
+        },
+      });
     }
   }
   if (JSON.stringify(state.diplomacies) !== JSON.stringify(before.diplomacies)) {
