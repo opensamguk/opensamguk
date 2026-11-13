@@ -10,13 +10,13 @@ import {
   unitSetSchema,
 } from '@opensamguk/rules';
 import { TRPCError } from '@trpc/server';
-import { z } from 'zod';
 import { protectedProcedure, router } from '../trpc';
 import { requireGeneral, requireWorld, readView, worldInput } from '../game/queries';
 import { worldResolver } from '../game/resolver';
 import { withPersonnel } from '../game/personnelApi';
 import { commandInput } from '../game/slots';
 import { commandAvailability } from '../game/commandAvailability';
+import { describeCommand } from './commands';
 
 async function actorCommands(tx: Parameters<typeof requireWorld>[0], worldId: string, userId: string) {
   const world = await requireWorld(tx, worldId);
@@ -52,9 +52,7 @@ export const nationCommandsRouter = router({
         const key = STRATEGY_KEYS.find((key) => key === def.key);
         const availableMonth = key ? Math.max(cooldown?.strategicUntil ?? 0, cooldown?.commands[key] ?? 0) : 0;
         return {
-          key: def.key,
-          name: def.name,
-          category: def.category,
+          ...describeCommand(def),
           ...(key
             ? {
                 cooldown: {
@@ -64,7 +62,6 @@ export const nationCommandsRouter = router({
                 },
               }
             : {}),
-          argsSchema: z.toJSONSchema(def.args, { io: 'input' }),
           ...commandAvailability(def, view, commandActor, ended),
         };
       });

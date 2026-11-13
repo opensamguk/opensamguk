@@ -200,7 +200,7 @@ function Editor<S extends DisplaySlot>({
   // 빈 칸이 실제로 무엇을 할지 보여 주려고 지금 방침을 읽는다. 못 읽으면 빈 칸은 휴식으로 보인다.
   const policy = usePolicyQuery(worldId);
   const emptyLabel = emptySlotLabel(policy.data);
-  const autoplay = source.timed ? home.data?.general.autoplay : undefined;
+  const autoplay = source.timed && source.walletKind !== 'nation' ? home.data?.general.autoplay : undefined;
 
   const [selected, setSelected] = useStoredSelection(source.storageKey);
   const [anchor, setAnchor] = useState<number | null>(null);
