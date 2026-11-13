@@ -63,7 +63,7 @@
 ### 초상과 이름
 
 - `portrait/Portrait.tsx`에 `shape="round"`를 더해 icon을 원형으로 쓸 수 있게 한다. 메인 장수 칸은 portrait, 목록·고르기·요약은 원형 icon, 28px 행 표는 thumb을 20×28로 줄여 쓴다.
-- 공개 빌드도 초상을 보인다. `portraitUrl.ts`의 공개 모드 분기, `vite.config.ts`의 `assertNoPublicImageBase`, 공개 자산 검사(`tools/public-assets`)와 D-031·T3-13·AC-M3-06 기록을 함께 고친다. 이 변경은 별도 PR로 한다.
+- 공개 빌드도 초상을 보인다 ([D-086](../product/decisions.md#d-086-공개-빌드도-장수-초상을-보인다-2026-11-13)). `portraitUrl.ts`의 공개 모드 분기, `vite.config.ts`의 `assertNoPublicImageBase`, 공개 자산 검사(`tools/public-assets`)와 D-031·T3-13·AC-M3-06 기록을 함께 고친다. 이 변경은 별도 PR로 한다.
 - 장수 이름 표시는 `game/names.ts`에 `displayName()` 하나를 두고 모든 화면이 쓴다. 괄호와 그 안을 뺀다. 같은 화면에서 이름이 겹치면 괄호를 그대로 둔다.
 
 ### 로비의 내 장수

@@ -251,6 +251,84 @@ describe('T2-15 AC-INT-20 외부 이미지 배포', () => {
     ])
       expect(inspectAssetText(`const x=${JSON.stringify(url)}`, 'main.js', new Set(), urls).length).toBeGreaterThan(0);
   });
+  describe('D-086 공개 빌드 초상', () => {
+    const portraitBase = `https://raw.githubusercontent.com/opensamguk/opensamguk-images/${'c'.repeat(40)}`;
+    const portraitCode = (base: string) =>
+      `const base=${JSON.stringify(base)};const url=(v,i)=>\`\${base}/portraits/\${v}/\${i}.webp\`;`;
+    async function remote(patch: { manifest?: object; meta?: object; code?: string } = {}) {
+      await put(
+        'apps/web/dist/assets/main.js',
+        `const fallback=${JSON.stringify(catalog[0]!.url)};${patch.code ?? portraitCode(portraitBase)}`,
+      );
+      await seal();
+      const metadata = JSON.parse(await readFile(join(dist, 'public-build.json'), 'utf8')) as object;
+      await put(
+        'apps/web/dist/public-build.json',
+        JSON.stringify({
+          ...metadata,
+          schema: 2,
+          remoteImages: catalog,
+          imageBaseUrl: portraitBase,
+          ...patch.meta,
+        }),
+      );
+      await put(
+        'manifest/public-assets.json',
+        JSON.stringify({
+          ...manifest,
+          decision: 'D-086',
+          portraitPolicy: 'remote',
+          remoteImageBases: [portraitBase],
+          delivery: 'external',
+          imageRevision: revision,
+          imageBaseUrl: base,
+          svgImageBaseUrl: svgBase,
+          ...patch.manifest,
+        }),
+      );
+      await put('docs/product/decisions.md', '## D-031. 기본 SVG\n## D-060 이미지 분리\n## D-086 공개 초상\n');
+    }
+    it('승인 base와 경로 틀만 있는 빌드를 통과시킨다', async () => {
+      await remote();
+      await expect(checkPublicAssets({ root })).resolves.toMatchObject({
+        images: 0,
+        portraitBases: 1,
+        decision: 'D-086',
+      });
+    });
+    it('빌드에 쓴 base가 승인 목록에 없으면 거부한다', async () => {
+      await remote({ meta: { imageBaseUrl: 'https://raw.githubusercontent.com/other/other/main' } });
+      await expect(checkPublicAssets({ root })).rejects.toThrow('metadata');
+    });
+    it.each([
+      [`https://raw.githubusercontent.com/opensamguk/opensamguk-images/main`, 'portrait-base'],
+      [`http://raw.githubusercontent.com/opensamguk/opensamguk-images/${'c'.repeat(40)}`, 'portrait-base'],
+      [`${portraitBase}/`, 'portrait-base'],
+      ['https://img.example.test/set', 'portrait-csp'],
+    ])('고정·https·CSP 규칙에 어긋난 base를 거부한다: %s', async (bad, rule) => {
+      await remote({ manifest: { remoteImageBases: [bad] }, meta: { imageBaseUrl: bad }, code: portraitCode(bad) });
+      await expect(checkPublicAssets({ root })).rejects.toThrow(rule);
+    });
+    it('완성된 초상 주소 문자열과 목록 밖 base는 계속 거부한다', async () => {
+      await remote({ code: `const a=${JSON.stringify(`${portraitBase}/portraits/icon/10001.webp`)};` });
+      await expect(checkPublicAssets({ root })).rejects.toThrow('portrait-path');
+      await remote({ code: portraitCode('https://raw.githubusercontent.com/opensamguk/opensamguk-images/main') });
+      await expect(checkPublicAssets({ root })).rejects.toThrow('external-url');
+    });
+    it('D-086 결정 기록이 없으면 거부한다', async () => {
+      await remote();
+      await put('docs/product/decisions.md', '## D-031. 기본 SVG\n## D-060 이미지 분리\n');
+      await expect(checkPublicAssets({ root })).rejects.toThrow('missing-decision');
+    });
+    it('이미지를 묶는 옛 배포 방식에는 원격 초상을 허용하지 않는다', async () => {
+      await remote();
+      await put(
+        'manifest/public-assets.json',
+        JSON.stringify({ ...manifest, decision: 'D-086', portraitPolicy: 'remote', remoteImageBases: [portraitBase] }),
+      );
+      await expect(checkPublicAssets({ root })).rejects.toThrow('decision-policy');
+    });
+  });
   it('승인 해시를 바꾼 목록과 추가 로컬 이미지를 거부한다', async () => {
     await put(
       'packages/shared/src/publicImageCatalog.json',
