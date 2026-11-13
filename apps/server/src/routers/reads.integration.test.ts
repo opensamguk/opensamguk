@@ -544,6 +544,48 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     }
   });
 
+  it('전략 대기는 소속국에서만 공통·명령별 가능 연월을 반환한다', async () => {
+    const id = await fixtureWorld('strategy-status');
+    const ruleFeatures = ['nation-strategy-v1', 'personnel'];
+    try {
+      await db.world.update({
+        where: { id },
+        data: {
+          status: 'PAUSED',
+          clockTick: 20000,
+          ruleFeatures,
+          replayFormat: 3,
+          replayOrigin: JSON.parse(
+            JSON.stringify({
+              version: 3,
+              initial: { ...state, ruleFeatures },
+              initialStateHash: 'checked',
+              resourceHash: 'checked',
+            }),
+          ),
+          nationStrategyState: {
+            version: 1,
+            nations: { '1': { strategicUntil: 4, commands: { nation_mobilize: 6 } } },
+          },
+        },
+      });
+      const own = await query('nation.get', { worldId: id, nationId: 1 });
+      expect(own.status).toBe(200);
+      expect(own.data.strategyStatus).toMatchObject({
+        remainingMonths: 2,
+        availableAt: { year: 191, month: 5 },
+        commands: expect.arrayContaining([
+          { key: 'nation_mobilize', name: '백성동원', remainingMonths: 4, availableAt: { year: 191, month: 7 } },
+        ]),
+      });
+      const foreign = await query('nation.get', { worldId: id, nationId: 1 }, users[2]!.cookie);
+      expect(foreign.status).toBe(200);
+      expect(foreign.data).not.toHaveProperty('strategyStatus');
+    } finally {
+      await db.world.delete({ where: { id } });
+    }
+  });
+
   it('94도시 지도는 정렬한 공개 도시·국가·장수 정보만 반환한다', async () => {
     const result = await query('world.map', { worldId });
     expect(result.status).toBe(200);
