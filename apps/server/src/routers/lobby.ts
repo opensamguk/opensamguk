@@ -55,7 +55,7 @@ export const lobbyRouter = router({
               turnTermMinutes: true,
               startedAt: true,
               createdAt: true,
-              result: { select: { endedYear: true, endedMonth: true } },
+              result: { select: { endedYear: true, endedMonth: true, winnerName: true, winnerColor: true } },
               _count: { select: { generals: { where: { userId: { not: null } } } } },
             },
           });
@@ -119,6 +119,10 @@ export const lobbyRouter = router({
               turnTermMinutes: world.turnTermMinutes,
               startedAt: world.startedAt?.toISOString() ?? null,
               humanGenerals: world._count.generals,
+              winner:
+                world.status === 'ENDED' && world.result?.winnerName != null && world.result.winnerColor != null
+                  ? { name: world.result.winnerName, color: world.result.winnerColor }
+                  : null,
               ...(world.replayFormat === 3 &&
               effectiveWorldOptions(world.preset === null ? null : parsePreset(world.preset), world.runtimeOptions)
                 .entry.npcPlay === 'on'

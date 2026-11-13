@@ -38,6 +38,7 @@ const world = (extra: Partial<LobbyWorld> = {}): LobbyWorld => ({
   turnTermMinutes: 60,
   startedAt: '2026-10-18T03:00:00.000Z',
   humanGenerals: 34,
+  winner: null,
   myGeneral: null,
   createBlockedReason: null,
   ...extra,

@@ -33,6 +33,7 @@ type Row = {
   turnTermMinutes: number;
   startedAt: string | null;
   humanGenerals: number;
+  winner: { name: string; color: string } | null;
   myGeneral: { id: number; name: string; nationName: string | null } | null;
   createBlockedReason: string | null;
 };
@@ -155,6 +156,7 @@ describe('T2-03 실제 로비 HTTP·PostgreSQL', () => {
         'turnTermMinutes',
         'startedAt',
         'humanGenerals',
+        'winner',
         'myGeneral',
         'createBlockedReason',
       ].sort(),
@@ -162,14 +164,15 @@ describe('T2-03 실제 로비 HTTP·PostgreSQL', () => {
     expect(row.scenarioTitle).toBe('【역사모드3】 군웅할거');
     expect(row.gameDate).toEqual(toGameDate(world.startYear, world.clockTick));
     expect(row.humanGenerals).toBe(1);
+    expect(row.winner).toBeNull();
     expect(row.presetName).toBeNull();
     expect(row.myGeneral).toBeNull();
     expect(result.text).not.toContain(world.seed);
   });
 
-  it('실제 엔진이 기록한 종료 연월을 로비와 메인이 함께 쓴다', async () => {
+  it.each(['END_YEAR', 'UNIFIED'] as const)('실제 엔진이 기록한 종료 연월과 승자 (%s)', async (reason) => {
     const user = await identity();
-    const { worldId } = await prepareSeasonWorld(db, 'END_YEAR');
+    const { worldId } = await prepareSeasonWorld(db, reason);
     worlds.push(worldId);
     const ended = await finishSeasonWorld(db, worldId);
     const lobby = await call<Row[]>('lobby.worlds', { includeEnded: true }, user.cookie);
@@ -180,9 +183,10 @@ describe('T2-03 실제 로비 HTTP·PostgreSQL', () => {
     );
     const row = lobby.data!.find((world) => world.id === worldId)!;
     expect(row.status).toBe('ENDED');
+    expect(row.winner).toEqual(ended.winnerName === null ? null : { name: ended.winnerName, color: ended.winnerColor });
     expect(row.gameDate).toEqual({ year: ended.endedYear, month: ended.endedMonth });
     expect(row.gameDate).toEqual(summary.data!.gameDate);
-    expect(row.gameDate.month).toBe(12);
+    expect(row.gameDate.month).toBe(reason === 'END_YEAR' ? 12 : 1);
   });
 
   for (const status of ['RUNNING', 'PREOPEN', 'PAUSED', 'ENDED'] as const) {

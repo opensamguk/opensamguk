@@ -94,11 +94,13 @@ export function mapCity(city: City) {
   };
 }
 
+function generalIdentity(general: Pick<General, 'id' | 'name' | 'nationId' | 'userId'>) {
+  return { id: general.id, name: general.name, nationId: general.nationId, isHuman: general.userId !== null };
+}
+
 export function ownGeneralInfo(general: General) {
   return {
-    id: general.id,
-    name: general.name,
-    nationId: general.nationId,
+    ...generalIdentity(general),
     portraitId: general.portraitId,
     cityKey: general.cityKey,
     leadership: general.leadership,
@@ -126,14 +128,12 @@ export function ownGeneralInfo(general: General) {
 }
 
 export function generalInfo(general: General, viewer: Viewer) {
-  return visibility(viewer).general(general)
-    ? ownGeneralInfo(general)
-    : { id: general.id, name: general.name, nationId: general.nationId };
+  return visibility(viewer).general(general) ? ownGeneralInfo(general) : generalIdentity(general);
 }
 
 // 병력은 부곡에만 저장한다. 주둔 표는 실제 지휘관별 병력과 병력 가중 평균을 읽는다.
 export function garrisonGeneralInfo(general: General, viewer: Viewer, units?: readonly CampaignUnitState[]) {
-  if (!visibility(viewer).general(general)) return { id: general.id, name: general.name, nationId: general.nationId };
+  if (!visibility(viewer).general(general)) return generalIdentity(general);
   const detail = ownGeneralInfo(general);
   if (units === undefined) return detail;
   let troops = 0,

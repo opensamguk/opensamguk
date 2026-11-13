@@ -33,7 +33,12 @@ describe('T1-12 / AC-M1-19 공개 범위 표', () => {
   it('허용하지 않은 필드는 값이 아니라 키 자체가 없고 재야끼리는 공유하지 않는다', () => {
     const actor = state.generals[3]!;
     const otherWild = { ...state.generals[0]!, nationId: null, worldId: 'world', turnRevision: 0, residenceTick: null };
-    expect(generalInfo(otherWild, actor)).toEqual({ id: otherWild.id, name: otherWild.name, nationId: null });
+    expect(generalInfo(otherWild, actor)).toEqual({
+      id: otherWild.id,
+      name: otherWild.name,
+      nationId: null,
+      isHuman: otherWild.userId !== null,
+    });
     const city = { ...state.cities[1]!, worldId: 'world' };
     expect(cityInfo(city, actor)).toEqual(mapCity(city));
     const nation = { ...state.nations[0]!, worldId: 'world' };
@@ -57,7 +62,7 @@ describe('T1-12 / AC-M1-19 공개 범위 표', () => {
       residenceTick: 105,
     };
     const result = generalInfo(source, source);
-    expect(result).toMatchObject({ gold: 11001, rice: 12001, crew: 13001, train: 41, atmos: 51 });
+    expect(result).toMatchObject({ isHuman: true, gold: 11001, rice: 12001, crew: 13001, train: 41, atmos: 51 });
     for (const field of ['worldId', 'userId', 'affinity', 'turnRevision', 'passwordHash', 'residenceTick'])
       expect(result).not.toHaveProperty(field);
   });
@@ -103,6 +108,7 @@ describe('T1-12 / AC-M1-19 공개 범위 표', () => {
         id: general.id,
         name: general.name,
         nationId: general.nationId,
+        isHuman: general.userId !== null,
       });
     expect({ general, units }).toEqual(before);
   });
