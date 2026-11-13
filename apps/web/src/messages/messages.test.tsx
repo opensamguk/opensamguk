@@ -60,8 +60,8 @@ const item = (id: string, extra: Partial<MessageItem> = {}): MessageItem => ({
   id,
   scope: 'PRIVATE',
   direction: 'received',
-  from: { generalId: 2, name: '하후돈', nation: { id: 1, name: '위', color: '#000080' } },
-  to: { generalId: 1, name: '조조', nation: { id: 1, name: '위', color: '#000080' } },
+  from: { portraitId: null, generalId: 2, name: '하후돈', nation: { id: 1, name: '위', color: '#000080' } },
+  to: { portraitId: null, generalId: 1, name: '조조', nation: { id: 1, name: '위', color: '#000080' } },
   body: `본문 ${id}`,
   sentAt: `2026-10-23T10:00:0${id.length}Z`,
   gameDate: { year: 191, month: 1 },
@@ -250,7 +250,7 @@ describe('메시지 패널', () => {
       direction: 'sent',
       body: '보낸 글',
       sentAt: '2026-10-23T12:00:00Z',
-      to: { generalId: 7, name: '유비', nation: null },
+      to: { portraitId: null, generalId: 7, name: '유비', nation: null },
     });
     on('message.list', () => ({ items: [item('a')], next: null }));
     on('message.send', () => ({ item: sent }));
@@ -415,7 +415,10 @@ describe('권한 변경', () => {
       pages: [{ items: [item('x', { read: false, body: '남의 본문' })], next: null }],
       pageParams: [null],
     });
-    client.setQueryData(keys.recipients, { generals: [{ id: 99, name: '남의 장수', nation: null }], nations: [] });
+    client.setQueryData(keys.recipients, {
+      generals: [{ id: 99, portraitId: null, name: '남의 장수', nation: null }],
+      nations: [],
+    });
     client.setQueryData(keys.worldNotices, {
       items: [{ id: 'n9', body: '남의 공지', pinned: true, publishedAt: '2026-10-23T00:00:00Z' }],
     });
@@ -790,7 +793,12 @@ describe('INT-25 메시지의 장수 얼굴과 이름', () => {
       <ul>
         <MessageRow
           item={item('a', {
-            from: { generalId: 2, name: '하후돈(夏侯惇)', nation: { id: 1, name: '위', color: '#000080' } },
+            from: {
+              portraitId: null,
+              generalId: 2,
+              name: '하후돈(夏侯惇)',
+              nation: { id: 1, name: '위', color: '#000080' },
+            },
           })}
         />
       </ul>,

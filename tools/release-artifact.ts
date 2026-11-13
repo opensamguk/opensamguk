@@ -6,6 +6,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { z } from 'zod';
+import { readReleasePublicAssets } from './release-public-assets';
 
 const run = promisify(execFile);
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -253,12 +254,7 @@ export async function buildRelease(inputValue: unknown, cwd = root) {
   await rename(join(partial, 'export', 'web'), join(payload, 'web'));
   const webFiles = await fileInventory(join(payload, 'web'));
   requireCondition(webFiles.length > 0);
-  const metadata = JSON.parse(await readFile(join(payload, 'web', 'public-build.json'), 'utf8')) as {
-    mode: string;
-    imageBaseUrl: string;
-    images: unknown[];
-  };
-  requireCondition(metadata.mode === 'public' && metadata.imageBaseUrl === '' && metadata.images.length === 6);
+  const assets = await readReleasePublicAssets(context, join(payload, 'web'));
   await run('tar', ['--create', '--file', join(payload, 'web.tar'), '--directory', join(payload, 'web'), '.'], {
     windowsHide: true,
   });
@@ -272,16 +268,6 @@ export async function buildRelease(inputValue: unknown, cwd = root) {
     });
   requireCondition(migrations.length > 0);
   const publicAssetManifest = await hashFile(join(context, 'manifest/public-assets.json'));
-  const assetPolicy = JSON.parse(await readFile(join(context, 'manifest/public-assets.json'), 'utf8')) as {
-    portraitPolicy: string;
-    remoteImageBases: string[];
-    externalAssetOrigins: string[];
-  };
-  requireCondition(
-    assetPolicy.portraitPolicy === 'fallback-only' &&
-      assetPolicy.remoteImageBases.length === 0 &&
-      assetPolicy.externalAssetOrigins.length === 0,
-  );
   const packageManager = (
     JSON.parse(await readFile(join(context, 'package.json'), 'utf8')) as { packageManager: string }
   ).packageManager;
@@ -298,11 +284,15 @@ export async function buildRelease(inputValue: unknown, cwd = root) {
       directory: 'payload/web',
       files: webFiles,
       archive: { path: 'payload/web.tar', ...(await hashFile(join(payload, 'web.tar'))) },
-      imageBaseUrl: metadata.imageBaseUrl,
+      imageBaseUrl: assets.imageBaseUrl,
     },
     migrations,
     resourcesSql: await hashFile(join(context, 'packages/db/sql/resources-init.sql')),
-    publicAssets: { ...publicAssetManifest, portraitPolicy: assetPolicy.portraitPolicy, externalPortraits: 0 },
+    publicAssets: {
+      ...publicAssetManifest,
+      portraitPolicy: assets.portraitPolicy,
+      externalPortraits: assets.externalPortraits,
+    },
     dataContract: 'unknown',
   };
   await rename(payload, join(directory, 'payload'));

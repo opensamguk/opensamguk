@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { displayName } from '../game/names';
 import { useWorldUnits } from '../game/queries';
+import { Portrait } from '../portrait/Portrait';
 import { useTRPC } from '../trpc';
 import { errorCode, serverMessage } from '../turns/apiError';
 import { CommandPicker } from '../turns/CommandPicker';
@@ -302,6 +303,13 @@ function OrdersBoard({ worldId, userId, accountNotice }: { worldId: string; user
               })
             }
           >
+            <Portrait
+              id={data.npcSuperior.portraitId}
+              name={data.npcSuperior.name}
+              variant="icon"
+              size={24}
+              decorative
+            />{' '}
             {displayName(data.npcSuperior.name)}에게 지시 요청
           </button>
           <p>받은 지시는 본인이 수락해야 실행합니다.</p>
@@ -313,7 +321,10 @@ function OrdersBoard({ worldId, userId, accountNotice }: { worldId: string; user
         {data.orders.map((item) => (
           <li key={item.id}>
             <p>
-              {displayName(item.issuerName)} → {displayName(item.recipientName)}: {name(item.command.commandKey)}{' '}
+              <Portrait id={item.issuerPortraitId} name={item.issuerName} variant="icon" size={24} decorative />{' '}
+              {displayName(item.issuerName)} →{' '}
+              <Portrait id={item.recipientPortraitId} name={item.recipientName} variant="icon" size={24} decorative />{' '}
+              {displayName(item.recipientName)}: {name(item.command.commandKey)}{' '}
               {args(item.command.args as Record<string, unknown>)}
             </p>
             <p>

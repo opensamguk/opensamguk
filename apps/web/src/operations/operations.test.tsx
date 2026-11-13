@@ -43,6 +43,7 @@ const cell = (i: number, start: GameDate, turn: SlotView = blank): TimelineCell 
 });
 const member = (patch: Partial<MemberTimeline> = {}): MemberTimeline => ({
   generalId: 1,
+  portraitId: null,
   name: '조운',
   cityKey: 3,
   cityName: '진류',
@@ -238,6 +239,7 @@ describe('작전에 맞추기', () => {
 describe('감찰 표', () => {
   const row = (patch: Partial<InspectionRow>): InspectionRow => ({
     generalId: 1,
+    portraitId: null,
     name: '관우',
     officerLevel: 11,
     cityKey: 3,

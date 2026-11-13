@@ -36,7 +36,7 @@ type OperationWorld = ReadWorld & {
 type GameDate = ReturnType<typeof toGameDate>;
 const include = {
   target: { select: { cityKey: true, name: true, nation: { select: publicNationDisplaySelect } } },
-  createdBy: { select: { id: true, name: true } },
+  createdBy: { select: { id: true, name: true, portraitId: true } },
   members: { include: { general: { include: { city: { select: { name: true } } } } } },
 } as const satisfies Prisma.OperationInclude;
 type Operation = Prisma.OperationGetPayload<{ include: typeof include }>;
@@ -230,6 +230,7 @@ async function timelines(tx: Tx, world: OperationWorld, operation: Operation, ac
       return {
         generalId: general.id,
         name: general.name,
+        portraitId: general.portraitId,
         cityKey: general.cityKey,
         cityName: general.city.name,
         isMe: general.id === actor.id,
@@ -256,7 +257,11 @@ function operationRow(
     targetTick,
     targetAt: operationTargetAt(world, targetTick),
     status: operation.status,
-    createdBy: { generalId: operation.createdBy.id, name: operation.createdBy.name },
+    createdBy: {
+      generalId: operation.createdBy.id,
+      name: operation.createdBy.name,
+      portraitId: operation.createdBy.portraitId,
+    },
     members: timeline.length,
     ready: timeline.filter((member) => member.verdict === 'READY').length,
     joined: joined(operation, actor),
@@ -415,6 +420,7 @@ export function inspectMembers(ctx: OperationContext, worldId: string) {
         rows.map(async (general) => ({
           generalId: general.id,
           name: general.name,
+          portraitId: general.portraitId,
           officerLevel: general.officerLevel,
           cityKey: general.cityKey,
           cityName: general.city.name,

@@ -189,7 +189,8 @@ test('AC-M3-12 군주의 지방 임명·교체·해임, 장수 이동과 375px �
         await expect(advisor.getByText('빈 자리')).toBeVisible();
       });
     }
-    await advisor.getByLabel('참모 임명할 장수').selectOption(String(candidate.id));
+    await advisor.getByRole('button', { name: '참모 임명할 장수 고르기' }).click();
+    await page.getByRole('group', { name: '참모 임명 후보' }).locator(`[data-general-id="${candidate.id}"]`).click();
     await withEngine(async () => {
       await advisor.getByRole('button', { name: '임명', exact: true }).click();
       await expect(advisor.getByText(candidate.name, { exact: true })).toBeVisible();

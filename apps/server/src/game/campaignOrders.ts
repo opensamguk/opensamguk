@@ -93,16 +93,21 @@ export async function readCampaignOrders(ctx: OrderContext, worldId: string) {
         recipients: Object.values(view.generals)
           .filter((general) => canIssueCampaignOrder(view, actor.id, general.id))
           .sort((a, b) => a.id - b.id)
-          .map(({ id, name, userId }) => ({ id, name, isHuman: userId !== null })),
-        npcSuperior: superior === null ? null : { id: superior, name: view.generals[superior]!.name },
+          .map(({ id, name, userId, portraitId }) => ({ id, name, portraitId, isHuman: userId !== null })),
+        npcSuperior:
+          superior === null
+            ? null
+            : { id: superior, name: view.generals[superior]!.name, portraitId: view.generals[superior]!.portraitId },
         orders: (view.campaign!.orders?.items ?? [])
           .filter((order) => order.issuerId === actor.id || order.recipientId === actor.id)
           .map((order) => ({
             id: order.id,
             issuerId: order.issuerId,
             issuerName: view.generals[order.issuerId]!.name,
+            issuerPortraitId: view.generals[order.issuerId]!.portraitId,
             recipientId: order.recipientId,
             recipientName: view.generals[order.recipientId]!.name,
+            recipientPortraitId: view.generals[order.recipientId]!.portraitId,
             command: order.command,
             status: order.status,
             createdTick: order.createdTick,

@@ -41,8 +41,18 @@ export const messageRouter = router({
             take: 21,
           });
           const page = rows.slice(0, 20);
+          const ids = new Set(page.flatMap((row) => [row.senderId, row.recipientId]).filter((id) => id !== null));
+          const portraits = new Map(
+            (ids.size
+              ? await tx.general.findMany({
+                  where: { worldId: input.worldId, id: { in: [...ids] } },
+                  select: { id: true, portraitId: true },
+                })
+              : []
+            ).map(({ id, portraitId }) => [id, portraitId]),
+          );
           return {
-            items: page.map((row) => messageItem(row, general.id)),
+            items: page.map((row) => messageItem(row, general.id, portraits)),
             next: rows.length > 20 ? encodeMessageCursor(page.at(-1)!) : null,
           };
         },
@@ -119,9 +129,14 @@ export const messageRouter = router({
             senderNationId: g.nationId,
             recipientId: recipient?.id ?? null,
             recipientNationId: input.scope === 'PRIVATE' ? null : nation!.id,
-            fromParty: { generalId: g.id, name: g.name, nation: ownNation },
+            fromParty: { generalId: g.id, name: g.name, nation: ownNation, portraitId: g.portraitId },
             toParty: recipient
-              ? { generalId: recipient.id, name: recipient.name, nation: recipient.nation }
+              ? {
+                  generalId: recipient.id,
+                  name: recipient.name,
+                  nation: recipient.nation,
+                  portraitId: recipient.portraitId,
+                }
               : { generalId: null, name: nation!.name, nation },
             body: input.body,
             sentAt: now,
@@ -188,7 +203,7 @@ export const messageRouter = router({
             removedAt: null,
             activeFromYear: { not: LINEAGE_EXITED_YEAR },
           },
-          select: { id: true, name: true, nation: { select: nationTagSelect } },
+          select: { id: true, name: true, portraitId: true, nation: { select: nationTagSelect } },
           orderBy: [{ name: 'asc' }, { id: 'asc' }],
         });
         const nations = await tx.nation.findMany({

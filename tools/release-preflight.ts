@@ -4,6 +4,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
 import { fileInventory, hashFile, safeSourcePath } from './release-artifact';
+import { readReleasePublicAssets } from './release-public-assets';
 
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
 const revision = z.string().regex(/^[a-f0-9]{40}$/);
@@ -45,11 +46,14 @@ const releaseManifest = z.strictObject({
     directory: z.literal('payload/web'),
     files: z.array(file).min(1),
     archive,
-    imageBaseUrl: z.literal(''),
+    imageBaseUrl: z.string(),
   }),
   migrations: z.array(fingerprint.extend({ name: z.string().regex(/^\d{14}_[a-z0-9_]+$/) })).min(1),
   resourcesSql: fingerprint,
-  publicAssets: fingerprint.extend({ portraitPolicy: z.literal('fallback-only'), externalPortraits: z.literal(0) }),
+  publicAssets: fingerprint.extend({
+    portraitPolicy: z.enum(['fallback-only', 'remote']),
+    externalPortraits: z.number().int().nonnegative(),
+  }),
   dataContract: z.literal('unknown'),
 });
 type Fingerprint = z.infer<typeof fingerprint>;
@@ -127,15 +131,6 @@ export async function preflightRelease(value: unknown) {
     requireCondition(new Set(manifest.web.files.map((entry) => entry.path)).size === manifest.web.files.length, 'WEB');
     requireCondition(webFiles.length === manifest.web.files.length, 'WEB');
     for (const entry of manifest.web.files) await checkedFile(web, entry.path, entry);
-    const metadata = JSON.parse(await readFile(join(web, 'public-build.json'), 'utf8')) as Record<string, unknown>;
-    requireCondition(
-      metadata.mode === 'public' &&
-        metadata.imageBaseUrl === '' &&
-        Array.isArray(metadata.images) &&
-        metadata.images.length === 6,
-      'PUBLIC',
-    );
-
     // 현재 producer는 확정 payload 옆의 단 하나의 partial에 원본 archive/context를 보존한다.
     const partials = (await readdir(directory)).filter((name) =>
       /^\.partial-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(name),
@@ -167,16 +162,11 @@ export async function preflightRelease(value: unknown) {
       await checkedFile(migrations, migration.name + '/migration.sql', migration);
     await checkedFile(context, 'packages/db/sql/resources-init.sql', manifest.resourcesSql);
     await checkedFile(context, 'manifest/public-assets.json', manifest.publicAssets);
-    const policy = JSON.parse(await readFile(join(context, 'manifest/public-assets.json'), 'utf8')) as Record<
-      string,
-      unknown
-    >;
+    const assets = await readReleasePublicAssets(context, web);
     requireCondition(
-      policy.portraitPolicy === 'fallback-only' &&
-        Array.isArray(policy.remoteImageBases) &&
-        policy.remoteImageBases.length === 0 &&
-        Array.isArray(policy.externalAssetOrigins) &&
-        policy.externalAssetOrigins.length === 0,
+      assets.imageBaseUrl === manifest.web.imageBaseUrl &&
+        assets.portraitPolicy === manifest.publicAssets.portraitPolicy &&
+        assets.externalPortraits === manifest.publicAssets.externalPortraits,
       'PUBLIC',
     );
     // 검증 중 manifest 교체도 성공 receipt로 확정하지 않는다.

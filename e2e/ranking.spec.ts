@@ -43,7 +43,7 @@ const topNames = (page: Page, count: number) =>
   generalsTable(page)
     .locator('tbody')
     .first()
-    .locator('tr td:nth-child(2) > span:first-child')
+    .getByTestId('ranked-general-name')
     .allInnerTexts()
     .then((names) => names.slice(0, count));
 

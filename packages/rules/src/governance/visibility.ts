@@ -78,7 +78,7 @@ export function governanceView(world: WorldView, viewerId: number | null, tick: 
     generals: Object.values(state.generals)
       .filter((general) => names.has(general.id))
       .sort((a, b) => a.id - b.id)
-      .map(({ id, name, nationId, officerLevel }) => ({ id, name, nationId, officerLevel })),
+      .map(({ id, name, nationId, officerLevel, portraitId }) => ({ id, name, nationId, officerLevel, portraitId })),
     courtCandidates,
     monthlyTick: gov.monthlyTick,
     revision: gov.revision,

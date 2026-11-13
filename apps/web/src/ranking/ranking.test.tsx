@@ -19,6 +19,7 @@ const wei = { id: 1, name: '위', color: '#2f5f9e' };
 const general = (rank: number, generalId: number, name: string, nation = wei): RankedGeneral => ({
   rank,
   generalId,
+  portraitId: null,
   name,
   nation,
   dedication: 1000 - rank,

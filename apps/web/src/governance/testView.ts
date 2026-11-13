@@ -7,9 +7,9 @@ export function testView(overrides: Partial<GovernanceView> = {}): GovernanceVie
     viewerGeneralId: 10,
     nations: [1, 2, 3, 4, 5].map((id) => ({ id, name: `국${id}`, color: '#336699' })),
     generals: [
-      { id: 10, name: '황제', nationId: 1, officerLevel: 12 },
-      { id: 20, name: '이군주', nationId: 2, officerLevel: 12 },
-      { id: 30, name: '삼장수', nationId: 3, officerLevel: 5 },
+      { id: 10, name: '황제', nationId: 1, officerLevel: 12, portraitId: null },
+      { id: 20, name: '이군주', nationId: 2, officerLevel: 12, portraitId: null },
+      { id: 30, name: '삼장수', nationId: 3, officerLevel: 5, portraitId: null },
     ],
     courtCandidates: [],
     monthlyTick: 0,

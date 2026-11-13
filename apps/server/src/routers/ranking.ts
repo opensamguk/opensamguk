@@ -53,9 +53,25 @@ export const rankingRouter = router({
           where: { worldId_userId: { worldId: input.worldId, userId: ctx.user.id } },
           select: { id: true },
         });
+        const top = rows.slice(0, 100);
+        const me = viewer ? (rows.find((row) => row.generalId === viewer.id) ?? null) : null;
+        const ids = top.map((row) => row.generalId);
+        if (me) ids.push(me.generalId);
+        const portraits = new Map(
+          (
+            await tx.general.findMany({
+              where: { worldId: input.worldId, id: { in: ids } },
+              select: { id: true, portraitId: true },
+            })
+          ).map(({ id, portraitId }) => [id, portraitId]),
+        );
+        const withPortrait = (row: (typeof rows)[number]) => ({
+          ...row,
+          portraitId: portraits.get(row.generalId) ?? null,
+        });
         return {
-          top: rows.slice(0, 100),
-          me: viewer ? (rows.find((row) => row.generalId === viewer.id) ?? null) : null,
+          top: top.map(withPortrait),
+          me: me ? withPortrait(me) : null,
           at: snapshotAt(snapshot),
         };
       }),

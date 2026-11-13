@@ -346,7 +346,7 @@ describe('T2-09 실제 HTTP 메시지·공지 권한 대조', () => {
     ).toBe('BAD_REQUEST');
     const recipients = (await call<Outputs['message']['recipients']>('message.recipients', { worldId })).data!;
     expect(recipients.generals.map((g) => g.id)).not.toContain(1);
-    expect(Object.keys(recipients.generals[0]!).sort()).toEqual(['id', 'name', 'nation']);
+    expect(Object.keys(recipients.generals[0]!).sort()).toEqual(['id', 'name', 'nation', 'portraitId']);
     expect(recipients.nations.map((n) => n.id)).toEqual([2]);
   });
   it('같은 시각의 41행을 시간·ID 커서로 빠짐과 중복 없이 읽는다', async () => {
