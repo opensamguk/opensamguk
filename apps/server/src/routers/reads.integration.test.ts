@@ -847,6 +847,20 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       expect(await db.world.findUniqueOrThrow({ where: { id: endedWorldId }, include: { result: true } })).toEqual(
         before,
       );
+      await db.yearbookSnapshot.update({
+        where: { worldId_tick: { worldId: endedWorldId, tick: 10000 } },
+        data: { activeGenerals: 12 },
+      });
+      const traits = {
+        philosophies: [{ name: '법가', count: 1 }],
+        personalities: [{ name: '의리', count: 2 }],
+        specialties: [{ name: '농업', count: 1 }],
+      };
+      await db.worldResult.update({ where: { worldId: endedWorldId }, data: { traitDistribution: traits } });
+      expect((await query('records.season', { worldId: endedWorldId })).data.statistics).toMatchObject({
+        peak: { generals: 12 },
+        traits,
+      });
     } finally {
       await db.world.delete({ where: { id: endedWorldId } });
     }

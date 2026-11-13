@@ -49,6 +49,12 @@ const winnerSummarySchema = z.strictObject({
   gold: z.number().int().nonnegative(),
   rice: z.number().int().nonnegative(),
 });
+const traitCounts = z.array(z.strictObject({ name: z.string().min(1), count: z.number().int().positive() }));
+const traitDistributionSchema = z.strictObject({
+  philosophies: traitCounts,
+  personalities: traitCounts,
+  specialties: traitCounts,
+});
 const battlePhases = z.array(
   z.object({
     kind: z.enum(['volley', 'hold', 'exchange']),
@@ -278,7 +284,11 @@ export const recordsRouter = router({
       const history = await tx.yearbookSnapshot.findMany({
         where: { worldId: input.worldId },
         orderBy: { tick: 'asc' },
-        select: { nations: { orderBy: { nationId: 'asc' }, select: { nationId: true, name: true } }, data: true },
+        select: {
+          nations: { orderBy: { nationId: 'asc' }, select: { nationId: true, name: true } },
+          data: true,
+          activeGenerals: true,
+        },
       });
       const removed = await tx.removedNation.findMany({
         where: { worldId: input.worldId },
@@ -291,7 +301,10 @@ export const recordsRouter = router({
         if (row.nationId !== null && row.nationName) nationNames.set(row.nationId, row.nationName);
       const final = { nations: result.remainingNations, generals: rows.length };
       const peak = { nations: final.nations, affiliatedGenerals: rows.filter((row) => row.nationId !== null).length };
+      let peakGenerals: number | undefined;
       for (const month of history) {
+        if (month.activeGenerals !== null)
+          peakGenerals = Math.max(peakGenerals ?? final.generals, month.activeGenerals);
         const nations = worldRecordInfo(month.data).nations;
         peak.nations = Math.max(peak.nations, nations.filter(({ cities }) => cities > 0).length);
         peak.affiliatedGenerals = Math.max(
@@ -299,7 +312,22 @@ export const recordsRouter = router({
           nations.reduce((total, nation) => total + nation.generals, 0),
         );
       }
-      return { result, generals, winnerSummary, statistics: { final, peak, nationNames: [...nationNames.values()] } };
+      const traits = traitDistributionSchema.safeParse(world.result?.traitDistribution).data;
+      if (traits && history.length === 0) peakGenerals = final.generals;
+      return {
+        result,
+        generals,
+        winnerSummary,
+        statistics: {
+          final,
+          peak: {
+            ...peak,
+            ...(peakGenerals === undefined ? {} : { generals: peakGenerals }),
+          },
+          nationNames: [...nationNames.values()],
+          ...(traits ? { traits } : {}),
+        },
+      };
     }),
   ),
   general: protectedProcedure.input(generalInput).query(({ ctx, input }) =>

@@ -21,6 +21,7 @@ import { hashState } from '@opensamguk/shared/node';
 import { engineFeatures } from './features';
 import { loadWorld } from './worldLoader';
 import { persistRanking } from './ranking';
+import { activeSeasonGenerals } from './seasonArchive';
 import { persistYearbookNations, persistRemovedNations, persistPublicNationEvents } from './nationArchive';
 import { persistCommandMeta } from './commandPersistence';
 import { persistExt } from './extState';
@@ -221,6 +222,7 @@ export async function persistMonthly(
       sequence,
       data: yearbook as unknown as Prisma.InputJsonValue,
       stateHash: hashState(snapshot),
+      activeGenerals: activeSeasonGenerals(next, date.year).length,
     },
   });
   await persistYearbookNations(tx, worldId, tick, rankedNations);

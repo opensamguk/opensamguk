@@ -72,6 +72,12 @@ async function checkEnd(worldId: string, reason: 'END_YEAR' | 'UNIFIED') {
   expect(value.world.actionSequence).toBe(result.endedSequence + archive.afterEnd.length);
   expect(value.logs.every((log) => log.tick <= result.endedTick)).toBe(true);
   expect(value.months.every((month) => month.tick <= result.endedTick)).toBe(true);
+  expect(value.months.every((month) => month.activeGenerals !== null)).toBe(true);
+  expect(result.traitDistribution).toMatchObject({
+    philosophies: expect.any(Array),
+    personalities: expect.any(Array),
+    specialties: expect.any(Array),
+  });
   if (reason === 'UNIFIED') {
     expect(value.archive).toHaveLength(1);
     expect(archive.months).toHaveLength(0);
