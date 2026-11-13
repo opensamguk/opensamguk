@@ -12,7 +12,7 @@ import {
   type TreatyRequestKind,
   type TreatyRequestState,
 } from '../game/treatyRequests';
-import { recordsInput } from '../queries';
+import { recordsInput, worldInput as strictWorldInput } from '../queries';
 import { protectedProcedure, router, worldVerifiedProcedure } from '../trpc';
 
 const listInput = worldInput.extend({ cursor: recordsInput.shape.cursor });
@@ -48,7 +48,7 @@ async function submitAndWait(
 
 export const treatyRouter = router({
   relations: protectedProcedure
-    .input(worldInput)
+    .input(strictWorldInput)
     .query(({ ctx, input }) =>
       ctx.db.$transaction((tx) => listRelations(tx, input.worldId, ctx.user.id), { isolationLevel: 'RepeatableRead' }),
     ),
