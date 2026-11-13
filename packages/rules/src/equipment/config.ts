@@ -77,6 +77,16 @@ export const rareEquipmentTools = {
     lootChance: 0.2,
     lootShare: 0.1,
   },
+  // core2026 c81d304, packages/logic/src/items/che_내정_납금박산로.ts (MIT).
+  tool_08: {
+    key: 'tool_08',
+    name: '납금박산로(내정)',
+    description: '내정 대성공 확률 +15%p.',
+    cost: 200,
+    charges: 1,
+    slot: 'tool',
+    domesticSuccess: 0.15,
+  },
 } as const;
 export const allEquipmentTools = { ...equipmentTools, ...rareEquipmentTools };
 export const equipmentToolKeySchema = z.enum(Object.keys(allEquipmentTools) as (keyof typeof allEquipmentTools)[]);

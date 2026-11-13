@@ -9,6 +9,7 @@ import type { CityField, Effect } from '../effects';
 import { applyModifiers, collectModifiers, collectModifiersWith, type ModifierProvider } from '../../modifiers';
 import { domesticSpecialtyFor } from '../../general/domesticSpecialty';
 import { domesticStatScore } from '../statScores';
+import { rareEquipmentTools } from '../../equipment/config';
 import { checkCityGoods, consumeCityGoods } from '../../logistics/consumption';
 import { cloneWorld } from '../../model/clone';
 
@@ -128,11 +129,16 @@ function makeInvestmentWithCollector(spec: Spec, collect: typeof collectModifier
         ((domesticStatScore(view, general, spec.key, spec.stat) * city.trust) / 100) * (0.8 + rng.next() * 0.4);
       const trait = domesticSpecialtyFor(view, general, spec.key);
       const critical = rng.next();
-      const success = 0.1 + (trait?.successBonus ?? 0) + (general.heritageBenefits?.domesticSuccess ?? 0) / 100;
+      const tool = rareEquipmentTools.tool_08;
+      const toolBonus = view.equipment?.generals[general.id]?.tool?.key === tool.key ? tool.domesticSuccess : 0;
+      const success =
+        0.1 + (trait?.successBonus ?? 0) + (general.heritageBenefits?.domesticSuccess ?? 0) / 100 + toolBonus;
       const failureChance = 0.1 - (general.heritageBenefits?.domesticFailure ?? 0) / 100;
+      const failureThreshold = general.heritageBenefits
+        ? success + failureChance
+        : 0.2 + (trait?.successBonus ?? 0) + toolBonus;
       if (critical < success) score *= 2.2 + rng.next() * 0.8;
-      else if (critical < (general.heritageBenefits ? success + failureChance : 0.2 + (trait?.successBonus ?? 0)))
-        score *= 0.2 + rng.next() * 0.2;
+      else if (critical < failureThreshold) score *= 0.2 + rng.next() * 0.2;
       if (trait) score *= trait.score;
       if (isFront(view, city.cityKey)) score *= BALANCE.FRONT_FACTOR;
       score = applyModifiers(score, collect(view, general.id, { stage: 'domestic.score', commandKey: spec.key }), {

@@ -421,9 +421,12 @@ it('INT-26 SAN10 명품 목록은 60개를 공개하고 월말 발견을 재생�
 it('INT-26 SAN10 옥벽을 명품 도구로 조회하고 매매 목록에서 제외한다', async () => {
   const f = await fixture(true, false, 'iron', 'rareTools');
   const before = await rpc('equipment.rare', { worldId: f.id }, f.player);
-  expect(before.data?.items).toHaveLength(61);
+  expect(before.data?.items).toHaveLength(62);
   expect(before.data?.items).toContainEqual(
     expect.objectContaining({ key: 'tool_07', slot: 'tool', name: '옥벽(약탈)', owner: null }),
+  );
+  expect(before.data?.items).toContainEqual(
+    expect.objectContaining({ key: 'tool_08', slot: 'tool', name: '납금박산로(내정)', owner: null }),
   );
   expect((await rpc('equipment.mine', { worldId: f.id }, f.player)).data?.tools?.map(({ key }) => key)).not.toContain(
     'tool_07',
