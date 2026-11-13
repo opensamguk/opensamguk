@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { visibilityFixture } from '../test/visibilityFixture';
 import {
+  cityCapacity,
   cityInfo,
   generalInfo,
   garrisonGeneralInfo,
@@ -40,7 +41,7 @@ describe('T1-12 / AC-M1-19 공개 범위 표', () => {
       isHuman: otherWild.userId !== null,
     });
     const city = { ...state.cities[1]!, worldId: 'world' };
-    expect(cityInfo(city, actor)).toEqual(mapCity(city));
+    expect(cityInfo(city, actor)).toEqual({ ...mapCity(city), ...cityCapacity(city) });
     const nation = { ...state.nations[0]!, worldId: 'world' };
     expect(nationInfo(nation, { cityCount: 1, generalCount: 2 }, actor)).toEqual({
       id: 1,

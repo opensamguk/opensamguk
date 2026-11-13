@@ -534,24 +534,40 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       { id: 1, gold: 11001 },
       { id: 2, gold: 11002 },
     ]);
-    expect(ally.generals.slice(2)).toEqual(
-      state.generals.slice(2).map(({ id, name, nationId }) => ({ id, name, nationId, isHuman: id !== 2 })),
+    expect(ally.generals.slice(2)).toMatchObject(
+      state.generals.slice(2).map(({ id, name, nationId, leadership, strength, intel, crew }) => ({
+        id,
+        name,
+        nationId,
+        isHuman: id !== 2,
+        leadership,
+        strength,
+        intel,
+        crew,
+      })),
     );
+    expect(ally.enemyCrew).toBe(state.generals[2]!.crew);
+    expect(ally.generals[2]).not.toHaveProperty('gold');
+    expect(ally.generals[2]).not.toHaveProperty('train');
     const resident = (await query('city.get', input, users[1]!.cookie)).data;
     expect(resident).toHaveProperty('population');
-    expect(resident.generals[0]).toEqual({ id: 1, name: state.generals[0]!.name, nationId: 1, isHuman: true });
+    expect(resident.generals[0]).toMatchObject({
+      id: 1,
+      name: state.generals[0]!.name,
+      nationId: 1,
+      isHuman: true,
+      leadership: state.generals[0]!.leadership,
+      crew: state.generals[0]!.crew,
+    });
+    expect(resident.generals[0]).not.toHaveProperty('gold');
     for (const user of users) {
       const unseen = (await query('city.get', { worldId, cityKey: state.cities[2]!.cityKey }, user.cookie)).data;
-      for (const field of [
-        'population',
-        'populationMax',
-        'agriculture',
-        'commerce',
-        'security',
-        'defence',
-        'wall',
-        'trust',
-      ])
+      expect(unseen).toMatchObject({
+        populationMax: state.cities[2]!.populationMax,
+        defence: state.cities[2]!.defence,
+        wall: state.cities[2]!.wall,
+      });
+      for (const field of ['population', 'agriculture', 'commerce', 'security', 'trust'])
         expect(unseen).not.toHaveProperty(field);
     }
     const spectator = (await query('city.get', input, users[3]!.cookie)).data;
@@ -581,15 +597,37 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
       philosophy: state.nations[1]!.philosophy,
       population: state.cities[1]!.population,
     });
-    expect(enemy.generals).toEqual([{ id: 3, name: state.generals[2]!.name, nationId: 2, isHuman: true }]);
+    expect(enemy.generals).toMatchObject([
+      {
+        id: 3,
+        name: state.generals[2]!.name,
+        nationId: 2,
+        isHuman: true,
+        leadership: state.generals[2]!.leadership,
+        age: state.generals[2]!.age,
+      },
+    ]);
+    expect(enemy.generals[0]).not.toHaveProperty('crew');
+    expect(enemy.cities[0]).toHaveProperty('wallMax', state.cities[1]!.wallMax);
+    expect(enemy.cities[0]).not.toHaveProperty('wall');
     expect(enemy.cities).toHaveLength(1);
     for (const user of users.slice(1)) {
       const nation = (await query('nation.get', { worldId, nationId: 1 }, user.cookie)).data;
       for (const field of ['gold', 'rice', 'taxRate', 'tech', 'capitalCityKey', 'financeEstimate', 'salaryRate'])
         expect(nation).not.toHaveProperty(field);
-      expect(nation.generals).toEqual(
-        state.generals.slice(0, 2).map(({ id, name, nationId }) => ({ id, name, nationId, isHuman: id !== 2 })),
+      expect(nation.generals).toMatchObject(
+        state.generals.slice(0, 2).map(({ id, name, nationId, leadership }) => ({
+          id,
+          name,
+          nationId,
+          isHuman: id !== 2,
+          leadership,
+        })),
       );
+      for (const general of nation.generals) {
+        expect(general).not.toHaveProperty('crew');
+        expect(general).not.toHaveProperty('gold');
+      }
     }
     const own = (await query('nation.get', { worldId, nationId: 1 })).data;
     expect(own).toMatchObject({ gold: state.nations[0]!.gold, rice: state.nations[0]!.rice, taxRate: 0.2 });
