@@ -94,8 +94,11 @@ export async function loadWorldAfterCapabilityCheck(
       attachOperationalKinds(cities.map(stripWorldId), operationalMap).map((city) => [city.cityKey, city]),
     ),
     nations: Object.fromEntries(
-      nations.map((nation) => {
-        return [nation.id, { ...stripWorldId(nation), capitalCityKey: nation.capitalCityKey }];
+      nations.map(({ diplomaticAidUntilMonth, ...nation }) => {
+        return [
+          nation.id,
+          { ...stripWorldId(nation), ...(diplomaticAidUntilMonth != null ? { diplomaticAidUntilMonth } : {}) },
+        ];
       }),
     ),
     generals: Object.fromEntries(

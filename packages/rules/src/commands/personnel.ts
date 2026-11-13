@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { BALANCE } from '../balance';
 import { LINEAGE_EXITED_YEAR } from '../lineage/config';
 import { refreshSupply } from '../supply';
+import { DIPLOMATIC_COOLDOWN_FEATURE } from '../diplomacy/cooldown';
 import type { WorldView } from '../model/world';
 import { commandMeta, defineCommand, fail, noArgs, positive, ruler, success, targetGeneral } from './support';
 
@@ -40,6 +41,9 @@ const establish = (uprising: boolean) =>
         level: 0,
         capitalCityKey: general.cityKey,
         isNpc: general.userId === null,
+        ...(uprising && state.ruleFeatures?.includes(DIPLOMATIC_COOLDOWN_FEATURE)
+          ? { diplomaticAidUntilMonth: Math.floor((actor.tick ?? 0) / TICKS_PER_MONTH) + 72 }
+          : {}),
       };
       general.gold -= BALANCE.FOUND_COST;
       general.nationId = id;

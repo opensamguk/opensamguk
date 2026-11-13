@@ -111,7 +111,10 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
       cities,
       readOperationalMap(world.operationalMap, world.ruleFeatures, world.replayOrigin),
     ),
-    nations,
+    nations: nations.map(({ diplomaticAidUntilMonth, ...nation }) => ({
+      ...nation,
+      ...(diplomaticAidUntilMonth != null ? { diplomaticAidUntilMonth } : {}),
+    })),
     generals: generals.map((general) =>
       storedGeneralRemoval(storedGeneralSex(general, world.ruleFeatures.includes('lineage-v1')), world.replayFormat),
     ),

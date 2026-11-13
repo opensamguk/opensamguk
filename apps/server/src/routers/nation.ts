@@ -1,11 +1,13 @@
 import { TRPCError } from '@trpc/server';
 import {
+  DIPLOMATIC_COOLDOWN_FEATURE,
   INTEL_FEATURE,
   NATION_STRATEGY_FEATURE,
   OFFICE_EFFECTS_FEATURE,
   STRATEGY_KEYS,
   TICKS_PER_MONTH,
   WANDERING_MONTH_LIMIT,
+  diplomaticAidMonths,
   nowTick,
   readStoredNationStrategy,
   strategyMonth,
@@ -52,6 +54,10 @@ export const nationRouter = router({
         ownNation && world.status !== 'ENDED' && world.ruleFeatures.includes(NATION_STRATEGY_FEATURE)
           ? await readStrategyStatus()
           : undefined;
+      const diplomaticAid =
+        ownNation && world.ruleFeatures.includes(DIPLOMATIC_COOLDOWN_FEATURE) && world.status !== 'ENDED'
+          ? { remainingMonths: diplomaticAidMonths(nation, strategyMonth(nowTick(worldClock(world), ctx.now))) }
+          : undefined;
       return {
         ...(lifecycle
           ? {
@@ -72,6 +78,7 @@ export const nationRouter = router({
         ...(ownNation ? { salaryRate } : {}),
         ...(finance ? { financeEstimate: finance.financeEstimate } : {}),
         ...(strategyStatus ? { strategyStatus } : {}),
+        ...(diplomaticAid ? { diplomaticAid } : {}),
         cities: cities.map((city) => {
           if (!ownNation) return { ...mapCity(city), ...cityCapacity(city) };
           const incomeEstimate = finance?.cityIncome.get(city.cityKey);

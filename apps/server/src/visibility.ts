@@ -31,7 +31,7 @@ type General = Omit<
 type City = Omit<Prisma.CityGetPayload<true>, 'kind'> & { kind?: string | null };
 type Nation = Omit<
   Prisma.NationGetPayload<true>,
-  'notice' | 'noticeDirective' | 'noticeRevision' | 'noticeUpdatedAt' | 'noticeUpdatedBy'
+  'notice' | 'noticeDirective' | 'noticeRevision' | 'noticeUpdatedAt' | 'noticeUpdatedBy' | 'diplomaticAidUntilMonth'
 >;
 export type Viewer = Pick<General, 'id' | 'nationId' | 'cityKey'> | null;
 

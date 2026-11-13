@@ -494,7 +494,8 @@ export async function readWorldState(db: PrismaClient, worldId: string): Promise
         statRules: statRulesSchema.parse({ stat: world.statRules }).stat,
         unitSet: unitSetSchema.parse(world.unitSet),
         cities: attachOperationalKinds(cities.map(stripWorldId), operationalMap),
-        nations: nations.map((nation) => {
+        nations: nations.map(({ diplomaticAidUntilMonth, ...nation }) => {
+          void diplomaticAidUntilMonth;
           return { ...stripWorldId(nation), capitalCityKey: nation.capitalCityKey };
         }),
         generals: generals.map(
