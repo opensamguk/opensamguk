@@ -35,7 +35,7 @@ type General = Omit<
 > & { politics?: number | null; charm?: number | null };
 type City = Omit<
   Prisma.CityGetPayload<true>,
-  'kind' | 'seasonalEvent' | 'conflictTick' | 'stratagemTick' | 'warCasualties' | 'conflict'
+  'kind' | 'seasonalEvent' | 'conflictTick' | 'stratagemTick' | 'warCasualties' | 'conflict' | 'conflictOrder'
 > & {
   kind?: string | null;
 };

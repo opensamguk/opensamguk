@@ -2,7 +2,7 @@ import type { Prisma } from '@opensamguk/db';
 import { checkReplayOrigin, readCityRuins, RUIN_PERCENT, type WorldState } from '@opensamguk/rules';
 
 type RuinInfo = { percent: (typeof RUIN_PERCENT)[number] } | null;
-type City = Omit<Prisma.CityGetPayload<Record<string, never>>, 'conflict'>;
+type City = Omit<Prisma.CityGetPayload<Record<string, never>>, 'conflict' | 'conflictOrder'>;
 
 // 같은 RepeatableRead 조회에서 도시 상한과 원장을 대조한다. 응답에는 복구 비율만 남긴다.
 export async function readCityScaleProjection(
@@ -20,7 +20,8 @@ export async function readCityScaleProjection(
   checkReplayOrigin(origin);
   if (world.replayFormat !== 3 || origin.version !== 3 || !origin.initial.ruleFeatures?.includes('city-scale-v1'))
     throw new Error('폐허의 재생 형식이나 생성 원장이 다릅니다.');
-  const rows = cities ?? (await tx.city.findMany({ where: { worldId }, omit: { conflict: true } }));
+  const rows =
+    cities ?? (await tx.city.findMany({ where: { worldId }, omit: { conflict: true, conflictOrder: true } }));
   const state: Pick<WorldState, 'ruleFeatures' | 'cities'> = {
     ruleFeatures: world.ruleFeatures,
     cities: Object.fromEntries(

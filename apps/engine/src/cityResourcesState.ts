@@ -34,7 +34,10 @@ export async function assertStoredCityResources(
     return;
   }
   if (world.replayFormat !== 3) throw new Error('도시 자원은 새 판 재생 형식에서만 쓸 수 있습니다.');
-  const cities = await tx.city.findMany({ where: { worldId: world.id }, omit: { kind: true, conflict: true } });
+  const cities = await tx.city.findMany({
+    where: { worldId: world.id },
+    omit: { kind: true, conflict: true, conflictOrder: true },
+  });
   readStoredCityResources(
     world.cityResourcesState,
     {

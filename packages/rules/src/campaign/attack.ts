@@ -17,7 +17,7 @@ import { readCampaignState, type CampaignUnitState } from './state';
 import { readCityResourcesState } from '../cityResources/state';
 import { disbandCityGarrison } from '../cityResources/ownership';
 import { recordWarCasualties } from '../monthly/warIncome';
-import { recordSiegeContribution } from '../battle/cityConflict';
+import { recordSiegeContribution, settleCityConflict } from '../battle/cityConflict';
 
 const argsSchema = z.strictObject({ cityKey: positive });
 const year = (view: WorldView, tick: number) => view.startYear + Math.floor(tick / (12 * TICKS_PER_MONTH));
@@ -260,12 +260,11 @@ function execute(view: WorldView, actor: Actor, raw: unknown, rng: Rng): Command
     }
     battleAwards.push({ generalId: ownerId, wins: 0, captures: 1 });
     const city = state.cities[cityKey]!;
-    city.nationId = nationId;
-    if (city.conflict) city.conflict = {};
+    city.nationId = settleCityConflict(state, city, nationId, history);
     city.defence = 0;
     city.security = Math.round(city.security * BALANCE.CAPTURE_SECURITY_FACTOR);
     city.trust = Math.max(0, city.trust - BALANCE.CAPTURE_TRUST_LOSS);
-    state.generals[ownerId]!.cityKey = cityKey;
+    if (city.nationId === nationId) state.generals[ownerId]!.cityKey = city.cityKey;
     if (defendingNation !== null) {
       const nation = state.nations[defendingNation]!;
       const remaining = Object.values(state.cities)
