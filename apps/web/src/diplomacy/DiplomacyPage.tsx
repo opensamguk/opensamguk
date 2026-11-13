@@ -143,7 +143,15 @@ export function DiplomacyPage({ tab }: { tab: DiplomacyTab }) {
     );
   else {
     const storageKey = requestsStorageKey(userId, worldId);
-    body = <Diplomacy key={storageKey} worldId={worldId} tab={tab} storageKey={storageKey} />;
+    body = (
+      <Diplomacy
+        key={storageKey}
+        worldId={worldId}
+        tab={tab}
+        storageKey={storageKey}
+        ownNationId={home.data.nation.id}
+      />
+    );
   }
 
   return (
@@ -157,7 +165,17 @@ export function DiplomacyPage({ tab }: { tab: DiplomacyTab }) {
   );
 }
 
-function Diplomacy({ worldId, tab, storageKey }: { worldId: string; tab: DiplomacyTab; storageKey: string }) {
+function Diplomacy({
+  worldId,
+  tab,
+  storageKey,
+  ownNationId,
+}: {
+  worldId: string;
+  tab: DiplomacyTab;
+  storageKey: string;
+  ownNationId: number;
+}) {
   const trpc = useTRPC();
   const href = useRouterState({ select: (state) => state.location.href });
   const map = useWorldMap(worldId);
@@ -179,6 +197,7 @@ function Diplomacy({ worldId, tab, storageKey }: { worldId: string; tab: Diploma
   // 끝난 요청의 조약은 국가 ID만 담는다. 이름은 공개 지도에서 찾는다. 지도에 없으면 없는 국가로 적는다.
   const nationLabel = (id: number) =>
     map.data ? nationName(map.data.nations.find((n) => n.id === id) ?? null, id) : `국가 ${id}`;
+  const cityLabel = (key: number) => map.data?.cities.find((city) => city.key === key)?.name ?? `도시 ${key}`;
   const treatyName = (treatyId: string) => {
     const t = items.find((row) => row.id === treatyId);
     return t ? `${nationName(t.from, t.fromNationId)}·${nationName(t.to, t.toNationId)} 조약` : '조약';
@@ -252,6 +271,9 @@ function Diplomacy({ worldId, tab, storageKey }: { worldId: string; tab: Diploma
             worldId={worldId}
             targets={head.targets}
             tradeEnabled={head.tradeEnabled === true}
+            expandedEnabled={head.expandedEnabled === true}
+            ownNationId={ownNationId}
+            map={map.data}
             busyFor={(toNationId) => {
               const mine = trackedFor(requests.tracked, { toNationId });
               if (mine) return `이 상대에게 보낸 제안이 ${phaseText(mine.phase)}`;
@@ -269,6 +291,7 @@ function Diplomacy({ worldId, tab, storageKey }: { worldId: string; tab: Diploma
           <TreatyList
             treaties={treatiesForTab(items, tab)}
             empty={emptyText(TAB_LABELS[tab], list.hasNextPage)}
+            cityLabel={cityLabel}
             busy={(id) => busyText(id, requests.tracked, pending)}
             onRespond={(treatyId, accept) => requests.send({ kind: 'treaty.respond', input: { treatyId, accept } })}
             onBreak={(treatyId) => requests.send({ kind: 'treaty.break', input: { treatyId } })}
@@ -369,12 +392,14 @@ function RequestPanel({
 function TreatyList({
   treaties,
   empty,
+  cityLabel,
   busy,
   onRespond,
   onBreak,
 }: {
   treaties: TreatyItem[];
   empty: string;
+  cityLabel: (key: number) => string;
   busy: (treatyId: string) => string | null;
   onRespond: (treatyId: string, accept: boolean) => void;
   onBreak: (treatyId: string) => void;
@@ -386,6 +411,7 @@ function TreatyList({
         <TreatyCard
           key={t.id}
           treaty={t}
+          cityLabel={cityLabel}
           busy={busy(t.id)}
           onRespond={(accept) => onRespond(t.id, accept)}
           onBreak={() => onBreak(t.id)}

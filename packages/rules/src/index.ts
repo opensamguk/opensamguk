@@ -91,6 +91,7 @@ export {
   treatyRespondByTick,
   treatyClauseEndTick,
   type TreatyOptions,
+  treatyOptions,
   applyTreatyInput,
   settleTreaties,
   treatyClosures,
@@ -105,6 +106,7 @@ export {
   type TreatyResponseGuide,
   type TreatyResponseGuideCode,
 } from './diplomacy/treaty';
+export { EXPANDED_TREATY_FEATURE, type TreatyAidFailure } from './diplomacy/treatyClauses';
 export type {
   TreatyClause,
   FirstTreatyClause,

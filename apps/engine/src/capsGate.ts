@@ -1,6 +1,7 @@
 import type { Prisma } from '@opensamguk/db';
 import {
   projectTreatyRows,
+  treatyOptions,
   selectWorldCapabilities,
   readStoredNationStrategy,
   readStoredPreparedTurns,
@@ -56,7 +57,7 @@ export async function assertWorldCapabilities(
   if (!enabled) {
     if (rows.length) throw new Error('조약을 끈 월드에 조약 저장 행이 있습니다.');
   } else {
-    const options = { tradeEnabled: modern && world.ruleFeatures.includes('treaty-trade') };
+    const options = treatyOptions(modern ? world.ruleFeatures : []);
     if (modern)
       for (const row of rows)
         if (!['PROPOSED', 'ACTIVE', 'BROKEN'].includes(row.status)) validateClosedTreatyRow(row, options);

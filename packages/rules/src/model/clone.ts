@@ -60,7 +60,9 @@ export function cloneWorldWithRegistry(view: WorldView, registry: ExtStateRegist
       ? {
           treaties: view.treaties.map((treaty) => ({
             ...treaty,
-            clauses: treaty.clauses.map((clause) => ({ ...clause })),
+            clauses: treaty.clauses.map((clause) =>
+              clause.kind === 'passage' ? { ...clause, cityKeys: [...clause.cityKeys] } : { ...clause },
+            ),
           })),
         }
       : {}),

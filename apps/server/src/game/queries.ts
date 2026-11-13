@@ -8,6 +8,7 @@ import {
   restoreExtState,
   selectWorldCapabilities,
   projectTreatyRows,
+  treatyOptions,
   validateBrokenTreatyRow,
   validateClosedTreatyRow,
   type WorldInit,
@@ -82,14 +83,13 @@ export async function readView(tx: Prisma.TransactionClient, worldId: string) {
       : capabilities?.kind === 'caps' && 'treaty' in capabilities.selection;
   if (!treatyEnabled && treatyRows.length) throw new Error('조약을 끈 월드에 조약 저장 행이 있습니다.');
   const breakEnabled = world.replayFormat === 3 && world.ruleFeatures.includes('treaty-break');
-  const treatyOptions = { tradeEnabled: world.replayFormat === 3 && world.ruleFeatures.includes('treaty-trade') };
+  const clauses = treatyOptions(world.replayFormat === 3 ? world.ruleFeatures : []);
   if (world.replayFormat === 3)
     for (const row of treatyRows)
-      if (!['PROPOSED', 'ACTIVE', 'BROKEN'].includes(row.status)) validateClosedTreatyRow(row, treatyOptions);
-  if (breakEnabled)
-    for (const row of treatyRows) if (row.status === 'BROKEN') validateBrokenTreatyRow(row, treatyOptions);
+      if (!['PROPOSED', 'ACTIVE', 'BROKEN'].includes(row.status)) validateClosedTreatyRow(row, clauses);
+  if (breakEnabled) for (const row of treatyRows) if (row.status === 'BROKEN') validateBrokenTreatyRow(row, clauses);
   const treaties = treatyEnabled
-    ? projectTreatyRows(breakEnabled ? treatyRows.filter((row) => row.status !== 'BROKEN') : treatyRows, treatyOptions)
+    ? projectTreatyRows(breakEnabled ? treatyRows.filter((row) => row.status !== 'BROKEN') : treatyRows, clauses)
     : undefined;
   const ext = restoreExtState(commands, await readWorldExtRows(tx, worldId), world.ruleFeatures);
   const cities = await tx.city.findMany({ where: { worldId } });

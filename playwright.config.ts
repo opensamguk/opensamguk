@@ -31,6 +31,7 @@ export default defineConfig({
     '**/intel.spec.ts',
     '**/relations.spec.ts',
     '**/npc-entry-acceptance.spec.ts',
+    '**/t2-07-nonaggression-expiry.spec.ts',
   ],
   forbidOnly: isCI,
   use: { baseURL: 'http://127.0.0.1:5173' },

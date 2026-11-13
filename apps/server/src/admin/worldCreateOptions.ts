@@ -455,7 +455,7 @@ async function artifactCreationProfiles(
         nations: entry.nations,
       },
       resources: [...resources, { kind: 'SCENARIO', key: entry.name, version: 1, contentHash: entry.contentHash }],
-      ruleFeatures: [...creationFeatures],
+      ruleFeatures: [...creationFeatures, 'treaty-break', 'treaty-expanded', 'treaty-trade'],
       presets: [
         {
           key: isEmpty ? 'empty' : 'regular',

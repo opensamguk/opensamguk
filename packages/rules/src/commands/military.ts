@@ -3,6 +3,7 @@ import { BALANCE } from '../balance';
 import { defineCommand, fail, noArgs, ownCity, positive, success } from './support';
 import { drillGain, recruitCost } from './statScores';
 import { crewContext, crewTypeFailure } from '../world/crewRequirements';
+import { hasTreatyPassage } from '../diplomacy/treatyClauses';
 
 export const recruitArgs = z.strictObject({ amount: positive, crewType: positive });
 
@@ -82,7 +83,10 @@ export const militaryCommands = [
       if (!city) return fail('BAD_TARGET', '도시가 없습니다.');
       if (!view.cities[general.cityKey]?.connections.includes(args.cityKey))
         return fail('NOT_ADJACENT', '연결된 도시가 아닙니다.');
-      return general.nationId !== null && city.nationId !== null && city.nationId !== general.nationId
+      return general.nationId !== null &&
+        city.nationId !== null &&
+        city.nationId !== general.nationId &&
+        !hasTreatyPassage(view, general.nationId, city.cityKey, actor.tick ?? 0)
         ? fail('NOT_OWN_CITY', '다른 국가 도시에는 출병해야 합니다.')
         : null;
     },

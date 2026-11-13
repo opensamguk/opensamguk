@@ -8,6 +8,7 @@ import {
   TREATY_INPUTS,
   validateNationTrustState,
   type TreatyQuoteCode,
+  type TreatyOptions,
   type TreatyRelation,
   type TreatyResponseGuideCode,
   type TreatyState,
@@ -22,8 +23,10 @@ import {
   requireTreatyBreakWorld,
   requireTreatyWorld,
   toTreatyDetail,
+  toTreatySettlementDate,
   treatyBreakEnabled,
   treatyTradeEnabled,
+  worldTreatyOptions,
   type TreatyDetail,
 } from './treatyQueries';
 import { normalizeTreatyRequestPayload, type TreatyRequestKind } from './treatyRequests';
@@ -66,6 +69,7 @@ type RecentAction = {
 export type TreatyListPage = {
   breakEnabled?: true;
   tradeEnabled?: true;
+  expandedEnabled?: true;
   canPropose: TreatyAllowed;
   targets: TreatyTarget[];
   items: TreatyListItem[];
@@ -101,16 +105,16 @@ function allowed(code: TreatyDenyCode, reason: string): TreatyAllowed {
 function publicNation(nation: NationRef): NationRef {
   return { id: nation.id, name: nation.name, color: nation.color };
 }
-function quote(input: Parameters<typeof quoteTreatyProposal>[0], tradeEnabled = false) {
+function quote(input: Parameters<typeof quoteTreatyProposal>[0], options: TreatyOptions) {
   try {
-    return quoteTreatyProposal(input, { tradeEnabled });
+    return quoteTreatyProposal(input, options);
   } catch {
     invalid();
   }
 }
-function responseGuide(input: Parameters<typeof guideTreatyResponse>[0], tradeEnabled = false) {
+function responseGuide(input: Parameters<typeof guideTreatyResponse>[0], options: TreatyOptions) {
   try {
-    return guideTreatyResponse(input, { tradeEnabled });
+    return guideTreatyResponse(input, options);
   } catch {
     invalid();
   }
@@ -146,7 +150,7 @@ async function recentActions(
           payload: event.payload,
           result: event.result,
         },
-        { tradeEnabled: treatyTradeEnabled(world) },
+        worldTreatyOptions(world),
       );
     } catch {
       invalid();
@@ -192,6 +196,7 @@ export async function listTreaties(
     return {
       ...(breakEnabled ? { breakEnabled: true } : {}),
       ...(treatyTradeEnabled(world) ? { tradeEnabled: true } : {}),
+      ...(worldTreatyOptions(world).expandedEnabled ? { expandedEnabled: true } : {}),
       canPropose,
       targets: [],
       items: [],
@@ -246,7 +251,7 @@ export async function listTreaties(
             payload: event.payload,
             result: event.result,
           },
-          { tradeEnabled: treatyTradeEnabled(world) },
+          worldTreatyOptions(world),
         );
       } catch {
         invalid();
@@ -354,7 +359,7 @@ export async function listTreaties(
           fromCityCount: cityCounts.get(row.fromNationId) ?? 0,
           target: { relation: current, cityCount: cityCounts.get(row.toNationId) ?? 0 },
         },
-        treatyTradeEnabled(world),
+        worldTreatyOptions(world),
       );
       if (result.cost === null) invalid();
       estimate = detail.incoming
@@ -404,7 +409,7 @@ export async function listTreaties(
             responderCityCount: cityCounts.get(row.toNationId) ?? 0,
             responderGold: ownGold,
           },
-          treatyTradeEnabled(world),
+          worldTreatyOptions(world),
         );
         canAccept = guidance.accept === null ? { ok: true } : allowed(guidance.accept.code, guidance.accept.message);
         canReject = guidance.reject === null ? { ok: true } : allowed(guidance.reject.code, guidance.reject.message);
@@ -418,7 +423,7 @@ export async function listTreaties(
       proposedAt: toGameDate(world.startYear, row.proposedTick),
       respondBy: date(detail.respondByTick),
       startAt: date(row.startTick),
-      endAt: date(row.endTick),
+      endAt: row.endTick === null ? null : toTreatySettlementDate(world.startYear, row.endTick),
       estimate,
       canAccept,
       canReject,
@@ -453,6 +458,7 @@ export async function listTreaties(
   return {
     ...(breakEnabled ? { breakEnabled: true } : {}),
     ...(treatyTradeEnabled(world) ? { tradeEnabled: true } : {}),
+    ...(worldTreatyOptions(world).expandedEnabled ? { expandedEnabled: true } : {}),
     canPropose,
     targets,
     items,
@@ -555,7 +561,7 @@ export async function quoteTreaty(
       fromCityCount,
       target: targetValue,
     },
-    treatyTradeEnabled(world),
+    worldTreatyOptions(world),
   );
   return {
     cost: result.cost === null ? null : { mine: result.cost.from, theirs: result.cost.to },

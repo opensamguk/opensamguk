@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { trpc } from '../trpc';
 import { errorCode, serverMessage } from '../turns/apiError';
 import { fetchRequest, sendAction, TREATY_PATH_KEY, type ActionInput, type RequestId } from './contract';
 import {
@@ -36,10 +37,22 @@ export function useTreatyRequests(worldId: string, storageKey: string) {
       writeTracked(sessionStore(), storageKey, next.tracked);
       setState(next);
       // 끝난 요청의 조약은 ID만 담는다. 카드 전체는 목록을 다시 받아 갱신한다.
-      if (next.finished.length > before.finished.length)
+      if (next.finished.length > before.finished.length) {
         void queryClient.invalidateQueries({ queryKey: TREATY_PATH_KEY });
+        if (
+          next.finished.some(
+            (item) =>
+              item.outcome === 'ACCEPTED' &&
+              item.treaty?.clauses.some((clause) => clause.kind === 'cityTransfer') &&
+              !before.finished.includes(item),
+          )
+        ) {
+          void queryClient.invalidateQueries({ queryKey: trpc.world.map.queryKey({ worldId }) });
+          void queryClient.invalidateQueries({ queryKey: trpc.city.get.queryKey({ worldId }) });
+        }
+      }
     },
-    [queryClient, storageKey],
+    [queryClient, storageKey, worldId],
   );
 
   const deliver = useCallback(

@@ -45,6 +45,7 @@ export function paidText(treaty: TreatyItem, cost: NonNullable<TreatyItem['cost'
 
 interface Props {
   treaty: TreatyItem;
+  cityLabel?: (key: number) => string;
   // 이 조약에 결과를 기다리는 요청이 있으면 그 안내. 있으면 단추를 잠근다.
   busy: string | null;
   onRespond: (accept: boolean) => void;
@@ -101,7 +102,15 @@ function CostFact({ treaty }: { treaty: TreatyItem }) {
   );
 }
 
-export function TreatyCard({ treaty, busy, onRespond, onBreak }: Props) {
+export function TreatyCard({ treaty, cityLabel = (key) => `도시 ${key}`, busy, onRespond, onBreak }: Props) {
+  const labels = {
+    city: cityLabel,
+    nation: (id: number) => nationName(id === treaty.fromNationId ? treaty.from : treaty.to, id),
+    recipient: (id: number) =>
+      id === treaty.fromNationId
+        ? nationName(treaty.to, treaty.toNationId)
+        : nationName(treaty.from, treaty.fromNationId),
+  };
   const [confirmBreak, setConfirmBreak] = useState(false);
   const status = STATUS_LABELS[treaty.status];
   const enforced = treaty.clauses.filter((c) => isEnforced(c.kind));
@@ -156,7 +165,7 @@ export function TreatyCard({ treaty, busy, onRespond, onBreak }: Props) {
           <h4 className={styles.clauseHead}>서버가 집행하는 조항</h4>
           <ul className={styles.clauses}>
             {enforced.map((clause, i) => (
-              <li key={i}>{describeClause(clause)}</li>
+              <li key={i}>{describeClause(clause, labels)}</li>
             ))}
           </ul>
         </section>

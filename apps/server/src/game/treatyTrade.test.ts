@@ -13,6 +13,7 @@ function fixture() {
     startYear: 191,
     actionSequence: 30,
     clockTick: 20000,
+    monthlyTick: 20000,
   };
   const actor = { id: 1, cityKey: 1, nationId: 1 as number | null, userId: 'owner' };
   const home = { cityKey: 1, nationId: 1, connections: [2] };
@@ -75,7 +76,7 @@ describe('T2-07 / AC-M2-14 교역 후보 API leaf', () => {
           cityName: '도시2',
           nation: { id: 2, name: '국가2', color: '#00f' },
           treatyId: '10',
-          tradeEndsAt: { year: 191, month: 4 },
+          tradeEndsAt: { year: 191, month: 5 },
         },
       ],
       blocked: null,
@@ -105,8 +106,20 @@ describe('T2-07 / AC-M2-14 교역 후보 API leaf', () => {
   it.each(['war', 'expired', 'removed'] as const)('%s 후보는 내보내지 않는다', async (mode) => {
     const f = fixture();
     if (mode === 'war') f.diplomacies.push({ nationA: 1, nationB: 2, state: 'WAR' });
-    if (mode === 'expired') f.world.clockTick = 40000;
+    if (mode === 'expired') f.world.monthlyTick = 40000;
     if (mode === 'removed') f.nations.pop();
+    expect(await f.query()).toMatchObject({ items: [], blocked: expect.any(String) });
+  });
+  it('시계가 만료 틱을 지나도 정산 전에는 교역 후보를 보여 준다', async () => {
+    const f = fixture();
+    f.world.clockTick = 41000;
+    f.world.monthlyTick = 30000;
+    expect(await f.query()).toMatchObject({ items: [{ cityKey: 2 }], blocked: null });
+  });
+  it('다음 정산 틱에 시작하는 조약은 이번 달 후보를 앞당기지 않는다', async () => {
+    const f = fixture();
+    f.row.startTick = 30000;
+    f.row.endTick = 50000;
     expect(await f.query()).toMatchObject({ items: [], blocked: expect.any(String) });
   });
   it('조약 저장 파손을 빈 후보로 숨기지 않는다', async () => {

@@ -72,7 +72,10 @@ describe('T2-07 / AC-M2-14 교역', () => {
     expect(trade.check(fixture(), { ...actor, tick }, args)).toBeNull();
   });
   it.each([40000, 50000])('조항을 닫은 월간 뒤에는 실패한다 tick=%i', (tick) => {
-    expect(trade.check(fixture(), { ...actor, tick }, args)?.code).toBe('BAD_STATE');
+    expect(trade.check(fixture(), { ...actor, tick }, args)).toEqual({
+      code: 'BAD_STATE',
+      message: '교역 조약이 없거나 만료되었습니다.',
+    });
   });
   it.each(['missing', 'proposed', 'noClause', 'war'] as const)('%s 상태는 실패하고 RNG를 쓰지 않는다', (mode) => {
     const state = fixture();
@@ -82,8 +85,9 @@ describe('T2-07 / AC-M2-14 교역', () => {
     if (mode === 'war') state.diplomacies = [{ nationA: 1, nationB: 2, state: 'WAR', untilTick: 0 }];
     const rng = rngFor('failure'),
       draw = vi.spyOn(rng, 'next');
-    expect(trade.check(state, actor, args)?.code).toBe('BAD_STATE');
-    expect(() => trade.execute(state, actor, args, rng)).toThrow();
+    const message = mode === 'war' ? '교전 중인 국가와는 교역할 수 없습니다.' : '교역 조약이 없거나 만료되었습니다.';
+    expect(trade.check(state, actor, args)).toEqual({ code: 'BAD_STATE', message });
+    expect(() => trade.execute(state, actor, args, rng)).toThrow(message);
     expect(draw).not.toHaveBeenCalled();
   });
   it('연결·국가·자기 도시와 실행 시각을 검사한다', () => {
@@ -104,6 +108,26 @@ describe('T2-07 / AC-M2-14 교역', () => {
     delete state.nations[2];
     expect(trade.check(state, actor, args)?.code).toBe('BAD_STATE');
   });
+  it('실제 교역 상대와 관문 여부를 구분해 실패 이유를 표시한다', () => {
+    const state = fixture();
+    state.nations[3] = { ...state.nations[2]!, id: 3, name: '국가3', capitalCityKey: 3 };
+    state.cities[3]!.nationId = 3;
+    state.diplomacies = [{ nationA: 1, nationB: 3, state: 'WAR', untilTick: 0 }];
+    expect(trade.check(state, actor, args)).toBeNull();
+    delete state.treaties;
+    expect(trade.check(state, actor, args)?.message).toBe('교역 조약이 없거나 만료되었습니다.');
+    state.diplomacies = [{ nationA: 2, nationB: 1, state: 'WAR', untilTick: 0 }];
+    expect(trade.check(state, actor, args)?.message).toBe('교전 중인 국가와는 교역할 수 없습니다.');
+    state.cities[2]!.kind = 'PASS';
+    expect(trade.check(state, actor, args)?.message).toBe('관문은 교역 경로에 포함되지 않습니다.');
+    delete state.cities[2]!.kind;
+    state.cities[1]!.kind = 'PASS';
+    expect(trade.check(state, actor, args)?.message).toBe('관문은 교역 경로에 포함되지 않습니다.');
+    delete state.cities[1]!.kind;
+    state.cities[2]!.nationId = null;
+    expect(trade.check(state, actor, args)?.code).toBe('BAD_TARGET');
+  });
+
   it('같은 상대의 여러 유효 조약은 ID가 작은 것을 고른다', () => {
     const state = fixture();
     state.treaties!.unshift({ ...state.treaties![0]!, id: 20 });

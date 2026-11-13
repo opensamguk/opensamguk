@@ -12,7 +12,7 @@ import {
   toTreatyDetail,
   type TreatyDetail,
 } from './treatyQueries';
-import { treatyTradeEnabled } from './treatyQueries';
+import { worldTreatyOptions } from './treatyQueries';
 
 export type TreatyRequestKind = keyof typeof TREATY_INPUTS;
 export type TreatyRequestState =
@@ -195,7 +195,7 @@ export async function readTreatyRequest(tx: Prisma.TransactionClient, input: Ide
         payload: event.payload,
         result: event.result,
       },
-      { tradeEnabled: treatyTradeEnabled(world) },
+      worldTreatyOptions(world),
     );
   } catch {
     invalid();

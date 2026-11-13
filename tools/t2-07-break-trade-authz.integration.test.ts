@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createDb, type PrismaClient } from '../packages/db/src/index';
-import { toGameDate } from '../packages/rules/src/index';
+import { TICKS_PER_MONTH, toGameDate, type TreatyClause } from '../packages/rules/src/index';
 import { buildServer } from '../apps/server/src/server';
 import { authzCase } from '../apps/server/src/authz/case';
 import { newSession } from '../apps/server/src/auth/session';
@@ -14,10 +14,12 @@ import type { AppRouter } from '../apps/server/src/router';
 import { monthlyFixture } from '../apps/engine/test/monthlyFixture';
 import { saveInitialWorld } from '../apps/engine/src/world/persistence';
 import { controlClock } from '../apps/engine/src/world/clock';
-import { acquireLease, releaseLease, renewLease, type Lease } from '../apps/engine/src/lease';
+import { acquireLease, databaseNow, releaseLease, renewLease, type Lease } from '../apps/engine/src/lease';
 import { TurnLoop } from '../apps/engine/src/turnLoop';
+import { loadReplayState } from '../apps/engine/src/monthly';
 import { pnpmCli } from './node-cli';
 import { testDatabaseUrl } from './test-database';
+import { expectSeparateProcessReplay, runTurnWorkerAndKill } from './test-turn-worker';
 
 // AC-M2-06·14: 실제 Fastify 주입, 세션, PostgreSQL, 중앙 엔진을 함께 지난다.
 type TreatyCaller = ReturnType<AppRouter['createCaller']>['treaty'];
@@ -42,6 +44,7 @@ const origin = 'http://t207-authz.test';
 const features = ['treaty', 'treaty-break', 'treaty-trade'];
 let admin: PrismaClient | undefined;
 let db: PrismaClient;
+let ownUrl: string;
 let app: Awaited<ReturnType<typeof buildServer>> | undefined;
 let catalogBefore: Catalog | undefined;
 let created = false;
@@ -130,7 +133,8 @@ beforeAll(async () => {
   created = true;
   ownOid = await identity();
   if (ownOid === undefined) throw Error('생성한 시험 DB의 OID가 없습니다.');
-  db = createDb(own.href);
+  ownUrl = own.href;
+  db = createDb(ownUrl);
   const [connected] = await db.$queryRaw<Array<{ name: string }>>`SELECT current_database() AS name`;
   expect(connected?.name).toBe(databaseName);
   await migrate(own.href);
@@ -139,7 +143,7 @@ beforeAll(async () => {
   await app.ready();
 });
 
-async function fixture(): Promise<Fixture> {
+async function fixture(atWar = false, tradeTick?: number): Promise<Fixture> {
   const state = await monthlyFixture();
   const users = Array.from({ length: 6 }, () => randomUUID());
   const owned: Fixture = { worldId: '', users, cookies: [], treatyId: '' };
@@ -183,9 +187,9 @@ async function fixture(): Promise<Fixture> {
     nationId: role.nation,
     cityKey: role.nation,
     officerLevel: role.user === 3 ? 1 : 12,
-    nextTurnTick: 10000,
+    nextTurnTick: tradeTick === undefined ? TICKS_PER_MONTH + 1 : role.user === 0 ? tradeTick : 3 * TICKS_PER_MONTH,
   }));
-  state.diplomacies = [];
+  state.diplomacies = atWar ? [{ nationA: 1, nationB: 2, state: 'WAR', untilTick: 0 }] : [];
   const made = await saveInitialWorld(db, state, {
     name: '조약 권한 HTTP 시험',
     turnTermMinutes: 120,
@@ -200,14 +204,6 @@ async function fixture(): Promise<Fixture> {
   await controlClock(db, made.worldId, 'start');
   return owned;
 }
-beforeEach(async () => {
-  f = await fixture();
-  const proposed = await complete('treaty.propose', { toNationId: 2, clauses: [{ kind: 'trade', months: 12 }] });
-  if (proposed.status !== 'applied') throw Error('실제 HTTP 제안 fixture 실패');
-  f.treatyId = proposed.treatyId;
-  const accepted = await complete('treaty.respond', { treatyId: f.treatyId, accept: true }, 5);
-  expect(accepted).toMatchObject({ status: 'applied', outcome: 'ACCEPTED', treatyId: f.treatyId });
-});
 afterEach(async () => {
   await Promise.allSettled([...pendingRequests]);
   for (const owned of fixtures.splice(0)) {
@@ -265,7 +261,7 @@ afterAll(async () => {
 });
 
 async function wire(path: string, input: unknown, cookie?: string): Promise<Wire> {
-  const mutation = path === 'treaty.propose' || path === 'treaty.respond' || path === 'treaty.break';
+  const mutation = ['treaty.propose', 'treaty.respond', 'treaty.break', 'turns.set'].includes(path);
   const encoded = JSON.stringify({ 0: input });
   const response = await app!.inject({
     method: mutation ? 'POST' : 'GET',
@@ -290,8 +286,7 @@ function error(response: Wire, status: number, code: string) {
   expect(response.error?.data.code).toBe(code);
   expect(response.error?.data.reason).toBeNull();
 }
-async function complete(path: QueuedPath, payload: Record<string, unknown>, user = 0): Promise<Output['request']> {
-  const requestId = randomUUID();
+async function queue(path: QueuedPath, payload: Record<string, unknown>, user: number, requestId: string) {
   const response = call(path, { ...payload, requestId }, user);
   pendingRequests.add(response);
   void response.then(
@@ -299,7 +294,6 @@ async function complete(path: QueuedPath, payload: Record<string, unknown>, user
     () => pendingRequests.delete(response),
   );
   const deadline = performance.now() + 4500;
-  let queued = false;
   while (performance.now() < deadline) {
     const event = await db.inputEvent.findFirst({
       where: { worldId: f.worldId, userId: f.users[user]!, idempotencyKey: `${path}:${requestId}` },
@@ -307,15 +301,16 @@ async function complete(path: QueuedPath, payload: Record<string, unknown>, user
     if (event) {
       expect(event.status).toBe('PENDING');
       expect(event.sequence).toBeNull();
-      queued = true;
-      break;
+      return { event, response };
     }
     await delay(10);
   }
-  if (!queued) {
-    const result = await response;
-    throw Error(`실제 입력 접수 실패: HTTP ${result.status} ${result.error?.data.code ?? 'NO_ERROR'}`);
-  }
+  const result = await response;
+  throw Error(`실제 입력 접수 실패: HTTP ${result.status} ${result.error?.data.code ?? 'NO_ERROR'}`);
+}
+
+async function complete(path: QueuedPath, payload: Record<string, unknown>, user = 0): Promise<Output['request']> {
+  const { event, response } = await queue(path, payload, user, randomUUID());
   if (!f.lease) {
     const lease = await acquireLease(db, f.worldId);
     if (!lease) throw Error('시험 엔진 리스가 없습니다.');
@@ -326,10 +321,51 @@ async function complete(path: QueuedPath, payload: Record<string, unknown>, user
   const result = value<Output['request']>(await response);
   expect(result.status).not.toBe('pending');
   const stored = await db.inputEvent.findFirstOrThrow({
-    where: { worldId: f.worldId, idempotencyKey: `${path}:${requestId}` },
+    where: { id: event.id },
   });
   expect(stored.status).toBe(result.status === 'applied' ? 'APPLIED' : 'REJECTED');
   return result;
+}
+
+async function recoverTreatyInput<T>(
+  path: QueuedPath,
+  payload: Record<string, unknown>,
+  user: number,
+  tick: number,
+  read: () => Promise<T>,
+) {
+  const { worldId } = f;
+  if (f.lease) await releaseLease(db, f.lease);
+  delete f.lease;
+  delete f.loop;
+  const requestId = randomUUID();
+  const { event, response } = await queue(path, payload, user, requestId);
+  const { clockTick, actionSequence } = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+  expect(tick).toBeGreaterThanOrEqual(clockTick);
+  const before = await read();
+  const target = { tick, inputId: event.id };
+  const failedToken = await runTurnWorkerAndKill(db, ownUrl, worldId, 'beforeCommit', target);
+  expect(await read()).toEqual(before);
+  const committedToken = await runTurnWorkerAndKill(db, ownUrl, worldId, 'committed', target);
+  expect(committedToken).toBeGreaterThan(failedToken);
+  const committed = await read();
+  const stored = await db.inputEvent.findUniqueOrThrow({ where: { id: event.id } });
+  expect(stored).toMatchObject({ status: 'APPLIED', tick, sequence: actionSequence + 1 });
+
+  const original = value<Output['request']>(await response);
+  const retry = value<Output['request']>(await call(path, { ...payload, requestId }, user));
+  if (retry.status !== 'applied') throw Error('커밋 뒤 같은 조약 요청의 적용 결과를 받지 못했습니다.');
+  expect(retry).toMatchObject({ kind: path, requestId });
+  expect(original).toEqual(original.status === 'pending' ? { status: 'pending', kind: path, requestId } : retry);
+
+  const restarted = await acquireLease(db, worldId);
+  if (!restarted) throw Error('재시작한 시험 엔진 리스가 없습니다.');
+  f.lease = restarted;
+  f.loop = new TurnLoop(db, restarted);
+  expect(restarted.fencingToken).toBeGreaterThan(committedToken);
+  expect(await f.loop.advanceTo(tick)).toEqual([]);
+  expect(await read()).toEqual(committed);
+  return { before, committed, retry, stored };
 }
 
 async function snapshot() {
@@ -383,7 +419,194 @@ function publicFields(data: unknown) {
   }
 }
 
+it('AC-M2-14 시계 체크포인트 전 수락한 교역 조약도 후보에 바로 나타난다', async () => {
+  f = await fixture();
+  const { worldId } = f;
+  const proposed = await complete('treaty.propose', { toNationId: 2, clauses: [{ kind: 'trade', months: 1 }] });
+  if (proposed.status !== 'applied') throw Error('교역 검증용 조약 제안을 접수하지 못했습니다.');
+  f.treatyId = proposed.treatyId;
+
+  // 다음 월간 경계 전에서만 실제 시계를 앞당기고, 엔진의 주기 체크포인트는 아직 실행하지 않는다.
+  const now = await databaseNow(db);
+  const before = await db.world.update({
+    where: { id: worldId },
+    data: { clockAnchorAt: new Date(now.getTime() - 20_000) },
+  });
+  f.loop = new TurnLoop(db, f.lease!, { elapsedNow: () => 0 });
+  expect(await complete('treaty.respond', { treatyId: f.treatyId, accept: true }, 5)).toMatchObject({
+    status: 'applied',
+    outcome: 'ACCEPTED',
+  });
+  const [world, treaty] = await db.$transaction([
+    db.world.findUniqueOrThrow({ where: { id: worldId } }),
+    db.treaty.findUniqueOrThrow({ where: { worldId_id: { worldId, id: Number(f.treatyId) } } }),
+  ]);
+  expect(world.clockTick).toBe(before.clockTick);
+  expect(world.monthlyTick).toBe(0);
+  expect(treaty.status).toBe('ACTIVE');
+  expect(treaty.startTick).toBeGreaterThan(world.clockTick);
+  expect(treaty.startTick).toBeLessThan(TICKS_PER_MONTH);
+
+  const target = { cityKey: 2, treatyId: f.treatyId, tradeEndsAt: { year: world.startYear, month: 3 } };
+  const targets = async () => value<Output['tradeTargets']>(await call('treaty.tradeTargets'));
+  expect(await targets()).toMatchObject({ items: [target], blocked: null });
+
+  await f.loop.advanceTo(TICKS_PER_MONTH);
+  expect(await targets()).toMatchObject({ items: [target], blocked: null });
+  await f.loop.advanceTo(2 * TICKS_PER_MONTH);
+  expect(await targets()).toMatchObject({ items: [], blocked: expect.any(String) });
+}, 90_000);
+
+it.each([false, true])(
+  'AC-M2-14 교역의 실제 예약·턴·복구와 재생을 검증한다 (교전=%s)',
+  async (atWar) => {
+    const tick = 100;
+    f = await fixture(atWar, tick);
+    const { worldId } = f;
+    const now = await databaseNow(db);
+    await db.world.update({ where: { id: worldId }, data: { clockAnchorAt: new Date(now.getTime() + 60_000) } });
+    const proposed = await complete('treaty.propose', { toNationId: 2, clauses: [{ kind: 'trade', months: 1 }] });
+    if (proposed.status !== 'applied') throw Error('교역 검증용 조약 제안을 접수하지 못했습니다.');
+    f.treatyId = proposed.treatyId;
+    expect(await complete('treaty.respond', { treatyId: f.treatyId, accept: true }, 5)).toMatchObject({
+      status: 'applied',
+      outcome: 'ACCEPTED',
+    });
+    const treaty = await db.treaty.findUniqueOrThrow({ where: { worldId_id: { worldId, id: Number(f.treatyId) } } });
+    expect(treaty).toMatchObject({ status: 'ACTIVE', endTick: TICKS_PER_MONTH });
+
+    const command = { commandKey: 'trade', args: { cityKey: 2 } };
+    const slots = Array.from({ length: 30 }, (_, index) => (index < 2 ? command : null));
+    const read = () =>
+      db.$transaction(async (tx) => ({
+        world: await tx.world.findUniqueOrThrow({
+          where: { id: worldId },
+          select: { clockTick: true, actionSequence: true },
+        }),
+        replay: await loadReplayState(tx, worldId),
+        inputs: await tx.inputEvent.findMany({ where: { worldId }, orderBy: { sequence: 'asc' } }),
+        logs: await tx.generalLog.findMany({ where: { worldId }, orderBy: [{ sequence: 'asc' }, { id: 'asc' }] }),
+      }));
+    expect(value(await call('turns.precheck', command))).toMatchObject({ ok: true });
+    expect(value<Output['tradeTargets']>(await call('treaty.tradeTargets')).items.map((item) => item.cityKey)).toEqual(
+      atWar ? [] : [2],
+    );
+    if (!atWar) {
+      await unchanged(async () => {
+        const input = { revision: 0, slots };
+        error(await call('turns.set', input, 2), 401, 'UNAUTHORIZED');
+        error(await call('turns.set', input, 4), 404, 'NOT_FOUND');
+        error(await call('turns.set', { ...input, generalId: 5 }), 400, 'BAD_REQUEST');
+      });
+    }
+    expect(value(await call('turns.set', { revision: 0, slots }))).toMatchObject({ ok: true, revision: 1 });
+    const before = await read();
+    expect(before.replay.turns[1]!.slice(0, 2)).toMatchObject(slots.slice(0, 2));
+    await releaseLease(db, f.lease!);
+    delete f.lease;
+    delete f.loop;
+
+    const scheduled = { tick, commandKey: 'trade' };
+    await runTurnWorkerAndKill(db, ownUrl, worldId, 'beforeCommit', scheduled);
+    expect(await read()).toEqual(before);
+    const committedToken = await runTurnWorkerAndKill(db, ownUrl, worldId, 'committed', scheduled);
+    const after = await read();
+    const old = before.replay.state;
+    const next = after.replay.state;
+    const nation = old.nations[1]!;
+    const home = old.cities[1]!;
+    const partner = old.cities[2]!;
+    const actor = old.generals[1]!;
+    expect(home.connections).toContain(2);
+    expect(old.diplomacies.some((relation) => relation.state === 'WAR')).toBe(atWar);
+    expect(after.world).toEqual({ clockTick: tick, actionSequence: before.world.actionSequence + 1 });
+    expect(after.inputs).toEqual(before.inputs);
+    expect(after.logs).toHaveLength(before.logs.length + 1);
+    expect(after.logs.at(-1)).toMatchObject({
+      tick,
+      generalId: 1,
+      commandKey: 'trade',
+      kind: atWar ? 'failure' : 'success',
+    });
+    const income = next.nations[1]!.gold - nation.gold;
+    const basis = ((home.commerce + partner.commerce) / 2) * 0.05;
+    if (atWar) {
+      expect(income).toBe(0);
+      expect(after.logs.at(-1)!.text).toBe('BAD_STATE: 교전 중인 국가와는 교역할 수 없습니다.');
+    } else {
+      expect(income).toBeGreaterThanOrEqual(Math.round(basis * 0.9));
+      expect(income).toBeLessThanOrEqual(Math.round(basis * 1.1));
+      expect(income).toBeGreaterThan(0);
+    }
+    expect(next.nations).toEqual({
+      ...old.nations,
+      1: { ...nation, gold: nation.gold + income, rice: nation.rice + income },
+    });
+    expect(next.cities).toEqual({
+      ...old.cities,
+      1: {
+        ...home,
+        commerce: atWar ? home.commerce : Math.min(home.commerceMax, Math.round(home.commerce * 1.01)),
+        agriculture: atWar ? home.agriculture : Math.min(home.agricultureMax, Math.round(home.agriculture * 1.01)),
+      },
+    });
+    expect(next.generals).toEqual({
+      ...old.generals,
+      1: {
+        ...actor,
+        experience: actor.experience + (atWar ? 0 : 10),
+        dedication: actor.dedication + (atWar ? 0 : 15),
+        nextTurnTick: tick + TICKS_PER_MONTH,
+      },
+    });
+    expect(after.replay.revisions[1]).toBe(2);
+
+    const restarted = await acquireLease(db, worldId);
+    if (!restarted) throw Error('교역 검증을 재시작할 리스가 없습니다.');
+    f.lease = restarted;
+    const loop = new TurnLoop(db, restarted);
+    expect(restarted.fencingToken).toBeGreaterThan(committedToken);
+    expect(await loop.advanceTo(tick)).toEqual([]);
+    expect(await read()).toEqual(after);
+    await loop.advanceTo(TICKS_PER_MONTH);
+    if (!atWar) {
+      expect(value<Output['tradeTargets']>(await call('treaty.tradeTargets')).items).toEqual([]);
+      const expired = await read();
+      expect(expired.replay.state.treaties ?? []).toEqual([]);
+      expect(await db.treaty.findUniqueOrThrow({ where: { worldId_id: { worldId, id: treaty.id } } })).toMatchObject({
+        status: 'ENDED',
+        endTick: TICKS_PER_MONTH,
+      });
+      expect(expired.replay.turns[1]![0]).toMatchObject(command);
+      const nextTick = TICKS_PER_MONTH + tick;
+      await loop.advanceTo(nextTick);
+      const denied = await read();
+      expect(denied.logs).toHaveLength(expired.logs.length + 1);
+      expect(denied.logs.at(-1)).toMatchObject({
+        tick: nextTick,
+        generalId: 1,
+        commandKey: 'trade',
+        kind: 'failure',
+        text: 'BAD_STATE: 교역 조약이 없거나 만료되었습니다.',
+      });
+      expect(denied.replay.state.nations).toEqual(expired.replay.state.nations);
+      expect(denied.replay.state.cities).toEqual(expired.replay.state.cities);
+      await loop.advanceTo(2 * TICKS_PER_MONTH);
+    }
+    await expectSeparateProcessReplay(db, ownUrl, worldId, atWar ? 1 : 2);
+  },
+  90_000,
+);
+
 describe('T2-07 / AC-M2-06·14 조약 후속 실제 HTTP·PG 권한', () => {
+  beforeEach(async () => {
+    f = await fixture();
+    const proposed = await complete('treaty.propose', { toNationId: 2, clauses: [{ kind: 'trade', months: 12 }] });
+    if (proposed.status !== 'applied') throw Error('실제 HTTP 제안 fixture 실패');
+    f.treatyId = proposed.treatyId;
+    const accepted = await complete('treaty.respond', { treatyId: f.treatyId, accept: true }, 5);
+    expect(accepted).toMatchObject({ status: 'applied', outcome: 'ACCEPTED', treatyId: f.treatyId });
+  });
   it(
     'treaty.break success는 실제 입력을 한 번 처리하고 신의·조약·국가 메시지를 저장한다',
     authzCase('treaty.break', 'success', async () => {
@@ -432,6 +655,64 @@ describe('T2-07 / AC-M2-06·14 조약 후속 실제 HTTP·PG 권한', () => {
       ).toEqual(before);
     }),
   );
+  it('AC-M1-14 불가침 조약 파기는 재시작 뒤 중복되지 않고 월말 재생 해시가 일치한다', async () => {
+    const { worldId } = f;
+    const proposed = await complete('treaty.propose', {
+      toNationId: 3,
+      clauses: [{ kind: 'nonAggression', months: 12 }],
+    });
+    expect(proposed).toMatchObject({ status: 'applied', outcome: 'PROPOSED' });
+    if (proposed.status !== 'applied') throw Error('불가침 제안이 저장되지 않았습니다.');
+    const { treatyId } = proposed;
+    const accepted = await complete('treaty.respond', { treatyId, accept: true }, 1);
+    expect(accepted).toMatchObject({ status: 'applied', outcome: 'ACCEPTED' });
+
+    const { clockTick } = await db.world.findUniqueOrThrow({ where: { id: worldId } });
+    const read = () =>
+      Promise.all([
+        db.inputEvent.findMany({ where: { worldId, kind: 'treaty.break' }, orderBy: { id: 'asc' } }),
+        db.treaty.findMany({ where: { worldId }, orderBy: { id: 'asc' } }),
+        db.diplomacy.findMany({ where: { worldId } }),
+        db.nationTrust.findMany({ where: { worldId } }),
+        db.message.findMany({ where: { worldId }, orderBy: { id: 'asc' } }),
+      ]);
+    const { before, committed, retry, stored } = await recoverTreatyInput(
+      'treaty.break',
+      { treatyId },
+      0,
+      clockTick,
+      read,
+    );
+    expect(before[1]).toMatchObject([
+      { id: Number(f.treatyId), status: 'ACTIVE', closedSequence: null },
+      { id: Number(treatyId), status: 'ACTIVE', closedSequence: null },
+    ]);
+    expect(before[2]).toEqual([expect.objectContaining({ nationA: 1, nationB: 3, state: 'NON_AGGRESSION' })]);
+    expect(before[3]).toEqual([]);
+    expect(before[4]).toEqual([]);
+
+    expect(committed[0]).toEqual([stored]);
+    expect(committed[1]).toEqual([
+      before[1][0],
+      { ...before[1][1], status: 'BROKEN', closedSequence: stored!.sequence },
+    ]);
+    expect(committed[2]).toEqual([]);
+    expect(committed[3]).toEqual([{ worldId, nationId: 1, brokenTreaties: 1, lastBrokenTick: clockTick }]);
+    const notices = committed[4].map(({ scope, recipientNationId, body }) => ({ scope, recipientNationId, body }));
+    expect(notices.sort((a, b) => a.recipientNationId! - b.recipientNationId!)).toEqual(
+      [2, 3].map((recipientNationId) => ({
+        scope: 'NATION',
+        recipientNationId,
+        body: '국가1 국가가 조약을 파기했습니다. 지금까지 파기 1회입니다.',
+      })),
+    );
+
+    expect(retry).toMatchObject({ outcome: 'BROKEN', treatyId });
+    expect(await f.loop!.advanceTo(TICKS_PER_MONTH)).toEqual([]);
+    expect(await read()).toEqual(committed);
+    await expectSeparateProcessReplay(db, ownUrl, worldId, 1);
+  }, 90_000);
+
   it(
     'treaty.tradeTargets success는 실제 수락한 교역 조약의 공개 후보만 보인다',
     authzCase('treaty.tradeTargets', 'success', async () =>
@@ -451,7 +732,7 @@ describe('T2-07 / AC-M2-06·14 조약 후속 실제 HTTP·PG 권한', () => {
               ).name,
               nation: { id: 2, name: '국가2', color: '#0000ff' },
               treatyId: f.treatyId,
-              tradeEndsAt: toGameDate(world.startYear, treaty.endTick!),
+              tradeEndsAt: toGameDate(world.startYear, Math.ceil(treaty.endTick! / TICKS_PER_MONTH) * TICKS_PER_MONTH),
             },
           ],
           blocked: null,
@@ -559,4 +840,104 @@ describe('T2-07 / AC-M2-06·14 조약 후속 실제 HTTP·PG 권한', () => {
       }),
     );
   }
+});
+
+describe('T2-07 / AC-M1-14·AC-M2-06 종전·불가침 조약 복구', () => {
+  const cases: {
+    label: string;
+    clause: TreatyClause;
+    atWar: boolean;
+    cost: { from: number; to: number };
+    months: number | null;
+  }[] = [
+    { label: '종전', clause: { kind: 'peace' }, atWar: true, cost: { from: 0, to: 0 }, months: null },
+    {
+      label: '불가침',
+      clause: { kind: 'nonAggression', months: 7 },
+      atWar: false,
+      cost: { from: 59, to: 117 },
+      months: 7,
+    },
+  ];
+
+  it.each(cases)(
+    '$label 제안·수락은 재시작 뒤 중복되지 않고 월말 재생 해시가 일치한다',
+    async ({ clause, atWar, cost, months }) => {
+      f = await fixture(atWar);
+      const { worldId } = f;
+      const clauses = [clause];
+      const read = async () => {
+        const [inputs, treaties, relations, gold] = await Promise.all([
+          db.inputEvent.findMany({ where: { worldId }, orderBy: { id: 'asc' } }),
+          db.treaty.findMany({ where: { worldId }, orderBy: { id: 'asc' } }),
+          db.diplomacy.findMany({ where: { worldId }, orderBy: [{ nationA: 'asc' }, { nationB: 'asc' }] }),
+          db.nation.findMany({ where: { worldId }, select: { id: true, gold: true }, orderBy: { id: 'asc' } }),
+        ]);
+        return { inputs, treaties, relations, gold };
+      };
+      expect(value<Output['quote']>(await call('treaty.quote', { toNationId: 2, clauses }))).toMatchObject({
+        cost: { mine: cost.from, theirs: cost.to },
+        problem: null,
+      });
+
+      const proposedTick = 500;
+      const acceptedTick = 501;
+      const proposed = await recoverTreatyInput('treaty.propose', { toNationId: 2, clauses }, 0, proposedTick, read);
+      const { treatyId } = proposed.retry;
+      expect(proposed.retry).toMatchObject({ outcome: 'PROPOSED' });
+      expect(proposed.before.treaties).toEqual([]);
+      expect(proposed.before.relations).toEqual(
+        atWar ? [{ worldId, nationA: 1, nationB: 2, state: 'WAR', untilTick: 0 }] : [],
+      );
+      expect(proposed.committed.inputs).toEqual([proposed.stored]);
+      expect(proposed.committed.treaties).toEqual([
+        expect.objectContaining({
+          id: Number(treatyId),
+          fromNationId: 1,
+          toNationId: 2,
+          clauses,
+          status: 'PROPOSED',
+          proposedTick,
+          startTick: null,
+          endTick: null,
+          costFrom: null,
+          costTo: null,
+          closedSequence: null,
+        }),
+      ]);
+      expect(proposed.committed.gold).toEqual(proposed.before.gold);
+      expect(proposed.committed.relations).toEqual(proposed.before.relations);
+
+      const accepted = await recoverTreatyInput('treaty.respond', { treatyId, accept: true }, 5, acceptedTick, read);
+      const endTick = months === null ? null : acceptedTick + months * TICKS_PER_MONTH;
+      expect(accepted.retry).toMatchObject({ outcome: 'ACCEPTED', treatyId, treaty: { status: 'ACTIVE', cost } });
+      expect(accepted.committed.inputs).toEqual([proposed.stored, accepted.stored]);
+      expect(accepted.committed.treaties).toEqual([
+        {
+          ...proposed.committed.treaties[0],
+          status: 'ACTIVE',
+          startTick: acceptedTick,
+          endTick,
+          costFrom: cost.from,
+          costTo: cost.to,
+        },
+      ]);
+      expect(accepted.committed.relations).toEqual(
+        endTick === null ? [] : [{ worldId, nationA: 1, nationB: 2, state: 'NON_AGGRESSION', untilTick: endTick }],
+      );
+      expect(accepted.committed.gold).toEqual([
+        { id: 1, gold: 100_000 - cost.from },
+        { id: 2, gold: 100_000 - cost.to },
+        { id: 3, gold: 100_000 },
+      ]);
+      expect(await f.loop!.advanceTo(TICKS_PER_MONTH)).toEqual([]);
+      expect(await read()).toMatchObject({
+        inputs: accepted.committed.inputs,
+        treaties: accepted.committed.treaties,
+        relations: accepted.committed.relations,
+      });
+      await expectSeparateProcessReplay(db, ownUrl, worldId, 1);
+    },
+    90_000,
+  );
 });

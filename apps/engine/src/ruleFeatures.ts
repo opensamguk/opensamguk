@@ -5,12 +5,15 @@ import {
   activityPayloadSchema,
   applyPersonnelInputStep,
   completePersonnelStep,
+  treatyOptions,
+  EXPANDED_TREATY_FEATURE,
   setPolicyPayloadSchema,
   updateResidenceAnchors,
   recordedLineageSuccession,
   reputationInputEvents,
   RELATIONS_FEATURE,
   recordedPossession,
+  type TreatyAidFailure,
   type PersonnelMonthResult,
   type PersonnelStepPacket,
   type ReplayState,
@@ -310,22 +313,26 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
     key: 'treaty',
     loadWorld: async (tx, worldId, state) => ({
       ...state,
-      ...(await loadTreaties(tx, worldId, { tradeEnabled: state.ruleFeatures?.includes('treaty-trade') ?? false })),
+      ...(await loadTreaties(tx, worldId, treatyOptions(state.ruleFeatures ?? []))),
     }),
     queuedInputs: {
       'treaty.propose': (tx, world, event, context) =>
         processTreatyQueuedInput(tx, world, event, {
           ...context,
           treatyTradeEnabled: world.ruleFeatures.includes('treaty-trade'),
+          treatyExpandedEnabled: world.ruleFeatures.includes(EXPANDED_TREATY_FEATURE),
         }),
       'treaty.respond': (tx, world, event, context) =>
         processTreatyQueuedInput(tx, world, event, {
           ...context,
           treatyTradeEnabled: world.ruleFeatures.includes('treaty-trade'),
+          treatyExpandedEnabled: world.ruleFeatures.includes(EXPANDED_TREATY_FEATURE),
         }),
     },
-    async persistMonthly(tx, worldId, before, next, _effects, context) {
+    async persistMonthly(tx, worldId, before, next, effects, context) {
       await persistTreatyClosures(tx, worldId, before.state, next.state, context);
+      for (const failure of effects as readonly TreatyAidFailure[])
+        await appendNationHistory(tx, worldId, context.tick, failure.nationId, failure.text);
     },
   },
   {
@@ -337,10 +344,12 @@ export const builtInEngineFeatures: readonly EngineFeature[] = [
           ...context,
           treatyBreakEnabled: true,
           treatyTradeEnabled: world.ruleFeatures.includes('treaty-trade'),
+          treatyExpandedEnabled: world.ruleFeatures.includes(EXPANDED_TREATY_FEATURE),
         }),
     },
   },
   { key: 'treaty-trade' },
+  { key: EXPANDED_TREATY_FEATURE },
   {
     key: 'reputation-v1',
     async loadReplayState(tx, worldId, replay) {

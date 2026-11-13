@@ -2,6 +2,15 @@ import { z } from 'zod';
 import { TICKS_PER_MONTH } from '../clock/constants';
 import type { DeepReadonly, WorldState } from '../model/world';
 import { canExecuteNationCommand } from '../personnel/permissions';
+import {
+  executeCityTransfer,
+  EXPANDED_TREATY_FEATURE,
+  isExpandedTreatyClause,
+  payMonthlyTribute,
+  returnExpiredVisitors,
+  validTreatyTargets,
+  type TreatyAidFailure,
+} from './treatyClauses';
 import type {
   BrokenTreatyRow,
   ClosedTreatyRow,
@@ -19,14 +28,19 @@ import type {
   TreatyState,
 } from './treatyTypes';
 
-export type TreatyOptions = Readonly<{ tradeEnabled?: boolean }>;
+export type TreatyOptions = Readonly<{ tradeEnabled?: boolean; expandedEnabled?: boolean }>;
 
-function connectedClauses(clauses: readonly TreatyClause[]): ConnectedTreatyClause[] {
-  return clauses.filter((clause): clause is ConnectedTreatyClause => isFirstClause(clause) || clause.kind === 'trade');
+export function treatyOptions(features: readonly string[]): TreatyOptions {
+  return {
+    tradeEnabled: features.includes('treaty-trade'),
+    expandedEnabled: features.includes(EXPANDED_TREATY_FEATURE),
+  };
 }
 
-function longestMonths(clauses: readonly TreatyClause[]): number | null {
-  const periods = clauses.flatMap((c) => (c.kind === 'nonAggression' || c.kind === 'trade' ? [c.months] : []));
+function longestMonths(clauses: DeepReadonly<TreatyClause[]>): number | null {
+  const periods = clauses.flatMap((clause) =>
+    'months' in clause && clause.months !== undefined ? [clause.months] : [],
+  );
   return periods.length ? Math.max(...periods) : null;
 }
 
@@ -111,7 +125,7 @@ const treatyIdSchema = z.string().regex(/^[1-9][0-9]*$/);
 const clauseSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('peace') }),
   z.strictObject({ kind: z.literal('nonAggression'), months: integer }),
-  z.strictObject({ kind: z.literal('passage'), cityKeys: z.array(integer) }),
+  z.strictObject({ kind: z.literal('passage'), cityKeys: z.array(integer), months: integer.optional() }),
   z.strictObject({ kind: z.literal('tribute'), payerNationId: integer, gold: integer, rice: integer, months: integer }),
   z.strictObject({ kind: z.literal('trade'), months: integer }),
   z.strictObject({ kind: z.literal('cityTransfer'), cityKey: integer, giverNationId: integer }),
@@ -293,7 +307,7 @@ export function validateTreatyState(value: unknown, options: TreatyOptions = {})
   const { clauses } = proposeStored.parse({ toNationId: row.toNationId, clauses: row.clauses });
   if (domainClauses(clauses, options)) throw new RangeError('저장된 조약의 조항을 확인하세요.');
   if (row.fromNationId === row.toNationId) throw new RangeError('저장된 조약의 당사국을 확인하세요.');
-  const treaty: TreatyState = { ...row, clauses: connectedClauses(clauses) };
+  const treaty: TreatyState = { ...row, clauses };
   if (treaty.respondByTick !== checkedTickAdd(treaty.proposedTick, RESPONSE_MONTHS))
     throw new RangeError('저장된 조약의 응답 기한을 확인하세요.');
   if (treaty.status === 'PROPOSED') {
@@ -348,7 +362,7 @@ export function validateClosedTreatyRow(value: unknown, options: TreatyOptions =
     )
       throw new RangeError('닫힌 조약의 제안 시각을 확인하세요.');
   }
-  return { ...row, clauses: connectedClauses(clauses) };
+  return { ...row, clauses };
 }
 
 export function validateBrokenTreatyRow(value: unknown, options: TreatyOptions = {}): BrokenTreatyRow {
@@ -494,7 +508,10 @@ export function validateTreatyRecord(value: unknown, context: TreatyRecordContex
     )
       throw new Error('종료 뒤 조약 기록을 확인하세요.');
   } else if (result.tick < context.monthlyTick) throw new Error('이미 정산한 시각보다 앞선 조약 기록입니다.');
-  assertTreatyRecordConsistency(record, { tradeEnabled: context.treatyTrade?.version === 1 });
+  assertTreatyRecordConsistency(record, {
+    tradeEnabled: context.treatyTrade?.version === 1,
+    expandedEnabled: context.treatyExpanded?.version === 1,
+  });
   return record;
 }
 
@@ -531,9 +548,34 @@ function domainClauses(clauses: readonly TreatyClause[], options: TreatyOptions)
     )
   )
     return 'BAD_INPUT';
-  return clauses.some((c) => !isFirstClause(c) && !(options.tradeEnabled && c.kind === 'trade'))
-    ? 'CLAUSE_NOT_CONNECTED'
-    : null;
+  for (const clause of clauses) {
+    if (isFirstClause(clause) || (options.tradeEnabled && clause.kind === 'trade')) continue;
+    if (!options.expandedEnabled || !isExpandedTreatyClause(clause)) return 'CLAUSE_NOT_CONNECTED';
+    if (clause.kind === 'passage') {
+      if (
+        clause.months === undefined ||
+        clause.months < 1 ||
+        clause.months > 120 ||
+        !clause.cityKeys.length ||
+        new Set(clause.cityKeys).size !== clause.cityKeys.length ||
+        clause.cityKeys.some((key) => key < 1)
+      )
+        return 'BAD_INPUT';
+    } else if (clause.kind === 'tribute') {
+      if (
+        clause.payerNationId < 1 ||
+        clause.months < 1 ||
+        clause.months > 120 ||
+        clause.gold < 0 ||
+        clause.gold > 10_000 ||
+        clause.rice < 0 ||
+        clause.rice > 10_000 ||
+        clause.gold + clause.rice === 0
+      )
+        return 'BAD_INPUT';
+    } else if (clause.kind === 'cityTransfer' && (clause.cityKey < 1 || clause.giverNationId < 1)) return 'BAD_INPUT';
+  }
+  return null;
 }
 
 function isFirstClause(clause: TreatyClause): clause is FirstTreatyClause {
@@ -555,6 +597,7 @@ function relationAllowsClauses(current: TreatyRelation, clauses: readonly Connec
   const nonAggression = clauses.some((c) => c.kind === 'nonAggression');
   return (
     (!peace || current === 'WAR' || current === 'DECLARED') &&
+    (peace || !clauses.some(isExpandedTreatyClause) || (current !== 'WAR' && current !== 'DECLARED')) &&
     !(nonAggression && current === 'NON_AGGRESSION') &&
     meetsTreatyPeaceRequirement(current, { peace, nonAggression })
   );
@@ -592,13 +635,12 @@ export function quoteTreatyProposal(
   if (domain === 'BAD_INPUT' || domain === 'CLAUSE_NOT_CONNECTED') return problem(domain);
   if (domain !== null) throw new Error('조약 견적의 조항 판정을 확인하세요.');
   if (proposal.toNationId === proposal.fromNationId || proposal.target === null) return problem('BAD_TARGET');
-  const firstClauses = connectedClauses(clauses);
-  const months = longestMonths(firstClauses);
+  const months = longestMonths(clauses);
   const cost = {
     from: calculateTreatyFee(proposal.fromCityCount, months),
     to: calculateTreatyFee(proposal.target.cityCount, months),
   };
-  if (!relationAllowsClauses(proposal.target.relation, firstClauses)) return problem('TREATY_RELATION', cost);
+  if (!relationAllowsClauses(proposal.target.relation, clauses)) return problem('TREATY_RELATION', cost);
   return { cost, problem: null };
 }
 
@@ -647,10 +689,10 @@ function putTreaties(state: TreatyWorldState, treaties: TreatyState[]): void {
 export function applyTreatyInput(
   state: TreatyView,
   input: TreatyInput & { generalId: number },
-  context: { tick: number; sequence: number; tradeEnabled?: boolean },
+  context: { tick: number; sequence: number } & TreatyOptions,
 ): TreatyApplyResult<TreatyWorldState> {
   const { tick, sequence } = context;
-  const options: TreatyOptions = { tradeEnabled: context.tradeEnabled ?? false };
+  const options = { ...treatyOptions(state.ruleFeatures ?? []), ...context };
   tickSchema.max(MAX_ENGINE_TICK).parse(tick);
   positive.max(MAX_STORED_INT).parse(sequence);
   positive.parse(input.generalId);
@@ -702,6 +744,7 @@ export function applyTreatyInput(
       next.diplomacies = next.diplomacies.filter((entry) => entry !== pair);
     }
     next.nationTrust = nextNationTrust(state.nationTrust, actor.nationId, tick);
+    if (options.expandedEnabled) returnExpiredVisitors(state, next, tick);
     return {
       ok: true,
       state: next,
@@ -714,7 +757,8 @@ export function applyTreatyInput(
     const proposal = proposeStored.parse(payload);
     if (proposal.toNationId === actor.nationId || !state.nations[proposal.toNationId]) return reject('BAD_TARGET');
     if (state.treaties?.some((entry) => entry.id === sequence)) throw new Error('이미 사용한 조약 순서입니다.');
-    const clauses = connectedClauses(proposal.clauses);
+    const clauses = proposal.clauses;
+    if (!validTreatyTargets(state, actor.nationId, proposal.toNationId, clauses)) return reject('BAD_TARGET');
     if (!relationAllows(state, actor.nationId, proposal.toNationId, clauses)) return reject('TREATY_RELATION');
     if (
       !canRepresentTreatyProposal({
@@ -760,6 +804,7 @@ export function applyTreatyInput(
   }
   if (input.kind === 'treaty.respond' && !relationAllows(state, treaty.fromNationId, treaty.toNationId, treaty.clauses))
     return reject('TREATY_RELATION');
+  if (!validTreatyTargets(state, treaty.fromNationId, treaty.toNationId, treaty.clauses)) return reject('BAD_TARGET');
   if (input.kind === 'treaty.propose' && !npc) {
     const next = structuredClone(state) as TreatyWorldState;
     putTreaties(next, [...(next.treaties ?? []), treaty]);
@@ -823,6 +868,7 @@ export function applyTreatyInput(
     next.diplomacies.sort((a, b) => a.nationA - b.nationA || a.nationB - b.nationB);
   }
   putTreaties(next, [...(next.treaties ?? []).filter((entry) => entry.id !== treaty.id), treaty]);
+  if (options.expandedEnabled) executeCityTransfer(next, treaty.fromNationId, treaty.toNationId, treaty.clauses);
   return {
     ok: true,
     state: next,
@@ -832,9 +878,23 @@ export function applyTreatyInput(
 
 // 기존 diplomacy 단계가 관계를 정산한 뒤 같은 월 경계에서 부른다.
 export function settleTreaties(state: TreatyView, tick: number): TreatyWorldState {
+  return settleTreatyState(state, tick, false).state;
+}
+
+export function settleMonthlyTreaties(state: TreatyView, tick: number) {
+  return settleTreatyState(state, tick, true);
+}
+
+function settleTreatyState(
+  state: TreatyView,
+  tick: number,
+  payTribute: boolean,
+): { state: TreatyWorldState; aidFailures: TreatyAidFailure[] } {
   if (!Number.isSafeInteger(tick) || tick <= 0 || tick % TICKS_PER_MONTH !== 0)
     throw new RangeError('월 경계 tick이 필요합니다.');
   const next = structuredClone(state) as TreatyWorldState;
+  const expanded = state.ruleFeatures?.includes(EXPANDED_TREATY_FEATURE);
+  const aidFailures = expanded && payTribute ? payMonthlyTribute(next, tick) : [];
   putTreaties(
     next,
     (next.treaties ?? []).filter(
@@ -844,7 +904,8 @@ export function settleTreaties(state: TreatyView, tick: number): TreatyWorldStat
         (entry.status === 'PROPOSED' ? entry.respondByTick > tick : entry.endTick === null || entry.endTick > tick),
     ),
   );
-  return next;
+  if (expanded) returnExpiredVisitors(state, next, tick);
+  return { state: next, aidFailures };
 }
 
 export function treatyClosures(before: TreatyView, next: TreatyView): TreatyClosure[] {

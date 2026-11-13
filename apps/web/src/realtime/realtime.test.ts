@@ -147,6 +147,26 @@ describe('SSE 재조회와 초안', () => {
     expect(invalidated(client, trpc.turns.get.queryKey({ worldId: WORLD }))).toBe(false);
   });
 
+  it('treaty.new는 조약과 같은 월드의 지도·도시·홈을 다시 읽는다', () => {
+    const client = new QueryClient();
+    const current: QueryKey[] = [
+      trpc.treaty.list.infiniteQueryKey({ worldId: WORLD }),
+      trpc.world.map.queryKey({ worldId: WORLD }),
+      trpc.city.get.queryKey({ worldId: WORLD, cityKey: 1 }),
+      trpc.home.get.queryKey({ worldId: WORLD }),
+    ];
+    const other: QueryKey[] = [
+      trpc.world.map.queryKey({ worldId: 'other' }),
+      trpc.city.get.queryKey({ worldId: 'other', cityKey: 1 }),
+      trpc.home.get.queryKey({ worldId: 'other' }),
+    ];
+    for (const key of [...current, ...other]) client.setQueryData(key, {});
+    applyWorldEvent(client, trpc, WORLD, { kind: 'treaty.new' });
+    expect(current.every((key) => invalidated(client, key))).toBe(true);
+    expect(other.some((key) => invalidated(client, key))).toBe(false);
+    client.clear();
+  });
+
   it('ready는 전체를 다시 조회하지만 캐시 밖의 초안은 건드리지 않는다', () => {
     const client = new QueryClient();
     seed(client);
