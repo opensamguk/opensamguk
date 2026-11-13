@@ -600,6 +600,20 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
     expect(own.cities[0]).toHaveProperty('population', state.cities[0]!.population);
     expect(own.cities[0]).toHaveProperty('populationMax', state.cities[0]!.populationMax);
     expect(own).toHaveProperty('salaryRate', 0.5);
+    expect(own.cities[0]).toHaveProperty('incomeEstimate.gold', own.financeEstimate?.gold.gross);
+    expect(own.cities[0]).toHaveProperty('incomeEstimate.rice', own.financeEstimate?.rice.gross);
+    expect(enemy.cities[0]).not.toHaveProperty('incomeEstimate');
+    const home = (await query('home.get', { worldId })).data;
+    expect(home.nation).toMatchObject({
+      population: own.population,
+      populationMax: own.populationMax,
+      salaryRate: own.salaryRate,
+      financeEstimate: own.financeEstimate,
+    });
+    expect(home.general.salaryEstimate).toEqual({
+      gold: own.financeEstimate?.gold.perGeneral,
+      rice: own.financeEstimate?.rice.perGeneral,
+    });
   });
 
   it('AC-M1-19 소유 도시를 자국에서만 지역과 규모 기준으로 정렬한다', async () => {
@@ -638,6 +652,7 @@ describe('T1-12 / AC-M1-19 실제 TCP HTTP·PostgreSQL 조회', () => {
   it('재야 home은 국가 null·본인 상세만 반환하고 없는 예턴을 휴식5개로 채운다', async () => {
     const { data } = await query('home.get', { worldId }, users[2]!.cookie);
     expect(data.nation).toBeNull();
+    expect(data.general).not.toHaveProperty('salaryEstimate');
     expect(data.general).toMatchObject({ id: 4, nationId: null, gold: 11004 });
     expect(data.turnsPreview).toEqual(
       Array.from({ length: 5 }, (_, slot) => ({ slot, commandKey: 'rest', args: {}, name: '휴식', explicit: false })),
