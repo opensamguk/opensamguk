@@ -115,6 +115,8 @@ describe('SSE 알림 해석', () => {
       trpc.personnel.officers.queryKey({ worldId: WORLD }),
       trpc.equipment.mine.queryKey({ worldId: WORLD }),
       trpc.world.summary.queryKey({ worldId: WORLD }),
+      trpc.nation.get.queryKey({ worldId: WORLD }),
+      trpc.ranking.nations.queryKey({ worldId: WORLD }),
       trpc.home.get.queryKey({ worldId: WORLD }),
       trpc.world.map.queryKey({ worldId: WORLD }),
       trpc.advice.get.queryKey({ worldId: WORLD }),
